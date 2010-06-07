@@ -571,6 +571,8 @@ int libxl_device_net2_add(struct libxl_ctx *ctx, uint32_t domid,
                           libxl_device_net2 *net2);
 libxl_net2info *libxl_device_net2_list(struct libxl_ctx *ctx, uint32_t domid,
                                        unsigned int *nb);
+int libxl_device_net2_del(struct libxl_ctx *ctx, libxl_device_net2 *net2,
+                          int wait);
 
 /* common paths */
 const char *libxl_sbindir_path(void);

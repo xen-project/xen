@@ -1756,6 +1756,20 @@ libxl_net2info *libxl_device_net2_list(struct libxl_ctx *ctx, uint32_t domid, un
     return res;
 }
 
+int libxl_device_net2_del(struct libxl_ctx *ctx, libxl_device_net2 *net2, int wait)
+{
+    libxl_device device;
+
+    device.backend_devid    = net2->devid;
+    device.backend_domid    = net2->backend_domid;
+    device.backend_kind     = DEVICE_VIF2;
+    device.devid            = net2->devid;
+    device.domid            = net2->domid;
+    device.kind             = DEVICE_VIF2;
+
+    return libxl_device_del(ctx, &device, wait);
+}
+
 
 /******************************************************************************/
 int libxl_device_console_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_console *console)

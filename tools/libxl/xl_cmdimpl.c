@@ -3922,6 +3922,41 @@ int main_network2list(int argc, char **argv)
     exit(0);
 }
 
+int main_network2detach(int argc, char **argv)
+{
+    int opt;
+    libxl_device_net2 net2;
+
+    if (argc != 4) {
+        help("network2-detach");
+        exit(0);
+    }
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("network2-detach");
+            exit(0);
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    if (domain_qualifier_to_domid(argv[2], &domid, 0) < 0) {
+        fprintf(stderr, "%s is an invalid domain identifier\n", argv[2]);
+        exit(1);
+    }
+    if (libxl_devid_to_device_net2(&ctx, domid, argv[3], &net2)) {
+       fprintf(stderr, "Error: Device %s not connected.\n", argv[3]);
+        exit(1);
+    }
+    if (libxl_device_net2_del(&ctx, &net2, 1)) {
+        fprintf(stderr, "libxl_device_net2_del failed.\n");
+        exit(1);
+    }
+    exit(0);
+}
+
 static char *uptime_to_string(unsigned long time, int short_mode)
 {
     int sec, min, hour, day;

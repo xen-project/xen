@@ -300,6 +300,11 @@ struct cmd_spec cmd_table[] = {
       "list version 2 virtual network interfaces for a domain",
       "<Domain(s)>",
     },
+    { "network2-detach",
+      &main_network2detach,
+      "destroy a domain's version 2 virtual network device",
+      "<Domain> <DevId>",
+    },
 };
 
 int cmdtable_len = sizeof(cmd_table)/sizeof(struct cmd_spec);

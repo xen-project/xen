@@ -65,5 +65,8 @@ int libxl_devid_to_device_disk(struct libxl_ctx *ctx, uint32_t domid,
 
 int libxl_strtomac(const char *mac_s, uint8_t *mac);
 
+int libxl_devid_to_device_net2(struct libxl_ctx *ctx, uint32_t domid,
+                               const char *devid, libxl_device_net2 *net2);
+
 #endif
 

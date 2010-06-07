@@ -468,6 +468,54 @@ int libxl_devid_to_device_disk(struct libxl_ctx *ctx, uint32_t domid,
     return 0;
 }
 
+int libxl_devid_to_device_net2(struct libxl_ctx *ctx, uint32_t domid,
+                               const char *devid, libxl_device_net2 *net2)
+{
+    char *tok, *endptr, *val;
+    char *dompath, *net2path, *be_path;
+    unsigned int devid_n, i;
+
+    devid_n = strtoul(devid, &endptr, 10);
+    if (devid == endptr) {
+        return ERROR_INVAL;
+    }
+    dompath = libxl_xs_get_dompath(ctx, domid);
+    net2path = libxl_sprintf(ctx, "%s/device/vif2/%s", dompath, devid);
+    if (!net2path) {
+        return ERROR_FAIL;
+    }
+    memset(net2, 0, sizeof (libxl_device_net2));
+    be_path = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/backend", net2path));
+
+    net2->devid = devid_n;
+    val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/mac", net2path));
+    for (i = 0, tok = strtok(val, ":"); tok && (i < 6);
+         ++i, tok = strtok(NULL, ":")) {
+        net2->front_mac[i] = strtoul(tok, NULL, 16);
+    }
+    val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/remote-mac", net2path));
+    for (i = 0, tok = strtok(val, ":"); tok && (i < 6);
+         ++i, tok = strtok(NULL, ":")) {
+        net2->back_mac[i] = strtoul(tok, NULL, 16);
+    }
+    val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/backend-id", net2path));
+    net2->backend_domid = strtoul(val, NULL, 10);
+
+    net2->domid = domid;
+    val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/remote-trusted", be_path));
+    net2->trusted = strtoul(val, NULL, 10);
+    val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/local-trusted", be_path));
+    net2->back_trusted = strtoul(val, NULL, 10);
+    val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/filter-mac", be_path));
+    net2->filter_mac = strtoul(val, NULL, 10);
+    val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/filter-mac", net2path));
+    net2->front_filter_mac = strtoul(val, NULL, 10);
+    val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/max-bypasses", be_path));
+    net2->max_bypasses = strtoul(val, NULL, 10);
+
+    return 0;
+}
+
 int libxl_strtomac(const char *mac_s, uint8_t *mac)
 {
     const char *end = mac_s + 17;
