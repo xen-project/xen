@@ -72,6 +72,7 @@ int main_tmem_destroy(int argc, char **argv);
 int main_tmem_thaw(int argc, char **argv);
 int main_tmem_set(int argc, char **argv);
 int main_tmem_shared_auth(int argc, char **argv);
+int main_network2attach(int argc, char **argv);
 
 void help(char *command);
 

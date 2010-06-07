@@ -68,6 +68,7 @@ void xl_log(struct libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
 
 typedef enum {
     DEVICE_VIF = 1,
+    DEVICE_VIF2,
     DEVICE_VBD,
     DEVICE_TAP,
     DEVICE_PCI,

@@ -287,6 +287,14 @@ struct cmd_spec cmd_table[] = {
       "                                 (abcdef01-2345-6789-1234-567890abcdef)\n"
       "  -A AUTH                        0=auth,1=deauth",
     },
+    { "network2-attach",
+      &main_network2attach,
+      "Create a new version 2 virtual network device",
+      "<Domain> [front_mac=<mac>] [back_mac=<mac>] [backend=<BackDomain>]"
+      " [trusted=<0|1>] [back_trusted=<0|1>] [bridge=<bridge>]"
+      " [filter_mac=<0|1>] [front_filter_mac=<0|1>] [pdev=<PDEV>]"
+      " [max_bypasses=n]",
+    },
 };
 
 int cmdtable_len = sizeof(cmd_table)/sizeof(struct cmd_spec);

@@ -467,3 +467,18 @@ int libxl_devid_to_device_disk(struct libxl_ctx *ctx, uint32_t domid,
 
     return 0;
 }
+
+int libxl_strtomac(const char *mac_s, uint8_t *mac)
+{
+    const char *end = mac_s + 17;
+    char val, *endptr;
+
+    for (; mac_s < end; mac_s += 3, ++mac) {
+        val = strtoul(mac_s, &endptr, 16);
+        if (endptr != (mac_s + 2)) {
+            return ERROR_INVAL;
+        }
+        *mac = val;
+    }
+    return 0;
+}

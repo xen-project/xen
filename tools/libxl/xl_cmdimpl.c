@@ -264,6 +264,29 @@ static void init_nic_info(libxl_device_nic *nic_info, int devnum)
     nic_info->nictype = NICTYPE_IOEMU;
 }
 
+static void init_net2_info(libxl_device_net2 *net2_info, int devnum)
+{
+    memset(net2_info, '\0', sizeof(*net2_info));
+
+    net2_info->devid = devnum;
+    net2_info->front_mac[0] = 0x00;
+    net2_info->front_mac[1] = 0x16;
+    net2_info->front_mac[2] = 0x3e;;
+    net2_info->front_mac[3] = 1 + (int) (0x7f * (rand() / (RAND_MAX + 1.0)));
+    net2_info->front_mac[4] = 1 + (int) (0xff * (rand() / (RAND_MAX + 1.0)));
+    net2_info->front_mac[5] = 1 + (int) (0xff * (rand() / (RAND_MAX + 1.0)));
+    net2_info->back_mac[0] = 0x00;
+    net2_info->back_mac[1] = 0x16;
+    net2_info->back_mac[2] = 0x3e;
+    net2_info->back_mac[3] = 1 + (int) (0x7f * (rand() / (RAND_MAX + 1.0)));
+    net2_info->back_mac[4] = 1 + (int) (0xff * (rand() / (RAND_MAX + 1.0)));
+    net2_info->back_mac[5] = 1 + (int) (0xff * (rand() / (RAND_MAX + 1.0)));
+    net2_info->back_trusted = 1;
+    net2_info->filter_mac = 1;
+    net2_info->max_bypasses = 5;
+    net2_info->bridge = "xenbr0";
+}
+
 static void init_vfb_info(libxl_device_vfb *vfb, int dev_num)
 {
     memset(vfb, 0x00, sizeof(libxl_device_vfb));
@@ -429,6 +452,8 @@ static void parse_config_data(const char *configfile_filename_report,
                               int *num_disks,
                               libxl_device_nic **vifs,
                               int *num_vifs,
+                              libxl_device_net2 **vif2s,
+                              int *num_vif2s,
                               libxl_device_pci **pcidevs,
                               int *num_pcidevs,
                               libxl_device_vfb **vfbs,
@@ -440,7 +465,7 @@ static void parse_config_data(const char *configfile_filename_report,
     const char *buf;
     long l;
     XLU_Config *config;
-    XLU_ConfigList *vbds, *nics, *pcis, *cvfbs;
+    XLU_ConfigList *vbds, *nics, *pcis, *cvfbs, *net2s;
     int pci_power_mgmt = 0;
     int pci_msitranslate = 1;
     int i, e;
@@ -675,6 +700,46 @@ skip:
         }
     }
 
+    if (!xlu_cfg_get_list(config, "vif2", &net2s, 0)) {
+        *num_vif2s = 0;
+        *vif2s = NULL;
+        while ((buf = xlu_cfg_get_listitem(net2s, *num_vif2s))) {
+            char *buf2 = strdup(buf);
+            char *p;
+
+            *vif2s = realloc(*vif2s, sizeof (libxl_device_net2) * (*num_vif2s + 1));
+            init_net2_info(*vif2s + *num_vif2s, *num_vif2s);
+
+            for (p = strtok(buf2, ","); p; p = strtok(buf2, ",")) {
+                while (isblank(*p))
+                    p++;
+                if (!strncmp("front_mac=", p, 10)) {
+                    libxl_strtomac(p + 10, (*vif2s)[*num_vif2s].front_mac);
+                } else if (!strncmp("back_mac=", p, 9)) {
+                    libxl_strtomac(p + 9, (*vif2s)[*num_vif2s].back_mac);
+                } else if (!strncmp("backend=", p, 8)) {
+                    domain_qualifier_to_domid(p + 8, &((*vif2s)[*num_vif2s].backend_domid), 0);
+                } else if (!strncmp("trusted=", p, 8)) {
+                    (*vif2s)[*num_vif2s].trusted = (*(p + 8) == '1');
+                } else if (!strncmp("back_trusted=", p, 13)) {
+                    (*vif2s)[*num_vif2s].back_trusted = (*(p + 13) == '1');
+                } else if (!strncmp("bridge=", p, 7)) {
+                    (*vif2s)[*num_vif2s].bridge = strdup(p + 13);
+                } else if (!strncmp("filter_mac=", p, 11)) {
+                    (*vif2s)[*num_vif2s].filter_mac = (*(p + 11) == '1');
+                } else if (!strncmp("front_filter_mac=", p, 17)) {
+                    (*vif2s)[*num_vif2s].front_filter_mac = (*(p + 17) == '1');
+                } else if (!strncmp("pdev=", p, 5)) {
+                    (*vif2s)[*num_vif2s].pdev = strtoul(p + 5, NULL, 10);
+                } else if (!strncmp("max_bypasses=", p, 13)) {
+                    (*vif2s)[*num_vif2s].max_bypasses = strtoul(p + 13, NULL, 10);
+                }
+            }
+            free(buf2);
+            ++(*num_vif2s);
+        }
+    }
+
     if (!xlu_cfg_get_list (config, "vfb", &cvfbs, 0)) {
         *num_vfbs = 0;
         *num_vkbs = 0;
@@ -850,6 +915,7 @@ static int create_domain(struct domain_create *dom_info)
     libxl_device_model_info dm_info;
     libxl_device_disk *disks = NULL;
     libxl_device_nic *vifs = NULL;
+    libxl_device_net2 *vif2s = NULL;
     libxl_device_pci *pcidevs = NULL;
     libxl_device_vfb *vfbs = NULL;
     libxl_device_vkb *vkbs = NULL;
@@ -864,7 +930,7 @@ static int create_domain(struct domain_create *dom_info)
     int migrate_fd = dom_info->migrate_fd;
     char **migration_domname_r = dom_info->migration_domname_r;
 
-    int num_disks = 0, num_vifs = 0, num_pcidevs = 0, num_vfbs = 0, num_vkbs = 0;
+    int num_disks = 0, num_vifs = 0, num_vif2s = 0, num_pcidevs = 0, num_vfbs = 0, num_vkbs = 0;
     int i, fd;
     int need_daemon = 1;
     int ret, rc;
@@ -976,7 +1042,7 @@ static int create_domain(struct domain_create *dom_info)
 
     printf("Parsing config file %s\n", config_file);
 
-    parse_config_data(config_file, config_data, config_len, &info1, &info2, &disks, &num_disks, &vifs, &num_vifs, &pcidevs, &num_pcidevs, &vfbs, &num_vfbs, &vkbs, &num_vkbs, &dm_info);
+    parse_config_data(config_file, config_data, config_len, &info1, &info2, &disks, &num_disks, &vifs, &num_vifs, &vif2s, &num_vif2s, &pcidevs, &num_pcidevs, &vfbs, &num_vfbs, &vkbs, &num_vkbs, &dm_info);
 
     if (migrate_fd >= 0) {
         if (info1.name) {
@@ -1045,6 +1111,17 @@ start:
             fprintf(stderr, "cannot add nic %d to domain: %d\n", i, ret);
             ret = ERROR_FAIL;
             goto error_out;
+        }
+    }
+    if (!info1.hvm) {
+        for (i = 0; i < num_vif2s; i++) {
+            vif2s[i].domid = domid;
+            ret = libxl_device_net2_add(&ctx, domid, &(vif2s[i]));
+            if (ret) {
+                fprintf(stderr, "cannot add net2 %d to domain: %d\n", i, ret);
+                ret = ERROR_FAIL;
+                goto error_out;
+            }
         }
     }
     if (info1.hvm) {
@@ -3700,6 +3777,102 @@ int main_blockdetach(int argc, char **argv)
     }
     if (libxl_device_disk_del(&ctx, &disk, 1)) {
         fprintf(stderr, "libxl_device_del failed.\n");
+    }
+    exit(0);
+}
+
+int main_network2attach(int argc, char **argv)
+{
+    int opt;
+    char *tok, *endptr;
+    char *back_dom = NULL;
+    uint32_t domid, back_domid;
+    unsigned int val, i;
+    libxl_device_net2 net2;
+
+    if ((argc < 3) || (argc > 12)) {
+        help("network2-attach");
+        exit(0);
+    }
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("network2-attach");
+            exit(0);
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    if (domain_qualifier_to_domid(argv[2], &domid, 0) < 0) {
+        fprintf(stderr, "%s is an invalid domain identifier\n", argv[1]);
+        exit(1);
+    }
+    init_net2_info(&net2, -1);
+    for (argv += 3, argc -= 3; argc > 0; --argc, ++argv) {
+        if (!strncmp("front_mac=", *argv, 10)) {
+            tok = strtok((*argv) + 10, ":");
+            for (i = 0; tok && i < 6; tok = strtok(NULL, ":"), ++i) {
+                val = strtoul(tok, &endptr, 16);
+                if ((tok == endptr) || (val > 255)) {
+                    fprintf(stderr, "Invalid parameter `front_mac'.\n");
+                    exit(1);
+                }
+                net2.front_mac[i] = val;
+            }
+        } else if (!strncmp("back_mac=", *argv, 9)) {
+            tok = strtok((*argv) + 10, ":");
+            for (i = 0; tok && i < 6; tok = strtok(NULL, ":"), ++i) {
+                val = strtoul(tok, &endptr, 16);
+                if ((tok == endptr) || (val > 255)) {
+                    fprintf(stderr, "Invalid parameter back_mac=%s.\n", *argv + 9);
+                    exit(1);
+                }
+                net2.back_mac[i] = val;
+            }
+        } else if (!strncmp("backend=", *argv, 8)) {
+            back_dom = *argv;
+        } else if (!strncmp("trusted=", *argv, 8)) {
+            net2.trusted = (*((*argv) + 8) == '1');
+        } else if (!strncmp("back_trusted=", *argv, 13)) {
+            net2.back_trusted = (*((*argv) + 13) == '1');
+        } else if (!strncmp("bridge=", *argv, 7)) {
+            net2.bridge = *argv + 13;
+        } else if (!strncmp("filter_mac=", *argv, 11)) {
+            net2.filter_mac = (*((*argv) + 11) == '1');
+        } else if (!strncmp("front_filter_mac=", *argv, 17)) {
+            net2.front_filter_mac = (*((*argv) + 17) == '1');
+        } else if (!strncmp("pdev=", *argv, 5)) {
+            val = strtoul(*argv + 5, &endptr, 10);
+            if (endptr == (*argv + 5)) {
+                fprintf(stderr, "Invalid parameter pdev=%s.\n", *argv + 5);
+                exit(1);
+            }
+            net2.pdev = val;
+        } else if (!strncmp("max_bypasses=", *argv, 13)) {
+            val = strtoul(*argv + 13, &endptr, 10);
+            if (endptr == (*argv + 13)) {
+                fprintf(stderr, "Invalid parameter max_bypasses=%s.\n", *argv + 13);
+                exit(1);
+            }
+            net2.max_bypasses = val;
+        } else {
+            fprintf(stderr, "unrecognized argument `%s'\n", *argv);
+            exit(1);
+        }
+    }
+
+    if (back_dom) {
+        if (domain_qualifier_to_domid(back_dom, &back_domid, 0) < 0) {
+            fprintf(stderr, "%s is an invalid domain identifier\n", back_dom);
+            exit(1);
+        }
+    }
+    net2.domid = domid;
+    net2.backend_domid = back_domid;
+    if (libxl_device_net2_add(&ctx, domid, &net2)) {
+        fprintf(stderr, "libxl_device_net2_add failed.\n");
     }
     exit(0);
 }

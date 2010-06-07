@@ -242,6 +242,21 @@ typedef struct {
     libxl_nic_type nictype;
 } libxl_device_nic;
 
+typedef struct {
+    int devid;
+    uint8_t front_mac[6];
+    uint8_t back_mac[6];
+    uint32_t backend_domid;
+    uint32_t domid;
+    uint32_t trusted:1;
+    uint32_t back_trusted:1;
+    uint32_t filter_mac:1;
+    uint32_t front_filter_mac:1;
+    uint32_t pdev;
+    uint32_t max_bypasses;
+    char *bridge;
+} libxl_device_net2;
+
 typedef struct  {
     union {
         unsigned int value;
@@ -538,6 +553,9 @@ int libxl_tmem_set(struct libxl_ctx *ctx, uint32_t domid, char* name,
                    uint32_t set);
 int libxl_tmem_shared_auth(struct libxl_ctx *ctx, uint32_t domid, char* uuid,
                            int auth);
+
+int libxl_device_net2_add(struct libxl_ctx *ctx, uint32_t domid,
+                          libxl_device_net2 *net2);
 
 /* common paths */
 const char *libxl_sbindir_path(void);

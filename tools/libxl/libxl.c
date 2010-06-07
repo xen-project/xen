@@ -1590,6 +1590,109 @@ libxl_nicinfo *libxl_list_nics(struct libxl_ctx *ctx, uint32_t domid, unsigned i
     return res;
 }
 
+/******************************************************************************/
+int libxl_device_net2_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_net2 *net2)
+{
+    flexarray_t *front, *back;
+    unsigned int boffset = 0, foffset = 0;
+    libxl_device device;
+    char *dompath, *dom, **l;
+    unsigned int nb;
+
+    front = flexarray_make(16, 1);
+    if (!front)
+        return ERROR_NOMEM;
+    back = flexarray_make(16, 1);
+    if (!back)
+        return ERROR_NOMEM;
+
+    if (!(dompath = libxl_xs_get_dompath(ctx, domid))) {
+        return ERROR_FAIL;
+    }
+    dom = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/name", dompath));
+
+    if (net2->devid == -1) {
+        if (!(l = libxl_xs_directory(ctx, XBT_NULL,
+                                     libxl_sprintf(ctx, "%s/device/vif2", dompath), &nb))) {
+            net2->devid = 0;
+        } else {
+            net2->devid = strtoul(l[nb - 1], NULL, 10) + 1;
+            libxl_free(ctx, l);
+        }
+    }
+
+    device.backend_devid = net2->devid;
+    device.backend_domid = net2->backend_domid;
+    device.backend_kind = DEVICE_VIF2;
+    device.devid = net2->devid;
+    device.domid = net2->domid;
+    device.kind = DEVICE_VIF2;
+
+    flexarray_set(back, boffset++, "domain");
+    flexarray_set(back, boffset++, dom);
+    flexarray_set(back, boffset++, "frontend-id");
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", net2->domid));
+
+    flexarray_set(back, boffset++, "local-trusted");
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", net2->back_trusted));
+    flexarray_set(back, boffset++, "mac");
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%02x:%02x:%02x:%02x:%02x:%02x",
+                                                 net2->back_mac[0], net2->back_mac[1],
+                                                 net2->back_mac[2], net2->back_mac[3],
+                                                 net2->back_mac[4], net2->back_mac[5]));
+
+    flexarray_set(back, boffset++, "remote-trusted");
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", net2->trusted));
+    flexarray_set(back, boffset++, "remote-mac");
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%02x:%02x:%02x:%02x:%02x:%02x",
+                                                 net2->front_mac[0], net2->front_mac[1],
+                                                 net2->front_mac[2], net2->front_mac[3],
+                                                 net2->front_mac[4], net2->front_mac[5]));
+
+    flexarray_set(back, boffset++, "max-bypasses");
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", net2->max_bypasses));
+    flexarray_set(back, boffset++, "filter-mac");
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", !!(net2->filter_mac)));
+    flexarray_set(back, boffset++, "handle");
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", net2->devid));
+    flexarray_set(back, boffset++, "online");
+    flexarray_set(back, boffset++, "1");
+    flexarray_set(back, boffset++, "state");
+    flexarray_set(back, boffset++, "1");
+
+    flexarray_set(front, foffset++, "backend-id");
+    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", net2->backend_domid));
+
+    flexarray_set(front, foffset++, "local-trusted");
+    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", net2->trusted));
+    flexarray_set(front, foffset++, "mac");
+    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%02x:%02x:%02x:%02x:%02x:%02x",
+                                                  net2->front_mac[0], net2->front_mac[1],
+                                                  net2->front_mac[2], net2->front_mac[3],
+                                                  net2->front_mac[4], net2->front_mac[5]));
+
+    flexarray_set(front, foffset++, "remote-trusted");
+    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", net2->back_trusted));
+    flexarray_set(front, foffset++, "remote-mac");
+    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%02x:%02x:%02x:%02x:%02x:%02x",
+                                                  net2->back_mac[0], net2->back_mac[1],
+                                                  net2->back_mac[2], net2->back_mac[3],
+                                                  net2->back_mac[4], net2->back_mac[5]));
+
+    flexarray_set(front, foffset++, "filter-mac");
+    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", !!(net2->filter_mac)));
+    flexarray_set(front, foffset++, "state");
+    flexarray_set(front, foffset++, "1");
+
+    libxl_device_generic_add(ctx, &device,
+                             libxl_xs_kvs_of_flexarray(ctx, back, boffset),
+                             libxl_xs_kvs_of_flexarray(ctx, front, foffset));
+
+    /* FIXME: wait for plug */
+    flexarray_free(back);
+    flexarray_free(front);
+    return 0;
+}
 
 /******************************************************************************/
 int libxl_device_console_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_console *console)
