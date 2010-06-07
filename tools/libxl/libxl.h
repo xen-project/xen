@@ -554,8 +554,23 @@ int libxl_tmem_set(struct libxl_ctx *ctx, uint32_t domid, char* name,
 int libxl_tmem_shared_auth(struct libxl_ctx *ctx, uint32_t domid, char* uuid,
                            int auth);
 
+typedef struct {
+    char *backend;
+    uint32_t backend_id;
+    char *frontend;
+    uint32_t frontend_id;
+    int devid;
+    int state;
+    uint8_t mac[6];
+    int trusted;
+    uint8_t back_mac[6];
+    int filter_mac;
+} libxl_net2info;
+
 int libxl_device_net2_add(struct libxl_ctx *ctx, uint32_t domid,
                           libxl_device_net2 *net2);
+libxl_net2info *libxl_device_net2_list(struct libxl_ctx *ctx, uint32_t domid,
+                                       unsigned int *nb);
 
 /* common paths */
 const char *libxl_sbindir_path(void);

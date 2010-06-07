@@ -1694,6 +1694,69 @@ int libxl_device_net2_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_ne
     return 0;
 }
 
+libxl_net2info *libxl_device_net2_list(struct libxl_ctx *ctx, uint32_t domid, unsigned int *nb)
+{
+    char *dompath, *net2_path_fe;
+    char **l;
+    char *val, *tok;
+    unsigned int nb_net2s, i;
+    libxl_net2info *res, *net2s;
+
+    dompath = libxl_xs_get_dompath(ctx, domid);
+    if (!dompath) {
+        return NULL;
+    }
+    l = libxl_xs_directory(ctx, XBT_NULL,
+                           libxl_sprintf(ctx, "%s/device/vif2", dompath), &nb_net2s);
+    if (!l) {
+        return NULL;
+    }
+    res = libxl_calloc(ctx, nb_net2s, sizeof (libxl_net2info));
+    if (!res) {
+        libxl_free(ctx, l);
+        return NULL;
+    }
+    net2s = res;
+    for (*nb = nb_net2s; nb_net2s > 0; --nb_net2s, ++l, ++net2s) {
+        net2_path_fe = libxl_sprintf(ctx, "%s/device/vif2/%s", dompath, *l);
+
+        net2s->backend = libxl_xs_read(ctx, XBT_NULL,
+                                       libxl_sprintf(ctx, "%s/backend", net2_path_fe));
+        val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/backend-id", net2_path_fe));
+        net2s->backend_id = val ? strtoul(val, NULL, 10) : -1;
+
+        net2s->devid = strtoul(*l, NULL, 10);
+        val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/state", net2_path_fe));
+        net2s->state = val ? strtoul(val, NULL, 10) : -1;
+
+        val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/mac", net2_path_fe));
+        for (i = 0, tok = strtok(val, ":"); tok && (i < 6);
+             ++i, tok = strtok(NULL, ":")) {
+            net2s->mac[i] = strtoul(tok, NULL, 16);
+        }
+        val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/remote-trusted", net2_path_fe));
+        net2s->trusted = val ? strtoul(val, NULL, 10) : -1;
+
+        val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/remote-mac", net2_path_fe));
+        for (i = 0, tok = strtok(val, ":"); tok && (i < 6);
+             ++i, tok = strtok(NULL, ":")) {
+            net2s->back_mac[i] = strtoul(tok, NULL, 16);
+        }
+        val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/filter-mac", net2_path_fe));
+        net2s->filter_mac = val ? strtoul(val, NULL, 10) : -1;
+
+        net2s->frontend = libxl_xs_read(ctx, XBT_NULL,
+                                        libxl_sprintf(ctx, "%s/frontend", net2s->backend));
+        val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/frontend-id", net2s->backend));
+        net2s->frontend_id = val ? strtoul(val, NULL, 10) : -1;
+        libxl_free(ctx, net2_path_fe);
+    }
+
+    libxl_free(ctx, l);
+    return res;
+}
+
+
 /******************************************************************************/
 int libxl_device_console_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_console *console)
 {

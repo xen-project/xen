@@ -295,6 +295,11 @@ struct cmd_spec cmd_table[] = {
       " [filter_mac=<0|1>] [front_filter_mac=<0|1>] [pdev=<PDEV>]"
       " [max_bypasses=n]",
     },
+    { "network2-list",
+      &main_network2list,
+      "list version 2 virtual network interfaces for a domain",
+      "<Domain(s)>",
+    },
 };
 
 int cmdtable_len = sizeof(cmd_table)/sizeof(struct cmd_spec);

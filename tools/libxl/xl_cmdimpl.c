@@ -3877,6 +3877,51 @@ int main_network2attach(int argc, char **argv)
     exit(0);
 }
 
+int main_network2list(int argc, char **argv)
+{
+    int opt;
+    unsigned int nb;
+    libxl_net2info *net2s;
+
+    if (argc < 3) {
+        help("network2-list");
+        exit(0);
+    }
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("network2-list");
+            exit(0);
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    printf("%-3s %-2s %-5s %-17s %-17s %-7s %-6s %-30s\n",
+           "Idx", "BE", "state", "Mac Addr.", "Remote Mac Addr.",
+           "trusted", "filter", "backend");
+    for (argv += 2, argc -=2; argc > 0; --argc, ++argv) {
+        if (domain_qualifier_to_domid(*argv, &domid, 0) < 0) {
+            fprintf(stderr, "%s is an invalid domain identifier\n", *argv);
+            continue;
+        }
+        if ((net2s = libxl_device_net2_list(&ctx, domid, &nb))) {
+            for (; nb > 0; --nb, ++net2s) {
+                printf("%3d %2d %5d ", net2s->devid, net2s->backend_id, net2s->state);
+                printf("%02x:%02x:%02x:%02x:%02x:%02x ",
+                       net2s->mac[0], net2s->mac[1], net2s->mac[2],
+                       net2s->mac[3], net2s->mac[4], net2s->mac[5]);
+                printf("%02x:%02x:%02x:%02x:%02x:%02x ",
+                       net2s->back_mac[0], net2s->back_mac[1], net2s->back_mac[2],
+                       net2s->back_mac[3], net2s->back_mac[4], net2s->back_mac[5]);
+                printf("%-7d %-6d %-30s\n", net2s->trusted, net2s->filter_mac, net2s->backend);
+            }
+        }
+    }
+    exit(0);
+}
+
 static char *uptime_to_string(unsigned long time, int short_mode)
 {
     int sec, min, hour, day;
