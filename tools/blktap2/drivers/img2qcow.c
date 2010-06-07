@@ -41,7 +41,6 @@
 #include <zlib.h>
 #include <inttypes.h>
 #include <libaio.h>
-#include <openssl/md5.h>
 
 #include "bswap.h"
 #include "aes.h"

@@ -33,10 +33,10 @@
 #include <zlib.h>
 #include <inttypes.h>
 #include <libaio.h>
-#include <openssl/md5.h>
 #include <limits.h>
 #include "bswap.h"
 #include "aes.h"
+#include "md5.h"
 
 #include "tapdisk.h"
 #include "tapdisk-driver.h"
@@ -80,46 +80,16 @@ struct qcow_request {
 
 static int decompress_cluster(struct tdqcow_state *s, uint64_t cluster_offset);
 
-#ifdef USE_GCRYPT
-
-#include <gcrypt.h>
-
 uint32_t gen_cksum(char *ptr, int len)
 {
   int i;
   uint32_t md[4];
 
   /* Generate checksum */
-  gcry_md_hash_buffer(GCRY_MD_MD5, md, ptr, len);
+  md5_sum((const uint8_t*)ptr, len, (uint8_t*)md);
 
   return md[0];
 }
-
-#else /* use libcrypto */
-
-#include <openssl/md5.h>
-
-uint32_t gen_cksum(char *ptr, int len)
-{
-  int i;
-  unsigned char *md;
-  uint32_t ret;
-
-  md = malloc(MD5_DIGEST_LENGTH);
-  if(!md) return 0;
-
-  /* Generate checksum */
-  if (MD5((unsigned char *)ptr, len, md) != md)
-    ret = 0;
-  else
-    memcpy(&ret, md, sizeof(uint32_t));
-
-  free(md);
-  return ret;
-}
-
-#endif
-
 
 static void free_aio_state(struct tdqcow_state* s)
 {

@@ -26,18 +26,6 @@ endif
 
 LIBS      += -lrt -lz
 
-ifeq ($(CONFIG_Linux),y)
-ifeq ($(shell . ./check_gcrypt $(CC)),yes)
-CFLAGS += -DUSE_GCRYPT
-CRYPT_LIB += -lgcrypt
-else
-CRYPT_LIB += -lcrypto
-$(warning === libgcrypt not installed: falling back to libcrypto ===)
-endif
-else
-CRYPT_LIB += -lcrypto
-endif
-
 LDFLAGS_img := $(LDFLAGS_libxenctrl) $(CRYPT_LIB) -lpthread -lz -lm
 
 LIBS += -L$(LIBVHDDIR) -lvhd
@@ -97,6 +85,7 @@ BLK-OBJS-y  += block-vhd.o
 BLK-OBJS-y  += block-log.o
 BLK-OBJS-y  += block-qcow.o
 BLK-OBJS-y  += aes.o
+BLK-OBJS-y  += md5.o
 BLK-OBJS-y  += $(PORTABLE-OBJS-y)
 BLK-OBJS-y  += $(REMUS-OBJS)
 
