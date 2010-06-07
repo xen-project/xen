@@ -76,7 +76,7 @@ int main(int argc, char **argv)
 
     if (i >= cmdtable_len) {
         if (!strcmp(cmd, "help")) {
-            help(argv[1]);
+            help(argv[2]);
             exit(0);
         } else {
             fprintf(stderr, "command not implemented\n");
