@@ -51,7 +51,7 @@ int xc_interface_open_core(xc_interface *xch)
     return -1;
 }
 
-int xc_interface_close(xc_interface *xch, int fd)
+int xc_interface_close_core(xc_interface *xch, int fd)
 {
     return close(fd);
 }
