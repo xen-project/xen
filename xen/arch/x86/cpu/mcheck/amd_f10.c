@@ -49,37 +49,43 @@
 #include "x86_mca.h"
 
 
-static enum mca_extinfo
+static struct mcinfo_extended *
 amd_f10_handler(struct mc_info *mi, uint16_t bank, uint64_t status)
 {
-	struct mcinfo_extended mc_ext;
+	struct mcinfo_extended *mc_ext;
 
 	/* Family 0x10 introduced additional MSR that belong to the
 	 * northbridge bank (4). */
 	if (mi == NULL || bank != 4)
-		return MCA_EXTINFO_IGNORED;
+		return NULL;
 
 	if (!(status & MCi_STATUS_VAL))
-		return MCA_EXTINFO_IGNORED;
+		return NULL;
 
 	if (!(status & MCi_STATUS_MISCV))
-		return MCA_EXTINFO_IGNORED;
+		return NULL;
 
-	memset(&mc_ext, 0, sizeof(mc_ext));
-	mc_ext.common.type = MC_TYPE_EXTENDED;
-	mc_ext.common.size = sizeof(mc_ext);
-	mc_ext.mc_msrs = 3;
+	mc_ext = x86_mcinfo_reserve(mi, sizeof(struct mcinfo_extended));
+	if (!mc_ext)
+	{
+		mi->flags |= MCINFO_FLAGS_UNCOMPLETE;
+		return NULL;
+	}
 
-	mc_ext.mc_msr[0].reg = MSR_F10_MC4_MISC1;
-	mc_ext.mc_msr[1].reg = MSR_F10_MC4_MISC2;
-	mc_ext.mc_msr[2].reg = MSR_F10_MC4_MISC3;
+	memset(mc_ext, 0, sizeof(mc_ext));
+	mc_ext->common.type = MC_TYPE_EXTENDED;
+	mc_ext->common.size = sizeof(mc_ext);
+	mc_ext->mc_msrs = 3;
 
-	mca_rdmsrl(MSR_F10_MC4_MISC1, mc_ext.mc_msr[0].value);
-	mca_rdmsrl(MSR_F10_MC4_MISC2, mc_ext.mc_msr[1].value);
-	mca_rdmsrl(MSR_F10_MC4_MISC3, mc_ext.mc_msr[2].value);
-	
-	x86_mcinfo_add(mi, &mc_ext);
-	return MCA_EXTINFO_LOCAL;
+	mc_ext->mc_msr[0].reg = MSR_F10_MC4_MISC1;
+	mc_ext->mc_msr[1].reg = MSR_F10_MC4_MISC2;
+	mc_ext->mc_msr[2].reg = MSR_F10_MC4_MISC3;
+
+	mca_rdmsrl(MSR_F10_MC4_MISC1, mc_ext->mc_msr[0].value);
+	mca_rdmsrl(MSR_F10_MC4_MISC2, mc_ext->mc_msr[1].value);
+	mca_rdmsrl(MSR_F10_MC4_MISC3, mc_ext->mc_msr[2].value);
+
+	return mc_ext;
 }
 
 /* AMD Family10 machine check */

@@ -110,12 +110,6 @@ enum mca_source {
 	MCA_MCE_SCAN
 };
 
-enum mca_extinfo {
-	MCA_EXTINFO_LOCAL,
-	MCA_EXTINFO_GLOBAL,
-	MCA_EXTINFO_IGNORED
-};
-
 struct mca_summary {
 	uint32_t	errcnt;	/* number of banks with valid errors */
 	int		ripv;	/* meaningful on #MC */
@@ -157,7 +151,7 @@ extern mctelem_cookie_t mcheck_mca_logout(enum mca_source, cpu_banks_t,
 typedef int (*mce_need_clearbank_t)(enum mca_source who, u64 status);
 extern void mce_need_clearbank_register(mce_need_clearbank_t);
 
-typedef enum mca_extinfo (*x86_mce_callback_t)
+typedef struct mcinfo_extended *(*x86_mce_callback_t)
     (struct mc_info *, uint16_t, uint64_t);
 extern void x86_mce_callback_register(x86_mce_callback_t);
 

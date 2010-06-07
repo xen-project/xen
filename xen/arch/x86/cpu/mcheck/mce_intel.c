@@ -155,52 +155,48 @@ static inline void intel_get_extended_msr(struct mcinfo_extended *ext, u32 msr)
     if ( ext->mc_msrs < ARRAY_SIZE(ext->mc_msr)
          && msr < MSR_IA32_MCG_EAX + nr_intel_ext_msrs ) {
         ext->mc_msr[ext->mc_msrs].reg = msr;
-        mca_rdmsrl(msr, ext->mc_msr[ext->mc_msrs].value);
+        rdmsrl(msr, ext->mc_msr[ext->mc_msrs].value);
         ++ext->mc_msrs;
     }
 }
 
-static enum mca_extinfo
-intel_get_extended_msrs(struct mc_info *mci, uint16_t bank, uint64_t status)
-{
-    struct mcinfo_extended mc_ext;
 
-    if (mci == NULL || nr_intel_ext_msrs == 0 || !(status & MCG_STATUS_EIPV))
-        return MCA_EXTINFO_IGNORED;
+struct mcinfo_extended *
+intel_get_extended_msrs(struct mcinfo_global *mig, struct mc_info *mi)
+{
+    struct mcinfo_extended *mc_ext;
+    int i;
+
+    /*
+     * According to spec, processor _support_ 64 bit will always
+     * have MSR beyond IA32_MCG_MISC
+     */
+    if (!mi|| !mig || nr_intel_ext_msrs == 0 ||
+            !(mig->mc_gstatus & MCG_STATUS_EIPV))
+        return NULL;
+
+    mc_ext = x86_mcinfo_reserve(mi, sizeof(struct mcinfo_extended));
+    if (!mc_ext)
+    {
+        mi->flags |= MCINFO_FLAGS_UNCOMPLETE;
+        return NULL;
+    }
 
     /* this function will called when CAP(9).MCG_EXT_P = 1 */
     memset(&mc_ext, 0, sizeof(struct mcinfo_extended));
-    mc_ext.common.type = MC_TYPE_EXTENDED;
-    mc_ext.common.size = sizeof(mc_ext);
+    mc_ext->common.type = MC_TYPE_EXTENDED;
+    mc_ext->common.size = sizeof(struct mcinfo_extended);
 
-    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_EAX);
-    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_EBX);
-    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_ECX);
-    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_EDX);
-    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_ESI);
-    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_EDI);
-    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_EBP);
-    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_ESP);
-    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_EFLAGS);
-    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_EIP);
-    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_MISC);
+    for (i = MSR_IA32_MCG_EAX; i <= MSR_IA32_MCG_MISC; i++)
+        intel_get_extended_msr(mc_ext, i);
 
 #ifdef __x86_64__
-    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_R8);
-    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_R9);
-    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_R10);
-    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_R11);
-    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_R12);
-    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_R13);
-    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_R14);
-    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_R15);
+    for (i = MSR_IA32_MCG_R8; i <= MSR_IA32_MCG_R15; i++)
+        intel_get_extended_msr(mc_ext, i);
 #endif
 
-    x86_mcinfo_add(mci, &mc_ext);
-
-    return MCA_EXTINFO_GLOBAL;
+    return mc_ext;
 }
-
 
 static void intel_UCR_handler(struct mcinfo_bank *bank,
              struct mcinfo_global *global,
@@ -960,7 +956,6 @@ enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c)
 
     /* machine check is available */
     x86_mce_vector_register(intel_machine_check);
-    x86_mce_callback_register(intel_get_extended_msrs);
     mce_recoverable_register(intel_recoverable_scan);
     mce_need_clearbank_register(intel_need_clearbank_scan);
 

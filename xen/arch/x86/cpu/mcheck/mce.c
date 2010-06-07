@@ -229,7 +229,6 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
 	mctelem_class_t which = MC_URGENT;	/* XXXgcc */
 	int errcnt = 0;
 	int i;
-	enum mca_extinfo cbret = MCA_EXTINFO_IGNORED;
 
 	mca_rdmsrl(MSR_IA32_MCG_STATUS, gstatus);
 	switch (who) {
@@ -291,6 +290,15 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
 				/* mc_info should at least hold up the global information */
 				ASSERT(mig);
 				mca_init_global(mc_flags, mig);
+				/* A hook here to get global extended msrs */
+				{
+					struct mcinfo_extended *intel_get_extended_msrs(
+					 struct mcinfo_global *mig, struct mc_info *mi);
+
+					 if (boot_cpu_data.x86_vendor ==
+					     X86_VENDOR_INTEL)
+						 intel_get_extended_msrs(mig, mci);
+				}
 			}
 		}
 
@@ -309,9 +317,8 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
 
 		mib = mca_init_bank(who, mci, i);
 
-		if (mc_callback_bank_extended && cbret != MCA_EXTINFO_GLOBAL) {
-			cbret = mc_callback_bank_extended(mci, i, status);
-		}
+		if (mc_callback_bank_extended)
+			mc_callback_bank_extended(mci, i, status);
 
 		/* By default, need_clear = 1 */
 		if (who != MCA_MCE_SCAN && need_clear)
