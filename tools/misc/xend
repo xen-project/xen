@@ -73,47 +73,8 @@ def start_daemon(daemon, *args):
     if os.fork() == 0:
         os.execvp(daemon, (daemon,) + args)
 
-def start_xenstored():
-    pidfname = "/var/run/xenstore.pid"
-    try:
-        f = open(pidfname, "a")
-        try:
-            fcntl.lockf(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            rootdir = os.getenv("XENSTORED_ROOTDIR") or "/var/lib/xenstored"
-            for i in glob.glob(rootdir + "/tdb*"):
-                try:
-                    os.unlink(i)
-                except:
-                    pass
-            os.unlink(pidfname)
-        except:
-            pass
-        f.close()
-    except:
-        pass
-    XENSTORED_TRACE = os.getenv("XENSTORED_TRACE")
-    cmd = "xenstored --pid-file /var/run/xenstore.pid"
-    if XENSTORED_TRACE:
-        cmd += " -T /var/log/xen/xenstored-trace.log"
-    s,o = commands.getstatusoutput(cmd)
-
-def start_consoled():
-    XENCONSOLED_TRACE = os.getenv("XENCONSOLED_TRACE")
-    args = ""
-    if XENCONSOLED_TRACE:
-        args += "--log=" + XENCONSOLED_TRACE
-    start_daemon("xenconsoled", args)
-
 def start_blktapctrl():
     start_daemon("blktapctrl", "")
-
-def start_xenbackendd():
-    XENBACKENDD_DEBUG = os.getenv("XENBACKENDD_DEBUG")
-    args = ""
-    if XENBACKENDD_DEBUG:
-        args += "-d"
-    if os.uname()[0] == 'NetBSD':
-        start_daemon("xenbackendd", args)
 
 def main():
     try:
@@ -127,15 +88,9 @@ def main():
         print 'usage: %s {start|stop|reload|restart}' % sys.argv[0]
     elif sys.argv[1] == 'start':
         if os.uname()[0] != "SunOS":
-            start_xenstored()
-            start_consoled()
-            start_xenbackendd()
             start_blktapctrl()
         return daemon.start()
     elif sys.argv[1] == 'trace_start':
-        start_xenstored()
-        start_consoled()
-        start_xenbackendd()
         start_blktapctrl()
         return daemon.start(trace=1)
     elif sys.argv[1] == 'stop':
@@ -143,9 +98,6 @@ def main():
     elif sys.argv[1] == 'reload':
         return daemon.reloadConfig()
     elif sys.argv[1] == 'restart':
-        start_xenstored()
-        start_consoled()
-        start_xenbackendd()
         start_blktapctrl()
         return daemon.stop() or daemon.start()
     elif sys.argv[1] == 'status':

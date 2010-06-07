@@ -3,20 +3,18 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 # Init scripts.
 XEND_INITD = init.d/xend
-XEND_SYSCONFIG = init.d/sysconfig.xend
 XENDOMAINS_INITD = init.d/xendomains
 XENDOMAINS_SYSCONFIG = init.d/sysconfig.xendomains
 
-XLD_INITD = init.d/xenlightdaemons
-XLD_SYSCONFIG = init.d/sysconfig.xenlightdaemons
-XENTOOLSTACK_SYSCONFIG = init.d/sysconfig.xen_toolstack
+XENCOMMONS_INITD = init.d/xencommons
+XENCOMMONS_SYSCONFIG = init.d/sysconfig.xencommons
 
 # Xen script dir and scripts to go there.
 XEN_SCRIPTS = network-bridge vif-bridge
 XEN_SCRIPTS += network-route vif-route
 XEN_SCRIPTS += network-nat vif-nat
-XEN_SCRIPTS += xl-vif-script
 XEN_SCRIPTS += vif2
+XEN_SCRIPTS += vif-setup
 XEN_SCRIPTS += block
 XEN_SCRIPTS += block-enbd block-nbd
 XEN_SCRIPTS += blktap
@@ -69,12 +67,10 @@ install-initd:
 	[ -d $(DESTDIR)$(CONFIG_DIR)/init.d ] || $(INSTALL_DIR) $(DESTDIR)$(CONFIG_DIR)/init.d
 	[ -d $(DESTDIR)$(CONFIG_DIR)/sysconfig ] || $(INSTALL_DIR) $(DESTDIR)$(CONFIG_DIR)/sysconfig
 	$(INSTALL_PROG) $(XEND_INITD) $(DESTDIR)$(CONFIG_DIR)/init.d
-	$(INSTALL_PROG) $(XEND_SYSCONFIG) $(DESTDIR)$(CONFIG_DIR)/sysconfig/xend
 	$(INSTALL_PROG) $(XENDOMAINS_INITD) $(DESTDIR)$(CONFIG_DIR)/init.d
 	$(INSTALL_PROG) $(XENDOMAINS_SYSCONFIG) $(DESTDIR)$(CONFIG_DIR)/sysconfig/xendomains
-	$(INSTALL_PROG) $(XLD_INITD) $(DESTDIR)$(CONFIG_DIR)/init.d
-	$(INSTALL_PROG) $(XLD_SYSCONFIG) $(DESTDIR)$(CONFIG_DIR)/sysconfig/xenlightdaemons
-	$(INSTALL_PROG) $(XENTOOLSTACK_SYSCONFIG) $(DESTDIR)$(CONFIG_DIR)/sysconfig/xen_toolstack
+	$(INSTALL_PROG) $(XENCOMMONS_INITD) $(DESTDIR)$(CONFIG_DIR)/init.d
+	$(INSTALL_PROG) $(XENCOMMONS_SYSCONFIG) $(DESTDIR)$(CONFIG_DIR)/sysconfig/xencommons
 
 .PHONY: install-scripts
 install-scripts:

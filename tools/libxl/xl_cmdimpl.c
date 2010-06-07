@@ -259,7 +259,7 @@ static void init_nic_info(libxl_device_nic *nic_info, int devnum)
     nic_info->mac[5] = 1 + (int) (0xff * (rand() / (RAND_MAX + 1.0)));
     nic_info->ifname = NULL;
     nic_info->bridge = "xenbr0";
-    CHK_ERRNO( asprintf(&nic_info->script, "%s/xl-vif-script",
+    CHK_ERRNO( asprintf(&nic_info->script, "%s/vif-bridge",
                libxl_xen_script_dir_path()) );
     nic_info->nictype = NICTYPE_IOEMU;
 }

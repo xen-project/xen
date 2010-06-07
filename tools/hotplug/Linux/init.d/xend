@@ -20,26 +20,6 @@
 ### END INIT INFO
 
 shopt -s extglob
-test -f /etc/sysconfig/xend && . /etc/sysconfig/xend
-test -f /etc/sysconfig/xen_toolstack && . /etc/sysconfig/xen_toolstack
-
-if test "x$xen_toolstack" != "xxend"
-then
-       exit 0
-fi
-
-if   test "x$1" = xstart && \
-     test -d /proc/xen && \
-   ! test -d /proc/xen/capabilities && \
-     grep '	xenfs$' /proc/filesystems >/dev/null && \
-   ! grep '^xenfs ' /proc/mounts >/dev/null;
-then
-	mount -t xenfs xenfs /proc/xen
-fi
-
-if ! grep -qs "control_d" /proc/xen/capabilities ; then
-	exit 0
-fi
 
 # Wait for Xend to be up
 function await_daemons_up
@@ -59,10 +39,6 @@ case "$1" in
   start)
 	mkdir -p /var/lock/subsys
 	touch /var/lock/subsys/xend
-	test -z "$XENSTORED_ROOTDIR" || export XENSTORED_ROOTDIR
-	test -z "$XENCONSOLED_TRACE" || export XENCONSOLED_TRACE
-	[[ "$XENSTORED_TRACE" == @(yes|on|1) ]] && export XENSTORED_TRACE
-	[[ "$XENBACKENDD_DEBUG" == @(yes|on|1) ]] && export XENBACKENDD_DEBUG
 	xend start
 	await_daemons_up
 	;;

@@ -28,9 +28,7 @@
 #                    boots / shuts down.
 ### END INIT INFO
 
-test -f /etc/sysconfig/xen_toolstack && . /etc/sysconfig/xen_toolstack
-
-if test "x$xen_toolstack" != "xxend"
+if `xm list &> /dev/null`
 then
 	exit 0
 fi
