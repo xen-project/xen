@@ -662,8 +662,7 @@ void hpet_broadcast_enter(void)
         spin_unlock(&ch->lock);
     }
 
-    /* Cancel any outstanding LAPIC timer event and disable interrupts. */
-    reprogram_timer(0);
+    /* Disable LAPIC timer interrupts. */
     disable_APIC_timer();
 
     spin_lock(&ch->lock);

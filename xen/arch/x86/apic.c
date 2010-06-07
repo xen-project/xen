@@ -195,6 +195,9 @@ void clear_local_APIC(void)
 
     maxlvt = get_maxlvt();
 
+    /* Work around AMD Erratum 411. This is a nice thing to do anyway. */
+    apic_write_around(APIC_TMICT, 0);
+
     /*
      * Masking an LVT entry on a P6 can trigger a local APIC error
      * if the vector is zero. Mask LVTERR first to prevent this.
@@ -1184,7 +1187,10 @@ void disable_APIC_timer(void)
 {
     if (using_apic_timer) {
         unsigned long v;
-        
+
+        /* Work around AMD Erratum 411. This is a nice thing to do anyway. */
+        apic_write_around(APIC_TMICT, 0);
+
         v = apic_read(APIC_LVTT);
         apic_write_around(APIC_LVTT, v | APIC_LVT_MASKED);
     }
