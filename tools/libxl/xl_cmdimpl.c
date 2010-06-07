@@ -3752,7 +3752,7 @@ int main_blockdetach(int argc, char **argv)
     int opt;
     libxl_device_disk disk;
 
-    if (argc != 3) {
+    if (argc != 4) {
         help("block-detach");
         exit(0);
     }
@@ -3767,12 +3767,12 @@ int main_blockdetach(int argc, char **argv)
         }
     }
 
-    if (domain_qualifier_to_domid(argv[1], &domid, 0) < 0) {
-        fprintf(stderr, "%s is an invalid domain identifier\n", argv[1]);
+    if (domain_qualifier_to_domid(argv[2], &domid, 0) < 0) {
+        fprintf(stderr, "%s is an invalid domain identifier\n", argv[2]);
         exit(1);
     }
-    if (libxl_devid_to_device_disk(&ctx, domid, argv[2], &disk)) {
-        fprintf(stderr, "Error: Device %s not connected.\n", argv[2]);
+    if (libxl_devid_to_device_disk(&ctx, domid, argv[3], &disk)) {
+        fprintf(stderr, "Error: Device %s not connected.\n", argv[3]);
         exit(1);
     }
     if (libxl_device_disk_del(&ctx, &disk, 1)) {
