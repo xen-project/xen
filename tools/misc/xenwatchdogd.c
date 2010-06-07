@@ -28,9 +28,12 @@ void daemonize(void)
 	err(1, "setsid");
     if (chdir("/") < 0)
 	err(1, "chdir /");
-    freopen("/dev/null", "r", stdin);
-    freopen("/dev/null", "w", stdout);
-    freopen("/dev/null", "w", stderr);
+    if (freopen("/dev/null", "r", stdin) == NULL)
+        err(1, "reopen stdin");
+    if(freopen("/dev/null", "w", stdout) == NULL)
+        err(1, "reopen stdout");
+    if(freopen("/dev/null", "w", stderr) == NULL)
+        err(1, "reopen stderr");
 }
 
 void catch_exit(int sig)
