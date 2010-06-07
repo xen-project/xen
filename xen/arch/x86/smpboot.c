@@ -348,7 +348,7 @@ void start_secondary(void *unused)
     construct_percpu_idt(cpu);
 
     setup_secondary_APIC_clock();
-    enable_APIC_timer();
+
     /*
      * low-memory mappings have been cleared, flush them from
      * the local TLBs too.

@@ -1064,11 +1064,11 @@ static void __setup_APIC_LVTT(unsigned int clocks)
     apic_write_around(APIC_TMICT, clocks/APIC_DIVISOR);
 }
 
-static void __devinit setup_APIC_timer(unsigned int clocks)
+static void __devinit setup_APIC_timer(void)
 {
     unsigned long flags;
     local_irq_save(flags);
-    __setup_APIC_LVTT(clocks);
+    __setup_APIC_LVTT(0);
     local_irq_restore(flags);
 }
 
@@ -1159,8 +1159,6 @@ static int __init calibrate_APIC_clock(void)
     return result;
 }
 
-static unsigned int calibration_result;
-
 void __init setup_boot_APIC_clock(void)
 {
     unsigned long flags;
@@ -1169,18 +1167,16 @@ void __init setup_boot_APIC_clock(void)
 
     local_irq_save(flags);
 
-    calibration_result = calibrate_APIC_clock();
-    /*
-     * Now set up the timer for real.
-     */
-    setup_APIC_timer(calibration_result);
+    calibrate_APIC_clock();
+
+    setup_APIC_timer();
     
     local_irq_restore(flags);
 }
 
 void __devinit setup_secondary_APIC_clock(void)
 {
-    setup_APIC_timer(calibration_result);
+    setup_APIC_timer();
 }
 
 void disable_APIC_timer(void)
