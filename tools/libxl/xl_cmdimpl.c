@@ -3709,7 +3709,7 @@ int main_blocklist(int argc, char **argv)
     libxl_device_disk *disks;
     libxl_diskinfo diskinfo;
 
-    if (argc < 2) {
+    if (argc < 3) {
         help("block-list");
         exit(0);
     }
@@ -3726,7 +3726,7 @@ int main_blocklist(int argc, char **argv)
 
     printf("%-5s %-3s %-6s %-5s %-6s %-8s %-30s\n",
            "Vdev", "BE", "handle", "state", "evt-ch", "ring-ref", "BE-path");
-    for (++argv, --argc; argc > 0; --argc, ++argv) {
+    for (argv += 2, argc -= 2; argc > 0; --argc, ++argv) {
         if (domain_qualifier_to_domid(*argv, &domid, 0) < 0) {
             fprintf(stderr, "%s is an invalid domain identifier\n", *argv);
             continue;
