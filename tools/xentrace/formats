@@ -70,6 +70,8 @@
 0x00082018  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  CLTS
 0x00082019  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  LMSW        [ value = 0x%(1)08x ]
 0x00082119  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  LMSW        [ value = 0x%(2)08x%(1)08x ]
+0x00082020  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  INTR_WINDOW [ value = 0x%(1)08x ]
+0x00082021  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  NPF         [ gpa = 0x%(2)08x%(1)08x mfn = 0x%(4)08x%(3)08x qual = 0x%(5)04x p2mt = 0x%(6)04x ]
 
 0x0010f001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  page_grant_map      [ domid = %(1)d ]
 0x0010f002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  page_grant_unmap    [ domid = %(1)d ]
