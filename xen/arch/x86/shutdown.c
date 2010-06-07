@@ -316,6 +316,13 @@ void machine_restart(unsigned int delay_millisecs)
             halt();
     }
 
+    /*
+     * We may be called from an interrupt context, and various functions we
+     * may need to call (alloc_domheap_pages, map_domain_page, ...) assert that
+     * they are not called from interrupt context. This hack keeps them happy.
+     */
+    local_irq_count(0) = 0;
+
     smp_send_stop();
 
     mdelay(delay_millisecs);
