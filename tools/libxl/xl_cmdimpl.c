@@ -3637,7 +3637,7 @@ int main_blockattach(int argc, char **argv)
     uint32_t fe_domid, be_domid = 0;
     libxl_device_disk disk = { 0 };
 
-    if ((argc < 4) || (argc > 6)) {
+    if ((argc < 5) || (argc > 7)) {
         help("block-attach");
         exit(0);
     }
@@ -3652,7 +3652,7 @@ int main_blockattach(int argc, char **argv)
         }
     }
 
-    tok = strtok(argv[2], ":");
+    tok = strtok(argv[3], ":");
     if (!strcmp(tok, "phy")) {
         disk.phystype = PHYSTYPE_PHY;
     } else if (!strcmp(tok, "file")) {
@@ -3680,17 +3680,17 @@ int main_blockattach(int argc, char **argv)
         fprintf(stderr, "Error: missing path to disk image.\n");
         exit(1);
     }
-    disk.virtpath = argv[3];
+    disk.virtpath = argv[4];
     disk.unpluggable = 1;
-    disk.readwrite = (argc <= 4 || argv[4][0] == 'w') ? 1 : 0;
+    disk.readwrite = ((argc <= 4) || (argv[5][0] == 'w'));
 
-    if (domain_qualifier_to_domid(argv[1], &fe_domid, 0) < 0) {
-        fprintf(stderr, "%s is an invalid domain identifier\n", argv[1]);
+    if (domain_qualifier_to_domid(argv[2], &fe_domid, 0) < 0) {
+        fprintf(stderr, "%s is an invalid domain identifier\n", argv[2]);
         exit(1);
     }
-    if (argc == 6) {
-        if (domain_qualifier_to_domid(argv[5], &be_domid, 0) < 0) {
-            fprintf(stderr, "%s is an invalid domain identifier\n", argv[5]);
+    if (argc == 7) {
+        if (domain_qualifier_to_domid(argv[6], &be_domid, 0) < 0) {
+            fprintf(stderr, "%s is an invalid domain identifier\n", argv[6]);
             exit(1);
         }
     }
