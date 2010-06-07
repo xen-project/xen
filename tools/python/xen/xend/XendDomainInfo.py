@@ -3299,7 +3299,7 @@ class XendDomainInfo:
                     log.info("Unmounting %s from %s." %
                              (fn, BOOTLOADER_LOOPBACK_DEVICE))
 
-                    dom0.destroyDevice('tap', BOOTLOADER_LOOPBACK_DEVICE)
+                    dom0.destroyDevice(devtype, BOOTLOADER_LOOPBACK_DEVICE, force = True)
 
             if blcfg is None:
                 msg = "Had a bootloader specified, but can't find disk"
