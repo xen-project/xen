@@ -104,12 +104,11 @@
 ^stubdom/ioemu/
 ^stubdom/stubdompath\.sh$
 ^tools/.*/build/lib.*/.*\.py$
-^tools/blktap2/daemon/blktapctrl$
+^tools/blktap2/control/tap-ctl$
 ^tools/blktap2/drivers/img2qcow$
 ^tools/blktap2/drivers/lock-util$
 ^tools/blktap2/drivers/qcow-create$
 ^tools/blktap2/drivers/qcow2raw$
-^tools/blktap2/drivers/tapdisk$
 ^tools/blktap2/drivers/tapdisk-client$
 ^tools/blktap2/drivers/tapdisk-diff$
 ^tools/blktap2/drivers/tapdisk-stream$
