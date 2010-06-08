@@ -82,7 +82,7 @@ tapdisk_vbd_initialize_vreq(td_vbd_request_t *vreq)
 }
 
 int
-tapdisk_vbd_initialize(int rfd, int wfd, uint16_t uuid)
+tapdisk_vbd_initialize(uint16_t uuid)
 {
 	int i;
 	td_vbd_t *vbd;
@@ -100,9 +100,6 @@ tapdisk_vbd_initialize(int rfd, int wfd, uint16_t uuid)
 	}
 
 	vbd->uuid     = uuid;
-	vbd->ipc.rfd  = rfd;
-	vbd->ipc.wfd  = wfd;
-	vbd->ipc.uuid = uuid;
 	vbd->ring.fd  = -1;
 
 	/* default blktap ring completion */
@@ -995,7 +992,6 @@ tapdisk_vbd_shutdown(td_vbd_t *vbd)
 		vbd->kicked);
 
 	tapdisk_vbd_close_vdi(vbd);
-	tapdisk_ipc_write(&vbd->ipc, TAPDISK_MESSAGE_CLOSE_RSP);
 	tapdisk_vbd_unregister_events(vbd);
 	tapdisk_vbd_unmap_device(vbd);
 	tapdisk_server_remove_vbd(vbd);
@@ -1196,7 +1192,6 @@ tapdisk_vbd_pause(td_vbd_t *vbd)
 
 	td_flag_clear(vbd->state, TD_VBD_PAUSE_REQUESTED);
 	td_flag_set(vbd->state, TD_VBD_PAUSED);
-	tapdisk_ipc_write(&vbd->ipc, TAPDISK_MESSAGE_PAUSE_RSP);
 
 	return 0;
 }
@@ -1208,7 +1203,6 @@ tapdisk_vbd_resume(td_vbd_t *vbd, const char *path, uint16_t drivertype)
 
 	if (!td_flag_test(vbd->state, TD_VBD_PAUSED)) {
 		EPRINTF("resume request for unpaused vbd %s\n", vbd->name);
-		tapdisk_ipc_write(&vbd->ipc, TAPDISK_MESSAGE_ERROR);
 		return -EINVAL;
 	}
 
@@ -1216,7 +1210,6 @@ tapdisk_vbd_resume(td_vbd_t *vbd, const char *path, uint16_t drivertype)
 	vbd->name = strdup(path);
 	if (!vbd->name) {
 		EPRINTF("copying new vbd %s name failed\n", path);
-		tapdisk_ipc_write(&vbd->ipc, TAPDISK_MESSAGE_ERROR);
 		return -EINVAL;
 	}
 	vbd->type = drivertype;
@@ -1241,15 +1234,12 @@ tapdisk_vbd_resume(td_vbd_t *vbd, const char *path, uint16_t drivertype)
 		sleep(TD_VBD_EIO_SLEEP);
 	}
 
-	if (err) {
-		tapdisk_ipc_write(&vbd->ipc, TAPDISK_MESSAGE_ERROR);
+	if (err)
 		return err;
-	}
 
 	tapdisk_vbd_start_queue(vbd);
 	td_flag_clear(vbd->state, TD_VBD_PAUSED);
 	td_flag_clear(vbd->state, TD_VBD_PAUSE_REQUESTED);
-	tapdisk_ipc_write(&vbd->ipc, TAPDISK_MESSAGE_RESUME_RSP);
 
 	return 0;
 }

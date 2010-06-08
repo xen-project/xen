@@ -217,13 +217,13 @@ int main(int argc, const char *argv[])
 		exit(-1);
 	}
 
-        err = tapdisk_server_initialize(NULL, NULL);
+        err = tapdisk_server_initialize();
         if( err ) {
           DPRINTF("qcow2raw Couldn't initialize server instance.\n");
           return err;
         }
 
-        err=tapdisk_vbd_initialize(-1,-1, QCOW_VBD);
+        err=tapdisk_vbd_initialize(QCOW_VBD);
         if( err ) {
           DPRINTF("qcow2raw Couldn't initialize qcow vbd.\n");
           return err;
@@ -335,7 +335,7 @@ int main(int argc, const char *argv[])
 	}
 
         //Now the output file should be there, reopen it as an aio VBD
-        err=tapdisk_vbd_initialize(-1,-1, AIO_VBD);
+        err=tapdisk_vbd_initialize(AIO_VBD);
         if( err ) {
           DPRINTF("qcow2raw Couldn't initialize aio vbd.\n");
           return err;

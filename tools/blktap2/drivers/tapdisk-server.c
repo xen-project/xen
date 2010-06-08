@@ -212,27 +212,6 @@ tapdisk_server_stop_vbds(void)
 		tapdisk_vbd_kill_queue(vbd);
 }
 
-static void
-tapdisk_server_send_error(const char *message)
-{
-	td_vbd_t *vbd, *tmp;
-
-	tapdisk_server_for_each_vbd(vbd, tmp)
-		tapdisk_ipc_write_error(&vbd->ipc, message);
-}
-
-static int
-tapdisk_server_init_ipc(const char *read, const char *write)
-{
-	return tapdisk_ipc_open(&server.ipc, read, write);
-}
-
-static void
-tapdisk_server_close_ipc(void)
-{
-	tapdisk_ipc_close(&server.ipc);
-}
-
 static int
 tapdisk_server_init_aio(void)
 {
@@ -250,7 +229,6 @@ static void
 tapdisk_server_close(void)
 {
 	tapdisk_server_close_aio();
-	tapdisk_server_close_ipc();
 }
 
 static void
@@ -292,7 +270,6 @@ tapdisk_server_signal_handler(int signal)
 		if (xfsz_error_sent)
 			break;
 
-		tapdisk_server_send_error("received SIGXFSZ, closing queues");
 		xfsz_error_sent = 1;
 		break;
 
@@ -303,7 +280,7 @@ tapdisk_server_signal_handler(int signal)
 }
 
 int
-tapdisk_server_initialize(const char *read, const char *write)
+tapdisk_server_initialize(void)
 {
 	int err;
 
@@ -312,21 +289,13 @@ tapdisk_server_initialize(const char *read, const char *write)
 
 	scheduler_initialize(&server.scheduler);
 
-	err = tapdisk_server_init_ipc(read, write);
-	if (err)
-		goto fail;
-
 	err = tapdisk_server_init_aio();
 	if (err)
-		goto fail;
+		return err;
 
 	server.run = 1;
 
 	return 0;
-
-fail:
-	tapdisk_server_close_ipc();
-	return err;
 }
 
 int

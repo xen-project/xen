@@ -540,7 +540,7 @@ tapdisk_stream_open_image(struct tapdisk_stream *s, const char *path, int type)
 
 	s->id = tapdisk_stream_count++;
 
-	err = tapdisk_vbd_initialize(-1, -1, s->id);
+	err = tapdisk_vbd_initialize(s->id);
 	if (err)
 		goto out;
 
@@ -755,7 +755,7 @@ main(int argc, char *argv[])
 
 	tapdisk_start_logging("tapdisk-diff");
 
-	err = tapdisk_server_initialize(NULL, NULL);
+	err = tapdisk_server_initialize();
 	if (err)
 		goto out;
 

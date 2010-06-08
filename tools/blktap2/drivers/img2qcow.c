@@ -200,13 +200,13 @@ int main(int argc, const char *argv[])
 			(uint64_t)info.size);
 	
         /* Open Qcow image*/
-        err = tapdisk_server_initialize(NULL, NULL);
+        err = tapdisk_server_initialize();
         if( err ) {
           DPRINTF("qcow2raw Couldn't initialize server instance.\n");
           return err;
         }
 
-        err=tapdisk_vbd_initialize(-1,-1, QCOW_VBD);
+        err=tapdisk_vbd_initialize(QCOW_VBD);
         if( err ) {
           DPRINTF("qcow2raw Couldn't initialize qcow vbd.\n");
           return err;

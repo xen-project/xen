@@ -62,7 +62,6 @@ PORTABLE-OBJS-$(CONFIG_Linux)  += blk_linux.o
 PORTABLE-OBJS-$(CONFIG_NetBSD) += blk_netbsd.o
 
 TAP-OBJS-y  := scheduler.o
-TAP-OBJS-y  += tapdisk-ipc.o
 TAP-OBJS-y  += tapdisk-vbd.o
 TAP-OBJS-y  += tapdisk-image.o
 TAP-OBJS-y  += tapdisk-driver.o

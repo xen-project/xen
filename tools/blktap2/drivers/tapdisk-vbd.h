@@ -34,7 +34,6 @@
 
 #include "tapdisk.h"
 #include "scheduler.h"
-#include "tapdisk-ipc.h"
 #include "tapdisk-image.h"
 
 #define TD_VBD_MAX_RETRIES          100
@@ -100,8 +99,6 @@ struct td_vbd_handle {
 	uint8_t                     reactivated;
 	td_flag_t                   flags;
 	td_flag_t                   state;
-
-	td_ipc_t                    ipc;
 
 	struct list_head            images;
 
@@ -171,7 +168,7 @@ tapdisk_vbd_next_image(td_image_t *image)
 	return list_entry(image->next.next, td_image_t, next);
 }
 
-int tapdisk_vbd_initialize(int, int, td_uuid_t);
+int tapdisk_vbd_initialize(td_uuid_t);
 void tapdisk_vbd_set_callback(td_vbd_t *, td_vbd_cb_t, void *);
 int tapdisk_vbd_parse_stack(td_vbd_t *vbd, const char *path);
 int tapdisk_vbd_open(td_vbd_t *, const char *, uint16_t,

@@ -249,7 +249,7 @@ tapdisk2_open_device(int type, const char *path, const char *name)
 	char *devname;
 	struct blktap2_params params;
 
-	err = tapdisk_vbd_initialize(-1, -1, TAPDISK2_VBD);
+	err = tapdisk_vbd_initialize(TAPDISK2_VBD);
 	if (err)
 		return err;
 
@@ -349,7 +349,7 @@ tapdisk2_create_device(const char *params)
 	if (err)
 		goto out;
 
-	err = tapdisk_server_initialize(NULL, NULL);
+	err = tapdisk_server_initialize();
 	if (err)
 		goto fail;
 
