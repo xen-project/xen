@@ -64,8 +64,6 @@
 #define O_LARGEFILE	0
 #endif
 
-
-#define TAPDISK 1
 #define BLOCK_PROCESSSZ 4096
 #define QCOW_VBD 0
 #define PROGRESS_QUANT 2

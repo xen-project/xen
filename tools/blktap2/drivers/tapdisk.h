@@ -64,6 +64,10 @@
 #include "tapdisk-log.h"
 #include "tapdisk-utils.h"
 
+#define DPRINTF(_f, _a...)           syslog(LOG_INFO, _f, ##_a)
+#define EPRINTF(_f, _a...)           syslog(LOG_ERR, "tap-err:%s: " _f, __func__, ##_a)
+#define PERROR(_f, _a...)            EPRINTF(_f ": %s", ##_a, strerror(errno))
+
 #define MAX_SEGMENTS_PER_REQ         11
 #define SECTOR_SHIFT                 9
 #define DEFAULT_SECTOR_SIZE          512

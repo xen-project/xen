@@ -33,7 +33,6 @@
 
 /* due to architectural choices in tapdisk, block-buffer is forced to
  * reimplement some code which is meant to be private */
-#define TAPDISK
 #include "tapdisk.h"
 #include "tapdisk-server.h"
 #include "tapdisk-driver.h"
