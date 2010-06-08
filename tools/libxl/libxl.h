@@ -164,6 +164,7 @@ typedef struct {
     bool apic; /* apic enabled or disabled */
     int vcpus; /* max number of vcpus */
     int vcpu_avail; /* vcpus actually available */
+    int xen_platform_pci; /* enable/disable the xen platform pci device */
     char **extra; /* extra parameters pass directly to qemu, NULL terminated */
     /* Network is missing */
 } libxl_device_model_info;

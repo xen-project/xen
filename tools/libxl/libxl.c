@@ -1159,6 +1159,7 @@ int libxl_create_device_model(struct libxl_ctx *ctx,
 
     path = libxl_sprintf(ctx, "/local/domain/0/device-model/%d", info->domid);
     xs_mkdir(ctx->xsh, XBT_NULL, path);
+    libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/disable_pf", path), "%d", !info->xen_platform_pci);
 
     libxl_create_logfile(ctx, libxl_sprintf(ctx, "qemu-dm-%s", info->dom_name), &logfile);
     logfile_w = open(logfile, O_WRONLY|O_CREAT, 0644);

@@ -240,6 +240,7 @@ static void init_dm_info(libxl_device_model_info *dm_info,
     dm_info->boot = "cda";
     dm_info->usb = 0;
     dm_info->usbdevice = NULL;
+    dm_info->xen_platform_pci = 1;
 }
 
 static void init_nic_info(libxl_device_nic *nic_info, int devnum)
@@ -869,6 +870,8 @@ skip_pci:
             dm_info->usb = l;
         if (!xlu_cfg_get_string (config, "usbdevice", &buf))
             dm_info->usbdevice = strdup(buf);
+        if (!xlu_cfg_get_long (config, "xen_platform_pci", &l))
+            dm_info->xen_platform_pci = l;
     }
 
     dm_info->type = c_info->hvm ? XENFV : XENPV;
