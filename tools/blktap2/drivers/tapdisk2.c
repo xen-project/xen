@@ -43,6 +43,7 @@
 #include "tapdisk-vbd.h"
 #include "tapdisk-utils.h"
 #include "tapdisk-server.h"
+#include "tapdisk-disktype.h"
 
 #define TAPDISK2_VBD 0
 
@@ -327,7 +328,7 @@ tapdisk2_set_child_fds(void)
 static int
 tapdisk2_create_device(const char *params)
 {
-	char *path;
+	const char *path;
 	int err, type;
 
 	chdir("/");

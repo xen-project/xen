@@ -28,6 +28,7 @@
 #define _TAPDISK_MESSAGE_H_
 
 #include <inttypes.h>
+#include <sys/types.h>
 
 #define TAPDISK_MESSAGE_MAX_PATH_LENGTH  256
 #define TAPDISK_MESSAGE_STRING_LENGTH    256
@@ -67,7 +68,6 @@ struct tapdisk_message_string {
 struct tapdisk_message {
 	uint16_t                         type;
 	uint16_t                         cookie;
-	uint16_t                         drivertype;
 
 	union {
 		pid_t                    tapdisk_pid;

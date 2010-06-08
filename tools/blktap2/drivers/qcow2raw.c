@@ -47,6 +47,7 @@
 #include "tapdisk-server.h"
 #include "tapdisk-driver.h"
 #include "tapdisk-interface.h"
+#include "tapdisk-disktype.h"
 #include "qcow.h"
 
 #if 1

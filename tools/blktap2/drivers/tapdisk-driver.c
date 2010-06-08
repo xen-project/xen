@@ -29,15 +29,16 @@
 
 #include "tapdisk-driver.h"
 #include "tapdisk-server.h"
+#include "tapdisk-disktype.h"
 
 td_driver_t *
 tapdisk_driver_allocate(int type, char *name, td_flag_t flags, int storage)
 {
 	int err;
 	td_driver_t *driver;
-	struct tap_disk *ops;
+	const struct tap_disk *ops;
 
-	ops = tapdisk_server_find_driver_interface(type);
+	ops = tapdisk_disk_drivers[type];
 	if (!ops)
 		return NULL;
 

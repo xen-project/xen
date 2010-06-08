@@ -80,7 +80,7 @@ struct td_vbd_request {
 };
 
 struct td_vbd_driver_info {
-	char                       *params;
+	const char                 *params;
 	int                         type;
 	struct list_head            next;
 };

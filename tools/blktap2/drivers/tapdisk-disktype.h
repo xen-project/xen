@@ -1,5 +1,5 @@
-/* 
- * Copyright (c) 2008, XenSource Inc.
+/*
+ * Copyright (c) 2007, 2010, XenSource Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,38 +25,38 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef _TAPDISK_DRIVER_H_
-#define _TAPDISK_DRIVER_H_
 
-#include "tapdisk.h"
-#include "scheduler.h"
-#include "tapdisk-queue.h"
+#ifndef __DISKTYPES_H__
+#define __DISKTYPES_H__
 
-#define TD_DRIVER_OPEN               0x0001
-#define TD_DRIVER_RDONLY             0x0002
+#define DISK_TYPE_AIO         0
+#define DISK_TYPE_SYNC        1
+#define DISK_TYPE_VMDK        2
+#define DISK_TYPE_VHDSYNC     3
+#define DISK_TYPE_VHD         4
+#define DISK_TYPE_RAM         5
+#define DISK_TYPE_QCOW        6
+#define DISK_TYPE_BLOCK_CACHE 7
+#define DISK_TYPE_LOG         9
+#define DISK_TYPE_REMUS       10
+#define DISK_TYPE_VINDEX      11
 
-struct td_driver_handle {
-	int                          type;
-	char                        *name;
+#define DISK_TYPE_NAME_MAX    32
 
-	int                          storage;
+typedef struct disk_info {
+	const char     *name; /* driver name, e.g. 'aio' */
+	char           *desc;  /* e.g. "raw image" */
+	unsigned int    flags; 
+} disk_info_t;
 
-	int                          refcnt;
-	td_flag_t                    state;
+extern const disk_info_t     *tapdisk_disk_types[];
+extern const struct tap_disk *tapdisk_disk_drivers[];
 
-	td_disk_info_t               info;
+/* one single controller for all instances of disk type */
+#define DISK_TYPE_SINGLE_CONTROLLER (1<<0)
 
-	void                        *data;
-	const struct tap_disk       *ops;
-
-	struct list_head             next;
-};
-
-td_driver_t *tapdisk_driver_allocate(int, char *, td_flag_t, int);
-void tapdisk_driver_free(td_driver_t *);
-
-void tapdisk_driver_queue_tiocb(td_driver_t *, struct tiocb *);
-
-void tapdisk_driver_debug(td_driver_t *);
+int tapdisk_disktype_find(const char *name);
+int tapdisk_disktype_parse_params(const char *params, const char **_path);
+int tapdisk_parse_disk_type(const char *, const char **, int *);
 
 #endif

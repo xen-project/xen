@@ -39,7 +39,7 @@
 #define ERR(_err, _f, _a...) tlog_error(_err, _f, ##_a)
 
 td_image_t *
-tapdisk_image_allocate(char *file, int type, int storage,
+tapdisk_image_allocate(const char *file, int type, int storage,
 		       td_flag_t flags, void *private)
 {
 	int err;

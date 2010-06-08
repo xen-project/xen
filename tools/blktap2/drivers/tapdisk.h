@@ -61,7 +61,6 @@
 
 #include "list.h"
 #include "blktaplib.h"
-#include "disktypes.h"
 #include "tapdisk-log.h"
 #include "tapdisk-utils.h"
 

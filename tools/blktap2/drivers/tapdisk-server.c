@@ -32,7 +32,6 @@
 #include <sys/ioctl.h>
 #include <sys/signal.h>
 
-#define TAPDISK
 #include "tapdisk-utils.h"
 #include "tapdisk-server.h"
 #include "tapdisk-driver.h"
@@ -45,18 +44,6 @@
 
 #define tapdisk_server_for_each_vbd(vbd, tmp)			        \
 	list_for_each_entry_safe(vbd, tmp, &server.vbds, next)
-
-struct tap_disk *
-tapdisk_server_find_driver_interface(int type)
-{
-	int n;
-
-	n = sizeof(dtypes) / sizeof(struct disk_info_t *);
-	if (type >= n)
-		return NULL;
-
-	return dtypes[type]->drv;
-}
 
 td_image_t *
 tapdisk_server_get_shared_image(td_image_t *image)

@@ -41,6 +41,7 @@
 #include "tapdisk.h"
 #include "tapdisk-driver.h"
 #include "tapdisk-interface.h"
+#include "tapdisk-disktype.h"
 #include "qcow.h"
 #include "blk.h"
 #include "atomicio.h"

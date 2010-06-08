@@ -98,6 +98,7 @@ struct req_ring {
  */
 td_vbd_t *device_vbd = NULL;
 td_image_t *remus_image = NULL;
+struct tap_disk tapdisk_remus;
 
 struct ramdisk {
 	size_t sector_size;

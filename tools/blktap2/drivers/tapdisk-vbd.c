@@ -43,6 +43,7 @@
 #include "tapdisk-driver.h"
 #include "tapdisk-server.h"
 #include "tapdisk-interface.h"
+#include "tapdisk-disktype.h"
 #include "tapdisk-vbd.h"
 #include "blktap2.h"
 
@@ -282,9 +283,9 @@ fail:
 
 /* TODO: ugh, lets not call it parent info... */
 static struct list_head *
-tapdisk_vbd_open_level(td_vbd_t *vbd, char* params, int driver_type, td_disk_info_t *parent_info, td_flag_t flags)
+tapdisk_vbd_open_level(td_vbd_t *vbd, const char* params, int driver_type, td_disk_info_t *parent_info, td_flag_t flags)
 {
-	char *name;
+	const char *name;
 	int type, err;
 	td_image_t *image;
 	td_disk_id_t id;
@@ -294,19 +295,16 @@ tapdisk_vbd_open_level(td_vbd_t *vbd, char* params, int driver_type, td_disk_inf
 	images = calloc(1, sizeof(struct list_head));
 	INIT_LIST_HEAD(images);
 
-	name   = params;
-	type   = driver_type;
+	name    = params;
+	id.name = NULL;
+	type    = driver_type;
 
 	for (;;) {
 		err   = -ENOMEM;
 		image = tapdisk_image_allocate(name, type,
 					       vbd->storage, flags, vbd);
 
-		/* free 'name' if it was created by td_get_parent_id() */
-		if (name != params) {
-			free(name);
-			name = NULL;
-		}
+		free(id.name);
 
 		if (!image)
 			return NULL;
@@ -382,7 +380,7 @@ tapdisk_vbd_open_level(td_vbd_t *vbd, char* params, int driver_type, td_disk_inf
 static int
 __tapdisk_vbd_open_vdi(td_vbd_t *vbd, td_flag_t extra_flags)
 {
-	char *file;
+	const char *file;
 	int err, type;
 	td_flag_t flags;
 	td_disk_id_t id;
@@ -524,9 +522,9 @@ tapdisk_vbd_open_vdi(td_vbd_t *vbd, const char *path,
 		     uint16_t drivertype, uint16_t storage, td_flag_t flags)
 {
 	int i, err;
-	struct tap_disk *ops;
+	const struct tap_disk *ops;
 
-	ops = tapdisk_server_find_driver_interface(drivertype);
+	ops = tapdisk_disk_drivers[drivertype];
 	if (!ops)
 		return -EINVAL;
 	DPRINTF("Loaded %s driver for vbd %u %s 0x%08x\n",
@@ -1573,7 +1571,8 @@ static int
 tapdisk_vbd_resume_ring(td_vbd_t *vbd)
 {
 	int i, err, type;
-	char *path, message[BLKTAP2_MAX_MESSAGE_LEN];
+	char message[BLKTAP2_MAX_MESSAGE_LEN];
+	const char *path;
 
 	memset(message, 0, sizeof(message));
 

@@ -65,6 +65,7 @@ TAP-OBJS-y  := scheduler.o
 TAP-OBJS-y  += tapdisk-vbd.o
 TAP-OBJS-y  += tapdisk-image.o
 TAP-OBJS-y  += tapdisk-driver.o
+TAP-OBJS-y  += tapdisk-disktype.o
 TAP-OBJS-y  += tapdisk-interface.o
 TAP-OBJS-y  += tapdisk-server.o
 TAP-OBJS-y  += tapdisk-queue.o
