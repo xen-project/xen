@@ -63,7 +63,7 @@ from xen.xend.XendConstants import *
 from xen.xend.XendAPIConstants import *
 from xen.xend.XendCPUPool import XendCPUPool
 from xen.xend.server.DevConstants import xenbusState
-from xen.xend.server.BlktapController import TAPDISK_DEVICE, parseDeviceString
+from xen.xend.server.BlktapController import TapdiskController
 
 from xen.xend.XendVMMetrics import XendVMMetrics
 
@@ -549,15 +549,8 @@ class XendDomainInfo:
                 dev =  xstransact.List(self.vmpath + '/device/tap2')
                 for x in dev:
                     path = self.getDeviceController('tap2').readBackend(x, 'params')
-                    if path and path.startswith(TAPDISK_DEVICE):
-                        try:
-                            _minor, _dev, ctrl = parseDeviceString(path)
-                            #pause the disk
-                            f = open(ctrl + '/pause', 'w')
-                            f.write('pause');
-                            f.close()
-                        except:
-                            pass
+                    if path and path.startswith(TapdiskController.TAP_DEV):
+                        TapdiskController.pause(path)
         except Exception, ex:
             log.warn('Could not pause blktap disk.');
 
@@ -578,17 +571,8 @@ class XendDomainInfo:
                 dev =  xstransact.List(self.vmpath + '/device/tap2')
                 for x in dev:
                     path = self.getDeviceController('tap2').readBackend(x, 'params')
-                    if path and path.startswith(TAPDISK_DEVICE):
-                        try:
-                            #Figure out the sysfs path.
-                            _minor, _dev, ctrl = parseDeviceString(path)
-                            #unpause the disk
-                            if(os.path.exists(ctrl + '/resume')):                  
-                                f = open(ctrl + '/resume', 'w');
-                                f.write('resume');
-                                f.close();
-                        except:
-                            pass
+                    if path and path.startswith(TapdiskController.TAP_DEV):
+                        TapdiskController.unpause(path)
 
         except Exception, ex:
             log.warn('Could not unpause blktap disk: %s' % str(ex));

@@ -1,5 +1,5 @@
 # Copyright (c) 2005, XenSource Ltd.
-import string, re
+import string, re, os
 
 from xen.xend.server.blkif import BlkifController
 from xen.xend.XendLogging import log
@@ -7,11 +7,6 @@ from xen.util.xpopen import xPopen3
 
 phantomDev = 0;
 phantomId = 0;
-
-TAPDISK_SYSFS   = '/sys/class/blktap2'
-TAPDISK_BINARY  = '/usr/sbin/tapdisk2'
-TAPDISK_DEVICE  = '/dev/xen/blktap-2/tapdev'
-TAPDISK_CONTROL = TAPDISK_SYSFS + '/blktap'
 
 blktap1_disk_types = [
     'aio',
@@ -42,20 +37,6 @@ def doexec(args, inputtext=None):
     stderr = proc.childerr
     rc = proc.wait()
     return (rc,stdout,stderr)
-
-def parseDeviceString(device):
-    if device.find('/dev') == -1:
-        raise Exception, 'invalid tap device: ' + device
-
-    pattern = re.compile(TAPDISK_DEVICE + '(\d+)$')
-    groups  = pattern.search(device)
-    if not groups:
-        raise Exception, 'malformed tap device: ' + device
-
-    minor   = groups.group(1)
-    control = TAPDISK_CONTROL + minor
-
-    return minor, device, control
 
 # blktap1 device controller
 class BlktapController(BlkifController):
@@ -179,18 +160,10 @@ class Blktap2Controller(BlktapController):
             (typ, params, file) = string.split(uname, ':', 2)
             subtyp = 'tapdisk'
 
-        #check for blktap2 installation.
-        blktap2_installed=0;
-        (rc,stdout, stderr) = doexec("cat /proc/devices");
-        out = stdout.read();
-        stdout.close();
-        stderr.close();
-        if( out.find("blktap2") >= 0 ):
-            blktap2_installed=1;
-
         if typ in ('tap'):
             if subtyp in ('tapdisk', 'ioemu'):
-                if params not in blktap2_disk_types or not blktap2_installed:
+                if params not in blktap2_disk_types or \
+                        TapdiskController.check():
                     # pass this device off to BlktapController
                     log.warn('WARNING: using deprecated blktap module')
                     self.deviceClass = 'tap'
@@ -198,22 +171,7 @@ class Blktap2Controller(BlktapController):
                     self.deviceClass = 'tap2'
                     return devid
 
-        if self.vm.image and self.vm.image.memory_sharing:
-            cmd = [ TAPDISK_BINARY, '-n', '%s:%s' % (params, file), '-s', '%d' % self.vm.getDomid() ]
-        else:
-            cmd = [ TAPDISK_BINARY, '-n', '%s:%s' % (params, file) ]
-        (rc,stdout,stderr) = doexec(cmd)
-
-        if rc != 0:
-            err = stderr.read();
-            out = stdout.read();
-            stdout.close();
-            stderr.close();
-            raise Exception, 'Failed to create device.\n    stdout: %s\n    stderr: %s\nCheck that target \"%s\" exists and that blktap2 driver installed in dom0.' % (out.rstrip(), err.rstrip(), file);
-
-        minor, device, control = parseDeviceString(stdout.readline())
-        stdout.close();
-        stderr.close();
+        device = TapdiskController.create(params, file)
 
         # modify the configutration to create a blkback for the underlying
         # blktap2 device. Note: we need to preserve the original tapdisk uname
@@ -226,8 +184,7 @@ class Blktap2Controller(BlktapController):
         config.pop('tapdisk_uname')
         return devid
 
-    # The new blocktap implementation requires a sysfs signal to close
-    # out disks.  This function is called from a thread when the
+    # This function is called from a thread when the
     # domain is detached from the disk.
     def finishDeviceCleanup(self, backpath, path):
         """Perform any device specific cleanup
@@ -239,14 +196,117 @@ class Blktap2Controller(BlktapController):
 
         #Figure out what we're going to wait on.
         self.waitForBackend_destroy(backpath)
+        TapdiskController.destroy(path)
 
-        #Figure out the sysfs path.
-        minor, dev, ctrl = parseDeviceString(path)
+class TapdiskException(Exception):
+    pass
 
-        #Close out the disk
-        f = open(ctrl + '/remove', 'w')
-        f.write('remove');
-        f.close()
+class TapdiskController(object):
+    '''class which encapsulates all tapdisk control operations'''
 
-        return
+    TAP_CTL = 'tap-ctl'
+    TAP_DEV = '/dev/xen/blktap-2/tapdev'
 
+    class Tapdisk(object):
+        def __init__(self, pid=None, minor=-1, state=None,
+                     dtype='', image=None, device=None):
+            self.pid = pid
+            self.minor = minor
+            self.state = state
+            self.dtype = dtype
+            self.image = image
+            self.device = device
+
+        def __str__(self):
+            return 'image=%s pid=%s minor=%s state=%s type=%s device=%s' \
+                % (self.image, self.pid, self.minor, self.state, self.dtype,
+                   self.device)
+
+    @staticmethod
+    def exc(*args):
+        rc, stdout, stderr = doexec([TapdiskController.TAP_CTL] + list(args))
+        out, err = stdout.read().strip(), stderr.read().strip()
+        stdout.close()
+        stderr.close()
+        if rc:
+            raise TapdiskException('%s failed (%s %s %s)' % \
+                                       (args, rc, out, err))
+        return out
+
+    @staticmethod
+    def check():
+        try:
+            TapdiskController.exc('check')
+            return 0
+        except Exception, e:
+            log.warn("tapdisk2 check failed: %s" % e)
+            return -1
+
+    @staticmethod
+    def list():
+        tapdisks = []
+
+        _list = TapdiskController.exc('list')
+        if not _list: return []
+
+        for line in _list.split('\n'):
+            tapdisk = TapdiskController.Tapdisk()
+
+            for pair in line.split():
+                key, value = pair.split('=')
+                if key == 'pid':
+                    tapdisk.pid = value
+                elif key == 'minor':
+                    tapdisk.minor = int(value)
+                    if tapdisk.minor >= 0:
+                        tapdisk.device = '%s%s' % \
+                            (TapdiskController.TAP_DEV, tapdisk.minor)
+                elif key == 'state':
+                    tapdisk.state = value
+                elif key == 'args' and value.find(':') != -1:
+                    tapdisk.dtype, tapdisk.image = value.split(':')
+
+            tapdisks.append(tapdisk)
+
+        return tapdisks
+
+    @staticmethod
+    def fromDevice(device):
+        if device.startswith(TapdiskController.TAP_DEV):
+            minor = os.minor(os.stat(device).st_rdev)
+            tapdisks = filter(lambda x: x.minor == minor,
+                              TapdiskController.list())
+            if len(tapdisks) == 1:
+                return tapdisks[0]
+        return None
+
+    @staticmethod
+    def create(dtype, image):
+        return TapdiskController.exc('create', '-a%s:%s' % (dtype, image))
+
+    @staticmethod
+    def destroy(device):
+        tapdisk = TapdiskController.fromDevice(device)
+        if tapdisk:
+            if tapdisk.pid:
+                TapdiskController.exc('destroy',
+                                      '-p%s' % tapdisk.pid,
+                                      '-m%s' % tapdisk.minor)
+            else:
+                TapdiskController.exc('free', '-m%s' % tapdisk.minor)
+
+    @staticmethod
+    def pause(device):
+        tapdisk = TapdiskController.fromDevice(device)
+        if tapdisk and tapdisk.pid:
+            TapdiskController.exc('pause',
+                                  '-p%s' % tapdisk.pid,
+                                  '-m%s' % tapdisk.minor)
+
+    @staticmethod
+    def unpause(device):
+        tapdisk = TapdiskController.fromDevice(device)
+        if tapdisk and tapdisk.pid:
+            TapdiskController.exc('unpause',
+                                  '-p%s' % tapdisk.pid,
+                                  '-m%s' % tapdisk.minor)
