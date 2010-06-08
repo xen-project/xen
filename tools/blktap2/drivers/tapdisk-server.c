@@ -63,6 +63,12 @@ tapdisk_server_get_shared_image(td_image_t *image)
 	return NULL;
 }
 
+struct list_head *
+tapdisk_server_get_all_vbds(void)
+{
+	return &server.vbds;
+}
+
 td_vbd_t *
 tapdisk_server_get_vbd(uint16_t uuid)
 {
@@ -218,24 +224,29 @@ tapdisk_server_close(void)
 	tapdisk_server_close_aio();
 }
 
-static void
-__tapdisk_server_run(void)
+void
+tapdisk_server_iterate(void)
 {
 	int ret;
 
-	while (server.run) {
-		tapdisk_server_assert_locks();
-		tapdisk_server_set_retry_timeout();
-		tapdisk_server_check_progress();
+	tapdisk_server_assert_locks();
+	tapdisk_server_set_retry_timeout();
+	tapdisk_server_check_progress();
 
-		ret = scheduler_wait_for_events(&server.scheduler);
-		if (ret < 0)
-			DBG(TLOG_WARN, "server wait returned %d\n", ret);
+	ret = scheduler_wait_for_events(&server.scheduler);
+	if (ret < 0)
+		DBG(TLOG_WARN, "server wait returned %d\n", ret);
 
-		tapdisk_server_check_vbds();
-		tapdisk_server_submit_tiocbs();
-		tapdisk_server_kick_responses();
-	}
+	tapdisk_server_check_vbds();
+	tapdisk_server_submit_tiocbs();
+	tapdisk_server_kick_responses();
+}
+
+static void
+__tapdisk_server_run(void)
+{
+	while (server.run)
+		tapdisk_server_iterate();
 }
 
 static void
@@ -267,22 +278,50 @@ tapdisk_server_signal_handler(int signal)
 }
 
 int
-tapdisk_server_initialize(void)
+tapdisk_server_init(void)
 {
-	int err;
-
-	memset(&server, 0, sizeof(tapdisk_server_t));
+	memset(&server, 0, sizeof(server));
 	INIT_LIST_HEAD(&server.vbds);
 
 	scheduler_initialize(&server.scheduler);
 
+	return 0;
+}
+
+int
+tapdisk_server_complete(void)
+{
+	int err;
+
 	err = tapdisk_server_init_aio();
 	if (err)
-		return err;
+		goto fail;
 
 	server.run = 1;
 
 	return 0;
+
+fail:
+	tapdisk_server_close_aio();
+	return err;
+}
+
+int
+tapdisk_server_initialize(void)
+{
+	int err;
+
+	tapdisk_server_init();
+
+	err = tapdisk_server_complete();
+	if (err)
+		goto fail;
+
+	return 0;
+
+fail:
+	tapdisk_server_close();
+	return err;
 }
 
 int

@@ -1,4 +1,4 @@
-/* 
+/*
  * Copyright (c) 2008, XenSource Inc.
  * All rights reserved.
  *
@@ -25,43 +25,45 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef _TAPDISK_SERVER_H_
-#define _TAPDISK_SERVER_H_
 
-#include "list.h"
-#include "tapdisk-vbd.h"
-#include "tapdisk-queue.h"
+#include <stdio.h>
+#include <errno.h>
 
-struct tap_disk *tapdisk_server_find_driver_interface(int);
+#include "tap-ctl.h"
 
-td_image_t *tapdisk_server_get_shared_image(td_image_t *);
+int
+tap_ctl_blk_major(void)
+{
+	FILE *devices;
+	int rv, major;
 
-struct list_head *tapdisk_server_get_all_vbds(void);
-td_vbd_t *tapdisk_server_get_vbd(td_uuid_t);
-void tapdisk_server_add_vbd(td_vbd_t *);
-void tapdisk_server_remove_vbd(td_vbd_t *);
+	devices = fopen("/proc/devices", "r");
+	if (!devices) {
+		rv = -errno;
+		goto out;
+	}
 
-void tapdisk_server_queue_tiocb(struct tiocb *);
+	do {
+		char buf[32], *s;
+		int n, offset;
 
-void tapdisk_server_check_state(void);
+		s = fgets(buf, sizeof(buf), devices);
+		if (!s)
+			break;
 
-event_id_t tapdisk_server_register_event(char, int, int, event_cb_t, void *);
-void tapdisk_server_unregister_event(event_id_t);
-void tapdisk_server_set_max_timeout(int);
+		major  = -ENODEV;
+		offset = 0;
 
-int tapdisk_server_init(void);
-int tapdisk_server_initialize(void);
-int tapdisk_server_complete(void);
-int tapdisk_server_run(void);
-void tapdisk_server_iterate(void);
+		n = sscanf(buf, "%d tapdev%n", &major, &offset);
+		if (n == 1 && offset)
+			break;
+	} while (1);
 
-#define TAPDISK_TIOCBS              (TAPDISK_DATA_REQUESTS + 50)
+	rv = major;
 
-typedef struct tapdisk_server {
-	int                          run;
-	struct list_head             vbds;
-	scheduler_t                  scheduler;
-	struct tqueue                aio_queue;
-} tapdisk_server_t;
+out:
+	if (devices)
+		fclose(devices);
 
-#endif
+	return rv;
+}

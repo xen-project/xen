@@ -27,107 +27,53 @@
  */
 #include <stdio.h>
 #include <errno.h>
-#include <fcntl.h>
-#include <stdlib.h>
 #include <unistd.h>
-#ifdef MEMSHR
-#include <memshr.h>
-#endif
+#include <string.h>
 
-#include "tapdisk.h"
-#include "tapdisk-utils.h"
-#include "tapdisk-server.h"
-#include "tapdisk-control.h"
+#include "tap-ctl.h"
+#include "blktap2.h"
 
-static void
-usage(const char *app, int err)
+int
+tap_ctl_check_blktap(const char **msg)
 {
-	fprintf(stderr, "usage: %s <-u uuid> <-c control socket>\n", app);
-	exit(err);
+	FILE *f;
+	int err = 0, minor;
+	char name[32];
+
+	memset(name, 0, sizeof(name));
+
+	f = fopen("/proc/misc", "r");
+	if (!f) {
+		*msg = "failed to open /proc/misc";
+		return -errno;
+	}
+
+	while (fscanf(f, "%d %32s", &minor, name) == 2) {
+		if (!strcmp(name, BLKTAP2_CONTROL_NAME))
+			goto out;
+	}
+
+	err = -ENOSYS;
+	*msg = "blktap kernel module not installed";
+
+out:
+	fclose(f);
+	return err;
 }
 
 int
-main(int argc, char *argv[])
+tap_ctl_check(const char **msg)
 {
-	char *control;
-	int c, err, nodaemon;
+	int err;
+	uid_t uid;
 
-	control  = NULL;
-	nodaemon = 0;
-
-	while ((c = getopt(argc, argv, "s:Dh")) != -1) {
-		switch (c) {
-		case 'D':
-			nodaemon = 1;
-			break;
-		case 'h':
-			usage(argv[0], 0);
-			break;
-		case 's':
-#ifdef MEMSHR
-			memshr_set_domid(atoi(optarg));
-#else
-			fprintf(stderr, "MEMSHR support not compiled in.\n");
-			exit(EXIT_FAILURE);
-#endif
-			break;
-		default:
-			usage(argv[0], EINVAL);
-		}
-	}
-
-	if (optind != argc)
-		usage(argv[0], EINVAL);
-
-	chdir("/");
-	tapdisk_start_logging("tapdisk2");
-
-	err = tapdisk_server_init();
-	if (err) {
-		DPRINTF("failed to initialize server: %d\n", err);
+	err = tap_ctl_check_blktap(msg);
+	if (err)
 		goto out;
-	}
 
-	if (!nodaemon) {
-		err = daemon(0, 1);
-		if (err) {
-			DPRINTF("failed to daemonize: %d\n", errno);
-			goto out;
-		}
-	}
-
-	err = tapdisk_control_open(&control);
-	if (err) {
-		DPRINTF("failed to open control socket: %d\n", err);
-		goto out;
-	}
-
-	fprintf(stdout, "%s\n", control);
-	fflush(stdout);
-
-	if (!nodaemon) {
-		int fd;
-
-		fd = open("/dev/null", O_RDWR);
-		if (fd != -1) {
-			dup2(fd, STDIN_FILENO);
-			dup2(fd, STDOUT_FILENO);
-			dup2(fd, STDERR_FILENO);
-			if (fd > 2)
-				close(fd);
-		}
-	}
-
-	err = tapdisk_server_complete();
-	if (err) {
-		DPRINTF("failed to complete server: %d\n", err);
-		goto out;
-	}
-
-	err = tapdisk_server_run();
+	err  = 0;
+	*msg = "ok";
 
 out:
-	tapdisk_control_close();
-	tapdisk_stop_logging();
 	return err;
 }

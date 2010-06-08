@@ -1,4 +1,4 @@
-/* 
+/*
  * Copyright (c) 2008, XenSource Inc.
  * All rights reserved.
  *
@@ -25,43 +25,43 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef _TAPDISK_SERVER_H_
-#define _TAPDISK_SERVER_H_
+#ifndef _BLKTAP_2_H_
+#define _BLKTAP_2_H_
 
-#include "list.h"
-#include "tapdisk-vbd.h"
-#include "tapdisk-queue.h"
+#define BLKTAP2_MAX_MESSAGE_LEN        256
 
-struct tap_disk *tapdisk_server_find_driver_interface(int);
+#define BLKTAP2_RING_MESSAGE_PAUSE     1
+#define BLKTAP2_RING_MESSAGE_RESUME    2
+#define BLKTAP2_RING_MESSAGE_CLOSE     3
 
-td_image_t *tapdisk_server_get_shared_image(td_image_t *);
+#define BLKTAP2_IOCTL_KICK_FE          1
+#define BLKTAP2_IOCTL_ALLOC_TAP        200
+#define BLKTAP2_IOCTL_FREE_TAP         201
+#define BLKTAP2_IOCTL_CREATE_DEVICE    202
+#define BLKTAP2_IOCTL_SET_PARAMS       203
+#define BLKTAP2_IOCTL_PAUSE            204
+#define BLKTAP2_IOCTL_REOPEN           205
+#define BLKTAP2_IOCTL_RESUME           206
 
-struct list_head *tapdisk_server_get_all_vbds(void);
-td_vbd_t *tapdisk_server_get_vbd(td_uuid_t);
-void tapdisk_server_add_vbd(td_vbd_t *);
-void tapdisk_server_remove_vbd(td_vbd_t *);
+#define BLKTAP2_SYSFS_DIR              "/sys/class/blktap2"
+#define BLKTAP2_CONTROL_NAME           "blktap-control"
+#define BLKTAP2_CONTROL_DIR            "/var/run/"BLKTAP2_CONTROL_NAME
+#define BLKTAP2_CONTROL_SOCKET         "ctl"
+#define BLKTAP2_DIRECTORY              "/dev/xen/blktap-2"
+#define BLKTAP2_CONTROL_DEVICE         BLKTAP2_DIRECTORY"/control"
+#define BLKTAP2_RING_DEVICE            BLKTAP2_DIRECTORY"/blktap"
+#define BLKTAP2_IO_DEVICE              BLKTAP2_DIRECTORY"/tapdev"
 
-void tapdisk_server_queue_tiocb(struct tiocb *);
+struct blktap2_handle {
+	unsigned int                   ring;
+	unsigned int                   device;
+	unsigned int                   minor;
+};
 
-void tapdisk_server_check_state(void);
-
-event_id_t tapdisk_server_register_event(char, int, int, event_cb_t, void *);
-void tapdisk_server_unregister_event(event_id_t);
-void tapdisk_server_set_max_timeout(int);
-
-int tapdisk_server_init(void);
-int tapdisk_server_initialize(void);
-int tapdisk_server_complete(void);
-int tapdisk_server_run(void);
-void tapdisk_server_iterate(void);
-
-#define TAPDISK_TIOCBS              (TAPDISK_DATA_REQUESTS + 50)
-
-typedef struct tapdisk_server {
-	int                          run;
-	struct list_head             vbds;
-	scheduler_t                  scheduler;
-	struct tqueue                aio_queue;
-} tapdisk_server_t;
+struct blktap2_params {
+	char                           name[BLKTAP2_MAX_MESSAGE_LEN];
+	unsigned long long             capacity;
+	unsigned long                  sector_size;
+};
 
 #endif

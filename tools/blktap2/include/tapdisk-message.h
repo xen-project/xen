@@ -33,6 +33,9 @@
 #define TAPDISK_MESSAGE_MAX_PATH_LENGTH  256
 #define TAPDISK_MESSAGE_STRING_LENGTH    256
 
+#define TAPDISK_MESSAGE_MAX_MINORS \
+	((TAPDISK_MESSAGE_MAX_PATH_LENGTH / sizeof(int)) - 1)
+
 #define TAPDISK_MESSAGE_FLAG_SHARED      0x01
 #define TAPDISK_MESSAGE_FLAG_RDONLY      0x02
 #define TAPDISK_MESSAGE_FLAG_ADD_CACHE   0x04
@@ -44,10 +47,13 @@ typedef uint8_t                          tapdisk_message_flag_t;
 typedef struct tapdisk_message_image     tapdisk_message_image_t;
 typedef struct tapdisk_message_params    tapdisk_message_params_t;
 typedef struct tapdisk_message_string    tapdisk_message_string_t;
+typedef struct tapdisk_message_response  tapdisk_message_response_t;
+typedef struct tapdisk_message_minors    tapdisk_message_minors_t;
+typedef struct tapdisk_message_list      tapdisk_message_list_t;
 
 struct tapdisk_message_params {
 	tapdisk_message_flag_t           flags;
-	
+
 	uint8_t                          storage;
 	uint32_t                         devnum;
 	uint32_t                         domid;
@@ -65,6 +71,23 @@ struct tapdisk_message_string {
 	char                             text[TAPDISK_MESSAGE_STRING_LENGTH];
 };
 
+struct tapdisk_message_response {
+	int                              error;
+	char                             message[TAPDISK_MESSAGE_STRING_LENGTH];
+};
+
+struct tapdisk_message_minors {
+	int                              count;
+	int                              list[TAPDISK_MESSAGE_MAX_MINORS];
+};
+
+struct tapdisk_message_list {
+	int                              count;
+	int                              minor;
+	int                              state;
+	char                             path[TAPDISK_MESSAGE_MAX_PATH_LENGTH];
+};
+
 struct tapdisk_message {
 	uint16_t                         type;
 	uint16_t                         cookie;
@@ -74,6 +97,9 @@ struct tapdisk_message {
 		tapdisk_message_image_t  image;
 		tapdisk_message_params_t params;
 		tapdisk_message_string_t string;
+		tapdisk_message_minors_t minors;
+		tapdisk_message_response_t response;
+		tapdisk_message_list_t   list;
 	} u;
 };
 
@@ -82,6 +108,8 @@ enum tapdisk_message_id {
 	TAPDISK_MESSAGE_RUNTIME_ERROR,
 	TAPDISK_MESSAGE_PID,
 	TAPDISK_MESSAGE_PID_RSP,
+	TAPDISK_MESSAGE_ATTACH,
+	TAPDISK_MESSAGE_ATTACH_RSP,
 	TAPDISK_MESSAGE_OPEN,
 	TAPDISK_MESSAGE_OPEN_RSP,
 	TAPDISK_MESSAGE_PAUSE,
@@ -90,6 +118,13 @@ enum tapdisk_message_id {
 	TAPDISK_MESSAGE_RESUME_RSP,
 	TAPDISK_MESSAGE_CLOSE,
 	TAPDISK_MESSAGE_CLOSE_RSP,
+	TAPDISK_MESSAGE_DETACH,
+	TAPDISK_MESSAGE_DETACH_RSP,
+	TAPDISK_MESSAGE_LIST_MINORS,
+	TAPDISK_MESSAGE_LIST_MINORS_RSP,
+	TAPDISK_MESSAGE_LIST,
+	TAPDISK_MESSAGE_LIST_RSP,
+	TAPDISK_MESSAGE_FORCE_SHUTDOWN,
 	TAPDISK_MESSAGE_EXIT,
 };
 
@@ -127,8 +162,35 @@ tapdisk_message_name(enum tapdisk_message_id id)
 	case TAPDISK_MESSAGE_CLOSE:
 		return "close";
 
+	case TAPDISK_MESSAGE_FORCE_SHUTDOWN:
+		return "force shutdown";
+
 	case TAPDISK_MESSAGE_CLOSE_RSP:
 		return "close response";
+
+	case TAPDISK_MESSAGE_ATTACH:
+		return "attach";
+
+	case TAPDISK_MESSAGE_ATTACH_RSP:
+		return "attach response";
+
+	case TAPDISK_MESSAGE_DETACH:
+		return "detach";
+
+	case TAPDISK_MESSAGE_DETACH_RSP:
+		return "detach response";
+
+	case TAPDISK_MESSAGE_LIST_MINORS:
+		return "list minors";
+
+	case TAPDISK_MESSAGE_LIST_MINORS_RSP:
+		return "list minors response";
+
+	case TAPDISK_MESSAGE_LIST:
+		return "list";
+
+	case TAPDISK_MESSAGE_LIST_RSP:
+		return "list response";
 
 	case TAPDISK_MESSAGE_EXIT:
 		return "exit";

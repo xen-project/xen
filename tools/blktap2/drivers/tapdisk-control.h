@@ -25,42 +25,11 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef _BLKTAP_2_H_
-#define _BLKTAP_2_H_
 
-#define MISC_MAJOR_NUMBER              10
+#ifndef __TAPDISK_CONTROL_H__
+#define __TAPDISK_CONTROL_H__
 
-#define BLKTAP2_MAX_MESSAGE_LEN        256
-
-#define BLKTAP2_RING_MESSAGE_PAUSE     1
-#define BLKTAP2_RING_MESSAGE_RESUME    2
-#define BLKTAP2_RING_MESSAGE_CLOSE     3
-
-#define BLKTAP2_IOCTL_KICK_FE          1
-#define BLKTAP2_IOCTL_ALLOC_TAP        200
-#define BLKTAP2_IOCTL_FREE_TAP         201
-#define BLKTAP2_IOCTL_CREATE_DEVICE    202
-#define BLKTAP2_IOCTL_SET_PARAMS       203
-#define BLKTAP2_IOCTL_PAUSE            204
-#define BLKTAP2_IOCTL_REOPEN           205
-#define BLKTAP2_IOCTL_RESUME           206
-
-#define BLKTAP2_CONTROL_NAME           "blktap-control"
-#define BLKTAP2_DIRECTORY              "/dev/xen/blktap-2"
-#define BLKTAP2_CONTROL_DEVICE         BLKTAP2_DIRECTORY"/control"
-#define BLKTAP2_RING_DEVICE            BLKTAP2_DIRECTORY"/blktap"
-#define BLKTAP2_IO_DEVICE              BLKTAP2_DIRECTORY"/tapdev"
-
-struct blktap2_handle {
-	unsigned int                   ring;
-	unsigned int                   device;
-	unsigned int                   minor;
-};
-
-struct blktap2_params {
-	char                           name[BLKTAP2_MAX_MESSAGE_LEN];
-	unsigned long long             capacity;
-	unsigned long                  sector_size;
-};
+int tapdisk_control_open(char **path);
+void tapdisk_control_close(void);
 
 #endif

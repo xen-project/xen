@@ -27,107 +27,49 @@
  */
 #include <stdio.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <stdlib.h>
 #include <unistd.h>
-#ifdef MEMSHR
-#include <memshr.h>
-#endif
+#include <string.h>
+#include <getopt.h>
 
-#include "tapdisk.h"
-#include "tapdisk-utils.h"
-#include "tapdisk-server.h"
-#include "tapdisk-control.h"
-
-static void
-usage(const char *app, int err)
-{
-	fprintf(stderr, "usage: %s <-u uuid> <-c control socket>\n", app);
-	exit(err);
-}
+#include "tap-ctl.h"
+#include "blktaplib.h"
 
 int
-main(int argc, char *argv[])
+tap_ctl_open(const int id, const int minor, const char *params)
 {
-	char *control;
-	int c, err, nodaemon;
+	int err;
+	tapdisk_message_t message;
 
-	control  = NULL;
-	nodaemon = 0;
+	memset(&message, 0, sizeof(message));
+	message.type = TAPDISK_MESSAGE_OPEN;
+	message.cookie = minor;
+	message.u.params.storage = TAPDISK_STORAGE_TYPE_DEFAULT;
+	message.u.params.devnum = minor;
 
-	while ((c = getopt(argc, argv, "s:Dh")) != -1) {
-		switch (c) {
-		case 'D':
-			nodaemon = 1;
-			break;
-		case 'h':
-			usage(argv[0], 0);
-			break;
-		case 's':
-#ifdef MEMSHR
-			memshr_set_domid(atoi(optarg));
-#else
-			fprintf(stderr, "MEMSHR support not compiled in.\n");
-			exit(EXIT_FAILURE);
-#endif
-			break;
-		default:
-			usage(argv[0], EINVAL);
-		}
+	err = snprintf(message.u.params.path,
+		       sizeof(message.u.params.path) - 1, "%s", params);
+	if (err >= sizeof(message.u.params.path)) {
+		EPRINTF("name too long\n");
+		return ENAMETOOLONG;
 	}
 
-	if (optind != argc)
-		usage(argv[0], EINVAL);
+	err = tap_ctl_connect_send_and_receive(id, &message, 5);
+	if (err)
+		return err;
 
-	chdir("/");
-	tapdisk_start_logging("tapdisk2");
-
-	err = tapdisk_server_init();
-	if (err) {
-		DPRINTF("failed to initialize server: %d\n", err);
-		goto out;
+	switch (message.type) {
+	case TAPDISK_MESSAGE_OPEN_RSP:
+		break;
+	case TAPDISK_MESSAGE_ERROR:
+		err = -message.u.response.error;
+		EPRINTF("open failed, err %d\n", err);
+		break;
+	default:
+		EPRINTF("got unexpected result '%s' from %d\n",
+			tapdisk_message_name(message.type), id);
+		err = EINVAL;
 	}
 
-	if (!nodaemon) {
-		err = daemon(0, 1);
-		if (err) {
-			DPRINTF("failed to daemonize: %d\n", errno);
-			goto out;
-		}
-	}
-
-	err = tapdisk_control_open(&control);
-	if (err) {
-		DPRINTF("failed to open control socket: %d\n", err);
-		goto out;
-	}
-
-	fprintf(stdout, "%s\n", control);
-	fflush(stdout);
-
-	if (!nodaemon) {
-		int fd;
-
-		fd = open("/dev/null", O_RDWR);
-		if (fd != -1) {
-			dup2(fd, STDIN_FILENO);
-			dup2(fd, STDOUT_FILENO);
-			dup2(fd, STDERR_FILENO);
-			if (fd > 2)
-				close(fd);
-		}
-	}
-
-	err = tapdisk_server_complete();
-	if (err) {
-		DPRINTF("failed to complete server: %d\n", err);
-		goto out;
-	}
-
-	err = tapdisk_server_run();
-
-out:
-	tapdisk_control_close();
-	tapdisk_stop_logging();
 	return err;
 }

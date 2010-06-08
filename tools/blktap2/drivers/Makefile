@@ -12,8 +12,7 @@ INST_DIR   = $(SBINDIR)
 CFLAGS    += -Werror -g -O0
 CFLAGS    += -Wno-unused
 CFLAGS    += -fno-strict-aliasing
-CFLAGS    += -I../lib -I../../libxc
-CFLAGS    += -I../include -I../../include
+CFLAGS    += -I$(BLKTAP_ROOT)/include -I$(BLKTAP_ROOT)/drivers
 CFLAGS    += $(CFLAGS_libxenctrl)
 CFLAGS    += -I $(LIBAIO_DIR)
 CFLAGS    += -I $(MEMSHR_DIR)
@@ -63,6 +62,7 @@ PORTABLE-OBJS-$(CONFIG_NetBSD) += blk_netbsd.o
 
 TAP-OBJS-y  := scheduler.o
 TAP-OBJS-y  += tapdisk-vbd.o
+TAP-OBJS-y  += tapdisk-control.o
 TAP-OBJS-y  += tapdisk-image.o
 TAP-OBJS-y  += tapdisk-driver.o
 TAP-OBJS-y  += tapdisk-disktype.o
