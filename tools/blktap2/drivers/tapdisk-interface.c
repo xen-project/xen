@@ -59,7 +59,7 @@ td_load(td_image_t *image)
 }
 
 int
-td_open(td_image_t *image)
+__td_open(td_image_t *image, td_disk_info_t *info)
 {
 	int err;
 	td_driver_t *driver;
@@ -72,6 +72,9 @@ td_open(td_image_t *image)
 						 image->storage);
 		if (!driver)
 			return -ENOMEM;
+
+		if (info) /* pre-seed driver->info for virtual drivers */
+			driver->info = *info;
 	}
 
 	if (!td_flag_test(driver->state, TD_DRIVER_OPEN)) {
@@ -92,6 +95,12 @@ td_open(td_image_t *image)
 	image->info   = driver->info;
 	driver->refcnt++;
 	return 0;
+}
+
+int
+td_open(td_image_t *image)
+{
+	return __td_open(image, NULL);
 }
 
 int

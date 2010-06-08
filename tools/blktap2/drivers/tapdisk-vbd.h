@@ -80,7 +80,7 @@ struct td_vbd_request {
 };
 
 struct td_vbd_driver_info {
-	const char                 *params;
+	char                       *params;
 	int                         type;
 	struct list_head            next;
 };
@@ -174,6 +174,7 @@ int tapdisk_vbd_parse_stack(td_vbd_t *vbd, const char *path);
 int tapdisk_vbd_open(td_vbd_t *, const char *, uint16_t,
 		     uint16_t, const char *, td_flag_t);
 int tapdisk_vbd_close(td_vbd_t *);
+void tapdisk_vbd_free_stack(td_vbd_t *);
 
 int tapdisk_vbd_open_vdi(td_vbd_t *, const char *,
 			 uint16_t, uint16_t, td_flag_t);
