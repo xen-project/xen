@@ -1,0 +1,21 @@
+#!/bin/sh
+#
+# PROVIDE: xend
+# REQUIRE: xencommons
+
+. /etc/rc.subr
+
+DIR=$(dirname "$0")
+. "${DIR}/xen-hotplugpath.sh"
+
+LD_LIBRARY_PATH="${LIBDIR}"
+export LD_LIBRARY_PATH PYTHONPATH
+
+name="xend"
+rcvar=$name
+command="${SBINDIR}/xend"
+start_cmd="echo Starting ${name}. && PATH=${PATH}:${SBINDIR} ${command} start"
+pidfile="/var/run/xend.pid"
+
+load_rc_config $name
+run_rc_command "$1"
