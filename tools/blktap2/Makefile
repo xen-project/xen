@@ -8,8 +8,8 @@ SUBDIRS-y :=
 SUBDIRS-y += include
 SUBDIRS-y += lvm
 SUBDIRS-y += vhd
-SUBDIRS-y += drivers
-SUBDIRS-y += control
+SUBDIRS-$(CONFIG_Linux) += drivers
+SUBDIRS-$(CONFIG_Linux) += control
 
 clean:
 	rm -rf *.a *.so *.o *.rpm $(LIB) *~ $(DEPS) TAGS
