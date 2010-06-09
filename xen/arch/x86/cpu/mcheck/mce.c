@@ -164,7 +164,7 @@ static struct mcinfo_bank *mca_init_bank(enum mca_source who,
     }
 
     memset(mib, 0, sizeof (struct mcinfo_bank));
-    mca_rdmsrl(MSR_IA32_MC0_STATUS + bank * 4, mib->mc_status);
+    mca_rdmsrl(MSR_IA32_MCx_STATUS(bank), mib->mc_status);
 
     mib->common.type = MC_TYPE_BANK;
     mib->common.size = sizeof (struct mcinfo_bank);
@@ -172,11 +172,11 @@ static struct mcinfo_bank *mca_init_bank(enum mca_source who,
 
     addr = misc = 0;
     if (mib->mc_status & MCi_STATUS_MISCV)
-        mca_rdmsrl(MSR_IA32_MC0_MISC + 4 * bank, mib->mc_misc);
+        mca_rdmsrl(MSR_IA32_MCx_MISC(bank), mib->mc_misc);
 
     if (mib->mc_status & MCi_STATUS_ADDRV)
     {
-        mca_rdmsrl(MSR_IA32_MC0_ADDR + 4 * bank, mib->mc_addr);
+        mca_rdmsrl(MSR_IA32_MCx_ADDR(bank), mib->mc_addr);
 
         if (mfn_valid(paddr_to_pfn(mib->mc_addr))) {
             struct domain *d;
@@ -287,7 +287,7 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, struct mca_banks *bankma
         if (!mcabanks_test(i, bankmask))
             continue;
 
-        mca_rdmsrl(MSR_IA32_MC0_STATUS + i * 4, status);
+        mca_rdmsrl(MSR_IA32_MCx_STATUS(i), status);
         if (!(status & MCi_STATUS_VAL))
             continue; /* this bank has no valid telemetry */
 
@@ -345,7 +345,7 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, struct mca_banks *bankma
         /* By default, need_clear = 1 */
         if (who != MCA_MCE_SCAN && need_clear)
             /* Clear status */
-            mca_wrmsrl(MSR_IA32_MC0_STATUS + 4 * i, 0x0ULL);
+            mca_wrmsrl(MSR_IA32_MCx_STATUS(i), 0x0ULL);
         else if ( who == MCA_MCE_SCAN && need_clear)
             mcabanks_set(i, clear_bank);
 
@@ -605,10 +605,10 @@ void mcheck_mca_clearbanks(struct mca_banks *bankmask)
     for (i = 0; i < 32 && i < nr_mce_banks; i++) {
         if (!mcabanks_test(i, bankmask))
             continue;
-        mca_rdmsrl(MSR_IA32_MC0_STATUS + i * 4, status);
+        mca_rdmsrl(MSR_IA32_MCx_STATUS(i), status);
         if (!(status & MCi_STATUS_VAL))
             continue;
-        mca_wrmsrl(MSR_IA32_MC0_STATUS + 4 * i, 0x0ULL);
+        mca_wrmsrl(MSR_IA32_MCx_STATUS(i), 0x0ULL);
     }
 }
 
@@ -1081,7 +1081,7 @@ void intpose_inval(unsigned int cpu_nr, uint64_t msr)
 
 #define IS_MCA_BANKREG(r) \
     ((r) >= MSR_IA32_MC0_CTL && \
-    (r) <= MSR_IA32_MC0_MISC + (nr_mce_banks - 1) * 4 && \
+    (r) <= MSR_IA32_MCx_MISC(nr_mce_banks - 1) && \
     ((r) - MSR_IA32_MC0_CTL) % 4 != 0) /* excludes MCi_CTL */
 
 static int x86_mc_msrinject_verify(struct xen_mc_msrinject *mci)

@@ -32,7 +32,7 @@ static fastcall void k7_machine_check(struct cpu_user_regs * regs, long error_co
 		smp_processor_id(), mcgsth, mcgstl);
 
 	for (i=1; i<nr_mce_banks; i++) {
-		rdmsr (MSR_IA32_MC0_STATUS+i*4,low, high);
+		rdmsr (MSR_IA32_MCx_STATUS(i),low, high);
 		if (high&(1<<31)) {
 			if (high & (1<<29))
 				recover |= 1;
@@ -41,16 +41,16 @@ static fastcall void k7_machine_check(struct cpu_user_regs * regs, long error_co
 			printk (KERN_EMERG "Bank %d: %08x%08x", i, high, low);
 			high &= ~(1<<31);
 			if (high & (1<<27)) {
-				rdmsr (MSR_IA32_MC0_MISC+i*4, alow, ahigh);
+				rdmsr (MSR_IA32_MCx_MISC(i), alow, ahigh);
 				printk ("[%08x%08x]", ahigh, alow);
 			}
 			if (high & (1<<26)) {
-				rdmsr (MSR_IA32_MC0_ADDR+i*4, alow, ahigh);
+				rdmsr (MSR_IA32_MCx_ADDR(i), alow, ahigh);
 				printk (" at %08x%08x", ahigh, alow);
 			}
 			printk ("\n");
 			/* Clear it */
-			wrmsr (MSR_IA32_MC0_STATUS+i*4, 0UL, 0UL);
+			wrmsr (MSR_IA32_MCx_STATUS(i), 0UL, 0UL);
 			/* Serialize */
 			wmb();
 			add_taint(TAINT_MACHINE_CHECK);
@@ -78,8 +78,8 @@ enum mcheck_type amd_k7_mcheck_init(struct cpuinfo_x86 *c)
 	 * as some Athlons cause spurious MCEs when its enabled. */
 	wrmsr (MSR_IA32_MC0_STATUS, 0x0, 0x0);
 	for (i=1; i<nr_mce_banks; i++) {
-		wrmsr (MSR_IA32_MC0_CTL+4*i, 0xffffffff, 0xffffffff);
-		wrmsr (MSR_IA32_MC0_STATUS+4*i, 0x0, 0x0);
+		wrmsr (MSR_IA32_MCx_CTL(i), 0xffffffff, 0xffffffff);
+		wrmsr (MSR_IA32_MCx_STATUS(i), 0x0, 0x0);
 	}
 
 	return mcheck_amd_k7;

@@ -178,7 +178,7 @@ static inline int mce_vendor_bank_msr(uint32_t msr)
 static inline int mce_bank_msr(uint32_t msr)
 {
     if ( (msr > MSR_IA32_MC0_CTL2 &&
-         msr < (MSR_IA32_MC0_CTL + 4 * nr_mce_banks - 1)) ||
+         msr < (MSR_IA32_MCx_CTL(nr_mce_banks - 1))) ||
         mce_vendor_bank_msr(msr) )
         return 1;
     return 0;

@@ -965,13 +965,13 @@ static void mce_init(void)
     {
         /* Some banks are shared across cores, use MCi_CTRL to judge whether
          * this bank has been initialized by other cores already. */
-        rdmsr(MSR_IA32_MC0_CTL + 4*i, l, h);
+        rdmsr(MSR_IA32_MCx_CTL(i), l, h);
         if (!(l | h))
         {
             /* if ctl is 0, this bank is never initialized */
             mce_printk(MCE_VERBOSE, "mce_init: init bank%d\n", i);
-            wrmsr (MSR_IA32_MC0_CTL + 4*i, 0xffffffff, 0xffffffff);
-            wrmsr (MSR_IA32_MC0_STATUS + 4*i, 0x0, 0x0);
+            wrmsr (MSR_IA32_MCx_CTL(i), 0xffffffff, 0xffffffff);
+            wrmsr (MSR_IA32_MCx_STATUS(i), 0x0, 0x0);
         }
     }
     if (firstbank) /* if cmci enabled, firstbank = 0 */

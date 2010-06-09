@@ -454,7 +454,7 @@ int vmce_init(struct cpuinfo_x86 *c)
         /* Don't care banks before firstbank */
         memset(h_mci_ctrl, 0xff, sizeof(h_mci_ctrl));
         for (i = firstbank; i < nr_mce_banks; i++)
-            rdmsrl(MSR_IA32_MC0_CTL + 4*i, h_mci_ctrl[i]);
+            rdmsrl(MSR_IA32_MCx_CTL(i), h_mci_ctrl[i]);
     }
 
     if (g_mcg_cap & MCG_CTL_P)
