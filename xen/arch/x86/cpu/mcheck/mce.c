@@ -1206,6 +1206,12 @@ static void x86_mc_mceinject(void *data)
 	__asm__ __volatile__("int $0x12");
 }
 
+static void x86_cmci_inject(void *data)
+{
+	printk("Simulating CMCI on cpu %d\n", smp_processor_id());
+	__asm__ __volatile__("int $0xf7");
+}
+
 #if BITS_PER_LONG == 64
 
 #define	ID2COOKIE(id)	((mctelem_cookie_t)(id))
@@ -1244,6 +1250,7 @@ CHECK_FIELD_(struct, mc_fetch, fetch_id);
 CHECK_FIELD_(struct, mc_physcpuinfo, ncpus);
 # define CHECK_compat_mc_physcpuinfo struct mc_physcpuinfo
 
+#define CHECK_compat_mc_inject_v2   struct mc_inject_v2
 CHECK_mc;
 # undef CHECK_compat_mc_fetch
 # undef CHECK_compat_mc_physcpuinfo
@@ -1448,6 +1455,52 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
             on_selected_cpus(cpumask_of(target), x86_mc_mceinject,
                   mc_mceinject, 1);
 		break;
+
+	case XEN_MC_inject_v2:
+	{
+		cpumask_t cpumap;
+
+		if (nr_mce_banks == 0)
+			return x86_mcerr("do_mca #MC", -ENODEV);
+
+		if ( op->u.mc_inject_v2.flags & XEN_MC_INJECT_CPU_BROADCAST )
+			cpus_copy(cpumap, cpu_online_map);
+		else
+		{
+			int gcw;
+
+			cpus_clear(cpumap);
+			xenctl_cpumap_to_cpumask(&cpumap,
+					&op->u.mc_inject_v2.cpumap);
+			gcw = cpus_weight(cpumap);
+			cpus_and(cpumap, cpu_online_map, cpumap);
+
+			if ( cpus_empty(cpumap) )
+				return x86_mcerr("No online CPU passed\n", -EINVAL);
+			else if ( gcw != cpus_weight(cpumap) )
+				dprintk(XENLOG_INFO,
+					"Not all required CPUs are online\n");
+		}
+
+		switch (op->u.mc_inject_v2.flags & XEN_MC_INJECT_TYPE_MASK)
+		{
+		case XEN_MC_INJECT_TYPE_MCE:
+			if ( mce_broadcast &&
+			  !cpus_equal(cpumap, cpu_online_map) )
+				printk("Not trigger MCE on all CPUs, may HANG!\n");
+			on_selected_cpus(&cpumap, x86_mc_mceinject, NULL, 1);
+			break;
+		case XEN_MC_INJECT_TYPE_CMCI:
+			if ( !cmci_support )
+				return x86_mcerr(
+				"No CMCI supported in platform\n", -EINVAL);
+			on_selected_cpus(&cpumap, x86_cmci_inject, NULL, 1);
+			break;
+		default:
+			return x86_mcerr("Wrong mca type\n", -EINVAL);
+		}
+		break;
+	}
 
 	default:
 		return x86_mcerr("do_mca: bad command", -EINVAL);

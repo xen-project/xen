@@ -2,6 +2,7 @@
 # ! - needs translation
 # ? - needs checking
 ?	dom0_vga_console_info		xen.h
+?   xenctl_cpumap               xen.h
 ?	mmu_update			xen.h
 !	mmuext_op			xen.h
 !	start_info			xen.h

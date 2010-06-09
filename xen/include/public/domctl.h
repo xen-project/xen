@@ -37,11 +37,6 @@
 
 #define XEN_DOMCTL_INTERFACE_VERSION 0x00000007
 
-struct xenctl_cpumap {
-    XEN_GUEST_HANDLE_64(uint8) bitmap;
-    uint32_t nr_cpus;
-};
-
 /*
  * NB. xen_domctl.domain is an IN/OUT parameter for this operation.
  * If it is specified as zero, an id is auto-allocated and returned.
