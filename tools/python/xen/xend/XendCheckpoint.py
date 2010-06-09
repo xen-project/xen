@@ -360,7 +360,7 @@ class RestoreInputHandler:
 
 
 def forkHelper(cmd, fd, inputHandler, closeToChild):
-    child = xPopen3(cmd, True, -1, [fd, xc.handle()])
+    child = xPopen3(cmd, True, -1, [fd])
 
     if closeToChild:
         child.tochild.close()
