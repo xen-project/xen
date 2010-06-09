@@ -328,10 +328,9 @@ static int core2_vpmu_msr_common_check(u32 msr_index, int *type, int *index)
     return 1;
 }
 
-static int core2_vpmu_do_wrmsr(struct cpu_user_regs *regs)
+static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
 {
-    u32 ecx = regs->ecx;
-    u64 msr_content, global_ctrl, non_global_ctrl;
+    u64 global_ctrl, non_global_ctrl;
     char pmu_enable = 0;
     int i, tmp;
     int type = -1, index = -1;
@@ -339,12 +338,11 @@ static int core2_vpmu_do_wrmsr(struct cpu_user_regs *regs)
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     struct core2_vpmu_context *core2_vpmu_cxt = NULL;
 
-    if ( !core2_vpmu_msr_common_check(ecx, &type, &index) )
+    if ( !core2_vpmu_msr_common_check(msr, &type, &index) )
         return 0;
 
-    msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
     core2_vpmu_cxt = vpmu->context;
-    switch ( ecx )
+    switch ( msr )
     {
     case MSR_CORE_PERF_GLOBAL_OVF_CTRL:
         core2_vpmu_cxt->global_ovf_status &= ~msr_content;
@@ -395,7 +393,7 @@ static int core2_vpmu_do_wrmsr(struct cpu_user_regs *regs)
         }
         break;
     default:
-        tmp = ecx - MSR_P6_EVNTSEL0;
+        tmp = msr - MSR_P6_EVNTSEL0;
         vmx_read_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, &global_ctrl);
         if ( tmp >= 0 && tmp < core2_get_pmc_count() )
             core2_vpmu_cxt->pmu_enable->arch_pmc_enable[tmp] =
@@ -445,7 +443,7 @@ static int core2_vpmu_do_wrmsr(struct cpu_user_regs *regs)
         if (inject_gp)
             vmx_inject_hw_exception(TRAP_gp_fault, 0);
         else
-            wrmsrl(ecx, msr_content);
+            wrmsrl(msr, msr_content);
     }
     else
         vmx_write_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, msr_content);
@@ -453,34 +451,32 @@ static int core2_vpmu_do_wrmsr(struct cpu_user_regs *regs)
     return 1;
 }
 
-static int core2_vpmu_do_rdmsr(struct cpu_user_regs *regs)
+static int core2_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
 {
-    u64 msr_content = 0;
     int type = -1, index = -1;
     struct vcpu *v = current;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     struct core2_vpmu_context *core2_vpmu_cxt = NULL;
 
-    if ( !core2_vpmu_msr_common_check(regs->ecx, &type, &index) )
+    if ( !core2_vpmu_msr_common_check(msr, &type, &index) )
         return 0;
 
     core2_vpmu_cxt = vpmu->context;
-    switch ( regs->ecx )
+    switch ( msr )
     {
     case MSR_CORE_PERF_GLOBAL_OVF_CTRL:
+        *msr_content = 0;
         break;
     case MSR_CORE_PERF_GLOBAL_STATUS:
-        msr_content = core2_vpmu_cxt->global_ovf_status;
+        *msr_content = core2_vpmu_cxt->global_ovf_status;
         break;
     case MSR_CORE_PERF_GLOBAL_CTRL:
-        vmx_read_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, &msr_content);
+        vmx_read_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, msr_content);
         break;
     default:
-        rdmsrl(regs->ecx, msr_content);
+        rdmsrl(msr, *msr_content);
     }
 
-    regs->eax = msr_content & 0xFFFFFFFF;
-    regs->edx = msr_content >> 32;
     return 1;
 }
 

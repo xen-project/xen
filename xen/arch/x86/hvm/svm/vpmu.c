@@ -167,42 +167,38 @@ static void amd_vpmu_save(struct vcpu *v)
     apic_write(APIC_LVTPC,  ctx->hw_lapic_lvtpc | APIC_LVT_MASKED);
 }
 
-static void context_update(struct cpu_user_regs *regs, u64 msr_content)
+static void context_update(unsigned int msr, u64 msr_content)
 {
     int i;
-    u32 addr = regs->ecx;
     struct vcpu *v = current;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     struct amd_vpmu_context *ctxt = vpmu->context;
 
     for ( i = 0; i < NUM_COUNTERS; i++ )
-        if ( addr == AMD_F10H_COUNTERS[i] )
+        if ( msr == AMD_F10H_COUNTERS[i] )
             ctxt->counters[i] = msr_content;
 
     for ( i = 0; i < NUM_COUNTERS; i++ )
-        if ( addr == AMD_F10H_CTRLS[i] )
+        if ( msr == AMD_F10H_CTRLS[i] )
             ctxt->ctrls[i] = msr_content;
 
     ctxt->hw_lapic_lvtpc = apic_read(APIC_LVTPC);
 }
 
-static int amd_vpmu_do_wrmsr(struct cpu_user_regs *regs)
+static int amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
 {
-    u64 msr_content = 0;
     struct vcpu *v = current;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
 
-    msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
-
     /* For all counters, enable guest only mode for HVM guest */
-    if ( (get_pmu_reg_type(regs->ecx) == MSR_TYPE_CTRL) &&
+    if ( (get_pmu_reg_type(msr) == MSR_TYPE_CTRL) &&
         !(is_guest_mode(msr_content)) )
     {
         set_guest_mode(msr_content);
     }
 
     /* check if the first counter is enabled */
-    if ( (get_pmu_reg_type(regs->ecx) == MSR_TYPE_CTRL) &&
+    if ( (get_pmu_reg_type(msr) == MSR_TYPE_CTRL) &&
         is_pmu_enabled(msr_content) && !(vpmu->flags & VPMU_RUNNING) )
     {
         if ( !acquire_pmu_ownership(PMU_OWNER_HVM) )
@@ -212,7 +208,7 @@ static int amd_vpmu_do_wrmsr(struct cpu_user_regs *regs)
     }
 
     /* stop saving & restore if guest stops first counter */
-    if ( (get_pmu_reg_type(regs->ecx) == MSR_TYPE_CTRL) && 
+    if ( (get_pmu_reg_type(msr) == MSR_TYPE_CTRL) && 
         (is_pmu_enabled(msr_content) == 0) && (vpmu->flags & VPMU_RUNNING) )
     {
         apic_write(APIC_LVTPC, PMU_APIC_VECTOR | APIC_LVT_MASKED);
@@ -221,21 +217,16 @@ static int amd_vpmu_do_wrmsr(struct cpu_user_regs *regs)
     }
 
     /* Update vpmu context immediately */
-    context_update(regs, msr_content);
+    context_update(msr, msr_content);
 
     /* Write to hw counters */
-    wrmsrl(regs->ecx, msr_content);
+    wrmsrl(msr, msr_content);
     return 1;
 }
 
-static int amd_vpmu_do_rdmsr(struct cpu_user_regs *regs)
+static int amd_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
 {
-    u64 msr_content = 0;
-
-    rdmsrl(regs->ecx, msr_content);
-    regs->eax = msr_content & 0xFFFFFFFF;
-    regs->edx = msr_content >> 32;
-
+    rdmsrl(msr, *msr_content);
     return 1;
 }
 

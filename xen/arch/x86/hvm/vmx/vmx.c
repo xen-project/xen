@@ -1846,8 +1846,8 @@ static int vmx_msr_read_intercept(struct cpu_user_regs *regs)
                        MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL;
         break;
     default:
-        if ( vpmu_do_rdmsr(regs) )
-            goto done;
+        if ( vpmu_do_rdmsr(ecx, &msr_content) )
+            break;
         if ( passive_domain_do_rdmsr(regs) )
             goto done;
         switch ( long_mode_do_msr_read(regs) )
@@ -2015,7 +2015,7 @@ static int vmx_msr_write_intercept(struct cpu_user_regs *regs)
     case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_PROCBASED_CTLS2:
         goto gp_fault;
     default:
-        if ( vpmu_do_wrmsr(regs) )
+        if ( vpmu_do_wrmsr(ecx, msr_content) )
             return X86EMUL_OKAY;
         if ( passive_domain_do_wrmsr(regs) )
             return X86EMUL_OKAY;

@@ -1105,8 +1105,8 @@ static int svm_msr_read_intercept(struct cpu_user_regs *regs)
     case MSR_K7_EVNTSEL1:
     case MSR_K7_EVNTSEL2:
     case MSR_K7_EVNTSEL3:
-        vpmu_do_rdmsr(regs);
-        goto done;
+        vpmu_do_rdmsr(ecx, &msr_content);
+        break;
 
     default:
 
@@ -1126,7 +1126,6 @@ static int svm_msr_read_intercept(struct cpu_user_regs *regs)
     regs->eax = (uint32_t)msr_content;
     regs->edx = (uint32_t)(msr_content >> 32);
 
-done:
     HVMTRACE_3D (MSR_READ, ecx, regs->eax, regs->edx);
     HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%x, eax=%lx, edx=%lx",
                 ecx, (unsigned long)regs->eax, (unsigned long)regs->edx);
@@ -1199,8 +1198,8 @@ static int svm_msr_write_intercept(struct cpu_user_regs *regs)
     case MSR_K7_EVNTSEL1:
     case MSR_K7_EVNTSEL2:
     case MSR_K7_EVNTSEL3:
-        vpmu_do_wrmsr(regs);
-        goto done;
+        vpmu_do_wrmsr(ecx, msr_content);
+        break;
 
     default:
         if ( wrmsr_viridian_regs(ecx, msr_content) )
@@ -1218,7 +1217,6 @@ static int svm_msr_write_intercept(struct cpu_user_regs *regs)
         }
         break;
     }
-done:
     return X86EMUL_OKAY;
 
  gpf:

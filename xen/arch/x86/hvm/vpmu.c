@@ -36,21 +36,21 @@
 static int __read_mostly opt_vpmu_enabled;
 boolean_param("vpmu", opt_vpmu_enabled);
 
-int vpmu_do_wrmsr(struct cpu_user_regs *regs)
+int vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(current);
 
     if ( vpmu->arch_vpmu_ops )
-        return vpmu->arch_vpmu_ops->do_wrmsr(regs);
+        return vpmu->arch_vpmu_ops->do_wrmsr(msr, msr_content);
     return 0;
 }
 
-int vpmu_do_rdmsr(struct cpu_user_regs *regs)
+int vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(current);
 
     if ( vpmu->arch_vpmu_ops )
-        return vpmu->arch_vpmu_ops->do_rdmsr(regs);
+        return vpmu->arch_vpmu_ops->do_rdmsr(msr, msr_content);
     return 0;
 }
 
