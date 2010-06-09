@@ -33,6 +33,7 @@
 #define __BLKTAPLIB_H__
 
 #include <syslog.h>
+#include <sys/time.h>
 #include <xenctrl.h>
 #include <xen/io/blkif.h>
 
