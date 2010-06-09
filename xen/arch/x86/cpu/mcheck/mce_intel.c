@@ -28,9 +28,9 @@ static int nr_intel_ext_msrs = 0;
 
 /* Below are for MCE handling */
 struct mce_softirq_barrier {
-	atomic_t val;
-	atomic_t ingen;
-	atomic_t outgen;
+    atomic_t val;
+    atomic_t ingen;
+    atomic_t outgen;
 };
 
 static struct mce_softirq_barrier mce_inside_bar, mce_severity_bar;
@@ -594,7 +594,7 @@ static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
     mce_barrier_enter(&mce_trap_bar);
     if (atomic_read(&found_error)) {
         mce_printk(MCE_CRITICAL, "MCE: Choose one CPU "
-		        "to clear error finding flag\n ");
+                   "to clear error finding flag\n ");
         atomic_set(&found_error, 0);
     }
     mca_rdmsrl(MSR_IA32_MCG_STATUS, gstatus);
