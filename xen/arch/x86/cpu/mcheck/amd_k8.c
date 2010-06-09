@@ -81,13 +81,8 @@ enum mcheck_type amd_k8_mcheck_init(struct cpuinfo_x86 *c)
 	uint32_t i;
 	enum mcequirk_amd_flags quirkflag;
 
-	/* Check for PPro style MCA; our caller has confirmed MCE support. */
-	if (!cpu_has(c, X86_FEATURE_MCA))
-		return mcheck_none;
-
 	quirkflag = mcequirk_lookup_amd_quirkdata(c);
 
-	mce_cap_init();
 	x86_mce_vector_register(k8_machine_check);
 
 	for (i = 0; i < nr_mce_banks; i++) {
@@ -100,8 +95,6 @@ enum mcheck_type amd_k8_mcheck_init(struct cpuinfo_x86 *c)
 			break;
 		}
 	}
-
-	set_in_cr4(X86_CR4_MCE);
 
 	return mcheck_amd_k8;
 }

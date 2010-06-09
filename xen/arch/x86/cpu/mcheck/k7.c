@@ -70,19 +70,9 @@ static fastcall void k7_machine_check(struct cpu_user_regs * regs, long error_co
 /* AMD K7 machine check */
 enum mcheck_type amd_k7_mcheck_init(struct cpuinfo_x86 *c)
 {
-	u32 l, h;
 	int i;
 
-	/* Check for PPro style MCA; our caller has confirmed MCE support. */
-	if (!cpu_has(c, X86_FEATURE_MCA))
-		return mcheck_none;
-
 	x86_mce_vector_register(k7_machine_check);
-
-	rdmsr (MSR_IA32_MCG_CAP, l, h);
-	if (l & (1<<8))	/* Control register present ? */
-		wrmsr (MSR_IA32_MCG_CTL, 0xffffffff, 0xffffffff);
-	nr_mce_banks = l & 0xff;
 
 	/* Clear status for MC index 0 separately, we don't touch CTL,
 	 * as some Athlons cause spurious MCEs when its enabled. */
@@ -91,8 +81,6 @@ enum mcheck_type amd_k7_mcheck_init(struct cpuinfo_x86 *c)
 		wrmsr (MSR_IA32_MC0_CTL+4*i, 0xffffffff, 0xffffffff);
 		wrmsr (MSR_IA32_MC0_STATUS+4*i, 0x0, 0x0);
 	}
-
-	set_in_cr4 (X86_CR4_MCE);
 
 	return mcheck_amd_k7;
 }

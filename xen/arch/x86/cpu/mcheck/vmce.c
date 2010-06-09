@@ -20,6 +20,12 @@
 
 #define dom_vmce(x)   ((x)->arch.vmca_msrs)
 
+uint64_t g_mcg_cap;
+
+/* Real value in physical CTL MSR */
+uint64_t h_mcg_ctl = 0UL;
+uint64_t *h_mci_ctrl;
+
 int vmce_init_msr(struct domain *d)
 {
     dom_vmce(d) = xmalloc(struct domain_mca_msrs);
@@ -431,3 +437,50 @@ int vmce_domain_inject(
     return inject_vmce(d);
 }
 
+int vmce_init(struct cpuinfo_x86 *c)
+{
+    u32 l, h;
+    u64 value;
+    int i;
+
+    if ( !h_mci_ctrl )
+    {
+        h_mci_ctrl = xmalloc_array(uint64_t, nr_mce_banks);
+        if (!h_mci_ctrl)
+        {
+            dprintk(XENLOG_INFO, "Failed to alloc h_mci_ctrl\n");
+            return -ENOMEM;
+        }
+        /* Don't care banks before firstbank */
+        memset(h_mci_ctrl, 0xff, sizeof(h_mci_ctrl));
+        for (i = firstbank; i < nr_mce_banks; i++)
+            rdmsrl(MSR_IA32_MC0_CTL + 4*i, h_mci_ctrl[i]);
+    }
+
+    if (g_mcg_cap & MCG_CTL_P)
+        rdmsrl(MSR_IA32_MCG_CTL, h_mcg_ctl);
+
+    rdmsr(MSR_IA32_MCG_CAP, l, h);
+    value = ((u64)h << 32) | l;
+    /* For Guest vMCE usage */
+    g_mcg_cap = value & ~MCG_CMCI_P;
+
+    return 0;
+}
+
+int mca_ctl_conflict(struct mcinfo_bank *bank, struct domain *d)
+{
+    int bank_nr;
+
+    if ( !bank || !d || !h_mci_ctrl )
+        return 1;
+
+    /* Will MCE happen in host if If host mcg_ctl is 0? */
+    if ( ~d->arch.vmca_msrs->mcg_ctl & h_mcg_ctl )
+        return 1;
+
+    bank_nr = bank->mc_bank;
+    if (~d->arch.vmca_msrs->mci_ctl[bank_nr] & h_mci_ctrl[bank_nr] )
+        return 1;
+    return 0;
+}

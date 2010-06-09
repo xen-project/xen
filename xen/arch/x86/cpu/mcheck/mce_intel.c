@@ -16,10 +16,13 @@
 #include "mce.h"
 #include "x86_mca.h"
 
-DEFINE_PER_CPU(cpu_banks_t, mce_banks_owned);
-DEFINE_PER_CPU(cpu_banks_t, no_cmci_banks);
+DEFINE_PER_CPU(struct mca_banks *, mce_banks_owned);
+DEFINE_PER_CPU(struct mca_banks *, no_cmci_banks);
+DEFINE_PER_CPU(struct mca_banks *, mce_clear_banks);
 int cmci_support = 0;
 int ser_support = 0;
+static int mce_force_broadcast;
+boolean_param("mce_fb", mce_force_broadcast);
 
 static int nr_intel_ext_msrs = 0;
 
@@ -528,12 +531,14 @@ static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
     uint64_t gstatus;
     mctelem_cookie_t mctc = NULL;
     struct mca_summary bs;
-    cpu_banks_t clear_bank;
+    struct mca_banks *clear_bank;
 
     mce_spin_lock(&mce_logout_lock);
 
-    memset( &clear_bank, 0x0, sizeof(cpu_banks_t));
-    mctc = mcheck_mca_logout(MCA_MCE_SCAN, mca_allbanks, &bs, &clear_bank);
+    clear_bank = __get_cpu_var(mce_clear_banks);
+    memset( clear_bank->bank_map, 0x0,
+        sizeof(long) * BITS_TO_LONGS(clear_bank->num));
+    mctc = mcheck_mca_logout(MCA_MCE_SCAN, mca_allbanks, &bs, clear_bank);
 
     if (bs.errcnt) {
         /* dump MCE error */
@@ -699,7 +704,7 @@ static int do_cmci_discover(int i)
     rdmsrl(msr, val);
     /* Some other CPU already owns this bank. */
     if (val & CMCI_EN) {
-        clear_bit(i, __get_cpu_var(mce_banks_owned));
+        mcabanks_clear(i, __get_cpu_var(mce_banks_owned));
         goto out;
     }
 
@@ -709,12 +714,12 @@ static int do_cmci_discover(int i)
 
     if (!(val & CMCI_EN)) {
         /* This bank does not support CMCI. Polling timer has to handle it. */
-        set_bit(i, __get_cpu_var(no_cmci_banks));
+        mcabanks_set(i, __get_cpu_var(no_cmci_banks));
         return 0;
     }
-    set_bit(i, __get_cpu_var(mce_banks_owned));
+    mcabanks_set(i, __get_cpu_var(mce_banks_owned));
 out:
-    clear_bit(i, __get_cpu_var(no_cmci_banks));
+    mcabanks_clear(i, __get_cpu_var(no_cmci_banks));
     return 1;
 }
 
@@ -730,7 +735,7 @@ static void cmci_discover(void)
     spin_lock_irqsave(&cmci_discover_lock, flags);
 
     for (i = 0; i < nr_mce_banks; i++)
-        if (!test_bit(i, __get_cpu_var(mce_banks_owned)))
+        if (!mcabanks_test(i, __get_cpu_var(mce_banks_owned)))
             do_cmci_discover(i);
 
     spin_unlock_irqrestore(&cmci_discover_lock, flags);
@@ -757,8 +762,8 @@ static void cmci_discover(void)
 
     mce_printk(MCE_VERBOSE, "CMCI: CPU%d owner_map[%lx], no_cmci_map[%lx]\n",
            smp_processor_id(),
-           *((unsigned long *)__get_cpu_var(mce_banks_owned)),
-           *((unsigned long *)__get_cpu_var(no_cmci_banks)));
+           *((unsigned long *)__get_cpu_var(mce_banks_owned)->bank_map),
+           *((unsigned long *)__get_cpu_var(no_cmci_banks)->bank_map));
 }
 
 /*
@@ -804,12 +809,12 @@ static void clear_cmci(void)
     for (i = 0; i < nr_mce_banks; i++) {
         unsigned msr = MSR_IA32_MC0_CTL2 + i;
         u64 val;
-        if (!test_bit(i, __get_cpu_var(mce_banks_owned)))
+        if (!mcabanks_test(i, __get_cpu_var(mce_banks_owned)))
             continue;
         rdmsrl(msr, val);
         if (val & (CMCI_EN|CMCI_THRESHOLD_MASK))
             wrmsrl(msr, val & ~(CMCI_EN|CMCI_THRESHOLD_MASK));
-        clear_bit(i, __get_cpu_var(mce_banks_owned));
+        mcabanks_clear(i, __get_cpu_var(mce_banks_owned));
     }
 }
 
@@ -878,16 +883,44 @@ fastcall void smp_cmci_interrupt(struct cpu_user_regs *regs)
 
 void mce_intel_feature_init(struct cpuinfo_x86 *c)
 {
-
 #ifdef CONFIG_X86_MCE_THERMAL
     intel_init_thermal(c);
 #endif
     intel_init_cmci(c);
 }
 
-static void _mce_cap_init(struct cpuinfo_x86 *c)
+static int mce_is_broadcast(struct cpuinfo_x86 *c)
 {
-    u32 l = mce_cap_init();
+    if (mce_force_broadcast)
+        return 1;
+
+    /* According to Intel SDM Dec, 2009, 15.10.4.1, For processors with
+     * DisplayFamily_DisplayModel encoding of 06H_EH and above,
+     * a MCA signal is broadcast to all logical processors in the system
+     */
+    if (c->x86_vendor == X86_VENDOR_INTEL && c->x86 == 6 &&
+        c->x86_model >= 0xe)
+            return 1;
+    return 0;
+}
+
+static void intel_mca_cap_init(struct cpuinfo_x86 *c)
+{
+    static int broadcast_check;
+    int broadcast;
+    u32 l, h;
+
+    broadcast = mce_is_broadcast(c);
+    if (broadcast_check && (broadcast != mce_broadcast) )
+            dprintk(XENLOG_INFO,
+                "CPUs have mixed broadcast support"
+                "may cause undetermined result!!!\n");
+
+    broadcast_check = 1;
+    if (broadcast)
+        mce_broadcast = broadcast;
+
+    rdmsr(MSR_IA32_MCG_CAP, l, h);
 
     if ((l & MCG_CMCI_P) && cpu_has_apic)
         cmci_support = 1;
@@ -912,8 +945,6 @@ static void mce_init(void)
     mctelem_cookie_t mctc;
     struct mca_summary bs;
 
-    clear_in_cr4(X86_CR4_MCE);
-
     mce_barrier_init(&mce_inside_bar);
     mce_barrier_init(&mce_severity_bar);
     mce_barrier_init(&mce_trap_bar);
@@ -929,8 +960,6 @@ static void mce_init(void)
         x86_mcinfo_dump(mctelem_dataptr(mctc));
         mctelem_commit(mctc);
     }
-
-    set_in_cr4(X86_CR4_MCE);
 
     for (i = firstbank; i < nr_mce_banks; i++)
     {
@@ -949,10 +978,35 @@ static void mce_init(void)
         wrmsr (MSR_IA32_MC0_STATUS, 0x0, 0x0);
 }
 
+static int init_mca_banks(void)
+{
+    struct mca_banks *mb1, *mb2, * mb3;
+
+    mb1 = mcabanks_alloc();
+    mb2 = mcabanks_alloc();
+    mb3 = mcabanks_alloc();
+    if (!mb1 || !mb2 || !mb3)
+        goto out;
+
+    __get_cpu_var(mce_clear_banks) = mb1;
+    __get_cpu_var(no_cmci_banks) = mb2;
+    __get_cpu_var(mce_banks_owned) = mb3;
+
+    return 0;
+out:
+    mcabanks_free(mb1);
+    mcabanks_free(mb2);
+    mcabanks_free(mb3);
+    return -ENOMEM;
+}
+
 /* p4/p6 family have similar MCA initialization process */
 enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c)
 {
-    _mce_cap_init(c);
+    if (init_mca_banks())
+        return mcheck_none;
+
+    intel_mca_cap_init(c);
 
     /* machine check is available */
     x86_mce_vector_register(intel_machine_check);
@@ -969,17 +1023,14 @@ enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c)
 
 int intel_mce_wrmsr(uint32_t msr, uint64_t val)
 {
-    int ret = 1;
+    int ret = 0;
 
-    switch ( msr )
+    if (msr > MSR_IA32_MC0_CTL2 &&
+        msr < (MSR_IA32_MC0_CTL2 + nr_mce_banks - 1))
     {
-    case MSR_IA32_MC0_CTL2 ... MSR_IA32_MC0_CTL2 + MAX_NR_BANKS - 1:
         mce_printk(MCE_QUIET, "We have disabled CMCI capability, "
                  "Guest should not write this MSR!\n");
-        break;
-    default:
-        ret = 0;
-        break;
+         ret = 1;
     }
 
     return ret;
@@ -987,17 +1038,14 @@ int intel_mce_wrmsr(uint32_t msr, uint64_t val)
 
 int intel_mce_rdmsr(uint32_t msr, uint64_t *val)
 {
-    int ret = 1;
+    int ret = 0;
 
-    switch ( msr )
+    if (msr > MSR_IA32_MC0_CTL2 &&
+        msr < (MSR_IA32_MC0_CTL2 + nr_mce_banks - 1))
     {
-    case MSR_IA32_MC0_CTL2 ... MSR_IA32_MC0_CTL2 + MAX_NR_BANKS - 1:
         mce_printk(MCE_QUIET, "We have disabled CMCI capability, "
                  "Guest should not read this MSR!\n");
-        break;
-    default:
-        ret = 0;
-        break;
+        ret = 1;
     }
 
     return ret;

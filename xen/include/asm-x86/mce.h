@@ -2,8 +2,6 @@
 #include <public/arch-x86/xen-mca.h>
 #ifndef _XEN_X86_MCE_H
 #define _XEN_X86_MCE_H
-/* Define for GUEST MCA handling */
-#define MAX_NR_BANKS 30
 
 /* This entry is for recording bank nodes for the impacted domain,
  * put into impact_header list. */

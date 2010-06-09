@@ -89,8 +89,37 @@
 #define CMCI_THRESHOLD			0x2
 
 #include <asm/domain.h>
-typedef DECLARE_BITMAP(cpu_banks_t, MAX_NR_BANKS);
-DECLARE_PER_CPU(cpu_banks_t, mce_banks_owned);
+
+struct mca_banks
+{
+    int num;
+    unsigned long *bank_map;
+};
+
+static inline void mcabanks_clear(int bit, struct mca_banks *banks)    \
+{
+    if (!banks || !banks->bank_map || bit >= banks->num)
+        return ;
+    clear_bit(bit, banks->bank_map);
+}
+
+static inline void mcabanks_set(int bit, struct mca_banks* banks)
+{
+    if (!banks || !banks->bank_map || bit >= banks->num)
+        return;
+    set_bit(bit, banks->bank_map);
+}
+
+static inline int mcabanks_test(int bit, struct mca_banks* banks)
+{
+    if (!banks || !banks->bank_map || bit >= banks->num)
+        return 0;
+    return test_bit(bit, banks->bank_map);
+}
+
+struct mca_banks *mcabanks_alloc(void);
+void mcabanks_free(struct mca_banks *banks);
+extern struct mca_banks *mca_allbanks;
 
 /* Below interfaces are defined for MCA internal processing:
  * a. pre_handler will be called early in MCA ISR context, mainly for early

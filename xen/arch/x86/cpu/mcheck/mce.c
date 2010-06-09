@@ -25,21 +25,15 @@
 
 int mce_disabled;
 invbool_param("mce", mce_disabled);
-static int mce_force_broadcast;
-boolean_param("mce_fb", mce_force_broadcast);
 int is_mc_panic;
 unsigned int nr_mce_banks;
 
 int mce_broadcast = 0;
-uint64_t g_mcg_cap;
-
-/* Real value in physical CTL MSR */
-uint64_t h_mcg_ctl = 0UL;
-uint64_t *h_mci_ctrl;
 int firstbank;
 
 static void intpose_init(void);
 static void mcinfo_clear(struct mc_info *);
+struct mca_banks *mca_allbanks;
 
 #define	SEG_PL(segsel)			((segsel) & 0x3)
 #define _MC_MSRINJ_F_REQ_HWCR_WREN	(1 << 16)
@@ -54,8 +48,6 @@ static int x86_mcerr(const char *msg, int err)
 #else
 #define x86_mcerr(msg, err) (err)
 #endif
-
-cpu_banks_t mca_allbanks;
 
 int mce_verbosity;
 static void __init mce_set_verbosity(char *str)
@@ -113,6 +105,36 @@ void mce_recoverable_register(mce_recoverable_t cbfunc)
     mc_recoverable_scan = cbfunc;
 }
 
+struct mca_banks *mcabanks_alloc(void)
+{
+    struct mca_banks *mb;
+
+    mb = xmalloc(struct mca_banks);
+    if (!mb)
+        return NULL;
+
+    mb->bank_map = xmalloc_array(unsigned long,
+            BITS_TO_LONGS(nr_mce_banks));
+    if (!mb->bank_map)
+    {
+        xfree(mb);
+        return NULL;
+    }
+
+    mb->num = nr_mce_banks;
+    memset(mb->bank_map, 0, sizeof(long) * BITS_TO_LONGS(nr_mce_banks));
+
+    return mb;
+}
+
+void mcabanks_free(struct mca_banks *banks)
+{
+    if (banks == NULL)
+        return;
+    if (banks->bank_map)
+        xfree(banks->bank_map);
+    xfree(banks);
+}
 /* Judging whether to Clear Machine Check error bank callback handler
  * According to Intel latest MCA OS Recovery Writer's Guide, 
  * whether the error MCA bank needs to be cleared is decided by the mca_source
@@ -218,8 +240,8 @@ static int mca_init_global(uint32_t flags, struct mcinfo_global *mig)
  * For Intel latest CPU, whether to clear the error bank status needs to
  * be judged by the callback function defined above.
  */
-mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
-    struct mca_summary *sp, cpu_banks_t* clear_bank)
+mctelem_cookie_t mcheck_mca_logout(enum mca_source who, struct mca_banks *bankmask,
+    struct mca_summary *sp, struct mca_banks* clear_bank)
 {
 	uint64_t gstatus, status;
 	struct mcinfo_global *mig = NULL;	/* on stack */
@@ -262,7 +284,7 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
 		struct mcinfo_bank *mib;		/* on stack */
 
 		/* Skip bank if corresponding bit in bankmask is clear */
-		if (!test_bit(i, bankmask))
+		if (!mcabanks_test(i, bankmask))
 			continue;
 
 		mca_rdmsrl(MSR_IA32_MC0_STATUS + i * 4, status);
@@ -325,7 +347,7 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
 			/* Clear status */
 			mca_wrmsrl(MSR_IA32_MC0_STATUS + 4 * i, 0x0ULL);
 		else if ( who == MCA_MCE_SCAN && need_clear)
-			set_bit(i, clear_bank);
+			mcabanks_set(i, clear_bank);
 
 		wmb();
 	}
@@ -359,7 +381,7 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
 
 /* Shared #MC handler. */
 void mcheck_cmn_handler(struct cpu_user_regs *regs, long error_code,
-    cpu_banks_t bankmask)
+    struct mca_banks *bankmask)
 {
 	int xen_state_lost, dom0_state_lost, domU_state_lost;
 	struct vcpu *v = current;
@@ -575,13 +597,13 @@ cmn_handler_done:
 	}
 }
 
-void mcheck_mca_clearbanks(cpu_banks_t bankmask)
+void mcheck_mca_clearbanks(struct mca_banks *bankmask)
 {
 	int i;
 	uint64_t status;
 
 	for (i = 0; i < 32 && i < nr_mce_banks; i++) {
-		if (!test_bit(i, bankmask))
+		if (!mcabanks_test(i, bankmask))
 			continue;
 		mca_rdmsrl(MSR_IA32_MC0_STATUS + i * 4, status);
 		if (!(status & MCi_STATUS_VAL))
@@ -620,21 +642,6 @@ int mce_available(struct cpuinfo_x86 *c)
 	return cpu_has(c, X86_FEATURE_MCE) && cpu_has(c, X86_FEATURE_MCA);
 }
 
-static int mce_is_broadcast(struct cpuinfo_x86 *c)
-{
-    if (mce_force_broadcast)
-        return 1;
-
-    /* According to Intel SDM Dec, 2009, 15.10.4.1, For processors with
-     * DisplayFamily_DisplayModel encoding of 06H_EH and above,
-     * a MCA signal is broadcast to all logical processors in the system
-     */
-    if (c->x86_vendor == X86_VENDOR_INTEL && c->x86 == 6 &&
-        c->x86_model >= 0xe)
-            return 1;
-    return 0;
-}
-
 /*
  * Check if bank 0 is usable for MCE. It isn't for AMD K7,
  * and Intel P6 family before model 0x1a.
@@ -652,77 +659,9 @@ int mce_firstbank(struct cpuinfo_x86 *c)
 	return 0;
 }
 
-/* This has to be run for each processor */
-void mcheck_init(struct cpuinfo_x86 *c)
+int show_mca_info(int inited, struct cpuinfo_x86 *c)
 {
-	int i, broadcast;
-	enum mcheck_type inited = mcheck_none;
 	static enum mcheck_type g_type = mcheck_unset;
-    static int broadcast_check;
-
-	if (mce_disabled == 1) {
-		dprintk(XENLOG_INFO, "MCE support disabled by bootparam\n");
-		return;
-	}
-
-    broadcast = mce_is_broadcast(c);
-    if (broadcast_check && (broadcast != mce_broadcast) )
-            dprintk(XENLOG_INFO,
-                "CPUs have mixed broadcast support"
-                "may cause undetermined result!!!\n");
-
-    broadcast_check = 1;
-    if (broadcast)
-        mce_broadcast = broadcast;
-
-	for (i = 0; i < MAX_NR_BANKS; i++)
-		set_bit(i,mca_allbanks);
-
-	/* Enforce at least MCE support in CPUID information.  Individual
-	 * families may also need to enforce a check for MCA support. */
-	if (!cpu_has(c, X86_FEATURE_MCE)) {
-		printk(XENLOG_INFO "CPU%i: No machine check support available\n",
-			smp_processor_id());
-		return;
-	}
-
-	intpose_init();
-	mctelem_init(sizeof (struct mc_info));
-
-	switch (c->x86_vendor) {
-	case X86_VENDOR_AMD:
-		inited = amd_mcheck_init(c);
-		break;
-
-	case X86_VENDOR_INTEL:
-		switch (c->x86) {
-		case 6:
-		case 15:
-			inited = intel_mcheck_init(c);
-			break;
-		}
-		break;
-
-	default:
-		break;
-	}
-
-    if ( !h_mci_ctrl )
-    {
-        h_mci_ctrl = xmalloc_array(uint64_t, nr_mce_banks);
-        if (!h_mci_ctrl)
-        {
-            dprintk(XENLOG_INFO, "Failed to alloc h_mci_ctrl\n");
-            return;
-        }
-        /* Don't care banks before firstbank */
-        memset(h_mci_ctrl, 0xff, sizeof(h_mci_ctrl));
-        for (i = firstbank; i < nr_mce_banks; i++)
-            rdmsrl(MSR_IA32_MC0_CTL + 4*i, h_mci_ctrl[i]);
-    }
-    if (g_mcg_cap & MCG_CTL_P)
-        rdmsrl(MSR_IA32_MCG_CTL, h_mcg_ctl);
-    set_poll_bankmask(c);
 
 	if (inited != g_type) {
 		char prefix[20];
@@ -751,32 +690,130 @@ void mcheck_init(struct cpuinfo_x86 *c)
 			printk("%sNo machine check initialization\n", prefix);
 			break;
 		}
-
-		g_type = inited;
+        g_type = inited;
 	}
+
+    return 0;
 }
 
-u64 mce_cap_init(void)
+int set_poll_bankmask(struct cpuinfo_x86 *c)
+{
+    int cpu = smp_processor_id();
+    struct mca_banks *mb;
+
+    mb = mcabanks_alloc();
+    if (!mb)
+        return -ENOMEM;
+
+    if (cmci_support && !mce_disabled) {
+        mb->num = per_cpu(no_cmci_banks, cpu)->num;
+        bitmap_copy(mb->bank_map, per_cpu(no_cmci_banks, cpu)->bank_map,
+            nr_mce_banks);
+    }
+    else {
+        bitmap_copy(mb->bank_map, mca_allbanks->bank_map, nr_mce_banks);
+        if (mce_firstbank(c))
+            mcabanks_clear(0, mb);
+    }
+    per_cpu(poll_bankmask, cpu) = mb;
+
+    return 0;
+}
+
+/* The perbank ctl/status init is platform specific because of AMD's quirk */
+int mca_cap_init(void)
 {
     u32 l, h;
     u64 value;
 
     rdmsr(MSR_IA32_MCG_CAP, l, h);
     value = ((u64)h << 32) | l;
-    /* For Guest vMCE usage */
-    g_mcg_cap = value & ~MCG_CMCI_P;
 
     if (l & MCG_CTL_P) /* Control register present ? */
         wrmsr(MSR_IA32_MCG_CTL, 0xffffffff, 0xffffffff);
 
-    nr_mce_banks = l & MCG_CAP_COUNT;
-    if ( nr_mce_banks > MAX_NR_BANKS )
+    if (nr_mce_banks &&  (l & MCG_CAP_COUNT) != nr_mce_banks)
     {
-        printk(KERN_WARNING "MCE: exceed max mce banks\n");
-        g_mcg_cap = (g_mcg_cap & ~MCG_CAP_COUNT) | MAX_NR_BANKS;
+        dprintk(XENLOG_WARNING, "Different bank number on cpu %x\n",
+                smp_processor_id());
+        return -ENODEV;
+    }
+    nr_mce_banks = l & MCG_CAP_COUNT;
+
+    /* mcabanks_alloc depends on nr_mcebanks */
+    if (!mca_allbanks)
+    {
+        int i;
+
+        mca_allbanks = mcabanks_alloc();
+        for ( i = 0; i < nr_mce_banks; i++)
+            mcabanks_set(i, mca_allbanks);
     }
 
-    return value;
+    return mca_allbanks ? 0:-ENOMEM;
+}
+
+/* This has to be run for each processor */
+void mcheck_init(struct cpuinfo_x86 *c)
+{
+	enum mcheck_type inited = mcheck_none;
+
+	if (mce_disabled == 1) {
+		dprintk(XENLOG_INFO, "MCE support disabled by bootparam\n");
+		return;
+	}
+
+	if (!mce_available(c))
+	{
+		printk(XENLOG_INFO "CPU%i: No machine check support available\n",
+		  smp_processor_id());
+		return;
+	}
+
+	/*Hardware Enable */
+	if (mca_cap_init())
+		return;
+
+	switch (c->x86_vendor) {
+	case X86_VENDOR_AMD:
+		inited = amd_mcheck_init(c);
+		break;
+
+	case X86_VENDOR_INTEL:
+		switch (c->x86) {
+		case 6:
+		case 15:
+			inited = intel_mcheck_init(c);
+			break;
+		}
+		break;
+
+	default:
+		break;
+	}
+
+	show_mca_info(inited, c);
+	if (inited == mcheck_none || inited == mcheck_unset)
+		goto out;
+
+	intpose_init();
+
+	mctelem_init(sizeof(struct mc_info));
+
+	vmce_init(c);
+
+    /* Turn on MCE now */
+	set_in_cr4(X86_CR4_MCE);
+
+	set_poll_bankmask(c);
+
+	return;
+out:
+	if (smp_processor_id() == 0)
+	{
+		mcabanks_free(mca_allbanks);
+		mca_allbanks = NULL;
+	}
 }
 
 static void mcinfo_clear(struct mc_info *mi)
@@ -1046,23 +1083,6 @@ void intpose_inval(unsigned int cpu_nr, uint64_t msr)
     ((r) >= MSR_IA32_MC0_CTL && \
     (r) <= MSR_IA32_MC0_MISC + (nr_mce_banks - 1) * 4 && \
     ((r) - MSR_IA32_MC0_CTL) % 4 != 0)	/* excludes MCi_CTL */
-
-int mca_ctl_conflict(struct mcinfo_bank *bank, struct domain *d)
-{
-    int bank_nr;
-
-    if ( !bank || !d || !h_mci_ctrl )
-        return 1;
-
-    /* Will MCE happen in host if If host mcg_ctl is 0? */
-    if ( ~d->arch.vmca_msrs->mcg_ctl & h_mcg_ctl )
-        return 1;
-
-    bank_nr = bank->mc_bank;
-    if (~d->arch.vmca_msrs->mci_ctl[bank_nr] & h_mci_ctrl[bank_nr] )
-        return 1;
-    return 0;
-}
 
 static int x86_mc_msrinject_verify(struct xen_mc_msrinject *mci)
 {
@@ -1435,19 +1455,7 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 
 	return ret;
 }
-void set_poll_bankmask(struct cpuinfo_x86 *c)
-{
 
-    if (cmci_support && !mce_disabled) {
-        memcpy(&(__get_cpu_var(poll_bankmask)),
-                &(__get_cpu_var(no_cmci_banks)), sizeof(cpu_banks_t));
-    }
-    else {
-        memcpy(&(get_cpu_var(poll_bankmask)), &mca_allbanks, sizeof(cpu_banks_t));
-        if (mce_firstbank(c))
-            clear_bit(0, get_cpu_var(poll_bankmask));
-    }
-}
 void mc_panic(char *s)
 {
     is_mc_panic = 1;

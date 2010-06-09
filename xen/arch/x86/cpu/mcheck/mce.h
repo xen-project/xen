@@ -72,7 +72,7 @@ extern void x86_mce_vector_register(x86_mce_vector_t);
 
 /* Common generic MCE handler that implementations may nominate
  * via x86_mce_vector_register. */
-extern void mcheck_cmn_handler(struct cpu_user_regs *, long, cpu_banks_t);
+extern void mcheck_cmn_handler(struct cpu_user_regs *, long, struct mca_banks *);
 
 /* Register a handler for judging whether mce is recoverable. */
 typedef int (*mce_recoverable_t)(u64 status);
@@ -120,18 +120,17 @@ struct mca_summary {
 	uint32_t	recoverable; 
 };
 
-extern cpu_banks_t mca_allbanks;
-void set_poll_bankmask(struct cpuinfo_x86 *c);
-DECLARE_PER_CPU(cpu_banks_t, poll_bankmask);
-DECLARE_PER_CPU(cpu_banks_t, no_cmci_banks);
+DECLARE_PER_CPU(struct mca_banks *, poll_bankmask);
+DECLARE_PER_CPU(struct mca_banks *, no_cmci_banks);
+
 extern int cmci_support;
 extern int ser_support;
 extern int is_mc_panic;
 extern int mce_broadcast;
-extern void mcheck_mca_clearbanks(cpu_banks_t);
+extern void mcheck_mca_clearbanks(struct mca_banks *);
 
-extern mctelem_cookie_t mcheck_mca_logout(enum mca_source, cpu_banks_t,
-    struct mca_summary *, cpu_banks_t*);
+extern mctelem_cookie_t mcheck_mca_logout(enum mca_source, struct mca_banks *,
+    struct mca_summary *, struct mca_banks *);
 
 /* Register a callback to be made during bank telemetry logout.
  * This callback is only available to those machine check handlers
@@ -164,10 +163,7 @@ int fill_vmsr_data(struct mcinfo_bank *mc_bank, struct domain *d,
 int inject_vmce(struct domain *d);
 int vmce_domain_inject(struct mcinfo_bank *bank, struct domain *d, struct mcinfo_global *global);
 
-extern uint64_t g_mcg_cap;
-/* Real value in physical CTL MSR */
-extern uint64_t h_mcg_ctl;
-extern uint64_t *h_mci_ctrl;
+extern int vmce_init(struct cpuinfo_x86 *c);
 
 extern unsigned int nr_mce_banks;
 
