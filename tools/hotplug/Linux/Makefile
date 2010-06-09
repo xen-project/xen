@@ -71,6 +71,7 @@ install-initd:
 	$(INSTALL_PROG) $(XENDOMAINS_SYSCONFIG) $(DESTDIR)$(CONFIG_DIR)/sysconfig/xendomains
 	$(INSTALL_PROG) $(XENCOMMONS_INITD) $(DESTDIR)$(CONFIG_DIR)/init.d
 	$(INSTALL_PROG) $(XENCOMMONS_SYSCONFIG) $(DESTDIR)$(CONFIG_DIR)/sysconfig/xencommons
+	$(INSTALL_PROG) init.d/xen-watchdog $(DESTDIR)$(CONFIG_DIR)/init.d
 
 .PHONY: install-scripts
 install-scripts:

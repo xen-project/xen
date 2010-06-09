@@ -41,10 +41,6 @@ install: build
 	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
 	$(INSTALL_PYTHON_PROG) $(INSTALL_BIN) $(DESTDIR)$(BINDIR)
 	$(INSTALL_PYTHON_PROG) $(INSTALL_SBIN) $(DESTDIR)$(SBINDIR)
-ifeq ($(CONFIG_Linux),y)
-	$(INSTALL_DIR) $(DESTDIR)$(CONFIG_DIR)/init.d
-	$(INSTALL_PROG) xen-watchdog $(DESTDIR)$(CONFIG_DIR)/init.d
-endif
 	set -e; for d in $(SUBDIRS); do $(MAKE) -C $$d install-recurse; done
 
 .PHONY: clean

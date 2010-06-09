@@ -8,7 +8,7 @@ XEN_SCRIPTS += vif-bridge
 XEN_SCRIPTS += vif-ip
 
 XEN_SCRIPT_DATA =
-XEN_RCD_PROG = rc.d/xencommons rc.d/xend rc.d/xendomains
+XEN_RCD_PROG = rc.d/xencommons rc.d/xend rc.d/xendomains rc.d/xen-watchdog
 
 .PHONY: all
 all:
