@@ -2147,11 +2147,6 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
         gdprintk(XENLOG_ERR, " --- GLA %#lx\n", gla);
     }
 
-    if ( qualification & EPT_GAW_VIOLATION )
-        gdprintk(XENLOG_ERR, " --- GPA too wide (max %u bits)\n", 
-                 9 * (unsigned int)current->domain->arch.hvm_domain.
-                 vmx.ept_control.gaw + 21);
-
     domain_crash(current->domain);
 }
 

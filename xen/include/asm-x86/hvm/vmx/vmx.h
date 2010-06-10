@@ -372,8 +372,6 @@ void setup_ept_dump(void);
 #define EPT_EFFECTIVE_WRITE         (1UL<<_EPT_EFFECTIVE_WRITE)
 #define _EPT_EFFECTIVE_EXEC         5
 #define EPT_EFFECTIVE_EXEC          (1UL<<_EPT_EFFECTIVE_EXEC)
-#define _EPT_GAW_VIOLATION          6
-#define EPT_GAW_VIOLATION           (1UL<<_EPT_GAW_VIOLATION)
 #define _EPT_GLA_VALID              7
 #define EPT_GLA_VALID               (1UL<<_EPT_GLA_VALID)
 #define _EPT_GLA_FAULT              8
