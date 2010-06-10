@@ -504,3 +504,33 @@ out:
 
 	return err;
 }
+
+int
+tap_ctl_find_minor(const char *type, const char *path)
+{
+	tap_list_t **list, **_entry;
+	int minor, err;
+
+	err = tap_ctl_list(&list);
+	if (err)
+		return err;
+
+	minor = -1;
+
+	for (_entry = list; *_entry != NULL; ++_entry) {
+		tap_list_t *entry  = *_entry;
+
+		if (type && (!entry->type || strcmp(entry->type, type)))
+			continue;
+
+		if (path && (!entry->path || strcmp(entry->path, path)))
+			continue;
+
+		minor = entry->minor;
+		break;
+	}
+
+	tap_ctl_free_list(list);
+
+	return minor >= 0 ? minor : -ENOENT;
+}

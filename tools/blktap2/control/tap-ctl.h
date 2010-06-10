@@ -77,6 +77,7 @@ int tap_ctl_get_driver_id(const char *handle);
 
 int tap_ctl_list(tap_list_t ***list);
 void tap_ctl_free_list(tap_list_t **list);
+int tap_ctl_find_minor(const char *type, const char *path);
 
 int tap_ctl_allocate(int *minor, char **devname);
 int tap_ctl_free(const int minor);
