@@ -40,16 +40,15 @@ struct restore_ctx {
     xen_pfn_t *live_p2m; /* Live mapping of the table mapping each PFN to its current MFN. */
     xen_pfn_t *p2m; /* A table mapping each PFN to its new MFN. */
     xen_pfn_t *p2m_batch; /* A table of P2M mappings in the current region.  */
+    int completed; /* Set when a consistent image is available */
     struct domain_info_context dinfo;
 };
-
-/* set when a consistent image is available */
-static int completed = 0;
 
 #define HEARTBEAT_MS 1000
 
 #ifndef __MINIOS__
-static ssize_t rdexact(struct xc_interface *xch, int fd, void* buf, size_t size)
+static ssize_t rdexact(struct xc_interface *xch, struct restore_ctx *ctx,
+                       int fd, void* buf, size_t size)
 {
     size_t offset = 0;
     ssize_t len;
@@ -58,7 +57,7 @@ static ssize_t rdexact(struct xc_interface *xch, int fd, void* buf, size_t size)
 
     while ( offset < size )
     {
-        if ( completed ) {
+        if ( ctx->completed ) {
             /* expect a heartbeat every HEARBEAT_MS ms maximum */
             tv.tv_sec = HEARTBEAT_MS / 1000;
             tv.tv_usec = (HEARTBEAT_MS % 1000) * 1000;
@@ -88,7 +87,7 @@ static ssize_t rdexact(struct xc_interface *xch, int fd, void* buf, size_t size)
     return 0;
 }
 
-#define RDEXACT(fd,buf,size) rdexact(xch, fd, buf, size)
+#define RDEXACT(fd,buf,size) rdexact(xch, ctx, fd, buf, size)
 #else
 #define RDEXACT read_exact
 #endif
@@ -330,7 +329,7 @@ typedef struct {
 } tailbuf_t;
 
 /* read stream until EOF, growing buffer as necssary */
-static int compat_buffer_qemu(xc_interface *xch,
+static int compat_buffer_qemu(xc_interface *xch, struct restore_ctx *ctx,
                               int fd, struct tailbuf_hvm *buf)
 {
     uint8_t *qbuf, *tmp;
@@ -379,7 +378,7 @@ static int compat_buffer_qemu(xc_interface *xch,
     return 0;
 }
 
-static int buffer_qemu(xc_interface *xch,
+static int buffer_qemu(xc_interface *xch, struct restore_ctx *ctx,
                        int fd, struct tailbuf_hvm *buf)
 {
     uint32_t qlen;
@@ -494,9 +493,9 @@ static int buffer_tail_hvm(xc_interface *xch, struct restore_ctx *ctx,
      * until EOF. Remus gets around this by sending a different signature
      * which includes a length prefix */
     if ( !memcmp(qemusig, "QemuDeviceModelRecord", sizeof(qemusig)) )
-        return compat_buffer_qemu(xch, fd, buf);
+        return compat_buffer_qemu(xch, ctx, fd, buf);
     else if ( !memcmp(qemusig, "RemusDeviceModelState", sizeof(qemusig)) )
-        return buffer_qemu(xch, fd, buf);
+        return buffer_qemu(xch, ctx, fd, buf);
 
     qemusig[20] = '\0';
     ERROR("Invalid QEMU signature: %s", qemusig);
@@ -661,7 +660,7 @@ static void pagebuf_free(pagebuf_t* buf)
     }
 }
 
-static int pagebuf_get_one(xc_interface *xch,
+static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
                            pagebuf_t* buf, int fd, uint32_t dom)
 {
     int count, countpages, oldcount, i;
@@ -681,7 +680,7 @@ static int pagebuf_get_one(xc_interface *xch,
     } else if (count == -1) {
         DPRINTF("Entering page verify mode\n");
         buf->verify = 1;
-        return pagebuf_get_one(xch, buf, fd, dom);
+        return pagebuf_get_one(xch, ctx, buf, fd, dom);
     } else if (count == -2) {
         buf->new_ctxt_format = 1;
         if ( RDEXACT(fd, &buf->max_vcpu_id, sizeof(buf->max_vcpu_id)) ||
@@ -691,7 +690,7 @@ static int pagebuf_get_one(xc_interface *xch,
             return -1;
         }
         // DPRINTF("Max VCPU ID: %d, vcpumap: %llx\n", buf->max_vcpu_id, buf->vcpumap);
-        return pagebuf_get_one(xch, buf, fd, dom);
+        return pagebuf_get_one(xch, ctx, buf, fd, dom);
     } else if (count == -3) {
         /* Skip padding 4 bytes then read the EPT identity PT location. */
         if ( read_exact(fd, &buf->identpt, sizeof(uint32_t)) ||
@@ -701,7 +700,7 @@ static int pagebuf_get_one(xc_interface *xch,
             return -1;
         }
         // DPRINTF("EPT identity map address: %llx\n", buf->identpt);
-        return pagebuf_get_one(xch, buf, fd, dom);
+        return pagebuf_get_one(xch, ctx, buf, fd, dom);
     } else if ( count == -4 )  {
         /* Skip padding 4 bytes then read the vm86 TSS location. */
         if ( read_exact(fd, &buf->vm86_tss, sizeof(uint32_t)) ||
@@ -711,21 +710,21 @@ static int pagebuf_get_one(xc_interface *xch,
             return -1;
         }
         // DPRINTF("VM86 TSS location: %llx\n", buf->vm86_tss);
-        return pagebuf_get_one(xch, buf, fd, dom);
+        return pagebuf_get_one(xch, ctx, buf, fd, dom);
     } else if ( count == -5 ) {
         DPRINTF("xc_domain_restore start tmem\n");
         if ( xc_tmem_restore(xch, dom, fd) ) {
             PERROR("error reading/restoring tmem");
             return -1;
         }
-        return pagebuf_get_one(xch, buf, fd, dom);
+        return pagebuf_get_one(xch, ctx, buf, fd, dom);
     }
     else if ( count == -6 ) {
         if ( xc_tmem_restore_extra(xch, dom, fd) ) {
             PERROR("error reading/restoring tmem extra");
             return -1;
         }
-        return pagebuf_get_one(xch, buf, fd, dom);
+        return pagebuf_get_one(xch, ctx, buf, fd, dom);
     } else if ( count == -7 ) {
         uint32_t tsc_mode, khz, incarn;
         uint64_t nsec;
@@ -737,7 +736,7 @@ static int pagebuf_get_one(xc_interface *xch,
             PERROR("error reading/restoring tsc info");
             return -1;
         }
-        return pagebuf_get_one(xch, buf, fd, dom);
+        return pagebuf_get_one(xch, ctx, buf, fd, dom);
     } else if ( (count > MAX_BATCH_SIZE) || (count < 0) ) {
         ERROR("Max batch size exceeded (%d). Giving up.", count);
         errno = EMSGSIZE;
@@ -793,14 +792,15 @@ static int pagebuf_get_one(xc_interface *xch,
     return count;
 }
 
-static int pagebuf_get(xc_interface *xch, pagebuf_t* buf, int fd, uint32_t dom)
+static int pagebuf_get(xc_interface *xch, struct restore_ctx *ctx,
+                       pagebuf_t* buf, int fd, uint32_t dom)
 {
     int rc;
 
     buf->nr_physpages = buf->nr_pages = 0;
 
     do {
-        rc = pagebuf_get_one(xch, buf, fd, dom);
+        rc = pagebuf_get_one(xch, ctx, buf, fd, dom);
     } while (rc > 0);
 
     if (rc < 0)
@@ -1185,9 +1185,9 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
 
         xc_report_progress_step(xch, n, dinfo->p2m_size);
 
-        if ( !completed ) {
+        if ( !ctx->completed ) {
             pagebuf.nr_physpages = pagebuf.nr_pages = 0;
-            if ( pagebuf_get_one(xch, &pagebuf, io_fd, dom) < 0 ) {
+            if ( pagebuf_get_one(xch, ctx, &pagebuf, io_fd, dom) < 0 ) {
                 PERROR("Error when reading batch");
                 goto out;
             }
@@ -1253,7 +1253,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
 
     // DPRINTF("Received all pages (%d races)\n", nraces);
 
-    if ( !completed ) {
+    if ( !ctx->completed ) {
         int flags = 0;
 
         if ( buffer_tail(xch, ctx, &tailbuf, io_fd, max_vcpu_id, vcpumap,
@@ -1261,7 +1261,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
             ERROR ("error buffering image tail");
             goto out;
         }
-        completed = 1;
+        ctx->completed = 1;
         /* shift into nonblocking mode for the remainder */
         if ( (flags = fcntl(io_fd, F_GETFL,0)) < 0 )
             flags = 0;
@@ -1270,7 +1270,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
 
     // DPRINTF("Buffered checkpoint\n");
 
-    if ( pagebuf_get(xch, &pagebuf, io_fd, dom) ) {
+    if ( pagebuf_get(xch, ctx, &pagebuf, io_fd, dom) ) {
         PERROR("error when buffering batch, finishing");
         goto finish;
     }
