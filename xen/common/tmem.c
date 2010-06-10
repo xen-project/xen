@@ -1916,8 +1916,6 @@ static NOINLINE int do_tmem_new_pool(cli_id_t this_cli_id,
                     client->pools[d_poolid] = global_shared_pools[s_poolid];
                     shared_pool_join(global_shared_pools[s_poolid], client);
                     pool_free(pool);
-                    if ( this_cli_id != CLI_ID_NULL )
-                        tmh_client_put(client->tmh);
                     return d_poolid;
                 }
             }
@@ -1938,8 +1936,6 @@ static NOINLINE int do_tmem_new_pool(cli_id_t this_cli_id,
         }
     }
     client->pools[d_poolid] = pool;
-    if ( this_cli_id != CLI_ID_NULL )
-        tmh_client_put(client->tmh);
     list_add_tail(&pool->pool_list, &global_pool_list);
     pool->pool_id = d_poolid;
     pool->persistent = persistent;
@@ -1949,8 +1945,6 @@ static NOINLINE int do_tmem_new_pool(cli_id_t this_cli_id,
 
 fail:
     pool_free(pool);
-    if ( this_cli_id != CLI_ID_NULL )
-        tmh_client_put(client->tmh);
     return -EPERM;
 }
 
@@ -1976,7 +1970,6 @@ static int tmemc_freeze_pools(cli_id_t cli_id, int arg)
         if ( (client = tmh_client_from_cli_id(cli_id)) == NULL)
             return -1;
         client_freeze(client,freeze);
-        tmh_client_put(client->tmh);
         printk("tmem: all pools %s for %s=%d\n",s,cli_id_str,cli_id);
     }
     return 0;
@@ -2185,10 +2178,8 @@ static int tmemc_list(cli_id_t cli_id, tmem_cli_va_t buf, uint32_t len,
     }
     else if ( (client = tmh_client_from_cli_id(cli_id)) == NULL)
         return -1;
-    else {
+    else
         off = tmemc_list_client(client, buf, 0, len, use_long);
-        tmh_client_put(client->tmh);
-    }
 
     return 0;
 }
@@ -2243,10 +2234,7 @@ static int tmemc_set_var(cli_id_t cli_id, uint32_t subop, uint32_t arg1)
     else if ( (client = tmh_client_from_cli_id(cli_id)) == NULL)
         return -1;
     else
-    {
         tmemc_set_var_one(client, subop, arg1);
-        tmh_client_put(client->tmh);
-    }
     return 0;
 }
 
@@ -2272,7 +2260,6 @@ static NOINLINE int tmemc_shared_pool_auth(cli_id_t cli_id, uint64_t uuid_lo,
             if ( auth == 0 )
                 client->shared_auth_uuid[i][0] =
                     client->shared_auth_uuid[i][1] = -1L;
-            tmh_client_put(client->tmh);
             return 1;
         }
         if ( (auth == 1) && (client->shared_auth_uuid[i][0] == -1L) &&
@@ -2280,15 +2267,11 @@ static NOINLINE int tmemc_shared_pool_auth(cli_id_t cli_id, uint64_t uuid_lo,
             free = i;
     }
     if ( auth == 0 )
-    {
-        tmh_client_put(client->tmh);
         return 0;
-    }
     if ( auth == 1 && free == -1 )
         return -ENOMEM;
     client->shared_auth_uuid[free][0] = uuid_lo;
     client->shared_auth_uuid[free][1] = uuid_hi;
-    tmh_client_put(client->tmh);
     return 1;
 }
 
@@ -2370,8 +2353,6 @@ static NOINLINE int tmemc_save_subop(int cli_id, uint32_t pool_id,
         client->frozen = client->was_frozen;
         rc = 0;
     }
-    if ( client )
-        tmh_client_put(client->tmh);
     return rc;
 }
 
@@ -2387,15 +2368,9 @@ static NOINLINE int tmemc_save_get_next_page(int cli_id, int pool_id,
     unsigned int pagesize = 1 << (pool->pageshift+12);
 
     if ( pool == NULL || is_ephemeral(pool) )
-    {
-        tmh_client_put(client->tmh);
         return -1;
-    }
     if ( bufsize < pagesize + sizeof(struct tmem_handle) )
-    {
-        tmh_client_put(client->tmh);
         return -ENOMEM;
-    }
 
     tmem_spin_lock(&pers_lists_spinlock);
     if ( list_empty(&pool->persistent_page_list) )
@@ -2427,7 +2402,6 @@ static NOINLINE int tmemc_save_get_next_page(int cli_id, int pool_id,
 
 out:
     tmem_spin_unlock(&pers_lists_spinlock);
-    tmh_client_put(client->tmh);
     return ret;
 }
 
@@ -2442,10 +2416,7 @@ static NOINLINE int tmemc_save_get_next_inv(int cli_id, tmem_cli_va_t buf,
     if ( client == NULL )
         return 0;
     if ( bufsize < sizeof(struct tmem_handle) )
-    {
-        tmh_client_put(client->tmh);
         return 0;
-    }
     tmem_spin_lock(&pers_lists_spinlock);
     if ( list_empty(&client->persistent_invalidated_list) )
         goto out;
@@ -2472,7 +2443,6 @@ static NOINLINE int tmemc_save_get_next_inv(int cli_id, tmem_cli_va_t buf,
     ret = 1;
 out:
     tmem_spin_unlock(&pers_lists_spinlock);
-    tmh_client_put(client->tmh);
     return ret;
 }
 
@@ -2482,11 +2452,10 @@ static int tmemc_restore_put_page(int cli_id, int pool_id, uint64_t oid,
     client_t *client = tmh_client_from_cli_id(cli_id);
     pool_t *pool = (client == NULL || pool_id >= MAX_POOLS_PER_DOMAIN)
                    ? NULL : client->pools[pool_id];
-    int rc = pool ? do_tmem_put(pool,oid,index,0,0,0,bufsize,buf.p) : -1;
 
-    if ( client )
-        tmh_client_put(client->tmh);
-    return rc;
+    if ( pool == NULL )
+        return -1;
+    return do_tmem_put(pool,oid,index,0,0,0,bufsize,buf.p);
 }
 
 static int tmemc_restore_flush_page(int cli_id, int pool_id, uint64_t oid,
@@ -2495,11 +2464,10 @@ static int tmemc_restore_flush_page(int cli_id, int pool_id, uint64_t oid,
     client_t *client = tmh_client_from_cli_id(cli_id);
     pool_t *pool = (client == NULL || pool_id >= MAX_POOLS_PER_DOMAIN)
                    ? NULL : client->pools[pool_id];
-    int rc = pool ? do_tmem_flush_page(pool, oid, index) : -1;
 
-    if ( client )
-        tmh_client_put(client->tmh);
-    return rc;
+    if ( pool == NULL )
+        return -1;
+    return do_tmem_flush_page(pool,oid,index);
 }
 
 static NOINLINE int do_tmem_control(struct tmem_op *op)

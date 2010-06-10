@@ -302,18 +302,18 @@ typedef struct page_info pfp_t;
 extern tmh_client_t *tmh_client_init(cli_id_t);
 extern void tmh_client_destroy(tmh_client_t *);
 
-/* this appears to be unreliable when a domain is being shut down */
+/* we don't need to take a reference to the domain here as we hold
+ * one for the entire life of the client, so use rcu_lock_domain_by_id
+ * variant instead of get_domain_by_id() */
 static inline struct client *tmh_client_from_cli_id(cli_id_t cli_id)
 {
-    struct domain *d = get_domain_by_id(cli_id); /* incs d->refcnt! */
+    struct client *c;
+    struct domain *d = rcu_lock_domain_by_id(cli_id);
     if (d == NULL)
         return NULL;
-    return (struct client *)(d->tmem);
-}
-
-static inline void tmh_client_put(tmh_client_t *tmh)
-{
-    put_domain(tmh->domain);
+    c = (struct client *)(d->tmem);
+    rcu_unlock_domain(d);
+    return c;
 }
 
 static inline struct client *tmh_client_from_current(void)
@@ -336,6 +336,9 @@ static inline tmh_cli_ptr_t *tmh_get_cli_ptr_from_current(void)
 static inline void tmh_set_client_from_id(struct client *client,
                                           tmh_client_t *tmh, cli_id_t cli_id)
 {
+    /* here we DO want to take/hold a reference to the domain as
+     * this routine should be called exactly once when the client is created;
+     * the matching put_domain is in tmh_client_destroy */
     struct domain *d = get_domain_by_id(cli_id);
     d->tmem = client;
     tmh->domain = d;
