@@ -71,8 +71,12 @@ struct vmx_domain {
     cpumask_t ept_synced;
 };
 
-#define ept_get_wl(d)  \
+#define ept_get_wl(d)   \
     ((d)->arch.hvm_domain.vmx.ept_control.ept_wl)
+#define ept_get_asr(d)  \
+    ((d)->arch.hvm_domain.vmx.ept_control.asr)
+#define ept_get_eptp(d) \
+    ((d)->arch.hvm_domain.vmx.ept_control.eptp)
 
 struct arch_vmx_struct {
     /* Virtual address of VMCS. */
@@ -181,6 +185,9 @@ extern bool_t cpu_has_vmx_ins_outs_instr_info;
 #define VMX_EPT_MEMORY_TYPE_WB                  0x00004000
 #define VMX_EPT_SUPERPAGE_2MB                   0x00010000
 #define VMX_EPT_SUPERPAGE_1GB                   0x00020000
+#define VMX_EPT_INVEPT_INSTRUCTION              0x00100000
+#define VMX_EPT_INVEPT_SINGLE_CONTEXT           0x02000000
+#define VMX_EPT_INVEPT_ALL_CONTEXT              0x04000000
 
 #define cpu_has_wbinvd_exiting \
     (vmx_secondary_exec_control & SECONDARY_EXEC_WBINVD_EXITING)

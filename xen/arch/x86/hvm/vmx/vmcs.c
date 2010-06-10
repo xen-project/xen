@@ -204,11 +204,14 @@ static int vmx_init_vmcs_config(void)
          *    ept paging structures memory type to WB;
          * 2) the CPU must support the EPT page-walk length of 4 according to
          *    Intel SDM 25.2.2.
+         * 3) the CPU must support INVEPT all context invalidation, because we
+         *    will use it as final resort if other types are not supported.
          *
          * Or we just don't use EPT.
          */
         if ( !(_vmx_ept_vpid_cap & VMX_EPT_MEMORY_TYPE_WB) ||
-             !(_vmx_ept_vpid_cap & VMX_EPT_WALK_LENGTH_4_SUPPORTED) )
+             !(_vmx_ept_vpid_cap & VMX_EPT_WALK_LENGTH_4_SUPPORTED) ||
+             !(_vmx_ept_vpid_cap & VMX_EPT_INVEPT_ALL_CONTEXT) )
             _vmx_secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_EPT;
     }
 
@@ -512,7 +515,8 @@ int vmx_cpu_up(void)
 
     hvm_asid_init(cpu_has_vmx_vpid ? (1u << VMCS_VPID_WIDTH) : 0);
 
-    ept_sync_all();
+    if ( cpu_has_vmx_ept )
+        ept_sync_all();
 
     if ( cpu_has_vmx_vpid )
         vpid_sync_all();

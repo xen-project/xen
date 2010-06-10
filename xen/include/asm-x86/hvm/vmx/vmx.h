@@ -43,9 +43,9 @@ typedef union {
     u64 epte;
 } ept_entry_t;
 
-#define EPT_TABLE_ORDER     9
+#define EPT_TABLE_ORDER         9
 #define EPTE_SUPER_PAGE_MASK    0x80
-#define EPTE_MFN_MASK           0x1fffffffffff000
+#define EPTE_MFN_MASK           0xffffffffff000ULL
 #define EPTE_AVAIL1_MASK        0xF00
 #define EPTE_EMT_MASK           0x38
 #define EPTE_IGMT_MASK          0x40
@@ -196,7 +196,11 @@ extern u64 vmx_ept_vpid_cap;
     (vmx_ept_vpid_cap & VMX_EPT_SUPERPAGE_1GB)
 #define cpu_has_vmx_ept_2mb                     \
     (vmx_ept_vpid_cap & VMX_EPT_SUPERPAGE_2MB)
+#define cpu_has_vmx_ept_invept_single_context   \
+    (vmx_ept_vpid_cap & VMX_EPT_INVEPT_SINGLE_CONTEXT)
 
+#define INVEPT_SINGLE_CONTEXT   1
+#define INVEPT_ALL_CONTEXT      2
 
 static inline void __vmptrld(u64 addr)
 {
@@ -280,18 +284,26 @@ static inline void __vm_clear_bit(unsigned long field, unsigned int bit)
     __vmwrite(field, __vmread(field) & ~(1UL << bit));
 }
 
-static inline void __invept(int ext, u64 eptp, u64 gpa)
+static inline void __invept(int type, u64 eptp, u64 gpa)
 {
     struct {
         u64 eptp, gpa;
     } operand = {eptp, gpa};
+
+    /*
+     * If single context invalidation is not supported, we escalate to
+     * use all context invalidation.
+     */
+    if ( (type == INVEPT_SINGLE_CONTEXT) &&
+         !cpu_has_vmx_ept_invept_single_context )
+        type = INVEPT_ALL_CONTEXT;
 
     asm volatile ( INVEPT_OPCODE
                    MODRM_EAX_08
                    /* CF==1 or ZF==1 --> crash (ud2) */
                    "ja 1f ; ud2 ; 1:\n"
                    :
-                   : "a" (&operand), "c" (ext)
+                   : "a" (&operand), "c" (type)
                    : "memory" );
 }
 
@@ -318,10 +330,7 @@ static inline void __invvpid(int ext, u16 vpid, u64 gva)
 
 static inline void ept_sync_all(void)
 {
-    if ( !current->domain->arch.hvm_domain.hap_enabled )
-        return;
-
-    __invept(2, 0, 0);
+    __invept(INVEPT_ALL_CONTEXT, 0, 0);
 }
 
 void ept_sync_domain(struct domain *d);

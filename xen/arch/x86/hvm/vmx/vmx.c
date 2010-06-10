@@ -678,7 +678,7 @@ static void vmx_ctxt_switch_to(struct vcpu *v)
         /* Test-and-test-and-set this CPU in the EPT-is-synced mask. */
         if ( !cpu_isset(cpu, d->arch.hvm_domain.vmx.ept_synced) &&
              !cpu_test_and_set(cpu, d->arch.hvm_domain.vmx.ept_synced) )
-            __invept(1, d->arch.hvm_domain.vmx.ept_control.eptp, 0);
+            __invept(INVEPT_SINGLE_CONTEXT, ept_get_eptp(d), 0);
     }
 
     vmx_restore_guest_msrs(v);
@@ -1210,7 +1210,7 @@ static void vmx_update_guest_efer(struct vcpu *v)
 static void __ept_sync_domain(void *info)
 {
     struct domain *d = info;
-    __invept(1, d->arch.hvm_domain.vmx.ept_control.eptp, 0);
+    __invept(INVEPT_SINGLE_CONTEXT, ept_get_eptp(d), 0);
 }
 
 void ept_sync_domain(struct domain *d)
