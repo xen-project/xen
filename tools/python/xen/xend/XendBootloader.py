@@ -38,10 +38,15 @@ def bootloader(blexec, disk, dom, quiet = False, blargs = '', kernel = '',
         msg = "Bootloader isn't executable"
         log.error(msg)
         raise VmError(msg)
-    if not os.access(disk, os.R_OK):
-        msg = "Disk isn't accessible"
-        log.error(msg)
-        raise VmError(msg)
+    attempt = 0
+    while True:
+        if not os.access(disk, os.R_OK) and attempt > 3:
+            msg = "Disk isn't accessible"
+            log.error(msg)
+            raise VmError(msg)
+        else:
+            break
+        attempt = attempt + 1
 
     if os.uname()[0] == "NetBSD" and disk.startswith('/dev/'):
        disk = disk.replace("/dev/", "/dev/r")
