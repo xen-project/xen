@@ -30,8 +30,7 @@
 
 #include <syslog.h>
 #include <errno.h>
-
-#include "tapdisk-message.h"
+#include <tapdisk-message.h>
 
 extern int tap_ctl_debug;
 

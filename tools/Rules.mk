@@ -13,6 +13,7 @@ XEN_XC             = $(XEN_ROOT)/tools/python/xen/lowlevel/xc
 XEN_LIBXC          = $(XEN_ROOT)/tools/libxc
 XEN_XENSTORE       = $(XEN_ROOT)/tools/xenstore
 XEN_LIBXENSTAT     = $(XEN_ROOT)/tools/xenstat/libxenstat/src
+XEN_BLKTAP2        = $(XEN_ROOT)/tools/blktap2
 
 CFLAGS_include = -I$(XEN_INCLUDE)
 
@@ -24,6 +25,9 @@ LDFLAGS_libxenguest = -L$(XEN_LIBXC) -lxenguest
 
 CFLAGS_libxenstore = -I$(XEN_XENSTORE) $(CFLAGS_include)
 LDFLAGS_libxenstore = -L$(XEN_XENSTORE) -lxenstore
+
+CFLAGS_libblktapctl = -I$(XEN_BLKTAP2)/control -I$(XEN_BLKTAP2)/include $(CFLAGS_include)
+LDFLAGS_libblktapctl = -L$(XEN_BLKTAP2)/control -lblktapctl
 
 X11_LDPATH = -L/usr/X11R6/$(LIBLEAFDIR)
 
