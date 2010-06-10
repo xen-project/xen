@@ -106,15 +106,13 @@ static void svm_cpu_down(void)
     write_efer(read_efer() & ~EFER_SVME);
 }
 
-static enum handler_return long_mode_do_msr_write(struct cpu_user_regs *regs)
+static enum handler_return
+long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
 {
-    u64 msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
-    u32 ecx = regs->ecx;
-
     HVM_DBG_LOG(DBG_LEVEL_0, "msr %x msr_content %"PRIx64,
-                ecx, msr_content);
+                msr, msr_content);
 
-    switch ( ecx )
+    switch ( msr )
     {
     case MSR_EFER:
         if ( hvm_set_efer(msr_content) )
@@ -1033,27 +1031,26 @@ static void svm_dr_access(struct vcpu *v, struct cpu_user_regs *regs)
     __restore_debug_registers(v);
 }
 
-static int svm_msr_read_intercept(struct cpu_user_regs *regs)
+static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 {
-    u64 msr_content = 0;
-    u32 ecx = regs->ecx, eax, edx;
+    u32 eax, edx;
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    switch ( ecx )
+    switch ( msr )
     {
     case MSR_EFER:
-        msr_content = v->arch.hvm_vcpu.guest_efer;
+        *msr_content = v->arch.hvm_vcpu.guest_efer;
         break;
 
     case MSR_IA32_SYSENTER_CS:
-        msr_content = v->arch.hvm_svm.guest_sysenter_cs;
+        *msr_content = v->arch.hvm_svm.guest_sysenter_cs;
         break;
     case MSR_IA32_SYSENTER_ESP:
-        msr_content = v->arch.hvm_svm.guest_sysenter_esp;
+        *msr_content = v->arch.hvm_svm.guest_sysenter_esp;
         break;
     case MSR_IA32_SYSENTER_EIP:
-        msr_content = v->arch.hvm_svm.guest_sysenter_eip;
+        *msr_content = v->arch.hvm_svm.guest_sysenter_eip;
         break;
 
     case MSR_IA32_MC4_MISC: /* Threshold register */
@@ -1062,7 +1059,7 @@ static int svm_msr_read_intercept(struct cpu_user_regs *regs)
          * MCA/MCE: We report that the threshold register is unavailable
          * for OS use (locked by the BIOS).
          */
-        msr_content = 1ULL << 61; /* MC4_MISC.Locked */
+        *msr_content = 1ULL << 61; /* MC4_MISC.Locked */
         break;
 
     case MSR_IA32_EBC_FREQUENCY_ID:
@@ -1071,30 +1068,30 @@ static int svm_msr_read_intercept(struct cpu_user_regs *regs)
          * has been migrated from an Intel host. The value zero is not
          * particularly meaningful, but at least avoids the guest crashing!
          */
-        msr_content = 0;
+        *msr_content = 0;
         break;
 
     case MSR_K8_VM_HSAVE_PA:
         goto gpf;
 
     case MSR_IA32_DEBUGCTLMSR:
-        msr_content = vmcb->debugctlmsr;
+        *msr_content = vmcb->debugctlmsr;
         break;
 
     case MSR_IA32_LASTBRANCHFROMIP:
-        msr_content = vmcb->lastbranchfromip;
+        *msr_content = vmcb->lastbranchfromip;
         break;
 
     case MSR_IA32_LASTBRANCHTOIP:
-        msr_content = vmcb->lastbranchtoip;
+        *msr_content = vmcb->lastbranchtoip;
         break;
 
     case MSR_IA32_LASTINTFROMIP:
-        msr_content = vmcb->lastintfromip;
+        *msr_content = vmcb->lastintfromip;
         break;
 
     case MSR_IA32_LASTINTTOIP:
-        msr_content = vmcb->lastinttoip;
+        *msr_content = vmcb->lastinttoip;
         break;
 
     case MSR_K7_PERFCTR0:
@@ -1105,30 +1102,28 @@ static int svm_msr_read_intercept(struct cpu_user_regs *regs)
     case MSR_K7_EVNTSEL1:
     case MSR_K7_EVNTSEL2:
     case MSR_K7_EVNTSEL3:
-        vpmu_do_rdmsr(ecx, &msr_content);
+        vpmu_do_rdmsr(msr, msr_content);
         break;
 
     default:
 
-        if ( rdmsr_viridian_regs(ecx, &msr_content) ||
-             rdmsr_hypervisor_regs(ecx, &msr_content) )
+        if ( rdmsr_viridian_regs(msr, msr_content) ||
+             rdmsr_hypervisor_regs(msr, msr_content) )
             break;
 
-        if ( rdmsr_safe(ecx, eax, edx) == 0 )
+        if ( rdmsr_safe(msr, eax, edx) == 0 )
         {
-            msr_content = ((uint64_t)edx << 32) | eax;
+            *msr_content = ((uint64_t)edx << 32) | eax;
             break;
         }
 
         goto gpf;
     }
 
-    regs->eax = (uint32_t)msr_content;
-    regs->edx = (uint32_t)(msr_content >> 32);
-
-    HVMTRACE_3D (MSR_READ, ecx, regs->eax, regs->edx);
-    HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%x, eax=%lx, edx=%lx",
-                ecx, (unsigned long)regs->eax, (unsigned long)regs->edx);
+    HVMTRACE_3D (MSR_READ, msr,
+                (uint32_t)*msr_content, (uint32_t)(*msr_content>>32));
+    HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%x, msr_value=%"PRIx64,
+                msr, *msr_content);
     return X86EMUL_OKAY;
 
  gpf:
@@ -1136,18 +1131,15 @@ static int svm_msr_read_intercept(struct cpu_user_regs *regs)
     return X86EMUL_EXCEPTION;
 }
 
-static int svm_msr_write_intercept(struct cpu_user_regs *regs)
+static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 {
-    u64 msr_content = 0;
-    u32 ecx = regs->ecx;
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
+    HVMTRACE_3D(MSR_WRITE, msr,
+               (uint32_t)msr_content, (uint32_t)(msr_content >> 32)); 
 
-    HVMTRACE_3D (MSR_WRITE, ecx, regs->eax, regs->edx);
-
-    switch ( ecx )
+    switch ( msr )
     {
     case MSR_K8_VM_HSAVE_PA:
         goto gpf;
@@ -1198,17 +1190,17 @@ static int svm_msr_write_intercept(struct cpu_user_regs *regs)
     case MSR_K7_EVNTSEL1:
     case MSR_K7_EVNTSEL2:
     case MSR_K7_EVNTSEL3:
-        vpmu_do_wrmsr(ecx, msr_content);
+        vpmu_do_wrmsr(msr, msr_content);
         break;
 
     default:
-        if ( wrmsr_viridian_regs(ecx, msr_content) )
+        if ( wrmsr_viridian_regs(msr, msr_content) )
             break;
 
-        switch ( long_mode_do_msr_write(regs) )
+        switch ( long_mode_do_msr_write(msr, msr_content) )
         {
         case HNDL_unhandled:
-            wrmsr_hypervisor_regs(ecx, msr_content);
+            wrmsr_hypervisor_regs(msr, msr_content);
             break;
         case HNDL_exception_raised:
             return X86EMUL_EXCEPTION;
@@ -1229,18 +1221,22 @@ static void svm_do_msr_access(struct cpu_user_regs *regs)
     int rc, inst_len;
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    uint64_t msr_content;
 
     if ( vmcb->exitinfo1 == 0 )
     {
         if ( (inst_len = __get_instruction_length(v, INSTR_RDMSR)) == 0 )
             return;
-        rc = hvm_msr_read_intercept(regs);
+        rc = hvm_msr_read_intercept(regs->ecx, &msr_content);
+        regs->eax = (uint32_t)msr_content;
+        regs->edx = (uint32_t)(msr_content >> 32);
     }
     else
     {
         if ( (inst_len = __get_instruction_length(v, INSTR_WRMSR)) == 0 )
             return;
-        rc = hvm_msr_write_intercept(regs);
+        msr_content = ((uint64_t)regs->edx << 32) | (uint32_t)regs->eax;
+        rc = hvm_msr_write_intercept(regs->ecx, msr_content);
     }
 
     if ( rc == X86EMUL_OKAY )

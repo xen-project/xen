@@ -69,8 +69,8 @@ static void vmx_cpuid_intercept(
     unsigned int *ecx, unsigned int *edx);
 static void vmx_wbinvd_intercept(void);
 static void vmx_fpu_dirty_intercept(void);
-static int vmx_msr_read_intercept(struct cpu_user_regs *regs);
-static int vmx_msr_write_intercept(struct cpu_user_regs *regs);
+static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content);
+static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content);
 static void vmx_invlpg_intercept(unsigned long vaddr);
 static void __ept_sync_domain(void *info);
 
@@ -160,70 +160,65 @@ void vmx_save_host_msrs(void)
         set_bit(VMX_INDEX_MSR_ ## address, &host_msr_state->flags);     \
         break
 
-static enum handler_return long_mode_do_msr_read(struct cpu_user_regs *regs)
+static enum handler_return
+long_mode_do_msr_read(unsigned int msr, uint64_t *msr_content)
 {
-    u64 msr_content = 0;
-    u32 ecx = regs->ecx;
     struct vcpu *v = current;
     struct vmx_msr_state *guest_msr_state = &v->arch.hvm_vmx.msr_state;
 
-    switch ( ecx )
+    switch ( msr )
     {
     case MSR_EFER:
-        msr_content = v->arch.hvm_vcpu.guest_efer;
+        *msr_content = v->arch.hvm_vcpu.guest_efer;
         break;
 
     case MSR_FS_BASE:
-        msr_content = __vmread(GUEST_FS_BASE);
+        *msr_content = __vmread(GUEST_FS_BASE);
         break;
 
     case MSR_GS_BASE:
-        msr_content = __vmread(GUEST_GS_BASE);
+        *msr_content = __vmread(GUEST_GS_BASE);
         break;
 
     case MSR_SHADOW_GS_BASE:
-        rdmsrl(MSR_SHADOW_GS_BASE, msr_content);
+        rdmsrl(MSR_SHADOW_GS_BASE, *msr_content);
         break;
 
     case MSR_STAR:
-        msr_content = guest_msr_state->msrs[VMX_INDEX_MSR_STAR];
+        *msr_content = guest_msr_state->msrs[VMX_INDEX_MSR_STAR];
         break;
 
     case MSR_LSTAR:
-        msr_content = guest_msr_state->msrs[VMX_INDEX_MSR_LSTAR];
+        *msr_content = guest_msr_state->msrs[VMX_INDEX_MSR_LSTAR];
         break;
 
     case MSR_CSTAR:
-        msr_content = v->arch.hvm_vmx.cstar;
+        *msr_content = v->arch.hvm_vmx.cstar;
         break;
 
     case MSR_SYSCALL_MASK:
-        msr_content = guest_msr_state->msrs[VMX_INDEX_MSR_SYSCALL_MASK];
+        *msr_content = guest_msr_state->msrs[VMX_INDEX_MSR_SYSCALL_MASK];
         break;
 
     default:
         return HNDL_unhandled;
     }
 
-    HVM_DBG_LOG(DBG_LEVEL_0, "msr 0x%x content 0x%"PRIx64, ecx, msr_content);
-
-    regs->eax = (u32)(msr_content >>  0);
-    regs->edx = (u32)(msr_content >> 32);
+    HVM_DBG_LOG(DBG_LEVEL_0, "msr 0x%x content 0x%"PRIx64, msr, *msr_content);
 
     return HNDL_done;
 }
 
-static enum handler_return long_mode_do_msr_write(struct cpu_user_regs *regs)
+static enum handler_return
+long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
 {
-    u64 msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
-    u32 ecx = regs->ecx;
     struct vcpu *v = current;
     struct vmx_msr_state *guest_msr_state = &v->arch.hvm_vmx.msr_state;
     struct vmx_msr_state *host_msr_state = &this_cpu(host_msr_state);
 
-    HVM_DBG_LOG(DBG_LEVEL_0, "msr 0x%x content 0x%"PRIx64, ecx, msr_content);
+    HVM_DBG_LOG(DBG_LEVEL_0, "msr 0x%x content 0x%"PRIx64, msr, msr_content);
 
-    switch ( ecx )
+    switch ( msr )
     {
     case MSR_EFER:
         if ( hvm_set_efer(msr_content) )
@@ -236,9 +231,9 @@ static enum handler_return long_mode_do_msr_write(struct cpu_user_regs *regs)
         if ( !is_canonical_address(msr_content) )
             goto uncanonical_address;
 
-        if ( ecx == MSR_FS_BASE )
+        if ( msr == MSR_FS_BASE )
             __vmwrite(GUEST_FS_BASE, msr_content);
-        else if ( ecx == MSR_GS_BASE )
+        else if ( msr == MSR_GS_BASE )
             __vmwrite(GUEST_GS_BASE, msr_content);
         else
             wrmsrl(MSR_SHADOW_GS_BASE, msr_content);
@@ -269,7 +264,7 @@ static enum handler_return long_mode_do_msr_write(struct cpu_user_regs *regs)
     return HNDL_done;
 
  uncanonical_address:
-    HVM_DBG_LOG(DBG_LEVEL_0, "Not cano address of msr write %x", ecx);
+    HVM_DBG_LOG(DBG_LEVEL_0, "Not cano address of msr write %x", msr);
     vmx_inject_hw_exception(TRAP_gp_fault, 0);
  exception_raised:
     return HNDL_exception_raised;
@@ -1813,44 +1808,43 @@ static int is_last_branch_msr(u32 ecx)
     return 0;
 }
 
-static int vmx_msr_read_intercept(struct cpu_user_regs *regs)
+static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 {
-    u64 msr_content = 0;
-    u32 ecx = regs->ecx, eax, edx;
+    u32 eax, edx;
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%x", ecx);
+    HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%x", msr);
 
-    switch ( ecx )
+    switch ( msr )
     {
     case MSR_IA32_SYSENTER_CS:
-        msr_content = (u32)__vmread(GUEST_SYSENTER_CS);
+        *msr_content = (u32)__vmread(GUEST_SYSENTER_CS);
         break;
     case MSR_IA32_SYSENTER_ESP:
-        msr_content = __vmread(GUEST_SYSENTER_ESP);
+        *msr_content = __vmread(GUEST_SYSENTER_ESP);
         break;
     case MSR_IA32_SYSENTER_EIP:
-        msr_content = __vmread(GUEST_SYSENTER_EIP);
+        *msr_content = __vmread(GUEST_SYSENTER_EIP);
         break;
     case MSR_IA32_DEBUGCTLMSR:
-        msr_content = __vmread(GUEST_IA32_DEBUGCTL);
+        *msr_content = __vmread(GUEST_IA32_DEBUGCTL);
 #ifdef __i386__
-        msr_content |= (u64)__vmread(GUEST_IA32_DEBUGCTL_HIGH) << 32;
+        *msr_content |= (u64)__vmread(GUEST_IA32_DEBUGCTL_HIGH) << 32;
 #endif
         break;
     case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_PROCBASED_CTLS2:
         goto gp_fault;
     case MSR_IA32_MISC_ENABLE:
-        rdmsrl(MSR_IA32_MISC_ENABLE, msr_content);
+        rdmsrl(MSR_IA32_MISC_ENABLE, *msr_content);
         /* Debug Trace Store is not supported. */
-        msr_content |= MSR_IA32_MISC_ENABLE_BTS_UNAVAIL |
+        *msr_content |= MSR_IA32_MISC_ENABLE_BTS_UNAVAIL |
                        MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL;
         break;
     default:
-        if ( vpmu_do_rdmsr(ecx, &msr_content) )
+        if ( vpmu_do_rdmsr(msr, msr_content) )
             break;
-        if ( passive_domain_do_rdmsr(regs) )
+        if ( passive_domain_do_rdmsr(msr, msr_content) )
             goto done;
-        switch ( long_mode_do_msr_read(regs) )
+        switch ( long_mode_do_msr_read(msr, msr_content) )
         {
             case HNDL_unhandled:
                 break;
@@ -1860,36 +1854,33 @@ static int vmx_msr_read_intercept(struct cpu_user_regs *regs)
                 goto done;
         }
 
-        if ( vmx_read_guest_msr(ecx, &msr_content) == 0 )
+        if ( vmx_read_guest_msr(msr, msr_content) == 0 )
             break;
 
-        if ( is_last_branch_msr(ecx) )
+        if ( is_last_branch_msr(msr) )
         {
-            msr_content = 0;
+            *msr_content = 0;
             break;
         }
 
-        if ( rdmsr_viridian_regs(ecx, &msr_content) ||
-             rdmsr_hypervisor_regs(ecx, &msr_content) )
+        if ( rdmsr_viridian_regs(msr, msr_content) ||
+             rdmsr_hypervisor_regs(msr, msr_content) )
             break;
 
-        if ( rdmsr_safe(ecx, eax, edx) == 0 )
+        if ( rdmsr_safe(msr, eax, edx) == 0 )
         {
-            msr_content = ((uint64_t)edx << 32) | eax;
+            *msr_content = ((uint64_t)edx << 32) | eax;
             break;
         }
 
         goto gp_fault;
     }
 
-    regs->eax = (uint32_t)msr_content;
-    regs->edx = (uint32_t)(msr_content >> 32);
-
 done:
-    HVMTRACE_3D (MSR_READ, ecx, regs->eax, regs->edx);
-    HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%x, eax=%lx, edx=%lx",
-                ecx, (unsigned long)regs->eax,
-                (unsigned long)regs->edx);
+    HVMTRACE_3D(MSR_READ, msr,
+                (uint32_t)*msr_content, (uint32_t)(*msr_content >> 32));
+    HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%x, msr_value=0x%"PRIx64,
+                msr, *msr_content);
     return X86EMUL_OKAY;
 
 gp_fault:
@@ -1957,20 +1948,17 @@ void vmx_vlapic_msr_changed(struct vcpu *v)
     vmx_vmcs_exit(v);
 }
 
-static int vmx_msr_write_intercept(struct cpu_user_regs *regs)
+static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 {
-    u32 ecx = regs->ecx;
-    u64 msr_content;
     struct vcpu *v = current;
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%x, eax=%x, edx=%x",
-                ecx, (u32)regs->eax, (u32)regs->edx);
+    HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%x, msr_value=0x%"PRIx64,
+                msr, msr_content);
 
-    msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
+    HVMTRACE_3D(MSR_WRITE, msr,
+               (uint32_t)msr_content, (uint32_t)(msr_content >> 32));
 
-    HVMTRACE_3D (MSR_WRITE, ecx, regs->eax, regs->edx);
-
-    switch ( ecx )
+    switch ( msr )
     {
     case MSR_IA32_SYSENTER_CS:
         __vmwrite(GUEST_SYSENTER_CS, msr_content);
@@ -2000,7 +1988,7 @@ static int vmx_msr_write_intercept(struct cpu_user_regs *regs)
         }
 
         if ( (rc < 0) ||
-             (vmx_add_host_load_msr(ecx) < 0) )
+             (vmx_add_host_load_msr(msr) < 0) )
             vmx_inject_hw_exception(TRAP_machine_check, 0);
         else
         {
@@ -2015,20 +2003,20 @@ static int vmx_msr_write_intercept(struct cpu_user_regs *regs)
     case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_PROCBASED_CTLS2:
         goto gp_fault;
     default:
-        if ( vpmu_do_wrmsr(ecx, msr_content) )
+        if ( vpmu_do_wrmsr(msr, msr_content) )
             return X86EMUL_OKAY;
-        if ( passive_domain_do_wrmsr(regs) )
+        if ( passive_domain_do_wrmsr(msr, msr_content) )
             return X86EMUL_OKAY;
 
-        if ( wrmsr_viridian_regs(ecx, msr_content) ) 
+        if ( wrmsr_viridian_regs(msr, msr_content) ) 
             break;
 
-        switch ( long_mode_do_msr_write(regs) )
+        switch ( long_mode_do_msr_write(msr, msr_content) )
         {
             case HNDL_unhandled:
-                if ( (vmx_write_guest_msr(ecx, msr_content) != 0) &&
-                     !is_last_branch_msr(ecx) )
-                    wrmsr_hypervisor_regs(ecx, msr_content);
+                if ( (vmx_write_guest_msr(msr, msr_content) != 0) &&
+                     !is_last_branch_msr(msr) )
+                    wrmsr_hypervisor_regs(msr, msr_content);
                 break;
             case HNDL_exception_raised:
                 return X86EMUL_EXCEPTION;
@@ -2572,15 +2560,26 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         vmx_dr_access(exit_qualification, regs);
         break;
     case EXIT_REASON_MSR_READ:
+    {
+        uint64_t msr_content;
         inst_len = __get_instruction_length(); /* Safe: RDMSR */
-        if ( hvm_msr_read_intercept(regs) == X86EMUL_OKAY )
+        if ( hvm_msr_read_intercept(regs->ecx, &msr_content) == X86EMUL_OKAY )
+        {
+            regs->eax = (uint32_t)msr_content;
+            regs->edx = (uint32_t)(msr_content >> 32);
             __update_guest_eip(inst_len);
+        }
         break;
+    }
     case EXIT_REASON_MSR_WRITE:
+    {
+        uint64_t msr_content;
         inst_len = __get_instruction_length(); /* Safe: WRMSR */
-        if ( hvm_msr_write_intercept(regs) == X86EMUL_OKAY )
+        msr_content = ((uint64_t)regs->edx << 32) | (uint32_t)regs->eax;
+        if ( hvm_msr_write_intercept(regs->ecx, msr_content) == X86EMUL_OKAY )
             __update_guest_eip(inst_len);
         break;
+    }
 
     case EXIT_REASON_MWAIT_INSTRUCTION:
     case EXIT_REASON_MONITOR_INSTRUCTION:

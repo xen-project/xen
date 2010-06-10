@@ -35,14 +35,14 @@ static unsigned long saved_lvtpc[NR_CPUS];
 
 static char *cpu_type;
 
-static int passive_domain_msr_op_checks(struct cpu_user_regs *regs ,int *typep, int *indexp)
+static int passive_domain_msr_op_checks(unsigned int msr, int *typep, int *indexp)
 {
 	struct vpmu_struct *vpmu = vcpu_vpmu(current);
 	if ( model == NULL )
 		return 0;
 	if ( model->is_arch_pmu_msr == NULL )
 		return 0;
-	if ( !model->is_arch_pmu_msr((u64)regs->ecx, typep, indexp) )
+	if ( !model->is_arch_pmu_msr(msr, typep, indexp) )
 		return 0;
 
 	if ( !(vpmu->flags & PASSIVE_DOMAIN_ALLOCATED) )
@@ -51,29 +51,24 @@ static int passive_domain_msr_op_checks(struct cpu_user_regs *regs ,int *typep, 
 	return 1;
 }
 
-int passive_domain_do_rdmsr(struct cpu_user_regs *regs)
+int passive_domain_do_rdmsr(unsigned int msr, uint64_t *msr_content)
 {
-	u64 msr_content;
 	int type, index;
 
-	if ( !passive_domain_msr_op_checks(regs, &type, &index))
+	if ( !passive_domain_msr_op_checks(msr, &type, &index))
 		return 0;
 
-	model->load_msr(current, type, index, &msr_content);
-	regs->eax = msr_content & 0xFFFFFFFF;
-	regs->edx = msr_content >> 32;
+	model->load_msr(current, type, index, msr_content);
 	return 1;
 }
 
-int passive_domain_do_wrmsr(struct cpu_user_regs *regs)
+int passive_domain_do_wrmsr(unsigned int msr, uint64_t msr_content)
 {
-	u64 msr_content;
 	int type, index;
 
-	if ( !passive_domain_msr_op_checks(regs, &type, &index))
+	if ( !passive_domain_msr_op_checks(msr, &type, &index))
 		return 0;
 
-	msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
 	model->save_msr(current, type, index, msr_content);
 	return 1;
 }

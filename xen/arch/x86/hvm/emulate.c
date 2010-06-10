@@ -825,16 +825,7 @@ static int hvmemul_read_msr(
     uint64_t *val,
     struct x86_emulate_ctxt *ctxt)
 {
-    struct cpu_user_regs _regs;
-    int rc;
-
-    _regs.ecx = (uint32_t)reg;
-
-    if ( (rc = hvm_msr_read_intercept(&_regs)) != X86EMUL_OKAY )
-        return rc;
-
-    *val = ((uint64_t)(uint32_t)_regs.edx << 32) | (uint32_t)_regs.eax;
-    return X86EMUL_OKAY;
+    return hvm_msr_read_intercept(reg, val);
 }
 
 static int hvmemul_write_msr(
@@ -842,13 +833,7 @@ static int hvmemul_write_msr(
     uint64_t val,
     struct x86_emulate_ctxt *ctxt)
 {
-    struct cpu_user_regs _regs;
-
-    _regs.edx = (uint32_t)(val >> 32);
-    _regs.eax = (uint32_t)val;
-    _regs.ecx = (uint32_t)reg;
-
-    return hvm_msr_write_intercept(&_regs);
+    return hvm_msr_write_intercept(reg, val);
 }
 
 static int hvmemul_wbinvd(

@@ -2010,10 +2010,8 @@ void hvm_rdtsc_intercept(struct cpu_user_regs *regs)
     regs->edx = (uint32_t)(tsc >> 32);
 }
 
-int hvm_msr_read_intercept(struct cpu_user_regs *regs)
+int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 {
-    uint32_t ecx = regs->ecx;
-    uint64_t msr_content = 0;
     struct vcpu *v = current;
     uint64_t *var_range_base, *fixed_range_base;
     int index, mtrr;
@@ -2026,58 +2024,58 @@ int hvm_msr_read_intercept(struct cpu_user_regs *regs)
     hvm_cpuid(1, &cpuid[0], &cpuid[1], &cpuid[2], &cpuid[3]);
     mtrr = !!(cpuid[3] & bitmaskof(X86_FEATURE_MTRR));
 
-    switch ( ecx )
+    switch ( msr )
     {
     case MSR_IA32_TSC:
-        msr_content = hvm_get_guest_tsc(v);
+        *msr_content = hvm_get_guest_tsc(v);
         break;
 
     case MSR_TSC_AUX:
-        msr_content = hvm_msr_tsc_aux(v);
+        *msr_content = hvm_msr_tsc_aux(v);
         break;
 
     case MSR_IA32_APICBASE:
-        msr_content = vcpu_vlapic(v)->hw.apic_base_msr;
+        *msr_content = vcpu_vlapic(v)->hw.apic_base_msr;
         break;
 
     case MSR_IA32_CR_PAT:
-        msr_content = v->arch.hvm_vcpu.pat_cr;
+        *msr_content = v->arch.hvm_vcpu.pat_cr;
         break;
 
     case MSR_MTRRcap:
         if ( !mtrr )
             goto gp_fault;
-        msr_content = v->arch.hvm_vcpu.mtrr.mtrr_cap;
+        *msr_content = v->arch.hvm_vcpu.mtrr.mtrr_cap;
         break;
     case MSR_MTRRdefType:
         if ( !mtrr )
             goto gp_fault;
-        msr_content = v->arch.hvm_vcpu.mtrr.def_type
+        *msr_content = v->arch.hvm_vcpu.mtrr.def_type
                         | (v->arch.hvm_vcpu.mtrr.enabled << 10);
         break;
     case MSR_MTRRfix64K_00000:
         if ( !mtrr )
             goto gp_fault;
-        msr_content = fixed_range_base[0];
+        *msr_content = fixed_range_base[0];
         break;
     case MSR_MTRRfix16K_80000:
     case MSR_MTRRfix16K_A0000:
         if ( !mtrr )
             goto gp_fault;
-        index = regs->ecx - MSR_MTRRfix16K_80000;
-        msr_content = fixed_range_base[index + 1];
+        index = msr - MSR_MTRRfix16K_80000;
+        *msr_content = fixed_range_base[index + 1];
         break;
     case MSR_MTRRfix4K_C0000...MSR_MTRRfix4K_F8000:
         if ( !mtrr )
             goto gp_fault;
-        index = regs->ecx - MSR_MTRRfix4K_C0000;
-        msr_content = fixed_range_base[index + 3];
+        index = msr - MSR_MTRRfix4K_C0000;
+        *msr_content = fixed_range_base[index + 3];
         break;
     case MSR_IA32_MTRR_PHYSBASE0...MSR_IA32_MTRR_PHYSMASK7:
         if ( !mtrr )
             goto gp_fault;
-        index = regs->ecx - MSR_IA32_MTRR_PHYSBASE0;
-        msr_content = var_range_base[index];
+        index = msr - MSR_IA32_MTRR_PHYSBASE0;
+        *msr_content = var_range_base[index];
         break;
 
     case MSR_K8_ENABLE_C1E:
@@ -2087,22 +2085,21 @@ int hvm_msr_read_intercept(struct cpu_user_regs *regs)
           * has been migrated to an Intel host. This fixes a guest crash
           * in this case.
           */
-         msr_content = 0;
+         *msr_content = 0;
          break;
 
     default:
-        ret = vmce_rdmsr(ecx, &msr_content);
+        ret = vmce_rdmsr(msr, msr_content);
         if ( ret < 0 )
             goto gp_fault;
         else if ( ret )
             break;
         /* ret == 0, This is not an MCE MSR, see other MSRs */
-        else if (!ret)
-            return hvm_funcs.msr_read_intercept(regs);
+        else if (!ret) {
+            return hvm_funcs.msr_read_intercept(msr, msr_content);
+        }
     }
 
-    regs->eax = (uint32_t)msr_content;
-    regs->edx = (uint32_t)(msr_content >> 32);
     return X86EMUL_OKAY;
 
 gp_fault:
@@ -2110,10 +2107,8 @@ gp_fault:
     return X86EMUL_EXCEPTION;
 }
 
-int hvm_msr_write_intercept(struct cpu_user_regs *regs)
+int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 {
-    uint32_t ecx = regs->ecx;
-    uint64_t msr_content = (uint32_t)regs->eax | ((uint64_t)regs->edx << 32);
     struct vcpu *v = current;
     int index, mtrr;
     uint32_t cpuid[4];
@@ -2122,7 +2117,7 @@ int hvm_msr_write_intercept(struct cpu_user_regs *regs)
     hvm_cpuid(1, &cpuid[0], &cpuid[1], &cpuid[2], &cpuid[3]);
     mtrr = !!(cpuid[3] & bitmaskof(X86_FEATURE_MTRR));
 
-    switch ( ecx )
+    switch ( msr )
     {
     case MSR_IA32_TSC:
         hvm_set_guest_tsc(v, msr_content);
@@ -2164,7 +2159,7 @@ int hvm_msr_write_intercept(struct cpu_user_regs *regs)
     case MSR_MTRRfix16K_A0000:
         if ( !mtrr )
             goto gp_fault;
-        index = regs->ecx - MSR_MTRRfix16K_80000 + 1;
+        index = msr - MSR_MTRRfix16K_80000 + 1;
         if ( !mtrr_fix_range_msr_set(&v->arch.hvm_vcpu.mtrr,
                                      index, msr_content) )
             goto gp_fault;
@@ -2172,7 +2167,7 @@ int hvm_msr_write_intercept(struct cpu_user_regs *regs)
     case MSR_MTRRfix4K_C0000...MSR_MTRRfix4K_F8000:
         if ( !mtrr )
             goto gp_fault;
-        index = regs->ecx - MSR_MTRRfix4K_C0000 + 3;
+        index = msr - MSR_MTRRfix4K_C0000 + 3;
         if ( !mtrr_fix_range_msr_set(&v->arch.hvm_vcpu.mtrr,
                                      index, msr_content) )
             goto gp_fault;
@@ -2181,7 +2176,7 @@ int hvm_msr_write_intercept(struct cpu_user_regs *regs)
         if ( !mtrr )
             goto gp_fault;
         if ( !mtrr_var_range_msr_set(&v->arch.hvm_vcpu.mtrr,
-                                     regs->ecx, msr_content) )
+                                     msr, msr_content) )
             goto gp_fault;
         break;
 
@@ -2190,13 +2185,13 @@ int hvm_msr_write_intercept(struct cpu_user_regs *regs)
         break;
 
     default:
-        ret = vmce_wrmsr(ecx, msr_content);
+        ret = vmce_wrmsr(msr, msr_content);
         if ( ret < 0 )
             goto gp_fault;
         else if ( ret )
             break;
         else if (!ret)
-            return hvm_funcs.msr_write_intercept(regs);
+            return hvm_funcs.msr_write_intercept(msr, msr_content);
     }
 
     return X86EMUL_OKAY;
