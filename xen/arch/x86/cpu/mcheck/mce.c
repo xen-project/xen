@@ -1509,15 +1509,39 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
     return ret;
 }
 
+int mcinfo_dumpped;
+static int x86_mcinfo_dump_panic(mctelem_cookie_t mctc)
+{
+    struct mc_info *mcip = mctelem_dataptr(mctc);
+
+    x86_mcinfo_dump(mcip);
+    mcinfo_dumpped++;
+
+    return 0;
+}
+
+/* XXX shall we dump commited mc_info?? */
+static void mc_panic_dump(void)
+{
+    int cpu;
+
+    dprintk(XENLOG_ERR, "Begin dump mc_info\n");
+    for_each_online_cpu(cpu)
+        mctelem_process_deferred(cpu, x86_mcinfo_dump_panic);
+    dprintk(XENLOG_ERR, "End dump mc_info, %x mcinfo dumped\n", mcinfo_dumpped);
+}
+
 void mc_panic(char *s)
 {
     is_mc_panic = 1;
     console_force_unlock();
+
     printk("Fatal machine check: %s\n", s);
     printk("\n"
            "****************************************\n"
            "\n"
            "   The processor has reported a hardware error which cannot\n"
            "   be recovered from.  Xen will now reboot the machine.\n");
+    mc_panic_dump();
     panic("HARDWARE ERROR");
 }

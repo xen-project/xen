@@ -257,6 +257,8 @@ static int mce_delayed_action(mctelem_cookie_t mctc)
     switch (result)
     {
     case MCER_RESET:
+        dprintk(XENLOG_ERR, "MCE delayed action failed\n");
+        x86_mcinfo_dump(mctelem_dataptr(mctc));
         panic("MCE: Software recovery failed for the UCR\n");
         break;
     case MCER_RECOVERED:
@@ -266,6 +268,7 @@ static int mce_delayed_action(mctelem_cookie_t mctc)
     case MCER_CONTINUE:
         dprintk(XENLOG_INFO, "MCE: Error can't be recovered, "
             "system is tainted\n");
+        x86_mcinfo_dump(mctelem_dataptr(mctc));
         ret = 1;
         break;
     default:
@@ -755,10 +758,6 @@ static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
     mctc = mcheck_mca_logout(MCA_MCE_SCAN, mca_allbanks, &bs, clear_bank);
 
     if (bs.errcnt) {
-        /* dump MCE error */
-        if (mctc != NULL)
-            x86_mcinfo_dump(mctelem_dataptr(mctc));
-
         /*
          * Uncorrected errors must be dealth with in softirq context.
          */
