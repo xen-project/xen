@@ -26,30 +26,7 @@ boolean_param("mce_fb", mce_force_broadcast);
 
 static int nr_intel_ext_msrs = 0;
 
-/* Below are for MCE handling */
-struct mce_softirq_barrier {
-    atomic_t val;
-    atomic_t ingen;
-    atomic_t outgen;
-};
-
-static struct mce_softirq_barrier mce_inside_bar, mce_severity_bar;
-static struct mce_softirq_barrier mce_trap_bar;
-
-/*
- * mce_logout_lock should only be used in the trap handler,
- * while MCIP has not been cleared yet in the global status
- * register. Other use is not safe, since an MCE trap can
- * happen at any moment, which would cause lock recursion.
- */
-static DEFINE_SPINLOCK(mce_logout_lock);
-
-static atomic_t severity_cpu = ATOMIC_INIT(-1);
-static atomic_t found_error = ATOMIC_INIT(0);
-
-static void mce_barrier_enter(struct mce_softirq_barrier *);
-static void mce_barrier_exit(struct mce_softirq_barrier *);
-
+/* Thermal Hanlding */
 #ifdef CONFIG_X86_MCE_THERMAL
 static void unexpected_thermal_interrupt(struct cpu_user_regs *regs)
 {
@@ -153,133 +130,34 @@ static void intel_init_thermal(struct cpuinfo_x86 *c)
 }
 #endif /* CONFIG_X86_MCE_THERMAL */
 
-static inline void intel_get_extended_msr(struct mcinfo_extended *ext, u32 msr)
-{
-    if ( ext->mc_msrs < ARRAY_SIZE(ext->mc_msr)
-         && msr < MSR_IA32_MCG_EAX + nr_intel_ext_msrs ) {
-        ext->mc_msr[ext->mc_msrs].reg = msr;
-        rdmsrl(msr, ext->mc_msr[ext->mc_msrs].value);
-        ++ext->mc_msrs;
-    }
-}
+/* MCE handling */
+struct mce_softirq_barrier {
+	atomic_t val;
+	atomic_t ingen;
+	atomic_t outgen;
+};
 
+static struct mce_softirq_barrier mce_inside_bar, mce_severity_bar;
+static struct mce_softirq_barrier mce_trap_bar;
 
-struct mcinfo_extended *
-intel_get_extended_msrs(struct mcinfo_global *mig, struct mc_info *mi)
-{
-    struct mcinfo_extended *mc_ext;
-    int i;
+/*
+ * mce_logout_lock should only be used in the trap handler,
+ * while MCIP has not been cleared yet in the global status
+ * register. Other use is not safe, since an MCE trap can
+ * happen at any moment, which would cause lock recursion.
+ */
+static DEFINE_SPINLOCK(mce_logout_lock);
 
-    /*
-     * According to spec, processor _support_ 64 bit will always
-     * have MSR beyond IA32_MCG_MISC
-     */
-    if (!mi|| !mig || nr_intel_ext_msrs == 0 ||
-            !(mig->mc_gstatus & MCG_STATUS_EIPV))
-        return NULL;
+static atomic_t severity_cpu = ATOMIC_INIT(-1);
+static atomic_t found_error = ATOMIC_INIT(0);
 
-    mc_ext = x86_mcinfo_reserve(mi, sizeof(struct mcinfo_extended));
-    if (!mc_ext)
-    {
-        mi->flags |= MCINFO_FLAGS_UNCOMPLETE;
-        return NULL;
-    }
-
-    /* this function will called when CAP(9).MCG_EXT_P = 1 */
-    memset(&mc_ext, 0, sizeof(struct mcinfo_extended));
-    mc_ext->common.type = MC_TYPE_EXTENDED;
-    mc_ext->common.size = sizeof(struct mcinfo_extended);
-
-    for (i = MSR_IA32_MCG_EAX; i <= MSR_IA32_MCG_MISC; i++)
-        intel_get_extended_msr(mc_ext, i);
-
-#ifdef __x86_64__
-    for (i = MSR_IA32_MCG_R8; i <= MSR_IA32_MCG_R15; i++)
-        intel_get_extended_msr(mc_ext, i);
-#endif
-
-    return mc_ext;
-}
+static void mce_barrier_enter(struct mce_softirq_barrier *);
+static void mce_barrier_exit(struct mce_softirq_barrier *);
 
 static void intel_UCR_handler(struct mcinfo_bank *bank,
              struct mcinfo_global *global,
              struct mcinfo_extended *extension,
-             struct mca_handle_result *result)
-{
-    struct domain *d;
-    unsigned long mfn, gfn;
-    uint32_t status;
-
-    mce_printk(MCE_VERBOSE, "MCE: Enter UCR recovery action\n");
-    result->result = MCA_NEED_RESET;
-    if (bank->mc_addr != 0) {
-         mfn = bank->mc_addr >> PAGE_SHIFT;
-         if (!offline_page(mfn, 1, &status)) {
-              /* This is free page */
-              if (status & PG_OFFLINE_OFFLINED)
-                  result->result = MCA_RECOVERED;
-              else if (status & PG_OFFLINE_PENDING) {
-                 /* This page has owner */
-                  if (status & PG_OFFLINE_OWNED) {
-                      result->result |= MCA_OWNER;
-                      result->owner = status >> PG_OFFLINE_OWNER_SHIFT;
-                      mce_printk(MCE_QUIET, "MCE: This error page is ownded"
-                                  " by DOM %d\n", result->owner);
-                      /* Fill vMCE# injection and vMCE# MSR virtualization "
-                       * "related data */
-                      bank->mc_domid = result->owner;
-                      /* XXX: Cannot handle shared pages yet 
-                       * (this should identify all domains and gfn mapping to
-                       *  the mfn in question) */
-                      BUG_ON( result->owner == DOMID_COW );
-                      if ( result->owner != DOMID_XEN ) {
-
-                          d = get_domain_by_id(result->owner);
-                          if ( mca_ctl_conflict(bank, d) )
-                          {
-                              /* Guest has different MCE ctl with hypervisor */
-                              if ( d )
-                                  put_domain(d);
-                              return;
-                          }
-
-                          ASSERT(d);
-                          gfn =
-                              get_gpfn_from_mfn((bank->mc_addr) >> PAGE_SHIFT);
-                          bank->mc_addr =  gfn << PAGE_SHIFT |
-                                        (bank->mc_addr & (PAGE_SIZE -1 ));
-                          if ( fill_vmsr_data(bank, d,
-                                              global->mc_gstatus) == -1 )
-                          {
-                              mce_printk(MCE_QUIET, "Fill vMCE# data for DOM%d "
-                                      "failed\n", result->owner);
-                              put_domain(d);
-                              domain_crash(d);
-                              return;
-                          }
-                          /* We will inject vMCE to DOMU*/
-                          if ( inject_vmce(d) < 0 )
-                          {
-                              mce_printk(MCE_QUIET, "inject vMCE to DOM%d"
-                                          " failed\n", d->domain_id);
-                              put_domain(d);
-                              domain_crash(d);
-                              return;
-                          }
-                          /* Impacted domain go on with domain's recovery job
-                           * if the domain has its own MCA handler.
-                           * For xen, it has contained the error and finished
-                           * its own recovery job.
-                           */
-                          result->result = MCA_RECOVERED;
-                          put_domain(d);
-                      }
-                  }
-              }
-         }
-    }
-}
-
+             struct mca_handle_result *result);
 #define INTEL_MAX_RECOVERY 2
 struct mca_error_handler intel_recovery_handler[INTEL_MAX_RECOVERY] =
             {{0x017A, intel_UCR_handler}, {0x00C0, intel_UCR_handler}};
@@ -526,6 +404,134 @@ static void mce_barrier(struct mce_softirq_barrier *bar)
 }
 #endif
 
+/* Intel MCE handler */
+static inline void intel_get_extended_msr(struct mcinfo_extended *ext, u32 msr)
+{
+    if ( ext->mc_msrs < ARRAY_SIZE(ext->mc_msr)
+         && msr < MSR_IA32_MCG_EAX + nr_intel_ext_msrs ) {
+        ext->mc_msr[ext->mc_msrs].reg = msr;
+        rdmsrl(msr, ext->mc_msr[ext->mc_msrs].value);
+        ++ext->mc_msrs;
+    }
+}
+
+
+struct mcinfo_extended *
+intel_get_extended_msrs(struct mcinfo_global *mig, struct mc_info *mi)
+{
+    struct mcinfo_extended *mc_ext;
+    int i;
+
+    /*
+     * According to spec, processor _support_ 64 bit will always
+     * have MSR beyond IA32_MCG_MISC
+     */
+    if (!mi|| !mig || nr_intel_ext_msrs == 0 ||
+            !(mig->mc_gstatus & MCG_STATUS_EIPV))
+        return NULL;
+
+    mc_ext = x86_mcinfo_reserve(mi, sizeof(struct mcinfo_extended));
+    if (!mc_ext)
+    {
+        mi->flags |= MCINFO_FLAGS_UNCOMPLETE;
+        return NULL;
+    }
+
+    /* this function will called when CAP(9).MCG_EXT_P = 1 */
+    memset(&mc_ext, 0, sizeof(struct mcinfo_extended));
+    mc_ext->common.type = MC_TYPE_EXTENDED;
+    mc_ext->common.size = sizeof(struct mcinfo_extended);
+
+    for (i = MSR_IA32_MCG_EAX; i <= MSR_IA32_MCG_MISC; i++)
+        intel_get_extended_msr(mc_ext, i);
+
+#ifdef __x86_64__
+    for (i = MSR_IA32_MCG_R8; i <= MSR_IA32_MCG_R15; i++)
+        intel_get_extended_msr(mc_ext, i);
+#endif
+
+    return mc_ext;
+}
+
+static void intel_UCR_handler(struct mcinfo_bank *bank,
+             struct mcinfo_global *global,
+             struct mcinfo_extended *extension,
+             struct mca_handle_result *result)
+{
+    struct domain *d;
+    unsigned long mfn, gfn;
+    uint32_t status;
+
+    mce_printk(MCE_VERBOSE, "MCE: Enter UCR recovery action\n");
+    result->result = MCA_NEED_RESET;
+    if (bank->mc_addr != 0) {
+         mfn = bank->mc_addr >> PAGE_SHIFT;
+         if (!offline_page(mfn, 1, &status)) {
+              /* This is free page */
+              if (status & PG_OFFLINE_OFFLINED)
+                  result->result = MCA_RECOVERED;
+              else if (status & PG_OFFLINE_PENDING) {
+                 /* This page has owner */
+                  if (status & PG_OFFLINE_OWNED) {
+                      result->result |= MCA_OWNER;
+                      result->owner = status >> PG_OFFLINE_OWNER_SHIFT;
+                      mce_printk(MCE_QUIET, "MCE: This error page is ownded"
+                                  " by DOM %d\n", result->owner);
+                      /* Fill vMCE# injection and vMCE# MSR virtualization "
+                       * "related data */
+                      bank->mc_domid = result->owner;
+                      /* XXX: Cannot handle shared pages yet 
+                       * (this should identify all domains and gfn mapping to
+                       *  the mfn in question) */
+                      BUG_ON( result->owner == DOMID_COW );
+                      if ( result->owner != DOMID_XEN ) {
+
+                          d = get_domain_by_id(result->owner);
+                          if ( mca_ctl_conflict(bank, d) )
+                          {
+                              /* Guest has different MCE ctl with hypervisor */
+                              if ( d )
+                                  put_domain(d);
+                              return;
+                          }
+
+                          ASSERT(d);
+                          gfn =
+                              get_gpfn_from_mfn((bank->mc_addr) >> PAGE_SHIFT);
+                          bank->mc_addr =  gfn << PAGE_SHIFT |
+                                        (bank->mc_addr & (PAGE_SIZE -1 ));
+                          if ( fill_vmsr_data(bank, d,
+                                              global->mc_gstatus) == -1 )
+                          {
+                              mce_printk(MCE_QUIET, "Fill vMCE# data for DOM%d "
+                                      "failed\n", result->owner);
+                              put_domain(d);
+                              domain_crash(d);
+                              return;
+                          }
+                          /* We will inject vMCE to DOMU*/
+                          if ( inject_vmce(d) < 0 )
+                          {
+                              mce_printk(MCE_QUIET, "inject vMCE to DOM%d"
+                                          " failed\n", d->domain_id);
+                              put_domain(d);
+                              domain_crash(d);
+                              return;
+                          }
+                          /* Impacted domain go on with domain's recovery job
+                           * if the domain has its own MCA handler.
+                           * For xen, it has contained the error and finished
+                           * its own recovery job.
+                           */
+                          result->result = MCA_RECOVERED;
+                          put_domain(d);
+                      }
+                  }
+              }
+         }
+    }
+}
+
 static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
 {
     uint64_t gstatus;
@@ -691,6 +697,7 @@ static int intel_recoverable_scan(u64 status)
     return 0;
 }
 
+/* CMCI */
 static DEFINE_SPINLOCK(cmci_discover_lock);
 
 /*
@@ -881,6 +888,7 @@ fastcall void smp_cmci_interrupt(struct cpu_user_regs *regs)
     set_irq_regs(old_regs);
 }
 
+/* MCA */
 void mce_intel_feature_init(struct cpuinfo_x86 *c)
 {
 #ifdef CONFIG_X86_MCE_THERMAL
@@ -1021,6 +1029,7 @@ enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c)
     return mcheck_intel;
 }
 
+/* intel specific MCA MSR */
 int intel_mce_wrmsr(uint32_t msr, uint64_t val)
 {
     int ret = 0;
