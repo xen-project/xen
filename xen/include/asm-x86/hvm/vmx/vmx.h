@@ -184,6 +184,20 @@ void vmx_update_debug_state(struct vcpu *v);
 #define MODRM_EAX_07    ".byte 0x38\n" /* [EAX], with reg/opcode: /7 */
 #define MODRM_EAX_ECX   ".byte 0xc1\n" /* EAX, ECX */
 
+extern u64 vmx_ept_vpid_cap;
+
+#define cpu_has_vmx_ept_wl4_supported           \
+    (vmx_ept_vpid_cap & VMX_EPT_WALK_LENGTH_4_SUPPORTED)
+#define cpu_has_vmx_ept_mt_uc                   \
+    (vmx_ept_vpid_cap & VMX_EPT_MEMORY_TYPE_UC)
+#define cpu_has_vmx_ept_mt_wb                   \
+    (vmx_ept_vpid_cap & VMX_EPT_MEMORY_TYPE_WB)
+#define cpu_has_vmx_ept_1gb                     \
+    (vmx_ept_vpid_cap & VMX_EPT_SUPERPAGE_1GB)
+#define cpu_has_vmx_ept_2mb                     \
+    (vmx_ept_vpid_cap & VMX_EPT_SUPERPAGE_2MB)
+
+
 static inline void __vmptrld(u64 addr)
 {
     asm volatile ( VMPTRLD_OPCODE

@@ -192,6 +192,26 @@ static int vmx_init_vmcs_config(void)
             MSR_IA32_VMX_PROCBASED_CTLS2, &mismatch);
     }
 
+    /* The IA32_VMX_EPT_VPID_CAP MSR exists only when EPT or VPID available */
+    if ( _vmx_secondary_exec_control & (SECONDARY_EXEC_ENABLE_EPT |
+                                        SECONDARY_EXEC_ENABLE_VPID) )
+    {
+        rdmsrl(MSR_IA32_VMX_EPT_VPID_CAP, _vmx_ept_vpid_cap);
+
+        /*
+         * Additional sanity checking before using EPT:
+         * 1) the CPU we are running on must support EPT WB, as we will set
+         *    ept paging structures memory type to WB;
+         * 2) the CPU must support the EPT page-walk length of 4 according to
+         *    Intel SDM 25.2.2.
+         *
+         * Or we just don't use EPT.
+         */
+        if ( !(_vmx_ept_vpid_cap & VMX_EPT_MEMORY_TYPE_WB) ||
+             !(_vmx_ept_vpid_cap & VMX_EPT_WALK_LENGTH_4_SUPPORTED) )
+            _vmx_secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_EPT;
+    }
+
     if ( _vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_EPT )
     {
         /*
@@ -209,11 +229,6 @@ static int vmx_init_vmcs_config(void)
                 ~(SECONDARY_EXEC_ENABLE_EPT |
                   SECONDARY_EXEC_UNRESTRICTED_GUEST);
     }
-
-    /* The IA32_VMX_EPT_VPID_CAP MSR exists only when EPT or VPID available */
-    if ( _vmx_secondary_exec_control &
-          (SECONDARY_EXEC_ENABLE_EPT | SECONDARY_EXEC_ENABLE_VPID) )
-        rdmsrl(MSR_IA32_VMX_EPT_VPID_CAP, _vmx_ept_vpid_cap);
 
     if ( (_vmx_secondary_exec_control & SECONDARY_EXEC_PAUSE_LOOP_EXITING) &&
           ple_gap == 0 )

@@ -253,7 +253,7 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
 
     ASSERT(table != NULL);
 
-    for ( i = EPT_DEFAULT_GAW; i > walk_level; i-- )
+    for ( i = ept_get_wl(d); i > walk_level; i-- )
     {
         ret = ept_next_level(d, 0, &table, &gfn_remainder, i * EPT_TABLE_ORDER);
         if ( !ret )
@@ -402,7 +402,7 @@ static mfn_t ept_get_entry(struct domain *d, unsigned long gfn, p2m_type_t *t,
 
     /* Should check if gfn obeys GAW here. */
 
-    for ( i = EPT_DEFAULT_GAW; i > 0; i-- )
+    for ( i = ept_get_wl(d); i > 0; i-- )
     {
     retry:
         ret = ept_next_level(d, 1, &table, &gfn_remainder,
@@ -492,7 +492,7 @@ static ept_entry_t ept_get_entry_content(struct domain *d, unsigned long gfn, in
     if ( gfn > d->arch.p2m->max_mapped_pfn )
         goto out;
 
-    for ( i = EPT_DEFAULT_GAW; i > 0; i-- )
+    for ( i = ept_get_wl(d); i > 0; i-- )
     {
         ret = ept_next_level(d, 1, &table, &gfn_remainder,
                              i * EPT_TABLE_ORDER);
@@ -531,7 +531,7 @@ void ept_walk_table(struct domain *d, unsigned long gfn)
         goto out;
     }
 
-    for ( i = EPT_DEFAULT_GAW; i >= 0; i-- )
+    for ( i = ept_get_wl(d); i >= 0; i-- )
     {
         ept_entry_t *ept_entry, *next;
         u32 index;
@@ -658,8 +658,6 @@ static void ept_change_entry_type_global(struct domain *d, p2m_type_t ot,
     if ( pagetable_get_pfn(p2m_get_pagetable(p2m_get_hostp2m(d))) == 0 )
         return;
 
-    BUG_ON(EPT_DEFAULT_GAW != 3);
-
     l4e = map_domain_page(mfn_x(pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d)))));
     for (i4 = 0; i4 < EPT_PAGETABLE_ENTRIES; i4++ )
     {
@@ -751,7 +749,7 @@ static void ept_dump_p2m_table(unsigned char key)
     int order;
     int i;
     int is_pod;
-    int ret;
+    int ret = 0;
     unsigned long index;
     unsigned long gfn, gfn_remainder;
     unsigned long record_counter = 0;
@@ -772,7 +770,7 @@ static void ept_dump_p2m_table(unsigned char key)
             table =
                 map_domain_page(mfn_x(pagetable_get_mfn(p2m_get_pagetable(p2m))));
 
-            for ( i = EPT_DEFAULT_GAW; i > 0; i-- )
+            for ( i = ept_get_wl(d); i > 0; i-- )
             {
                 ret = ept_next_level(d, 1, &table, &gfn_remainder,
                                      i * EPT_TABLE_ORDER);

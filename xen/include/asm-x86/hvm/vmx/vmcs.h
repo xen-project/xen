@@ -55,22 +55,24 @@ struct vmx_msr_state {
     unsigned long msrs[VMX_MSR_COUNT];
 };
 
-#define EPT_DEFAULT_MT      6
-#define EPT_DEFAULT_GAW     3
+#define EPT_DEFAULT_MT      MTRR_TYPE_WRBACK
 
 struct vmx_domain {
     unsigned long apic_access_mfn;
     union {
         struct {
-            u64 etmt :3,
-                gaw  :3,
-                rsvd :6,
-                asr  :52;
+            u64 ept_mt :3,
+                ept_wl :3,
+                rsvd   :6,
+                asr    :52;
         };
         u64 eptp;
     } ept_control;
     cpumask_t ept_synced;
 };
+
+#define ept_get_wl(d)  \
+    ((d)->arch.hvm_domain.vmx.ept_control.ept_wl)
 
 struct arch_vmx_struct {
     /* Virtual address of VMCS. */
@@ -174,8 +176,9 @@ extern u32 vmx_secondary_exec_control;
 
 extern bool_t cpu_has_vmx_ins_outs_instr_info;
 
-extern u64 vmx_ept_vpid_cap;
-
+#define VMX_EPT_WALK_LENGTH_4_SUPPORTED         0x00000040
+#define VMX_EPT_MEMORY_TYPE_UC                  0x00000100
+#define VMX_EPT_MEMORY_TYPE_WB                  0x00004000
 #define VMX_EPT_SUPERPAGE_2MB                   0x00010000
 #define VMX_EPT_SUPERPAGE_1GB                   0x00020000
 
@@ -193,10 +196,6 @@ extern u64 vmx_ept_vpid_cap;
     (vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_SECONDARY_CONTROLS)
 #define cpu_has_vmx_ept \
     (vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_EPT)
-#define cpu_has_vmx_ept_1gb \
-    (vmx_ept_vpid_cap & VMX_EPT_SUPERPAGE_1GB)
-#define cpu_has_vmx_ept_2mb \
-    (vmx_ept_vpid_cap & VMX_EPT_SUPERPAGE_2MB)
 #define cpu_has_vmx_vpid \
     (vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_VPID)
 #define cpu_has_monitor_trap_flag \
