@@ -321,6 +321,19 @@ static void mce_barrier_init(struct mce_softirq_barrier *bar)
       atomic_set(&bar->outgen, 0);
 }
 
+static void mce_handler_init(void)
+{
+    if (smp_processor_id() != 0)
+        return;
+
+    /* callback register, do we really need so many callback? */
+    /* mce handler data initialization */
+    mce_barrier_init(&mce_inside_bar);
+    mce_barrier_init(&mce_severity_bar);
+    mce_barrier_init(&mce_trap_bar);
+    spin_lock_init(&mce_logout_lock);
+    open_softirq(MACHINE_CHECK_SOFTIRQ, mce_softirq);
+}
 #if 0
 /*
  * This function will need to be used when offlining a CPU in the
@@ -858,6 +871,8 @@ static void intel_init_cmci(struct cpuinfo_x86 *c)
 
     l = apic_read(APIC_CMCI);
     apic_write_around(APIC_CMCI, l & ~APIC_LVT_MASKED);
+
+    mce_set_owner();
 }
 
 fastcall void smp_cmci_interrupt(struct cpu_user_regs *regs)
@@ -889,13 +904,6 @@ fastcall void smp_cmci_interrupt(struct cpu_user_regs *regs)
 }
 
 /* MCA */
-void mce_intel_feature_init(struct cpuinfo_x86 *c)
-{
-#ifdef CONFIG_X86_MCE_THERMAL
-    intel_init_thermal(c);
-#endif
-    intel_init_cmci(c);
-}
 
 static int mce_is_broadcast(struct cpuinfo_x86 *c)
 {
@@ -912,54 +920,55 @@ static int mce_is_broadcast(struct cpuinfo_x86 *c)
     return 0;
 }
 
-static void intel_mca_cap_init(struct cpuinfo_x86 *c)
+/* Check and init MCA */
+static void intel_init_mca(struct cpuinfo_x86 *c)
 {
-    static int broadcast_check;
-    int broadcast;
+    int broadcast, cmci=0, ser=0, ext_num = 0, first;
     u32 l, h;
 
     broadcast = mce_is_broadcast(c);
-    if (broadcast_check && (broadcast != mce_broadcast) )
-            dprintk(XENLOG_INFO,
-                "CPUs have mixed broadcast support"
-                "may cause undetermined result!!!\n");
-
-    broadcast_check = 1;
-    if (broadcast)
-        mce_broadcast = broadcast;
 
     rdmsr(MSR_IA32_MCG_CAP, l, h);
 
     if ((l & MCG_CMCI_P) && cpu_has_apic)
-        cmci_support = 1;
+        cmci = 1;
 
     /* Support Software Error Recovery */
     if (l & MCG_SER_P)
-        ser_support = 1;
+        ser = 1;
 
     if (l & MCG_EXT_P)
+        ext_num = (l >> MCG_EXT_CNT) & 0xff;
+
+    first = mce_firstbank(c);
+
+    dprintk(XENLOG_INFO, "MCA Capaility: CPU %x SER %x"
+       "CMCI %x firstbank %x extended MCE MSR %x\n",
+       smp_processor_id(), ser, cmci, first, ext_num);
+
+    if (smp_processor_id())
     {
-        nr_intel_ext_msrs = (l >> MCG_EXT_CNT) & 0xff;
-        mce_printk (MCE_QUIET, "CPU%d: Intel Extended MCE MSRs (%d) available\n",
-            smp_processor_id(), nr_intel_ext_msrs);
+        mce_broadcast = broadcast;
+        cmci_support = cmci;
+        ser_support = ser;
+        nr_intel_ext_msrs = ext_num;
+        firstbank = first;
     }
-    firstbank = mce_firstbank(c);
+    else
+    {
+        if (cmci != cmci_support || ser != ser_support ||
+            broadcast != mce_broadcast ||
+            first != firstbank)
+            dprintk(XENLOG_WARNING,
+              "CPU %x has different MCA capability with BSP\n"
+              "may cause undetermined result!!!\n", smp_processor_id());
+    }
 }
 
-static void mce_init(void)
+static void intel_mce_post_reset(void)
 {
-    u32 l, h;
-    int i;
     mctelem_cookie_t mctc;
     struct mca_summary bs;
-
-    mce_barrier_init(&mce_inside_bar);
-    mce_barrier_init(&mce_severity_bar);
-    mce_barrier_init(&mce_trap_bar);
-    spin_lock_init(&mce_logout_lock);
-
-    /* log the machine checks left over from the previous reset.
-     * This also clears all registers*/
 
     mctc = mcheck_mca_logout(MCA_RESET, mca_allbanks, &bs, NULL);
 
@@ -968,7 +977,17 @@ static void mce_init(void)
         x86_mcinfo_dump(mctelem_dataptr(mctc));
         mctelem_commit(mctc);
     }
+    return;
+}
 
+static void intel_init_mce(void)
+{
+    u32 l, h;
+    int i;
+
+    intel_mce_post_reset();
+
+    /* clear all banks */
     for (i = firstbank; i < nr_mce_banks; i++)
     {
         /* Some banks are shared across cores, use MCi_CTRL to judge whether
@@ -984,9 +1003,13 @@ static void mce_init(void)
     }
     if (firstbank) /* if cmci enabled, firstbank = 0 */
         wrmsr (MSR_IA32_MC0_STATUS, 0x0, 0x0);
+
+    x86_mce_vector_register(intel_machine_check);
+    mce_recoverable_register(intel_recoverable_scan);
+    mce_need_clearbank_register(intel_need_clearbank_scan);
 }
 
-static int init_mca_banks(void)
+static int intel_init_mca_banks(void)
 {
     struct mca_banks *mb1, *mb2, * mb3;
 
@@ -1011,21 +1034,20 @@ out:
 /* p4/p6 family have similar MCA initialization process */
 enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c)
 {
-    if (init_mca_banks())
-        return mcheck_none;
+    if (intel_init_mca_banks())
+         return mcheck_none;
 
-    intel_mca_cap_init(c);
+    intel_init_mca(c);
 
-    /* machine check is available */
-    x86_mce_vector_register(intel_machine_check);
-    mce_recoverable_register(intel_recoverable_scan);
-    mce_need_clearbank_register(intel_need_clearbank_scan);
+    mce_handler_init();
 
-    mce_init();
-    mce_intel_feature_init(c);
-    mce_set_owner();
+    intel_init_mce();
 
-    open_softirq(MACHINE_CHECK_SOFTIRQ, mce_softirq);
+    intel_init_cmci(c);
+#ifdef CONFIG_X86_MCE_THERMAL
+    intel_init_thermal(c);
+#endif
+
     return mcheck_intel;
 }
 
