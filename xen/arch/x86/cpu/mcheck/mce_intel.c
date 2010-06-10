@@ -501,10 +501,76 @@ intel_get_extended_msrs(struct mcinfo_global *mig, struct mc_info *mi)
     return mc_ext;
 }
 
-#define INTEL_MAX_RECOVERY 2
+enum intel_mce_type
+{
+    intel_mce_invalid,
+    intel_mce_fatal,
+    intel_mce_corrected,
+    intel_mce_ucr_ucna,
+    intel_mce_ucr_srao,
+    intel_mce_ucr_srar,
+};
+
+static enum intel_mce_type intel_check_mce_type(uint64_t status)
+{
+    if (!(status & MCi_STATUS_VAL))
+        return intel_mce_invalid;
+
+    if (status & MCi_STATUS_PCC)
+        return intel_mce_fatal;
+
+    /* Corrected error? */
+    if (!(status & MCi_STATUS_UC))
+        return intel_mce_corrected;
+
+    if (!ser_support)
+        return intel_mce_fatal;
+
+    if (status & MCi_STATUS_S)
+    {
+        if (status & MCi_STATUS_AR)
+        {
+            if (status & MCi_STATUS_OVER)
+                return intel_mce_fatal;
+            else
+                return intel_mce_ucr_srar;
+        } else
+            return intel_mce_ucr_srao;
+    }
+    else
+        return intel_mce_ucr_ucna;
+
+    /* Any type not included abovoe ? */
+    return intel_mce_fatal;
+}
+
 static int is_async_memerr(uint64_t status)
 {
     return (status & 0xFFFF) == 0x17A || (status & 0xFFF0) == 0xC0;
+}
+
+struct mcinfo_recovery *mci_add_pageoff_action(int bank, struct mc_info *mi,
+                              uint64_t mfn, uint32_t status)
+{
+    struct mcinfo_recovery *rec;
+
+    if (!mi)
+        return NULL;
+
+    rec = x86_mcinfo_reserve(mi, sizeof(struct mcinfo_recovery));
+    if (!rec)
+    {
+        mi->flags |= MCINFO_FLAGS_UNCOMPLETE;
+        return NULL;
+    }
+
+    memset(rec, 0, sizeof(struct mcinfo_recovery));
+
+    rec->mc_bank = bank;
+    rec->action_types = MC_ACTION_PAGE_OFFLINE;
+    rec->action_info.page_retire.mfn = mfn;
+    rec->action_info.page_retire.status = status;
+    return rec;
 }
 
 static void intel_memerr_dhandler(int bnum,
@@ -516,79 +582,116 @@ static void intel_memerr_dhandler(int bnum,
     struct domain *d;
     unsigned long mfn, gfn;
     uint32_t status;
+    uint64_t mc_status, mc_misc;
 
     mce_printk(MCE_VERBOSE, "MCE: Enter UCR recovery action\n");
     result->result = MCA_NEED_RESET;
-    if (bank->mc_addr != 0) {
-         mfn = bank->mc_addr >> PAGE_SHIFT;
-         if (!offline_page(mfn, 1, &status)) {
-              /* This is free page */
-              if (status & PG_OFFLINE_OFFLINED)
-                  result->result = MCA_RECOVERED;
-              else if (status & PG_OFFLINE_PENDING) {
-                 /* This page has owner */
-                  if (status & PG_OFFLINE_OWNED) {
-                      result->result |= MCA_OWNER;
-                      result->owner = status >> PG_OFFLINE_OWNER_SHIFT;
-                      mce_printk(MCE_QUIET, "MCE: This error page is ownded"
-                                  " by DOM %d\n", result->owner);
-                      /* Fill vMCE# injection and vMCE# MSR virtualization "
-                       * "related data */
-                      bank->mc_domid = result->owner;
-                      /* XXX: Cannot handle shared pages yet 
-                       * (this should identify all domains and gfn mapping to
-                       *  the mfn in question) */
-                      BUG_ON( result->owner == DOMID_COW );
-                      if ( result->owner != DOMID_XEN ) {
 
-                          d = get_domain_by_id(result->owner);
-                          if ( mca_ctl_conflict(bank, d) )
-                          {
-                              /* Guest has different MCE ctl with hypervisor */
-                              if ( d )
-                                  put_domain(d);
-                              return;
-                          }
+    mc_status = bank->mc_status;
+    mc_misc = bank->mc_misc;
+    if (!(mc_status &  MCi_STATUS_ADDRV) ||
+        !(mc_status & MCi_STATUS_MISCV) ||
+        ((mc_misc & MCi_MISC_ADDRMOD_MASK) != MCi_MISC_PHYSMOD) )
+    {
+        result->result |= MCA_NO_ACTION;
+        dprintk(XENLOG_WARNING,
+            "No physical address provided for memory error\n");
+        return;
+    }
 
-                          ASSERT(d);
-                          gfn =
-                              get_gpfn_from_mfn((bank->mc_addr) >> PAGE_SHIFT);
-                          bank->mc_addr =  gfn << PAGE_SHIFT |
-                                        (bank->mc_addr & (PAGE_SIZE -1 ));
-                          if ( fill_vmsr_data(bank, d,
-                                              global->mc_gstatus) == -1 )
-                          {
-                              mce_printk(MCE_QUIET, "Fill vMCE# data for DOM%d "
-                                      "failed\n", result->owner);
-                              put_domain(d);
-                              domain_crash(d);
-                              return;
-                          }
-                          /* We will inject vMCE to DOMU*/
-                          if ( inject_vmce(d) < 0 )
-                          {
-                              mce_printk(MCE_QUIET, "inject vMCE to DOM%d"
-                                          " failed\n", d->domain_id);
-                              put_domain(d);
-                              domain_crash(d);
-                              return;
-                          }
-                          /* Impacted domain go on with domain's recovery job
-                           * if the domain has its own MCA handler.
-                           * For xen, it has contained the error and finished
-                           * its own recovery job.
-                           */
-                          result->result = MCA_RECOVERED;
-                          put_domain(d);
-                      }
-                  }
-              }
-         }
+    mfn = bank->mc_addr >> PAGE_SHIFT;
+    if (offline_page(mfn, 1, &status))
+    {
+        dprintk(XENLOG_WARNING,
+                "Failed to offline page %lx for MCE error\n", mfn);
+        return;
+    }
+
+    mci_add_pageoff_action(bnum, binfo->mi, mfn, status);
+
+    /* This is free page */
+    if (status & PG_OFFLINE_OFFLINED)
+        result->result = MCA_RECOVERED;
+    else if (status & PG_OFFLINE_PENDING) {
+        /* This page has owner */
+        if (status & PG_OFFLINE_OWNED) {
+            result->result |= MCA_OWNER;
+            result->owner = status >> PG_OFFLINE_OWNER_SHIFT;
+            mce_printk(MCE_QUIET, "MCE: This error page is ownded"
+              " by DOM %d\n", result->owner);
+            /* Fill vMCE# injection and vMCE# MSR virtualization "
+             * "related data */
+            bank->mc_domid = result->owner;
+            /* XXX: Cannot handle shared pages yet 
+             * (this should identify all domains and gfn mapping to
+             *  the mfn in question) */
+            BUG_ON( result->owner == DOMID_COW );
+            if ( result->owner != DOMID_XEN ) {
+                d = get_domain_by_id(result->owner);
+                if ( mca_ctl_conflict(bank, d) )
+                {
+                    /* Guest has different MCE ctl with hypervisor */
+                    if ( d )
+                        put_domain(d);
+                    return;
+                }
+
+                ASSERT(d);
+                gfn = get_gpfn_from_mfn((bank->mc_addr) >> PAGE_SHIFT);
+                bank->mc_addr =  gfn << PAGE_SHIFT |
+                  (bank->mc_addr & (PAGE_SIZE -1 ));
+                if ( fill_vmsr_data(bank, d,
+                      global->mc_gstatus) == -1 )
+                {
+                    mce_printk(MCE_QUIET, "Fill vMCE# data for DOM%d "
+                      "failed\n", result->owner);
+                    put_domain(d);
+                    domain_crash(d);
+                    return;
+                }
+                /* We will inject vMCE to DOMU*/
+                if ( inject_vmce(d) < 0 )
+                {
+                    mce_printk(MCE_QUIET, "inject vMCE to DOM%d"
+                      " failed\n", d->domain_id);
+                    put_domain(d);
+                    domain_crash(d);
+                    return;
+                }
+                /* Impacted domain go on with domain's recovery job
+                 * if the domain has its own MCA handler.
+                 * For xen, it has contained the error and finished
+                 * its own recovery job.
+                 */
+                result->result = MCA_RECOVERED;
+                put_domain(d);
+            }
+        }
     }
 }
 
+static int default_check(uint64_t status)
+{
+    return 1;
+}
+
+static void intel_default_dhandler(int bnum,
+             struct mca_binfo *binfo,
+             struct mca_handle_result *result)
+{
+    uint64_t status = binfo->mib->mc_status;
+    enum intel_mce_type type;
+
+    type = intel_check_mce_type(status);
+
+    if (type == intel_mce_fatal || type == intel_mce_ucr_srar)
+        result->result = MCA_RESET;
+    else if (type == intel_mce_ucr_srao)
+        result->result = MCA_NO_ACTION;
+}
+
 struct mca_error_handler intel_mce_dhandlers[] =
-            {{is_async_memerr, intel_memerr_dhandler}};
+            {{is_async_memerr, intel_memerr_dhandler}, {default_check, intel_default_dhandler}};
 
 static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
 {

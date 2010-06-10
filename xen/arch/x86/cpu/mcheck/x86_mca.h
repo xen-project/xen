@@ -88,6 +88,9 @@
 /*Intel Specific bitfield*/
 #define CMCI_THRESHOLD			0x2
 
+#define MCi_MISC_ADDRMOD_MASK (0x7UL << 6)
+#define MCi_MISC_PHYSMOD    (0x2UL << 6)
+
 #include <asm/domain.h>
 
 struct mca_banks
