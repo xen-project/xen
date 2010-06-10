@@ -1170,17 +1170,19 @@ static client_t *client_create(cli_id_t cli_id)
     if ( client == NULL )
     {
         printk("failed... out of memory\n");
-        return NULL;
+        goto fail;
     }
     memset(client,0,sizeof(client_t));
     if ( (client->tmh = tmh_client_init(cli_id)) == NULL )
     {
         printk("failed... can't allocate host-dependent part of client\n");
-        if ( client )
-            tmh_free_infra(client);
-        return NULL;
+        goto fail;
     }
-    tmh_set_client_from_id(client, client->tmh, cli_id);
+    if ( !tmh_set_client_from_id(client, client->tmh, cli_id) )
+    {
+        printk("failed... can't set client\n");
+        goto fail;
+    }
     client->cli_id = cli_id;
 #ifdef __i386__
     client->compress = 0;
@@ -1202,6 +1204,10 @@ static client_t *client_create(cli_id_t cli_id)
     client->succ_eph_gets = 0; client->succ_pers_gets = 0;
     printk("ok\n");
     return client;
+
+ fail:
+    tmh_free_infra(client);
+    return NULL;
 }
 
 static void client_free(client_t *client)

@@ -339,10 +339,10 @@ EXPORT tmh_client_t *tmh_client_init(cli_id_t cli_id)
 
 EXPORT void tmh_client_destroy(tmh_client_t *tmh)
 {
+    ASSERT(tmh->domain->is_dying);
 #ifndef __i386__
     xmem_pool_destroy(tmh->persistent_pool);
 #endif
-    put_domain(tmh->domain);
     tmh->domain = NULL;
 }
 
