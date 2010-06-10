@@ -291,9 +291,9 @@ static void rtc_update_second(void *opaque)
      * trying to sync the RTC registers */
     if ( unlikely(now - s->next_second_time > SECONDS(86400)) )
     {
-        dprintk(XENLOG_WARNING, "HVM RTC: dom %u skipping %llu seconds\n",
+        dprintk(XENLOG_WARNING, "HVM RTC: dom %u skipping %"PRId64" seconds\n",
                 vrtc_domain(s)->domain_id, 
-                (now - s->next_second_time) / SYSTEM_TIME_HZ);
+                (int64_t)((now - s->next_second_time) / SYSTEM_TIME_HZ));
         s->next_second_time = now;
     }
 
