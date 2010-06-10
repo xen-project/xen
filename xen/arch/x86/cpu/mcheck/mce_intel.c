@@ -150,6 +150,7 @@ static DEFINE_SPINLOCK(mce_logout_lock);
 
 static atomic_t severity_cpu = ATOMIC_INIT(-1);
 static atomic_t found_error = ATOMIC_INIT(0);
+static cpumask_t mce_fatal_cpus;
 
 static void mce_barrier_enter(struct mce_softirq_barrier *);
 static void mce_barrier_exit(struct mce_softirq_barrier *);
@@ -320,6 +321,27 @@ static void mce_softirq(void)
     }
 
     mce_barrier_exit(&mce_inside_bar);
+}
+
+/*
+ * Return:
+ * -1: if system can't be recoved
+ * 0: Continoue to next step
+ */
+static int mce_urgent_action(struct cpu_user_regs *regs,
+                              mctelem_cookie_t mctc)
+{
+    uint64_t gstatus;
+
+    if ( mctc == NULL)
+        return 0;
+
+    mca_rdmsrl(MSR_IA32_MCG_STATUS, gstatus);
+    /* Xen is not pre-emptible */
+    if ( !(gstatus & MCG_STATUS_RIPV) && !guest_mode(regs))
+        return 0;
+
+    return mce_action(regs, mctc) == MCER_RESET ? -1 : 0;
 }
 
 /* Machine Check owner judge algorithm:
@@ -693,6 +715,31 @@ static void intel_default_dhandler(int bnum,
 struct mca_error_handler intel_mce_dhandlers[] =
             {{is_async_memerr, intel_memerr_dhandler}, {default_check, intel_default_dhandler}};
 
+static void intel_default_uhandler(int bnum,
+             struct mca_binfo *binfo,
+             struct mca_handle_result *result)
+{
+    uint64_t status = binfo->mib->mc_status;
+    enum intel_mce_type type;
+
+    type = intel_check_mce_type(status);
+
+    switch (type)
+    {
+    /* Panic if no handler for SRAR error */
+    case intel_mce_ucr_srar:
+    case intel_mce_fatal:
+        result->result = MCA_RESET;
+        break;
+    default:
+        result->result = MCA_NO_ACTION;
+        break;
+    }
+}
+
+struct mca_error_handler intel_mce_uhandlers[] =
+            {{default_check, intel_default_uhandler}};
+
 static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
 {
     uint64_t gstatus;
@@ -724,17 +771,16 @@ static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
              * clearing  the banks, and deal with the telemetry after reboot
              * (the MSRs are sticky)
              */
-            if (bs.pcc)
-                mc_panic("State lost due to machine check exception.\n");
-            if (!bs.ripv)
-                mc_panic("RIPV =0 can't resume execution!\n");
-            if (!bs.recoverable)
-                mc_panic("Machine check exception software recovery fail.\n");
+            if (bs.pcc || !bs.recoverable)
+                cpu_set(smp_processor_id(), mce_fatal_cpus);
         } else {
             if (mctc != NULL)
                 mctelem_commit(mctc);
         }
         atomic_set(&found_error, 1);
+
+        /* The last CPU will be take check/clean-up etc */
+        atomic_set(&severity_cpu, smp_processor_id());
 
         mce_printk(MCE_CRITICAL, "MCE: clear_bank map %lx on CPU%d\n",
                 *((unsigned long*)clear_bank), smp_processor_id());
@@ -745,25 +791,35 @@ static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
     }
     mce_spin_unlock(&mce_logout_lock);
 
+    mce_barrier_enter(&mce_trap_bar);
+    if ( mctc != NULL && mce_urgent_action(regs, mctc))
+        cpu_set(smp_processor_id(), mce_fatal_cpus);
+    mce_barrier_exit(&mce_trap_bar);
     /*
      * Wait until everybody has processed the trap.
      */
     mce_barrier_enter(&mce_trap_bar);
-    /* According to latest MCA OS writer guide, if no error bank found
-     * on all cpus, something unexpected happening, we can't do any
-     * recovery job but to reset the system.
-     */
-    if (atomic_read(&found_error) == 0)
-        mc_panic("Unexpected condition for the MCE handler, need reset\n");
-    mce_barrier_exit(&mce_trap_bar);
-
-    /* Clear error finding flags after all cpus finishes above judgement */
-    mce_barrier_enter(&mce_trap_bar);
-    if (atomic_read(&found_error)) {
-        mce_printk(MCE_CRITICAL, "MCE: Choose one CPU "
-                   "to clear error finding flag\n ");
+    if (atomic_read(&severity_cpu) == smp_processor_id())
+    {
+        /* According to SDM, if no error bank found on any cpus,
+         * something unexpected happening, we can't do any
+         * recovery job but to reset the system.
+         */
+        if (atomic_read(&found_error) == 0)
+            mc_panic("MCE: No CPU found valid MCE, need reset\n");
+        if (!cpus_empty(mce_fatal_cpus))
+        {
+            char *ebufp, ebuf[96] = "MCE: Fatal error happened on CPUs ";
+            ebufp = ebuf + strlen(ebuf);
+            cpumask_scnprintf(ebufp, 95 - strlen(ebuf), mce_fatal_cpus);
+            mc_panic(ebuf);
+        }
         atomic_set(&found_error, 0);
     }
+    mce_barrier_exit(&mce_trap_bar);
+
+    /* Clear flags after above fatal check */
+    mce_barrier_enter(&mce_trap_bar);
     mca_rdmsrl(MSR_IA32_MCG_STATUS, gstatus);
     if ((gstatus & MCG_STATUS_MCIP) != 0) {
         mce_printk(MCE_CRITICAL, "MCE: Clear MCIP@ last step");
@@ -1158,6 +1214,8 @@ static void intel_init_mce(void)
 
     mce_dhandlers = intel_mce_dhandlers;
     mce_dhandler_num = sizeof(intel_mce_dhandlers)/sizeof(struct mca_error_handler);
+    mce_uhandlers = intel_mce_uhandlers;
+    mce_uhandler_num = sizeof(intel_mce_uhandlers)/sizeof(struct mca_error_handler);
 }
 
 static int intel_init_mca_banks(void)
