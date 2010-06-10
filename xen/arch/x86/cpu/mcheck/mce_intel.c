@@ -154,89 +154,124 @@ static atomic_t found_error = ATOMIC_INIT(0);
 static void mce_barrier_enter(struct mce_softirq_barrier *);
 static void mce_barrier_exit(struct mce_softirq_barrier *);
 
-static void intel_UCR_handler(struct mcinfo_bank *bank,
-             struct mcinfo_global *global,
-             struct mcinfo_extended *extension,
-             struct mca_handle_result *result);
-#define INTEL_MAX_RECOVERY 2
-struct mca_error_handler intel_recovery_handler[INTEL_MAX_RECOVERY] =
-            {{0x017A, intel_UCR_handler}, {0x00C0, intel_UCR_handler}};
+struct mca_error_handler *mce_dhandlers, *mce_uhandlers;
+int mce_dhandler_num, mce_uhandler_num;
+
+enum mce_result
+{
+    MCER_NOERROR,
+    MCER_RECOVERED,
+    /* Not recoverd, but can continue */
+    MCER_CONTINUE,
+    MCER_RESET,
+};
+
+/* Maybe called in MCE context, no lock, no printk */
+static enum mce_result mce_action(struct cpu_user_regs *regs,
+                      mctelem_cookie_t mctc)
+{
+    struct mc_info *local_mi;
+    enum mce_result ret = MCER_NOERROR;
+    uint32_t i;
+    struct mcinfo_common *mic = NULL;
+    struct mca_handle_result mca_res;
+    struct mca_binfo binfo;
+    struct mca_error_handler *handlers = mce_dhandlers;
+    int handler_num = mce_dhandler_num;
+
+    /* When in mce context, regs is valid */
+    if (regs)
+    {
+        handler_num = mce_uhandler_num;
+        handlers = mce_uhandlers;
+    }
+
+    /* At least a default handler should be registerd */
+    ASSERT(handler_num);
+
+    local_mi = (struct mc_info*)mctelem_dataptr(mctc);
+    x86_mcinfo_lookup(mic, local_mi, MC_TYPE_GLOBAL);
+    if (mic == NULL) {
+        printk(KERN_ERR "MCE: get local buffer entry failed\n ");
+        return MCER_CONTINUE;
+    }
+
+    memset(&binfo, 0, sizeof(binfo));
+    binfo.mig = (struct mcinfo_global *)mic;
+    binfo.mi = local_mi;
+
+    /* Processing bank information */
+    x86_mcinfo_lookup(mic, local_mi, MC_TYPE_BANK);
+
+    for ( ; ret != MCER_RESET && mic && mic->size;
+          mic = x86_mcinfo_next(mic) )
+    {
+        if (mic->type != MC_TYPE_BANK) {
+            continue;
+        }
+        binfo.mib = (struct mcinfo_bank*)mic;
+        binfo.bank = binfo.mib->mc_bank;
+        memset(&mca_res, 0x0f, sizeof(mca_res));
+        for ( i = 0; i < handler_num; i++ ) {
+            if (handlers[i].owned_error(binfo.mib->mc_status))
+            {
+                handlers[i].recovery_handler(binfo.bank, &binfo, &mca_res);
+
+                if (mca_res.result & MCA_OWNER)
+                    binfo.mib->mc_domid = mca_res.owner;
+
+                if (mca_res.result == MCA_NEED_RESET)
+                    ret = MCER_RESET;
+                else if (mca_res.result == MCA_RECOVERED)
+                {
+                    if (ret < MCER_RECOVERED)
+                        ret = MCER_RECOVERED;
+                }
+                else if (mca_res.result == MCA_NO_ACTION)
+                {
+                    if (ret < MCER_CONTINUE)
+                        ret = MCER_CONTINUE;
+                }
+                break;
+            }
+        }
+        ASSERT(i != handler_num);
+    }
+
+    return ret;
+}
 
 /*
  * Called from mctelem_process_deferred. Return 1 if the telemetry
  * should be committed for dom0 consumption, 0 if it should be
  * dismissed.
  */
-static int mce_action(mctelem_cookie_t mctc)
+static int mce_delayed_action(mctelem_cookie_t mctc)
 {
-    struct mc_info *local_mi;
-    uint32_t i;
-    struct mcinfo_common *mic = NULL;
-    struct mcinfo_global *mc_global;
-    struct mcinfo_bank *mc_bank;
-    struct mca_handle_result mca_res;
+    enum mce_result result;
+    int ret = 0;
 
-    local_mi = (struct mc_info*)mctelem_dataptr(mctc);
-    x86_mcinfo_lookup(mic, local_mi, MC_TYPE_GLOBAL);
-    if (mic == NULL) {
-        printk(KERN_ERR "MCE: get local buffer entry failed\n ");
-        return 0;
+    result = mce_action(NULL, mctc);
+
+    switch (result)
+    {
+    case MCER_RESET:
+        panic("MCE: Software recovery failed for the UCR\n");
+        break;
+    case MCER_RECOVERED:
+        dprintk(XENLOG_INFO, "MCE: Error is successfully recovered\n");
+        ret  = 1;
+        break;
+    case MCER_CONTINUE:
+        dprintk(XENLOG_INFO, "MCE: Error can't be recovered, "
+            "system is tainted\n");
+        ret = 1;
+        break;
+    default:
+        ret = 0;
+        break;
     }
-
-    mc_global = (struct mcinfo_global *)mic;
-
-    /* Processing bank information */
-    x86_mcinfo_lookup(mic, local_mi, MC_TYPE_BANK);
-
-    for ( ; mic && mic->size; mic = x86_mcinfo_next(mic) ) {
-        if (mic->type != MC_TYPE_BANK) {
-            continue;
-        }
-        mc_bank = (struct mcinfo_bank*)mic;
-
-        /* TODO: Add recovery actions here, such as page-offline, etc */
-        memset(&mca_res, 0x0f, sizeof(mca_res));
-        for ( i = 0; i < INTEL_MAX_RECOVERY; i++ ) {
-            if ( ((mc_bank->mc_status & 0xffff) ==
-                        intel_recovery_handler[i].mca_code) ||
-                  ((mc_bank->mc_status & 0xfff0) ==
-                        intel_recovery_handler[i].mca_code)) {
-                /* For SRAR, OVER = 1 should have caused reset
-                 * For SRAO, OVER = 1 skip recovery action, continue execution
-                 */
-                if (!(mc_bank->mc_status & MCi_STATUS_OVER))
-                    intel_recovery_handler[i].recovery_handler
-                                (mc_bank, mc_global, NULL, &mca_res);
-                else {
-                   if (!(mc_global->mc_gstatus & MCG_STATUS_RIPV))
-                       mca_res.result = MCA_NEED_RESET;
-                   else
-                       mca_res.result = MCA_NO_ACTION;
-                }
-                if (mca_res.result & MCA_OWNER)
-                    mc_bank->mc_domid = mca_res.owner;
-                if (mca_res.result == MCA_NEED_RESET)
-                    /* DOMID_XEN*/
-                    mc_panic("MCE: Software recovery failed for the UCR "
-                                "error\n");
-                else if (mca_res.result == MCA_RECOVERED)
-                    mce_printk(MCE_VERBOSE, "MCE: The UCR error is"
-                                "successfully recovered by software!\n");
-                else if (mca_res.result == MCA_NO_ACTION)
-                    mce_printk(MCE_VERBOSE, "MCE: Overwrite SRAO error can't"
-                                "do recover action, RIPV=1, let it be.\n");
-                break;
-            }
-        }
-        /* For SRAR, no defined recovery action should have caused reset
-         * in MCA Handler
-         */
-        if ( i >= INTEL_MAX_RECOVERY )
-            mce_printk(MCE_VERBOSE, "MCE: No software recovery action"
-                            " found for this SRAO error\n");
-
-    }
-    return 1;
+    return ret;
 }
 
 /* Softirq Handler for this MCE# processing */
@@ -274,7 +309,7 @@ static void mce_softirq(void)
          * vMCE MSRs virtualization buffer
          */
         for_each_online_cpu(workcpu) {
-            mctelem_process_deferred(workcpu, mce_action);
+            mctelem_process_deferred(workcpu, mce_delayed_action);
         }
 
         /* Step2: Send Log to DOM0 through vIRQ */
@@ -466,11 +501,18 @@ intel_get_extended_msrs(struct mcinfo_global *mig, struct mc_info *mi)
     return mc_ext;
 }
 
-static void intel_UCR_handler(struct mcinfo_bank *bank,
-             struct mcinfo_global *global,
-             struct mcinfo_extended *extension,
+#define INTEL_MAX_RECOVERY 2
+static int is_async_memerr(uint64_t status)
+{
+    return (status & 0xFFFF) == 0x17A || (status & 0xFFF0) == 0xC0;
+}
+
+static void intel_memerr_dhandler(int bnum,
+             struct mca_binfo *binfo,
              struct mca_handle_result *result)
 {
+    struct mcinfo_bank *bank = binfo->mib;
+    struct mcinfo_global *global = binfo->mig;
     struct domain *d;
     unsigned long mfn, gfn;
     uint32_t status;
@@ -544,6 +586,9 @@ static void intel_UCR_handler(struct mcinfo_bank *bank,
          }
     }
 }
+
+struct mca_error_handler intel_mce_dhandlers[] =
+            {{is_async_memerr, intel_memerr_dhandler}};
 
 static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
 {
@@ -1007,6 +1052,9 @@ static void intel_init_mce(void)
     x86_mce_vector_register(intel_machine_check);
     mce_recoverable_register(intel_recoverable_scan);
     mce_need_clearbank_register(intel_need_clearbank_scan);
+
+    mce_dhandlers = intel_mce_dhandlers;
+    mce_dhandler_num = sizeof(intel_mce_dhandlers)/sizeof(struct mca_error_handler);
 }
 
 static int intel_init_mca_banks(void)

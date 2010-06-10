@@ -151,6 +151,15 @@ struct mca_handle_result
     struct recovery_action *action;
 };
 
+/*Keep bank so that we can get staus even if mib is NULL */
+struct mca_binfo {
+    int bank;
+    struct mcinfo_global *mig;
+    struct mcinfo_bank *mib;
+    struct mc_info *mi;
+    struct cpu_user_regs *regs;
+};
+
 extern void (*mca_prehandler)( struct cpu_user_regs *regs,
                         struct mca_handle_result *result);
 
@@ -161,10 +170,8 @@ struct mca_error_handler
      * a seperate function to decode the corresponding actions
      * for the particular mca error later.
     */
-    uint16_t mca_code;
-    void (*recovery_handler)( struct mcinfo_bank *bank,
-                    struct mcinfo_global *global,
-                    struct mcinfo_extended *extension,
+    int (*owned_error)(uint64_t status);
+    void (*recovery_handler)(int bank, struct mca_binfo *binfo,
                     struct mca_handle_result *result);
 };
 
