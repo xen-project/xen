@@ -334,11 +334,6 @@ void tboot_shutdown(uint32_t shutdown_type)
 
     local_irq_disable();
 
-    /* we may be called from an interrupt context, so to prevent */
-    /* 'ASSERT(!in_irq());' in alloc_domheap_pages(), decrease count */
-    while ( in_irq() )
-        irq_exit();
-
     /* Create identity map for tboot shutdown code. */
     /* do before S3 integrity because mapping tboot may change xenheap */
     map_base = PFN_DOWN(g_tboot_shared->tboot_base);
