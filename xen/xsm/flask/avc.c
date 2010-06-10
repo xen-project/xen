@@ -124,6 +124,8 @@ DEFINE_PER_CPU(struct avc_cache_stats, avc_cache_stats);
 static struct avc_cache avc_cache;
 static struct avc_callback_node *avc_callbacks;
 
+static DEFINE_RCU_READ_LOCK(avc_rcu_lock);
+
 static inline int avc_hash(u32 ssid, u32 tsid, u16 tclass)
 {
     return (ssid ^ (tsid<<2) ^ (tclass<<4)) & (AVC_CACHE_SLOTS - 1);
@@ -255,7 +257,7 @@ int avc_get_hash_stats(char *buf, uint32_t size)
     struct avc_node *node;
     struct hlist_head *head;
 
-    rcu_read_lock();
+    rcu_read_lock(&avc_rcu_lock);
 
     slots_used = 0;
     max_chain_len = 0;
@@ -275,7 +277,7 @@ int avc_get_hash_stats(char *buf, uint32_t size)
         }
     }
 
-    rcu_read_unlock();
+    rcu_read_unlock(&avc_rcu_lock);
     
     return snprintf(buf, size, "entries: %d\nbuckets used: %d/%d\n"
                                 "longest chain: %d\n",
@@ -328,7 +330,7 @@ static inline int avc_reclaim_node(void)
         lock = &avc_cache.slots_lock[hvalue];
 
         spin_lock_irqsave(&avc_cache.slots_lock[hvalue], flags);
-        rcu_read_lock();
+        rcu_read_lock(&avc_rcu_lock);
         hlist_for_each_entry(node, next, head, list)
         {
                 avc_node_delete(node);
@@ -336,12 +338,12 @@ static inline int avc_reclaim_node(void)
                 ecx++;
                 if ( ecx >= AVC_CACHE_RECLAIM )
                 {
-		  rcu_read_unlock();
+		  rcu_read_unlock(&avc_rcu_lock);
 		  spin_unlock_irqrestore(lock, flags);
 		  goto out;
                 }
         }
-        rcu_read_unlock();
+        rcu_read_unlock(&avc_rcu_lock);
         spin_unlock_irqrestore(lock, flags);
     }    
 out:
@@ -727,10 +729,10 @@ int avc_ss_reset(u32 seqno)
         lock = &avc_cache.slots_lock[i];
 
         spin_lock_irqsave(lock, flag);
-        rcu_read_lock();
+        rcu_read_lock(&avc_rcu_lock);
         hlist_for_each_entry(node, next, head, list)
             avc_node_delete(node);
-        rcu_read_unlock();
+        rcu_read_unlock(&avc_rcu_lock);
         spin_unlock_irqrestore(lock, flag);
     }
     
@@ -780,12 +782,12 @@ int avc_has_perm_noaudit(u32 ssid, u32 tsid, u16 tclass, u32 requested,
 
     BUG_ON(!requested);
 
-    rcu_read_lock();
+    rcu_read_lock(&avc_rcu_lock);
 
     node = avc_lookup(ssid, tsid, tclass);
     if ( !node )
     {
-        rcu_read_unlock();
+        rcu_read_unlock(&avc_rcu_lock);
 
         if ( in_avd )
             avd = in_avd;
@@ -795,7 +797,7 @@ int avc_has_perm_noaudit(u32 ssid, u32 tsid, u16 tclass, u32 requested,
         rc = security_compute_av(ssid,tsid,tclass,requested,avd);
         if ( rc )
             goto out;
-        rcu_read_lock();
+        rcu_read_lock(&avc_rcu_lock);
         node = avc_insert(ssid,tsid,tclass,avd);
     } else {
         if ( in_avd )
@@ -814,7 +816,7 @@ int avc_has_perm_noaudit(u32 ssid, u32 tsid, u16 tclass, u32 requested,
             rc = -EACCES;
     }
 
-    rcu_read_unlock();
+    rcu_read_unlock(&avc_rcu_lock);
 out:
     return rc;
 }

@@ -162,6 +162,8 @@ struct msixtbl_entry
     struct rcu_head rcu;
 };
 
+static DEFINE_RCU_READ_LOCK(msixtbl_rcu_lock);
+
 static struct msixtbl_entry *msixtbl_find_entry(
     struct vcpu *v, unsigned long addr)
 {
@@ -207,7 +209,7 @@ static int msixtbl_read(
     void *virt;
     int r = X86EMUL_UNHANDLEABLE;
 
-    rcu_read_lock();
+    rcu_read_lock(&msixtbl_rcu_lock);
 
     if ( len != 4 )
         goto out;
@@ -225,7 +227,7 @@ static int msixtbl_read(
     r = X86EMUL_OKAY;
 
 out:
-    rcu_read_unlock();
+    rcu_read_unlock(&msixtbl_rcu_lock);
     return r;
 }
 
@@ -238,7 +240,7 @@ static int msixtbl_write(struct vcpu *v, unsigned long address,
     int nr_entry;
     int r = X86EMUL_UNHANDLEABLE;
 
-    rcu_read_lock();
+    rcu_read_lock(&msixtbl_rcu_lock);
 
     if ( len != 4 )
         goto out;
@@ -265,7 +267,7 @@ static int msixtbl_write(struct vcpu *v, unsigned long address,
     r = X86EMUL_OKAY;
 
 out:
-    rcu_read_unlock();
+    rcu_read_unlock(&msixtbl_rcu_lock);
     return r;
 }
 
@@ -274,12 +276,12 @@ static int msixtbl_range(struct vcpu *v, unsigned long addr)
     struct msixtbl_entry *entry;
     void *virt;
 
-    rcu_read_lock();
+    rcu_read_lock(&msixtbl_rcu_lock);
 
     entry = msixtbl_find_entry(v, addr);
     virt = msixtbl_addr_to_virt(entry, addr);
 
-    rcu_read_unlock();
+    rcu_read_unlock(&msixtbl_rcu_lock);
 
     return !!virt;
 }

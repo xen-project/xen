@@ -145,14 +145,14 @@ typedef struct _rcu_read_lock rcu_read_lock_t;
  *
  * It is illegal to block while in an RCU read-side critical section.
  */
-#define rcu_read_lock(x)       do { } while (0)
+#define rcu_read_lock(x)       ((void)(x))
 
 /**
  * rcu_read_unlock - marks the end of an RCU read-side critical section.
  *
  * See rcu_read_lock() for more information.
  */
-#define rcu_read_unlock(x)     do { } while (0)
+#define rcu_read_unlock(x)     ((void)(x))
 
 /*
  * So where is rcu_write_lock()?  It does not exist, as there is no

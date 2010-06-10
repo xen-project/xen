@@ -344,6 +344,10 @@ struct domain_setup_info
     unsigned long symtab_len;
 };
 
+/* Protect updates/reads (resp.) of domain_list and domain_hash. */
+extern spinlock_t domlist_update_lock;
+extern rcu_read_lock_t domlist_read_lock;
+
 extern struct vcpu *idle_vcpu[NR_CPUS];
 #define IDLE_DOMAIN_ID   (0x7FFFU)
 #define is_idle_domain(d) ((d)->domain_id == IDLE_DOMAIN_ID)
@@ -532,10 +536,6 @@ unsigned long hypercall_create_continuation(
         softirq_pending(smp_processor_id()) |   \
         local_events_need_delivery()            \
     ))
-
-/* Protect updates/reads (resp.) of domain_list and domain_hash. */
-extern spinlock_t domlist_update_lock;
-extern rcu_read_lock_t domlist_read_lock;
 
 extern struct domain *domain_list;
 
