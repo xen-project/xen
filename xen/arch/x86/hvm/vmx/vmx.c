@@ -344,32 +344,28 @@ void vmx_save_host_msrs(void) {}
 #define vmx_save_guest_msrs(v)      ((void)0)
 #define vmx_restore_guest_msrs(v)   ((void)0)
 
-static enum handler_return long_mode_do_msr_read(struct cpu_user_regs *regs)
+static enum handler_return
+long_mode_do_msr_read(unsigned int msr, uint64_t *msr_content)
 {
-    u64 msr_content = 0;
     struct vcpu *v = current;
 
-    switch ( regs->ecx )
+    switch ( msr )
     {
     case MSR_EFER:
-        msr_content = v->arch.hvm_vcpu.guest_efer;
+        *msr_content = v->arch.hvm_vcpu.guest_efer;
         break;
 
     default:
         return HNDL_unhandled;
     }
 
-    regs->eax = msr_content >>  0;
-    regs->edx = msr_content >> 32;
-
     return HNDL_done;
 }
 
-static enum handler_return long_mode_do_msr_write(struct cpu_user_regs *regs)
+static enum handler_return
+long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
 {
-    u64 msr_content = regs->eax | ((u64)regs->edx << 32);
-
-    switch ( regs->ecx )
+    switch ( msr )
     {
     case MSR_EFER:
         if ( hvm_set_efer(msr_content) )
