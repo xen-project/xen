@@ -58,7 +58,6 @@
 #endif
 
 DEFINE_PER_CPU(struct vcpu *, curr_vcpu);
-DEFINE_PER_CPU(u64, efer);
 DEFINE_PER_CPU(unsigned long, cr4);
 
 static void default_idle(void);

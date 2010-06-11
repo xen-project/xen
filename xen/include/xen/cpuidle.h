@@ -27,7 +27,7 @@
 #ifndef _XEN_CPUIDLE_H
 #define _XEN_CPUIDLE_H
 
-#include <xen/smp.h>
+#include <xen/cpumask.h>
 
 #define ACPI_PROCESSOR_MAX_POWER        8
 #define CPUIDLE_NAME_LEN                16

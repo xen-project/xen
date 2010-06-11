@@ -102,23 +102,10 @@ static inline int wrmsr_safe(unsigned int msr, uint64_t val)
 
 
 DECLARE_PER_CPU(u64, efer);
-
-#define read_efer() this_cpu(efer)
-
-#define write_efer(val) do { \
-    this_cpu(efer) = val; \
-    wrmsrl(MSR_EFER, val); \
-} while(0)
+u64 read_efer(void);
+void write_efer(u64 val);
 
 DECLARE_PER_CPU(u32, ler_msr);
-
-#define ler_enable() do { \
-    u64 debugctl; \
-    if ( !this_cpu(ler_msr) ) \
-        return; \
-    rdmsrl(MSR_IA32_DEBUGCTLMSR, debugctl); \
-    wrmsrl(MSR_IA32_DEBUGCTLMSR, debugctl | 1); \
-} while(0)
 
 #endif /* !__ASSEMBLY__ */
 

@@ -81,6 +81,8 @@ static char __read_mostly opt_nmi[10] = "fatal";
 #endif
 string_param("nmi", opt_nmi);
 
+DEFINE_PER_CPU(u64, efer);
+
 DEFINE_PER_CPU_READ_MOSTLY(u32, ler_msr);
 
 DEFINE_PER_CPU_READ_MOSTLY(struct desc_struct *, gdt_table);
@@ -3111,6 +3113,28 @@ asmlinkage void do_device_not_available(struct cpu_user_regs *regs)
         TRACE_0D(TRC_PV_MATH_STATE_RESTORE);
 
     return;
+}
+
+u64 read_efer(void)
+{
+    return this_cpu(efer);
+}
+
+void write_efer(u64 val)
+{
+    this_cpu(efer) = val;
+    wrmsrl(MSR_EFER, val);
+}
+
+static void ler_enable(void)
+{
+    u64 debugctl;
+    
+    if ( !this_cpu(ler_msr) )
+        return;
+
+    rdmsrl(MSR_IA32_DEBUGCTLMSR, debugctl);
+    wrmsrl(MSR_IA32_DEBUGCTLMSR, debugctl | 1);
 }
 
 asmlinkage void do_debug(struct cpu_user_regs *regs)
