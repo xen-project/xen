@@ -81,9 +81,9 @@ amd_f10_handler(struct mc_info *mi, uint16_t bank, uint64_t status)
 	mc_ext->mc_msr[1].reg = MSR_F10_MC4_MISC2;
 	mc_ext->mc_msr[2].reg = MSR_F10_MC4_MISC3;
 
-	mca_rdmsrl(MSR_F10_MC4_MISC1, mc_ext->mc_msr[0].value);
-	mca_rdmsrl(MSR_F10_MC4_MISC2, mc_ext->mc_msr[1].value);
-	mca_rdmsrl(MSR_F10_MC4_MISC3, mc_ext->mc_msr[2].value);
+	mc_ext->mc_msr[0].value = mca_rdmsr(MSR_F10_MC4_MISC1);
+	mc_ext->mc_msr[1].value = mca_rdmsr(MSR_F10_MC4_MISC2);
+	mc_ext->mc_msr[2].value = mca_rdmsr(MSR_F10_MC4_MISC3);
 
 	return mc_ext;
 }

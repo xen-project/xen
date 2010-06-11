@@ -144,7 +144,7 @@ static void mce_amd_work_fn(void *data)
 		uint64_t value;
 		uint32_t counter;
 
-		mca_rdmsrl(MSR_IA32_MC4_MISC, value);
+		value = mca_rdmsr(MSR_IA32_MC4_MISC);
 		/* Only the error counter field is of interest
 		 * Bit field is described in AMD K8 BKDG chapter 6.4.5.5
 		 */
@@ -169,7 +169,7 @@ static void mce_amd_work_fn(void *data)
 			value &= ~(0x60FFF00000000ULL);
 			/* Counter enable */
 			value |= (1ULL << 51);
-			mca_wrmsrl(MSR_IA32_MC4_MISC, value);
+			mca_wrmsr(MSR_IA32_MC4_MISC, value);
 			wmb();
 		}
 	}

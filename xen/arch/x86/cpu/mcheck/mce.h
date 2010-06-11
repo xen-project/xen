@@ -83,13 +83,16 @@ extern struct intpose_ent *intpose_lookup(unsigned int, uint64_t,
     uint64_t *);
 extern void intpose_inval(unsigned int, uint64_t);
 
-#define mca_rdmsrl(msr, var) do { \
-       if (intpose_lookup(smp_processor_id(), msr, &var) == NULL) \
-               rdmsrl(msr, var); \
-} while (0)
+static inline uint64_t mca_rdmsr(unsigned int msr)
+{
+	uint64_t val;
+	if (intpose_lookup(smp_processor_id(), msr, &val) == NULL)
+		rdmsrl(msr, val);
+	return val;
+}
 
 /* Write an MSR, invalidating any interposed value */
-#define        mca_wrmsrl(msr, val) do { \
+#define mca_wrmsr(msr, val) do { \
        intpose_inval(smp_processor_id(), msr); \
        wrmsrl(msr, val); \
 } while (0)

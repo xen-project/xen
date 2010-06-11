@@ -164,7 +164,7 @@ static struct mcinfo_bank *mca_init_bank(enum mca_source who,
     }
 
     memset(mib, 0, sizeof (struct mcinfo_bank));
-    mca_rdmsrl(MSR_IA32_MCx_STATUS(bank), mib->mc_status);
+    mib->mc_status = mca_rdmsr(MSR_IA32_MCx_STATUS(bank));
 
     mib->common.type = MC_TYPE_BANK;
     mib->common.size = sizeof (struct mcinfo_bank);
@@ -172,11 +172,11 @@ static struct mcinfo_bank *mca_init_bank(enum mca_source who,
 
     addr = misc = 0;
     if (mib->mc_status & MCi_STATUS_MISCV)
-        mca_rdmsrl(MSR_IA32_MCx_MISC(bank), mib->mc_misc);
+        mib->mc_misc = mca_rdmsr(MSR_IA32_MCx_MISC(bank));
 
     if (mib->mc_status & MCi_STATUS_ADDRV)
     {
-        mca_rdmsrl(MSR_IA32_MCx_ADDR(bank), mib->mc_addr);
+        mib->mc_addr = mca_rdmsr(MSR_IA32_MCx_ADDR(bank));
 
         if (mfn_valid(paddr_to_pfn(mib->mc_addr))) {
             struct domain *d;
@@ -189,7 +189,7 @@ static struct mcinfo_bank *mca_init_bank(enum mca_source who,
     }
 
     if (who == MCA_CMCI_HANDLER) {
-        mca_rdmsrl(MSR_IA32_MC0_CTL2 + bank, mib->mc_ctrl2);
+        mib->mc_ctrl2 = mca_rdmsr(MSR_IA32_MC0_CTL2 + bank);
         rdtscll(mib->mc_tsc);
     }
 
@@ -207,7 +207,7 @@ static int mca_init_global(uint32_t flags, struct mcinfo_global *mig)
     memset(mig, 0, sizeof (struct mcinfo_global));
     mig->common.type = MC_TYPE_GLOBAL;
     mig->common.size = sizeof (struct mcinfo_global);
-    mca_rdmsrl(MSR_IA32_MCG_STATUS, status);
+    status = mca_rdmsr(MSR_IA32_MCG_STATUS);
     mig->mc_gstatus = status;
     mig->mc_domid = mig->mc_vcpuid = -1;
     mig->mc_flags = flags;
@@ -252,7 +252,7 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, struct mca_banks *bankma
     int errcnt = 0;
     int i;
 
-    mca_rdmsrl(MSR_IA32_MCG_STATUS, gstatus);
+    gstatus = mca_rdmsr(MSR_IA32_MCG_STATUS);
     switch (who) {
     case MCA_MCE_HANDLER:
     case MCA_MCE_SCAN:
@@ -287,7 +287,7 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, struct mca_banks *bankma
         if (!mcabanks_test(i, bankmask))
             continue;
 
-        mca_rdmsrl(MSR_IA32_MCx_STATUS(i), status);
+        status = mca_rdmsr(MSR_IA32_MCx_STATUS(i));
         if (!(status & MCi_STATUS_VAL))
             continue; /* this bank has no valid telemetry */
 
@@ -345,7 +345,7 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, struct mca_banks *bankma
         /* By default, need_clear = 1 */
         if (who != MCA_MCE_SCAN && need_clear)
             /* Clear status */
-            mca_wrmsrl(MSR_IA32_MCx_STATUS(i), 0x0ULL);
+            mca_wrmsr(MSR_IA32_MCx_STATUS(i), 0x0ULL);
         else if ( who == MCA_MCE_SCAN && need_clear)
             mcabanks_set(i, clear_bank);
 
@@ -407,7 +407,7 @@ void mcheck_cmn_handler(struct cpu_user_regs *regs, long error_code,
 
     /* Read global status;  if it does not indicate machine check
      * in progress then bail as long as we have a valid ip to return to. */
-    mca_rdmsrl(MSR_IA32_MCG_STATUS, gstatus);
+    gstatus = mca_rdmsr(MSR_IA32_MCG_STATUS);
     ripv = ((gstatus & MCG_STATUS_RIPV) != 0);
     if (!(gstatus & MCG_STATUS_MCIP) && ripv) {
         add_taint(TAINT_MACHINE_CHECK); /* questionable */
@@ -426,7 +426,7 @@ void mcheck_cmn_handler(struct cpu_user_regs *regs, long error_code,
 
     /* Clear MCIP or another #MC will enter shutdown state */
     gstatus &= ~MCG_STATUS_MCIP;
-    mca_wrmsrl(MSR_IA32_MCG_STATUS, gstatus);
+    mca_wrmsr(MSR_IA32_MCG_STATUS, gstatus);
     wmb();
 
     /* If no valid errors and our stack is intact, we're done */
@@ -605,10 +605,10 @@ void mcheck_mca_clearbanks(struct mca_banks *bankmask)
     for (i = 0; i < 32 && i < nr_mce_banks; i++) {
         if (!mcabanks_test(i, bankmask))
             continue;
-        mca_rdmsrl(MSR_IA32_MCx_STATUS(i), status);
+        status = mca_rdmsr(MSR_IA32_MCx_STATUS(i));
         if (!(status & MCi_STATUS_VAL))
             continue;
-        mca_wrmsrl(MSR_IA32_MCx_STATUS(i), 0x0ULL);
+        mca_wrmsr(MSR_IA32_MCx_STATUS(i), 0x0ULL);
     }
 }
 

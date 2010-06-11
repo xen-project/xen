@@ -339,7 +339,7 @@ static int mce_urgent_action(struct cpu_user_regs *regs,
     if ( mctc == NULL)
         return 0;
 
-    mca_rdmsrl(MSR_IA32_MCG_STATUS, gstatus);
+    gstatus = mca_rdmsr(MSR_IA32_MCG_STATUS);
     /* Xen is not pre-emptible */
     if ( !(gstatus & MCG_STATUS_RIPV) && !guest_mode(regs))
         return 0;
@@ -819,10 +819,10 @@ static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
 
     /* Clear flags after above fatal check */
     mce_barrier_enter(&mce_trap_bar);
-    mca_rdmsrl(MSR_IA32_MCG_STATUS, gstatus);
+    gstatus = mca_rdmsr(MSR_IA32_MCG_STATUS);
     if ((gstatus & MCG_STATUS_MCIP) != 0) {
         mce_printk(MCE_CRITICAL, "MCE: Clear MCIP@ last step");
-        mca_wrmsrl(MSR_IA32_MCG_STATUS, gstatus & ~MCG_STATUS_MCIP);
+        mca_wrmsr(MSR_IA32_MCG_STATUS, gstatus & ~MCG_STATUS_MCIP);
     }
     mce_barrier_exit(&mce_trap_bar);
 
