@@ -202,6 +202,18 @@ extern u64 vmx_ept_vpid_cap;
 #define INVEPT_SINGLE_CONTEXT   1
 #define INVEPT_ALL_CONTEXT      2
 
+#define cpu_has_vmx_vpid_invvpid_individual_addr                    \
+    (vmx_ept_vpid_cap & VMX_VPID_INVVPID_INDIVIDUAL_ADDR)
+#define cpu_has_vmx_vpid_invvpid_single_context                     \
+    (vmx_ept_vpid_cap & VMX_VPID_INVVPID_SINGLE_CONTEXT)
+#define cpu_has_vmx_vpid_invvpid_single_context_retaining_global    \
+    (vmx_ept_vpid_cap & VMX_VPID_INVVPID_SINGLE_CONTEXT_RETAINING_GLOBAL)
+
+#define INVVPID_INDIVIDUAL_ADDR                 0
+#define INVVPID_SINGLE_CONTEXT                  1
+#define INVVPID_ALL_CONTEXT                     2
+#define INVVPID_SINGLE_CONTEXT_RETAINING_GLOBAL 3
+
 static inline void __vmptrld(u64 addr)
 {
     asm volatile ( VMPTRLD_OPCODE
@@ -307,7 +319,7 @@ static inline void __invept(int type, u64 eptp, u64 gpa)
                    : "memory" );
 }
 
-static inline void __invvpid(int ext, u16 vpid, u64 gva)
+static inline void __invvpid(int type, u16 vpid, u64 gva)
 {
     struct {
         u64 vpid:16;
@@ -324,7 +336,7 @@ static inline void __invvpid(int ext, u16 vpid, u64 gva)
                    "    "__FIXUP_WORD" 1b,2b\n"
                    ".previous"
                    :
-                   : "a" (&operand), "c" (ext)
+                   : "a" (&operand), "c" (type)
                    : "memory" );
 }
 
@@ -337,12 +349,31 @@ void ept_sync_domain(struct domain *d);
 
 static inline void vpid_sync_vcpu_gva(struct vcpu *v, unsigned long gva)
 {
-    __invvpid(0, v->arch.hvm_vcpu.asid, (u64)gva);
+    int type = INVVPID_INDIVIDUAL_ADDR;
+
+    /*
+     * If individual address invalidation is not supported, we escalate to
+     * use single context invalidation.
+     */
+    if ( likely(cpu_has_vmx_vpid_invvpid_individual_addr) )
+        goto execute_invvpid;
+
+    type = INVVPID_SINGLE_CONTEXT;
+
+    /*
+     * If single context invalidation is not supported, we escalate to
+     * use all context invalidation.
+     */
+    if ( !cpu_has_vmx_vpid_invvpid_single_context )
+        type = INVVPID_ALL_CONTEXT;
+
+execute_invvpid:
+    __invvpid(type, v->arch.hvm_vcpu.asid, (u64)gva);
 }
 
 static inline void vpid_sync_all(void)
 {
-    __invvpid(2, 0, 0);
+    __invvpid(INVVPID_ALL_CONTEXT, 0, 0);
 }
 
 static inline void __vmxoff(void)

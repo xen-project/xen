@@ -189,6 +189,12 @@ extern bool_t cpu_has_vmx_ins_outs_instr_info;
 #define VMX_EPT_INVEPT_SINGLE_CONTEXT           0x02000000
 #define VMX_EPT_INVEPT_ALL_CONTEXT              0x04000000
 
+#define VMX_VPID_INVVPID_INSTRUCTION                        0x100000000ULL
+#define VMX_VPID_INVVPID_INDIVIDUAL_ADDR                    0x10000000000ULL
+#define VMX_VPID_INVVPID_SINGLE_CONTEXT                     0x20000000000ULL
+#define VMX_VPID_INVVPID_ALL_CONTEXT                        0x40000000000ULL
+#define VMX_VPID_INVVPID_SINGLE_CONTEXT_RETAINING_GLOBAL    0x80000000000ULL
+
 #define cpu_has_wbinvd_exiting \
     (vmx_secondary_exec_control & SECONDARY_EXEC_WBINVD_EXITING)
 #define cpu_has_vmx_virtualize_apic_accesses \
