@@ -6,7 +6,9 @@
 #ifndef __ASSEMBLY__
 
 #include <xen/smp.h>
+#include <xen/types.h>
 #include <xen/percpu.h>
+#include <xen/errno.h>
 
 #define rdmsr(msr,val1,val2) \
      __asm__ __volatile__("rdmsr" \
@@ -34,8 +36,9 @@ static inline void wrmsrl(unsigned int msr, __u64 val)
 }
 
 /* rdmsr with exception handling */
-#define rdmsr_safe(msr,val1,val2) ({\
+#define rdmsr_safe(msr,val) ({\
     int _rc; \
+    uint32_t val1, val2; \
     __asm__ __volatile__( \
         "1: rdmsr\n2:\n" \
         ".section .fixup,\"ax\"\n" \
@@ -47,23 +50,30 @@ static inline void wrmsrl(unsigned int msr, __u64 val)
         ".previous\n" \
         : "=a" (val1), "=d" (val2), "=&r" (_rc) \
         : "c" (msr), "2" (0), "i" (-EFAULT)); \
+    val = val2 | ((uint64_t)val1 << 32); \
     _rc; })
 
 /* wrmsr with exception handling */
-#define wrmsr_safe(msr,val1,val2) ({\
-    int _rc; \
-    __asm__ __volatile__( \
-        "1: wrmsr\n2:\n" \
-        ".section .fixup,\"ax\"\n" \
-        "3: movl %5,%0\n; jmp 2b\n" \
-        ".previous\n" \
-        ".section __ex_table,\"a\"\n" \
-        "   "__FIXUP_ALIGN"\n" \
-        "   "__FIXUP_WORD" 1b,3b\n" \
-        ".previous\n" \
-        : "=&r" (_rc) \
-        : "c" (msr), "a" (val1), "d" (val2), "0" (0), "i" (-EFAULT)); \
-    _rc; })
+static inline int wrmsr_safe(unsigned int msr, uint64_t val)
+{
+    int _rc;
+    uint32_t lo, hi;
+    lo = (uint32_t)val;
+    hi = (uint32_t)(val >> 32);
+
+    __asm__ __volatile__(
+        "1: wrmsr\n2:\n"
+        ".section .fixup,\"ax\"\n"
+        "3: movl %5,%0\n; jmp 2b\n"
+        ".previous\n"
+        ".section __ex_table,\"a\"\n"
+        "   "__FIXUP_ALIGN"\n"
+        "   "__FIXUP_WORD" 1b,3b\n"
+        ".previous\n"
+        : "=&r" (_rc)
+        : "c" (msr), "a" (lo), "d" (hi), "0" (0), "i" (-EFAULT));
+    return _rc;
+}
 
 #define rdtsc(low,high) \
      __asm__ __volatile__("rdtsc" : "=a" (low), "=d" (high))

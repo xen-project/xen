@@ -1809,8 +1809,6 @@ static int is_last_branch_msr(u32 ecx)
 
 static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 {
-    u32 eax, edx;
-
     HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%x", msr);
 
     switch ( msr )
@@ -1866,11 +1864,8 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
              rdmsr_hypervisor_regs(msr, msr_content) )
             break;
 
-        if ( rdmsr_safe(msr, eax, edx) == 0 )
-        {
-            *msr_content = ((uint64_t)edx << 32) | eax;
+        if ( rdmsr_safe(msr, *msr_content) == 0 )
             break;
-        }
 
         goto gp_fault;
     }

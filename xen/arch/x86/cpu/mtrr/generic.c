@@ -107,7 +107,10 @@ void __init mtrr_state_warn(void)
    worth it because the best error handling is to ignore it. */
 void mtrr_wrmsr(unsigned msr, unsigned a, unsigned b)
 {
-	if (wrmsr_safe(msr, a, b) < 0)
+	uint64_t msr_content;
+
+	msr_content = ((uint64_t)b << 32) | a;
+	if (wrmsr_safe(msr, msr_content) < 0)
 		printk(KERN_ERR
 			"MTRR: CPU %u: Writing MSR %x to %x:%x failed\n",
 			smp_processor_id(), msr, a, b);

@@ -857,14 +857,14 @@ static void svm_init_erratum_383(struct cpuinfo_x86 *c)
 
 static int svm_cpu_up(void)
 {
-    u32 eax, edx, phys_hsa_lo, phys_hsa_hi;   
-    u64 phys_hsa;
+    u32 phys_hsa_lo, phys_hsa_hi;   
+    uint64_t phys_hsa, msr_content;
     int rc, cpu = smp_processor_id();
     struct cpuinfo_x86 *c = &cpu_data[cpu];
  
     /* Check whether SVM feature is disabled in BIOS */
-    rdmsr(MSR_K8_VM_CR, eax, edx);
-    if ( eax & K8_VMCR_SVME_DISABLE )
+    rdmsrl(MSR_K8_VM_CR, msr_content);
+    if ( msr_content & K8_VMCR_SVME_DISABLE )
     {
         printk("CPU%d: AMD SVM Extension is disabled in BIOS.\n", cpu);
         return -EINVAL;
@@ -892,15 +892,14 @@ static int svm_cpu_up(void)
      * Check whether EFER.LMSLE can be written.
      * Unfortunately there's no feature bit defined for this.
      */
-    eax = read_efer();
-    edx = read_efer() >> 32;
-    if ( wrmsr_safe(MSR_EFER, eax | EFER_LMSLE, edx) == 0 )
-        rdmsr(MSR_EFER, eax, edx);
-    if ( eax & EFER_LMSLE )
+    msr_content = read_efer();
+    if ( wrmsr_safe(MSR_EFER, msr_content | EFER_LMSLE) == 0 )
+        rdmsrl(MSR_EFER, msr_content);
+    if ( msr_content & EFER_LMSLE )
     {
         if ( c == &boot_cpu_data )
             cpu_has_lmsl = 1;
-        wrmsr(MSR_EFER, eax ^ EFER_LMSLE, edx);
+        wrmsrl(MSR_EFER, msr_content ^ EFER_LMSLE);
     }
     else
     {
@@ -1033,7 +1032,6 @@ static void svm_dr_access(struct vcpu *v, struct cpu_user_regs *regs)
 
 static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 {
-    u32 eax, edx;
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
@@ -1111,11 +1109,8 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
              rdmsr_hypervisor_regs(msr, msr_content) )
             break;
 
-        if ( rdmsr_safe(msr, eax, edx) == 0 )
-        {
-            *msr_content = ((uint64_t)edx << 32) | eax;
+        if ( rdmsr_safe(msr, *msr_content) == 0 )
             break;
-        }
 
         goto gpf;
     }

@@ -235,18 +235,18 @@ int force_mwait __cpuinitdata;
 
 static void disable_c1e(void *unused)
 {
-	u32 lo, hi;
+	uint64_t msr_content;
 
 	/*
 	 * Disable C1E mode, as the APIC timer stops in that mode.
 	 * The MSR does not exist in all FamilyF CPUs (only Rev F and above),
 	 * but we safely catch the #GP in that case.
 	 */
-	if ((rdmsr_safe(MSR_K8_ENABLE_C1E, lo, hi) == 0) &&
-	    (lo & (3u << 27)) &&
-	    (wrmsr_safe(MSR_K8_ENABLE_C1E, lo & ~(3u << 27), hi) != 0))
-		printk(KERN_ERR "Failed to disable C1E on CPU#%u (%08x)\n",
-		       smp_processor_id(), lo);
+	if ((rdmsr_safe(MSR_K8_ENABLE_C1E, msr_content) == 0) &&
+	    (msr_content & (3u << 27)) &&
+	    (wrmsr_safe(MSR_K8_ENABLE_C1E, msr_content & ~(3u << 27)) != 0))
+		printk(KERN_ERR "Failed to disable C1E on CPU#%u (%16"PRIx64")\n",
+		       smp_processor_id(), msr_content);
 }
 
 static void check_disable_c1e(unsigned int port, u8 value)

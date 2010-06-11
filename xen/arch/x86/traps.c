@@ -1716,8 +1716,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     unsigned long code_base, code_limit;
     char io_emul_stub[32];
     void (*io_emul)(struct cpu_user_regs *) __attribute__((__regparm__(1)));
-    uint32_t l, h;
-    uint64_t val;
+    uint64_t val, msr_content;
 
     if ( !read_descriptor(regs->cs, v, regs,
                           &code_base, &code_limit, &ar,
@@ -2185,32 +2184,32 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         break;
 
     case 0x30: /* WRMSR */ {
-        u32 eax = regs->eax;
-        u32 edx = regs->edx;
-        u64 val = ((u64)edx << 32) | eax;
+        uint32_t eax = regs->eax;
+        uint32_t edx = regs->edx;
+        msr_content = ((uint64_t)edx << 32) | eax;
         switch ( (u32)regs->ecx )
         {
 #ifdef CONFIG_X86_64
         case MSR_FS_BASE:
             if ( is_pv_32on64_vcpu(v) )
                 goto fail;
-            if ( wrmsr_safe(MSR_FS_BASE, eax, edx) )
+            if ( wrmsr_safe(MSR_FS_BASE, msr_content) )
                 goto fail;
-            v->arch.guest_context.fs_base = val;
+            v->arch.guest_context.fs_base = msr_content;
             break;
         case MSR_GS_BASE:
             if ( is_pv_32on64_vcpu(v) )
                 goto fail;
-            if ( wrmsr_safe(MSR_GS_BASE, eax, edx) )
+            if ( wrmsr_safe(MSR_GS_BASE, msr_content) )
                 goto fail;
-            v->arch.guest_context.gs_base_kernel = val;
+            v->arch.guest_context.gs_base_kernel = msr_content;
             break;
         case MSR_SHADOW_GS_BASE:
             if ( is_pv_32on64_vcpu(v) )
                 goto fail;
-            if ( wrmsr_safe(MSR_SHADOW_GS_BASE, eax, edx) )
+            if ( wrmsr_safe(MSR_SHADOW_GS_BASE, msr_content) )
                 goto fail;
-            v->arch.guest_context.gs_base_user = val;
+            v->arch.guest_context.gs_base_user = msr_content;
             break;
 #endif
         case MSR_K7_FID_VID_STATUS:
@@ -2230,7 +2229,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 goto fail;
             if ( !is_cpufreq_controller(v->domain) )
                 break;
-            if ( wrmsr_safe(regs->ecx, eax, edx) != 0 )
+            if ( wrmsr_safe(regs->ecx, msr_content) != 0 )
                 goto fail;
             break;
         case MSR_AMD64_NB_CFG:
@@ -2239,11 +2238,11 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 goto fail;
             if ( !IS_PRIV(v->domain) )
                 break;
-            if ( (rdmsr_safe(MSR_AMD64_NB_CFG, l, h) != 0) ||
-                 (eax != l) ||
-                 ((edx ^ h) & ~(1 << (AMD64_NB_CFG_CF8_EXT_ENABLE_BIT - 32))) )
+            if ( (rdmsr_safe(MSR_AMD64_NB_CFG, val) != 0) ||
+                 (eax != (uint32_t)val) ||
+                 ((edx ^ (val >> 32)) & ~(1 << (AMD64_NB_CFG_CF8_EXT_ENABLE_BIT - 32))) )
                 goto invalid;
-            if ( wrmsr_safe(MSR_AMD64_NB_CFG, eax, edx) != 0 )
+            if ( wrmsr_safe(MSR_AMD64_NB_CFG, msr_content) != 0 )
                 goto fail;
             break;
         case MSR_FAM10H_MMIO_CONF_BASE:
@@ -2252,15 +2251,15 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 goto fail;
             if ( !IS_PRIV(v->domain) )
                 break;
-            if ( (rdmsr_safe(MSR_FAM10H_MMIO_CONF_BASE, l, h) != 0) ||
-                 (((((u64)h << 32) | l) ^ val) &
+            if ( (rdmsr_safe(MSR_FAM10H_MMIO_CONF_BASE, val) != 0) ||
+                 ((val ^ msr_content) &
                   ~( FAM10H_MMIO_CONF_ENABLE |
                     (FAM10H_MMIO_CONF_BUSRANGE_MASK <<
                      FAM10H_MMIO_CONF_BUSRANGE_SHIFT) |
                     ((u64)FAM10H_MMIO_CONF_BASE_MASK <<
                      FAM10H_MMIO_CONF_BASE_SHIFT))) )
                 goto invalid;
-            if ( wrmsr_safe(MSR_FAM10H_MMIO_CONF_BASE, eax, edx) != 0 )
+            if ( wrmsr_safe(MSR_FAM10H_MMIO_CONF_BASE, msr_content) != 0 )
                 goto fail;
             break;
         case MSR_IA32_MPERF:
@@ -2270,7 +2269,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 goto fail;
             if ( !is_cpufreq_controller(v->domain) )
                 break;
-            if ( wrmsr_safe(regs->ecx, eax, edx) != 0 )
+            if ( wrmsr_safe(regs->ecx, msr_content) != 0 )
                 goto fail;
             break;
         case MSR_IA32_THERM_CONTROL:
@@ -2278,25 +2277,25 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 goto fail;
             if ( (v->domain->domain_id != 0) || !v->domain->is_pinned )
                 break;
-            if ( wrmsr_safe(regs->ecx, eax, edx) != 0 )
+            if ( wrmsr_safe(regs->ecx, msr_content) != 0 )
                 goto fail;
             break;
         default:
-            if ( wrmsr_hypervisor_regs(regs->ecx, val) )
+            if ( wrmsr_hypervisor_regs(regs->ecx, msr_content) )
                 break;
 
-            rc = vmce_wrmsr(regs->ecx, val);
+            rc = vmce_wrmsr(regs->ecx, msr_content);
             if ( rc < 0 )
                 goto fail;
             if ( rc )
                 break;
 
-            if ( (rdmsr_safe(regs->ecx, l, h) != 0) ||
-                 (eax != l) || (edx != h) )
+            if ( (rdmsr_safe(regs->ecx, val) != 0) ||
+                 (eax != (uint32_t)val) || (edx != (uint32_t)(val >> 32)) )
         invalid:
                 gdprintk(XENLOG_WARNING, "Domain attempted WRMSR %p from "
-                        "%08x:%08x to %08x:%08x.\n",
-                        _p(regs->ecx), h, l, edx, eax);
+                        "0x%16"PRIx64" to 0x%16"PRIx64".\n",
+                        _p(regs->ecx), val, msr_content);
             break;
         }
         break;
@@ -2355,12 +2354,16 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 regs->eax = regs->edx = 0;
                 break;
             }
-            if ( rdmsr_safe(regs->ecx, regs->eax, regs->edx) != 0 )
+            if ( rdmsr_safe(regs->ecx, msr_content) != 0 )
                 goto fail;
+            regs->eax = (uint32_t)msr_content;
+            regs->edx = (uint32_t)(msr_content >> 32);
             break;
         case MSR_IA32_MISC_ENABLE:
-            if ( rdmsr_safe(regs->ecx, regs->eax, regs->edx) )
+            if ( rdmsr_safe(regs->ecx, msr_content) )
                 goto fail;
+            regs->eax = (uint32_t)msr_content;
+            regs->edx = (uint32_t)(msr_content >> 32);
             regs->eax &= ~(MSR_IA32_MISC_ENABLE_PERF_AVAIL |
                            MSR_IA32_MISC_ENABLE_MONITOR_ENABLE);
             regs->eax |= MSR_IA32_MISC_ENABLE_BTS_UNAVAIL |
@@ -2387,8 +2390,10 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             /* Everyone can read the MSR space. */
             /* gdprintk(XENLOG_WARNING,"Domain attempted RDMSR %p.\n",
                         _p(regs->ecx));*/
-            if ( rdmsr_safe(regs->ecx, regs->eax, regs->edx) )
+            if ( rdmsr_safe(regs->ecx, msr_content) )
                 goto fail;
+            regs->eax = (uint32_t)msr_content;
+            regs->edx = (uint32_t)(msr_content >> 32);
             break;
         }
         break;

@@ -125,8 +125,8 @@ static const char __init *pci_mmcfg_intel_945(void)
 
 static const char __init *pci_mmcfg_amd_fam10h(void)
 {
-    u32 low, high, address;
-    u64 base, msr;
+    uint32_t address;
+    uint64_t base, msr_content;
     int i;
     unsigned segnbits = 0, busnbits;
 
@@ -134,20 +134,17 @@ static const char __init *pci_mmcfg_amd_fam10h(void)
         return NULL;
 
     address = MSR_FAM10H_MMIO_CONF_BASE;
-    if (rdmsr_safe(address, low, high))
+    if (rdmsr_safe(address, msr_content))
         return NULL;
-
-    msr = high;
-    msr <<= 32;
-    msr |= low;
 
     /* mmconfig is not enable */
-    if (!(msr & FAM10H_MMIO_CONF_ENABLE))
+    if (!(msr_content & FAM10H_MMIO_CONF_ENABLE))
         return NULL;
 
-    base = msr & (FAM10H_MMIO_CONF_BASE_MASK<<FAM10H_MMIO_CONF_BASE_SHIFT);
+    base = msr_content &
+        (FAM10H_MMIO_CONF_BASE_MASK<<FAM10H_MMIO_CONF_BASE_SHIFT);
 
-    busnbits = (msr >> FAM10H_MMIO_CONF_BUSRANGE_SHIFT) &
+    busnbits = (msr_content >> FAM10H_MMIO_CONF_BUSRANGE_SHIFT) &
                 FAM10H_MMIO_CONF_BUSRANGE_MASK;
 
     /*
