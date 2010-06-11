@@ -393,6 +393,29 @@ static int _set_status(unsigned gt_version,
         return _set_status_v2(domid, readonly, mapflag, shah, act, status);
 }
 
+static void mapcount(
+    struct domain *ld, unsigned long mfn,
+    unsigned int *wrc, unsigned int *rdc)
+{
+    struct grant_table *gt = ld->grant_table;
+    struct grant_mapping *map;
+    grant_handle_t handle;
+    struct domain *rd;
+
+    *wrc = *rdc = 0;
+
+    for ( handle = 0; handle < gt->maptrack_limit; handle++ )
+    {
+        map = &maptrack_entry(gt, handle);
+        if ( !(map->flags & (GNTMAP_device_map|GNTMAP_host_map)) )
+            continue;
+        rd = rcu_lock_domain_by_id(map->domid);
+        if ( active_entry(rd->grant_table, map->ref).frame == mfn )
+            (map->flags & GNTMAP_readonly) ? (*rdc)++ : (*wrc)++;
+        rcu_unlock_domain(rd);
+    }
+}
+
 /*
  * Returns 0 if TLB flush / invalidate required by caller.
  * va will indicate the address to be invalidated.
@@ -598,17 +621,25 @@ __gnttab_map_grant_ref(
 
     if ( !is_hvm_domain(ld) && need_iommu(ld) )
     {
+        unsigned int wrc, rdc;
         int err = 0;
         /* Shouldn't happen, because you can't use iommu in a HVM domain. */
         BUG_ON(paging_mode_translate(ld));
         /* We're not translated, so we know that gmfns and mfns are
            the same things, so the IOMMU entry is always 1-to-1. */
+        mapcount(ld, frame, &wrc, &rdc);
         if ( (act_pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) &&
              !(old_pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) )
-            err = iommu_map_page(ld, frame, frame,
-                                 IOMMUF_readable|IOMMUF_writable);
+        {
+            if ( wrc == 0 )
+                err = iommu_map_page(ld, frame, frame,
+                                     IOMMUF_readable|IOMMUF_writable);
+        }
         else if ( act_pin && !old_pin )
-            err = iommu_map_page(ld, frame, frame, IOMMUF_readable);
+        {
+            if ( (wrc + rdc) == 0 )
+                err = iommu_map_page(ld, frame, frame, IOMMUF_readable);
+        }
         if ( err )
         {
             rc = GNTST_general_error;
@@ -785,12 +816,13 @@ __gnttab_unmap_common(
 
     if ( !is_hvm_domain(ld) && need_iommu(ld) )
     {
+        unsigned int wrc, rdc;
         int err = 0;
         BUG_ON(paging_mode_translate(ld));
-        if ( old_pin && !act->pin )
+        mapcount(ld, op->frame, &wrc, &rdc);
+        if ( (wrc + rdc) == 0 )
             err = iommu_unmap_page(ld, op->frame);
-        else if ( (old_pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) &&
-                  !(act->pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) )
+        else if ( wrc == 0 )
             err = iommu_map_page(ld, op->frame, op->frame, IOMMUF_readable);
         if ( err )
         {
