@@ -243,8 +243,8 @@ static void disable_c1e(void *unused)
 	 * but we safely catch the #GP in that case.
 	 */
 	if ((rdmsr_safe(MSR_K8_ENABLE_C1E, msr_content) == 0) &&
-	    (msr_content & (3u << 27)) &&
-	    (wrmsr_safe(MSR_K8_ENABLE_C1E, msr_content & ~(3u << 27)) != 0))
+	    (msr_content & (3ULL << 27)) &&
+	    (wrmsr_safe(MSR_K8_ENABLE_C1E, msr_content & ~(3ULL << 27)) != 0))
 		printk(KERN_ERR "Failed to disable C1E on CPU#%u (%16"PRIx64")\n",
 		       smp_processor_id(), msr_content);
 }
