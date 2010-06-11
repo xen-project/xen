@@ -12,6 +12,7 @@
 #include <xen/string.h>
 #include <xen/smp.h>
 #include <xen/init.h>
+#include <asm/io_apic.h>
 #include <asm/mach-default/mach_mpparse.h>
 
 /* should be called last. */

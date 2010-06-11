@@ -66,6 +66,7 @@
 #include <asm/hvm/vpt.h>
 #include <asm/hypercall.h>
 #include <asm/mce.h>
+#include <asm/apic.h>
 #include <public/arch-x86/cpuid.h>
 
 /*

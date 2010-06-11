@@ -53,6 +53,7 @@
 #include <asm/hvm/trace.h>
 #include <asm/xenoprof.h>
 #include <asm/debugger.h>
+#include <asm/apic.h>
 
 enum handler_return { HNDL_done, HNDL_unhandled, HNDL_exception_raised };
 

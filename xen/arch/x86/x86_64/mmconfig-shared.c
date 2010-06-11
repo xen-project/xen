@@ -12,6 +12,8 @@
  * Author: Allen Kay <allen.m.kay@intel.com> -  adapted to xen from Linux
  */
 
+#include <xen/config.h>
+#include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/acpi.h>
 #include <xen/xmalloc.h>

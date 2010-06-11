@@ -35,6 +35,8 @@
 #define nr_ioapics              iosapic_get_nr_iosapics()
 #define nr_ioapic_registers(i)  iosapic_get_nr_pins(i)
 #else
+#include <asm/apic.h>
+#include <asm/io_apic.h>
 #define nr_ioapic_registers(i)  nr_ioapic_registers[i]
 #endif
 

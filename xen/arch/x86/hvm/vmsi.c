@@ -39,6 +39,7 @@
 #include <asm/hvm/support.h>
 #include <asm/current.h>
 #include <asm/event.h>
+#include <asm/io_apic.h>
 
 static void vmsi_inj_irq(
     struct domain *d,

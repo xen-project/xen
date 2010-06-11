@@ -2,6 +2,7 @@
 #define __X86_BZIMAGE_H__
 
 #include <xen/config.h>
+#include <xen/init.h>
 
 int __init bzimage_headroom(char *image_start, unsigned long image_length);
 

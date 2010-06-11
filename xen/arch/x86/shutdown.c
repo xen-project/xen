@@ -23,6 +23,7 @@
 #include <asm/processor.h>
 #include <asm/mpspec.h>
 #include <asm/tboot.h>
+#include <asm/apic.h>
 
 enum reboot_type {
         BOOT_TRIPLE = 't',

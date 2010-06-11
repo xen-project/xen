@@ -24,6 +24,7 @@
 #include <asm/system.h>
 #include <asm/regs.h>
 #include <asm/types.h>
+#include <asm/apic.h>
 #include <asm/msr.h>
 #include <asm/msr-index.h>
 #include <asm/hvm/support.h>

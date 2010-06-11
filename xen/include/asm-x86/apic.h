@@ -219,9 +219,6 @@ extern int lapic_resume(void);
 extern int check_nmi_watchdog (void);
 extern void enable_NMI_through_LVT0 (void * dummy);
 
-extern void watchdog_disable(void);
-extern void watchdog_enable(void);
-
 extern unsigned int nmi_watchdog;
 #define NMI_NONE	0
 #define NMI_IO_APIC	1

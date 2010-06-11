@@ -26,6 +26,9 @@
 #include <xen/delay.h>
 #include <xen/keyhandler.h>
 #include <xen/tasklet.h>
+#ifdef CONFIG_X86
+#include <asm/msi.h>
+#endif
 
 LIST_HEAD(alldevs_list);
 spinlock_t pcidevs_lock = SPIN_LOCK_UNLOCKED;

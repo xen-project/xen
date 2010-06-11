@@ -25,6 +25,7 @@
 #include <acpi/cpufreq/processor_perf.h>
 #include <asm/edd.h>
 #include <asm/mtrr.h>
+#include <asm/io_apic.h>
 #include "cpu/mtrr/mtrr.h"
 #include <xsm/xsm.h>
 

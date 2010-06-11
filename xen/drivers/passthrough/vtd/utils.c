@@ -28,6 +28,10 @@
 #include "vtd.h"
 #include "extern.h"
 
+#if defined(CONFIG_X86)
+#include <asm/io_apic.h>
+#endif
+
 int is_usb_device(u8 bus, u8 devfn)
 {
     u16 class = pci_conf_read16(bus, PCI_SLOT(devfn), PCI_FUNC(devfn),

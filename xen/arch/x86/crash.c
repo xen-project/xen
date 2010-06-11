@@ -26,6 +26,8 @@
 #include <asm/shared.h>
 #include <asm/hvm/support.h>
 #include <asm/hpet.h>
+#include <asm/apic.h>
+#include <asm/io_apic.h>
 
 static atomic_t waiting_for_crash_ipi;
 static unsigned int crashing_cpu;

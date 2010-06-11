@@ -10,6 +10,7 @@
 #include <xen/init.h>
 #include <xen/dmi.h>
 #include <asm/mach-default/mach_mpparse.h>
+#include <asm/io_apic.h>
 
 static int dmi_bigsmp; /* can be set by dmi scanners */
 

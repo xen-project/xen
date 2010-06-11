@@ -24,6 +24,7 @@
 #include <asm/paging.h>
 #include <xen/iommu.h>
 #include <xen/numa.h>
+#include <asm/fixmap.h>
 #include "../iommu.h"
 #include "../dmar.h"
 #include "../vtd.h"

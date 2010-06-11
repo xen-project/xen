@@ -1,6 +1,8 @@
 #ifndef __ASM_MACH_APIC_H
 #define __ASM_MACH_APIC_H
 
+#include <asm/apic.h>
+#include <asm/io_apic.h>
 #include <asm/genapic.h>
 #include <asm/smp.h>
 

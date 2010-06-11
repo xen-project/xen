@@ -21,6 +21,7 @@
 #include <xen/hvm/iommu.h>
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
+#include <asm/io_apic.h>
 
 #define INTREMAP_TABLE_ORDER    1
 #define INTREMAP_LENGTH 0xB

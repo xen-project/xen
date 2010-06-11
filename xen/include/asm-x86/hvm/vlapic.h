@@ -74,11 +74,7 @@ static inline void vlapic_set_reg(
     *((uint32_t *)(&vlapic->regs->data[reg])) = val;
 }
 
-static inline int is_vlapic_lvtpc_enabled(struct vlapic *vlapic)
-{
-    return vlapic_enabled(vlapic) &&
-           !(vlapic_get_reg(vlapic, APIC_LVTPC) & APIC_LVT_MASKED);
-}
+bool_t is_vlapic_lvtpc_enabled(struct vlapic *vlapic);
 
 int vlapic_set_irq(struct vlapic *vlapic, uint8_t vec, uint8_t trig);
 

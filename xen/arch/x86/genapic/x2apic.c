@@ -17,9 +17,13 @@
  * Place - Suite 330, Boston, MA 02111-1307 USA.
  */
 
+#include <xen/config.h>
+#include <xen/init.h>
 #include <xen/cpumask.h>
 #include <asm/apicdef.h>
 #include <asm/genapic.h>
+#include <asm/apic.h>
+#include <asm/io_apic.h>
 #include <xen/smp.h>
 #include <asm/mach-default/mach_mpparse.h>
 

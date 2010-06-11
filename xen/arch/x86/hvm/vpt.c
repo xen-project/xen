@@ -21,6 +21,7 @@
 #include <asm/hvm/support.h>
 #include <asm/hvm/vpt.h>
 #include <asm/event.h>
+#include <asm/apic.h>
 
 #define mode_is(d, name) \
     ((d)->arch.hvm_domain.params[HVM_PARAM_TIMER_MODE] == HVMPTM_##name)

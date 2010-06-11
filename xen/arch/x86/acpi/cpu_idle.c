@@ -51,6 +51,7 @@
 #include <public/platform.h>
 #include <public/sysctl.h>
 #include <acpi/cpufreq/cpufreq.h>
+#include <asm/apic.h>
 
 /*#define DEBUG_PM_CX*/
 

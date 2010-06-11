@@ -15,6 +15,7 @@
 #include <asm/flushtlb.h>
 #include <asm/hardirq.h>
 #include <asm/hvm/support.h>
+#include <asm/fixmap.h>
 
 static inline struct vcpu *mapcache_current_vcpu(void)
 {

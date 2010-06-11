@@ -11,15 +11,9 @@
 #include <asm/current.h>
 #endif
 
-#ifdef CONFIG_X86_LOCAL_APIC
 #ifndef __ASSEMBLY__
 #include <asm/bitops.h>
 #include <asm/mpspec.h>
-#ifdef CONFIG_X86_IO_APIC
-#include <asm/io_apic.h>
-#endif
-#include <asm/apic.h>
-#endif
 #endif
 
 #define BAD_APICID -1U
@@ -64,21 +58,8 @@ int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm);
  */
 #define raw_smp_processor_id() (get_processor_id())
 
-#ifdef CONFIG_X86_LOCAL_APIC
-
-static inline int hard_smp_processor_id(void)
-{
-	/* we don't want to mark this access volatile - bad code generation */
-	return get_apic_id();
-}
-
-static __inline int logical_smp_processor_id(void)
-{
-	/* we don't want to mark this access volatile - bad code generation */
-	return get_logical_apic_id();
-}
-
-#endif
+int hard_smp_processor_id(void);
+int logical_smp_processor_id(void);
 
 #endif /* !__ASSEMBLY__ */
 

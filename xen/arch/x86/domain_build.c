@@ -32,6 +32,7 @@
 #include <asm/e820.h>
 #include <asm/acpi.h>
 #include <asm/bzimage.h> /* for bzimage_parse */
+#include <asm/io_apic.h>
 
 #include <public/version.h>
 

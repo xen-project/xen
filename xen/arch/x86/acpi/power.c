@@ -28,7 +28,8 @@
 #include <xen/cpu.h>
 #include <public/platform.h>
 #include <asm/tboot.h>
-
+#include <asm/apic.h>
+#include <asm/io_apic.h>
 #include <acpi/cpufreq/cpufreq.h>
 
 uint32_t system_reset_counter = 1;

@@ -20,6 +20,7 @@
 
 #include <xen/config.h>
 #include <xen/errno.h>
+#include <asm/apicdef.h>
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
 #include <asm/hvm/svm/amd-iommu-acpi.h>

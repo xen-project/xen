@@ -39,6 +39,7 @@
 #include <asm/hvm/support.h>
 #include <asm/current.h>
 #include <asm/event.h>
+#include <asm/io_apic.h>
 
 /* HACK: Route IRQ0 only to VCPU0 to prevent time jumps. */
 #define IRQ0_SPECIAL_ROUTING 1

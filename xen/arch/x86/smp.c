@@ -22,6 +22,16 @@
 #include <asm/hvm/support.h>
 #include <mach_apic.h>
 
+int hard_smp_processor_id(void)
+{
+    return get_apic_id();
+}
+
+int logical_smp_processor_id(void)
+{
+    return get_logical_apic_id();
+}
+
 /*
  * send_IPI_mask(cpumask, vector): sends @vector IPI to CPUs in @cpumask,
  * excluding the local CPU. @cpumask may be empty.

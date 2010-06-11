@@ -51,6 +51,11 @@ int numa_off __devinitdata = 0;
 
 int acpi_numa __devinitdata;
 
+int srat_disabled(void)
+{
+	return numa_off || acpi_numa < 0;
+}
+
 /*
  * Given a shift value, try to populate memnodemap[]
  * Returns :

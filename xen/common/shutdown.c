@@ -6,6 +6,7 @@
 #include <xen/delay.h>
 #include <xen/shutdown.h>
 #include <xen/console.h>
+#include <xen/kexec.h>
 #include <asm/debugger.h>
 #include <public/sched.h>
 

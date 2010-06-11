@@ -31,6 +31,8 @@
 #include <xen/numa.h>
 #include <asm/current.h>
 #include <asm/page.h>
+#include <asm/apic.h>
+#include <asm/io_apic.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/support.h>
@@ -801,6 +803,12 @@ int vlapic_ack_pending_irq(struct vcpu *v, int vector)
     vlapic_clear_irr(vector, vlapic);
 
     return 1;
+}
+
+bool_t is_vlapic_lvtpc_enabled(struct vlapic *vlapic)
+{
+    return (vlapic_enabled(vlapic) &&
+            !(vlapic_get_reg(vlapic, APIC_LVTPC) & APIC_LVT_MASKED));
 }
 
 /* Reset the VLPAIC back to its power-on/reset state. */

@@ -55,6 +55,7 @@
 #include <asm/hvm/cacheattr.h>
 #include <asm/hvm/trace.h>
 #include <asm/mtrr.h>
+#include <asm/apic.h>
 #include <public/sched.h>
 #include <public/hvm/ioreq.h>
 #include <public/version.h>

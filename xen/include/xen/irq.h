@@ -5,6 +5,7 @@
 #include <xen/cpumask.h>
 #include <xen/spinlock.h>
 #include <xen/time.h>
+#include <xen/list.h>
 #include <asm/regs.h>
 #include <asm/hardirq.h>
 

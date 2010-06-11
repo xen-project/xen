@@ -53,6 +53,7 @@
 #include <asm/hvm/vpt.h>
 #include <asm/hvm/trace.h>
 #include <asm/hap.h>
+#include <asm/apic.h>
 #include <asm/debugger.h>       
 
 u32 svm_feature_flags;

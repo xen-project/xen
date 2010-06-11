@@ -114,6 +114,7 @@
 #include <xsm/xsm.h>
 #include <xen/trace.h>
 #include <asm/setup.h>
+#include <asm/fixmap.h>
 #include <asm/mem_sharing.h>
 
 /*

@@ -13,6 +13,7 @@
 #include <xen/smp.h>
 #include <xen/init.h>
 #include <asm/mach-summit/mach_mpparse.h>
+#include <asm/io_apic.h>
 
 static __init int probe_summit(void)
 { 

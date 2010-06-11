@@ -13,6 +13,7 @@
 #include <asm/msr.h>
 #include <asm/p2m.h>
 #include <asm/mce.h>
+#include <asm/apic.h>
 #include "mce.h"
 #include "x86_mca.h"
 
