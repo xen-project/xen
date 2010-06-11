@@ -849,10 +849,14 @@ static void svm_init_erratum_383(struct cpuinfo_x86 *c)
     if ( c->x86 != 0x10 )
         return;
 
-    rdmsrl(MSR_AMD64_DC_CFG, msr_content);
-    wrmsrl(MSR_AMD64_DC_CFG, msr_content | (1ULL << 47));
-
-    amd_erratum383_found = 1;
+    /* use safe methods to be compatible with nested virtualization */
+    if (rdmsr_safe(MSR_AMD64_DC_CFG, msr_content) == 0 &&
+        wrmsr_safe(MSR_AMD64_DC_CFG, msr_content | (1ULL << 47)) == 0)
+    {
+        amd_erratum383_found = 1;
+    } else {
+        printk("Failed to enable erratum 383\n");
+    }
 }
 
 static int svm_cpu_up(void)
