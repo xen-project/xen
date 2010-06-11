@@ -35,10 +35,8 @@ enum {
 typedef u8 mtrr_type;
 
 struct mtrr_var_range {
-	u32 base_lo;
-	u32 base_hi;
-	u32 mask_lo;
-	u32 mask_hi;
+	uint64_t base;
+	uint64_t mask;
 };
 
 #define NUM_FIXED_RANGES 88

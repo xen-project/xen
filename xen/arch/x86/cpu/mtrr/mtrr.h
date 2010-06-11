@@ -60,8 +60,7 @@ extern int positive_have_wrcomb(void);
 struct set_mtrr_context {
 	unsigned long flags;
 	unsigned long cr4val;
-	u32 deftype_lo;
-	u32 deftype_hi;
+	uint64_t deftype;
 	u32 ccr3;
 };
 
@@ -83,5 +82,5 @@ extern unsigned int num_var_ranges;
 
 void mtrr_state_warn(void);
 const char *mtrr_attrib_to_str(int x);
-void mtrr_wrmsr(unsigned, unsigned, unsigned);
+void mtrr_wrmsr(unsigned int msr, uint64_t msr_content);
 

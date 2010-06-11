@@ -30,8 +30,8 @@ struct mtrr_state mtrr_state = {};
 static void
 get_mtrr_var_range(unsigned int index, struct mtrr_var_range *vr)
 {
-	rdmsr(MTRRphysBase_MSR(index), vr->base_lo, vr->base_hi);
-	rdmsr(MTRRphysMask_MSR(index), vr->mask_lo, vr->mask_hi);
+	rdmsrl(MTRRphysBase_MSR(index), vr->base);
+	rdmsrl(MTRRphysMask_MSR(index), vr->mask);
 }
 
 static void
@@ -105,15 +105,12 @@ void __init mtrr_state_warn(void)
 /* Doesn't attempt to pass an error out to MTRR users
    because it's quite complicated in some cases and probably not
    worth it because the best error handling is to ignore it. */
-void mtrr_wrmsr(unsigned msr, unsigned a, unsigned b)
+void mtrr_wrmsr(unsigned int msr, uint64_t msr_content)
 {
-	uint64_t msr_content;
-
-	msr_content = ((uint64_t)b << 32) | a;
 	if (wrmsr_safe(msr, msr_content) < 0)
 		printk(KERN_ERR
-			"MTRR: CPU %u: Writing MSR %x to %x:%x failed\n",
-			smp_processor_id(), msr, a, b);
+			"MTRR: CPU %u: Writing MSR %x to %"PRIx64" failed\n",
+			smp_processor_id(), msr, msr_content);
 	/* Cache overlap status for efficient HVM MTRR virtualisation. */
 	mtrr_state.overlapped = is_var_mtrr_overlapped(&mtrr_state);
 }
@@ -124,12 +121,12 @@ void mtrr_wrmsr(unsigned msr, unsigned a, unsigned b)
  */
 static inline void k8_enable_fixed_iorrs(void)
 {
-	unsigned lo, hi;
+	uint64_t msr_content;
 
-	rdmsr(MSR_K8_SYSCFG, lo, hi);
-	mtrr_wrmsr(MSR_K8_SYSCFG, lo
+	rdmsrl(MSR_K8_SYSCFG, msr_content);
+	mtrr_wrmsr(MSR_K8_SYSCFG, msr_content 
 				| K8_MTRRFIXRANGE_DRAM_ENABLE
-				| K8_MTRRFIXRANGE_DRAM_MODIFY, hi);
+				| K8_MTRRFIXRANGE_DRAM_MODIFY);
 }
 
 /**
@@ -142,16 +139,17 @@ static inline void k8_enable_fixed_iorrs(void)
  */
 static void set_fixed_range(int msr, int * changed, unsigned int * msrwords)
 {
-	unsigned lo, hi;
+	uint64_t msr_content, val;
 
-	rdmsr(msr, lo, hi);
+	rdmsrl(msr, msr_content);
+	val = ((uint64_t)msrwords[1] << 32) | msrwords[0];
 
-	if (lo != msrwords[0] || hi != msrwords[1]) {
+	if (msr_content != val) {
 		if (boot_cpu_data.x86_vendor == X86_VENDOR_AMD &&
 		    boot_cpu_data.x86 == 15 &&
 		    ((msrwords[0] | msrwords[1]) & K8_MTRR_RDMEM_WRMEM_MASK))
 			k8_enable_fixed_iorrs();
-		mtrr_wrmsr(msr, msrwords[0], msrwords[1]);
+		mtrr_wrmsr(msr, val);
 		*changed = TRUE;
 	}
 }
@@ -227,29 +225,40 @@ static int set_fixed_ranges(mtrr_type * frs)
     changes are made  */
 static int set_mtrr_var_ranges(unsigned int index, struct mtrr_var_range *vr)
 {
-	unsigned int lo, hi;
+	uint32_t lo, hi, base_lo, base_hi, mask_lo, mask_hi;
 	int changed = FALSE;
 
 	rdmsr(MTRRphysBase_MSR(index), lo, hi);
-	if ((vr->base_lo & 0xfffff0ffUL) != (lo & 0xfffff0ffUL)
-	    || (vr->base_hi & (size_and_mask >> (32 - PAGE_SHIFT))) !=
-		(hi & (size_and_mask >> (32 - PAGE_SHIFT)))) {
-		mtrr_wrmsr(MTRRphysBase_MSR(index), vr->base_lo, vr->base_hi);
+	base_lo = (uint32_t)vr->base;
+	base_hi = (uint32_t)(vr->base >> 32);
+
+	lo &= 0xfffff0ffUL;
+	base_lo &= 0xfffff0ffUL;
+	hi &= size_and_mask >> (32 - PAGE_SHIFT);
+	base_hi &= size_and_mask >> (32 - PAGE_SHIFT);
+
+	if ((base_lo != lo) || (base_hi != hi)) {
+		mtrr_wrmsr(MTRRphysBase_MSR(index), vr->base);
 		changed = TRUE;
 	}
 
 	rdmsr(MTRRphysMask_MSR(index), lo, hi);
+	mask_lo = (uint32_t)vr->mask;
+	mask_hi = (uint32_t)(vr->mask >> 32);
 
-	if ((vr->mask_lo & 0xfffff800UL) != (lo & 0xfffff800UL)
-	    || (vr->mask_hi & (size_and_mask >> (32 - PAGE_SHIFT))) !=
-		(hi & (size_and_mask >> (32 - PAGE_SHIFT)))) {
-		mtrr_wrmsr(MTRRphysMask_MSR(index), vr->mask_lo, vr->mask_hi);
+	lo &= 0xfffff800UL;
+	mask_lo &= 0xfffff800UL;
+	hi &= size_and_mask >> (32 - PAGE_SHIFT);
+	mask_hi &= size_and_mask >> (32 - PAGE_SHIFT);
+
+	if ((mask_lo != lo) || (mask_hi != hi)) {
+		mtrr_wrmsr(MTRRphysMask_MSR(index), vr->mask);
 		changed = TRUE;
 	}
 	return changed;
 }
 
-static u32 deftype_lo, deftype_hi;
+static uint64_t deftype;
 
 static unsigned long set_mtrr_state(void)
 /*  [SUMMARY] Set the MTRR state for this CPU.
@@ -271,9 +280,9 @@ static unsigned long set_mtrr_state(void)
 
 	/*  Set_mtrr_restore restores the old value of MTRRdefType,
 	   so to set it we fiddle with the saved value  */
-	if ((deftype_lo & 0xff) != mtrr_state.def_type
-	    || ((deftype_lo & 0xc00) >> 10) != mtrr_state.enabled) {
-		deftype_lo = (deftype_lo & ~0xcff) | mtrr_state.def_type | (mtrr_state.enabled << 10);
+	if ((deftype & 0xff) != mtrr_state.def_type
+	    || ((deftype & 0xc00) >> 10) != mtrr_state.enabled) {
+		deftype = (deftype & ~0xcff) | mtrr_state.def_type | (mtrr_state.enabled << 10);
 		change_mask |= MTRR_CHANGE_MASK_DEFTYPE;
 	}
 
@@ -316,10 +325,10 @@ static void prepare_set(void)
 	flush_tlb_local();
 
 	/*  Save MTRR state */
-	rdmsr(MTRRdefType_MSR, deftype_lo, deftype_hi);
+	rdmsrl(MTRRdefType_MSR, deftype);
 
 	/*  Disable MTRRs, and set the default type to uncached  */
-	mtrr_wrmsr(MTRRdefType_MSR, deftype_lo & ~0xcff, deftype_hi);
+	mtrr_wrmsr(MTRRdefType_MSR, deftype & ~0xcff);
 }
 
 static void post_set(void)
@@ -328,7 +337,7 @@ static void post_set(void)
 	flush_tlb_local();
 
 	/* Intel (P6) standard MTRRs */
-	mtrr_wrmsr(MTRRdefType_MSR, deftype_lo, deftype_hi);
+	mtrr_wrmsr(MTRRdefType_MSR, deftype);
 		
 	/*  Enable caches  */
 	write_cr0(read_cr0() & 0xbfffffff);
@@ -385,16 +394,20 @@ static void generic_set_mtrr(unsigned int reg, unsigned long base,
 	if (size == 0) {
 		/* The invalid bit is kept in the mask, so we simply clear the
 		   relevant mask register to disable a range. */
-		mtrr_wrmsr(MTRRphysMask_MSR(reg), 0, 0);
+		mtrr_wrmsr(MTRRphysMask_MSR(reg), 0);
 		memset(vr, 0, sizeof(struct mtrr_var_range));
 	} else {
-		vr->base_lo = base << PAGE_SHIFT | type;
-		vr->base_hi = (base & size_and_mask) >> (32 - PAGE_SHIFT);
-		vr->mask_lo = -size << PAGE_SHIFT | 0x800;
-		vr->mask_hi = (-size & size_and_mask) >> (32 - PAGE_SHIFT);
+		uint32_t base_lo, base_hi, mask_lo, mask_hi;
 
-		mtrr_wrmsr(MTRRphysBase_MSR(reg), vr->base_lo, vr->base_hi);
-		mtrr_wrmsr(MTRRphysMask_MSR(reg), vr->mask_lo, vr->mask_hi);
+		base_lo = base << PAGE_SHIFT | type;
+		base_hi = (base & size_and_mask) >> (32 - PAGE_SHIFT);
+		mask_lo = -size << PAGE_SHIFT | 0x800;
+		mask_hi = (-size & size_and_mask) >> (32 - PAGE_SHIFT);
+		vr->base = ((uint64_t)base_hi << 32) | base_lo;
+		vr->mask = ((uint64_t)mask_hi << 32) | mask_lo;
+
+		mtrr_wrmsr(MTRRphysBase_MSR(reg), vr->base);
+		mtrr_wrmsr(MTRRphysMask_MSR(reg), vr->mask);
 	}
 
 	post_set();
