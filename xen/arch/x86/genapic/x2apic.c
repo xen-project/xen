@@ -90,6 +90,7 @@ void send_IPI_mask_x2apic_phys(const cpumask_t *cpumask, int vector)
 {
     unsigned int cpu, cfg;
     unsigned long flags;
+    uint64_t msr_content;
 
     /*
      * Ensure that any synchronisation data written in program order by this
@@ -107,8 +108,10 @@ void send_IPI_mask_x2apic_phys(const cpumask_t *cpumask, int vector)
 
     cfg = APIC_DM_FIXED | 0 /* no shorthand */ | APIC_DEST_PHYSICAL | vector;
     for_each_cpu_mask ( cpu, *cpumask )
-        if ( cpu != smp_processor_id() )
-            apic_wrmsr(APIC_ICR, cfg, cpu_physical_id(cpu));
+        if ( cpu != smp_processor_id() ) {
+            msr_content = cfg | ((uint64_t)cpu_physical_id(cpu) << 32);
+            apic_wrmsr(APIC_ICR, msr_content);
+        }
 
     local_irq_restore(flags);
 }
@@ -117,6 +120,7 @@ void send_IPI_mask_x2apic_cluster(const cpumask_t *cpumask, int vector)
 {
     unsigned int cpu, cfg;
     unsigned long flags;
+    uint64_t msr_content;
 
     mb(); /* see the comment in send_IPI_mask_x2apic_phys() */
 
@@ -124,8 +128,10 @@ void send_IPI_mask_x2apic_cluster(const cpumask_t *cpumask, int vector)
 
     cfg = APIC_DM_FIXED | 0 /* no shorthand */ | APIC_DEST_LOGICAL | vector;
     for_each_cpu_mask ( cpu, *cpumask )
-        if ( cpu != smp_processor_id() )
-            apic_wrmsr(APIC_ICR, cfg, cpu_2_logical_apicid[cpu]);
+        if ( cpu != smp_processor_id() ) {
+            msr_content = cfg | ((uint64_t)cpu_2_logical_apicid[cpu] << 32);
+            apic_wrmsr(APIC_ICR, msr_content);
+        }
 
     local_irq_restore(flags);
 }

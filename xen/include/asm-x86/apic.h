@@ -4,7 +4,7 @@
 #include <xen/config.h>
 #include <asm/apicdef.h>
 #include <asm/fixmap.h>
-#include <asm/system.h>
+#include <asm/msr.h>
 
 #define Dprintk(x...)
 
@@ -76,34 +76,31 @@ static __inline u32 apic_mem_read(unsigned long reg)
  * access the 64-bit ICR register.
  */
 
-static __inline void apic_wrmsr(unsigned long reg, u32 low, u32 high)
+static __inline void apic_wrmsr(unsigned long reg, uint64_t msr_content)
 {
     if (reg == APIC_DFR || reg == APIC_ID || reg == APIC_LDR ||
         reg == APIC_LVR)
         return;
 
-    __asm__ __volatile__("wrmsr"
-            : /* no outputs */
-            : "c" (APIC_MSR_BASE + (reg >> 4)), "a" (low), "d" (high));
+    wrmsrl(APIC_MSR_BASE + (reg >> 4), msr_content);
 }
 
-static __inline void apic_rdmsr(unsigned long reg, u32 *low, u32 *high)
+static __inline uint64_t apic_rdmsr(unsigned long reg)
 {
+    uint64_t msr_content;
+
     if (reg == APIC_DFR)
-    {
-        *low = *high = -1u;
-        return;
-    }
-    __asm__ __volatile__("rdmsr"
-            : "=a" (*low), "=d" (*high)
-            : "c" (APIC_MSR_BASE + (reg >> 4)));
+        return -1u;
+
+    rdmsrl(APIC_MSR_BASE + (reg >> 4), msr_content);
+    return msr_content;
 }
 
 static __inline void apic_write(unsigned long reg, u32 v)
 {
 
     if ( x2apic_enabled )
-        apic_wrmsr(reg, v, 0);
+        apic_wrmsr(reg, v);
     else
         apic_mem_write(reg, v);
 }
@@ -111,20 +108,17 @@ static __inline void apic_write(unsigned long reg, u32 v)
 static __inline void apic_write_atomic(unsigned long reg, u32 v)
 {
     if ( x2apic_enabled )
-        apic_wrmsr(reg, v, 0);
+        apic_wrmsr(reg, v);
     else
         apic_mem_write_atomic(reg, v);
 }
 
 static __inline u32 apic_read(unsigned long reg)
 {
-    u32 lo, hi;
-
     if ( x2apic_enabled )
-        apic_rdmsr(reg, &lo, &hi);
+        return apic_rdmsr(reg);
     else
-        lo = apic_mem_read(reg);
-    return lo;
+        return apic_mem_read(reg);
 }
 
 static __inline u64 apic_icr_read(void)
@@ -132,7 +126,7 @@ static __inline u64 apic_icr_read(void)
     u32 lo, hi;
 
     if ( x2apic_enabled )
-        apic_rdmsr(APIC_ICR, &lo, &hi);
+        return apic_rdmsr(APIC_ICR);
     else
     {
         lo = apic_mem_read(APIC_ICR);
@@ -145,7 +139,7 @@ static __inline u64 apic_icr_read(void)
 static __inline void apic_icr_write(u32 low, u32 dest)
 {
     if ( x2apic_enabled )
-        apic_wrmsr(APIC_ICR, low, dest);
+        apic_wrmsr(APIC_ICR, low | ((uint64_t)dest << 32));
     else
     {
         apic_mem_write(APIC_ICR2, dest << 24);

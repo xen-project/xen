@@ -5,7 +5,6 @@
 
 #ifndef __ASSEMBLY__
 
-#include <xen/smp.h>
 #include <xen/types.h>
 #include <xen/percpu.h>
 #include <xen/errno.h>
@@ -104,29 +103,22 @@ static inline int wrmsr_safe(unsigned int msr, uint64_t val)
 
 DECLARE_PER_CPU(u64, efer);
 
-static inline u64 read_efer(void)
-{
-    return this_cpu(efer);
-}
+#define read_efer() this_cpu(efer)
 
-static inline void write_efer(u64 val)
-{
-    this_cpu(efer) = val;
-    wrmsrl(MSR_EFER, val);
-}
+#define write_efer(val) do { \
+    this_cpu(efer) = val; \
+    wrmsrl(MSR_EFER, val); \
+} while(0)
 
 DECLARE_PER_CPU(u32, ler_msr);
 
-static inline void ler_enable(void)
-{
-    u64 debugctl;
-    
-    if ( !this_cpu(ler_msr) )
-        return;
-
-    rdmsrl(MSR_IA32_DEBUGCTLMSR, debugctl);
-    wrmsrl(MSR_IA32_DEBUGCTLMSR, debugctl | 1);
-}
+#define ler_enable() do { \
+    u64 debugctl; \
+    if ( !this_cpu(ler_msr) ) \
+        return; \
+    rdmsrl(MSR_IA32_DEBUGCTLMSR, debugctl); \
+    wrmsrl(MSR_IA32_DEBUGCTLMSR, debugctl | 1); \
+} while(0)
 
 #endif /* !__ASSEMBLY__ */
 
