@@ -1253,15 +1253,13 @@ static char *get_blktap2_device(struct libxl_ctx *ctx,
 static char *make_blktap2_device(struct libxl_ctx *ctx,
 				 const char *name, const char *type)
 {
-    char *params, *devname = NULL, *rv = NULL;
+    char *params, *devname = NULL;
     int err;
     params = libxl_sprintf(ctx, "%s:%s", type, name);
     err = tap_ctl_create(params, &devname);
-    if (!err) {
-        rv = libxl_sprintf(ctx, devname);
-        free(devname);
-    }
-    return rv;
+    if (!err)
+        libxl_ptr_add(ctx, devname);
+    return err ? NULL : devname;
 }
 
 int libxl_device_disk_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk)
