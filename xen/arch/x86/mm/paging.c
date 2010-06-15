@@ -29,8 +29,6 @@
 #include <xen/numa.h>
 #include <xsm/xsm.h>
 
-#define hap_enabled(d) (is_hvm_domain(d) && (d)->arch.hvm_domain.hap_enabled)
-
 /* Printouts */
 #define PAGING_PRINTK(_f, _a...)                                     \
     debugtrace_printk("pg: %s(): " _f, __func__, ##_a)

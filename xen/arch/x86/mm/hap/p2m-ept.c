@@ -704,7 +704,7 @@ static void ept_dump_p2m_table(unsigned char key)
 
     for_each_domain(d)
     {
-        if ( !(is_hvm_domain(d) && d->arch.hvm_domain.hap_enabled) )
+        if ( !hap_enabled(d) )
             continue;
 
         p2m = p2m_get_hostp2m(d);

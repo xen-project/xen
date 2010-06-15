@@ -32,7 +32,7 @@
 #include <xen/sched.h>
 
 /* Auditing of memory sharing code? */
-#define MEM_SHARING_AUDIT  0 
+#define MEM_SHARING_AUDIT  0
 
 #if MEM_SHARING_AUDIT
 static void mem_sharing_audit(void);
@@ -42,12 +42,9 @@ static void mem_sharing_audit(void);
 # define mem_sharing_audit() do {} while(0)
 #endif /* MEM_SHARING_AUDIT */
 
-
-#define hap_enabled(d) \
-    (is_hvm_domain(d) && paging_mode_hap(d))
 #define mem_sharing_enabled(d) \
     (is_hvm_domain(d) && (d)->arch.hvm_domain.mem_sharing_enabled)
- 
+
 #undef mfn_to_page
 #define mfn_to_page(_m) __mfn_to_page(mfn_x(_m))
 #undef mfn_valid
