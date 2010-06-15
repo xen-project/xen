@@ -196,11 +196,10 @@ int restore_common(struct libxl_ctx *ctx, uint32_t domid,
                    int fd)
 {
     /* read signature */
-    xc_domain_restore(ctx->xch, fd, domid,
-                      state->store_port, &state->store_mfn,
-                      state->console_port, &state->console_mfn,
-                      info->hvm, info->u.hvm.pae, 0);
-    return 0;
+    return xc_domain_restore(ctx->xch, fd, domid,
+                             state->store_port, &state->store_mfn,
+                             state->console_port, &state->console_mfn,
+                             info->hvm, info->u.hvm.pae, 0);
 }
 
 struct suspendinfo {
