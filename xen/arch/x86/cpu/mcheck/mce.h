@@ -174,15 +174,14 @@ extern unsigned int nr_mce_banks;
 static inline int mce_vendor_bank_msr(uint32_t msr)
 {
     if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL &&
-        (msr > MSR_IA32_MC0_CTL2 && msr < (MSR_IA32_MC0_CTL2 + nr_mce_banks)) )
+         msr >= MSR_IA32_MC0_CTL2 && msr < (MSR_IA32_MC0_CTL2 + nr_mce_banks) )
           return 1;
     return 0;
 }
 
 static inline int mce_bank_msr(uint32_t msr)
 {
-    if ( (msr > MSR_IA32_MC0_CTL2 &&
-         msr < (MSR_IA32_MCx_CTL(nr_mce_banks - 1))) ||
+    if ( (msr >= MSR_IA32_MC0_CTL && msr < MSR_IA32_MCx_CTL(nr_mce_banks)) ||
         mce_vendor_bank_msr(msr) )
         return 1;
     return 0;

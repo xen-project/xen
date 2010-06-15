@@ -1146,26 +1146,26 @@ static void intel_init_mca(struct cpuinfo_x86 *c)
 
     first = mce_firstbank(c);
 
-    dprintk(XENLOG_INFO, "MCA Capaility: CPU %x SER %x"
-       "CMCI %x firstbank %x extended MCE MSR %x\n",
-       smp_processor_id(), ser, cmci, first, ext_num);
-
-    if (smp_processor_id())
+    if (smp_processor_id() == 0)
     {
+        dprintk(XENLOG_INFO, "MCA Capability: BCAST %x SER %x"
+                " CMCI %x firstbank %x extended MCE MSR %x\n",
+                broadcast, ser, cmci, first, ext_num);
+
         mce_broadcast = broadcast;
         cmci_support = cmci;
         ser_support = ser;
         nr_intel_ext_msrs = ext_num;
         firstbank = first;
     }
-    else
+    else if (cmci != cmci_support || ser != ser_support ||
+             broadcast != mce_broadcast ||
+             first != firstbank || ext_num != nr_intel_ext_msrs)
     {
-        if (cmci != cmci_support || ser != ser_support ||
-            broadcast != mce_broadcast ||
-            first != firstbank)
-            dprintk(XENLOG_WARNING,
-              "CPU %x has different MCA capability with BSP\n"
-              "may cause undetermined result!!!\n", smp_processor_id());
+        dprintk(XENLOG_WARNING,
+                "CPU %u has different MCA capability (%x,%x,%x,%x,%x)"
+                " than BSP, may cause undetermined result!!!\n",
+                smp_processor_id(), broadcast, ser, cmci, first, ext_num);
     }
 }
 
@@ -1265,8 +1265,7 @@ int intel_mce_wrmsr(uint32_t msr, uint64_t val)
 {
     int ret = 0;
 
-    if (msr > MSR_IA32_MC0_CTL2 &&
-        msr < (MSR_IA32_MC0_CTL2 + nr_mce_banks - 1))
+    if (msr >= MSR_IA32_MC0_CTL2 && msr < (MSR_IA32_MC0_CTL2 + nr_mce_banks))
     {
         mce_printk(MCE_QUIET, "We have disabled CMCI capability, "
                  "Guest should not write this MSR!\n");
@@ -1280,8 +1279,7 @@ int intel_mce_rdmsr(uint32_t msr, uint64_t *val)
 {
     int ret = 0;
 
-    if (msr > MSR_IA32_MC0_CTL2 &&
-        msr < (MSR_IA32_MC0_CTL2 + nr_mce_banks - 1))
+    if (msr >= MSR_IA32_MC0_CTL2 && msr < (MSR_IA32_MC0_CTL2 + nr_mce_banks))
     {
         mce_printk(MCE_QUIET, "We have disabled CMCI capability, "
                  "Guest should not read this MSR!\n");
