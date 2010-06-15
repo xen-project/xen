@@ -23,5 +23,8 @@ int __init decompress(void *inbuf, unsigned int len, void *outbuf)
     if ( len >= 2 && !memcmp(inbuf, "\135\000", 2) )
         return unlzma(inbuf, len, NULL, NULL, outbuf, NULL, error);
 
+    if ( len >= 5 && !memcmp(inbuf, "\x89LZO", 5) )
+        return unlzo(inbuf, len, NULL, NULL, outbuf, NULL, error);
+
     return 1;
 }
