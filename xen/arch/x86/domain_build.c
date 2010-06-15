@@ -914,6 +914,8 @@ int __init construct_dom0(
                 {
                     *l2tab = l2e_from_page(page,
                                            L1_PROT|_PAGE_DIRTY|_PAGE_PSE);
+                    if ( opt_allow_superpage )
+                        get_superpage(page_to_mfn(page), d);
                     va += 1UL << L2_PAGETABLE_SHIFT;
                     continue;
                 }

@@ -155,7 +155,9 @@ unsigned long __read_mostly pdx_group_valid[BITS_TO_LONGS(
 int opt_allow_superpage;
 boolean_param("allowsuperpage", opt_allow_superpage);
 
+#ifdef __i386__
 static int get_superpage(unsigned long mfn, struct domain *d);
+#endif
 static void put_superpage(unsigned long mfn);
 
 #define l1_disallow_mask(d)                                     \
@@ -2568,7 +2570,7 @@ void clear_superpage_mark(struct page_info *page)
 
 }
 
-static int get_superpage(unsigned long mfn, struct domain *d)
+int get_superpage(unsigned long mfn, struct domain *d)
 {
     struct spage_info *spage;
     unsigned long x, nx, y;
@@ -2611,7 +2613,11 @@ static void put_superpage(unsigned long mfn)
     unsigned long x, nx, y;
     unsigned long do_pages = 0;
 
-    ASSERT(opt_allow_superpage);
+    if ( !opt_allow_superpage )
+    {
+        put_spage_pages(mfn_to_page(mfn));
+        return;
+    }
 
     spage = mfn_to_spage(mfn);
     y = spage->type_info;

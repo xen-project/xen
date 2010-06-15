@@ -281,6 +281,7 @@ extern void share_xen_page_with_privileged_guests(
 #define frame_table ((struct page_info *)FRAMETABLE_VIRT_START)
 #ifdef __x86_64__
 #define spage_table ((struct spage_info *)SPAGETABLE_VIRT_START)
+int get_superpage(unsigned long mfn, struct domain *d);
 #endif
 extern unsigned long max_page;
 extern unsigned long total_pages;
