@@ -188,6 +188,7 @@ struct cpuinfo_ia64 {
 };
 
 DECLARE_PER_CPU(struct cpuinfo_ia64, cpu_info);
+DECLARE_PER_CPU(int, cpu_state);
 
 /*
  * The "local" data variable.  It refers to the per-CPU data of the currently executing
