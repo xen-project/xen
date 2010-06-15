@@ -48,9 +48,10 @@ void intel_mcheck_timer(struct cpuinfo_x86 *c);
 void mce_intel_feature_init(struct cpuinfo_x86 *c);
 void amd_nonfatal_mcheck_init(struct cpuinfo_x86 *c);
 
+int is_vmce_ready(struct mcinfo_bank *bank, struct domain *d);
+
 u64 mce_cap_init(void);
 extern int firstbank;
-int mca_ctl_conflict(struct mcinfo_bank *bank, struct domain *d);
 
 int intel_mce_rdmsr(uint32_t msr, uint64_t *val);
 int intel_mce_wrmsr(uint32_t msr, uint64_t val);

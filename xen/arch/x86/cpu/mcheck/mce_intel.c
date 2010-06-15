@@ -654,9 +654,9 @@ static void intel_memerr_dhandler(int bnum,
             BUG_ON( result->owner == DOMID_COW );
             if ( result->owner != DOMID_XEN ) {
                 d = get_domain_by_id(result->owner);
-                if ( mca_ctl_conflict(bank, d) )
+                if ( !is_vmce_ready(bank, d) )
                 {
-                    /* Guest has different MCE ctl with hypervisor */
+                    /* Should not inject vMCE to guest */
                     if ( d )
                         put_domain(d);
                     return;

@@ -468,7 +468,7 @@ int vmce_init(struct cpuinfo_x86 *c)
     return 0;
 }
 
-int mca_ctl_conflict(struct mcinfo_bank *bank, struct domain *d)
+static int mca_ctl_conflict(struct mcinfo_bank *bank, struct domain *d)
 {
     int bank_nr;
 
@@ -482,5 +482,81 @@ int mca_ctl_conflict(struct mcinfo_bank *bank, struct domain *d)
     bank_nr = bank->mc_bank;
     if (~d->arch.vmca_msrs->mci_ctl[bank_nr] & h_mci_ctrl[bank_nr] )
         return 1;
+    return 0;
+}
+
+static int is_hvm_vmce_ready(struct mcinfo_bank *bank, struct domain *d)
+{
+    struct vcpu *v;
+    int no_vmce = 0, i;
+
+    if (!is_hvm_domain(d))
+        return 0;
+
+    /* kill guest if not enabled vMCE */
+    for_each_vcpu(d, v)
+    {
+        if (!(v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_MCE))
+        {
+            no_vmce = 1;
+            break;
+        }
+
+        if (!mce_broadcast)
+            break;
+    }
+
+    if (no_vmce)
+        return 0;
+
+    /* Guest has virtualized family/model information */
+    for ( i = 0; i < MAX_CPUID_INPUT; i++ )
+    {
+        if (d->arch.cpuids[i].input[0] == 0x1)
+        {
+            uint32_t veax = d->arch.cpuids[i].eax, vfam, vmod;
+
+			vfam = (veax >> 8) & 15;
+			vmod = (veax >> 4) & 15;
+
+            if (vfam == 0x6 || vfam == 0xf)
+                vmod += ((veax >> 16) & 0xF) << 4;
+			if (vfam == 0xf)
+				vfam += (veax >> 20) & 0xff;
+
+            if ( ( vfam != boot_cpu_data.x86 ) ||
+                 (vmod != boot_cpu_data.x86_model) )
+            {
+                dprintk(XENLOG_WARNING,
+                    "No vmce for different virtual family/model cpuid\n");
+                no_vmce = 1;
+            }
+            break;
+        }
+    }
+
+    if (no_vmce)
+        return 0;
+
+    /* Guest has different MCE ctl value setting */
+    if (mca_ctl_conflict(bank, d))
+    {
+        dprintk(XENLOG_WARNING,
+          "No vmce, guest has different mca control setting\n");
+        return 0;
+    }
+
+    return 1;
+}
+
+int is_vmce_ready(struct mcinfo_bank *bank, struct domain *d)
+{
+    if ( d == dom0)
+        return dom0_vmce_enabled();
+
+    /* No vMCE to HVM guest now */
+    if ( is_hvm_domain(d) )
+        return is_hvm_vmce_ready(bank, d);
+
     return 0;
 }
