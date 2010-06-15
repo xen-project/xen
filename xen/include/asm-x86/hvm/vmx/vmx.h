@@ -35,7 +35,7 @@ typedef union {
         x           :   1,
         emt         :   3, /* EPT Memory type */
         ipat        :   1, /* Ignore PAT memory type */
-        sp_avail    :   1, /* Is this a superpage? */
+        sp          :   1, /* Is this a superpage? */
         avail1      :   4,
         mfn         :   40,
         avail2      :   12;

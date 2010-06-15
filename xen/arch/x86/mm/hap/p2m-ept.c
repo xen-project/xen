@@ -29,6 +29,9 @@
 #include <asm/mtrr.h>
 #include <asm/hvm/cacheattr.h>
 
+#define is_epte_present(ept_entry)      ((ept_entry)->epte & 0x7)
+#define is_epte_superpage(ept_entry)    ((ept_entry)->sp)
+
 /* Non-ept "lock-and-check" wrapper */
 static int ept_pod_check_and_populate(struct domain *d, unsigned long gfn,
                                       ept_entry_t *entry, int order,
@@ -106,7 +109,7 @@ static int ept_set_middle_entry(struct domain *d, ept_entry_t *ept_entry)
 
     ept_entry->emt = 0;
     ept_entry->ipat = 0;
-    ept_entry->sp_avail = 0;
+    ept_entry->sp = 0;
     ept_entry->avail1 = 0;
     ept_entry->mfn = page_to_mfn(pg);
     ept_entry->avail2 = 0;
@@ -142,7 +145,7 @@ static int ept_next_level(struct domain *d, bool_t read_only,
 
     ept_entry = (*table) + index;
 
-    if ( !(ept_entry->epte & 0x7) )
+    if ( !is_epte_present(ept_entry) )
     {
         if ( ept_entry->avail1 == p2m_populate_on_demand )
             return GUEST_TABLE_POD_PAGE;
@@ -154,8 +157,8 @@ static int ept_next_level(struct domain *d, bool_t read_only,
             return GUEST_TABLE_MAP_FAILED;
     }
 
-    /* The only time sp_avail would be set here is if we had hit a superpage */
-    if ( ept_entry->sp_avail )
+    /* The only time sp would be set here is if we had hit a superpage */
+    if ( is_epte_superpage(ept_entry) )
         return GUEST_TABLE_SUPER_PAGE;
     else
     {
@@ -196,7 +199,7 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
         if ( (gfn & ((1UL << order) - 1)) )
             return 1;
 
-    table = map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
+    table = map_domain_page(ept_get_asr(d));
 
     ASSERT(table != NULL);
 
@@ -226,7 +229,7 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
         /* We reached the level we're looking for */
 
         /* No need to flush if the old entry wasn't valid */
-        if ( !(ept_entry->epte & 7) )
+        if ( !is_epte_present(ept_entry) )
             needs_sync = 0;
 
         if ( mfn_valid(mfn_x(mfn)) || direct_mmio || p2m_is_paged(p2mt) ||
@@ -235,7 +238,7 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
             ept_entry->emt = epte_get_entry_emt(d, gfn, mfn, &ipat,
                                                 direct_mmio);
             ept_entry->ipat = ipat;
-            ept_entry->sp_avail = order ? 1 : 0;
+            ept_entry->sp = order ? 1 : 0;
 
             if ( ret == GUEST_TABLE_SUPER_PAGE )
             {
@@ -298,7 +301,7 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
                                                       _mfn(super_mfn + i),
                                                       &ipat, direct_mmio);
             split_ept_entry->ipat = ipat;
-            split_ept_entry->sp_avail =  0;
+            split_ept_entry->sp   =  0;
             /* Don't increment mfn if it's a PoD mfn */
             if ( super_p2mt != p2m_populate_on_demand )
                 split_ept_entry->mfn = super_mfn + i;
@@ -377,8 +380,7 @@ out:
 static mfn_t ept_get_entry(struct domain *d, unsigned long gfn, p2m_type_t *t,
                            p2m_query_t q)
 {
-    ept_entry_t *table =
-        map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
+    ept_entry_t *table = map_domain_page(ept_get_asr(d));
     unsigned long gfn_remainder = gfn;
     ept_entry_t *ept_entry;
     u32 index;
@@ -471,8 +473,7 @@ out:
  * pass a p2m_query_t type along to distinguish. */
 static ept_entry_t ept_get_entry_content(struct domain *d, unsigned long gfn)
 {
-    ept_entry_t *table =
-        map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
+    ept_entry_t *table = map_domain_page(ept_get_asr(d));
     unsigned long gfn_remainder = gfn;
     ept_entry_t *ept_entry;
     ept_entry_t content = { .epte = 0 };
@@ -505,8 +506,7 @@ static ept_entry_t ept_get_entry_content(struct domain *d, unsigned long gfn)
 
 void ept_walk_table(struct domain *d, unsigned long gfn)
 {
-    ept_entry_t *table =
-        map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
+    ept_entry_t *table = map_domain_page(ept_get_asr(d));
     unsigned long gfn_remainder = gfn;
 
     int i;
@@ -533,7 +533,8 @@ void ept_walk_table(struct domain *d, unsigned long gfn)
 
         gdprintk(XENLOG_ERR, " epte %"PRIx64"\n", ept_entry->epte);
 
-        if ( i==0 || !(ept_entry->epte & 0x7) || ept_entry->sp_avail)
+        if ( (i == 0) || !is_epte_present(ept_entry) ||
+             is_epte_superpage(ept_entry) )
             goto out;
         else
         {
@@ -596,7 +597,7 @@ void ept_change_entry_emt_with_range(struct domain *d, unsigned long start_gfn,
         order = 0;
         mfn = _mfn(e.mfn);
 
-        if ( e.sp_avail )
+        if ( is_epte_superpage(&e) )
         {
             if ( !(gfn & ((1 << EPT_TABLE_ORDER) - 1)) &&
                  ((gfn + 0x1FF) <= end_gfn) )
@@ -632,92 +633,39 @@ void ept_change_entry_emt_with_range(struct domain *d, unsigned long start_gfn,
  * to the new type.  This is used in hardware-assisted paging to
  * quickly enable or diable log-dirty tracking
  */
-static void ept_change_entry_type_global(struct domain *d, p2m_type_t ot,
-                                         p2m_type_t nt)
+static void ept_change_entry_type_page(mfn_t ept_page_mfn, int ept_page_level,
+                                       p2m_type_t ot, p2m_type_t nt)
 {
-    ept_entry_t *l4e;
-    ept_entry_t *l3e;
-    ept_entry_t *l2e;
-    ept_entry_t *l1e;
-    int i4;
-    int i3;
-    int i2;
-    int i1;
+    ept_entry_t *epte = map_domain_page(mfn_x(ept_page_mfn));
 
-    if ( pagetable_get_pfn(d->arch.phys_table) == 0 )
-        return;
-
-    l4e = map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
-    for (i4 = 0; i4 < EPT_PAGETABLE_ENTRIES; i4++ )
+    for ( int i = 0; i < EPT_PAGETABLE_ENTRIES; i++ )
     {
-        if ( !l4e[i4].epte )
+        if ( !is_epte_present(epte + i) )
             continue;
 
-        if ( !l4e[i4].sp_avail )
-        {
-            l3e = map_domain_page(l4e[i4].mfn);
-            for ( i3 = 0; i3 < EPT_PAGETABLE_ENTRIES; i3++ )
-            {
-                if ( !l3e[i3].epte )
-                    continue;
-
-                if ( !l3e[i3].sp_avail )
-                {
-                    l2e = map_domain_page(l3e[i3].mfn);
-                    for ( i2 = 0; i2 < EPT_PAGETABLE_ENTRIES; i2++ )
-                    {
-                        if ( !l2e[i2].epte )
-                            continue;
-
-                        if ( !l2e[i2].sp_avail )
-                        {
-                            l1e = map_domain_page(l2e[i2].mfn);
-
-                            for ( i1  = 0; i1 < EPT_PAGETABLE_ENTRIES; i1++ )
-                            {
-                                if ( !l1e[i1].epte )
-                                    continue;
-
-                                if ( l1e[i1].avail1 != ot )
-                                    continue;
-                                l1e[i1].avail1 = nt;
-                                ept_p2m_type_to_flags(l1e+i1, nt);
-                            }
-
-                            unmap_domain_page(l1e);
-                        }
-                        else
-                        {
-                            if ( l2e[i2].avail1 != ot )
-                                continue;
-                            l2e[i2].avail1 = nt;
-                            ept_p2m_type_to_flags(l2e+i2, nt);
-                        }
-                    }
-
-                    unmap_domain_page(l2e);
-                }
-                else
-                {
-                    if ( l3e[i3].avail1 != ot )
-                        continue;
-                    l3e[i3].avail1 = nt;
-                    ept_p2m_type_to_flags(l3e+i3, nt);
-                }
-            }
-
-            unmap_domain_page(l3e);
-        }
+        if ( (ept_page_level > 0) && !is_epte_superpage(epte + i) )
+            ept_change_entry_type_page(_mfn(epte[i].mfn),
+                                       ept_page_level - 1, ot, nt);
         else
         {
-            if ( l4e[i4].avail1 != ot )
+            if ( epte[i].avail1 != ot )
                 continue;
-            l4e[i4].avail1 = nt;
-            ept_p2m_type_to_flags(l4e+i4, nt);
+
+            epte[i].avail1 = nt;
+            ept_p2m_type_to_flags(epte + i, nt);
         }
     }
 
-    unmap_domain_page(l4e);
+    unmap_domain_page(epte);
+}
+
+static void ept_change_entry_type_global(struct domain *d,
+                                         p2m_type_t ot, p2m_type_t nt)
+{
+    if ( ept_get_asr(d) == 0 )
+        return;
+
+    ept_change_entry_type_page(_mfn(ept_get_asr(d)), ept_get_wl(d), ot, nt);
 
     ept_sync_domain(d);
 }
