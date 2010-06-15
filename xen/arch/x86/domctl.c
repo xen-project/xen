@@ -207,11 +207,12 @@ long arch_do_domctl(
 
                 for ( j = 0; j < k; j++ )
                 {
-                    unsigned long type = 0, mfn = arr[j];
+                    unsigned long type = 0, mfn = gmfn_to_mfn(d, arr[j]);
 
                     page = mfn_to_page(mfn);
 
-                    if ( unlikely(!mfn_valid(mfn)) )
+                    if ( unlikely(!mfn_valid(mfn)) ||
+                         unlikely(is_xen_heap_mfn(mfn)) )
                         type = XEN_DOMCTL_PFINFO_XTAB;
                     else if ( xsm_getpageframeinfo(page) != 0 )
                         ;
@@ -306,14 +307,15 @@ long arch_do_domctl(
             for ( j = 0; j < k; j++ )
             {      
                 struct page_info *page;
-                unsigned long mfn = arr32[j];
+                unsigned long mfn = gmfn_to_mfn(d, arr32[j]);
 
                 page = mfn_to_page(mfn);
 
                 if ( domctl->cmd == XEN_DOMCTL_getpageframeinfo3)
                     arr32[j] = 0;
 
-                if ( unlikely(!mfn_valid(mfn)) )
+                if ( unlikely(!mfn_valid(mfn)) ||
+                     unlikely(is_xen_heap_mfn(mfn)) )
                     arr32[j] |= XEN_DOMCTL_PFINFO_XTAB;
                 else if ( xsm_getpageframeinfo(page) != 0 )
                     continue;

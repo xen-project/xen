@@ -1288,56 +1288,62 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
                 goto out;
             }
 
-            if ( hvm )
+            /* Get page types */
+            if ( xc_get_pfn_type_batch(xch, dom, batch, pfn_type) )
             {
-                /* Look for and skip completely empty batches. */
-                for ( j = 0; j < batch; j++ )
-                {
-                    if ( !pfn_err[j] )
-                        break;
-                    pfn_type[j] |= XEN_DOMCTL_PFINFO_XTAB;
-                }
-                if ( j == batch )
-                {
-                    munmap(region_base, batch*PAGE_SIZE);
-                    continue; /* bail on this batch: no valid pages */
-                }
-                for ( ; j < batch; j++ )
-                    if ( pfn_err[j] )
-                        pfn_type[j] |= XEN_DOMCTL_PFINFO_XTAB;
+                PERROR("get_pfn_type_batch failed");
+                goto out;
             }
-            else
+
+            for ( run = j = 0; j < batch; j++ )
             {
-                /* Get page types */
-                if ( xc_get_pfn_type_batch(xch, dom, batch, pfn_type) )
+                unsigned long gmfn = pfn_batch[j];
+
+                if ( !hvm )
+                    gmfn = pfn_to_mfn(gmfn);
+
+                if ( pfn_err[j] )
                 {
-                    PERROR("get_pfn_type_batch failed");
-                    goto out;
+                    if ( pfn_type[j] == XEN_DOMCTL_PFINFO_XTAB )
+                        continue;
+                    DPRINTF("map fail: page %i mfn %08lx err %d\n",
+                            j, gmfn, pfn_err[j]);
+                    pfn_type[j] = XEN_DOMCTL_PFINFO_XTAB;
+                    continue;
                 }
 
-                for ( j = 0; j < batch; j++ )
+                if ( pfn_type[j] == XEN_DOMCTL_PFINFO_XTAB )
                 {
-                    unsigned long mfn = pfn_to_mfn(pfn_batch[j]);
-                    
-                    if ( pfn_type[j] == XEN_DOMCTL_PFINFO_XTAB )
-                    {
-                        DPRINTF("type fail: page %i mfn %08lx\n", 
-                                j, mfn);
-                        continue;
-                    }
-                    
-                    if ( debug )
+                    DPRINTF("type fail: page %i mfn %08lx\n", j, gmfn);
+                    continue;
+                }
+
+                /* canonicalise mfn->pfn */
+                pfn_type[j] |= pfn_batch[j];
+                ++run;
+
+                if ( debug )
+                {
+                    if ( hvm )
+                        DPRINTF("%d pfn=%08lx sum=%08lx\n",
+                                iter,
+                                pfn_type[j],
+                                csum_page(region_base + (PAGE_SIZE*j)));
+                    else
                         DPRINTF("%d pfn= %08lx mfn= %08lx [mfn]= %08lx"
                                 " sum= %08lx\n",
                                 iter,
-                                pfn_type[j] | pfn_batch[j],
-                                mfn,
-                                mfn_to_pfn(mfn),
+                                pfn_type[j],
+                                gmfn,
+                                mfn_to_pfn(gmfn),
                                 csum_page(region_base + (PAGE_SIZE*j)));
-                    
-                    /* canonicalise mfn->pfn */
-                    pfn_type[j] |= pfn_batch[j];
                 }
+            }
+
+            if ( !run )
+            {
+                munmap(region_base, batch*PAGE_SIZE);
+                continue; /* bail on this batch: no valid pages */
             }
 
             if ( wrexact(io_fd, &batch, sizeof(unsigned int)) )
