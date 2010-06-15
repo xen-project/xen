@@ -78,8 +78,12 @@ static int vmx_domain_initialise(struct domain *d)
 {
     int rc;
 
-    d->arch.hvm_domain.vmx.ept_control.etmt = EPT_DEFAULT_MT;
-    d->arch.hvm_domain.vmx.ept_control.gaw  = EPT_DEFAULT_GAW;
+    /* Set the memory type used when accessing EPT paging structures. */
+    d->arch.hvm_domain.vmx.ept_control.ept_mt = EPT_DEFAULT_MT;
+
+    /* set EPT page-walk length, now it's actual walk length - 1, i.e. 3 */
+    d->arch.hvm_domain.vmx.ept_control.ept_wl = 3;
+
     d->arch.hvm_domain.vmx.ept_control.asr  =
         pagetable_get_pfn(d->arch.phys_table);
 
