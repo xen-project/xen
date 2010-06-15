@@ -48,6 +48,7 @@ setopt CONFIG_XEN_DOM0 y
 setopt CONFIG_XEN_SYS_HYPERVISOR y
 setopt CONFIG_XEN_GNTDEV y
 setopt CONFIG_VMI y
+setopt CONFIG_TUN y
 
 setopt CONFIG_KVM y
 setopt CONFIG_KVM_INTEL y
