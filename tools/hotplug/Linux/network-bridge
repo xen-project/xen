@@ -216,6 +216,10 @@ op_start () {
 	return
     fi
 
+    if [ `brctl show | wc -l` != 1 ]; then
+        return
+    fi
+
     if link_exists "$pdev"; then
         # The device is already up.
         return
@@ -263,6 +267,10 @@ op_stop () {
     fi
     if ! link_exists "$bridge"; then
 	return
+    fi
+    if ! [ -e "/sys/class/net/${bridge}/brif/${pdev}" ]; then
+        # $bridge is not a bridge to which pdev is enslaved
+        return
     fi
 
     claim_lock "network-bridge"

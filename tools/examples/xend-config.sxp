@@ -147,8 +147,22 @@
 #
 # (network-script 'network-bridge netdev=eth1')
 #
-# The bridge is named xenbr0, by default.  To rename the bridge, use
+# The bridge is named eth0, by default (yes, really!)
 #
+
+# It is normally much better to create the bridge yourself in
+# /etc/network/interfaces.  network-bridge start does nothing if you
+# already have a bridge, and network-bridge stop does nothing if the
+# default bridge name (normally eth0) is not a bridge.  See
+# bridge-utils-interfaces(5) for full information on the syntax in
+# /etc/network/interfaces, but you probably want something like this:
+#    iface xenbr0 inet static
+#        address [etc]
+#        netmask [etc]
+#        [etc]
+#        bridge_ports eth0
+#
+# To have network-bridge create a differently-named bridge, use:
 # (network-script 'network-bridge bridge=<name>')
 #
 # It is possible to use the network-bridge script in more complicated
@@ -169,7 +183,8 @@
 # configuring a new vif, but a value specified here would act as a default.
 #
 # If you are using only one bridge, the vif-bridge script will discover that,
-# so there is no need to specify it explicitly.
+# so there is no need to specify it explicitly.  The default is to use
+# the bridge which is listed first in the output from brctl.
 #
 (vif-script vif-bridge)
 
