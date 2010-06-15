@@ -2297,7 +2297,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                  (eax != (uint32_t)val) || (edx != (uint32_t)(val >> 32)) )
         invalid:
                 gdprintk(XENLOG_WARNING, "Domain attempted WRMSR %p from "
-                        "0x%16"PRIx64" to 0x%16"PRIx64".\n",
+                        "0x%016"PRIx64" to 0x%016"PRIx64".\n",
                         _p(regs->ecx), val, msr_content);
             break;
         }
