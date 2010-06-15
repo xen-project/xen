@@ -875,7 +875,7 @@ static void __do_IRQ_guest(int irq)
 struct irq_desc *domain_spin_lock_irq_desc(
     struct domain *d, int pirq, unsigned long *pflags)
 {
-    unsigned int irq;
+    int irq;
     unsigned long flags;
     struct irq_desc *desc;
 
@@ -1042,7 +1042,7 @@ extern int ioapic_ack_new;
 static int pirq_acktype(struct domain *d, int pirq)
 {
     struct irq_desc  *desc;
-    unsigned int irq;
+    int irq;
 
     irq = domain_pirq_to_irq(d, pirq);
     if ( irq <= 0 )
