@@ -58,7 +58,6 @@ static PyObject *pyxc_error_to_exception(xc_interface *xch)
         snprintf(err_buf.message, sizeof(err_buf.message),
                  "xc_interface_open failed: %s",
                  strerror(errno));
-        err_buf.message[sizeof(err_buf)-1] = 0;
         err_buf.code = XC_INTERNAL_ERROR;
         err = &err_buf;
     }
