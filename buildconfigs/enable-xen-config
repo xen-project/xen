@@ -15,7 +15,7 @@ setopt()
 	VALUE=$2
 
 	# First remove any existing instances of this option
-	sed -e "s/^# ${OPTION} is not set$//g ; s/^^{OPTION}=.$//g" -i "${CONFIG}"
+	sed -e "s/^# ${OPTION} is not set$//g ; s/^${OPTION}=.*$//g" -i "${CONFIG}"
 
 	# Then append the new value
 	case ${VALUE} in
