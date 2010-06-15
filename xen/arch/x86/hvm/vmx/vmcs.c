@@ -193,6 +193,15 @@ static void vmx_init_vmcs_config(void)
              !(_vmx_ept_vpid_cap & VMX_EPT_WALK_LENGTH_4_SUPPORTED) ||
              !(_vmx_ept_vpid_cap & VMX_EPT_INVEPT_ALL_CONTEXT) )
             _vmx_secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_EPT;
+
+        /*
+         * the CPU must support INVVPID all context invalidation, because we
+         * will use it as final resort if other types are not supported.
+         *
+         * Or we just don't use VPID.
+         */
+        if ( !(_vmx_ept_vpid_cap & VMX_VPID_INVVPID_ALL_CONTEXT) )
+            _vmx_secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_VPID;
     }
 
     if ( _vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_EPT )
