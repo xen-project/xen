@@ -20,19 +20,6 @@
 
 extern int trap_init_f00f_bug(void);
 
-/*
- * opt_cpuid_mask_ecx/edx: cpuid.1[ecx, edx] feature mask.
- * For example, E8400[Intel Core 2 Duo Processor series] ecx = 0x0008E3FD, 
- * edx = 0xBFEBFBFF when executing CPUID.EAX = 1 normally. If you want to
- * 'rev down' to E8400, you can set these values in these Xen boot parameters.
- */
-static unsigned int opt_cpuid_mask_ecx, opt_cpuid_mask_edx;
-integer_param("cpuid_mask_ecx", opt_cpuid_mask_ecx);
-integer_param("cpuid_mask_edx", opt_cpuid_mask_edx);
-static unsigned int opt_cpuid_mask_ext_ecx, opt_cpuid_mask_ext_edx;
-integer_param("cpuid_mask_ext_ecx", opt_cpuid_mask_ext_ecx);
-integer_param("cpuid_mask_ext_edx", opt_cpuid_mask_ext_edx);
-
 static int use_xsave = 1;
 boolean_param("xsave", use_xsave);
 
@@ -43,46 +30,57 @@ boolean_param("xsave", use_xsave);
 struct movsl_mask movsl_mask __read_mostly;
 #endif
 
-static void __devinit set_cpuidmask(struct cpuinfo_x86 *c)
+/*
+ * opt_cpuid_mask_ecx/edx: cpuid.1[ecx, edx] feature mask.
+ * For example, E8400[Intel Core 2 Duo Processor series] ecx = 0x0008E3FD,
+ * edx = 0xBFEBFBFF when executing CPUID.EAX = 1 normally. If you want to
+ * 'rev down' to E8400, you can set these values in these Xen boot parameters.
+ */
+static void __devinit set_cpuidmask(const struct cpuinfo_x86 *c)
 {
-	unsigned int model = c->x86_model;
+	const char *extra = "";
 
-	if (!(opt_cpuid_mask_ecx | opt_cpuid_mask_edx | 
-	      opt_cpuid_mask_ext_ecx | opt_cpuid_mask_ext_edx))
+	if (!~(opt_cpuid_mask_ecx & opt_cpuid_mask_edx &
+	       opt_cpuid_mask_ext_ecx & opt_cpuid_mask_ext_edx))
 		return;
 
-	if (c->x86 != 0x6)	/* Only family 6 supports this feature  */
-		return;
-
-	if ((model == 0x1d) || ((model == 0x17) && (c->x86_mask >= 4))) {
-		wrmsr(MSR_IA32_CPUID_FEATURE_MASK1,
-		      opt_cpuid_mask_ecx ? : ~0u,
-		      opt_cpuid_mask_edx ? : ~0u);
-	}
+	/* Only family 6 supports this feature  */
+	switch ((c->x86 == 6) * c->x86_model) {
+	case 0x17:
+		if ((c->x86_mask & 0x0f) < 4)
+			break;
+		/* fall through */
+	case 0x1d:
+		wrmsr(MSR_INTEL_CPUID_FEATURE_MASK,
+		      opt_cpuid_mask_ecx,
+		      opt_cpuid_mask_edx);
+		if (!~(opt_cpuid_mask_ext_ecx & opt_cpuid_mask_ext_edx))
+			return;
+		extra = "extended ";
+		break;
 /* 
  * CPU supports this feature if the processor signature meets the following:
  * (CPUID.(EAX=01h):EAX) > 000106A2h, or
  * (CPUID.(EAX=01h):EAX) == 000106Exh, 0002065xh, 000206Cxh, 000206Exh, or 000206Fxh
  *
  */
-	else if (((model == 0x1a) && (c->x86_mask > 2))
-		 || model == 0x1e
-		 || model == 0x25 
-		 || model == 0x2c 
-		 || model == 0x2e 
-		 || model == 0x2f) {
-		wrmsr(MSR_IA32_CPUID1_FEATURE_MASK,
-		      opt_cpuid_mask_ecx ? : ~0u,
-		      opt_cpuid_mask_edx ? : ~0u);
-		wrmsr(MSR_IA32_CPUID80000001_FEATURE_MASK,
-		      opt_cpuid_mask_ext_ecx ? : ~0u,
-		      opt_cpuid_mask_ext_edx ? : ~0u);
-	}
-	else {
-		printk(XENLOG_ERR "Cannot set CPU feature mask on CPU#%d\n",
-		       smp_processor_id());
+	case 0x1a:
+		if ((c->x86_mask & 0x0f) <= 2)
+			break;
+		/* fall through */
+	case 0x1e: case 0x1f:
+	case 0x25: case 0x2c: case 0x2e: case 0x2f:
+		wrmsr(MSR_INTEL_CPUID1_FEATURE_MASK,
+		      opt_cpuid_mask_ecx,
+		      opt_cpuid_mask_edx);
+		wrmsr(MSR_INTEL_CPUID80000001_FEATURE_MASK,
+		      opt_cpuid_mask_ext_ecx,
+		      opt_cpuid_mask_ext_edx);
 		return;
 	}
+
+	printk(XENLOG_ERR "Cannot set CPU feature mask on CPU#%d\n",
+	       smp_processor_id());
 }
 
 void __devinit early_intel_workaround(struct cpuinfo_x86 *c)

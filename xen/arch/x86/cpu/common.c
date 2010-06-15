@@ -22,6 +22,15 @@ static int cachesize_override __cpuinitdata = -1;
 static int disable_x86_fxsr __cpuinitdata;
 static int disable_x86_serial_nr __cpuinitdata;
 
+unsigned int __devinitdata opt_cpuid_mask_ecx = ~0u;
+integer_param("cpuid_mask_ecx", opt_cpuid_mask_ecx);
+unsigned int __devinitdata opt_cpuid_mask_edx = ~0u;
+integer_param("cpuid_mask_edx", opt_cpuid_mask_edx);
+unsigned int __devinitdata opt_cpuid_mask_ext_ecx = ~0u;
+integer_param("cpuid_mask_ext_ecx", opt_cpuid_mask_ext_ecx);
+unsigned int __devinitdata opt_cpuid_mask_ext_edx = ~0u;
+integer_param("cpuid_mask_ext_edx", opt_cpuid_mask_ext_edx);
+
 struct cpu_dev * cpu_devs[X86_VENDOR_NUM] = {};
 
 /*

@@ -32,14 +32,6 @@
 static char opt_famrev[14];
 string_param("cpuid_mask_cpu", opt_famrev);
 
-/* Finer-grained CPUID feature control. */
-static unsigned int opt_cpuid_mask_ecx, opt_cpuid_mask_edx;
-integer_param("cpuid_mask_ecx", opt_cpuid_mask_ecx);
-integer_param("cpuid_mask_edx", opt_cpuid_mask_edx);
-static unsigned int opt_cpuid_mask_ext_ecx, opt_cpuid_mask_ext_edx;
-integer_param("cpuid_mask_ext_ecx", opt_cpuid_mask_ext_ecx);
-integer_param("cpuid_mask_ext_edx", opt_cpuid_mask_ext_edx);
-
 static inline void wrmsr_amd(unsigned int index, unsigned int lo, 
 		unsigned int hi)
 {
@@ -60,7 +52,7 @@ static inline void wrmsr_amd(unsigned int index, unsigned int lo,
  *
  * The processor revision string parameter has precedene.
  */
-static void __devinit set_cpuidmask(struct cpuinfo_x86 *c)
+static void __devinit set_cpuidmask(const struct cpuinfo_x86 *c)
 {
 	static unsigned int feat_ecx, feat_edx;
 	static unsigned int extfeat_ecx, extfeat_edx;
@@ -75,12 +67,12 @@ static void __devinit set_cpuidmask(struct cpuinfo_x86 *c)
 	ASSERT((status == not_parsed) && (smp_processor_id() == 0));
 	status = no_mask;
 
-	if (opt_cpuid_mask_ecx | opt_cpuid_mask_edx |
-	    opt_cpuid_mask_ext_ecx | opt_cpuid_mask_ext_edx) {
-		feat_ecx = opt_cpuid_mask_ecx ? : ~0U;
-		feat_edx = opt_cpuid_mask_edx ? : ~0U;
-		extfeat_ecx = opt_cpuid_mask_ext_ecx ? : ~0U;
-		extfeat_edx = opt_cpuid_mask_ext_edx ? : ~0U;
+	if (~(opt_cpuid_mask_ecx & opt_cpuid_mask_edx &
+	      opt_cpuid_mask_ext_ecx & opt_cpuid_mask_ext_edx)) {
+		feat_ecx = opt_cpuid_mask_ecx;
+		feat_edx = opt_cpuid_mask_edx;
+		extfeat_ecx = opt_cpuid_mask_ext_ecx;
+		extfeat_edx = opt_cpuid_mask_ext_edx;
 	} else if (*opt_famrev == '\0') {
 		return;
 	} else if (!strcmp(opt_famrev, "fam_0f_rev_c")) {
