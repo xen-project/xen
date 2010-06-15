@@ -169,6 +169,10 @@ zlib-options = $(shell					\
 	 if has_header lzma.h; then			\
 	   echo "-DHAVE_LZMA";				\
 	   echo "-llzma";				\
+	 fi;						\
+	 if has_header lzo/lzo1x.h; then		\
+	   echo "-DHAVE_LZO1X";				\
+	   echo "-llzo2";				\
 	 fi) | grep $(1))
 endif
 

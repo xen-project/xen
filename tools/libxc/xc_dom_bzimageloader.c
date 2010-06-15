@@ -273,6 +273,188 @@ static int xc_try_lzma_decode(
 
 #endif
 
+#if defined(HAVE_LZO1X)
+
+#include <lzo/lzo1x.h>
+
+#define LZOP_HEADER_HAS_FILTER 0x00000800
+#define LZOP_MAX_BLOCK_SIZE (64*1024*1024)
+
+static inline uint_fast16_t lzo_read_16(const unsigned char *buf)
+{
+    return buf[1] | (buf[0] << 8);
+}
+
+static inline uint_fast32_t lzo_read_32(const unsigned char *buf)
+{
+    return lzo_read_16(buf + 2) | ((uint32_t)lzo_read_16(buf) << 16);
+}
+
+static int xc_try_lzo1x_decode(
+    struct xc_dom_image *dom, void **blob, size_t *size)
+{
+    int ret;
+    const unsigned char *cur = dom->kernel_blob;
+    unsigned char *out_buf = NULL;
+    size_t left = dom->kernel_size;
+    const char *msg;
+    unsigned version;
+    static const unsigned char magic[] = {
+        0x89, 0x4c, 0x5a, 0x4f, 0x00, 0x0d, 0x0a, 0x1a, 0x0a
+    };
+
+    ret = lzo_init();
+    if ( ret != LZO_E_OK )
+    {
+        DOMPRINTF("LZO1x: Failed to init library (%d)\n", ret);
+        return -1;
+    }
+
+    if ( left < 16 || memcmp(cur, magic, 9) )
+    {
+        DOMPRINTF("LZO1x: Unrecognized magic\n");
+        return -1;
+    }
+
+    /* get version (2bytes), skip library version (2),
+     * 'need to be extracted' version (2) and method (1) */
+    version = lzo_read_16(cur + 9);
+    cur += 16;
+    left -= 16;
+
+    if ( version >= 0x0940 )
+    {
+        /* skip level */
+        ++cur;
+        if ( left )
+            --left;
+    }
+
+    if ( left >= 4 && (lzo_read_32(cur) & LZOP_HEADER_HAS_FILTER) )
+        ret = 8; /* flags + filter info */
+    else
+        ret = 4; /* flags */
+
+    /* skip mode and mtime_low */
+    ret += 8;
+    if ( version >= 0x0940 )
+        ret += 4; /* skip mtime_high */
+
+    /* don't care about the file name, and skip checksum */
+    if ( left > ret )
+        ret += 1 + cur[ret] + 4;
+
+    if ( left < ret )
+    {
+        DOMPRINTF("LZO1x: Incomplete header\n");
+        return -1;
+    }
+    cur += ret;
+    left -= ret;
+
+    for ( *size = 0; ; )
+    {
+        lzo_uint src_len, dst_len, out_len;
+        unsigned char *tmp_buf;
+
+        msg = "Short input";
+        if ( left < 4 )
+            break;
+
+        dst_len = lzo_read_32(cur);
+        if ( !dst_len )
+            return 0;
+
+        if ( dst_len > LZOP_MAX_BLOCK_SIZE )
+        {
+            msg = "Block size too large";
+            break;
+        }
+
+        if ( left < 12 )
+            break;
+
+        src_len = lzo_read_32(cur + 4);
+        cur += 12; /* also skip block checksum info */
+        left -= 12;
+
+        msg = "Bad source length";
+        if ( src_len <= 0 || src_len > dst_len || src_len > left )
+            break;
+
+        msg = "Failed to (re)alloc memory";
+        tmp_buf = realloc(out_buf, *size + dst_len);
+        if ( tmp_buf == NULL )
+            break;
+
+        out_buf = tmp_buf;
+        out_len = dst_len;
+
+        ret = lzo1x_decompress_safe(cur, src_len,
+                                    out_buf + *size, &out_len, NULL);
+        switch ( ret )
+        {
+        case LZO_E_OK:
+            msg = "Input underrun";
+            if ( out_len != dst_len )
+                break;
+
+            *blob = out_buf;
+            *size += out_len;
+            cur += src_len;
+            left -= src_len;
+            continue;
+
+        case LZO_E_INPUT_NOT_CONSUMED:
+            msg = "Unconsumed input";
+            break;
+
+        case LZO_E_OUTPUT_OVERRUN:
+            msg = "Output overrun";
+            break;
+
+        case LZO_E_INPUT_OVERRUN:
+            msg = "Input overrun";
+            break;
+
+        case LZO_E_LOOKBEHIND_OVERRUN:
+            msg = "Look-behind overrun";
+            break;
+
+        case LZO_E_EOF_NOT_FOUND:
+            msg = "No EOF marker";
+            break;
+
+        case LZO_E_ERROR:
+            msg = "General error";
+            break;
+
+        default:
+            msg = "Internal program error (bug)";
+            break;
+        }
+
+        break;
+    }
+
+    free(out_buf);
+    DOMPRINTF("LZO1x decompression error: %s\n", msg);
+
+    return -1;
+}
+
+#else /* !defined(HAVE_LZO1X) */
+
+static int xc_try_lzo1x_decode(
+    struct xc_dom_image *dom, void **blob, size_t *size)
+{
+    DOMPRINTF("%s: LZO1x decompress support unavailable\n",
+                  __FUNCTION__);
+    return -1;
+}
+
+#endif
+
 struct setup_header {
     uint8_t  _pad0[0x1f1];  /* skip uninteresting stuff */
     uint8_t  setup_sects;
@@ -389,6 +571,17 @@ static int xc_dom_probe_bzimage_kernel(struct xc_dom_image *dom)
         {
             xc_dom_panic(dom->xch, XC_INVALID_KERNEL,
                          "%s unable to LZMA decompress kernel",
+                         __FUNCTION__);
+            return -EINVAL;
+        }
+    }
+    else if ( memcmp(dom->kernel_blob, "\x89LZO", 5) == 0 )
+    {
+        ret = xc_try_lzo1x_decode(dom, &dom->kernel_blob, &dom->kernel_size);
+        if ( ret < 0 )
+        {
+            xc_dom_panic(dom->xch, XC_INVALID_KERNEL,
+                         "%s unable to LZO decompress kernel\n",
                          __FUNCTION__);
             return -EINVAL;
         }
