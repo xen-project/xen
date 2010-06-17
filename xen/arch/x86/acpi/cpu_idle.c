@@ -59,6 +59,11 @@ static void lapic_timer_nop(void) { }
 static void (*lapic_timer_off)(void);
 static void (*lapic_timer_on)(void);
 
+static uint64_t (*get_tick)(void);
+static uint64_t (*ticks_elapsed)(uint64_t t1, uint64_t t2);
+static uint64_t (*tick_to_ns)(uint64_t ticks);
+static uint64_t (*ns_to_tick)(uint64_t ticks);
+
 extern void (*pm_idle) (void);
 extern void (*dead_idle) (void);
 extern void menu_get_trace_data(u32 *expected, u32 *pred);
@@ -92,7 +97,7 @@ static void print_acpi_power(uint32_t cpu, struct acpi_processor_power *power)
     
     for ( i = 1; i < power->count; i++ )
     {
-        res = acpi_pm_tick_to_ns(power->states[i].time);
+        res = tick_to_ns(power->states[i].time);
         idle_usage += power->states[i].usage;
         idle_res += res;
 
@@ -133,7 +138,13 @@ static int __init cpu_idle_key_init(void)
 }
 __initcall(cpu_idle_key_init);
 
-static inline u32 ticks_elapsed(u32 t1, u32 t2)
+static uint64_t get_stime_tick(void) { return (uint64_t)NOW(); }
+static uint64_t stime_ticks_elapsed(uint64_t t1, uint64_t t2) { return t2 - t1; }
+static uint64_t stime_tick_to_ns(uint64_t ticks) { return ticks; }
+static uint64_t ns_to_stime_tick(uint64_t ns) { return ns; }
+
+static uint64_t get_acpi_pm_tick(void) { return (uint64_t)inl(pmtmr_ioport); }
+static uint64_t acpi_pm_ticks_elapsed(uint64_t t1, uint64_t t2)
 {
     if ( t2 >= t1 )
         return (t2 - t1);
@@ -279,8 +290,8 @@ static void acpi_processor_idle(void)
     struct acpi_processor_power *power = processor_powers[smp_processor_id()];
     struct acpi_processor_cx *cx = NULL;
     int next_state;
-    int sleep_ticks = 0;
-    u32 t1, t2 = 0;
+    int64_t sleep_ticks = 0;
+    uint64_t t1, t2 = 0;
     u32 exp = 0, pred = 0;
     u32 irq_traced[4] = { 0 };
 
@@ -338,13 +349,13 @@ static void acpi_processor_idle(void)
         if ( cx->type == ACPI_STATE_C1 || local_apic_timer_c2_ok )
         {
             /* Get start time (ticks) */
-            t1 = inl(pmtmr_ioport);
+            t1 = get_tick();
             /* Trace cpu idle entry */
             TRACE_4D(TRC_PM_IDLE_ENTRY, cx->idx, t1, exp, pred);
             /* Invoke C2 */
             acpi_idle_do_entry(cx);
             /* Get end time (ticks) */
-            t2 = inl(pmtmr_ioport);
+            t2 = get_tick();
             trace_exit_reason(irq_traced);
             /* Trace cpu idle exit */
             TRACE_6D(TRC_PM_IDLE_EXIT, cx->idx, t2,
@@ -395,13 +406,13 @@ static void acpi_processor_idle(void)
         lapic_timer_off();
 
         /* Get start time (ticks) */
-        t1 = inl(pmtmr_ioport);
+        t1 = get_tick();
         /* Trace cpu idle entry */
         TRACE_4D(TRC_PM_IDLE_ENTRY, cx->idx, t1, exp, pred);
         /* Invoke C3 */
         acpi_idle_do_entry(cx);
         /* Get end time (ticks) */
-        t2 = inl(pmtmr_ioport);
+        t2 = get_tick();
 
         /* recovering TSC */
         cstate_restore_tsc();
@@ -438,7 +449,7 @@ static void acpi_processor_idle(void)
     cx->usage++;
     if ( sleep_ticks > 0 )
     {
-        power->last_residency = acpi_pm_tick_to_ns(sleep_ticks) / 1000UL;
+        power->last_residency = tick_to_ns(sleep_ticks) / 1000UL;
         cx->time += sleep_ticks;
     }
 
@@ -751,7 +762,7 @@ static void set_cx(
     cx->latency  = xen_cx->latency;
     cx->power    = xen_cx->power;
     
-    cx->latency_ticks = ns_to_acpi_pm_tick(cx->latency * 1000UL);
+    cx->latency_ticks = ns_to_tick(cx->latency * 1000UL);
     cx->target_residency = cx->latency * latency_factor;
     if ( cx->type == ACPI_STATE_C1 || cx->type == ACPI_STATE_C2 )
         acpi_power->safe_state = cx;
@@ -845,6 +856,24 @@ long set_cx_pminfo(uint32_t cpu, struct xen_processor_power *power)
         return -EFAULT;
     }
 
+    if ( cpu_id == 0 )
+    {
+        if ( boot_cpu_has(X86_FEATURE_NONSTOP_TSC) )
+        {
+            get_tick = get_stime_tick;
+            ticks_elapsed = stime_ticks_elapsed;
+            tick_to_ns = stime_tick_to_ns;
+            ns_to_tick = ns_to_stime_tick;
+        }
+        else
+        {
+            get_tick = get_acpi_pm_tick;
+            ticks_elapsed = acpi_pm_ticks_elapsed;
+            tick_to_ns = acpi_pm_tick_to_ns;
+            ns_to_tick = ns_to_acpi_pm_tick;
+        }
+    }
+        
     acpi_power = processor_powers[cpu_id];
     if ( !acpi_power )
     {
@@ -922,7 +951,7 @@ int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
         if ( i != 0 )
         {
             usage = power->states[i].usage;
-            res = acpi_pm_tick_to_ns(power->states[i].time);
+            res = tick_to_ns(power->states[i].time);
             idle_usage += usage;
             idle_res += res;
         }
