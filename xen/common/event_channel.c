@@ -295,10 +295,36 @@ static long evtchn_bind_ipi(evtchn_bind_ipi_t *bind)
 }
 
 
+static void link_pirq_port(int port, struct evtchn *chn, struct vcpu *v)
+{
+    chn->u.pirq.prev_port = 0;
+    chn->u.pirq.next_port = v->pirq_evtchn_head;
+    if ( v->pirq_evtchn_head )
+        evtchn_from_port(v->domain, v->pirq_evtchn_head)
+            ->u.pirq.prev_port = port;
+    v->pirq_evtchn_head = port;
+}
+
+static void unlink_pirq_port(struct evtchn *chn, struct vcpu *v)
+{
+    struct domain *d = v->domain;
+
+    if ( chn->u.pirq.prev_port )
+        evtchn_from_port(d, chn->u.pirq.prev_port)->u.pirq.next_port =
+            chn->u.pirq.next_port;
+    else
+        v->pirq_evtchn_head = chn->u.pirq.next_port;
+    if ( chn->u.pirq.next_port )
+        evtchn_from_port(d, chn->u.pirq.next_port)->u.pirq.prev_port =
+            chn->u.pirq.prev_port;
+}
+
+
 static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
 {
     struct evtchn *chn;
     struct domain *d = current->domain;
+    struct vcpu   *v = d->vcpu[0];
     int            port, pirq = bind->pirq;
     long           rc;
 
@@ -319,7 +345,7 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
     chn = evtchn_from_port(d, port);
 
     d->pirq_to_evtchn[pirq] = port;
-    rc = pirq_guest_bind(d->vcpu[0], pirq, 
+    rc = pirq_guest_bind(v, pirq,
                          !!(bind->flags & BIND_PIRQ__WILL_SHARE));
     if ( rc != 0 )
     {
@@ -328,7 +354,8 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
     }
 
     chn->state  = ECS_PIRQ;
-    chn->u.pirq = pirq;
+    chn->u.pirq.irq = pirq;
+    link_pirq_port(port, chn, v);
 
     bind->port = port;
 
@@ -376,8 +403,9 @@ static long __evtchn_close(struct domain *d1, int port1)
         break;
 
     case ECS_PIRQ:
-        pirq_guest_unbind(d1, chn1->u.pirq);
-        d1->pirq_to_evtchn[chn1->u.pirq] = 0;
+        pirq_guest_unbind(d1, chn1->u.pirq.irq);
+        d1->pirq_to_evtchn[chn1->u.pirq.irq] = 0;
+        unlink_pirq_port(chn1, d1->vcpu[chn1->notify_vcpu_id]);
         break;
 
     case ECS_VIRQ:
@@ -688,7 +716,7 @@ static long evtchn_status(evtchn_status_t *status)
         break;
     case ECS_PIRQ:
         status->status = EVTCHNSTAT_pirq;
-        status->u.pirq = chn->u.pirq;
+        status->u.pirq = chn->u.pirq.irq;
         break;
     case ECS_VIRQ:
         status->status = EVTCHNSTAT_virq;
@@ -747,8 +775,16 @@ long evtchn_bind_vcpu(unsigned int port, unsigned int vcpu_id)
         break;
     case ECS_UNBOUND:
     case ECS_INTERDOMAIN:
-    case ECS_PIRQ:
         chn->notify_vcpu_id = vcpu_id;
+        break;
+    case ECS_PIRQ:
+        if ( chn->notify_vcpu_id == vcpu_id )
+            break;
+        unlink_pirq_port(chn, d->vcpu[chn->notify_vcpu_id]);
+        chn->notify_vcpu_id = vcpu_id;
+        pirq_set_affinity(d, chn->u.pirq.irq,
+                          cpumask_of(d->vcpu[vcpu_id]->processor));
+        link_pirq_port(port, chn, d->vcpu[vcpu_id]);
         break;
     default:
         rc = -EINVAL;
@@ -1064,6 +1100,23 @@ void evtchn_destroy_final(struct domain *d)
 }
 
 
+void evtchn_move_pirqs(struct vcpu *v)
+{
+    struct domain *d = v->domain;
+    const cpumask_t *mask = cpumask_of(v->processor);
+    unsigned int port;
+    struct evtchn *chn;
+
+    spin_lock(&d->event_lock);
+    for ( port = v->pirq_evtchn_head; port; port = chn->u.pirq.next_port )
+    {
+        chn = evtchn_from_port(d, port);
+        pirq_set_affinity(d, chn->u.pirq.irq, mask);
+    }
+    spin_unlock(&d->event_lock);
+}
+
+
 static void domain_dump_evtchn_info(struct domain *d)
 {
     unsigned int port;
@@ -1105,7 +1158,7 @@ static void domain_dump_evtchn_info(struct domain *d)
                    chn->u.interdomain.remote_port);
             break;
         case ECS_PIRQ:
-            printk(" p=%d", chn->u.pirq);
+            printk(" p=%d", chn->u.pirq.irq);
             break;
         case ECS_VIRQ:
             printk(" v=%d", chn->u.virq);

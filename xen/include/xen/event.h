@@ -47,6 +47,9 @@ long evtchn_bind_vcpu(unsigned int port, unsigned int vcpu_id);
 /* Unmask a local event-channel port. */
 int evtchn_unmask(unsigned int port);
 
+/* Move all PIRQs after a vCPU was moved to another pCPU. */
+void evtchn_move_pirqs(struct vcpu *v);
+
 /* Allocate/free a Xen-attached event channel port. */
 int alloc_unbound_xen_event_channel(
     struct vcpu *local_vcpu, domid_t remote_domid);

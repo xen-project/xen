@@ -875,6 +875,8 @@ static struct task_slice sedf_do_schedule(
         ret.time = EXTRA_QUANTUM;
     }
 
+    ret.migrated = 0;
+
     EDOM_INFO(ret.task)->sched_start_abs = now;
     CHECK(ret.time > 0);
     ASSERT(sedf_runnable(ret.task));

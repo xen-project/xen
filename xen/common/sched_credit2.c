@@ -991,10 +991,17 @@ csched_schedule(
     }
 #endif
 
+    ret.migrated = 0;
+
     if ( !is_idle_vcpu(snext->vcpu) )
     {
         snext->start_time = now;
-        snext->vcpu->processor = cpu; /* Safe because lock for old processor is held */
+        /* Safe because lock for old processor is held */
+        if ( snext->vcpu->processor != cpu )
+        {
+            snext->vcpu->processor = cpu;
+            ret.migrated = 1;
+        }
     }
 
     /*

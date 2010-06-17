@@ -501,16 +501,28 @@ void move_native_irq(int irq)
 }
 
 /* For re-setting irq interrupt affinity for specific irq */
-void irq_set_affinity(int irq, cpumask_t mask)
+void irq_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
 {
-    struct irq_desc *desc = irq_to_desc(irq);
-    
     if (!desc->handler->set_affinity)
         return;
     
     ASSERT(spin_is_locked(&desc->lock));
+    desc->status &= ~IRQ_MOVE_PENDING;
+    wmb();
+    cpus_copy(desc->pending_mask, *mask);
+    wmb();
     desc->status |= IRQ_MOVE_PENDING;
-    cpus_copy(desc->pending_mask, mask);
+}
+
+void pirq_set_affinity(struct domain *d, int pirq, const cpumask_t *mask)
+{
+    unsigned long flags;
+    struct irq_desc *desc = domain_spin_lock_irq_desc(d, pirq, &flags);
+
+    if ( !desc )
+        return;
+    irq_set_affinity(desc, mask);
+    spin_unlock_irqrestore(&desc->lock, flags);
 }
 
 DEFINE_PER_CPU(unsigned int, irq_count);

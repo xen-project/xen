@@ -139,6 +139,7 @@ extern int pirq_guest_eoi(struct domain *d, int irq);
 extern int pirq_guest_unmask(struct domain *d);
 extern int pirq_guest_bind(struct vcpu *v, int irq, int will_share);
 extern void pirq_guest_unbind(struct domain *d, int irq);
+extern void pirq_set_affinity(struct domain *d, int irq, const cpumask_t *);
 extern irq_desc_t *domain_spin_lock_irq_desc(
     struct domain *d, int irq, unsigned long *pflags);
 

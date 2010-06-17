@@ -61,7 +61,11 @@ struct evtchn
             u16            remote_port;
             struct domain *remote_dom;
         } interdomain; /* state == ECS_INTERDOMAIN */
-        u16 pirq;      /* state == ECS_PIRQ */
+        struct {
+            u16            irq;
+            u16            next_port;
+            u16            prev_port;
+        } pirq;        /* state == ECS_PIRQ */
         u16 virq;      /* state == ECS_VIRQ */
     } u;
 #ifdef FLASK_ENABLE
@@ -141,6 +145,9 @@ struct vcpu
      * < 0: multiple ports may be being polled.
      */
     int              poll_evtchn;
+
+    /* (over-)protected by ->domain->event_lock */
+    int              pirq_evtchn_head;
 
     unsigned long    pause_flags;
     atomic_t         pause_count;

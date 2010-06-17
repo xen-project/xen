@@ -206,7 +206,7 @@ static inline int __cpus_weight(const cpumask_t *srcp, int nbits)
 }
 
 #define cpus_copy(dest, src) __cpus_copy(&(dest), &(src))
-static inline void __cpus_copy(cpumask_t *dstp, cpumask_t *srcp)
+static inline void __cpus_copy(cpumask_t *dstp, const cpumask_t *srcp)
 {
 	bitmap_copy(dstp->bits, srcp->bits, NR_CPUS);
 }

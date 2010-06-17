@@ -143,7 +143,7 @@ void move_native_irq(int irq);
 
 void move_masked_irq(int irq);
 
-void irq_set_affinity(int irq, cpumask_t mask);
+void irq_set_affinity(struct irq_desc *, const cpumask_t *mask);
 
 #define domain_pirq_to_irq(d, pirq) ((d)->arch.pirq_irq[pirq])
 #define domain_irq_to_pirq(d, irq) ((d)->arch.irq_pirq[irq])

@@ -1168,7 +1168,7 @@ csched_runq_steal(int peer_cpu, int cpu, int pri)
 
 static struct csched_vcpu *
 csched_load_balance(struct csched_private *prv, int cpu,
-    struct csched_vcpu *snext)
+    struct csched_vcpu *snext, bool_t *stolen)
 {
     struct csched_vcpu *speer;
     cpumask_t workers;
@@ -1221,7 +1221,10 @@ csched_load_balance(struct csched_private *prv, int cpu,
         speer = csched_runq_steal(peer_cpu, cpu, snext->pri);
         spin_unlock(per_cpu(schedule_data, peer_cpu).schedule_lock);
         if ( speer != NULL )
+        {
+            *stolen = 1;
             return speer;
+        }
     }
 
  out:
@@ -1269,6 +1272,7 @@ csched_schedule(
         BUG_ON( is_idle_vcpu(current) || list_empty(runq) );
 
     snext = __runq_elem(runq->next);
+    ret.migrated = 0;
 
     /* Tasklet work (which runs in idle VCPU context) overrides all else. */
     if ( tasklet_work_scheduled )
@@ -1288,7 +1292,7 @@ csched_schedule(
     if ( snext->pri > CSCHED_PRI_TS_OVER )
         __runq_remove(snext);
     else
-        snext = csched_load_balance(prv, cpu, snext);
+        snext = csched_load_balance(prv, cpu, snext, &ret.migrated);
 
     /*
      * Update idlers mask if necessary. When we're idling, other CPUs

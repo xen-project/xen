@@ -79,6 +79,7 @@ static inline void vcpu_schedule_unlock(struct vcpu *v)
 struct task_slice {
     struct vcpu *task;
     s_time_t     time;
+    bool_t       migrated;
 };
 
 struct scheduler {

@@ -272,6 +272,7 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
         cpus_setall(v->cpu_affinity);
         v->processor = new_p;
         v->sched_priv = vcpu_priv[v->vcpu_id];
+        evtchn_move_pirqs(v);
 
         new_p = cycle_cpu(new_p, c->cpu_valid);
     }
@@ -418,6 +419,9 @@ static void vcpu_migrate(struct vcpu *v)
     v->processor = new_cpu;
     spin_unlock_irqrestore(
         per_cpu(schedule_data, old_cpu).schedule_lock, flags);
+
+    if ( old_cpu != new_cpu )
+        evtchn_move_pirqs(v);
 
     /* Wake on new CPU. */
     vcpu_wake(v);
@@ -1093,6 +1097,9 @@ static void schedule(void)
     perfc_incr(sched_ctx);
 
     stop_timer(&prev->periodic_timer);
+
+    if ( next_slice.migrated )
+        evtchn_move_pirqs(next);
 
     /* Ensure that the domain has an up-to-date time base. */
     update_vcpu_system_time(next);

@@ -271,7 +271,7 @@ void hvm_migrate_pirqs(struct vcpu *v)
             continue;
         irq = desc - irq_desc;
         ASSERT(MSI_IRQ(irq));
-        irq_set_affinity(irq, *cpumask_of(v->processor));
+        irq_set_affinity(desc, cpumask_of(v->processor));
         spin_unlock_irq(&desc->lock);
     }
     spin_unlock(&d->event_lock);

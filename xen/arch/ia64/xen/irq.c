@@ -612,6 +612,11 @@ xen_debug_irq(unsigned long vector, struct pt_regs *regs)
 	}
 }
 
+void pirq_set_affinity(struct domain *d, int irq, const cpumask_t *mask)
+{
+	/* FIXME */
+}
+
 /*
  * Exit an interrupt context. Process softirqs if needed and possible:
  */
