@@ -664,13 +664,16 @@ static void __init init_platform_timer(void)
 
 void cstate_restore_tsc(void)
 {
-    struct cpu_time *t = &this_cpu(cpu_time);
-    struct time_scale sys_to_tsc = scale_reciprocal(t->tsc_scale);
+    struct cpu_time *t;
+    struct time_scale sys_to_tsc;
     s_time_t stime_delta;
     u64 new_tsc;
 
     if ( boot_cpu_has(X86_FEATURE_NONSTOP_TSC) )
         return;
+
+    t = &this_cpu(cpu_time);
+    sys_to_tsc = scale_reciprocal(t->tsc_scale);
 
     stime_delta = read_platform_stime() - t->stime_master_stamp;
     if ( stime_delta < 0 )
