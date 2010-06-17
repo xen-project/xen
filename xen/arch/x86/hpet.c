@@ -34,6 +34,7 @@ struct hpet_event_channel
     int           shift;
     s_time_t      next_event;
     cpumask_t     cpumask;
+    spinlock_t    cpumask_lock;
     spinlock_t    lock;
     void          (*event_handler)(struct hpet_event_channel *);
 
@@ -196,7 +197,7 @@ again:
     /* find all expired events */
     for_each_cpu_mask(cpu, ch->cpumask)
     {
-        spin_lock_irq(&ch->lock);
+        spin_lock_irq(&ch->cpumask_lock);
 
         if ( cpumask_test_cpu(cpu, ch->cpumask) )
         {
@@ -206,7 +207,7 @@ again:
                 next_event = per_cpu(timer_deadline_end, cpu);
         }
 
-        spin_unlock_irq(&ch->lock);
+        spin_unlock_irq(&ch->cpumask_lock);
     }
 
     /* wakeup the cpus which have an expired event. */
@@ -579,6 +580,7 @@ void hpet_broadcast_init(void)
             hpet_events[i].next_event = STIME_MAX;
             hpet_events[i].event_handler = handle_hpet_broadcast;
             spin_lock_init(&hpet_events[i].lock);
+            spin_lock_init(&hpet_events[i].cpumask_lock);
         }
 
         return;
@@ -613,6 +615,7 @@ void hpet_broadcast_init(void)
     legacy_hpet_event.idx = 0;
     legacy_hpet_event.flags = 0;
     spin_lock_init(&legacy_hpet_event.lock);
+    spin_lock_init(&legacy_hpet_event.cpumask_lock);
 
     if ( !force_hpet_broadcast )
         pv_rtc_handler = handle_rtc_once;
@@ -689,9 +692,9 @@ void hpet_broadcast_exit(void)
     if ( !reprogram_timer(this_cpu(timer_deadline_start)) )
         raise_softirq(TIMER_SOFTIRQ);
 
-    spin_lock_irq(&ch->lock);
+    spin_lock_irq(&ch->cpumask_lock);
     cpu_clear(cpu, ch->cpumask);
-    spin_unlock_irq(&ch->lock);
+    spin_unlock_irq(&ch->cpumask_lock);
 
     if ( ch != &legacy_hpet_event )
     {
