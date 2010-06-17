@@ -664,14 +664,12 @@ void hpet_broadcast_enter(void)
 
     /* Disable LAPIC timer interrupts. */
     disable_APIC_timer();
+    cpu_set(cpu, ch->cpumask);
 
     spin_lock(&ch->lock);
-
-    cpu_set(cpu, ch->cpumask);
     /* reprogram if current cpu expire time is nearer */
     if ( this_cpu(timer_deadline_end) < ch->next_event )
         reprogram_hpet_evt_channel(ch, this_cpu(timer_deadline_end), NOW(), 1);
-
     spin_unlock(&ch->lock);
 }
 
@@ -692,11 +690,7 @@ void hpet_broadcast_exit(void)
         raise_softirq(TIMER_SOFTIRQ);
 
     spin_lock_irq(&ch->lock);
-
     cpu_clear(cpu, ch->cpumask);
-    if ( cpus_empty(ch->cpumask) && ch->next_event != STIME_MAX )
-        reprogram_hpet_evt_channel(ch, STIME_MAX, 0, 0);
-
     spin_unlock_irq(&ch->lock);
 
     if ( ch != &legacy_hpet_event )
