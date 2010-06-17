@@ -138,9 +138,9 @@ static inline u32 ticks_elapsed(u32 t1, u32 t2)
     if ( t2 >= t1 )
         return (t2 - t1);
     else if ( !(acpi_gbl_FADT.flags & ACPI_FADT_32BIT_TIMER) )
-        return (((0x00FFFFFF - t1) + t2) & 0x00FFFFFF);
+        return (((0x00FFFFFF - t1) + t2 + 1) & 0x00FFFFFF);
     else
-        return ((0xFFFFFFFF - t1) + t2);
+        return ((0xFFFFFFFF - t1) + t2 +1);
 }
 
 static void acpi_safe_halt(void)
