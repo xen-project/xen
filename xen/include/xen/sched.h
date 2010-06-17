@@ -592,7 +592,8 @@ void cpu_init(void);
 
 struct scheduler;
 
-struct scheduler *scheduler_alloc(char *name);
+struct scheduler *scheduler_get_default(void);
+struct scheduler *scheduler_alloc(unsigned int sched_id, int *perr);
 void scheduler_free(struct scheduler *sched);
 void schedule_cpu_switch(unsigned int cpu, struct cpupool *c);
 void vcpu_force_reschedule(struct vcpu *v);
@@ -634,8 +635,8 @@ extern enum cpufreq_controller {
 
 #define CPUPOOLID_NONE    -1
 
-struct cpupool *cpupool_create(int poolid, char *sched);
-int cpupool_destroy(struct cpupool *c);
+struct cpupool *cpupool_get_by_id(int poolid);
+void cpupool_put(struct cpupool *pool);
 int cpupool_add_domain(struct domain *d, int poolid);
 void cpupool_rm_domain(struct domain *d);
 int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op);

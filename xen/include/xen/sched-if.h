@@ -133,6 +133,4 @@ struct cpupool
     struct scheduler *sched;
 };
 
-const struct scheduler *scheduler_get_by_id(unsigned int id);
-
 #endif /* __XEN_SCHED_IF_H__ */

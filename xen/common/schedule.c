@@ -965,17 +965,28 @@ long sched_adjust(struct domain *d, struct xen_domctl_scheduler_op *op)
 
 long sched_adjust_global(struct xen_sysctl_scheduler_op *op)
 {
-    const struct scheduler *sched;
-
-    sched = scheduler_get_by_id(op->sched_id);
-    if ( sched == NULL )
-        return -ESRCH;
+    struct cpupool *pool;
+    int rc;
 
     if ( (op->cmd != XEN_DOMCTL_SCHEDOP_putinfo) &&
          (op->cmd != XEN_DOMCTL_SCHEDOP_getinfo) )
         return -EINVAL;
 
-    return SCHED_OP(sched, adjust_global, op);
+    pool = cpupool_get_by_id(op->cpupool_id);
+    if ( pool == NULL )
+        return -ESRCH;
+
+    if ( op->sched_id != pool->sched->sched_id )
+    {
+        cpupool_put(pool);
+        return -EINVAL;
+    }
+
+    rc = SCHED_OP(pool->sched, adjust_global, op);
+
+    cpupool_put(pool);
+
+    return rc;
 }
 
 static void vcpu_periodic_timer_work(struct vcpu *v)
@@ -1154,19 +1165,6 @@ static void poll_timer_fn(void *data)
         vcpu_unblock(v);
 }
 
-/* Get scheduler by id */
-const struct scheduler *scheduler_get_by_id(unsigned int id)
-{
-    int i;
-
-    for ( i = 0; schedulers[i] != NULL; i++ )
-    {
-        if ( schedulers[i]->sched_id == id )
-            return schedulers[i];
-    }
-    return NULL;
-}
-
 static int cpu_schedule_up(unsigned int cpu)
 {
     struct schedule_data *sd = &per_cpu(schedule_data, cpu);
@@ -1302,29 +1300,28 @@ void schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
     SCHED_OP(old_ops, free_pdata, ppriv_old, cpu);
 }
 
-struct scheduler *scheduler_alloc(char *name)
+struct scheduler *scheduler_get_default(void)
+{
+    return &ops;
+}
+
+struct scheduler *scheduler_alloc(unsigned int sched_id, int *perr)
 {
     int i;
-    const struct scheduler *data;
     struct scheduler *sched;
 
-    if ( name == NULL )
-        return &ops;
+    for ( i = 0; schedulers[i] != NULL; i++ )
+        if ( schedulers[i]->sched_id == sched_id )
+            goto found;
+    *perr = -ENOENT;
+    return NULL;
 
-    data = &ops;
-    for ( i = 0; (schedulers[i] != NULL) && (name != NULL) ; i++ )
-    {
-        if ( strcmp(schedulers[i]->opt_name, name) == 0 )
-        {
-            data = schedulers[i];
-            break;
-        }
-    }
-
+ found:
+    *perr = -ENOMEM;
     if ( (sched = xmalloc(struct scheduler)) == NULL )
         return NULL;
-    memcpy(sched, data, sizeof(*sched));
-    if ( SCHED_OP(sched, init) != 0 )
+    memcpy(sched, schedulers[i], sizeof(*sched));
+    if ( (*perr = SCHED_OP(sched, init)) != 0 )
     {
         xfree(sched);
         sched = NULL;

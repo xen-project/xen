@@ -71,6 +71,22 @@ static struct cpupool *cpupool_find_by_id(int id, int exact)
     return exact ? NULL : *q;
 }
 
+struct cpupool *cpupool_get_by_id(int poolid)
+{
+    struct cpupool *c;
+    /* cpupool_ctl_lock protects against concurrent pool destruction */
+    spin_lock(&cpupool_ctl_lock);
+    c = cpupool_find_by_id(poolid, 1);
+    if ( c == NULL )
+        spin_unlock(&cpupool_ctl_lock);
+    return c;
+}
+
+void cpupool_put(struct cpupool *pool)
+{
+    spin_unlock(&cpupool_ctl_lock);
+}
+
 /*
  * create a new cpupool with specified poolid and scheduler
  * returns pointer to new cpupool structure if okay, NULL else
@@ -79,18 +95,22 @@ static struct cpupool *cpupool_find_by_id(int id, int exact)
  * - poolid already used
  * - unknown scheduler
  */
-struct cpupool *cpupool_create(int poolid, char *sched)
+static struct cpupool *cpupool_create(
+    int poolid, unsigned int sched_id, int *perr)
 {
     struct cpupool *c;
     struct cpupool **q;
     int last = 0;
 
+    *perr = -ENOMEM;
     if ( (c = alloc_cpupool_struct()) == NULL )
         return NULL;
     memset(c, 0, sizeof(*c));
 
-    cpupool_dprintk("cpupool_create(pool=%d,sched=%s)\n", poolid, sched);
+    cpupool_dprintk("cpupool_create(pool=%d,sched=%u)\n", poolid, sched_id);
+
     spin_lock(&cpupool_lock);
+
     for_each_cpupool(q)
     {
         last = (*q)->cpupool_id;
@@ -103,23 +123,36 @@ struct cpupool *cpupool_create(int poolid, char *sched)
         {
             spin_unlock(&cpupool_lock);
             free_cpupool_struct(c);
+            *perr = -EEXIST;
             return NULL;
         }
         c->next = *q;
     }
-    *q = c;
+
     c->cpupool_id = (poolid == CPUPOOLID_NONE) ? (last + 1) : poolid;
-    if ( (c->sched = scheduler_alloc(sched)) == NULL )
+    if ( poolid == 0 )
     {
-        spin_unlock(&cpupool_lock);
-        cpupool_destroy(c);
-        return NULL;
+        c->sched = scheduler_get_default();
     }
+    else
+    {
+        c->sched = scheduler_alloc(sched_id, perr);
+        if ( c->sched == NULL )
+        {
+            spin_unlock(&cpupool_lock);
+            free_cpupool_struct(c);
+            return NULL;
+        }
+    }
+
+    *q = c;
+
     spin_unlock(&cpupool_lock);
 
     cpupool_dprintk("Created cpupool %d with scheduler %s (%s)\n",
                     c->cpupool_id, c->sched->name, c->sched->opt_name);
 
+    *perr = 0;
     return c;
 }
 /*
@@ -130,7 +163,7 @@ struct cpupool *cpupool_create(int poolid, char *sched)
  * - cpus still assigned to pool
  * - pool not in list
  */
-int cpupool_destroy(struct cpupool *c)
+static int cpupool_destroy(struct cpupool *c)
 {
     struct cpupool **q;
 
@@ -138,10 +171,15 @@ int cpupool_destroy(struct cpupool *c)
     for_each_cpupool(q)
         if ( *q == c )
             break;
-    if ( (*q != c) || (c->n_dom != 0) || cpus_weight(c->cpu_valid) )
+    if ( *q != c )
     {
         spin_unlock(&cpupool_lock);
-        return 1;
+        return -ENOENT;
+    }
+    if ( (c->n_dom != 0) || cpus_weight(c->cpu_valid) )
+    {
+        spin_unlock(&cpupool_lock);
+        return -EBUSY;
     }
     *q = c->next;
     spin_unlock(&cpupool_lock);
@@ -365,19 +403,11 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
     case XEN_SYSCTL_CPUPOOL_OP_CREATE:
     {
         int poolid;
-        const struct scheduler *sched;
 
         poolid = (op->cpupool_id == XEN_SYSCTL_CPUPOOL_PAR_ANY) ?
             CPUPOOLID_NONE: op->cpupool_id;
-        sched = scheduler_get_by_id(op->sched_id);
-        ret = -ENOENT;
-        if ( sched == NULL )
-            break;
-        ret = 0;
-        c = cpupool_create(poolid, sched->opt_name);
-        if ( c == NULL )
-            ret = -EINVAL;
-        else
+        c = cpupool_create(poolid, op->sched_id, &ret);
+        if ( c != NULL )
             op->cpupool_id = c->cpupool_id;
     }
     break;
@@ -388,7 +418,7 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
         ret = -ENOENT;
         if ( c == NULL )
             break;
-        ret = (cpupool_destroy(c) != 0) ? -EBUSY : 0;
+        ret = cpupool_destroy(c);
     }
     break;
 
@@ -571,8 +601,9 @@ static struct notifier_block cpu_nfb = {
 
 static int __init cpupool_presmp_init(void)
 {
+    int err;
     void *cpu = (void *)(long)smp_processor_id();
-    cpupool0 = cpupool_create(0, NULL);
+    cpupool0 = cpupool_create(0, 0, &err);
     BUG_ON(cpupool0 == NULL);
     cpu_callback(&cpu_nfb, CPU_ONLINE, cpu);
     register_cpu_notifier(&cpu_nfb);
