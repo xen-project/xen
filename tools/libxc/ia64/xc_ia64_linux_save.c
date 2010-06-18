@@ -647,7 +647,7 @@ xc_domain_save(xc_interface *xc_handle, int io_fd, uint32_t dom, uint32_t max_it
                     fprintf(stderr, "cannot map mfn page %lx gpfn %lx: %s\n",
                             xc_ia64_p2m_mfn(&p2m_table, N),
                             N, safe_strerror(errno));
-                    continue;
+                    goto out;
                 }
 
                 if (write_exact(io_fd, &N, sizeof(N))) {
