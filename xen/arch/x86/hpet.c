@@ -34,6 +34,17 @@ struct hpet_event_channel
     int           shift;
     s_time_t      next_event;
     cpumask_t     cpumask;
+    /*
+     * cpumask_lock is used to prevent hpet intr handler from accessing other
+     * cpu's timer_deadline_start/end after the other cpu's mask was cleared --
+     * mask cleared means cpu waken up, then accessing timer_deadline_xxx from
+     * other cpu is not safe.
+     * It is not used for protecting cpumask, so set ops needn't take it.
+     * Multiple cpus clear cpumask simultaneously is ok due to the atomic
+     * feature of cpu_clear, so hpet_broadcast_exit() can take read lock for 
+     * clearing cpumask, and handle_hpet_broadcast() have to take write lock 
+     * for read cpumask & access timer_deadline_xxx.
+     */
     rwlock_t      cpumask_lock;
     spinlock_t    lock;
     void          (*event_handler)(struct hpet_event_channel *);
