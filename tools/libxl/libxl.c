@@ -51,12 +51,16 @@ int libxl_ctx_init(struct libxl_ctx *ctx, int version, xentoollog_logger *lg)
 
     ctx->xch = xc_interface_open(lg,lg,0);
     if (!ctx->xch) {
+        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, errno, 
+                        "cannot open libxc handle");
         free(ctx->alloc_ptrs);
         return ERROR_FAIL;
     }
 
     ctx->xsh = xs_daemon_open();
     if (!ctx->xsh) {
+        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, errno, 
+                        "cannot connect to xenstore");
         xc_interface_close(ctx->xch);
         free(ctx->alloc_ptrs);
         return ERROR_FAIL;
