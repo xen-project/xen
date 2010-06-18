@@ -74,7 +74,7 @@ int main(int argc, char **argv)
     if (cspec)
         return cspec->cmd_impl(argc, argv);
     else if (!strcmp(cmd, "help")) {
-        help(argv[2]);
+        help(argv[optind]);
         exit(0);
     } else {
         fprintf(stderr, "command not implemented\n");

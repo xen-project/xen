@@ -1285,7 +1285,7 @@ void help(char *command)
     struct cmd_spec *cmd;
 
     if (!command || !strcmp(command, "help")) {
-        printf("Usage xl <subcommand> [args]\n\n");
+        printf("Usage xl [-v] <subcommand> [args]\n\n");
         printf("xl full list of subcommands:\n\n");
         for (i = 0; i < cmdtable_len; i++)
             printf(" %-20s%s\n",
@@ -1293,7 +1293,7 @@ void help(char *command)
     } else {
         cmd = cmdtable_lookup(command);
         if (cmd) {
-            printf("Usage: xl %s %s\n\n%s.\n\n",
+            printf("Usage: xl [-v] %s %s\n\n%s.\n\n",
                    cmd->cmd_name,
                    cmd->cmd_usage,
                    cmd->cmd_desc);
