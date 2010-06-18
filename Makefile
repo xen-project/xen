@@ -37,7 +37,9 @@ test:
 # build and install everything into local dist directory
 .PHONY: dist
 dist: DESTDIR=$(DISTDIR)/install
-dist: dist-xen dist-kernels dist-tools dist-stubdom dist-docs
+dist: dist-xen dist-kernels dist-tools dist-stubdom dist-docs dist-misc
+
+dist-misc:
 	$(INSTALL_DIR) $(DISTDIR)/check
 	$(INSTALL_DATA) ./COPYING $(DISTDIR)
 	$(INSTALL_DATA) ./README $(DISTDIR)
