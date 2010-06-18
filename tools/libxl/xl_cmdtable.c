@@ -12,6 +12,8 @@
  * GNU Lesser General Public License for more details.
  */
 
+#include <string.h>
+
 #include "xl.h"
 
 struct cmd_spec cmd_table[] = {
@@ -308,3 +310,24 @@ struct cmd_spec cmd_table[] = {
 };
 
 int cmdtable_len = sizeof(cmd_table)/sizeof(struct cmd_spec);
+
+/* Look up a command in the table, allowing unambiguous truncation */
+struct cmd_spec *cmdtable_lookup(const char *s)
+{
+    struct cmd_spec *cmd = NULL;
+    size_t len;
+    int i;
+
+    if (!s) 
+        return NULL;
+    len = strlen(s);
+    for (i = 0; i < cmdtable_len; i++) {
+        if (!strncmp(s, cmd_table[i].cmd_name, len)) {
+            if (cmd == NULL) 
+                cmd = &cmd_table[i];
+            else 
+                return NULL;
+        }
+    }
+    return cmd;
+}

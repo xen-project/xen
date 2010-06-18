@@ -1282,6 +1282,7 @@ error_out:
 void help(char *command)
 {
     int i;
+    struct cmd_spec *cmd;
 
     if (!command || !strcmp(command, "help")) {
         printf("Usage xl <subcommand> [args]\n\n");
@@ -1290,18 +1291,17 @@ void help(char *command)
             printf(" %-20s%s\n",
                    cmd_table[i].cmd_name, cmd_table[i].cmd_desc);
     } else {
-        for (i = 0; i < cmdtable_len; i++)
-            if (!strcmp(command, cmd_table[i].cmd_name))
-                break;
-        if (i == cmdtable_len) {
-            printf("command not implemented\n");
-        } else {
+        cmd = cmdtable_lookup(command);
+        if (cmd) {
             printf("Usage: xl %s %s\n\n%s.\n\n",
-                   cmd_table[i].cmd_name,
-                   cmd_table[i].cmd_usage,
-                   cmd_table[i].cmd_desc);
-            if (cmd_table[i].cmd_option)
-            printf("Options:\n\n%s\n", cmd_table[i].cmd_option);
+                   cmd->cmd_name,
+                   cmd->cmd_usage,
+                   cmd->cmd_desc);
+            if (cmd->cmd_option)
+                printf("Options:\n\n%s\n", cmd->cmd_option);
+        }
+        else {
+            printf("command \"%s\" not implemented\n", command);
         }
     }
 }

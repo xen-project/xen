@@ -37,8 +37,9 @@ static xentoollog_level minmsglevel = XTL_PROGRESS;
 
 int main(int argc, char **argv)
 {
-    int opt = 0, i;
+    int opt = 0;
     char *cmd = 0;
+    struct cmd_spec *cspec;
 
     while ((opt = getopt(argc, argv, "+v")) >= 0) {
         switch (opt) {
@@ -69,18 +70,14 @@ int main(int argc, char **argv)
 
     srand(time(0));
 
-    for (i = 0; i < cmdtable_len; i++) {
-        if (!strcmp(cmd, cmd_table[i].cmd_name))
-        	cmd_table[i].cmd_impl(argc, argv);
-    }
-
-    if (i >= cmdtable_len) {
-        if (!strcmp(cmd, "help")) {
-            help(argv[2]);
-            exit(0);
-        } else {
-            fprintf(stderr, "command not implemented\n");
-            exit(1);
-        }
+    cspec = cmdtable_lookup(cmd);
+    if (cspec)
+        return cspec->cmd_impl(argc, argv);
+    else if (!strcmp(cmd, "help")) {
+        help(argv[2]);
+        exit(0);
+    } else {
+        fprintf(stderr, "command not implemented\n");
+        exit(1);
     }
 }

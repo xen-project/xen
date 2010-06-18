@@ -80,6 +80,8 @@ void help(char *command);
 
 extern struct cmd_spec cmd_table[];
 extern int cmdtable_len;
+/* Look up a command in the table, allowing unambiguous truncation */
+struct cmd_spec *cmdtable_lookup(const char *s);
 
 extern struct libxl_ctx ctx;
 extern xentoollog_logger_stdiostream *logger;
