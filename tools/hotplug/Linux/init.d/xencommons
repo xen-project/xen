@@ -24,16 +24,21 @@ test -f /etc/sysconfig/xencommons && . /etc/sysconfig/xencommons
 XENCONSOLED_PIDFILE=/var/run/xenconsoled.pid
 shopt -s extglob
 
-if test "x$1" = xstart && \
-     test -d /proc/xen && \
-   ! test -d /proc/xen/capabilities && \
-     grep '	xenfs$' /proc/filesystems >/dev/null && \
-   ! grep '^xenfs ' /proc/mounts >/dev/null;
-then
-	mount -t xenfs xenfs /proc/xen
+if test "x$1" = xstart; then
+	if ! grep '	xenfs$' /proc/filesystems >/dev/null; then
+		test -x /sbin/modprobe && /sbin/modprobe xenfs 2>/dev/null
+	fi
+	if test -d /proc/xen && \
+	    ! test -d /proc/xen/capabilities && \
+	      grep '	xenfs$' /proc/filesystems >/dev/null && \
+	    ! grep '^xenfs ' /proc/mounts >/dev/null;
+	then
+		mount -t xenfs xenfs /proc/xen
+	fi
 fi
 
-if ! grep -q "control_d" /proc/xen/capabilities ; then
+if ! test -e /proc/xen/capabilities || \
+    ! grep -q "control_d" /proc/xen/capabilities ; then
 	exit 0
 fi
 
