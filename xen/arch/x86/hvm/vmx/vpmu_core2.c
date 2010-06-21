@@ -83,7 +83,7 @@ static int core2_get_bitwidth_fix_count(void)
 {
     u32 eax, ebx, ecx, edx;
     cpuid(0xa, &eax, &ebx, &ecx, &edx);
-    return ((edx & 0x1f70) >> 5);
+    return ((edx & 0x1fe0) >> 5);
 }
 
 static int is_core2_vpmu_msr(u32 msr_index, int *type, int *index)
