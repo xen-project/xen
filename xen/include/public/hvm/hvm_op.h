@@ -127,6 +127,16 @@ struct xen_hvm_set_mem_type {
 typedef struct xen_hvm_set_mem_type xen_hvm_set_mem_type_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_set_mem_type_t);
 
+/* Hint from PV drivers for pagetable destruction. */
+#define HVMOP_pagetable_dying        9
+struct xen_hvm_pagetable_dying {
+    /* Domain with a pagetable about to be destroyed. */
+    domid_t  domid;
+    /* guest physical address of the toplevel pagetable dying */
+    uint64_aligned_t gpa;
+};
+typedef struct xen_hvm_pagetable_dying xen_hvm_pagetable_dying_t;
+DEFINE_XEN_GUEST_HANDLE(xen_hvm_pagetable_dying_t);
 
 #endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */
 

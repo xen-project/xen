@@ -60,6 +60,7 @@ void shadow_domain_init(struct domain *d, unsigned int domcr_flags)
     d->arch.paging.shadow.oos_active = 0;
     d->arch.paging.shadow.oos_off = (domcr_flags & DOMCRF_oos_off) ?  1 : 0;
 #endif
+    d->arch.paging.shadow.pagetable_dying_op = 0;
 }
 
 /* Setup the shadow-specfic parts of a vcpu struct. Note: The most important
@@ -1314,22 +1315,23 @@ static inline int space_is_available(
 }
 
 /* Dispatcher function: call the per-mode function that will unhook the
- * non-Xen mappings in this top-level shadow mfn */
-static void shadow_unhook_mappings(struct vcpu *v, mfn_t smfn)
+ * non-Xen mappings in this top-level shadow mfn.  With user_only == 1,
+ * unhooks only the user-mode mappings. */
+void shadow_unhook_mappings(struct vcpu *v, mfn_t smfn, int user_only)
 {
     struct page_info *sp = mfn_to_page(smfn);
     switch ( sp->u.sh.type )
     {
     case SH_type_l2_32_shadow:
-        SHADOW_INTERNAL_NAME(sh_unhook_32b_mappings, 2)(v,smfn);
+        SHADOW_INTERNAL_NAME(sh_unhook_32b_mappings, 2)(v, smfn, user_only);
         break;
     case SH_type_l2_pae_shadow:
     case SH_type_l2h_pae_shadow:
-        SHADOW_INTERNAL_NAME(sh_unhook_pae_mappings, 3)(v,smfn);
+        SHADOW_INTERNAL_NAME(sh_unhook_pae_mappings, 3)(v, smfn, user_only);
         break;
 #if CONFIG_PAGING_LEVELS >= 4
     case SH_type_l4_64_shadow:
-        SHADOW_INTERNAL_NAME(sh_unhook_64b_mappings, 4)(v,smfn);
+        SHADOW_INTERNAL_NAME(sh_unhook_64b_mappings, 4)(v, smfn, user_only);
         break;
 #endif
     default:
@@ -1399,7 +1401,7 @@ static void _shadow_prealloc(
             {
                 TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_PREALLOC_UNHOOK);
                 shadow_unhook_mappings(v, 
-                               pagetable_get_mfn(v2->arch.shadow_table[i]));
+                               pagetable_get_mfn(v2->arch.shadow_table[i]), 0);
 
                 /* See if that freed up enough space */
                 if ( space_is_available(d, order, count) )
@@ -1454,7 +1456,7 @@ static void shadow_blow_tables(struct domain *d)
         for ( i = 0 ; i < 4 ; i++ )
             if ( !pagetable_is_null(v->arch.shadow_table[i]) )
                 shadow_unhook_mappings(v, 
-                               pagetable_get_mfn(v->arch.shadow_table[i]));
+                               pagetable_get_mfn(v->arch.shadow_table[i]), 0);
 
     /* Make sure everyone sees the unshadowings */
     flush_tlb_mask(&d->domain_dirty_cpumask);

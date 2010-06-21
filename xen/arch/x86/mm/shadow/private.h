@@ -321,6 +321,8 @@ static inline int sh_type_is_pinnable(struct vcpu *v, unsigned int t)
 
 #endif /* (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) */
 
+#define SHF_pagetable_dying (1u<<31)
+
 static inline int sh_page_has_multiple_shadows(struct page_info *pg)
 {
     u32 shadows;
@@ -405,6 +407,10 @@ int shadow_write_guest_entry(struct vcpu *v, intpte_t *p,
                              intpte_t new, mfn_t gmfn);
 int shadow_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p,
                                intpte_t *old, intpte_t new, mfn_t gmfn);
+
+/* Unhook the non-Xen mappings in this top-level shadow mfn.
+ * With user_only == 1, unhooks only the user-mode mappings. */
+void shadow_unhook_mappings(struct vcpu *v, mfn_t smfn, int user_only);
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
 /* Allow a shadowed page to go out of sync */

@@ -3153,6 +3153,30 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
+    case HVMOP_pagetable_dying:
+    {
+        struct xen_hvm_pagetable_dying a;
+        struct domain *d;
+
+        if ( copy_from_guest(&a, arg, 1) )
+            return -EFAULT;
+
+        rc = rcu_lock_target_domain_by_id(a.domid, &d);
+        if ( rc != 0 )
+            return rc;
+
+        rc = -EINVAL;
+        if ( !is_hvm_domain(d) || !paging_mode_shadow(d) )
+            goto param_fail5;
+
+        rc = 0;
+        pagetable_dying(d, a.gpa);
+
+    param_fail5:
+        rcu_unlock_domain(d);
+        break;
+    }
+
     default:
     {
         gdprintk(XENLOG_WARNING, "Bad HVM op %ld.\n", op);
