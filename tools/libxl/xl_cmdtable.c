@@ -316,18 +316,19 @@ struct cmd_spec *cmdtable_lookup(const char *s)
 {
     struct cmd_spec *cmd = NULL;
     size_t len;
-    int i;
+    int i, count = 0;
 
     if (!s) 
         return NULL;
     len = strlen(s);
     for (i = 0; i < cmdtable_len; i++) {
         if (!strncmp(s, cmd_table[i].cmd_name, len)) {
-            if (cmd == NULL) 
-                cmd = &cmd_table[i];
-            else 
-                return NULL;
+            cmd = &cmd_table[i];
+            /* Take an exact match, even if it also prefixes another command */
+            if (len == strlen(cmd->cmd_name))
+                return cmd;
+            count++;
         }
     }
-    return cmd;
+    return (count == 1) ? cmd : NULL;
 }
