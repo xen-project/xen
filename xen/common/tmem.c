@@ -1483,6 +1483,7 @@ copy_uncompressed:
         pgp_free_data(pgp, pool);
     if ( ( pgp->pfp = tmem_page_alloc(pool) ) == NULL )
         goto failed_dup;
+    pgp->size = 0;
     /* tmh_copy_from_client properly handles len==0 and offsets != 0 */
     ret = tmh_copy_from_client(pgp->pfp,cmfn,tmem_offset,pfn_offset,len,0);
     if ( ret == -EFAULT )
@@ -1492,7 +1493,6 @@ copy_uncompressed:
         if ( pcd_associate(pgp,NULL,0) == -ENOMEM )
             goto failed_dup;
     }
-    pgp->size = 0;
 
 done:
     /* successfully replaced data, clean up and return success */
@@ -1509,12 +1509,14 @@ done:
 bad_copy:
     /* this should only happen if the client passed a bad mfn */
     failed_copies++;
-ASSERT(0);
-    return -EFAULT;
+    ret = -EFAULT;
+    goto cleanup;
 
 failed_dup:
    /* couldn't change out the data, flush the old data and return
     * -ENOSPC instead of -ENOMEM to differentiate failed _dup_ put */
+    ret = -ENOSPC;
+cleanup:
     pgpfound = pgp_delete_from_obj(obj, pgp->index);
     ASSERT(pgpfound == pgp);
     pgp_delete(pgpfound,0);
@@ -1528,7 +1530,7 @@ failed_dup:
         tmem_spin_unlock(&obj->obj_spinlock);
     }
     pool->dup_puts_flushed++;
-    return -ENOSPC;
+    return ret;
 }
 
 
@@ -1579,6 +1581,7 @@ static NOINLINE int do_tmem_put(pool_t *pool,
         goto free;
     ASSERT(ret != -EEXIST);
     pgp->index = index;
+    pgp->size = 0;
 
     if ( len != 0 && client->compress )
     {
@@ -1615,7 +1618,6 @@ copy_uncompressed:
         if ( pcd_associate(pgp,NULL,0) == -ENOMEM )
             goto delete_and_free;
     }
-    pgp->size = 0;
 
 insert_page:
     if ( is_ephemeral(pool) )
@@ -1648,6 +1650,11 @@ insert_page:
         tot_good_eph_puts++;
     return 1;
 
+bad_copy:
+    /* this should only happen if the client passed a bad mfn */
+    ret = -EFAULT;
+    failed_copies++;
+
 delete_and_free:
     ASSERT((obj != NULL) && (pgp != NULL) && (pgp->index != -1));
     pgpdel = pgp_delete_from_obj(obj, pgp->index);
@@ -1669,12 +1676,6 @@ free:
     }
     pool->no_mem_puts++;
     return ret;
-
-bad_copy:
-    /* this should only happen if the client passed a bad mfn */
-    failed_copies++;
-ASSERT(0);
-    goto free;
 }
 
 static NOINLINE int do_tmem_get(pool_t *pool, uint64_t oid, uint32_t index,
@@ -1758,7 +1759,6 @@ static NOINLINE int do_tmem_get(pool_t *pool, uint64_t oid, uint32_t index,
 bad_copy:
     /* this should only happen if the client passed a bad mfn */
     failed_copies++;
-ASSERT(0);
     return -EFAULT;
 
 }

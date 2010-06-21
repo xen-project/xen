@@ -2265,7 +2265,8 @@ static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
     HYPERCALL(xen_version),
     HYPERCALL(event_channel_op),
     HYPERCALL(sched_op),
-    HYPERCALL(hvm_op)
+    HYPERCALL(hvm_op),
+    HYPERCALL(tmem_op)
 };
 
 #else /* defined(__x86_64__) */
@@ -2313,7 +2314,8 @@ static hvm_hypercall_t *hvm_hypercall64_table[NR_hypercalls] = {
     HYPERCALL(xen_version),
     HYPERCALL(event_channel_op),
     HYPERCALL(sched_op),
-    HYPERCALL(hvm_op)
+    HYPERCALL(hvm_op),
+    HYPERCALL(tmem_op)
 };
 
 static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
@@ -2323,7 +2325,8 @@ static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
     HYPERCALL(xen_version),
     HYPERCALL(event_channel_op),
     HYPERCALL(sched_op),
-    HYPERCALL(hvm_op)
+    HYPERCALL(hvm_op),
+    HYPERCALL(tmem_op)
 };
 
 #endif /* defined(__x86_64__) */
