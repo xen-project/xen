@@ -82,8 +82,10 @@ const xc_error *xc_get_last_error(xc_interface *xch)
 
 void xc_clear_last_error(xc_interface *xch)
 {
-    xch->last_error.code = XC_ERROR_NONE;
-    xch->last_error.message[0] = '\0';
+    if (xch) {
+        xch->last_error.code = XC_ERROR_NONE;
+        xch->last_error.message[0] = '\0';
+    }
 }
 
 const char *xc_error_code_to_desc(int code)
