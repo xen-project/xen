@@ -101,7 +101,7 @@ static inline void *cli_mfn_to_va(tmem_cli_mfn_t cmfn, unsigned long *pcli_mfn)
     p2m_type_t t;
 
     cli_mfn = mfn_x(gfn_to_mfn(current->domain, cmfn, &t));
-    if (t != p2m_ram_rw)
+    if (t != p2m_ram_rw || cli_mfn == INVALID_MFN)
         return NULL;
     if (pcli_mfn != NULL)
         *pcli_mfn = cli_mfn;
