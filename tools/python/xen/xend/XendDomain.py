@@ -824,10 +824,16 @@ class XendDomain:
         if type(state) == int:
             state = POWER_STATE_NAMES[state]
         state = state.lower()
-        
-        self.domains_lock.acquire()
+        resu = False
+        count = 0
+        while True:
+            resu = self.domains_lock.acquire(0)
+            if resu or count < 20:
+                break
+            count += 1
         try:
-            self._refresh(refresh_shutdown = False)
+            if resu:
+                self._refresh(refresh_shutdown = False)
             
             # active domains
             active_domains = self.domains.values()
@@ -846,7 +852,8 @@ class XendDomain:
                                   POWER_STATE_NAMES[x._stateGet()].lower() == state,
                               active_domains + inactive_domains)
         finally:
-            self.domains_lock.release()
+            if resu:
+                self.domains_lock.release()
 
 
     def list_sorted(self, state = DOM_STATE_RUNNING):
