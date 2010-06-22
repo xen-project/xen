@@ -1,5 +1,7 @@
 # netlink wrappers
 
+# See include/linux/netlink.h and rtnetlink.h
+
 import socket, struct
 import xen.lowlevel.netlink
 
@@ -77,9 +79,9 @@ class rtattr(object):
         return align(self.rta_len)
 
     def pack(self):
-        self.rta_len = self.fmtlen + align(len(self.body), 2)
+        self.rta_len = self.fmtlen + len(self.body)
         s = struct.pack(self.fmt, self.rta_len, self.rta_type) + self.body
-        pad = self.rta_len - len(s)
+        pad = align(self.rta_len) - len(s)
         if pad:
             s += '\0' * pad
         return s
@@ -127,14 +129,16 @@ class nlmsg(object):
         attr.rta_type = type
         attr.body = data
         self.rta += attr.pack()
+        self.nlmsg_len = len(self)
 
     def settype(self, cmd):
         self.nlmsg_type = cmd
 
     def pack(self):
-        return struct.pack(self.fmt, len(self), self.nlmsg_type,
+        s = struct.pack(self.fmt, len(self), self.nlmsg_type,
                            self.nlmsg_flags, self.nlmsg_seq,
                            self.nlmsg_pid) + self.body + self.rta
+        return s
 
     def unpack(self, msg):
         args = struct.unpack(self.fmt, msg[:self.fmtlen])
