@@ -2,7 +2,7 @@
 #
 # Coordinates with devices at suspend, resume, and commit hooks
 
-import os
+import os, re
 
 import netlink, qdisc, util
 
