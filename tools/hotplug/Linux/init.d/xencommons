@@ -27,7 +27,6 @@ shopt -s extglob
 if test "x$1" = xstart && \
      test -d /proc/xen && \
    ! test -d /proc/xen/capabilities && \
-     grep '	xenfs$' /proc/filesystems >/dev/null && \
    ! grep '^xenfs ' /proc/mounts >/dev/null;
 then
 	mount -t xenfs xenfs /proc/xen
