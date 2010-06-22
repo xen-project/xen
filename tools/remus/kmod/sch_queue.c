@@ -16,7 +16,14 @@
  * So it supports two operations, barrier and release.
  */
 
-#include <linux/config.h>
+#include <linux/version.h>
+#if LINUX_VERSION_CODE == KERNEL_VERSION(2,6,18)
+#  define OLDKERNEL
+#endif
+
+#ifdef OLDKERNEL
+#  include <linux/config.h>
+#endif
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
@@ -24,6 +31,17 @@
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
 #include <net/pkt_sched.h>
+
+#ifdef OLDKERNEL
+#  define compatnlattr rtattr
+#  define compatnllen RTA_PAYLOAD
+#  define compatnldata RTA_DATA
+#else
+#  include <xen/features.h>
+#  define compatnlattr nlattr
+#  define compatnllen nla_len
+#  define compatnldata nla_data
+#endif
 
 /* xenbus directory */
 #define FIFO_BUF    (10*1024*1024)
@@ -43,6 +61,7 @@ struct tc_queue_qopt {
   int action;
 };
 
+#ifdef OLDKERNEL
 /* borrowed from drivers/xen/netback/loopback.c */
 #ifdef CONFIG_X86
 static int is_foreign(unsigned long pfn)
@@ -88,6 +107,12 @@ static int skb_remove_foreign_references(struct sk_buff *skb)
 
   return 1;
 }
+#else /* OLDKERNEL */
+static int skb_remove_foreign_references(struct sk_buff *skb)
+{
+  return !skb_linearize(skb);
+}
+#endif /* OLDKERNEL */
 
 static int queue_enqueue(struct sk_buff *skb, struct Qdisc* sch)
 {
@@ -112,7 +137,7 @@ static int queue_enqueue(struct sk_buff *skb, struct Qdisc* sch)
 
 /* dequeue doesn't actually dequeue until the release command is
  * received. */
-static inline struct sk_buff *queue_dequeue(struct Qdisc* sch)
+static struct sk_buff *queue_dequeue(struct Qdisc* sch)
 {
   struct queue_sched_data *q = qdisc_priv(sch);
   struct sk_buff* peek;
@@ -145,7 +170,7 @@ static inline struct sk_buff *queue_dequeue(struct Qdisc* sch)
   return qdisc_dequeue_head(sch);
 }
 
-static int queue_init(struct Qdisc *sch, struct rtattr *opt)
+static int queue_init(struct Qdisc *sch, struct compatnlattr *opt)
 {
   sch->flags |= TCQ_F_THROTTLED;
 
@@ -155,7 +180,7 @@ static int queue_init(struct Qdisc *sch, struct rtattr *opt)
 /* receives two messages:
  *   0: checkpoint queue (set stop to next packet)
  *   1: dequeue until stop */
-static int queue_change(struct Qdisc* sch, struct rtattr* opt)
+static int queue_change(struct Qdisc* sch, struct compatnlattr* opt)
 {
   struct queue_sched_data *q = qdisc_priv(sch);
   struct tc_queue_qopt* msg;
@@ -163,10 +188,10 @@ static int queue_change(struct Qdisc* sch, struct rtattr* opt)
   struct timeval tv;
   */
 
-  if (!opt || RTA_PAYLOAD(opt) < sizeof(*msg))
+  if (!opt || compatnllen(opt) < sizeof(*msg))
     return -EINVAL;
 
-  msg = RTA_DATA(opt);
+  msg = compatnldata(opt);
 
   if (msg->action == TCQ_CHECKPOINT) {
     /* reset stop */
@@ -174,7 +199,11 @@ static int queue_change(struct Qdisc* sch, struct rtattr* opt)
   } else if (msg->action == TCQ_DEQUEUE) {
     /* dequeue */
     sch->flags &= ~TCQ_F_THROTTLED;
+#ifdef OLDKERNEL
     netif_schedule(sch->dev);
+#else
+    netif_schedule_queue(sch->dev_queue);
+#endif
     /*
     do_gettimeofday(&tv);
     printk("queue release at %lu.%06lu (%d bytes)\n", tv.tv_sec, tv.tv_usec,
@@ -192,8 +221,11 @@ struct Qdisc_ops queue_qdisc_ops = {
   .priv_size   =       sizeof(struct queue_sched_data),
   .enqueue     =       queue_enqueue,
   .dequeue     =       queue_dequeue,
-  .init                =       queue_init,
-  .change       =      queue_change,
+#ifndef OLDKERNEL
+  .peek        =       qdisc_peek_head,
+#endif
+  .init        =       queue_init,
+  .change      =       queue_change,
   .owner       =       THIS_MODULE,
 };
 
