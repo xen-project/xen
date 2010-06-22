@@ -28,9 +28,17 @@
 #                    boots / shuts down.
 ### END INIT INFO
 
-if `xm list &> /dev/null`
+CMD=xm
+$CMD list &> /dev/null
+if test $? -ne 0
 then
-	exit 0
+	CMD=xl
+fi
+
+$CMD list &> /dev/null
+if test $? -ne 0
+then
+	exit 0;
 fi
 
 # Correct exit code would probably be 5, but it's enough 
@@ -164,7 +172,7 @@ contains_something()
 # read name from xen config file
 rdname()
 {
-    NM=$(xm create --quiet --dryrun --defconfig "$1" |
+    NM=$($CMD create --quiet --dryrun --defconfig "$1" |
          sed -n 's/^.*(name \(.*\))$/\1/p')
 }
 
@@ -211,7 +219,7 @@ is_running()
 		RC=0
 		;;
 	esac
-    done < <(xm list -l | grep '(\(domain\|domid\|name\)')
+    done < <($CMD list -l | grep '(\(domain\|domid\|name\)')
     return $RC
 }
 
@@ -235,8 +243,8 @@ start()
                 HEADER=`head -c 16 $dom | head -n 1 2> /dev/null`
                 if [ $HEADER = "LinuxGuestRecord" ]; then
                     echo -n " ${dom##*/}"
-                    XMR=`xm restore $dom 2>&1 1>/dev/null`
-                    #xm restore $dom
+                    XMR=`$CMD restore $dom 2>&1 1>/dev/null`
+                    #$CMD restore $dom
                     if [ $? -ne 0 ]; then
                         echo -e "\nAn error occurred while restoring domain ${dom##*/}:\n$XMR"
                         rc_failed $?
@@ -271,7 +279,7 @@ start()
 	    if [ $? -eq 0 ] || is_running $dom; then
 		echo -n "(skip)"
 	    else
-		XMC=`xm create --quiet --defconfig $dom`
+		XMC=`$CMD create --quiet --defconfig $dom`
 		if [ $? -ne 0 ]; then
 		    echo -e "\nAn error occurred while creating domain ${dom##*/}: $XMC\n"
 		    rc_failed $?
@@ -293,17 +301,17 @@ all_zombies()
 	if test "$state" != "-b---d" -a "$state" != "-----d"; then
 	    return 1;
 	fi
-    done < <(xm list -l | grep '(\(domain\|domid\|name\)')
+    done < <($CMD list -l | grep '(\(domain\|domid\|name\)')
     return 0
 }
 
-# Wait for max $XENDOMAINS_STOP_MAXWAIT for xm $1 to finish;
+# Wait for max $XENDOMAINS_STOP_MAXWAIT for $CMD $1 to finish;
 # if it has not exited by that time kill it, so the init script will
 # succeed within a finite amount of time; if $2 is nonnull, it will
 # kill the command as well as soon as no domain (except for zombies)
 # are left (used for shutdown --all). Third parameter, if any, suppresses
 # output of dots per working state (formatting issues)
-watchdog_xm()
+watchdog_xencmd()
 {
     if test -z "$XENDOMAINS_STOP_MAXWAIT" -o "$XENDOMAINS_STOP_MAXWAIT" = "0"; then
 	exit
@@ -311,8 +319,8 @@ watchdog_xm()
 
     usleep 20000
     for no in `seq 0 $XENDOMAINS_STOP_MAXWAIT`; do
-	# exit if xm save/migrate/shutdown is finished
-	PSAX=`ps axlw | grep "xm $1" | grep -v grep`
+	# exit if $CMD save/migrate/shutdown is finished
+	PSAX=`ps axlw | grep "$CMD $1" | grep -v grep`
 	if test -z "$PSAX"; then exit; fi
 	if ! test -n "$3"; then echo -n '.'; fi
 	sleep 1
@@ -321,7 +329,7 @@ watchdog_xm()
     done
     sleep 1
     read PSF PSUID PSPID PSPPID < <(echo "$PSAX")
-    # kill xm $1
+    # kill $CMD $1
     kill $PSPID >/dev/null 2>&1
     
     echo -e .
@@ -360,7 +368,7 @@ stop()
 	if test -n "$XENDOMAINS_SYSRQ"; then
 	    for sysrq in $XENDOMAINS_SYSRQ; do
 		echo -n "(SR-$sysrq)"
-		XMR=`xm sysrq $id $sysrq 2>&1 1>/dev/null`
+		XMR=`$CMD sysrq $id $sysrq 2>&1 1>/dev/null`
 		if test $? -ne 0; then
 		    echo -e "\nAn error occurred while doing sysrq on domain:\n$XMR\n"
 		    rc_failed $?
@@ -376,9 +384,9 @@ stop()
 	fi
 	if test -n "$XENDOMAINS_MIGRATE"; then
 	    echo -n "(migr)"
-	    watchdog_xm migrate &
+	    watchdog_xencmd migrate &
 	    WDOG_PID=$!
-	    XMR=`xm migrate $id $XENDOMAINS_MIGRATE 2>&1 1>/dev/null`
+	    XMR=`$CMD migrate $id $XENDOMAINS_MIGRATE 2>&1 1>/dev/null`
 	    if test $? -ne 0; then
 		echo -e "\nAn error occurred while migrating domain:\n$XMR\n"
 		rc_failed $?
@@ -395,10 +403,10 @@ stop()
 	fi
 	if test -n "$XENDOMAINS_SAVE"; then
 	    echo -n "(save)"
-	    watchdog_xm save &
+	    watchdog_xencmd save &
 	    WDOG_PID=$!
 	    mkdir -p "$XENDOMAINS_SAVE"
-	    XMR=`xm save $id $XENDOMAINS_SAVE/$name 2>&1 1>/dev/null`
+	    XMR=`$CMD save $id $XENDOMAINS_SAVE/$name 2>&1 1>/dev/null`
 	    if test $? -ne 0; then
 		echo -e "\nAn error occurred while saving domain:\n$XMR\n"
 		rc_failed $?
@@ -414,9 +422,9 @@ stop()
 	if test -n "$XENDOMAINS_SHUTDOWN"; then
 	    # XENDOMAINS_SHUTDOWN should be "--halt --wait"
 	    echo -n "(shut)"
-	    watchdog_xm shutdown &
+	    watchdog_xencmd shutdown &
 	    WDOG_PID=$!
-	    XMR=`xm shutdown $id $XENDOMAINS_SHUTDOWN 2>&1 1>/dev/null`
+	    XMR=`$CMD shutdown $id $XENDOMAINS_SHUTDOWN 2>&1 1>/dev/null`
 	    if test $? -ne 0; then
 		echo -e "\nAn error occurred while shutting down domain:\n$XMR\n"
 		rc_failed $?
@@ -424,7 +432,7 @@ stop()
 	    fi
 	    kill $WDOG_PID >/dev/null 2>&1
 	fi
-    done < <(xm list -l | grep '(\(domain\|domid\|name\)')
+    done < <($CMD list -l | grep '(\(domain\|domid\|name\)')
 
     # NB. this shuts down ALL Xen domains (politely), not just the ones in
     # AUTODIR/*
@@ -433,9 +441,9 @@ stop()
     if ! all_zombies && test -n "$XENDOMAINS_SHUTDOWN_ALL"; then
 	# XENDOMAINS_SHUTDOWN_ALL should be "--all --halt --wait"
 	echo -n " SHUTDOWN_ALL "
-	watchdog_xm shutdown 1 false &
+	watchdog_xencmd shutdown 1 false &
 	WDOG_PID=$!
-	XMR=`xm shutdown $XENDOMAINS_SHUTDOWN_ALL 2>&1 1>/dev/null`
+	XMR=`$CMD shutdown $XENDOMAINS_SHUTDOWN_ALL 2>&1 1>/dev/null`
 	if test $? -ne 0; then
 	    echo -e "\nAn error occurred while shutting down all domains: $XMR\n"
 	    rc_failed $?
@@ -461,7 +469,7 @@ check_domain_up()
 		return 0
 		;;
 	esac
-    done < <(xm list -l | grep '(\(domain\|domid\|name\)')
+    done < <($CMD list -l | grep '(\(domain\|domid\|name\)')
     return 1
 }
 
