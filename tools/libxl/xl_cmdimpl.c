@@ -316,7 +316,8 @@ static void init_console_info(libxl_device_console *console, int dev_num, libxl_
         console->build_state = state;
 }
 
-static void printf_info(libxl_domain_create_info *c_info,
+static void printf_info(int domid,
+                        libxl_domain_create_info *c_info,
                         libxl_domain_build_info *b_info,
                         libxl_device_disk *disks,
                         int num_disks,
@@ -331,117 +332,132 @@ static void printf_info(libxl_domain_create_info *c_info,
                         libxl_device_model_info *dm_info)
 {
     int i;
-    printf("*** domain_create_info ***\n");
-    printf("hvm: %d\n", c_info->hvm);
-    printf("hap: %d\n", c_info->hap);
-    printf("oos: %d\n", c_info->oos);
-    printf("ssidref: %d\n", c_info->ssidref);
-    printf("name: %s\n", c_info->name);
-    printf("uuid: " UUID_FMT "\n",
+    printf("(domain\n\t(domid %d)\n", domid);
+    printf("\t(domain_create_info)\n");
+    printf("\t(hvm %d)\n", c_info->hvm);
+    printf("\t(hap %d)\n", c_info->hap);
+    printf("\t(oos %d)\n", c_info->oos);
+    printf("\t(ssidref %d)\n", c_info->ssidref);
+    printf("\t(name %s)\n", c_info->name);
+    printf("\t(uuid " UUID_FMT ")\n",
            (c_info->uuid)[0], (c_info->uuid)[1], (c_info->uuid)[2], (c_info->uuid)[3],
            (c_info->uuid)[4], (c_info->uuid)[5], (c_info->uuid)[6], (c_info->uuid)[7],
            (c_info->uuid)[8], (c_info->uuid)[9], (c_info->uuid)[10], (c_info->uuid)[11],
            (c_info->uuid)[12], (c_info->uuid)[13], (c_info->uuid)[14], (c_info->uuid)[15]);
-    printf("cpupool: %s (%d)\n", c_info->poolname, c_info->poolid);
+    printf("\t(cpupool %s (%d))\n", c_info->poolname, c_info->poolid);
     if (c_info->xsdata)
-        printf("xsdata: contains data\n");
+        printf("\t(xsdata contains data)\n");
     else
-        printf("xsdata: (null)\n");
+        printf("\t(xsdata (null))\n");
     if (c_info->platformdata)
-        printf("platformdata: contains data\n");
+        printf("\t(platformdata contains data)\n");
     else
-        printf("platformdata: (null)\n");
+        printf("\t(platformdata (null))\n");
 
 
-    printf("\n\n\n*** domain_build_info ***\n");
-    printf("timer_mode: %d\n", b_info->timer_mode);
-    printf("hpet: %d\n", b_info->hpet);
-    printf("vpt_align: %d\n", b_info->vpt_align);
-    printf("max_vcpus: %d\n", b_info->max_vcpus);
-    printf("tsc_mode: %d\n", b_info->tsc_mode);
-    printf("max_memkb: %d\n", b_info->max_memkb);
-    printf("target_memkb: %d\n", b_info->target_memkb);
-    printf("kernel: %s\n", b_info->kernel);
-    printf("hvm: %d\n", b_info->hvm);
+    printf("\t(domain_build_info)\n");
+    printf("\t(timer_mode %d)\n", b_info->timer_mode);
+    printf("\t(hpet %d)\n", b_info->hpet);
+    printf("\t(vpt_align %d)\n", b_info->vpt_align);
+    printf("\t(max_vcpus %d)\n", b_info->max_vcpus);
+    printf("\t(tsc_mode %d)\n", b_info->tsc_mode);
+    printf("\t(max_memkb %d)\n", b_info->max_memkb);
+    printf("\t(target_memkb %d)\n", b_info->target_memkb);
 
+    printf("\t(image\n");
     if (c_info->hvm) {
-        printf("video_memkb: %d\n", b_info->video_memkb);
-        printf("shadow_memkb: %d\n", b_info->shadow_memkb);
-        printf("    pae: %d\n", b_info->u.hvm.pae);
-        printf("    apic: %d\n", b_info->u.hvm.apic);
-        printf("    acpi: %d\n", b_info->u.hvm.acpi);
-        printf("    nx: %d\n", b_info->u.hvm.nx);
-        printf("    viridian: %d\n", b_info->u.hvm.viridian);
+        printf("\t\t(hvm\n");
+        printf("\t\t\t(loader %s)\n", b_info->kernel);
+        printf("\t\t\t(video_memkb %d)\n", b_info->video_memkb);
+        printf("\t\t\t(shadow_memkb %d)\n", b_info->shadow_memkb);
+        printf("\t\t\t(pae %d)\n", b_info->u.hvm.pae);
+        printf("\t\t\t(apic %d)\n", b_info->u.hvm.apic);
+        printf("\t\t\t(acpi %d)\n", b_info->u.hvm.acpi);
+        printf("\t\t\t(nx %d)\n", b_info->u.hvm.nx);
+        printf("\t\t\t(viridian %d)\n", b_info->u.hvm.viridian);
+
+        printf("\t\t\t(device_model %s)\n", dm_info->device_model);
+        printf("\t\t\t(videoram %d)\n", dm_info->videoram);
+        printf("\t\t\t(stdvga %d)\n", dm_info->stdvga);
+        printf("\t\t\t(vnc %d)\n", dm_info->vnc);
+        printf("\t\t\t(vnclisten %s)\n", dm_info->vnclisten);
+        printf("\t\t\t(vncdisplay %d)\n", dm_info->vncdisplay);
+        printf("\t\t\t(vncunused %d)\n", dm_info->vncunused);
+        printf("\t\t\t(keymap %s)\n", dm_info->keymap);
+        printf("\t\t\t(sdl %d)\n", dm_info->sdl);
+        printf("\t\t\t(opengl %d)\n", dm_info->opengl);
+        printf("\t\t\t(nographic %d)\n", dm_info->nographic);
+        printf("\t\t\t(serial %s)\n", dm_info->serial);
+        printf("\t\t\t(boot %s)\n", dm_info->boot);
+        printf("\t\t\t(usb %d)\n", dm_info->usb);
+        printf("\t\t\t(usbdevice %s)\n", dm_info->usbdevice);
+        printf("\t\t\t(apic %d)\n", dm_info->apic);
+        printf("\t\t)\n");
     } else {
-        printf("cmdline: %s\n", b_info->u.pv.cmdline);
-        printf("ramdisk: %s\n", b_info->u.pv.ramdisk);
+        printf("\t\t(linux %d)\n", b_info->hvm);
+        printf("\t\t\t(kernel %s)\n", b_info->kernel);
+        printf("\t\t\t(cmdline %s)\n", b_info->u.pv.cmdline);
+        printf("\t\t\t(ramdisk %s)\n", b_info->u.pv.ramdisk);
+        printf("\t\t)\n");
     }
+    printf("\t)\n");
 
     for (i = 0; i < num_disks; i++) {
-        printf("\n\n\n*** disks_info: %d ***\n", i);
-        printf("backend_domid %d\n", disks[i].backend_domid);
-        printf("domid %d\n", disks[i].domid);
-        printf("physpath %s\n", disks[i].physpath);
-        printf("phystype %d\n", disks[i].phystype);
-        printf("virtpath %s\n", disks[i].virtpath);
-        printf("unpluggable %d\n", disks[i].unpluggable);
-        printf("readwrite %d\n", disks[i].readwrite);
-        printf("is_cdrom %d\n", disks[i].is_cdrom);
+        printf("\t(device\n");
+        printf("\t\t(tap\n");
+        printf("\t\t\t(backend_domid %d)\n", disks[i].backend_domid);
+        printf("\t\t\t(domid %d)\n", disks[i].domid);
+        printf("\t\t\t(physpath %s)\n", disks[i].physpath);
+        printf("\t\t\t(phystype %d)\n", disks[i].phystype);
+        printf("\t\t\t(virtpath %s)\n", disks[i].virtpath);
+        printf("\t\t\t(unpluggable %d)\n", disks[i].unpluggable);
+        printf("\t\t\t(readwrite %d)\n", disks[i].readwrite);
+        printf("\t\t\t(is_cdrom %d)\n", disks[i].is_cdrom);
+        printf("\t\t)\n");
+        printf("\t)\n");
     }
 
     for (i = 0; i < num_vifs; i++) {
-        printf("\n\n\n*** vifs_info: %d ***\n", i);
-        printf("backend_domid %d\n", vifs[i].backend_domid);
-        printf("domid %d\n", vifs[i].domid);
-        printf("devid %d\n", vifs[i].devid);
-        printf("mtu %d\n", vifs[i].mtu);
-        printf("model %s\n", vifs[i].model);
-        printf("mac %02x:%02x:%02x:%02x:%02x:%02x\n", vifs[i].mac[0], vifs[i].mac[1], vifs[i].mac[2], vifs[i].mac[3], vifs[i].mac[4], vifs[i].mac[5]);
+        printf("\t(device\n");
+        printf("\t\t(vif\n");
+        printf("\t\t\t(backend_domid %d)\n", vifs[i].backend_domid);
+        printf("\t\t\t(domid %d)\n", vifs[i].domid);
+        printf("\t\t\t(devid %d)\n", vifs[i].devid);
+        printf("\t\t\t(mtu %d)\n", vifs[i].mtu);
+        printf("\t\t\t(model %s)\n", vifs[i].model);
+        printf("\t\t\t(mac %02x%02x%02x%02x%02x%02x)\n", vifs[i].mac[0], vifs[i].mac[1], vifs[i].mac[2], vifs[i].mac[3], vifs[i].mac[4], vifs[i].mac[5]);
+        printf("\t\t)\n");
+        printf("\t)\n");
     }
 
     for (i = 0; i < num_pcidevs; i++) {
-        printf("\n\n\n*** pcidevs_info: %d ***\n", i);
-        printf("pci dev "PCI_BDF_VDEVFN"\n", pcidevs[i].domain, pcidevs[i].bus, pcidevs[i].dev, pcidevs[i].func, pcidevs[i].vdevfn);
-        printf("opts msitranslate %d power_mgmt %d\n", pcidevs[i].msitranslate, pcidevs[i].power_mgmt);
+        printf("\t(device\n");
+        printf("\t\t(pci\n");
+        printf("\t\t\t(pci dev "PCI_BDF_VDEVFN")\n", pcidevs[i].domain, pcidevs[i].bus, pcidevs[i].dev, pcidevs[i].func, pcidevs[i].vdevfn);
+        printf("\t\t\t(opts msitranslate %d power_mgmt %d)\n", pcidevs[i].msitranslate, pcidevs[i].power_mgmt);
+        printf("\t\t)\n");
+        printf("\t)\n");
     }
 
     for (i = 0; i < num_vfbs; i++) {
-        printf("\n\n\n*** vfbs_info: %d ***\n", i);
-        printf("backend_domid %d\n", vfbs[i].backend_domid);
-        printf("domid %d\n", vfbs[i].domid);
-        printf("devid %d\n", vfbs[i].devid);
-        printf("vnc: %d\n", vfbs[i].vnc);
-        printf("vnclisten: %s\n", vfbs[i].vnclisten);
-        printf("vncdisplay: %d\n", vfbs[i].vncdisplay);
-        printf("vncunused: %d\n", vfbs[i].vncunused);
-        printf("keymap: %s\n", vfbs[i].keymap);
-        printf("sdl: %d\n", vfbs[i].sdl);
-        printf("opengl: %d\n", vfbs[i].opengl);
-        printf("display: %s\n", vfbs[i].display);
-        printf("xauthority: %s\n", vfbs[i].xauthority);
+        printf("\t(device\n");
+        printf("\t\t(vfb\n");
+        printf("\t\t\t(backend_domid %d)\n", vfbs[i].backend_domid);
+        printf("\t\t\t(domid %d)\n", vfbs[i].domid);
+        printf("\t\t\t(devid %d)\n", vfbs[i].devid);
+        printf("\t\t\t(vnc %d)\n", vfbs[i].vnc);
+        printf("\t\t\t(vnclisten %s)\n", vfbs[i].vnclisten);
+        printf("\t\t\t(vncdisplay %d)\n", vfbs[i].vncdisplay);
+        printf("\t\t\t(vncunused %d)\n", vfbs[i].vncunused);
+        printf("\t\t\t(keymap %s)\n", vfbs[i].keymap);
+        printf("\t\t\t(sdl %d)\n", vfbs[i].sdl);
+        printf("\t\t\t(opengl %d)\n", vfbs[i].opengl);
+        printf("\t\t\t(display %s)\n", vfbs[i].display);
+        printf("\t\t\t(xauthority %s)\n", vfbs[i].xauthority);
+        printf("\t\t)\n");
+        printf("\t)\n");
     }
-
-    if (c_info->hvm) {
-        printf("\n\n\n*** device_model_info ***\n");
-        printf("domid: %d\n", dm_info->domid);
-        printf("dom_name: %s\n", dm_info->dom_name);
-        printf("device_model: %s\n", dm_info->device_model);
-        printf("videoram: %d\n", dm_info->videoram);
-        printf("stdvga: %d\n", dm_info->stdvga);
-        printf("vnc: %d\n", dm_info->vnc);
-        printf("vnclisten: %s\n", dm_info->vnclisten);
-        printf("vncdisplay: %d\n", dm_info->vncdisplay);
-        printf("vncunused: %d\n", dm_info->vncunused);
-        printf("keymap: %s\n", dm_info->keymap);
-        printf("sdl: %d\n", dm_info->sdl);
-        printf("opengl: %d\n", dm_info->opengl);
-        printf("nographic: %d\n", dm_info->nographic);
-        printf("serial: %s\n", dm_info->serial);
-        printf("boot: %s\n", dm_info->boot);
-        printf("usb: %d\n", dm_info->usb);
-        printf("usbdevice: %s\n", dm_info->usbdevice);
-        printf("apic: %d\n", dm_info->apic);
-    }
+       printf(")\n");
 }
 
 static void parse_config_data(const char *configfile_filename_report,
@@ -903,6 +919,8 @@ struct domain_create {
     int debug;
     int daemonize;
     int paused;
+    int dryrun;
+    int quiet;
     const char *config_file;
     const char *extra_config; /* extra config string */
     const char *restore_file;
@@ -1043,9 +1061,13 @@ static int create_domain(struct domain_create *dom_info)
         config_file = "<saved>";
     }
 
-    printf("Parsing config file %s\n", config_file);
+    if (!dom_info->quiet)
+        printf("Parsing config file %s\n", config_file);
 
     parse_config_data(config_file, config_data, config_len, &info1, &info2, &disks, &num_disks, &vifs, &num_vifs, &vif2s, &num_vif2s, &pcidevs, &num_pcidevs, &vfbs, &num_vfbs, &vkbs, &num_vkbs, &dm_info);
+
+    if (dom_info->dryrun)
+        return 0;
 
     if (migrate_fd >= 0) {
         if (info1.name) {
@@ -1062,7 +1084,7 @@ static int create_domain(struct domain_create *dom_info)
     }
 
     if (debug)
-        printf_info(&info1, &info2, disks, num_disks, vifs, num_vifs, pcidevs, num_pcidevs, vfbs, num_vfbs, vkbs, num_vkbs, &dm_info);
+        printf_info(-1, &info1, &info2, disks, num_disks, vifs, num_vifs, pcidevs, num_pcidevs, vfbs, num_vfbs, vkbs, num_vkbs, &dm_info);
 
 start:
     domid = 0;
@@ -1729,6 +1751,42 @@ void reboot_domain(char *p)
     find_domain(p);
     rc=libxl_domain_shutdown(&ctx, domid, 1);
     if (rc) { fprintf(stderr,"reboot failed (rc=%d)\n.",rc);exit(-1); }
+}
+
+void list_domains_details(void)
+{
+    struct libxl_dominfo *info;
+    char *config_file;
+    uint8_t *data;
+    int nb_domain, i, len, rc;
+    int num_disks = 0, num_vifs = 0, num_vif2s = 0, num_pcidevs = 0, num_vfbs = 0, num_vkbs = 0;
+    libxl_domain_create_info info1;
+    libxl_domain_build_info info2;
+    libxl_device_model_info dm_info;
+    libxl_device_disk *disks = NULL;
+    libxl_device_nic *vifs = NULL;
+    libxl_device_net2 *vif2s = NULL;
+    libxl_device_pci *pcidevs = NULL;
+    libxl_device_vfb *vfbs = NULL;
+    libxl_device_vkb *vkbs = NULL;
+
+    info = libxl_list_domain(&ctx, &nb_domain);
+
+    if (!info) {
+        fprintf(stderr, "libxl_domain_infolist failed.\n");
+        exit(1);
+    }
+    for (i = 0; i < nb_domain; i++) {
+        rc = libxl_userdata_retrieve(&ctx, info[i].domid, "xl", &data, &len);
+        if (rc)
+            continue;
+        CHK_ERRNO(asprintf(&config_file, "<domid %d data>", info[i].domid));
+        parse_config_data(config_file, (char *)data, len, &info1, &info2, &disks, &num_disks, &vifs, &num_vifs, &vif2s, &num_vif2s, &pcidevs, &num_pcidevs, &vfbs, &num_vfbs, &vkbs, &num_vkbs, &dm_info);
+        printf_info(info[i].domid, &info1, &info2, disks, num_disks, vifs, num_vifs, pcidevs, num_pcidevs, vfbs, num_vfbs, vkbs, num_vkbs, &dm_info);
+        free(data);
+        free(config_file);
+    }
+    free(info);
 }
 
 void list_domains(int verbose)
@@ -2537,9 +2595,24 @@ int main_reboot(int argc, char **argv)
 int main_list(int argc, char **argv)
 {
     int opt, verbose = 0;
+    int details = 0;
+    int option_index = 0;
+    static struct option long_options[] = {
+        {"long", 0, 0, 'l'},
+        {"help", 0, 0, 'h'},
+        {"verbose", 0, 0, 'v'},
+        {0, 0, 0, 0}
+    };
 
-    while ((opt = getopt(argc, argv, "hv")) != -1) {
+    while (1) {
+        opt = getopt_long(argc, argv, "lvh", long_options, &option_index);
+        if (opt == -1)
+            break;
+
         switch (opt) {
+        case 'l':
+            details = 1;
+            break;
         case 'h':
             help("list");
             exit(0);
@@ -2552,7 +2625,10 @@ int main_list(int argc, char **argv)
         }
     }
 
-    list_domains(verbose);
+    if (details)
+        list_domains_details();
+    else
+        list_domains(verbose);
     exit(0);
 }
 
@@ -2581,11 +2657,27 @@ int main_create(int argc, char **argv)
     char *p, extra_config[1024];
     struct domain_create dom_info;
     char dom[10]; /* long enough */
-    int paused = 0, debug = 0, daemonize = 1, console_autoconnect = 0;
+    int paused = 0, debug = 0, daemonize = 1, console_autoconnect = 0,
+        dryrun = 0, quite = 0;
     int opt, rc;
+    int option_index = 0;
+    static struct option long_options[] = {
+        {"dryrun", 0, 0, 'n'},
+        {"quiet", 0, 0, 'q'},
+        {"help", 0, 0, 'h'},
+        {"defconfig", 1, 0, 'f'},
+        {0, 0, 0, 0}
+    };
 
-    while ((opt = getopt(argc, argv, "hpcde")) != -1) {
+    while (1) {
+        opt = getopt_long(argc, argv, "hnqf:pcde", long_options, &option_index);
+        if (opt == -1)
+            break;
+
         switch (opt) {
+        case 'f':
+            filename = optarg;
+            break;
         case 'p':
             paused = 1;
             break;
@@ -2601,6 +2693,12 @@ int main_create(int argc, char **argv)
         case 'h':
             help("create");
             exit(0);
+        case 'n':
+            dryrun = 1;
+            break;
+        case 'q':
+            quite = 1;
+            break;
         default:
             fprintf(stderr, "option not supported\n");
             break;
@@ -2628,6 +2726,8 @@ int main_create(int argc, char **argv)
     dom_info.debug = debug;
     dom_info.daemonize = daemonize;
     dom_info.paused = paused;
+    dom_info.dryrun = dryrun;
+    dom_info.quiet = quite;
     dom_info.config_file = filename;
     dom_info.extra_config = extra_config;
     dom_info.migrate_fd = -1;

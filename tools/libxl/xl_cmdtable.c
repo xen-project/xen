@@ -21,16 +21,22 @@ struct cmd_spec cmd_table[] = {
       &main_create,
       "Create a domain from config file <filename>",
       "<ConfigFile> [options] [vars]",
-      "-h  Print this help.\n"
-      "-p  Leave the domain paused after it is created.\n"
-      "-c  Connect to the console after the domain is created.\n"
-      "-d  Enable debug messages.\n"
-      "-e  Do not wait in the background for the death of the domain."
+      "-h                      Print this help.\n"
+      "-p                      Leave the domain paused after it is created.\n"
+      "-c                      Connect to the console after the domain is created.\n"
+      "-d                      Enable debug messages.\n"
+      "-f=FILE, --defconfig=FILE\n                     Use the given configuration file.\n"
+      "-q, --quiet             Quiet.\n"
+      "-n, --dryrun            Dry run - prints the resulting configuration.\n"
+      "-d                      Enable debug messages.\n"
+      "-e                      Do not wait in the background for the death of the domain."
     },
     { "list",
       &main_list,
       "List information about all/some domains",
-      "[-v] [Domain]",
+      "[options] [Domain]\n",
+      "-l, --long                              Output all VM details"
+      "-v, --verbose                   Prints out UUIDs",
     },
     { "destroy",
       &main_destroy,
