@@ -72,7 +72,8 @@ static PyObject *pyxc_error_to_exception(xc_interface *xch)
     else
         pyerr = Py_BuildValue("(is)", err->code, desc);
 
-    xc_clear_last_error(xch);
+    if (xch)
+        xc_clear_last_error(xch);
 
     if ( pyerr != NULL )
     {
