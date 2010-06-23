@@ -162,8 +162,8 @@ int libxl_wait_for_device_model(struct libxl_ctx *ctx,
                                                       void *userdata),
                                 void *check_callback_userdata);
 int libxl_wait_for_backend(struct libxl_ctx *ctx, char *be_path, char *state);
-int libxl_device_pci_flr(struct libxl_ctx *ctx, unsigned int domain, unsigned int bus,
-                         unsigned int dev, unsigned int func);
+int libxl_device_pci_reset(struct libxl_ctx *ctx, unsigned int domain, unsigned int bus,
+                           unsigned int dev, unsigned int func);
 
 /* from xenguest (helper */
 int hvm_build_set_params(xc_interface *handle, uint32_t domid,

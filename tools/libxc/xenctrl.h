@@ -1517,6 +1517,32 @@ int xc_memshr_debug_gref(xc_interface *xch,
                          uint32_t domid,
                          grant_ref_t gref);
 
+int xc_flask_load(xc_interface *xc_handle, char *buf, uint32_t size);
+int xc_flask_context_to_sid(xc_interface *xc_handle, char *buf, uint32_t size, uint32_t *sid);
+int xc_flask_sid_to_context(xc_interface *xc_handle, int sid, char *buf, uint32_t size);
+int xc_flask_getenforce(xc_interface *xc_handle);
+int xc_flask_setenforce(xc_interface *xc_handle, int mode);
+int xc_flask_add_pirq(xc_interface *xc_handle, unsigned int pirq, char *scontext);
+int xc_flask_add_ioport(xc_interface *xc_handle, unsigned long low, unsigned long high,
+                      char *scontext);
+int xc_flask_add_iomem(xc_interface *xc_handle, unsigned long low, unsigned long high,
+                     char *scontext);
+int xc_flask_add_device(xc_interface *xc_handle, unsigned long device, char *scontext);
+int xc_flask_del_pirq(xc_interface *xc_handle, unsigned int pirq);
+int xc_flask_del_ioport(xc_interface *xc_handle, unsigned long low, unsigned long high);
+int xc_flask_del_iomem(xc_interface *xc_handle, unsigned long low, unsigned long high);
+int xc_flask_del_device(xc_interface *xc_handle, unsigned long device);
+int xc_flask_access(xc_interface *xc_handle, const char *scon, const char *tcon,
+                  uint16_t tclass, uint32_t req,
+                  uint32_t *allowed, uint32_t *decided,
+                  uint32_t *auditallow, uint32_t *auditdeny,
+                  uint32_t *seqno);
+int xc_flask_avc_cachestats(xc_interface *xc_handle, char *buf, int size);
+int xc_flask_policyvers(xc_interface *xc_handle, char *buf, int size);
+int xc_flask_avc_hashstats(xc_interface *xc_handle, char *buf, int size);
+int xc_flask_getavc_threshold(xc_interface *xc_handle);
+int xc_flask_setavc_threshold(xc_interface *xc_handle, int threshold);
+
 struct elf_binary;
 void xc_elf_set_logfile(struct xc_interface *xch, struct elf_binary *elf,
                         int verbose);

@@ -22,6 +22,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <fcntl.h>
+
 
 #include "libxl.h"
 #include "libxl_internal.h"
@@ -389,22 +391,36 @@ int libxl_device_del(struct libxl_ctx *ctx, libxl_device *dev, int wait)
     return 0;
 }
 
-int libxl_device_pci_flr(struct libxl_ctx *ctx, unsigned int domain, unsigned int bus,
+int libxl_device_pci_reset(struct libxl_ctx *ctx, unsigned int domain, unsigned int bus,
                          unsigned int dev, unsigned int func)
 {
-    char *do_flr = "/sys/bus/pci/drivers/pciback/do_flr";
-    FILE *fd;
+    char *reset = "/sys/bus/pci/drivers/pciback/do_flr";
+    int fd, rc;
 
-    fd = fopen(do_flr, "w");
-    if (fd != NULL) {
-        fprintf(fd, PCI_BDF, domain, bus, dev, func);
-        fclose(fd);
-        return 0;
+    fd = open(reset, O_WRONLY);
+    if (fd > 0) {
+        char *buf = libxl_sprintf(ctx, PCI_BDF, domain, bus, dev, func);
+        rc = write(fd, buf, strlen(buf));
+        if (rc < 0)
+            XL_LOG(ctx, XL_LOG_ERROR, "write to %s returned %d", reset, rc);
+        close(fd);
+        return rc < 0 ? rc : 0;
+    }
+    if (errno != ENOENT)
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "Failed to access pciback path %s", reset);
+    reset = libxl_sprintf(ctx, "/sys/bus/pci/devices/"PCI_BDF"/reset", domain, bus, dev, func);
+    fd = open(reset, O_WRONLY);
+    if (fd > 0) {
+        rc = write(fd, "1", 1);
+        if (rc < 0)
+            XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "write to %s returned %d", reset, rc);
+        close(fd);
+        return rc < 0 ? rc : 0;
     }
     if (errno == ENOENT) {
-        XL_LOG(ctx, XL_LOG_ERROR, "Pciback doesn't support do_flr, cannot flr the device");
+        XL_LOG(ctx, XL_LOG_ERROR, "The kernel doesn't support PCI device reset from sysfs");
     } else {
-        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "Failed to access pciback path %s", do_flr);
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "Failed to access reset path %s", reset);
     }
     return -1;
 }
@@ -418,7 +434,7 @@ int libxl_wait_for_device_model(struct libxl_ctx *ctx,
     char *path;
     char *p;
     unsigned int len;
-    int rc;
+    int rc = 0;
     struct xs_handle *xsh;
     int nfds;
     fd_set rfds;
@@ -432,28 +448,29 @@ int libxl_wait_for_device_model(struct libxl_ctx *ctx,
     tv.tv_sec = LIBXL_DEVICE_MODEL_START_TIMEOUT;
     tv.tv_usec = 0;
     nfds = xs_fileno(xsh) + 1;
-    while (tv.tv_sec > 0) {
+    while (rc > 0 || (!rc && tv.tv_sec > 0)) {
+        p = xs_read(xsh, XBT_NULL, path, &len);
+        if (p && (!state || !strcmp(state, p))) {
+            free(p);
+            xs_unwatch(xsh, path, path);
+            xs_daemon_close(xsh);
+            if (check_callback) {
+                rc = check_callback(ctx, check_callback_userdata);
+                if (rc) return rc;
+            }
+            return 0;
+        }
+        free(p);
+again:
         FD_ZERO(&rfds);
         FD_SET(xs_fileno(xsh), &rfds);
-        if (select(nfds, &rfds, NULL, NULL, &tv) > 0) {
+        rc = select(nfds, &rfds, NULL, NULL, &tv);
+        if (rc > 0) {
             l = xs_read_watch(xsh, &num);
-            if (l != NULL) {
+            if (l != NULL)
                 free(l);
-                p = xs_read(xsh, XBT_NULL, path, &len);
-                if (!p)
-                    continue;
-                if (!state || !strcmp(state, p)) {
-                    free(p);
-                    xs_unwatch(xsh, path, path);
-                    xs_daemon_close(xsh);
-                    if (check_callback) {
-                        rc = check_callback(ctx, check_callback_userdata);
-                        if (rc) return rc;
-                    }
-                    return 0;
-                }
-                free(p);
-            }
+            else
+                goto again;
         }
     }
     xs_unwatch(xsh, path, path);
