@@ -2850,6 +2850,11 @@ EXPORT void *tmem_relinquish_pages(unsigned int order, unsigned int memflags)
     return pfp;
 }
 
+EXPORT unsigned long tmem_freeable_pages(void)
+{
+    return tmh_freeable_pages();
+}
+
 /* called at hypervisor startup */
 static int __init init_tmem(void)
 {

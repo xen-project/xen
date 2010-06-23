@@ -316,11 +316,14 @@ static struct page_info *alloc_heap_pages(
     spin_lock(&heap_lock);
 
     /*
-     * TMEM: When available memory is scarce, allow only mid-size allocations
-     * to avoid worst of fragmentation issues. Others try TMEM pools then fail.
+     * TMEM: When available memory is scarce due to tmem absorbing it, allow
+     * only mid-size allocations to avoid worst of fragmentation issues.
+     * Others try tmem pools then fail.  This is a workaround until all
+     * post-dom0-creation-multi-page allocations can be eliminated.
      */
     if ( opt_tmem && ((order == 0) || (order >= 9)) &&
-         (total_avail_pages <= midsize_alloc_zone_pages) )
+         (total_avail_pages <= midsize_alloc_zone_pages) &&
+         tmem_freeable_pages() )
         goto try_tmem;
 
     /*
