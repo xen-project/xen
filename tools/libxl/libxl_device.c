@@ -22,6 +22,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <fcntl.h>
+
 
 #include "libxl.h"
 #include "libxl_internal.h"
@@ -389,22 +391,36 @@ int libxl_device_del(struct libxl_ctx *ctx, libxl_device *dev, int wait)
     return 0;
 }
 
-int libxl_device_pci_flr(struct libxl_ctx *ctx, unsigned int domain, unsigned int bus,
+int libxl_device_pci_reset(struct libxl_ctx *ctx, unsigned int domain, unsigned int bus,
                          unsigned int dev, unsigned int func)
 {
-    char *do_flr = "/sys/bus/pci/drivers/pciback/do_flr";
-    FILE *fd;
+    char *reset = "/sys/bus/pci/drivers/pciback/do_flr";
+    int fd, rc;
 
-    fd = fopen(do_flr, "w");
-    if (fd != NULL) {
-        fprintf(fd, PCI_BDF, domain, bus, dev, func);
-        fclose(fd);
-        return 0;
+    fd = open(reset, O_WRONLY);
+    if (fd > 0) {
+        char *buf = libxl_sprintf(ctx, PCI_BDF, domain, bus, dev, func);
+        rc = write(fd, buf, strlen(buf));
+        if (rc < 0)
+            XL_LOG(ctx, XL_LOG_ERROR, "write to %s returned %d", reset, rc);
+        close(fd);
+        return rc < 0 ? rc : 0;
+    }
+    if (errno != ENOENT)
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "Failed to access pciback path %s", reset);
+    reset = libxl_sprintf(ctx, "/sys/bus/pci/devices/"PCI_BDF"/reset", domain, bus, dev, func);
+    fd = open(reset, O_WRONLY);
+    if (fd > 0) {
+        rc = write(fd, "1", 1);
+        if (rc < 0)
+            XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "write to %s returned %d", reset, rc);
+        close(fd);
+        return rc < 0 ? rc : 0;
     }
     if (errno == ENOENT) {
-        XL_LOG(ctx, XL_LOG_ERROR, "Pciback doesn't support do_flr, cannot flr the device");
+        XL_LOG(ctx, XL_LOG_ERROR, "The kernel doesn't support PCI device reset from sysfs");
     } else {
-        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "Failed to access pciback path %s", do_flr);
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "Failed to access reset path %s", reset);
     }
     return -1;
 }
