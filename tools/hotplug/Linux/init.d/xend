@@ -37,6 +37,10 @@ function await_daemons_up
 
 case "$1" in
   start)
+	if [ -z "`ps -C xenconsoled -o pid=`" ]; then
+		echo "xencommons should be started first."
+		exit 1
+	fi
 	mkdir -p /var/lock/subsys
 	touch /var/lock/subsys/xend
 	xend start
