@@ -34,10 +34,7 @@
 #include <caml/callback.h>
 #include <caml/fail.h>
 
-#define EVENTCHN_PATH "/dev/xen/eventchn"
-
-static int eventchn_major = 10;
-static int eventchn_minor = 61;
+#define EVENTCHN_PATH "/dev/xen/evtchn"
 
 static int do_ioctl(int handle, int cmd, void *arg)
 {
@@ -56,15 +53,7 @@ static int do_write_port(int handle, evtchn_port_t port)
 
 int eventchn_do_open(void)
 {
-	int fd;
-
-	fd = open(EVENTCHN_PATH, O_RDWR);
-	if (fd == -1 && errno == ENOENT) {
-		mkdir("/dev/xen", 0640);
-		mknod(EVENTCHN_PATH, S_IFCHR | 0640, makedev(eventchn_major, eventchn_minor));
-		fd = open(EVENTCHN_PATH, O_RDWR);
-	}
-	return fd;
+	return open(EVENTCHN_PATH, O_RDWR);
 }
 
 CAMLprim value stub_eventchn_init(value unit)
