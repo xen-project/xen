@@ -39,7 +39,7 @@ static void unexpected_thermal_interrupt(struct cpu_user_regs *regs)
 /* P4/Xeon Thermal transition interrupt handler */
 static void intel_thermal_interrupt(struct cpu_user_regs *regs)
 {
-    u32 l, h;
+    uint64_t msr_content;
     unsigned int cpu = smp_processor_id();
     static s_time_t next[NR_CPUS];
 
@@ -48,8 +48,8 @@ static void intel_thermal_interrupt(struct cpu_user_regs *regs)
         return;
 
     next[cpu] = NOW() + MILLISECS(5000);
-    rdmsr(MSR_IA32_THERM_STATUS, l, h);
-    if (l & 0x1) {
+    rdmsrl(MSR_IA32_THERM_STATUS, msr_content);
+    if (msr_content & 0x1) {
         printk(KERN_EMERG "CPU%d: Temperature above threshold\n", cpu);
         printk(KERN_EMERG "CPU%d: Running in modulated clock mode\n",
                 cpu);
@@ -75,7 +75,8 @@ fastcall void smp_thermal_interrupt(struct cpu_user_regs *regs)
 /* P4/Xeon Thermal regulation detect and init */
 static void intel_init_thermal(struct cpuinfo_x86 *c)
 {
-    u32 l, h;
+    uint64_t msr_content;
+    uint32_t val;
     int tm2 = 0;
     unsigned int cpu = smp_processor_id();
 
@@ -91,39 +92,38 @@ static void intel_init_thermal(struct cpuinfo_x86 *c)
      * be some SMM goo which handles it, so we can't even put a handler
      * since it might be delivered via SMI already -zwanem.
      */
-    rdmsr (MSR_IA32_MISC_ENABLE, l, h);
-    h = apic_read(APIC_LVTTHMR);
-    if ((l & (1<<3)) && (h & APIC_DM_SMI)) {
+    rdmsrl(MSR_IA32_MISC_ENABLE, msr_content);
+    val = apic_read(APIC_LVTTHMR);
+    if ((msr_content & (1ULL<<3)) && (val & APIC_DM_SMI)) {
         printk(KERN_DEBUG "CPU%d: Thermal monitoring handled by SMI\n",cpu);
         return; /* -EBUSY */
     }
 
-    if (cpu_has(c, X86_FEATURE_TM2) && (l & (1 << 13)))
+    if (cpu_has(c, X86_FEATURE_TM2) && (msr_content & (1ULL << 13)))
         tm2 = 1;
 
     /* check whether a vector already exists, temporarily masked? */
-    if (h & APIC_VECTOR_MASK) {
+    if (val & APIC_VECTOR_MASK) {
         printk(KERN_DEBUG "CPU%d: Thermal LVT vector (%#x) already installed\n",
-                 cpu, (h & APIC_VECTOR_MASK));
+                 cpu, (val & APIC_VECTOR_MASK));
         return; /* -EBUSY */
     }
 
     /* The temperature transition interrupt handler setup */
-    h = THERMAL_APIC_VECTOR;    /* our delivery vector */
-    h |= (APIC_DM_FIXED | APIC_LVT_MASKED);  /* we'll mask till we're ready */
-    apic_write_around(APIC_LVTTHMR, h);
+    val = THERMAL_APIC_VECTOR;    /* our delivery vector */
+    val |= (APIC_DM_FIXED | APIC_LVT_MASKED);  /* we'll mask till we're ready */
+    apic_write_around(APIC_LVTTHMR, val);
 
-    rdmsr (MSR_IA32_THERM_INTERRUPT, l, h);
-    wrmsr (MSR_IA32_THERM_INTERRUPT, l | 0x03 , h);
+    rdmsrl(MSR_IA32_THERM_INTERRUPT, msr_content);
+    wrmsrl(MSR_IA32_THERM_INTERRUPT, msr_content | 0x03);
 
     /* ok we're good to go... */
     vendor_thermal_interrupt = intel_thermal_interrupt;
 
-    rdmsr (MSR_IA32_MISC_ENABLE, l, h);
-    wrmsr (MSR_IA32_MISC_ENABLE, l | (1<<3), h);
+    rdmsrl(MSR_IA32_MISC_ENABLE, msr_content);
+    wrmsrl(MSR_IA32_MISC_ENABLE, msr_content | (1ULL<<3));
 
-    l = apic_read (APIC_LVTTHMR);
-    apic_write_around (APIC_LVTTHMR, l & ~APIC_LVT_MASKED);
+    apic_write_around(APIC_LVTTHMR, apic_read(APIC_LVTTHMR) & ~APIC_LVT_MASKED);
     if (opt_cpu_info)
         printk(KERN_INFO "CPU%u: Thermal monitoring enabled (%s)\n",
                 cpu, tm2 ? "TM2" : "TM1");
@@ -1128,21 +1128,21 @@ static int mce_is_broadcast(struct cpuinfo_x86 *c)
 static void intel_init_mca(struct cpuinfo_x86 *c)
 {
     int broadcast, cmci=0, ser=0, ext_num = 0, first;
-    u32 l, h;
+    uint64_t msr_content;
 
     broadcast = mce_is_broadcast(c);
 
-    rdmsr(MSR_IA32_MCG_CAP, l, h);
+    rdmsrl(MSR_IA32_MCG_CAP, msr_content);
 
-    if ((l & MCG_CMCI_P) && cpu_has_apic)
+    if ((msr_content & MCG_CMCI_P) && cpu_has_apic)
         cmci = 1;
 
     /* Support Software Error Recovery */
-    if (l & MCG_SER_P)
+    if (msr_content & MCG_SER_P)
         ser = 1;
 
-    if (l & MCG_EXT_P)
-        ext_num = (l >> MCG_EXT_CNT) & 0xff;
+    if (msr_content & MCG_EXT_P)
+        ext_num = (msr_content >> MCG_EXT_CNT) & 0xff;
 
     first = mce_firstbank(c);
 
@@ -1186,7 +1186,7 @@ static void intel_mce_post_reset(void)
 
 static void intel_init_mce(void)
 {
-    u32 l, h;
+    uint64_t msr_content;
     int i;
 
     intel_mce_post_reset();
@@ -1196,17 +1196,17 @@ static void intel_init_mce(void)
     {
         /* Some banks are shared across cores, use MCi_CTRL to judge whether
          * this bank has been initialized by other cores already. */
-        rdmsr(MSR_IA32_MCx_CTL(i), l, h);
-        if (!(l | h))
+        rdmsrl(MSR_IA32_MCx_CTL(i), msr_content);
+        if (!msr_content)
         {
             /* if ctl is 0, this bank is never initialized */
             mce_printk(MCE_VERBOSE, "mce_init: init bank%d\n", i);
-            wrmsr (MSR_IA32_MCx_CTL(i), 0xffffffff, 0xffffffff);
-            wrmsr (MSR_IA32_MCx_STATUS(i), 0x0, 0x0);
+            wrmsrl(MSR_IA32_MCx_CTL(i), 0xffffffffffffffffULL);
+            wrmsrl(MSR_IA32_MCx_STATUS(i), 0x0ULL);
         }
     }
     if (firstbank) /* if cmci enabled, firstbank = 0 */
-        wrmsr (MSR_IA32_MC0_STATUS, 0x0, 0x0);
+        wrmsrl(MSR_IA32_MC0_STATUS, 0x0ULL);
 
     x86_mce_vector_register(intel_machine_check);
     mce_recoverable_register(intel_recoverable_scan);
