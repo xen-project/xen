@@ -62,7 +62,7 @@ static DEFINE_SPINLOCK(microcode_update_lock);
 static int collect_cpu_info(int cpu_num, struct cpu_signature *csig)
 {
     struct cpuinfo_x86 *c = &cpu_data[cpu_num];
-    unsigned int val[2];
+    uint64_t msr_content;
 
     BUG_ON(cpu_num != smp_processor_id());
 
@@ -81,15 +81,16 @@ static int collect_cpu_info(int cpu_num, struct cpu_signature *csig)
     if ( (c->x86_model >= 5) || (c->x86 > 6) )
     {
         /* get processor flags from MSR 0x17 */
-        rdmsr(MSR_IA32_PLATFORM_ID, val[0], val[1]);
-        csig->pf = 1 << ((val[1] >> 18) & 7);
+        rdmsrl(MSR_IA32_PLATFORM_ID, msr_content);
+        csig->pf = 1 << ((msr_content >> 50) & 7);
     }
 
-    wrmsr(MSR_IA32_UCODE_REV, 0, 0);
+    wrmsrl(MSR_IA32_UCODE_REV, 0x0ULL);
     /* see notes above for revision 1.07.  Apparent chip bug */
     sync_core();
     /* get the current revision from MSR 0x8B */
-    rdmsr(MSR_IA32_UCODE_REV, val[0], csig->rev);
+    rdmsrl(MSR_IA32_UCODE_REV, msr_content);
+    csig->rev = (uint32_t)(msr_content >> 32);
     pr_debug("microcode: collect_cpu_info : sig=0x%x, pf=0x%x, rev=0x%x\n",
              csig->sig, csig->pf, csig->rev);
 
@@ -249,6 +250,7 @@ static int get_matching_microcode(void *mc, int cpu)
 static int apply_microcode(int cpu)
 {
     unsigned long flags;
+    uint64_t msr_content;
     unsigned int val[2];
     int cpu_num = raw_smp_processor_id();
     struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu_num);
@@ -263,16 +265,15 @@ static int apply_microcode(int cpu)
     spin_lock_irqsave(&microcode_update_lock, flags);
 
     /* write microcode via MSR 0x79 */
-    wrmsr(MSR_IA32_UCODE_WRITE,
-          (unsigned long) uci->mc.mc_intel->bits,
-          (unsigned long) uci->mc.mc_intel->bits >> 16 >> 16);
-    wrmsr(MSR_IA32_UCODE_REV, 0, 0);
+    wrmsrl(MSR_IA32_UCODE_WRITE, (unsigned long)uci->mc.mc_intel->bits);
+    wrmsrl(MSR_IA32_UCODE_REV, 0x0ULL);
 
     /* see notes above for revision 1.07.  Apparent chip bug */
     sync_core();
 
     /* get the current revision from MSR 0x8B */
-    rdmsr(MSR_IA32_UCODE_REV, val[0], val[1]);
+    rdmsrl(MSR_IA32_UCODE_REV, msr_content);
+    val[1] = (uint32_t)(msr_content >> 32);
 
     spin_unlock_irqrestore(&microcode_update_lock, flags);
     if ( val[1] != uci->mc.mc_intel->hdr.rev )

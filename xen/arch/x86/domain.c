@@ -1088,21 +1088,15 @@ static void load_segments(struct vcpu *n)
     {
         /* This can only be non-zero if selector is NULL. */
         if ( nctxt->fs_base )
-            wrmsr(MSR_FS_BASE,
-                  nctxt->fs_base,
-                  nctxt->fs_base>>32);
+            wrmsrl(MSR_FS_BASE, nctxt->fs_base);
 
         /* Most kernels have non-zero GS base, so don't bother testing. */
         /* (This is also a serialising instruction, avoiding AMD erratum #88.) */
-        wrmsr(MSR_SHADOW_GS_BASE,
-              nctxt->gs_base_kernel,
-              nctxt->gs_base_kernel>>32);
+        wrmsrl(MSR_SHADOW_GS_BASE, nctxt->gs_base_kernel);
 
         /* This can only be non-zero if selector is NULL. */
         if ( nctxt->gs_base_user )
-            wrmsr(MSR_GS_BASE,
-                  nctxt->gs_base_user,
-                  nctxt->gs_base_user>>32);
+            wrmsrl(MSR_GS_BASE, nctxt->gs_base_user);
 
         /* If in kernel mode then switch the GS bases around. */
         if ( (n->arch.flags & TF_kernel_mode) )

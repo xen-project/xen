@@ -276,9 +276,9 @@ static void __pminit setup_p6_watchdog(unsigned counter)
 
 static int __pminit setup_p4_watchdog(void)
 {
-    unsigned int misc_enable, dummy;
+    uint64_t misc_enable;
 
-    rdmsr(MSR_IA32_MISC_ENABLE, misc_enable, dummy);
+    rdmsrl(MSR_IA32_MISC_ENABLE, misc_enable);
     if (!(misc_enable & MSR_IA32_MISC_ENABLE_PERF_AVAIL))
         return 0;
 
@@ -304,11 +304,11 @@ static int __pminit setup_p4_watchdog(void)
     clear_msr_range(MSR_P4_BPU_CCCR0, 18);
     clear_msr_range(MSR_P4_BPU_PERFCTR0, 18);
         
-    wrmsr(MSR_P4_CRU_ESCR0, P4_NMI_CRU_ESCR0, 0);
-    wrmsr(MSR_P4_IQ_CCCR0, P4_NMI_IQ_CCCR0 & ~P4_CCCR_ENABLE, 0);
+    wrmsrl(MSR_P4_CRU_ESCR0, P4_NMI_CRU_ESCR0);
+    wrmsrl(MSR_P4_IQ_CCCR0, P4_NMI_IQ_CCCR0 & ~P4_CCCR_ENABLE);
     write_watchdog_counter("P4_IQ_COUNTER0");
     apic_write(APIC_LVTPC, APIC_DM_NMI);
-    wrmsr(MSR_P4_IQ_CCCR0, nmi_p4_cccr_val, 0);
+    wrmsrl(MSR_P4_IQ_CCCR0, nmi_p4_cccr_val);
     return 1;
 }
 
@@ -442,7 +442,7 @@ void nmi_watchdog_tick(struct cpu_user_regs * regs)
              * - LVTPC is masked on interrupt and must be
              *   unmasked by the LVTPC handler.
              */
-            wrmsr(MSR_P4_IQ_CCCR0, nmi_p4_cccr_val, 0);
+            wrmsrl(MSR_P4_IQ_CCCR0, nmi_p4_cccr_val);
             apic_write(APIC_LVTPC, APIC_DM_NMI);
         }
         else if ( nmi_perfctr_msr == MSR_P6_PERFCTR0 )

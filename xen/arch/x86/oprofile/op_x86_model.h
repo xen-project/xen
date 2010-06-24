@@ -11,14 +11,9 @@
 #ifndef OP_X86_MODEL_H
 #define OP_X86_MODEL_H
 
-struct op_saved_msr {
-	unsigned int high;
-	unsigned int low;
-};
-
 struct op_msr {
 	unsigned long addr;
-	struct op_saved_msr saved;
+	uint64_t value;
 };
 
 struct op_msrs {

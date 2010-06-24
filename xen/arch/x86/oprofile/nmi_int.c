@@ -104,15 +104,11 @@ static void nmi_cpu_save_registers(struct op_msrs *msrs)
 	unsigned int i;
 
 	for (i = 0; i < nr_ctrs; ++i) {
-		rdmsr(counters[i].addr,
-			counters[i].saved.low,
-			counters[i].saved.high);
+		rdmsrl(counters[i].addr, counters[i].value);
 	}
  
 	for (i = 0; i < nr_ctrls; ++i) {
-		rdmsr(controls[i].addr,
-			controls[i].saved.low,
-			controls[i].saved.high);
+		rdmsrl(controls[i].addr, controls[i].value);
 	}
 }
 
@@ -222,15 +218,11 @@ static void nmi_restore_registers(struct op_msrs * msrs)
 	unsigned int i;
 
 	for (i = 0; i < nr_ctrls; ++i) {
-		wrmsr(controls[i].addr,
-			controls[i].saved.low,
-			controls[i].saved.high);
+		wrmsrl(controls[i].addr, controls[i].value);
 	}
  
 	for (i = 0; i < nr_ctrs; ++i) {
-		wrmsr(counters[i].addr,
-			counters[i].saved.low,
-			counters[i].saved.high);
+		wrmsrl(counters[i].addr, counters[i].value);
 	}
 }
  
