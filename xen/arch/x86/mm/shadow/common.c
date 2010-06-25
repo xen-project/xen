@@ -3241,9 +3241,12 @@ void shadow_teardown(struct domain *d)
         {
             int i;
             mfn_t *oos_snapshot = v->arch.paging.shadow.oos_snapshot;
-            for(i = 0; i < SHADOW_OOS_PAGES; i++)
+            for ( i = 0; i < SHADOW_OOS_PAGES; i++ )
                 if ( mfn_valid(oos_snapshot[i]) )
+                {
                     shadow_free(d, oos_snapshot[i]);
+                    oos_snapshot[i] = _mfn(INVALID_MFN);
+                }
         }
 #endif /* OOS */
     }
@@ -3395,17 +3398,23 @@ static int shadow_one_bit_disable(struct domain *d, u32 mode)
 #endif
                 make_cr3(v, pagetable_get_pfn(v->arch.guest_table));
 
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) 
+            {
+                int i;
+                mfn_t *oos_snapshot = v->arch.paging.shadow.oos_snapshot;
+                for ( i = 0; i < SHADOW_OOS_PAGES; i++ )
+                    if ( mfn_valid(oos_snapshot[i]) )
+                    {
+                        shadow_free(d, oos_snapshot[i]);
+                        oos_snapshot[i] = _mfn(INVALID_MFN);
+                    }
+            }
+#endif /* OOS */
         }
 
         /* Pull down the memory allocation */
         if ( sh_set_allocation(d, 0, NULL) != 0 )
-        {
-            // XXX - How can this occur?
-            //       Seems like a bug to return an error now that we've
-            //       disabled the relevant shadow mode.
-            //
-            return -ENOMEM;
-        }
+            BUG(); /* In fact, we will have BUG()ed already */
         shadow_hash_teardown(d);
         SHADOW_PRINTK("un-shadowing of domain %u done."
                        "  Shadow pages total = %u, free = %u, p2m=%u\n",

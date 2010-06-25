@@ -700,23 +700,21 @@ int paging_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
      */
     switch ( sc->op )
     {
+
+    case XEN_DOMCTL_SHADOW_OP_ENABLE:
+        if ( !(sc->mode & XEN_DOMCTL_SHADOW_ENABLE_LOG_DIRTY) )
+            break;
+        /* Else fall through... */
     case XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY:
         if ( hap_enabled(d) )
             hap_logdirty_init(d);
         return paging_log_dirty_enable(d);
 
-    case XEN_DOMCTL_SHADOW_OP_ENABLE:
-        if ( sc->mode & XEN_DOMCTL_SHADOW_ENABLE_LOG_DIRTY )
-        {
-            if ( hap_enabled(d) )
-                hap_logdirty_init(d);
-            return paging_log_dirty_enable(d);
-        }
-
     case XEN_DOMCTL_SHADOW_OP_OFF:
         if ( paging_mode_log_dirty(d) )
             if ( (rc = paging_log_dirty_disable(d)) != 0 )
                 return rc;
+        break;
 
     case XEN_DOMCTL_SHADOW_OP_CLEAN:
     case XEN_DOMCTL_SHADOW_OP_PEEK:
