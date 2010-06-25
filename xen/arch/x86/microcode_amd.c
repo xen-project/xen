@@ -47,7 +47,6 @@ struct equiv_cpu_entry *equiv_cpu_table;
 static int collect_cpu_info(int cpu, struct cpu_signature *csig)
 {
     struct cpuinfo_x86 *c = &cpu_data[cpu];
-    uint32_t dummy;
 
     memset(csig, 0, sizeof(*csig));
 
@@ -58,7 +57,7 @@ static int collect_cpu_info(int cpu, struct cpu_signature *csig)
         return -EINVAL;
     }
 
-    rdmsr(MSR_AMD_PATCHLEVEL, csig->rev, dummy);
+    rdmsrl(MSR_AMD_PATCHLEVEL, csig->rev);
 
     printk(KERN_INFO "microcode: collect_cpu_info: patch_id=0x%x\n",
            csig->rev);
@@ -126,7 +125,7 @@ static int apply_microcode(int cpu)
 {
     unsigned long flags;
     struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
-    uint32_t rev, dummy;
+    uint32_t rev;
     struct microcode_amd *mc_amd = uci->mc.mc_amd;
 
     /* We should bind the task to the CPU */
@@ -140,7 +139,7 @@ static int apply_microcode(int cpu)
     wrmsrl(MSR_AMD_PATCHLOADER, (unsigned long)&mc_amd->hdr.data_code);
 
     /* get patch id after patching */
-    rdmsr(MSR_AMD_PATCHLEVEL, rev, dummy);
+    rdmsrl(MSR_AMD_PATCHLEVEL, rev);
 
     spin_unlock_irqrestore(&microcode_update_lock, flags);
 

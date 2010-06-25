@@ -559,6 +559,7 @@ skip_move:
 
     late_setup_arch(&cmdline);
 
+    timer_init();
     idle_vcpu[0] = (struct vcpu*) ia64_r13;
     scheduler_init();
 
@@ -569,7 +570,6 @@ skip_move:
     local_irq_disable();
     init_IRQ ();
     init_xen_time(); /* initialise the time */
-    timer_init();
 
     rcu_init();
 

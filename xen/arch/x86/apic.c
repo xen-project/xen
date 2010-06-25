@@ -332,23 +332,19 @@ void disconnect_bsp_APIC(int virt_wire_setup)
 
 void disable_local_APIC(void)
 {
-    unsigned long value;
-
     clear_local_APIC();
 
     /*
      * Disable APIC (implies clearing of registers
      * for 82489DX!).
      */
-    value = apic_read(APIC_SPIV);
-    value &= ~APIC_SPIV_APIC_ENABLED;
-    apic_write_around(APIC_SPIV, value);
+    apic_write_around(APIC_SPIV,
+        apic_read(APIC_SPIV) & ~APIC_SPIV_APIC_ENABLED);
 
     if (enabled_via_apicbase) {
-        unsigned int l, h;
-        rdmsr(MSR_IA32_APICBASE, l, h);
-        l &= ~MSR_IA32_APICBASE_ENABLE;
-        wrmsr(MSR_IA32_APICBASE, l, h);
+        uint64_t msr_content;
+        rdmsrl(MSR_IA32_APICBASE, msr_content);
+        wrmsrl(MSR_IA32_APICBASE, msr_content & ~MSR_IA32_APICBASE_ENABLE);
     }
 }
 
@@ -708,7 +704,7 @@ int lapic_suspend(void)
 
 int lapic_resume(void)
 {
-    unsigned int l, h;
+    uint64_t msr_content;
     unsigned long flags;
     int maxlvt;
 
@@ -725,10 +721,10 @@ int lapic_resume(void)
      */
     if ( !x2apic_enabled )
     {
-        rdmsr(MSR_IA32_APICBASE, l, h);
-        l &= ~MSR_IA32_APICBASE_BASE;
-        l |= MSR_IA32_APICBASE_ENABLE | mp_lapic_addr;
-        wrmsr(MSR_IA32_APICBASE, l, h);
+        rdmsrl(MSR_IA32_APICBASE, msr_content);
+        msr_content &= ~MSR_IA32_APICBASE_BASE;
+        wrmsrl(MSR_IA32_APICBASE,
+            msr_content | MSR_IA32_APICBASE_ENABLE | mp_lapic_addr);
     }
     else
         enable_x2apic();
@@ -817,7 +813,8 @@ custom_param("apic_verbosity", apic_set_verbosity);
 
 static int __init detect_init_APIC (void)
 {
-    u32 h, l, features;
+    uint64_t msr_content;
+    u32 features;
 
     /* Disabled by kernel option? */
     if (enable_local_apic < 0)
@@ -854,12 +851,14 @@ static int __init detect_init_APIC (void)
          * software for Intel P6 or later and AMD K7
          * (Model > 1) or later.
          */
-        rdmsr(MSR_IA32_APICBASE, l, h);
-        if (!(l & MSR_IA32_APICBASE_ENABLE)) {
+        rdmsrl(MSR_IA32_APICBASE, msr_content);
+        if (!(msr_content & MSR_IA32_APICBASE_ENABLE)) {
             printk("Local APIC disabled by BIOS -- reenabling.\n");
-            l &= ~MSR_IA32_APICBASE_BASE;
-            l |= MSR_IA32_APICBASE_ENABLE | APIC_DEFAULT_PHYS_BASE;
-            wrmsr(MSR_IA32_APICBASE, l, h);
+            msr_content &= ~MSR_IA32_APICBASE_BASE;
+            msr_content |= MSR_IA32_APICBASE_ENABLE | APIC_DEFAULT_PHYS_BASE;
+            wrmsrl(MSR_IA32_APICBASE,
+                msr_content | MSR_IA32_APICBASE_ENABLE
+                | APIC_DEFAULT_PHYS_BASE);
             enabled_via_apicbase = 1;
         }
     }
@@ -877,9 +876,9 @@ static int __init detect_init_APIC (void)
     mp_lapic_addr = APIC_DEFAULT_PHYS_BASE;
 
     /* The BIOS may have set up the APIC at some other address */
-    rdmsr(MSR_IA32_APICBASE, l, h);
-    if (l & MSR_IA32_APICBASE_ENABLE)
-        mp_lapic_addr = l & MSR_IA32_APICBASE_BASE;
+    rdmsrl(MSR_IA32_APICBASE, msr_content);
+    if (msr_content & MSR_IA32_APICBASE_ENABLE)
+        mp_lapic_addr = msr_content & MSR_IA32_APICBASE_BASE;
 
     if (nmi_watchdog != NMI_NONE)
         nmi_watchdog = NMI_LOCAL_APIC;
@@ -897,7 +896,7 @@ no_apic:
 
 void enable_x2apic(void)
 {
-    u32 lo, hi;
+    uint64_t msr_content;
 
     if ( smp_processor_id() == 0 )
     {
@@ -925,11 +924,12 @@ void enable_x2apic(void)
         BUG_ON(!x2apic_enabled); /* APs only enable x2apic when BSP did so. */
     }
 
-    rdmsr(MSR_IA32_APICBASE, lo, hi);
-    if ( !(lo & MSR_IA32_APICBASE_EXTD) )
+    rdmsrl(MSR_IA32_APICBASE, msr_content);
+    if ( !(msr_content & MSR_IA32_APICBASE_EXTD) )
     {
-        lo |= MSR_IA32_APICBASE_ENABLE | MSR_IA32_APICBASE_EXTD;
-        wrmsr(MSR_IA32_APICBASE, lo, 0);
+        msr_content |= MSR_IA32_APICBASE_ENABLE | MSR_IA32_APICBASE_EXTD;
+        msr_content = (uint32_t)msr_content;
+        wrmsrl(MSR_IA32_APICBASE, msr_content);
         printk("x2APIC mode enabled.\n");
     }
     else

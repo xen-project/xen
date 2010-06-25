@@ -37,7 +37,7 @@ static inline void wrmsrl(unsigned int msr, __u64 val)
 /* rdmsr with exception handling */
 #define rdmsr_safe(msr,val) ({\
     int _rc; \
-    uint32_t val1, val2; \
+    uint32_t lo, hi; \
     __asm__ __volatile__( \
         "1: rdmsr\n2:\n" \
         ".section .fixup,\"ax\"\n" \
@@ -47,9 +47,9 @@ static inline void wrmsrl(unsigned int msr, __u64 val)
         "   "__FIXUP_ALIGN"\n" \
         "   "__FIXUP_WORD" 1b,3b\n" \
         ".previous\n" \
-        : "=a" (val1), "=d" (val2), "=&r" (_rc) \
+        : "=a" (lo), "=d" (hi), "=&r" (_rc) \
         : "c" (msr), "2" (0), "i" (-EFAULT)); \
-    val = val2 | ((uint64_t)val1 << 32); \
+    val = lo | ((uint64_t)hi << 32); \
     _rc; })
 
 /* wrmsr with exception handling */

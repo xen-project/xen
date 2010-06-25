@@ -723,22 +723,20 @@ int set_poll_bankmask(struct cpuinfo_x86 *c)
 /* The perbank ctl/status init is platform specific because of AMD's quirk */
 int mca_cap_init(void)
 {
-    u32 l, h;
-    u64 value;
+    uint64_t msr_content;
 
-    rdmsr(MSR_IA32_MCG_CAP, l, h);
-    value = ((u64)h << 32) | l;
+    rdmsrl(MSR_IA32_MCG_CAP, msr_content);
 
-    if (l & MCG_CTL_P) /* Control register present ? */
-        wrmsr(MSR_IA32_MCG_CTL, 0xffffffff, 0xffffffff);
+    if (msr_content & MCG_CTL_P) /* Control register present ? */
+        wrmsrl(MSR_IA32_MCG_CTL, 0xffffffffffffffffULL);
 
-    if (nr_mce_banks &&  (l & MCG_CAP_COUNT) != nr_mce_banks)
+    if (nr_mce_banks && (msr_content & MCG_CAP_COUNT) != nr_mce_banks)
     {
         dprintk(XENLOG_WARNING, "Different bank number on cpu %x\n",
                 smp_processor_id());
         return -ENODEV;
     }
-    nr_mce_banks = l & MCG_CAP_COUNT;
+    nr_mce_banks = msr_content & MCG_CAP_COUNT;
 
     /* mcabanks_alloc depends on nr_mcebanks */
     if (!mca_allbanks)

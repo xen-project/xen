@@ -439,7 +439,6 @@ int vmce_domain_inject(
 
 int vmce_init(struct cpuinfo_x86 *c)
 {
-    u32 l, h;
     u64 value;
     int i;
 
@@ -460,8 +459,7 @@ int vmce_init(struct cpuinfo_x86 *c)
     if (g_mcg_cap & MCG_CTL_P)
         rdmsrl(MSR_IA32_MCG_CTL, h_mcg_ctl);
 
-    rdmsr(MSR_IA32_MCG_CAP, l, h);
-    value = ((u64)h << 32) | l;
+    rdmsrl(MSR_IA32_MCG_CAP, value);
     /* For Guest vMCE usage */
     g_mcg_cap = value & ~MCG_CMCI_P;
 

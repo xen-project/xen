@@ -324,10 +324,9 @@ static void __cpuinit squash_the_stupid_serial_number(struct cpuinfo_x86 *c)
 {
 	if (cpu_has(c, X86_FEATURE_PN) && disable_x86_serial_nr ) {
 		/* Disable processor serial number */
-		unsigned long lo,hi;
-		rdmsr(MSR_IA32_BBL_CR_CTL,lo,hi);
-		lo |= 0x200000;
-		wrmsr(MSR_IA32_BBL_CR_CTL,lo,hi);
+		uint64_t msr_content;
+		rdmsrl(MSR_IA32_BBL_CR_CTL,msr_content);
+		wrmsrl(MSR_IA32_BBL_CR_CTL, msr_content | 0x200000);
 		printk(KERN_NOTICE "CPU serial number disabled.\n");
 		clear_bit(X86_FEATURE_PN, c->x86_capability);
 
