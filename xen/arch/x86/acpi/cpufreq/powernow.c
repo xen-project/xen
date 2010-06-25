@@ -44,13 +44,13 @@
 #define USE_HW_PSTATE           0x00000080
 #define HW_PSTATE_MASK          0x00000007
 #define HW_PSTATE_VALID_MASK    0x80000000
-#define HW_PSTATE_MAX_MASK      0x000000f000000000ULL
+#define HW_PSTATE_MAX_MASK      0x000000f0
 #define HW_PSTATE_MAX_SHIFT     4
 #define MSR_PSTATE_DEF_BASE     0xc0010064 /* base of Pstate MSRs */
 #define MSR_PSTATE_STATUS       0xc0010063 /* Pstate Status MSR */
 #define MSR_PSTATE_CTRL         0xc0010062 /* Pstate control MSR */
 #define MSR_PSTATE_CUR_LIMIT    0xc0010061 /* pstate current limit MSR */
-#define MSR_HWCR_CPBDIS_MASK    0x02000000
+#define MSR_HWCR_CPBDIS_MASK    0x02000000ULL
 
 struct powernow_cpufreq_data {
     struct processor_performance *acpi_data;

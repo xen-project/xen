@@ -51,7 +51,7 @@ enum {
     SYSTEM_IO_CAPABLE,
 };
 
-#define INTEL_MSR_RANGE         (0xffff)
+#define INTEL_MSR_RANGE         (0xffffull)
 #define CPUID_6_ECX_APERFMPERF_CAPABILITY       (0x1)
 
 static struct acpi_cpufreq_data *drv_data[NR_CPUS];
