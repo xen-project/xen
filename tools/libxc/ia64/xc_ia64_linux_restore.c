@@ -29,21 +29,21 @@ static unsigned long p2m_size;
 static unsigned long nr_pfns;
 
 static int
-populate_page_if_necessary(xc_interface *xc_handle, uint32_t dom, unsigned long gmfn,
+populate_page_if_necessary(xc_interface *xch, uint32_t dom, unsigned long gmfn,
                            struct xen_ia64_p2m_table *p2m_table)
 {
     if (xc_ia64_p2m_present(p2m_table, gmfn))
         return 0;
 
-    return xc_domain_memory_populate_physmap(xc_handle, dom, 1, 0, 0, &gmfn);
+    return xc_domain_memory_populate_physmap(xch, dom, 1, 0, 0, &gmfn);
 }
 
 static int
-read_page(xc_interface *xc_handle, int io_fd, uint32_t dom, unsigned long pfn)
+read_page(xc_interface *xch, int io_fd, uint32_t dom, unsigned long pfn)
 {
     void *mem;
 
-    mem = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+    mem = xc_map_foreign_range(xch, dom, PAGE_SIZE,
                                PROT_READ|PROT_WRITE, pfn);
     if (mem == NULL) {
         ERROR("cannot map page");
@@ -65,7 +65,7 @@ read_page(xc_interface *xc_handle, int io_fd, uint32_t dom, unsigned long pfn)
  * pages here.
  */
 static int
-xc_ia64_recv_unallocated_list(xc_interface *xc_handle, int io_fd, uint32_t dom,
+xc_ia64_recv_unallocated_list(xc_interface *xch, int io_fd, uint32_t dom,
                               struct xen_ia64_p2m_table *p2m_table)
 {
     int rc = -1;
@@ -98,7 +98,7 @@ xc_ia64_recv_unallocated_list(xc_interface *xc_handle, int io_fd, uint32_t dom,
         }
     }
     if (nr_frees > 0) {
-        if (xc_domain_memory_decrease_reservation(xc_handle, dom, nr_frees,
+        if (xc_domain_memory_decrease_reservation(xch, dom, nr_frees,
                                                   0, pfntab) < 0) {
             PERROR("Could not decrease reservation");
             goto out;
@@ -116,7 +116,7 @@ xc_ia64_recv_unallocated_list(xc_interface *xc_handle, int io_fd, uint32_t dom,
 }
 
 static int
-xc_ia64_recv_vcpu_context(xc_interface *xc_handle, int io_fd, uint32_t dom,
+xc_ia64_recv_vcpu_context(xc_interface *xch, int io_fd, uint32_t dom,
                           uint32_t vcpu, vcpu_guest_context_any_t *ctxt_any)
 {
     vcpu_guest_context_t *ctxt = &ctxt_any->c;
@@ -130,14 +130,14 @@ xc_ia64_recv_vcpu_context(xc_interface *xc_handle, int io_fd, uint32_t dom,
     /* Initialize and set registers.  */
     ctxt->flags = VGCF_EXTRA_REGS | VGCF_SET_CR_IRR | VGCF_online |
         VGCF_SET_AR_ITC;
-    if (xc_vcpu_setcontext(xc_handle, dom, vcpu, ctxt_any) != 0) {
+    if (xc_vcpu_setcontext(xch, dom, vcpu, ctxt_any) != 0) {
         ERROR("Couldn't set vcpu context");
         return -1;
     }
 
     /* Just a check.  */
     ctxt->flags = 0;
-    if (xc_vcpu_getcontext(xc_handle, dom, vcpu, ctxt_any)) {
+    if (xc_vcpu_getcontext(xch, dom, vcpu, ctxt_any)) {
         ERROR("Could not get vcpu context");
         return -1;
     }
@@ -147,7 +147,7 @@ xc_ia64_recv_vcpu_context(xc_interface *xc_handle, int io_fd, uint32_t dom,
 
 /* Read shared info.  */
 static int
-xc_ia64_recv_shared_info(xc_interface *xc_handle, int io_fd, uint32_t dom,
+xc_ia64_recv_shared_info(xc_interface *xch, int io_fd, uint32_t dom,
                          unsigned long shared_info_frame,
                          unsigned long *start_info_pfn)
 {
@@ -157,7 +157,7 @@ xc_ia64_recv_shared_info(xc_interface *xc_handle, int io_fd, uint32_t dom,
     shared_info_t *shared_info;
     
     /* Read shared info.  */
-    shared_info = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+    shared_info = xc_map_foreign_range(xch, dom, PAGE_SIZE,
                                        PROT_READ|PROT_WRITE,
                                        shared_info_frame);
     if (shared_info == NULL) {
@@ -186,7 +186,8 @@ xc_ia64_recv_shared_info(xc_interface *xc_handle, int io_fd, uint32_t dom,
 }
 
 static int
-xc_ia64_recv_vcpumap(const xc_dominfo_t *info, int io_fd, uint64_t **vcpumapp)
+xc_ia64_recv_vcpumap(xc_interface *xch,
+                     const xc_dominfo_t *info, int io_fd, uint64_t **vcpumapp)
 {
     uint64_t max_virt_cpus;
     unsigned long vcpumap_size;
@@ -222,7 +223,7 @@ xc_ia64_recv_vcpumap(const xc_dominfo_t *info, int io_fd, uint64_t **vcpumapp)
 }
 
 static int
-xc_ia64_pv_recv_vcpu_context(xc_interface *xc_handle, int io_fd, int32_t dom,
+xc_ia64_pv_recv_vcpu_context(xc_interface *xch, int io_fd, int32_t dom,
                              uint32_t vcpu)
 {
     int rc = -1;
@@ -237,11 +238,11 @@ xc_ia64_pv_recv_vcpu_context(xc_interface *xc_handle, int io_fd, int32_t dom,
         return -1;
     }
 
-    if (xc_ia64_recv_vcpu_context(xc_handle, io_fd, dom, vcpu, &ctxt_any))
+    if (xc_ia64_recv_vcpu_context(xch, io_fd, dom, vcpu, &ctxt_any))
         goto out;
 
     /* Then get privreg page.  */
-    if (read_page(xc_handle, io_fd, dom, ctxt->privregs_pfn) < 0) {
+    if (read_page(xch, io_fd, dom, ctxt->privregs_pfn) < 0) {
         ERROR("Could not read vcpu privregs");
         goto out;
     }
@@ -254,7 +255,7 @@ xc_ia64_pv_recv_vcpu_context(xc_interface *xc_handle, int io_fd, int32_t dom,
 }
 
 static int
-xc_ia64_pv_recv_shared_info(xc_interface *xc_handle, int io_fd, int32_t dom, 
+xc_ia64_pv_recv_shared_info(xc_interface *xch, int io_fd, int32_t dom, 
                             unsigned long shared_info_frame,
                             struct xen_ia64_p2m_table *p2m_table,
                             unsigned int store_evtchn,
@@ -268,16 +269,16 @@ xc_ia64_pv_recv_shared_info(xc_interface *xc_handle, int io_fd, int32_t dom,
     start_info_t *start_info;
     
     /* Read shared info.  */
-    if (xc_ia64_recv_shared_info(xc_handle, io_fd, dom,
+    if (xc_ia64_recv_shared_info(xch, io_fd, dom,
                                  shared_info_frame, &gmfn))
         return -1;
 
     /* Uncanonicalise the suspend-record frame number and poke resume rec. */
-    if (populate_page_if_necessary(xc_handle, dom, gmfn, p2m_table)) {
+    if (populate_page_if_necessary(xch, dom, gmfn, p2m_table)) {
         ERROR("cannot populate page 0x%lx", gmfn);
         return -1;
     }
-    start_info = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+    start_info = xc_map_foreign_range(xch, dom, PAGE_SIZE,
                                       PROT_READ | PROT_WRITE, gmfn);
     if (start_info == NULL) {
         ERROR("cannot map start_info page");
@@ -296,7 +297,7 @@ xc_ia64_pv_recv_shared_info(xc_interface *xc_handle, int io_fd, int32_t dom,
 }
 
 static int
-xc_ia64_pv_recv_context_ver_one_or_two(xc_interface *xc_handle, int io_fd, uint32_t dom,
+xc_ia64_pv_recv_context_ver_one_or_two(xc_interface *xch, int io_fd, uint32_t dom,
                                        unsigned long shared_info_frame,
                                        struct xen_ia64_p2m_table *p2m_table,
                                        unsigned int store_evtchn,
@@ -307,20 +308,20 @@ xc_ia64_pv_recv_context_ver_one_or_two(xc_interface *xc_handle, int io_fd, uint3
     int rc;
 
     /* vcpu 0 context */
-    rc = xc_ia64_pv_recv_vcpu_context(xc_handle, io_fd, dom, 0);
+    rc = xc_ia64_pv_recv_vcpu_context(xch, io_fd, dom, 0);
     if (rc)
         return rc;
 
 
     /* shared_info */
-    rc = xc_ia64_pv_recv_shared_info(xc_handle, io_fd, dom, shared_info_frame,
+    rc = xc_ia64_pv_recv_shared_info(xch, io_fd, dom, shared_info_frame,
                                      p2m_table, store_evtchn, store_mfn,
                                      console_evtchn, console_mfn);
     return rc;
 }
 
 static int
-xc_ia64_pv_recv_context_ver_three(xc_interface *xc_handle, int io_fd, uint32_t dom,
+xc_ia64_pv_recv_context_ver_three(xc_interface *xch, int io_fd, uint32_t dom,
                                   unsigned long shared_info_frame,
                                   struct xen_ia64_p2m_table *p2m_table,
                                   unsigned int store_evtchn,
@@ -335,11 +336,11 @@ xc_ia64_pv_recv_context_ver_three(xc_interface *xc_handle, int io_fd, uint32_t d
     /* vcpu map */
     uint64_t *vcpumap = NULL;
     
-    if (xc_domain_getinfo(xc_handle, dom, 1, &info) != 1) {
+    if (xc_domain_getinfo(xch, dom, 1, &info) != 1) {
         ERROR("Could not get domain info");
         return -1;
     }
-    rc = xc_ia64_recv_vcpumap(&info, io_fd, &vcpumap);
+    rc = xc_ia64_recv_vcpumap(xch, &info, io_fd, &vcpumap);
     if (rc != 0)
         goto out;
 
@@ -348,13 +349,13 @@ xc_ia64_pv_recv_context_ver_three(xc_interface *xc_handle, int io_fd, uint32_t d
         if (!__test_bit(i, vcpumap))
             continue;
 
-        rc = xc_ia64_pv_recv_vcpu_context(xc_handle, io_fd, dom, i);
+        rc = xc_ia64_pv_recv_vcpu_context(xch, io_fd, dom, i);
         if (rc != 0)
             goto out;
     }    
 
     /* shared_info */
-    rc = xc_ia64_pv_recv_shared_info(xc_handle, io_fd, dom, shared_info_frame,
+    rc = xc_ia64_pv_recv_shared_info(xch, io_fd, dom, shared_info_frame,
                                      p2m_table, store_evtchn, store_mfn,
                                      console_evtchn, console_mfn);
  out:
@@ -365,7 +366,7 @@ xc_ia64_pv_recv_context_ver_three(xc_interface *xc_handle, int io_fd, uint32_t d
 
 static int
 xc_ia64_pv_recv_context(unsigned long format_version,
-                        xc_interface *xc_handle, int io_fd, uint32_t dom,
+                        xc_interface *xch, int io_fd, uint32_t dom,
                         unsigned long shared_info_frame,
                         struct xen_ia64_p2m_table *p2m_table,
                         unsigned int store_evtchn,
@@ -377,14 +378,14 @@ xc_ia64_pv_recv_context(unsigned long format_version,
     switch (format_version) {
     case XC_IA64_SR_FORMAT_VER_ONE:
     case XC_IA64_SR_FORMAT_VER_TWO:
-        rc = xc_ia64_pv_recv_context_ver_one_or_two(xc_handle, io_fd, dom,
+        rc = xc_ia64_pv_recv_context_ver_one_or_two(xch, io_fd, dom,
                                                     shared_info_frame,
                                                     p2m_table, store_evtchn,
                                                     store_mfn, console_evtchn,
                                                     console_mfn);
         break;
     case XC_IA64_SR_FORMAT_VER_THREE:
-        rc = xc_ia64_pv_recv_context_ver_three(xc_handle, io_fd, dom,
+        rc = xc_ia64_pv_recv_context_ver_three(xch, io_fd, dom,
                                                shared_info_frame,
                                                p2m_table, store_evtchn,
                                                store_mfn, console_evtchn,
@@ -399,7 +400,7 @@ xc_ia64_pv_recv_context(unsigned long format_version,
 }
 
 static int
-xc_ia64_hvm_recv_context(xc_interface *xc_handle, int io_fd, uint32_t dom,
+xc_ia64_hvm_recv_context(xc_interface *xch, int io_fd, uint32_t dom,
                          unsigned long shared_info_frame,
                          struct xen_ia64_p2m_table *p2m_table,
                          unsigned int store_evtchn, unsigned long *store_mfn,
@@ -429,16 +430,16 @@ xc_ia64_hvm_recv_context(xc_interface *xc_handle, int io_fd, uint32_t dom,
     uint8_t *hvm_buf = NULL;
 
     /* Read shared info.  */
-    if (xc_ia64_recv_shared_info(xc_handle, io_fd, dom, shared_info_frame,
+    if (xc_ia64_recv_shared_info(xch, io_fd, dom, shared_info_frame,
                                  NULL))
         goto out;
 
     /* vcpu map */
-    if (xc_domain_getinfo(xc_handle, dom, 1, &info) != 1) {
+    if (xc_domain_getinfo(xch, dom, 1, &info) != 1) {
         ERROR("Could not get domain info");
         goto out;
     }
-    if (xc_ia64_recv_vcpumap(&info, io_fd, &vcpumap))
+    if (xc_ia64_recv_vcpumap(xch, &info, io_fd, &vcpumap))
         goto out;
     
     /* vcpu context */
@@ -449,7 +450,7 @@ xc_ia64_hvm_recv_context(xc_interface *xc_handle, int io_fd, uint32_t dom,
         if (!__test_bit(i, vcpumap))
             continue;
 
-        if (xc_ia64_recv_vcpu_context(xc_handle, io_fd, dom, i, &ctxt_any))
+        if (xc_ia64_recv_vcpu_context(xch, io_fd, dom, i, &ctxt_any))
             goto out;
 
         /* system context of vcpu is recieved as hvm context. */
@@ -463,18 +464,18 @@ xc_ia64_hvm_recv_context(xc_interface *xc_handle, int io_fd, uint32_t dom,
 
     /* These comms pages need to be zeroed at the start of day */
     for (i = 0; i < NR_PARAMS; i++) {
-        rc = xc_clear_domain_page(xc_handle, dom, magic_pfns[i]);
+        rc = xc_clear_domain_page(xch, dom, magic_pfns[i]);
         if (rc != 0) {
             ERROR("error zeroing magic pages: %i", rc);
             goto out;
         }
-        rc = xc_set_hvm_param(xc_handle, dom, hvm_params[i], magic_pfns[i]);
+        rc = xc_set_hvm_param(xch, dom, hvm_params[i], magic_pfns[i]);
         if (rc != 0) {
             ERROR("error setting HVM params: %i", rc);
             goto out;
         }
     }
-    rc = xc_set_hvm_param(xc_handle, dom,
+    rc = xc_set_hvm_param(xch, dom,
                           HVM_PARAM_STORE_EVTCHN, store_evtchn);
     if (rc != 0) {
         ERROR("error setting HVM params: %i", rc);
@@ -501,7 +502,7 @@ xc_ia64_hvm_recv_context(xc_interface *xc_handle, int io_fd, uint32_t dom,
         goto out;
     }
 
-    rc = xc_domain_hvm_setcontext(xc_handle, dom, hvm_buf, rec_size);
+    rc = xc_domain_hvm_setcontext(xch, dom, hvm_buf, rec_size);
     if (rc != 0) {
         ERROR("error setting the HVM context");
         goto out;
@@ -521,7 +522,7 @@ out:
  * hvm domain requires IO pages allocated when XEN_DOMCTL_arch_setup
  */
 static int
-xc_ia64_hvm_domain_setup(xc_interface *xc_handle, uint32_t dom)
+xc_ia64_hvm_domain_setup(xc_interface *xch, uint32_t dom)
 {
     int rc;
     xen_pfn_t pfn_list[] = {
@@ -531,7 +532,7 @@ xc_ia64_hvm_domain_setup(xc_interface *xc_handle, uint32_t dom)
     };
     unsigned long nr_pages = sizeof(pfn_list) / sizeof(pfn_list[0]);
 
-    rc = xc_domain_memory_populate_physmap(xc_handle, dom, nr_pages,
+    rc = xc_domain_memory_populate_physmap(xch, dom, nr_pages,
                                            0, 0, &pfn_list[0]);
     if (rc != 0)
         PERROR("Could not allocate IO page or buffer io page.");
@@ -539,7 +540,7 @@ xc_ia64_hvm_domain_setup(xc_interface *xc_handle, uint32_t dom)
 }
 
 int
-xc_domain_restore(xc_interface *xc_handle, int io_fd, uint32_t dom,
+xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                   unsigned int store_evtchn, unsigned long *store_mfn,
                   unsigned int console_evtchn, unsigned long *console_mfn,
                   unsigned int hvm, unsigned int pae, int superpages)
@@ -580,7 +581,7 @@ xc_domain_restore(xc_interface *xc_handle, int io_fd, uint32_t dom,
         goto out;
     }
 
-    if (hvm && xc_ia64_hvm_domain_setup(xc_handle, dom) != 0)
+    if (hvm && xc_ia64_hvm_domain_setup(xch, dom) != 0)
         goto out;
     
     /* Build firmware (will be overwritten).  */
@@ -589,13 +590,13 @@ xc_domain_restore(xc_interface *xc_handle, int io_fd, uint32_t dom,
     domctl.u.arch_setup.bp = 0; /* indicate domain restore */
     
     domctl.cmd = XEN_DOMCTL_arch_setup;
-    if (xc_domctl(xc_handle, &domctl))
+    if (xc_domctl(xch, &domctl))
         goto out;
 
     /* Get the domain's shared-info frame. */
     domctl.cmd = XEN_DOMCTL_getdomaininfo;
     domctl.domain = (domid_t)dom;
-    if (xc_domctl(xc_handle, &domctl) < 0) {
+    if (xc_domctl(xch, &domctl) < 0) {
         ERROR("Could not get information on new domain");
         goto out;
     }
@@ -622,7 +623,7 @@ xc_domain_restore(xc_interface *xc_handle, int io_fd, uint32_t dom,
             ERROR("read: memmap_info");
             goto out;
         }
-        if (xc_ia64_p2m_map(&p2m_table, xc_handle,
+        if (xc_ia64_p2m_map(&p2m_table, xch,
                             dom, memmap_info, IA64_DOM0VP_EFP_ALLOC_PTE)) {
             ERROR("p2m mapping");
             goto out;
@@ -647,7 +648,7 @@ xc_domain_restore(xc_interface *xc_handle, int io_fd, uint32_t dom,
         memdesc->num_pages = nr_pfns << (PAGE_SHIFT - EFI_PAGE_SHIFT);
         memdesc->attribute = EFI_MEMORY_WB;
 
-        if (xc_ia64_p2m_map(&p2m_table, xc_handle,
+        if (xc_ia64_p2m_map(&p2m_table, xch,
                             dom, memmap_info, IA64_DOM0VP_EFP_ALLOC_PTE)) {
             ERROR("p2m mapping");
             goto out;
@@ -668,26 +669,26 @@ xc_domain_restore(xc_interface *xc_handle, int io_fd, uint32_t dom,
         if (gmfn == INVALID_MFN)
             break;
 
-        if (populate_page_if_necessary(xc_handle, dom, gmfn, &p2m_table) < 0) {
+        if (populate_page_if_necessary(xch, dom, gmfn, &p2m_table) < 0) {
             ERROR("can not populate page 0x%lx", gmfn);
             goto out;
         }
-        if (read_page(xc_handle, io_fd, dom, gmfn) < 0)
+        if (read_page(xch, io_fd, dom, gmfn) < 0)
             goto out;
     }
 
     DPRINTF("Received all pages\n");
 
-    if (xc_ia64_recv_unallocated_list(xc_handle, io_fd, dom, &p2m_table))
+    if (xc_ia64_recv_unallocated_list(xch, io_fd, dom, &p2m_table))
         goto out;
 
     if (!hvm)
         rc = xc_ia64_pv_recv_context(ver, 
-                                     xc_handle, io_fd, dom, shared_info_frame,
+                                     xch, io_fd, dom, shared_info_frame,
                                      &p2m_table, store_evtchn, store_mfn,
                                      console_evtchn, console_mfn);
     else
-        rc = xc_ia64_hvm_recv_context(xc_handle, io_fd, dom, shared_info_frame,
+        rc = xc_ia64_hvm_recv_context(xch, io_fd, dom, shared_info_frame,
                                       &p2m_table, store_evtchn, store_mfn,
                                       console_evtchn, console_mfn);
     if (rc)
@@ -713,7 +714,7 @@ xc_domain_restore(xc_interface *xc_handle, int io_fd, uint32_t dom,
     xc_ia64_p2m_unmap(&p2m_table);
 
     if ((rc != 0) && (dom != 0))
-        xc_domain_destroy(xc_handle, dom);
+        xc_domain_destroy(xch, dom);
 
     DPRINTF("Restore exit with rc=%d\n", rc);
 

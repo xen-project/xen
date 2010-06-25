@@ -72,7 +72,7 @@ static int vcpu_ia64(struct xc_dom_image *dom, void *ptr)
 {
     vcpu_guest_context_ia64_t *ctxt = ptr;
 
-    xc_dom_printf("%s: called\n", __FUNCTION__);
+    DOMPRINTF_CALLED(dom->xch);
 
     /* clear everything */
     memset(ctxt, 0, sizeof(*ctxt));

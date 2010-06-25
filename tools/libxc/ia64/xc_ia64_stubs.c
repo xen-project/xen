@@ -19,7 +19,7 @@ xc_ia64_fpsr_default(void)
 }
 
 static int
-xc_ia64_get_pfn_list(xc_interface *xc_handle, uint32_t domid, xen_pfn_t *pfn_buf,
+xc_ia64_get_pfn_list(xc_interface *xch, uint32_t domid, xen_pfn_t *pfn_buf,
                      unsigned int start_page, unsigned int nr_pages)
 {
     DECLARE_DOMCTL;
@@ -36,34 +36,34 @@ xc_ia64_get_pfn_list(xc_interface *xc_handle, uint32_t domid, xen_pfn_t *pfn_buf
         PERROR("Could not lock pfn list buffer");
         return -1;
     }
-    ret = do_domctl(xc_handle, &domctl);
+    ret = do_domctl(xch, &domctl);
     unlock_pages(pfn_buf, nr_pages * sizeof(xen_pfn_t));
 
     return ret < 0 ? -1 : nr_pages;
 }
 
 int
-xc_get_pfn_list(xc_interface *xc_handle, uint32_t domid, uint64_t *pfn_buf,
+xc_get_pfn_list(xc_interface *xch, uint32_t domid, uint64_t *pfn_buf,
                 unsigned long max_pfns)
 {
-    return xc_ia64_get_pfn_list(xc_handle, domid, (xen_pfn_t *)pfn_buf,
+    return xc_ia64_get_pfn_list(xch, domid, (xen_pfn_t *)pfn_buf,
                                 0, max_pfns);
 }
 
 long
-xc_get_max_pages(xc_interface *xc_handle, uint32_t domid)
+xc_get_max_pages(xc_interface *xch, uint32_t domid)
 {
     struct xen_domctl domctl;
     domctl.cmd = XEN_DOMCTL_getdomaininfo;
     domctl.domain = (domid_t)domid;
-    return ((do_domctl(xc_handle, &domctl) < 0)
+    return ((do_domctl(xch, &domctl) < 0)
             ? -1 : domctl.u.getdomaininfo.max_pages);
 }
 
 /* It is possible to get memmap_info and memmap by
    foreign domain page mapping. But it's racy. Use hypercall to avoid race. */
 static int
-xc_ia64_get_memmap(xc_interface *xc_handle,
+xc_ia64_get_memmap(xc_interface *xch,
                    uint32_t domid, char *buf, unsigned long bufsize)
 {
     privcmd_hypercall_t hypercall;
@@ -78,13 +78,13 @@ xc_ia64_get_memmap(xc_interface *xc_handle,
 
     if (lock_pages(buf, bufsize) != 0)
         return -1;
-    ret = do_xen_hypercall(xc_handle, &hypercall);
+    ret = do_xen_hypercall(xch, &hypercall);
     unlock_pages(buf, bufsize);
     return ret;
 }
 
 int
-xc_ia64_copy_memmap(xc_interface *xc_handle, uint32_t domid, shared_info_t *live_shinfo,
+xc_ia64_copy_memmap(xc_interface *xch, uint32_t domid, shared_info_t *live_shinfo,
                     xen_ia64_memmap_info_t **memmap_info_p,
                     unsigned long *memmap_info_num_pages_p)
 {
@@ -98,7 +98,7 @@ xc_ia64_copy_memmap(xc_interface *xc_handle, uint32_t domid, shared_info_t *live
 
     int ret;
 
-    gpfn_max_prev = xc_memory_op(xc_handle, XENMEM_maximum_gpfn, &domid);
+    gpfn_max_prev = xc_memory_op(xch, XENMEM_maximum_gpfn, &domid);
     if (gpfn_max_prev < 0)
         return -1;
 
@@ -113,7 +113,7 @@ xc_ia64_copy_memmap(xc_interface *xc_handle, uint32_t domid, shared_info_t *live
     memmap_info = malloc(memmap_size);
     if (memmap_info == NULL)
         return -1;
-    ret = xc_ia64_get_memmap(xc_handle,
+    ret = xc_ia64_get_memmap(xch,
                              domid, (char*)memmap_info, memmap_size);
     if (ret != 0) {
         free(memmap_info);
@@ -127,7 +127,7 @@ xc_ia64_copy_memmap(xc_interface *xc_handle, uint32_t domid, shared_info_t *live
         goto again;
     }
 
-    gpfn_max_post = xc_memory_op(xc_handle, XENMEM_maximum_gpfn, &domid);
+    gpfn_max_post = xc_memory_op(xch, XENMEM_maximum_gpfn, &domid);
     if (gpfn_max_prev < 0) {
         free(memmap_info);
         return -1;
@@ -163,7 +163,7 @@ xc_ia64_copy_memmap(xc_interface *xc_handle, uint32_t domid, shared_info_t *live
 #define PTRS_PER_PTE    (1UL << (PAGE_SHIFT - 3))
 
 static void*
-xc_ia64_map_foreign_p2m(xc_interface *xc_handle, uint32_t dom,
+xc_ia64_map_foreign_p2m(xc_interface *xch, uint32_t dom,
                         struct xen_ia64_memmap_info *memmap_info,
                         unsigned long flags, unsigned long *p2m_size_p)
 {
@@ -174,12 +174,12 @@ xc_ia64_map_foreign_p2m(xc_interface *xc_handle, uint32_t dom,
     int ret;
     int saved_errno;
 
-    gpfn_max = xc_memory_op(xc_handle, XENMEM_maximum_gpfn, &dom);
+    gpfn_max = xc_memory_op(xch, XENMEM_maximum_gpfn, &dom);
     if (gpfn_max < 0)
         return NULL;
     p2m_size =
         (((gpfn_max + 1) + PTRS_PER_PTE - 1) / PTRS_PER_PTE) << PAGE_SHIFT;
-    addr = mmap(NULL, p2m_size, PROT_READ, MAP_SHARED, xc_handle, 0);
+    addr = mmap(NULL, p2m_size, PROT_READ, MAP_SHARED, xch->fd, 0);
     if (addr == MAP_FAILED)
         return NULL;
 
@@ -197,7 +197,7 @@ xc_ia64_map_foreign_p2m(xc_interface *xc_handle, uint32_t dom,
         errno = saved_errno;
         return NULL;
     }
-    ret = do_xen_hypercall(xc_handle, &hypercall);
+    ret = do_xen_hypercall(xch, &hypercall);
     saved_errno = errno;
     unlock_pages(memmap_info,
                  sizeof(*memmap_info) + memmap_info->efi_memmap_size);
@@ -219,11 +219,11 @@ xc_ia64_p2m_init(struct xen_ia64_p2m_table *p2m_table)
 }
 
 int
-xc_ia64_p2m_map(struct xen_ia64_p2m_table *p2m_table, xc_interface *xc_handle,
+xc_ia64_p2m_map(struct xen_ia64_p2m_table *p2m_table, xc_interface *xch,
                 uint32_t domid, struct xen_ia64_memmap_info *memmap_info,
                 unsigned long flag)
 {
-    p2m_table->p2m = xc_ia64_map_foreign_p2m(xc_handle, domid, memmap_info,
+    p2m_table->p2m = xc_ia64_map_foreign_p2m(xch, domid, memmap_info,
                                              flag, &p2m_table->size);
     if (p2m_table->p2m == NULL) {
         PERROR("Could not map foreign p2m. falling back to old method");

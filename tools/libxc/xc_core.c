@@ -642,7 +642,7 @@ xc_domain_dumpcore_via_callback(xc_interface *xch,
     offset += filesz;
 
     /* arch context */
-    sts = xc_core_arch_context_get_shdr(&arch_ctxt, sheaders, strtab,
+    sts = xc_core_arch_context_get_shdr(xch, &arch_ctxt, sheaders, strtab,
                                         &filesz, offset);
     if ( sts != 0 )
         goto out;
@@ -773,7 +773,7 @@ xc_domain_dumpcore_via_callback(xc_interface *xch,
     }
 
     /* arch specific context */
-    sts = xc_core_arch_context_dump(&arch_ctxt, args, dump_rtn);
+    sts = xc_core_arch_context_dump(xch, &arch_ctxt, args, dump_rtn);
     if ( sts != 0 )
         goto out;
 

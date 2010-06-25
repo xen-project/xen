@@ -35,7 +35,7 @@ typedef struct xc_dom_image domain_t;
 #define XENLOG_INFO     "info:"
 #define XENLOG_WARNING	"Warning:"
 #define XENLOG_GUEST	""
-#define printk(fmt, args ...)	xc_dom_printf(fmt, ## args)
+#define printk(fmt, args ...)	IPRINTF(fmt, ## args)
 
 #define BUG_ON(p)	assert(!(p))
 #define BUILD_BUG_ON(condition) ((void)sizeof(struct { int:-!!(condition); }))

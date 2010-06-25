@@ -23,7 +23,11 @@
 
 #include <asm/dom_fw_common.h>
 
+#ifdef __XEN__
 void efi_systable_init_domu(struct fw_tables *tables);
+#else
+void efi_systable_init_domu(xc_interface *xch, struct fw_tables *tables);
+#endif
 
 int
 complete_domu_memmap(domain_t *d,
