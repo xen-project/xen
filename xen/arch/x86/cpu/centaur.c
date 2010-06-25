@@ -17,7 +17,7 @@
 
 static void __init init_c3(struct cpuinfo_x86 *c)
 {
-	u32  lo, hi;
+	uint64_t msr_content;
 
 	/* Test for Centaur Extended Feature Flags presence */
 	if (cpuid_eax(0xC0000000) >= 0xC0000001) {
@@ -25,17 +25,17 @@ static void __init init_c3(struct cpuinfo_x86 *c)
 
 		/* enable ACE unit, if present and disabled */
 		if ((tmp & (ACE_PRESENT | ACE_ENABLED)) == ACE_PRESENT) {
-			rdmsr (MSR_VIA_FCR, lo, hi);
-			lo |= ACE_FCR;		/* enable ACE unit */
-			wrmsr (MSR_VIA_FCR, lo, hi);
+			rdmsrl(MSR_VIA_FCR, msr_content);
+			/* enable ACE unit */
+			wrmsrl(MSR_VIA_FCR, msr_content | ACE_FCR);
 			printk(KERN_INFO "CPU: Enabled ACE h/w crypto\n");
 		}
 
 		/* enable RNG unit, if present and disabled */
 		if ((tmp & (RNG_PRESENT | RNG_ENABLED)) == RNG_PRESENT) {
-			rdmsr (MSR_VIA_RNG, lo, hi);
-			lo |= RNG_ENABLE;	/* enable RNG unit */
-			wrmsr (MSR_VIA_RNG, lo, hi);
+			rdmsrl(MSR_VIA_RNG, msr_content);
+			/* enable RNG unit */
+			wrmsrl(MSR_VIA_RNG, msr_content | RNG_ENABLE);
 			printk(KERN_INFO "CPU: Enabled h/w RNG\n");
 		}
 
@@ -47,9 +47,8 @@ static void __init init_c3(struct cpuinfo_x86 *c)
 
 	/* Cyrix III family needs CX8 & PGE explicity enabled. */
 	if (c->x86_model >=6 && c->x86_model <= 9) {
-		rdmsr (MSR_VIA_FCR, lo, hi);
-		lo |= (1<<1 | 1<<7);
-		wrmsr (MSR_VIA_FCR, lo, hi);
+		rdmsrl(MSR_VIA_FCR, msr_content);
+		wrmsrl(MSR_VIA_FCR, msr_content | (1ULL << 1 | 1ULL << 7));
 		set_bit(X86_FEATURE_CX8, c->x86_capability);
 	}
 
