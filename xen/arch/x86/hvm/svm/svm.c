@@ -862,8 +862,7 @@ static void svm_init_erratum_383(struct cpuinfo_x86 *c)
 
 static int svm_cpu_up(void)
 {
-    u32 phys_hsa_lo, phys_hsa_hi;   
-    uint64_t phys_hsa, msr_content;
+    uint64_t msr_content;
     int rc, cpu = smp_processor_id();
     struct cpuinfo_x86 *c = &cpu_data[cpu];
  
@@ -881,10 +880,7 @@ static int svm_cpu_up(void)
     write_efer(read_efer() | EFER_SVME);
 
     /* Initialize the HSA for this core. */
-    phys_hsa = (u64)virt_to_maddr(hsa[cpu]);
-    phys_hsa_lo = (u32)phys_hsa;
-    phys_hsa_hi = (u32)(phys_hsa >> 32);    
-    wrmsr(MSR_K8_VM_HSAVE_PA, phys_hsa_lo, phys_hsa_hi);
+    wrmsrl(MSR_K8_VM_HSAVE_PA, (uint64_t)virt_to_maddr(hsa[cpu]));
 
     /* check for erratum 383 */
     svm_init_erratum_383(c);
