@@ -32,13 +32,14 @@ struct xc_core_arch_context {
 #define xc_core_arch_context_free(arch_ctxt)            do {} while (0)
 #define xc_core_arch_context_get(arch_ctxt, ctxt, xch, domid) \
                                                                 (0)
-#define xc_core_arch_context_dump(arch_ctxt, args, dump_rtn)    (0)
+#define xc_core_arch_context_dump(xch, arch_ctxt, args, dump_rtn)    (0)
 
 int
 xc_core_arch_gpfn_may_present(struct xc_core_arch_context *arch_ctxt,
                               unsigned long pfn);
 static inline int
-xc_core_arch_context_get_shdr(struct xc_core_arch_context *arch_ctxt, 
+xc_core_arch_context_get_shdr(xc_interface *xch,
+                              struct xc_core_arch_context *arch_ctxt, 
                               struct xc_core_section_headers *sheaders,
                               struct xc_core_strtab *strtab,
                               uint64_t *filesz, uint64_t offset)

@@ -28,7 +28,7 @@
 uint32_t
 xen_ia64_version(struct xc_dom_image *dom)
 {
-    return xc_version(dom->guest_xc, XENVER_version, NULL);   
+    return xc_version(dom->xch, XENVER_version, NULL);   
 }
 
 int
@@ -41,11 +41,12 @@ xen_ia64_fpswa_revision(struct xc_dom_image *dom, unsigned int *revision)
     hypercall.arg[1] = (unsigned long)revision;
 
     if (lock_pages(revision, sizeof(*revision)) != 0) {
+        xc_interface *xch = dom->xch;
         PERROR("Could not lock memory for xen fpswa hypercall");
         return -1;
     }
 
-    ret = do_xen_hypercall(dom->guest_xc, &hypercall);
+    ret = do_xen_hypercall(dom->xch, &hypercall);
     
     unlock_pages(revision, sizeof(*revision));
 
@@ -75,7 +76,7 @@ xen_ia64_dom_fw_map(struct xc_dom_image *dom, unsigned long mpaddr)
     unsigned long page_size = XC_DOM_PAGE_SIZE(dom);
     void* ret;
     
-    ret = xc_map_foreign_range(dom->guest_xc, dom->guest_domid,
+    ret = xc_map_foreign_range(dom->xch, dom->guest_domid,
                                page_size, PROT_READ | PROT_WRITE,
                                mpaddr / page_size);
     if (ret != NULL)
@@ -98,8 +99,9 @@ xen_ia64_is_vcpu_allocated(struct xc_dom_image *dom, uint32_t vcpu)
 
     int rc;
     xc_vcpuinfo_t info;
+    xc_interface *xch = dom->xch;
 
-    rc = xc_vcpu_getinfo(dom->guest_xc, dom->guest_domid,
+    rc = xc_vcpu_getinfo(xch, dom->guest_domid,
                          vcpu, &info);
     if (rc == 0)
         return 1;

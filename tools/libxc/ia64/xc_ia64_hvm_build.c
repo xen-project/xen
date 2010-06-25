@@ -13,14 +13,14 @@
 #include <xen/hvm/params.h>
 
 static int
-xc_ia64_copy_to_domain_pages(xc_interface *xc_handle, uint32_t domid, void* src_page,
+xc_ia64_copy_to_domain_pages(xc_interface *xch, uint32_t domid, void* src_page,
                              unsigned long dst_pfn, int nr_pages)
 {
     // N.B. gva should be page aligned
     int i;
 
     for (i = 0; i < nr_pages; i++) {
-        if (xc_copy_to_domain_page(xc_handle, domid, dst_pfn + i,
+        if (xc_copy_to_domain_page(xch, domid, dst_pfn + i,
                                    src_page + (i << PAGE_SHIFT)))
             return -1;
     }
@@ -87,13 +87,14 @@ static int add_pal_hob(void* hob_buf);
 static int add_mem_hob(void* hob_buf, unsigned long dom_mem_size);
 static int add_vcpus_hob(void* hob_buf, unsigned long nr_vcpu);
 static int add_nvram_hob(void* hob_buf, unsigned long nvram_addr);
-static int build_hob(void* hob_buf, unsigned long hob_buf_size,
+static int build_hob(xc_interface *xch,
+                     void* hob_buf, unsigned long hob_buf_size,
                      unsigned long dom_mem_size, unsigned long vcpus,
                      unsigned long nvram_addr);
-static int load_hob(xc_interface *xc_handle,uint32_t dom, void *hob_buf);
+static int load_hob(xc_interface *xch,uint32_t dom, void *hob_buf);
 
 static int
-xc_ia64_build_hob(xc_interface *xc_handle, uint32_t dom,
+xc_ia64_build_hob(xc_interface *xch, uint32_t dom,
                   unsigned long memsize, unsigned long vcpus,
                   unsigned long nvram_addr)
 {
@@ -105,13 +106,13 @@ xc_ia64_build_hob(xc_interface *xc_handle, uint32_t dom,
         return -1;
     }
 
-    if (build_hob(hob_buf, GFW_HOB_SIZE, memsize, vcpus, nvram_addr) < 0) {
+    if (build_hob(xch, hob_buf, GFW_HOB_SIZE, memsize, vcpus, nvram_addr) < 0) {
         free(hob_buf);
         PERROR("Could not build hob");
         return -1;
     }
 
-    if (load_hob(xc_handle, dom, hob_buf) < 0) {
+    if (load_hob(xch, dom, hob_buf) < 0) {
         free(hob_buf);
         PERROR("Could not load hob");
         return -1;
@@ -190,7 +191,7 @@ hob_add(void* hob_start, int type, void* data, int data_size)
 }
 
 static int
-get_hob_size(void* hob_buf)
+get_hob_size(xc_interface *xch, void* hob_buf)
 {
     HOB_INFO *phit = (HOB_INFO*)hob_buf;
 
@@ -202,7 +203,7 @@ get_hob_size(void* hob_buf)
 }
 
 static int
-build_hob(void* hob_buf, unsigned long hob_buf_size,
+build_hob(xc_interface *xch, void* hob_buf, unsigned long hob_buf_size,
           unsigned long dom_mem_size, unsigned long vcpus,
           unsigned long nvram_addr)
 {
@@ -239,13 +240,13 @@ err_out:
 }
 
 static int
-load_hob(xc_interface *xc_handle, uint32_t dom, void *hob_buf)
+load_hob(xc_interface *xch, uint32_t dom, void *hob_buf)
 {
     // hob_buf should be page aligned
     int hob_size;
     int nr_pages;
 
-    hob_size = get_hob_size(hob_buf);
+    hob_size = get_hob_size(xch, hob_buf);
     if (hob_size < 0) {
         PERROR("Invalid hob data");
         return -1;
@@ -258,7 +259,7 @@ load_hob(xc_interface *xc_handle, uint32_t dom, void *hob_buf)
 
     nr_pages = (hob_size + PAGE_SIZE -1) >> PAGE_SHIFT;
 
-    return xc_ia64_copy_to_domain_pages(xc_handle, dom, hob_buf,
+    return xc_ia64_copy_to_domain_pages(xch, dom, hob_buf,
                                         GFW_HOB_START >> PAGE_SHIFT, nr_pages);
 }
 
@@ -529,7 +530,7 @@ add_pal_hob(void* hob_buf)
 #define VALIDATE_NVRAM_FD(x) ((1UL<<(sizeof(x)*8 - 1)) | x)
 #define IS_VALID_NVRAM_FD(x) ((uint64_t)x >> (sizeof(x)*8 - 1))
 static uint64_t 
-nvram_init(const char *nvram_path)
+nvram_init(xc_interface *xch, const char *nvram_path)
 {
     uint64_t fd = 0;
     fd = open(nvram_path, O_CREAT|O_RDWR, 0644);
@@ -545,7 +546,7 @@ nvram_init(const char *nvram_path)
 }
 
 static int 
-copy_from_nvram_to_GFW(xc_interface *xc_handle, uint32_t dom, int nvram_fd)
+copy_from_nvram_to_GFW(xc_interface *xch, uint32_t dom, int nvram_fd)
 {
     unsigned int nr_pages = NVRAM_SIZE >> PAGE_SHIFT;
     struct stat file_stat;
@@ -571,7 +572,7 @@ copy_from_nvram_to_GFW(xc_interface *xc_handle, uint32_t dom, int nvram_fd)
         return -1;
     }
 
-    return  xc_ia64_copy_to_domain_pages(xc_handle, dom, buf,
+    return  xc_ia64_copy_to_domain_pages(xch, dom, buf,
                                          NVRAM_START >> PAGE_SHIFT, nr_pages);
 }
 
@@ -579,7 +580,7 @@ copy_from_nvram_to_GFW(xc_interface *xc_handle, uint32_t dom, int nvram_fd)
 /*
  *Check is the address where NVRAM data located valid
  */
-static int is_valid_address(void *addr)
+static int is_valid_address(xc_interface *xch, void *addr)
 {
     struct nvram_save_addr *p = (struct nvram_save_addr *)addr;	
 
@@ -597,7 +598,7 @@ static int is_valid_address(void *addr)
  * can be got.
  */
 static int
-copy_from_GFW_to_nvram(xc_interface *xc_handle, uint32_t dom, int nvram_fd)
+copy_from_GFW_to_nvram(xc_interface *xch, uint32_t dom, int nvram_fd)
 {
     xen_pfn_t *pfn_list = NULL;
     char *tmp_ptr = NULL;
@@ -625,7 +626,7 @@ copy_from_GFW_to_nvram(xc_interface *xc_handle, uint32_t dom, int nvram_fd)
      * memory address first.
      */
     pfn_list[0] = NVRAM_START >> PAGE_SHIFT;
-    tmp_ptr = (char *)xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+    tmp_ptr = (char *)xc_map_foreign_range(xch, dom, PAGE_SIZE,
                                            PROT_READ | PROT_WRITE, pfn_list[0]);
 
     if ( NULL == tmp_ptr )
@@ -637,7 +638,7 @@ copy_from_GFW_to_nvram(xc_interface *xc_handle, uint32_t dom, int nvram_fd)
     }
 
     /* Check is NVRAM data vaild */
-    if ( !is_valid_address(tmp_ptr) )
+    if ( !is_valid_address(xch, tmp_ptr) )
     {
         free(pfn_list);
         munmap(tmp_ptr, PAGE_SIZE);
@@ -654,7 +655,7 @@ copy_from_GFW_to_nvram(xc_interface *xc_handle, uint32_t dom, int nvram_fd)
     for ( i=0; i<nr_pages; i++ )
         pfn_list[i] = (addr_from_GFW_4k_align >> PAGE_SHIFT) + i;
 
-    tmp_ptr = (char *)xc_map_foreign_pages(xc_handle, dom,
+    tmp_ptr = (char *)xc_map_foreign_pages(xch, dom,
                                            PROT_READ | PROT_WRITE,
                                            pfn_list, nr_pages);
     if ( NULL == tmp_ptr )
@@ -686,12 +687,12 @@ copy_from_GFW_to_nvram(xc_interface *xc_handle, uint32_t dom, int nvram_fd)
     return 0;
 }
 
-int xc_ia64_save_to_nvram(xc_interface *xc_handle, uint32_t dom) 
+int xc_ia64_save_to_nvram(xc_interface *xch, uint32_t dom) 
 {
     xc_dominfo_t info;
     uint64_t nvram_fd = 0;
 
-    if ( xc_domain_getinfo(xc_handle, dom, 1, &info) != 1 )
+    if ( xc_domain_getinfo(xch, dom, 1, &info) != 1 )
     {
         PERROR("Could not get info for domain");
         return -1;
@@ -700,12 +701,12 @@ int xc_ia64_save_to_nvram(xc_interface *xc_handle, uint32_t dom)
     if ( !info.hvm )
         return 0;
 
-    xc_get_hvm_param(xc_handle, dom, HVM_PARAM_NVRAM_FD, &nvram_fd);
+    xc_get_hvm_param(xch, dom, HVM_PARAM_NVRAM_FD, &nvram_fd);
 
     if ( !IS_VALID_NVRAM_FD(nvram_fd) )
         PERROR("Nvram not initialized. Nvram save failed!");
     else
-        copy_from_GFW_to_nvram(xc_handle, dom, (int)nvram_fd);	
+        copy_from_GFW_to_nvram(xch, dom, (int)nvram_fd);	
 
     // although save to nvram maybe fail, we don't return any error number
     // to Xend. This is quite logical because damage of NVRAM on native would 
@@ -717,7 +718,7 @@ int xc_ia64_save_to_nvram(xc_interface *xc_handle, uint32_t dom)
 #define NVRAM_DIR         "/var/lib/xen/nvram/"
 #define NVRAM_FILE_PREFIX "nvram_"
 
-int xc_ia64_nvram_init(xc_interface *xc_handle, char *dom_name, uint32_t dom)
+int xc_ia64_nvram_init(xc_interface *xch, char *dom_name, uint32_t dom)
 {
     uint64_t nvram_fd;
     char nvram_path[PATH_MAX] = NVRAM_DIR;
@@ -750,14 +751,14 @@ int xc_ia64_nvram_init(xc_interface *xc_handle, char *dom_name, uint32_t dom)
     strcat(nvram_path, NVRAM_FILE_PREFIX);
     strcat(nvram_path, dom_name);
 
-    nvram_fd = nvram_init(nvram_path);
+    nvram_fd = nvram_init(xch, nvram_path);
     if ( nvram_fd == (uint64_t)(-1) )
     {
-        xc_set_hvm_param(xc_handle, dom, HVM_PARAM_NVRAM_FD, 0);
+        xc_set_hvm_param(xch, dom, HVM_PARAM_NVRAM_FD, 0);
         return -1;
     }
 
-    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_NVRAM_FD, nvram_fd);
+    xc_set_hvm_param(xch, dom, HVM_PARAM_NVRAM_FD, nvram_fd);
     return 0; 
 }
 
@@ -784,7 +785,7 @@ min(unsigned long lhs, unsigned long rhs)
 }
 
 static int
-xc_ia64_setup_memmap_info(xc_interface *xc_handle, uint32_t dom,
+xc_ia64_setup_memmap_info(xc_interface *xch, uint32_t dom,
                           unsigned long dom_memsize, /* in bytes */
                           unsigned long *pfns_special_pages, 
                           unsigned long nr_special_pages,
@@ -795,7 +796,7 @@ xc_ia64_setup_memmap_info(xc_interface *xc_handle, uint32_t dom,
     efi_memory_desc_t *md;
     uint64_t nr_mds;
     
-    memmap_info = xc_map_foreign_range(xc_handle, dom,
+    memmap_info = xc_map_foreign_range(xch, dom,
                                        PAGE_SIZE * memmap_info_num_pages,
                                        PROT_READ | PROT_WRITE,
                                        memmap_info_pfn);
@@ -861,14 +862,14 @@ xc_ia64_setup_memmap_info(xc_interface *xc_handle, uint32_t dom,
 
 /* setup shared_info page */
 static int
-xc_ia64_setup_shared_info(xc_interface *xc_handle, uint32_t dom,
+xc_ia64_setup_shared_info(xc_interface *xch, uint32_t dom,
                           unsigned long shared_info_pfn,
                           unsigned long memmap_info_pfn,
                           unsigned long memmap_info_num_pages)
 {
     shared_info_t *shared_info;
 
-    shared_info = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+    shared_info = xc_map_foreign_range(xch, dom, PAGE_SIZE,
                                        PROT_READ | PROT_WRITE,
                                        shared_info_pfn);
     if (shared_info == NULL) {
@@ -891,7 +892,7 @@ xc_ia64_setup_shared_info(xc_interface *xc_handle, uint32_t dom,
  * convenient to allocate discontiguous memory with different size.
  */
 static int
-setup_guest(xc_interface *xc_handle, uint32_t dom, unsigned long memsize,
+setup_guest(xc_interface *xch, uint32_t dom, unsigned long memsize,
             char *image, unsigned long image_size)
 {
     xen_pfn_t *pfn_list;
@@ -949,7 +950,7 @@ setup_guest(xc_interface *xc_handle, uint32_t dom, unsigned long memsize,
          pfn++)
         pfn_list[i++] = pfn;
 
-    rc = xc_domain_memory_populate_physmap(xc_handle, dom, nr_pages, 0, 0,
+    rc = xc_domain_memory_populate_physmap(xch, dom, nr_pages, 0, 0,
                                            &pfn_list[0]);
     if (rc != 0) {
         PERROR("Could not allocate normal memory for Vti guest.");
@@ -962,7 +963,7 @@ setup_guest(xc_interface *xc_handle, uint32_t dom, unsigned long memsize,
     for (i = 0; i < GFW_PAGES; i++) 
         pfn_list[i] = (GFW_START >> PAGE_SHIFT) + i;
 
-    rc = xc_domain_memory_populate_physmap(xc_handle, dom, GFW_PAGES,
+    rc = xc_domain_memory_populate_physmap(xch, dom, GFW_PAGES,
                                            0, 0, &pfn_list[0]);
     if (rc != 0) {
         PERROR("Could not allocate GFW memory for Vti guest.");
@@ -978,7 +979,7 @@ setup_guest(xc_interface *xc_handle, uint32_t dom, unsigned long memsize,
     pfn_list[nr_special_pages] = memmap_info_pfn;
     nr_special_pages++;
 
-    rc = xc_domain_memory_populate_physmap(xc_handle, dom, nr_special_pages,
+    rc = xc_domain_memory_populate_physmap(xch, dom, nr_special_pages,
                                            0, 0, &pfn_list[0]);
     if (rc != 0) {
         PERROR("Could not allocate IO page or store page or buffer io page.");
@@ -992,11 +993,11 @@ setup_guest(xc_interface *xc_handle, uint32_t dom, unsigned long memsize,
         domctl.u.arch_setup.maxmem = dom_memsize + VGA_IO_SIZE + 1 * MEM_G;
     domctl.cmd = XEN_DOMCTL_arch_setup;
     domctl.domain = (domid_t)dom;
-    if (xc_domctl(xc_handle, &domctl))
+    if (xc_domctl(xch, &domctl))
         goto error_out;
 
     // Load guest firmware 
-    if (xc_ia64_copy_to_domain_pages(xc_handle, dom, image,
+    if (xc_ia64_copy_to_domain_pages(xch, dom, image,
                             (GFW_START + GFW_SIZE - image_size) >> PAGE_SHIFT,
                             image_size >> PAGE_SHIFT)) {
         PERROR("Could not load guest firmware into domain");
@@ -1005,28 +1006,28 @@ setup_guest(xc_interface *xc_handle, uint32_t dom, unsigned long memsize,
 
     domctl.cmd = XEN_DOMCTL_getdomaininfo;
     domctl.domain = (domid_t)dom;
-    if (xc_domctl(xc_handle, &domctl) < 0) {
+    if (xc_domctl(xch, &domctl) < 0) {
         PERROR("Could not get info on domain");
         goto error_out;
     }
 
-    if (xc_ia64_setup_memmap_info(xc_handle, dom, dom_memsize,
+    if (xc_ia64_setup_memmap_info(xch, dom, dom_memsize,
                                   pfn_list, nr_special_pages,
                                   memmap_info_pfn, memmap_info_num_pages)) {
         PERROR("Could not build memmap info");
         goto error_out;
     }
-    if (xc_ia64_setup_shared_info(xc_handle, dom,
+    if (xc_ia64_setup_shared_info(xch, dom,
                                   domctl.u.getdomaininfo.shared_info_frame,
                                   memmap_info_pfn, memmap_info_num_pages)) {
         PERROR("Could not setup shared_info");
         goto error_out;
     }
 
-    xc_get_hvm_param(xc_handle, dom, HVM_PARAM_NVRAM_FD, &nvram_fd);
+    xc_get_hvm_param(xch, dom, HVM_PARAM_NVRAM_FD, &nvram_fd);
     if ( !IS_VALID_NVRAM_FD(nvram_fd) )
         nvram_start = 0;
-    else if ( copy_from_nvram_to_GFW(xc_handle, dom, (int)nvram_fd ) == -1 ) {
+    else if ( copy_from_nvram_to_GFW(xch, dom, (int)nvram_fd ) == -1 ) {
         nvram_start = 0;
         close(nvram_fd);
     }
@@ -1034,16 +1035,16 @@ setup_guest(xc_interface *xc_handle, uint32_t dom, unsigned long memsize,
     vcpus = domctl.u.getdomaininfo.max_vcpu_id + 1;
 
     // Hand-off state passed to guest firmware 
-    if (xc_ia64_build_hob(xc_handle, dom, dom_memsize, vcpus, nvram_start) < 0) {
+    if (xc_ia64_build_hob(xch, dom, dom_memsize, vcpus, nvram_start) < 0) {
         PERROR("Could not build hob");
         goto error_out;
     }
 
     // zero clear all special pages
     for (i = 0; i < sizeof(special_pages) / sizeof(special_pages[0]); i++) {
-        xc_set_hvm_param(xc_handle, dom,
+        xc_set_hvm_param(xch, dom,
                          special_pages[i].param, special_pages[i].pfn);
-        if (xc_clear_domain_page(xc_handle, dom, special_pages[i].pfn))
+        if (xc_clear_domain_page(xch, dom, special_pages[i].pfn))
             goto error_out;
     }
 
@@ -1055,7 +1056,7 @@ error_out:
 }
 
 int
-xc_hvm_build(xc_interface *xc_handle, uint32_t domid, int memsize, const char *image_name)
+xc_hvm_build(xc_interface *xch, uint32_t domid, int memsize, const char *image_name)
 {
     vcpu_guest_context_any_t st_ctxt_any;
     vcpu_guest_context_t *ctxt = &st_ctxt_any.c;
@@ -1063,13 +1064,13 @@ xc_hvm_build(xc_interface *xc_handle, uint32_t domid, int memsize, const char *i
     unsigned long image_size;
     unsigned long nr_pages;
 
-    nr_pages = xc_get_max_pages(xc_handle, domid);
+    nr_pages = xc_get_max_pages(xch, domid);
     if (nr_pages < 0) {
         PERROR("Could not find total pages for domain");
         goto error_out;
     }
 
-    image = xc_read_image(image_name, &image_size);
+    image = xc_read_image(xch, image_name, &image_size);
     if (image == NULL) {
         PERROR("Could not read guest firmware image %s", image_name);
         goto error_out;
@@ -1077,7 +1078,7 @@ xc_hvm_build(xc_interface *xc_handle, uint32_t domid, int memsize, const char *i
 
     image_size = (image_size + PAGE_SIZE - 1) & PAGE_MASK;
 
-    if (setup_guest(xc_handle, domid, (unsigned long)memsize, image,
+    if (setup_guest(xch, domid, (unsigned long)memsize, image,
                     image_size) < 0) {
         ERROR("Error constructing guest OS");
         goto error_out;
@@ -1092,7 +1093,7 @@ xc_hvm_build(xc_interface *xc_handle, uint32_t domid, int memsize, const char *i
     ctxt->regs.psr = IA64_PSR_AC | IA64_PSR_BN;
     ctxt->regs.cr.dcr = 0;
     ctxt->regs.cr.pta = 15 << 2;
-    return xc_vcpu_setcontext(xc_handle, domid, 0, &st_ctxt_any);
+    return xc_vcpu_setcontext(xch, domid, 0, &st_ctxt_any);
 
 error_out:
     free(image);
@@ -1105,14 +1106,14 @@ error_out:
  * memsize pages marked populate-on-demand, and with a PoD cache size
  * of target.  If target == memsize, pages are populated normally.
  */
-int xc_hvm_build_target_mem(xc_interface *xc_handle,
+int xc_hvm_build_target_mem(xc_interface *xch,
                             uint32_t domid,
                             int memsize,
                             int target,
                             const char *image_name)
 {
     /* XXX:PoD isn't supported yet */
-    return xc_hvm_build(xc_handle, domid, target, image_name);
+    return xc_hvm_build(xch, domid, target, image_name);
 }
 
 /*
@@ -1131,7 +1132,7 @@ int xc_hvm_build_target_mem(xc_interface *xc_handle,
 #define _PAGE_AR_RW     (2 <<  9)       /* read & write */
 
 int
-xc_ia64_set_os_type(xc_interface *xc_handle, char *guest_os_type, uint32_t dom)
+xc_ia64_set_os_type(xc_interface *xch, char *guest_os_type, uint32_t dom)
 {
     DECLARE_DOMCTL;
 
@@ -1153,7 +1154,7 @@ xc_ia64_set_os_type(xc_interface *xc_handle, char *guest_os_type, uint32_t dom)
         domctl.u.set_opt_feature.optf.pgprot = (_PAGE_P | _PAGE_A | _PAGE_D |
                                                 _PAGE_MA_WB | _PAGE_AR_RW);
         domctl.u.set_opt_feature.optf.key = 0;
-        if (xc_domctl(xc_handle, &domctl))
+        if (xc_domctl(xch, &domctl))
             PERROR("Failed to set region 4 identity mapping for Windows "
                    "guest OS type.\n");
 
@@ -1162,7 +1163,7 @@ xc_ia64_set_os_type(xc_interface *xc_handle, char *guest_os_type, uint32_t dom)
         domctl.u.set_opt_feature.optf.pgprot = (_PAGE_P | _PAGE_A | _PAGE_D |
                                                 _PAGE_MA_UC | _PAGE_AR_RW);
         domctl.u.set_opt_feature.optf.key = 0;
-        if (xc_domctl(xc_handle, &domctl))
+        if (xc_domctl(xch, &domctl))
             PERROR("Failed to set region 5 identity mapping for Windows "
                    "guest OS type.\n");
         return 0;
@@ -1176,7 +1177,7 @@ xc_ia64_set_os_type(xc_interface *xc_handle, char *guest_os_type, uint32_t dom)
         domctl.u.set_opt_feature.optf.pgprot = (_PAGE_P | _PAGE_A | _PAGE_D |
                                                 _PAGE_MA_WB | _PAGE_AR_RW);
         domctl.u.set_opt_feature.optf.key = 0;
-        if (xc_domctl(xc_handle, &domctl))
+        if (xc_domctl(xch, &domctl))
             PERROR("Failed to set region 7 identity mapping for Linux "
                    "guest OS type.\n");
         return 0;

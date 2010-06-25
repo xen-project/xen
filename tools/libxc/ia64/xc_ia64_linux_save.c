@@ -54,7 +54,7 @@ static inline void set_bit(int nr, volatile void * addr)
 
 static int
 suspend_and_state(int (*suspend)(void*), void* data,
-                  xc_interface *xc_handle, int io_fd,
+                  xc_interface *xch, int io_fd,
                   int dom, xc_dominfo_t *info)
 {
     if ( !(*suspend)(data) ) {
@@ -62,7 +62,7 @@ suspend_and_state(int (*suspend)(void*), void* data,
         return -1;
     }
 
-    if ( (xc_domain_getinfo(xc_handle, dom, 1, info) != 1) ||
+    if ( (xc_domain_getinfo(xch, dom, 1, info) != 1) ||
          !info->shutdown || (info->shutdown_reason != SHUTDOWN_suspend) ) {
         ERROR("Could not get domain info");
         return -1;
@@ -86,7 +86,7 @@ md_is_not_ram(const efi_memory_desc_t *md)
  * page after pausing the domain.
  */
 static int
-xc_ia64_send_unallocated_list(xc_interface *xc_handle, int io_fd, 
+xc_ia64_send_unallocated_list(xc_interface *xch, int io_fd, 
                               struct xen_ia64_p2m_table *p2m_table,
                               xen_ia64_memmap_info_t *memmap_info, 
                               void *memmap_desc_start, void *memmap_desc_end)
@@ -155,11 +155,11 @@ xc_ia64_send_unallocated_list(xc_interface *xc_handle, int io_fd,
 }
 
 static int
-xc_ia64_send_vcpu_context(xc_interface *xc_handle, int io_fd, uint32_t dom,
+xc_ia64_send_vcpu_context(xc_interface *xch, int io_fd, uint32_t dom,
                           uint32_t vcpu, vcpu_guest_context_any_t *ctxt_any)
 {
     vcpu_guest_context_t *ctxt = &ctxt_any->c;
-    if (xc_vcpu_getcontext(xc_handle, dom, vcpu, ctxt_any)) {
+    if (xc_vcpu_getcontext(xch, dom, vcpu, ctxt_any)) {
         ERROR("Could not get vcpu context");
         return -1;
     }
@@ -174,7 +174,7 @@ xc_ia64_send_vcpu_context(xc_interface *xc_handle, int io_fd, uint32_t dom,
 }
 
 static int
-xc_ia64_send_shared_info(xc_interface *xc_handle, int io_fd, shared_info_t *live_shinfo)
+xc_ia64_send_shared_info(xc_interface *xch, int io_fd, shared_info_t *live_shinfo)
 {
     if (write_exact(io_fd, live_shinfo, PAGE_SIZE)) {
         ERROR("Error when writing to state file (1)");
@@ -184,7 +184,7 @@ xc_ia64_send_shared_info(xc_interface *xc_handle, int io_fd, shared_info_t *live
 }
 
 static int
-xc_ia64_send_vcpumap(xc_interface *xc_handle, int io_fd, uint32_t dom,
+xc_ia64_send_vcpumap(xc_interface *xch, int io_fd, uint32_t dom,
                      const xc_dominfo_t *info, uint64_t max_virt_cpus,
                      uint64_t **vcpumapp)
 {
@@ -204,7 +204,7 @@ xc_ia64_send_vcpumap(xc_interface *xc_handle, int io_fd, uint32_t dom,
 
     for (i = 0; i <= info->max_vcpu_id; i++) {
         xc_vcpuinfo_t vinfo;
-        if ((xc_vcpu_getinfo(xc_handle, dom, i, &vinfo) == 0) && vinfo.online)
+        if ((xc_vcpu_getinfo(xch, dom, i, &vinfo) == 0) && vinfo.online)
             __set_bit(i, vcpumap);
     }
 
@@ -231,7 +231,7 @@ xc_ia64_send_vcpumap(xc_interface *xc_handle, int io_fd, uint32_t dom,
 
 
 static int
-xc_ia64_pv_send_context(xc_interface *xc_handle, int io_fd, uint32_t dom,
+xc_ia64_pv_send_context(xc_interface *xch, int io_fd, uint32_t dom,
                         const xc_dominfo_t *info, shared_info_t *live_shinfo)
 {
     int rc = -1;
@@ -239,7 +239,7 @@ xc_ia64_pv_send_context(xc_interface *xc_handle, int io_fd, uint32_t dom,
 
     /* vcpu map */
     uint64_t *vcpumap = NULL;
-    if (xc_ia64_send_vcpumap(xc_handle, io_fd, dom, info, XEN_LEGACY_MAX_VCPUS,
+    if (xc_ia64_send_vcpumap(xch, io_fd, dom, info, XEN_LEGACY_MAX_VCPUS,
                              &vcpumap))
         goto out;
 
@@ -254,10 +254,10 @@ xc_ia64_pv_send_context(xc_interface *xc_handle, int io_fd, uint32_t dom,
         if (!__test_bit(i, vcpumap))
             continue;
 
-        if (xc_ia64_send_vcpu_context(xc_handle, io_fd, dom, i, &ctxt_any))
+        if (xc_ia64_send_vcpu_context(xch, io_fd, dom, i, &ctxt_any))
             goto out;
 
-        mem = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+        mem = xc_map_foreign_range(xch, dom, PAGE_SIZE,
                                    PROT_READ|PROT_WRITE, ctxt->privregs_pfn);
         if (mem == NULL) {
             ERROR("cannot map privreg page");
@@ -271,7 +271,7 @@ xc_ia64_pv_send_context(xc_interface *xc_handle, int io_fd, uint32_t dom,
         munmap(mem, PAGE_SIZE);
     }    
 
-    rc = xc_ia64_send_shared_info(xc_handle, io_fd, live_shinfo);
+    rc = xc_ia64_send_shared_info(xch, io_fd, live_shinfo);
 
  out:
     if (vcpumap != NULL)
@@ -280,7 +280,7 @@ xc_ia64_pv_send_context(xc_interface *xc_handle, int io_fd, uint32_t dom,
 }
 
 static int
-xc_ia64_hvm_send_context(xc_interface *xc_handle, int io_fd, uint32_t dom,
+xc_ia64_hvm_send_context(xc_interface *xch, int io_fd, uint32_t dom,
                          const xc_dominfo_t *info, shared_info_t *live_shinfo)
 {
     int rc = -1;
@@ -305,11 +305,11 @@ xc_ia64_hvm_send_context(xc_interface *xc_handle, int io_fd, uint32_t dom,
     uint64_t hvm_buf_size = 0;
     uint8_t *hvm_buf = NULL;
 
-    if (xc_ia64_send_shared_info(xc_handle, io_fd, live_shinfo))
+    if (xc_ia64_send_shared_info(xch, io_fd, live_shinfo))
         return -1;
 
     /* vcpu map */
-    if (xc_ia64_send_vcpumap(xc_handle, io_fd, dom, info, XEN_LEGACY_MAX_VCPUS,
+    if (xc_ia64_send_vcpumap(xch, io_fd, dom, info, XEN_LEGACY_MAX_VCPUS,
                              &vcpumap))
         goto out;
 
@@ -321,7 +321,7 @@ xc_ia64_hvm_send_context(xc_interface *xc_handle, int io_fd, uint32_t dom,
         if (!__test_bit(i, vcpumap))
             continue;
 
-        if (xc_ia64_send_vcpu_context(xc_handle, io_fd, dom, i, &ctxt_any))
+        if (xc_ia64_send_vcpu_context(xch, io_fd, dom, i, &ctxt_any))
             goto out;
 
         /* system context of vcpu is sent as hvm context. */
@@ -330,7 +330,7 @@ xc_ia64_hvm_send_context(xc_interface *xc_handle, int io_fd, uint32_t dom,
     /* Save magic-page locations. */
     memset(magic_pfns, 0, sizeof(magic_pfns));
     for (i = 0; i < NR_PARAMS; i++) {
-        if (xc_get_hvm_param(xc_handle, dom, hvm_params[i], &magic_pfns[i])) {
+        if (xc_get_hvm_param(xch, dom, hvm_params[i], &magic_pfns[i])) {
             PERROR("Error when xc_get_hvm_param");
             goto out;
         }
@@ -342,7 +342,7 @@ xc_ia64_hvm_send_context(xc_interface *xc_handle, int io_fd, uint32_t dom,
     }
 
     /* Need another buffer for HVM context */
-    hvm_buf_size = xc_domain_hvm_getcontext(xc_handle, dom, 0, 0);
+    hvm_buf_size = xc_domain_hvm_getcontext(xch, dom, 0, 0);
     if (hvm_buf_size == -1) {
         ERROR("Couldn't get HVM context size from Xen");
         goto out;
@@ -355,7 +355,7 @@ xc_ia64_hvm_send_context(xc_interface *xc_handle, int io_fd, uint32_t dom,
     }
 
     /* Get HVM context from Xen and save it too */
-    rec_size = xc_domain_hvm_getcontext(xc_handle, dom, hvm_buf, hvm_buf_size);
+    rec_size = xc_domain_hvm_getcontext(xch, dom, hvm_buf, hvm_buf_size);
     if (rec_size == -1) {
         ERROR("HVM:Could not get hvm buffer");
         goto out;
@@ -381,7 +381,7 @@ out:
 }
 
 int
-xc_domain_save(xc_interface *xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
+xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iters,
                uint32_t max_factor, uint32_t flags,
                struct save_callbacks* callbacks,
                int hvm, void (*switch_qemu_logdirty)(int, unsigned))
@@ -449,7 +449,7 @@ xc_domain_save(xc_interface *xc_handle, int io_fd, uint32_t dom, uint32_t max_it
 
     //initialize_mbit_rate();
 
-    if (xc_domain_getinfo(xc_handle, dom, 1, &info) != 1) {
+    if (xc_domain_getinfo(xch, dom, 1, &info) != 1) {
         ERROR("Could not get domain info");
         return 1;
     }
@@ -466,14 +466,14 @@ xc_domain_save(xc_interface *xc_handle, int io_fd, uint32_t dom, uint32_t max_it
 #endif
 
     /* Map the shared info frame */
-    live_shinfo = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+    live_shinfo = xc_map_foreign_range(xch, dom, PAGE_SIZE,
                                        PROT_READ, shared_info_frame);
     if (!live_shinfo) {
         ERROR("Couldn't map live_shinfo");
         goto out;
     }
 
-    p2m_size = xc_memory_op(xc_handle, XENMEM_maximum_gpfn, &dom) + 1;
+    p2m_size = xc_memory_op(xch, XENMEM_maximum_gpfn, &dom) + 1;
 
     /* This is expected by xm restore.  */
     if (write_exact(io_fd, &p2m_size, sizeof(unsigned long))) {
@@ -498,7 +498,7 @@ xc_domain_save(xc_interface *xc_handle, int io_fd, uint32_t dom, uint32_t max_it
     domctl.cmd = XEN_DOMCTL_arch_setup;
     domctl.domain = (domid_t)dom;
     domctl.u.arch_setup.flags = XEN_DOMAINSETUP_query;
-    if (xc_domctl(xc_handle, &domctl) < 0) {
+    if (xc_domctl(xch, &domctl) < 0) {
         ERROR("Could not get domain setup");
         goto out;
     }
@@ -511,7 +511,7 @@ xc_domain_save(xc_interface *xc_handle, int io_fd, uint32_t dom, uint32_t max_it
     /* Domain is still running at this point */
     if (live) {
 
-        if (xc_shadow_control(xc_handle, dom,
+        if (xc_shadow_control(xch, dom,
                               XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY,
                               NULL, 0, NULL, 0, NULL ) < 0) {
             ERROR("Couldn't enable shadow mode");
@@ -551,7 +551,7 @@ xc_domain_save(xc_interface *xc_handle, int io_fd, uint32_t dom, uint32_t max_it
 
         last_iter = 1;
 
-        if (suspend_and_state(callbacks->suspend, callbacks->data, xc_handle,
+        if (suspend_and_state(callbacks->suspend, callbacks->data, xch,
                               io_fd, dom, &info)) {
             ERROR("Domain appears not to have suspended");
             goto out;
@@ -560,14 +560,14 @@ xc_domain_save(xc_interface *xc_handle, int io_fd, uint32_t dom, uint32_t max_it
     }
 
     /* copy before use in case someone updating them */
-    if (xc_ia64_copy_memmap(xc_handle, info.domid, live_shinfo,
+    if (xc_ia64_copy_memmap(xch, info.domid, live_shinfo,
                             &memmap_info, &memmap_info_num_pages) != 0) {
         PERROR("Could not copy memmap");
         goto out;
     }
     memmap_size = memmap_info_num_pages << PAGE_SHIFT;
 
-    if (xc_ia64_p2m_map(&p2m_table, xc_handle, dom, memmap_info, 0) < 0) {
+    if (xc_ia64_p2m_map(&p2m_table, xch, dom, memmap_info, 0) < 0) {
         PERROR("xc_ia64_p2m_map");
         goto out;
     }
@@ -596,7 +596,7 @@ xc_domain_save(xc_interface *xc_handle, int io_fd, uint32_t dom, uint32_t max_it
            slightly wasteful to peek the whole array evey time,
            but this is fast enough for the moment. */
         if (!last_iter) {
-            if (xc_shadow_control(xc_handle, dom,
+            if (xc_shadow_control(xch, dom,
                                   XEN_DOMCTL_SHADOW_OP_PEEK,
                                   to_skip, p2m_size,
                                   NULL, 0, NULL) != p2m_size) {
@@ -638,7 +638,7 @@ xc_domain_save(xc_interface *xc_handle, int io_fd, uint32_t dom, uint32_t max_it
                             xc_ia64_p2m_mfn(&p2m_table, N),
                             N, p2m_size);
 
-                mem = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+                mem = xc_map_foreign_range(xch, dom, PAGE_SIZE,
                                            PROT_READ|PROT_WRITE, N);
                 if (mem == NULL) {
                     /* The page may have move.
@@ -681,14 +681,14 @@ xc_domain_save(xc_interface *xc_handle, int io_fd, uint32_t dom, uint32_t max_it
                 last_iter = 1;
 
                 if (suspend_and_state(callbacks->suspend, callbacks->data,
-                                      xc_handle, io_fd, dom, &info)) {
+                                      xch, io_fd, dom, &info)) {
                     ERROR("Domain appears not to have suspended");
                     goto out;
                 }
             }
 
             /* Pages to be sent are pages which were dirty.  */
-            if (xc_shadow_control(xc_handle, dom,
+            if (xc_shadow_control(xch, dom,
                                   XEN_DOMCTL_SHADOW_OP_CLEAN,
                                   to_send, p2m_size,
                                   NULL, 0, NULL ) != p2m_size) {
@@ -698,7 +698,7 @@ xc_domain_save(xc_interface *xc_handle, int io_fd, uint32_t dom, uint32_t max_it
 
             sent_last_iter = sent_this_iter;
 
-            //print_stats(xc_handle, dom, sent_this_iter, &stats, 1);
+            //print_stats(xch, dom, sent_this_iter, &stats, 1);
         }
     }
 
@@ -713,16 +713,16 @@ xc_domain_save(xc_interface *xc_handle, int io_fd, uint32_t dom, uint32_t max_it
         }
     }
 
-    if (xc_ia64_send_unallocated_list(xc_handle, io_fd, &p2m_table,
+    if (xc_ia64_send_unallocated_list(xch, io_fd, &p2m_table,
                                       memmap_info,
                                       memmap_desc_start, memmap_desc_end))
         goto out;
 
     if (!hvm)
-        rc = xc_ia64_pv_send_context(xc_handle, io_fd,
+        rc = xc_ia64_pv_send_context(xch, io_fd,
                                      dom, &info, live_shinfo);
     else
-        rc = xc_ia64_hvm_send_context(xc_handle, io_fd,
+        rc = xc_ia64_hvm_send_context(xch, io_fd,
                                       dom, &info, live_shinfo);
     if (rc)
         goto out;
@@ -735,27 +735,27 @@ xc_domain_save(xc_interface *xc_handle, int io_fd, uint32_t dom, uint32_t max_it
        callbacks->postcopy(callbacks->data);
 
    /* Flush last write and discard cache for file. */
-   discard_file_cache(io_fd, 1 /* flush */);
+   discard_file_cache(xch, io_fd, 1 /* flush */);
 
    /* checkpoint_cb can spend arbitrarily long in between rounds */
    if (!rc && callbacks->checkpoint &&
        callbacks->checkpoint(callbacks->data) > 0)
    {
        /* reset stats timer */
-       //print_stats(xc_handle, dom, 0, &stats, 0);
+       //print_stats(xch, dom, 0, &stats, 0);
 
        rc = 1;
        /* last_iter = 1; */
-       if ( suspend_and_state(callbacks->suspend, callbacks->data, xc_handle,
+       if ( suspend_and_state(callbacks->suspend, callbacks->data, xch,
                               io_fd, dom, &info) )
        {
            ERROR("Domain appears not to have suspended");
            goto out;
        }
        DPRINTF("SUSPEND shinfo %08lx\n", info.shared_info_frame);
-       //print_stats(xc_handle, dom, 0, &stats, 1);
+       //print_stats(xch, dom, 0, &stats, 1);
 
-       if ( xc_shadow_control(xc_handle, dom,
+       if ( xc_shadow_control(xch, dom,
                               XEN_DOMCTL_SHADOW_OP_CLEAN, to_send,
                               p2m_size, NULL, 0, NULL) != p2m_size )
        {
@@ -766,7 +766,7 @@ xc_domain_save(xc_interface *xc_handle, int io_fd, uint32_t dom, uint32_t max_it
    }
 
     if (live) {
-        if (xc_shadow_control(xc_handle, dom,
+        if (xc_shadow_control(xch, dom,
                               XEN_DOMCTL_SHADOW_OP_OFF,
                               NULL, 0, NULL, 0, NULL ) < 0) {
             DPRINTF("Warning - couldn't disable shadow mode");

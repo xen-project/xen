@@ -47,7 +47,11 @@
 #include <asm/dom_fw.h>
 #include <asm/dom_fw_domu.h>
 
+#ifdef __XEN__
 void efi_systable_init_domu(struct fw_tables *tables)
+#else
+void efi_systable_init_domu(xc_interface *xch, struct fw_tables *tables)
+#endif
 {
 	int i = 1;
 
@@ -77,6 +81,9 @@ complete_domu_memmap(domain_t * d,
 	void *p;
 	void *memmap_start;
 	void *memmap_end;
+#ifndef __XEN__
+	xc_interface *xch = d->xch;
+#endif
 
 	if (memmap_info_pfn == 0 || memmap_info_num_pages == 0) {
 		/* old domain builder which doesn't setup

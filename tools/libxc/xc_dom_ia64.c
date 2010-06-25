@@ -172,7 +172,7 @@ int arch_setup_meminit(struct xc_dom_image *dom)
         dom->p2m_host[pfn] = start + pfn;
 
     /* allocate guest memory */
-    rc = xc_domain_memory_populate_physmap(dom->guest_xc, dom->guest_domid,
+    rc = xc_domain_memory_populate_physmap(dom->xch, dom->guest_domid,
                                            nbr, 0, 0,
                                            dom->p2m_host);
     return rc;
@@ -195,7 +195,7 @@ static int ia64_setup_memmap(struct xc_dom_image *dom)
     memmap_info_pfn = dom->start_info_pfn - 1;
     DOMPRINTF("%s: memmap: mfn 0x%" PRIpfn " pages 0x%lx",
               __FUNCTION__, memmap_info_pfn, memmap_info_num_pages);
-    memmap_info = xc_map_foreign_range(dom->guest_xc, dom->guest_domid,
+    memmap_info = xc_map_foreign_range(dom->xch, dom->guest_domid,
                                        page_size * memmap_info_num_pages,
                                        PROT_READ | PROT_WRITE,
                                        memmap_info_pfn);
@@ -225,7 +225,7 @@ static int ia64_setup_memmap(struct xc_dom_image *dom)
      * we use xen_ia64_boot_param::efi_memmap::{efi_memmap, efi_memmap_size}
      * for this purpose
      */
-    start_info = xc_map_foreign_range(dom->guest_xc, dom->guest_domid,
+    start_info = xc_map_foreign_range(dom->xch, dom->guest_domid,
 				      page_size,
 				      PROT_READ | PROT_WRITE,
 				      dom->start_info_pfn);
@@ -254,7 +254,7 @@ int arch_setup_bootearly(struct xc_dom_image *dom)
         domctl.u.arch_setup.maxmem = 0;
         domctl.cmd = XEN_DOMCTL_arch_setup;
         domctl.domain = dom->guest_domid;
-        rc = xc_domctl(dom->guest_xc, &domctl);
+        rc = xc_domctl(dom->xch, &domctl);
         DOMPRINTF("%s: hvm-3.0-ia64-sioemu: %d", __FUNCTION__, rc);
         return rc;
     }
@@ -267,7 +267,7 @@ int arch_setup_bootearly(struct xc_dom_image *dom)
     domctl.cmd = XEN_DOMCTL_arch_setup;
     domctl.domain = dom->guest_domid;
     domctl.u.arch_setup.flags = XEN_DOMAINSETUP_query;
-    rc = do_domctl(dom->guest_xc, &domctl);
+    rc = do_domctl(dom->xch, &domctl);
     if (rc)
         return rc;
     rc = xen_ia64_dom_fw_setup(dom, domctl.u.arch_setup.hypercall_imm,
@@ -286,7 +286,7 @@ int arch_setup_bootearly(struct xc_dom_image *dom)
         + sizeof(start_info_t);
     domctl.u.arch_setup.maxmem = dom->total_pages << PAGE_SHIFT;
     domctl.u.arch_setup.vhpt_size_log2 = dom->vhpt_size_log2;
-    rc = do_domctl(dom->guest_xc, &domctl);
+    rc = do_domctl(dom->xch, &domctl);
     return rc;
 }
 
@@ -298,7 +298,7 @@ int arch_setup_bootlate(struct xc_dom_image *dom)
     /* setup shared_info page */
     DOMPRINTF("%s: shared_info: mfn 0x%" PRIpfn "",
               __FUNCTION__, dom->shared_info_mfn);
-    shared_info = xc_map_foreign_range(dom->guest_xc, dom->guest_domid,
+    shared_info = xc_map_foreign_range(dom->xch, dom->guest_domid,
                                        page_size,
                                        PROT_READ | PROT_WRITE,
                                        dom->shared_info_mfn);

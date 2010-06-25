@@ -318,7 +318,11 @@ dom_fw_pal_hypercall_patch(uint64_t brkimm, unsigned long paddr, unsigned long i
 }
 
 static inline void
+#ifdef __XEN__ 
 print_md(efi_memory_desc_t *md)
+#else
+print_md(xc_interface *xch, efi_memory_desc_t *md)
+#endif
 {
 	uint64_t size;
 	
@@ -581,7 +585,11 @@ dom_fw_init(domain_t *d,
 	if (xen_ia64_is_dom0(d)) {
 		efi_systable_init_dom0(tables);
 	} else {
+#ifdef __XEN__
 		efi_systable_init_domu(tables);
+#else
+		efi_systable_init_domu(d->xch, tables);
+#endif
 	}
 
 	/* fill in the SAL system table: */
@@ -675,7 +683,11 @@ dom_fw_init(domain_t *d,
 
 	/* Display memmap.  */
 	for (i = 0 ; i < tables->num_mds; i++)
+#ifdef __XEN__
 		print_md(&tables->efi_memmap[i]);
+#else
+		print_md(d->xch, &tables->efi_memmap[i]);
+#endif
 
 	/* Fill boot_param  */
 	bp->efi_systab = FW_FIELD_MPA(efi_systab);

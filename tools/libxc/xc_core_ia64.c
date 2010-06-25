@@ -48,10 +48,12 @@ xc_memory_map_cmp(const void *lhs__, const void *rhs__)
         return 1;
 
     /* memory map overlap isn't allowed. complain */
-    DPRINTF("duplicated addresses are detected "
+#ifdef DEBUG
+    fprintf(stderr, "duplicated addresses are detected "
             "(0x%" PRIx64 ", 0x%" PRIx64 "), "
             "(0x%" PRIx64 ", 0x%" PRIx64 ")\n",
             lhs->addr, lhs->size, rhs->addr, rhs->size);
+#endif
     return 0;
 }
 
@@ -316,7 +318,8 @@ xc_core_arch_context_get(struct xc_core_arch_context* arch_ctxt,
 }
 
 int
-xc_core_arch_context_get_shdr(struct xc_core_arch_context *arch_ctxt, 
+xc_core_arch_context_get_shdr(xc_interface *xch,
+                              struct xc_core_arch_context *arch_ctxt, 
                               struct xc_core_section_headers *sheaders,
                               struct xc_core_strtab *strtab,
                               uint64_t *filesz, uint64_t offset)
@@ -332,14 +335,15 @@ xc_core_arch_context_get_shdr(struct xc_core_arch_context *arch_ctxt,
     }
 
     /* mmapped priv regs */
-    shdr = xc_core_shdr_get(sheaders);
+    shdr = xc_core_shdr_get(xch, sheaders);
     if ( shdr == NULL )
     {
         PERROR("Could not get section header for .xen_ia64_mapped_regs");
         return sts;
     }
     *filesz = arch_ctxt->mapped_regs_size * arch_ctxt->nr_vcpus;
-    sts = xc_core_shdr_set(shdr, strtab, XEN_DUMPCORE_SEC_IA64_MAPPED_REGS,
+    sts = xc_core_shdr_set(xch, shdr, strtab,
+                           XEN_DUMPCORE_SEC_IA64_MAPPED_REGS,
                            SHT_PROGBITS, offset, *filesz,
                            __alignof__(*arch_ctxt->mapped_regs[0]),
                            arch_ctxt->mapped_regs_size);
@@ -347,7 +351,8 @@ xc_core_arch_context_get_shdr(struct xc_core_arch_context *arch_ctxt,
 }
 
 int
-xc_core_arch_context_dump(struct xc_core_arch_context* arch_ctxt,
+xc_core_arch_context_dump(xc_interface *xch,
+                          struct xc_core_arch_context* arch_ctxt,
                           void* args, dumpcore_rtn_t dump_rtn)
 {
     int sts = 0;
@@ -356,7 +361,7 @@ xc_core_arch_context_dump(struct xc_core_arch_context* arch_ctxt,
     /* ia64 mapped_regs: .xen_ia64_mapped_regs */
     for ( i = 0; i < arch_ctxt->nr_vcpus; i++ )
     {
-        sts = dump_rtn(args, (char*)arch_ctxt->mapped_regs[i],
+        sts = dump_rtn(xch, args, (char*)arch_ctxt->mapped_regs[i],
                        arch_ctxt->mapped_regs_size);
         if ( sts != 0 )
             break;

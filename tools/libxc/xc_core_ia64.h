@@ -43,12 +43,14 @@ xc_core_arch_context_get(struct xc_core_arch_context* arch_ctxt,
                          vcpu_guest_context_any_t* ctxt,
                          xc_interface *xch, uint32_t domid);
 int
-xc_core_arch_context_get_shdr(struct xc_core_arch_context* arch_ctxt, 
+xc_core_arch_context_get_shdr(xc_interface *xch,
+                              struct xc_core_arch_context* arch_ctxt, 
                               struct xc_core_section_headers *sheaders,
                               struct xc_core_strtab *strtab,
                               uint64_t *filesz, uint64_t offset);
 int
-xc_core_arch_context_dump(struct xc_core_arch_context* arch_ctxt,
+xc_core_arch_context_dump(xc_interface *xch,
+                          struct xc_core_arch_context* arch_ctxt,
                           void* args, dumpcore_rtn_t dump_rtn);
 
 int
