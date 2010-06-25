@@ -37,15 +37,15 @@ get_mtrr_var_range(unsigned int index, struct mtrr_var_range *vr)
 static void
 get_fixed_ranges(mtrr_type * frs)
 {
-	unsigned int *p = (unsigned int *) frs;
+	uint64_t *p = (uint64_t *) frs;
 	int i;
 
-	rdmsr(MTRRfix64K_00000_MSR, p[0], p[1]);
+	rdmsrl(MTRRfix64K_00000_MSR, p[0]);
 
 	for (i = 0; i < 2; i++)
-		rdmsr(MTRRfix16K_80000_MSR + i, p[2 + i * 2], p[3 + i * 2]);
+		rdmsrl(MTRRfix16K_80000_MSR + i, p[1 + i]);
 	for (i = 0; i < 8; i++)
-		rdmsr(MTRRfix4K_C0000_MSR + i, p[6 + i * 2], p[7 + i * 2]);
+		rdmsrl(MTRRfix4K_C0000_MSR + i, p[3 + i]);
 }
 
 void mtrr_save_fixed_ranges(void *info)
@@ -59,7 +59,7 @@ void __init get_mtrr_state(void)
 {
 	unsigned int i;
 	struct mtrr_var_range *vrs;
-	unsigned lo, dummy;
+	uint64_t msr_content;
 
 	if (!mtrr_state.var_ranges) {
 		mtrr_state.var_ranges = xmalloc_array(struct mtrr_var_range,
@@ -69,17 +69,17 @@ void __init get_mtrr_state(void)
 	} 
 	vrs = mtrr_state.var_ranges;
 
-	rdmsr(MTRRcap_MSR, lo, dummy);
-	mtrr_state.have_fixed = (lo >> 8) & 1;
+	rdmsrl(MTRRcap_MSR, msr_content);
+	mtrr_state.have_fixed = (msr_content >> 8) & 1;
 
 	for (i = 0; i < num_var_ranges; i++)
 		get_mtrr_var_range(i, &vrs[i]);
 	if (mtrr_state.have_fixed)
 		get_fixed_ranges(mtrr_state.fixed_ranges);
 
-	rdmsr(MTRRdefType_MSR, lo, dummy);
-	mtrr_state.def_type = (lo & 0xff);
-	mtrr_state.enabled = (lo & 0xc00) >> 10;
+	rdmsrl(MTRRdefType_MSR, msr_content);
+	mtrr_state.def_type = (msr_content & 0xff);
+	mtrr_state.enabled = (msr_content & 0xc00) >> 10;
 
 	/* Store mtrr_cap for HVM MTRR virtualisation. */
 	rdmsrl(MTRRcap_MSR, mtrr_state.mtrr_cap);
@@ -179,10 +179,10 @@ int generic_get_free_region(unsigned long base, unsigned long size, int replace_
 static void generic_get_mtrr(unsigned int reg, unsigned long *base,
 			     unsigned long *size, mtrr_type *type)
 {
-	unsigned int mask_lo, mask_hi, base_lo, base_hi;
+	uint64_t _mask, _base;
 
-	rdmsr(MTRRphysMask_MSR(reg), mask_lo, mask_hi);
-	if ((mask_lo & 0x800) == 0) {
+	rdmsrl(MTRRphysMask_MSR(reg), _mask);
+	if ((_mask & 0x800) == 0) {
 		/*  Invalid (i.e. free) range  */
 		*base = 0;
 		*size = 0;
@@ -190,17 +190,16 @@ static void generic_get_mtrr(unsigned int reg, unsigned long *base,
 		return;
 	}
 
-	rdmsr(MTRRphysBase_MSR(reg), base_lo, base_hi);
+	rdmsrl(MTRRphysBase_MSR(reg), _base);
 
 	/* Work out the shifted address mask. */
-	mask_lo = size_or_mask | mask_hi << (32 - PAGE_SHIFT)
-	    | mask_lo >> PAGE_SHIFT;
+	_mask = size_or_mask | (_mask >> PAGE_SHIFT);
 
 	/* This works correctly if size is a power of two, i.e. a
 	   contiguous range. */
-	*size = -mask_lo;
-	*base = base_hi << (32 - PAGE_SHIFT) | base_lo >> PAGE_SHIFT;
-	*type = base_lo & 0xff;
+	*size = -(uint32_t)_mask;
+	*base = _base >> PAGE_SHIFT;
+	*type = _base & 0xff;
 }
 
 /**
@@ -226,9 +225,12 @@ static int set_fixed_ranges(mtrr_type * frs)
 static int set_mtrr_var_ranges(unsigned int index, struct mtrr_var_range *vr)
 {
 	uint32_t lo, hi, base_lo, base_hi, mask_lo, mask_hi;
+	uint64_t msr_content;
 	int changed = FALSE;
 
-	rdmsr(MTRRphysBase_MSR(index), lo, hi);
+	rdmsrl(MTRRphysBase_MSR(index), msr_content);
+	lo = (uint32_t)msr_content;
+	hi = (uint32_t)(msr_content >> 32);
 	base_lo = (uint32_t)vr->base;
 	base_hi = (uint32_t)(vr->base >> 32);
 
@@ -242,7 +244,9 @@ static int set_mtrr_var_ranges(unsigned int index, struct mtrr_var_range *vr)
 		changed = TRUE;
 	}
 
-	rdmsr(MTRRphysMask_MSR(index), lo, hi);
+	rdmsrl(MTRRphysMask_MSR(index), msr_content);
+	lo = (uint32_t)msr_content;
+	hi = (uint32_t)(msr_content >> 32);
 	mask_lo = (uint32_t)vr->mask;
 	mask_hi = (uint32_t)(vr->mask >> 32);
 
@@ -451,9 +455,9 @@ int generic_validate_add_page(unsigned long base, unsigned long size, unsigned i
 
 static int generic_have_wrcomb(void)
 {
-	unsigned long config, dummy;
-	rdmsr(MTRRcap_MSR, config, dummy);
-	return (config & (1 << 10));
+	unsigned long config;
+	rdmsrl(MTRRcap_MSR, config);
+	return (config & (1ULL << 10));
 }
 
 int positive_have_wrcomb(void)
