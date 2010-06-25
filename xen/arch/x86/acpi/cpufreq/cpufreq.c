@@ -137,13 +137,12 @@ struct drv_cmd {
 static void do_drv_read(void *drvcmd)
 {
     struct drv_cmd *cmd;
-    u32 h;
 
     cmd = (struct drv_cmd *)drvcmd;
 
     switch (cmd->type) {
     case SYSTEM_INTEL_MSR_CAPABLE:
-        rdmsr(cmd->addr.msr.reg, cmd->val, h);
+        rdmsrl(cmd->addr.msr.reg, cmd->val);
         break;
     case SYSTEM_IO_CAPABLE:
         acpi_os_read_port((acpi_io_address)cmd->addr.io.port,
@@ -157,15 +156,16 @@ static void do_drv_read(void *drvcmd)
 static void do_drv_write(void *drvcmd)
 {
     struct drv_cmd *cmd;
-    u32 lo, hi;
+    uint64_t msr_content;
 
     cmd = (struct drv_cmd *)drvcmd;
 
     switch (cmd->type) {
     case SYSTEM_INTEL_MSR_CAPABLE:
-        rdmsr(cmd->addr.msr.reg, lo, hi);
-        lo = (lo & ~INTEL_MSR_RANGE) | (cmd->val & INTEL_MSR_RANGE);
-        wrmsr(cmd->addr.msr.reg, lo, hi);
+        rdmsrl(cmd->addr.msr.reg, msr_content);
+        msr_content = (msr_content & ~INTEL_MSR_RANGE)
+            | (cmd->val & INTEL_MSR_RANGE);
+        wrmsrl(cmd->addr.msr.reg, msr_content);
         break;
     case SYSTEM_IO_CAPABLE:
         acpi_os_write_port((acpi_io_address)cmd->addr.io.port,
@@ -252,8 +252,8 @@ static void read_measured_perf_ctrs(void *_readin)
 {
     struct perf_pair *readin = _readin;
 
-    rdmsr(MSR_IA32_APERF, readin->aperf.split.lo, readin->aperf.split.hi);
-    rdmsr(MSR_IA32_MPERF, readin->mperf.split.lo, readin->mperf.split.hi);
+    rdmsrl(MSR_IA32_APERF, readin->aperf.whole);
+    rdmsrl(MSR_IA32_MPERF, readin->mperf.whole);
 }
 
 /*

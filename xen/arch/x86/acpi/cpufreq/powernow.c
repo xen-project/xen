@@ -44,7 +44,7 @@
 #define USE_HW_PSTATE           0x00000080
 #define HW_PSTATE_MASK          0x00000007
 #define HW_PSTATE_VALID_MASK    0x80000000
-#define HW_PSTATE_MAX_MASK      0x000000f0
+#define HW_PSTATE_MAX_MASK      0x000000f000000000ULL
 #define HW_PSTATE_MAX_SHIFT     4
 #define MSR_PSTATE_DEF_BASE     0xc0010064 /* base of Pstate MSRs */
 #define MSR_PSTATE_STATUS       0xc0010063 /* Pstate Status MSR */
@@ -77,15 +77,15 @@ static void transition_pstate(void *drvcmd)
     cmd = (struct drv_cmd *) drvcmd;
 
     if (cmd->turbo != CPUFREQ_TURBO_UNSUPPORTED) {
-        u32 lo, hi;
-        rdmsr(MSR_K8_HWCR, lo, hi);
+        uint64_t msr_content;
+        rdmsrl(MSR_K8_HWCR, msr_content);
         if (cmd->turbo == CPUFREQ_TURBO_ENABLED)
-            lo &= ~MSR_HWCR_CPBDIS_MASK;
+            msr_content &= ~MSR_HWCR_CPBDIS_MASK;
         else
-            lo |= MSR_HWCR_CPBDIS_MASK; 
-        wrmsr(MSR_K8_HWCR, lo, hi);
+            msr_content |= MSR_HWCR_CPBDIS_MASK; 
+        wrmsrl(MSR_K8_HWCR, msr_content);
     }
-    wrmsr(MSR_PSTATE_CTRL, cmd->val, 0);
+    wrmsrl(MSR_PSTATE_CTRL, cmd->val);
 }
 
 static int powernow_cpufreq_target(struct cpufreq_policy *policy,
@@ -194,7 +194,8 @@ static int powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
     struct powernow_cpufreq_data *data;
     unsigned int result = 0;
     struct processor_performance *perf;
-    u32 max_hw_pstate, hi = 0, lo = 0;
+    u32 max_hw_pstate;
+    uint64_t msr_content;
     struct cpuinfo_x86 *c = &cpu_data[policy->cpu];
 
     data = xmalloc(struct powernow_cpufreq_data);
@@ -226,8 +227,8 @@ static int powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
         result = -ENODEV;
         goto err_unreg;
     }
-    rdmsr(MSR_PSTATE_CUR_LIMIT, hi, lo);
-    max_hw_pstate = (hi & HW_PSTATE_MAX_MASK) >> HW_PSTATE_MAX_SHIFT;
+    rdmsrl(MSR_PSTATE_CUR_LIMIT, msr_content);
+    max_hw_pstate = (msr_content & HW_PSTATE_MAX_MASK) >> HW_PSTATE_MAX_SHIFT;
 
     if (perf->control_register.space_id != perf->status_register.space_id) {
         result = -ENODEV;
