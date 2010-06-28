@@ -10,6 +10,10 @@ SUBDIRS_PROGRAMS = xenstored
 
 SUBDIRS = $(SUBDIRS_LIBS) $(SUBDIRS_PROGRAMS)
 
+.NOTPARALLEL:
+# targets here must be run in order, otherwise we can try
+# to build programs before the libraries are done
+
 .PHONY: all
 all: build
 
