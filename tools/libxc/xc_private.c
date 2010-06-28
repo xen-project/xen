@@ -52,7 +52,7 @@ xc_interface *xc_interface_open(xentoollog_logger *logger,
     return xch;
 
  err:
-    if (xch) xtl_logger_destroy(xch->error_handler);
+    if (xch) xtl_logger_destroy(xch->error_handler_tofree);
     if (xch != &xch_buf) free(xch);
     return 0;
 }
