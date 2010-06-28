@@ -365,6 +365,8 @@ class Parser:
 def atomp(sxpr):
     """Check if an sxpr is an atom.
     """
+    if sxpr == '':
+        return 0
     if sxpr.isalnum() or sxpr == '@':
         return 1
     for c in sxpr:
