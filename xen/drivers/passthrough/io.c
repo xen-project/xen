@@ -28,7 +28,7 @@
 
 static void hvm_dirq_assist(unsigned long _d);
 
-static int pt_irq_need_timer(uint32_t flags)
+bool_t pt_irq_need_timer(uint32_t flags)
 {
     return !(flags & (HVM_IRQ_DPCI_GUEST_MSI | HVM_IRQ_DPCI_TRANSLATE));
 }

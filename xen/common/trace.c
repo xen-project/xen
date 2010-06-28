@@ -130,7 +130,8 @@ static int alloc_trace_bufs(void)
         char         *rawbuf;
         struct t_buf *buf;
 
-        if ( (rawbuf = alloc_xenheap_pages(order, 0)) == NULL )
+        if ( (rawbuf = alloc_xenheap_pages(
+                order, MEMF_bits(32 + PAGE_SHIFT))) == NULL )
         {
             printk("Xen trace buffers: memory allocation failed\n");
             opt_tbuf_size = 0;
