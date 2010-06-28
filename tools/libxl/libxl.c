@@ -858,6 +858,8 @@ static char ** libxl_build_device_model_args(struct libxl_ctx *ctx,
         flexarray_set(dm_args, num++, info->serial);
     }
     if (info->type == XENFV) {
+        int ioemu_vifs = 0;
+
         if (info->videoram) {
             flexarray_set(dm_args, num++, "-videoram");
             flexarray_set(dm_args, num++, libxl_sprintf(ctx, "%d", info->videoram));
@@ -901,7 +903,13 @@ static char ** libxl_build_device_model_args(struct libxl_ctx *ctx,
                 flexarray_set(dm_args, num++, "-net");
                 flexarray_set(dm_args, num++, libxl_sprintf(ctx, "tap,vlan=%d,ifname=%s,bridge=%s",
                             vifs[i].devid, vifs[i].ifname, vifs[i].bridge));
+                ioemu_vifs++;
             }
+        }
+        /* If we have no emulated nics, tell qemu not to create any */
+        if ( ioemu_vifs == 0 ) {
+            flexarray_set(dm_args, num++, "-net");
+            flexarray_set(dm_args, num++, "none");
         }
     }
     if (info->saved_state) {
