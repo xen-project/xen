@@ -260,7 +260,9 @@ static void pci_clean_dpci_irqs(struct domain *d)
               i = find_next_bit(hvm_irq_dpci->mapping, d->nr_pirqs, i + 1) )
         {
             pirq_guest_unbind(d, i);
-            kill_timer(&hvm_irq_dpci->hvm_timer[domain_pirq_to_irq(d, i)]);
+
+            if ( pt_irq_need_timer(hvm_irq_dpci->mirq[i].flags) )
+                kill_timer(&hvm_irq_dpci->hvm_timer[domain_pirq_to_irq(d, i)]);
 
             list_for_each_safe ( digl_list, tmp,
                                  &hvm_irq_dpci->mirq[i].digl_list )
