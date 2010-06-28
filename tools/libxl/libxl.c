@@ -1454,6 +1454,8 @@ int libxl_device_nic_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_nic
     flexarray_set(back, boffset++, libxl_sprintf(ctx, "%02x:%02x:%02x:%02x:%02x:%02x",
                                                  nic->mac[0], nic->mac[1], nic->mac[2],
                                                  nic->mac[3], nic->mac[4], nic->mac[5]));
+    flexarray_set(back, boffset++, "bridge");
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%s", nic->bridge));
     flexarray_set(back, boffset++, "handle");
     flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", nic->devid));
 
