@@ -415,6 +415,9 @@ class Grub:
         timeout = int(self.cf.timeout)
 
         self.selected_image = self.cf.default
+        # If the selected (default) image doesn't exist we select the first entry
+        if self.selected_image > len(self.cf.images):
+            self.selected_image = 0
         self.isdone = False
         while not self.isdone:
             self.run_main(timeout)
