@@ -19,7 +19,7 @@ eb-roms.h.new: $(ROMS)
 	cat $^ | ../hvmloader/mkhex etherboot >$@
 
 eb-roms.h: Config
-	$(MAKE) $@.new
+	$(MAKE) NO_WERROR=1 $@.new
 	mv -f $@.new $@
 
 $D/src/arch/i386/Config: $T Config
@@ -35,4 +35,4 @@ $D/src/bin/NIC: $D/src/arch/i386/Config
 
 .PHONY: clean
 clean:
-	rm -rf $D *~
+	rm -rf $D *~ eb-roms.h

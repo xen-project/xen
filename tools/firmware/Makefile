@@ -8,7 +8,7 @@ INST_DIR := $(DESTDIR)$(XENFIRMWAREDIR)
 SUBDIRS :=
 SUBDIRS += rombios
 SUBDIRS += vgabios
-#SUBDIRS += etherboot
+SUBDIRS += etherboot
 SUBDIRS += hvmloader
 
 .PHONY: all
