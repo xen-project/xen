@@ -309,7 +309,7 @@ void __init init_trace_bufs(void)
 
     for(i=0; i<T_INFO_PAGES; i++)
         share_xen_page_with_privileged_guests(
-            virt_to_page(t_info) + i, XENSHARE_writable);
+            virt_to_page(t_info) + i, XENSHARE_readonly);
 
     if ( opt_tbuf_size == 0 )
     {

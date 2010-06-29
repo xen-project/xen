@@ -63,7 +63,7 @@ typedef struct settings_st {
 } settings_t;
 
 struct t_struct {
-    struct t_info *t_info;  /* Structure with information about individual buffers */
+    const struct t_info *t_info; /* Structure with information about individual buffers */
     struct t_buf **meta;    /* Pointers to trace buffer metadata */
     unsigned char **data;   /* Pointers to trace buffer data areas */
 };
@@ -475,9 +475,8 @@ static struct t_struct *map_tbufs(unsigned long tbufs_mfn, unsigned int num,
     int i;
 
     /* Map t_info metadata structure */
-    tbufs.t_info = xc_map_foreign_range(xc_handle, DOMID_XEN,
-                                        tinfo_size, PROT_READ | PROT_WRITE,
-                                        tbufs_mfn);
+    tbufs.t_info = xc_map_foreign_range(xc_handle, DOMID_XEN, tinfo_size,
+                                        PROT_READ, tbufs_mfn);
 
     if ( tbufs.t_info == 0 ) 
     {
@@ -503,7 +502,8 @@ static struct t_struct *map_tbufs(unsigned long tbufs_mfn, unsigned int num,
     for(i=0; i<num; i++)
     {
         
-        uint32_t *mfn_list = ((uint32_t *)tbufs.t_info) + tbufs.t_info->mfn_offset[i];
+        const uint32_t *mfn_list = (const uint32_t *)tbufs.t_info
+                                   + tbufs.t_info->mfn_offset[i];
         int j;
         xen_pfn_t pfn_list[tbufs.t_info->tbuf_size];
 
