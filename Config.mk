@@ -154,9 +154,9 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 6392763643311272590ef5c6f75ba11d5b132585
-# Wed Jun 9 17:10:59 2010 +0100
-# Fix read-only image file handling
+QEMU_TAG ?= 109ed219afc4be5cc5c22f912bb125d1fb102bb2
+# Tue Jun 29 14:42:48 2010 +0100
+# stubdom: fix creation hang by not initialising xenfb_pv if nographic
 
 # Optional components
 XENSTAT_XENTOP     ?= y
