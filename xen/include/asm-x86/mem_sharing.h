@@ -22,6 +22,8 @@
 #ifndef __MEM_SHARING_H__
 #define __MEM_SHARING_H__
 
+#ifdef __x86_64__
+
 #define sharing_supported(_d) \
     (is_hvm_domain(_d) && paging_mode_hap(_d)) 
 
@@ -42,5 +44,11 @@ int mem_sharing_cache_resize(struct domain *d, int new_size);
 int mem_sharing_domctl(struct domain *d, 
                        xen_domctl_mem_sharing_op_t *mec);
 void mem_sharing_init(void);
+
+#else 
+
+#define mem_sharing_init()  do { } while (0)
+
+#endif /* __x86_64__ */
 
 #endif /* __MEM_SHARING_H__ */

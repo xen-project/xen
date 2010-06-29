@@ -3448,20 +3448,23 @@ int do_mmu_update(
                         rc = -ENOENT;
                         break;
                     }
+#ifdef __x86_64__
                     /* XXX: Ugly: pull all the checks into a separate function. 
                      * Don't want to do it now, not to interfere with mem_paging
                      * patches */
                     else if ( p2m_ram_shared == l1e_p2mt )
                     {
                         /* Unshare the page for RW foreign mappings */
-                        if(l1e_get_flags(l1e) & _PAGE_RW)
+                        if ( l1e_get_flags(l1e) & _PAGE_RW )
                         {
                             rc = mem_sharing_unshare_page(pg_owner, 
                                                           l1e_get_pfn(l1e), 
                                                           0);
-                            if(rc) break; 
+                            if ( rc )
+                                break; 
                         }
                     } 
+#endif
 
                     okay = mod_l1_entry(va, l1e, mfn,
                                         cmd == MMU_PT_UPDATE_PRESERVE_AD, v,
@@ -4806,8 +4809,10 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         return rc;
     }
 
+#ifdef __x86_64__
     case XENMEM_get_sharing_freed_pages:
         return mem_sharing_get_nr_saved_mfns();
+#endif
 
     default:
         return subarch_memory_op(op, arg);

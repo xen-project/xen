@@ -78,11 +78,12 @@ typedef enum {
     p2m_grant_map_rw = 7,       /* Read/write grant mapping */
     p2m_grant_map_ro = 8,       /* Read-only grant mapping */
 
+    /* Likewise, although these are defined in all builds, they can only
+     * be used in 64-bit builds */
     p2m_ram_paging_out = 9,       /* Memory that is being paged out */
     p2m_ram_paged = 10,           /* Memory that has been paged out */
     p2m_ram_paging_in = 11,       /* Memory that is being paged in */
     p2m_ram_paging_in_start = 12, /* Memory that is being paged in */
-
     p2m_ram_shared = 13,          /* Shared or sharable memory */
 } p2m_type_t;
 
@@ -154,6 +155,7 @@ typedef enum {
 #define p2m_is_paged(_t)    (p2m_to_mask(_t) & P2M_PAGED_TYPES)
 #define p2m_is_sharable(_t) (p2m_to_mask(_t) & P2M_SHARABLE_TYPES)
 #define p2m_is_shared(_t)   (p2m_to_mask(_t) & P2M_SHARED_TYPES)
+
 
 /* Populate-on-demand */
 #define POPULATE_ON_DEMAND_MFN  (1<<9)
@@ -323,20 +325,21 @@ static inline mfn_t gfn_to_mfn_unshare(struct domain *d,
                                        int must_succeed)
 {
     mfn_t mfn;
-    int ret;
 
     mfn = gfn_to_mfn(d, gfn, p2mt);
-    if(p2m_is_shared(*p2mt))
+#ifdef __x86_64__
+    if ( p2m_is_shared(*p2mt) )
     {
-        ret = mem_sharing_unshare_page(d, gfn,
-                must_succeed ? MEM_SHARING_MUST_SUCCEED : 0);
-        if(ret < 0)
+        if ( mem_sharing_unshare_page(d, gfn,
+                                      must_succeed 
+                                      ? MEM_SHARING_MUST_SUCCEED : 0) )
         {
             BUG_ON(must_succeed);
             return mfn;
         }
         mfn = gfn_to_mfn(d, gfn, p2mt);
     }
+#endif
 
     return mfn;
 }
@@ -438,10 +441,11 @@ p2m_type_t p2m_change_type(struct domain *d, unsigned long gfn,
 /* Set mmio addresses in the p2m table (for pass-through) */
 int set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn);
 int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn);
-/* Modify p2m table for shared gfn */
-int
-set_shared_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn);
 
+
+#ifdef __x86_64__
+/* Modify p2m table for shared gfn */
+int set_shared_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn);
 /* Check if a nominated gfn is valid to be paged out */
 int p2m_mem_paging_nominate(struct domain *d, unsigned long gfn);
 /* Evict a frame */
@@ -452,6 +456,10 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn);
 int p2m_mem_paging_prep(struct domain *d, unsigned long gfn);
 /* Resume normal operation (in case a domain was paused) */
 void p2m_mem_paging_resume(struct domain *d);
+#else
+static inline void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
+{ }
+#endif
 
 struct page_info *p2m_alloc_ptp(struct domain *d, unsigned long type);
 
