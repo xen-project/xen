@@ -9,6 +9,8 @@ T=gpxe-git-snapshot.tar.gz
 
 ROMS = $(addprefix $D/src/bin/, $(addsuffix .rom, $(NICS)))
 
+.NOTPARALLEL:
+
 .PHONY: all
 all: eb-roms.h
 
