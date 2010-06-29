@@ -42,21 +42,28 @@ do_start () {
 		test -z "$XENSTORED_ROOTDIR" || XENSTORED_ROOTDIR="/var/lib/xenstored"
 		rm -f "$XENSTORED_ROOTDIR"/tdb* &>/dev/null
 		test -z "$XENSTORED_TRACE" || XENSTORED_ARGS=" -T /var/log/xen/xenstored-trace.log"
+
+		echo Starting xenstored...
 		xenstored --pid-file=/var/run/xenstore.pid $XENSTORED_ARGS
+		echo Setting domain 0 name...
 		xenstore-write "/local/domain/0/name" "Domain-0"
 	fi
 
+	echo Starting xenconsoled...
 	test -z "$XENCONSOLED_TRACE" || XENCONSOLED_ARGS=" -T /var/log/xen/xenstored-trace.log"
 	xenconsoled --pid-file=$XENCONSOLED_PIDFILE $XENCONSOLED_ARGS
 	test -z "$XENBACKENDD_DEBUG" || XENBACKENDD_ARGS="-d"
 	test "`uname`" != "NetBSD" || xenbackendd $XENBACKENDD_ARGS
 }
 do_stop () {
+        echo Stopping xenconsoled
 	if read 2>/dev/null <$XENCONSOLED_PIDFILE pid; then
 		kill $pid
 		while kill -9 $pid >/dev/null 2>&1; do sleep 0.1; done
 		rm -f $XENCONSOLED_PIDFILE
 	fi
+
+	echo WARNING: Not stopping xenstored, as it cannot be restarted.
 }
 
 case "$1" in
