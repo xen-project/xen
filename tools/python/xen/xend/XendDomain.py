@@ -250,6 +250,18 @@ class XendDomain:
         @return: path to config file.
         """
         return os.path.join(self._managed_path(domuuid), CACHED_CONFIG_FILE)
+    def domain_setpauseflag(self, dom, flag=False):
+        try:
+            dominfo = self.domain_lookup_nr(dom)
+            dominfo.paused_by_admin = flag
+        except Exception, err:
+            log.debug("error in in setpauseflag")
+    def domain_getpauseflag(self, dom):
+        try:
+            dominfo = self.domain_lookup_nr(dom)
+            return dominfo.paused_by_admin
+        except Exception, err:
+            log.debug("error in in getpauseflag")
 
     def _managed_check_point_path(self, domuuid):
         """Returns absolute path to check point file for managed domain.
