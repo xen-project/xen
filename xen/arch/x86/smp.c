@@ -144,6 +144,7 @@ void send_IPI_mask_flat(const cpumask_t *cpumask, int vector)
     unsigned long cfg;
     unsigned long flags;
 
+    mask &= cpus_addr(cpu_online_map)[0];
     mask &= ~(1UL << smp_processor_id());
     if ( mask == 0 )
         return;
@@ -183,7 +184,7 @@ void send_IPI_mask_phys(const cpumask_t *mask, int vector)
 
     for_each_cpu_mask ( query_cpu, *mask )
     {
-        if ( query_cpu == smp_processor_id() )
+        if ( !cpu_online(query_cpu) || (query_cpu == smp_processor_id()) )
             continue;
 
         /*

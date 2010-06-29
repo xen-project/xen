@@ -133,6 +133,7 @@
 ^tools/firmware/.*\.bin$
 ^tools/firmware/.*\.sym$
 ^tools/firmware/.*bios/.*bios.*\.txt$
+^tools/firmware/etherboot/eb-roms\.h$
 ^tools/firmware/etherboot/gpxe/.*$
 ^tools/firmware/extboot/extboot.img$
 ^tools/firmware/extboot/signrom$
