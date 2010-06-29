@@ -26,23 +26,22 @@
 #define NUM_COUNTERS 4
 #define NUM_CONTROLS 4
 
-#define CTR_READ(l,h,msrs,c) do {rdmsr(msrs->counters[(c)].addr, (l), (h));} while (0)
+#define CTR_READ(msr_content,msrs,c) do {rdmsrl(msrs->counters[(c)].addr, (msr_content));} while (0)
 #define CTR_WRITE(l,msrs,c) do {wrmsr(msrs->counters[(c)].addr, -(unsigned int)(l), -1);} while (0)
-#define CTR_OVERFLOWED(n) (!((n) & (1U<<31)))
+#define CTR_OVERFLOWED(n) (!((n) & (1ULL<<31)))
 
-#define CTRL_READ(l,h,msrs,c) do {rdmsr(msrs->controls[(c)].addr, (l), (h));} while (0)
-#define CTRL_WRITE(l,h,msrs,c) do {wrmsr(msrs->controls[(c)].addr, (l), (h));} while (0)
-#define CTRL_SET_ACTIVE(n) (n |= (1<<22))
-#define CTRL_SET_INACTIVE(n) (n &= ~(1<<22))
-#define CTRL_CLEAR(lo, hi) (lo &= (1<<21), hi = 0)
-#define CTRL_SET_ENABLE(val) (val |= 1<<20)
+#define CTRL_READ(msr_content,msrs,c) do {rdmsrl(msrs->controls[(c)].addr, (msr_content));} while (0)
+#define CTRL_WRITE(msr_content,msrs,c) do {wrmsrl(msrs->controls[(c)].addr, (msr_content));} while (0)
+#define CTRL_SET_ACTIVE(n) (n |= (1ULL<<22))
+#define CTRL_SET_INACTIVE(n) (n &= ~(1ULL<<22))
+#define CTRL_CLEAR(val) (val &= (1ULL<<21))
+#define CTRL_SET_ENABLE(val) (val |= 1ULL<<20)
 #define CTRL_SET_USR(val,u) (val |= ((u & 1) << 16))
 #define CTRL_SET_KERN(val,k) (val |= ((k & 1) << 17))
 #define CTRL_SET_UM(val, m) (val |= ((m & 0xff) << 8))
-#define CTRL_SET_EVENT_LOW(val, e) (val |= (e & 0xff))
-#define CTRL_SET_EVENT_HIGH(val, e) (val |= ((e >> 8) & 0xf))
-#define CTRL_SET_HOST_ONLY(val, h) (val |= ((h & 1) << 9))
-#define CTRL_SET_GUEST_ONLY(val, h) (val |= ((h & 1) << 8))
+#define CTRL_SET_EVENT(val, e) (val |= (((e >> 8) & 0xf) | (e & 0xff)))
+#define CTRL_SET_HOST_ONLY(val, h) (val |= ((h & 0x1ULL) << 41))
+#define CTRL_SET_GUEST_ONLY(val, h) (val |= ((h & 0x1ULL) << 40))
 
 static unsigned long reset_value[NUM_COUNTERS];
 
@@ -64,14 +63,14 @@ static void athlon_fill_in_addresses(struct op_msrs * const msrs)
  
 static void athlon_setup_ctrs(struct op_msrs const * const msrs)
 {
-	unsigned int low, high;
+	uint64_t msr_content;
 	int i;
  
 	/* clear all counters */
 	for (i = 0 ; i < NUM_CONTROLS; ++i) {
-		CTRL_READ(low, high, msrs, i);
-		CTRL_CLEAR(low, high);
-		CTRL_WRITE(low, high, msrs, i);
+		CTRL_READ(msr_content, msrs, i);
+		CTRL_CLEAR(msr_content);
+		CTRL_WRITE(msr_content, msrs, i);
 	}
 	
 	/* avoid a false detection of ctr overflows in NMI handler */
@@ -86,17 +85,16 @@ static void athlon_setup_ctrs(struct op_msrs const * const msrs)
 
 			CTR_WRITE(counter_config[i].count, msrs, i);
 
-			CTRL_READ(low, high, msrs, i);
-			CTRL_CLEAR(low, high);
-			CTRL_SET_ENABLE(low);
-			CTRL_SET_USR(low, counter_config[i].user);
-			CTRL_SET_KERN(low, counter_config[i].kernel);
-			CTRL_SET_UM(low, counter_config[i].unit_mask);
-			CTRL_SET_EVENT_LOW(low, counter_config[i].event);
-			CTRL_SET_EVENT_HIGH(high, counter_config[i].event);
-			CTRL_SET_HOST_ONLY(high, 0);
-			CTRL_SET_GUEST_ONLY(high, 0);
-			CTRL_WRITE(low, high, msrs, i);
+			CTRL_READ(msr_content, msrs, i);
+			CTRL_CLEAR(msr_content);
+			CTRL_SET_ENABLE(msr_content);
+			CTRL_SET_USR(msr_content, counter_config[i].user);
+			CTRL_SET_KERN(msr_content, counter_config[i].kernel);
+			CTRL_SET_UM(msr_content, counter_config[i].unit_mask);
+			CTRL_SET_EVENT(msr_content, counter_config[i].event);
+			CTRL_SET_HOST_ONLY(msr_content, 0);
+			CTRL_SET_GUEST_ONLY(msr_content, 0);
+			CTRL_WRITE(msr_content, msrs, i);
 		} else {
 			reset_value[i] = 0;
 		}
@@ -108,7 +106,7 @@ static int athlon_check_ctrs(unsigned int const cpu,
 			     struct cpu_user_regs * const regs)
 
 {
-	unsigned int low, high;
+	uint64_t msr_content;
 	int i;
 	int ovf = 0;
 	unsigned long eip = regs->eip;
@@ -128,8 +126,8 @@ static int athlon_check_ctrs(unsigned int const cpu,
 	}
 
 	for (i = 0 ; i < NUM_COUNTERS; ++i) {
-		CTR_READ(low, high, msrs, i);
-		if (CTR_OVERFLOWED(low)) {
+		CTR_READ(msr_content, msrs, i);
+		if (CTR_OVERFLOWED(msr_content)) {
 			xenoprof_log_event(current, regs, eip, mode, i);
 			CTR_WRITE(reset_value[i], msrs, i);
 			ovf = 1;
@@ -143,13 +141,13 @@ static int athlon_check_ctrs(unsigned int const cpu,
  
 static void athlon_start(struct op_msrs const * const msrs)
 {
-	unsigned int low, high;
+	uint64_t msr_content;
 	int i;
 	for (i = 0 ; i < NUM_COUNTERS ; ++i) {
 		if (reset_value[i]) {
-			CTRL_READ(low, high, msrs, i);
-			CTRL_SET_ACTIVE(low);
-			CTRL_WRITE(low, high, msrs, i);
+			CTRL_READ(msr_content, msrs, i);
+			CTRL_SET_ACTIVE(msr_content);
+			CTRL_WRITE(msr_content, msrs, i);
 		}
 	}
 }
@@ -157,15 +155,15 @@ static void athlon_start(struct op_msrs const * const msrs)
 
 static void athlon_stop(struct op_msrs const * const msrs)
 {
-	unsigned int low,high;
+	uint64_t msr_content;
 	int i;
 
 	/* Subtle: stop on all counters to avoid race with
 	 * setting our pm callback */
 	for (i = 0 ; i < NUM_COUNTERS ; ++i) {
-		CTRL_READ(low, high, msrs, i);
-		CTRL_SET_INACTIVE(low);
-		CTRL_WRITE(low, high, msrs, i);
+		CTRL_READ(msr_content, msrs, i);
+		CTRL_SET_INACTIVE(msr_content);
+		CTRL_WRITE(msr_content, msrs, i);
 	}
 }
 
