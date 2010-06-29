@@ -37,14 +37,32 @@ if ! grep -q "control_d" /proc/xen/capabilities ; then
 fi
 
 do_start () {
+        local time=0
+	local timeout=30
+
 	if ! `xenstore-read -s / >/dev/null 2>&1`
 	then
 		test -z "$XENSTORED_ROOTDIR" || XENSTORED_ROOTDIR="/var/lib/xenstored"
 		rm -f "$XENSTORED_ROOTDIR"/tdb* &>/dev/null
 		test -z "$XENSTORED_TRACE" || XENSTORED_ARGS=" -T /var/log/xen/xenstored-trace.log"
 
-		echo Starting xenstored...
+		echo -n Starting xenstored...
 		xenstored --pid-file=/var/run/xenstore.pid $XENSTORED_ARGS
+
+		# Wait for xenstored to actually come up, timing out after 30 seconds
+                while [ $time -lt $timeout ] && ! `xenstore-read -s / >/dev/null 2>&1` ; do
+                    echo -n .
+		    time=$(($time+1))
+                    sleep 1
+                done
+		echo
+
+		# Exit if we timed out
+		if ! [ $time -lt $timeout ] ; then
+		    echo Could not start xenstored
+		    exit 1
+		fi
+
 		echo Setting domain 0 name...
 		xenstore-write "/local/domain/0/name" "Domain-0"
 	fi
