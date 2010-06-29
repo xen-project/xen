@@ -77,7 +77,7 @@ cpumask_t target_cpus_x2apic(void)
 
 cpumask_t vector_allocation_domain_x2apic(int cpu)
 {
-	return cpumask_of_cpu(cpu);
+    return cpumask_of_cpu(cpu);
 }
 
 unsigned int cpu_mask_to_apicid_x2apic_phys(cpumask_t cpumask)
@@ -90,9 +90,10 @@ unsigned int cpu_mask_to_apicid_x2apic_cluster(cpumask_t cpumask)
     return cpu_2_logical_apicid[first_cpu(cpumask)];
 }
 
-void send_IPI_mask_x2apic_phys(const cpumask_t *cpumask, int vector)
+static void __send_IPI_mask_x2apic(
+    const cpumask_t *cpumask, int vector, unsigned int dest_mode)
 {
-    unsigned int cpu, cfg;
+    unsigned int cpu;
     unsigned long flags;
     uint64_t msr_content;
 
@@ -110,32 +111,25 @@ void send_IPI_mask_x2apic_phys(const cpumask_t *cpumask, int vector)
 
     local_irq_save(flags);
 
-    cfg = APIC_DM_FIXED | 0 /* no shorthand */ | APIC_DEST_PHYSICAL | vector;
     for_each_cpu_mask ( cpu, *cpumask )
-        if ( cpu != smp_processor_id() ) {
-            msr_content = cfg | ((uint64_t)cpu_physical_id(cpu) << 32);
-            apic_wrmsr(APIC_ICR, msr_content);
-        }
+    {
+        if ( !cpu_online(cpu) || (cpu == smp_processor_id()) )
+            continue;
+        msr_content = (dest_mode == APIC_DEST_PHYSICAL)
+            ? cpu_physical_id(cpu) : cpu_2_logical_apicid[cpu];
+        msr_content = (msr_content << 32) | APIC_DM_FIXED | dest_mode | vector;
+        apic_wrmsr(APIC_ICR, msr_content);
+    }
 
     local_irq_restore(flags);
 }
 
+void send_IPI_mask_x2apic_phys(const cpumask_t *cpumask, int vector)
+{
+    __send_IPI_mask_x2apic(cpumask, vector, APIC_DEST_PHYSICAL);
+}
+
 void send_IPI_mask_x2apic_cluster(const cpumask_t *cpumask, int vector)
 {
-    unsigned int cpu, cfg;
-    unsigned long flags;
-    uint64_t msr_content;
-
-    mb(); /* see the comment in send_IPI_mask_x2apic_phys() */
-
-    local_irq_save(flags);
-
-    cfg = APIC_DM_FIXED | 0 /* no shorthand */ | APIC_DEST_LOGICAL | vector;
-    for_each_cpu_mask ( cpu, *cpumask )
-        if ( cpu != smp_processor_id() ) {
-            msr_content = cfg | ((uint64_t)cpu_2_logical_apicid[cpu] << 32);
-            apic_wrmsr(APIC_ICR, msr_content);
-        }
-
-    local_irq_restore(flags);
+    __send_IPI_mask_x2apic(cpumask, vector, APIC_DEST_LOGICAL);
 }
