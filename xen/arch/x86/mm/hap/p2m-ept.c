@@ -307,18 +307,10 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     }
     else
     {
-        int num = order / EPT_TABLE_ORDER;
         int level;
         ept_entry_t *split_ept_entry;
 
-        if ( (num >= 2) && hvm_hap_has_1gb(d) )
-            num = 2;
-        else if ( (num >= 1) && hvm_hap_has_2mb(d) )
-            num = 1;
-        else
-            num = 0;
-
-        for ( level = split_level; level > num ; level-- )
+        for ( level = split_level; level > walk_level ; level-- )
         {
             rv = ept_split_large_page(d, &table, &index, gfn, level);
             if ( !rv )
