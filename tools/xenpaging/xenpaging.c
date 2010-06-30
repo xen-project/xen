@@ -373,8 +373,10 @@ int xenpaging_resume_page(xenpaging_t *paging, mem_event_response_t *rsp)
     return ret;
 }
 
-int xenpaging_populate_page(xenpaging_t *paging, unsigned long *gfn, int fd, int i)
+static int xenpaging_populate_page(
+    xenpaging_t *paging, uint64_t *gfn, int fd, int i)
 {
+    unsigned long _gfn;
     void *page;
     int ret;
 
@@ -389,8 +391,10 @@ int xenpaging_populate_page(xenpaging_t *paging, unsigned long *gfn, int fd, int
 
     /* Map page */
     ret = -EFAULT;
+    _gfn = *gfn;
     page = xc_map_foreign_pages(paging->xc_handle, paging->mem_event.domain_id,
-                                PROT_READ | PROT_WRITE, gfn, 1);
+                                PROT_READ | PROT_WRITE, &_gfn, 1);
+    *gfn = _gfn;
     if ( page == NULL )
     {
         ERROR("Error mapping page: page is null");
@@ -544,7 +548,7 @@ int main(int argc, char *argv[])
     
                 if ( i >= num_pages )
                 {
-                    DPRINTF("Couldn't find page %lx\n", req.gfn);
+                    DPRINTF("Couldn't find page %"PRIx64"\n", req.gfn);
                     goto out;
                 }
                 
@@ -575,7 +579,7 @@ int main(int argc, char *argv[])
             else
             {
                 DPRINTF("page already populated (domain = %d; vcpu = %d;"
-                        " gfn = %lx; paused = %"PRId64")\n",
+                        " gfn = %"PRIx64"; paused = %"PRId64")\n",
                         paging->mem_event.domain_id, req.vcpu_id,
                         req.gfn, req.flags & MEM_EVENT_FLAG_VCPU_PAUSED);
 
