@@ -127,9 +127,8 @@ unsigned int compat_iret(void)
         ti = &v->arch.guest_context.trap_ctxt[13];
         if ( TI_GET_IF(ti) )
             eflags &= ~X86_EFLAGS_IF;
-        regs->_eflags = eflags & ~(X86_EFLAGS_VM|X86_EFLAGS_RF|
-                                   X86_EFLAGS_NT|X86_EFLAGS_TF);
-
+        regs->_eflags &= ~(X86_EFLAGS_VM|X86_EFLAGS_RF|
+                           X86_EFLAGS_NT|X86_EFLAGS_TF);
         if ( unlikely(__put_user(0, (u32 *)regs->rsp)) )
             goto exit_and_crash;
         regs->_eip = ti->address;
