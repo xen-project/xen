@@ -1027,7 +1027,7 @@ static void __pirq_guest_eoi(struct domain *d, int pirq)
 
 int pirq_guest_eoi(struct domain *d, int irq)
 {
-    if ( (irq < 0) || (irq > d->nr_pirqs) )
+    if ( (irq < 0) || (irq >= d->nr_pirqs) )
         return -EINVAL;
 
     __pirq_guest_eoi(d, irq);
