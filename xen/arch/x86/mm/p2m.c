@@ -2557,7 +2557,7 @@ p2m_type_t p2m_change_type(struct domain *d, unsigned long gfn,
 
     p2m_lock(d->arch.p2m);
 
-    mfn = gfn_to_mfn(d, gfn, &pt);
+    mfn = gfn_to_mfn_query(d, gfn, &pt);
     if ( pt == ot )
         set_p2m_entry(d, gfn, mfn, 0, nt);
 
