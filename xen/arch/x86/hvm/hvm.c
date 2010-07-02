@@ -2242,6 +2242,10 @@ static long hvm_vcpu_op(
     {
     case VCPUOP_register_runstate_memory_area:
     case VCPUOP_get_runstate_info:
+    case VCPUOP_set_periodic_timer:
+    case VCPUOP_stop_periodic_timer:
+    case VCPUOP_set_singleshot_timer:
+    case VCPUOP_stop_singleshot_timer:
         rc = do_vcpu_op(cmd, vcpuid, arg);
         break;
     default:
@@ -2267,6 +2271,7 @@ static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
     HYPERCALL(xen_version),
     HYPERCALL(event_channel_op),
     HYPERCALL(sched_op),
+    HYPERCALL(set_timer_op),
     HYPERCALL(hvm_op),
     HYPERCALL(tmem_op)
 };
@@ -2299,6 +2304,10 @@ static long hvm_vcpu_op_compat32(
     {
     case VCPUOP_register_runstate_memory_area:
     case VCPUOP_get_runstate_info:
+    case VCPUOP_set_periodic_timer:
+    case VCPUOP_stop_periodic_timer:
+    case VCPUOP_set_singleshot_timer:
+    case VCPUOP_stop_singleshot_timer:
         rc = compat_vcpu_op(cmd, vcpuid, arg);
         break;
     default:
@@ -2316,6 +2325,7 @@ static hvm_hypercall_t *hvm_hypercall64_table[NR_hypercalls] = {
     HYPERCALL(xen_version),
     HYPERCALL(event_channel_op),
     HYPERCALL(sched_op),
+    HYPERCALL(set_timer_op),
     HYPERCALL(hvm_op),
     HYPERCALL(tmem_op)
 };
@@ -2327,6 +2337,7 @@ static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
     HYPERCALL(xen_version),
     HYPERCALL(event_channel_op),
     HYPERCALL(sched_op),
+    HYPERCALL(set_timer_op),
     HYPERCALL(hvm_op),
     HYPERCALL(tmem_op)
 };
