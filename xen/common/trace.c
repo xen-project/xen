@@ -50,12 +50,11 @@ integer_param("tbuf_size", opt_tbuf_size);
 static struct t_info *t_info;
 #define T_INFO_PAGES 2  /* Size fixed at 2 pages for now. */
 #define T_INFO_SIZE ((T_INFO_PAGES)*(PAGE_SIZE))
-/* t_info.tbuf_size + list of mfn offsets + 1 to round up / sizeof uint32_t */
-#define T_INFO_FIRST_OFFSET ((sizeof(int16_t) + NR_CPUS * sizeof(int16_t) + 1) / sizeof(uint32_t))
 static DEFINE_PER_CPU_READ_MOSTLY(struct t_buf *, t_bufs);
 static DEFINE_PER_CPU_READ_MOSTLY(unsigned char *, t_data);
 static DEFINE_PER_CPU_READ_MOSTLY(spinlock_t, t_lock);
 static int data_size;
+static u32 t_info_first_offset __read_mostly;
 
 /* High water mark for trace buffers; */
 /* Send virtual interrupt when buffer level reaches this point */
@@ -75,13 +74,29 @@ static cpumask_t tb_cpu_mask = CPU_MASK_ALL;
 /* which tracing events are enabled */
 static u32 tb_event_mask = TRC_ALL;
 
+/* Return the number of elements _type necessary to store at least _x bytes of data
+ * i.e., sizeof(_type) * ans >= _x. */
+#define fit_to_type(_type, _x) (((_x)+sizeof(_type)-1) / sizeof(_type))
+
+static void calc_tinfo_first_offset(void)
+{
+    int offset_in_bytes;
+    
+    offset_in_bytes = offsetof(struct t_info, mfn_offset[NR_CPUS]);
+
+    t_info_first_offset = fit_to_type(uint32_t, offset_in_bytes);
+
+    gdprintk(XENLOG_INFO, "%s: NR_CPUs %d, offset_in_bytes %d, t_info_first_offset %u\n",
+           __func__, NR_CPUS, offset_in_bytes, (unsigned)t_info_first_offset);
+}
+
 /**
  * check_tbuf_size - check to make sure that the proposed size will fit
  * in the currently sized struct t_info.
  */
 static inline int check_tbuf_size(int size)
 {
-    return (num_online_cpus() * size + T_INFO_FIRST_OFFSET) > (T_INFO_SIZE / sizeof(uint32_t));
+    return (num_online_cpus() * size + t_info_first_offset) > (T_INFO_SIZE / sizeof(uint32_t));
 }
 
 /**
@@ -100,7 +115,7 @@ static int alloc_trace_bufs(void)
     unsigned long nr_pages;
     /* Start after a fixed-size array of NR_CPUS */
     uint32_t *t_info_mfn_list = (uint32_t *)t_info;
-    int offset = T_INFO_FIRST_OFFSET;
+    int offset = t_info_first_offset;
 
     BUG_ON(check_tbuf_size(opt_tbuf_size));
 
@@ -293,6 +308,10 @@ static struct notifier_block cpu_nfb = {
 void __init init_trace_bufs(void)
 {
     int i;
+
+    /* Calculate offset in u32 of first mfn */
+    calc_tinfo_first_offset();
+
     /* t_info size fixed at 2 pages for now.  That should be big enough / small enough
      * until it's worth making it dynamic. */
     t_info = alloc_xenheap_pages(1, 0);
