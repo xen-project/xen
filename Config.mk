@@ -154,9 +154,9 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 109ed219afc4be5cc5c22f912bb125d1fb102bb2
-# Tue Jun 29 14:42:48 2010 +0100
-# stubdom: fix creation hang by not initialising xenfb_pv if nographic
+QEMU_TAG ?= add968aaf68cb57257428f8cfadb209f2614a6d8
+# Fri Jul 2 17:36:01 2010 +0100
+# Revert "Wait for frontend state Connected before connecting the backend"
 
 # Optional components
 XENSTAT_XENTOP     ?= y
