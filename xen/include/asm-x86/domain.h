@@ -415,9 +415,7 @@ struct arch_vcpu
     struct mapcache_vcpu mapcache;
 #endif
 
-#if XEN_GDBSX_CONFIG
     uint32_t gdbsx_vcpu_event;
-#endif 
 
     /* A secondary copy of the vcpu time info. */
     XEN_GUEST_HANDLE(vcpu_time_info_t) time_info_guest;

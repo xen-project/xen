@@ -1492,9 +1492,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         if ( (inst_len = __get_instruction_length(v, INSTR_INT3)) == 0 )
             break;
         __update_guest_eip(regs, inst_len);
-#ifdef XEN_GDBSX_CONFIG
         current->arch.gdbsx_vcpu_event = TRAP_int3;
-#endif
         domain_pause_for_debugger();
         break;
 

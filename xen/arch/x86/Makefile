@@ -13,6 +13,7 @@ obj-y += bitops.o
 obj-y += clear_page.o
 obj-y += copy_page.o
 obj-y += compat.o
+obj-y += debug.o
 obj-y += delay.o
 obj-y += dmi_scan.o
 obj-y += domctl.o
@@ -57,7 +58,6 @@ obj-y += hpet.o
 obj-y += bzimage.o
 
 obj-$(crash_debug) += gdbstub.o
-obj-$(gdbsx) += debug.o
 
 x86_emulate.o: x86_emulate/x86_emulate.c x86_emulate/x86_emulate.h
 

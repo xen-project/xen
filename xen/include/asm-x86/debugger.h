@@ -68,10 +68,8 @@ static inline int debugger_trap_entry(
     if ( guest_kernel_mode(v, regs) && v->domain->debugger_attached &&
          ((vector == TRAP_int3) || (vector == TRAP_debug)) )
     {
-#ifdef XEN_GDBSX_CONFIG
         if ( vector != TRAP_debug ) /* domain pause is good enough */
             current->arch.gdbsx_vcpu_event = vector;
-#endif
         domain_pause_for_debugger();
         return 1;
     }
