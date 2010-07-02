@@ -92,11 +92,19 @@ static void calc_tinfo_first_offset(void)
 
 /**
  * check_tbuf_size - check to make sure that the proposed size will fit
- * in the currently sized struct t_info.
+ * in the currently sized struct t_info and allows prod and cons to
+ * reach double the value without overflow.
  */
-static inline int check_tbuf_size(int size)
+static int check_tbuf_size(u32 pages)
 {
-    return (num_online_cpus() * size + t_info_first_offset) > (T_INFO_SIZE / sizeof(uint32_t));
+    struct t_buf dummy;
+    typeof(dummy.prod) size;
+    
+    size = ((typeof(dummy.prod))pages)  * PAGE_SIZE;
+    
+    return (size / PAGE_SIZE != pages)
+           || (size + size < size)
+           || (num_online_cpus() * pages + t_info_first_offset > T_INFO_SIZE / sizeof(uint32_t));
 }
 
 /**
