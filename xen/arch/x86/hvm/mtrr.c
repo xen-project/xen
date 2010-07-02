@@ -707,7 +707,7 @@ HVM_REGISTER_SAVE_RESTORE(MTRR, hvm_save_mtrr_msr, hvm_load_mtrr_msr,
                           1, HVMSR_PER_VCPU);
 
 uint8_t epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
-                           uint8_t *ipat, int direct_mmio)
+                           uint8_t *ipat, bool_t direct_mmio)
 {
     uint8_t gmtrr_mtype, hmtrr_mtype;
     uint32_t type;

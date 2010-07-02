@@ -229,33 +229,41 @@ static int ept_split_large_page(struct domain *d,
  * by observing whether any gfn->mfn translations are modified.
  */
 static int
-ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn, 
+ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
               unsigned int order, p2m_type_t p2mt)
 {
-    ept_entry_t *table = NULL;
+    ept_entry_t *table, *ept_entry;
     unsigned long gfn_remainder = gfn;
-    unsigned long offset = 0;
-    ept_entry_t *ept_entry = NULL;
+    unsigned long offset;
     u32 index;
-    int i;
+    int i, target = order / EPT_TABLE_ORDER;
     int rv = 0;
     int ret = 0;
-    int split_level = 0;
-    int walk_level = order / EPT_TABLE_ORDER;
-    int direct_mmio = (p2mt == p2m_mmio_direct);
+    bool_t direct_mmio = (p2mt == p2m_mmio_direct);
     uint8_t ipat = 0;
     int need_modify_vtd_table = 1;
     int needs_sync = 1;
 
-    if (  order != 0 )
-        if ( (gfn & ((1UL << order) - 1)) )
-            return 1;
+    /*
+     * the caller must make sure:
+     * 1. passing valid gfn and mfn at order boundary.
+     * 2. gfn not exceeding guest physical address width.
+     * 3. passing a valid order.
+     */
+    if ( ((gfn | mfn_x(mfn)) & ((1UL << order) - 1)) ||
+         (gfn >> ((ept_get_wl(d) + 1) * EPT_TABLE_ORDER)) ||
+         (order % EPT_TABLE_ORDER) )
+        return 0;
+
+    ASSERT((target == 2 && hvm_hap_has_1gb(d)) ||
+           (target == 1 && hvm_hap_has_2mb(d)) ||
+           (target == 0));
 
     table = map_domain_page(ept_get_asr(d));
 
     ASSERT(table != NULL);
 
-    for ( i = ept_get_wl(d); i > walk_level; i-- )
+    for ( i = ept_get_wl(d); i > target; i-- )
     {
         ret = ept_next_level(d, 0, &table, &gfn_remainder, i * EPT_TABLE_ORDER);
         if ( !ret )
@@ -264,21 +272,23 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
             break;
     }
 
-    /* If order == 0, we should only get POD if we have a POD superpage.
-     * If i > walk_level, we need to split the page; otherwise,
-     * just behave as normal. */
-    ASSERT(ret != GUEST_TABLE_POD_PAGE || i != walk_level);
+    ASSERT(ret != GUEST_TABLE_POD_PAGE || i != target);
 
-    index = gfn_remainder >> ( i ?  (i * EPT_TABLE_ORDER): order);
-    offset = (gfn_remainder & ( ((1 << (i*EPT_TABLE_ORDER)) - 1)));
-
-    split_level = i;
+    index = gfn_remainder >> (i * EPT_TABLE_ORDER);
+    gfn_remainder &= (1UL << (i * EPT_TABLE_ORDER)) - 1;
 
     ept_entry = table + index;
 
-    if ( i == walk_level )
+    offset = gfn_remainder;
+
+    /*
+     * When we are here, we must be on a leaf ept entry
+     * with i == target or i > target.
+     */
+
+    if ( i == target )
     {
-        /* We reached the level we're looking for */
+        /* We reached the target level. */
 
         /* No need to flush if the old entry wasn't valid */
         if ( !is_epte_present(ept_entry) )
@@ -307,12 +317,14 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     }
     else
     {
-        int level;
+        /* We need to split the original page. */
         ept_entry_t *split_ept_entry;
 
-        for ( level = split_level; level > walk_level ; level-- )
+        ASSERT(is_epte_superpage(ept_entry));
+
+        for ( ; i > target; i-- )
         {
-            rv = ept_split_large_page(d, &table, &index, gfn, level);
+            rv = ept_split_large_page(d, &table, &index, gfn, i);
             if ( !rv )
                 goto out;
         }
@@ -559,7 +571,7 @@ static mfn_t ept_get_entry_current(unsigned long gfn, p2m_type_t *t,
     return ept_get_entry(current->domain, gfn, t, q);
 }
 
-/* 
+/*
  * To test if the new emt type is the same with old,
  * return 1 to not to reset ept entry.
  */
@@ -569,14 +581,14 @@ static int need_modify_ept_entry(struct domain *d, unsigned long gfn,
 {
     uint8_t ipat;
     uint8_t emt;
-    int direct_mmio = (p2mt == p2m_mmio_direct);
+    bool_t direct_mmio = (p2mt == p2m_mmio_direct);
 
     emt = epte_get_entry_emt(d, gfn, mfn, &ipat, direct_mmio);
 
     if ( (emt == o_emt) && (ipat == o_ipat) )
         return 0;
 
-    return 1; 
+    return 1;
 }
 
 void ept_change_entry_emt_with_range(struct domain *d, unsigned long start_gfn,
