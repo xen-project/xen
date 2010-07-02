@@ -234,7 +234,7 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
 {
     ept_entry_t *table, *ept_entry;
     unsigned long gfn_remainder = gfn;
-    unsigned long offset;
+    unsigned long offset = 0;
     u32 index;
     int i, target = order / EPT_TABLE_ORDER;
     int rv = 0;
