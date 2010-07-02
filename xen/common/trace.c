@@ -53,12 +53,12 @@ static struct t_info *t_info;
 static DEFINE_PER_CPU_READ_MOSTLY(struct t_buf *, t_bufs);
 static DEFINE_PER_CPU_READ_MOSTLY(unsigned char *, t_data);
 static DEFINE_PER_CPU_READ_MOSTLY(spinlock_t, t_lock);
-static int data_size;
+static u32 data_size;
 static u32 t_info_first_offset __read_mostly;
 
 /* High water mark for trace buffers; */
 /* Send virtual interrupt when buffer level reaches this point */
-static int t_buf_highwater;
+static u32 t_buf_highwater;
 
 /* Number of records lost due to per-CPU trace buffer being full. */
 static DEFINE_PER_CPU(unsigned long, lost_records);
@@ -163,7 +163,7 @@ static int alloc_trace_bufs(void)
 
         spin_lock_irqsave(&per_cpu(t_lock, cpu), flags);
 
-        buf = per_cpu(t_bufs, cpu) = (struct t_buf *)rawbuf;
+        per_cpu(t_bufs, cpu) = buf = (struct t_buf *)rawbuf;
         buf->cons = buf->prod = 0;
         per_cpu(t_data, cpu) = (unsigned char *)(buf + 1);
 
@@ -214,6 +214,7 @@ out_dealloc:
         spin_lock_irqsave(&per_cpu(t_lock, cpu), flags);
         if ( (rawbuf = (char *)per_cpu(t_bufs, cpu)) )
         {
+            per_cpu(t_bufs, cpu) = NULL;
             ASSERT(!(virt_to_page(rawbuf)->count_info & PGC_allocated));
             free_xenheap_pages(rawbuf, order);
         }
@@ -432,19 +433,37 @@ int tb_control(xen_sysctl_tbuf_op_t *tbc)
     return rc;
 }
 
-static inline int calc_rec_size(int cycles, int extra) 
+static inline unsigned int calc_rec_size(bool_t cycles, unsigned int extra) 
 {
-    int rec_size;
-    rec_size = 4;
+    unsigned int rec_size = 4;
+
     if ( cycles )
         rec_size += 8;
     rec_size += extra;
     return rec_size;
 }
 
-static inline int calc_unconsumed_bytes(struct t_buf *buf)
+static inline bool_t bogus(u32 prod, u32 cons)
 {
-    int x = buf->prod - buf->cons;
+    if ( unlikely(prod & 3) || unlikely(prod >= 2 * data_size) ||
+         unlikely(cons & 3) || unlikely(cons >= 2 * data_size) )
+    {
+        tb_init_done = 0;
+        printk(XENLOG_WARNING "trc#%u: bogus prod (%08x) and/or cons (%08x)\n",
+               smp_processor_id(), prod, cons);
+        return 1;
+    }
+    return 0;
+}
+
+static inline u32 calc_unconsumed_bytes(const struct t_buf *buf)
+{
+    u32 prod = buf->prod, cons = buf->cons;
+    s32 x = prod - cons;
+
+    if ( bogus(prod, cons) )
+        return data_size;
+
     if ( x < 0 )
         x += 2*data_size;
 
@@ -454,9 +473,14 @@ static inline int calc_unconsumed_bytes(struct t_buf *buf)
     return x;
 }
 
-static inline int calc_bytes_to_wrap(struct t_buf *buf)
+static inline u32 calc_bytes_to_wrap(const struct t_buf *buf)
 {
-    int x = data_size - buf->prod;
+    u32 prod = buf->prod;
+    s32 x = data_size - prod;
+
+    if ( bogus(prod, buf->cons) )
+        return 0;
+
     if ( x <= 0 )
         x += data_size;
 
@@ -466,35 +490,37 @@ static inline int calc_bytes_to_wrap(struct t_buf *buf)
     return x;
 }
 
-static inline int calc_bytes_avail(struct t_buf *buf)
+static inline u32 calc_bytes_avail(const struct t_buf *buf)
 {
     return data_size - calc_unconsumed_bytes(buf);
 }
 
-static inline struct t_rec *
-next_record(struct t_buf *buf)
+static inline struct t_rec *next_record(const struct t_buf *buf)
 {
-    int x = buf->prod;
+    u32 x = buf->prod;
+
+    if ( !tb_init_done || bogus(x, buf->cons) )
+        return NULL;
+
     if ( x >= data_size )
         x -= data_size;
 
-    ASSERT(x >= 0);
     ASSERT(x < data_size);
 
     return (struct t_rec *)&this_cpu(t_data)[x];
 }
 
-static inline int __insert_record(struct t_buf *buf,
-                                  unsigned long event,
-                                  int extra,
-                                  int cycles,
-                                  int rec_size,
-                                  unsigned char *extra_data)
+static inline void __insert_record(struct t_buf *buf,
+                                   unsigned long event,
+                                   unsigned int extra,
+                                   bool_t cycles,
+                                   unsigned int rec_size,
+                                   const void *extra_data)
 {
     struct t_rec *rec;
     unsigned char *dst;
-    unsigned long extra_word = extra/sizeof(u32);
-    int local_rec_size = calc_rec_size(cycles, extra);
+    unsigned int extra_word = extra / sizeof(u32);
+    unsigned int local_rec_size = calc_rec_size(cycles, extra);
     uint32_t next;
 
     BUG_ON(local_rec_size != rec_size);
@@ -510,11 +536,13 @@ static inline int __insert_record(struct t_buf *buf,
             printk(XENLOG_WARNING
                    "%s: avail=%u (size=%08x prod=%08x cons=%08x) rec=%u\n",
                    __func__, next, data_size, buf->prod, buf->cons, rec_size);
-        return 0;
+        return;
     }
     rmb();
 
     rec = next_record(buf);
+    if ( !rec )
+        return;
     rec->event = event;
     rec->extra_u32 = extra_word;
     dst = (unsigned char *)rec->u.nocycles.extra_u32;
@@ -531,21 +559,22 @@ static inline int __insert_record(struct t_buf *buf,
 
     wmb();
 
-    next = buf->prod + rec_size;
+    next = buf->prod;
+    if ( bogus(next, buf->cons) )
+        return;
+    next += rec_size;
     if ( next >= 2*data_size )
         next -= 2*data_size;
-    ASSERT(next >= 0);
     ASSERT(next < 2*data_size);
     buf->prod = next;
-
-    return rec_size;
 }
 
-static inline int insert_wrap_record(struct t_buf *buf, int size)
+static inline void insert_wrap_record(struct t_buf *buf,
+                                      unsigned int size)
 {
-    int space_left = calc_bytes_to_wrap(buf);
-    unsigned long extra_space = space_left - sizeof(u32);
-    int cycles = 0;
+    u32 space_left = calc_bytes_to_wrap(buf);
+    unsigned int extra_space = space_left - sizeof(u32);
+    bool_t cycles = 0;
 
     BUG_ON(space_left > size);
 
@@ -557,17 +586,13 @@ static inline int insert_wrap_record(struct t_buf *buf, int size)
         ASSERT((extra_space/sizeof(u32)) <= TRACE_EXTRA_MAX);
     }
 
-    return __insert_record(buf,
-                    TRC_TRACE_WRAP_BUFFER,
-                    extra_space,
-                    cycles,
-                    space_left,
-                    NULL);
+    __insert_record(buf, TRC_TRACE_WRAP_BUFFER, extra_space, cycles,
+                    space_left, NULL);
 }
 
 #define LOST_REC_SIZE (4 + 8 + 16) /* header + tsc + sizeof(struct ed) */
 
-static inline int insert_lost_records(struct t_buf *buf)
+static inline void insert_lost_records(struct t_buf *buf)
 {
     struct {
         u32 lost_records;
@@ -582,12 +607,8 @@ static inline int insert_lost_records(struct t_buf *buf)
 
     this_cpu(lost_records) = 0;
 
-    return __insert_record(buf,
-                           TRC_LOST_RECORDS,
-                           sizeof(ed),
-                           1 /* cycles */,
-                           LOST_REC_SIZE,
-                           (unsigned char *)&ed);
+    __insert_record(buf, TRC_LOST_RECORDS, sizeof(ed), 1 /* cycles */,
+                    LOST_REC_SIZE, &ed);
 }
 
 /*
@@ -609,13 +630,15 @@ static DECLARE_TASKLET(trace_notify_dom0_tasklet, trace_notify_dom0, 0);
  * failure, otherwise 0.  Failure occurs only if the trace buffers are not yet
  * initialised.
  */
-void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
+void __trace_var(u32 event, bool_t cycles, unsigned int extra,
+                 const void *extra_data)
 {
     struct t_buf *buf;
-    unsigned long flags, bytes_to_tail, bytes_to_wrap;
-    int rec_size, total_size;
-    int extra_word;
-    int started_below_highwater = 0;
+    unsigned long flags;
+    u32 bytes_to_tail, bytes_to_wrap;
+    unsigned int rec_size, total_size;
+    unsigned int extra_word;
+    bool_t started_below_highwater;
 
     if( !tb_init_done )
         return;
@@ -654,7 +677,11 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
     buf = this_cpu(t_bufs);
 
     if ( unlikely(!buf) )
+    {
+        /* Make gcc happy */
+        started_below_highwater = 0;
         goto unlock;
+    }
 
     started_below_highwater = (calc_unconsumed_bytes(buf) < t_buf_highwater);
 
@@ -735,8 +762,9 @@ unlock:
     spin_unlock_irqrestore(&this_cpu(t_lock), flags);
 
     /* Notify trace buffer consumer that we've crossed the high water mark. */
-    if ( started_below_highwater &&
-         (calc_unconsumed_bytes(buf) >= t_buf_highwater) )
+    if ( likely(buf!=NULL)
+         && started_below_highwater
+         && (calc_unconsumed_bytes(buf) >= t_buf_highwater) )
         tasklet_schedule(&trace_notify_dom0_tasklet);
 }
 

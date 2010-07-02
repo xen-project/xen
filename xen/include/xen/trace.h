@@ -36,7 +36,7 @@ int tb_control(struct xen_sysctl_tbuf_op *tbc);
 
 int trace_will_trace_event(u32 event);
 
-void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data);
+void __trace_var(u32 event, bool_t cycles, unsigned int extra, const void *);
 
 static inline void trace_var(u32 event, int cycles, int extra,
                                unsigned char *extra_data)
@@ -57,7 +57,7 @@ static inline void trace_var(u32 event, int cycles, int extra,
         {                                                       \
             u32 _d[1];                                          \
             _d[0] = d1;                                         \
-            __trace_var(_e, 1, sizeof(*_d), (unsigned char *)_d); \
+            __trace_var(_e, 1, sizeof(_d), _d);                 \
         }                                                       \
     } while ( 0 )
  
@@ -68,7 +68,7 @@ static inline void trace_var(u32 event, int cycles, int extra,
             u32 _d[2];                                          \
             _d[0] = d1;                                         \
             _d[1] = d2;                                         \
-            __trace_var(_e, 1, sizeof(*_d)*2, (unsigned char *)_d); \
+            __trace_var(_e, 1, sizeof(_d), _d);                 \
         }                                                       \
     } while ( 0 )
  
@@ -80,7 +80,7 @@ static inline void trace_var(u32 event, int cycles, int extra,
             _d[0] = d1;                                         \
             _d[1] = d2;                                         \
             _d[2] = d3;                                         \
-            __trace_var(_e, 1, sizeof(*_d)*3, (unsigned char *)_d); \
+            __trace_var(_e, 1, sizeof(_d), _d);                 \
         }                                                       \
     } while ( 0 )
  
@@ -93,7 +93,7 @@ static inline void trace_var(u32 event, int cycles, int extra,
             _d[1] = d2;                                         \
             _d[2] = d3;                                         \
             _d[3] = d4;                                         \
-            __trace_var(_e, 1, sizeof(*_d)*4, (unsigned char *)_d); \
+            __trace_var(_e, 1, sizeof(_d), _d);                 \
         }                                                       \
     } while ( 0 )
  
@@ -107,7 +107,7 @@ static inline void trace_var(u32 event, int cycles, int extra,
             _d[2] = d3;                                         \
             _d[3] = d4;                                         \
             _d[4] = d5;                                         \
-            __trace_var(_e, 1, sizeof(*_d)*5, (unsigned char *)_d); \
+            __trace_var(_e, 1, sizeof(_d), _d);                 \
         }                                                       \
     } while ( 0 )
 
@@ -122,7 +122,7 @@ static inline void trace_var(u32 event, int cycles, int extra,
             _d[3] = d4;                                         \
             _d[4] = d5;                                         \
             _d[5] = d6;                                         \
-            __trace_var(_e, 1, sizeof(*_d)*6, (unsigned char *)_d); \
+            __trace_var(_e, 1, sizeof(_d), _d);                 \
         }                                                       \
     } while ( 0 )
 
