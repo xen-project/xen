@@ -40,14 +40,14 @@
 
 
 typedef struct mem_event_shared_page {
-    int port;
+    uint32_t port;
 } mem_event_shared_page_t;
 
 typedef struct mem_event_st {
-    unsigned long gfn;
-    unsigned long offset;
-    unsigned long p2mt;
-    int vcpu_id;
+    uint64_t gfn;
+    uint64_t offset;
+    uint32_t p2mt;
+    int32_t vcpu_id;
     uint64_t flags;
 } mem_event_request_t, mem_event_response_t;
 

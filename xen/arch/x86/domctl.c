@@ -1420,6 +1420,7 @@ long arch_do_domctl(
     break;
 #endif /* XEN_GDBSX_CONFIG */
 
+#ifdef __x86_64__
     case XEN_DOMCTL_mem_event_op:
     {
         struct domain *d;
@@ -1450,6 +1451,7 @@ long arch_do_domctl(
         } 
     }
     break;
+#endif /* __x86_64__ */
 
     default:
         ret = -ENOSYS;

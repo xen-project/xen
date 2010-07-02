@@ -982,6 +982,7 @@ bool_t hvm_hap_nested_page_fault(unsigned long gfn)
         return 1;
     }
 
+#ifdef __x86_64__
     /* Check if the page has been paged out */
     if ( p2m_is_paged(p2mt) || (p2mt == p2m_ram_paging_out) )
         p2m_mem_paging_populate(current->domain, gfn);
@@ -992,6 +993,7 @@ bool_t hvm_hap_nested_page_fault(unsigned long gfn)
         mem_sharing_unshare_page(current->domain, gfn, 0);
         return 1;
     }
+#endif
  
     /* Spurious fault? PoD and log-dirty also take this path. */
     if ( p2m_is_ram(p2mt) )

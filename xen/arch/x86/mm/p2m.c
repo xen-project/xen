@@ -1868,17 +1868,23 @@ void p2m_teardown(struct domain *d)
 {
     struct page_info *pg;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
+#ifdef __x86_64__
     unsigned long gfn;
     p2m_type_t t;
     mfn_t mfn;
+#endif
 
     p2m_lock(p2m);
-    for(gfn=0; gfn < p2m->max_mapped_pfn; gfn++)
+
+#ifdef __x86_64__
+    for ( gfn=0; gfn < p2m->max_mapped_pfn; gfn++ )
     {
         mfn = p2m->get_entry(d, gfn, &t, p2m_query);
-        if(mfn_valid(mfn) && (t == p2m_ram_shared))
+        if ( mfn_valid(mfn) && (t == p2m_ram_shared) )
             BUG_ON(mem_sharing_unshare_page(d, gfn, MEM_SHARING_DESTROY_GFN));
     }
+#endif
+
     p2m->phys_table = pagetable_null();
 
     while ( (pg = page_list_remove_head(&p2m->pages)) )
@@ -2551,7 +2557,7 @@ p2m_type_t p2m_change_type(struct domain *d, unsigned long gfn,
 
     p2m_lock(d->arch.p2m);
 
-    mfn = gfn_to_mfn(d, gfn, &pt);
+    mfn = gfn_to_mfn_query(d, gfn, &pt);
     if ( pt == ot )
         set_p2m_entry(d, gfn, mfn, 0, nt);
 
@@ -2616,6 +2622,7 @@ clear_mmio_p2m_entry(struct domain *d, unsigned long gfn)
     return rc;
 }
 
+#ifdef __x86_64__
 int
 set_shared_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
 {
@@ -2798,7 +2805,7 @@ void p2m_mem_paging_resume(struct domain *d)
     /* Unpause any domains that were paused because the ring was full */
     mem_event_unpause_vcpus(d);
 }
-
+#endif /* __x86_64__ */
 
 /*
  * Local variables:
