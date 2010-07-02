@@ -138,7 +138,7 @@ static int alloc_trace_bufs(void)
     }
 
     t_info->tbuf_size = opt_tbuf_size;
-    printk("tbuf_size %d\n", t_info->tbuf_size);
+    printk(XENLOG_INFO "tbuf_size %d\n", t_info->tbuf_size);
 
     nr_pages = opt_tbuf_size;
     order = get_order_from_pages(nr_pages);
@@ -195,7 +195,7 @@ static int alloc_trace_bufs(void)
             /* Write list first, then write per-cpu offset. */
             wmb();
             t_info->mfn_offset[cpu]=offset;
-            printk("p%d mfn %"PRIx32" offset %d\n",
+            printk(XENLOG_INFO "p%d mfn %"PRIx32" offset %d\n",
                    cpu, mfn, offset);
             offset+=i;
         }
@@ -503,12 +503,13 @@ static inline int __insert_record(struct t_buf *buf,
     /* Double-check once more that we have enough space.
      * Don't bugcheck here, in case the userland tool is doing
      * something stupid. */
-    if ( calc_bytes_avail(buf) < rec_size )
+    next = calc_bytes_avail(buf);
+    if ( next < rec_size )
     {
-        printk("%s: %u bytes left (%u - ((%u - %u) %% %u) recsize %u.\n",
-               __func__,
-               calc_bytes_avail(buf),
-               data_size, buf->prod, buf->cons, data_size, rec_size);
+        if ( printk_ratelimit() )
+            printk(XENLOG_WARNING
+                   "%s: avail=%u (size=%08x prod=%08x cons=%08x) rec=%u\n",
+                   __func__, next, data_size, buf->prod, buf->cons, rec_size);
         return 0;
     }
     rmb();
