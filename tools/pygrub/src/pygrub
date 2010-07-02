@@ -634,13 +634,13 @@ if __name__ == "__main__":
     sel = None
     
     def usage():
-        print >> sys.stderr, "Usage: %s [-q|--quiet] [-i|--interactive] [--output=] [--kernel=] [--ramdisk=] [--args=] [--entry=] <image>" %(sys.argv[0],)
+        print >> sys.stderr, "Usage: %s [-q|--quiet] [-i|--interactive] [-n|--not-really] [--output=] [--kernel=] [--ramdisk=] [--args=] [--entry=] <image>" %(sys.argv[0],)
 
     try:
-        opts, args = getopt.gnu_getopt(sys.argv[1:], 'qih::',
-                                   ["quiet", "interactive", "help", "output=",
-                                    "entry=", "kernel=", "ramdisk=", "args=",
-                                    "isconfig"])
+        opts, args = getopt.gnu_getopt(sys.argv[1:], 'qinh::',
+                                   ["quiet", "interactive", "not-really", 
+                                    "help", "output=", "entry=", "kernel=", 
+                                    "ramdisk=", "args=", "isconfig"])
     except getopt.GetoptError:
         usage()
         sys.exit(1)
@@ -654,6 +654,7 @@ if __name__ == "__main__":
     entry = None
     interactive = True
     isconfig = False
+    not_really = False
 
     # what was passed in
     incfg = { "kernel": None, "ramdisk": None, "args": "" }
@@ -667,6 +668,8 @@ if __name__ == "__main__":
             interactive = False
         elif o in ("-i", "--interactive"):
             interactive = True
+        elif o in ("-n", "--not-really"):
+            not_really = True
         elif o in ("-h", "--help"):
             usage()
             sys.exit()
@@ -715,18 +718,24 @@ if __name__ == "__main__":
     if not chosencfg["kernel"]:
         chosencfg = run_grub(file, entry, fs, incfg["args"])
 
-    data = fs.open_file(chosencfg["kernel"]).read()
-    (tfd, bootcfg["kernel"]) = tempfile.mkstemp(prefix="boot_kernel.",
-        dir="/var/run/xend/boot")
-    os.write(tfd, data)
-    os.close(tfd)
-
-    if chosencfg["ramdisk"]:
-        data = fs.open_file(chosencfg["ramdisk"],).read()
-        (tfd, bootcfg["ramdisk"]) = tempfile.mkstemp(prefix="boot_ramdisk.",
-            dir="/var/run/xend/boot")
+    if not_really:
+        bootcfg["kernel"] = "<kernel:%s>" % chosencfg["kernel"]
+    else:
+        data = fs.open_file(chosencfg["kernel"]).read()
+        (tfd, bootcfg["kernel"]) = tempfile.mkstemp(prefix="boot_kernel.",
+                                                    dir="/var/run/xend/boot")
         os.write(tfd, data)
         os.close(tfd)
+
+    if chosencfg["ramdisk"]:
+        if not_really:
+            bootcfg["ramdisk"] = "<ramdisk:%s>" % chosencfg["ramdisk"]
+        else:
+            data = fs.open_file(chosencfg["ramdisk"],).read()
+            (tfd, bootcfg["ramdisk"]) = tempfile.mkstemp(
+                prefix="boot_ramdisk.", dir="/var/run/xend/boot")
+            os.write(tfd, data)
+            os.close(tfd)
     else:
         initrd = None
 
