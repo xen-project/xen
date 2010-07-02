@@ -252,6 +252,10 @@
 #define MSR_AMD_PATCHLEVEL		0x0000008b
 #define MSR_AMD_PATCHLOADER		0xc0010020
 
+/* AMD OS Visible Workaround MSRs */
+#define MSR_AMD_OSVW_ID_LENGTH          0xc0010140
+#define MSR_AMD_OSVW_STATUS             0xc0010141
+
 /* K6 MSRs */
 #define MSR_K6_EFER			0xc0000080
 #define MSR_K6_STAR			0xc0000081

@@ -7,12 +7,12 @@
 #include <asm/io.h>
 #include <asm/msr.h>
 #include <asm/processor.h>
+#include <asm/amd.h>
 #include <asm/hvm/support.h>
 #include <asm/setup.h> /* amd_init_cpu */
 #include <asm/acpi.h>
 
 #include "cpu.h"
-#include "amd.h"
 
 /*
  * Pre-canned values for overriding the CPUID features 
@@ -145,6 +145,54 @@ static void __devinit set_cpuidmask(const struct cpuinfo_x86 *c)
 		wrmsr_amd(MSR_K8_FEATURE_MASK, feat_edx, feat_ecx);
 		wrmsr_amd(MSR_K8_EXT_FEATURE_MASK, extfeat_edx, extfeat_ecx);
 	}
+}
+
+/*
+ * Check for the presence of an AMD erratum. Arguments are defined in amd.h 
+ * for each known erratum. Return 1 if erratum is found.
+ */
+int cpu_has_amd_erratum(const struct cpuinfo_x86 *cpu, int osvw, ...) 
+{
+	va_list ap;
+	u32 range;
+	u32 ms;
+	
+	if (cpu->x86_vendor != X86_VENDOR_AMD)
+		return 0;
+
+	va_start(ap, osvw);
+
+	if (osvw) {
+		u16 osvw_id = va_arg(ap, int);
+
+		if (cpu_has(cpu, X86_FEATURE_OSVW)) {
+			u64 osvw_len;
+			rdmsrl(MSR_AMD_OSVW_ID_LENGTH, osvw_len);
+
+			if (osvw_id < osvw_len) {
+				u64 osvw_bits;
+				rdmsrl(MSR_AMD_OSVW_STATUS + (osvw_id >> 6), 
+				       osvw_bits);
+
+				va_end(ap);
+				return (osvw_bits >> (osvw_id & 0x3f)) & 0x01;
+			}
+		}
+	}
+
+	/* OSVW unavailable or ID unknown, match family-model-stepping range */
+	ms = (cpu->x86_model << 8) | cpu->x86_mask;
+	while ((range = va_arg(ap, int))) {
+		if ((cpu->x86 == AMD_MODEL_RANGE_FAMILY(range)) &&
+		    (ms >= AMD_MODEL_RANGE_START(range)) &&
+		    (ms <= AMD_MODEL_RANGE_END(range))) {
+			va_end(ap);
+			return 1;
+		}
+	}
+
+	va_end(ap);
+	return 0;
 }
 
 /*
