@@ -4671,7 +4671,7 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
     paddr_t gcr3 = 0;
     mfn_t smfn, gmfn;
     p2m_type_t p2mt;
-    unsigned long gl3pa;
+    char *gl3pa = NULL;
     guest_l3e_t *gl3e = NULL;
     paddr_t gl2a = 0;
 
@@ -4685,13 +4685,14 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
     gmfn = gfn_to_mfn_query(v->domain, _gfn(gpa >> PAGE_SHIFT), &p2mt);
     if ( !mfn_valid(gmfn) || !p2m_is_ram(p2mt) )
     {
-        printk(XENLOG_DEBUG "sh_pagetable_dying: gpa not valid %lx\n", gpa);
+        printk(XENLOG_DEBUG "sh_pagetable_dying: gpa not valid %"PRIpaddr"\n",
+               gpa);
         goto out;
     }
     if ( !fast_path )
     {
-        gl3pa = (unsigned long) sh_map_domain_page(gmfn);
-        gl3e = (guest_l3e_t *) (gl3pa + (gpa & ~PAGE_MASK));
+        gl3pa = sh_map_domain_page(gmfn);
+        gl3e = (guest_l3e_t *)(gl3pa + ((unsigned long)gpa & ~PAGE_MASK));
     }
     for ( i = 0; i < 4; i++ )
     {
