@@ -120,6 +120,8 @@ struct shadow_domain {
     /* OOS */
     int oos_active;
     int oos_off;
+
+    int pagetable_dying_op;
 };
 
 struct shadow_vcpu {
@@ -148,6 +150,8 @@ struct shadow_vcpu {
         mfn_t smfn[SHADOW_OOS_FIXUPS];
         unsigned long off[SHADOW_OOS_FIXUPS];
     } oos_fixup[SHADOW_OOS_PAGES];
+
+    int pagetable_dying;
 };
 
 /************************************************/

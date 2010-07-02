@@ -2179,37 +2179,43 @@ void sh_destroy_monitor_table(struct vcpu *v, mfn_t mmfn)
  * These are called from common code when we are running out of shadow
  * memory, and unpinning all the top-level shadows hasn't worked. 
  *
+ * With user_only == 1, we leave guest kernel-mode mappings in place too,
+ * unhooking only the user-mode mappings
+ *
  * This implementation is pretty crude and slow, but we hope that it won't 
  * be called very often. */
 
 #if GUEST_PAGING_LEVELS == 2
 
-void sh_unhook_32b_mappings(struct vcpu *v, mfn_t sl2mfn)
+void sh_unhook_32b_mappings(struct vcpu *v, mfn_t sl2mfn, int user_only)
 {    
     shadow_l2e_t *sl2e;
     SHADOW_FOREACH_L2E(sl2mfn, sl2e, 0, 0, v->domain, {
-        (void) shadow_set_l2e(v, sl2e, shadow_l2e_empty(), sl2mfn);
+        if ( !user_only || (sl2e->l2 & _PAGE_USER) )
+            (void) shadow_set_l2e(v, sl2e, shadow_l2e_empty(), sl2mfn);
     });
 }
 
 #elif GUEST_PAGING_LEVELS == 3
 
-void sh_unhook_pae_mappings(struct vcpu *v, mfn_t sl2mfn)
+void sh_unhook_pae_mappings(struct vcpu *v, mfn_t sl2mfn, int user_only)
 /* Walk a PAE l2 shadow, unhooking entries from all the subshadows */
 {
     shadow_l2e_t *sl2e;
     SHADOW_FOREACH_L2E(sl2mfn, sl2e, 0, 0, v->domain, {
-        (void) shadow_set_l2e(v, sl2e, shadow_l2e_empty(), sl2mfn);
+        if ( !user_only || (sl2e->l2 & _PAGE_USER) )
+            (void) shadow_set_l2e(v, sl2e, shadow_l2e_empty(), sl2mfn);
     });
 }
 
 #elif GUEST_PAGING_LEVELS == 4
 
-void sh_unhook_64b_mappings(struct vcpu *v, mfn_t sl4mfn)
+void sh_unhook_64b_mappings(struct vcpu *v, mfn_t sl4mfn, int user_only)
 {
     shadow_l4e_t *sl4e;
     SHADOW_FOREACH_L4E(sl4mfn, sl4e, 0, 0, v->domain, {
-        (void) shadow_set_l4e(v, sl4e, shadow_l4e_empty(), sl4mfn);
+        if ( !user_only || (sl4e->l4 & _PAGE_USER) )
+            (void) shadow_set_l4e(v, sl4e, shadow_l4e_empty(), sl4mfn);
     });
 }
 
@@ -2693,8 +2699,18 @@ sh_map_and_validate_gl1e(struct vcpu *v, mfn_t gl1mfn,
 static inline void check_for_early_unshadow(struct vcpu *v, mfn_t gmfn)
 {
 #if SHADOW_OPTIMIZATIONS & SHOPT_EARLY_UNSHADOW
-    if ( v->arch.paging.shadow.last_emulated_mfn_for_unshadow == mfn_x(gmfn)
-         && sh_mfn_is_a_page_table(gmfn) )
+    /* If the domain has never made a "dying" op, use the two-writes
+     * heuristic; otherwise, unshadow as soon as we write a zero for a dying
+     * process.
+     *
+     * Don't bother trying to unshadow if it's not a PT, or if it's > l1.
+     */
+    if ( ( v->arch.paging.shadow.pagetable_dying
+           || ( !v->domain->arch.paging.shadow.pagetable_dying_op
+                && v->arch.paging.shadow.last_emulated_mfn_for_unshadow == mfn_x(gmfn) ) )
+         && sh_mfn_is_a_page_table(gmfn)
+         && !(mfn_to_page(gmfn)->shadow_flags
+              & (SHF_L2_32|SHF_L2_PAE|SHF_L2H_PAE|SHF_L4_64)) )
     {
         perfc_incr(shadow_early_unshadow);
         sh_remove_shadows(v, gmfn, 1, 0 /* Fast, can fail to unshadow */ );
@@ -3384,6 +3400,40 @@ static int sh_page_fault(struct vcpu *v,
      * caught by user-mode page-table check above.
      */
  emulate_readonly:
+
+    /* Unshadow if we are writing to a toplevel pagetable that is
+     * flagged as a dying process, and that is not currently used. */
+    if ( sh_mfn_is_a_page_table(gmfn)
+         && (mfn_to_page(gmfn)->shadow_flags & SHF_pagetable_dying) )
+    {
+        int used = 0;
+        struct vcpu *tmp;
+        for_each_vcpu(d, tmp)
+        {
+#if GUEST_PAGING_LEVELS == 3
+            int i;
+            for ( i = 0; i < 4; i++ )
+            {
+                mfn_t smfn = _mfn(pagetable_get_pfn(v->arch.shadow_table[i]));
+                if ( mfn_valid(smfn) && (mfn_x(smfn) != 0) )
+                {
+                    used |= (mfn_to_page(smfn)->v.sh.back == mfn_x(gmfn));
+
+                    if ( used )
+                        break;
+                }
+            }
+#else /* 32 or 64 */
+            used = (mfn_x(pagetable_get_mfn(tmp->arch.guest_table)) == mfn_x(gmfn));
+#endif
+            if ( used )
+                break;
+        }
+
+        if ( !used )
+            sh_remove_shadows(v, gmfn, 1 /* fast */, 0 /* can fail */);
+    }
+
     /*
      * We don't need to hold the lock for the whole emulation; we will
      * take it again when we write to the pagetables.
@@ -4363,6 +4413,11 @@ int sh_rm_write_access_from_sl1p(struct vcpu *v, mfn_t gmfn,
     ASSERT(mfn_valid(gmfn));
     ASSERT(mfn_valid(smfn));
 
+    /* Remember if we've been told that this process is being torn down */
+    v->arch.paging.shadow.pagetable_dying
+        = !!(mfn_to_page(gmfn)->shadow_flags & SHF_pagetable_dying);
+
+
     sp = mfn_to_page(smfn);
 
     if ( ((sp->count_info & PGC_count_mask) != 0)
@@ -4601,6 +4656,110 @@ int sh_remove_l3_shadow(struct vcpu *v, mfn_t sl4mfn, mfn_t sl3mfn)
     return done;
 }
 #endif /* 64bit guest */ 
+
+/**************************************************************************/
+/* Function for the guest to inform us that a process is being torn
+ * down.  We remember that as a hint to unshadow its pagetables soon,
+ * and in the meantime we unhook its top-level user-mode entries. */
+
+#if GUEST_PAGING_LEVELS == 3
+static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
+{
+    int i = 0;
+    int flush = 0;
+    int fast_path = 0;
+    paddr_t gcr3 = 0;
+    mfn_t smfn, gmfn;
+    p2m_type_t p2mt;
+    unsigned long gl3pa;
+    guest_l3e_t *gl3e = NULL;
+    paddr_t gl2a = 0;
+
+    shadow_lock(v->domain);
+
+    gcr3 = (v->arch.hvm_vcpu.guest_cr[3]);
+    /* fast path: the pagetable belongs to the current context */
+    if ( gcr3 == gpa )
+        fast_path = 1;
+
+    gmfn = gfn_to_mfn_query(v->domain, _gfn(gpa >> PAGE_SHIFT), &p2mt);
+    if ( !mfn_valid(gmfn) || !p2m_is_ram(p2mt) )
+    {
+        printk(XENLOG_DEBUG "sh_pagetable_dying: gpa not valid %lx\n", gpa);
+        goto out;
+    }
+    if ( !fast_path )
+    {
+        gl3pa = (unsigned long) sh_map_domain_page(gmfn);
+        gl3e = (guest_l3e_t *) (gl3pa + (gpa & ~PAGE_MASK));
+    }
+    for ( i = 0; i < 4; i++ )
+    {
+        if ( fast_path )
+            smfn = _mfn(pagetable_get_pfn(v->arch.shadow_table[i]));
+        else
+        {
+            /* retrieving the l2s */
+            gl2a = guest_l3e_get_paddr(gl3e[i]);
+            gmfn = gfn_to_mfn_query(v->domain, _gfn(gl2a >> PAGE_SHIFT), &p2mt);
+            smfn = shadow_hash_lookup(v, mfn_x(gmfn), SH_type_l2_pae_shadow);
+        }
+
+        if ( mfn_valid(smfn) )
+        {
+            gmfn = _mfn(mfn_to_page(smfn)->v.sh.back);
+            mfn_to_page(gmfn)->shadow_flags |= SHF_pagetable_dying;
+            shadow_unhook_mappings(v, smfn, 1/* user pages only */);
+            flush = 1;
+        }
+    }
+    if ( flush )
+        flush_tlb_mask(&v->domain->domain_dirty_cpumask);
+
+    /* Remember that we've seen the guest use this interface, so we
+     * can rely on it using it in future, instead of guessing at
+     * when processes are being torn down. */
+    v->domain->arch.paging.shadow.pagetable_dying_op = 1;
+
+    v->arch.paging.shadow.pagetable_dying = 1;
+
+out:
+    if ( !fast_path )
+        unmap_domain_page(gl3pa);
+    shadow_unlock(v->domain);
+}
+#else
+static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
+{
+    mfn_t smfn, gmfn;
+    p2m_type_t p2mt;
+
+    shadow_lock(v->domain);
+
+    gmfn = gfn_to_mfn_query(v->domain, _gfn(gpa >> PAGE_SHIFT), &p2mt);
+#if GUEST_PAGING_LEVELS == 2
+    smfn = shadow_hash_lookup(v, mfn_x(gmfn), SH_type_l2_32_shadow);
+#else
+    smfn = shadow_hash_lookup(v, mfn_x(gmfn), SH_type_l4_64_shadow);
+#endif
+    if ( mfn_valid(smfn) )
+    {
+        mfn_to_page(gmfn)->shadow_flags |= SHF_pagetable_dying;
+        shadow_unhook_mappings(v, smfn, 1/* user pages only */);
+        /* Now flush the TLB: we removed toplevel mappings. */
+        flush_tlb_mask(&v->domain->domain_dirty_cpumask);
+    }
+
+    /* Remember that we've seen the guest use this interface, so we
+     * can rely on it using it in future, instead of guessing at
+     * when processes are being torn down. */
+    v->domain->arch.paging.shadow.pagetable_dying_op = 1;
+
+    v->arch.paging.shadow.pagetable_dying = 1;
+
+    shadow_unlock(v->domain);
+}
+#endif
 
 /**************************************************************************/
 /* Handling HVM guest writes to pagetables  */
@@ -5247,6 +5406,7 @@ const struct paging_mode sh_paging_mode = {
 #if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC
     .shadow.guess_wrmap            = sh_guess_wrmap,
 #endif
+    .shadow.pagetable_dying        = sh_pagetable_dying,
     .shadow.shadow_levels          = SHADOW_PAGING_LEVELS,
 };
 
