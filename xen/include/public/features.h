@@ -68,6 +68,9 @@
  */
 #define XENFEAT_gnttab_map_avail_bits      7
 
+/* x86: Does this Xen host support the HVM callback vector type? */
+#define XENFEAT_hvm_callback_vector        8
+
 /* x86: pvclock algorithm is safe to use on HVM */
 #define XENFEAT_hvm_safe_pvclock           9
 

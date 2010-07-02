@@ -33,17 +33,20 @@ enum hvm_intsrc {
     hvm_intsrc_pic,
     hvm_intsrc_lapic,
     hvm_intsrc_nmi,
-    hvm_intsrc_mce
+    hvm_intsrc_mce,
+    hvm_intsrc_vector
 };
 struct hvm_intack {
     uint8_t source; /* enum hvm_intsrc */
     uint8_t vector;
 };
-#define hvm_intack_none       ( (struct hvm_intack) { hvm_intsrc_none,  0 } )
-#define hvm_intack_pic(vec)   ( (struct hvm_intack) { hvm_intsrc_pic,   vec } )
-#define hvm_intack_lapic(vec) ( (struct hvm_intack) { hvm_intsrc_lapic, vec } )
-#define hvm_intack_nmi        ( (struct hvm_intack) { hvm_intsrc_nmi,   2 } )
-#define hvm_intack_mce        ( (struct hvm_intack) { hvm_intsrc_mce,   18 } )
+#define hvm_intack(src, vec)   ((struct hvm_intack) { hvm_intsrc_##src, vec })
+#define hvm_intack_none        hvm_intack(none, 0)
+#define hvm_intack_pic(vec)    hvm_intack(pic, vec)
+#define hvm_intack_lapic(vec)  hvm_intack(lapic, vec)
+#define hvm_intack_nmi         hvm_intack(nmi, 2)
+#define hvm_intack_mce         hvm_intack(mce, 18)
+#define hvm_intack_vector(vec) hvm_intack(vector, vec)
 enum hvm_intblk {
     hvm_intblk_none,      /* not blocked (deliverable) */
     hvm_intblk_shadow,    /* MOV-SS or STI shadow */

@@ -286,6 +286,9 @@ void pt_intr_post(struct vcpu *v, struct hvm_intack intack)
     time_cb *cb;
     void *cb_priv;
 
+    if ( intack.source == hvm_intsrc_vector )
+        return;
+
     spin_lock(&v->arch.hvm_vcpu.tm_lock);
 
     pt = is_pt_irq(v, intack);
