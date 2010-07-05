@@ -711,7 +711,7 @@ void msi_msg_write_remap_rte(
 }
 #endif
 
-int enable_intremap(struct iommu *iommu)
+int enable_intremap(struct iommu *iommu, int eim)
 {
     struct acpi_drhd_unit *drhd;
     struct ir_ctrl *ir_ctrl;
@@ -721,10 +721,25 @@ int enable_intremap(struct iommu *iommu)
     ASSERT(ecap_intr_remap(iommu->ecap) && iommu_intremap);
 
     ir_ctrl = iommu_ir_ctrl(iommu);
+    sts = dmar_readl(iommu->reg, DMAR_GSTS_REG);
+
+    /* Return if already enabled by Xen */
+    if ( (sts & DMA_GSTS_IRES) && ir_ctrl->iremap_maddr )
+        return 0;
+
+    sts = dmar_readl(iommu->reg, DMAR_GSTS_REG);
+    if ( !(sts & DMA_GSTS_QIES) )
+    {
+        dprintk(XENLOG_ERR VTDPREFIX,
+                "Queued invalidation is not enabled, should not enable "
+                "interrupt remapping\n");
+        return -EINVAL;
+    }
+
     if ( ir_ctrl->iremap_maddr == 0 )
     {
         drhd = iommu_to_drhd(iommu);
-        ir_ctrl->iremap_maddr = alloc_pgtable_maddr(drhd, IREMAP_ARCH_PAGE_NR );
+        ir_ctrl->iremap_maddr = alloc_pgtable_maddr(drhd, IREMAP_ARCH_PAGE_NR);
         if ( ir_ctrl->iremap_maddr == 0 )
         {
             dprintk(XENLOG_WARNING VTDPREFIX,
@@ -737,7 +752,7 @@ int enable_intremap(struct iommu *iommu)
 #ifdef CONFIG_X86
     /* set extended interrupt mode bit */
     ir_ctrl->iremap_maddr |=
-            x2apic_enabled ? (1 << IRTA_REG_EIME_SHIFT) : 0;
+            eim ? (1 << IRTA_REG_EIME_SHIFT) : 0;
 #endif
     spin_lock_irqsave(&iommu->register_lock, flags);
 
@@ -774,13 +789,18 @@ void disable_intremap(struct iommu *iommu)
     u32 sts;
     unsigned long flags;
 
-    ASSERT(ecap_intr_remap(iommu->ecap) && iommu_intremap);
+    if ( !ecap_intr_remap(iommu->ecap) )
+        return;
 
     spin_lock_irqsave(&iommu->register_lock, flags);
     sts = dmar_readl(iommu->reg, DMAR_GSTS_REG);
+    if ( !(sts & DMA_GSTS_IRES) )
+        goto out;
+
     dmar_writel(iommu->reg, DMAR_GCMD_REG, sts & (~DMA_GCMD_IRE));
 
     IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
                   !(sts & DMA_GSTS_IRES), sts);
+out:
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }

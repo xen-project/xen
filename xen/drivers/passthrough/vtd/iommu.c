@@ -1834,24 +1834,20 @@ static int init_vtd_hw(void)
         spin_lock_irqsave(&iommu->register_lock, flags);
         dmar_writel(iommu->reg, DMAR_FECTL_REG, 0);
         spin_unlock_irqrestore(&iommu->register_lock, flags);
-
-        /* initialize flush functions */
-        flush = iommu_get_flush(iommu);
-        flush->context = flush_context_reg;
-        flush->iotlb = flush_iotlb_reg;
     }
 
-    if ( iommu_qinval )
+    for_each_drhd_unit ( drhd )
     {
-        for_each_drhd_unit ( drhd )
+        iommu = drhd->iommu;
+        /*
+         * If queued invalidation not enabled, use regiser based
+         * invalidation
+         */
+        if ( enable_qinval(iommu) != 0 )
         {
-            iommu = drhd->iommu;
-            if ( enable_qinval(iommu) != 0 )
-            {
-                dprintk(XENLOG_INFO VTDPREFIX,
-                        "Failed to enable Queued Invalidation!\n");
-                break;
-            }
+            flush = iommu_get_flush(iommu);
+            flush->context = flush_context_reg;
+            flush->iotlb = flush_iotlb_reg;
         }
     }
 
@@ -1877,9 +1873,9 @@ static int init_vtd_hw(void)
         for_each_drhd_unit ( drhd )
         {
             iommu = drhd->iommu;
-            if ( enable_intremap(iommu) != 0 )
+            if ( enable_intremap(iommu, 0) != 0 )
             {
-                dprintk(XENLOG_INFO VTDPREFIX,
+                dprintk(XENLOG_WARNING VTDPREFIX,
                         "Failed to enable Interrupt Remapping!\n");
                 break;
             }

@@ -437,10 +437,16 @@ int enable_qinval(struct iommu *iommu)
     u32 sts;
     unsigned long flags;
 
+    if ( !ecap_queued_inval(iommu->ecap) || !iommu_qinval )
+        return -ENOENT;
+
     qi_ctrl = iommu_qi_ctrl(iommu);
     flush = iommu_get_flush(iommu);
 
-    ASSERT(ecap_queued_inval(iommu->ecap) && iommu_qinval);
+    /* Return if already enabled by Xen */
+    sts = dmar_readl(iommu->reg, DMAR_GSTS_REG);
+    if ( (sts & DMA_GSTS_QIES) && qi_ctrl->qinval_maddr )
+        return 0;
 
     if ( qi_ctrl->qinval_maddr == 0 )
     {
@@ -488,14 +494,19 @@ void disable_qinval(struct iommu *iommu)
     u32 sts;
     unsigned long flags;
 
-    ASSERT(ecap_queued_inval(iommu->ecap) && iommu_qinval);
+    if ( !ecap_queued_inval(iommu->ecap) )
+        return;
 
     spin_lock_irqsave(&iommu->register_lock, flags);
     sts = dmar_readl(iommu->reg, DMAR_GSTS_REG);
+    if ( !(sts & DMA_GSTS_QIES) )
+        goto out;
+
     dmar_writel(iommu->reg, DMAR_GCMD_REG, sts & (~DMA_GCMD_QIE));
 
     /* Make sure hardware complete it */
     IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
                   !(sts & DMA_GSTS_QIES), sts);
+out:
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
