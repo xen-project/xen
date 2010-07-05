@@ -459,11 +459,13 @@ static inline bool_t bogus(u32 prod, u32 cons)
 static inline u32 calc_unconsumed_bytes(const struct t_buf *buf)
 {
     u32 prod = buf->prod, cons = buf->cons;
-    s32 x = prod - cons;
+    s32 x;
 
+    barrier(); /* must read buf->prod and buf->cons only once */
     if ( bogus(prod, cons) )
         return data_size;
 
+    x = prod - cons;
     if ( x < 0 )
         x += 2*data_size;
 
@@ -475,12 +477,14 @@ static inline u32 calc_unconsumed_bytes(const struct t_buf *buf)
 
 static inline u32 calc_bytes_to_wrap(const struct t_buf *buf)
 {
-    u32 prod = buf->prod;
-    s32 x = data_size - prod;
+    u32 prod = buf->prod, cons = buf->cons;
+    s32 x;
 
-    if ( bogus(prod, buf->cons) )
+    barrier(); /* must read buf->prod and buf->cons only once */
+    if ( bogus(prod, cons) )
         return 0;
 
+    x = data_size - prod;
     if ( x <= 0 )
         x += data_size;
 
@@ -495,11 +499,14 @@ static inline u32 calc_bytes_avail(const struct t_buf *buf)
     return data_size - calc_unconsumed_bytes(buf);
 }
 
-static inline struct t_rec *next_record(const struct t_buf *buf)
+static inline struct t_rec *next_record(const struct t_buf *buf,
+                                        uint32_t *next)
 {
-    u32 x = buf->prod;
+    u32 x = buf->prod, cons = buf->cons;
 
-    if ( !tb_init_done || bogus(x, buf->cons) )
+    barrier(); /* must read buf->prod and buf->cons only once */
+    *next = x;
+    if ( !tb_init_done || bogus(x, cons) )
         return NULL;
 
     if ( x >= data_size )
@@ -526,23 +533,21 @@ static inline void __insert_record(struct t_buf *buf,
     BUG_ON(local_rec_size != rec_size);
     BUG_ON(extra & 3);
 
+    rec = next_record(buf, &next);
+    if ( !rec )
+        return;
     /* Double-check once more that we have enough space.
      * Don't bugcheck here, in case the userland tool is doing
      * something stupid. */
-    next = calc_bytes_avail(buf);
-    if ( next < rec_size )
+    if ( (unsigned char *)rec + rec_size > this_cpu(t_data) + data_size )
     {
         if ( printk_ratelimit() )
             printk(XENLOG_WARNING
-                   "%s: avail=%u (size=%08x prod=%08x cons=%08x) rec=%u\n",
-                   __func__, next, data_size, buf->prod, buf->cons, rec_size);
+                   "%s: size=%08x prod=%08x cons=%08x rec=%u\n",
+                   __func__, data_size, next, buf->cons, rec_size);
         return;
     }
-    rmb();
 
-    rec = next_record(buf);
-    if ( !rec )
-        return;
     rec->event = event;
     rec->extra_u32 = extra_word;
     dst = (unsigned char *)rec->u.nocycles.extra_u32;
@@ -559,9 +564,6 @@ static inline void __insert_record(struct t_buf *buf,
 
     wmb();
 
-    next = buf->prod;
-    if ( bogus(next, buf->cons) )
-        return;
     next += rec_size;
     if ( next >= 2*data_size )
         next -= 2*data_size;
