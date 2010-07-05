@@ -134,6 +134,12 @@ int iommu_supports_eim(void)
     if ( !iommu_enabled || !iommu_qinval || !iommu_intremap )
         return 0;
 
+    if ( list_empty(&acpi_drhd_units) )
+    {
+        dprintk(XENLOG_WARNING VTDPREFIX, "VT-d is not supported\n");
+        return 0;
+    }
+
     /* We MUST have a DRHD unit for each IOAPIC. */
     for ( apic = 0; apic < nr_ioapics; apic++ )
         if ( !ioapic_to_drhd(IO_APIC_ID(apic)) )
@@ -143,9 +149,6 @@ int iommu_supports_eim(void)
                     apic, IO_APIC_ID(apic));
             return 0;
     }
-
-    if ( list_empty(&acpi_drhd_units) )
-        return 0;
 
     for_each_drhd_unit ( drhd )
         if ( !ecap_queued_inval(drhd->iommu->ecap) ||
@@ -803,4 +806,81 @@ void disable_intremap(struct iommu *iommu)
                   !(sts & DMA_GSTS_IRES), sts);
 out:
     spin_unlock_irqrestore(&iommu->register_lock, flags);
+}
+
+/*
+ * This function is used to enable Interrutp remapping when
+ * enable x2apic
+ */
+int iommu_enable_IR(void)
+{
+    struct acpi_drhd_unit *drhd;
+    struct iommu *iommu;
+
+    if ( !iommu_supports_eim() )
+        return -1;
+
+    for_each_drhd_unit ( drhd )
+    {
+        struct qi_ctrl *qi_ctrl = NULL;
+
+        iommu = drhd->iommu;
+        qi_ctrl = iommu_qi_ctrl(iommu);
+
+        /* Clear previous faults */
+        clear_fault_bits(iommu);
+
+        /*
+         * Disable interrupt remapping and queued invalidation if
+         * already enabled by BIOS
+         */
+        disable_intremap(iommu);
+        disable_qinval(iommu);
+    }
+
+    /* Enable queue invalidation */
+    for_each_drhd_unit ( drhd )
+    {
+        iommu = drhd->iommu;
+        if ( enable_qinval(iommu) != 0 )
+        {
+            dprintk(XENLOG_INFO VTDPREFIX,
+                    "Failed to enable Queued Invalidation!\n");
+            return -1;
+        }
+    }
+
+    /* Enable interrupt remapping */
+    for_each_drhd_unit ( drhd )
+    {
+        iommu = drhd->iommu;
+        if ( enable_intremap(iommu, 1) )
+        {
+            dprintk(XENLOG_INFO VTDPREFIX,
+                    "Failed to enable Interrupt Remapping!\n");
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+/*
+ * Check if interrupt remapping is enabled or not
+ * return 1: enabled
+ * return 0: not enabled
+ */
+int intremap_enabled(void)
+{
+    struct acpi_drhd_unit *drhd;
+    u32 sts;
+
+    for_each_drhd_unit ( drhd )
+    {
+        sts = dmar_readl(drhd->iommu->reg, DMAR_GSTS_REG);
+        if ( !(sts & DMA_GSTS_IRES) )
+            return 0;
+    }
+
+    return 1;
 }

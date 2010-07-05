@@ -70,6 +70,9 @@ int apic_verbosity;
 int x2apic_enabled __read_mostly = 0;
 int directed_eoi_enabled __read_mostly = 0;
 
+/* x2APIC is enabled in BIOS */
+static int x2apic_preenabled;
+
 /*
  * The following vectors are part of the Linux architecture, there
  * is no hardware IRQ pin equivalent for them, they are triggered
@@ -489,6 +492,47 @@ static void apic_pm_activate(void)
     apic_pm_state.active = 1;
 }
 
+static void resume_x2apic(void)
+{
+    uint64_t msr_content;
+    struct IO_APIC_route_entry **ioapic_entries = NULL;
+
+    ASSERT(x2apic_enabled);
+
+    ioapic_entries = alloc_ioapic_entries();
+    if ( !ioapic_entries )
+    {
+        printk("Allocate ioapic_entries failed\n");
+        goto out;
+    }
+
+    if ( save_IO_APIC_setup(ioapic_entries) )
+    {
+        printk("Saving IO-APIC state failed\n");
+        goto out;
+    }
+
+    mask_8259A();
+    mask_IO_APIC_setup(ioapic_entries);
+
+    iommu_enable_IR();
+
+    rdmsrl(MSR_IA32_APICBASE, msr_content);
+    if ( !(msr_content & MSR_IA32_APICBASE_EXTD) )
+    {
+        msr_content |= MSR_IA32_APICBASE_ENABLE | MSR_IA32_APICBASE_EXTD;
+        msr_content = (uint32_t)msr_content;
+        wrmsrl(MSR_IA32_APICBASE, msr_content);
+    }
+
+    restore_IO_APIC_setup(ioapic_entries);
+    unmask_8259A();
+
+out:
+    if ( ioapic_entries )
+        free_ioapic_entries(ioapic_entries);
+}
+
 void __devinit setup_local_APIC(void)
 {
     unsigned long oldvalue, value, ver, maxlvt;
@@ -727,7 +771,7 @@ int lapic_resume(void)
             msr_content | MSR_IA32_APICBASE_ENABLE | mp_lapic_addr);
     }
     else
-        enable_x2apic();
+        resume_x2apic();
 
     apic_write(APIC_LVTERR, ERROR_APIC_VECTOR | APIC_LVT_MASKED);
     apic_write(APIC_ID, apic_pm_state.apic_id);
@@ -894,35 +938,138 @@ no_apic:
     return -1;
 }
 
-void enable_x2apic(void)
+void check_x2apic_preenabled(void)
 {
     uint64_t msr_content;
 
-    if ( smp_processor_id() == 0 )
+    if ( !x2apic_is_available() )
+        return;
+
+    rdmsrl(MSR_IA32_APICBASE, msr_content);
+    if ( msr_content & MSR_IA32_APICBASE_EXTD )
     {
-        if ( !iommu_supports_eim() )
-        {
-            printk("x2APIC would not be enabled without EIM.\n");
-            return;
-        }
-
-        if ( apic_x2apic_phys.probe() )
-            genapic = &apic_x2apic_phys;
-        else if ( apic_x2apic_cluster.probe() )
-            genapic = &apic_x2apic_cluster;
-        else
-        {
-            printk("x2APIC would not be enabled due to x2apic=off.\n");
-            return;
-        }
-
+        printk("x2APIC mode is already enabled by BIOS.\n");
+        x2apic_preenabled = 1;
         x2apic_enabled = 1;
-        printk("Switched to APIC driver %s.\n", genapic->name);
     }
+}
+
+static void enable_bsp_x2apic(void)
+{
+    struct IO_APIC_route_entry **ioapic_entries = NULL;
+    const struct genapic *x2apic_genapic = NULL;
+
+    ASSERT(smp_processor_id() == 0);
+
+    if ( x2apic_preenabled )
+    {
+        /*
+         * Interrupt remapping should be also enabled by BIOS when
+         * x2APIC is already enabled by BIOS, otherwise it's a BIOS
+         * bug
+         */
+        if ( !intremap_enabled() )
+            panic("Interrupt remapping is not enabled by BIOS while "
+                  "x2APIC is already enabled by BIOS!\n");
+    }
+
+    x2apic_genapic = apic_x2apic_probe();
+    if ( x2apic_genapic )
+        genapic = x2apic_genapic;
     else
     {
-        BUG_ON(!x2apic_enabled); /* APs only enable x2apic when BSP did so. */
+        if ( x2apic_cmdline_disable() )
+        {
+            if ( x2apic_preenabled )
+            {
+                /* Ignore x2apic=0, and set default x2apic mode */
+                genapic = &apic_x2apic_cluster;
+                printk("x2APIC: already enabled by BIOS, ignore x2apic=0.\n");
+            }
+            else
+            {
+                printk("Not enable x2APIC due to x2apic=0 is set.\n");
+                return;
+            }
+        }
+        else
+        {
+            if ( !iommu_enabled || !iommu_intremap || !iommu_qinval )
+                panic("Cannot enable x2APIC due to iommu or interrupt "
+                      "remapping or queued invalidation is disabled "
+                      "by command line!\n");
+            else
+            {
+                if ( x2apic_preenabled )
+                    panic("x2APIC: already enabled by BIOS, but "
+                          "iommu_supports_eim fails\n");
+                else
+                {
+                    printk("Not enable x2APIC due to "
+                           "iommu_supports_eim fails!\n");
+                    return;
+                }
+            }
+        }
     }
+
+    ioapic_entries = alloc_ioapic_entries();
+    if ( !ioapic_entries )
+    {
+        printk("Allocate ioapic_entries failed\n");
+        goto out;
+    }
+
+    if ( save_IO_APIC_setup(ioapic_entries) )
+    {
+        printk("Saving IO-APIC state failed\n");
+        goto out;
+    }
+
+    mask_8259A();
+    mask_IO_APIC_setup(ioapic_entries);
+
+    if ( iommu_enable_IR() )
+    {
+        printk("Would not enable x2APIC due to interrupt remapping "
+               "cannot be enabled.\n");
+        goto restore_out;
+    }
+
+    x2apic_enabled = 1;
+    printk("Switched to APIC driver %s.\n", genapic->name);
+
+    if ( !x2apic_preenabled )
+    {
+        uint64_t msr_content;
+        rdmsrl(MSR_IA32_APICBASE, msr_content);
+        if ( !(msr_content & MSR_IA32_APICBASE_EXTD) )
+        {
+            msr_content |= MSR_IA32_APICBASE_ENABLE |
+                           MSR_IA32_APICBASE_EXTD;
+            msr_content = (uint32_t)msr_content;
+            wrmsrl(MSR_IA32_APICBASE, msr_content);
+            printk("x2APIC mode enabled.\n");
+        }
+    }
+
+restore_out:
+    restore_IO_APIC_setup(ioapic_entries);
+    unmask_8259A();
+
+out:
+    if ( ioapic_entries )
+        free_ioapic_entries(ioapic_entries);
+}
+
+static void enable_ap_x2apic(void)
+{
+    uint64_t msr_content;
+
+    ASSERT(smp_processor_id() != 0);
+
+    /* APs only enable x2apic when BSP did so. */
+    BUG_ON(!x2apic_enabled);
 
     rdmsrl(MSR_IA32_APICBASE, msr_content);
     if ( !(msr_content & MSR_IA32_APICBASE_EXTD) )
@@ -930,10 +1077,15 @@ void enable_x2apic(void)
         msr_content |= MSR_IA32_APICBASE_ENABLE | MSR_IA32_APICBASE_EXTD;
         msr_content = (uint32_t)msr_content;
         wrmsrl(MSR_IA32_APICBASE, msr_content);
-        printk("x2APIC mode enabled.\n");
     }
+}
+
+void enable_x2apic(void)
+{
+    if ( smp_processor_id() == 0 )
+        enable_bsp_x2apic();
     else
-        printk("x2APIC mode enabled by BIOS.\n");
+        enable_ap_x2apic();
 }
 
 void __init init_apic_mappings(void)

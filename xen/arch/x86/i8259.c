@@ -175,6 +175,26 @@ int i8259A_irq_pending(unsigned int irq)
     return ret;
 }
 
+void mask_8259A(void)
+{
+    unsigned long flags;
+
+    spin_lock_irqsave(&i8259A_lock, flags);
+    outb(0xff, 0xA1);
+    outb(0xff, 0x21);
+    spin_unlock_irqrestore(&i8259A_lock, flags);
+}
+
+void unmask_8259A(void)
+{
+    unsigned long flags;
+
+    spin_lock_irqsave(&i8259A_lock, flags);
+    outb(cached_A1, 0xA1);
+    outb(cached_21, 0x21);
+    spin_unlock_irqrestore(&i8259A_lock, flags);
+}
+
 /*
  * This function assumes to be called rarely. Switching between
  * 8259A registers is slow.

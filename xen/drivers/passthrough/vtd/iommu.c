@@ -1790,7 +1790,7 @@ static void setup_dom0_devices(struct domain *d)
     spin_unlock(&pcidevs_lock);
 }
 
-static void clear_fault_bits(struct iommu *iommu)
+void clear_fault_bits(struct iommu *iommu)
 {
     u64 val;
     unsigned long flags;

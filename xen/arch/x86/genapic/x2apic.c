@@ -33,6 +33,11 @@ boolean_param("x2apic", x2apic);
 static int  x2apic_phys; /* By default we use logical cluster mode. */
 boolean_param("x2apic_phys", x2apic_phys);
 
+int x2apic_cmdline_disable(void)
+{
+    return (x2apic == 0);
+}
+
 static int probe_x2apic_phys(void)
 {
     return x2apic && x2apic_phys && x2apic_is_available() &&
@@ -54,6 +59,20 @@ const struct genapic apic_x2apic_cluster = {
     APIC_INIT("x2apic_cluster", probe_x2apic_cluster),
     GENAPIC_X2APIC_CLUSTER
 };
+
+const struct genapic *apic_x2apic_probe(void)
+{
+    if ( !x2apic || !x2apic_is_available() )
+        return NULL;
+
+    if ( !iommu_supports_eim() )
+        return NULL;
+
+    if ( x2apic_phys )
+        return &apic_x2apic_phys;
+    else
+        return &apic_x2apic_cluster;
+}
 
 void init_apic_ldr_x2apic_phys(void)
 {
