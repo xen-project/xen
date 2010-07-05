@@ -545,6 +545,8 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
         }
 
         args.memflags |= MEMF_node(XENMEMF_get_node(reservation.mem_flags));
+        if (reservation.mem_flags & XENMEMF_exact_node_request)
+            args.memflags |= MEMF_exact_node;
 
         if ( op == XENMEM_populate_physmap
              && (reservation.mem_flags & XENMEMF_populate_on_demand) )

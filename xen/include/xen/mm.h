@@ -82,6 +82,8 @@ int assign_pages(
 #define  MEMF_tmem        (1U<<_MEMF_tmem)
 #define _MEMF_no_dma      3
 #define  MEMF_no_dma      (1U<<_MEMF_no_dma)
+#define _MEMF_exact_node  4
+#define  MEMF_exact_node  (1U<<_MEMF_exact_node)
 #define _MEMF_node        8
 #define  MEMF_node(n)     ((((n)+1)&0xff)<<_MEMF_node)
 #define _MEMF_bits        24
