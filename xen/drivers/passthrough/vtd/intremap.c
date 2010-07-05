@@ -137,15 +137,20 @@ int iommu_supports_eim(void)
     /* We MUST have a DRHD unit for each IOAPIC. */
     for ( apic = 0; apic < nr_ioapics; apic++ )
         if ( !ioapic_to_drhd(IO_APIC_ID(apic)) )
+    {
+            dprintk(XENLOG_WARNING VTDPREFIX,
+                    "There is not a DRHD for IOAPIC 0x%x (id: 0x%x)!\n",
+                    apic, IO_APIC_ID(apic));
             return 0;
+    }
 
     if ( list_empty(&acpi_drhd_units) )
         return 0;
 
     for_each_drhd_unit ( drhd )
-        if ( !ecap_queued_inval(drhd->ecap) ||
-             !ecap_intr_remap(drhd->ecap) ||
-             !ecap_eim(drhd->ecap) )
+        if ( !ecap_queued_inval(drhd->iommu->ecap) ||
+             !ecap_intr_remap(drhd->iommu->ecap) ||
+             !ecap_eim(drhd->iommu->ecap) )
             return 0;
 
     return 1;
