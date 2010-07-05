@@ -21,14 +21,14 @@
 #include <xen/lib.h>
 #include <xen/perfc.h>
 #include <asm/hvm/svm/asid.h>
+#include <asm/amd.h>
 
 void svm_asid_init(struct cpuinfo_x86 *c)
 {
     int nasids = 0;
 
     /* Check for erratum #170, and leave ASIDs disabled if it's present. */
-    if ( (c->x86 == 0x10) ||
-         ((c->x86 == 0xf) && (c->x86_model >= 0x68) && (c->x86_mask >= 1)) )
+    if ( !cpu_has_amd_erratum(c, AMD_ERRATUM_170) )
         nasids = cpuid_ebx(0x8000000A);
 
     hvm_asid_init(nasids);
