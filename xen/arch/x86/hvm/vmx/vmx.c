@@ -2089,6 +2089,9 @@ static void vmx_wbinvd_intercept(void)
     if ( !has_arch_mmios(current->domain) )
         return;
 
+    if ( iommu_snoop )
+        return;
+
     if ( cpu_has_wbinvd_exiting )
         on_each_cpu(wbinvd_ipi, NULL, 1);
     else
