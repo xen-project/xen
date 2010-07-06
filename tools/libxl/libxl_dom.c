@@ -68,6 +68,7 @@ int build_pre(struct libxl_ctx *ctx, uint32_t domid,
             (info->hvm) ? info->max_memkb : 
             (info->max_memkb + info->u.pv.slack_memkb));
     xc_domain_set_tsc_info(ctx->xch, domid, info->tsc_mode, 0, 0, 0);
+    xc_domain_disable_migrate(ctx->xch, info->disable_migrate);
 
     if (info->hvm) {
         unsigned long shadow;
