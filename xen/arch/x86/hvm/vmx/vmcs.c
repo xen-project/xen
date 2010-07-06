@@ -1064,8 +1064,10 @@ void vmx_do_resume(struct vcpu *v)
          *  1: flushing cache (wbinvd) when the guest is scheduled out if
          *     there is no wbinvd exit, or
          *  2: execute wbinvd on all dirty pCPUs when guest wbinvd exits.
+         * If VT-d engine can force snooping, we don't need to do these.
          */
-        if ( has_arch_pdevs(v->domain) && !cpu_has_wbinvd_exiting )
+        if ( has_arch_pdevs(v->domain) && !iommu_snoop
+                && !cpu_has_wbinvd_exiting )
         {
             int cpu = v->arch.hvm_vmx.active_cpu;
             if ( cpu != -1 )

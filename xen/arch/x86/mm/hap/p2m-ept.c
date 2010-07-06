@@ -118,6 +118,74 @@ static int ept_set_middle_entry(struct domain *d, ept_entry_t *ept_entry)
     return 1;
 }
 
+/* free ept sub tree behind an entry */
+void ept_free_entry(struct domain *d, ept_entry_t *ept_entry, int level)
+{
+    /* End if the entry is a leaf entry. */
+    if ( level == 0 || !is_epte_present(ept_entry) ||
+         is_epte_superpage(ept_entry) )
+        return;
+
+    if ( level > 1 )
+    {
+        ept_entry_t *epte = map_domain_page(ept_entry->mfn);
+        for ( int i = 0; i < EPT_PAGETABLE_ENTRIES; i++ )
+            ept_free_entry(d, epte + i, level - 1);
+        unmap_domain_page(epte);
+    }
+
+    d->arch.p2m->free_page(d, mfn_to_page(ept_entry->mfn));
+}
+
+static int ept_split_super_page(struct domain *d, ept_entry_t *ept_entry,
+                                int level, int target)
+{
+    ept_entry_t new_ept, *table;
+    uint64_t trunk;
+    int rv = 1;
+
+    /* End if the entry is a leaf entry or reaches the target level. */
+    if ( level == 0 || level == target )
+        return rv;
+
+    ASSERT(is_epte_superpage(ept_entry));
+
+    if ( !ept_set_middle_entry(d, &new_ept) )
+        return 0;
+
+    table = map_domain_page(new_ept.mfn);
+    trunk = 1UL << ((level - 1) * EPT_TABLE_ORDER);
+
+    for ( int i = 0; i < EPT_PAGETABLE_ENTRIES; i++ )
+    {
+        ept_entry_t *epte = table + i;
+
+        epte->emt = ept_entry->emt;
+        epte->ipat = ept_entry->ipat;
+        epte->sp = (level > 1) ? 1 : 0;
+        epte->avail1 = ept_entry->avail1;
+        epte->avail2 = 0;
+        epte->mfn = ept_entry->mfn + i * trunk;
+
+        ept_p2m_type_to_flags(epte, epte->avail1);
+
+        if ( (level - 1) == target )
+            continue;
+
+        ASSERT(is_epte_superpage(epte));
+
+        if ( !(rv = ept_split_super_page(d, epte, level - 1, target)) )
+            break;
+    }
+
+    unmap_domain_page(table);
+
+    /* Even failed we should install the newly allocated ept page. */
+    *ept_entry = new_ept;
+
+    return rv;
+}
+
 /* Take the currently mapped table, find the corresponding gfn entry,
  * and map the next table, if available.  If the entry is empty
  * and read_only is set, 
@@ -134,13 +202,18 @@ static int ept_set_middle_entry(struct domain *d, ept_entry_t *ept_entry)
  */
 static int ept_next_level(struct domain *d, bool_t read_only,
                           ept_entry_t **table, unsigned long *gfn_remainder,
-                          u32 shift)
+                          int next_level)
 {
+    unsigned long mfn;
     ept_entry_t *ept_entry;
-    ept_entry_t *next;
-    u32 index;
+    u32 shift, index;
+
+    shift = next_level * EPT_TABLE_ORDER;
 
     index = *gfn_remainder >> shift;
+
+    /* index must be falling into the page */
+    ASSERT(index < EPT_PAGETABLE_ENTRIES);
 
     ept_entry = (*table) + index;
 
@@ -159,69 +232,12 @@ static int ept_next_level(struct domain *d, bool_t read_only,
     /* The only time sp would be set here is if we had hit a superpage */
     if ( is_epte_superpage(ept_entry) )
         return GUEST_TABLE_SUPER_PAGE;
-    else
-    {
-        *gfn_remainder &= (1UL << shift) - 1;
-        next = map_domain_page(ept_entry->mfn);
-        unmap_domain_page(*table);
-        *table = next;
-        return GUEST_TABLE_NORMAL_PAGE;
-    }
-}
 
-/* It's super page before and we should break down it now. */
-static int ept_split_large_page(struct domain *d,
-                                ept_entry_t **table, u32 *index,
-                                unsigned long gfn, int level)
-{
-    ept_entry_t *prev_table = *table;
-    ept_entry_t *split_table = NULL;
-    ept_entry_t *split_entry = NULL;
-    ept_entry_t *ept_entry = (*table) + (*index);
-    ept_entry_t temp_ept_entry;
-    unsigned long s_gfn, s_mfn;
-    unsigned long offset, trunk;
-    int i;
-
-    /* alloc new page for new ept middle level entry which is
-     * before a leaf super entry
-     */
-
-    if ( !ept_set_middle_entry(d, &temp_ept_entry) )
-        return 0;
-
-    /* split the super page to small next level pages */
-    split_table = map_domain_page(temp_ept_entry.mfn);
-    offset = gfn & ((1UL << (level * EPT_TABLE_ORDER)) - 1);
-    trunk = (1UL << ((level-1) * EPT_TABLE_ORDER));
-
-    for ( i = 0; i < (1UL << EPT_TABLE_ORDER); i++ )
-    {
-        s_gfn = gfn - offset + i * trunk;
-        s_mfn = ept_entry->mfn + i * trunk;
-
-        split_entry = split_table + i;
-        split_entry->emt = ept_entry->emt;
-        split_entry->ipat = ept_entry->ipat;
-
-        split_entry->sp = (level > 1) ? 1 : 0;
-
-        split_entry->mfn = s_mfn;
-
-        split_entry->avail1 = ept_entry->avail1;
-        split_entry->avail2 = 0;
-        /* last step */
-        split_entry->r = split_entry->w = split_entry->x = 1;
-        ept_p2m_type_to_flags(split_entry, ept_entry->avail1);
-    }
-
-    *ept_entry = temp_ept_entry;
-    
-    *index = offset / trunk;
-    *table = split_table;
-    unmap_domain_page(prev_table);
-
-    return 1;
+    mfn = ept_entry->mfn;
+    unmap_domain_page(*table);
+    *table = map_domain_page(mfn);
+    *gfn_remainder &= (1UL << shift) - 1;
+    return GUEST_TABLE_NORMAL_PAGE;
 }
 
 /*
@@ -229,56 +245,64 @@ static int ept_split_large_page(struct domain *d,
  * by observing whether any gfn->mfn translations are modified.
  */
 static int
-ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn, 
+ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
               unsigned int order, p2m_type_t p2mt)
 {
-    ept_entry_t *table = NULL;
+    ept_entry_t *table, *ept_entry;
     unsigned long gfn_remainder = gfn;
     unsigned long offset = 0;
-    ept_entry_t *ept_entry = NULL;
     u32 index;
-    int i;
+    int i, target = order / EPT_TABLE_ORDER;
     int rv = 0;
     int ret = 0;
-    int split_level = 0;
-    int walk_level = order / EPT_TABLE_ORDER;
-    int direct_mmio = (p2mt == p2m_mmio_direct);
+    bool_t direct_mmio = (p2mt == p2m_mmio_direct);
     uint8_t ipat = 0;
     int need_modify_vtd_table = 1;
     int needs_sync = 1;
 
-    if (  order != 0 )
-        if ( (gfn & ((1UL << order) - 1)) )
-            return 1;
+    /*
+     * the caller must make sure:
+     * 1. passing valid gfn and mfn at order boundary.
+     * 2. gfn not exceeding guest physical address width.
+     * 3. passing a valid order.
+     */
+    if ( ((gfn | mfn_x(mfn)) & ((1UL << order) - 1)) ||
+         (gfn >> ((ept_get_wl(d) + 1) * EPT_TABLE_ORDER)) ||
+         (order % EPT_TABLE_ORDER) )
+        return 0;
+
+    ASSERT((target == 2 && hvm_hap_has_1gb(d)) ||
+           (target == 1 && hvm_hap_has_2mb(d)) ||
+           (target == 0));
 
     table = map_domain_page(ept_get_asr(d));
 
     ASSERT(table != NULL);
 
-    for ( i = ept_get_wl(d); i > walk_level; i-- )
+    for ( i = ept_get_wl(d); i > target; i-- )
     {
-        ret = ept_next_level(d, 0, &table, &gfn_remainder, i * EPT_TABLE_ORDER);
+        ret = ept_next_level(d, 0, &table, &gfn_remainder, i);
         if ( !ret )
             goto out;
         else if ( ret != GUEST_TABLE_NORMAL_PAGE )
             break;
     }
 
-    /* If order == 0, we should only get POD if we have a POD superpage.
-     * If i > walk_level, we need to split the page; otherwise,
-     * just behave as normal. */
-    ASSERT(ret != GUEST_TABLE_POD_PAGE || i != walk_level);
+    ASSERT(ret != GUEST_TABLE_POD_PAGE || i != target);
 
-    index = gfn_remainder >> ( i ?  (i * EPT_TABLE_ORDER): order);
-    offset = (gfn_remainder & ( ((1 << (i*EPT_TABLE_ORDER)) - 1)));
-
-    split_level = i;
+    index = gfn_remainder >> (i * EPT_TABLE_ORDER);
+    offset = gfn_remainder & ((1UL << (i * EPT_TABLE_ORDER)) - 1);
 
     ept_entry = table + index;
 
-    if ( i == walk_level )
+    /*
+     * When we are here, we must be on a leaf ept entry
+     * with i == target or i > target.
+     */
+
+    if ( i == target )
     {
-        /* We reached the level we're looking for */
+        /* We reached the target level. */
 
         /* No need to flush if the old entry wasn't valid */
         if ( !is_epte_present(ept_entry) )
@@ -291,14 +315,13 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
                                                 direct_mmio);
             ept_entry->ipat = ipat;
             ept_entry->sp = order ? 1 : 0;
+            ept_entry->avail1 = p2mt;
+            ept_entry->avail2 = 0;
 
             if ( ept_entry->mfn == mfn_x(mfn) )
                 need_modify_vtd_table = 0;
             else
                 ept_entry->mfn = mfn_x(mfn);
-
-            ept_entry->avail1 = p2mt;
-            ept_entry->avail2 = 0;
 
             ept_p2m_type_to_flags(ept_entry, p2mt);
         }
@@ -307,32 +330,51 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     }
     else
     {
-        int level;
-        ept_entry_t *split_ept_entry;
+        /* We need to split the original page. */
+        ept_entry_t split_ept_entry;
 
-        for ( level = split_level; level > walk_level ; level-- )
+        ASSERT(is_epte_superpage(ept_entry));
+
+        split_ept_entry = *ept_entry;
+
+        if ( !ept_split_super_page(d, &split_ept_entry, i, target) )
         {
-            rv = ept_split_large_page(d, &table, &index, gfn, level);
-            if ( !rv )
-                goto out;
+            ept_free_entry(d, &split_ept_entry, i);
+            goto out;
         }
 
-        split_ept_entry = table + index;
-        split_ept_entry->avail1 = p2mt;
-        ept_p2m_type_to_flags(split_ept_entry, p2mt);
-        split_ept_entry->emt = epte_get_entry_emt(d, gfn, mfn, &ipat,
-                                                  direct_mmio);
-        split_ept_entry->ipat = ipat;
+        /* now install the newly split ept sub-tree */
+        /* NB: please make sure domian is paused and no in-fly VT-d DMA. */
+        *ept_entry = split_ept_entry;
 
-        if ( split_ept_entry->mfn == mfn_x(mfn) )
-            need_modify_vtd_table = 0;
-        else
-            split_ept_entry->mfn = mfn_x(mfn);
+        /* then move to the level we want to make real changes */
+        for ( ; i > target; i-- )
+            ept_next_level(d, 0, &table, &gfn_remainder, i);
+
+        ASSERT(i == target);
+
+        index = gfn_remainder >> (i * EPT_TABLE_ORDER);
+        offset = gfn_remainder & ((1UL << (i * EPT_TABLE_ORDER)) - 1);
+
+        ept_entry = table + index;
+
+        ept_entry->emt = epte_get_entry_emt(d, gfn, mfn, &ipat, direct_mmio);
+        ept_entry->ipat = ipat;
+        ept_entry->sp = i ? 1 : 0;
+        ept_entry->avail1 = p2mt;
+        ept_entry->avail2 = 0;
+
+        if ( ept_entry->mfn == mfn_x(mfn) )
+             need_modify_vtd_table = 0;
+        else /* the caller should take care of the previous page */
+            ept_entry->mfn = mfn_x(mfn);
+
+        ept_p2m_type_to_flags(ept_entry, p2mt);
     }
 
     /* Track the highest gfn for which we have ever had a valid mapping */
-    if ( mfn_valid(mfn_x(mfn))
-         && (gfn + (1UL << order) - 1 > d->arch.p2m->max_mapped_pfn) )
+    if ( mfn_valid(mfn_x(mfn)) &&
+         (gfn + (1UL << order) - 1 > d->arch.p2m->max_mapped_pfn) )
         d->arch.p2m->max_mapped_pfn = gfn + (1UL << order) - 1;
 
     /* Success */
@@ -354,11 +396,11 @@ out:
                 for ( i = 0; i < (1 << order); i++ )
                     iommu_map_page(
                         d, gfn - offset + i, mfn_x(mfn) - offset + i,
-                        IOMMUF_readable|IOMMUF_writable);
+                        IOMMUF_readable | IOMMUF_writable);
             }
             else if ( !order )
                 iommu_map_page(
-                    d, gfn, mfn_x(mfn), IOMMUF_readable|IOMMUF_writable);
+                    d, gfn, mfn_x(mfn), IOMMUF_readable | IOMMUF_writable);
         }
         else
         {
@@ -398,8 +440,7 @@ static mfn_t ept_get_entry(struct domain *d, unsigned long gfn, p2m_type_t *t,
     for ( i = ept_get_wl(d); i > 0; i-- )
     {
     retry:
-        ret = ept_next_level(d, 1, &table, &gfn_remainder,
-                             i * EPT_TABLE_ORDER);
+        ret = ept_next_level(d, 1, &table, &gfn_remainder, i);
         if ( !ret )
             goto out;
         else if ( ret == GUEST_TABLE_POD_PAGE )
@@ -486,8 +527,7 @@ static ept_entry_t ept_get_entry_content(struct domain *d, unsigned long gfn, in
 
     for ( i = ept_get_wl(d); i > 0; i-- )
     {
-        ret = ept_next_level(d, 1, &table, &gfn_remainder,
-                             i * EPT_TABLE_ORDER);
+        ret = ept_next_level(d, 1, &table, &gfn_remainder, i);
         if ( !ret || ret == GUEST_TABLE_POD_PAGE )
             goto out;
         else if ( ret == GUEST_TABLE_SUPER_PAGE )
@@ -559,7 +599,7 @@ static mfn_t ept_get_entry_current(unsigned long gfn, p2m_type_t *t,
     return ept_get_entry(current->domain, gfn, t, q);
 }
 
-/* 
+/*
  * To test if the new emt type is the same with old,
  * return 1 to not to reset ept entry.
  */
@@ -569,14 +609,14 @@ static int need_modify_ept_entry(struct domain *d, unsigned long gfn,
 {
     uint8_t ipat;
     uint8_t emt;
-    int direct_mmio = (p2mt == p2m_mmio_direct);
+    bool_t direct_mmio = (p2mt == p2m_mmio_direct);
 
     emt = epte_get_entry_emt(d, gfn, mfn, &ipat, direct_mmio);
 
     if ( (emt == o_emt) && (ipat == o_ipat) )
         return 0;
 
-    return 1; 
+    return 1;
 }
 
 void ept_change_entry_emt_with_range(struct domain *d, unsigned long start_gfn,
@@ -710,8 +750,7 @@ static void ept_dump_p2m_table(unsigned char key)
 
             for ( i = ept_get_wl(d); i > 0; i-- )
             {
-                ret = ept_next_level(d, 1, &table, &gfn_remainder,
-                                     i * EPT_TABLE_ORDER);
+                ret = ept_next_level(d, 1, &table, &gfn_remainder, i);
                 if ( ret != GUEST_TABLE_NORMAL_PAGE )
                     break;
             }

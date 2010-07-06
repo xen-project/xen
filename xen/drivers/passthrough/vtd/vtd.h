@@ -108,4 +108,7 @@ void unmap_vtd_domain_page(void *va);
 void iommu_flush_cache_entry(void *addr, unsigned int size);
 void iommu_flush_cache_page(void *addr, unsigned long npages);
 
+int iommu_alloc(struct acpi_drhd_unit *drhd);
+void iommu_free(struct acpi_drhd_unit *drhd);
+
 #endif // _VTD_H_

@@ -2089,6 +2089,9 @@ static void vmx_wbinvd_intercept(void)
     if ( !has_arch_mmios(current->domain) )
         return;
 
+    if ( iommu_snoop )
+        return;
+
     if ( cpu_has_wbinvd_exiting )
         on_each_cpu(wbinvd_ipi, NULL, 1);
     else
@@ -2406,9 +2409,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
                 goto exit_and_crash;
             inst_len = __get_instruction_length(); /* Safe: INT3 */
             __update_guest_eip(inst_len);
-#ifdef XEN_GDBSX_CONFIG
             current->arch.gdbsx_vcpu_event = TRAP_int3;
-#endif
             domain_pause_for_debugger();
             break;
         case TRAP_no_device:

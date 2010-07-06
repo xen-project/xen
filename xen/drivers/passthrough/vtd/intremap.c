@@ -134,18 +134,26 @@ int iommu_supports_eim(void)
     if ( !iommu_enabled || !iommu_qinval || !iommu_intremap )
         return 0;
 
+    if ( list_empty(&acpi_drhd_units) )
+    {
+        dprintk(XENLOG_WARNING VTDPREFIX, "VT-d is not supported\n");
+        return 0;
+    }
+
     /* We MUST have a DRHD unit for each IOAPIC. */
     for ( apic = 0; apic < nr_ioapics; apic++ )
         if ( !ioapic_to_drhd(IO_APIC_ID(apic)) )
+    {
+            dprintk(XENLOG_WARNING VTDPREFIX,
+                    "There is not a DRHD for IOAPIC 0x%x (id: 0x%x)!\n",
+                    apic, IO_APIC_ID(apic));
             return 0;
-
-    if ( list_empty(&acpi_drhd_units) )
-        return 0;
+    }
 
     for_each_drhd_unit ( drhd )
-        if ( !ecap_queued_inval(drhd->ecap) ||
-             !ecap_intr_remap(drhd->ecap) ||
-             !ecap_eim(drhd->ecap) )
+        if ( !ecap_queued_inval(drhd->iommu->ecap) ||
+             !ecap_intr_remap(drhd->iommu->ecap) ||
+             !ecap_eim(drhd->iommu->ecap) )
             return 0;
 
     return 1;
@@ -706,7 +714,7 @@ void msi_msg_write_remap_rte(
 }
 #endif
 
-int enable_intremap(struct iommu *iommu)
+int enable_intremap(struct iommu *iommu, int eim)
 {
     struct acpi_drhd_unit *drhd;
     struct ir_ctrl *ir_ctrl;
@@ -716,10 +724,25 @@ int enable_intremap(struct iommu *iommu)
     ASSERT(ecap_intr_remap(iommu->ecap) && iommu_intremap);
 
     ir_ctrl = iommu_ir_ctrl(iommu);
+    sts = dmar_readl(iommu->reg, DMAR_GSTS_REG);
+
+    /* Return if already enabled by Xen */
+    if ( (sts & DMA_GSTS_IRES) && ir_ctrl->iremap_maddr )
+        return 0;
+
+    sts = dmar_readl(iommu->reg, DMAR_GSTS_REG);
+    if ( !(sts & DMA_GSTS_QIES) )
+    {
+        dprintk(XENLOG_ERR VTDPREFIX,
+                "Queued invalidation is not enabled, should not enable "
+                "interrupt remapping\n");
+        return -EINVAL;
+    }
+
     if ( ir_ctrl->iremap_maddr == 0 )
     {
         drhd = iommu_to_drhd(iommu);
-        ir_ctrl->iremap_maddr = alloc_pgtable_maddr(drhd, IREMAP_ARCH_PAGE_NR );
+        ir_ctrl->iremap_maddr = alloc_pgtable_maddr(drhd, IREMAP_ARCH_PAGE_NR);
         if ( ir_ctrl->iremap_maddr == 0 )
         {
             dprintk(XENLOG_WARNING VTDPREFIX,
@@ -732,7 +755,7 @@ int enable_intremap(struct iommu *iommu)
 #ifdef CONFIG_X86
     /* set extended interrupt mode bit */
     ir_ctrl->iremap_maddr |=
-            x2apic_enabled ? (1 << IRTA_REG_EIME_SHIFT) : 0;
+            eim ? (1 << IRTA_REG_EIME_SHIFT) : 0;
 #endif
     spin_lock_irqsave(&iommu->register_lock, flags);
 
@@ -769,13 +792,95 @@ void disable_intremap(struct iommu *iommu)
     u32 sts;
     unsigned long flags;
 
-    ASSERT(ecap_intr_remap(iommu->ecap) && iommu_intremap);
+    if ( !ecap_intr_remap(iommu->ecap) )
+        return;
 
     spin_lock_irqsave(&iommu->register_lock, flags);
     sts = dmar_readl(iommu->reg, DMAR_GSTS_REG);
+    if ( !(sts & DMA_GSTS_IRES) )
+        goto out;
+
     dmar_writel(iommu->reg, DMAR_GCMD_REG, sts & (~DMA_GCMD_IRE));
 
     IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
                   !(sts & DMA_GSTS_IRES), sts);
+out:
     spin_unlock_irqrestore(&iommu->register_lock, flags);
+}
+
+/*
+ * This function is used to enable Interrutp remapping when
+ * enable x2apic
+ */
+int iommu_enable_IR(void)
+{
+    struct acpi_drhd_unit *drhd;
+    struct iommu *iommu;
+
+    if ( !iommu_supports_eim() )
+        return -1;
+
+    for_each_drhd_unit ( drhd )
+    {
+        struct qi_ctrl *qi_ctrl = NULL;
+
+        iommu = drhd->iommu;
+        qi_ctrl = iommu_qi_ctrl(iommu);
+
+        /* Clear previous faults */
+        clear_fault_bits(iommu);
+
+        /*
+         * Disable interrupt remapping and queued invalidation if
+         * already enabled by BIOS
+         */
+        disable_intremap(iommu);
+        disable_qinval(iommu);
+    }
+
+    /* Enable queue invalidation */
+    for_each_drhd_unit ( drhd )
+    {
+        iommu = drhd->iommu;
+        if ( enable_qinval(iommu) != 0 )
+        {
+            dprintk(XENLOG_INFO VTDPREFIX,
+                    "Failed to enable Queued Invalidation!\n");
+            return -1;
+        }
+    }
+
+    /* Enable interrupt remapping */
+    for_each_drhd_unit ( drhd )
+    {
+        iommu = drhd->iommu;
+        if ( enable_intremap(iommu, 1) )
+        {
+            dprintk(XENLOG_INFO VTDPREFIX,
+                    "Failed to enable Interrupt Remapping!\n");
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+/*
+ * Check if interrupt remapping is enabled or not
+ * return 1: enabled
+ * return 0: not enabled
+ */
+int intremap_enabled(void)
+{
+    struct acpi_drhd_unit *drhd;
+    u32 sts;
+
+    for_each_drhd_unit ( drhd )
+    {
+        sts = dmar_readl(drhd->iommu->reg, DMAR_GSTS_REG);
+        if ( !(sts & DMA_GSTS_IRES) )
+            return 0;
+    }
+
+    return 1;
 }

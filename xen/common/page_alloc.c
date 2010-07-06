@@ -300,11 +300,15 @@ static struct page_info *alloc_heap_pages(
     unsigned int i, j, zone = 0;
     unsigned int num_nodes = num_online_nodes();
     unsigned long request = 1UL << order;
+    bool_t exact_node_request = !!(memflags & MEMF_exact_node);
     cpumask_t extra_cpus_mask, mask;
     struct page_info *pg;
 
     if ( node == NUMA_NO_NODE )
+    {
         node = cpu_to_node(smp_processor_id());
+        exact_node_request = 0;
+    }
 
     ASSERT(node >= 0);
     ASSERT(zone_lo <= zone_hi);
@@ -345,6 +349,9 @@ static struct page_info *alloc_heap_pages(
                     goto found;
         } while ( zone-- > zone_lo ); /* careful: unsigned zone may wrap */
 
+        if ( exact_node_request )
+            goto not_found;
+
         /* Pick next node, wrapping around if needed. */
         node = next_node(node, node_online_map);
         if (node == MAX_NUMNODES)
@@ -360,6 +367,7 @@ static struct page_info *alloc_heap_pages(
         return pg;
     }
 
+ not_found:
     /* No suitable memory blocks. Fail the request. */
     spin_unlock(&heap_lock);
     return NULL;

@@ -100,4 +100,39 @@
 	__bit(X86_FEATURE_SKINIT))
 #define AMD_EXTFEATURES_FAM11h_REV_B_EDX  AMD_EXTFEATURES_K8_REV_G_EDX
 
+/* AMD errata checking
+ *
+ * Errata are defined using the AMD_LEGACY_ERRATUM() or AMD_OSVW_ERRATUM()
+ * macros. The latter is intended for newer errata that have an OSVW id
+ * assigned, which it takes as first argument. Both take a variable number
+ * of family-specific model-stepping ranges created by AMD_MODEL_RANGE().
+ *
+ * Example 1:
+ * #define AMD_ERRATUM_319                                              \
+ *   AMD_LEGACY_ERRATUM(AMD_MODEL_RANGE(0x10, 0x2, 0x1, 0x4, 0x2),      \
+ *                      AMD_MODEL_RANGE(0x10, 0x8, 0x0, 0x8, 0x0),      \
+ *                      AMD_MODEL_RANGE(0x10, 0x9, 0x0, 0x9, 0x0))
+ * Example 2:
+ * #define AMD_ERRATUM_400                                              \
+ *   AMD_OSVW_ERRATUM(1, AMD_MODEL_RANGE(0xf, 0x41, 0x2, 0xff, 0xf),    \
+ *                       AMD_MODEL_RANGE(0x10, 0x2, 0x1, 0xff, 0xf))
+ *   
+ */
+
+#define AMD_LEGACY_ERRATUM(...)         0 /* legacy */, __VA_ARGS__, 0
+#define AMD_OSVW_ERRATUM(osvw_id, ...)  1 /* osvw */, osvw_id, __VA_ARGS__, 0
+#define AMD_MODEL_RANGE(f, m_start, s_start, m_end, s_end)              \
+    ((f << 24) | (m_start << 16) | (s_start << 12) | (m_end << 4) | (s_end))
+#define AMD_MODEL_RANGE_FAMILY(range)   (((range) >> 24) & 0xff)
+#define AMD_MODEL_RANGE_START(range)    (((range) >> 12) & 0xfff)
+#define AMD_MODEL_RANGE_END(range)      ((range) & 0xfff)
+
+#define AMD_ERRATUM_170                                                 \
+    AMD_LEGACY_ERRATUM(AMD_MODEL_RANGE(0x0f, 0x0, 0x0, 0x67, 0xf))
+
+#define AMD_ERRATUM_383                                                 \
+    AMD_OSVW_ERRATUM(3, AMD_MODEL_RANGE(0x10, 0x2, 0x1, 0xff, 0xf),	\
+		        AMD_MODEL_RANGE(0x12, 0x0, 0x0, 0x1, 0x0))
+
+int cpu_has_amd_erratum(const struct cpuinfo_x86 *, int, ...);
 #endif /* __AMD_H__ */

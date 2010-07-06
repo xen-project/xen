@@ -144,14 +144,17 @@ struct iommu_flush *iommu_get_flush(struct iommu *iommu)
     return iommu ? &iommu->intel->flush : NULL;
 }
 
-static unsigned int clflush_size;
 static int iommus_incoherent;
 static void __iommu_flush_cache(void *addr, unsigned int size)
 {
     int i;
+    static unsigned int clflush_size = 0;
 
     if ( !iommus_incoherent )
         return;
+
+    if ( clflush_size == 0 )
+        clflush_size = get_cache_line_size();
 
     for ( i = 0; i < size; i += clflush_size )
         cacheline_flush((char *)addr + i);
@@ -1037,7 +1040,7 @@ static int iommu_set_interrupt(struct iommu *iommu)
     return irq;
 }
 
-static int __init iommu_alloc(struct acpi_drhd_unit *drhd)
+int __init iommu_alloc(struct acpi_drhd_unit *drhd)
 {
     struct iommu *iommu;
     unsigned long sagaw, nr_dom;
@@ -1131,7 +1134,7 @@ static int __init iommu_alloc(struct acpi_drhd_unit *drhd)
     return 0;
 }
 
-static void __init iommu_free(struct acpi_drhd_unit *drhd)
+void __init iommu_free(struct acpi_drhd_unit *drhd)
 {
     struct iommu *iommu = drhd->iommu;
 
@@ -1787,7 +1790,7 @@ static void setup_dom0_devices(struct domain *d)
     spin_unlock(&pcidevs_lock);
 }
 
-static void clear_fault_bits(struct iommu *iommu)
+void clear_fault_bits(struct iommu *iommu)
 {
     u64 val;
     unsigned long flags;
@@ -1831,24 +1834,20 @@ static int init_vtd_hw(void)
         spin_lock_irqsave(&iommu->register_lock, flags);
         dmar_writel(iommu->reg, DMAR_FECTL_REG, 0);
         spin_unlock_irqrestore(&iommu->register_lock, flags);
-
-        /* initialize flush functions */
-        flush = iommu_get_flush(iommu);
-        flush->context = flush_context_reg;
-        flush->iotlb = flush_iotlb_reg;
     }
 
-    if ( iommu_qinval )
+    for_each_drhd_unit ( drhd )
     {
-        for_each_drhd_unit ( drhd )
+        iommu = drhd->iommu;
+        /*
+         * If queued invalidation not enabled, use regiser based
+         * invalidation
+         */
+        if ( enable_qinval(iommu) != 0 )
         {
-            iommu = drhd->iommu;
-            if ( enable_qinval(iommu) != 0 )
-            {
-                dprintk(XENLOG_INFO VTDPREFIX,
-                        "Failed to enable Queued Invalidation!\n");
-                break;
-            }
+            flush = iommu_get_flush(iommu);
+            flush->context = flush_context_reg;
+            flush->iotlb = flush_iotlb_reg;
         }
     }
 
@@ -1874,9 +1873,9 @@ static int init_vtd_hw(void)
         for_each_drhd_unit ( drhd )
         {
             iommu = drhd->iommu;
-            if ( enable_intremap(iommu) != 0 )
+            if ( enable_intremap(iommu, 0) != 0 )
             {
-                dprintk(XENLOG_INFO VTDPREFIX,
+                dprintk(XENLOG_WARNING VTDPREFIX,
                         "Failed to enable Interrupt Remapping!\n");
                 break;
             }
@@ -1943,8 +1942,6 @@ int __init intel_vtd_setup(void)
 
     platform_quirks();
 
-    clflush_size = get_cache_line_size();
-
     irq_to_iommu = xmalloc_array(struct iommu*, nr_irqs);
     BUG_ON(!irq_to_iommu);
     memset(irq_to_iommu, 0, nr_irqs * sizeof(struct iommu*));
@@ -1958,9 +1955,6 @@ int __init intel_vtd_setup(void)
      */
     for_each_drhd_unit ( drhd )
     {
-        if ( iommu_alloc(drhd) != 0 )
-            goto error;
-
         iommu = drhd->iommu;
 
         if ( iommu_snoop && !ecap_snp_ctl(iommu->ecap) )
@@ -2000,8 +1994,6 @@ int __init intel_vtd_setup(void)
     return 0;
 
  error:
-    for_each_drhd_unit ( drhd )
-        iommu_free(drhd);
     iommu_enabled = 0;
     iommu_snoop = 0;
     iommu_passthrough = 0;

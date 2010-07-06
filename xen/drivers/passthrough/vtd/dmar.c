@@ -32,6 +32,7 @@
 #include "dmar.h"
 #include "iommu.h"
 #include "extern.h"
+#include "vtd.h"
 
 #undef PREFIX
 #define PREFIX VTDPREFIX "ACPI DMAR:"
@@ -378,7 +379,6 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
     struct acpi_table_drhd * drhd = (struct acpi_table_drhd *)header;
     void *dev_scope_start, *dev_scope_end;
     struct acpi_drhd_unit *dmaru;
-    void *addr;
     int ret;
     static int include_all = 0;
 
@@ -397,8 +397,9 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
         dprintk(VTDPREFIX, "  dmaru->address = %"PRIx64"\n",
                 dmaru->address);
 
-    addr = map_to_nocache_virt(0, drhd->address);
-    dmaru->ecap = dmar_readq(addr, DMAR_ECAP_REG);
+    ret = iommu_alloc(dmaru);
+    if ( ret )
+        goto out;
 
     dev_scope_start = (void *)(drhd + 1);
     dev_scope_end = ((void *)drhd) + header->length;
@@ -420,7 +421,7 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
     }
 
     if ( ret )
-        xfree(dmaru);
+        goto out;
     else if ( force_iommu || dmaru->include_all )
         acpi_register_drhd_unit(dmaru);
     else
@@ -451,14 +452,15 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
 
         if ( invalid_cnt )
         {
-            xfree(dmaru);
-
             if ( iommu_workaround_bios_bug &&
                  invalid_cnt == dmaru->scope.devices_cnt )
             {
                 dprintk(XENLOG_WARNING VTDPREFIX,
                     "  Workaround BIOS bug: ignore the DRHD due to all "
                     "devices under its scope are not PCI discoverable!\n");
+
+                iommu_free(dmaru);
+                xfree(dmaru);
             }
             else
             {
@@ -474,6 +476,12 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
             acpi_register_drhd_unit(dmaru);
     }
 
+out:
+    if ( ret )
+    {
+        iommu_free(dmaru);
+        xfree(dmaru);
+    }
     return ret;
 }
 

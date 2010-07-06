@@ -25,6 +25,8 @@ extern int apic_verbosity;
 extern int x2apic_enabled;
 extern int directed_eoi_enabled;
 
+extern void check_x2apic_preenabled(void);
+extern int x2apic_cmdline_disable(void);
 extern void enable_x2apic(void);
 
 static __inline int x2apic_is_available(void)

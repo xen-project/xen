@@ -34,6 +34,7 @@
 #include <asm/regs.h>
 #include <asm/cpufeature.h>
 #include <asm/processor.h>
+#include <asm/amd.h>
 #include <asm/types.h>
 #include <asm/debugreg.h>
 #include <asm/msr.h>
@@ -846,8 +847,8 @@ static void svm_init_erratum_383(struct cpuinfo_x86 *c)
 {
     uint64_t msr_content;
 
-    /* only family 10h is affected */
-    if ( c->x86 != 0x10 )
+    /* check whether CPU is affected */
+    if ( !cpu_has_amd_erratum(c, AMD_ERRATUM_383) )
         return;
 
     /* use safe methods to be compatible with nested virtualization */
@@ -1492,9 +1493,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         if ( (inst_len = __get_instruction_length(v, INSTR_INT3)) == 0 )
             break;
         __update_guest_eip(regs, inst_len);
-#ifdef XEN_GDBSX_CONFIG
         current->arch.gdbsx_vcpu_event = TRAP_int3;
-#endif
         domain_pause_for_debugger();
         break;
 

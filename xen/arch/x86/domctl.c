@@ -34,7 +34,6 @@
 #include <public/mem_event.h>
 #include <asm/mem_sharing.h>
 
-#ifdef XEN_GDBSX_CONFIG                    
 #ifdef XEN_KDB_CONFIG
 #include "../kdb/include/kdbdefs.h"
 #include "../kdb/include/kdbproto.h"
@@ -43,8 +42,9 @@ typedef unsigned long kdbva_t;
 typedef unsigned char kdbbyt_t;
 extern int dbg_rw_mem(kdbva_t, kdbbyt_t *, int, domid_t, int, uint64_t);
 #endif
-static int 
-gdbsx_guest_mem_io(domid_t domid, struct xen_domctl_gdbsx_memio *iop)
+
+static int gdbsx_guest_mem_io(
+    domid_t domid, struct xen_domctl_gdbsx_memio *iop)
 {   
     ulong l_uva = (ulong)iop->uva;
     iop->remain = dbg_rw_mem(
@@ -52,7 +52,6 @@ gdbsx_guest_mem_io(domid_t domid, struct xen_domctl_gdbsx_memio *iop)
         iop->gwr, iop->pgd3val);
     return (iop->remain ? -EFAULT : 0);
 }
-#endif  /* XEN_GDBSX_CONFIG */
 
 long arch_do_domctl(
     struct xen_domctl *domctl,
@@ -1309,7 +1308,6 @@ long arch_do_domctl(
     }
     break;
 
-#ifdef XEN_GDBSX_CONFIG
     case XEN_DOMCTL_gdbsx_guestmemio:
     {
         struct domain *d;
@@ -1418,7 +1416,6 @@ long arch_do_domctl(
         rcu_unlock_domain(d);
     }
     break;
-#endif /* XEN_GDBSX_CONFIG */
 
 #ifdef __x86_64__
     case XEN_DOMCTL_mem_event_op:

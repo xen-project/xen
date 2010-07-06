@@ -909,6 +909,9 @@ void __init __start_xen(unsigned long mbi_p)
 
     tboot_probe();
 
+    /* Check if x2APIC is already enabled in BIOS */
+    check_x2apic_preenabled();
+
     /* Unmap the first page of CPU0's stack. */
     memguard_guard_stack(cpu0_stack);
 
@@ -927,9 +930,6 @@ void __init __start_xen(unsigned long mbi_p)
 
     acpi_boot_init();
 
-    if ( x2apic_is_available() )
-        enable_x2apic();
-
     init_cpu_to_node();
 
     if ( smp_found_config )
@@ -941,6 +941,9 @@ void __init __start_xen(unsigned long mbi_p)
 #endif
 
     init_apic_mappings();
+
+    if ( x2apic_is_available() )
+        enable_x2apic();
 
     init_IRQ();
 
