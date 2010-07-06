@@ -8,7 +8,6 @@
 extern int mp_bus_id_to_type [MAX_MP_BUSSES];
 extern int mp_bus_id_to_node [MAX_MP_BUSSES];
 extern int mp_bus_id_to_local [MAX_MP_BUSSES];
-extern int quad_local_to_mp_bus_id [NR_CPUS/4][4];
 extern int mp_bus_id_to_pci_bus [MAX_MP_BUSSES];
 
 extern unsigned int def_to_bigsmp;
