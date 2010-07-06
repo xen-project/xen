@@ -97,7 +97,6 @@ typedef struct {
     uint32_t target_memkb;
     uint32_t video_memkb;
     uint32_t shadow_memkb;
-    bool disable_migrate;
     const char *kernel;
     int hvm;
     union {
