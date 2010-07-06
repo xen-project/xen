@@ -2195,21 +2195,19 @@ interactive_bootkey()
 //--------------------------------------------------------------------------
 
 void
-print_boot_device(e)
-  ipl_entry_t *e;
+print_boot_device(type, desc)
+  Bit16u type; Bit32u desc;
 {
-  Bit16u type;
   char description[33];
   Bit16u ss = get_SS();
-  type = e->type;
   /* NIC appears as type 0x80 */
   if (type == IPL_TYPE_BEV) type = 0x4;
   if (type == 0 || type > 0x4) BX_PANIC("Bad drive type\n");
   printf("Booting from %s", drivetypes[type]);
   /* print product string if BEV */
-  if (type == 4 && e->description != 0) {
+  if (type == 4 && desc != 0) {
     /* first 32 bytes are significant */
-    memcpyb(ss, &description, (Bit16u)(e->description >> 16), (Bit16u)(e->description & 0xffff), 32);
+    memcpyb(ss, &description, (Bit16u)(desc >> 16), (Bit16u)(desc & 0xffff), 32);
     /* terminate string */
     description[32] = 0;
     printf(" [%S]", ss, description);
@@ -8284,7 +8282,7 @@ ASM_END
 
   /* Do the loading, and set up vector as a far pointer to the boot
    * address, and bootdrv as the boot drive */
-  print_boot_device(&e);
+  print_boot_device(e.type, e.description);
 
   switch(e.type) {
   case IPL_TYPE_FLOPPY: /* FDD */
