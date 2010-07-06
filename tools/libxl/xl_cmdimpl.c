@@ -189,9 +189,6 @@ static void init_create_info(libxl_domain_create_info *c_info)
 static void init_build_info(libxl_domain_build_info *b_info, libxl_domain_create_info *c_info)
 {
     memset(b_info, '\0', sizeof(*b_info));
-    b_info->timer_mode = -1;
-    b_info->hpet = 1;
-    b_info->vpt_align = -1;
     b_info->max_vcpus = 1;
     b_info->max_memkb = 32 * 1024;
     b_info->target_memkb = b_info->max_memkb;
@@ -205,6 +202,9 @@ static void init_build_info(libxl_domain_build_info *b_info, libxl_domain_create
         b_info->u.hvm.acpi = 1;
         b_info->u.hvm.nx = 1;
         b_info->u.hvm.viridian = 0;
+        b_info->u.hvm.hpet = 1;
+        b_info->u.hvm.vpt_align = 1;
+        b_info->u.hvm.timer_mode = 0;
     } else {
         b_info->u.pv.slack_memkb = 8 * 1024;
     }
@@ -356,9 +356,6 @@ static void printf_info(int domid,
 
 
     printf("\t(domain_build_info)\n");
-    printf("\t(timer_mode %d)\n", b_info->timer_mode);
-    printf("\t(hpet %d)\n", b_info->hpet);
-    printf("\t(vpt_align %d)\n", b_info->vpt_align);
     printf("\t(max_vcpus %d)\n", b_info->max_vcpus);
     printf("\t(tsc_mode %d)\n", b_info->tsc_mode);
     printf("\t(max_memkb %d)\n", b_info->max_memkb);
@@ -375,6 +372,9 @@ static void printf_info(int domid,
         printf("\t\t\t(acpi %d)\n", b_info->u.hvm.acpi);
         printf("\t\t\t(nx %d)\n", b_info->u.hvm.nx);
         printf("\t\t\t(viridian %d)\n", b_info->u.hvm.viridian);
+        printf("\t\t\t(hpet %d)\n", b_info->u.hvm.hpet);
+        printf("\t\t\t(vpt_align %d)\n", b_info->u.hvm.vpt_align);
+        printf("\t\t\t(timer_mode %d)\n", b_info->u.hvm.timer_mode);
 
         printf("\t\t\t(device_model %s)\n", dm_info->device_model);
         printf("\t\t\t(videoram %d)\n", dm_info->videoram);
@@ -571,6 +571,12 @@ static void parse_config_data(const char *configfile_filename_report,
             b_info->u.hvm.nx = l;
         if (!xlu_cfg_get_long (config, "viridian", &l))
             b_info->u.hvm.viridian = l;
+        if (!xlu_cfg_get_long (config, "hpet", &l))
+            b_info->u.hvm.hpet = l;
+        if (!xlu_cfg_get_long (config, "vpt_align", &l))
+            b_info->u.hvm.vpt_align = l;
+        if (!xlu_cfg_get_long (config, "timer_mode", &l))
+            b_info->u.hvm.timer_mode = l;
     } else {
         char *cmdline = NULL;
         const char *root = NULL, *extra = "";

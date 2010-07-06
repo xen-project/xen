@@ -83,6 +83,15 @@ bool xs_mkdir(struct xs_handle *h, xs_transaction_t t,
 bool xs_rm(struct xs_handle *h, xs_transaction_t t,
 	   const char *path);
 
+/* Restrict a xenstore handle so that it acts as if it had the
+ * permissions of domain @domid.  The handle must currently be
+ * using domain 0's credentials.
+ *
+ * Returns false on failure, in which case the handle continues
+ * to use the old credentials, or true on success.
+ */
+bool xs_restrict(struct xs_handle *h, unsigned domid);
+
 /* Get permissions of node (first element is owner, first perms is "other").
  * Returns malloced array, or NULL: call free() after use.
  */

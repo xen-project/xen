@@ -31,13 +31,13 @@ let operation_c_mapping =
            Transaction_end; Introduce; Release;
            Getdomainpath; Write; Mkdir; Rm;
            Setperms; Watchevent; Error; Isintroduced;
-           Resume; Set_target |]
+           Resume; Set_target; Restrict |]
 let size = Array.length operation_c_mapping
 
 (* [offset_pq] has to be the same as in <xen/io/xs_wire.h> *)
 let offset_pq = size
 let operation_c_mapping_pq =
-	[| Restrict |]
+	[| |]
 let size_pq = Array.length operation_c_mapping_pq
 
 let array_search el a =

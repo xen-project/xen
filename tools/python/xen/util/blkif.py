@@ -87,7 +87,7 @@ def _parse_uname(uname):
                 fn = "/dev/%s" %(fn,)
                
         if typ in ("tap", "tap2"):
-            (taptype, fn) = fn.split(":", 2)[1:3]
+            (taptype, fn) = fn.split(":", 1)
     return (fn, taptype)
 
 def blkdev_uname_to_file(uname):

@@ -169,6 +169,8 @@ SUBCOMMAND_HELP = {
     #usb
     'usb-add'     : ('<domain> <[host:bus.addr] [host:vendor_id:product_id]>','Add the usb device to FV VM.'),
     'usb-del'     : ('<domain> <[host:bus.addr] [host:vendor_id:product_id]>','Delete the usb device to FV VM.'),
+    #domstate
+    'domstate'  : ('<domain> ', 'get the state of a domain'),
 
     # device commands
 
@@ -401,6 +403,7 @@ common_commands = [
     "uptime",
     "usb-add",
     "usb-del",
+    "domstate",
     "vcpu-set",
     ]
 
@@ -435,6 +438,7 @@ domain_commands = [
     "uptime",
     "usb-add",
     "usb-del",
+    "domstate",
     "vcpu-list",
     "vcpu-pin",
     "vcpu-set",
@@ -948,7 +952,6 @@ def getDomains(domain_names, state, full = 0, pool = None):
                     return "-"
             state_str = "".join([state_on_off(state)
                                  for state in states])
-            
             dom_rec.update({'name':     dom_rec['name_label'],
                             'memory_actual': int(dom_metrics_rec['memory_actual'])/1024,
                             'vcpus':    dom_metrics_rec['VCPUs_number'],
@@ -1457,8 +1460,10 @@ def xm_pause(args):
 
     if serverType == SERVER_XEN_API:
         server.xenapi.VM.pause(get_single_vm(dom))
+        server.xenapi.VM.set_pauseflag(get_single_vm(dom), True)
     else:
         server.xend.domain.pause(dom)
+        server.xend.domain.setpauseflag(dom, True)
 
 def xm_unpause(args):
     arg_check(args, "unpause", 1)
@@ -1466,8 +1471,10 @@ def xm_unpause(args):
 
     if serverType == SERVER_XEN_API:
         server.xenapi.VM.unpause(get_single_vm(dom))
+        server.xenapi.VM.set_pauseflag(get_single_vm(dom), False)
     else:
         server.xend.domain.unpause(dom)
+        server.xend.domain.setpauseflag(dom, False)
 
 def xm_dump_core(args):
     live = False
@@ -1578,6 +1585,32 @@ def xm_mem_set(args):
 def xm_usb_add(args):
     arg_check(args, "usb-add", 2)
     server.xend.domain.usb_add(args[0],args[1])
+
+def xm_domstate(args):
+    arg_check(args, "domstate", 1)
+    (opitons, params) = getopt.gnu_getopt(args, 's',  ['domname='])
+    doms = getDomains(params, 'all')
+    d = parse_doms_info(doms[0])
+    state =  d['state']
+    if state:
+        if   state.find('s') > 0:
+            print 'shutoff'  
+        elif state.find('b') > 0: 
+            print 'idle'  
+        elif state.find('d') > 0: 
+            print 'shutdown'  
+        elif state.find('r') > 0: 
+            print 'running'  
+        elif state.find('c') > 0:
+            print 'crashed' 
+        elif state.find('p') > 0:
+            if server.xend.domain.getpauseflag(args[0]):
+                print 'paused by admin'
+            else:
+                print 'paused'
+    else:
+        print 'shutoff'
+    return 
 
 def xm_usb_del(args):
     arg_check(args, "usb-del", 2)
@@ -3861,6 +3894,8 @@ commands = {
     #usb
     "usb-add": xm_usb_add,
     "usb-del": xm_usb_del,
+    #domstate
+    "domstate": xm_domstate,
     }
 
 ## The commands supported by a separate argument parser in xend.xm.

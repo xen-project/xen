@@ -154,9 +154,9 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 6392763643311272590ef5c6f75ba11d5b132585
-# Wed Jun 9 17:10:59 2010 +0100
-# Fix read-only image file handling
+QEMU_TAG ?= add968aaf68cb57257428f8cfadb209f2614a6d8
+# Fri Jul 2 17:36:01 2010 +0100
+# Revert "Wait for frontend state Connected before connecting the backend"
 
 # Optional components
 XENSTAT_XENTOP     ?= y

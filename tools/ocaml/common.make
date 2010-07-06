@@ -9,7 +9,7 @@ OCAMLLEX ?= ocamllex
 OCAMLYACC ?= ocamlyacc
 
 CFLAGS += -fPIC -Werror
-CFLAGS += -I$(TOPLEVEL)/../include -I$(TOPLEVEL)/../libxc
+CFLAGS += -I$(TOPLEVEL)/../include -I$(TOPLEVEL)/../libxc -I$(TOPLEVEL)/../xenstore -I$(TOPLEVEL)/../libxl
 CFLAGS-$(CONFIG_Linux) += -I/usr/lib64/ocaml -I/usr/lib/ocaml
 CFLAGS-$(CONFIG_NetBSD) += -I/usr/pkg/lib/ocaml -fPIC
 

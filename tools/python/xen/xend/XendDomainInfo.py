@@ -329,6 +329,8 @@ class XendDomainInfo:
     @type info: dictionary
     @ivar domid: Domain ID (if VM has started)
     @type domid: int or None
+    @ivar paused_by_admin: Is this Domain paused by command or API 
+    @type paused_by_admin: bool 
     @ivar guest_bitsize: the bitsize of guest 
     @type guest_bitsize: int or None
     @ivar alloc_mem: the memory domain allocated when booting 
@@ -392,6 +394,7 @@ class XendDomainInfo:
             self.domid = domid
         self.guest_bitsize = None
         self.alloc_mem = None
+        self.paused_by_admin = False
 
         maxmem = self.info.get('memory_static_max', 0)
         memory = self.info.get('memory_dynamic_max', 0)
@@ -3284,7 +3287,7 @@ class XendDomainInfo:
                     log.info("Unmounting %s from %s." %
                              (fn, BOOTLOADER_LOOPBACK_DEVICE))
 
-                    dom0.destroyDevice(devtype, BOOTLOADER_LOOPBACK_DEVICE, force = True)
+                    dom0.destroyDevice('tap', BOOTLOADER_LOOPBACK_DEVICE)
 
             if blcfg is None:
                 msg = "Had a bootloader specified, but can't find disk"

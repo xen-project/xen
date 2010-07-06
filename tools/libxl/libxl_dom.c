@@ -62,13 +62,6 @@ int get_shutdown_reason(struct libxl_ctx *ctx, uint32_t domid)
 int build_pre(struct libxl_ctx *ctx, uint32_t domid,
               libxl_domain_build_info *info, libxl_domain_build_state *state)
 {
-    if (info->timer_mode != -1)
-        xc_set_hvm_param(ctx->xch, domid, HVM_PARAM_TIMER_MODE,
-                (unsigned long) info->timer_mode);
-    if (info->hpet != -1)
-        xc_set_hvm_param(ctx->xch, domid, HVM_PARAM_HPET_ENABLED, (unsigned long) info->hpet);
-    if (info->vpt_align != -1)
-        xc_set_hvm_param(ctx->xch, domid, HVM_PARAM_VPT_ALIGN, (unsigned long) info->vpt_align);
     xc_domain_max_vcpus(ctx->xch, domid, info->max_vcpus);
     xc_domain_setmaxmem(ctx->xch, domid, info->target_memkb + LIBXL_MAXMEM_CONSTANT);
     xc_domain_set_memmap_limit(ctx->xch, domid, 

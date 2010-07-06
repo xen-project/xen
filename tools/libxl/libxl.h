@@ -90,9 +90,6 @@ typedef struct {
 } libxl_domain_create_info;
 
 typedef struct {
-    int timer_mode;
-    int hpet;
-    int vpt_align;
     int max_vcpus;
     int cur_vcpus;
     int tsc_mode;
@@ -110,6 +107,9 @@ typedef struct {
             bool nx;
             bool viridian;
             char *timeoffset;
+            bool hpet;
+            bool vpt_align;
+            int timer_mode;
         } hvm;
         struct {
             uint32_t   slack_memkb;

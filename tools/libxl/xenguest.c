@@ -49,7 +49,10 @@ int hvm_build_set_params(xc_interface *handle, uint32_t domid,
     xc_set_hvm_param(handle, domid, HVM_PARAM_PAE_ENABLED, info->u.hvm.pae);
 #if defined(__i386__) || defined(__x86_64__)
     xc_set_hvm_param(handle, domid, HVM_PARAM_VIRIDIAN, info->u.hvm.viridian);
+    xc_set_hvm_param(handle, domid, HVM_PARAM_HPET_ENABLED, (unsigned long) info->u.hvm.hpet);
 #endif
+    xc_set_hvm_param(handle, domid, HVM_PARAM_TIMER_MODE, (unsigned long) info->u.hvm.timer_mode);
+    xc_set_hvm_param(handle, domid, HVM_PARAM_VPT_ALIGN, (unsigned long) info->u.hvm.vpt_align);
     xc_set_hvm_param(handle, domid, HVM_PARAM_STORE_EVTCHN, store_evtchn);
     return 0;
 }

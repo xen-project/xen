@@ -615,6 +615,14 @@ unwind:
 	return false;
 }
 
+bool xs_restrict(struct xs_handle *h, unsigned domid)
+{
+	char buf[16];
+
+	sprintf(buf, "%d", domid);
+	return xs_bool(xs_single(h, XBT_NULL, XS_RESTRICT, buf, NULL));
+}
+
 /* Watch a node for changes (poll on fd to detect, or call read_watch()).
  * When the node (or any child) changes, fd will become readable.
  * Token is returned when watch is read, to allow matching.

@@ -238,6 +238,20 @@ class SrvDomain(SrvDir):
     def op_reset(self, _, req):
         self.acceptCommand(req)
         return self.xd.domain_reset(self.dom.getName())
+ 
+    def op_do_get_pauseflag(self, op, req):
+        self.acceptCommand(req)
+        return req.threadRequest(self.do_get_pauseflag, op, req)
+
+    def do_get_pauseflag(self, _, req):
+        return self.xd.domain_getpauseflag(self.dom.getName(), req)
+ 
+    def op_do_set_pauseflag(self, op, req):
+        self.acceptCommand(req)
+        return req.threadRequest(self.do_set_pauseflag, op, req)
+
+    def do_set_pauseflag(self, _, req):
+        return self.xd.domain_setpauseflag(self.dom.getName(), req)
 
     def op_usb_add(self, op, req):
         self.acceptCommand(req)

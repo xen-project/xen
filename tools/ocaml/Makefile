@@ -4,7 +4,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 SUBDIRS_LIBS = \
 	libs/uuid libs/mmap \
 	libs/log libs/xc libs/eventchn \
-	libs/xb libs/xs
+	libs/xb libs/xs libs/xl
 
 SUBDIRS_PROGRAMS = xenstored
 
