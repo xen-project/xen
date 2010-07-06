@@ -8243,7 +8243,27 @@ Bit16u seq_nr;
     write_word(ebda_seg, IPL_BOOTFIRST_OFFSET, 0xFFFF);
     /* Reset boot sequence */
     write_word(ebda_seg, IPL_SEQUENCE_OFFSET, 0xFFFF);
-  } else if (bootdev == 0) BX_PANIC("No bootable device.\n");
+  } else if (bootdev == 0) {
+    printf("\nNo bootable device.\n");
+    printf("Reboot or press any key to retry.");
+    write_word(ebda_seg, IPL_SEQUENCE_OFFSET, 0xFFFF);
+ASM_START
+    sti
+ASM_END
+    {
+      Bit8u sc, ac;
+      while(!dequeue_key(&sc, &ac, 1)) {
+ASM_START
+        hlt
+ASM_END
+      }
+    }
+ASM_START
+    cli
+ASM_END
+    printf("\n\n");
+    return;
+  }
 
   /* Translate from CMOS runes to an IPL table offset by subtracting 1 */
   bootdev -= 1;
