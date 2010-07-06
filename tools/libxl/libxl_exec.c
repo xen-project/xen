@@ -30,19 +30,6 @@
 #include "libxl.h"
 #include "libxl_internal.h"
 
-static pid_t libxl_fork(struct libxl_ctx *ctx)
-{
-    pid_t pid;
-
-    pid = fork();
-    if (pid == -1) {
-        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "fork failed");
-        return -1;
-    }
-
-    return pid;
-}
-
 static int call_waitpid(pid_t (*waitpid_cb)(pid_t, int *, int), pid_t pid, int *status, int options)
 {
     return (waitpid_cb) ? waitpid_cb(pid, status, options) : waitpid(pid, status, options);
@@ -61,38 +48,41 @@ void libxl_exec(int stdinfd, int stdoutfd, int stderrfd, char *arg0, char **args
         dup2(stderrfd, STDERR_FILENO);
     for (i = 4; i < 256; i++)
         close(i);
+
+    signal(SIGPIPE, SIG_DFL);
+    /* in case our caller set it to IGN.  subprocesses are entitled
+     * to assume they got DFL. */
+
     execv(arg0, args);
     _exit(-1);
 }
 
-void libxl_report_child_exitstatus(struct libxl_ctx *ctx,
+void libxl_report_child_exitstatus(struct libxl_ctx *ctx, int level,
                                    const char *what, pid_t pid, int status)
 {
-    /* treats all exit statuses as errors; if that's not what you want,
-     * check status yourself first */
 
     if (WIFEXITED(status)) {
         int st = WEXITSTATUS(status);
         if (st)
-            XL_LOG(ctx, XL_LOG_ERROR, "%s [%ld] exited"
+            XL_LOG(ctx, level, "%s [%ld] exited"
                    " with error status %d", what, (unsigned long)pid, st);
         else
-            XL_LOG(ctx, XL_LOG_ERROR, "%s [%ld] unexpectedly"
+            XL_LOG(ctx, level, "%s [%ld] unexpectedly"
                    " exited status zero", what, (unsigned long)pid);
     } else if (WIFSIGNALED(status)) {
         int sig = WTERMSIG(status);
         const char *str = strsignal(sig);
         const char *coredump = WCOREDUMP(status) ? " (core dumped)" : "";
         if (str)
-            XL_LOG(ctx, XL_LOG_ERROR, "%s [%ld] died due to"
+            XL_LOG(ctx, level, "%s [%ld] died due to"
                    " fatal signal %s%s", what, (unsigned long)pid,
                    str, coredump);
         else
-            XL_LOG(ctx, XL_LOG_ERROR, "%s [%ld] died due to unknown"
+            XL_LOG(ctx, level, "%s [%ld] died due to unknown"
                    " fatal signal number %d%s", what, (unsigned long)pid,
                    sig, coredump);
     } else {
-        XL_LOG(ctx, XL_LOG_ERROR, "%s [%ld] gave unknown"
+        XL_LOG(ctx, level, "%s [%ld] gave unknown"
                " wait status 0x%x", what, (unsigned long)pid, status);
     }
 }
@@ -153,7 +143,7 @@ static void report_spawn_intermediate_status(struct libxl_ctx *ctx,
         char *intermediate_what = libxl_sprintf(ctx,
                           "%s intermediate process (startup monitor)",
                           for_spawn->what);
-        libxl_report_child_exitstatus(ctx, intermediate_what,
+        libxl_report_child_exitstatus(ctx, XL_LOG_ERROR, intermediate_what,
                                       for_spawn->intermediate, status);
     }
 }

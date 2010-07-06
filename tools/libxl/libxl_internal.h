@@ -41,21 +41,18 @@
 #ifdef XL_LOGGING_ENABLED
 #define XL_LOG(ctx, loglevel, _f, _a...)   xl_log(ctx, loglevel, -1, __FILE__, __LINE__, __func__, _f, ##_a)
 #define XL_LOG_ERRNO(ctx, loglevel, _f, _a...)   xl_log(ctx, loglevel, errno, __FILE__, __LINE__, __func__, _f, ##_a)
-#define XL_LOG_ERRNOVAL(ctx, errnoval, loglevel, _f, _a...)   xl_log(ctx, loglevel, errnoval, __FILE__, __LINE__, __func__, _f, ##_a)
+#define XL_LOG_ERRNOVAL(ctx, loglevel, errnoval, _f, _a...)   xl_log(ctx, loglevel, errnoval, __FILE__, __LINE__, __func__, _f, ##_a)
 #else
 #define XL_LOG(ctx, loglevel, _f, _a...)
 #define XL_LOG_ERRNO(ctx, loglevel, _f, _a...)
 #define XL_LOG_ERRNOVAL(ctx, loglevel, errnoval, _f, _a...)
 #endif
-
-#define XL_LOG_DEBUG 3
-#define XL_LOG_INFO 2
-#define XL_LOG_WARNING 1
-#define XL_LOG_ERROR 0
+  /* all of these macros preserve errno (saving and restoring) */
 
 /* logging */
 void xl_logv(struct libxl_ctx *ctx, int errnoval, int loglevel, const char *file, int line, const char *func, char *fmt, va_list al);
 void xl_log(struct libxl_ctx *ctx, int errnoval, int loglevel, const char *file, int line, const char *func, char *fmt, ...);
+  /* these functions preserve errno (saving and restoring) */
 
 
 typedef enum {
@@ -133,6 +130,7 @@ int restore_common(struct libxl_ctx *ctx, uint32_t domid,
                    libxl_domain_build_info *info, libxl_domain_build_state *state, int fd);
 int core_suspend(struct libxl_ctx *ctx, uint32_t domid, int fd, int hvm, int live, int debug);
 int save_device_model(struct libxl_ctx *ctx, uint32_t domid, int fd);
+void libxl__userdata_destroyall(struct libxl_ctx *ctx, uint32_t domid);
 
 /* from xl_device */
 char *device_disk_backend_type_of_phystype(libxl_disk_phystype phystype);
@@ -152,13 +150,13 @@ int libxl_wait_for_device_model(struct libxl_ctx *ctx,
                                                       void *userdata),
                                 void *check_callback_userdata);
 int libxl_wait_for_backend(struct libxl_ctx *ctx, char *be_path, char *state);
-int libxl_device_pci_flr(struct libxl_ctx *ctx, unsigned int domain, unsigned int bus,
-                         unsigned int dev, unsigned int func);
+int libxl_device_pci_reset(struct libxl_ctx *ctx, unsigned int domain, unsigned int bus,
+                           unsigned int dev, unsigned int func);
 
 /* from xenguest (helper */
 int hvm_build_set_params(int handle, uint32_t domid,
-                         int apic, int acpi, int pae, int nx, int viridian,
-                         int vcpus, int store_evtchn, unsigned long *store_mfn);
+                         libxl_domain_build_info *info,
+                         int store_evtchn, unsigned long *store_mfn);
 
 /* xl_exec */
 
@@ -183,8 +181,8 @@ int libxl_spawn_spawn(struct libxl_ctx *ctx,
                       void (*intermediate_hook)(void *for_spawn, pid_t innerchild));
   /* Logs errors.  A copy of "what" is taken.  Return values:
    *  < 0   error, for_spawn need not be detached
-   *   +1   caller is now the inner child, should probably call libxl_exec
-   *    0   caller is the parent, must call detach on *for_spawn eventually
+   *   +1   caller is the parent, must call detach on *for_spawn eventually
+   *    0   caller is now the inner child, should probably call libxl_exec
    * Caller, may pass 0 for for_spawn, in which case no need to detach.
    */
 int libxl_spawn_detach(struct libxl_ctx *ctx,
@@ -203,6 +201,8 @@ int libxl_spawn_check(struct libxl_ctx *ctx,
 void libxl_exec(int stdinfd, int stdoutfd, int stderrfd, char *arg0, char **args); // logs errors, never returns
 void libxl_log_child_exitstatus(struct libxl_ctx *ctx,
                                 const char *what, pid_t pid, int status);
+
+char *libxl_abs_path(struct libxl_ctx *ctx, char *s, const char *path);
 
 #endif
 

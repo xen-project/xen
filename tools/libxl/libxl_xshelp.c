@@ -19,6 +19,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <inttypes.h>
 
 #include "libxl.h"
 #include "libxl_internal.h"
@@ -32,7 +33,8 @@ int xs_writev(struct xs_handle *xsh, xs_transaction_t t, char *dir, char *kvs[])
         return 0;
 
     for (i = 0; kvs[i] != NULL; i += 2) {
-        asprintf(&path, "%s/%s", dir, kvs[i]);
+        if (asprintf(&path, "%s/%s", dir, kvs[i]) < 0)
+            return -1;
         if (path && kvs[i + 1]) {
             int length = strlen(kvs[i + 1]);
             xs_write(xsh, t, path, kvs[i + 1], length);
@@ -118,7 +120,7 @@ char *libxl_xs_get_dompath(struct libxl_ctx *ctx, uint32_t domid)
 {
     char *s = xs_get_domain_path(ctx->xsh, domid);
     if (!s) {
-        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "failed to get dompath for %lu",
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "failed to get dompath for %" PRIu32,
                      domid);
         return NULL;
     }

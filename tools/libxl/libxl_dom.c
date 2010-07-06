@@ -16,6 +16,8 @@
 #include "libxl_osdeps.h"
 
 #include <stdio.h>
+#include <assert.h>
+#include <glob.h>
 #include <inttypes.h>
 #include <string.h>
 #include <sys/time.h> /* for struct timeval */
@@ -72,6 +74,7 @@ int build_pre(struct libxl_ctx *ctx, uint32_t domid,
     xc_domain_set_memmap_limit(ctx->xch, domid, 
             (info->hvm) ? info->max_memkb : 
             (info->max_memkb + info->u.pv.slack_memkb));
+    xc_domain_set_tsc_info(ctx->xch, domid, info->tsc_mode, 0, 0, 0);
 
     if (info->hvm) {
         unsigned long shadow;
@@ -97,22 +100,22 @@ int build_post(struct libxl_ctx *ctx, uint32_t domid,
     xc_cpuid_apply_policy(ctx->xch, domid);
 #endif
 
-    ents = libxl_calloc(ctx, (10 + info->max_vcpus) * 2, sizeof(char *));
+    ents = libxl_calloc(ctx, 12 + (info->max_vcpus * 2) + 2, sizeof(char *));
     ents[0] = "memory/static-max";
     ents[1] = libxl_sprintf(ctx, "%d", info->max_memkb);
     ents[2] = "memory/target";
     ents[3] = libxl_sprintf(ctx, "%d", info->target_memkb);
-    ents[2] = "memory/videoram";
-    ents[3] = libxl_sprintf(ctx, "%d", info->video_memkb);
-    ents[4] = "domid";
-    ents[5] = libxl_sprintf(ctx, "%d", domid);
-    ents[6] = "store/port";
-    ents[7] = libxl_sprintf(ctx, "%"PRIu32, state->store_port);
-    ents[8] = "store/ring-ref";
-    ents[9] = libxl_sprintf(ctx, "%lu", state->store_mfn);
+    ents[4] = "memory/videoram";
+    ents[5] = libxl_sprintf(ctx, "%d", info->video_memkb);
+    ents[6] = "domid";
+    ents[7] = libxl_sprintf(ctx, "%d", domid);
+    ents[8] = "store/port";
+    ents[9] = libxl_sprintf(ctx, "%"PRIu32, state->store_port);
+    ents[10] = "store/ring-ref";
+    ents[11] = libxl_sprintf(ctx, "%lu", state->store_mfn);
     for (i = 0; i < info->max_vcpus; i++) {
-        ents[10+(i*2)]   = libxl_sprintf(ctx, "cpu/%d/availability", i);
-        ents[10+(i*2)+1] = (i && info->cur_vcpus && (i >= info->cur_vcpus))
+        ents[12+(i*2)]   = libxl_sprintf(ctx, "cpu/%d/availability", i);
+        ents[12+(i*2)+1] = (i && info->cur_vcpus && !(info->cur_vcpus & (1 << i)))
                             ? "offline" : "online";
     }
 
@@ -168,15 +171,19 @@ int build_hvm(struct libxl_ctx *ctx, uint32_t domid,
 {
     int ret;
 
-    ret = xc_hvm_build_target_mem(ctx->xch, domid, (info->max_memkb - info->video_memkb) / 1024, (info->target_memkb - info->video_memkb) / 1024, info->kernel);
+    ret = xc_hvm_build_target_mem(
+        ctx->xch,
+        domid,
+        (info->max_memkb - info->video_memkb) / 1024,
+        (info->target_memkb - info->video_memkb) / 1024,
+        libxl_abs_path(ctx, (char *)info->kernel,
+                       libxl_xenfirmwaredir_path()));
     if (ret) {
         XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, ret, "hvm building failed");
         return ERROR_FAIL;
     }
-    ret = hvm_build_set_params(ctx->xch, domid, info->u.hvm.apic, info->u.hvm.acpi,
-                               info->u.hvm.pae, info->u.hvm.nx, info->u.hvm.viridian,
-                               info->max_vcpus,
-                               state->store_port, &state->store_mfn);
+    ret = hvm_build_set_params(ctx->xch, domid, info, state->store_port,
+                               &state->store_mfn);
     if (ret) {
         XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, ret, "hvm build set params failed");
         return ERROR_FAIL;
@@ -189,11 +196,10 @@ int restore_common(struct libxl_ctx *ctx, uint32_t domid,
                    int fd)
 {
     /* read signature */
-    xc_domain_restore(ctx->xch, fd, domid,
-                      state->store_port, &state->store_mfn,
-                      state->console_port, &state->console_mfn,
-                      info->hvm, info->u.hvm.pae, 0);
-    return 0;
+    return xc_domain_restore(ctx->xch, fd, domid,
+                             state->store_port, &state->store_mfn,
+                             state->console_port, &state->console_mfn,
+                             info->hvm, info->u.hvm.pae, 0);
 }
 
 struct suspendinfo {
@@ -340,12 +346,154 @@ int save_device_model(struct libxl_ctx *ctx, uint32_t domid, int fd)
     libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "/local/domain/0/device-model/%d/command", domid), "save", strlen("save"));
     libxl_wait_for_device_model(ctx, domid, "paused", NULL, NULL);
 
-    write(fd, QEMU_SIGNATURE, strlen(QEMU_SIGNATURE));
+    c = libxl_write_exactly(ctx, fd, QEMU_SIGNATURE, strlen(QEMU_SIGNATURE),
+                            "saved-state file", "qemu signature");
+    if (c)
+        return c;
     fd2 = open(filename, O_RDONLY);
     while ((c = read(fd2, buf, sizeof(buf))) != 0) {
-        write(fd, buf, c);
+        if (c < 0) {
+            if (errno == EINTR)
+                continue;
+            return errno;
+        }
+        c = libxl_write_exactly(
+            ctx, fd, buf, c, "saved-state file", "qemu state");
+        if (c)
+            return c;
     }
     close(fd2);
     unlink(filename);
+    return 0;
+}
+
+char *libxl_uuid2string(struct libxl_ctx *ctx, uint8_t uuid[16]) {
+    char *s = string_of_uuid(ctx, uuid);
+    if (!s) XL_LOG(ctx, XL_LOG_ERROR, "cannot allocate for uuid");
+    return s;
+}
+
+static const char *userdata_path(struct libxl_ctx *ctx, uint32_t domid,
+                                      const char *userdata_userid,
+                                      const char *wh) {
+    char *path, *uuid_string;
+    struct libxl_dominfo info;
+    int rc;
+
+    rc = libxl_domain_info(ctx, &info, domid);
+    if (rc) {
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "unable to find domain info"
+                     " for domain %"PRIu32, domid);
+        return 0;
+    }
+    uuid_string = string_of_uuid(ctx, info.uuid);
+
+    path = libxl_sprintf(ctx, "/var/lib/xen/"
+                         "userdata-%s.%s.%s",
+                         wh, uuid_string, userdata_userid);
+    if (!path)
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "unable to allocate for"
+                     " userdata path");
+    return path;
+}
+
+static int userdata_delete(struct libxl_ctx *ctx, const char *path) {
+    int r;
+    r = unlink(path);
+    if (r) {
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "remove failed for %s", path);
+        return errno;
+    }
+    return 0;
+}
+
+void libxl__userdata_destroyall(struct libxl_ctx *ctx, uint32_t domid) {
+    const char *pattern;
+    glob_t gl;
+    int r, i;
+
+    pattern = userdata_path(ctx, domid, "*", "?");
+    if (!pattern) return;
+
+    gl.gl_pathc = 0;
+    gl.gl_pathv = 0;
+    gl.gl_offs = 0;
+    r = glob(pattern, GLOB_ERR|GLOB_NOSORT|GLOB_MARK, 0, &gl);
+    if (r == GLOB_NOMATCH) return;
+    if (r) XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "glob failed for %s", pattern);
+
+    for (i=0; i<gl.gl_pathc; i++) {
+        userdata_delete(ctx, gl.gl_pathv[i]);
+    }
+    globfree(&gl);
+}
+
+int libxl_userdata_store(struct libxl_ctx *ctx, uint32_t domid,
+                              const char *userdata_userid,
+                              const uint8_t *data, int datalen) {
+    const char *filename;
+    const char *newfilename;
+    int e;
+    int fd = -1;
+    FILE *f = 0;
+    size_t rs;
+
+    filename = userdata_path(ctx, domid, userdata_userid, "d");
+    if (!filename) return ENOMEM;
+
+    if (!datalen)
+        return userdata_delete(ctx, filename);
+
+    newfilename = userdata_path(ctx, domid, userdata_userid, "n");
+    if (!newfilename) return ENOMEM;
+
+    fd= open(newfilename, O_RDWR|O_CREAT|O_TRUNC, 0600);
+    if (fd<0) goto xe;
+
+    f= fdopen(fd, "wb");
+    if (!f) goto xe;
+    fd = -1;
+
+    rs = fwrite(data, 1, datalen, f);
+    if (rs != datalen) { assert(ferror(f)); goto xe; }
+
+    if (fclose(f)) goto xe;
+    f = 0;
+
+    if (rename(newfilename,filename)) goto xe;
+
+    return 0;
+
+ xe:
+    e = errno;
+    if (f) fclose(f);
+    if (fd>=0) close(fd);
+
+    XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "cannot write %s for %s",
+                 newfilename, filename);
+    return e;
+}
+
+int libxl_userdata_retrieve(struct libxl_ctx *ctx, uint32_t domid,
+                                 const char *userdata_userid,
+                                 uint8_t **data_r, int *datalen_r) {
+    const char *filename;
+    int e;
+    int datalen = 0;
+    void *data = 0;
+
+    filename = userdata_path(ctx, domid, userdata_userid, "d");
+    if (!filename) return ENOMEM;
+
+    e = libxl_read_file_contents(ctx, filename, data_r ? &data : 0, &datalen);
+
+    if (!e && !datalen) {
+        XL_LOG(ctx, XL_LOG_ERROR, "userdata file %s is empty", filename);
+        if (data_r) assert(!*data_r);
+        return EPROTO;
+    }
+
+    if (data_r) *data_r = data;
+    if (datalen_r) *datalen_r = datalen;
     return 0;
 }

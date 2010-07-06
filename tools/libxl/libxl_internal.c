@@ -156,10 +156,12 @@ void xl_logv(struct libxl_ctx *ctx, int loglevel, int errnoval,
 {
     char *enomem = "[out of memory formatting log message]";
     char *s;
-    int rc;
+    int rc, esave;
 
     if (!ctx->log_callback)
         return;
+
+    esave = errno;
 
     rc = vasprintf(&s, fmt, ap);
     if (rc<0) { s = enomem; goto x; }
@@ -180,6 +182,7 @@ void xl_logv(struct libxl_ctx *ctx, int loglevel, int errnoval,
     ctx->log_callback(ctx->log_userdata, loglevel, file, line, func, s);
     if (s != enomem)
         free(s);
+    errno = esave;
 }
 
 void xl_log(struct libxl_ctx *ctx, int loglevel, int errnoval,
@@ -191,3 +194,11 @@ void xl_log(struct libxl_ctx *ctx, int loglevel, int errnoval,
     xl_logv(ctx, loglevel, errnoval, file, line, func, fmt, ap);
     va_end(ap);
 }
+
+char *libxl_abs_path(struct libxl_ctx *ctx, char *s, const char *path)
+{
+    if (!s || s[0] == '/')
+        return s;
+    return libxl_sprintf(ctx, "%s/%s", path, s);
+}
+

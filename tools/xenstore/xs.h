@@ -48,6 +48,9 @@ struct xs_handle *xs_daemon_open_readonly(void);
 /* Close the connection to the xs daemon. */
 void xs_daemon_close(struct xs_handle *);
 
+/* Throw away the connection to the xs daemon, for use after fork(). */
+void xs_daemon_destroy_postfork(struct xs_handle *);
+
 /* Get contents of a directory.
  * Returns a malloced array: call free() on it after use.
  * Num indicates size.
