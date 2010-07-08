@@ -65,11 +65,13 @@ int main(int argc, char **argv)
 
     srand(time(0));
 
+    optind = 2;
+
     cspec = cmdtable_lookup(argv[1]);
     if (cspec)
         return cspec->cmd_impl(argc, argv);
     else if (!strcmp(argv[1], "help")) {
-        help(argv[optind]);
+        help(argv[1]);
         exit(0);
     } else {
         fprintf(stderr, "command not implemented\n");
