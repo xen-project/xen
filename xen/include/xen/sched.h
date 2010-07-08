@@ -89,8 +89,8 @@ struct vcpu
 
     struct vcpu     *next_in_list;
 
-    uint64_t         periodic_period;
-    uint64_t         periodic_last_event;
+    s_time_t         periodic_period;
+    s_time_t         periodic_last_event;
     struct timer     periodic_timer;
     struct timer     singleshot_timer;
 
