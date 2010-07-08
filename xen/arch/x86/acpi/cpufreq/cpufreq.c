@@ -210,9 +210,11 @@ static u32 get_cur_val(cpumask_t mask)
 
     if (!cpu_isset(cpu, mask))
         cpu = first_cpu(mask);
-    policy = cpufreq_cpu_policy[cpu];
+    if (cpu >= NR_CPUS)
+        return 0;
 
-    if (cpu >= NR_CPUS || !policy || !drv_data[policy->cpu])
+    policy = cpufreq_cpu_policy[cpu];
+    if (!policy || !drv_data[policy->cpu])
         return 0;    
 
     switch (drv_data[policy->cpu]->cpu_feature) {
