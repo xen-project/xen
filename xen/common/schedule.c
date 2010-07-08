@@ -828,7 +828,7 @@ long sched_adjust(struct domain *d, struct xen_domctl_scheduler_op *op)
 static void vcpu_periodic_timer_work(struct vcpu *v)
 {
     s_time_t now = NOW();
-    uint64_t periodic_next_event;
+    s_time_t periodic_next_event;
 
     ASSERT(!active_timer(&v->periodic_timer));
 
