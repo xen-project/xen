@@ -895,6 +895,8 @@ skip_pci:
             dm_info->usb = l;
         if (!xlu_cfg_get_string (config, "usbdevice", &buf))
             dm_info->usbdevice = strdup(buf);
+        if (!xlu_cfg_get_string (config, "soundhw", &buf))
+            dm_info->soundhw = strdup(buf);
         if (!xlu_cfg_get_long (config, "xen_platform_pci", &l))
             dm_info->xen_platform_pci = l;
     }

@@ -161,6 +161,7 @@ typedef struct {
     char *boot; /* boot order, for example dca */
     bool usb; /* usb support enabled or disabled */
     char *usbdevice; /* enable usb mouse: tablet for absolute mouse, mouse for PS/2 protocol relative mouse */
+    char *soundhw; /* enable sound hardware */
     bool apic; /* apic enabled or disabled */
     int vcpus; /* max number of vcpus */
     int vcpu_avail; /* vcpus actually available */

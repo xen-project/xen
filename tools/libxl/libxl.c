@@ -879,6 +879,10 @@ static char ** libxl_build_device_model_args(struct libxl_ctx *ctx,
                 flexarray_set(dm_args, num++, info->usbdevice);
             }
         }
+        if (info->soundhw) {
+            flexarray_set(dm_args, num++, "-soundhw");
+            flexarray_set(dm_args, num++, info->soundhw);
+        }
         if (info->apic) {
             flexarray_set(dm_args, num++, "-acpi");
         }
