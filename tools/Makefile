@@ -35,6 +35,7 @@ SUBDIRS-y += xenpmd
 SUBDIRS-y += libxl
 SUBDIRS-y += remus
 SUBDIRS-$(CONFIG_X86) += xenpaging
+SUBDIRS-y += debugger/gdbsx
 
 # These don't cross-compile
 ifeq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
@@ -114,3 +115,9 @@ subdir-clean-ioemu-dir:
 		$(buildmakevars2shellvars); \
 		$(MAKE) -C ioemu-dir clean; \
 	fi
+
+subdir-clean-debugger/gdbsx:
+	$(MAKE) -C debugger/gdbsx clean
+
+subdir-install-debugger/gdbsx:
+	$(MAKE) -C debugger/gdbsx install
