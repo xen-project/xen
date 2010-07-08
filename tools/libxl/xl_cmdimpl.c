@@ -833,9 +833,12 @@ skip_vfb:
             p = strtok(buf2, ",");
             if (!p)
                 goto skip_pci;
-            if (!sscanf(p, PCI_BDF_VDEVFN, &domain, &bus, &dev, &func, &vdevfn)) {
-                sscanf(p, "%02x:%02x.%01x@%02x", &bus, &dev, &func, &vdevfn);
+            if (sscanf(p, PCI_BDF_VDEVFN, &domain, &bus, &dev, &func, &vdevfn) < 4) {
                 domain = 0;
+                if (sscanf(p, "%02x:%02x.%01x@%02x", &bus, &dev, &func, &vdevfn) < 3) {
+                    fprintf(stderr,"xl: Unable to parse pci bdf (%s)\n", p);
+                    goto skip_pci;
+                }
             }
             libxl_device_pci_init(*pcidevs + *num_pcidevs, domain, bus, dev, func, vdevfn);
             (*pcidevs)[*num_pcidevs].msitranslate = pci_msitranslate;
