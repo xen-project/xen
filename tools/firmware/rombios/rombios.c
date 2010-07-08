@@ -3735,10 +3735,10 @@ cdrom_boot()
   // Validity checks
   if(buffer[0]!=0)return 4;
   for(i=0;i<5;i++){
-    if(buffer[1+i]!=read_byte(0xf000,&isotag[i]))return 5;
+    if(read_byte(get_SS(),&buffer[1+i])!=read_byte(0xf000,&isotag[i]))return 5;
    }
   for(i=0;i<23;i++)
-    if(buffer[7+i]!=read_byte(0xf000,&eltorito[i]))return 6;
+    if(read_byte(get_SS(),&buffer[7+i])!=read_byte(0xf000,&eltorito[i]))return 6;
 
   // ok, now we calculate the Boot catalog address
   lba=buffer[0x4A]*0x1000000+buffer[0x49]*0x10000+buffer[0x48]*0x100+buffer[0x47];
