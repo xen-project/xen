@@ -830,8 +830,10 @@ class HVMImageHandler(ImageHandler):
         self.acpi = int(vmConfig['platform'].get('acpi', 0))
         self.guest_os_type = vmConfig['platform'].get('guest_os_type')
         self.memory_sharing = int(vmConfig['memory_sharing'])
-        xc.dom_set_memshr(self.vm.getDomid(), self.memory_sharing)
-
+        try:
+            xc.dom_set_memshr(self.vm.getDomid(), self.memory_sharing)
+        except:
+            pass
 
     # Return a list of cmd line args to the device models based on the
     # xm config file
