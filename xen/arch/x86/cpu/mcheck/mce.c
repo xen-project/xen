@@ -934,7 +934,7 @@ static void do_mc_get_cpu_info(void *v)
      * Deal with sparse masks, condensed into a contig array.
      */
     while (cpn >= 0) {
-        if (cpu_isset(cpn, cpu_online_map))
+        if (cpu_online(cpn))
             cindex++;
         cpn--;
     }
@@ -1415,7 +1415,7 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
         if (target >= NR_CPUS)
             return x86_mcerr("do_mca inject: bad target", -EINVAL);
 
-        if (!cpu_isset(target, cpu_online_map))
+        if (!cpu_online(target))
             return x86_mcerr("do_mca inject: target offline",
                              -EINVAL);
 
@@ -1442,7 +1442,7 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
         if (target >= NR_CPUS)
             return x86_mcerr("do_mca #MC: bad target", -EINVAL);
 
-        if (!cpu_isset(target, cpu_online_map))
+        if (!cpu_online(target))
             return x86_mcerr("do_mca #MC: target offline", -EINVAL);
 
         add_taint(TAINT_ERROR_INJECT);
