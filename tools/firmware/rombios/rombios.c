@@ -8243,24 +8243,15 @@ Bit16u seq_nr;
     write_word(ebda_seg, IPL_SEQUENCE_OFFSET, 0xFFFF);
   } else if (bootdev == 0) {
     printf("\nNo bootable device.\n");
-    printf("Reboot or press any key to retry.");
-    write_word(ebda_seg, IPL_SEQUENCE_OFFSET, 0xFFFF);
+    printf("Powering off in 30 seconds.\n");
 ASM_START
     sti
+    mov cx, #0x01c9
+    mov dx, #0xc380
+    mov ah, #0x86   ;; INT 15/86: wait CX:DX usec.
+    int #0x15
 ASM_END
-    {
-      Bit8u sc, ac;
-      while(!dequeue_key(&sc, &ac, 1)) {
-ASM_START
-        hlt
-ASM_END
-      }
-    }
-ASM_START
-    cli
-ASM_END
-    printf("\n\n");
-    return;
+    bios_printf(BIOS_PRINTF_HALT, "");
   }
 
   /* Translate from CMOS runes to an IPL table offset by subtracting 1 */
