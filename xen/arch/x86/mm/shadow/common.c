@@ -1817,14 +1817,24 @@ static unsigned int sh_set_allocation(struct domain *d,
     unsigned int j, order = shadow_max_order(d);
 
     ASSERT(shadow_locked_by_me(d));
-    
-    /* Don't allocate less than the minimum acceptable, plus one page per
-     * megabyte of RAM (for the p2m table) */
-    lower_bound = shadow_min_acceptable_pages(d) + (d->tot_pages / 256);
-    if ( pages > 0 && pages < lower_bound )
-        pages = lower_bound;
-    /* Round up to largest block size */
-    pages = (pages + ((1<<SHADOW_MAX_ORDER)-1)) & ~((1<<SHADOW_MAX_ORDER)-1);
+
+    if ( pages > 0 )
+    {
+        /* Check for minimum value. */
+        if ( pages < d->arch.paging.shadow.p2m_pages )
+            pages = 0;
+        else
+            pages -= d->arch.paging.shadow.p2m_pages;
+        
+        /* Don't allocate less than the minimum acceptable, plus one page per
+         * megabyte of RAM (for the p2m table) */
+        lower_bound = shadow_min_acceptable_pages(d) + (d->tot_pages / 256);
+        if ( pages < lower_bound )
+            pages = lower_bound;
+        
+        /* Round up to largest block size */
+        pages = (pages + ((1<<SHADOW_MAX_ORDER)-1)) & ~((1<<SHADOW_MAX_ORDER)-1);
+    }
 
     SHADOW_PRINTK("current %i target %i\n", 
                    d->arch.paging.shadow.total_pages, pages);
@@ -1884,7 +1894,8 @@ static unsigned int sh_set_allocation(struct domain *d,
 /* Return the size of the shadow pool, rounded up to the nearest MB */
 static unsigned int shadow_get_allocation(struct domain *d)
 {
-    unsigned int pg = d->arch.paging.shadow.total_pages;
+    unsigned int pg = d->arch.paging.shadow.total_pages
+        + d->arch.paging.shadow.p2m_pages;
     return ((pg >> (20 - PAGE_SHIFT))
             + ((pg & ((1 << (20 - PAGE_SHIFT)) - 1)) ? 1 : 0));
 }
