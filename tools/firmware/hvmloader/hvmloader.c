@@ -576,16 +576,66 @@ static void init_vm86_tss(void)
     printf("vm86 TSS at %08lx\n", virt_to_phys(tss));
 }
 
+static void dump_e820_table(void)
+{
+    struct e820entry *e820 = E820;
+    unsigned int nr = *E820_NR;
+    unsigned int last_end = 0;
+    int i;
+
+    printf("E820 table:\n");
+
+    for ( i = 0; i < nr; i++ )
+    {
+        unsigned int start = e820[i].addr;
+        unsigned int end = e820[i].addr + e820[i].size;
+
+        if ( start < last_end )
+            printf(" OVERLAP!!\n");
+        else if ( start > last_end )
+            printf(" HOLE: %08x - %08x\n", last_end, start);
+
+        printf(" [%02d]: %08x - %08x: ", i, start, end);
+        switch ( e820[i].type )
+        {
+        case E820_RAM:
+            printf("RAM\n");
+            break;
+        case E820_RESERVED:
+            printf("RESERVED\n");
+            break;
+        case E820_ACPI:
+            printf("ACPI\n");
+            break;
+        case E820_NVS:
+            printf("NVS\n");
+            break;
+        default:
+            printf("UNKNOWN (%08x)\n", e820[i].type);
+            break;
+        }
+
+        last_end = end;
+    }
+}
+
 /* Create an E820 table based on memory parameters provided in hvm_info. */
 static void build_e820_table(void)
 {
     struct e820entry *e820 = E820;
     unsigned int nr = 0;
 
-    /* 0x0-0x9FC00: Ordinary RAM. */
-    e820[nr].addr = 0x0;
-    e820[nr].size = 0x9FC00;
+    /* 0x0-0x9E000: Ordinary RAM. */
+    /* (Must be at least 512K to keep Windows happy) */
+    e820[nr].addr = 0x00000;
+    e820[nr].size = 0x9E000;
     e820[nr].type = E820_RAM;
+    nr++;
+
+    /* 0x9E000-0x9FC00: Reserved for internal use. */
+    e820[nr].addr = 0x9E000;
+    e820[nr].size = 0x01C00;
+    e820[nr].type = E820_RESERVED;
     nr++;
 
     /* 0x9FC00-0xA0000: Extended BIOS Data Area (EBDA). */
@@ -739,6 +789,7 @@ int main(void)
                ROMBIOS_PHYSICAL_ADDRESS + rombios_sz - 1);
 
     build_e820_table();
+    dump_e820_table();
 
     bios_info = (struct bios_info *)BIOS_INFO_PHYSICAL_ADDRESS;
     memset(bios_info, 0, sizeof(*bios_info));

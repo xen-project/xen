@@ -1,6 +1,6 @@
 /////////////////////////////////////////////////////////////////////////
 // $Id: rombios.c,v 1.221 2008/12/07 17:32:29 sshwarts Exp $
-/////////////////////////////////////////////////////////////////////////
+////////////////////////////#/////////////////////////////////////////////
 //
 //  Copyright (C) 2002  MandrakeSoft S.A.
 //
@@ -8862,13 +8862,14 @@ int13_out:
 int18_handler: ;; Boot Failure recovery: try the next device.
 
   ;; Reset SP and SS
-  mov  ax, #0xfffe
+  mov  ax, #0x0ffe
   mov  sp, ax
-  xor  ax, ax
+  mov  ax, #0x9e00
   mov  ss, ax
 
   ;; The first time we do this it will have been set to -1 so 
   ;; we will start from device 0.
+  xor  ax, ax
   mov  ds, ax
   mov  bx, word ptr [0x40E]       ;; EBDA segment
   mov  ds, bx                     ;; Set segment
@@ -8902,9 +8903,9 @@ int19_relocated: ;; Boot function, relocated
   ;; 
   ;; Reset SP and SS
 
-  mov  ax, #0xfffe
+  mov  ax, #0x0ffe
   mov  sp, ax
-  xor  ax, ax
+  mov  ax, #0x9e00
   mov  ss, ax
 
   call _machine_reset
@@ -10839,10 +10840,9 @@ normal_post:
   ; case 0: normal startup
 
   cli
-  mov  ax, #0xfffe
+  mov  ax, #0x0ffe
   mov  sp, ax
-  xor  ax, ax
-  mov  ds, ax
+  mov  ax, #0x9e00
   mov  ss, ax
 
   ;; Save shutdown status
