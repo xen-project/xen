@@ -3188,6 +3188,15 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
+    case HVMOP_get_time: {
+        xen_hvm_get_time_t gxt;
+
+        gxt.now = NOW();
+        if ( copy_to_guest(arg, &gxt, 1) )
+            rc = -EFAULT;
+        break;
+    }
+
     default:
     {
         gdprintk(XENLOG_WARNING, "Bad HVM op %ld.\n", op);
