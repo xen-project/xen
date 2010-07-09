@@ -152,14 +152,19 @@ static void mce_amd_work_fn(void *data)
 
 		/* HW does not count *all* kinds of correctable errors.
 		 * Thus it is possible, that the polling routine finds an
-		 * correctable error even if the HW reports nothing.
-		 * However, the other way around is not possible (= BUG).
-		 */ 
+		 * correctable error even if the HW reports nothing. */ 
 		if (counter > 0) {
 			/* HW reported correctable errors,
 			 * the polling routine did not find...
 			 */
-			BUG_ON(adjust == 0);
+			if (adjust == 0) {
+				printk("CPU counter reports %"PRIu32
+					" correctable hardware error%s that %s"
+					" not reported by the status MSRs\n",
+					counter,
+					(counter == 1 ? "" : "s"),
+					(counter == 1 ? "was" : "were"));
+			}
 			/* subtract 1 to not double count the error 
 			 * from the polling service routine */ 
 			adjust += (counter - 1);
