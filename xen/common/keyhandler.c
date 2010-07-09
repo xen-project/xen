@@ -307,8 +307,8 @@ static struct keyhandler dump_domains_keyhandler = {
 };
 
 static cpumask_t read_clocks_cpumask = CPU_MASK_NONE;
-static s_time_t read_clocks_time[NR_CPUS];
-static u64 read_cycles_time[NR_CPUS];
+static DEFINE_PER_CPU(s_time_t, read_clocks_time);
+static DEFINE_PER_CPU(u64, read_cycles_time);
 
 static void read_clocks_slave(void *unused)
 {
@@ -316,8 +316,8 @@ static void read_clocks_slave(void *unused)
     local_irq_disable();
     while ( !cpu_isset(cpu, read_clocks_cpumask) )
         cpu_relax();
-    read_clocks_time[cpu] = NOW();
-    read_cycles_time[cpu] = get_cycles();
+    per_cpu(read_clocks_time, cpu) = NOW();
+    per_cpu(read_cycles_time, cpu) = get_cycles();
     cpu_clear(cpu, read_clocks_cpumask);
     local_irq_enable();
 }
@@ -339,8 +339,8 @@ static void read_clocks(unsigned char key)
 
     local_irq_disable();
     read_clocks_cpumask = cpu_online_map;
-    read_clocks_time[cpu] = NOW();
-    read_cycles_time[cpu] = get_cycles();
+    per_cpu(read_clocks_time, cpu) = NOW();
+    per_cpu(read_cycles_time, cpu) = get_cycles();
     cpu_clear(cpu, read_clocks_cpumask);
     local_irq_enable();
 
@@ -350,20 +350,24 @@ static void read_clocks(unsigned char key)
     min_stime_cpu = max_stime_cpu = min_cycles_cpu = max_cycles_cpu = cpu;
     for_each_online_cpu ( cpu )
     {
-        if ( read_clocks_time[cpu] < read_clocks_time[min_stime_cpu] )
+        if ( per_cpu(read_clocks_time, cpu) <
+             per_cpu(read_clocks_time, min_stime_cpu) )
             min_stime_cpu = cpu;
-        if ( read_clocks_time[cpu] > read_clocks_time[max_stime_cpu] )
+        if ( per_cpu(read_clocks_time, cpu) >
+             per_cpu(read_clocks_time, max_stime_cpu) )
             max_stime_cpu = cpu;
-        if ( read_cycles_time[cpu] < read_cycles_time[min_cycles_cpu] )
+        if ( per_cpu(read_cycles_time, cpu) <
+             per_cpu(read_cycles_time, min_cycles_cpu) )
             min_cycles_cpu = cpu;
-        if ( read_cycles_time[cpu] > read_cycles_time[max_cycles_cpu] )
+        if ( per_cpu(read_cycles_time, cpu) >
+             per_cpu(read_cycles_time, max_cycles_cpu) )
             max_cycles_cpu = cpu;
     }
 
-    min_stime = read_clocks_time[min_stime_cpu];
-    max_stime = read_clocks_time[max_stime_cpu];
-    min_cycles = read_cycles_time[min_cycles_cpu];
-    max_cycles = read_cycles_time[max_cycles_cpu];
+    min_stime = per_cpu(read_clocks_time, min_stime_cpu);
+    max_stime = per_cpu(read_clocks_time, max_stime_cpu);
+    min_cycles = per_cpu(read_cycles_time, min_cycles_cpu);
+    max_cycles = per_cpu(read_cycles_time, max_cycles_cpu);
 
     spin_unlock(&lock);
 
