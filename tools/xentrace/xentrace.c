@@ -45,7 +45,7 @@ do {                                                            \
 /* sleep for this long (milliseconds) between checking the trace buffers */
 #define POLL_SLEEP_MILLIS 100
 
-#define DEFAULT_TBUF_SIZE 20
+#define DEFAULT_TBUF_SIZE 32
 /***** The code **************************************************************/
 
 typedef struct settings_st {

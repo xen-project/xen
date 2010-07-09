@@ -192,6 +192,7 @@ static void init_build_info(libxl_domain_build_info *b_info, libxl_domain_create
     b_info->max_vcpus = 1;
     b_info->max_memkb = 32 * 1024;
     b_info->target_memkb = b_info->max_memkb;
+    b_info->disable_migrate = 0;
     if (c_info->hvm) {
         b_info->shadow_memkb = 0; /* Set later */
         b_info->video_memkb = 8 * 1024;
@@ -360,6 +361,7 @@ static void printf_info(int domid,
     printf("\t(tsc_mode %d)\n", b_info->tsc_mode);
     printf("\t(max_memkb %d)\n", b_info->max_memkb);
     printf("\t(target_memkb %d)\n", b_info->target_memkb);
+    printf("\t(nomigrate %d)\n", b_info->disable_migrate);
 
     printf("\t(image\n");
     if (c_info->hvm) {
@@ -550,6 +552,9 @@ static void parse_config_data(const char *configfile_filename_report,
         ? l * 1024
         : libxl_get_required_shadow_memory(b_info->max_memkb,
                                            b_info->max_vcpus);
+
+    if (!xlu_cfg_get_long (config, "nomigrate", &l))
+        b_info->disable_migrate = l;
 
     if (!xlu_cfg_get_long(config, "tsc_mode", &l))
         b_info->tsc_mode = l;
@@ -833,9 +838,12 @@ skip_vfb:
             p = strtok(buf2, ",");
             if (!p)
                 goto skip_pci;
-            if (!sscanf(p, PCI_BDF_VDEVFN, &domain, &bus, &dev, &func, &vdevfn)) {
-                sscanf(p, "%02x:%02x.%01x@%02x", &bus, &dev, &func, &vdevfn);
+            if (sscanf(p, PCI_BDF_VDEVFN, &domain, &bus, &dev, &func, &vdevfn) < 4) {
                 domain = 0;
+                if (sscanf(p, "%02x:%02x.%01x@%02x", &bus, &dev, &func, &vdevfn) < 3) {
+                    fprintf(stderr,"xl: Unable to parse pci bdf (%s)\n", p);
+                    goto skip_pci;
+                }
             }
             libxl_device_pci_init(*pcidevs + *num_pcidevs, domain, bus, dev, func, vdevfn);
             (*pcidevs)[*num_pcidevs].msitranslate = pci_msitranslate;
@@ -892,6 +900,8 @@ skip_pci:
             dm_info->usb = l;
         if (!xlu_cfg_get_string (config, "usbdevice", &buf))
             dm_info->usbdevice = strdup(buf);
+        if (!xlu_cfg_get_string (config, "soundhw", &buf))
+            dm_info->soundhw = strdup(buf);
         if (!xlu_cfg_get_long (config, "xen_platform_pci", &l))
             dm_info->xen_platform_pci = l;
     }
