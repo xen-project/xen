@@ -68,7 +68,7 @@ do_start () {
 	fi
 
 	echo Starting xenconsoled...
-	test -z "$XENCONSOLED_TRACE" || XENCONSOLED_ARGS=" -T /var/log/xen/xenstored-trace.log"
+	test -z "$XENCONSOLED_TRACE" || XENCONSOLED_ARGS=" --log=$XENCONSOLED_TRACE"
 	xenconsoled --pid-file=$XENCONSOLED_PIDFILE $XENCONSOLED_ARGS
 	test -z "$XENBACKENDD_DEBUG" || XENBACKENDD_ARGS="-d"
 	test "`uname`" != "NetBSD" || xenbackendd $XENBACKENDD_ARGS
