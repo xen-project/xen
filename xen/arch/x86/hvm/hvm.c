@@ -3197,6 +3197,23 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
+    case HVMOP_xentrace: {
+        xen_hvm_xentrace_t tr;
+
+        if ( copy_from_guest(&tr, arg, 1 ) )
+            return -EFAULT;
+
+        if ( tr.extra_bytes > sizeof(tr.extra)
+             || (tr.event & ~((1u<<TRC_SUBCLS_SHIFT)-1)) )
+            return -EINVAL;
+
+        /* Cycles will be taken at the vmexit and vmenter */
+        trace_var(tr.event | TRC_GUEST, 0 /*!cycles*/,
+                  tr.extra_bytes,
+                  (unsigned char *)tr.extra);
+        break;
+    }
+
     default:
     {
         gdprintk(XENLOG_WARNING, "Bad HVM op %ld.\n", op);

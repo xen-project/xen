@@ -39,6 +39,7 @@
 #define TRC_PV       0x0020f000    /* Xen PV traces            */
 #define TRC_SHADOW   0x0040f000    /* Xen shadow tracing       */
 #define TRC_PM       0x0080f000    /* Xen power management trace */
+#define TRC_GUEST    0x0800f000    /* Guest-generated traces   */
 #define TRC_ALL      0x0ffff000
 #define TRC_HD_TO_EVENT(x) ((x)&0x0fffffff)
 #define TRC_HD_CYCLE_FLAG (1UL<<31)

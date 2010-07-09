@@ -22,6 +22,7 @@
 #define __XEN_PUBLIC_HVM_HVM_OP_H__
 
 #include "../xen.h"
+#include "../trace.h"
 
 /* Get/set subcommands: extra argument == pointer to xen_hvm_param struct. */
 #define HVMOP_set_param           0
@@ -145,6 +146,14 @@ struct xen_hvm_get_time {
 };
 typedef struct xen_hvm_get_time xen_hvm_get_time_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_get_time_t);
+
+#define HVMOP_xentrace              11
+struct xen_hvm_xentrace {
+    uint16_t event, extra_bytes;
+    uint8_t extra[TRACE_EXTRA_MAX * sizeof(uint32_t)];
+};
+typedef struct xen_hvm_xentrace xen_hvm_xentrace_t;
+DEFINE_XEN_GUEST_HANDLE(xen_hvm_xentrace_t);
 
 #endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */
 
