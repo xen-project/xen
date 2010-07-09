@@ -29,7 +29,7 @@ LOADADDR = 0x100000
 CFLAGS += $(CFLAGS_include) -I.
 
 SRCS  = hvmloader.c mp_tables.c util.c smbios.c 
-SRCS += 32bitbios_support.c smp.c cacheattr.c
+SRCS += 32bitbios_support.c smp.c cacheattr.c xenbus.c
 ifeq ($(debug),y)
 SRCS += tests.c
 endif

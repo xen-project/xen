@@ -704,6 +704,7 @@ int main(void)
 
     printf("CPU speed is %u MHz\n", get_cpu_mhz());
 
+    xenbus_setup();
     apic_setup();
     pci_setup();
 
@@ -802,6 +803,8 @@ int main(void)
     bios_info->madt_csum_addr = madt_csum_addr;
     bios_info->madt_lapic0_addr = madt_lapic0_addr;
     bios_info->bios32_entry = bios32_addr;
+
+    xenbus_shutdown();
 
     printf("Invoking ROMBIOS ...\n");
     return 0;

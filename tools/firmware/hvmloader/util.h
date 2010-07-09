@@ -155,6 +155,18 @@ int vprintf(const char *fmt, va_list ap);
 void *mem_alloc(uint32_t size, uint32_t align);
 #define virt_to_phys(v) ((unsigned long)(v))
 
+/* Connect our xenbus client to the backend.  
+ * Call once, before any other xenbus actions. */
+void xenbus_setup(void);
+
+/* Reset the xenbus connection so the next kernel can start again. */
+void xenbus_shutdown(void);
+
+/* Read a xenstore key.  Returns a nul-terminated string (even if the XS
+ * data wasn't nul-terminated) or NULL.  The returned string is in a
+ * static buffer, so only valid until the next xenstore/xenbus operation. */
+char *xenstore_read(char *path);
+
 /* Prepare the 32bit BIOS */
 uint32_t highbios_setup(void);
 
