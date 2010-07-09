@@ -30,8 +30,8 @@ static int iommu_populate_page_table(struct domain *d);
  *   force|required             Don't boot unless IOMMU is enabled
  *   workaround_bios_bug        Workaround some bios issue to still enable
                                 VT-d, don't guarantee security
- *   passthrough                Enable VT-d DMA passthrough (no DMA
- *                              translation for Dom0)
+ *   dom0-passthrough           No DMA translation at all for Dom0
+ *   dom0-strict                No 1:1 memory mapping for Dom0
  *   no-snoop                   Disable VT-d Snoop Control
  *   no-qinval                  Disable VT-d Queued Invalidation
  *   no-intremap                Disable VT-d Interrupt Remapping
@@ -39,6 +39,7 @@ static int iommu_populate_page_table(struct domain *d);
 custom_param("iommu", parse_iommu_param);
 bool_t __read_mostly iommu_enabled = 1;
 bool_t __read_mostly force_iommu;
+bool_t __read_mostly iommu_dom0_strict;
 bool_t __read_mostly iommu_verbose;
 bool_t __read_mostly iommu_workaround_bios_bug;
 bool_t __read_mostly iommu_passthrough;
@@ -64,8 +65,6 @@ static void __init parse_iommu_param(char *s)
             force_iommu = 1;
         else if ( !strcmp(s, "workaround_bios_bug") )
             iommu_workaround_bios_bug = 1;
-        else if ( !strcmp(s, "passthrough") )
-            iommu_passthrough = 1;
         else if ( !strcmp(s, "verbose") )
             iommu_verbose = 1;
         else if ( !strcmp(s, "no-snoop") )
@@ -78,14 +77,18 @@ static void __init parse_iommu_param(char *s)
             amd_iommu_debug = 1;
         else if ( !strcmp(s, "amd-iommu-perdev-intremap") )
             amd_iommu_perdev_intremap = 1;
+        else if ( !strcmp(s, "dom0-passthrough") )
+            iommu_passthrough = 1;
+        else if ( !strcmp(s, "dom0-strict") )
+            iommu_dom0_strict = 1;
 
         s = ss + 1;
     } while ( ss );
 }
 
-int iommu_domain_init(struct domain *domain)
+int iommu_domain_init(struct domain *d)
 {
-    struct hvm_iommu *hd = domain_hvm_iommu(domain);
+    struct hvm_iommu *hd = domain_hvm_iommu(d);
 
     spin_lock_init(&hd->mapping_lock);
     INIT_LIST_HEAD(&hd->g2m_ioport_list);
@@ -94,8 +97,10 @@ int iommu_domain_init(struct domain *domain)
     if ( !iommu_enabled )
         return 0;
 
+    d->need_iommu = ((d->domain_id == 0) && iommu_dom0_strict);
+
     hd->platform_ops = iommu_get_ops();
-    return hd->platform_ops->init(domain);
+    return hd->platform_ops->init(d);
 }
 
 int iommu_add_device(struct pci_dev *pdev)
@@ -276,6 +281,9 @@ int __init iommu_setup(void)
 {
     int rc = -ENODEV;
 
+    if ( iommu_dom0_strict )
+        iommu_passthrough = 0;
+
     if ( iommu_enabled )
     {
         rc = iommu_hardware_setup();
@@ -290,8 +298,15 @@ int __init iommu_setup(void)
         iommu_snoop = 0;
         iommu_qinval = 0;
         iommu_intremap = 0;
+        iommu_passthrough = 0;
+        iommu_dom0_strict = 0;
     }
     printk("I/O virtualisation %sabled\n", iommu_enabled ? "en" : "dis");
+    if ( iommu_enabled )
+        printk(" - Dom0 mode: %s\n",
+               iommu_passthrough ? "Passthrough" :
+               iommu_dom0_strict ? "Strict" : "Relaxed");
+
     return rc;
 }
 

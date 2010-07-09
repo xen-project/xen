@@ -1179,7 +1179,8 @@ static int intel_iommu_domain_init(struct domain *d)
     if ( d->domain_id == 0 )
     {
         /* Set up 1:1 page table for dom0 */
-        iommu_set_dom0_mapping(d);
+        if ( !need_iommu(d) )
+            iommu_set_dom0_mapping(d);
 
         setup_dom0_devices(d);
         setup_dom0_rmrr(d);

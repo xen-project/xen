@@ -1462,12 +1462,18 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
     if ( ret )
         goto destroy_m2p;
 
-    for ( i = spfn; i < epfn; i++ )
-        if ( iommu_map_page(dom0, i, i, IOMMUF_readable|IOMMUF_writable) )
-            break;
-
-    if ( i != epfn )
-        goto destroy_iommu;
+    if ( !need_iommu(dom0) )
+    {
+        for ( i = spfn; i < epfn; i++ )
+            if ( iommu_map_page(dom0, i, i, IOMMUF_readable|IOMMUF_writable) )
+                break;
+        if ( i != epfn )
+        {
+            while (i-- > old_max)
+                iommu_unmap_page(dom0, i);
+            goto destroy_m2p;
+        }
+    }
 
     /* We can't revert any more */
     transfer_pages_to_heap(&info);
@@ -1475,10 +1481,6 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
     share_hotadd_m2p_table(&info);
 
     return 0;
-
-destroy_iommu:
-    while (i-- > old_max)
-        iommu_unmap_page(dom0, i);
 
 destroy_m2p:
     destroy_m2p_mapping(&info);

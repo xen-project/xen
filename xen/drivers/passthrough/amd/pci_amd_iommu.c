@@ -231,7 +231,7 @@ static int amd_iommu_domain_init(struct domain *domain)
     {
         unsigned long i; 
 
-        if ( !iommu_passthrough )
+        if ( !iommu_passthrough && !need_iommu(domain) )
         {
             /* setup 1:1 page table for dom0 */
             for ( i = 0; i < max_page; i++ )
