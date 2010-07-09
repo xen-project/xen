@@ -54,6 +54,8 @@ static void *
 smbios_type_4_init(void *start, unsigned int cpu_number,
                    char *cpu_manufacturer);
 static void *
+smbios_type_11_init(void *start);
+static void *
 smbios_type_16_init(void *start, uint32_t memory_size_mb, int nr_mem_devs);
 static void *
 smbios_type_17_init(void *start, uint32_t memory_size_mb, int instance);
@@ -112,6 +114,7 @@ write_smbios_tables(void *start,
     do_struct(smbios_type_3_init(p));
     for ( cpu_num = 1; cpu_num <= vcpus; cpu_num++ )
         do_struct(smbios_type_4_init(p, cpu_num, cpu_manufacturer));
+    do_struct(smbios_type_11_init(p));
 
     /* Each 'memory device' covers up to 16GB of address space. */
     nr_mem_devs = (memsize + 0x3fff) >> 14;
@@ -283,6 +286,7 @@ smbios_type_0_init(void *start, const char *xen_version,
 {
     struct smbios_type_0 *p = (struct smbios_type_0 *)start;
     static const char *smbios_release_date = __SMBIOS_DATE__;
+    const char *s;
 
     memset(p, 0, sizeof(*p));
 
@@ -309,10 +313,16 @@ smbios_type_0_init(void *start, const char *xen_version,
     p->embedded_controller_minor = 0xff;
 
     start += sizeof(struct smbios_type_0);
-    strcpy((char *)start, "Xen");
-    start += strlen("Xen") + 1;
-    strcpy((char *)start, xen_version);
-    start += strlen(xen_version) + 1;
+    if ((s = xenstore_read("bios-strings/bios-vendor")) == NULL || *s == '\0')
+        s = "Xen";
+    strcpy((char *)start, s);
+    start += strlen(s) + 1;
+
+    if ((s = xenstore_read("bios-strings/bios-version")) == NULL || *s == '\0')
+        s = xen_version;
+    strcpy((char *)start, s);
+    start += strlen(s) + 1;
+
     strcpy((char *)start, smbios_release_date);
     start += strlen(smbios_release_date) + 1;
 
@@ -327,6 +337,7 @@ smbios_type_1_init(void *start, const char *xen_version,
 {
     char uuid_str[37];
     struct smbios_type_1 *p = (struct smbios_type_1 *)start;
+    const char *s;
 
     memset(p, 0, sizeof(*p));
 
@@ -347,15 +358,31 @@ smbios_type_1_init(void *start, const char *xen_version,
 
     start += sizeof(struct smbios_type_1);
     
-    strcpy((char *)start, "Xen");
-    start += strlen("Xen") + 1;
-    strcpy((char *)start, "HVM domU");
-    start += strlen("HVM domU") + 1;
-    strcpy((char *)start, xen_version);
-    start += strlen(xen_version) + 1;
+    if ((s = xenstore_read("bios-strings/system-manufacturer")) == NULL  
+        || *s == '\0')
+        s = "Xen";
+    strcpy((char *)start, s);
+    start += strlen(s) + 1;
+
+    if ((s = xenstore_read("bios-strings/system-product-name")) == NULL
+         || *s == '\0')
+        s = "HVM domU";
+    strcpy((char *)start, s);
+    start += strlen(s) + 1;
+
+    if ((s = xenstore_read("bios-strings/system-version")) == NULL
+        || *s == '\0')
+        s = xen_version;
+    strcpy((char *)start, s);
+    start += strlen(s) + 1;
+
     uuid_to_string(uuid_str, uuid); 
-    strcpy((char *)start, uuid_str);
-    start += strlen(uuid_str) + 1;
+    if ((s = xenstore_read("bios-strings/system-serial-number")) == NULL
+        || *s == '\0')
+        s = uuid_str;
+    strcpy((char *)start, s);
+    start += strlen(s) + 1;
+
     *((uint8_t *)start) = 0;
     
     return start+1; 
@@ -438,6 +465,45 @@ smbios_type_4_init(
     start += strlen(cpu_manufacturer) + 1;
 
     *((uint8_t *)start) = 0;
+    return start+1;
+}
+
+/* Type 11 -- OEM Strings */
+static void *
+smbios_type_11_init(void *start) 
+{
+    struct smbios_type_11 *p = (struct smbios_type_11 *)start;
+    char path[20] = "bios-strings/oem-XX";
+    const char *s;
+    int i;
+
+    p->header.type = 11;
+    p->header.length = sizeof(struct smbios_type_11);
+    p->header.handle = 0xB00;
+
+    p->count = 0;
+
+    start += sizeof(struct smbios_type_11);
+
+    /* Pull out as many oem-* strings we find in xenstore */
+    for (i = 1; i < 100; i++) {
+        path[(sizeof path) - 3] = '0' + ((i < 10) ? i : i / 10);
+        path[(sizeof path) - 2] = (i < 10) ? '\0' : '0' + (i % 10);
+        if ((s = xenstore_read(path)) == NULL || *s == '\0')
+            break;
+        strcpy((char *)start, s);
+        start += strlen(s) + 1;
+        p->count++;
+    }
+    
+    /* Make sure there's at least one type-11 string */
+    if (p->count == 0) {
+        strcpy((char *)start, "Xen");
+        start += strlen("Xen") + 1;
+        p->count++;
+    }
+    *((uint8_t *)start) = 0;
+
     return start+1;
 }
 

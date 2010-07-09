@@ -115,6 +115,12 @@ struct smbios_type_4 {
 	uint8_t upgrade;
 } __attribute__ ((packed));
 
+/* SMBIOS type 11 - OEM Strings */
+struct smbios_type_11 {
+   struct smbios_structure_header header;
+   uint8_t count;
+} __attribute__ ((packed));
+
 /* SMBIOS type 16 - Physical Memory Array
  *   Associated with one type 17 (Memory Device).
  */
