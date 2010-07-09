@@ -34,7 +34,7 @@
 
 struct cpufreq_driver   *cpufreq_driver;
 struct processor_pminfo *__read_mostly processor_pminfo[NR_CPUS];
-struct cpufreq_policy   *__read_mostly cpufreq_cpu_policy[NR_CPUS];
+DEFINE_PER_CPU_READ_MOSTLY(struct cpufreq_policy *, cpufreq_cpu_policy);
 
 DEFINE_PER_CPU(spinlock_t, cpufreq_statistic_lock);
 
@@ -46,7 +46,7 @@ void cpufreq_residency_update(unsigned int cpu, uint8_t state)
 {
     uint64_t now, total_idle_ns;
     int64_t delta;
-    struct pm_px *pxpt = cpufreq_statistic_data[cpu];
+    struct pm_px *pxpt = per_cpu(cpufreq_statistic_data, cpu);
 
     total_idle_ns = get_cpu_idle_time(cpu);
     now = NOW();
@@ -70,7 +70,7 @@ void cpufreq_statistic_update(unsigned int cpu, uint8_t from, uint8_t to)
 
     spin_lock(cpufreq_statistic_lock);
 
-    pxpt = cpufreq_statistic_data[cpu];
+    pxpt = per_cpu(cpufreq_statistic_data, cpu);
     if ( !pxpt || !pmpt ) {
         spin_unlock(cpufreq_statistic_lock);
         return;
@@ -102,7 +102,7 @@ int cpufreq_statistic_init(unsigned int cpuid)
 
     spin_lock(cpufreq_statistic_lock);
 
-    pxpt = cpufreq_statistic_data[cpuid];
+    pxpt = per_cpu(cpufreq_statistic_data, cpuid);
     if ( pxpt ) {
         spin_unlock(cpufreq_statistic_lock);
         return 0;
@@ -116,7 +116,7 @@ int cpufreq_statistic_init(unsigned int cpuid)
         return -ENOMEM;
     }
     memset(pxpt, 0, sizeof(*pxpt));
-    cpufreq_statistic_data[cpuid] = pxpt;
+    per_cpu(cpufreq_statistic_data, cpuid) = pxpt;
 
     pxpt->u.trans_pt = xmalloc_array(uint64_t, count * count);
     if (!pxpt->u.trans_pt) {
@@ -158,7 +158,7 @@ void cpufreq_statistic_exit(unsigned int cpuid)
 
     spin_lock(cpufreq_statistic_lock);
 
-    pxpt = cpufreq_statistic_data[cpuid];
+    pxpt = per_cpu(cpufreq_statistic_data, cpuid);
     if (!pxpt) {
         spin_unlock(cpufreq_statistic_lock);
         return;
@@ -167,7 +167,7 @@ void cpufreq_statistic_exit(unsigned int cpuid)
     xfree(pxpt->u.trans_pt);
     xfree(pxpt->u.pt);
     xfree(pxpt);
-    cpufreq_statistic_data[cpuid] = NULL;
+    per_cpu(cpufreq_statistic_data, cpuid) = NULL;
 
     spin_unlock(cpufreq_statistic_lock);
 }
@@ -182,7 +182,7 @@ void cpufreq_statistic_reset(unsigned int cpuid)
 
     spin_lock(cpufreq_statistic_lock);
 
-    pxpt = cpufreq_statistic_data[cpuid];
+    pxpt = per_cpu(cpufreq_statistic_data, cpuid);
     if ( !pmpt || !pxpt || !pxpt->u.pt || !pxpt->u.trans_pt ) {
         spin_unlock(cpufreq_statistic_lock);
         return;
@@ -382,8 +382,7 @@ int cpufreq_driver_getavg(unsigned int cpu, unsigned int flag)
     struct cpufreq_policy *policy;
     int freq_avg;
 
-    policy = cpufreq_cpu_policy[cpu];
-    if (!cpu_online(cpu) || !policy)
+    if (!cpu_online(cpu) || !(policy = per_cpu(cpufreq_cpu_policy, cpu)))
         return 0;
 
     if (cpufreq_driver->getavg)
@@ -400,7 +399,7 @@ void cpufreq_enable_turbo(int cpuid)
 {
     struct cpufreq_policy *policy;
 
-    policy = cpufreq_cpu_policy[cpuid];
+    policy = per_cpu(cpufreq_cpu_policy, cpuid);
     if (policy->turbo != CPUFREQ_TURBO_UNSUPPORTED)
         policy->turbo = CPUFREQ_TURBO_ENABLED;
 }
@@ -409,7 +408,7 @@ void cpufreq_disable_turbo(int cpuid)
 {
     struct cpufreq_policy *policy;
 
-    policy = cpufreq_cpu_policy[cpuid];
+    policy = per_cpu(cpufreq_cpu_policy, cpuid);
     if (policy->turbo != CPUFREQ_TURBO_UNSUPPORTED)
         policy->turbo = CPUFREQ_TURBO_DISABLED;
 }
@@ -418,7 +417,7 @@ int cpufreq_get_turbo_status(int cpuid)
 {
     struct cpufreq_policy *policy;
 
-    policy = cpufreq_cpu_policy[cpuid];
+    policy = per_cpu(cpufreq_cpu_policy, cpuid);
     return policy->turbo;
 }
 

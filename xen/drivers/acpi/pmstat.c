@@ -43,7 +43,7 @@
 #include <acpi/cpufreq/cpufreq.h>
 #include <xen/pmstat.h>
 
-struct pm_px *__read_mostly cpufreq_statistic_data[NR_CPUS];
+DEFINE_PER_CPU_READ_MOSTLY(struct pm_px *, cpufreq_statistic_data);
 
 extern struct list_head cpufreq_governor_list;
 
@@ -92,7 +92,7 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
 
         spin_lock(cpufreq_statistic_lock);
 
-        pxpt = cpufreq_statistic_data[op->cpuid];
+        pxpt = per_cpu(cpufreq_statistic_data, op->cpuid);
         if ( !pxpt || !pxpt->u.pt || !pxpt->u.trans_pt )
         {
             spin_unlock(cpufreq_statistic_lock);
@@ -204,7 +204,7 @@ static int get_cpufreq_para(struct xen_sysctl_pm_op *op)
     if ( !op || !cpu_online(op->cpuid) )
         return -EINVAL;
     pmpt = processor_pminfo[op->cpuid];
-    policy = cpufreq_cpu_policy[op->cpuid];
+    policy = per_cpu(cpufreq_cpu_policy, op->cpuid);
 
     if ( !pmpt || !pmpt->perf.states ||
          !policy || !policy->governor )
@@ -313,7 +313,7 @@ static int set_cpufreq_gov(struct xen_sysctl_pm_op *op)
     if ( !op || !cpu_online(op->cpuid) )
         return -EINVAL;
 
-    old_policy = cpufreq_cpu_policy[op->cpuid];
+    old_policy = per_cpu(cpufreq_cpu_policy, op->cpuid);
     if ( !old_policy )
         return -EINVAL;
 
@@ -333,7 +333,7 @@ static int set_cpufreq_para(struct xen_sysctl_pm_op *op)
 
     if ( !op || !cpu_online(op->cpuid) )
         return -EINVAL;
-    policy = cpufreq_cpu_policy[op->cpuid];
+    policy = per_cpu(cpufreq_cpu_policy, op->cpuid);
 
     if ( !policy || !policy->governor )
         return -EINVAL;

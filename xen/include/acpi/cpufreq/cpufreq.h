@@ -59,7 +59,7 @@ struct cpufreq_policy {
                                  * See CPUFREQ_TURBO_* below for defines */
     bool_t              aperf_mperf; /* CPU has APERF/MPERF MSRs */
 };
-extern struct cpufreq_policy *cpufreq_cpu_policy[NR_CPUS];
+DECLARE_PER_CPU(struct cpufreq_policy *, cpufreq_cpu_policy);
 
 extern int __cpufreq_set_policy(struct cpufreq_policy *data,
                                 struct cpufreq_policy *policy);

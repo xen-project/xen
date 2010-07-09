@@ -56,7 +56,7 @@ static struct dbs_tuners {
     .powersave_bias = 0,
 };
 
-static struct timer dbs_timer[NR_CPUS];
+static DEFINE_PER_CPU(struct timer, dbs_timer);
 
 int write_ondemand_sampling_rate(unsigned int sampling_rate)
 {
@@ -181,7 +181,7 @@ static void do_dbs_timer(void *dbs)
 
     dbs_check_cpu(dbs_info);
 
-    set_timer(&dbs_timer[dbs_info->cpu],
+    set_timer(&per_cpu(dbs_timer, dbs_info->cpu),
             align_timer(NOW() , dbs_tuners_ins.sampling_rate));
 }
 
@@ -189,10 +189,10 @@ static void dbs_timer_init(struct cpu_dbs_info_s *dbs_info)
 {
     dbs_info->enable = 1;
 
-    init_timer(&dbs_timer[dbs_info->cpu], do_dbs_timer, 
+    init_timer(&per_cpu(dbs_timer, dbs_info->cpu), do_dbs_timer,
         (void *)dbs_info, dbs_info->cpu);
 
-    set_timer(&dbs_timer[dbs_info->cpu], NOW()+dbs_tuners_ins.sampling_rate);
+    set_timer(&per_cpu(dbs_timer, dbs_info->cpu), NOW()+dbs_tuners_ins.sampling_rate);
 
     if ( processor_pminfo[dbs_info->cpu]->perf.shared_type
             == CPUFREQ_SHARED_TYPE_HW )
@@ -205,7 +205,7 @@ static void dbs_timer_exit(struct cpu_dbs_info_s *dbs_info)
 {
     dbs_info->enable = 0;
     dbs_info->stoppable = 0;
-    kill_timer(&dbs_timer[dbs_info->cpu]);
+    kill_timer(&per_cpu(dbs_timer, dbs_info->cpu));
 }
 
 int cpufreq_governor_dbs(struct cpufreq_policy *policy, unsigned int event)
@@ -362,7 +362,7 @@ void cpufreq_dbs_timer_suspend(void)
 
     if ( per_cpu(cpu_dbs_info,cpu).stoppable )
     {
-        stop_timer( &dbs_timer[cpu] );
+        stop_timer( &per_cpu(dbs_timer, cpu) );
     }
 }
 
@@ -377,7 +377,7 @@ void cpufreq_dbs_timer_resume(void)
     if ( per_cpu(cpu_dbs_info,cpu).stoppable )
     {
         now = NOW();
-        t = &dbs_timer[cpu];
+        t = &per_cpu(dbs_timer, cpu);
         if (t->expires <= now)
         {
             t->function(t->data);

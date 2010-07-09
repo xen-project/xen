@@ -58,7 +58,7 @@ struct pm_px {
     uint64_t prev_idle_wall;
 };
 
-extern struct pm_px *cpufreq_statistic_data[NR_CPUS];
+DECLARE_PER_CPU(struct pm_px *, cpufreq_statistic_data);
 
 int cpufreq_cpu_init(unsigned int cpuid);
 #endif /* __XEN_PROCESSOR_PM_H__ */

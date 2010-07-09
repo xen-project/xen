@@ -90,8 +90,7 @@ int cpufreq_register_governor(struct cpufreq_governor *governor)
 
 int cpufreq_unregister_governor(struct cpufreq_governor *governor)
 {
-    int cpu = smp_processor_id();
-    struct cpufreq_policy *policy = cpufreq_cpu_policy[cpu];
+    struct cpufreq_policy *policy = this_cpu(cpufreq_cpu_policy);
 
     if (!governor || !policy)
         return -EINVAL;
@@ -110,10 +109,11 @@ int cpufreq_unregister_governor(struct cpufreq_governor *governor)
 int cpufreq_limit_change(unsigned int cpu)
 {
     struct processor_performance *perf = &processor_pminfo[cpu]->perf;
-    struct cpufreq_policy *data = cpufreq_cpu_policy[cpu];
+    struct cpufreq_policy *data;
     struct cpufreq_policy policy;
 
-    if (!cpu_online(cpu) || !data || !processor_pminfo[cpu])
+    if (!cpu_online(cpu) || !(data = per_cpu(cpufreq_cpu_policy, cpu)) ||
+        !processor_pminfo[cpu])
         return -ENODEV;
 
     if ((perf->platform_limit < 0) || 
@@ -149,7 +149,7 @@ int cpufreq_add_cpu(unsigned int cpu)
     if (!cpufreq_driver)
         return 0;
 
-    if (cpufreq_cpu_policy[cpu])
+    if (per_cpu(cpufreq_cpu_policy, cpu))
         return 0;
 
     if (perf->shared_type == CPUFREQ_SHARED_TYPE_HW)
@@ -200,21 +200,21 @@ int cpufreq_add_cpu(unsigned int cpu)
 
         memset(policy, 0, sizeof(struct cpufreq_policy));
         policy->cpu = cpu;
-        cpufreq_cpu_policy[cpu] = policy;
+        per_cpu(cpufreq_cpu_policy, cpu) = policy;
 
         ret = cpufreq_driver->init(policy);
         if (ret) {
             xfree(policy);
-            cpufreq_cpu_policy[cpu] = NULL;
+            per_cpu(cpufreq_cpu_policy, cpu) = NULL;
             return ret;
         }
         if (cpufreq_verbose)
             printk("CPU %u initialization completed\n", cpu);
     } else {
         firstcpu = first_cpu(cpufreq_dom->map);
-        policy = cpufreq_cpu_policy[firstcpu];
+        policy = per_cpu(cpufreq_cpu_policy, firstcpu);
 
-        cpufreq_cpu_policy[cpu] = policy;
+        per_cpu(cpufreq_cpu_policy, cpu) = policy;
         if (cpufreq_verbose)
             printk("adding CPU %u\n", cpu);
     }
@@ -255,7 +255,7 @@ int cpufreq_add_cpu(unsigned int cpu)
 err2:
     cpufreq_statistic_exit(cpu);
 err1:
-    cpufreq_cpu_policy[cpu] = NULL;
+    per_cpu(cpufreq_cpu_policy, cpu) = NULL;
     cpu_clear(cpu, policy->cpus);
     cpu_clear(cpu, cpufreq_dom->map);
 
@@ -287,14 +287,14 @@ int cpufreq_del_cpu(unsigned int cpu)
         !cpu_online(cpu))
         return -EINVAL;
 
-    if (!cpufreq_cpu_policy[cpu])
+    if (!per_cpu(cpufreq_cpu_policy, cpu))
         return 0;
 
     if (perf->shared_type == CPUFREQ_SHARED_TYPE_HW)
         hw_all = 1;
 
     dom = perf->domain_info.domain;
-    policy = cpufreq_cpu_policy[cpu];
+    policy = per_cpu(cpufreq_cpu_policy, cpu);
 
     list_for_each(pos, &cpufreq_dom_list_head) {
         cpufreq_dom = list_entry(pos, struct cpufreq_dom, node);
@@ -314,7 +314,7 @@ int cpufreq_del_cpu(unsigned int cpu)
         __cpufreq_governor(policy, CPUFREQ_GOV_STOP);
 
     cpufreq_statistic_exit(cpu);
-    cpufreq_cpu_policy[cpu] = NULL;
+    per_cpu(cpufreq_cpu_policy, cpu) = NULL;
     cpu_clear(cpu, policy->cpus);
     cpu_clear(cpu, cpufreq_dom->map);
 

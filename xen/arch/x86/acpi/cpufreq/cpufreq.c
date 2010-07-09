@@ -210,10 +210,10 @@ static u32 get_cur_val(cpumask_t mask)
 
     if (!cpu_isset(cpu, mask))
         cpu = first_cpu(mask);
-    if (cpu >= NR_CPUS)
+    if (cpu >= NR_CPUS || !cpu_online(cpu))
         return 0;
 
-    policy = cpufreq_cpu_policy[cpu];
+    policy = per_cpu(cpufreq_cpu_policy, cpu);
     if (!policy || !drv_data[policy->cpu])
         return 0;    
 
@@ -281,7 +281,7 @@ unsigned int get_measured_perf(unsigned int cpu, unsigned int flag)
     if (!cpu_online(cpu))
         return 0;
 
-    policy = cpufreq_cpu_policy[cpu];
+    policy = per_cpu(cpufreq_cpu_policy, cpu);
     if (!policy || !policy->aperf_mperf)
         return 0;
 
@@ -366,7 +366,10 @@ static unsigned int get_cur_freq_on_cpu(unsigned int cpu)
     struct acpi_cpufreq_data *data;
     unsigned int freq;
 
-    policy = cpufreq_cpu_policy[cpu];
+    if (!cpu_online(cpu))
+        return 0;
+
+    policy = per_cpu(cpufreq_cpu_policy, cpu);
     if (!policy)
         return 0;
 

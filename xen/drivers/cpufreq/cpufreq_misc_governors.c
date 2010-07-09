@@ -63,9 +63,9 @@ static int cpufreq_governor_userspace(struct cpufreq_policy *policy,
 
 int write_userspace_scaling_setspeed(unsigned int cpu, unsigned int freq)
 {
-    struct cpufreq_policy *policy = cpufreq_cpu_policy[cpu];
+    struct cpufreq_policy *policy;
 
-    if (!cpu_online(cpu) || !policy)
+    if (!cpu_online(cpu) || !(policy = per_cpu(cpufreq_cpu_policy, cpu)))
         return -EINVAL;
 
     cpu_set_freq[cpu] = freq;
