@@ -2011,6 +2011,8 @@ void hvm_rdtsc_intercept(struct cpu_user_regs *regs)
     tsc = hvm_get_guest_tsc(v);
     regs->eax = (uint32_t)tsc;
     regs->edx = (uint32_t)(tsc >> 32);
+
+    HVMTRACE_2D(RDTSC, regs->eax, regs->edx);
 }
 
 int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)

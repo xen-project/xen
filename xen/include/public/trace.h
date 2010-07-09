@@ -156,6 +156,7 @@
 #define TRC_HVM_CLTS            (TRC_HVM_HANDLER + 0x18)
 #define TRC_HVM_LMSW            (TRC_HVM_HANDLER + 0x19)
 #define TRC_HVM_LMSW64          (TRC_HVM_HANDLER + TRC_64_FLAG + 0x19)
+#define TRC_HVM_RDTSC           (TRC_HVM_HANDLER + 0x1a)
 #define TRC_HVM_INTR_WINDOW     (TRC_HVM_HANDLER + 0x20)
 #define TRC_HVM_NPF             (TRC_HVM_HANDLER + 0x21)
 
