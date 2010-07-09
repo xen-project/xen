@@ -1214,7 +1214,7 @@ void help(char *command)
     struct cmd_spec *cmd;
 
     if (!command || !strcmp(command, "help")) {
-        printf("Usage xl [-v] <subcommand> [args]\n\n");
+        printf("Usage xl <subcommand> [args]\n\n");
         printf("xl full list of subcommands:\n\n");
         for (i = 0; i < cmdtable_len; i++)
             printf(" %-20s%s\n",
