@@ -184,8 +184,6 @@ int hvm_save(struct domain *d, hvm_domain_context_t *h)
 
 int hvm_load(struct domain *d, hvm_domain_context_t *h)
 {
-    char *c;
-    uint64_t cset;
     struct hvm_save_header hdr;
     struct hvm_save_descriptor *desc;
     hvm_load_handler handler;
@@ -200,21 +198,6 @@ int hvm_load(struct domain *d, hvm_domain_context_t *h)
 
     if ( arch_hvm_load(d, &hdr) )
         return -1;
-
-    c = strrchr(xen_changeset(), ':');
-    if ( hdr.changeset == -1ULL )
-        gdprintk(XENLOG_WARNING, 
-                 "HVM restore: Xen changeset was not saved.\n");
-    else if ( c == NULL )
-        gdprintk(XENLOG_WARNING, 
-                 "HVM restore: Xen changeset is not available.\n");
-    else
-    {
-        cset = simple_strtoll(c, NULL, 16);
-        if ( hdr.changeset != cset )
-        gdprintk(XENLOG_WARNING, "HVM restore: saved Xen changeset (%#"PRIx64
-                 ") does not match host (%#"PRIx64").\n", hdr.changeset, cset);
-    }
 
     /* Down all the vcpus: we only re-enable the ones that had state saved. */
     for_each_vcpu(d, v) 
