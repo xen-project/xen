@@ -41,13 +41,13 @@ static void intel_thermal_interrupt(struct cpu_user_regs *regs)
 {
     uint64_t msr_content;
     unsigned int cpu = smp_processor_id();
-    static s_time_t next[NR_CPUS];
+    static DEFINE_PER_CPU(s_time_t, next);
 
     ack_APIC_irq();
-    if (NOW() < next[cpu])
+    if (NOW() < per_cpu(next, cpu))
         return;
 
-    next[cpu] = NOW() + MILLISECS(5000);
+    per_cpu(next, cpu) = NOW() + MILLISECS(5000);
     rdmsrl(MSR_IA32_THERM_STATUS, msr_content);
     if (msr_content & 0x1) {
         printk(KERN_EMERG "CPU%d: Temperature above threshold\n", cpu);

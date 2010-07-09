@@ -109,15 +109,19 @@ static struct mc_telem_ctl {
 	 * Telemetry array
 	 */
 	struct mctelem_ent *mctc_elems;
+} mctctl;
+
+struct mc_telem_cpu_ctl {
 	/*
 	 * Per-CPU processing lists, used for deferred (softirq)
-	 * processing of telemetry. mctc_cpu is indexed by the
-	 * CPU that the telemetry belongs to. mctc_cpu_processing
-	 * is indexed by the CPU that is processing the telemetry.
+	 * processing of telemetry. @pending is indexed by the
+	 * CPU that the telemetry belongs to. @processing is indexed
+	 * by the CPU that is processing the telemetry.
 	 */
-	struct mctelem_ent *mctc_cpu[NR_CPUS];
-	struct mctelem_ent *mctc_cpu_processing[NR_CPUS];
-} mctctl;
+	struct mctelem_ent *pending;
+	struct mctelem_ent *processing;
+};
+static DEFINE_PER_CPU(struct mc_telem_cpu_ctl, mctctl);
 
 /* Lock protecting all processing lists */
 static DEFINE_SPINLOCK(processing_lock);
@@ -139,8 +143,7 @@ void mctelem_defer(mctelem_cookie_t cookie)
 {
 	struct mctelem_ent *tep = COOKIE2MCTE(cookie);
 
-	mctelem_xchg_head(&mctctl.mctc_cpu[smp_processor_id()],
-	    &tep->mcte_next, tep);
+	mctelem_xchg_head(&this_cpu(mctctl.pending), &tep->mcte_next, tep);
 }
 
 void mctelem_process_deferred(unsigned int cpu,
@@ -154,10 +157,10 @@ void mctelem_process_deferred(unsigned int cpu,
 	 * First, unhook the list of telemetry structures, and	
 	 * hook it up to the processing list head for this CPU.
 	 */
-	mctelem_xchg_head(&mctctl.mctc_cpu[cpu],
-	    &mctctl.mctc_cpu_processing[smp_processor_id()], NULL);
+	mctelem_xchg_head(&per_cpu(mctctl.pending, cpu),
+			  &this_cpu(mctctl.processing), NULL);
 
-	head = mctctl.mctc_cpu_processing[smp_processor_id()];
+	head = this_cpu(mctctl.processing);
 
 	/*
 	 * Then, fix up the list to include prev pointers, to make
@@ -193,7 +196,7 @@ void mctelem_process_deferred(unsigned int cpu,
 
 int mctelem_has_deferred(unsigned int cpu)
 {
-	if (mctctl.mctc_cpu[cpu] != NULL)
+	if (per_cpu(mctctl.pending, cpu) != NULL)
 		return 1;
 	return 0;
 }
