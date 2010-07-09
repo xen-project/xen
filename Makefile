@@ -74,7 +74,7 @@ install-kernels:
 	for i in $(XKERNELS) ; do $(MAKE) $$i-install || exit 1; done
 
 .PHONY: install-stubdom
-install-stubdom: tools/ioemu-dir
+install-stubdom: tools/ioemu-dir install-tools
 	$(MAKE) -C stubdom install
 ifeq (x86_64,$(XEN_TARGET_ARCH))
 	XEN_TARGET_ARCH=x86_32 $(MAKE) -C stubdom install-grub
