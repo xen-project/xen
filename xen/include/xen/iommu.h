@@ -26,7 +26,7 @@
 #include <public/hvm/ioreq.h>
 #include <public/domctl.h>
 
-extern bool_t iommu_enabled, iommu_pv_enabled;
+extern bool_t iommu_enabled;
 extern bool_t force_iommu, iommu_verbose;
 extern bool_t iommu_workaround_bios_bug, iommu_passthrough;
 extern bool_t iommu_snoop, iommu_qinval, iommu_intremap;

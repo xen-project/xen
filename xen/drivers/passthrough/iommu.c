@@ -27,8 +27,6 @@ static int iommu_populate_page_table(struct domain *d);
  * value may contain:
  *
  *   off|no|false|disable       Disable IOMMU (default)
- *   pv                         Enable IOMMU for PV domains
- *   no-pv                      Disable IOMMU for PV domains (default)
  *   force|required             Don't boot unless IOMMU is enabled
  *   workaround_bios_bug        Workaround some bios issue to still enable
                                 VT-d, don't guarantee security
@@ -40,7 +38,6 @@ static int iommu_populate_page_table(struct domain *d);
  */
 custom_param("iommu", parse_iommu_param);
 bool_t __read_mostly iommu_enabled = 1;
-bool_t __read_mostly iommu_pv_enabled;
 bool_t __read_mostly force_iommu;
 bool_t __read_mostly iommu_verbose;
 bool_t __read_mostly iommu_workaround_bios_bug;
@@ -63,10 +60,6 @@ static void __init parse_iommu_param(char *s)
         if ( !strcmp(s, "off") || !strcmp(s, "no") || !strcmp(s, "false") ||
              !strcmp(s, "0") || !strcmp(s, "disable") )
             iommu_enabled = 0;
-        else if ( !strcmp(s, "pv") )
-            iommu_pv_enabled = 1;
-        else if ( !strcmp(s, "no-pv") )
-            iommu_pv_enabled = 0;
         else if ( !strcmp(s, "force") || !strcmp(s, "required") )
             force_iommu = 1;
         else if ( !strcmp(s, "workaround_bios_bug") )
@@ -294,15 +287,11 @@ int __init iommu_setup(void)
 
     if ( !iommu_enabled )
     {
-        iommu_pv_enabled = 0;
         iommu_snoop = 0;
         iommu_qinval = 0;
         iommu_intremap = 0;
     }
     printk("I/O virtualisation %sabled\n", iommu_enabled ? "en" : "dis");
-    if ( iommu_enabled )
-        printk("I/O virtualisation for PV guests %sabled\n",
-               iommu_pv_enabled ? "en" : "dis");
     return rc;
 }
 

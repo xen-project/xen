@@ -841,12 +841,6 @@ long arch_do_domctl(
         bus = (domctl->u.assign_device.machine_bdf >> 16) & 0xff;
         devfn = (domctl->u.assign_device.machine_bdf >> 8) & 0xff;
 
-        if ( !iommu_pv_enabled && !is_hvm_domain(d) )
-        {
-            ret = -ENOSYS;
-            goto assign_device_out;
-        }
-
         ret = assign_device(d, bus, devfn);
         if ( ret )
             gdprintk(XENLOG_ERR, "XEN_DOMCTL_assign_device: "
@@ -882,11 +876,6 @@ long arch_do_domctl(
         bus = (domctl->u.assign_device.machine_bdf >> 16) & 0xff;
         devfn = (domctl->u.assign_device.machine_bdf >> 8) & 0xff;
 
-        if ( !iommu_pv_enabled && !is_hvm_domain(d) )
-        {
-            ret = -ENOSYS;
-            goto deassign_device_out;
-        }
         spin_lock(&pcidevs_lock);
         ret = deassign_device(d, bus, devfn);
         spin_unlock(&pcidevs_lock);
