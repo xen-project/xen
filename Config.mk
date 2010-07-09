@@ -154,9 +154,9 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= add968aaf68cb57257428f8cfadb209f2614a6d8
-# Fri Jul 2 17:36:01 2010 +0100
-# Revert "Wait for frontend state Connected before connecting the backend"
+QEMU_TAG ?= 833e7e9a4c95739429dc0c803bbbf2346f9897fd
+# Thu Jul 8 17:33:29 2010 +0100
+# Move the xenfb pointer handler to the connected method
 
 # Optional components
 XENSTAT_XENTOP     ?= y
