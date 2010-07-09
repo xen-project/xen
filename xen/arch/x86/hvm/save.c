@@ -55,10 +55,11 @@ int arch_hvm_load(struct domain *d, struct hvm_save_header *hdr)
     }
 
     cpuid(1, &eax, &ebx, &ecx, &edx);
-    /* TODO: need to define how big a difference is acceptable? */
-    if ( hdr->cpuid != eax )
-        gdprintk(XENLOG_WARNING, "HVM restore: saved CPUID (%#"PRIx32") "
-               "does not match host (%#"PRIx32").\n", hdr->cpuid, eax);
+    /* CPUs ought to match but with feature-masking they might not */
+    if ( (hdr->cpuid & ~0x0fUL) != (eax & ~0x0fUL) )
+        gdprintk(XENLOG_INFO, "HVM restore (%u): VM saved on one CPU "
+                 "(%#"PRIx32") and restored on another (%#"PRIx32").\n", 
+                 d->domain_id, hdr->cpuid, eax);
 
     /* Restore guest's preferred TSC frequency. */
     if ( hdr->gtsc_khz )
