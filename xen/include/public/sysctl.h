@@ -468,17 +468,17 @@ struct xen_sysctl_topologyinfo {
      * IN: maximum addressable entry in the caller-provided arrays.
      * OUT: largest cpu identifier in the system.
      * If OUT is greater than IN then the arrays are truncated!
+     * If OUT is leass than IN then the array tails are not written by sysctl.
      */
     uint32_t max_cpu_index;
 
     /*
-     * If not NULL, this array is filled with core/socket/node identifier for 
-     * each cpu.
+     * If not NULL, these arrays are filled with core/socket/node identifier
+     * for each cpu.
      * If a cpu has no core/socket/node information (e.g., cpu not present) 
-     * then the sentinel value ~0u is written.
-     * The size of this array is specified by the caller (@max_cpu_index+1).
-     * If the array has more than @max_cpu_index+1 elements then the trailing
-     * elements of the array will not be written by the sysctl.
+     * then the sentinel value ~0u is written to each array.
+     * The number of array elements written by the sysctl is:
+     *   min(@max_cpu_index_IN,@max_cpu_index_OUT)+1
      */
     XEN_GUEST_HANDLE_64(uint32) cpu_to_core;
     XEN_GUEST_HANDLE_64(uint32) cpu_to_socket;
