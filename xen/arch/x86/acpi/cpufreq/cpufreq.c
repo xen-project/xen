@@ -180,7 +180,7 @@ static void drv_read(struct drv_cmd *cmd)
 {
     cmd->val = 0;
 
-    ASSERT(cpus_weight(cmd->mask) == 1);
+    ASSERT(cpumask_weight(cmd->mask) == 1);
 
     /* to reduce IPI for the sake of performance */
     if (likely(cpumask_test_cpu(smp_processor_id(), cmd->mask)))

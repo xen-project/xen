@@ -192,6 +192,7 @@ static inline int __cpus_full(const cpumask_t *srcp, int nbits)
 	return bitmap_full(srcp->bits, nbits);
 }
 
+#define cpumask_weight(cpumask) __cpus_weight(cpumask, NR_CPUS)
 #define cpus_weight(cpumask) __cpus_weight(&(cpumask), NR_CPUS)
 static inline int __cpus_weight(const cpumask_t *srcp, int nbits)
 {
