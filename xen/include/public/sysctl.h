@@ -476,8 +476,8 @@ struct xen_sysctl_topologyinfo {
      * each cpu.
      * If a cpu has no core/socket/node information (e.g., cpu not present) 
      * then the sentinel value ~0u is written.
-     * The size of this array is specified by the caller in @max_cpu_index.
-     * If the actual @max_cpu_index is smaller than the array then the trailing
+     * The size of this array is specified by the caller (@max_cpu_index+1).
+     * If the array has more than @max_cpu_index+1 elements then the trailing
      * elements of the array will not be written by the sysctl.
      */
     XEN_GUEST_HANDLE_64(uint32) cpu_to_core;
