@@ -560,8 +560,8 @@ static int msix_capability_init(struct pci_dev *dev,
 
     /* Request & Map MSI-X table region */
     table_offset = pci_conf_read32(bus, slot, func, msix_table_offset_reg(pos));
-    bir = (u8)(table_offset & PCI_MSIX_FLAGS_BIRMASK);
-    table_offset &= ~PCI_MSIX_FLAGS_BIRMASK;
+    bir = (u8)(table_offset & PCI_MSIX_BIRMASK);
+    table_offset &= ~PCI_MSIX_BIRMASK;
     entry_offset = msi->entry_nr * PCI_MSIX_ENTRY_SIZE;
 
     table_paddr = msi->table_base + table_offset;

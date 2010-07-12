@@ -119,14 +119,6 @@ int msi_free_irq(struct msi_desc *entry);
 
 extern const struct hw_interrupt_type pci_msi_type;
 
-/*
- * MSI-X Address Register
- */
-#define PCI_MSIX_FLAGS_QSIZE		0x7FF
-#define PCI_MSIX_FLAGS_ENABLE		(1 << 15)
-#define PCI_MSIX_FLAGS_BIRMASK		(7 << 0)
-#define PCI_MSIX_FLAGS_BITMASK		(1 << 0)
-
 #define PCI_MSIX_ENTRY_SIZE			16
 #define  PCI_MSIX_ENTRY_LOWER_ADDR_OFFSET	0
 #define  PCI_MSIX_ENTRY_UPPER_ADDR_OFFSET	4
@@ -151,15 +143,14 @@ extern const struct hw_interrupt_type pci_msi_type;
 	control |= PCI_MSI_FLAGS_ENABLE
 
 #define msix_control_reg(base)		(base + PCI_MSIX_FLAGS)
-#define msix_table_offset_reg(base)	(base + 0x04)
-#define msix_pba_offset_reg(base)	(base + 0x08)
+#define msix_table_offset_reg(base)	(base + PCI_MSIX_TABLE)
+#define msix_pba_offset_reg(base)	(base + PCI_MSIX_PBA)
 #define msix_enable(control)	 	control |= PCI_MSIX_FLAGS_ENABLE
 #define msix_disable(control)	 	control &= ~PCI_MSIX_FLAGS_ENABLE
 #define msix_table_size(control) 	((control & PCI_MSIX_FLAGS_QSIZE)+1)
 #define multi_msix_capable		msix_table_size
-#define msix_unmask(address)	 	(address & ~PCI_MSIX_FLAGS_BITMASK)
-#define msix_mask(address)		(address | PCI_MSIX_FLAGS_BITMASK)
-#define msix_is_pending(address) 	(address & PCI_MSIX_FLAGS_PENDMASK)
+#define msix_unmask(address)	 	(address & ~PCI_MSIX_VECTOR_BITMASK)
+#define msix_mask(address)		(address | PCI_MSIX_VECTOR_BITMASK)
 
 /*
  * MSI Defined Data Structures
