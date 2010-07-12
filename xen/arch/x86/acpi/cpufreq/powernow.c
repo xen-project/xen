@@ -66,7 +66,7 @@ static struct cpufreq_driver powernow_cpufreq_driver;
 
 struct drv_cmd {
     unsigned int type;
-    cpumask_t mask;
+    const cpumask_t *mask;
     u32 val;
     int turbo;
 };
@@ -124,12 +124,10 @@ static int powernow_cpufreq_target(struct cpufreq_policy *policy,
             return 0;
     }
 
-    cpus_clear(cmd.mask);
-
     if (policy->shared_type != CPUFREQ_SHARED_TYPE_ANY)
-        cmd.mask = online_policy_cpus;
+        cmd.mask = &online_policy_cpus;
     else
-        cpu_set(policy->cpu, cmd.mask);
+        cmd.mask = cpumask_of(policy->cpu);
 
     freqs.old = perf->states[perf->state].core_frequency * 1000;
     freqs.new = data->freq_table[next_state].frequency;
@@ -137,7 +135,7 @@ static int powernow_cpufreq_target(struct cpufreq_policy *policy,
     cmd.val = next_perf_state;
     cmd.turbo = policy->turbo;
 
-    on_selected_cpus(&cmd.mask, transition_pstate, &cmd, 1);
+    on_selected_cpus(cmd.mask, transition_pstate, &cmd, 1);
 
     for_each_cpu_mask(j, online_policy_cpus)
         cpufreq_statistic_update(j, perf->state, next_perf_state);

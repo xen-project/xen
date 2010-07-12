@@ -460,7 +460,7 @@ void irq_complete_move(struct irq_desc **descp)
     vector = get_irq_regs()->entry_vector;
     me = smp_processor_id();
 
-    if (vector == cfg->vector && cpumask_test_cpu(me, cfg->domain))
+    if (vector == cfg->vector && cpu_isset(me, cfg->domain))
         send_cleanup_vector(cfg);
 }
 

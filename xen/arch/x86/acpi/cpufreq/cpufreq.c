@@ -129,7 +129,7 @@ typedef union {
 
 struct drv_cmd {
     unsigned int type;
-    cpumask_t mask;
+    const cpumask_t *mask;
     drv_addr_union addr;
     u32 val;
 };
@@ -183,33 +183,32 @@ static void drv_read(struct drv_cmd *cmd)
     ASSERT(cpus_weight(cmd->mask) == 1);
 
     /* to reduce IPI for the sake of performance */
-    if (likely(cpu_isset(smp_processor_id(), cmd->mask)))
+    if (likely(cpumask_test_cpu(smp_processor_id(), cmd->mask)))
         do_drv_read((void *)cmd);
     else
-        on_selected_cpus(&cmd->mask, do_drv_read, cmd, 1);
+        on_selected_cpus(cmd->mask, do_drv_read, cmd, 1);
 }
 
 static void drv_write(struct drv_cmd *cmd)
 {
-    if ((cpus_weight(cmd->mask) ==  1) &&
-        cpu_isset(smp_processor_id(), cmd->mask))
+    if (cpumask_equal(cmd->mask, cpumask_of(smp_processor_id())))
         do_drv_write((void *)cmd);
     else
-        on_selected_cpus(&cmd->mask, do_drv_write, cmd, 1);
+        on_selected_cpus(cmd->mask, do_drv_write, cmd, 1);
 }
 
-static u32 get_cur_val(cpumask_t mask)
+static u32 get_cur_val(const cpumask_t *mask)
 {
     struct cpufreq_policy *policy;
     struct processor_performance *perf;
     struct drv_cmd cmd;
     unsigned int cpu = smp_processor_id();
 
-    if (unlikely(cpus_empty(mask)))
+    if (unlikely(cpumask_empty(mask)))
         return 0;
 
-    if (!cpu_isset(cpu, mask))
-        cpu = first_cpu(mask);
+    if (!cpumask_test_cpu(cpu, mask))
+        cpu = cpumask_first(mask);
     if (cpu >= NR_CPUS || !cpu_online(cpu))
         return 0;
 
@@ -232,7 +231,7 @@ static u32 get_cur_val(cpumask_t mask)
         return 0;
     }
 
-    cmd.mask = cpumask_of_cpu(cpu);
+    cmd.mask = cpumask_of(cpu);
 
     drv_read(&cmd);
     return cmd.val;
@@ -378,7 +377,7 @@ static unsigned int get_cur_freq_on_cpu(unsigned int cpu)
         data->acpi_data == NULL || data->freq_table == NULL))
         return 0;
 
-    freq = extract_freq(get_cur_val(cpumask_of_cpu(cpu)), data);
+    freq = extract_freq(get_cur_val(cpumask_of(cpu)), data);
     return freq;
 }
 
@@ -402,7 +401,7 @@ static void feature_detect(void *info)
     }
 }
 
-static unsigned int check_freqs(cpumask_t mask, unsigned int freq,
+static unsigned int check_freqs(const cpumask_t *mask, unsigned int freq,
                                 struct acpi_cpufreq_data *data)
 {
     unsigned int cur_freq;
@@ -473,12 +472,10 @@ static int acpi_cpufreq_target(struct cpufreq_policy *policy,
         return -ENODEV;
     }
 
-    cpus_clear(cmd.mask);
-
     if (policy->shared_type != CPUFREQ_SHARED_TYPE_ANY)
-        cmd.mask = online_policy_cpus;
+        cmd.mask = &online_policy_cpus;
     else
-        cpu_set(policy->cpu, cmd.mask);
+        cmd.mask = cpumask_of(policy->cpu);
 
     freqs.old = perf->states[perf->state].core_frequency * 1000;
     freqs.new = data->freq_table[next_state].frequency;

@@ -210,7 +210,7 @@ again:
     {
         write_lock_irq(&ch->cpumask_lock);
 
-        if ( cpumask_test_cpu(cpu, ch->cpumask) )
+        if ( cpu_isset(cpu, ch->cpumask) )
         {
             if ( per_cpu(timer_deadline_start, cpu) <= now )
                 cpu_set(cpu, mask);

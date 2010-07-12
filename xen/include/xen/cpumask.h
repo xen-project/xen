@@ -106,22 +106,13 @@ static inline void __cpus_clear(cpumask_t *dstp, int nbits)
 }
 
 /* No static inline type checking - see Subtlety (1) above. */
+#define cpumask_test_cpu(cpu, cpumask) test_bit(cpu, (cpumask)->bits)
 #define cpu_isset(cpu, cpumask) test_bit((cpu), (cpumask).bits)
 
 #define cpu_test_and_set(cpu, cpumask) __cpu_test_and_set((cpu), &(cpumask))
 static inline int __cpu_test_and_set(int cpu, cpumask_t *addr)
 {
 	return test_and_set_bit(cpu, addr->bits);
-}
-
-/**
- * cpumask_test_cpu - test for a cpu in a cpumask
- */
-#define cpumask_test_cpu(cpu, cpumask) __cpu_test((cpu), &(cpumask))
-
-static inline int __cpu_test(int cpu, cpumask_t *addr)
-{
-	return test_bit(cpu, addr->bits);
 }
 
 #define cpu_test_and_clear(cpu, cpumask) __cpu_test_and_clear((cpu), &(cpumask))
@@ -166,6 +157,7 @@ static inline void __cpus_complement(cpumask_t *dstp,
 	bitmap_complement(dstp->bits, srcp->bits, nbits);
 }
 
+#define cpumask_equal(src1, src2) __cpus_equal(src1, src2, NR_CPUS)
 #define cpus_equal(src1, src2) __cpus_equal(&(src1), &(src2), NR_CPUS)
 static inline int __cpus_equal(const cpumask_t *src1p,
 					const cpumask_t *src2p, int nbits)
@@ -187,6 +179,7 @@ static inline int __cpus_subset(const cpumask_t *src1p,
 	return bitmap_subset(src1p->bits, src2p->bits, nbits);
 }
 
+#define cpumask_empty(src) __cpus_empty(src, NR_CPUS)
 #define cpus_empty(src) __cpus_empty(&(src), NR_CPUS)
 static inline int __cpus_empty(const cpumask_t *srcp, int nbits)
 {
@@ -227,18 +220,21 @@ static inline void __cpus_shift_left(cpumask_t *dstp,
 	bitmap_shift_left(dstp->bits, srcp->bits, n, nbits);
 }
 
+#define cpumask_first(src) __first_cpu(src, NR_CPUS)
 #define first_cpu(src) __first_cpu(&(src), NR_CPUS)
 static inline int __first_cpu(const cpumask_t *srcp, int nbits)
 {
 	return min_t(int, nbits, find_first_bit(srcp->bits, nbits));
 }
 
+#define cpumask_next(n, src) __next_cpu(n, src, NR_CPUS)
 #define next_cpu(n, src) __next_cpu((n), &(src), NR_CPUS)
 static inline int __next_cpu(int n, const cpumask_t *srcp, int nbits)
 {
 	return min_t(int, nbits, find_next_bit(srcp->bits, nbits, n+1));
 }
 
+#define cpumask_last(src) __last_cpu(src, NR_CPUS)
 #define last_cpu(src) __last_cpu(&(src), NR_CPUS)
 static inline int __last_cpu(const cpumask_t *srcp, int nbits)
 {
@@ -250,6 +246,7 @@ static inline int __last_cpu(const cpumask_t *srcp, int nbits)
 	return pcpu;
 }
 
+#define cpumask_cycle(n, src) __cycle_cpu(n, src, NR_CPUS)
 #define cycle_cpu(n, src) __cycle_cpu((n), &(src), NR_CPUS)
 static inline int __cycle_cpu(int n, const cpumask_t *srcp, int nbits)
 {
