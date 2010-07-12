@@ -787,6 +787,13 @@ s_time_t get_s_time(void)
     return now;
 }
 
+uint64_t tsc_ticks2ns(uint64_t ticks)
+{
+    struct cpu_time *t = &this_cpu(cpu_time);
+
+    return scale_delta(ticks, &t->tsc_scale);
+}
+
 /* Explicitly OR with 1 just in case version number gets out of sync. */
 #define version_update_begin(v) (((v)+1)|1)
 #define version_update_end(v)   ((v)+1)

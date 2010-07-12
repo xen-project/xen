@@ -55,6 +55,14 @@
 
 /*#define DEBUG_PM_CX*/
 
+#define GET_HW_RES_IN_NS(msr, val) \
+    do { rdmsrl(msr, val); val = tsc_ticks2ns(val); } while( 0 )
+#define GET_PC3_RES(val)  GET_HW_RES_IN_NS(0x3F8, val)
+#define GET_PC6_RES(val)  GET_HW_RES_IN_NS(0x3F9, val)
+#define GET_PC7_RES(val)  GET_HW_RES_IN_NS(0x3FA, val)
+#define GET_CC3_RES(val)  GET_HW_RES_IN_NS(0x3FC, val)
+#define GET_CC6_RES(val)  GET_HW_RES_IN_NS(0x3FD, val)
+
 static void lapic_timer_nop(void) { }
 static void (*lapic_timer_off)(void);
 static void (*lapic_timer_on)(void);
@@ -75,6 +83,63 @@ static int local_apic_timer_c2_ok __read_mostly = 0;
 boolean_param("lapic_timer_c2_ok", local_apic_timer_c2_ok);
 
 static struct acpi_processor_power *__read_mostly processor_powers[NR_CPUS];
+
+struct hw_residencies
+{
+    uint64_t pc3;
+    uint64_t pc6;
+    uint64_t pc7;
+    uint64_t cc3;
+    uint64_t cc6;
+};
+
+static void do_get_hw_residencies(void *arg)
+{
+    struct cpuinfo_x86 *c = &current_cpu_data;
+    struct hw_residencies *hw_res = (struct hw_residencies *)arg;
+
+    if ( c->x86_vendor != X86_VENDOR_INTEL || c->x86 != 6 )
+        return;
+
+    switch ( c->x86_model )
+    {
+    /* Nehalem */
+    case 0x1A:
+    case 0x1E:
+    case 0x1F:
+    case 0x2E:
+    /* Westmere */
+    case 0x25:
+    case 0x2C:
+        GET_PC3_RES(hw_res->pc3);
+        GET_PC6_RES(hw_res->pc6);
+        GET_PC7_RES(hw_res->pc7);
+        GET_CC3_RES(hw_res->cc3);
+        GET_CC6_RES(hw_res->cc6);
+        break;
+    }
+}
+
+static void get_hw_residencies(uint32_t cpu, struct hw_residencies *hw_res)
+{
+    if ( smp_processor_id() == cpu )
+        do_get_hw_residencies((void *)hw_res);
+    else
+        on_selected_cpus(cpumask_of(cpu),
+                         do_get_hw_residencies, (void *)hw_res, 1);
+}
+
+static void print_hw_residencies(uint32_t cpu)
+{
+    struct hw_residencies hw_res = {0};
+
+    get_hw_residencies(cpu, &hw_res);
+
+    printk("PC3[%"PRId64"] PC6[%"PRId64"] PC7[%"PRId64"]\n",
+           hw_res.pc3, hw_res.pc6, hw_res.pc7);
+    printk("CC3[%"PRId64"] CC6[%"PRId64"]\n",
+           hw_res.cc3, hw_res.cc6);
+}
 
 static char* acpi_cstate_method_name[] =
 {
@@ -113,6 +178,7 @@ static void print_acpi_power(uint32_t cpu, struct acpi_processor_power *power)
     printk("    C0:\tusage[%08d] duration[%"PRId64"]\n",
            idle_usage, NOW() - idle_res);
 
+    print_hw_residencies(cpu);
 }
 
 static void dump_cx(unsigned char key)
@@ -933,6 +999,7 @@ int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
     const struct acpi_processor_power *power = processor_powers[cpuid];
     uint64_t usage, res, idle_usage = 0, idle_res = 0;
     int i;
+    struct hw_residencies hw_res = {0};
 
     if ( power == NULL )
     {
@@ -964,6 +1031,14 @@ int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
              copy_to_guest_offset(stat->residencies, i, &res, 1) )
             return -EFAULT;
     }
+
+    get_hw_residencies(cpuid, &hw_res);
+
+    stat->pc3 = hw_res.pc3;
+    stat->pc6 = hw_res.pc6;
+    stat->pc7 = hw_res.pc7;
+    stat->cc3 = hw_res.cc3;
+    stat->cc6 = hw_res.cc6;
 
     return 0;
 }

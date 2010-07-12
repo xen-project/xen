@@ -223,6 +223,11 @@ struct pm_cx_stat {
     uint64_aligned_t idle_time;                 /* idle time from boot */
     XEN_GUEST_HANDLE_64(uint64) triggers;    /* Cx trigger counts */
     XEN_GUEST_HANDLE_64(uint64) residencies; /* Cx residencies */
+    uint64_aligned_t pc3;
+    uint64_aligned_t pc6;
+    uint64_aligned_t pc7;
+    uint64_aligned_t cc3;
+    uint64_aligned_t cc6;
 };
 
 struct xen_sysctl_get_pmstat {
