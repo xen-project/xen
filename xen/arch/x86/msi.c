@@ -676,7 +676,7 @@ static int __pci_enable_msix(struct msi_info *msi, struct msi_desc **desc)
         return -ENODEV;
 
     pos = pci_find_cap_offset(msi->bus, slot, func, PCI_CAP_ID_MSIX);
-    control = pci_conf_read16(msi->bus, slot, func, msi_control_reg(pos));
+    control = pci_conf_read16(msi->bus, slot, func, msix_control_reg(pos));
     nr_entries = multi_msix_capable(control);
     if (msi->entry_nr >= nr_entries)
         return -EINVAL;
