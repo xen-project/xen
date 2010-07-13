@@ -16,8 +16,12 @@ struct vcpu;
 
 struct cpu_info {
     struct cpu_user_regs guest_cpu_user_regs;
-    unsigned int         processor_id;
-    struct vcpu         *current_vcpu;
+    unsigned int processor_id;
+    struct vcpu *current_vcpu;
+    unsigned long per_cpu_offset;
+#ifdef __x86_64__ /* get_stack_bottom() must be 16-byte aligned */
+    unsigned long __pad_for_stack_bottom;
+#endif
 };
 
 static inline struct cpu_info *get_cpu_info(void)
@@ -35,7 +39,10 @@ static inline struct cpu_info *get_cpu_info(void)
 #define current               (get_current())
 
 #define get_processor_id()    (get_cpu_info()->processor_id)
-#define set_processor_id(id)  (get_cpu_info()->processor_id = (id))
+#define set_processor_id(id)  do {                                      \
+    struct cpu_info *ci__ = get_cpu_info();                             \
+    ci__->per_cpu_offset = __per_cpu_offset[ci__->processor_id = (id)]; \
+} while (0)
 
 #define guest_cpu_user_regs() (&get_cpu_info()->guest_cpu_user_regs)
 
