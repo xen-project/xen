@@ -270,42 +270,6 @@ static void set_iommu_event_log_control(struct amd_iommu *iommu,
     writel(entry, iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
 }
 
-static void amd_iommu_reset_event_log(struct amd_iommu *iommu)
-{
-    u32 entry;
-    int log_run;
-    int loop_count = 1000;
-
-    /* wait until EventLogRun bit = 0 */
-    do {
-        entry = readl(iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
-        log_run = get_field_from_reg_u32(entry,
-                                        IOMMU_STATUS_EVENT_LOG_RUN_MASK,
-                                        IOMMU_STATUS_EVENT_LOG_RUN_SHIFT);
-        loop_count--;
-    } while ( log_run && loop_count );
-
-    if ( log_run )
-    {
-        AMD_IOMMU_DEBUG("Warning: EventLogRun bit is not cleared"
-                       "before reset!\n");
-        return;
-    }
-
-    set_iommu_event_log_control(iommu, IOMMU_CONTROL_DISABLED);
-
-    /*clear overflow bit */
-    set_field_in_reg_u32(IOMMU_CONTROL_DISABLED, entry,
-                         IOMMU_STATUS_EVENT_OVERFLOW_MASK,
-                         IOMMU_STATUS_EVENT_OVERFLOW_SHIFT, &entry);
-    writel(entry, iommu->mmio_base+IOMMU_STATUS_MMIO_OFFSET);
-
-    /*reset event log base address */
-    iommu->event_log_head = 0;
-
-    set_iommu_event_log_control(iommu, IOMMU_CONTROL_ENABLED);
-}
-
 static void parse_event_log_entry(u32 entry[]);
 
 static int amd_iommu_read_event_log(struct amd_iommu *iommu)
@@ -340,6 +304,45 @@ static int amd_iommu_read_event_log(struct amd_iommu *iommu)
     }
 
     return 0;
+}
+
+static void amd_iommu_reset_event_log(struct amd_iommu *iommu)
+{
+    u32 entry;
+    int log_run;
+    int loop_count = 1000;
+
+    /* wait until EventLogRun bit = 0 */
+    do {
+        entry = readl(iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
+        log_run = get_field_from_reg_u32(entry,
+                                        IOMMU_STATUS_EVENT_LOG_RUN_MASK,
+                                        IOMMU_STATUS_EVENT_LOG_RUN_SHIFT);
+        loop_count--;
+    } while ( log_run && loop_count );
+
+    if ( log_run )
+    {
+        AMD_IOMMU_DEBUG("Warning: EventLogRun bit is not cleared"
+                       "before reset!\n");
+        return;
+    }
+
+    set_iommu_event_log_control(iommu, IOMMU_CONTROL_DISABLED);
+
+    /* read event log for debugging */
+    amd_iommu_read_event_log(iommu);
+
+    /*clear overflow bit */
+    set_field_in_reg_u32(IOMMU_CONTROL_DISABLED, entry,
+                         IOMMU_STATUS_EVENT_OVERFLOW_MASK,
+                         IOMMU_STATUS_EVENT_OVERFLOW_SHIFT, &entry);
+    writel(entry, iommu->mmio_base+IOMMU_STATUS_MMIO_OFFSET);
+
+    /*reset event log base address */
+    iommu->event_log_head = 0;
+
+    set_iommu_event_log_control(iommu, IOMMU_CONTROL_ENABLED);
 }
 
 static void iommu_msi_set_affinity(unsigned int irq, cpumask_t mask)
@@ -491,6 +494,11 @@ static void parse_event_log_entry(u32 entry[])
         printk(XENLOG_ERR "AMD_IOV: "
             "%s: domain:%d, device id:0x%x, fault address:0x%"PRIx64"\n",
             event_str[code-1], domain_id, device_id, *addr);
+    }
+    else
+    {
+        AMD_IOMMU_DEBUG("event 0x%08x 0x%08x 0x%08x 0x%08x\n", entry[0],
+                        entry[1], entry[2], entry[3]);
     }
 }
 
