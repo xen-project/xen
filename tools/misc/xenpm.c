@@ -858,7 +858,7 @@ void cpu_topology_func(int argc, char *argv[])
         info.max_cpu_index = MAX_NR_CPU-1;
 
     printf("CPU\tcore\tsocket\tnode\n");
-    for ( i = 0; i < info.max_cpu_index; i++ )
+    for ( i = 0; i <= info.max_cpu_index; i++ )
     {
         if ( cpu_to_core[i] == INVALID_TOPOLOGY_ID )
             continue;
