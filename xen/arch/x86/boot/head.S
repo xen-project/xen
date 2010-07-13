@@ -101,7 +101,7 @@ __start:
         mov     $0x80000001,%eax
         cpuid
 1:      mov     %edx,sym_phys(cpuid_ext_features)
-        mov     %edx,sym_phys(boot_cpu_data)+CPUINFO_ext_features
+        mov     %edx,sym_phys(boot_cpu_data)+CPUINFO86_ext_features
 
 #if defined(__x86_64__)
         /* Check for availability of long mode. */

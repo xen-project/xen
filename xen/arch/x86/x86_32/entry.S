@@ -61,17 +61,6 @@
 #include <asm/page.h>
 #include <public/xen.h>
 
-#define GET_GUEST_REGS(reg)                     \
-        movl $~(STACK_SIZE-1),reg;              \
-        andl %esp,reg;                          \
-        orl  $(STACK_SIZE-CPUINFO_sizeof),reg;
-
-#define GET_CURRENT(reg)         \
-        movl $STACK_SIZE-4, reg; \
-        orl  %esp, reg;          \
-        andl $~3,reg;            \
-        movl (reg),reg;
-
         ALIGN
 restore_all_guest:
         ASSERT_INTERRUPTS_DISABLED
@@ -590,7 +579,7 @@ handle_nmi_mce:
         jmp   ret_from_intr
 .Lnmi_mce_xen:
         /* Check the outer (guest) context for %ds/%es state validity. */
-        GET_GUEST_REGS(%ebx)
+        GET_CPUINFO_FIELD(CPUINFO_guest_cpu_user_regs,%ebx)
         testl $X86_EFLAGS_VM,%ss:UREGS_eflags(%ebx)
         mov   %ds,%eax
         mov   %es,%edx

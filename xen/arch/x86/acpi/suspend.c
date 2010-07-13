@@ -13,10 +13,13 @@
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/i387.h>
+#include <xen/hypercall.h>
 
 #if defined(CONFIG_X86_64)
 static unsigned long saved_lstar, saved_cstar;
 static unsigned long saved_sysenter_esp, saved_sysenter_eip;
+static unsigned long saved_fs_base, saved_gs_base, saved_kernel_gs_base;
+static uint16_t saved_segs[4];
 #endif
 
 void save_rest_processor_state(void)
@@ -25,6 +28,12 @@ void save_rest_processor_state(void)
         unlazy_fpu(current);
 
 #if defined(CONFIG_X86_64)
+    asm volatile (
+        "mov %%ds,(%0); mov %%es,2(%0); mov %%fs,4(%0); mov %%gs,6(%0)"
+        : : "r" (saved_segs) : "memory" );
+    rdmsrl(MSR_FS_BASE, saved_fs_base);
+    rdmsrl(MSR_GS_BASE, saved_gs_base);
+    rdmsrl(MSR_SHADOW_GS_BASE, saved_kernel_gs_base);
     rdmsrl(MSR_CSTAR, saved_cstar);
     rdmsrl(MSR_LSTAR, saved_lstar);
     if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
@@ -35,9 +44,10 @@ void save_rest_processor_state(void)
 #endif
 }
 
+
 void restore_rest_processor_state(void)
 {
-    struct vcpu *v = current;
+    struct vcpu *curr = current;
 
     load_TR();
 
@@ -51,6 +61,10 @@ void restore_rest_processor_state(void)
           X86_EFLAGS_DF|X86_EFLAGS_IF|X86_EFLAGS_TF,
           0U);
 
+    wrmsrl(MSR_FS_BASE, saved_fs_base);
+    wrmsrl(MSR_GS_BASE, saved_gs_base);
+    wrmsrl(MSR_SHADOW_GS_BASE, saved_kernel_gs_base);
+
     if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
     {
         /* Recover sysenter MSRs */
@@ -58,21 +72,30 @@ void restore_rest_processor_state(void)
         wrmsrl(MSR_IA32_SYSENTER_EIP, saved_sysenter_eip);
         wrmsr(MSR_IA32_SYSENTER_CS, __HYPERVISOR_CS, 0);
     }
+
+    if ( !is_idle_vcpu(curr) )
+    {
+        asm volatile (
+            "mov (%0),%%ds; mov 2(%0),%%es; mov 4(%0),%%fs"
+            : : "r" (saved_segs) : "memory" );
+        do_set_segment_base(SEGBASE_GS_USER_SEL, saved_segs[3]);
+    }
+
 #else /* !defined(CONFIG_X86_64) */
     if ( supervisor_mode_kernel && cpu_has_sep )
         wrmsr(MSR_IA32_SYSENTER_ESP, &this_cpu(init_tss).esp1, 0);
 #endif
 
     /* Maybe load the debug registers. */
-    BUG_ON(is_hvm_vcpu(v));
-    if ( !is_idle_vcpu(v) && unlikely(v->arch.guest_context.debugreg[7]) )
+    BUG_ON(is_hvm_vcpu(curr));
+    if ( !is_idle_vcpu(curr) && curr->arch.guest_context.debugreg[7] )
     {
-        write_debugreg(0, v->arch.guest_context.debugreg[0]);
-        write_debugreg(1, v->arch.guest_context.debugreg[1]);
-        write_debugreg(2, v->arch.guest_context.debugreg[2]);
-        write_debugreg(3, v->arch.guest_context.debugreg[3]);
-        write_debugreg(6, v->arch.guest_context.debugreg[6]);
-        write_debugreg(7, v->arch.guest_context.debugreg[7]);
+        write_debugreg(0, curr->arch.guest_context.debugreg[0]);
+        write_debugreg(1, curr->arch.guest_context.debugreg[1]);
+        write_debugreg(2, curr->arch.guest_context.debugreg[2]);
+        write_debugreg(3, curr->arch.guest_context.debugreg[3]);
+        write_debugreg(6, curr->arch.guest_context.debugreg[6]);
+        write_debugreg(7, curr->arch.guest_context.debugreg[7]);
     }
 
     /* Reload FPU state on next FPU use. */

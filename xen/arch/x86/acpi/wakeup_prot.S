@@ -20,21 +20,6 @@
 
 #define REF(x)          x(%rip)
 
-#define RDMSR(ind, m)                   \
-        xorq    %rdx, %rdx;             \
-        mov     $ind, %ecx;             \
-        rdmsr;                          \
-        shlq    $0x20, %rdx;              \
-        orq     %rax, %rdx;             \
-        movq    %rdx, m(%rip);
-
-#define WRMSR(ind, m)                   \
-        mov     $ind, %ecx;             \
-        movq    m(%rip), %rdx;          \
-        mov     %edx, %eax;             \
-        shrq    $0x20, %rdx;              \
-        wrmsr;
-
 #else /* !defined(__x86_64__) */
 
         .code32
@@ -76,21 +61,16 @@ ENTRY(do_suspend_lowlevel)
         mov     %cr8, GREG(ax)
         mov     GREG(ax), REF(saved_cr8)
 
-        RDMSR(MSR_FS_BASE, saved_fs_base)
-        RDMSR(MSR_GS_BASE, saved_gs_base)
-        RDMSR(MSR_SHADOW_GS_BASE, saved_kernel_gs_base)
-
 #else /* !defined(__x86_64__) */
 
         pushfl;
         popl    SAVED_GREG(flags)
 
-#endif
-
         mov     %ds, REF(saved_ds)
         mov     %es, REF(saved_es)
-        mov     %fs, REF(saved_fs)
-        mov     %gs, REF(saved_gs)
+
+#endif
+
         mov     %ss, REF(saved_ss)
 
         sgdt    REF(saved_gdt)
@@ -148,40 +128,11 @@ __ret_point:
         pushq   %rax
         lretq
 1:
-
         mov     REF(saved_cr8), %rax
         mov     %rax, %cr8
 
         pushq   SAVED_GREG(flags)
         popfq
-
-        /* Idle vcpu doesn't need segment selectors reload, since
-         * those may contain stale value from other domains and 
-         * reload may result page fault due to no matched gdt entry
-         */
-        mov     $(STACK_SIZE - 8), %rax
-        or      %rsp, %rax
-        and     $~7, %rax
-        mov     (%rax), %rax
-        mov     0x10(%rax), %rax
-        cmpw    $0x7fff, (%rax)
-        je      1f
-
-        /* These selectors are from guest, and thus need reload */
-        mov     REF(saved_ds), %ds
-        mov     REF(saved_es), %es
-        mov     REF(saved_fs), %fs
-
-        /* gs load is special */
-        mov     REF(saved_gs), %rsi
-        mov     $3, %rdi        # SEGBASE_GS_USER_SEL
-        call    do_set_segment_base
-
-1:
-        # MSR restore
-        WRMSR(MSR_FS_BASE, saved_fs_base)
-        WRMSR(MSR_GS_BASE, saved_gs_base)
-        WRMSR(MSR_SHADOW_GS_BASE, saved_kernel_gs_base)
 
 #else /* !defined(__x86_64__) */
 
@@ -217,15 +168,10 @@ __ret_point:
 
 .data
         .align 16
-saved_ds:        .word   0
-saved_es:        .word   0
-saved_ss:        .word   0
-saved_gs:        .word   0
-saved_fs:        .word   0
-
-        .align 4
         .globl   saved_magic
 saved_magic:     .long   0x9abcdef0
+
+saved_ss:        .word   0
 
         .align 8
 DECLARE_GREG(sp)
@@ -257,10 +203,6 @@ saved_cr0:      .quad   0
 saved_cr3:      .quad   0
 saved_cr8:      .quad   0
 
-saved_gs_base:  .quad   0
-saved_fs_base:  .quad   0
-saved_kernel_gs_base:   .quad   0
-
 #else /* !defined(__x86_64__) */
 
 saved_gdt:      .long   0,0
@@ -269,5 +211,8 @@ saved_ldt:      .long   0
 
 saved_cr0:      .long   0
 saved_cr3:      .long   0
+
+saved_ds:       .word   0
+saved_es:       .word   0
 
 #endif 

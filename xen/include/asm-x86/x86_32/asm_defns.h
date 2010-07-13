@@ -142,4 +142,12 @@ STR(IRQ) #nr "_interrupt:\n\t"                  \
     "pushl $"#nr"<<16\n\t"                      \
     "jmp common_interrupt");
 
+#define GET_CPUINFO_FIELD(field,reg)                    \
+        movl $~(STACK_SIZE-1),reg;                      \
+        andl %esp,reg;                                  \
+        orl  $(STACK_SIZE-CPUINFO_sizeof+field),reg;
+#define GET_CURRENT(reg)                                \
+        GET_CPUINFO_FIELD(CPUINFO_current_vcpu,reg)     \
+        movl (reg),reg;
+
 #endif /* __X86_32_ASM_DEFNS_H__ */

@@ -31,12 +31,8 @@
 #define STGI   .byte 0x0F,0x01,0xDC
 #define CLGI   .byte 0x0F,0x01,0xDD
 
-#define get_current(reg)                        \
-        mov $STACK_SIZE-BYTES_PER_LONG, r(reg); \
-        or  r(sp), r(reg);                      \
-        and $~(BYTES_PER_LONG-1),r(reg);        \
-        mov (r(reg)),r(reg);
-
+#define get_current(reg) GET_CURRENT(r(reg))
+        
 #if defined(__x86_64__)
 #define r(reg) %r##reg
 #define addr_of(lbl) lbl(%rip)

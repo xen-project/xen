@@ -11,17 +11,6 @@
 #include <asm/desc.h>
 #include <public/xen.h>
 
-#define GET_GUEST_REGS(reg)                     \
-        movq $~(STACK_SIZE-1),reg;              \
-        andq %rsp,reg;                          \
-        orq  $(STACK_SIZE-CPUINFO_sizeof),reg;
-
-#define GET_CURRENT(reg)         \
-        movq $STACK_SIZE-8, reg; \
-        orq  %rsp, reg;          \
-        andq $~7,reg;            \
-        movq (reg),reg;
-
         ALIGN
 ENTRY(compat_hypercall)
         pushq $0

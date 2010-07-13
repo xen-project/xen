@@ -12,17 +12,6 @@
 #include <asm/page.h>
 #include <public/xen.h>
 
-#define GET_GUEST_REGS(reg)                     \
-        movq $~(STACK_SIZE-1),reg;              \
-        andq %rsp,reg;                          \
-        orq  $(STACK_SIZE-CPUINFO_sizeof),reg;
-
-#define GET_CURRENT(reg)         \
-        movq $STACK_SIZE-8, reg; \
-        orq  %rsp, reg;          \
-        andq $~7,reg;            \
-        movq (reg),reg;
-
         ALIGN
 /* %rbx: struct vcpu */
 switch_to_kernel:
@@ -434,10 +423,10 @@ domain_crash_synchronous_string:
 
 ENTRY(domain_crash_synchronous)
         # Get out of the guest-save area of the stack.
-        GET_GUEST_REGS(%rax)
+        GET_CPUINFO_FIELD(CPUINFO_guest_cpu_user_regs,%rax)
         movq  %rax,%rsp
         # create_bounce_frame() temporarily clobbers CS.RPL. Fix up.
-        movq  CPUINFO_current_vcpu(%rax),%rax
+        GET_CURRENT(%rax)
         movq  VCPU_domain(%rax),%rax
         testb $1,DOMAIN_is_32bit_pv(%rax)
         setz  %al
@@ -610,7 +599,7 @@ handle_ist_exception:
         testb $3,UREGS_cs(%rsp)
         jz    1f
         /* Interrupted guest context. Copy the context to stack bottom. */
-        GET_GUEST_REGS(%rdi)
+        GET_CPUINFO_FIELD(CPUINFO_guest_cpu_user_regs,%rdi)
         movq  %rsp,%rsi
         movl  $UREGS_kernel_sizeof/8,%ecx
         movq  %rdi,%rsp

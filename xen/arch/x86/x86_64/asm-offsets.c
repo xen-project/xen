@@ -132,6 +132,8 @@ void __dummy__(void)
     OFFSET(COMPAT_VCPUINFO_upcall_mask, struct compat_vcpu_info, evtchn_upcall_mask);
     BLANK();
 
+    OFFSET(CPUINFO_guest_cpu_user_regs, struct cpu_info, guest_cpu_user_regs);
+    OFFSET(CPUINFO_processor_id, struct cpu_info, processor_id);
     OFFSET(CPUINFO_current_vcpu, struct cpu_info, current_vcpu);
     DEFINE(CPUINFO_sizeof, sizeof(struct cpu_info));
     BLANK();
@@ -151,7 +153,7 @@ void __dummy__(void)
     DEFINE(IRQSTAT_shift, LOG_2(sizeof(irq_cpustat_t)));
     BLANK();
 
-    OFFSET(CPUINFO_ext_features, struct cpuinfo_x86, x86_capability[1]);
+    OFFSET(CPUINFO86_ext_features, struct cpuinfo_x86, x86_capability[1]);
     BLANK();
 
     OFFSET(MB_flags, multiboot_info_t, flags);

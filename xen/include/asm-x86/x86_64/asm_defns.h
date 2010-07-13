@@ -122,4 +122,12 @@ STR(IRQ) #nr "_interrupt:\n\t"                  \
     "movl $"#nr",4(%rsp)\n\t"                   \
     "jmp common_interrupt");
 
+#define GET_CPUINFO_FIELD(field,reg)                    \
+        movq $~(STACK_SIZE-1),reg;                      \
+        andq %rsp,reg;                                  \
+        orq  $(STACK_SIZE-CPUINFO_sizeof+field),reg;
+#define GET_CURRENT(reg)                                \
+        GET_CPUINFO_FIELD(CPUINFO_current_vcpu,reg)     \
+        movq (reg),reg;
+
 #endif /* __X86_64_ASM_DEFNS_H__ */
