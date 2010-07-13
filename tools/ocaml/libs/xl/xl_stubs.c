@@ -28,24 +28,41 @@
 
 #include "libxl.h"
 
+struct caml_logger {
+	struct xentoollog_logger logger;
+	int log_offset;
+	char log_buf[2048];
+};
+
+void log_vmessage(struct xentoollog_logger *logger, xentoollog_level level,
+                  int errnoval, const char *context, const char *format, va_list al)
+{
+	struct caml_logger *ologger = (struct caml_logger *) logger;
+
+	ologger->log_offset += vsnprintf(ologger->log_buf + ologger->log_offset,
+	                                 2048 - ologger->log_offset, format, al);
+}
+
+void log_destroy(struct xentoollog_logger *logger)
+{
+}
+
 #define INIT_CTX()  \
-	ret = libxl_ctx_init(&ctx, LIBXL_VERSION, NULL); \
+	lg.logger.vmessage = log_vmessage; \
+	lg.logger.destroy = log_destroy; \
+	lg.logger.progress = NULL; \
+	ret = libxl_ctx_init(&ctx, LIBXL_VERSION, (struct xentoollog_logger *) &lg); \
 	if (ret != 0) \
-		failwith_xl("cannot init context");
+		failwith_xl("cannot init context", &lg);
 
 #define FREE_CTX()  \
 	libxl_ctx_free(&ctx)
 
-void log_callback(void *userdata, int loglevel, const char *file,
-		int line, const char *func, char *s)
+void failwith_xl(char *fname, struct caml_logger *lg)
 {
-}
-
-void failwith_xl(char *log_data)
-{
-	char s[1024];
-	snprintf(s, 1024, "proper logging not implemented yet: error in %s", log_data);
-	caml_raise_with_string(*caml_named_value("xl.error"), log_data);
+	char *s;
+	s = (lg) ? lg->log_buf : fname;
+	caml_raise_with_string(*caml_named_value("xl.error"), s);
 }
 
 static int string_string_tuple_array_val (char ***c_val, value v)
@@ -298,7 +315,7 @@ static value Val_physinfo(struct libxl_physinfo *c_val)
 value stub_xl_domain_make(value info)
 {
 	CAMLparam1(info);
-	struct libxl_ctx ctx;
+	struct libxl_ctx ctx; struct caml_logger lg;
 	uint32_t domid;
 	libxl_domain_create_info c_info;
 	int ret;
@@ -309,7 +326,7 @@ value stub_xl_domain_make(value info)
 
 	ret = libxl_domain_make(&ctx, &c_info, &domid);
 	if (ret != 0)
-		failwith_xl("domain make");
+		failwith_xl("domain make", &lg);
 
 	FREE_CTX();
 
@@ -323,7 +340,7 @@ value stub_xl_domain_build(value info, value domid)
 {
 	CAMLparam2(info, domid);
 	CAMLlocal1(result);
-	struct libxl_ctx ctx;
+	struct libxl_ctx ctx; struct caml_logger lg;
 	libxl_domain_build_info c_info;
 	libxl_domain_build_state c_state;
 	int ret;
@@ -336,7 +353,7 @@ value stub_xl_domain_build(value info, value domid)
 
 	ret = libxl_domain_build(&ctx, &c_info, c_domid, &c_state);
 	if (ret != 0)
-		failwith_xl("domain_build");
+		failwith_xl("domain_build", &lg);
 
 	result = Val_domain_build_state(&c_state);
 	FREE_CTX();
@@ -348,7 +365,7 @@ value stub_xl_disk_add(value info, value domid)
 {
 	CAMLparam2(info, domid);
 	libxl_device_disk c_info;
-	struct libxl_ctx ctx;
+	struct libxl_ctx ctx; struct caml_logger lg;
 	int ret;
 
 	device_disk_val(&c_info, info);
@@ -357,7 +374,7 @@ value stub_xl_disk_add(value info, value domid)
 	INIT_CTX();
 	ret = libxl_device_disk_add(&ctx, Int_val(domid), &c_info);
 	if (ret != 0)
-		failwith_xl("disk_add");
+		failwith_xl("disk_add", &lg);
 	FREE_CTX();
 	CAMLreturn(Val_unit);
 }
@@ -366,7 +383,7 @@ value stub_xl_disk_remove(value info, value domid)
 {
 	CAMLparam2(info, domid);
 	libxl_device_disk c_info;
-	struct libxl_ctx ctx;
+	struct libxl_ctx ctx; struct caml_logger lg;
 	int ret;
 
 	device_disk_val(&c_info, info);
@@ -375,7 +392,7 @@ value stub_xl_disk_remove(value info, value domid)
 	INIT_CTX();
 	ret = libxl_device_disk_del(&ctx, &c_info, 0);
 	if (ret != 0)
-		failwith_xl("disk_remove");
+		failwith_xl("disk_remove", &lg);
 	FREE_CTX();
 	CAMLreturn(Val_unit);
 }
@@ -383,7 +400,7 @@ value stub_xl_disk_remove(value info, value domid)
 value stub_xl_nic_add(value info, value domid)
 {
 	CAMLparam2(info, domid);
-	struct libxl_ctx ctx;
+	struct libxl_ctx ctx; struct caml_logger lg;
 	libxl_device_nic c_info;
 	int ret;
 
@@ -393,7 +410,7 @@ value stub_xl_nic_add(value info, value domid)
 	INIT_CTX();
 	ret = libxl_device_nic_add(&ctx, Int_val(domid), &c_info);
 	if (ret != 0)
-		failwith_xl("nic_add");
+		failwith_xl("nic_add", &lg);
 	FREE_CTX();
 	CAMLreturn(Val_unit);
 }
@@ -401,7 +418,7 @@ value stub_xl_nic_add(value info, value domid)
 value stub_xl_nic_remove(value info, value domid)
 {
 	CAMLparam2(info, domid);
-	struct libxl_ctx ctx;
+	struct libxl_ctx ctx; struct caml_logger lg;
 	libxl_device_nic c_info;
 	int ret;
 
@@ -411,7 +428,7 @@ value stub_xl_nic_remove(value info, value domid)
 	INIT_CTX();
 	ret = libxl_device_nic_del(&ctx, &c_info, 0);
 	if (ret != 0)
-		failwith_xl("nic_remove");
+		failwith_xl("nic_remove", &lg);
 	FREE_CTX();
 	CAMLreturn(Val_unit);
 }
@@ -419,7 +436,7 @@ value stub_xl_nic_remove(value info, value domid)
 value stub_xl_console_add(value info, value state, value domid)
 {
 	CAMLparam3(info, state, domid);
-	struct libxl_ctx ctx;
+	struct libxl_ctx ctx; struct caml_logger lg;
 	libxl_device_console c_info;
 	libxl_domain_build_state c_state;
 	int ret;
@@ -432,7 +449,7 @@ value stub_xl_console_add(value info, value state, value domid)
 	INIT_CTX();
 	ret = libxl_device_console_add(&ctx, Int_val(domid), &c_info);
 	if (ret != 0)
-		failwith_xl("console_add");
+		failwith_xl("console_add", &lg);
 	FREE_CTX();
 	CAMLreturn(Val_unit);
 }
@@ -440,7 +457,7 @@ value stub_xl_console_add(value info, value state, value domid)
 value stub_xl_vkb_add(value info, value domid)
 {
 	CAMLparam2(info, domid);
-	struct libxl_ctx ctx;
+	struct libxl_ctx ctx; struct caml_logger lg;
 	libxl_device_vkb c_info;
 	int ret;
 
@@ -450,7 +467,7 @@ value stub_xl_vkb_add(value info, value domid)
 	INIT_CTX();
 	ret = libxl_device_vkb_add(&ctx, Int_val(domid), &c_info);
 	if (ret != 0)
-		failwith_xl("vkb_add");
+		failwith_xl("vkb_add", &lg);
 	FREE_CTX();
 	
 	CAMLreturn(Val_unit);
@@ -459,13 +476,13 @@ value stub_xl_vkb_add(value info, value domid)
 value stub_xl_vkb_clean_shutdown(value domid)
 {
 	CAMLparam1(domid);
-	struct libxl_ctx ctx;
+	struct libxl_ctx ctx; struct caml_logger lg;
 	int ret;
 
 	INIT_CTX();
 	ret = libxl_device_vkb_clean_shutdown(&ctx, Int_val(domid));
 	if (ret != 0)
-		failwith_xl("vkb_clean_shutdown");
+		failwith_xl("vkb_clean_shutdown", &lg);
 	FREE_CTX();
 	
 	CAMLreturn(Val_unit);
@@ -474,13 +491,13 @@ value stub_xl_vkb_clean_shutdown(value domid)
 value stub_xl_vkb_hard_shutdown(value domid)
 {
 	CAMLparam1(domid);
-	struct libxl_ctx ctx;
+	struct libxl_ctx ctx; struct caml_logger lg;
 	int ret;
 
 	INIT_CTX();
 	ret = libxl_device_vkb_hard_shutdown(&ctx, Int_val(domid));
 	if (ret != 0)
-		failwith_xl("vkb_hard_shutdown");
+		failwith_xl("vkb_hard_shutdown", &lg);
 	FREE_CTX();
 	
 	CAMLreturn(Val_unit);
@@ -489,7 +506,7 @@ value stub_xl_vkb_hard_shutdown(value domid)
 value stub_xl_vfb_add(value info, value domid)
 {
 	CAMLparam2(info, domid);
-	struct libxl_ctx ctx;
+	struct libxl_ctx ctx; struct caml_logger lg;
 	libxl_device_vfb c_info;
 	int ret;
 
@@ -499,7 +516,7 @@ value stub_xl_vfb_add(value info, value domid)
 	INIT_CTX();
 	ret = libxl_device_vfb_add(&ctx, Int_val(domid), &c_info);
 	if (ret != 0)
-		failwith_xl("vfb_add");
+		failwith_xl("vfb_add", &lg);
 	FREE_CTX();
 	
 	CAMLreturn(Val_unit);
@@ -508,13 +525,13 @@ value stub_xl_vfb_add(value info, value domid)
 value stub_xl_vfb_clean_shutdown(value domid)
 {
 	CAMLparam1(domid);
-	struct libxl_ctx ctx;
+	struct libxl_ctx ctx; struct caml_logger lg;
 	int ret;
 
 	INIT_CTX();
 	ret = libxl_device_vfb_clean_shutdown(&ctx, Int_val(domid));
 	if (ret != 0)
-		failwith_xl("vfb_clean_shutdown");
+		failwith_xl("vfb_clean_shutdown", &lg);
 	FREE_CTX();
 	
 	CAMLreturn(Val_unit);
@@ -523,13 +540,13 @@ value stub_xl_vfb_clean_shutdown(value domid)
 value stub_xl_vfb_hard_shutdown(value domid)
 {
 	CAMLparam1(domid);
-	struct libxl_ctx ctx;
+	struct libxl_ctx ctx; struct caml_logger lg;
 	int ret;
 
 	INIT_CTX();
 	ret = libxl_device_vfb_hard_shutdown(&ctx, Int_val(domid));
 	if (ret != 0)
-		failwith_xl("vfb_hard_shutdown");
+		failwith_xl("vfb_hard_shutdown", &lg);
 	FREE_CTX();
 	
 	CAMLreturn(Val_unit);
@@ -538,7 +555,7 @@ value stub_xl_vfb_hard_shutdown(value domid)
 value stub_xl_pci_add(value info, value domid)
 {
 	CAMLparam2(info, domid);
-	struct libxl_ctx ctx;
+	struct libxl_ctx ctx; struct caml_logger lg;
 	libxl_device_pci c_info;
 	int ret;
 
@@ -547,7 +564,7 @@ value stub_xl_pci_add(value info, value domid)
 	INIT_CTX();
 	ret = libxl_device_pci_add(&ctx, Int_val(domid), &c_info);
 	if (ret != 0)
-		failwith_xl("pci_add");
+		failwith_xl("pci_add", &lg);
 	FREE_CTX();
 	
 	CAMLreturn(Val_unit);
@@ -556,7 +573,7 @@ value stub_xl_pci_add(value info, value domid)
 value stub_xl_pci_remove(value info, value domid)
 {
 	CAMLparam2(info, domid);
-	struct libxl_ctx ctx;
+	struct libxl_ctx ctx; struct caml_logger lg;
 	libxl_device_pci c_info;
 	int ret;
 
@@ -565,7 +582,7 @@ value stub_xl_pci_remove(value info, value domid)
 	INIT_CTX();
 	ret = libxl_device_pci_remove(&ctx, Int_val(domid), &c_info);
 	if (ret != 0)
-		failwith_xl("pci_remove");
+		failwith_xl("pci_remove", &lg);
 	FREE_CTX();
 	
 	CAMLreturn(Val_unit);
@@ -574,13 +591,13 @@ value stub_xl_pci_remove(value info, value domid)
 value stub_xl_pci_shutdown(value domid)
 {
 	CAMLparam1(domid);
-	struct libxl_ctx ctx;
+	struct libxl_ctx ctx; struct caml_logger lg;
 	int ret;
 
 	INIT_CTX();
 	ret = libxl_device_pci_shutdown(&ctx, Int_val(domid));
 	if (ret != 0)
-		failwith_xl("pci_shutdown");
+		failwith_xl("pci_shutdown", &lg);
 	FREE_CTX();
 	
 	CAMLreturn(Val_unit);
@@ -589,13 +606,13 @@ value stub_xl_pci_shutdown(value domid)
 value stub_xl_button_press(value domid, value button)
 {
 	CAMLparam2(domid, button);
-	struct libxl_ctx ctx;
+	struct libxl_ctx ctx; struct caml_logger lg;
 	int ret;
 	
 	INIT_CTX();
 	ret = libxl_button_press(&ctx, Int_val(domid), Int_val(button) + POWER_BUTTON);
 	if (ret != 0)
-		failwith_xl("button_press");
+		failwith_xl("button_press", &lg);
 	FREE_CTX();
 
 	CAMLreturn(Val_unit);
@@ -605,14 +622,14 @@ value stub_xl_physinfo(value unit)
 {
 	CAMLparam1(unit);
 	CAMLlocal1(physinfo);
-	struct libxl_ctx ctx;
+	struct libxl_ctx ctx; struct caml_logger lg;
 	struct libxl_physinfo c_physinfo;
 	int ret;
 
 	INIT_CTX();
 	ret = libxl_get_physinfo(&ctx, &c_physinfo);
 	if (ret != 0)
-		failwith_xl("physinfo");
+		failwith_xl("physinfo", &lg);
 	FREE_CTX();
 	
 	physinfo = Val_physinfo(&c_physinfo);
@@ -623,14 +640,14 @@ value stub_xl_sched_credit_domain_get(value domid)
 {
 	CAMLparam1(domid);
 	CAMLlocal1(scinfo);
-	struct libxl_ctx ctx;
+	struct libxl_ctx ctx; struct caml_logger lg;
 	struct libxl_sched_credit c_scinfo;
 	int ret;
 
 	INIT_CTX();
 	ret = libxl_sched_credit_domain_get(&ctx, Int_val(domid), &c_scinfo);
 	if (ret != 0)
-		failwith_xl("sched_credit_domain_get");
+		failwith_xl("sched_credit_domain_get", &lg);
 	FREE_CTX();
 	
 	scinfo = Val_sched_credit(&c_scinfo);
@@ -640,7 +657,7 @@ value stub_xl_sched_credit_domain_get(value domid)
 value stub_xl_sched_credit_domain_set(value domid, value scinfo)
 {
 	CAMLparam2(domid, scinfo);
-	struct libxl_ctx ctx;
+	struct libxl_ctx ctx; struct caml_logger lg;
 	struct libxl_sched_credit c_scinfo;
 	int ret;
 
@@ -649,7 +666,7 @@ value stub_xl_sched_credit_domain_set(value domid, value scinfo)
 	INIT_CTX();
 	ret = libxl_sched_credit_domain_set(&ctx, Int_val(domid), &c_scinfo);
 	if (ret != 0)
-		failwith_xl("sched_credit_domain_set");
+		failwith_xl("sched_credit_domain_set", &lg);
 	FREE_CTX();
 	
 	CAMLreturn(Val_unit);
@@ -658,13 +675,13 @@ value stub_xl_sched_credit_domain_set(value domid, value scinfo)
 value stub_xl_send_trigger(value domid, value trigger, value vcpuid)
 {
 	CAMLparam3(domid, trigger, vcpuid);
-	struct libxl_ctx ctx;
+	struct libxl_ctx ctx; struct caml_logger lg;
 	int ret;
 
 	INIT_CTX();
 	ret = libxl_send_trigger(&ctx, Int_val(domid), String_val(trigger), Int_val(vcpuid));
 	if (ret != 0)
-		failwith_xl("send_trigger");
+		failwith_xl("send_trigger", &lg);
 	FREE_CTX();
 	CAMLreturn(Val_unit);
 }
@@ -672,13 +689,13 @@ value stub_xl_send_trigger(value domid, value trigger, value vcpuid)
 value stub_xl_send_sysrq(value domid, value sysrq)
 {
 	CAMLparam2(domid, sysrq);
-	struct libxl_ctx ctx;
+	struct libxl_ctx ctx; struct caml_logger lg;
 	int ret;
 
 	INIT_CTX();
 	ret = libxl_send_sysrq(&ctx, Int_val(domid), Int_val(sysrq));
 	if (ret != 0)
-		failwith_xl("send_sysrq");
+		failwith_xl("send_sysrq", &lg);
 	FREE_CTX();
 	CAMLreturn(Val_unit);
 }
@@ -686,13 +703,13 @@ value stub_xl_send_sysrq(value domid, value sysrq)
 value stub_xl_send_debug_keys(value keys)
 {
 	CAMLparam1(keys);
-	struct libxl_ctx ctx;
+	struct libxl_ctx ctx; struct caml_logger lg;
 	int ret;
 
 	INIT_CTX();
 	ret = libxl_send_debug_keys(&ctx, String_val(keys));
 	if (ret != 0)
-		failwith_xl("send_debug_keys");
+		failwith_xl("send_debug_keys", &lg);
 	FREE_CTX();
 	CAMLreturn(Val_unit);
 }
