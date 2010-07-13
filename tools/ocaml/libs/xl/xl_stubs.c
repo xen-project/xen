@@ -114,15 +114,15 @@ static int domain_build_info_val (libxl_domain_build_info *c_val, value v)
 	CAMLparam1(v);
 	CAMLlocal1(infopriv);
 
-	c_val->max_vcpus = Int_val(Field(v, 3));
-	c_val->cur_vcpus = Int_val(Field(v, 4));
-	c_val->max_memkb = Int64_val(Field(v, 5));
-	c_val->target_memkb = Int64_val(Field(v, 6));
-	c_val->video_memkb = Int64_val(Field(v, 7));
-	c_val->shadow_memkb = Int64_val(Field(v, 8));
-	c_val->kernel = String_val(Field(v, 9));
-	c_val->hvm = Tag_val(Field(v, 10)) == 0;
-	infopriv = Field(Field(v, 10), 0);
+	c_val->max_vcpus = Int_val(Field(v, 0));
+	c_val->cur_vcpus = Int_val(Field(v, 1));
+	c_val->max_memkb = Int64_val(Field(v, 2));
+	c_val->target_memkb = Int64_val(Field(v, 3));
+	c_val->video_memkb = Int64_val(Field(v, 4));
+	c_val->shadow_memkb = Int64_val(Field(v, 5));
+	c_val->kernel = String_val(Field(v, 6));
+	c_val->hvm = Tag_val(Field(v, 7)) == 0;
+	infopriv = Field(Field(v, 7), 0);
 	if (c_val->hvm) {
 		c_val->u.hvm.pae = Bool_val(Field(infopriv, 0));
 		c_val->u.hvm.apic = Bool_val(Field(infopriv, 1));
@@ -130,9 +130,9 @@ static int domain_build_info_val (libxl_domain_build_info *c_val, value v)
 		c_val->u.hvm.nx = Bool_val(Field(infopriv, 3));
 		c_val->u.hvm.viridian = Bool_val(Field(infopriv, 4));
 		c_val->u.hvm.timeoffset = String_val(Field(infopriv, 5));
-		c_val->u.hvm.timer_mode = Int_val(Field(v, 0));
-		c_val->u.hvm.hpet = Int_val(Field(v, 1));
-		c_val->u.hvm.vpt_align = Int_val(Field(v, 2));
+		c_val->u.hvm.timer_mode = Int_val(Field(infopriv, 6));
+		c_val->u.hvm.hpet = Int_val(Field(infopriv, 7));
+		c_val->u.hvm.vpt_align = Int_val(Field(infopriv, 8));
 	} else {
 		c_val->u.pv.slack_memkb = Int64_val(Field(infopriv, 0));
 		c_val->u.pv.cmdline = String_val(Field(infopriv, 1));

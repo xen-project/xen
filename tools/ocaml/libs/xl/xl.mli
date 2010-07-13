@@ -45,15 +45,15 @@ type build_hvm_info =
 	nx : bool;
 	viridian : bool;
 	timeoffset : string;
+	timer_mode : int;
+	hpet : int;
+	vpt_align : int;
 }
 
 type build_spec = BuildHVM of build_hvm_info | BuildPV of build_pv_info
 
 type build_info =
 {
-	timer_mode : int;
-	hpet : int;
-	vpt_align : int;
 	max_vcpus : int;
 	cur_vcpus : int;
 	max_memkb : int64;
