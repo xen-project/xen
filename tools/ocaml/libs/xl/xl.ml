@@ -13,6 +13,8 @@
  * GNU Lesser General Public License for more details.
  *)
 
+exception Error of string
+
 type create_info =
 {
 	hvm : bool;
@@ -207,3 +209,5 @@ external domain_sched_credit_set : domid -> sched_credit -> unit = "stub_xl_sche
 external send_trigger : domid -> string -> int -> unit = "stub_xl_send_trigger"
 external send_sysrq : domid -> char -> unit = "stub_xl_send_sysrq"
 external send_debug_keys : domid -> string -> unit = "stub_xl_send_debug_keys"
+
+let _ = Callback.register_exception "xl.error" (Error "register_callback")

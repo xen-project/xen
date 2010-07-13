@@ -13,6 +13,8 @@
  * GNU Lesser General Public License for more details.
  *)
 
+exception Error of string
+
 type create_info =
 {
 	hvm : bool;
