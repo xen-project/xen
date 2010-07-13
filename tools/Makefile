@@ -35,7 +35,7 @@ SUBDIRS-y += xenpmd
 SUBDIRS-y += libxl
 SUBDIRS-y += remus
 SUBDIRS-$(CONFIG_X86) += xenpaging
-SUBDIRS-y += debugger/gdbsx
+SUBDIRS-$(CONFIG_X86) += debugger/gdbsx
 
 # These don't cross-compile
 ifeq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
