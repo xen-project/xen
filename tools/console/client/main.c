@@ -115,6 +115,8 @@ static int get_pty_fd(struct xs_handle *xs, char *path, int seconds)
 			 * disambiguate: just read the pty path */
 			pty_path = xs_read(xs, XBT_NULL, path, &len);
 			if (pty_path != NULL) {
+				if (access(pty_path, R_OK|W_OK) != 0)
+					continue;
 				pty_fd = open(pty_path, O_RDWR | O_NOCTTY);
 				if (pty_fd == -1) 
 					err(errno, "Could not open tty `%s'", 
