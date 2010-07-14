@@ -1425,6 +1425,48 @@ int libxl_device_disk_del(struct libxl_ctx *ctx,
     return libxl_device_del(ctx, &device, wait);
 }
 
+const char * libxl_device_disk_local_attach(struct libxl_ctx *ctx, libxl_device_disk *disk)
+{
+    char *dev = NULL;
+    int phystype = disk->phystype;
+    switch (phystype) {
+        case PHYSTYPE_PHY: {
+            fprintf(stderr, "attaching PHY disk %s to domain 0\n", disk->physpath);
+            dev = disk->physpath;
+            break;
+        }
+        case PHYSTYPE_FILE:
+            /* let's pretend is tap:aio for the moment */
+            phystype = PHYSTYPE_AIO;
+        case PHYSTYPE_AIO: case PHYSTYPE_QCOW: case PHYSTYPE_QCOW2: case PHYSTYPE_VHD: {
+            const char *msg;
+            if (!tap_ctl_check(&msg)) {
+                const char *type = device_disk_string_of_phystype(phystype);
+                dev = get_blktap2_device(ctx, disk->physpath, type);
+                if (!dev)
+                    dev = make_blktap2_device(ctx, disk->physpath, type);
+            }
+            break;
+        }
+        default:
+            XL_LOG(ctx, XL_LOG_ERROR, "unrecognized disk physical type: %d\n", phystype);
+            break;
+    }
+    return dev;
+}
+
+int libxl_device_disk_local_detach(struct libxl_ctx *ctx, libxl_device_disk *disk)
+{
+    /* Nothing to do for PHYSTYPE_PHY. */
+
+    /*
+     * For other device types assume that the blktap2 process is
+     * needed by the soon to be started domain and do nothing.
+     */
+
+    return 0;
+}
+
 /******************************************************************************/
 int libxl_device_nic_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic)
 {

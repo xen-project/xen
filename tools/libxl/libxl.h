@@ -423,6 +423,12 @@ int libxl_device_disk_getinfo(struct libxl_ctx *ctx, uint32_t domid,
                               libxl_device_disk *disk, libxl_diskinfo *diskinfo);
 int libxl_cdrom_insert(struct libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk);
 
+/*
+ * Make a disk available in this domain. Returns path to a device.
+ */
+const char * libxl_device_disk_local_attach(struct libxl_ctx *ctx, libxl_device_disk *disk);
+int libxl_device_disk_local_detach(struct libxl_ctx *ctx, libxl_device_disk *disk);
+
 typedef struct {
     char *backend;
     uint32_t backend_id;
