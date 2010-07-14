@@ -111,6 +111,7 @@ int libxl_free_all(struct libxl_ctx *ctx);
 void *libxl_zalloc(struct libxl_ctx *ctx, int bytes);
 void *libxl_calloc(struct libxl_ctx *ctx, size_t nmemb, size_t size);
 char *libxl_sprintf(struct libxl_ctx *ctx, const char *fmt, ...) PRINTF_ATTRIBUTE(2, 3);
+char *libxl_strdup(struct libxl_ctx *ctx, const char *c);
 char *libxl_dirname(struct libxl_ctx *ctx, const char *s);
 
 char **libxl_xs_kvs_of_flexarray(struct libxl_ctx *ctx, flexarray_t *array, int length);

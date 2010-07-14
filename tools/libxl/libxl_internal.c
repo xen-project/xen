@@ -138,10 +138,20 @@ char *libxl_sprintf(struct libxl_ctx *ctx, const char *fmt, ...)
     return s;
 }
 
+char *libxl_strdup(struct libxl_ctx *ctx, const char *c)
+{
+    char *s = strdup(c);
+
+    if (s)
+        libxl_ptr_add(ctx, s);
+
+    return s;
+}
+
 char *libxl_dirname(struct libxl_ctx *ctx, const char *s)
 {
     char *c;
-    char *ptr = libxl_sprintf(ctx, "%s", s);
+    char *ptr = libxl_strdup(ctx, s);
 
     c = strrchr(ptr, '/');
     if (!c)

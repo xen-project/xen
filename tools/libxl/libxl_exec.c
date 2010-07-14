@@ -100,7 +100,7 @@ int libxl_spawn_spawn(struct libxl_ctx *ctx,
     struct libxl_spawn_starting *for_spawn = starting->for_spawn;
 
     if (for_spawn) {
-        for_spawn->what = libxl_sprintf(ctx, "%s", what);
+        for_spawn->what = libxl_strdup(ctx, what);
         if (!for_spawn->what) return ERROR_NOMEM;
     }
 

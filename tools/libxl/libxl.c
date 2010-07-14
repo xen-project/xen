@@ -1339,7 +1339,7 @@ int libxl_device_disk_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_di
                 flexarray_set(back, boffset++, "tapdisk-params");
                 flexarray_set(back, boffset++, libxl_sprintf(ctx, "%s:%s", device_disk_string_of_phystype(disk->phystype), disk->physpath));
                 flexarray_set(back, boffset++, "params");
-                flexarray_set(back, boffset++, libxl_sprintf(ctx, "%s", dev));
+                flexarray_set(back, boffset++, libxl_strdup(ctx, dev));
                 backend_type = "phy";
                 device_physdisk_major_minor(dev, &major, &minor);
                 flexarray_set(back, boffset++, "physical-device");
@@ -1467,7 +1467,7 @@ int libxl_device_nic_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_nic
                                                  nic->mac[0], nic->mac[1], nic->mac[2],
                                                  nic->mac[3], nic->mac[4], nic->mac[5]));
     flexarray_set(back, boffset++, "bridge");
-    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%s", nic->bridge));
+    flexarray_set(back, boffset++, libxl_strdup(ctx, nic->bridge));
     flexarray_set(back, boffset++, "handle");
     flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", nic->devid));
 
@@ -2020,13 +2020,13 @@ static int libxl_build_xenpv_qemu_args(struct libxl_ctx *ctx,
 
     info->vnc = vfb->vnc;
     if (vfb->vnclisten)
-        info->vnclisten = libxl_sprintf(ctx, "%s", vfb->vnclisten);
+        info->vnclisten = libxl_strdup(ctx, vfb->vnclisten);
     info->vncdisplay = vfb->vncdisplay;
     info->vncunused = vfb->vncunused;
     if (vfb->vncpasswd)
         info->vncpasswd = vfb->vncpasswd;
     if (vfb->keymap)
-        info->keymap = libxl_sprintf(ctx, "%s", vfb->keymap);
+        info->keymap = libxl_strdup(ctx, vfb->keymap);
     info->sdl = vfb->sdl;
     info->opengl = vfb->opengl;
     for (i = 0; i < num_console; i++) {
@@ -2782,19 +2782,19 @@ const libxl_version_info* libxl_get_version_info(struct libxl_ctx *ctx)
     info->xen_version_major = xen_version >> 16;
     info->xen_version_minor = xen_version & 0xFF;
     xc_version(ctx->xch, XENVER_extraversion, &u.xen_extra);
-    info->xen_version_extra = libxl_sprintf(ctx, "%s", u.xen_extra);
+    info->xen_version_extra = libxl_strdup(ctx, u.xen_extra);
 
     xc_version(ctx->xch, XENVER_compile_info, &u.xen_cc);
-    info->compiler = libxl_sprintf(ctx, "%s", u.xen_cc.compiler);
-    info->compile_by = libxl_sprintf(ctx, "%s", u.xen_cc.compile_by);
-    info->compile_domain = libxl_sprintf(ctx, "%s", u.xen_cc.compile_domain);
-    info->compile_date = libxl_sprintf(ctx, "%s", u.xen_cc.compile_date);
+    info->compiler = libxl_strdup(ctx, u.xen_cc.compiler);
+    info->compile_by = libxl_strdup(ctx, u.xen_cc.compile_by);
+    info->compile_domain = libxl_strdup(ctx, u.xen_cc.compile_domain);
+    info->compile_date = libxl_strdup(ctx, u.xen_cc.compile_date);
 
     xc_version(ctx->xch, XENVER_capabilities, &u.xen_caps);
-    info->capabilities = libxl_sprintf(ctx, "%s", u.xen_caps);
+    info->capabilities = libxl_strdup(ctx, u.xen_caps);
 
     xc_version(ctx->xch, XENVER_changeset, &u.xen_chgset);
-    info->changeset = libxl_sprintf(ctx, "%s", u.xen_chgset);
+    info->changeset = libxl_strdup(ctx, u.xen_chgset);
 
     xc_version(ctx->xch, XENVER_platform_parameters, &u.p_parms);
     info->virt_start = u.p_parms.virt_start;
@@ -2802,7 +2802,7 @@ const libxl_version_info* libxl_get_version_info(struct libxl_ctx *ctx)
     info->pagesize = xc_version(ctx->xch, XENVER_pagesize, NULL);
 
     xc_version(ctx->xch, XENVER_commandline, &u.xen_commandline);
-    info->commandline = libxl_sprintf(ctx, "%s", u.xen_commandline);
+    info->commandline = libxl_strdup(ctx, u.xen_commandline);
 
     return info;
 }
