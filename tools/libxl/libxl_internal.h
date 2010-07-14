@@ -176,7 +176,7 @@ int hvm_build_set_params(xc_interface *handle, uint32_t domid,
  /* higher-level double-fork and separate detach eg as for device models */
 
 struct libxl_spawn_starting {
-    /* put this in your own stateu structure as returned to application */
+    /* put this in your own status structure as returned to application */
     /* all fields are private to libxl_spawn_... */
     pid_t intermediate;
     char *what; /* malloc'd in spawn_spawn */
