@@ -630,16 +630,34 @@ def sniff_netware(fs, cfg):
 
     return cfg
 
+def format_sxp(kernel, ramdisk, args):
+    s = "linux (kernel %s)" % kernel
+    if ramdisk:
+        s += "(ramdisk %s)" % ramdisk
+    if args:
+        s += "(args \"%s\")" % args
+    return s
+                
+def format_simple(kernel, ramdisk, args, sep):
+    s = ("kernel %s" % kernel) + sep
+    if ramdisk:
+        s += ("ramdisk %s" % ramdisk) + sep
+    if args:
+        s += ("args %s" % args) + sep
+    s += sep
+    return s
+
 if __name__ == "__main__":
     sel = None
     
     def usage():
-        print >> sys.stderr, "Usage: %s [-q|--quiet] [-i|--interactive] [-n|--not-really] [--output=] [--kernel=] [--ramdisk=] [--args=] [--entry=] <image>" %(sys.argv[0],)
+        print >> sys.stderr, "Usage: %s [-q|--quiet] [-i|--interactive] [-n|--not-really] [--output=] [--kernel=] [--ramdisk=] [--args=] [--entry=] [--output-directory=] [--output-format=sxp|simple|simple0] <image>" %(sys.argv[0],)
 
     try:
         opts, args = getopt.gnu_getopt(sys.argv[1:], 'qinh::',
-                                   ["quiet", "interactive", "not-really", 
-                                    "help", "output=", "entry=", "kernel=", 
+                                   ["quiet", "interactive", "not-really", "help", 
+                                    "output=", "output-format=", "output-directory=",
+                                    "entry=", "kernel=", 
                                     "ramdisk=", "args=", "isconfig"])
     except getopt.GetoptError:
         usage()
@@ -655,6 +673,8 @@ if __name__ == "__main__":
     interactive = True
     isconfig = False
     not_really = False
+    output_format = "sxp"
+    output_directory = "/var/run/xend/boot"
 
     # what was passed in
     incfg = { "kernel": None, "ramdisk": None, "args": "" }
@@ -687,6 +707,14 @@ if __name__ == "__main__":
             interactive = False
         elif o in ("--isconfig",):
             isconfig = True
+        elif o in ("--output-format",):
+            if a not in ["sxp", "simple", "simple0"]:
+                print "unkonwn output format %s" % a
+                usage()
+                sys.exit(1)
+            output_format = a
+        elif o in ("--output-directory",):
+            output_directory = a
 
     if output is None or output == "-":
         fd = sys.stdout.fileno()
@@ -723,7 +751,7 @@ if __name__ == "__main__":
     else:
         data = fs.open_file(chosencfg["kernel"]).read()
         (tfd, bootcfg["kernel"]) = tempfile.mkstemp(prefix="boot_kernel.",
-                                                    dir="/var/run/xend/boot")
+                                                    dir=output_directory)
         os.write(tfd, data)
         os.close(tfd)
 
@@ -733,26 +761,29 @@ if __name__ == "__main__":
         else:
             data = fs.open_file(chosencfg["ramdisk"],).read()
             (tfd, bootcfg["ramdisk"]) = tempfile.mkstemp(
-                prefix="boot_ramdisk.", dir="/var/run/xend/boot")
+                prefix="boot_ramdisk.", dir=output_directory)
             os.write(tfd, data)
             os.close(tfd)
     else:
         initrd = None
 
-    sxp = "linux (kernel %s)" % bootcfg["kernel"]
-    if bootcfg["ramdisk"]:
-        sxp += "(ramdisk %s)" % bootcfg["ramdisk"]
+    args = None
     if chosencfg["args"]:
         zfsinfo = fsimage.getbootstring(fs)
-        if zfsinfo is None:
-            sxp += "(args \"%s\")" % chosencfg["args"]
-        else:
+        if zfsinfo is not None:
             e = re.compile("zfs-bootfs=[\w\-\.\:@/]+" )
             (chosencfg["args"],count) = e.subn(zfsinfo, chosencfg["args"])
             if count == 0:
                chosencfg["args"] += " -B %s" % zfsinfo
-            sxp += "(args \"%s\")" % (chosencfg["args"])
+        args = chosencfg["args"]
+
+    if output_format == "sxp":
+        ostring = format_sxp(bootcfg["kernel"], bootcfg["ramdisk"], args)
+    elif output_format == "simple":
+        ostring = format_simple(bootcfg["kernel"], bootcfg["ramdisk"], args, "\n")
+    elif output_format == "simple0":
+        ostring = format_simple(bootcfg["kernel"], bootcfg["ramdisk"], args, "\0")
 
     sys.stdout.flush()
-    os.write(fd, sxp)
+    os.write(fd, ostring)
     
