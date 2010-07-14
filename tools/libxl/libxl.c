@@ -786,12 +786,12 @@ int libxl_domain_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
     return 0;
 }
 
-int libxl_console_attach(struct libxl_ctx *ctx, uint32_t domid, int cons_num)
+int libxl_console_exec(struct libxl_ctx *ctx, uint32_t domid, int cons_num)
 {
-    char *cmd = libxl_sprintf(
-        ctx, "%s/xenconsole %d --num %d",
-        libxl_private_bindir_path(), domid, cons_num);
-    return (system(cmd) != 0) ? ERROR_FAIL : 0;
+    char *p = libxl_sprintf(ctx, "%s/xenconsole", libxl_private_bindir_path());
+    char *domid_s = libxl_sprintf(ctx, "%d", domid);
+    char *cons_num_s = libxl_sprintf(ctx, "%d", cons_num);
+    return execl(p, p, domid_s, "--num", cons_num_s, (void *)NULL) == 0 ? 0 : ERROR_FAIL;
 }
 
 static char ** libxl_build_device_model_args(struct libxl_ctx *ctx,

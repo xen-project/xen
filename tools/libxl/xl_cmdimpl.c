@@ -931,12 +931,45 @@ static void *xrealloc(void *ptr, size_t sz) {
     return r;
 }
 
+int autoconnect_console(int cons_num)
+{
+    int status;
+    pid_t pid, r;
+
+    /*
+     * Fork for xenconsole. We exec xenconsole in the foreground
+     * process allowing it to retain the tty. xl continues in the
+     * child. The xenconsole client uses a xenstore watch to wait for
+     * the console to be setup so there is no race.
+     */
+    pid = fork();
+    if (pid < 0) {
+        perror("unable to fork xenconsole");
+        return ERROR_FAIL;
+    } else if (pid == 0)
+        return 0;
+
+    /*
+     * Catch failure of the create process.
+     */
+    sleep(1);
+    r = waitpid(pid, &status, WNOHANG);
+    if (r > 0 && WIFEXITED(status) && WEXITSTATUS(status) != 0)
+        _exit(WEXITSTATUS(status));
+
+    libxl_console_exec(&ctx, domid, cons_num);
+    /* Do not return. xl continued in child process */
+    fprintf(stderr, "Unable to attach console\n");
+    _exit(1);
+}
+
 struct domain_create {
     int debug;
     int daemonize;
     int paused;
     int dryrun;
     int quiet;
+    int console_autoconnect;
     const char *config_file;
     const char *extra_config; /* extra config string */
     const char *restore_file;
@@ -1118,6 +1151,12 @@ start:
         perror("cannot save config file");
         ret = ERROR_FAIL;
         goto error_out;
+    }
+
+    if (dom_info->console_autoconnect) {
+        ret = autoconnect_console(0);
+        if (ret)
+            goto error_out;
     }
 
     if (!restore_file || !need_daemon) {
@@ -1467,12 +1506,6 @@ int main_memset(int argc, char **argv)
     exit(0);
 }
 
-void console(char *p, int cons_num)
-{
-    find_domain(p);
-    libxl_console_attach(&ctx, domid, cons_num);
-}
-
 void cd_insert(char *dom, char *virtdev, char *phys)
 {
     libxl_device_disk disk;
@@ -1570,7 +1603,6 @@ int main_cd_insert(int argc, char **argv)
 int main_console(int argc, char **argv)
 {
     int opt = 0, cons_num = 0;
-    char *p = NULL;
 
     while ((opt = getopt(argc, argv, "hn:")) != -1) {
         switch (opt) {
@@ -1592,10 +1624,10 @@ int main_console(int argc, char **argv)
         exit(2);
     }
 
-    p = argv[optind];
-
-    console(p, cons_num);
-    exit(0);
+    find_domain(argv[optind]);
+    libxl_console_exec(&ctx, domid, 0);
+    fprintf(stderr, "Unable to attach console\n");
+    return 1;
 }
 
 void pcilist(char *dom)
@@ -2672,7 +2704,6 @@ int main_create(int argc, char **argv)
     char *filename = NULL;
     char *p, extra_config[1024];
     struct domain_create dom_info;
-    char dom[10]; /* long enough */
     int paused = 0, debug = 0, daemonize = 1, console_autoconnect = 0,
         dryrun = 0, quite = 0;
     int opt, rc;
@@ -2747,15 +2778,11 @@ int main_create(int argc, char **argv)
     dom_info.config_file = filename;
     dom_info.extra_config = extra_config;
     dom_info.migrate_fd = -1;
+    dom_info.console_autoconnect = console_autoconnect;
 
     rc = create_domain(&dom_info);
     if (rc < 0)
         exit(-rc);
-
-    if (console_autoconnect) {
-        snprintf(dom, sizeof(dom), "%d", rc);
-        console(dom, 0);
-    }
 
     exit(0);
 }

@@ -358,7 +358,7 @@ int libxl_domain_unpause(struct libxl_ctx *ctx, uint32_t domid);
 int libxl_domain_setmaxmem(struct libxl_ctx *ctx, uint32_t domid, uint32_t target_memkb);
 int libxl_set_memory_target(struct libxl_ctx *ctx, uint32_t domid, uint32_t target_memkb, int enforce);
 
-int libxl_console_attach(struct libxl_ctx *ctx, uint32_t domid, int cons_num);
+int libxl_console_exec(struct libxl_ctx *ctx, uint32_t domid, int cons_num);
 
 int libxl_domain_info(struct libxl_ctx*, struct libxl_dominfo *info_r,
                       uint32_t domid);
