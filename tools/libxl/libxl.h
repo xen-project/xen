@@ -132,7 +132,9 @@ typedef struct {
         } hvm;
         struct {
             uint32_t   slack_memkb;
-            const char *cmdline;
+            const char *bootloader;
+            const char *bootloader_args;
+            char *cmdline;
             libxl_file_reference ramdisk;
             const char *features;
         } pv;
@@ -328,6 +330,23 @@ int libxl_domain_destroy(struct libxl_ctx *ctx, uint32_t domid, int force);
 
 int libxl_file_reference_map(struct libxl_ctx *ctx, libxl_file_reference *f);
 int libxl_file_reference_unmap(struct libxl_ctx *ctx, libxl_file_reference *f);
+
+/*
+ * Run the configured bootloader for a PV domain and update
+ * info->kernel, info->u.pv.ramdisk and info->u.pv.cmdline as
+ * appropriate (any initial values present in these fields must have
+ * been allocated with malloc).
+ *
+ * Is a NOP on non-PV domains or those with no bootloader configured.
+ *
+ * Users should call libxl_file_reference_unmap on the kernel and
+ * ramdisk to cleanup or rely on libxl_domain_{build,restore} to do
+ * it.
+ */
+int libxl_run_bootloader(struct libxl_ctx *ctx,
+                         libxl_domain_build_info *info,
+                         libxl_device_disk *disk,
+                         uint32_t domid);
 
 char *libxl_uuid2string(struct libxl_ctx *ctx, uint8_t uuid[16]);
   /* 0 means ERROR_ENOMEM, which we have logged */

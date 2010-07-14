@@ -363,6 +363,12 @@ static void printf_info(int domid,
     printf("\t(target_memkb %d)\n", b_info->target_memkb);
     printf("\t(nomigrate %d)\n", b_info->disable_migrate);
 
+    if (!c_info->hvm && b_info->u.pv.bootloader) {
+        printf("\t(bootloader %s)\n", b_info->u.pv.bootloader);
+        if (b_info->u.pv.bootloader_args)
+            printf("\t(bootloader_args %s)\n", b_info->u.pv.bootloader_args);
+    }
+
     printf("\t(image\n");
     if (c_info->hvm) {
         printf("\t\t(hvm\n");
@@ -598,6 +604,16 @@ static void parse_config_data(const char *configfile_filename_report,
 
         if ((root || extra) && !cmdline) {
             fprintf(stderr, "Failed to allocate memory for cmdline\n");
+            exit(1);
+        }
+
+        if (!xlu_cfg_get_string (config, "bootloader", &buf))
+            b_info->u.pv.bootloader = strdup(buf);
+        if (!xlu_cfg_get_string (config, "bootloader_args", &buf))
+            b_info->u.pv.bootloader_args = strdup(buf);
+
+        if (!b_info->u.pv.bootloader && !b_info->kernel.path) {
+            fprintf(stderr, "Neither kernel nor bootloader specified\n");
             exit(1);
         }
 
@@ -1157,6 +1173,12 @@ start:
         ret = autoconnect_console(0);
         if (ret)
             goto error_out;
+    }
+
+    ret = libxl_run_bootloader(&ctx, &info2, num_disks > 0 ? &disks[0] : NULL, domid);
+    if (ret) {
+        fprintf(stderr, "failed to run bootloader: %d\n", ret);
+        goto error_out;
     }
 
     if (!restore_file || !need_daemon) {
