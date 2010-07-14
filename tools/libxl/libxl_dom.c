@@ -247,7 +247,7 @@ static int core_suspend_callback(void *data)
         return 1;
     }
     path = libxl_sprintf(si->ctx, "%s/control/shutdown", libxl_xs_get_dompath(si->ctx, si->domid));
-    libxl_xs_write(si->ctx, XBT_NULL, path, "suspend", strlen("suspend"));
+    libxl_xs_write(si->ctx, XBT_NULL, path, "suspend");
     if (si->hvm) {
         unsigned long hvm_pvdrv, hvm_s_state;
         xc_get_hvm_param(si->ctx->xch, si->domid, HVM_PARAM_CALLBACK_IRQ, &hvm_pvdrv);
@@ -275,7 +275,7 @@ static int core_suspend_callback(void *data)
     }
     if (!strcmp(state, "suspend")) {
         XL_LOG(si->ctx, XL_LOG_ERROR, "guest didn't suspend in time");
-        libxl_xs_write(si->ctx, XBT_NULL, path, "", 1);
+        libxl_xs_write(si->ctx, XBT_NULL, path, "");
     }
     return 1;
 }
@@ -338,7 +338,7 @@ int save_device_model(struct libxl_ctx *ctx, uint32_t domid, int fd)
     char *filename = libxl_sprintf(ctx, "/var/lib/xen/qemu-save.%d", domid);
 
     XL_LOG(ctx, XL_LOG_DEBUG, "Saving device model state to %s", filename);
-    libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "/local/domain/0/device-model/%d/command", domid), "save", strlen("save"));
+    libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "/local/domain/0/device-model/%d/command", domid), "save");
     libxl_wait_for_device_model(ctx, domid, "paused", NULL, NULL);
 
     c = libxl_write_exactly(ctx, fd, QEMU_SIGNATURE, strlen(QEMU_SIGNATURE),

@@ -523,7 +523,7 @@ int libxl_domain_unpause(struct libxl_ctx *ctx, uint32_t domid)
         path = libxl_sprintf(ctx, "/local/domain/0/device-model/%d/state", domid);
         state = libxl_xs_read(ctx, XBT_NULL, path);
         if (state != NULL && !strcmp(state, "paused")) {
-            libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "/local/domain/0/device-model/%d/command", domid), "continue", strlen("continue"));
+            libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "/local/domain/0/device-model/%d/command", domid), "continue");
             libxl_wait_for_device_model(ctx, domid, "running", NULL, NULL);
         }
     }
@@ -2663,7 +2663,7 @@ int libxl_domain_setmaxmem(struct libxl_ctx *ctx, uint32_t domid, uint32_t max_m
     }
 
     if (domid != 0)
-        libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/memory/static-max", dompath), "%lu", max_memkb);
+        libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/memory/static-max", dompath), "%"PRIu32, max_memkb);
 
     return 0;
 }
@@ -2702,14 +2702,14 @@ int libxl_set_memory_target(struct libxl_ctx *ctx, uint32_t domid, uint32_t targ
     videoram_s = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/memory/videoram", dompath));
     videoram = videoram_s ? atoi(videoram_s) : 0;
 
-    libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/memory/target", dompath), "%lu", target_memkb);
+    libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/memory/target", dompath), "%"PRIu32, target_memkb);
 
     rc = xc_domain_getinfolist(ctx->xch, domid, 1, &info);
     if (rc != 1 || info.domain != domid)
         return rc;
     xcinfo2xlinfo(&info, &ptr);
     uuid = libxl_uuid2string(ctx, ptr.uuid);
-    libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "/vm/%s/memory", uuid), "%lu", target_memkb / 1024);
+    libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "/vm/%s/memory", uuid), "%"PRIu32, target_memkb / 1024);
 
     if (enforce || !domid)
         memorykb = target_memkb;

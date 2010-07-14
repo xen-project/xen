@@ -117,7 +117,7 @@ char **libxl_xs_kvs_of_flexarray(struct libxl_ctx *ctx, flexarray_t *array, int 
 int libxl_xs_writev(struct libxl_ctx *ctx, xs_transaction_t t,
                     char *dir, char **kvs);
 int libxl_xs_write(struct libxl_ctx *ctx, xs_transaction_t t,
-                   char *path, char *fmt, ...);
+                   char *path, char *fmt, ...) PRINTF_ATTRIBUTE(4, 5);
 char *libxl_xs_get_dompath(struct libxl_ctx *ctx, uint32_t domid); // logs errs
 char *libxl_xs_read(struct libxl_ctx *ctx, xs_transaction_t t, char *path);
 char **libxl_xs_directory(struct libxl_ctx *ctx, xs_transaction_t t, char *path, unsigned int *nb);
