@@ -120,7 +120,7 @@ static int domain_build_info_val (libxl_domain_build_info *c_val, value v)
 	c_val->target_memkb = Int64_val(Field(v, 3));
 	c_val->video_memkb = Int64_val(Field(v, 4));
 	c_val->shadow_memkb = Int64_val(Field(v, 5));
-	c_val->kernel = String_val(Field(v, 6));
+	c_val->kernel.path = String_val(Field(v, 6));
 	c_val->hvm = Tag_val(Field(v, 7)) == 0;
 	infopriv = Field(Field(v, 7), 0);
 	if (c_val->hvm) {
@@ -136,7 +136,7 @@ static int domain_build_info_val (libxl_domain_build_info *c_val, value v)
 	} else {
 		c_val->u.pv.slack_memkb = Int64_val(Field(infopriv, 0));
 		c_val->u.pv.cmdline = String_val(Field(infopriv, 1));
-		c_val->u.pv.ramdisk = String_val(Field(infopriv, 2));
+		c_val->u.pv.ramdisk.path = String_val(Field(infopriv, 2));
 		c_val->u.pv.features = String_val(Field(infopriv, 3));
 	}
 

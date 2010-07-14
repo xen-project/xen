@@ -90,6 +90,24 @@ typedef struct {
 } libxl_domain_create_info;
 
 typedef struct {
+    /*
+     * Path is always set if the file refernece is valid. However if
+     * mapped is true then the actual file may already be unlinked.
+     */
+    char *path;
+    int mapped;
+    void *data;
+    size_t size;
+} libxl_file_reference;
+
+/*
+ * Instances of libxl_file_reference contained in this struct which
+ * have been mapped (with libxl_file_reference_map) will be unmapped
+ * by libxl_domain_build/restore. If either of these are never called
+ * then the user is responsible for calling
+ * libxl_file_reference_unmap.
+ */
+typedef struct {
     int max_vcpus;
     int cur_vcpus;
     int tsc_mode;
@@ -98,7 +116,7 @@ typedef struct {
     uint32_t video_memkb;
     uint32_t shadow_memkb;
     bool disable_migrate;
-    const char *kernel;
+    libxl_file_reference kernel;
     int hvm;
     union {
         struct {
@@ -115,7 +133,7 @@ typedef struct {
         struct {
             uint32_t   slack_memkb;
             const char *cmdline;
-            const char *ramdisk;
+            libxl_file_reference ramdisk;
             const char *features;
         } pv;
     } u;
@@ -307,6 +325,9 @@ int libxl_domain_suspend(struct libxl_ctx *ctx, libxl_domain_suspend_info *info,
 int libxl_domain_resume(struct libxl_ctx *ctx, uint32_t domid);
 int libxl_domain_shutdown(struct libxl_ctx *ctx, uint32_t domid, int req);
 int libxl_domain_destroy(struct libxl_ctx *ctx, uint32_t domid, int force);
+
+int libxl_file_reference_map(struct libxl_ctx *ctx, libxl_file_reference *f);
+int libxl_file_reference_unmap(struct libxl_ctx *ctx, libxl_file_reference *f);
 
 char *libxl_uuid2string(struct libxl_ctx *ctx, uint8_t uuid[16]);
   /* 0 means ERROR_ENOMEM, which we have logged */

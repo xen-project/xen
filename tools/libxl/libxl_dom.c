@@ -143,22 +143,76 @@ int build_pv(struct libxl_ctx *ctx, uint32_t domid,
     int ret;
     int flags = 0;
 
+    xc_dom_loginit(ctx->xch);
+
     dom = xc_dom_allocate(ctx->xch, info->u.pv.cmdline, info->u.pv.features);
     if (!dom) {
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xc_dom_allocate failed");
-        return -1;
+        return ERROR_FAIL;
     }
-    ret = xc_dom_linux_build(ctx->xch, dom, domid, info->target_memkb / 1024,
-                                  info->kernel, info->u.pv.ramdisk, flags,
-                                  state->store_port, &state->store_mfn,
-                                  state->console_port, &state->console_mfn);
-    if (ret != 0) {
-        xc_dom_release(dom);
-        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, ret, "xc_dom_linux_build failed");
-        return -2;
+
+    if (info->kernel.mapped) {
+        if ( (ret = xc_dom_kernel_mem(dom, info->kernel.data, info->kernel.size)) != 0) {
+            XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xc_dom_kernel_mem failed");
+            goto out;
+        }
+    } else {
+        if ( (ret = xc_dom_kernel_file(dom, info->kernel.path)) != 0) {
+            XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xc_dom_kernel_file failed");
+            goto out;
+        }
     }
+
+    if ( info->u.pv.ramdisk.path && strlen(info->u.pv.ramdisk.path) ) {
+        if (info->u.pv.ramdisk.mapped) {
+            if ( (ret = xc_dom_ramdisk_mem(dom, info->u.pv.ramdisk.data, info->u.pv.ramdisk.size)) != 0 ) {
+                XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xc_dom_ramdisk_mem failed");
+                goto out;
+            }
+        } else {
+            if ( (ret = xc_dom_ramdisk_file(dom, info->u.pv.ramdisk.path)) != 0 ) {
+                XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xc_dom_ramdisk_file failed");
+                goto out;
+            }
+        }
+    }
+
+    dom->flags = flags;
+    dom->console_evtchn = state->console_port;
+    dom->xenstore_evtchn = state->store_port;
+
+    if ( (ret = xc_dom_boot_xen_init(dom, ctx->xch, domid)) != 0 ) {
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xc_dom_boot_xen_init failed");
+        goto out;
+    }
+    if ( (ret = xc_dom_parse_image(dom)) != 0 ) {
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xc_dom_parse_image failed");
+        goto out;
+    }
+    if ( (ret = xc_dom_mem_init(dom, info->target_memkb / 1024)) != 0 ) {
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xc_dom_mem_init failed");
+        goto out;
+    }
+    if ( (ret = xc_dom_boot_mem_init(dom)) != 0 ) {
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xc_dom_boot_mem_init failed");
+        goto out;
+    }
+    if ( (ret = xc_dom_build_image(dom)) != 0 ) {
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xc_dom_build_image failed");
+        goto out;
+    }
+    if ( (ret = xc_dom_boot_image(dom)) != 0 ) {
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xc_dom_boot_image failed");
+        goto out;
+    }
+
+    state->console_mfn = xc_dom_p2m_host(dom, dom->console_pfn);
+    state->store_mfn = xc_dom_p2m_host(dom, dom->xenstore_pfn);
+
+    ret = 0;
+out:
     xc_dom_release(dom);
-    return 0;
+    return ret == 0 ? 0 : ERROR_FAIL;
 }
 
 int build_hvm(struct libxl_ctx *ctx, uint32_t domid,
@@ -166,12 +220,17 @@ int build_hvm(struct libxl_ctx *ctx, uint32_t domid,
 {
     int ret;
 
+    if (info->kernel.mapped) {
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "build_hvm kernel cannot be mmapped");
+        return ERROR_INVAL;
+    }
+
     ret = xc_hvm_build_target_mem(
         ctx->xch,
         domid,
         (info->max_memkb - info->video_memkb) / 1024,
         (info->target_memkb - info->video_memkb) / 1024,
-        libxl_abs_path(ctx, (char *)info->kernel,
+        libxl_abs_path(ctx, (char *)info->kernel.path,
                        libxl_xenfirmwaredir_path()));
     if (ret) {
         XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, ret, "hvm building failed");

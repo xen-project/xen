@@ -22,6 +22,7 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <sys/select.h>
+#include <sys/mman.h>
 #include <sys/wait.h>
 #include <signal.h>
 #include <unistd.h> /* for write, unlink and close */
@@ -291,12 +292,12 @@ int libxl_domain_build(struct libxl_ctx *ctx, libxl_domain_build_info *info, uin
         vments[i++] = "image/ostype";
         vments[i++] = "linux";
         vments[i++] = "image/kernel";
-        vments[i++] = (char*) info->kernel;
+        vments[i++] = (char*) info->kernel.path;
         vments[i++] = "start_time";
         vments[i++] = libxl_sprintf(ctx, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
-        if (info->u.pv.ramdisk) {
+        if (info->u.pv.ramdisk.path) {
             vments[i++] = "image/ramdisk";
-            vments[i++] = (char*) info->u.pv.ramdisk;
+            vments[i++] = (char*) info->u.pv.ramdisk.path;
         }
         if (info->u.pv.cmdline) {
             vments[i++] = "image/cmdline";
@@ -305,6 +306,10 @@ int libxl_domain_build(struct libxl_ctx *ctx, libxl_domain_build_info *info, uin
     }
     ret = build_post(ctx, domid, info, state, vments, localents);
 out:
+    libxl_file_reference_unmap(ctx, &info->kernel);
+    if (!info->hvm)
+	    libxl_file_reference_unmap(ctx, &info->u.pv.ramdisk);
+
     return ret;
 }
 
@@ -338,12 +343,12 @@ int libxl_domain_restore(struct libxl_ctx *ctx, libxl_domain_build_info *info,
         vments[i++] = "image/ostype";
         vments[i++] = "linux";
         vments[i++] = "image/kernel";
-        vments[i++] = (char*) info->kernel;
+        vments[i++] = (char*) info->kernel.path;
         vments[i++] = "start_time";
         vments[i++] = libxl_sprintf(ctx, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
-        if (info->u.pv.ramdisk) {
+        if (info->u.pv.ramdisk.path) {
             vments[i++] = "image/ramdisk";
-            vments[i++] = (char*) info->u.pv.ramdisk;
+            vments[i++] = (char*) info->u.pv.ramdisk.path;
         }
         if (info->u.pv.cmdline) {
             vments[i++] = "image/cmdline";
@@ -361,6 +366,10 @@ int libxl_domain_restore(struct libxl_ctx *ctx, libxl_domain_build_info *info,
     }
 
 out:
+    libxl_file_reference_unmap(ctx, &info->kernel);
+    if (!info->hvm)
+	    libxl_file_reference_unmap(ctx, &info->u.pv.ramdisk);
+
     esave = errno;
 
     flags = fcntl(fd, F_GETFL);
@@ -1057,9 +1066,9 @@ static int libxl_create_stubdom(struct libxl_ctx *ctx,
     b_info.max_vcpus = 1;
     b_info.max_memkb = 32 * 1024;
     b_info.target_memkb = b_info.max_memkb;
-    b_info.kernel = libxl_abs_path(ctx, "ioemu-stubdom.gz", libxl_xenfirmwaredir_path());
+    b_info.kernel.path = libxl_abs_path(ctx, "ioemu-stubdom.gz", libxl_xenfirmwaredir_path());
     b_info.u.pv.cmdline = libxl_sprintf(ctx, " -d %d", info->domid);
-    b_info.u.pv.ramdisk = "";
+    b_info.u.pv.ramdisk.path = "";
     b_info.u.pv.features = "";
     b_info.hvm = 0;
 
@@ -3181,3 +3190,47 @@ int libxl_tmem_shared_auth(struct libxl_ctx *ctx, uint32_t domid,
     return rc;
 }
 
+int libxl_file_reference_map(struct libxl_ctx *ctx, libxl_file_reference *f)
+{
+	struct stat st_buf;
+	int ret, fd;
+	void *data;
+
+	if (f->mapped)
+		return 0;
+
+	fd = open(f->path, O_RDONLY);
+	if (f < 0)
+		return ERROR_FAIL;
+
+	ret = fstat(fd, &st_buf);
+	if (ret < 0)
+		goto out;
+
+	ret = -1;
+	data = mmap(NULL, st_buf.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+	if (data == NULL)
+		goto out;
+
+	f->mapped = 1;
+	f->data = data;
+	f->size = st_buf.st_size;
+
+	ret = 0;
+out:
+	close(fd);
+
+	return ret == 0 ? 0 : ERROR_FAIL;
+}
+
+int libxl_file_reference_unmap(struct libxl_ctx *ctx, libxl_file_reference *f)
+{
+	int ret;
+
+	if (!f->mapped)
+		return 0;
+
+	ret = munmap(f->data, f->size);
+
+	return ret == 0 ? 0 : ERROR_FAIL;
+}

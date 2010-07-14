@@ -196,7 +196,7 @@ static void init_build_info(libxl_domain_build_info *b_info, libxl_domain_create
     if (c_info->hvm) {
         b_info->shadow_memkb = 0; /* Set later */
         b_info->video_memkb = 8 * 1024;
-        b_info->kernel = "hvmloader";
+        b_info->kernel.path = "hvmloader";
         b_info->hvm = 1;
         b_info->u.hvm.pae = 1;
         b_info->u.hvm.apic = 1;
@@ -366,7 +366,7 @@ static void printf_info(int domid,
     printf("\t(image\n");
     if (c_info->hvm) {
         printf("\t\t(hvm\n");
-        printf("\t\t\t(loader %s)\n", b_info->kernel);
+        printf("\t\t\t(loader %s)\n", b_info->kernel.path);
         printf("\t\t\t(video_memkb %d)\n", b_info->video_memkb);
         printf("\t\t\t(shadow_memkb %d)\n", b_info->shadow_memkb);
         printf("\t\t\t(pae %d)\n", b_info->u.hvm.pae);
@@ -397,9 +397,9 @@ static void printf_info(int domid,
         printf("\t\t)\n");
     } else {
         printf("\t\t(linux %d)\n", b_info->hvm);
-        printf("\t\t\t(kernel %s)\n", b_info->kernel);
+        printf("\t\t\t(kernel %s)\n", b_info->kernel.path);
         printf("\t\t\t(cmdline %s)\n", b_info->u.pv.cmdline);
-        printf("\t\t\t(ramdisk %s)\n", b_info->u.pv.ramdisk);
+        printf("\t\t\t(ramdisk %s)\n", b_info->u.pv.ramdisk.path);
         printf("\t\t)\n");
     }
     printf("\t)\n");
@@ -563,7 +563,7 @@ static void parse_config_data(const char *configfile_filename_report,
         b_info->video_memkb = l * 1024;
 
     if (!xlu_cfg_get_string (config, "kernel", &buf))
-        b_info->kernel = strdup(buf);
+        b_info->kernel.path = strdup(buf);
 
     if (c_info->hvm == 1) {
         if (!xlu_cfg_get_long (config, "pae", &l))
@@ -603,7 +603,7 @@ static void parse_config_data(const char *configfile_filename_report,
 
         b_info->u.pv.cmdline = cmdline;
         if (!xlu_cfg_get_string (config, "ramdisk", &buf))
-            b_info->u.pv.ramdisk = strdup(buf);
+            b_info->u.pv.ramdisk.path = strdup(buf);
     }
 
     if (!xlu_cfg_get_list (config, "disk", &vbds, 0)) {
