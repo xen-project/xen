@@ -1393,6 +1393,11 @@ struct xc_cx_stat {
     uint64_t idle_time;    /* idle time from boot */
     uint64_t *triggers;    /* Cx trigger counts */
     uint64_t *residencies; /* Cx residencies */
+    uint64_t pc3;
+    uint64_t pc6;
+    uint64_t pc7;
+    uint64_t cc3;
+    uint64_t cc6;
 };
 typedef struct xc_cx_stat xc_cx_stat_t;
 

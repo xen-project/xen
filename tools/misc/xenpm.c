@@ -15,6 +15,7 @@
  * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston, MA 02111-1307 USA.
  */
+#define MAX_NR_CPU 512
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -91,6 +92,13 @@ static void print_cxstat(int cpuid, struct xc_cx_stat *cxstat)
         printf("                       residency  [%020"PRIu64" ms]\n",
                cxstat->residencies[i]/1000000UL);
     }
+    printf("pc3                  : [%020"PRIu64" ms]\n"
+           "pc6                  : [%020"PRIu64" ms]\n"
+           "pc7                  : [%020"PRIu64" ms]\n",
+           cxstat->pc3/1000000UL, cxstat->pc6/1000000UL, cxstat->pc7/1000000UL);
+    printf("cc3                  : [%020"PRIu64" ms]\n"
+           "cc6                  : [%020"PRIu64" ms]\n",
+           cxstat->cc3/1000000UL, cxstat->cc6/1000000UL);
     printf("\n");
 }
 
@@ -306,9 +314,13 @@ static uint64_t *sum, *sum_cx, *sum_px;
 
 static void signal_int_handler(int signo)
 {
-    int i, j;
+    int i, j, k, ret;
     struct timeval tv;
     int cx_cap = 0, px_cap = 0;
+    uint32_t cpu_to_core[MAX_NR_CPU];
+    uint32_t cpu_to_socket[MAX_NR_CPU];
+    uint32_t cpu_to_node[MAX_NR_CPU];
+    xc_topologyinfo_t info = { 0 };
 
     if ( gettimeofday(&tv, NULL) == -1 )
     {
@@ -369,6 +381,93 @@ static void signal_int_handler(int signo)
                     pxstat_start[i].pt[j].residency;
                 printf("  P%d\t%"PRIu64"\t(%5.2f%%)\n", j,
                         res / 1000000UL, 100UL * res / (double)sum_px[i]);
+            }
+        }
+    }
+
+    set_xen_guest_handle(info.cpu_to_core, cpu_to_core);
+    set_xen_guest_handle(info.cpu_to_socket, cpu_to_socket);
+    set_xen_guest_handle(info.cpu_to_node, cpu_to_node);
+    info.max_cpu_index = MAX_NR_CPU - 1;
+
+    ret = xc_topologyinfo(xc_handle, &info);
+    if ( !ret )
+    {
+        uint32_t socket_ids[MAX_NR_CPU];
+        uint32_t core_ids[MAX_NR_CPU];
+        uint32_t socket_nr = 0;
+        uint32_t core_nr = 0;
+
+        if ( info.max_cpu_index > MAX_NR_CPU - 1 )
+            info.max_cpu_index = MAX_NR_CPU - 1;
+        /* check validity */
+        for ( i = 0; i <= info.max_cpu_index; i++ )
+        {
+            if ( cpu_to_core[i] == INVALID_TOPOLOGY_ID ||
+                 cpu_to_socket[i] == INVALID_TOPOLOGY_ID )
+                break;
+        }
+        if ( i > info.max_cpu_index )
+        {
+            /* find socket nr & core nr per socket */
+            for ( i = 0; i <= info.max_cpu_index; i++ )
+            {
+                for ( j = 0; j < socket_nr; j++ )
+                    if ( cpu_to_socket[i] == socket_ids[j] )
+                        break;
+                if ( j == socket_nr )
+                {
+                    socket_ids[j] = cpu_to_socket[i];
+                    socket_nr++;
+                }
+
+                for ( j = 0; j < core_nr; j++ )
+                    if ( cpu_to_core[i] == core_ids[j] )
+                        break;
+                if ( j == core_nr )
+                {
+                    core_ids[j] = cpu_to_core[i];
+                    core_nr++;
+                }
+            }
+
+            /* print out CC? and PC? */
+            for ( i = 0; i < socket_nr; i++ )
+            {
+                uint64_t res;
+                for ( j = 0; j <= info.max_cpu_index; j++ )
+                {
+                    if ( cpu_to_socket[j] == socket_ids[i] )
+                        break;
+                }
+                printf("Socket %d\n", socket_ids[i]);
+                res = cxstat_end[j].pc3 - cxstat_start[j].pc3;
+                printf("\tPC3\t%"PRIu64" ms\t%.2f%%\n",  res / 1000000UL, 
+                       100UL * res / (double)sum_cx[j]);
+                res = cxstat_end[j].pc6 - cxstat_start[j].pc6;
+                printf("\tPC6\t%"PRIu64" ms\t%.2f%%\n",  res / 1000000UL, 
+                       100UL * res / (double)sum_cx[j]);
+                res = cxstat_end[j].pc7 - cxstat_start[j].pc7;
+                printf("\tPC7\t%"PRIu64" ms\t%.2f%%\n",  res / 1000000UL, 
+                       100UL * res / (double)sum_cx[j]);
+                for ( k = 0; k < core_nr; k++ )
+                {
+                    for ( j = 0; j <= info.max_cpu_index; j++ )
+                    {
+                        if ( cpu_to_socket[j] == socket_ids[i] &&
+                             cpu_to_core[j] == core_ids[k] )
+                            break;
+                    }
+                    printf("\t Core %d CPU %d\n", core_ids[k], j);
+                    res = cxstat_end[j].cc3 - cxstat_start[j].cc3;
+                    printf("\t\tCC3\t%"PRIu64" ms\t%.2f%%\n",  res / 1000000UL, 
+                           100UL * res / (double)sum_cx[j]);
+                    res = cxstat_end[j].cc6 - cxstat_start[j].cc6;
+                    printf("\t\tCC6\t%"PRIu64" ms\t%.2f%%\n",  res / 1000000UL, 
+                           100UL * res / (double)sum_cx[j]);
+                    printf("\n");
+
+                }
             }
         }
         printf("  Avg freq\t%d\tKHz\n", avgfreq[i]);
@@ -832,8 +931,6 @@ void scaling_governor_func(int argc, char *argv[])
 out:
     fprintf(stderr, "failed to set governor name\n");
 }
-
-#define MAX_NR_CPU 512
 
 void cpu_topology_func(int argc, char *argv[])
 {
