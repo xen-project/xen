@@ -205,7 +205,7 @@ static void init_build_info(libxl_domain_build_info *b_info, libxl_domain_create
         b_info->u.hvm.viridian = 0;
         b_info->u.hvm.hpet = 1;
         b_info->u.hvm.vpt_align = 1;
-        b_info->u.hvm.timer_mode = 0;
+        b_info->u.hvm.timer_mode = 1;
     } else {
         b_info->u.pv.slack_memkb = 8 * 1024;
     }
