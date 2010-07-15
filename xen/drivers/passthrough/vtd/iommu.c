@@ -143,14 +143,17 @@ struct iommu_flush *iommu_get_flush(struct iommu *iommu)
     return iommu ? &iommu->intel->flush : NULL;
 }
 
-static unsigned int clflush_size;
 static int iommus_incoherent;
 static void __iommu_flush_cache(void *addr, unsigned int size)
 {
     int i;
+    static unsigned int clflush_size = 0;
 
     if ( !iommus_incoherent )
         return;
+
+    if ( clflush_size == 0 )
+        clflush_size = get_cache_line_size();
 
     for ( i = 0; i < size; i += clflush_size )
         cacheline_flush((char *)addr + i);
@@ -1036,7 +1039,7 @@ static int iommu_set_interrupt(struct iommu *iommu)
     return irq;
 }
 
-static int iommu_alloc(struct acpi_drhd_unit *drhd)
+int __init iommu_alloc(struct acpi_drhd_unit *drhd)
 {
     struct iommu *iommu;
     unsigned long sagaw, nr_dom;
@@ -1130,7 +1133,7 @@ static int iommu_alloc(struct acpi_drhd_unit *drhd)
     return 0;
 }
 
-static void iommu_free(struct acpi_drhd_unit *drhd)
+void __init iommu_free(struct acpi_drhd_unit *drhd)
 {
     struct iommu *iommu = drhd->iommu;
 
@@ -1938,8 +1941,6 @@ int intel_vtd_setup(void)
 
     platform_quirks();
 
-    clflush_size = get_cache_line_size();
-
     irq_to_iommu = xmalloc_array(struct iommu*, nr_irqs);
     BUG_ON(!irq_to_iommu);
     memset(irq_to_iommu, 0, nr_irqs * sizeof(struct iommu*));
@@ -1953,9 +1954,6 @@ int intel_vtd_setup(void)
      */
     for_each_drhd_unit ( drhd )
     {
-        if ( iommu_alloc(drhd) != 0 )
-            goto error;
-
         iommu = drhd->iommu;
 
         if ( iommu_snoop && !ecap_snp_ctl(iommu->ecap) )
@@ -1995,8 +1993,6 @@ int intel_vtd_setup(void)
     return 0;
 
  error:
-    for_each_drhd_unit ( drhd )
-        iommu_free(drhd);
     iommu_enabled = 0;
     iommu_snoop = 0;
     iommu_passthrough = 0;

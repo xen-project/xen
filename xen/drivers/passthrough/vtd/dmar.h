@@ -50,7 +50,6 @@ struct acpi_drhd_unit {
     struct dmar_scope scope;            /* must be first member of struct */
     struct list_head list;
     u64    address;                     /* register base address of the unit */
-    u64    ecap;
     u8     include_all:1;
     struct iommu *iommu;
     struct list_head ioapic_list;
