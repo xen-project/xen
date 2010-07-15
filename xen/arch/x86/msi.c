@@ -623,6 +623,14 @@ static int __pci_enable_msi(struct msi_info *msi, struct msi_desc **desc)
         return 0;
     }
 
+    if ( find_msi_entry(pdev, -1, PCI_CAP_ID_MSIX) )
+    {
+        dprintk(XENLOG_WARNING, "MSI-X is already in use on "
+                "device %02x:%02x.%01x\n", msi->bus,
+                PCI_SLOT(msi->devfn), PCI_FUNC(msi->devfn));
+        return 0;
+    }
+
     status = msi_capability_init(pdev, msi->irq, desc);
     return status;
 }
@@ -685,6 +693,14 @@ static int __pci_enable_msix(struct msi_info *msi, struct msi_desc **desc)
     {
         dprintk(XENLOG_WARNING, "irq %d has already mapped to MSIX on "
                 "device %02x:%02x.%01x.\n", msi->irq, msi->bus,
+                PCI_SLOT(msi->devfn), PCI_FUNC(msi->devfn));
+        return 0;
+    }
+
+    if ( find_msi_entry(pdev, -1, PCI_CAP_ID_MSI) )
+    {
+        dprintk(XENLOG_WARNING, "MSI is already in use on "
+                "device %02x:%02x.%01x\n", msi->bus,
                 PCI_SLOT(msi->devfn), PCI_FUNC(msi->devfn));
         return 0;
     }
