@@ -50,21 +50,6 @@ def is_disk_image(file):
         return True
     return False
 
-def get_active_partition(file):
-    """Find the offset for the start of the first active partition "
-    "in the disk image file."""
-
-    fd = os.open(file, os.O_RDONLY)
-    buf = os.read(fd, 512)
-    for poff in (446, 462, 478, 494): # partition offsets
-        # active partition has 0x80 as the first byte
-        if struct.unpack("<c", buf[poff:poff+1]) == ('\x80',):
-            return buf[poff:poff+16]
-
-    # if there's not a partition marked as active, fall back to
-    # the first partition
-    return buf[446:446+16]
-
 SECTOR_SIZE=512
 DK_LABEL_LOC=1
 DKL_MAGIC=0xdabe
@@ -101,25 +86,44 @@ FDISK_PART_SOLARIS=0xbf
 FDISK_PART_SOLARIS_OLD=0x82
 FDISK_PART_GPT=0xee
 
-def get_fs_offset(file):
+def get_partition_offsets(file):
     if not is_disk_image(file):
-        return 0
+        # No MBR: assume whole disk filesystem, which is like a 
+        # single partition starting at 0
+        return [0]
 
-    partbuf = get_active_partition(file)
-    if len(partbuf) == 0:
-        raise RuntimeError, "Unable to find active partition on disk"
+    part_offs = []
 
-    offset = struct.unpack("<L", partbuf[8:12])[0] * SECTOR_SIZE
+    fd = os.open(file, os.O_RDONLY)
+    buf = os.read(fd, 512)
+    for poff in (446, 462, 478, 494): # partition offsets
 
-    type = struct.unpack("<B", partbuf[4:5])[0]
+        # MBR contains a 16 byte descriptor per partition
+        partbuf = buf[poff:poff+16]
+        offset  = struct.unpack("<L", partbuf[8:12])[0] * SECTOR_SIZE
+        type    = struct.unpack("<B", partbuf[4:5])[0]
+        
+        # offset == 0 implies this partition is not enabled
+        if offset == 0:
+            continue
 
-    if type == FDISK_PART_SOLARIS or type == FDISK_PART_SOLARIS_OLD:
-        offset += get_solaris_slice(file, offset)
+        if type == FDISK_PART_SOLARIS or type == FDISK_PART_SOLARIS_OLD:
+            try:
+                offset += get_solaris_slice(file, offset)
+            except RuntimeError:
+                continue # no solaris magic at that offset, ignore partition
 
-    if type == FDISK_PART_GPT:
-        offset = get_fs_offset_gpt(file)
-    
-    return offset
+        if type == FDISK_PART_GPT:
+            offset = get_fs_offset_gpt(file)
+
+        # Active partition has 0x80 as the first byte.
+        # If active, prepend to front of list, otherwise append to back.
+        if struct.unpack("<c", buf[poff:poff+1]) == ('\x80',):
+            part_offs.insert(0, offset)
+        else:
+            part_offs.append(offset)
+
+    return part_offs
 
 class GrubLineEditor(curses.textpad.Textbox):
     def __init__(self, screen, startx, starty, line = ""):
@@ -734,17 +738,40 @@ if __name__ == "__main__":
     bootfsargs = '"%s"' % incfg["args"]
     bootfsgroup = re.findall('zfs-bootfs=(.*?)[\s\,\"]', bootfsargs)
     if bootfsgroup:
-        fs = fsimage.open(file, get_fs_offset(file), bootfsgroup[0])
+        bootfsoptions = bootfsgroup[0]
     else:
-        fs = fsimage.open(file, get_fs_offset(file))
+        bootfsoptions = ""
 
-    chosencfg = sniff_solaris(fs, incfg)
+    # get list of offsets into file which start partitions
+    part_offs = get_partition_offsets(file)
 
-    if not chosencfg["kernel"]:
-        chosencfg = sniff_netware(fs, incfg)
+    for offset in part_offs:
+        try:
+            fs = fsimage.open(file, offset, bootfsoptions)
 
-    if not chosencfg["kernel"]:
-        chosencfg = run_grub(file, entry, fs, incfg["args"])
+            chosencfg = sniff_solaris(fs, incfg)
+
+            if not chosencfg["kernel"]:
+                chosencfg = sniff_netware(fs, incfg)
+
+            if not chosencfg["kernel"]:
+                chosencfg = run_grub(file, entry, fs, incfg["args"])
+
+            # Break as soon as we've found the kernel so that we continue
+            # to use this fsimage object
+            if chosencfg["kernel"]:
+                break
+            fs = None
+
+        except:
+            # IOErrors raised by fsimage.open
+            # RuntimeErrors raised by run_grub if no menu.lst present
+            fs = None
+            continue
+
+    # Did looping through partitions find us a kernel?
+    if not fs:
+        raise RuntimeError, "Unable to find partition containing kernel"
 
     if not_really:
         bootcfg["kernel"] = "<kernel:%s>" % chosencfg["kernel"]
