@@ -708,7 +708,12 @@ def configure_image(vals):
         return None
     config_image = [ vals.builder ]
     if vals.kernel:
-        if os.path.dirname(vals.kernel) != "" and os.path.exists(vals.kernel):
+        if vals.bootloader:
+            # If bootloader is specified, vals.kernel will be used
+            # by bootloader when boots DomU. So it is needless to
+            # check the path is existent or not.
+            config_image.append([ 'kernel', vals.kernel ])
+        elif os.path.dirname(vals.kernel) != "" and os.path.exists(vals.kernel):
             config_image.append([ 'kernel', vals.kernel ])
         elif vals.kernel == 'hvmloader':
             # Keep hvmloader w/o a path and let xend find it.
@@ -721,7 +726,10 @@ def configure_image(vals):
         else:
             raise ValueError('Cannot find kernel "%s"' % vals.kernel)
     if vals.ramdisk:
-        if os.path.dirname(vals.ramdisk) != "" and os.path.exists(vals.ramdisk):
+        if vals.bootloader:
+            # Same with 'kernel' above
+            config_image.append([ 'ramdisk', vals.ramdisk ])
+        elif os.path.dirname(vals.ramdisk) != "" and os.path.exists(vals.ramdisk):
             config_image.append([ 'ramdisk', vals.ramdisk ])
         elif os.path.exists(os.path.abspath(vals.ramdisk)):
             # Keep old behaviour, if path is valid.
