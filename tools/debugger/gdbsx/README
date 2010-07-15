@@ -26,7 +26,7 @@ USAGE:
       bash> gdb ./vmlinux             (exact matching vmlinux of guest kernel)
       (gdb) target remote dom0:9999 
 
-   - Additionally, to debug loadable kernel modules, please do following:
+   - Additionally, to debug 32bit loadable kernel modules, please do following:
       (gdb) p init_mm.pgd[3]
       $1 = {pgd = 0x1b874f027}
       (gdb) monitor pgd3 0x1b874f027  (Make sure value is in HEX)

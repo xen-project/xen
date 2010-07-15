@@ -132,12 +132,12 @@ _do_qRcmd_req(char *remote_buf)
 static void
 process_q_request(char *remote_buf)
 {
-    /* send a list of tids: "m 0,1,2,3l" */
+    /* send a list of tids: "m0,1,2,3l" */
     if (strcmp("qfThreadInfo", remote_buf) == 0) {
         vcpuid_t vid = 0;
         char *p = remote_buf;
 
-        sprintf(p, "m %x", vid);        /* puts null char at the end */
+        sprintf(p, "m%x", vid);        /* puts null char at the end */
         p = p + strlen(p);
         for (vid=1; vid <= max_vcpuid; vid++) {
             sprintf(p, ",%x", vid);
@@ -146,8 +146,9 @@ process_q_request(char *remote_buf)
         sprintf(p, "l");                /* puts null char at the end */
         return;
     }
+
     /* qSymbol works for init_mm, and not init_mm.pgd, hence we can't use
-         * it at this time. instead use "monitor" in gdb */
+     * it at this time. instead use "monitor" in gdb */
     if (strncmp("qRcmd,", remote_buf, 6) == 0) {
         _do_qRcmd_req(remote_buf);
         return;
@@ -155,8 +156,7 @@ process_q_request(char *remote_buf)
 
     /* TBD : qThreadExtraInfo : send extra banner info  */
 
-        /* nothing else supported right now */
-    remote_buf[0] = '\0';
+    remote_buf[0] = '\0';              /* nothing else supported for now */
 
     return;
 }
