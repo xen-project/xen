@@ -136,6 +136,126 @@ static void __init replace_pin_at_irq(unsigned int irq,
     }
 }
 
+struct IO_APIC_route_entry **alloc_ioapic_entries(void)
+{
+    int apic;
+    struct IO_APIC_route_entry **ioapic_entries;
+
+    ioapic_entries = xmalloc_array(struct IO_APIC_route_entry *, nr_ioapics);
+    if (!ioapic_entries)
+        return 0;
+
+    for (apic = 0; apic < nr_ioapics; apic++) {
+        ioapic_entries[apic] =
+            xmalloc_array(struct IO_APIC_route_entry,
+                          nr_ioapic_registers[apic]);
+        if (!ioapic_entries[apic])
+            goto nomem;
+    }
+
+    return ioapic_entries;
+
+nomem:
+    while (--apic >= 0)
+        xfree(ioapic_entries[apic]);
+    xfree(ioapic_entries);
+
+    return 0;
+}
+
+/*
+ * Saves all the IO-APIC RTE's
+ */
+int save_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries)
+{
+    int apic, pin;
+
+    if (!ioapic_entries)
+        return -ENOMEM;
+
+    for (apic = 0; apic < nr_ioapics; apic++) {
+        if (!ioapic_entries[apic])
+            return -ENOMEM;
+
+        for (pin = 0; pin < nr_ioapic_registers[apic]; pin++) {
+            *(((int *)&ioapic_entries[apic][pin])+0) =
+                __io_apic_read(apic, 0x10+pin*2);
+            *(((int *)&ioapic_entries[apic][pin])+1) =
+                __io_apic_read(apic, 0x11+pin*2);
+        }
+    }
+
+    return 0;
+}
+
+/*
+ * Mask all IO APIC entries.
+ */
+void mask_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries)
+{
+    int apic, pin;
+
+    if (!ioapic_entries)
+        return;
+
+    for (apic = 0; apic < nr_ioapics; apic++) {
+        if (!ioapic_entries[apic])
+            break;
+
+        for (pin = 0; pin < nr_ioapic_registers[apic]; pin++) {
+            struct IO_APIC_route_entry entry;
+            unsigned long flags;
+
+            entry = ioapic_entries[apic][pin];
+            if (!entry.mask) {
+                entry.mask = 1;
+
+                spin_lock_irqsave(&ioapic_lock, flags);
+                __io_apic_write(apic, 0x11+2*pin, *(((int *)&entry)+1));
+                __io_apic_write(apic, 0x10+2*pin, *(((int *)&entry)+0));
+                spin_unlock_irqrestore(&ioapic_lock, flags);
+            }
+        }
+    }
+}
+
+/*
+ * Restore IO APIC entries which was saved in ioapic_entries.
+ */
+int restore_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries)
+{
+    int apic, pin;
+    unsigned long flags;
+    struct IO_APIC_route_entry entry;
+
+    if (!ioapic_entries)
+        return -ENOMEM;
+
+    for (apic = 0; apic < nr_ioapics; apic++) {
+        if (!ioapic_entries[apic])
+            return -ENOMEM;
+
+        for (pin = 0; pin < nr_ioapic_registers[apic]; pin++)
+            entry = ioapic_entries[apic][pin];
+            spin_lock_irqsave(&ioapic_lock, flags);
+            __io_apic_write(apic, 0x11+2*pin, *(((int *)&entry)+1));
+            __io_apic_write(apic, 0x10+2*pin, *(((int *)&entry)+0));
+            spin_unlock_irqrestore(&ioapic_lock, flags);
+    }
+
+    return 0;
+}
+
+void free_ioapic_entries(struct IO_APIC_route_entry **ioapic_entries)
+{
+    int apic;
+
+    for (apic = 0; apic < nr_ioapics; apic++)
+        xfree(ioapic_entries[apic]);
+
+    xfree(ioapic_entries);
+}
+
 static void __modify_IO_APIC_irq (unsigned int irq, unsigned long enable, unsigned long disable)
 {
     struct irq_pin_list *entry = irq_2_pin + irq;

@@ -70,6 +70,7 @@ cpumask_t vector_allocation_domain_flat(int cpu);
 	.send_IPI_mask = send_IPI_mask_flat, \
 	.send_IPI_self = send_IPI_self_flat
 
+const struct genapic *apic_x2apic_probe(void);
 void init_apic_ldr_x2apic_phys(void);
 void init_apic_ldr_x2apic_cluster(void);
 void clustered_apic_check_x2apic(void);

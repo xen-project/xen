@@ -91,6 +91,8 @@ asmlinkage void do_IRQ(struct cpu_user_regs *regs);
 void disable_8259A_irq(unsigned int irq);
 void enable_8259A_irq(unsigned int irq);
 int i8259A_irq_pending(unsigned int irq);
+void mask_8259A(void);
+void unmask_8259A(void);
 void init_8259A(int aeoi);
 int i8259A_suspend(void);
 int i8259A_resume(void);
