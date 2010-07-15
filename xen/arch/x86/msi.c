@@ -57,10 +57,11 @@ static void msix_fixmap_free(int idx)
     spin_unlock(&msix_fixmap_lock);
 }
 
-static int msix_get_fixmap(struct pci_dev *dev, unsigned long table_paddr,
-                           unsigned long entry_paddr)
+static int msix_get_fixmap(struct pci_dev *dev, u64 table_paddr,
+                           u64 entry_paddr)
 {
-    int nr_page, idx;
+    long nr_page;
+    int idx;
 
     nr_page = (entry_paddr >> PAGE_SHIFT) - (table_paddr >> PAGE_SHIFT);
 
@@ -536,7 +537,7 @@ static int msix_capability_init(struct pci_dev *dev,
     struct msi_desc *entry;
     int pos;
     u16 control;
-    unsigned long table_paddr, entry_paddr;
+    u64 table_paddr, entry_paddr;
     u32 table_offset, entry_offset;
     u8 bir;
     void __iomem *base;
@@ -571,7 +572,8 @@ static int msix_capability_init(struct pci_dev *dev,
         xfree(entry);
         return idx;
     }
-    base = (void *)(fix_to_virt(idx) + (entry_paddr & ((1UL << PAGE_SHIFT) - 1)));
+    base = (void *)(fix_to_virt(idx) +
+        ((unsigned long)entry_paddr & ((1UL << PAGE_SHIFT) - 1)));
 
     entry->msi_attrib.type = PCI_CAP_ID_MSIX;
     entry->msi_attrib.is_64 = 1;
