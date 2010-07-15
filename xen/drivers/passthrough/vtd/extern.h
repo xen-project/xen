@@ -33,7 +33,7 @@ extern struct keyhandler dump_iommu_info_keyhandler;
 
 int enable_qinval(struct iommu *iommu);
 void disable_qinval(struct iommu *iommu);
-int enable_intremap(struct iommu *iommu);
+int enable_intremap(struct iommu *iommu, int eim);
 void disable_intremap(struct iommu *iommu);
 int queue_invalidate_context(struct iommu *iommu,
     u16 did, u16 source_id, u8 function_mask, u8 granu);
