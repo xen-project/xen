@@ -1591,9 +1591,8 @@ static int intel_iommu_map_page(
     struct hvm_iommu *hd = domain_hvm_iommu(d);
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
-    struct dma_pte *page = NULL, *pte = NULL;
+    struct dma_pte *page = NULL, *pte = NULL, old, new = { 0 };
     u64 pg_maddr;
-    int pte_present;
     int flush_dev_iotlb;
     int iommu_domid;
 
@@ -1611,15 +1610,22 @@ static int intel_iommu_map_page(
     }
     page = (struct dma_pte *)map_vtd_domain_page(pg_maddr);
     pte = page + (gfn & LEVEL_MASK);
-    pte_present = dma_pte_present(*pte);
-    dma_set_pte_addr(*pte, (paddr_t)mfn << PAGE_SHIFT_4K);
-    dma_set_pte_prot(*pte,
+    old = *pte;
+    dma_set_pte_addr(new, (paddr_t)mfn << PAGE_SHIFT_4K);
+    dma_set_pte_prot(new,
                      ((flags & IOMMUF_readable) ? DMA_PTE_READ  : 0) |
                      ((flags & IOMMUF_writable) ? DMA_PTE_WRITE : 0));
 
     /* Set the SNP on leaf page table if Snoop Control available */
     if ( iommu_snoop )
-        dma_set_pte_snp(*pte);
+        dma_set_pte_snp(new);
+
+    if ( old.val == new.val )
+    {
+        spin_unlock(&hd->mapping_lock);
+        return 0;
+    }
+    *pte = new;
 
     iommu_flush_cache_entry(pte, sizeof(struct dma_pte));
     spin_unlock(&hd->mapping_lock);
@@ -1642,7 +1648,7 @@ static int intel_iommu_map_page(
             continue;
         if ( iommu_flush_iotlb_psi(iommu, iommu_domid,
                                    (paddr_t)gfn << PAGE_SHIFT_4K, 1,
-                                   !pte_present, flush_dev_iotlb) )
+                                   !dma_pte_present(old), flush_dev_iotlb) )
             iommu_flush_write_buffer(iommu);
     }
 
