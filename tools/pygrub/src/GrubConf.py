@@ -61,7 +61,7 @@ class GrubDiskPart(object):
         if self.part is not None:
             return "d%dp%d" %(self.disk, self.part)
         else:
-            return "d%d" %(self,disk,)
+            return "d%d" %(self.disk,)
 
     def get_disk(self):
         return self._disk
