@@ -78,6 +78,7 @@
 #define X86_FEATURE_ARAT	(3*32+ 10) /* Always running APIC timer */
 #define X86_FEATURE_ARCH_PERFMON (3*32+11) /* Intel Architectural PerfMon */
 #define X86_FEATURE_TSC_RELIABLE (3*32+12) /* TSC is known to be reliable */
+#define X86_FEATURE_XTOPOLOGY    (3*32+13) /* cpu topology enum extensions */
 
 /* Intel-defined CPU features, CPUID level 0x00000001 (ecx), word 4 */
 #define X86_FEATURE_XMM3	(4*32+ 0) /* Streaming SIMD Extensions-3 */

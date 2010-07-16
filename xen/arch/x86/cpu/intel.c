@@ -154,6 +154,9 @@ static void __devinit init_intel(struct cpuinfo_x86 *c)
 	}
 #endif
 
+	/* Detect the extended topology information if available */
+	detect_extended_topology(c);
+
 	select_idle_routine(c);
 	l2 = init_intel_cacheinfo(c);
 	if (c->cpuid_level > 9) {
@@ -197,10 +200,12 @@ static void __devinit init_intel(struct cpuinfo_x86 *c)
 
 	if ( p )
 		safe_strcpy(c->x86_model_id, p);
-	
-	c->x86_max_cores = num_cpu_cores(c);
 
-	detect_ht(c);
+	if ( !cpu_has(c, X86_FEATURE_XTOPOLOGY) )
+	{
+		c->x86_max_cores = num_cpu_cores(c);
+		detect_ht(c);
+	}
 
 	set_cpuidmask(c);
 

@@ -202,6 +202,8 @@ extern void print_cpu_info(unsigned int cpu);
 extern unsigned int init_intel_cacheinfo(struct cpuinfo_x86 *c);
 extern void dodgy_tsc(void);
 
+extern void detect_extended_topology(struct cpuinfo_x86 *c);
+
 #ifdef CONFIG_X86_HT
 extern void detect_ht(struct cpuinfo_x86 *c);
 #else
