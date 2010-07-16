@@ -57,6 +57,8 @@ enum acpi_madt_entry_id {
 	ACPI_MADT_IOSAPIC,
 	ACPI_MADT_LSAPIC,
 	ACPI_MADT_PLAT_INT_SRC,
+	ACPI_MADT_X2APIC,
+	ACPI_MADT_X2APIC_NMI,
 	ACPI_MADT_ENTRY_COUNT
 };
 
@@ -74,6 +76,17 @@ struct acpi_table_lapic {
 		u32			enabled:1;
 		u32			reserved:31;
 	}			flags;
+} __attribute__ ((packed));
+
+struct acpi_table_x2apic {
+	struct acpi_subtable_header header;
+	u16			reserved;
+	u32			id;
+	struct {
+		u32			enabled:1;
+		u32			reserved:31;
+	}			flags;
+	u32         acpi_uid;
 } __attribute__ ((packed));
 
 struct acpi_table_ioapic {
@@ -103,6 +116,14 @@ struct acpi_table_lapic_nmi {
 	u8			acpi_id;
 	acpi_interrupt_flags	flags;
 	u8			lint;
+} __attribute__ ((packed));
+
+struct acpi_table_x2apic_nmi {
+	struct acpi_subtable_header header;
+	acpi_interrupt_flags	flags;
+	u32			acpi_uid;
+	u8			lint;
+	u8			reserved[3];
 } __attribute__ ((packed));
 
 struct acpi_table_lapic_addr_ovr {
@@ -280,6 +301,7 @@ void acpi_table_print_srat_entry (struct acpi_subtable_header *srat);
 /* the following four functions are architecture-dependent */
 void acpi_numa_slit_init (struct acpi_table_slit *slit);
 void acpi_numa_processor_affinity_init (struct acpi_srat_cpu_affinity *pa);
+void acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa);
 void acpi_numa_memory_affinity_init (struct acpi_srat_mem_affinity *ma);
 void acpi_numa_arch_fixup(void);
 

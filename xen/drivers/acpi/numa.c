@@ -90,6 +90,21 @@ void __init acpi_table_print_srat_entry(struct acpi_subtable_header * header)
 #endif				/* ACPI_DEBUG_OUTPUT */
 		break;
 
+	case ACPI_SRAT_TYPE_X2APIC_CPU_AFFINITY:
+#ifdef ACPI_DEBUG_OUTPUT
+		{
+			struct acpi_srat_x2apic_cpu_affinity *p =
+			    (struct acpi_srat_x2apic_cpu_affinity *)header;
+			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
+					  "SRAT Processor (x2apicid[0x%08x]) in"
+					  " proximity domain %d %s\n",
+					  p->apic_id,
+					  p->proximity_domain,
+					  (p->flags & ACPI_SRAT_CPU_ENABLED) ?
+					  "enabled" : "disabled"));
+		}
+#endif				/* ACPI_DEBUG_OUTPUT */
+		break;
 	default:
 		printk(KERN_WARNING PREFIX
 		       "Found unsupported SRAT entry (type = 0x%x)\n",
@@ -101,6 +116,33 @@ void __init acpi_table_print_srat_entry(struct acpi_subtable_header * header)
 static int __init acpi_parse_slit(struct acpi_table_header *table)
 {
 	acpi_numa_slit_init((struct acpi_table_slit *)table);
+
+	return 0;
+}
+
+void __init __attribute__ ((weak))
+acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa)
+{
+	printk(KERN_WARNING PREFIX
+	       "Found unsupported x2apic [0x%08x] SRAT entry\n", pa->apic_id);
+	return;
+}
+
+
+static int __init
+acpi_parse_x2apic_affinity(struct acpi_subtable_header *header,
+			   const unsigned long end)
+{
+	struct acpi_srat_x2apic_cpu_affinity *processor_affinity;
+
+	processor_affinity = (struct acpi_srat_x2apic_cpu_affinity *)header;
+	if (!processor_affinity)
+		return -EINVAL;
+
+	acpi_table_print_srat_entry(header);
+
+	/* let architecture-dependent part to do it */
+	acpi_numa_x2apic_affinity_init(processor_affinity);
 
 	return 0;
 }
@@ -164,6 +206,8 @@ int __init acpi_numa_init(void)
 {
 	/* SRAT: Static Resource Affinity Table */
 	if (!acpi_table_parse(ACPI_SIG_SRAT, acpi_parse_srat)) {
+		acpi_table_parse_srat(ACPI_SRAT_TYPE_X2APIC_CPU_AFFINITY,
+				           acpi_parse_x2apic_affinity, NR_CPUS);
 		acpi_table_parse_srat(ACPI_SRAT_PROCESSOR_AFFINITY,
 					       acpi_parse_processor_affinity,
 					       NR_CPUS);

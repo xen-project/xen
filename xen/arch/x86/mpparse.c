@@ -833,7 +833,7 @@ void __init mp_register_lapic_address (
 
 
 int __devinit mp_register_lapic (
-	u8			id, 
+	u32			id,
 	u8			enabled)
 {
 	struct mpc_config_processor processor;
