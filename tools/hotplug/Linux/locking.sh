@@ -39,6 +39,12 @@ release_lock()
 }
 
 
+# This function will be redefined in xen-hotplug-common.sh.
+sigerr() {
+  exit 1
+}
+
+
 _claim_lock()
 {
   local lockdir="$1"
@@ -47,7 +53,7 @@ _claim_lock()
 
   while [ $retries -lt $LOCK_RETRIES ]
   do
-    mkdir "$lockdir" 2>/dev/null && trap "release_lock $1; sigerr" ERR &&
+    mkdir "$lockdir" 2>/dev/null && trap "_release_lock $lockdir; sigerr" ERR &&
       _update_lock_info "$lockdir" && return
 
     local new_owner=$(_lock_owner "$lockdir")
