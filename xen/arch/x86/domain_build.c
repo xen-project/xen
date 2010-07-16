@@ -1142,6 +1142,8 @@ int __init construct_dom0(
 
     BUG_ON(rc != 0);
 
+    iommu_dom0_init(dom0);
+
     return 0;
 }
 

@@ -64,6 +64,7 @@ int intremap_enabled(void);
 int iommu_add_device(struct pci_dev *pdev);
 int iommu_remove_device(struct pci_dev *pdev);
 int iommu_domain_init(struct domain *d);
+void iommu_dom0_init(struct domain *d);
 void iommu_domain_destroy(struct domain *d);
 int device_assigned(u8 bus, u8 devfn);
 int assign_device(struct domain *d, u8 bus, u8 devfn);
@@ -109,6 +110,7 @@ bool_t pt_irq_need_timer(uint32_t flags);
 
 struct iommu_ops {
     int (*init)(struct domain *d);
+    void (*dom0_init)(struct domain *d);
     int (*add_device)(struct pci_dev *pdev);
     int (*remove_device)(struct pci_dev *pdev);
     int (*assign_device)(struct domain *d, u8 bus, u8 devfn);

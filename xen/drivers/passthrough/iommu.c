@@ -18,6 +18,7 @@
 #include <asm/hvm/iommu.h>
 #include <xen/paging.h>
 #include <xen/guest_access.h>
+#include <xen/softirq.h>
 
 static void parse_iommu_param(char *s);
 static int iommu_populate_page_table(struct domain *d);
@@ -97,10 +98,37 @@ int iommu_domain_init(struct domain *d)
     if ( !iommu_enabled )
         return 0;
 
-    d->need_iommu = ((d->domain_id == 0) && iommu_dom0_strict);
-
     hd->platform_ops = iommu_get_ops();
     return hd->platform_ops->init(d);
+}
+
+void iommu_dom0_init(struct domain *d)
+{
+    struct hvm_iommu *hd = domain_hvm_iommu(d);
+
+    if ( !iommu_enabled )
+        return;
+
+    d->need_iommu = !!iommu_dom0_strict;
+    if ( need_iommu(d) )
+    {
+        struct page_info *page;
+        unsigned int i = 0;
+        page_list_for_each ( page, &d->page_list )
+        {
+            unsigned long mfn = page_to_mfn(page);
+            unsigned int mapping = IOMMUF_readable;
+            if ( ((page->u.inuse.type_info & PGT_count_mask) == 0) ||
+                 ((page->u.inuse.type_info & PGT_type_mask)
+                  == PGT_writable_page) )
+                mapping |= IOMMUF_writable;
+            hd->platform_ops->map_page(d, mfn, mfn, mapping);
+            if ( !(i++ & 0xfffff) )
+                process_pending_softirqs();
+        }
+    }
+
+    return hd->platform_ops->dom0_init(d);
 }
 
 int iommu_add_device(struct pci_dev *pdev)

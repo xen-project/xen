@@ -1171,30 +1171,33 @@ void __init iommu_free(struct acpi_drhd_unit *drhd)
 static int intel_iommu_domain_init(struct domain *d)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
-    struct iommu *iommu;
-    struct acpi_drhd_unit *drhd;
 
     hd->agaw = width_to_agaw(DEFAULT_DOMAIN_ADDRESS_WIDTH);
 
-    if ( d->domain_id == 0 )
+    return 0;
+}
+
+static void intel_iommu_dom0_init(struct domain *d)
+{
+    struct iommu *iommu;
+    struct acpi_drhd_unit *drhd;
+
+    if ( !iommu_passthrough && !need_iommu(d) )
     {
         /* Set up 1:1 page table for dom0 */
-        if ( !need_iommu(d) )
-            iommu_set_dom0_mapping(d);
-
-        setup_dom0_devices(d);
-        setup_dom0_rmrr(d);
-
-        iommu_flush_all();
-
-        for_each_drhd_unit ( drhd )
-        {
-            iommu = drhd->iommu;
-            iommu_enable_translation(iommu);
-        }
+        iommu_set_dom0_mapping(d);
     }
 
-    return 0;
+    setup_dom0_devices(d);
+    setup_dom0_rmrr(d);
+
+    iommu_flush_all();
+
+    for_each_drhd_unit ( drhd )
+    {
+        iommu = drhd->iommu;
+        iommu_enable_translation(iommu);
+    }
 }
 
 static int domain_context_mapping_one(
@@ -2161,6 +2164,7 @@ static void vtd_resume(void)
 
 const struct iommu_ops intel_iommu_ops = {
     .init = intel_iommu_domain_init,
+    .dom0_init = intel_iommu_dom0_init,
     .add_device = intel_iommu_add_device,
     .remove_device = intel_iommu_remove_device,
     .assign_device  = intel_iommu_assign_device,

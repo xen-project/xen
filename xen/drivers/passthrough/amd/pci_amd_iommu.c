@@ -212,9 +212,9 @@ static int get_paging_mode(unsigned long entries)
     return level;
 }
 
-static int amd_iommu_domain_init(struct domain *domain)
+static int amd_iommu_domain_init(struct domain *d)
 {
-    struct hvm_iommu *hd = domain_hvm_iommu(domain);
+    struct hvm_iommu *hd = domain_hvm_iommu(d);
 
     /* allocate page directroy */
     if ( allocate_domain_resources(hd) != 0 )
@@ -224,27 +224,26 @@ static int amd_iommu_domain_init(struct domain *domain)
         return -ENOMEM;
     }
 
-    hd->paging_mode = is_hvm_domain(domain)?
+    hd->paging_mode = is_hvm_domain(d) ?
         IOMMU_PAGE_TABLE_LEVEL_4 : get_paging_mode(max_page);
 
-    if ( domain->domain_id == 0 )
-    {
-        unsigned long i; 
-
-        if ( !iommu_passthrough && !need_iommu(domain) )
-        {
-            /* setup 1:1 page table for dom0 */
-            for ( i = 0; i < max_page; i++ )
-                amd_iommu_map_page(domain, i, i,
-                                   IOMMUF_readable|IOMMUF_writable);
-        }
-
-        amd_iommu_setup_dom0_devices(domain);
-    }
-
-    hd->domain_id = domain->domain_id;
+    hd->domain_id = d->domain_id;
 
     return 0;
+}
+
+static void amd_iommu_dom0_init(struct domain *d)
+{
+    unsigned long i; 
+
+    if ( !iommu_passthrough && !need_iommu(d) )
+    {
+        /* Set up 1:1 page table for dom0 */
+        for ( i = 0; i < max_page; i++ )
+            amd_iommu_map_page(d, i, i, IOMMUF_readable|IOMMUF_writable);
+    }
+
+    amd_iommu_setup_dom0_devices(d);
 }
 
 static void amd_iommu_disable_domain_device(
@@ -433,6 +432,7 @@ static int amd_iommu_group_id(u8 bus, u8 devfn)
 
 const struct iommu_ops amd_iommu_ops = {
     .init = amd_iommu_domain_init,
+    .dom0_init = amd_iommu_dom0_init,
     .add_device = amd_iommu_add_device,
     .remove_device = amd_iommu_remove_device,
     .assign_device  = amd_iommu_assign_device,

@@ -2298,6 +2298,8 @@ int __init construct_dom0(struct domain *d,
 
 	physdev_init_dom0(d);
 
+	iommu_dom0_init(d);
+
 	return 0;
 }
 
