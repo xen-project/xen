@@ -102,6 +102,11 @@ struct cmd_spec cmd_table[] = {
       "-e              Do not wait in the background (on <host>) for the death\n"
       "                of the domain."
     },
+    { "dump-core",
+      &main_dump_core,
+      "Core dump a domain",
+      "<Domain> <filename>"
+    },
     { "restore",
       &main_restore,
       "Restore a domain from a saved state",
@@ -294,6 +299,11 @@ struct cmd_spec cmd_table[] = {
       "  -u UUID                        Specify uuid\n"
       "                                 (abcdef01-2345-6789-1234-567890abcdef)\n"
       "  -A AUTH                        0=auth,1=deauth",
+    },
+    { "tmem-freeable",
+      &main_tmem_freeable,
+      "Get information about how much freeable memory (MB) is in-use by tmem",
+      "",
     },
     { "network2-attach",
       &main_network2attach,

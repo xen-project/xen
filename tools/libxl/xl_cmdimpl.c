@@ -947,9 +947,9 @@ static void *xrealloc(void *ptr, size_t sz) {
     return r;
 }
 
-int autoconnect_console(int cons_num)
+int autoconnect_console(int hvm)
 {
-    int status;
+    int status, options;
     pid_t pid, r;
 
     /*
@@ -966,14 +966,21 @@ int autoconnect_console(int cons_num)
         return 0;
 
     /*
-     * Catch failure of the create process.
+     * In the PV case we only catch failure of the create process, in
+     * the HVM case we also wait for the creation process to be
+     * completed so that the stubdom is already up and running and we
+     * can connect to it.
      */
+    if (hvm)
+        options = 0;
+    else
+        options = WNOHANG;
     sleep(1);
-    r = waitpid(pid, &status, WNOHANG);
+    r = waitpid(pid, &status, options);
     if (r > 0 && WIFEXITED(status) && WEXITSTATUS(status) != 0)
         _exit(WEXITSTATUS(status));
 
-    libxl_console_exec(&ctx, domid, cons_num);
+    libxl_primary_console_exec(&ctx, domid);
     /* Do not return. xl continued in child process */
     fprintf(stderr, "Unable to attach console\n");
     _exit(1);
@@ -1170,7 +1177,7 @@ start:
     }
 
     if (dom_info->console_autoconnect) {
-        ret = autoconnect_console(0);
+        ret = autoconnect_console(info1.hvm);
         if (ret)
             goto error_out;
     }
@@ -1624,18 +1631,13 @@ int main_cd_insert(int argc, char **argv)
 
 int main_console(int argc, char **argv)
 {
-    int opt = 0, cons_num = 0;
+    int opt = 0;
 
     while ((opt = getopt(argc, argv, "hn:")) != -1) {
         switch (opt) {
         case 'h':
             help("console");
             exit(0);
-        case 'n':
-            if (optarg) {
-                cons_num = strtol(optarg, NULL, 10);
-            }
-            break;
         default:
             fprintf(stderr, "option not supported\n");
             break;
@@ -1647,7 +1649,7 @@ int main_console(int argc, char **argv)
     }
 
     find_domain(argv[optind]);
-    libxl_console_exec(&ctx, domid, 0);
+    libxl_primary_console_exec(&ctx, domid);
     fprintf(stderr, "Unable to attach console\n");
     return 1;
 }
@@ -2262,6 +2264,14 @@ static void migrate_domain(char *domain_spec, const char *rune,
     exit(-ERROR_BADFAIL);
 }
 
+static void core_dump_domain(const char *domain_spec, const char *filename)
+{
+    int rc;
+    find_domain(domain_spec);
+    rc=libxl_domain_core_dump(&ctx, domid, filename);
+    if (rc) { fprintf(stderr,"core dump failed (rc=%d)\n.",rc);exit(-1); }
+}
+
 static void migrate_receive(int debug, int daemonize)
 {
     int rc, rc2;
@@ -2528,6 +2538,16 @@ int main_migrate(int argc, char **argv)
     }
 
     migrate_domain(p, rune, config_filename);
+    exit(0);
+}
+
+int main_dump_core(int argc, char **argv)
+{
+    if ( argc-optind < 2 ) {
+        help("dump-core");
+        exit(2);
+    }
+    core_dump_domain(argv[optind], argv[optind + 1]);
     exit(0);
 }
 
@@ -4586,3 +4606,26 @@ int main_tmem_shared_auth(int argc, char **argv)
     exit(0);
 }
 
+int main_tmem_freeable(int argc, char **argv)
+{
+    int opt;
+    int mb;
+
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("tmem-freeable");
+            exit(0);
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    mb = libxl_tmem_freeable(&ctx);
+    if (mb == -1)
+        exit(-1);
+
+    printf("%d\n", mb);
+    exit(0);
+}

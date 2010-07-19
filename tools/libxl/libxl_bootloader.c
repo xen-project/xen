@@ -251,7 +251,7 @@ static char * bootloader_interact(struct libxl_ctx *ctx, int xenconsoled_fd, int
                 if (temp == NULL)
                     goto out_err;
                 output = temp;
-                memset(output + size_out, new_size - size_out, 0);
+                memset(output + size_out, 0, new_size - size_out);
                 size_out = new_size;
             }
 
@@ -386,7 +386,7 @@ int libxl_run_bootloader(struct libxl_ctx *ctx,
     }
 
     dom_console_xs_path = libxl_sprintf(ctx, "%s/serial/0/tty", libxl_xs_get_dompath(ctx, domid));
-    libxl_xs_write(ctx, XBT_NULL, dom_console_xs_path, dom_console_slave_tty_path);
+    libxl_xs_write(ctx, XBT_NULL, dom_console_xs_path, "%s", dom_console_slave_tty_path);
 
     pid = fork_exec_bootloader(&bootloader_fd, (char *)info->u.pv.bootloader, args);
     if (pid < 0) {

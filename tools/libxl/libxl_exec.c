@@ -53,7 +53,7 @@ void libxl_exec(int stdinfd, int stdoutfd, int stderrfd, char *arg0, char **args
     /* in case our caller set it to IGN.  subprocesses are entitled
      * to assume they got DFL. */
 
-    execv(arg0, args);
+    execvp(arg0, args);
     _exit(-1);
 }
 
