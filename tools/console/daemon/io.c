@@ -747,6 +747,11 @@ static void cleanup_domain(struct domain *d)
 {
 	domain_close_tty(d);
 
+	if (d->log_fd != -1) {
+		close(d->log_fd);
+		d->log_fd = -1;
+	}
+
 	free(d->buffer.data);
 	d->buffer.data = NULL;
 
