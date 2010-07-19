@@ -102,6 +102,11 @@ struct cmd_spec cmd_table[] = {
       "-e              Do not wait in the background (on <host>) for the death\n"
       "                of the domain."
     },
+    { "dump-core",
+      &main_dump_core,
+      "Core dump a domain",
+      "<Domain> <filename>"
+    },
     { "restore",
       &main_restore,
       "Restore a domain from a saved state",

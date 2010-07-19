@@ -523,6 +523,13 @@ int libxl_domain_pause(struct libxl_ctx *ctx, uint32_t domid)
     return 0;
 }
 
+int libxl_domain_core_dump(struct libxl_ctx *ctx, uint32_t domid, const char *filename)
+{
+    if ( xc_domain_dumpcore(ctx->xch, domid, filename) )
+        return ERROR_FAIL;
+    return 0;
+}
+
 int libxl_domain_unpause(struct libxl_ctx *ctx, uint32_t domid)
 {
     char *path;

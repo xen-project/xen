@@ -395,6 +395,8 @@ int libxl_domain_rename(struct libxl_ctx *ctx, uint32_t domid,
 int libxl_domain_pause(struct libxl_ctx *ctx, uint32_t domid);
 int libxl_domain_unpause(struct libxl_ctx *ctx, uint32_t domid);
 
+int libxl_domain_core_dump(struct libxl_ctx *ctx, uint32_t domid, const char *filename);
+
 int libxl_domain_setmaxmem(struct libxl_ctx *ctx, uint32_t domid, uint32_t target_memkb);
 int libxl_set_memory_target(struct libxl_ctx *ctx, uint32_t domid, uint32_t target_memkb, int enforce);
 

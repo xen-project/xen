@@ -2264,6 +2264,14 @@ static void migrate_domain(char *domain_spec, const char *rune,
     exit(-ERROR_BADFAIL);
 }
 
+static void core_dump_domain(const char *domain_spec, const char *filename)
+{
+    int rc;
+    find_domain(domain_spec);
+    rc=libxl_domain_core_dump(&ctx, domid, filename);
+    if (rc) { fprintf(stderr,"core dump failed (rc=%d)\n.",rc);exit(-1); }
+}
+
 static void migrate_receive(int debug, int daemonize)
 {
     int rc, rc2;
@@ -2530,6 +2538,16 @@ int main_migrate(int argc, char **argv)
     }
 
     migrate_domain(p, rune, config_filename);
+    exit(0);
+}
+
+int main_dump_core(int argc, char **argv)
+{
+    if ( argc-optind < 2 ) {
+        help("dump-core");
+        exit(2);
+    }
+    core_dump_domain(argv[optind], argv[optind + 1]);
     exit(0);
 }
 
