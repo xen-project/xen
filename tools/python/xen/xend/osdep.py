@@ -83,13 +83,19 @@ def _netbsd_balloon_stat(label):
 
     import commands
 
-    if label != 'current':
-       return None
-    cmd = "/sbin/sysctl hw.physmem64"
+    xend2netbsd_labels = { 'current'      : 'kern.xen.balloon.current',
+                           'target'       : 'kern.xen.balloon.target',
+                           'low-balloon'  : None,
+                           'high-balloon' : None,
+                           'limit'        : None }
+
+    cmdarg = xend2netbsd_labels[label]
+    if cmdarg is None:
+        return None
+    cmd = "/sbin/sysctl " + cmdarg
     sysctloutput = commands.getoutput(cmd)
     (name, value) = sysctloutput.split('=')
-    """Return value in KB."""
-    return int(value) / 1024
+    return int(value)
 
 def _solaris_balloon_stat(label):
     """Returns the value for the named label, or None if an error occurs."""
