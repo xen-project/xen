@@ -399,6 +399,14 @@ int libxl_domain_setmaxmem(struct libxl_ctx *ctx, uint32_t domid, uint32_t targe
 int libxl_set_memory_target(struct libxl_ctx *ctx, uint32_t domid, uint32_t target_memkb, int enforce);
 
 int libxl_console_exec(struct libxl_ctx *ctx, uint32_t domid, int cons_num);
+/* libxl_primary_console_exec finds the domid and console number
+ * corresponding to the primary console of the given vm, then calls
+ * libxl_console_exec with the right arguments (domid might be different
+ * if the guest is using stubdoms).
+ * This function can be called after creating the device model, in
+ * case of HVM guests, and before libxl_run_bootloader in case of PV
+ * guests using pygrub. */ 
+int libxl_primary_console_exec(struct libxl_ctx *ctx, uint32_t domid_vm);
 
 int libxl_domain_info(struct libxl_ctx*, struct libxl_dominfo *info_r,
                       uint32_t domid);

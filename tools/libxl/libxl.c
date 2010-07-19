@@ -803,6 +803,15 @@ int libxl_console_exec(struct libxl_ctx *ctx, uint32_t domid, int cons_num)
     return execl(p, p, domid_s, "--num", cons_num_s, (void *)NULL) == 0 ? 0 : ERROR_FAIL;
 }
 
+int libxl_primary_console_exec(struct libxl_ctx *ctx, uint32_t domid_vm)
+{
+    uint32_t stubdomid = libxl_get_stubdom_id(ctx, domid_vm);
+    if (stubdomid)
+        return libxl_console_exec(ctx, stubdomid, 1);
+    else
+        return libxl_console_exec(ctx, domid_vm, 0);
+}
+
 static char ** libxl_build_device_model_args(struct libxl_ctx *ctx,
                                              libxl_device_model_info *info,
                                              libxl_device_nic *vifs,
