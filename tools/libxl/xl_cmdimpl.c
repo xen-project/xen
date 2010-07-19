@@ -4586,3 +4586,26 @@ int main_tmem_shared_auth(int argc, char **argv)
     exit(0);
 }
 
+int main_tmem_freeable(int argc, char **argv)
+{
+    int opt;
+    int mb;
+
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("tmem-freeable");
+            exit(0);
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    mb = libxl_tmem_freeable(&ctx);
+    if (mb == -1)
+        exit(-1);
+
+    printf("%d\n", mb);
+    exit(0);
+}

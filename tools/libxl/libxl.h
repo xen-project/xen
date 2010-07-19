@@ -602,6 +602,7 @@ int libxl_tmem_set(struct libxl_ctx *ctx, uint32_t domid, char* name,
                    uint32_t set);
 int libxl_tmem_shared_auth(struct libxl_ctx *ctx, uint32_t domid, char* uuid,
                            int auth);
+int libxl_tmem_freeable(struct libxl_ctx *ctx);
 
 typedef struct {
     char *backend;

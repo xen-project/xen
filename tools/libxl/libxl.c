@@ -3232,6 +3232,20 @@ int libxl_tmem_shared_auth(struct libxl_ctx *ctx, uint32_t domid,
     return rc;
 }
 
+int libxl_tmem_freeable(struct libxl_ctx *ctx)
+{
+    int rc;
+
+    rc = xc_tmem_control(ctx->xch, -1, TMEMC_QUERY_FREEABLE_MB, -1, 0, 0, 0, 0);
+    if (rc < 0) {
+        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc,
+            "Can not get tmem freeable memory");
+        return -1;
+    }
+
+    return rc;
+}
+
 int libxl_file_reference_map(struct libxl_ctx *ctx, libxl_file_reference *f)
 {
 	struct stat st_buf;
