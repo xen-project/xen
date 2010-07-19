@@ -156,7 +156,7 @@ static void dump_cpu(void)
            "             ss 0x%8.8x (0x%16.16llx + 0x%8.8x / 0x%5.5x)\n"
            "             tr 0x%8.8x (0x%16.16llx + 0x%8.8x / 0x%5.5x)\n"
            "           ldtr 0x%8.8x (0x%16.16llx + 0x%8.8x / 0x%5.5x)\n"
-           "           itdr            (0x%16.16llx + 0x%8.8x)\n"
+           "           idtr            (0x%16.16llx + 0x%8.8x)\n"
            "           gdtr            (0x%16.16llx + 0x%8.8x)\n"
            "    sysenter cs 0x%8.8llx  eip 0x%16.16llx  esp 0x%16.16llx\n"
            "      shadow gs 0x%16.16llx\n"
