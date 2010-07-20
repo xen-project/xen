@@ -400,6 +400,7 @@ int libxl_domain_core_dump(struct libxl_ctx *ctx, uint32_t domid, const char *fi
 int libxl_domain_setmaxmem(struct libxl_ctx *ctx, uint32_t domid, uint32_t target_memkb);
 int libxl_set_memory_target(struct libxl_ctx *ctx, uint32_t domid, uint32_t target_memkb, int enforce);
 
+int libxl_vncviewer_exec(struct libxl_ctx *ctx, uint32_t domid, int autopass);
 int libxl_console_exec(struct libxl_ctx *ctx, uint32_t domid, int cons_num);
 /* libxl_primary_console_exec finds the domid and console number
  * corresponding to the primary console of the given vm, then calls
