@@ -62,8 +62,11 @@ install: subdirs-install
 	$(INSTALL_DIR) $(DESTDIR)/var/lib/xen
 	$(INSTALL_DIR) $(DESTDIR)/var/lock/subsys
 
-.PHONY: clean distclean
-clean distclean: subdirs-clean
+.PHONY: clean
+clean: subdirs-clean
+
+.PHONY: distclean
+distclean: subdirs-distclean
 
 ifneq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
 IOEMU_CONFIGURE_CROSS ?= --cpu=$(XEN_TARGET_ARCH) \
@@ -121,3 +124,6 @@ subdir-clean-debugger/gdbsx:
 
 subdir-install-debugger/gdbsx:
 	$(MAKE) -C debugger/gdbsx install
+
+subdir-distclean-firmware: .phony
+	$(MAKE) -C firmware distclean
