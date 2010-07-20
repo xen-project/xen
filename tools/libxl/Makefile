@@ -15,7 +15,7 @@ CFLAGS += -Werror -Wno-format-zero-length
 CFLAGS += -I. -fPIC
 CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) $(CFLAGS_libxenstore) $(CFLAGS_libblktapctl)
 
-LIBS = $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenguest) $(LDFLAGS_libxenstore) $(LDFLAGS_libblktapctl) -lutil
+LIBS = $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenguest) $(LDFLAGS_libxenstore) $(LDFLAGS_libblktapctl) $(UTIL_LIBS)
 
 LIBXL_OBJS-y = osdeps.o libxl_paths.o libxl_bootloader.o
 LIBXL_OBJS = flexarray.o libxl.o libxl_dom.o libxl_exec.o libxl_xshelp.o libxl_device.o libxl_internal.o xenguest.o libxl_utils.o $(LIBXL_OBJS-y)

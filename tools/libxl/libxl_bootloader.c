@@ -15,9 +15,16 @@
 #include "libxl_osdeps.h"
 
 #include <string.h>
-#include <pty.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <termios.h>
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+#include <util.h>
+#elif defined(__linux__)
+#include <pty.h>
+#elif defined(__sun__)
+#include <stropts.h>
+#endif
 
 #include <sys/stat.h>
 #include <sys/types.h>
