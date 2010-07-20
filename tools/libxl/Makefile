@@ -85,7 +85,7 @@ xl_cmdimpl.o: xl_cmdimpl.c
 xl_cmdtable.o: xl_cmdtable.c
 	$(CC) $(CFLAGS) -c xl_cmdtable.c
 
-$(CLIENTS): xl.o xl_cmdimpl.o xl_cmdtable.o libxlutil.so libxenlight.so
+$(CLIENTS): xl.o xl_cmdimpl.o xl_cmdtable.o libxl_paths.o libxl_bootloader.o libxlutil.so libxenlight.so
 	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 .PHONY: install
