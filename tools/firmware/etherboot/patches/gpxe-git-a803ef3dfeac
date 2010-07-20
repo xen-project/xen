@@ -1,0 +1,125 @@
+commit a803ef3dfeac4e8aa35810bba65f9ccab0bdf264
+Author: Michael Brown <mcb30@ipxe.org>
+Date:   Thu Jun 24 01:23:00 2010 +0100
+
+    [build] Avoid hard-coding the path to perl
+    
+    The path "/usr/bin/perl" has been hard-coded since Etherboot 5.1, for
+    no discernible reason.  Use just "perl" instead to fix the
+    inconsistency and allow building on systems with Perl installed
+    outside of /usr/bin.
+    
+    This commit also includes a later fix that removes a dependency on
+    "perl" which broke builds from fully clean trees.
+    
+    Reported-by: Gabor Z. Papp <gzp@papp.hu>
+    Signed-off-by: Michael Brown <mcb30@ipxe.org>
+    Signed-off-by: Stefan Hajnoczi <stefanha@gmail.com>
+
+diff -pruN a/src/arch/i386/Makefile.pcbios b/src/arch/i386/Makefile.pcbios
+--- a/src/arch/i386/Makefile.pcbios	2010-06-29 20:31:33.000000000 +0100
++++ b/src/arch/i386/Makefile.pcbios	2010-07-20 16:07:06.000000000 +0100
+@@ -24,11 +24,11 @@ MEDIA		+= raw
+ 
+ # Padding rules
+ #
+-PAD_rom		= $(PADIMG) --blksize=512 --byte=0xff $@
++PAD_rom		= $(PERL) $(PADIMG) --blksize=512 --byte=0xff $@
+ PAD_hrom	= $(PAD_rom)
+ PAD_xrom	= $(PAD_rom)
+-PAD_dsk		= $(PADIMG) --blksize=512 $@
+-PAD_hd		= $(PADIMG) --blksize=32768 $@
++PAD_dsk		= $(PERL) $(PADIMG) --blksize=512 $@
++PAD_hd		= $(PERL) $(PADIMG) --blksize=32768 $@
+ 
+ # rule to make a non-emulation ISO boot image
+ NON_AUTO_MEDIA	+= iso
+@@ -67,4 +67,4 @@ NON_AUTO_MEDIA	+= usb
+ NON_AUTO_MEDIA += pdsk
+ %pdsk : %dsk
+ 	$(Q)cp $< $@
+-	$(Q)$(PADIMG) --blksize=1474560 $@
++	$(Q)$(PERL) $(PADIMG) --blksize=1474560 $@
+diff -pruN a/src/Makefile b/src/Makefile
+--- a/src/Makefile	2010-06-29 20:31:33.000000000 +0100
++++ b/src/Makefile	2010-07-20 16:02:56.000000000 +0100
+@@ -20,7 +20,7 @@ MKDIR		:= mkdir
+ CP		:= cp
+ ECHO		:= echo
+ PRINTF		:= printf
+-PERL		:= /usr/bin/perl
++PERL		:= perl
+ CC		:= $(CROSS_COMPILE)gcc
+ CPP		:= $(CC) -E
+ AS		:= $(CROSS_COMPILE)as
+@@ -31,12 +31,12 @@ RANLIB		:= $(CROSS_COMPILE)ranlib
+ OBJCOPY		:= $(CROSS_COMPILE)objcopy
+ NM		:= $(CROSS_COMPILE)nm
+ OBJDUMP		:= $(CROSS_COMPILE)objdump
+-PARSEROM	:= $(PERL) ./util/parserom.pl
+-MAKEROM		:= $(PERL) ./util/makerom.pl
+-SYMCHECK	:= $(PERL) ./util/symcheck.pl
+-SORTOBJDUMP	:= $(PERL) ./util/sortobjdump.pl
+-PADIMG		:= $(PERL) ./util/padimg.pl
+-LICENCE		:= $(PERL) ./util/licence.pl
++PARSEROM	:= ./util/parserom.pl
++MAKEROM		:= ./util/makerom.pl
++SYMCHECK	:= ./util/symcheck.pl
++SORTOBJDUMP	:= ./util/sortobjdump.pl
++PADIMG		:= ./util/padimg.pl
++LICENCE		:= ./util/licence.pl
+ NRV2B		:= ./util/nrv2b
+ ZBIN		:= ./util/zbin
+ ELF2EFI32	:= ./util/elf2efi32
+diff -pruN a/src/Makefile.housekeeping b/src/Makefile.housekeeping
+--- a/src/Makefile.housekeeping	2010-06-29 20:31:33.000000000 +0100
++++ b/src/Makefile.housekeeping	2010-07-20 16:04:42.000000000 +0100
+@@ -486,7 +486,7 @@ define src_template
+ 		 '\n$(2) : $$($(4)_DEPS)\n' \
+ 		 '\nTAGS : $$($(4)_DEPS)\n' \
+ 		>> $(2)
+-	@$(PARSEROM) $(1) >> $(2)
++	@$(PERL) $(PARSEROM) $(1) >> $(2)
+ 
+ endef
+ 
+@@ -695,7 +695,7 @@ $(BIN)/%.tmp : $(BLIB) $(MAKEDEPS) $(LDS
+ 	$(QM)$(ECHO) "  [LD] $@"
+ 	$(Q)$(LD) $(LDFLAGS) -T $(LDSCRIPT) $(TGT_LD_FLAGS) $(BLIB) -o $@ \
+ 		-Map $(BIN)/$*.tmp.map
+-	$(Q)$(OBJDUMP) -ht $@ | $(SORTOBJDUMP) >> $(BIN)/$*.tmp.map
++	$(Q)$(OBJDUMP) -ht $@ | $(PERL) $(SORTOBJDUMP) >> $(BIN)/$*.tmp.map
+ 
+ # Keep intermediate object file (useful for debugging)
+ .PRECIOUS : $(BIN)/%.tmp
+@@ -752,7 +752,7 @@ $(BIN)/%.licence : $(BIN)/%.tmp
+ 		echo "files are missing a licence declaration:" ;\
+ 		echo $(call unlicensed_deps_list,$<);\
+ 		exit 1,\
+-		$(LICENCE) $(call licence_list,$<))
++		$(PERL) $(LICENCE) $(call licence_list,$<))
+ 
+ # Extract compression information from intermediate object file
+ #
+@@ -866,10 +866,10 @@ endif # defined(BIN)
+ # the automatic build system and varies by target; it includes the
+ # "-p 0x1234,0x5678" string to set the PCI IDs.
+ #
+-FINALISE_rom	= $(MAKEROM) $(MAKEROM_FLAGS) $(TGT_MAKEROM_FLAGS) \
++FINALISE_rom	= $(PERL) $(MAKEROM) $(MAKEROM_FLAGS) $(TGT_MAKEROM_FLAGS) \
+ 		  -i$(IDENT) -s 0 $@
+ FINALISE_hrom	= $(FINALISE_rom)
+-FINALISE_xrom	= $(MAKEROM) $(MAKEROM_FLAGS) $(TGT_MAKEROM_FLAGS) \
++FINALISE_xrom	= $(PERL) $(MAKEROM) $(MAKEROM_FLAGS) $(TGT_MAKEROM_FLAGS) \
+ 		  -i$(IDENT) -n -s 0 $@
+ 
+ # Some ROMs require specific flags to be passed to makerom.pl
+@@ -987,7 +987,7 @@ $(SYMTAB) : $(BLIB)
+ CLEANUP	+= $(BIN)/symtab
+ 
+ symcheck : $(SYMTAB)
+-	$(SYMCHECK) $<
++	$(PERL) $(SYMCHECK) $<
+ 
+ endif # defined(BIN)
+ 

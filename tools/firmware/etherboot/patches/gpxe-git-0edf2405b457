@@ -1,0 +1,30 @@
+commit 0edf2405b457e542c244a72285511b3ff5c06885
+Author: Michael Brown <mcb30@ipxe.org>
+Date:   Tue Apr 27 09:52:22 2010 +0100
+
+    [build] Fix building with binutils 2.16
+    
+    Signed-off-by: Michael Brown <mcb30@ipxe.org>
+    Signed-off-by: Stefan Hajnoczi <stefanha@gmail.com>
+
+diff --git a/src/arch/i386/scripts/i386.lds b/src/arch/i386/scripts/i386.lds
+index 278a397..0ce2c10 100644
+--- a/src/arch/i386/scripts/i386.lds
++++ b/src/arch/i386/scripts/i386.lds
+@@ -24,6 +24,8 @@ SECTIONS {
+      *
+      */
+ 
++    PROVIDE ( _max_align = 16 );
++
+     /*
+      * The prefix
+      *
+@@ -169,7 +171,6 @@ SECTIONS {
+      *
+      */
+ 
+-    PROVIDE ( _max_align = 16 );
+     .			= 0;
+ 
+     .			= ALIGN ( _max_align );
