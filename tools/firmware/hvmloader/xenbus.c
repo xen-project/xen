@@ -53,14 +53,20 @@ void xenbus_setup(void)
            (unsigned long) rings, (unsigned long) event);
 }
 
-/* Reset the xenbus connection so the next kernel can start again. 
- * We zero out the whole ring -- the backend can handle this, and it's 
- * not going to surprise any frontends since it's equivalent to never 
- * having used the rings. */
+/* Reset the xenbus connection so the next kernel can start again. */
 void xenbus_shutdown(void)
 {
     ASSERT(rings != NULL);
+
+    /* We zero out the whole ring -- the backend can handle this, and it's 
+     * not going to surprise any frontends since it's equivalent to never 
+     * having used the rings. */
     memset(rings, 0, sizeof *rings);
+
+    /* Clear the xenbus event-channel too */
+    get_shared_info()->evtchn_pending[event / sizeof (unsigned long)]
+        &= ~(1UL << ((event % sizeof (unsigned long))));    
+
     rings = NULL;
 }
 

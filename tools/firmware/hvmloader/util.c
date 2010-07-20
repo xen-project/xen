@@ -587,10 +587,28 @@ struct hvm_info_table *get_hvm_info_table(void)
     return table;
 }
 
+struct shared_info *get_shared_info(void) 
+{
+    static struct shared_info *shared_info = NULL;
+    struct xen_add_to_physmap xatp;
+
+    if ( shared_info != NULL )
+        return shared_info;
+
+    xatp.domid = DOMID_SELF;
+    xatp.space = XENMAPSPACE_shared_info;
+    xatp.idx   = 0;
+    xatp.gpfn  = 0xfffffu;
+    shared_info = (struct shared_info *)(xatp.gpfn << PAGE_SHIFT);
+    if ( hypercall_memory_op(XENMEM_add_to_physmap, &xatp) != 0 )
+        BUG();
+
+    return shared_info;
+}
+
 uint16_t get_cpu_mhz(void)
 {
-    struct xen_add_to_physmap xatp;
-    struct shared_info *shared_info = (struct shared_info *)0xfffff000;
+    struct shared_info *shared_info = get_shared_info();
     struct vcpu_time_info *info = &shared_info->vcpu_info[0].time;
     uint64_t cpu_khz;
     uint32_t tsc_to_nsec_mul, version;
@@ -599,14 +617,6 @@ uint16_t get_cpu_mhz(void)
     static uint16_t cpu_mhz;
     if ( cpu_mhz != 0 )
         return cpu_mhz;
-
-    /* Map shared-info page. */
-    xatp.domid = DOMID_SELF;
-    xatp.space = XENMAPSPACE_shared_info;
-    xatp.idx   = 0;
-    xatp.gpfn  = (unsigned long)shared_info >> 12;
-    if ( hypercall_memory_op(XENMEM_add_to_physmap, &xatp) != 0 )
-        BUG();
 
     /* Get a consistent snapshot of scale factor (multiplier and shift). */
     do {
