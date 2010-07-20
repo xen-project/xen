@@ -843,6 +843,69 @@ int libxl_primary_console_exec(struct libxl_ctx *ctx, uint32_t domid_vm)
         return libxl_console_exec(ctx, domid_vm, 0);
 }
 
+int libxl_vncviewer_exec(struct libxl_ctx *ctx, uint32_t domid, int autopass)
+{
+    const char *vnc_port, *vfb_back;
+    const char *vnc_listen = NULL, *vnc_pass = NULL;
+    int port = 0, autopass_fd = -1;
+    char *vnc_bin, *args[] = {
+        "vncviewer",
+        NULL, /* hostname:display */
+        NULL, /* -autopass */
+        NULL,
+    };
+
+    vnc_port = libxl_xs_read(ctx, XBT_NULL,
+                            libxl_sprintf(ctx,
+                            "/local/domain/%d/console/vnc-port", domid));
+    if ( vnc_port )
+        port = atoi(vnc_port) - 5900;
+
+    vfb_back = libxl_xs_read(ctx, XBT_NULL,
+                            libxl_sprintf(ctx,
+                            "/local/domain/%d/device/vfb/0/backend", domid));
+    if ( vfb_back ) {
+        vnc_listen = libxl_xs_read(ctx, XBT_NULL,
+                            libxl_sprintf(ctx,
+                            "/local/domain/%d/console/vnc-listen", domid));
+        if ( autopass )
+            vnc_pass = libxl_xs_read(ctx, XBT_NULL,
+                            libxl_sprintf(ctx,
+                            "/local/domain/%d/console/vnc-pass", domid));
+    }
+
+    if ( NULL == vnc_listen )
+        vnc_listen = "localhost";
+
+    if ( (vnc_bin = getenv("VNCVIEWER")) )
+        args[0] = vnc_bin;
+
+    args[1] = libxl_sprintf(ctx, "%s:%d", vnc_listen, port);
+
+    if ( vnc_pass ) {
+        char tmpname[] = "/tmp/vncautopass.XXXXXX";
+        autopass_fd = mkstemp(tmpname);
+        if ( autopass_fd < 0 )
+            goto skip_autopass;
+
+        if ( unlink(tmpname) )
+            /* should never happen */
+            XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "unlink %s failed", tmpname);
+
+        if ( libxl_write_exactly(ctx, autopass_fd, vnc_pass, strlen(vnc_pass),
+                                    tmpname, "vnc password") ) {
+            do { close(autopass_fd); } while(errno == EINTR);
+            goto skip_autopass;
+        }
+
+        args[2] = "-autopass";
+    }
+
+skip_autopass:
+    libxl_exec(autopass_fd, -1, -1, args[0], args);
+    return 0;
+}
+
 static char ** libxl_build_device_model_args(struct libxl_ctx *ctx,
                                              libxl_device_model_info *info,
                                              libxl_device_nic *vifs,

@@ -83,6 +83,14 @@ struct cmd_spec cmd_table[] = {
       "Attach to domain's console",
       "<Domain>",
     },
+    { "vncviewer",
+      &main_vncviewer,
+      "Attach to domain's VNC server.",
+      "[options] <Domain>\n"
+      "--autopass               Pass VNC password to viewer via stdin and\n"
+      "                         -autopass\n"
+      "--vncviewer-autopass     (consistency alias for --autopass)"
+    },
     { "save",
       &main_save,
       "Save a domain state to restore later",

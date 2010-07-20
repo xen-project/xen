@@ -1654,6 +1654,52 @@ int main_console(int argc, char **argv)
     return 1;
 }
 
+static int vncviewer(const char *domain_spec, int autopass)
+{
+    find_domain(domain_spec);
+    libxl_vncviewer_exec(&ctx, domid, autopass);
+    fprintf(stderr, "Unable to execute vncviewer\n");
+    return 1;
+}
+
+int main_vncviewer(int argc, char **argv)
+{
+    static const struct option long_options[] = {
+        {"autopass", 0, 0, 'a'},
+        {"vncviewer-autopass", 0, 0, 'a'},
+        {"help", 0, 0, 'h'},
+        {0, 0, 0, 0}
+    };
+    int opt, autopass = 0;
+
+    while (1) {
+        opt = getopt_long(argc, argv, "ah", long_options, NULL);
+        if (opt == -1)
+            break;
+
+        switch (opt) {
+        case 'a':
+            autopass = 1;
+            break;
+        case 'h':
+            help("vncviewer");
+            exit(0);
+        default:
+            fprintf(stderr, "option not supported\n");
+            break;
+        }
+    }
+
+    if (argc - optind != 1) {
+        help("vncviewer");
+        exit(2);
+    }
+
+    if (vncviewer(argv[optind], autopass))
+        exit(1);
+    exit(0);
+}
+
 void pcilist(char *dom)
 {
     libxl_device_pci *pcidevs;
