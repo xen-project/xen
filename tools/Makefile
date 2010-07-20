@@ -119,11 +119,14 @@ subdir-clean-ioemu-dir:
 		$(MAKE) -C ioemu-dir clean; \
 	fi
 
-subdir-clean-debugger/gdbsx:
+subdir-clean-debugger/gdbsx subdir-distclean-debugger/gdbsx: .phony
 	$(MAKE) -C debugger/gdbsx clean
 
-subdir-install-debugger/gdbsx:
+subdir-install-debugger/gdbsx: .phony
 	$(MAKE) -C debugger/gdbsx install
+
+subdir-all-debugger/gdbsx: .phony
+	$(MAKE) -C debugger/gdbsx all
 
 subdir-distclean-firmware: .phony
 	$(MAKE) -C firmware distclean
