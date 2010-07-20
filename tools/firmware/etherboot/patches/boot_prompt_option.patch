@@ -1,7 +1,7 @@
-diff -pruN a/src/arch/i386/prefix/romprefix.S b/src/arch/i386/prefix/romprefix.S
---- a/src/arch/i386/prefix/romprefix.S	2008-09-25 03:34:26.000000000 +0100
-+++ b/src/arch/i386/prefix/romprefix.S	2008-09-25 12:01:33.000000000 +0100
-@@ -320,6 +320,7 @@ no_pmm:
+diff -pruN gpxe/src/arch/i386/prefix/romprefix.S gpxe.new/src/arch/i386/prefix/romprefix.S
+--- gpxe/src/arch/i386/prefix/romprefix.S	2010-06-29 20:31:33.000000000 +0100
++++ gpxe.new/src/arch/i386/prefix/romprefix.S	2010-07-20 10:40:20.000000000 +0100
+@@ -458,6 +458,7 @@ no_pmm:
  	xorw	%di, %di
  	cs rep	movsb
  
@@ -9,23 +9,27 @@ diff -pruN a/src/arch/i386/prefix/romprefix.S b/src/arch/i386/prefix/romprefix.S
  	/* Prompt for POST-time shell */
  	movw	$init_message_prompt, %si
  	xorw	%di, %di
-@@ -341,6 +342,7 @@ no_pmm:
+@@ -484,6 +485,7 @@ no_pmm:
  	pushw	%cs
  	call	exec
- 1:
+ out:
 +#endif
  	/* Restore registers */
  	popw	%gs
  	popw	%fs
-@@ -371,9 +373,11 @@ init_message_pmm:
+@@ -538,6 +540,7 @@ init_message_no_pmm:
  init_message_int19:
  	.asciz	" INT19"
  	.size	init_message_int19, . - init_message_int19
 +#ifndef NO_POST_PROMPT
  init_message_prompt:
- 	.asciz	"\nPress Ctrl-B to configure gPXE..."
+ 	.asciz	"\nPress Ctrl-B to configure "
  	.size	init_message_prompt, . - init_message_prompt
+@@ -547,6 +550,7 @@ init_message_dots:
+ init_message_done:
+ 	.asciz	"\n\n"
+ 	.size	init_message_done, . - init_message_done
 +#endif
- clear_message:
- 	.asciz	"\r                                     \n\n"
- 	.size	clear_message, . - clear_message
+ 
+ /* ROM image location
+  *

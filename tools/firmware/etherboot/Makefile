@@ -4,6 +4,9 @@ XEN_ROOT = ../../..
 include $(XEN_ROOT)/tools/Rules.mk
 include Config
 
+GPXE_GIT_URL := git://git.etherboot.org/scm/gpxe.git
+GPXE_GIT_TAG := v1.0.1
+
 D=gpxe
 T=gpxe-git-snapshot.tar.gz
 
@@ -14,7 +17,7 @@ ROMS = $(addprefix $D/src/bin/, $(addsuffix .rom, $(NICS)))
 .PHONY: all
 all: eb-roms.h
 
-%.rom: $D/src/arch/i386/Config
+%.rom: $D/src/arch/i386/Makefile
 	$(MAKE) -C $D/src bin/$(*F).rom
 
 eb-roms.h.new: $(ROMS)
@@ -24,7 +27,13 @@ eb-roms.h: Config
 	$(MAKE) NO_WERROR=1 $@.new
 	mv -f $@.new $@
 
-$D/src/arch/i386/Config: $T Config
+$T:
+	$(GIT) clone $(GPXE_GIT_URL) $D.git
+	cd $D.git && \
+	$(GIT) archive --format=tar --prefix=$D/ $(GPXE_GIT_TAG) | gzip >../$T
+	rm -rf $D.git
+
+$D/src/arch/i386/Makefile: $T Config
 	rm -rf $D
 	gzip -dc $T | tar xf -
 	for i in $$(cat patches/series) ; do                 \
@@ -32,9 +41,9 @@ $D/src/arch/i386/Config: $T Config
 	done
 	cat Config >>$@
 
-$D/src/bin/NIC: $D/src/arch/i386/Config
+$D/src/bin/NIC: $D/src/arch/i386/Makefile
 	$(MAKE) -C $D/src bin/NIC
 
 .PHONY: clean
 clean:
-	rm -rf $D *~ eb-roms.h
+	rm -rf $D $D.git *~ eb-roms.h

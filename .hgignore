@@ -135,6 +135,7 @@
 ^tools/firmware/.*bios/.*bios.*\.txt$
 ^tools/firmware/etherboot/eb-roms\.h$
 ^tools/firmware/etherboot/gpxe/.*$
+^tools/firmware/etherboot/gpxe\.git/.*$
 ^tools/firmware/extboot/extboot.img$
 ^tools/firmware/extboot/signrom$
 ^tools/firmware/hvmloader/acpi/dsdt.*\.c$
