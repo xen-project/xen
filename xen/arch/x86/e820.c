@@ -10,9 +10,19 @@
 #include <asm/mtrr.h>
 #include <asm/msr.h>
 
-/* opt_mem: Limit of physical RAM. Any RAM beyond this point is ignored. */
+/*
+ * opt_mem: Limit maximum address of physical RAM.
+ *          Any RAM beyond this address limit is ignored.
+ */
 static unsigned long long __initdata opt_mem;
 size_param("mem", opt_mem);
+
+/*
+ * opt_availmem: Limit maximum usable amount of physical RAM.
+ *               Any RAM beyond this limited amount is ignored.
+ */
+static unsigned long long __initdata opt_availmem;
+size_param("availmem", opt_availmem);
 
 /* opt_nomtrr_check: Don't clip ram to highest cacheable MTRR. */
 static int __initdata e820_mtrr_clip = -1;
@@ -503,7 +513,8 @@ static void __init reserve_dmi_region(void)
 static void __init machine_specific_memory_setup(
     struct e820entry *raw, int *raw_nr)
 {
-    uint64_t top_of_ram;
+    uint64_t top_of_ram, size;
+    int i;
 
     char nr = (char)*raw_nr;
     sanitize_e820_map(raw, &nr);
@@ -512,6 +523,17 @@ static void __init machine_specific_memory_setup(
 
     if ( opt_mem )
         clip_to_limit(opt_mem, NULL);
+
+    if ( opt_availmem )
+    {
+        for ( i = size = 0; (i < e820.nr_map) && (size <= opt_availmem); i++ )
+            if ( e820.map[i].type == E820_RAM )
+                size += e820.map[i].size;
+        if ( size > opt_availmem )
+            clip_to_limit(
+                e820.map[i-1].addr + e820.map[i-1].size - (size-opt_availmem),
+                NULL);
+    }
 
 #ifdef __i386__
     clip_to_limit((1ULL << 30) * MACHPHYS_MBYTES,
