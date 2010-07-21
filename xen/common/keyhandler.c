@@ -203,7 +203,8 @@ static void dump_domains(unsigned char key)
                
         printk("VCPU information and callbacks for domain %u:\n",
                d->domain_id);
-        for_each_vcpu ( d, v ) {
+        for_each_vcpu ( d, v )
+        {
             printk("    VCPU%d: CPU%d [has=%c] flags=%lx poll=%d "
                    "upcall_pend = %02x, upcall_mask = %02x ",
                    v->vcpu_id, v->processor,
@@ -218,7 +219,15 @@ static void dump_domains(unsigned char key)
             arch_dump_vcpu_info(v);
             periodic_timer_print(tmpstr, sizeof(tmpstr), v->periodic_period);
             printk("    %s\n", tmpstr);
-            printk("    Notifying guest (virq %d, port %d, stat %d/%d/%d)\n",
+        }
+    }
+
+    for_each_domain ( d )
+    {
+        for_each_vcpu ( d, v )
+        {
+            printk("Notifying guest %d:%d (virq %d, port %d, stat %d/%d/%d)\n",
+                   d->domain_id, v->vcpu_id,
                    VIRQ_DEBUG, v->virq_to_evtchn[VIRQ_DEBUG],
                    test_bit(v->virq_to_evtchn[VIRQ_DEBUG], 
                             &shared_info(d, evtchn_pending)),
