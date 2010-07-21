@@ -140,14 +140,22 @@ XSM_ENABLE ?= n
 FLASK_ENABLE ?= n
 ACM_SECURITY ?= n
 
+# Download GIT repositories via HTTP or GIT's own protocol?
+# GIT's protocol is faster and more robust, when it works at all (firewalls
+# may block it). We make it the default, but if your GIT repository downloads
+# fail or hang, please specify GIT_HTTP=y in your environment.
+GIT_HTTP ?= n
+
 XEN_EXTFILES_URL=http://xenbits.xensource.com/xen-extfiles
 # All the files at that location were downloaded from elsewhere on
 # the internet.  The original download URL is preserved as a comment
 # near the place in the Xen Makefiles where the file is used.
 
-# GIT protocol can be faster than HTTP, if your firewall lets it through.
-# QEMU_REMOTE=git://xenbits.xensource.com/qemu-xen-unstable.git
+ifeq ($(GIT_HTTP),y)
 QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
+else
+QEMU_REMOTE=git://xenbits.xensource.com/qemu-xen-unstable.git
+endif
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.

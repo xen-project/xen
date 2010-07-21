@@ -4,9 +4,12 @@ XEN_ROOT = ../../..
 include $(XEN_ROOT)/tools/Rules.mk
 include Config
 
-# NB. git:// protocol is faster but doesn't work through all firewalls
-# GPXE_GIT_URL := git://git.etherboot.org/scm/gpxe.git
+ifeq ($(GIT_HTTP),y)
 GPXE_GIT_URL := http://git.etherboot.org/scm/gpxe.git
+else
+GPXE_GIT_URL := git://git.etherboot.org/scm/gpxe.git
+endif
+
 GPXE_GIT_TAG := v1.0.1
 
 D=gpxe
