@@ -63,9 +63,8 @@ void xenbus_shutdown(void)
      * having used the rings. */
     memset(rings, 0, sizeof *rings);
 
-    /* Clear the xenbus event-channel too */
-    get_shared_info()->evtchn_pending[event / sizeof (unsigned long)]
-        &= ~(1UL << ((event % sizeof (unsigned long))));    
+    /* Clear the event-channel state too. */
+    memset(get_shared_info(), 0, PAGE_SIZE);
 
     rings = NULL;
 }
