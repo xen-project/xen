@@ -28,8 +28,7 @@
 #define SPECIALPAGE_XENSTORE 1
 #define SPECIALPAGE_IOREQ    2
 #define SPECIALPAGE_IDENT_PT 3
-#define SPECIALPAGE_SHINFO   4
-#define NR_SPECIAL_PAGES     5
+#define NR_SPECIAL_PAGES     4
 #define special_pfn(x) (0xff000u - NR_SPECIAL_PAGES + (x))
 
 static void build_hvm_info(void *hvm_info_page, uint64_t mem_size)
@@ -125,8 +124,6 @@ static int setup_guest(xc_interface *xch,
     unsigned long target_pages = (unsigned long)target << (20 - PAGE_SHIFT);
     unsigned long pod_pages = 0;
     unsigned long entry_eip, cur_pages;
-    struct xen_add_to_physmap xatp;
-    struct shared_info *shared_info;
     void *hvm_info_page;
     uint32_t *ident_pt;
     struct elf_binary elf;
@@ -337,28 +334,10 @@ static int setup_guest(xc_interface *xch,
     build_hvm_info(hvm_info_page, v_end);
     munmap(hvm_info_page, PAGE_SIZE);
 
-    /* Map and initialise shared_info page. */
-    xatp.domid = dom;
-    xatp.space = XENMAPSPACE_shared_info;
-    xatp.idx   = 0;
-    xatp.gpfn  = special_pfn(SPECIALPAGE_SHINFO);
-    if ( (xc_memory_op(xch, XENMEM_add_to_physmap, &xatp) != 0) ||
-         ((shared_info = xc_map_foreign_range(
-             xch, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
-             special_pfn(SPECIALPAGE_SHINFO))) == NULL) )
-        goto error_out;
-    memset(shared_info, 0, PAGE_SIZE);
-    /* NB. evtchn_upcall_mask is unused: leave as zero. */
-    memset(&shared_info->evtchn_mask[0], 0xff,
-           sizeof(shared_info->evtchn_mask));
-    munmap(shared_info, PAGE_SIZE);
-
     /* Allocate and clear special pages. */
     for ( i = 0; i < NR_SPECIAL_PAGES; i++ )
     {
         xen_pfn_t pfn = special_pfn(i);
-        if ( i == SPECIALPAGE_SHINFO )
-            continue;
         rc = xc_domain_memory_populate_physmap(xch, dom, 1, 0, 0, &pfn);
         if ( rc != 0 )
         {
