@@ -959,7 +959,7 @@ static char ** libxl_build_device_model_args(struct libxl_ctx *ctx,
             flexarray_set(dm_args, num++, "-boot");
             flexarray_set(dm_args, num++, info->boot);
         }
-        if (info->usb) {
+        if (info->usb || info->usbdevice) {
             flexarray_set(dm_args, num++, "-usb");
             if (info->usbdevice) {
                 flexarray_set(dm_args, num++, "-usbdevice");
