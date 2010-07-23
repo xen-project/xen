@@ -48,6 +48,9 @@ CONFIG_DIR = /etc
 else
 CONFIG_DIR = $(PREFIX)/etc
 endif
+
+SYSCONFIG_DIR = $(CONFIG_DIR)/sysconfig
+
 XEN_CONFIG_DIR = $(CONFIG_DIR)/xen
 XEN_SCRIPT_DIR = $(XEN_CONFIG_DIR)/scripts
 
