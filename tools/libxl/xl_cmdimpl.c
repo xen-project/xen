@@ -2796,7 +2796,7 @@ int main_create(int argc, char **argv)
     char *p, extra_config[1024];
     struct domain_create dom_info;
     int paused = 0, debug = 0, daemonize = 1, console_autoconnect = 0,
-        dryrun = 0, quite = 0;
+        dryrun = 0, quiet = 0;
     int opt, rc;
     int option_index = 0;
     static struct option long_options[] = {
@@ -2835,7 +2835,7 @@ int main_create(int argc, char **argv)
             dryrun = 1;
             break;
         case 'q':
-            quite = 1;
+            quiet = 1;
             break;
         default:
             fprintf(stderr, "option not supported\n");
@@ -2865,7 +2865,7 @@ int main_create(int argc, char **argv)
     dom_info.daemonize = daemonize;
     dom_info.paused = paused;
     dom_info.dryrun = dryrun;
-    dom_info.quiet = quite;
+    dom_info.quiet = quiet;
     dom_info.config_file = filename;
     dom_info.extra_config = extra_config;
     dom_info.migrate_fd = -1;
