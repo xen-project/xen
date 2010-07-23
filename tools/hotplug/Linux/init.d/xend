@@ -8,9 +8,9 @@
 # description: Starts and stops the Xen control daemon.
 ### BEGIN INIT INFO
 # Provides:          xend
-# Required-Start:    $syslog $remote_fs
+# Required-Start:    $syslog $remote_fs xenstored
 # Should-Start:
-# Required-Stop:     $syslog $remote_fs
+# Required-Stop:     $syslog $remote_fs xenstored
 # Should-Stop:
 # Default-Start:     3 4 5
 # Default-Stop:      0 1 2 6
