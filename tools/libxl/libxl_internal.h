@@ -222,5 +222,8 @@ char *libxl_abs_path(struct libxl_ctx *ctx, char *s, const char *path);
 #define XL_LOG_WARNING XTL_WARN
 #define XL_LOG_ERROR   XTL_ERROR
 
+/* Error handling */
+int libxl_xc_error(int xc_err);
+
 #endif
 

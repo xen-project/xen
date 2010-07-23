@@ -250,10 +250,16 @@ int restore_common(struct libxl_ctx *ctx, uint32_t domid,
                    int fd)
 {
     /* read signature */
-    return xc_domain_restore(ctx->xch, fd, domid,
+    int rc;
+    rc = xc_domain_restore(ctx->xch, fd, domid,
                              state->store_port, &state->store_mfn,
                              state->console_port, &state->console_mfn,
                              info->hvm, info->u.hvm.pae, 0);
+    if ( rc < 0 ) {
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "restoring domain");
+        return ERROR_FAIL;
+    }
+    return 0;
 }
 
 struct suspendinfo {
@@ -359,7 +365,7 @@ int core_suspend(struct libxl_ctx *ctx, uint32_t domid, int fd,
 
     si.xce = xc_evtchn_open();
     if (si.xce < 0)
-        return -1;
+        return ERROR_FAIL;
 
     if (si.xce > 0) {
         port = xs_suspend_evtchn_port(si.domid);
@@ -438,7 +444,7 @@ static const char *userdata_path(struct libxl_ctx *ctx, uint32_t domid,
     if (rc) {
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "unable to find domain info"
                      " for domain %"PRIu32, domid);
-        return 0;
+        return NULL;
     }
     uuid_string = string_of_uuid(ctx, info.uuid);
 
@@ -493,13 +499,13 @@ int libxl_userdata_store(struct libxl_ctx *ctx, uint32_t domid,
     size_t rs;
 
     filename = userdata_path(ctx, domid, userdata_userid, "d");
-    if (!filename) return ENOMEM;
+    if (!filename) return ERROR_NOMEM;
 
     if (!datalen)
         return userdata_delete(ctx, filename);
 
     newfilename = userdata_path(ctx, domid, userdata_userid, "n");
-    if (!newfilename) return ENOMEM;
+    if (!newfilename) return ERROR_NOMEM;
 
     fd= open(newfilename, O_RDWR|O_CREAT|O_TRUNC, 0600);
     if (fd<0) goto xe;
@@ -523,9 +529,10 @@ int libxl_userdata_store(struct libxl_ctx *ctx, uint32_t domid,
     if (f) fclose(f);
     if (fd>=0) close(fd);
 
+    errno = e;
     XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "cannot write %s for %s",
                  newfilename, filename);
-    return e;
+    return ERROR_FAIL;
 }
 
 int libxl_userdata_retrieve(struct libxl_ctx *ctx, uint32_t domid,
@@ -537,14 +544,14 @@ int libxl_userdata_retrieve(struct libxl_ctx *ctx, uint32_t domid,
     void *data = 0;
 
     filename = userdata_path(ctx, domid, userdata_userid, "d");
-    if (!filename) return ENOMEM;
+    if (!filename) return ERROR_NOMEM;
 
     e = libxl_read_file_contents(ctx, filename, data_r ? &data : 0, &datalen);
 
     if (!e && !datalen) {
         XL_LOG(ctx, XL_LOG_ERROR, "userdata file %s is empty", filename);
         if (data_r) assert(!*data_r);
-        return EPROTO;
+        return ERROR_FAIL;
     }
 
     if (data_r) *data_r = data;
