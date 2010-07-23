@@ -87,7 +87,7 @@ int libxl_domain_make(struct libxl_ctx *ctx, libxl_domain_create_info *info,
     char *rw_paths[] = { "device", "device/suspend/event-channel" , "data"};
     char *ro_paths[] = { "cpu", "memory", "device", "error", "drivers",
                          "control", "attr", "messages" };
-    char *dom_path, *vm_path, *vss_path;
+    char *dom_path, *vm_path;
     struct xs_permissions roperm[2];
     struct xs_permissions rwperm[1];
     xs_transaction_t t;
@@ -121,8 +121,7 @@ int libxl_domain_make(struct libxl_ctx *ctx, libxl_domain_create_info *info,
         return ERROR_FAIL;
 
     vm_path = libxl_sprintf(ctx, "/vm/%s", uuid_string);
-    vss_path = libxl_sprintf(ctx, "/vss/%s", uuid_string);
-    if (!vm_path || !vss_path) {
+    if (!vm_path) {
         XL_LOG(ctx, XL_LOG_ERROR, "cannot allocate create paths");
         return ERROR_FAIL;
     }
@@ -144,12 +143,7 @@ retry_transaction:
     xs_mkdir(ctx->xsh, t, vm_path);
     xs_set_permissions(ctx->xsh, t, vm_path, roperm, ARRAY_SIZE(roperm));
 
-    xs_rm(ctx->xsh, t, vss_path);
-    xs_mkdir(ctx->xsh, t, vss_path);
-    xs_set_permissions(ctx->xsh, t, vss_path, rwperm, ARRAY_SIZE(rwperm));
-
     xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/vm", dom_path), vm_path, strlen(vm_path));
-    xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/vss", dom_path), vss_path, strlen(vss_path));
     rc = libxl_domain_rename(ctx, *domid, 0, info->name, t);
     if (rc) return rc;
 
@@ -787,7 +781,7 @@ static int libxl_destroy_device_model(struct libxl_ctx *ctx, uint32_t domid)
 int libxl_domain_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
 {
     char *dom_path;
-    char *vm_path, *vss_path, *xapi_path;
+    char *vm_path;
     int rc, dm_present;
 
     if (is_hvm(ctx, domid)) {
@@ -826,18 +820,8 @@ int libxl_domain_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
         if (!xs_rm(ctx->xsh, XBT_NULL, vm_path))
             XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xs_rm failed for %s", vm_path);
 
-    vss_path = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/vss", dom_path));
-    if (vss_path)
-        if (!xs_rm(ctx->xsh, XBT_NULL, vss_path))
-            XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xs_rm failed for %s", vss_path);
-
     if (!xs_rm(ctx->xsh, XBT_NULL, dom_path))
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xs_rm failed for %s", dom_path);
-
-    xapi_path = libxl_sprintf(ctx, "/xapi/%u", domid);
-    if (xapi_path)
-        if (!xs_rm(ctx->xsh, XBT_NULL, xapi_path))
-            XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xs_rm failed for %s", xapi_path);
 
     libxl__userdata_destroyall(ctx, domid);
 

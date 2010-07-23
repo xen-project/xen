@@ -42,11 +42,10 @@ static const char *string_of_kinds[] = {
 int libxl_device_generic_add(struct libxl_ctx *ctx, libxl_device *device,
                              char **bents, char **fents)
 {
-    char *dom_path_backend, *dom_path, *frontend_path, *backend_path, *hotplug_path;
+    char *dom_path_backend, *dom_path, *frontend_path, *backend_path;
     xs_transaction_t t;
     struct xs_permissions frontend_perms[2];
     struct xs_permissions backend_perms[2];
-    struct xs_permissions hotplug_perms[1];
 
     if (!is_valid_device_kind(device->backend_kind) || !is_valid_device_kind(device->kind))
         return ERROR_INVAL;
@@ -58,8 +57,6 @@ int libxl_device_generic_add(struct libxl_ctx *ctx, libxl_device *device,
                                   dom_path, string_of_kinds[device->kind], device->devid);
     backend_path = libxl_sprintf(ctx, "%s/backend/%s/%u/%d",
                                  dom_path_backend, string_of_kinds[device->backend_kind], device->domid, device->devid);
-    hotplug_path = libxl_sprintf(ctx, "/xapi/%d/hotplug/%s/%d",
-                                  device->domid, string_of_kinds[device->kind], device->devid);
 
     frontend_perms[0].id = device->domid;
     frontend_perms[0].perms = XS_PERM_NONE;
@@ -70,9 +67,6 @@ int libxl_device_generic_add(struct libxl_ctx *ctx, libxl_device *device,
     backend_perms[0].perms = XS_PERM_NONE;
     backend_perms[1].id = device->domid;
     backend_perms[1].perms = XS_PERM_READ;
-
-    hotplug_perms[0].id = device->backend_domid;
-    hotplug_perms[0].perms = XS_PERM_NONE;
 
 retry_transaction:
     t = xs_transaction_start(ctx->xsh);
@@ -86,9 +80,6 @@ retry_transaction:
 
     xs_mkdir(ctx->xsh, t, backend_path);
     xs_set_permissions(ctx->xsh, t, backend_path, backend_perms, ARRAY_SIZE(backend_perms));
-
-    xs_mkdir(ctx->xsh, t, hotplug_path);
-    xs_set_permissions(ctx->xsh, t, hotplug_path, hotplug_perms, ARRAY_SIZE(hotplug_perms));
 
     xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/backend", frontend_path), backend_path, strlen(backend_path));
     xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/frontend", backend_path), frontend_path, strlen(frontend_path));
@@ -353,7 +344,7 @@ int libxl_devices_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
 
 int libxl_device_del(struct libxl_ctx *ctx, libxl_device *dev, int wait)
 {
-    char *dom_path_backend, *backend_path, *hotplug_path;
+    char *dom_path_backend, *backend_path;
     int rc;
     struct libxl_ctx clone;
 
@@ -367,10 +358,6 @@ int libxl_device_del(struct libxl_ctx *ctx, libxl_device *dev, int wait)
                                     dom_path_backend, 
                                     string_of_kinds[dev->backend_kind], 
                                     dev->domid, dev->devid);
-    hotplug_path        = libxl_sprintf(&clone, "/xapi/%d/hotplug/%s/%d",
-                                    dev->domid,
-                                    string_of_kinds[dev->kind], 
-                                    dev->devid);
     libxl_free(&clone, dom_path_backend);
 
     rc = libxl_device_destroy(&clone, backend_path, !wait);
@@ -386,7 +373,6 @@ int libxl_device_del(struct libxl_ctx *ctx, libxl_device *dev, int wait)
         (void)wait_for_dev_destroy(&clone, &tv);
     }
 
-    xs_rm(clone.xsh, XBT_NULL, hotplug_path);
     libxl_ctx_free(&clone);
     return 0;
 }
