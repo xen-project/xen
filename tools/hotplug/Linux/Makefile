@@ -101,8 +101,7 @@ install-udev:
 		$(INSTALL_DIR) $(DESTDIR)$(UDEV_RULES_DIR)/rules.d
 	set -e; for i in $(UDEV_RULES); \
 	    do \
-	    $(INSTALL_DATA) $$i $(DESTDIR)$(UDEV_RULES_DIR); \
-	    ln -sf ../$$i $(DESTDIR)$(UDEV_RULES_DIR)/rules.d; \
+	    $(INSTALL_DATA) $$i $(DESTDIR)$(UDEV_RULES_DIR)/rules.d; \
 	done
 
 .PHONY: clean
