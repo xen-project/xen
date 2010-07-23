@@ -1182,6 +1182,12 @@ start:
             goto error_out;
     }
 
+    /*
+     * Do not attempt to reconnect if we come round again due to a
+     * guest reboot -- the stdin/out will be disconnected by then.
+     */
+    dom_info->console_autoconnect = 0;
+
     ret = libxl_run_bootloader(&ctx, &b_info, num_disks > 0 ? &disks[0] : NULL, domid);
     if (ret) {
         fprintf(stderr, "failed to run bootloader: %d\n", ret);
