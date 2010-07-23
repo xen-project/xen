@@ -1177,7 +1177,7 @@ start:
     }
 
     if (dom_info->console_autoconnect) {
-        ret = autoconnect_console(info1.hvm);
+        ret = autoconnect_console(c_info.hvm);
         if (ret)
             goto error_out;
     }
