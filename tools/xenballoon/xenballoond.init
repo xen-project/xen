@@ -7,7 +7,7 @@
 # Written by: Dan Magenheimer <dan.magenheimer@oracle.com>
 #
 # chkconfig: 2345 98 01
-# description: Starts and stops the Xen control daemon.
+# description: Starts and stops the Xen ballooning daemon.
 ### BEGIN INIT INFO
 # Provides:          xenballoond
 # Required-Start:    $syslog $remote_fs
@@ -17,7 +17,7 @@
 # Default-Start:     3 4 5
 # Default-Stop:      0 1 2 6
 # Default-Enabled:   yes
-# Short-Description: Start/stop xend
+# Short-Description: Start/stop xenballoond
 # Description:       Starts and stops the Xen ballooning daemon.
 ### END INIT INFO
 
