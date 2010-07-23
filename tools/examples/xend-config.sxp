@@ -294,3 +294,11 @@
 # we have to realize this may incur security issue and we can't make sure the
 # device assignment could really work properly even after we do this.
 #(pci-passthrough-strict-check yes)
+
+# If we have a very big scsi device configuration, start of xend is slow,
+# because xend scans all the device paths to build its internal PSCSI device
+# list.  If we need only a few devices for assigning to a guest, we can reduce
+# the scan to this device. Set list list of device paths in same syntax like in
+# command lsscsi, e.g. ('16:0:0:0' '15:0') 
+# (pscsi-device-mask ('*'))
+

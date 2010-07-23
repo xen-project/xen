@@ -326,7 +326,12 @@ class XendNode:
         pscsi_table = {}
         pscsi_HBA_table = {}
 
-        for pscsi_record in vscsi_util.get_all_scsi_devices():
+        pscsi_records = []
+        for pscsi_mask in xendoptions().get_pscsi_device_mask():
+            pscsi_records += vscsi_util.get_all_scsi_devices(pscsi_mask)
+        log.debug("pscsi record count: %s" % len(pscsi_records))
+
+        for pscsi_record in pscsi_records:
             scsi_id = pscsi_record['scsi_id']
             if scsi_id:
                 saved_HBA_uuid = None

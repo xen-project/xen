@@ -148,11 +148,12 @@ def _vscsi_get_scsidevices_by_sysfs():
     return devices
 
 
-def vscsi_get_scsidevices():
+def vscsi_get_scsidevices(mask=""):
     """ get all scsi devices information """
 
-    devices = _vscsi_get_scsidevices_by_lsscsi("")
-    if devices:
+    devices = _vscsi_get_scsidevices_by_lsscsi("[%s]" % mask)
+    if devices or (len(mask) and mask[0] != "*"):
+        # devices found or partial device scan
         return devices
     return _vscsi_get_scsidevices_by_sysfs()
 
@@ -274,9 +275,9 @@ def get_scsi_device(pHCTL):
             return _make_scsi_record(scsi_info)
     return None
 
-def get_all_scsi_devices():
+def get_all_scsi_devices(mask=""):
     scsi_records = []
-    for scsi_info in vscsi_get_scsidevices():
+    for scsi_info in vscsi_get_scsidevices(mask):
         scsi_record = _make_scsi_record(scsi_info)
         scsi_records.append(scsi_record)
     return scsi_records

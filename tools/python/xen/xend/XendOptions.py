@@ -164,6 +164,9 @@ class XendOptions:
         """
         print >>sys.stderr, "xend [ERROR]", fmt % args
 
+    """Default mask for pscsi device scan."""
+    xend_pscsi_device_mask = ['*']
+
 
     def configure(self):
         self.set_config()
@@ -429,6 +432,10 @@ class XendOptions:
     def get_pci_dev_assign_strict_check(self):
         return self.get_config_bool("pci-passthrough-strict-check",
                                     self.pci_dev_assign_strict_check_default)
+
+    def get_pscsi_device_mask(self):
+        return self.get_config_value("pscsi-device-mask",
+                                      self.xend_pscsi_device_mask)
 
 class XendOptionsFile(XendOptions):
 
