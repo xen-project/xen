@@ -26,13 +26,8 @@ LDFLAGS_libxenguest = -L$(XEN_LIBXC) -lxenguest
 CFLAGS_libxenstore = -I$(XEN_XENSTORE) $(CFLAGS_include)
 LDFLAGS_libxenstore = -L$(XEN_XENSTORE) -lxenstore
 
-ifeq ($(CONFIG_Linux),y)
 CFLAGS_libblktapctl = -I$(XEN_BLKTAP2)/control -I$(XEN_BLKTAP2)/include $(CFLAGS_include)
 LDFLAGS_libblktapctl = -L$(XEN_BLKTAP2)/control -lblktapctl
-else
-CFLAGS_libblktapctl =
-LDFLAGS_libblktapctl =
-endif
 
 X11_LDPATH = -L/usr/X11R6/$(LIBLEAFDIR)
 

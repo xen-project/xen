@@ -23,32 +23,11 @@
 
 #define _GNU_SOURCE
 
-#include <libxl_internal.h>
-
 #ifdef NEED_OWN_ASPRINTF
 #include <stdarg.h>
 
 int asprintf(char **buffer, char *fmt, ...);
 int vasprintf(char **buffer, const char *fmt, va_list ap);
 #endif /*NEED_OWN_ASPRINTF*/
-
-/*
- * blktap2 support
- */
-
-/* libxl_blktap_enabled:
- *    return true if blktap/blktap2 support is available.
- */
-int libxl_blktap_enabled(struct libxl_ctx *ctx);
-
-/* libxl_blktap_devpath:
- *    Argument: path and disk image as specified in config file.
- *      The type specifies whether this is aio, qcow, qcow2, etc.
- *    returns device path xenstore wants to have. returns NULL
- *      if no device corresponds to the disk.
- */
-const char *libxl_blktap_devpath(struct libxl_ctx *ctx,
-                                 const char *disk,
-                                 libxl_disk_phystype phystype);
 
 #endif
