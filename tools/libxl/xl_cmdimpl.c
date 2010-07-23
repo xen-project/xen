@@ -1920,13 +1920,16 @@ void list_domains(int verbose)
     }
     printf("Name                                        ID   Mem VCPUs\tState\tTime(s)\n");
     for (i = 0; i < nb_domain; i++) {
-        printf("%-40s %5d %5lu %5d        %c%c%c %8.1f",
+        printf("%-40s %5d %5lu %5d     %c%c%c%c%c%c  %8.1f",
                 libxl_domid_to_name(&ctx, info[i].domid),
                 info[i].domid,
                 (unsigned long) (info[i].max_memkb / 1024),
                 info[i].vcpu_online,
                 info[i].running ? 'r' : '-',
+                info[i].blocked ? 'b' : '-',
                 info[i].paused ? 'p' : '-',
+                info[i].shutdown ? 's' : '-',
+                info[i].crashed ? 'c' : '-',
                 info[i].dying ? 'd' : '-',
                 ((float)info[i].cpu_time / 1e9));
         if (verbose) {

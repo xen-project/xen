@@ -402,17 +402,27 @@ int libxl_domain_resume(struct libxl_ctx *ctx, uint32_t domid)
 }
 
 static void xcinfo2xlinfo(const xc_domaininfo_t *xcinfo,
-                          struct libxl_dominfo *xlinfo) {
+                          struct libxl_dominfo *xlinfo)
+{
+    unsigned int shutdown_reason;
+
     memcpy(&(xlinfo->uuid), xcinfo->handle, sizeof(xen_domain_handle_t));
     xlinfo->domid = xcinfo->domain;
 
-    if (xcinfo->flags & XEN_DOMINF_dying)
-        xlinfo->dying = 1;
-    else if (xcinfo->flags & XEN_DOMINF_paused)
-        xlinfo->paused = 1;
-    else if (xcinfo->flags & XEN_DOMINF_blocked ||
-             xcinfo->flags & XEN_DOMINF_running)
-        xlinfo->running = 1;
+    xlinfo->dying    = !!(xcinfo->flags&XEN_DOMINF_dying);
+    xlinfo->shutdown = !!(xcinfo->flags&XEN_DOMINF_shutdown);
+    xlinfo->paused   = !!(xcinfo->flags&XEN_DOMINF_paused);
+    xlinfo->blocked  = !!(xcinfo->flags&XEN_DOMINF_blocked);
+    xlinfo->running  = !!(xcinfo->flags&XEN_DOMINF_running);
+    xlinfo->crashed  = 0;
+
+    shutdown_reason = (xcinfo->flags>>XEN_DOMINF_shutdownshift) & XEN_DOMINF_shutdownmask;
+
+    if ( xlinfo->shutdown && (shutdown_reason == SHUTDOWN_crash) ) {
+        xlinfo->shutdown = 0;
+        xlinfo->crashed  = 1;
+    }
+
     xlinfo->max_memkb = PAGE_TO_MEMKB(xcinfo->tot_pages);
     xlinfo->cpu_time = xcinfo->cpu_time;
     xlinfo->vcpu_max_id = xcinfo->max_vcpu_id;

@@ -25,9 +25,12 @@
 struct libxl_dominfo {
     uint8_t uuid[16];
     uint32_t domid;
-    uint8_t dying:1;
-    uint8_t paused:1;
     uint8_t running:1;
+    uint8_t blocked:1;
+    uint8_t paused:1;
+    uint8_t shutdown:1;
+    uint8_t crashed:1;
+    uint8_t dying:1;
     uint64_t max_memkb;
     uint64_t cpu_time;
     uint32_t vcpu_max_id;
