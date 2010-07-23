@@ -18,6 +18,8 @@ CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) $(CFLAGS_libxenstore) $(CFL
 LIBS = $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenguest) $(LDFLAGS_libxenstore) $(LDFLAGS_libblktapctl) $(UTIL_LIBS)
 
 LIBXL_OBJS-y = osdeps.o libxl_paths.o libxl_bootloader.o
+LIBXL_OBJS-$(CONFIG_Linux) += libxl_linux.o
+LIBXL_OBJS-$(CONFIG_NetBSD) += libxl_netbsd.o
 LIBXL_OBJS = flexarray.o libxl.o libxl_dom.o libxl_exec.o libxl_xshelp.o libxl_device.o libxl_internal.o xenguest.o libxl_utils.o $(LIBXL_OBJS-y)
 
 AUTOINCS= libxlu_cfg_y.h libxlu_cfg_l.h
@@ -85,7 +87,7 @@ xl_cmdimpl.o: xl_cmdimpl.c
 xl_cmdtable.o: xl_cmdtable.c
 	$(CC) $(CFLAGS) -c xl_cmdtable.c
 
-$(CLIENTS): xl.o xl_cmdimpl.o xl_cmdtable.o libxl_paths.o libxl_bootloader.o libxlutil.so libxenlight.so
+$(CLIENTS): xl.o xl_cmdimpl.o xl_cmdtable.o libxlutil.so libxenlight.so
 	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 .PHONY: install
