@@ -3,10 +3,7 @@ override XEN_TARGET_ARCH=x86_32
 CFLAGS =
 include $(XEN_ROOT)/Config.mk
 
-# Disable PIE/SSP if GCC supports them. They can break us.
-$(call cc-option-add,CFLAGS,CC,-nopie)
-$(call cc-option-add,CFLAGS,CC,-fno-stack-protector)
-$(call cc-option-add,CFLAGS,CC,-fno-stack-protector-all)
+$(call cc-options-add,CFLAGS,CC,$(EMBEDDED_EXTRA_CFLAGS))
 
 CFLAGS += -Werror -fno-builtin -msoft-float
 

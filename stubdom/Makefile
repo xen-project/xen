@@ -58,9 +58,7 @@ CROSS_PREFIX=$(CURDIR)/$(CROSS_ROOT)
 # Disable PIE/SSP if GCC supports them. They can break us.
 TARGET_CFLAGS += $(CFLAGS)
 TARGET_CPPFLAGS += $(CPPFLAGS)
-TARGET_CFLAGS += $(call cc-option,$(CC),-nopie,)
-TARGET_CFLAGS += $(call cc-option,$(CC),-fno-stack-protector,)
-TARGET_CFLAGS += $(call cc-option,$(CC),-fno-stack-protector-all,)
+$(call cc-options-add,TARGET_CFLAGS,CC,$(EMBEDDED_EXTRA_CFLAGS))
 
 # Do not use host headers and libs
 GCC_INSTALL = $(shell LANG=C gcc -print-search-dirs | sed -n -e 's/install: \(.*\)/\1/p')
