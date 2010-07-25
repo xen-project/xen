@@ -59,6 +59,8 @@ define cc-option-add-closure
     endif
 endef
 
+cc-options-add = $(foreach o,$(3),$(call cc-option-add,$(1),$(2),$(o)))
+
 # cc-ver: Check compiler is at least specified version. Return boolean 'y'/'n'.
 # Usage: ifeq ($(call cc-ver,$(CC),0x030400),y)
 cc-ver = $(shell if [ $$((`$(1) -dumpversion | awk -F. \
@@ -133,6 +135,9 @@ $(call cc-option-add,CFLAGS,CC,-Wdeclaration-after-statement)
 
 LDFLAGS += $(foreach i, $(EXTRA_LIB), -L$(i)) 
 CFLAGS += $(foreach i, $(EXTRA_INCLUDES), -I$(i))
+
+EMBEDDED_EXTRA_CFLAGS := -nopie -fno-stack-protector -fno-stack-protector-all
+EMBEDDED_EXTRA_CFLAGS += -fno-exceptions
 
 # Enable XSM security module.  Enabling XSM requires selection of an 
 # XSM security module (FLASK_ENABLE or ACM_SECURITY).

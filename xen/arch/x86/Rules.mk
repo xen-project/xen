@@ -25,10 +25,7 @@ CFLAGS += -I$(BASEDIR)/include/asm-x86/mach-default
 # Prevent floating-point variables from creeping into Xen.
 CFLAGS += -msoft-float
 
-# Disable PIE/SSP if GCC supports them. They can break us.
-$(call cc-option-add,CFLAGS,CC,-nopie)
-$(call cc-option-add,CFLAGS,CC,-fno-stack-protector)
-$(call cc-option-add,CFLAGS,CC,-fno-stack-protector-all)
+$(call cc-options-add,CFLAGS,CC,$(EMBEDDED_EXTRA_CFLAGS))
 
 ifeq ($(supervisor_mode_kernel),y)
 CFLAGS += -DCONFIG_X86_SUPERVISOR_MODE_KERNEL=1
