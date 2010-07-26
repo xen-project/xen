@@ -4,6 +4,17 @@
 #
 # chkconfig: 2345 21 79
 # description: Run domain watchdog daemon
+### BEGIN INIT INFO
+# Provides:          xen-watchdog
+# Required-Start:    xend
+# Should-Start:      $syslog $remote_fs
+# Required-Stop:     xend
+# Should-Stop:       $syslog $remote_fs
+# Default-Start:     3 4 5
+# Default-Stop:      0 1 2 6
+# Short-Description: Start/stop xen-watchdog
+# Description:       Run domain watchdog daemon.
+### END INIT INFO
 #
 
 # Source function library.
