@@ -14,7 +14,6 @@
 # Should-Stop:
 # Default-Start:     3 4 5
 # Default-Stop:      1
-# Default-Enabled:   yes
 # Short-Description: Start/stop xenstored and xenconsoled
 # Description:       Starts and stops the daemons neeeded for xl/xend
 ### END INIT INFO

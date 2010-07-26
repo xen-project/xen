@@ -22,7 +22,6 @@
 # Should-Stop:
 # Default-Start:     3 4 5
 # Default-Stop:      0 1 2 6
-# Default-Enabled:   yes
 # Short-Description: Start/stop secondary xen domains
 # Description:       Start / stop domains automatically when domain 0 
 #                    boots / shuts down.
