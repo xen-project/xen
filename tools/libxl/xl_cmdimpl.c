@@ -708,58 +708,63 @@ static void parse_config_data(const char *configfile_filename_report,
         d_config->num_disks = 0;
         d_config->disks = NULL;
         while ((buf = xlu_cfg_get_listitem (vbds, d_config->num_disks)) != NULL) {
+            libxl_device_disk *disk;
             char *buf2 = strdup(buf);
             char *p, *p2;
+
             d_config->disks = (libxl_device_disk *) realloc(d_config->disks, sizeof (libxl_device_disk) * (d_config->num_disks + 1));
-            d_config->disks[d_config->num_disks].backend_domid = 0;
-            d_config->disks[d_config->num_disks].domid = 0;
-            d_config->disks[d_config->num_disks].unpluggable = 0;
+            disk = d_config->disks + d_config->num_disks;
+
+            disk->backend_domid = 0;
+            disk->domid = 0;
+            disk->unpluggable = 0;
+
             p = strtok(buf2, ",:");
             while (*p == ' ')
                 p++;
             if (!strcmp(p, "phy")) {
-                d_config->disks[d_config->num_disks].phystype = PHYSTYPE_PHY;
+                disk->phystype = PHYSTYPE_PHY;
             } else if (!strcmp(p, "file")) {
-                d_config->disks[d_config->num_disks].phystype = PHYSTYPE_FILE;
+                disk->phystype = PHYSTYPE_FILE;
             } else if (!strcmp(p, "tap")) {
                 p = strtok(NULL, ":");
                 if (!strcmp(p, "aio")) {
-                    d_config->disks[d_config->num_disks].phystype = PHYSTYPE_AIO;
+                    disk->phystype = PHYSTYPE_AIO;
                 } else if (!strcmp(p, "vhd")) {
-                    d_config->disks[d_config->num_disks].phystype = PHYSTYPE_VHD;
+                    disk->phystype = PHYSTYPE_VHD;
                 } else if (!strcmp(p, "qcow")) {
-                    d_config->disks[d_config->num_disks].phystype = PHYSTYPE_QCOW;
+                    disk->phystype = PHYSTYPE_QCOW;
                 } else if (!strcmp(p, "qcow2")) {
-                    d_config->disks[d_config->num_disks].phystype = PHYSTYPE_QCOW2;
+                    disk->phystype = PHYSTYPE_QCOW2;
                 }
             }
             p = strtok(NULL, ",");
             while (*p == ' ')
                 p++;
-            d_config->disks[d_config->num_disks].physpath= strdup(p);
+            disk->physpath= strdup(p);
             p = strtok(NULL, ",");
             while (*p == ' ')
                 p++;
             p2 = strchr(p, ':');
             if (p2 == NULL) {
-                d_config->disks[d_config->num_disks].virtpath = strdup(p);
-                d_config->disks[d_config->num_disks].is_cdrom = 0;
-                d_config->disks[d_config->num_disks].unpluggable = 1;
+                disk->virtpath = strdup(p);
+                disk->is_cdrom = 0;
+                disk->unpluggable = 1;
             } else {
                 *p2 = '\0';
-                d_config->disks[d_config->num_disks].virtpath = strdup(p);
+                disk->virtpath = strdup(p);
                 if (!strcmp(p2 + 1, "cdrom")) {
-                    d_config->disks[d_config->num_disks].is_cdrom = 1;
-                    d_config->disks[d_config->num_disks].unpluggable = 1;
+                    disk->is_cdrom = 1;
+                    disk->unpluggable = 1;
                 } else
-                    d_config->disks[d_config->num_disks].is_cdrom = 0;
+                    disk->is_cdrom = 0;
             }
             p = strtok(NULL, ",");
             while (*p == ' ')
                 p++;
-            d_config->disks[d_config->num_disks].readwrite = (p[0] == 'w') ? 1 : 0;
+            disk->readwrite = (p[0] == 'w') ? 1 : 0;
             free(buf2);
-            d_config->num_disks = d_config->num_disks + 1;
+            d_config->num_disks++;
         }
     }
 
@@ -767,10 +772,14 @@ static void parse_config_data(const char *configfile_filename_report,
         d_config->num_vifs = 0;
         d_config->vifs = NULL;
         while ((buf = xlu_cfg_get_listitem (nics, d_config->num_vifs)) != NULL) {
+            libxl_device_nic *nic;
             char *buf2 = strdup(buf);
             char *p, *p2;
+
             d_config->vifs = (libxl_device_nic *) realloc(d_config->vifs, sizeof (libxl_device_nic) * (d_config->num_vifs+1));
-            init_nic_info(d_config->vifs + d_config->num_vifs, d_config->num_vifs);
+            nic = d_config->vifs + d_config->num_vifs;
+            init_nic_info(nic, d_config->num_vifs);
+
             p = strtok(buf2, ",");
             if (!p)
                 goto skip;
@@ -781,39 +790,39 @@ static void parse_config_data(const char *configfile_filename_report,
                     break;
                 *p2 = '\0';
                 if (!strcmp(p, "model")) {
-                    d_config->vifs[d_config->num_vifs].model = strdup(p2 + 1);
+                    nic->model = strdup(p2 + 1);
                 } else if (!strcmp(p, "mac")) {
                     char *p3 = p2 + 1;
                     *(p3 + 2) = '\0';
-                    d_config->vifs[d_config->num_vifs].mac[0] = strtol(p3, NULL, 16);
+                    nic->mac[0] = strtol(p3, NULL, 16);
                     p3 = p3 + 3;
                     *(p3 + 2) = '\0';
-                    d_config->vifs[d_config->num_vifs].mac[1] = strtol(p3, NULL, 16);
+                    nic->mac[1] = strtol(p3, NULL, 16);
                     p3 = p3 + 3;
                     *(p3 + 2) = '\0';
-                    d_config->vifs[d_config->num_vifs].mac[2] = strtol(p3, NULL, 16);
+                    nic->mac[2] = strtol(p3, NULL, 16);
                     p3 = p3 + 3;
                     *(p3 + 2) = '\0';
-                    d_config->vifs[d_config->num_vifs].mac[3] = strtol(p3, NULL, 16);
+                    nic->mac[3] = strtol(p3, NULL, 16);
                     p3 = p3 + 3;
                     *(p3 + 2) = '\0';
-                    d_config->vifs[d_config->num_vifs].mac[4] = strtol(p3, NULL, 16);
+                    nic->mac[4] = strtol(p3, NULL, 16);
                     p3 = p3 + 3;
                     *(p3 + 2) = '\0';
-                    d_config->vifs[d_config->num_vifs].mac[5] = strtol(p3, NULL, 16);
+                    nic->mac[5] = strtol(p3, NULL, 16);
                 } else if (!strcmp(p, "bridge")) {
-                    d_config->vifs[d_config->num_vifs].bridge = strdup(p2 + 1);
+                    nic->bridge = strdup(p2 + 1);
                 } else if (!strcmp(p, "type")) {
                     if (!strcmp(p2 + 1, "ioemu"))
-                        d_config->vifs[d_config->num_vifs].nictype = NICTYPE_IOEMU;
+                        nic->nictype = NICTYPE_IOEMU;
                     else
-                        d_config->vifs[d_config->num_vifs].nictype = NICTYPE_VIF;
+                        nic->nictype = NICTYPE_VIF;
                 } else if (!strcmp(p, "ip")) {
-                    inet_pton(AF_INET, p2 + 1, &d_config->vifs[d_config->num_vifs].ip);
+                    inet_pton(AF_INET, p2 + 1, &nic->ip);
                 } else if (!strcmp(p, "script")) {
-                    d_config->vifs[d_config->num_vifs].script = strdup(p2 + 1);
+                    nic->script = strdup(p2 + 1);
                 } else if (!strcmp(p, "vifname")) {
-                    d_config->vifs[d_config->num_vifs].ifname = strdup(p2 + 1);
+                    nic->ifname = strdup(p2 + 1);
                 } else if (!strcmp(p, "rate")) {
                     fprintf(stderr, "the rate parameter for vifs is currently not supported\n");
                 } else if (!strcmp(p, "accel")) {
@@ -822,7 +831,7 @@ static void parse_config_data(const char *configfile_filename_report,
             } while ((p = strtok(NULL, ",")) != NULL);
 skip:
             free(buf2);
-            d_config->num_vifs = d_config->num_vifs + 1;
+            d_config->num_vifs++;
         }
     }
 
@@ -830,39 +839,42 @@ skip:
         d_config->num_vif2s = 0;
         d_config->vif2s = NULL;
         while ((buf = xlu_cfg_get_listitem(net2s, d_config->num_vif2s))) {
+            libxl_device_net2 *net2;
             char *buf2 = strdup(buf);
             char *p;
 
             d_config->vif2s = realloc(d_config->vif2s, sizeof (libxl_device_net2) * (d_config->num_vif2s + 1));
-            init_net2_info(d_config->vif2s + d_config->num_vif2s, d_config->num_vif2s);
+            net2 = d_config->vif2s + d_config->num_vif2s;
+
+            init_net2_info(net2, d_config->num_vif2s);
 
             for (p = strtok(buf2, ","); p; p = strtok(buf2, ",")) {
                 while (isblank(*p))
                     p++;
                 if (!strncmp("front_mac=", p, 10)) {
-                    libxl_strtomac(p + 10, d_config->vif2s[d_config->num_vif2s].front_mac);
+                    libxl_strtomac(p + 10, net2->front_mac);
                 } else if (!strncmp("back_mac=", p, 9)) {
-                    libxl_strtomac(p + 9, d_config->vif2s[d_config->num_vif2s].back_mac);
+                    libxl_strtomac(p + 9, net2->back_mac);
                 } else if (!strncmp("backend=", p, 8)) {
-                    domain_qualifier_to_domid(p + 8, &d_config->vif2s[d_config->num_vif2s].backend_domid, 0);
+                    domain_qualifier_to_domid(p + 8, &net2->backend_domid, 0);
                 } else if (!strncmp("trusted=", p, 8)) {
-                    d_config->vif2s[d_config->num_vif2s].trusted = (*(p + 8) == '1');
+                    net2->trusted = (*(p + 8) == '1');
                 } else if (!strncmp("back_trusted=", p, 13)) {
-                    d_config->vif2s[d_config->num_vif2s].back_trusted = (*(p + 13) == '1');
+                    net2->back_trusted = (*(p + 13) == '1');
                 } else if (!strncmp("bridge=", p, 7)) {
-                    d_config->vif2s[d_config->num_vif2s].bridge = strdup(p + 13);
+                    net2->bridge = strdup(p + 13);
                 } else if (!strncmp("filter_mac=", p, 11)) {
-                    d_config->vif2s[d_config->num_vif2s].filter_mac = (*(p + 11) == '1');
+                    net2->filter_mac = (*(p + 11) == '1');
                 } else if (!strncmp("front_filter_mac=", p, 17)) {
-                    d_config->vif2s[d_config->num_vif2s].front_filter_mac = (*(p + 17) == '1');
+                    net2->front_filter_mac = (*(p + 17) == '1');
                 } else if (!strncmp("pdev=", p, 5)) {
-                    d_config->vif2s[d_config->num_vif2s].pdev = strtoul(p + 5, NULL, 10);
+                    net2->pdev = strtoul(p + 5, NULL, 10);
                 } else if (!strncmp("max_bypasses=", p, 13)) {
-                    d_config->vif2s[d_config->num_vif2s].max_bypasses = strtoul(p + 13, NULL, 10);
+                    net2->max_bypasses = strtoul(p + 13, NULL, 10);
                 }
             }
             free(buf2);
-            ++d_config->num_vif2s;
+            d_config->num_vif2s++;
         }
     }
 
@@ -872,13 +884,19 @@ skip:
         d_config->vfbs = NULL;
         d_config->vkbs = NULL;
         while ((buf = xlu_cfg_get_listitem (cvfbs, d_config->num_vfbs)) != NULL) {
+            libxl_device_vfb *vfb;
+            libxl_device_vkb *vkb;
+
             char *buf2 = strdup(buf);
             char *p, *p2;
+
             d_config->vfbs = (libxl_device_vfb *) realloc(d_config->vfbs, sizeof(libxl_device_vfb) * (d_config->num_vfbs + 1));
-            init_vfb_info(d_config->vfbs + d_config->num_vfbs, d_config->num_vfbs);
+            vfb = d_config->vfbs + d_config->num_vfbs;
+            init_vfb_info(vfb, d_config->num_vfbs);
 
             d_config->vkbs = (libxl_device_vkb *) realloc(d_config->vkbs, sizeof(libxl_device_vkb) * (d_config->num_vkbs + 1));
-            init_vkb_info(d_config->vkbs + d_config->num_vkbs, d_config->num_vkbs);
+            vkb = d_config->vkbs + d_config->num_vkbs;
+            init_vkb_info(vkb, d_config->num_vkbs);
 
             p = strtok(buf2, ",");
             if (!p)
@@ -890,31 +908,31 @@ skip:
                     break;
                 *p2 = '\0';
                 if (!strcmp(p, "vnc")) {
-                    d_config->vfbs[d_config->num_vfbs].vnc = atoi(p2 + 1);
+                    vfb->vnc = atoi(p2 + 1);
                 } else if (!strcmp(p, "vnclisten")) {
-                    d_config->vfbs[d_config->num_vfbs].vnclisten = strdup(p2 + 1);
+                    vfb->vnclisten = strdup(p2 + 1);
                 } else if (!strcmp(p, "vncpasswd")) {
-                    d_config->vfbs[d_config->num_vfbs].vncpasswd = strdup(p2 + 1);
+                    vfb->vncpasswd = strdup(p2 + 1);
                 } else if (!strcmp(p, "vncdisplay")) {
-                    d_config->vfbs[d_config->num_vfbs].vncdisplay = atoi(p2 + 1);
+                    vfb->vncdisplay = atoi(p2 + 1);
                 } else if (!strcmp(p, "vncunused")) {
-                    d_config->vfbs[d_config->num_vfbs].vncunused = atoi(p2 + 1);
+                    vfb->vncunused = atoi(p2 + 1);
                 } else if (!strcmp(p, "keymap")) {
-                    d_config->vfbs[d_config->num_vfbs].keymap = strdup(p2 + 1);
+                    vfb->keymap = strdup(p2 + 1);
                 } else if (!strcmp(p, "sdl")) {
-                    d_config->vfbs[d_config->num_vfbs].sdl = atoi(p2 + 1);
+                    vfb->sdl = atoi(p2 + 1);
                 } else if (!strcmp(p, "opengl")) {
-                    d_config->vfbs[d_config->num_vfbs].opengl = atoi(p2 + 1);
+                    vfb->opengl = atoi(p2 + 1);
                 } else if (!strcmp(p, "display")) {
-                    d_config->vfbs[d_config->num_vfbs].display = strdup(p2 + 1);
+                    vfb->display = strdup(p2 + 1);
                 } else if (!strcmp(p, "xauthority")) {
-                    d_config->vfbs[d_config->num_vfbs].xauthority = strdup(p2 + 1);
+                    vfb->xauthority = strdup(p2 + 1);
                 }
             } while ((p = strtok(NULL, ",")) != NULL);
 skip_vfb:
             free(buf2);
-            d_config->num_vfbs = d_config->num_vfbs + 1;
-            d_config->num_vkbs = d_config->num_vkbs + 1;
+            d_config->num_vfbs++;
+            d_config->num_vkbs++;
         }
     }
 
@@ -928,11 +946,15 @@ skip_vfb:
         d_config->num_pcidevs = 0;
         d_config->pcidevs = NULL;
         while ((buf = xlu_cfg_get_listitem (pcis, d_config->num_pcidevs)) != NULL) {
+            libxl_device_pci *pcidev;
             unsigned int domain = 0, bus = 0, dev = 0, func = 0, vdevfn = 0;
             char *buf2 = strdup(buf);
             char *p;
+
             d_config->pcidevs = (libxl_device_pci *) realloc(d_config->pcidevs, sizeof (libxl_device_pci) * (d_config->num_pcidevs + 1));
-            memset(d_config->pcidevs + d_config->num_pcidevs, 0x00, sizeof(libxl_device_pci));
+            pcidev = d_config->pcidevs + d_config->num_pcidevs;
+            memset(pcidev, 0x00, sizeof(libxl_device_pci));
+
             p = strtok(buf2, ",");
             if (!p)
                 goto skip_pci;
@@ -943,21 +965,22 @@ skip_vfb:
                     goto skip_pci;
                 }
             }
-            libxl_device_pci_init(d_config->pcidevs + d_config->num_pcidevs, domain, bus, dev, func, vdevfn);
-            d_config->pcidevs[d_config->num_pcidevs].msitranslate = pci_msitranslate;
-            d_config->pcidevs[d_config->num_pcidevs].power_mgmt = pci_power_mgmt;
+
+            libxl_device_pci_init(pcidev, domain, bus, dev, func, vdevfn);
+            pcidev->msitranslate = pci_msitranslate;
+            pcidev->power_mgmt = pci_power_mgmt;
             while ((p = strtok(NULL, ",=")) != NULL) {
                 while (*p == ' ')
                     p++;
                 if (!strcmp(p, "msitranslate")) {
                     p = strtok(NULL, ",=");
-                    d_config->pcidevs[d_config->num_pcidevs].msitranslate = atoi(p);
+                    pcidev->msitranslate = atoi(p);
                 } else if (!strcmp(p, "power_mgmt")) {
                     p = strtok(NULL, ",=");
-                    d_config->pcidevs[d_config->num_pcidevs].power_mgmt = atoi(p);
+                    pcidev->power_mgmt = atoi(p);
                 }
             }
-            d_config->num_pcidevs = d_config->num_pcidevs + 1;
+            d_config->num_pcidevs++;
 skip_pci:
             free(buf2);
         }
