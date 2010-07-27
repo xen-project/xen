@@ -41,6 +41,7 @@ from xen.util.pci import pci_opts_list_from_sxp, pci_convert_sxp_to_dict
 from xen.xend.XendSXPDev import dev_dict_to_sxp
 from xen.util import xsconstants
 from xen.util import auxbin
+from xen.xend.XendAPIConstants import *
 import xen.util.fileuri
 
 log = logging.getLogger("xend.XendConfig")
@@ -61,6 +62,11 @@ def reverse_dict(adict):
 
 def bool0(v):
     return v != '0' and v != 'False' and bool(v)
+
+def convert_on_crash(v):
+    v = str(v)
+    return XEN_API_ON_CRASH_BEHAVIOUR_LEGACY[v] \
+            if v in XEN_API_ON_CRASH_BEHAVIOUR else v
 
 # Recursively copy a data struct, scrubbing out VNC passwords.
 # Will scrub any dict entry with a key of 'vncpasswd' or any
@@ -212,7 +218,7 @@ XENAPI_CFG_TYPES = {
     'VCPUs_live': int,
     'actions_after_shutdown': str,
     'actions_after_reboot': str,
-    'actions_after_crash': str,
+    'actions_after_crash': convert_on_crash,
     'PV_bootloader': str,
     'PV_kernel': str,
     'PV_ramdisk': str,

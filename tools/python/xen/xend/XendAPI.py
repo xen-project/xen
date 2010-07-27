@@ -1701,7 +1701,8 @@ class XendAPI(object):
     def VM_set_actions_after_crash(self, session, vm_ref, action):
         if action not in XEN_API_ON_CRASH_BEHAVIOUR:
             return xen_api_error(['VM_ON_CRASH_BEHAVIOUR_INVALID', vm_ref])
-        return self.VM_set('actions_after_crash', session, vm_ref, action)
+        return self.VM_set('actions_after_crash', session, vm_ref,
+                XEN_API_ON_CRASH_BEHAVIOUR_LEGACY[action])
 
     def VM_set_HVM_boot_policy(self, session, vm_ref, value):
         if value != "" and value != "BIOS order":

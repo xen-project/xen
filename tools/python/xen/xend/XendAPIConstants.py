@@ -63,6 +63,18 @@ XEN_API_ON_CRASH_BEHAVIOUR_FILTER = {
     'rename_restart' : 'rename_restart',
 }
 
+XEN_API_ON_CRASH_BEHAVIOUR_LEGACY = {
+    'destroy' : 'destroy',
+    'coredump-destroy' : 'coredump-destroy',
+    'coredump_and_destroy' : 'coredump-destroy',
+    'restart' : 'restart',
+    'coredump-restart' : 'coredump-restart',
+    'coredump_and_restart' : 'coredump-restart',
+    'preserve' : 'preserve',
+    'rename-restart' : 'rename-restart',
+    'rename_restart' : 'rename-restart',
+}
+
 XEN_API_VBD_MODE = ['RO', 'RW']
 XEN_API_VDI_TYPE = ['system', 'user', 'ephemeral']
 XEN_API_VBD_TYPE = ['CD', 'Disk']
