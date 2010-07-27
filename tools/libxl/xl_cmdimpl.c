@@ -128,6 +128,15 @@ struct domain_config {
     libxl_domain_create_info c_info;
     libxl_domain_build_info b_info;
 
+    int num_disks, num_vifs, num_vif2s, num_pcidevs, num_vfbs, num_vkbs;
+
+    libxl_device_disk *disks;
+    libxl_device_nic *vifs;
+    libxl_device_net2 *vif2s;
+    libxl_device_pci *pcidevs;
+    libxl_device_vfb *vfbs;
+    libxl_device_vkb *vkbs;
+
     enum action_on_shutdown on_poweroff;
     enum action_on_shutdown on_reboot;
     enum action_on_shutdown on_watchdog;
@@ -358,16 +367,6 @@ static void init_console_info(libxl_device_console *console, int dev_num, libxl_
 
 static void printf_info(int domid,
                         struct domain_config *d_config,
-                        libxl_device_disk *disks,
-                        int num_disks,
-                        libxl_device_nic *vifs,
-                        int num_vifs,
-                        libxl_device_pci *pcidevs,
-                        int num_pcidevs,
-                        libxl_device_vfb *vfbs,
-                        int num_vfbs,
-                        libxl_device_vkb *vkb,
-                        int num_vkbs,
                         libxl_device_model_info *dm_info)
 {
     int i;
@@ -452,58 +451,66 @@ static void printf_info(int domid,
     }
     printf("\t)\n");
 
-    for (i = 0; i < num_disks; i++) {
+    for (i = 0; i < d_config->num_disks; i++) {
         printf("\t(device\n");
         printf("\t\t(tap\n");
-        printf("\t\t\t(backend_domid %d)\n", disks[i].backend_domid);
-        printf("\t\t\t(domid %d)\n", disks[i].domid);
-        printf("\t\t\t(physpath %s)\n", disks[i].physpath);
-        printf("\t\t\t(phystype %d)\n", disks[i].phystype);
-        printf("\t\t\t(virtpath %s)\n", disks[i].virtpath);
-        printf("\t\t\t(unpluggable %d)\n", disks[i].unpluggable);
-        printf("\t\t\t(readwrite %d)\n", disks[i].readwrite);
-        printf("\t\t\t(is_cdrom %d)\n", disks[i].is_cdrom);
+        printf("\t\t\t(backend_domid %d)\n", d_config->disks[i].backend_domid);
+        printf("\t\t\t(domid %d)\n", d_config->disks[i].domid);
+        printf("\t\t\t(physpath %s)\n", d_config->disks[i].physpath);
+        printf("\t\t\t(phystype %d)\n", d_config->disks[i].phystype);
+        printf("\t\t\t(virtpath %s)\n", d_config->disks[i].virtpath);
+        printf("\t\t\t(unpluggable %d)\n", d_config->disks[i].unpluggable);
+        printf("\t\t\t(readwrite %d)\n", d_config->disks[i].readwrite);
+        printf("\t\t\t(is_cdrom %d)\n", d_config->disks[i].is_cdrom);
         printf("\t\t)\n");
         printf("\t)\n");
     }
 
-    for (i = 0; i < num_vifs; i++) {
+    for (i = 0; i < d_config->num_vifs; i++) {
         printf("\t(device\n");
         printf("\t\t(vif\n");
-        printf("\t\t\t(backend_domid %d)\n", vifs[i].backend_domid);
-        printf("\t\t\t(domid %d)\n", vifs[i].domid);
-        printf("\t\t\t(devid %d)\n", vifs[i].devid);
-        printf("\t\t\t(mtu %d)\n", vifs[i].mtu);
-        printf("\t\t\t(model %s)\n", vifs[i].model);
-        printf("\t\t\t(mac %02x%02x%02x%02x%02x%02x)\n", vifs[i].mac[0], vifs[i].mac[1], vifs[i].mac[2], vifs[i].mac[3], vifs[i].mac[4], vifs[i].mac[5]);
+        printf("\t\t\t(backend_domid %d)\n", d_config->vifs[i].backend_domid);
+        printf("\t\t\t(domid %d)\n", d_config->vifs[i].domid);
+        printf("\t\t\t(devid %d)\n", d_config->vifs[i].devid);
+        printf("\t\t\t(mtu %d)\n", d_config->vifs[i].mtu);
+        printf("\t\t\t(model %s)\n", d_config->vifs[i].model);
+        printf("\t\t\t(mac %02x%02x%02x%02x%02x%02x)\n",
+               d_config->vifs[i].mac[0], d_config->vifs[i].mac[1],
+               d_config->vifs[i].mac[2], d_config->vifs[i].mac[3],
+               d_config->vifs[i].mac[4], d_config->vifs[i].mac[5]);
         printf("\t\t)\n");
         printf("\t)\n");
     }
 
-    for (i = 0; i < num_pcidevs; i++) {
+    for (i = 0; i < d_config->num_pcidevs; i++) {
         printf("\t(device\n");
         printf("\t\t(pci\n");
-        printf("\t\t\t(pci dev "PCI_BDF_VDEVFN")\n", pcidevs[i].domain, pcidevs[i].bus, pcidevs[i].dev, pcidevs[i].func, pcidevs[i].vdevfn);
-        printf("\t\t\t(opts msitranslate %d power_mgmt %d)\n", pcidevs[i].msitranslate, pcidevs[i].power_mgmt);
+        printf("\t\t\t(pci dev "PCI_BDF_VDEVFN")\n",
+               d_config->pcidevs[i].domain, d_config->pcidevs[i].bus,
+               d_config->pcidevs[i].dev, d_config->pcidevs[i].func,
+               d_config->pcidevs[i].vdevfn);
+        printf("\t\t\t(opts msitranslate %d power_mgmt %d)\n",
+               d_config->pcidevs[i].msitranslate,
+               d_config->pcidevs[i].power_mgmt);
         printf("\t\t)\n");
         printf("\t)\n");
     }
 
-    for (i = 0; i < num_vfbs; i++) {
+    for (i = 0; i < d_config->num_vfbs; i++) {
         printf("\t(device\n");
         printf("\t\t(vfb\n");
-        printf("\t\t\t(backend_domid %d)\n", vfbs[i].backend_domid);
-        printf("\t\t\t(domid %d)\n", vfbs[i].domid);
-        printf("\t\t\t(devid %d)\n", vfbs[i].devid);
-        printf("\t\t\t(vnc %d)\n", vfbs[i].vnc);
-        printf("\t\t\t(vnclisten %s)\n", vfbs[i].vnclisten);
-        printf("\t\t\t(vncdisplay %d)\n", vfbs[i].vncdisplay);
-        printf("\t\t\t(vncunused %d)\n", vfbs[i].vncunused);
-        printf("\t\t\t(keymap %s)\n", vfbs[i].keymap);
-        printf("\t\t\t(sdl %d)\n", vfbs[i].sdl);
-        printf("\t\t\t(opengl %d)\n", vfbs[i].opengl);
-        printf("\t\t\t(display %s)\n", vfbs[i].display);
-        printf("\t\t\t(xauthority %s)\n", vfbs[i].xauthority);
+        printf("\t\t\t(backend_domid %d)\n", d_config->vfbs[i].backend_domid);
+        printf("\t\t\t(domid %d)\n", d_config->vfbs[i].domid);
+        printf("\t\t\t(devid %d)\n", d_config->vfbs[i].devid);
+        printf("\t\t\t(vnc %d)\n", d_config->vfbs[i].vnc);
+        printf("\t\t\t(vnclisten %s)\n", d_config->vfbs[i].vnclisten);
+        printf("\t\t\t(vncdisplay %d)\n", d_config->vfbs[i].vncdisplay);
+        printf("\t\t\t(vncunused %d)\n", d_config->vfbs[i].vncunused);
+        printf("\t\t\t(keymap %s)\n", d_config->vfbs[i].keymap);
+        printf("\t\t\t(sdl %d)\n", d_config->vfbs[i].sdl);
+        printf("\t\t\t(opengl %d)\n", d_config->vfbs[i].opengl);
+        printf("\t\t\t(display %s)\n", d_config->vfbs[i].display);
+        printf("\t\t\t(xauthority %s)\n", d_config->vfbs[i].xauthority);
         printf("\t\t)\n");
         printf("\t)\n");
     }
@@ -530,18 +537,6 @@ static void parse_config_data(const char *configfile_filename_report,
                               const char *configfile_data,
                               int configfile_len,
                               struct domain_config *d_config,
-                              libxl_device_disk **disks,
-                              int *num_disks,
-                              libxl_device_nic **vifs,
-                              int *num_vifs,
-                              libxl_device_net2 **vif2s,
-                              int *num_vif2s,
-                              libxl_device_pci **pcidevs,
-                              int *num_pcidevs,
-                              libxl_device_vfb **vfbs,
-                              int *num_vfbs,
-                              libxl_device_vkb **vkbs,
-                              int *num_vkbs,
                               libxl_device_model_info *dm_info)
 {
     const char *buf;
@@ -710,72 +705,72 @@ static void parse_config_data(const char *configfile_filename_report,
     }
 
     if (!xlu_cfg_get_list (config, "disk", &vbds, 0)) {
-        *num_disks = 0;
-        *disks = NULL;
-        while ((buf = xlu_cfg_get_listitem (vbds, *num_disks)) != NULL) {
+        d_config->num_disks = 0;
+        d_config->disks = NULL;
+        while ((buf = xlu_cfg_get_listitem (vbds, d_config->num_disks)) != NULL) {
             char *buf2 = strdup(buf);
             char *p, *p2;
-            *disks = (libxl_device_disk *) realloc(*disks, sizeof (libxl_device_disk) * ((*num_disks) + 1));
-            (*disks)[*num_disks].backend_domid = 0;
-            (*disks)[*num_disks].domid = 0;
-            (*disks)[*num_disks].unpluggable = 0;
+            d_config->disks = (libxl_device_disk *) realloc(d_config->disks, sizeof (libxl_device_disk) * (d_config->num_disks + 1));
+            d_config->disks[d_config->num_disks].backend_domid = 0;
+            d_config->disks[d_config->num_disks].domid = 0;
+            d_config->disks[d_config->num_disks].unpluggable = 0;
             p = strtok(buf2, ",:");
             while (*p == ' ')
                 p++;
             if (!strcmp(p, "phy")) {
-                (*disks)[*num_disks].phystype = PHYSTYPE_PHY;
+                d_config->disks[d_config->num_disks].phystype = PHYSTYPE_PHY;
             } else if (!strcmp(p, "file")) {
-                (*disks)[*num_disks].phystype = PHYSTYPE_FILE;
+                d_config->disks[d_config->num_disks].phystype = PHYSTYPE_FILE;
             } else if (!strcmp(p, "tap")) {
                 p = strtok(NULL, ":");
                 if (!strcmp(p, "aio")) {
-                    (*disks)[*num_disks].phystype = PHYSTYPE_AIO;
+                    d_config->disks[d_config->num_disks].phystype = PHYSTYPE_AIO;
                 } else if (!strcmp(p, "vhd")) {
-                    (*disks)[*num_disks].phystype = PHYSTYPE_VHD;
+                    d_config->disks[d_config->num_disks].phystype = PHYSTYPE_VHD;
                 } else if (!strcmp(p, "qcow")) {
-                    (*disks)[*num_disks].phystype = PHYSTYPE_QCOW;
+                    d_config->disks[d_config->num_disks].phystype = PHYSTYPE_QCOW;
                 } else if (!strcmp(p, "qcow2")) {
-                    (*disks)[*num_disks].phystype = PHYSTYPE_QCOW2;
+                    d_config->disks[d_config->num_disks].phystype = PHYSTYPE_QCOW2;
                 }
             }
             p = strtok(NULL, ",");
             while (*p == ' ')
                 p++;
-            (*disks)[*num_disks].physpath= strdup(p);
+            d_config->disks[d_config->num_disks].physpath= strdup(p);
             p = strtok(NULL, ",");
             while (*p == ' ')
                 p++;
             p2 = strchr(p, ':');
             if (p2 == NULL) {
-                (*disks)[*num_disks].virtpath = strdup(p);
-                (*disks)[*num_disks].is_cdrom = 0;
-                (*disks)[*num_disks].unpluggable = 1;
+                d_config->disks[d_config->num_disks].virtpath = strdup(p);
+                d_config->disks[d_config->num_disks].is_cdrom = 0;
+                d_config->disks[d_config->num_disks].unpluggable = 1;
             } else {
                 *p2 = '\0';
-                (*disks)[*num_disks].virtpath = strdup(p);
+                d_config->disks[d_config->num_disks].virtpath = strdup(p);
                 if (!strcmp(p2 + 1, "cdrom")) {
-                    (*disks)[*num_disks].is_cdrom = 1;
-                    (*disks)[*num_disks].unpluggable = 1;
+                    d_config->disks[d_config->num_disks].is_cdrom = 1;
+                    d_config->disks[d_config->num_disks].unpluggable = 1;
                 } else
-                    (*disks)[*num_disks].is_cdrom = 0;
+                    d_config->disks[d_config->num_disks].is_cdrom = 0;
             }
             p = strtok(NULL, ",");
             while (*p == ' ')
                 p++;
-            (*disks)[*num_disks].readwrite = (p[0] == 'w') ? 1 : 0;
+            d_config->disks[d_config->num_disks].readwrite = (p[0] == 'w') ? 1 : 0;
             free(buf2);
-            *num_disks = (*num_disks) + 1;
+            d_config->num_disks = d_config->num_disks + 1;
         }
     }
 
     if (!xlu_cfg_get_list (config, "vif", &nics, 0)) {
-        *num_vifs = 0;
-        *vifs = NULL;
-        while ((buf = xlu_cfg_get_listitem (nics, *num_vifs)) != NULL) {
+        d_config->num_vifs = 0;
+        d_config->vifs = NULL;
+        while ((buf = xlu_cfg_get_listitem (nics, d_config->num_vifs)) != NULL) {
             char *buf2 = strdup(buf);
             char *p, *p2;
-            *vifs = (libxl_device_nic *) realloc(*vifs, sizeof (libxl_device_nic) * ((*num_vifs) + 1));
-            init_nic_info((*vifs) + (*num_vifs), (*num_vifs));
+            d_config->vifs = (libxl_device_nic *) realloc(d_config->vifs, sizeof (libxl_device_nic) * (d_config->num_vifs+1));
+            init_nic_info(d_config->vifs + d_config->num_vifs, d_config->num_vifs);
             p = strtok(buf2, ",");
             if (!p)
                 goto skip;
@@ -786,39 +781,39 @@ static void parse_config_data(const char *configfile_filename_report,
                     break;
                 *p2 = '\0';
                 if (!strcmp(p, "model")) {
-                    (*vifs)[*num_vifs].model = strdup(p2 + 1);
+                    d_config->vifs[d_config->num_vifs].model = strdup(p2 + 1);
                 } else if (!strcmp(p, "mac")) {
                     char *p3 = p2 + 1;
                     *(p3 + 2) = '\0';
-                    (*vifs)[*num_vifs].mac[0] = strtol(p3, NULL, 16);
+                    d_config->vifs[d_config->num_vifs].mac[0] = strtol(p3, NULL, 16);
                     p3 = p3 + 3;
                     *(p3 + 2) = '\0';
-                    (*vifs)[*num_vifs].mac[1] = strtol(p3, NULL, 16);
+                    d_config->vifs[d_config->num_vifs].mac[1] = strtol(p3, NULL, 16);
                     p3 = p3 + 3;
                     *(p3 + 2) = '\0';
-                    (*vifs)[*num_vifs].mac[2] = strtol(p3, NULL, 16);
+                    d_config->vifs[d_config->num_vifs].mac[2] = strtol(p3, NULL, 16);
                     p3 = p3 + 3;
                     *(p3 + 2) = '\0';
-                    (*vifs)[*num_vifs].mac[3] = strtol(p3, NULL, 16);
+                    d_config->vifs[d_config->num_vifs].mac[3] = strtol(p3, NULL, 16);
                     p3 = p3 + 3;
                     *(p3 + 2) = '\0';
-                    (*vifs)[*num_vifs].mac[4] = strtol(p3, NULL, 16);
+                    d_config->vifs[d_config->num_vifs].mac[4] = strtol(p3, NULL, 16);
                     p3 = p3 + 3;
                     *(p3 + 2) = '\0';
-                    (*vifs)[*num_vifs].mac[5] = strtol(p3, NULL, 16);
+                    d_config->vifs[d_config->num_vifs].mac[5] = strtol(p3, NULL, 16);
                 } else if (!strcmp(p, "bridge")) {
-                    (*vifs)[*num_vifs].bridge = strdup(p2 + 1);
+                    d_config->vifs[d_config->num_vifs].bridge = strdup(p2 + 1);
                 } else if (!strcmp(p, "type")) {
                     if (!strcmp(p2 + 1, "ioemu"))
-                        (*vifs)[*num_vifs].nictype = NICTYPE_IOEMU;
+                        d_config->vifs[d_config->num_vifs].nictype = NICTYPE_IOEMU;
                     else
-                        (*vifs)[*num_vifs].nictype = NICTYPE_VIF;
+                        d_config->vifs[d_config->num_vifs].nictype = NICTYPE_VIF;
                 } else if (!strcmp(p, "ip")) {
-                    inet_pton(AF_INET, p2 + 1, &((*vifs)[*num_vifs].ip));
+                    inet_pton(AF_INET, p2 + 1, &d_config->vifs[d_config->num_vifs].ip);
                 } else if (!strcmp(p, "script")) {
-                    (*vifs)[*num_vifs].script = strdup(p2 + 1);
+                    d_config->vifs[d_config->num_vifs].script = strdup(p2 + 1);
                 } else if (!strcmp(p, "vifname")) {
-                    (*vifs)[*num_vifs].ifname = strdup(p2 + 1);
+                    d_config->vifs[d_config->num_vifs].ifname = strdup(p2 + 1);
                 } else if (!strcmp(p, "rate")) {
                     fprintf(stderr, "the rate parameter for vifs is currently not supported\n");
                 } else if (!strcmp(p, "accel")) {
@@ -827,63 +822,63 @@ static void parse_config_data(const char *configfile_filename_report,
             } while ((p = strtok(NULL, ",")) != NULL);
 skip:
             free(buf2);
-            *num_vifs = (*num_vifs) + 1;
+            d_config->num_vifs = d_config->num_vifs + 1;
         }
     }
 
     if (!xlu_cfg_get_list(config, "vif2", &net2s, 0)) {
-        *num_vif2s = 0;
-        *vif2s = NULL;
-        while ((buf = xlu_cfg_get_listitem(net2s, *num_vif2s))) {
+        d_config->num_vif2s = 0;
+        d_config->vif2s = NULL;
+        while ((buf = xlu_cfg_get_listitem(net2s, d_config->num_vif2s))) {
             char *buf2 = strdup(buf);
             char *p;
 
-            *vif2s = realloc(*vif2s, sizeof (libxl_device_net2) * (*num_vif2s + 1));
-            init_net2_info(*vif2s + *num_vif2s, *num_vif2s);
+            d_config->vif2s = realloc(d_config->vif2s, sizeof (libxl_device_net2) * (d_config->num_vif2s + 1));
+            init_net2_info(d_config->vif2s + d_config->num_vif2s, d_config->num_vif2s);
 
             for (p = strtok(buf2, ","); p; p = strtok(buf2, ",")) {
                 while (isblank(*p))
                     p++;
                 if (!strncmp("front_mac=", p, 10)) {
-                    libxl_strtomac(p + 10, (*vif2s)[*num_vif2s].front_mac);
+                    libxl_strtomac(p + 10, d_config->vif2s[d_config->num_vif2s].front_mac);
                 } else if (!strncmp("back_mac=", p, 9)) {
-                    libxl_strtomac(p + 9, (*vif2s)[*num_vif2s].back_mac);
+                    libxl_strtomac(p + 9, d_config->vif2s[d_config->num_vif2s].back_mac);
                 } else if (!strncmp("backend=", p, 8)) {
-                    domain_qualifier_to_domid(p + 8, &((*vif2s)[*num_vif2s].backend_domid), 0);
+                    domain_qualifier_to_domid(p + 8, &d_config->vif2s[d_config->num_vif2s].backend_domid, 0);
                 } else if (!strncmp("trusted=", p, 8)) {
-                    (*vif2s)[*num_vif2s].trusted = (*(p + 8) == '1');
+                    d_config->vif2s[d_config->num_vif2s].trusted = (*(p + 8) == '1');
                 } else if (!strncmp("back_trusted=", p, 13)) {
-                    (*vif2s)[*num_vif2s].back_trusted = (*(p + 13) == '1');
+                    d_config->vif2s[d_config->num_vif2s].back_trusted = (*(p + 13) == '1');
                 } else if (!strncmp("bridge=", p, 7)) {
-                    (*vif2s)[*num_vif2s].bridge = strdup(p + 13);
+                    d_config->vif2s[d_config->num_vif2s].bridge = strdup(p + 13);
                 } else if (!strncmp("filter_mac=", p, 11)) {
-                    (*vif2s)[*num_vif2s].filter_mac = (*(p + 11) == '1');
+                    d_config->vif2s[d_config->num_vif2s].filter_mac = (*(p + 11) == '1');
                 } else if (!strncmp("front_filter_mac=", p, 17)) {
-                    (*vif2s)[*num_vif2s].front_filter_mac = (*(p + 17) == '1');
+                    d_config->vif2s[d_config->num_vif2s].front_filter_mac = (*(p + 17) == '1');
                 } else if (!strncmp("pdev=", p, 5)) {
-                    (*vif2s)[*num_vif2s].pdev = strtoul(p + 5, NULL, 10);
+                    d_config->vif2s[d_config->num_vif2s].pdev = strtoul(p + 5, NULL, 10);
                 } else if (!strncmp("max_bypasses=", p, 13)) {
-                    (*vif2s)[*num_vif2s].max_bypasses = strtoul(p + 13, NULL, 10);
+                    d_config->vif2s[d_config->num_vif2s].max_bypasses = strtoul(p + 13, NULL, 10);
                 }
             }
             free(buf2);
-            ++(*num_vif2s);
+            ++d_config->num_vif2s;
         }
     }
 
     if (!xlu_cfg_get_list (config, "vfb", &cvfbs, 0)) {
-        *num_vfbs = 0;
-        *num_vkbs = 0;
-        *vfbs = NULL;
-        *vkbs = NULL;
-        while ((buf = xlu_cfg_get_listitem (cvfbs, *num_vfbs)) != NULL) {
+        d_config->num_vfbs = 0;
+        d_config->num_vkbs = 0;
+        d_config->vfbs = NULL;
+        d_config->vkbs = NULL;
+        while ((buf = xlu_cfg_get_listitem (cvfbs, d_config->num_vfbs)) != NULL) {
             char *buf2 = strdup(buf);
             char *p, *p2;
-            *vfbs = (libxl_device_vfb *) realloc(*vfbs, sizeof(libxl_device_vfb) * ((*num_vfbs) + 1));
-            init_vfb_info((*vfbs) + (*num_vfbs), (*num_vfbs));
+            d_config->vfbs = (libxl_device_vfb *) realloc(d_config->vfbs, sizeof(libxl_device_vfb) * (d_config->num_vfbs + 1));
+            init_vfb_info(d_config->vfbs + d_config->num_vfbs, d_config->num_vfbs);
 
-            *vkbs = (libxl_device_vkb *) realloc(*vkbs, sizeof(libxl_device_vkb) * ((*num_vkbs) + 1));
-            init_vkb_info((*vkbs) + (*num_vkbs), (*num_vkbs));
+            d_config->vkbs = (libxl_device_vkb *) realloc(d_config->vkbs, sizeof(libxl_device_vkb) * (d_config->num_vkbs + 1));
+            init_vkb_info(d_config->vkbs + d_config->num_vkbs, d_config->num_vkbs);
 
             p = strtok(buf2, ",");
             if (!p)
@@ -895,31 +890,31 @@ skip:
                     break;
                 *p2 = '\0';
                 if (!strcmp(p, "vnc")) {
-                    (*vfbs)[*num_vfbs].vnc = atoi(p2 + 1);
+                    d_config->vfbs[d_config->num_vfbs].vnc = atoi(p2 + 1);
                 } else if (!strcmp(p, "vnclisten")) {
-                    (*vfbs)[*num_vfbs].vnclisten = strdup(p2 + 1);
+                    d_config->vfbs[d_config->num_vfbs].vnclisten = strdup(p2 + 1);
                 } else if (!strcmp(p, "vncpasswd")) {
-                    (*vfbs)[*num_vfbs].vncpasswd = strdup(p2 + 1);
+                    d_config->vfbs[d_config->num_vfbs].vncpasswd = strdup(p2 + 1);
                 } else if (!strcmp(p, "vncdisplay")) {
-                    (*vfbs)[*num_vfbs].vncdisplay = atoi(p2 + 1);
+                    d_config->vfbs[d_config->num_vfbs].vncdisplay = atoi(p2 + 1);
                 } else if (!strcmp(p, "vncunused")) {
-                    (*vfbs)[*num_vfbs].vncunused = atoi(p2 + 1);
+                    d_config->vfbs[d_config->num_vfbs].vncunused = atoi(p2 + 1);
                 } else if (!strcmp(p, "keymap")) {
-                    (*vfbs)[*num_vfbs].keymap = strdup(p2 + 1);
+                    d_config->vfbs[d_config->num_vfbs].keymap = strdup(p2 + 1);
                 } else if (!strcmp(p, "sdl")) {
-                    (*vfbs)[*num_vfbs].sdl = atoi(p2 + 1);
+                    d_config->vfbs[d_config->num_vfbs].sdl = atoi(p2 + 1);
                 } else if (!strcmp(p, "opengl")) {
-                    (*vfbs)[*num_vfbs].opengl = atoi(p2 + 1);
+                    d_config->vfbs[d_config->num_vfbs].opengl = atoi(p2 + 1);
                 } else if (!strcmp(p, "display")) {
-                    (*vfbs)[*num_vfbs].display = strdup(p2 + 1);
+                    d_config->vfbs[d_config->num_vfbs].display = strdup(p2 + 1);
                 } else if (!strcmp(p, "xauthority")) {
-                    (*vfbs)[*num_vfbs].xauthority = strdup(p2 + 1);
+                    d_config->vfbs[d_config->num_vfbs].xauthority = strdup(p2 + 1);
                 }
             } while ((p = strtok(NULL, ",")) != NULL);
 skip_vfb:
             free(buf2);
-            *num_vfbs = (*num_vfbs) + 1;
-            *num_vkbs = (*num_vkbs) + 1;
+            d_config->num_vfbs = d_config->num_vfbs + 1;
+            d_config->num_vkbs = d_config->num_vkbs + 1;
         }
     }
 
@@ -930,14 +925,14 @@ skip_vfb:
         pci_power_mgmt = l;
 
     if (!xlu_cfg_get_list (config, "pci", &pcis, 0)) {
-        *num_pcidevs = 0;
-        *pcidevs = NULL;
-        while ((buf = xlu_cfg_get_listitem (pcis, *num_pcidevs)) != NULL) {
+        d_config->num_pcidevs = 0;
+        d_config->pcidevs = NULL;
+        while ((buf = xlu_cfg_get_listitem (pcis, d_config->num_pcidevs)) != NULL) {
             unsigned int domain = 0, bus = 0, dev = 0, func = 0, vdevfn = 0;
             char *buf2 = strdup(buf);
             char *p;
-            *pcidevs = (libxl_device_pci *) realloc(*pcidevs, sizeof (libxl_device_pci) * ((*num_pcidevs) + 1));
-            memset(*pcidevs + *num_pcidevs, 0x00, sizeof(libxl_device_pci));
+            d_config->pcidevs = (libxl_device_pci *) realloc(d_config->pcidevs, sizeof (libxl_device_pci) * (d_config->num_pcidevs + 1));
+            memset(d_config->pcidevs + d_config->num_pcidevs, 0x00, sizeof(libxl_device_pci));
             p = strtok(buf2, ",");
             if (!p)
                 goto skip_pci;
@@ -948,21 +943,21 @@ skip_vfb:
                     goto skip_pci;
                 }
             }
-            libxl_device_pci_init(*pcidevs + *num_pcidevs, domain, bus, dev, func, vdevfn);
-            (*pcidevs)[*num_pcidevs].msitranslate = pci_msitranslate;
-            (*pcidevs)[*num_pcidevs].power_mgmt = pci_power_mgmt;
+            libxl_device_pci_init(d_config->pcidevs + d_config->num_pcidevs, domain, bus, dev, func, vdevfn);
+            d_config->pcidevs[d_config->num_pcidevs].msitranslate = pci_msitranslate;
+            d_config->pcidevs[d_config->num_pcidevs].power_mgmt = pci_power_mgmt;
             while ((p = strtok(NULL, ",=")) != NULL) {
                 while (*p == ' ')
                     p++;
                 if (!strcmp(p, "msitranslate")) {
                     p = strtok(NULL, ",=");
-                    (*pcidevs)[*num_pcidevs].msitranslate = atoi(p);
+                    d_config->pcidevs[d_config->num_pcidevs].msitranslate = atoi(p);
                 } else if (!strcmp(p, "power_mgmt")) {
                     p = strtok(NULL, ",=");
-                    (*pcidevs)[*num_pcidevs].power_mgmt = atoi(p);
+                    d_config->pcidevs[d_config->num_pcidevs].power_mgmt = atoi(p);
                 }
             }
-            *num_pcidevs = (*num_pcidevs) + 1;
+            d_config->num_pcidevs = d_config->num_pcidevs + 1;
 skip_pci:
             free(buf2);
         }
@@ -1199,12 +1194,6 @@ static int create_domain(struct domain_create *dom_info)
 
     libxl_domain_build_state state;
     libxl_device_model_info dm_info;
-    libxl_device_disk *disks = NULL;
-    libxl_device_nic *vifs = NULL;
-    libxl_device_net2 *vif2s = NULL;
-    libxl_device_pci *pcidevs = NULL;
-    libxl_device_vfb *vfbs = NULL;
-    libxl_device_vkb *vkbs = NULL;
     libxl_device_console console;
 
     int debug = dom_info->debug;
@@ -1216,7 +1205,6 @@ static int create_domain(struct domain_create *dom_info)
     int migrate_fd = dom_info->migrate_fd;
     char **migration_domname_r = dom_info->migration_domname_r;
 
-    int num_disks = 0, num_vifs = 0, num_vif2s = 0, num_pcidevs = 0, num_vfbs = 0, num_vkbs = 0;
     int i, fd;
     int need_daemon = 1;
     int ret, rc;
@@ -1227,7 +1215,7 @@ static int create_domain(struct domain_create *dom_info)
     int restore_fd = -1;
     struct save_file_header hdr;
 
-    memset(&d_config, 0x00, sizeof(d_config);
+    memset(&d_config, 0x00, sizeof(d_config));
     memset(&dm_info, 0x00, sizeof(dm_info));
 
     if (restore_file) {
@@ -1330,7 +1318,7 @@ static int create_domain(struct domain_create *dom_info)
     if (!dom_info->quiet)
         printf("Parsing config file %s\n", config_file);
 
-    parse_config_data(config_file, config_data, config_len, &d_config, &disks, &num_disks, &vifs, &num_vifs, &vif2s, &num_vif2s, &pcidevs, &num_pcidevs, &vfbs, &num_vfbs, &vkbs, &num_vkbs, &dm_info);
+    parse_config_data(config_file, config_data, config_len, &d_config, &dm_info);
 
     if (dom_info->dryrun)
         return 0;
@@ -1350,7 +1338,7 @@ static int create_domain(struct domain_create *dom_info)
     }
 
     if (debug)
-        printf_info(-1, &d_config, disks, num_disks, vifs, num_vifs, pcidevs, num_pcidevs, vfbs, num_vfbs, vkbs, num_vkbs, &dm_info);
+        printf_info(-1, &d_config, &dm_info);
 
 start:
     domid = 0;
@@ -1382,7 +1370,7 @@ start:
      */
     dom_info->console_autoconnect = 0;
 
-    ret = libxl_run_bootloader(&ctx, &d_config.b_info, num_disks > 0 ? &disks[0] : NULL, domid);
+    ret = libxl_run_bootloader(&ctx, &d_config.b_info, d_config.num_disks > 0 ? &d_config.disks[0] : NULL, domid);
     if (ret) {
         fprintf(stderr, "failed to run bootloader: %d\n", ret);
         goto error_out;
@@ -1404,18 +1392,18 @@ start:
         goto error_out;
     }
 
-    for (i = 0; i < num_disks; i++) {
-        disks[i].domid = domid;
-        ret = libxl_device_disk_add(&ctx, domid, &disks[i]);
+    for (i = 0; i < d_config.num_disks; i++) {
+        d_config.disks[i].domid = domid;
+        ret = libxl_device_disk_add(&ctx, domid, &d_config.disks[i]);
         if (ret) {
             fprintf(stderr, "cannot add disk %d to domain: %d\n", i, ret);
             ret = ERROR_FAIL;
             goto error_out;
         }
     }
-    for (i = 0; i < num_vifs; i++) {
-        vifs[i].domid = domid;
-        ret = libxl_device_nic_add(&ctx, domid, &vifs[i]);
+    for (i = 0; i < d_config.num_vifs; i++) {
+        d_config.vifs[i].domid = domid;
+        ret = libxl_device_nic_add(&ctx, domid, &d_config.vifs[i]);
         if (ret) {
             fprintf(stderr, "cannot add nic %d to domain: %d\n", i, ret);
             ret = ERROR_FAIL;
@@ -1423,9 +1411,9 @@ start:
         }
     }
     if (!d_config.c_info.hvm) {
-        for (i = 0; i < num_vif2s; i++) {
-            vif2s[i].domid = domid;
-            ret = libxl_device_net2_add(&ctx, domid, &(vif2s[i]));
+        for (i = 0; i < d_config.num_vif2s; i++) {
+            d_config.vif2s[i].domid = domid;
+            ret = libxl_device_net2_add(&ctx, domid, &d_config.vif2s[i]);
             if (ret) {
                 fprintf(stderr, "cannot add net2 %d to domain: %d\n", i, ret);
                 ret = ERROR_FAIL;
@@ -1435,28 +1423,30 @@ start:
     }
     if (d_config.c_info.hvm) {
         dm_info.domid = domid;
-        MUST( libxl_create_device_model(&ctx, &dm_info, disks, num_disks,
-                                        vifs, num_vifs, &dm_starting) );
+        MUST( libxl_create_device_model(&ctx, &dm_info,
+                                        d_config.disks, d_config.num_disks,
+                                        d_config.vifs, d_config.num_vifs,
+                                        &dm_starting) );
     } else {
-        for (i = 0; i < num_vfbs; i++) {
-            vfbs[i].domid = domid;
-            libxl_device_vfb_add(&ctx, domid, &vfbs[i]);
-            vkbs[i].domid = domid;
-            libxl_device_vkb_add(&ctx, domid, &vkbs[i]);
+        for (i = 0; i < d_config.num_vfbs; i++) {
+            d_config.vfbs[i].domid = domid;
+            libxl_device_vfb_add(&ctx, domid, &d_config.vfbs[i]);
+            d_config.vkbs[i].domid = domid;
+            libxl_device_vkb_add(&ctx, domid, &d_config.vkbs[i]);
         }
         init_console_info(&console, 0, &state);
         console.domid = domid;
-        if (num_vfbs)
+        if (d_config.num_vfbs)
             console.constype = CONSTYPE_IOEMU;
         libxl_device_console_add(&ctx, domid, &console);
-        if (num_vfbs)
-            libxl_create_xenpv_qemu(&ctx, vfbs, 1, &console, &dm_starting);
+        if (d_config.num_vfbs)
+            libxl_create_xenpv_qemu(&ctx, d_config.vfbs, 1, &console, &dm_starting);
     }
 
     if (dm_starting)
         MUST( libxl_confirm_device_model_startup(&ctx, dm_starting) );
-    for (i = 0; i < num_pcidevs; i++)
-        libxl_device_pci_add(&ctx, domid, &pcidevs[i]);
+    for (i = 0; i < d_config.num_pcidevs; i++)
+        libxl_device_pci_add(&ctx, domid, &d_config.pcidevs[i]);
 
     if (!paused)
         libxl_domain_unpause(&ctx, domid);
@@ -1521,9 +1511,9 @@ start:
     }
     LOG("Waiting for domain %s (domid %d) to die [pid %ld]",
         d_config.c_info.name, domid, (long)getpid());
-    w1 = (libxl_waiter*) xmalloc(sizeof(libxl_waiter) * num_disks);
+    w1 = (libxl_waiter*) xmalloc(sizeof(libxl_waiter) * d_config.num_disks);
     w2 = (libxl_waiter*) xmalloc(sizeof(libxl_waiter));
-    libxl_wait_for_disk_ejects(&ctx, domid, disks, num_disks, w1);
+    libxl_wait_for_disk_ejects(&ctx, domid, d_config.disks, d_config.num_disks, w1);
     libxl_wait_for_domain_death(&ctx, domid, w2);
     libxl_get_wait_fd(&ctx, &fd);
     while (1) {
@@ -2086,14 +2076,7 @@ void list_domains_details(void)
     char *config_file;
     uint8_t *data;
     int nb_domain, i, len, rc;
-    int num_disks = 0, num_vifs = 0, num_vif2s = 0, num_pcidevs = 0, num_vfbs = 0, num_vkbs = 0;
     libxl_device_model_info dm_info;
-    libxl_device_disk *disks = NULL;
-    libxl_device_nic *vifs = NULL;
-    libxl_device_net2 *vif2s = NULL;
-    libxl_device_pci *pcidevs = NULL;
-    libxl_device_vfb *vfbs = NULL;
-    libxl_device_vkb *vkbs = NULL;
 
     info = libxl_list_domain(&ctx, &nb_domain);
 
@@ -2106,9 +2089,9 @@ void list_domains_details(void)
         if (rc)
             continue;
         CHK_ERRNO(asprintf(&config_file, "<domid %d data>", info[i].domid));
-        memset(&d_config, 0x00, sizeof(d_config);
-        parse_config_data(config_file, (char *)data, len, &d_config, &disks, &num_disks, &vifs, &num_vifs, &vif2s, &num_vif2s, &pcidevs, &num_pcidevs, &vfbs, &num_vfbs, &vkbs, &num_vkbs, &dm_info);
-        printf_info(info[i].domid, &d_config, disks, num_disks, vifs, num_vifs, pcidevs, num_pcidevs, vfbs, num_vfbs, vkbs, num_vkbs, &dm_info);
+        memset(&d_config, 0x00, sizeof(d_config));
+        parse_config_data(config_file, (char *)data, len, &d_config, &dm_info);
+        printf_info(info[i].domid, &d_config, &dm_info);
         free(data);
         free(config_file);
     }
