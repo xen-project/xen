@@ -704,52 +704,42 @@ int libxl_free_waiter(libxl_waiter *waiter)
 
 int libxl_event_get_domain_death_info(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event, struct libxl_dominfo *info)
 {
-    int rc = 0, ret;
-    if (event && event->type == LIBXL_EVENT_DOMAIN_DEATH) {
-        ret = libxl_domain_info(ctx, info, domid);
+    if (libxl_domain_info(ctx, info, domid) < 0)
+        return 0;
 
-        if (ret == 0 && info->domid == domid) {
-            if (info->running || (!info->shutdown && !info->dying))
-                    goto out;
-                rc = 1;
-                goto out;
-        }
-        memset(info, 0, sizeof(*info));
-        rc = 1;
-        goto out;
-    }
-out:
-    return rc;
+    if (info->running || (!info->shutdown && !info->dying))
+        return ERROR_INVAL;
+
+    return 1;
 }
 
 int libxl_event_get_disk_eject_info(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event, libxl_device_disk *disk)
 {
-    if (event && event->type == LIBXL_EVENT_DISK_EJECT) {
-        char *path;
-        char *backend;
-        char *value = libxl_xs_read(ctx, XBT_NULL, event->path);
+    char *path;
+    char *backend;
+    char *value;
 
-        if (!value || strcmp(value,  "eject"))
-            return 0;
+    value = libxl_xs_read(ctx, XBT_NULL, event->path);
 
-        path = strdup(event->path);
-        path[strlen(path) - 6] = '\0';
-        backend = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/backend", path));
+    if (!value || strcmp(value,  "eject"))
+        return 0;
 
-        disk->backend_domid = 0;
-        disk->domid = domid;
-        disk->physpath = NULL;
-        disk->phystype = 0;
-        /* this value is returned to the user: do not free right away */
-        disk->virtpath = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/dev", backend));
-        disk->unpluggable = 1;
-        disk->readwrite = 0;
-        disk->is_cdrom = 1;
+    path = strdup(event->path);
+    path[strlen(path) - 6] = '\0';
+    backend = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/backend", path));
 
-        free(path);
-        return 1;
-    }
-    return 0;
+    disk->backend_domid = 0;
+    disk->domid = domid;
+    disk->physpath = NULL;
+    disk->phystype = 0;
+    /* this value is returned to the user: do not free right away */
+    disk->virtpath = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/dev", backend));
+    disk->unpluggable = 1;
+    disk->readwrite = 0;
+    disk->is_cdrom = 1;
+
+    free(path);
+    return 1;
 }
 
 static int libxl_destroy_device_model(struct libxl_ctx *ctx, uint32_t domid)

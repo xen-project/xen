@@ -393,7 +393,24 @@ int libxl_stop_waiting(struct libxl_ctx *ctx, libxl_waiter *waiter);
 int libxl_free_event(libxl_event *event);
 int libxl_free_waiter(libxl_waiter *waiter);
 
+/*
+ * Returns:
+ *  - 0 if the domain is dead but there is no cleanup to be done. e.g
+ *    because someone else has already done it.
+ *  - 1 if the domain is dead and there is cleanup to be done.
+ *
+ * Can return error if the domain exists and is still running.
+ *
+ * *info will contain valid domain state iff 1 is returned. In
+ * particular if 1 is returned then info->shutdown_reason is
+ * guaranteed to be valid since by definition the domain is
+ * (shutdown||dying))
+ */
 int libxl_event_get_domain_death_info(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event, struct libxl_dominfo *info);
+
+/*
+ * Returns true and fills *disk if the caller should eject the disk
+ */
 int libxl_event_get_disk_eject_info(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event, libxl_device_disk *disk);
 
 int libxl_domain_rename(struct libxl_ctx *ctx, uint32_t domid,
