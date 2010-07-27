@@ -988,6 +988,18 @@ int autoconnect_console(int hvm)
     _exit(1);
 }
 
+/* Returns 1 if domain should be restarted */
+static int handle_domain_death(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event, struct libxl_dominfo *info)
+{
+    if (info->shutdown_reason != SHUTDOWN_suspend) {
+        LOG("Domain %d needs to be clean: destroying the domain", domid);
+        libxl_domain_destroy(ctx, domid, 0);
+        if (info->shutdown_reason == SHUTDOWN_reboot)
+            return 1;
+    }
+    return 0;
+}
+
 struct domain_create {
     int debug;
     int daemonize;
@@ -1357,25 +1369,20 @@ start:
                 LOG("Domain %d is dead", domid);
 
                 if (ret) {
-                    if (info.shutdown_reason != SHUTDOWN_suspend) {
-                        LOG("Domain %d needs to be clean: destroying the domain", domid);
-                        libxl_domain_destroy(&ctx, domid, 0);
-                        if (info.shutdown_reason == SHUTDOWN_reboot) {
-                            libxl_free_waiter(w1);
-                            libxl_free_waiter(w2);
-                            free(w1);
-                            free(w2);
-                            LOG("Done. Rebooting now");
-                            /*
-                             * XXX FIXME: If this sleep is not there then
-                             * domain re-creation fails sometimes.
-                             */
-                            sleep(2);
-                            goto start;
-                        }
-                        LOG("Done. Exiting now");
+                    if (handle_domain_death(&ctx, domid, &event, &info)) {
+                        libxl_free_waiter(w1);
+                        libxl_free_waiter(w2);
+                        free(w1);
+                        free(w2);
+                        /*
+                         * XXX FIXME: If this sleep is not there then domain
+                         * re-creation fails sometimes.
+                         */
+                        LOG("Done. Rebooting now");
+                        sleep(2);
+                        goto start;
                     }
-                    LOG("Domain %d does not need to be clean, exiting now", domid);
+                    LOG("Done. Exiting now");
                     exit(0);
                 }
                 break;
