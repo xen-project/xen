@@ -451,6 +451,8 @@ int libxl_devid_to_device_disk(struct libxl_ctx *ctx, uint32_t domid,
     }
 
     val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/backend-id", diskpath));
+    if (!val)
+        return ERROR_FAIL;
     disk->backend_domid = strtoul(val, NULL, 10);
     disk->domid = domid;
     be_path = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/backend", diskpath));
