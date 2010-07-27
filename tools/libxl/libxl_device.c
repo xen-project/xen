@@ -123,7 +123,7 @@ char *device_disk_backend_type_of_phystype(libxl_disk_phystype phystype)
     }
 }
 
-int device_physdisk_major_minor(char *physpath, int *major, int *minor)
+int device_physdisk_major_minor(const char *physpath, int *major, int *minor)
 {
     struct stat buf;
     if (stat(physpath, &buf) < 0)
