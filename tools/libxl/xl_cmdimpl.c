@@ -1935,7 +1935,7 @@ void list_domains(int verbose)
                 info[i].blocked ? 'b' : '-',
                 info[i].paused ? 'p' : '-',
                 info[i].shutdown ? 's' : '-',
-                info[i].crashed ? 'c' : '-',
+                info[i].shutdown_reason == SHUTDOWN_crash ? 'c' : '-',
                 info[i].dying ? 'd' : '-',
                 ((float)info[i].cpu_time / 1e9));
         if (verbose) {

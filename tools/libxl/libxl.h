@@ -29,8 +29,16 @@ struct libxl_dominfo {
     uint8_t blocked:1;
     uint8_t paused:1;
     uint8_t shutdown:1;
-    uint8_t crashed:1;
     uint8_t dying:1;
+
+    /*
+     * Valid SHUTDOWN_* value from xen/sched.h iff (shutdown||dying).
+     *
+     * Otherwise set to a value guaranteed not to clash with any valid
+     * SHUTDOWN_* constant.
+     */
+    unsigned int shutdown_reason;
+
     uint64_t max_memkb;
     uint64_t cpu_time;
     uint32_t vcpu_max_id;
