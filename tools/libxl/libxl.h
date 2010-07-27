@@ -338,6 +338,7 @@ int libxl_domain_suspend(struct libxl_ctx *ctx, libxl_domain_suspend_info *info,
 int libxl_domain_resume(struct libxl_ctx *ctx, uint32_t domid);
 int libxl_domain_shutdown(struct libxl_ctx *ctx, uint32_t domid, int req);
 int libxl_domain_destroy(struct libxl_ctx *ctx, uint32_t domid, int force);
+int libxl_domain_preserve(struct libxl_ctx *ctx, uint32_t domid, libxl_domain_create_info *info, const char *name_suffix, uint8_t new_uuid[16]);
 
 int libxl_file_reference_map(struct libxl_ctx *ctx, libxl_file_reference *f);
 int libxl_file_reference_unmap(struct libxl_ctx *ctx, libxl_file_reference *f);

@@ -402,6 +402,61 @@ int libxl_domain_resume(struct libxl_ctx *ctx, uint32_t domid)
     return 0;
 }
 
+/*
+ * Preserves a domain but rewrites xenstore etc to make it unique so
+ * that the domain can be restarted.
+ *
+ * Does not modify info so that it may be reused.
+ */
+int libxl_domain_preserve(struct libxl_ctx *ctx, uint32_t domid,
+                          libxl_domain_create_info *info, const char *name_suffix, uint8_t new_uuid[16])
+{
+    struct xs_permissions roperm[2];
+    xs_transaction_t t;
+    char *preserved_name;
+    char *uuid_string;
+    char *vm_path;
+    char *dom_path;
+
+    int rc;
+
+    preserved_name = libxl_sprintf(ctx, "%s%s", info->name, name_suffix);
+    if (!preserved_name) return ERROR_NOMEM;
+
+    uuid_string = libxl_uuid2string(ctx, new_uuid);
+    if (!uuid_string) return ERROR_NOMEM;
+
+    dom_path = libxl_xs_get_dompath(ctx, domid);
+    if (!dom_path) return ERROR_FAIL;
+
+    vm_path = libxl_sprintf(ctx, "/vm/%s", uuid_string);
+    if (!vm_path) return ERROR_FAIL;
+
+    roperm[0].id = 0;
+    roperm[0].perms = XS_PERM_NONE;
+    roperm[1].id = domid;
+    roperm[1].perms = XS_PERM_READ;
+
+ retry_transaction:
+    t = xs_transaction_start(ctx->xsh);
+
+    xs_rm(ctx->xsh, t, vm_path);
+    xs_mkdir(ctx->xsh, t, vm_path);
+    xs_set_permissions(ctx->xsh, t, vm_path, roperm, ARRAY_SIZE(roperm));
+
+    xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/vm", dom_path), vm_path, strlen(vm_path));
+    rc = libxl_domain_rename(ctx, domid, info->name, preserved_name, t);
+    if (rc) return rc;
+
+    xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/uuid", vm_path), uuid_string, strlen(uuid_string));
+
+    if (!xs_transaction_end(ctx->xsh, t, 0))
+        if (errno == EAGAIN)
+            goto retry_transaction;
+
+    return 0;
+}
+
 static void xcinfo2xlinfo(const xc_domaininfo_t *xcinfo,
                           struct libxl_dominfo *xlinfo)
 {
