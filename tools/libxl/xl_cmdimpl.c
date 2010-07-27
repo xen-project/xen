@@ -125,6 +125,9 @@ static char *action_on_shutdown_names[] = {
 };
 
 struct domain_config {
+    libxl_domain_create_info c_info;
+    libxl_domain_build_info b_info;
+
     enum action_on_shutdown on_poweroff;
     enum action_on_shutdown on_reboot;
     enum action_on_shutdown on_watchdog;
@@ -354,8 +357,7 @@ static void init_console_info(libxl_device_console *console, int dev_num, libxl_
 }
 
 static void printf_info(int domid,
-                        libxl_domain_create_info *c_info,
-                        libxl_domain_build_info *b_info,
+                        struct domain_config *d_config,
                         libxl_device_disk *disks,
                         int num_disks,
                         libxl_device_nic *vifs,
@@ -369,6 +371,10 @@ static void printf_info(int domid,
                         libxl_device_model_info *dm_info)
 {
     int i;
+
+    libxl_domain_create_info *c_info = &d_config->c_info;
+    libxl_domain_build_info *b_info = &d_config->b_info;
+
     printf("(domain\n\t(domid %d)\n", domid);
     printf("\t(domain_create_info)\n");
     printf("\t(hvm %d)\n", c_info->hvm);
@@ -523,8 +529,6 @@ static int parse_action_on_shutdown(const char *buf, enum action_on_shutdown *a)
 static void parse_config_data(const char *configfile_filename_report,
                               const char *configfile_data,
                               int configfile_len,
-                              libxl_domain_create_info *c_info,
-                              libxl_domain_build_info *b_info,
                               struct domain_config *d_config,
                               libxl_device_disk **disks,
                               int *num_disks,
@@ -547,6 +551,9 @@ static void parse_config_data(const char *configfile_filename_report,
     int pci_power_mgmt = 0;
     int pci_msitranslate = 1;
     int e;
+
+    libxl_domain_create_info *c_info = &d_config->c_info;
+    libxl_domain_build_info *b_info = &d_config->b_info;
 
     config= xlu_cfg_init(stderr, configfile_filename_report);
     if (!config) {
@@ -1068,7 +1075,6 @@ int autoconnect_console(int hvm)
 
 /* Returns 1 if domain should be restarted, 2 if domain should be renamed then restarted  */
 static int handle_domain_death(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event,
-                               libxl_domain_create_info *c_info,
                                struct domain_config *d_config, struct libxl_dominfo *info)
 {
     int restart = 0;
@@ -1097,7 +1103,7 @@ static int handle_domain_death(struct libxl_ctx *ctx, uint32_t domid, libxl_even
         char *corefile;
         int rc;
 
-        if (asprintf(&corefile, "/var/xen/dump/%s", c_info->name) < 0) {
+        if (asprintf(&corefile, "/var/xen/dump/%s", d_config->c_info.name) < 0) {
             LOG("failed to construct core dump path");
         } else {
             LOG("dumping core to %s", corefile);
@@ -1138,7 +1144,6 @@ static int handle_domain_death(struct libxl_ctx *ctx, uint32_t domid, libxl_even
 }
 
 static int preserve_domain(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event,
-                           libxl_domain_create_info *c_info,
                            struct domain_config *d_config, struct libxl_dominfo *info)
 {
     time_t now;
@@ -1168,8 +1173,8 @@ static int preserve_domain(struct libxl_ctx *ctx, uint32_t domid, libxl_event *e
 
     random_uuid(&new_uuid[0]);
 
-    LOG("Preserving domain %d %s with suffix%s", domid, c_info->name, stime);
-    rc = libxl_domain_preserve(ctx, domid, c_info, stime, new_uuid);
+    LOG("Preserving domain %d %s with suffix%s", domid, d_config->c_info.name, stime);
+    rc = libxl_domain_preserve(ctx, domid, &d_config->c_info, stime, new_uuid);
 
     return rc == 0 ? 1 : 0;
 }
@@ -1192,8 +1197,6 @@ static int create_domain(struct domain_create *dom_info)
 {
     struct domain_config d_config;
 
-    libxl_domain_create_info c_info;
-    libxl_domain_build_info b_info;
     libxl_domain_build_state state;
     libxl_device_model_info dm_info;
     libxl_device_disk *disks = NULL;
@@ -1224,6 +1227,7 @@ static int create_domain(struct domain_create *dom_info)
     int restore_fd = -1;
     struct save_file_header hdr;
 
+    memset(&d_config, 0x00, sizeof(d_config);
     memset(&dm_info, 0x00, sizeof(dm_info));
 
     if (restore_file) {
@@ -1326,32 +1330,32 @@ static int create_domain(struct domain_create *dom_info)
     if (!dom_info->quiet)
         printf("Parsing config file %s\n", config_file);
 
-    parse_config_data(config_file, config_data, config_len, &c_info, &b_info, &d_config, &disks, &num_disks, &vifs, &num_vifs, &vif2s, &num_vif2s, &pcidevs, &num_pcidevs, &vfbs, &num_vfbs, &vkbs, &num_vkbs, &dm_info);
+    parse_config_data(config_file, config_data, config_len, &d_config, &disks, &num_disks, &vifs, &num_vifs, &vif2s, &num_vif2s, &pcidevs, &num_pcidevs, &vfbs, &num_vfbs, &vkbs, &num_vkbs, &dm_info);
 
     if (dom_info->dryrun)
         return 0;
 
     if (migrate_fd >= 0) {
-        if (c_info.name) {
+        if (d_config.c_info.name) {
             /* when we receive a domain we get its name from the config
              * file; and we receive it to a temporary name */
             assert(!common_domname);
-            common_domname = c_info.name;
-            if (asprintf(migration_domname_r, "%s--incoming", c_info.name) < 0) {
+            common_domname = d_config.c_info.name;
+            if (asprintf(migration_domname_r, "%s--incoming", d_config.c_info.name) < 0) {
                 fprintf(stderr, "Failed to allocate memory in asprintf\n");
                 exit(1);
             }
-            c_info.name = *migration_domname_r;
+            d_config.c_info.name = *migration_domname_r;
         }
     }
 
     if (debug)
-        printf_info(-1, &c_info, &b_info, disks, num_disks, vifs, num_vifs, pcidevs, num_pcidevs, vfbs, num_vfbs, vkbs, num_vkbs, &dm_info);
+        printf_info(-1, &d_config, disks, num_disks, vifs, num_vifs, pcidevs, num_pcidevs, vfbs, num_vfbs, vkbs, num_vkbs, &dm_info);
 
 start:
     domid = 0;
 
-    ret = libxl_domain_make(&ctx, &c_info, &domid);
+    ret = libxl_domain_make(&ctx, &d_config.c_info, &domid);
     if (ret) {
         fprintf(stderr, "cannot make domain: %d\n", ret);
         ret = ERROR_FAIL;
@@ -1367,7 +1371,7 @@ start:
     }
 
     if (dom_info->console_autoconnect) {
-        ret = autoconnect_console(c_info.hvm);
+        ret = autoconnect_console(d_config.c_info.hvm);
         if (ret)
             goto error_out;
     }
@@ -1378,7 +1382,7 @@ start:
      */
     dom_info->console_autoconnect = 0;
 
-    ret = libxl_run_bootloader(&ctx, &b_info, num_disks > 0 ? &disks[0] : NULL, domid);
+    ret = libxl_run_bootloader(&ctx, &d_config.b_info, num_disks > 0 ? &disks[0] : NULL, domid);
     if (ret) {
         fprintf(stderr, "failed to run bootloader: %d\n", ret);
         goto error_out;
@@ -1389,9 +1393,9 @@ start:
             free(dm_info.saved_state);
             dm_info.saved_state = NULL;
         }
-        ret = libxl_domain_build(&ctx, &b_info, domid, &state);
+        ret = libxl_domain_build(&ctx, &d_config.b_info, domid, &state);
     } else {
-        ret = libxl_domain_restore(&ctx, &b_info, domid, restore_fd, &state, &dm_info);
+        ret = libxl_domain_restore(&ctx, &d_config.b_info, domid, restore_fd, &state, &dm_info);
     }
 
     if (ret) {
@@ -1418,7 +1422,7 @@ start:
             goto error_out;
         }
     }
-    if (!c_info.hvm) {
+    if (!d_config.c_info.hvm) {
         for (i = 0; i < num_vif2s; i++) {
             vif2s[i].domid = domid;
             ret = libxl_device_net2_add(&ctx, domid, &(vif2s[i]));
@@ -1429,7 +1433,7 @@ start:
             }
         }
     }
-    if (c_info.hvm) {
+    if (d_config.c_info.hvm) {
         dm_info.domid = domid;
         MUST( libxl_create_device_model(&ctx, &dm_info, disks, num_disks,
                                         vifs, num_vifs, &dm_starting) );
@@ -1493,7 +1497,7 @@ start:
             exit(-1);
         }
 
-        if (asprintf(&name, "xl-%s", c_info.name) < 0) {
+        if (asprintf(&name, "xl-%s", d_config.c_info.name) < 0) {
             LOG("Failed to allocate memory in asprintf");
             exit(1);
         }
@@ -1516,7 +1520,7 @@ start:
         need_daemon = 0;
     }
     LOG("Waiting for domain %s (domid %d) to die [pid %ld]",
-        c_info.name, domid, (long)getpid());
+        d_config.c_info.name, domid, (long)getpid());
     w1 = (libxl_waiter*) xmalloc(sizeof(libxl_waiter) * num_disks);
     w2 = (libxl_waiter*) xmalloc(sizeof(libxl_waiter));
     libxl_wait_for_disk_ejects(&ctx, domid, disks, num_disks, w1);
@@ -1545,9 +1549,9 @@ start:
                 LOG("Domain %d is dead", domid);
 
                 if (ret) {
-                    switch (handle_domain_death(&ctx, domid, &event, &c_info, &d_config, &info)) {
+                    switch (handle_domain_death(&ctx, domid, &event, &d_config, &info)) {
                     case 2:
-                        if (!preserve_domain(&ctx, domid, &event, &c_info, &d_config, &info))
+                        if (!preserve_domain(&ctx, domid, &event, &d_config, &info))
                             /* If we fail then exit leaving the old domain in place. */
                             exit(-1);
 
@@ -2083,8 +2087,6 @@ void list_domains_details(void)
     uint8_t *data;
     int nb_domain, i, len, rc;
     int num_disks = 0, num_vifs = 0, num_vif2s = 0, num_pcidevs = 0, num_vfbs = 0, num_vkbs = 0;
-    libxl_domain_create_info c_info;
-    libxl_domain_build_info b_info;
     libxl_device_model_info dm_info;
     libxl_device_disk *disks = NULL;
     libxl_device_nic *vifs = NULL;
@@ -2104,8 +2106,9 @@ void list_domains_details(void)
         if (rc)
             continue;
         CHK_ERRNO(asprintf(&config_file, "<domid %d data>", info[i].domid));
-        parse_config_data(config_file, (char *)data, len, &c_info, &b_info, &d_config, &disks, &num_disks, &vifs, &num_vifs, &vif2s, &num_vif2s, &pcidevs, &num_pcidevs, &vfbs, &num_vfbs, &vkbs, &num_vkbs, &dm_info);
-        printf_info(info[i].domid, &c_info, &b_info, disks, num_disks, vifs, num_vifs, pcidevs, num_pcidevs, vfbs, num_vfbs, vkbs, num_vkbs, &dm_info);
+        memset(&d_config, 0x00, sizeof(d_config);
+        parse_config_data(config_file, (char *)data, len, &d_config, &disks, &num_disks, &vifs, &num_vifs, &vif2s, &num_vif2s, &pcidevs, &num_pcidevs, &vfbs, &num_vfbs, &vkbs, &num_vkbs, &dm_info);
+        printf_info(info[i].domid, &d_config, disks, num_disks, vifs, num_vifs, pcidevs, num_pcidevs, vfbs, num_vfbs, vkbs, num_vkbs, &dm_info);
         free(data);
         free(config_file);
     }
