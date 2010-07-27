@@ -104,6 +104,7 @@ enum action_on_shutdown {
     ACTION_DESTROY,
 
     ACTION_RESTART,
+    ACTION_RESTART_RENAME,
 
     ACTION_PRESERVE,
 
@@ -115,6 +116,7 @@ static char *action_on_shutdown_names[] = {
     [ACTION_DESTROY] = "destroy",
 
     [ACTION_RESTART] = "restart",
+    [ACTION_RESTART_RENAME] = "rename-restart",
 
     [ACTION_PRESERVE] = "preserve",
 
@@ -1064,7 +1066,7 @@ int autoconnect_console(int hvm)
     _exit(1);
 }
 
-/* Returns 1 if domain should be restarted */
+/* Returns 1 if domain should be restarted, 2 if domain should be renamed then restarted  */
 static int handle_domain_death(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event,
                                libxl_domain_create_info *c_info,
                                struct domain_config *d_config, struct libxl_dominfo *info)
@@ -1114,6 +1116,10 @@ static int handle_domain_death(struct libxl_ctx *ctx, uint32_t domid, libxl_even
     case ACTION_PRESERVE:
         break;
 
+    case ACTION_RESTART_RENAME:
+        restart = 2;
+        break;
+
     case ACTION_RESTART:
         restart = 1;
         /* fall-through */
@@ -1129,6 +1135,43 @@ static int handle_domain_death(struct libxl_ctx *ctx, uint32_t domid, libxl_even
     }
 
     return restart;
+}
+
+static int preserve_domain(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event,
+                           libxl_domain_create_info *c_info,
+                           struct domain_config *d_config, struct libxl_dominfo *info)
+{
+    time_t now;
+    struct tm tm;
+    char stime[24];
+
+    uint8_t new_uuid[16];
+
+    int rc;
+
+    now = time(NULL);
+    if (now == ((time_t) -1)) {
+        LOG("Failed to get current time for domain rename");
+        return 0;
+    }
+
+    tzset();
+    if (gmtime_r(&now, &tm) == NULL) {
+        LOG("Failed to convert time to UTC");
+        return 0;
+    }
+
+    if (!strftime(&stime[0], sizeof(stime), "-%Y%m%dT%H%MZ", &tm)) {
+        LOG("Failed to format time as a string");
+        return 0;
+    }
+
+    random_uuid(&new_uuid[0]);
+
+    LOG("Preserving domain %d %s with suffix%s", domid, c_info->name, stime);
+    rc = libxl_domain_preserve(ctx, domid, c_info, stime, new_uuid);
+
+    return rc == 0 ? 1 : 0;
 }
 
 struct domain_create {
@@ -1502,7 +1545,15 @@ start:
                 LOG("Domain %d is dead", domid);
 
                 if (ret) {
-                    if (handle_domain_death(&ctx, domid, &event, &c_info, &d_config, &info)) {
+                    switch (handle_domain_death(&ctx, domid, &event, &c_info, &d_config, &info)) {
+                    case 2:
+                        if (!preserve_domain(&ctx, domid, &event, &c_info, &d_config, &info))
+                            /* If we fail then exit leaving the old domain in place. */
+                            exit(-1);
+
+                        /* Otherwise fall through and restart. */
+                    case 1:
+
                         libxl_free_waiter(w1);
                         libxl_free_waiter(w2);
                         free(w1);
@@ -1514,9 +1565,10 @@ start:
                         LOG("Done. Rebooting now");
                         sleep(2);
                         goto start;
+                    case 0:
+                        LOG("Done. Exiting now");
+                        exit(0);
                     }
-                    LOG("Done. Exiting now");
-                    exit(0);
                 }
                 break;
             case LIBXL_EVENT_DISK_EJECT:
