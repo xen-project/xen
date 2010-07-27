@@ -99,6 +99,36 @@ struct save_file_header {
     uint32_t optional_data_len; /* skip, or skip tail, if not understood */
 };
 
+
+enum action_on_shutdown {
+    ACTION_DESTROY,
+
+    ACTION_RESTART,
+
+    ACTION_PRESERVE,
+
+    ACTION_COREDUMP_DESTROY,
+    ACTION_COREDUMP_RESTART,
+};
+
+static char *action_on_shutdown_names[] = {
+    [ACTION_DESTROY] = "destroy",
+
+    [ACTION_RESTART] = "restart",
+
+    [ACTION_PRESERVE] = "preserve",
+
+    [ACTION_COREDUMP_DESTROY] = "coredump-destroy",
+    [ACTION_COREDUMP_RESTART] = "coredump-restart",
+};
+
+struct domain_config {
+    enum action_on_shutdown on_poweroff;
+    enum action_on_shutdown on_reboot;
+    enum action_on_shutdown on_watchdog;
+    enum action_on_shutdown on_crash;
+};
+
 /* Optional data, in order:
  *   4 bytes uint32_t  config file size
  *   n bytes           config file in Unix text file format
@@ -472,11 +502,28 @@ static void printf_info(int domid,
        printf(")\n");
 }
 
+static int parse_action_on_shutdown(const char *buf, enum action_on_shutdown *a)
+{
+    int i;
+    const char *n;
+
+    for (i = 0; i < sizeof(action_on_shutdown_names) / sizeof(action_on_shutdown_names[0]); i++) {
+        n = action_on_shutdown_names[i];
+
+        if (strcmp(buf, n) == 0) {
+            *a = i;
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static void parse_config_data(const char *configfile_filename_report,
                               const char *configfile_data,
                               int configfile_len,
                               libxl_domain_create_info *c_info,
                               libxl_domain_build_info *b_info,
+                              struct domain_config *d_config,
                               libxl_device_disk **disks,
                               int *num_disks,
                               libxl_device_nic **vifs,
@@ -551,6 +598,35 @@ static void parse_config_data(const char *configfile_filename_report,
     if (!xlu_cfg_get_long (config, "memory", &l)) {
         b_info->max_memkb = l * 1024;
         b_info->target_memkb = b_info->max_memkb;
+    }
+
+    if (xlu_cfg_get_string (config, "on_poweroff", &buf))
+        buf = "destroy";
+    if (!parse_action_on_shutdown(buf, &d_config->on_poweroff)) {
+        fprintf(stderr, "Unknown on_poweroff action \"%s\" specified\n", buf);
+        exit(1);
+    }
+
+    if (xlu_cfg_get_string (config, "on_reboot", &buf))
+        buf = "restart";
+    if (!parse_action_on_shutdown(buf, &d_config->on_reboot)) {
+        fprintf(stderr, "Unknown on_reboot action \"%s\" specified\n", buf);
+        exit(1);
+    }
+
+    if (xlu_cfg_get_string (config, "on_watchdog", &buf))
+        buf = "destroy";
+    if (!parse_action_on_shutdown(buf, &d_config->on_watchdog)) {
+        fprintf(stderr, "Unknown on_watchdog action \"%s\" specified\n", buf);
+        exit(1);
+    }
+
+
+    if (xlu_cfg_get_string (config, "on_crash", &buf))
+        buf = "destroy";
+    if (!parse_action_on_shutdown(buf, &d_config->on_crash)) {
+        fprintf(stderr, "Unknown on_crash action \"%s\" specified\n", buf);
+        exit(1);
     }
 
     /* libxl_get_required_shadow_memory() must be called after final values
@@ -989,15 +1065,70 @@ int autoconnect_console(int hvm)
 }
 
 /* Returns 1 if domain should be restarted */
-static int handle_domain_death(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event, struct libxl_dominfo *info)
+static int handle_domain_death(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event,
+                               libxl_domain_create_info *c_info,
+                               struct domain_config *d_config, struct libxl_dominfo *info)
 {
-    if (info->shutdown_reason != SHUTDOWN_suspend) {
-        LOG("Domain %d needs to be clean: destroying the domain", domid);
-        libxl_domain_destroy(ctx, domid, 0);
-        if (info->shutdown_reason == SHUTDOWN_reboot)
-            return 1;
+    int restart = 0;
+    enum action_on_shutdown action;
+
+    switch (info->shutdown_reason) {
+    case SHUTDOWN_poweroff:
+        action = d_config->on_poweroff;
+        break;
+    case SHUTDOWN_reboot:
+        action = d_config->on_reboot;
+        break;
+    case SHUTDOWN_suspend:
+        return 0;
+    case SHUTDOWN_crash:
+        action = d_config->on_crash;
+        break;
+    case SHUTDOWN_watchdog:
+        action = d_config->on_watchdog;
+        break;
     }
-    return 0;
+
+    LOG("Action for shutdown reason code %d is %s", info->shutdown_reason, action_on_shutdown_names[action]);
+
+    if (action == ACTION_COREDUMP_DESTROY || action == ACTION_COREDUMP_RESTART) {
+        char *corefile;
+        int rc;
+
+        if (asprintf(&corefile, "/var/xen/dump/%s", c_info->name) < 0) {
+            LOG("failed to construct core dump path");
+        } else {
+            LOG("dumping core to %s", corefile);
+            rc=libxl_domain_core_dump(ctx, domid, corefile);
+            if (rc) LOG("core dump failed (rc=%d).", rc);
+        }
+        /* No point crying over spilled milk, continue on failure. */
+
+        if (action == ACTION_COREDUMP_DESTROY)
+            action = ACTION_DESTROY;
+        else
+            action = ACTION_RESTART;
+    }
+
+    switch (action) {
+    case ACTION_PRESERVE:
+        break;
+
+    case ACTION_RESTART:
+        restart = 1;
+        /* fall-through */
+    case ACTION_DESTROY:
+        LOG("Domain %d needs to be cleaned up: destroying the domain", domid);
+        libxl_domain_destroy(ctx, domid, 0);
+        break;
+
+    case ACTION_COREDUMP_DESTROY:
+    case ACTION_COREDUMP_RESTART:
+        /* Already handled these above. */
+        abort();
+    }
+
+    return restart;
 }
 
 struct domain_create {
@@ -1016,6 +1147,8 @@ struct domain_create {
 
 static int create_domain(struct domain_create *dom_info)
 {
+    struct domain_config d_config;
+
     libxl_domain_create_info c_info;
     libxl_domain_build_info b_info;
     libxl_domain_build_state state;
@@ -1150,7 +1283,7 @@ static int create_domain(struct domain_create *dom_info)
     if (!dom_info->quiet)
         printf("Parsing config file %s\n", config_file);
 
-    parse_config_data(config_file, config_data, config_len, &c_info, &b_info, &disks, &num_disks, &vifs, &num_vifs, &vif2s, &num_vif2s, &pcidevs, &num_pcidevs, &vfbs, &num_vfbs, &vkbs, &num_vkbs, &dm_info);
+    parse_config_data(config_file, config_data, config_len, &c_info, &b_info, &d_config, &disks, &num_disks, &vifs, &num_vifs, &vif2s, &num_vif2s, &pcidevs, &num_pcidevs, &vfbs, &num_vfbs, &vkbs, &num_vkbs, &dm_info);
 
     if (dom_info->dryrun)
         return 0;
@@ -1369,7 +1502,7 @@ start:
                 LOG("Domain %d is dead", domid);
 
                 if (ret) {
-                    if (handle_domain_death(&ctx, domid, &event, &info)) {
+                    if (handle_domain_death(&ctx, domid, &event, &c_info, &d_config, &info)) {
                         libxl_free_waiter(w1);
                         libxl_free_waiter(w2);
                         free(w1);
@@ -1892,6 +2025,8 @@ void reboot_domain(char *p)
 void list_domains_details(void)
 {
     struct libxl_dominfo *info;
+    struct domain_config d_config;
+
     char *config_file;
     uint8_t *data;
     int nb_domain, i, len, rc;
@@ -1917,7 +2052,7 @@ void list_domains_details(void)
         if (rc)
             continue;
         CHK_ERRNO(asprintf(&config_file, "<domid %d data>", info[i].domid));
-        parse_config_data(config_file, (char *)data, len, &c_info, &b_info, &disks, &num_disks, &vifs, &num_vifs, &vif2s, &num_vif2s, &pcidevs, &num_pcidevs, &vfbs, &num_vfbs, &vkbs, &num_vkbs, &dm_info);
+        parse_config_data(config_file, (char *)data, len, &c_info, &b_info, &d_config, &disks, &num_disks, &vifs, &num_vifs, &vif2s, &num_vif2s, &pcidevs, &num_pcidevs, &vfbs, &num_vfbs, &vkbs, &num_vkbs, &dm_info);
         printf_info(info[i].domid, &c_info, &b_info, disks, num_disks, vifs, num_vifs, pcidevs, num_pcidevs, vfbs, num_vfbs, vkbs, num_vkbs, &dm_info);
         free(data);
         free(config_file);
