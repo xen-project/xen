@@ -211,15 +211,19 @@ static void init_build_info(libxl_domain_build_info *b_info, libxl_domain_create
     }
 }
 
+static void random_uuid(uint8_t *uuid)
+{
+    int i;
+    for (i = 0; i < 16; i++)
+        uuid[i] = rand();
+}
+
 static void init_dm_info(libxl_device_model_info *dm_info,
         libxl_domain_create_info *c_info, libxl_domain_build_info *b_info)
 {
-    int i;
     memset(dm_info, '\0', sizeof(*dm_info));
 
-    for (i = 0; i < 16; i++) {
-        dm_info->uuid[i] = rand();
-    }
+    random_uuid(&dm_info->uuid[0]);
 
     dm_info->dom_name = c_info->name;
     dm_info->device_model = "qemu-dm";
@@ -493,7 +497,7 @@ static void parse_config_data(const char *configfile_filename_report,
     XLU_ConfigList *vbds, *nics, *pcis, *cvfbs, *net2s;
     int pci_power_mgmt = 0;
     int pci_msitranslate = 1;
-    int i, e;
+    int e;
 
     config= xlu_cfg_init(stderr, configfile_filename_report);
     if (!config) {
@@ -521,9 +525,7 @@ static void parse_config_data(const char *configfile_filename_report,
         c_info->name = strdup(buf);
     else
         c_info->name = "test";
-    for (i = 0; i < 16; i++) {
-        c_info->uuid[i] = rand();
-    }
+    random_uuid(&c_info->uuid[0]);
 
     if (!xlu_cfg_get_long(config, "oos", &l))
         c_info->oos = l;
