@@ -702,20 +702,19 @@ int libxl_free_waiter(libxl_waiter *waiter)
     return 0;
 }
 
-int libxl_event_get_domain_death_info(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event, xc_domaininfo_t *info)
+int libxl_event_get_domain_death_info(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event, struct libxl_dominfo *info)
 {
     int rc = 0, ret;
-
     if (event && event->type == LIBXL_EVENT_DOMAIN_DEATH) {
-        ret = xc_domain_getinfolist(ctx->xch, domid, 1, info);
-        if (ret == 1 && info->domain == domid) {
-                if (info->flags & XEN_DOMINF_running ||
-                    (!(info->flags & XEN_DOMINF_shutdown) && !(info->flags & XEN_DOMINF_dying)))
+        ret = libxl_domain_info(ctx, info, domid);
+
+        if (ret == 0 && info->domid == domid) {
+            if (info->running || (!info->shutdown && !info->dying))
                     goto out;
                 rc = 1;
                 goto out;
         }
-        memset(info, 0, sizeof(xc_dominfo_t));
+        memset(info, 0, sizeof(*info));
         rc = 1;
         goto out;
     }

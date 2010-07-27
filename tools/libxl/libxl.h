@@ -393,7 +393,7 @@ int libxl_stop_waiting(struct libxl_ctx *ctx, libxl_waiter *waiter);
 int libxl_free_event(libxl_event *event);
 int libxl_free_waiter(libxl_waiter *waiter);
 
-int libxl_event_get_domain_death_info(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event, xc_domaininfo_t *info);
+int libxl_event_get_domain_death_info(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event, struct libxl_dominfo *info);
 int libxl_event_get_disk_eject_info(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event, libxl_device_disk *disk);
 
 int libxl_domain_rename(struct libxl_ctx *ctx, uint32_t domid,

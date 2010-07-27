@@ -1335,7 +1335,7 @@ start:
     while (1) {
         int ret;
         fd_set rfds;
-        xc_domaininfo_t info;
+        struct libxl_dominfo info;
         libxl_event event;
         libxl_device_disk disk;
         memset(&info, 0x00, sizeof(xc_domaininfo_t));
@@ -1351,11 +1351,10 @@ start:
             case LIBXL_EVENT_DOMAIN_DEATH:
                 if (libxl_event_get_domain_death_info(&ctx, domid, &event, &info)) {
                     LOG("Domain %d is dead", domid);
-                    if (info.flags & XEN_DOMINF_dying || (info.flags & XEN_DOMINF_shutdown && (((info.flags >> XEN_DOMINF_shutdownshift) & XEN_DOMINF_shutdownmask) != SHUTDOWN_suspend))) {
+                    if (info.dying || (info.shutdown && info.shutdown_reason != SHUTDOWN_suspend)) {
                         LOG("Domain %d needs to be clean: destroying the domain", domid);
                         libxl_domain_destroy(&ctx, domid, 0);
-                        if (info.flags & XEN_DOMINF_shutdown &&
-                            (((info.flags >> XEN_DOMINF_shutdownshift) & XEN_DOMINF_shutdownmask) == SHUTDOWN_reboot)) {
+                        if (info.shutdown && info.shutdown_reason == SHUTDOWN_reboot) {
                             libxl_free_waiter(w1);
                             libxl_free_waiter(w2);
                             free(w1);
