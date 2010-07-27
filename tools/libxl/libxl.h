@@ -357,8 +357,8 @@ char *libxl_uuid2string(struct libxl_ctx *ctx, uint8_t uuid[16]);
 /* events handling */
 
 typedef enum {
-    DOMAIN_DEATH,
-    DISK_EJECT,
+    LIBXL_EVENT_DOMAIN_DEATH,
+    LIBXL_EVENT_DISK_EJECT,
 } libxl_event_type;
 
 typedef struct {

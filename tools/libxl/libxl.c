@@ -643,7 +643,7 @@ int libxl_get_wait_fd(struct libxl_ctx *ctx, int *fd)
 int libxl_wait_for_domain_death(struct libxl_ctx *ctx, uint32_t domid, libxl_waiter *waiter)
 {
     waiter->path = strdup("@releaseDomain");
-    if (asprintf(&(waiter->token), "%d", DOMAIN_DEATH) < 0)
+    if (asprintf(&(waiter->token), "%d", LIBXL_EVENT_DOMAIN_DEATH) < 0)
         return -1;
     if (!xs_watch(ctx->xsh, waiter->path, waiter->token))
         return -1;
@@ -663,7 +663,7 @@ int libxl_wait_for_disk_ejects(struct libxl_ctx *ctx, uint32_t guest_domid, libx
                      libxl_xs_get_dompath(ctx, domid),
                      device_disk_dev_number(disks[i].virtpath)) < 0)
             return -1;
-        if (asprintf(&(waiter[i].token), "%d", DISK_EJECT) < 0)
+        if (asprintf(&(waiter[i].token), "%d", LIBXL_EVENT_DISK_EJECT) < 0)
             return -1;
         xs_watch(ctx->xsh, waiter->path, waiter->token);
     }
@@ -711,7 +711,7 @@ int libxl_event_get_domain_death_info(struct libxl_ctx *ctx, uint32_t domid, lib
 {
     int rc = 0, ret;
 
-    if (event && event->type == DOMAIN_DEATH) {
+    if (event && event->type == LIBXL_EVENT_DOMAIN_DEATH) {
         ret = xc_domain_getinfolist(ctx->xch, domid, 1, info);
         if (ret == 1 && info->domain == domid) {
                 if (info->flags & XEN_DOMINF_running ||
@@ -730,7 +730,7 @@ out:
 
 int libxl_event_get_disk_eject_info(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event, libxl_device_disk *disk)
 {
-    if (event && event->type == DISK_EJECT) {
+    if (event && event->type == LIBXL_EVENT_DISK_EJECT) {
         char *path;
         char *backend;
         char *value = libxl_xs_read(ctx, XBT_NULL, event->path);

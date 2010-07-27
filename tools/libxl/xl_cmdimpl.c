@@ -1348,7 +1348,7 @@ start:
             continue;
         libxl_get_event(&ctx, &event);
         switch (event.type) {
-            case DOMAIN_DEATH:
+            case LIBXL_EVENT_DOMAIN_DEATH:
                 if (libxl_event_get_domain_death_info(&ctx, domid, &event, &info)) {
                     LOG("Domain %d is dead", domid);
                     if (info.flags & XEN_DOMINF_dying || (info.flags & XEN_DOMINF_shutdown && (((info.flags >> XEN_DOMINF_shutdownshift) & XEN_DOMINF_shutdownmask) != SHUTDOWN_suspend))) {
@@ -1374,7 +1374,7 @@ start:
                     exit(0);
                 }
                 break;
-            case DISK_EJECT:
+            case LIBXL_EVENT_DISK_EJECT:
                 if (libxl_event_get_disk_eject_info(&ctx, domid, &event, &disk))
                     libxl_cdrom_insert(&ctx, domid, &disk);
                 break;
