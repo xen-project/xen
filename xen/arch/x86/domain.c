@@ -139,12 +139,14 @@ void dump_pageframe_info(struct domain *d)
     }
     else
     {
+        spin_lock(&d->page_alloc_lock);
         page_list_for_each ( page, &d->page_list )
         {
             printk("    DomPage %p: caf=%08lx, taf=%" PRtype_info "\n",
                    _p(page_to_mfn(page)),
                    page->count_info, page->u.inuse.type_info);
         }
+        spin_unlock(&d->page_alloc_lock);
     }
 
     if ( is_hvm_domain(d) )
@@ -152,12 +154,14 @@ void dump_pageframe_info(struct domain *d)
         p2m_pod_dump_data(d);
     }
 
+    spin_lock(&d->page_alloc_lock);
     page_list_for_each ( page, &d->xenpage_list )
     {
         printk("    XenPage %p: caf=%08lx, taf=%" PRtype_info "\n",
                _p(page_to_mfn(page)),
                page->count_info, page->u.inuse.type_info);
     }
+    spin_unlock(&d->page_alloc_lock);
 }
 
 struct domain *alloc_domain_struct(void)
