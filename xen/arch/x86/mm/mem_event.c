@@ -21,6 +21,7 @@
  */
 
 
+#include <asm/domain.h>
 #include <xen/event.h>
 #include <asm/p2m.h>
 #include <asm/mem_event.h>
@@ -224,6 +225,12 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
             p2m_type_t p2mt;
             mfn_t ring_mfn;
             mfn_t shared_mfn;
+
+            /* Currently only EPT is supported */
+            rc = -ENODEV;
+            if ( !(hap_enabled(d) &&
+                  (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL)) )
+                break;
 
             /* Get MFN of ring page */
             guest_get_eff_l1e(v, ring_addr, &l1e);

@@ -385,11 +385,13 @@ static void dump_numa(unsigned char key)
 		for_each_online_node(i)
 			page_num_node[i] = 0;
 
+		spin_lock(&d->page_alloc_lock);
 		page_list_for_each(page, &d->page_list)
 		{
 			i = phys_to_nid((paddr_t)page_to_mfn(page) << PAGE_SHIFT);
 			page_num_node[i]++;
 		}
+		spin_unlock(&d->page_alloc_lock);
 
 		for_each_online_node(i)
 			printk("    Node %u: %u\n", i, page_num_node[i]);

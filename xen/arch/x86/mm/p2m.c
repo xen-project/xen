@@ -1833,6 +1833,7 @@ int p2m_alloc_table(struct domain *d,
         goto error;
 
     /* Copy all existing mappings from the page list and m2p */
+    spin_lock(&d->page_alloc_lock);
     page_list_for_each(page, &d->page_list)
     {
         mfn = page_to_mfn(page);
@@ -1848,13 +1849,16 @@ int p2m_alloc_table(struct domain *d,
 #endif
              && gfn != INVALID_M2P_ENTRY
             && !set_p2m_entry(d, gfn, mfn, 0, p2m_ram_rw) )
-            goto error;
+            goto error_unlock;
     }
+    spin_unlock(&d->page_alloc_lock);
 
     P2M_PRINTK("p2m table initialised (%u pages)\n", page_count);
     p2m_unlock(p2m);
     return 0;
 
+error_unlock:
+    spin_unlock(&d->page_alloc_lock);
  error:
     P2M_PRINTK("failed to initialize p2m table, gfn=%05lx, mfn=%"
                PRI_mfn "\n", gfn, mfn_x(mfn));

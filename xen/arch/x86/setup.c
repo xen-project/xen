@@ -363,22 +363,38 @@ void init_done(void)
     startup_cpu_idle_loop();
 }
 
-static char * __init cmdline_cook(char *p)
+static bool_t __init loader_is_grub2(const char *loader_name)
+{
+    /* GRUB1="GNU GRUB 0.xx"; GRUB2="GRUB 1.xx" */
+    const char *p = strstr(loader_name, "GRUB ");
+    return (p != NULL) && (p[5] != '0');
+}
+
+static char * __init cmdline_cook(char *p, char *loader_name)
 {
     p = p ? : "";
+
+    /* Strip leading whitespace. */
     while ( *p == ' ' )
         p++;
+
+    /* GRUB2 does not include image name as first item on command line. */
+    if ( loader_is_grub2(loader_name) )
+        return p;
+
+    /* Strip image name plus whitespace. */
     while ( (*p != ' ') && (*p != '\0') )
         p++;
     while ( *p == ' ' )
         p++;
+
     return p;
 }
 
 void __init __start_xen(unsigned long mbi_p)
 {
     char *memmap_type = NULL;
-    char *cmdline, *kextra;
+    char *cmdline, *kextra, *loader;
     unsigned long _initrd_start = 0, _initrd_len = 0;
     unsigned int initrdidx = 1;
     multiboot_info_t *mbi = __va(mbi_p);
@@ -396,9 +412,13 @@ void __init __start_xen(unsigned long mbi_p)
 
     set_intr_gate(TRAP_page_fault, &early_page_fault);
 
+    loader = (mbi->flags & MBI_LOADERNAME)
+        ? (char *)__va(mbi->boot_loader_name) : "unknown";
+
     /* Parse the command-line options. */
     cmdline = cmdline_cook((mbi->flags & MBI_CMDLINE) ?
-                           __va(mbi->cmdline) : NULL);
+                           __va(mbi->cmdline) : NULL,
+                           loader);
     if ( (kextra = strstr(cmdline, " -- ")) != NULL )
     {
         /*
@@ -431,6 +451,8 @@ void __init __start_xen(unsigned long mbi_p)
     ns16550.irq     = 3;
     ns16550_init(1, &ns16550);
     console_init_preirq();
+
+    printk("Bootloader: %s\n", loader);
 
     printk("Command line: %s\n", cmdline);
 
@@ -1032,7 +1054,7 @@ void __init __start_xen(unsigned long mbi_p)
     {
         static char dom0_cmdline[MAX_GUEST_CMDLINE];
 
-        cmdline = cmdline_cook(cmdline);
+        cmdline = cmdline_cook(cmdline, loader);
         safe_strcpy(dom0_cmdline, cmdline);
 
         if ( kextra != NULL )
