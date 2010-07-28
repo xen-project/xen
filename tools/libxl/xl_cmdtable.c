@@ -14,6 +14,7 @@
 
 #include <string.h>
 
+#include "libxl.h"
 #include "xl.h"
 
 struct cmd_spec cmd_table[] = {

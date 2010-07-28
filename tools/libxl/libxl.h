@@ -22,7 +22,7 @@
 #include <xs.h>
 #include <sys/wait.h> /* for pid_t */
 
-struct libxl_dominfo {
+typedef struct {
     uint8_t uuid[16];
     uint32_t domid;
     uint8_t running:1;
@@ -43,16 +43,16 @@ struct libxl_dominfo {
     uint64_t cpu_time;
     uint32_t vcpu_max_id;
     uint32_t vcpu_online;
-};
+} libxl_dominfo;
 
-struct libxl_poolinfo {
+typedef struct {
     uint32_t poolid;
-};
+} libxl_poolinfo;
 
-struct libxl_vminfo {
+typedef struct {
     uint8_t uuid[16];
     uint32_t domid;
-};
+} libxl_vminfo;
 
 typedef struct {
     int xen_version_major;
@@ -69,7 +69,7 @@ typedef struct {
     char *commandline;
 } libxl_version_info;
 
-struct libxl_ctx {
+typedef struct {
     xentoollog_logger *lg;
     xc_interface *xch;
     struct xs_handle *xsh;
@@ -83,9 +83,9 @@ struct libxl_ctx {
      * may leave them untouched */
     int (*waitpid_instead)(pid_t pid, int *status, int flags);
     libxl_version_info version_info;
-};
+} libxl_ctx;
 
-const libxl_version_info* libxl_get_version_info(struct libxl_ctx *ctx);
+const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx);
 
 typedef struct {
     bool hvm;
@@ -291,7 +291,7 @@ typedef struct {
     char *bridge;
 } libxl_device_net2;
 
-typedef struct  {
+typedef struct {
     union {
         unsigned int value;
         struct {
@@ -322,26 +322,26 @@ enum {
 #define LIBXL_VERSION 0
 
 /* context functions */
-int libxl_ctx_init(struct libxl_ctx *ctx, int version, xentoollog_logger*);
-int libxl_ctx_free(struct libxl_ctx *ctx);
-int libxl_ctx_set_log(struct libxl_ctx *ctx, xentoollog_logger*);
-int libxl_ctx_postfork(struct libxl_ctx *ctx);
+int libxl_ctx_init(libxl_ctx *ctx, int version, xentoollog_logger*);
+int libxl_ctx_free(libxl_ctx *ctx);
+int libxl_ctx_set_log(libxl_ctx *ctx, xentoollog_logger*);
+int libxl_ctx_postfork(libxl_ctx *ctx);
 
 /* domain related functions */
-int libxl_domain_make(struct libxl_ctx *ctx, libxl_domain_create_info *info, uint32_t *domid);
-int libxl_domain_build(struct libxl_ctx *ctx, libxl_domain_build_info *info, uint32_t domid, /* out */ libxl_domain_build_state *state);
-int libxl_domain_restore(struct libxl_ctx *ctx, libxl_domain_build_info *info,
+int libxl_domain_make(libxl_ctx *ctx, libxl_domain_create_info *info, uint32_t *domid);
+int libxl_domain_build(libxl_ctx *ctx, libxl_domain_build_info *info, uint32_t domid, /* out */ libxl_domain_build_state *state);
+int libxl_domain_restore(libxl_ctx *ctx, libxl_domain_build_info *info,
                          uint32_t domid, int fd, libxl_domain_build_state *state,
                          libxl_device_model_info *dm_info);
-int libxl_domain_suspend(struct libxl_ctx *ctx, libxl_domain_suspend_info *info,
+int libxl_domain_suspend(libxl_ctx *ctx, libxl_domain_suspend_info *info,
                           uint32_t domid, int fd);
-int libxl_domain_resume(struct libxl_ctx *ctx, uint32_t domid);
-int libxl_domain_shutdown(struct libxl_ctx *ctx, uint32_t domid, int req);
-int libxl_domain_destroy(struct libxl_ctx *ctx, uint32_t domid, int force);
-int libxl_domain_preserve(struct libxl_ctx *ctx, uint32_t domid, libxl_domain_create_info *info, const char *name_suffix, uint8_t new_uuid[16]);
+int libxl_domain_resume(libxl_ctx *ctx, uint32_t domid);
+int libxl_domain_shutdown(libxl_ctx *ctx, uint32_t domid, int req);
+int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid, int force);
+int libxl_domain_preserve(libxl_ctx *ctx, uint32_t domid, libxl_domain_create_info *info, const char *name_suffix, uint8_t new_uuid[16]);
 
-int libxl_file_reference_map(struct libxl_ctx *ctx, libxl_file_reference *f);
-int libxl_file_reference_unmap(struct libxl_ctx *ctx, libxl_file_reference *f);
+int libxl_file_reference_map(libxl_ctx *ctx, libxl_file_reference *f);
+int libxl_file_reference_unmap(libxl_ctx *ctx, libxl_file_reference *f);
 
 /*
  * Run the configured bootloader for a PV domain and update
@@ -355,12 +355,12 @@ int libxl_file_reference_unmap(struct libxl_ctx *ctx, libxl_file_reference *f);
  * ramdisk to cleanup or rely on libxl_domain_{build,restore} to do
  * it.
  */
-int libxl_run_bootloader(struct libxl_ctx *ctx,
+int libxl_run_bootloader(libxl_ctx *ctx,
                          libxl_domain_build_info *info,
                          libxl_device_disk *disk,
                          uint32_t domid);
 
-char *libxl_uuid2string(struct libxl_ctx *ctx, uint8_t uuid[16]);
+char *libxl_uuid2string(libxl_ctx *ctx, uint8_t uuid[16]);
   /* 0 means ERROR_ENOMEM, which we have logged */
 
 /* events handling */
@@ -384,13 +384,13 @@ typedef struct {
 } libxl_waiter;
 
 
-int libxl_get_wait_fd(struct libxl_ctx *ctx, int *fd);
+int libxl_get_wait_fd(libxl_ctx *ctx, int *fd);
 /* waiter is allocated by the caller */
-int libxl_wait_for_domain_death(struct libxl_ctx *ctx, uint32_t domid, libxl_waiter *waiter);
+int libxl_wait_for_domain_death(libxl_ctx *ctx, uint32_t domid, libxl_waiter *waiter);
 /* waiter is a preallocated array of num_disks libxl_waiter elements */
-int libxl_wait_for_disk_ejects(struct libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disks, int num_disks, libxl_waiter *waiter);
-int libxl_get_event(struct libxl_ctx *ctx, libxl_event *event);
-int libxl_stop_waiting(struct libxl_ctx *ctx, libxl_waiter *waiter);
+int libxl_wait_for_disk_ejects(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disks, int num_disks, libxl_waiter *waiter);
+int libxl_get_event(libxl_ctx *ctx, libxl_event *event);
+int libxl_stop_waiting(libxl_ctx *ctx, libxl_waiter *waiter);
 int libxl_free_event(libxl_event *event);
 int libxl_free_waiter(libxl_waiter *waiter);
 
@@ -407,30 +407,30 @@ int libxl_free_waiter(libxl_waiter *waiter);
  * guaranteed to be valid since by definition the domain is
  * (shutdown||dying))
  */
-int libxl_event_get_domain_death_info(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event, struct libxl_dominfo *info);
+int libxl_event_get_domain_death_info(libxl_ctx *ctx, uint32_t domid, libxl_event *event, libxl_dominfo *info);
 
 /*
  * Returns true and fills *disk if the caller should eject the disk
  */
-int libxl_event_get_disk_eject_info(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event, libxl_device_disk *disk);
+int libxl_event_get_disk_eject_info(libxl_ctx *ctx, uint32_t domid, libxl_event *event, libxl_device_disk *disk);
 
-int libxl_domain_rename(struct libxl_ctx *ctx, uint32_t domid,
+int libxl_domain_rename(libxl_ctx *ctx, uint32_t domid,
                         const char *old_name, const char *new_name,
                         xs_transaction_t trans);
   /* if old_name is NULL, any old name is OK; otherwise we check
    * transactionally that the domain has the old old name; if
    * trans is not 0 we use caller's transaction and caller must do retries */
 
-int libxl_domain_pause(struct libxl_ctx *ctx, uint32_t domid);
-int libxl_domain_unpause(struct libxl_ctx *ctx, uint32_t domid);
+int libxl_domain_pause(libxl_ctx *ctx, uint32_t domid);
+int libxl_domain_unpause(libxl_ctx *ctx, uint32_t domid);
 
-int libxl_domain_core_dump(struct libxl_ctx *ctx, uint32_t domid, const char *filename);
+int libxl_domain_core_dump(libxl_ctx *ctx, uint32_t domid, const char *filename);
 
-int libxl_domain_setmaxmem(struct libxl_ctx *ctx, uint32_t domid, uint32_t target_memkb);
-int libxl_set_memory_target(struct libxl_ctx *ctx, uint32_t domid, uint32_t target_memkb, int enforce);
+int libxl_domain_setmaxmem(libxl_ctx *ctx, uint32_t domid, uint32_t target_memkb);
+int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid, uint32_t target_memkb, int enforce);
 
-int libxl_vncviewer_exec(struct libxl_ctx *ctx, uint32_t domid, int autopass);
-int libxl_console_exec(struct libxl_ctx *ctx, uint32_t domid, int cons_num);
+int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass);
+int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num);
 /* libxl_primary_console_exec finds the domid and console number
  * corresponding to the primary console of the given vm, then calls
  * libxl_console_exec with the right arguments (domid might be different
@@ -438,29 +438,29 @@ int libxl_console_exec(struct libxl_ctx *ctx, uint32_t domid, int cons_num);
  * This function can be called after creating the device model, in
  * case of HVM guests, and before libxl_run_bootloader in case of PV
  * guests using pygrub. */ 
-int libxl_primary_console_exec(struct libxl_ctx *ctx, uint32_t domid_vm);
+int libxl_primary_console_exec(libxl_ctx *ctx, uint32_t domid_vm);
 
-int libxl_domain_info(struct libxl_ctx*, struct libxl_dominfo *info_r,
+int libxl_domain_info(libxl_ctx*, libxl_dominfo *info_r,
                       uint32_t domid);
-struct libxl_dominfo * libxl_list_domain(struct libxl_ctx*, int *nb_domain);
-struct libxl_poolinfo * libxl_list_pool(struct libxl_ctx*, int *nb_pool);
-struct libxl_vminfo * libxl_list_vm(struct libxl_ctx *ctx, int *nb_vm);
+libxl_dominfo * libxl_list_domain(libxl_ctx*, int *nb_domain);
+libxl_poolinfo * libxl_list_pool(libxl_ctx*, int *nb_pool);
+libxl_vminfo * libxl_list_vm(libxl_ctx *ctx, int *nb_vm);
 
 typedef struct libxl_device_model_starting libxl_device_model_starting;
-int libxl_create_device_model(struct libxl_ctx *ctx,
+int libxl_create_device_model(libxl_ctx *ctx,
                               libxl_device_model_info *info,
                               libxl_device_disk *disk, int num_disks,
                               libxl_device_nic *vifs, int num_vifs,
                               libxl_device_model_starting **starting_r);
-int libxl_create_xenpv_qemu(struct libxl_ctx *ctx, libxl_device_vfb *vfb,
+int libxl_create_xenpv_qemu(libxl_ctx *ctx, libxl_device_vfb *vfb,
                             int num_console, libxl_device_console *console,
                             libxl_device_model_starting **starting_r);
   /* Caller must either: pass starting_r==0, or on successful
    * return pass *starting_r (which will be non-0) to
    * libxl_confirm_device_model or libxl_detach_device_model. */
-int libxl_confirm_device_model_startup(struct libxl_ctx *ctx,
+int libxl_confirm_device_model_startup(libxl_ctx *ctx,
                               libxl_device_model_starting *starting);
-int libxl_detach_device_model(struct libxl_ctx *ctx,
+int libxl_detach_device_model(libxl_ctx *ctx,
                               libxl_device_model_starting *starting);
   /* DM is detached even if error is returned */
 
@@ -475,18 +475,18 @@ typedef struct {
     int rref;
 } libxl_diskinfo;
 
-int libxl_device_disk_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk);
-int libxl_device_disk_del(struct libxl_ctx *ctx, libxl_device_disk *disk, int wait);
-libxl_device_disk *libxl_device_disk_list(struct libxl_ctx *ctx, uint32_t domid, int *num);
-int libxl_device_disk_getinfo(struct libxl_ctx *ctx, uint32_t domid,
+int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk);
+int libxl_device_disk_del(libxl_ctx *ctx, libxl_device_disk *disk, int wait);
+libxl_device_disk *libxl_device_disk_list(libxl_ctx *ctx, uint32_t domid, int *num);
+int libxl_device_disk_getinfo(libxl_ctx *ctx, uint32_t domid,
                               libxl_device_disk *disk, libxl_diskinfo *diskinfo);
-int libxl_cdrom_insert(struct libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk);
+int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk);
 
 /*
  * Make a disk available in this domain. Returns path to a device.
  */
-const char * libxl_device_disk_local_attach(struct libxl_ctx *ctx, libxl_device_disk *disk);
-int libxl_device_disk_local_detach(struct libxl_ctx *ctx, libxl_device_disk *disk);
+const char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *disk);
+int libxl_device_disk_local_detach(libxl_ctx *ctx, libxl_device_disk *disk);
 
 typedef struct {
     char *backend;
@@ -502,26 +502,26 @@ typedef struct {
     int rref_rx;
 } libxl_nicinfo;
 
-int libxl_device_nic_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic);
-int libxl_device_nic_del(struct libxl_ctx *ctx, libxl_device_nic *nic, int wait);
-libxl_nicinfo *libxl_list_nics(struct libxl_ctx *ctx, uint32_t domid, unsigned int *nb);
+int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic);
+int libxl_device_nic_del(libxl_ctx *ctx, libxl_device_nic *nic, int wait);
+libxl_nicinfo *libxl_list_nics(libxl_ctx *ctx, uint32_t domid, unsigned int *nb);
 
-int libxl_device_console_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_console *console);
+int libxl_device_console_add(libxl_ctx *ctx, uint32_t domid, libxl_device_console *console);
 
-int libxl_device_vkb_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb);
-int libxl_device_vkb_clean_shutdown(struct libxl_ctx *ctx, uint32_t domid);
-int libxl_device_vkb_hard_shutdown(struct libxl_ctx *ctx, uint32_t domid);
+int libxl_device_vkb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb);
+int libxl_device_vkb_clean_shutdown(libxl_ctx *ctx, uint32_t domid);
+int libxl_device_vkb_hard_shutdown(libxl_ctx *ctx, uint32_t domid);
 
-int libxl_device_vfb_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb);
-int libxl_device_vfb_clean_shutdown(struct libxl_ctx *ctx, uint32_t domid);
-int libxl_device_vfb_hard_shutdown(struct libxl_ctx *ctx, uint32_t domid);
+int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb);
+int libxl_device_vfb_clean_shutdown(libxl_ctx *ctx, uint32_t domid);
+int libxl_device_vfb_hard_shutdown(libxl_ctx *ctx, uint32_t domid);
 
 #define PCI_BDF                "%04x:%02x:%02x.%01x"
 #define PCI_BDF_VDEVFN         "%04x:%02x:%02x.%01x@%02x"
-int libxl_device_pci_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev);
-int libxl_device_pci_remove(struct libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev);
-int libxl_device_pci_shutdown(struct libxl_ctx *ctx, uint32_t domid);
-libxl_device_pci *libxl_device_pci_list(struct libxl_ctx *ctx, uint32_t domid, int *num);
+int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev);
+int libxl_device_pci_remove(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev);
+int libxl_device_pci_shutdown(libxl_ctx *ctx, uint32_t domid);
+libxl_device_pci *libxl_device_pci_list(libxl_ctx *ctx, uint32_t domid, int *num);
 int libxl_device_pci_init(libxl_device_pci *pcidev, unsigned int domain,
                           unsigned int bus, unsigned int dev,
                           unsigned int func, unsigned int vdevfn);
@@ -542,12 +542,12 @@ int libxl_device_pci_init(libxl_device_pci *pcidev, unsigned int domain,
  * semantics of the data.  For specifications of the data formats
  * see the code or documentation for the libxl caller in question.
  */
-int libxl_userdata_store(struct libxl_ctx *ctx, uint32_t domid,
+int libxl_userdata_store(libxl_ctx *ctx, uint32_t domid,
                               const char *userdata_userid,
                               const uint8_t *data, int datalen);
   /* If datalen==0, data is not used and the user data for
    * that domain and userdata_userid is deleted. */
-int libxl_userdata_retrieve(struct libxl_ctx *ctx, uint32_t domid,
+int libxl_userdata_retrieve(libxl_ctx *ctx, uint32_t domid,
                                  const char *userdata_userid,
                                  uint8_t **data_r, int *datalen_r);
   /* On successful return, *data_r is from malloc.
@@ -562,9 +562,9 @@ typedef enum {
     SLEEP_BUTTON
 } libxl_button;
 
-int libxl_button_press(struct libxl_ctx *ctx, uint32_t domid, libxl_button button);
+int libxl_button_press(libxl_ctx *ctx, uint32_t domid, libxl_button button);
 
-struct libxl_vcpuinfo {
+typedef struct {
     uint32_t vcpuid; /* vcpu's id */
     uint32_t cpu; /* current mapping */
     uint8_t online:1; /* currently online (not hotplugged)? */
@@ -572,9 +572,9 @@ struct libxl_vcpuinfo {
     uint8_t running:1; /* currently scheduled on its CPU? */
     uint64_t vcpu_time; /* total vcpu time ran (ns) */
     uint64_t *cpumap; /* current cpu's affinities */
-};
+} libxl_vcpuinfo;
 
-struct libxl_physinfo {
+typedef struct {
     uint32_t threads_per_core;
     uint32_t cores_per_socket;
 
@@ -589,60 +589,60 @@ struct libxl_physinfo {
     uint32_t nr_nodes;
     uint32_t hw_cap[8];
     uint32_t phys_cap;
-};
+}  libxl_physinfo;
 
-int libxl_get_physinfo(struct libxl_ctx *ctx, struct libxl_physinfo *physinfo);
-struct libxl_vcpuinfo *libxl_list_vcpu(struct libxl_ctx *ctx, uint32_t domid,
+int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo);
+libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
                                        int *nb_vcpu, int *cpusize);
-int libxl_set_vcpuaffinity(struct libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
+int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
                            uint64_t *cpumap, int cpusize);
-int libxl_set_vcpucount(struct libxl_ctx *ctx, uint32_t domid, uint32_t count);
+int libxl_set_vcpucount(libxl_ctx *ctx, uint32_t domid, uint32_t count);
 
-int libxl_get_sched_id(struct libxl_ctx *ctx);
+int libxl_get_sched_id(libxl_ctx *ctx);
 
 
-struct libxl_sched_credit {
+typedef struct {
     int weight;
     int cap;
-};
+} libxl_sched_credit;
 
-int libxl_sched_credit_domain_get(struct libxl_ctx *ctx, uint32_t domid,
-                                  struct libxl_sched_credit *scinfo);
-int libxl_sched_credit_domain_set(struct libxl_ctx *ctx, uint32_t domid,
-                                  struct libxl_sched_credit *scinfo);
-int libxl_send_trigger(struct libxl_ctx *ctx, uint32_t domid,
+int libxl_sched_credit_domain_get(libxl_ctx *ctx, uint32_t domid,
+                                  libxl_sched_credit *scinfo);
+int libxl_sched_credit_domain_set(libxl_ctx *ctx, uint32_t domid,
+                                  libxl_sched_credit *scinfo);
+int libxl_send_trigger(libxl_ctx *ctx, uint32_t domid,
                        char *trigger_name, uint32_t vcpuid);
-int libxl_send_sysrq(struct libxl_ctx *ctx, uint32_t domid, char sysrq);
-int libxl_send_debug_keys(struct libxl_ctx *ctx, char *keys);
+int libxl_send_sysrq(libxl_ctx *ctx, uint32_t domid, char sysrq);
+int libxl_send_debug_keys(libxl_ctx *ctx, char *keys);
 
-struct libxl_xen_console_reader {
+typedef struct {
     char *buffer;
     unsigned int size;
     unsigned int count;
     unsigned int clear;
     unsigned int incremental;
     unsigned int index;
-};
+}  libxl_xen_console_reader;
 
-struct libxl_xen_console_reader *
-    libxl_xen_console_read_start(struct libxl_ctx *ctx, int clear);
-int libxl_xen_console_read_line(struct libxl_ctx *ctx,
-                                struct libxl_xen_console_reader *cr,
+libxl_xen_console_reader *
+    libxl_xen_console_read_start(libxl_ctx *ctx, int clear);
+int libxl_xen_console_read_line(libxl_ctx *ctx,
+                                libxl_xen_console_reader *cr,
                                 char **line_r);
-void libxl_xen_console_read_finish(struct libxl_ctx *ctx,
-                                   struct libxl_xen_console_reader *cr);
+void libxl_xen_console_read_finish(libxl_ctx *ctx,
+                                   libxl_xen_console_reader *cr);
 
-uint32_t libxl_vm_get_start_time(struct libxl_ctx *ctx, uint32_t domid);
+uint32_t libxl_vm_get_start_time(libxl_ctx *ctx, uint32_t domid);
 
-char *libxl_tmem_list(struct libxl_ctx *ctx, uint32_t domid, int use_long);
-int libxl_tmem_freeze(struct libxl_ctx *ctx, uint32_t domid);
-int libxl_tmem_destroy(struct libxl_ctx *ctx, uint32_t domid);
-int libxl_tmem_thaw(struct libxl_ctx *ctx, uint32_t domid);
-int libxl_tmem_set(struct libxl_ctx *ctx, uint32_t domid, char* name,
+char *libxl_tmem_list(libxl_ctx *ctx, uint32_t domid, int use_long);
+int libxl_tmem_freeze(libxl_ctx *ctx, uint32_t domid);
+int libxl_tmem_destroy(libxl_ctx *ctx, uint32_t domid);
+int libxl_tmem_thaw(libxl_ctx *ctx, uint32_t domid);
+int libxl_tmem_set(libxl_ctx *ctx, uint32_t domid, char* name,
                    uint32_t set);
-int libxl_tmem_shared_auth(struct libxl_ctx *ctx, uint32_t domid, char* uuid,
+int libxl_tmem_shared_auth(libxl_ctx *ctx, uint32_t domid, char* uuid,
                            int auth);
-int libxl_tmem_freeable(struct libxl_ctx *ctx);
+int libxl_tmem_freeable(libxl_ctx *ctx);
 
 typedef struct {
     char *backend;
@@ -657,11 +657,11 @@ typedef struct {
     int filter_mac;
 } libxl_net2info;
 
-int libxl_device_net2_add(struct libxl_ctx *ctx, uint32_t domid,
+int libxl_device_net2_add(libxl_ctx *ctx, uint32_t domid,
                           libxl_device_net2 *net2);
-libxl_net2info *libxl_device_net2_list(struct libxl_ctx *ctx, uint32_t domid,
+libxl_net2info *libxl_device_net2_list(libxl_ctx *ctx, uint32_t domid,
                                        unsigned int *nb);
-int libxl_device_net2_del(struct libxl_ctx *ctx, libxl_device_net2 *net2,
+int libxl_device_net2_del(libxl_ctx *ctx, libxl_device_net2 *net2,
                           int wait);
 
 /* common paths */

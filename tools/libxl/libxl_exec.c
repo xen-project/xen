@@ -57,7 +57,7 @@ void libxl_exec(int stdinfd, int stdoutfd, int stderrfd, char *arg0, char **args
     _exit(-1);
 }
 
-void libxl_report_child_exitstatus(struct libxl_ctx *ctx,
+void libxl_report_child_exitstatus(libxl_ctx *ctx,
                                    xentoollog_level level,
                                    const char *what, pid_t pid, int status)
 {
@@ -88,7 +88,7 @@ void libxl_report_child_exitstatus(struct libxl_ctx *ctx,
     }
 }
 
-int libxl_spawn_spawn(struct libxl_ctx *ctx,
+int libxl_spawn_spawn(libxl_ctx *ctx,
                       libxl_device_model_starting *starting,
                       const char *what,
                       void (*intermediate_hook)(void *for_spawn,
@@ -97,7 +97,7 @@ int libxl_spawn_spawn(struct libxl_ctx *ctx,
     pid_t child, got;
     int status;
     pid_t intermediate;
-    struct libxl_spawn_starting *for_spawn = starting->for_spawn;
+    libxl_spawn_starting *for_spawn = starting->for_spawn;
 
     if (for_spawn) {
         for_spawn->what = libxl_strdup(ctx, what);
@@ -135,8 +135,8 @@ int libxl_spawn_spawn(struct libxl_ctx *ctx,
           ? WTERMSIG(status)+128 : -1);
 }
 
-static void report_spawn_intermediate_status(struct libxl_ctx *ctx,
-                                 struct libxl_spawn_starting *for_spawn,
+static void report_spawn_intermediate_status(libxl_ctx *ctx,
+                                 libxl_spawn_starting *for_spawn,
                                  int status)
 {
     if (!WIFEXITED(status)) {
@@ -149,8 +149,8 @@ static void report_spawn_intermediate_status(struct libxl_ctx *ctx,
     }
 }
 
-int libxl_spawn_detach(struct libxl_ctx *ctx,
-                       struct libxl_spawn_starting *for_spawn)
+int libxl_spawn_detach(libxl_ctx *ctx,
+                       libxl_spawn_starting *for_spawn)
 {
     int r, status;
     pid_t got;
@@ -182,9 +182,9 @@ int libxl_spawn_detach(struct libxl_ctx *ctx,
     return rc;
 }
 
-int libxl_spawn_check(struct libxl_ctx *ctx, void *for_spawn_void)
+int libxl_spawn_check(libxl_ctx *ctx, void *for_spawn_void)
 {
-    struct libxl_spawn_starting *for_spawn = for_spawn_void;
+    libxl_spawn_starting *for_spawn = for_spawn_void;
     pid_t got;
     int status;
 

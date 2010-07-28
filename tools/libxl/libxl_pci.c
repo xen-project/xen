@@ -35,7 +35,7 @@
 #include "libxl_internal.h"
 #include "flexarray.h"
 
-static int libxl_create_pci_backend(struct libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev, int num)
+static int libxl_create_pci_backend(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev, int num)
 {
     flexarray_t *front;
     flexarray_t *back;
@@ -100,7 +100,7 @@ static int libxl_create_pci_backend(struct libxl_ctx *ctx, uint32_t domid, libxl
     return 0;
 }
 
-static int libxl_device_pci_add_xenstore(struct libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
+static int libxl_device_pci_add_xenstore(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
 {
     flexarray_t *back;
     char *num_devs, *be_path;
@@ -153,7 +153,7 @@ retry_transaction:
     return 0;
 }
 
-static int libxl_device_pci_remove_xenstore(struct libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
+static int libxl_device_pci_remove_xenstore(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
 {
     char *be_path, *num_devs_path, *num_devs, *xsdev, *tmp, *tmppath;
     int num, i, j;
@@ -258,7 +258,7 @@ retry_transaction2:
     return 0;
 }
 
-int libxl_device_pci_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
+int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
 {
     char *path;
     char *state, *vdevfn;
@@ -370,7 +370,7 @@ out:
     return 0;
 }
 
-int libxl_device_pci_remove(struct libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
+int libxl_device_pci_remove(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
 {
     char *path;
     char *state;
@@ -466,7 +466,7 @@ out:
     return 0;
 }
 
-libxl_device_pci *libxl_device_pci_list(struct libxl_ctx *ctx, uint32_t domid, int *num)
+libxl_device_pci *libxl_device_pci_list(libxl_ctx *ctx, uint32_t domid, int *num)
 {
     char *be_path, *num_devs, *xsdev, *xsvdevfn, *xsopts;
     int n, i;
@@ -510,7 +510,7 @@ libxl_device_pci *libxl_device_pci_list(struct libxl_ctx *ctx, uint32_t domid, i
     return pcidevs;
 }
 
-int libxl_device_pci_shutdown(struct libxl_ctx *ctx, uint32_t domid)
+int libxl_device_pci_shutdown(libxl_ctx *ctx, uint32_t domid)
 {
     libxl_device_pci *pcidevs;
     int num, i;

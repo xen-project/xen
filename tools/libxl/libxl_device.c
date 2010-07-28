@@ -39,7 +39,7 @@ static const char *string_of_kinds[] = {
     [DEVICE_CONSOLE] = "console",
 };
 
-int libxl_device_generic_add(struct libxl_ctx *ctx, libxl_device *device,
+int libxl_device_generic_add(libxl_ctx *ctx, libxl_device *device,
                              char **bents, char **fents)
 {
     char *dom_path_backend, *dom_path, *frontend_path, *backend_path;
@@ -219,7 +219,7 @@ int device_disk_dev_number(char *virtpath)
     return -1;
 }
 
-int libxl_device_destroy(struct libxl_ctx *ctx, char *be_path, int force)
+int libxl_device_destroy(libxl_ctx *ctx, char *be_path, int force)
 {
     xs_transaction_t t;
     char *state_path = libxl_sprintf(ctx, "%s/state", be_path);
@@ -248,7 +248,7 @@ retry_transaction:
         return 0;
 }
 
-int wait_for_dev_destroy(struct libxl_ctx *ctx, struct timeval *tv)
+int wait_for_dev_destroy(libxl_ctx *ctx, struct timeval *tv)
 {
     int nfds, rc;
     unsigned int n;
@@ -276,14 +276,14 @@ int wait_for_dev_destroy(struct libxl_ctx *ctx, struct timeval *tv)
     return rc;
 }
 
-int libxl_devices_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
+int libxl_devices_destroy(libxl_ctx *ctx, uint32_t domid, int force)
 {
     char *path, *be_path, *fe_path;
     unsigned int num1, num2;
     char **l1 = NULL, **l2 = NULL;
     int i, j, n = 0, n_watches = 0;
     flexarray_t *toremove;
-    struct libxl_ctx clone;
+    libxl_ctx clone;
 
     if (libxl_ctx_init(&clone, LIBXL_VERSION, ctx->lg)) {
         return -1;
@@ -342,11 +342,11 @@ int libxl_devices_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
     return 0;
 }
 
-int libxl_device_del(struct libxl_ctx *ctx, libxl_device *dev, int wait)
+int libxl_device_del(libxl_ctx *ctx, libxl_device *dev, int wait)
 {
     char *dom_path_backend, *backend_path;
     int rc;
-    struct libxl_ctx clone;
+    libxl_ctx clone;
 
     if (libxl_ctx_init(&clone, LIBXL_VERSION, ctx->lg)) {
         return -1;
@@ -377,7 +377,7 @@ int libxl_device_del(struct libxl_ctx *ctx, libxl_device *dev, int wait)
     return 0;
 }
 
-int libxl_device_pci_reset(struct libxl_ctx *ctx, unsigned int domain, unsigned int bus,
+int libxl_device_pci_reset(libxl_ctx *ctx, unsigned int domain, unsigned int bus,
                          unsigned int dev, unsigned int func)
 {
     char *reset = "/sys/bus/pci/drivers/pciback/do_flr";
@@ -411,9 +411,9 @@ int libxl_device_pci_reset(struct libxl_ctx *ctx, unsigned int domain, unsigned 
     return -1;
 }
 
-int libxl_wait_for_device_model(struct libxl_ctx *ctx,
+int libxl_wait_for_device_model(libxl_ctx *ctx,
                                 uint32_t domid, char *state,
-                                int (*check_callback)(struct libxl_ctx *ctx,
+                                int (*check_callback)(libxl_ctx *ctx,
                                                       void *userdata),
                                 void *check_callback_userdata)
 {
@@ -465,7 +465,7 @@ again:
     return -1;
 }
 
-int libxl_wait_for_backend(struct libxl_ctx *ctx, char *be_path, char *state)
+int libxl_wait_for_backend(libxl_ctx *ctx, char *be_path, char *state)
 {
     int watchdog = 100;
     unsigned int len;

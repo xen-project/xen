@@ -23,12 +23,12 @@
 #include "libxl_internal.h"
 #include "libxl_utils.h"
 
-int libxl_error_set(struct libxl_ctx *ctx, int code)
+int libxl_error_set(libxl_ctx *ctx, int code)
 {
     return 0;
 }
 
-int libxl_ptr_add(struct libxl_ctx *ctx, void *ptr)
+int libxl_ptr_add(libxl_ctx *ctx, void *ptr)
 {
     int i;
     void **re;
@@ -59,7 +59,7 @@ int libxl_ptr_add(struct libxl_ctx *ctx, void *ptr)
     return 0;
 }
 
-int libxl_free(struct libxl_ctx *ctx, void *ptr)
+int libxl_free(libxl_ctx *ctx, void *ptr)
 {
     int i;
 
@@ -78,7 +78,7 @@ int libxl_free(struct libxl_ctx *ctx, void *ptr)
     return -1;
 }
 
-int libxl_free_all(struct libxl_ctx *ctx)
+int libxl_free_all(libxl_ctx *ctx)
 {
     void *ptr;
     int i;
@@ -91,7 +91,7 @@ int libxl_free_all(struct libxl_ctx *ctx)
     return 0;
 }
 
-void *libxl_zalloc(struct libxl_ctx *ctx, int bytes)
+void *libxl_zalloc(libxl_ctx *ctx, int bytes)
 {
     void *ptr = calloc(bytes, 1);
     if (!ptr) {
@@ -103,7 +103,7 @@ void *libxl_zalloc(struct libxl_ctx *ctx, int bytes)
     return ptr;
 }
 
-void *libxl_calloc(struct libxl_ctx *ctx, size_t nmemb, size_t size)
+void *libxl_calloc(libxl_ctx *ctx, size_t nmemb, size_t size)
 {
     void *ptr = calloc(nmemb, size);
     if (!ptr) {
@@ -115,7 +115,7 @@ void *libxl_calloc(struct libxl_ctx *ctx, size_t nmemb, size_t size)
     return ptr;
 }
 
-char *libxl_sprintf(struct libxl_ctx *ctx, const char *fmt, ...)
+char *libxl_sprintf(libxl_ctx *ctx, const char *fmt, ...)
 {
     char *s;
     va_list ap;
@@ -138,7 +138,7 @@ char *libxl_sprintf(struct libxl_ctx *ctx, const char *fmt, ...)
     return s;
 }
 
-char *libxl_strdup(struct libxl_ctx *ctx, const char *c)
+char *libxl_strdup(libxl_ctx *ctx, const char *c)
 {
     char *s = strdup(c);
 
@@ -148,7 +148,7 @@ char *libxl_strdup(struct libxl_ctx *ctx, const char *c)
     return s;
 }
 
-char *libxl_dirname(struct libxl_ctx *ctx, const char *s)
+char *libxl_dirname(libxl_ctx *ctx, const char *s)
 {
     char *c;
     char *ptr = libxl_strdup(ctx, s);
@@ -160,7 +160,7 @@ char *libxl_dirname(struct libxl_ctx *ctx, const char *s)
     return ptr;
 }
 
-void xl_logv(struct libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
+void xl_logv(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
              const char *file, int line, const char *func,
              char *fmt, va_list ap)
 {
@@ -187,7 +187,7 @@ void xl_logv(struct libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
     errno = esave;
 }
 
-void xl_log(struct libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
+void xl_log(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
             const char *file, int line, const char *func,
             char *fmt, ...)
 {
@@ -197,7 +197,7 @@ void xl_log(struct libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
     va_end(ap);
 }
 
-char *libxl_abs_path(struct libxl_ctx *ctx, char *s, const char *path)
+char *libxl_abs_path(libxl_ctx *ctx, char *s, const char *path)
 {
     if (!s || s[0] == '/')
         return s;

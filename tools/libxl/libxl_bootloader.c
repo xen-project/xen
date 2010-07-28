@@ -30,7 +30,7 @@
 #define XENCONSOLED_BUF_SIZE 16
 #define BOOTLOADER_BUF_SIZE 1024
 
-static char **make_bootloader_args(struct libxl_ctx *ctx,
+static char **make_bootloader_args(libxl_ctx *ctx,
                                    libxl_domain_build_info *info,
                                    uint32_t domid,
                                    const char *fifo, const char *disk)
@@ -161,7 +161,7 @@ static pid_t fork_exec_bootloader(int *master, char *arg0, char **args)
  * if there is actual data to write, otherwise this would loop too fast,
  * eating up CPU time.
  */
-static char * bootloader_interact(struct libxl_ctx *ctx, int xenconsoled_fd, int bootloader_fd, int fifo_fd)
+static char * bootloader_interact(libxl_ctx *ctx, int xenconsoled_fd, int bootloader_fd, int fifo_fd)
 {
     int ret;
 
@@ -271,7 +271,7 @@ out_err:
     return NULL;
 }
 
-static void parse_bootloader_result(struct libxl_ctx *ctx,
+static void parse_bootloader_result(libxl_ctx *ctx,
                                     libxl_domain_build_info *info,
                                     const char *o)
 {
@@ -295,7 +295,7 @@ static void parse_bootloader_result(struct libxl_ctx *ctx,
     }
 }
 
-int libxl_run_bootloader(struct libxl_ctx *ctx,
+int libxl_run_bootloader(libxl_ctx *ctx,
                          libxl_domain_build_info *info,
                          libxl_device_disk *disk,
                          uint32_t domid)

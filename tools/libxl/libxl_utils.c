@@ -43,7 +43,7 @@ unsigned long libxl_get_required_shadow_memory(unsigned long maxmem_kb, unsigned
     return 4 * (256 * smp_cpus + 2 * (maxmem_kb / 1024));
 }
 
-char *libxl_domid_to_name(struct libxl_ctx *ctx, uint32_t domid)
+char *libxl_domid_to_name(libxl_ctx *ctx, uint32_t domid)
 {
     unsigned int len;
     char path[strlen("/local/domain") + 12];
@@ -55,12 +55,12 @@ char *libxl_domid_to_name(struct libxl_ctx *ctx, uint32_t domid)
     return s;
 }
 
-int libxl_name_to_domid(struct libxl_ctx *ctx, const char *name,
+int libxl_name_to_domid(libxl_ctx *ctx, const char *name,
                         uint32_t *domid)
 {
     int i, nb_domains;
     char *domname;
-    struct libxl_dominfo *dominfo;
+    libxl_dominfo *dominfo;
 
     dominfo = libxl_list_domain(ctx, &nb_domains);
     if (!dominfo)
@@ -78,7 +78,7 @@ int libxl_name_to_domid(struct libxl_ctx *ctx, const char *name,
     return -1;
 }
 
-char *libxl_poolid_to_name(struct libxl_ctx *ctx, uint32_t poolid)
+char *libxl_poolid_to_name(libxl_ctx *ctx, uint32_t poolid)
 {
     unsigned int len;
     char path[strlen("/local/pool") + 12];
@@ -92,12 +92,12 @@ char *libxl_poolid_to_name(struct libxl_ctx *ctx, uint32_t poolid)
     return s;
 }
 
-int libxl_name_to_poolid(struct libxl_ctx *ctx, const char *name,
+int libxl_name_to_poolid(libxl_ctx *ctx, const char *name,
                         uint32_t *poolid)
 {
     int i, nb_pools;
     char *poolname;
-    struct libxl_poolinfo *poolinfo;
+    libxl_poolinfo *poolinfo;
 
     poolinfo = libxl_list_pool(ctx, &nb_pools);
     if (!poolinfo)
@@ -115,7 +115,7 @@ int libxl_name_to_poolid(struct libxl_ctx *ctx, const char *name,
     return -1;
 }
 
-int libxl_get_stubdom_id(struct libxl_ctx *ctx, int guest_domid)
+int libxl_get_stubdom_id(libxl_ctx *ctx, int guest_domid)
 {
     char * stubdom_id_s = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/image/device-model-domid", libxl_xs_get_dompath(ctx, guest_domid)));
     if (stubdom_id_s)
@@ -124,7 +124,7 @@ int libxl_get_stubdom_id(struct libxl_ctx *ctx, int guest_domid)
         return 0;
 }
 
-int libxl_is_stubdom(struct libxl_ctx *ctx, uint32_t domid, uint32_t *target_domid)
+int libxl_is_stubdom(libxl_ctx *ctx, uint32_t domid, uint32_t *target_domid)
 {
     char *target, *endptr;
     uint32_t value;
@@ -140,7 +140,7 @@ int libxl_is_stubdom(struct libxl_ctx *ctx, uint32_t domid, uint32_t *target_dom
     return 1;
 }
 
-static int logrename(struct libxl_ctx *ctx, const char *old, const char *new) {
+static int logrename(libxl_ctx *ctx, const char *old, const char *new) {
     int r;
 
     r = rename(old, new);
@@ -154,7 +154,7 @@ static int logrename(struct libxl_ctx *ctx, const char *old, const char *new) {
     return 0;
 }
 
-int libxl_create_logfile(struct libxl_ctx *ctx, char *name, char **full_name)
+int libxl_create_logfile(libxl_ctx *ctx, char *name, char **full_name)
 {
     struct stat stat_buf;
     char *logfile, *logfile_new;
@@ -186,7 +186,7 @@ int libxl_create_logfile(struct libxl_ctx *ctx, char *name, char **full_name)
     return 0;
 }
 
-int libxl_string_to_phystype(struct libxl_ctx *ctx, char *s, libxl_disk_phystype *phystype)
+int libxl_string_to_phystype(libxl_ctx *ctx, char *s, libxl_disk_phystype *phystype)
 {
     char *p;
     int rc = 0;
@@ -216,7 +216,7 @@ out:
     return rc;
 }
 
-int libxl_read_file_contents(struct libxl_ctx *ctx, const char *filename,
+int libxl_read_file_contents(libxl_ctx *ctx, const char *filename,
                              void **data_r, int *datalen_r) {
     FILE *f = 0;
     uint8_t *data = 0;
@@ -289,7 +289,7 @@ int libxl_read_file_contents(struct libxl_ctx *ctx, const char *filename,
 
 #define READ_WRITE_EXACTLY(rw, zero_is_eof, constdata)                    \
                                                                           \
-  int libxl_##rw##_exactly(struct libxl_ctx *ctx, int fd,                 \
+  int libxl_##rw##_exactly(libxl_ctx *ctx, int fd,                 \
                            constdata void *data, ssize_t sz,              \
                            const char *filename, const char *what) {      \
       ssize_t got;                                                        \
@@ -322,14 +322,14 @@ READ_WRITE_EXACTLY(read, 1, /* */)
 READ_WRITE_EXACTLY(write, 0, const)
 
 
-int libxl_ctx_postfork(struct libxl_ctx *ctx) {
+int libxl_ctx_postfork(libxl_ctx *ctx) {
     if (ctx->xsh) xs_daemon_destroy_postfork(ctx->xsh);
     ctx->xsh = xs_daemon_open();
     if (!ctx->xsh) return ERROR_FAIL;
     return 0;
 }
 
-pid_t libxl_fork(struct libxl_ctx *ctx)
+pid_t libxl_fork(libxl_ctx *ctx)
 {
     pid_t pid;
 
@@ -350,7 +350,7 @@ pid_t libxl_fork(struct libxl_ctx *ctx)
     return pid;
 }
 
-int libxl_pipe(struct libxl_ctx *ctx, int pipes[2])
+int libxl_pipe(libxl_ctx *ctx, int pipes[2])
 {
     if (pipe(pipes) < 0) {
         XL_LOG(ctx, XL_LOG_ERROR, "Failed to create a pipe");
@@ -359,7 +359,7 @@ int libxl_pipe(struct libxl_ctx *ctx, int pipes[2])
     return 0;
 }
 
-int libxl_mac_to_device_nic(struct libxl_ctx *ctx, uint32_t domid,
+int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
                             const char *mac, libxl_device_nic *nic)
 {
     libxl_nicinfo *nics;
@@ -400,7 +400,7 @@ int libxl_mac_to_device_nic(struct libxl_ctx *ctx, uint32_t domid,
     return 0;
 }
 
-int libxl_devid_to_device_nic(struct libxl_ctx *ctx, uint32_t domid,
+int libxl_devid_to_device_nic(libxl_ctx *ctx, uint32_t domid,
                               const char *devid, libxl_device_nic *nic)
 {
     char *tok, *val;
@@ -433,7 +433,7 @@ int libxl_devid_to_device_nic(struct libxl_ctx *ctx, uint32_t domid,
     return 0;
 }
 
-int libxl_devid_to_device_disk(struct libxl_ctx *ctx, uint32_t domid,
+int libxl_devid_to_device_disk(libxl_ctx *ctx, uint32_t domid,
                                const char *devid, libxl_device_disk *disk)
 {
     char *endptr, *val;
@@ -470,7 +470,7 @@ int libxl_devid_to_device_disk(struct libxl_ctx *ctx, uint32_t domid,
     return 0;
 }
 
-int libxl_devid_to_device_net2(struct libxl_ctx *ctx, uint32_t domid,
+int libxl_devid_to_device_net2(libxl_ctx *ctx, uint32_t domid,
                                const char *devid, libxl_device_net2 *net2)
 {
     char *tok, *endptr, *val;

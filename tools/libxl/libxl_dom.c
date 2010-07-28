@@ -31,7 +31,7 @@
 #include "libxl.h"
 #include "libxl_internal.h"
 
-int is_hvm(struct libxl_ctx *ctx, uint32_t domid)
+int is_hvm(libxl_ctx *ctx, uint32_t domid)
 {
     xc_domaininfo_t info;
     int ret;
@@ -44,7 +44,7 @@ int is_hvm(struct libxl_ctx *ctx, uint32_t domid)
     return !!(info.flags & XEN_DOMINF_hvm_guest);
 }
 
-int get_shutdown_reason(struct libxl_ctx *ctx, uint32_t domid)
+int get_shutdown_reason(libxl_ctx *ctx, uint32_t domid)
 {
     xc_domaininfo_t info;
     int ret;
@@ -59,7 +59,7 @@ int get_shutdown_reason(struct libxl_ctx *ctx, uint32_t domid)
     return dominfo_get_shutdown_reason(&info);
 }
 
-int build_pre(struct libxl_ctx *ctx, uint32_t domid,
+int build_pre(libxl_ctx *ctx, uint32_t domid,
               libxl_domain_build_info *info, libxl_domain_build_state *state)
 {
     xc_domain_max_vcpus(ctx->xch, domid, info->max_vcpus);
@@ -82,7 +82,7 @@ int build_pre(struct libxl_ctx *ctx, uint32_t domid,
     return 0;
 }
 
-int build_post(struct libxl_ctx *ctx, uint32_t domid,
+int build_post(libxl_ctx *ctx, uint32_t domid,
                libxl_domain_build_info *info, libxl_domain_build_state *state,
                char **vms_ents, char **local_ents)
 {
@@ -136,7 +136,7 @@ retry_transaction:
     return 0;
 }
 
-int build_pv(struct libxl_ctx *ctx, uint32_t domid,
+int build_pv(libxl_ctx *ctx, uint32_t domid,
              libxl_domain_build_info *info, libxl_domain_build_state *state)
 {
     struct xc_dom_image *dom;
@@ -215,7 +215,7 @@ out:
     return ret == 0 ? 0 : ERROR_FAIL;
 }
 
-int build_hvm(struct libxl_ctx *ctx, uint32_t domid,
+int build_hvm(libxl_ctx *ctx, uint32_t domid,
               libxl_domain_build_info *info, libxl_domain_build_state *state)
 {
     int ret;
@@ -245,7 +245,7 @@ int build_hvm(struct libxl_ctx *ctx, uint32_t domid,
     return 0;
 }
 
-int restore_common(struct libxl_ctx *ctx, uint32_t domid,
+int restore_common(libxl_ctx *ctx, uint32_t domid,
                    libxl_domain_build_info *info, libxl_domain_build_state *state,
                    int fd)
 {
@@ -263,7 +263,7 @@ int restore_common(struct libxl_ctx *ctx, uint32_t domid,
 }
 
 struct suspendinfo {
-    struct libxl_ctx *ctx;
+    libxl_ctx *ctx;
     int xce; /* event channel handle */
     int suspend_eventchn;
     int domid;
@@ -345,7 +345,7 @@ static int core_suspend_callback(void *data)
     return 1;
 }
 
-int core_suspend(struct libxl_ctx *ctx, uint32_t domid, int fd,
+int core_suspend(libxl_ctx *ctx, uint32_t domid, int fd,
 		int hvm, int live, int debug)
 {
     int flags;
@@ -396,7 +396,7 @@ int core_suspend(struct libxl_ctx *ctx, uint32_t domid, int fd,
     return 0;
 }
 
-int save_device_model(struct libxl_ctx *ctx, uint32_t domid, int fd)
+int save_device_model(libxl_ctx *ctx, uint32_t domid, int fd)
 {
     int fd2, c;
     char buf[1024];
@@ -427,17 +427,17 @@ int save_device_model(struct libxl_ctx *ctx, uint32_t domid, int fd)
     return 0;
 }
 
-char *libxl_uuid2string(struct libxl_ctx *ctx, uint8_t uuid[16]) {
+char *libxl_uuid2string(libxl_ctx *ctx, uint8_t uuid[16]) {
     char *s = string_of_uuid(ctx, uuid);
     if (!s) XL_LOG(ctx, XL_LOG_ERROR, "cannot allocate for uuid");
     return s;
 }
 
-static const char *userdata_path(struct libxl_ctx *ctx, uint32_t domid,
+static const char *userdata_path(libxl_ctx *ctx, uint32_t domid,
                                       const char *userdata_userid,
                                       const char *wh) {
     char *path, *uuid_string;
-    struct libxl_dominfo info;
+    libxl_dominfo info;
     int rc;
 
     rc = libxl_domain_info(ctx, &info, domid);
@@ -457,7 +457,7 @@ static const char *userdata_path(struct libxl_ctx *ctx, uint32_t domid,
     return path;
 }
 
-static int userdata_delete(struct libxl_ctx *ctx, const char *path) {
+static int userdata_delete(libxl_ctx *ctx, const char *path) {
     int r;
     r = unlink(path);
     if (r) {
@@ -467,7 +467,7 @@ static int userdata_delete(struct libxl_ctx *ctx, const char *path) {
     return 0;
 }
 
-void libxl__userdata_destroyall(struct libxl_ctx *ctx, uint32_t domid) {
+void libxl__userdata_destroyall(libxl_ctx *ctx, uint32_t domid) {
     const char *pattern;
     glob_t gl;
     int r, i;
@@ -488,7 +488,7 @@ void libxl__userdata_destroyall(struct libxl_ctx *ctx, uint32_t domid) {
     globfree(&gl);
 }
 
-int libxl_userdata_store(struct libxl_ctx *ctx, uint32_t domid,
+int libxl_userdata_store(libxl_ctx *ctx, uint32_t domid,
                               const char *userdata_userid,
                               const uint8_t *data, int datalen) {
     const char *filename;
@@ -535,7 +535,7 @@ int libxl_userdata_store(struct libxl_ctx *ctx, uint32_t domid,
     return ERROR_FAIL;
 }
 
-int libxl_userdata_retrieve(struct libxl_ctx *ctx, uint32_t domid,
+int libxl_userdata_retrieve(libxl_ctx *ctx, uint32_t domid,
                                  const char *userdata_userid,
                                  uint8_t **data_r, int *datalen_r) {
     const char *filename;

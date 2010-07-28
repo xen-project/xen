@@ -64,7 +64,7 @@
 int logfile = 2;
 
 /* every libxl action in xl uses this same libxl context */
-struct libxl_ctx ctx;
+libxl_ctx ctx;
 
 /* when we operate on a domain, it is this one: */
 static uint32_t domid;
@@ -1092,8 +1092,8 @@ int autoconnect_console(int hvm)
 }
 
 /* Returns 1 if domain should be restarted, 2 if domain should be renamed then restarted  */
-static int handle_domain_death(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event,
-                               struct domain_config *d_config, struct libxl_dominfo *info)
+static int handle_domain_death(libxl_ctx *ctx, uint32_t domid, libxl_event *event,
+                               struct domain_config *d_config, libxl_dominfo *info)
 {
     int restart = 0;
     enum action_on_shutdown action;
@@ -1161,8 +1161,8 @@ static int handle_domain_death(struct libxl_ctx *ctx, uint32_t domid, libxl_even
     return restart;
 }
 
-static int preserve_domain(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event,
-                           struct domain_config *d_config, struct libxl_dominfo *info)
+static int preserve_domain(libxl_ctx *ctx, uint32_t domid, libxl_event *event,
+                           struct domain_config *d_config, libxl_dominfo *info)
 {
     time_t now;
     struct tm tm;
@@ -1542,7 +1542,7 @@ start:
     while (1) {
         int ret;
         fd_set rfds;
-        struct libxl_dominfo info;
+        libxl_dominfo info;
         libxl_event event;
         libxl_device_disk disk;
 
@@ -2093,7 +2093,7 @@ void reboot_domain(char *p)
 
 void list_domains_details(void)
 {
-    struct libxl_dominfo *info;
+    libxl_dominfo *info;
     struct domain_config d_config;
 
     char *config_file;
@@ -2123,7 +2123,7 @@ void list_domains_details(void)
 
 void list_domains(int verbose)
 {
-    struct libxl_dominfo *info;
+    libxl_dominfo *info;
     int nb_domain, i;
 
     info = libxl_list_domain(&ctx, &nb_domain);
@@ -2157,7 +2157,7 @@ void list_domains(int verbose)
 
 void list_vm(void)
 {
-    struct libxl_vminfo *info;
+    libxl_vminfo *info;
     int nb_vm, i;
 
     info = libxl_list_vm(&ctx, &nb_vm);
@@ -3139,7 +3139,7 @@ int main_button_press(int argc, char **argv)
 }
 
 static void print_vcpuinfo(uint32_t tdomid,
-                           const struct libxl_vcpuinfo *vcpuinfo,
+                           const libxl_vcpuinfo *vcpuinfo,
                            uint32_t nr_cpus)
 {
     int i, l;
@@ -3206,9 +3206,9 @@ static void print_vcpuinfo(uint32_t tdomid,
 
 void vcpulist(int argc, char **argv)
 {
-    struct libxl_dominfo *dominfo;
-    struct libxl_vcpuinfo *vcpuinfo;
-    struct libxl_physinfo physinfo;
+    libxl_dominfo *dominfo;
+    libxl_vcpuinfo *vcpuinfo;
+    libxl_physinfo physinfo;
     int nb_vcpu, nb_domain, cpusize;
 
     if (libxl_get_physinfo(&ctx, &physinfo) != 0) {
@@ -3270,8 +3270,8 @@ int main_vcpulist(int argc, char **argv)
 
 void vcpupin(char *d, const char *vcpu, char *cpu)
 {
-    struct libxl_vcpuinfo *vcpuinfo;
-    struct libxl_physinfo physinfo;
+    libxl_vcpuinfo *vcpuinfo;
+    libxl_physinfo physinfo;
     uint64_t *cpumap = NULL;
 
     uint32_t vcpuid, cpuida, cpuidb;
@@ -3463,7 +3463,7 @@ static void output_nodeinfo(void)
 
 static void output_physinfo(void)
 {
-    struct libxl_physinfo info;
+    libxl_physinfo info;
     const libxl_version_info *vinfo;
     unsigned int i;
 
@@ -3529,7 +3529,7 @@ int main_info(int argc, char **argv)
 }
 
 static int sched_credit_domain_get(
-    int domid, struct libxl_sched_credit *scinfo)
+    int domid, libxl_sched_credit *scinfo)
 {
     int rc;
 
@@ -3541,7 +3541,7 @@ static int sched_credit_domain_get(
 }
 
 static int sched_credit_domain_set(
-    int domid, struct libxl_sched_credit *scinfo)
+    int domid, libxl_sched_credit *scinfo)
 {
     int rc;
 
@@ -3553,7 +3553,7 @@ static int sched_credit_domain_set(
 }
 
 static void sched_credit_domain_output(
-    int domid, struct libxl_sched_credit *scinfo)
+    int domid, libxl_sched_credit *scinfo)
 {
     printf("%-33s %4d %6d %4d\n",
         libxl_domid_to_name(&ctx, domid),
@@ -3564,8 +3564,8 @@ static void sched_credit_domain_output(
 
 int main_sched_credit(int argc, char **argv)
 {
-    struct libxl_dominfo *info;
-    struct libxl_sched_credit scinfo;
+    libxl_dominfo *info;
+    libxl_sched_credit scinfo;
     int nb_domain, i;
     char *dom = NULL;
     int weight = 256, cap = 0, opt_w = 0, opt_c = 0;
@@ -3859,7 +3859,7 @@ int main_debug_keys(int argc, char **argv)
 int main_dmesg(int argc, char **argv)
 {
     unsigned int clear = 0;
-    struct libxl_xen_console_reader *cr;
+    libxl_xen_console_reader *cr;
     char *line;
     int opt, ret = 1;
 
@@ -4538,7 +4538,7 @@ static void print_domU_uptime(uint32_t domuid, int short_mode, time_t now)
 
 static void print_uptime(int short_mode, uint32_t doms[], int nb_doms)
 {
-    struct libxl_vminfo *info;
+    libxl_vminfo *info;
     time_t now;
     int nb_vm, i;
 
