@@ -1113,6 +1113,9 @@ static int handle_domain_death(libxl_ctx *ctx, uint32_t domid, libxl_event *even
     case SHUTDOWN_watchdog:
         action = d_config->on_watchdog;
         break;
+    default:
+        LOG("Unknown shutdown reason code %s. Destroying domain.", info->shutdown_reason);
+        action = ACTION_DESTROY;
     }
 
     LOG("Action for shutdown reason code %d is %s", info->shutdown_reason, action_on_shutdown_names[action]);
