@@ -25,7 +25,6 @@
 #include <public/xen.h>
 #include <asm/shared.h>
 #include <asm/hvm/support.h>
-#include <asm/hpet.h>
 #include <asm/apic.h>
 #include <asm/io_apic.h>
 
@@ -43,9 +42,10 @@ static int crash_nmi_callback(struct cpu_user_regs *regs, int cpu)
     local_irq_disable();
 
     kexec_crash_save_cpu();
-    disable_local_APIC();
+
+    __stop_this_cpu();
+
     atomic_dec(&waiting_for_crash_ipi);
-    hvm_cpu_down();
 
     for ( ; ; )
         halt();
@@ -57,7 +57,10 @@ static void nmi_shootdown_cpus(void)
 {
     unsigned long msecs;
 
+    local_irq_disable();
+
     crashing_cpu = smp_processor_id();
+    local_irq_count(crashing_cpu) = 0;
 
     atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
     /* Would it be better to replace the trap vector here? */
@@ -74,24 +77,17 @@ static void nmi_shootdown_cpus(void)
         msecs--;
     }
 
-    /* Leave the nmi callback set */
-    disable_local_APIC();
+    __stop_this_cpu();
+    disable_IO_APIC();
+
+    local_irq_enable();
 }
 
 void machine_crash_shutdown(void)
 {
     crash_xen_info_t *info;
 
-    local_irq_disable();
-
     nmi_shootdown_cpus();
-
-    if ( hpet_broadcast_is_available() )
-        hpet_disable_legacy_broadcast();
-
-    disable_IO_APIC();
-
-    hvm_cpu_down();
 
     info = kexec_crash_save_info();
     info->xen_phys_start = xen_phys_start;

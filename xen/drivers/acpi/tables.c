@@ -41,7 +41,7 @@ mps_inti_flags_polarity[] = { "dfl", "high", "res", "low" };
 static const char *__initdata
 mps_inti_flags_trigger[] = { "dfl", "edge", "res", "level" };
 
-static struct acpi_table_desc initial_tables[ACPI_MAX_TABLES] __initdata;
+static struct acpi_table_desc initial_tables[ACPI_MAX_TABLES];
 
 static int acpi_apic_instance __initdata;
 
@@ -269,7 +269,7 @@ acpi_table_parse_madt(enum acpi_madt_type id,
  * Scan the ACPI System Descriptor Table (STD) for a table matching @id,
  * run @handler on it.  Return 0 if table found, return on if not.
  */
-int __init acpi_table_parse(char *id, acpi_table_handler handler)
+int acpi_table_parse(char *id, acpi_table_handler handler)
 {
 	struct acpi_table_header *table = NULL;
 

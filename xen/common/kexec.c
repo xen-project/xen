@@ -6,7 +6,9 @@
  * - Magnus Damm <magnus@valinux.co.jp>
  */
 
+#include <xen/init.h>
 #include <xen/lib.h>
+#include <xen/acpi.h>
 #include <xen/ctype.h>
 #include <xen/errno.h>
 #include <xen/guest_access.h>
@@ -201,6 +203,22 @@ crash_xen_info_t *kexec_crash_save_info(void)
     return out;
 }
 
+static int acpi_dmar_reinstate(struct acpi_table_header *table)
+{
+    table->signature[0] = 'D';
+    table->checksum += 'X'-'D';
+    return 0;
+}
+
+static void kexec_common_shutdown(void)
+{
+    watchdog_disable();
+    console_start_sync();
+    spin_debug_disable();
+    one_cpu_only();
+    acpi_table_parse(ACPI_SIG_DMAR, acpi_dmar_reinstate);
+}
+
 void kexec_crash(void)
 {
     int pos;
@@ -209,15 +227,23 @@ void kexec_crash(void)
     if ( !test_bit(KEXEC_IMAGE_CRASH_BASE + pos, &kexec_flags) )
         return;
 
-    console_start_sync();
-
-    one_cpu_only();
+    kexec_common_shutdown();
     kexec_crash_save_cpu();
     machine_crash_shutdown();
-
     machine_kexec(&kexec_image[KEXEC_IMAGE_CRASH_BASE + pos]);
 
     BUG();
+}
+
+static long kexec_reboot(void *_image)
+{
+    xen_kexec_image_t *image = _image;
+
+    kexec_common_shutdown();
+    machine_reboot_kexec(image);
+
+    BUG();
+    return 0;
 }
 
 static void do_crashdump_trigger(unsigned char key)
@@ -540,7 +566,7 @@ static int kexec_exec(XEN_GUEST_HANDLE(void) uarg)
 {
     xen_kexec_exec_t exec;
     xen_kexec_image_t *image;
-    int base, bit, pos;
+    int base, bit, pos, ret = -EINVAL;
 
     if ( unlikely(copy_from_guest(&exec, uarg, 1)) )
         return -EFAULT;
@@ -558,8 +584,7 @@ static int kexec_exec(XEN_GUEST_HANDLE(void) uarg)
     {
     case KEXEC_TYPE_DEFAULT:
         image = &kexec_image[base + pos];
-        one_cpu_only();
-        machine_reboot_kexec(image); /* Does not return */
+        ret = continue_hypercall_on_cpu(0, kexec_reboot, image);
         break;
     case KEXEC_TYPE_CRASH:
         kexec_crash(); /* Does not return */

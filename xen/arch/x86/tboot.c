@@ -478,7 +478,10 @@ int __init tboot_parse_dmar_table(acpi_table_handler dmar_handler)
     dmar_table = NULL;
     acpi_get_table(ACPI_SIG_DMAR, 0, &dmar_table);
     if ( dmar_table != NULL )
-        ((struct acpi_table_dmar *)dmar_table)->header.signature[0] = '\0';
+    {
+        dmar_table->signature[0] = 'X';
+        dmar_table->checksum -= 'X'-'D';
+    }
 
     return rc;
 }

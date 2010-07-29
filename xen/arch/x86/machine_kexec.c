@@ -18,6 +18,7 @@
 #include <xen/domain_page.h>
 #include <asm/fixmap.h>
 #include <asm/hvm/hvm.h>
+#include <asm/hpet.h>
 
 typedef void (*relocate_new_kernel_t)(
                 unsigned long indirection_page,
@@ -76,38 +77,11 @@ void machine_kexec_unload(int type, int slot, xen_kexec_image_t *image)
 {
 }
 
-static void __machine_reboot_kexec(void *data)
-{
-    xen_kexec_image_t *image = (xen_kexec_image_t *)data;
-
-    watchdog_disable();
-    console_start_sync();
-
-    smp_send_stop();
-
-    machine_kexec(image);
-}
-
 void machine_reboot_kexec(xen_kexec_image_t *image)
 {
-    int reboot_cpu_id;
-
-    reboot_cpu_id = 0;
-
-    if ( !cpu_isset(reboot_cpu_id, cpu_online_map) )
-        reboot_cpu_id = smp_processor_id();
-
-    if ( reboot_cpu_id != smp_processor_id() )
-    {
-        on_selected_cpus(cpumask_of(reboot_cpu_id), __machine_reboot_kexec,
-                         image, 0);
-        for (;;)
-                ; /* nothing */
-    }
-    else
-    {
-        __machine_reboot_kexec(image);
-    }
+    BUG_ON(smp_processor_id() != 0);
+    smp_send_stop();
+    machine_kexec(image);
     BUG();
 }
 
@@ -117,6 +91,9 @@ void machine_kexec(xen_kexec_image_t *image)
         .base = (unsigned long)(boot_cpu_gdt_table - FIRST_RESERVED_GDT_ENTRY),
         .limit = LAST_RESERVED_GDT_BYTE
     };
+
+    if ( hpet_broadcast_is_available() )
+        hpet_disable_legacy_broadcast();
 
     /*
      * compat_machine_kexec() returns to idle pagetables, which requires us

@@ -336,7 +336,7 @@ void on_selected_cpus(
     spin_unlock(&call_lock);
 }
 
-static void __stop_this_cpu(void)
+void __stop_this_cpu(void)
 {
     ASSERT(!local_irq_is_enabled());
 

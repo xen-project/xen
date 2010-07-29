@@ -738,7 +738,8 @@ static int __init acpi_parse_dmar(struct acpi_table_header *table)
 
 out:
     /* Zap ACPI DMAR signature to prevent dom0 using vt-d HW. */
-    dmar->header.signature[0] = '\0';
+    dmar->header.signature[0] = 'X';
+    dmar->header.checksum -= 'X'-'D';
     return ret;
 }
 

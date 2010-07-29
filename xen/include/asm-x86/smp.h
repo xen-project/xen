@@ -61,6 +61,8 @@ int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm);
 int hard_smp_processor_id(void);
 int logical_smp_processor_id(void);
 
+void __stop_this_cpu(void);
+
 #endif /* !__ASSEMBLY__ */
 
 #else /* CONFIG_SMP */
