@@ -11,7 +11,7 @@ CFLAGS   += $(INCLUDES)
 HDRS     = $(wildcard *.h)
 
 TARGETS-y := xenperf xenpm xen-tmem-list-parse gtraceview gtracestat xenlockprof xenwatchdogd
-TARGETS-$(CONFIG_X86) += xen-detect xen-hvmctx
+TARGETS-$(CONFIG_X86) += xen-detect xen-hvmctx xen-hvmcrash
 TARGETS-$(CONFIG_MIGRATE) += xen-hptool
 TARGETS := $(TARGETS-y)
 
@@ -24,7 +24,7 @@ INSTALL_BIN-$(CONFIG_X86) += xen-detect
 INSTALL_BIN := $(INSTALL_BIN-y)
 
 INSTALL_SBIN-y := xm xen-bugtool xen-python-path xend xenperf xsview xenpm xen-tmem-list-parse gtraceview gtracestat xenlockprof xenwatchdogd
-INSTALL_SBIN-$(CONFIG_X86) += xen-hvmctx
+INSTALL_SBIN-$(CONFIG_X86) += xen-hvmctx xen-hvmcrash
 INSTALL_SBIN-$(CONFIG_MIGRATE) += xen-hptool
 INSTALL_SBIN := $(INSTALL_SBIN-y)
 
@@ -51,7 +51,7 @@ clean:
 %.o: %.c $(HDRS) Makefile
 	$(CC) -c $(CFLAGS) -o $@ $<
 
-xen-hvmctx xenperf xenpm gtracestat xenlockprof xen-hptool xenwatchdogd: %: %.o Makefile
+xen-hvmctx xen-hvmcrash xenperf xenpm gtracestat xenlockprof xen-hptool xenwatchdogd: %: %.o Makefile
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS) $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenguest) $(LDFLAGS_libxenstore)
 
 gtraceview: %: %.o Makefile

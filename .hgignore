@@ -199,6 +199,7 @@
 ^tools/misc/xen_cpuperf$
 ^tools/misc/xen-detect$
 ^tools/misc/xen-hptool$
+^tools/misc/xen-hvmcrash$
 ^tools/misc/xen-tmem-list-parse$
 ^tools/misc/xenperf$
 ^tools/misc/xenpm$
