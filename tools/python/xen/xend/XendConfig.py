@@ -65,8 +65,10 @@ def bool0(v):
 
 def convert_on_crash(v):
     v = str(v)
-    return XEN_API_ON_CRASH_BEHAVIOUR_LEGACY[v] \
-            if v in XEN_API_ON_CRASH_BEHAVIOUR else v
+    if v in XEN_API_ON_CRASH_BEHAVIOUR:
+        return XEN_API_ON_CRASH_BEHAVIOUR_LEGACY[v]
+    else:
+        return v
 
 # Recursively copy a data struct, scrubbing out VNC passwords.
 # Will scrub any dict entry with a key of 'vncpasswd' or any
