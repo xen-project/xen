@@ -15,9 +15,9 @@
 #include "libxl_osdeps.h"
 
 #include <string.h>
-#include <pty.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <termios.h>
 
 #include <sys/stat.h>
 #include <sys/types.h>

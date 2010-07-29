@@ -23,6 +23,14 @@
 
 #define _GNU_SOURCE
 
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+#include <util.h>
+#elif defined(__linux__)
+#include <pty.h>
+#elif defined(__sun__)
+#include <stropts.h>
+#endif
+
 #ifdef NEED_OWN_ASPRINTF
 #include <stdarg.h>
 
