@@ -32,6 +32,7 @@ int main_cd_insert(int argc, char **argv);
 int main_console(int argc, char **argv);
 int main_vncviewer(int argc, char **argv);
 int main_pcilist(int argc, char **argv);
+int main_pcilist_assignable(int argc, char **argv);
 int main_pcidetach(int argc, char **argv);
 int main_pciattach(int argc, char **argv);
 int main_restore(int argc, char **argv);

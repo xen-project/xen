@@ -91,6 +91,8 @@ typedef struct {
 #define XC_PCI_BDF             "0x%x, 0x%x, 0x%x, 0x%x"
 #define AUTO_PHP_SLOT          0x100
 #define SYSFS_PCI_DEV          "/sys/bus/pci/devices"
+#define SYSFS_PCIBACK_DRIVER   "/sys/bus/pci/drivers/pciback"
+
 #define PROC_PCI_NUM_RESOURCES 7
 #define PCI_BAR_IO             0x01
 

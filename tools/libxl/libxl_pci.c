@@ -28,6 +28,7 @@
 #include <unistd.h> /* for write, unlink and close */
 #include <stdint.h>
 #include <inttypes.h>
+#include <dirent.h>
 #include <assert.h>
 
 #include "libxl.h"
@@ -258,22 +259,77 @@ retry_transaction2:
     return 0;
 }
 
-int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
+static int get_all_assigned_devices(libxl_ctx *ctx, libxl_device_pci **list, int *num)
+{
+    libxl_device_pci *pcidevs = NULL;
+    char **domlist;
+    unsigned int nd = 0, i;
+
+    *list = NULL;
+    *num = 0;
+
+    domlist = libxl_xs_directory(ctx, XBT_NULL, "/local/domain", &nd);
+    for(i = 0; i < nd; i++) {
+        char *path, *num_devs;
+
+        path = libxl_sprintf(ctx, "/local/domain/0/backend/pci/%s/0/num_devs", domlist[i]);
+        num_devs = libxl_xs_read(ctx, XBT_NULL, path);
+        if ( num_devs ) {
+            int ndev = atoi(num_devs), j;
+            char *devpath, *bdf;
+
+            pcidevs = calloc(sizeof(*pcidevs), ndev);
+            for(j = (pcidevs) ? 0 : ndev; j < ndev; j++) {
+                devpath = libxl_sprintf(ctx, "/local/domain/0/backend/pci/%s/0/dev-%u",
+                                        domlist[i], j);
+                bdf = libxl_xs_read(ctx, XBT_NULL, devpath);
+                if ( bdf ) {
+                    unsigned dom, bus, dev, func;
+                    if ( sscanf(bdf, PCI_BDF, &dom, &bus, &dev, &func) != 4 )
+                        continue;
+
+                    libxl_device_pci_init(pcidevs + *num, dom, bus, dev, func, 0);
+                    (*num)++;
+                }
+            }
+        }
+    }
+
+    if ( 0 == *num ) {
+        free(pcidevs);
+        pcidevs = NULL;
+    }else{
+        *list = pcidevs;
+    }
+
+    return 0;
+}
+
+static int is_assigned(libxl_device_pci *assigned, int num_assigned,
+                       int dom, int bus, int dev, int func)
+{
+    int i;
+
+    for(i = 0; i < num_assigned; i++) {
+        if ( assigned[i].domain != dom )
+            continue;
+        if ( assigned[i].bus != bus )
+            continue;
+        if ( assigned[i].dev != dev )
+            continue;
+        if ( assigned[i].func != func )
+            continue;
+        return 1;
+    }
+
+    return 0;
+}
+
+static int do_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
 {
     char *path;
     char *state, *vdevfn;
     int rc, hvm;
-    int stubdomid = 0;
-
-    /* TODO: check if the device can be assigned */
-
-    libxl_device_pci_reset(ctx, pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func);
-
-    stubdomid = libxl_get_stubdom_id(ctx, domid);
-    if (stubdomid != 0) {
-        libxl_device_pci pcidev_s = *pcidev;
-        libxl_device_pci_add(ctx, stubdomid, &pcidev_s);
-    }
 
     hvm = is_hvm(ctx, domid);
     if (hvm) {
@@ -368,6 +424,38 @@ out:
 
     libxl_device_pci_add_xenstore(ctx, domid, pcidev);
     return 0;
+}
+
+int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
+{
+    libxl_device_pci *assigned;
+    int num_assigned, rc;
+    int stubdomid = 0;
+
+    rc = get_all_assigned_devices(ctx, &assigned, &num_assigned);
+    if ( rc ) {
+        XL_LOG(ctx, XL_LOG_ERROR, "cannot determine if device is assigned, refusing to continue");
+        return ERROR_FAIL;
+    }
+    if ( is_assigned(assigned, num_assigned, pcidev->domain,
+                     pcidev->bus, pcidev->dev, pcidev->func) ) {
+        XL_LOG(ctx, XL_LOG_ERROR, "PCI device already attached to a domain");
+        free(assigned);
+        return ERROR_FAIL;
+    }
+    free(assigned);
+
+    libxl_device_pci_reset(ctx, pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func);
+
+    stubdomid = libxl_get_stubdom_id(ctx, domid);
+    if (stubdomid != 0) {
+        libxl_device_pci pcidev_s = *pcidev;
+        rc = do_pci_add(ctx, stubdomid, &pcidev_s);
+        if ( rc )
+            return rc;
+    }
+
+    return do_pci_add(ctx, domid, pcidev);
 }
 
 int libxl_device_pci_remove(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
@@ -466,7 +554,64 @@ out:
     return 0;
 }
 
-libxl_device_pci *libxl_device_pci_list(libxl_ctx *ctx, uint32_t domid, int *num)
+static libxl_device_pci *scan_sys_pcidir(libxl_device_pci *assigned,
+                                         int num_assigned, const char *path, int *num)
+{
+    libxl_device_pci *pcidevs = NULL, *new;
+    struct dirent *de;
+    DIR *dir;
+
+    dir = opendir(path);
+    if ( NULL == dir )
+        return pcidevs;
+
+    while( (de = readdir(dir)) ) {
+        unsigned dom, bus, dev, func;
+        if ( sscanf(de->d_name, PCI_BDF, &dom, &bus, &dev, &func) != 4 )
+            continue;
+
+        if ( is_assigned(assigned, num_assigned, dom, bus, dev, func) )
+            continue;
+
+        new = realloc(pcidevs, ((*num) + 1) * sizeof(*new));
+        if ( NULL == new )
+            continue;
+
+        pcidevs = new;
+        new = pcidevs + *num;
+
+        memset(new, 0, sizeof(*new));
+        libxl_device_pci_init(new, dom, bus, dev, func, 0);
+        (*num)++;
+    }
+
+    closedir(dir);
+    return pcidevs;
+}
+
+int libxl_device_pci_list_assignable(libxl_ctx *ctx, libxl_device_pci **list, int *num)
+{
+    libxl_device_pci *pcidevs = NULL;
+    libxl_device_pci *assigned;
+    int num_assigned, rc;
+
+    *num = 0;
+    *list = NULL;
+
+    rc = get_all_assigned_devices(ctx, &assigned, &num_assigned);
+    if ( rc )
+        return rc;
+
+    pcidevs = scan_sys_pcidir(assigned, num_assigned,
+                              SYSFS_PCIBACK_DRIVER, num);
+
+    free(assigned);
+    if ( *num )
+        *list = pcidevs;
+    return 0;
+}
+
+int libxl_device_pci_list_assigned(libxl_ctx *ctx, libxl_device_pci **list, uint32_t domid, int *num)
 {
     char *be_path, *num_devs, *xsdev, *xsvdevfn, *xsopts;
     int n, i;
@@ -477,7 +622,8 @@ libxl_device_pci *libxl_device_pci_list(libxl_ctx *ctx, uint32_t domid, int *num
     num_devs = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/num_devs", be_path));
     if (!num_devs) {
         *num = 0;
-        return NULL;
+        *list = NULL;
+        return ERROR_FAIL;
     }
     n = atoi(num_devs);
     pcidevs = calloc(n, sizeof(libxl_device_pci));
@@ -507,15 +653,19 @@ libxl_device_pci *libxl_device_pci_list(libxl_ctx *ctx, uint32_t domid, int *num
             } while ((p = strtok_r(NULL, ",=", &saveptr)) != NULL);
         }
     }
-    return pcidevs;
+    if ( *num )
+        *list = pcidevs;
+    return 0;
 }
 
 int libxl_device_pci_shutdown(libxl_ctx *ctx, uint32_t domid)
 {
     libxl_device_pci *pcidevs;
-    int num, i;
+    int num, i, rc;
 
-    pcidevs = libxl_device_pci_list(ctx, domid, &num);
+    rc = libxl_device_pci_list_assigned(ctx, &pcidevs, domid, &num);
+    if ( rc )
+        return rc;
     for (i = 0; i < num; i++) {
         if (libxl_device_pci_remove(ctx, domid, pcidevs + i) < 0)
             return ERROR_FAIL;

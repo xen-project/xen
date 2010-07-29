@@ -1923,6 +1923,39 @@ int main_vncviewer(int argc, char **argv)
     exit(0);
 }
 
+void pcilist_assignable(void)
+{
+    libxl_device_pci *pcidevs;
+    int num, i;
+
+    if ( libxl_device_pci_list_assignable(&ctx, &pcidevs, &num) )
+        return;
+    for (i = 0; i < num; i++) {
+        printf("%04x:%02x:%02x:%01x\n",
+                pcidevs[i].domain, pcidevs[i].bus, pcidevs[i].dev, pcidevs[i].func);
+    }
+    free(pcidevs);
+}
+
+int main_pcilist_assignable(int argc, char **argv)
+{
+    int opt;
+
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("pci-list-assignable-devices");
+            exit(0);
+        default:
+            fprintf(stderr, "option not supported\n");
+            break;
+        }
+    }
+
+    pcilist_assignable();
+    exit(0);
+}
+
 void pcilist(char *dom)
 {
     libxl_device_pci *pcidevs;
@@ -1930,8 +1963,7 @@ void pcilist(char *dom)
 
     find_domain(dom);
 
-    pcidevs = libxl_device_pci_list(&ctx, domid, &num);
-    if (!num)
+    if (libxl_device_pci_list_assigned(&ctx, &pcidevs, domid, &num))
         return;
     printf("VFn  domain bus  slot func\n");
     for (i = 0; i < num; i++) {
