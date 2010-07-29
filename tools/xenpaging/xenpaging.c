@@ -73,8 +73,9 @@ xenpaging_t *xenpaging_init(xc_interface **xch_r, domid_t domain_id)
     xc_interface *xch;
     int rc;
 
-    xch = xc_interface_open(0,0,0);
-    if ( !xch ) return NULL;
+    xch = xc_interface_open(NULL, NULL, 0);
+    if ( !xch )
+        goto err_iface;
 
     DPRINTF("xenpaging init\n");
     *xch_r = xch;
@@ -101,7 +102,7 @@ xenpaging_t *xenpaging_init(xc_interface **xch_r, domid_t domain_id)
     paging->mem_event.ring_page = init_page();
     if ( paging->mem_event.ring_page == NULL )
     {
-        ERROR("Error initialising shared page");
+        ERROR("Error initialising ring page");
         goto err;
     }
 
@@ -199,13 +200,27 @@ xenpaging_t *xenpaging_init(xc_interface **xch_r, domid_t domain_id)
     return paging;
 
  err:
-    if ( paging->bitmap )
-        free(paging->bitmap);
-    if ( paging->platform_info )
-        free(paging->platform_info);
     if ( paging )
-        free(paging);
+    {
+        if ( paging->mem_event.shared_page )
+        {
+            munlock(paging->mem_event.shared_page, PAGE_SIZE);
+            free(paging->mem_event.shared_page);
+        }
 
+        if ( paging->mem_event.ring_page )
+        {
+            munlock(paging->mem_event.ring_page, PAGE_SIZE);
+            free(paging->mem_event.ring_page);
+        }
+
+        free(paging->bitmap);
+        free(paging->platform_info);
+        free(paging->domain_info);
+        free(paging);
+    }
+
+ err_iface: 
     return NULL;
 }
 
@@ -618,6 +633,8 @@ int main(int argc, char *argv[])
 
     if ( rc == 0 )
         rc = rc1;
+
+    xc_interface_close(xch);
 
     return rc;
 }
