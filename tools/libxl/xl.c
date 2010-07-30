@@ -83,6 +83,7 @@ int main(int argc, char **argv)
     }
 
     libxl_ctx_free(&ctx);
+    xtl_logger_destroy((xentoollog_logger*)logger);
 
     return ret;
 }
