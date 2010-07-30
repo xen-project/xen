@@ -2126,22 +2126,15 @@ void reboot_domain(char *p)
     if (rc) { fprintf(stderr,"reboot failed (rc=%d)\n.",rc);exit(-1); }
 }
 
-void list_domains_details(void)
+void list_domains_details(const libxl_dominfo *info, int nb_domain)
 {
-    libxl_dominfo *info;
     struct domain_config d_config;
 
     char *config_file;
     uint8_t *data;
-    int nb_domain, i, len, rc;
+    int i, len, rc;
     libxl_device_model_info dm_info;
 
-    info = libxl_list_domain(&ctx, &nb_domain);
-
-    if (!info) {
-        fprintf(stderr, "libxl_domain_infolist failed.\n");
-        exit(1);
-    }
     for (i = 0; i < nb_domain; i++) {
         rc = libxl_userdata_retrieve(&ctx, info[i].domid, "xl", &data, &len);
         if (rc)
@@ -2153,20 +2146,12 @@ void list_domains_details(void)
         free(data);
         free(config_file);
     }
-    free(info);
 }
 
-void list_domains(int verbose)
+void list_domains(int verbose, const libxl_dominfo *info, int nb_domain)
 {
-    libxl_dominfo *info;
-    int nb_domain, i;
+    int i;
 
-    info = libxl_list_domain(&ctx, &nb_domain);
-
-    if (!info) {
-        fprintf(stderr, "libxl_domain_infolist failed.\n");
-        exit(1);
-    }
     printf("Name                                        ID   Mem VCPUs\tState\tTime(s)\n");
     for (i = 0; i < nb_domain; i++) {
         printf("%-40s %5d %5lu %5d     %c%c%c%c%c%c  %8.1f",
@@ -2187,7 +2172,6 @@ void list_domains(int verbose)
         }
         putchar('\n');
     }
-    free(info);
 }
 
 void list_vm(void)
@@ -2992,6 +2976,10 @@ int main_list(int argc, char **argv)
         {0, 0, 0, 0}
     };
 
+    libxl_dominfo info_buf;
+    libxl_dominfo *info, *info_free=0;
+    int nb_domain, rc;
+
     while (1) {
         opt = getopt_long(argc, argv, "lvh", long_options, &option_index);
         if (opt == -1)
@@ -3013,10 +3001,34 @@ int main_list(int argc, char **argv)
         }
     }
 
+    if (optind >= argc) {
+        info = libxl_list_domain(&ctx, &nb_domain);
+        if (!info) {
+            fprintf(stderr, "libxl_domain_infolist failed.\n");
+            exit(1);
+        }
+        info_free = info;
+    } else if (optind == argc-1) {
+        find_domain(argv[optind]);
+        rc = libxl_domain_info(&ctx, &info_buf, domid);
+        if (rc) {
+            fprintf(stderr, "libxl_domain_info failed (code %d).\n", rc);
+            exit(-rc);
+        }
+        info = &info_buf;
+        nb_domain = 1;
+    } else {
+        help("list");
+        exit(2);
+    }
+
     if (details)
-        list_domains_details();
+        list_domains_details(info, nb_domain);
     else
-        list_domains(verbose);
+        list_domains(verbose, info, nb_domain);
+
+    free(info_free);
+
     exit(0);
 }
 
