@@ -360,7 +360,7 @@ int libxl_run_bootloader(libxl_ctx *ctx,
                          libxl_device_disk *disk,
                          uint32_t domid);
 
-char *libxl_uuid2string(libxl_ctx *ctx, uint8_t uuid[16]);
+char *libxl_uuid2string(libxl_ctx *ctx, const uint8_t uuid[16]);
   /* 0 means ERROR_ENOMEM, which we have logged */
 
 /* events handling */
