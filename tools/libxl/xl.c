@@ -40,6 +40,7 @@ int main(int argc, char **argv)
     int opt = 0;
     char *cmd = 0;
     struct cmd_spec *cspec;
+    int ret;
 
     while ((opt = getopt(argc, argv, "+v")) >= 0) {
         switch (opt) {
@@ -72,12 +73,16 @@ int main(int argc, char **argv)
 
     cspec = cmdtable_lookup(cmd);
     if (cspec)
-        return cspec->cmd_impl(argc, argv);
+        ret = cspec->cmd_impl(argc, argv);
     else if (!strcmp(cmd, "help")) {
         help(argv[optind]);
-        exit(0);
+        ret = 0;
     } else {
         fprintf(stderr, "command not implemented\n");
-        exit(1);
+        ret = 1;
     }
+
+    libxl_ctx_free(&ctx);
+
+    return ret;
 }
