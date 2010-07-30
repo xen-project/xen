@@ -1701,7 +1701,7 @@ int main_memmax(int argc, char **argv)
     }
     if (optind >= argc - 1) {
         help("mem-max");
-        exit(2);
+        return 2;
     }
 
     p = argv[optind];
@@ -1710,10 +1710,10 @@ int main_memmax(int argc, char **argv)
     rc = set_memory_max(p, mem);
     if (rc) {
         fprintf(stderr, "cannot set domid %d static max memory to : %s\n", domid, mem);
-        exit(1);
+        return 1;
     }
 
-    exit(0);
+    return 0;
 }
 
 void set_memory_target(char *p, char *mem)
@@ -1740,7 +1740,7 @@ int main_memset(int argc, char **argv)
         switch (opt) {
         case 'h':
             help("mem-set");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option not supported\n");
             break;
@@ -1748,14 +1748,14 @@ int main_memset(int argc, char **argv)
     }
     if (optind >= argc - 1) {
         help("mem-set");
-        exit(2);
+        return 2;
     }
 
     p = argv[optind];
     mem = argv[optind + 1];
 
     set_memory_target(p, mem);
-    exit(0);
+    return 0;
 }
 
 void cd_insert(char *dom, char *virtdev, char *phys)
@@ -1806,7 +1806,7 @@ int main_cd_eject(int argc, char **argv)
         switch (opt) {
         case 'h':
             help("cd-eject");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option not supported\n");
             break;
@@ -1814,14 +1814,14 @@ int main_cd_eject(int argc, char **argv)
     }
     if (optind >= argc - 1) {
         help("cd-eject");
-        exit(2);
+        return 2;
     }
 
     p = argv[optind];
     virtdev = argv[optind + 1];
 
     cd_insert(p, virtdev, NULL);
-    exit(0);
+    return 0;
 }
 
 int main_cd_insert(int argc, char **argv)
@@ -1833,7 +1833,7 @@ int main_cd_insert(int argc, char **argv)
         switch (opt) {
         case 'h':
             help("cd-insert");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option not supported\n");
             break;
@@ -1841,7 +1841,7 @@ int main_cd_insert(int argc, char **argv)
     }
     if (optind >= argc - 2) {
         help("cd-insert");
-        exit(2);
+        return 2;
     }
 
     p = argv[optind];
@@ -1849,7 +1849,7 @@ int main_cd_insert(int argc, char **argv)
     file = argv[optind + 2];
 
     cd_insert(p, virtdev, file);
-    exit(0);
+    return 0;
 }
 
 int main_console(int argc, char **argv)
@@ -1860,7 +1860,7 @@ int main_console(int argc, char **argv)
         switch (opt) {
         case 'h':
             help("console");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option not supported\n");
             break;
@@ -1868,7 +1868,7 @@ int main_console(int argc, char **argv)
     }
     if (optind >= argc) {
         help("console");
-        exit(2);
+        return 2;
     }
 
     find_domain(argv[optind]);
@@ -1906,7 +1906,7 @@ int main_vncviewer(int argc, char **argv)
             break;
         case 'h':
             help("vncviewer");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option not supported\n");
             break;
@@ -1915,12 +1915,12 @@ int main_vncviewer(int argc, char **argv)
 
     if (argc - optind != 1) {
         help("vncviewer");
-        exit(2);
+        return 2;
     }
 
     if (vncviewer(argv[optind], autopass))
-        exit(1);
-    exit(0);
+        return 1;
+    return 0;
 }
 
 void pcilist_assignable(void)
@@ -1945,7 +1945,7 @@ int main_pcilist_assignable(int argc, char **argv)
         switch (opt) {
         case 'h':
             help("pci-list-assignable-devices");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option not supported\n");
             break;
@@ -1953,7 +1953,7 @@ int main_pcilist_assignable(int argc, char **argv)
     }
 
     pcilist_assignable();
-    exit(0);
+    return 0;
 }
 
 void pcilist(char *dom)
@@ -1981,7 +1981,7 @@ int main_pcilist(int argc, char **argv)
         switch (opt) {
         case 'h':
             help("pci-list");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option not supported\n");
             break;
@@ -1989,13 +1989,13 @@ int main_pcilist(int argc, char **argv)
     }
     if (optind >= argc) {
         help("pci-list");
-        exit(2);
+        return 2;
     }
 
     domname = argv[optind];
 
     pcilist(domname);
-    exit(0);
+    return 0;
 }
 
 void pcidetach(char *dom, char *bdf)
@@ -2023,7 +2023,7 @@ int main_pcidetach(int argc, char **argv)
         switch (opt) {
         case 'h':
             help("pci-detach");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option not supported\n");
             break;
@@ -2031,14 +2031,14 @@ int main_pcidetach(int argc, char **argv)
     }
     if (optind >= argc - 1) {
         help("pci-detach");
-        exit(2);
+        return 2;
     }
 
     domname = argv[optind];
     bdf = argv[optind + 1];
 
     pcidetach(domname, bdf);
-    exit(0);
+    return 0;
 }
 void pciattach(char *dom, char *bdf, char *vs)
 {
@@ -2065,7 +2065,7 @@ int main_pciattach(int argc, char **argv)
         switch (opt) {
         case 'h':
             help("pci-attach");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option not supported\n");
             break;
@@ -2073,7 +2073,7 @@ int main_pciattach(int argc, char **argv)
     }
     if (optind >= argc - 1) {
         help("pci-attach");
-        exit(2);
+        return 2;
     }
 
     domname = argv[optind];
@@ -2083,7 +2083,7 @@ int main_pciattach(int argc, char **argv)
         vs = argv[optind + 2];
 
     pciattach(domname, bdf, vs);
-    exit(0);
+    return 0;
 }
 
 void pause_domain(char *p)
@@ -2673,7 +2673,7 @@ int main_restore(int argc, char **argv)
             break;
         case 'h':
             help("restore");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option not supported\n");
             break;
@@ -2687,7 +2687,7 @@ int main_restore(int argc, char **argv)
         checkpoint_file = argv[optind + 1];
     } else {
         help("restore");
-        exit(2);
+        return 2;
     }
 
     memset(&dom_info, 0, sizeof(dom_info));
@@ -2700,9 +2700,9 @@ int main_restore(int argc, char **argv)
 
     rc = create_domain(&dom_info);
     if (rc < 0)
-        exit(-rc);
+        return -rc;
 
-    exit(0);
+    return 0;
 }
 
 int main_migrate_receive(int argc, char **argv)
@@ -2714,7 +2714,7 @@ int main_migrate_receive(int argc, char **argv)
         switch (opt) {
         case 'h':
             help("migrate-receive");
-            exit(2);
+            return 2;
             break;
         case 'e':
             daemonize = 0;
@@ -2730,10 +2730,10 @@ int main_migrate_receive(int argc, char **argv)
 
     if (argc-optind != 0) {
         help("migrate-receive");
-        exit(2);
+        return 2;
     }
     migrate_receive(debug, daemonize);
-    exit(0);
+    return 0;
 }
 
 int main_save(int argc, char **argv)
@@ -2750,7 +2750,7 @@ int main_save(int argc, char **argv)
             break;
         case 'h':
             help("save");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option not supported\n");
             break;
@@ -2759,14 +2759,14 @@ int main_save(int argc, char **argv)
 
     if (argc-optind < 1 || argc-optind > 3) {
         help("save");
-        exit(2);
+        return 2;
     }
 
     p = argv[optind];
     filename = argv[optind + 1];
     config_filename = argv[optind + 2];
     save_domain(p, filename, checkpoint, config_filename);
-    exit(0);
+    return 0;
 }
 
 int main_migrate(int argc, char **argv)
@@ -2782,7 +2782,7 @@ int main_migrate(int argc, char **argv)
         switch (opt) {
         case 'h':
             help("migrate");
-            exit(0);
+            return 0;
         case 'C':
             config_filename = optarg;
             break;
@@ -2803,7 +2803,7 @@ int main_migrate(int argc, char **argv)
 
     if (argc-optind < 2 || argc-optind > 2) {
         help("migrate");
-        exit(2);
+        return 2;
     }
 
     p = argv[optind];
@@ -2816,21 +2816,21 @@ int main_migrate(int argc, char **argv)
                      ssh_command, host,
                      daemonize ? "" : " -e",
                      debug ? " -d" : "") < 0)
-            exit(1);
+            return 1;
     }
 
     migrate_domain(p, rune, config_filename);
-    exit(0);
+    return 0;
 }
 
 int main_dump_core(int argc, char **argv)
 {
     if ( argc-optind < 2 ) {
         help("dump-core");
-        exit(2);
+        return 2;
     }
     core_dump_domain(argv[optind], argv[optind + 1]);
-    exit(0);
+    return 0;
 }
 
 int main_pause(int argc, char **argv)
@@ -2843,7 +2843,7 @@ int main_pause(int argc, char **argv)
         switch (opt) {
         case 'h':
             help("pause");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option not supported\n");
             break;
@@ -2851,13 +2851,13 @@ int main_pause(int argc, char **argv)
     }
     if (optind >= argc) {
         help("pause");
-        exit(2);
+        return 2;
     }
 
     p = argv[optind];
 
     pause_domain(p);
-    exit(0);
+    return 0;
 }
 
 int main_unpause(int argc, char **argv)
@@ -2870,7 +2870,7 @@ int main_unpause(int argc, char **argv)
         switch (opt) {
         case 'h':
             help("unpause");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option not supported\n");
             break;
@@ -2878,13 +2878,13 @@ int main_unpause(int argc, char **argv)
     }
     if (optind >= argc) {
         help("unpause");
-        exit(2);
+        return 2;
     }
 
     p = argv[optind];
 
     unpause_domain(p);
-    exit(0);
+    return 0;
 }
 
 int main_destroy(int argc, char **argv)
@@ -2896,7 +2896,7 @@ int main_destroy(int argc, char **argv)
         switch (opt) {
         case 'h':
             help("destroy");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option not supported\n");
             break;
@@ -2904,13 +2904,13 @@ int main_destroy(int argc, char **argv)
     }
     if (optind >= argc) {
         help("destroy");
-        exit(2);
+        return 2;
     }
 
     p = argv[optind];
 
     destroy_domain(p);
-    exit(0);
+    return 0;
 }
 
 int main_shutdown(int argc, char **argv)
@@ -2922,7 +2922,7 @@ int main_shutdown(int argc, char **argv)
         switch (opt) {
         case 'h':
             help("shutdown");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option not supported\n");
             break;
@@ -2930,13 +2930,13 @@ int main_shutdown(int argc, char **argv)
     }
     if (optind >= argc) {
         help("shutdown");
-        exit(2);
+        return 2;
     }
 
     p = argv[optind];
 
     shutdown_domain(p);
-    exit(0);
+    return 0;
 }
 
 int main_reboot(int argc, char **argv)
@@ -2948,7 +2948,7 @@ int main_reboot(int argc, char **argv)
         switch (opt) {
         case 'h':
             help("reboot");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option not supported\n");
             break;
@@ -2956,13 +2956,13 @@ int main_reboot(int argc, char **argv)
     }
     if (optind >= argc) {
         help("reboot");
-        exit(2);
+        return 2;
     }
 
     p = argv[optind];
 
     reboot_domain(p);
-    exit(0);
+    return 0;
 }
 int main_list(int argc, char **argv)
 {
@@ -2991,7 +2991,7 @@ int main_list(int argc, char **argv)
             break;
         case 'h':
             help("list");
-            exit(0);
+            return 0;
         case 'v':
             verbose = 1;
             break;
@@ -3005,7 +3005,7 @@ int main_list(int argc, char **argv)
         info = libxl_list_domain(&ctx, &nb_domain);
         if (!info) {
             fprintf(stderr, "libxl_domain_infolist failed.\n");
-            exit(1);
+            return 1;
         }
         info_free = info;
     } else if (optind == argc-1) {
@@ -3013,13 +3013,13 @@ int main_list(int argc, char **argv)
         rc = libxl_domain_info(&ctx, &info_buf, domid);
         if (rc) {
             fprintf(stderr, "libxl_domain_info failed (code %d).\n", rc);
-            exit(-rc);
+            return -rc;
         }
         info = &info_buf;
         nb_domain = 1;
     } else {
         help("list");
-        exit(2);
+        return 2;
     }
 
     if (details)
@@ -3029,7 +3029,7 @@ int main_list(int argc, char **argv)
 
     free(info_free);
 
-    exit(0);
+    return 0;
 }
 
 int main_list_vm(int argc, char **argv)
@@ -3040,7 +3040,7 @@ int main_list_vm(int argc, char **argv)
         switch (opt) {
         case 'h':
             help("list-vm");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option not supported\n");
             break;
@@ -3048,7 +3048,7 @@ int main_list_vm(int argc, char **argv)
     }
 
     list_vm();
-    exit(0);
+    return 0;
 }
 
 int main_create(int argc, char **argv)
@@ -3091,7 +3091,7 @@ int main_create(int argc, char **argv)
             break;
         case 'h':
             help("create");
-            exit(0);
+            return 0;
         case 'n':
             dryrun = 1;
             break;
@@ -3116,7 +3116,7 @@ int main_create(int argc, char **argv)
             filename = argv[optind];
         } else {
             help("create");
-            exit(2);
+            return 2;
         }
         optind++;
     }
@@ -3134,9 +3134,9 @@ int main_create(int argc, char **argv)
 
     rc = create_domain(&dom_info);
     if (rc < 0)
-        exit(-rc);
+        return -rc;
 
-    exit(0);
+    return 0;
 }
 
 void button_press(char *p, char *b)
@@ -3167,7 +3167,7 @@ int main_button_press(int argc, char **argv)
         switch (opt) {
         case 'h':
             help("button-press");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option not supported\n");
             break;
@@ -3175,14 +3175,14 @@ int main_button_press(int argc, char **argv)
     }
     if (optind >= argc - 1) {
         help("button-press");
-        exit(2);
+        return 2;
     }
 
     p = argv[optind];
     b = argv[optind + 1];
 
     button_press(p, b);
-    exit(0);
+    return 0;
 }
 
 static void print_vcpuinfo(uint32_t tdomid,
@@ -3304,7 +3304,7 @@ int main_vcpulist(int argc, char **argv)
         switch (opt) {
         case 'h':
             help("vcpu-list");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option `%c' not supported.\n", opt);
             break;
@@ -3312,7 +3312,7 @@ int main_vcpulist(int argc, char **argv)
     }
 
     vcpulist(argc - 2, argv + 2);
-    exit(0);
+    return 0;
 }
 
 void vcpupin(char *d, const char *vcpu, char *cpu)
@@ -3402,13 +3402,13 @@ int main_vcpupin(int argc, char **argv)
 
     if (argc != 5) {
         help("vcpu-pin");
-        exit(0);
+        return 0;
     }
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
         case 'h':
             help("vcpu-pin");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option `%c' not supported.\n", opt);
             break;
@@ -3416,7 +3416,7 @@ int main_vcpupin(int argc, char **argv)
     }
 
     vcpupin(argv[2], argv[3] , argv[4]);
-    exit(0);
+    return 0;
 }
 
 void vcpuset(char *d, char* nr_vcpus)
@@ -3443,13 +3443,13 @@ int main_vcpuset(int argc, char **argv)
 
     if (argc != 4) {
         help("vcpu-set");
-        exit(0);
+        return 0;
     }
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
         case 'h':
         help("vcpu-set");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option `%c' not supported.\n", opt);
             break;
@@ -3457,7 +3457,7 @@ int main_vcpuset(int argc, char **argv)
     }
 
     vcpuset(argv[2], argv[3]);
-    exit(0);
+    return 0;
 }
 
 static void output_xeninfo(void)
@@ -3564,7 +3564,7 @@ int main_info(int argc, char **argv)
         switch (opt) {
         case 'h':
             help("info");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option `%c' not supported.\n", opt);
             break;
@@ -3572,7 +3572,7 @@ int main_info(int argc, char **argv)
     }
 
     info();
-    exit(0);
+    return 0;
 }
 
 static int sched_credit_domain_get(
@@ -3633,7 +3633,7 @@ int main_sched_credit(int argc, char **argv)
             break;
         case 'h':
             help("sched-credit");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option `%c' not supported.\n", opt);
             break;
@@ -3642,21 +3642,21 @@ int main_sched_credit(int argc, char **argv)
 
     if (!dom && (opt_w || opt_c)) {
         fprintf(stderr, "Must specify a domain.\n");
-        exit(1);
+        return 1;
     }
 
     if (!dom) { /* list all domain's credit scheduler info */
         info = libxl_list_domain(&ctx, &nb_domain);
         if (!info) {
             fprintf(stderr, "libxl_domain_infolist failed.\n");
-            exit(1);
+            return 1;
         }
 
         printf("%-33s %4s %6s %4s\n", "Name", "ID", "Weight", "Cap");
         for (i = 0; i < nb_domain; i++) {
             rc = sched_credit_domain_get(info[i].domid, &scinfo);
             if (rc)
-                exit(-rc);
+                return -rc;
             sched_credit_domain_output(info[i].domid, &scinfo);
         }
     } else {
@@ -3664,7 +3664,7 @@ int main_sched_credit(int argc, char **argv)
 
         rc = sched_credit_domain_get(domid, &scinfo);
         if (rc)
-            exit(-rc);
+            return -rc;
 
         if (!opt_w && !opt_c) { /* output credit scheduler info */
             printf("%-33s %4s %6s %4s\n", "Name", "ID", "Weight", "Cap");
@@ -3676,11 +3676,11 @@ int main_sched_credit(int argc, char **argv)
                 scinfo.cap = cap;
             rc = sched_credit_domain_set(domid, &scinfo);
             if (rc)
-                exit(-rc);
+                return -rc;
         }
     }
 
-    exit(0);
+    return 0;
 }
 
 int main_domid(int argc, char **argv)
@@ -3692,7 +3692,7 @@ int main_domid(int argc, char **argv)
         switch (opt) {
         case 'h':
             help("domid");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option `%c' not supported.\n", opt);
             break;
@@ -3703,17 +3703,17 @@ int main_domid(int argc, char **argv)
     if (!domname) {
         fprintf(stderr, "Must specify a domain name.\n\n");
         help("domid");
-        exit(1);
+        return 1;
     }
 
     if (libxl_name_to_domid(&ctx, domname, &domid)) {
         fprintf(stderr, "Can't get domid of domain name '%s', maybe this domain does not exist.\n", domname);
-        exit(1);
+        return 1;
     }
 
     printf("%d\n", domid);
 
-    exit(0);
+    return 0;
 }
 
 int main_domname(int argc, char **argv)
@@ -3726,7 +3726,7 @@ int main_domname(int argc, char **argv)
         switch (opt) {
         case 'h':
             help("domname");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option `%c' not supported.\n", opt);
             break;
@@ -3736,24 +3736,24 @@ int main_domname(int argc, char **argv)
     if (!argv[optind]) {
         fprintf(stderr, "Must specify a domain id.\n\n");
         help("domname");
-        exit(1);
+        return 1;
     }
     domid = strtol(argv[optind], &endptr, 10);
     if (domid == 0 && !strcmp(endptr, argv[optind])) {
         /*no digits at all*/
         fprintf(stderr, "Invalid domain id.\n\n");
-        exit(1);
+        return 1;
     }
 
     domname = libxl_domid_to_name(&ctx, domid);
     if (!domname) {
         fprintf(stderr, "Can't get domain name of domain id '%d', maybe this domain does not exist.\n", domid);
-        exit(1);
+        return 1;
     }
 
     printf("%s\n", domname);
 
-    exit(0);
+    return 0;
 }
 
 int main_rename(int argc, char **argv)
@@ -3766,7 +3766,7 @@ int main_rename(int argc, char **argv)
         switch (opt) {
         case 'h':
             help("rename");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option `%c' not supported.\n", opt);
             break;
@@ -3777,7 +3777,7 @@ int main_rename(int argc, char **argv)
     if (!dom || !argv[optind]) {
         fprintf(stderr, "'xl rename' requires 2 arguments.\n\n");
         help("rename");
-        exit(1);
+        return 1;
     }
 
     find_domain(dom);
@@ -3785,10 +3785,10 @@ int main_rename(int argc, char **argv)
 
     if (libxl_domain_rename(&ctx, domid, common_domname, new_name, 0)) {
         fprintf(stderr, "Can't rename domain '%s'.\n", dom);
-        exit(1);
+        return 1;
     }
 
-    exit(0);
+    return 0;
 }
 
 int main_trigger(int argc, char **argv)
@@ -3803,7 +3803,7 @@ int main_trigger(int argc, char **argv)
         switch (opt) {
         case 'h':
             help("trigger");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option `%c' not supported.\n", opt);
             break;
@@ -3814,7 +3814,7 @@ int main_trigger(int argc, char **argv)
     if (!dom || !argv[optind]) {
         fprintf(stderr, "'xl trigger' requires between 2 and 3 arguments.\n\n");
         help("trigger");
-        exit(1);
+        return 1;
     }
 
     find_domain(dom);
@@ -3830,7 +3830,7 @@ int main_trigger(int argc, char **argv)
 
     libxl_send_trigger(&ctx, domid, trigger_name, vcpuid);
 
-    exit(0);
+    return 0;
 }
 
 
@@ -3844,7 +3844,7 @@ int main_sysrq(int argc, char **argv)
         switch (opt) {
         case 'h':
             help("sysrq");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option `%c' not supported.\n", opt);
             break;
@@ -3855,7 +3855,7 @@ int main_sysrq(int argc, char **argv)
     if (!dom || !argv[optind]) {
         fprintf(stderr, "'xl sysrq' requires 2 arguments.\n\n");
         help("sysrq");
-        exit(1);
+        return 1;
     }
 
     find_domain(dom);
@@ -3865,12 +3865,12 @@ int main_sysrq(int argc, char **argv)
     if (sysrq[1] != '\0') {
         fprintf(stderr, "Invalid sysrq.\n\n");
         help("sysrq");
-        exit(1);
+        return 1;
     }
 
     libxl_send_sysrq(&ctx, domid, sysrq[0]);
 
-    exit(0);
+    return 0;
 }
 
 int main_debug_keys(int argc, char **argv)
@@ -3882,7 +3882,7 @@ int main_debug_keys(int argc, char **argv)
         switch (opt) {
         case 'h':
             help("debug-keys");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option not supported\n");
             break;
@@ -3890,17 +3890,17 @@ int main_debug_keys(int argc, char **argv)
     }
     if (optind >= argc) {
         help("debug-keys");
-        exit(2);
+        return 2;
     }
 
     keys = argv[optind];
 
     if (libxl_send_debug_keys(&ctx, keys)) {
         fprintf(stderr, "cannot send debug keys: %s\n", keys);
-        exit(1);
+        return 1;
     }
 
-    exit(0);
+    return 0;
 }
 
 int main_dmesg(int argc, char **argv)
@@ -3917,7 +3917,7 @@ int main_dmesg(int argc, char **argv)
             break;
         case 'h':
             help("dmesg");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option not supported\n");
             break;
@@ -3933,7 +3933,7 @@ int main_dmesg(int argc, char **argv)
 
 finish:
     libxl_xen_console_read_finish(&ctx, cr);
-    exit(ret);
+    return ret;
 }
 
 int main_top(int argc, char **argv)
@@ -3944,14 +3944,14 @@ int main_top(int argc, char **argv)
         switch (opt) {
         case 'h':
             help("top");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option `%c' not supported.\n", opt);
             break;
         }
     }
 
-    exit(system("xentop"));
+    return system("xentop");
 }
 
 int main_networkattach(int argc, char **argv)
@@ -3964,13 +3964,13 @@ int main_networkattach(int argc, char **argv)
 
     if ((argc < 3) || (argc > 11)) {
         help("network-attach");
-        exit(0);
+        return 0;
     }
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
         case 'h':
             help("network-attach");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option `%c' not supported.\n", opt);
             break;
@@ -3979,7 +3979,7 @@ int main_networkattach(int argc, char **argv)
 
     if (domain_qualifier_to_domid(argv[2], &domid, 0) < 0) {
         fprintf(stderr, "%s is an invalid domain identifier\n", argv[2]);
-        exit(1);
+        return 1;
     }
     init_nic_info(&nic, -1);
     for (argv += 3, argc -= 3; argc > 0; ++argv, --argc) {
@@ -3990,7 +3990,7 @@ int main_networkattach(int argc, char **argv)
                 nic.nictype = NICTYPE_IOEMU;
             } else {
                 fprintf(stderr, "Invalid parameter `type'.\n");
-                exit(1);
+                return 1;
             }
         } else if (!strncmp("mac=", *argv, 4)) {
             tok = strtok((*argv) + 4, ":");
@@ -3998,7 +3998,7 @@ int main_networkattach(int argc, char **argv)
                 val = strtoul(tok, &endptr, 16);
                 if ((tok == endptr) || (val > 255)) {
                     fprintf(stderr, "Invalid parameter `mac'.\n");
-                    exit(1);
+                    return 1;
                 }
                 nic.mac[i] = val;
             }
@@ -4007,7 +4007,7 @@ int main_networkattach(int argc, char **argv)
         } else if (!strncmp("ip=", *argv, 3)) {
             if (!inet_aton((*argv) + 3, &(nic.ip))) {
                 fprintf(stderr, "Invalid parameter `ip'.\n");
-                exit(1);
+                return 1;
             }
         } else if (!strncmp("script=", *argv, 6)) {
             nic.script = (*argv) + 6;
@@ -4015,7 +4015,7 @@ int main_networkattach(int argc, char **argv)
             val = strtoul((*argv) + 8, &endptr, 10);
             if (((*argv) + 8) == endptr) {
                 fprintf(stderr, "Invalid parameter `backend'.\n");
-                exit(1);
+                return 1;
             }
             nic.backend_domid = val;
         } else if (!strncmp("vifname=", *argv, 8)) {
@@ -4026,15 +4026,15 @@ int main_networkattach(int argc, char **argv)
         } else if (!strncmp("accel=", *argv, 6)) {
         } else {
             fprintf(stderr, "unrecognized argument `%s'\n", *argv);
-            exit(1);
+            return 1;
         }
     }
     nic.domid = domid;
     if (libxl_device_nic_add(&ctx, domid, &nic)) {
         fprintf(stderr, "libxl_device_nic_add failed.\n");
-        exit(1);
+        return 1;
     }
-    exit(0);
+    return 0;
 }
 
 int main_networklist(int argc, char **argv)
@@ -4045,13 +4045,13 @@ int main_networklist(int argc, char **argv)
 
     if (argc < 3) {
         help("network-list");
-        exit(1);
+        return 1;
     }
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
             case 'h':
                 help("network-list");
-                exit(0);
+                return 0;
             default:
                 fprintf(stderr, "option `%c' not supported.\n", opt);
                 break;
@@ -4082,7 +4082,7 @@ int main_networklist(int argc, char **argv)
                    nics->rref_tx, nics->rref_rx, nics->backend);
         }
     }
-    exit(0);
+    return 0;
 }
 
 int main_networkdetach(int argc, char **argv)
@@ -4092,13 +4092,13 @@ int main_networkdetach(int argc, char **argv)
 
     if (argc != 4) {
         help("network-detach");
-        exit(0);
+        return 0;
     }
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
         case 'h':
             help("network-detach");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option `%c' not supported.\n", opt);
             break;
@@ -4107,25 +4107,25 @@ int main_networkdetach(int argc, char **argv)
 
     if (domain_qualifier_to_domid(argv[2], &domid, 0) < 0) {
         fprintf(stderr, "%s is an invalid domain identifier\n", argv[2]);
-        exit(1);
+        return 1;
     }
 
     if (!strchr(argv[3], ':')) {
         if (libxl_devid_to_device_nic(&ctx, domid, argv[3], &nic)) {
             fprintf(stderr, "Unknown device %s.\n", argv[3]);
-            exit(1);
+            return 1;
         }
     } else {
         if (libxl_mac_to_device_nic(&ctx, domid, argv[3], &nic)) {
             fprintf(stderr, "Unknown device %s.\n", argv[3]);
-            exit(1);
+            return 1;
         }
     }
     if (libxl_device_nic_del(&ctx, &nic, 1)) {
         fprintf(stderr, "libxl_device_nic_del failed.\n");
-        exit(1);
+        return 1;
     }
-    exit(0);
+    return 0;
 }
 
 int main_blockattach(int argc, char **argv)
@@ -4137,13 +4137,13 @@ int main_blockattach(int argc, char **argv)
 
     if ((argc < 5) || (argc > 7)) {
         help("block-attach");
-        exit(0);
+        return 0;
     }
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
         case 'h':
             help("block-attach");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option `%c' not supported.\n", opt);
             break;
@@ -4167,16 +4167,16 @@ int main_blockattach(int argc, char **argv)
             disk.phystype = PHYSTYPE_QCOW2;
         } else {
             fprintf(stderr, "Error: `%s' is not a valid disk image.\n", tok);
-            exit(1);
+            return 1;
         }
     } else {
         fprintf(stderr, "Error: `%s' is not a valid block device.\n", tok);
-        exit(1);
+        return 1;
     }
     disk.physpath = strtok(NULL, "\0");
     if (!disk.physpath) {
         fprintf(stderr, "Error: missing path to disk image.\n");
-        exit(1);
+        return 1;
     }
     disk.virtpath = argv[4];
     disk.unpluggable = 1;
@@ -4184,12 +4184,12 @@ int main_blockattach(int argc, char **argv)
 
     if (domain_qualifier_to_domid(argv[2], &fe_domid, 0) < 0) {
         fprintf(stderr, "%s is an invalid domain identifier\n", argv[2]);
-        exit(1);
+        return 1;
     }
     if (argc == 7) {
         if (domain_qualifier_to_domid(argv[6], &be_domid, 0) < 0) {
             fprintf(stderr, "%s is an invalid domain identifier\n", argv[6]);
-            exit(1);
+            return 1;
         }
     }
     disk.domid = fe_domid;
@@ -4197,7 +4197,7 @@ int main_blockattach(int argc, char **argv)
     if (libxl_device_disk_add(&ctx, fe_domid, &disk)) {
         fprintf(stderr, "libxl_device_disk_add failed.\n");
     }
-    exit(0);
+    return 0;
 }
 
 int main_blocklist(int argc, char **argv)
@@ -4209,13 +4209,13 @@ int main_blocklist(int argc, char **argv)
 
     if (argc < 3) {
         help("block-list");
-        exit(0);
+        return 0;
     }
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
         case 'h':
             help("block-list");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option `%c' not supported.\n", opt);
             break;
@@ -4242,7 +4242,7 @@ int main_blocklist(int argc, char **argv)
             }
         }
     }
-    exit(0);
+    return 0;
 }
 
 int main_blockdetach(int argc, char **argv)
@@ -4252,13 +4252,13 @@ int main_blockdetach(int argc, char **argv)
 
     if (argc != 4) {
         help("block-detach");
-        exit(0);
+        return 0;
     }
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
         case 'h':
             help("block-detach");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option `%c' not supported.\n", opt);
             break;
@@ -4267,16 +4267,16 @@ int main_blockdetach(int argc, char **argv)
 
     if (domain_qualifier_to_domid(argv[2], &domid, 0) < 0) {
         fprintf(stderr, "%s is an invalid domain identifier\n", argv[2]);
-        exit(1);
+        return 1;
     }
     if (libxl_devid_to_device_disk(&ctx, domid, argv[3], &disk)) {
         fprintf(stderr, "Error: Device %s not connected.\n", argv[3]);
-        exit(1);
+        return 1;
     }
     if (libxl_device_disk_del(&ctx, &disk, 1)) {
         fprintf(stderr, "libxl_device_del failed.\n");
     }
-    exit(0);
+    return 0;
 }
 
 int main_network2attach(int argc, char **argv)
@@ -4290,13 +4290,13 @@ int main_network2attach(int argc, char **argv)
 
     if ((argc < 3) || (argc > 12)) {
         help("network2-attach");
-        exit(0);
+        return 0;
     }
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
         case 'h':
             help("network2-attach");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option `%c' not supported.\n", opt);
             break;
@@ -4305,7 +4305,7 @@ int main_network2attach(int argc, char **argv)
 
     if (domain_qualifier_to_domid(argv[2], &domid, 0) < 0) {
         fprintf(stderr, "%s is an invalid domain identifier\n", argv[1]);
-        exit(1);
+        return 1;
     }
     init_net2_info(&net2, -1);
     for (argv += 3, argc -= 3; argc > 0; --argc, ++argv) {
@@ -4315,7 +4315,7 @@ int main_network2attach(int argc, char **argv)
                 val = strtoul(tok, &endptr, 16);
                 if ((tok == endptr) || (val > 255)) {
                     fprintf(stderr, "Invalid parameter `front_mac'.\n");
-                    exit(1);
+                    return 1;
                 }
                 net2.front_mac[i] = val;
             }
@@ -4325,7 +4325,7 @@ int main_network2attach(int argc, char **argv)
                 val = strtoul(tok, &endptr, 16);
                 if ((tok == endptr) || (val > 255)) {
                     fprintf(stderr, "Invalid parameter back_mac=%s.\n", *argv + 9);
-                    exit(1);
+                    return 1;
                 }
                 net2.back_mac[i] = val;
             }
@@ -4345,26 +4345,26 @@ int main_network2attach(int argc, char **argv)
             val = strtoul(*argv + 5, &endptr, 10);
             if (endptr == (*argv + 5)) {
                 fprintf(stderr, "Invalid parameter pdev=%s.\n", *argv + 5);
-                exit(1);
+                return 1;
             }
             net2.pdev = val;
         } else if (!strncmp("max_bypasses=", *argv, 13)) {
             val = strtoul(*argv + 13, &endptr, 10);
             if (endptr == (*argv + 13)) {
                 fprintf(stderr, "Invalid parameter max_bypasses=%s.\n", *argv + 13);
-                exit(1);
+                return 1;
             }
             net2.max_bypasses = val;
         } else {
             fprintf(stderr, "unrecognized argument `%s'\n", *argv);
-            exit(1);
+            return 1;
         }
     }
 
     if (back_dom) {
         if (domain_qualifier_to_domid(back_dom, &back_domid, 0) < 0) {
             fprintf(stderr, "%s is an invalid domain identifier\n", back_dom);
-            exit(1);
+            return 1;
         }
     }
     net2.domid = domid;
@@ -4372,7 +4372,7 @@ int main_network2attach(int argc, char **argv)
     if (libxl_device_net2_add(&ctx, domid, &net2)) {
         fprintf(stderr, "libxl_device_net2_add failed.\n");
     }
-    exit(0);
+    return 0;
 }
 
 int main_network2list(int argc, char **argv)
@@ -4383,13 +4383,13 @@ int main_network2list(int argc, char **argv)
 
     if (argc < 3) {
         help("network2-list");
-        exit(0);
+        return 0;
     }
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
         case 'h':
             help("network2-list");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option `%c' not supported.\n", opt);
             break;
@@ -4417,7 +4417,7 @@ int main_network2list(int argc, char **argv)
             }
         }
     }
-    exit(0);
+    return 0;
 }
 
 int main_network2detach(int argc, char **argv)
@@ -4427,13 +4427,13 @@ int main_network2detach(int argc, char **argv)
 
     if (argc != 4) {
         help("network2-detach");
-        exit(0);
+        return 0;
     }
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
         case 'h':
             help("network2-detach");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option `%c' not supported.\n", opt);
             break;
@@ -4442,17 +4442,17 @@ int main_network2detach(int argc, char **argv)
 
     if (domain_qualifier_to_domid(argv[2], &domid, 0) < 0) {
         fprintf(stderr, "%s is an invalid domain identifier\n", argv[2]);
-        exit(1);
+        return 1;
     }
     if (libxl_devid_to_device_net2(&ctx, domid, argv[3], &net2)) {
        fprintf(stderr, "Error: Device %s not connected.\n", argv[3]);
-        exit(1);
+        return 1;
     }
     if (libxl_device_net2_del(&ctx, &net2, 1)) {
         fprintf(stderr, "libxl_device_net2_del failed.\n");
-        exit(1);
+        return 1;
     }
-    exit(0);
+    return 0;
 }
 
 static char *uptime_to_string(unsigned long time, int short_mode)
@@ -4624,7 +4624,7 @@ int main_uptime(int argc, char **argv)
             break;
         case 'h':
             help("uptime");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option `%c' not supported.\n", opt);
             break;
@@ -4638,7 +4638,7 @@ int main_uptime(int argc, char **argv)
 
     print_uptime(short_mode, domains, nb_doms);
 
-    exit(0);
+    return 0;
 }
 
 int main_tmem_list(int argc, char **argv)
@@ -4659,7 +4659,7 @@ int main_tmem_list(int argc, char **argv)
             break;
         case 'h':
             help("tmem-list");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option `%c' not supported.\n", opt);
             break;
@@ -4670,7 +4670,7 @@ int main_tmem_list(int argc, char **argv)
     if (!dom && all == 0) {
         fprintf(stderr, "You must specify -a or a domain id.\n\n");
         help("tmem-list");
-        exit(1);
+        return 1;
     }
 
     if (all)
@@ -4680,11 +4680,11 @@ int main_tmem_list(int argc, char **argv)
 
     buf = libxl_tmem_list(&ctx, domid, use_long);
     if (buf == NULL)
-        exit(-1);
+        return -1;
 
     printf("%s\n", buf);
     free(buf);
-    exit(0);
+    return 0;
 }
 
 int main_tmem_freeze(int argc, char **argv)
@@ -4700,7 +4700,7 @@ int main_tmem_freeze(int argc, char **argv)
             break;
         case 'h':
             help("tmem-freeze");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option `%c' not supported.\n", opt);
             break;
@@ -4711,7 +4711,7 @@ int main_tmem_freeze(int argc, char **argv)
     if (!dom && all == 0) {
         fprintf(stderr, "You must specify -a or a domain id.\n\n");
         help("tmem-freeze");
-        exit(1);
+        return 1;
     }
 
     if (all)
@@ -4720,7 +4720,7 @@ int main_tmem_freeze(int argc, char **argv)
         find_domain(dom);
 
     libxl_tmem_freeze(&ctx, domid);
-    exit(0);
+    return 0;
 }
 
 int main_tmem_destroy(int argc, char **argv)
@@ -4736,7 +4736,7 @@ int main_tmem_destroy(int argc, char **argv)
             break;
         case 'h':
             help("tmem-destroy");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option `%c' not supported.\n", opt);
             break;
@@ -4747,7 +4747,7 @@ int main_tmem_destroy(int argc, char **argv)
     if (!dom && all == 0) {
         fprintf(stderr, "You must specify -a or a domain id.\n\n");
         help("tmem-destroy");
-        exit(1);
+        return 1;
     }
 
     if (all)
@@ -4756,7 +4756,7 @@ int main_tmem_destroy(int argc, char **argv)
         find_domain(dom);
 
     libxl_tmem_destroy(&ctx, domid);
-    exit(0);
+    return 0;
 }
 
 int main_tmem_thaw(int argc, char **argv)
@@ -4772,7 +4772,7 @@ int main_tmem_thaw(int argc, char **argv)
             break;
         case 'h':
             help("tmem-thaw");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option `%c' not supported.\n", opt);
             break;
@@ -4783,7 +4783,7 @@ int main_tmem_thaw(int argc, char **argv)
     if (!dom && all == 0) {
         fprintf(stderr, "You must specify -a or a domain id.\n\n");
         help("tmem-thaw");
-        exit(1);
+        return 1;
     }
 
     if (all)
@@ -4792,7 +4792,7 @@ int main_tmem_thaw(int argc, char **argv)
         find_domain(dom);
 
     libxl_tmem_thaw(&ctx, domid);
-    exit(0);
+    return 0;
 }
 
 int main_tmem_set(int argc, char **argv)
@@ -4822,7 +4822,7 @@ int main_tmem_set(int argc, char **argv)
             break;
         case 'h':
             help("tmem-set");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option `%c' not supported.\n", opt);
             break;
@@ -4833,7 +4833,7 @@ int main_tmem_set(int argc, char **argv)
     if (!dom && all == 0) {
         fprintf(stderr, "You must specify -a or a domain id.\n\n");
         help("tmem-set");
-        exit(1);
+        return 1;
     }
 
     if (all)
@@ -4844,7 +4844,7 @@ int main_tmem_set(int argc, char **argv)
     if (!opt_w && !opt_c && !opt_p) {
         fprintf(stderr, "No set value specified.\n\n");
         help("tmem-set");
-        exit(1);
+        return 1;
     }
 
     if (opt_w)
@@ -4854,7 +4854,7 @@ int main_tmem_set(int argc, char **argv)
     if (opt_p)
         libxl_tmem_set(&ctx, domid, "compress", compress);
 
-    exit(0);
+    return 0;
 }
 
 int main_tmem_shared_auth(int argc, char **argv)
@@ -4880,7 +4880,7 @@ int main_tmem_shared_auth(int argc, char **argv)
             break;
         case 'h':
             help("tmem-shared-auth");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option `%c' not supported.\n", opt);
             break;
@@ -4891,7 +4891,7 @@ int main_tmem_shared_auth(int argc, char **argv)
     if (!dom && all == 0) {
         fprintf(stderr, "You must specify -a or a domain id.\n\n");
         help("tmem-shared-auth");
-        exit(1);
+        return 1;
     }
 
     if (all)
@@ -4902,18 +4902,18 @@ int main_tmem_shared_auth(int argc, char **argv)
     if (uuid == NULL || autharg == NULL) {
         fprintf(stderr, "No uuid or auth specified.\n\n");
         help("tmem-shared-auth");
-        exit(1);
+        return 1;
     }
 
     auth = strtol(autharg, &endptr, 10);
     if (*endptr != '\0') {
         fprintf(stderr, "Invalid auth, valid auth are <0|1>.\n\n");
-        exit(1);
+        return 1;
     }
 
     libxl_tmem_shared_auth(&ctx, domid, uuid, auth);
 
-    exit(0);
+    return 0;
 }
 
 int main_tmem_freeable(int argc, char **argv)
@@ -4925,7 +4925,7 @@ int main_tmem_freeable(int argc, char **argv)
         switch (opt) {
         case 'h':
             help("tmem-freeable");
-            exit(0);
+            return 0;
         default:
             fprintf(stderr, "option `%c' not supported.\n", opt);
             break;
@@ -4934,8 +4934,8 @@ int main_tmem_freeable(int argc, char **argv)
 
     mb = libxl_tmem_freeable(&ctx);
     if (mb == -1)
-        exit(-1);
+        return -1;
 
     printf("%d\n", mb);
-    exit(0);
+    return 0;
 }
