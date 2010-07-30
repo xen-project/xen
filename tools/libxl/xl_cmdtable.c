@@ -25,7 +25,6 @@ struct cmd_spec cmd_table[] = {
       "-h                      Print this help.\n"
       "-p                      Leave the domain paused after it is created.\n"
       "-c                      Connect to the console after the domain is created.\n"
-      "-d                      Enable debug messages.\n"
       "-f=FILE, --defconfig=FILE\n                     Use the given configuration file.\n"
       "-q, --quiet             Quiet.\n"
       "-n, --dryrun            Dry run - prints the resulting configuration.\n"
