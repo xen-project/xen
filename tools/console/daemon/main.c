@@ -73,7 +73,8 @@ int main(int argc, char **argv)
 	bool is_interactive = false;
 	int ch;
 	int syslog_option = LOG_CONS;
-	int syslog_mask = LOG_WARNING;
+	int syslog_mask = LOG_MASK(LOG_WARNING)|LOG_MASK(LOG_ERR)|LOG_MASK(LOG_CRIT)|\
+		          LOG_MASK(LOG_ALERT)|LOG_MASK(LOG_EMERG);
 	int opt_ind = 0;
 	char *pidfile = NULL;
 
@@ -89,7 +90,8 @@ int main(int argc, char **argv)
 #ifndef __sun__
 			syslog_option |= LOG_PERROR;
 #endif
-			syslog_mask = LOG_DEBUG;
+			syslog_mask |= LOG_MASK(LOG_NOTICE)|LOG_MASK(LOG_INFO)| \
+				      LOG_MASK(LOG_DEBUG);
 			break;
 		case 'i':
 			is_interactive = true;
