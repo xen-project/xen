@@ -1,8 +1,6 @@
 XEN_ROOT = ../../..
 include ./Rules.mk
 
-sbindir=/usr/sbin
-
 .PHONY: all
 all:
 	$(MAKE) -C gx
@@ -16,8 +14,8 @@ clean:
 
 .PHONY: install
 install: all
-	[ -d $(DESTDIR)$(sbindir) ] || $(INSTALL_DIR) $(DESTDIR)$(sbindir)
-	$(INSTALL_PROG) gdbsx $(DESTDIR)$(sbindir)/gdbsx
+	[ -d $(DESTDIR)$(SBINDIR) ] || $(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
+	$(INSTALL_PROG) gdbsx $(DESTDIR)$(SBINDIR)/gdbsx
 
 gdbsx: gx/gx_all.a xg/xg_all.a 
 	$(CC) -o $@ $^
