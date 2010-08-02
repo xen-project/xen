@@ -26,4 +26,16 @@ struct op_counter_config {
 
 extern struct op_counter_config counter_config[];
 
+/* AMD IBS configuration */
+struct op_ibs_config {
+    unsigned long op_enabled;
+    unsigned long fetch_enabled;
+    unsigned long max_cnt_fetch;
+    unsigned long max_cnt_op;
+    unsigned long rand_en;
+    unsigned long dispatched_ops;
+};
+
+extern struct op_ibs_config ibs_config;
+
 #endif /* OP_COUNTER_H */
