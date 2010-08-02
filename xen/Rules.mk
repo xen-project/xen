@@ -8,7 +8,6 @@ perfc         ?= n
 perfc_arrays  ?= n
 lock_profile  ?= n
 crash_debug   ?= n
-gdbsx         ?= n
 frame_pointer ?= n
 
 XEN_ROOT=$(BASEDIR)/..
@@ -53,7 +52,6 @@ CFLAGS-$(perfc)         += -DPERF_COUNTERS
 CFLAGS-$(perfc_arrays)  += -DPERF_ARRAYS
 CFLAGS-$(lock_profile)  += -DLOCK_PROFILE
 CFLAGS-$(frame_pointer) += -fno-omit-frame-pointer -DCONFIG_FRAME_POINTER
-CFLAGS-$(gdbsx)         += -DXEN_GDBSX_CONFIG
 
 ifneq ($(max_phys_cpus),)
 CFLAGS-y                += -DMAX_PHYS_CPUS=$(max_phys_cpus)

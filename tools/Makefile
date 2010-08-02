@@ -36,6 +36,7 @@ SUBDIRS-y += xenpmd
 SUBDIRS-y += libxl
 SUBDIRS-y += remus
 SUBDIRS-$(CONFIG_X86) += xenpaging
+SUBDIRS-$(CONFIG_X86) += debugger/gdbsx
 
 # These don't cross-compile
 ifeq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
@@ -134,3 +135,14 @@ subdir-clean-ocaml-xenstored:
 		$(MAKE) -C ocaml-xenstored clean; \
 	fi
 
+subdir-clean-debugger/gdbsx subdir-distclean-debugger/gdbsx: .phony
+	$(MAKE) -C debugger/gdbsx clean
+
+subdir-install-debugger/gdbsx: .phony
+	$(MAKE) -C debugger/gdbsx install
+
+subdir-all-debugger/gdbsx: .phony
+	$(MAKE) -C debugger/gdbsx all
+
+subdir-distclean-firmware: .phony
+	$(MAKE) -C firmware distclean
