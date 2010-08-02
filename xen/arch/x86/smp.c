@@ -326,7 +326,7 @@ int on_selected_cpus(
     return 0;
 }
 
-static void __stop_this_cpu(void)
+void __stop_this_cpu(void)
 {
     ASSERT(!local_irq_is_enabled());
 

@@ -102,6 +102,9 @@ static __inline int logical_smp_processor_id(void)
 
 extern int __cpu_disable(void);
 extern void __cpu_die(unsigned int cpu);
+
+void __stop_this_cpu(void);
+
 #endif /* !__ASSEMBLY__ */
 
 #else /* CONFIG_SMP */
