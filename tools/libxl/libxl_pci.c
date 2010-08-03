@@ -416,7 +416,7 @@ static int do_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
 out:
     if (!libxl_is_stubdom(ctx, domid, NULL)) {
         rc = xc_assign_device(ctx->xch, domid, pcidev->value);
-        if (rc < 0) {
+        if (rc < 0 && (hvm || errno != ENOSYS)) {
             XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "xc_assign_device failed");
             return ERROR_FAIL;
         }
@@ -541,7 +541,7 @@ out:
 
     if (!libxl_is_stubdom(ctx, domid, NULL)) {
         rc = xc_deassign_device(ctx->xch, domid, pcidev->value);
-        if (rc < 0)
+        if (rc < 0 && (hvm || errno != ENOSYS))
             XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "xc_deassign_device failed");
     }
 
