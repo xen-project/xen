@@ -1473,7 +1473,7 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
     backend_type = device_disk_backend_type_of_phystype(disk->phystype);
     devid = device_disk_dev_number(disk->virtpath);
     if (devid==-1) {
-        XL_LOG(ctx, XL_LOG_ERROR, "Invalid or unuspported"
+        XL_LOG(ctx, XL_LOG_ERROR, "Invalid or unsupported"
                " virtual disk identifier %s", disk->virtpath);
         return ERROR_INVAL;
     }

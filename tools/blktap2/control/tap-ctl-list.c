@@ -385,9 +385,9 @@ _tap_ctl_free_tapdisks(struct tapdisk *tapv, int n_taps)
 	struct tapdisk *tap;
 
 	for (tap = tapv; tap < &tapv[n_taps]; ++tap) {
-		struct tapdisk_list *tl;
+		struct tapdisk_list *tl, *next;
 
-		list_for_each_entry(tl, &tap->list, entry) {
+		list_for_each_entry_safe(tl, next, &tap->list, entry) {
 			free(tl->params);
 			free(tl);
 		}
