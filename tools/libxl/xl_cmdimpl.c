@@ -143,6 +143,16 @@ struct domain_config {
     enum action_on_shutdown on_crash;
 };
 
+static void free_domain_config(struct domain_config *d_config)
+{
+    free(d_config->disks);
+    free(d_config->vifs);
+    free(d_config->vif2s);
+    free(d_config->pcidevs);
+    free(d_config->vfbs);
+    free(d_config->vkbs);
+}
+
 /* Optional data, in order:
  *   4 bytes uint32_t  config file size
  *   n bytes           config file in Unix text file format
@@ -1346,8 +1356,9 @@ static int create_domain(struct domain_create *dom_info)
 
     parse_config_data(config_file, config_data, config_len, &d_config, &dm_info);
 
+    ret = 0;
     if (dom_info->dryrun)
-        return 0;
+        goto out;
 
     if (migrate_fd >= 0) {
         if (d_config.c_info.name) {
@@ -1477,8 +1488,9 @@ start:
     if (!paused)
         libxl_domain_unpause(&ctx, domid);
 
+    ret = domid; /* caller gets success in parent */
     if (!daemonize)
-        return domid; /* caller gets success in parent */
+        goto out;
 
     if (need_daemon) {
         char *fullname, *name;
@@ -1605,6 +1617,12 @@ start:
 error_out:
     if (domid)
         libxl_domain_destroy(&ctx, domid, 0);
+out:
+
+    free_domain_config(&d_config);
+
+    free(config_data);
+
     return ret;
 }
 
@@ -2143,6 +2161,7 @@ void list_domains_details(const libxl_dominfo *info, int nb_domain)
         memset(&d_config, 0x00, sizeof(d_config));
         parse_config_data(config_file, (char *)data, len, &d_config, &dm_info);
         printf_info(info[i].domid, &d_config, &dm_info);
+        free_domain_config(&d_config);
         free(data);
         free(config_file);
     }
