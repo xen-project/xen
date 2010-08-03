@@ -61,6 +61,7 @@ int libxl_name_to_domid(libxl_ctx *ctx, const char *name,
     int i, nb_domains;
     char *domname;
     libxl_dominfo *dominfo;
+    int ret = -1;
 
     dominfo = libxl_list_domain(ctx, &nb_domains);
     if (!dominfo)
@@ -72,10 +73,12 @@ int libxl_name_to_domid(libxl_ctx *ctx, const char *name,
             continue;
         if (strcmp(domname, name) == 0) {
             *domid = dominfo[i].domid;
-            return 0;
+            ret = 0;
+            break;
         }
     }
-    return -1;
+    free(dominfo);
+    return ret;
 }
 
 char *libxl_poolid_to_name(libxl_ctx *ctx, uint32_t poolid)
