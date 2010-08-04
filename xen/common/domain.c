@@ -191,6 +191,8 @@ struct vcpu *alloc_vcpu(
     /* Must be called after making new vcpu visible to for_each_vcpu(). */
     vcpu_check_shutdown(v);
 
+    domain_update_node_affinity(d);
+
     return v;
 }
 
@@ -234,6 +236,8 @@ struct domain *domain_create(
     spin_lock_init(&d->hypercall_deadlock_mutex);
     INIT_PAGE_LIST_HEAD(&d->page_list);
     INIT_PAGE_LIST_HEAD(&d->xenpage_list);
+
+    spin_lock_init(&d->node_affinity_lock);
 
     spin_lock_init(&d->shutdown_lock);
     d->shutdown_code = -1;
@@ -338,6 +342,31 @@ struct domain *domain_create(
     xfree(d->pirq_to_evtchn);
     free_domain_struct(d);
     return NULL;
+}
+
+
+void domain_update_node_affinity(struct domain *d)
+{
+    cpumask_t cpumask = CPU_MASK_NONE;
+    nodemask_t nodemask = NODE_MASK_NONE;
+    struct vcpu *v;
+    unsigned int node;
+
+    spin_lock(&d->node_affinity_lock);
+
+    for_each_vcpu ( d, v )
+        cpus_or(cpumask, cpumask, v->cpu_affinity);
+
+    for_each_online_node ( node )
+    {
+        if ( cpus_intersects(node_to_cpumask(node), cpumask) )
+            node_set(node, nodemask);
+        else
+            node_clear(node, nodemask);
+    }
+
+    d->node_affinity = nodemask;
+    spin_unlock(&d->node_affinity_lock);
 }
 
 

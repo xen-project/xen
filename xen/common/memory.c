@@ -259,7 +259,7 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
     unsigned long in_chunk_order, out_chunk_order;
     xen_pfn_t     gpfn, gmfn, mfn;
     unsigned long i, j, k;
-    unsigned int  node, memflags = 0;
+    unsigned int  memflags = 0;
     long          rc = 0;
     struct domain *d;
     struct page_info *page;
@@ -324,10 +324,7 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
         d,
         XENMEMF_get_address_bits(exch.out.mem_flags) ? :
         (BITS_PER_LONG+PAGE_SHIFT)));
-    node = XENMEMF_get_node(exch.out.mem_flags);
-    if ( node == NUMA_NO_NODE )
-        node = domain_to_node(d);
-    memflags |= MEMF_node(node);
+    memflags |= MEMF_node(XENMEMF_get_node(exch.out.mem_flags));
 
     for ( i = (exch.nr_exchanged >> in_chunk_order);
           i < (exch.in.nr_extents >> in_chunk_order);
@@ -545,7 +542,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
         }
 
         args.memflags |= MEMF_node(XENMEMF_get_node(reservation.mem_flags));
-        if (reservation.mem_flags & XENMEMF_exact_node_request)
+        if ( reservation.mem_flags & XENMEMF_exact_node_request )
             args.memflags |= MEMF_exact_node;
 
         if ( op == XENMEM_populate_physmap

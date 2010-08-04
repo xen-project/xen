@@ -23,6 +23,8 @@
 #include <xen/mm.h>
 #include <xen/tasklet.h>
 #include <public/mem_event.h>
+#include <xen/cpumask.h>
+#include <xen/nodemask.h>
 
 #ifdef CONFIG_COMPAT
 #include <compat/vcpu.h>
@@ -326,6 +328,11 @@ struct domain
 
     /* Memory paging support */
     struct mem_event_domain mem_event;
+
+    /* Currently computed from union of all vcpu cpu-affinity masks. */
+    nodemask_t node_affinity;
+    unsigned int last_alloc_node;
+    spinlock_t node_affinity_lock;
 };
 
 struct domain_setup_info
@@ -392,6 +399,8 @@ static inline void get_knownalive_domain(struct domain *d)
     atomic_inc(&d->refcnt);
     ASSERT(!(atomic_read(&d->refcnt) & DOMAIN_DESTROYED));
 }
+
+void domain_update_node_affinity(struct domain *d);
 
 struct domain *domain_create(
     domid_t domid, unsigned int domcr_flags, ssidref_t ssidref);

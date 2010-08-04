@@ -270,6 +270,7 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
         SCHED_OP(VCPU2OP(v), destroy_vcpu, v);
 
         cpus_setall(v->cpu_affinity);
+        domain_update_node_affinity(d);
         v->processor = new_p;
         v->sched_priv = vcpu_priv[v->vcpu_id];
         evtchn_move_pirqs(v);
@@ -477,6 +478,7 @@ int cpu_disable_scheduler(unsigned int cpu)
                 printk("Breaking vcpu affinity for domain %d vcpu %d\n",
                         v->domain->domain_id, v->vcpu_id);
                 cpus_setall(v->cpu_affinity);
+                domain_update_node_affinity(d);
             }
 
             if ( v->processor == cpu )
@@ -519,6 +521,7 @@ int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity)
 
     old_affinity = v->cpu_affinity;
     v->cpu_affinity = *affinity;
+    domain_update_node_affinity(v->domain);
     *affinity = old_affinity;
     if ( !cpu_isset(v->processor, v->cpu_affinity) )
         set_bit(_VPF_migrating, &v->pause_flags);
