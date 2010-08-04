@@ -1117,8 +1117,6 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         goto gpf;
     }
 
-    HVMTRACE_3D (MSR_READ, msr,
-                (uint32_t)*msr_content, (uint32_t)(*msr_content>>32));
     HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%x, msr_value=%"PRIx64,
                 msr, *msr_content);
     return X86EMUL_OKAY;
@@ -1132,9 +1130,6 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 {
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-
-    HVMTRACE_3D(MSR_WRITE, msr,
-               (uint32_t)msr_content, (uint32_t)(msr_content >> 32)); 
 
     switch ( msr )
     {

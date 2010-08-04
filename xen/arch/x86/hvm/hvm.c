@@ -2021,7 +2021,7 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     uint64_t *var_range_base, *fixed_range_base;
     int index, mtrr;
     uint32_t cpuid[4];
-    int ret;
+    int ret = X86EMUL_OKAY;
 
     var_range_base = (uint64_t *)v->arch.hvm_vcpu.mtrr.var_ranges;
     fixed_range_base = (uint64_t *)v->arch.hvm_vcpu.mtrr.fixed_ranges;
@@ -2094,24 +2094,25 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
          break;
 
     default:
-        ret = vmce_rdmsr(msr, msr_content);
-        if ( ret < 0 )
+        if ( (ret = vmce_rdmsr(msr, msr_content)) < 0 )
             goto gp_fault;
-        else if ( ret )
-            break;
-        /* ret == 0, This is not an MCE MSR, see other MSRs */
-        else if (!ret) {
-            return hvm_funcs.msr_read_intercept(msr, msr_content);
-        }
+        /* If ret == 0 then this is not an MCE MSR, see other MSRs. */
+        ret = ((ret == 0)
+               ? hvm_funcs.msr_read_intercept(msr, msr_content)
+               : X86EMUL_OKAY);
+        break;
     }
 
-    HVMTRACE_3D(MSR_READ, (uint32_t)*msr_content, (uint32_t)(*msr_content >> 32), msr);
+ out:
+    HVMTRACE_3D(MSR_READ, msr,
+                (uint32_t)*msr_content, (uint32_t)(*msr_content >> 32));
+    return ret;
 
-    return X86EMUL_OKAY;
-
-gp_fault:
+ gp_fault:
     hvm_inject_exception(TRAP_gp_fault, 0, 0);
-    return X86EMUL_EXCEPTION;
+    ret = X86EMUL_EXCEPTION;
+    *msr_content = -1ull;
+    goto out;
 }
 
 int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
@@ -2119,9 +2120,10 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
     struct vcpu *v = current;
     int index, mtrr;
     uint32_t cpuid[4];
-    int ret;
+    int ret = X86EMUL_OKAY;
 
-    HVMTRACE_3D(MSR_WRITE, (uint32_t)msr_content, (uint32_t)(msr_content >> 32), msr);
+    HVMTRACE_3D(MSR_WRITE, msr,
+               (uint32_t)msr_content, (uint32_t)(msr_content >> 32));
 
     hvm_cpuid(1, &cpuid[0], &cpuid[1], &cpuid[2], &cpuid[3]);
     mtrr = !!(cpuid[3] & bitmaskof(X86_FEATURE_MTRR));
@@ -2194,16 +2196,16 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         break;
 
     default:
-        ret = vmce_wrmsr(msr, msr_content);
-        if ( ret < 0 )
+        if ( (ret = vmce_wrmsr(msr, msr_content)) < 0 )
             goto gp_fault;
-        else if ( ret )
-            break;
-        else if (!ret)
-            return hvm_funcs.msr_write_intercept(msr, msr_content);
+        /* If ret == 0 then this is not an MCE MSR, see other MSRs. */
+        ret = ((ret == 0)
+               ? hvm_funcs.msr_write_intercept(msr, msr_content)
+               : X86EMUL_OKAY);
+        break;
     }
 
-    return X86EMUL_OKAY;
+    return ret;
 
 gp_fault:
     hvm_inject_exception(TRAP_gp_fault, 0, 0);
