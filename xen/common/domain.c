@@ -358,12 +358,8 @@ void domain_update_node_affinity(struct domain *d)
         cpus_or(cpumask, cpumask, v->cpu_affinity);
 
     for_each_online_node ( node )
-    {
         if ( cpus_intersects(node_to_cpumask(node), cpumask) )
             node_set(node, nodemask);
-        else
-            node_clear(node, nodemask);
-    }
 
     d->node_affinity = nodemask;
     spin_unlock(&d->node_affinity_lock);
