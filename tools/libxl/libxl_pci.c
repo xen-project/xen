@@ -36,6 +36,59 @@
 #include "libxl_internal.h"
 #include "flexarray.h"
 
+#define PCI_BDF                "%04x:%02x:%02x.%01x"
+#define PCI_BDF_SHORT          "%02x:%02x.%01x"
+#define PCI_BDF_VDEVFN         "%04x:%02x:%02x.%01x@%02x"
+
+static int pcidev_init(libxl_device_pci *pcidev, unsigned int domain,
+                          unsigned int bus, unsigned int dev,
+                          unsigned int func, unsigned int vdevfn)
+{
+    pcidev->domain = domain;
+    pcidev->bus = bus;
+    pcidev->dev = dev;
+    pcidev->func = func;
+    pcidev->vdevfn = vdevfn;
+    return 0;
+}
+
+int libxl_device_pci_parse_bdf(libxl_device_pci *pcidev, const char *str)
+{
+    unsigned dom, bus, dev, func;
+    char *p, *buf2;
+    int rc;
+
+    if ( NULL == (buf2 = strdup(str)) )
+        return ERROR_NOMEM;
+
+    p = strtok(buf2, ",");
+
+    if ( sscanf(str, PCI_BDF, &dom, &bus, &dev, &func) != 4 ) {
+        dom = 0;
+        if ( sscanf(str, PCI_BDF_SHORT, &bus, &dev, &func) != 3 ) {
+            rc = ERROR_FAIL;
+            goto out;
+        }
+    }
+
+    rc = pcidev_init(pcidev, dom, bus, dev, func, 0);
+
+    while ((p = strtok(NULL, ",=")) != NULL) {
+        while (*p == ' ')
+            p++;
+        if (!strcmp(p, "msitranslate")) {
+            p = strtok(NULL, ",=");
+            pcidev->msitranslate = atoi(p);
+        } else if (!strcmp(p, "power_mgmt")) {
+            p = strtok(NULL, ",=");
+            pcidev->power_mgmt = atoi(p);
+        }
+    }
+out:
+    free(buf2);
+    return rc;
+}
+
 static int libxl_create_pci_backend(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev, int num)
 {
     flexarray_t *front;
@@ -288,7 +341,7 @@ static int get_all_assigned_devices(libxl_ctx *ctx, libxl_device_pci **list, int
                     if ( sscanf(bdf, PCI_BDF, &dom, &bus, &dev, &func) != 4 )
                         continue;
 
-                    libxl_device_pci_init(pcidevs + *num, dom, bus, dev, func, 0);
+                    pcidev_init(pcidevs + *num, dom, bus, dev, func, 0);
                     (*num)++;
                 }
             }
@@ -366,7 +419,7 @@ int libxl_device_pci_list_assignable(libxl_ctx *ctx, libxl_device_pci **list, in
         new = pcidevs + *num;
 
         memset(new, 0, sizeof(*new));
-        libxl_device_pci_init(new, dom, bus, dev, func, 0);
+        pcidev_init(new, dom, bus, dev, func, 0);
         (*num)++;
     }
 
@@ -629,7 +682,7 @@ int libxl_device_pci_list_assigned(libxl_ctx *ctx, libxl_device_pci **list, uint
         xsvdevfn = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/vdevfn-%d", be_path, i));
         if (xsvdevfn)
             vdevfn = strtol(xsvdevfn, (char **) NULL, 16);
-        libxl_device_pci_init(pcidevs + i, domain, bus, dev, func, vdevfn);
+        pcidev_init(pcidevs + i, domain, bus, dev, func, vdevfn);
         xsopts = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/opts-%d", be_path, i));
         if (xsopts) {
             char *saveptr;
@@ -665,18 +718,6 @@ int libxl_device_pci_shutdown(libxl_ctx *ctx, uint32_t domid)
             return ERROR_FAIL;
     }
     free(pcidevs);
-    return 0;
-}
-
-int libxl_device_pci_init(libxl_device_pci *pcidev, unsigned int domain,
-                          unsigned int bus, unsigned int dev,
-                          unsigned int func, unsigned int vdevfn)
-{
-    pcidev->domain = domain;
-    pcidev->bus = bus;
-    pcidev->dev = dev;
-    pcidev->func = func;
-    pcidev->vdevfn = vdevfn;
     return 0;
 }
 

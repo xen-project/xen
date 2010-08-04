@@ -495,7 +495,7 @@ static void printf_info(int domid,
     for (i = 0; i < d_config->num_pcidevs; i++) {
         printf("\t(device\n");
         printf("\t\t(pci\n");
-        printf("\t\t\t(pci dev "PCI_BDF_VDEVFN")\n",
+        printf("\t\t\t(pci dev %04x:%02x:%02x.%01x@%02x)\n",
                d_config->pcidevs[i].domain, d_config->pcidevs[i].bus,
                d_config->pcidevs[i].dev, d_config->pcidevs[i].func,
                d_config->pcidevs[i].vdevfn);
@@ -953,46 +953,20 @@ skip_vfb:
         pci_power_mgmt = l;
 
     if (!xlu_cfg_get_list (config, "pci", &pcis, 0)) {
+        int i;
         d_config->num_pcidevs = 0;
         d_config->pcidevs = NULL;
-        while ((buf = xlu_cfg_get_listitem (pcis, d_config->num_pcidevs)) != NULL) {
+        for(i = 0; (buf = xlu_cfg_get_listitem (pcis, i)) != NULL; i++) {
             libxl_device_pci *pcidev;
-            unsigned int domain = 0, bus = 0, dev = 0, func = 0, vdevfn = 0;
-            char *buf2 = strdup(buf);
-            char *p;
 
             d_config->pcidevs = (libxl_device_pci *) realloc(d_config->pcidevs, sizeof (libxl_device_pci) * (d_config->num_pcidevs + 1));
             pcidev = d_config->pcidevs + d_config->num_pcidevs;
             memset(pcidev, 0x00, sizeof(libxl_device_pci));
 
-            p = strtok(buf2, ",");
-            if (!p)
-                goto skip_pci;
-            if (sscanf(p, PCI_BDF_VDEVFN, &domain, &bus, &dev, &func, &vdevfn) < 4) {
-                domain = 0;
-                if (sscanf(p, "%02x:%02x.%01x@%02x", &bus, &dev, &func, &vdevfn) < 3) {
-                    fprintf(stderr,"xl: Unable to parse pci bdf (%s)\n", p);
-                    goto skip_pci;
-                }
-            }
-
-            libxl_device_pci_init(pcidev, domain, bus, dev, func, vdevfn);
             pcidev->msitranslate = pci_msitranslate;
             pcidev->power_mgmt = pci_power_mgmt;
-            while ((p = strtok(NULL, ",=")) != NULL) {
-                while (*p == ' ')
-                    p++;
-                if (!strcmp(p, "msitranslate")) {
-                    p = strtok(NULL, ",=");
-                    pcidev->msitranslate = atoi(p);
-                } else if (!strcmp(p, "power_mgmt")) {
-                    p = strtok(NULL, ",=");
-                    pcidev->power_mgmt = atoi(p);
-                }
-            }
-            d_config->num_pcidevs++;
-skip_pci:
-            free(buf2);
+            if (!libxl_device_pci_parse_bdf(pcidev, buf))
+                d_config->num_pcidevs++;
         }
     }
 
@@ -2019,16 +1993,14 @@ int main_pcilist(int argc, char **argv)
 void pcidetach(char *dom, char *bdf)
 {
     libxl_device_pci pcidev;
-    unsigned int domain, bus, dev, func;
 
     find_domain(dom);
 
     memset(&pcidev, 0x00, sizeof(pcidev));
-    if (sscanf(bdf, PCI_BDF, &domain, &bus, &dev, &func) != 4) {
+    if (libxl_device_pci_parse_bdf(&pcidev, bdf)) {
         fprintf(stderr, "pci-detach: malformed BDF specification \"%s\"\n", bdf);
         exit(2);
     }
-    libxl_device_pci_init(&pcidev, domain, bus, dev, func, 0);
     libxl_device_pci_remove(&ctx, domid, &pcidev);
 }
 
@@ -2061,16 +2033,14 @@ int main_pcidetach(int argc, char **argv)
 void pciattach(char *dom, char *bdf, char *vs)
 {
     libxl_device_pci pcidev;
-    unsigned int domain, bus, dev, func;
 
     find_domain(dom);
 
     memset(&pcidev, 0x00, sizeof(pcidev));
-    if (sscanf(bdf, PCI_BDF, &domain, &bus, &dev, &func) != 4) {
+    if (libxl_device_pci_parse_bdf(&pcidev, bdf)) {
         fprintf(stderr, "pci-attach: malformed BDF specification \"%s\"\n", bdf);
         exit(2);
     }
-    libxl_device_pci_init(&pcidev, domain, bus, dev, func, 0);
     libxl_device_pci_add(&ctx, domid, &pcidev);
 }
 
