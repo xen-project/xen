@@ -57,8 +57,6 @@ xc_interface *xc_interface_open(xentoollog_logger *logger,
     return 0;
 }
 
-static void xc_clean_hcall_buf(void);
-
 int xc_interface_close(xc_interface *xch)
 {
     int rc = 0;
@@ -70,9 +68,6 @@ int xc_interface_close(xc_interface *xch)
         rc = xc_interface_close_core(xch, xch->fd);
         if (rc) PERROR("Could not close hypervisor interface");
     }
-
-    xc_clean_hcall_buf();
-
     free(xch);
     return rc;
 }
@@ -185,8 +180,6 @@ void unlock_pages(void *addr, size_t len) { }
 int hcall_buf_prep(void **addr, size_t len) { return 0; }
 void hcall_buf_release(void **addr, size_t len) { }
 
-static void xc_clean_hcall_buf(void) { }
-
 #else /* !__sun__ */
 
 int lock_pages(void *addr, size_t len)
@@ -230,14 +223,6 @@ static void _xc_clean_hcall_buf(void *m)
     }
 
     pthread_setspecific(hcall_buf_pkey, NULL);
-}
-
-static void xc_clean_hcall_buf(void)
-{
-    void *hcall_buf = pthread_getspecific(hcall_buf_pkey);
-
-    if (hcall_buf)
-        _xc_clean_hcall_buf(hcall_buf);
 }
 
 static void _xc_init_hcall_buf(void)
