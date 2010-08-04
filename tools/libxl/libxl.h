@@ -22,8 +22,12 @@
 #include <xs.h>
 #include <sys/wait.h> /* for pid_t */
 
+typedef uint8_t libxl_uuid[16];
+
+typedef uint8_t libxl_mac[6];
+
 typedef struct {
-    uint8_t uuid[16];
+    libxl_uuid uuid;
     uint32_t domid;
     uint8_t running:1;
     uint8_t blocked:1;
@@ -50,7 +54,7 @@ typedef struct {
 } libxl_poolinfo;
 
 typedef struct {
-    uint8_t uuid[16];
+    libxl_uuid uuid;
     uint32_t domid;
 } libxl_vminfo;
 
@@ -93,7 +97,7 @@ typedef struct {
     bool oos;
     int ssidref;
     char *name;
-    uint8_t uuid[16];
+    libxl_uuid uuid;
     char **xsdata;
     char **platformdata;
     uint32_t poolid;
@@ -173,7 +177,7 @@ typedef enum {
 
 typedef struct {
     int domid;
-    uint8_t uuid[16]; /* this is use only with stubdom, and must be different from the domain uuid */
+    libxl_uuid uuid; /* this is use only with stubdom, and must be different from the domain uuid */
     char *dom_name;
     char *device_model;
     char *saved_state;
@@ -268,7 +272,7 @@ typedef struct {
     int devid;
     int mtu;
     char *model;
-    uint8_t mac[6];
+    libxl_mac mac;
     struct in_addr ip;
     char *bridge;
     char *ifname;
@@ -278,8 +282,8 @@ typedef struct {
 
 typedef struct {
     int devid;
-    uint8_t front_mac[6];
-    uint8_t back_mac[6];
+    libxl_mac front_mac;
+    libxl_mac back_mac;
     uint32_t backend_domid;
     uint32_t domid;
     uint32_t trusted:1;
@@ -338,7 +342,7 @@ int libxl_domain_suspend(libxl_ctx *ctx, libxl_domain_suspend_info *info,
 int libxl_domain_resume(libxl_ctx *ctx, uint32_t domid);
 int libxl_domain_shutdown(libxl_ctx *ctx, uint32_t domid, int req);
 int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid, int force);
-int libxl_domain_preserve(libxl_ctx *ctx, uint32_t domid, libxl_domain_create_info *info, const char *name_suffix, uint8_t new_uuid[16]);
+int libxl_domain_preserve(libxl_ctx *ctx, uint32_t domid, libxl_domain_create_info *info, const char *name_suffix, libxl_uuid new_uuid);
 
 int libxl_file_reference_map(libxl_ctx *ctx, libxl_file_reference *f);
 int libxl_file_reference_unmap(libxl_ctx *ctx, libxl_file_reference *f);
@@ -360,7 +364,7 @@ int libxl_run_bootloader(libxl_ctx *ctx,
                          libxl_device_disk *disk,
                          uint32_t domid);
 
-char *libxl_uuid2string(libxl_ctx *ctx, const uint8_t uuid[16]);
+char *libxl_uuid2string(libxl_ctx *ctx, const libxl_uuid uuid);
   /* 0 means ERROR_ENOMEM, which we have logged */
 
 /* events handling */
@@ -496,7 +500,7 @@ typedef struct {
     int devid;
     int state;
     char *script;
-    uint8_t mac[6];
+    libxl_mac mac;
     int evtch;
     int rref_tx;
     int rref_rx;
@@ -516,16 +520,12 @@ int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb);
 int libxl_device_vfb_clean_shutdown(libxl_ctx *ctx, uint32_t domid);
 int libxl_device_vfb_hard_shutdown(libxl_ctx *ctx, uint32_t domid);
 
-#define PCI_BDF                "%04x:%02x:%02x.%01x"
-#define PCI_BDF_VDEVFN         "%04x:%02x:%02x.%01x@%02x"
 int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev);
 int libxl_device_pci_remove(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev);
 int libxl_device_pci_shutdown(libxl_ctx *ctx, uint32_t domid);
 int libxl_device_pci_list_assigned(libxl_ctx *ctx, libxl_device_pci **list, uint32_t domid, int *num);
 int libxl_device_pci_list_assignable(libxl_ctx *ctx, libxl_device_pci **list, int *num);
-int libxl_device_pci_init(libxl_device_pci *pcidev, unsigned int domain,
-                          unsigned int bus, unsigned int dev,
-                          unsigned int func, unsigned int vdevfn);
+int libxl_device_pci_parse_bdf(libxl_ctx *ctx, libxl_device_pci *pcidev, const char *str);
 
 /*
  * Functions for allowing users of libxl to store private data
@@ -652,9 +652,9 @@ typedef struct {
     uint32_t frontend_id;
     int devid;
     int state;
-    uint8_t mac[6];
+    libxl_mac mac;
     int trusted;
-    uint8_t back_mac[6];
+    libxl_mac back_mac;
     int filter_mac;
 } libxl_net2info;
 

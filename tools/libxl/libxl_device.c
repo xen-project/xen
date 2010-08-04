@@ -380,6 +380,8 @@ int libxl_device_del(libxl_ctx *ctx, libxl_device *dev, int wait)
 int libxl_wait_for_device_model(libxl_ctx *ctx,
                                 uint32_t domid, char *state,
                                 int (*check_callback)(libxl_ctx *ctx,
+                                                      uint32_t domid,
+                                                      const char *state,
                                                       void *userdata),
                                 void *check_callback_userdata)
 {
@@ -402,18 +404,24 @@ int libxl_wait_for_device_model(libxl_ctx *ctx,
     nfds = xs_fileno(xsh) + 1;
     while (rc > 0 || (!rc && tv.tv_sec > 0)) {
         p = xs_read(xsh, XBT_NULL, path, &len);
-        if (p && (!state || !strcmp(state, p))) {
-            free(p);
-            xs_unwatch(xsh, path, path);
-            xs_daemon_close(xsh);
-            if (check_callback) {
-                rc = check_callback(ctx, check_callback_userdata);
-                if (rc) return rc;
-            }
-            return 0;
+        if ( NULL == p )
+            goto again;
+
+        if ( NULL != state && strcmp(p, state) )
+            goto again;
+
+        if ( NULL != check_callback ) {
+            rc = (*check_callback)(ctx, domid, p, check_callback_userdata);
+            if ( rc > 0 )
+                goto again;
         }
+
         free(p);
+        xs_unwatch(xsh, path, path);
+        xs_daemon_close(xsh);
+        return rc;
 again:
+        free(p);
         FD_ZERO(&rfds);
         FD_SET(xs_fileno(xsh), &rfds);
         rc = select(nfds, &rfds, NULL, NULL, &tv);

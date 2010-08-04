@@ -91,7 +91,11 @@ int xlu_cfg_readdata(XLU_Config *cfg, const char *data, int length) {
 }
 
 void xlu__cfg_set_free(XLU_ConfigSetting *set) {
+    int i;
+
     free(set->name);
+    for (i=0; i<set->nvalues; i++)
+        free(set->values[i]);
     free(set->values);
     free(set);
 }

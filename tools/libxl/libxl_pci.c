@@ -36,6 +36,161 @@
 #include "libxl_internal.h"
 #include "flexarray.h"
 
+#define PCI_BDF                "%04x:%02x:%02x.%01x"
+#define PCI_BDF_SHORT          "%02x:%02x.%01x"
+#define PCI_BDF_VDEVFN         "%04x:%02x:%02x.%01x@%02x"
+
+static int pcidev_init(libxl_device_pci *pcidev, unsigned int domain,
+                          unsigned int bus, unsigned int dev,
+                          unsigned int func, unsigned int vdevfn)
+{
+    pcidev->domain = domain;
+    pcidev->bus = bus;
+    pcidev->dev = dev;
+    pcidev->func = func;
+    pcidev->vdevfn = vdevfn;
+    return 0;
+}
+
+static int hex_convert(const char *str, unsigned int *val, unsigned int mask)
+{
+    unsigned long ret;
+    char *end;
+
+    ret = strtoul(str, &end, 16);
+    if ( end == str || *end != '\0' )
+        return -1;
+    if ( ret & ~mask )
+        return -1;
+    *val = (unsigned int)ret & mask;
+    return 0;
+}
+
+#define STATE_DOMAIN    0
+#define STATE_BUS       1
+#define STATE_DEV       2
+#define STATE_FUNC      3
+#define STATE_VSLOT     4
+#define STATE_OPTIONS_K 6
+#define STATE_OPTIONS_V 7
+#define STATE_TERMINAL  8
+int libxl_device_pci_parse_bdf(libxl_ctx *ctx, libxl_device_pci *pcidev, const char *str)
+{
+    unsigned state = STATE_DOMAIN;
+    unsigned dom, bus, dev, func, vslot = 0;
+    char *buf2, *tok, *ptr, *end, *optkey = NULL;
+
+    if ( NULL == (buf2 = ptr = strdup(str)) )
+        return ERROR_NOMEM;
+
+    for(tok = ptr, end = ptr + strlen(ptr) + 1; ptr < end; ptr++) {
+        switch(state) {
+        case STATE_DOMAIN:
+            if ( *ptr == ':' ) {
+                state = STATE_BUS;
+                *ptr = '\0';
+                if ( hex_convert(tok, &dom, 0xffff) )
+                    goto parse_error;
+                tok = ptr + 1;
+            }
+            break;
+        case STATE_BUS:
+            if ( *ptr == ':' ) {
+                state = STATE_DEV;
+                *ptr = '\0';
+                if ( hex_convert(tok, &bus, 0xff) )
+                    goto parse_error;
+                tok = ptr + 1;
+            }else if ( *ptr == '.' ) {
+                state = STATE_FUNC;
+                *ptr = '\0';
+                if ( dom & ~0xff )
+                    goto parse_error;
+                bus = dom;
+                dom = 0;
+                if ( hex_convert(tok, &dev, 0xff) )
+                    goto parse_error;
+                tok = ptr + 1;
+            }
+            break;
+        case STATE_DEV:
+            if ( *ptr == '.' ) {
+                state = STATE_FUNC;
+                *ptr = '\0';
+                if ( hex_convert(tok, &dev, 0xff) )
+                    goto parse_error;
+                tok = ptr + 1;
+            }
+            break;
+        case STATE_FUNC:
+            if ( *ptr == '\0' || *ptr == '@' || *ptr == ',' ) {
+                switch( *ptr ) {
+                case '\0':
+                    state = STATE_TERMINAL;
+                    break;
+                case '@':
+                    state = STATE_VSLOT;
+                    break;
+                case ',':
+                    state = STATE_OPTIONS_K;
+                    break;
+                }
+                *ptr = '\0';
+                if ( hex_convert(tok, &func, 0x7) )
+                    goto parse_error;
+                tok = ptr + 1;
+            }
+            break;
+        case STATE_VSLOT:
+            if ( *ptr == '\0' || *ptr == ',' ) {
+                state = ( *ptr == ',' ) ? STATE_OPTIONS_K : STATE_TERMINAL;
+                *ptr = '\0';
+                if ( hex_convert(tok, &vslot, 0xff) )
+                    goto parse_error;
+                tok = ptr + 1;
+            }
+            break;
+        case STATE_OPTIONS_K:
+            if ( *ptr == '=' ) {
+                state = STATE_OPTIONS_V;
+                *ptr = '\0';
+                optkey = tok;
+                tok = ptr + 1;
+            }
+            break;
+        case STATE_OPTIONS_V:
+            if ( *ptr == ',' || *ptr == '\0' ) {
+                state = (*ptr == ',') ? STATE_OPTIONS_K : STATE_TERMINAL;
+                *ptr = '\0';
+                if ( !strcmp(optkey, "msitranslate") ) {
+                    pcidev->msitranslate = atoi(tok);
+                }else if ( !strcmp(optkey, "power_mgmt") ) {
+                    pcidev->power_mgmt = atoi(tok);
+                }else{
+                    XL_LOG(ctx, XL_LOG_WARNING,
+                           "Unknown PCI BDF option: %s", optkey);
+                }
+                tok = ptr + 1;
+            }
+        default:
+            break;
+        }
+    }
+
+    free(buf2);
+
+    if ( tok != ptr || state != STATE_TERMINAL )
+        goto parse_error;
+
+    pcidev_init(pcidev, dom, bus, dev, func, vslot << 3);
+
+    return 0;
+
+parse_error:
+    printf("parse error: %s\n", str);
+    return ERROR_INVAL;
+}
+
 static int libxl_create_pci_backend(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev, int num)
 {
     flexarray_t *front;
@@ -288,7 +443,7 @@ static int get_all_assigned_devices(libxl_ctx *ctx, libxl_device_pci **list, int
                     if ( sscanf(bdf, PCI_BDF, &dom, &bus, &dev, &func) != 4 )
                         continue;
 
-                    libxl_device_pci_init(pcidevs + *num, dom, bus, dev, func, 0);
+                    pcidev_init(pcidevs + *num, dom, bus, dev, func, 0);
                     (*num)++;
                 }
             }
@@ -325,6 +480,71 @@ static int is_assigned(libxl_device_pci *assigned, int num_assigned,
     return 0;
 }
 
+int libxl_device_pci_list_assignable(libxl_ctx *ctx, libxl_device_pci **list, int *num)
+{
+    libxl_device_pci *pcidevs = NULL, *new, *assigned;
+    struct dirent *de;
+    DIR *dir;
+    int rc, num_assigned;
+
+    *num = 0;
+    *list = NULL;
+
+    rc = get_all_assigned_devices(ctx, &assigned, &num_assigned);
+    if ( rc )
+        return rc;
+
+    dir = opendir(SYSFS_PCIBACK_DRIVER);
+    if ( NULL == dir ) {
+        if ( errno == ENOENT ) {
+            XL_LOG(ctx, XL_LOG_ERROR, "Looks like pciback driver not loaded");
+        }else{
+            XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "Couldn't open %s", SYSFS_PCIBACK_DRIVER);
+        }
+        free(assigned);
+        return ERROR_FAIL;
+    }
+
+    while( (de = readdir(dir)) ) {
+        unsigned dom, bus, dev, func;
+        if ( sscanf(de->d_name, PCI_BDF, &dom, &bus, &dev, &func) != 4 )
+            continue;
+
+        if ( is_assigned(assigned, num_assigned, dom, bus, dev, func) )
+            continue;
+
+        new = realloc(pcidevs, ((*num) + 1) * sizeof(*new));
+        if ( NULL == new )
+            continue;
+
+        pcidevs = new;
+        new = pcidevs + *num;
+
+        memset(new, 0, sizeof(*new));
+        pcidev_init(new, dom, bus, dev, func, 0);
+        (*num)++;
+    }
+
+    closedir(dir);
+    free(assigned);
+    *list = pcidevs;
+    return 0;
+}
+
+static int pci_ins_check(libxl_ctx *ctx, uint32_t domid, const char *state, void *priv)
+{
+    char *orig_state = priv;
+
+    if ( !strcmp(state, "pci-insert-failed") )
+        return -1;
+    if ( !strcmp(state, "pci-inserted") )
+        return 0;
+    if ( !strcmp(state, orig_state) )
+        return 1;
+
+    return 1;
+}
+ 
 static int do_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
 {
     char *path;
@@ -347,13 +567,17 @@ static int do_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
                            pcidev->bus, pcidev->dev, pcidev->func);
         path = libxl_sprintf(ctx, "/local/domain/0/device-model/%d/command", domid);
         xs_write(ctx->xsh, XBT_NULL, path, "pci-ins", strlen("pci-ins"));
-        if (libxl_wait_for_device_model(ctx, domid, "pci-inserted", NULL, NULL) < 0)
-            XL_LOG(ctx, XL_LOG_ERROR, "Device Model didn't respond in time");
+        rc = libxl_wait_for_device_model(ctx, domid, NULL, pci_ins_check, state);
         path = libxl_sprintf(ctx, "/local/domain/0/device-model/%d/parameter", domid);
         vdevfn = libxl_xs_read(ctx, XBT_NULL, path);
-        sscanf(vdevfn + 2, "%x", &pcidev->vdevfn);
         path = libxl_sprintf(ctx, "/local/domain/0/device-model/%d/state", domid);
+        if ( rc < 0 )
+            XL_LOG(ctx, XL_LOG_ERROR, "qemu refused to add device: %s", vdevfn);
+        else if ( sscanf(vdevfn, "0x%x", &pcidev->vdevfn) != 1 )
+            rc = -1;
         xs_write(ctx->xsh, XBT_NULL, path, state, strlen(state));
+        if ( rc )
+            return ERROR_FAIL;
     } else {
         char *sysfs_path = libxl_sprintf(ctx, SYSFS_PCI_DEV"/"PCI_BDF"/resource", pcidev->domain,
                                          pcidev->bus, pcidev->dev, pcidev->func);
@@ -460,12 +684,20 @@ int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcide
 
 int libxl_device_pci_remove(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
 {
+    libxl_device_pci *assigned;
     char *path;
     char *state;
-    int hvm, rc;
+    int hvm, rc, num;
     int stubdomid = 0;
 
-    /* TODO: check if the device can be detached */
+    if ( !libxl_device_pci_list_assigned(ctx, &assigned, domid, &num) ) {
+        if ( !is_assigned(assigned, num, pcidev->domain,
+                         pcidev->bus, pcidev->dev, pcidev->func) ) {
+            XL_LOG(ctx, XL_LOG_ERROR, "PCI device not attached to this domain");
+            return ERROR_INVAL;
+        }
+    }
+
     libxl_device_pci_remove_xenstore(ctx, domid, pcidev);
 
     hvm = is_hvm(ctx, domid);
@@ -554,63 +786,6 @@ out:
     return 0;
 }
 
-static libxl_device_pci *scan_sys_pcidir(libxl_device_pci *assigned,
-                                         int num_assigned, const char *path, int *num)
-{
-    libxl_device_pci *pcidevs = NULL, *new;
-    struct dirent *de;
-    DIR *dir;
-
-    dir = opendir(path);
-    if ( NULL == dir )
-        return pcidevs;
-
-    while( (de = readdir(dir)) ) {
-        unsigned dom, bus, dev, func;
-        if ( sscanf(de->d_name, PCI_BDF, &dom, &bus, &dev, &func) != 4 )
-            continue;
-
-        if ( is_assigned(assigned, num_assigned, dom, bus, dev, func) )
-            continue;
-
-        new = realloc(pcidevs, ((*num) + 1) * sizeof(*new));
-        if ( NULL == new )
-            continue;
-
-        pcidevs = new;
-        new = pcidevs + *num;
-
-        memset(new, 0, sizeof(*new));
-        libxl_device_pci_init(new, dom, bus, dev, func, 0);
-        (*num)++;
-    }
-
-    closedir(dir);
-    return pcidevs;
-}
-
-int libxl_device_pci_list_assignable(libxl_ctx *ctx, libxl_device_pci **list, int *num)
-{
-    libxl_device_pci *pcidevs = NULL;
-    libxl_device_pci *assigned;
-    int num_assigned, rc;
-
-    *num = 0;
-    *list = NULL;
-
-    rc = get_all_assigned_devices(ctx, &assigned, &num_assigned);
-    if ( rc )
-        return rc;
-
-    pcidevs = scan_sys_pcidir(assigned, num_assigned,
-                              SYSFS_PCIBACK_DRIVER, num);
-
-    free(assigned);
-    if ( *num )
-        *list = pcidevs;
-    return 0;
-}
-
 int libxl_device_pci_list_assigned(libxl_ctx *ctx, libxl_device_pci **list, uint32_t domid, int *num)
 {
     char *be_path, *num_devs, *xsdev, *xsvdevfn, *xsopts;
@@ -623,7 +798,7 @@ int libxl_device_pci_list_assigned(libxl_ctx *ctx, libxl_device_pci **list, uint
     if (!num_devs) {
         *num = 0;
         *list = NULL;
-        return ERROR_FAIL;
+        return 0;
     }
     n = atoi(num_devs);
     pcidevs = calloc(n, sizeof(libxl_device_pci));
@@ -635,7 +810,7 @@ int libxl_device_pci_list_assigned(libxl_ctx *ctx, libxl_device_pci **list, uint
         xsvdevfn = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/vdevfn-%d", be_path, i));
         if (xsvdevfn)
             vdevfn = strtol(xsvdevfn, (char **) NULL, 16);
-        libxl_device_pci_init(pcidevs + i, domain, bus, dev, func, vdevfn);
+        pcidev_init(pcidevs + i, domain, bus, dev, func, vdevfn);
         xsopts = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/opts-%d", be_path, i));
         if (xsopts) {
             char *saveptr;
@@ -674,24 +849,13 @@ int libxl_device_pci_shutdown(libxl_ctx *ctx, uint32_t domid)
     return 0;
 }
 
-int libxl_device_pci_init(libxl_device_pci *pcidev, unsigned int domain,
-                          unsigned int bus, unsigned int dev,
-                          unsigned int func, unsigned int vdevfn)
-{
-    pcidev->domain = domain;
-    pcidev->bus = bus;
-    pcidev->dev = dev;
-    pcidev->func = func;
-    pcidev->vdevfn = vdevfn;
-    return 0;
-}
-
 int libxl_device_pci_reset(libxl_ctx *ctx, unsigned int domain, unsigned int bus,
                          unsigned int dev, unsigned int func)
 {
-    char *reset = "/sys/bus/pci/drivers/pciback/do_flr";
+    char *reset;
     int fd, rc;
 
+    reset = libxl_sprintf(ctx, "%s/pciback/do_flr", SYSFS_PCI_DEV);
     fd = open(reset, O_WRONLY);
     if (fd > 0) {
         char *buf = libxl_sprintf(ctx, PCI_BDF, domain, bus, dev, func);
@@ -703,7 +867,7 @@ int libxl_device_pci_reset(libxl_ctx *ctx, unsigned int domain, unsigned int bus
     }
     if (errno != ENOENT)
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "Failed to access pciback path %s", reset);
-    reset = libxl_sprintf(ctx, "/sys/bus/pci/devices/"PCI_BDF"/reset", domain, bus, dev, func);
+    reset = libxl_sprintf(ctx, "%s/"PCI_BDF"/reset", SYSFS_PCI_DEV, domain, bus, dev, func);
     fd = open(reset, O_WRONLY);
     if (fd > 0) {
         rc = write(fd, "1", 1);

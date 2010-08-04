@@ -410,7 +410,7 @@ int libxl_domain_resume(libxl_ctx *ctx, uint32_t domid)
  * Does not modify info so that it may be reused.
  */
 int libxl_domain_preserve(libxl_ctx *ctx, uint32_t domid,
-                          libxl_domain_create_info *info, const char *name_suffix, uint8_t new_uuid[16])
+                          libxl_domain_create_info *info, const char *name_suffix, libxl_uuid new_uuid)
 {
     struct xs_permissions roperm[2];
     xs_transaction_t t;
@@ -1420,12 +1420,12 @@ int libxl_detach_device_model(libxl_ctx *ctx,
 int libxl_confirm_device_model_startup(libxl_ctx *ctx,
                                        libxl_device_model_starting *starting)
 {
-    int problem = libxl_wait_for_device_model(ctx, starting->domid, "running",
-                                              libxl_spawn_check,
-                                              starting->for_spawn);
-    int detach = libxl_detach_device_model(ctx, starting);
+    int problem = libxl_wait_for_device_model(ctx, starting->domid, "running", NULL, NULL);
+    int detach;
+    if ( !problem )
+        problem = libxl_spawn_check(ctx, starting->for_spawn);
+    detach = libxl_detach_device_model(ctx, starting);
     return problem ? problem : detach;
-    return 0;
 }
 
 
