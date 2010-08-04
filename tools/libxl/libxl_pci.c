@@ -564,12 +564,20 @@ int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcide
 
 int libxl_device_pci_remove(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
 {
+    libxl_device_pci *assigned;
     char *path;
     char *state;
-    int hvm, rc;
+    int hvm, rc, num;
     int stubdomid = 0;
 
-    /* TODO: check if the device can be detached */
+    if ( !libxl_device_pci_list_assigned(ctx, &assigned, domid, &num) ) {
+        if ( !is_assigned(assigned, num, pcidev->domain,
+                         pcidev->bus, pcidev->dev, pcidev->func) ) {
+            XL_LOG(ctx, XL_LOG_ERROR, "PCI device not attached to this domain");
+            return ERROR_INVAL;
+        }
+    }
+
     libxl_device_pci_remove_xenstore(ctx, domid, pcidev);
 
     hvm = is_hvm(ctx, domid);
