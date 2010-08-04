@@ -325,6 +325,57 @@ static int is_assigned(libxl_device_pci *assigned, int num_assigned,
     return 0;
 }
 
+int libxl_device_pci_list_assignable(libxl_ctx *ctx, libxl_device_pci **list, int *num)
+{
+    libxl_device_pci *pcidevs = NULL, *new, *assigned;
+    struct dirent *de;
+    DIR *dir;
+    int rc, num_assigned;
+
+    *num = 0;
+    *list = NULL;
+
+    rc = get_all_assigned_devices(ctx, &assigned, &num_assigned);
+    if ( rc )
+        return rc;
+
+    dir = opendir(SYSFS_PCIBACK_DRIVER);
+    if ( NULL == dir ) {
+        if ( errno == ENOENT ) {
+            XL_LOG(ctx, XL_LOG_ERROR, "Looks like pciback driver not loaded");
+        }else{
+            XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "Couldn't open %s", SYSFS_PCIBACK_DRIVER);
+        }
+        free(assigned);
+        return ERROR_FAIL;
+    }
+
+    while( (de = readdir(dir)) ) {
+        unsigned dom, bus, dev, func;
+        if ( sscanf(de->d_name, PCI_BDF, &dom, &bus, &dev, &func) != 4 )
+            continue;
+
+        if ( is_assigned(assigned, num_assigned, dom, bus, dev, func) )
+            continue;
+
+        new = realloc(pcidevs, ((*num) + 1) * sizeof(*new));
+        if ( NULL == new )
+            continue;
+
+        pcidevs = new;
+        new = pcidevs + *num;
+
+        memset(new, 0, sizeof(*new));
+        libxl_device_pci_init(new, dom, bus, dev, func, 0);
+        (*num)++;
+    }
+
+    closedir(dir);
+    free(assigned);
+    *list = pcidevs;
+    return 0;
+}
+
 static int do_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
 {
     char *path;
@@ -554,63 +605,6 @@ out:
     return 0;
 }
 
-static libxl_device_pci *scan_sys_pcidir(libxl_device_pci *assigned,
-                                         int num_assigned, const char *path, int *num)
-{
-    libxl_device_pci *pcidevs = NULL, *new;
-    struct dirent *de;
-    DIR *dir;
-
-    dir = opendir(path);
-    if ( NULL == dir )
-        return pcidevs;
-
-    while( (de = readdir(dir)) ) {
-        unsigned dom, bus, dev, func;
-        if ( sscanf(de->d_name, PCI_BDF, &dom, &bus, &dev, &func) != 4 )
-            continue;
-
-        if ( is_assigned(assigned, num_assigned, dom, bus, dev, func) )
-            continue;
-
-        new = realloc(pcidevs, ((*num) + 1) * sizeof(*new));
-        if ( NULL == new )
-            continue;
-
-        pcidevs = new;
-        new = pcidevs + *num;
-
-        memset(new, 0, sizeof(*new));
-        libxl_device_pci_init(new, dom, bus, dev, func, 0);
-        (*num)++;
-    }
-
-    closedir(dir);
-    return pcidevs;
-}
-
-int libxl_device_pci_list_assignable(libxl_ctx *ctx, libxl_device_pci **list, int *num)
-{
-    libxl_device_pci *pcidevs = NULL;
-    libxl_device_pci *assigned;
-    int num_assigned, rc;
-
-    *num = 0;
-    *list = NULL;
-
-    rc = get_all_assigned_devices(ctx, &assigned, &num_assigned);
-    if ( rc )
-        return rc;
-
-    pcidevs = scan_sys_pcidir(assigned, num_assigned,
-                              SYSFS_PCIBACK_DRIVER, num);
-
-    free(assigned);
-    if ( *num )
-        *list = pcidevs;
-    return 0;
-}
-
 int libxl_device_pci_list_assigned(libxl_ctx *ctx, libxl_device_pci **list, uint32_t domid, int *num)
 {
     char *be_path, *num_devs, *xsdev, *xsvdevfn, *xsopts;
@@ -623,7 +617,7 @@ int libxl_device_pci_list_assigned(libxl_ctx *ctx, libxl_device_pci **list, uint
     if (!num_devs) {
         *num = 0;
         *list = NULL;
-        return ERROR_FAIL;
+        return 0;
     }
     n = atoi(num_devs);
     pcidevs = calloc(n, sizeof(libxl_device_pci));
@@ -689,9 +683,10 @@ int libxl_device_pci_init(libxl_device_pci *pcidev, unsigned int domain,
 int libxl_device_pci_reset(libxl_ctx *ctx, unsigned int domain, unsigned int bus,
                          unsigned int dev, unsigned int func)
 {
-    char *reset = "/sys/bus/pci/drivers/pciback/do_flr";
+    char *reset;
     int fd, rc;
 
+    reset = libxl_sprintf(ctx, "%s/pciback/do_flr", SYSFS_PCI_DEV);
     fd = open(reset, O_WRONLY);
     if (fd > 0) {
         char *buf = libxl_sprintf(ctx, PCI_BDF, domain, bus, dev, func);
@@ -703,7 +698,7 @@ int libxl_device_pci_reset(libxl_ctx *ctx, unsigned int domain, unsigned int bus
     }
     if (errno != ENOENT)
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "Failed to access pciback path %s", reset);
-    reset = libxl_sprintf(ctx, "/sys/bus/pci/devices/"PCI_BDF"/reset", domain, bus, dev, func);
+    reset = libxl_sprintf(ctx, "%s/"PCI_BDF"/reset", SYSFS_PCI_DEV, domain, bus, dev, func);
     fd = open(reset, O_WRONLY);
     if (fd > 0) {
         rc = write(fd, "1", 1);
