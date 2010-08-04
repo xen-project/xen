@@ -162,6 +162,8 @@ int libxl_devices_destroy(libxl_ctx *ctx, uint32_t domid, int force);
 int libxl_wait_for_device_model(libxl_ctx *ctx,
                                 uint32_t domid, char *state,
                                 int (*check_callback)(libxl_ctx *ctx,
+                                                      uint32_t domid,
+                                                      const char *state,
                                                       void *userdata),
                                 void *check_callback_userdata);
 int libxl_wait_for_backend(libxl_ctx *ctx, char *be_path, char *state);

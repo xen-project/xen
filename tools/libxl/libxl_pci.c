@@ -531,6 +531,20 @@ int libxl_device_pci_list_assignable(libxl_ctx *ctx, libxl_device_pci **list, in
     return 0;
 }
 
+static int pci_ins_check(libxl_ctx *ctx, uint32_t domid, const char *state, void *priv)
+{
+    char *orig_state = priv;
+
+    if ( !strcmp(state, "pci-insert-failed") )
+        return -1;
+    if ( !strcmp(state, "pci-inserted") )
+        return 0;
+    if ( !strcmp(state, orig_state) )
+        return 1;
+
+    return 1;
+}
+ 
 static int do_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
 {
     char *path;
@@ -553,13 +567,17 @@ static int do_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
                            pcidev->bus, pcidev->dev, pcidev->func);
         path = libxl_sprintf(ctx, "/local/domain/0/device-model/%d/command", domid);
         xs_write(ctx->xsh, XBT_NULL, path, "pci-ins", strlen("pci-ins"));
-        if (libxl_wait_for_device_model(ctx, domid, "pci-inserted", NULL, NULL) < 0)
-            XL_LOG(ctx, XL_LOG_ERROR, "Device Model didn't respond in time");
+        rc = libxl_wait_for_device_model(ctx, domid, NULL, pci_ins_check, state);
         path = libxl_sprintf(ctx, "/local/domain/0/device-model/%d/parameter", domid);
         vdevfn = libxl_xs_read(ctx, XBT_NULL, path);
-        sscanf(vdevfn + 2, "%x", &pcidev->vdevfn);
         path = libxl_sprintf(ctx, "/local/domain/0/device-model/%d/state", domid);
+        if ( rc < 0 )
+            XL_LOG(ctx, XL_LOG_ERROR, "qemu refused to add device: %s", vdevfn);
+        else if ( sscanf(vdevfn, "0x%x", &pcidev->vdevfn) != 1 )
+            rc = -1;
         xs_write(ctx->xsh, XBT_NULL, path, state, strlen(state));
+        if ( rc )
+            return ERROR_FAIL;
     } else {
         char *sysfs_path = libxl_sprintf(ctx, SYSFS_PCI_DEV"/"PCI_BDF"/resource", pcidev->domain,
                                          pcidev->bus, pcidev->dev, pcidev->func);

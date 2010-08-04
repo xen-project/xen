@@ -1420,12 +1420,12 @@ int libxl_detach_device_model(libxl_ctx *ctx,
 int libxl_confirm_device_model_startup(libxl_ctx *ctx,
                                        libxl_device_model_starting *starting)
 {
-    int problem = libxl_wait_for_device_model(ctx, starting->domid, "running",
-                                              libxl_spawn_check,
-                                              starting->for_spawn);
-    int detach = libxl_detach_device_model(ctx, starting);
+    int problem = libxl_wait_for_device_model(ctx, starting->domid, "running", NULL, NULL);
+    int detach;
+    if ( !problem )
+        problem = libxl_spawn_check(ctx, starting->for_spawn);
+    detach = libxl_detach_device_model(ctx, starting);
     return problem ? problem : detach;
-    return 0;
 }
 
 
