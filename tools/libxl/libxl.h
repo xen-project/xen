@@ -24,6 +24,8 @@
 
 typedef uint8_t libxl_uuid[16];
 
+typedef uint8_t libxl_mac[6];
+
 typedef struct {
     libxl_uuid uuid;
     uint32_t domid;
@@ -270,7 +272,7 @@ typedef struct {
     int devid;
     int mtu;
     char *model;
-    uint8_t mac[6];
+    libxl_mac mac;
     struct in_addr ip;
     char *bridge;
     char *ifname;
@@ -280,8 +282,8 @@ typedef struct {
 
 typedef struct {
     int devid;
-    uint8_t front_mac[6];
-    uint8_t back_mac[6];
+    libxl_mac front_mac;
+    libxl_mac back_mac;
     uint32_t backend_domid;
     uint32_t domid;
     uint32_t trusted:1;
@@ -498,7 +500,7 @@ typedef struct {
     int devid;
     int state;
     char *script;
-    uint8_t mac[6];
+    libxl_mac mac;
     int evtch;
     int rref_tx;
     int rref_rx;
@@ -650,9 +652,9 @@ typedef struct {
     uint32_t frontend_id;
     int devid;
     int state;
-    uint8_t mac[6];
+    libxl_mac mac;
     int trusted;
-    uint8_t back_mac[6];
+    libxl_mac back_mac;
     int filter_mac;
 } libxl_net2info;
 
