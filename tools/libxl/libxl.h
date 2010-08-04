@@ -22,8 +22,10 @@
 #include <xs.h>
 #include <sys/wait.h> /* for pid_t */
 
+typedef uint8_t libxl_uuid[16];
+
 typedef struct {
-    uint8_t uuid[16];
+    libxl_uuid uuid;
     uint32_t domid;
     uint8_t running:1;
     uint8_t blocked:1;
@@ -50,7 +52,7 @@ typedef struct {
 } libxl_poolinfo;
 
 typedef struct {
-    uint8_t uuid[16];
+    libxl_uuid uuid;
     uint32_t domid;
 } libxl_vminfo;
 
@@ -93,7 +95,7 @@ typedef struct {
     bool oos;
     int ssidref;
     char *name;
-    uint8_t uuid[16];
+    libxl_uuid uuid;
     char **xsdata;
     char **platformdata;
     uint32_t poolid;
@@ -173,7 +175,7 @@ typedef enum {
 
 typedef struct {
     int domid;
-    uint8_t uuid[16]; /* this is use only with stubdom, and must be different from the domain uuid */
+    libxl_uuid uuid; /* this is use only with stubdom, and must be different from the domain uuid */
     char *dom_name;
     char *device_model;
     char *saved_state;
@@ -338,7 +340,7 @@ int libxl_domain_suspend(libxl_ctx *ctx, libxl_domain_suspend_info *info,
 int libxl_domain_resume(libxl_ctx *ctx, uint32_t domid);
 int libxl_domain_shutdown(libxl_ctx *ctx, uint32_t domid, int req);
 int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid, int force);
-int libxl_domain_preserve(libxl_ctx *ctx, uint32_t domid, libxl_domain_create_info *info, const char *name_suffix, uint8_t new_uuid[16]);
+int libxl_domain_preserve(libxl_ctx *ctx, uint32_t domid, libxl_domain_create_info *info, const char *name_suffix, libxl_uuid new_uuid);
 
 int libxl_file_reference_map(libxl_ctx *ctx, libxl_file_reference *f);
 int libxl_file_reference_unmap(libxl_ctx *ctx, libxl_file_reference *f);
@@ -360,7 +362,7 @@ int libxl_run_bootloader(libxl_ctx *ctx,
                          libxl_device_disk *disk,
                          uint32_t domid);
 
-char *libxl_uuid2string(libxl_ctx *ctx, const uint8_t uuid[16]);
+char *libxl_uuid2string(libxl_ctx *ctx, const libxl_uuid uuid);
   /* 0 means ERROR_ENOMEM, which we have logged */
 
 /* events handling */

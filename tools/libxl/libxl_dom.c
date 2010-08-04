@@ -427,7 +427,7 @@ int save_device_model(libxl_ctx *ctx, uint32_t domid, int fd)
     return 0;
 }
 
-char *libxl_uuid2string(libxl_ctx *ctx, const uint8_t uuid[16]) {
+char *libxl_uuid2string(libxl_ctx *ctx, const libxl_uuid uuid) {
     char *s = string_of_uuid(ctx, uuid);
     if (!s) XL_LOG(ctx, XL_LOG_ERROR, "cannot allocate for uuid");
     return s;

@@ -265,11 +265,11 @@ static void init_build_info(libxl_domain_build_info *b_info, libxl_domain_create
     }
 }
 
-static void random_uuid(uint8_t *uuid)
+static void random_uuid(libxl_uuid *uuid)
 {
     int i;
     for (i = 0; i < 16; i++)
-        uuid[i] = rand();
+        (*uuid)[i] = rand();
 }
 
 static void init_dm_info(libxl_device_model_info *dm_info,
@@ -277,7 +277,7 @@ static void init_dm_info(libxl_device_model_info *dm_info,
 {
     memset(dm_info, '\0', sizeof(*dm_info));
 
-    random_uuid(&dm_info->uuid[0]);
+    random_uuid(&dm_info->uuid);
 
     dm_info->dom_name = c_info->name;
     dm_info->device_model = "qemu-dm";
@@ -586,7 +586,7 @@ static void parse_config_data(const char *configfile_filename_report,
         c_info->name = strdup(buf);
     else
         c_info->name = "test";
-    random_uuid(&c_info->uuid[0]);
+    random_uuid(&c_info->uuid);
 
     if (!xlu_cfg_get_long(config, "oos", &l))
         c_info->oos = l;
@@ -1155,7 +1155,7 @@ static int preserve_domain(libxl_ctx *ctx, uint32_t domid, libxl_event *event,
     struct tm tm;
     char stime[24];
 
-    uint8_t new_uuid[16];
+    libxl_uuid new_uuid;
 
     int rc;
 
@@ -1176,7 +1176,7 @@ static int preserve_domain(libxl_ctx *ctx, uint32_t domid, libxl_event *event,
         return 0;
     }
 
-    random_uuid(&new_uuid[0]);
+    random_uuid(&new_uuid);
 
     LOG("Preserving domain %d %s with suffix%s", domid, d_config->c_info.name, stime);
     rc = libxl_domain_preserve(ctx, domid, &d_config->c_info, stime, new_uuid);

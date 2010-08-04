@@ -410,7 +410,7 @@ int libxl_domain_resume(libxl_ctx *ctx, uint32_t domid)
  * Does not modify info so that it may be reused.
  */
 int libxl_domain_preserve(libxl_ctx *ctx, uint32_t domid,
-                          libxl_domain_create_info *info, const char *name_suffix, uint8_t new_uuid[16])
+                          libxl_domain_create_info *info, const char *name_suffix, libxl_uuid new_uuid)
 {
     struct xs_permissions roperm[2];
     xs_transaction_t t;
