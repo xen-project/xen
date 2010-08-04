@@ -521,7 +521,7 @@ int libxl_device_pci_remove(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pc
 int libxl_device_pci_shutdown(libxl_ctx *ctx, uint32_t domid);
 int libxl_device_pci_list_assigned(libxl_ctx *ctx, libxl_device_pci **list, uint32_t domid, int *num);
 int libxl_device_pci_list_assignable(libxl_ctx *ctx, libxl_device_pci **list, int *num);
-int libxl_device_pci_parse_bdf(libxl_device_pci *pcidev, const char *str);
+int libxl_device_pci_parse_bdf(libxl_ctx *ctx, libxl_device_pci *pcidev, const char *str);
 
 /*
  * Functions for allowing users of libxl to store private data

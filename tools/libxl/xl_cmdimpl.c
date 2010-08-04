@@ -965,7 +965,7 @@ skip_vfb:
 
             pcidev->msitranslate = pci_msitranslate;
             pcidev->power_mgmt = pci_power_mgmt;
-            if (!libxl_device_pci_parse_bdf(pcidev, buf))
+            if (!libxl_device_pci_parse_bdf(&ctx, pcidev, buf))
                 d_config->num_pcidevs++;
         }
     }
@@ -1997,7 +1997,7 @@ void pcidetach(char *dom, char *bdf)
     find_domain(dom);
 
     memset(&pcidev, 0x00, sizeof(pcidev));
-    if (libxl_device_pci_parse_bdf(&pcidev, bdf)) {
+    if (libxl_device_pci_parse_bdf(&ctx, &pcidev, bdf)) {
         fprintf(stderr, "pci-detach: malformed BDF specification \"%s\"\n", bdf);
         exit(2);
     }
@@ -2037,7 +2037,7 @@ void pciattach(char *dom, char *bdf, char *vs)
     find_domain(dom);
 
     memset(&pcidev, 0x00, sizeof(pcidev));
-    if (libxl_device_pci_parse_bdf(&pcidev, bdf)) {
+    if (libxl_device_pci_parse_bdf(&ctx, &pcidev, bdf)) {
         fprintf(stderr, "pci-attach: malformed BDF specification \"%s\"\n", bdf);
         exit(2);
     }

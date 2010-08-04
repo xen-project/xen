@@ -52,41 +52,143 @@ static int pcidev_init(libxl_device_pci *pcidev, unsigned int domain,
     return 0;
 }
 
-int libxl_device_pci_parse_bdf(libxl_device_pci *pcidev, const char *str)
+static int hex_convert(const char *str, unsigned int *val, unsigned int mask)
 {
-    unsigned dom, bus, dev, func;
-    char *p, *buf2;
-    int rc;
+    unsigned long ret;
+    char *end;
 
-    if ( NULL == (buf2 = strdup(str)) )
+    ret = strtoul(str, &end, 16);
+    if ( end == str || *end != '\0' )
+        return -1;
+    if ( ret & ~mask )
+        return -1;
+    *val = (unsigned int)ret & mask;
+    return 0;
+}
+
+#define STATE_DOMAIN    0
+#define STATE_BUS       1
+#define STATE_DEV       2
+#define STATE_FUNC      3
+#define STATE_VSLOT     4
+#define STATE_OPTIONS_K 6
+#define STATE_OPTIONS_V 7
+#define STATE_TERMINAL  8
+int libxl_device_pci_parse_bdf(libxl_ctx *ctx, libxl_device_pci *pcidev, const char *str)
+{
+    unsigned state = STATE_DOMAIN;
+    unsigned dom, bus, dev, func, vslot = 0;
+    char *buf2, *tok, *ptr, *end, *optkey = NULL;
+
+    if ( NULL == (buf2 = ptr = strdup(str)) )
         return ERROR_NOMEM;
 
-    p = strtok(buf2, ",");
-
-    if ( sscanf(str, PCI_BDF, &dom, &bus, &dev, &func) != 4 ) {
-        dom = 0;
-        if ( sscanf(str, PCI_BDF_SHORT, &bus, &dev, &func) != 3 ) {
-            rc = ERROR_FAIL;
-            goto out;
+    for(tok = ptr, end = ptr + strlen(ptr) + 1; ptr < end; ptr++) {
+        switch(state) {
+        case STATE_DOMAIN:
+            if ( *ptr == ':' ) {
+                state = STATE_BUS;
+                *ptr = '\0';
+                if ( hex_convert(tok, &dom, 0xffff) )
+                    goto parse_error;
+                tok = ptr + 1;
+            }
+            break;
+        case STATE_BUS:
+            if ( *ptr == ':' ) {
+                state = STATE_DEV;
+                *ptr = '\0';
+                if ( hex_convert(tok, &bus, 0xff) )
+                    goto parse_error;
+                tok = ptr + 1;
+            }else if ( *ptr == '.' ) {
+                state = STATE_FUNC;
+                *ptr = '\0';
+                if ( dom & ~0xff )
+                    goto parse_error;
+                bus = dom;
+                dom = 0;
+                if ( hex_convert(tok, &dev, 0xff) )
+                    goto parse_error;
+                tok = ptr + 1;
+            }
+            break;
+        case STATE_DEV:
+            if ( *ptr == '.' ) {
+                state = STATE_FUNC;
+                *ptr = '\0';
+                if ( hex_convert(tok, &dev, 0xff) )
+                    goto parse_error;
+                tok = ptr + 1;
+            }
+            break;
+        case STATE_FUNC:
+            if ( *ptr == '\0' || *ptr == '@' || *ptr == ',' ) {
+                switch( *ptr ) {
+                case '\0':
+                    state = STATE_TERMINAL;
+                    break;
+                case '@':
+                    state = STATE_VSLOT;
+                    break;
+                case ',':
+                    state = STATE_OPTIONS_K;
+                    break;
+                }
+                *ptr = '\0';
+                if ( hex_convert(tok, &func, 0x7) )
+                    goto parse_error;
+                tok = ptr + 1;
+            }
+            break;
+        case STATE_VSLOT:
+            if ( *ptr == '\0' || *ptr == ',' ) {
+                state = ( *ptr == ',' ) ? STATE_OPTIONS_K : STATE_TERMINAL;
+                *ptr = '\0';
+                if ( hex_convert(tok, &vslot, 0xff) )
+                    goto parse_error;
+                tok = ptr + 1;
+            }
+            break;
+        case STATE_OPTIONS_K:
+            if ( *ptr == '=' ) {
+                state = STATE_OPTIONS_V;
+                *ptr = '\0';
+                optkey = tok;
+                tok = ptr + 1;
+            }
+            break;
+        case STATE_OPTIONS_V:
+            if ( *ptr == ',' || *ptr == '\0' ) {
+                state = (*ptr == ',') ? STATE_OPTIONS_K : STATE_TERMINAL;
+                *ptr = '\0';
+                if ( !strcmp(optkey, "msitranslate") ) {
+                    pcidev->msitranslate = atoi(tok);
+                }else if ( !strcmp(optkey, "power_mgmt") ) {
+                    pcidev->power_mgmt = atoi(tok);
+                }else{
+                    XL_LOG(ctx, XL_LOG_WARNING,
+                           "Unknown PCI BDF option: %s", optkey);
+                }
+                tok = ptr + 1;
+            }
+        default:
+            break;
         }
     }
 
-    rc = pcidev_init(pcidev, dom, bus, dev, func, 0);
-
-    while ((p = strtok(NULL, ",=")) != NULL) {
-        while (*p == ' ')
-            p++;
-        if (!strcmp(p, "msitranslate")) {
-            p = strtok(NULL, ",=");
-            pcidev->msitranslate = atoi(p);
-        } else if (!strcmp(p, "power_mgmt")) {
-            p = strtok(NULL, ",=");
-            pcidev->power_mgmt = atoi(p);
-        }
-    }
-out:
     free(buf2);
-    return rc;
+
+    if ( tok != ptr || state != STATE_TERMINAL )
+        goto parse_error;
+
+    pcidev_init(pcidev, dom, bus, dev, func, vslot << 3);
+
+    return 0;
+
+parse_error:
+    printf("parse error: %s\n", str);
+    return ERROR_INVAL;
 }
 
 static int libxl_create_pci_backend(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev, int num)
