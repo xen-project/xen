@@ -101,6 +101,7 @@ int libxl_name_to_poolid(libxl_ctx *ctx, const char *name,
     int i, nb_pools;
     char *poolname;
     libxl_poolinfo *poolinfo;
+    int ret = -1;
 
     poolinfo = libxl_list_pool(ctx, &nb_pools);
     if (!poolinfo)
@@ -112,10 +113,12 @@ int libxl_name_to_poolid(libxl_ctx *ctx, const char *name,
             continue;
         if (strcmp(poolname, name) == 0) {
             *poolid = poolinfo[i].poolid;
-            return 0;
+            ret = 0;
+            break;
         }
     }
-    return -1;
+    free(poolinfo);
+    return ret;
 }
 
 int libxl_get_stubdom_id(libxl_ctx *ctx, int guest_domid)
