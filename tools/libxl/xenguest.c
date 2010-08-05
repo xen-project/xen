@@ -23,7 +23,8 @@
 
 int hvm_build_set_params(xc_interface *handle, uint32_t domid,
                          libxl_domain_build_info *info,
-                         int store_evtchn, unsigned long *store_mfn)
+                         int store_evtchn, unsigned long *store_mfn,
+                         int console_evtchn, unsigned long *console_mfn)
 {
     struct hvm_info_table *va_hvm;
     uint8_t *va_map, sum;
@@ -46,6 +47,7 @@ int hvm_build_set_params(xc_interface *handle, uint32_t domid,
     munmap(va_map, XC_PAGE_SIZE);
 
     xc_get_hvm_param(handle, domid, HVM_PARAM_STORE_PFN, store_mfn);
+    xc_get_hvm_param(handle, domid, HVM_PARAM_CONSOLE_PFN, console_mfn);
     xc_set_hvm_param(handle, domid, HVM_PARAM_PAE_ENABLED, info->u.hvm.pae);
 #if defined(__i386__) || defined(__x86_64__)
     xc_set_hvm_param(handle, domid, HVM_PARAM_VIRIDIAN, info->u.hvm.viridian);
@@ -54,5 +56,6 @@ int hvm_build_set_params(xc_interface *handle, uint32_t domid,
     xc_set_hvm_param(handle, domid, HVM_PARAM_TIMER_MODE, (unsigned long) info->u.hvm.timer_mode);
     xc_set_hvm_param(handle, domid, HVM_PARAM_VPT_ALIGN, (unsigned long) info->u.hvm.vpt_align);
     xc_set_hvm_param(handle, domid, HVM_PARAM_STORE_EVTCHN, store_evtchn);
+    xc_set_hvm_param(handle, domid, HVM_PARAM_CONSOLE_EVTCHN, console_evtchn);
     return 0;
 }
