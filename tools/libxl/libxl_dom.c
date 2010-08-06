@@ -237,7 +237,7 @@ int build_hvm(libxl_ctx *ctx, uint32_t domid,
         return ERROR_FAIL;
     }
     ret = hvm_build_set_params(ctx->xch, domid, info, state->store_port,
-                               &state->store_mfn);
+                               &state->store_mfn, state->console_port, &state->console_mfn);
     if (ret) {
         XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, ret, "hvm build set params failed");
         return ERROR_FAIL;

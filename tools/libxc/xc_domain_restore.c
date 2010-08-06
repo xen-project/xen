@@ -640,6 +640,7 @@ typedef struct {
     uint64_t vcpumap;
     uint64_t identpt;
     uint64_t vm86_tss;
+    uint64_t console_pfn;
 } pagebuf_t;
 
 static int pagebuf_init(pagebuf_t* buf)
@@ -736,6 +737,16 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
             PERROR("error reading/restoring tsc info");
             return -1;
         }
+        return pagebuf_get_one(xch, ctx, buf, fd, dom);
+    } else if (count == -8 ) {
+        /* Skip padding 4 bytes then read the console pfn location. */
+        if ( read_exact(fd, &buf->console_pfn, sizeof(uint32_t)) ||
+             read_exact(fd, &buf->console_pfn, sizeof(uint64_t)) )
+        {
+            PERROR("error read the address of the console pfn");
+            return -1;
+        }
+        // DPRINTF("console pfn location: %llx\n", buf->console_pfn);
         return pagebuf_get_one(xch, ctx, buf, fd, dom);
     } else if ( (count > MAX_BATCH_SIZE) || (count < 0) ) {
         ERROR("Max batch size exceeded (%d). Giving up.", count);
@@ -1055,6 +1066,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     pagebuf_t pagebuf;
     tailbuf_t tailbuf, tmptail;
     void* vcpup;
+    uint64_t console_pfn = 0;
 
     static struct restore_ctx _ctx = {
         .live_p2m = NULL,
@@ -1207,6 +1219,8 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                 xc_set_hvm_param(xch, dom, HVM_PARAM_IDENT_PT, pagebuf.identpt);
             if ( pagebuf.vm86_tss )
                 xc_set_hvm_param(xch, dom, HVM_PARAM_VM86_TSS, pagebuf.vm86_tss);
+            if ( pagebuf.console_pfn )
+                console_pfn = pagebuf.console_pfn;
             break;  /* our work here is done */
         }
 
@@ -1716,6 +1730,19 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
         goto out;
     }
     *store_mfn = tailbuf.u.hvm.magicpfns[2];
+
+    if ( console_pfn ) {
+        if ( xc_clear_domain_page(xch, dom, console_pfn) ) {
+            PERROR("error zeroing console page");
+            goto out;
+        }
+        if ( (frc = xc_set_hvm_param(xch, dom, 
+                                    HVM_PARAM_CONSOLE_PFN, console_pfn)) ) {
+            PERROR("error setting HVM param: %i", frc);
+            goto out;
+        }
+        *console_mfn = console_pfn;
+    }
 
     frc = xc_domain_hvm_setcontext(xch, dom, tailbuf.u.hvm.hvmbuf,
                                    tailbuf.u.hvm.reclen);

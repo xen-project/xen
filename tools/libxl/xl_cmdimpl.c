@@ -1433,6 +1433,9 @@ start:
         }
     }
     if (d_config.c_info.hvm) {
+        init_console_info(&console, 0, &state);
+        console.domid = domid;
+        libxl_device_console_add(&ctx, domid, &console);
         dm_info.domid = domid;
         MUST( libxl_create_device_model(&ctx, &dm_info,
                                         d_config.disks, d_config.num_disks,

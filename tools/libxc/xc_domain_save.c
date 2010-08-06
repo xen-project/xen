@@ -1587,6 +1587,17 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
             PERROR("Error when writing the vm86 TSS for guest");
             goto out;
         }
+
+        chunk.id = -8;
+        xc_get_hvm_param(xch, dom, HVM_PARAM_CONSOLE_PFN,
+                         (unsigned long *)&chunk.data);
+
+        if ( (chunk.data != 0) &&
+             wrexact(io_fd, &chunk, sizeof(chunk)) )
+        {
+            PERROR("Error when writing the console pfn for guest");
+            goto out;
+        }
     }
 
     /* Zero terminate */

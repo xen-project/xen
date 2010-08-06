@@ -173,7 +173,8 @@ int libxl_device_pci_reset(libxl_ctx *ctx, unsigned int domain, unsigned int bus
 /* from xenguest (helper */
 int hvm_build_set_params(xc_interface *handle, uint32_t domid,
                          libxl_domain_build_info *info,
-                         int store_evtchn, unsigned long *store_mfn);
+                         int store_evtchn, unsigned long *store_mfn,
+                         int console_evtchn, unsigned long *console_mfn);
 
 /* xl_exec */
 
