@@ -528,12 +528,13 @@ int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity)
 
     old_affinity = v->cpu_affinity;
     v->cpu_affinity = *affinity;
-    domain_update_node_affinity(v->domain);
     *affinity = old_affinity;
     if ( !cpu_isset(v->processor, v->cpu_affinity) )
         set_bit(_VPF_migrating, &v->pause_flags);
 
     vcpu_schedule_unlock_irq(v);
+
+    domain_update_node_affinity(v->domain);
 
     if ( test_bit(_VPF_migrating, &v->pause_flags) )
     {
