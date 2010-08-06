@@ -475,6 +475,9 @@ static int init_ibs_nmi(void)
 
 static u32 get_ibs_caps(void)
 {
+#ifdef	CONFIG_X86_32
+	return 0;
+#else
 	unsigned int max_level;
 
 	if (!boot_cpu_has(X86_FEATURE_IBS))
@@ -491,6 +494,7 @@ static u32 get_ibs_caps(void)
 		return IBS_CAPS_AVAIL;
 
 	return ibs_caps;
+#endif
 }
 
 u32 ibs_init(void)
