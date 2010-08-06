@@ -49,9 +49,6 @@ static u64 passive_samples;
 static u64 idle_samples;
 static u64 others_samples;
 
-/* AMD IBS support */
-extern u32 ibs_caps;
-
 int acquire_pmu_ownership(int pmu_ownship)
 {
     spin_lock(&pmu_owner_lock);
