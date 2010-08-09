@@ -614,5 +614,5 @@ int libxl_check_device_model_version(libxl_ctx *ctx, char *path)
         }
     }
 
-    return -1;
+    return 0;
 }
