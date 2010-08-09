@@ -982,7 +982,7 @@ long arch_do_domctl(
 
             ret = iomem_permit_access(d, mfn, mfn + nr_mfns - 1);
             for ( i = 0; i < nr_mfns; i++ )
-                set_mmio_p2m_entry(d, gfn+i, _mfn(mfn+i));
+                set_mmio_p2m_entry(p2m_get_hostp2m(d), gfn+i, _mfn(mfn+i));
         }
         else
         {
@@ -991,7 +991,7 @@ long arch_do_domctl(
                  gfn, mfn, nr_mfns);
 
             for ( i = 0; i < nr_mfns; i++ )
-                clear_mmio_p2m_entry(d, gfn+i);
+                clear_mmio_p2m_entry(p2m_get_hostp2m(d), gfn+i);
             ret = iomem_deny_access(d, mfn, mfn + nr_mfns - 1);
         }
 

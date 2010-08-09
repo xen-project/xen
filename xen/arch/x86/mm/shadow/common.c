@@ -1714,8 +1714,9 @@ sh_alloc_p2m_pages(struct domain *d)
 
 // Returns 0 if no memory is available...
 static struct page_info *
-shadow_alloc_p2m_page(struct domain *d)
+shadow_alloc_p2m_page(struct p2m_domain *p2m)
 {
+    struct domain *d = p2m->domain;
     struct page_info *pg;
     mfn_t mfn;
     void *p;
@@ -1741,8 +1742,9 @@ shadow_alloc_p2m_page(struct domain *d)
 }
 
 static void
-shadow_free_p2m_page(struct domain *d, struct page_info *pg)
+shadow_free_p2m_page(struct p2m_domain *p2m, struct page_info *pg)
 {
+    struct domain *d = p2m->domain;
     ASSERT(page_get_owner(pg) == d);
     /* Should have just the one ref we gave it in alloc_p2m_page() */
     if ( (pg->count_info & PGC_count_mask) != 1 )
@@ -3100,6 +3102,7 @@ int shadow_enable(struct domain *d, u32 mode)
     struct page_info *pg = NULL;
     uint32_t *e;
     int i, rv = 0;
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
     mode |= PG_SH_enable;
 
@@ -3135,7 +3138,8 @@ int shadow_enable(struct domain *d, u32 mode)
      * to avoid possible deadlock. */
     if ( mode & PG_translate )
     {
-        rv = p2m_alloc_table(d, shadow_alloc_p2m_page, shadow_free_p2m_page);
+        rv = p2m_alloc_table(p2m,
+            shadow_alloc_p2m_page, shadow_free_p2m_page);
         if (rv != 0)
             goto out_unlocked;
     }
@@ -3146,7 +3150,7 @@ int shadow_enable(struct domain *d, u32 mode)
     {
         /* Get a single page from the shadow pool.  Take it via the 
          * P2M interface to make freeing it simpler afterwards. */
-        pg = shadow_alloc_p2m_page(d);
+        pg = shadow_alloc_p2m_page(p2m);
         if ( pg == NULL )
         {
             rv = -ENOMEM;
@@ -3195,10 +3199,10 @@ int shadow_enable(struct domain *d, u32 mode)
  out_locked:
     shadow_unlock(d);
  out_unlocked:
-    if ( rv != 0 && !pagetable_is_null(p2m_get_pagetable(p2m_get_hostp2m(d))) )
-        p2m_teardown(d);
+    if ( rv != 0 && !pagetable_is_null(p2m_get_pagetable(p2m)) )
+        p2m_teardown(p2m);
     if ( rv != 0 && pg != NULL )
-        shadow_free_p2m_page(d, pg);
+        shadow_free_p2m_page(p2m, pg);
     domain_unpause(d);
     return rv;
 }
@@ -3210,6 +3214,7 @@ void shadow_teardown(struct domain *d)
     struct vcpu *v;
     mfn_t mfn;
     struct page_info *pg;
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
     ASSERT(d->is_dying);
     ASSERT(d != current->domain);
@@ -3264,7 +3269,7 @@ void shadow_teardown(struct domain *d)
 #endif /* (SHADOW_OPTIMIZATIONS & (SHOPT_VIRTUAL_TLB|SHOPT_OUT_OF_SYNC)) */
 
     while ( (pg = page_list_remove_head(&d->arch.paging.shadow.p2m_freelist)) )
-        shadow_free_p2m_page(d, pg);
+        shadow_free_p2m_page(p2m, pg);
 
     if ( d->arch.paging.shadow.total_pages != 0 )
     {
@@ -3298,7 +3303,7 @@ void shadow_teardown(struct domain *d)
             if ( !hvm_paging_enabled(v) )
                 v->arch.guest_table = pagetable_null();
         }
-        shadow_free_p2m_page(d, 
+        shadow_free_p2m_page(p2m, 
             pagetable_get_page(d->arch.paging.shadow.unpaged_pagetable));
         d->arch.paging.shadow.unpaged_pagetable = pagetable_null();
     }
@@ -3335,7 +3340,7 @@ void shadow_final_teardown(struct domain *d)
         shadow_teardown(d);
 
     /* It is now safe to pull down the p2m map. */
-    p2m_teardown(d);
+    p2m_teardown(p2m_get_hostp2m(d));
 
     SHADOW_PRINTK("dom %u final teardown done."
                    "  Shadow pages total = %u, free = %u, p2m=%u\n",
@@ -3657,10 +3662,11 @@ int shadow_track_dirty_vram(struct domain *d,
     unsigned long i;
     p2m_type_t t;
     struct sh_dirty_vram *dirty_vram = d->arch.hvm_domain.dirty_vram;
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
     if (end_pfn < begin_pfn
-            || begin_pfn > d->arch.p2m->max_mapped_pfn
-            || end_pfn >= d->arch.p2m->max_mapped_pfn)
+            || begin_pfn > p2m->max_mapped_pfn
+            || end_pfn >= p2m->max_mapped_pfn)
         return -EINVAL;
 
     shadow_lock(d);
@@ -3729,7 +3735,7 @@ int shadow_track_dirty_vram(struct domain *d,
 
         /* Iterate over VRAM to track dirty bits. */
         for ( i = 0; i < nr; i++ ) {
-            mfn_t mfn = gfn_to_mfn(d, begin_pfn + i, &t);
+            mfn_t mfn = gfn_to_mfn(p2m, begin_pfn + i, &t);
             struct page_info *page;
             int dirty = 0;
             paddr_t sl1ma = dirty_vram->sl1ma[i];
@@ -3814,7 +3820,7 @@ int shadow_track_dirty_vram(struct domain *d,
                 /* was clean for more than two seconds, try to disable guest
                  * write access */
                 for ( i = begin_pfn; i < end_pfn; i++ ) {
-                    mfn_t mfn = gfn_to_mfn(d, i, &t);
+                    mfn_t mfn = gfn_to_mfn(p2m, i, &t);
                     if (mfn_x(mfn) != INVALID_MFN)
                         flush_tlb |= sh_remove_write_access(d->vcpu[0], mfn, 1, 0);
                 }

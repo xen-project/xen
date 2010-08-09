@@ -61,7 +61,7 @@ dbg_hvm_va2mfn(dbgva_t vaddr, struct domain *dp, int toaddr)
         return INVALID_MFN;
     }
 
-    mfn = mfn_x(gfn_to_mfn(dp, gfn, &gfntype)); 
+    mfn = mfn_x(gfn_to_mfn(p2m_get_hostp2m(dp), gfn, &gfntype)); 
     if ( p2m_is_readonly(gfntype) && toaddr )
     {
         DBGP2("kdb:p2m_is_readonly: gfntype:%x\n", gfntype);

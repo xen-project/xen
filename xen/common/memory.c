@@ -161,7 +161,7 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
     unsigned long mfn;
 
 #ifdef CONFIG_X86
-    mfn = mfn_x(gfn_to_mfn(d, gmfn, &p2mt)); 
+    mfn = mfn_x(gfn_to_mfn(p2m_get_hostp2m(d), gmfn, &p2mt)); 
 #else
     mfn = gmfn_to_mfn(d, gmfn);
 #endif
@@ -356,7 +356,7 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
                 p2m_type_t p2mt;
 
                 /* Shared pages cannot be exchanged */
-                mfn = mfn_x(gfn_to_mfn_unshare(d, gmfn + k, &p2mt, 0));
+                mfn = mfn_x(gfn_to_mfn_unshare(p2m_get_hostp2m(d), gmfn + k, &p2mt, 0));
                 if ( p2m_is_shared(p2mt) )
                 {
                     rc = -ENOMEM;
