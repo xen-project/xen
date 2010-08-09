@@ -538,3 +538,81 @@ int libxl_strtomac(const char *mac_s, uint8_t *mac)
     }
     return 0;
 }
+
+#define QEMU_VERSION_STR  "QEMU emulator version "
+
+
+int libxl_check_device_model_version(libxl_ctx *ctx, char *path)
+{
+    pid_t pid = -1;
+    int pipefd[2];
+    char buf[100];
+    ssize_t i, count = 0;
+    int status;
+    char *abs_path = NULL;
+
+    abs_path = libxl_abs_path(ctx, path, libxl_private_bindir_path());
+
+    if (pipe(pipefd))
+        return -1;
+
+    pid = fork();
+    if (pid == -1) {
+        return -1;
+    }
+
+    if (!pid) {
+        close(pipefd[0]);
+        if (dup2(pipefd[1], STDOUT_FILENO) == -1)
+            exit(1);
+        execlp(abs_path, abs_path, "-h", NULL);
+
+        close(pipefd[1]);
+        exit(127);
+    }
+
+    close(pipefd[1]);
+    if (abs_path != path)
+        libxl_free(ctx, abs_path);
+
+    /* attempt to get the first line of `qemu -h` */
+    while ((i = read(pipefd[0], buf + count, 99 - count)) > 0) {
+        if (i + count > 90)
+            break;
+        for (int j = 0; j <  i; j++) {
+            if (buf[j + count] == '\n')
+                break;
+        }
+        count += i;
+    }
+    count += i;
+    close(pipefd[0]);
+    waitpid(pid, &status, 0);
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+        return -1;
+    }
+
+    /* Check if we have the forked qemu-xen. */
+    /* QEMU-DM emulator version 0.10.2, ... */
+    if (strncmp("QEMU-DM ", buf, 7) == 0) {
+        return 0;
+    }
+
+    /* Check if the version is above 12.0 */
+    /* The first line is : QEMU emulator version 0.12.50, ... */
+    if (strncmp(QEMU_VERSION_STR, buf, strlen(QEMU_VERSION_STR)) == 0) {
+        int major, minor;
+        char *endptr = NULL;
+        char *v = buf + strlen(QEMU_VERSION_STR);
+
+        major = strtol(v, &endptr, 10);
+        if (major == 0 && endptr && *endptr == '.') {
+            v = endptr + 1;
+            minor = strtol(v, &endptr, 10);
+            if (minor >= 12)
+                return 1;
+        }
+    }
+
+    return 0;
+}

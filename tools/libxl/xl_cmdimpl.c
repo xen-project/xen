@@ -833,6 +833,11 @@ static void parse_config_data(const char *configfile_filename_report,
                     nic->script = strdup(p2 + 1);
                 } else if (!strcmp(p, "vifname")) {
                     nic->ifname = strdup(p2 + 1);
+                } else if (!strcmp(p, "backend")) {
+                    if(libxl_name_to_domid(&ctx, (p2 + 1), &(nic->backend_domid))) {
+                        fprintf(stderr, "Specified backend domain does not exist, defaulting to Dom0\n");
+                        nic->backend_domid = 0;
+                    }
                 } else if (!strcmp(p, "rate")) {
                     fprintf(stderr, "the rate parameter for vifs is currently not supported\n");
                 } else if (!strcmp(p, "accel")) {
@@ -1926,7 +1931,7 @@ void pcilist_assignable(void)
     if ( libxl_device_pci_list_assignable(&ctx, &pcidevs, &num) )
         return;
     for (i = 0; i < num; i++) {
-        printf("%04x:%02x:%02x:%01x\n",
+        printf("%04x:%02x:%02x.%01x\n",
                 pcidevs[i].domain, pcidevs[i].bus, pcidevs[i].dev, pcidevs[i].func);
     }
     free(pcidevs);
@@ -2127,6 +2132,9 @@ void list_domains_details(const libxl_dominfo *info, int nb_domain)
     libxl_device_model_info dm_info;
 
     for (i = 0; i < nb_domain; i++) {
+        /* no detailed info available on dom0 */
+        if (info[i].domid == 0)
+            continue;
         rc = libxl_userdata_retrieve(&ctx, info[i].domid, "xl", &data, &len);
         if (rc)
             continue;
@@ -3003,6 +3011,11 @@ int main_list(int argc, char **argv)
     } else if (optind == argc-1) {
         find_domain(argv[optind]);
         rc = libxl_domain_info(&ctx, &info_buf, domid);
+        if (rc == ERROR_INVAL) {
+            fprintf(stderr, "Error: Domain \'%s\' does not exist.\n",
+                argv[optind]);
+            return -rc;
+        }
         if (rc) {
             fprintf(stderr, "libxl_domain_info failed (code %d).\n", rc);
             return -rc;
@@ -4004,10 +4017,9 @@ int main_networkattach(int argc, char **argv)
         } else if (!strncmp("script=", *argv, 6)) {
             nic.script = (*argv) + 6;
         } else if (!strncmp("backend=", *argv, 8)) {
-            val = strtoul((*argv) + 8, &endptr, 10);
-            if (((*argv) + 8) == endptr) {
-                fprintf(stderr, "Invalid parameter `backend'.\n");
-                return 1;
+            if(libxl_name_to_domid(&ctx, ((*argv) + 8), &val)) {
+                fprintf(stderr, "Specified backend domain does not exist, defaulting to Dom0\n");
+                val = 0;
             }
             nic.backend_domid = val;
         } else if (!strncmp("vifname=", *argv, 8)) {

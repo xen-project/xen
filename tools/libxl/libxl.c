@@ -964,7 +964,7 @@ skip_autopass:
     return 0;
 }
 
-static char ** libxl_build_device_model_args(libxl_ctx *ctx,
+static char ** libxl_build_device_model_args_old(libxl_ctx *ctx,
                                              libxl_device_model_info *info,
                                              libxl_device_nic *vifs,
                                              int num_vifs)
@@ -1070,12 +1070,12 @@ static char ** libxl_build_device_model_args(libxl_ctx *ctx,
                                            vifs[i].mac[0], vifs[i].mac[1], vifs[i].mac[2],
                                            vifs[i].mac[3], vifs[i].mac[4], vifs[i].mac[5]);
                 if (!vifs[i].ifname)
-                    vifs[i].ifname = libxl_sprintf(ctx, "tap%d.%d", info->domid, vifs[i].devid - 1);
+                    vifs[i].ifname = libxl_sprintf(ctx, "tap%d.%d", info->domid, vifs[i].devid);
                 flexarray_set(dm_args, num++, "-net");
                 flexarray_set(dm_args, num++, libxl_sprintf(ctx, "nic,vlan=%d,macaddr=%s,model=%s",
                             vifs[i].devid, smac, vifs[i].model));
                 flexarray_set(dm_args, num++, "-net");
-                flexarray_set(dm_args, num++, libxl_sprintf(ctx, "tap,vlan=%d,ifname=%s,bridge=%s",
+                flexarray_set(dm_args, num++, libxl_sprintf(ctx, "tap,vlan=%d,ifname=%s,bridge=%s,script=no",
                             vifs[i].devid, vifs[i].ifname, vifs[i].bridge));
                 ioemu_vifs++;
             }
@@ -1098,8 +1098,166 @@ static char ** libxl_build_device_model_args(libxl_ctx *ctx,
     else
         flexarray_set(dm_args, num++, "xenfv");
     flexarray_set(dm_args, num++, NULL);
-
     return (char **) flexarray_contents(dm_args);
+}
+
+static char ** libxl_build_device_model_args_new(libxl_ctx *ctx,
+                                             libxl_device_model_info *info,
+                                             libxl_device_nic *vifs,
+                                             int num_vifs)
+{
+    int num = 0, i;
+    flexarray_t *dm_args;
+    int nb;
+    libxl_device_disk *disks;
+
+    dm_args = flexarray_make(16, 1);
+    if (!dm_args)
+        return NULL;
+
+    flexarray_set(dm_args, num++, "qemu-system-xen");
+    flexarray_set(dm_args, num++, "-xen-domid");
+
+    flexarray_set(dm_args, num++, libxl_sprintf(ctx, "%d", info->domid));
+
+    if (info->dom_name) {
+        flexarray_set(dm_args, num++, "-name");
+        flexarray_set(dm_args, num++, info->dom_name);
+    }
+    if (info->vnc || info->vncdisplay || info->vnclisten || info->vncunused) {
+        int display = 0;
+        const char *listen = "127.0.0.1";
+
+        flexarray_set(dm_args, num++, "-vnc");
+
+        if (info->vncdisplay) {
+            display = info->vncdisplay;
+            if (info->vnclisten && strchr(info->vnclisten, ':') == NULL) {
+                listen = info->vnclisten;
+            }
+        } else if (info->vnclisten) {
+            listen = info->vnclisten;
+        }
+
+        if (strchr(listen, ':') != NULL)
+            flexarray_set(dm_args, num++,
+                    libxl_sprintf(ctx, "%s%s", listen,
+                        info->vncunused ? ",to=99" : ""));
+        else
+            flexarray_set(dm_args, num++,
+                    libxl_sprintf(ctx, "%s:%d%s", listen, display,
+                        info->vncunused ? ",to=99" : ""));
+    }
+    if (info->sdl) {
+        flexarray_set(dm_args, num++, "-sdl");
+    }
+    if (info->keymap) {
+        flexarray_set(dm_args, num++, "-k");
+        flexarray_set(dm_args, num++, info->keymap);
+    }
+    if (info->nographic && (!info->sdl && !info->vnc)) {
+        flexarray_set(dm_args, num++, "-nographic");
+    }
+    if (info->serial) {
+        flexarray_set(dm_args, num++, "-serial");
+        flexarray_set(dm_args, num++, info->serial);
+    }
+    if (info->type == XENFV) {
+        int ioemu_vifs = 0;
+
+        if (info->stdvga) {
+                flexarray_set(dm_args, num++, "-vga");
+                flexarray_set(dm_args, num++, "std");
+        }
+
+        if (info->boot) {
+            flexarray_set(dm_args, num++, "-boot");
+            flexarray_set(dm_args, num++, libxl_sprintf(ctx, "order=%s", info->boot));
+        }
+        if (info->usb || info->usbdevice) {
+            flexarray_set(dm_args, num++, "-usb");
+            if (info->usbdevice) {
+                flexarray_set(dm_args, num++, "-usbdevice");
+                flexarray_set(dm_args, num++, info->usbdevice);
+            }
+        }
+        if (info->soundhw) {
+            flexarray_set(dm_args, num++, "-soundhw");
+            flexarray_set(dm_args, num++, info->soundhw);
+        }
+        if (!info->apic) {
+            flexarray_set(dm_args, num++, "-no-acpi");
+        }
+        if (info->vcpus > 1) {
+            flexarray_set(dm_args, num++, "-smp");
+            if (info->vcpu_avail)
+                flexarray_set(dm_args, num++, libxl_sprintf(ctx, "%d,maxcpus=%d", info->vcpus, info->vcpu_avail));
+            else
+                flexarray_set(dm_args, num++, libxl_sprintf(ctx, "%d", info->vcpus));
+        }
+        for (i = 0; i < num_vifs; i++) {
+            if (vifs[i].nictype == NICTYPE_IOEMU) {
+                char *smac = libxl_sprintf(ctx, "%02x:%02x:%02x:%02x:%02x:%02x",
+                                           vifs[i].mac[0], vifs[i].mac[1], vifs[i].mac[2],
+                                           vifs[i].mac[3], vifs[i].mac[4], vifs[i].mac[5]);
+                if (!vifs[i].ifname)
+                    vifs[i].ifname = libxl_sprintf(ctx, "tap%d.%d", info->domid, vifs[i].devid);
+                flexarray_set(dm_args, num++, "-net");
+                flexarray_set(dm_args, num++, libxl_sprintf(ctx, "nic,vlan=%d,macaddr=%s,model=%s",
+                            vifs[i].devid, smac, vifs[i].model));
+                flexarray_set(dm_args, num++, "-net");
+                flexarray_set(dm_args, num++, libxl_sprintf(ctx, "tap,vlan=%d,ifname=%s,script=no",
+                            vifs[i].devid, vifs[i].ifname));
+                ioemu_vifs++;
+            }
+        }
+        /* If we have no emulated nics, tell qemu not to create any */
+        if ( ioemu_vifs == 0 ) {
+            flexarray_set(dm_args, num++, "-net");
+            flexarray_set(dm_args, num++, "none");
+        }
+    }
+    if (info->saved_state) {
+        flexarray_set(dm_args, num++, "-loadvm");
+        flexarray_set(dm_args, num++, info->saved_state);
+    }
+    for (i = 0; info->extra && info->extra[i] != NULL; i++)
+        flexarray_set(dm_args, num++, info->extra[i]);
+    flexarray_set(dm_args, num++, "-M");
+    if (info->type == XENPV)
+        flexarray_set(dm_args, num++, "xenpv");
+    else
+        flexarray_set(dm_args, num++, "xenfv");
+
+    disks = libxl_device_disk_list(ctx, info->domid, &nb);
+    for (; nb > 0; --nb, ++disks) {
+        if ( disks->is_cdrom ) {
+            flexarray_set(dm_args, num++, "-cdrom");
+            flexarray_set(dm_args, num++, disks->physpath);
+        }else{
+            flexarray_set(dm_args, num++, libxl_sprintf(ctx, "-%s", disks->virtpath));
+            flexarray_set(dm_args, num++, disks->physpath);
+        }
+    }
+
+    flexarray_set(dm_args, num++, NULL);
+    return (char **) flexarray_contents(dm_args);
+}
+
+static char ** libxl_build_device_model_args(libxl_ctx *ctx,
+                                             libxl_device_model_info *info,
+                                             libxl_device_nic *vifs,
+                                             int num_vifs)
+{
+    int new_qemu;
+
+    new_qemu = libxl_check_device_model_version(ctx, info->device_model);
+
+    if (new_qemu == 1) {
+        return libxl_build_device_model_args_new(ctx, info, vifs, num_vifs);
+    } else {
+        return libxl_build_device_model_args_old(ctx, info, vifs, num_vifs);
+    }
 }
 
 void dm_xenstore_record_pid(void *for_spawn, pid_t innerchild)
