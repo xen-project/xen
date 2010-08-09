@@ -206,6 +206,58 @@ void __devinit srat_detect_node(int cpu)
 }
 
 /*
+ * Sort CPUs by <node,package,core,thread> tuple. Fortunately this hierarchy is
+ * reflected in the structure of modern APIC identifiers, so we sort based on
+ * those. This is slightly complicated by the fact that the BSP must remain
+ * CPU 0. Hence we do a variation on longest-prefix matching to do the best we
+ * can while keeping CPU 0 static.
+ */
+static void __init normalise_cpu_order(void)
+{
+    unsigned int i, j, min_cpu;
+    uint32_t apicid, diff, min_diff;
+
+    for_each_present_cpu ( i )
+    {
+        apicid = x86_cpu_to_apicid[i];
+        min_diff = min_cpu = ~0u;
+
+        /*
+         * Find remaining CPU with longest-prefix match on APIC ID.
+         * Among identical longest-prefix matches, pick the smallest APIC ID.
+         */
+        for ( j = next_cpu(i, cpu_present_map);
+              j < NR_CPUS;
+              j = next_cpu(j, cpu_present_map) )
+        {
+            diff = x86_cpu_to_apicid[j] ^ apicid;
+            while ( diff & (diff-1) )
+                diff &= diff-1;
+            if ( (diff < min_diff) ||
+                 ((diff == min_diff) &&
+                  (x86_cpu_to_apicid[j] < x86_cpu_to_apicid[min_cpu])) )
+            {
+                min_diff = diff;
+                min_cpu = j;
+            }
+        }
+
+        /* If no match then there must be no CPUs remaining to consider. */
+        if ( min_cpu >= NR_CPUS )
+        {
+            BUG_ON(next_cpu(i, cpu_present_map) < NR_CPUS);
+            break;
+        }
+
+        /* Switch the best-matching CPU with the next CPU in logical order. */
+        j = next_cpu(i, cpu_present_map);
+        apicid = x86_cpu_to_apicid[min_cpu];
+        x86_cpu_to_apicid[min_cpu] = x86_cpu_to_apicid[j];
+        x86_cpu_to_apicid[j] = apicid;
+    }
+}
+
+/*
  * Ensure a given physical memory range is present in the bootstrap mappings.
  * Use superpage mappings to ensure that pagetable memory needn't be allocated.
  */
@@ -952,8 +1004,6 @@ void __init __start_xen(unsigned long mbi_p)
 
     acpi_boot_init();
 
-    init_cpu_to_node();
-
     if ( smp_found_config )
         get_smp_config();
 
@@ -963,6 +1013,10 @@ void __init __start_xen(unsigned long mbi_p)
 #endif
 
     init_apic_mappings();
+
+    normalise_cpu_order();
+
+    init_cpu_to_node();
 
     if ( x2apic_is_available() )
         enable_x2apic();
