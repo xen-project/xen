@@ -642,6 +642,12 @@ static long do_poll(struct sched_poll *sched_poll)
 /* Voluntarily yield the processor for this allocation. */
 static long do_yield(void)
 {
+    struct vcpu * v=current;
+
+    vcpu_schedule_lock_irq(v);
+    SCHED_OP(VCPU2OP(v), yield, v);
+    vcpu_schedule_unlock_irq(v);
+
     TRACE_2D(TRC_SCHED_YIELD, current->domain->domain_id, current->vcpu_id);
     raise_softirq(SCHEDULE_SOFTIRQ);
     return 0;
