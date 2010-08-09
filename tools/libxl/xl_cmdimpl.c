@@ -833,6 +833,11 @@ static void parse_config_data(const char *configfile_filename_report,
                     nic->script = strdup(p2 + 1);
                 } else if (!strcmp(p, "vifname")) {
                     nic->ifname = strdup(p2 + 1);
+                } else if (!strcmp(p, "backend")) {
+                    if(libxl_name_to_domid(&ctx, (p2 + 1), &(nic->backend_domid))) {
+                        fprintf(stderr, "Specified backend domain does not exist, defaulting to Dom0\n");
+                        nic->backend_domid = 0;
+                    }
                 } else if (!strcmp(p, "rate")) {
                     fprintf(stderr, "the rate parameter for vifs is currently not supported\n");
                 } else if (!strcmp(p, "accel")) {
@@ -4012,10 +4017,9 @@ int main_networkattach(int argc, char **argv)
         } else if (!strncmp("script=", *argv, 6)) {
             nic.script = (*argv) + 6;
         } else if (!strncmp("backend=", *argv, 8)) {
-            val = strtoul((*argv) + 8, &endptr, 10);
-            if (((*argv) + 8) == endptr) {
-                fprintf(stderr, "Invalid parameter `backend'.\n");
-                return 1;
+            if(libxl_name_to_domid(&ctx, ((*argv) + 8), &val)) {
+                fprintf(stderr, "Specified backend domain does not exist, defaulting to Dom0\n");
+                val = 0;
             }
             nic.backend_domid = val;
         } else if (!strncmp("vifname=", *argv, 8)) {
