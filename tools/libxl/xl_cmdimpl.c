@@ -3003,6 +3003,11 @@ int main_list(int argc, char **argv)
     } else if (optind == argc-1) {
         find_domain(argv[optind]);
         rc = libxl_domain_info(&ctx, &info_buf, domid);
+        if (rc == ERROR_INVAL) {
+            fprintf(stderr, "Error: Domain \'%s\' does not exist.\n",
+                argv[optind]);
+            return -rc;
+        }
         if (rc) {
             fprintf(stderr, "libxl_domain_info failed (code %d).\n", rc);
             return -rc;
