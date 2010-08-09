@@ -1070,7 +1070,7 @@ static char ** libxl_build_device_model_args(libxl_ctx *ctx,
                                            vifs[i].mac[0], vifs[i].mac[1], vifs[i].mac[2],
                                            vifs[i].mac[3], vifs[i].mac[4], vifs[i].mac[5]);
                 if (!vifs[i].ifname)
-                    vifs[i].ifname = libxl_sprintf(ctx, "tap%d.%d", info->domid, vifs[i].devid - 1);
+                    vifs[i].ifname = libxl_sprintf(ctx, "tap%d.%d", info->domid, vifs[i].devid);
                 flexarray_set(dm_args, num++, "-net");
                 flexarray_set(dm_args, num++, libxl_sprintf(ctx, "nic,vlan=%d,macaddr=%s,model=%s",
                             vifs[i].devid, smac, vifs[i].model));
