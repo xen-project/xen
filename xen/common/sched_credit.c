@@ -1100,7 +1100,9 @@ csched_acct(void* dummy)
                 if ( credit > CSCHED_CREDITS_PER_TSLICE )
                 {
                     __csched_vcpu_acct_stop_locked(prv, svc);
-                    credit = 0;
+                    /* Divide credits in half, so that when it starts
+                     * accounting again, it starts a little bit "ahead" */
+                    credit /= 2;
                     atomic_set(&svc->credit, credit);
                 }
             }
