@@ -310,6 +310,8 @@ typedef struct {
     };
     unsigned int domain;
     unsigned int vdevfn;
+#define LIBXL_PCI_FUNC_ALL (~0U)
+    unsigned int vfunc_mask;
     bool msitranslate;
     bool power_mgmt;
 } libxl_device_pci;

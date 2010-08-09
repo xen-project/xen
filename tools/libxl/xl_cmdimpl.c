@@ -1931,7 +1931,7 @@ void pcilist_assignable(void)
     if ( libxl_device_pci_list_assignable(&ctx, &pcidevs, &num) )
         return;
     for (i = 0; i < num; i++) {
-        printf("%04x:%02x:%02x:%01x\n",
+        printf("%04x:%02x:%02x.%01x\n",
                 pcidevs[i].domain, pcidevs[i].bus, pcidevs[i].dev, pcidevs[i].func);
     }
     free(pcidevs);

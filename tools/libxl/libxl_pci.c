@@ -136,8 +136,13 @@ int libxl_device_pci_parse_bdf(libxl_ctx *ctx, libxl_device_pci *pcidev, const c
                     break;
                 }
                 *ptr = '\0';
-                if ( hex_convert(tok, &func, 0x7) )
-                    goto parse_error;
+                if ( !strcmp(tok, "*") ) {
+                    pcidev->vfunc_mask = LIBXL_PCI_FUNC_ALL;
+                }else{
+                    if ( hex_convert(tok, &func, 0x7) )
+                        goto parse_error;
+                    pcidev->vfunc_mask = (1 << 0);
+                }
                 tok = ptr + 1;
             }
             break;
@@ -187,7 +192,6 @@ int libxl_device_pci_parse_bdf(libxl_ctx *ctx, libxl_device_pci *pcidev, const c
     return 0;
 
 parse_error:
-    printf("parse error: %s\n", str);
     return ERROR_INVAL;
 }
 
@@ -531,6 +535,55 @@ int libxl_device_pci_list_assignable(libxl_ctx *ctx, libxl_device_pci **list, in
     return 0;
 }
 
+/* 
+ * This function checks that all functions of a device are bound to pciback
+ * driver. It also initialises a bit-mask of which function numbers are present
+ * on that device.
+*/
+static int pci_multifunction_check(libxl_ctx *ctx, libxl_device_pci *pcidev, unsigned int *func_mask)
+{
+    struct dirent *de;
+    DIR *dir;
+
+    *func_mask = 0;
+
+    dir = opendir(SYSFS_PCI_DEV);
+    if ( NULL == dir ) {
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "Couldn't open %s", SYSFS_PCI_DEV);
+        return -1;
+    }
+
+    while( (de = readdir(dir)) ) {
+        unsigned dom, bus, dev, func;
+        struct stat st;
+        char *path;
+
+        if ( sscanf(de->d_name, PCI_BDF, &dom, &bus, &dev, &func) != 4 )
+            continue;
+        if ( pcidev->domain != dom )
+            continue;
+        if ( pcidev->bus != bus )
+            continue;
+        if ( pcidev->dev != dev )
+            continue;
+
+        path = libxl_sprintf(ctx, "%s/" PCI_BDF, SYSFS_PCIBACK_DRIVER, dom, bus, dev, func);
+        if ( lstat(path, &st) ) {
+            if ( errno == ENOENT )
+                XL_LOG(ctx, XL_LOG_ERROR, PCI_BDF " is not assigned to pciback driver",
+                       dom, bus, dev, func);
+            else
+                XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "Couldn't lstat %s", path);
+            closedir(dir);
+            return -1;
+        }
+        (*func_mask) |= (1 << func);
+    }
+
+    closedir(dir);
+    return 0;
+}
+
 static int pci_ins_check(libxl_ctx *ctx, uint32_t domid, const char *state, void *priv)
 {
     char *orig_state = priv;
@@ -652,8 +705,9 @@ out:
 
 int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
 {
+    unsigned int orig_vdev, pfunc_mask;
     libxl_device_pci *assigned;
-    int num_assigned, rc;
+    int num_assigned, rc, i;
     int stubdomid = 0;
 
     rc = get_all_assigned_devices(ctx, &assigned, &num_assigned);
@@ -679,10 +733,43 @@ int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcide
             return rc;
     }
 
-    return do_pci_add(ctx, domid, pcidev);
+    orig_vdev = pcidev->vdevfn & ~7U;
+
+    if ( pcidev->vfunc_mask == LIBXL_PCI_FUNC_ALL ) {
+        if ( !(pcidev->vdevfn >> 3) ) {
+            XL_LOG(ctx, XL_LOG_ERROR, "Must specify a v-slot for multi-function devices");
+            return ERROR_INVAL;
+        }
+        if ( pci_multifunction_check(ctx, pcidev, &pfunc_mask) ) {
+            return ERROR_FAIL;
+        }
+        pcidev->vfunc_mask &= pfunc_mask;
+        /* so now vfunc_mask == pfunc_mask */
+    }else{
+        pfunc_mask = (1 << pcidev->func);
+    }
+
+    for(i = 7; i >= 0; --i) {
+        if ( (1 << i) & pfunc_mask ) {
+            if ( pcidev->vfunc_mask == pfunc_mask ) {
+                pcidev->func = i;
+                pcidev->vdevfn = orig_vdev | i;
+            }else{
+                /* if not passing through multiple devices in a block make
+                 * sure that virtual function number 0 is always used otherwise
+                 * guest won't see the device
+                 */
+                pcidev->vdevfn = orig_vdev;
+            }
+            if ( do_pci_add(ctx, domid, pcidev) )
+                rc = ERROR_FAIL;
+        }
+    }
+
+    return rc;
 }
 
-int libxl_device_pci_remove(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
+static int do_pci_remove(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
 {
     libxl_device_pci *assigned;
     char *path;
@@ -711,10 +798,15 @@ int libxl_device_pci_remove(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pc
         libxl_xs_write(ctx, XBT_NULL, path, PCI_BDF, pcidev->domain,
                        pcidev->bus, pcidev->dev, pcidev->func);
         path = libxl_sprintf(ctx, "/local/domain/0/device-model/%d/command", domid);
-        xs_write(ctx->xsh, XBT_NULL, path, "pci-rem", strlen("pci-rem"));
-        if (libxl_wait_for_device_model(ctx, domid, "pci-removed", NULL, NULL) < 0) {
-            XL_LOG(ctx, XL_LOG_ERROR, "Device Model didn't respond in time");
-            return ERROR_FAIL;
+
+        /* Remove all functions at once atomically by only signalling
+         * device-model for function 0 */
+        if ( (pcidev->vdevfn & 0x7) == 0 ) {
+            xs_write(ctx->xsh, XBT_NULL, path, "pci-rem", strlen("pci-rem"));
+            if (libxl_wait_for_device_model(ctx, domid, "pci-removed", NULL, NULL) < 0) {
+                XL_LOG(ctx, XL_LOG_ERROR, "Device Model didn't respond in time");
+                return ERROR_FAIL;
+            }
         }
         path = libxl_sprintf(ctx, "/local/domain/0/device-model/%d/state", domid);
         xs_write(ctx->xsh, XBT_NULL, path, state, strlen(state));
@@ -769,7 +861,10 @@ skip1:
         fclose(f);
     }
 out:
-    libxl_device_pci_reset(ctx, pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func);
+    /* don't do multiple resets while some functions are still passed through */
+    if ( (pcidev->vdevfn & 0x7) == 0 ) {
+        libxl_device_pci_reset(ctx, pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func);
+    }
 
     if (!libxl_is_stubdom(ctx, domid, NULL)) {
         rc = xc_deassign_device(ctx->xch, domid, pcidev->value);
@@ -784,6 +879,38 @@ out:
     }
 
     return 0;
+}
+
+int libxl_device_pci_remove(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
+{
+    unsigned int orig_vdev, pfunc_mask;
+    int i, rc;
+
+    orig_vdev = pcidev->vdevfn & ~7U;
+
+    if ( pcidev->vfunc_mask == LIBXL_PCI_FUNC_ALL ) {
+        if ( pci_multifunction_check(ctx, pcidev, &pfunc_mask) ) {
+            return ERROR_FAIL;
+        }
+        pcidev->vfunc_mask &= pfunc_mask;
+    }else{
+        pfunc_mask = (1 << pcidev->func);
+    }
+
+    for(i = 7; i >= 0; --i) {
+        if ( (1 << i) & pfunc_mask ) {
+            if ( pcidev->vfunc_mask == pfunc_mask ) {
+                pcidev->func = i;
+                pcidev->vdevfn = orig_vdev | i;
+            }else{
+                pcidev->vdevfn = orig_vdev;
+            }
+            if ( do_pci_remove(ctx, domid, pcidev) )
+                rc = ERROR_FAIL;
+        }
+    }
+
+    return rc;
 }
 
 int libxl_device_pci_list_assigned(libxl_ctx *ctx, libxl_device_pci **list, uint32_t domid, int *num)
