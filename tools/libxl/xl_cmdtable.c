@@ -35,8 +35,8 @@ struct cmd_spec cmd_table[] = {
       &main_list,
       "List information about all/some domains",
       "[options] [Domain]\n",
-      "-l, --long                              Output all VM details"
-      "-v, --verbose                   Prints out UUIDs",
+      "-l, --long              Output all VM details\n"
+      "-v, --verbose           Prints out UUIDs",
     },
     { "destroy",
       &main_destroy,
