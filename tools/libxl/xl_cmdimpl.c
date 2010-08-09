@@ -2127,6 +2127,9 @@ void list_domains_details(const libxl_dominfo *info, int nb_domain)
     libxl_device_model_info dm_info;
 
     for (i = 0; i < nb_domain; i++) {
+        /* no detailed info available on dom0 */
+        if (info[i].domid == 0)
+            continue;
         rc = libxl_userdata_retrieve(&ctx, info[i].domid, "xl", &data, &len);
         if (rc)
             continue;
