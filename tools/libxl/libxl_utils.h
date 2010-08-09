@@ -68,5 +68,11 @@ int libxl_strtomac(const char *mac_s, uint8_t *mac);
 int libxl_devid_to_device_net2(libxl_ctx *ctx, uint32_t domid,
                                const char *devid, libxl_device_net2 *net2);
 
+/* check the version of qemu
+ * return 1 if is the new one
+ * return 0 if is the old one
+ * return -1 if there are an error */
+int libxl_check_device_model_version(libxl_ctx *ctx, char *path);
+
 #endif
 
