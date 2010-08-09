@@ -267,7 +267,7 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
      * 3. passing a valid order.
      */
     if ( ((gfn | mfn_x(mfn)) & ((1UL << order) - 1)) ||
-         (gfn >> ((ept_get_wl(d) + 1) * EPT_TABLE_ORDER)) ||
+         ((u64)gfn >> ((ept_get_wl(d) + 1) * EPT_TABLE_ORDER)) ||
          (order % EPT_TABLE_ORDER) )
         return 0;
 
