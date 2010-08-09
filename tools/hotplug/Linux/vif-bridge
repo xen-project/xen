@@ -81,20 +81,26 @@ fi
 
 case "$command" in
     online)
-	setup_bridge_port "$vif"
-	add_to_bridge "$bridge" "$vif"
+        setup_bridge_port "$dev"
+        add_to_bridge "$bridge" "$dev"
         ;;
 
     offline)
-        do_without_error brctl delif "$bridge" "$vif"
-        do_without_error ifconfig "$vif" down
+        do_without_error brctl delif "$bridge" "$dev"
+        do_without_error ifconfig "$dev" down
+        ;;
+
+    add)
+        add_to_bridge "$bridge" "$dev"
         ;;
 esac
 
-handle_iptable
+if [ "$type_if" = vif ]; then
+    handle_iptable
+fi
 
-log debug "Successful vif-bridge $command for $vif, bridge $bridge."
-if [ "$command" == "online" ]
+log debug "Successful vif-bridge $command for $dev, bridge $bridge."
+if [ "$type_if" = vif -a "$command" = "online" ]
 then
   success
 fi

@@ -31,12 +31,6 @@ then
   exit 1
 fi
 
-case "$command" in
-    add | remove)
-        exit 0
-        ;;
-esac
-
 
 # Parameters may be read from the environment, the command line arguments, and
 # the store, with overriding in that order.  The environment is given by the
@@ -45,24 +39,62 @@ esac
 
 evalVariables "$@"
 
-ip=${ip:-}
-ip=$(xenstore_read_default "$XENBUS_PATH/ip" "$ip")
+# Older versions of Xen do not pass in the type as an argument,
+# so the default value is vif.
+: ${type_if:=vif}
 
-# Check presence of compulsory args.
-XENBUS_PATH="${XENBUS_PATH:?}"
-vif="${vif:?}"
+case "$type_if" in
+    vif)
+        dev=$vif
+        ;;
+    tap)
+        dev=$INTERFACE
+        ;;
+    *)
+        log err "unknown interface type $type_if"
+        exit 1
+        ;;
+esac
+
+case "$command" in
+    online | offline)
+        test "$type_if" != vif && exit 0
+        ;;
+    add | remove)
+        test "$type_if" != tap && exit 0
+        ;;
+esac
 
 
-vifname=$(xenstore_read_default "$XENBUS_PATH/vifname" "")
-if [ "$vifname" ]
-then
-  if [ "$command" == "online" ] && ! ip link show "$vifname" >&/dev/null
-  then
-    do_or_die ip link set "$vif" name "$vifname"
-  fi
-  vif="$vifname"
+if [ "$type_if" = vif ]; then
+    # Check presence of compulsory args.
+    XENBUS_PATH="${XENBUS_PATH:?}"
+    vif="${vif:?}"
+
+    vifname=$(xenstore_read_default "$XENBUS_PATH/vifname" "")
+    if [ "$vifname" ]
+    then
+        if [ "$command" == "online" ] && ! ip link show "$vifname" >&/dev/null
+        then
+            do_or_die ip link set "$vif" name "$vifname"
+        fi
+        vif="$vifname"
+    fi
+elif [ "$type_if" = tap ]; then
+    # Check presence of compulsory args.
+    : ${INTERFACE:?}
+
+    # Get xenbus_path from device name.
+    # The name is built like that: "tap${domid}.${devid}".
+    dev_=${dev#tap}
+    domid=${dev_%.*}
+    devid=${dev_#*.}
+
+    XENBUS_PATH="/local/domain/0/backend/vif/$domid/$devid"
 fi
 
+ip=${ip:-}
+ip=$(xenstore_read_default "$XENBUS_PATH/ip" "$ip")
 
 frob_iptable()
 {

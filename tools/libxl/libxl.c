@@ -1075,7 +1075,7 @@ static char ** libxl_build_device_model_args_old(libxl_ctx *ctx,
                 flexarray_set(dm_args, num++, libxl_sprintf(ctx, "nic,vlan=%d,macaddr=%s,model=%s",
                             vifs[i].devid, smac, vifs[i].model));
                 flexarray_set(dm_args, num++, "-net");
-                flexarray_set(dm_args, num++, libxl_sprintf(ctx, "tap,vlan=%d,ifname=%s,bridge=%s",
+                flexarray_set(dm_args, num++, libxl_sprintf(ctx, "tap,vlan=%d,ifname=%s,bridge=%s,script=no",
                             vifs[i].devid, vifs[i].ifname, vifs[i].bridge));
                 ioemu_vifs++;
             }
@@ -1206,8 +1206,8 @@ static char ** libxl_build_device_model_args_new(libxl_ctx *ctx,
                 flexarray_set(dm_args, num++, libxl_sprintf(ctx, "nic,vlan=%d,macaddr=%s,model=%s",
                             vifs[i].devid, smac, vifs[i].model));
                 flexarray_set(dm_args, num++, "-net");
-                flexarray_set(dm_args, num++, libxl_sprintf(ctx, "tap,vlan=%d,ifname=%s,script=%s",
-                            vifs[i].devid, vifs[i].ifname, "/etc/xen/scripts/qemu-ifup"));
+                flexarray_set(dm_args, num++, libxl_sprintf(ctx, "tap,vlan=%d,ifname=%s,script=no",
+                            vifs[i].devid, vifs[i].ifname));
                 ioemu_vifs++;
             }
         }
