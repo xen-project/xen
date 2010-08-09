@@ -1313,7 +1313,7 @@ void schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
 
     spin_unlock_irqrestore(per_cpu(schedule_data, cpu).schedule_lock, flags);
 
-    SCHED_OP(old_ops, free_vdata, vpriv);
+    SCHED_OP(old_ops, free_vdata, vpriv_old);
     SCHED_OP(old_ops, free_pdata, ppriv_old, cpu);
 }
 
