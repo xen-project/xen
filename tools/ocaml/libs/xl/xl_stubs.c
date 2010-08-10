@@ -58,12 +58,14 @@ void log_destroy(struct xentoollog_logger *logger)
 	lg.logger.vmessage = log_vmessage; \
 	lg.logger.destroy = log_destroy; \
 	lg.logger.progress = NULL; \
+	caml_enter_blocking_section(); \
 	ret = libxl_ctx_init(&ctx, LIBXL_VERSION, (struct xentoollog_logger *) &lg); \
 	if (ret != 0) \
 		failwith_xl("cannot init context", &lg);
 
 #define FREE_CTX()  \
 	gc_free(&gc); \
+	caml_leave_blocking_section(); \
 	libxl_ctx_free(&ctx)
 
 static void * gc_calloc(caml_gc *gc, size_t nmemb, size_t size)
