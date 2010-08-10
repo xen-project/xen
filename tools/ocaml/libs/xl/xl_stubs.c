@@ -63,18 +63,38 @@ void log_destroy(struct xentoollog_logger *logger)
 		failwith_xl("cannot init context", &lg);
 
 #define FREE_CTX()  \
+	gc_free(&gc); \
 	libxl_ctx_free(&ctx)
 
 static void * gc_calloc(caml_gc *gc, size_t nmemb, size_t size)
 {
 	void *ptr;
 	ptr = calloc(nmemb, size);
+	if (!ptr)
+		caml_raise_out_of_memory();
+	gc->ptrs[gc->offset++] = ptr;
 	return ptr;
 }
 
 static char * dup_String_val(caml_gc *gc, value s)
 {
-	return String_val(s);
+	int len;
+	char *c;
+	len = caml_string_length(s);
+	c = calloc(len + 1, sizeof(char));
+	if (!c)
+		caml_raise_out_of_memory();
+	gc->ptrs[gc->offset++] = c;
+	memcpy(c, String_val(s), len);
+	return c;
+}
+
+static void gc_free(caml_gc *gc)
+{
+	int i;
+	for (i = 0; i < gc->offset; i++) {
+		free(gc->ptrs[i]);
+	}
 }
 
 void failwith_xl(char *fname, struct caml_logger *lg)
@@ -348,9 +368,6 @@ value stub_xl_domain_make(value info)
 		failwith_xl("domain make", &lg);
 
 	FREE_CTX();
-
-	free(c_info.xsdata);
-	free(c_info.platformdata);
 
 	CAMLreturn(Val_int(domid));
 }
