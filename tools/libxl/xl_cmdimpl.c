@@ -3213,7 +3213,7 @@ static void print_vcpuinfo(uint32_t tdomid,
     /*      TIM */
     printf("%9.1f  ", ((float)vcpuinfo->vcpu_time / 1e9));
     /* CPU AFFINITY */
-    pcpumap = nr_cpus > 64 ? -1 : ((1 << nr_cpus) - 1);
+    pcpumap = nr_cpus > 64 ? (uint64_t)-1 : ((1ULL << nr_cpus) - 1);
     for (cpumap = vcpuinfo->cpumap; nr_cpus; ++cpumap) {
         if (*cpumap < pcpumap) {
             break;
