@@ -65,6 +65,18 @@ void log_destroy(struct xentoollog_logger *logger)
 #define FREE_CTX()  \
 	libxl_ctx_free(&ctx)
 
+static void * gc_calloc(caml_gc *gc, size_t nmemb, size_t size)
+{
+	void *ptr;
+	ptr = calloc(nmemb, size);
+	return ptr;
+}
+
+static char * dup_String_val(caml_gc *gc, value s)
+{
+	return String_val(s);
+}
+
 void failwith_xl(char *fname, struct caml_logger *lg)
 {
 	char *s;
@@ -81,13 +93,13 @@ static int string_string_tuple_array_val (caml_gc *gc, char ***c_val, value v)
 
 	for (i = 0, a = Field(v, 5); a != Val_emptylist; a = Field(a, 1)) { i++; }
 
-	array = calloc((i + 1) * 2, sizeof(char *));
+	array = gc_calloc(gc, (i + 1) * 2, sizeof(char *));
 	if (!array)
 		return 1;
 	for (i = 0, a = Field(v, 5); a != Val_emptylist; a = Field(a, 1), i++) {
 		value b = Field(a, 0);
-		array[i * 2] = String_val(Field(b, 0));
-		array[i * 2 + 1] = String_val(Field(b, 1));
+		array[i * 2] = dup_String_val(gc, Field(b, 0));
+		array[i * 2 + 1] = dup_String_val(gc, Field(b, 1));
 	}
 	*c_val = array;
 	CAMLreturn(0);
@@ -103,7 +115,7 @@ static int domain_create_info_val (caml_gc *gc, libxl_domain_create_info *c_val,
 	c_val->hap = Bool_val(Field(v, 1));
 	c_val->oos = Bool_val(Field(v, 2));
 	c_val->ssidref = Int32_val(Field(v, 3));
-	c_val->name = String_val(Field(v, 4));
+	c_val->name = dup_String_val(gc, Field(v, 4));
 	a = Field(v, 5);
 	for (i = 0; i < 16; i++)
 		c_val->uuid[i] = Int_val(Field(a, i));
@@ -111,7 +123,7 @@ static int domain_create_info_val (caml_gc *gc, libxl_domain_create_info *c_val,
 	string_string_tuple_array_val(gc, &(c_val->platformdata), Field(v, 7));
 
 	c_val->poolid = Int32_val(Field(v, 8));
-	c_val->poolname = String_val(Field(v, 9));
+	c_val->poolname = dup_String_val(gc, Field(v, 9));
 
 	CAMLreturn(0);
 }
@@ -127,7 +139,7 @@ static int domain_build_info_val (caml_gc *gc, libxl_domain_build_info *c_val, v
 	c_val->target_memkb = Int64_val(Field(v, 3));
 	c_val->video_memkb = Int64_val(Field(v, 4));
 	c_val->shadow_memkb = Int64_val(Field(v, 5));
-	c_val->kernel.path = String_val(Field(v, 6));
+	c_val->kernel.path = dup_String_val(gc, Field(v, 6));
 	c_val->hvm = Tag_val(Field(v, 7)) == 0;
 	infopriv = Field(Field(v, 7), 0);
 	if (c_val->hvm) {
@@ -136,15 +148,15 @@ static int domain_build_info_val (caml_gc *gc, libxl_domain_build_info *c_val, v
 		c_val->u.hvm.acpi = Bool_val(Field(infopriv, 2));
 		c_val->u.hvm.nx = Bool_val(Field(infopriv, 3));
 		c_val->u.hvm.viridian = Bool_val(Field(infopriv, 4));
-		c_val->u.hvm.timeoffset = String_val(Field(infopriv, 5));
+		c_val->u.hvm.timeoffset = dup_String_val(gc, Field(infopriv, 5));
 		c_val->u.hvm.timer_mode = Int_val(Field(infopriv, 6));
 		c_val->u.hvm.hpet = Int_val(Field(infopriv, 7));
 		c_val->u.hvm.vpt_align = Int_val(Field(infopriv, 8));
 	} else {
 		c_val->u.pv.slack_memkb = Int64_val(Field(infopriv, 0));
-		c_val->u.pv.cmdline = String_val(Field(infopriv, 1));
-		c_val->u.pv.ramdisk.path = String_val(Field(infopriv, 2));
-		c_val->u.pv.features = String_val(Field(infopriv, 3));
+		c_val->u.pv.cmdline = dup_String_val(gc, Field(infopriv, 1));
+		c_val->u.pv.ramdisk.path = dup_String_val(gc, Field(infopriv, 2));
+		c_val->u.pv.features = dup_String_val(gc, Field(infopriv, 3));
 	}
 
 	CAMLreturn(0);
@@ -155,9 +167,9 @@ static int device_disk_val(caml_gc *gc, libxl_device_disk *c_val, value v)
 	CAMLparam1(v);
 
 	c_val->backend_domid = Int_val(Field(v, 0));
-	c_val->physpath = String_val(Field(v, 1));
+	c_val->physpath = dup_String_val(gc, Field(v, 1));
 	c_val->phystype = (Int_val(Field(v, 2))) + PHYSTYPE_QCOW;
-	c_val->virtpath = String_val(Field(v, 3));
+	c_val->virtpath = dup_String_val(gc, Field(v, 3));
 	c_val->unpluggable = Bool_val(Field(v, 4));
 	c_val->readwrite = Bool_val(Field(v, 5));
 	c_val->is_cdrom = Bool_val(Field(v, 6));
@@ -173,7 +185,7 @@ static int device_nic_val(caml_gc *gc, libxl_device_nic *c_val, value v)
 	c_val->backend_domid = Int_val(Field(v, 0));
 	c_val->devid = Int_val(Field(v, 1));
 	c_val->mtu = Int_val(Field(v, 2));
-	c_val->model = String_val(Field(v, 3));
+	c_val->model = dup_String_val(gc, Field(v, 3));
 
 	if (Wosize_val(Field(v, 4)) != 6) {
 		ret = 1;
@@ -183,9 +195,9 @@ static int device_nic_val(caml_gc *gc, libxl_device_nic *c_val, value v)
 		c_val->mac[i] = Int_val(Field(Field(v, 4), i));
 
 	/* not handling c_val->ip */
-	c_val->bridge = String_val(Field(v, 5));
-	c_val->ifname = String_val(Field(v, 6));
-	c_val->script = String_val(Field(v, 7));
+	c_val->bridge = dup_String_val(gc, Field(v, 5));
+	c_val->ifname = dup_String_val(gc, Field(v, 6));
+	c_val->script = dup_String_val(gc, Field(v, 7));
 	c_val->nictype = (Int_val(Field(v, 8))) + NICTYPE_IOEMU;
 
 out:
@@ -220,14 +232,14 @@ static int device_vfb_val(caml_gc *gc, libxl_device_vfb *c_val, value v)
 	c_val->backend_domid = Int_val(Field(v, 0));
 	c_val->devid = Int_val(Field(v, 1));
 	c_val->vnc = Bool_val(Field(v, 2));
-	c_val->vnclisten = String_val(Field(v, 3));
-	c_val->vncpasswd = String_val(Field(v, 4));
+	c_val->vnclisten = dup_String_val(gc, Field(v, 3));
+	c_val->vncpasswd = dup_String_val(gc, Field(v, 4));
 	c_val->vncdisplay = Int_val(Field(v, 5));
-	c_val->keymap = String_val(Field(v, 6));
+	c_val->keymap = dup_String_val(gc, Field(v, 6));
 	c_val->sdl = Bool_val(Field(v, 7));
 	c_val->opengl = Bool_val(Field(v, 8));
-	c_val->display = String_val(Field(v, 9));
-	c_val->xauthority = String_val(Field(v, 10));
+	c_val->display = dup_String_val(gc, Field(v, 9));
+	c_val->xauthority = dup_String_val(gc, Field(v, 10));
 
 	CAMLreturn(0);
 }
@@ -682,11 +694,14 @@ value stub_xl_sched_credit_domain_set(value domid, value scinfo)
 value stub_xl_send_trigger(value domid, value trigger, value vcpuid)
 {
 	CAMLparam3(domid, trigger, vcpuid);
-	libxl_ctx ctx; struct caml_logger lg;
 	int ret;
+	char *c_trigger;
+	INIT_STRUCT();
+
+	c_trigger = dup_String_val(&gc, trigger);
 
 	INIT_CTX();
-	ret = libxl_send_trigger(&ctx, Int_val(domid), String_val(trigger), Int_val(vcpuid));
+	ret = libxl_send_trigger(&ctx, Int_val(domid), c_trigger, Int_val(vcpuid));
 	if (ret != 0)
 		failwith_xl("send_trigger", &lg);
 	FREE_CTX();
@@ -711,10 +726,13 @@ value stub_xl_send_debug_keys(value keys)
 {
 	CAMLparam1(keys);
 	int ret;
+	char *c_keys;
 	INIT_STRUCT();
 
+	c_keys = dup_String_val(&gc, keys);
+
 	INIT_CTX();
-	ret = libxl_send_debug_keys(&ctx, String_val(keys));
+	ret = libxl_send_debug_keys(&ctx, c_keys);
 	if (ret != 0)
 		failwith_xl("send_debug_keys", &lg);
 	FREE_CTX();
