@@ -596,9 +596,9 @@ typedef struct {
 
 int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo);
 libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
-                                       int *nb_vcpu, int *cpusize);
+                                       int *nb_vcpu, int *nrcpus);
 int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
-                           uint64_t *cpumap, int cpusize);
+                           uint64_t *cpumap, int nrcpus);
 int libxl_set_vcpucount(libxl_ctx *ctx, uint32_t domid, uint32_t count);
 
 int libxl_get_sched_id(libxl_ctx *ctx);

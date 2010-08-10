@@ -2694,7 +2694,7 @@ const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx)
 }
 
 libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
-                                       int *nb_vcpu, int *cpusize)
+                                       int *nb_vcpu, int *nrcpus)
 {
     libxl_vcpuinfo *ptr, *ret;
     xc_domaininfo_t domaininfo;
@@ -2709,7 +2709,7 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "getting physinfo");
         return NULL;
     }
-    *cpusize = physinfo.max_cpu_id + 1;
+    *nrcpus = physinfo.max_cpu_id + 1;
     ptr = libxl_calloc(ctx, domaininfo.max_vcpu_id + 1, sizeof (libxl_vcpuinfo));
     if (!ptr) {
         return NULL;
@@ -2717,7 +2717,7 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
 
     ret = ptr;
     for (*nb_vcpu = 0; *nb_vcpu <= domaininfo.max_vcpu_id; ++*nb_vcpu, ++ptr) {
-        ptr->cpumap = libxl_calloc(ctx, (*cpusize + 63) / 64, sizeof (uint64_t));
+        ptr->cpumap = libxl_calloc(ctx, (*nrcpus + 63) / 64, sizeof (uint64_t));
         if (!ptr->cpumap) {
             return NULL;
         }
@@ -2725,7 +2725,8 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
             XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "getting vcpu info");
             return NULL;
         }
-        if (xc_vcpu_getaffinity(ctx->xch, domid, *nb_vcpu, ptr->cpumap, *cpusize) == -1) {
+        if (xc_vcpu_getaffinity(ctx->xch, domid, *nb_vcpu,
+            ptr->cpumap, ((*nrcpus) + 7) / 8) == -1) {
             XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "getting vcpu affinity");
             return NULL;
         }
@@ -2740,9 +2741,9 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
 }
 
 int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
-                           uint64_t *cpumap, int cpusize)
+                           uint64_t *cpumap, int nrcpus)
 {
-    if (xc_vcpu_setaffinity(ctx->xch, domid, vcpuid, cpumap, cpusize)) {
+    if (xc_vcpu_setaffinity(ctx->xch, domid, vcpuid, cpumap, (nrcpus + 7) / 8)) {
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "setting vcpu affinity");
         return ERROR_FAIL;
     }

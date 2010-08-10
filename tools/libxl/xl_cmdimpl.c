@@ -3261,7 +3261,7 @@ void vcpulist(int argc, char **argv)
     libxl_dominfo *dominfo;
     libxl_vcpuinfo *vcpuinfo;
     libxl_physinfo physinfo;
-    int nb_vcpu, nb_domain, cpusize;
+    int nb_vcpu, nb_domain, nrcpus;
 
     if (libxl_get_physinfo(&ctx, &physinfo) != 0) {
         fprintf(stderr, "libxl_physinfo failed.\n");
@@ -3275,7 +3275,8 @@ void vcpulist(int argc, char **argv)
             goto vcpulist_out;
         }
         for (; nb_domain > 0; --nb_domain, ++dominfo) {
-            if (!(vcpuinfo = libxl_list_vcpu(&ctx, dominfo->domid, &nb_vcpu, &cpusize))) {
+            if (!(vcpuinfo = libxl_list_vcpu(&ctx, dominfo->domid, &nb_vcpu,
+                &nrcpus))) {
                 fprintf(stderr, "libxl_list_vcpu failed.\n");
                 goto vcpulist_out;
             }
@@ -3288,7 +3289,7 @@ void vcpulist(int argc, char **argv)
             if (domain_qualifier_to_domid(*argv, &domid, 0) < 0) {
                 fprintf(stderr, "%s is an invalid domain identifier\n", *argv);
             }
-            if (!(vcpuinfo = libxl_list_vcpu(&ctx, domid, &nb_vcpu, &cpusize))) {
+            if (!(vcpuinfo = libxl_list_vcpu(&ctx, domid, &nb_vcpu, &nrcpus))) {
                 fprintf(stderr, "libxl_list_vcpu failed.\n");
                 goto vcpulist_out;
             }
