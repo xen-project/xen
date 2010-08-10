@@ -106,12 +106,17 @@ multiboot_info_t *reloc(multiboot_info_t *mbi_old)
         mbi->mmap_addr = (u32)reloc_mbi_struct(
             (memory_map_t *)mbi->mmap_addr, mbi->mmap_length);
 
+    if ( mbi->flags & MBI_LOADERNAME )
+        mbi->boot_loader_name = (u32)reloc_mbi_string(
+            (char *)mbi->boot_loader_name);
+
     /* Mask features we don't understand or don't relocate. */
     mbi->flags &= (MBI_MEMLIMITS |
-                   MBI_DRIVES |
+                   MBI_BOOTDEV |
                    MBI_CMDLINE |
                    MBI_MODULES |
-                   MBI_MEMMAP);
+                   MBI_MEMMAP |
+                   MBI_LOADERNAME);
 
     return mbi;
 }

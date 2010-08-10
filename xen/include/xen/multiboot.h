@@ -31,14 +31,17 @@
 /* The magic number passed by a Multiboot-compliant boot loader. */
 #define MULTIBOOT_BOOTLOADER_MAGIC     0x2BADB002
 
-#define MBI_MEMLIMITS  (1<<0)
-#define MBI_DRIVES     (1<<1)
-#define MBI_CMDLINE    (1<<2)
-#define MBI_MODULES    (1<<3)
-#define MBI_AOUT_SYMS  (1<<4)
-#define MBI_ELF_SYMS   (1<<5)
-#define MBI_MEMMAP     (1<<6)
-#define MBI_LOADERNAME (1<<9)
+#define MBI_MEMLIMITS  (1u<< 0)
+#define MBI_BOOTDEV    (1u<< 1)
+#define MBI_CMDLINE    (1u<< 2)
+#define MBI_MODULES    (1u<< 3)
+#define MBI_AOUT_SYMS  (1u<< 4)
+#define MBI_ELF_SYMS   (1u<< 5)
+#define MBI_MEMMAP     (1u<< 6)
+#define MBI_DRIVES     (1u<< 7)
+#define MBI_BIOSCONFIG (1u<< 8)
+#define MBI_LOADERNAME (1u<< 9)
+#define MBI_APM        (1u<<10)
 
 #ifndef __ASSEMBLY__
 
@@ -66,7 +69,7 @@ typedef struct {
     u32 mem_lower;
     u32 mem_upper;
 
-    /* Valid if flags sets MBI_DRIVES */
+    /* Valid if flags sets MBI_BOOTDEV */
     u32 boot_device;
 
     /* Valid if flags sets MBI_CMDLINE */
@@ -85,6 +88,19 @@ typedef struct {
     /* Valid if flags sets MBI_MEMMAP */
     u32 mmap_length;
     u32 mmap_addr;
+
+    /* Valid if flags sets MBI_DRIVES */
+    u32 drives_length;
+    u32 drives_addr;
+
+    /* Valid if flags sets MBI_BIOSCONFIG */
+    u32 config_table;
+
+    /* Valid if flags sets MBI_LOADERNAME */
+    u32 boot_loader_name;
+
+    /* Valid if flags sets MBI_APM */
+    u32 apm_table;
 } multiboot_info_t;
 
 /* The module structure.  */
