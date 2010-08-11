@@ -70,11 +70,13 @@ int libxl_ctx_init(libxl_ctx *ctx, int version, xentoollog_logger *lg)
     return 0;
 }
 
+static void do_free_version_info(libxl_version_info *info);
 int libxl_ctx_free(libxl_ctx *ctx)
 {
     libxl_free_all(ctx);
     free(ctx->alloc_ptrs);
     xc_interface_close(ctx->xch);
+    do_free_version_info(&ctx->version_info);
     if (ctx->xsh) xs_daemon_close(ctx->xsh); 
     return 0;
 }
@@ -2648,6 +2650,18 @@ int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo)
     return 0;
 }
 
+static void do_free_version_info(libxl_version_info *info)
+{
+    free(info->xen_version_extra);
+    free(info->compiler);
+    free(info->compile_by);
+    free(info->compile_domain);
+    free(info->compile_date);
+    free(info->capabilities);
+    free(info->changeset);
+    free(info->commandline);
+}
+
 const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx)
 {
     union {
@@ -2667,20 +2681,21 @@ const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx)
     xen_version = xc_version(ctx->xch, XENVER_version, NULL);
     info->xen_version_major = xen_version >> 16;
     info->xen_version_minor = xen_version & 0xFF;
+
     xc_version(ctx->xch, XENVER_extraversion, &u.xen_extra);
-    info->xen_version_extra = libxl_strdup(ctx, u.xen_extra);
+    info->xen_version_extra = strdup(u.xen_extra);
 
     xc_version(ctx->xch, XENVER_compile_info, &u.xen_cc);
-    info->compiler = libxl_strdup(ctx, u.xen_cc.compiler);
-    info->compile_by = libxl_strdup(ctx, u.xen_cc.compile_by);
-    info->compile_domain = libxl_strdup(ctx, u.xen_cc.compile_domain);
-    info->compile_date = libxl_strdup(ctx, u.xen_cc.compile_date);
+    info->compiler = strdup(u.xen_cc.compiler);
+    info->compile_by = strdup(u.xen_cc.compile_by);
+    info->compile_domain = strdup(u.xen_cc.compile_domain);
+    info->compile_date = strdup(u.xen_cc.compile_date);
 
     xc_version(ctx->xch, XENVER_capabilities, &u.xen_caps);
-    info->capabilities = libxl_strdup(ctx, u.xen_caps);
+    info->capabilities = strdup(u.xen_caps);
 
     xc_version(ctx->xch, XENVER_changeset, &u.xen_chgset);
-    info->changeset = libxl_strdup(ctx, u.xen_chgset);
+    info->changeset = strdup(u.xen_chgset);
 
     xc_version(ctx->xch, XENVER_platform_parameters, &u.p_parms);
     info->virt_start = u.p_parms.virt_start;
@@ -2688,7 +2703,7 @@ const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx)
     info->pagesize = xc_version(ctx->xch, XENVER_pagesize, NULL);
 
     xc_version(ctx->xch, XENVER_commandline, &u.xen_commandline);
-    info->commandline = libxl_strdup(ctx, u.xen_commandline);
+    info->commandline = strdup(u.xen_commandline);
 
     return info;
 }
