@@ -511,6 +511,7 @@ typedef struct {
 int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic);
 int libxl_device_nic_del(libxl_ctx *ctx, libxl_device_nic *nic, int wait);
 libxl_nicinfo *libxl_list_nics(libxl_ctx *ctx, uint32_t domid, unsigned int *nb);
+void libxl_free_nics_list(libxl_nicinfo *nics, unsigned int nb);
 
 int libxl_device_console_add(libxl_ctx *ctx, uint32_t domid, libxl_device_console *console);
 

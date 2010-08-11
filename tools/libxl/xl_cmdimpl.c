@@ -4045,8 +4045,8 @@ int main_networkattach(int argc, char **argv)
 int main_networklist(int argc, char **argv)
 {
     int opt;
-    libxl_nicinfo *nics;
-    unsigned int nb;
+    libxl_nicinfo *nics, *list;
+    unsigned int nb, i;
 
     if (argc < 3) {
         help("network-list");
@@ -4071,10 +4071,10 @@ int main_networklist(int argc, char **argv)
             fprintf(stderr, "%s is an invalid domain identifier\n", *argv);
             continue;
         }
-        if (!(nics = libxl_list_nics(&ctx, domid, &nb))) {
+        if (!(list = nics = libxl_list_nics(&ctx, domid, &nb))) {
             continue;
         }
-        for (; nb > 0; --nb, ++nics) {
+        for (i = 0; i < nb; ++i, ++nics) {
             /* Idx BE */
             printf("%-3d %-2d ", nics->devid, nics->backend_id);
             /* MAC */
@@ -4086,6 +4086,7 @@ int main_networklist(int argc, char **argv)
                    nics->devid, nics->state, nics->evtch,
                    nics->rref_tx, nics->rref_rx, nics->backend);
         }
+        libxl_free_nics_list(list, nb);
     }
     return 0;
 }

@@ -1887,10 +1887,21 @@ int libxl_device_nic_del(libxl_ctx *ctx,
     return libxl_device_del(ctx, &device, wait);
 }
 
+void libxl_free_nics_list(libxl_nicinfo *nics, unsigned int nb)
+{
+    unsigned int i;
+    for(i = 0; i < nb; i++) {
+        free(nics[i].backend);
+        free(nics[i].frontend);
+        free(nics[i].script);
+    }
+    free(nics);
+}
+
 libxl_nicinfo *libxl_list_nics(libxl_ctx *ctx, uint32_t domid, unsigned int *nb)
 {
     char *dompath, *nic_path_fe;
-    char **l;
+    char **l, **list;
     char *val, *tok;
     unsigned int nb_nics, i;
     libxl_nicinfo *res, *nics;
@@ -1899,22 +1910,21 @@ libxl_nicinfo *libxl_list_nics(libxl_ctx *ctx, uint32_t domid, unsigned int *nb)
     if (!dompath) {
         return NULL;
     }
-    l = libxl_xs_directory(ctx, XBT_NULL,
+    list = l = libxl_xs_directory(ctx, XBT_NULL,
                            libxl_sprintf(ctx, "%s/device/vif", dompath), &nb_nics);
     if (!l) {
         return NULL;
     }
-    res = libxl_calloc(ctx, nb_nics, sizeof (libxl_device_nic));
+    nics = res = calloc(nb_nics, sizeof (libxl_device_nic));
     if (!res) {
         libxl_free(ctx, l);
         return NULL;
     }
-    nics = res;
     for (*nb = nb_nics; nb_nics > 0; --nb_nics, ++l, ++nics) {
         nic_path_fe = libxl_sprintf(ctx, "%s/device/vif/%s", dompath, *l);
 
-        nics->backend = libxl_xs_read(ctx, XBT_NULL,
-                                      libxl_sprintf(ctx, "%s/backend", nic_path_fe));
+        nics->backend = xs_read(ctx->xsh, XBT_NULL,
+                                libxl_sprintf(ctx, "%s/backend", nic_path_fe), NULL);
         val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/backend-id", nic_path_fe));
         nics->backend_id = val ? strtoul(val, NULL, 10) : -1;
 
@@ -1932,17 +1942,14 @@ libxl_nicinfo *libxl_list_nics(libxl_ctx *ctx, uint32_t domid, unsigned int *nb)
         nics->rref_tx = val ? strtol(val, NULL, 10) : -1;
         val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/rx-ring-ref", nic_path_fe));
         nics->rref_rx = val ? strtol(val, NULL, 10) : -1;
-        nics->frontend = libxl_xs_read(ctx, XBT_NULL,
-                                       libxl_sprintf(ctx, "%s/frontend", nics->backend));
+        nics->frontend = xs_read(ctx->xsh, XBT_NULL,
+                                 libxl_sprintf(ctx, "%s/frontend", nics->backend), NULL);
         val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/frontend-id", nics->backend));
         nics->frontend_id = val ? strtoul(val, NULL, 10) : -1;
-        nics->script = libxl_xs_read(ctx, XBT_NULL,
-                                     libxl_sprintf(ctx, "%s/script", nics->backend));
-
-        libxl_free(ctx, nic_path_fe);
+        nics->script = xs_read(ctx->xsh, XBT_NULL,
+                               libxl_sprintf(ctx, "%s/script", nics->backend), NULL);
     }
 
-    libxl_free(ctx, l);
     return res;
 }
 

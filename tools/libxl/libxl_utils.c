@@ -368,14 +368,14 @@ int libxl_pipe(libxl_ctx *ctx, int pipes[2])
 int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
                             const char *mac, libxl_device_nic *nic)
 {
-    libxl_nicinfo *nics;
-    unsigned int nb, i;
+    libxl_nicinfo *nics, *list;
+    unsigned int nb, i, j;
     uint8_t mac_n[6];
     uint8_t *a, *b;
     const char *tok;
     char *endptr;
 
-    nics = libxl_list_nics(ctx, domid, &nb);
+    list = nics = libxl_list_nics(ctx, domid, &nb);
     if (!nics) {
         return ERROR_FAIL;
     }
@@ -387,7 +387,7 @@ int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
         }
     }
     memset(nic, 0, sizeof (libxl_device_nic));
-    for (; nb; --nb, ++nics) {
+    for (j = 0; j < nb; ++j, ++nics) {
         for (i = 0, a = nics->mac, b = mac_n;
              (b < mac_n + 6) && (*a == *b); ++a, ++b)
             ;
@@ -397,12 +397,12 @@ int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
             nic->devid = nics->devid;
             memcpy(nic->mac, nics->mac, sizeof (nic->mac));
             nic->script = nics->script;
-            libxl_free(ctx, nics);
+            libxl_free_nics_list(list, nb);
             return 0;
         }
     }
 
-    libxl_free(ctx, nics);
+    libxl_free_nics_list(list, nb);
     return 0;
 }
 
@@ -422,6 +422,9 @@ int libxl_devid_to_device_nic(libxl_ctx *ctx, uint32_t domid,
     nic_path_be = libxl_xs_read(ctx, XBT_NULL,
                                 libxl_sprintf(ctx, "%s/backend", nic_path_fe));
     val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/backend-id", nic_path_fe));
+    if ( NULL == val ) {
+        return ERROR_FAIL;
+    }
     nic->backend_domid = strtoul(val, NULL, 10);
     nic->devid = strtoul(devid, NULL, 10);
     libxl_free(ctx, val);
