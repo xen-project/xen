@@ -232,7 +232,7 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     {
         if ( c->cr0 & X86_CR0_PG )
         {
-            mfn = mfn_x(gfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT, &p2mt));
+            mfn = mfn_x(gfn_to_mfn(p2m, c->cr3 >> PAGE_SHIFT, &p2mt));
             if ( !p2m_is_ram(p2mt) || !get_page(mfn_to_page(mfn), v->domain) )
             {
                 gdprintk(XENLOG_ERR, "Invalid CR3 value=0x%"PRIx64"\n",
@@ -946,6 +946,9 @@ static void svm_do_nested_pgfault(paddr_t gpa)
     unsigned long gfn = gpa >> PAGE_SHIFT;
     mfn_t mfn;
     p2m_type_t p2mt;
+    struct p2m_domain *p2m;
+
+    p2m = p2m_get_hostp2m(current->domain);
 
     if ( tb_init_done )
     {
@@ -958,7 +961,7 @@ static void svm_do_nested_pgfault(paddr_t gpa)
 
         _d.gpa = gpa;
         _d.qualification = 0;
-        _d.mfn = mfn_x(gfn_to_mfn_query(current->domain, gfn, &_d.p2mt));
+        _d.mfn = mfn_x(gfn_to_mfn_query(p2m, gfn, &_d.p2mt));
         
         __trace_var(TRC_HVM_NPF, 0, sizeof(_d), (unsigned char *)&_d);
     }
@@ -967,7 +970,7 @@ static void svm_do_nested_pgfault(paddr_t gpa)
         return;
 
     /* Everything else is an error. */
-    mfn = gfn_to_mfn_type_current(gfn, &p2mt, p2m_guest);
+    mfn = gfn_to_mfn_guest(p2m, gfn, &p2mt);
     gdprintk(XENLOG_ERR, "SVM violation gpa %#"PRIpaddr", mfn %#lx, type %i\n",
              gpa, mfn_x(mfn), p2mt);
     domain_crash(current->domain);
@@ -1117,8 +1120,6 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         goto gpf;
     }
 
-    HVMTRACE_3D (MSR_READ, msr,
-                (uint32_t)*msr_content, (uint32_t)(*msr_content>>32));
     HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%x, msr_value=%"PRIx64,
                 msr, *msr_content);
     return X86EMUL_OKAY;
@@ -1132,9 +1133,6 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 {
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-
-    HVMTRACE_3D(MSR_WRITE, msr,
-               (uint32_t)msr_content, (uint32_t)(msr_content >> 32)); 
 
     switch ( msr )
     {

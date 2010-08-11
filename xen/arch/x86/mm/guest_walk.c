@@ -86,17 +86,17 @@ static uint32_t set_ad_bits(void *guest_p, void *walk_p, int set_dirty)
     return 0;
 }
 
-static inline void *map_domain_gfn(struct domain *d,
+static inline void *map_domain_gfn(struct p2m_domain *p2m,
                                    gfn_t gfn, 
                                    mfn_t *mfn,
                                    p2m_type_t *p2mt,
                                    uint32_t *rc) 
 {
     /* Translate the gfn, unsharing if shared */
-    *mfn = gfn_to_mfn_unshare(d, gfn_x(gfn), p2mt, 0);
+    *mfn = gfn_to_mfn_unshare(p2m, gfn_x(gfn), p2mt, 0);
     if ( p2m_is_paging(*p2mt) )
     {
-        p2m_mem_paging_populate(d, gfn_x(gfn));
+        p2m_mem_paging_populate(p2m, gfn_x(gfn));
 
         *rc = _PAGE_PAGED;
         return NULL;
@@ -119,7 +119,8 @@ static inline void *map_domain_gfn(struct domain *d,
 
 /* Walk the guest pagetables, after the manner of a hardware walker. */
 uint32_t
-guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw, 
+guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
+                  unsigned long va, walk_t *gw, 
                   uint32_t pfec, mfn_t top_mfn, void *top_map)
 {
     struct domain *d = v->domain;
@@ -154,7 +155,7 @@ guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw,
     if ( rc & _PAGE_PRESENT ) goto out;
 
     /* Map the l3 table */
-    l3p = map_domain_gfn(d, 
+    l3p = map_domain_gfn(p2m, 
                          guest_l4e_get_gfn(gw->l4e), 
                          &gw->l3mfn,
                          &p2mt, 
@@ -181,7 +182,7 @@ guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw,
 #endif /* PAE or 64... */
 
     /* Map the l2 table */
-    l2p = map_domain_gfn(d, 
+    l2p = map_domain_gfn(p2m, 
                          guest_l3e_get_gfn(gw->l3e), 
                          &gw->l2mfn,
                          &p2mt, 
@@ -237,7 +238,7 @@ guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw,
     else 
     {
         /* Not a superpage: carry on and find the l1e. */
-        l1p = map_domain_gfn(d, 
+        l1p = map_domain_gfn(p2m, 
                              guest_l2e_get_gfn(gw->l2e), 
                              &gw->l1mfn,
                              &p2mt,

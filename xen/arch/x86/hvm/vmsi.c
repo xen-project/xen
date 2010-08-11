@@ -159,7 +159,10 @@ struct msixtbl_entry
     unsigned long gtable;       /* gpa of msix table */
     unsigned long table_len;
     unsigned long table_flags[MAX_MSIX_TABLE_ENTRIES / BITS_PER_LONG + 1];
-
+#define MAX_MSIX_ACC_ENTRIES 3
+    struct { 
+        uint32_t msi_ad[3];	/* Shadow of address low, high and data */
+    } gentries[MAX_MSIX_ACC_ENTRIES];
     struct rcu_head rcu;
 };
 
@@ -205,9 +208,10 @@ static int msixtbl_read(
     struct vcpu *v, unsigned long address,
     unsigned long len, unsigned long *pval)
 {
-    unsigned long offset;
+    unsigned long offset, val;
     struct msixtbl_entry *entry;
     void *virt;
+    int nr_entry, index;
     int r = X86EMUL_UNHANDLEABLE;
 
     rcu_read_lock(&msixtbl_rcu_lock);
@@ -215,18 +219,29 @@ static int msixtbl_read(
     if ( len != 4 )
         goto out;
 
-    offset = address & (PCI_MSIX_ENTRY_SIZE - 1);
-    if ( offset != PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET)
-        goto out;
-
     entry = msixtbl_find_entry(v, address);
     virt = msixtbl_addr_to_virt(entry, address);
     if ( !virt )
         goto out;
 
-    *pval = readl(virt);
-    r = X86EMUL_OKAY;
+    nr_entry = (address - entry->gtable) / PCI_MSIX_ENTRY_SIZE;
+    offset = address & (PCI_MSIX_ENTRY_SIZE - 1);
+    if ( nr_entry >= MAX_MSIX_ACC_ENTRIES && 
+         offset != PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET )
+        goto out;
 
+    val = readl(virt);
+    if ( offset != PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET )
+    {
+        index = offset / sizeof(uint32_t);
+        *pval = entry->gentries[nr_entry].msi_ad[index];
+    }
+    else 
+    {
+        *pval = val;
+    }
+    
+    r = X86EMUL_OKAY;
 out:
     rcu_read_unlock(&msixtbl_rcu_lock);
     return r;
@@ -238,7 +253,7 @@ static int msixtbl_write(struct vcpu *v, unsigned long address,
     unsigned long offset;
     struct msixtbl_entry *entry;
     void *virt;
-    int nr_entry;
+    int nr_entry, index;
     int r = X86EMUL_UNHANDLEABLE;
 
     rcu_read_lock(&msixtbl_rcu_lock);
@@ -252,6 +267,11 @@ static int msixtbl_write(struct vcpu *v, unsigned long address,
     offset = address & (PCI_MSIX_ENTRY_SIZE - 1);
     if ( offset != PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET)
     {
+        if ( nr_entry < MAX_MSIX_ACC_ENTRIES ) 
+        {
+            index = offset / sizeof(uint32_t);
+            entry->gentries[nr_entry].msi_ad[index] = val;
+        }
         set_bit(nr_entry, &entry->table_flags);
         goto out;
     }

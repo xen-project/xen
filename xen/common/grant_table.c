@@ -109,7 +109,7 @@ static unsigned inline int max_nr_maptrack_frames(void)
 #define gfn_to_mfn_private(_d, _gfn) ({                     \
     p2m_type_t __p2mt;                                      \
     unsigned long __x;                                      \
-    __x = mfn_x(gfn_to_mfn_unshare(_d, _gfn, &__p2mt, 1));  \
+    __x = mfn_x(gfn_to_mfn_unshare(p2m_get_hostp2m(_d), _gfn, &__p2mt, 1));  \
     if ( !p2m_is_valid(__p2mt) )                            \
         __x = INVALID_MFN;                                  \
     __x; })
@@ -1933,12 +1933,13 @@ __gnttab_copy(
     {
 #ifdef CONFIG_X86
         p2m_type_t p2mt;
-        s_frame = mfn_x(gfn_to_mfn(sd, op->source.u.gmfn, &p2mt));
+        struct p2m_domain *p2m = p2m_get_hostp2m(sd);
+        s_frame = mfn_x(gfn_to_mfn(p2m, op->source.u.gmfn, &p2mt));
         if ( !p2m_is_valid(p2mt) )
           s_frame = INVALID_MFN;
         if ( p2m_is_paging(p2mt) )
         {
-            p2m_mem_paging_populate(sd, op->source.u.gmfn);
+            p2m_mem_paging_populate(p2m, op->source.u.gmfn);
             rc = -ENOENT;
             goto error_out;
         }
@@ -1979,12 +1980,13 @@ __gnttab_copy(
     {
 #ifdef CONFIG_X86
         p2m_type_t p2mt;
-        d_frame = mfn_x(gfn_to_mfn_unshare(dd, op->dest.u.gmfn, &p2mt, 1));
+        struct p2m_domain *p2m = p2m_get_hostp2m(dd);
+        d_frame = mfn_x(gfn_to_mfn_unshare(p2m, op->dest.u.gmfn, &p2mt, 1));
         if ( !p2m_is_valid(p2mt) )
           d_frame = INVALID_MFN;
         if ( p2m_is_paging(p2mt) )
         {
-            p2m_mem_paging_populate(dd, op->dest.u.gmfn);
+            p2m_mem_paging_populate(p2m, op->dest.u.gmfn);
             rc = -ENOENT;
             goto error_out;
         }

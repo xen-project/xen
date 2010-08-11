@@ -28,6 +28,7 @@
 #include "op_x86_model.h"
  
 struct op_counter_config counter_config[OP_MAX_COUNTER];
+struct op_ibs_config ibs_config;
 
 static struct op_x86_model_spec const *__read_mostly model;
 static struct op_msrs cpu_msrs[NR_CPUS];
@@ -430,6 +431,7 @@ static int __init nmi_init(void)
 			case 0x10:
 				model = &op_athlon_spec;
 				cpu_type = "x86-64/family10";
+				ibs_caps = ibs_init();
 				break;
 			case 0x11:
 				model = &op_athlon_spec;

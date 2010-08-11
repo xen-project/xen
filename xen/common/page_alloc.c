@@ -295,20 +295,29 @@ static unsigned long init_node_heap(int node, unsigned long mfn,
 /* Allocate 2^@order contiguous pages. */
 static struct page_info *alloc_heap_pages(
     unsigned int zone_lo, unsigned int zone_hi,
-    unsigned int node, unsigned int order, unsigned int memflags)
+    unsigned int order, unsigned int memflags,
+    struct domain *d)
 {
-    unsigned int i, j, zone = 0;
-    unsigned int num_nodes = num_online_nodes();
+    unsigned int first_node, i, j, zone = 0, nodemask_retry = 0;
+    unsigned int node = (uint8_t)((memflags >> _MEMF_node) - 1);
     unsigned long request = 1UL << order;
-    bool_t exact_node_request = !!(memflags & MEMF_exact_node);
     cpumask_t extra_cpus_mask, mask;
     struct page_info *pg;
+    nodemask_t nodemask = (d != NULL ) ? d->node_affinity : node_online_map;
 
     if ( node == NUMA_NO_NODE )
     {
-        node = cpu_to_node(smp_processor_id());
-        exact_node_request = 0;
+        memflags &= ~MEMF_exact_node;
+        if ( d != NULL )
+        {
+            node = next_node(d->last_alloc_node, nodemask);
+            if ( node >= MAX_NUMNODES )
+                node = first_node(nodemask);
+        }
+        if ( node >= MAX_NUMNODES )
+            node = cpu_to_node(smp_processor_id());
     }
+    first_node = node;
 
     ASSERT(node >= 0);
     ASSERT(zone_lo <= zone_hi);
@@ -335,7 +344,7 @@ static struct page_info *alloc_heap_pages(
      * zone before failing, only calc new node value if we fail to find memory 
      * in target node, this avoids needless computation on fast-path.
      */
-    for ( i = 0; i < num_nodes; i++ )
+    for ( ; ; )
     {
         zone = zone_hi;
         do {
@@ -349,18 +358,35 @@ static struct page_info *alloc_heap_pages(
                     goto found;
         } while ( zone-- > zone_lo ); /* careful: unsigned zone may wrap */
 
-        if ( exact_node_request )
+        if ( memflags & MEMF_exact_node )
             goto not_found;
 
-        /* Pick next node, wrapping around if needed. */
-        node = next_node(node, node_online_map);
-        if (node == MAX_NUMNODES)
-            node = first_node(node_online_map);
+        /* Pick next node. */
+        if ( !node_isset(node, nodemask) )
+        {
+            /* Very first node may be caller-specified and outside nodemask. */
+            ASSERT(!nodemask_retry);
+            first_node = node = first_node(nodemask);
+            if ( node < MAX_NUMNODES )
+                continue;
+        }
+        else if ( (node = next_node(node, nodemask)) >= MAX_NUMNODES )
+            node = first_node(nodemask);
+        if ( node == first_node )
+        {
+            /* When we have tried all in nodemask, we fall back to others. */
+            if ( nodemask_retry++ )
+                goto not_found;
+            nodes_andnot(nodemask, node_online_map, nodemask);
+            first_node = node = first_node(nodemask);
+            if ( node >= MAX_NUMNODES )
+                goto not_found;
+        }
     }
 
  try_tmem:
     /* Try to free memory from tmem */
-    if ( (pg = tmem_relinquish_pages(order,memflags)) != NULL )
+    if ( (pg = tmem_relinquish_pages(order, memflags)) != NULL )
     {
         /* reassigning an already allocated anonymous heap page */
         spin_unlock(&heap_lock);
@@ -385,6 +411,9 @@ static struct page_info *alloc_heap_pages(
     avail[node][zone] -= request;
     total_avail_pages -= request;
     ASSERT(total_avail_pages >= 0);
+
+    if ( d != NULL )
+        d->last_alloc_node = node;
 
     spin_unlock(&heap_lock);
 
@@ -1010,7 +1039,7 @@ void *alloc_xenheap_pages(unsigned int order, unsigned int memflags)
     ASSERT(!in_irq());
 
     pg = alloc_heap_pages(MEMZONE_XEN, MEMZONE_XEN,
-        cpu_to_node(smp_processor_id()), order, memflags);
+                          order, memflags, NULL);
     if ( unlikely(pg == NULL) )
         return NULL;
 
@@ -1153,24 +1182,21 @@ struct page_info *alloc_domheap_pages(
 {
     struct page_info *pg = NULL;
     unsigned int bits = memflags >> _MEMF_bits, zone_hi = NR_ZONES - 1;
-    unsigned int node = (uint8_t)((memflags >> _MEMF_node) - 1), dma_zone;
+    unsigned int dma_zone;
 
     ASSERT(!in_irq());
-
-    if ( (node == NUMA_NO_NODE) && (d != NULL) )
-        node = domain_to_node(d);
 
     bits = domain_clamp_alloc_bitsize(d, bits ? : (BITS_PER_LONG+PAGE_SHIFT));
     if ( (zone_hi = min_t(unsigned int, bits_to_zone(bits), zone_hi)) == 0 )
         return NULL;
 
     if ( dma_bitsize && ((dma_zone = bits_to_zone(dma_bitsize)) < zone_hi) )
-        pg = alloc_heap_pages(dma_zone + 1, zone_hi, node, order, memflags);
+        pg = alloc_heap_pages(dma_zone + 1, zone_hi, order, memflags, d);
 
     if ( (pg == NULL) &&
          ((memflags & MEMF_no_dma) ||
-          ((pg = alloc_heap_pages(MEMZONE_XEN + 1, zone_hi,
-                                  node, order, memflags)) == NULL)) )
+          ((pg = alloc_heap_pages(MEMZONE_XEN + 1, zone_hi, order,
+                                  memflags, d)) == NULL)) )
          return NULL;
 
     if ( (d != NULL) && assign_pages(d, pg, order, memflags) )

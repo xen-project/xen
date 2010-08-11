@@ -19,6 +19,7 @@
 #include <asm/regs.h>
 #include <asm/current.h>
 #include <asm/hvm/support.h>
+#include <xen/pci_regs.h>
  
 #include "op_x86_model.h"
 #include "op_counter.h"
@@ -46,6 +47,116 @@
 static unsigned long reset_value[NUM_COUNTERS];
 
 extern char svm_stgi_label[];
+
+u32 ibs_caps = 0;
+static u64 ibs_op_ctl;
+
+/* IBS cpuid feature detection */
+#define IBS_CPUID_FEATURES              0x8000001b
+
+/* IBS MSRs */
+#define MSR_AMD64_IBSFETCHCTL           0xc0011030
+#define MSR_AMD64_IBSFETCHLINAD         0xc0011031
+#define MSR_AMD64_IBSFETCHPHYSAD        0xc0011032
+#define MSR_AMD64_IBSOPCTL              0xc0011033
+#define MSR_AMD64_IBSOPRIP              0xc0011034
+#define MSR_AMD64_IBSOPDATA             0xc0011035
+#define MSR_AMD64_IBSOPDATA2            0xc0011036
+#define MSR_AMD64_IBSOPDATA3            0xc0011037
+#define MSR_AMD64_IBSDCLINAD            0xc0011038
+#define MSR_AMD64_IBSDCPHYSAD           0xc0011039
+#define MSR_AMD64_IBSCTL                0xc001103a
+
+/*
+ * Same bit mask as for IBS cpuid feature flags (Fn8000_001B_EAX), but
+ * bit 0 is used to indicate the existence of IBS.
+ */
+#define IBS_CAPS_AVAIL                  (1LL<<0)
+#define IBS_CAPS_RDWROPCNT              (1LL<<3)
+#define IBS_CAPS_OPCNT                  (1LL<<4)
+
+/* IBS randomization macros */
+#define IBS_RANDOM_BITS                 12
+#define IBS_RANDOM_MASK                 ((1ULL << IBS_RANDOM_BITS) - 1)
+#define IBS_RANDOM_MAXCNT_OFFSET        (1ULL << (IBS_RANDOM_BITS - 5))
+
+/* IbsFetchCtl bits/masks */
+#define IBS_FETCH_RAND_EN               (1ULL<<57)
+#define IBS_FETCH_VAL                   (1ULL<<49)
+#define IBS_FETCH_ENABLE                (1ULL<<48)
+#define IBS_FETCH_CNT                   0xFFFF0000ULL
+#define IBS_FETCH_MAX_CNT               0x0000FFFFULL
+
+/* IbsOpCtl bits */
+#define IBS_OP_CNT_CTL                  (1ULL<<19)
+#define IBS_OP_VAL                      (1ULL<<18)
+#define IBS_OP_ENABLE                   (1ULL<<17)
+#define IBS_OP_MAX_CNT                  0x0000FFFFULL
+
+/* IBS sample identifier */
+#define IBS_FETCH_CODE                  13
+#define IBS_OP_CODE                     14
+
+#define clamp(val, min, max) ({			\
+	typeof(val) __val = (val);		\
+	typeof(min) __min = (min);		\
+	typeof(max) __max = (max);		\
+	(void) (&__val == &__min);		\
+	(void) (&__val == &__max);		\
+	__val = __val < __min ? __min: __val;	\
+	__val > __max ? __max: __val; })
+
+/*
+ * 16-bit Linear Feedback Shift Register (LFSR)
+ */
+static unsigned int lfsr_random(void)
+{
+    static unsigned int lfsr_value = 0xF00D;
+    unsigned int bit;
+
+    /* Compute next bit to shift in */
+    bit = ((lfsr_value >> 0) ^
+           (lfsr_value >> 2) ^
+           (lfsr_value >> 3) ^
+           (lfsr_value >> 5)) & 0x0001;
+
+    /* Advance to next register value */
+    lfsr_value = (lfsr_value >> 1) | (bit << 15);
+
+    return lfsr_value;
+}
+
+/*
+ * IBS software randomization
+ *
+ * The IBS periodic op counter is randomized in software. The lower 12
+ * bits of the 20 bit counter are randomized. IbsOpCurCnt is
+ * initialized with a 12 bit random value.
+ */
+static inline u64 op_amd_randomize_ibs_op(u64 val)
+{
+    unsigned int random = lfsr_random();
+
+    if (!(ibs_caps & IBS_CAPS_RDWROPCNT))
+        /*
+         * Work around if the hw can not write to IbsOpCurCnt
+         *
+         * Randomize the lower 8 bits of the 16 bit
+         * IbsOpMaxCnt [15:0] value in the range of -128 to
+         * +127 by adding/subtracting an offset to the
+         * maximum count (IbsOpMaxCnt).
+         *
+         * To avoid over or underflows and protect upper bits
+         * starting at bit 16, the initial value for
+         * IbsOpMaxCnt must fit in the range from 0x0081 to
+         * 0xff80.
+         */
+        val += (s8)(random >> 4);
+    else
+        val |= (u64)(random & IBS_RANDOM_MASK) << 32;
+
+    return val;
+}
 
 static void athlon_fill_in_addresses(struct op_msrs * const msrs)
 {
@@ -101,6 +212,78 @@ static void athlon_setup_ctrs(struct op_msrs const * const msrs)
 	}
 }
 
+static inline void
+ibs_log_event(u64 data, struct cpu_user_regs * const regs, int mode)
+{
+	struct vcpu *v = current;
+	u32 temp = 0;
+
+	temp = data & 0xFFFFFFFF;
+	xenoprof_log_event(v, regs, temp, mode, 0);
+	
+	temp = (data >> 32) & 0xFFFFFFFF;
+	xenoprof_log_event(v, regs, temp, mode, 0);
+	
+}
+
+static inline int handle_ibs(int mode, struct cpu_user_regs * const regs)
+{
+	u64 val, ctl;
+	struct vcpu *v = current;
+
+	if (!ibs_caps)
+		return 1;
+
+	if (ibs_config.fetch_enabled) {
+		rdmsrl(MSR_AMD64_IBSFETCHCTL, ctl);
+		if (ctl & IBS_FETCH_VAL) {
+			rdmsrl(MSR_AMD64_IBSFETCHLINAD, val);
+			xenoprof_log_event(v, regs, IBS_FETCH_CODE, mode, 0);
+			xenoprof_log_event(v, regs, val, mode, 0);
+
+			ibs_log_event(val, regs, mode);
+			ibs_log_event(ctl, regs, mode);
+
+			rdmsrl(MSR_AMD64_IBSFETCHPHYSAD, val);
+			ibs_log_event(val, regs, mode);
+		
+			/* reenable the IRQ */
+			ctl &= ~(IBS_FETCH_VAL | IBS_FETCH_CNT);
+			ctl |= IBS_FETCH_ENABLE;
+			wrmsrl(MSR_AMD64_IBSFETCHCTL, ctl);
+		}
+	}
+
+	if (ibs_config.op_enabled) {
+		rdmsrl(MSR_AMD64_IBSOPCTL, ctl);
+		if (ctl & IBS_OP_VAL) {
+
+			rdmsrl(MSR_AMD64_IBSOPRIP, val);
+			xenoprof_log_event(v, regs, IBS_OP_CODE, mode, 0);
+			xenoprof_log_event(v, regs, val, mode, 0);
+			
+			ibs_log_event(val, regs, mode);
+
+			rdmsrl(MSR_AMD64_IBSOPDATA, val);
+			ibs_log_event(val, regs, mode);
+			rdmsrl(MSR_AMD64_IBSOPDATA2, val);
+			ibs_log_event(val, regs, mode);
+			rdmsrl(MSR_AMD64_IBSOPDATA3, val);
+			ibs_log_event(val, regs, mode);
+			rdmsrl(MSR_AMD64_IBSDCLINAD, val);
+			ibs_log_event(val, regs, mode);
+			rdmsrl(MSR_AMD64_IBSDCPHYSAD, val);
+			ibs_log_event(val, regs, mode);
+
+			/* reenable the IRQ */
+			ctl = op_amd_randomize_ibs_op(ibs_op_ctl);
+			wrmsrl(MSR_AMD64_IBSOPCTL, ctl);
+		}
+	}
+
+    return 1;
+}
+
 static int athlon_check_ctrs(unsigned int const cpu,
 			     struct op_msrs const * const msrs,
 			     struct cpu_user_regs * const regs)
@@ -134,10 +317,51 @@ static int athlon_check_ctrs(unsigned int const cpu,
 		}
 	}
 
+	ovf = handle_ibs(mode, regs);
 	/* See op_model_ppro.c */
 	return ovf;
 }
 
+static inline void start_ibs(void)
+{
+	u64 val = 0;
+
+	if (!ibs_caps)
+		return;
+
+	if (ibs_config.fetch_enabled) {
+		val = (ibs_config.max_cnt_fetch >> 4) & IBS_FETCH_MAX_CNT;
+		val |= ibs_config.rand_en ? IBS_FETCH_RAND_EN : 0;
+		val |= IBS_FETCH_ENABLE;
+		wrmsrl(MSR_AMD64_IBSFETCHCTL, val);
+	}
+
+	if (ibs_config.op_enabled) {
+		ibs_op_ctl = ibs_config.max_cnt_op >> 4;
+		if (!(ibs_caps & IBS_CAPS_RDWROPCNT)) {
+			/*
+			 * IbsOpCurCnt not supported.  See
+			 * op_amd_randomize_ibs_op() for details.
+			 */
+			ibs_op_ctl = clamp((unsigned long long)ibs_op_ctl, 
+							0x0081ULL, 0xFF80ULL);
+		} else {
+			/*
+			 * The start value is randomized with a
+			 * positive offset, we need to compensate it
+			 * with the half of the randomized range. Also
+			 * avoid underflows.
+			 */
+		ibs_op_ctl = min(ibs_op_ctl + IBS_RANDOM_MAXCNT_OFFSET,
+					IBS_OP_MAX_CNT);
+		}
+		if (ibs_caps & IBS_CAPS_OPCNT && ibs_config.dispatched_ops)
+			ibs_op_ctl |= IBS_OP_CNT_CTL;
+		ibs_op_ctl |= IBS_OP_ENABLE;
+		val = op_amd_randomize_ibs_op(ibs_op_ctl);
+		wrmsrl(MSR_AMD64_IBSOPCTL, val);
+	}
+}
  
 static void athlon_start(struct op_msrs const * const msrs)
 {
@@ -150,8 +374,22 @@ static void athlon_start(struct op_msrs const * const msrs)
 			CTRL_WRITE(msr_content, msrs, i);
 		}
 	}
+	start_ibs();
 }
 
+static void stop_ibs(void)
+{
+	if (!ibs_caps)
+		return;
+
+	if (ibs_config.fetch_enabled)
+		/* clear max count and enable */
+		wrmsrl(MSR_AMD64_IBSFETCHCTL, 0);
+
+	if (ibs_config.op_enabled)
+		/* clear max count and enable */
+		wrmsrl(MSR_AMD64_IBSOPCTL, 0);
+}
 
 static void athlon_stop(struct op_msrs const * const msrs)
 {
@@ -165,8 +403,118 @@ static void athlon_stop(struct op_msrs const * const msrs)
 		CTRL_SET_INACTIVE(msr_content);
 		CTRL_WRITE(msr_content, msrs, i);
 	}
+
+	stop_ibs();
 }
 
+#define IBSCTL_LVTOFFSETVAL             (1 << 8)
+#define APIC_EILVT_MSG_NMI              0x4
+#define APIC_EILVT_LVTOFF_IBS           1
+#define APIC_EILVTn(n)                  (0x500 + 0x10 * n)
+static inline void init_ibs_nmi_per_cpu(void *arg)
+{
+	unsigned long reg;
+
+	reg = (APIC_EILVT_LVTOFF_IBS << 4) + APIC_EILVTn(0);
+	apic_write(reg, APIC_EILVT_MSG_NMI << 8);
+}
+
+#define PCI_VENDOR_ID_AMD               0x1022
+#define PCI_DEVICE_ID_AMD_10H_NB_MISC   0x1203
+#define IBSCTL                          0x1cc
+static int init_ibs_nmi(void)
+{
+	int bus, dev, func;
+	u32 id, value;
+	u16 vendor_id, dev_id;
+	int nodes;
+
+	/* per CPU setup */
+	on_each_cpu(init_ibs_nmi_per_cpu, NULL, 1);
+
+	nodes = 0;
+	for (bus = 0; bus < 256; bus++) {
+		for (dev = 0; dev < 32; dev++) {
+			for (func = 0; func < 8; func++) {
+				id = pci_conf_read32(bus, dev, func, PCI_VENDOR_ID);
+
+				if ((id == 0xffffffff) || (id == 0x00000000) ||
+					(id == 0x0000ffff) || (id == 0xffff0000))
+					continue;
+
+				vendor_id = id & 0xffff;
+				dev_id = (id >> 16) & 0xffff;
+
+				if ((vendor_id == PCI_VENDOR_ID_AMD) &&
+					(dev_id == PCI_DEVICE_ID_AMD_10H_NB_MISC)) {
+
+					pci_conf_write32(bus, dev, func, IBSCTL,
+						IBSCTL_LVTOFFSETVAL | APIC_EILVT_LVTOFF_IBS);
+
+					value = pci_conf_read32(bus, dev, func, IBSCTL);
+
+					if (value != (IBSCTL_LVTOFFSETVAL |
+						APIC_EILVT_LVTOFF_IBS)) {
+						printk("Xenoprofile: Failed to setup IBS LVT offset, "
+							"IBSCTL = 0x%08x", value);
+						return 1;
+					}
+					nodes++;
+				}
+			}
+		}
+	}
+
+	if (!nodes) {
+		printk("Xenoprofile: No CPU node configured for IBS");
+		return 1;
+	}
+
+	return 0;
+}
+
+static u32 get_ibs_caps(void)
+{
+#ifdef	CONFIG_X86_32
+	return 0;
+#else
+	unsigned int max_level;
+
+	if (!boot_cpu_has(X86_FEATURE_IBS))
+		return 0;
+
+    /* check IBS cpuid feature flags */
+	max_level = cpuid_eax(0x80000000);
+	if (max_level < IBS_CPUID_FEATURES)
+		return IBS_CAPS_AVAIL;
+
+	ibs_caps = cpuid_eax(IBS_CPUID_FEATURES);
+	if (!(ibs_caps & IBS_CAPS_AVAIL))
+		/* cpuid flags not valid */
+		return IBS_CAPS_AVAIL;
+
+	return ibs_caps;
+#endif
+}
+
+u32 ibs_init(void)
+{
+	u32 ibs_caps = 0;
+
+	ibs_caps = get_ibs_caps();
+
+	if ( !ibs_caps )
+		return 0;
+
+	if (init_ibs_nmi()) {
+		ibs_caps = 0;
+		return 0;
+	}
+
+	printk("Xenoprofile: AMD IBS detected (0x%08x)\n",
+		(unsigned)ibs_caps);
+	return ibs_caps;
+}
 
 struct op_x86_model_spec const op_athlon_spec = {
 	.num_counters = NUM_COUNTERS,

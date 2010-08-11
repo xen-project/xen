@@ -235,7 +235,7 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
             /* Get MFN of ring page */
             guest_get_eff_l1e(v, ring_addr, &l1e);
             gfn = l1e_get_pfn(l1e);
-            ring_mfn = gfn_to_mfn(dom_mem_event, gfn, &p2mt);
+            ring_mfn = gfn_to_mfn(p2m_get_hostp2m(dom_mem_event), gfn, &p2mt);
 
             rc = -EINVAL;
             if ( unlikely(!mfn_valid(mfn_x(ring_mfn))) )
@@ -244,7 +244,7 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
             /* Get MFN of shared page */
             guest_get_eff_l1e(v, shared_addr, &l1e);
             gfn = l1e_get_pfn(l1e);
-            shared_mfn = gfn_to_mfn(dom_mem_event, gfn, &p2mt);
+            shared_mfn = gfn_to_mfn(p2m_get_hostp2m(dom_mem_event), gfn, &p2mt);
 
             rc = -EINVAL;
             if ( unlikely(!mfn_valid(mfn_x(shared_mfn))) )

@@ -440,14 +440,21 @@ void io_apic_write_remap_rte(
     {
         *IO_APIC_BASE(apic) = rte_upper ? (reg + 1) : reg;
         *(IO_APIC_BASE(apic)+4) = value;
+
+        /* Recover the original value of 'mask' bit */
+        if ( rte_upper )
+        {
+            *IO_APIC_BASE(apic) = reg;
+            *(IO_APIC_BASE(apic)+4) = *(((u32 *)&old_rte)+0);
+        }
         return;
     }
 
     /* write new entry to ioapic */
-    *IO_APIC_BASE(apic) = reg;
-    *(IO_APIC_BASE(apic)+4) = *(((u32 *)&old_rte)+0);
     *IO_APIC_BASE(apic) = reg + 1;
     *(IO_APIC_BASE(apic)+4) = *(((u32 *)&old_rte)+1);
+    *IO_APIC_BASE(apic) = reg;
+    *(IO_APIC_BASE(apic)+4) = *(((u32 *)&old_rte)+0);
 }
 
 #if defined(__i386__) || defined(__x86_64__)

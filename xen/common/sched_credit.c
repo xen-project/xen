@@ -64,7 +64,8 @@
 /*
  * Flags
  */
-#define CSCHED_FLAG_VCPU_PARKED 0x0001  /* VCPU over capped credits */
+#define CSCHED_FLAG_VCPU_PARKED    0x0001  /* VCPU over capped credits */
+#define CSCHED_FLAG_VCPU_YIELD     0x0002  /* VCPU yielding */
 
 
 /*
@@ -106,6 +107,12 @@
 
 #endif /* CSCHED_STATS */
 
+
+/*
+ * Boot parameters
+ */
+int sched_credit_default_yield = 0;
+boolean_param("sched_credit_default_yield", sched_credit_default_yield);
 
 /*
  * Physical CPU
@@ -200,6 +207,18 @@ __runq_insert(unsigned int cpu, struct csched_vcpu *svc)
         const struct csched_vcpu * const iter_svc = __runq_elem(iter);
         if ( svc->pri > iter_svc->pri )
             break;
+    }
+
+    /* If the vcpu yielded, try to put it behind one lower-priority
+     * runnable vcpu if we can.  The next runq_sort will bring it forward
+     * within 30ms if the queue too long. */
+    if ( svc->flags & CSCHED_FLAG_VCPU_YIELD
+         && __runq_elem(iter)->pri > CSCHED_PRI_IDLE )
+    {
+        iter=iter->next;
+
+        /* Some sanity checks */
+        BUG_ON(iter == runq);
     }
 
     list_add_tail(&svc->runq_elem, iter);
@@ -748,6 +767,18 @@ csched_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
     __runq_tickle(cpu, svc);
 }
 
+static void
+csched_vcpu_yield(const struct scheduler *ops, struct vcpu *vc)
+{
+    struct csched_vcpu * const sv = CSCHED_VCPU(vc);
+
+    if ( !sched_credit_default_yield )
+    {
+        /* Let the scheduler know that this vcpu is trying to yield */
+        sv->flags |= CSCHED_FLAG_VCPU_YIELD;
+    }
+}
+
 static int
 csched_dom_cntl(
     const struct scheduler *ops,
@@ -1069,7 +1100,9 @@ csched_acct(void* dummy)
                 if ( credit > CSCHED_CREDITS_PER_TSLICE )
                 {
                     __csched_vcpu_acct_stop_locked(prv, svc);
-                    credit = 0;
+                    /* Divide credits in half, so that when it starts
+                     * accounting again, it starts a little bit "ahead" */
+                    credit /= 2;
                     atomic_set(&svc->credit, credit);
                 }
             }
@@ -1280,6 +1313,12 @@ csched_schedule(
         snext = CSCHED_VCPU(idle_vcpu[cpu]);
         snext->pri = CSCHED_PRI_TS_BOOST;
     }
+
+    /*
+     * Clear YIELD flag before scheduling out
+     */
+    if ( scurr->flags & CSCHED_FLAG_VCPU_YIELD )
+        scurr->flags &= ~(CSCHED_FLAG_VCPU_YIELD);
 
     /*
      * SMP Load balance:
@@ -1509,6 +1548,7 @@ const struct scheduler sched_credit_def = {
 
     .sleep          = csched_vcpu_sleep,
     .wake           = csched_vcpu_wake,
+    .yield          = csched_vcpu_yield,
 
     .adjust         = csched_dom_cntl,
 

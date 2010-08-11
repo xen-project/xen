@@ -264,7 +264,7 @@ process_mce:
         ALIGN
 /* %ebx: struct vcpu */
 process_nmi:
-        cmpw $1 << VCPU_TRAP_NMI,VCPU_async_exception_mask(%ebx)
+        testb $1 << VCPU_TRAP_NMI,VCPU_async_exception_mask(%ebx)
         jnz  test_guest_events
         sti
         movb $0,VCPU_nmi_pending(%ebx)
