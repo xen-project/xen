@@ -76,7 +76,7 @@ build: $(ACM_INST_TOOLS) $(ACM_NOINST_TOOLS)
 	chmod 700 $(ACM_SCRIPTS)
 
 xensec_tool: $(OBJS_TOOL)
-	$(CC) -g $(CFLAGS) $(LDFLAGS) -O0 -o $@ $^ $(LDFLAGS_libxenctrl)
+	$(CC) -g $(CFLAGS) $(LDFLAGS) -O0 -o $@ $^ $(LDLIBS_libxenctrl)
 
 xensec_gen: xensec_gen.py
 	cp -f $^ $@

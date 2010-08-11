@@ -8,7 +8,7 @@ SONAME   = libblktap.so.$(MAJOR)
 CFLAGS   += -I.
 CFLAGS   += $(CFLAGS_libxenctrl)
 CFLAGS   += $(CFLAGS_libxenstore)
-LDFLAGS  += $(LDFLAGS_libxenstore)
+LDLIBS   += $(LDLIBS_libxenstore)
 
 SRCS     :=
 SRCS     += xenbus.c blkif.c xs_api.c
@@ -46,8 +46,8 @@ clean:
 	rm -rf *.a *.so* *.o *.opic *.rpm $(LIB) *~ $(DEPS) xen TAGS
 
 libblktap.so.$(MAJOR).$(MINOR): $(OBJS_PIC) 
-	$(CC) $(CFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,$(SONAME) $(SHLIB_CFLAGS) \
-	      $(LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,$(SONAME) $(SHLIB_LDFLAGS) \
+	      -o $@ $^ $(LDLIBS)
 	ln -sf libblktap.so.$(MAJOR).$(MINOR) libblktap.so.$(MAJOR)
 	ln -sf libblktap.so.$(MAJOR) libblktap.so
 

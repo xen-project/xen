@@ -145,7 +145,7 @@ libxenctrl.so.$(MAJOR): libxenctrl.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
 libxenctrl.so.$(MAJOR).$(MINOR): $(CTRL_PIC_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenctrl.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $^ $(PTHREAD_LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenctrl.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(PTHREAD_LIBS)
 
 # libxenguest
 
@@ -181,7 +181,7 @@ xc_dom_bzimageloader.opic: CFLAGS += $(call zlib-options,D)
 
 libxenguest.so.$(MAJOR).$(MINOR): COMPRESSION_LIBS = $(call zlib-options,l)
 libxenguest.so.$(MAJOR).$(MINOR): $(GUEST_PIC_OBJS) libxenctrl.so
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenguest.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $(GUEST_PIC_OBJS) $(COMPRESSION_LIBS) -lz -lxenctrl $(PTHREAD_LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenguest.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $(GUEST_PIC_OBJS) $(COMPRESSION_LIBS) -lz -lxenctrl $(PTHREAD_LIBS)
 
 -include $(DEPS)
 

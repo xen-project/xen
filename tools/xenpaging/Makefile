@@ -4,7 +4,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 CFLAGS   += -I $(XEN_XC)
 CFLAGS   += -I ./
 CFLAGS   += $(CFLAGS_libxenctrl) $(CFLAGS_libxenstore)
-LDFLAGS  += $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenstore)
+LDLIBS  += $(LDLIBS_libxenctrl) $(LDLIBS_libxenstore)
 
 POLICY    = default
 
@@ -15,11 +15,8 @@ CFLAGS   += -Werror
 CFLAGS   += -Wno-unused
 CFLAGS   += -g
 
-#CFLAGS   += -Wl,-rpath,..
 CFLAGS   += -Wp,-MD,.$(@F).d
 DEPS     = .*.d
-
-#LDFLAGS  += $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenguest)
 
 OBJS     = $(SRCS:.c=.o)
 IBINS    = xenpaging
@@ -27,7 +24,7 @@ IBINS    = xenpaging
 all: $(IBINS)
 
 xenpaging: $(OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 install: all
 	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)

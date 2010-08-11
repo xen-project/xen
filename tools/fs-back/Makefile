@@ -14,8 +14,8 @@ CFLAGS   += $(INCLUDES) -I.
 CFLAGS   += -D_GNU_SOURCE
 
 LIBS      := -L. -L.. -L../lib
-LIBS      += $(LDFLAGS_libxenctrl)
-LIBS      += $(LDFLAGS_libxenstore)
+LIBS      += $(LDLIBS_libxenctrl)
+LIBS      += $(LDLIBS_libxenstore)
 LIBS      += -lrt -lpthread
 
 OBJS	  := fs-xenbus.o fs-ops.o

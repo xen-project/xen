@@ -18,16 +18,16 @@ XEN_BLKTAP2        = $(XEN_ROOT)/tools/blktap2
 CFLAGS_include = -I$(XEN_INCLUDE)
 
 CFLAGS_libxenctrl = -I$(XEN_LIBXC) $(CFLAGS_include)
-LDFLAGS_libxenctrl = -L$(XEN_LIBXC) -lxenctrl
+LDLIBS_libxenctrl = -L$(XEN_LIBXC) -lxenctrl
 
 CFLAGS_libxenguest = -I$(XEN_LIBXC) $(CFLAGS_include)
-LDFLAGS_libxenguest = -L$(XEN_LIBXC) -lxenguest
+LDLIBS_libxenguest = -L$(XEN_LIBXC) -lxenguest
 
 CFLAGS_libxenstore = -I$(XEN_XENSTORE) $(CFLAGS_include)
-LDFLAGS_libxenstore = -L$(XEN_XENSTORE) -lxenstore
+LDLIBS_libxenstore = -L$(XEN_XENSTORE) -lxenstore
 
 CFLAGS_libblktapctl = -I$(XEN_BLKTAP2)/control -I$(XEN_BLKTAP2)/include $(CFLAGS_include)
-LDFLAGS_libblktapctl = -L$(XEN_BLKTAP2)/control -lblktapctl
+LDLIBS_libblktapctl = -L$(XEN_BLKTAP2)/control -lblktapctl
 
 X11_LDPATH = -L/usr/X11R6/$(LIBLEAFDIR)
 

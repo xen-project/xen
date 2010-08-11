@@ -15,7 +15,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 CFLAGS  += -Werror
 CFLAGS  += $(CFLAGS_libxenstore)
 CPPFLAGS += -DXEN_SCRIPT_DIR="\"$(XEN_SCRIPT_DIR)\""
-LDFLAGS += $(LDFLAGS_libxenstore)
+LDLIBS  += $(LDLIBS_libxenstore)
 
 SBIN = xenbackendd
 
@@ -36,6 +36,6 @@ clean:
 
 
 %: %.c Makefile
-	$(CC) $(CFLAGS) $(CPPFLAGS) $< $(LDFLAGS) -o $@
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS) $< -o $@ $(LDLIBS)
 
 -include $(DEPS)

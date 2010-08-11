@@ -51,7 +51,7 @@ CURSES_LIBS = -lcurses
 PTHREAD_LIBS = -lpthread
 UTIL_LIBS =
 SONAME_LDFLAG = -h
-SHLIB_CFLAGS = -R $(SunOS_LIBDIR) -shared
+SHLIB_LDFLAGS = -R $(SunOS_LIBDIR) -shared
 
 ifneq ($(debug),y)
 CFLAGS += -O2 -fno-omit-frame-pointer

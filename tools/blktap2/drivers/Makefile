@@ -25,7 +25,7 @@ endif
 
 LIBS      += -lrt -lz
 
-LDFLAGS_img := $(LDFLAGS_libxenctrl) $(CRYPT_LIB) -lpthread -lz -lm
+LBLIBS_img := $(LDLIBS_libxenctrl) $(CRYPT_LIB) -lpthread -lz -lm
 
 LIBS += -L$(LIBVHDDIR) -lvhd
 
@@ -93,16 +93,16 @@ all: $(IBIN) lock-util qcow-util
 
 
 tapdisk2: $(TAP-OBJS-y) $(BLK-OBJS-y) $(MISC-OBJS-y) tapdisk2.c
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(AIOLIBS) $(MEMSHRLIBS) $(LDFLAGS_img)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(AIOLIBS) $(MEMSHRLIBS) $(LBLIBS_img)
 
 tapdisk-client: tapdisk-client.o
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)  $(LDFLAGS_img)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)  $(LBLIBS_img)
 
 tapdisk-stream tapdisk-diff: %: %.o $(TAP-OBJS-y) $(BLK-OBJS-y)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(AIOLIBS) $(MEMSHRLIBS) $(LDFLAGS_img)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(AIOLIBS) $(MEMSHRLIBS) $(LBLIBS_img)
 
 td-util: td.o tapdisk-utils.o tapdisk-log.o $(PORTABLE-OBJS-y)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)  $(LDFLAGS_img)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)  $(LBLIBS_img)
 
 lock-util: lock.c
 	$(CC) $(CFLAGS) -DUTIL -o lock-util lock.c $(LDFLAGS) $(LIBS)
@@ -111,7 +111,7 @@ lock-util: lock.c
 qcow-util: img2qcow qcow2raw qcow-create
 
 img2qcow qcow2raw qcow-create: %: %.o $(TAP-OBJS-y) $(BLK-OBJS-y)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(AIOLIBS) $(MEMSHRLIBS) $(LDFLAGS_img)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(AIOLIBS) $(MEMSHRLIBS) $(LBLIBS_img)
 
 install: all
 	$(INSTALL_DIR) -p $(DESTDIR)$(INST_DIR)

@@ -2,7 +2,7 @@ XEN_ROOT = ../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 CFLAGS  += $(CFLAGS_libxenctrl)
-LDFLAGS += $(LDFLAGS_libxenctrl)
+LDLIBS += $(LDLIBS_libxenctrl)
 
 SUBDIRS-y :=
 SUBDIRS-y += include
