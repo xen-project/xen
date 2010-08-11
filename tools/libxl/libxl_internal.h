@@ -25,6 +25,14 @@
 #include <xenctrl.h>
 #include "xentoollog.h"
 
+#if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 1)
+#define _hidden __attribute__((visibility("hidden")))
+#define _protected __attribute__((visibility("protected")))
+#else
+#define _hidden
+#define _protected
+#endif
+
 #include "flexarray.h"
 #include "libxl_utils.h"
 
@@ -51,13 +59,13 @@
   /* all of these macros preserve errno (saving and restoring) */
 
 /* logging */
-void xl_logv(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
+_hidden void xl_logv(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
              const char *file /* may be 0 */, int line /* ignored if !file */,
              const char *func /* may be 0 */,
              char *fmt, va_list al)
      __attribute__((format(printf,7,0)));
 
-void xl_log(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
+_hidden void xl_log(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
             const char *file /* may be 0 */, int line /* ignored if !file */,
             const char *func /* may be 0 */,
             char *fmt, ...)
@@ -104,74 +112,74 @@ typedef struct {
                 (u)[0], (u)[1], (u)[2], (u)[3], (u)[4], (u)[5], (u)[6], (u)[7], \
                 (u)[8], (u)[9], (u)[10], (u)[11], (u)[12], (u)[13], (u)[14], (u)[15])
 
-int xs_writev(struct xs_handle *xsh, xs_transaction_t t, char *dir, char *kvs[]);
+_hidden int xs_writev(struct xs_handle *xsh, xs_transaction_t t, char *dir, char *kvs[]);
 
 /* memory allocation tracking/helpers */
-int libxl_ptr_add(libxl_ctx *ctx, void *ptr);
-void libxl_free(libxl_ctx *ctx, void *ptr);
-void libxl_free_all(libxl_ctx *ctx);
-void *libxl_zalloc(libxl_ctx *ctx, int bytes);
-void *libxl_calloc(libxl_ctx *ctx, size_t nmemb, size_t size);
-char *libxl_sprintf(libxl_ctx *ctx, const char *fmt, ...) PRINTF_ATTRIBUTE(2, 3);
-char *libxl_strdup(libxl_ctx *ctx, const char *c);
-char *libxl_dirname(libxl_ctx *ctx, const char *s);
+_hidden int libxl_ptr_add(libxl_ctx *ctx, void *ptr);
+_hidden void libxl_free(libxl_ctx *ctx, void *ptr);
+_hidden void libxl_free_all(libxl_ctx *ctx);
+_hidden void *libxl_zalloc(libxl_ctx *ctx, int bytes);
+_hidden void *libxl_calloc(libxl_ctx *ctx, size_t nmemb, size_t size);
+_hidden char *libxl_sprintf(libxl_ctx *ctx, const char *fmt, ...) PRINTF_ATTRIBUTE(2, 3);
+_hidden char *libxl_strdup(libxl_ctx *ctx, const char *c);
+_hidden char *libxl_dirname(libxl_ctx *ctx, const char *s);
 
-char **libxl_xs_kvs_of_flexarray(libxl_ctx *ctx, flexarray_t *array, int length);
-int libxl_xs_writev(libxl_ctx *ctx, xs_transaction_t t,
+_hidden char **libxl_xs_kvs_of_flexarray(libxl_ctx *ctx, flexarray_t *array, int length);
+_hidden int libxl_xs_writev(libxl_ctx *ctx, xs_transaction_t t,
                     char *dir, char **kvs);
-int libxl_xs_write(libxl_ctx *ctx, xs_transaction_t t,
+_hidden int libxl_xs_write(libxl_ctx *ctx, xs_transaction_t t,
                    char *path, char *fmt, ...) PRINTF_ATTRIBUTE(4, 5);
-char *libxl_xs_get_dompath(libxl_ctx *ctx, uint32_t domid); // logs errs
-char *libxl_xs_read(libxl_ctx *ctx, xs_transaction_t t, char *path);
-char **libxl_xs_directory(libxl_ctx *ctx, xs_transaction_t t, char *path, unsigned int *nb);
+_hidden char *libxl_xs_get_dompath(libxl_ctx *ctx, uint32_t domid); // logs errs
+_hidden char *libxl_xs_read(libxl_ctx *ctx, xs_transaction_t t, char *path);
+_hidden char **libxl_xs_directory(libxl_ctx *ctx, xs_transaction_t t, char *path, unsigned int *nb);
 
 /* from xl_dom */
-int is_hvm(libxl_ctx *ctx, uint32_t domid);
-int get_shutdown_reason(libxl_ctx *ctx, uint32_t domid);
+_hidden int is_hvm(libxl_ctx *ctx, uint32_t domid);
+_hidden int get_shutdown_reason(libxl_ctx *ctx, uint32_t domid);
 #define dominfo_get_shutdown_reason(info) (((info)->flags >> XEN_DOMINF_shutdownshift) & XEN_DOMINF_shutdownmask)
 
-int build_pre(libxl_ctx *ctx, uint32_t domid,
+_hidden int build_pre(libxl_ctx *ctx, uint32_t domid,
               libxl_domain_build_info *info, libxl_domain_build_state *state);
-int build_post(libxl_ctx *ctx, uint32_t domid,
+_hidden int build_post(libxl_ctx *ctx, uint32_t domid,
                libxl_domain_build_info *info, libxl_domain_build_state *state,
                char **vms_ents, char **local_ents);
 
-int build_pv(libxl_ctx *ctx, uint32_t domid,
+_hidden int build_pv(libxl_ctx *ctx, uint32_t domid,
              libxl_domain_build_info *info, libxl_domain_build_state *state);
-int build_hvm(libxl_ctx *ctx, uint32_t domid,
+_hidden int build_hvm(libxl_ctx *ctx, uint32_t domid,
               libxl_domain_build_info *info, libxl_domain_build_state *state);
 
-int restore_common(libxl_ctx *ctx, uint32_t domid,
+_hidden int restore_common(libxl_ctx *ctx, uint32_t domid,
                    libxl_domain_build_info *info, libxl_domain_build_state *state, int fd);
-int core_suspend(libxl_ctx *ctx, uint32_t domid, int fd, int hvm, int live, int debug);
-int save_device_model(libxl_ctx *ctx, uint32_t domid, int fd);
-void libxl__userdata_destroyall(libxl_ctx *ctx, uint32_t domid);
+_hidden int core_suspend(libxl_ctx *ctx, uint32_t domid, int fd, int hvm, int live, int debug);
+_hidden int save_device_model(libxl_ctx *ctx, uint32_t domid, int fd);
+_hidden void libxl__userdata_destroyall(libxl_ctx *ctx, uint32_t domid);
 
 /* from xl_device */
-char *device_disk_backend_type_of_phystype(libxl_disk_phystype phystype);
-char *device_disk_string_of_phystype(libxl_disk_phystype phystype);
+_hidden char *device_disk_backend_type_of_phystype(libxl_disk_phystype phystype);
+_hidden char *device_disk_string_of_phystype(libxl_disk_phystype phystype);
 
-int device_physdisk_major_minor(const char *physpath, int *major, int *minor);
-int device_disk_dev_number(char *virtpath);
+_hidden int device_physdisk_major_minor(const char *physpath, int *major, int *minor);
+_hidden int device_disk_dev_number(char *virtpath);
 
-int libxl_device_generic_add(libxl_ctx *ctx, libxl_device *device,
+_hidden int libxl_device_generic_add(libxl_ctx *ctx, libxl_device *device,
                              char **bents, char **fents);
-int libxl_device_del(libxl_ctx *ctx, libxl_device *dev, int wait);
-int libxl_device_destroy(libxl_ctx *ctx, char *be_path, int force);
-int libxl_devices_destroy(libxl_ctx *ctx, uint32_t domid, int force);
-int libxl_wait_for_device_model(libxl_ctx *ctx,
+_hidden int libxl_device_del(libxl_ctx *ctx, libxl_device *dev, int wait);
+_hidden int libxl_device_destroy(libxl_ctx *ctx, char *be_path, int force);
+_hidden int libxl_devices_destroy(libxl_ctx *ctx, uint32_t domid, int force);
+_hidden int libxl_wait_for_device_model(libxl_ctx *ctx,
                                 uint32_t domid, char *state,
                                 int (*check_callback)(libxl_ctx *ctx,
                                                       uint32_t domid,
                                                       const char *state,
                                                       void *userdata),
                                 void *check_callback_userdata);
-int libxl_wait_for_backend(libxl_ctx *ctx, char *be_path, char *state);
-int libxl_device_pci_reset(libxl_ctx *ctx, unsigned int domain, unsigned int bus,
+_hidden int libxl_wait_for_backend(libxl_ctx *ctx, char *be_path, char *state);
+_hidden int libxl_device_pci_reset(libxl_ctx *ctx, unsigned int domain, unsigned int bus,
                            unsigned int dev, unsigned int func);
 
 /* from xenguest (helper */
-int hvm_build_set_params(xc_interface *handle, uint32_t domid,
+_hidden int hvm_build_set_params(xc_interface *handle, uint32_t domid,
                          libxl_domain_build_info *info,
                          int store_evtchn, unsigned long *store_mfn,
                          int console_evtchn, unsigned long *console_mfn);
@@ -193,7 +201,7 @@ struct libxl_device_model_starting {
     int domid;
 };
 
-int libxl_spawn_spawn(libxl_ctx *ctx,
+_hidden int libxl_spawn_spawn(libxl_ctx *ctx,
                       libxl_device_model_starting *starting,
                       const char *what,
                       void (*intermediate_hook)(void *for_spawn, pid_t innerchild));
@@ -203,11 +211,11 @@ int libxl_spawn_spawn(libxl_ctx *ctx,
    *    0   caller is now the inner child, should probably call libxl_exec
    * Caller, may pass 0 for for_spawn, in which case no need to detach.
    */
-int libxl_spawn_detach(libxl_ctx *ctx,
+_hidden int libxl_spawn_detach(libxl_ctx *ctx,
                        libxl_spawn_starting *for_spawn);
   /* Logs errors.  Idempotent, but only permitted after successful
    * call to libxl_spawn_spawn, and no point calling it again if it fails. */
-int libxl_spawn_check(libxl_ctx *ctx,
+_hidden int libxl_spawn_check(libxl_ctx *ctx,
                       void *for_spawn);
   /* Logs errors but also returns them.
    * for_spawn must actually be a  libxl_spawn_starting*  but
@@ -216,19 +224,19 @@ int libxl_spawn_check(libxl_ctx *ctx,
 
  /* low-level stuff, for synchronous subprocesses etc. */
 
-void libxl_exec(int stdinfd, int stdoutfd, int stderrfd, char *arg0, char **args); // logs errors, never returns
-void libxl_log_child_exitstatus(libxl_ctx *ctx,
+_hidden void libxl_exec(int stdinfd, int stdoutfd, int stderrfd, char *arg0, char **args); // logs errors, never returns
+_hidden void libxl_log_child_exitstatus(libxl_ctx *ctx,
                                 const char *what, pid_t pid, int status);
 
-char *libxl_abs_path(libxl_ctx *ctx, char *s, const char *path);
+_hidden char *libxl_abs_path(libxl_ctx *ctx, char *s, const char *path);
 
 #define XL_LOG_DEBUG   XTL_DEBUG
 #define XL_LOG_INFO    XTL_INFO
 #define XL_LOG_WARNING XTL_WARN
 #define XL_LOG_ERROR   XTL_ERROR
 
-char *_libxl_domid_to_name(libxl_ctx *ctx, uint32_t domid);
-char *_libxl_poolid_to_name(libxl_ctx *ctx, uint32_t poolid);
+_hidden char *_libxl_domid_to_name(libxl_ctx *ctx, uint32_t domid);
+_hidden char *_libxl_poolid_to_name(libxl_ctx *ctx, uint32_t poolid);
 
 #endif
 
