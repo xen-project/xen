@@ -2722,6 +2722,8 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
     xc_domaininfo_t domaininfo;
     xc_vcpuinfo_t vcpuinfo;
     xc_physinfo_t physinfo = { 0 };
+    uint64_t *cpumaps;
+    unsigned num_cpuwords;
 
     if (xc_domain_getinfolist(ctx->xch, domid, 1, &domaininfo) != 1) {
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "getting infolist");
@@ -2732,14 +2734,15 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
         return NULL;
     }
     *nrcpus = physinfo.max_cpu_id + 1;
-    ptr = libxl_calloc(ctx, domaininfo.max_vcpu_id + 1, sizeof (libxl_vcpuinfo));
+    ret = ptr = calloc(domaininfo.max_vcpu_id + 1, sizeof (libxl_vcpuinfo));
     if (!ptr) {
         return NULL;
     }
 
-    ret = ptr;
+    num_cpuwords = ((physinfo.max_cpu_id + 64) / 64);
+    cpumaps = calloc(num_cpuwords * sizeof(*cpumaps), domaininfo.max_vcpu_id + 1);
     for (*nb_vcpu = 0; *nb_vcpu <= domaininfo.max_vcpu_id; ++*nb_vcpu, ++ptr) {
-        ptr->cpumap = libxl_calloc(ctx, (*nrcpus + 63) / 64, sizeof (uint64_t));
+        ptr->cpumap = cpumaps + (num_cpuwords * *nb_vcpu);
         if (!ptr->cpumap) {
             return NULL;
         }
@@ -2760,6 +2763,13 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
         ptr->vcpu_time = vcpuinfo.cpu_time;
     }
     return ret;
+}
+
+void libxl_free_vcpu_list(libxl_vcpuinfo *vcpu)
+{
+    if ( vcpu )
+        free(vcpu[0].cpumap);
+    free(vcpu);
 }
 
 int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
