@@ -116,7 +116,7 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE(void) compat)
 
             start_extent = cmp.xchg.nr_exchanged;
             end_extent = (COMPAT_ARG_XLAT_SIZE - sizeof(*nat.xchg)) /
-                         (((1U << __builtin_abs(order_delta)) + 1) *
+                         (((1U << ABS(order_delta)) + 1) *
                           sizeof(*space));
             if ( end_extent == 0 )
             {
