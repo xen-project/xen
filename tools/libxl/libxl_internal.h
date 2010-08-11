@@ -108,8 +108,8 @@ int xs_writev(struct xs_handle *xsh, xs_transaction_t t, char *dir, char *kvs[])
 
 /* memory allocation tracking/helpers */
 int libxl_ptr_add(libxl_ctx *ctx, void *ptr);
-int libxl_free(libxl_ctx *ctx, void *ptr);
-int libxl_free_all(libxl_ctx *ctx);
+void libxl_free(libxl_ctx *ctx, void *ptr);
+void libxl_free_all(libxl_ctx *ctx);
 void *libxl_zalloc(libxl_ctx *ctx, int bytes);
 void *libxl_calloc(libxl_ctx *ctx, size_t nmemb, size_t size);
 char *libxl_sprintf(libxl_ctx *ctx, const char *fmt, ...) PRINTF_ATTRIBUTE(2, 3);
