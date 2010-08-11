@@ -37,7 +37,7 @@ libfsimage.so.$(MAJOR): libfsimage.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
 libfsimage.so.$(MAJOR).$(MINOR): $(PIC_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libfsimage.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $^ -lpthread
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libfsimage.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ -lpthread
 
 -include $(DEPS)
 

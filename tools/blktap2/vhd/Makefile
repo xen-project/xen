@@ -38,10 +38,10 @@ LIBS_DEPENDS	  := lib/libvhd.so lib/vhd.a
 $(LIBS_DEPENDS):subdirs-all
 
 vhd-util: vhd-util.o $(LIBS_DEPENDS)
-	$(CC) $(CFLAGS) -o vhd-util vhd-util.o $(LDFLAGS) $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o vhd-util vhd-util.o $(LIBS)
 
 vhd-update: vhd-update.o $(LIBS_DEPENDS)
-	$(CC) $(CFLAGS) -o vhd-update vhd-update.o $(LDFLAGS) $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o vhd-update vhd-update.o $(LIBS)
 
 install: all
 	$(MAKE) subdirs-install

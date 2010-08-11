@@ -44,7 +44,7 @@ libxenapi.so.$(MAJOR): libxenapi.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
 libxenapi.so.$(MAJOR).$(MINOR): $(LIBXENAPI_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenapi.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenapi.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^
 
 libxenapi.a: $(LIBXENAPI_OBJS)
 	$(AR) rcs libxenapi.a $^

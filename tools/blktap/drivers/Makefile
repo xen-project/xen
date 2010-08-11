@@ -29,8 +29,8 @@ CFLAGS += -DMEMSHR
 MEMSHRLIBS += $(MEMSHR_DIR)/libmemshr.a
 endif
 
-LDFLAGS_blktapctrl := $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenstore) $(MEMSHRLIBS) -L../lib -lblktap -lrt -lm -lpthread
-LDFLAGS_img := $(LIBAIO_DIR)/libaio.a $(CRYPT_LIB) -lpthread -lz
+LDLIBS_blktapctrl := $(MEMSHRLIBS) $(LDLIBS_libxenctrl) $(LDLIBS_libxenstore) -L../lib -lblktap -lrt -lm -lpthread
+LDLIBS_img := $(LIBAIO_DIR)/libaio.a $(CRYPT_LIB) -lpthread -lz
 
 BLK-OBJS-y  := block-aio.o
 BLK-OBJS-y  += block-sync.o
@@ -48,16 +48,16 @@ BLKTAB-OBJS-$(CONFIG_Linux) += blktapctrl_linux.o
 all: $(IBIN) qcow-util
 
 blktapctrl: $(BLKTAB-OBJS-y)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LDFLAGS_blktapctrl)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS_blktapctrl)
 
 tapdisk: tapdisk.o $(BLK-OBJS-y)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LDFLAGS_img)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS_img)
 
 .PHONY: qcow-util
 qcow-util: img2qcow qcow2raw qcow-create
 
 img2qcow qcow2raw qcow-create: %: %.o $(BLK-OBJS-y)
-	$(CC) $(CFLAGS) -o $* $^ $(LDFLAGS) $(LDFLAGS_img)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $* $^ $(LDLIBS_img)
 
 install: all
 	$(INSTALL_PROG) $(IBIN) $(QCOW_UTIL) $(VHD_UTIL) $(DESTDIR)$(SBINDIR)

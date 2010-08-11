@@ -52,7 +52,7 @@ libxutil.so.$(MAJOR): libxutil.so.$(MAJOR).$(MINOR)
 	ln -sf $^ $@
 
 libxutil.so.$(MAJOR).$(MINOR): $(PIC_OBJS)
-	$(CC) $(CFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxutil.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxutil.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^
 
 libxutil.a: $(LIB_OBJS)
 	$(AR) rc $@ $^

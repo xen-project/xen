@@ -59,7 +59,7 @@ CURSES_LIBS = -lncurses
 PTHREAD_LIBS = -lpthread
 UTIL_LIBS = -lutil
 SONAME_LDFLAG = -soname
-SHLIB_CFLAGS = -shared
+SHLIB_LDFLAGS = -shared
 
 ifneq ($(debug),y)
 CFLAGS += -O2 -fomit-frame-pointer

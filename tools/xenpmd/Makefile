@@ -3,7 +3,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 CFLAGS  += -Werror
 CFLAGS  += $(CFLAGS_libxenstore)
-LDFLAGS += $(LDFLAGS_libxenstore)
+LDLIBS += $(LDLIBS_libxenstore)
 
 BIN      = xenpmd
 
@@ -20,6 +20,6 @@ clean:
 	$(RM) -f $(BIN) $(DEPS)
 
 %: %.c Makefile
-	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $< -o $@ $(LDLIBS)
 
 -include $(DEPS)

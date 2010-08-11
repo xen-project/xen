@@ -13,8 +13,7 @@
  * GNU Lesser General Public License for more details.
  */
 
-#include <stdlib.h>
-#include "flexarray.h"
+#include "libxl_internal.h"
 
 flexarray_t *flexarray_make(int size, int autogrow)
 {

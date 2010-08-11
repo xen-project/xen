@@ -228,7 +228,7 @@ static int libxl_create_pci_backend(libxl_ctx *ctx, uint32_t domid, libxl_device
     flexarray_set(back, boffset++, "state");
     flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", 1));
     flexarray_set(back, boffset++, "domain");
-    flexarray_set(back, boffset++, libxl_domid_to_name(ctx, domid));
+    flexarray_set(back, boffset++, _libxl_domid_to_name(ctx, domid));
     for (i = 0; i < num; i++) {
         flexarray_set(back, boffset++, libxl_sprintf(ctx, "key-%d", i));
         flexarray_set(back, boffset++, libxl_sprintf(ctx, PCI_BDF, pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func));

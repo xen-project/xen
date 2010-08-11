@@ -4,7 +4,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 CFLAGS  += -Werror
 
 CFLAGS  += $(CFLAGS_libxenctrl)
-LDFLAGS += $(LDFLAGS_libxenctrl)
+LDLIBS += $(LDLIBS_libxenctrl)
 
 HDRS     = $(wildcard *.h)
 OBJS     = $(patsubst %.c,%.o,$(wildcard *.c))
@@ -50,9 +50,9 @@ clean:
 	$(RM) *.a *.so *.o *.rpm $(BIN) $(LIBBIN) $(DEPS)
 
 %: %.c $(HDRS) Makefile
-	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LDLIBS)
 xentrace_%: %.c $(HDRS) Makefile
-	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LDLIBS)
 
 -include $(DEPS)
 

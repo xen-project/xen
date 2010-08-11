@@ -59,26 +59,26 @@ int libxl_ptr_add(libxl_ctx *ctx, void *ptr)
     return 0;
 }
 
-int libxl_free(libxl_ctx *ctx, void *ptr)
+void libxl_free(libxl_ctx *ctx, void *ptr)
 {
     int i;
 
     if (!ptr)
-        return 0;
+        return;
 
     /* remove the pointer from the tracked ptrs */
     for (i = 0; i < ctx->alloc_maxsize; i++) {
         if (ctx->alloc_ptrs[i] == ptr) {
             ctx->alloc_ptrs[i] = NULL;
             free(ptr);
-            return 0;
+            return;
         }
     }
     /* haven't find the pointer, really bad */
-    return -1;
+    abort();
 }
 
-int libxl_free_all(libxl_ctx *ctx)
+void libxl_free_all(libxl_ctx *ctx)
 {
     void *ptr;
     int i;
@@ -88,7 +88,6 @@ int libxl_free_all(libxl_ctx *ctx)
         ctx->alloc_ptrs[i] = NULL;
         free(ptr);
     }
-    return 0;
 }
 
 void *libxl_zalloc(libxl_ctx *ctx, int bytes)

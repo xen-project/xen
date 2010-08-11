@@ -20,7 +20,7 @@ OCAMLCFLAGS += -g $(OCAMLINCLUDE) -w F -warn-error F
 #LDFLAGS = -cclib -L./
 
 DESTDIR ?= /
-VERSION := echo 0.0
+VERSION := 4.1
 
 OCAMLABI = $(shell $(OCAMLC) -version)
 OCAMLLIBDIR = $(shell $(OCAMLC) -where)
