@@ -571,24 +571,46 @@ static u64 plt_stamp64;          /* 64-bit platform counter stamp           */
 static u64 plt_stamp;            /* hardware-width platform counter stamp   */
 static struct timer plt_overflow_timer;
 
-static void plt_overflow(void *unused)
-{
-    u64 count;
-
-    spin_lock_irq(&platform_timer_lock);
-    count = plt_src.read_counter();
-    plt_stamp64 += (count - plt_stamp) & plt_mask;
-    plt_stamp = count;
-    spin_unlock_irq(&platform_timer_lock);
-
-    set_timer(&plt_overflow_timer, NOW() + plt_overflow_period);
-}
-
 static s_time_t __read_platform_stime(u64 platform_time)
 {
     u64 diff = platform_time - platform_timer_stamp;
     ASSERT(spin_is_locked(&platform_timer_lock));
     return (stime_platform_stamp + scale_delta(diff, &plt_scale));
+}
+
+static void plt_overflow(void *unused)
+{
+    int i;
+    u64 count;
+    s_time_t now, plt_now, plt_wrap;
+
+    spin_lock_irq(&platform_timer_lock);
+
+    count = plt_src.read_counter();
+    plt_stamp64 += (count - plt_stamp) & plt_mask;
+    plt_stamp = count;
+
+    now = NOW();
+    plt_wrap = __read_platform_stime(plt_stamp64);
+    for ( i = 0; i < 10; i++ )
+    {
+        plt_now = plt_wrap;
+        plt_wrap = __read_platform_stime(plt_stamp64 + plt_mask + 1);
+        if ( ABS(plt_wrap - now) > ABS(plt_now - now) )
+            break;
+        plt_stamp64 += plt_mask + 1;
+    }
+    if ( i != 0 )
+    {
+        static bool_t warned_once;
+        if ( !test_and_set_bool(warned_once) )
+            printk("Platform timer appears to have unexpectedly wrapped "
+                   "%u%s times.\n", i, (i == 10) ? " or more" : "");
+    }
+
+    spin_unlock_irq(&platform_timer_lock);
+
+    set_timer(&plt_overflow_timer, NOW() + plt_overflow_period);
 }
 
 static s_time_t read_platform_stime(void)
