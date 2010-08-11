@@ -227,8 +227,7 @@ char *libxl_abs_path(libxl_ctx *ctx, char *s, const char *path);
 #define XL_LOG_WARNING XTL_WARN
 #define XL_LOG_ERROR   XTL_ERROR
 
-/* Error handling */
-int libxl_xc_error(int xc_err);
+char *_libxl_domid_to_name(libxl_ctx *ctx, uint32_t domid);
 
 #endif
 

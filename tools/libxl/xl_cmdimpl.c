@@ -2154,8 +2154,10 @@ void list_domains(int verbose, const libxl_dominfo *info, int nb_domain)
 
     printf("Name                                        ID   Mem VCPUs\tState\tTime(s)\n");
     for (i = 0; i < nb_domain; i++) {
+        char *domname;
+        domname = libxl_domid_to_name(&ctx, info[i].domid);
         printf("%-40s %5d %5lu %5d     %c%c%c%c%c%c  %8.1f",
-                libxl_domid_to_name(&ctx, info[i].domid),
+                domname,
                 info[i].domid,
                 (unsigned long) (info[i].max_memkb / 1024),
                 info[i].vcpu_online,
@@ -2166,6 +2168,7 @@ void list_domains(int verbose, const libxl_dominfo *info, int nb_domain)
                 info[i].shutdown_reason == SHUTDOWN_crash ? 'c' : '-',
                 info[i].dying ? 'd' : '-',
                 ((float)info[i].cpu_time / 1e9));
+        free(domname);
         if (verbose) {
             char *uuid = libxl_uuid2string(&ctx, info[i].uuid);
             printf(" %s", uuid);
@@ -2177,6 +2180,7 @@ void list_domains(int verbose, const libxl_dominfo *info, int nb_domain)
 void list_vm(void)
 {
     libxl_vminfo *info;
+    char *domname;
     int nb_vm, i;
 
     info = libxl_list_vm(&ctx, &nb_vm);
@@ -2187,12 +2191,14 @@ void list_vm(void)
     }
     printf("UUID                                  ID    name\n");
     for (i = 0; i < nb_vm; i++) {
+        domname = libxl_domid_to_name(&ctx, info[i].domid);
         printf(UUID_FMT "  %d    %-30s\n",
             info[i].uuid[0], info[i].uuid[1], info[i].uuid[2], info[i].uuid[3],
             info[i].uuid[4], info[i].uuid[5], info[i].uuid[6], info[i].uuid[7],
             info[i].uuid[8], info[i].uuid[9], info[i].uuid[10], info[i].uuid[11],
             info[i].uuid[12], info[i].uuid[13], info[i].uuid[14], info[i].uuid[15],
-            info[i].domid, libxl_domid_to_name(&ctx, info[i].domid));
+            info[i].domid, domname);
+        free(domname);
     }
     free(info);
 }
@@ -3197,10 +3203,13 @@ static void print_vcpuinfo(uint32_t tdomid,
     int i, l;
     uint64_t *cpumap;
     uint64_t pcpumap;
+    char *domname;
 
     /*      NAME  ID  VCPU */
+    domname = libxl_domid_to_name(&ctx, tdomid);
     printf("%-32s %5u %5u",
-           libxl_domid_to_name(&ctx, tdomid), tdomid, vcpuinfo->vcpuid);
+           domname, tdomid, vcpuinfo->vcpuid);
+    free(domname);
     if (!vcpuinfo->online) {
         /*      CPU STA */
         printf("%5c %3c%cp ", '-', '-', '-');
@@ -3608,11 +3617,14 @@ static int sched_credit_domain_set(
 static void sched_credit_domain_output(
     int domid, libxl_sched_credit *scinfo)
 {
+    char *domname;
+    domname = libxl_domid_to_name(&ctx, domid);
     printf("%-33s %4d %6d %4d\n",
-        libxl_domid_to_name(&ctx, domid),
+        domname,
         domid,
         scinfo->weight,
         scinfo->cap);
+    free(domname);
 }
 
 int main_sched_credit(int argc, char **argv)
@@ -3758,6 +3770,7 @@ int main_domname(int argc, char **argv)
     }
 
     printf("%s\n", domname);
+    free(domname);
 
     return 0;
 }
@@ -4519,6 +4532,7 @@ static void print_dom0_uptime(int short_mode, time_t now)
     uint32_t uptime = 0;
     char *uptime_str = NULL;
     char *now_str = NULL;
+    char *domname;
 
     fd = open("/proc/uptime", O_RDONLY);
     if (fd == -1)
@@ -4533,24 +4547,25 @@ static void print_dom0_uptime(int short_mode, time_t now)
     strtok(buf, " ");
     uptime = strtoul(buf, NULL, 10);
 
+    domname = libxl_domid_to_name(&ctx, 0);
     if (short_mode)
     {
         now_str = current_time_to_string(now);
         uptime_str = uptime_to_string(uptime, 1);
         printf(" %s up %s, %s (%d)\n", now_str, uptime_str,
-               libxl_domid_to_name(&ctx, 0), 0);
+               domname, 0);
     }
     else
     {
+        now_str = NULL;
         uptime_str = uptime_to_string(uptime, 0);
-        printf("%-33s %4d %s\n", libxl_domid_to_name(&ctx, 0),
+        printf("%-33s %4d %s\n", domname,
                0, uptime_str);
     }
 
-    if (now_str)
-        free(now_str);
-    if (uptime_str)
-        free(uptime_str);
+    free(now_str);
+    free(uptime_str);
+    free(domname);
     return;
 err:
     fprintf(stderr, "Can not get Dom0 uptime.\n");
@@ -4563,29 +4578,31 @@ static void print_domU_uptime(uint32_t domuid, int short_mode, time_t now)
     uint32_t uptime = 0;
     char *uptime_str = NULL;
     char *now_str = NULL;
+    char *domname;
 
     s_time = libxl_vm_get_start_time(&ctx, domuid);
     if (s_time == -1)
         return;
     uptime = now - s_time;
+    domname = libxl_domid_to_name(&ctx, domuid);
     if (short_mode)
     {
         now_str = current_time_to_string(now);
         uptime_str = uptime_to_string(uptime, 1);
         printf(" %s up %s, %s (%d)\n", now_str, uptime_str,
-               libxl_domid_to_name(&ctx, domuid), domuid);
+               domname, domuid);
     }
     else
     {
+        now_str = NULL;
         uptime_str = uptime_to_string(uptime, 0);
-        printf("%-33s %4d %s\n", libxl_domid_to_name(&ctx, domuid),
+        printf("%-33s %4d %s\n", domname,
                domuid, uptime_str);
     }
 
-    if (now_str)
-        free(now_str);
-    if (uptime_str)
-        free(uptime_str);
+    free(domname);
+    free(now_str);
+    free(uptime_str);
     return;
 }
 

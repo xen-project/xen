@@ -51,7 +51,14 @@ char *libxl_domid_to_name(libxl_ctx *ctx, uint32_t domid)
 
     snprintf(path, sizeof(path), "/local/domain/%d/name", domid);
     s = xs_read(ctx->xsh, XBT_NULL, path, &len);
-    libxl_ptr_add(ctx, s);
+    return s;
+}
+
+char *_libxl_domid_to_name(libxl_ctx *ctx, uint32_t domid)
+{
+    char *s = libxl_domid_to_name(ctx, domid);
+    if ( s )
+        libxl_ptr_add(ctx, s);
     return s;
 }
 
@@ -68,7 +75,7 @@ int libxl_name_to_domid(libxl_ctx *ctx, const char *name,
         return ERROR_NOMEM;
 
     for (i = 0; i < nb_domains; i++) {
-        domname = libxl_domid_to_name(ctx, dominfo[i].domid);
+        domname = _libxl_domid_to_name(ctx, dominfo[i].domid);
         if (!domname)
             continue;
         if (strcmp(domname, name) == 0) {

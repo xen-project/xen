@@ -1379,7 +1379,7 @@ static int libxl_create_stubdom(libxl_ctx *ctx,
 
     memset(&c_info, 0x00, sizeof(libxl_domain_create_info));
     c_info.hvm = 0;
-    c_info.name = libxl_sprintf(ctx, "%s-dm", libxl_domid_to_name(ctx, info->domid));
+    c_info.name = libxl_sprintf(ctx, "%s-dm", _libxl_domid_to_name(ctx, info->domid));
     for (i = 0; i < 16; i++)
         c_info.uuid[i] = info->uuid[i];
 
@@ -2186,7 +2186,7 @@ retry_transaction:
     flexarray_set(back, boffset++, "state");
     flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", 1));
     flexarray_set(back, boffset++, "domain");
-    flexarray_set(back, boffset++, libxl_domid_to_name(ctx, domid));
+    flexarray_set(back, boffset++, _libxl_domid_to_name(ctx, domid));
     flexarray_set(back, boffset++, "protocol");
     flexarray_set(back, boffset++, LIBXL_XENCONSOLE_PROTOCOL);
 
@@ -2243,7 +2243,7 @@ int libxl_device_vkb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb)
     flexarray_set(back, boffset++, "state");
     flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", 1));
     flexarray_set(back, boffset++, "domain");
-    flexarray_set(back, boffset++, libxl_domid_to_name(ctx, domid));
+    flexarray_set(back, boffset++, _libxl_domid_to_name(ctx, domid));
 
     flexarray_set(front, foffset++, "backend-id");
     flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", vkb->backend_domid));
@@ -2420,7 +2420,7 @@ static int libxl_build_xenpv_qemu_args(libxl_ctx *ctx,
         uint32_t guest_domid;
         if (libxl_is_stubdom(ctx, vfb->domid, &guest_domid)) {
             char *filename;
-            char *name = libxl_sprintf(ctx, "qemu-dm-%s", libxl_domid_to_name(ctx, guest_domid));
+            char *name = libxl_sprintf(ctx, "qemu-dm-%s", _libxl_domid_to_name(ctx, guest_domid));
             libxl_create_logfile(ctx, name, &filename);
             info->serial = libxl_sprintf(ctx, "file:%s", filename);
             free(filename);
@@ -2438,7 +2438,7 @@ static int libxl_build_xenpv_qemu_args(libxl_ctx *ctx,
         info->extra[j] = NULL;
     }
     info->domid = vfb->domid;
-    info->dom_name = libxl_domid_to_name(ctx, vfb->domid);
+    info->dom_name = _libxl_domid_to_name(ctx, vfb->domid);
     info->device_model = libxl_abs_path(ctx, "qemu-dm", libxl_libexec_path());
     info->type = XENPV;
     return 0;
@@ -2484,7 +2484,7 @@ int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb)
     flexarray_set(back, boffset++, "state");
     flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", 1));
     flexarray_set(back, boffset++, "domain");
-    flexarray_set(back, boffset++, libxl_domid_to_name(ctx, domid));
+    flexarray_set(back, boffset++, _libxl_domid_to_name(ctx, domid));
     flexarray_set(back, boffset++, "vnc");
     flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", vfb->vnc));
     flexarray_set(back, boffset++, "vnclisten");
