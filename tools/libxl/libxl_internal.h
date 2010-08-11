@@ -228,6 +228,7 @@ char *libxl_abs_path(libxl_ctx *ctx, char *s, const char *path);
 #define XL_LOG_ERROR   XTL_ERROR
 
 char *_libxl_domid_to_name(libxl_ctx *ctx, uint32_t domid);
+char *_libxl_poolid_to_name(libxl_ctx *ctx, uint32_t poolid);
 
 #endif
 

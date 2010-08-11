@@ -98,7 +98,14 @@ char *libxl_poolid_to_name(libxl_ctx *ctx, uint32_t poolid)
         return "Pool-0";
     snprintf(path, sizeof(path), "/local/pool/%d/name", poolid);
     s = xs_read(ctx->xsh, XBT_NULL, path, &len);
-    libxl_ptr_add(ctx, s);
+    return s;
+}
+
+char *_libxl_poolid_to_name(libxl_ctx *ctx, uint32_t poolid)
+{
+    char *s = libxl_poolid_to_name(ctx, poolid);
+    if ( s )
+        libxl_ptr_add(ctx, s);
     return s;
 }
 
@@ -115,7 +122,7 @@ int libxl_name_to_poolid(libxl_ctx *ctx, const char *name,
         return ERROR_NOMEM;
 
     for (i = 0; i < nb_pools; i++) {
-        poolname = libxl_poolid_to_name(ctx, poolinfo[i].poolid);
+        poolname = _libxl_poolid_to_name(ctx, poolinfo[i].poolid);
         if (!poolname)
             continue;
         if (strcmp(poolname, name) == 0) {
