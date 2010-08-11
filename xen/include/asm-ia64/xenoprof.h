@@ -34,6 +34,13 @@ void xenoprof_arch_stop(void);
 void xenoprof_arch_disable_virq(void);
 void xenoprof_arch_release_counters(void);
 
+static inline int xenoprof_arch_ibs_counter(XEN_GUEST_HANDLE(void) arg)
+{
+    return -ENOSYS;  /* not supported */
+}
+/* AMD IBS not supported */
+#define ibs_caps	0
+
 struct vcpu;
 struct cpu_user_regs;
 int xenoprofile_get_mode(struct vcpu *v, struct cpu_user_regs * const regs);

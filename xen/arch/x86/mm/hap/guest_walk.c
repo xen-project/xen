@@ -43,13 +43,14 @@ unsigned long hap_gva_to_gfn(GUEST_PAGING_LEVELS)(
     void *top_map;
     p2m_type_t p2mt;
     walk_t gw;
+    struct p2m_domain *p2m = p2m_get_hostp2m(v->domain);
 
     /* Get the top-level table's MFN */
     cr3 = v->arch.hvm_vcpu.guest_cr[3];
-    top_mfn = gfn_to_mfn_unshare(v->domain, cr3 >> PAGE_SHIFT, &p2mt, 0);
+    top_mfn = gfn_to_mfn_unshare(p2m, cr3 >> PAGE_SHIFT, &p2mt, 0);
     if ( p2m_is_paging(p2mt) )
     {
-        p2m_mem_paging_populate(v->domain, cr3 >> PAGE_SHIFT);
+        p2m_mem_paging_populate(p2m, cr3 >> PAGE_SHIFT);
 
         pfec[0] = PFEC_page_paged;
         return INVALID_GFN;
@@ -71,17 +72,17 @@ unsigned long hap_gva_to_gfn(GUEST_PAGING_LEVELS)(
 #if GUEST_PAGING_LEVELS == 3
     top_map += (cr3 & ~(PAGE_MASK | 31));
 #endif
-    missing = guest_walk_tables(v, gva, &gw, pfec[0], top_mfn, top_map);
+    missing = guest_walk_tables(v, p2m, gva, &gw, pfec[0], top_mfn, top_map);
     unmap_domain_page(top_map);
 
     /* Interpret the answer */
     if ( missing == 0 )
     {
         gfn_t gfn = guest_l1e_get_gfn(gw.l1e);
-        gfn_to_mfn_unshare(v->domain, gfn_x(gfn), &p2mt, 0);
+        gfn_to_mfn_unshare(p2m, gfn_x(gfn), &p2mt, 0);
         if ( p2m_is_paging(p2mt) )
         {
-            p2m_mem_paging_populate(v->domain, gfn_x(gfn));
+            p2m_mem_paging_populate(p2m, gfn_x(gfn));
 
             pfec[0] = PFEC_page_paged;
             return INVALID_GFN;
@@ -130,4 +131,3 @@ unsigned long hap_gva_to_gfn(GUEST_PAGING_LEVELS)(
  * indent-tabs-mode: nil
  * End:
  */
-

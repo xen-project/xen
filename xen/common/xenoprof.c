@@ -881,6 +881,20 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
             ret = -EFAULT;
         break;
 
+    case XENOPROF_ibs_counter:
+        if ( (xenoprof_state != XENOPROF_COUNTERS_RESERVED) ||
+             (adomains == 0) )
+        {
+            ret = -EPERM;
+            break;
+        }
+        ret = xenoprof_arch_ibs_counter(arg);
+        break;
+
+    case XENOPROF_get_ibs_caps:
+        ret = ibs_caps;
+        break;
+
     default:
         ret = -ENOSYS;
     }

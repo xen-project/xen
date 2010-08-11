@@ -70,7 +70,7 @@ static int hap_enable_vram_tracking(struct domain *d)
 
     /* set l1e entries of P2M table to be read-only. */
     for (i = dirty_vram->begin_pfn; i < dirty_vram->end_pfn; i++)
-        p2m_change_type(d, i, p2m_ram_rw, p2m_ram_logdirty);
+        p2m_change_type(p2m_get_hostp2m(d), i, p2m_ram_rw, p2m_ram_logdirty);
 
     flush_tlb_mask(&d->domain_dirty_cpumask);
     return 0;
@@ -90,7 +90,7 @@ static int hap_disable_vram_tracking(struct domain *d)
 
     /* set l1e entries of P2M table with normal mode */
     for (i = dirty_vram->begin_pfn; i < dirty_vram->end_pfn; i++)
-        p2m_change_type(d, i, p2m_ram_logdirty, p2m_ram_rw);
+        p2m_change_type(p2m_get_hostp2m(d), i, p2m_ram_logdirty, p2m_ram_rw);
 
     flush_tlb_mask(&d->domain_dirty_cpumask);
     return 0;
@@ -106,7 +106,7 @@ static void hap_clean_vram_tracking(struct domain *d)
 
     /* set l1e entries of P2M table to be read-only. */
     for (i = dirty_vram->begin_pfn; i < dirty_vram->end_pfn; i++)
-        p2m_change_type(d, i, p2m_ram_rw, p2m_ram_logdirty);
+        p2m_change_type(p2m_get_hostp2m(d), i, p2m_ram_rw, p2m_ram_logdirty);
 
     flush_tlb_mask(&d->domain_dirty_cpumask);
 }
@@ -200,7 +200,8 @@ static int hap_enable_log_dirty(struct domain *d)
     hap_unlock(d);
 
     /* set l1e entries of P2M table to be read-only. */
-    p2m_change_entry_type_global(d, p2m_ram_rw, p2m_ram_logdirty);
+    p2m_change_entry_type_global(p2m_get_hostp2m(d),
+        p2m_ram_rw, p2m_ram_logdirty);
     flush_tlb_mask(&d->domain_dirty_cpumask);
     return 0;
 }
@@ -212,14 +213,16 @@ static int hap_disable_log_dirty(struct domain *d)
     hap_unlock(d);
 
     /* set l1e entries of P2M table with normal mode */
-    p2m_change_entry_type_global(d, p2m_ram_logdirty, p2m_ram_rw);
+    p2m_change_entry_type_global(p2m_get_hostp2m(d),
+        p2m_ram_logdirty, p2m_ram_rw);
     return 0;
 }
 
 static void hap_clean_dirty_bitmap(struct domain *d)
 {
     /* set l1e entries of P2M table to be read-only. */
-    p2m_change_entry_type_global(d, p2m_ram_rw, p2m_ram_logdirty);
+    p2m_change_entry_type_global(p2m_get_hostp2m(d),
+        p2m_ram_rw, p2m_ram_logdirty);
     flush_tlb_mask(&d->domain_dirty_cpumask);
 }
 
@@ -273,8 +276,9 @@ static void hap_free(struct domain *d, mfn_t mfn)
     page_list_add_tail(pg, &d->arch.paging.hap.freelist);
 }
 
-static struct page_info *hap_alloc_p2m_page(struct domain *d)
+static struct page_info *hap_alloc_p2m_page(struct p2m_domain *p2m)
 {
+    struct domain *d = p2m->domain;
     struct page_info *pg;
 
     hap_lock(d);
@@ -312,8 +316,9 @@ static struct page_info *hap_alloc_p2m_page(struct domain *d)
     return pg;
 }
 
-static void hap_free_p2m_page(struct domain *d, struct page_info *pg)
+static void hap_free_p2m_page(struct p2m_domain *p2m, struct page_info *pg)
 {
+    struct domain *d = p2m->domain;
     hap_lock(d);
     ASSERT(page_get_owner(pg) == d);
     /* Should have just the one ref we gave it in alloc_p2m_page() */
@@ -594,7 +599,8 @@ int hap_enable(struct domain *d, u32 mode)
     /* allocate P2m table */
     if ( mode & PG_translate )
     {
-        rv = p2m_alloc_table(d, hap_alloc_p2m_page, hap_free_p2m_page);
+        rv = p2m_alloc_table(p2m_get_hostp2m(d),
+            hap_alloc_p2m_page, hap_free_p2m_page);
         if ( rv != 0 )
             goto out;
     }
@@ -611,7 +617,7 @@ void hap_final_teardown(struct domain *d)
     if ( d->arch.paging.hap.total_pages != 0 )
         hap_teardown(d);
 
-    p2m_teardown(d);
+    p2m_teardown(p2m_get_hostp2m(d));
     ASSERT(d->arch.paging.hap.p2m_pages == 0);
 }
 
@@ -711,9 +717,11 @@ void hap_vcpu_init(struct vcpu *v)
 static int hap_page_fault(struct vcpu *v, unsigned long va,
                           struct cpu_user_regs *regs)
 {
+    struct domain *d = v->domain;
+
     HAP_ERROR("Intercepted a guest #PF (%u:%u) with HAP enabled.\n",
-              v->domain->domain_id, v->vcpu_id);
-    domain_crash(v->domain);
+              d->domain_id, v->vcpu_id);
+    domain_crash(d);
     return 0;
 }
 
@@ -882,5 +890,3 @@ static const struct paging_mode hap_paging_long_mode = {
  * indent-tabs-mode: nil
  * End:
  */
-
-

@@ -42,9 +42,14 @@ int xenoprof_arch_init(int *num_events, char *cpu_type);
 
 int xenoprof_arch_counter(XEN_GUEST_HANDLE(void) arg);
 int compat_oprof_arch_counter(XEN_GUEST_HANDLE(void) arg);
+int xenoprof_arch_ibs_counter(XEN_GUEST_HANDLE(void) arg);
 
 struct vcpu;
 struct cpu_user_regs;
+
+/* AMD IBS support */
+u32 ibs_init(void);
+extern u32 ibs_caps;
 
 int xenoprofile_get_mode(struct vcpu *v, struct cpu_user_regs * const regs);
 
