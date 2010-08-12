@@ -114,24 +114,37 @@ typedef struct {
 
 _hidden int xs_writev(struct xs_handle *xsh, xs_transaction_t t, char *dir, char *kvs[]);
 
-/* memory allocation tracking/helpers */
-_hidden int libxl_ptr_add(libxl_ctx *ctx, void *ptr);
-_hidden void libxl_free(libxl_ctx *ctx, void *ptr);
-_hidden void libxl_free_all(libxl_ctx *ctx);
-_hidden void *libxl_zalloc(libxl_ctx *ctx, int bytes);
-_hidden void *libxl_calloc(libxl_ctx *ctx, size_t nmemb, size_t size);
-_hidden char *libxl_sprintf(libxl_ctx *ctx, const char *fmt, ...) PRINTF_ATTRIBUTE(2, 3);
-_hidden char *libxl_strdup(libxl_ctx *ctx, const char *c);
-_hidden char *libxl_dirname(libxl_ctx *ctx, const char *s);
+typedef struct {
+    /* mini-GC */
+    int alloc_maxsize;
+    void **alloc_ptrs;
+    libxl_ctx *owner;
+} libxl_gc;
 
-_hidden char **libxl_xs_kvs_of_flexarray(libxl_ctx *ctx, flexarray_t *array, int length);
-_hidden int libxl_xs_writev(libxl_ctx *ctx, xs_transaction_t t,
+#define LIBXL_INIT_GC(ctx) (libxl_gc){ .alloc_maxsize = 0, .alloc_ptrs = 0, .owner = ctx }
+static inline libxl_ctx *libxl_gc_owner(libxl_gc *gc)
+{
+    return gc->owner;
+}
+
+/* memory allocation tracking/helpers */
+_hidden int libxl_ptr_add(libxl_gc *gc, void *ptr);
+_hidden void libxl_free(libxl_gc *gc, void *ptr);
+_hidden void libxl_free_all(libxl_gc *gc);
+_hidden void *libxl_zalloc(libxl_gc *gc, int bytes);
+_hidden void *libxl_calloc(libxl_gc *gc, size_t nmemb, size_t size);
+_hidden char *libxl_sprintf(libxl_gc *gc, const char *fmt, ...) PRINTF_ATTRIBUTE(2, 3);
+_hidden char *libxl_strdup(libxl_gc *gc, const char *c);
+_hidden char *libxl_dirname(libxl_gc *gc, const char *s);
+
+_hidden char **libxl_xs_kvs_of_flexarray(libxl_gc *gc, flexarray_t *array, int length);
+_hidden int libxl_xs_writev(libxl_gc *gc, xs_transaction_t t,
                     char *dir, char **kvs);
-_hidden int libxl_xs_write(libxl_ctx *ctx, xs_transaction_t t,
+_hidden int libxl_xs_write(libxl_gc *gc, xs_transaction_t t,
                    char *path, char *fmt, ...) PRINTF_ATTRIBUTE(4, 5);
-_hidden char *libxl_xs_get_dompath(libxl_ctx *ctx, uint32_t domid); // logs errs
-_hidden char *libxl_xs_read(libxl_ctx *ctx, xs_transaction_t t, char *path);
-_hidden char **libxl_xs_directory(libxl_ctx *ctx, xs_transaction_t t, char *path, unsigned int *nb);
+_hidden char *libxl_xs_get_dompath(libxl_gc *gc, uint32_t domid); // logs errs
+_hidden char *libxl_xs_read(libxl_gc *gc, xs_transaction_t t, char *path);
+_hidden char **libxl_xs_directory(libxl_gc *gc, xs_transaction_t t, char *path, unsigned int *nb);
 
 /* from xl_dom */
 _hidden int is_hvm(libxl_ctx *ctx, uint32_t domid);
@@ -175,8 +188,6 @@ _hidden int libxl_wait_for_device_model(libxl_ctx *ctx,
                                                       void *userdata),
                                 void *check_callback_userdata);
 _hidden int libxl_wait_for_backend(libxl_ctx *ctx, char *be_path, char *state);
-_hidden int libxl_device_pci_reset(libxl_ctx *ctx, unsigned int domain, unsigned int bus,
-                           unsigned int dev, unsigned int func);
 
 /* from xenguest (helper */
 _hidden int hvm_build_set_params(xc_interface *handle, uint32_t domid,
@@ -225,18 +236,17 @@ _hidden int libxl_spawn_check(libxl_ctx *ctx,
  /* low-level stuff, for synchronous subprocesses etc. */
 
 _hidden void libxl_exec(int stdinfd, int stdoutfd, int stderrfd, char *arg0, char **args); // logs errors, never returns
-_hidden void libxl_log_child_exitstatus(libxl_ctx *ctx,
+_hidden void libxl_log_child_exitstatus(libxl_gc *gc,
                                 const char *what, pid_t pid, int status);
 
-_hidden char *libxl_abs_path(libxl_ctx *ctx, char *s, const char *path);
+_hidden char *libxl_abs_path(libxl_gc *gc, char *s, const char *path);
 
 #define XL_LOG_DEBUG   XTL_DEBUG
 #define XL_LOG_INFO    XTL_INFO
 #define XL_LOG_WARNING XTL_WARN
 #define XL_LOG_ERROR   XTL_ERROR
 
-_hidden char *_libxl_domid_to_name(libxl_ctx *ctx, uint32_t domid);
-_hidden char *_libxl_poolid_to_name(libxl_ctx *ctx, uint32_t poolid);
+_hidden char *_libxl_domid_to_name(libxl_gc *gc, uint32_t domid);
+_hidden char *_libxl_poolid_to_name(libxl_gc *gc, uint32_t poolid);
 
 #endif
-

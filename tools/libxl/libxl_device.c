@@ -42,20 +42,24 @@ static const char *string_of_kinds[] = {
 int libxl_device_generic_add(libxl_ctx *ctx, libxl_device *device,
                              char **bents, char **fents)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     char *dom_path_backend, *dom_path, *frontend_path, *backend_path;
     xs_transaction_t t;
     struct xs_permissions frontend_perms[2];
     struct xs_permissions backend_perms[2];
+    int rc;
 
-    if (!is_valid_device_kind(device->backend_kind) || !is_valid_device_kind(device->kind))
-        return ERROR_INVAL;
+    if (!is_valid_device_kind(device->backend_kind) || !is_valid_device_kind(device->kind)) {
+        rc = ERROR_INVAL;
+        goto out;
+    }
 
-    dom_path_backend = libxl_xs_get_dompath(ctx, device->backend_domid);
-    dom_path = libxl_xs_get_dompath(ctx, device->domid);
+    dom_path_backend = libxl_xs_get_dompath(&gc, device->backend_domid);
+    dom_path = libxl_xs_get_dompath(&gc, device->domid);
 
-    frontend_path = libxl_sprintf(ctx, "%s/device/%s/%d",
+    frontend_path = libxl_sprintf(&gc, "%s/device/%s/%d",
                                   dom_path, string_of_kinds[device->kind], device->devid);
-    backend_path = libxl_sprintf(ctx, "%s/backend/%s/%u/%d",
+    backend_path = libxl_sprintf(&gc, "%s/backend/%s/%u/%d",
                                  dom_path_backend, string_of_kinds[device->backend_kind], device->domid, device->devid);
 
     frontend_perms[0].id = device->domid;
@@ -81,12 +85,12 @@ retry_transaction:
     xs_mkdir(ctx->xsh, t, backend_path);
     xs_set_permissions(ctx->xsh, t, backend_path, backend_perms, ARRAY_SIZE(backend_perms));
 
-    xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/backend", frontend_path), backend_path, strlen(backend_path));
-    xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/frontend", backend_path), frontend_path, strlen(frontend_path));
+    xs_write(ctx->xsh, t, libxl_sprintf(&gc, "%s/backend", frontend_path), backend_path, strlen(backend_path));
+    xs_write(ctx->xsh, t, libxl_sprintf(&gc, "%s/frontend", backend_path), frontend_path, strlen(frontend_path));
 
     /* and write frontend kvs and backend kvs */
-    libxl_xs_writev(ctx, t, backend_path, bents);
-    libxl_xs_writev(ctx, t, frontend_path, fents);
+    libxl_xs_writev(&gc, t, backend_path, bents);
+    libxl_xs_writev(&gc, t, frontend_path, fents);
 
     if (!xs_transaction_end(ctx->xsh, t, 0)) {
         if (errno == EAGAIN)
@@ -94,7 +98,10 @@ retry_transaction:
         else
             XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xs transaction failed");
     }
-    return 0;
+    rc = 0;
+out:
+    libxl_free_all(&gc);
+    return rc;
 }
 
 char *device_disk_string_of_phystype(libxl_disk_phystype phystype)
@@ -221,35 +228,43 @@ int device_disk_dev_number(char *virtpath)
 
 int libxl_device_destroy(libxl_ctx *ctx, char *be_path, int force)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     xs_transaction_t t;
-    char *state_path = libxl_sprintf(ctx, "%s/state", be_path);
-    char *state = libxl_xs_read(ctx, XBT_NULL, state_path);
+    char *state_path = libxl_sprintf(&gc, "%s/state", be_path);
+    char *state = libxl_xs_read(&gc, XBT_NULL, state_path);
+    int rc = 0;
+
     if (!state)
-        return 0;
+        goto out;
     if (atoi(state) != 4) {
         xs_rm(ctx->xsh, XBT_NULL, be_path);
-        return 0;
+        goto out;
     }
 
 retry_transaction:
     t = xs_transaction_start(ctx->xsh);
-    xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/online", be_path), "0", strlen("0"));
+    xs_write(ctx->xsh, t, libxl_sprintf(&gc, "%s/online", be_path), "0", strlen("0"));
     xs_write(ctx->xsh, t, state_path, "5", strlen("5"));
     if (!xs_transaction_end(ctx->xsh, t, 0)) {
         if (errno == EAGAIN)
             goto retry_transaction;
-        else
-            return -1;
+        else {
+            rc = -1;
+            goto out;
+        }
     }
     if (!force) {
         xs_watch(ctx->xsh, state_path, be_path);
-        return 1;
-    } else
-        return 0;
+        rc = 1;
+    }
+out:
+    libxl_free_all(&gc);
+    return rc;
 }
 
 int wait_for_dev_destroy(libxl_ctx *ctx, struct timeval *tv)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     int nfds, rc;
     unsigned int n;
     fd_set rfds;
@@ -262,57 +277,52 @@ int wait_for_dev_destroy(libxl_ctx *ctx, struct timeval *tv)
     if (select(nfds, &rfds, NULL, NULL, tv) > 0) {
         l1 = xs_read_watch(ctx->xsh, &n);
         if (l1 != NULL) {
-            char *state = libxl_xs_read(ctx, XBT_NULL, l1[XS_WATCH_PATH]);
+            char *state = libxl_xs_read(&gc, XBT_NULL, l1[XS_WATCH_PATH]);
             if (!state || atoi(state) == 6) {
                 xs_unwatch(ctx->xsh, l1[0], l1[1]);
                 xs_rm(ctx->xsh, XBT_NULL, l1[XS_WATCH_TOKEN]);
                 XL_LOG(ctx, XL_LOG_DEBUG, "Destroyed device backend at %s", l1[XS_WATCH_TOKEN]);
                 rc = 0;
             }
-            libxl_free(ctx, state);
             free(l1);
         }
     }
+    libxl_free_all(&gc);
     return rc;
 }
 
 int libxl_devices_destroy(libxl_ctx *ctx, uint32_t domid, int force)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     char *path, *be_path, *fe_path;
     unsigned int num1, num2;
     char **l1 = NULL, **l2 = NULL;
     int i, j, n = 0, n_watches = 0;
     flexarray_t *toremove;
-    libxl_ctx clone;
-
-    if (libxl_ctx_init(&clone, LIBXL_VERSION, ctx->lg)) {
-        return -1;
-    }
 
     toremove = flexarray_make(16, 1);
-    path = libxl_sprintf(&clone, "/local/domain/%d/device", domid);
-    l1 = libxl_xs_directory(&clone, XBT_NULL, path, &num1);
+    path = libxl_sprintf(&gc, "/local/domain/%d/device", domid);
+    l1 = libxl_xs_directory(&gc, XBT_NULL, path, &num1);
     if (!l1) {
-        XL_LOG(&clone, XL_LOG_ERROR, "%s is empty", path);
-        libxl_ctx_free(&clone);
-        return 0;
+        XL_LOG(ctx, XL_LOG_ERROR, "%s is empty", path);
+        goto out;
     }
     for (i = 0; i < num1; i++) {
         if (!strcmp("vfs", l1[i]))
             continue;
-        path = libxl_sprintf(&clone, "/local/domain/%d/device/%s", domid, l1[i]);
-        l2 = libxl_xs_directory(&clone, XBT_NULL, path, &num2);
+        path = libxl_sprintf(&gc, "/local/domain/%d/device/%s", domid, l1[i]);
+        l2 = libxl_xs_directory(&gc, XBT_NULL, path, &num2);
         if (!l2)
             continue;
         for (j = 0; j < num2; j++) {
-            fe_path = libxl_sprintf(&clone, "/local/domain/%d/device/%s/%s", domid, l1[i], l2[j]);
-            be_path = libxl_xs_read(&clone, XBT_NULL, libxl_sprintf(&clone, "%s/backend", fe_path));
+            fe_path = libxl_sprintf(&gc, "/local/domain/%d/device/%s/%s", domid, l1[i], l2[j]);
+            be_path = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/backend", fe_path));
             if (be_path != NULL) {
-                if (libxl_device_destroy(&clone, be_path, force) > 0)
+                if (libxl_device_destroy(ctx, be_path, force) > 0)
                     n_watches++;
-                flexarray_set(toremove, n++, libxl_dirname(&clone, be_path));
+                flexarray_set(toremove, n++, libxl_dirname(&gc, be_path));
             } else {
-                xs_rm(clone.xsh, XBT_NULL, path);
+                xs_rm(ctx->xsh, XBT_NULL, path);
             }
         }
     }
@@ -326,7 +336,7 @@ int libxl_devices_destroy(libxl_ctx *ctx, uint32_t domid, int force)
         tv.tv_sec = LIBXL_DESTROY_TIMEOUT;
         tv.tv_usec = 0;
         while (n_watches > 0) {
-            if (wait_for_dev_destroy(&clone, &tv)) {
+            if (wait_for_dev_destroy(ctx, &tv)) {
                 break;
             } else {
                 n_watches--;
@@ -335,46 +345,44 @@ int libxl_devices_destroy(libxl_ctx *ctx, uint32_t domid, int force)
     }
     for (i = 0; i < n; i++) {
         flexarray_get(toremove, i, (void**) &path);
-        xs_rm(clone.xsh, XBT_NULL, path);
+        xs_rm(ctx->xsh, XBT_NULL, path);
     }
+out:
     flexarray_free(toremove);
-    libxl_ctx_free(&clone);
+    libxl_free_all(&gc);
     return 0;
 }
 
 int libxl_device_del(libxl_ctx *ctx, libxl_device *dev, int wait)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     char *dom_path_backend, *backend_path;
     int rc;
-    libxl_ctx clone;
-
-    if (libxl_ctx_init(&clone, LIBXL_VERSION, ctx->lg)) {
-        return -1;
-    }
 
     /* Create strings */
-    dom_path_backend    = libxl_xs_get_dompath(&clone, dev->backend_domid);
-    backend_path        = libxl_sprintf(&clone, "%s/backend/%s/%u/%d",
+    dom_path_backend    = libxl_xs_get_dompath(&gc, dev->backend_domid);
+    backend_path        = libxl_sprintf(&gc, "%s/backend/%s/%u/%d",
                                     dom_path_backend, 
                                     string_of_kinds[dev->backend_kind], 
                                     dev->domid, dev->devid);
-    libxl_free(&clone, dom_path_backend);
-
-    rc = libxl_device_destroy(&clone, backend_path, !wait);
+    rc = libxl_device_destroy(ctx, backend_path, !wait);
     if (rc == -1) {
-        libxl_ctx_free(&clone);
-        return ERROR_FAIL;
+        rc = ERROR_FAIL;
+        goto out;
     }
 
     if (wait) {
         struct timeval tv;
         tv.tv_sec = LIBXL_DESTROY_TIMEOUT;
         tv.tv_usec = 0;
-        (void)wait_for_dev_destroy(&clone, &tv);
+        (void)wait_for_dev_destroy(ctx, &tv);
     }
 
-    libxl_ctx_free(&clone);
-    return 0;
+    rc = 0;
+
+out:
+    libxl_free_all(&gc);
+    return rc;
 }
 
 int libxl_wait_for_device_model(libxl_ctx *ctx,
@@ -385,6 +393,7 @@ int libxl_wait_for_device_model(libxl_ctx *ctx,
                                                       void *userdata),
                                 void *check_callback_userdata)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     char *path;
     char *p;
     unsigned int len;
@@ -397,7 +406,7 @@ int libxl_wait_for_device_model(libxl_ctx *ctx,
     char **l = NULL;
 
     xsh = xs_daemon_open();
-    path = libxl_sprintf(ctx, "/local/domain/0/device-model/%d/state", domid);
+    path = libxl_sprintf(&gc, "/local/domain/0/device-model/%d/state", domid);
     xs_watch(xsh, path, path);
     tv.tv_sec = LIBXL_DEVICE_MODEL_START_TIMEOUT;
     tv.tv_usec = 0;
@@ -419,6 +428,7 @@ int libxl_wait_for_device_model(libxl_ctx *ctx,
         free(p);
         xs_unwatch(xsh, path, path);
         xs_daemon_close(xsh);
+        libxl_free_all(&gc);
         return rc;
 again:
         free(p);
@@ -436,15 +446,17 @@ again:
     xs_unwatch(xsh, path, path);
     xs_daemon_close(xsh);
     XL_LOG(ctx, XL_LOG_ERROR, "Device Model not ready");
+    libxl_free_all(&gc);
     return -1;
 }
 
 int libxl_wait_for_backend(libxl_ctx *ctx, char *be_path, char *state)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     int watchdog = 100;
     unsigned int len;
     char *p;
-    char *path = libxl_sprintf(ctx, "%s/state", be_path);
+    char *path = libxl_sprintf(&gc, "%s/state", be_path);
 
     while (watchdog > 0) {
         p = xs_read(ctx->xsh, XBT_NULL, path, &len);
@@ -467,6 +479,7 @@ int libxl_wait_for_backend(libxl_ctx *ctx, char *be_path, char *state)
         }
     }
     XL_LOG(ctx, XL_LOG_ERROR, "Backend %s not ready", be_path);
+    libxl_free_all(&gc);
     return -1;
 }
 

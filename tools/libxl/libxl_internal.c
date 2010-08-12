@@ -28,7 +28,7 @@ int libxl_error_set(libxl_ctx *ctx, int code)
     return 0;
 }
 
-int libxl_ptr_add(libxl_ctx *ctx, void *ptr)
+int libxl_ptr_add(libxl_gc *gc, void *ptr)
 {
     int i;
     void **re;
@@ -37,29 +37,29 @@ int libxl_ptr_add(libxl_ctx *ctx, void *ptr)
         return 0;
 
     /* fast case: we have space in the array for storing the pointer */
-    for (i = 0; i < ctx->alloc_maxsize; i++) {
-        if (!ctx->alloc_ptrs[i]) {
-            ctx->alloc_ptrs[i] = ptr;
+    for (i = 0; i < gc->alloc_maxsize; i++) {
+        if (!gc->alloc_ptrs[i]) {
+            gc->alloc_ptrs[i] = ptr;
             return 0;
         }
     }
     /* realloc alloc_ptrs manually with calloc/free/replace */
-    re = calloc(ctx->alloc_maxsize + 25, sizeof(void *));
+    re = calloc(gc->alloc_maxsize + 25, sizeof(void *));
     if (!re)
         return -1;
-    for (i = 0; i < ctx->alloc_maxsize; i++)
-        re[i] = ctx->alloc_ptrs[i];
+    for (i = 0; i < gc->alloc_maxsize; i++)
+        re[i] = gc->alloc_ptrs[i];
     /* assign the next pointer */
     re[i] = ptr;
 
     /* replace the old alloc_ptr */
-    free(ctx->alloc_ptrs);
-    ctx->alloc_ptrs = re;
-    ctx->alloc_maxsize += 25;
+    free(gc->alloc_ptrs);
+    gc->alloc_ptrs = re;
+    gc->alloc_maxsize += 25;
     return 0;
 }
 
-void libxl_free(libxl_ctx *ctx, void *ptr)
+void libxl_free(libxl_gc *gc, void *ptr)
 {
     int i;
 
@@ -67,9 +67,9 @@ void libxl_free(libxl_ctx *ctx, void *ptr)
         return;
 
     /* remove the pointer from the tracked ptrs */
-    for (i = 0; i < ctx->alloc_maxsize; i++) {
-        if (ctx->alloc_ptrs[i] == ptr) {
-            ctx->alloc_ptrs[i] = NULL;
+    for (i = 0; i < gc->alloc_maxsize; i++) {
+        if (gc->alloc_ptrs[i] == ptr) {
+            gc->alloc_ptrs[i] = NULL;
             free(ptr);
             return;
         }
@@ -78,43 +78,44 @@ void libxl_free(libxl_ctx *ctx, void *ptr)
     abort();
 }
 
-void libxl_free_all(libxl_ctx *ctx)
+void libxl_free_all(libxl_gc *gc)
 {
     void *ptr;
     int i;
 
-    for (i = 0; i < ctx->alloc_maxsize; i++) {
-        ptr = ctx->alloc_ptrs[i];
-        ctx->alloc_ptrs[i] = NULL;
+    for (i = 0; i < gc->alloc_maxsize; i++) {
+        ptr = gc->alloc_ptrs[i];
+        gc->alloc_ptrs[i] = NULL;
         free(ptr);
     }
+    free(gc->alloc_ptrs);
 }
 
-void *libxl_zalloc(libxl_ctx *ctx, int bytes)
+void *libxl_zalloc(libxl_gc *gc, int bytes)
 {
     void *ptr = calloc(bytes, 1);
     if (!ptr) {
-        libxl_error_set(ctx, ENOMEM);
+        libxl_error_set(libxl_gc_owner(gc), ENOMEM);
         return NULL;
     }
 
-    libxl_ptr_add(ctx, ptr);
+    libxl_ptr_add(gc, ptr);
     return ptr;
 }
 
-void *libxl_calloc(libxl_ctx *ctx, size_t nmemb, size_t size)
+void *libxl_calloc(libxl_gc *gc, size_t nmemb, size_t size)
 {
     void *ptr = calloc(nmemb, size);
     if (!ptr) {
-        libxl_error_set(ctx, ENOMEM);
+        libxl_error_set(libxl_gc_owner(gc), ENOMEM);
         return NULL;
     }
 
-    libxl_ptr_add(ctx, ptr);
+    libxl_ptr_add(gc, ptr);
     return ptr;
 }
 
-char *libxl_sprintf(libxl_ctx *ctx, const char *fmt, ...)
+char *libxl_sprintf(libxl_gc *gc, const char *fmt, ...)
 {
     char *s;
     va_list ap;
@@ -128,7 +129,7 @@ char *libxl_sprintf(libxl_ctx *ctx, const char *fmt, ...)
         return NULL;
     }
 
-    s = libxl_zalloc(ctx, ret + 1);
+    s = libxl_zalloc(gc, ret + 1);
     if (s) {
         va_start(ap, fmt);
         ret = vsnprintf(s, ret + 1, fmt, ap);
@@ -137,20 +138,20 @@ char *libxl_sprintf(libxl_ctx *ctx, const char *fmt, ...)
     return s;
 }
 
-char *libxl_strdup(libxl_ctx *ctx, const char *c)
+char *libxl_strdup(libxl_gc *gc, const char *c)
 {
     char *s = strdup(c);
 
     if (s)
-        libxl_ptr_add(ctx, s);
+        libxl_ptr_add(gc, s);
 
     return s;
 }
 
-char *libxl_dirname(libxl_ctx *ctx, const char *s)
+char *libxl_dirname(libxl_gc *gc, const char *s)
 {
     char *c;
-    char *ptr = libxl_strdup(ctx, s);
+    char *ptr = libxl_strdup(gc, s);
 
     c = strrchr(ptr, '/');
     if (!c)
@@ -196,10 +197,10 @@ void xl_log(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
     va_end(ap);
 }
 
-char *libxl_abs_path(libxl_ctx *ctx, char *s, const char *path)
+char *libxl_abs_path(libxl_gc *gc, char *s, const char *path)
 {
     if (!s || s[0] == '/')
         return s;
-    return libxl_sprintf(ctx, "%s/%s", path, s);
+    return libxl_sprintf(gc, "%s/%s", path, s);
 }
 

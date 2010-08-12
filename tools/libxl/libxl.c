@@ -45,17 +45,12 @@ int libxl_ctx_init(libxl_ctx *ctx, int version, xentoollog_logger *lg)
         return ERROR_VERSION;
     memset(ctx, 0, sizeof(libxl_ctx));
     ctx->lg = lg;
-    ctx->alloc_maxsize = 256;
-    ctx->alloc_ptrs = calloc(ctx->alloc_maxsize, sizeof(void *));
-    if (!ctx->alloc_ptrs)
-        return ERROR_NOMEM;
     memset(&ctx->version_info, 0, sizeof(libxl_version_info));
 
     ctx->xch = xc_interface_open(lg,lg,0);
     if (!ctx->xch) {
         XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, errno, 
                         "cannot open libxc handle");
-        free(ctx->alloc_ptrs);
         return ERROR_FAIL;
     }
 
@@ -64,7 +59,6 @@ int libxl_ctx_init(libxl_ctx *ctx, int version, xentoollog_logger *lg)
         XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, errno, 
                         "cannot connect to xenstore");
         xc_interface_close(ctx->xch);
-        free(ctx->alloc_ptrs);
         return ERROR_FAIL;
     }
     return 0;
@@ -73,8 +67,6 @@ int libxl_ctx_init(libxl_ctx *ctx, int version, xentoollog_logger *lg)
 static void do_free_version_info(libxl_version_info *info);
 int libxl_ctx_free(libxl_ctx *ctx)
 {
-    libxl_free_all(ctx);
-    free(ctx->alloc_ptrs);
     xc_interface_close(ctx->xch);
     do_free_version_info(&ctx->version_info);
     if (ctx->xsh) xs_daemon_close(ctx->xsh); 
@@ -86,6 +78,7 @@ int libxl_ctx_free(libxl_ctx *ctx)
 int libxl_domain_make(libxl_ctx *ctx, libxl_domain_create_info *info,
                        uint32_t *domid)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     int flags, ret, i, rc;
     char *uuid_string;
     char *rw_paths[] = { "device", "device/suspend/event-channel" , "data"};
@@ -98,7 +91,10 @@ int libxl_domain_make(libxl_ctx *ctx, libxl_domain_create_info *info,
     xen_domain_handle_t handle;
 
     uuid_string = libxl_uuid2string(ctx, info->uuid);
-    if (!uuid_string) return ERROR_NOMEM;
+    if (!uuid_string) {
+        libxl_free_all(&gc);
+        return ERROR_NOMEM;
+    }
 
     flags = info->hvm ? XEN_DOMCTL_CDF_hvm_guest : 0;
     flags |= info->hap ? XEN_DOMCTL_CDF_hap : 0;
@@ -111,22 +107,27 @@ int libxl_domain_make(libxl_ctx *ctx, libxl_domain_create_info *info,
     ret = xc_domain_create(ctx->xch, info->ssidref, handle, flags, domid);
     if (ret < 0) {
         XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, ret, "domain creation fail");
+        libxl_free_all(&gc);
         return ERROR_FAIL;
     }
 
     ret = xc_cpupool_movedomain(ctx->xch, info->poolid, *domid);
     if (ret < 0) {
         XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, ret, "domain move fail");
+        libxl_free_all(&gc);
         return ERROR_FAIL;
     }
 
-    dom_path = libxl_xs_get_dompath(ctx, *domid);
-    if (!dom_path)
+    dom_path = libxl_xs_get_dompath(&gc, *domid);
+    if (!dom_path) {
+        libxl_free_all(&gc);
         return ERROR_FAIL;
+    }
 
-    vm_path = libxl_sprintf(ctx, "/vm/%s", uuid_string);
+    vm_path = libxl_sprintf(&gc, "/vm/%s", uuid_string);
     if (!vm_path) {
         XL_LOG(ctx, XL_LOG_ERROR, "cannot allocate create paths");
+        libxl_free_all(&gc);
         return ERROR_FAIL;
     }
 
@@ -147,42 +148,47 @@ retry_transaction:
     xs_mkdir(ctx->xsh, t, vm_path);
     xs_set_permissions(ctx->xsh, t, vm_path, roperm, ARRAY_SIZE(roperm));
 
-    xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/vm", dom_path), vm_path, strlen(vm_path));
+    xs_write(ctx->xsh, t, libxl_sprintf(&gc, "%s/vm", dom_path), vm_path, strlen(vm_path));
     rc = libxl_domain_rename(ctx, *domid, 0, info->name, t);
-    if (rc) return rc;
+    if (rc) {
+        libxl_free_all(&gc);
+        return rc;
+    }
 
     for (i = 0; i < ARRAY_SIZE(rw_paths); i++) {
-        char *path = libxl_sprintf(ctx, "%s/%s", dom_path, rw_paths[i]);
+        char *path = libxl_sprintf(&gc, "%s/%s", dom_path, rw_paths[i]);
         xs_mkdir(ctx->xsh, t, path);
         xs_set_permissions(ctx->xsh, t, path, rwperm, ARRAY_SIZE(rwperm));
-        libxl_free(ctx, path);
     }
     for (i = 0; i < ARRAY_SIZE(ro_paths); i++) {
-        char *path = libxl_sprintf(ctx, "%s/%s", dom_path, ro_paths[i]);
+        char *path = libxl_sprintf(&gc, "%s/%s", dom_path, ro_paths[i]);
         xs_mkdir(ctx->xsh, t, path);
         xs_set_permissions(ctx->xsh, t, path, roperm, ARRAY_SIZE(roperm));
-        libxl_free(ctx, path);
     }
 
-    xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/uuid", vm_path), uuid_string, strlen(uuid_string));
-    xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/name", vm_path), info->name, strlen(info->name));
+    xs_write(ctx->xsh, t, libxl_sprintf(&gc, "%s/uuid", vm_path), uuid_string, strlen(uuid_string));
+    xs_write(ctx->xsh, t, libxl_sprintf(&gc, "%s/name", vm_path), info->name, strlen(info->name));
     if (info->poolname)
-        xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/pool_name", vm_path), info->poolname, strlen(info->poolname));
+        xs_write(ctx->xsh, t, libxl_sprintf(&gc, "%s/pool_name", vm_path), info->poolname, strlen(info->poolname));
 
-    libxl_xs_writev(ctx, t, dom_path, info->xsdata);
-    libxl_xs_writev(ctx, t, libxl_sprintf(ctx, "%s/platform", dom_path), info->platformdata);
+    libxl_xs_writev(&gc, t, dom_path, info->xsdata);
+    libxl_xs_writev(&gc, t, libxl_sprintf(&gc, "%s/platform", dom_path), info->platformdata);
 
-    xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/control/platform-feature-multiprocessor-suspend", dom_path), "1", 1);
+    xs_write(ctx->xsh, t, libxl_sprintf(&gc, "%s/control/platform-feature-multiprocessor-suspend", dom_path), "1", 1);
 
     if (!xs_transaction_end(ctx->xsh, t, 0))
         if (errno == EAGAIN)
             goto retry_transaction;
+
+    libxl_free_all(&gc);
     return 0;
 }
 
 int libxl_domain_rename(libxl_ctx *ctx, uint32_t domid,
                         const char *old_name, const char *new_name,
-                        xs_transaction_t trans) {
+                        xs_transaction_t trans)
+{
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     char *dom_path = 0;
     const char *name_path;
     char *got_old_name;
@@ -190,10 +196,10 @@ int libxl_domain_rename(libxl_ctx *ctx, uint32_t domid,
     xs_transaction_t our_trans = 0;
     int rc;
 
-    dom_path = libxl_xs_get_dompath(ctx, domid);
+    dom_path = libxl_xs_get_dompath(&gc, domid);
     if (!dom_path) goto x_nomem;
 
-    name_path= libxl_sprintf(ctx, "%s/name", dom_path);
+    name_path= libxl_sprintf(&gc, "%s/name", dom_path);
     if (!name_path) goto x_nomem;
 
  retry_transaction:
@@ -250,8 +256,8 @@ int libxl_domain_rename(libxl_ctx *ctx, uint32_t domid,
 
     rc = 0;
  x_rc:
-    if (dom_path) libxl_free(ctx, dom_path);
     if (our_trans) xs_transaction_end(ctx->xsh, our_trans, 1);
+    libxl_free_all(&gc);
     return rc;
 
  x_fail:  rc = ERROR_FAIL;  goto x_rc;
@@ -260,38 +266,42 @@ int libxl_domain_rename(libxl_ctx *ctx, uint32_t domid,
 
 int libxl_domain_build(libxl_ctx *ctx, libxl_domain_build_info *info, uint32_t domid, libxl_domain_build_state *state)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     char **vments = NULL, **localents = NULL;
     struct timeval start_time;
     int i, ret;
 
     ret = build_pre(ctx, domid, info, state);
-    if (ret) goto out;
+    if (ret)
+        goto out;
 
     gettimeofday(&start_time, NULL);
 
     if (info->hvm) {
         ret = build_hvm(ctx, domid, info, state);
-        if (ret) goto out;
+        if (ret)
+            goto out;
 
-        vments = libxl_calloc(ctx, 7, sizeof(char *));
+        vments = libxl_calloc(&gc, 7, sizeof(char *));
         vments[0] = "rtc/timeoffset";
         vments[1] = (info->u.hvm.timeoffset) ? info->u.hvm.timeoffset : "";
         vments[2] = "image/ostype";
         vments[3] = "hvm";
         vments[4] = "start_time";
-        vments[5] = libxl_sprintf(ctx, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
+        vments[5] = libxl_sprintf(&gc, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
     } else {
         ret = build_pv(ctx, domid, info, state);
-        if (ret) goto out;
+        if (ret)
+            goto out;
 
-        vments = libxl_calloc(ctx, 11, sizeof(char *));
+        vments = libxl_calloc(&gc, 11, sizeof(char *));
         i = 0;
         vments[i++] = "image/ostype";
         vments[i++] = "linux";
         vments[i++] = "image/kernel";
         vments[i++] = (char*) info->kernel.path;
         vments[i++] = "start_time";
-        vments[i++] = libxl_sprintf(ctx, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
+        vments[i++] = libxl_sprintf(&gc, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
         if (info->u.pv.ramdisk.path) {
             vments[i++] = "image/ramdisk";
             vments[i++] = (char*) info->u.pv.ramdisk.path;
@@ -307,6 +317,7 @@ out:
     if (!info->hvm)
 	    libxl_file_reference_unmap(ctx, &info->u.pv.ramdisk);
 
+    libxl_free_all(&gc);
     return ret;
 }
 
@@ -314,35 +325,38 @@ int libxl_domain_restore(libxl_ctx *ctx, libxl_domain_build_info *info,
                          uint32_t domid, int fd, libxl_domain_build_state *state,
                          libxl_device_model_info *dm_info)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     char **vments = NULL, **localents = NULL;
     struct timeval start_time;
     int i, ret, esave, flags;
 
     ret = build_pre(ctx, domid, info, state);
-    if (ret) goto out;
+    if (ret)
+        goto out;
 
     ret = restore_common(ctx, domid, info, state, fd);
-    if (ret) goto out;
+    if (ret)
+        goto out;
 
     gettimeofday(&start_time, NULL);
 
     if (info->hvm) {
-        vments = libxl_calloc(ctx, 7, sizeof(char *));
+        vments = libxl_calloc(&gc, 7, sizeof(char *));
         vments[0] = "rtc/timeoffset";
         vments[1] = (info->u.hvm.timeoffset) ? info->u.hvm.timeoffset : "";
         vments[2] = "image/ostype";
         vments[3] = "hvm";
         vments[4] = "start_time";
-        vments[5] = libxl_sprintf(ctx, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
+        vments[5] = libxl_sprintf(&gc, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
     } else {
-        vments = libxl_calloc(ctx, 11, sizeof(char *));
+        vments = libxl_calloc(&gc, 11, sizeof(char *));
         i = 0;
         vments[i++] = "image/ostype";
         vments[i++] = "linux";
         vments[i++] = "image/kernel";
         vments[i++] = (char*) info->kernel.path;
         vments[i++] = "start_time";
-        vments[i++] = libxl_sprintf(ctx, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
+        vments[i++] = libxl_sprintf(&gc, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
         if (info->u.pv.ramdisk.path) {
             vments[i++] = "image/ramdisk";
             vments[i++] = (char*) info->u.pv.ramdisk.path;
@@ -353,7 +367,8 @@ int libxl_domain_restore(libxl_ctx *ctx, libxl_domain_build_info *info,
         }
     }
     ret = build_post(ctx, domid, info, state, vments, localents);
-    if (ret) goto out;
+    if (ret)
+        goto out;
 
     dm_info->saved_state = NULL;
     if (info->hvm) {
@@ -380,28 +395,36 @@ out:
     }
 
     errno = esave;
+    libxl_free_all(&gc);
     return ret;
 }
 
 int libxl_domain_resume(libxl_ctx *ctx, uint32_t domid)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
+    int rc = 0;
+
     if (is_hvm(ctx, domid)) {
         XL_LOG(ctx, XL_LOG_DEBUG, "Called domain_resume on "
                 "non-cooperative hvm domain %u", domid);
-        return ERROR_NI;
+        rc = ERROR_NI;
+        goto out;
     }
     if (xc_domain_resume(ctx->xch, domid, 1)) {
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, 
                         "xc_domain_resume failed for domain %u", 
                         domid);
-        return ERROR_FAIL;
+        rc = ERROR_FAIL;
+        goto out;
     }
     if (!xs_resume_domain(ctx->xsh, domid)) {
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, 
                         "xs_resume_domain failed for domain %u", 
                         domid);
-        return ERROR_FAIL;
+        rc = ERROR_FAIL;
     }
+out:
+    libxl_free_all(&gc);
     return 0;
 }
 
@@ -414,6 +437,7 @@ int libxl_domain_resume(libxl_ctx *ctx, uint32_t domid)
 int libxl_domain_preserve(libxl_ctx *ctx, uint32_t domid,
                           libxl_domain_create_info *info, const char *name_suffix, libxl_uuid new_uuid)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     struct xs_permissions roperm[2];
     xs_transaction_t t;
     char *preserved_name;
@@ -423,17 +447,29 @@ int libxl_domain_preserve(libxl_ctx *ctx, uint32_t domid,
 
     int rc;
 
-    preserved_name = libxl_sprintf(ctx, "%s%s", info->name, name_suffix);
-    if (!preserved_name) return ERROR_NOMEM;
+    preserved_name = libxl_sprintf(&gc, "%s%s", info->name, name_suffix);
+    if (!preserved_name) {
+        libxl_free_all(&gc);
+        return ERROR_NOMEM;
+    }
 
     uuid_string = libxl_uuid2string(ctx, new_uuid);
-    if (!uuid_string) return ERROR_NOMEM;
+    if (!uuid_string) {
+        libxl_free_all(&gc);
+        return ERROR_NOMEM;
+    }
 
-    dom_path = libxl_xs_get_dompath(ctx, domid);
-    if (!dom_path) return ERROR_FAIL;
+    dom_path = libxl_xs_get_dompath(&gc, domid);
+    if (!dom_path) {
+        libxl_free_all(&gc);
+        return ERROR_FAIL;
+    }
 
-    vm_path = libxl_sprintf(ctx, "/vm/%s", uuid_string);
-    if (!vm_path) return ERROR_FAIL;
+    vm_path = libxl_sprintf(&gc, "/vm/%s", uuid_string);
+    if (!vm_path) {
+        libxl_free_all(&gc);
+        return ERROR_FAIL;
+    }
 
     roperm[0].id = 0;
     roperm[0].perms = XS_PERM_NONE;
@@ -447,16 +483,17 @@ int libxl_domain_preserve(libxl_ctx *ctx, uint32_t domid,
     xs_mkdir(ctx->xsh, t, vm_path);
     xs_set_permissions(ctx->xsh, t, vm_path, roperm, ARRAY_SIZE(roperm));
 
-    xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/vm", dom_path), vm_path, strlen(vm_path));
+    xs_write(ctx->xsh, t, libxl_sprintf(&gc, "%s/vm", dom_path), vm_path, strlen(vm_path));
     rc = libxl_domain_rename(ctx, domid, info->name, preserved_name, t);
     if (rc) return rc;
 
-    xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/uuid", vm_path), uuid_string, strlen(uuid_string));
+    xs_write(ctx->xsh, t, libxl_sprintf(&gc, "%s/uuid", vm_path), uuid_string, strlen(uuid_string));
 
     if (!xs_transaction_end(ctx->xsh, t, 0))
         if (errno == EAGAIN)
             goto retry_transaction;
 
+    libxl_free_all(&gc);
     return 0;
 }
 
@@ -586,11 +623,12 @@ int libxl_domain_suspend(libxl_ctx *ctx, libxl_domain_suspend_info *info,
     int hvm = is_hvm(ctx, domid);
     int live = info != NULL && info->flags & XL_SUSPEND_LIVE;
     int debug = info != NULL && info->flags & XL_SUSPEND_DEBUG;
+    int rc = 0;
 
     core_suspend(ctx, domid, fd, hvm, live, debug);
     if (hvm)
-        return save_device_model(ctx, domid, fd);
-    return 0;
+        rc = save_device_model(ctx, domid, fd);
+    return rc;
 }
 
 int libxl_domain_pause(libxl_ctx *ctx, uint32_t domid)
@@ -619,24 +657,26 @@ int libxl_domain_core_dump(libxl_ctx *ctx, uint32_t domid,
 
 int libxl_domain_unpause(libxl_ctx *ctx, uint32_t domid)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     char *path;
     char *state;
-    int ret;
+    int ret, rc = 0;
 
     if (is_hvm(ctx, domid)) {
-        path = libxl_sprintf(ctx, "/local/domain/0/device-model/%d/state", domid);
-        state = libxl_xs_read(ctx, XBT_NULL, path);
+        path = libxl_sprintf(&gc, "/local/domain/0/device-model/%d/state", domid);
+        state = libxl_xs_read(&gc, XBT_NULL, path);
         if (state != NULL && !strcmp(state, "paused")) {
-            libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "/local/domain/0/device-model/%d/command", domid), "continue");
+            libxl_xs_write(&gc, XBT_NULL, libxl_sprintf(&gc, "/local/domain/0/device-model/%d/command", domid), "continue");
             libxl_wait_for_device_model(ctx, domid, "running", NULL, NULL);
         }
     }
     ret = xc_domain_unpause(ctx->xch, domid);
     if (ret<0) {
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "unpausing domain %d", domid);
-        return ERROR_FAIL;
+        rc = ERROR_FAIL;
     }
-    return 0;
+    libxl_free_all(&gc);
+    return rc;
 }
 
 static char *req_table[] = {
@@ -649,17 +689,22 @@ static char *req_table[] = {
 
 int libxl_domain_shutdown(libxl_ctx *ctx, uint32_t domid, int req)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     char *shutdown_path;
     char *dom_path;
 
-    if (req > ARRAY_SIZE(req_table))
+    if (req > ARRAY_SIZE(req_table)) {
+        libxl_free_all(&gc);
         return ERROR_INVAL;
+    }
 
-    dom_path = libxl_xs_get_dompath(ctx, domid);
-    if (!dom_path)
+    dom_path = libxl_xs_get_dompath(&gc, domid);
+    if (!dom_path) {
+        libxl_free_all(&gc);
         return ERROR_FAIL;
+    }
 
-    shutdown_path = libxl_sprintf(ctx, "%s/control/shutdown", dom_path);
+    shutdown_path = libxl_sprintf(&gc, "%s/control/shutdown", dom_path);
 
     xs_write(ctx->xsh, XBT_NULL, shutdown_path, req_table[req], strlen(req_table[req]));
     if (is_hvm(ctx,domid)) {
@@ -684,6 +729,7 @@ int libxl_domain_shutdown(libxl_ctx *ctx, uint32_t domid, int req)
             }
        }
     }
+    libxl_free_all(&gc);
     return 0;
 }
 
@@ -705,7 +751,8 @@ int libxl_wait_for_domain_death(libxl_ctx *ctx, uint32_t domid, libxl_waiter *wa
 
 int libxl_wait_for_disk_ejects(libxl_ctx *ctx, uint32_t guest_domid, libxl_device_disk *disks, int num_disks, libxl_waiter *waiter)
 {
-    int i;
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
+    int i, rc = -1;
     uint32_t domid = libxl_get_stubdom_id(ctx, guest_domid);
 
     if (!domid)
@@ -713,14 +760,17 @@ int libxl_wait_for_disk_ejects(libxl_ctx *ctx, uint32_t guest_domid, libxl_devic
 
     for (i = 0; i < num_disks; i++) {
         if (asprintf(&(waiter[i].path), "%s/device/vbd/%d/eject",
-                     libxl_xs_get_dompath(ctx, domid),
+                     libxl_xs_get_dompath(&gc, domid),
                      device_disk_dev_number(disks[i].virtpath)) < 0)
-            return -1;
+            goto out;
         if (asprintf(&(waiter[i].token), "%d", LIBXL_EVENT_DISK_EJECT) < 0)
-            return -1;
+            goto out;
         xs_watch(ctx->xsh, waiter->path, waiter->token);
     }
-    return 0;
+    rc = 0;
+out:
+    libxl_free_all(&gc);
+    return rc;
 }
 
 int libxl_get_event(libxl_ctx *ctx, libxl_event *event)
@@ -773,49 +823,56 @@ int libxl_event_get_domain_death_info(libxl_ctx *ctx, uint32_t domid, libxl_even
 
 int libxl_event_get_disk_eject_info(libxl_ctx *ctx, uint32_t domid, libxl_event *event, libxl_device_disk *disk)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     char *path;
     char *backend;
     char *value;
 
-    value = libxl_xs_read(ctx, XBT_NULL, event->path);
+    value = libxl_xs_read(&gc, XBT_NULL, event->path);
 
-    if (!value || strcmp(value,  "eject"))
+    if (!value || strcmp(value,  "eject")) {
+        libxl_free_all(&gc);
         return 0;
+    }
 
     path = strdup(event->path);
     path[strlen(path) - 6] = '\0';
-    backend = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/backend", path));
+    backend = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/backend", path));
 
     disk->backend_domid = 0;
     disk->domid = domid;
     disk->physpath = NULL;
     disk->phystype = 0;
     /* this value is returned to the user: do not free right away */
-    disk->virtpath = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/dev", backend));
+    disk->virtpath = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/dev", backend));
     disk->unpluggable = 1;
     disk->readwrite = 0;
     disk->is_cdrom = 1;
 
     free(path);
+    libxl_free_all(&gc);
     return 1;
 }
 
 static int libxl_destroy_device_model(libxl_ctx *ctx, uint32_t domid)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     char *pid;
     int ret;
 
-    pid = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "/local/domain/%d/image/device-model-pid", domid));
+    pid = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "/local/domain/%d/image/device-model-pid", domid));
     if (!pid) {
         int stubdomid = libxl_get_stubdom_id(ctx, domid);
         if (!stubdomid) {
             XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "Couldn't find device model's pid");
-            return ERROR_INVAL;
+            ret = ERROR_INVAL;
+            goto out;
         }
         XL_LOG(ctx, XL_LOG_ERROR, "Device model is a stubdom, domid=%d\n", stubdomid);
-        return libxl_domain_destroy(ctx, stubdomid, 0);
+        ret = libxl_domain_destroy(ctx, stubdomid, 0);
+        goto out;
     }
-    xs_rm(ctx->xsh, XBT_NULL, libxl_sprintf(ctx, "/local/domain/0/device-model/%d", domid));
+    xs_rm(ctx->xsh, XBT_NULL, libxl_sprintf(&gc, "/local/domain/0/device-model/%d", domid));
 
     ret = kill(atoi(pid), SIGHUP);
     if (ret < 0 && errno == ESRCH) {
@@ -828,11 +885,14 @@ static int libxl_destroy_device_model(libxl_ctx *ctx, uint32_t domid)
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "failed to kill Device Model [%d]",
                      atoi(pid));
     }
+out:
+    libxl_free_all(&gc);
     return ret;
 }
 
 int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid, int force)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     char *dom_path;
     char *vm_path;
     int rc, dm_present;
@@ -841,20 +901,21 @@ int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid, int force)
         dm_present = 1;
     } else {
         char *pid;
-        pid = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "/local/domain/%d/image/device-model-pid", domid));
+        pid = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "/local/domain/%d/image/device-model-pid", domid));
         dm_present = (pid != NULL);
-        libxl_free(ctx, pid);
     }
 
-    dom_path = libxl_xs_get_dompath(ctx, domid);
-    if (!dom_path)
-        return ERROR_FAIL;
+    dom_path = libxl_xs_get_dompath(&gc, domid);
+    if (!dom_path) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
 
     if (libxl_device_pci_shutdown(ctx, domid) < 0)
         XL_LOG(ctx, XL_LOG_ERROR, "pci shutdown failed for domid %d", domid);
     if (dm_present) {
         xs_write(ctx->xsh, XBT_NULL,
-                 libxl_sprintf(ctx, "/local/domain/0/device-model/%d/command", domid),
+                 libxl_sprintf(&gc, "/local/domain/0/device-model/%d/command", domid),
                  "shutdown", strlen("shutdown"));
     }
     rc = xc_domain_pause(ctx->xch, domid);
@@ -868,7 +929,7 @@ int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid, int force)
     if (libxl_devices_destroy(ctx, domid, force) < 0)
         XL_LOG(ctx, XL_LOG_ERROR, "libxl_destroy_devices failed for %d", domid);
 
-    vm_path = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/vm", dom_path));
+    vm_path = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/vm", dom_path));
     if (vm_path)
         if (!xs_rm(ctx->xsh, XBT_NULL, vm_path))
             XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xs_rm failed for %s", vm_path);
@@ -881,17 +942,24 @@ int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid, int force)
     rc = xc_domain_destroy(ctx->xch, domid);
     if (rc < 0) {
         XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "xc_domain_destroy failed for %d", domid);
-        return ERROR_FAIL;
+        rc = ERROR_FAIL;
+        goto out;
     }
+    rc = 0;
+out:
+    libxl_free_all(&gc);
     return 0;
 }
 
 int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num)
 {
-    char *p = libxl_sprintf(ctx, "%s/xenconsole", libxl_private_bindir_path());
-    char *domid_s = libxl_sprintf(ctx, "%d", domid);
-    char *cons_num_s = libxl_sprintf(ctx, "%d", cons_num);
-    return execl(p, p, domid_s, "--num", cons_num_s, (void *)NULL) == 0 ? 0 : ERROR_FAIL;
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
+    char *p = libxl_sprintf(&gc, "%s/xenconsole", libxl_private_bindir_path());
+    char *domid_s = libxl_sprintf(&gc, "%d", domid);
+    char *cons_num_s = libxl_sprintf(&gc, "%d", cons_num);
+    execl(p, p, domid_s, "--num", cons_num_s, (void *)NULL);
+    libxl_free_all(&gc);
+    return ERROR_FAIL;
 }
 
 int libxl_primary_console_exec(libxl_ctx *ctx, uint32_t domid_vm)
@@ -905,6 +973,7 @@ int libxl_primary_console_exec(libxl_ctx *ctx, uint32_t domid_vm)
 
 int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     const char *vnc_port, *vfb_back;
     const char *vnc_listen = NULL, *vnc_pass = NULL;
     int port = 0, autopass_fd = -1;
@@ -915,22 +984,22 @@ int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass)
         NULL,
     };
 
-    vnc_port = libxl_xs_read(ctx, XBT_NULL,
-                            libxl_sprintf(ctx,
+    vnc_port = libxl_xs_read(&gc, XBT_NULL,
+                            libxl_sprintf(&gc,
                             "/local/domain/%d/console/vnc-port", domid));
     if ( vnc_port )
         port = atoi(vnc_port) - 5900;
 
-    vfb_back = libxl_xs_read(ctx, XBT_NULL,
-                            libxl_sprintf(ctx,
+    vfb_back = libxl_xs_read(&gc, XBT_NULL,
+                            libxl_sprintf(&gc,
                             "/local/domain/%d/device/vfb/0/backend", domid));
     if ( vfb_back ) {
-        vnc_listen = libxl_xs_read(ctx, XBT_NULL,
-                            libxl_sprintf(ctx,
+        vnc_listen = libxl_xs_read(&gc, XBT_NULL,
+                            libxl_sprintf(&gc,
                             "/local/domain/%d/console/vnc-listen", domid));
         if ( autopass )
-            vnc_pass = libxl_xs_read(ctx, XBT_NULL,
-                            libxl_sprintf(ctx,
+            vnc_pass = libxl_xs_read(&gc, XBT_NULL,
+                            libxl_sprintf(&gc,
                             "/local/domain/%d/console/vnc-pass", domid));
     }
 
@@ -940,7 +1009,7 @@ int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass)
     if ( (vnc_bin = getenv("VNCVIEWER")) )
         args[0] = vnc_bin;
 
-    args[1] = libxl_sprintf(ctx, "%s:%d", vnc_listen, port);
+    args[1] = libxl_sprintf(&gc, "%s:%d", vnc_listen, port);
 
     if ( vnc_pass ) {
         char tmpname[] = "/tmp/vncautopass.XXXXXX";
@@ -962,11 +1031,12 @@ int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass)
     }
 
 skip_autopass:
+    libxl_free_all(&gc);
     libxl_exec(autopass_fd, -1, -1, args[0], args);
     return 0;
 }
 
-static char ** libxl_build_device_model_args_old(libxl_ctx *ctx,
+static char ** libxl_build_device_model_args_old(libxl_gc *gc,
                                              libxl_device_model_info *info,
                                              libxl_device_nic *vifs,
                                              int num_vifs)
@@ -974,13 +1044,14 @@ static char ** libxl_build_device_model_args_old(libxl_ctx *ctx,
     int num = 0, i;
     flexarray_t *dm_args;
     dm_args = flexarray_make(16, 1);
+
     if (!dm_args)
         return NULL;
 
     flexarray_set(dm_args, num++, "qemu-dm");
     flexarray_set(dm_args, num++, "-d");
 
-    flexarray_set(dm_args, num++, libxl_sprintf(ctx, "%d", info->domid));
+    flexarray_set(dm_args, num++, libxl_sprintf(gc, "%d", info->domid));
 
     if (info->dom_name) {
         flexarray_set(dm_args, num++, "-domain-name");
@@ -992,18 +1063,18 @@ static char ** libxl_build_device_model_args_old(libxl_ctx *ctx,
             if (info->vnclisten && strchr(info->vnclisten, ':') == NULL) {
                 flexarray_set(
                     dm_args, num++,
-                    libxl_sprintf(ctx, "%s:%d%s",
+                    libxl_sprintf(gc, "%s:%d%s",
                                   info->vnclisten,
                                   info->vncdisplay,
                                   info->vncpasswd ? ",password" : ""));
             } else {
-                flexarray_set(dm_args, num++, libxl_sprintf(ctx, "127.0.0.1:%d", info->vncdisplay));
+                flexarray_set(dm_args, num++, libxl_sprintf(gc, "127.0.0.1:%d", info->vncdisplay));
             }
         } else if (info->vnclisten) {
             if (strchr(info->vnclisten, ':') != NULL) {
                 flexarray_set(dm_args, num++, info->vnclisten);
             } else {
-                flexarray_set(dm_args, num++, libxl_sprintf(ctx, "%s:0", info->vnclisten));
+                flexarray_set(dm_args, num++, libxl_sprintf(gc, "%s:0", info->vnclisten));
             }
         } else {
             flexarray_set(dm_args, num++, "127.0.0.1:0");
@@ -1034,7 +1105,7 @@ static char ** libxl_build_device_model_args_old(libxl_ctx *ctx,
 
         if (info->videoram) {
             flexarray_set(dm_args, num++, "-videoram");
-            flexarray_set(dm_args, num++, libxl_sprintf(ctx, "%d", info->videoram));
+            flexarray_set(dm_args, num++, libxl_sprintf(gc, "%d", info->videoram));
         }
         if (info->stdvga) {
             flexarray_set(dm_args, num++, "-std-vga");
@@ -1060,24 +1131,24 @@ static char ** libxl_build_device_model_args_old(libxl_ctx *ctx,
         }
         if (info->vcpus > 1) {
             flexarray_set(dm_args, num++, "-vcpus");
-            flexarray_set(dm_args, num++, libxl_sprintf(ctx, "%d", info->vcpus));
+            flexarray_set(dm_args, num++, libxl_sprintf(gc, "%d", info->vcpus));
         }
         if (info->vcpu_avail) {
             flexarray_set(dm_args, num++, "-vcpu_avail");
-            flexarray_set(dm_args, num++, libxl_sprintf(ctx, "0x%x", info->vcpu_avail));
+            flexarray_set(dm_args, num++, libxl_sprintf(gc, "0x%x", info->vcpu_avail));
         }
         for (i = 0; i < num_vifs; i++) {
             if (vifs[i].nictype == NICTYPE_IOEMU) {
-                char *smac = libxl_sprintf(ctx, "%02x:%02x:%02x:%02x:%02x:%02x",
+                char *smac = libxl_sprintf(gc, "%02x:%02x:%02x:%02x:%02x:%02x",
                                            vifs[i].mac[0], vifs[i].mac[1], vifs[i].mac[2],
                                            vifs[i].mac[3], vifs[i].mac[4], vifs[i].mac[5]);
                 if (!vifs[i].ifname)
-                    vifs[i].ifname = libxl_sprintf(ctx, "tap%d.%d", info->domid, vifs[i].devid);
+                    vifs[i].ifname = libxl_sprintf(gc, "tap%d.%d", info->domid, vifs[i].devid);
                 flexarray_set(dm_args, num++, "-net");
-                flexarray_set(dm_args, num++, libxl_sprintf(ctx, "nic,vlan=%d,macaddr=%s,model=%s",
+                flexarray_set(dm_args, num++, libxl_sprintf(gc, "nic,vlan=%d,macaddr=%s,model=%s",
                             vifs[i].devid, smac, vifs[i].model));
                 flexarray_set(dm_args, num++, "-net");
-                flexarray_set(dm_args, num++, libxl_sprintf(ctx, "tap,vlan=%d,ifname=%s,bridge=%s,script=no",
+                flexarray_set(dm_args, num++, libxl_sprintf(gc, "tap,vlan=%d,ifname=%s,bridge=%s,script=no",
                             vifs[i].devid, vifs[i].ifname, vifs[i].bridge));
                 ioemu_vifs++;
             }
@@ -1103,7 +1174,7 @@ static char ** libxl_build_device_model_args_old(libxl_ctx *ctx,
     return (char **) flexarray_contents(dm_args);
 }
 
-static char ** libxl_build_device_model_args_new(libxl_ctx *ctx,
+static char ** libxl_build_device_model_args_new(libxl_gc *gc,
                                              libxl_device_model_info *info,
                                              libxl_device_nic *vifs,
                                              int num_vifs)
@@ -1120,7 +1191,7 @@ static char ** libxl_build_device_model_args_new(libxl_ctx *ctx,
     flexarray_set(dm_args, num++, "qemu-system-xen");
     flexarray_set(dm_args, num++, "-xen-domid");
 
-    flexarray_set(dm_args, num++, libxl_sprintf(ctx, "%d", info->domid));
+    flexarray_set(dm_args, num++, libxl_sprintf(gc, "%d", info->domid));
 
     if (info->dom_name) {
         flexarray_set(dm_args, num++, "-name");
@@ -1143,11 +1214,11 @@ static char ** libxl_build_device_model_args_new(libxl_ctx *ctx,
 
         if (strchr(listen, ':') != NULL)
             flexarray_set(dm_args, num++,
-                    libxl_sprintf(ctx, "%s%s", listen,
+                    libxl_sprintf(gc, "%s%s", listen,
                         info->vncunused ? ",to=99" : ""));
         else
             flexarray_set(dm_args, num++,
-                    libxl_sprintf(ctx, "%s:%d%s", listen, display,
+                    libxl_sprintf(gc, "%s:%d%s", listen, display,
                         info->vncunused ? ",to=99" : ""));
     }
     if (info->sdl) {
@@ -1174,7 +1245,7 @@ static char ** libxl_build_device_model_args_new(libxl_ctx *ctx,
 
         if (info->boot) {
             flexarray_set(dm_args, num++, "-boot");
-            flexarray_set(dm_args, num++, libxl_sprintf(ctx, "order=%s", info->boot));
+            flexarray_set(dm_args, num++, libxl_sprintf(gc, "order=%s", info->boot));
         }
         if (info->usb || info->usbdevice) {
             flexarray_set(dm_args, num++, "-usb");
@@ -1193,22 +1264,22 @@ static char ** libxl_build_device_model_args_new(libxl_ctx *ctx,
         if (info->vcpus > 1) {
             flexarray_set(dm_args, num++, "-smp");
             if (info->vcpu_avail)
-                flexarray_set(dm_args, num++, libxl_sprintf(ctx, "%d,maxcpus=%d", info->vcpus, info->vcpu_avail));
+                flexarray_set(dm_args, num++, libxl_sprintf(gc, "%d,maxcpus=%d", info->vcpus, info->vcpu_avail));
             else
-                flexarray_set(dm_args, num++, libxl_sprintf(ctx, "%d", info->vcpus));
+                flexarray_set(dm_args, num++, libxl_sprintf(gc, "%d", info->vcpus));
         }
         for (i = 0; i < num_vifs; i++) {
             if (vifs[i].nictype == NICTYPE_IOEMU) {
-                char *smac = libxl_sprintf(ctx, "%02x:%02x:%02x:%02x:%02x:%02x",
+                char *smac = libxl_sprintf(gc, "%02x:%02x:%02x:%02x:%02x:%02x",
                                            vifs[i].mac[0], vifs[i].mac[1], vifs[i].mac[2],
                                            vifs[i].mac[3], vifs[i].mac[4], vifs[i].mac[5]);
                 if (!vifs[i].ifname)
-                    vifs[i].ifname = libxl_sprintf(ctx, "tap%d.%d", info->domid, vifs[i].devid);
+                    vifs[i].ifname = libxl_sprintf(gc, "tap%d.%d", info->domid, vifs[i].devid);
                 flexarray_set(dm_args, num++, "-net");
-                flexarray_set(dm_args, num++, libxl_sprintf(ctx, "nic,vlan=%d,macaddr=%s,model=%s",
+                flexarray_set(dm_args, num++, libxl_sprintf(gc, "nic,vlan=%d,macaddr=%s,model=%s",
                             vifs[i].devid, smac, vifs[i].model));
                 flexarray_set(dm_args, num++, "-net");
-                flexarray_set(dm_args, num++, libxl_sprintf(ctx, "tap,vlan=%d,ifname=%s,script=no",
+                flexarray_set(dm_args, num++, libxl_sprintf(gc, "tap,vlan=%d,ifname=%s,script=no",
                             vifs[i].devid, vifs[i].ifname));
                 ioemu_vifs++;
             }
@@ -1231,34 +1302,36 @@ static char ** libxl_build_device_model_args_new(libxl_ctx *ctx,
     else
         flexarray_set(dm_args, num++, "xenfv");
 
-    disks = libxl_device_disk_list(ctx, info->domid, &nb);
+    disks = libxl_device_disk_list(libxl_gc_owner(gc), info->domid, &nb);
     for (; nb > 0; --nb, ++disks) {
         if ( disks->is_cdrom ) {
             flexarray_set(dm_args, num++, "-cdrom");
             flexarray_set(dm_args, num++, disks->physpath);
         }else{
-            flexarray_set(dm_args, num++, libxl_sprintf(ctx, "-%s", disks->virtpath));
+            flexarray_set(dm_args, num++, libxl_sprintf(gc, "-%s", disks->virtpath));
             flexarray_set(dm_args, num++, disks->physpath);
         }
     }
+    free(disks);
 
     flexarray_set(dm_args, num++, NULL);
     return (char **) flexarray_contents(dm_args);
 }
 
-static char ** libxl_build_device_model_args(libxl_ctx *ctx,
+static char ** libxl_build_device_model_args(libxl_gc *gc,
                                              libxl_device_model_info *info,
                                              libxl_device_nic *vifs,
                                              int num_vifs)
 {
+    libxl_ctx *ctx = libxl_gc_owner(gc);
     int new_qemu;
 
     new_qemu = libxl_check_device_model_version(ctx, info->device_model);
 
     if (new_qemu == 1) {
-        return libxl_build_device_model_args_new(ctx, info, vifs, num_vifs);
+        return libxl_build_device_model_args_new(gc, info, vifs, num_vifs);
     } else {
-        return libxl_build_device_model_args_old(ctx, info, vifs, num_vifs);
+        return libxl_build_device_model_args_old(gc, info, vifs, num_vifs);
     }
 }
 
@@ -1309,6 +1382,7 @@ static int libxl_vfb_and_vkb_from_device_model_info(libxl_ctx *ctx,
 
 static int libxl_write_dmargs(libxl_ctx *ctx, int domid, int guest_domid, char **args)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     int i;
     char *vm_path;
     char *dmargs, *path;
@@ -1321,7 +1395,7 @@ static int libxl_write_dmargs(libxl_ctx *ctx, int domid, int guest_domid, char *
     roperm[1].id = domid;
     roperm[1].perms = XS_PERM_READ;
 
-    vm_path = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "/local/domain/%d/vm", guest_domid));
+    vm_path = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "/local/domain/%d/vm", guest_domid));
 
     i = 0;
     dmargs_size = 0;
@@ -1340,17 +1414,18 @@ static int libxl_write_dmargs(libxl_ctx *ctx, int domid, int guest_domid, char *
         }
         i++;
     }
-    path = libxl_sprintf(ctx, "%s/image/dmargs", vm_path);
+    path = libxl_sprintf(&gc, "%s/image/dmargs", vm_path);
 
 retry_transaction:
     t = xs_transaction_start(ctx->xsh);
     xs_write(ctx->xsh, t, path, dmargs, strlen(dmargs));
     xs_set_permissions(ctx->xsh, t, path, roperm, ARRAY_SIZE(roperm));
-    xs_set_permissions(ctx->xsh, t, libxl_sprintf(ctx, "%s/rtc/timeoffset", vm_path), roperm, ARRAY_SIZE(roperm));
+    xs_set_permissions(ctx->xsh, t, libxl_sprintf(&gc, "%s/rtc/timeoffset", vm_path), roperm, ARRAY_SIZE(roperm));
     if (!xs_transaction_end(ctx->xsh, t, 0))
         if (errno == EAGAIN)
             goto retry_transaction;
     free(dmargs);
+    libxl_free_all(&gc);
     return 0;
 }
 
@@ -1362,6 +1437,7 @@ static int libxl_create_stubdom(libxl_ctx *ctx,
                                 libxl_device_vkb *vkb,
                                 libxl_device_model_starting **starting_r)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     int i, num_console = 1, ret;
     libxl_device_console *console;
     libxl_domain_create_info c_info;
@@ -1373,13 +1449,15 @@ static int libxl_create_stubdom(libxl_ctx *ctx,
     xs_transaction_t t;
     libxl_device_model_starting *dm_starting = 0;
 
-    args = libxl_build_device_model_args(ctx, info, vifs, num_vifs);
-    if (!args)
-        return ERROR_FAIL;
+    args = libxl_build_device_model_args(&gc, info, vifs, num_vifs);
+    if (!args) {
+        ret = ERROR_FAIL;
+        goto out;
+    }
 
     memset(&c_info, 0x00, sizeof(libxl_domain_create_info));
     c_info.hvm = 0;
-    c_info.name = libxl_sprintf(ctx, "%s-dm", _libxl_domid_to_name(ctx, info->domid));
+    c_info.name = libxl_sprintf(&gc, "%s-dm", _libxl_domid_to_name(&gc, info->domid));
     for (i = 0; i < 16; i++)
         c_info.uuid[i] = info->uuid[i];
 
@@ -1387,28 +1465,31 @@ static int libxl_create_stubdom(libxl_ctx *ctx,
     b_info.max_vcpus = 1;
     b_info.max_memkb = 32 * 1024;
     b_info.target_memkb = b_info.max_memkb;
-    b_info.kernel.path = libxl_abs_path(ctx, "ioemu-stubdom.gz", libxl_xenfirmwaredir_path());
-    b_info.u.pv.cmdline = libxl_sprintf(ctx, " -d %d", info->domid);
+    b_info.kernel.path = libxl_abs_path(&gc, "ioemu-stubdom.gz", libxl_xenfirmwaredir_path());
+    b_info.u.pv.cmdline = libxl_sprintf(&gc, " -d %d", info->domid);
     b_info.u.pv.ramdisk.path = "";
     b_info.u.pv.features = "";
     b_info.hvm = 0;
 
     ret = libxl_domain_make(ctx, &c_info, &domid);
-    if (ret) return ret;
+    if (ret)
+        goto out_free;
     ret = libxl_domain_build(ctx, &b_info, domid, &state);
-    if (ret) return ret;
+    if (ret)
+        goto out_free;
 
     libxl_write_dmargs(ctx, domid, info->domid, args);
-    libxl_xs_write(ctx, XBT_NULL,
-                   libxl_sprintf(ctx, "%s/image/device-model-domid", libxl_xs_get_dompath(ctx, info->domid)),
+    libxl_xs_write(&gc, XBT_NULL,
+                   libxl_sprintf(&gc, "%s/image/device-model-domid", libxl_xs_get_dompath(&gc, info->domid)),
                    "%d", domid);
-    libxl_xs_write(ctx, XBT_NULL,
-                   libxl_sprintf(ctx, "%s/target", libxl_xs_get_dompath(ctx, domid)),
+    libxl_xs_write(&gc, XBT_NULL,
+                   libxl_sprintf(&gc, "%s/target", libxl_xs_get_dompath(&gc, domid)),
                    "%d", info->domid);
     ret = xc_domain_set_target(ctx->xch, domid, info->domid);
     if (ret<0) {
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "setting target domain %d -> %d", domid, info->domid);
-        return ERROR_FAIL;
+        ret = ERROR_FAIL;
+        goto out_free;
     }
     xs_set_target(ctx->xsh, domid, info->domid);
 
@@ -1418,10 +1499,10 @@ static int libxl_create_stubdom(libxl_ctx *ctx,
     perm[1].perms = XS_PERM_READ;
 retry_transaction:
     t = xs_transaction_start(ctx->xsh);
-    xs_mkdir(ctx->xsh, t, libxl_sprintf(ctx, "/local/domain/0/device-model/%d", info->domid));
-    xs_set_permissions(ctx->xsh, t, libxl_sprintf(ctx, "/local/domain/0/device-model/%d", info->domid), perm, ARRAY_SIZE(perm));
-    xs_mkdir(ctx->xsh, t, libxl_sprintf(ctx, "/local/domain/%d/device/vfs", domid));
-    xs_set_permissions(ctx->xsh, t, libxl_sprintf(ctx, "/local/domain/%d/device/vfs",domid), perm, ARRAY_SIZE(perm));
+    xs_mkdir(ctx->xsh, t, libxl_sprintf(&gc, "/local/domain/0/device-model/%d", info->domid));
+    xs_set_permissions(ctx->xsh, t, libxl_sprintf(&gc, "/local/domain/0/device-model/%d", info->domid), perm, ARRAY_SIZE(perm));
+    xs_mkdir(ctx->xsh, t, libxl_sprintf(&gc, "/local/domain/%d/device/vfs", domid));
+    xs_set_permissions(ctx->xsh, t, libxl_sprintf(&gc, "/local/domain/%d/device/vfs",domid), perm, ARRAY_SIZE(perm));
     if (!xs_transaction_end(ctx->xsh, t, 0))
         if (errno == EAGAIN)
             goto retry_transaction;
@@ -1429,26 +1510,32 @@ retry_transaction:
     for (i = 0; i < num_disks; i++) {
         disks[i].domid = domid;
         ret = libxl_device_disk_add(ctx, domid, &disks[i]);
-        if (ret) return ret;
+        if (ret)
+            goto out_free;
     }
     for (i = 0; i < num_vifs; i++) {
         vifs[i].domid = domid;
         ret = libxl_device_nic_add(ctx, domid, &vifs[i]);
-        if (ret) return ret;
+        if (ret)
+            goto out_free;
     }
     vfb->domid = domid;
     ret = libxl_device_vfb_add(ctx, domid, vfb);
-    if (ret) return ret;
+    if (ret)
+        goto out_free;
     vkb->domid = domid;
     ret = libxl_device_vkb_add(ctx, domid, vkb);
-    if (ret) return ret;
+    if (ret)
+        goto out_free;
 
     if (info->serial)
         num_console++;
 
-    console = libxl_calloc(ctx, num_console, sizeof(libxl_device_console));
-    if (!console)
-        return ERROR_NOMEM;
+    console = libxl_calloc(&gc, num_console, sizeof(libxl_device_console));
+    if (!console) {
+        ret = ERROR_NOMEM;
+        goto out_free;
+    }
 
     for (i = 0; i < num_console; i++) {
         console[i].devid = i;
@@ -1457,28 +1544,34 @@ retry_transaction:
         if (!i)
             console[i].build_state = &state;
         ret = libxl_device_console_add(ctx, domid, &console[i]);
-        if (ret) return ret;
+        if (ret)
+            goto out_free;
     }
     if (libxl_create_xenpv_qemu(ctx, vfb, num_console, console, &dm_starting) < 0) {
-        free(args);
-        return ERROR_FAIL;
+        ret = ERROR_FAIL;
+        goto out_free;
     }
     if (libxl_confirm_device_model_startup(ctx, dm_starting) < 0) {
-        free(args);
-        return ERROR_FAIL;
+        ret = ERROR_FAIL;
+        goto out_free;
     }
 
     libxl_domain_unpause(ctx, domid);
 
     if (starting_r) {
-        *starting_r = libxl_calloc(ctx, sizeof(libxl_device_model_starting), 1);
+        *starting_r = calloc(sizeof(libxl_device_model_starting), 1);
         (*starting_r)->domid = info->domid;
-        (*starting_r)->dom_path = libxl_xs_get_dompath(ctx, info->domid);
+        (*starting_r)->dom_path = libxl_xs_get_dompath(&gc, info->domid);
         (*starting_r)->for_spawn = NULL;
     }
 
+    ret = 0;
+
+out_free:
     free(args);
-    return 0;
+out:
+    libxl_free_all(&gc);
+    return ret;
 }
 
 int libxl_create_device_model(libxl_ctx *ctx,
@@ -1487,6 +1580,7 @@ int libxl_create_device_model(libxl_ctx *ctx,
                               libxl_device_nic *vifs, int num_vifs,
                               libxl_device_model_starting **starting_r)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     char *path, *logfile;
     int logfile_w, null;
     int rc;
@@ -1501,48 +1595,55 @@ int libxl_create_device_model(libxl_ctx *ctx,
         libxl_device_vkb vkb;
 
         libxl_vfb_and_vkb_from_device_model_info(ctx, info, &vfb, &vkb);
-        return libxl_create_stubdom(ctx, info, disks, num_disks, vifs, num_vifs, &vfb, &vkb, starting_r);
+        rc = libxl_create_stubdom(ctx, info, disks, num_disks, vifs, num_vifs, &vfb, &vkb, starting_r);
+        goto out;
     }
 
-    args = libxl_build_device_model_args(ctx, info, vifs, num_vifs);
-    if (!args)
-        return ERROR_FAIL;
+    args = libxl_build_device_model_args(&gc, info, vifs, num_vifs);
+    if (!args) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
 
-    path = libxl_sprintf(ctx, "/local/domain/0/device-model/%d", info->domid);
+    path = libxl_sprintf(&gc, "/local/domain/0/device-model/%d", info->domid);
     xs_mkdir(ctx->xsh, XBT_NULL, path);
-    libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/disable_pf", path), "%d", !info->xen_platform_pci);
+    libxl_xs_write(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/disable_pf", path), "%d", !info->xen_platform_pci);
 
-    libxl_create_logfile(ctx, libxl_sprintf(ctx, "qemu-dm-%s", info->dom_name), &logfile);
+    libxl_create_logfile(ctx, libxl_sprintf(&gc, "qemu-dm-%s", info->dom_name), &logfile);
     logfile_w = open(logfile, O_WRONLY|O_CREAT, 0644);
     free(logfile);
     null = open("/dev/null", O_RDONLY);
 
     if (starting_r) {
         rc = ERROR_NOMEM;
-        *starting_r = libxl_calloc(ctx, sizeof(libxl_device_model_starting), 1);
-        if (!*starting_r) goto xit;
+        *starting_r = calloc(sizeof(libxl_device_model_starting), 1);
+        if (!*starting_r)
+            goto out_close;
         p = *starting_r;
-        p->for_spawn = libxl_calloc(ctx, sizeof(libxl_spawn_starting), 1);
+        p->for_spawn = calloc(sizeof(libxl_spawn_starting), 1);
     } else {
         p = &buf_starting;
         p->for_spawn = NULL;
     }
 
     p->domid = info->domid;
-    p->dom_path = libxl_xs_get_dompath(ctx, info->domid);
-    if (!p->dom_path) { libxl_free(ctx, p); return ERROR_FAIL; }
+    p->dom_path = libxl_xs_get_dompath(&gc, info->domid);
+    if (!p->dom_path) {
+        rc = ERROR_FAIL;
+        goto out_close;
+    }
 
     if (info->vncpasswd) {
-    retry_transaction:
+retry_transaction:
         /* Find uuid and the write the vnc password to xenstore for qemu. */
         t = xs_transaction_start(ctx->xsh);
-        vm_path = libxl_xs_read(ctx,t,libxl_sprintf(ctx, "%s/vm", p->dom_path));
+        vm_path = libxl_xs_read(&gc,t,libxl_sprintf(&gc, "%s/vm", p->dom_path));
         if (vm_path) {
             /* Now write the vncpassword into it. */
-            pass_stuff = libxl_calloc(ctx, 2, sizeof(char *));
+            pass_stuff = libxl_calloc(&gc, 2, sizeof(char *));
             pass_stuff[0] = "vncpasswd";
             pass_stuff[1] = info->vncpasswd;
-            libxl_xs_writev(ctx,t,vm_path,pass_stuff);
+            libxl_xs_writev(&gc,t,vm_path,pass_stuff);
             if (!xs_transaction_end(ctx->xsh, t, 0))
                 if (errno == EAGAIN)
                     goto retry_transaction;
@@ -1550,19 +1651,22 @@ int libxl_create_device_model(libxl_ctx *ctx,
     }
 
     rc = libxl_spawn_spawn(ctx, p, "device model", dm_xenstore_record_pid);
-    if (rc < 0) goto xit;
+    if (rc < 0)
+        goto out_close;
     if (!rc) { /* inner child */
         libxl_exec(null, logfile_w, logfile_w,
-                   libxl_abs_path(ctx, info->device_model, libxl_private_bindir_path()),
+                   libxl_abs_path(&gc, info->device_model, libxl_private_bindir_path()),
                    args);
     }
 
     rc = 0;
- xit:
-    free(args);
+
+out_close:
     close(null);
     close(logfile_w);
-
+    free(args);
+out:
+    libxl_free_all(&gc);
     return rc;
 }
 
@@ -1571,8 +1675,9 @@ int libxl_detach_device_model(libxl_ctx *ctx,
 {
     int rc;
     rc = libxl_spawn_detach(ctx, starting->for_spawn);
-    if (starting->for_spawn) libxl_free(ctx, starting->for_spawn);
-    libxl_free(ctx, starting);
+    if (starting->for_spawn)
+        free(starting->for_spawn);
+    free(starting);
     return rc;
 }
 
@@ -1591,29 +1696,30 @@ int libxl_confirm_device_model_startup(libxl_ctx *ctx,
 
 /******************************************************************************/
 
-static char *get_blktap2_device(libxl_ctx *ctx,
+static char *get_blktap2_device(libxl_gc *gc,
 				const char *name, const char *type)
 {
     int minor = tap_ctl_find_minor(type, name);
     if (minor < 0)
         return NULL;
-    return libxl_sprintf(ctx, "/dev/xen/blktap-2/tapdev%d", minor);
+    return libxl_sprintf(gc, "/dev/xen/blktap-2/tapdev%d", minor);
 }
 
-static char *make_blktap2_device(libxl_ctx *ctx,
+static char *make_blktap2_device(libxl_gc *gc,
 				 const char *name, const char *type)
 {
     char *params, *devname = NULL;
     int err;
-    params = libxl_sprintf(ctx, "%s:%s", type, name);
+    params = libxl_sprintf(gc, "%s:%s", type, name);
     err = tap_ctl_create(params, &devname);
     if (!err)
-        libxl_ptr_add(ctx, devname);
+        libxl_ptr_add(gc, devname);
     return err ? NULL : devname;
 }
 
 int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     flexarray_t *front;
     flexarray_t *back;
     char *backend_type;
@@ -1621,21 +1727,26 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
     unsigned int foffset = 0;
     int devid;
     libxl_device device;
-    int major, minor;
+    int major, minor, rc;
 
     front = flexarray_make(16, 1);
-    if (!front)
-        return ERROR_NOMEM;
+    if (!front) {
+        rc = ERROR_NOMEM;
+        goto out;
+    }
     back = flexarray_make(16, 1);
-    if (!back) /* leaks front if error */
-        return ERROR_NOMEM;
+    if (!back) {
+        rc = ERROR_NOMEM;
+        goto out_free;
+    }
 
     backend_type = device_disk_backend_type_of_phystype(disk->phystype);
     devid = device_disk_dev_number(disk->virtpath);
     if (devid==-1) {
         XL_LOG(ctx, XL_LOG_ERROR, "Invalid or unsupported"
                " virtual disk identifier %s", disk->virtpath);
-        return ERROR_INVAL;
+        rc = ERROR_INVAL;
+        goto out_free;
     }
 
     device.backend_devid = devid;
@@ -1649,7 +1760,7 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
 
             device_physdisk_major_minor(disk->physpath, &major, &minor);
             flexarray_set(back, boffset++, "physical-device");
-            flexarray_set(back, boffset++, libxl_sprintf(ctx, "%x:%x", major, minor));
+            flexarray_set(back, boffset++, libxl_sprintf(&gc, "%x:%x", major, minor));
 
             flexarray_set(back, boffset++, "params");
             flexarray_set(back, boffset++, disk->physpath);
@@ -1665,25 +1776,27 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
             if (!tap_ctl_check(&msg)) {
                 const char *type = device_disk_string_of_phystype(disk->phystype);
                 char *dev;
-                dev = get_blktap2_device(ctx, disk->physpath, type);
+                dev = get_blktap2_device(&gc, disk->physpath, type);
                 if (!dev)
-                    dev = make_blktap2_device(ctx, disk->physpath, type);
-                if (!dev)
-                    return ERROR_FAIL;
+                    dev = make_blktap2_device(&gc, disk->physpath, type);
+                if (!dev) {
+                    rc = ERROR_FAIL;
+                    goto out_free;
+                }
                 flexarray_set(back, boffset++, "tapdisk-params");
-                flexarray_set(back, boffset++, libxl_sprintf(ctx, "%s:%s", device_disk_string_of_phystype(disk->phystype), disk->physpath));
+                flexarray_set(back, boffset++, libxl_sprintf(&gc, "%s:%s", device_disk_string_of_phystype(disk->phystype), disk->physpath));
                 flexarray_set(back, boffset++, "params");
-                flexarray_set(back, boffset++, libxl_strdup(ctx, dev));
+                flexarray_set(back, boffset++, libxl_strdup(&gc, dev));
                 backend_type = "phy";
                 device_physdisk_major_minor(dev, &major, &minor);
                 flexarray_set(back, boffset++, "physical-device");
-                flexarray_set(back, boffset++, libxl_sprintf(ctx, "%x:%x", major, minor));
+                flexarray_set(back, boffset++, libxl_sprintf(&gc, "%x:%x", major, minor));
                 device.backend_kind = DEVICE_VBD;
 
                 break;
             }
             flexarray_set(back, boffset++, "params");
-            flexarray_set(back, boffset++, libxl_sprintf(ctx, "%s:%s",
+            flexarray_set(back, boffset++, libxl_sprintf(&gc, "%s:%s",
                           device_disk_string_of_phystype(disk->phystype), disk->physpath));
 
             device.backend_kind = DEVICE_TAP;
@@ -1691,19 +1804,20 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
         }
         default:
             XL_LOG(ctx, XL_LOG_ERROR, "unrecognized disk physical type: %d\n", disk->phystype);
-            return ERROR_INVAL;
+            rc = ERROR_INVAL;
+            goto out_free;
     }
 
     flexarray_set(back, boffset++, "frontend-id");
-    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", disk->domid));
+    flexarray_set(back, boffset++, libxl_sprintf(&gc, "%d", disk->domid));
     flexarray_set(back, boffset++, "online");
     flexarray_set(back, boffset++, "1");
     flexarray_set(back, boffset++, "removable");
-    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", (disk->unpluggable) ? 1 : 0));
+    flexarray_set(back, boffset++, libxl_sprintf(&gc, "%d", (disk->unpluggable) ? 1 : 0));
     flexarray_set(back, boffset++, "bootable");
-    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", 1));
+    flexarray_set(back, boffset++, libxl_sprintf(&gc, "%d", 1));
     flexarray_set(back, boffset++, "state");
-    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", 1));
+    flexarray_set(back, boffset++, libxl_sprintf(&gc, "%d", 1));
     flexarray_set(back, boffset++, "dev");
     flexarray_set(back, boffset++, disk->virtpath);
     flexarray_set(back, boffset++, "type");
@@ -1712,11 +1826,11 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
     flexarray_set(back, boffset++, disk->readwrite ? "w" : "r");
 
     flexarray_set(front, foffset++, "backend-id");
-    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", disk->backend_domid));
+    flexarray_set(front, foffset++, libxl_sprintf(&gc, "%d", disk->backend_domid));
     flexarray_set(front, foffset++, "state");
-    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", 1));
+    flexarray_set(front, foffset++, libxl_sprintf(&gc, "%d", 1));
     flexarray_set(front, foffset++, "virtual-device");
-    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", devid));
+    flexarray_set(front, foffset++, libxl_sprintf(&gc, "%d", devid));
     flexarray_set(front, foffset++, "device-type");
     flexarray_set(front, foffset++, disk->is_cdrom ? "cdrom" : "disk");
 
@@ -1726,11 +1840,17 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
     }
 
     libxl_device_generic_add(ctx, &device,
-                             libxl_xs_kvs_of_flexarray(ctx, back, boffset),
-                             libxl_xs_kvs_of_flexarray(ctx, front, foffset));
+                             libxl_xs_kvs_of_flexarray(&gc, back, boffset),
+                             libxl_xs_kvs_of_flexarray(&gc, front, foffset));
+
+    rc = 0;
+
+out_free:
     flexarray_free(back);
     flexarray_free(front);
-    return 0;
+out:
+    libxl_free_all(&gc);
+    return rc;
 }
 
 int libxl_device_disk_del(libxl_ctx *ctx, 
@@ -1750,9 +1870,10 @@ int libxl_device_disk_del(libxl_ctx *ctx,
     return libxl_device_del(ctx, &device, wait);
 }
 
-const char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *disk)
+char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *disk)
 {
-    char *dev = NULL;
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
+    char *dev = NULL, *ret;
     int phystype = disk->phystype;
     switch (phystype) {
         case PHYSTYPE_PHY: {
@@ -1767,9 +1888,9 @@ const char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *d
             const char *msg;
             if (!tap_ctl_check(&msg)) {
                 const char *type = device_disk_string_of_phystype(phystype);
-                dev = get_blktap2_device(ctx, disk->physpath, type);
+                dev = get_blktap2_device(&gc, disk->physpath, type);
                 if (!dev)
-                    dev = make_blktap2_device(ctx, disk->physpath, type);
+                    dev = make_blktap2_device(&gc, disk->physpath, type);
             }
             break;
         }
@@ -1777,7 +1898,9 @@ const char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *d
             XL_LOG(ctx, XL_LOG_ERROR, "unrecognized disk physical type: %d\n", phystype);
             break;
     }
-    return dev;
+    ret = strdup(dev);
+    libxl_free_all(&gc);
+    return ret;
 }
 
 int libxl_device_disk_local_detach(libxl_ctx *ctx, libxl_device_disk *disk)
@@ -1795,31 +1918,36 @@ int libxl_device_disk_local_detach(libxl_ctx *ctx, libxl_device_disk *disk)
 /******************************************************************************/
 int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     flexarray_t *front;
     flexarray_t *back;
     unsigned int boffset = 0;
     unsigned int foffset = 0;
     libxl_device device;
     char *dompath, **l;
-    unsigned int nb;
+    unsigned int nb, rc;
 
     front = flexarray_make(16, 1);
-    if (!front)
-        return ERROR_NOMEM;
+    if (!front) {
+        rc = ERROR_NOMEM;
+        goto out;
+    }
     back = flexarray_make(16, 1);
-    if (!back)
-        return ERROR_NOMEM;
+    if (!back) {
+        rc = ERROR_NOMEM;
+        goto out_free;
+    }
 
     if (nic->devid == -1) {
-        if (!(dompath = libxl_xs_get_dompath(ctx, domid))) {
-            return ERROR_FAIL;
+        if (!(dompath = libxl_xs_get_dompath(&gc, domid))) {
+            rc = ERROR_FAIL;
+            goto out_free;
         }
-        if (!(l = libxl_xs_directory(ctx, XBT_NULL,
-                                     libxl_sprintf(ctx, "%s/device/vif", dompath), &nb))) {
+        if (!(l = libxl_xs_directory(&gc, XBT_NULL,
+                                     libxl_sprintf(&gc, "%s/device/vif", dompath), &nb))) {
             nic->devid = 0;
         } else {
             nic->devid = strtoul(l[nb - 1], NULL, 10) + 1;
-            libxl_free(ctx, l);
         }
     }
 
@@ -1831,30 +1959,30 @@ int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic)
     device.kind = DEVICE_VIF;
 
     flexarray_set(back, boffset++, "frontend-id");
-    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", nic->domid));
+    flexarray_set(back, boffset++, libxl_sprintf(&gc, "%d", nic->domid));
     flexarray_set(back, boffset++, "online");
     flexarray_set(back, boffset++, "1");
     flexarray_set(back, boffset++, "state");
-    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", 1));
+    flexarray_set(back, boffset++, libxl_sprintf(&gc, "%d", 1));
     flexarray_set(back, boffset++, "script");
     flexarray_set(back, boffset++, nic->script);
     flexarray_set(back, boffset++, "mac");
-    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%02x:%02x:%02x:%02x:%02x:%02x",
+    flexarray_set(back, boffset++, libxl_sprintf(&gc, "%02x:%02x:%02x:%02x:%02x:%02x",
                                                  nic->mac[0], nic->mac[1], nic->mac[2],
                                                  nic->mac[3], nic->mac[4], nic->mac[5]));
     flexarray_set(back, boffset++, "bridge");
-    flexarray_set(back, boffset++, libxl_strdup(ctx, nic->bridge));
+    flexarray_set(back, boffset++, libxl_strdup(&gc, nic->bridge));
     flexarray_set(back, boffset++, "handle");
-    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", nic->devid));
+    flexarray_set(back, boffset++, libxl_sprintf(&gc, "%d", nic->devid));
 
     flexarray_set(front, foffset++, "backend-id");
-    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", nic->backend_domid));
+    flexarray_set(front, foffset++, libxl_sprintf(&gc, "%d", nic->backend_domid));
     flexarray_set(front, foffset++, "state");
-    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", 1));
+    flexarray_set(front, foffset++, libxl_sprintf(&gc, "%d", 1));
     flexarray_set(front, foffset++, "handle");
-    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", nic->devid));
+    flexarray_set(front, foffset++, libxl_sprintf(&gc, "%d", nic->devid));
     flexarray_set(front, foffset++, "mac");
-    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%02x:%02x:%02x:%02x:%02x:%02x",
+    flexarray_set(front, foffset++, libxl_sprintf(&gc, "%02x:%02x:%02x:%02x:%02x:%02x",
                                                   nic->mac[0], nic->mac[1], nic->mac[2],
                                                   nic->mac[3], nic->mac[4], nic->mac[5]));
     if (0 /* protocol != native*/) {
@@ -1863,13 +1991,17 @@ int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic)
     }
 
     libxl_device_generic_add(ctx, &device,
-                             libxl_xs_kvs_of_flexarray(ctx, back, boffset),
-                             libxl_xs_kvs_of_flexarray(ctx, front, foffset));
+                             libxl_xs_kvs_of_flexarray(&gc, back, boffset),
+                             libxl_xs_kvs_of_flexarray(&gc, front, foffset));
 
     /* FIXME: wait for plug */
+    rc = 0;
+out_free:
     flexarray_free(back);
     flexarray_free(front);
-    return 0;
+out:
+    libxl_free_all(&gc);
+    return rc;
 }
 
 int libxl_device_nic_del(libxl_ctx *ctx, 
@@ -1900,87 +2032,94 @@ void libxl_free_nics_list(libxl_nicinfo *nics, unsigned int nb)
 
 libxl_nicinfo *libxl_list_nics(libxl_ctx *ctx, uint32_t domid, unsigned int *nb)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     char *dompath, *nic_path_fe;
     char **l, **list;
     char *val, *tok;
     unsigned int nb_nics, i;
     libxl_nicinfo *res, *nics;
 
-    dompath = libxl_xs_get_dompath(ctx, domid);
-    if (!dompath) {
-        return NULL;
-    }
-    list = l = libxl_xs_directory(ctx, XBT_NULL,
-                           libxl_sprintf(ctx, "%s/device/vif", dompath), &nb_nics);
-    if (!l) {
-        return NULL;
-    }
+    dompath = libxl_xs_get_dompath(&gc, domid);
+    if (!dompath)
+        goto err;
+    list = l = libxl_xs_directory(&gc, XBT_NULL,
+                           libxl_sprintf(&gc, "%s/device/vif", dompath), &nb_nics);
+    if (!l)
+        goto err;
     nics = res = calloc(nb_nics, sizeof (libxl_device_nic));
-    if (!res) {
-        libxl_free(ctx, l);
-        return NULL;
-    }
+    if (!res)
+        goto err;
     for (*nb = nb_nics; nb_nics > 0; --nb_nics, ++l, ++nics) {
-        nic_path_fe = libxl_sprintf(ctx, "%s/device/vif/%s", dompath, *l);
+        nic_path_fe = libxl_sprintf(&gc, "%s/device/vif/%s", dompath, *l);
 
         nics->backend = xs_read(ctx->xsh, XBT_NULL,
-                                libxl_sprintf(ctx, "%s/backend", nic_path_fe), NULL);
-        val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/backend-id", nic_path_fe));
+                                libxl_sprintf(&gc, "%s/backend", nic_path_fe), NULL);
+        val = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/backend-id", nic_path_fe));
         nics->backend_id = val ? strtoul(val, NULL, 10) : -1;
 
         nics->devid = strtoul(*l, NULL, 10);
-        val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/state", nic_path_fe));
+        val = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/state", nic_path_fe));
         nics->state = val ? strtoul(val, NULL, 10) : -1;
-        val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/mac", nic_path_fe));
+        val = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/mac", nic_path_fe));
         for (i = 0, tok = strtok(val, ":"); tok && (i < 6);
              ++i, tok = strtok(NULL, ":")) {
             nics->mac[i] = strtoul(tok, NULL, 16);
         }
-        val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/event-channel", nic_path_fe));
+        val = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/event-channel", nic_path_fe));
         nics->evtch = val ? strtol(val, NULL, 10) : -1;
-        val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/tx-ring-ref", nic_path_fe));
+        val = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/tx-ring-ref", nic_path_fe));
         nics->rref_tx = val ? strtol(val, NULL, 10) : -1;
-        val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/rx-ring-ref", nic_path_fe));
+        val = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/rx-ring-ref", nic_path_fe));
         nics->rref_rx = val ? strtol(val, NULL, 10) : -1;
         nics->frontend = xs_read(ctx->xsh, XBT_NULL,
-                                 libxl_sprintf(ctx, "%s/frontend", nics->backend), NULL);
-        val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/frontend-id", nics->backend));
+                                 libxl_sprintf(&gc, "%s/frontend", nics->backend), NULL);
+        val = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/frontend-id", nics->backend));
         nics->frontend_id = val ? strtoul(val, NULL, 10) : -1;
         nics->script = xs_read(ctx->xsh, XBT_NULL,
-                               libxl_sprintf(ctx, "%s/script", nics->backend), NULL);
+                               libxl_sprintf(&gc, "%s/script", nics->backend), NULL);
     }
 
+    libxl_free_all(&gc);
     return res;
+err:
+    libxl_free_all(&gc);
+    return NULL;
 }
 
 /******************************************************************************/
 int libxl_device_net2_add(libxl_ctx *ctx, uint32_t domid, libxl_device_net2 *net2)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     flexarray_t *front, *back;
     unsigned int boffset = 0, foffset = 0;
     libxl_device device;
     char *dompath, *dom, **l;
     unsigned int nb;
+    int rc;
 
     front = flexarray_make(16, 1);
-    if (!front)
-        return ERROR_NOMEM;
-    back = flexarray_make(16, 1);
-    if (!back)
-        return ERROR_NOMEM;
-
-    if (!(dompath = libxl_xs_get_dompath(ctx, domid))) {
-        return ERROR_FAIL;
+    if (!front) {
+        rc = ERROR_NOMEM;
+        goto err;
     }
-    dom = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/name", dompath));
+    back = flexarray_make(16, 1);
+    if (!back) {
+        rc = ERROR_NOMEM;
+        goto err_free;
+    }
+
+    if (!(dompath = libxl_xs_get_dompath(&gc, domid))) {
+        rc = ERROR_FAIL;
+        goto err_free;
+    }
+    dom = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/name", dompath));
 
     if (net2->devid == -1) {
-        if (!(l = libxl_xs_directory(ctx, XBT_NULL,
-                                     libxl_sprintf(ctx, "%s/device/vif2", dompath), &nb))) {
+        if (!(l = libxl_xs_directory(&gc, XBT_NULL,
+                                     libxl_sprintf(&gc, "%s/device/vif2", dompath), &nb))) {
             net2->devid = 0;
         } else {
             net2->devid = strtoul(l[nb - 1], NULL, 10) + 1;
-            libxl_free(ctx, l);
         }
     }
 
@@ -1994,129 +2133,132 @@ int libxl_device_net2_add(libxl_ctx *ctx, uint32_t domid, libxl_device_net2 *net
     flexarray_set(back, boffset++, "domain");
     flexarray_set(back, boffset++, dom);
     flexarray_set(back, boffset++, "frontend-id");
-    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", net2->domid));
+    flexarray_set(back, boffset++, libxl_sprintf(&gc, "%d", net2->domid));
 
     flexarray_set(back, boffset++, "local-trusted");
-    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", net2->back_trusted));
+    flexarray_set(back, boffset++, libxl_sprintf(&gc, "%d", net2->back_trusted));
     flexarray_set(back, boffset++, "mac");
-    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%02x:%02x:%02x:%02x:%02x:%02x",
+    flexarray_set(back, boffset++, libxl_sprintf(&gc, "%02x:%02x:%02x:%02x:%02x:%02x",
                                                  net2->back_mac[0], net2->back_mac[1],
                                                  net2->back_mac[2], net2->back_mac[3],
                                                  net2->back_mac[4], net2->back_mac[5]));
 
     flexarray_set(back, boffset++, "remote-trusted");
-    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", net2->trusted));
+    flexarray_set(back, boffset++, libxl_sprintf(&gc, "%d", net2->trusted));
     flexarray_set(back, boffset++, "remote-mac");
-    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%02x:%02x:%02x:%02x:%02x:%02x",
+    flexarray_set(back, boffset++, libxl_sprintf(&gc, "%02x:%02x:%02x:%02x:%02x:%02x",
                                                  net2->front_mac[0], net2->front_mac[1],
                                                  net2->front_mac[2], net2->front_mac[3],
                                                  net2->front_mac[4], net2->front_mac[5]));
 
     flexarray_set(back, boffset++, "max-bypasses");
-    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", net2->max_bypasses));
+    flexarray_set(back, boffset++, libxl_sprintf(&gc, "%d", net2->max_bypasses));
     flexarray_set(back, boffset++, "filter-mac");
-    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", !!(net2->filter_mac)));
+    flexarray_set(back, boffset++, libxl_sprintf(&gc, "%d", !!(net2->filter_mac)));
     flexarray_set(back, boffset++, "handle");
-    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", net2->devid));
+    flexarray_set(back, boffset++, libxl_sprintf(&gc, "%d", net2->devid));
     flexarray_set(back, boffset++, "online");
     flexarray_set(back, boffset++, "1");
     flexarray_set(back, boffset++, "state");
     flexarray_set(back, boffset++, "1");
 
     flexarray_set(front, foffset++, "backend-id");
-    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", net2->backend_domid));
+    flexarray_set(front, foffset++, libxl_sprintf(&gc, "%d", net2->backend_domid));
 
     flexarray_set(front, foffset++, "local-trusted");
-    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", net2->trusted));
+    flexarray_set(front, foffset++, libxl_sprintf(&gc, "%d", net2->trusted));
     flexarray_set(front, foffset++, "mac");
-    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%02x:%02x:%02x:%02x:%02x:%02x",
+    flexarray_set(front, foffset++, libxl_sprintf(&gc, "%02x:%02x:%02x:%02x:%02x:%02x",
                                                   net2->front_mac[0], net2->front_mac[1],
                                                   net2->front_mac[2], net2->front_mac[3],
                                                   net2->front_mac[4], net2->front_mac[5]));
 
     flexarray_set(front, foffset++, "remote-trusted");
-    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", net2->back_trusted));
+    flexarray_set(front, foffset++, libxl_sprintf(&gc, "%d", net2->back_trusted));
     flexarray_set(front, foffset++, "remote-mac");
-    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%02x:%02x:%02x:%02x:%02x:%02x",
+    flexarray_set(front, foffset++, libxl_sprintf(&gc, "%02x:%02x:%02x:%02x:%02x:%02x",
                                                   net2->back_mac[0], net2->back_mac[1],
                                                   net2->back_mac[2], net2->back_mac[3],
                                                   net2->back_mac[4], net2->back_mac[5]));
 
     flexarray_set(front, foffset++, "filter-mac");
-    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", !!(net2->filter_mac)));
+    flexarray_set(front, foffset++, libxl_sprintf(&gc, "%d", !!(net2->filter_mac)));
     flexarray_set(front, foffset++, "state");
     flexarray_set(front, foffset++, "1");
 
     libxl_device_generic_add(ctx, &device,
-                             libxl_xs_kvs_of_flexarray(ctx, back, boffset),
-                             libxl_xs_kvs_of_flexarray(ctx, front, foffset));
+                             libxl_xs_kvs_of_flexarray(&gc, back, boffset),
+                             libxl_xs_kvs_of_flexarray(&gc, front, foffset));
 
     /* FIXME: wait for plug */
+    rc = 0;
+err_free:
     flexarray_free(back);
     flexarray_free(front);
-    return 0;
+err:
+    libxl_free_all(&gc);
+    return rc;
 }
 
 libxl_net2info *libxl_device_net2_list(libxl_ctx *ctx, uint32_t domid, unsigned int *nb)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     char *dompath, *net2_path_fe;
     char **l;
     char *val, *tok;
     unsigned int nb_net2s, i;
     libxl_net2info *res, *net2s;
 
-    dompath = libxl_xs_get_dompath(ctx, domid);
-    if (!dompath) {
-        return NULL;
-    }
-    l = libxl_xs_directory(ctx, XBT_NULL,
-                           libxl_sprintf(ctx, "%s/device/vif2", dompath), &nb_net2s);
-    if (!l) {
-        return NULL;
-    }
-    res = libxl_calloc(ctx, nb_net2s, sizeof (libxl_net2info));
-    if (!res) {
-        libxl_free(ctx, l);
-        return NULL;
-    }
+    dompath = libxl_xs_get_dompath(&gc, domid);
+    if (!dompath)
+        goto err;
+    l = libxl_xs_directory(&gc, XBT_NULL,
+                           libxl_sprintf(&gc, "%s/device/vif2", dompath), &nb_net2s);
+    if (!l)
+        goto err;
+    res = calloc(nb_net2s, sizeof (libxl_net2info));
+    if (!res)
+        goto err;
     net2s = res;
     for (*nb = nb_net2s; nb_net2s > 0; --nb_net2s, ++l, ++net2s) {
-        net2_path_fe = libxl_sprintf(ctx, "%s/device/vif2/%s", dompath, *l);
+        net2_path_fe = libxl_sprintf(&gc, "%s/device/vif2/%s", dompath, *l);
 
-        net2s->backend = libxl_xs_read(ctx, XBT_NULL,
-                                       libxl_sprintf(ctx, "%s/backend", net2_path_fe));
-        val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/backend-id", net2_path_fe));
+        net2s->backend = libxl_xs_read(&gc, XBT_NULL,
+                                       libxl_sprintf(&gc, "%s/backend", net2_path_fe));
+        val = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/backend-id", net2_path_fe));
         net2s->backend_id = val ? strtoul(val, NULL, 10) : -1;
 
         net2s->devid = strtoul(*l, NULL, 10);
-        val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/state", net2_path_fe));
+        val = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/state", net2_path_fe));
         net2s->state = val ? strtoul(val, NULL, 10) : -1;
 
-        val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/mac", net2_path_fe));
+        val = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/mac", net2_path_fe));
         for (i = 0, tok = strtok(val, ":"); tok && (i < 6);
              ++i, tok = strtok(NULL, ":")) {
             net2s->mac[i] = strtoul(tok, NULL, 16);
         }
-        val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/remote-trusted", net2_path_fe));
+        val = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/remote-trusted", net2_path_fe));
         net2s->trusted = val ? strtoul(val, NULL, 10) : -1;
 
-        val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/remote-mac", net2_path_fe));
+        val = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/remote-mac", net2_path_fe));
         for (i = 0, tok = strtok(val, ":"); tok && (i < 6);
              ++i, tok = strtok(NULL, ":")) {
             net2s->back_mac[i] = strtoul(tok, NULL, 16);
         }
-        val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/filter-mac", net2_path_fe));
+        val = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/filter-mac", net2_path_fe));
         net2s->filter_mac = val ? strtoul(val, NULL, 10) : -1;
 
-        net2s->frontend = libxl_xs_read(ctx, XBT_NULL,
-                                        libxl_sprintf(ctx, "%s/frontend", net2s->backend));
-        val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/frontend-id", net2s->backend));
+        net2s->frontend = libxl_xs_read(&gc, XBT_NULL,
+                                        libxl_sprintf(&gc, "%s/frontend", net2s->backend));
+        val = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/frontend-id", net2s->backend));
         net2s->frontend_id = val ? strtoul(val, NULL, 10) : -1;
-        libxl_free(ctx, net2_path_fe);
     }
 
-    libxl_free(ctx, l);
+    libxl_free_all(&gc);
     return res;
+err:
+    libxl_free_all(&gc);
+    return NULL;
 }
 
 int libxl_device_net2_del(libxl_ctx *ctx, libxl_device_net2 *net2, int wait)
@@ -2137,21 +2279,23 @@ int libxl_device_net2_del(libxl_ctx *ctx, libxl_device_net2 *net2, int wait)
 /******************************************************************************/
 int libxl_device_console_add(libxl_ctx *ctx, uint32_t domid, libxl_device_console *console)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     flexarray_t *front;
     flexarray_t *back;
     unsigned int boffset = 0;
     unsigned int foffset = 0;
     libxl_device device;
+    int rc;
 
     if (console->build_state) {
         xs_transaction_t t;
-        char **ents = (char **) libxl_calloc(ctx, 9, sizeof(char *));
+        char **ents = (char **) libxl_calloc(&gc, 9, sizeof(char *));
         ents[0] = "console/port";
-        ents[1] = libxl_sprintf(ctx, "%"PRIu32, console->build_state->console_port);
+        ents[1] = libxl_sprintf(&gc, "%"PRIu32, console->build_state->console_port);
         ents[2] = "console/ring-ref";
-        ents[3] = libxl_sprintf(ctx, "%lu", console->build_state->console_mfn);
+        ents[3] = libxl_sprintf(&gc, "%lu", console->build_state->console_mfn);
         ents[4] = "console/limit";
-        ents[5] = libxl_sprintf(ctx, "%d", LIBXL_XENCONSOLE_LIMIT);
+        ents[5] = libxl_sprintf(&gc, "%d", LIBXL_XENCONSOLE_LIMIT);
         ents[6] = "console/type";
         if (console->constype == CONSTYPE_XENCONSOLED)
             ents[7] = "xenconsoled";
@@ -2159,18 +2303,22 @@ int libxl_device_console_add(libxl_ctx *ctx, uint32_t domid, libxl_device_consol
             ents[7] = "ioemu";
 retry_transaction:
         t = xs_transaction_start(ctx->xsh);
-        libxl_xs_writev(ctx, t, libxl_xs_get_dompath(ctx, console->domid), ents);
+        libxl_xs_writev(&gc, t, libxl_xs_get_dompath(&gc, console->domid), ents);
         if (!xs_transaction_end(ctx->xsh, t, 0))
             if (errno == EAGAIN)
                 goto retry_transaction;
     }
 
     front = flexarray_make(16, 1);
-    if (!front)
-        return ERROR_NOMEM;
+    if (!front) {
+        rc = ERROR_NOMEM;
+        goto out;
+    }
     back = flexarray_make(16, 1);
-    if (!back)
-        return ERROR_NOMEM;
+    if (!back) {
+        rc = ERROR_NOMEM;
+        goto out_free;
+    }
 
     device.backend_devid = console->devid;
     device.backend_domid = console->backend_domid;
@@ -2180,22 +2328,22 @@ retry_transaction:
     device.kind = DEVICE_CONSOLE;
 
     flexarray_set(back, boffset++, "frontend-id");
-    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", console->domid));
+    flexarray_set(back, boffset++, libxl_sprintf(&gc, "%d", console->domid));
     flexarray_set(back, boffset++, "online");
     flexarray_set(back, boffset++, "1");
     flexarray_set(back, boffset++, "state");
-    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", 1));
+    flexarray_set(back, boffset++, libxl_sprintf(&gc, "%d", 1));
     flexarray_set(back, boffset++, "domain");
-    flexarray_set(back, boffset++, _libxl_domid_to_name(ctx, domid));
+    flexarray_set(back, boffset++, _libxl_domid_to_name(&gc, domid));
     flexarray_set(back, boffset++, "protocol");
     flexarray_set(back, boffset++, LIBXL_XENCONSOLE_PROTOCOL);
 
     flexarray_set(front, foffset++, "backend-id");
-    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", console->backend_domid));
+    flexarray_set(front, foffset++, libxl_sprintf(&gc, "%d", console->backend_domid));
     flexarray_set(front, foffset++, "state");
-    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", 1));
+    flexarray_set(front, foffset++, libxl_sprintf(&gc, "%d", 1));
     flexarray_set(front, foffset++, "limit");
-    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", LIBXL_XENCONSOLE_LIMIT));
+    flexarray_set(front, foffset++, libxl_sprintf(&gc, "%d", LIBXL_XENCONSOLE_LIMIT));
     flexarray_set(front, foffset++, "protocol");
     flexarray_set(front, foffset++, LIBXL_XENCONSOLE_PROTOCOL);
     flexarray_set(front, foffset++, "type");
@@ -2205,29 +2353,38 @@ retry_transaction:
         flexarray_set(front, foffset++, "ioemu");
 
     libxl_device_generic_add(ctx, &device,
-                             libxl_xs_kvs_of_flexarray(ctx, back, boffset),
-                             libxl_xs_kvs_of_flexarray(ctx, front, foffset));
+                             libxl_xs_kvs_of_flexarray(&gc, back, boffset),
+                             libxl_xs_kvs_of_flexarray(&gc, front, foffset));
+    rc = 0;
+out_free:
     flexarray_free(back);
     flexarray_free(front);
-
-    return 0;
+out:
+    libxl_free_all(&gc);
+    return rc;
 }
 
 /******************************************************************************/
 int libxl_device_vkb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     flexarray_t *front;
     flexarray_t *back;
     unsigned int boffset = 0;
     unsigned int foffset = 0;
     libxl_device device;
+    int rc;
 
     front = flexarray_make(16, 1);
-    if (!front)
-        return ERROR_NOMEM;
+    if (!front) {
+        rc = ERROR_NOMEM;
+        goto out;
+    }
     back = flexarray_make(16, 1);
-    if (!back)
-        return ERROR_NOMEM;
+    if (!back) {
+        rc = ERROR_NOMEM;
+        goto out_free;
+    }
 
     device.backend_devid = vkb->devid;
     device.backend_domid = vkb->backend_domid;
@@ -2237,26 +2394,29 @@ int libxl_device_vkb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb)
     device.kind = DEVICE_VKBD;
 
     flexarray_set(back, boffset++, "frontend-id");
-    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", vkb->domid));
+    flexarray_set(back, boffset++, libxl_sprintf(&gc, "%d", vkb->domid));
     flexarray_set(back, boffset++, "online");
     flexarray_set(back, boffset++, "1");
     flexarray_set(back, boffset++, "state");
-    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", 1));
+    flexarray_set(back, boffset++, libxl_sprintf(&gc, "%d", 1));
     flexarray_set(back, boffset++, "domain");
-    flexarray_set(back, boffset++, _libxl_domid_to_name(ctx, domid));
+    flexarray_set(back, boffset++, _libxl_domid_to_name(&gc, domid));
 
     flexarray_set(front, foffset++, "backend-id");
-    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", vkb->backend_domid));
+    flexarray_set(front, foffset++, libxl_sprintf(&gc, "%d", vkb->backend_domid));
     flexarray_set(front, foffset++, "state");
-    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", 1));
+    flexarray_set(front, foffset++, libxl_sprintf(&gc, "%d", 1));
 
     libxl_device_generic_add(ctx, &device,
-                             libxl_xs_kvs_of_flexarray(ctx, back, boffset),
-                             libxl_xs_kvs_of_flexarray(ctx, front, foffset));
+                             libxl_xs_kvs_of_flexarray(&gc, back, boffset),
+                             libxl_xs_kvs_of_flexarray(&gc, front, foffset));
+    rc = 0;
+out_free:
     flexarray_free(back);
     flexarray_free(front);
-
-    return 0;
+out:
+    libxl_free_all(&gc);
+    return rc;
 }
 
 int libxl_device_vkb_clean_shutdown(libxl_ctx *ctx, uint32_t domid)
@@ -2271,16 +2431,17 @@ int libxl_device_vkb_hard_shutdown(libxl_ctx *ctx, uint32_t domid)
 
 libxl_device_disk *libxl_device_disk_list(libxl_ctx *ctx, uint32_t domid, int *num)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     char *be_path_tap, *be_path_vbd;
     libxl_device_disk *dend, *disks, *ret = NULL;
     char **b, **l = NULL;
     unsigned int numl;
     char *type;
 
-    be_path_vbd = libxl_sprintf(ctx, "%s/backend/vbd/%d", libxl_xs_get_dompath(ctx, 0), domid);
-    be_path_tap = libxl_sprintf(ctx, "%s/backend/tap/%d", libxl_xs_get_dompath(ctx, 0), domid);
+    be_path_vbd = libxl_sprintf(&gc, "%s/backend/vbd/%d", libxl_xs_get_dompath(&gc, 0), domid);
+    be_path_tap = libxl_sprintf(&gc, "%s/backend/tap/%d", libxl_xs_get_dompath(&gc, 0), domid);
 
-    b = l = libxl_xs_directory(ctx, XBT_NULL, be_path_vbd, &numl);
+    b = l = libxl_xs_directory(&gc, XBT_NULL, be_path_vbd, &numl);
     if (l) {
         ret = realloc(ret, sizeof(libxl_device_disk) * numl);
         disks = ret;
@@ -2289,20 +2450,19 @@ libxl_device_disk *libxl_device_disk_list(libxl_ctx *ctx, uint32_t domid, int *n
         for (; disks < dend; ++disks, ++l) {
             disks->backend_domid = 0;
             disks->domid = domid;
-            disks->physpath = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/%s/params", be_path_vbd, *l));
-            libxl_string_to_phystype(ctx, libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/%s/type", be_path_vbd, *l)), &(disks->phystype));
-            disks->virtpath = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/%s/dev", be_path_vbd, *l));
-            disks->unpluggable = atoi(libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/%s/removable", be_path_vbd, *l)));
-            if (!strcmp(libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/%s/mode", be_path_vbd, *l)), "w"))
+            disks->physpath = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/%s/params", be_path_vbd, *l));
+            libxl_string_to_phystype(ctx, libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/%s/type", be_path_vbd, *l)), &(disks->phystype));
+            disks->virtpath = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/%s/dev", be_path_vbd, *l));
+            disks->unpluggable = atoi(libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/%s/removable", be_path_vbd, *l)));
+            if (!strcmp(libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/%s/mode", be_path_vbd, *l)), "w"))
                 disks->readwrite = 1;
             else
                 disks->readwrite = 0;
-            type = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/device-type", libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/%s/frontend", be_path_vbd, *l))));
+            type = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/device-type", libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/%s/frontend", be_path_vbd, *l))));
             disks->is_cdrom = !strcmp(type, "cdrom");
         }
-        libxl_free(ctx, b);
     }
-    b = l = libxl_xs_directory(ctx, XBT_NULL, be_path_tap, &numl);
+    b = l = libxl_xs_directory(&gc, XBT_NULL, be_path_tap, &numl);
     if (l) {
         ret = realloc(ret, sizeof(libxl_device_disk) * (*num + numl));
         disks = ret + *num;
@@ -2310,51 +2470,54 @@ libxl_device_disk *libxl_device_disk_list(libxl_ctx *ctx, uint32_t domid, int *n
         for (dend = ret + *num; disks < dend; ++disks, ++l) {
             disks->backend_domid = 0;
             disks->domid = domid;
-            disks->physpath = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/%s/params", be_path_tap, *l));
-            libxl_string_to_phystype(ctx, libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/%s/type", be_path_tap, *l)), &(disks->phystype));
-            disks->virtpath = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/%s/dev", be_path_tap, *l));
-            disks->unpluggable = atoi(libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/%s/removable", be_path_tap, *l)));
-            if (!strcmp(libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/%s/mode", be_path_tap, *l)), "w"))
+            disks->physpath = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/%s/params", be_path_tap, *l));
+            libxl_string_to_phystype(ctx, libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/%s/type", be_path_tap, *l)), &(disks->phystype));
+            disks->virtpath = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/%s/dev", be_path_tap, *l));
+            disks->unpluggable = atoi(libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/%s/removable", be_path_tap, *l)));
+            if (!strcmp(libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/%s/mode", be_path_tap, *l)), "w"))
                 disks->readwrite = 1;
             else
                 disks->readwrite = 0;
-            type = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/device-type", libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/%s/frontend", be_path_tap, *l))));
+            type = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/device-type", libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/%s/frontend", be_path_tap, *l))));
             disks->is_cdrom = !strcmp(type, "cdrom");
         }
-        libxl_free(ctx, b);
     }
+    libxl_free_all(&gc);
     return ret;
 }
 
 int libxl_device_disk_getinfo(libxl_ctx *ctx, uint32_t domid,
                               libxl_device_disk *disk, libxl_diskinfo *diskinfo)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     char *dompath, *diskpath;
     char *val;
 
-    dompath = libxl_xs_get_dompath(ctx, domid);
+    dompath = libxl_xs_get_dompath(&gc, domid);
     diskinfo->devid = device_disk_dev_number(disk->virtpath);
 
     /* tap devices entries in xenstore are written as vbd devices. */
-    diskpath = libxl_sprintf(ctx, "%s/device/vbd/%d", dompath, diskinfo->devid);
-    diskinfo->backend = libxl_xs_read(ctx, XBT_NULL,
-                                      libxl_sprintf(ctx, "%s/backend", diskpath));
+    diskpath = libxl_sprintf(&gc, "%s/device/vbd/%d", dompath, diskinfo->devid);
+    diskinfo->backend = libxl_xs_read(&gc, XBT_NULL,
+                                      libxl_sprintf(&gc, "%s/backend", diskpath));
     if (!diskinfo->backend) {
+        libxl_free_all(&gc);
         return ERROR_FAIL;
     }
-    val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/backend-id", diskpath));
+    val = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/backend-id", diskpath));
     diskinfo->backend_id = val ? strtoul(val, NULL, 10) : -1;
-    val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/state", diskpath));
+    val = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/state", diskpath));
     diskinfo->state = val ? strtoul(val, NULL, 10) : -1;
-    val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/event-channel", diskpath));
+    val = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/event-channel", diskpath));
     diskinfo->evtch = val ? strtoul(val, NULL, 10) : -1;
-    val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/ring-ref", diskpath));
+    val = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/ring-ref", diskpath));
     diskinfo->rref = val ? strtoul(val, NULL, 10) : -1;
-    diskinfo->frontend = libxl_xs_read(ctx, XBT_NULL,
-                                       libxl_sprintf(ctx, "%s/frontend", diskinfo->backend));
-    val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/frontend-id", diskinfo->backend));
+    diskinfo->frontend = libxl_xs_read(&gc, XBT_NULL,
+                                       libxl_sprintf(&gc, "%s/frontend", diskinfo->backend));
+    val = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/frontend-id", diskinfo->backend));
     diskinfo->frontend_id = val ? strtoul(val, NULL, 10) : -1;
 
+    libxl_free_all(&gc);
     return 0;
 }
 
@@ -2376,6 +2539,7 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk)
     }
     if (i == num) {
         XL_LOG(ctx, XL_LOG_ERROR, "Virtual device not found");
+        free(disks);
         return ERROR_FAIL;
     }
     libxl_device_disk_del(ctx, disks + i, 1);
@@ -2388,28 +2552,30 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk)
         libxl_device_disk_add(ctx, stubdomid, disk);
         disk->domid = domid;
     }
+    free(disks);
     return 0;
 }
 
 /******************************************************************************/
-static int libxl_build_xenpv_qemu_args(libxl_ctx *ctx,
+static int libxl_build_xenpv_qemu_args(libxl_gc *gc,
                                        libxl_device_vfb *vfb,
                                        int num_console,
                                        libxl_device_console *console,
                                        libxl_device_model_info *info)
 {
+    libxl_ctx *ctx = libxl_gc_owner(gc);
     int i = 0, j = 0, num = 0;
     memset(info, 0x00, sizeof(libxl_device_model_info));
 
     info->vnc = vfb->vnc;
     if (vfb->vnclisten)
-        info->vnclisten = libxl_strdup(ctx, vfb->vnclisten);
+        info->vnclisten = libxl_strdup(gc, vfb->vnclisten);
     info->vncdisplay = vfb->vncdisplay;
     info->vncunused = vfb->vncunused;
     if (vfb->vncpasswd)
         info->vncpasswd = vfb->vncpasswd;
     if (vfb->keymap)
-        info->keymap = libxl_strdup(ctx, vfb->keymap);
+        info->keymap = libxl_strdup(gc, vfb->keymap);
     info->sdl = vfb->sdl;
     info->opengl = vfb->opengl;
     for (i = 0; i < num_console; i++) {
@@ -2420,9 +2586,9 @@ static int libxl_build_xenpv_qemu_args(libxl_ctx *ctx,
         uint32_t guest_domid;
         if (libxl_is_stubdom(ctx, vfb->domid, &guest_domid)) {
             char *filename;
-            char *name = libxl_sprintf(ctx, "qemu-dm-%s", _libxl_domid_to_name(ctx, guest_domid));
+            char *name = libxl_sprintf(gc, "qemu-dm-%s", _libxl_domid_to_name(gc, guest_domid));
             libxl_create_logfile(ctx, name, &filename);
-            info->serial = libxl_sprintf(ctx, "file:%s", filename);
+            info->serial = libxl_sprintf(gc, "file:%s", filename);
             free(filename);
         } else {
             info->serial = "pty";
@@ -2430,7 +2596,7 @@ static int libxl_build_xenpv_qemu_args(libxl_ctx *ctx,
         num--;
     }
     if (num > 0) {
-        info->extra = (char **) libxl_calloc(ctx, num * 2 + 1, sizeof(char *));
+        info->extra = (char **) libxl_calloc(gc, num * 2 + 1, sizeof(char *));
         for (j = 0; j < num * 2; j = j + 2) {
             info->extra[j] = "-serial";
             info->extra[j + 1] = "pty";
@@ -2438,8 +2604,8 @@ static int libxl_build_xenpv_qemu_args(libxl_ctx *ctx,
         info->extra[j] = NULL;
     }
     info->domid = vfb->domid;
-    info->dom_name = _libxl_domid_to_name(ctx, vfb->domid);
-    info->device_model = libxl_abs_path(ctx, "qemu-dm", libxl_libexec_path());
+    info->dom_name = _libxl_domid_to_name(gc, vfb->domid);
+    info->device_model = libxl_abs_path(gc, "qemu-dm", libxl_libexec_path());
     info->type = XENPV;
     return 0;
 }
@@ -2448,27 +2614,35 @@ int libxl_create_xenpv_qemu(libxl_ctx *ctx, libxl_device_vfb *vfb,
                             int num_console, libxl_device_console *console,
                             libxl_device_model_starting **starting_r)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     libxl_device_model_info info;
 
-    libxl_build_xenpv_qemu_args(ctx, vfb, num_console, console, &info);
+    libxl_build_xenpv_qemu_args(&gc, vfb, num_console, console, &info);
     libxl_create_device_model(ctx, &info, NULL, 0, NULL, 0, starting_r);
+    libxl_free_all(&gc);
     return 0;
 }
 
 int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     flexarray_t *front;
     flexarray_t *back;
     unsigned int boffset = 0;
     unsigned int foffset = 0;
     libxl_device device;
+    int rc;
 
     front = flexarray_make(16, 1);
-    if (!front)
-        return ERROR_NOMEM;
+    if (!front) {
+        rc = ERROR_NOMEM;
+        goto out;
+    }
     back = flexarray_make(16, 1);
-    if (!back)
-        return ERROR_NOMEM;
+    if (!back) {
+        rc = ERROR_NOMEM;
+        goto out_free;
+    }
 
     device.backend_devid = vfb->devid;
     device.backend_domid = vfb->backend_domid;
@@ -2478,27 +2652,27 @@ int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb)
     device.kind = DEVICE_VFB;
 
     flexarray_set(back, boffset++, "frontend-id");
-    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", vfb->domid));
+    flexarray_set(back, boffset++, libxl_sprintf(&gc, "%d", vfb->domid));
     flexarray_set(back, boffset++, "online");
     flexarray_set(back, boffset++, "1");
     flexarray_set(back, boffset++, "state");
-    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", 1));
+    flexarray_set(back, boffset++, libxl_sprintf(&gc, "%d", 1));
     flexarray_set(back, boffset++, "domain");
-    flexarray_set(back, boffset++, _libxl_domid_to_name(ctx, domid));
+    flexarray_set(back, boffset++, _libxl_domid_to_name(&gc, domid));
     flexarray_set(back, boffset++, "vnc");
-    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", vfb->vnc));
+    flexarray_set(back, boffset++, libxl_sprintf(&gc, "%d", vfb->vnc));
     flexarray_set(back, boffset++, "vnclisten");
     flexarray_set(back, boffset++, vfb->vnclisten);
     flexarray_set(back, boffset++, "vncpasswd");
     flexarray_set(back, boffset++, vfb->vncpasswd);
     flexarray_set(back, boffset++, "vncdisplay");
-    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", vfb->vncdisplay));
+    flexarray_set(back, boffset++, libxl_sprintf(&gc, "%d", vfb->vncdisplay));
     flexarray_set(back, boffset++, "vncunused");
-    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", vfb->vncunused));
+    flexarray_set(back, boffset++, libxl_sprintf(&gc, "%d", vfb->vncunused));
     flexarray_set(back, boffset++, "sdl");
-    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", vfb->sdl));
+    flexarray_set(back, boffset++, libxl_sprintf(&gc, "%d", vfb->sdl));
     flexarray_set(back, boffset++, "opengl");
-    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", vfb->opengl));
+    flexarray_set(back, boffset++, libxl_sprintf(&gc, "%d", vfb->opengl));
     if (vfb->xauthority) {
         flexarray_set(back, boffset++, "xauthority");
         flexarray_set(back, boffset++, vfb->xauthority);
@@ -2509,17 +2683,20 @@ int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb)
     }
 
     flexarray_set(front, foffset++, "backend-id");
-    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", vfb->backend_domid));
+    flexarray_set(front, foffset++, libxl_sprintf(&gc, "%d", vfb->backend_domid));
     flexarray_set(front, foffset++, "state");
-    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", 1));
+    flexarray_set(front, foffset++, libxl_sprintf(&gc, "%d", 1));
 
     libxl_device_generic_add(ctx, &device,
-                             libxl_xs_kvs_of_flexarray(ctx, back, boffset),
-                             libxl_xs_kvs_of_flexarray(ctx, front, foffset));
+                             libxl_xs_kvs_of_flexarray(&gc, back, boffset),
+                             libxl_xs_kvs_of_flexarray(&gc, front, foffset));
+    rc = 0;
+out_free:
     flexarray_free(front);
     flexarray_free(back);
-
-    return 0;
+out:
+    libxl_free_all(&gc);
+    return rc;
 }
 
 int libxl_device_vfb_clean_shutdown(libxl_ctx *ctx, uint32_t domid)
@@ -2536,81 +2713,90 @@ int libxl_device_vfb_hard_shutdown(libxl_ctx *ctx, uint32_t domid)
 
 int libxl_domain_setmaxmem(libxl_ctx *ctx, uint32_t domid, uint32_t max_memkb)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     char *mem, *endptr;
     uint32_t memorykb;
-    char *dompath = libxl_xs_get_dompath(ctx, domid);
+    char *dompath = libxl_xs_get_dompath(&gc, domid);
+    int rc = 1;
 
-    mem = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/memory/target", dompath));
+    mem = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/memory/target", dompath));
     if (!mem) {
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "cannot get memory info from %s/memory/target\n", dompath);
-        return 1;
+        goto out;
     }
     memorykb = strtoul(mem, &endptr, 10);
     if (*endptr != '\0') {
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "invalid memory %s from %s/memory/target\n", mem, dompath);
-        return 1;
+        goto out;
     }
 
     if (max_memkb < memorykb) {
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "memory_static_max must be greater than or or equal to memory_dynamic_max\n");
-        return 1;
+        goto out;
     }
 
     if (domid != 0)
-        libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/memory/static-max", dompath), "%"PRIu32, max_memkb);
+        libxl_xs_write(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/memory/static-max", dompath), "%"PRIu32, max_memkb);
 
-    return 0;
+    rc = 0;
+out:
+    libxl_free_all(&gc);
+    return rc;
 }
 
 int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid, uint32_t target_memkb, int enforce)
 {
-    int rc = 0;
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
+    int rc = 1;
     uint32_t memorykb = 0, videoram = 0;
     char *memmax, *endptr, *videoram_s = NULL;
-    char *dompath = libxl_xs_get_dompath(ctx, domid);
+    char *dompath = libxl_xs_get_dompath(&gc, domid);
     xc_domaininfo_t info;
     libxl_dominfo ptr;
     char *uuid;
 
     if (domid) {
-        memmax = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/memory/static-max", dompath));
+        memmax = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/memory/static-max", dompath));
         if (!memmax) {
             XL_LOG_ERRNO(ctx, XL_LOG_ERROR,
                 "cannot get memory info from %s/memory/static-max\n", dompath);
-            return 1;
+            goto out;
         }
         memorykb = strtoul(memmax, &endptr, 10);
         if (*endptr != '\0') {
             XL_LOG_ERRNO(ctx, XL_LOG_ERROR,
                 "invalid max memory %s from %s/memory/static-max\n", memmax, dompath);
-            return 1;
+            goto out;
         }
 
         if (target_memkb > memorykb) {
             XL_LOG(ctx, XL_LOG_ERROR,
                 "memory_dynamic_max must be less than or equal to memory_static_max\n");
-            return 1;
+            goto out;
         }
     }
 
-    videoram_s = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/memory/videoram", dompath));
+    videoram_s = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/memory/videoram", dompath));
     videoram = videoram_s ? atoi(videoram_s) : 0;
 
-    libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/memory/target", dompath), "%"PRIu32, target_memkb);
+    libxl_xs_write(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/memory/target", dompath), "%"PRIu32, target_memkb);
 
     rc = xc_domain_getinfolist(ctx->xch, domid, 1, &info);
     if (rc != 1 || info.domain != domid)
-        return rc;
+        goto out;
     xcinfo2xlinfo(&info, &ptr);
     uuid = libxl_uuid2string(ctx, ptr.uuid);
-    libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "/vm/%s/memory", uuid), "%"PRIu32, target_memkb / 1024);
+    libxl_xs_write(&gc, XBT_NULL, libxl_sprintf(&gc, "/vm/%s/memory", uuid), "%"PRIu32, target_memkb / 1024);
 
     if (enforce || !domid)
         memorykb = target_memkb;
     rc = xc_domain_setmaxmem(ctx->xch, domid, memorykb + LIBXL_MAXMEM_CONSTANT);
     if (rc != 0)
-        return rc;
+        goto out;
     rc = xc_domain_memory_set_pod_target(ctx->xch, domid, (target_memkb - videoram) / 4, NULL, NULL, NULL);
+
+out:
+    libxl_free_all(&gc);
     return rc;
 }
 
@@ -2784,26 +2970,31 @@ int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
 
 int libxl_set_vcpucount(libxl_ctx *ctx, uint32_t domid, uint32_t count)
 {
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
     xc_domaininfo_t domaininfo;
     char *dompath;
-    int i;
+    int i, rc = ERROR_FAIL;
 
     if (xc_domain_getinfolist(ctx->xch, domid, 1, &domaininfo) != 1) {
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "getting domain info list");
-        return ERROR_FAIL;
+        goto out;
     }
     if (!count || ((domaininfo.max_vcpu_id + 1) < count)) {
-        return ERROR_INVAL;
+        rc = ERROR_INVAL;
+        goto out;
     }
-    if (!(dompath = libxl_xs_get_dompath(ctx, domid)))
-        return ERROR_FAIL;
+    if (!(dompath = libxl_xs_get_dompath(&gc, domid)))
+        goto out;
 
     for (i = 0; i <= domaininfo.max_vcpu_id; ++i) {
-        libxl_xs_write(ctx, XBT_NULL,
-                       libxl_sprintf(ctx, "%s/cpu/%u/availability", dompath, i),
+        libxl_xs_write(&gc, XBT_NULL,
+                       libxl_sprintf(&gc, "%s/cpu/%u/availability", dompath, i),
                        "%s", ((1 << i) & ((1 << count) - 1)) ? "online" : "offline");
     }
-    return 0;
+    rc = 0;
+out:
+    libxl_free_all(&gc);
+    return rc;
 }
 
 /*
@@ -2916,10 +3107,12 @@ int libxl_send_trigger(libxl_ctx *ctx, uint32_t domid, char *trigger_name, uint3
 
 int libxl_send_sysrq(libxl_ctx *ctx, uint32_t domid, char sysrq)
 {
-    char *dompath = libxl_xs_get_dompath(ctx, domid);
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
+    char *dompath = libxl_xs_get_dompath(&gc, domid);
 
-    libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/control/sysrq", dompath), "%c", sysrq);
+    libxl_xs_write(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/control/sysrq", dompath), "%c", sysrq);
 
+    libxl_free_all(&gc);
     return 0;
 }
 
@@ -3006,20 +3199,24 @@ void libxl_xen_console_read_finish(libxl_ctx *ctx,
 
 uint32_t libxl_vm_get_start_time(libxl_ctx *ctx, uint32_t domid)
 {
-    char *dompath = libxl_xs_get_dompath(ctx, domid);
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
+    char *dompath = libxl_xs_get_dompath(&gc, domid);
     char *vm_path, *start_time;
+    uint32_t ret;
 
     vm_path = libxl_xs_read(
-        ctx, XBT_NULL, libxl_sprintf(ctx, "%s/vm", dompath));
+        &gc, XBT_NULL, libxl_sprintf(&gc, "%s/vm", dompath));
     start_time = libxl_xs_read(
-        ctx, XBT_NULL, libxl_sprintf(ctx, "%s/start_time", vm_path));
+        &gc, XBT_NULL, libxl_sprintf(&gc, "%s/start_time", vm_path));
     if (start_time == NULL) {
         XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, -1,
                         "Can't get start time of domain '%d'", domid);
-        return -1;
+        ret = -1;
+    }else{
+        ret = strtoul(start_time, NULL, 10);
     }
-
-    return strtoul(start_time, NULL, 10);
+    libxl_free_all(&gc);
+    return ret;
 }
 
 char *libxl_tmem_list(libxl_ctx *ctx, uint32_t domid, int use_long)

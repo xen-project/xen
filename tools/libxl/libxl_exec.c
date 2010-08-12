@@ -100,7 +100,7 @@ int libxl_spawn_spawn(libxl_ctx *ctx,
     libxl_spawn_starting *for_spawn = starting->for_spawn;
 
     if (for_spawn) {
-        for_spawn->what = libxl_strdup(ctx, what);
+        for_spawn->what = strdup(what);
         if (!for_spawn->what) return ERROR_NOMEM;
     }
 
@@ -140,10 +140,12 @@ static void report_spawn_intermediate_status(libxl_ctx *ctx,
                                  int status)
 {
     if (!WIFEXITED(status)) {
+        char *intermediate_what;
         /* intermediate process did the logging itself if it exited */
-        char *intermediate_what = libxl_sprintf(ctx,
-                          "%s intermediate process (startup monitor)",
-                          for_spawn->what);
+        if ( asprintf(&intermediate_what,
+                 "%s intermediate process (startup monitor)",
+                 for_spawn->what) < 0 )
+            intermediate_what = "intermediate process (startup monitor)";
         libxl_report_child_exitstatus(ctx, XL_LOG_ERROR, intermediate_what,
                                       for_spawn->intermediate, status);
     }

@@ -3267,7 +3267,7 @@ static void print_vcpuinfo(uint32_t tdomid,
 
 void vcpulist(int argc, char **argv)
 {
-    libxl_dominfo *dominfo;
+    libxl_dominfo *dominfo, *domlist;
     libxl_vcpuinfo *vcpuinfo, *list = NULL;
     libxl_physinfo physinfo;
     int nb_vcpu, nb_domain, nrcpus;
@@ -3279,7 +3279,7 @@ void vcpulist(int argc, char **argv)
     printf("%-32s %5s %5s %5s %5s %9s %s\n",
            "Name", "ID", "VCPU", "CPU", "State", "Time(s)", "CPU Affinity");
     if (!argc) {
-        if (!(dominfo = libxl_list_domain(&ctx, &nb_domain))) {
+        if (!(domlist = dominfo = libxl_list_domain(&ctx, &nb_domain))) {
             fprintf(stderr, "libxl_list_domain failed.\n");
             goto vcpulist_out;
         }
@@ -3294,6 +3294,7 @@ void vcpulist(int argc, char **argv)
             }
             libxl_free_vcpu_list(list);
         }
+        free(domlist);
     } else {
         for (; argc > 0; ++argv, --argc) {
             if (domain_qualifier_to_domid(*argv, &domid, 0) < 0) {

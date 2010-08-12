@@ -30,7 +30,7 @@
 #define XENCONSOLED_BUF_SIZE 16
 #define BOOTLOADER_BUF_SIZE 1024
 
-static char **make_bootloader_args(libxl_ctx *ctx,
+static char **make_bootloader_args(libxl_gc *gc,
                                    libxl_domain_build_info *info,
                                    uint32_t domid,
                                    const char *fifo, const char *disk)
@@ -45,20 +45,20 @@ static char **make_bootloader_args(libxl_ctx *ctx,
     flexarray_set(args, nr++, (char *)info->u.pv.bootloader);
 
     if (info->kernel.path)
-        flexarray_set(args, nr++, libxl_sprintf(ctx, "--kernel=%s", info->kernel.path));
+        flexarray_set(args, nr++, libxl_sprintf(gc, "--kernel=%s", info->kernel.path));
     if (info->u.pv.ramdisk.path)
-        flexarray_set(args, nr++, libxl_sprintf(ctx, "--ramdisk=%s", info->u.pv.ramdisk.path));
+        flexarray_set(args, nr++, libxl_sprintf(gc, "--ramdisk=%s", info->u.pv.ramdisk.path));
     if (info->u.pv.cmdline && *info->u.pv.cmdline != '\0')
-        flexarray_set(args, nr++, libxl_sprintf(ctx, "--args=%s", info->u.pv.cmdline));
+        flexarray_set(args, nr++, libxl_sprintf(gc, "--args=%s", info->u.pv.cmdline));
 
-    flexarray_set(args, nr++, libxl_sprintf(ctx, "--output=%s", fifo));
+    flexarray_set(args, nr++, libxl_sprintf(gc, "--output=%s", fifo));
     flexarray_set(args, nr++, "--output-format=simple0");
-    flexarray_set(args, nr++, libxl_sprintf(ctx, "--output-directory=%s", "/var/run/libxl/"));
+    flexarray_set(args, nr++, libxl_sprintf(gc, "--output-directory=%s", "/var/run/libxl/"));
 
     if (info->u.pv.bootloader_args) {
         char *saveptr;
         /* Operate on a duplicate since strtok modifes the argument */
-        char *dup = libxl_strdup(ctx, info->u.pv.bootloader_args);
+        char *dup = libxl_strdup(gc, info->u.pv.bootloader_args);
         char *t = strtok_r(dup, " \t\n", &saveptr);
         do {
             flexarray_set(args, nr++, t);
@@ -161,7 +161,7 @@ static pid_t fork_exec_bootloader(int *master, char *arg0, char **args)
  * if there is actual data to write, otherwise this would loop too fast,
  * eating up CPU time.
  */
-static char * bootloader_interact(libxl_ctx *ctx, int xenconsoled_fd, int bootloader_fd, int fifo_fd)
+static char * bootloader_interact(libxl_gc *gc, int xenconsoled_fd, int bootloader_fd, int fifo_fd)
 {
     int ret;
 
@@ -263,7 +263,7 @@ static char * bootloader_interact(libxl_ctx *ctx, int xenconsoled_fd, int bootlo
         }
     }
 
-    libxl_ptr_add(ctx, output);
+    libxl_ptr_add(gc, output);
     return output;
 
 out_err:
@@ -300,8 +300,8 @@ int libxl_run_bootloader(libxl_ctx *ctx,
                          libxl_device_disk *disk,
                          uint32_t domid)
 {
-    int ret;
-
+    libxl_gc gc = LIBXL_INIT_GC(ctx);
+    int ret, rc = 0;
     char *fifo = NULL;
     const char *diskpath = NULL;
     char **args = NULL;
@@ -322,49 +322,48 @@ int libxl_run_bootloader(libxl_ctx *ctx,
     struct stat st_buf;
 
     if (info->hvm || !info->u.pv.bootloader)
-        return 0;
+        goto out;
 
+    rc = ERROR_INVAL;
     if (!disk)
-        return ERROR_INVAL;
+        goto out;
 
+    rc = ERROR_FAIL;
     ret = mkdir("/var/run/libxl/", S_IRWXU);
     if (ret < 0 && errno != EEXIST)
-        return ERROR_FAIL;
+        goto out;
 
     ret = stat("/var/run/libxl/", &st_buf);
     if (ret < 0)
-        return ERROR_FAIL;
+        goto out;
 
     if (!S_ISDIR(st_buf.st_mode))
-        return ERROR_FAIL;
+        goto out;
 
     tempdir = mkdtemp(tempdir_template);
     if (tempdir == NULL)
-        return ERROR_FAIL;
+        goto out;
 
     ret = asprintf(&fifo, "%s/fifo", tempdir);
     if (ret < 0) {
-        ret = ERROR_FAIL;
         fifo = NULL;
-        goto out;
+        goto out_close;
     }
 
     ret = mkfifo(fifo, 0600);
     if (ret < 0) {
-        ret = ERROR_FAIL;
-        goto out;
+        goto out_close;
     }
 
     diskpath = libxl_device_disk_local_attach(ctx, disk);
     if (!diskpath) {
-        ret = ERROR_FAIL;
-        goto out;
+        goto out_close;
     }
 
-    args = make_bootloader_args(ctx, info, domid, fifo, diskpath);
+    args = make_bootloader_args(&gc, info, domid, fifo, diskpath);
     if (args == NULL) {
-        ret = ERROR_NOMEM;
-        goto out;
+        rc = ERROR_NOMEM;
+        goto out_close;
     }
 
     /*
@@ -381,17 +380,15 @@ int libxl_run_bootloader(libxl_ctx *ctx,
                                &dom_console_slave_tty_path[0],
                                sizeof(dom_console_slave_tty_path));
     if (ret < 0) {
-        ret = ERROR_FAIL;
-        goto out;
+        goto out_close;
     }
 
-    dom_console_xs_path = libxl_sprintf(ctx, "%s/serial/0/tty", libxl_xs_get_dompath(ctx, domid));
-    libxl_xs_write(ctx, XBT_NULL, dom_console_xs_path, "%s", dom_console_slave_tty_path);
+    dom_console_xs_path = libxl_sprintf(&gc, "%s/serial/0/tty", libxl_xs_get_dompath(&gc, domid));
+    libxl_xs_write(&gc, XBT_NULL, dom_console_xs_path, "%s", dom_console_slave_tty_path);
 
     pid = fork_exec_bootloader(&bootloader_fd, (char *)info->u.pv.bootloader, args);
     if (pid < 0) {
-        ret = ERROR_FAIL;
-        goto out;
+        goto out_close;
     }
 
     while (1) {
@@ -402,30 +399,27 @@ int libxl_run_bootloader(libxl_ctx *ctx,
         if (errno == EINTR)
             continue;
 
-        ret = ERROR_FAIL;
-        goto out;
+        goto out_close;
     }
 
     fcntl(fifo_fd, F_SETFL, O_NDELAY);
 
-    blout = bootloader_interact(ctx, xenconsoled_fd, bootloader_fd, fifo_fd);
+    blout = bootloader_interact(&gc, xenconsoled_fd, bootloader_fd, fifo_fd);
     if (blout == NULL) {
-        ret = ERROR_FAIL;
-        goto out;
+        goto out_close;
     }
 
     pid = waitpid(pid, &blrc, 0);
     if (pid == -1 || (pid > 0 && WIFEXITED(blrc) && WEXITSTATUS(blrc) != 0)) {
-        ret = ERROR_FAIL;
-        goto out;
+        goto out_close;
     }
 
     libxl_device_disk_local_detach(ctx, disk);
 
     parse_bootloader_result(ctx, info, blout);
 
-    ret = 0;
-out:
+    rc = 0;
+out_close:
     if (fifo_fd > -1)
         close(fifo_fd);
     if (bootloader_fd > -1)
@@ -444,6 +438,8 @@ out:
 
     free(args);
 
-    return ret;
+out:
+    libxl_free_all(&gc);
+    return rc;
 }
 

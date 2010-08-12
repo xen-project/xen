@@ -78,10 +78,6 @@ typedef struct {
     xc_interface *xch;
     struct xs_handle *xsh;
 
-    /* mini-GC */
-    int alloc_maxsize;
-    void **alloc_ptrs;
-
     /* for callers who reap children willy-nilly; caller must only
      * set this after libxl_init and before any other call - or
      * may leave them untouched */
@@ -491,7 +487,7 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk);
 /*
  * Make a disk available in this domain. Returns path to a device.
  */
-const char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *disk);
+char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *disk);
 int libxl_device_disk_local_detach(libxl_ctx *ctx, libxl_device_disk *disk);
 
 typedef struct {
