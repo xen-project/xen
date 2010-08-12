@@ -607,30 +607,35 @@ static int msix_capability_init(struct pci_dev *dev,
  * indicates the successful setup of an entry zero with the new MSI
  * irq or non-zero for otherwise.
  **/
+
 static int __pci_enable_msi(struct msi_info *msi, struct msi_desc **desc)
 {
     int status;
     struct pci_dev *pdev;
+    struct msi_desc *old_desc;
 
     ASSERT(spin_is_locked(&pcidevs_lock));
     pdev = pci_get_pdev(msi->bus, msi->devfn);
     if ( !pdev )
         return -ENODEV;
 
-    if ( find_msi_entry(pdev, msi->irq, PCI_CAP_ID_MSI) )
+    old_desc = find_msi_entry(pdev, msi->irq, PCI_CAP_ID_MSI);
+    if ( old_desc )
     {
         dprintk(XENLOG_WARNING, "irq %d has already mapped to MSI on "
                 "device %02x:%02x.%01x.\n", msi->irq, msi->bus,
                 PCI_SLOT(msi->devfn), PCI_FUNC(msi->devfn));
+        *desc = old_desc;
         return 0;
     }
 
-    if ( find_msi_entry(pdev, -1, PCI_CAP_ID_MSIX) )
+    old_desc = find_msi_entry(pdev, -1, PCI_CAP_ID_MSIX);
+    if ( old_desc )
     {
         dprintk(XENLOG_WARNING, "MSI-X is already in use on "
                 "device %02x:%02x.%01x\n", msi->bus,
                 PCI_SLOT(msi->devfn), PCI_FUNC(msi->devfn));
-        return 0;
+        pci_disable_msi(old_desc);
     }
 
     status = msi_capability_init(pdev, msi->irq, desc);
@@ -679,6 +684,7 @@ static int __pci_enable_msix(struct msi_info *msi, struct msi_desc **desc)
     u16 control;
     u8 slot = PCI_SLOT(msi->devfn);
     u8 func = PCI_FUNC(msi->devfn);
+    struct msi_desc *old_desc;
 
     ASSERT(spin_is_locked(&pcidevs_lock));
     pdev = pci_get_pdev(msi->bus, msi->devfn);
@@ -691,20 +697,24 @@ static int __pci_enable_msix(struct msi_info *msi, struct msi_desc **desc)
     if (msi->entry_nr >= nr_entries)
         return -EINVAL;
 
-    if ( find_msi_entry(pdev, msi->irq, PCI_CAP_ID_MSIX) )
+    old_desc = find_msi_entry(pdev, msi->irq, PCI_CAP_ID_MSIX);
+    if ( old_desc )
     {
         dprintk(XENLOG_WARNING, "irq %d has already mapped to MSIX on "
                 "device %02x:%02x.%01x.\n", msi->irq, msi->bus,
                 PCI_SLOT(msi->devfn), PCI_FUNC(msi->devfn));
+        *desc = old_desc;
         return 0;
     }
 
-    if ( find_msi_entry(pdev, -1, PCI_CAP_ID_MSI) )
+    old_desc = find_msi_entry(pdev, -1, PCI_CAP_ID_MSI);
+    if ( old_desc )
     {
         dprintk(XENLOG_WARNING, "MSI is already in use on "
                 "device %02x:%02x.%01x\n", msi->bus,
                 PCI_SLOT(msi->devfn), PCI_FUNC(msi->devfn));
-        return 0;
+        pci_disable_msi(old_desc);
+
     }
 
     status = msix_capability_init(pdev, msi, desc);
