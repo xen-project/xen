@@ -97,7 +97,7 @@ def _vscsi_get_scsidevices_by_lsscsi(option = ""):
     devices = []
 
     for scsiinfo in os.popen('{ lsscsi -g %s; } 2>/dev/null' % option).readlines():
-        s = scsiinfo.replace(']', '] ').split()
+        s = scsiinfo.replace(']', '] ').split()
         hctl = s[0][1:-1]
         try:
             devname = s[-2].split('/dev/')[1]
