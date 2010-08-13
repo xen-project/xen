@@ -76,21 +76,21 @@ retry_transaction:
     t = xs_transaction_start(ctx->xsh);
     /* FIXME: read frontend_path and check state before removing stuff */
 
-    xs_rm(ctx->xsh, t, frontend_path);
-    xs_rm(ctx->xsh, t, backend_path);
+    if (fents) {
+        xs_rm(ctx->xsh, t, frontend_path);
+        xs_mkdir(ctx->xsh, t, frontend_path);
+        xs_set_permissions(ctx->xsh, t, frontend_path, frontend_perms, ARRAY_SIZE(frontend_perms));
+        xs_write(ctx->xsh, t, libxl_sprintf(&gc, "%s/backend", frontend_path), backend_path, strlen(backend_path));
+        libxl_xs_writev(&gc, t, frontend_path, fents);
+    }
 
-    xs_mkdir(ctx->xsh, t, frontend_path);
-    xs_set_permissions(ctx->xsh, t, frontend_path, frontend_perms, ARRAY_SIZE(frontend_perms));
-
-    xs_mkdir(ctx->xsh, t, backend_path);
-    xs_set_permissions(ctx->xsh, t, backend_path, backend_perms, ARRAY_SIZE(backend_perms));
-
-    xs_write(ctx->xsh, t, libxl_sprintf(&gc, "%s/backend", frontend_path), backend_path, strlen(backend_path));
-    xs_write(ctx->xsh, t, libxl_sprintf(&gc, "%s/frontend", backend_path), frontend_path, strlen(frontend_path));
-
-    /* and write frontend kvs and backend kvs */
-    libxl_xs_writev(&gc, t, backend_path, bents);
-    libxl_xs_writev(&gc, t, frontend_path, fents);
+    if (bents) {
+        xs_rm(ctx->xsh, t, backend_path);
+        xs_mkdir(ctx->xsh, t, backend_path);
+        xs_set_permissions(ctx->xsh, t, backend_path, backend_perms, ARRAY_SIZE(backend_perms));
+        xs_write(ctx->xsh, t, libxl_sprintf(&gc, "%s/frontend", backend_path), frontend_path, strlen(frontend_path));
+        libxl_xs_writev(&gc, t, backend_path, bents);
+    }
 
     if (!xs_transaction_end(ctx->xsh, t, 0)) {
         if (errno == EAGAIN)

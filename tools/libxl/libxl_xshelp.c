@@ -49,6 +49,9 @@ char **libxl_xs_kvs_of_flexarray(libxl_gc *gc, flexarray_t *array, int length)
     char **kvs;
     int i;
 
+    if (!length)
+        return NULL;
+
     kvs = libxl_calloc(gc, length + 2, sizeof(char *));
     if (kvs) {
         for (i = 0; i < length; i += 2) {
