@@ -75,7 +75,7 @@ $(LINUX_DIR)/include/linux/autoconf.h: $(LINUX_SRCDIR)/.valid-src
 	# tree. Finally attempt to use make defconfig.
 	set -e ; \
 	CONFIG_VERSION=$$(sed -ne 's/$$(XENGUEST)//; s/^EXTRAVERSION = //p' $(LINUX_SRCDIR)/Makefile); \
-	if [ ! -z "$(XEN_LINUX_CONFIG)" -a -r $(XEN_LINUX_CONFIG) ]; then \
+	if [ ! -z "$(XEN_LINUX_CONFIG)" -a -r "$(XEN_LINUX_CONFIG)" ]; then \
 	  cp $(XEN_LINUX_CONFIG) $(CONFIG_FILE); \
 	elif [ -r $(DESTDIR)/boot/config-$(LINUX_VER3)$$CONFIG_VERSION$(EXTRAVERSION) ] ; then \
 	  cp $(DESTDIR)/boot/config-$(LINUX_VER3)$$CONFIG_VERSION$(EXTRAVERSION) $(CONFIG_FILE) ; \
