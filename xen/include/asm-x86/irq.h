@@ -23,9 +23,6 @@
 #define irq_to_desc(irq)    (&irq_desc[irq])
 #define irq_cfg(irq)        (&irq_cfg[irq])
 
-#define MAX_GSI_IRQS PAGE_SIZE * 8
-#define MAX_NR_IRQS (2 * MAX_GSI_IRQS)
-
 struct irq_cfg {
         int  vector;
         cpumask_t domain;

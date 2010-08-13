@@ -2503,6 +2503,9 @@ void dump_ioapic_irq_info(void)
 
 unsigned highest_gsi(void);
 
+static unsigned int __initdata max_gsi_irqs;
+integer_param("max_gsi_irqs", max_gsi_irqs);
+
 void __init init_ioapic_mappings(void)
 {
     unsigned long ioapic_phys;
@@ -2547,19 +2550,37 @@ void __init init_ioapic_mappings(void)
 
     nr_irqs_gsi = max(nr_irqs_gsi, highest_gsi());
 
+    if ( max_gsi_irqs == 0 )
+        max_gsi_irqs = nr_irqs ? nr_irqs / 8 : PAGE_SIZE;
+    else if ( nr_irqs != 0 && max_gsi_irqs > nr_irqs )
+    {
+        printk(XENLOG_WARNING "\"max_gsi_irqs=\" cannot be specified larger"
+                              " than \"nr_irqs=\"\n");
+        max_gsi_irqs = nr_irqs;
+    }
+    if ( max_gsi_irqs < 16 )
+        max_gsi_irqs = 16;
+
+    /* for PHYSDEVOP_pirq_eoi_gmfn guest assumptions */
+    if ( max_gsi_irqs > PAGE_SIZE * 8 )
+        max_gsi_irqs = PAGE_SIZE * 8;
+
     if ( !smp_found_config || skip_ioapic_setup || nr_irqs_gsi < 16 )
         nr_irqs_gsi = 16;
-    else if ( nr_irqs_gsi > MAX_GSI_IRQS)
+    else if ( nr_irqs_gsi > max_gsi_irqs )
     {
-        /* for PHYSDEVOP_pirq_eoi_gmfn guest assumptions */
-        printk(KERN_WARNING "Limiting number of GSI IRQs found (%u) to %lu\n",
-               nr_irqs_gsi, MAX_GSI_IRQS);
-        nr_irqs_gsi = MAX_GSI_IRQS;
+        printk(XENLOG_WARNING "Limiting to %u GSI IRQs (found %u)\n",
+               max_gsi_irqs, nr_irqs_gsi);
+        nr_irqs_gsi = max_gsi_irqs;
     }
 
-    if (nr_irqs < 2 * nr_irqs_gsi)
-        nr_irqs = 2 * nr_irqs_gsi;
-
-    if (nr_irqs > MAX_NR_IRQS)
-        nr_irqs = MAX_NR_IRQS;
+    if ( nr_irqs == 0 )
+        nr_irqs = cpu_has_apic ?
+                  max(16U + num_present_cpus() * NR_DYNAMIC_VECTORS,
+                      8 * nr_irqs_gsi) :
+                  nr_irqs_gsi;
+    else if ( nr_irqs < 16 )
+        nr_irqs = 16;
+    printk(XENLOG_INFO "IRQ limits: %u GSI, %u MSI/MSI-X\n",
+           nr_irqs_gsi, nr_irqs - nr_irqs_gsi);
 }

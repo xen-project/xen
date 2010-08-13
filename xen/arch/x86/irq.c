@@ -29,7 +29,7 @@ int __read_mostly opt_noirqbalance = 0;
 boolean_param("noirqbalance", opt_noirqbalance);
 
 unsigned int __read_mostly nr_irqs_gsi = 16;
-unsigned int __read_mostly nr_irqs = 1024;
+unsigned int __read_mostly nr_irqs;
 integer_param("nr_irqs", nr_irqs);
 
 u8 __read_mostly *irq_vector;

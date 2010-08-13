@@ -274,6 +274,8 @@ struct domain *domain_create(
             d->nr_pirqs = nr_irqs_gsi + extra_domU_irqs;
         else
             d->nr_pirqs = nr_irqs_gsi + extra_dom0_irqs;
+        if ( d->nr_pirqs > nr_irqs )
+            d->nr_pirqs = nr_irqs;
 
         d->pirq_to_evtchn = xmalloc_array(u16, d->nr_pirqs);
         d->pirq_mask = xmalloc_array(
