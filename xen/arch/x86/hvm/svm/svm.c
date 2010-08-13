@@ -1261,6 +1261,22 @@ static void svm_vmexit_do_rdtsc(struct cpu_user_regs *regs)
     hvm_rdtsc_intercept(regs);
 }
 
+static void svm_vmexit_do_pause(struct cpu_user_regs *regs)
+{
+    unsigned int inst_len;
+
+    if ( (inst_len = __get_instruction_length(current, INSTR_PAUSE)) == 0 )
+        return;
+    __update_guest_eip(regs, inst_len);
+
+    /*
+     * The guest is running a contended spinlock and we've detected it.
+     * Do something useful, like reschedule the guest
+     */
+    perfc_incr(pauseloop_exits);
+    do_sched_op_compat(SCHEDOP_yield, 0);
+}
+
 static void svm_vmexit_ud_intercept(struct cpu_user_regs *regs)
 {
     struct hvm_emulate_ctxt ctxt;
@@ -1655,12 +1671,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case VMEXIT_PAUSE:
-        /*
-         * The guest is running a contended spinlock and we've detected it.
-         * Do something useful, like reschedule the guest
-         */
-        perfc_incr(pauseloop_exits);
-        do_sched_op_compat(SCHEDOP_yield, 0);
+        svm_vmexit_do_pause(regs);
         break;
 
     default:
