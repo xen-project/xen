@@ -12,6 +12,116 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Lesser General Public License for more details.
  */
+
+/*
+ * libxl memory management
+ *
+ * From the point of view of the application (ie, libxl's caller),
+ * struct libxl_ctx* is threadsafe, and all returned allocated
+ * structures are obtained from malloc(), and must be freed by the
+ * caller either directly or by calling an appropriate free function
+ * provided by libxl.  Ie the application does not get automatic
+ * assistance from libxl in managing these allocations.
+ *
+ * Specific details are in the header comments which should be found
+ * in libxl.h or libxlutil.h, next to the relevant function
+ * declarations.
+ *
+ * Internally, libxl has a garbage collection scheme which allows much libxl
+ * code to allocate strings etc. for internal use without needing to
+ * free them.  These are called "temporary allocations".
+ *
+ * The pool for these temporary allocations, along with any other
+ * thread-specific data which is private to libxl but shared between
+ * libxl functions (such as the current xenstore transaction), is
+ * stored in the "gc context" which is a special enhanced context
+ * structure allocated automatically by convenience macros at every
+ * entry to libxl.
+ *
+ * Every libxl function falls into one of these categories:
+ *
+ * 1. Public functions (declared in libxl.h, libxlutil.h), which may
+ *    be called by libxl applications.  If a public function returns
+ *    any allocated object to its caller, that object must have come
+ *    from malloc.
+ *
+ *    The definitions of public functions MUST use the gc context
+ *    initialisation macros (or do the equivalent work themselves).
+ *    These macros will ensure that all temporary allocations will be
+ *    automatically freed before the function returns to its caller.
+ *
+ *    A public function may be called from within libxl; the call
+ *    context initialisation macros will make sure that the internal
+ *    caller's context is reused (eg, so that the same xenstore
+ *    transaction is used).
+ *
+ *    Public functions have names like libxl_foobar.
+ *
+ * 2. Private functions, which may not be called by libxl
+ *    applications; they are not declared in libxl.h or libxlutil.h
+ *    and they may not be called other than by other libxl functions.
+ *
+ *    Private functions should not use the gc context initialisation
+ *    macros.
+ *
+ *    Private functions have names like libxl__foobar (NB, two underscores).
+ *    Also the declaration of such functions must be preceeded by the _hidden
+ *    macro.
+ *
+ * Allocations made by a libxl function fall into one of the following
+ * categories (where "object" includes any memory allocation):
+ *
+ * (a) Objects which are not returned to the function's caller.
+ *     These should be allocated from the temporary pool.
+ *
+ * (b) Objects which are intended for return to the calling
+ *     application.  This includes all allocated objects returned by
+ *     any public function.
+ *
+ *     It may also include objects allocated by an internal function
+ *     specifically for eventual return by the function's external
+ *     callers, but this situation should be clearly documented in
+ *     comments.
+ *
+ *     These should be allocated from malloc() et al. and comments
+ *     near the function declaration should explain the memory
+ *     ownership.  If a simple free() by the application is not
+ *     sufficient, a suitable public freeing function should be
+ *     provided.
+ *
+ * (c) Internal objects whose size and/or lifetime dictate explicit
+ *     memory management within libxl.  This includes objects which
+ *     will be embedded in opaque structures which will be returned to
+ *     the libxl caller (more generally, any internal object whose
+ *     lifetime exceeds the libxl entrypoint which creates it) and
+ *     objects which are so large or numerous that explicit memory
+ *     management is required.
+ *
+ *     These should be allocated from malloc() et al., and freed
+ *     explicitly at the appropriate point.  The situation should be
+ *     documented in comments.
+ *
+ * (d) Objects which are allocated by internal-only functions and
+ *     returned to the function's (therefore, internal) caller but are
+ *     strictly for internal use by other parts of libxl.  These
+ *     should be allocated from the temporary pool.
+ *
+ *     Where a function's primary purpose is to return such an object,
+ *     it should have a libxl_gc * as it's first argument.
+ *
+ *     Note that there are two ways to change an allocation from this
+ *     category to the "public" category. Either the implementation
+ *     is kept internal and a wrapper function duplicates all memory
+ *     allocations so that they are suitable for return to external
+ *     callers or the implementation uses plain malloc() et al calls
+ *     and an internal wrapper adds the relevant pointers to the gc.
+ *     The latter method is preferred for obvious performance reasons.
+ *
+ * No temporary objects allocated from the pool should be explicitly freed.
+ * Calling libxl_free_all() before returning from a public functions will do
+ * this. The upshot of this is that almost all calls to libxl_free() are
+ * erroneous.
+ */
 #ifndef LIBXL_H
 #define LIBXL_H
 
