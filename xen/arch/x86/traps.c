@@ -2228,6 +2228,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case MSR_K8_PSTATE5:
         case MSR_K8_PSTATE6:
         case MSR_K8_PSTATE7:
+        case MSR_K8_HWCR:
             if ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD )
                 goto fail;
             if ( !is_cpufreq_controller(v->domain) )
@@ -2267,6 +2268,14 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             break;
         case MSR_IA32_MPERF:
         case MSR_IA32_APERF:
+            if (( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ) &&
+                ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD ) )
+                goto fail;
+            if ( !is_cpufreq_controller(v->domain) )
+                break;
+            if ( wrmsr_safe(regs->ecx, msr_content ) != 0 )
+                goto fail;
+            break;
         case MSR_IA32_PERF_CTL:
             if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
                 goto fail;
