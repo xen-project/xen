@@ -31,6 +31,7 @@ enum instruction_index {
     INSTR_HLT,
     INSTR_INT3,
     INSTR_RDTSC,
+    INSTR_PAUSE,
     INSTR_MAX_COUNT /* Must be last - Number of instructions supported */
 };
 
