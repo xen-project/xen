@@ -736,8 +736,8 @@ long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
         pi->scrub_pages      = 0;
         pi->cpu_khz          = local_cpu_data->proc_freq / 1000;
 
-        pi->max_node_id = last_node(node_online_map);
-        pi->max_cpu_id = last_cpu(cpu_online_map);
+        pi->max_node_id = MAX_NUMNODES-1;
+        pi->max_cpu_id = NR_CPUS-1;
 
         if ( copy_field_to_guest(u_sysctl, op, u.physinfo) )
             ret = -EFAULT;

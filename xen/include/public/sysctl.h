@@ -93,8 +93,10 @@ DEFINE_XEN_GUEST_HANDLE(xen_sysctl_tbuf_op_t);
 struct xen_sysctl_physinfo {
     uint32_t threads_per_core;
     uint32_t cores_per_socket;
-    uint32_t nr_cpus, max_cpu_id;
-    uint32_t nr_nodes, max_node_id;
+    uint32_t nr_cpus;     /* # CPUs currently online */
+    uint32_t max_cpu_id;  /* Largest possible CPU ID on this host */
+    uint32_t nr_nodes;    /* # nodes currently online */
+    uint32_t max_node_id; /* Largest possible node ID on this host */
     uint32_t cpu_khz;
     uint64_aligned_t total_pages;
     uint64_aligned_t free_pages;
