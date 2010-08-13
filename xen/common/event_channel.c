@@ -1123,14 +1123,11 @@ static void domain_dump_evtchn_info(struct domain *d)
 
     bitmap_scnlistprintf(keyhandler_scratch, sizeof(keyhandler_scratch),
                          d->poll_mask, d->max_vcpus);
-    printk("Domain %d polling vCPUs: {%s}\n",
-           d->domain_id, keyhandler_scratch);
-
-    if ( !spin_trylock(&d->event_lock) )
-        return;
-
     printk("Event channel information for domain %d:\n"
-           "    port [p/m]\n", d->domain_id);
+           "Polling vCPUs: {%s}\n"
+           "    port [p/m]\n", d->domain_id, keyhandler_scratch);
+
+    spin_lock(&d->event_lock);
 
     for ( port = 1; port < MAX_EVTCHNS(d); ++port )
     {
