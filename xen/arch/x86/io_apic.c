@@ -2093,8 +2093,8 @@ void ioapic_suspend(void)
     spin_lock_irqsave(&ioapic_lock, flags);
     for (apic = 0; apic < nr_ioapics; apic++) {
         for (i = 0; i < nr_ioapic_registers[apic]; i ++, entry ++ ) {
-            *(((int *)entry) + 1) = io_apic_read(apic, 0x11 + 2 * i);
-            *(((int *)entry) + 0) = io_apic_read(apic, 0x10 + 2 * i);
+            *(((int *)entry) + 1) = __io_apic_read(apic, 0x11 + 2 * i);
+            *(((int *)entry) + 0) = __io_apic_read(apic, 0x10 + 2 * i);
         }
     }
     spin_unlock_irqrestore(&ioapic_lock, flags);
@@ -2109,14 +2109,14 @@ void ioapic_resume(void)
 
     spin_lock_irqsave(&ioapic_lock, flags);
     for (apic = 0; apic < nr_ioapics; apic++){
-        reg_00.raw = io_apic_read(apic, 0);
+        reg_00.raw = __io_apic_read(apic, 0);
         if (reg_00.bits.ID != mp_ioapics[apic].mpc_apicid) {
             reg_00.bits.ID = mp_ioapics[apic].mpc_apicid;
-            io_apic_write(apic, 0, reg_00.raw);
+            __io_apic_write(apic, 0, reg_00.raw);
         }
         for (i = 0; i < nr_ioapic_registers[apic]; i++, entry++) {
-            io_apic_write(apic, 0x11+2*i, *(((int *)entry)+1));
-            io_apic_write(apic, 0x10+2*i, *(((int *)entry)+0));
+            __io_apic_write(apic, 0x11+2*i, *(((int *)entry)+1));
+            __io_apic_write(apic, 0x10+2*i, *(((int *)entry)+0));
         }
     }
     spin_unlock_irqrestore(&ioapic_lock, flags);
