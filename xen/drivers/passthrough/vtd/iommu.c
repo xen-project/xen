@@ -2127,10 +2127,11 @@ static void vtd_suspend(void)
 
         iommu_disable_translation(iommu);
 
-        if ( iommu_intremap )
-            disable_intremap(iommu);
-
-        if ( iommu_qinval )
+        /* If interrupt remapping is enabled, queued invalidation
+         * will be disabled following interupt remapping disabling
+         * in local apic suspend
+         */
+        if ( !iommu_intremap && iommu_qinval )
             disable_qinval(iommu);
     }
 }

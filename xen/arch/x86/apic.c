@@ -492,9 +492,21 @@ static void apic_pm_activate(void)
     apic_pm_state.active = 1;
 }
 
-static void resume_x2apic(void)
+static void __enable_x2apic(void)
 {
     uint64_t msr_content;
+
+    rdmsrl(MSR_IA32_APICBASE, msr_content);
+    if ( !(msr_content & MSR_IA32_APICBASE_EXTD) )
+    {
+        msr_content |= MSR_IA32_APICBASE_ENABLE | MSR_IA32_APICBASE_EXTD;
+        msr_content = (uint32_t)msr_content;
+        wrmsrl(MSR_IA32_APICBASE, msr_content);
+    }
+}
+
+static void resume_x2apic(void)
+{
     struct IO_APIC_route_entry **ioapic_entries = NULL;
 
     ASSERT(x2apic_enabled);
@@ -516,14 +528,7 @@ static void resume_x2apic(void)
     mask_IO_APIC_setup(ioapic_entries);
 
     iommu_enable_IR();
-
-    rdmsrl(MSR_IA32_APICBASE, msr_content);
-    if ( !(msr_content & MSR_IA32_APICBASE_EXTD) )
-    {
-        msr_content |= MSR_IA32_APICBASE_ENABLE | MSR_IA32_APICBASE_EXTD;
-        msr_content = (uint32_t)msr_content;
-        wrmsrl(MSR_IA32_APICBASE, msr_content);
-    }
+    __enable_x2apic();
 
     restore_IO_APIC_setup(ioapic_entries);
     unmask_8259A();
@@ -739,9 +744,10 @@ int lapic_suspend(void)
     apic_pm_state.apic_tmict = apic_read(APIC_TMICT);
     apic_pm_state.apic_tdcr = apic_read(APIC_TDCR);
     apic_pm_state.apic_thmr = apic_read(APIC_LVTTHMR);
-    
+
     local_irq_save(flags);
     disable_local_APIC();
+    iommu_disable_IR();
     local_irq_restore(flags);
     return 0;
 }
@@ -1041,16 +1047,8 @@ static void enable_bsp_x2apic(void)
 
     if ( !x2apic_preenabled )
     {
-        uint64_t msr_content;
-        rdmsrl(MSR_IA32_APICBASE, msr_content);
-        if ( !(msr_content & MSR_IA32_APICBASE_EXTD) )
-        {
-            msr_content |= MSR_IA32_APICBASE_ENABLE |
-                           MSR_IA32_APICBASE_EXTD;
-            msr_content = (uint32_t)msr_content;
-            wrmsrl(MSR_IA32_APICBASE, msr_content);
-            printk("x2APIC mode enabled.\n");
-        }
+        __enable_x2apic();
+        printk("x2APIC mode enabled.\n");
     }
 
 restore_out:
@@ -1064,20 +1062,12 @@ out:
 
 static void enable_ap_x2apic(void)
 {
-    uint64_t msr_content;
-
     ASSERT(smp_processor_id() != 0);
 
     /* APs only enable x2apic when BSP did so. */
     BUG_ON(!x2apic_enabled);
 
-    rdmsrl(MSR_IA32_APICBASE, msr_content);
-    if ( !(msr_content & MSR_IA32_APICBASE_EXTD) )
-    {
-        msr_content |= MSR_IA32_APICBASE_ENABLE | MSR_IA32_APICBASE_EXTD;
-        msr_content = (uint32_t)msr_content;
-        wrmsrl(MSR_IA32_APICBASE, msr_content);
-    }
+    __enable_x2apic();
 }
 
 void enable_x2apic(void)

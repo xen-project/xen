@@ -873,6 +873,24 @@ int iommu_enable_IR(void)
 }
 
 /*
+ * This function is used to disable Interrutp remapping when
+ * suspend local apic
+ */
+void iommu_disable_IR(void)
+{
+    struct acpi_drhd_unit *drhd;
+
+    if ( !iommu_supports_eim() )
+        return;
+
+    for_each_drhd_unit ( drhd )
+        disable_intremap(drhd->iommu);
+
+    for_each_drhd_unit ( drhd )
+        disable_qinval(drhd->iommu);
+}
+
+/*
  * Check if interrupt remapping is enabled or not
  * return 1: enabled
  * return 0: not enabled
