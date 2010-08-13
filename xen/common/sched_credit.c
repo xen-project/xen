@@ -555,10 +555,11 @@ __csched_vcpu_acct_start(struct csched_private *prv, struct csched_vcpu *svc)
 
         sdom->active_vcpu_count++;
         list_add(&svc->active_vcpu_elem, &sdom->active_vcpu);
+        /* Make weight per-vcpu */
+        prv->weight += sdom->weight;
         if ( list_empty(&sdom->active_sdom_elem) )
         {
             list_add(&sdom->active_sdom_elem, &prv->active_sdom);
-            prv->weight += sdom->weight;
         }
     }
 
@@ -576,13 +577,13 @@ __csched_vcpu_acct_stop_locked(struct csched_private *prv,
     CSCHED_VCPU_STAT_CRANK(svc, state_idle);
     CSCHED_STAT_CRANK(acct_vcpu_idle);
 
+    BUG_ON( prv->weight < sdom->weight );
     sdom->active_vcpu_count--;
     list_del_init(&svc->active_vcpu_elem);
+    prv->weight -= sdom->weight;
     if ( list_empty(&sdom->active_vcpu) )
     {
-        BUG_ON( prv->weight < sdom->weight );
         list_del_init(&sdom->active_sdom_elem);
-        prv->weight -= sdom->weight;
     }
 }
 
@@ -804,8 +805,8 @@ csched_dom_cntl(
         {
             if ( !list_empty(&sdom->active_sdom_elem) )
             {
-                prv->weight -= sdom->weight;
-                prv->weight += op->u.credit.weight;
+                prv->weight -= sdom->weight * sdom->active_vcpu_count;
+                prv->weight += op->u.credit.weight * sdom->active_vcpu_count;
             }
             sdom->weight = op->u.credit.weight;
         }
@@ -976,9 +977,9 @@ csched_acct(void* dummy)
         BUG_ON( is_idle_domain(sdom->dom) );
         BUG_ON( sdom->active_vcpu_count == 0 );
         BUG_ON( sdom->weight == 0 );
-        BUG_ON( sdom->weight > weight_left );
+        BUG_ON( (sdom->weight * sdom->active_vcpu_count) > weight_left );
 
-        weight_left -= sdom->weight;
+        weight_left -= ( sdom->weight * sdom->active_vcpu_count );
 
         /*
          * A domain's fair share is computed using its weight in competition
@@ -991,7 +992,9 @@ csched_acct(void* dummy)
         credit_peak = sdom->active_vcpu_count * CSCHED_CREDITS_PER_ACCT;
         if ( prv->credit_balance < 0 )
         {
-            credit_peak += ( ( -prv->credit_balance * sdom->weight) +
+            credit_peak += ( ( -prv->credit_balance
+                               * sdom->weight
+                               * sdom->active_vcpu_count) +
                              (weight_total - 1)
                            ) / weight_total;
         }
@@ -1002,11 +1005,15 @@ csched_acct(void* dummy)
             if ( credit_cap < credit_peak )
                 credit_peak = credit_cap;
 
+            /* FIXME -- set cap per-vcpu as well...? */
             credit_cap = ( credit_cap + ( sdom->active_vcpu_count - 1 )
                          ) / sdom->active_vcpu_count;
         }
 
-        credit_fair = ( ( credit_total * sdom->weight) + (weight_total - 1)
+        credit_fair = ( ( credit_total
+                          * sdom->weight
+                          * sdom->active_vcpu_count )
+                        + (weight_total - 1)
                       ) / weight_total;
 
         if ( credit_fair < credit_peak )
