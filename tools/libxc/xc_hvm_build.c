@@ -107,7 +107,6 @@ static int setup_guest(int xc_handle,
     xen_pfn_t *page_array = NULL;
     unsigned long i, nr_pages = (unsigned long)memsize << (20 - PAGE_SHIFT);
     unsigned long target_pages = (unsigned long)target << (20 - PAGE_SHIFT);
-    unsigned long pod_pages = 0;
     unsigned long entry_eip, cur_pages;
     struct xen_add_to_physmap xatp;
     struct shared_info *shared_info;
@@ -209,11 +208,6 @@ static int setup_guest(int xc_handle,
             if ( done > 0 )
             {
                 done <<= SUPERPAGE_PFN_SHIFT;
-                if ( pod_mode && target_pages > cur_pages )
-                {
-                    int d = target_pages - cur_pages;
-                    pod_pages += ( done < d ) ? done : d;
-                }
                 cur_pages += done;
                 count -= done;
             }
@@ -225,15 +219,16 @@ static int setup_guest(int xc_handle,
             rc = xc_domain_memory_populate_physmap(
                 xc_handle, dom, count, 0, 0, &page_array[cur_pages]);
             cur_pages += count;
-            if ( pod_mode )
-                pod_pages -= count;
         }
     }
 
+    /* Subtract 0x20 from target_pages for the VGA "hole".  Xen will
+     * adjust the PoD cache size so that domain tot_pages will be
+     * target_pages - 0x20 after this call. */
     if ( pod_mode )
         rc = xc_domain_memory_set_pod_target(xc_handle,
                                              dom,
-                                             pod_pages,
+                                             target_pages - 0x20,
                                              NULL, NULL, NULL);
 
     if ( rc != 0 )
