@@ -21,10 +21,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/time.h> /* for time */
+#include <time.h>
 #include <getopt.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <sys/socket.h>

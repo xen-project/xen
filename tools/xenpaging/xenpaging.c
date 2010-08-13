@@ -23,6 +23,7 @@
 #include <inttypes.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <time.h>
 #include <xc_private.h>
 
 #include <xen/mem_event.h>

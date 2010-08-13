@@ -150,7 +150,7 @@ typedef struct xc_core_header {
 #define XC_CORE_MAGIC     0xF00FEBED
 #define XC_CORE_MAGIC_HVM 0xF00FEBEE
 
-#ifdef __linux__
+#if 0 /*def __linux__*/
 
 #include <sys/ptrace.h>
 #include <thread_db.h>

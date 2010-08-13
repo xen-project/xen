@@ -34,7 +34,7 @@
 #include <termios.h>
 #include <stdarg.h>
 #include <sys/mman.h>
-#include <sys/time.h>
+#include <time.h>
 #include <assert.h>
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 #include <util.h>

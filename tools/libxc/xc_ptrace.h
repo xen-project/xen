@@ -1,3 +1,5 @@
+#error xc_ptrace is disabled.
+
 #ifndef XC_PTRACE_
 #define XC_PTRACE_
 
