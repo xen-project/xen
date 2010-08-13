@@ -127,6 +127,7 @@ static int setup_guest(int xc_handle,
     if ( memsize > target )
         pod_mode = 1;
 
+    memset(&elf, 0, sizeof(elf));
     if ( elf_init(&elf, image, image_size) != 0 )
         goto error_out;
     elf_parse_binary(&elf);
