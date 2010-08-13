@@ -30,7 +30,7 @@ LDFLAGS = $(shell xml2-config --libs) \
 # -h for Solaris
 SONAME_LDFLAG ?= -soname
 # -R /usr/sfw/$(LIBDIR) -shared for Solaris
-SHLIB_CFLAGS ?= -shared
+SHLIB_LDFLAGS ?= -shared
 
 # ginstall for Solaris
 INSTALL      = install
@@ -54,7 +54,7 @@ libxenapi.so.$(MAJOR): libxenapi.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
 libxenapi.so.$(MAJOR).$(MINOR): $(LIBXENAPI_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenapi.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenapi.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^
 
 libxenapi.a: $(LIBXENAPI_OBJS)
 	$(AR) rcs libxenapi.a $^

@@ -24,7 +24,7 @@ fs-install: fs-all
 	$(INSTALL_PROG) $(FSLIB) $(DESTDIR)$(FSDIR)
 
 $(FSLIB): $(PIC_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) $(SHLIB_CFLAGS) -o $@ $^ -lfsimage $(FS_LIBDEPS)
+	$(CC) $(CFLAGS) $(LDFLAGS) $(SHLIB_LDFLAGS) -o $@ $^ -lfsimage $(FS_LIBDEPS)
 
 clean distclean:
 	rm -f $(PIC_OBJS) $(FSLIB) $(DEPS)

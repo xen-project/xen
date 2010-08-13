@@ -22,12 +22,12 @@ typedef struct flexarray {
     void **data; /* array of pointer */
 } flexarray_t;
 
-flexarray_t *flexarray_make(int size, int autogrow);
-void flexarray_free(flexarray_t *array);
-int flexarray_grow(flexarray_t *array, int extents);
-int flexarray_set(flexarray_t *array, unsigned int index, void *ptr);
-int flexarray_get(flexarray_t *array, int index, void **ptr);
+_hidden flexarray_t *flexarray_make(int size, int autogrow);
+_hidden void flexarray_free(flexarray_t *array);
+_hidden int flexarray_grow(flexarray_t *array, int extents);
+_hidden int flexarray_set(flexarray_t *array, unsigned int index, void *ptr);
+_hidden int flexarray_get(flexarray_t *array, int index, void **ptr);
 
-void **flexarray_contents(flexarray_t *array);
+_hidden void **flexarray_contents(flexarray_t *array);
 
 #endif

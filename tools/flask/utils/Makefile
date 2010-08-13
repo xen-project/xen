@@ -14,7 +14,7 @@ BASECFLAGS+= -I$(LIBFLASK_ROOT)/include
 BASECFLAGS+= -I.
 
 CFLAGS  += $(BASECFLAGS)
-LDFLAGS += $(PROFILE) -L$(XEN_LIBXC) -L$(LIBFLASK_ROOT)
+LDLIBS += $(PROFILE) -L$(XEN_LIBXC) -L$(LIBFLASK_ROOT)
 TESTDIR  = testsuite/tmp
 TESTFLAGS= -DTESTING
 TESTENV  = XENSTORED_ROOTDIR=$(TESTDIR) XENSTORED_RUNDIR=$(TESTDIR)
@@ -27,7 +27,7 @@ CLIENTS_OBJS := $(patsubst flask-%,%.o,$(CLIENTS))
 all: $(CLIENTS)
 
 $(CLIENTS): flask-%: %.o
-	$(CC) $(CFLAGS) $(LDFLAGS) $< $(LOADLIBES) $(LDLIBS) -L. -lflask $(LDFLAGS_libxenctrl) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $< $(LOADLIBES) $(LDLIBS) -L. -lflask $(LDLIBS_libxenctrl) -o $@
 
 .PHONY: clean
 clean: 

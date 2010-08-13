@@ -6,8 +6,11 @@ CFLAGS  += -Werror
 
 CFLAGS  += $(CFLAGS_libxenctrl)
 CFLAGS  += $(CFLAGS_libxenstore)
-LDFLAGS += $(LDFLAGS_libxenctrl)
-LDFLAGS += $(LDFLAGS_libxenstore)
+LDLIBS += $(LDLIBS_libxenctrl)
+LDLIBS += $(LDLIBS_libxenstore)
+LDLIBS += $(UTIL_LIBS)
+LDLIBS += $(SOCKET_LIBS)
+LDLIBS += -lrt
 
 BIN      = xenconsoled xenconsole
 
@@ -20,12 +23,10 @@ clean:
 	$(RM) client/*.o daemon/*.o
 
 xenconsoled: $(patsubst %.c,%.o,$(wildcard daemon/*.c))
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) \
-              $(UTIL_LIBS) $(SOCKET_LIBS) -lrt
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 xenconsole: $(patsubst %.c,%.o,$(wildcard client/*.c))
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) \
-	      $(UTIL_LIBS) $(SOCKET_LIBS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 .PHONY: install
 install: $(BIN)

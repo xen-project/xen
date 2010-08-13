@@ -511,6 +511,7 @@ typedef struct {
 int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic);
 int libxl_device_nic_del(libxl_ctx *ctx, libxl_device_nic *nic, int wait);
 libxl_nicinfo *libxl_list_nics(libxl_ctx *ctx, uint32_t domid, unsigned int *nb);
+void libxl_free_nics_list(libxl_nicinfo *nics, unsigned int nb);
 
 int libxl_device_console_add(libxl_ctx *ctx, uint32_t domid, libxl_device_console *console);
 
@@ -596,9 +597,10 @@ typedef struct {
 
 int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo);
 libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
-                                       int *nb_vcpu, int *cpusize);
+                                       int *nb_vcpu, int *nrcpus);
+void libxl_free_vcpu_list(libxl_vcpuinfo *vcpu);
 int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
-                           uint64_t *cpumap, int cpusize);
+                           uint64_t *cpumap, int nrcpus);
 int libxl_set_vcpucount(libxl_ctx *ctx, uint32_t domid, uint32_t count);
 
 int libxl_get_sched_id(libxl_ctx *ctx);

@@ -46,8 +46,8 @@ clean:
 	$(RM) *.a *.so *.o *.rpm $(BIN) $(LIBBIN)
 
 %: %.c $(HDRS) Makefile
-	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS_libxenctrl)
+	$(CC) $(CFLAGS) -o $@ $< $(LDLIBS_libxenctrl)
 
 XENITP_OBJS=xenitp.o ia64-dis.o ia64-opc.o cpu-ia64-opc.o
 xenitp: $(XENITP_OBJS)
-	$(CC) $(CFLAGS) -o $@ $(XENITP_OBJS) $(LDFLAGS_libxenctrl)
+	$(CC) $(CFLAGS) -o $@ $(XENITP_OBJS) $(LDLIBS_libxenctrl)

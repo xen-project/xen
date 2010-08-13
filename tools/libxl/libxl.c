@@ -70,11 +70,13 @@ int libxl_ctx_init(libxl_ctx *ctx, int version, xentoollog_logger *lg)
     return 0;
 }
 
+static void do_free_version_info(libxl_version_info *info);
 int libxl_ctx_free(libxl_ctx *ctx)
 {
     libxl_free_all(ctx);
     free(ctx->alloc_ptrs);
     xc_interface_close(ctx->xch);
+    do_free_version_info(&ctx->version_info);
     if (ctx->xsh) xs_daemon_close(ctx->xsh); 
     return 0;
 }
@@ -1377,7 +1379,7 @@ static int libxl_create_stubdom(libxl_ctx *ctx,
 
     memset(&c_info, 0x00, sizeof(libxl_domain_create_info));
     c_info.hvm = 0;
-    c_info.name = libxl_sprintf(ctx, "%s-dm", libxl_domid_to_name(ctx, info->domid));
+    c_info.name = libxl_sprintf(ctx, "%s-dm", _libxl_domid_to_name(ctx, info->domid));
     for (i = 0; i < 16; i++)
         c_info.uuid[i] = info->uuid[i];
 
@@ -1885,10 +1887,21 @@ int libxl_device_nic_del(libxl_ctx *ctx,
     return libxl_device_del(ctx, &device, wait);
 }
 
+void libxl_free_nics_list(libxl_nicinfo *nics, unsigned int nb)
+{
+    unsigned int i;
+    for(i = 0; i < nb; i++) {
+        free(nics[i].backend);
+        free(nics[i].frontend);
+        free(nics[i].script);
+    }
+    free(nics);
+}
+
 libxl_nicinfo *libxl_list_nics(libxl_ctx *ctx, uint32_t domid, unsigned int *nb)
 {
     char *dompath, *nic_path_fe;
-    char **l;
+    char **l, **list;
     char *val, *tok;
     unsigned int nb_nics, i;
     libxl_nicinfo *res, *nics;
@@ -1897,22 +1910,21 @@ libxl_nicinfo *libxl_list_nics(libxl_ctx *ctx, uint32_t domid, unsigned int *nb)
     if (!dompath) {
         return NULL;
     }
-    l = libxl_xs_directory(ctx, XBT_NULL,
+    list = l = libxl_xs_directory(ctx, XBT_NULL,
                            libxl_sprintf(ctx, "%s/device/vif", dompath), &nb_nics);
     if (!l) {
         return NULL;
     }
-    res = libxl_calloc(ctx, nb_nics, sizeof (libxl_device_nic));
+    nics = res = calloc(nb_nics, sizeof (libxl_device_nic));
     if (!res) {
         libxl_free(ctx, l);
         return NULL;
     }
-    nics = res;
     for (*nb = nb_nics; nb_nics > 0; --nb_nics, ++l, ++nics) {
         nic_path_fe = libxl_sprintf(ctx, "%s/device/vif/%s", dompath, *l);
 
-        nics->backend = libxl_xs_read(ctx, XBT_NULL,
-                                      libxl_sprintf(ctx, "%s/backend", nic_path_fe));
+        nics->backend = xs_read(ctx->xsh, XBT_NULL,
+                                libxl_sprintf(ctx, "%s/backend", nic_path_fe), NULL);
         val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/backend-id", nic_path_fe));
         nics->backend_id = val ? strtoul(val, NULL, 10) : -1;
 
@@ -1930,17 +1942,14 @@ libxl_nicinfo *libxl_list_nics(libxl_ctx *ctx, uint32_t domid, unsigned int *nb)
         nics->rref_tx = val ? strtol(val, NULL, 10) : -1;
         val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/rx-ring-ref", nic_path_fe));
         nics->rref_rx = val ? strtol(val, NULL, 10) : -1;
-        nics->frontend = libxl_xs_read(ctx, XBT_NULL,
-                                       libxl_sprintf(ctx, "%s/frontend", nics->backend));
+        nics->frontend = xs_read(ctx->xsh, XBT_NULL,
+                                 libxl_sprintf(ctx, "%s/frontend", nics->backend), NULL);
         val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/frontend-id", nics->backend));
         nics->frontend_id = val ? strtoul(val, NULL, 10) : -1;
-        nics->script = libxl_xs_read(ctx, XBT_NULL,
-                                     libxl_sprintf(ctx, "%s/script", nics->backend));
-
-        libxl_free(ctx, nic_path_fe);
+        nics->script = xs_read(ctx->xsh, XBT_NULL,
+                               libxl_sprintf(ctx, "%s/script", nics->backend), NULL);
     }
 
-    libxl_free(ctx, l);
     return res;
 }
 
@@ -2177,7 +2186,7 @@ retry_transaction:
     flexarray_set(back, boffset++, "state");
     flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", 1));
     flexarray_set(back, boffset++, "domain");
-    flexarray_set(back, boffset++, libxl_domid_to_name(ctx, domid));
+    flexarray_set(back, boffset++, _libxl_domid_to_name(ctx, domid));
     flexarray_set(back, boffset++, "protocol");
     flexarray_set(back, boffset++, LIBXL_XENCONSOLE_PROTOCOL);
 
@@ -2234,7 +2243,7 @@ int libxl_device_vkb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb)
     flexarray_set(back, boffset++, "state");
     flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", 1));
     flexarray_set(back, boffset++, "domain");
-    flexarray_set(back, boffset++, libxl_domid_to_name(ctx, domid));
+    flexarray_set(back, boffset++, _libxl_domid_to_name(ctx, domid));
 
     flexarray_set(front, foffset++, "backend-id");
     flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", vkb->backend_domid));
@@ -2411,7 +2420,7 @@ static int libxl_build_xenpv_qemu_args(libxl_ctx *ctx,
         uint32_t guest_domid;
         if (libxl_is_stubdom(ctx, vfb->domid, &guest_domid)) {
             char *filename;
-            char *name = libxl_sprintf(ctx, "qemu-dm-%s", libxl_domid_to_name(ctx, guest_domid));
+            char *name = libxl_sprintf(ctx, "qemu-dm-%s", _libxl_domid_to_name(ctx, guest_domid));
             libxl_create_logfile(ctx, name, &filename);
             info->serial = libxl_sprintf(ctx, "file:%s", filename);
             free(filename);
@@ -2429,7 +2438,7 @@ static int libxl_build_xenpv_qemu_args(libxl_ctx *ctx,
         info->extra[j] = NULL;
     }
     info->domid = vfb->domid;
-    info->dom_name = libxl_domid_to_name(ctx, vfb->domid);
+    info->dom_name = _libxl_domid_to_name(ctx, vfb->domid);
     info->device_model = libxl_abs_path(ctx, "qemu-dm", libxl_libexec_path());
     info->type = XENPV;
     return 0;
@@ -2475,7 +2484,7 @@ int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb)
     flexarray_set(back, boffset++, "state");
     flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", 1));
     flexarray_set(back, boffset++, "domain");
-    flexarray_set(back, boffset++, libxl_domid_to_name(ctx, domid));
+    flexarray_set(back, boffset++, _libxl_domid_to_name(ctx, domid));
     flexarray_set(back, boffset++, "vnc");
     flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", vfb->vnc));
     flexarray_set(back, boffset++, "vnclisten");
@@ -2648,6 +2657,18 @@ int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo)
     return 0;
 }
 
+static void do_free_version_info(libxl_version_info *info)
+{
+    free(info->xen_version_extra);
+    free(info->compiler);
+    free(info->compile_by);
+    free(info->compile_domain);
+    free(info->compile_date);
+    free(info->capabilities);
+    free(info->changeset);
+    free(info->commandline);
+}
+
 const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx)
 {
     union {
@@ -2667,20 +2688,21 @@ const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx)
     xen_version = xc_version(ctx->xch, XENVER_version, NULL);
     info->xen_version_major = xen_version >> 16;
     info->xen_version_minor = xen_version & 0xFF;
+
     xc_version(ctx->xch, XENVER_extraversion, &u.xen_extra);
-    info->xen_version_extra = libxl_strdup(ctx, u.xen_extra);
+    info->xen_version_extra = strdup(u.xen_extra);
 
     xc_version(ctx->xch, XENVER_compile_info, &u.xen_cc);
-    info->compiler = libxl_strdup(ctx, u.xen_cc.compiler);
-    info->compile_by = libxl_strdup(ctx, u.xen_cc.compile_by);
-    info->compile_domain = libxl_strdup(ctx, u.xen_cc.compile_domain);
-    info->compile_date = libxl_strdup(ctx, u.xen_cc.compile_date);
+    info->compiler = strdup(u.xen_cc.compiler);
+    info->compile_by = strdup(u.xen_cc.compile_by);
+    info->compile_domain = strdup(u.xen_cc.compile_domain);
+    info->compile_date = strdup(u.xen_cc.compile_date);
 
     xc_version(ctx->xch, XENVER_capabilities, &u.xen_caps);
-    info->capabilities = libxl_strdup(ctx, u.xen_caps);
+    info->capabilities = strdup(u.xen_caps);
 
     xc_version(ctx->xch, XENVER_changeset, &u.xen_chgset);
-    info->changeset = libxl_strdup(ctx, u.xen_chgset);
+    info->changeset = strdup(u.xen_chgset);
 
     xc_version(ctx->xch, XENVER_platform_parameters, &u.p_parms);
     info->virt_start = u.p_parms.virt_start;
@@ -2688,18 +2710,20 @@ const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx)
     info->pagesize = xc_version(ctx->xch, XENVER_pagesize, NULL);
 
     xc_version(ctx->xch, XENVER_commandline, &u.xen_commandline);
-    info->commandline = libxl_strdup(ctx, u.xen_commandline);
+    info->commandline = strdup(u.xen_commandline);
 
     return info;
 }
 
 libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
-                                       int *nb_vcpu, int *cpusize)
+                                       int *nb_vcpu, int *nrcpus)
 {
     libxl_vcpuinfo *ptr, *ret;
     xc_domaininfo_t domaininfo;
     xc_vcpuinfo_t vcpuinfo;
     xc_physinfo_t physinfo = { 0 };
+    uint64_t *cpumaps;
+    unsigned num_cpuwords;
 
     if (xc_domain_getinfolist(ctx->xch, domid, 1, &domaininfo) != 1) {
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "getting infolist");
@@ -2709,15 +2733,16 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "getting physinfo");
         return NULL;
     }
-    *cpusize = physinfo.max_cpu_id + 1;
-    ptr = libxl_calloc(ctx, domaininfo.max_vcpu_id + 1, sizeof (libxl_vcpuinfo));
+    *nrcpus = physinfo.max_cpu_id + 1;
+    ret = ptr = calloc(domaininfo.max_vcpu_id + 1, sizeof (libxl_vcpuinfo));
     if (!ptr) {
         return NULL;
     }
 
-    ret = ptr;
+    num_cpuwords = ((physinfo.max_cpu_id + 64) / 64);
+    cpumaps = calloc(num_cpuwords * sizeof(*cpumaps), domaininfo.max_vcpu_id + 1);
     for (*nb_vcpu = 0; *nb_vcpu <= domaininfo.max_vcpu_id; ++*nb_vcpu, ++ptr) {
-        ptr->cpumap = libxl_calloc(ctx, (*cpusize + 63) / 64, sizeof (uint64_t));
+        ptr->cpumap = cpumaps + (num_cpuwords * *nb_vcpu);
         if (!ptr->cpumap) {
             return NULL;
         }
@@ -2725,7 +2750,8 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
             XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "getting vcpu info");
             return NULL;
         }
-        if (xc_vcpu_getaffinity(ctx->xch, domid, *nb_vcpu, ptr->cpumap, *cpusize) == -1) {
+        if (xc_vcpu_getaffinity(ctx->xch, domid, *nb_vcpu,
+            ptr->cpumap, ((*nrcpus) + 7) / 8) == -1) {
             XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "getting vcpu affinity");
             return NULL;
         }
@@ -2739,10 +2765,17 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
     return ret;
 }
 
-int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
-                           uint64_t *cpumap, int cpusize)
+void libxl_free_vcpu_list(libxl_vcpuinfo *vcpu)
 {
-    if (xc_vcpu_setaffinity(ctx->xch, domid, vcpuid, cpumap, cpusize)) {
+    if ( vcpu )
+        free(vcpu[0].cpumap);
+    free(vcpu);
+}
+
+int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
+                           uint64_t *cpumap, int nrcpus)
+{
+    if (xc_vcpu_setaffinity(ctx->xch, domid, vcpuid, cpumap, (nrcpus + 7) / 8)) {
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "setting vcpu affinity");
         return ERROR_FAIL;
     }
