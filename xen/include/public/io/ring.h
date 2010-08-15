@@ -103,8 +103,16 @@ union __name##_sring_entry {                                            \
 struct __name##_sring {                                                 \
     RING_IDX req_prod, req_event;                                       \
     RING_IDX rsp_prod, rsp_event;                                       \
-    uint8_t  netfront_smartpoll_active;                                 \
-    uint8_t  pad[47];                                                   \
+    union {                                                             \
+        struct {                                                        \
+            uint8_t smartpoll_active;                                   \
+        } netif;                                                        \
+        struct {                                                        \
+            uint8_t msg;                                                \
+        } tapif_user;                                                   \
+        uint8_t pvt_pad[4];                                             \
+    } private;                                                          \
+    uint8_t pad[44];                                                    \
     union __name##_sring_entry ring[1]; /* variable-length */           \
 };                                                                      \
                                                                         \
