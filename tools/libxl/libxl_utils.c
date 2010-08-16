@@ -97,7 +97,7 @@ char *libxl_poolid_to_name(libxl_ctx *ctx, uint32_t poolid)
     char *s;
 
     if (poolid == 0)
-        return "Pool-0";
+        return strdup("Pool-0");
     snprintf(path, sizeof(path), "/local/pool/%d/name", poolid);
     s = xs_read(ctx->xsh, XBT_NULL, path, &len);
     return s;
