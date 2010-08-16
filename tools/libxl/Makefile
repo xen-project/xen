@@ -32,6 +32,8 @@ LIBXLU_OBJS = libxlu_cfg_y.o libxlu_cfg_l.o libxlu_cfg.o
 
 CLIENTS = xl
 
+XL_OBJS = xl.o xl_cmdimpl.o xl_cmdtable.o
+
 .PHONY: all
 all: $(CLIENTS) libxenlight.so libxenlight.a libxlutil.so libxlutil.a \
 	$(AUTOSRCS) $(AUTOINCS)
@@ -82,16 +84,7 @@ libxlutil.so.$(XLUMAJOR).$(XLUMINOR): $(LIBXLU_OBJS)
 libxlutil.a: $(LIBXLU_OBJS)
 	$(AR) rcs libxlutil.a $^
 
-xl.o: xl.c
-	$(CC) $(CFLAGS) -c xl.c
-
-xl_cmdimpl.o: xl_cmdimpl.c
-	$(CC) $(CFLAGS) -c xl_cmdimpl.c
-
-xl_cmdtable.o: xl_cmdtable.c
-	$(CC) $(CFLAGS) -c xl_cmdtable.c
-
-$(CLIENTS): xl.o xl_cmdimpl.o xl_cmdtable.o libxlutil.so libxenlight.so
+$(CLIENTS): $(XL_OBJS) libxlutil.so libxenlight.so
 	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 .PHONY: install
