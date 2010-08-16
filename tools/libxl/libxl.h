@@ -141,6 +141,10 @@ typedef uint8_t libxl_uuid[16];
 
 typedef uint8_t libxl_mac[6];
 
+typedef char **libxl_string_list;
+
+typedef char **libxl_key_value_list;
+
 typedef struct {
     libxl_uuid uuid;
     uint32_t domid;
@@ -209,8 +213,8 @@ typedef struct {
     int ssidref;
     char *name;
     libxl_uuid uuid;
-    char **xsdata;
-    char **platformdata;
+    libxl_key_value_list xsdata;
+    libxl_key_value_list platformdata;
     uint32_t poolid;
     char *poolname;
 } libxl_domain_create_info;
@@ -313,7 +317,7 @@ typedef struct {
     int vcpus; /* max number of vcpus */
     int vcpu_avail; /* vcpus actually available */
     int xen_platform_pci; /* enable/disable the xen platform pci device */
-    char **extra; /* extra parameters pass directly to qemu, NULL terminated */
+    libxl_string_list extra; /* extra parameters pass directly to qemu, NULL terminated */
     /* Network is missing */
 } libxl_device_model_info;
 
