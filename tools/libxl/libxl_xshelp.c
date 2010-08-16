@@ -110,10 +110,9 @@ int libxl_xs_write(libxl_gc *gc, xs_transaction_t t,
 char * libxl_xs_read(libxl_gc *gc, xs_transaction_t t, char *path)
 {
     libxl_ctx *ctx = libxl_gc_owner(gc);
-    unsigned int len;
     char *ptr;
 
-    ptr = xs_read(ctx->xsh, t, path, &len);
+    ptr = xs_read(ctx->xsh, t, path, NULL);
     if (ptr != NULL) {
         libxl_ptr_add(gc, ptr);
         return ptr;
