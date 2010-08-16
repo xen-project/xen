@@ -29,7 +29,7 @@ const char *libxl_blktap_devpath(libxl_gc *gc,
                                  libxl_disk_phystype phystype)
 {
     const char *type;
-    char *params, *devname;
+    char *params, *devname = NULL;
     int minor, err;
 
     type = device_disk_string_of_phystype(phystype);
