@@ -145,6 +145,37 @@ typedef char **libxl_string_list;
 
 typedef char **libxl_key_value_list;
 
+typedef enum {
+    XENFV = 1,
+    XENPV,
+} libxl_qemu_machine_type;
+
+typedef enum {
+    LIBXL_CONSTYPE_SERIAL,
+    LIBXL_CONSTYPE_PV,
+} libxl_console_constype;
+
+typedef enum {
+    LIBXL_CONSBACK_XENCONSOLED,
+    LIBXL_CONSBACK_IOEMU,
+} libxl_console_consback;
+
+typedef enum {
+    PHYSTYPE_QCOW = 1,
+    PHYSTYPE_QCOW2,
+    PHYSTYPE_VHD,
+    PHYSTYPE_AIO,
+    PHYSTYPE_FILE,
+    PHYSTYPE_PHY,
+} libxl_disk_phystype;
+
+typedef enum {
+    NICTYPE_IOEMU = 1,
+    NICTYPE_VIF,
+} libxl_nic_type;
+
+#define LIBXL_PCI_FUNC_ALL (~0U)
+
 typedef struct {
     libxl_uuid uuid;
     uint32_t domid;
@@ -285,11 +316,6 @@ typedef struct {
     int (*suspend_callback)(void *, int);
 } libxl_domain_suspend_info;
 
-typedef enum {
-    XENFV = 1,
-    XENPV,
-} libxl_qemu_machine_type;
-
 typedef struct {
     int domid;
     libxl_uuid uuid; /* this is use only with stubdom, and must be different from the domain uuid */
@@ -343,16 +369,6 @@ typedef struct {
     int devid;
 } libxl_device_vkb;
 
-typedef enum {
-    LIBXL_CONSTYPE_SERIAL,
-    LIBXL_CONSTYPE_PV,
-} libxl_console_constype;
-
-typedef enum {
-    LIBXL_CONSBACK_XENCONSOLED,
-    LIBXL_CONSBACK_IOEMU,
-} libxl_console_consback;
-
 typedef struct {
     uint32_t backend_domid;
     uint32_t domid;
@@ -361,15 +377,6 @@ typedef struct {
     libxl_domain_build_state *build_state;
     char *output;
 } libxl_device_console;
-
-typedef enum {
-    PHYSTYPE_QCOW = 1,
-    PHYSTYPE_QCOW2,
-    PHYSTYPE_VHD,
-    PHYSTYPE_AIO,
-    PHYSTYPE_FILE,
-    PHYSTYPE_PHY,
-} libxl_disk_phystype;
 
 typedef struct {
     uint32_t backend_domid;
@@ -381,11 +388,6 @@ typedef struct {
     int readwrite;
     int is_cdrom;
 } libxl_device_disk;
-
-typedef enum {
-    NICTYPE_IOEMU = 1,
-    NICTYPE_VIF,
-} libxl_nic_type;
 
 typedef struct {
     uint32_t backend_domid;
@@ -431,7 +433,6 @@ typedef struct {
     };
     unsigned int domain;
     unsigned int vdevfn;
-#define LIBXL_PCI_FUNC_ALL (~0U)
     unsigned int vfunc_mask;
     bool msitranslate;
     bool power_mgmt;
