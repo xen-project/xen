@@ -442,19 +442,12 @@ int save_device_model(libxl_ctx *ctx, uint32_t domid, int fd)
     return 0;
 }
 
-char *libxl_uuid2string(libxl_ctx *ctx, const libxl_uuid uuid)
+char *libxl_uuid2string(libxl_gc *gc, const libxl_uuid uuid)
 {
-    libxl_gc gc = LIBXL_INIT_GC(ctx);
-    char *s = string_of_uuid(&gc, uuid);
-    char *ret;
-    if (!s) {
-        XL_LOG(ctx, XL_LOG_ERROR, "cannot allocate for uuid");
-        ret = NULL;
-    }else{
-        ret = strdup(s);
-    }
-    libxl_free_all(&gc);
-    return ret;
+    char *s = libxl_sprintf(gc, LIBXL_UUID_FMT, LIBXL_UUID_BYTES(uuid));
+    if (!s)
+        XL_LOG(libxl_gc_owner(gc), XL_LOG_ERROR, "cannot allocate for uuid");
+    return s;
 }
 
 static const char *userdata_path(libxl_gc *gc, uint32_t domid,
@@ -472,7 +465,7 @@ static const char *userdata_path(libxl_gc *gc, uint32_t domid,
                      " for domain %"PRIu32, domid);
         return NULL;
     }
-    uuid_string = string_of_uuid(gc, info.uuid);
+    uuid_string = libxl_sprintf(gc, LIBXL_UUID_FMT, LIBXL_UUID_BYTES(info.uuid));
 
     path = libxl_sprintf(gc, "/var/lib/xen/"
                          "userdata-%s.%s.%s",

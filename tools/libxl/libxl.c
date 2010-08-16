@@ -90,7 +90,7 @@ int libxl_domain_make(libxl_ctx *ctx, libxl_domain_create_info *info,
     xs_transaction_t t;
     xen_domain_handle_t handle;
 
-    uuid_string = libxl_uuid2string(ctx, info->uuid);
+    uuid_string = libxl_uuid2string(&gc, info->uuid);
     if (!uuid_string) {
         libxl_free_all(&gc);
         return ERROR_NOMEM;
@@ -453,7 +453,7 @@ int libxl_domain_preserve(libxl_ctx *ctx, uint32_t domid,
         return ERROR_NOMEM;
     }
 
-    uuid_string = libxl_uuid2string(ctx, new_uuid);
+    uuid_string = libxl_uuid2string(&gc, new_uuid);
     if (!uuid_string) {
         libxl_free_all(&gc);
         return ERROR_NOMEM;
@@ -2764,7 +2764,7 @@ int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid, uint32_t target_memk
     if (rc != 1 || info.domain != domid)
         goto out;
     xcinfo2xlinfo(&info, &ptr);
-    uuid = libxl_uuid2string(ctx, ptr.uuid);
+    uuid = libxl_uuid2string(&gc, ptr.uuid);
     libxl_xs_write(&gc, XBT_NULL, libxl_sprintf(&gc, "/vm/%s/memory", uuid), "%"PRIu32, target_memkb / 1024);
 
     if (enforce || !domid)

@@ -132,6 +132,12 @@
 #include <sys/wait.h> /* for pid_t */
 
 typedef uint8_t libxl_uuid[16];
+#define LIBXL_UUID_FMT "%02hhx%02hhx%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx"
+#define LIBXL_UUID_BYTES(uuid) uuid[0], uuid[1], uuid[2], uuid[3], \
+            uuid[4], uuid[5], uuid[6], uuid[7], \
+            uuid[8], uuid[9], uuid[10], uuid[11], \
+            uuid[12], uuid[13], uuid[14], uuid[15] \
+
 
 typedef uint8_t libxl_mac[6];
 
@@ -477,7 +483,6 @@ int libxl_run_bootloader(libxl_ctx *ctx,
                          libxl_device_disk *disk,
                          uint32_t domid);
 
-char *libxl_uuid2string(libxl_ctx *ctx, const libxl_uuid uuid);
   /* 0 means ERROR_ENOMEM, which we have logged */
 
 /* events handling */

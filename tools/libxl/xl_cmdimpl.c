@@ -41,8 +41,6 @@
 #include "libxlutil.h"
 #include "xl.h"
 
-#define UUID_FMT "%02hhx%02hhx%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx"
-
 #define CHK_ERRNO( call ) ({                                            \
         int chk_errno = (call);                                         \
         if (chk_errno < 0) {                                                \
@@ -393,11 +391,7 @@ static void printf_info(int domid,
     printf("\t(oos %d)\n", c_info->oos);
     printf("\t(ssidref %d)\n", c_info->ssidref);
     printf("\t(name %s)\n", c_info->name);
-    printf("\t(uuid " UUID_FMT ")\n",
-           (c_info->uuid)[0], (c_info->uuid)[1], (c_info->uuid)[2], (c_info->uuid)[3],
-           (c_info->uuid)[4], (c_info->uuid)[5], (c_info->uuid)[6], (c_info->uuid)[7],
-           (c_info->uuid)[8], (c_info->uuid)[9], (c_info->uuid)[10], (c_info->uuid)[11],
-           (c_info->uuid)[12], (c_info->uuid)[13], (c_info->uuid)[14], (c_info->uuid)[15]);
+    printf("\t(uuid " LIBXL_UUID_FMT ")\n", LIBXL_UUID_BYTES(c_info->uuid));
     printf("\t(cpupool %s (%d))\n", c_info->poolname, c_info->poolid);
     if (c_info->xsdata)
         printf("\t(xsdata contains data)\n");
@@ -2188,10 +2182,8 @@ void list_domains(int verbose, const libxl_dominfo *info, int nb_domain)
                 info[i].dying ? 'd' : '-',
                 ((float)info[i].cpu_time / 1e9));
         free(domname);
-        if (verbose) {
-            char *uuid = libxl_uuid2string(&ctx, info[i].uuid);
-            printf(" %s", uuid);
-        }
+        if (verbose)
+            printf(" " LIBXL_UUID_FMT, LIBXL_UUID_BYTES(info[i].uuid));
         putchar('\n');
     }
 }
@@ -2211,11 +2203,7 @@ void list_vm(void)
     printf("UUID                                  ID    name\n");
     for (i = 0; i < nb_vm; i++) {
         domname = libxl_domid_to_name(&ctx, info[i].domid);
-        printf(UUID_FMT "  %d    %-30s\n",
-            info[i].uuid[0], info[i].uuid[1], info[i].uuid[2], info[i].uuid[3],
-            info[i].uuid[4], info[i].uuid[5], info[i].uuid[6], info[i].uuid[7],
-            info[i].uuid[8], info[i].uuid[9], info[i].uuid[10], info[i].uuid[11],
-            info[i].uuid[12], info[i].uuid[13], info[i].uuid[14], info[i].uuid[15],
+        printf(LIBXL_UUID_FMT "  %d    %-30s\n", LIBXL_UUID_BYTES(info[i].uuid),
             info[i].domid, domname);
         free(domname);
     }

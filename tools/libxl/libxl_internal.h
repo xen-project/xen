@@ -106,12 +106,6 @@ typedef struct {
 
 #define PRINTF_ATTRIBUTE(x, y) __attribute__((format(printf, x, y)))
 
-#define UUID_FMT "%02hhx%02hhx%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx"
-#define string_of_uuid(ctx, u) \
-    libxl_sprintf(ctx, UUID_FMT, \
-                (u)[0], (u)[1], (u)[2], (u)[3], (u)[4], (u)[5], (u)[6], (u)[7], \
-                (u)[8], (u)[9], (u)[10], (u)[11], (u)[12], (u)[13], (u)[14], (u)[15])
-
 _hidden int xs_writev(struct xs_handle *xsh, xs_transaction_t t, char *dir, char *kvs[]);
 
 typedef struct {
@@ -266,5 +260,7 @@ int libxl_blktap_enabled(libxl_gc *gc);
 const char *libxl_blktap_devpath(libxl_gc *gc,
                                  const char *disk,
                                  libxl_disk_phystype phystype);
+
+_hidden char *libxl_uuid2string(libxl_gc *gc, const libxl_uuid uuid);
 
 #endif
