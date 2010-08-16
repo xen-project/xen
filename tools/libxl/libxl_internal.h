@@ -263,4 +263,13 @@ const char *libxl_blktap_devpath(libxl_gc *gc,
 
 _hidden char *libxl_uuid2string(libxl_gc *gc, const libxl_uuid uuid);
 
+struct libxl__xen_console_reader {
+    char *buffer;
+    unsigned int size;
+    unsigned int count;
+    unsigned int clear;
+    unsigned int incremental;
+    unsigned int index;
+};
+
 #endif

@@ -744,14 +744,7 @@ int libxl_send_trigger(libxl_ctx *ctx, uint32_t domid,
 int libxl_send_sysrq(libxl_ctx *ctx, uint32_t domid, char sysrq);
 int libxl_send_debug_keys(libxl_ctx *ctx, char *keys);
 
-typedef struct {
-    char *buffer;
-    unsigned int size;
-    unsigned int count;
-    unsigned int clear;
-    unsigned int incremental;
-    unsigned int index;
-}  libxl_xen_console_reader;
+typedef struct libxl__xen_console_reader libxl_xen_console_reader;
 
 libxl_xen_console_reader *
     libxl_xen_console_read_start(libxl_ctx *ctx, int clear);
