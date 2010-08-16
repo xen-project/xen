@@ -40,6 +40,7 @@
 #endif
 
 #include "xs.h"
+#include "xenctrl.h"
 
 #define ESCAPE_CHARACTER 0x1d
 
@@ -254,6 +255,12 @@ static int console_loop(int fd, struct xs_handle *xs, char *pty_path)
 	return 0;
 }
 
+typedef enum {
+       CONSOLE_INVAL,
+       CONSOLE_PV,
+       CONSOLE_SERIAL,
+} console_type;
+
 int main(int argc, char **argv)
 {
 	struct termios attr;
@@ -263,6 +270,7 @@ int main(int argc, char **argv)
 	unsigned int num = 0;
 	int opt_ind=0;
 	struct option lopt[] = {
+		{ "type",     1, 0, 't' },
 		{ "num",     1, 0, 'n' },
 		{ "help",    0, 0, 'h' },
 		{ 0 },
@@ -272,6 +280,7 @@ int main(int argc, char **argv)
 	int spty, xsfd;
 	struct xs_handle *xs;
 	char *end;
+	console_type type = CONSOLE_INVAL;
 
 	while((ch = getopt_long(argc, argv, sopt, lopt, &opt_ind)) != -1) {
 		switch(ch) {
@@ -281,6 +290,17 @@ int main(int argc, char **argv)
 			break;
 		case 'n':
 			num = atoi(optarg);
+			break;
+		case 't':
+			if (!strcmp(optarg, "serial"))
+				type = CONSOLE_SERIAL;
+			else if (!strcmp(optarg, "pv"))
+				type = CONSOLE_PV;
+			else {
+				fprintf(stderr, "Invalid type argument\n");
+				fprintf(stderr, "Console types supported are: serial, pv\n");
+				exit(EINVAL);
+			}
 			break;
 		default:
 			fprintf(stderr, "Invalid argument\n");
@@ -314,10 +334,30 @@ int main(int argc, char **argv)
 	dom_path = xs_get_domain_path(xs, domid);
 	if (dom_path == NULL)
 		err(errno, "xs_get_domain_path()");
-	path = malloc(strlen(dom_path) + strlen("/serial/0/tty") + 5);
+	if (type == CONSOLE_INVAL) {
+		xc_dominfo_t xcinfo;
+		xc_interface *xc_handle = xc_interface_open(0,0,0);
+		if (xc_handle == NULL)
+			err(errno, "Could not open xc interface");
+		xc_domain_getinfo(xc_handle, domid, 1, &xcinfo);
+		/* default to pv console for pv guests and serial for hvm guests */
+		if (xcinfo.hvm)
+			type = CONSOLE_SERIAL;
+		else
+			type = CONSOLE_PV;
+		xc_interface_close(xc_handle);
+	}
+	path = malloc(strlen(dom_path) + strlen("/device/console/0/tty") + 5);
 	if (path == NULL)
 		err(ENOMEM, "malloc");
-	snprintf(path, strlen(dom_path) + strlen("/serial/0/tty") + 5, "%s/serial/%d/tty", dom_path, num);
+	if (type == CONSOLE_SERIAL)
+		snprintf(path, strlen(dom_path) + strlen("/serial/0/tty") + 5, "%s/serial/%d/tty", dom_path, num);
+	else {
+		if (num == 0)
+			snprintf(path, strlen(dom_path) + strlen("/console/tty") + 1, "%s/console/tty", dom_path);
+		else
+			snprintf(path, strlen(dom_path) + strlen("/device/console/%d/tty") + 5, "%s/device/console/%d/tty", dom_path, num);
+	}
 
 	/* FIXME consoled currently does not assume domain-0 doesn't have a
 	   console which is good when we break domain-0 up.  To keep us

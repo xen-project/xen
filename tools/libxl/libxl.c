@@ -952,13 +952,20 @@ out:
     return 0;
 }
 
-int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num)
+int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num, libxl_console_constype type)
 {
     libxl_gc gc = LIBXL_INIT_GC(ctx);
     char *p = libxl_sprintf(&gc, "%s/xenconsole", libxl_private_bindir_path());
     char *domid_s = libxl_sprintf(&gc, "%d", domid);
     char *cons_num_s = libxl_sprintf(&gc, "%d", cons_num);
-    execl(p, p, domid_s, "--num", cons_num_s, (void *)NULL);
+    char *cons_type_s;
+
+    if (type == LIBXL_CONSTYPE_PV)
+        cons_type_s = "pv";
+    else
+        cons_type_s = "serial";
+
+    execl(p, p, domid_s, "--num", cons_num_s, "--type", cons_type_s, (void *)NULL);
     libxl_free_all(&gc);
     return ERROR_FAIL;
 }
@@ -967,9 +974,13 @@ int libxl_primary_console_exec(libxl_ctx *ctx, uint32_t domid_vm)
 {
     uint32_t stubdomid = libxl_get_stubdom_id(ctx, domid_vm);
     if (stubdomid)
-        return libxl_console_exec(ctx, stubdomid, 1);
-    else
-        return libxl_console_exec(ctx, domid_vm, 0);
+        return libxl_console_exec(ctx, stubdomid, 1, LIBXL_CONSTYPE_PV);
+    else {
+        if (is_hvm(ctx, domid_vm))
+            return libxl_console_exec(ctx, domid_vm, 0, LIBXL_CONSTYPE_SERIAL);
+        else
+            return libxl_console_exec(ctx, domid_vm, 0, LIBXL_CONSTYPE_PV);
+    }
 }
 
 int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass)
@@ -1540,15 +1551,22 @@ retry_transaction:
 
     for (i = 0; i < num_console; i++) {
         console[i].devid = i;
-        console[i].constype = CONSTYPE_IOEMU;
+        console[i].consback = LIBXL_CONSBACK_IOEMU;
         console[i].domid = domid;
-        if (!i)
+        if (!i) {
+            char *filename;
+            char *name = libxl_sprintf(&gc, "qemu-dm-%s", libxl_domid_to_name(ctx, info->domid));
+            libxl_create_logfile(ctx, name, &filename);
+            console[i].output = libxl_sprintf(&gc, "file:%s", filename);
             console[i].build_state = &state;
+            free(filename);
+        } else
+            console[i].output = "pty";
         ret = libxl_device_console_add(ctx, domid, &console[i]);
         if (ret)
             goto out_free;
     }
-    if (libxl_create_xenpv_qemu(ctx, vfb, num_console, console, &dm_starting) < 0) {
+    if (libxl_create_xenpv_qemu(ctx, domid, vfb, &dm_starting) < 0) {
         ret = ERROR_FAIL;
         goto out_free;
     }
@@ -2290,7 +2308,7 @@ int libxl_device_console_add(libxl_ctx *ctx, uint32_t domid, libxl_device_consol
 
     if (console->build_state) {
         xs_transaction_t t;
-        char **ents = (char **) libxl_calloc(&gc, 9, sizeof(char *));
+        char **ents = (char **) libxl_calloc(&gc, 11, sizeof(char *));
         ents[0] = "console/port";
         ents[1] = libxl_sprintf(&gc, "%"PRIu32, console->build_state->console_port);
         ents[2] = "console/ring-ref";
@@ -2298,10 +2316,12 @@ int libxl_device_console_add(libxl_ctx *ctx, uint32_t domid, libxl_device_consol
         ents[4] = "console/limit";
         ents[5] = libxl_sprintf(&gc, "%d", LIBXL_XENCONSOLE_LIMIT);
         ents[6] = "console/type";
-        if (console->constype == CONSTYPE_XENCONSOLED)
+        if (console->consback == LIBXL_CONSBACK_XENCONSOLED)
             ents[7] = "xenconsoled";
         else
             ents[7] = "ioemu";
+        ents[8] = "console/output";
+        ents[9] = console->output;
 retry_transaction:
         t = xs_transaction_start(ctx->xsh);
         libxl_xs_writev(&gc, t, libxl_xs_get_dompath(&gc, console->domid), ents);
@@ -2339,19 +2359,25 @@ retry_transaction:
     flexarray_set(back, boffset++, "protocol");
     flexarray_set(back, boffset++, LIBXL_XENCONSOLE_PROTOCOL);
 
-    flexarray_set(front, foffset++, "backend-id");
-    flexarray_set(front, foffset++, libxl_sprintf(&gc, "%d", console->backend_domid));
-    flexarray_set(front, foffset++, "state");
-    flexarray_set(front, foffset++, libxl_sprintf(&gc, "%d", 1));
-    flexarray_set(front, foffset++, "limit");
-    flexarray_set(front, foffset++, libxl_sprintf(&gc, "%d", LIBXL_XENCONSOLE_LIMIT));
-    flexarray_set(front, foffset++, "protocol");
-    flexarray_set(front, foffset++, LIBXL_XENCONSOLE_PROTOCOL);
-    flexarray_set(front, foffset++, "type");
-    if (console->constype == CONSTYPE_XENCONSOLED)
-        flexarray_set(front, foffset++, "xenconsoled");
-    else
-        flexarray_set(front, foffset++, "ioemu");
+    /* if devid == 0 do not add the frontend to device/console/ because
+     * it has already been added to console/ */
+    if (device.devid > 0) {
+        flexarray_set(front, foffset++, "backend-id");
+        flexarray_set(front, foffset++, libxl_sprintf(&gc, "%d", console->backend_domid));
+        flexarray_set(front, foffset++, "state");
+        flexarray_set(front, foffset++, libxl_sprintf(&gc, "%d", 1));
+        flexarray_set(front, foffset++, "limit");
+        flexarray_set(front, foffset++, libxl_sprintf(&gc, "%d", LIBXL_XENCONSOLE_LIMIT));
+        flexarray_set(front, foffset++, "protocol");
+        flexarray_set(front, foffset++, LIBXL_XENCONSOLE_PROTOCOL);
+        flexarray_set(front, foffset++, "type");
+        if (console->consback == LIBXL_CONSBACK_XENCONSOLED)
+            flexarray_set(front, foffset++, "xenconsoled");
+        else
+            flexarray_set(front, foffset++, "ioemu");
+        flexarray_set(front, foffset++, "output");
+        flexarray_set(front, foffset++, console->output);
+    }
 
     libxl_device_generic_add(ctx, &device,
                              libxl_xs_kvs_of_flexarray(&gc, back, boffset),
@@ -2559,13 +2585,11 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk)
 
 /******************************************************************************/
 static int libxl_build_xenpv_qemu_args(libxl_gc *gc,
+                                       uint32_t domid,
                                        libxl_device_vfb *vfb,
-                                       int num_console,
-                                       libxl_device_console *console,
                                        libxl_device_model_info *info)
 {
     libxl_ctx *ctx = libxl_gc_owner(gc);
-    int i = 0, j = 0, num = 0;
     memset(info, 0x00, sizeof(libxl_device_model_info));
 
     info->vnc = vfb->vnc;
@@ -2579,46 +2603,20 @@ static int libxl_build_xenpv_qemu_args(libxl_gc *gc,
         info->keymap = libxl_strdup(gc, vfb->keymap);
     info->sdl = vfb->sdl;
     info->opengl = vfb->opengl;
-    for (i = 0; i < num_console; i++) {
-        if (console->constype == CONSTYPE_IOEMU)
-            num++;
-    }
-    if (num > 0) {
-        uint32_t guest_domid;
-        if (libxl_is_stubdom(ctx, vfb->domid, &guest_domid)) {
-            char *filename;
-            char *name = libxl_sprintf(gc, "qemu-dm-%s", _libxl_domid_to_name(gc, guest_domid));
-            libxl_create_logfile(ctx, name, &filename);
-            info->serial = libxl_sprintf(gc, "file:%s", filename);
-            free(filename);
-        } else {
-            info->serial = "pty";
-        }
-        num--;
-    }
-    if (num > 0) {
-        info->extra = (char **) libxl_calloc(gc, num * 2 + 1, sizeof(char *));
-        for (j = 0; j < num * 2; j = j + 2) {
-            info->extra[j] = "-serial";
-            info->extra[j + 1] = "pty";
-        }
-        info->extra[j] = NULL;
-    }
-    info->domid = vfb->domid;
-    info->dom_name = _libxl_domid_to_name(gc, vfb->domid);
+    info->domid = domid;
+    info->dom_name = libxl_domid_to_name(ctx, domid);
     info->device_model = libxl_abs_path(gc, "qemu-dm", libxl_libexec_path());
     info->type = XENPV;
     return 0;
 }
 
-int libxl_create_xenpv_qemu(libxl_ctx *ctx, libxl_device_vfb *vfb,
-                            int num_console, libxl_device_console *console,
+int libxl_create_xenpv_qemu(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb,
                             libxl_device_model_starting **starting_r)
 {
     libxl_gc gc = LIBXL_INIT_GC(ctx);
     libxl_device_model_info info;
 
-    libxl_build_xenpv_qemu_args(&gc, vfb, num_console, console, &info);
+    libxl_build_xenpv_qemu_args(&gc, domid, vfb, &info);
     libxl_create_device_model(ctx, &info, NULL, 0, NULL, 0, starting_r);
     libxl_free_all(&gc);
     return 0;

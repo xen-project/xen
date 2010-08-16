@@ -167,9 +167,9 @@ endif
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 833e7e9a4c95739429dc0c803bbbf2346f9897fd
-# Thu Jul 8 17:33:29 2010 +0100
-# Move the xenfb pointer handler to the connected method
+QEMU_TAG ?= 466608f3a32e1f9808acdf832a5843af37e5fcec
+# Mon Aug 16 13:29:36 2010 +0100
+# support multiple pv consoles for hvm guests too
 
 # Optional components
 XENSTAT_XENTOP     ?= y

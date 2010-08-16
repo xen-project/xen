@@ -87,8 +87,6 @@ struct domain {
 	struct buffer buffer;
 	struct domain *next;
 	char *conspath;
-	char *serialpath;
-	int use_consolepath;
 	int ring_ref;
 	evtchn_port_or_error_t local_port;
 	evtchn_port_or_error_t remote_port;
@@ -440,20 +438,8 @@ static int domain_create_tty(struct domain *dom)
 		goto out;
 	}
 
-	if (dom->use_consolepath) {
-		success = asprintf(&path, "%s/limit", dom->conspath) !=
-			-1;
-		if (!success)
-			goto out;
-		data = xs_read(xs, XBT_NULL, path, &len);
-		if (data) {
-			dom->buffer.max_capacity = strtoul(data, 0, 0);
-			free(data);
-		}
-		free(path);
-	}
-
-	success = asprintf(&path, "%s/limit", dom->serialpath) != -1;
+	success = asprintf(&path, "%s/limit", dom->conspath) !=
+		-1;
 	if (!success)
 		goto out;
 	data = xs_read(xs, XBT_NULL, path, &len);
@@ -463,23 +449,13 @@ static int domain_create_tty(struct domain *dom)
 	}
 	free(path);
 
-	success = asprintf(&path, "%s/tty", dom->serialpath) != -1;
+	success = (asprintf(&path, "%s/tty", dom->conspath) != -1);
 	if (!success)
 		goto out;
 	success = xs_write(xs, XBT_NULL, path, slave, strlen(slave));
 	free(path);
 	if (!success)
 		goto out;
-
-	if (dom->use_consolepath) {
-		success = (asprintf(&path, "%s/tty", dom->conspath) != -1);
-		if (!success)
-			goto out;
-		success = xs_write(xs, XBT_NULL, path, slave, strlen(slave));
-		free(path);
-		if (!success)
-			goto out;
-	}
 
 	if (fcntl(dom->master_fd, F_SETFL, O_NONBLOCK) == -1)
 		goto out;
@@ -524,29 +500,20 @@ static int xs_gather(struct xs_handle *xs, const char *dir, ...)
 	va_end(ap);
 	return ret;
 }
-
+ 
 static int domain_create_ring(struct domain *dom)
 {
 	int err, remote_port, ring_ref, rc;
 	char *type, path[PATH_MAX];
 
-	err = xs_gather(xs, dom->serialpath,
+	err = xs_gather(xs, dom->conspath,
 			"ring-ref", "%u", &ring_ref,
 			"port", "%i", &remote_port,
 			NULL);
-	if (err) {
-		err = xs_gather(xs, dom->conspath,
-				"ring-ref", "%u", &ring_ref,
-				"port", "%i", &remote_port,
-				NULL);
-		if (err)
-			goto out;
-		dom->use_consolepath = 1;
-	} else
-		dom->use_consolepath = 0;
+	if (err)
+		goto out;
 
-	snprintf(path, sizeof(path), "%s/type",
-		dom->use_consolepath ? dom->conspath: dom->serialpath);
+	snprintf(path, sizeof(path), "%s/type", dom->conspath);
 	type = xs_read(xs, XBT_NULL, path, NULL);
 	if (type && strcmp(type, "xenconsoled") != 0) {
 		free(type);
@@ -628,16 +595,12 @@ static bool watch_domain(struct domain *dom, bool watch)
 
 	snprintf(domid_str, sizeof(domid_str), "dom%u", dom->domid);
 	if (watch) {
-		success = xs_watch(xs, dom->serialpath, domid_str);
-		if (success) {
-			success = xs_watch(xs, dom->conspath, domid_str);
-			if (success)
-				domain_create_ring(dom);
-			else
-				xs_unwatch(xs, dom->serialpath, domid_str);
-		}
+		success = xs_watch(xs, dom->conspath, domid_str);
+		if (success)
+			domain_create_ring(dom);
+		else
+			xs_unwatch(xs, dom->conspath, domid_str);
 	} else {
-		success = xs_unwatch(xs, dom->serialpath, domid_str);
 		success = xs_unwatch(xs, dom->conspath, domid_str);
 	}
 
@@ -665,14 +628,6 @@ static struct domain *create_domain(int domid)
 	}
 
 	dom->domid = domid;
-
-	dom->serialpath = xs_get_domain_path(xs, dom->domid);
-	s = realloc(dom->serialpath, strlen(dom->serialpath) +
-		    strlen("/serial/0") + 1);
-	if (s == NULL)
-		goto out;
-	dom->serialpath = s;
-	strcat(dom->serialpath, "/serial/0");
 
 	dom->conspath = xs_get_domain_path(xs, dom->domid);
 	s = realloc(dom->conspath, strlen(dom->conspath) +
@@ -712,7 +667,6 @@ static struct domain *create_domain(int domid)
 
 	return dom;
  out:
-	free(dom->serialpath);
 	free(dom->conspath);
 	free(dom);
 	return NULL;
@@ -754,9 +708,6 @@ static void cleanup_domain(struct domain *d)
 
 	free(d->buffer.data);
 	d->buffer.data = NULL;
-
-	free(d->serialpath);
-	d->serialpath = NULL;
 
 	free(d->conspath);
 	d->conspath = NULL;

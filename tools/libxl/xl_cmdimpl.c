@@ -371,7 +371,8 @@ static void init_console_info(libxl_device_console *console, int dev_num, libxl_
 {
     memset(console, 0x00, sizeof(libxl_device_console));
     console->devid = dev_num;
-    console->constype = CONSTYPE_XENCONSOLED;
+    console->consback = LIBXL_CONSBACK_XENCONSOLED;
+    console->output = "pty";
     if (state)
         console->build_state = state;
 }
@@ -1457,10 +1458,10 @@ start:
         init_console_info(&console, 0, &state);
         console.domid = domid;
         if (d_config.num_vfbs)
-            console.constype = CONSTYPE_IOEMU;
+             console.consback = LIBXL_CONSBACK_IOEMU;
         libxl_device_console_add(&ctx, domid, &console);
         if (d_config.num_vfbs)
-            libxl_create_xenpv_qemu(&ctx, d_config.vfbs, 1, &console, &dm_starting);
+            libxl_create_xenpv_qemu(&ctx, domid, d_config.vfbs, &dm_starting);
     }
 
     if (dm_starting)
@@ -1855,13 +1856,27 @@ int main_cd_insert(int argc, char **argv)
 
 int main_console(int argc, char **argv)
 {
-    int opt = 0;
+    int opt = 0, num = 0;
+    libxl_console_constype type = -1;
 
-    while ((opt = getopt(argc, argv, "hn:")) != -1) {
+    while ((opt = getopt(argc, argv, "hn:t:")) != -1) {
         switch (opt) {
         case 'h':
             help("console");
             return 0;
+        case 't':
+            if (!strcmp(optarg, "pv"))
+                type = LIBXL_CONSTYPE_PV;
+            else if (!strcmp(optarg, "serial"))
+                type = LIBXL_CONSTYPE_SERIAL;
+            else {
+                fprintf(stderr, "console type supported are: pv, serial\n");
+                return 2;
+            }
+            break;
+        case 'n':
+            num = atoi(optarg);
+            break;
         default:
             fprintf(stderr, "option not supported\n");
             break;
@@ -1873,7 +1888,10 @@ int main_console(int argc, char **argv)
     }
 
     find_domain(argv[optind]);
-    libxl_primary_console_exec(&ctx, domid);
+    if (type <= 0 && num == 0)
+        libxl_primary_console_exec(&ctx, domid);
+    else
+        libxl_console_exec(&ctx, domid, num, type);
     fprintf(stderr, "Unable to attach console\n");
     return 1;
 }

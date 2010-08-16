@@ -232,7 +232,7 @@ static int device_console_val(caml_gc *gc, libxl_device_console *c_val, value v)
 
 	c_val->backend_domid = Int_val(Field(v, 0));
 	c_val->devid = Int_val(Field(v, 1));
-	c_val->constype = (Int_val(Field(v, 2))) + CONSTYPE_XENCONSOLED;
+	c_val->consback = (Int_val(Field(v, 2))) + LIBXL_CONSBACK_XENCONSOLED;
 
 	CAMLreturn(0);
 }

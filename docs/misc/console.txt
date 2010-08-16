@@ -1,0 +1,91 @@
+Xen PV Console notes
+------------------------------------------------------------------------
+                                                      Stefano Stabellini
+                                        stefano.stabellini@eu.citrix.com
+
+
+Xen traditionally provided a single pv console to pv guests, storing the
+relevant information in xenstore under /local/domain/$DOMID/console.
+
+Now many years after the introduction of the pv console we have
+multiple pv consoles support for pv and hvm guests; multiple pv
+console backends (qemu and xenconsoled) and emulated serial cards too.
+
+This document tries to describe how the whole system works and how the
+different components interact with each others.
+
+The first PV console path in xenstore remains:
+
+/local/domain/$DOMID/console
+
+the other PV consoles follow the conventional xenstore device path and
+live in:
+
+/local/domain/$DOMID/device/console/$DEVID.
+
+The output of a PV console, whether it should be a file, a pty, a
+socket, or something else, is specified by the toolstack in the xenstore
+node "output", under the relevant console section.
+For example:
+
+# xenstore-read /local/domain/26/device/console/1/output
+pty
+
+The backend chosen for a particular console is specified by the
+toolstack in the "type" node on xenstore, under the relevant console
+section.
+For example:
+
+# xenstore-read /local/domain/26/console/type
+xenconsoled
+
+The supported values are only xenconsoled or ioemu; xenconsoled has
+several limitations: it can only be used for the first PV console and it
+can only have a pty as output.
+
+If the output is a pty, backends write the device name to the "tty" node
+in xenstore under the relevant console path.
+
+Emulated serials are provided by qemu-dm only to hvm guests; the number
+of emulated serials depends on how many "-serial" command line options
+are given to qemu. The output of a serial is specified as argument to
+the -serial command line option to qemu. Qemu writes the tty name to
+xenstore in the following path:
+
+/local/domain/$DOMID/serial/$SERIAL_NUM/tty
+
+
+xenconsole is the tool to connect to a PV console or an emulated serial
+that has a pty as output. Xenconsole takes a domid as parameter plus an
+optional console type (pv for PV consoles or serial for emulated
+serials) and console number. Depending on the type and console
+number, xenconsole will look for the tty node in different xenstore
+paths, as described above.  If the user doesn't specify the console type
+xenconsole will try to guess: if the guest is a pv guest it defaults to
+PV console, if the guest is an hvm guest it defaults to emulated serial.
+
+By default xl creates a pv console for hvm guests, plus an emulated
+serial if the user specified 'serial = "pty"' in the VM config file.
+Considering that xenconsole defaults to emulated serials for hvm guests,
+executing xl create -c "domain" causes xenconsole to attach to the
+emulated serial tty. This is most probably what the user wanted because
+currently no bootloaders support xen pv consoles so the only way to
+interact with a bootloader like grub over a console is to use the
+emulated serial.
+However the pv console is still easy to use with Linux PV on HVM guests:
+the user just need to pass "console=hvc0" to the kernel command line and
+then execute "xl console -t pv <domain>" to connect to it.
+
+When using stubdoms the serial cards are still emulated by qemu (this
+time running in the stubdom), the number of serial cards and where the
+output goes is still specified using qemu command line options.
+The difference is that for each emulated serial card there must be a pv
+console connection between the stubdom and dom0 to export the serial
+output from the stubdom to dom0. The pv console backend for stubdom's pv
+consoles is always ioemu because multiple pv consoles support is a
+requirement in this case, considering that minios has its own pv console
+too. In order to simplify the setup when using stubdoms the hvm guest
+can only have one pv console with xenstored as backend (the stubdom
+could provide pv console backends to the hvm guest but then it would
+need another pv console connection for each console backend to export
+the pty to dom0).

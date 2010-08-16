@@ -335,16 +335,22 @@ typedef struct {
 } libxl_device_vkb;
 
 typedef enum {
-    CONSTYPE_XENCONSOLED,
-    CONSTYPE_IOEMU,
+    LIBXL_CONSTYPE_SERIAL,
+    LIBXL_CONSTYPE_PV,
 } libxl_console_constype;
+
+typedef enum {
+    LIBXL_CONSBACK_XENCONSOLED,
+    LIBXL_CONSBACK_IOEMU,
+} libxl_console_consback;
 
 typedef struct {
     uint32_t backend_domid;
     uint32_t domid;
     int devid;
-    libxl_console_constype constype;
+    libxl_console_consback consback;
     libxl_domain_build_state *build_state;
+    char *output;
 } libxl_device_console;
 
 typedef enum {
@@ -542,7 +548,7 @@ int libxl_domain_setmaxmem(libxl_ctx *ctx, uint32_t domid, uint32_t target_memkb
 int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid, uint32_t target_memkb, int enforce);
 
 int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass);
-int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num);
+int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num, libxl_console_constype type);
 /* libxl_primary_console_exec finds the domid and console number
  * corresponding to the primary console of the given vm, then calls
  * libxl_console_exec with the right arguments (domid might be different
@@ -564,8 +570,7 @@ int libxl_create_device_model(libxl_ctx *ctx,
                               libxl_device_disk *disk, int num_disks,
                               libxl_device_nic *vifs, int num_vifs,
                               libxl_device_model_starting **starting_r);
-int libxl_create_xenpv_qemu(libxl_ctx *ctx, libxl_device_vfb *vfb,
-                            int num_console, libxl_device_console *console,
+int libxl_create_xenpv_qemu(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb,
                             libxl_device_model_starting **starting_r);
   /* Caller must either: pass starting_r==0, or on successful
    * return pass *starting_r (which will be non-0) to
