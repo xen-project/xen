@@ -147,6 +147,8 @@ typedef char **libxl_key_value_list;
 
 typedef uint64_t *libxl_cpumap;
 
+typedef uint32_t libxl_hwcap[8];
+
 typedef enum {
     XENFV = 1,
     XENPV,
@@ -713,7 +715,7 @@ typedef struct {
     uint64_t scrub_pages;
 
     uint32_t nr_nodes;
-    uint32_t hw_cap[8];
+    libxl_hwcap hw_cap;
     uint32_t phys_cap;
 }  libxl_physinfo;
 
