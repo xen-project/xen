@@ -199,7 +199,7 @@ typedef struct {
     char *what; /* malloc'd in spawn_spawn */
 }  libxl_spawn_starting;
 
-struct libxl_device_model_starting {
+struct libxl__device_model_starting {
     libxl_spawn_starting *for_spawn; /* first! */
     char *dom_path; /* from libxl_malloc, only for dm_xenstore_record_pid */
     int domid;

@@ -577,7 +577,7 @@ libxl_dominfo * libxl_list_domain(libxl_ctx*, int *nb_domain);
 libxl_poolinfo * libxl_list_pool(libxl_ctx*, int *nb_pool);
 libxl_vminfo * libxl_list_vm(libxl_ctx *ctx, int *nb_vm);
 
-typedef struct libxl_device_model_starting libxl_device_model_starting;
+typedef struct libxl__device_model_starting libxl_device_model_starting;
 int libxl_create_device_model(libxl_ctx *ctx,
                               libxl_device_model_info *info,
                               libxl_device_disk *disk, int num_disks,
