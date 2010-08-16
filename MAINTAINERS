@@ -1,0 +1,154 @@
+
+	List of maintainers and how to submit changes
+
+Please try to follow the guidelines below.  This will make things
+easier on the maintainers.  Not all of these guidelines matter for every
+trivial patch so apply some common sense.
+
+1.	Always _test_ your changes, however small, on at least 4 or
+	5 people, preferably many more.
+
+2.	Make sure your changes compile correctly in multiple
+	configurations. For example, both 32- and 64-bit x86.
+
+3.	Make a patch available to the relevant maintainer in the list. Use
+	'diff -u' to make the patch easy to merge. Be prepared to get your
+	changes sent back with seemingly silly requests about formatting
+	and variable names.  These aren't as silly as they seem. One
+	job the maintainersdo is to keep things looking the same.
+
+	PLEASE try to include any credit lines you want added with the
+	patch. It avoids people being missed off by mistake and makes
+	it easier to know who wants adding and who doesn't.
+
+	PLEASE document known bugs. If it doesn't work for everything
+	or does something very odd once a month document it.
+
+	PLEASE remember that submissions must be made under the terms
+	of the "Developer's Certificate of Origin" (DCO) and should include
+	a Signed-off-by: line.
+
+4.	Make sure you have the right to send any changes you make. If you
+	do changes at work you may find your employer owns the patch
+	not you.
+
+5.	Happy hacking.
+
+Descriptions of section entries:
+
+	M: Mail patches to: FullName <address@domain>
+	L: Mailing list that is relevant to this area
+	W: Web-page with status/info
+	T: SCM tree type and location.  Type is one of: git, hg, quilt, stgit.
+	S: Status, one of the following:
+	   Supported:	Someone is actually paid to look after this.
+	   Maintained:	Someone actually looks after it.
+	   Odd Fixes:	It has a maintainer but they don't have time to do
+			much other than throw the odd patch in. See below..
+	   Orphan:	No current maintainer [but maybe you could take the
+			role as you write your new code].
+	   Obsolete:	Old code. Something tagged obsolete generally means
+			it has been replaced by a better system and you
+			should be using that.
+	F: Files and directories with wildcard patterns.
+	   A trailing slash includes all files and subdirectory files.
+	   F:	drivers/net/	all files in and below drivers/net
+	   F:	drivers/net/*	all files in drivers/net, but not below
+	   F:	*/net/*		all files in "any top level directory"/net
+	   One pattern per line.  Multiple F: lines acceptable.
+	X: Files and directories that are NOT maintained, same rules as F:
+	   Files exclusions are tested before file matches.
+	   Can be useful for excluding a specific subdirectory, for instance:
+	   F:	net/
+	   X:	net/ipv6/
+	   matches all files in and below net excluding net/ipv6/
+	K: Keyword perl extended regex pattern to match content in a
+	   patch or file.  For instance:
+	   K: of_get_profile
+	      matches patches or files that contain "of_get_profile"
+	   K: \b(printk|pr_(info|err))\b
+	      matches patches or files that contain one or more of the words
+	      printk, pr_info or pr_err
+	   One regex pattern per line.  Multiple K: lines acceptable.
+
+Maintainers List (try to look for most precise areas first)
+
+		-----------------------------------
+
+CPU POOLS
+M:	Juergen Gross <juergen.gross@ts.fujitsu.com>
+S:	Supported
+F:	xen/common/cpupool.c
+
+GDBSX DEBUGGER
+M:	Mukesh Rathor <mukesh.rathor@oracle.com>
+S:	Supported
+F:	xen/arch/x86/debug.c
+F:	tools/debugger/gdbsx/
+
+LINUX (PV_OPS)
+M:	Jeremy Fitzhardinge <jeremy@goop.org>
+S:	Supported
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/jeremy/xen.git
+
+LINUX (XCP)
+M:	Ian Campbell <ian.campbell@citrix.com>
+S:	Supported
+T:	hg http://xenbits.xen.org/XCP/linux-2.6.*.pq.hg
+
+MINI-OS
+M:	Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+S:	Supported
+F:	extras/mini-os/
+
+QEMU-DM
+M:	Ian Jackson <ian.jackson@eu.citrix.com>
+S:	Supported
+T:	git git://xenbits.xen.org/qemu-xen-*.git
+
+SCHEDULING
+M:	George Dunlap <george.dunlap@eu.citrix.com>
+S:	Supported
+F:	xen/common/sched*
+
+STUB DOMAINS
+M:	Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+S:	Supported
+F:	stubdom/
+
+TOOLSTACK
+M:	Ian Jackson <ian.jackson@eu.citrix.com>
+M:	Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+S:	Supported
+F:	tools/
+
+TRANSCENDENT MEMORY (TMEM)
+M:	Dan Magenheimer <dan.magenheimer@oracle.com>
+W:	http://oss.oracle.com/projects/tmem
+S:	Supported
+F:	xen/common/tmem*
+F:	xen/include/xen/tmem*
+F:	docs/misc/tmem*
+
+USB PV DRIVERS
+M:	Noboru Iwamatsu <n_iwamatsu@jp.fujitsu.com>
+S:	Supported
+T:	hg http://xenbits.xen.org/linux-2.6.18-xen.hg
+F:	drivers/xen/usb*/
+
+X86 MEMORY MANAGEMENT
+M:	Tim Deegan <tim.deegan@citrix.com>
+S:	Supported
+F:	xen/arch/x86/mm/
+
+XENTRACE
+M:	George Dunlap <george.dunlap@eu.citrix.com>
+S:	Supported
+F:	tools/xentrace/
+F:	xen/common/trace.c
+
+THE REST
+M:	Keir Fraser <keir.fraser@citrix.com>
+S:	Supported
+F:	*
+F:	*/
