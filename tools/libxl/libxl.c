@@ -1315,17 +1315,17 @@ static char ** libxl_build_device_model_args_new(libxl_gc *gc,
         flexarray_set(dm_args, num++, "xenfv");
 
     disks = libxl_device_disk_list(libxl_gc_owner(gc), info->domid, &nb);
-    for (; nb > 0; --nb, ++disks) {
-        if ( disks->is_cdrom ) {
+    for (i; i < nb; i++) {
+        if ( disks[i].is_cdrom ) {
             flexarray_set(dm_args, num++, "-cdrom");
-            flexarray_set(dm_args, num++, disks->physpath);
+            flexarray_set(dm_args, num++, disks[i].physpath);
         }else{
-            flexarray_set(dm_args, num++, libxl_sprintf(gc, "-%s", disks->virtpath));
-            flexarray_set(dm_args, num++, disks->physpath);
+            flexarray_set(dm_args, num++, libxl_sprintf(gc, "-%s", disks[i].virtpath));
+            flexarray_set(dm_args, num++, disks[i].physpath);
         }
     }
+    /* FIXME: leaks disk paths */
     free(disks);
-
     flexarray_set(dm_args, num++, NULL);
     return (char **) flexarray_contents(dm_args);
 }
@@ -2462,7 +2462,7 @@ libxl_device_disk *libxl_device_disk_list(libxl_ctx *ctx, uint32_t domid, int *n
     char *be_path_tap, *be_path_vbd;
     libxl_device_disk *dend, *disks, *ret = NULL;
     char **b, **l = NULL;
-    unsigned int numl;
+    unsigned int numl, len;
     char *type;
 
     be_path_vbd = libxl_sprintf(&gc, "%s/backend/vbd/%d", libxl_xs_get_dompath(&gc, 0), domid);
@@ -2477,9 +2477,9 @@ libxl_device_disk *libxl_device_disk_list(libxl_ctx *ctx, uint32_t domid, int *n
         for (; disks < dend; ++disks, ++l) {
             disks->backend_domid = 0;
             disks->domid = domid;
-            disks->physpath = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/%s/params", be_path_vbd, *l));
+            disks->physpath = xs_read(ctx->xsh, XBT_NULL, libxl_sprintf(&gc, "%s/%s/params", be_path_vbd, *l), &len);
             libxl_string_to_phystype(ctx, libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/%s/type", be_path_vbd, *l)), &(disks->phystype));
-            disks->virtpath = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/%s/dev", be_path_vbd, *l));
+            disks->virtpath = xs_read(ctx->xsh, XBT_NULL, libxl_sprintf(&gc, "%s/%s/dev", be_path_vbd, *l), &len);
             disks->unpluggable = atoi(libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/%s/removable", be_path_vbd, *l)));
             if (!strcmp(libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/%s/mode", be_path_vbd, *l)), "w"))
                 disks->readwrite = 1;
@@ -2497,9 +2497,9 @@ libxl_device_disk *libxl_device_disk_list(libxl_ctx *ctx, uint32_t domid, int *n
         for (dend = ret + *num; disks < dend; ++disks, ++l) {
             disks->backend_domid = 0;
             disks->domid = domid;
-            disks->physpath = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/%s/params", be_path_tap, *l));
+            disks->physpath = xs_read(ctx->xsh, XBT_NULL, libxl_sprintf(&gc, "%s/%s/params", be_path_tap, *l), &len);
             libxl_string_to_phystype(ctx, libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/%s/type", be_path_tap, *l)), &(disks->phystype));
-            disks->virtpath = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/%s/dev", be_path_tap, *l));
+            disks->virtpath = xs_read(ctx->xsh, XBT_NULL, libxl_sprintf(&gc, "%s/%s/dev", be_path_tap, *l), &len);
             disks->unpluggable = atoi(libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/%s/removable", be_path_tap, *l)));
             if (!strcmp(libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/%s/mode", be_path_tap, *l)), "w"))
                 disks->readwrite = 1;
@@ -2579,6 +2579,7 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk)
         libxl_device_disk_add(ctx, stubdomid, disk);
         disk->domid = domid;
     }
+    /* FIXME: leaks disk paths */
     free(disks);
     return 0;
 }
