@@ -59,25 +59,6 @@ int libxl_ptr_add(libxl_gc *gc, void *ptr)
     return 0;
 }
 
-void libxl_free(libxl_gc *gc, void *ptr)
-{
-    int i;
-
-    if (!ptr)
-        return;
-
-    /* remove the pointer from the tracked ptrs */
-    for (i = 0; i < gc->alloc_maxsize; i++) {
-        if (gc->alloc_ptrs[i] == ptr) {
-            gc->alloc_ptrs[i] = NULL;
-            free(ptr);
-            return;
-        }
-    }
-    /* haven't find the pointer, really bad */
-    abort();
-}
-
 void libxl_free_all(libxl_gc *gc)
 {
     void *ptr;

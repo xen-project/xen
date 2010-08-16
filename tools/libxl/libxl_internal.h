@@ -129,7 +129,6 @@ static inline libxl_ctx *libxl_gc_owner(libxl_gc *gc)
 
 /* memory allocation tracking/helpers */
 _hidden int libxl_ptr_add(libxl_gc *gc, void *ptr);
-_hidden void libxl_free(libxl_gc *gc, void *ptr);
 _hidden void libxl_free_all(libxl_gc *gc);
 _hidden void *libxl_zalloc(libxl_gc *gc, int bytes);
 _hidden void *libxl_calloc(libxl_gc *gc, size_t nmemb, size_t size);

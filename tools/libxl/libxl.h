@@ -117,10 +117,9 @@
  *     and an internal wrapper adds the relevant pointers to the gc.
  *     The latter method is preferred for obvious performance reasons.
  *
- * No temporary objects allocated from the pool should be explicitly freed.
- * Calling libxl_free_all() before returning from a public functions will do
- * this. The upshot of this is that almost all calls to libxl_free() are
- * erroneous.
+ * No temporary objects allocated from the pool may be explicitly freed.
+ * Therefore public functions which initialize a libxl_gc MUST call
+ * libxl_free_all() before returning.
  */
 #ifndef LIBXL_H
 #define LIBXL_H
