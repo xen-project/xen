@@ -248,4 +248,23 @@ _hidden char *libxl_abs_path(libxl_gc *gc, char *s, const char *path);
 _hidden char *_libxl_domid_to_name(libxl_gc *gc, uint32_t domid);
 _hidden char *_libxl_poolid_to_name(libxl_gc *gc, uint32_t poolid);
 
+/*
+ * blktap2 support
+ */
+
+/* libxl_blktap_enabled:
+ *    return true if blktap/blktap2 support is available.
+ */
+int libxl_blktap_enabled(libxl_gc *gc);
+
+/* libxl_blktap_devpath:
+ *    Argument: path and disk image as specified in config file.
+ *      The type specifies whether this is aio, qcow, qcow2, etc.
+ *    returns device path xenstore wants to have. returns NULL
+ *      if no device corresponds to the disk.
+ */
+const char *libxl_blktap_devpath(libxl_gc *gc,
+                                 const char *disk,
+                                 libxl_disk_phystype phystype);
+
 #endif

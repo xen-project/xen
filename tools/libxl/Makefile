@@ -18,6 +18,12 @@ CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) $(CFLAGS_libxenstore) $(CFL
 LIBS = $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore) $(LDLIBS_libblktapctl) $(UTIL_LIBS)
 
 LIBXL_OBJS-y = osdeps.o libxl_paths.o libxl_bootloader.o
+ifeq ($(LIBXL_BLKTAP),y)
+LIBXL_OBJS-y += libxl_blktap2.o
+else
+LIBXL_OBJS-y += libxl_noblktap2.o
+endif
+
 LIBXL_OBJS = flexarray.o libxl.o libxl_pci.o libxl_dom.o libxl_exec.o libxl_xshelp.o libxl_device.o libxl_internal.o xenguest.o libxl_utils.o $(LIBXL_OBJS-y)
 
 AUTOINCS= libxlu_cfg_y.h libxlu_cfg_l.h

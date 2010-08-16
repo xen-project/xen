@@ -36,7 +36,6 @@
 #include "libxl_utils.h"
 #include "libxl_internal.h"
 #include "flexarray.h"
-#include "tap-ctl.h"
 
 #define PAGE_TO_MEMKB(pages) ((pages) * 4)
 
@@ -1715,27 +1714,6 @@ int libxl_confirm_device_model_startup(libxl_ctx *ctx,
 
 /******************************************************************************/
 
-static char *get_blktap2_device(libxl_gc *gc,
-				const char *name, const char *type)
-{
-    int minor = tap_ctl_find_minor(type, name);
-    if (minor < 0)
-        return NULL;
-    return libxl_sprintf(gc, "/dev/xen/blktap-2/tapdev%d", minor);
-}
-
-static char *make_blktap2_device(libxl_gc *gc,
-				 const char *name, const char *type)
-{
-    char *params, *devname = NULL;
-    int err;
-    params = libxl_sprintf(gc, "%s:%s", type, name);
-    err = tap_ctl_create(params, &devname);
-    if (!err)
-        libxl_ptr_add(gc, devname);
-    return err ? NULL : devname;
-}
-
 int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk)
 {
     libxl_gc gc = LIBXL_INIT_GC(ctx);
@@ -1790,14 +1768,13 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
         case PHYSTYPE_FILE:
             /* let's pretend is tap:aio for the moment */
             disk->phystype = PHYSTYPE_AIO;
-        case PHYSTYPE_AIO: case PHYSTYPE_QCOW: case PHYSTYPE_QCOW2: case PHYSTYPE_VHD: {
-            const char *msg;
-            if (!tap_ctl_check(&msg)) {
-                const char *type = device_disk_string_of_phystype(disk->phystype);
-                char *dev;
-                dev = get_blktap2_device(&gc, disk->physpath, type);
-                if (!dev)
-                    dev = make_blktap2_device(&gc, disk->physpath, type);
+        case PHYSTYPE_AIO:
+        case PHYSTYPE_QCOW:
+        case PHYSTYPE_QCOW2:
+        case PHYSTYPE_VHD:
+            if (libxl_blktap_enabled(&gc)) {
+                const char *dev = libxl_blktap_devpath(&gc,
+                                               disk->physpath, disk->phystype);
                 if (!dev) {
                     rc = ERROR_FAIL;
                     goto out_free;
@@ -1820,7 +1797,7 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
 
             device.backend_kind = DEVICE_TAP;
             break;
-        }
+
         default:
             XL_LOG(ctx, XL_LOG_ERROR, "unrecognized disk physical type: %d\n", disk->phystype);
             rc = ERROR_INVAL;
@@ -1892,7 +1869,8 @@ int libxl_device_disk_del(libxl_ctx *ctx,
 char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *disk)
 {
     libxl_gc gc = LIBXL_INIT_GC(ctx);
-    char *dev = NULL, *ret;
+    const char *dev = NULL;
+    char *ret;
     int phystype = disk->phystype;
     switch (phystype) {
         case PHYSTYPE_PHY: {
@@ -1903,16 +1881,14 @@ char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *disk)
         case PHYSTYPE_FILE:
             /* let's pretend is tap:aio for the moment */
             phystype = PHYSTYPE_AIO;
-        case PHYSTYPE_AIO: case PHYSTYPE_QCOW: case PHYSTYPE_QCOW2: case PHYSTYPE_VHD: {
-            const char *msg;
-            if (!tap_ctl_check(&msg)) {
-                const char *type = device_disk_string_of_phystype(phystype);
-                dev = get_blktap2_device(&gc, disk->physpath, type);
-                if (!dev)
-                    dev = make_blktap2_device(&gc, disk->physpath, type);
-            }
+        case PHYSTYPE_AIO:
+        case PHYSTYPE_QCOW:
+        case PHYSTYPE_QCOW2:
+        case PHYSTYPE_VHD:
+            if (libxl_blktap_enabled(&gc))
+                dev = libxl_blktap_devpath(&gc, disk->physpath, phystype);
             break;
-        }
+
         default:
             XL_LOG(ctx, XL_LOG_ERROR, "unrecognized disk physical type: %d\n", phystype);
             break;
