@@ -2501,8 +2501,8 @@ int libxl_device_disk_getinfo(libxl_ctx *ctx, uint32_t domid,
 
     /* tap devices entries in xenstore are written as vbd devices. */
     diskpath = libxl_sprintf(&gc, "%s/device/vbd/%d", dompath, diskinfo->devid);
-    diskinfo->backend = libxl_xs_read(&gc, XBT_NULL,
-                                      libxl_sprintf(&gc, "%s/backend", diskpath));
+    diskinfo->backend = xs_read(ctx->xsh, XBT_NULL,
+                                libxl_sprintf(&gc, "%s/backend", diskpath), NULL);
     if (!diskinfo->backend) {
         libxl_free_all(&gc);
         return ERROR_FAIL;
@@ -2515,8 +2515,8 @@ int libxl_device_disk_getinfo(libxl_ctx *ctx, uint32_t domid,
     diskinfo->evtch = val ? strtoul(val, NULL, 10) : -1;
     val = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/ring-ref", diskpath));
     diskinfo->rref = val ? strtoul(val, NULL, 10) : -1;
-    diskinfo->frontend = libxl_xs_read(&gc, XBT_NULL,
-                                       libxl_sprintf(&gc, "%s/frontend", diskinfo->backend));
+    diskinfo->frontend = xs_read(ctx->xsh, XBT_NULL,
+                                 libxl_sprintf(&gc, "%s/frontend", diskinfo->backend), NULL);
     val = libxl_xs_read(&gc, XBT_NULL, libxl_sprintf(&gc, "%s/frontend-id", diskinfo->backend));
     diskinfo->frontend_id = val ? strtoul(val, NULL, 10) : -1;
 
