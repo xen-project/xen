@@ -145,6 +145,8 @@ typedef char **libxl_string_list;
 
 typedef char **libxl_key_value_list;
 
+typedef uint64_t *libxl_cpumap;
+
 typedef enum {
     XENFV = 1,
     XENPV,
@@ -695,7 +697,7 @@ typedef struct {
     uint8_t blocked:1; /* blocked waiting for an event? */
     uint8_t running:1; /* currently scheduled on its CPU? */
     uint64_t vcpu_time; /* total vcpu time ran (ns) */
-    uint64_t *cpumap; /* current cpu's affinities */
+    libxl_cpumap cpumap; /* current cpu's affinities */
 } libxl_vcpuinfo;
 
 typedef struct {
