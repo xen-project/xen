@@ -2592,17 +2592,20 @@ static int libxl_build_xenpv_qemu_args(libxl_gc *gc,
     libxl_ctx *ctx = libxl_gc_owner(gc);
     memset(info, 0x00, sizeof(libxl_device_model_info));
 
-    info->vnc = vfb->vnc;
-    if (vfb->vnclisten)
-        info->vnclisten = libxl_strdup(gc, vfb->vnclisten);
-    info->vncdisplay = vfb->vncdisplay;
-    info->vncunused = vfb->vncunused;
-    if (vfb->vncpasswd)
-        info->vncpasswd = vfb->vncpasswd;
-    if (vfb->keymap)
-        info->keymap = libxl_strdup(gc, vfb->keymap);
-    info->sdl = vfb->sdl;
-    info->opengl = vfb->opengl;
+    if (vfb != NULL) {
+        info->vnc = vfb->vnc;
+        if (vfb->vnclisten)
+            info->vnclisten = libxl_strdup(gc, vfb->vnclisten);
+        info->vncdisplay = vfb->vncdisplay;
+        info->vncunused = vfb->vncunused;
+        if (vfb->vncpasswd)
+            info->vncpasswd = vfb->vncpasswd;
+        if (vfb->keymap)
+            info->keymap = libxl_strdup(gc, vfb->keymap);
+        info->sdl = vfb->sdl;
+        info->opengl = vfb->opengl;
+    } else
+        info->nographic = 1;
     info->domid = domid;
     info->dom_name = libxl_domid_to_name(ctx, domid);
     info->device_model = libxl_abs_path(gc, "qemu-dm", libxl_libexec_path());
