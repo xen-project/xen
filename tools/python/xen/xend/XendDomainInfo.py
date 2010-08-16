@@ -3261,6 +3261,7 @@ class XendDomainInfo:
 
             taptype = blkdev_uname_to_taptype(disk)
             mounted = devtype in ['tap', 'tap2'] and taptype != 'aio' and taptype != 'sync' and not os.stat(fn).st_rdev
+            mounted_vbd_uuid = 0
             if mounted:
                 # This is a file, not a device.  pygrub can cope with a
                 # file if it's raw, but if it's QCOW or other such formats
@@ -3276,7 +3277,8 @@ class XendDomainInfo:
 
                 from xen.xend import XendDomain
                 dom0 = XendDomain.instance().privilegedDomain()
-                dom0._waitForDeviceUUID(dom0.create_vbd(vbd, disk))
+                mounted_vbd_uuid = dom0.create_vbd(vbd, disk);
+                dom0._waitForDeviceUUID(mounted_vbd_uuid)
                 fn = BOOTLOADER_LOOPBACK_DEVICE
 
             try:
@@ -3286,8 +3288,9 @@ class XendDomainInfo:
                 if mounted:
                     log.info("Unmounting %s from %s." %
                              (fn, BOOTLOADER_LOOPBACK_DEVICE))
-
-                    dom0.destroyDevice('tap', BOOTLOADER_LOOPBACK_DEVICE)
+                    _, vbd_info = dom0.info['devices'][mounted_vbd_uuid]
+                    dom0.destroyDevice(dom0.getBlockDeviceClass(vbd_info['devid']), 
+                                       BOOTLOADER_LOOPBACK_DEVICE, force = True)
 
             if blcfg is None:
                 msg = "Had a bootloader specified, but can't find disk"
