@@ -11,6 +11,13 @@
     return (x);                   \
   }while(0)
 
+/* Some versions of flex have a bug (Fedora bugzilla 612465) which causes
+ * it to fail to declare these functions, which it defines.  So declare
+ * them ourselves.  Hopefully we won't have to simultaneously support
+ * a flex version which declares these differently somehow. */
+int xlu__cfg_yyget_column(yyscan_t yyscanner);
+void xlu__cfg_yyset_column(int  column_no, yyscan_t yyscanner);
+
 %}
 
 %option warn

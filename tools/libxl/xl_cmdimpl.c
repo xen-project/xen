@@ -214,7 +214,7 @@ static void find_domain(const char *p)
 
 #define LOG(_f, _a...)   dolog(__FILE__, __LINE__, __func__, _f "\n", ##_a)
 
-void dolog(const char *file, int line, const char *func, char *fmt, ...)
+static void dolog(const char *file, int line, const char *func, char *fmt, ...)
 {
     va_list ap;
     char *s;
@@ -1037,7 +1037,7 @@ static void *xrealloc(void *ptr, size_t sz) {
     return r;
 }
 
-int autoconnect_console(int hvm)
+static int autoconnect_console(int hvm)
 {
     int status, options;
     pid_t pid, r;
@@ -1661,7 +1661,7 @@ static int64_t parse_mem_size_kb(char *mem)
     return kbytes;
 }
 
-int set_memory_max(char *p, char *mem)
+static int set_memory_max(char *p, char *mem)
 {
     int64_t memorykb;
     int rc;
@@ -1712,7 +1712,7 @@ int main_memmax(int argc, char **argv)
     return 0;
 }
 
-void set_memory_target(char *p, char *mem)
+static void set_memory_target(char *p, char *mem)
 {
     long long int memorykb;
 
@@ -1754,7 +1754,7 @@ int main_memset(int argc, char **argv)
     return 0;
 }
 
-void cd_insert(char *dom, char *virtdev, char *phys)
+static void cd_insert(char *dom, char *virtdev, char *phys)
 {
     libxl_device_disk disk;
     char *p;
@@ -1936,7 +1936,7 @@ int main_vncviewer(int argc, char **argv)
     return 0;
 }
 
-void pcilist_assignable(void)
+static void pcilist_assignable(void)
 {
     libxl_device_pci *pcidevs;
     int num, i;
@@ -1969,7 +1969,7 @@ int main_pcilist_assignable(int argc, char **argv)
     return 0;
 }
 
-void pcilist(char *dom)
+static void pcilist(char *dom)
 {
     libxl_device_pci *pcidevs;
     int num, i;
@@ -2011,7 +2011,7 @@ int main_pcilist(int argc, char **argv)
     return 0;
 }
 
-void pcidetach(char *dom, char *bdf)
+static void pcidetach(char *dom, char *bdf)
 {
     libxl_device_pci pcidev;
 
@@ -2051,7 +2051,7 @@ int main_pcidetach(int argc, char **argv)
     pcidetach(domname, bdf);
     return 0;
 }
-void pciattach(char *dom, char *bdf, char *vs)
+static void pciattach(char *dom, char *bdf, char *vs)
 {
     libxl_device_pci pcidev;
 
@@ -2095,19 +2095,19 @@ int main_pciattach(int argc, char **argv)
     return 0;
 }
 
-void pause_domain(char *p)
+static void pause_domain(char *p)
 {
     find_domain(p);
     libxl_domain_pause(&ctx, domid);
 }
 
-void unpause_domain(char *p)
+static void unpause_domain(char *p)
 {
     find_domain(p);
     libxl_domain_unpause(&ctx, domid);
 }
 
-void destroy_domain(char *p)
+static void destroy_domain(char *p)
 {
     int rc;
     find_domain(p);
@@ -2119,7 +2119,7 @@ void destroy_domain(char *p)
     if (rc) { fprintf(stderr,"destroy failed (rc=%d)\n.",rc); exit(-1); }
 }
 
-void shutdown_domain(char *p)
+static void shutdown_domain(char *p)
 {
     int rc;
     find_domain(p);
@@ -2127,7 +2127,7 @@ void shutdown_domain(char *p)
     if (rc) { fprintf(stderr,"shutdown failed (rc=%d)\n.",rc);exit(-1); }
 }
 
-void reboot_domain(char *p)
+static void reboot_domain(char *p)
 {
     int rc;
     find_domain(p);
@@ -2135,7 +2135,7 @@ void reboot_domain(char *p)
     if (rc) { fprintf(stderr,"reboot failed (rc=%d)\n.",rc);exit(-1); }
 }
 
-void list_domains_details(const libxl_dominfo *info, int nb_domain)
+static void list_domains_details(const libxl_dominfo *info, int nb_domain)
 {
     struct domain_config d_config;
 
@@ -2161,7 +2161,7 @@ void list_domains_details(const libxl_dominfo *info, int nb_domain)
     }
 }
 
-void list_domains(int verbose, const libxl_dominfo *info, int nb_domain)
+static void list_domains(int verbose, const libxl_dominfo *info, int nb_domain)
 {
     int i;
 
@@ -2188,7 +2188,7 @@ void list_domains(int verbose, const libxl_dominfo *info, int nb_domain)
     }
 }
 
-void list_vm(void)
+static void list_vm(void)
 {
     libxl_vminfo *info;
     char *domname;
@@ -2236,7 +2236,7 @@ static void save_domain_core_begin(char *domain_spec,
     }
 }
 
-void save_domain_core_writeconfig(int fd, const char *filename,
+static void save_domain_core_writeconfig(int fd, const char *filename,
                                   const uint8_t *config_data, int config_len)
 {
     struct save_file_header hdr;
@@ -2275,7 +2275,7 @@ void save_domain_core_writeconfig(int fd, const char *filename,
             hdr.optional_data_len);
 }
 
-int save_domain(char *p, char *filename, int checkpoint,
+static int save_domain(char *p, char *filename, int checkpoint,
                 const char *override_config_file)
 {
     int fd;
@@ -3157,7 +3157,7 @@ int main_create(int argc, char **argv)
     return 0;
 }
 
-void button_press(char *p, char *b)
+static void button_press(char *p, char *b)
 {
     libxl_button button;
 
@@ -3272,7 +3272,7 @@ static void print_vcpuinfo(uint32_t tdomid,
     }
 }
 
-void vcpulist(int argc, char **argv)
+static void vcpulist(int argc, char **argv)
 {
     libxl_dominfo *dominfo, *domlist;
     libxl_vcpuinfo *vcpuinfo, *list = NULL;
@@ -3340,7 +3340,7 @@ int main_vcpulist(int argc, char **argv)
     return 0;
 }
 
-void vcpupin(char *d, const char *vcpu, char *cpu)
+static void vcpupin(char *d, const char *vcpu, char *cpu)
 {
     libxl_vcpuinfo *vcpuinfo;
     libxl_physinfo physinfo;
@@ -3444,7 +3444,7 @@ int main_vcpupin(int argc, char **argv)
     return 0;
 }
 
-void vcpuset(char *d, char* nr_vcpus)
+static void vcpuset(char *d, char* nr_vcpus)
 {
     char *endptr;
     unsigned int max_vcpus;

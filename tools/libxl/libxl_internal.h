@@ -272,4 +272,6 @@ struct libxl__xen_console_reader {
     unsigned int index;
 };
 
+_hidden int libxl_error_set(libxl_ctx *ctx, int code);
+
 #endif

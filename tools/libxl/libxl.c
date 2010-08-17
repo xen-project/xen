@@ -1346,7 +1346,7 @@ static char ** libxl_build_device_model_args(libxl_gc *gc,
     }
 }
 
-void dm_xenstore_record_pid(void *for_spawn, pid_t innerchild)
+static void dm_xenstore_record_pid(void *for_spawn, pid_t innerchild)
 {
     libxl_device_model_starting *starting = for_spawn;
     char *kvs[3];

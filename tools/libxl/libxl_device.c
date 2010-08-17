@@ -262,7 +262,7 @@ out:
     return rc;
 }
 
-int wait_for_dev_destroy(libxl_ctx *ctx, struct timeval *tv)
+static int wait_for_dev_destroy(libxl_ctx *ctx, struct timeval *tv)
 {
     libxl_gc gc = LIBXL_INIT_GC(ctx);
     int nfds, rc;
