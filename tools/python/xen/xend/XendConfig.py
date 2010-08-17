@@ -686,12 +686,12 @@ class XendConfig(dict):
         # Convert scheduling parameters to vcpus_params
         if 'vcpus_params' not in cfg:
             cfg['vcpus_params'] = {}
-        if not cfg["vcpus_params"].has_key("weight"):
-            cfg["vcpus_params"]["weight"] = \
-                int(sxp.child_value(sxp_cfg, "cpu_weight", 256))
-        if not cfg["vcpus_params"].has_key("cap"):
-            cfg["vcpus_params"]["cap"] = \
-                int(sxp.child_value(sxp_cfg, "cpu_cap", 0))
+        if not cfg["vcpus_params"].has_key("weight"):
+            cfg["vcpus_params"]["weight"] = \
+                int(sxp.child_value(sxp_cfg, "cpu_weight", 256))
+        if not cfg["vcpus_params"].has_key("cap"):
+            cfg["vcpus_params"]["cap"] = \
+                int(sxp.child_value(sxp_cfg, "cpu_cap", 0))
 
         # Only extract options we know about.
         extract_keys = LEGACY_UNSUPPORTED_BY_XENAPI_CFG + \
