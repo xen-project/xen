@@ -457,6 +457,7 @@ int libxl_wait_for_backend(libxl_ctx *ctx, char *be_path, char *state)
     unsigned int len;
     char *p;
     char *path = libxl_sprintf(&gc, "%s/state", be_path);
+    int rc = -1;
 
     while (watchdog > 0) {
         p = xs_read(ctx->xsh, XBT_NULL, path, &len);
@@ -468,10 +469,11 @@ int libxl_wait_for_backend(libxl_ctx *ctx, char *be_path, char *state)
                 XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "Failed to access backend %s",
                        be_path);
             }
-            return -1;
+            goto out;
         } else {
             if (!strcmp(p, state)) {
-                return 0;
+                rc = 0;
+                goto out;
             } else {
                 usleep(100000);
                 watchdog--;
@@ -479,7 +481,8 @@ int libxl_wait_for_backend(libxl_ctx *ctx, char *be_path, char *state)
         }
     }
     XL_LOG(ctx, XL_LOG_ERROR, "Backend %s not ready", be_path);
+out:
     libxl_free_all(&gc);
-    return -1;
+    return rc;
 }
 
