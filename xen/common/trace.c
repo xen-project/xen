@@ -321,9 +321,9 @@ void __init init_trace_bufs(void)
     /* Calculate offset in u32 of first mfn */
     calc_tinfo_first_offset();
 
-    /* t_info size fixed at 2 pages for now.  That should be big enough / small enough
-     * until it's worth making it dynamic. */
-    t_info = alloc_xenheap_pages(1, 0);
+    /* t_info size is fixed for now. Currently this works great, so there
+     * seems to be no need to make it dynamic. */
+    t_info = alloc_xenheap_pages(get_order_from_pages(T_INFO_PAGES), 0);
 
     if ( t_info == NULL )
     {
