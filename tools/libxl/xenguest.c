@@ -20,6 +20,7 @@
 #include <string.h>
 
 #include "libxl.h"
+#include "libxl_internal.h"
 
 int hvm_build_set_params(xc_interface *handle, uint32_t domid,
                          libxl_domain_build_info *info,
