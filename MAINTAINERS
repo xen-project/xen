@@ -86,6 +86,19 @@ S:	Supported
 F:	xen/arch/x86/debug.c
 F:	tools/debugger/gdbsx/
 
+INTEL(R) TRUSTED EXECUTION TECHNOLOGY (TXT)
+M:	Joseph Cihula <joseph.cihula@intel.com>
+M:	Shane Wang <shane.wang@intel.com>
+S:	Supported
+F:	xen/arch/x86/tboot.c
+F:	xen/include/asm-x86/tboot.h
+
+INTEL(R) VT FOR DIRECTED I/O (VT-D)
+M:	Allen Kay <allen.m.kay@intel.com>
+M:	Weidong Han <weidong.han@intel.com>
+S:	Supported
+F:	xen/drivers/passthrough/vtd/
+
 LINUX (PV_OPS)
 M:	Jeremy Fitzhardinge <jeremy@goop.org>
 S:	Supported
