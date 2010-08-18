@@ -19,6 +19,7 @@
 #include <xen/keyhandler.h>
 #include <xen/percpu.h>
 #include <xen/cpu.h>
+#include <xen/symbols.h>
 #include <asm/system.h>
 #include <asm/desc.h>
 
@@ -533,6 +534,13 @@ s_time_t align_timer(s_time_t firsttick, uint64_t period)
     return firsttick + (period - 1) - ((firsttick - 1) % period);
 }
 
+static void dump_timer(struct timer *t, s_time_t now)
+{
+    printk("  ex=%8ldus timer=%p cb=%p(%p)",
+           (t->expires - now) / 1000, t, t->function, t->data);
+    print_symbol(" %s\n", (unsigned long)t->function);
+}
+
 static void dump_timerq(unsigned char key)
 {
     struct timer  *t;
@@ -541,28 +549,19 @@ static void dump_timerq(unsigned char key)
     s_time_t       now = NOW();
     int            i, j;
 
-    printk("Dumping timer queues: NOW=0x%08X%08X\n",
-           (u32)(now>>32), (u32)now);
+    printk("Dumping timer queues:\n");
 
     for_each_online_cpu( i )
     {
         ts = &per_cpu(timers, i);
 
-        printk("CPU[%02d] ", i);
+        printk("CPU%02d:\n", i);
         spin_lock_irqsave(&ts->lock, flags);
         for ( j = 1; j <= GET_HEAP_SIZE(ts->heap); j++ )
-        {
-            t = ts->heap[j];
-            printk ("  %d : %p ex=0x%08X%08X %p %p\n",
-                    j, t, (u32)(t->expires>>32), (u32)t->expires,
-                    t->data, t->function);
-        }
+            dump_timer(ts->heap[j], now);
         for ( t = ts->list, j = 0; t != NULL; t = t->list_next, j++ )
-            printk (" L%d : %p ex=0x%08X%08X %p %p\n",
-                    j, t, (u32)(t->expires>>32), (u32)t->expires,
-                    t->data, t->function);
+            dump_timer(t, now);
         spin_unlock_irqrestore(&ts->lock, flags);
-        printk("\n");
     }
 }
 
