@@ -75,6 +75,14 @@ Maintainers List (try to look for most precise areas first)
 
 		-----------------------------------
 
+ACPI & POWER MANAGEMENT
+M:	Winston Wang <wang.l.winston@intel.com>
+M:	Gang Wei <gang.wei@intel.com>
+S:	Supported
+F:	xen/arch/x86/acpi/
+F:	xen/drivers/acpi/
+F:	xen/drivers/cpufreq/
+
 CPU POOLS
 M:	Juergen Gross <juergen.gross@ts.fujitsu.com>
 S:	Supported
@@ -99,6 +107,14 @@ M:	Weidong Han <weidong.han@intel.com>
 S:	Supported
 F:	xen/drivers/passthrough/vtd/
 
+INTEL(R) VT FOR X86 (VT-X)
+M:	Jun Nakajima <jun.nakajima@intel.com>
+M:	Eddie Dong <eddie.dong@intel.com>
+S:	Supported
+F:	xen/arch/x86/hvm/vmx/
+F:	xen/arch/x86/mm/hap/p2m-ept.c
+F:	xen/include/asm-x86/hvm/vmx/
+
 LINUX (PV_OPS)
 M:	Jeremy Fitzhardinge <jeremy@goop.org>
 S:	Supported
@@ -108,6 +124,11 @@ LINUX (XCP)
 M:	Ian Campbell <ian.campbell@citrix.com>
 S:	Supported
 T:	hg http://xenbits.xen.org/XCP/linux-2.6.*.pq.hg
+
+MACHINE CHECK (MCA) & RAS
+M:	Yunhong Jiang <yunhong.jiang@intel.com>
+S:	Supported
+F:	xen/arch/x86/cpu/mcheck/
 
 MINI-OS
 M:	Stefano Stabellini <stefano.stabellini@eu.citrix.com>
