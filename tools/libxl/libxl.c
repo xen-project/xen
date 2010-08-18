@@ -959,12 +959,20 @@ int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num, libxl_conso
     char *cons_num_s = libxl_sprintf(&gc, "%d", cons_num);
     char *cons_type_s;
 
-    if (type == LIBXL_CONSTYPE_PV)
+    switch (type) {
+    case LIBXL_CONSTYPE_PV:
         cons_type_s = "pv";
-    else
+        break;
+    case LIBXL_CONSTYPE_SERIAL:
         cons_type_s = "serial";
+        break;
+    default:
+        goto out;
+    }
 
     execl(p, p, domid_s, "--num", cons_num_s, "--type", cons_type_s, (void *)NULL);
+
+out:
     libxl_free_all(&gc);
     return ERROR_FAIL;
 }

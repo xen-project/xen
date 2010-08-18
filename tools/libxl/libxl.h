@@ -155,7 +155,7 @@ typedef enum {
 } libxl_qemu_machine_type;
 
 typedef enum {
-    LIBXL_CONSTYPE_SERIAL,
+    LIBXL_CONSTYPE_SERIAL = 1,
     LIBXL_CONSTYPE_PV,
 } libxl_console_constype;
 

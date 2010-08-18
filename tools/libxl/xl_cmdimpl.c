@@ -1851,7 +1851,7 @@ int main_cd_insert(int argc, char **argv)
 int main_console(int argc, char **argv)
 {
     int opt = 0, num = 0;
-    libxl_console_constype type = -1;
+    libxl_console_constype type = 0;
 
     while ((opt = getopt(argc, argv, "hn:t:")) != -1) {
         switch (opt) {
@@ -1882,7 +1882,7 @@ int main_console(int argc, char **argv)
     }
 
     find_domain(argv[optind]);
-    if (type <= 0 && num == 0)
+    if (!type)
         libxl_primary_console_exec(&ctx, domid);
     else
         libxl_console_exec(&ctx, domid, num, type);
