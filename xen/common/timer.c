@@ -19,19 +19,16 @@
 #include <xen/keyhandler.h>
 #include <xen/percpu.h>
 #include <xen/cpu.h>
+#include <xen/symbols.h>
 #include <asm/system.h>
 #include <asm/desc.h>
 
-/*
- * We pull handlers off the timer list this far in future,
- * rather than reprogramming the time hardware.
- */
+/* We program the time hardware this far behind the closest deadline. */
 static unsigned int timer_slop __read_mostly = 50000; /* 50 us */
 integer_param("timer_slop", timer_slop);
 
 struct timers {
     spinlock_t     lock;
-    bool_t         overflow;
     struct timer **heap;
     struct timer  *list;
     struct timer  *running;
@@ -42,8 +39,7 @@ static DEFINE_PER_CPU(struct timers, timers);
 
 static cpumask_t timer_valid_cpumask;
 
-DEFINE_PER_CPU(s_time_t, timer_deadline_start);
-DEFINE_PER_CPU(s_time_t, timer_deadline_end);
+DEFINE_PER_CPU(s_time_t, timer_deadline);
 
 /****************************************************************************
  * HEAP OPERATIONS.
@@ -209,7 +205,6 @@ static int add_entry(struct timer *t)
         return rc;
 
     /* Fall back to adding to the slower linked list. */
-    timers->overflow = 1;
     t->status = TIMER_STATUS_in_list;
     return add_to_list(&timers->list, t);
 }
@@ -310,7 +305,6 @@ void set_timer(struct timer *timer, s_time_t expires)
         deactivate_timer(timer);
 
     timer->expires = expires;
-    timer->expires_end = expires + timer_slop;
 
     activate_timer(timer);
 
@@ -426,13 +420,13 @@ static void timer_softirq_action(void)
 {
     struct timer  *t, **heap, *next;
     struct timers *ts;
-    s_time_t       now;
+    s_time_t       now, deadline;
 
     ts = &this_cpu(timers);
     heap = ts->heap;
 
     /* If we overflowed the heap, try to allocate a larger heap. */
-    if ( unlikely(ts->overflow) )
+    if ( unlikely(ts->list != NULL) )
     {
         /* old_limit == (2^n)-1; new_limit == (2^(n+4))-1 */
         int old_limit = GET_HEAP_LIMIT(heap);
@@ -480,46 +474,16 @@ static void timer_softirq_action(void)
         add_entry(t);
     }
 
-    ts->overflow = (ts->list != NULL);
-    if ( unlikely(ts->overflow) )
-    {
-        /* Find earliest deadline at head of list or top of heap. */
-        this_cpu(timer_deadline_start) = ts->list->expires;
-        if ( (GET_HEAP_SIZE(heap) != 0) &&
-             ((t = heap[1])->expires < this_cpu(timer_deadline_start)) )
-            this_cpu(timer_deadline_start) = t->expires;
-        this_cpu(timer_deadline_end) = this_cpu(timer_deadline_start);
-    }
-    else
-    {
-        /*
-         * Find the earliest deadline that encompasses largest number of timers
-         * on the heap. To do this we take timers from the heap while their
-         * valid deadline ranges continue to intersect.
-         */
-        s_time_t start = 0, end = STIME_MAX;
-        struct timer **list_tail = &ts->list;
+    /* Find earliest deadline from head of linked list and top of heap. */
+    deadline = STIME_MAX;
+    if ( GET_HEAP_SIZE(heap) != 0 )
+        deadline = heap[1]->expires;
+    if ( (ts->list != NULL) && (ts->list->expires < deadline) )
+        deadline = ts->list->expires;
+    this_cpu(timer_deadline) =
+        (deadline == STIME_MAX) ? 0 : deadline + timer_slop;
 
-        while ( (GET_HEAP_SIZE(heap) != 0) &&
-                ((t = heap[1])->expires <= end) )
-        {
-            remove_entry(t);
-
-            t->status = TIMER_STATUS_in_list;
-            t->list_next = NULL;
-            *list_tail = t;
-            list_tail = &t->list_next;
-
-            start = t->expires;
-            if ( end > t->expires_end )
-                end = t->expires_end;
-        }
-
-        this_cpu(timer_deadline_start) = start;
-        this_cpu(timer_deadline_end) = end;
-    }
-
-    if ( !reprogram_timer(this_cpu(timer_deadline_start)) )
+    if ( !reprogram_timer(this_cpu(timer_deadline)) )
         raise_softirq(TIMER_SOFTIRQ);
 
     spin_unlock_irq(&ts->lock);
@@ -533,6 +497,13 @@ s_time_t align_timer(s_time_t firsttick, uint64_t period)
     return firsttick + (period - 1) - ((firsttick - 1) % period);
 }
 
+static void dump_timer(struct timer *t, s_time_t now)
+{
+    printk("  ex=%8ldus timer=%p cb=%p(%p)",
+           (t->expires - now) / 1000, t, t->function, t->data);
+    print_symbol(" %s\n", (unsigned long)t->function);
+}
+
 static void dump_timerq(unsigned char key)
 {
     struct timer  *t;
@@ -541,28 +512,19 @@ static void dump_timerq(unsigned char key)
     s_time_t       now = NOW();
     int            i, j;
 
-    printk("Dumping timer queues: NOW=0x%08X%08X\n",
-           (u32)(now>>32), (u32)now);
+    printk("Dumping timer queues:\n");
 
     for_each_online_cpu( i )
     {
         ts = &per_cpu(timers, i);
 
-        printk("CPU[%02d] ", i);
+        printk("CPU%02d:\n", i);
         spin_lock_irqsave(&ts->lock, flags);
         for ( j = 1; j <= GET_HEAP_SIZE(ts->heap); j++ )
-        {
-            t = ts->heap[j];
-            printk ("  %d : %p ex=0x%08X%08X %p %p\n",
-                    j, t, (u32)(t->expires>>32), (u32)t->expires,
-                    t->data, t->function);
-        }
+            dump_timer(ts->heap[j], now);
         for ( t = ts->list, j = 0; t != NULL; t = t->list_next, j++ )
-            printk (" L%d : %p ex=0x%08X%08X %p %p\n",
-                    j, t, (u32)(t->expires>>32), (u32)t->expires,
-                    t->data, t->function);
+            dump_timer(t, now);
         spin_unlock_irqrestore(&ts->lock, flags);
-        printk("\n");
     }
 }
 

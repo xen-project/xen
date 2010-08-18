@@ -173,7 +173,7 @@ static inline s_time_t avg_intr_interval_us(void)
 
 static unsigned int get_sleep_length_us(void)
 {
-    s_time_t us = (this_cpu(timer_deadline_start) - NOW()) / 1000;
+    s_time_t us = (this_cpu(timer_deadline) - NOW()) / 1000;
     /*
      * while us < 0 or us > (u32)-1, return a large u32,
      * choose (unsigned int)-2000 to avoid wrapping while added with exit

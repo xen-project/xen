@@ -252,7 +252,7 @@ void cpuidle_wakeup_mwait(cpumask_t *mask)
 static void mwait_idle_with_hints(unsigned long eax, unsigned long ecx)
 {
     unsigned int cpu = smp_processor_id();
-    s_time_t expires = per_cpu(timer_deadline_start, cpu);
+    s_time_t expires = per_cpu(timer_deadline, cpu);
 
     __monitor((void *)&mwait_wakeup(cpu), 0, 0);
     smp_mb();

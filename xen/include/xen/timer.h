@@ -16,7 +16,6 @@
 struct timer {
     /* System time expiry value (nanoseconds since boot). */
     s_time_t expires;
-    s_time_t expires_end;
 
     /* Position in active-timer data structure. */
     union {
@@ -82,12 +81,8 @@ void kill_timer(struct timer *timer);
 /* Bootstrap initialisation. Must be called before any other timer function. */
 void timer_init(void);
 
-/*
- * Next timer deadline for each CPU.
- * Modified only by the local CPU and never in interrupt context.
- */
-DECLARE_PER_CPU(s_time_t, timer_deadline_start);
-DECLARE_PER_CPU(s_time_t, timer_deadline_end);
+/* Next timer deadline for each CPU. */
+DECLARE_PER_CPU(s_time_t, timer_deadline);
 
 /* Arch-defined function to reprogram timer hardware for new deadline. */
 int reprogram_timer(s_time_t timeout);
