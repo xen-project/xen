@@ -2,7 +2,7 @@
 
 if test "$script"
 then
-    exec "$script" $*
+    exec $script $*
 else
     exec /etc/xen/scripts/vif-bridge $*
 fi
