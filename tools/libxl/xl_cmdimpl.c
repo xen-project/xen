@@ -4261,7 +4261,7 @@ int main_blockattach(int argc, char **argv)
 int main_blocklist(int argc, char **argv)
 {
     int opt;
-    int nb;
+    int i, nb;
     libxl_device_disk *disks;
     libxl_diskinfo diskinfo;
 
@@ -4291,14 +4291,17 @@ int main_blocklist(int argc, char **argv)
         if (!disks) {
             continue;
         }
-        for (; nb > 0; --nb, ++disks) {
-            if (!libxl_device_disk_getinfo(&ctx, domid, disks, &diskinfo)) {
+        for (i=0; i<nb; i++) {
+            if (!libxl_device_disk_getinfo(&ctx, domid, &disks[i], &diskinfo)) {
                 /*      Vdev BE   hdl  st   evch rref BE-path*/
                 printf("%-5d %-3d %-6d %-5d %-6d %-8d %-30s\n",
                        diskinfo.devid, diskinfo.backend_id, diskinfo.frontend_id,
                        diskinfo.state, diskinfo.evtch, diskinfo.rref, diskinfo.backend);
+                libxl_diskinfo_destroy(&diskinfo);
             }
+            libxl_device_disk_destroy(&disks[i]);
         }
+        free(disks);
     }
     return 0;
 }

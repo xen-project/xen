@@ -1355,8 +1355,8 @@ static char ** libxl_build_device_model_args_new(libxl_gc *gc,
             flexarray_set(dm_args, num++, libxl_sprintf(gc, "-%s", disks[i].virtpath));
             flexarray_set(dm_args, num++, disks[i].physpath);
         }
+        libxl_device_disk_destroy(&disks[i]);
     }
-    /* FIXME: leaks disk paths */
     free(disks);
     flexarray_set(dm_args, num++, NULL);
     return (char **) flexarray_contents(dm_args);
@@ -2562,6 +2562,7 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk)
     int num, i;
     uint32_t stubdomid;
     libxl_device_disk *disks;
+    int ret = ERROR_FAIL;
 
     if (!disk->physpath) {
         disk->physpath = "";
@@ -2575,9 +2576,11 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk)
     }
     if (i == num) {
         XL_LOG(ctx, XL_LOG_ERROR, "Virtual device not found");
-        free(disks);
-        return ERROR_FAIL;
+        goto out;
     }
+
+    ret = 0;
+
     libxl_device_disk_del(ctx, disks + i, 1);
     libxl_device_disk_add(ctx, domid, disk);
     stubdomid = libxl_get_stubdom_id(ctx, domid);
@@ -2588,9 +2591,11 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk)
         libxl_device_disk_add(ctx, stubdomid, disk);
         disk->domid = domid;
     }
-    /* FIXME: leaks disk paths */
+out:
+    for (i = 0; i < num; i++)
+        libxl_device_disk_destroy(&disks[i]);
     free(disks);
-    return 0;
+    return ret;
 }
 
 /******************************************************************************/
