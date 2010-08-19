@@ -77,10 +77,14 @@ static ssize_t rdexact(struct xc_interface *xch, struct restore_ctx *ctx,
         len = read(fd, buf + offset, size - offset);
         if ( (len == -1) && ((errno == EINTR) || (errno == EAGAIN)) )
             continue;
-        if ( len == 0 )
+        if ( len == 0 ) {
+            ERROR("0-length read");
             errno = 0;
-        if ( len <= 0 )
+        }
+        if ( len <= 0 ) {
+            ERROR("read_exact_timed failed (read rc: %d, errno: %d)", len, errno);
             return -1;
+        }
         offset += len;
     }
 
@@ -694,8 +698,8 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
         return pagebuf_get_one(xch, ctx, buf, fd, dom);
     } else if (count == -3) {
         /* Skip padding 4 bytes then read the EPT identity PT location. */
-        if ( read_exact(fd, &buf->identpt, sizeof(uint32_t)) ||
-             read_exact(fd, &buf->identpt, sizeof(uint64_t)) )
+        if ( RDEXACT(fd, &buf->identpt, sizeof(uint32_t)) ||
+             RDEXACT(fd, &buf->identpt, sizeof(uint64_t)) )
         {
             PERROR("error read the address of the EPT identity map");
             return -1;
@@ -704,8 +708,8 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
         return pagebuf_get_one(xch, ctx, buf, fd, dom);
     } else if ( count == -4 )  {
         /* Skip padding 4 bytes then read the vm86 TSS location. */
-        if ( read_exact(fd, &buf->vm86_tss, sizeof(uint32_t)) ||
-             read_exact(fd, &buf->vm86_tss, sizeof(uint64_t)) )
+        if ( RDEXACT(fd, &buf->vm86_tss, sizeof(uint32_t)) ||
+             RDEXACT(fd, &buf->vm86_tss, sizeof(uint64_t)) )
         {
             PERROR("error read the address of the vm86 TSS");
             return -1;
@@ -729,10 +733,10 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
     } else if ( count == -7 ) {
         uint32_t tsc_mode, khz, incarn;
         uint64_t nsec;
-        if ( read_exact(fd, &tsc_mode, sizeof(uint32_t)) ||
-             read_exact(fd, &nsec, sizeof(uint64_t)) ||
-             read_exact(fd, &khz, sizeof(uint32_t)) ||
-             read_exact(fd, &incarn, sizeof(uint32_t)) ||
+        if ( RDEXACT(fd, &tsc_mode, sizeof(uint32_t)) ||
+             RDEXACT(fd, &nsec, sizeof(uint64_t)) ||
+             RDEXACT(fd, &khz, sizeof(uint32_t)) ||
+             RDEXACT(fd, &incarn, sizeof(uint32_t)) ||
              xc_domain_set_tsc_info(xch, dom, tsc_mode, nsec, khz, incarn) ) {
             PERROR("error reading/restoring tsc info");
             return -1;
@@ -740,8 +744,8 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
         return pagebuf_get_one(xch, ctx, buf, fd, dom);
     } else if (count == -8 ) {
         /* Skip padding 4 bytes then read the console pfn location. */
-        if ( read_exact(fd, &buf->console_pfn, sizeof(uint32_t)) ||
-             read_exact(fd, &buf->console_pfn, sizeof(uint64_t)) )
+        if ( RDEXACT(fd, &buf->console_pfn, sizeof(uint32_t)) ||
+             RDEXACT(fd, &buf->console_pfn, sizeof(uint64_t)) )
         {
             PERROR("error read the address of the console pfn");
             return -1;
@@ -768,7 +772,7 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
         }
         buf->pfn_types = ptmp;
     }
-    if ( read_exact(fd, buf->pfn_types + oldcount, count * sizeof(*(buf->pfn_types)))) {
+    if ( RDEXACT(fd, buf->pfn_types + oldcount, count * sizeof(*(buf->pfn_types)))) {
         PERROR("Error when reading region pfn types");
         return -1;
     }
@@ -795,7 +799,7 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
         }
         buf->pages = ptmp;
     }
-    if ( read_exact(fd, buf->pages + oldcount * PAGE_SIZE, countpages * PAGE_SIZE) ) {
+    if ( RDEXACT(fd, buf->pages + oldcount * PAGE_SIZE, countpages * PAGE_SIZE) ) {
         PERROR("Error when reading pages");
         return -1;
     }
