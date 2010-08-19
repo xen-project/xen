@@ -2010,6 +2010,7 @@ static void pcilist(char *dom)
     printf("VFn  domain bus  slot func\n");
     for (i = 0; i < num; i++) {
         printf("0x%02x 0x%04x 0x%02x 0x%02x 0x%01x\n", pcidevs[i].vdevfn, pcidevs[i].domain, pcidevs[i].bus, pcidevs[i].dev, pcidevs[i].func);
+        libxl_device_pci_destroy(&pcidevs[i]);
     }
     free(pcidevs);
 }
@@ -2052,6 +2053,7 @@ static void pcidetach(char *dom, char *bdf)
         exit(2);
     }
     libxl_device_pci_remove(&ctx, domid, &pcidev);
+    libxl_device_pci_destroy(&pcidev);
 }
 
 int main_pcidetach(int argc, char **argv)
@@ -2092,6 +2094,7 @@ static void pciattach(char *dom, char *bdf, char *vs)
         exit(2);
     }
     libxl_device_pci_add(&ctx, domid, &pcidev);
+    libxl_device_pci_destroy(&pcidev);
 }
 
 int main_pciattach(int argc, char **argv)
