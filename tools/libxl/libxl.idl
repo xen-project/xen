@@ -195,7 +195,7 @@ libxl_device_console = Struct("device_console", [
     ("domid", domid),
     ("devid", integer),
     ("consback", libxl_console_consback),
-    ("build_state", Reference(libxl_domain_build_state)),
+    ("build_state", Reference(libxl_domain_build_state), True),
     ("output", string),
     ])
 
