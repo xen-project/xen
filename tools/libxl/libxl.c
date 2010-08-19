@@ -1129,7 +1129,7 @@ static char ** libxl_build_device_model_args_old(libxl_gc *gc,
     }
     if (info->sdl) {
         flexarray_set(dm_args, num++, "-sdl");
-        if (info->opengl) {
+        if (!info->opengl) {
             flexarray_set(dm_args, num++, "-disable-opengl");
         }
     }
