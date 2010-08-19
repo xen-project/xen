@@ -60,6 +60,14 @@ _libxl_paths.h: genpath
 
 libxl_paths.c: _libxl_paths.h
 
+libxl.h: _libxl_types.h
+
+$(LIBXL_OBJS:%.o=%.c) $(LIBXLU_OBJS:%.o=%.c) $(XL_OBJS:%.o=%.c): libxl.h
+
+_libxl_types.h: libxl.idl gentypes.py libxltypes.py
+	python gentypes.py libxl.idl  __libxl_types.h
+	mv __libxl_types.h _libxl_types.h
+
 libxenlight.so: libxenlight.so.$(MAJOR)
 	ln -sf $< $@
 
@@ -107,10 +115,7 @@ install: all
 
 .PHONY: clean
 clean:
-	# XXX Preserve during transition to autogeneration
-	cp _libxl_types.h SAVED__libxl_types.h
 	$(RM) -f _*.h *.o *.so* *.a $(CLIENTS) $(DEPS)
-	mv SAVED__libxl_types.h _libxl_types.h 
 #	$(RM) -f $(AUTOSRCS) $(AUTOINCS)
 
 distclean: clean

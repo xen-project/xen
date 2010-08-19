@@ -1,0 +1,329 @@
+# -*- python -*-
+#
+# Builtin libxl types
+#
+
+libxl_ctx = Builtin("ctx")
+libxl_uuid = Builtin("uuid")
+libxl_mac = Builtin("mac")
+libxl_qemu_machine_type = Builtin("qemu_machine_type")
+libxl_console_consback = Builtin("console_consback")
+libxl_console_constype = Builtin("console_constype")
+libxl_disk_phystype = Builtin("disk_phystype")
+libxl_nic_type = Builtin("nic_type")
+
+libxl_string_list = Builtin("string_list")
+libxl_key_value_list = Builtin("key_value_list")
+
+libxl_cpumap = Builtin("cpumap")
+
+libxl_hwcap = Builtin("hwcap")
+
+#
+# Complex libxl types
+#
+libxl_dominfo = Struct("dominfo",[
+    ("uuid",        libxl_uuid),
+    ("domid",       domid),
+    ("running",     BitField(uint8, 1)),
+    ("blocked",     BitField(uint8, 1)),
+    ("paused",      BitField(uint8, 1)),
+    ("shutdown",    BitField(uint8, 1)),
+    ("dying",       BitField(uint8, 1)),
+    
+    ("shutdown_reason", unsigned, False, 
+"""Valid SHUTDOWN_* value from xen/sched.h iff (shutdown||dying).
+
+Otherwise set to a value guaranteed not to clash with any valid
+SHUTDOWN_* constant."""),
+    ("max_memkb",   uint64),
+    ("cpu_time",    uint64),
+    ("vcpu_max_id", uint32),
+    ("vcpu_online", uint32),
+    ])
+
+libxl_poolinfo = Struct("poolinfo", [
+    ("poolid", uint32)
+    ])
+
+libxl_vminfo = Struct("vminfo", [
+    ("uuid", libxl_uuid),
+    ("domid", domid),
+    ])
+
+libxl_version_info = Struct("version_info", [
+    ("xen_version_major", integer),
+    ("xen_version_minor", integer),
+    ("xen_version_extra", string),
+    ("compiler",          string),
+    ("compile_by",        string),
+    ("compile_domain",    string),
+    ("compile_date",      string),
+    ("capabilities",      string),
+    ("changeset",         string),
+    ("virt_start",        unsigned_long),
+    ("pagesize",          unsigned_long),
+    ("commandline",       string),
+    ])
+                                             
+libxl_domain_create_info = Struct("domain_create_info",[
+    ("hvm",          bool),
+    ("hap",          bool),
+    ("oos",          bool),
+    ("ssidref",      integer),
+    ("name",         string),
+    ("uuid",         libxl_uuid),
+    ("xsdata",       libxl_key_value_list),
+    ("platformdata", libxl_key_value_list),
+    ("poolid",       uint32),
+    ("poolname",     string),
+    ])
+
+libxl_file_reference = Struct("file_reference",[
+    ("path", string, False,
+"""Path is always set if the file reference is valid. However if
+mapped is true then the actual file may already be unlinked."""),
+    ("mapped", integer),
+    ("data", void),
+    ("size", size_t)])
+
+libxl_domain_build_info = Struct("domain_build_info",[
+    ("max_vcpus",       integer),
+    ("cur_vcpus",       integer),
+    ("tsc_mode",        integer),
+    ("max_memkb",       uint32),
+    ("target_memkb",    uint32),
+    ("video_memkb",     uint32),
+    ("shadow_memkb",    uint32),
+    ("disable_migrate", bool),
+    ("kernel",          libxl_file_reference),
+    ("hvm",             integer),
+    ("u", KeyedUnion(None, "hvm",
+                [("hvm", "%s", Struct(None,
+                                       [("pae", bool),
+                                        ("apic", bool),
+                                        ("acpi", bool),
+                                        ("nx", bool),
+                                        ("viridian", bool),
+                                        ("timeoffset", string),
+                                        ("hpet", bool),
+                                        ("vpt_align", bool),
+                                        ("timer_mode", integer),
+                                        ])),
+                 ("pv", "!%s", Struct(None,
+                                       [("slack_memkb", uint32),
+                                        ("bootloader", string, True),
+                                        ("bootloader_args", string, True),
+                                        ("cmdline", string),
+                                        ("ramdisk", libxl_file_reference),
+                                        ("features", string, True),
+                                        ])),
+                 ])),
+    ],
+    comment =
+"""Instances of libxl_file_reference contained in this struct which
+have been mapped (with libxl_file_reference_map) will be unmapped
+by libxl_domain_build/restore. If either of these are never called
+then the user is responsible for calling
+libxl_file_reference_unmap.""")
+
+libxl_domain_build_state = Struct("domain_build_state",[
+    ("store_port",   uint32),
+    ("store_mfn",    unsigned_long),
+    ("console_port", uint32),
+    ("console_mfn",  unsigned_long),
+    ])
+
+libxl_device_model_info = Struct("device_model_info",[
+    ("domid",            integer),
+    ("uuid",             libxl_uuid,  False, "this is use only with stubdom, and must be different from the domain uuid"),
+    ("dom_name",         string),
+    ("device_model",     string),
+    ("saved_state",      string),
+    ("type",             libxl_qemu_machine_type),
+    ("videoram",         integer,           False, "size of the videoram in MB"),
+    ("stdvga",           bool,              False, "stdvga enabled or disabled"),
+    ("vnc",              bool,              False, "vnc enabled or disabled"),
+    ("vnclisten",        string,            False, "address:port that should be listened on for the VNC server if vnc is set"),
+    ("vncpasswd",        string,            False, "the VNC password"),
+    ("vncdisplay",       integer,           False, "set VNC display number"),
+    ("vncunused",        bool,              False, "try to find an unused port for the VNC server"),
+    ("keymap",           string,            False, "set keyboard layout, default is en-us keyboard"),
+    ("sdl",              bool,              False, "sdl enabled or disabled"),
+    ("opengl",           bool,              False, "opengl enabled or disabled (if enabled requires sdl enabled)"),
+    ("nographic",        bool,              False, "no graphics, use serial port"),
+    ("serial",           string,            False, "serial port re-direct to pty deivce"),
+    ("boot",             string,            False, "boot order, for example dca"),
+    ("usb",              bool,              False, "usb support enabled or disabled"),
+    ("usbdevice",        string,            False, "enable usb mouse: tablet for absolute mouse, mouse for PS/2 protocol relative mouse"),
+    ("soundhw",          string,            False, "enable sound hardware"),
+    ("apic",             bool,              False, "apic enabled or disabled"),
+    ("vcpus",            integer,           False, "max number of vcpus"),
+    ("vcpu_avail",       integer,           False, "vcpus actually available"),
+    ("xen_platform_pci", integer,           False, "enable/disable the xen platform pci device"),
+    ("extra",            libxl_string_list, False, "extra parameters pass directly to qemu, NULL terminated"),
+    ],
+    comment=
+"""Device Model information.
+
+Network is missing""")
+
+libxl_device_vfb = Struct("device_vfb", [
+    ("backend_domid", uint32),
+    ("domid",         uint32),
+    ("devid",         integer),
+    ("vnc",           bool,     False, "vnc enabled or disabled"),
+    ("vnclisten",     string,   False, "address:port that should be listened on for the VNC server if vnc is set"),
+    ("vncpasswd",     string,   False, "the VNC password"),
+    ("vncdisplay",    integer,  False, "set VNC display number"),
+    ("vncunused",     bool,     False, "try to find an unused port for the VNC server"),
+    ("keymap",        string,   False, "set keyboard layout, default is en-us keyboard"),
+    ("sdl",           bool,     False, "sdl enabled or disabled"),
+    ("opengl",        bool,     False, "opengl enabled or disabled (if enabled requires sdl enabled)"),
+    ("display",       string),
+    ("xauthority",    string),
+    ])
+
+libxl_device_vkb = Struct("device_vkb", [
+    ("backend_domid", uint32),
+    ("domid", domid),
+    ("devid", integer),
+    ])
+
+libxl_device_console = Struct("device_console", [
+    ("backend_domid", uint32),
+    ("domid", domid),
+    ("devid", integer),
+    ("consback", libxl_console_consback),
+    ("build_state", Reference(libxl_domain_build_state)),
+    ("output", string),
+    ])
+
+libxl_device_disk = Struct("device_disk", [
+    ("backend_domid", uint32),
+    ("domid", domid),
+    ("physpath", string),
+    ("phystype", libxl_disk_phystype),
+    ("virtpath", string),
+    ("unpluggable", integer),
+    ("readwrite", integer),
+    ("is_cdrom", integer),
+    ])
+
+libxl_device_nic = Struct("device_nic", [
+    ("backend_domid", uint32),
+    ("domid", domid),
+    ("devid", integer),
+    ("mtu", integer),
+    ("model", string),
+    ("mac", libxl_mac),
+    ("ip", inaddr_ip),
+    ("bridge", string),
+    ("ifname", string),
+    ("script", string),
+    ("nictype", libxl_nic_type),
+    ])
+
+libxl_device_net2 = Struct("device_net2", [
+    ("devid", integer),
+    ("front_mac", libxl_mac),
+    ("back_mac", libxl_mac),
+    ("backend_domid", uint32),
+    ("domid", domid),
+    ("trusted", BitField(uint32, 1)),
+    ("back_trusted", BitField(uint32, 1)),
+    ("filter_mac", BitField(uint32, 1)),
+    ("front_filter_mac", BitField(uint32, 1)),
+    ("pdev", uint32),
+    ("max_bypasses", uint32),
+    ("bridge", string),
+    ])
+
+libxl_device_pci = Struct("device_pci", [
+    (None, Union(None, [("value", unsigned_integer),
+                        (None, Struct(None,[("reserved1", BitField(unsigned_integer, 2)),
+                                            ("reg",       BitField(unsigned_integer, 6)),
+                                            ("func",      BitField(unsigned_integer, 3)),
+                                            ("dev",       BitField(unsigned_integer, 5)),
+                                            ("bus",       BitField(unsigned_integer, 8)),
+                                            ("reserved2", BitField(unsigned_integer, 7)),
+                                            ("enable",    BitField(unsigned_integer, 1)),
+                                             ])),
+                        ])
+     ),
+    ("domain", unsigned_integer),
+    ("vdevfn", unsigned_integer),
+    ("vfunc_mask", unsigned_integer),
+    ("msitranslate", bool),
+    ("power_mgmt", bool),
+    ])
+
+libxl_diskinfo = Struct("diskinfo", [
+    ("backend", string),
+    ("backend_id", uint32),
+    ("frontend", string),
+    ("frontend_id", uint32),
+    ("devid", integer),
+    ("state", integer),
+    ("evtch", integer),
+    ("rref", integer),
+    ])
+
+libxl_nicinfo = Struct("nicinfo", [
+    ("backend", string),
+    ("backend_id", uint32),
+    ("frontend", string),
+    ("frontend_id", uint32),
+    ("devid", integer),
+    ("state", integer),
+    ("script", string),
+    ("mac", libxl_mac),
+    ("evtch", integer),
+    ("rref_tx", integer),
+    ("rref_rx", integer),
+    ])
+
+libxl_vcpuinfo = Struct("vcpuinfo", [
+    ("vcpuid", uint32,              False, "vcpu's id"),
+    ("cpu", uint32,                 False, "current mapping"),
+    ("online", BitField(uint8, 1),  False, "currently online (not hotplugged)?"),
+    ("blocked", BitField(uint8, 1), False, "blocked waiting for an event?"),
+    ("running", BitField(uint8, 1), False, "currently scheduled on its CPU?"),
+    ("vcpu_time", uint64,           False, "total vcpu time ran (ns)"),
+    ("cpumap", libxl_cpumap,        False, "current cpu's affinities"),
+    ])
+
+libxl_physinfo = Struct("physinfo", [
+    ("threads_per_core", uint32),
+    ("cores_per_socket", uint32),
+
+    ("max_cpu_id", uint32),
+    ("nr_cpus", uint32),
+    ("cpu_khz", uint32),
+
+    ("total_pages", uint64),
+    ("free_pages", uint64),
+    ("scrub_pages", uint64),
+
+    ("nr_nodes", uint32),
+    ("hw_cap", libxl_hwcap),
+    ("phys_cap", uint32),
+    ])
+
+libxl_sched_credit = Struct("sched_credit", [
+    ("weight", integer),
+    ("cap", integer),
+    ])
+
+libxl_net2info = Struct("net2info", [
+    ("backend", string),
+    ("backend_id", uint32),
+    ("frontend", string),
+    ("frontend_id", uint32),
+    ("devid", integer),
+    ("state", integer),
+    ("mac", libxl_mac),
+    ("trusted", integer),
+    ("back_mac", libxl_mac),
+    ("filter_mac", integer),
+    ])
