@@ -150,7 +150,7 @@ if __name__ == '__main__':
 
 """ % " ".join(sys.argv))
 
-    for ty in [t for t in types if t.autogenerate_destructor]:
+    for ty in [t for t in types if t.destructor_fn is not None and t.autogenerate_destructor]:
         f.write("void %s(%s *p)\n" % (ty.destructor_fn, ty.typename))
         f.write("{\n")
         f.write(libxl_C_type_destroy(ty, "p", True))

@@ -40,16 +40,16 @@ SHUTDOWN_* constant."""),
     ("cpu_time",    uint64),
     ("vcpu_max_id", uint32),
     ("vcpu_online", uint32),
-    ])
+    ], destructor_fn=None)
 
 libxl_poolinfo = Struct("poolinfo", [
     ("poolid", uint32)
-    ])
+    ], destructor_fn=None)
 
 libxl_vminfo = Struct("vminfo", [
     ("uuid", libxl_uuid),
     ("domid", domid),
-    ])
+    ], destructor_fn=None)
 
 libxl_version_info = Struct("version_info", [
     ("xen_version_major", integer),
@@ -132,7 +132,7 @@ libxl_domain_build_state = Struct("domain_build_state",[
     ("store_mfn",    unsigned_long),
     ("console_port", uint32),
     ("console_mfn",  unsigned_long),
-    ])
+    ], destructor_fn=None)
 
 libxl_device_model_info = Struct("device_model_info",[
     ("domid",            integer),
@@ -308,12 +308,12 @@ libxl_physinfo = Struct("physinfo", [
     ("nr_nodes", uint32),
     ("hw_cap", libxl_hwcap),
     ("phys_cap", uint32),
-    ])
+    ], destructor_fn=None)
 
 libxl_sched_credit = Struct("sched_credit", [
     ("weight", integer),
     ("cap", integer),
-    ])
+    ], destructor_fn=None)
 
 libxl_net2info = Struct("net2info", [
     ("backend", string),
