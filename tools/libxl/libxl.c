@@ -63,11 +63,10 @@ int libxl_ctx_init(libxl_ctx *ctx, int version, xentoollog_logger *lg)
     return 0;
 }
 
-static void do_free_version_info(libxl_version_info *info);
 int libxl_ctx_free(libxl_ctx *ctx)
 {
     xc_interface_close(ctx->xch);
-    do_free_version_info(&ctx->version_info);
+    libxl_version_info_destroy(&ctx->version_info);
     if (ctx->xsh) xs_daemon_close(ctx->xsh); 
     return 0;
 }
@@ -2854,18 +2853,6 @@ int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo)
     physinfo->phys_cap = xcphysinfo.capabilities;
 
     return 0;
-}
-
-static void do_free_version_info(libxl_version_info *info)
-{
-    free(info->xen_version_extra);
-    free(info->compiler);
-    free(info->compile_by);
-    free(info->compile_domain);
-    free(info->compile_date);
-    free(info->capabilities);
-    free(info->changeset);
-    free(info->commandline);
 }
 
 const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx)
