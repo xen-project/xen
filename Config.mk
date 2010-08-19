@@ -167,9 +167,9 @@ endif
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= b2ea6374ccd134f225f0ca728c836928fb8ae25c
-# Thu Aug 19 17:45:33 2010 +0100
-# passthrough: graphics passthrough cleanup
+QEMU_TAG ?= 1734e63891573d4729c71b5acc3b20eb637ad8fb
+# Thu Aug 19 18:10:43 2010 +0100
+# Allow -disable-opengl even if opengl support is not compiled in
 
 # Optional components
 XENSTAT_XENTOP     ?= y
