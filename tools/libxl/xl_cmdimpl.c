@@ -3301,49 +3301,58 @@ static void print_vcpuinfo(uint32_t tdomid,
     }
 }
 
+static void print_domain_vcpuinfo(uint32_t domid, uint32_t nr_cpus)
+{
+    libxl_vcpuinfo *vcpuinfo;
+    int i, nb_vcpu, nrcpus;
+
+    vcpuinfo = libxl_list_vcpu(&ctx, domid, &nb_vcpu, &nrcpus);
+
+    if (!vcpuinfo) {
+        fprintf(stderr, "libxl_list_vcpu failed.\n");
+        return;
+    }
+
+    for (i = 0; i < nb_vcpu; i++) {
+        print_vcpuinfo(domid, &vcpuinfo[i], nr_cpus);
+        libxl_vcpuinfo_destroy(&vcpuinfo[i]);
+    }
+
+    free(vcpuinfo);
+}
+
 static void vcpulist(int argc, char **argv)
 {
-    libxl_dominfo *dominfo, *domlist;
-    libxl_vcpuinfo *vcpuinfo, *list = NULL;
+    libxl_dominfo *dominfo;
     libxl_physinfo physinfo;
-    int nb_vcpu, nb_domain, nrcpus;
+    int i, nb_domain;
 
     if (libxl_get_physinfo(&ctx, &physinfo) != 0) {
         fprintf(stderr, "libxl_physinfo failed.\n");
         goto vcpulist_out;
     }
+
     printf("%-32s %5s %5s %5s %5s %9s %s\n",
            "Name", "ID", "VCPU", "CPU", "State", "Time(s)", "CPU Affinity");
     if (!argc) {
-        if (!(domlist = dominfo = libxl_list_domain(&ctx, &nb_domain))) {
+        if (!(dominfo = libxl_list_domain(&ctx, &nb_domain))) {
             fprintf(stderr, "libxl_list_domain failed.\n");
             goto vcpulist_out;
         }
-        for (; nb_domain > 0; --nb_domain, ++dominfo) {
-            if (!(list = vcpuinfo = libxl_list_vcpu(&ctx, dominfo->domid, &nb_vcpu,
-                &nrcpus))) {
-                fprintf(stderr, "libxl_list_vcpu failed.\n");
-                goto vcpulist_out;
-            }
-            for (; nb_vcpu > 0; --nb_vcpu, ++vcpuinfo) {
-                print_vcpuinfo(dominfo->domid, vcpuinfo, physinfo.nr_cpus);
-            }
-            libxl_free_vcpu_list(list);
-        }
-        free(domlist);
+
+        for (i = 0; i<nb_domain; i++)
+            print_domain_vcpuinfo(dominfo[i].domid, physinfo.nr_cpus);
+
+        free(dominfo);
+
     } else {
         for (; argc > 0; ++argv, --argc) {
             if (domain_qualifier_to_domid(*argv, &domid, 0) < 0) {
                 fprintf(stderr, "%s is an invalid domain identifier\n", *argv);
-            }
-            if (!(list = vcpuinfo = libxl_list_vcpu(&ctx, domid, &nb_vcpu, &nrcpus))) {
-                fprintf(stderr, "libxl_list_vcpu failed.\n");
                 goto vcpulist_out;
             }
-            for (; nb_vcpu > 0; --nb_vcpu, ++vcpuinfo) {
-                print_vcpuinfo(domid, vcpuinfo, physinfo.nr_cpus);
-            }
-            libxl_free_vcpu_list(list);
+
+            print_domain_vcpuinfo(domid, physinfo.nr_cpus);
         }
     }
   vcpulist_out:
