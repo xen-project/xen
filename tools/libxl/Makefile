@@ -102,12 +102,15 @@ install: all
 	ln -sf libxlutil.so.$(XLUMAJOR).$(XLUMINOR) $(DESTDIR)$(LIBDIR)/libxlutil.so.$(XLUMAJOR)
 	ln -sf libxlutil.so.$(XLUMAJOR) $(DESTDIR)$(LIBDIR)/libxlutil.so
 	$(INSTALL_DATA) libxlutil.a $(DESTDIR)$(LIBDIR)
-	$(INSTALL_DATA) libxl.h $(DESTDIR)$(INCLUDEDIR)
+	$(INSTALL_DATA) libxl.h _libxl_types.h $(DESTDIR)$(INCLUDEDIR)
 	$(INSTALL_DATA) bash-completion $(DESTDIR)$(BASH_COMPLETION_DIR)/xl.sh
 
 .PHONY: clean
 clean:
+	# XXX Preserve during transition to autogeneration
+	cp _libxl_types.h SAVED__libxl_types.h
 	$(RM) -f _*.h *.o *.so* *.a $(CLIENTS) $(DEPS)
+	mv SAVED__libxl_types.h _libxl_types.h 
 #	$(RM) -f $(AUTOSRCS) $(AUTOINCS)
 
 distclean: clean
