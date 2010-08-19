@@ -23,7 +23,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/select.h>
-#include <sys/mman.h>
 #include <sys/wait.h>
 #include <sys/time.h>
 #include <signal.h>
@@ -340,9 +339,9 @@ int libxl_domain_build(libxl_ctx *ctx, libxl_domain_build_info *info, uint32_t d
     }
     ret = build_post(ctx, domid, info, state, vments, localents);
 out:
-    libxl_file_reference_unmap(ctx, &info->kernel);
+    libxl__file_reference_unmap(&info->kernel);
     if (!info->hvm)
-	    libxl_file_reference_unmap(ctx, &info->u.pv.ramdisk);
+	    libxl__file_reference_unmap(&info->u.pv.ramdisk);
 
     libxl_free_all(&gc);
     return ret;
@@ -405,9 +404,9 @@ int libxl_domain_restore(libxl_ctx *ctx, libxl_domain_build_info *info,
     }
 
 out:
-    libxl_file_reference_unmap(ctx, &info->kernel);
+    libxl__file_reference_unmap(&info->kernel);
     if (!info->hvm)
-	    libxl_file_reference_unmap(ctx, &info->u.pv.ramdisk);
+	    libxl__file_reference_unmap(&info->u.pv.ramdisk);
 
     esave = errno;
 
@@ -3355,47 +3354,8 @@ int libxl_tmem_freeable(libxl_ctx *ctx)
     return rc;
 }
 
-int libxl_file_reference_map(libxl_ctx *ctx, libxl_file_reference *f)
+void libxl_file_reference_destroy(libxl_file_reference *f)
 {
-	struct stat st_buf;
-	int ret, fd;
-	void *data;
-
-	if (f->mapped)
-		return 0;
-
-	fd = open(f->path, O_RDONLY);
-	if (f < 0)
-		return ERROR_FAIL;
-
-	ret = fstat(fd, &st_buf);
-	if (ret < 0)
-		goto out;
-
-	ret = -1;
-	data = mmap(NULL, st_buf.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-	if (data == NULL)
-		goto out;
-
-	f->mapped = 1;
-	f->data = data;
-	f->size = st_buf.st_size;
-
-	ret = 0;
-out:
-	close(fd);
-
-	return ret == 0 ? 0 : ERROR_FAIL;
-}
-
-int libxl_file_reference_unmap(libxl_ctx *ctx, libxl_file_reference *f)
-{
-	int ret;
-
-	if (!f->mapped)
-		return 0;
-
-	ret = munmap(f->data, f->size);
-
-	return ret == 0 ? 0 : ERROR_FAIL;
+    libxl__file_reference_unmap(f);
+    free(f->path);
 }

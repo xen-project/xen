@@ -274,4 +274,7 @@ struct libxl__xen_console_reader {
 
 _hidden int libxl_error_set(libxl_ctx *ctx, int code);
 
+_hidden int libxl__file_reference_map(libxl_file_reference *f);
+_hidden int libxl__file_reference_unmap(libxl_file_reference *f);
+
 #endif

@@ -85,7 +85,7 @@ libxl_file_reference = Struct("file_reference",[
 mapped is true then the actual file may already be unlinked."""),
     ("mapped", integer),
     ("data", void),
-    ("size", size_t)])
+    ("size", size_t)], autogenerate_destructor=False)
 
 libxl_domain_build_info = Struct("domain_build_info",[
     ("max_vcpus",       integer),

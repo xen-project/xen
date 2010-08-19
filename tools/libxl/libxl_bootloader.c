@@ -279,12 +279,12 @@ static void parse_bootloader_result(libxl_ctx *ctx,
         if (strncmp("kernel ", o, strlen("kernel ")) == 0) {
             free(info->kernel.path);
             info->kernel.path = strdup(o + strlen("kernel "));
-            libxl_file_reference_map(ctx, &info->kernel);
+            libxl__file_reference_map(&info->kernel);
             unlink(info->kernel.path);
         } else if (strncmp("ramdisk ", o, strlen("ramdisk ")) == 0) {
             free(info->u.pv.ramdisk.path);
             info->u.pv.ramdisk.path = strdup(o + strlen("ramdisk "));
-            libxl_file_reference_map(ctx, &info->u.pv.ramdisk);
+            libxl__file_reference_map(&info->u.pv.ramdisk);
             unlink(info->u.pv.ramdisk.path);
         } else if (strncmp("args ", o, strlen("args ")) == 0) {
             free(info->u.pv.cmdline);

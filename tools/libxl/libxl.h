@@ -142,10 +142,8 @@ typedef uint8_t libxl_uuid[16];
 typedef uint8_t libxl_mac[6];
 
 typedef char **libxl_string_list;
-void libxl_string_list_destroy(libxl_string_list sl);
 
 typedef char **libxl_key_value_list;
-void libxl_key_value_list_destroy(libxl_key_value_list kvl);
 
 typedef uint64_t *libxl_cpumap;
 
@@ -235,8 +233,10 @@ int libxl_domain_shutdown(libxl_ctx *ctx, uint32_t domid, int req);
 int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid, int force);
 int libxl_domain_preserve(libxl_ctx *ctx, uint32_t domid, libxl_domain_create_info *info, const char *name_suffix, libxl_uuid new_uuid);
 
-int libxl_file_reference_map(libxl_ctx *ctx, libxl_file_reference *f);
-int libxl_file_reference_unmap(libxl_ctx *ctx, libxl_file_reference *f);
+/* destructors for builtin data types */
+void libxl_string_list_destroy(libxl_string_list sl);
+void libxl_key_value_list_destroy(libxl_key_value_list kvl);
+void libxl_file_reference_destroy(libxl_file_reference *f);
 
 /*
  * Run the configured bootloader for a PV domain and update
