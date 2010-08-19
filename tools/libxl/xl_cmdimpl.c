@@ -1557,9 +1557,11 @@ start:
                 if (ret) {
                     switch (handle_domain_death(&ctx, domid, &event, &d_config, &info)) {
                     case 2:
-                        if (!preserve_domain(&ctx, domid, &event, &d_config, &info))
+                        if (!preserve_domain(&ctx, domid, &event, &d_config, &info)) {
                             /* If we fail then exit leaving the old domain in place. */
-                            exit(-1);
+                            ret = -1;
+                            goto out;
+                        }
 
                         /* Otherwise fall through and restart. */
                     case 1:
@@ -1577,7 +1579,8 @@ start:
                         goto start;
                     case 0:
                         LOG("Done. Exiting now");
-                        exit(0);
+                        ret = 0;
+                        goto out;
                     }
                 }
                 break;
@@ -1589,13 +1592,13 @@ start:
         libxl_free_event(&event);
     }
 
-    close(logfile);
-    exit(0);
-
 error_out:
     if (domid)
         libxl_domain_destroy(&ctx, domid, 0);
+
 out:
+    if (logfile != 2)
+        close(logfile);
 
     free_domain_config(&d_config);
 
