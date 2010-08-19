@@ -144,12 +144,34 @@ struct domain_config {
 
 static void free_domain_config(struct domain_config *d_config)
 {
+    int i;
+
+    for (i=0; i<d_config->num_disks; i++)
+        libxl_device_disk_destroy(&d_config->disks[i]);
     free(d_config->disks);
+
+    for (i=0; i<d_config->num_vifs; i++)
+        libxl_device_nic_destroy(&d_config->vifs[i]);
     free(d_config->vifs);
+
+    for (i=0; i<d_config->num_vif2s; i++)
+        libxl_device_net2_destroy(&d_config->vif2s[i]);
     free(d_config->vif2s);
+
+    for (i=0; i<d_config->num_pcidevs; i++)
+        libxl_device_pci_destroy(&d_config->pcidevs[i]);
     free(d_config->pcidevs);
+
+    for (i=0; i<d_config->num_vfbs; i++)
+        libxl_device_vfb_destroy(&d_config->vfbs[i]);
     free(d_config->vfbs);
+
+    for (i=0; i<d_config->num_vkbs; i++)
+        libxl_device_vkb_destroy(&d_config->vkbs[i]);
     free(d_config->vkbs);
+
+    libxl_domain_create_info_destroy(&d_config->c_info);
+    libxl_domain_build_info_destroy(&d_config->b_info);
 }
 
 /* Optional data, in order:
@@ -309,7 +331,7 @@ static void init_nic_info(libxl_device_nic *nic_info, int devnum)
     nic_info->domid = 0;
     nic_info->devid = devnum;
     nic_info->mtu = 1492;
-    nic_info->model = "e1000";
+    nic_info->model = strdup("e1000");
     nic_info->mac[0] = 0x00;
     nic_info->mac[1] = 0x16;
     nic_info->mac[2] = 0x3e;
@@ -317,7 +339,7 @@ static void init_nic_info(libxl_device_nic *nic_info, int devnum)
     nic_info->mac[4] = 1 + (int) (0xff * (rand() / (RAND_MAX + 1.0)));
     nic_info->mac[5] = 1 + (int) (0xff * (rand() / (RAND_MAX + 1.0)));
     nic_info->ifname = NULL;
-    nic_info->bridge = "xenbr0";
+    nic_info->bridge = strdup("xenbr0");
     CHK_ERRNO( asprintf(&nic_info->script, "%s/vif-bridge",
                libxl_xen_script_dir_path()) );
     nic_info->nictype = NICTYPE_IOEMU;
@@ -796,6 +818,7 @@ static void parse_config_data(const char *configfile_filename_report,
                     break;
                 *p2 = '\0';
                 if (!strcmp(p, "model")) {
+                    free(nic->model);
                     nic->model = strdup(p2 + 1);
                 } else if (!strcmp(p, "mac")) {
                     char *p3 = p2 + 1;
@@ -817,6 +840,7 @@ static void parse_config_data(const char *configfile_filename_report,
                     *(p3 + 2) = '\0';
                     nic->mac[5] = strtol(p3, NULL, 16);
                 } else if (!strcmp(p, "bridge")) {
+                    free(nic->bridge);
                     nic->bridge = strdup(p2 + 1);
                 } else if (!strcmp(p, "type")) {
                     if (!strcmp(p2 + 1, "ioemu"))
