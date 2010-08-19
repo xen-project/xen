@@ -73,6 +73,33 @@ int libxl_ctx_free(libxl_ctx *ctx)
     return 0;
 }
 
+void libxl_string_list_destroy(libxl_string_list sl)
+{
+    int i;
+
+    if (!sl)
+        return;
+
+    for (i = 0; sl[i] != NULL; i++)
+        free(sl[i]);
+    free(sl);
+}
+
+void libxl_key_value_list_destroy(libxl_key_value_list kvl)
+{
+    int i;
+
+    if (!kvl)
+        return;
+
+    for (i = 0; kvl[i] != NULL; i += 2) {
+        free(kvl[i]);
+        if (kvl[i + 1])
+            free(kvl[i + 1]);
+    }
+    free(kvl);
+}
+
 /******************************************************************************/
 
 int libxl_domain_make(libxl_ctx *ctx, libxl_domain_create_info *info,

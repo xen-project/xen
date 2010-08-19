@@ -25,6 +25,7 @@ LIBXL_OBJS-y += libxl_noblktap2.o
 endif
 
 LIBXL_OBJS = flexarray.o libxl.o libxl_pci.o libxl_dom.o libxl_exec.o libxl_xshelp.o libxl_device.o libxl_internal.o xenguest.o libxl_utils.o $(LIBXL_OBJS-y)
+LIBXL_OBJS += _libxl_types.o
 
 AUTOINCS= libxlu_cfg_y.h libxlu_cfg_l.h
 AUTOSRCS= libxlu_cfg_y.c libxlu_cfg_l.c
@@ -64,9 +65,10 @@ libxl.h: _libxl_types.h
 
 $(LIBXL_OBJS:%.o=%.c) $(LIBXLU_OBJS:%.o=%.c) $(XL_OBJS:%.o=%.c): libxl.h
 
-_libxl_types.h: libxl.idl gentypes.py libxltypes.py
-	python gentypes.py libxl.idl  __libxl_types.h
+_libxl_types.h _libxl_types.c: libxl.idl gentypes.py libxltypes.py
+	python gentypes.py libxl.idl __libxl_types.h __libxl_types.c
 	mv __libxl_types.h _libxl_types.h
+	mv __libxl_types.c _libxl_types.c
 
 libxenlight.so: libxenlight.so.$(MAJOR)
 	ln -sf $< $@
@@ -116,6 +118,7 @@ install: all
 .PHONY: clean
 clean:
 	$(RM) -f _*.h *.o *.so* *.a $(CLIENTS) $(DEPS)
+	$(RM) -f _*.c
 #	$(RM) -f $(AUTOSRCS) $(AUTOINCS)
 
 distclean: clean

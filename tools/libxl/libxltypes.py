@@ -1,9 +1,16 @@
 import sys
 
+PASS_BY_VALUE = 1
+PASS_BY_REFERENCE = 2
+
 class Type(object):
     def __init__(self, typename, **kwargs):
         self.comment = kwargs.setdefault('comment', None)
         self.namespace = kwargs.setdefault('namespace', "libxl_")
+
+        self.passby = kwargs.setdefault('passby', PASS_BY_VALUE)
+        if self.passby not in [PASS_BY_VALUE, PASS_BY_REFERENCE]:
+            raise ValueError
 
         if typename is None: # Anonymous type
             self.typename = None
@@ -12,14 +19,23 @@ class Type(object):
         else:
             self.typename = self.namespace + typename
 
+        if self.typename is not None:
+            self.destructor_fn = kwargs.setdefault('destructor_fn', self.typename + "_destroy")
+        else:
+            self.destructor_fn = kwargs.setdefault('destructor_fn', None)
+
+        self.autogenerate_destructor = kwargs.setdefault('autogenerate_destructor', True)
+
 class Builtin(Type):
     """Builtin type"""
     def __init__(self, typename, **kwargs):
+        kwargs.setdefault('destructor_fn', None)
         Type.__init__(self, typename, **kwargs)
 
 class UInt(Type):
     def __init__(self, w, **kwargs):
         kwargs.setdefault('namespace', None)
+        kwargs.setdefault('destructor_fn', None)
         Type.__init__(self, "uint%d_t" % w, **kwargs)
 
         self.width = w
@@ -27,6 +43,7 @@ class UInt(Type):
 class BitField(Type):
     def __init__(self, ty, w, **kwargs):
         kwargs.setdefault('namespace', None)
+        kwargs.setdefault('destructor_fn', None)
         Type.__init__(self, ty.typename, **kwargs)
 
         self.width = w
@@ -63,10 +80,16 @@ class Aggregate(Type):
 
 class Struct(Aggregate):
     def __init__(self, name, fields, **kwargs):
+        kwargs.setdefault('passby', PASS_BY_REFERENCE)
         Aggregate.__init__(self, "struct", name, fields, **kwargs)
 
 class Union(Aggregate):
     def __init__(self, name, fields, **kwargs):
+        # Generally speaking some intelligence is required to free a
+        # union therefore any specific instance of this class will
+        # need to provide an explicit destructor function.
+        kwargs.setdefault('passby', PASS_BY_REFERENCE)
+        kwargs.setdefault('destructor_fn', None)
         Aggregate.__init__(self, "union", name, fields, **kwargs)
 
 class KeyedUnion(Aggregate):
@@ -87,7 +110,14 @@ class KeyedUnion(Aggregate):
 class Reference(Type):
     """A reference to another type"""
     def __init__(self, ty, **kwargs):
+        self.ref_type = ty
+        
         # Ugh
+        
+        kwargs.setdefault('destructor_fn', "free")
+        kwargs.setdefault('autogenerate_destructor', False)
+        kwargs.setdefault('passby', PASS_BY_VALUE)
+        
         kwargs.setdefault('namespace', ty.namespace)
         typename = ty.typename[len(kwargs['namespace']):]
         Type.__init__(self, typename + " *", **kwargs)
@@ -112,7 +142,7 @@ uint64 = UInt(64)
 
 domid = UInt(32)
 
-string = Builtin("char *", namespace = None)
+string = Builtin("char *", namespace = None, destructor_fn = "free")
 
 inaddr_ip = Builtin("struct in_addr", namespace = None)
 

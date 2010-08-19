@@ -12,10 +12,10 @@ libxl_console_constype = Builtin("console_constype")
 libxl_disk_phystype = Builtin("disk_phystype")
 libxl_nic_type = Builtin("nic_type")
 
-libxl_string_list = Builtin("string_list")
-libxl_key_value_list = Builtin("key_value_list")
+libxl_string_list = Builtin("string_list", destructor_fn="libxl_string_list_destroy")
+libxl_key_value_list = Builtin("key_value_list", destructor_fn="libxl_key_value_list_destroy")
 
-libxl_cpumap = Builtin("cpumap")
+libxl_cpumap = Builtin("cpumap", destructor_fn="free")
 
 libxl_hwcap = Builtin("hwcap")
 

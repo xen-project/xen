@@ -142,8 +142,10 @@ typedef uint8_t libxl_uuid[16];
 typedef uint8_t libxl_mac[6];
 
 typedef char **libxl_string_list;
+void libxl_string_list_destroy(libxl_string_list sl);
 
 typedef char **libxl_key_value_list;
+void libxl_key_value_list_destroy(libxl_key_value_list kvl);
 
 typedef uint64_t *libxl_cpumap;
 
