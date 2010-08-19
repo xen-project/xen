@@ -1624,6 +1624,8 @@ out:
     if (logfile != 2)
         close(logfile);
 
+    libxl_device_model_info_destroy(&dm_info);
+
     free_domain_config(&d_config);
 
     free(config_data);
