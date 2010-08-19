@@ -405,42 +405,44 @@ int libxl_pipe(libxl_ctx *ctx, int pipes[2])
 int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
                             const char *mac, libxl_device_nic *nic)
 {
-    libxl_nicinfo *nics, *list;
-    unsigned int nb, i, j;
+    libxl_nicinfo *nics;
+    unsigned int nb, i;
+    int found;
     uint8_t mac_n[6];
     uint8_t *a, *b;
     const char *tok;
     char *endptr;
 
-    list = nics = libxl_list_nics(ctx, domid, &nb);
-    if (!nics) {
+    nics = libxl_list_nics(ctx, domid, &nb);
+    if (!nics)
         return ERROR_FAIL;
-    }
 
     for (i = 0, tok = mac; *tok && (i < 6); ++i, tok += 3) {
         mac_n[i] = strtol(tok, &endptr, 16);
-        if (endptr != (tok + 2)) {
+        if (endptr != (tok + 2))
             return ERROR_INVAL;
-        }
     }
     memset(nic, 0, sizeof (libxl_device_nic));
-    for (j = 0; j < nb; ++j, ++nics) {
-        for (i = 0, a = nics->mac, b = mac_n;
+    found = 0;
+    for (i = 0; i < nb; ++i) {
+        for (i = 0, a = nics[i].mac, b = mac_n;
              (b < mac_n + 6) && (*a == *b); ++a, ++b)
             ;
         if ((b >= mac_n + 6) && (*a == *b)) {
-            nic->backend_domid = nics->backend_id;
-            nic->domid = nics->frontend_id;
-            nic->devid = nics->devid;
-            memcpy(nic->mac, nics->mac, sizeof (nic->mac));
-            nic->script = nics->script;
-            libxl_free_nics_list(list, nb);
-            return 0;
+            nic->backend_domid = nics[i].backend_id;
+            nic->domid = nics[i].frontend_id;
+            nic->devid = nics[i].devid;
+            memcpy(nic->mac, nics[i].mac, sizeof (nic->mac));
+            nic->script = strdup(nics[i].script);
+            found = 1;
+            break;
         }
     }
 
-    libxl_free_nics_list(list, nb);
-    return 0;
+    for (i=0; i<nb; i++)
+        libxl_nicinfo_destroy(&nics[i]);
+    free(nics);
+    return found;
 }
 
 int libxl_devid_to_device_nic(libxl_ctx *ctx, uint32_t domid,
@@ -472,8 +474,7 @@ int libxl_devid_to_device_nic(libxl_ctx *ctx, uint32_t domid,
          ++i, tok = strtok(NULL, ":")) {
         nic->mac[i] = strtoul(tok, NULL, 16);
     }
-    nic->script = libxl_xs_read(&gc, XBT_NULL,
-                                libxl_sprintf(&gc, "%s/script", nic_path_be));
+    nic->script = xs_read(ctx->xsh, XBT_NULL, libxl_sprintf(&gc, "%s/script", nic_path_be), NULL);
     rc = 0;
 out:
     libxl_free_all(&gc);

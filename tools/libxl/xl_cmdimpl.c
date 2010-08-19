@@ -4091,13 +4091,14 @@ int main_networkattach(int argc, char **argv)
         fprintf(stderr, "libxl_device_nic_add failed.\n");
         return 1;
     }
+    libxl_device_nic_destroy(&nic);
     return 0;
 }
 
 int main_networklist(int argc, char **argv)
 {
     int opt;
-    libxl_nicinfo *nics, *list;
+    libxl_nicinfo *nics;
     unsigned int nb, i;
 
     if (argc < 3) {
@@ -4123,22 +4124,23 @@ int main_networklist(int argc, char **argv)
             fprintf(stderr, "%s is an invalid domain identifier\n", *argv);
             continue;
         }
-        if (!(list = nics = libxl_list_nics(&ctx, domid, &nb))) {
+        if (!(nics = libxl_list_nics(&ctx, domid, &nb))) {
             continue;
         }
-        for (i = 0; i < nb; ++i, ++nics) {
+        for (i = 0; i < nb; ++i) {
             /* Idx BE */
-            printf("%-3d %-2d ", nics->devid, nics->backend_id);
+            printf("%-3d %-2d ", nics[i].devid, nics[i].backend_id);
             /* MAC */
             printf("%02x:%02x:%02x:%02x:%02x:%02x ",
-                   nics->mac[0], nics->mac[1], nics->mac[2],
-                   nics->mac[3], nics->mac[4], nics->mac[5]);
+                   nics[i].mac[0], nics[i].mac[1], nics[i].mac[2],
+                   nics[i].mac[3], nics[i].mac[4], nics[i].mac[5]);
             /* Hdl  Sta  evch txr/rxr  BE-path */
             printf("%6d %5d %6d %5d/%-11d %-30s\n",
-                   nics->devid, nics->state, nics->evtch,
-                   nics->rref_tx, nics->rref_rx, nics->backend);
+                   nics[i].devid, nics[i].state, nics[i].evtch,
+                   nics[i].rref_tx, nics[i].rref_rx, nics[i].backend);
+            libxl_nicinfo_destroy(&nics[i]);
         }
-        libxl_free_nics_list(list, nb);
+        free(nics);
     }
     return 0;
 }
@@ -4183,6 +4185,7 @@ int main_networkdetach(int argc, char **argv)
         fprintf(stderr, "libxl_device_nic_del failed.\n");
         return 1;
     }
+    libxl_device_nic_destroy(&nic);
     return 0;
 }
 

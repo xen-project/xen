@@ -2047,17 +2047,6 @@ int libxl_device_nic_del(libxl_ctx *ctx,
     return libxl_device_del(ctx, &device, wait);
 }
 
-void libxl_free_nics_list(libxl_nicinfo *nics, unsigned int nb)
-{
-    unsigned int i;
-    for(i = 0; i < nb; i++) {
-        free(nics[i].backend);
-        free(nics[i].frontend);
-        free(nics[i].script);
-    }
-    free(nics);
-}
-
 libxl_nicinfo *libxl_list_nics(libxl_ctx *ctx, uint32_t domid, unsigned int *nb)
 {
     libxl_gc gc = LIBXL_INIT_GC(ctx);
