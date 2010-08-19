@@ -499,7 +499,7 @@ s_time_t align_timer(s_time_t firsttick, uint64_t period)
 
 static void dump_timer(struct timer *t, s_time_t now)
 {
-    printk("  ex=%8ldus timer=%p cb=%p(%p)",
+    printk("  ex=%8"PRId64"us timer=%p cb=%p(%p)",
            (t->expires - now) / 1000, t, t->function, t->data);
     print_symbol(" %s\n", (unsigned long)t->function);
 }
