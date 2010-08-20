@@ -145,8 +145,11 @@ if __name__ == '__main__':
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "libxl.h"
+
+#define LIBXL_DTOR_POISON 0xa5
 
 """ % " ".join(sys.argv))
 
@@ -154,6 +157,7 @@ if __name__ == '__main__':
         f.write("void %s(%s *p)\n" % (ty.destructor_fn, ty.typename))
         f.write("{\n")
         f.write(libxl_C_type_destroy(ty, "p", True))
+        f.write("\tmemset(p, LIBXL_DTOR_POISON, sizeof(*p));\n")
         f.write("}\n")
         f.write("\n")
     f.close()
