@@ -793,13 +793,55 @@ static void _irq_guest_eoi(struct irq_desc *desc)
     desc->handler->enable(irq);
 }
 
+static void set_eoi_ready(void *data);
+
 static void irq_guest_eoi_timer_fn(void *data)
 {
     struct irq_desc *desc = data;
+    unsigned int irq = desc - irq_desc;
+    irq_guest_action_t *action;
+    cpumask_t cpu_eoi_map;
     unsigned long flags;
 
     spin_lock_irqsave(&desc->lock, flags);
-    _irq_guest_eoi(desc);
+    
+    if ( !(desc->status & IRQ_GUEST) )
+        goto out;
+
+    action = (irq_guest_action_t *)desc->action;
+
+    if ( action->ack_type != ACKTYPE_NONE )
+    {
+        unsigned int i;
+        for ( i = 0; i < action->nr_guests; i++ )
+        {
+            struct domain *d = action->guest[i];
+            unsigned int pirq = domain_irq_to_pirq(d, irq);
+            if ( test_and_clear_bit(pirq, d->pirq_mask) )
+                action->in_flight--;
+        }
+    }
+
+    if ( action->in_flight != 0 )
+        goto out;
+
+    switch ( action->ack_type )
+    {
+    case ACKTYPE_UNMASK:
+        desc->handler->end(irq);
+        break;
+    case ACKTYPE_EOI:
+        cpu_eoi_map = action->cpu_eoi_map;
+        spin_unlock_irq(&desc->lock);
+        on_selected_cpus(&cpu_eoi_map, set_eoi_ready, desc, 0);
+        spin_lock_irq(&desc->lock);
+        break;
+    case ACKTYPE_NONE:
+        _irq_guest_eoi(desc);
+        break;
+    }
+
+ out:
     spin_unlock_irqrestore(&desc->lock, flags);
 }
 
@@ -856,9 +898,11 @@ static void __do_IRQ_guest(int irq)
         }
     }
 
-    if ( already_pending == action->nr_guests )
+    stop_timer(&action->eoi_timer);
+
+    if ( (action->ack_type == ACKTYPE_NONE) &&
+         (already_pending == action->nr_guests) )
     {
-        stop_timer(&action->eoi_timer);
         desc->handler->disable(irq);
         desc->status |= IRQ_GUEST_EOI_PENDING;
         for ( i = 0; i < already_pending; ++i )
@@ -874,9 +918,10 @@ static void __do_IRQ_guest(int irq)
              * - skip the timer setup below.
              */
         }
-        migrate_timer(&action->eoi_timer, smp_processor_id());
-        set_timer(&action->eoi_timer, NOW() + MILLISECS(1));
     }
+
+    migrate_timer(&action->eoi_timer, smp_processor_id());
+    set_timer(&action->eoi_timer, NOW() + MILLISECS(1));
 }
 
 /*
@@ -1315,9 +1360,7 @@ static irq_guest_action_t *__pirq_guest_unbind(
     BUG_ON(!cpus_empty(action->cpu_eoi_map));
 
     desc->action = NULL;
-    desc->status &= ~IRQ_GUEST;
-    desc->status &= ~IRQ_INPROGRESS;
-    kill_timer(&action->eoi_timer);
+    desc->status &= ~(IRQ_GUEST|IRQ_GUEST_EOI_PENDING|IRQ_INPROGRESS);
     desc->handler->shutdown(irq);
 
     /* Caller frees the old guest descriptor block. */
@@ -1351,7 +1394,10 @@ void pirq_guest_unbind(struct domain *d, int pirq)
     spin_unlock_irq(&desc->lock);
 
     if ( oldaction != NULL )
+    {
+        kill_timer(&oldaction->eoi_timer);
         xfree(oldaction);
+    }
 }
 
 static int pirq_guest_force_unbind(struct domain *d, int irq)
@@ -1389,7 +1435,10 @@ static int pirq_guest_force_unbind(struct domain *d, int irq)
     spin_unlock_irq(&desc->lock);
 
     if ( oldaction != NULL )
+    {
+        kill_timer(&oldaction->eoi_timer);
         xfree(oldaction);
+    }
 
     return bound;
 }
