@@ -991,6 +991,8 @@ int __init acpi_boot_init(void)
 
 	acpi_mmcfg_init();
 
+	erst_init();
+
 	return 0;
 }
 

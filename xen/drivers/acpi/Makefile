@@ -1,5 +1,6 @@
 subdir-y += tables
 subdir-y += utilities
+subdir-y += apei
 
 obj-y += tables.o
 obj-y += numa.o

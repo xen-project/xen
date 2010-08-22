@@ -285,6 +285,7 @@ char * __acpi_map_table (unsigned long phys_addr, unsigned long size);
 int acpi_boot_init (void);
 int acpi_boot_table_init (void);
 int acpi_numa_init (void);
+int erst_init(void);
 
 int acpi_table_init (void);
 int acpi_table_parse(char *id, acpi_table_handler handler);

@@ -181,6 +181,13 @@ int _rw_is_write_locked(rwlock_t *lock);
 #define spin_is_locked(l)             _spin_is_locked(l)
 #define spin_trylock(l)               _spin_trylock(l)
 
+#define spin_trylock_irqsave(lock, flags)       \
+({                                              \
+    local_irq_save(flags);                      \
+    spin_trylock(lock) ?                        \
+    1 : ({ local_irq_restore(flags); 0; });     \
+})
+
 /* Ensure a lock is quiescent between two critical operations. */
 #define spin_barrier(l)               _spin_barrier(l)
 #define spin_barrier_irq(l)           _spin_barrier_irq(l)

@@ -20,6 +20,7 @@
 #include <xen/iommu.h>
 #include <asm/amd-iommu.h>
 #include <asm/msi.h>
+#include <acpi/apei.h>
 
 /*
  * Here we define all the compile-time 'special' virtual
@@ -52,6 +53,8 @@ enum fixed_addresses {
     FIX_MSIX_IO_RESERV_BASE,
     FIX_MSIX_IO_RESERV_END = FIX_MSIX_IO_RESERV_BASE + FIX_MSIX_MAX_PAGES -1,
     FIX_TBOOT_MAP_ADDRESS,
+    FIX_APEI_RANGE_BASE,
+    FIX_APEI_RANGE_END = FIX_APEI_RANGE_BASE + FIX_APEI_RANGE_MAX -1,
     __end_of_fixed_addresses
 };
 

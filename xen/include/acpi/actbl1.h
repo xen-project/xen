@@ -60,6 +60,7 @@
 #define ACPI_SIG_ASF            "ASF!"	/* Alert Standard Format table */
 #define ACPI_SIG_BOOT           "BOOT"	/* Simple Boot Flag Table */
 #define ACPI_SIG_CPEP           "CPEP"	/* Corrected Platform Error Polling table */
+#define ACPI_SIG_ERST           "ERST"  /* Error Record Serialization Table */
 #define ACPI_SIG_DBGP           "DBGP"	/* Debug Port table */
 #define ACPI_SIG_DMAR           "DMAR"	/* DMA Remapping table */
 #define ACPI_SIG_ECDT           "ECDT"	/* Embedded Controller Boot Resources Table */
@@ -91,6 +92,18 @@
 struct acpi_subtable_header {
 	u8 type;
 	u8 length;
+};
+
+/* Subtable header for WHEA tables (EINJ, ERST, WDAT) */
+
+struct acpi_whea_header {
+	u8 action;
+	u8 instruction;
+	u8 flags;
+	u8 reserved;
+	struct acpi_generic_address register_region;
+	u64 value;              /* Value used with Read/Write register */
+	u64 mask;               /* Bitmask required for this register instruction */
 };
 
 /*******************************************************************************
@@ -346,6 +359,96 @@ struct acpi_table_ecdt {
 	u32 uid;		/* Unique ID - must be same as the EC _UID method */
 	u8 gpe;			/* The GPE for the EC */
 	u8 id[1];		/* Full namepath of the EC in the ACPI namespace */
+};
+
+/*******************************************************************************
+ *
+ * ERST - Error Record Serialization Table (ACPI 4.0)
+ *        Version 1
+ *
+ ******************************************************************************/
+
+struct acpi_table_erst {
+	struct acpi_table_header header;        /* Common ACPI table header */
+	u32 header_length;
+	u32 reserved;
+	u32 entries;
+};
+
+/* ERST Serialization Entries (actions) */
+
+struct acpi_erst_entry {
+	struct acpi_whea_header whea_header;    /* Common header for WHEA tables */
+};
+
+/* Masks for Flags field above */
+
+#define ACPI_ERST_PRESERVE          (1)
+
+/* Values for Action field above */
+
+enum acpi_erst_actions {
+	ACPI_ERST_BEGIN_WRITE = 0,
+	ACPI_ERST_BEGIN_READ = 1,
+	ACPI_ERST_BEGIN_CLEAR = 2,
+	ACPI_ERST_END = 3,
+	ACPI_ERST_SET_RECORD_OFFSET = 4,
+	ACPI_ERST_EXECUTE_OPERATION = 5,
+	ACPI_ERST_CHECK_BUSY_STATUS = 6,
+	ACPI_ERST_GET_COMMAND_STATUS = 7,
+	ACPI_ERST_GET_RECORD_ID = 8,
+	ACPI_ERST_SET_RECORD_ID = 9,
+	ACPI_ERST_GET_RECORD_COUNT = 10,
+	ACPI_ERST_BEGIN_DUMMY_WRIITE = 11,
+	ACPI_ERST_NOT_USED = 12,
+	ACPI_ERST_GET_ERROR_RANGE = 13,
+	ACPI_ERST_GET_ERROR_LENGTH = 14,
+	ACPI_ERST_GET_ERROR_ATTRIBUTES = 15,
+	ACPI_ERST_ACTION_RESERVED = 16  /* 16 and greater are reserved */
+};
+
+/* Values for Instruction field above */
+
+enum acpi_erst_instructions {
+	ACPI_ERST_READ_REGISTER = 0,
+	ACPI_ERST_READ_REGISTER_VALUE = 1,
+	ACPI_ERST_WRITE_REGISTER = 2,
+	ACPI_ERST_WRITE_REGISTER_VALUE = 3,
+	ACPI_ERST_NOOP = 4,
+	ACPI_ERST_LOAD_VAR1 = 5,
+	ACPI_ERST_LOAD_VAR2 = 6,
+	ACPI_ERST_STORE_VAR1 = 7,
+	ACPI_ERST_ADD = 8,
+	ACPI_ERST_SUBTRACT = 9,
+	ACPI_ERST_ADD_VALUE = 10,
+	ACPI_ERST_SUBTRACT_VALUE = 11,
+	ACPI_ERST_STALL = 12,
+	ACPI_ERST_STALL_WHILE_TRUE = 13,
+	ACPI_ERST_SKIP_NEXT_IF_TRUE = 14,
+	ACPI_ERST_GOTO = 15,
+	ACPI_ERST_SET_SRC_ADDRESS_BASE = 16,
+	ACPI_ERST_SET_DST_ADDRESS_BASE = 17,
+	ACPI_ERST_MOVE_DATA = 18,
+	ACPI_ERST_INSTRUCTION_RESERVED = 19     /* 19 and greater are reserved */
+};
+
+/* Command status return values */
+
+enum acpi_erst_command_status {
+	ACPI_ERST_SUCESS = 0,
+	ACPI_ERST_NO_SPACE = 1,
+	ACPI_ERST_NOT_AVAILABLE = 2,
+	ACPI_ERST_FAILURE = 3,
+	ACPI_ERST_RECORD_EMPTY = 4,
+	ACPI_ERST_NOT_FOUND = 5,
+	ACPI_ERST_STATUS_RESERVED = 6   /* 6 and greater are reserved */
+};
+
+/* Error Record Serialization Information */
+
+struct acpi_erst_info {
+	u16 signature;          /* Should be "ER" */
+	u8 data[48];
 };
 
 /*******************************************************************************
