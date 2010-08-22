@@ -431,8 +431,8 @@ And the available types are:
 \item[VMASST\_TYPE\_4gb\_segments] Provide emulated support for
   instructions that rely on 4GB segments (such as the techniques used
   by some TLS solutions).
-\item[VMASST\_TYPE\_4gb\_segments\_notify] Provide a callback to the
-  guest if the above segment fixups are used: allows the guest to
+\item[VMASST\_TYPE\_4gb\_segments\_notify] Provide a callback (via trap number
+  15) to the guest if the above segment fixups are used: allows the guest to
   display a warning message during boot.
 \item[VMASST\_TYPE\_writable\_pagetables] Enable writable pagetable
   mode - described above.
