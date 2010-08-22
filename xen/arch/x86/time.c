@@ -1508,6 +1508,11 @@ unsigned long get_localtime(struct domain *d)
         + d->time_offset_seconds;
 }
 
+unsigned long get_sec(void)
+{
+    return wc_sec + (wc_nsec + NOW()) / 1000000000ULL;
+}
+
 /* "cmos_utc_offset" is the difference between UTC time and CMOS time. */
 static long cmos_utc_offset; /* in seconds */
 
