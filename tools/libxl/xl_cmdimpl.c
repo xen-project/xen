@@ -883,7 +883,7 @@ skip:
 
             init_net2_info(net2, d_config->num_vif2s);
 
-            for (p = strtok(buf2, ","); p; p = strtok(buf2, ",")) {
+            for (p = strtok(buf2, ","); p; p = strtok(NULL, ",")) {
                 while (isblank(*p))
                     p++;
                 if (!strncmp("front_mac=", p, 10)) {
