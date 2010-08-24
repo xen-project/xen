@@ -33,7 +33,7 @@
 static char **make_bootloader_args(libxl_gc *gc,
                                    libxl_domain_build_info *info,
                                    uint32_t domid,
-                                   const char *fifo, const char *disk)
+                                   const char *fifo, char *disk)
 {
     flexarray_t *args;
     int nr = 0;
@@ -65,7 +65,7 @@ static char **make_bootloader_args(libxl_gc *gc,
         } while ((t = strtok_r(NULL, " \t\n", &saveptr)));
     }
 
-    flexarray_set(args, nr++, strdup(disk));
+    flexarray_set(args, nr++, disk);
 
     /* Sentinal for execv */
     flexarray_set(args, nr++, NULL);
@@ -303,7 +303,7 @@ int libxl_run_bootloader(libxl_ctx *ctx,
     libxl_gc gc = LIBXL_INIT_GC(ctx);
     int ret, rc = 0;
     char *fifo = NULL;
-    const char *diskpath = NULL;
+    char *diskpath = NULL;
     char **args = NULL;
 
     char tempdir_template[] = "/var/run/libxl/bl.XXXXXX";
@@ -414,12 +414,14 @@ int libxl_run_bootloader(libxl_ctx *ctx,
         goto out_close;
     }
 
-    libxl_device_disk_local_detach(ctx, disk);
-
     parse_bootloader_result(ctx, info, blout);
 
     rc = 0;
 out_close:
+    if (diskpath) {
+        libxl_device_disk_local_detach(ctx, disk);
+        free(diskpath);
+    }
     if (fifo_fd > -1)
         close(fifo_fd);
     if (bootloader_fd > -1)
