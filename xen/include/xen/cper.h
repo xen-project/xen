@@ -41,7 +41,7 @@ static inline u64 cper_next_record_id(void)
 	static u64 record_id;
 
 	if (!record_id)
-		record_id = get_sec() << 32;
+		record_id = (u64)get_sec() << 32;
 
 	return ++record_id;
 }
