@@ -884,28 +884,33 @@ skip:
             init_net2_info(net2, d_config->num_vif2s);
 
             for (p = strtok(buf2, ","); p; p = strtok(NULL, ",")) {
+                char* val;
                 while (isblank(*p))
                     p++;
-                if (!strncmp("front_mac=", p, 10)) {
-                    libxl_strtomac(p + 10, net2->front_mac);
-                } else if (!strncmp("back_mac=", p, 9)) {
-                    libxl_strtomac(p + 9, net2->back_mac);
-                } else if (!strncmp("backend=", p, 8)) {
-                    domain_qualifier_to_domid(p + 8, &net2->backend_domid, 0);
-                } else if (!strncmp("trusted=", p, 8)) {
-                    net2->trusted = (*(p + 8) == '1');
-                } else if (!strncmp("back_trusted=", p, 13)) {
-                    net2->back_trusted = (*(p + 13) == '1');
-                } else if (!strncmp("bridge=", p, 7)) {
-                    net2->bridge = strdup(p + 13);
-                } else if (!strncmp("filter_mac=", p, 11)) {
-                    net2->filter_mac = (*(p + 11) == '1');
-                } else if (!strncmp("front_filter_mac=", p, 17)) {
-                    net2->front_filter_mac = (*(p + 17) == '1');
-                } else if (!strncmp("pdev=", p, 5)) {
-                    net2->pdev = strtoul(p + 5, NULL, 10);
-                } else if (!strncmp("max_bypasses=", p, 13)) {
-                    net2->max_bypasses = strtoul(p + 13, NULL, 10);
+                val = strchr(p, '=');
+                if (val == NULL)
+                    continue;
+                *val++ = 0;
+                if (!strcmp("front_mac", p)) {
+                    libxl_strtomac(val, net2->front_mac);
+                } else if (!strcmp("back_mac", p)) {
+                    libxl_strtomac(val, net2->back_mac);
+                } else if (!strcmp("backend", p)) {
+                    domain_qualifier_to_domid(val, &net2->backend_domid, 0);
+                } else if (!strcmp("trusted", p)) {
+                    net2->trusted = (*val == '1');
+                } else if (!strcmp("back_trusted", p)) {
+                    net2->back_trusted = (*val == '1');
+                } else if (!strcmp("bridge", p)) {
+                    net2->bridge = strdup(val);
+                } else if (!strcmp("filter_mac", p)) {
+                    net2->filter_mac = (*val == '1');
+                } else if (!strcmp("front_filter_mac", p)) {
+                    net2->front_filter_mac = (*val == '1');
+                } else if (!strcmp("pdev", p)) {
+                    net2->pdev = strtoul(val, NULL, 10);
+                } else if (!strcmp("max_bypasses", p)) {
+                    net2->max_bypasses = strtoul(val, NULL, 10);
                 }
             }
             free(buf2);
