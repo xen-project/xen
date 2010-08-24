@@ -150,32 +150,6 @@ typedef struct xc_core_header {
 #define XC_CORE_MAGIC     0xF00FEBED
 #define XC_CORE_MAGIC_HVM 0xF00FEBEE
 
-#if 0 /*def __linux__*/
-
-#include <sys/ptrace.h>
-#include <thread_db.h>
-
-typedef void (*thr_ev_handler_t)(long);
-
-void xc_register_event_handler(
-    thr_ev_handler_t h,
-    td_event_e e);
-
-long xc_ptrace(
-    xc_interface *xch,
-    enum __ptrace_request request,
-    uint32_t  domid,
-    long addr,
-    long data);
-
-int xc_waitdomain(
-    xc_interface *xch,
-    int domain,
-    int *status,
-    int options);
-
-#endif /* __linux__ */
-
 /*
  * DOMAIN MANAGEMENT FUNCTIONS
  */
