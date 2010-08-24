@@ -53,7 +53,7 @@ int main(int argc, char **argv)
         }
     }
 
-    cmd = argv[optind++];
+    cmd = argv[optind];
 
     if (!cmd) {
         help(NULL);
@@ -69,13 +69,18 @@ int main(int argc, char **argv)
         exit(1);
     }
 
+    /* Reset options for per-command use of getopt. */
+    argv += optind;
+    argc -= optind;
+    optind = 1;
+
     srand(time(0));
 
     cspec = cmdtable_lookup(cmd);
     if (cspec)
         ret = cspec->cmd_impl(argc, argv);
     else if (!strcmp(cmd, "help")) {
-        help(argv[optind]);
+        help(argv[1]);
         ret = 0;
     } else {
         fprintf(stderr, "command not implemented\n");
