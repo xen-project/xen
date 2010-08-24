@@ -363,8 +363,8 @@ int xenpaging_evict_page(xc_interface *xch, xenpaging_t *paging,
         goto out;
     }
 
-    /* Notify policy of page being paged in */
-    policy_notify_paged_in(paging->mem_event.domain_id, victim->gfn);
+    /* Notify policy of page being paged out */
+    policy_notify_paged_out(paging->mem_event.domain_id, victim->gfn);
 
  out:
     return ret;
