@@ -2875,6 +2875,17 @@ int main_migrate(int argc, char **argv)
 
 int main_dump_core(int argc, char **argv)
 {
+    int opt;
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("dump-core");
+            return 0;
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
     if ( argc-optind < 2 ) {
         help("dump-core");
         return 2;
@@ -4037,10 +4048,6 @@ int main_networkattach(int argc, char **argv)
     int i;
     unsigned int val;
 
-    if ((argc < 3) || (argc > 11)) {
-        help("network-attach");
-        return 0;
-    }
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
         case 'h':
@@ -4051,13 +4058,17 @@ int main_networkattach(int argc, char **argv)
             break;
         }
     }
+    if ((argc-optind < 2) || (argc-optind > 11)) {
+        help("network-attach");
+        return 0;
+    }
 
-    if (domain_qualifier_to_domid(argv[2], &domid, 0) < 0) {
-        fprintf(stderr, "%s is an invalid domain identifier\n", argv[2]);
+    if (domain_qualifier_to_domid(argv[optind], &domid, 0) < 0) {
+        fprintf(stderr, "%s is an invalid domain identifier\n", argv[optind]);
         return 1;
     }
     init_nic_info(&nic, -1);
-    for (argv += 3, argc -= 3; argc > 0; ++argv, --argc) {
+    for (argv += optind+1, argc -= optind+1; argc > 0; ++argv, --argc) {
         if (!strncmp("type=", *argv, 5)) {
             if (!strncmp("vif", (*argv) + 5, 4)) {
                 nic.nictype = NICTYPE_VIF;
@@ -4118,10 +4129,6 @@ int main_networklist(int argc, char **argv)
     libxl_nicinfo *nics;
     unsigned int nb, i;
 
-    if (argc < 3) {
-        help("network-list");
-        return 1;
-    }
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
             case 'h':
@@ -4132,11 +4139,15 @@ int main_networklist(int argc, char **argv)
                 break;
         }
     }
+    if (argc-optind < 1) {
+        help("network-list");
+        return 1;
+    }
 
     /*      Idx  BE   MAC   Hdl  Sta  evch txr/rxr  BE-path */
     printf("%-3s %-2s %-17s %-6s %-5s %-6s %5s/%-5s %-30s\n",
            "Idx", "BE", "Mac Addr.", "handle", "state", "evt-ch", "tx-", "rx-ring-ref", "BE-path");
-    for (argv += 2, argc -= 2; argc > 0; --argc, ++argv) {
+    for (argv += optind, argc -= optind; argc > 0; --argc, ++argv) {
         if (domain_qualifier_to_domid(*argv, &domid, 0) < 0) {
             fprintf(stderr, "%s is an invalid domain identifier\n", *argv);
             continue;
@@ -4167,10 +4178,6 @@ int main_networkdetach(int argc, char **argv)
     int opt;
     libxl_device_nic nic;
 
-    if (argc != 4) {
-        help("network-detach");
-        return 0;
-    }
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
         case 'h':
@@ -4181,20 +4188,24 @@ int main_networkdetach(int argc, char **argv)
             break;
         }
     }
+    if (argc-optind != 2) {
+        help("network-detach");
+        return 0;
+    }
 
-    if (domain_qualifier_to_domid(argv[2], &domid, 0) < 0) {
-        fprintf(stderr, "%s is an invalid domain identifier\n", argv[2]);
+    if (domain_qualifier_to_domid(argv[optind], &domid, 0) < 0) {
+        fprintf(stderr, "%s is an invalid domain identifier\n", argv[optind]);
         return 1;
     }
 
-    if (!strchr(argv[3], ':')) {
-        if (libxl_devid_to_device_nic(&ctx, domid, argv[3], &nic)) {
-            fprintf(stderr, "Unknown device %s.\n", argv[3]);
+    if (!strchr(argv[optind+1], ':')) {
+        if (libxl_devid_to_device_nic(&ctx, domid, argv[optind+1], &nic)) {
+            fprintf(stderr, "Unknown device %s.\n", argv[optind+1]);
             return 1;
         }
     } else {
-        if (libxl_mac_to_device_nic(&ctx, domid, argv[3], &nic)) {
-            fprintf(stderr, "Unknown device %s.\n", argv[3]);
+        if (libxl_mac_to_device_nic(&ctx, domid, argv[optind+1], &nic)) {
+            fprintf(stderr, "Unknown device %s.\n", argv[optind+1]);
             return 1;
         }
     }
@@ -4213,10 +4224,6 @@ int main_blockattach(int argc, char **argv)
     uint32_t fe_domid, be_domid = 0;
     libxl_device_disk disk = { 0 };
 
-    if ((argc < 5) || (argc > 7)) {
-        help("block-attach");
-        return 0;
-    }
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
         case 'h':
@@ -4227,8 +4234,12 @@ int main_blockattach(int argc, char **argv)
             break;
         }
     }
+    if ((argc-optind < 3) || (argc-optind > 5)) {
+        help("block-attach");
+        return 0;
+    }
 
-    tok = strtok(argv[3], ":");
+    tok = strtok(argv[optind+1], ":");
     if (!strcmp(tok, "phy")) {
         disk.phystype = PHYSTYPE_PHY;
     } else if (!strcmp(tok, "file")) {
@@ -4256,22 +4267,23 @@ int main_blockattach(int argc, char **argv)
         fprintf(stderr, "Error: missing path to disk image.\n");
         return 1;
     }
-    disk.virtpath = argv[4];
+    disk.virtpath = argv[optind+2];
     disk.unpluggable = 1;
-    disk.readwrite = ((argc <= 4) || (argv[5][0] == 'w'));
+    disk.readwrite = ((argc-optind <= 2) || (argv[optind+3][0] == 'w'));
 
-    if (domain_qualifier_to_domid(argv[2], &fe_domid, 0) < 0) {
-        fprintf(stderr, "%s is an invalid domain identifier\n", argv[2]);
+    if (domain_qualifier_to_domid(argv[optind], &fe_domid, 0) < 0) {
+        fprintf(stderr, "%s is an invalid domain identifier\n", argv[optind]);
         return 1;
     }
-    if (argc == 7) {
-        if (domain_qualifier_to_domid(argv[6], &be_domid, 0) < 0) {
-            fprintf(stderr, "%s is an invalid domain identifier\n", argv[6]);
+    if (argc-optind == 5) {
+        if (domain_qualifier_to_domid(argv[optind+4], &be_domid, 0) < 0) {
+            fprintf(stderr, "%s is an invalid domain identifier\n", argv[optind+4]);
             return 1;
         }
     }
     disk.domid = fe_domid;
     disk.backend_domid = be_domid;
+
     if (libxl_device_disk_add(&ctx, fe_domid, &disk)) {
         fprintf(stderr, "libxl_device_disk_add failed.\n");
     }
@@ -4285,10 +4297,6 @@ int main_blocklist(int argc, char **argv)
     libxl_device_disk *disks;
     libxl_diskinfo diskinfo;
 
-    if (argc < 3) {
-        help("block-list");
-        return 0;
-    }
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
         case 'h':
@@ -4299,10 +4307,14 @@ int main_blocklist(int argc, char **argv)
             break;
         }
     }
+    if (argc-optind < 1) {
+        help("block-list");
+        return 0;
+    }
 
     printf("%-5s %-3s %-6s %-5s %-6s %-8s %-30s\n",
            "Vdev", "BE", "handle", "state", "evt-ch", "ring-ref", "BE-path");
-    for (argv += 2, argc -= 2; argc > 0; --argc, ++argv) {
+    for (argv += optind, argc -= optind; argc > 0; --argc, ++argv) {
         if (domain_qualifier_to_domid(*argv, &domid, 0) < 0) {
             fprintf(stderr, "%s is an invalid domain identifier\n", *argv);
             continue;
@@ -4331,10 +4343,6 @@ int main_blockdetach(int argc, char **argv)
     int opt;
     libxl_device_disk disk;
 
-    if (argc != 4) {
-        help("block-detach");
-        return 0;
-    }
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
         case 'h':
@@ -4345,13 +4353,17 @@ int main_blockdetach(int argc, char **argv)
             break;
         }
     }
+    if (argc-optind != 2) {
+        help("block-detach");
+        return 0;
+    }
 
-    if (domain_qualifier_to_domid(argv[2], &domid, 0) < 0) {
-        fprintf(stderr, "%s is an invalid domain identifier\n", argv[2]);
+    if (domain_qualifier_to_domid(argv[optind], &domid, 0) < 0) {
+        fprintf(stderr, "%s is an invalid domain identifier\n", argv[optind]);
         return 1;
     }
-    if (libxl_devid_to_device_disk(&ctx, domid, argv[3], &disk)) {
-        fprintf(stderr, "Error: Device %s not connected.\n", argv[3]);
+    if (libxl_devid_to_device_disk(&ctx, domid, argv[optind+1], &disk)) {
+        fprintf(stderr, "Error: Device %s not connected.\n", argv[optind+1]);
         return 1;
     }
     if (libxl_device_disk_del(&ctx, &disk, 1)) {
@@ -4369,10 +4381,6 @@ int main_network2attach(int argc, char **argv)
     unsigned int val, i;
     libxl_device_net2 net2;
 
-    if ((argc < 3) || (argc > 12)) {
-        help("network2-attach");
-        return 0;
-    }
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
         case 'h':
@@ -4383,13 +4391,17 @@ int main_network2attach(int argc, char **argv)
             break;
         }
     }
+    if ((argc-optind < 1) || (argc-optind > 10)) {
+        help("network2-attach");
+        return 0;
+    }
 
-    if (domain_qualifier_to_domid(argv[2], &domid, 0) < 0) {
-        fprintf(stderr, "%s is an invalid domain identifier\n", argv[1]);
+    if (domain_qualifier_to_domid(argv[optind], &domid, 0) < 0) {
+        fprintf(stderr, "%s is an invalid domain identifier\n", argv[optind]);
         return 1;
     }
     init_net2_info(&net2, -1);
-    for (argv += 3, argc -= 3; argc > 0; --argc, ++argv) {
+    for (argv += optind+1, argc -= optind+1; argc > 0; --argc, ++argv) {
         if (!strncmp("front_mac=", *argv, 10)) {
             tok = strtok((*argv) + 10, ":");
             for (i = 0; tok && i < 6; tok = strtok(NULL, ":"), ++i) {
@@ -4462,10 +4474,6 @@ int main_network2list(int argc, char **argv)
     unsigned int nb;
     libxl_net2info *net2s;
 
-    if (argc < 3) {
-        help("network2-list");
-        return 0;
-    }
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
         case 'h':
@@ -4476,11 +4484,15 @@ int main_network2list(int argc, char **argv)
             break;
         }
     }
+    if (argc - optind < 1) {
+        help("network2-list");
+        return 0;
+    }
 
     printf("%-3s %-2s %-5s %-17s %-17s %-7s %-6s %-30s\n",
            "Idx", "BE", "state", "Mac Addr.", "Remote Mac Addr.",
            "trusted", "filter", "backend");
-    for (argv += 2, argc -=2; argc > 0; --argc, ++argv) {
+    for (argv += optind, argc -=optind; argc > 0; --argc, ++argv) {
         if (domain_qualifier_to_domid(*argv, &domid, 0) < 0) {
             fprintf(stderr, "%s is an invalid domain identifier\n", *argv);
             continue;
@@ -4506,10 +4518,6 @@ int main_network2detach(int argc, char **argv)
     int opt;
     libxl_device_net2 net2;
 
-    if (argc != 4) {
-        help("network2-detach");
-        return 0;
-    }
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
         case 'h':
@@ -4520,13 +4528,17 @@ int main_network2detach(int argc, char **argv)
             break;
         }
     }
+    if (argc-optind != 2) {
+        help("network2-detach");
+        return 0;
+    }
 
-    if (domain_qualifier_to_domid(argv[2], &domid, 0) < 0) {
-        fprintf(stderr, "%s is an invalid domain identifier\n", argv[2]);
+    if (domain_qualifier_to_domid(argv[optind], &domid, 0) < 0) {
+        fprintf(stderr, "%s is an invalid domain identifier\n", argv[optind]);
         return 1;
     }
-    if (libxl_devid_to_device_net2(&ctx, domid, argv[3], &net2)) {
-       fprintf(stderr, "Error: Device %s not connected.\n", argv[3]);
+    if (libxl_devid_to_device_net2(&ctx, domid, argv[optind+1], &net2)) {
+        fprintf(stderr, "Error: Device %s not connected.\n", argv[optind+1]);
         return 1;
     }
     if (libxl_device_net2_del(&ctx, &net2, 1)) {
