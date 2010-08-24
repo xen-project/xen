@@ -1,11 +1,20 @@
-#ifndef XC_EFI_H
-#define XC_EFI_H
-
-/* definitions from xen/include/asm-ia64/linux-xen/linux/efi.h */
-
 /*
  * Extensible Firmware Interface
  * Based on 'Extensible Firmware Interface Specification' version 0.9, April 30, 1999
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * Copyright (C) 1999 VA Linux Systems
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
@@ -13,6 +22,11 @@
  *      David Mosberger-Tang <davidm@hpl.hp.com>
  *      Stephane Eranian <eranian@hpl.hp.com>
  */
+
+#ifndef XC_EFI_H
+#define XC_EFI_H
+
+/* definitions from xen/include/asm-ia64/linux-xen/linux/efi.h */
 
 typedef struct {
         uint8_t b[16];

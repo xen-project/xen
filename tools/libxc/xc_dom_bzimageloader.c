@@ -7,13 +7,27 @@
  * ELF file embedded in the bzImage.  The loader extracts this ELF
  * image and passes it off to the standard ELF loader.
  *
- * This code is licenced under the GPL.
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ *
  * written 2006 by Gerd Hoffmann <kraxel@suse.de>.
  * written 2007 by Jeremy Fitzhardinge <jeremy@xensource.com>
  * written 2008 by Ian Campbell <ijc@hellion.org.uk>
  * written 2009 by Chris Lalancette <clalance@redhat.com>
  *
  */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <inttypes.h>
