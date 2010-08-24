@@ -260,7 +260,7 @@ int restore_common(libxl_ctx *ctx, uint32_t domid,
                              state->store_port, &state->store_mfn,
                              state->console_port, &state->console_mfn,
                              info->hvm, info->u.hvm.pae, 0);
-    if ( rc < 0 ) {
+    if ( rc ) {
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "restoring domain");
         return ERROR_FAIL;
     }
