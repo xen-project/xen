@@ -320,9 +320,10 @@ static int ioapic_rte_to_remap_entry(struct iommu *iommu,
         *(((u32 *)&new_rte) + 0) = value;
         new_ire.lo.fpd = 0;
         new_ire.lo.dm = new_rte.dest_mode;
-        new_ire.lo.rh = 0;
         new_ire.lo.tm = new_rte.trigger;
         new_ire.lo.dlm = new_rte.delivery_mode;
+        /* Hardware require RH = 1 for LPR delivery mode */
+        new_ire.lo.rh = (new_ire.lo.dlm == dest_LowestPrio);
         new_ire.lo.avail = 0;
         new_ire.lo.res_1 = 0;
         new_ire.lo.vector = new_rte.vector;
@@ -632,9 +633,10 @@ static int msi_msg_to_remap_entry(
     /* Set interrupt remapping table entry */
     new_ire.lo.fpd = 0;
     new_ire.lo.dm = (msg->address_lo >> MSI_ADDR_DESTMODE_SHIFT) & 0x1;
-    new_ire.lo.rh = 0;
     new_ire.lo.tm = (msg->data >> MSI_DATA_TRIGGER_SHIFT) & 0x1;
     new_ire.lo.dlm = (msg->data >> MSI_DATA_DELIVERY_MODE_SHIFT) & 0x1;
+    /* Hardware require RH = 1 for LPR delivery mode */
+    new_ire.lo.rh = (new_ire.lo.dlm == dest_LowestPrio);
     new_ire.lo.avail = 0;
     new_ire.lo.res_1 = 0;
     new_ire.lo.vector = (msg->data >> MSI_DATA_VECTOR_SHIFT) &
