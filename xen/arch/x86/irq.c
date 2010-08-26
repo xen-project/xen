@@ -86,14 +86,14 @@ static int __bind_irq_vector(int irq, int vector, cpumask_t domain)
     cpus_and(mask, domain, cpu_online_map);
     if (cpus_empty(mask))
         return -EINVAL;
-    if ((cfg->vector == vector) && cpus_equal(cfg->domain, domain))
+    if ((cfg->vector == vector) && cpus_equal(cfg->domain, mask))
         return 0;
     if (cfg->vector != IRQ_VECTOR_UNASSIGNED) 
         return -EBUSY;
     for_each_cpu_mask(cpu, mask)
         per_cpu(vector_irq, cpu)[vector] = irq;
     cfg->vector = vector;
-    cfg->domain = domain;
+    cfg->domain = mask;
     irq_status[irq] = IRQ_USED;
     if (IO_APIC_IRQ(irq))
         irq_vector[irq] = vector;
