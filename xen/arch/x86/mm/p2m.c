@@ -1802,7 +1802,7 @@ static void audit_p2m(struct domain *d)
             continue;
         }
 
-        if ( gfn == SHARED_P2M_ENTRY)
+        if ( gfn == SHARED_M2P_ENTRY )
         {
             P2M_PRINTK("shared mfn (%lx) on domain page list!\n",
                     mfn);
