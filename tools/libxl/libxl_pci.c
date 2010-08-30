@@ -24,6 +24,7 @@
 #include <sys/select.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 #include <signal.h>
 #include <unistd.h> /* for write, unlink and close */
 #include <stdint.h>
