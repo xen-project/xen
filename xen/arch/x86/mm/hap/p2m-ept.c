@@ -431,6 +431,10 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
     int i;
     int ret = 0;
     mfn_t mfn = _mfn(INVALID_MFN);
+    int do_locking = !p2m_locked_by_me(p2m);
+
+    if ( do_locking )
+        p2m_lock(p2m);
 
     *t = p2m_mmio_dm;
 
@@ -507,6 +511,8 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
     }
 
 out:
+    if ( do_locking )
+        p2m_unlock(p2m);
     unmap_domain_page(table);
     return mfn;
 }
