@@ -54,6 +54,8 @@ int libxl_ctx_init(libxl_ctx *ctx, int version, xentoollog_logger *lg)
     }
 
     ctx->xsh = xs_daemon_open();
+    if (!ctx->xsh)
+        ctx->xsh = xs_domain_open();
     if (!ctx->xsh) {
         XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, errno, 
                         "cannot connect to xenstore");
