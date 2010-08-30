@@ -78,10 +78,23 @@ Maintainers List (try to look for most precise areas first)
 ACPI & POWER MANAGEMENT
 M:	Winston Wang <wang.l.winston@intel.com>
 M:	Gang Wei <gang.wei@intel.com>
+M:	Mark Langsdorf <mark.langsdorf@amd.com>
 S:	Supported
 F:	xen/arch/x86/acpi/
 F:	xen/drivers/acpi/
 F:	xen/drivers/cpufreq/
+
+AMD IOMMU
+M:	Wei Wang <wei.wang2@amd.com>
+S:	Supported
+F:	xen/drivers/passthrough/amd/
+
+AMD SVM
+M:	Andre Przywara <andre.przywara@amd.com>
+M:	Christoph Egger <christoph.egger@amd.com>
+M:	Wei Huang <wei.huang2@amd.com>
+S:	Supported
+F:	xen/arch/x86/hvm/svm/
 
 CPU POOLS
 M:	Juergen Gross <juergen.gross@ts.fujitsu.com>
@@ -126,6 +139,7 @@ S:	Supported
 T:	hg http://xenbits.xen.org/XCP/linux-2.6.*.pq.hg
 
 MACHINE CHECK (MCA) & RAS
+M:	Christoph Egger <christoph.egger@amd.com>
 M:	Yunhong Jiang <yunhong.jiang@intel.com>
 S:	Supported
 F:	xen/arch/x86/cpu/mcheck/
