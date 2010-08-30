@@ -25,8 +25,8 @@
 
 struct irq_cfg {
         int  vector;
-        cpumask_t domain;
-        cpumask_t old_domain;
+        cpumask_t cpu_mask;
+        cpumask_t old_cpu_mask;
         unsigned move_cleanup_count;
         u8 move_in_progress : 1;
 };

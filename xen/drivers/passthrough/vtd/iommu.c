@@ -1837,7 +1837,7 @@ static int init_vtd_hw(void)
         }
 
         cfg = irq_cfg(iommu->irq);
-        dma_msi_set_affinity(iommu->irq, cfg->domain);
+        dma_msi_set_affinity(iommu->irq, cfg->cpu_mask);
 
         clear_fault_bits(iommu);
 

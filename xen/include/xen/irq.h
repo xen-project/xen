@@ -117,7 +117,7 @@ extern int request_irq_vector(unsigned int vector,
 
 struct irq_cfg {
         int  vector;
-        cpumask_t domain;
+        cpumask_t cpu_mask;
 };
 
 extern struct irq_cfg irq_cfg[];

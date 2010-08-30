@@ -124,7 +124,7 @@ void msi_compose_msg(struct pci_dev *pdev, int irq,
     cpumask_t domain;
     struct irq_cfg *cfg = irq_cfg(irq);
     int vector = cfg->vector;
-    domain = cfg->domain;
+    domain = cfg->cpu_mask;
 
     if ( cpus_empty( domain ) ) {
         dprintk(XENLOG_ERR,"%s, compose msi message error!!\n", __func__);

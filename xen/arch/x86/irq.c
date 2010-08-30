@@ -74,39 +74,39 @@ void unlock_vector_lock(void)
     spin_unlock(&vector_lock);
 }
 
-static int __bind_irq_vector(int irq, int vector, cpumask_t domain)
+static int __bind_irq_vector(int irq, int vector, cpumask_t cpu_mask)
 {
-    cpumask_t mask;
+    cpumask_t online_mask;
     int cpu;
     struct irq_cfg *cfg = irq_cfg(irq);
 
     BUG_ON((unsigned)irq >= nr_irqs);
     BUG_ON((unsigned)vector >= NR_VECTORS);
 
-    cpus_and(mask, domain, cpu_online_map);
-    if (cpus_empty(mask))
+    cpus_and(online_mask, cpu_mask, cpu_online_map);
+    if (cpus_empty(online_mask))
         return -EINVAL;
-    if ((cfg->vector == vector) && cpus_equal(cfg->domain, mask))
+    if ((cfg->vector == vector) && cpus_equal(cfg->cpu_mask, online_mask))
         return 0;
     if (cfg->vector != IRQ_VECTOR_UNASSIGNED) 
         return -EBUSY;
-    for_each_cpu_mask(cpu, mask)
+    for_each_cpu_mask(cpu, online_mask)
         per_cpu(vector_irq, cpu)[vector] = irq;
     cfg->vector = vector;
-    cfg->domain = mask;
+    cfg->cpu_mask = online_mask;
     irq_status[irq] = IRQ_USED;
     if (IO_APIC_IRQ(irq))
         irq_vector[irq] = vector;
     return 0;
 }
 
-int bind_irq_vector(int irq, int vector, cpumask_t domain)
+int bind_irq_vector(int irq, int vector, cpumask_t cpu_mask)
 {
     unsigned long flags;
     int ret;
 
     spin_lock_irqsave(&vector_lock, flags);
-    ret = __bind_irq_vector(irq, vector, domain);
+    ret = __bind_irq_vector(irq, vector, cpu_mask);
     spin_unlock_irqrestore(&vector_lock, flags);
     return ret;
 }
@@ -179,13 +179,13 @@ static void __clear_irq_vector(int irq)
     BUG_ON(!cfg->vector);
 
     vector = cfg->vector;
-    cpus_and(tmp_mask, cfg->domain, cpu_online_map);
+    cpus_and(tmp_mask, cfg->cpu_mask, cpu_online_map);
 
     for_each_cpu_mask(cpu, tmp_mask)
         per_cpu(vector_irq, cpu)[vector] = -1;
 
     cfg->vector = IRQ_VECTOR_UNASSIGNED;
-    cpus_clear(cfg->domain);
+    cpus_clear(cfg->cpu_mask);
     init_one_irq_status(irq);
 
     if (likely(!cfg->move_in_progress))
@@ -257,8 +257,8 @@ static void init_one_irq_status(int irq)
 static void init_one_irq_cfg(struct irq_cfg *cfg)
 {
     cfg->vector = IRQ_VECTOR_UNASSIGNED;
-    cpus_clear(cfg->domain);
-    cpus_clear(cfg->old_domain);
+    cpus_clear(cfg->cpu_mask);
+    cpus_clear(cfg->old_cpu_mask);
 }
 
 int init_irq_data(void)
@@ -354,7 +354,7 @@ int __assign_irq_vector(int irq, struct irq_cfg *cfg, cpumask_t mask)
     old_vector = irq_to_vector(irq);
     if (old_vector) {
         cpus_and(tmp_mask, mask, cpu_online_map);
-        cpus_and(tmp_mask, cfg->domain, tmp_mask);
+        cpus_and(tmp_mask, cfg->cpu_mask, tmp_mask);
         if (!cpus_empty(tmp_mask)) {
             cfg->vector = old_vector;
             return 0;
@@ -369,7 +369,7 @@ int __assign_irq_vector(int irq, struct irq_cfg *cfg, cpumask_t mask)
         int new_cpu;
         int vector, offset;
 
-        tmp_mask = vector_allocation_domain(cpu);
+        tmp_mask = vector_allocation_cpumask(cpu);
         cpus_and(tmp_mask, tmp_mask, cpu_online_map);
 
         vector = current_vector;
@@ -395,12 +395,12 @@ next:
         current_offset = offset;
         if (old_vector) {
             cfg->move_in_progress = 1;
-            cpus_copy(cfg->old_domain, cfg->domain);
+            cpus_copy(cfg->old_cpu_mask, cfg->cpu_mask);
         }
         for_each_cpu_mask(new_cpu, tmp_mask)
             per_cpu(vector_irq, new_cpu)[vector] = irq;
         cfg->vector = vector;
-        cpus_copy(cfg->domain, tmp_mask);
+        cpus_copy(cfg->cpu_mask, tmp_mask);
 
         irq_status[irq] = IRQ_USED;
             if (IO_APIC_IRQ(irq))
@@ -424,7 +424,7 @@ int assign_irq_vector(int irq)
     ret = __assign_irq_vector(irq, cfg, TARGET_CPUS);
     if (!ret) {
         ret = cfg->vector;
-        cpus_copy(desc->affinity, cfg->domain);
+        cpus_copy(desc->affinity, cfg->cpu_mask);
     }
     spin_unlock_irqrestore(&vector_lock, flags);
     return ret;
@@ -445,7 +445,7 @@ void __setup_vector_irq(int cpu)
     /* Mark the inuse vectors */
     for (irq = 0; irq < nr_irqs; ++irq) {
         cfg = irq_cfg(irq);
-        if (!cpu_isset(cpu, cfg->domain))
+        if (!cpu_isset(cpu, cfg->cpu_mask))
             continue;
         vector = irq_to_vector(irq);
         per_cpu(vector_irq, cpu)[vector] = irq;

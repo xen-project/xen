@@ -412,7 +412,7 @@ fastcall void smp_irq_move_cleanup_interrupt(struct cpu_user_regs *regs)
         if (!cfg->move_cleanup_count)
             goto unlock;
 
-        if (vector == cfg->vector && cpu_isset(me, cfg->domain))
+        if (vector == cfg->vector && cpu_isset(me, cfg->cpu_mask))
             goto unlock;
 
         irr = apic_read(APIC_IRR + (vector / 32 * 0x10));
@@ -441,7 +441,7 @@ static void send_cleanup_vector(struct irq_cfg *cfg)
 {
     cpumask_t cleanup_mask;
 
-    cpus_and(cleanup_mask, cfg->old_domain, cpu_online_map);
+    cpus_and(cleanup_mask, cfg->old_cpu_mask, cpu_online_map);
     cfg->move_cleanup_count = cpus_weight(cleanup_mask);
     genapic->send_IPI_mask(&cleanup_mask, IRQ_MOVE_CLEANUP_VECTOR);
 
@@ -460,7 +460,7 @@ void irq_complete_move(struct irq_desc **descp)
     vector = get_irq_regs()->entry_vector;
     me = smp_processor_id();
 
-    if (vector == cfg->vector && cpu_isset(me, cfg->domain))
+    if (vector == cfg->vector && cpu_isset(me, cfg->cpu_mask))
         send_cleanup_vector(cfg);
 }
 
@@ -488,7 +488,7 @@ unsigned int set_desc_affinity(struct irq_desc *desc, cpumask_t mask)
         return BAD_APICID;
 
     cpus_copy(desc->affinity, mask);
-    cpus_and(dest_mask, desc->affinity, cfg->domain);
+    cpus_and(dest_mask, desc->affinity, cfg->cpu_mask);
 
     return cpu_mask_to_apicid(dest_mask);
 }
@@ -638,8 +638,8 @@ void /*__init*/ setup_ioapic_dest(void)
                 continue;
             irq = pin_2_irq(irq_entry, ioapic, pin);
             cfg = irq_cfg(irq);
-            BUG_ON(cpus_empty(cfg->domain));
-            set_ioapic_affinity_irq(irq, cfg->domain);
+            BUG_ON(cpus_empty(cfg->cpu_mask));
+            set_ioapic_affinity_irq(irq, cfg->cpu_mask);
         }
 
     }
@@ -1003,7 +1003,7 @@ static void __init setup_IO_APIC_irqs(void)
             }
             cfg = irq_cfg(irq);
             SET_DEST(entry.dest.dest32, entry.dest.logical.logical_dest,
-                cpu_mask_to_apicid(cfg->domain));
+                cpu_mask_to_apicid(cfg->cpu_mask));
             spin_lock_irqsave(&ioapic_lock, flags);
             io_apic_write(apic, 0x11+2*pin, *(((int *)&entry)+1));
             io_apic_write(apic, 0x10+2*pin, *(((int *)&entry)+0));
@@ -2446,7 +2446,7 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
     rte.vector = cfg->vector;
 
     SET_DEST(rte.dest.dest32, rte.dest.logical.logical_dest,
-        cpu_mask_to_apicid(cfg->domain));
+        cpu_mask_to_apicid(cfg->cpu_mask));
 
     io_apic_write(apic, 0x10 + 2 * pin, *(((int *)&rte) + 0));
     io_apic_write(apic, 0x11 + 2 * pin, *(((int *)&rte) + 1));

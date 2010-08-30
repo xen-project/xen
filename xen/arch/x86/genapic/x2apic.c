@@ -94,7 +94,7 @@ cpumask_t target_cpus_x2apic(void)
     return cpu_online_map;
 }
 
-cpumask_t vector_allocation_domain_x2apic(int cpu)
+cpumask_t vector_allocation_cpumask_x2apic(int cpu)
 {
     return cpumask_of_cpu(cpu);
 }

@@ -31,7 +31,7 @@ cpumask_t target_cpus_flat(void)
 	return cpu_online_map;
 }
 
-cpumask_t vector_allocation_domain_flat(int cpu)
+cpumask_t vector_allocation_cpumask_flat(int cpu)
 {
 	return cpu_online_map;
 } 
@@ -64,7 +64,7 @@ cpumask_t target_cpus_phys(void)
 	return cpu_online_map;
 }
 
-cpumask_t vector_allocation_domain_phys(int cpu)
+cpumask_t vector_allocation_cpumask_phys(int cpu)
 {
 	return cpumask_of_cpu(cpu);
 }
