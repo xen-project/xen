@@ -387,6 +387,10 @@ static mfn_t ept_get_entry(struct domain *d, unsigned long gfn, p2m_type_t *t,
     int i;
     int ret = 0;
     mfn_t mfn = _mfn(INVALID_MFN);
+    int do_locking = !p2m_locked_by_me(d->arch.p2m);
+
+    if ( do_locking )
+        p2m_lock(d->arch.p2m);
 
     *t = p2m_mmio_dm;
 
@@ -464,6 +468,8 @@ static mfn_t ept_get_entry(struct domain *d, unsigned long gfn, p2m_type_t *t,
     }
 
 out:
+    if ( do_locking )
+        p2m_unlock(d->arch.p2m);
     unmap_domain_page(table);
     return mfn;
 }
