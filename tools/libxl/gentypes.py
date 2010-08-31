@@ -64,6 +64,11 @@ def libxl_C_type_destroy(ty, v, reference, indent = "    ", parent = None):
         deref = v + "->"
     else:
         deref = v + "."
+        
+    if ty.passby == libxltypes.PASS_BY_REFERENCE and not reference:
+        makeref = "&"
+    else:
+        makeref = ""
 
     s = ""
     if isinstance(ty, libxltypes.KeyedUnion):
@@ -76,6 +81,8 @@ def libxl_C_type_destroy(ty, v, reference, indent = "    ", parent = None):
             s += "}\n"
     elif isinstance(ty, libxltypes.Reference):
         s += libxl_C_type_destroy(ty.ref_type, v, True, indent, v)
+        if ty.destructor_fn is not None:
+            s += "%s(%s);\n" % (ty.destructor_fn, makeref + v)
     elif isinstance(ty, libxltypes.Struct) and (parent is None or ty.destructor_fn is None):
         for f in [f for f in ty.fields if not f.const]:
 
@@ -84,11 +91,6 @@ def libxl_C_type_destroy(ty, v, reference, indent = "    ", parent = None):
             else:
                 s += libxl_C_type_destroy(f.type, deref + f.name, False, "", deref)
     else:
-        if ty.passby == libxltypes.PASS_BY_REFERENCE and not reference:
-            makeref = "&"
-        else:
-            makeref = ""
-
         if ty.destructor_fn is not None:
             s += "%s(%s);\n" % (ty.destructor_fn, makeref + v)
             
