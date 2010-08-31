@@ -159,7 +159,7 @@ if __name__ == '__main__':
         f.write("void %s(%s *p)\n" % (ty.destructor_fn, ty.typename))
         f.write("{\n")
         f.write(libxl_C_type_destroy(ty, "p", True))
-        f.write("\tmemset(p, LIBXL_DTOR_POISON, sizeof(*p));\n")
+        f.write("    memset(p, LIBXL_DTOR_POISON, sizeof(*p));\n")
         f.write("}\n")
         f.write("\n")
     f.close()
