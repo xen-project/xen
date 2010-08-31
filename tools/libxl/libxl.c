@@ -2955,30 +2955,32 @@ int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
     return 0;
 }
 
-int libxl_set_vcpucount(libxl_ctx *ctx, uint32_t domid, uint32_t count)
+int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid, uint32_t bitmask)
 {
     libxl_gc gc = LIBXL_INIT_GC(ctx);
-    xc_domaininfo_t domaininfo;
+    libxl_dominfo info;
     char *dompath;
+    xs_transaction_t t;
     int i, rc = ERROR_FAIL;
 
-    if (xc_domain_getinfolist(ctx->xch, domid, 1, &domaininfo) != 1) {
+    if (libxl_domain_info(ctx, &info, domid) < 0) {
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "getting domain info list");
-        goto out;
-    }
-    if (!count || ((domaininfo.max_vcpu_id + 1) < count)) {
-        rc = ERROR_INVAL;
         goto out;
     }
     if (!(dompath = libxl_xs_get_dompath(&gc, domid)))
         goto out;
 
-    for (i = 0; i <= domaininfo.max_vcpu_id; ++i) {
-        libxl_xs_write(&gc, XBT_NULL,
+retry_transaction:
+    t = xs_transaction_start(ctx->xsh);
+    for (i = 0; i <= info.vcpu_max_id; i++)
+        libxl_xs_write(&gc, t,
                        libxl_sprintf(&gc, "%s/cpu/%u/availability", dompath, i),
-                       "%s", ((1 << i) & ((1 << count) - 1)) ? "online" : "offline");
-    }
-    rc = 0;
+                       "%s", ((1 << i) & bitmask) ? "online" : "offline");
+    if (!xs_transaction_end(ctx->xsh, t, 0)) {
+        if (errno == EAGAIN)
+            goto retry_transaction;
+    } else
+        rc = 0;
 out:
     libxl_free_all(&gc);
     return rc;

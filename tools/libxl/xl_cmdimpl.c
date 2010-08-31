@@ -3504,7 +3504,8 @@ int main_vcpupin(int argc, char **argv)
 static void vcpuset(char *d, char* nr_vcpus)
 {
     char *endptr;
-    unsigned int max_vcpus;
+    unsigned int max_vcpus, i;
+    uint32_t bitmask = 0;
 
     max_vcpus = strtoul(nr_vcpus, &endptr, 10);
     if (nr_vcpus == endptr) {
@@ -3514,9 +3515,11 @@ static void vcpuset(char *d, char* nr_vcpus)
 
     find_domain(d);
 
-    if (libxl_set_vcpucount(&ctx, domid, max_vcpus) == ERROR_INVAL) {
-        fprintf(stderr, "Error: Cannot set vcpus greater than max vcpus on running domain or lesser than 1.\n");
-    }
+    for (i = 0; i < max_vcpus; i++)
+        bitmask |= 1 << i;
+
+    if (libxl_set_vcpuonline(&ctx, domid, bitmask) < 0)
+        fprintf(stderr, "libxl_set_vcpuonline failed domid=%d bitmask=%x\n", domid, bitmask);
 }
 
 int main_vcpuset(int argc, char **argv)
