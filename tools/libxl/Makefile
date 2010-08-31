@@ -66,7 +66,7 @@ libxl.h: _libxl_types.h
 $(LIBXL_OBJS:%.o=%.c) $(LIBXLU_OBJS:%.o=%.c) $(XL_OBJS:%.o=%.c): libxl.h
 
 _libxl_types.h _libxl_types.c: libxl.idl gentypes.py libxltypes.py
-	python gentypes.py libxl.idl __libxl_types.h __libxl_types.c
+	$(PYTHON) gentypes.py libxl.idl __libxl_types.h __libxl_types.c
 	mv __libxl_types.h _libxl_types.h
 	mv __libxl_types.c _libxl_types.c
 
