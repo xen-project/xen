@@ -182,6 +182,8 @@ def parse(f):
             globs[n] = t
         elif isinstance(t,type(object)) and issubclass(t, Type):
             globs[n] = t
+        elif n in ['PASS_BY_REFERENCE', 'PASS_BY_VALUE']:
+            globs[n] = t
 
     try:
         execfile(f, globs, locs)

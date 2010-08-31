@@ -73,9 +73,10 @@ int libxl_ctx_free(libxl_ctx *ctx)
     return 0;
 }
 
-void libxl_string_list_destroy(libxl_string_list sl)
+void libxl_string_list_destroy(libxl_string_list *psl)
 {
     int i;
+    libxl_string_list sl = *psl;
 
     if (!sl)
         return;
@@ -85,9 +86,10 @@ void libxl_string_list_destroy(libxl_string_list sl)
     free(sl);
 }
 
-void libxl_key_value_list_destroy(libxl_key_value_list kvl)
+void libxl_key_value_list_destroy(libxl_key_value_list *pkvl)
 {
     int i;
+    libxl_key_value_list kvl = *pkvl;
 
     if (!kvl)
         return;

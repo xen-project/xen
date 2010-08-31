@@ -234,8 +234,8 @@ int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid, int force);
 int libxl_domain_preserve(libxl_ctx *ctx, uint32_t domid, libxl_domain_create_info *info, const char *name_suffix, libxl_uuid new_uuid);
 
 /* destructors for builtin data types */
-void libxl_string_list_destroy(libxl_string_list sl);
-void libxl_key_value_list_destroy(libxl_key_value_list kvl);
+void libxl_string_list_destroy(libxl_string_list *sl);
+void libxl_key_value_list_destroy(libxl_key_value_list *kvl);
 void libxl_file_reference_destroy(libxl_file_reference *f);
 
 /*
