@@ -20,7 +20,7 @@
 
 extern int trap_init_f00f_bug(void);
 
-static int use_xsave = 1;
+static int use_xsave;
 boolean_param("xsave", use_xsave);
 
 #ifdef CONFIG_X86_INTEL_USERCOPY
