@@ -1214,8 +1214,8 @@ int shadow_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p,
  * l1 tables (covering 2MB of virtual address space each).  Similarly, a
  * 32-bit guest l2 table (4GB va) needs to be shadowed by four
  * PAE/64-bit l2 tables (1GB va each).  These multi-page shadows are
- * contiguous and aligned; functions for handling offsets into them are
- * defined in shadow.c (shadow_l1_index() etc.)
+ * not contiguous in memory; functions for handling offsets into them are
+ * defined in shadow/multi.c (shadow_l1_index() etc.)
  *    
  * This table shows the allocation behaviour of the different modes:
  *

@@ -421,13 +421,27 @@ sh_guest_get_eff_l1e(struct vcpu *v, unsigned long addr, void *eff_l1e)
  * way to see this is: a 32-bit guest L2 page maps 4GB of virtual address
  * space, while a PAE- or 64-bit shadow L2 page maps 1GB of virtual address
  * space.)
- *
- * For PAE guests, for every 32-bytes of guest L3 page table, we use 64-bytes
- * of shadow (to store both the shadow, and the info that would normally be
- * stored in page_info fields).  This arrangement allows the shadow and the
- * "page_info" fields to always be stored in the same page (in fact, in
- * the same cache line), avoiding an extra call to map_domain_page().
  */
+
+/* From one page of a multi-page shadow, find the next one */
+static inline mfn_t sh_next_page(mfn_t smfn)
+{
+    mfn_t next;
+    struct page_info *pg = mfn_to_page(smfn);
+
+    ASSERT(pg->u.sh.type == SH_type_l1_32_shadow
+           || pg->u.sh.type == SH_type_fl1_32_shadow
+           || pg->u.sh.type == SH_type_l2_32_shadow);
+    ASSERT(pg->u.sh.type == SH_type_l2_32_shadow || pg->u.sh.head);
+    ASSERT(pg->list.next != PAGE_LIST_NULL);
+
+    next = _mfn(pdx_to_pfn(pg->list.next));
+
+    /* XXX not for long */ ASSERT(mfn_x(next) == mfn_x(smfn) + 1);
+    ASSERT(mfn_to_page(next)->u.sh.type == pg->u.sh.type);
+    ASSERT(!mfn_to_page(next)->u.sh.head);
+    return next;
+}
 
 static inline u32
 guest_index(void *ptr)
@@ -440,8 +454,8 @@ shadow_l1_index(mfn_t *smfn, u32 guest_index)
 {
 #if (GUEST_PAGING_LEVELS == 2)
     ASSERT(mfn_to_page(*smfn)->u.sh.head);
-    *smfn = _mfn(mfn_x(*smfn) +
-                 (guest_index / SHADOW_L1_PAGETABLE_ENTRIES));
+    if ( guest_index >= SHADOW_L1_PAGETABLE_ENTRIES )
+        *smfn = sh_next_page(*smfn);
     return (guest_index % SHADOW_L1_PAGETABLE_ENTRIES);
 #else
     return guest_index;
@@ -452,13 +466,12 @@ static u32
 shadow_l2_index(mfn_t *smfn, u32 guest_index)
 {
 #if (GUEST_PAGING_LEVELS == 2)
+    int i;
     ASSERT(mfn_to_page(*smfn)->u.sh.head);
     // Because we use 2 shadow l2 entries for each guest entry, the number of
     // guest entries per shadow page is SHADOW_L2_PAGETABLE_ENTRIES/2
-    //
-    *smfn = _mfn(mfn_x(*smfn) +
-                 (guest_index / (SHADOW_L2_PAGETABLE_ENTRIES / 2)));
-
+    for ( i = 0; i < guest_index / (SHADOW_L2_PAGETABLE_ENTRIES / 2); i++ )
+        *smfn = sh_next_page(*smfn);
     // We multiply by two to get the index of the first of the two entries
     // used to shadow the specified guest entry.
     return (guest_index % (SHADOW_L2_PAGETABLE_ENTRIES / 2)) * 2;
@@ -1014,11 +1027,11 @@ static int shadow_set_l2e(struct vcpu *v,
     /* In 2-on-3 we work with pairs of l2es pointing at two-page
      * shadows.  Reference counting and up-pointers track from the first
      * page of the shadow to the first l2e, so make sure that we're 
-     * working with those:     
-     * Align the pointer down so it's pointing at the first of the pair */
+     * working with those:
+     * Start with a pair of identical entries */
+    shadow_l2e_t pair[2] = { new_sl2e, new_sl2e };
+    /* Align the pointer down so it's pointing at the first of the pair */
     sl2e = (shadow_l2e_t *)((unsigned long)sl2e & ~(sizeof(shadow_l2e_t)));
-    /* Align the mfn of the shadow entry too */
-    new_sl2e.l2 &= ~(1<<PAGE_SHIFT);
 #endif
 
     ASSERT(sl2e != NULL);
@@ -1055,19 +1068,16 @@ static int shadow_set_l2e(struct vcpu *v,
                 sh_resync(v, gl1mfn);
         }
 #endif
+#if GUEST_PAGING_LEVELS == 2
+        /* Update the second entry to point tio the second half of the l1 */
+        sl1mfn = sh_next_page(sl1mfn);
+        pair[1] = shadow_l2e_from_mfn(sl1mfn, shadow_l2e_get_flags(new_sl2e));
+#endif
     }
 
     /* Write the new entry */
 #if GUEST_PAGING_LEVELS == 2
-    {
-        shadow_l2e_t pair[2] = { new_sl2e, new_sl2e };
-        /* The l1 shadow is two pages long and need to be pointed to by
-         * two adjacent l1es.  The pair have the same flags, but point
-         * at odd and even MFNs */
-        ASSERT(!(pair[0].l2 & (1<<PAGE_SHIFT)));
-        pair[1].l2 |= (1<<PAGE_SHIFT);
-        shadow_write_entries(sl2e, &pair, 2, sl2mfn);
-    }
+    shadow_write_entries(sl2e, &pair, 2, sl2mfn);
 #else /* normal case */
     shadow_write_entries(sl2e, &new_sl2e, 1, sl2mfn);
 #endif
@@ -1301,7 +1311,7 @@ do {                                                                    \
     int __done = 0;                                                     \
     _SHADOW_FOREACH_L1E(_sl1mfn, _sl1e, _gl1p,                          \
                          ({ (__done = _done); }), _code);               \
-    _sl1mfn = _mfn(mfn_x(_sl1mfn) + 1);                                 \
+    _sl1mfn = sh_next_page(_sl1mfn);                                    \
     if ( !__done )                                                      \
         _SHADOW_FOREACH_L1E(_sl1mfn, _sl1e, _gl1p,                      \
                              ({ (__done = _done); }), _code);           \
@@ -1335,7 +1345,7 @@ do {                                                                      \
                 increment_ptr_to_guest_entry(_gl2p);                      \
             }                                                             \
         sh_unmap_domain_page(_sp);                                        \
-        _sl2mfn = _mfn(mfn_x(_sl2mfn) + 1);                               \
+        if ( _j < 3 ) _sl2mfn = sh_next_page(_sl2mfn);                    \
     }                                                                     \
 } while (0)
 
@@ -4332,13 +4342,14 @@ sh_update_cr3(struct vcpu *v, int do_locking)
     ///
 #if SHADOW_PAGING_LEVELS == 3
         {
-            mfn_t smfn;
+            mfn_t smfn = pagetable_get_mfn(v->arch.shadow_table[0]);
             int i;
             for ( i = 0; i < 4; i++ )
             {
 #if GUEST_PAGING_LEVELS == 2
                 /* 2-on-3: make a PAE l3 that points at the four-page l2 */
-                smfn = _mfn(pagetable_get_pfn(v->arch.shadow_table[0]) + i);
+                if ( i != 0 )
+                    smfn = sh_next_page(smfn);
 #else
                 /* 3-on-3: make a PAE l3 that points at the four l2 pages */
                 smfn = pagetable_get_mfn(v->arch.shadow_table[i]);
