@@ -84,7 +84,7 @@ struct xs_handle {
 #define mutex_lock(m)		pthread_mutex_lock(m)
 #define mutex_unlock(m)		pthread_mutex_unlock(m)
 #define condvar_signal(c)	pthread_cond_signal(c)
-#define condvar_wait(c,m,hnd)	pthread_cond_wait(c,m)
+#define condvar_wait(c,m)	pthread_cond_wait(c,m)
 #define cleanup_push(f, a)	\
     pthread_cleanup_push((void (*)(void *))(f), (void *)(a))
 /*
@@ -111,7 +111,7 @@ struct xs_handle {
 #define mutex_lock(m)		((void)0)
 #define mutex_unlock(m)		((void)0)
 #define condvar_signal(c)	((void)0)
-#define condvar_wait(c,m,hnd)	read_message(hnd)
+#define condvar_wait(c,m)	((void)0)
 #define cleanup_push(f, a)	((void)0)
 #define cleanup_pop(run)	((void)0)
 #define read_thread_exists(h)	(0)
@@ -337,21 +337,20 @@ static void *read_reply(
 
 	read_from_thread = read_thread_exists(h);
 
-#ifdef USE_PTHREAD
 	/* Read from comms channel ourselves if there is no reader thread. */
 	if (!read_from_thread && (read_message(h) == -1))
 		return NULL;
-#endif
 
 	mutex_lock(&h->reply_mutex);
-	while (list_empty(&h->reply_list) && (!read_from_thread || read_thread_exists(h)))
-		condvar_wait(&h->reply_condvar, &h->reply_mutex, h);
-	if (read_from_thread && !read_thread_exists(h)) {
+#ifdef USE_PTHREAD
+	while (list_empty(&h->reply_list) && read_from_thread && h->fd != -1)
+		condvar_wait(&h->reply_condvar, &h->reply_mutex);
+#endif
+	if (list_empty(&h->reply_list)) {
 		mutex_unlock(&h->reply_mutex);
 		errno = EINVAL;
 		return NULL;
 	}
-	assert(!list_empty(&h->reply_list));
 	msg = list_top(&h->reply_list, struct xs_stored_msg, list);
 	list_del(&msg->list);
 	assert(list_empty(&h->reply_list));
@@ -663,13 +662,22 @@ char **xs_read_watch(struct xs_handle *h, unsigned int *num)
 	struct xs_stored_msg *msg;
 	char **ret, *strings, c = 0;
 	unsigned int num_strings, i;
+	int read_from_thread;
+
+	read_from_thread = read_thread_exists(h);
+
+	/* Read from comms channel ourselves if there is no reader thread. */
+	if (!read_from_thread && (read_message(h) == -1))
+		return NULL;
 
 	mutex_lock(&h->watch_mutex);
 
 	/* Wait on the condition variable for a watch to fire. */
-	while (list_empty(&h->watch_list) && read_thread_exists(h))
-		condvar_wait(&h->watch_condvar, &h->watch_mutex, h);
-	if (!read_thread_exists(h)) {
+#ifdef USE_PTHREAD
+	while (list_empty(&h->watch_list) && read_from_thread && h->fd != -1)
+		condvar_wait(&h->watch_condvar, &h->watch_mutex);
+#endif
+	if (list_empty(&h->watch_list)) {
 		mutex_unlock(&h->watch_mutex);
 		errno = EINVAL;
 		return NULL;
@@ -965,21 +973,27 @@ error:
 static void *read_thread(void *arg)
 {
 	struct xs_handle *h = arg;
+	int fd;
 
 	while (read_message(h) != -1)
 		continue;
 
-	/* Kick anyone waiting for a reply */
-	pthread_mutex_lock(&h->request_mutex);
-	h->read_thr_exists = 0;
-	pthread_mutex_unlock(&h->request_mutex);
+	/* An error return from read_message leaves the socket in an undefined
+	 * state; we might have read only the header and not the message after
+	 * it, or (more commonly) the other end has closed the connection.
+	 * Since further communication is unsafe, close the socket.
+	 */
+	fd = h->fd;
+	h->fd = -1;
+	close(fd);
 
+	/* wake up all waiters */
 	pthread_mutex_lock(&h->reply_mutex);
-	pthread_cond_signal(&h->reply_condvar);
+	pthread_cond_broadcast(&h->reply_condvar);
 	pthread_mutex_unlock(&h->reply_mutex);
 
 	pthread_mutex_lock(&h->watch_mutex);
-	pthread_cond_signal(&h->watch_condvar);
+	pthread_cond_broadcast(&h->watch_condvar);
 	pthread_mutex_unlock(&h->watch_mutex);
 
 	return NULL;
