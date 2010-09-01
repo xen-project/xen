@@ -2621,7 +2621,7 @@ clear_mmio_p2m_entry(struct p2m_domain *p2m, unsigned long gfn)
 
     mfn = gfn_to_mfn(p2m, gfn, &t);
 
-    /* Do not use mfn_valid() here as MMIO pages are always above max_page */
+    /* Do not use mfn_valid() here as it will usually fail for MMIO pages. */
     if ( (INVALID_MFN == mfn_x(mfn)) || (t != p2m_mmio_direct) )
     {
         gdprintk(XENLOG_ERR,
