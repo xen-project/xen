@@ -35,7 +35,7 @@ struct page_info
     union {
         /* Each frame can be threaded onto a doubly-linked list.
          *
-         * For unused shadow pages, a list of pages of this order; 
+         * For unused shadow pages, a list of free shadow pages;
          * for multi-page shadows, links to the other pages in this shadow;
          * for pinnable shadows, if pinned, a list of all pinned shadows
          * (see sh_type_is_pinnable() for the definition of "pinnable" 
@@ -94,7 +94,7 @@ struct page_info
             __pdx_t back;
         } sh;
 
-        /* Page is on a free list (including shadow code free lists). */
+        /* Page is on a free list. */
         struct {
             /* Order-size of the free chunk this page is the head of. */
             unsigned int order;
@@ -258,9 +258,6 @@ struct spage_info
 #elif defined(__x86_64__)
 #define PRtype_info "016lx"/* should only be used for printk's */
 #endif
-
-/* The order of the largest allocation unit we use for shadow pages */
-#define SHADOW_MAX_ORDER 2 /* Need up to 16k allocs for 32-bit on PAE/64 */
 
 /* The number of out-of-sync shadows we allow per vcpu (prime, please) */
 #define SHADOW_OOS_PAGES 3

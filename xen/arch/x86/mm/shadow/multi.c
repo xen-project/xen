@@ -437,7 +437,6 @@ static inline mfn_t sh_next_page(mfn_t smfn)
 
     next = _mfn(pdx_to_pfn(pg->list.next));
 
-    /* XXX not for long */ ASSERT(mfn_x(next) == mfn_x(smfn) + 1);
     ASSERT(mfn_to_page(next)->u.sh.type == pg->u.sh.type);
     ASSERT(!mfn_to_page(next)->u.sh.head);
     return next;

@@ -97,8 +97,7 @@ struct shadow_domain {
     struct page_list_head pinned_shadows;
 
     /* Memory allocation */
-    struct page_list_head freelists[SHADOW_MAX_ORDER + 1];
-    struct page_list_head p2m_freelist;
+    struct page_list_head freelist;
     unsigned int      total_pages;  /* number of pages allocated */
     unsigned int      free_pages;   /* number of pages on freelists */
     unsigned int      p2m_pages;    /* number of pages allocates to p2m */
