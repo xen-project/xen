@@ -1377,7 +1377,7 @@ static void _shadow_prealloc(
 
     /* Stage one: walk the list of pinned pages, unpinning them */
     perfc_incr(shadow_prealloc_1);
-    page_list_for_each_safe_reverse(sp, t, &d->arch.paging.shadow.pinned_shadows)
+    foreach_pinned_shadow(d, sp, t)
     {
         smfn = page_to_mfn(sp);
 
@@ -1445,7 +1445,7 @@ static void shadow_blow_tables(struct domain *d)
     ASSERT(v != NULL);
 
     /* Pass one: unpin all pinned pages */
-    page_list_for_each_safe_reverse(sp, t, &d->arch.paging.shadow.pinned_shadows)
+    foreach_pinned_shadow(d, sp, t)
     {
         smfn = page_to_mfn(sp);
         sh_unpin(v, smfn);
@@ -1527,6 +1527,7 @@ mfn_t shadow_alloc(struct domain *d,
 {
     struct page_info *sp = NULL;
     unsigned int order = shadow_order(shadow_type);
+    struct page_list_head tmp_list;
     cpumask_t mask;
     void *p;
     int i;
@@ -1572,6 +1573,11 @@ mfn_t shadow_alloc(struct domain *d,
         break;
     }
 
+    /* Page lists don't have pointers back to the head structure, so
+     * it's safe to use a head structure on the stack to link the pages
+     * together. */
+    INIT_PAGE_LIST_HEAD(&tmp_list);
+
     /* Init page info fields and clear the pages */
     for ( i = 0; i < 1<<order ; i++ ) 
     {
@@ -1598,6 +1604,7 @@ mfn_t shadow_alloc(struct domain *d,
                             && i == 0 );
         sp[i].v.sh.back = backpointer;
         set_next_shadow(&sp[i], NULL);
+        page_list_add_tail(&sp[i], &tmp_list);
         perfc_incr(shadow_alloc_count);
     }
     return page_to_mfn(sp);
@@ -2668,10 +2675,7 @@ static int sh_remove_shadow_via_pointer(struct vcpu *v, mfn_t smfn)
 
     ASSERT(sp->u.sh.type > 0);
     ASSERT(sp->u.sh.type < SH_type_max_shadow);
-    ASSERT(sp->u.sh.type != SH_type_l2_32_shadow);
-    ASSERT(sp->u.sh.type != SH_type_l2_pae_shadow);
-    ASSERT(sp->u.sh.type != SH_type_l2h_pae_shadow);
-    ASSERT(sp->u.sh.type != SH_type_l4_64_shadow);
+    ASSERT(sh_type_has_up_pointer(v, sp->u.sh.type));
     
     if (sp->up == 0) return 0;
     pmfn = _mfn(sp->up >> PAGE_SHIFT);
@@ -2823,7 +2827,7 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
     }                                                                   \
     if ( sh_type_is_pinnable(v, t) )                                    \
         sh_unpin(v, smfn);                                              \
-    else                                                                \
+    else if ( sh_type_has_up_pointer(v, t) )                            \
         sh_remove_shadow_via_pointer(v, smfn);                          \
     if( !fast                                                           \
         && (pg->count_info & PGC_page_table)                            \

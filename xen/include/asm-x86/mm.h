@@ -35,13 +35,18 @@ struct page_info
     union {
         /* Each frame can be threaded onto a doubly-linked list.
          *
-         * For unused shadow pages, a list of pages of this order; for
-         * pinnable shadows, if pinned, a list of other pinned shadows
-         * (see sh_type_is_pinnable() below for the definition of
-         * "pinnable" shadow types).
+         * For unused shadow pages, a list of pages of this order; 
+         * for multi-page shadows, links to the other pages in this shadow;
+         * for pinnable shadows, if pinned, a list of all pinned shadows
+         * (see sh_type_is_pinnable() for the definition of "pinnable" 
+         * shadow types).  N.B. a shadow may be both pinnable and multi-page.
+         * In that case the pages are inserted in order in the list of
+         * pinned shadows and walkers of that list must be prepared 
+         * to keep them all together during updates. 
          */
         struct page_list_entry list;
-        /* For non-pinnable shadows, a higher entry that points at us. */
+        /* For non-pinnable single-page shadows, a higher entry that points
+         * at us. */
         paddr_t up;
         /* For shared/sharable pages the sharing handle */
         uint64_t shr_handle; 

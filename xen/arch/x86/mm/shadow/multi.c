@@ -1588,10 +1588,7 @@ sh_make_shadow(struct vcpu *v, mfn_t gmfn, u32 shadow_type)
     SHADOW_DEBUG(MAKE_SHADOW, "(%05lx, %u)=>%05lx\n",
                   mfn_x(gmfn), shadow_type, mfn_x(smfn));
 
-    if ( shadow_type != SH_type_l2_32_shadow 
-         && shadow_type != SH_type_l2_pae_shadow 
-         && shadow_type != SH_type_l2h_pae_shadow 
-         && shadow_type != SH_type_l4_64_shadow )
+    if ( sh_type_has_up_pointer(v, shadow_type) )
         /* Lower-level shadow, not yet linked form a higher level */
         mfn_to_page(smfn)->up = 0;
 
@@ -1622,7 +1619,10 @@ sh_make_shadow(struct vcpu *v, mfn_t gmfn, u32 shadow_type)
             page_list_for_each_safe(sp, t, &v->domain->arch.paging.shadow.pinned_shadows)
             {
                 if ( sp->u.sh.type == SH_type_l3_64_shadow )
+                {
                     sh_unpin(v, page_to_mfn(sp));
+                    sp->up = 0;
+                }
             }
             v->domain->arch.paging.shadow.opt_flags &= ~SHOPT_LINUX_L3_TOPLEVEL;
         }
@@ -2534,9 +2534,12 @@ int sh_safe_not_to_sync(struct vcpu *v, mfn_t gl1mfn)
     struct page_info *sp;
     mfn_t smfn;
 
+    if ( !sh_type_has_up_pointer(v, SH_type_l1_shadow) )
+        return 0;
+
     smfn = get_shadow_status(v, gl1mfn, SH_type_l1_shadow);
     ASSERT(mfn_valid(smfn)); /* Otherwise we would not have been called */
-    
+
     /* Up to l2 */
     sp = mfn_to_page(smfn);
     if ( sp->u.sh.count != 1 || !sp->up )
@@ -2547,6 +2550,7 @@ int sh_safe_not_to_sync(struct vcpu *v, mfn_t gl1mfn)
 #if (SHADOW_PAGING_LEVELS == 4) 
     /* up to l3 */
     sp = mfn_to_page(smfn);
+    ASSERT(sh_type_has_up_pointer(v, SH_type_l2_shadow));
     if ( sp->u.sh.count != 1 || !sp->up )
         return 0;
     smfn = _mfn(sp->up >> PAGE_SHIFT);
@@ -2555,17 +2559,10 @@ int sh_safe_not_to_sync(struct vcpu *v, mfn_t gl1mfn)
     /* up to l4 */
     sp = mfn_to_page(smfn);
     if ( sp->u.sh.count != 1
-         || sh_type_is_pinnable(v, SH_type_l3_64_shadow) || !sp->up )
+         || !sh_type_has_up_pointer(v, SH_type_l3_64_shadow) || !sp->up )
         return 0;
     smfn = _mfn(sp->up >> PAGE_SHIFT);
     ASSERT(mfn_valid(smfn));
-#endif
-
-#if (GUEST_PAGING_LEVELS == 2 && SHADOW_PAGING_LEVELS == 3)
-    /* In 2-on-3 shadow mode the up pointer contains the link to the
-     * shadow page, but the shadow_table contains only the first of the
-     * four pages that makes the PAE top shadow tables. */
-    smfn = _mfn(mfn_x(smfn) & ~0x3UL);
 #endif
 
     if ( pagetable_get_pfn(v->arch.shadow_table[0]) == mfn_x(smfn)
