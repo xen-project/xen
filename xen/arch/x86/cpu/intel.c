@@ -30,7 +30,7 @@ static unsigned int opt_cpuid_mask_ecx, opt_cpuid_mask_edx;
 integer_param("cpuid_mask_ecx", opt_cpuid_mask_ecx);
 integer_param("cpuid_mask_edx", opt_cpuid_mask_edx);
 
-static int use_xsave = 1;
+static int use_xsave;
 boolean_param("xsave", use_xsave);
 
 #ifdef CONFIG_X86_INTEL_USERCOPY
