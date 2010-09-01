@@ -688,9 +688,6 @@ __DEFINE_XEN_GUEST_HANDLE(uint64, uint64_t);
 
 #endif /* !__ASSEMBLY__ */
 
-/* Default definitions for macros used by domctl/sysctl. */
-#if defined(__XEN__) || defined(__XEN_TOOLS__)
-
 #ifndef uint64_aligned_t
 #define uint64_aligned_t uint64_t
 #endif
@@ -698,14 +695,12 @@ __DEFINE_XEN_GUEST_HANDLE(uint64, uint64_t);
 #define XEN_GUEST_HANDLE_64(name) XEN_GUEST_HANDLE(name)
 #endif
 
-#ifndef __ASSEMBLY__
+#if (defined(__XEN__) || defined(__XEN_TOOLS__)) && !defined(__ASSEMBLY__)
 struct xenctl_cpumap {
     XEN_GUEST_HANDLE_64(uint8) bitmap;
     uint32_t nr_cpus;
 };
 #endif
-
-#endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */
 
 #endif /* __XEN_PUBLIC_XEN_H__ */
 
