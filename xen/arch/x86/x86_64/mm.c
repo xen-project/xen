@@ -163,9 +163,15 @@ void *do_page_walk(struct vcpu *v, unsigned long addr)
 
 void __init pfn_pdx_hole_setup(unsigned long mask)
 {
-    unsigned int i, j, bottom_shift, hole_shift;
+    unsigned int i, j, bottom_shift = 0, hole_shift = 0;
 
-    for ( hole_shift = bottom_shift = j = 0; ; )
+    /*
+     * We skip the first MAX_ORDER bits, as we never want to compress them.
+     * This guarantees that page-pointer arithmetic remains valid within
+     * contiguous aligned ranges of 2^MAX_ORDER pages. Among others, our
+     * buddy allocator relies on this assumption.
+     */
+    for ( j = MAX_ORDER-1; ; )
     {
         i = find_next_zero_bit(&mask, BITS_PER_LONG, j);
         j = find_next_bit(&mask, BITS_PER_LONG, i);
