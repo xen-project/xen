@@ -1593,6 +1593,9 @@ mfn_t shadow_alloc(struct domain *d,
         sp[i].u.sh.type = shadow_type;
         sp[i].u.sh.pinned = 0;
         sp[i].u.sh.count = 0;
+        sp[i].u.sh.head = ( shadow_type >= SH_type_min_shadow 
+                            && shadow_type <= SH_type_max_shadow 
+                            && i == 0 );
         sp[i].v.sh.back = backpointer;
         set_next_shadow(&sp[i], NULL);
         perfc_incr(shadow_alloc_count);
@@ -1616,6 +1619,7 @@ void shadow_free(struct domain *d, mfn_t smfn)
     shadow_type = sp->u.sh.type;
     ASSERT(shadow_type != SH_type_none);
     ASSERT(shadow_type != SH_type_p2m_table);
+    ASSERT(sp->u.sh.head || (shadow_type > SH_type_max_shadow));
     order = shadow_order(shadow_type);
 
     d->arch.paging.shadow.free_pages += 1 << order;
@@ -1637,7 +1641,7 @@ void shadow_free(struct domain *d, mfn_t smfn)
         }
 #endif
         /* Strip out the type: this is now a free shadow page */
-        sp[i].u.sh.type = 0;
+        sp[i].u.sh.type = sp[i].u.sh.head = 0;
         /* Remember the TLB timestamp so we will know whether to flush 
          * TLBs when we reuse the page.  Because the destructors leave the
          * contents of the pages in place, we can delay TLB flushes until
@@ -1941,6 +1945,8 @@ static void sh_hash_audit_bucket(struct domain *d, int bucket)
         /* Bogus type? */
         BUG_ON( sp->u.sh.type == 0 );
         BUG_ON( sp->u.sh.type > SH_type_max_shadow );
+        /* Wrong page of a multi-page shadow? */
+        BUG_ON( !sp->u.sh.head );
         /* Wrong bucket? */
         BUG_ON( sh_hash(__backpointer(sp), sp->u.sh.type) != bucket );
         /* Duplicate entry? */

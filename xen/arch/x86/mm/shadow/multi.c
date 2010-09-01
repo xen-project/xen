@@ -94,6 +94,7 @@ get_fl1_shadow_status(struct vcpu *v, gfn_t gfn)
 /* Look for FL1 shadows in the hash table */
 {
     mfn_t smfn = shadow_hash_lookup(v, gfn_x(gfn), SH_type_fl1_shadow);
+    ASSERT(!mfn_valid(smfn) || mfn_to_page(smfn)->u.sh.head);
     return smfn;
 }
 
@@ -102,6 +103,7 @@ get_shadow_status(struct vcpu *v, mfn_t gmfn, u32 shadow_type)
 /* Look for shadows in the hash table */
 {
     mfn_t smfn = shadow_hash_lookup(v, mfn_x(gmfn), shadow_type);
+    ASSERT(!mfn_valid(smfn) || mfn_to_page(smfn)->u.sh.head);
     perfc_incr(shadow_get_shadow_status);
     return smfn;
 }
@@ -113,6 +115,7 @@ set_fl1_shadow_status(struct vcpu *v, gfn_t gfn, mfn_t smfn)
     SHADOW_PRINTK("gfn=%"SH_PRI_gfn", type=%08x, smfn=%05lx\n",
                    gfn_x(gfn), SH_type_fl1_shadow, mfn_x(smfn));
 
+    ASSERT(mfn_to_page(smfn)->u.sh.head);
     shadow_hash_insert(v, gfn_x(gfn), SH_type_fl1_shadow, smfn);
 }
 
@@ -126,6 +129,8 @@ set_shadow_status(struct vcpu *v, mfn_t gmfn, u32 shadow_type, mfn_t smfn)
     SHADOW_PRINTK("d=%d, v=%d, gmfn=%05lx, type=%08x, smfn=%05lx\n",
                    d->domain_id, v->vcpu_id, mfn_x(gmfn),
                    shadow_type, mfn_x(smfn));
+
+    ASSERT(mfn_to_page(smfn)->u.sh.head);
 
     /* 32-on-64 PV guests don't own their l4 pages so can't get_page them */
     if ( !is_pv_32on64_vcpu(v) || shadow_type != SH_type_l4_64_shadow )
@@ -143,6 +148,7 @@ delete_fl1_shadow_status(struct vcpu *v, gfn_t gfn, mfn_t smfn)
 {
     SHADOW_PRINTK("gfn=%"SH_PRI_gfn", type=%08x, smfn=%05lx\n",
                    gfn_x(gfn), SH_type_fl1_shadow, mfn_x(smfn));
+    ASSERT(mfn_to_page(smfn)->u.sh.head);
     shadow_hash_delete(v, gfn_x(gfn), SH_type_fl1_shadow, smfn);
 }
 
@@ -153,6 +159,7 @@ delete_shadow_status(struct vcpu *v, mfn_t gmfn, u32 shadow_type, mfn_t smfn)
     SHADOW_PRINTK("d=%d, v=%d, gmfn=%05lx, type=%08x, smfn=%05lx\n",
                    v->domain->domain_id, v->vcpu_id,
                    mfn_x(gmfn), shadow_type, mfn_x(smfn));
+    ASSERT(mfn_to_page(smfn)->u.sh.head);
     shadow_hash_delete(v, mfn_x(gmfn), shadow_type, smfn);
     /* 32-on-64 PV guests don't own their l4 pages; see set_shadow_status */
     if ( !is_pv_32on64_vcpu(v) || shadow_type != SH_type_l4_64_shadow )
@@ -432,6 +439,7 @@ static u32
 shadow_l1_index(mfn_t *smfn, u32 guest_index)
 {
 #if (GUEST_PAGING_LEVELS == 2)
+    ASSERT(mfn_to_page(*smfn)->u.sh.head);
     *smfn = _mfn(mfn_x(*smfn) +
                  (guest_index / SHADOW_L1_PAGETABLE_ENTRIES));
     return (guest_index % SHADOW_L1_PAGETABLE_ENTRIES);
@@ -444,6 +452,7 @@ static u32
 shadow_l2_index(mfn_t *smfn, u32 guest_index)
 {
 #if (GUEST_PAGING_LEVELS == 2)
+    ASSERT(mfn_to_page(*smfn)->u.sh.head);
     // Because we use 2 shadow l2 entries for each guest entry, the number of
     // guest entries per shadow page is SHADOW_L2_PAGETABLE_ENTRIES/2
     //
@@ -1023,6 +1032,7 @@ static int shadow_set_l2e(struct vcpu *v,
     if ( shadow_l2e_get_flags(new_sl2e) & _PAGE_PRESENT ) 
     {
         mfn_t sl1mfn = shadow_l2e_get_mfn(new_sl2e);
+        ASSERT(mfn_to_page(sl1mfn)->u.sh.head);
 
         /* About to install a new reference */
         if ( !sh_get_ref(v, sl1mfn, paddr) )
@@ -1033,13 +1043,15 @@ static int shadow_set_l2e(struct vcpu *v,
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
         {
             struct page_info *sp = mfn_to_page(sl1mfn);
-            mfn_t gl1mfn = backpointer(sp);
+            mfn_t gl1mfn;
 
+            ASSERT(sp->u.sh.head);
+            gl1mfn = backpointer(sp);
             /* If the shadow is a fl1 then the backpointer contains
                the GFN instead of the GMFN, and it's definitely not
                OOS. */
             if ( (sp->u.sh.type != SH_type_fl1_shadow) && mfn_valid(gl1mfn)
-                 && mfn_is_out_of_sync(gl1mfn) )
+                 && mfn_is_out_of_sync(gl1mfn) ) 
                 sh_resync(v, gl1mfn);
         }
 #endif
@@ -1993,15 +2005,17 @@ static shadow_l1e_t * shadow_get_and_create_l1e(struct vcpu *v,
 void sh_destroy_l4_shadow(struct vcpu *v, mfn_t smfn)
 {
     shadow_l4e_t *sl4e;
-    u32 t = mfn_to_page(smfn)->u.sh.type;
+    struct page_info *sp = mfn_to_page(smfn);
+    u32 t = sp->u.sh.type;
     mfn_t gmfn, sl4mfn;
 
     SHADOW_DEBUG(DESTROY_SHADOW,
                   "%s(%05lx)\n", __func__, mfn_x(smfn));
     ASSERT(t == SH_type_l4_shadow);
+    ASSERT(sp->u.sh.head);
 
     /* Record that the guest page isn't shadowed any more (in this type) */
-    gmfn = backpointer(mfn_to_page(smfn));
+    gmfn = backpointer(sp);
     delete_shadow_status(v, gmfn, t, smfn);
     shadow_demote(v, gmfn, t);
     /* Decrement refcounts of all the old entries */
@@ -2022,15 +2036,17 @@ void sh_destroy_l4_shadow(struct vcpu *v, mfn_t smfn)
 void sh_destroy_l3_shadow(struct vcpu *v, mfn_t smfn)
 {
     shadow_l3e_t *sl3e;
-    u32 t = mfn_to_page(smfn)->u.sh.type;
+    struct page_info *sp = mfn_to_page(smfn);
+    u32 t = sp->u.sh.type;
     mfn_t gmfn, sl3mfn;
 
     SHADOW_DEBUG(DESTROY_SHADOW,
                   "%s(%05lx)\n", __func__, mfn_x(smfn));
     ASSERT(t == SH_type_l3_shadow);
+    ASSERT(sp->u.sh.head);
 
     /* Record that the guest page isn't shadowed any more (in this type) */
-    gmfn = backpointer(mfn_to_page(smfn));
+    gmfn = backpointer(sp);
     delete_shadow_status(v, gmfn, t, smfn);
     shadow_demote(v, gmfn, t);
 
@@ -2052,7 +2068,8 @@ void sh_destroy_l3_shadow(struct vcpu *v, mfn_t smfn)
 void sh_destroy_l2_shadow(struct vcpu *v, mfn_t smfn)
 {
     shadow_l2e_t *sl2e;
-    u32 t = mfn_to_page(smfn)->u.sh.type;
+    struct page_info *sp = mfn_to_page(smfn);
+    u32 t = sp->u.sh.type;
     mfn_t gmfn, sl2mfn;
 
     SHADOW_DEBUG(DESTROY_SHADOW,
@@ -2063,9 +2080,10 @@ void sh_destroy_l2_shadow(struct vcpu *v, mfn_t smfn)
 #else
     ASSERT(t == SH_type_l2_shadow);
 #endif
+    ASSERT(sp->u.sh.head);
 
     /* Record that the guest page isn't shadowed any more (in this type) */
-    gmfn = backpointer(mfn_to_page(smfn));
+    gmfn = backpointer(sp);
     delete_shadow_status(v, gmfn, t, smfn);
     shadow_demote(v, gmfn, t);
 
@@ -2086,21 +2104,23 @@ void sh_destroy_l1_shadow(struct vcpu *v, mfn_t smfn)
 {
     struct domain *d = v->domain;
     shadow_l1e_t *sl1e;
-    u32 t = mfn_to_page(smfn)->u.sh.type;
+    struct page_info *sp = mfn_to_page(smfn);
+    u32 t = sp->u.sh.type;
 
     SHADOW_DEBUG(DESTROY_SHADOW,
                   "%s(%05lx)\n", __func__, mfn_x(smfn));
     ASSERT(t == SH_type_l1_shadow || t == SH_type_fl1_shadow);
+    ASSERT(sp->u.sh.head);
 
     /* Record that the guest page isn't shadowed any more (in this type) */
     if ( t == SH_type_fl1_shadow )
     {
-        gfn_t gfn = _gfn(mfn_to_page(smfn)->v.sh.back);
+        gfn_t gfn = _gfn(sp->v.sh.back);
         delete_fl1_shadow_status(v, gfn, smfn);
     }
     else 
     {
-        mfn_t gmfn = backpointer(mfn_to_page(smfn));
+        mfn_t gmfn = backpointer(sp);
         delete_shadow_status(v, gmfn, t, smfn);
         shadow_demote(v, gmfn, t);
     }
@@ -5160,6 +5180,7 @@ int sh_audit_l1_table(struct vcpu *v, mfn_t sl1mfn, mfn_t x)
     int done = 0;
     
     /* Follow the backpointer */
+    ASSERT(mfn_to_page(sl1mfn)->u.sh.head);
     gl1mfn = backpointer(mfn_to_page(sl1mfn));
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
@@ -5254,6 +5275,7 @@ int sh_audit_l2_table(struct vcpu *v, mfn_t sl2mfn, mfn_t x)
     int done = 0;
 
     /* Follow the backpointer */
+    ASSERT(mfn_to_page(sl2mfn)->u.sh.head);
     gl2mfn = backpointer(mfn_to_page(sl2mfn));
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
@@ -5303,6 +5325,7 @@ int sh_audit_l3_table(struct vcpu *v, mfn_t sl3mfn, mfn_t x)
     int done = 0;
 
     /* Follow the backpointer */
+    ASSERT(mfn_to_page(sl3mfn)->u.sh.head);
     gl3mfn = backpointer(mfn_to_page(sl3mfn));
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) 
@@ -5350,6 +5373,7 @@ int sh_audit_l4_table(struct vcpu *v, mfn_t sl4mfn, mfn_t x)
     int done = 0;
 
     /* Follow the backpointer */
+    ASSERT(mfn_to_page(sl4mfn)->u.sh.head);
     gl4mfn = backpointer(mfn_to_page(sl4mfn));
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) 
