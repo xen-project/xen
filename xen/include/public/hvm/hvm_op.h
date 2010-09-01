@@ -128,6 +128,8 @@ struct xen_hvm_set_mem_type {
 typedef struct xen_hvm_set_mem_type xen_hvm_set_mem_type_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_set_mem_type_t);
 
+#endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */
+
 /* Hint from PV drivers for pagetable destruction. */
 #define HVMOP_pagetable_dying        9
 struct xen_hvm_pagetable_dying {
@@ -154,7 +156,5 @@ struct xen_hvm_xentrace {
 };
 typedef struct xen_hvm_xentrace xen_hvm_xentrace_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_xentrace_t);
-
-#endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */
 
 #endif /* __XEN_PUBLIC_HVM_HVM_OP_H__ */
