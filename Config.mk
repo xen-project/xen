@@ -167,9 +167,9 @@ endif
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 1734e63891573d4729c71b5acc3b20eb637ad8fb
-# Thu Aug 19 18:10:43 2010 +0100
-# Allow -disable-opengl even if opengl support is not compiled in
+QEMU_TAG ?= 6add1c6c520ca65421256d5168b5d274f13942d3
+# Thu Sep 2 19:08:58 2010 +0100
+# passthrough: enabling IGD passthrough for Calpella and Sandybridge
 
 # Optional components
 XENSTAT_XENTOP     ?= y
