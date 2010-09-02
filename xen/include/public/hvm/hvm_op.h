@@ -135,8 +135,9 @@ DEFINE_XEN_GUEST_HANDLE(xen_hvm_set_mem_type_t);
 struct xen_hvm_pagetable_dying {
     /* Domain with a pagetable about to be destroyed. */
     domid_t  domid;
+    uint16_t pad[3]; /* align next field on 8-byte boundary */
     /* guest physical address of the toplevel pagetable dying */
-    uint64_aligned_t gpa;
+    uint64_t gpa;
 };
 typedef struct xen_hvm_pagetable_dying xen_hvm_pagetable_dying_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_pagetable_dying_t);
