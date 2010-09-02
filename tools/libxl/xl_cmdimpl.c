@@ -627,6 +627,9 @@ static void parse_config_data(const char *configfile_filename_report,
         b_info->cur_vcpus = (1 << l) - 1;
     }
 
+    if (!xlu_cfg_get_long (config, "maxvcpus", &l))
+        b_info->max_vcpus = l;
+
     if (!xlu_cfg_get_long (config, "memory", &l)) {
         b_info->max_memkb = l * 1024;
         b_info->target_memkb = b_info->max_memkb;
