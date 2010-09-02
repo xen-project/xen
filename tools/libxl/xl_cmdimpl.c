@@ -2721,11 +2721,14 @@ int main_restore(int argc, char **argv)
     char *checkpoint_file = NULL;
     char *config_file = NULL;
     struct domain_create dom_info;
-    int paused = 0, debug = 0, daemonize = 1;
+    int paused = 0, debug = 0, daemonize = 1, console_autoconnect = 0;
     int opt, rc;
 
-    while ((opt = getopt(argc, argv, "hpde")) != -1) {
+    while ((opt = getopt(argc, argv, "chpde")) != -1) {
         switch (opt) {
+        case 'c':
+            console_autoconnect = 1;
+            break;
         case 'p':
             paused = 1;
             break;
@@ -2761,6 +2764,7 @@ int main_restore(int argc, char **argv)
     dom_info.config_file = config_file;
     dom_info.restore_file = checkpoint_file;
     dom_info.migrate_fd = -1;
+    dom_info.console_autoconnect = console_autoconnect;
 
     rc = create_domain(&dom_info);
     if (rc < 0)
