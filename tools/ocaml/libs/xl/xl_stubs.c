@@ -131,6 +131,7 @@ static int domain_create_info_val (caml_gc *gc, libxl_domain_create_info *c_val,
 {
 	CAMLparam1(v);
 	CAMLlocal1(a);
+	uint8_t *uuid = libxl_uuid_bytearray(&c_val->uuid);
 	int i;
 
 	c_val->hvm = Bool_val(Field(v, 0));
@@ -140,7 +141,7 @@ static int domain_create_info_val (caml_gc *gc, libxl_domain_create_info *c_val,
 	c_val->name = dup_String_val(gc, Field(v, 4));
 	a = Field(v, 5);
 	for (i = 0; i < 16; i++)
-		c_val->uuid[i] = Int_val(Field(a, i));
+		uuid[i] = Int_val(Field(a, i));
 	string_string_tuple_array_val(gc, &(c_val->xsdata), Field(v, 6));
 	string_string_tuple_array_val(gc, &(c_val->platformdata), Field(v, 7));
 

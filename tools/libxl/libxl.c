@@ -131,7 +131,7 @@ int libxl_domain_make(libxl_ctx *ctx, libxl_domain_create_info *info,
     *domid = -1;
 
     /* Ultimately, handle is an array of 16 uint8_t, same as uuid */
-    memcpy(handle, info->uuid, sizeof(xen_domain_handle_t));
+    libxl_uuid_copy((libxl_uuid *)handle, &info->uuid);
 
     ret = xc_domain_create(ctx->xch, info->ssidref, handle, flags, domid);
     if (ret < 0) {
@@ -1506,8 +1506,8 @@ static int libxl_create_stubdom(libxl_ctx *ctx,
     memset(&c_info, 0x00, sizeof(libxl_domain_create_info));
     c_info.hvm = 0;
     c_info.name = libxl_sprintf(&gc, "%s-dm", _libxl_domid_to_name(&gc, info->domid));
-    for (i = 0; i < 16; i++)
-        c_info.uuid[i] = info->uuid[i];
+
+    libxl_uuid_copy(&c_info.uuid, &info->uuid);
 
     memset(&b_info, 0x00, sizeof(libxl_domain_build_info));
     b_info.max_vcpus = 1;

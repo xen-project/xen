@@ -16,6 +16,9 @@ CFLAGS += -I. -fPIC
 CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) $(CFLAGS_libxenstore) $(CFLAGS_libblktapctl)
 
 LIBS = $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore) $(LDLIBS_libblktapctl) $(UTIL_LIBS)
+ifeq ($(CONFIG_Linux),y)
+LIBS += -luuid
+endif
 
 LIBXL_OBJS-y = osdeps.o libxl_paths.o libxl_bootloader.o
 ifeq ($(LIBXL_BLKTAP),y)

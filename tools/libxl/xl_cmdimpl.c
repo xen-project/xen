@@ -286,19 +286,12 @@ static void init_build_info(libxl_domain_build_info *b_info, libxl_domain_create
     }
 }
 
-static void random_uuid(libxl_uuid *uuid)
-{
-    int i;
-    for (i = 0; i < 16; i++)
-        (*uuid)[i] = rand();
-}
-
 static void init_dm_info(libxl_device_model_info *dm_info,
         libxl_domain_create_info *c_info, libxl_domain_build_info *b_info)
 {
     memset(dm_info, '\0', sizeof(*dm_info));
 
-    random_uuid(&dm_info->uuid);
+    libxl_uuid_generate(&dm_info->uuid);
 
     dm_info->dom_name = c_info->name;
     dm_info->device_model = "qemu-dm";
@@ -325,6 +318,11 @@ static void init_dm_info(libxl_device_model_info *dm_info,
 
 static void init_nic_info(libxl_device_nic *nic_info, int devnum)
 {
+    const uint8_t *r;
+    libxl_uuid uuid;
+
+    libxl_uuid_generate(&uuid);
+    r = libxl_uuid_bytearray(&uuid);
     memset(nic_info, '\0', sizeof(*nic_info));
 
     nic_info->backend_domid = 0;
@@ -335,9 +333,9 @@ static void init_nic_info(libxl_device_nic *nic_info, int devnum)
     nic_info->mac[0] = 0x00;
     nic_info->mac[1] = 0x16;
     nic_info->mac[2] = 0x3e;
-    nic_info->mac[3] = 1 + (int) (0x7f * (rand() / (RAND_MAX + 1.0)));
-    nic_info->mac[4] = 1 + (int) (0xff * (rand() / (RAND_MAX + 1.0)));
-    nic_info->mac[5] = 1 + (int) (0xff * (rand() / (RAND_MAX + 1.0)));
+    nic_info->mac[3] = r[0] & 0x7f;
+    nic_info->mac[4] = r[1];
+    nic_info->mac[5] = r[2];
     nic_info->ifname = NULL;
     nic_info->bridge = strdup("xenbr0");
     CHK_ERRNO( asprintf(&nic_info->script, "%s/vif-bridge",
@@ -347,21 +345,26 @@ static void init_nic_info(libxl_device_nic *nic_info, int devnum)
 
 static void init_net2_info(libxl_device_net2 *net2_info, int devnum)
 {
+    const uint8_t *r;
+    libxl_uuid uuid;
+
+    libxl_uuid_generate(&uuid);
+    r = libxl_uuid_bytearray(&uuid);
     memset(net2_info, '\0', sizeof(*net2_info));
 
     net2_info->devid = devnum;
     net2_info->front_mac[0] = 0x00;
     net2_info->front_mac[1] = 0x16;
     net2_info->front_mac[2] = 0x3e;;
-    net2_info->front_mac[3] = 1 + (int) (0x7f * (rand() / (RAND_MAX + 1.0)));
-    net2_info->front_mac[4] = 1 + (int) (0xff * (rand() / (RAND_MAX + 1.0)));
-    net2_info->front_mac[5] = 1 + (int) (0xff * (rand() / (RAND_MAX + 1.0)));
+    net2_info->front_mac[3] = 0x7f & r[0];
+    net2_info->front_mac[4] = r[1];
+    net2_info->front_mac[5] = r[2];
     net2_info->back_mac[0] = 0x00;
     net2_info->back_mac[1] = 0x16;
     net2_info->back_mac[2] = 0x3e;
-    net2_info->back_mac[3] = 1 + (int) (0x7f * (rand() / (RAND_MAX + 1.0)));
-    net2_info->back_mac[4] = 1 + (int) (0xff * (rand() / (RAND_MAX + 1.0)));
-    net2_info->back_mac[5] = 1 + (int) (0xff * (rand() / (RAND_MAX + 1.0)));
+    net2_info->back_mac[3] = 0x7f & r[3];
+    net2_info->back_mac[4] = r[4];
+    net2_info->back_mac[5] = r[5];
     net2_info->back_trusted = 1;
     net2_info->filter_mac = 1;
     net2_info->max_bypasses = 5;
@@ -604,8 +607,16 @@ static void parse_config_data(const char *configfile_filename_report,
         c_info->name = strdup(buf);
     else
         c_info->name = "test";
-    random_uuid(&c_info->uuid);
 
+    if (!xlu_cfg_get_string (config, "uuid", &buf) ) {
+        if ( libxl_uuid_from_string(&c_info->uuid, buf) ) {
+            fprintf(stderr, "Failed to parse UUID: %s\n", buf);
+            exit(1);
+        }
+    }else{
+        libxl_uuid_generate(&c_info->uuid);
+    }
+ 
     if (!xlu_cfg_get_long(config, "oos", &l))
         c_info->oos = l;
 
@@ -1209,7 +1220,7 @@ static int preserve_domain(libxl_ctx *ctx, uint32_t domid, libxl_event *event,
         return 0;
     }
 
-    random_uuid(&new_uuid);
+    libxl_uuid_generate(&new_uuid);
 
     LOG("Preserving domain %d %s with suffix%s", domid, d_config->c_info.name, stime);
     rc = libxl_domain_preserve(ctx, domid, &d_config->c_info, stime, new_uuid);

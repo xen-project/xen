@@ -74,8 +74,6 @@ int main(int argc, char **argv)
     argc -= optind;
     optind = 1;
 
-    srand(time(0));
-
     cspec = cmdtable_lookup(cmd);
     if (cspec)
         ret = cspec->cmd_impl(argc, argv);
