@@ -1080,39 +1080,20 @@ static void *xrealloc(void *ptr, size_t sz) {
     return r;
 }
 
-static int autoconnect_console(int hvm)
+static pid_t autoconnect_console(void)
 {
-    int status, options;
-    pid_t pid, r;
+    pid_t pid;
 
-    /*
-     * Fork for xenconsole. We exec xenconsole in the foreground
-     * process allowing it to retain the tty. xl continues in the
-     * child. The xenconsole client uses a xenstore watch to wait for
-     * the console to be setup so there is no race.
-     */
     pid = fork();
     if (pid < 0) {
         perror("unable to fork xenconsole");
         return ERROR_FAIL;
-    } else if (pid == 0)
-        return 0;
+    } else if (pid > 0)
+        return pid;
 
-    /*
-     * In the PV case we only catch failure of the create process, in
-     * the HVM case we also wait for the creation process to be
-     * completed so that the stubdom is already up and running and we
-     * can connect to it.
-     */
-    if (hvm)
-        options = 0;
-    else
-        options = WNOHANG;
+    libxl_ctx_postfork(&ctx);
+
     sleep(1);
-    r = waitpid(pid, &status, options);
-    if (r > 0 && WIFEXITED(status) && WEXITSTATUS(status) != 0)
-        _exit(WEXITSTATUS(status));
-
     libxl_primary_console_exec(&ctx, domid);
     /* Do not return. xl continued in child process */
     fprintf(stderr, "Unable to attach console\n");
@@ -1268,6 +1249,8 @@ static int create_domain(struct domain_create *dom_info)
     int config_len = 0;
     int restore_fd = -1;
     struct save_file_header hdr;
+    pid_t child_console_pid = -1;
+    int status = 0;
 
     memset(&d_config, 0x00, sizeof(d_config));
     memset(&dm_info, 0x00, sizeof(dm_info));
@@ -1413,17 +1396,11 @@ start:
         goto error_out;
     }
 
-    if (dom_info->console_autoconnect) {
-        ret = autoconnect_console(d_config.c_info.hvm);
-        if (ret)
+    if (dom_info->console_autoconnect && !d_config.c_info.hvm) {
+        child_console_pid = autoconnect_console();
+        if (child_console_pid < 0)
             goto error_out;
     }
-
-    /*
-     * Do not attempt to reconnect if we come round again due to a
-     * guest reboot -- the stdin/out will be disconnected by then.
-     */
-    dom_info->console_autoconnect = 0;
 
     ret = libxl_run_bootloader(&ctx, &d_config.b_info, d_config.num_disks > 0 ? &d_config.disks[0] : NULL, domid);
     if (ret) {
@@ -1506,6 +1483,12 @@ start:
     for (i = 0; i < d_config.num_pcidevs; i++)
         libxl_device_pci_add(&ctx, domid, &d_config.pcidevs[i]);
 
+    if (dom_info->console_autoconnect && d_config.c_info.hvm) {
+        child_console_pid = autoconnect_console();
+        if (child_console_pid < 0)
+            goto error_out;
+    }
+
     if (!paused)
         libxl_domain_unpause(&ctx, domid);
 
@@ -1520,7 +1503,6 @@ start:
 
         child1 = libxl_fork(&ctx);
         if (child1) {
-            int status;
             for (;;) {
                 got_child = waitpid(child1, &status, 0);
                 if (got_child == child1) break;
@@ -1537,7 +1519,8 @@ start:
                 ret = ERROR_FAIL;
                 goto error_out;
             }
-            return domid; /* caller gets success in parent */
+            ret = domid;
+            goto waitpid_out;
         }
 
         rc = libxl_ctx_postfork(&ctx);
@@ -1613,6 +1596,13 @@ start:
                         libxl_free_waiter(w2);
                         free(w1);
                         free(w2);
+
+                        /*
+                         * Do not attempt to reconnect if we come round again due to a
+                         * guest reboot -- the stdin/out will be disconnected by then.
+                         */
+                        dom_info->console_autoconnect = 0;
+
                         /*
                          * XXX FIXME: If this sleep is not there then domain
                          * re-creation fails sometimes.
@@ -1649,6 +1639,10 @@ out:
 
     free(config_data);
 
+waitpid_out:
+    if (child_console_pid > 0 &&
+            waitpid(child_console_pid, &status, 0) < 0 && errno == EINTR)
+        goto waitpid_out;
     return ret;
 }
 
