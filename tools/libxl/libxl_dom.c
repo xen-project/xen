@@ -378,9 +378,7 @@ int core_suspend(libxl_ctx *ctx, uint32_t domid, int fd,
     if (si.xce > 0) {
         port = xs_suspend_evtchn_port(si.domid);
 
-        if (port < 0) {
-            XL_LOG(ctx, XL_LOG_WARNING, "Failed to get the suspend evtchn port");
-        } else {
+        if (port >= 0) {
             si.suspend_eventchn = xc_suspend_evtchn_init(ctx->xch, si.xce, si.domid, port);
 
             if (si.suspend_eventchn < 0)
