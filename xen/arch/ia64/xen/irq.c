@@ -85,7 +85,7 @@ irq_desc_t irq_desc[NR_IRQS] = {
 struct irq_cfg irq_cfg[NR_IRQS] = {
     [0 ... NR_IRQS-1] ={
         .vector = -1,
-        .domain = CPU_MASK_ALL,
+        .cpu_mask = CPU_MASK_ALL,
 }
 };
 
