@@ -100,7 +100,8 @@
 #define machine_to_phys_mapping ((unsigned long *)MACH2PHYS_VIRT_START)
 #endif
 
-/* 32-/64-bit invariability. */
+/* 32-/64-bit invariability for control interfaces (domctl/sysctl). */
+#if defined(__XEN__) || defined(__XEN_TOOLS__)
 #undef ___DEFINE_XEN_GUEST_HANDLE
 #define ___DEFINE_XEN_GUEST_HANDLE(name, type)                  \
     typedef struct { type *p; }                                 \
@@ -115,6 +116,7 @@
 #define uint64_aligned_t uint64_t __attribute__((aligned(8)))
 #define __XEN_GUEST_HANDLE_64(name) __guest_handle_64_ ## name
 #define XEN_GUEST_HANDLE_64(name) __XEN_GUEST_HANDLE_64(name)
+#endif
 
 #ifndef __ASSEMBLY__
 
