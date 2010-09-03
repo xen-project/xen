@@ -277,7 +277,15 @@ def restore(xd, fd, dominfo = None, paused = False, relocating = False):
         # set memory limit
         xc.domain_setmaxmem(dominfo.getDomid(), maxmem)
 
-        balloon.free(memory + shadow, dominfo)
+        vtd_mem = 0
+        info = xc.physinfo()
+        if 'hvm_directio' in info['virt_caps']:
+            # Reserve 1 page per MiB of RAM for separate VT-d page table.
+            vtd_mem = 4 * (dominfo.info['memory_static_max'] / 1024 / 1024)
+            # Round vtd_mem up to a multiple of a MiB.
+            vtd_mem = ((vtd_mem + 1023) / 1024) * 1024
+
+        balloon.free(memory + shadow + vtd_mem, dominfo)
 
         shadow_cur = xc.shadow_mem_control(dominfo.getDomid(), shadow / 1024)
         dominfo.info['shadow_memory'] = shadow_cur
