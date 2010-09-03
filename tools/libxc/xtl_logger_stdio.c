@@ -108,9 +108,12 @@ static void stdiostream_progress(struct xentoollog_logger *logger_in,
     if (lg->progress_erase_len)
         putc('\r', lg->f);
 
-    newpel = fprintf(lg->f, "%s%s" "%s: %lu/%lu  %3d%%",
+    lg->progress_last_percent = percent;
+
+    newpel = fprintf(lg->f, "%s%s" "%s: %lu/%lu  %3d%%%s",
                      context?context:"", context?": ":"",
-                     doing_what, done, total, percent);
+                     doing_what, done, total, percent,
+		     done == total ? "\n" : "");
 
     extra_erase = lg->progress_erase_len - newpel;
     if (extra_erase > 0)

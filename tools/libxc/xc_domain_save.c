@@ -1461,6 +1461,8 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
       skip:
 
+        xc_report_progress_step(xch, dinfo->p2m_size, dinfo->p2m_size);
+
         total_sent += sent_this_iter;
 
         if ( last_iter )
