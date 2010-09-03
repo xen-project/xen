@@ -861,7 +861,7 @@ static xen_pfn_t *map_and_save_p2m_table(xc_interface *xch,
 /* must be done AFTER suspend_and_state() */
 static int save_tsc_info(xc_interface *xch, uint32_t dom, int io_fd)
 {
-    int marker = -7;
+    int marker = XC_SAVE_ID_TSC_INFO;
     uint32_t tsc_mode, khz, incarn;
     uint64_t nsec;
 
@@ -1142,7 +1142,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
     print_stats(xch, dom, 0, &stats, 0);
 
-    tmem_saved = xc_tmem_save(xch, dom, io_fd, live, -5);
+    tmem_saved = xc_tmem_save(xch, dom, io_fd, live, XC_SAVE_ID_TMEM);
     if ( tmem_saved == -1 )
     {
         PERROR("Error when writing to state file (tmem)");
@@ -1474,13 +1474,13 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
         if ( last_iter && debug )
         {
-            int minusone = -1;
+            int id = XC_SAVE_ID_ENABLE_VERIFY_MODE;
             memset(to_send, 0xff, BITMAP_SIZE);
             debug = 0;
             DPRINTF("Entering debug resend-all mode\n");
 
             /* send "-1" to put receiver into debug mode */
-            if ( wrexact(io_fd, &minusone, sizeof(int)) )
+            if ( wrexact(io_fd, &id, sizeof(int)) )
             {
                 PERROR("Error when writing to state file (6)");
                 goto out;
@@ -1511,7 +1511,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
                 DPRINTF("SUSPEND shinfo %08lx\n", info.shared_info_frame);
                 if ( (tmem_saved > 0) &&
-                     (xc_tmem_save_extra(xch,dom,io_fd,-6) == -1) )
+                     (xc_tmem_save_extra(xch,dom,io_fd,XC_SAVE_ID_TMEM_EXTRA) == -1) )
                 {
                         PERROR("Error when writing to state file (tmem)");
                         goto out;
@@ -1545,10 +1545,10 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
     {
         struct {
-            int minustwo;
+            int id;
             int max_vcpu_id;
             uint64_t vcpumap;
-        } chunk = { -2, info.max_vcpu_id };
+        } chunk = { XC_SAVE_ID_VCPU_INFO, info.max_vcpu_id };
 
         if ( info.max_vcpu_id >= 64 )
         {
@@ -1580,7 +1580,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
             uint64_t data;
         } chunk = { 0, };
 
-        chunk.id = -3;
+        chunk.id = XC_SAVE_ID_HVM_IDENT_PT;
         xc_get_hvm_param(xch, dom, HVM_PARAM_IDENT_PT,
                          (unsigned long *)&chunk.data);
 
@@ -1591,7 +1591,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
             goto out;
         }
 
-        chunk.id = -4;
+        chunk.id = XC_SAVE_ID_HVM_VM86_TSS;
         xc_get_hvm_param(xch, dom, HVM_PARAM_VM86_TSS,
                          (unsigned long *)&chunk.data);
 
@@ -1602,7 +1602,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
             goto out;
         }
 
-        chunk.id = -8;
+        chunk.id = XC_SAVE_ID_HVM_CONSOLE_PFN;
         xc_get_hvm_param(xch, dom, HVM_PARAM_CONSOLE_PFN,
                          (unsigned long *)&chunk.data);
 

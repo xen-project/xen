@@ -1,5 +1,5 @@
 /*
- * Defintions and utilities for save / restore.
+ * Definitions and utilities for save / restore.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,6 +20,117 @@
 
 #include <xen/foreign/x86_32.h>
 #include <xen/foreign/x86_64.h>
+
+/*
+ * SAVE/RESTORE/MIGRATE PROTOCOL
+ * =============================
+ *
+ * The general form of a stream of chunks is a header followed by a
+ * body consisting of a variable number of chunks (terminated by a
+ * chunk with type 0) followed by a trailer.
+ *
+ * For a rolling/checkpoint (e.g. remus) migration then the body and
+ * trailer phases can be repeated until an external event
+ * (e.g. failure) causes the process to terminate and commit to the
+ * most recent complete checkpoint.
+ *
+ * HEADER
+ * ------
+ *
+ * unsigned long        : p2m_size
+ *
+ * extended-info (PV-only, optional):
+ *
+ *   If first unsigned long == ~0UL then extended info is present,
+ *   otherwise unsigned long is part of p2m. Note that p2m_size above
+ *   does not include the length of the extended info.
+ *
+ *   extended-info:
+ *
+ *     unsigned long    : signature == ~0UL
+ *     uint32_t	        : number of bytes remaining in extended-info
+ *
+ *     1 or more extended-info blocks of form:
+ *     char[4]          : block identifier
+ *     uint32_t         : block data size
+ *     bytes            : block data
+ *
+ *     defined extended-info blocks:
+ *     "vcpu"		: VCPU context info containing vcpu_guest_context_t.
+ *                        The precise variant of the context structure
+ *                        (e.g. 32 vs 64 bit) is distinguished by
+ *                        the block size.
+ *     "extv"           : Presence indicates use of extended VCPU context in
+ *                        tail, data size is 0.
+ *
+ * p2m (PV-only):
+ *
+ *   consists of p2m_size bytes comprising an array of xen_pfn_t sized entries.
+ *
+ * BODY PHASE
+ * ----------
+ *
+ * A series of chunks with a common header:
+ *   int              : chunk type
+ *
+ * If the chunk type is +ve then chunk contains guest memory data, and the
+ * type contains the number of pages in the batch:
+ *
+ *     unsigned long[]  : PFN array, length == number of pages in batch
+ *                        Each entry consists of XEN_DOMCTL_PFINFO_*
+ *                        in bits 31-28 and the PFN number in bits 27-0.
+ *     page data        : PAGE_SIZE bytes for each page marked present in PFN
+ *                        array
+ *
+ * If the chunk type is -ve then chunk consists of one of a number of
+ * metadata types.  See definitions of XC_SAVE_ID_* below.
+ *
+ * If chunk type is 0 then body phase is complete.
+ *
+ * TAIL PHASE
+ * ----------
+ *
+ * Content differs for PV and HVM guests.
+ *
+ * HVM TAIL:
+ *
+ *  "Magic" pages:
+ *     uint64_t         : I/O req PFN
+ *     uint64_t         : Buffered I/O req PFN
+ *     uint64_t         : Store PFN
+ *  Xen HVM Context:
+ *     uint32_t         : Length of context in bytes
+ *     bytes            : Context data
+ *  Qemu context:
+ *     char[21]         : Signature:
+ *       "QemuDeviceModelRecord" : Read Qemu save data until EOF
+ *       "RemusDeviceModelState" : uint32_t length field followed by that many
+ *                                 bytes of Qemu save data
+ *
+ * PV TAIL:
+ *
+ *  Unmapped PFN list   : list of all the PFNs that were not in map at the close
+ *     unsigned int     : Number of unmapped pages
+ *     unsigned long[]  : PFNs of unmapped pages
+ *
+ *  VCPU context data   : A series of VCPU records, one per present VCPU
+ *                        Maximum and present map supplied in XC_SAVE_ID_VCPUINFO
+ *     bytes:           : VCPU context structure. Size is determined by size
+ *                        provided in extended-info header
+ *     bytes[128]       : Extended VCPU context (present IFF "extv" block
+ *                        present in extended-info header)
+ *
+ *  Shared Info Page    : 4096 bytes of shared info page
+ */
+
+#define XC_SAVE_ID_ENABLE_VERIFY_MODE -1 /* Switch to validation phase. */
+#define XC_SAVE_ID_VCPU_INFO          -2 /* Additional VCPU info */
+#define XC_SAVE_ID_HVM_IDENT_PT       -3 /* (HVM-only) */
+#define XC_SAVE_ID_HVM_VM86_TSS       -4 /* (HVM-only) */
+#define XC_SAVE_ID_TMEM               -5
+#define XC_SAVE_ID_TMEM_EXTRA         -6
+#define XC_SAVE_ID_TSC_INFO           -7
+#define XC_SAVE_ID_HVM_CONSOLE_PFN    -8 /* (HVM-only) */
 
 /*
 ** We process save/restore/migrate in batches of pages; the below
