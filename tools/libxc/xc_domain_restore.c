@@ -680,14 +680,18 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
 
     // DPRINTF("reading batch of %d pages\n", count);
 
-    if (!count) {
+    switch ( count )
+    {
+    case 0:
         // DPRINTF("Last batch read\n");
         return 0;
-    } else if (count == XC_SAVE_ID_ENABLE_VERIFY_MODE) {
+
+    case XC_SAVE_ID_ENABLE_VERIFY_MODE:
         DPRINTF("Entering page verify mode\n");
         buf->verify = 1;
         return pagebuf_get_one(xch, ctx, buf, fd, dom);
-    } else if (count == XC_SAVE_ID_VCPU_INFO) {
+
+    case XC_SAVE_ID_VCPU_INFO:
         buf->new_ctxt_format = 1;
         if ( RDEXACT(fd, &buf->max_vcpu_id, sizeof(buf->max_vcpu_id)) ||
              buf->max_vcpu_id >= 64 || RDEXACT(fd, &buf->vcpumap,
@@ -697,7 +701,8 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
         }
         // DPRINTF("Max VCPU ID: %d, vcpumap: %llx\n", buf->max_vcpu_id, buf->vcpumap);
         return pagebuf_get_one(xch, ctx, buf, fd, dom);
-    } else if (count == XC_SAVE_ID_HVM_IDENT_PT) {
+
+    case XC_SAVE_ID_HVM_IDENT_PT:
         /* Skip padding 4 bytes then read the EPT identity PT location. */
         if ( RDEXACT(fd, &buf->identpt, sizeof(uint32_t)) ||
              RDEXACT(fd, &buf->identpt, sizeof(uint64_t)) )
@@ -707,7 +712,8 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
         }
         // DPRINTF("EPT identity map address: %llx\n", buf->identpt);
         return pagebuf_get_one(xch, ctx, buf, fd, dom);
-    } else if ( count == XC_SAVE_ID_HVM_VM86_TSS )  {
+
+    case XC_SAVE_ID_HVM_VM86_TSS:
         /* Skip padding 4 bytes then read the vm86 TSS location. */
         if ( RDEXACT(fd, &buf->vm86_tss, sizeof(uint32_t)) ||
              RDEXACT(fd, &buf->vm86_tss, sizeof(uint64_t)) )
@@ -717,21 +723,24 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
         }
         // DPRINTF("VM86 TSS location: %llx\n", buf->vm86_tss);
         return pagebuf_get_one(xch, ctx, buf, fd, dom);
-    } else if ( count == XC_SAVE_ID_TMEM ) {
+
+    case XC_SAVE_ID_TMEM:
         DPRINTF("xc_domain_restore start tmem\n");
         if ( xc_tmem_restore(xch, dom, fd) ) {
             PERROR("error reading/restoring tmem");
             return -1;
         }
         return pagebuf_get_one(xch, ctx, buf, fd, dom);
-    }
-    else if ( count == XC_SAVE_ID_TMEM_EXTRA ) {
+
+    case XC_SAVE_ID_TMEM_EXTRA:
         if ( xc_tmem_restore_extra(xch, dom, fd) ) {
             PERROR("error reading/restoring tmem extra");
             return -1;
         }
         return pagebuf_get_one(xch, ctx, buf, fd, dom);
-    } else if ( count == XC_SAVE_ID_TSC_INFO ) {
+
+    case XC_SAVE_ID_TSC_INFO:
+    {
         uint32_t tsc_mode, khz, incarn;
         uint64_t nsec;
         if ( RDEXACT(fd, &tsc_mode, sizeof(uint32_t)) ||
@@ -743,7 +752,9 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
             return -1;
         }
         return pagebuf_get_one(xch, ctx, buf, fd, dom);
-    } else if (count == XC_SAVE_ID_HVM_CONSOLE_PFN ) {
+    }
+
+    case XC_SAVE_ID_HVM_CONSOLE_PFN :
         /* Skip padding 4 bytes then read the console pfn location. */
         if ( RDEXACT(fd, &buf->console_pfn, sizeof(uint32_t)) ||
              RDEXACT(fd, &buf->console_pfn, sizeof(uint64_t)) )
@@ -753,10 +764,14 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
         }
         // DPRINTF("console pfn location: %llx\n", buf->console_pfn);
         return pagebuf_get_one(xch, ctx, buf, fd, dom);
-    } else if ( (count > MAX_BATCH_SIZE) || (count < 0) ) {
-        ERROR("Max batch size exceeded (%d). Giving up.", count);
-        errno = EMSGSIZE;
-        return -1;
+
+    default:
+        if ( (count > MAX_BATCH_SIZE) || (count < 0) ) {
+            ERROR("Max batch size exceeded (%d). Giving up.", count);
+            errno = EMSGSIZE;
+            return -1;
+        }
+        break;
     }
 
     oldcount = buf->nr_pages;
