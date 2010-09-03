@@ -1402,10 +1402,12 @@ start:
             goto error_out;
     }
 
-    ret = libxl_run_bootloader(&ctx, &d_config.b_info, d_config.num_disks > 0 ? &d_config.disks[0] : NULL, domid);
-    if (ret) {
-        fprintf(stderr, "failed to run bootloader: %d\n", ret);
-        goto error_out;
+    if (!restore_file) {
+        ret = libxl_run_bootloader(&ctx, &d_config.b_info, d_config.num_disks > 0 ? &d_config.disks[0] : NULL, domid);
+        if (ret) {
+            fprintf(stderr, "failed to run bootloader: %d\n", ret);
+            goto error_out;
+        }
     }
 
     if (!restore_file || !need_daemon) {
