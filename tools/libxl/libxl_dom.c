@@ -466,8 +466,8 @@ static const char *userdata_path(libxl_gc *gc, uint32_t domid,
     uuid_string = libxl_sprintf(gc, LIBXL_UUID_FMT, LIBXL_UUID_BYTES(info.uuid));
 
     path = libxl_sprintf(gc, "/var/lib/xen/"
-                         "userdata-%s.%s.%s",
-                         wh, uuid_string, userdata_userid);
+                         "userdata-%s.%u.%s.%s",
+                         wh, domid, uuid_string, userdata_userid);
     if (!path)
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "unable to allocate for"
                      " userdata path");
