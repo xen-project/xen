@@ -1094,6 +1094,8 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     void* vcpup;
     uint64_t console_pfn = 0;
 
+    int orig_io_fd_flags;
+
     static struct restore_ctx _ctx = {
         .live_p2m = NULL,
         .p2m = NULL,
@@ -1110,6 +1112,11 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
 
     if ( superpages )
         return 1;
+
+    if ( (orig_io_fd_flags = fcntl(io_fd, F_GETFL, 0)) < 0 ) {
+        PERROR("unable to read IO FD flags");
+        goto out;
+    }
 
     if ( read_exact(io_fd, &dinfo->p2m_size, sizeof(unsigned long)) )
     {
@@ -1294,7 +1301,6 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     // DPRINTF("Received all pages (%d races)\n", nraces);
 
     if ( !ctx->completed ) {
-        int flags = 0;
 
         if ( buffer_tail(xch, ctx, &tailbuf, io_fd, max_vcpu_id, vcpumap,
                          ext_vcpucontext) < 0 ) {
@@ -1308,11 +1314,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
          * nonblocking mode for the remainder.
          */
         if ( !ctx->last_checkpoint )
-        {
-            if ( (flags = fcntl(io_fd, F_GETFL,0)) < 0 )
-                flags = 0;
-            fcntl(io_fd, F_SETFL, flags | O_NONBLOCK);
-        }
+            fcntl(io_fd, F_SETFL, orig_io_fd_flags | O_NONBLOCK);
     }
 
     if ( ctx->last_checkpoint )
@@ -1805,8 +1807,10 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     /* discard cache for save file  */
     discard_file_cache(xch, io_fd, 1 /*flush*/);
 
+    fcntl(io_fd, F_SETFL, orig_io_fd_flags);
+
     DPRINTF("Restore exit with rc=%d\n", rc);
-    
+
     return rc;
 }
 /*
