@@ -77,7 +77,7 @@ def diagnose(dom):
 def diagnose_console():
     port    = xstransact.Read(dompath + '/console/port')
     ringref = xstransact.Read(dompath + '/console/ring-ref')
-    tty     = xstransact.Read(dompath + '/serial/0/tty')
+    tty     = xstransact.Read(dompath + '/console/tty')
 
     if not port:
         print "Console port is missing; Xend has failed."

@@ -85,7 +85,7 @@ def bootloader(blexec, disk, dom, quiet = False, blargs = '', kernel = '',
     fcntl.fcntl(m1, fcntl.F_SETFL, os.O_NDELAY)
 
     slavename = ptsname.ptsname(m1)
-    dom.storeDom("serial/0/tty", slavename)
+    dom.storeDom("console/tty", slavename)
 
     # Release the domain lock here, because we definitely don't want 
     # a stuck bootloader to deny service to other xend clients.

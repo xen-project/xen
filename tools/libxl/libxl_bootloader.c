@@ -383,7 +383,7 @@ int libxl_run_bootloader(libxl_ctx *ctx,
         goto out_close;
     }
 
-    dom_console_xs_path = libxl_sprintf(&gc, "%s/serial/0/tty", libxl_xs_get_dompath(&gc, domid));
+    dom_console_xs_path = libxl_sprintf(&gc, "%s/console/tty", libxl_xs_get_dompath(&gc, domid));
     libxl_xs_write(&gc, XBT_NULL, dom_console_xs_path, "%s", dom_console_slave_tty_path);
 
     pid = fork_exec_bootloader(&bootloader_fd, (char *)info->u.pv.bootloader, args);
