@@ -1,1 +1,0 @@
-obj-m := sch_queue.o ebt_imq.o

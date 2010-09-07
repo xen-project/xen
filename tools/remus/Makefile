@@ -1,8 +1,6 @@
 XEN_ROOT=../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-SUBDIRS-$(CONFIG_Linux) := imqebt kmod
-
 SCRIPTS = remus
 
 .PHONY: all
