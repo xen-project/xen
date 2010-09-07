@@ -67,7 +67,7 @@ int libxl_ctx_init(libxl_ctx *ctx, int version, xentoollog_logger *lg)
 
 int libxl_ctx_free(libxl_ctx *ctx)
 {
-    xc_interface_close(ctx->xch);
+    if (ctx->xch) xc_interface_close(ctx->xch);
     libxl_version_info_destroy(&ctx->version_info);
     if (ctx->xsh) xs_daemon_close(ctx->xsh); 
     return 0;
