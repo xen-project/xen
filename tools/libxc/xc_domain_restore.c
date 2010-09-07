@@ -42,6 +42,7 @@ struct restore_ctx {
     xen_pfn_t *p2m; /* A table mapping each PFN to its new MFN. */
     xen_pfn_t *p2m_batch; /* A table of P2M mappings in the current region.  */
     int completed; /* Set when a consistent image is available */
+    int last_checkpoint; /* Set when we should commit to the current checkpoint when it completes. */
     struct domain_info_context dinfo;
 };
 
@@ -765,6 +766,11 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
         // DPRINTF("console pfn location: %llx\n", buf->console_pfn);
         return pagebuf_get_one(xch, ctx, buf, fd, dom);
 
+    case XC_SAVE_ID_LAST_CHECKPOINT:
+        ctx->last_checkpoint = 1;
+        // DPRINTF("last checkpoint indication received");
+        return pagebuf_get_one(xch, ctx, buf, fd, dom);
+
     default:
         if ( (count > MAX_BATCH_SIZE) || (count < 0) ) {
             ERROR("Max batch size exceeded (%d). Giving up.", count);
@@ -1296,10 +1302,23 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
             goto out;
         }
         ctx->completed = 1;
-        /* shift into nonblocking mode for the remainder */
-        if ( (flags = fcntl(io_fd, F_GETFL,0)) < 0 )
-            flags = 0;
-        fcntl(io_fd, F_SETFL, flags | O_NONBLOCK);
+
+        /*
+         * If more checkpoints are expected then shift into
+         * nonblocking mode for the remainder.
+         */
+        if ( !ctx->last_checkpoint )
+        {
+            if ( (flags = fcntl(io_fd, F_GETFL,0)) < 0 )
+                flags = 0;
+            fcntl(io_fd, F_SETFL, flags | O_NONBLOCK);
+        }
+    }
+
+    if ( ctx->last_checkpoint )
+    {
+        // DPRINTF("Last checkpoint, finishing\n");
+        goto finish;
     }
 
     // DPRINTF("Buffered checkpoint\n");

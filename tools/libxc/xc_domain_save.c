@@ -1616,6 +1616,20 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
         }
     }
 
+    if ( !callbacks->checkpoint )
+    {
+        /*
+         * If this is not a checkpointed save then this must be the first and
+         * last checkpoint.
+         */
+        i = XC_SAVE_ID_LAST_CHECKPOINT;
+        if ( wrexact(io_fd, &i, sizeof(int)) )
+        {
+            PERROR("Error when writing last checkpoint chunk");
+            goto out;
+        }
+    }
+
     /* Zero terminate */
     i = 0;
     if ( wrexact(io_fd, &i, sizeof(int)) )

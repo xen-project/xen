@@ -131,6 +131,7 @@
 #define XC_SAVE_ID_TMEM_EXTRA         -6
 #define XC_SAVE_ID_TSC_INFO           -7
 #define XC_SAVE_ID_HVM_CONSOLE_PFN    -8 /* (HVM-only) */
+#define XC_SAVE_ID_LAST_CHECKPOINT    -9 /* Commit to restoring after completion of current iteration. */
 
 /*
 ** We process save/restore/migrate in batches of pages; the below
