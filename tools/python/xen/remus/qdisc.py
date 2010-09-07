@@ -146,17 +146,17 @@ class CfifoQdisc(Qdisc):
 
 qdisc_kinds['cfifo'] = CfifoQdisc
 
-TC_QUEUE_CHECKPOINT = 0
-TC_QUEUE_RELEASE = 1
+TC_PLUG_CHECKPOINT = 0
+TC_PLUG_RELEASE = 1
 
-class QueueQdisc(Qdisc):
+class PlugQdisc(Qdisc):
     fmt = 'I'
 
     def __init__(self, qdict=None):
         if not qdict:
-            qdict = {'kind': 'queue',
+            qdict = {'kind': 'plug',
                      'handle': TC_H_ROOT}
-        super(QueueQdisc, self).__init__(qdict)
+        super(PlugQdisc, self).__init__(qdict)
 
         self.action = 0
 
@@ -169,10 +169,10 @@ class QueueQdisc(Qdisc):
         arg = args[0]
 
         if arg == 'checkpoint':
-            self.action = TC_QUEUE_CHECKPOINT
+            self.action = TC_PLUG_CHECKPOINT
         elif arg == 'release':
-            self.action = TC_QUEUE_RELEASE
+            self.action = TC_PLUG_RELEASE
         else:
             raise QdiscException('unknown action')
 
-qdisc_kinds['queue'] = QueueQdisc
+qdisc_kinds['plug'] = PlugQdisc

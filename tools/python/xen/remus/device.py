@@ -281,12 +281,12 @@ class BufferedNIC(CheckpointedDevice):
         if not self.installed:
             self.install()
 
-        self._sendqmsg(qdisc.TC_QUEUE_CHECKPOINT)
+        self._sendqmsg(qdisc.TC_PLUG_CHECKPOINT)
 
     def commit(self):
         '''Called when checkpoint has been acknowledged by
         the backup'''
-        self._sendqmsg(qdisc.TC_QUEUE_RELEASE)
+        self._sendqmsg(qdisc.TC_PLUG_RELEASE)
 
     # private
     def _sendqmsg(self, action):
@@ -296,7 +296,7 @@ class BufferedNIC(CheckpointedDevice):
         return True
 
     def setup(self):
-        """install Remus queue on VIF outbound traffic"""
+        """install Remus plug on VIF outbound traffic"""
         self.bufdev = self.pool.get()
 
         devname = self.bufdev.devname
@@ -308,19 +308,19 @@ class BufferedNIC(CheckpointedDevice):
 
         self.bufdevno = bufdev['index']
         self.handle = qdisc.TC_H_ROOT
-        self.q = qdisc.QueueQdisc()
+        self.q = qdisc.PlugQdisc()
 
-        if not util.modprobe('sch_queue'):
-            raise BufferedNICException('could not load sch_queue module')
+        if not util.modprobe('sch_plug'):
+            raise BufferedNICException('could not load sch_plug module')
 
     def install(self):
         devname = self.bufdev.devname
         q = self.rth.getqdisc(self.bufdevno)
         if q:
-            if q['kind'] == 'queue':
+            if q['kind'] == 'plug':
                 self.installed = True
                 return
-            if q['kind'] != 'pfifo_fast':
+            if q['kind'] not in ('ingress', 'pfifo_fast'):
                 raise BufferedNICException('there is already a queueing '
                                            'discipline on %s' % devname)
 
