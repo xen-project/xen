@@ -237,6 +237,9 @@ static void find_domain(const char *p)
 #define LOG(_f, _a...)   dolog(__FILE__, __LINE__, __func__, _f "\n", ##_a)
 
 static void dolog(const char *file, int line, const char *func, char *fmt, ...)
+     __attribute__((format(printf,4,5)));
+
+static void dolog(const char *file, int line, const char *func, char *fmt, ...)
 {
     va_list ap;
     char *s;
@@ -1123,7 +1126,7 @@ static int handle_domain_death(libxl_ctx *ctx, uint32_t domid, libxl_event *even
         action = d_config->on_watchdog;
         break;
     default:
-        LOG("Unknown shutdown reason code %s. Destroying domain.", info->shutdown_reason);
+        LOG("Unknown shutdown reason code %d. Destroying domain.", info->shutdown_reason);
         action = ACTION_DESTROY;
     }
 
@@ -1537,7 +1540,7 @@ start:
         }
         rc = libxl_create_logfile(&ctx, name, &fullname);
         if (rc) {
-            LOG("failed to open logfile %s",fullname,strerror(errno));
+            LOG("failed to open logfile %s: %s",fullname,strerror(errno));
             exit(-1);
         }
 
