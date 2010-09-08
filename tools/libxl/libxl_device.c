@@ -96,7 +96,7 @@ retry_transaction:
         if (errno == EAGAIN)
             goto retry_transaction;
         else
-            XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xs transaction failed");
+            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xs transaction failed");
     }
     rc = 0;
 out:
@@ -104,7 +104,7 @@ out:
     return rc;
 }
 
-char *device_disk_string_of_phystype(libxl_disk_phystype phystype)
+char *libxl__device_disk_string_of_phystype(libxl_disk_phystype phystype)
 {
     switch (phystype) {
         case PHYSTYPE_QCOW: return "qcow";
@@ -117,7 +117,7 @@ char *device_disk_string_of_phystype(libxl_disk_phystype phystype)
     }
 }
 
-char *device_disk_backend_type_of_phystype(libxl_disk_phystype phystype)
+char *libxl__device_disk_backend_type_of_phystype(libxl_disk_phystype phystype)
 {
     switch (phystype) {
         case PHYSTYPE_QCOW: return "tap";
@@ -130,7 +130,7 @@ char *device_disk_backend_type_of_phystype(libxl_disk_phystype phystype)
     }
 }
 
-int device_physdisk_major_minor(const char *physpath, int *major, int *minor)
+int libxl__device_physdisk_major_minor(const char *physpath, int *major, int *minor)
 {
     struct stat buf;
     if (stat(physpath, &buf) < 0)
@@ -188,7 +188,7 @@ static int device_virtdisk_matches(const char *virtpath, const char *devtype,
     return 1;
 }
 
-int device_disk_dev_number(char *virtpath)
+int libxl__device_disk_dev_number(char *virtpath)
 {
     int disk, partition;
     char *ep;
@@ -281,7 +281,7 @@ static int wait_for_dev_destroy(libxl_ctx *ctx, struct timeval *tv)
             if (!state || atoi(state) == 6) {
                 xs_unwatch(ctx->xsh, l1[0], l1[1]);
                 xs_rm(ctx->xsh, XBT_NULL, l1[XS_WATCH_TOKEN]);
-                XL_LOG(ctx, XL_LOG_DEBUG, "Destroyed device backend at %s", l1[XS_WATCH_TOKEN]);
+                LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Destroyed device backend at %s", l1[XS_WATCH_TOKEN]);
                 rc = 0;
             }
             free(l1);
@@ -304,7 +304,7 @@ int libxl__devices_destroy(libxl_ctx *ctx, uint32_t domid, int force)
     path = libxl__sprintf(&gc, "/local/domain/%d/device", domid);
     l1 = libxl__xs_directory(&gc, XBT_NULL, path, &num1);
     if (!l1) {
-        XL_LOG(ctx, XL_LOG_ERROR, "%s is empty", path);
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "%s is empty", path);
         goto out;
     }
     for (i = 0; i < num1; i++) {
@@ -445,7 +445,7 @@ again:
     }
     xs_unwatch(xsh, path, path);
     xs_daemon_close(xsh);
-    XL_LOG(ctx, XL_LOG_ERROR, "Device Model not ready");
+    LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Device Model not ready");
     libxl__free_all(&gc);
     return -1;
 }
@@ -463,10 +463,10 @@ int libxl__wait_for_backend(libxl_ctx *ctx, char *be_path, char *state)
         p = xs_read(ctx->xsh, XBT_NULL, path, &len);
         if (p == NULL) {
             if (errno == ENOENT) {
-                XL_LOG(ctx, XL_LOG_ERROR, "Backend %s does not exist",
+                LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Backend %s does not exist",
                        be_path);
             } else {
-                XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "Failed to access backend %s",
+                LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Failed to access backend %s",
                        be_path);
             }
             goto out;
@@ -480,7 +480,7 @@ int libxl__wait_for_backend(libxl_ctx *ctx, char *be_path, char *state)
             }
         }
     }
-    XL_LOG(ctx, XL_LOG_ERROR, "Backend %s not ready", be_path);
+    LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Backend %s not ready", be_path);
 out:
     libxl__free_all(&gc);
     return rc;

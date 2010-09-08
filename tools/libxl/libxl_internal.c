@@ -147,7 +147,7 @@ char *libxl__dirname(libxl_gc *gc, const char *s)
     return ptr;
 }
 
-void xl_logv(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
+void libxl__logv(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
              const char *file, int line, const char *func,
              char *fmt, va_list ap)
 {
@@ -174,13 +174,13 @@ void xl_logv(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
     errno = esave;
 }
 
-void xl_log(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
+void libxl__log(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
             const char *file, int line, const char *func,
             char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
-    xl_logv(ctx, msglevel, errnoval, file, line, func, fmt, ap);
+    libxl__logv(ctx, msglevel, errnoval, file, line, func, fmt, ap);
     va_end(ap);
 }
 

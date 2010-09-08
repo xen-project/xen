@@ -45,27 +45,27 @@
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
 
-#define XL_LOGGING_ENABLED
+#define LIBXL__LOGGING_ENABLED
 
-#ifdef XL_LOGGING_ENABLED
-#define XL_LOG(ctx, loglevel, _f, _a...)   xl_log(ctx, loglevel, -1, __FILE__, __LINE__, __func__, _f, ##_a)
-#define XL_LOG_ERRNO(ctx, loglevel, _f, _a...)   xl_log(ctx, loglevel, errno, __FILE__, __LINE__, __func__, _f, ##_a)
-#define XL_LOG_ERRNOVAL(ctx, loglevel, errnoval, _f, _a...)   xl_log(ctx, loglevel, errnoval, __FILE__, __LINE__, __func__, _f, ##_a)
+#ifdef LIBXL__LOGGING_ENABLED
+#define LIBXL__LOG(ctx, loglevel, _f, _a...)   libxl__log(ctx, loglevel, -1, __FILE__, __LINE__, __func__, _f, ##_a)
+#define LIBXL__LOG_ERRNO(ctx, loglevel, _f, _a...)   libxl__log(ctx, loglevel, errno, __FILE__, __LINE__, __func__, _f, ##_a)
+#define LIBXL__LOG_ERRNOVAL(ctx, loglevel, errnoval, _f, _a...)   libxl__log(ctx, loglevel, errnoval, __FILE__, __LINE__, __func__, _f, ##_a)
 #else
-#define XL_LOG(ctx, loglevel, _f, _a...)
-#define XL_LOG_ERRNO(ctx, loglevel, _f, _a...)
-#define XL_LOG_ERRNOVAL(ctx, loglevel, errnoval, _f, _a...)
+#define LIBXL__LOG(ctx, loglevel, _f, _a...)
+#define LIBXL__LOG_ERRNO(ctx, loglevel, _f, _a...)
+#define LIBXL__LOG_ERRNOVAL(ctx, loglevel, errnoval, _f, _a...)
 #endif
   /* all of these macros preserve errno (saving and restoring) */
 
 /* logging */
-_hidden void xl_logv(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
+_hidden void libxl__logv(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
              const char *file /* may be 0 */, int line /* ignored if !file */,
              const char *func /* may be 0 */,
              char *fmt, va_list al)
      __attribute__((format(printf,7,0)));
 
-_hidden void xl_log(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
+_hidden void libxl__log(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
             const char *file /* may be 0 */, int line /* ignored if !file */,
             const char *func /* may be 0 */,
             char *fmt, ...)
@@ -140,33 +140,32 @@ _hidden char *libxl__xs_read(libxl_gc *gc, xs_transaction_t t, char *path);
 _hidden char **libxl__xs_directory(libxl_gc *gc, xs_transaction_t t, char *path, unsigned int *nb);
 
 /* from xl_dom */
-_hidden int is_hvm(libxl_ctx *ctx, uint32_t domid);
-_hidden int get_shutdown_reason(libxl_ctx *ctx, uint32_t domid);
-#define dominfo_get_shutdown_reason(info) (((info)->flags >> XEN_DOMINF_shutdownshift) & XEN_DOMINF_shutdownmask)
+_hidden int libxl__domain_is_hvm(libxl_ctx *ctx, uint32_t domid);
+_hidden int libxl__domain_shutdown_reason(libxl_ctx *ctx, uint32_t domid);
 
-_hidden int build_pre(libxl_ctx *ctx, uint32_t domid,
+_hidden int libxl__build_pre(libxl_ctx *ctx, uint32_t domid,
               libxl_domain_build_info *info, libxl_domain_build_state *state);
-_hidden int build_post(libxl_ctx *ctx, uint32_t domid,
+_hidden int libxl__build_post(libxl_ctx *ctx, uint32_t domid,
                libxl_domain_build_info *info, libxl_domain_build_state *state,
                char **vms_ents, char **local_ents);
 
-_hidden int build_pv(libxl_ctx *ctx, uint32_t domid,
+_hidden int libxl__build_pv(libxl_ctx *ctx, uint32_t domid,
              libxl_domain_build_info *info, libxl_domain_build_state *state);
-_hidden int build_hvm(libxl_ctx *ctx, uint32_t domid,
+_hidden int libxl__build_hvm(libxl_ctx *ctx, uint32_t domid,
               libxl_domain_build_info *info, libxl_domain_build_state *state);
 
-_hidden int restore_common(libxl_ctx *ctx, uint32_t domid,
+_hidden int libxl__domain_restore_common(libxl_ctx *ctx, uint32_t domid,
                    libxl_domain_build_info *info, libxl_domain_build_state *state, int fd);
-_hidden int core_suspend(libxl_ctx *ctx, uint32_t domid, int fd, int hvm, int live, int debug);
-_hidden int save_device_model(libxl_ctx *ctx, uint32_t domid, int fd);
+_hidden int libxl__domain_suspend_common(libxl_ctx *ctx, uint32_t domid, int fd, int hvm, int live, int debug);
+_hidden int libxl__domain_save_device_model(libxl_ctx *ctx, uint32_t domid, int fd);
 _hidden void libxl__userdata_destroyall(libxl_ctx *ctx, uint32_t domid);
 
 /* from xl_device */
-_hidden char *device_disk_backend_type_of_phystype(libxl_disk_phystype phystype);
-_hidden char *device_disk_string_of_phystype(libxl_disk_phystype phystype);
+_hidden char *libxl__device_disk_backend_type_of_phystype(libxl_disk_phystype phystype);
+_hidden char *libxl__device_disk_string_of_phystype(libxl_disk_phystype phystype);
 
-_hidden int device_physdisk_major_minor(const char *physpath, int *major, int *minor);
-_hidden int device_disk_dev_number(char *virtpath);
+_hidden int libxl__device_physdisk_major_minor(const char *physpath, int *major, int *minor);
+_hidden int libxl__device_disk_dev_number(char *virtpath);
 
 _hidden int libxl__device_generic_add(libxl_ctx *ctx, libxl_device *device,
                              char **bents, char **fents);
@@ -234,10 +233,10 @@ _hidden void libxl__log_child_exitstatus(libxl_gc *gc,
 
 _hidden char *libxl__abs_path(libxl_gc *gc, char *s, const char *path);
 
-#define XL_LOG_DEBUG   XTL_DEBUG
-#define XL_LOG_INFO    XTL_INFO
-#define XL_LOG_WARNING XTL_WARN
-#define XL_LOG_ERROR   XTL_ERROR
+#define LIBXL__LOG_DEBUG   XTL_DEBUG
+#define LIBXL__LOG_INFO    XTL_INFO
+#define LIBXL__LOG_WARNING XTL_WARN
+#define LIBXL__LOG_ERROR   XTL_ERROR
 
 _hidden char *libxl__domid_to_name(libxl_gc *gc, uint32_t domid);
 _hidden char *libxl__poolid_to_name(libxl_gc *gc, uint32_t poolid);
@@ -246,18 +245,18 @@ _hidden char *libxl__poolid_to_name(libxl_gc *gc, uint32_t poolid);
  * blktap2 support
  */
 
-/* libxl_blktap_enabled:
+/* libxl__blktap_enabled:
  *    return true if blktap/blktap2 support is available.
  */
-int libxl_blktap_enabled(libxl_gc *gc);
+_hidden int libxl__blktap_enabled(libxl_gc *gc);
 
-/* libxl_blktap_devpath:
+/* libxl__blktap_devpath:
  *    Argument: path and disk image as specified in config file.
  *      The type specifies whether this is aio, qcow, qcow2, etc.
  *    returns device path xenstore wants to have. returns NULL
  *      if no device corresponds to the disk.
  */
-const char *libxl_blktap_devpath(libxl_gc *gc,
+_hidden const char *libxl__blktap_devpath(libxl_gc *gc,
                                  const char *disk,
                                  libxl_disk_phystype phystype);
 

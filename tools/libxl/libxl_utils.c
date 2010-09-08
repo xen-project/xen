@@ -184,7 +184,7 @@ static int logrename(libxl_ctx *ctx, const char *old, const char *new) {
     if (r) {
         if (errno == ENOENT) return 0; /* ok */
 
-        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "failed to rotate logfile - could not"
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "failed to rotate logfile - could not"
                      " rename %s to %s", old, new);
         return ERROR_FAIL;
     }
@@ -218,7 +218,7 @@ int libxl_create_logfile(libxl_ctx *ctx, char *name, char **full_name)
             goto out;
     } else {
         if (errno != ENOENT)
-            XL_LOG_ERRNO(ctx, XL_LOG_WARNING, "problem checking existence of"
+            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_WARNING, "problem checking existence of"
                          " logfile %s, which might have needed to be rotated",
                          name);
     }
@@ -271,23 +271,23 @@ int libxl_read_file_contents(libxl_ctx *ctx, const char *filename,
     f = fopen(filename, "r");
     if (!f) {
         if (errno == ENOENT) return ENOENT;
-        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "failed to open %s", filename);
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "failed to open %s", filename);
         goto xe;
     }
 
     if (fstat(fileno(f), &stab)) {
-        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "failed to fstat %s", filename);
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "failed to fstat %s", filename);
         goto xe;
     }
 
     if (!S_ISREG(stab.st_mode)) {
-        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "%s is not a plain file", filename);
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "%s is not a plain file", filename);
         errno = ENOTTY;
         goto xe;
     }
 
     if (stab.st_size > INT_MAX) {
-        XL_LOG(ctx, XL_LOG_ERROR, "file %s is far too large", filename);
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "file %s is far too large", filename);
         errno = EFBIG;
         goto xe;
     }
@@ -301,9 +301,9 @@ int libxl_read_file_contents(libxl_ctx *ctx, const char *filename,
         rs = fread(data, 1, datalen, f);
         if (rs != datalen) {
             if (ferror(f))
-                XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "failed to read %s", filename);
+                LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "failed to read %s", filename);
             else if (feof(f))
-                XL_LOG(ctx, XL_LOG_ERROR, "%s changed size while we"
+                LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "%s changed size while we"
                        " were reading it", filename);
             else
                 abort();
@@ -313,7 +313,7 @@ int libxl_read_file_contents(libxl_ctx *ctx, const char *filename,
 
     if (fclose(f)) {
         f = 0;
-        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "failed to close %s", filename);
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "failed to close %s", filename);
         goto xe;
     }
 
@@ -342,13 +342,13 @@ int libxl_read_file_contents(libxl_ctx *ctx, const char *filename,
           if (got == -1) {                                                \
               if (errno == EINTR) continue;                               \
               if (!ctx) return errno;                                     \
-              XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "failed to " #rw " %s%s%s", \
+              LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "failed to " #rw " %s%s%s", \
                            what?what:"", what?" from ":"", filename);     \
               return errno;                                               \
           }                                                               \
           if (got == 0) {                                                 \
               if (!ctx) return EPROTO;                                    \
-              XL_LOG(ctx, XL_LOG_ERROR,                                   \
+              LIBXL__LOG(ctx, LIBXL__LOG_ERROR,                                   \
                      zero_is_eof                                          \
                      ? "file/stream truncated reading %s%s%s"             \
                      : "file/stream write returned 0! writing %s%s%s",    \
@@ -378,7 +378,7 @@ pid_t libxl_fork(libxl_ctx *ctx)
 
     pid = fork();
     if (pid == -1) {
-        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "fork failed");
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "fork failed");
         return -1;
     }
 
@@ -396,7 +396,7 @@ pid_t libxl_fork(libxl_ctx *ctx)
 int libxl_pipe(libxl_ctx *ctx, int pipes[2])
 {
     if (pipe(pipes) < 0) {
-        XL_LOG(ctx, XL_LOG_ERROR, "Failed to create a pipe");
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Failed to create a pipe");
         return -1;
     }
     return 0;

@@ -18,13 +18,13 @@
 
 #include "tap-ctl.h"
 
-int libxl_blktap_enabled(libxl_gc *gc)
+int libxl__blktap_enabled(libxl_gc *gc)
 {
     const char *msg;
     return !tap_ctl_check(&msg);
 }
 
-const char *libxl_blktap_devpath(libxl_gc *gc,
+const char *libxl__blktap_devpath(libxl_gc *gc,
                                  const char *disk,
                                  libxl_disk_phystype phystype)
 {
@@ -32,7 +32,7 @@ const char *libxl_blktap_devpath(libxl_gc *gc,
     char *params, *devname = NULL;
     int minor, err;
 
-    type = device_disk_string_of_phystype(phystype);
+    type = libxl__device_disk_string_of_phystype(phystype);
     minor = tap_ctl_find_minor(type, disk);
     if (minor >= 0) {
         devname = libxl__sprintf(gc, "/dev/xen/blktap-2/tapdev%d", minor);

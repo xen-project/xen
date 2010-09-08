@@ -125,7 +125,7 @@ char *libxl__xs_get_dompath(libxl_gc *gc, uint32_t domid)
     libxl_ctx *ctx = libxl_gc_owner(gc);
     char *s = xs_get_domain_path(ctx->xsh, domid);
     if (!s) {
-        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "failed to get dompath for %" PRIu32,
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "failed to get dompath for %" PRIu32,
                      domid);
         return NULL;
     }

@@ -65,25 +65,25 @@ void libxl_report_child_exitstatus(libxl_ctx *ctx,
     if (WIFEXITED(status)) {
         int st = WEXITSTATUS(status);
         if (st)
-            XL_LOG(ctx, level, "%s [%ld] exited"
+            LIBXL__LOG(ctx, level, "%s [%ld] exited"
                    " with error status %d", what, (unsigned long)pid, st);
         else
-            XL_LOG(ctx, level, "%s [%ld] unexpectedly"
+            LIBXL__LOG(ctx, level, "%s [%ld] unexpectedly"
                    " exited status zero", what, (unsigned long)pid);
     } else if (WIFSIGNALED(status)) {
         int sig = WTERMSIG(status);
         const char *str = strsignal(sig);
         const char *coredump = WCOREDUMP(status) ? " (core dumped)" : "";
         if (str)
-            XL_LOG(ctx, level, "%s [%ld] died due to"
+            LIBXL__LOG(ctx, level, "%s [%ld] died due to"
                    " fatal signal %s%s", what, (unsigned long)pid,
                    str, coredump);
         else
-            XL_LOG(ctx, level, "%s [%ld] died due to unknown"
+            LIBXL__LOG(ctx, level, "%s [%ld] died due to unknown"
                    " fatal signal number %d%s", what, (unsigned long)pid,
                    sig, coredump);
     } else {
-        XL_LOG(ctx, level, "%s [%ld] gave unknown"
+        LIBXL__LOG(ctx, level, "%s [%ld] gave unknown"
                " wait status 0x%x", what, (unsigned long)pid, status);
     }
 }
@@ -146,7 +146,7 @@ static void report_spawn_intermediate_status(libxl_ctx *ctx,
                  "%s intermediate process (startup monitor)",
                  for_spawn->what) < 0 )
             intermediate_what = "intermediate process (startup monitor)";
-        libxl_report_child_exitstatus(ctx, XL_LOG_ERROR, intermediate_what,
+        libxl_report_child_exitstatus(ctx, LIBXL__LOG_ERROR, intermediate_what,
                                       for_spawn->intermediate, status);
     }
 }
@@ -163,7 +163,7 @@ int libxl__spawn_detach(libxl_ctx *ctx,
     if (for_spawn->intermediate) {
         r = kill(for_spawn->intermediate, SIGKILL);
         if (r) {
-            XL_LOG_ERRNO(ctx, XL_LOG_ERROR,
+            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
                          "could not kill %s intermediate process [%ld]",
                          for_spawn->what,
                          (unsigned long)for_spawn->intermediate);
