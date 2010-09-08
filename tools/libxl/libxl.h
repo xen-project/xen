@@ -107,7 +107,7 @@
  *     should be allocated from the temporary pool.
  *
  *     Where a function's primary purpose is to return such an object,
- *     it should have a libxl_gc * as it's first argument.
+ *     it should have a libxl__gc * as it's first argument.
  *
  *     Note that there are two ways to change an allocation from this
  *     category to the "public" category. Either the implementation
@@ -118,7 +118,7 @@
  *     The latter method is preferred for obvious performance reasons.
  *
  * No temporary objects allocated from the pool may be explicitly freed.
- * Therefore public functions which initialize a libxl_gc MUST call
+ * Therefore public functions which initialize a libxl__gc MUST call
  * libxl__free_all() before returning.
  */
 #ifndef LIBXL_H

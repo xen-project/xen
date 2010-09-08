@@ -34,7 +34,7 @@ int libxl__error_set(libxl_ctx *ctx, int code)
     return 0;
 }
 
-int libxl__ptr_add(libxl_gc *gc, void *ptr)
+int libxl__ptr_add(libxl__gc *gc, void *ptr)
 {
     int i;
     void **re;
@@ -65,7 +65,7 @@ int libxl__ptr_add(libxl_gc *gc, void *ptr)
     return 0;
 }
 
-void libxl__free_all(libxl_gc *gc)
+void libxl__free_all(libxl__gc *gc)
 {
     void *ptr;
     int i;
@@ -78,11 +78,11 @@ void libxl__free_all(libxl_gc *gc)
     free(gc->alloc_ptrs);
 }
 
-void *libxl__zalloc(libxl_gc *gc, int bytes)
+void *libxl__zalloc(libxl__gc *gc, int bytes)
 {
     void *ptr = calloc(bytes, 1);
     if (!ptr) {
-        libxl__error_set(libxl_gc_owner(gc), ENOMEM);
+        libxl__error_set(libxl__gc_owner(gc), ENOMEM);
         return NULL;
     }
 
@@ -90,11 +90,11 @@ void *libxl__zalloc(libxl_gc *gc, int bytes)
     return ptr;
 }
 
-void *libxl__calloc(libxl_gc *gc, size_t nmemb, size_t size)
+void *libxl__calloc(libxl__gc *gc, size_t nmemb, size_t size)
 {
     void *ptr = calloc(nmemb, size);
     if (!ptr) {
-        libxl__error_set(libxl_gc_owner(gc), ENOMEM);
+        libxl__error_set(libxl__gc_owner(gc), ENOMEM);
         return NULL;
     }
 
@@ -102,7 +102,7 @@ void *libxl__calloc(libxl_gc *gc, size_t nmemb, size_t size)
     return ptr;
 }
 
-char *libxl__sprintf(libxl_gc *gc, const char *fmt, ...)
+char *libxl__sprintf(libxl__gc *gc, const char *fmt, ...)
 {
     char *s;
     va_list ap;
@@ -125,7 +125,7 @@ char *libxl__sprintf(libxl_gc *gc, const char *fmt, ...)
     return s;
 }
 
-char *libxl__strdup(libxl_gc *gc, const char *c)
+char *libxl__strdup(libxl__gc *gc, const char *c)
 {
     char *s = strdup(c);
 
@@ -135,7 +135,7 @@ char *libxl__strdup(libxl_gc *gc, const char *c)
     return s;
 }
 
-char *libxl__dirname(libxl_gc *gc, const char *s)
+char *libxl__dirname(libxl__gc *gc, const char *s)
 {
     char *c;
     char *ptr = libxl__strdup(gc, s);
@@ -184,7 +184,7 @@ void libxl__log(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
     va_end(ap);
 }
 
-char *libxl__abs_path(libxl_gc *gc, char *s, const char *path)
+char *libxl__abs_path(libxl__gc *gc, char *s, const char *path)
 {
     if (!s || s[0] == '/')
         return s;

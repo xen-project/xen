@@ -83,7 +83,7 @@ typedef enum {
     DEVICE_VFB,
     DEVICE_VKBD,
     DEVICE_CONSOLE,
-} libxl_device_kinds;
+} libxl__device_kinds;
 
 #define is_valid_device_kind(kind) (((kind) >= DEVICE_VIF) && ((kind) <= DEVICE_CONSOLE))
 
@@ -92,9 +92,9 @@ typedef struct {
     uint32_t backend_domid;
     uint32_t devid;
     uint32_t domid;
-    libxl_device_kinds backend_kind;
-    libxl_device_kinds kind;
-} libxl_device;
+    libxl__device_kinds backend_kind;
+    libxl__device_kinds kind;
+} libxl__device;
 
 #define XC_PCI_BDF             "0x%x, 0x%x, 0x%x, 0x%x"
 #define AUTO_PHP_SLOT          0x100
@@ -113,31 +113,31 @@ typedef struct {
     int alloc_maxsize;
     void **alloc_ptrs;
     libxl_ctx *owner;
-} libxl_gc;
+} libxl__gc;
 
-#define LIBXL_INIT_GC(ctx) (libxl_gc){ .alloc_maxsize = 0, .alloc_ptrs = 0, .owner = ctx }
-static inline libxl_ctx *libxl_gc_owner(libxl_gc *gc)
+#define LIBXL_INIT_GC(ctx) (libxl__gc){ .alloc_maxsize = 0, .alloc_ptrs = 0, .owner = ctx }
+static inline libxl_ctx *libxl__gc_owner(libxl__gc *gc)
 {
     return gc->owner;
 }
 
 /* memory allocation tracking/helpers */
-_hidden int libxl__ptr_add(libxl_gc *gc, void *ptr);
-_hidden void libxl__free_all(libxl_gc *gc);
-_hidden void *libxl__zalloc(libxl_gc *gc, int bytes);
-_hidden void *libxl__calloc(libxl_gc *gc, size_t nmemb, size_t size);
-_hidden char *libxl__sprintf(libxl_gc *gc, const char *fmt, ...) PRINTF_ATTRIBUTE(2, 3);
-_hidden char *libxl__strdup(libxl_gc *gc, const char *c);
-_hidden char *libxl__dirname(libxl_gc *gc, const char *s);
+_hidden int libxl__ptr_add(libxl__gc *gc, void *ptr);
+_hidden void libxl__free_all(libxl__gc *gc);
+_hidden void *libxl__zalloc(libxl__gc *gc, int bytes);
+_hidden void *libxl__calloc(libxl__gc *gc, size_t nmemb, size_t size);
+_hidden char *libxl__sprintf(libxl__gc *gc, const char *fmt, ...) PRINTF_ATTRIBUTE(2, 3);
+_hidden char *libxl__strdup(libxl__gc *gc, const char *c);
+_hidden char *libxl__dirname(libxl__gc *gc, const char *s);
 
-_hidden char **libxl__xs_kvs_of_flexarray(libxl_gc *gc, flexarray_t *array, int length);
-_hidden int libxl__xs_writev(libxl_gc *gc, xs_transaction_t t,
+_hidden char **libxl__xs_kvs_of_flexarray(libxl__gc *gc, flexarray_t *array, int length);
+_hidden int libxl__xs_writev(libxl__gc *gc, xs_transaction_t t,
                     char *dir, char **kvs);
-_hidden int libxl__xs_write(libxl_gc *gc, xs_transaction_t t,
+_hidden int libxl__xs_write(libxl__gc *gc, xs_transaction_t t,
                    char *path, char *fmt, ...) PRINTF_ATTRIBUTE(4, 5);
-_hidden char *libxl__xs_get_dompath(libxl_gc *gc, uint32_t domid); // logs errs
-_hidden char *libxl__xs_read(libxl_gc *gc, xs_transaction_t t, char *path);
-_hidden char **libxl__xs_directory(libxl_gc *gc, xs_transaction_t t, char *path, unsigned int *nb);
+_hidden char *libxl__xs_get_dompath(libxl__gc *gc, uint32_t domid); // logs errs
+_hidden char *libxl__xs_read(libxl__gc *gc, xs_transaction_t t, char *path);
+_hidden char **libxl__xs_directory(libxl__gc *gc, xs_transaction_t t, char *path, unsigned int *nb);
 
 /* from xl_dom */
 _hidden int libxl__domain_is_hvm(libxl_ctx *ctx, uint32_t domid);
@@ -167,9 +167,9 @@ _hidden char *libxl__device_disk_string_of_phystype(libxl_disk_phystype phystype
 _hidden int libxl__device_physdisk_major_minor(const char *physpath, int *major, int *minor);
 _hidden int libxl__device_disk_dev_number(char *virtpath);
 
-_hidden int libxl__device_generic_add(libxl_ctx *ctx, libxl_device *device,
+_hidden int libxl__device_generic_add(libxl_ctx *ctx, libxl__device *device,
                              char **bents, char **fents);
-_hidden int libxl__device_del(libxl_ctx *ctx, libxl_device *dev, int wait);
+_hidden int libxl__device_del(libxl_ctx *ctx, libxl__device *dev, int wait);
 _hidden int libxl__device_destroy(libxl_ctx *ctx, char *be_path, int force);
 _hidden int libxl__devices_destroy(libxl_ctx *ctx, uint32_t domid, int force);
 _hidden int libxl__wait_for_device_model(libxl_ctx *ctx,
@@ -190,10 +190,10 @@ typedef struct {
     /* all fields are private to libxl_spawn_... */
     pid_t intermediate;
     char *what; /* malloc'd in spawn_spawn */
-}  libxl_spawn_starting;
+} libxl__spawn_starting;
 
 struct libxl__device_model_starting {
-    libxl_spawn_starting *for_spawn; /* first! */
+    libxl__spawn_starting *for_spawn; /* first! */
     char *dom_path; /* from libxl_malloc, only for dm_xenstore_record_pid */
     int domid;
 };
@@ -209,31 +209,31 @@ _hidden int libxl__spawn_spawn(libxl_ctx *ctx,
    * Caller, may pass 0 for for_spawn, in which case no need to detach.
    */
 _hidden int libxl__spawn_detach(libxl_ctx *ctx,
-                       libxl_spawn_starting *for_spawn);
+                       libxl__spawn_starting *for_spawn);
   /* Logs errors.  Idempotent, but only permitted after successful
    * call to libxl__spawn_spawn, and no point calling it again if it fails. */
 _hidden int libxl__spawn_check(libxl_ctx *ctx,
                       void *for_spawn);
   /* Logs errors but also returns them.
-   * for_spawn must actually be a  libxl_spawn_starting*  but
+   * for_spawn must actually be a  libxl__spawn_starting*  but
    * we take void* so you can pass this function directly to
    * libxl__wait_for_device_model.  Caller must still call detach. */
 
  /* low-level stuff, for synchronous subprocesses etc. */
 
 _hidden void libxl__exec(int stdinfd, int stdoutfd, int stderrfd, char *arg0, char **args); // logs errors, never returns
-_hidden void libxl__log_child_exitstatus(libxl_gc *gc,
+_hidden void libxl__log_child_exitstatus(libxl__gc *gc,
                                 const char *what, pid_t pid, int status);
 
-_hidden char *libxl__abs_path(libxl_gc *gc, char *s, const char *path);
+_hidden char *libxl__abs_path(libxl__gc *gc, char *s, const char *path);
 
 #define LIBXL__LOG_DEBUG   XTL_DEBUG
 #define LIBXL__LOG_INFO    XTL_INFO
 #define LIBXL__LOG_WARNING XTL_WARN
 #define LIBXL__LOG_ERROR   XTL_ERROR
 
-_hidden char *libxl__domid_to_name(libxl_gc *gc, uint32_t domid);
-_hidden char *libxl__poolid_to_name(libxl_gc *gc, uint32_t poolid);
+_hidden char *libxl__domid_to_name(libxl__gc *gc, uint32_t domid);
+_hidden char *libxl__poolid_to_name(libxl__gc *gc, uint32_t poolid);
 
 /*
  * blktap2 support
@@ -242,7 +242,7 @@ _hidden char *libxl__poolid_to_name(libxl_gc *gc, uint32_t poolid);
 /* libxl__blktap_enabled:
  *    return true if blktap/blktap2 support is available.
  */
-_hidden int libxl__blktap_enabled(libxl_gc *gc);
+_hidden int libxl__blktap_enabled(libxl__gc *gc);
 
 /* libxl__blktap_devpath:
  *    Argument: path and disk image as specified in config file.
@@ -250,11 +250,11 @@ _hidden int libxl__blktap_enabled(libxl_gc *gc);
  *    returns device path xenstore wants to have. returns NULL
  *      if no device corresponds to the disk.
  */
-_hidden const char *libxl__blktap_devpath(libxl_gc *gc,
+_hidden const char *libxl__blktap_devpath(libxl__gc *gc,
                                  const char *disk,
                                  libxl_disk_phystype phystype);
 
-_hidden char *libxl__uuid2string(libxl_gc *gc, const libxl_uuid uuid);
+_hidden char *libxl__uuid2string(libxl__gc *gc, const libxl_uuid uuid);
 
 struct libxl__xen_console_reader {
     char *buffer;

@@ -90,7 +90,7 @@ int libxl__build_post(libxl_ctx *ctx, uint32_t domid,
                libxl_domain_build_info *info, libxl_domain_build_state *state,
                char **vms_ents, char **local_ents)
 {
-    libxl_gc gc = LIBXL_INIT_GC(ctx);
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
     char *dom_path, *vm_path;
     xs_transaction_t t;
     char **ents;
@@ -261,7 +261,7 @@ static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
 int libxl__build_hvm(libxl_ctx *ctx, uint32_t domid,
               libxl_domain_build_info *info, libxl_domain_build_state *state)
 {
-    libxl_gc gc = LIBXL_INIT_GC(ctx);
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
     int ret, rc = ERROR_INVAL;
 
     if (info->kernel.mapped) {
@@ -311,7 +311,7 @@ int libxl__domain_restore_common(libxl_ctx *ctx, uint32_t domid,
 }
 
 struct suspendinfo {
-    libxl_gc *gc;
+    libxl__gc *gc;
     int xce; /* event channel handle */
     int suspend_eventchn;
     int domid;
@@ -343,7 +343,7 @@ static int libxl__domain_suspend_common_callback(void *data)
     int ret;
     char *path, *state = "suspend";
     int watchdog = 60;
-    libxl_ctx *ctx = libxl_gc_owner(si->gc);
+    libxl_ctx *ctx = libxl__gc_owner(si->gc);
 
     if (si->hvm)
         xc_get_hvm_param(ctx->xch, si->domid, HVM_PARAM_ACPI_S_STATE, &s_state);
@@ -397,7 +397,7 @@ static int libxl__domain_suspend_common_callback(void *data)
 int libxl__domain_suspend_common(libxl_ctx *ctx, uint32_t domid, int fd,
 		int hvm, int live, int debug)
 {
-    libxl_gc gc = LIBXL_INIT_GC(ctx);
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
     int flags;
     int port;
     struct save_callbacks callbacks;
@@ -449,7 +449,7 @@ out:
 
 int libxl__domain_save_device_model(libxl_ctx *ctx, uint32_t domid, int fd)
 {
-    libxl_gc gc = LIBXL_INIT_GC(ctx);
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
     int fd2, c;
     char buf[1024];
     char *filename = libxl__sprintf(&gc, "/var/lib/xen/qemu-save.%d", domid);
@@ -483,19 +483,19 @@ int libxl__domain_save_device_model(libxl_ctx *ctx, uint32_t domid, int fd)
     return 0;
 }
 
-char *libxl__uuid2string(libxl_gc *gc, const libxl_uuid uuid)
+char *libxl__uuid2string(libxl__gc *gc, const libxl_uuid uuid)
 {
     char *s = libxl__sprintf(gc, LIBXL_UUID_FMT, LIBXL_UUID_BYTES(uuid));
     if (!s)
-        LIBXL__LOG(libxl_gc_owner(gc), LIBXL__LOG_ERROR, "cannot allocate for uuid");
+        LIBXL__LOG(libxl__gc_owner(gc), LIBXL__LOG_ERROR, "cannot allocate for uuid");
     return s;
 }
 
-static const char *userdata_path(libxl_gc *gc, uint32_t domid,
+static const char *userdata_path(libxl__gc *gc, uint32_t domid,
                                       const char *userdata_userid,
                                       const char *wh)
 {
-    libxl_ctx *ctx = libxl_gc_owner(gc);
+    libxl_ctx *ctx = libxl__gc_owner(gc);
     char *path, *uuid_string;
     libxl_dominfo info;
     int rc;
@@ -529,7 +529,7 @@ static int userdata_delete(libxl_ctx *ctx, const char *path) {
 
 void libxl__userdata_destroyall(libxl_ctx *ctx, uint32_t domid)
 {
-    libxl_gc gc = LIBXL_INIT_GC(ctx);
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
     const char *pattern;
     glob_t gl;
     int r, i;
@@ -559,7 +559,7 @@ int libxl_userdata_store(libxl_ctx *ctx, uint32_t domid,
                               const char *userdata_userid,
                               const uint8_t *data, int datalen)
 {
-    libxl_gc gc = LIBXL_INIT_GC(ctx);
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
     const char *filename;
     const char *newfilename;
     int e, rc;
@@ -628,7 +628,7 @@ int libxl_userdata_retrieve(libxl_ctx *ctx, uint32_t domid,
                                  const char *userdata_userid,
                                  uint8_t **data_r, int *datalen_r)
 {
-    libxl_gc gc = LIBXL_INIT_GC(ctx);
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
     const char *filename;
     int e, rc;
     int datalen = 0;

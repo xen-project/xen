@@ -16,12 +16,12 @@
 #include "libxl_osdeps.h"
 #include "libxl_internal.h"
 
-int libxl__blktap_enabled(libxl_gc *gc)
+int libxl__blktap_enabled(libxl__gc *gc)
 {
     return 0;
 }
 
-const char *libxl__blktap_devpath(libxl_gc *gc,
+const char *libxl__blktap_devpath(libxl__gc *gc,
                                  const char *disk,
                                  libxl_disk_phystype phystype)
 {

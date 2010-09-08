@@ -39,10 +39,10 @@ static const char *string_of_kinds[] = {
     [DEVICE_CONSOLE] = "console",
 };
 
-int libxl__device_generic_add(libxl_ctx *ctx, libxl_device *device,
+int libxl__device_generic_add(libxl_ctx *ctx, libxl__device *device,
                              char **bents, char **fents)
 {
-    libxl_gc gc = LIBXL_INIT_GC(ctx);
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
     char *dom_path_backend, *dom_path, *frontend_path, *backend_path;
     xs_transaction_t t;
     struct xs_permissions frontend_perms[2];
@@ -228,7 +228,7 @@ int libxl__device_disk_dev_number(char *virtpath)
 
 int libxl__device_destroy(libxl_ctx *ctx, char *be_path, int force)
 {
-    libxl_gc gc = LIBXL_INIT_GC(ctx);
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
     xs_transaction_t t;
     char *state_path = libxl__sprintf(&gc, "%s/state", be_path);
     char *state = libxl__xs_read(&gc, XBT_NULL, state_path);
@@ -264,7 +264,7 @@ out:
 
 static int wait_for_dev_destroy(libxl_ctx *ctx, struct timeval *tv)
 {
-    libxl_gc gc = LIBXL_INIT_GC(ctx);
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
     int nfds, rc;
     unsigned int n;
     fd_set rfds;
@@ -293,7 +293,7 @@ static int wait_for_dev_destroy(libxl_ctx *ctx, struct timeval *tv)
 
 int libxl__devices_destroy(libxl_ctx *ctx, uint32_t domid, int force)
 {
-    libxl_gc gc = LIBXL_INIT_GC(ctx);
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
     char *path, *be_path, *fe_path;
     unsigned int num1, num2;
     char **l1 = NULL, **l2 = NULL;
@@ -353,9 +353,9 @@ out:
     return 0;
 }
 
-int libxl__device_del(libxl_ctx *ctx, libxl_device *dev, int wait)
+int libxl__device_del(libxl_ctx *ctx, libxl__device *dev, int wait)
 {
-    libxl_gc gc = LIBXL_INIT_GC(ctx);
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
     char *dom_path_backend, *backend_path;
     int rc;
 
@@ -393,7 +393,7 @@ int libxl__wait_for_device_model(libxl_ctx *ctx,
                                                       void *userdata),
                                 void *check_callback_userdata)
 {
-    libxl_gc gc = LIBXL_INIT_GC(ctx);
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
     char *path;
     char *p;
     unsigned int len;
@@ -452,7 +452,7 @@ again:
 
 int libxl__wait_for_backend(libxl_ctx *ctx, char *be_path, char *state)
 {
-    libxl_gc gc = LIBXL_INIT_GC(ctx);
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
     int watchdog = 100;
     unsigned int len;
     char *p;

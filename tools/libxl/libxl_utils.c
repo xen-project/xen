@@ -54,9 +54,9 @@ char *libxl_domid_to_name(libxl_ctx *ctx, uint32_t domid)
     return s;
 }
 
-char *libxl__domid_to_name(libxl_gc *gc, uint32_t domid)
+char *libxl__domid_to_name(libxl__gc *gc, uint32_t domid)
 {
-    char *s = libxl_domid_to_name(libxl_gc_owner(gc), domid);
+    char *s = libxl_domid_to_name(libxl__gc_owner(gc), domid);
     if ( s )
         libxl__ptr_add(gc, s);
     return s;
@@ -103,9 +103,9 @@ char *libxl_poolid_to_name(libxl_ctx *ctx, uint32_t poolid)
     return s;
 }
 
-char *libxl__poolid_to_name(libxl_gc *gc, uint32_t poolid)
+char *libxl__poolid_to_name(libxl__gc *gc, uint32_t poolid)
 {
-    char *s = libxl_poolid_to_name(libxl_gc_owner(gc), poolid);
+    char *s = libxl_poolid_to_name(libxl__gc_owner(gc), poolid);
     if ( s )
         libxl__ptr_add(gc, s);
     return s;
@@ -141,7 +141,7 @@ int libxl_name_to_poolid(libxl_ctx *ctx, const char *name,
 
 int libxl_get_stubdom_id(libxl_ctx *ctx, int guest_domid)
 {
-    libxl_gc gc = LIBXL_INIT_GC(ctx);
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
     char * stubdom_id_s;
     int ret;
 
@@ -158,7 +158,7 @@ int libxl_get_stubdom_id(libxl_ctx *ctx, int guest_domid)
 
 int libxl_is_stubdom(libxl_ctx *ctx, uint32_t domid, uint32_t *target_domid)
 {
-    libxl_gc gc = LIBXL_INIT_GC(ctx);
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
     char *target, *endptr;
     uint32_t value;
     int ret = 0;
@@ -193,7 +193,7 @@ static int logrename(libxl_ctx *ctx, const char *old, const char *new) {
 
 int libxl_create_logfile(libxl_ctx *ctx, char *name, char **full_name)
 {
-    libxl_gc gc = LIBXL_INIT_GC(ctx);
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
     struct stat stat_buf;
     char *logfile, *logfile_new;
     int i, rc;
@@ -448,7 +448,7 @@ int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
 int libxl_devid_to_device_nic(libxl_ctx *ctx, uint32_t domid,
                               const char *devid, libxl_device_nic *nic)
 {
-    libxl_gc gc = LIBXL_INIT_GC(ctx);
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
     char *tok, *val;
     char *dompath, *nic_path_fe, *nic_path_be;
     unsigned int i;
@@ -484,7 +484,7 @@ out:
 int libxl_devid_to_device_disk(libxl_ctx *ctx, uint32_t domid,
                                const char *devid, libxl_device_disk *disk)
 {
-    libxl_gc gc = LIBXL_INIT_GC(ctx);
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
     char *endptr, *val;
     char *dompath, *diskpath, *be_path;
     unsigned int devid_n;
@@ -527,7 +527,7 @@ out:
 int libxl_devid_to_device_net2(libxl_ctx *ctx, uint32_t domid,
                                const char *devid, libxl_device_net2 *net2)
 {
-    libxl_gc gc = LIBXL_INIT_GC(ctx);
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
     char *tok, *endptr, *val;
     char *dompath, *net2path, *be_path;
     unsigned int devid_n, i;
@@ -598,7 +598,7 @@ int libxl_strtomac(const char *mac_s, uint8_t *mac)
 
 int libxl_check_device_model_version(libxl_ctx *ctx, char *path)
 {
-    libxl_gc gc = LIBXL_INIT_GC(ctx);
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
     pid_t pid = -1;
     int pipefd[2];
     char buf[100];

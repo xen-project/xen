@@ -97,7 +97,7 @@ int libxl__spawn_spawn(libxl_ctx *ctx,
     pid_t child, got;
     int status;
     pid_t intermediate;
-    libxl_spawn_starting *for_spawn = starting->for_spawn;
+    libxl__spawn_starting *for_spawn = starting->for_spawn;
 
     if (for_spawn) {
         for_spawn->what = strdup(what);
@@ -136,7 +136,7 @@ int libxl__spawn_spawn(libxl_ctx *ctx,
 }
 
 static void report_spawn_intermediate_status(libxl_ctx *ctx,
-                                 libxl_spawn_starting *for_spawn,
+                                 libxl__spawn_starting *for_spawn,
                                  int status)
 {
     if (!WIFEXITED(status)) {
@@ -152,7 +152,7 @@ static void report_spawn_intermediate_status(libxl_ctx *ctx,
 }
 
 int libxl__spawn_detach(libxl_ctx *ctx,
-                       libxl_spawn_starting *for_spawn)
+                       libxl__spawn_starting *for_spawn)
 {
     int r, status;
     pid_t got;
@@ -186,7 +186,7 @@ int libxl__spawn_detach(libxl_ctx *ctx,
 
 int libxl__spawn_check(libxl_ctx *ctx, void *for_spawn_void)
 {
-    libxl_spawn_starting *for_spawn = for_spawn_void;
+    libxl__spawn_starting *for_spawn = for_spawn_void;
     pid_t got;
     int status;
 
