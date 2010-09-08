@@ -181,12 +181,6 @@ _hidden int libxl__wait_for_device_model(libxl_ctx *ctx,
                                 void *check_callback_userdata);
 _hidden int libxl__wait_for_backend(libxl_ctx *ctx, char *be_path, char *state);
 
-/* from xenguest (helper */
-_hidden int hvm_build_set_params(xc_interface *handle, uint32_t domid,
-                         libxl_domain_build_info *info,
-                         int store_evtchn, unsigned long *store_mfn,
-                         int console_evtchn, unsigned long *console_mfn);
-
 /* xl_exec */
 
  /* higher-level double-fork and separate detach eg as for device models */
