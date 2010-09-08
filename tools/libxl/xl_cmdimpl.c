@@ -1645,6 +1645,14 @@ waitpid_out:
     if (child_console_pid > 0 &&
             waitpid(child_console_pid, &status, 0) < 0 && errno == EINTR)
         goto waitpid_out;
+
+    /*
+     * If we have daemonized then do not return to the caller -- this has
+     * already happened in the parent.
+     */
+    if ( !need_daemon )
+        exit(ret);
+
     return ret;
 }
 
