@@ -45,20 +45,20 @@ static char **make_bootloader_args(libxl_gc *gc,
     flexarray_set(args, nr++, (char *)info->u.pv.bootloader);
 
     if (info->kernel.path)
-        flexarray_set(args, nr++, libxl_sprintf(gc, "--kernel=%s", info->kernel.path));
+        flexarray_set(args, nr++, libxl__sprintf(gc, "--kernel=%s", info->kernel.path));
     if (info->u.pv.ramdisk.path)
-        flexarray_set(args, nr++, libxl_sprintf(gc, "--ramdisk=%s", info->u.pv.ramdisk.path));
+        flexarray_set(args, nr++, libxl__sprintf(gc, "--ramdisk=%s", info->u.pv.ramdisk.path));
     if (info->u.pv.cmdline && *info->u.pv.cmdline != '\0')
-        flexarray_set(args, nr++, libxl_sprintf(gc, "--args=%s", info->u.pv.cmdline));
+        flexarray_set(args, nr++, libxl__sprintf(gc, "--args=%s", info->u.pv.cmdline));
 
-    flexarray_set(args, nr++, libxl_sprintf(gc, "--output=%s", fifo));
+    flexarray_set(args, nr++, libxl__sprintf(gc, "--output=%s", fifo));
     flexarray_set(args, nr++, "--output-format=simple0");
-    flexarray_set(args, nr++, libxl_sprintf(gc, "--output-directory=%s", "/var/run/libxl/"));
+    flexarray_set(args, nr++, libxl__sprintf(gc, "--output-directory=%s", "/var/run/libxl/"));
 
     if (info->u.pv.bootloader_args) {
         char *saveptr;
         /* Operate on a duplicate since strtok modifes the argument */
-        char *dup = libxl_strdup(gc, info->u.pv.bootloader_args);
+        char *dup = libxl__strdup(gc, info->u.pv.bootloader_args);
         char *t = strtok_r(dup, " \t\n", &saveptr);
         do {
             flexarray_set(args, nr++, t);
@@ -126,7 +126,7 @@ static pid_t fork_exec_bootloader(int *master, char *arg0, char **args)
         return -1;
     else if (pid == 0) {
         setenv("TERM", "vt100", 1);
-        libxl_exec(-1, -1, -1, arg0, args);
+        libxl__exec(-1, -1, -1, arg0, args);
         return -1;
     }
 
@@ -263,7 +263,7 @@ static char * bootloader_interact(libxl_gc *gc, int xenconsoled_fd, int bootload
         }
     }
 
-    libxl_ptr_add(gc, output);
+    libxl__ptr_add(gc, output);
     return output;
 
 out_err:
@@ -383,8 +383,8 @@ int libxl_run_bootloader(libxl_ctx *ctx,
         goto out_close;
     }
 
-    dom_console_xs_path = libxl_sprintf(&gc, "%s/console/tty", libxl_xs_get_dompath(&gc, domid));
-    libxl_xs_write(&gc, XBT_NULL, dom_console_xs_path, "%s", dom_console_slave_tty_path);
+    dom_console_xs_path = libxl__sprintf(&gc, "%s/console/tty", libxl__xs_get_dompath(&gc, domid));
+    libxl__xs_write(&gc, XBT_NULL, dom_console_xs_path, "%s", dom_console_slave_tty_path);
 
     pid = fork_exec_bootloader(&bootloader_fd, (char *)info->u.pv.bootloader, args);
     if (pid < 0) {
@@ -441,7 +441,7 @@ out_close:
     free(args);
 
 out:
-    libxl_free_all(&gc);
+    libxl__free_all(&gc);
     return rc;
 }
 

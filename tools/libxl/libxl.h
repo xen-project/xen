@@ -119,7 +119,7 @@
  *
  * No temporary objects allocated from the pool may be explicitly freed.
  * Therefore public functions which initialize a libxl_gc MUST call
- * libxl_free_all() before returning.
+ * libxl__free_all() before returning.
  */
 #ifndef LIBXL_H
 #define LIBXL_H

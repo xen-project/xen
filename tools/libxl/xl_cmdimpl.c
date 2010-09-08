@@ -4395,7 +4395,7 @@ int main_blockdetach(int argc, char **argv)
         return 1;
     }
     if (libxl_device_disk_del(&ctx, &disk, 1)) {
-        fprintf(stderr, "libxl_device_del failed.\n");
+        fprintf(stderr, "libxl_device_disk_del failed.\n");
     }
     return 0;
 }

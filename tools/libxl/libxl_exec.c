@@ -35,7 +35,7 @@ static int call_waitpid(pid_t (*waitpid_cb)(pid_t, int *, int), pid_t pid, int *
     return (waitpid_cb) ? waitpid_cb(pid, status, options) : waitpid(pid, status, options);
 }
 
-void libxl_exec(int stdinfd, int stdoutfd, int stderrfd, char *arg0, char **args)
+void libxl__exec(int stdinfd, int stdoutfd, int stderrfd, char *arg0, char **args)
      /* call this in the child */
 {
     int i;
@@ -88,7 +88,7 @@ void libxl_report_child_exitstatus(libxl_ctx *ctx,
     }
 }
 
-int libxl_spawn_spawn(libxl_ctx *ctx,
+int libxl__spawn_spawn(libxl_ctx *ctx,
                       libxl_device_model_starting *starting,
                       const char *what,
                       void (*intermediate_hook)(void *for_spawn,
@@ -151,7 +151,7 @@ static void report_spawn_intermediate_status(libxl_ctx *ctx,
     }
 }
 
-int libxl_spawn_detach(libxl_ctx *ctx,
+int libxl__spawn_detach(libxl_ctx *ctx,
                        libxl_spawn_starting *for_spawn)
 {
     int r, status;
@@ -184,7 +184,7 @@ int libxl_spawn_detach(libxl_ctx *ctx,
     return rc;
 }
 
-int libxl_spawn_check(libxl_ctx *ctx, void *for_spawn_void)
+int libxl__spawn_check(libxl_ctx *ctx, void *for_spawn_void)
 {
     libxl_spawn_starting *for_spawn = for_spawn_void;
     pid_t got;

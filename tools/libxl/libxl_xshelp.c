@@ -44,7 +44,7 @@ int xs_writev(struct xs_handle *xsh, xs_transaction_t t, char *dir, char *kvs[])
     return 0;
 }
 
-char **libxl_xs_kvs_of_flexarray(libxl_gc *gc, flexarray_t *array, int length)
+char **libxl__xs_kvs_of_flexarray(libxl_gc *gc, flexarray_t *array, int length)
 {
     char **kvs;
     int i;
@@ -52,7 +52,7 @@ char **libxl_xs_kvs_of_flexarray(libxl_gc *gc, flexarray_t *array, int length)
     if (!length)
         return NULL;
 
-    kvs = libxl_calloc(gc, length + 2, sizeof(char *));
+    kvs = libxl__calloc(gc, length + 2, sizeof(char *));
     if (kvs) {
         for (i = 0; i < length; i += 2) {
             void *ptr;
@@ -68,7 +68,7 @@ char **libxl_xs_kvs_of_flexarray(libxl_gc *gc, flexarray_t *array, int length)
     return kvs;
 }
 
-int libxl_xs_writev(libxl_gc *gc, xs_transaction_t t,
+int libxl__xs_writev(libxl_gc *gc, xs_transaction_t t,
                     char *dir, char *kvs[])
 {
     libxl_ctx *ctx = libxl_gc_owner(gc);
@@ -79,7 +79,7 @@ int libxl_xs_writev(libxl_gc *gc, xs_transaction_t t,
         return 0;
 
     for (i = 0; kvs[i] != NULL; i += 2) {
-        path = libxl_sprintf(gc, "%s/%s", dir, kvs[i]);
+        path = libxl__sprintf(gc, "%s/%s", dir, kvs[i]);
         if (path && kvs[i + 1]) {
             int length = strlen(kvs[i + 1]);
             xs_write(ctx->xsh, t, path, kvs[i + 1], length);
@@ -88,7 +88,7 @@ int libxl_xs_writev(libxl_gc *gc, xs_transaction_t t,
     return 0;
 }
 
-int libxl_xs_write(libxl_gc *gc, xs_transaction_t t,
+int libxl__xs_write(libxl_gc *gc, xs_transaction_t t,
                    char *path, char *fmt, ...)
 {
     libxl_ctx *ctx = libxl_gc_owner(gc);
@@ -107,20 +107,20 @@ int libxl_xs_write(libxl_gc *gc, xs_transaction_t t,
     return 0;
 }
 
-char * libxl_xs_read(libxl_gc *gc, xs_transaction_t t, char *path)
+char * libxl__xs_read(libxl_gc *gc, xs_transaction_t t, char *path)
 {
     libxl_ctx *ctx = libxl_gc_owner(gc);
     char *ptr;
 
     ptr = xs_read(ctx->xsh, t, path, NULL);
     if (ptr != NULL) {
-        libxl_ptr_add(gc, ptr);
+        libxl__ptr_add(gc, ptr);
         return ptr;
     }
     return 0;
 }
 
-char *libxl_xs_get_dompath(libxl_gc *gc, uint32_t domid)
+char *libxl__xs_get_dompath(libxl_gc *gc, uint32_t domid)
 {
     libxl_ctx *ctx = libxl_gc_owner(gc);
     char *s = xs_get_domain_path(ctx->xsh, domid);
@@ -129,15 +129,15 @@ char *libxl_xs_get_dompath(libxl_gc *gc, uint32_t domid)
                      domid);
         return NULL;
     }
-    libxl_ptr_add(gc, s);
+    libxl__ptr_add(gc, s);
     return s;
 }
 
-char **libxl_xs_directory(libxl_gc *gc, xs_transaction_t t, char *path, unsigned int *nb)
+char **libxl__xs_directory(libxl_gc *gc, xs_transaction_t t, char *path, unsigned int *nb)
 {
     libxl_ctx *ctx = libxl_gc_owner(gc);
     char **ret = NULL;
     ret = xs_directory(ctx->xsh, XBT_NULL, path, nb);
-    libxl_ptr_add(gc, ret);
+    libxl__ptr_add(gc, ret);
     return ret;
 }
