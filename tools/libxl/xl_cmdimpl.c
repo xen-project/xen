@@ -606,10 +606,8 @@ static void parse_config_data(const char *configfile_filename_report,
     if (!xlu_cfg_get_long (config, "hap", &l))
         c_info->hap = l;
 
-    if (!xlu_cfg_get_string (config, "name", &buf))
-        c_info->name = strdup(buf);
-    else
-        c_info->name = "test";
+    if (xlu_cfg_replace_string (config, "name", &c_info->name))
+        c_info->name = strdup("test");
 
     if (!xlu_cfg_get_string (config, "uuid", &buf) ) {
         if ( libxl_uuid_from_string(&c_info->uuid, buf) ) {
@@ -695,8 +693,7 @@ static void parse_config_data(const char *configfile_filename_report,
     if (!xlu_cfg_get_long (config, "videoram", &l))
         b_info->video_memkb = l * 1024;
 
-    if (!xlu_cfg_get_string (config, "kernel", &buf))
-        b_info->kernel.path = strdup(buf);
+    xlu_cfg_replace_string (config, "kernel", &b_info->kernel.path);
 
     if (c_info->hvm == 1) {
         if (!xlu_cfg_get_long (config, "pae", &l))
@@ -734,10 +731,8 @@ static void parse_config_data(const char *configfile_filename_report,
             exit(1);
         }
 
-        if (!xlu_cfg_get_string (config, "bootloader", &buf))
-            b_info->u.pv.bootloader = strdup(buf);
-        if (!xlu_cfg_get_string (config, "bootloader_args", &buf))
-            b_info->u.pv.bootloader_args = strdup(buf);
+        xlu_cfg_replace_string (config, "bootloader", &b_info->u.pv.bootloader);
+        xlu_cfg_replace_string (config, "bootloader_args", &b_info->u.pv.bootloader_args);
 
         if (!b_info->u.pv.bootloader && !b_info->kernel.path) {
             fprintf(stderr, "Neither kernel nor bootloader specified\n");
@@ -745,8 +740,7 @@ static void parse_config_data(const char *configfile_filename_report,
         }
 
         b_info->u.pv.cmdline = cmdline;
-        if (!xlu_cfg_get_string (config, "ramdisk", &buf))
-            b_info->u.pv.ramdisk.path = strdup(buf);
+        xlu_cfg_replace_string (config, "ramdisk", &b_info->u.pv.ramdisk.path);
     }
 
     if (!xlu_cfg_get_list (config, "disk", &vbds, 0)) {
