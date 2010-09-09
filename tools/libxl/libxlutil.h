@@ -46,6 +46,7 @@ void xlu_cfg_destroy(XLU_Config*);
  */
 
 int xlu_cfg_get_string(const XLU_Config*, const char *n, const char **value_r);
+int xlu_cfg_replace_string(const XLU_Config *cfg, const char *n, char **value_r); /* free/strdup version */
 int xlu_cfg_get_long(const XLU_Config*, const char *n, long *value_r);
 
 int xlu_cfg_get_list(const XLU_Config*, const char *n,

@@ -297,7 +297,7 @@ static void init_dm_info(libxl_device_model_info *dm_info,
     libxl_uuid_generate(&dm_info->uuid);
 
     dm_info->dom_name = c_info->name;
-    dm_info->device_model = "qemu-dm";
+    dm_info->device_model = strdup("qemu-dm");
     dm_info->videoram = b_info->video_memkb / 1024;
     dm_info->apic = b_info->u.hvm.apic;
     dm_info->vcpus = b_info->max_vcpus;
@@ -305,7 +305,7 @@ static void init_dm_info(libxl_device_model_info *dm_info,
 
     dm_info->stdvga = 0;
     dm_info->vnc = 1;
-    dm_info->vnclisten = "127.0.0.1";
+    dm_info->vnclisten = strdup("127.0.0.1");
     dm_info->vncdisplay = 0;
     dm_info->vncunused = 1;
     dm_info->keymap = NULL;
@@ -313,7 +313,7 @@ static void init_dm_info(libxl_device_model_info *dm_info,
     dm_info->opengl = 0;
     dm_info->nographic = 0;
     dm_info->serial = NULL;
-    dm_info->boot = "cda";
+    dm_info->boot = strdup("cda");
     dm_info->usb = 0;
     dm_info->usbdevice = NULL;
     dm_info->xen_platform_pci = 1;
@@ -1022,38 +1022,30 @@ skip_vfb:
         init_dm_info(dm_info, c_info, b_info);
 
         /* then process config related to dm */
-        if (!xlu_cfg_get_string (config, "device_model", &buf))
-            dm_info->device_model = strdup(buf);
+        xlu_cfg_replace_string (config, "device_model", &dm_info->device_model);
         if (!xlu_cfg_get_long (config, "stdvga", &l))
             dm_info->stdvga = l;
         if (!xlu_cfg_get_long (config, "vnc", &l))
             dm_info->vnc = l;
-        if (!xlu_cfg_get_string (config, "vnclisten", &buf))
-            dm_info->vnclisten = strdup(buf);
-        if (!xlu_cfg_get_string (config, "vncpasswd", &buf))
-            dm_info->vncpasswd = strdup(buf);
+        xlu_cfg_replace_string (config, "vnclisten", &dm_info->vnclisten);
+        xlu_cfg_replace_string (config, "vncpasswd", &dm_info->vncpasswd);
         if (!xlu_cfg_get_long (config, "vncdisplay", &l))
             dm_info->vncdisplay = l;
         if (!xlu_cfg_get_long (config, "vncunused", &l))
             dm_info->vncunused = l;
-        if (!xlu_cfg_get_string (config, "keymap", &buf))
-            dm_info->keymap = strdup(buf);
+        xlu_cfg_replace_string (config, "keymap", &dm_info->keymap);
         if (!xlu_cfg_get_long (config, "sdl", &l))
             dm_info->sdl = l;
         if (!xlu_cfg_get_long (config, "opengl", &l))
             dm_info->opengl = l;
         if (!xlu_cfg_get_long (config, "nographic", &l))
             dm_info->nographic = l;
-        if (!xlu_cfg_get_string (config, "serial", &buf))
-            dm_info->serial = strdup(buf);
-        if (!xlu_cfg_get_string (config, "boot", &buf))
-            dm_info->boot = strdup(buf);
+        xlu_cfg_replace_string (config, "serial", &dm_info->serial);
+        xlu_cfg_replace_string (config, "boot", &dm_info->boot);
         if (!xlu_cfg_get_long (config, "usb", &l))
             dm_info->usb = l;
-        if (!xlu_cfg_get_string (config, "usbdevice", &buf))
-            dm_info->usbdevice = strdup(buf);
-        if (!xlu_cfg_get_string (config, "soundhw", &buf))
-            dm_info->soundhw = strdup(buf);
+        xlu_cfg_replace_string (config, "usbdevice", &dm_info->usbdevice);
+        xlu_cfg_replace_string (config, "soundhw", &dm_info->soundhw);
         if (!xlu_cfg_get_long (config, "xen_platform_pci", &l))
             dm_info->xen_platform_pci = l;
     }

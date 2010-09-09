@@ -151,7 +151,18 @@ int xlu_cfg_get_string(const XLU_Config *cfg, const char *n,
     *value_r= set->values[0];
     return 0;
 }
-        
+ 
+int xlu_cfg_replace_string(const XLU_Config *cfg, const char *n,
+                           char **value_r) {
+    XLU_ConfigSetting *set;
+    int e;
+
+    e= find_atom(cfg,n,&set);  if (e) return e;
+    free(*value_r);
+    *value_r= strdup(set->values[0]);
+    return 0;
+}
+
 int xlu_cfg_get_long(const XLU_Config *cfg, const char *n,
                      long *value_r) {
     long l;
