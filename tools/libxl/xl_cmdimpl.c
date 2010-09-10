@@ -3179,21 +3179,17 @@ int main_create(int argc, char **argv)
         }
     }
 
-    memset(extra_config, 0, sizeof(extra_config));
-    while (optind < argc) {
-        if ((p = strchr(argv[optind], '='))) {
-            if (strlen(extra_config) + 1 < sizeof(extra_config)) {
-                if (strlen(extra_config))
-                    strcat(extra_config, "\n");
-                strcat(extra_config, argv[optind]);
-            }
+    extra_config[0] = '\0';
+    for (p = extra_config; optind < argc; optind++) {
+        if (strchr(argv[optind], '=') != NULL) {
+            p += snprintf(p, sizeof(extra_config) - (p - extra_config),
+                "%s\n", argv[optind]);
         } else if (!filename) {
             filename = argv[optind];
         } else {
             help("create");
             return 2;
         }
-        optind++;
     }
 
     memset(&dom_info, 0, sizeof(dom_info));
