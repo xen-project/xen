@@ -1190,14 +1190,17 @@ static char ** libxl_build_device_model_args_old(libxl__gc *gc,
                 char *smac = libxl__sprintf(gc, "%02x:%02x:%02x:%02x:%02x:%02x",
                                            vifs[i].mac[0], vifs[i].mac[1], vifs[i].mac[2],
                                            vifs[i].mac[3], vifs[i].mac[4], vifs[i].mac[5]);
+                char *ifname;
                 if (!vifs[i].ifname)
-                    vifs[i].ifname = libxl__sprintf(gc, "tap%d.%d", info->domid, vifs[i].devid);
+                    ifname = libxl__sprintf(gc, "tap%d.%d", info->domid, vifs[i].devid);
+                else
+                    ifname = vifs[i].ifname;
                 flexarray_set(dm_args, num++, "-net");
                 flexarray_set(dm_args, num++, libxl__sprintf(gc, "nic,vlan=%d,macaddr=%s,model=%s",
                             vifs[i].devid, smac, vifs[i].model));
                 flexarray_set(dm_args, num++, "-net");
                 flexarray_set(dm_args, num++, libxl__sprintf(gc, "tap,vlan=%d,ifname=%s,bridge=%s,script=no",
-                            vifs[i].devid, vifs[i].ifname, vifs[i].bridge));
+                            vifs[i].devid, ifname, vifs[i].bridge));
                 ioemu_vifs++;
             }
         }
