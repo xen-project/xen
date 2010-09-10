@@ -79,6 +79,20 @@ struct xs_handle {
 
 	/* One request at a time. */
 	pthread_mutex_t request_mutex;
+
+	/* Lock discipline:
+	 *  Only holder of the request lock may write to h->fd.
+	 *  Only holder of the request lock may access read_thr_exists.
+	 *  If read_thr_exists==0, only holder of request lock may read h->fd;
+	 *  If read_thr_exists==1, only the read thread may read h->fd.
+	 *  Only holder of the reply lock may access reply_list.
+	 *  Only holder of the watch lock may access watch_list.
+	 * Lock hierarchy:
+	 *  The order in which to acquire locks is
+	 *     request_mutex
+	 *     reply_mutex
+	 *     watch_mutex
+	 */
 };
 
 #define mutex_lock(m)		pthread_mutex_lock(m)
@@ -662,21 +676,27 @@ char **xs_read_watch(struct xs_handle *h, unsigned int *num)
 	struct xs_stored_msg *msg;
 	char **ret, *strings, c = 0;
 	unsigned int num_strings, i;
-	int read_from_thread;
-
-	read_from_thread = read_thread_exists(h);
-
-	/* Read from comms channel ourselves if there is no reader thread. */
-	if (!read_from_thread && (read_message(h) == -1))
-		return NULL;
 
 	mutex_lock(&h->watch_mutex);
 
-	/* Wait on the condition variable for a watch to fire. */
 #ifdef USE_PTHREAD
-	while (list_empty(&h->watch_list) && read_from_thread && h->fd != -1)
+	/* Wait on the condition variable for a watch to fire.
+	 * If the reader thread doesn't exist yet, then that's because
+	 * we haven't called xs_watch.	Presumably the application
+	 * will do so later; in the meantime we just block.
+	 */
+	while (list_empty(&h->watch_list) && h->fd != -1)
 		condvar_wait(&h->watch_condvar, &h->watch_mutex);
-#endif
+#else /* !defined(USE_PTHREAD) */
+	/* Read from comms channel ourselves if there are no threads
+	 * and therefore no reader thread. */
+
+	assert(!read_thread_exists(h)); /* not threadsafe but worth a check */
+	if ((read_message(h) == -1))
+		return NULL;
+
+#endif /* !defined(USE_PTHREAD) */
+
 	if (list_empty(&h->watch_list)) {
 		mutex_unlock(&h->watch_mutex);
 		errno = EINVAL;
@@ -900,6 +920,10 @@ char *xs_debug_command(struct xs_handle *h, const char *cmd,
 
 static int read_message(struct xs_handle *h)
 {
+	/* IMPORTANT: It is forbidden to call this function without
+	 * acquiring the request lock and checking that h->read_thr_exists
+	 * is false.  See "Lock discipline" in struct xs_handle, above. */
+         
 	struct xs_stored_msg *msg = NULL;
 	char *body = NULL;
 	int saved_errno = 0;
