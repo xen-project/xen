@@ -300,7 +300,12 @@ let read store perm path =
 		Node.check_perm ent perm Perms.READ;
 		ent.Node.value
 	in
-	Path.apply store.root path do_read
+	if path = [] then (
+		let ent = store.root in
+		Node.check_perm ent perm Perms.READ;
+		ent.Node.value
+	) else
+		Path.apply store.root path do_read
 
 let ls store perm path =
 	let children =
