@@ -274,7 +274,7 @@ static void init_build_info(libxl_domain_build_info *b_info, libxl_domain_create
     if (c_info->hvm) {
         b_info->shadow_memkb = 0; /* Set later */
         b_info->video_memkb = 8 * 1024;
-        b_info->kernel.path = "hvmloader";
+        b_info->kernel.path = strdup("hvmloader");
         b_info->hvm = 1;
         b_info->u.hvm.pae = 1;
         b_info->u.hvm.apic = 1;
