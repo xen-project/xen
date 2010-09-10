@@ -1315,22 +1315,20 @@ static int create_domain(struct domain_create *dom_info)
                                        &config_data, &config_len);
         if (ret) { fprintf(stderr, "Failed to read config file: %s: %s\n",
                            config_file, strerror(errno)); return ERROR_FAIL; }
-        if (!restore_file && extra_config
-            && strlen(extra_config)) {
-            if (config_len > INT_MAX - (strlen(extra_config) + 2)) {
+        if (!restore_file && extra_config && strlen(extra_config)) {
+            if (config_len > INT_MAX - (strlen(extra_config) + 2 + 1)) {
                 fprintf(stderr, "Failed to attach extra configration\n");
                 return ERROR_FAIL;
             }
+            /* allocate space for the extra config plus two EOLs plus \0 */
             config_data = realloc(config_data, config_len
-                + strlen(extra_config) + 2);
+                + strlen(extra_config) + 2 + 1);
             if (!config_data) {
                 fprintf(stderr, "Failed to realloc config_data\n");
                 return ERROR_FAIL;
             }
-            strcat(config_data, "\n");
-            strcat(config_data, extra_config);
-            strcat(config_data, "\n");
-            config_len += (strlen(extra_config) + 2);
+            config_len += sprintf(config_data + config_len, "\n%s\n",
+                extra_config);
         }
     } else {
         if (!config_data) {
