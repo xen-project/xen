@@ -296,7 +296,7 @@ static void init_dm_info(libxl_device_model_info *dm_info,
 
     libxl_uuid_generate(&dm_info->uuid);
 
-    dm_info->dom_name = c_info->name;
+    dm_info->dom_name = strdup(c_info->name);
     dm_info->device_model = strdup("qemu-dm");
     dm_info->videoram = b_info->video_memkb / 1024;
     dm_info->apic = b_info->u.hvm.apic;
