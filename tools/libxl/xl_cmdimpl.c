@@ -1511,7 +1511,7 @@ start:
                 goto error_out;
             }
             ret = domid;
-            goto waitpid_out;
+            goto out;
         }
 
         rc = libxl_ctx_postfork(&ctx);
