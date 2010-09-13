@@ -67,7 +67,7 @@ u32 vmx_vmentry_control __read_mostly;
 u64 vmx_ept_vpid_cap __read_mostly;
 bool_t cpu_has_vmx_ins_outs_instr_info __read_mostly;
 
-static DEFINE_PER_CPU_READ_MOSTLY(struct vmcs_struct *, host_vmcs);
+static DEFINE_PER_CPU_READ_MOSTLY(struct vmcs_struct *, vmxon_region);
 static DEFINE_PER_CPU(struct vmcs_struct *, current_vmcs);
 static DEFINE_PER_CPU(struct list_head, active_vmcs_list);
 
@@ -427,11 +427,11 @@ static void vmx_load_vmcs(struct vcpu *v)
 
 int vmx_cpu_up_prepare(unsigned int cpu)
 {
-    if ( per_cpu(host_vmcs, cpu) != NULL )
+    if ( per_cpu(vmxon_region, cpu) != NULL )
         return 0;
 
-    per_cpu(host_vmcs, cpu) = vmx_alloc_vmcs();
-    if ( per_cpu(host_vmcs, cpu) != NULL )
+    per_cpu(vmxon_region, cpu) = vmx_alloc_vmcs();
+    if ( per_cpu(vmxon_region, cpu) != NULL )
         return 0;
 
     printk("CPU%d: Could not allocate host VMCS\n", cpu);
@@ -440,8 +440,8 @@ int vmx_cpu_up_prepare(unsigned int cpu)
 
 void vmx_cpu_dead(unsigned int cpu)
 {
-    vmx_free_vmcs(per_cpu(host_vmcs, cpu));
-    per_cpu(host_vmcs, cpu) = NULL;
+    vmx_free_vmcs(per_cpu(vmxon_region, cpu));
+    per_cpu(vmxon_region, cpu) = NULL;
 }
 
 int vmx_cpu_up(void)
@@ -498,7 +498,7 @@ int vmx_cpu_up(void)
     if ( (rc = vmx_cpu_up_prepare(cpu)) != 0 )
         return rc;
 
-    switch ( __vmxon(virt_to_maddr(this_cpu(host_vmcs))) )
+    switch ( __vmxon(virt_to_maddr(this_cpu(vmxon_region))) )
     {
     case -2: /* #UD or #GP */
         if ( bios_locked &&
