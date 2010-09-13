@@ -1458,7 +1458,7 @@ struct tmem_oid {
     uint64_t oid[3];
 };
 
-int xc_tmem_control_oid(int xc, int32_t pool_id, uint32_t subop,
+int xc_tmem_control_oid(xc_interface *xch, int32_t pool_id, uint32_t subop,
                         uint32_t cli_id, uint32_t arg1, uint32_t arg2,
                         struct tmem_oid oid, void *buf);
 int xc_tmem_control(xc_interface *xch,

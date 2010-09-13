@@ -81,7 +81,7 @@ int xc_tmem_control(xc_interface *xch,
         memset(buf, 0, arg1);
 #endif
 
-    rc = do_tmem_op(xc, &op);
+    rc = do_tmem_op(xch, &op);
 
     if (subop == TMEMC_LIST) {
         if (arg1 != 0)
@@ -91,7 +91,7 @@ int xc_tmem_control(xc_interface *xch,
     return rc;
 }
 
-int xc_tmem_control_oid(int xc,
+int xc_tmem_control_oid(xc_interface *xch,
                         int32_t pool_id,
                         uint32_t subop,
                         uint32_t cli_id,
@@ -463,7 +463,7 @@ int xc_tmem_restore(xc_interface *xch, int dom, int io_fd)
             if ( read_exact(io_fd, buf, pagesize) )
                 return -1;
             checksum += *buf;
-            if ( (rc = xc_tmem_control_oid(xc, pool_id,
+            if ( (rc = xc_tmem_control_oid(xch, pool_id,
                                            TMEMC_RESTORE_PUT_PAGE, dom,
                                            bufsize, index, oid, buf)) <= 0 )
             {
