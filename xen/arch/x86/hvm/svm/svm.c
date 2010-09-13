@@ -116,11 +116,6 @@ long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
 
     switch ( msr )
     {
-    case MSR_EFER:
-        if ( hvm_set_efer(msr_content) )
-            return HNDL_exception_raised;
-        break;
-
     case MSR_IA32_MC4_MISC: /* Threshold register */
     case MSR_F10_MC4_MISC1 ... MSR_F10_MC4_MISC3:
         /*
@@ -1042,10 +1037,6 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 
     switch ( msr )
     {
-    case MSR_EFER:
-        *msr_content = v->arch.hvm_vcpu.guest_efer;
-        break;
-
     case MSR_IA32_SYSENTER_CS:
         *msr_content = v->arch.hvm_svm.guest_sysenter_cs;
         break;

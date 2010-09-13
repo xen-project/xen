@@ -2039,6 +2039,10 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 
     switch ( msr )
     {
+    case MSR_EFER:
+        *msr_content = v->arch.hvm_vcpu.guest_efer;
+        break;
+
     case MSR_IA32_TSC:
         *msr_content = hvm_get_guest_tsc(v);
         break;
@@ -2138,6 +2142,11 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 
     switch ( msr )
     {
+    case MSR_EFER:
+        if ( hvm_set_efer(msr_content) )
+           return X86EMUL_EXCEPTION;
+        break;
+
     case MSR_IA32_TSC:
         hvm_set_guest_tsc(v, msr_content);
         break;

@@ -172,10 +172,6 @@ long_mode_do_msr_read(unsigned int msr, uint64_t *msr_content)
 
     switch ( msr )
     {
-    case MSR_EFER:
-        *msr_content = v->arch.hvm_vcpu.guest_efer;
-        break;
-
     case MSR_FS_BASE:
         *msr_content = __vmread(GUEST_FS_BASE);
         break;
@@ -224,11 +220,6 @@ long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
 
     switch ( msr )
     {
-    case MSR_EFER:
-        if ( hvm_set_efer(msr_content) )
-            goto exception_raised;
-        break;
-
     case MSR_FS_BASE:
     case MSR_GS_BASE:
     case MSR_SHADOW_GS_BASE:
@@ -270,7 +261,6 @@ long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
  uncanonical_address:
     HVM_DBG_LOG(DBG_LEVEL_0, "Not cano address of msr write %x", msr);
     vmx_inject_hw_exception(TRAP_gp_fault, 0);
- exception_raised:
     return HNDL_exception_raised;
 }
 
@@ -351,36 +341,13 @@ void vmx_save_host_msrs(void) {}
 static enum handler_return
 long_mode_do_msr_read(unsigned int msr, uint64_t *msr_content)
 {
-    struct vcpu *v = current;
-
-    switch ( msr )
-    {
-    case MSR_EFER:
-        *msr_content = v->arch.hvm_vcpu.guest_efer;
-        break;
-
-    default:
-        return HNDL_unhandled;
-    }
-
-    return HNDL_done;
+    return HNDL_unhandled;
 }
 
 static enum handler_return
 long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
 {
-    switch ( msr )
-    {
-    case MSR_EFER:
-        if ( hvm_set_efer(msr_content) )
-            return HNDL_exception_raised;
-        break;
-
-    default:
-        return HNDL_unhandled;
-    }
-
-    return HNDL_done;
+    return HNDL_unhandled;
 }
 
 #endif /* __i386__ */
