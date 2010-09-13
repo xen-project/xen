@@ -60,6 +60,8 @@ void vmx_do_resume(struct vcpu *);
 void vmx_vlapic_msr_changed(struct vcpu *v);
 void vmx_realmode(struct cpu_user_regs *regs);
 void vmx_update_debug_state(struct vcpu *v);
+void vmx_update_exception_bitmap(struct vcpu *v);
+
 
 /*
  * Exit Reasons
@@ -290,16 +292,6 @@ static inline unsigned long __vmread_safe(unsigned long field, int *error)
                    : "memory");
 
     return ecx;
-}
-
-static inline void __vm_set_bit(unsigned long field, unsigned int bit)
-{
-    __vmwrite(field, __vmread(field) | (1UL << bit));
-}
-
-static inline void __vm_clear_bit(unsigned long field, unsigned int bit)
-{
-    __vmwrite(field, __vmread(field) & ~(1UL << bit));
 }
 
 static inline void __invept(int type, u64 eptp, u64 gpa)

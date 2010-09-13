@@ -385,6 +385,11 @@ long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
 
 #endif /* __i386__ */
 
+void vmx_update_exception_bitmap(struct vcpu *v)
+{
+    __vmwrite(EXCEPTION_BITMAP, v->arch.hvm_vmx.exception_bitmap);
+}
+
 static int vmx_guest_x86_mode(struct vcpu *v)
 {
     unsigned int cs_ar_bytes;
@@ -623,7 +628,8 @@ static int vmx_load_vmcs_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
 static void vmx_fpu_enter(struct vcpu *v)
 {
     setup_fpu(v);
-    __vm_clear_bit(EXCEPTION_BITMAP, TRAP_no_device);
+    v->arch.hvm_vmx.exception_bitmap &= ~(1u << TRAP_no_device);
+    vmx_update_exception_bitmap(v);
     v->arch.hvm_vmx.host_cr0 &= ~X86_CR0_TS;
     __vmwrite(HOST_CR0, v->arch.hvm_vmx.host_cr0);
 }
@@ -649,7 +655,8 @@ static void vmx_fpu_leave(struct vcpu *v)
     {
         v->arch.hvm_vcpu.hw_cr[0] |= X86_CR0_TS;
         __vmwrite(GUEST_CR0, v->arch.hvm_vcpu.hw_cr[0]);
-        __vm_set_bit(EXCEPTION_BITMAP, TRAP_no_device);
+        v->arch.hvm_vmx.exception_bitmap |= (1u << TRAP_no_device);
+        vmx_update_exception_bitmap(v);
     }
 }
 
@@ -1049,7 +1056,7 @@ static void vmx_update_host_cr3(struct vcpu *v)
 
 void vmx_update_debug_state(struct vcpu *v)
 {
-    unsigned long intercepts, mask;
+    unsigned long mask;
 
     ASSERT(v == current);
 
@@ -1057,12 +1064,11 @@ void vmx_update_debug_state(struct vcpu *v)
     if ( !cpu_has_monitor_trap_flag )
         mask |= 1u << TRAP_debug;
 
-    intercepts = __vmread(EXCEPTION_BITMAP);
     if ( v->arch.hvm_vcpu.debug_state_latch )
-        intercepts |= mask;
+        v->arch.hvm_vmx.exception_bitmap |= mask;
     else
-        intercepts &= ~mask;
-    __vmwrite(EXCEPTION_BITMAP, intercepts);
+        v->arch.hvm_vmx.exception_bitmap &= ~mask;
+    vmx_update_exception_bitmap(v);
 }
 
 static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
@@ -1124,7 +1130,8 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
                     vmx_set_segment_register(v, s, &reg[s]);
                 v->arch.hvm_vcpu.hw_cr[4] |= X86_CR4_VME;
                 __vmwrite(GUEST_CR4, v->arch.hvm_vcpu.hw_cr[4]);
-                __vmwrite(EXCEPTION_BITMAP, 0xffffffff);
+                v->arch.hvm_vmx.exception_bitmap = 0xffffffff;
+                vmx_update_exception_bitmap(v);
             }
             else 
             {
@@ -1136,11 +1143,11 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
                     ((v->arch.hvm_vcpu.hw_cr[4] & ~X86_CR4_VME)
                      |(v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_VME));
                 __vmwrite(GUEST_CR4, v->arch.hvm_vcpu.hw_cr[4]);
-                __vmwrite(EXCEPTION_BITMAP, 
-                          HVM_TRAP_MASK
+                v->arch.hvm_vmx.exception_bitmap = HVM_TRAP_MASK
                           | (paging_mode_hap(v->domain) ?
                              0 : (1U << TRAP_page_fault))
-                          | (1U << TRAP_no_device));
+                          | (1U << TRAP_no_device);
+                vmx_update_exception_bitmap(v);
                 vmx_update_debug_state(v);
             }
         }

@@ -97,6 +97,7 @@ struct arch_vmx_struct {
     /* Cache of cpu execution control. */
     u32                  exec_control;
     u32                  secondary_exec_control;
+    u32                  exception_bitmap;
 
 #ifdef __x86_64__
     struct vmx_msr_state msr_state;
