@@ -37,7 +37,7 @@ Quick-Start Guide
 First, there are a number of prerequisites for building a Xen source
 release. Make sure you have all the following installed, either by
 visiting the project webpage or installing a pre-built package
-provided by your Linux distributor:
+provided by your OS distributor:
     * GCC v3.4 or later
     * GNU Make
     * GNU Binutils
@@ -51,13 +51,19 @@ provided by your Linux distributor:
     * hotplug or udev
     * GNU bison and GNU flex
 
+Second, you need to acquire a suitable kernel for use in domain 0. If
+possible you should use a kernel provided by your OS distributor. If
+no suitable kernel is available from your OS distributor then refer to
+http://wiki.xen.org/xenwiki/XenDom0Kernels for suggestions for
+suitable kernels to use.
+
 [NB. Unless noted otherwise, all the following steps should be
 performed with root privileges.]
 
 1. Download and untar the source tarball file. This will be a
    file named xen-unstable-src.tgz, or xen-$version-src.tgz.
    You can also pull the current version from the mercurial
-   repository at http://xenbits.xensource.com/
+   repository at http://xenbits.xen.org/
 
     # tar xzf xen-unstable-src.tgz
 
@@ -68,42 +74,23 @@ performed with root privileges.]
 
 2. cd to xen-unstable (or whatever you sensibly rename it to).
 
-On Linux:
-
-3. For the very first build, or if you want to destroy existing
-   .configs and build trees, perform the following steps:
+3. For the very first build, or if you want to destroy build trees,
+   perform the following steps:
 
     # make world
     # make install
 
    This will create and install onto the local machine. It will build
-   the xen binary (xen.gz), and a linux kernel and modules that can be
-   used in both dom0 and an unprivileged guest kernel (vmlinuz-2.6.x-xen),
-   the tools and the documentation.
+   the xen binary (xen.gz), the tools and the documentation.
 
    You can override the destination for make install by setting DESTDIR
    to some value.
 
-   The make command line defaults to building the kernel vmlinuz-2.6.x-xen.
-   You can override this default by specifying KERNELS=kernelname. For
-   example, you can make two kernels - linux-2.6-xen0
-   and linux-2.6-xenU - which are smaller builds containing only selected
-   modules, intended primarily for developers that don't like to wait
-   for a full -xen kernel to build. The -xenU kernel is particularly small,
-   as it does not contain any physical device drivers, and hence is
-   only useful for guest domains.
-
-   To make these two kernels, simply specify
-
-   KERNELS="linux-2.6-xen0 linux-2.6-xenU"
-
-   in the make command line.
-
 4. To rebuild an existing tree without modifying the config:
     # make dist
 
-   This will build and install xen, kernels, tools, and
-   docs into the local dist/ directory.
+   This will build and install xen, tools, and docs into the local dist/
+   directory.
 
    You can override the destination for make install by setting DISTDIR
    to some value.
@@ -113,24 +100,7 @@ On Linux:
    version of hotplug or udev scripts, for example), but make dist
    includes all versions of those scripts, so that you can copy the dist
    directory to another machine and install from that distribution.
-
-5. To rebuild a kernel with a modified config:
-
-    # make linux-2.6-xen-config CONFIGMODE=menuconfig     (or xconfig)
-    # make linux-2.6-xen-build
-    # make linux-2.6-xen-install
-
-   Depending on your config, you may need to use 'mkinitrd' to create
-   an initial ram disk, just like a native system e.g.
-    # depmod 2.6.18-xen
-    # mkinitrd -v -f --with=aacraid --with=sd_mod --with=scsi_mod initrd-2.6.18-xen.img 2.6.18-xen
-
-   Other systems may requires the use of 'mkinitramfs' to create the
-   ram disk.
-    # depmod 2.6.18-xen
-    # mkinitramfs -o initrd-2.6.18-xen.img 2.6.18-xen
-
-
+   
 Python Runtime Libraries
 ========================
 
