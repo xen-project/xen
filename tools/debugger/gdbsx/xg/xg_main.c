@@ -158,6 +158,7 @@ xg_init()
 
 
 /*
+ * Precondition: domctl global struct must be filled 
  * Returns : 0 Success, failure otherwise with errno set
  */
 static int
@@ -365,6 +366,19 @@ _change_TF(vcpuid_t which_vcpu, int guest_bitness, int setit)
 {
     union vcpu_guest_context_any anyc;
     int sz = sizeof(anyc);
+
+    /* first try the MTF for hvm guest. otherwise do manually */
+    if (_hvm_guest) {
+        domctl.u.debug_op.vcpu = which_vcpu;
+        domctl.u.debug_op.op = setit ? XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_ON :
+                                       XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_OFF;
+
+        if (_domctl_hcall(XEN_DOMCTL_debug_op, NULL, 0) == 0) {
+            XGTRC("vcpu:%d:MTF success setit:%d\n", which_vcpu, setit);
+            return 0;
+        }
+        XGTRC("vcpu:%d:MTF failed. setit:%d\n", which_vcpu, setit);
+    }
 
     memset(&anyc, 0, sz);
     domctl.u.vcpucontext.vcpu = (uint16_t)which_vcpu;
