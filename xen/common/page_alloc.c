@@ -579,7 +579,8 @@ static void free_heap_pages(
             /* Merge with predecessor block? */
             if ( !mfn_valid(page_to_mfn(pg-mask)) ||
                  !page_state_is(pg-mask, free) ||
-                 (PFN_ORDER(pg-mask) != order) )
+                 (PFN_ORDER(pg-mask) != order) ||
+                 (phys_to_nid(page_to_maddr(pg-mask)) != node) )
                 break;
             pg -= mask;
             page_list_del(pg, &heap(node, zone, order));
@@ -589,15 +590,13 @@ static void free_heap_pages(
             /* Merge with successor block? */
             if ( !mfn_valid(page_to_mfn(pg+mask)) ||
                  !page_state_is(pg+mask, free) ||
-                 (PFN_ORDER(pg+mask) != order) )
+                 (PFN_ORDER(pg+mask) != order) ||
+                 (phys_to_nid(page_to_maddr(pg+mask)) != node) )
                 break;
             page_list_del(pg + mask, &heap(node, zone, order));
         }
 
         order++;
-
-        /* After merging, pg should remain in the same node. */
-        ASSERT(phys_to_nid(page_to_maddr(pg)) == node);
     }
 
     PFN_ORDER(pg) = order;
@@ -849,25 +848,22 @@ int query_page_offline(unsigned long mfn, uint32_t *status)
 static void init_heap_pages(
     struct page_info *pg, unsigned long nr_pages)
 {
-    unsigned int nid_curr, nid_prev;
     unsigned long i;
 
-    nid_prev = phys_to_nid(page_to_maddr(pg-1));
-
-    for ( i = 0; i < nr_pages; nid_prev = nid_curr, i++ )
+    for ( i = 0; i < nr_pages; i++ )
     {
-        nid_curr = phys_to_nid(page_to_maddr(pg+i));
+        unsigned int nid = phys_to_nid(page_to_maddr(pg+i));
 
-        if ( unlikely(!avail[nid_curr]) )
+        if ( unlikely(!avail[nid]) )
         {
             unsigned long s = page_to_mfn(pg + i);
             unsigned long e = page_to_mfn(pg + nr_pages - 1) + 1;
-            bool_t use_tail = (nid_curr == phys_to_nid(pfn_to_paddr(e - 1))) &&
+            bool_t use_tail = (nid == phys_to_nid(pfn_to_paddr(e - 1))) &&
                               !(s & ((1UL << MAX_ORDER) - 1)) &&
                               (find_first_set_bit(e) <= find_first_set_bit(s));
             unsigned long n;
 
-            n = init_node_heap(nid_curr, page_to_mfn(pg+i), nr_pages - i,
+            n = init_node_heap(nid, page_to_mfn(pg+i), nr_pages - i,
                                &use_tail);
             BUG_ON(i + n > nr_pages);
             if ( n && !use_tail )
@@ -880,16 +876,7 @@ static void init_heap_pages(
             nr_pages -= n;
         }
 
-        /*
-         * Free pages of the same node, or if they differ, but are on a
-         * MAX_ORDER alignment boundary (which already get reserved).
-         */
-        if ( (nid_curr == nid_prev) ||
-             !(page_to_mfn(pg+i) & ((1UL << MAX_ORDER) - 1)) )
-            free_heap_pages(pg+i, 0);
-        else
-            printk("Reserving non-aligned node boundary @ mfn %#lx\n",
-                   page_to_mfn(pg+i));
+        free_heap_pages(pg+i, 0);
     }
 }
 
