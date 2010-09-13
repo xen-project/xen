@@ -108,8 +108,8 @@
         __guest_handle_ ## name;                                \
     typedef struct { union { type *p; uint64_aligned_t q; }; }  \
         __guest_handle_64_ ## name
-#undef set_xen_guest_handle
-#define set_xen_guest_handle(hnd, val)                      \
+#undef set_xen_guest_handle_raw
+#define set_xen_guest_handle_raw(hnd, val)                  \
     do { if ( sizeof(hnd) == 8 ) *(uint64_t *)&(hnd) = 0;   \
          (hnd).p = val;                                     \
     } while ( 0 )
