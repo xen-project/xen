@@ -385,6 +385,11 @@ long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
 
 #endif /* __i386__ */
 
+void vmx_update_cpu_exec_control(struct vcpu *v)
+{
+    __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vmx.exec_control);
+}
+
 static void vmx_update_secondary_exec_control(struct vcpu *v)
 {
     __vmwrite(SECONDARY_VM_EXEC_CONTROL,
@@ -419,7 +424,7 @@ static void vmx_save_dr(struct vcpu *v)
     /* Clear the DR dirty flag and re-enable intercepts for DR accesses. */
     v->arch.hvm_vcpu.flag_dr_dirty = 0;
     v->arch.hvm_vmx.exec_control |= CPU_BASED_MOV_DR_EXITING;
-    __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vmx.exec_control);
+    vmx_update_cpu_exec_control(v);
 
     v->arch.guest_context.debugreg[0] = read_debugreg(0);
     v->arch.guest_context.debugreg[1] = read_debugreg(1);
@@ -968,7 +973,7 @@ static void vmx_set_rdtsc_exiting(struct vcpu *v, bool_t enable)
     v->arch.hvm_vmx.exec_control &= ~CPU_BASED_RDTSC_EXITING;
     if ( enable )
         v->arch.hvm_vmx.exec_control |= CPU_BASED_RDTSC_EXITING;
-    __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vmx.exec_control);
+    vmx_update_cpu_exec_control(v);
     vmx_vmcs_exit(v);
 }
 
@@ -1101,7 +1106,7 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
             v->arch.hvm_vmx.exec_control &= ~cr3_ctls;
             if ( !hvm_paging_enabled(v) )
                 v->arch.hvm_vmx.exec_control |= cr3_ctls;
-            __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vmx.exec_control);
+            vmx_update_cpu_exec_control(v);
 
             /* Changing CR0.PE can change some bits in real CR4. */
             vmx_update_guest_cr(v, 4);
@@ -1559,7 +1564,7 @@ static void vmx_dr_access(unsigned long exit_qualification,
 
     /* Allow guest direct access to DR registers */
     v->arch.hvm_vmx.exec_control &= ~CPU_BASED_MOV_DR_EXITING;
-    __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vmx.exec_control);
+    vmx_update_cpu_exec_control(v);
 }
 
 static void vmx_invlpg_intercept(unsigned long vaddr)
@@ -2488,14 +2493,12 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     case EXIT_REASON_PENDING_VIRT_INTR:
         /* Disable the interrupt window. */
         v->arch.hvm_vmx.exec_control &= ~CPU_BASED_VIRTUAL_INTR_PENDING;
-        __vmwrite(CPU_BASED_VM_EXEC_CONTROL,
-                  v->arch.hvm_vmx.exec_control);
+        vmx_update_cpu_exec_control(v);
         break;
     case EXIT_REASON_PENDING_VIRT_NMI:
         /* Disable the NMI window. */
         v->arch.hvm_vmx.exec_control &= ~CPU_BASED_VIRTUAL_NMI_PENDING;
-        __vmwrite(CPU_BASED_VM_EXEC_CONTROL,
-                  v->arch.hvm_vmx.exec_control);
+        vmx_update_cpu_exec_control(v);
         break;
     case EXIT_REASON_TASK_SWITCH: {
         const enum hvm_task_switch_reason reasons[] = {
@@ -2655,7 +2658,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     case EXIT_REASON_MONITOR_TRAP_FLAG:
         v->arch.hvm_vmx.exec_control &= ~CPU_BASED_MONITOR_TRAP_FLAG;
-        __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vmx.exec_control);
+        vmx_update_cpu_exec_control(v);
         if ( v->domain->debugger_attached && v->arch.hvm_vcpu.single_step )
             domain_pause_for_debugger();
         break;

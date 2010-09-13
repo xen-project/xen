@@ -709,7 +709,7 @@ static int construct_vmcs(struct vcpu *v)
     /* Do not enable Monitor Trap Flag unless start single step debug */
     v->arch.hvm_vmx.exec_control &= ~CPU_BASED_MONITOR_TRAP_FLAG;
 
-    __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vmx.exec_control);
+    vmx_update_cpu_exec_control(v);
     __vmwrite(VM_EXIT_CONTROLS, vmexit_ctl);
     __vmwrite(VM_ENTRY_CONTROLS, vmentry_ctl);
 

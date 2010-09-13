@@ -69,7 +69,6 @@
 
 static void enable_intr_window(struct vcpu *v, struct hvm_intack intack)
 {
-    u32 *cpu_exec_control = &v->arch.hvm_vmx.exec_control;
     u32 ctl = CPU_BASED_VIRTUAL_INTR_PENDING;
 
     ASSERT(intack.source != hvm_intsrc_none);
@@ -103,10 +102,10 @@ static void enable_intr_window(struct vcpu *v, struct hvm_intack intack)
         ctl = CPU_BASED_VIRTUAL_NMI_PENDING;
     }
 
-    if ( !(*cpu_exec_control & ctl) )
+    if ( !(v->arch.hvm_vmx.exec_control & ctl) )
     {
-        *cpu_exec_control |= ctl;
-        __vmwrite(CPU_BASED_VM_EXEC_CONTROL, *cpu_exec_control);
+        v->arch.hvm_vmx.exec_control |= ctl;
+        vmx_update_cpu_exec_control(v);
     }
 }
 
@@ -121,7 +120,7 @@ asmlinkage void vmx_intr_assist(void)
     if ( unlikely(v->arch.hvm_vcpu.single_step) )
     {
         v->arch.hvm_vmx.exec_control |= CPU_BASED_MONITOR_TRAP_FLAG;
-        __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vmx.exec_control);
+        vmx_update_cpu_exec_control(v);
         return;
     }
 
