@@ -29,6 +29,9 @@
 
 #include "xen.h"
 
+/* version of ABI */
+#define TMEM_SPEC_VERSION          1
+
 /* Commands to HYPERVISOR_tmem_op() */
 #define TMEM_CONTROL               0
 #define TMEM_NEW_POOL              1
@@ -75,10 +78,12 @@
 /* Bits for HYPERVISOR_tmem_op(TMEM_NEW_POOL) */
 #define TMEM_POOL_PERSIST          1
 #define TMEM_POOL_SHARED           2
+#define TMEM_POOL_PRECOMPRESSED    4
 #define TMEM_POOL_PAGESIZE_SHIFT   4
 #define TMEM_POOL_PAGESIZE_MASK  0xf
 #define TMEM_POOL_VERSION_SHIFT   24
 #define TMEM_POOL_VERSION_MASK  0xff
+#define TMEM_POOL_RESERVED_BITS  0x00ffff00
 
 /* Bits for client flags (save/restore) */
 #define TMEM_CLIENT_COMPRESS       1
@@ -106,12 +111,12 @@ struct tmem_op {
             uint32_t cli_id;
             uint32_t arg1;
             uint32_t arg2;
-            uint64_t arg3;
+            uint64_t oid[3];
             tmem_cli_va_t buf;
         } ctrl; /* for cmd == TMEM_CONTROL */
         struct {
             
-            uint64_t object;
+            uint64_t oid[3];
             uint32_t index;
             uint32_t tmem_offset;
             uint32_t pfn_offset;
@@ -126,9 +131,8 @@ DEFINE_XEN_GUEST_HANDLE(tmem_op_t);
 struct tmem_handle {
     uint32_t pool_id;
     uint32_t index;
-    uint64_t oid;
+    uint64_t oid[3];
 };
-
 #endif
 
 #endif /* __XEN_PUBLIC_TMEM_H__ */
