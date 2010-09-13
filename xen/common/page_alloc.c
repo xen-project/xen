@@ -415,8 +415,6 @@ static struct page_info *alloc_heap_pages(
     if ( d != NULL )
         d->last_alloc_node = node;
 
-    spin_unlock(&heap_lock);
-
     cpus_clear(mask);
 
     for ( i = 0; i < (1 << order); i++ )
@@ -437,6 +435,8 @@ static struct page_info *alloc_heap_pages(
         pg[i].u.inuse.type_info = 0;
         page_set_owner(&pg[i], NULL);
     }
+
+    spin_unlock(&heap_lock);
 
     if ( unlikely(!cpus_empty(mask)) )
     {
@@ -533,6 +533,8 @@ static void free_heap_pages(
     ASSERT(order <= MAX_ORDER);
     ASSERT(node >= 0);
 
+    spin_lock(&heap_lock);
+
     for ( i = 0; i < (1 << order); i++ )
     {
         /*
@@ -559,8 +561,6 @@ static void free_heap_pages(
         if ( pg[i].u.free.need_tlbflush )
             pg[i].tlbflush_timestamp = tlbflush_current_time();
     }
-
-    spin_lock(&heap_lock);
 
     avail[node][zone] += 1 << order;
     total_avail_pages += 1 << order;
