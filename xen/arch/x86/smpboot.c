@@ -1602,7 +1602,7 @@ void __init smp_intr_init(void)
 		irq_vector[irq] = FIRST_HIPRIORITY_VECTOR + seridx + 1;
 		per_cpu(vector_irq, cpu)[FIRST_HIPRIORITY_VECTOR + seridx + 1] = irq;
 		irq_cfg[irq].vector = FIRST_HIPRIORITY_VECTOR + seridx + 1;
-		irq_cfg[irq].domain = (cpumask_t)CPU_MASK_ALL;
+		irq_cfg[irq].domain = cpu_online_map;
 	}
 
 	/* IPI for cleanuping vectors after irq move */
