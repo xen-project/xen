@@ -63,7 +63,56 @@ int xc_tmem_control(xc_interface *xch,
     set_xen_guest_handle(op.u.ctrl.buf,buf);
     op.u.ctrl.arg1 = arg1;
     op.u.ctrl.arg2 = arg2;
-    op.u.ctrl.arg3 = arg3;
+    /* use xc_tmem_control_oid if arg3 is required */
+    op.u.ctrl.oid[0] = 0;
+    op.u.ctrl.oid[1] = 0;
+    op.u.ctrl.oid[2] = 0;
+
+    if (subop == TMEMC_LIST) {
+        if ((arg1 != 0) && (lock_pages(buf, arg1) != 0))
+        {
+            PERROR("Could not lock memory for Xen hypercall");
+            return -ENOMEM;
+        }
+    }
+
+#ifdef VALGRIND
+    if (arg1 != 0)
+        memset(buf, 0, arg1);
+#endif
+
+    rc = do_tmem_op(xc, &op);
+
+    if (subop == TMEMC_LIST) {
+        if (arg1 != 0)
+            unlock_pages(buf, arg1);
+    }
+
+    return rc;
+}
+
+int xc_tmem_control_oid(int xc,
+                        int32_t pool_id,
+                        uint32_t subop,
+                        uint32_t cli_id,
+                        uint32_t arg1,
+                        uint32_t arg2,
+                        struct tmem_oid oid,
+                        void *buf)
+{
+    tmem_op_t op;
+    int rc;
+
+    op.cmd = TMEM_CONTROL;
+    op.pool_id = pool_id;
+    op.u.ctrl.subop = subop;
+    op.u.ctrl.cli_id = cli_id;
+    set_xen_guest_handle(op.u.ctrl.buf,buf);
+    op.u.ctrl.arg1 = arg1;
+    op.u.ctrl.arg2 = arg2;
+    op.u.ctrl.oid[0] = oid.oid[0];
+    op.u.ctrl.oid[1] = oid.oid[1];
+    op.u.ctrl.oid[2] = oid.oid[2];
 
     if (subop == TMEMC_LIST) {
         if ((arg1 != 0) && (lock_pages(buf, arg1) != 0))
@@ -254,7 +303,7 @@ int xc_tmem_save(xc_interface *xch,
                 } else {
                     /* page list terminator */
                     h = (struct tmem_handle *)buf;
-                    h->oid = -1;
+                    h->oid[0] = h->oid[1] = h->oid[2] = -1L;
                     if ( write_exact(io_fd, &h->oid, sizeof(h->oid)) )
                         return -1;
                     break;
@@ -291,7 +340,8 @@ int xc_tmem_save_extra(xc_interface *xch, int dom, int io_fd, int field_marker)
         if ( write_exact(io_fd, &handle.index, sizeof(handle.index)) )
             return -1;
         count++;
-        checksum += handle.pool_id + handle.oid + handle.index;
+        checksum += handle.pool_id + handle.oid[0] + handle.oid[1] +
+                    handle.oid[2] + handle.index;
     }
     if ( count )
             DPRINTF("needed %d tmem invalidates, check=%d\n",count,checksum);
@@ -401,20 +451,21 @@ int xc_tmem_restore(xc_interface *xch, int dom, int io_fd)
         }
         for ( j = n_pages; j > 0; j-- )
         {
-            uint64_t oid;
+            struct tmem_oid oid;
             uint32_t index;
             int rc;
             if ( read_exact(io_fd, &oid, sizeof(oid)) )
                 return -1;
-            if ( oid == -1 )
+            if ( oid.oid[0] == -1L && oid.oid[1] == -1L && oid.oid[2] == -1L )
                 break;
             if ( read_exact(io_fd, &index, sizeof(index)) )
                 return -1;
             if ( read_exact(io_fd, buf, pagesize) )
                 return -1;
             checksum += *buf;
-            if ( (rc = xc_tmem_control(xch, pool_id, TMEMC_RESTORE_PUT_PAGE,
-                                 dom, bufsize, index, oid, buf)) <= 0 )
+            if ( (rc = xc_tmem_control_oid(xc, pool_id,
+                                           TMEMC_RESTORE_PUT_PAGE, dom,
+                                           bufsize, index, oid, buf)) <= 0 )
             {
                 DPRINTF("xc_tmem_restore: putting page failed, rc=%d\n",rc);
                 return -1;
@@ -434,7 +485,7 @@ int xc_tmem_restore(xc_interface *xch, int dom, int io_fd)
 int xc_tmem_restore_extra(xc_interface *xch, int dom, int io_fd)
 {
     uint32_t pool_id;
-    uint64_t oid;
+    struct tmem_oid oid;
     uint32_t index;
     int count = 0;
     int checksum = 0;
@@ -445,11 +496,11 @@ int xc_tmem_restore_extra(xc_interface *xch, int dom, int io_fd)
             return -1;
         if ( read_exact(io_fd, &index, sizeof(index)) )
             return -1;
-        if ( xc_tmem_control(xch, pool_id, TMEMC_RESTORE_FLUSH_PAGE, dom,
+        if ( xc_tmem_control_oid(xch, pool_id, TMEMC_RESTORE_FLUSH_PAGE, dom,
                              0,index,oid,NULL) <= 0 )
             return -1;
         count++;
-        checksum += pool_id + oid + index;
+        checksum += pool_id + oid.oid[0] + oid.oid[1] + oid.oid[2] + index;
     }
     if ( pool_id != -1 )
         return -1;
