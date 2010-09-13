@@ -654,16 +654,22 @@ static void intel_memerr_dhandler(int bnum,
             BUG_ON( result->owner == DOMID_COW );
             if ( result->owner != DOMID_XEN ) {
                 d = get_domain_by_id(result->owner);
-                if ( !is_vmce_ready(bank, d) )
-                {
-                    /* Should not inject vMCE to guest */
-                    if ( d )
-                        put_domain(d);
-                    return;
-                }
-
                 ASSERT(d);
                 gfn = get_gpfn_from_mfn((bank->mc_addr) >> PAGE_SHIFT);
+
+                if ( !is_vmce_ready(bank, d) )
+                {
+                    printk("DOM%d not ready for vMCE\n", d->domain_id);
+                    goto vmce_failed;
+                }
+
+                if ( unmmap_broken_page(d, _mfn(mfn), gfn) )
+                {
+                    printk("Unmap broken memory %lx for DOM%d failed\n",
+                            mfn, d->domain_id);
+                    goto vmce_failed;
+                }
+
                 bank->mc_addr =  gfn << PAGE_SHIFT |
                   (bank->mc_addr & (PAGE_SIZE -1 ));
                 if ( fill_vmsr_data(bank, d,
@@ -671,18 +677,15 @@ static void intel_memerr_dhandler(int bnum,
                 {
                     mce_printk(MCE_QUIET, "Fill vMCE# data for DOM%d "
                       "failed\n", result->owner);
-                    put_domain(d);
-                    domain_crash(d);
-                    return;
+                    goto vmce_failed;
                 }
+
                 /* We will inject vMCE to DOMU*/
                 if ( inject_vmce(d) < 0 )
                 {
                     mce_printk(MCE_QUIET, "inject vMCE to DOM%d"
                       " failed\n", d->domain_id);
-                    put_domain(d);
-                    domain_crash(d);
-                    return;
+                    goto vmce_failed;
                 }
                 /* Impacted domain go on with domain's recovery job
                  * if the domain has its own MCA handler.
@@ -691,6 +694,11 @@ static void intel_memerr_dhandler(int bnum,
                  */
                 result->result = MCA_RECOVERED;
                 put_domain(d);
+
+                return;
+vmce_failed:
+                put_domain(d);
+                domain_crash(d);
             }
         }
     }

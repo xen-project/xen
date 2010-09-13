@@ -49,6 +49,7 @@ void mce_intel_feature_init(struct cpuinfo_x86 *c);
 void amd_nonfatal_mcheck_init(struct cpuinfo_x86 *c);
 
 int is_vmce_ready(struct mcinfo_bank *bank, struct domain *d);
+int unmmap_broken_page(struct domain *d, mfn_t mfn, unsigned long gfn);
 
 u64 mce_cap_init(void);
 extern int firstbank;
