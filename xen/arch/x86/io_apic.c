@@ -2030,8 +2030,8 @@ static inline void check_timer(void)
         return;
     }
     printk(" failed :(.\n");
-    panic("IO-APIC + timer doesn't work!  Boot with apic=debug and send a "
-          "report.  Then try booting with the 'noapic' option");
+    panic("IO-APIC + timer doesn't work!  Boot with apic_verbosity=debug "
+          "and send a report.  Then try booting with the 'noapic' option");
 }
 
 /*
