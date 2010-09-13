@@ -385,6 +385,12 @@ long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
 
 #endif /* __i386__ */
 
+static void vmx_update_secondary_exec_control(struct vcpu *v)
+{
+    __vmwrite(SECONDARY_VM_EXEC_CONTROL,
+              v->arch.hvm_vmx.secondary_exec_control);
+}
+
 void vmx_update_exception_bitmap(struct vcpu *v)
 {
     __vmwrite(EXCEPTION_BITMAP, v->arch.hvm_vmx.exception_bitmap);
@@ -1936,18 +1942,18 @@ static void vmx_install_vlapic_mapping(struct vcpu *v)
 void vmx_vlapic_msr_changed(struct vcpu *v)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
-    uint32_t ctl;
 
     if ( !cpu_has_vmx_virtualize_apic_accesses )
         return;
 
     vmx_vmcs_enter(v);
-    ctl  = __vmread(SECONDARY_VM_EXEC_CONTROL);
-    ctl &= ~SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES;
+    v->arch.hvm_vmx.secondary_exec_control &=
+        ~SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES;
     if ( !vlapic_hw_disabled(vlapic) &&
          (vlapic_base_address(vlapic) == APIC_DEFAULT_PHYS_BASE) )
-        ctl |= SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES;
-    __vmwrite(SECONDARY_VM_EXEC_CONTROL, ctl);
+        v->arch.hvm_vmx.secondary_exec_control |=
+            SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES;
+    vmx_update_secondary_exec_control(v);
     vmx_vmcs_exit(v);
 }
 
@@ -2703,16 +2709,14 @@ asmlinkage void vmx_vmenter_helper(void)
             /* VPID was disabled: now enabled. */
             curr->arch.hvm_vmx.secondary_exec_control |=
                 SECONDARY_EXEC_ENABLE_VPID;
-            __vmwrite(SECONDARY_VM_EXEC_CONTROL,
-                      curr->arch.hvm_vmx.secondary_exec_control);
+            vmx_update_secondary_exec_control(curr);
         }
         else if ( old_asid && !new_asid )
         {
             /* VPID was enabled: now disabled. */
             curr->arch.hvm_vmx.secondary_exec_control &=
                 ~SECONDARY_EXEC_ENABLE_VPID;
-            __vmwrite(SECONDARY_VM_EXEC_CONTROL,
-                      curr->arch.hvm_vmx.secondary_exec_control);
+            vmx_update_secondary_exec_control(curr);
         }
     }
 
