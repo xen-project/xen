@@ -85,6 +85,7 @@ typedef enum {
     p2m_ram_paging_in = 11,       /* Memory that is being paged in */
     p2m_ram_paging_in_start = 12, /* Memory that is being paged in */
     p2m_ram_shared = 13,          /* Shared or sharable memory */
+    p2m_ram_broken  =14,          /* Broken page, access cause domain crash */
 } p2m_type_t;
 
 typedef enum {
@@ -138,6 +139,7 @@ typedef enum {
  * reinit the type correctly after fault */
 #define P2M_SHARABLE_TYPES (p2m_to_mask(p2m_ram_rw))
 #define P2M_SHARED_TYPES   (p2m_to_mask(p2m_ram_shared))
+#define P2M_BROKEN_TYPES (p2m_to_mask(p2m_ram_broken))
 
 /* Useful predicates */
 #define p2m_is_ram(_t) (p2m_to_mask(_t) & P2M_RAM_TYPES)
@@ -155,7 +157,7 @@ typedef enum {
 #define p2m_is_paged(_t)    (p2m_to_mask(_t) & P2M_PAGED_TYPES)
 #define p2m_is_sharable(_t) (p2m_to_mask(_t) & P2M_SHARABLE_TYPES)
 #define p2m_is_shared(_t)   (p2m_to_mask(_t) & P2M_SHARED_TYPES)
-
+#define p2m_is_broken(_t)   (p2m_to_mask(_t) & P2M_BROKEN_TYPES)
 
 /* Populate-on-demand */
 #define POPULATE_ON_DEMAND_MFN  (1<<9)
@@ -306,17 +308,31 @@ static inline mfn_t _gfn_to_mfn_type(struct p2m_domain *p2m,
                                      unsigned long gfn, p2m_type_t *t,
                                      p2m_query_t q)
 {
+    mfn_t mfn;
+
     if ( !p2m || !paging_mode_translate(p2m->domain) )
     {
         /* Not necessarily true, but for non-translated guests, we claim
          * it's the most generic kind of memory */
         *t = p2m_ram_rw;
-        return _mfn(gfn);
+        mfn = _mfn(gfn);
     }
-    if ( likely(current->domain == p2m->domain) )
-        return gfn_to_mfn_type_current(p2m, gfn, t, q);
+    else if ( likely(current->domain == p2m->domain) )
+        mfn = gfn_to_mfn_type_current(p2m, gfn, t, q);
     else
-        return gfn_to_mfn_type_p2m(p2m, gfn, t, q);
+        mfn = gfn_to_mfn_type_p2m(p2m, gfn, t, q);
+
+#ifdef __x86_64__
+    if (unlikely((p2m_is_broken(*t))))
+    {
+        /* Return invalid_mfn to avoid caller's access */
+        mfn = _mfn(INVALID_MFN);
+        if (q == p2m_guest)
+            domain_crash(p2m->domain);
+    }
+#endif
+
+    return mfn;
 }
 
 #define gfn_to_mfn(p2m, g, t) _gfn_to_mfn_type((p2m), (g), (t), p2m_alloc)
