@@ -2331,7 +2331,14 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         case EXIT_REASON_PENDING_VIRT_INTR:
         case EXIT_REASON_PENDING_VIRT_NMI:
         case EXIT_REASON_MCE_DURING_VMENTRY:
+        case EXIT_REASON_GETSEC:
+        case EXIT_REASON_ACCESS_GDTR_OR_IDTR:
+        case EXIT_REASON_ACCESS_LDTR_OR_TR:
+        case EXIT_REASON_VMX_PREEMPTION_TIMER_EXPIRED:
+        case EXIT_REASON_INVEPT:
+        case EXIT_REASON_INVVPID:
             break;
+
         default:
             v->arch.hvm_vmx.vmx_emulate = 1;
             perfc_incr(realmode_exits);
@@ -2582,6 +2589,15 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     case EXIT_REASON_VMWRITE:
     case EXIT_REASON_VMXOFF:
     case EXIT_REASON_VMXON:
+    case EXIT_REASON_GETSEC:
+    case EXIT_REASON_INVEPT:
+    case EXIT_REASON_INVVPID:
+        /*
+         * We should never exit on GETSEC because CR4.SMXE is always 0 when
+         * running in guest context, and the CPU checks that before getting
+         * as far as vmexit.
+         */
+        WARN_ON(exit_reason == EXIT_REASON_GETSEC);
         vmx_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
         break;
 
@@ -2647,6 +2663,10 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
     }
 
+    case EXIT_REASON_ACCESS_GDTR_OR_IDTR:
+    case EXIT_REASON_ACCESS_LDTR_OR_TR:
+    case EXIT_REASON_VMX_PREEMPTION_TIMER_EXPIRED:
+    /* fall through */
     default:
     exit_and_crash:
         gdprintk(XENLOG_ERR, "Bad vmexit (reason %x)\n", exit_reason);

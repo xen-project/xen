@@ -77,6 +77,7 @@ void vmx_update_debug_state(struct vcpu *v);
 #define EXIT_REASON_PENDING_VIRT_NMI    8
 #define EXIT_REASON_TASK_SWITCH         9
 #define EXIT_REASON_CPUID               10
+#define EXIT_REASON_GETSEC              11
 #define EXIT_REASON_HLT                 12
 #define EXIT_REASON_INVD                13
 #define EXIT_REASON_INVLPG              14
@@ -107,9 +108,14 @@ void vmx_update_debug_state(struct vcpu *v);
 #define EXIT_REASON_MCE_DURING_VMENTRY  41
 #define EXIT_REASON_TPR_BELOW_THRESHOLD 43
 #define EXIT_REASON_APIC_ACCESS         44
+#define EXIT_REASON_ACCESS_GDTR_OR_IDTR 46
+#define EXIT_REASON_ACCESS_LDTR_OR_TR   47
 #define EXIT_REASON_EPT_VIOLATION       48
 #define EXIT_REASON_EPT_MISCONFIG       49
+#define EXIT_REASON_INVEPT              50
 #define EXIT_REASON_RDTSCP              51
+#define EXIT_REASON_VMX_PREEMPTION_TIMER_EXPIRED 52
+#define EXIT_REASON_INVVPID             53
 #define EXIT_REASON_WBINVD              54
 #define EXIT_REASON_XSETBV              55
 
