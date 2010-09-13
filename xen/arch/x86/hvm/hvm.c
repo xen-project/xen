@@ -2321,6 +2321,7 @@ static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
     HYPERCALL(sched_op),
     HYPERCALL(set_timer_op),
     HYPERCALL(hvm_op),
+    HYPERCALL(sysctl),
     HYPERCALL(tmem_op)
 };
 
@@ -2375,6 +2376,7 @@ static hvm_hypercall_t *hvm_hypercall64_table[NR_hypercalls] = {
     HYPERCALL(sched_op),
     HYPERCALL(set_timer_op),
     HYPERCALL(hvm_op),
+    HYPERCALL(sysctl),
     HYPERCALL(tmem_op)
 };
 
@@ -2387,6 +2389,7 @@ static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
     HYPERCALL(sched_op),
     HYPERCALL(set_timer_op),
     HYPERCALL(hvm_op),
+    HYPERCALL(sysctl),
     HYPERCALL(tmem_op)
 };
 
