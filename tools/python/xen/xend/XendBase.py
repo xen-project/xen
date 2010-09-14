@@ -115,7 +115,7 @@ class XendBase:
             # In OSS, ref == uuid
             return uuid
         else:
-            raise "Big Error.. TODO!"
+            raise ValueError("Big Error.. TODO!")
 
     def get_all_records(cls):
         return dict([(inst.get_uuid(), inst.get_record())

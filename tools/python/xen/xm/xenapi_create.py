@@ -707,7 +707,7 @@ class sxp2xml:
                 vm.attributes['security_label'] = \
                                     security.set_security_label(sec_data[0][1][1],sec_data[0][2][1])
             except Exception, e:
-                raise "Invalid security data format: %s" % str(sec_data)
+                raise ValueError("Invalid security data format: %s" % str(sec_data))
 
         # Make the name tag
 

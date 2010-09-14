@@ -2796,7 +2796,7 @@ def xm_network_attach(args):
                              for ref, record in server.xenapi.network
                              .get_all_records().items()])
             if bridge not in networks.keys():
-                raise "Unknown bridge name!"
+                raise ValueError("Unknown bridge name!")
             return networks[bridge]
 
         vif_conv = {
