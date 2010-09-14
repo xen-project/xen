@@ -1209,7 +1209,7 @@ struct domain_create {
     const char *extra_config; /* extra config string */
     const char *restore_file;
     int migrate_fd; /* -1 means none */
-    char **migration_domname_r;
+    char **migration_domname_r; /* from malloc */
 };
 
 static int create_domain(struct domain_create *dom_info)
@@ -1227,7 +1227,6 @@ static int create_domain(struct domain_create *dom_info)
     const char *extra_config = dom_info->extra_config;
     const char *restore_file = dom_info->restore_file;
     int migrate_fd = dom_info->migrate_fd;
-    char **migration_domname_r = dom_info->migration_domname_r;
 
     int i, fd;
     int need_daemon = 1;
@@ -1353,12 +1352,16 @@ static int create_domain(struct domain_create *dom_info)
             /* when we receive a domain we get its name from the config
              * file; and we receive it to a temporary name */
             assert(!common_domname);
+            
             common_domname = d_config.c_info.name;
-            if (asprintf(migration_domname_r, "%s--incoming", d_config.c_info.name) < 0) {
+            d_config.c_info.name = 0; /* steals allocation from config */
+
+            if (asprintf(&d_config.c_info.name,
+                         "%s--incoming", d_config.c_info.name) < 0) {
                 fprintf(stderr, "Failed to allocate memory in asprintf\n");
                 exit(1);
             }
-            d_config.c_info.name = *migration_domname_r;
+            *dom_info->migration_domname_r = strdup(d_config.c_info.name);
         }
     }
 
