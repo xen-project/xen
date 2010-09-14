@@ -167,9 +167,9 @@ endif
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 6add1c6c520ca65421256d5168b5d274f13942d3
-# Thu Sep 2 19:08:58 2010 +0100
-# passthrough: enabling IGD passthrough for Calpella and Sandybridge
+QEMU_TAG ?= f95d202ed6444dacb15fbea4dee185eb0e048d9a
+# Tue Sep 14 17:31:43 2010 +0100
+# ioemu: fix VNC altgr-insert behavior
 
 # Optional components
 XENSTAT_XENTOP     ?= y
