@@ -1030,6 +1030,12 @@ void notify_via_xen_event_channel(struct domain *ld, int lport)
 
     spin_lock(&ld->event_lock);
 
+    if ( unlikely(ld->is_dying) )
+    {
+        spin_unlock(&ld->event_lock);
+        return;
+    }
+
     ASSERT(port_is_valid(ld, lport));
     lchn = evtchn_from_port(ld, lport);
     ASSERT(lchn->consumer_is_xen);
