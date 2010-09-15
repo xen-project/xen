@@ -351,6 +351,31 @@ static int sched_has_urgent_vcpu(void)
     return atomic_read(&this_cpu(schedule_data).urgent_count);
 }
 
+/*
+ * "AAJ72. EOI Transaction May Not be Sent if Software Enters Core C6 During 
+ * an Interrupt Service Routine"
+ * 
+ * There was an errata with some Core i7 processors that an EOI transaction 
+ * may not be sent if software enters core C6 during an interrupt service 
+ * routine. So we don't enter deep Cx state if there is an EOI pending.
+ */
+bool_t errata_c6_eoi_workaround(void)
+{
+    static bool_t fix_needed = -1;
+
+    if ( unlikely(fix_needed == -1) )
+    {
+        int model = boot_cpu_data.x86_model;
+        fix_needed = (cpu_has_apic && !directed_eoi_enabled &&
+                      (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) &&
+                      (boot_cpu_data.x86 == 6) &&
+                      ((model == 0x1a) || (model == 0x1e) || (model == 0x1f) ||
+                       (model == 0x25) || (model == 0x2c) || (model == 0x2f)));
+    }
+
+    return (fix_needed && cpu_has_pending_apic_eoi());
+}
+
 static void acpi_processor_idle(void)
 {
     struct acpi_processor_power *power = processor_powers[smp_processor_id()];
@@ -400,6 +425,9 @@ static void acpi_processor_idle(void)
         cpufreq_dbs_timer_resume();
         return;
     }
+
+    if ( (cx->type == ACPI_STATE_C3) && errata_c6_eoi_workaround() )
+        cx = power->safe_state;
 
     power->last_state = cx;
 

@@ -765,6 +765,11 @@ struct pending_eoi {
 static DEFINE_PER_CPU(struct pending_eoi, pending_eoi[NR_DYNAMIC_VECTORS]);
 #define pending_eoi_sp(p) ((p)[NR_DYNAMIC_VECTORS-1].vector)
 
+bool_t cpu_has_pending_apic_eoi(void)
+{
+    return (pending_eoi_sp(this_cpu(pending_eoi)) != 0);
+}
+
 static inline void set_pirq_eoi(struct domain *d, unsigned int irq)
 {
     if ( d->arch.pirq_eoi_map )
