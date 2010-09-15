@@ -67,8 +67,6 @@ bool_t cpu_has_lmsl;
 
 static struct hvm_function_table svm_function_table;
 
-enum handler_return { HNDL_done, HNDL_unhandled, HNDL_exception_raised };
-
 /* va of hardware host save area     */
 static DEFINE_PER_CPU_READ_MOSTLY(void *, hsa);
 
@@ -106,30 +104,6 @@ static void inline __update_guest_eip(
 static void svm_cpu_down(void)
 {
     write_efer(read_efer() & ~EFER_SVME);
-}
-
-static enum handler_return
-long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
-{
-    HVM_DBG_LOG(DBG_LEVEL_0, "msr %x msr_content %"PRIx64,
-                msr, msr_content);
-
-    switch ( msr )
-    {
-    case MSR_IA32_MC4_MISC: /* Threshold register */
-    case MSR_F10_MC4_MISC1 ... MSR_F10_MC4_MISC3:
-        /*
-         * MCA/MCE: Threshold register is reported to be locked, so we ignore
-         * all write accesses. This behaviour matches real HW, so guests should
-         * have no problem with this.
-         */
-        break;
-
-    default:
-        return HNDL_unhandled;
-    }
-
-    return HNDL_done;
 }
 
 static void svm_save_dr(struct vcpu *v)
@@ -1179,20 +1153,20 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         vpmu_do_wrmsr(msr, msr_content);
         break;
 
+    case MSR_IA32_MC4_MISC: /* Threshold register */
+    case MSR_F10_MC4_MISC1 ... MSR_F10_MC4_MISC3:
+        /*
+         * MCA/MCE: Threshold register is reported to be locked, so we ignore
+         * all write accesses. This behaviour matches real HW, so guests should
+         * have no problem with this.
+         */
+        break;
+
     default:
         if ( wrmsr_viridian_regs(msr, msr_content) )
             break;
 
-        switch ( long_mode_do_msr_write(msr, msr_content) )
-        {
-        case HNDL_unhandled:
-            wrmsr_hypervisor_regs(msr, msr_content);
-            break;
-        case HNDL_exception_raised:
-            return X86EMUL_EXCEPTION;
-        case HNDL_done:
-            break;
-        }
+        wrmsr_hypervisor_regs(msr, msr_content);
         break;
     }
     return X86EMUL_OKAY;
