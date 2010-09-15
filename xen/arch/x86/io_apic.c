@@ -2463,6 +2463,9 @@ void dump_ioapic_irq_info(void)
     unsigned int irq, pin, printed = 0;
     unsigned long flags;
 
+    if ( !irq_2_pin )
+        return;
+
     for ( irq = 0; irq < nr_irqs_gsi; irq++ )
     {
         entry = &irq_2_pin[irq];
