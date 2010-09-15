@@ -32,6 +32,7 @@ enum hvm_io_state {
     HVMIO_dispatched,
     HVMIO_awaiting_completion,
     HVMIO_handle_mmio_awaiting_completion,
+    HVMIO_handle_pio_awaiting_completion,
     HVMIO_completed
 };
 
@@ -98,6 +99,7 @@ struct hvm_vcpu {
     /* I/O request in flight to device model. */
     enum hvm_io_state   io_state;
     unsigned long       io_data;
+    int                 io_size;
 
     /*
      * HVM emulation:
@@ -107,9 +109,6 @@ struct hvm_vcpu {
      */
     unsigned long       mmio_gva;
     unsigned long       mmio_gpfn;
-    uint16_t            io_port;
-    int                 io_size;
-    unsigned            io_dir;
 
     /* Callback into x86_emulate when emulating FPU/MMX/XMM instructions. */
     void (*fpu_exception_callback)(void *, struct cpu_user_regs *);

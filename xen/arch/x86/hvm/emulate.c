@@ -48,7 +48,7 @@ static void hvmtrace_io_assist(int is_mmio, ioreq_t *p)
     trace_var(event, 0/*!cycles*/, size, buffer);
 }
 
-int hvmemul_do_io(
+static int hvmemul_do_io(
     int is_mmio, paddr_t addr, unsigned long *reps, int size,
     paddr_t ram_gpa, int dir, int df, void *p_data)
 {
@@ -142,6 +142,7 @@ int hvmemul_do_io(
 
     curr->arch.hvm_vcpu.io_state =
         (p_data == NULL) ? HVMIO_dispatched : HVMIO_awaiting_completion;
+    curr->arch.hvm_vcpu.io_size = size;
 
     p->dir = dir;
     p->data_is_ptr = value_is_ptr;
@@ -224,7 +225,7 @@ int hvmemul_do_io(
     return X86EMUL_OKAY;
 }
 
-static int hvmemul_do_pio(
+int hvmemul_do_pio(
     unsigned long port, unsigned long *reps, int size,
     paddr_t ram_gpa, int dir, int df, void *p_data)
 {

@@ -1333,23 +1333,6 @@ static void svm_vmexit_do_invalidate_cache(struct cpu_user_regs *regs)
     __update_guest_eip(regs, inst_len);
 }
 
-static int svm_vmexit_do_io(struct vmcb_struct *vmcb,
-                             struct cpu_user_regs *regs)
-{
-    uint16_t port;
-    int bytes, dir;
-    int rc;
-
-    port = (vmcb->exitinfo1 >> 16) & 0xFFFF;
-    bytes = ((vmcb->exitinfo1 >> 4) & 0x07);
-    dir = (vmcb->exitinfo1 & 1) ? IOREQ_READ : IOREQ_WRITE;
-
-    rc = handle_mmio_decoded(port, bytes, dir);
-    if ( rc != X86EMUL_RETRY )
-        __update_guest_eip(regs, vmcb->exitinfo2 - vmcb->rip);
-    return rc;
-}
-
 static void svm_invlpg_intercept(unsigned long vaddr)
 {
     struct vcpu *curr = current;
@@ -1558,9 +1541,13 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case VMEXIT_IOIO:
-        if ( ( vmcb->exitinfo1 & ( 1 << 2 ) ) == 0 ) {
-            if ( !svm_vmexit_do_io(vmcb, regs) )
-                hvm_inject_exception(TRAP_gp_fault, 0, 0);
+        if ( (vmcb->exitinfo1 & (1u<<2)) == 0 )
+        {
+            uint16_t port = (vmcb->exitinfo1 >> 16) & 0xFFFF;
+            int bytes = ((vmcb->exitinfo1 >> 4) & 0x07);
+            int dir = (vmcb->exitinfo1 & 1) ? IOREQ_READ : IOREQ_WRITE;
+            if ( handle_pio(port, bytes, dir) )
+                __update_guest_eip(regs, vmcb->exitinfo2 - vmcb->rip);
             break;
         }
         /* fallthrough to emulation if a string instruction */

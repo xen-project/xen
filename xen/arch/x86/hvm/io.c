@@ -171,22 +171,10 @@ int handle_mmio(void)
     struct hvm_emulate_ctxt ctxt;
     struct vcpu *curr = current;
     int rc;
-    unsigned long data, reps = 1;
 
-    if ( curr->arch.hvm_vcpu.io_size == 0 ) {
-        hvm_emulate_prepare(&ctxt, guest_cpu_user_regs());
-        rc = hvm_emulate_one(&ctxt);
-    } else {
-        if ( curr->arch.hvm_vcpu.io_dir == 0 )
-            data = guest_cpu_user_regs()->eax;
-        rc = hvmemul_do_io(0, curr->arch.hvm_vcpu.io_port, &reps,
-                           curr->arch.hvm_vcpu.io_size, 0,
-                           curr->arch.hvm_vcpu.io_dir, 0, &data);
-        if ( curr->arch.hvm_vcpu.io_dir == 1 && rc == X86EMUL_OKAY ) {
-            memcpy(&(guest_cpu_user_regs()->eax),
-                   &data, curr->arch.hvm_vcpu.io_size);
-        }
-    }
+    hvm_emulate_prepare(&ctxt, guest_cpu_user_regs());
+
+    rc = hvm_emulate_one(&ctxt);
 
     if ( curr->arch.hvm_vcpu.io_state == HVMIO_awaiting_completion )
         curr->arch.hvm_vcpu.io_state = HVMIO_handle_mmio_awaiting_completion;
@@ -196,21 +184,14 @@ int handle_mmio(void)
     switch ( rc )
     {
     case X86EMUL_UNHANDLEABLE:
-        if ( curr->arch.hvm_vcpu.io_size == 0 )
-            gdprintk(XENLOG_WARNING,
-                     "MMIO emulation failed @ %04x:%lx: "
-                     "%02x %02x %02x %02x %02x %02x\n",
-                     hvmemul_get_seg_reg(x86_seg_cs, &ctxt)->sel,
-                     ctxt.insn_buf_eip,
-                     ctxt.insn_buf[0], ctxt.insn_buf[1],
-                     ctxt.insn_buf[2], ctxt.insn_buf[3],
-                     ctxt.insn_buf[4], ctxt.insn_buf[5]);
-        else
-            gdprintk(XENLOG_WARNING,
-                     "I/O emulation failed: %s 0x%04x, %i bytes, data=%08lx\n",
-                      curr->arch.hvm_vcpu.io_dir ? "in" : "out",
-                      curr->arch.hvm_vcpu.io_port,
-                      curr->arch.hvm_vcpu.io_size, data);
+        gdprintk(XENLOG_WARNING,
+                 "MMIO emulation failed @ %04x:%lx: "
+                 "%02x %02x %02x %02x %02x %02x\n",
+                 hvmemul_get_seg_reg(x86_seg_cs, &ctxt)->sel,
+                 ctxt.insn_buf_eip,
+                 ctxt.insn_buf[0], ctxt.insn_buf[1],
+                 ctxt.insn_buf[2], ctxt.insn_buf[3],
+                 ctxt.insn_buf[4], ctxt.insn_buf[5]);
         return 0;
     case X86EMUL_EXCEPTION:
         if ( ctxt.exn_pending )
@@ -220,15 +201,9 @@ int handle_mmio(void)
         break;
     }
 
-    if ( curr->arch.hvm_vcpu.io_size == 0 )
-        hvm_emulate_writeback(&ctxt);
-    else
-        curr->arch.hvm_vcpu.io_size = 0;
+    hvm_emulate_writeback(&ctxt);
 
-    if (rc == X86EMUL_RETRY)
-        return rc;
-    else
-        return 1;
+    return 1;
 }
 
 int handle_mmio_with_translation(unsigned long gva, unsigned long gpfn)
@@ -238,12 +213,36 @@ int handle_mmio_with_translation(unsigned long gva, unsigned long gpfn)
     return handle_mmio();
 }
 
-int handle_mmio_decoded(uint16_t port, int size, int dir)
+int handle_pio(uint16_t port, int size, int dir)
 {
-    current->arch.hvm_vcpu.io_port = port;
-    current->arch.hvm_vcpu.io_size = size;
-    current->arch.hvm_vcpu.io_dir = dir;
-    return handle_mmio();
+    struct vcpu *curr = current;
+    unsigned long data, reps = 1;
+    int rc;
+
+    if ( dir == IOREQ_WRITE )
+        data = guest_cpu_user_regs()->eax;
+
+    rc = hvmemul_do_pio(port, &reps, size, 0, dir, 0, &data);
+
+    switch ( rc )
+    {
+    case X86EMUL_OKAY:
+        if ( dir == IOREQ_READ )
+            memcpy(&guest_cpu_user_regs()->eax,
+                   &data, curr->arch.hvm_vcpu.io_size);
+        break;
+    case X86EMUL_RETRY:
+        if ( curr->arch.hvm_vcpu.io_state != HVMIO_awaiting_completion )
+            return 0;
+        /* Completion in hvm_io_assist() with no re-emulation required. */
+        ASSERT(dir == IOREQ_READ);
+        curr->arch.hvm_vcpu.io_state = HVMIO_handle_pio_awaiting_completion;
+        break;
+    default:
+        BUG();
+    }
+
+    return 1;
 }
 
 void hvm_io_assist(void)
@@ -259,13 +258,23 @@ void hvm_io_assist(void)
     io_state = curr->arch.hvm_vcpu.io_state;
     curr->arch.hvm_vcpu.io_state = HVMIO_none;
 
-    if ( (io_state == HVMIO_awaiting_completion) ||
-         (io_state == HVMIO_handle_mmio_awaiting_completion) )
+    switch ( io_state )
     {
+    case HVMIO_awaiting_completion:
         curr->arch.hvm_vcpu.io_state = HVMIO_completed;
         curr->arch.hvm_vcpu.io_data = p->data;
-        if ( io_state == HVMIO_handle_mmio_awaiting_completion )
-            (void)handle_mmio();
+        break;
+    case HVMIO_handle_mmio_awaiting_completion:
+        curr->arch.hvm_vcpu.io_state = HVMIO_completed;
+        curr->arch.hvm_vcpu.io_data = p->data;
+        (void)handle_mmio();
+        break;
+    case HVMIO_handle_pio_awaiting_completion:
+        memcpy(&guest_cpu_user_regs()->eax,
+               &p->data, curr->arch.hvm_vcpu.io_size);
+        break;
+    default:
+        break;
     }
 
     if ( p->state == STATE_IOREQ_NONE )
