@@ -285,6 +285,8 @@ void xs_daemon_close(struct xs_handle *h)
 	mutex_unlock(&h->request_mutex);
 	mutex_unlock(&h->reply_mutex);
 	mutex_unlock(&h->watch_mutex);
+
+	close_fds_free(h);
 }
 
 static bool read_all(int fd, void *data, unsigned int len)
