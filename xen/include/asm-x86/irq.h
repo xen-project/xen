@@ -150,4 +150,6 @@ void irq_set_affinity(int irq, cpumask_t mask);
 #define domain_pirq_to_irq(d, pirq) ((d)->arch.pirq_irq[pirq])
 #define domain_irq_to_pirq(d, irq) ((d)->arch.irq_pirq[irq])
 
+bool_t cpu_has_pending_apic_eoi(void);
+
 #endif /* _ASM_HW_IRQ_H */
