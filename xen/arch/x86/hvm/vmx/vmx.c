@@ -1434,7 +1434,7 @@ struct hvm_function_table * __init start_vmx(void)
  * Not all cases receive valid value in the VM-exit instruction length field.
  * Callers must know what they're doing!
  */
-static int __get_instruction_length(void)
+static int get_instruction_length(void)
 {
     int len;
     len = __vmread(VM_EXIT_INSTRUCTION_LEN); /* Safe: callers audited */
@@ -1442,12 +1442,12 @@ static int __get_instruction_length(void)
     return len;
 }
 
-static void __update_guest_eip(unsigned long inst_len)
+static void update_guest_eip(void)
 {
     struct cpu_user_regs *regs = guest_cpu_user_regs();
     unsigned long x;
 
-    regs->eip += inst_len;
+    regs->eip += get_instruction_length(); /* Safe: callers audited */
     regs->eflags &= ~X86_EFLAGS_RF;
 
     x = __vmread(GUEST_INTERRUPTIBILITY_INFO);
@@ -1459,12 +1459,6 @@ static void __update_guest_eip(unsigned long inst_len)
 
     if ( regs->eflags & X86_EFLAGS_TF )
         vmx_inject_hw_exception(TRAP_debug, HVM_DELIVER_NO_ERROR_CODE);
-}
-
-static void update_guest_eip(void)
-{
-    unsigned long inst_len = __get_instruction_length();
-    __update_guest_eip(inst_len);
 }
 
 static void vmx_fpu_dirty_intercept(void)
@@ -2198,7 +2192,7 @@ static int vmx_handle_eoi_write(void)
     if ( (((exit_qualification >> 12) & 0xf) == 1) &&
          ((exit_qualification & 0xfff) == APIC_EOI) )
     {
-        update_guest_eip();
+        update_guest_eip(); /* Safe: APIC data write */
         vlapic_EOI_set(vcpu_vlapic(current));
         return 1;
     }
@@ -2384,7 +2378,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         case TRAP_int3:
             if ( !v->domain->debugger_attached )
                 goto exit_and_crash;
-            update_guest_eip();
+            update_guest_eip(); /* Safe: INT3 */
             current->arch.gdbsx_vcpu_event = TRAP_int3;
             domain_pause_for_debugger();
             break;
@@ -2467,7 +2461,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
          */
         inst_len = ((source != 3) ||        /* CALL, IRET, or JMP? */
                     (idtv_info & (1u<<10))) /* IntrType > 3? */
-            ? __get_instruction_length() /* Safe: SDM 3B 23.2.4 */ : 0;
+            ? get_instruction_length() /* Safe: SDM 3B 23.2.4 */ : 0;
         if ( (source == 3) && (idtv_info & INTR_INFO_DELIVER_CODE_MASK) )
             ecode = __vmread(IDT_VECTORING_ERROR_CODE);
         regs->eip += inst_len;
@@ -2475,15 +2469,15 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
     }
     case EXIT_REASON_CPUID:
-        update_guest_eip();
+        update_guest_eip(); /* Safe: CPUID */
         vmx_do_cpuid(regs);
         break;
     case EXIT_REASON_HLT:
-        update_guest_eip();
+        update_guest_eip(); /* Safe: HLT */
         hvm_hlt(regs->eflags);
         break;
     case EXIT_REASON_INVLPG:
-        update_guest_eip();
+        update_guest_eip(); /* Safe: INVLPG */
         exit_qualification = __vmread(EXIT_QUALIFICATION);
         vmx_invlpg_intercept(exit_qualification);
         break;
@@ -2491,7 +2485,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         regs->ecx = hvm_msr_tsc_aux(v);
         /* fall through */
     case EXIT_REASON_RDTSC:
-        update_guest_eip();
+        update_guest_eip(); /* Safe: RDTSC, RDTSCP */
         hvm_rdtsc_intercept(regs);
         break;
     case EXIT_REASON_VMCALL:
@@ -2501,7 +2495,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         rc = hvm_do_hypercall(regs);
         if ( rc != HVM_HCALL_preempted )
         {
-            update_guest_eip();
+            update_guest_eip(); /* Safe: VMCALL */
             if ( rc == HVM_HCALL_invalidate )
                 send_invalidate_req();
         }
@@ -2511,7 +2505,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     {
         exit_qualification = __vmread(EXIT_QUALIFICATION);
         if ( vmx_cr_access(exit_qualification, regs) )
-            update_guest_eip();
+            update_guest_eip(); /* Safe: MOV Cn, LMSW, CLTS */
         break;
     }
     case EXIT_REASON_DR_ACCESS:
@@ -2525,7 +2519,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         {
             regs->eax = (uint32_t)msr_content;
             regs->edx = (uint32_t)(msr_content >> 32);
-            update_guest_eip();
+            update_guest_eip(); /* Safe: RDMSR */
         }
         break;
     }
@@ -2534,7 +2528,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         uint64_t msr_content;
         msr_content = ((uint64_t)regs->edx << 32) | (uint32_t)regs->eax;
         if ( hvm_msr_write_intercept(regs->ecx, msr_content) == X86EMUL_OKAY )
-            update_guest_eip();
+            update_guest_eip(); /* Safe: WRMSR */
         break;
     }
 
@@ -2573,23 +2567,25 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         exit_qualification = __vmread(EXIT_QUALIFICATION);
         if ( exit_qualification & 0x10 )
         {
+            /* INS, OUTS */
             if ( !handle_mmio() )
                 vmx_inject_hw_exception(TRAP_gp_fault, 0);
         }
         else
         {
+            /* IN, OUT */
             uint16_t port = (exit_qualification >> 16) & 0xFFFF;
             int bytes = (exit_qualification & 0x07) + 1;
             int dir = (exit_qualification & 0x08) ? IOREQ_READ : IOREQ_WRITE;
             if ( handle_pio(port, bytes, dir) )
-                update_guest_eip();
+                update_guest_eip(); /* Safe: IN, OUT */
         }
         break;
 
     case EXIT_REASON_INVD:
     case EXIT_REASON_WBINVD:
     {
-        update_guest_eip();
+        update_guest_eip(); /* Safe: INVD, WBINVD */
         vmx_wbinvd_intercept();
         break;
     }
@@ -2619,11 +2615,9 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     case EXIT_REASON_XSETBV:
     {
-        u64 new_bv  =  (((u64)regs->edx) << 32) | regs->eax;
+        u64 new_bv = (((u64)regs->edx) << 32) | regs->eax;
         if ( vmx_handle_xsetbv(new_bv) == 0 )
-        {
-            update_guest_eip();
-        }
+            update_guest_eip(); /* Safe: XSETBV */
         break;
     }
 
