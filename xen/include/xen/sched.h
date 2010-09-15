@@ -188,15 +188,6 @@ struct mem_event_domain
     void *ring_page;
     /* front-end ring */
     mem_event_front_ring_t front_ring;
-    /* if domain has been paused due to ring contention */
-    bool_t paused;
-    int paused_vcpus[MAX_VIRT_CPUS];
-    /* the memory event mode */
-    unsigned long mode;
-    /* domain to receive memory events */
-    struct domain *domain;
-    /* enabled? */
-    bool_t enabled;
     /* event channel port (vcpu0 only) */
     int xen_port;
 };
@@ -581,6 +572,9 @@ extern struct domain *domain_list;
  /* VCPU affinity has changed: migrating to a new CPU. */
 #define _VPF_migrating       3
 #define VPF_migrating        (1UL<<_VPF_migrating)
+ /* VCPU is blocked on memory-event ring. */
+#define _VPF_mem_event       4
+#define VPF_mem_event        (1UL<<_VPF_mem_event)
 
 static inline int vcpu_runnable(struct vcpu *v)
 {

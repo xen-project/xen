@@ -27,16 +27,18 @@
 #include <asm/mem_event.h>
 #include <asm/mem_paging.h>
 
-
+/* for public/io/ring.h macros */
 #define xen_mb()   mb()
 #define xen_rmb()  rmb()
 #define xen_wmb()  wmb()
 
+#define mem_event_ring_lock_init(_d)  spin_lock_init(&(_d)->mem_event.ring_lock)
+#define mem_event_ring_lock(_d)       spin_lock(&(_d)->mem_event.ring_lock)
+#define mem_event_ring_unlock(_d)     spin_unlock(&(_d)->mem_event.ring_lock)
 
 #define MEM_EVENT_RING_THRESHOLD 4
 
-
-int mem_event_enable(struct domain *d, mfn_t ring_mfn, mfn_t shared_mfn)
+static int mem_event_enable(struct domain *d, mfn_t ring_mfn, mfn_t shared_mfn)
 {
     int rc;
 
@@ -65,9 +67,6 @@ int mem_event_enable(struct domain *d, mfn_t ring_mfn, mfn_t shared_mfn)
 
     mem_event_ring_lock_init(d);
 
-    d->mem_event.paused = 0;
-    d->mem_event.enabled = 1;
-
     return 0;
 
  err_shared:
@@ -80,11 +79,8 @@ int mem_event_enable(struct domain *d, mfn_t ring_mfn, mfn_t shared_mfn)
     return 1;
 }
 
-int mem_event_disable(struct domain *d)
+static int mem_event_disable(struct domain *d)
 {
-    d->mem_event.enabled = 0;
-    d->mem_event.paused = 0;
-
     unmap_domain_page(d->mem_event.ring_page);
     d->mem_event.ring_page = NULL;
 
@@ -142,26 +138,14 @@ void mem_event_unpause_vcpus(struct domain *d)
 {
     struct vcpu *v;
 
-    for_each_vcpu(d, v)
-    {
-        if ( d->mem_event.paused_vcpus[v->vcpu_id] )
-        {
-            vcpu_unpause(v);
-            d->mem_event.paused_vcpus[v->vcpu_id] = 0;
-        }
-    }
-}
-
-int mem_event_pause_vcpu(struct domain *d, struct vcpu *v)
-{
-    vcpu_pause_nosync(v);
-    d->mem_event.paused_vcpus[v->vcpu_id] = 1;
-
-    return 0;
+    for_each_vcpu ( d, v )
+        if ( test_and_clear_bit(_VPF_mem_event, &v->pause_flags) )
+            vcpu_wake(v);
 }
 
 int mem_event_check_ring(struct domain *d)
 {
+    struct vcpu *curr = current;
     int free_requests;
     int ring_full;
 
@@ -170,8 +154,11 @@ int mem_event_check_ring(struct domain *d)
     free_requests = RING_FREE_REQUESTS(&d->mem_event.front_ring);
     ring_full = free_requests < MEM_EVENT_RING_THRESHOLD;
 
-    if ( (current->domain->domain_id == d->domain_id) && ring_full )
-        mem_event_pause_vcpu(d, current);
+    if ( (curr->domain->domain_id == d->domain_id) && ring_full )
+    {
+        set_bit(_VPF_mem_event, &curr->pause_flags);
+        vcpu_sleep_nosync(curr);
+    }
 
     mem_event_ring_unlock(d);
 
@@ -198,8 +185,9 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
 
     if ( unlikely(d->vcpu == NULL) || unlikely(d->vcpu[0] == NULL) )
     {
-        MEM_EVENT_ERROR("Memory paging op on a domain (%u) with no vcpus\n",
-                         d->domain_id);
+        gdprintk(XENLOG_INFO,
+                 "Memory paging op on a domain (%u) with no vcpus\n",
+                 d->domain_id);
         return -EINVAL;
     }
 

@@ -24,31 +24,6 @@
 #ifndef __MEM_EVENT_H__
 #define __MEM_EVENT_H__
 
-
-/* Printouts */
-#define MEM_EVENT_PRINTK(_f, _a...)                                      \
-    debugtrace_printk("mem_event: %s(): " _f, __func__, ##_a)
-#define MEM_EVENT_ERROR(_f, _a...)                                       \
-    printk("mem_event error: %s(): " _f, __func__, ##_a)
-#define MEM_EVENT_DEBUG(flag, _f, _a...)                                 \
-    do {                                                                  \
-        if (MEM_EVENT_DEBUG_ ## flag)                                    \
-            debugtrace_printk("mem_event debug: %s(): " _f, __func__, ##_a); \
-    } while (0)
-
-
-#define mem_event_enabled(_d) (_d)->mem_event.enabled
-
-
-/* Ring lock */
-#define mem_event_ring_lock_init(_d)  spin_lock_init(&(_d)->mem_event.ring_lock)
-#define mem_event_ring_lock(_d)       spin_lock(&(_d)->mem_event.ring_lock)
-#define mem_event_ring_unlock(_d)     spin_unlock(&(_d)->mem_event.ring_lock)
-
-
-int mem_event_enable(struct domain *d, mfn_t ring_mfn, mfn_t shared_mfn);
-int mem_event_disable(struct domain *d);
-
 int mem_event_check_ring(struct domain *d);
 void mem_event_put_request(struct domain *d, mem_event_request_t *req);
 void mem_event_get_response(struct domain *d, mem_event_response_t *rsp);
