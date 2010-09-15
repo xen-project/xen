@@ -36,7 +36,7 @@ static long no_idt[2];
 static int reboot_mode;
 
 /*
- * reboot=b[ios] | t[riple] | k[bd] | [, [w]arm | [c]old]
+ * reboot=b[ios] | t[riple] | k[bd] | n[o] [, [w]arm | [c]old]
  * warm   Don't set the cold reboot flag
  * cold   Set the cold reboot flag
  * bios   Reboot by jumping through the BIOS (only for X86_32)
@@ -51,6 +51,9 @@ static void __init set_reboot_type(char *str)
     {
         switch ( *str )
         {
+        case 'n': /* no reboot */
+            opt_noreboot = 1;
+            break;
         case 'w': /* "warm" reboot (no memory testing etc) */
             reboot_mode = 0x1234;
             break;
