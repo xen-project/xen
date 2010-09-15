@@ -1461,6 +1461,12 @@ static void __update_guest_eip(unsigned long inst_len)
         vmx_inject_hw_exception(TRAP_debug, HVM_DELIVER_NO_ERROR_CODE);
 }
 
+static void update_guest_eip(void)
+{
+    unsigned long inst_len = __get_instruction_length();
+    __update_guest_eip(inst_len);
+}
+
 static void vmx_fpu_dirty_intercept(void)
 {
     struct vcpu *curr = current;
@@ -2192,8 +2198,7 @@ static int vmx_handle_eoi_write(void)
     if ( (((exit_qualification >> 12) & 0xf) == 1) &&
          ((exit_qualification & 0xfff) == APIC_EOI) )
     {
-        int inst_len = __get_instruction_length(); /* Safe: APIC data write */
-        __update_guest_eip(inst_len);
+        update_guest_eip();
         vlapic_EOI_set(vcpu_vlapic(current));
         return 1;
     }
@@ -2379,8 +2384,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         case TRAP_int3:
             if ( !v->domain->debugger_attached )
                 goto exit_and_crash;
-            inst_len = __get_instruction_length(); /* Safe: INT3 */
-            __update_guest_eip(inst_len);
+            update_guest_eip();
             current->arch.gdbsx_vcpu_event = TRAP_int3;
             domain_pause_for_debugger();
             break;
@@ -2471,18 +2475,15 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
     }
     case EXIT_REASON_CPUID:
-        inst_len = __get_instruction_length(); /* Safe: CPUID */
-        __update_guest_eip(inst_len);
+        update_guest_eip();
         vmx_do_cpuid(regs);
         break;
     case EXIT_REASON_HLT:
-        inst_len = __get_instruction_length(); /* Safe: HLT */
-        __update_guest_eip(inst_len);
+        update_guest_eip();
         hvm_hlt(regs->eflags);
         break;
     case EXIT_REASON_INVLPG:
-        inst_len = __get_instruction_length(); /* Safe: INVLPG */
-        __update_guest_eip(inst_len);
+        update_guest_eip();
         exit_qualification = __vmread(EXIT_QUALIFICATION);
         vmx_invlpg_intercept(exit_qualification);
         break;
@@ -2490,19 +2491,17 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         regs->ecx = hvm_msr_tsc_aux(v);
         /* fall through */
     case EXIT_REASON_RDTSC:
-        inst_len = __get_instruction_length();
-        __update_guest_eip(inst_len);
+        update_guest_eip();
         hvm_rdtsc_intercept(regs);
         break;
     case EXIT_REASON_VMCALL:
     {
         int rc;
         HVMTRACE_1D(VMMCALL, regs->eax);
-        inst_len = __get_instruction_length(); /* Safe: VMCALL */
         rc = hvm_do_hypercall(regs);
         if ( rc != HVM_HCALL_preempted )
         {
-            __update_guest_eip(inst_len);
+            update_guest_eip();
             if ( rc == HVM_HCALL_invalidate )
                 send_invalidate_req();
         }
@@ -2511,9 +2510,8 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     case EXIT_REASON_CR_ACCESS:
     {
         exit_qualification = __vmread(EXIT_QUALIFICATION);
-        inst_len = __get_instruction_length(); /* Safe: MOV Cn, LMSW, CLTS */
         if ( vmx_cr_access(exit_qualification, regs) )
-            __update_guest_eip(inst_len);
+            update_guest_eip();
         break;
     }
     case EXIT_REASON_DR_ACCESS:
@@ -2523,22 +2521,20 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     case EXIT_REASON_MSR_READ:
     {
         uint64_t msr_content;
-        inst_len = __get_instruction_length(); /* Safe: RDMSR */
         if ( hvm_msr_read_intercept(regs->ecx, &msr_content) == X86EMUL_OKAY )
         {
             regs->eax = (uint32_t)msr_content;
             regs->edx = (uint32_t)(msr_content >> 32);
-            __update_guest_eip(inst_len);
+            update_guest_eip();
         }
         break;
     }
     case EXIT_REASON_MSR_WRITE:
     {
         uint64_t msr_content;
-        inst_len = __get_instruction_length(); /* Safe: WRMSR */
         msr_content = ((uint64_t)regs->edx << 32) | (uint32_t)regs->eax;
         if ( hvm_msr_write_intercept(regs->ecx, msr_content) == X86EMUL_OKAY )
-            __update_guest_eip(inst_len);
+            update_guest_eip();
         break;
     }
 
@@ -2585,17 +2581,15 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
             uint16_t port = (exit_qualification >> 16) & 0xFFFF;
             int bytes = (exit_qualification & 0x07) + 1;
             int dir = (exit_qualification & 0x08) ? IOREQ_READ : IOREQ_WRITE;
-            inst_len = __get_instruction_length();
             if ( handle_pio(port, bytes, dir) )
-                __update_guest_eip(inst_len);
+                update_guest_eip();
         }
         break;
 
     case EXIT_REASON_INVD:
     case EXIT_REASON_WBINVD:
     {
-        inst_len = __get_instruction_length(); /* Safe: INVD, WBINVD */
-        __update_guest_eip(inst_len);
+        update_guest_eip();
         vmx_wbinvd_intercept();
         break;
     }
@@ -2628,8 +2622,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         u64 new_bv  =  (((u64)regs->edx) << 32) | regs->eax;
         if ( vmx_handle_xsetbv(new_bv) == 0 )
         {
-            inst_len = __get_instruction_length();
-            __update_guest_eip(inst_len);
+            update_guest_eip();
         }
         break;
     }
