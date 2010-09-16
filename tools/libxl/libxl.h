@@ -186,6 +186,14 @@ typedef struct {
 } libxl_file_reference;
 void libxl_file_reference_destroy(libxl_file_reference *p);
 
+/* libxl_cpuid_policy_list is a dynamic array storing CPUID policies
+ * for multiple leafs. It is terminated with an entry holding
+ * XEN_CPUID_INPUT_UNUSED in input[0]
+ */
+typedef struct libxl__cpuid_policy libxl_cpuid_policy;
+typedef libxl_cpuid_policy * libxl_cpuid_policy_list;
+void libxl_cpuid_destroy(libxl_cpuid_policy_list *cpuid_list);
+
 #define LIBXL_PCI_FUNC_ALL (~0U)
 
 #include "_libxl_types.h"

@@ -271,6 +271,7 @@ static void init_build_info(libxl_domain_build_info *b_info, libxl_domain_create
     b_info->max_memkb = 32 * 1024;
     b_info->target_memkb = b_info->max_memkb;
     b_info->disable_migrate = 0;
+    b_info->cpuid = NULL;
     if (c_info->hvm) {
         b_info->shadow_memkb = 0; /* Set later */
         b_info->video_memkb = 8 * 1024;

@@ -11,6 +11,7 @@ libxl_console_consback = Number("console_consback", namespace="libxl_")
 libxl_console_constype = Number("console_constype", namespace="libxl_")
 libxl_disk_phystype = Number("disk_phystype", namespace="libxl_")
 libxl_nic_type = Number("nic_type", namespace="libxl_")
+libxl_cpuid_policy_list = Builtin("cpuid_policy_list", destructor_fn="libxl_cpuid_destroy", passby=PASS_BY_REFERENCE)
 
 libxl_string_list = Builtin("string_list", destructor_fn="libxl_string_list_destroy", passby=PASS_BY_REFERENCE)
 libxl_key_value_list = Builtin("key_value_list", destructor_fn="libxl_key_value_list_destroy", passby=PASS_BY_REFERENCE)
@@ -90,6 +91,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
     ("shadow_memkb",    uint32),
     ("disable_migrate", bool),
     ("kernel",          libxl_file_reference),
+    ("cpuid",           libxl_cpuid_policy_list),
     ("hvm",             integer),
     ("u", KeyedUnion(None, "hvm",
                 [("hvm", "%s", Struct(None,

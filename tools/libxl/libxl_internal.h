@@ -236,6 +236,17 @@ _hidden char *libxl__abs_path(libxl__gc *gc, char *s, const char *path);
 _hidden char *libxl__domid_to_name(libxl__gc *gc, uint32_t domid);
 _hidden char *libxl__poolid_to_name(libxl__gc *gc, uint32_t poolid);
 
+
+  /* holds the CPUID response for a single CPUID leaf
+   * input contains the value of the EAX and ECX register,
+   * and each policy string contains a filter to apply to
+   * the host given values for that particular leaf.
+   */
+struct libxl__cpuid_policy {
+    uint32_t input[2];
+    char *policy[4];
+};
+
 /*
  * blktap2 support
  */

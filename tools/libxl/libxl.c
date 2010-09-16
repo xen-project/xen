@@ -102,6 +102,21 @@ void libxl_key_value_list_destroy(libxl_key_value_list *pkvl)
     free(kvl);
 }
 
+void libxl_cpuid_destroy(libxl_cpuid_policy_list *p_cpuid_list)
+{
+    int i, j;
+    libxl_cpuid_policy_list cpuid_list = *p_cpuid_list;
+
+    if (cpuid_list == NULL)
+        return;
+    for (i = 0; cpuid_list[i].input[0] != XEN_CPUID_INPUT_UNUSED; i++) {
+        for (j = 0; j < 4; j++)
+            if (cpuid_list[i].policy[j] != NULL)
+                free(cpuid_list[i].policy[j]);
+    }
+    return;
+}
+
 /******************************************************************************/
 
 int libxl_domain_make(libxl_ctx *ctx, libxl_domain_create_info *info,
