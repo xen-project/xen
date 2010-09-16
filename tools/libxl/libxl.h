@@ -136,8 +136,10 @@
 typedef uint8_t libxl_mac[6];
 
 typedef char **libxl_string_list;
+void libxl_string_list_destroy(libxl_string_list *sl);
 
 typedef char **libxl_key_value_list;
+void libxl_key_value_list_destroy(libxl_key_value_list *kvl);
 
 typedef uint64_t *libxl_cpumap;
 
@@ -171,6 +173,18 @@ typedef enum {
     NICTYPE_IOEMU = 1,
     NICTYPE_VIF,
 } libxl_nic_type;
+
+typedef struct {
+    /*
+     * Path is always set if the file reference is valid. However if
+     * mapped is true then the actual file may already be unlinked.
+     */
+    char * path;
+    int mapped;
+    void * data;
+    size_t size;
+} libxl_file_reference;
+void libxl_file_reference_destroy(libxl_file_reference *p);
 
 #define LIBXL_PCI_FUNC_ALL (~0U)
 
@@ -226,11 +240,6 @@ int libxl_domain_resume(libxl_ctx *ctx, uint32_t domid);
 int libxl_domain_shutdown(libxl_ctx *ctx, uint32_t domid, int req);
 int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid, int force);
 int libxl_domain_preserve(libxl_ctx *ctx, uint32_t domid, libxl_domain_create_info *info, const char *name_suffix, libxl_uuid new_uuid);
-
-/* destructors for builtin data types */
-void libxl_string_list_destroy(libxl_string_list *sl);
-void libxl_key_value_list_destroy(libxl_key_value_list *kvl);
-void libxl_file_reference_destroy(libxl_file_reference *f);
 
 /*
  * Run the configured bootloader for a PV domain and update

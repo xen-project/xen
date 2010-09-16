@@ -269,9 +269,28 @@ static int device_vfb_val(caml_gc *gc, libxl_device_vfb *c_val, value v)
 
 static int device_pci_val(caml_gc *gc, libxl_device_pci *c_val, value v)
 {
+	union {
+		unsigned int value;
+		struct {
+			unsigned int reserved1:2;
+			unsigned int reg:6;
+			unsigned int func:3;
+			unsigned int dev:5;
+			unsigned int bus:8;
+			unsigned int reserved2:7;
+			unsigned int enable:1;
+		}fields;
+	}u;
 	CAMLparam1(v);
 
-	c_val->value = Int_val(Field(v, 0));
+	/* FIXME: propagate API change to ocaml */
+	u.value = Int_val(Field(v, 0));
+	c_val->reg = u.fields.reg;
+	c_val->func = u.fields.func;
+	c_val->dev = u.fields.dev;
+	c_val->bus = u.fields.bus;
+	c_val->enable = u.fields.enable;
+
 	c_val->domain = Int_val(Field(v, 1));
 	c_val->vdevfn = Int_val(Field(v, 2));
 	c_val->msitranslate = Bool_val(Field(v, 3));

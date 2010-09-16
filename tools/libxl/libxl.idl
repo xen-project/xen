@@ -6,14 +6,15 @@
 libxl_ctx = Builtin("ctx")
 libxl_uuid = Builtin("uuid")
 libxl_mac = Builtin("mac")
-libxl_qemu_machine_type = Builtin("qemu_machine_type")
-libxl_console_consback = Builtin("console_consback")
-libxl_console_constype = Builtin("console_constype")
-libxl_disk_phystype = Builtin("disk_phystype")
-libxl_nic_type = Builtin("nic_type")
+libxl_qemu_machine_type = Number("qemu_machine_type", namespace="libxl_")
+libxl_console_consback = Number("console_consback", namespace="libxl_")
+libxl_console_constype = Number("console_constype", namespace="libxl_")
+libxl_disk_phystype = Number("disk_phystype", namespace="libxl_")
+libxl_nic_type = Number("nic_type", namespace="libxl_")
 
 libxl_string_list = Builtin("string_list", destructor_fn="libxl_string_list_destroy", passby=PASS_BY_REFERENCE)
 libxl_key_value_list = Builtin("key_value_list", destructor_fn="libxl_key_value_list_destroy", passby=PASS_BY_REFERENCE)
+libxl_file_reference = Builtin("file_reference", destructor_fn="libxl_file_reference_destroy", passby=PASS_BY_REFERENCE)
 
 libxl_cpumap = Builtin("cpumap", destructor_fn="free")
 
@@ -78,14 +79,6 @@ libxl_domain_create_info = Struct("domain_create_info",[
     ("poolid",       uint32),
     ("poolname",     string),
     ])
-
-libxl_file_reference = Struct("file_reference",[
-    ("path", string, False,
-"""Path is always set if the file reference is valid. However if
-mapped is true then the actual file may already be unlinked."""),
-    ("mapped", integer),
-    ("data", void),
-    ("size", size_t)], autogenerate_destructor=False)
 
 libxl_domain_build_info = Struct("domain_build_info",[
     ("max_vcpus",       integer),
@@ -240,17 +233,11 @@ libxl_device_net2 = Struct("device_net2", [
     ])
 
 libxl_device_pci = Struct("device_pci", [
-    (None, Union(None, [("value", unsigned_integer),
-                        (None, Struct(None,[("reserved1", BitField(unsigned_integer, 2)),
-                                            ("reg",       BitField(unsigned_integer, 6)),
-                                            ("func",      BitField(unsigned_integer, 3)),
-                                            ("dev",       BitField(unsigned_integer, 5)),
-                                            ("bus",       BitField(unsigned_integer, 8)),
-                                            ("reserved2", BitField(unsigned_integer, 7)),
-                                            ("enable",    BitField(unsigned_integer, 1)),
-                                             ])),
-                        ])
-     ),
+    ("reg",       uint8),
+    ("func",      uint8),
+    ("dev",       uint8),
+    ("bus",       uint8),
+    ("enable",    bool),
     ("domain", unsigned_integer),
     ("vdevfn", unsigned_integer),
     ("vfunc_mask", unsigned_integer),

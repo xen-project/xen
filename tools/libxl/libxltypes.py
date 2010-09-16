@@ -14,10 +14,13 @@ class Type(object):
 
         if typename is None: # Anonymous type
             self.typename = None
+            self.rawname = None
         elif self.namespace is None: # e.g. system provided types
             self.typename = typename
+            self.rawname = typename
         else:
             self.typename = self.namespace + typename
+            self.rawname = typename
 
         if self.typename is not None:
             self.destructor_fn = kwargs.setdefault('destructor_fn', self.typename + "_destroy")
@@ -30,13 +33,22 @@ class Builtin(Type):
     """Builtin type"""
     def __init__(self, typename, **kwargs):
         kwargs.setdefault('destructor_fn', None)
+        kwargs.setdefault('autogenerate_destructor', False)
         Type.__init__(self, typename, **kwargs)
 
-class UInt(Type):
+class Number(Builtin):
+    def __init__(self, ctype, **kwargs):
+        kwargs.setdefault('namespace', None)
+        kwargs.setdefault('destructor_fn', None)
+        kwargs.setdefault('signed', False)
+        self.signed = kwargs['signed']
+        Builtin.__init__(self, ctype, **kwargs)
+
+class UInt(Number):
     def __init__(self, w, **kwargs):
         kwargs.setdefault('namespace', None)
         kwargs.setdefault('destructor_fn', None)
-        Type.__init__(self, "uint%d_t" % w, **kwargs)
+        Number.__init__(self, "uint%d_t" % w, **kwargs)
 
         self.width = w
 
@@ -128,12 +140,12 @@ class Reference(Type):
 
 void = Builtin("void *", namespace = None)
 bool = Builtin("bool", namespace = None)
-size_t = Builtin("size_t", namespace = None)
+size_t = Number("size_t", namespace = None)
 
-integer = Builtin("int", namespace = None)
-unsigned_integer = Builtin("unsigned int", namespace = None)
-unsigned = Builtin("unsigned int", namespace = None)
-unsigned_long = Builtin("unsigned long", namespace = None)
+integer = Number("int", namespace = None, signed = True)
+unsigned_integer = Number("unsigned int", namespace = None)
+unsigned = Number("unsigned int", namespace = None)
+unsigned_long = Number("unsigned long", namespace = None)
 
 uint8 = UInt(8)
 uint16 = UInt(16)

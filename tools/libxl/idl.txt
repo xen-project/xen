@@ -13,7 +13,8 @@ contain the initial namespace element (e.g. "libxl_"). See below for
 how to specify a namespace.
 
 The Type.typename contains the C name of the type _including_ the
-namespace element.
+namespace element while Type.rawname is always set to the 'base' name
+of the type.
 
 The libxltypes.Type base class has several other properties which
 apply to all types. The properties are set by passing a named
