@@ -705,11 +705,6 @@ void console_force_unlock(void)
     console_start_sync();
 }
 
-void console_force_lock(void)
-{
-    spin_lock(&console_lock);
-}
-
 void console_start_sync(void)
 {
     atomic_inc(&print_everything);

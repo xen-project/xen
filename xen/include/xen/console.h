@@ -22,7 +22,6 @@ int console_has(const char *device);
 int fill_console_start_info(struct dom0_vga_console_info *);
 
 void console_force_unlock(void);
-void console_force_lock(void);
 
 void console_start_sync(void);
 void console_end_sync(void);
