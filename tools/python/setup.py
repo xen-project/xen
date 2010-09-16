@@ -9,13 +9,22 @@ extra_compile_args  = [ "-fno-strict-aliasing", "-Werror" ]
 include_dirs = [ XEN_ROOT + "/tools/libxc",
                  XEN_ROOT + "/tools/xenstore",
                  XEN_ROOT + "/tools/include",
+                 XEN_ROOT + "/tools/libxl",
                  ]
 
 library_dirs = [ XEN_ROOT + "/tools/libxc",
                  XEN_ROOT + "/tools/xenstore",
+                 XEN_ROOT + "/tools/libxl",
+                 XEN_ROOT + "/tools/blktap2/control",
                  ]
 
 libraries = [ "xenctrl", "xenguest", "xenstore" ]
+
+plat = os.uname()[0]
+if plat == 'Linux':
+    uuid_libs = ["uuid"]
+else:
+    uuid_libs = []
 
 xc = Extension("xc",
                extra_compile_args = extra_compile_args,
@@ -83,8 +92,14 @@ netlink = Extension("netlink",
                     sources            = [ "xen/lowlevel/netlink/netlink.c",
                                            "xen/lowlevel/netlink/libnetlink.c"])
 
-modules = [ xc, xs, ptsname, acm, flask ]
-plat = os.uname()[0]
+xl = Extension("xl",
+               extra_compile_args = extra_compile_args,
+               include_dirs       = include_dirs + [ "xen/lowlevel/xl" ],
+               library_dirs       = library_dirs,
+               libraries          = libraries + ["xenlight", "blktapctl" ] + uuid_libs,
+               sources            = [ "xen/lowlevel/xl/xl.c", "xen/lowlevel/xl/_pyxl_types.c" ])
+
+modules = [ xc, xs, ptsname, acm, flask, xl ]
 if plat == 'SunOS':
     modules.extend([ scf, process ])
 if plat == 'Linux':

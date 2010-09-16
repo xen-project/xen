@@ -19,7 +19,12 @@ genpath-target = $(call buildmakevars2file,$(XENPATH))
 $(eval $(genpath-target))
 
 .PHONY: build buildpy
-buildpy: genpath 
+buildpy: genpath genwrap.py $(XEN_ROOT)/tools/libxl/libxl.idl \
+		$(XEN_ROOT)/tools/libxl/libxltypes.py
+	PYTHONPATH=$(XEN_ROOT)/tools/libxl $(PYTHON) genwrap.py \
+		$(XEN_ROOT)/tools/libxl/libxl.idl \
+		xen/lowlevel/xl/_pyxl_types.h \
+		xen/lowlevel/xl/_pyxl_types.c
 	CC="$(CC)" CFLAGS="$(CFLAGS)" $(PYTHON) setup.py build
 
 build: buildpy refresh-pot refresh-po $(CATALOGS)
@@ -85,6 +90,8 @@ test:
 clean:
 	rm -f $(XENPATH)
 	rm -rf build *.pyc *.pyo *.o *.a *~ $(CATALOGS) xen/util/auxbin.pyc
+	rm -f xen/lowlevel/xl/_pyxl_types.h
+	rm -f xen/lowlevel/xl/_pyxl_types.c
 	rm -f $(DEPS)
 
 -include $(DEPS)

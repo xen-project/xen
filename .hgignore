@@ -211,6 +211,8 @@
 ^tools/pygrub/build/.*$
 ^tools/python/build/.*$
 ^tools/python/xen/util/path\.py$
+^tools/python/xen/lowlevel/xl/_pyxl_types.c
+^tools/python/xen/lowlevel/xl/_pyxl_types.h
 ^tools/remus/imqebt/imqebt$
 ^tools/remus/kmod/.*(\.cmd|\.mod|\.ko|\.mod\.c|\.symvers|\.xen)$
 ^tools/security/secpol_tool$
