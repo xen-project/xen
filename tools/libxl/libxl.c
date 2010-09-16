@@ -899,21 +899,25 @@ static int libxl_destroy_device_model(libxl_ctx *ctx, uint32_t domid)
         }
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Device model is a stubdom, domid=%d\n", stubdomid);
         ret = libxl_domain_destroy(ctx, stubdomid, 0);
-        goto out;
+        if (ret)
+            goto out;
+    } else {
+        ret = kill(atoi(pid), SIGHUP);
+        if (ret < 0 && errno == ESRCH) {
+            LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Device Model already exited");
+            ret = 0;
+        } else if (ret == 0) {
+            LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Device Model signaled");
+            ret = 0;
+        } else {
+            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "failed to kill Device Model [%d]",
+                    atoi(pid));
+            ret = ERROR_FAIL;
+            goto out;
+        }
     }
     xs_rm(ctx->xsh, XBT_NULL, libxl__sprintf(&gc, "/local/domain/0/device-model/%d", domid));
 
-    ret = kill(atoi(pid), SIGHUP);
-    if (ret < 0 && errno == ESRCH) {
-        LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Device Model already exited");
-        ret = 0;
-    } else if (ret == 0) {
-        LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Device Model signaled");
-        ret = 0;
-    } else {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "failed to kill Device Model [%d]",
-                     atoi(pid));
-    }
 out:
     libxl__free_all(&gc);
     return ret;
