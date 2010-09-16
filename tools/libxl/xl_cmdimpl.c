@@ -3402,7 +3402,7 @@ int main_vcpulist(int argc, char **argv)
         }
     }
 
-    vcpulist(argc - 2, argv + 2);
+    vcpulist(argc - optind, argv + optind);
     return 0;
 }
 
@@ -3491,10 +3491,6 @@ int main_vcpupin(int argc, char **argv)
 {
     int opt;
 
-    if (argc != 5) {
-        help("vcpu-pin");
-        return 0;
-    }
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
         case 'h':
@@ -3506,7 +3502,12 @@ int main_vcpupin(int argc, char **argv)
         }
     }
 
-    vcpupin(argv[2], argv[3] , argv[4]);
+    if (optind != argc - 3) {
+        help("vcpu-pin");
+        return 2;
+    }
+
+    vcpupin(argv[optind], argv[optind+1] , argv[optind+2]);
     return 0;
 }
 
@@ -3535,10 +3536,6 @@ int main_vcpuset(int argc, char **argv)
 {
     int opt;
 
-    if (argc != 4) {
-        help("vcpu-set");
-        return 0;
-    }
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
         case 'h':
@@ -3550,7 +3547,11 @@ int main_vcpuset(int argc, char **argv)
         }
     }
 
-    vcpuset(argv[2], argv[3]);
+    if (optind >= argc - 1) {
+        help("vcpu-set");
+        return 2;
+    }
+    vcpuset(argv[optind], argv[optind+1]);
     return 0;
 }
 
