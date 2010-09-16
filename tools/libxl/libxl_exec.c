@@ -35,7 +35,8 @@ static int call_waitpid(pid_t (*waitpid_cb)(pid_t, int *, int), pid_t pid, int *
     return (waitpid_cb) ? waitpid_cb(pid, status, options) : waitpid(pid, status, options);
 }
 
-void libxl__exec(int stdinfd, int stdoutfd, int stderrfd, char *arg0, char **args)
+void libxl__exec(int stdinfd, int stdoutfd, int stderrfd, const char *arg0,
+                char **args)
      /* call this in the child */
 {
     int i;

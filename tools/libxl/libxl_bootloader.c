@@ -118,7 +118,7 @@ static int open_xenconsoled_pty(int *master, int *slave, char *slave_path, size_
     return 0;
 }
 
-static pid_t fork_exec_bootloader(int *master, char *arg0, char **args)
+static pid_t fork_exec_bootloader(int *master, const char *arg0, char **args)
 {
     struct termios termattr;
     pid_t pid = forkpty(master, NULL, NULL, NULL);
@@ -386,7 +386,7 @@ int libxl_run_bootloader(libxl_ctx *ctx,
     dom_console_xs_path = libxl__sprintf(&gc, "%s/console/tty", libxl__xs_get_dompath(&gc, domid));
     libxl__xs_write(&gc, XBT_NULL, dom_console_xs_path, "%s", dom_console_slave_tty_path);
 
-    pid = fork_exec_bootloader(&bootloader_fd, (char *)info->u.pv.bootloader, args);
+    pid = fork_exec_bootloader(&bootloader_fd, info->u.pv.bootloader, args);
     if (pid < 0) {
         goto out_close;
     }

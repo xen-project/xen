@@ -221,7 +221,8 @@ _hidden int libxl__spawn_check(libxl_ctx *ctx,
 
  /* low-level stuff, for synchronous subprocesses etc. */
 
-_hidden void libxl__exec(int stdinfd, int stdoutfd, int stderrfd, char *arg0, char **args); // logs errors, never returns
+_hidden void libxl__exec(int stdinfd, int stdoutfd, int stderrfd,
+               const char *arg0, char **args); // logs errors, never returns
 _hidden void libxl__log_child_exitstatus(libxl__gc *gc,
                                 const char *what, pid_t pid, int status);
 
