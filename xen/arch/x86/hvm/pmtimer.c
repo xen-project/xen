@@ -83,14 +83,16 @@ void hvm_acpi_sleep_button(struct domain *d)
  * since the last time we did that. */
 static void pmt_update_time(PMTState *s)
 {
-    uint64_t curr_gtime;
+    uint64_t curr_gtime, tmp;
     uint32_t msb = s->pm.tmr_val & TMR_VAL_MSB;
     
     ASSERT(spin_is_locked(&s->lock));
 
     /* Update the timer */
     curr_gtime = hvm_get_guest_time(s->vcpu);
-    s->pm.tmr_val += ((curr_gtime - s->last_gtime) * s->scale) >> 32;
+    tmp = ((curr_gtime - s->last_gtime) * s->scale) + s->not_accounted;
+    s->not_accounted = (uint32_t)tmp;
+    s->pm.tmr_val += tmp >> 32;
     s->pm.tmr_val &= TMR_VAL_MASK;
     s->last_gtime = curr_gtime;
     
@@ -257,6 +259,7 @@ static int pmtimer_load(struct domain *d, hvm_domain_context_t *h)
 
     /* Calculate future counter values from now. */
     s->last_gtime = hvm_get_guest_time(s->vcpu);
+    s->not_accounted = 0;
 
     /* Set the SCI state from the registers */ 
     pmt_update_sci(s);
@@ -276,6 +279,7 @@ void pmtimer_init(struct vcpu *v)
     spin_lock_init(&s->lock);
 
     s->scale = ((uint64_t)FREQUENCE_PMTIMER << 32) / SYSTEM_TIME_HZ;
+    s->not_accounted = 0;
     s->vcpu = v;
 
     /* Intercept port I/O (need two handlers because PM1a_CNT is between
