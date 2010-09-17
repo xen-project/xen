@@ -203,6 +203,11 @@ static PyObject *fixed_bytearray_get(const uint8_t *ptr, size_t len)
 
 #include "_pyxl_types.h"
 
+int attrib__libxl_cpuid_policy_list_set(PyObject *v, libxl_cpuid_policy_list *pptr)
+{
+    return -1;
+}
+
 int attrib__libxl_cpumap_set(PyObject *v, libxl_cpumap *pptr)
 {
     return -1;
@@ -246,6 +251,11 @@ int attrib__libxl_uuid_set(PyObject *v, libxl_uuid *pptr)
 int attrib__struct_in_addr_set(PyObject *v, struct in_addr *pptr)
 {
     return -1;
+}
+
+PyObject *attrib__libxl_cpuid_policy_list_get(libxl_cpuid_policy_list *pptr)
+{
+    return NULL;
 }
 
 PyObject *attrib__libxl_cpumap_get(libxl_cpumap *pptr)
