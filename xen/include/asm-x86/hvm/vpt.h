@@ -117,6 +117,7 @@ typedef struct PMTState {
     struct hvm_hw_pmtimer pm;   /* 32bit timer value */
     struct vcpu *vcpu;          /* Keeps sync with this vcpu's guest-time */
     uint64_t last_gtime;        /* Last (guest) time we updated the timer */
+    uint32_t not_accounted;     /* time not accounted at last update */
     uint64_t scale;             /* Multiplier to get from tsc to timer ticks */
     struct timer timer;         /* To make sure we send SCIs */
     spinlock_t lock;
