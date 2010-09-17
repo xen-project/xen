@@ -47,7 +47,7 @@ struct segment_register *hvmemul_get_seg_reg(
     struct hvm_emulate_ctxt *hvmemul_ctxt);
 
 int hvmemul_do_pio(
-    paddr_t addr, unsigned long *reps, int size,
+    unsigned long port, unsigned long *reps, int size,
     paddr_t ram_gpa, int dir, int df, void *p_data);
 
 #endif /* __ASM_X86_HVM_EMULATE_H__ */
