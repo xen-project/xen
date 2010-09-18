@@ -548,6 +548,8 @@ asmlinkage void do_IRQ(struct cpu_user_regs *regs)
         return;
     }
 
+    irq_enter();
+
     desc = irq_to_desc(irq);
 
     spin_lock(&desc->lock);
@@ -581,14 +583,10 @@ asmlinkage void do_IRQ(struct cpu_user_regs *regs)
             desc->rl_quantum_start = now;
         }
 
-        irq_enter();
         tsc_in = tb_init_done ? get_cycles() : 0;
         __do_IRQ_guest(irq);
         TRACE_3D(TRC_TRACE_IRQ, irq, tsc_in, get_cycles());
-        irq_exit();
-        spin_unlock(&desc->lock);
-        set_irq_regs(old_regs);
-        return;
+        goto out_no_end;
     }
 
     desc->status &= ~IRQ_REPLAY;
@@ -607,20 +605,20 @@ asmlinkage void do_IRQ(struct cpu_user_regs *regs)
     while ( desc->status & IRQ_PENDING )
     {
         desc->status &= ~IRQ_PENDING;
-        irq_enter();
         spin_unlock_irq(&desc->lock);
         tsc_in = tb_init_done ? get_cycles() : 0;
         action->handler(irq, action->dev_id, regs);
         TRACE_3D(TRC_TRACE_IRQ, irq, tsc_in, get_cycles());
         spin_lock_irq(&desc->lock);
-        irq_exit();
     }
 
     desc->status &= ~IRQ_INPROGRESS;
 
  out:
     desc->handler->end(irq);
+ out_no_end:
     spin_unlock(&desc->lock);
+    irq_exit();
     set_irq_regs(old_regs);
 }
 
