@@ -454,10 +454,10 @@ void __setup_vector_irq(int cpu)
 
 void move_masked_irq(int irq)
 {
-	struct irq_desc *desc = irq_to_desc(irq);
+    struct irq_desc *desc = irq_to_desc(irq);
 
-	if (likely(!(desc->status & IRQ_MOVE_PENDING)))
-		return;
+    if (likely(!(desc->status & IRQ_MOVE_PENDING)))
+        return;
     
     desc->status &= ~IRQ_MOVE_PENDING;
 
@@ -467,22 +467,19 @@ void move_masked_irq(int irq)
     if (!desc->handler->set_affinity)
         return;
 
-	/*
-	 * If there was a valid mask to work with, please
-	 * do the disable, re-program, enable sequence.
-	 * This is *not* particularly important for level triggered
-	 * but in a edge trigger case, we might be setting rte
-	 * when an active trigger is comming in. This could
-	 * cause some ioapics to mal-function.
-	 * Being paranoid i guess!
-	 *
-	 * For correct operation this depends on the caller
-	 * masking the irqs.
-	 */
+    /*
+     * If there was a valid mask to work with, please do the disable, 
+     * re-program, enable sequence. This is *not* particularly important for 
+     * level triggered but in a edge trigger case, we might be setting rte when 
+     * an active trigger is comming in. This could cause some ioapics to 
+     * mal-function. Being paranoid i guess!
+     *
+     * For correct operation this depends on the caller masking the irqs.
+     */
     if (likely(cpus_intersects(desc->pending_mask, cpu_online_map)))
         desc->handler->set_affinity(irq, desc->pending_mask);
 
-	cpus_clear(desc->pending_mask);
+    cpus_clear(desc->pending_mask);
 }
 
 void move_native_irq(int irq)
