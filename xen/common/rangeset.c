@@ -251,6 +251,22 @@ int rangeset_contains_range(
     return contains;
 }
 
+int rangeset_overlaps_range(
+    struct rangeset *r, unsigned long s, unsigned long e)
+{
+    struct range *x;
+    int overlaps;
+
+    ASSERT(s <= e);
+
+    spin_lock(&r->lock);
+    x = find_range(r, e);
+    overlaps = (x && (s <= x->e));
+    spin_unlock(&r->lock);
+
+    return overlaps;
+}
+
 int rangeset_report_ranges(
     struct rangeset *r, unsigned long s, unsigned long e,
     int (*cb)(unsigned long s, unsigned long e, void *), void *ctxt)

@@ -53,6 +53,8 @@ int __must_check rangeset_remove_range(
     struct rangeset *r, unsigned long s, unsigned long e);
 int __must_check rangeset_contains_range(
     struct rangeset *r, unsigned long s, unsigned long e);
+int __must_check rangeset_overlaps_range(
+    struct rangeset *r, unsigned long s, unsigned long e);
 int rangeset_report_ranges(
     struct rangeset *r, unsigned long s, unsigned long e,
     int (*cb)(unsigned long s, unsigned long e, void *), void *ctxt);
