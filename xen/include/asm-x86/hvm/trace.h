@@ -72,7 +72,7 @@
             _d.d[4]=(d5);                                               \
             _d.d[5]=(d6);                                               \
             __trace_var(TRC_HVM_ ## evt, cycles,                        \
-                        sizeof(u32)*count+1, &_d);                      \
+                        sizeof(*_d.d) * count, &_d);                    \
         }                                                               \
     } while(0)
 
