@@ -42,14 +42,12 @@ static inline struct vcpu *mapcache_current_vcpu(void)
 
 void *map_domain_page(unsigned long mfn)
 {
-    unsigned long va;
-    unsigned int idx, i, flags;
+    unsigned long va, flags;
+    unsigned int idx, i;
     struct vcpu *v;
     struct mapcache_domain *dcache;
     struct mapcache_vcpu *vcache;
     struct vcpu_maphash_entry *hashent;
-
-    ASSERT(!in_irq());
 
     perfc_incr(map_domain_page_count);
 
@@ -57,6 +55,8 @@ void *map_domain_page(unsigned long mfn)
 
     dcache = &v->domain->arch.mapcache;
     vcache = &v->arch.mapcache;
+
+    local_irq_save(flags);
 
     hashent = &vcache->hash[MAPHASH_HASHFN(mfn)];
     if ( hashent->mfn == mfn )
@@ -69,7 +69,7 @@ void *map_domain_page(unsigned long mfn)
         goto out;
     }
 
-    spin_lock_irqsave(&dcache->lock, flags);
+    spin_lock(&dcache->lock);
 
     /* Has some other CPU caused a wrap? We must flush if so. */
     if ( unlikely(dcache->epoch != vcache->shadow_epoch) )
@@ -105,11 +105,12 @@ void *map_domain_page(unsigned long mfn)
     set_bit(idx, dcache->inuse);
     dcache->cursor = idx + 1;
 
-    spin_unlock_irqrestore(&dcache->lock, flags);
+    spin_unlock(&dcache->lock);
 
     l1e_write(&dcache->l1tab[idx], l1e_from_pfn(mfn, __PAGE_HYPERVISOR));
 
  out:
+    local_irq_restore(flags);
     va = MAPCACHE_VIRT_START + (idx << PAGE_SHIFT);
     return (void *)va;
 }
@@ -119,10 +120,8 @@ void unmap_domain_page(const void *va)
     unsigned int idx;
     struct vcpu *v;
     struct mapcache_domain *dcache;
-    unsigned long mfn;
+    unsigned long mfn, flags;
     struct vcpu_maphash_entry *hashent;
-
-    ASSERT(!in_irq());
 
     ASSERT((void *)MAPCACHE_VIRT_START <= va);
     ASSERT(va < (void *)MAPCACHE_VIRT_END);
@@ -134,6 +133,8 @@ void unmap_domain_page(const void *va)
     idx = ((unsigned long)va - MAPCACHE_VIRT_START) >> PAGE_SHIFT;
     mfn = l1e_get_pfn(dcache->l1tab[idx]);
     hashent = &v->arch.mapcache.hash[MAPHASH_HASHFN(mfn)];
+
+    local_irq_save(flags);
 
     if ( hashent->idx == idx )
     {
@@ -163,6 +164,8 @@ void unmap_domain_page(const void *va)
         /* /Second/, mark as garbage. */
         set_bit(idx, dcache->garbage);
     }
+
+    local_irq_restore(flags);
 }
 
 void mapcache_domain_init(struct domain *d)
