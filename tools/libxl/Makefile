@@ -42,18 +42,15 @@ XL_OBJS = xl.o xl_cmdimpl.o xl_cmdtable.o
 all: $(CLIENTS) libxenlight.so libxenlight.a libxlutil.so libxlutil.a \
 	$(AUTOSRCS) $(AUTOINCS)
 
-$(AUTOINCS): $(AUTOSRCS)
-
-#%_y.h: %_y.c
-#%_l.h: %_l.c
-
 $(LIBXLU_OBJS): $(AUTOINCS)
 
-%.c: %.y
-	$(BISON) --output=$@ $<
+%.c %.h: %.y
+	@rm -f $*.[ch]
+	$(BISON) --output=$*.c $<
 
-%.c: %.l
-	$(FLEX) --header-file=$*.h --outfile=$@ $<
+%.c %.h: %.l
+	@rm -f $*.[ch]
+	$(FLEX) --header-file=$*.h --outfile=$*.c $<
 
 genpath-target = $(call buildmakevars2file,_libxl_paths.h)
 $(eval $(genpath-target))
@@ -66,12 +63,12 @@ libxl_paths.c: _libxl_paths.h
 
 libxl.h: _libxl_types.h
 
-$(LIBXL_OBJS:%.o=%.c) $(LIBXLU_OBJS:%.o=%.c) $(XL_OBJS:%.o=%.c): libxl.h
+$(LIBXL_OBJS) $(LIBXLU_OBJS) $(XL_OBJS): libxl.h
 
-_libxl_types.h _libxl_types.c: libxl.idl gentypes.py libxltypes.py
-	$(PYTHON) gentypes.py libxl.idl __libxl_types.h __libxl_types.c
-	mv __libxl_types.h _libxl_types.h
-	mv __libxl_types.c _libxl_types.c
+_libxl_%.h _libxl_%.c: libxl.idl gen%.py libxl%.py
+	$(PYTHON) gen$*.py libxl.idl __libxl_$*.h __libxl_$*.c
+	mv __libxl_$*.h _libxl_$*.h
+	mv __libxl_$*.c _libxl_$*.c
 
 libxenlight.so: libxenlight.so.$(MAJOR)
 	ln -sf $< $@
