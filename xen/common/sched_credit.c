@@ -499,26 +499,36 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
         cpumask_t cpu_idlers;
         cpumask_t nxt_idlers;
         int nxt, weight_cpu, weight_nxt;
+        int migrate_factor;
 
         nxt = cycle_cpu(cpu, cpus);
 
         if ( cpu_isset(cpu, per_cpu(cpu_core_map, nxt)) )
         {
+            /* We're on the same socket, so check the busy-ness of threads.
+             * Migrate if # of idlers is less at all */
             ASSERT( cpu_isset(nxt, per_cpu(cpu_core_map, cpu)) );
+            migrate_factor = 1;
             cpus_and(cpu_idlers, idlers, per_cpu(cpu_sibling_map, cpu));
             cpus_and(nxt_idlers, idlers, per_cpu(cpu_sibling_map, nxt));
         }
         else
         {
+            /* We're on different sockets, so check the busy-ness of cores.
+             * Migrate only if the other core is twice as idle */
             ASSERT( !cpu_isset(nxt, per_cpu(cpu_core_map, cpu)) );
+            migrate_factor = 2;
             cpus_and(cpu_idlers, idlers, per_cpu(cpu_core_map, cpu));
             cpus_and(nxt_idlers, idlers, per_cpu(cpu_core_map, nxt));
         }
 
         weight_cpu = cpus_weight(cpu_idlers);
         weight_nxt = cpus_weight(nxt_idlers);
-        if ( ( (weight_cpu < weight_nxt) ^ sched_smt_power_savings )
-                && (weight_cpu != weight_nxt) )
+        /* smt_power_savings: consolidate work rather than spreading it */
+        if ( ( sched_smt_power_savings
+               && (weight_cpu > weight_nxt) )
+             || ( !sched_smt_power_savings
+                  && (weight_cpu * migrate_factor < weight_nxt) ) )
         {
             cpu = cycle_cpu(CSCHED_PCPU(nxt)->idle_bias, nxt_idlers);
             if ( commit )
