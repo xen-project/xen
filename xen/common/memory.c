@@ -234,7 +234,7 @@ static void decrease_reservation(struct memop_args *a)
             t.d = a->domain->domain_id;
             t.order = a->extent_order;
         
-            __trace_var(TRC_MEM_DECREASE_RESERVATION, 0, sizeof(t), (unsigned char *)&t);
+            __trace_var(TRC_MEM_DECREASE_RESERVATION, 0, sizeof(t), &t);
         }
 
         /* See if populate-on-demand wants to handle this */

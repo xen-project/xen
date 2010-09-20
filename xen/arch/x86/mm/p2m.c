@@ -841,7 +841,7 @@ p2m_pod_zero_check_superpage(struct domain *d, unsigned long gfn)
         t.d = d->domain_id;
         t.order = 9;
 
-        __trace_var(TRC_MEM_POD_ZERO_RECLAIM, 0, sizeof(t), (unsigned char *)&t);
+        __trace_var(TRC_MEM_POD_ZERO_RECLAIM, 0, sizeof(t), &t);
     }
 
     /* Finally!  We've passed all the checks, and can add the mfn superpage
@@ -955,7 +955,7 @@ p2m_pod_zero_check(struct domain *d, unsigned long *gfns, int count)
                 t.d = d->domain_id;
                 t.order = 0;
         
-                __trace_var(TRC_MEM_POD_ZERO_RECLAIM, 0, sizeof(t), (unsigned char *)&t);
+                __trace_var(TRC_MEM_POD_ZERO_RECLAIM, 0, sizeof(t), &t);
             }
 
             /* Add to cache, and account for the new p2m PoD entry */
@@ -1115,7 +1115,7 @@ p2m_pod_demand_populate(struct domain *d, unsigned long gfn,
         t.d = d->domain_id;
         t.order = order;
         
-        __trace_var(TRC_MEM_POD_POPULATE, 0, sizeof(t), (unsigned char *)&t);
+        __trace_var(TRC_MEM_POD_POPULATE, 0, sizeof(t), &t);
     }
 
     return 0;
@@ -1146,7 +1146,7 @@ remap_and_retry:
         t.gfn = gfn;
         t.d = d->domain_id;
         
-        __trace_var(TRC_MEM_POD_SUPERPAGE_SPLINTER, 0, sizeof(t), (unsigned char *)&t);
+        __trace_var(TRC_MEM_POD_SUPERPAGE_SPLINTER, 0, sizeof(t), &t);
     }
 
     return 0;
@@ -1212,7 +1212,7 @@ p2m_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
         t.d = d->domain_id;
         t.order = page_order;
 
-        __trace_var(TRC_MEM_SET_P2M_ENTRY, 0, sizeof(t), (unsigned char *)&t);
+        __trace_var(TRC_MEM_SET_P2M_ENTRY, 0, sizeof(t), &t);
     }
 
 #if CONFIG_PAGING_LEVELS >= 4
