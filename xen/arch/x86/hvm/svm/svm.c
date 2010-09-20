@@ -932,7 +932,7 @@ static void svm_do_nested_pgfault(paddr_t gpa)
         _d.qualification = 0;
         _d.mfn = mfn_x(gfn_to_mfn_query(p2m, gfn, &_d.p2mt));
         
-        __trace_var(TRC_HVM_NPF, 0, sizeof(_d), (unsigned char *)&_d);
+        __trace_var(TRC_HVM_NPF, 0, sizeof(_d), &_d);
     }
 
     if ( hvm_hap_nested_page_fault(gfn) )

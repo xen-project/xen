@@ -93,7 +93,7 @@ static inline void trace_runstate_change(struct vcpu *v, int new_state)
     event |= ( v->runstate.state & 0x3 ) << 8;
     event |= ( new_state & 0x3 ) << 4;
 
-    __trace_var(event, 1/*tsc*/, sizeof(d), (unsigned char *)&d);
+    __trace_var(event, 1/*tsc*/, sizeof(d), &d);
 }
 
 static inline void trace_continue_running(struct vcpu *v)
@@ -106,8 +106,7 @@ static inline void trace_continue_running(struct vcpu *v)
     d.vcpu = v->vcpu_id;
     d.domain = v->domain->domain_id;
 
-    __trace_var(TRC_SCHED_CONTINUE_RUNNING, 1/*tsc*/, sizeof(d),
-                (unsigned char *)&d);
+    __trace_var(TRC_SCHED_CONTINUE_RUNNING, 1/*tsc*/, sizeof(d), &d);
 }
 
 static inline void vcpu_urgent_count_update(struct vcpu *v)

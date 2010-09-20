@@ -715,7 +715,7 @@ static inline void trace_resync(int event, mfn_t gmfn)
     {
         /* Convert gmfn to gfn */
         unsigned long gfn = mfn_to_gfn(current->domain, gmfn);
-        __trace_var(event, 0/*!tsc*/, sizeof(gfn), (unsigned char*)&gfn);
+        __trace_var(event, 0/*!tsc*/, sizeof(gfn), &gfn);
     }
 }
 
@@ -1314,8 +1314,7 @@ static inline void trace_shadow_prealloc_unpin(struct domain *d, mfn_t smfn)
         unsigned long gfn;
         ASSERT(mfn_valid(smfn));
         gfn = mfn_to_gfn(d, backpointer(mfn_to_page(smfn)));
-        __trace_var(TRC_SHADOW_PREALLOC_UNPIN, 0/*!tsc*/,
-                    sizeof(gfn), (unsigned char*)&gfn);
+        __trace_var(TRC_SHADOW_PREALLOC_UNPIN, 0/*!tsc*/, sizeof(gfn), &gfn);
     }
 }
 
@@ -2200,7 +2199,7 @@ static inline void trace_shadow_wrmap_bf(mfn_t gmfn)
     {
         /* Convert gmfn to gfn */
         unsigned long gfn = mfn_to_gfn(current->domain, gmfn);
-        __trace_var(TRC_SHADOW_WRMAP_BF, 0/*!tsc*/, sizeof(gfn), (unsigned char*)&gfn);
+        __trace_var(TRC_SHADOW_WRMAP_BF, 0/*!tsc*/, sizeof(gfn), &gfn);
     }
 }
 

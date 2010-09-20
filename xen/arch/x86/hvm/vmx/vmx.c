@@ -2082,7 +2082,7 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
         _d.qualification = qualification;
         _d.mfn = mfn_x(gfn_to_mfn_query(p2m, gfn, &_d.p2mt));
         
-        __trace_var(TRC_HVM_NPF, 0, sizeof(_d), (unsigned char *)&_d);
+        __trace_var(TRC_HVM_NPF, 0, sizeof(_d), &_d);
     }
 
     if ( (qualification & EPT_GLA_VALID) &&
