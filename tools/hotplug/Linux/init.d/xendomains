@@ -46,8 +46,18 @@ if ! [ -e /proc/xen/privcmd ]; then
 	exit 0
 fi
 
-LOCKFILE=/var/lock/subsys/xendomains
-XENDOM_CONFIG=/etc/sysconfig/xendomains
+# See docs/misc/distro_mapping.txt
+if [ -d /var/lock/subsys ]; then
+	LOCKFILE=/var/lock/subsys/xendomains
+else
+	LOCKFILE=/var/lock/xendomains
+fi
+
+if [ -d /etc/sysconfig ]; then
+	XENDOM_CONFIG=/etc/sysconfig/xendomains
+else
+	XENDOM_CONFIG=/etc/default/xendomains
+fi
 
 test -r $XENDOM_CONFIG || { echo "$XENDOM_CONFIG not existing";
 	if [ "$1" = "stop" ]; then exit 0;

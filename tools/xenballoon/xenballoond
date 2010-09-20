@@ -21,7 +21,7 @@
 # If xenbus is running and the /usr/bin/xenstore-* tools are installed,
 # "xenbus is enabled".
 #
-# Parameters are documented in /etc/sysconfig/xenballoon.conf. Although 
+# Parameters are documented in <SYSCONFIG>/xenballoon.conf. Although
 # some are not used with directed ballooning, all must be set properly.
 # If xenbus is enabled, some of these parameters may be overridden by values
 # set by domain0 via xenbus.
@@ -237,7 +237,12 @@ else
 fi
 preswapnow=0
 
-. /etc/sysconfig/xenballoon.conf
+# See docs/misc/distro_mapping.txt
+if [ -f /etc/sysconfig/xenballoon.conf ]; then
+	. /etc/sysconfig/xenballoon.conf
+elif [ -f /etc/default/xenballoon.conf ]; then
+	. /etc/default/xenballoon.conf
+fi
 
 while true;
 do

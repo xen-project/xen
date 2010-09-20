@@ -62,16 +62,17 @@ build:
 .PHONY: install
 install: all install-initd install-scripts $(HOTPLUGS)
 
+# See docs/misc/distro_mapping.txt for INITD_DIR location
 .PHONY: install-initd
 install-initd:
-	[ -d $(DESTDIR)$(CONFIG_DIR)/init.d ] || $(INSTALL_DIR) $(DESTDIR)$(CONFIG_DIR)/init.d
+	[ -d $(DESTDIR)$(INITD_DIR) ] || $(INSTALL_DIR) $(DESTDIR)$(INITD_DIR)
 	[ -d $(DESTDIR)$(SYSCONFIG_DIR) ] || $(INSTALL_DIR) $(DESTDIR)$(SYSCONFIG_DIR)
-	$(INSTALL_PROG) $(XEND_INITD) $(DESTDIR)$(CONFIG_DIR)/init.d
-	$(INSTALL_PROG) $(XENDOMAINS_INITD) $(DESTDIR)$(CONFIG_DIR)/init.d
+	$(INSTALL_PROG) $(XEND_INITD) $(DESTDIR)$(INITD_DIR)
+	$(INSTALL_PROG) $(XENDOMAINS_INITD) $(DESTDIR)$(INITD_DIR)
 	$(INSTALL_PROG) $(XENDOMAINS_SYSCONFIG) $(DESTDIR)$(SYSCONFIG_DIR)/xendomains
-	$(INSTALL_PROG) $(XENCOMMONS_INITD) $(DESTDIR)$(CONFIG_DIR)/init.d
+	$(INSTALL_PROG) $(XENCOMMONS_INITD) $(DESTDIR)$(INITD_DIR)
 	$(INSTALL_PROG) $(XENCOMMONS_SYSCONFIG) $(DESTDIR)$(SYSCONFIG_DIR)/xencommons
-	$(INSTALL_PROG) init.d/xen-watchdog $(DESTDIR)$(CONFIG_DIR)/init.d
+	$(INSTALL_PROG) init.d/xen-watchdog $(DESTDIR)$(INITD_DIR)
 
 .PHONY: install-scripts
 install-scripts:

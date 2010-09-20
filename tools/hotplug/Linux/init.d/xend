@@ -40,14 +40,20 @@ case "$1" in
 		echo "xencommons should be started first."
 		exit 1
 	fi
-	mkdir -p /var/lock/subsys
-	touch /var/lock/subsys/xend
+	# mkdir shouldn't be needed as most distros have this already created. Default to using subsys.
+	# See docs/misc/distro_mapping.txt
+	mkdir -p /var/lock
+	if [ -d /var/lock/subsys ] ; then
+		touch /var/lock/subsys/xend
+	else
+		touch /var/lock/xend
+	fi
 	xend start
 	await_daemons_up
 	;;
   stop)
 	xend stop
-	rm -f /var/lock/subsys/xend
+	rm -f /var/lock/subsys/xend /var/lock/xend
 	;;
   status)
 	xend status

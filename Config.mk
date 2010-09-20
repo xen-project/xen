@@ -31,6 +31,12 @@ DOCDIR      ?= $(SHAREDIR)/doc/xen
 MANDIR      ?= $(SHAREDIR)/man
 BASH_COMPLETION_DIR ?= $(CONFIG_DIR)/bash_completion.d
 
+# These are the Red Hat settings.
+# See distro_mapping.txt for other options
+CONFIG_LEAF_DIR ?= sysconfig
+SUBSYS_DIR ?= /var/run/subsys
+INITD_DIR ?= /etc/rc.d/init.d
+
 ifneq ($(EXTRA_PREFIX),)
 EXTRA_INCLUDES += $(EXTRA_PREFIX)/include
 EXTRA_LIB += $(EXTRA_PREFIX)/$(LIBLEAFDIR)

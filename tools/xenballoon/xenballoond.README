@@ -56,16 +56,20 @@ Guest prerequisites to use xenballoond:
     be installed.  Binaries can be obtained, for example, by building
     xen-vvv.gz/tools in a guest-binary-compatible development tree
 
-Instructions to install/deploy xenballoond (in Redhat-based system):
+Instructions to install/deploy xenballoond:
+  (see docs/misc/distro_mapping.txt for SYSCONFIG and INITD_DIR definitions)
 - in each guest:
   - ensure pre-requisites are met (see above)
-  - place xenballoon.conf in /etc/sysconfig
+  - place xenballoon.conf in <SYSCONFIG>
   - place xenballoond in /usr/sbin
-  - copy xenballoond.init to /etc/rc.d/init.d/xenballoond (note file rename)
-  - edit /etc/sysconfig/xenballoond.conf as desired (especially note that
+  - copy xenballoond.init to <INITD_DIR>/xenballoond (note file rename)
+  - edit <SYSCONFIG>/xenballoond.conf as desired (especially note that
     selfballooning defaults as off)
   - start xenballoond with "service xenballoond start", and/or configure
-    xenballoond to start at init (e.g. "chkconfig xenballoond on")
+    xenballoond to start at init
+        (Red Hat e.g. "chkconfig xenballoond on")
+        (Debian e.g. " update-rc.d xenballoond defaults")
+        (Suse e.g. " insserv xenballoond")
 - in domain0:
   - if monitoring is desired, xenballoon-monitor may be installed in /usr/sbin
 - note that certain xenballoond.conf variables may be overridden by domain0
@@ -73,7 +77,6 @@ Instructions to install/deploy xenballoond (in Redhat-based system):
   xenballoond.conf
 
 TODO:
-080630 modifications to support SUSE-based and debian-based guests
 080630 domain0 ballooning policy module
 080630 experiment with more aggressive (optionally) memory minimum targets
 080630 BUG: xenballoond doesn't properly record the fact that it's running;

@@ -1,0 +1,27 @@
+With directory layout differences between Red Hat, Debian, Suse and
+other distros one needs to set the variables for the elements below
+
+-----------------+------------------+---------------+----------------+
+                 | RedHat (default) |  Debian       |  Suse          |
+-----------------+------------------+---------------+----------------+
+CONFIG_LEAF_DIR  | sysconfig        | default       | sysconfig      |
+SUBSYS_DIR       | /var/run/subsys  | /var/run      | /var/run       |
+INITD_DIR        | /etc/rc.d/init.d | /etc/init.d   | /etc/init.d    |
+-----------------+------------------+---------------+----------------+
+
+The build currently defaults to the elements used by Red Hat.
+For others, these env variables must be set in the shell env
+or modified in Config.mk before running make.
+
+This mechanism sets the location that files are installed to, but does
+not change the code itself. Scripts that refer to files affected by these
+directories must check each possible location at run time.
+
+To add support for new distributions that don't use the above locations,
+one must grep for the above elements and add appropriate checks.
+
+For example if a new distro uses /etc/bork as it's config dir, It's not
+sufficient to set CONFIG_LEAF_DIR=bork, one must also add tests for the
+existance of the bork dir in every context where config files are read.
+
+

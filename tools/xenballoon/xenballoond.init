@@ -29,6 +29,8 @@
 
 if [ -f /etc/sysconfig/xenballoon.conf ]; then
 	. /etc/sysconfig/xenballoon.conf
+elif [ -f /etc/default/xenballoon.conf ]; then
+	. /etc/default/xenballoon.conf
 fi
 
 # Check that balloon driver is present

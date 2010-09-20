@@ -203,7 +203,7 @@ uninstall:
 	rm -f  $(D)$(CONFIG_DIR)/udev/xen-backend.rules
 	rm -f  $(D)$(CONFIG_DIR)/udev/rules.d/xend.rules
 	rm -f  $(D)$(CONFIG_DIR)/udev/xend.rules
-	rm -f  $(D)$(CONFIG_DIR)/sysconfig/xendomains
+	rm -f  $(D)$(SYSCONFIG_DIR)/xendomains
 	rm -rf $(D)/var/run/xen* $(D)/var/lib/xen*
 	rm -rf $(D)/boot/*xen*
 	rm -rf $(D)/lib/modules/*xen*
