@@ -3414,6 +3414,7 @@ int do_mmu_update(
         case MMU_NORMAL_PT_UPDATE:
         case MMU_PT_UPDATE_PRESERVE_AD:
         {
+            unsigned int retries = 0;
             p2m_type_t p2mt;
 
             rc = xsm_mmu_normal_update(d, pg_owner, req.val);
@@ -3445,6 +3446,7 @@ int do_mmu_update(
                           (unsigned long)(req.ptr & ~PAGE_MASK));
             page = mfn_to_page(mfn);
 
+        retry:
             if ( page_lock(page) )
             {
                 switch ( page->u.inuse.type_info & PGT_type_mask )
@@ -3600,6 +3602,11 @@ int do_mmu_update(
                 okay = paging_write_guest_entry(
                     v, va, req.val, _mfn(mfn));
                 put_page_type(page);
+            }
+            else if ( retries++ < 5 )
+            {
+                /* Page type can be in flux, so we retry a few times. */
+                goto retry;
             }
 
             unmap_domain_page_with_cache(va, &mapcache);
