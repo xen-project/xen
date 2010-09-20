@@ -45,6 +45,10 @@ struct pci_dev {
     struct list_head domain_list;
 
     struct list_head msi_list;
+    unsigned int msix_nr_entries, msix_used_entries;
+    struct {
+        unsigned long first, last;
+    } msix_table, msix_pba;
     int msix_table_refcnt[MAX_MSIX_TABLE_PAGES];
     int msix_table_idx[MAX_MSIX_TABLE_PAGES];
     spinlock_t msix_table_lock;

@@ -26,6 +26,8 @@
 #include <xen/hvm/irq.h>
 #include <xen/tasklet.h>
 
+struct rangeset *__read_mostly mmio_ro_ranges;
+
 static void hvm_dirq_assist(unsigned long _d);
 
 bool_t pt_irq_need_timer(uint32_t flags)
@@ -565,3 +567,11 @@ void hvm_dpci_eoi(struct domain *d, unsigned int guest_gsi,
 unlock:
     spin_unlock(&d->event_lock);
 }
+
+static int __init setup_mmio_ro_ranges(void)
+{
+    mmio_ro_ranges = rangeset_new(NULL, "r/o mmio ranges",
+                                  RANGESETF_prettyprint_hex);
+    return 0;
+}
+__initcall(setup_mmio_ro_ranges);

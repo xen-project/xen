@@ -72,8 +72,12 @@ static void ept_p2m_type_to_flags(ept_entry_t *entry, p2m_type_t type)
             entry->r = entry->w = entry->x = 0;
             return;
         case p2m_ram_rw:
-        case p2m_mmio_direct:
             entry->r = entry->w = entry->x = 1;
+            return;
+        case p2m_mmio_direct:
+            entry->r = entry->x = 1;
+            entry->w = !rangeset_contains_singleton(mmio_ro_ranges,
+                                                    entry->mfn);
             return;
         case p2m_ram_logdirty:
         case p2m_ram_ro:
@@ -721,6 +725,9 @@ static void ept_change_entry_type_global(struct p2m_domain *p2m,
     struct domain *d = p2m->domain;
     if ( ept_get_asr(d) == 0 )
         return;
+
+    BUG_ON(p2m_is_grant(ot) || p2m_is_grant(nt));
+    BUG_ON(ot != nt && (ot == p2m_mmio_direct || nt == p2m_mmio_direct));
 
     ept_change_entry_type_page(_mfn(ept_get_asr(d)), ept_get_wl(d), ot, nt);
 

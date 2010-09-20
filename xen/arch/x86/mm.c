@@ -822,7 +822,13 @@ get_page_from_l1e(
             return 0;
         }
 
-        return 1;
+        if ( !(l1f & _PAGE_RW) || IS_PRIV(pg_owner) ||
+             !rangeset_contains_singleton(mmio_ro_ranges, mfn) )
+            return 1;
+        dprintk(XENLOG_G_WARNING,
+                "d%d: Forcing read-only access to MFN %lx\n",
+                l1e_owner->domain_id, mfn);
+        return -1;
     }
 
     if ( unlikely(real_pg_owner != pg_owner) )
@@ -1178,9 +1184,15 @@ static int alloc_l1_table(struct page_info *page)
 
     for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
     {
-        if ( is_guest_l1_slot(i) &&
-             unlikely(!get_page_from_l1e(pl1e[i], d, d)) )
-            goto fail;
+        if ( is_guest_l1_slot(i) )
+            switch ( get_page_from_l1e(pl1e[i], d, d) )
+            {
+            case 0:
+                goto fail;
+            case -1:
+                l1e_remove_flags(pl1e[i], _PAGE_RW);
+                break;
+            }
 
         adjust_guest_l1e(pl1e[i], d);
     }
@@ -1764,8 +1776,14 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
             return rc;
         }
 
-        if ( unlikely(!get_page_from_l1e(nl1e, pt_dom, pg_dom)) )
+        switch ( get_page_from_l1e(nl1e, pt_dom, pg_dom) )
+        {
+        case 0:
             return 0;
+        case -1:
+            l1e_remove_flags(nl1e, _PAGE_RW);
+            break;
+        }
         
         adjust_guest_l1e(nl1e, pt_dom);
         if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, pt_vcpu,
@@ -4919,8 +4937,9 @@ static int ptwr_emulated_update(
 
     /* Check the new PTE. */
     nl1e = l1e_from_intpte(val);
-    if ( unlikely(!get_page_from_l1e(nl1e, d, d)) )
+    switch ( get_page_from_l1e(nl1e, d, d) )
     {
+    case 0:
         if ( is_pv_32bit_domain(d) && (bytes == 4) && (unaligned_addr & 4) &&
              !do_cmpxchg && (l1e_get_flags(nl1e) & _PAGE_PRESENT) )
         {
@@ -4939,6 +4958,10 @@ static int ptwr_emulated_update(
             MEM_LOG("ptwr_emulate: could not get_page_from_l1e()");
             return X86EMUL_UNHANDLEABLE;
         }
+        break;
+    case -1:
+        l1e_remove_flags(nl1e, _PAGE_RW);
+        break;
     }
 
     adjust_guest_l1e(nl1e, d);

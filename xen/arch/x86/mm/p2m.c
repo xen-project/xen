@@ -72,7 +72,7 @@ boolean_param("hap_1gb", opt_hap_1gb);
 #define SUPERPAGE_PAGES (1UL << 9)
 #define superpage_aligned(_x)  (((_x)&(SUPERPAGE_PAGES-1))==0)
 
-static unsigned long p2m_type_to_flags(p2m_type_t t) 
+static unsigned long p2m_type_to_flags(p2m_type_t t, mfn_t mfn)
 {
     unsigned long flags;
 #ifdef __x86_64__
@@ -101,7 +101,9 @@ static unsigned long p2m_type_to_flags(p2m_type_t t)
     case p2m_mmio_dm:
         return flags;
     case p2m_mmio_direct:
-        return flags | P2M_BASE_FLAGS | _PAGE_RW | _PAGE_PCD;
+        if ( !rangeset_contains_singleton(mmio_ro_ranges, mfn_x(mfn)) )
+            flags |= _PAGE_RW;
+        return flags | P2M_BASE_FLAGS | _PAGE_PCD;
     case p2m_populate_on_demand:
         return flags;
     }
@@ -1299,8 +1301,10 @@ p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
             domain_crash(p2m->domain);
             goto out;
         }
+        ASSERT(!mfn_valid(mfn) || p2mt != p2m_mmio_direct);
         l3e_content = mfn_valid(mfn) 
-            ? l3e_from_pfn(mfn_x(mfn), p2m_type_to_flags(p2mt) | _PAGE_PSE)
+            ? l3e_from_pfn(mfn_x(mfn),
+                           p2m_type_to_flags(p2mt, mfn) | _PAGE_PSE)
             : l3e_empty();
         entry_content.l1 = l3e_content.l3;
         paging_write_p2m_entry(p2m->domain, gfn, p2m_entry,
@@ -1334,7 +1338,8 @@ p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         ASSERT(p2m_entry);
         
         if ( mfn_valid(mfn) || (p2mt == p2m_mmio_direct) )
-            entry_content = l1e_from_pfn(mfn_x(mfn), p2m_type_to_flags(p2mt));
+            entry_content = l1e_from_pfn(mfn_x(mfn),
+                                         p2m_type_to_flags(p2mt, mfn));
         else
             entry_content = l1e_empty();
         
@@ -1358,9 +1363,11 @@ p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
             goto out;
         }
         
+        ASSERT(!mfn_valid(mfn) || p2mt != p2m_mmio_direct);
         if ( mfn_valid(mfn) || p2m_is_magic(p2mt) )
             l2e_content = l2e_from_pfn(mfn_x(mfn),
-                                       p2m_type_to_flags(p2mt) | _PAGE_PSE);
+                                       p2m_type_to_flags(p2mt, mfn) |
+                                       _PAGE_PSE);
         else
             l2e_content = l2e_empty();
         
@@ -2437,6 +2444,7 @@ void p2m_change_type_global(struct p2m_domain *p2m, p2m_type_t ot, p2m_type_t nt
 #endif /* CONFIG_PAGING_LEVELS == 4 */
 
     BUG_ON(p2m_is_grant(ot) || p2m_is_grant(nt));
+    BUG_ON(ot != nt && (ot == p2m_mmio_direct || nt == p2m_mmio_direct));
 
     if ( !paging_mode_translate(p2m->domain) )
         return;
@@ -2478,7 +2486,7 @@ void p2m_change_type_global(struct p2m_domain *p2m, p2m_type_t ot, p2m_type_t nt
                     continue;
                 mfn = l3e_get_pfn(l3e[i3]);
                 gfn = get_gpfn_from_mfn(mfn);
-                flags = p2m_type_to_flags(nt);
+                flags = p2m_type_to_flags(nt, _mfn(mfn));
                 l1e_content = l1e_from_pfn(mfn, flags | _PAGE_PSE);
                 paging_write_p2m_entry(p2m->domain, gfn,
                                        (l1_pgentry_t *)&l3e[i3],
@@ -2509,7 +2517,7 @@ void p2m_change_type_global(struct p2m_domain *p2m, p2m_type_t ot, p2m_type_t nt
 #endif
 				)
                            * L2_PAGETABLE_ENTRIES) * L1_PAGETABLE_ENTRIES; 
-                    flags = p2m_type_to_flags(nt);
+                    flags = p2m_type_to_flags(nt, _mfn(mfn));
                     l1e_content = l1e_from_pfn(mfn, flags | _PAGE_PSE);
                     paging_write_p2m_entry(p2m->domain, gfn,
                                            (l1_pgentry_t *)&l2e[i2],
@@ -2533,7 +2541,7 @@ void p2m_change_type_global(struct p2m_domain *p2m, p2m_type_t ot, p2m_type_t nt
 				     )
                            * L2_PAGETABLE_ENTRIES) * L1_PAGETABLE_ENTRIES; 
                     /* create a new 1le entry with the new type */
-                    flags = p2m_type_to_flags(nt);
+                    flags = p2m_type_to_flags(nt, _mfn(mfn));
                     l1e_content = l1e_from_pfn(mfn, flags);
                     paging_write_p2m_entry(p2m->domain, gfn, &l1e[i1],
                                            l1mfn, l1e_content, 1);

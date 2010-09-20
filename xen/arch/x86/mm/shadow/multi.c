@@ -674,7 +674,9 @@ _sh_propagate(struct vcpu *v,
     }
 
     /* Read-only memory */
-    if ( p2m_is_readonly(p2mt) )
+    if ( p2m_is_readonly(p2mt) ||
+         (p2mt == p2m_mmio_direct &&
+          rangeset_contains_singleton(mmio_ro_ranges, mfn_x(target_mfn))) )
         sflags &= ~_PAGE_RW;
     
     // protect guest page tables
@@ -1225,15 +1227,19 @@ static int shadow_set_l1e(struct vcpu *v,
         /* About to install a new reference */        
         if ( shadow_mode_refcounts(d) ) {
             TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_SHADOW_L1_GET_REF);
-            if ( shadow_get_page_from_l1e(new_sl1e, d, new_type) == 0 ) 
+            switch ( shadow_get_page_from_l1e(new_sl1e, d, new_type) )
             {
+            case 0:
                 /* Doesn't look like a pagetable. */
                 flags |= SHADOW_SET_ERROR;
                 new_sl1e = shadow_l1e_empty();
-            }
-            else
-            {
+                break;
+            case -1:
+                shadow_l1e_remove_flags(new_sl1e, _PAGE_RW);
+                /* fall through */
+            default:
                 shadow_vram_get_l1e(new_sl1e, sl1e, sl1mfn, d);
+                break;
             }
         }
     } 
