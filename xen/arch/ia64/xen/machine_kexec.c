@@ -104,7 +104,7 @@ void machine_reboot_kexec(xen_kexec_image_t *image)
 
 static int machine_kexec_get_xen(xen_kexec_range_t *range)
 {
-	range->start = range->start = ia64_tpa(_text);
+	range->start = ia64_tpa(_text);
 	range->size = (unsigned long)_end - (unsigned long)_text;
 	return 0;
 }

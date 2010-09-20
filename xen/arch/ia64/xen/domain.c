@@ -565,7 +565,7 @@ static void init_switch_stack(struct vcpu *v)
 {
 	struct pt_regs *regs = vcpu_regs (v);
 	struct switch_stack *sw = (struct switch_stack *) regs - 1;
-	extern void ia64_ret_from_clone;
+	extern char ia64_ret_from_clone;
 
 	memset(sw, 0, sizeof(struct switch_stack) + sizeof(struct pt_regs));
 	sw->ar_bspstore = (unsigned long)vcpu_to_rbs_bottom(v);
@@ -728,7 +728,7 @@ vcpu_to_switch_stack(struct vcpu* v)
 static int
 vcpu_has_not_run(struct vcpu* v)
 {
-	extern void ia64_ret_from_clone;
+	extern char ia64_ret_from_clone;
 	struct switch_stack *sw = vcpu_to_switch_stack(v);
 
 	return (sw == (struct switch_stack *)(vcpu_regs(v)) - 1) &&
