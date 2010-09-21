@@ -194,14 +194,16 @@ int xlu_cfg_get_long(const XLU_Config *cfg, const char *n,
         
 
 int xlu_cfg_get_list(const XLU_Config *cfg, const char *n,
-                     XLU_ConfigList **list_r, int *entries_r) {
+                     XLU_ConfigList **list_r, int *entries_r, int dont_warn) {
     XLU_ConfigSetting *set;
     set= find(cfg,n);  if (!set) return ESRCH;
     if (set->avalues==1) {
-        fprintf(cfg->report,
-                "%s:%d: warning: parameter `%s' is a single value"
-                " but should be a list\n",
-                cfg->filename, set->lineno, n);
+        if (!dont_warn) {
+            fprintf(cfg->report,
+                    "%s:%d: warning: parameter `%s' is a single value"
+                    " but should be a list\n",
+                    cfg->filename, set->lineno, n);
+        }
         return EINVAL;
     }
     if (list_r) *list_r= set;

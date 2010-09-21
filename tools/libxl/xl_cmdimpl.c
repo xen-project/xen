@@ -744,7 +744,7 @@ static void parse_config_data(const char *configfile_filename_report,
         xlu_cfg_replace_string (config, "ramdisk", &b_info->u.pv.ramdisk.path);
     }
 
-    if (!xlu_cfg_get_list (config, "disk", &vbds, 0)) {
+    if (!xlu_cfg_get_list (config, "disk", &vbds, 0, 0)) {
         d_config->num_disks = 0;
         d_config->disks = NULL;
         while ((buf = xlu_cfg_get_listitem (vbds, d_config->num_disks)) != NULL) {
@@ -808,7 +808,7 @@ static void parse_config_data(const char *configfile_filename_report,
         }
     }
 
-    if (!xlu_cfg_get_list (config, "vif", &nics, 0)) {
+    if (!xlu_cfg_get_list (config, "vif", &nics, 0, 0)) {
         d_config->num_vifs = 0;
         d_config->vifs = NULL;
         while ((buf = xlu_cfg_get_listitem (nics, d_config->num_vifs)) != NULL) {
@@ -882,7 +882,7 @@ skip:
         }
     }
 
-    if (!xlu_cfg_get_list(config, "vif2", &net2s, 0)) {
+    if (!xlu_cfg_get_list(config, "vif2", &net2s, 0, 0)) {
         d_config->num_vif2s = 0;
         d_config->vif2s = NULL;
         while ((buf = xlu_cfg_get_listitem(net2s, d_config->num_vif2s))) {
@@ -930,7 +930,7 @@ skip:
         }
     }
 
-    if (!xlu_cfg_get_list (config, "vfb", &cvfbs, 0)) {
+    if (!xlu_cfg_get_list (config, "vfb", &cvfbs, 0, 0)) {
         d_config->num_vfbs = 0;
         d_config->num_vkbs = 0;
         d_config->vfbs = NULL;
@@ -994,7 +994,7 @@ skip_vfb:
     if (!xlu_cfg_get_long (config, "pci_power_mgmt", &l))
         pci_power_mgmt = l;
 
-    if (!xlu_cfg_get_list (config, "pci", &pcis, 0)) {
+    if (!xlu_cfg_get_list (config, "pci", &pcis, 0, 0)) {
         int i;
         d_config->num_pcidevs = 0;
         d_config->pcidevs = NULL;
