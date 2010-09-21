@@ -52,12 +52,12 @@ $(LIBXLU_OBJS): $(AUTOINCS)
 	@rm -f $*.[ch]
 	$(FLEX) --header-file=$*.h --outfile=$*.c $<
 
-genpath-target = $(call buildmakevars2file,_libxl_paths.h)
+genpath-target = $(call buildmakevars2file,_libxl_paths.h.tmp)
 $(eval $(genpath-target))
 
 _libxl_paths.h: genpath
-	sed -e "s/\([^=]*\)=\(.*\)/#define \1 \2/g" $@ >_$@
-	mv _$@ $@
+	sed -e "s/\([^=]*\)=\(.*\)/#define \1 \2/g" $@.tmp >$@.2.tmp
+	if ! cmp $@.2.tmp $@; then mv -f $@.2.tmp $@; fi
 
 libxl_paths.c: _libxl_paths.h
 

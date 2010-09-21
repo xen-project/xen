@@ -120,16 +120,17 @@ buildmakevars2file = $(eval $(call buildmakevars2file-closure,$(1)))
 define buildmakevars2file-closure
     .PHONY: genpath
     genpath:
-	rm -f $(1);                                                    \
-	echo "SBINDIR=\"$(SBINDIR)\"" >> $(1);                         \
-	echo "BINDIR=\"$(BINDIR)\"" >> $(1);                           \
-	echo "LIBEXEC=\"$(LIBEXEC)\"" >> $(1);                         \
-	echo "LIBDIR=\"$(LIBDIR)\"" >> $(1);                           \
-	echo "SHAREDIR=\"$(SHAREDIR)\"" >> $(1);                       \
-	echo "PRIVATE_BINDIR=\"$(PRIVATE_BINDIR)\"" >> $(1);           \
-	echo "XENFIRMWAREDIR=\"$(XENFIRMWAREDIR)\"" >> $(1);           \
-	echo "XEN_CONFIG_DIR=\"$(XEN_CONFIG_DIR)\"" >> $(1);           \
-	echo "XEN_SCRIPT_DIR=\"$(XEN_SCRIPT_DIR)\"" >> $(1)
+	rm -f $(1).tmp;                                                    \
+	echo "SBINDIR=\"$(SBINDIR)\"" >> $(1).tmp;                         \
+	echo "BINDIR=\"$(BINDIR)\"" >> $(1).tmp;                           \
+	echo "LIBEXEC=\"$(LIBEXEC)\"" >> $(1).tmp;                         \
+	echo "LIBDIR=\"$(LIBDIR)\"" >> $(1).tmp;                           \
+	echo "SHAREDIR=\"$(SHAREDIR)\"" >> $(1).tmp;                       \
+	echo "PRIVATE_BINDIR=\"$(PRIVATE_BINDIR)\"" >> $(1).tmp;           \
+	echo "XENFIRMWAREDIR=\"$(XENFIRMWAREDIR)\"" >> $(1).tmp;           \
+	echo "XEN_CONFIG_DIR=\"$(XEN_CONFIG_DIR)\"" >> $(1).tmp;           \
+	echo "XEN_SCRIPT_DIR=\"$(XEN_SCRIPT_DIR)\"" >> $(1).tmp;           \
+	if ! cmp $(1).tmp $(1); then mv -f $(1).tmp $(1); fi
 endef
 
 ifeq ($(debug),y)
