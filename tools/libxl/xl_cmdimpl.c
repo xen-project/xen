@@ -4282,7 +4282,7 @@ int main_blockattach(int argc, char **argv)
     }
     disk.virtpath = argv[optind+2];
     disk.unpluggable = 1;
-    disk.readwrite = ((argc-optind <= 2) || (argv[optind+3][0] == 'w'));
+    disk.readwrite = ((argc-optind <= 3) || (argv[optind+3][0] == 'w'));
 
     if (domain_qualifier_to_domid(argv[optind], &fe_domid, 0) < 0) {
         fprintf(stderr, "%s is an invalid domain identifier\n", argv[optind]);
