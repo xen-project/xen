@@ -31,11 +31,21 @@ DOCDIR      ?= $(SHAREDIR)/doc/xen
 MANDIR      ?= $(SHAREDIR)/man
 BASH_COMPLETION_DIR ?= $(CONFIG_DIR)/bash_completion.d
 
-# These are the Red Hat settings.
+# arguments: variable, common path part, path to test, if yes, if no
+define setvar_dir
+  ifndef $(1)
+    ifneq (,$(wildcard $(2)$(3)))
+      $(1) ?= $(2)$(4)
+    else
+      $(1) ?= $(2)$(5)
+    endif
+  endif
+endef
+
 # See distro_mapping.txt for other options
-CONFIG_LEAF_DIR ?= sysconfig
-SUBSYS_DIR ?= /var/run/subsys
-INITD_DIR ?= /etc/rc.d/init.d
+$(eval $(call setvar_dir,CONFIG_LEAF_DIR,,/etc/sysconfig,sysconfig,default))
+$(eval $(call setvar_dir,SUBSYS_DIR,/var/run,/subsys,/subsys,))
+$(eval $(call setvar_dir,INITD_DIR,/etc,/rc.d/init.d,/rc.d/init.d,/init.d))
 
 ifneq ($(EXTRA_PREFIX),)
 EXTRA_INCLUDES += $(EXTRA_PREFIX)/include
