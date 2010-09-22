@@ -21,6 +21,7 @@ XEN_CONFIGS += xmexample.nbd
 XEN_CONFIGS += xmexample.vti
 XEN_CONFIGS += xend-pci-quirks.sxp
 XEN_CONFIGS += xend-pci-permissive.sxp
+XEN_CONFIGS += xl.conf
 
 .PHONY: all
 all:
