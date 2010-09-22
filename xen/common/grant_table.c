@@ -139,6 +139,34 @@ shared_entry_header(struct grant_table *t, grant_ref_t ref)
 #define active_entry(t, e) \
     ((t)->active[(e)/ACGNT_PER_PAGE][(e)%ACGNT_PER_PAGE])
 
+/* Check if the page has been paged out */
+static int __get_paged_frame(unsigned long gfn, unsigned long *frame, int readonly, struct domain *rd)
+{
+    struct p2m_domain *p2m;
+    p2m_type_t p2mt;
+    mfn_t mfn;
+    int rc = GNTST_okay;
+    
+    p2m = p2m_get_hostp2m(rd);
+    if ( readonly )
+        mfn = gfn_to_mfn(p2m, gfn, &p2mt);
+    else
+        mfn = gfn_to_mfn_unshare(p2m, gfn, &p2mt, 1);
+    
+    if ( p2m_is_valid(p2mt) ) {
+        *frame = mfn_x(mfn);
+        if ( p2m_is_paged(p2mt) )
+            p2m_mem_paging_populate(p2m, gfn);
+        if ( p2m_is_paging(p2mt) )
+            rc = GNTST_eagain;
+    } else {
+       *frame = INVALID_MFN;
+       rc = GNTST_bad_page;
+    }
+    
+    return rc;
+}
+
 static inline int
 __get_maptrack_handle(
     struct grant_table *t)
@@ -527,14 +555,16 @@ __gnttab_map_grant_ref(
 
         if ( !act->pin )
         {
+            unsigned long gfn;
+            unsigned long frame;
+
+            gfn = sha1 ? sha1->frame : sha2->full_page.frame;
+            rc = __get_paged_frame(gfn, &frame, !!(op->flags & GNTMAP_readonly), rd);
+            if ( rc != GNTST_okay )
+	         goto unlock_out;
+            act->gfn = gfn;
             act->domid = ld->domain_id;
-            if ( sha1 )
-                act->gfn = sha1->frame;
-            else
-                act->gfn = sha2->full_page.frame;
-            act->frame = (op->flags & GNTMAP_readonly) ?  
-                            gmfn_to_mfn(rd, act->gfn) :
-                            gfn_to_mfn_private(rd, act->gfn); 
+            act->frame = frame;
             act->start = 0;
             act->length = PAGE_SIZE;
             act->is_sub_page = 0;
@@ -1697,6 +1727,7 @@ __acquire_grant_for_copy(
     domid_t trans_domid;
     grant_ref_t trans_gref;
     struct domain *rrd;
+    unsigned long gfn;
     unsigned long grant_frame;
     unsigned trans_page_off;
     unsigned trans_length;
@@ -1814,9 +1845,11 @@ __acquire_grant_for_copy(
         }
         else if ( sha1 )
         {
-            act->gfn = sha1->frame;
-            grant_frame = readonly ? gmfn_to_mfn(rd, act->gfn) :
-                                     gfn_to_mfn_private(rd, act->gfn);
+            gfn = sha1->frame;
+            rc = __get_paged_frame(gfn, &grant_frame, readonly, rd);
+            if ( rc != GNTST_okay )
+		goto unlock_out;
+            act->gfn = gfn;
             is_sub_page = 0;
             trans_page_off = 0;
             trans_length = PAGE_SIZE;
@@ -1824,9 +1857,11 @@ __acquire_grant_for_copy(
         }
         else if ( !(sha2->hdr.flags & GTF_sub_page) )
         {
-            act->gfn = sha2->full_page.frame;
-            grant_frame = readonly ? gmfn_to_mfn(rd, act->gfn) :
-                                     gfn_to_mfn_private(rd, act->gfn);
+            gfn = sha2->full_page.frame;
+            rc = __get_paged_frame(gfn, &grant_frame, readonly, rd);
+            if ( rc != GNTST_okay )
+		    goto unlock_out;
+            act->gfn = gfn;
             is_sub_page = 0;
             trans_page_off = 0;
             trans_length = PAGE_SIZE;
@@ -1834,9 +1869,11 @@ __acquire_grant_for_copy(
         }
         else
         {
-            act->gfn = sha2->sub_page.frame;
-            grant_frame = readonly ? gmfn_to_mfn(rd, act->gfn) :
-                                     gfn_to_mfn_private(rd, act->gfn);
+            gfn = sha2->sub_page.frame;
+            rc = __get_paged_frame(gfn, &grant_frame, readonly, rd);
+            if ( rc != GNTST_okay )
+		    goto unlock_out;
+            act->gfn = gfn;
             is_sub_page = 1;
             trans_page_off = sha2->sub_page.page_off;
             trans_length = sha2->sub_page.length;
@@ -1932,17 +1969,9 @@ __gnttab_copy(
     else
     {
 #ifdef CONFIG_X86
-        p2m_type_t p2mt;
-        struct p2m_domain *p2m = p2m_get_hostp2m(sd);
-        s_frame = mfn_x(gfn_to_mfn(p2m, op->source.u.gmfn, &p2mt));
-        if ( !p2m_is_valid(p2mt) )
-          s_frame = INVALID_MFN;
-        if ( p2m_is_paging(p2mt) )
-        {
-            p2m_mem_paging_populate(p2m, op->source.u.gmfn);
-            rc = -ENOENT;
-            goto error_out;
-        }
+	rc = __get_paged_frame(op->source.u.gmfn, &s_frame, 1, sd);
+	if ( rc != GNTST_okay )
+		goto error_out;
 #else
         s_frame = gmfn_to_mfn(sd, op->source.u.gmfn);        
 #endif
@@ -1979,17 +2008,9 @@ __gnttab_copy(
     else
     {
 #ifdef CONFIG_X86
-        p2m_type_t p2mt;
-        struct p2m_domain *p2m = p2m_get_hostp2m(dd);
-        d_frame = mfn_x(gfn_to_mfn_unshare(p2m, op->dest.u.gmfn, &p2mt, 1));
-        if ( !p2m_is_valid(p2mt) )
-          d_frame = INVALID_MFN;
-        if ( p2m_is_paging(p2mt) )
-        {
-            p2m_mem_paging_populate(p2m, op->dest.u.gmfn);
-            rc = -ENOENT;
-            goto error_out;
-        }
+	rc = __get_paged_frame(op->dest.u.gmfn, &d_frame, 0, dd);
+	if ( rc != GNTST_okay )
+		goto error_out;
 #else
         d_frame = gmfn_to_mfn(dd, op->dest.u.gmfn);
 #endif
