@@ -334,6 +334,15 @@ int libxl_domain_core_dump(libxl_ctx *ctx, uint32_t domid, const char *filename)
 int libxl_domain_setmaxmem(libxl_ctx *ctx, uint32_t domid, uint32_t target_memkb);
 int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid, int32_t target_memkb, int relative, int enforce);
 int libxl_get_memory_target(libxl_ctx *ctx, uint32_t domid, uint32_t *out_target);
+/* how much free memory in the system a domain needs to be built */
+int libxl_domain_need_memory(libxl_ctx *ctx, libxl_domain_build_info *b_info,
+        libxl_device_model_info *dm_info, uint32_t *need_memkb);
+/* how much free memory is available in the system */
+int libxl_get_free_memory(libxl_ctx *ctx, uint32_t *memkb);
+/* wait for a given amount of memory to be free in the system */
+int libxl_wait_for_free_memory(libxl_ctx *ctx, uint32_t domid, uint32_t memory_kb, int wait_secs);
+/* wait for the memory target of a domain to be reached */
+int libxl_wait_for_memory_target(libxl_ctx *ctx, uint32_t domid, int wait_secs);
 
 int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass);
 int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num, libxl_console_constype type);

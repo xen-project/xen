@@ -2778,9 +2778,11 @@ static int libxl__fill_dom0_memory_info(libxl__gc *gc, uint32_t *target_memkb)
 {
     int rc;
     libxl_dominfo info;
+    libxl_physinfo physinfo;
     char *target = NULL, *endptr = NULL;
     char *target_path = "/local/domain/0/memory/target";
     char *max_path = "/local/domain/0/memory/static-max";
+    char *free_mem_slack_path = "/local/domain/0/memory/freemem-slack";
     xs_transaction_t t;
     libxl_ctx *ctx = libxl__gc_owner(gc);
 
@@ -2804,10 +2806,16 @@ retry_transaction:
     if (rc < 0)
         return rc;
 
+    rc = libxl_get_physinfo(ctx, &physinfo);
+    if (rc < 0)
+        return rc;
+
     libxl__xs_write(gc, t, target_path, "%"PRIu32,
             (uint32_t) info.current_memkb);
     libxl__xs_write(gc, t, max_path, "%"PRIu32,
             (uint32_t) info.max_memkb);
+    libxl__xs_write(gc, t, free_mem_slack_path, "%"PRIu32, (uint32_t)
+            (PAGE_TO_MEMKB(physinfo.total_pages) - info.current_memkb));
 
     *target_memkb = (uint32_t) info.current_memkb;
     rc = 0;
@@ -2819,6 +2827,33 @@ out:
 
 
     return rc;
+}
+
+/* returns how much memory should be left free in the system */
+static int libxl__get_free_memory_slack(libxl__gc *gc, uint32_t *free_mem_slack)
+{
+    int rc;
+    char *free_mem_slack_path = "/local/domain/0/memory/freemem-slack";
+    char *free_mem_slack_s, *endptr;
+    uint32_t target_memkb;
+
+retry:
+    free_mem_slack_s = libxl__xs_read(gc, XBT_NULL, free_mem_slack_path);
+    if (!free_mem_slack_s) {
+        rc = libxl__fill_dom0_memory_info(gc, &target_memkb);
+        if (rc < 0)
+            return rc;
+        goto retry;
+    } else {
+        *free_mem_slack = strtoul(free_mem_slack_s, &endptr, 10);
+        if (*endptr != '\0') {
+            LIBXL__LOG_ERRNO(gc->owner, LIBXL__LOG_ERROR,
+                    "invalid free_mem_slack %s from %s\n",
+                    free_mem_slack_s, free_mem_slack_path);
+            return ERROR_FAIL;
+        }
+    }
+    return 0;
 }
 
 int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid,
@@ -2977,6 +3012,102 @@ int libxl_get_memory_target(libxl_ctx *ctx, uint32_t domid, uint32_t *out_target
 out:
     libxl__free_all(&gc);
     return rc;
+}
+
+int libxl_domain_need_memory(libxl_ctx *ctx, libxl_domain_build_info *b_info,
+        libxl_device_model_info *dm_info, uint32_t *need_memkb)
+{
+    *need_memkb = b_info->target_memkb;
+    if (b_info->hvm) {
+        *need_memkb += b_info->shadow_memkb + LIBXL_HVM_EXTRA_MEMORY;
+        if (strstr(dm_info->device_model, "stubdom-dm"))
+            *need_memkb += 32 * 1024;
+    } else
+        *need_memkb += LIBXL_PV_EXTRA_MEMORY;
+    if (*need_memkb % (2 * 1024))
+        *need_memkb += (2 * 1024) - (*need_memkb % (2 * 1024));
+    return 0;
+}
+
+int libxl_get_free_memory(libxl_ctx *ctx, uint32_t *memkb)
+{
+    int rc = 0;
+    libxl_physinfo info;
+    uint32_t freemem_slack;
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
+
+    rc = libxl_get_physinfo(ctx, &info);
+    if (rc < 0)
+        goto out;
+    rc = libxl__get_free_memory_slack(&gc, &freemem_slack);
+    if (rc < 0)
+        goto out;
+
+    if ((info.free_pages + info.scrub_pages) * 4 > freemem_slack)
+        *memkb = (info.free_pages + info.scrub_pages) * 4 - freemem_slack;
+    else
+        *memkb = 0;
+
+out:
+    libxl__free_all(&gc);
+    return rc;
+}
+
+int libxl_wait_for_free_memory(libxl_ctx *ctx, uint32_t domid, uint32_t
+        memory_kb, int wait_secs)
+{
+    int rc = 0;
+    libxl_physinfo info;
+    uint32_t freemem_slack;
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
+
+    rc = libxl__get_free_memory_slack(&gc, &freemem_slack);
+    if (rc < 0)
+        goto out;
+    while (wait_secs > 0) {
+        rc = libxl_get_physinfo(ctx, &info);
+        if (rc < 0)
+            goto out;
+        if (info.free_pages * 4 - freemem_slack >= memory_kb) {
+            rc = 0;
+            goto out;
+        }
+        wait_secs--;
+        sleep(1);
+    }
+    rc = ERROR_NOMEM;
+
+out:
+    libxl__free_all(&gc);
+    return rc;
+}
+
+int libxl_wait_for_memory_target(libxl_ctx *ctx, uint32_t domid, int wait_secs)
+{
+    int rc = 0;
+    uint32_t target_memkb = 0;
+    libxl_dominfo info;
+
+    do {
+        wait_secs--;
+        sleep(1);
+
+        rc = libxl_get_memory_target(ctx, domid, &target_memkb);
+        if (rc < 0)
+            goto out;
+
+        rc = libxl_domain_info(ctx, &info, domid);
+        if (rc < 0)
+            return rc;
+    } while (wait_secs > 0 && info.current_memkb > target_memkb);
+
+    if (info.current_memkb <= target_memkb)
+        rc = 0;
+    else
+        rc = ERROR_FAIL;
+
+out:
+    return 0;
 }
 
 int libxl_button_press(libxl_ctx *ctx, uint32_t domid, libxl_button button)

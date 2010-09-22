@@ -41,6 +41,8 @@
 #define LIBXL_XENCONSOLE_LIMIT 1048576
 #define LIBXL_XENCONSOLE_PROTOCOL "vt100"
 #define LIBXL_MAXMEM_CONSTANT 1024
+#define LIBXL_PV_EXTRA_MEMORY 1024
+#define LIBXL_HVM_EXTRA_MEMORY 2048
 #define QEMU_SIGNATURE "QemuDeviceModelRecord"
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
