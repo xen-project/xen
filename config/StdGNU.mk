@@ -45,8 +45,10 @@ PRIVATE_BINDIR = $(PRIVATE_PREFIX)/bin
 
 ifeq ($(PREFIX),/usr)
 CONFIG_DIR = /etc
+XEN_LOCK_DIR = /var/lock
 else
 CONFIG_DIR = $(PREFIX)/etc
+XEN_LOCK_DIR = $(PREFIX)/var/lock
 endif
 
 SYSCONFIG_DIR = $(CONFIG_DIR)/$(CONFIG_LEAF_DIR)

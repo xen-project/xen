@@ -60,3 +60,7 @@ const char *libxl_xen_script_dir_path(void)
     return XEN_SCRIPT_DIR;
 }
 
+const char *libxl_lock_dir_path(void)
+{
+    return XEN_LOCK_DIR;
+}

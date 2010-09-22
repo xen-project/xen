@@ -7,4 +7,10 @@ LIBLEAFDIR_x86_64 = lib
 LIBEXEC = $(PREFIX)/libexec
 PRIVATE_BINDIR = $(BINDIR)
 
+ifeq ($(PREFIX),/usr)
+XEN_LOCK_DIR = /var/lib
+else
+XEN_LOCK_DIR = $(PREFIX)/var/lib
+endif
+
 WGET = ftp
