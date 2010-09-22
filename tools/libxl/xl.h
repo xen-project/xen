@@ -92,5 +92,6 @@ extern xentoollog_logger_stdiostream *logger;
 
 /* global options */
 extern int autoballoon;
+extern char *lockfile;
 
 #endif /* XL_H */

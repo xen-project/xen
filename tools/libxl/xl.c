@@ -34,6 +34,7 @@
 
 xentoollog_logger_stdiostream *logger;
 int autoballoon = 1;
+char *lockfile;
 
 static xentoollog_level minmsglevel = XTL_PROGRESS;
 
@@ -44,6 +45,7 @@ static void parse_global_config(const char *configfile,
     long l;
     XLU_Config *config;
     int e;
+    const char *buf;
 
     config = xlu_cfg_init(stderr, configfile);
     if (!config) {
@@ -59,6 +61,16 @@ static void parse_global_config(const char *configfile,
 
     if (!xlu_cfg_get_long (config, "autoballoon", &l))
         autoballoon = l;
+
+    if (!xlu_cfg_get_string (config, "lockfile", &buf))
+        lockfile = strdup(buf);
+    else {
+        e = asprintf(&lockfile, "%s/xl", (char *)libxl_lock_dir_path());
+        if (e < 0) {
+            fprintf(stderr, "asprintf memory allocation failed\n");
+            exit(1);
+        }
+    }
 
     xlu_cfg_destroy(config);
 }

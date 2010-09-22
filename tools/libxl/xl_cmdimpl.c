@@ -68,6 +68,7 @@ libxl_ctx ctx;
 /* when we operate on a domain, it is this one: */
 static uint32_t domid;
 static const char *common_domname;
+static int fd_lock = -1;
 
 
 static const char savefileheader_magic[32]=
@@ -232,6 +233,65 @@ static void find_domain(const char *p)
         exit(2);
     }
     common_domname = was_name ? p : libxl_domid_to_name(&ctx, domid);
+}
+
+static int acquire_lock(void)
+{
+    int rc;
+    struct flock fl;
+
+    /* lock already acquired */
+    if (fd_lock >= 0)
+        return ERROR_INVAL;
+
+    fl.l_type = F_WRLCK;
+    fl.l_whence = SEEK_SET;
+    fl.l_start = 0;
+    fl.l_len = 0;
+    fd_lock = open(lockfile, O_WRONLY|O_CREAT, S_IWUSR);
+    if (fd_lock < 0) {
+        fprintf(stderr, "cannot open the lockfile %s errno=%d\n", lockfile, errno);
+        return ERROR_FAIL;
+    }
+get_lock:
+    rc = fcntl(fd_lock, F_SETLKW, &fl);
+    if (rc < 0 && errno == EINTR)
+        goto get_lock;
+    if (rc < 0) {
+        fprintf(stderr, "cannot acquire lock %s errno=%d\n", lockfile, errno);
+        rc = ERROR_FAIL;
+    } else
+        rc = 0;
+    return rc;
+}
+
+static int release_lock(void)
+{
+    int rc;
+    struct flock fl;
+
+    /* lock not acquired */
+    if (fd_lock < 0)
+        return ERROR_INVAL;
+
+release_lock:
+    fl.l_type = F_UNLCK;
+    fl.l_whence = SEEK_SET;
+    fl.l_start = 0;
+    fl.l_len = 0;
+
+    rc = fcntl(fd_lock, F_SETLKW, &fl);
+    if (rc < 0 && errno == EINTR)
+        goto release_lock;
+    if (rc < 0) {
+        fprintf(stderr, "cannot release lock %s, errno=%d\n", lockfile, errno);
+        rc = ERROR_FAIL;
+    } else
+        rc = 0;
+    close(fd_lock);
+    fd_lock = -1;
+
+    return rc;
 }
 
 #define LOG(_f, _a...)   dolog(__FILE__, __LINE__, __func__, _f "\n", ##_a)
@@ -1213,6 +1273,48 @@ struct domain_create {
     char **migration_domname_r; /* from malloc */
 };
 
+static int freemem(libxl_domain_build_info *b_info, libxl_device_model_info *dm_info)
+{
+    int rc, retries = 3;
+    uint32_t need_memkb, free_memkb;
+
+    if (!autoballoon)
+        return 0;
+
+    rc = libxl_domain_need_memory(&ctx, b_info, dm_info, &need_memkb);
+    if (rc < 0)
+        return rc;
+
+    do {
+        rc = libxl_get_free_memory(&ctx, &free_memkb);
+        if (rc < 0)
+            return rc;
+
+        if (free_memkb >= need_memkb)
+            return 0;
+
+        rc = libxl_set_memory_target(&ctx, 0, free_memkb - need_memkb, 1, 0);
+        if (rc < 0)
+            return rc;
+
+        rc = libxl_wait_for_free_memory(&ctx, domid, need_memkb, 10);
+        if (!rc)
+            return 0;
+        else if (rc != ERROR_NOMEM)
+            return rc;
+
+        /* the memory target has been reached but the free memory is still
+         * not enough: loop over again */
+        rc = libxl_wait_for_memory_target(&ctx, 0, 1);
+        if (rc < 0)
+            return rc;
+
+        retries--;
+    } while (retries > 0);
+
+    return ERROR_NOMEM;
+}
+
 static int create_domain(struct domain_create *dom_info)
 {
     struct domain_config d_config;
@@ -1372,6 +1474,17 @@ static int create_domain(struct domain_create *dom_info)
 start:
     domid = 0;
 
+    rc = acquire_lock();
+    if (rc < 0)
+        goto error_out;
+
+    ret = freemem(&d_config.b_info, &dm_info);
+    if (ret < 0) {
+        fprintf(stderr, "failed to free memory for the domain\n");
+        ret = ERROR_FAIL;
+        goto error_out;
+    }
+
     ret = libxl_domain_make(&ctx, &d_config.c_info, &domid);
     if (ret) {
         fprintf(stderr, "cannot make domain: %d\n", ret);
@@ -1481,6 +1594,8 @@ start:
         if (child_console_pid < 0)
             goto error_out;
     }
+
+    release_lock();
 
     if (!paused)
         libxl_domain_unpause(&ctx, domid);
@@ -1619,6 +1734,7 @@ start:
     }
 
 error_out:
+    release_lock();
     if (domid)
         libxl_domain_destroy(&ctx, domid, 0);
 
