@@ -87,7 +87,7 @@ static int domain_has_security(struct domain *d, u32 perms)
         return -EACCES;
         
     return avc_has_perm(dsec->sid, SECINITSID_SECURITY, SECCLASS_SECURITY, 
-                                                                perms, NULL);
+                        perms, NULL);
 }
 
 static int flask_security_user(char *buf, uint32_t size)
@@ -166,13 +166,13 @@ static int flask_security_user(char *buf, uint32_t size)
     memset(buf, 0, size);
     memcpy(buf, page, length);
         
-out3:
+ out3:
     xfree(sids);
-out2:
+ out2:
     if ( page )
         xfree(page);
     xfree(user);
-out:
+ out:
     xfree(con);
     return length;
 }
@@ -232,11 +232,11 @@ static int flask_security_relabel(char *buf, uint32_t size)
     memcpy(buf, newcon, len);
     length = len;
 
-out3:
+ out3:
     xfree(newcon);
-out2:
+ out2:
     xfree(tcon);
-out:
+ out:
     xfree(scon);
     return length;
 }
@@ -297,11 +297,11 @@ static int flask_security_create(char *buf, uint32_t size)
     memcpy(buf, newcon, len);
     length = len;
         
-out3:
+ out3:
     xfree(newcon);
-out2:
+ out2:
     xfree(tcon);
-out:
+ out:
     xfree(scon);
     return length;
 }
@@ -348,13 +348,13 @@ static int flask_security_access(char *buf, uint32_t size)
 
     memset(buf, 0, size);
     length = snprintf(buf, size, "%x %x %x %x %u", 
-                                        avd.allowed, 0xffffffff,
-                                        avd.auditallow, avd.auditdeny, 
-                                        avd.seqno);
+                      avd.allowed, 0xffffffff,
+                      avd.auditallow, avd.auditdeny, 
+                      avd.seqno);
                 
-out2:
+ out2:
     xfree(tcon);
-out:
+ out:
     xfree(scon);
     return length;
 }
@@ -406,7 +406,7 @@ static int flask_security_member(char *buf, uint32_t size)
     if ( len > size )
     {
         printk("%s:  context size (%u) exceeds payload "
-                "max\n", __FUNCTION__, len);
+               "max\n", __FUNCTION__, len);
         length = -ERANGE;
         goto out3;
     }
@@ -415,11 +415,11 @@ static int flask_security_member(char *buf, uint32_t size)
     memcpy(buf, newcon, len);
     length = len;
 
-out3:
+ out3:
     xfree(newcon);
-out2:
+ out2:
     xfree(tcon);
-out:
+ out:
     xfree(scon);
     return length;
 }
@@ -443,7 +443,7 @@ static int flask_security_setenforce(char *buf, uint32_t count)
     }
     length = count;
 
-out:
+ out:
     return length;
 }
 
@@ -463,7 +463,7 @@ static int flask_security_context(char *buf, uint32_t count)
     memset(buf, 0, count);
     length = snprintf(buf, count, "%u", sid);
 
-out:
+ out:
     return length;
 }
 
@@ -491,7 +491,7 @@ static int flask_security_sid(char *buf, uint32_t count)
 
     xfree(context);
 
-out:
+ out:
     return length;
 }
 
@@ -539,7 +539,7 @@ static int flask_security_disable(char *buf, uint32_t count)
 
     length = count;
 
-out:
+ out:
     return length;
 }
 
@@ -563,7 +563,7 @@ static int flask_security_setavc_threshold(char *buf, uint32_t count)
     }
     ret = count;
 
-out:
+ out:
     return ret;
 }
 
@@ -590,7 +590,7 @@ static int flask_security_set_bool(char *buf, uint32_t count)
     bool_pending_values[i] = new_value;
     length = count;
 
-out:
+ out:
     spin_unlock(&sel_sem);
     return length;
 }
@@ -615,7 +615,7 @@ static int flask_security_commit_bools(char *buf, uint32_t count)
     
     length = count;
 
-out:
+ out:
     spin_unlock(&sel_sem);
     return length;
 }
@@ -640,9 +640,9 @@ static int flask_security_get_bool(char *buf, uint32_t count)
 
     memset(buf, 0, count);
     length = snprintf(buf, count, "%d %d", cur_enforcing,
-                bool_pending_values[i]);
+                      bool_pending_values[i]);
 
-out:
+ out:
     spin_unlock(&sel_sem);
     return length;
 }
@@ -663,7 +663,7 @@ static int flask_security_make_bools(void)
     bool_num = num;
     bool_pending_values = values;
 
-out:
+ out:
     if ( names )
     {
         for ( i = 0; i < num; i++ )
@@ -689,7 +689,7 @@ static int flask_security_avc_cachestats(char *buf, uint32_t count)
     memset(page, 0, PAGE_SIZE);
 
     len = snprintf(page, PAGE_SIZE, "lookups hits misses allocations reclaims "
-                                                                   "frees\n");
+                   "frees\n");
     if ( len > count ) {
         length = -EINVAL;
         goto out;
@@ -705,8 +705,8 @@ static int flask_security_avc_cachestats(char *buf, uint32_t count)
         st = &per_cpu(avc_cache_stats, cpu);
 
         len = snprintf(page, PAGE_SIZE, "%u %u %u %u %u %u\n", st->lookups,
-                                       st->hits, st->misses, st->allocations,
-                                                       st->reclaims, st->frees);
+                       st->hits, st->misses, st->allocations,
+                       st->reclaims, st->frees);
         if ( len > count ) {
             length = -EINVAL;
             goto out;
@@ -717,7 +717,7 @@ static int flask_security_avc_cachestats(char *buf, uint32_t count)
         count -= len;
     }
 
-out:
+ out:
     xfree(page);    
     return length;
 }
@@ -745,7 +745,7 @@ static int flask_security_load(char *buf, uint32_t count)
     else
         length = count;
 
-out:
+ out:
     spin_unlock(&sel_sem);
     return length;
 }
@@ -780,7 +780,7 @@ static int flask_ocontext_del(char *buf, uint32_t size)
     }
 
     len = security_ocontext_del(ocontext, low, high);
-  out:
+ out:
     xfree(ocontext);
     return len;
 }
@@ -831,7 +831,7 @@ static int flask_ocontext_add(char *buf, uint32_t size)
         goto out;
     }
     len = security_ocontext_add(ocontext, low, high, sid);
-out:
+ out:
     xfree(ocontext);
     xfree(scontext);
     return len;
@@ -854,7 +854,7 @@ long do_flask_op(XEN_GUEST_HANDLE(xsm_op_t) u_flask_op)
         return -EINVAL;
 
     if ( (op->buf == NULL && op->size != 0) || 
-                                    (op->buf != NULL && op->size == 0) )
+         (op->buf != NULL && op->size == 0) )
         return -EINVAL;
 
     arg = xmalloc_bytes(op->size + 1);
@@ -864,7 +864,7 @@ long do_flask_op(XEN_GUEST_HANDLE(xsm_op_t) u_flask_op)
     memset(arg, 0, op->size + 1);
 
     if ( (FLASK_COPY_IN&(1UL<<op->cmd)) && op->buf != NULL && 
-           copy_from_guest(arg, guest_handle_from_ptr(op->buf, char), op->size) )
+         copy_from_guest(arg, guest_handle_from_ptr(op->buf, char), op->size) )
     {
         rc = -EFAULT;
         goto out;
@@ -1020,7 +1020,7 @@ long do_flask_op(XEN_GUEST_HANDLE(xsm_op_t) u_flask_op)
     }
     
     if ( (FLASK_COPY_OUT&(1UL<<op->cmd)) && op->buf != NULL && 
-             copy_to_guest(guest_handle_from_ptr(op->buf, char), arg, op->size) )
+         copy_to_guest(guest_handle_from_ptr(op->buf, char), arg, op->size) )
     {
         rc = -EFAULT;
         goto out;
@@ -1030,7 +1030,7 @@ long do_flask_op(XEN_GUEST_HANDLE(xsm_op_t) u_flask_op)
     if ( copy_to_guest(u_flask_op, op, 1) )
         rc = -EFAULT;
 
-out:
+ out:
     xfree(arg);
     return rc;
 }

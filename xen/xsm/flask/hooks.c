@@ -1,4 +1,4 @@
- /*
+/*
  *  This file contains the Flask hook function implementations for Xen.
  *
  *  Author:  George Coker, <gscoker@alpha.ncsc.mil>
@@ -32,7 +32,7 @@
 struct xsm_operations *original_ops = NULL;
 
 static int domain_has_perm(struct domain *dom1, struct domain *dom2, 
-                                                        u16 class, u32 perms)
+                           u16 class, u32 perms)
 {
     struct domain_security_struct *dsec1, *dsec2;
 
@@ -102,7 +102,7 @@ static void flask_domain_free_security(struct domain *d)
 }
 
 static int flask_evtchn_unbound(struct domain *d1, struct evtchn *chn, 
-                                                                    domid_t id2)
+                                domid_t id2)
 {
     u32 newsid;
     int rc;
@@ -126,7 +126,7 @@ static int flask_evtchn_unbound(struct domain *d1, struct evtchn *chn,
 
     dsec2 = d2->ssid;
     rc = security_transition_sid(dsec1->sid, dsec2->sid, SECCLASS_EVENT, 
-                                                                    &newsid);
+                                 &newsid);
     if ( rc )
         goto out;
 
@@ -140,13 +140,13 @@ static int flask_evtchn_unbound(struct domain *d1, struct evtchn *chn,
     else
         esec->sid = newsid;
 
-out:
+ out:
     put_domain(d2);
     return rc;
 }
 
 static int flask_evtchn_interdomain(struct domain *d1, struct evtchn *chn1, 
-                                        struct domain *d2, struct evtchn *chn2)
+                                    struct domain *d2, struct evtchn *chn2)
 {
     u32 newsid1;
     u32 newsid2;
@@ -161,11 +161,11 @@ static int flask_evtchn_interdomain(struct domain *d1, struct evtchn *chn1,
     esec2 = chn2->ssid;
 
     rc = security_transition_sid(dsec1->sid, dsec2->sid, 
-                                        SECCLASS_EVENT, &newsid1);
+                                 SECCLASS_EVENT, &newsid1);
     if ( rc )
     {
         printk("%s: security_transition_sid failed, rc=%d (domain=%d)\n",
-                                            __FUNCTION__, -rc, d2->domain_id);
+               __FUNCTION__, -rc, d2->domain_id);
         return rc;
     }
 
@@ -174,11 +174,11 @@ static int flask_evtchn_interdomain(struct domain *d1, struct evtchn *chn1,
         return rc;
 
     rc = security_transition_sid(dsec2->sid, dsec1->sid, 
-                                        SECCLASS_EVENT, &newsid2);
+                                 SECCLASS_EVENT, &newsid2);
     if ( rc )
     {
         printk("%s: security_transition_sid failed, rc=%d (domain=%d)\n",
-                                            __FUNCTION__, -rc, d1->domain_id);
+               __FUNCTION__, -rc, d1->domain_id);
         return rc;
     }
 
@@ -216,11 +216,11 @@ static int flask_evtchn_send(struct domain *d, struct evtchn *chn)
     {
     case ECS_INTERDOMAIN:
         rc = domain_has_evtchn(d, chn, EVENT__SEND);
-    break;
+        break;
     case ECS_IPI:
     case ECS_UNBOUND:
         rc = 0;
-    break;
+        break;
     default:
         rc = -EPERM;
     }
@@ -274,7 +274,7 @@ static void flask_free_security_evtchn(struct evtchn *chn)
 }
 
 static int flask_grant_mapref(struct domain *d1, struct domain *d2, 
-                                                                uint32_t flags)
+                              uint32_t flags)
 {
     u32 perms = GRANT__MAP_READ;
 
@@ -327,20 +327,20 @@ static int get_page_sid(struct page_info *page, u32 *sid)
 
     switch ( d->domain_id )
     {
-        case DOMID_IO:
-            /*A tracked IO page?*/
-            *sid = SECINITSID_DOMIO;
+    case DOMID_IO:
+        /*A tracked IO page?*/
+        *sid = SECINITSID_DOMIO;
         break;
 
-        case DOMID_XEN:
-            /*A page from Xen's private heap?*/
-            *sid = SECINITSID_DOMXEN;
+    case DOMID_XEN:
+        /*A page from Xen's private heap?*/
+        *sid = SECINITSID_DOMXEN;
         break;
 
-        default:
-            /*Pages are implicitly labeled by domain ownership!*/
-            dsec = d->ssid;
-            *sid = dsec ? dsec->sid : SECINITSID_UNLABELED;
+    default:
+        /*Pages are implicitly labeled by domain ownership!*/
+        dsec = d->ssid;
+        *sid = dsec ? dsec->sid : SECINITSID_UNLABELED;
         break;
     }
 
@@ -397,14 +397,14 @@ static int flask_console_io(struct domain *d, int cmd)
 
     switch ( cmd )
     {
-        case CONSOLEIO_read:
-            perm = XEN__READCONSOLE;
+    case CONSOLEIO_read:
+        perm = XEN__READCONSOLE;
         break;
-        case CONSOLEIO_write:
-            perm = XEN__WRITECONSOLE;
+    case CONSOLEIO_write:
+        perm = XEN__WRITECONSOLE;
         break;
-        default:
-            return -EPERM;
+    default:
+        return -EPERM;
     }
 
     return domain_has_xen(d, perm);
@@ -416,27 +416,27 @@ static int flask_profile(struct domain *d, int op)
 
     switch ( op )
     {
-        case XENOPROF_init:
-        case XENOPROF_enable_virq:
-        case XENOPROF_disable_virq:
-        case XENOPROF_get_buffer:
-            perm = XEN__NONPRIVPROFILE;
+    case XENOPROF_init:
+    case XENOPROF_enable_virq:
+    case XENOPROF_disable_virq:
+    case XENOPROF_get_buffer:
+        perm = XEN__NONPRIVPROFILE;
         break;
-        case XENOPROF_reset_active_list:
-        case XENOPROF_reset_passive_list:
-        case XENOPROF_set_active:
-        case XENOPROF_set_passive:
-        case XENOPROF_reserve_counters:
-        case XENOPROF_counter:
-        case XENOPROF_setup_events:
-        case XENOPROF_start:
-        case XENOPROF_stop:
-        case XENOPROF_release_counters:
-        case XENOPROF_shutdown:
-            perm = XEN__PRIVPROFILE;
+    case XENOPROF_reset_active_list:
+    case XENOPROF_reset_passive_list:
+    case XENOPROF_set_active:
+    case XENOPROF_set_passive:
+    case XENOPROF_reserve_counters:
+    case XENOPROF_counter:
+    case XENOPROF_setup_events:
+    case XENOPROF_start:
+    case XENOPROF_stop:
+    case XENOPROF_release_counters:
+    case XENOPROF_shutdown:
+        perm = XEN__PRIVPROFILE;
         break;
-        default:
-            return -EPERM;
+    default:
+        return -EPERM;
     }
 
     return domain_has_xen(d, perm);
@@ -453,7 +453,7 @@ static int flask_schedop_shutdown(struct domain *d1, struct domain *d2)
 }
 
 static void flask_security_domaininfo(struct domain *d, 
-                                        struct xen_domctl_getdomaininfo *info)
+                                      struct xen_domctl_getdomaininfo *info)
 {
     struct domain_security_struct *dsec;
 
@@ -464,7 +464,7 @@ static void flask_security_domaininfo(struct domain *d,
 static int flask_setvcpucontext(struct domain *d)
 {
     return domain_has_perm(current->domain, d, SECCLASS_DOMAIN, 
-                                                        DOMAIN__SETVCPUCONTEXT);
+                           DOMAIN__SETVCPUCONTEXT);
 }
 
 static int flask_pausedomain(struct domain *d)
@@ -491,21 +491,21 @@ static int flask_domain_create(struct domain *d, u32 ssidref)
     dsec1 = current->domain->ssid;
 
     if ( dsec1->create_sid == SECSID_NULL ) 
-		dsec1->create_sid = ssidref;
+        dsec1->create_sid = ssidref;
 
-	rc = avc_has_perm(dsec1->sid, dsec1->create_sid, SECCLASS_DOMAIN, 
-          		                                          DOMAIN__CREATE, NULL);
-	if ( rc )
+    rc = avc_has_perm(dsec1->sid, dsec1->create_sid, SECCLASS_DOMAIN, 
+                      DOMAIN__CREATE, NULL);
+    if ( rc )
     {
-	    dsec1->create_sid = SECSID_NULL;
-		return rc;
+        dsec1->create_sid = SECSID_NULL;
+        return rc;
     }
 
     dsec2 = d->ssid;
     dsec2->sid = dsec1->create_sid;
 
-	dsec1->create_sid = SECSID_NULL;
-	dsec2->create_sid = SECSID_NULL;
+    dsec1->create_sid = SECSID_NULL;
+    dsec2->create_sid = SECSID_NULL;
 
     return rc;
 }
@@ -513,13 +513,13 @@ static int flask_domain_create(struct domain *d, u32 ssidref)
 static int flask_max_vcpus(struct domain *d)
 {
     return domain_has_perm(current->domain, d, SECCLASS_DOMAIN, 
-                                                            DOMAIN__MAX_VCPUS);
+                           DOMAIN__MAX_VCPUS);
 }
 
 static int flask_destroydomain(struct domain *d)
 {
     return domain_has_perm(current->domain, d, SECCLASS_DOMAIN, 
-                                                            DOMAIN__DESTROY);
+                           DOMAIN__DESTROY);
 }
 
 static int flask_vcpuaffinity(int cmd, struct domain *d)
@@ -528,14 +528,14 @@ static int flask_vcpuaffinity(int cmd, struct domain *d)
 
     switch ( cmd )
     {
-        case XEN_DOMCTL_setvcpuaffinity:
-            perm = DOMAIN__SETVCPUAFFINITY;
+    case XEN_DOMCTL_setvcpuaffinity:
+        perm = DOMAIN__SETVCPUAFFINITY;
         break;
-        case XEN_DOMCTL_getvcpuaffinity:
-            perm = DOMAIN__GETVCPUAFFINITY;
+    case XEN_DOMCTL_getvcpuaffinity:
+        perm = DOMAIN__GETVCPUAFFINITY;
         break;
-        default:
-            return -EPERM;
+    default:
+        return -EPERM;
     }
 
     return domain_has_perm(current->domain, d, SECCLASS_DOMAIN, perm );
@@ -550,25 +550,25 @@ static int flask_scheduler(struct domain *d)
         return rc;
 
     return domain_has_perm(current->domain, d, SECCLASS_DOMAIN, 
-                                                            DOMAIN__SCHEDULER);
+                           DOMAIN__SCHEDULER);
 }
 
 static int flask_getdomaininfo(struct domain *d)
 {
     return domain_has_perm(current->domain, d, SECCLASS_DOMAIN,
-                                                        DOMAIN__GETDOMAININFO);
+                           DOMAIN__GETDOMAININFO);
 }
 
 static int flask_getvcpucontext(struct domain *d)
 {
     return domain_has_perm(current->domain, d, SECCLASS_DOMAIN, 
-                                                        DOMAIN__GETVCPUCONTEXT);
+                           DOMAIN__GETVCPUCONTEXT);
 }
 
 static int flask_getvcpuinfo(struct domain *d)
 {
     return domain_has_perm(current->domain, d, SECCLASS_DOMAIN,
-                                                        DOMAIN__GETVCPUINFO);
+                           DOMAIN__GETVCPUINFO);
 }
 
 static int flask_domain_settime(struct domain *d)
@@ -604,19 +604,19 @@ static int flask_sched_id(void)
 static int flask_setdomainmaxmem(struct domain *d)
 {
     return domain_has_perm(current->domain, d, SECCLASS_DOMAIN,
-                                                    DOMAIN__SETDOMAINMAXMEM);
+                           DOMAIN__SETDOMAINMAXMEM);
 }
 
 static int flask_setdomainhandle(struct domain *d)
 {
     return domain_has_perm(current->domain, d, SECCLASS_DOMAIN,
-                                                    DOMAIN__SETDOMAINHANDLE);
+                           DOMAIN__SETDOMAINHANDLE);
 }
 
 static int flask_setdebugging(struct domain *d)
 {
     return domain_has_perm(current->domain, d, SECCLASS_DOMAIN,
-                                                        DOMAIN__SETDEBUGGING);
+                           DOMAIN__SETDEBUGGING);
 }
 
 static int flask_debug_keys(void)
@@ -652,7 +652,7 @@ static int irq_has_perm(struct domain *d, uint8_t pirq, uint8_t access)
     struct avc_audit_data ad;
 
     rc = domain_has_perm(current->domain, d, SECCLASS_RESOURCE,
-                                                    resource_to_perm(access));
+                         resource_to_perm(access));
 
     if ( rc )
         return rc;
@@ -678,7 +678,7 @@ static int irq_has_perm(struct domain *d, uint8_t pirq, uint8_t access)
 
     if ( access )
         return avc_has_perm(tsec->sid, rsid, SECCLASS_RESOURCE, 
-                                                        RESOURCE__USE, &ad);
+                            RESOURCE__USE, &ad);
     else
         return rc;
 }
@@ -693,7 +693,7 @@ static int iomem_has_perm(struct domain *d, unsigned long mfn, uint8_t access)
     struct avc_audit_data ad;
 
     rc = domain_has_perm(current->domain, d, SECCLASS_RESOURCE,
-                                                    resource_to_perm(access));
+                         resource_to_perm(access));
     if ( rc )
         return rc;
 
@@ -718,7 +718,7 @@ static int iomem_has_perm(struct domain *d, unsigned long mfn, uint8_t access)
         return rc;
 
     return avc_has_perm(tsec->sid, rsid, SECCLASS_RESOURCE, 
-                                                        RESOURCE__USE, &ad);
+                        RESOURCE__USE, &ad);
 }
 
 static int flask_perfcontrol(void)
@@ -733,23 +733,23 @@ static int flask_shadow_control(struct domain *d, uint32_t op)
 
     switch ( op )
     {
-        case XEN_DOMCTL_SHADOW_OP_OFF:
-            perm = SHADOW__DISABLE;
+    case XEN_DOMCTL_SHADOW_OP_OFF:
+        perm = SHADOW__DISABLE;
         break;
-        case XEN_DOMCTL_SHADOW_OP_ENABLE:
-        case XEN_DOMCTL_SHADOW_OP_ENABLE_TEST:
-        case XEN_DOMCTL_SHADOW_OP_ENABLE_TRANSLATE:
-        case XEN_DOMCTL_SHADOW_OP_GET_ALLOCATION:
-        case XEN_DOMCTL_SHADOW_OP_SET_ALLOCATION:
-            perm = SHADOW__ENABLE;
+    case XEN_DOMCTL_SHADOW_OP_ENABLE:
+    case XEN_DOMCTL_SHADOW_OP_ENABLE_TEST:
+    case XEN_DOMCTL_SHADOW_OP_ENABLE_TRANSLATE:
+    case XEN_DOMCTL_SHADOW_OP_GET_ALLOCATION:
+    case XEN_DOMCTL_SHADOW_OP_SET_ALLOCATION:
+        perm = SHADOW__ENABLE;
         break;
-        case XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY:
-        case XEN_DOMCTL_SHADOW_OP_PEEK:
-        case XEN_DOMCTL_SHADOW_OP_CLEAN:
-            perm = SHADOW__LOGDIRTY;
+    case XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY:
+    case XEN_DOMCTL_SHADOW_OP_PEEK:
+    case XEN_DOMCTL_SHADOW_OP_CLEAN:
+        perm = SHADOW__LOGDIRTY;
         break;
-        default:
-            return -EPERM;
+    default:
+        return -EPERM;
     }
 
     return domain_has_perm(current->domain, d, SECCLASS_SHADOW, perm);
@@ -765,7 +765,7 @@ static int ioport_has_perm(struct domain *d, uint32_t ioport, uint8_t access)
     struct domain_security_struct *ssec, *tsec;
 
     rc = domain_has_perm(current->domain, d, SECCLASS_RESOURCE,
-                                                    resource_to_perm(access));
+                         resource_to_perm(access));
 
     if ( rc )
         return rc;
@@ -791,7 +791,7 @@ static int ioport_has_perm(struct domain *d, uint32_t ioport, uint8_t access)
 
     if ( access )
         return avc_has_perm(tsec->sid, rsid, SECCLASS_RESOURCE, 
-                                                        RESOURCE__USE, &ad);
+                            RESOURCE__USE, &ad);
     else
         return rc;
 }
@@ -819,7 +819,7 @@ static int flask_getmemlist(struct domain *d)
 static int flask_hypercall_init(struct domain *d)
 {
     return domain_has_perm(current->domain, d, SECCLASS_DOMAIN,
-                                                            DOMAIN__HYPERCALL);
+                           DOMAIN__HYPERCALL);
 }
 
 static int flask_hvmcontext(struct domain *d, uint32_t cmd)
@@ -828,15 +828,15 @@ static int flask_hvmcontext(struct domain *d, uint32_t cmd)
 
     switch ( cmd )
     {
-        case XEN_DOMCTL_sethvmcontext:
-            perm = HVM__SETHVMC;
+    case XEN_DOMCTL_sethvmcontext:
+        perm = HVM__SETHVMC;
         break;
-        case XEN_DOMCTL_gethvmcontext:
-        case XEN_DOMCTL_gethvmcontext_partial:
-            perm = HVM__GETHVMC;
+    case XEN_DOMCTL_gethvmcontext:
+    case XEN_DOMCTL_gethvmcontext_partial:
+        perm = HVM__GETHVMC;
         break;
-        default:
-            return -EPERM;
+    default:
+        return -EPERM;
     }
 
     return domain_has_perm(current->domain, d, SECCLASS_HVM, perm);
@@ -848,14 +848,14 @@ static int flask_address_size(struct domain *d, uint32_t cmd)
 
     switch ( cmd )
     {
-        case XEN_DOMCTL_set_address_size:
-            perm = DOMAIN__SETADDRSIZE;
+    case XEN_DOMCTL_set_address_size:
+        perm = DOMAIN__SETADDRSIZE;
         break;
-        case XEN_DOMCTL_get_address_size:
-            perm = DOMAIN__GETADDRSIZE;
+    case XEN_DOMCTL_get_address_size:
+        perm = DOMAIN__GETADDRSIZE;
         break;
-        default:
-            return -EPERM;
+    default:
+        return -EPERM;
     }
 
     return domain_has_perm(current->domain, d, SECCLASS_DOMAIN, perm);
@@ -867,14 +867,14 @@ static int flask_hvm_param(struct domain *d, unsigned long op)
 
     switch ( op )
     {
-        case HVMOP_set_param:
-            perm = HVM__SETPARAM;
+    case HVMOP_set_param:
+        perm = HVM__SETPARAM;
         break;
-        case HVMOP_get_param:
-            perm = HVM__GETPARAM;
+    case HVMOP_get_param:
+        perm = HVM__GETPARAM;
         break;
-        default:
-            return -EPERM;
+    default:
+        return -EPERM;
     }
 
     return domain_has_perm(current->domain, d, SECCLASS_HVM, perm);
@@ -901,14 +901,14 @@ static int flask_apic(struct domain *d, int cmd)
 
     switch ( cmd )
     {
-        case PHYSDEVOP_APIC_READ:
-            perm = XEN__READAPIC;
+    case PHYSDEVOP_APIC_READ:
+        perm = XEN__READAPIC;
         break;
-        case PHYSDEVOP_APIC_WRITE:
-            perm = XEN__WRITEAPIC;
+    case PHYSDEVOP_APIC_WRITE:
+        perm = XEN__WRITEAPIC;
         break;
-        default:
-            return -EPERM;
+    default:
+        return -EPERM;
     }
 
     return domain_has_xen(d, perm);
@@ -937,17 +937,17 @@ static int flask_memtype(uint32_t access)
 
     switch ( access )
     {
-        case XENPF_add_memtype:
-            perm = XEN__MTRR_ADD;
+    case XENPF_add_memtype:
+        perm = XEN__MTRR_ADD;
         break;
-        case XENPF_del_memtype:
-            perm = XEN__MTRR_DEL;
+    case XENPF_del_memtype:
+        perm = XEN__MTRR_DEL;
         break;
-        case XENPF_read_memtype:
-            perm = XEN__MTRR_READ;
+    case XENPF_read_memtype:
+        perm = XEN__MTRR_READ;
         break;
-        default:
-            return -EPERM;
+    default:
+        return -EPERM;
     }
 
     return domain_has_xen(current->domain, perm);
@@ -969,7 +969,7 @@ static int flask_platform_quirk(uint32_t quirk)
     dsec = current->domain->ssid;
 
     return avc_has_perm(dsec->sid, SECINITSID_XEN, SECCLASS_XEN, 
-                                                            XEN__QUIRK, NULL);
+                        XEN__QUIRK, NULL);
 }
 
 static int flask_firmware_info(void)
@@ -998,7 +998,7 @@ static int flask_machine_memory_map(void)
     dsec = current->domain->ssid;
 
     return avc_has_perm(dsec->sid, SECINITSID_XEN, SECCLASS_MMU, 
-                                                          MMU__MEMORYMAP, NULL);
+                        MMU__MEMORYMAP, NULL);
 }
 
 static int flask_domain_memory_map(struct domain *d)
@@ -1007,7 +1007,7 @@ static int flask_domain_memory_map(struct domain *d)
 }
 
 static int flask_mmu_normal_update(struct domain *d, struct domain *f, 
-                                                                intpte_t fpte)
+                                   intpte_t fpte)
 {
     int rc = 0;
     u32 map_perms = MMU__MAP_READ;
@@ -1044,7 +1044,7 @@ static int flask_mmu_machphys_update(struct domain *d, unsigned long mfn)
 }
 
 static int flask_update_va_mapping(struct domain *d, struct domain *f, 
-                                                            l1_pgentry_t pte)
+                                   l1_pgentry_t pte)
 {
     int rc = 0;
     u32 psid;
@@ -1165,14 +1165,14 @@ static int flask_ext_vcpucontext (struct domain *d, uint32_t cmd)
 
     switch ( cmd )
     {
-        case XEN_DOMCTL_set_ext_vcpucontext:
-            perm = DOMAIN__SETEXTVCPUCONTEXT;
+    case XEN_DOMCTL_set_ext_vcpucontext:
+        perm = DOMAIN__SETEXTVCPUCONTEXT;
         break;
-        case XEN_DOMCTL_get_ext_vcpucontext:
-            perm = DOMAIN__GETEXTVCPUCONTEXT;
+    case XEN_DOMCTL_get_ext_vcpucontext:
+        perm = DOMAIN__GETEXTVCPUCONTEXT;
         break;
-        default:
-            return -EPERM;
+    default:
+        return -EPERM;
     }
 
     return domain_has_perm(current->domain, d, SECCLASS_DOMAIN, perm);
@@ -1180,7 +1180,7 @@ static int flask_ext_vcpucontext (struct domain *d, uint32_t cmd)
 #endif
 
 static int io_has_perm(struct domain *d, char *name, unsigned long s, 
-                                                    unsigned long e, u32 access)
+                       unsigned long e, u32 access)
 {
     int rc = -EPERM;
 
@@ -1218,13 +1218,13 @@ static int io_has_perm(struct domain *d, char *name, unsigned long s,
 }
 
 static int flask_add_range(struct domain *d, char *name, unsigned long s,
-                                                                    unsigned long e)
+                           unsigned long e)
 {
     return io_has_perm(d, name, s, e, 1);
 }
 
 static int flask_remove_range(struct domain *d, char *name, unsigned long s,
-                                                                    unsigned long e)
+                              unsigned long e)
 {
     return io_has_perm(d, name, s, e, 0);
 }
@@ -1335,7 +1335,8 @@ static __init int flask_init(void)
 {
     int ret = 0;
 
-    if ( !flask_enabled ) {
+    if ( !flask_enabled )
+    {
         printk("Flask:  Disabled at boot.\n");
         return 0;
     }
