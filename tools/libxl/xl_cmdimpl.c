@@ -1767,7 +1767,7 @@ static void set_memory_target(char *p, char *mem)
         exit(3);
     }
 
-    libxl_set_memory_target(&ctx, domid, memorykb, /* enforce */ 1);
+    libxl_set_memory_target(&ctx, domid, memorykb, 0, /* enforce */ 1);
 }
 
 int main_memset(int argc, char **argv)

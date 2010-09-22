@@ -332,7 +332,8 @@ int libxl_domain_unpause(libxl_ctx *ctx, uint32_t domid);
 int libxl_domain_core_dump(libxl_ctx *ctx, uint32_t domid, const char *filename);
 
 int libxl_domain_setmaxmem(libxl_ctx *ctx, uint32_t domid, uint32_t target_memkb);
-int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid, uint32_t target_memkb, int enforce);
+int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid, int32_t target_memkb, int relative, int enforce);
+int libxl_get_memory_target(libxl_ctx *ctx, uint32_t domid, uint32_t *out_target);
 
 int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass);
 int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num, libxl_console_constype type);

@@ -2774,13 +2774,61 @@ out:
     return rc;
 }
 
-int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid, uint32_t
-        target_memkb, int enforce)
+static int libxl__fill_dom0_memory_info(libxl__gc *gc, uint32_t *target_memkb)
+{
+    int rc;
+    libxl_dominfo info;
+    char *target = NULL, *endptr = NULL;
+    char *target_path = "/local/domain/0/memory/target";
+    char *max_path = "/local/domain/0/memory/static-max";
+    xs_transaction_t t;
+    libxl_ctx *ctx = libxl__gc_owner(gc);
+
+retry_transaction:
+    t = xs_transaction_start(ctx->xsh);
+
+    target = libxl__xs_read(gc, t, target_path);
+    if (target) {
+        *target_memkb = strtoul(target, &endptr, 10);
+        if (*endptr != '\0') {
+            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                    "invalid memory target %s from %s\n", target, target_path);
+            rc = ERROR_FAIL;
+            goto out;
+        }
+        rc = 0;
+        goto out;
+    }
+
+    rc = libxl_domain_info(ctx, &info, 0);
+    if (rc < 0)
+        return rc;
+
+    libxl__xs_write(gc, t, target_path, "%"PRIu32,
+            (uint32_t) info.current_memkb);
+    libxl__xs_write(gc, t, max_path, "%"PRIu32,
+            (uint32_t) info.max_memkb);
+
+    *target_memkb = (uint32_t) info.current_memkb;
+    rc = 0;
+
+out:
+    if (!xs_transaction_end(ctx->xsh, t, 0))
+        if (errno == EAGAIN)
+            goto retry_transaction;
+
+
+    return rc;
+}
+
+int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid,
+        int32_t target_memkb, int relative, int enforce)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
     int rc = 1, abort = 0;
-    uint32_t videoram = 0;
-    char *videoram_s = NULL;
+    uint32_t memorykb = 0, videoram = 0;
+    uint32_t current_target_memkb = 0, new_target_memkb = 0;
+    char *memmax, *endptr, *videoram_s = NULL, *target = NULL;
     char *dompath = libxl__xs_get_dompath(&gc, domid);
     xc_domaininfo_t info;
     libxl_dominfo ptr;
@@ -2790,35 +2838,92 @@ int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid, uint32_t
 retry_transaction:
     t = xs_transaction_start(ctx->xsh);
 
-    videoram_s = libxl__xs_read(&gc, t, libxl__sprintf(&gc, "%s/memory/videoram",
-                dompath));
+    target = libxl__xs_read(&gc, t, libxl__sprintf(&gc,
+                "%s/memory/target", dompath));
+    if (!target && !domid) {
+        xs_transaction_end(ctx->xsh, t, 1);
+        rc = libxl__fill_dom0_memory_info(&gc, &current_target_memkb);
+        if (rc < 0) {
+            abort = 1;
+            goto out;
+        }
+        goto retry_transaction;
+    } else if (!target) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                "cannot get target memory info from %s/memory/target\n",
+                dompath);
+        abort = 1;
+        goto out;
+    } else {
+        current_target_memkb = strtoul(target, &endptr, 10);
+        if (*endptr != '\0') {
+            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                    "invalid memory target %s from %s/memory/target\n",
+                    target, dompath);
+            abort = 1;
+            goto out;
+        }
+    }
+    memmax = libxl__xs_read(&gc, t, libxl__sprintf(&gc,
+                "%s/memory/static-max", dompath));
+    if (!memmax) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                "cannot get memory info from %s/memory/static-max\n",
+                dompath);
+        abort = 1;
+        goto out;
+    }
+    memorykb = strtoul(memmax, &endptr, 10);
+    if (*endptr != '\0') {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                "invalid max memory %s from %s/memory/static-max\n",
+                memmax, dompath);
+        abort = 1;
+        goto out;
+    }
+
+    if (relative)
+        new_target_memkb = current_target_memkb + target_memkb;
+    else
+        new_target_memkb = target_memkb;
+    if (new_target_memkb > memorykb) {
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                "memory_dynamic_max must be less than or equal to"
+                " memory_static_max\n");
+        abort = 1;
+        goto out;
+    }
+
+    videoram_s = libxl__xs_read(&gc, t, libxl__sprintf(&gc,
+                "%s/memory/videoram", dompath));
     videoram = videoram_s ? atoi(videoram_s) : 0;
 
     if (enforce) {
-        rc = xc_domain_setmaxmem(ctx->xch, domid, target_memkb +
+        memorykb = new_target_memkb;
+        rc = xc_domain_setmaxmem(ctx->xch, domid, memorykb +
                 LIBXL_MAXMEM_CONSTANT);
         if (rc != 0) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
                     "xc_domain_setmaxmem domid=%d memkb=%d failed "
-                    "rc=%d\n", domid, target_memkb + LIBXL_MAXMEM_CONSTANT, rc);
+                    "rc=%d\n", domid, memorykb + LIBXL_MAXMEM_CONSTANT, rc);
             abort = 1;
             goto out;
         }
     }
 
-    rc = xc_domain_memory_set_pod_target(ctx->xch, domid, (target_memkb -
-                videoram) / 4, NULL, NULL, NULL);
+    rc = xc_domain_memory_set_pod_target(ctx->xch, domid,
+            (new_target_memkb - videoram) / 4, NULL, NULL, NULL);
     if (rc != 0) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
                 "xc_domain_memory_set_pod_target domid=%d, memkb=%d "
-                "failed rc=%d\n", domid, (target_memkb - videoram) / 4,
+                "failed rc=%d\n", domid, (new_target_memkb - videoram) / 4,
                 rc);
         abort = 1;
         goto out;
     }
 
-    libxl__xs_write(&gc, t, libxl__sprintf(&gc, "%s/memory/target", dompath),
-            "%"PRIu32, target_memkb);
+    libxl__xs_write(&gc, t, libxl__sprintf(&gc, "%s/memory/target",
+                dompath), "%"PRIu32, new_target_memkb);
     rc = xc_domain_getinfolist(ctx->xch, domid, 1, &info);
     if (rc != 1 || info.domain != domid) {
         abort = 1;
@@ -2826,14 +2931,50 @@ retry_transaction:
     }
     xcinfo2xlinfo(&info, &ptr);
     uuid = libxl__uuid2string(&gc, ptr.uuid);
-    libxl__xs_write(&gc, t, libxl__sprintf(&gc, "/vm/%s/memory", uuid), "%"PRIu32,
-            target_memkb / 1024);
+    libxl__xs_write(&gc, t, libxl__sprintf(&gc, "/vm/%s/memory", uuid),
+            "%"PRIu32, new_target_memkb / 1024);
 
 out:
     if (!xs_transaction_end(ctx->xsh, t, abort) && !abort)
         if (errno == EAGAIN)
             goto retry_transaction;
 
+    libxl__free_all(&gc);
+    return rc;
+}
+
+int libxl_get_memory_target(libxl_ctx *ctx, uint32_t domid, uint32_t *out_target)
+{
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    int rc = 1;
+    char *target = NULL, *endptr = NULL;
+    char *dompath = libxl__xs_get_dompath(&gc, domid);
+    uint32_t target_memkb;
+
+    target = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc,
+                "%s/memory/target", dompath));
+    if (!target && !domid) {
+        rc = libxl__fill_dom0_memory_info(&gc, &target_memkb);
+        if (rc < 0)
+            goto out;
+    } else if (!target) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                "cannot get target memory info from %s/memory/target\n",
+                dompath);
+        goto out;
+    } else {
+        target_memkb = strtoul(target, &endptr, 10);
+        if (*endptr != '\0') {
+            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                    "invalid memory target %s from %s/memory/target\n",
+                    target, dompath);
+            goto out;
+        }
+    }
+    *out_target = target_memkb;
+    rc = 0;
+
+out:
     libxl__free_all(&gc);
     return rc;
 }
