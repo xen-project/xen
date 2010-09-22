@@ -43,6 +43,7 @@
 #define LIBXL_MAXMEM_CONSTANT 1024
 #define LIBXL_PV_EXTRA_MEMORY 1024
 #define LIBXL_HVM_EXTRA_MEMORY 2048
+#define LIBXL_MIN_DOM0_MEM (128*1024)
 #define QEMU_SIGNATURE "QemuDeviceModelRecord"
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))

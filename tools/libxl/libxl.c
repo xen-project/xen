@@ -2916,6 +2916,12 @@ retry_transaction:
         abort = 1;
         goto out;
     }
+    if (!domid && new_target_memkb < LIBXL_MIN_DOM0_MEM) {
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                "new target for dom0 is below the minimum threshold\n");
+        abort = 1;
+        goto out;
+    }
 
     if (relative)
         new_target_memkb = current_target_memkb + target_memkb;
