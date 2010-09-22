@@ -2218,7 +2218,7 @@ static void list_domains(int verbose, const libxl_dominfo *info, int nb_domain)
         printf("%-40s %5d %5lu %5d     %c%c%c%c%c%c  %8.1f",
                 domname,
                 info[i].domid,
-                (unsigned long) (info[i].max_memkb / 1024),
+                (unsigned long) (info[i].current_memkb / 1024),
                 info[i].vcpu_online,
                 info[i].running ? 'r' : '-',
                 info[i].blocked ? 'b' : '-',

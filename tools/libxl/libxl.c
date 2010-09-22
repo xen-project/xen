@@ -558,7 +558,8 @@ static void xcinfo2xlinfo(const xc_domaininfo_t *xcinfo,
     else
         xlinfo->shutdown_reason  = ~0;
 
-    xlinfo->max_memkb = PAGE_TO_MEMKB(xcinfo->tot_pages);
+    xlinfo->current_memkb = PAGE_TO_MEMKB(xcinfo->tot_pages);
+    xlinfo->max_memkb = PAGE_TO_MEMKB(xcinfo->max_pages);
     xlinfo->cpu_time = xcinfo->cpu_time;
     xlinfo->vcpu_max_id = xcinfo->max_vcpu_id;
     xlinfo->vcpu_online = xcinfo->nr_online_vcpus;

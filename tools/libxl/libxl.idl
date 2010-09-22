@@ -38,6 +38,7 @@ libxl_dominfo = Struct("dominfo",[
 
 Otherwise set to a value guaranteed not to clash with any valid
 SHUTDOWN_* constant."""),
+    ("current_memkb",   uint64),
     ("max_memkb",   uint64),
     ("cpu_time",    uint64),
     ("vcpu_max_id", uint32),
