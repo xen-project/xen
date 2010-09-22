@@ -2768,9 +2768,6 @@ int libxl_domain_setmaxmem(libxl_ctx *ctx, uint32_t domid, uint32_t max_memkb)
         goto out;
     }
 
-    if (domid != 0)
-        libxl__xs_write(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/memory/static-max", dompath), "%"PRIu32, max_memkb);
-
     rc = 0;
 out:
     libxl__free_all(&gc);
