@@ -2952,12 +2952,13 @@ retry_transaction:
         }
     }
 
+    new_target_memkb -= videoram;
     rc = xc_domain_memory_set_pod_target(ctx->xch, domid,
-            (new_target_memkb - videoram) / 4, NULL, NULL, NULL);
+            new_target_memkb / 4, NULL, NULL, NULL);
     if (rc != 0) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
                 "xc_domain_memory_set_pod_target domid=%d, memkb=%d "
-                "failed rc=%d\n", domid, (new_target_memkb - videoram) / 4,
+                "failed rc=%d\n", domid, new_target_memkb / 4,
                 rc);
         abort = 1;
         goto out;

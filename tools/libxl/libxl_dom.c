@@ -110,7 +110,7 @@ int libxl__build_post(libxl_ctx *ctx, uint32_t domid,
     ents[0] = "memory/static-max";
     ents[1] = libxl__sprintf(&gc, "%d", info->max_memkb);
     ents[2] = "memory/target";
-    ents[3] = libxl__sprintf(&gc, "%d", info->target_memkb);
+    ents[3] = libxl__sprintf(&gc, "%d", info->target_memkb - info->video_memkb);
     ents[4] = "memory/videoram";
     ents[5] = libxl__sprintf(&gc, "%d", info->video_memkb);
     ents[6] = "domid";
