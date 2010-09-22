@@ -2774,58 +2774,66 @@ out:
     return rc;
 }
 
-int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid, uint32_t target_memkb, int enforce)
+int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid, uint32_t
+        target_memkb, int enforce)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
-    int rc = 1;
-    uint32_t memorykb = 0, videoram = 0;
-    char *memmax, *endptr, *videoram_s = NULL;
+    int rc = 1, abort = 0;
+    uint32_t videoram = 0;
+    char *videoram_s = NULL;
     char *dompath = libxl__xs_get_dompath(&gc, domid);
     xc_domaininfo_t info;
     libxl_dominfo ptr;
     char *uuid;
+    xs_transaction_t t;
 
-    if (domid) {
-        memmax = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/memory/static-max", dompath));
-        if (!memmax) {
-            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
-                "cannot get memory info from %s/memory/static-max\n", dompath);
-            goto out;
-        }
-        memorykb = strtoul(memmax, &endptr, 10);
-        if (*endptr != '\0') {
-            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
-                "invalid max memory %s from %s/memory/static-max\n", memmax, dompath);
-            goto out;
-        }
+retry_transaction:
+    t = xs_transaction_start(ctx->xsh);
 
-        if (target_memkb > memorykb) {
-            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                "memory_dynamic_max must be less than or equal to memory_static_max\n");
+    videoram_s = libxl__xs_read(&gc, t, libxl__sprintf(&gc, "%s/memory/videoram",
+                dompath));
+    videoram = videoram_s ? atoi(videoram_s) : 0;
+
+    if (enforce) {
+        rc = xc_domain_setmaxmem(ctx->xch, domid, target_memkb +
+                LIBXL_MAXMEM_CONSTANT);
+        if (rc != 0) {
+            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                    "xc_domain_setmaxmem domid=%d memkb=%d failed "
+                    "rc=%d\n", domid, target_memkb + LIBXL_MAXMEM_CONSTANT, rc);
+            abort = 1;
             goto out;
         }
     }
 
-    videoram_s = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/memory/videoram", dompath));
-    videoram = videoram_s ? atoi(videoram_s) : 0;
-
-    libxl__xs_write(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/memory/target", dompath), "%"PRIu32, target_memkb);
-
-    rc = xc_domain_getinfolist(ctx->xch, domid, 1, &info);
-    if (rc != 1 || info.domain != domid)
+    rc = xc_domain_memory_set_pod_target(ctx->xch, domid, (target_memkb -
+                videoram) / 4, NULL, NULL, NULL);
+    if (rc != 0) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                "xc_domain_memory_set_pod_target domid=%d, memkb=%d "
+                "failed rc=%d\n", domid, (target_memkb - videoram) / 4,
+                rc);
+        abort = 1;
         goto out;
+    }
+
+    libxl__xs_write(&gc, t, libxl__sprintf(&gc, "%s/memory/target", dompath),
+            "%"PRIu32, target_memkb);
+    rc = xc_domain_getinfolist(ctx->xch, domid, 1, &info);
+    if (rc != 1 || info.domain != domid) {
+        abort = 1;
+        goto out;
+    }
     xcinfo2xlinfo(&info, &ptr);
     uuid = libxl__uuid2string(&gc, ptr.uuid);
-    libxl__xs_write(&gc, XBT_NULL, libxl__sprintf(&gc, "/vm/%s/memory", uuid), "%"PRIu32, target_memkb / 1024);
-
-    if (enforce || !domid)
-        memorykb = target_memkb;
-    rc = xc_domain_setmaxmem(ctx->xch, domid, memorykb + LIBXL_MAXMEM_CONSTANT);
-    if (rc != 0)
-        goto out;
-    rc = xc_domain_memory_set_pod_target(ctx->xch, domid, (target_memkb - videoram) / 4, NULL, NULL, NULL);
+    libxl__xs_write(&gc, t, libxl__sprintf(&gc, "/vm/%s/memory", uuid), "%"PRIu32,
+            target_memkb / 1024);
 
 out:
+    if (!xs_transaction_end(ctx->xsh, t, abort) && !abort)
+        if (errno == EAGAIN)
+            goto retry_transaction;
+
     libxl__free_all(&gc);
     return rc;
 }
