@@ -708,6 +708,9 @@ static void parse_config_data(const char *configfile_filename_report,
         b_info->target_memkb = b_info->max_memkb;
     }
 
+    if (!xlu_cfg_get_long (config, "maxmem", &l))
+        b_info->max_memkb = l * 1024;
+
     if (xlu_cfg_get_string (config, "on_poweroff", &buf))
         buf = "destroy";
     if (!parse_action_on_shutdown(buf, &d_config->on_poweroff)) {
