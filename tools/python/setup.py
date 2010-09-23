@@ -14,8 +14,7 @@ include_dirs = [ XEN_ROOT + "/tools/libxc",
 
 library_dirs = [ XEN_ROOT + "/tools/libxc",
                  XEN_ROOT + "/tools/xenstore",
-                 XEN_ROOT + "/tools/libxl",
-                 XEN_ROOT + "/tools/blktap2/control",
+                 XEN_ROOT + "/tools/libxl"
                  ]
 
 libraries = [ "xenctrl", "xenguest", "xenstore" ]
@@ -23,8 +22,11 @@ libraries = [ "xenctrl", "xenguest", "xenstore" ]
 plat = os.uname()[0]
 if plat == 'Linux':
     uuid_libs = ["uuid"]
+    blktap_ctl_libs = ["blktapctl"]
+    library_dirs.append(XEN_ROOT + "/tools/blktap2/control")
 else:
     uuid_libs = []
+    blktap_ctl_libs = []
 
 xc = Extension("xc",
                extra_compile_args = extra_compile_args,
@@ -96,7 +98,7 @@ xl = Extension("xl",
                extra_compile_args = extra_compile_args,
                include_dirs       = include_dirs + [ "xen/lowlevel/xl" ],
                library_dirs       = library_dirs,
-               libraries          = libraries + ["xenlight", "blktapctl" ] + uuid_libs,
+               libraries          = libraries + ["xenlight" ] + blktap_ctl_libs + uuid_libs,
                sources            = [ "xen/lowlevel/xl/xl.c", "xen/lowlevel/xl/_pyxl_types.c" ])
 
 modules = [ xc, xs, ptsname, acm, flask, xl ]
