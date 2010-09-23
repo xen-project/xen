@@ -2785,6 +2785,7 @@ static int libxl__fill_dom0_memory_info(libxl__gc *gc, uint32_t *target_memkb)
     char *free_mem_slack_path = "/local/domain/0/memory/freemem-slack";
     xs_transaction_t t;
     libxl_ctx *ctx = libxl__gc_owner(gc);
+    uint32_t free_mem_slack = 0;
 
 retry_transaction:
     t = xs_transaction_start(ctx->xsh);
@@ -2814,8 +2815,14 @@ retry_transaction:
             (uint32_t) info.current_memkb);
     libxl__xs_write(gc, t, max_path, "%"PRIu32,
             (uint32_t) info.max_memkb);
-    libxl__xs_write(gc, t, free_mem_slack_path, "%"PRIu32, (uint32_t)
-            (PAGE_TO_MEMKB(physinfo.total_pages) - info.current_memkb));
+
+    free_mem_slack = (uint32_t) (PAGE_TO_MEMKB(physinfo.total_pages) -
+            info.current_memkb);
+    /* From empirical measurements the free_mem_slack shouldn't be more
+     * than 15% of the total memory present on the system. */
+    if (free_mem_slack > PAGE_TO_MEMKB(physinfo.total_pages) * 0.15)
+        free_mem_slack = PAGE_TO_MEMKB(physinfo.total_pages) * 0.15;
+    libxl__xs_write(gc, t, free_mem_slack_path, "%"PRIu32, free_mem_slack);
 
     *target_memkb = (uint32_t) info.current_memkb;
     rc = 0;
