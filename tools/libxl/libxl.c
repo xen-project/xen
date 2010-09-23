@@ -1718,7 +1718,7 @@ retry_transaction:
         vm_path = libxl__xs_read(&gc,t,libxl__sprintf(&gc, "%s/vm", p->dom_path));
         if (vm_path) {
             /* Now write the vncpassword into it. */
-            pass_stuff = libxl__calloc(&gc, 2, sizeof(char *));
+            pass_stuff = libxl__calloc(&gc, 3, sizeof(char *));
             pass_stuff[0] = "vncpasswd";
             pass_stuff[1] = info->vncpasswd;
             libxl__xs_writev(&gc,t,vm_path,pass_stuff);
