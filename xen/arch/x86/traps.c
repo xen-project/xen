@@ -1670,6 +1670,16 @@ unsigned long guest_to_host_gpr_switch(unsigned long)
 
 void (*pv_post_outb_hook)(unsigned int port, u8 value);
 
+static inline uint64_t guest_misc_enable(uint64_t val)
+{
+    val &= ~(MSR_IA32_MISC_ENABLE_PERF_AVAIL |
+             MSR_IA32_MISC_ENABLE_MONITOR_ENABLE);
+    val |= MSR_IA32_MISC_ENABLE_BTS_UNAVAIL |
+           MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL |
+           MSR_IA32_MISC_ENABLE_XTPR_DISABLE;
+    return val;
+}
+
 /* Instruction fetch with error handling. */
 #define insn_fetch(type, base, eip, limit)                                  \
 ({  unsigned long _rc, _ptr = (base) + (eip);                               \
@@ -2266,6 +2276,13 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             if ( wrmsr_safe(MSR_FAM10H_MMIO_CONF_BASE, msr_content) != 0 )
                 goto fail;
             break;
+        case MSR_IA32_MISC_ENABLE:
+            if ( rdmsr_safe(regs->ecx, val) )
+                goto invalid;
+            val = guest_misc_enable(val);
+            if ( msr_content != val )
+                goto invalid;
+            break;
         case MSR_IA32_MPERF:
         case MSR_IA32_APERF:
             if (( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ) &&
@@ -2302,8 +2319,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             if ( rc )
                 break;
 
-            if ( (rdmsr_safe(regs->ecx, val) != 0) ||
-                 (eax != (uint32_t)val) || (edx != (uint32_t)(val >> 32)) )
+            if ( (rdmsr_safe(regs->ecx, val) != 0) || (msr_content != val) )
         invalid:
                 gdprintk(XENLOG_WARNING, "Domain attempted WRMSR %p from "
                         "0x%016"PRIx64" to 0x%016"PRIx64".\n",
@@ -2374,13 +2390,9 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case MSR_IA32_MISC_ENABLE:
             if ( rdmsr_safe(regs->ecx, msr_content) )
                 goto fail;
+            msr_content = guest_misc_enable(msr_content);
             regs->eax = (uint32_t)msr_content;
             regs->edx = (uint32_t)(msr_content >> 32);
-            regs->eax &= ~(MSR_IA32_MISC_ENABLE_PERF_AVAIL |
-                           MSR_IA32_MISC_ENABLE_MONITOR_ENABLE);
-            regs->eax |= MSR_IA32_MISC_ENABLE_BTS_UNAVAIL |
-                         MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL |
-                         MSR_IA32_MISC_ENABLE_XTPR_DISABLE;
             break;
         case MSR_EFER:
         case MSR_AMD_PATCHLEVEL:

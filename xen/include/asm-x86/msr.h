@@ -41,7 +41,8 @@ static inline void wrmsrl(unsigned int msr, __u64 val)
     __asm__ __volatile__( \
         "1: rdmsr\n2:\n" \
         ".section .fixup,\"ax\"\n" \
-        "3: movl %5,%2\n; jmp 2b\n" \
+        "3: xorl %0,%0\n; xorl %1,%1\n" \
+        "   movl %5,%2\n; jmp 2b\n" \
         ".previous\n" \
         ".section __ex_table,\"a\"\n" \
         "   "__FIXUP_ALIGN"\n" \
