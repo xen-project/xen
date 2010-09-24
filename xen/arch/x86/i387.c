@@ -132,6 +132,8 @@ void restore_fpu(struct vcpu *v)
     }
 }
 
+#define XSTATE_CPUID 0xd
+
 /*
  * Maximum size (in byte) of the XSAVE/XRSTOR save area required by all
  * the supported and enabled features on the processor, including the
@@ -148,7 +150,12 @@ void xsave_init(void)
     int cpu = smp_processor_id();
     u32 min_size;
 
-    cpuid_count(0xd, 0, &eax, &ebx, &ecx, &edx);
+    if ( boot_cpu_data.cpuid_level < XSTATE_CPUID ) {
+        printk(XENLOG_ERR "XSTATE_CPUID missing\n");
+        return;
+    }
+
+    cpuid_count(XSTATE_CPUID, 0, &eax, &ebx, &ecx, &edx);
 
     printk("%s: cpu%d: cntxt_max_size: 0x%x and states: %08x:%08x\n",
         __func__, cpu, ecx, edx, eax);
@@ -169,7 +176,7 @@ void xsave_init(void)
      */
     set_in_cr4(X86_CR4_OSXSAVE);
     set_xcr0(eax & XCNTXT_MASK);
-    cpuid_count(0xd, 0, &eax, &ebx, &ecx, &edx);
+    cpuid_count(XSTATE_CPUID, 0, &eax, &ebx, &ecx, &edx);
     clear_in_cr4(X86_CR4_OSXSAVE);
 
     if ( cpu == 0 )
