@@ -340,10 +340,7 @@ static int get_page_sid(struct page_info *page, u32 *sid)
         default:
             /*Pages are implicitly labeled by domain ownership!*/
             dsec = d->ssid;
-            if (dsec)
-                *sid = dsec->sid;
-            else
-                rc = -ENOENT;
+            *sid = dsec ? dsec->sid : SECINITSID_UNLABELED;
         break;
     }
 
