@@ -1733,7 +1733,7 @@ retry_transaction:
         goto out_close;
     if (!rc) { /* inner child */
         libxl__exec(null, logfile_w, logfile_w,
-                   libxl__abs_path(&gc, info->device_model, libxl_private_bindir_path()),
+                   libxl__abs_path(&gc, info->device_model, libxl_libexec_path()),
                    args);
     }
 
