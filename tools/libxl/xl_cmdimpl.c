@@ -647,7 +647,7 @@ static void parse_config_data(const char *configfile_filename_report,
     const char *buf;
     long l;
     XLU_Config *config;
-    XLU_ConfigList *vbds, *nics, *pcis, *cvfbs, *net2s;
+    XLU_ConfigList *vbds, *nics, *pcis, *cvfbs, *net2s, *cpuids;
     int pci_power_mgmt = 0;
     int pci_msitranslate = 1;
     int e;
@@ -1085,15 +1085,82 @@ skip_vfb:
         }
     }
 
-    if (!xlu_cfg_get_string(config, "cpuid", &buf)) {
-        char *buf2, *p, *strtok_ptr;
+    switch (xlu_cfg_get_list(config, "cpuid", &cpuids, 0, 1)) {
+    case 0:
+        {
+            int i;
+            char *errstr;
 
-        buf2 = strdup(buf);
-        p = strtok_r(buf2, ",", &strtok_ptr);
-        for (p = strtok_r(NULL, ",", &strtok_ptr); p != NULL;
-             p = strtok_r(NULL, ",", &strtok_ptr))
-            libxl_cpuid_parse_config(&b_info->cpuid, p);
-        free(buf2);
+            for (i = 0; (buf = xlu_cfg_get_listitem(cpuids, i)) != NULL; i++) {
+                e = libxl_cpuid_parse_config_xend(&b_info->cpuid, buf);
+                switch (e) {
+                case 0: continue;
+                case 1:
+                    errstr = "illegal leaf number";
+                    break;
+                case 2:
+                    errstr = "illegal subleaf number";
+                    break;
+                case 3:
+                    errstr = "missing colon";
+                    break;
+                case 4:
+                    errstr = "invalid register name (must be e[abcd]x)";
+                    break;
+                case 5:
+                    errstr = "policy string must be exactly 32 characters long";
+                    break;
+                default:
+                    errstr = "unknown error";
+                    break;
+                }
+                fprintf(stderr, "while parsing CPUID line: \"%s\":\n", buf);
+                fprintf(stderr, "  error #%i: %s\n", e, errstr);
+            }
+        }
+        break;
+    case EINVAL:    /* config option is not a list, parse as a string */
+        if (!xlu_cfg_get_string(config, "cpuid", &buf)) {
+            char *buf2, *p, *errstr, *strtok_ptr = NULL;
+
+            buf2 = strdup(buf);
+            p = strtok_r(buf2, ",", &strtok_ptr);
+            if (p == NULL) {
+                free(buf2);
+                break;
+            }
+            if (strcmp(p, "host")) {
+                fprintf(stderr, "while parsing CPUID string: \"%s\":\n", buf);
+                fprintf(stderr, "  error: first word must be \"host\"\n");
+                free(buf2);
+                break;
+            }
+            for (p = strtok_r(NULL, ",", &strtok_ptr); p != NULL;
+                 p = strtok_r(NULL, ",", &strtok_ptr)) {
+                e = libxl_cpuid_parse_config(&b_info->cpuid, p);
+                switch (e) {
+                case 0: continue;
+                case 1:
+                    errstr = "missing \"=\" in key=value";
+                    break;
+                case 2:
+                    errstr = "unknown CPUID flag name";
+                    break;
+                case 3:
+                    errstr = "illegal CPUID value (must be: [0|1|x|k|s])";
+                    break;
+                default:
+                    errstr = "unknown error";
+                    break;
+                }
+                fprintf(stderr, "while parsing CPUID flag: \"%s\":\n", p);
+                fprintf(stderr, "  error #%i: %s\n", e, errstr);
+            }
+            free(buf2);
+        }
+        break;
+    default:
+        break;
     }
 
     if (c_info->hvm == 1) {
