@@ -1577,7 +1577,6 @@ void shadow_free(struct domain *d, mfn_t smfn)
 
     shadow_type = sp->u.sh.type;
     ASSERT(shadow_type != SH_type_none);
-    ASSERT(shadow_type != SH_type_p2m_table);
     ASSERT(sp->u.sh.head || (shadow_type > SH_type_max_shadow));
     pages = shadow_size(shadow_type);
 
@@ -1637,6 +1636,8 @@ shadow_alloc_p2m_page(struct p2m_domain *p2m)
  
     shadow_prealloc(d, SH_type_p2m_table, 1);
     pg = mfn_to_page(shadow_alloc(d, SH_type_p2m_table, 0));
+    d->arch.paging.shadow.p2m_pages++;
+    d->arch.paging.shadow.total_pages--;
 
     shadow_unlock(d);
 
@@ -1647,8 +1648,6 @@ shadow_alloc_p2m_page(struct p2m_domain *p2m)
      * believed to be a concern. */
     page_set_owner(pg, d);
     pg->count_info |= 1;
-    d->arch.paging.shadow.p2m_pages++;
-    d->arch.paging.shadow.total_pages--;
     return pg;
 }
 
@@ -1664,12 +1663,14 @@ shadow_free_p2m_page(struct p2m_domain *p2m, struct page_info *pg)
                      pg->count_info, pg->u.inuse.type_info);
     }
     pg->count_info &= ~PGC_count_mask;
-    /* Free should not decrement domain's total allocation, since 
-     * these pages were allocated without an owner. */
+    pg->u.sh.type = SH_type_p2m_table; /* p2m code reuses type-info */
     page_set_owner(pg, NULL); 
-    free_domheap_pages(pg, 0);
+
+    shadow_lock(d);
+    shadow_free(d, page_to_mfn(pg));
     d->arch.paging.shadow.p2m_pages--;
-    perfc_decr(shadow_alloc_count);
+    d->arch.paging.shadow.total_pages++;
+    shadow_unlock(d);
 }
 
 #if CONFIG_PAGING_LEVELS == 3
@@ -3114,7 +3115,7 @@ void shadow_teardown(struct domain *d)
 {
     struct vcpu *v;
     mfn_t mfn;
-    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+    struct page_info *unpaged_pagetable = NULL;
 
     ASSERT(d->is_dying);
     ASSERT(d != current->domain);
@@ -3200,8 +3201,8 @@ void shadow_teardown(struct domain *d)
             if ( !hvm_paging_enabled(v) )
                 v->arch.guest_table = pagetable_null();
         }
-        shadow_free_p2m_page(p2m, 
-            pagetable_get_page(d->arch.paging.shadow.unpaged_pagetable));
+        unpaged_pagetable = 
+            pagetable_get_page(d->arch.paging.shadow.unpaged_pagetable);
         d->arch.paging.shadow.unpaged_pagetable = pagetable_null();
     }
 
@@ -3218,6 +3219,10 @@ void shadow_teardown(struct domain *d)
     }
 
     shadow_unlock(d);
+
+    /* Must be called outside the lock */
+    if ( unpaged_pagetable ) 
+        shadow_free_p2m_page(p2m_get_hostp2m(d), unpaged_pagetable);
 }
 
 void shadow_final_teardown(struct domain *d)
@@ -3238,13 +3243,16 @@ void shadow_final_teardown(struct domain *d)
 
     /* It is now safe to pull down the p2m map. */
     p2m_teardown(p2m_get_hostp2m(d));
-
+    /* Free any shadow memory that the p2m teardown released */
+    shadow_lock(d);
+    sh_set_allocation(d, 0, NULL);
     SHADOW_PRINTK("dom %u final teardown done."
                    "  Shadow pages total = %u, free = %u, p2m=%u\n",
                    d->domain_id,
                    d->arch.paging.shadow.total_pages, 
                    d->arch.paging.shadow.free_pages, 
                    d->arch.paging.shadow.p2m_pages);
+    shadow_unlock(d);
 }
 
 static int shadow_one_bit_enable(struct domain *d, u32 mode)

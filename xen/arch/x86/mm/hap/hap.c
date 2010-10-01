@@ -329,8 +329,9 @@ static void hap_free_p2m_page(struct p2m_domain *p2m, struct page_info *pg)
     /* Free should not decrement domain's total allocation, since
      * these pages were allocated without an owner. */
     page_set_owner(pg, NULL);
-    free_domheap_page(pg);
     d->arch.paging.hap.p2m_pages--;
+    d->arch.paging.hap.total_pages++;
+    hap_free(d, page_to_mfn(pg));
     ASSERT(d->arch.paging.hap.p2m_pages >= 0);
     hap_unlock(d);
 }
@@ -618,7 +619,11 @@ void hap_final_teardown(struct domain *d)
         hap_teardown(d);
 
     p2m_teardown(p2m_get_hostp2m(d));
+    /* Free any memory that the p2m teardown released */
+    hap_lock(d);
+    hap_set_allocation(d, 0, NULL);
     ASSERT(d->arch.paging.hap.p2m_pages == 0);
+    hap_unlock(d);
 }
 
 void hap_teardown(struct domain *d)
