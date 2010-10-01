@@ -469,6 +469,7 @@ static void printf_info(int domid,
                         libxl_device_model_info *dm_info)
 {
     int i;
+    libxl_dominfo info;
 
     libxl_domain_create_info *c_info = &d_config->c_info;
     libxl_domain_build_info *b_info = &d_config->b_info;
@@ -480,7 +481,16 @@ static void printf_info(int domid,
     printf("\t(oos %d)\n", c_info->oos);
     printf("\t(ssidref %d)\n", c_info->ssidref);
     printf("\t(name %s)\n", c_info->name);
-    printf("\t(uuid " LIBXL_UUID_FMT ")\n", LIBXL_UUID_BYTES(c_info->uuid));
+
+    /* retrieve the UUID from dominfo, since it is probably generated
+     * during parsing and thus does not match the real one
+     */
+    if (libxl_domain_info(&ctx, &info, domid) == 0) {
+        printf("\t(uuid " LIBXL_UUID_FMT ")\n", LIBXL_UUID_BYTES(info.uuid));
+    } else {
+        printf("\t(uuid <unknown>)\n");
+    }
+
     printf("\t(cpupool %s (%d))\n", c_info->poolname, c_info->poolid);
     if (c_info->xsdata)
         printf("\t(xsdata contains data)\n");
