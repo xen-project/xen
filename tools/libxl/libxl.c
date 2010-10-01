@@ -3743,6 +3743,66 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
     return 0;
 }
 
+/* parse a single list item from the legacy Python xend syntax, where
+ * the strings for each register were directly exposed to the user.
+ * Used for maintaining compatibility with older config files
+ */
+int libxl_cpuid_parse_config_xend(libxl_cpuid_policy_list *cpuid,
+                                  const char* str)
+{
+    char *endptr;
+    unsigned long value;
+    uint32_t leaf, subleaf = XEN_CPUID_INPUT_UNUSED;
+    struct libxl__cpuid_policy *entry;
+
+    /* parse the leaf number */
+    value = strtoul(str, &endptr, 0);
+    if (str == endptr) {
+        return 1;
+    }
+    leaf = value;
+    /* check for an optional subleaf number */
+    if (*endptr == ',') {
+        str = endptr + 1;
+        value = strtoul(str, &endptr, 0);
+        if (str == endptr) {
+            return 2;
+        }
+        subleaf = value;
+    }
+    if (*endptr != ':') {
+        return 3;
+    }
+    str = endptr + 1;
+    entry = cpuid_find_match(cpuid, leaf, subleaf);
+    for (str = endptr + 1; *str != 0;) {
+        if (str[0] != 'e' || str[2] != 'x') {
+            return 4;
+        }
+        value = str[1] - 'a';
+        endptr = strchr(str, '=');
+        if (value < 0 || value > 3 || endptr == NULL) {
+            return 4;
+        }
+        str = endptr + 1;
+        endptr = strchr(str, ',');
+        if (endptr == NULL) {
+            endptr = strchr(str, 0);
+        }
+        if (endptr - str != 32) {
+            return 5;
+        }
+        entry->policy[value] = calloc(32 + 1, 1);
+        strncpy(entry->policy[value], str, 32);
+        entry->policy[value][32] = 0;
+        if (*endptr == 0) {
+            break;
+        }
+        for (str = endptr + 1; *str == ' ' || *str == '\n'; str++);
+    }
+    return 0;
+}
+
 char *libxl_tmem_list(libxl_ctx *ctx, uint32_t domid, int use_long)
 {
     int rc;

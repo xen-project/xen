@@ -412,6 +412,8 @@ int libxl_device_pci_list_assigned(libxl_ctx *ctx, libxl_device_pci **list, uint
 int libxl_device_pci_list_assignable(libxl_ctx *ctx, libxl_device_pci **list, int *num);
 int libxl_device_pci_parse_bdf(libxl_ctx *ctx, libxl_device_pci *pcidev, const char *str);
 int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str);
+int libxl_cpuid_parse_config_xend(libxl_cpuid_policy_list *cpuid,
+                                  const char* str);
 
 /*
  * Functions for allowing users of libxl to store private data
