@@ -1085,6 +1085,17 @@ skip_vfb:
         }
     }
 
+    if (!xlu_cfg_get_string(config, "cpuid", &buf)) {
+        char *buf2, *p, *strtok_ptr;
+
+        buf2 = strdup(buf);
+        p = strtok_r(buf2, ",", &strtok_ptr);
+        for (p = strtok_r(NULL, ",", &strtok_ptr); p != NULL;
+             p = strtok_r(NULL, ",", &strtok_ptr))
+            libxl_cpuid_parse_config(&b_info->cpuid, p);
+        free(buf2);
+    }
+
     if (c_info->hvm == 1) {
         /* init dm from c and b */
         init_dm_info(dm_info, c_info, b_info);
