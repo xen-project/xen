@@ -38,9 +38,6 @@
 #include <io_ports.h>
 #include <public/physdev.h>
 
-/* Different to Linux: our implementation can be simpler. */
-#define make_8259A_irq(irq) (io_apic_irqs &= ~(1<<(irq)))
-
 int (*ioapic_renumber_irq)(int ioapic, int irq);
 atomic_t irq_mis_count;
 
@@ -1929,7 +1926,6 @@ static inline void check_timer(void)
     
     irq_desc[0].depth  = 0;
     irq_desc[0].status &= ~IRQ_DISABLED;
-    irq_desc[0].handler = &ioapic_edge_type;
 
     /*
      * Subtle, code in do_timer_interrupt() expects an AEOI

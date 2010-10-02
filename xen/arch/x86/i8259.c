@@ -367,6 +367,12 @@ void __devinit init_8259A(int auto_eoi)
     spin_unlock_irqrestore(&i8259A_lock, flags);
 }
 
+void __init make_8259A_irq(unsigned int irq)
+{
+    io_apic_irqs &= ~(1 << irq);
+    irq_to_desc(irq)->handler = &i8259A_irq_type;
+}
+
 static struct irqaction __read_mostly cascade = { no_action, "cascade", NULL};
 
 void __init init_IRQ(void)
