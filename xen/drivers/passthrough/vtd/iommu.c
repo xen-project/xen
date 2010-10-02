@@ -689,10 +689,34 @@ static int iommu_set_root_entry(struct iommu *iommu)
     return 0;
 }
 
-static void iommu_enable_translation(struct iommu *iommu)
+#define GGC 0x52
+#define GGC_MEMORY_VT_ENABLED  (0x8 << 8)
+static int is_igd_vt_enabled(void)
+{
+    unsigned short ggc;
+
+    /* integrated graphics on Intel platforms is located at 0:2.0 */
+    ggc = pci_conf_read16(0, 2, 0, GGC);
+    return ( ggc & GGC_MEMORY_VT_ENABLED ? 1 : 0 );
+}
+
+static void iommu_enable_translation(struct acpi_drhd_unit *drhd)
 {
     u32 sts;
     unsigned long flags;
+    struct iommu *iommu = drhd->iommu;
+
+    if ( !is_igd_vt_enabled() && is_igd_drhd(drhd) ) 
+    {
+        if ( force_iommu )
+            panic("BIOS did not enable IGD for VT properly, crash Xen for security purpose!\n");
+        else
+        {
+            dprintk(XENLOG_WARNING VTDPREFIX,
+                    "BIOS did not enable IGD for VT properly.  Disabling IGD VT-d engine.\n");
+            return;
+        }
+    }
 
     if ( iommu_verbose )
         dprintk(VTDPREFIX,
@@ -1179,7 +1203,6 @@ static int intel_iommu_domain_init(struct domain *d)
 
 static void intel_iommu_dom0_init(struct domain *d)
 {
-    struct iommu *iommu;
     struct acpi_drhd_unit *drhd;
 
     if ( !iommu_passthrough && !need_iommu(d) )
@@ -1195,8 +1218,7 @@ static void intel_iommu_dom0_init(struct domain *d)
 
     for_each_drhd_unit ( drhd )
     {
-        iommu = drhd->iommu;
-        iommu_enable_translation(iommu);
+        iommu_enable_translation(drhd);
     }
 }
 
@@ -2165,7 +2187,7 @@ static void vtd_resume(void)
                     (u32) iommu_state[i][DMAR_FEUADDR_REG]);
         spin_unlock_irqrestore(&iommu->register_lock, flags);
 
-        iommu_enable_translation(iommu);
+        iommu_enable_translation(drhd);
     }
 }
 

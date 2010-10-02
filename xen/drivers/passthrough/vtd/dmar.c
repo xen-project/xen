@@ -46,6 +46,7 @@ LIST_HEAD(acpi_rmrr_units);
 LIST_HEAD(acpi_atsr_units);
 LIST_HEAD(acpi_rhsa_units);
 
+static u64 igd_drhd_address;
 u8 dmar_host_address_width;
 
 void dmar_scope_add_buses(struct dmar_scope *scope, u16 sec_bus, u16 sub_bus)
@@ -239,6 +240,11 @@ struct acpi_rhsa_unit * drhd_to_rhsa(struct acpi_drhd_unit *drhd)
     return NULL;
 }
 
+int is_igd_drhd(struct acpi_drhd_unit *drhd)
+{
+    return ( drhd->address == igd_drhd_address ? 1 : 0);
+}
+
 /*
  * Count number of devices in device scope.  Do not include PCI sub
  * hierarchies.
@@ -272,7 +278,8 @@ static int scope_device_count(void *start, void *end)
 
 
 static int __init acpi_parse_dev_scope(void *start, void *end,
-                                       void *acpi_entry, int type)
+                                       void *acpi_entry, int type,
+                                       int *igd)
 {
     struct dmar_scope *scope = acpi_entry;
     struct acpi_ioapic_unit *acpi_ioapic_unit;
@@ -333,6 +340,8 @@ static int __init acpi_parse_dev_scope(void *start, void *end,
             if ( iommu_verbose )
                 dprintk(VTDPREFIX, "  endpoint: %x:%x.%x\n",
                         bus, path->dev, path->fn);
+            if ( (bus == 0) && (path->dev == 2) && (path->fn == 0) )
+                *igd = 1;
             break;
 
         case ACPI_DEV_IOAPIC:
@@ -379,7 +388,7 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
     struct acpi_table_drhd * drhd = (struct acpi_table_drhd *)header;
     void *dev_scope_start, *dev_scope_end;
     struct acpi_drhd_unit *dmaru;
-    int ret;
+    int ret, igd = 0;
     static int include_all = 0;
 
     if ( (ret = acpi_dmar_check_length(header, sizeof(*drhd))) != 0 )
@@ -404,7 +413,10 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
     dev_scope_start = (void *)(drhd + 1);
     dev_scope_end = ((void *)drhd) + header->length;
     ret = acpi_parse_dev_scope(dev_scope_start, dev_scope_end,
-                               dmaru, DMAR_TYPE);
+                               dmaru, DMAR_TYPE, &igd);
+
+    if ( igd )
+        igd_drhd_address = dmaru->address;
 
     if ( dmaru->include_all )
     {
@@ -492,7 +504,7 @@ acpi_parse_one_rmrr(struct acpi_dmar_entry_header *header)
     struct acpi_rmrr_unit *rmrru;
     void *dev_scope_start, *dev_scope_end;
     u64 base_addr = rmrr->base_address, end_addr = rmrr->end_address;
-    int ret;
+    int ret, igd = 0;
 
     if ( (ret = acpi_dmar_check_length(header, sizeof(*rmrr))) != 0 )
         return ret;
@@ -524,7 +536,7 @@ acpi_parse_one_rmrr(struct acpi_dmar_entry_header *header)
     dev_scope_start = (void *)(rmrr + 1);
     dev_scope_end   = ((void *)rmrr) + header->length;
     ret = acpi_parse_dev_scope(dev_scope_start, dev_scope_end,
-                               rmrru, RMRR_TYPE);
+                               rmrru, RMRR_TYPE, &igd);
 
     if ( ret || (rmrru->scope.devices_cnt == 0) )
         xfree(rmrru);
@@ -589,7 +601,7 @@ acpi_parse_one_atsr(struct acpi_dmar_entry_header *header)
 {
     struct acpi_table_atsr *atsr = (struct acpi_table_atsr *)header;
     struct acpi_atsr_unit *atsru;
-    int ret;
+    int ret, igd = 0;
     static int all_ports;
     void *dev_scope_start, *dev_scope_end;
 
@@ -610,7 +622,7 @@ acpi_parse_one_atsr(struct acpi_dmar_entry_header *header)
         dev_scope_start = (void *)(atsr + 1);
         dev_scope_end   = ((void *)atsr) + header->length;
         ret = acpi_parse_dev_scope(dev_scope_start, dev_scope_end,
-                                   atsru, ATSR_TYPE);
+                                   atsru, ATSR_TYPE, &igd);
     }
     else
     {
