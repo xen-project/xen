@@ -2776,6 +2776,47 @@ sh_remove_all_shadows_and_parents(struct vcpu *v, mfn_t gmfn)
 
 /**************************************************************************/
 
+/* Reset the up-pointers of every L3 shadow to 0. 
+ * This is called when l3 shadows stop being pinnable, to clear out all
+ * the list-head bits so the up-pointer field is properly inititalised. */
+static int sh_clear_up_pointer(struct vcpu *v, mfn_t smfn, mfn_t unused)
+{
+    mfn_to_page(smfn)->up = 0;
+    return 0;
+}
+
+void sh_reset_l3_up_pointers(struct vcpu *v)
+{
+    static hash_callback_t callbacks[SH_type_unused] = {
+        NULL, /* none    */
+        NULL, /* l1_32   */
+        NULL, /* fl1_32  */
+        NULL, /* l2_32   */
+        NULL, /* l1_pae  */
+        NULL, /* fl1_pae */
+        NULL, /* l2_pae  */
+        NULL, /* l2h_pae */
+        NULL, /* l1_64   */
+        NULL, /* fl1_64  */
+        NULL, /* l2_64   */
+        NULL, /* l2h_64  */
+#if CONFIG_PAGING_LEVELS >= 4
+        sh_clear_up_pointer, /* l3_64   */
+#else
+        NULL, /* l3_64   */
+#endif
+        NULL, /* l4_64   */
+        NULL, /* p2m     */
+        NULL  /* unused  */
+    };
+    static unsigned int callback_mask = 1 << SH_type_l3_64_shadow;    
+
+    hash_foreach(v, callback_mask, callbacks, _mfn(INVALID_MFN));
+}
+
+
+/**************************************************************************/
+
 static void sh_update_paging_modes(struct vcpu *v)
 {
     struct domain *d = v->domain;

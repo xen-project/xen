@@ -475,6 +475,12 @@ mfn_t oos_snapshot_lookup(struct vcpu *v, mfn_t gmfn);
 
 #endif /* (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) */
 
+
+/* Reset the up-pointers of every L3 shadow to 0. 
+ * This is called when l3 shadows stop being pinnable, to clear out all
+ * the list-head bits so the up-pointer field is properly inititalised. */
+void sh_reset_l3_up_pointers(struct vcpu *v);
+
 /******************************************************************************
  * Flags used in the return value of the shadow_set_lXe() functions...
  */

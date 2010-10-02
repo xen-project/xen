@@ -1634,12 +1634,10 @@ sh_make_shadow(struct vcpu *v, mfn_t gmfn, u32 shadow_type)
             page_list_for_each_safe(sp, t, &v->domain->arch.paging.shadow.pinned_shadows)
             {
                 if ( sp->u.sh.type == SH_type_l3_64_shadow )
-                {
                     sh_unpin(v, page_to_mfn(sp));
-                    sp->up = 0;
-                }
             }
             v->domain->arch.paging.shadow.opt_flags &= ~SHOPT_LINUX_L3_TOPLEVEL;
+            sh_reset_l3_up_pointers(v);
         }
     }
 #endif
