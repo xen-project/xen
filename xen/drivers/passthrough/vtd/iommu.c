@@ -1987,9 +1987,9 @@ int __init intel_vtd_setup(void)
             "since Queued Invalidation isn't supported or enabled.\n");
     }
 
-#define P(p,s) printk("Intel VT-d %s %ssupported.\n", s, (p)? "" : "not ")
+#define P(p,s) printk("Intel VT-d %s %senabled.\n", s, (p)? "" : "not ")
     P(iommu_snoop, "Snoop Control");
-    P(iommu_passthrough, "DMA Passthrough");
+    P(iommu_passthrough, "Dom0 DMA Passthrough");
     P(iommu_qinval, "Queued Invalidation");
     P(iommu_intremap, "Interrupt Remapping");
 #undef P
