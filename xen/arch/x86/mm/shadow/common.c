@@ -2871,6 +2871,7 @@ sh_remove_all_shadows_and_parents(struct vcpu *v, mfn_t gmfn)
 
 /**************************************************************************/
 
+#if CONFIG_PAGING_LEVELS >= 4
 /* Reset the up-pointers of every L3 shadow to 0. 
  * This is called when l3 shadows stop being pinnable, to clear out all
  * the list-head bits so the up-pointer field is properly inititalised. */
@@ -2879,6 +2880,7 @@ static int sh_clear_up_pointer(struct vcpu *v, mfn_t smfn, mfn_t unused)
     mfn_to_page(smfn)->up = 0;
     return 0;
 }
+#endif
 
 void sh_reset_l3_up_pointers(struct vcpu *v)
 {
