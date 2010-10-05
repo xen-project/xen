@@ -2331,30 +2331,6 @@ int libxl_device_console_add(libxl_ctx *ctx, uint32_t domid, libxl_device_consol
     libxl__device device;
     int rc;
 
-    if (console->build_state) {
-        xs_transaction_t t;
-        char **ents = (char **) libxl__calloc(&gc, 11, sizeof(char *));
-        ents[0] = "console/port";
-        ents[1] = libxl__sprintf(&gc, "%"PRIu32, console->build_state->console_port);
-        ents[2] = "console/ring-ref";
-        ents[3] = libxl__sprintf(&gc, "%lu", console->build_state->console_mfn);
-        ents[4] = "console/limit";
-        ents[5] = libxl__sprintf(&gc, "%d", LIBXL_XENCONSOLE_LIMIT);
-        ents[6] = "console/type";
-        if (console->consback == LIBXL_CONSBACK_XENCONSOLED)
-            ents[7] = "xenconsoled";
-        else
-            ents[7] = "ioemu";
-        ents[8] = "console/output";
-        ents[9] = console->output;
-retry_transaction:
-        t = xs_transaction_start(ctx->xsh);
-        libxl__xs_writev(&gc, t, libxl__xs_get_dompath(&gc, console->domid), ents);
-        if (!xs_transaction_end(ctx->xsh, t, 0))
-            if (errno == EAGAIN)
-                goto retry_transaction;
-    }
-
     front = flexarray_make(16, 1);
     if (!front) {
         rc = ERROR_NOMEM;
@@ -2384,24 +2360,32 @@ retry_transaction:
     flexarray_set(back, boffset++, "protocol");
     flexarray_set(back, boffset++, LIBXL_XENCONSOLE_PROTOCOL);
 
-    /* if devid == 0 do not add the frontend to device/console/ because
-     * it has already been added to console/ */
-    if (device.devid > 0) {
-        flexarray_set(front, foffset++, "backend-id");
-        flexarray_set(front, foffset++, libxl__sprintf(&gc, "%d", console->backend_domid));
+    flexarray_set(front, foffset++, "backend-id");
+    flexarray_set(front, foffset++, libxl__sprintf(&gc, "%d", console->backend_domid));
+    flexarray_set(front, foffset++, "limit");
+    flexarray_set(front, foffset++, libxl__sprintf(&gc, "%d", LIBXL_XENCONSOLE_LIMIT));
+    flexarray_set(front, foffset++, "type");
+    if (console->consback == LIBXL_CONSBACK_XENCONSOLED)
+        flexarray_set(front, foffset++, "xenconsoled");
+    else
+        flexarray_set(front, foffset++, "ioemu");
+    flexarray_set(front, foffset++, "output");
+    flexarray_set(front, foffset++, console->output);
+
+    if (device.devid == 0) {
+        if (console->build_state == NULL) {
+            rc = ERROR_INVAL;
+            goto out_free;
+        }
+        flexarray_set(front, foffset++, "port");
+        flexarray_set(front, foffset++, libxl__sprintf(&gc, "%"PRIu32, console->build_state->console_port));
+        flexarray_set(front, foffset++, "ring-ref");
+        flexarray_set(front, foffset++, libxl__sprintf(&gc, "%lu", console->build_state->console_mfn));
+    } else {
         flexarray_set(front, foffset++, "state");
         flexarray_set(front, foffset++, libxl__sprintf(&gc, "%d", 1));
-        flexarray_set(front, foffset++, "limit");
-        flexarray_set(front, foffset++, libxl__sprintf(&gc, "%d", LIBXL_XENCONSOLE_LIMIT));
         flexarray_set(front, foffset++, "protocol");
         flexarray_set(front, foffset++, LIBXL_XENCONSOLE_PROTOCOL);
-        flexarray_set(front, foffset++, "type");
-        if (console->consback == LIBXL_CONSBACK_XENCONSOLED)
-            flexarray_set(front, foffset++, "xenconsoled");
-        else
-            flexarray_set(front, foffset++, "ioemu");
-        flexarray_set(front, foffset++, "output");
-        flexarray_set(front, foffset++, console->output);
     }
 
     libxl__device_generic_add(ctx, &device,

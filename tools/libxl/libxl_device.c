@@ -39,11 +39,32 @@ static const char *string_of_kinds[] = {
     [DEVICE_CONSOLE] = "console",
 };
 
+static char *libxl__device_frontend_path(libxl__gc *gc, libxl__device *device)
+{
+    char *dom_path = libxl__xs_get_dompath(gc, device->domid);
+
+    /* Console 0 is a special case */
+    if (device->kind == DEVICE_CONSOLE && device->devid == 0)
+        return libxl__sprintf(gc, "%s/console", dom_path);
+
+    return libxl__sprintf(gc, "%s/device/%s/%d", dom_path,
+                          string_of_kinds[device->kind], device->devid);
+}
+
+static char *libxl__device_backend_path(libxl__gc *gc, libxl__device *device)
+{
+    char *dom_path = libxl__xs_get_dompath(gc, device->backend_domid);
+
+    return libxl__sprintf(gc, "%s/backend/%s/%u/%d", dom_path,
+                          string_of_kinds[device->backend_kind],
+                          device->domid, device->devid);
+}
+
 int libxl__device_generic_add(libxl_ctx *ctx, libxl__device *device,
                              char **bents, char **fents)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
-    char *dom_path_backend, *dom_path, *frontend_path, *backend_path;
+    char *frontend_path, *backend_path;
     xs_transaction_t t;
     struct xs_permissions frontend_perms[2];
     struct xs_permissions backend_perms[2];
@@ -54,13 +75,8 @@ int libxl__device_generic_add(libxl_ctx *ctx, libxl__device *device,
         goto out;
     }
 
-    dom_path_backend = libxl__xs_get_dompath(&gc, device->backend_domid);
-    dom_path = libxl__xs_get_dompath(&gc, device->domid);
-
-    frontend_path = libxl__sprintf(&gc, "%s/device/%s/%d",
-                                  dom_path, string_of_kinds[device->kind], device->devid);
-    backend_path = libxl__sprintf(&gc, "%s/backend/%s/%u/%d",
-                                 dom_path_backend, string_of_kinds[device->backend_kind], device->domid, device->devid);
+    frontend_path = libxl__device_frontend_path(&gc, device);
+    backend_path = libxl__device_backend_path(&gc, device);
 
     frontend_perms[0].id = device->domid;
     frontend_perms[0].perms = XS_PERM_NONE;
@@ -326,6 +342,16 @@ int libxl__devices_destroy(libxl_ctx *ctx, uint32_t domid, int force)
             }
         }
     }
+
+    /* console 0 frontend directory is not under /local/domain/<domid>/device */
+    fe_path = libxl__sprintf(&gc, "/local/domain/%d/console", domid);
+    be_path = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/backend", fe_path));
+    if (be_path && strcmp(be_path, "")) {
+        if (libxl__device_destroy(ctx, be_path, force) > 0)
+            n_watches++;
+        flexarray_set(toremove, n++, libxl__dirname(&gc, be_path));
+    }
+
     if (!force) {
         /* Linux-ism. Most implementations leave the timeout
          * untouched after select. Linux, however, will chip
@@ -356,15 +382,11 @@ out:
 int libxl__device_del(libxl_ctx *ctx, libxl__device *dev, int wait)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
-    char *dom_path_backend, *backend_path;
+    char *backend_path;
     int rc;
 
-    /* Create strings */
-    dom_path_backend    = libxl__xs_get_dompath(&gc, dev->backend_domid);
-    backend_path        = libxl__sprintf(&gc, "%s/backend/%s/%u/%d",
-                                    dom_path_backend, 
-                                    string_of_kinds[dev->backend_kind], 
-                                    dev->domid, dev->devid);
+    backend_path = libxl__device_backend_path(&gc, dev);
+
     rc = libxl__device_destroy(ctx, backend_path, !wait);
     if (rc == -1) {
         rc = ERROR_FAIL;
