@@ -429,7 +429,7 @@ out_close:
     if (xenconsoled_fd > -1)
         close(xenconsoled_fd);
     if (xenconsoled_slave > -1)
-        close(xenconsoled_fd);
+        close(xenconsoled_slave);
 
     if (fifo) {
         unlink(fifo);
