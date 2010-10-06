@@ -2262,7 +2262,7 @@ int main_pcilist(int argc, char **argv)
     return 0;
 }
 
-static void pcidetach(char *dom, char *bdf)
+static void pcidetach(char *dom, char *bdf, int force)
 {
     libxl_device_pci pcidev;
 
@@ -2273,20 +2273,24 @@ static void pcidetach(char *dom, char *bdf)
         fprintf(stderr, "pci-detach: malformed BDF specification \"%s\"\n", bdf);
         exit(2);
     }
-    libxl_device_pci_remove(&ctx, domid, &pcidev);
+    libxl_device_pci_remove(&ctx, domid, &pcidev, force);
     libxl_device_pci_destroy(&pcidev);
 }
 
 int main_pcidetach(int argc, char **argv)
 {
     int opt;
+    int force = 0;
     char *domname = NULL, *bdf = NULL;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
+    while ((opt = getopt(argc, argv, "hf")) != -1) {
         switch (opt) {
         case 'h':
             help("pci-detach");
             return 0;
+        case 'f':
+            force = 1;
+            break;
         default:
             fprintf(stderr, "option not supported\n");
             break;
@@ -2300,7 +2304,7 @@ int main_pcidetach(int argc, char **argv)
     domname = argv[optind];
     bdf = argv[optind + 1];
 
-    pcidetach(domname, bdf);
+    pcidetach(domname, bdf, force);
     return 0;
 }
 static void pciattach(char *dom, char *bdf, char *vs)

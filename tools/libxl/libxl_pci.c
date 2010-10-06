@@ -841,7 +841,8 @@ out:
     return rc;
 }
 
-static int do_pci_remove(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev)
+static int do_pci_remove(libxl__gc *gc, uint32_t domid,
+                         libxl_device_pci *pcidev, int force)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     libxl_device_pci *assigned;
@@ -857,8 +858,6 @@ static int do_pci_remove(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev
             return ERROR_INVAL;
         }
     }
-
-    libxl_device_pci_remove_xenstore(gc, domid, pcidev);
 
     hvm = libxl__domain_is_hvm(ctx, domid);
     if (hvm) {
@@ -878,7 +877,12 @@ static int do_pci_remove(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev
             xs_write(ctx->xsh, XBT_NULL, path, "pci-rem", strlen("pci-rem"));
             if (libxl__wait_for_device_model(ctx, domid, "pci-removed", NULL, NULL) < 0) {
                 LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Device Model didn't respond in time");
-                return ERROR_FAIL;
+                /* This depends on guest operating system acknowledging the
+                 * SCI, if it doesn't respond in time then we may wish to 
+                 * force the removal.
+                 */
+                if ( !force )
+                    return ERROR_FAIL;
             }
         }
         path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/state", domid);
@@ -924,7 +928,7 @@ skip1:
         if ((fscanf(f, "%u", &irq) == 1) && irq) {
             rc = xc_physdev_unmap_pirq(ctx->xch, domid, irq);
             if (rc < 0) {
-                LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc, "xc_physdev_map_pirq irq=%d", irq);
+                LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc, "xc_physdev_unmap_pirq irq=%d", irq);
             }
             rc = xc_domain_irq_permission(ctx->xch, domid, irq, 0);
             if (rc < 0) {
@@ -948,13 +952,16 @@ out:
     stubdomid = libxl_get_stubdom_id(ctx, domid);
     if (stubdomid != 0) {
         libxl_device_pci pcidev_s = *pcidev;
-        libxl_device_pci_remove(ctx, stubdomid, &pcidev_s);
+        libxl_device_pci_remove(ctx, stubdomid, &pcidev_s, force);
     }
+
+    libxl_device_pci_remove_xenstore(gc, domid, pcidev);
 
     return 0;
 }
 
-int libxl_device_pci_remove(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
+int libxl_device_pci_remove(libxl_ctx *ctx, uint32_t domid,
+                            libxl_device_pci *pcidev, int force)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
     unsigned int orig_vdev, pfunc_mask;
@@ -980,7 +987,7 @@ int libxl_device_pci_remove(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pc
             }else{
                 pcidev->vdevfn = orig_vdev;
             }
-            if ( do_pci_remove(&gc, domid, pcidev) )
+            if ( do_pci_remove(&gc, domid, pcidev, force) )
                 rc = ERROR_FAIL;
         }
     }
@@ -1049,7 +1056,11 @@ int libxl_device_pci_shutdown(libxl_ctx *ctx, uint32_t domid)
     if ( rc )
         return rc;
     for (i = 0; i < num; i++) {
-        if (libxl_device_pci_remove(ctx, domid, pcidevs + i) < 0)
+        /* Force remove on shutdown since, on HVM, qemu will not always
+         * respond to SCI interrupt because the guest kernel has shut down the
+         * devices by the time we even get here!
+         */
+        if (libxl_device_pci_remove(ctx, domid, pcidevs + i, 1) < 0)
             return ERROR_FAIL;
     }
     free(pcidevs);

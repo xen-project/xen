@@ -406,7 +406,7 @@ int libxl_device_vfb_clean_shutdown(libxl_ctx *ctx, uint32_t domid);
 int libxl_device_vfb_hard_shutdown(libxl_ctx *ctx, uint32_t domid);
 
 int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev);
-int libxl_device_pci_remove(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev);
+int libxl_device_pci_remove(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev, int force);
 int libxl_device_pci_shutdown(libxl_ctx *ctx, uint32_t domid);
 int libxl_device_pci_list_assigned(libxl_ctx *ctx, libxl_device_pci **list, uint32_t domid, int *num);
 int libxl_device_pci_list_assignable(libxl_ctx *ctx, libxl_device_pci **list, int *num);
