@@ -1356,55 +1356,84 @@ int hvm_virtual_to_linear_addr(
     return 0;
 }
 
-static void *hvm_map_entry(unsigned long va)
+static void *__hvm_map_guest_frame(unsigned long gfn, bool_t writable)
 {
-    unsigned long gfn, mfn;
+    unsigned long mfn;
     p2m_type_t p2mt;
-    uint32_t pfec;
-    struct vcpu *v = current;
-    struct p2m_domain *p2m = p2m_get_hostp2m(v->domain);
+    struct p2m_domain *p2m = p2m_get_hostp2m(current->domain);
 
-    if ( ((va & ~PAGE_MASK) + 8) > PAGE_SIZE )
-    {
-        gdprintk(XENLOG_ERR, "Descriptor table entry "
-                 "straddles page boundary\n");
-        domain_crash(current->domain);
+    mfn = mfn_x(writable
+                ? gfn_to_mfn_unshare(p2m, gfn, &p2mt, 0)
+                : gfn_to_mfn(p2m, gfn, &p2mt));
+    if ( (p2m_is_shared(p2mt) && writable) || !p2m_is_ram(p2mt) )
         return NULL;
-    }
-
-    /* We're mapping on behalf of the segment-load logic, which might
-     * write the accessed flags in the descriptors (in 32-bit mode), but
-     * we still treat it as a kernel-mode read (i.e. no access checks). */
-    pfec = PFEC_page_present;
-    gfn = paging_gva_to_gfn(current, va, &pfec);
-    if ( pfec == PFEC_page_paged || pfec == PFEC_page_shared )
-        return NULL;
-    mfn = mfn_x(gfn_to_mfn_unshare(p2m, gfn, &p2mt, 0));
     if ( p2m_is_paging(p2mt) )
     {
         p2m_mem_paging_populate(p2m, gfn);
         return NULL;
     }
-    if ( p2m_is_shared(p2mt) )
-        return NULL;
-    if ( !p2m_is_ram(p2mt) )
-    {
-        gdprintk(XENLOG_ERR, "Failed to look up descriptor table entry\n");
-        domain_crash(current->domain);
-        return NULL;
-    }
 
     ASSERT(mfn_valid(mfn));
 
-    paging_mark_dirty(current->domain, mfn);
+    if ( writable )
+        paging_mark_dirty(current->domain, mfn);
 
-    return (char *)map_domain_page(mfn) + (va & ~PAGE_MASK);
+    return map_domain_page(mfn);
+}
+
+void *hvm_map_guest_frame_rw(unsigned long gfn)
+{
+    return __hvm_map_guest_frame(gfn, 1);
+}
+
+void *hvm_map_guest_frame_ro(unsigned long gfn)
+{
+    return __hvm_map_guest_frame(gfn, 0);
+}
+
+void hvm_unmap_guest_frame(void *p)
+{
+    if ( p )
+        unmap_domain_page(p);
+}
+
+static void *hvm_map_entry(unsigned long va)
+{
+    unsigned long gfn;
+    uint32_t pfec;
+    char *v;
+
+    if ( ((va & ~PAGE_MASK) + 8) > PAGE_SIZE )
+    {
+        gdprintk(XENLOG_ERR, "Descriptor table entry "
+                 "straddles page boundary\n");
+        goto fail;
+    }
+
+    /*
+     * We're mapping on behalf of the segment-load logic, which might write
+     * the accessed flags in the descriptors (in 32-bit mode), but we still
+     * treat it as a kernel-mode read (i.e. no access checks).
+     */
+    pfec = PFEC_page_present;
+    gfn = paging_gva_to_gfn(current, va, &pfec);
+    if ( (pfec == PFEC_page_paged) || (pfec == PFEC_page_shared) )
+        goto fail;
+
+    v = hvm_map_guest_frame_rw(gfn);
+    if ( v == NULL )
+        goto fail;
+
+    return v + (va & ~PAGE_MASK);
+
+ fail:
+    domain_crash(current->domain);
+    return NULL;
 }
 
 static void hvm_unmap_entry(void *p)
 {
-    if ( p )
-        unmap_domain_page(p);
+    hvm_unmap_guest_frame(p);
 }
 
 static int hvm_load_segment_selector(
