@@ -638,7 +638,7 @@ value stub_xl_pci_remove(value info, value domid)
 	device_pci_val(&gc, &c_info, info);
 
 	INIT_CTX();
-	ret = libxl_device_pci_remove(&ctx, Int_val(domid), &c_info);
+	ret = libxl_device_pci_remove(&ctx, Int_val(domid), &c_info, 0);
 	if (ret != 0)
 		failwith_xl("pci_remove", &lg);
 	FREE_CTX();

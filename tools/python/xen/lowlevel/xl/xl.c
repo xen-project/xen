@@ -441,15 +441,16 @@ static PyObject *pyxl_pci_del(XlObject *self, PyObject *args)
 {
     Py_device_pci *pci;
     PyObject *obj;
-    int domid;
-    if ( !PyArg_ParseTuple(args, "iO", &domid, &obj) )
+    int domid, force = 0;
+
+    if ( !PyArg_ParseTuple(args, "iO|i", &domid, &obj, &force) )
         return NULL;
     if ( !Pydevice_pci_Check(obj) ) {
         PyErr_SetString(PyExc_TypeError, "Xxpected xl.device_pci");
         return NULL;
     }
     pci = (Py_device_pci *)obj;
-    if ( libxl_device_pci_remove(&self->ctx, domid, &pci->obj) ) {
+    if ( libxl_device_pci_remove(&self->ctx, domid, &pci->obj, force) ) {
         PyErr_SetString(xl_error_obj, "cannot remove pci device");
         return NULL;
     }
