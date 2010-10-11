@@ -43,6 +43,47 @@ static inline void wrmsr_amd(unsigned int index, unsigned int lo,
 	);
 }
 
+static inline int rdmsr_amd_safe(unsigned int msr, unsigned int *lo,
+				 unsigned int *hi)
+{
+	int err;
+
+	asm volatile("1: rdmsr\n2:\n"
+		     ".section .fixup,\"ax\"\n"
+		     "3: movl %6,%2\n"
+		     "   jmp 2b\n"
+		     ".previous\n"
+		     ".section __ex_table,\"a\"\n"
+		     __FIXUP_ALIGN "\n"
+		     __FIXUP_WORD " 1b,3b\n"
+		     ".previous\n"
+		     : "=a" (*lo), "=d" (*hi), "=r" (err)
+		     : "c" (msr), "D" (0x9c5a203a), "2" (0), "i" (-EFAULT));
+
+	return err;
+}
+
+static inline int wrmsr_amd_safe(unsigned int msr, unsigned int lo,
+				 unsigned int hi)
+{
+	int err;
+
+	asm volatile("1: wrmsr\n2:\n"
+		     ".section .fixup,\"ax\"\n"
+		     "3: movl %6,%0\n"
+		     "   jmp 2b\n"
+		     ".previous\n"
+		     ".section __ex_table,\"a\"\n"
+		     __FIXUP_ALIGN "\n"
+		     __FIXUP_WORD " 1b,3b\n"
+		     ".previous\n"
+		     : "=r" (err)
+		     : "c" (msr), "a" (lo), "d" (hi), "D" (0x9c5a203a),
+		       "0" (0), "i" (-EFAULT));
+
+	return err;
+}
+
 /*
  * Mask the features and extended features returned by CPUID.  Parameters are
  * set from the boot line via two methods:
@@ -329,6 +370,24 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 	   3DNow is IDd by bit 31 in extended CPUID (1*32+31) anyway */
 	clear_bit(0*32+31, c->x86_capability);
 	
+#ifdef CONFIG_X86_64
+	if (c->x86 == 0xf && c->x86_model < 0x14
+	    && cpu_has(c, X86_FEATURE_LAHF_LM)) {
+		/*
+		 * Some BIOSes incorrectly force this feature, but only K8
+		 * revision D (model = 0x14) and later actually support it.
+		 * (AMD Erratum #110, docId: 25759).
+		 */
+		unsigned int lo, hi;
+
+		clear_bit(X86_FEATURE_LAHF_LM, c->x86_capability);
+		if (!rdmsr_amd_safe(0xc001100d, &lo, &hi)) {
+			hi &= ~1;
+			wrmsr_amd_safe(0xc001100d, lo, hi);
+		}
+	}
+#endif
+
 	r = get_model_name(c);
 
 	switch(c->x86)
