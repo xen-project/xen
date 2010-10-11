@@ -2276,6 +2276,14 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             if ( wrmsr_safe(MSR_FAM10H_MMIO_CONF_BASE, msr_content) != 0 )
                 goto fail;
             break;
+        case MSR_IA32_UCODE_REV:
+            if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
+                goto fail;
+            if ( rdmsr_safe(regs->ecx, val) )
+                goto fail;
+            if ( msr_content )
+                goto invalid;
+            break;
         case MSR_IA32_MISC_ENABLE:
             if ( rdmsr_safe(regs->ecx, val) )
                 goto invalid;
@@ -2382,11 +2390,16 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 regs->eax = regs->edx = 0;
                 break;
             }
-            if ( rdmsr_safe(regs->ecx, msr_content) != 0 )
-                goto fail;
-            regs->eax = (uint32_t)msr_content;
-            regs->edx = (uint32_t)(msr_content >> 32);
-            break;
+            goto rdmsr_normal;
+        case MSR_IA32_UCODE_REV:
+            BUILD_BUG_ON(MSR_IA32_UCODE_REV != MSR_AMD_PATCHLEVEL);
+            if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+            {
+                if ( wrmsr_safe(MSR_IA32_UCODE_REV, 0) )
+                    goto fail;
+                sync_core();
+            }
+            goto rdmsr_normal;
         case MSR_IA32_MISC_ENABLE:
             if ( rdmsr_safe(regs->ecx, msr_content) )
                 goto fail;
@@ -2394,8 +2407,6 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             regs->eax = (uint32_t)msr_content;
             regs->edx = (uint32_t)(msr_content >> 32);
             break;
-        case MSR_EFER:
-        case MSR_AMD_PATCHLEVEL:
         default:
             if ( rdmsr_hypervisor_regs(regs->ecx, &val) )
             {
@@ -2411,6 +2422,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             if ( rc )
                 goto rdmsr_writeback;
 
+        case MSR_EFER:
+ rdmsr_normal:
             /* Everyone can read the MSR space. */
             /* gdprintk(XENLOG_WARNING,"Domain attempted RDMSR %p.\n",
                         _p(regs->ecx));*/
