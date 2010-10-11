@@ -7,14 +7,21 @@ TARGET := test_x86_emulator
 .PHONY: all
 all: $(TARGET)
 
-.PHONY: blowfish.bin
-blowfish.bin:
-	make -f blowfish.mk all
-
-blowfish.h: blowfish.bin
-	(echo "static unsigned int blowfish_code[] = {"; \
-	od -v -t x $< | sed 's/^[0-9]* /0x/' | sed 's/ /, 0x/g' | sed 's/$$/,/';\
+.PHONY: blowfish.h
+blowfish.h:
+	rm -f blowfish.bin
+	XEN_TARGET_ARCH=x86_32 make -f blowfish.mk all
+	(echo "static unsigned int blowfish32_code[] = {"; \
+	od -v -t x blowfish.bin | sed 's/^[0-9]* /0x/' | sed 's/ /, 0x/g' | sed 's/$$/,/';\
 	echo "};") >$@
+	rm -f blowfish.bin
+ifeq ($(XEN_COMPILE_ARCH),x86_64)
+	XEN_TARGET_ARCH=x86_64 make -f blowfish.mk all
+	(echo "static unsigned int blowfish64_code[] = {"; \
+	od -v -t x blowfish.bin | sed 's/^[0-9]* /0x/' | sed 's/ /, 0x/g' | sed 's/$$/,/';\
+	echo "};") >>$@
+	rm -f blowfish.bin
+endif
 
 $(TARGET): x86_emulate.o test_x86_emulator.o
 	$(HOSTCC) -o $@ $^

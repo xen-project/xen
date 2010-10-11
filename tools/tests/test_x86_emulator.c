@@ -65,7 +65,7 @@ int main(int argc, char **argv)
     struct x86_emulate_ctxt ctxt;
     struct cpu_user_regs regs;
     char *instr;
-    unsigned int *res, i;
+    unsigned int *res, i, j;
     int rc;
 #ifndef __x86_64__
     unsigned int bcdres_native, bcdres_emul;
@@ -442,41 +442,58 @@ int main(int argc, char **argv)
     printf("skipped\n");
 #endif
 
-    printf("Testing blowfish code sequence");
-    memcpy(res, blowfish_code, sizeof(blowfish_code));
-    regs.eax = 2;
-    regs.edx = 1;
-    regs.eip = (unsigned long)res;
-    regs.esp = (unsigned long)res + MMAP_SZ - 4;
-    *(uint32_t *)(unsigned long)regs.esp = 0x12345678;
-    regs.eflags = 2;
-    i = 0;
-    while ( (uint32_t)regs.eip != 0x12345678 )
+    for ( j = 1; j <= 2; j++ )
     {
-        if ( (i++ & 8191) == 0 )
-            printf(".");
-        rc = x86_emulate(&ctxt, &emulops);
-        if ( rc != X86EMUL_OKAY )
+#if defined(__i386__)
+        if ( j == 2 ) break;
+        memcpy(res, blowfish32_code, sizeof(blowfish32_code));
+#else
+        memcpy(res, (j == 1) ? blowfish32_code : blowfish64_code,
+               (j == 1) ? sizeof(blowfish32_code) : sizeof(blowfish64_code));
+#endif
+        printf("Testing blowfish %u-bit code sequence", j*32);
+        regs.eax = 2;
+        regs.edx = 1;
+        regs.eip = (unsigned long)res;
+        regs.esp = (unsigned long)res + MMAP_SZ - 4;
+        if ( j == 2 )
         {
-            printf("failed at %%eip == %08x\n", (unsigned int)regs.eip);
-            return 1;
+            ctxt.addr_size = ctxt.sp_size = 64;
+            *(uint32_t *)(unsigned long)regs.esp = 0;
+            regs.esp -= 4;
         }
+        *(uint32_t *)(unsigned long)regs.esp = 0x12345678;
+        regs.eflags = 2;
+        i = 0;
+        while ( regs.eip != 0x12345678 )
+        {
+            if ( (i++ & 8191) == 0 )
+                printf(".");
+            rc = x86_emulate(&ctxt, &emulops);
+            if ( rc != X86EMUL_OKAY )
+            {
+                printf("failed at %%eip == %08x\n", (unsigned int)regs.eip);
+                return 1;
+            }
+        }
+        if ( (regs.esp != ((unsigned long)res + MMAP_SZ)) ||
+             (regs.eax != 2) || (regs.edx != 1) )
+            goto fail;
+        printf("okay\n");
     }
-    if ( (regs.esp != ((unsigned long)res + MMAP_SZ)) ||
-         (regs.eax != 2) || (regs.edx != 1) )
-        goto fail;
-    printf("okay\n");
 
-#ifndef __x86_64__
     printf("%-40s", "Testing blowfish native execution...");    
     asm volatile (
+#if defined(__i386__)
         "movl $0x100000,%%ecx; call *%%ecx"
+#else
+        "movl $0x100000,%%ecx; call *%%rcx"
+#endif
         : "=a" (regs.eax), "=d" (regs.edx)
         : "0" (2), "1" (1) : "ecx" );
     if ( (regs.eax != 2) || (regs.edx != 1) )
         goto fail;
     printf("okay\n");
-#endif    
 
     return 0;
 
