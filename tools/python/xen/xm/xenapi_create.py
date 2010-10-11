@@ -14,13 +14,15 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2007 Tom Wilkie <tom.wilkie@gmail.com>
+# Copyright (C) 2010 ANEXIA Internetdienstleistungs GmbH
+#   Author: Stephan Peijnik <spe@anexia.at>
 #============================================================================
 """Domain creation using new XenAPI
 """
 
 from xen.xm.main import server, get_default_SR
 from xml.dom.minidom import parse, getDOMImplementation
-from xml.parsers.xmlproc import xmlproc, xmlval, xmldtd
+from lxml import etree
 from xen.xend import sxp
 from xen.xend.XendAPIConstants import XEN_API_ON_NORMAL_EXIT, \
      XEN_API_ON_CRASH_BEHAVIOUR
@@ -35,6 +37,7 @@ import os
 from os.path import join
 import traceback
 import re
+import warnings # Used by lxml-based validator
 
 def log(_, msg):
     #print "> " + msg
@@ -118,61 +121,57 @@ class xenapi_create:
         Use this if possible as it gives nice
         error messages
         """
-        dtd = xmldtd.load_dtd(self.dtd)
-        parser = xmlproc.XMLProcessor()
-        parser.set_application(xmlval.ValidatingApp(dtd, parser))
-        parser.dtd = dtd
-        parser.ent = dtd
-        parser.parse_resource(file)
-
+        try:
+            dtd = etree.DTD(open(self.dtd, 'r'))
+        except IOError:
+            # The old code did neither raise an exception here, nor
+            # did it report an error. For now we issue a warning.
+            # TODO: How to handle a missing dtd file?
+            # --sp
+            warnings.warn('DTD file %s not found.' % (self.dtd),
+                          UserWarning)
+            return
+        
+        tree = etree.parse(file)
+        root = tree.getroot()
+        if not dtd.validate(root):
+            self.handle_dtd_errors(dtd)
+            
     def check_dom_against_dtd(self, dom):
         """
         Check DOM again DTD.
         Doesn't give as nice error messages.
         (no location info)
         """
-        dtd = xmldtd.load_dtd(self.dtd)
-        app = xmlval.ValidatingApp(dtd, self)
-        app.set_locator(self)
-        self.dom2sax(dom, app)
-
-    # Get errors back from ValidatingApp       
-    def report_error(self, number, args=None):
-        self.errors = xmlproc.errors.english
         try:
-            msg = self.errors[number]
-            if args != None:
-                msg = msg % args
-        except KeyError:
-            msg = self.errors[4002] % number # Unknown err msg :-)
-        print msg 
+            dtd = etree.DTD(open(self.dtd, 'r'))
+        except IOError:
+            # The old code did neither raise an exception here, nor
+            # did it report an error. For now we issue a warning.
+            # TODO: How to handle a missing dtd file?
+            # --sp
+            warnings.warn('DTD file %s not found.' % (self.dtd),
+                          UserWarning)
+            return
+
+        # XXX: This may be a bit slow. Maybe we should use another way
+        # of getting an etree root element from the minidom DOM tree...
+        # -- sp
+        root = etree.XML(dom.toxml())
+        if not dtd.validate(root):
+            self.handle_dtd_errors(dtd)
+
+    # Do the same that was done in report_error before. This is directly
+    # called by check_dtd and check_dom_against_dtd.
+    # We are using sys.stderr instead of print though (python3k clean).
+    def handle_dtd_errors(self, dtd):
+        # XXX: Do we really want to bail out here?
+        # -- sp
+        for err in dtd.error_log:
+            err_str = 'ERROR: %s\n' % (str(err),)
+            sys.stderr.write(err_str)
+        sys.stderr.flush()
         sys.exit(-1)
-
-    # Here for compatibility with ValidatingApp
-    def get_line(self):
-        return -1
-
-    def get_column(self):
-        return -1
-
-    def dom2sax(self, dom, app):
-        """
-        Take a dom tree and tarverse it,
-        issuing SAX calls to app.
-        """
-        for child in dom.childNodes:
-            if child.nodeType == child.TEXT_NODE:
-                data = child.nodeValue
-                app.handle_data(data, 0, len(data))
-            else:
-                app.handle_start_tag(
-                    child.nodeName,
-                    self.attrs_to_dict(child.attributes))
-                self.dom2sax(child, app)
-                app.handle_end_tag(child.nodeName)
-
-    def attrs_to_dict(self, attrs):
-        return dict(attrs.items())     
 
     #
     # Checks which cannot be done with dtd

@@ -107,12 +107,15 @@ Python Runtime Libraries
 Xend (the Xen daemon) has the following runtime dependencies:
 
     * Python 2.3 or later.
-      In many distros, the XML-aspects to the standard library
+      In some distros, the XML-aspects to the standard library
       (xml.dom.minidom etc) are broken out into a separate python-xml package.
       This is also required.
+      In more recent versions of Debian and Ubuntu the XML-aspects are included
+      in the base python package however (python-xml has been removed
+      from Debian in squeeze and from Ubuntu in intrepid).
 
           URL:    http://www.python.org/
-          Debian: python, python-xml
+          Debian: python
 
     * For optional SSL support, pyOpenSSL:
           URL:    http://pyopenssl.sourceforge.net/
@@ -123,8 +126,9 @@ Xend (the Xen daemon) has the following runtime dependencies:
           Debian: python-pam
 
     * For optional XenAPI support in XM, PyXML:
-          URL:    http://pyxml.sourceforge.net
-          YUM:    PyXML
+          URL:    http://codespeak.net/lxml/
+	  Debian: python-lxml
+          YUM:    python-lxml
 
 
 Intel(R) Trusted Execution Technology Support
