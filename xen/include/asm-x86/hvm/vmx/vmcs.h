@@ -156,18 +156,23 @@ extern u32 vmx_cpu_based_exec_control;
 #define PIN_BASED_EXT_INTR_MASK         0x00000001
 #define PIN_BASED_NMI_EXITING           0x00000008
 #define PIN_BASED_VIRTUAL_NMIS          0x00000020
+#define PIN_BASED_PREEMPT_TIMER         0x00000040
 extern u32 vmx_pin_based_exec_control;
 
 #define VM_EXIT_IA32E_MODE              0x00000200
 #define VM_EXIT_ACK_INTR_ON_EXIT        0x00008000
 #define VM_EXIT_SAVE_GUEST_PAT          0x00040000
 #define VM_EXIT_LOAD_HOST_PAT           0x00080000
+#define VM_EXIT_SAVE_GUEST_EFER         0x00100000
+#define VM_EXIT_LOAD_HOST_EFER          0x00200000
+#define VM_EXIT_SAVE_PREEMPT_TIMER      0x00400000
 extern u32 vmx_vmexit_control;
 
 #define VM_ENTRY_IA32E_MODE             0x00000200
 #define VM_ENTRY_SMM                    0x00000400
 #define VM_ENTRY_DEACT_DUAL_MONITOR     0x00000800
 #define VM_ENTRY_LOAD_GUEST_PAT         0x00004000
+#define VM_ENTRY_LOAD_GUEST_EFER        0x00008000
 extern u32 vmx_vmentry_control;
 
 #define SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES 0x00000001
