@@ -105,9 +105,9 @@ moretodo:
     rmb(); /* Ensure we see queued responses up to 'rp'. */
     cons = dev->rx.rsp_cons;
 
-    nr_consumed = 0;
-    some = 0;
-    while ((cons != rp) && !some)
+    for (nr_consumed = 0, some = 0;
+         (cons != rp) && !some;
+         nr_consumed++, cons++)
     {
         struct net_buffer* buf;
         unsigned char* page;
@@ -146,10 +146,6 @@ moretodo:
 #endif
 		dev->netif_rx(page+rx->offset,rx->status);
         }
-
-        nr_consumed++;
-
-        ++cons;
     }
     dev->rx.rsp_cons=cons;
 
