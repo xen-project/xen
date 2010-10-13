@@ -432,15 +432,18 @@ static void init_net2_info(libxl_device_net2 *net2_info, int devnum)
     net2_info->back_trusted = 1;
     net2_info->filter_mac = 1;
     net2_info->max_bypasses = 5;
-    net2_info->bridge = "xenbr0";
+    net2_info->bridge = strdup("xenbr0");
 }
 
 static void init_vfb_info(libxl_device_vfb *vfb, int dev_num)
 {
     memset(vfb, 0x00, sizeof(libxl_device_vfb));
     vfb->devid = dev_num;
+    vfb->display = NULL;
+    vfb->xauthority = NULL;
     vfb->vnc = 1;
-    vfb->vnclisten = "127.0.0.1";
+    vfb->vncpasswd = NULL;
+    vfb->vnclisten = strdup("127.0.0.1");
     vfb->vncdisplay = 0;
     vfb->vncunused = 1;
     vfb->keymap = NULL;
@@ -459,7 +462,7 @@ static void init_console_info(libxl_device_console *console, int dev_num, libxl_
     memset(console, 0x00, sizeof(libxl_device_console));
     console->devid = dev_num;
     console->consback = LIBXL_CONSBACK_XENCONSOLED;
-    console->output = "pty";
+    console->output = strdup("pty");
     if (state)
         console->build_state = state;
 }
@@ -935,8 +938,10 @@ static void parse_config_data(const char *configfile_filename_report,
                 } else if (!strcmp(p, "ip")) {
                     inet_pton(AF_INET, p2 + 1, &nic->ip);
                 } else if (!strcmp(p, "script")) {
+                    free(nic->script);
                     nic->script = strdup(p2 + 1);
                 } else if (!strcmp(p, "vifname")) {
+                    free(nic->ifname);
                     nic->ifname = strdup(p2 + 1);
                 } else if (!strcmp(p, "backend")) {
                     if(libxl_name_to_domid(&ctx, (p2 + 1), &(nic->backend_domid))) {
@@ -987,6 +992,7 @@ skip:
                 } else if (!strcmp("back_trusted", p)) {
                     net2->back_trusted = (*val == '1');
                 } else if (!strcmp("bridge", p)) {
+                    free(net2->bridge);
                     net2->bridge = strdup(val);
                 } else if (!strcmp("filter_mac", p)) {
                     net2->filter_mac = (*val == '1');
@@ -1035,22 +1041,27 @@ skip:
                 if (!strcmp(p, "vnc")) {
                     vfb->vnc = atoi(p2 + 1);
                 } else if (!strcmp(p, "vnclisten")) {
+                    free(vfb->vnclisten);
                     vfb->vnclisten = strdup(p2 + 1);
                 } else if (!strcmp(p, "vncpasswd")) {
+                    free(vfb->vncpasswd);
                     vfb->vncpasswd = strdup(p2 + 1);
                 } else if (!strcmp(p, "vncdisplay")) {
                     vfb->vncdisplay = atoi(p2 + 1);
                 } else if (!strcmp(p, "vncunused")) {
                     vfb->vncunused = atoi(p2 + 1);
                 } else if (!strcmp(p, "keymap")) {
+                    free(vfb->keymap);
                     vfb->keymap = strdup(p2 + 1);
                 } else if (!strcmp(p, "sdl")) {
                     vfb->sdl = atoi(p2 + 1);
                 } else if (!strcmp(p, "opengl")) {
                     vfb->opengl = atoi(p2 + 1);
                 } else if (!strcmp(p, "display")) {
+                    free(vfb->display);
                     vfb->display = strdup(p2 + 1);
                 } else if (!strcmp(p, "xauthority")) {
+                    free(vfb->xauthority);
                     vfb->xauthority = strdup(p2 + 1);
                 }
             } while ((p = strtok(NULL, ",")) != NULL);
@@ -1412,7 +1423,6 @@ static int create_domain(struct domain_create *dom_info)
 
     libxl_domain_build_state state;
     libxl_device_model_info dm_info;
-    libxl_device_console console;
 
     int debug = dom_info->debug;
     int daemonize = dom_info->daemonize;
@@ -1651,26 +1661,35 @@ start:
         }
     }
     if (d_config.c_info.hvm) {
+        libxl_device_console console;
+
         init_console_info(&console, 0, &state);
         console.domid = domid;
         libxl_device_console_add(&ctx, domid, &console);
+        libxl_device_console_destroy(&console);
+
         dm_info.domid = domid;
         MUST( libxl_create_device_model(&ctx, &dm_info,
                                         d_config.disks, d_config.num_disks,
                                         d_config.vifs, d_config.num_vifs,
                                         &dm_starting) );
     } else {
+        libxl_device_console console;
+
         for (i = 0; i < d_config.num_vfbs; i++) {
             d_config.vfbs[i].domid = domid;
             libxl_device_vfb_add(&ctx, domid, &d_config.vfbs[i]);
             d_config.vkbs[i].domid = domid;
             libxl_device_vkb_add(&ctx, domid, &d_config.vkbs[i]);
         }
+
         init_console_info(&console, 0, &state);
         console.domid = domid;
         if (d_config.num_vfbs)
              console.consback = LIBXL_CONSBACK_IOEMU;
         libxl_device_console_add(&ctx, domid, &console);
+        libxl_device_console_destroy(&console);
+
         if (d_config.num_vfbs)
             libxl_create_xenpv_qemu(&ctx, domid, d_config.vfbs, &dm_starting);
     }
