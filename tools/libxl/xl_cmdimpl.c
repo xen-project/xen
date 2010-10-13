@@ -1551,7 +1551,7 @@ static int create_domain(struct domain_create *dom_info)
             d_config.c_info.name = 0; /* steals allocation from config */
 
             if (asprintf(&d_config.c_info.name,
-                         "%s--incoming", d_config.c_info.name) < 0) {
+                         "%s--incoming", common_domname) < 0) {
                 fprintf(stderr, "Failed to allocate memory in asprintf\n");
                 exit(1);
             }
