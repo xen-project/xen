@@ -24,26 +24,6 @@
 #include "libxl.h"
 #include "libxl_internal.h"
 
-int xs_writev(struct xs_handle *xsh, xs_transaction_t t, char *dir, char *kvs[])
-{
-    char *path;
-    int i;
-
-    if (!kvs)
-        return 0;
-
-    for (i = 0; kvs[i] != NULL; i += 2) {
-        if (asprintf(&path, "%s/%s", dir, kvs[i]) < 0)
-            return -1;
-        if (path && kvs[i + 1]) {
-            int length = strlen(kvs[i + 1]);
-            xs_write(xsh, t, path, kvs[i + 1], length);
-        }
-        free(path);
-    }
-    return 0;
-}
-
 char **libxl__xs_kvs_of_flexarray(libxl__gc *gc, flexarray_t *array, int length)
 {
     char **kvs;

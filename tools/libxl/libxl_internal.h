@@ -109,8 +109,6 @@ typedef struct {
 
 #define PRINTF_ATTRIBUTE(x, y) __attribute__((format(printf, x, y)))
 
-_hidden int xs_writev(struct xs_handle *xsh, xs_transaction_t t, char *dir, char *kvs[]);
-
 typedef struct {
     /* mini-GC */
     int alloc_maxsize;
