@@ -51,6 +51,10 @@
 
 #define CLS "ctx"
 
+#if PY_MAJOR_VERSION < 2 || (PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION < 5)
+#define Py_ssize_t int
+#endif
+
 static PyObject *xl_error_obj;
 
 int genwrap__obj_init(PyObject *self, PyObject *args, PyObject *kwds)
