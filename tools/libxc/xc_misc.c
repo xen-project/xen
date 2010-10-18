@@ -42,7 +42,7 @@ int xc_readconsolering(xc_interface *xch,
         sysctl.u.readconsole.incremental = incremental;
     }
 
-    if ( (ret = lock_pages(buffer, nr_chars)) != 0 )
+    if ( (ret = lock_pages(xch, buffer, nr_chars)) != 0 )
         return ret;
 
     if ( (ret = do_sysctl(xch, &sysctl)) == 0 )
@@ -52,7 +52,7 @@ int xc_readconsolering(xc_interface *xch,
             *pindex = sysctl.u.readconsole.index;
     }
 
-    unlock_pages(buffer, nr_chars);
+    unlock_pages(xch, buffer, nr_chars);
 
     return ret;
 }
@@ -66,12 +66,12 @@ int xc_send_debug_keys(xc_interface *xch, char *keys)
     set_xen_guest_handle(sysctl.u.debug_keys.keys, keys);
     sysctl.u.debug_keys.nr_keys = len;
 
-    if ( (ret = lock_pages(keys, len)) != 0 )
+    if ( (ret = lock_pages(xch, keys, len)) != 0 )
         return ret;
 
     ret = do_sysctl(xch, &sysctl);
 
-    unlock_pages(keys, len);
+    unlock_pages(xch, keys, len);
 
     return ret;
 }
@@ -154,7 +154,7 @@ int xc_mca_op(xc_interface *xch, struct xen_mc *mc)
     DECLARE_HYPERCALL;
 
     mc->interface_version = XEN_MCA_INTERFACE_VERSION;
-    if ( lock_pages(mc, sizeof(mc)) )
+    if ( lock_pages(xch, mc, sizeof(mc)) )
     {
         PERROR("Could not lock xen_mc memory");
         return -EINVAL;
@@ -163,7 +163,7 @@ int xc_mca_op(xc_interface *xch, struct xen_mc *mc)
     hypercall.op = __HYPERVISOR_mca;
     hypercall.arg[0] = (unsigned long)mc;
     ret = do_xen_hypercall(xch, &hypercall);
-    unlock_pages(mc, sizeof(mc));
+    unlock_pages(xch, mc, sizeof(mc));
     return ret;
 }
 #endif
@@ -227,12 +227,12 @@ int xc_getcpuinfo(xc_interface *xch, int max_cpus,
     sysctl.u.getcpuinfo.max_cpus = max_cpus; 
     set_xen_guest_handle(sysctl.u.getcpuinfo.info, info); 
 
-    if ( (rc = lock_pages(info, max_cpus*sizeof(*info))) != 0 )
+    if ( (rc = lock_pages(xch, info, max_cpus*sizeof(*info))) != 0 )
         return rc;
 
     rc = do_sysctl(xch, &sysctl);
 
-    unlock_pages(info, max_cpus*sizeof(*info));
+    unlock_pages(xch, info, max_cpus*sizeof(*info));
 
     if ( nr_cpus )
         *nr_cpus = sysctl.u.getcpuinfo.nr_cpus; 
@@ -250,7 +250,7 @@ int xc_hvm_set_pci_intx_level(
     struct xen_hvm_set_pci_intx_level _arg, *arg = &_arg;
     int rc;
 
-    if ( (rc = hcall_buf_prep((void **)&arg, sizeof(*arg))) != 0 )
+    if ( (rc = hcall_buf_prep(xch, (void **)&arg, sizeof(*arg))) != 0 )
     {
         PERROR("Could not lock memory");
         return rc;
@@ -269,7 +269,7 @@ int xc_hvm_set_pci_intx_level(
 
     rc = do_xen_hypercall(xch, &hypercall);
 
-    hcall_buf_release((void **)&arg, sizeof(*arg));
+    hcall_buf_release(xch, (void **)&arg, sizeof(*arg));
 
     return rc;
 }
@@ -283,7 +283,7 @@ int xc_hvm_set_isa_irq_level(
     struct xen_hvm_set_isa_irq_level _arg, *arg = &_arg;
     int rc;
 
-    if ( (rc = hcall_buf_prep((void **)&arg, sizeof(*arg))) != 0 )
+    if ( (rc = hcall_buf_prep(xch, (void **)&arg, sizeof(*arg))) != 0 )
     {
         PERROR("Could not lock memory");
         return rc;
@@ -299,7 +299,7 @@ int xc_hvm_set_isa_irq_level(
 
     rc = do_xen_hypercall(xch, &hypercall);
 
-    hcall_buf_release((void **)&arg, sizeof(*arg));
+    hcall_buf_release(xch, (void **)&arg, sizeof(*arg));
 
     return rc;
 }
@@ -319,7 +319,7 @@ int xc_hvm_set_pci_link_route(
     arg.link    = link;
     arg.isa_irq = isa_irq;
 
-    if ( (rc = lock_pages(&arg, sizeof(arg))) != 0 )
+    if ( (rc = lock_pages(xch, &arg, sizeof(arg))) != 0 )
     {
         PERROR("Could not lock memory");
         return rc;
@@ -327,7 +327,7 @@ int xc_hvm_set_pci_link_route(
 
     rc = do_xen_hypercall(xch, &hypercall);
 
-    unlock_pages(&arg, sizeof(arg));
+    unlock_pages(xch, &arg, sizeof(arg));
 
     return rc;
 }
@@ -350,7 +350,7 @@ int xc_hvm_track_dirty_vram(
     arg.nr        = nr;
     set_xen_guest_handle(arg.dirty_bitmap, (uint8_t *)dirty_bitmap);
 
-    if ( (rc = lock_pages(&arg, sizeof(arg))) != 0 )
+    if ( (rc = lock_pages(xch, &arg, sizeof(arg))) != 0 )
     {
         PERROR("Could not lock memory");
         return rc;
@@ -358,7 +358,7 @@ int xc_hvm_track_dirty_vram(
 
     rc = do_xen_hypercall(xch, &hypercall);
 
-    unlock_pages(&arg, sizeof(arg));
+    unlock_pages(xch, &arg, sizeof(arg));
 
     return rc;
 }
@@ -378,7 +378,7 @@ int xc_hvm_modified_memory(
     arg.first_pfn = first_pfn;
     arg.nr        = nr;
 
-    if ( (rc = lock_pages(&arg, sizeof(arg))) != 0 )
+    if ( (rc = lock_pages(xch, &arg, sizeof(arg))) != 0 )
     {
         PERROR("Could not lock memory");
         return rc;
@@ -386,7 +386,7 @@ int xc_hvm_modified_memory(
 
     rc = do_xen_hypercall(xch, &hypercall);
 
-    unlock_pages(&arg, sizeof(arg));
+    unlock_pages(xch, &arg, sizeof(arg));
 
     return rc;
 }
@@ -407,7 +407,7 @@ int xc_hvm_set_mem_type(
     arg.first_pfn    = first_pfn;
     arg.nr           = nr;
 
-    if ( (rc = lock_pages(&arg, sizeof(arg))) != 0 )
+    if ( (rc = lock_pages(xch, &arg, sizeof(arg))) != 0 )
     {
         PERROR("Could not lock memory");
         return rc;
@@ -415,7 +415,7 @@ int xc_hvm_set_mem_type(
 
     rc = do_xen_hypercall(xch, &hypercall);
 
-    unlock_pages(&arg, sizeof(arg));
+    unlock_pages(xch, &arg, sizeof(arg));
 
     return rc;
 }

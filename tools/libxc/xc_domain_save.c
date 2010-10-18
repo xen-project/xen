@@ -1046,14 +1046,14 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
     memset(to_send, 0xff, BITMAP_SIZE);
 
-    if ( lock_pages(to_send, BITMAP_SIZE) )
+    if ( lock_pages(xch, to_send, BITMAP_SIZE) )
     {
         PERROR("Unable to lock to_send");
         return 1;
     }
 
     /* (to fix is local only) */
-    if ( lock_pages(to_skip, BITMAP_SIZE) )
+    if ( lock_pages(xch, to_skip, BITMAP_SIZE) )
     {
         PERROR("Unable to lock to_skip");
         return 1;
@@ -1091,7 +1091,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
     memset(pfn_type, 0,
            ROUNDUP(MAX_BATCH_SIZE * sizeof(*pfn_type), PAGE_SHIFT));
 
-    if ( lock_pages(pfn_type, MAX_BATCH_SIZE * sizeof(*pfn_type)) )
+    if ( lock_pages(xch, pfn_type, MAX_BATCH_SIZE * sizeof(*pfn_type)) )
     {
         PERROR("Unable to lock pfn_type array");
         goto out;

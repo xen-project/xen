@@ -618,7 +618,7 @@ int xc_gnttab_op(xc_interface *xch, int cmd, void * op, int op_size, int count)
     hypercall.arg[1] = (unsigned long)op;
     hypercall.arg[2] = count;
 
-    if ( lock_pages(op, count* op_size) != 0 )
+    if ( lock_pages(xch, op, count* op_size) != 0 )
     {
         PERROR("Could not lock memory for Xen hypercall");
         goto out1;
@@ -626,7 +626,7 @@ int xc_gnttab_op(xc_interface *xch, int cmd, void * op, int op_size, int count)
 
     ret = do_xen_hypercall(xch, &hypercall);
 
-    unlock_pages(op, count * op_size);
+    unlock_pages(xch, op, count * op_size);
 
  out1:
     return ret;
@@ -670,7 +670,7 @@ static void *_gnttab_map_table(xc_interface *xch, int domid, int *gnt_num)
     *gnt_num = query.nr_frames * (PAGE_SIZE / sizeof(grant_entry_v1_t) );
 
     frame_list = malloc(query.nr_frames * sizeof(unsigned long));
-    if ( !frame_list || lock_pages(frame_list,
+    if ( !frame_list || lock_pages(xch, frame_list,
                                    query.nr_frames * sizeof(unsigned long)) )
     {
         ERROR("Alloc/lock frame_list in xc_gnttab_map_table\n");
@@ -714,7 +714,7 @@ static void *_gnttab_map_table(xc_interface *xch, int domid, int *gnt_num)
 err:
     if ( frame_list )
     {
-        unlock_pages(frame_list, query.nr_frames * sizeof(unsigned long));
+        unlock_pages(xch, frame_list, query.nr_frames * sizeof(unsigned long));
         free(frame_list);
     }
     if ( pfn_list )

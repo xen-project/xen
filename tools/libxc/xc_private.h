@@ -100,11 +100,11 @@ void xc_report_progress_step(xc_interface *xch,
 
 void *xc_memalign(size_t alignment, size_t size);
 
-int lock_pages(void *addr, size_t len);
-void unlock_pages(void *addr, size_t len);
+int lock_pages(xc_interface *xch, void *addr, size_t len);
+void unlock_pages(xc_interface *xch, void *addr, size_t len);
 
-int hcall_buf_prep(void **addr, size_t len);
-void hcall_buf_release(void **addr, size_t len);
+int hcall_buf_prep(xc_interface *xch, void **addr, size_t len);
+void hcall_buf_release(xc_interface *xch, void **addr, size_t len);
 
 int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall);
 
@@ -125,7 +125,7 @@ static inline int do_physdev_op(xc_interface *xch, int cmd, void *op, size_t len
 
     DECLARE_HYPERCALL;
 
-    if ( hcall_buf_prep(&op, len) != 0 )
+    if ( hcall_buf_prep(xch, &op, len) != 0 )
     {
         PERROR("Could not lock memory for Xen hypercall");
         goto out1;
@@ -142,7 +142,7 @@ static inline int do_physdev_op(xc_interface *xch, int cmd, void *op, size_t len
                     " rebuild the user-space tool set?\n");
     }
 
-    hcall_buf_release(&op, len);
+    hcall_buf_release(xch, &op, len);
 
 out1:
     return ret;
@@ -153,7 +153,7 @@ static inline int do_domctl(xc_interface *xch, struct xen_domctl *domctl)
     int ret = -1;
     DECLARE_HYPERCALL;
 
-    if ( hcall_buf_prep((void **)&domctl, sizeof(*domctl)) != 0 )
+    if ( hcall_buf_prep(xch, (void **)&domctl, sizeof(*domctl)) != 0 )
     {
         PERROR("Could not lock memory for Xen hypercall");
         goto out1;
@@ -171,7 +171,7 @@ static inline int do_domctl(xc_interface *xch, struct xen_domctl *domctl)
                     " rebuild the user-space tool set?\n");
     }
 
-    hcall_buf_release((void **)&domctl, sizeof(*domctl));
+    hcall_buf_release(xch, (void **)&domctl, sizeof(*domctl));
 
  out1:
     return ret;
@@ -182,7 +182,7 @@ static inline int do_sysctl(xc_interface *xch, struct xen_sysctl *sysctl)
     int ret = -1;
     DECLARE_HYPERCALL;
 
-    if ( hcall_buf_prep((void **)&sysctl, sizeof(*sysctl)) != 0 )
+    if ( hcall_buf_prep(xch, (void **)&sysctl, sizeof(*sysctl)) != 0 )
     {
         PERROR("Could not lock memory for Xen hypercall");
         goto out1;
@@ -200,7 +200,7 @@ static inline int do_sysctl(xc_interface *xch, struct xen_sysctl *sysctl)
                     " rebuild the user-space tool set?\n");
     }
 
-    hcall_buf_release((void **)&sysctl, sizeof(*sysctl));
+    hcall_buf_release(xch, (void **)&sysctl, sizeof(*sysctl));
 
  out1:
     return ret;

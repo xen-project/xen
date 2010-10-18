@@ -71,7 +71,7 @@ xc_interface *xc_interface_open(xentoollog_logger *logger,
     return 0;
 }
 
-static void xc_clean_hcall_buf(void);
+static void xc_clean_hcall_buf(xc_interface *xch);
 
 int xc_interface_close(xc_interface *xch)
 {
@@ -85,7 +85,7 @@ int xc_interface_close(xc_interface *xch)
         if (rc) PERROR("Could not close hypervisor interface");
     }
 
-    xc_clean_hcall_buf();
+    xc_clean_hcall_buf(xch);
 
     free(xch);
     return rc;
@@ -193,17 +193,17 @@ void xc_report_progress_step(xc_interface *xch,
 
 #ifdef __sun__
 
-int lock_pages(void *addr, size_t len) { return 0; }
-void unlock_pages(void *addr, size_t len) { }
+int lock_pages(xc_interface *xch, void *addr, size_t len) { return 0; }
+void unlock_pages(xc_interface *xch, void *addr, size_t len) { }
 
-int hcall_buf_prep(void **addr, size_t len) { return 0; }
-void hcall_buf_release(void **addr, size_t len) { }
+int hcall_buf_prep(xc_interface *xch, void **addr, size_t len) { return 0; }
+void hcall_buf_release(xc_interface *xch, void **addr, size_t len) { }
 
-static void xc_clean_hcall_buf(void) { }
+static void xc_clean_hcall_buf(xc_interface *xch) { }
 
 #else /* !__sun__ */
 
-int lock_pages(void *addr, size_t len)
+int lock_pages(xc_interface *xch, void *addr, size_t len)
 {
       int e;
       void *laddr = (void *)((unsigned long)addr & PAGE_MASK);
@@ -213,7 +213,7 @@ int lock_pages(void *addr, size_t len)
       return e;
 }
 
-void unlock_pages(void *addr, size_t len)
+void unlock_pages(xc_interface *xch, void *addr, size_t len)
 {
     void *laddr = (void *)((unsigned long)addr & PAGE_MASK);
     size_t llen = (len + ((unsigned long)addr - (unsigned long)laddr) +
@@ -226,6 +226,7 @@ void unlock_pages(void *addr, size_t len)
 static pthread_key_t hcall_buf_pkey;
 static pthread_once_t hcall_buf_pkey_once = PTHREAD_ONCE_INIT;
 struct hcall_buf {
+    xc_interface *xch;
     void *buf;
     void *oldbuf;
 };
@@ -238,7 +239,7 @@ static void _xc_clean_hcall_buf(void *m)
     {
         if ( hcall_buf->buf )
         {
-            unlock_pages(hcall_buf->buf, PAGE_SIZE);
+            unlock_pages(hcall_buf->xch, hcall_buf->buf, PAGE_SIZE);
             free(hcall_buf->buf);
         }
 
@@ -253,14 +254,14 @@ static void _xc_init_hcall_buf(void)
     pthread_key_create(&hcall_buf_pkey, _xc_clean_hcall_buf);
 }
 
-static void xc_clean_hcall_buf(void)
+static void xc_clean_hcall_buf(xc_interface *xch)
 {
     pthread_once(&hcall_buf_pkey_once, _xc_init_hcall_buf);
 
     _xc_clean_hcall_buf(pthread_getspecific(hcall_buf_pkey));
 }
 
-int hcall_buf_prep(void **addr, size_t len)
+int hcall_buf_prep(xc_interface *xch, void **addr, size_t len)
 {
     struct hcall_buf *hcall_buf;
 
@@ -272,13 +273,14 @@ int hcall_buf_prep(void **addr, size_t len)
         hcall_buf = calloc(1, sizeof(*hcall_buf));
         if ( !hcall_buf )
             goto out;
+        hcall_buf->xch = xch;
         pthread_setspecific(hcall_buf_pkey, hcall_buf);
     }
 
     if ( !hcall_buf->buf )
     {
         hcall_buf->buf = xc_memalign(PAGE_SIZE, PAGE_SIZE);
-        if ( !hcall_buf->buf || lock_pages(hcall_buf->buf, PAGE_SIZE) )
+        if ( !hcall_buf->buf || lock_pages(xch, hcall_buf->buf, PAGE_SIZE) )
         {
             free(hcall_buf->buf);
             hcall_buf->buf = NULL;
@@ -295,10 +297,10 @@ int hcall_buf_prep(void **addr, size_t len)
     }
 
  out:
-    return lock_pages(*addr, len);
+    return lock_pages(xch, *addr, len);
 }
 
-void hcall_buf_release(void **addr, size_t len)
+void hcall_buf_release(xc_interface *xch, void **addr, size_t len)
 {
     struct hcall_buf *hcall_buf = pthread_getspecific(hcall_buf_pkey);
 
@@ -310,7 +312,7 @@ void hcall_buf_release(void **addr, size_t len)
     }
     else
     {
-        unlock_pages(*addr, len);
+        unlock_pages(xch, *addr, len);
     }
 }
 
@@ -337,7 +339,7 @@ int xc_mmuext_op(
     DECLARE_HYPERCALL;
     long ret = -EINVAL;
 
-    if ( hcall_buf_prep((void **)&op, nr_ops*sizeof(*op)) != 0 )
+    if ( hcall_buf_prep(xch, (void **)&op, nr_ops*sizeof(*op)) != 0 )
     {
         PERROR("Could not lock memory for Xen hypercall");
         goto out1;
@@ -351,7 +353,7 @@ int xc_mmuext_op(
 
     ret = do_xen_hypercall(xch, &hypercall);
 
-    hcall_buf_release((void **)&op, nr_ops*sizeof(*op));
+    hcall_buf_release(xch, (void **)&op, nr_ops*sizeof(*op));
 
  out1:
     return ret;
@@ -371,7 +373,7 @@ static int flush_mmu_updates(xc_interface *xch, struct xc_mmu *mmu)
     hypercall.arg[2] = 0;
     hypercall.arg[3] = mmu->subject;
 
-    if ( lock_pages(mmu->updates, sizeof(mmu->updates)) != 0 )
+    if ( lock_pages(xch, mmu->updates, sizeof(mmu->updates)) != 0 )
     {
         PERROR("flush_mmu_updates: mmu updates lock_pages failed");
         err = 1;
@@ -386,7 +388,7 @@ static int flush_mmu_updates(xc_interface *xch, struct xc_mmu *mmu)
 
     mmu->idx = 0;
 
-    unlock_pages(mmu->updates, sizeof(mmu->updates));
+    unlock_pages(xch, mmu->updates, sizeof(mmu->updates));
 
  out:
     return err;
@@ -438,38 +440,38 @@ int xc_memory_op(xc_interface *xch,
     case XENMEM_increase_reservation:
     case XENMEM_decrease_reservation:
     case XENMEM_populate_physmap:
-        if ( lock_pages(reservation, sizeof(*reservation)) != 0 )
+        if ( lock_pages(xch, reservation, sizeof(*reservation)) != 0 )
         {
             PERROR("Could not lock");
             goto out1;
         }
         get_xen_guest_handle(extent_start, reservation->extent_start);
         if ( (extent_start != NULL) &&
-             (lock_pages(extent_start,
+             (lock_pages(xch, extent_start,
                     reservation->nr_extents * sizeof(xen_pfn_t)) != 0) )
         {
             PERROR("Could not lock");
-            unlock_pages(reservation, sizeof(*reservation));
+            unlock_pages(xch, reservation, sizeof(*reservation));
             goto out1;
         }
         break;
     case XENMEM_machphys_mfn_list:
-        if ( lock_pages(xmml, sizeof(*xmml)) != 0 )
+        if ( lock_pages(xch, xmml, sizeof(*xmml)) != 0 )
         {
             PERROR("Could not lock");
             goto out1;
         }
         get_xen_guest_handle(extent_start, xmml->extent_start);
-        if ( lock_pages(extent_start,
+        if ( lock_pages(xch, extent_start,
                    xmml->max_extents * sizeof(xen_pfn_t)) != 0 )
         {
             PERROR("Could not lock");
-            unlock_pages(xmml, sizeof(*xmml));
+            unlock_pages(xch, xmml, sizeof(*xmml));
             goto out1;
         }
         break;
     case XENMEM_add_to_physmap:
-        if ( lock_pages(arg, sizeof(struct xen_add_to_physmap)) )
+        if ( lock_pages(xch, arg, sizeof(struct xen_add_to_physmap)) )
         {
             PERROR("Could not lock");
             goto out1;
@@ -478,7 +480,7 @@ int xc_memory_op(xc_interface *xch,
     case XENMEM_current_reservation:
     case XENMEM_maximum_reservation:
     case XENMEM_maximum_gpfn:
-        if ( lock_pages(arg, sizeof(domid_t)) )
+        if ( lock_pages(xch, arg, sizeof(domid_t)) )
         {
             PERROR("Could not lock");
             goto out1;
@@ -486,7 +488,7 @@ int xc_memory_op(xc_interface *xch,
         break;
     case XENMEM_set_pod_target:
     case XENMEM_get_pod_target:
-        if ( lock_pages(arg, sizeof(struct xen_pod_target)) )
+        if ( lock_pages(xch, arg, sizeof(struct xen_pod_target)) )
         {
             PERROR("Could not lock");
             goto out1;
@@ -501,29 +503,29 @@ int xc_memory_op(xc_interface *xch,
     case XENMEM_increase_reservation:
     case XENMEM_decrease_reservation:
     case XENMEM_populate_physmap:
-        unlock_pages(reservation, sizeof(*reservation));
+        unlock_pages(xch, reservation, sizeof(*reservation));
         get_xen_guest_handle(extent_start, reservation->extent_start);
         if ( extent_start != NULL )
-            unlock_pages(extent_start,
+            unlock_pages(xch, extent_start,
                          reservation->nr_extents * sizeof(xen_pfn_t));
         break;
     case XENMEM_machphys_mfn_list:
-        unlock_pages(xmml, sizeof(*xmml));
+        unlock_pages(xch, xmml, sizeof(*xmml));
         get_xen_guest_handle(extent_start, xmml->extent_start);
-        unlock_pages(extent_start,
+        unlock_pages(xch, extent_start,
                      xmml->max_extents * sizeof(xen_pfn_t));
         break;
     case XENMEM_add_to_physmap:
-        unlock_pages(arg, sizeof(struct xen_add_to_physmap));
+        unlock_pages(xch, arg, sizeof(struct xen_add_to_physmap));
         break;
     case XENMEM_current_reservation:
     case XENMEM_maximum_reservation:
     case XENMEM_maximum_gpfn:
-        unlock_pages(arg, sizeof(domid_t));
+        unlock_pages(xch, arg, sizeof(domid_t));
         break;
     case XENMEM_set_pod_target:
     case XENMEM_get_pod_target:
-        unlock_pages(arg, sizeof(struct xen_pod_target));
+        unlock_pages(xch, arg, sizeof(struct xen_pod_target));
         break;
     }
 
@@ -565,7 +567,7 @@ int xc_get_pfn_list(xc_interface *xch,
     memset(pfn_buf, 0, max_pfns * sizeof(*pfn_buf));
 #endif
 
-    if ( lock_pages(pfn_buf, max_pfns * sizeof(*pfn_buf)) != 0 )
+    if ( lock_pages(xch, pfn_buf, max_pfns * sizeof(*pfn_buf)) != 0 )
     {
         PERROR("xc_get_pfn_list: pfn_buf lock failed");
         return -1;
@@ -573,7 +575,7 @@ int xc_get_pfn_list(xc_interface *xch,
 
     ret = do_domctl(xch, &domctl);
 
-    unlock_pages(pfn_buf, max_pfns * sizeof(*pfn_buf));
+    unlock_pages(xch, pfn_buf, max_pfns * sizeof(*pfn_buf));
 
     return (ret < 0) ? -1 : domctl.u.getmemlist.num_pfns;
 }
@@ -648,7 +650,7 @@ int xc_version(xc_interface *xch, int cmd, void *arg)
         break;
     }
 
-    if ( (argsize != 0) && (lock_pages(arg, argsize) != 0) )
+    if ( (argsize != 0) && (lock_pages(xch, arg, argsize) != 0) )
     {
         PERROR("Could not lock memory for version hypercall");
         return -ENOMEM;
@@ -662,7 +664,7 @@ int xc_version(xc_interface *xch, int cmd, void *arg)
     rc = do_xen_version(xch, cmd, arg);
 
     if ( argsize != 0 )
-        unlock_pages(arg, argsize);
+        unlock_pages(xch, arg, argsize);
 
     return rc;
 }

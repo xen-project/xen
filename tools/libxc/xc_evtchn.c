@@ -33,7 +33,7 @@ static int do_evtchn_op(xc_interface *xch, int cmd, void *arg,
     hypercall.arg[0] = cmd;
     hypercall.arg[1] = (unsigned long)arg;
 
-    if ( lock_pages(arg, arg_size) != 0 )
+    if ( lock_pages(xch, arg, arg_size) != 0 )
     {
         PERROR("do_evtchn_op: arg lock failed");
         goto out;
@@ -42,7 +42,7 @@ static int do_evtchn_op(xc_interface *xch, int cmd, void *arg,
     if ((ret = do_xen_hypercall(xch, &hypercall)) < 0 && !silently_fail)
         ERROR("do_evtchn_op: HYPERVISOR_event_channel_op failed: %d", ret);
 
-    unlock_pages(arg, arg_size);
+    unlock_pages(xch, arg, arg_size);
  out:
     return ret;
 }

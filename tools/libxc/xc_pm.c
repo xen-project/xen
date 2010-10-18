@@ -53,14 +53,14 @@ int xc_pm_get_pxstat(xc_interface *xch, int cpuid, struct xc_px_stat *pxpt)
     if ( (ret = xc_pm_get_max_px(xch, cpuid, &max_px)) != 0)
         return ret;
 
-    if ( (ret = lock_pages(pxpt->trans_pt, 
+    if ( (ret = lock_pages(xch, pxpt->trans_pt, 
         max_px * max_px * sizeof(uint64_t))) != 0 )
         return ret;
 
-    if ( (ret = lock_pages(pxpt->pt, 
+    if ( (ret = lock_pages(xch, pxpt->pt, 
         max_px * sizeof(struct xc_px_val))) != 0 )
     {
-        unlock_pages(pxpt->trans_pt, max_px * max_px * sizeof(uint64_t));
+        unlock_pages(xch, pxpt->trans_pt, max_px * max_px * sizeof(uint64_t));
         return ret;
     }
 
@@ -75,8 +75,8 @@ int xc_pm_get_pxstat(xc_interface *xch, int cpuid, struct xc_px_stat *pxpt)
     ret = xc_sysctl(xch, &sysctl);
     if ( ret )
     {
-        unlock_pages(pxpt->trans_pt, max_px * max_px * sizeof(uint64_t));
-        unlock_pages(pxpt->pt, max_px * sizeof(struct xc_px_val));
+        unlock_pages(xch, pxpt->trans_pt, max_px * max_px * sizeof(uint64_t));
+        unlock_pages(xch, pxpt->pt, max_px * sizeof(struct xc_px_val));
         return ret;
     }
 
@@ -85,8 +85,8 @@ int xc_pm_get_pxstat(xc_interface *xch, int cpuid, struct xc_px_stat *pxpt)
     pxpt->last = sysctl.u.get_pmstat.u.getpx.last;
     pxpt->cur = sysctl.u.get_pmstat.u.getpx.cur;
 
-    unlock_pages(pxpt->trans_pt, max_px * max_px * sizeof(uint64_t));
-    unlock_pages(pxpt->pt, max_px * sizeof(struct xc_px_val));
+    unlock_pages(xch, pxpt->trans_pt, max_px * max_px * sizeof(uint64_t));
+    unlock_pages(xch, pxpt->pt, max_px * sizeof(struct xc_px_val));
 
     return ret;
 }
@@ -128,11 +128,11 @@ int xc_pm_get_cxstat(xc_interface *xch, int cpuid, struct xc_cx_stat *cxpt)
     if ( (ret = xc_pm_get_max_cx(xch, cpuid, &max_cx)) )
         goto unlock_0;
 
-    if ( (ret = lock_pages(cxpt, sizeof(struct xc_cx_stat))) )
+    if ( (ret = lock_pages(xch, cxpt, sizeof(struct xc_cx_stat))) )
         goto unlock_0;
-    if ( (ret = lock_pages(cxpt->triggers, max_cx * sizeof(uint64_t))) )
+    if ( (ret = lock_pages(xch, cxpt->triggers, max_cx * sizeof(uint64_t))) )
         goto unlock_1;
-    if ( (ret = lock_pages(cxpt->residencies, max_cx * sizeof(uint64_t))) )
+    if ( (ret = lock_pages(xch, cxpt->residencies, max_cx * sizeof(uint64_t))) )
         goto unlock_2;
 
     sysctl.cmd = XEN_SYSCTL_get_pmstat;
@@ -155,11 +155,11 @@ int xc_pm_get_cxstat(xc_interface *xch, int cpuid, struct xc_cx_stat *cxpt)
     cxpt->cc6 = sysctl.u.get_pmstat.u.getcx.cc6;
 
 unlock_3:
-    unlock_pages(cxpt->residencies, max_cx * sizeof(uint64_t));
+    unlock_pages(xch, cxpt->residencies, max_cx * sizeof(uint64_t));
 unlock_2:
-    unlock_pages(cxpt->triggers, max_cx * sizeof(uint64_t));
+    unlock_pages(xch, cxpt->triggers, max_cx * sizeof(uint64_t));
 unlock_1:
-    unlock_pages(cxpt, sizeof(struct xc_cx_stat));
+    unlock_pages(xch, cxpt, sizeof(struct xc_cx_stat));
 unlock_0:
     return ret;
 }
@@ -200,13 +200,13 @@ int xc_get_cpufreq_para(xc_interface *xch, int cpuid,
              (!user_para->scaling_available_governors) )
             return -EINVAL;
 
-        if ( (ret = lock_pages(user_para->affected_cpus,
+        if ( (ret = lock_pages(xch, user_para->affected_cpus,
                                user_para->cpu_num * sizeof(uint32_t))) )
             goto unlock_1;
-        if ( (ret = lock_pages(user_para->scaling_available_frequencies,
+        if ( (ret = lock_pages(xch, user_para->scaling_available_frequencies,
                                user_para->freq_num * sizeof(uint32_t))) )
             goto unlock_2;
-        if ( (ret = lock_pages(user_para->scaling_available_governors,
+        if ( (ret = lock_pages(xch, user_para->scaling_available_governors,
                  user_para->gov_num * CPUFREQ_NAME_LEN * sizeof(char))) )
             goto unlock_3;
 
@@ -263,13 +263,13 @@ int xc_get_cpufreq_para(xc_interface *xch, int cpuid,
     }
 
 unlock_4:
-    unlock_pages(user_para->scaling_available_governors,
+    unlock_pages(xch, user_para->scaling_available_governors,
                  user_para->gov_num * CPUFREQ_NAME_LEN * sizeof(char));
 unlock_3:
-    unlock_pages(user_para->scaling_available_frequencies,
+    unlock_pages(xch, user_para->scaling_available_frequencies,
                  user_para->freq_num * sizeof(uint32_t));
 unlock_2:
-    unlock_pages(user_para->affected_cpus,
+    unlock_pages(xch, user_para->affected_cpus,
                  user_para->cpu_num * sizeof(uint32_t));
 unlock_1:
     return ret;

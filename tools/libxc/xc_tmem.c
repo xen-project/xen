@@ -28,7 +28,7 @@ static int do_tmem_op(xc_interface *xch, tmem_op_t *op)
 
     hypercall.op = __HYPERVISOR_tmem_op;
     hypercall.arg[0] = (unsigned long)op;
-    if (lock_pages(op, sizeof(*op)) != 0)
+    if (lock_pages(xch, op, sizeof(*op)) != 0)
     {
         PERROR("Could not lock memory for Xen hypercall");
         return -EFAULT;
@@ -39,7 +39,7 @@ static int do_tmem_op(xc_interface *xch, tmem_op_t *op)
             DPRINTF("tmem operation failed -- need to"
                     " rebuild the user-space tool set?\n");
     }
-    unlock_pages(op, sizeof(*op));
+    unlock_pages(xch, op, sizeof(*op));
 
     return ret;
 }
@@ -69,7 +69,7 @@ int xc_tmem_control(xc_interface *xch,
     op.u.ctrl.oid[2] = 0;
 
     if (subop == TMEMC_LIST) {
-        if ((arg1 != 0) && (lock_pages(buf, arg1) != 0))
+        if ((arg1 != 0) && (lock_pages(xch, buf, arg1) != 0))
         {
             PERROR("Could not lock memory for Xen hypercall");
             return -ENOMEM;
@@ -85,7 +85,7 @@ int xc_tmem_control(xc_interface *xch,
 
     if (subop == TMEMC_LIST) {
         if (arg1 != 0)
-            unlock_pages(buf, arg1);
+            unlock_pages(xch, buf, arg1);
     }
 
     return rc;
@@ -115,7 +115,7 @@ int xc_tmem_control_oid(xc_interface *xch,
     op.u.ctrl.oid[2] = oid.oid[2];
 
     if (subop == TMEMC_LIST) {
-        if ((arg1 != 0) && (lock_pages(buf, arg1) != 0))
+        if ((arg1 != 0) && (lock_pages(xch, buf, arg1) != 0))
         {
             PERROR("Could not lock memory for Xen hypercall");
             return -ENOMEM;
@@ -131,7 +131,7 @@ int xc_tmem_control_oid(xc_interface *xch,
 
     if (subop == TMEMC_LIST) {
         if (arg1 != 0)
-            unlock_pages(buf, arg1);
+            unlock_pages(xch, buf, arg1);
     }
 
     return rc;

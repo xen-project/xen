@@ -92,7 +92,7 @@ int xc_acm_op(xc_interface *xch, int cmd, void *arg, unsigned long arg_size)
 
     hypercall.op = __HYPERVISOR_xsm_op;
     hypercall.arg[0] = (unsigned long)&acmctl;
-    if ( lock_pages(&acmctl, sizeof(acmctl)) != 0)
+    if ( lock_pages(xch, &acmctl, sizeof(acmctl)) != 0)
     {
         PERROR("Could not lock memory for Xen hypercall");
         return -EFAULT;
@@ -103,7 +103,7 @@ int xc_acm_op(xc_interface *xch, int cmd, void *arg, unsigned long arg_size)
             DPRINTF("acmctl operation failed -- need to"
                     " rebuild the user-space tool set?\n");
     }
-    unlock_pages(&acmctl, sizeof(acmctl));
+    unlock_pages(xch, &acmctl, sizeof(acmctl));
 
     switch (cmd) {
         case ACMOP_getdecision: {

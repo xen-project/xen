@@ -85,13 +85,13 @@ int xc_cpupool_getinfo(xc_interface *xch,
         set_xen_guest_handle(sysctl.u.cpupool_op.cpumap.bitmap, local);
         sysctl.u.cpupool_op.cpumap.nr_cpus = sizeof(info->cpumap) * 8;
 
-        if ( (err = lock_pages(local, sizeof(local))) != 0 )
+        if ( (err = lock_pages(xch, local, sizeof(local))) != 0 )
         {
             PERROR("Could not lock memory for Xen hypercall");
             break;
         }
         err = do_sysctl_save(xch, &sysctl);
-        unlock_pages(local, sizeof (local));
+        unlock_pages(xch, local, sizeof (local));
 
         if ( err < 0 )
             break;
@@ -161,14 +161,14 @@ int xc_cpupool_freeinfo(xc_interface *xch,
     set_xen_guest_handle(sysctl.u.cpupool_op.cpumap.bitmap, local);
     sysctl.u.cpupool_op.cpumap.nr_cpus = sizeof(*cpumap) * 8;
 
-    if ( (err = lock_pages(local, sizeof(local))) != 0 )
+    if ( (err = lock_pages(xch, local, sizeof(local))) != 0 )
     {
         PERROR("Could not lock memory for Xen hypercall");
         return err;
     }
 
     err = do_sysctl_save(xch, &sysctl);
-    unlock_pages(local, sizeof (local));
+    unlock_pages(xch, local, sizeof (local));
 
     if (err < 0)
         return err;

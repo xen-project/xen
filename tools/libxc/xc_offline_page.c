@@ -71,7 +71,7 @@ int xc_mark_page_online(xc_interface *xch, unsigned long start,
     if ( !status || (end < start) )
         return -EINVAL;
 
-    if (lock_pages(status, sizeof(uint32_t)*(end - start + 1)))
+    if (lock_pages(xch, status, sizeof(uint32_t)*(end - start + 1)))
     {
         ERROR("Could not lock memory for xc_mark_page_online\n");
         return -EINVAL;
@@ -84,7 +84,7 @@ int xc_mark_page_online(xc_interface *xch, unsigned long start,
     set_xen_guest_handle(sysctl.u.page_offline.status, status);
     ret = xc_sysctl(xch, &sysctl);
 
-    unlock_pages(status, sizeof(uint32_t)*(end - start + 1));
+    unlock_pages(xch, status, sizeof(uint32_t)*(end - start + 1));
 
     return ret;
 }
@@ -98,7 +98,7 @@ int xc_mark_page_offline(xc_interface *xch, unsigned long start,
     if ( !status || (end < start) )
         return -EINVAL;
 
-    if (lock_pages(status, sizeof(uint32_t)*(end - start + 1)))
+    if (lock_pages(xch, status, sizeof(uint32_t)*(end - start + 1)))
     {
         ERROR("Could not lock memory for xc_mark_page_offline");
         return -EINVAL;
@@ -111,7 +111,7 @@ int xc_mark_page_offline(xc_interface *xch, unsigned long start,
     set_xen_guest_handle(sysctl.u.page_offline.status, status);
     ret = xc_sysctl(xch, &sysctl);
 
-    unlock_pages(status, sizeof(uint32_t)*(end - start + 1));
+    unlock_pages(xch, status, sizeof(uint32_t)*(end - start + 1));
 
     return ret;
 }
@@ -125,7 +125,7 @@ int xc_query_page_offline_status(xc_interface *xch, unsigned long start,
     if ( !status || (end < start) )
         return -EINVAL;
 
-    if (lock_pages(status, sizeof(uint32_t)*(end - start + 1)))
+    if (lock_pages(xch, status, sizeof(uint32_t)*(end - start + 1)))
     {
         ERROR("Could not lock memory for xc_query_page_offline_status\n");
         return -EINVAL;
@@ -138,7 +138,7 @@ int xc_query_page_offline_status(xc_interface *xch, unsigned long start,
     set_xen_guest_handle(sysctl.u.page_offline.status, status);
     ret = xc_sysctl(xch, &sysctl);
 
-    unlock_pages(status, sizeof(uint32_t)*(end - start + 1));
+    unlock_pages(xch, status, sizeof(uint32_t)*(end - start + 1));
 
     return ret;
 }
@@ -291,7 +291,7 @@ static int init_mem_info(xc_interface *xch, int domid,
         minfo->pfn_type[i] = pfn_to_mfn(i, minfo->p2m_table,
                                         minfo->guest_width);
 
-    if ( lock_pages(minfo->pfn_type, minfo->p2m_size * sizeof(*minfo->pfn_type)) )
+    if ( lock_pages(xch, minfo->pfn_type, minfo->p2m_size * sizeof(*minfo->pfn_type)) )
     {
         ERROR("Unable to lock pfn_type array");
         goto failed;
@@ -310,7 +310,7 @@ static int init_mem_info(xc_interface *xch, int domid,
     return 0;
 
 unlock:
-    unlock_pages(minfo->pfn_type, minfo->p2m_size * sizeof(*minfo->pfn_type));
+    unlock_pages(xch, minfo->pfn_type, minfo->p2m_size * sizeof(*minfo->pfn_type));
 failed:
     if (minfo->pfn_type)
     {
