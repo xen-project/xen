@@ -196,6 +196,9 @@ extern int phys_proc_id[NR_CPUS];
 extern int cpu_core_id[NR_CPUS];
 extern int opt_cpu_info;
 
+/* Maximum width of physical addresses supported by the hardware */
+extern unsigned int paddr_bits;
+
 extern void identify_cpu(struct cpuinfo_x86 *);
 extern void setup_clear_cpu_cap(unsigned int);
 extern void print_cpu_info(unsigned int cpu);

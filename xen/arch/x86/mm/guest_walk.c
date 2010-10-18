@@ -63,7 +63,7 @@ static uint32_t mandatory_flags(struct vcpu *v, uint32_t pfec)
          && !(pfec & PFEC_user_mode) )
         pfec &= ~PFEC_write_access;
 
-    return flags[(pfec & 0x1f) >> 1];
+    return flags[(pfec & 0x1f) >> 1] | _PAGE_INVALID_BITS;
 }
 
 /* Modify a guest pagetable entry to set the Accessed and Dirty bits.
@@ -131,17 +131,19 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
     guest_l3e_t *l3p = NULL;
     guest_l4e_t *l4p;
 #endif
-    uint32_t gflags, mflags, rc = 0;
+    uint32_t gflags, mflags, iflags, rc = 0;
     int pse;
 
     perfc_incr(guest_walk);
     memset(gw, 0, sizeof(*gw));
     gw->va = va;
 
-    /* Mandatory bits that must be set in every entry.  We invert NX, to
-     * calculate as if there were an "X" bit that allowed access. 
-     * We will accumulate, in rc, the set of flags that are missing. */
+    /* Mandatory bits that must be set in every entry.  We invert NX and
+     * the invalid bits, to calculate as if there were an "X" bit that
+     * allowed access.  We will accumulate, in rc, the set of flags that
+     * are missing/unwanted. */
     mflags = mandatory_flags(v, pfec);
+    iflags = (_PAGE_NX_BIT | _PAGE_INVALID_BITS);
 
 #if GUEST_PAGING_LEVELS >= 3 /* PAE or 64... */
 #if GUEST_PAGING_LEVELS >= 4 /* 64-bit only... */
@@ -150,7 +152,7 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
     gw->l4mfn = top_mfn;
     l4p = (guest_l4e_t *) top_map;
     gw->l4e = l4p[guest_l4_table_offset(va)];
-    gflags = guest_l4e_get_flags(gw->l4e) ^ _PAGE_NX_BIT;
+    gflags = guest_l4e_get_flags(gw->l4e) ^ iflags;
     rc |= ((gflags & mflags) ^ mflags);
     if ( rc & _PAGE_PRESENT ) goto out;
 
@@ -164,7 +166,7 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
         goto out;
     /* Get the l3e and check its flags*/
     gw->l3e = l3p[guest_l3_table_offset(va)];
-    gflags = guest_l3e_get_flags(gw->l3e) ^ _PAGE_NX_BIT;
+    gflags = guest_l3e_get_flags(gw->l3e) ^ iflags;
     rc |= ((gflags & mflags) ^ mflags);
     if ( rc & _PAGE_PRESENT )
         goto out;
@@ -201,7 +203,7 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
 
 #endif /* All levels... */
 
-    gflags = guest_l2e_get_flags(gw->l2e) ^ _PAGE_NX_BIT;
+    gflags = guest_l2e_get_flags(gw->l2e) ^ iflags;
     rc |= ((gflags & mflags) ^ mflags);
     if ( rc & _PAGE_PRESENT )
         goto out;
@@ -246,7 +248,7 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
         if(l1p == NULL)
             goto out;
         gw->l1e = l1p[guest_l1_table_offset(va)];
-        gflags = guest_l1e_get_flags(gw->l1e) ^ _PAGE_NX_BIT;
+        gflags = guest_l1e_get_flags(gw->l1e) ^ iflags;
         rc |= ((gflags & mflags) ^ mflags);
     }
 

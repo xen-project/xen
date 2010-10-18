@@ -99,6 +99,9 @@ unsigned long hap_gva_to_gfn(GUEST_PAGING_LEVELS)(
     if ( missing & _PAGE_PRESENT )
         pfec[0] &= ~PFEC_page_present;
 
+    if ( missing & _PAGE_INVALID_BITS ) 
+        pfec[0] |= PFEC_reserved_bit;
+
     if ( missing & _PAGE_PAGED )
         pfec[0] = PFEC_page_paged;
 

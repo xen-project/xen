@@ -3181,6 +3181,8 @@ static int sh_page_fault(struct vcpu *v,
         perfc_incr(shadow_fault_bail_real_fault);
         SHADOW_PRINTK("not a shadow fault\n");
         reset_early_unshadow(v);
+        if ( (rc & _PAGE_INVALID_BITS) )
+            regs->error_code |= PFEC_reserved_bit;
         goto propagate;
     }
 
@@ -3772,6 +3774,7 @@ sh_gva_to_gfn(struct vcpu *v, unsigned long va, uint32_t *pfec)
 {
     walk_t gw;
     gfn_t gfn;
+    uint32_t missing;
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB)
     /* Check the vTLB cache first */
@@ -3780,10 +3783,12 @@ sh_gva_to_gfn(struct vcpu *v, unsigned long va, uint32_t *pfec)
         return vtlb_gfn;
 #endif /* (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB) */
 
-    if ( sh_walk_guest_tables(v, va, &gw, pfec[0]) != 0 )
+    if ( (missing = sh_walk_guest_tables(v, va, &gw, pfec[0])) != 0 )
     {
-        if ( !(guest_l1e_get_flags(gw.l1e) & _PAGE_PRESENT) )
+        if ( (missing & _PAGE_PRESENT) )
             pfec[0] &= ~PFEC_page_present;
+        if ( missing & _PAGE_INVALID_BITS )
+            pfec[0] |= PFEC_reserved_bit;
         return INVALID_GFN;
     }
     gfn = guest_walk_to_gfn(&gw);

@@ -600,6 +600,8 @@ struct mtrr_value {
 	unsigned long	lsize;
 };
 
+unsigned int paddr_bits __read_mostly = 36;
+
 /**
  * mtrr_bp_init - initialize mtrrs on the boot CPU
  *
@@ -620,17 +622,16 @@ void __init mtrr_bp_init(void)
 		   Intel will implement it to when they extend the address
 		   bus of the Xeon. */
 		if (cpuid_eax(0x80000000) >= 0x80000008) {
-			u32 phys_addr;
-			phys_addr = cpuid_eax(0x80000008) & 0xff;
+			paddr_bits = cpuid_eax(0x80000008) & 0xff;
 			/* CPUID workaround for Intel 0F33/0F34 CPU */
 			if (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL &&
 			    boot_cpu_data.x86 == 0xF &&
 			    boot_cpu_data.x86_model == 0x3 &&
 			    (boot_cpu_data.x86_mask == 0x3 ||
 			     boot_cpu_data.x86_mask == 0x4))
-				phys_addr = 36;
+				paddr_bits = 36;
 
-			size_or_mask = ~((1ULL << (phys_addr - PAGE_SHIFT)) - 1);
+			size_or_mask = ~((1ULL << (paddr_bits - PAGE_SHIFT)) - 1);
 			size_and_mask = ~size_or_mask & 0xfffff00000ULL;
 		} else if (boot_cpu_data.x86_vendor == X86_VENDOR_CENTAUR &&
 			   boot_cpu_data.x86 == 6) {

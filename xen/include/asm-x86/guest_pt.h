@@ -204,6 +204,17 @@ guest_supports_nx(struct vcpu *v)
 }
 
 
+/* Some bits are invalid in any pagetable entry. */
+#if GUEST_PAGING_LEVELS == 2
+#define _PAGE_INVALID_BITS (0)
+#elif GUEST_PAGING_LEVELS == 3
+#define _PAGE_INVALID_BITS \
+    get_pte_flags(((1ull<<63) - 1) & ~((1ull<<paddr_bits) - 1))
+#else /* GUEST_PAGING_LEVELS == 4 */
+#define _PAGE_INVALID_BITS \
+    get_pte_flags(((1ull<<52) - 1) & ~((1ull<<paddr_bits) - 1))
+#endif
+
 
 /* Type used for recording a walk through guest pagetables.  It is
  * filled in by the pagetable walk function, and also used as a cache
