@@ -512,35 +512,6 @@ static int clear_pte(xc_interface *xch, int domid,
                       __clear_pte, mfn);
 }
 
-static int exchange_page(xc_interface *xch, xen_pfn_t mfn,
-                     xen_pfn_t *new_mfn, int domid)
-{
-    int rc;
-    xen_pfn_t out_mfn;
-
-	struct xen_memory_exchange exchange = {
-		.in = {
-			.nr_extents   = 1,
-			.extent_order = 0,
-			.domid        = domid
-		},
-		.out = {
-			.nr_extents   = 1,
-			.extent_order = 0,
-			.domid        = domid
-		}
-    };
-    set_xen_guest_handle(exchange.in.extent_start, &mfn);
-    set_xen_guest_handle(exchange.out.extent_start, &out_mfn);
-
-    rc = xc_memory_op(xch, XENMEM_exchange, &exchange);
-
-    if (!rc)
-        *new_mfn = out_mfn;
-
-    return rc;
-}
-
 /*
  * Check if a page can be exchanged successfully
  */
@@ -704,7 +675,9 @@ int xc_exchange_page(xc_interface *xch, int domid, xen_pfn_t mfn)
         goto failed;
     }
 
-    rc = exchange_page(xch, mfn, &new_mfn, domid);
+    rc = xc_domain_memory_exchange_pages(xch, domid,
+					 1, 0, &mfn,
+					 1, 0, &new_mfn);
 
     if (rc)
     {

@@ -728,6 +728,37 @@ int xc_domain_populate_physmap_exact(xc_interface *xch,
     return err;
 }
 
+int xc_domain_memory_exchange_pages(xc_interface *xch,
+                                    int domid,
+                                    unsigned long nr_in_extents,
+                                    unsigned int in_order,
+                                    xen_pfn_t *in_extents,
+                                    unsigned long nr_out_extents,
+                                    unsigned int out_order,
+                                    xen_pfn_t *out_extents)
+{
+    int rc;
+
+    struct xen_memory_exchange exchange = {
+        .in = {
+            .nr_extents   = nr_in_extents,
+            .extent_order = in_order,
+            .domid        = domid
+        },
+        .out = {
+            .nr_extents   = nr_out_extents,
+            .extent_order = out_order,
+            .domid        = domid
+        }
+    };
+    set_xen_guest_handle(exchange.in.extent_start, in_extents);
+    set_xen_guest_handle(exchange.out.extent_start, out_extents);
+
+    rc = xc_memory_op(xch, XENMEM_exchange, &exchange);
+
+    return rc;
+}
+
 static int xc_domain_pod_target(xc_interface *xch,
                                 int op,
                                 uint32_t domid,

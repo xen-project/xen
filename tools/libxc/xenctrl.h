@@ -829,6 +829,15 @@ int xc_domain_populate_physmap_exact(xc_interface *xch,
 #define xc_domain_memory_populate_physmap(x, d, nr, eo, mf, es) \
     xc_domain_populate_physmap_exact(x, d, nr, eo, mf, es)
 
+int xc_domain_memory_exchange_pages(xc_interface *xch,
+                                    int domid,
+                                    unsigned long nr_in_extents,
+                                    unsigned int in_order,
+                                    xen_pfn_t *in_extents,
+                                    unsigned long nr_out_extents,
+                                    unsigned int out_order,
+                                    xen_pfn_t *out_extents);
+
 int xc_domain_set_pod_target(xc_interface *xch,
                              uint32_t domid,
                              uint64_t target_pages,
