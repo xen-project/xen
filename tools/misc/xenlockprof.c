@@ -60,8 +60,7 @@ int main(int argc, char *argv[])
 
     if ( argc > 1 )
     {
-        if ( xc_lockprof_control(xc_handle, XEN_SYSCTL_LOCKPROF_reset, NULL,
-                                 NULL, NULL) != 0 )
+        if ( xc_lockprof_reset(xc_handle) != 0 )
         {
             fprintf(stderr, "Error reseting profile data: %d (%s)\n",
                     errno, strerror(errno));
@@ -71,8 +70,7 @@ int main(int argc, char *argv[])
     }
 
     n = 0;
-    if ( xc_lockprof_control(xc_handle, XEN_SYSCTL_LOCKPROF_query, &n,
-                             NULL, NULL) != 0 )
+    if ( xc_lockprof_query_number(xc_handle, &n) != 0 )
     {
         fprintf(stderr, "Error getting number of profile records: %d (%s)\n",
                 errno, strerror(errno));
@@ -89,8 +87,7 @@ int main(int argc, char *argv[])
     }
 
     i = n;
-    if ( xc_lockprof_control(xc_handle, XEN_SYSCTL_LOCKPROF_query, &i,
-                             &time, data) != 0 )
+    if ( xc_lockprof_query(xc_handle, &i, &time, data) != 0 )
     {
         fprintf(stderr, "Error getting profile records: %d (%s)\n",
                 errno, strerror(errno));

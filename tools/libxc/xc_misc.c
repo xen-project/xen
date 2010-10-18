@@ -215,8 +215,35 @@ int xc_perfc_query(xc_interface *xch,
     return do_sysctl(xch, &sysctl);
 }
 
-int xc_lockprof_control(xc_interface *xch,
-                        uint32_t opcode,
+int xc_lockprof_reset(xc_interface *xch)
+{
+    DECLARE_SYSCTL;
+
+    sysctl.cmd = XEN_SYSCTL_lockprof_op;
+    sysctl.u.lockprof_op.cmd = XEN_SYSCTL_LOCKPROF_reset;
+    set_xen_guest_handle(sysctl.u.lockprof_op.data, NULL);
+
+    return do_sysctl(xch, &sysctl);
+}
+
+int xc_lockprof_query_number(xc_interface *xch,
+                             uint32_t *n_elems)
+{
+    int rc;
+    DECLARE_SYSCTL;
+
+    sysctl.cmd = XEN_SYSCTL_lockprof_op;
+    sysctl.u.lockprof_op.cmd = XEN_SYSCTL_LOCKPROF_query;
+    set_xen_guest_handle(sysctl.u.lockprof_op.data, NULL);
+
+    rc = do_sysctl(xch, &sysctl);
+
+    *n_elems = sysctl.u.lockprof_op.nr_elem;
+
+    return rc;
+}
+
+int xc_lockprof_query(xc_interface *xch,
                         uint32_t *n_elems,
                         uint64_t *time,
                         xc_lockprof_data_t *data)
@@ -225,16 +252,13 @@ int xc_lockprof_control(xc_interface *xch,
     DECLARE_SYSCTL;
 
     sysctl.cmd = XEN_SYSCTL_lockprof_op;
-    sysctl.u.lockprof_op.cmd = opcode;
-    sysctl.u.lockprof_op.max_elem = n_elems ? *n_elems : 0;
+    sysctl.u.lockprof_op.cmd = XEN_SYSCTL_LOCKPROF_query;
+    sysctl.u.lockprof_op.max_elem = *n_elems;
     set_xen_guest_handle(sysctl.u.lockprof_op.data, data);
 
     rc = do_sysctl(xch, &sysctl);
 
-    if (n_elems)
-        *n_elems = sysctl.u.lockprof_op.nr_elem;
-    if (time)
-        *time = sysctl.u.lockprof_op.time;
+    *n_elems = sysctl.u.lockprof_op.nr_elem;
 
     return rc;
 }

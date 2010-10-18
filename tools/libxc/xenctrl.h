@@ -898,12 +898,14 @@ int xc_perfc_query(xc_interface *xch,
                    xc_perfc_val_t *val);
 
 typedef xen_sysctl_lockprof_data_t xc_lockprof_data_t;
+int xc_lockprof_reset(xc_interface *xch);
+int xc_lockprof_query_number(xc_interface *xch,
+                             uint32_t *n_elems);
 /* IMPORTANT: The caller is responsible for mlock()'ing the @data array. */
-int xc_lockprof_control(xc_interface *xch,
-                        uint32_t opcode,
-                        uint32_t *n_elems,
-                        uint64_t *time,
-                        xc_lockprof_data_t *data);
+int xc_lockprof_query(xc_interface *xch,
+                      uint32_t *n_elems,
+                      uint64_t *time,
+                      xc_lockprof_data_t *data);
 
 /**
  * Memory maps a range within one domain to a local address range.  Mappings
