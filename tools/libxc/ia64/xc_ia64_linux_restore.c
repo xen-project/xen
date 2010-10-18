@@ -246,12 +246,6 @@ xc_ia64_pv_recv_vcpu_context(xc_interface *xch, int io_fd, int32_t dom,
     vcpu_guest_context_any_t ctxt_any;
     vcpu_guest_context_t *ctxt = &ctxt_any.c;
 
-    if (lock_pages(&ctxt_any, sizeof(ctxt_any))) {
-        /* needed for build domctl, but might as well do early */
-        ERROR("Unable to lock_pages ctxt");
-        return -1;
-    }
-
     if (xc_ia64_recv_vcpu_context(xch, io_fd, dom, vcpu, &ctxt_any))
         goto out;
 
@@ -264,7 +258,6 @@ xc_ia64_pv_recv_vcpu_context(xc_interface *xch, int io_fd, int32_t dom,
     rc = 0;
 
  out:
-    unlock_pages(&ctxt, sizeof(ctxt));
     return rc;
 }
 
