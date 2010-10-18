@@ -421,9 +421,7 @@ int xc_flush_mmu_updates(xc_interface *xch, struct xc_mmu *mmu)
     return flush_mmu_updates(xch, mmu);
 }
 
-int xc_memory_op(xc_interface *xch,
-                 int cmd,
-                 void *arg)
+int do_memory_op(xc_interface *xch, int cmd, void *arg, size_t len)
 {
     DECLARE_HYPERCALL;
     struct xen_memory_reservation *reservation = arg;
@@ -435,16 +433,17 @@ int xc_memory_op(xc_interface *xch,
     hypercall.arg[0] = (unsigned long)cmd;
     hypercall.arg[1] = (unsigned long)arg;
 
+    if ( len && lock_pages(xch, arg, len) != 0 )
+    {
+        PERROR("Could not lock memory for XENMEM hypercall");
+        goto out1;
+    }
+
     switch ( cmd )
     {
     case XENMEM_increase_reservation:
     case XENMEM_decrease_reservation:
     case XENMEM_populate_physmap:
-        if ( lock_pages(xch, reservation, sizeof(*reservation)) != 0 )
-        {
-            PERROR("Could not lock");
-            goto out1;
-        }
         get_xen_guest_handle(extent_start, reservation->extent_start);
         if ( (extent_start != NULL) &&
              (lock_pages(xch, extent_start,
@@ -456,11 +455,6 @@ int xc_memory_op(xc_interface *xch,
         }
         break;
     case XENMEM_machphys_mfn_list:
-        if ( lock_pages(xch, xmml, sizeof(*xmml)) != 0 )
-        {
-            PERROR("Could not lock");
-            goto out1;
-        }
         get_xen_guest_handle(extent_start, xmml->extent_start);
         if ( lock_pages(xch, extent_start,
                    xmml->max_extents * sizeof(xen_pfn_t)) != 0 )
@@ -471,61 +465,40 @@ int xc_memory_op(xc_interface *xch,
         }
         break;
     case XENMEM_add_to_physmap:
-        if ( lock_pages(xch, arg, sizeof(struct xen_add_to_physmap)) )
-        {
-            PERROR("Could not lock");
-            goto out1;
-        }
-        break;
     case XENMEM_current_reservation:
     case XENMEM_maximum_reservation:
     case XENMEM_maximum_gpfn:
-        if ( lock_pages(xch, arg, sizeof(domid_t)) )
-        {
-            PERROR("Could not lock");
-            goto out1;
-        }
-        break;
     case XENMEM_set_pod_target:
     case XENMEM_get_pod_target:
-        if ( lock_pages(xch, arg, sizeof(struct xen_pod_target)) )
-        {
-            PERROR("Could not lock");
-            goto out1;
-        }
         break;
     }
 
     ret = do_xen_hypercall(xch, &hypercall);
+
+    if ( len )
+        unlock_pages(xch, arg, len);
 
     switch ( cmd )
     {
     case XENMEM_increase_reservation:
     case XENMEM_decrease_reservation:
     case XENMEM_populate_physmap:
-        unlock_pages(xch, reservation, sizeof(*reservation));
         get_xen_guest_handle(extent_start, reservation->extent_start);
         if ( extent_start != NULL )
             unlock_pages(xch, extent_start,
                          reservation->nr_extents * sizeof(xen_pfn_t));
         break;
     case XENMEM_machphys_mfn_list:
-        unlock_pages(xch, xmml, sizeof(*xmml));
         get_xen_guest_handle(extent_start, xmml->extent_start);
         unlock_pages(xch, extent_start,
                      xmml->max_extents * sizeof(xen_pfn_t));
         break;
     case XENMEM_add_to_physmap:
-        unlock_pages(xch, arg, sizeof(struct xen_add_to_physmap));
-        break;
     case XENMEM_current_reservation:
     case XENMEM_maximum_reservation:
     case XENMEM_maximum_gpfn:
-        unlock_pages(xch, arg, sizeof(domid_t));
-        break;
     case XENMEM_set_pod_target:
     case XENMEM_get_pod_target:
-        unlock_pages(xch, arg, sizeof(struct xen_pod_target));
         break;
     }
 
@@ -535,7 +508,7 @@ int xc_memory_op(xc_interface *xch,
 
 long xc_maximum_ram_page(xc_interface *xch)
 {
-    return xc_memory_op(xch, XENMEM_maximum_ram_page, NULL);
+    return do_memory_op(xch, XENMEM_maximum_ram_page, NULL, 0);
 }
 
 long long xc_domain_get_cpu_usage( xc_interface *xch, domid_t domid, int vcpu )
@@ -562,7 +535,7 @@ int xc_machphys_mfn_list(xc_interface *xch,
         .max_extents = max_extents,
     };
     set_xen_guest_handle(xmml.extent_start, extent_start);
-    rc = xc_memory_op(xch, XENMEM_machphys_mfn_list, &xmml);
+    rc = do_memory_op(xch, XENMEM_machphys_mfn_list, &xmml, sizeof(xmml));
     if (rc || xmml.nr_extents != max_extents)
         return -1;
     return 0;

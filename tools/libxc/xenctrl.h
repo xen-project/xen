@@ -981,9 +981,6 @@ int xc_mmuext_op(xc_interface *xch, struct mmuext_op *op, unsigned int nr_ops,
 /* System wide memory properties */
 long xc_maximum_ram_page(xc_interface *xch);
 
-int xc_memory_op(xc_interface *xch, int cmd, void *arg);
-
-
 /* Get current total pages allocated to a domain. */
 long xc_get_tot_pages(xc_interface *xch, uint32_t domid);
 

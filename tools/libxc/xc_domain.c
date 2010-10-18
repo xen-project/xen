@@ -488,17 +488,16 @@ int xc_domain_set_memmap_limit(xc_interface *xch,
 
     set_xen_guest_handle(fmap.map.buffer, &e820);
 
-    if ( lock_pages(xch, &fmap, sizeof(fmap)) || lock_pages(xch, &e820, sizeof(e820)) )
+    if ( lock_pages(xch, &e820, sizeof(e820)) )
     {
         PERROR("Could not lock memory for Xen hypercall");
         rc = -1;
         goto out;
     }
 
-    rc = xc_memory_op(xch, XENMEM_set_memory_map, &fmap);
+    rc = do_memory_op(xch, XENMEM_set_memory_map, &fmap, sizeof(fmap));
 
  out:
-    unlock_pages(xch, &fmap, sizeof(fmap));
     unlock_pages(xch, &e820, sizeof(e820));
     return rc;
 }
@@ -581,7 +580,7 @@ int xc_domain_get_tsc_info(xc_interface *xch,
 
 int xc_domain_maximum_gpfn(xc_interface *xch, domid_t domid)
 {
-    return xc_memory_op(xch, XENMEM_maximum_gpfn, &domid);
+    return do_memory_op(xch, XENMEM_maximum_gpfn, &domid, sizeof(domid));
 }
 
 int xc_domain_increase_reservation(xc_interface *xch,
@@ -602,7 +601,7 @@ int xc_domain_increase_reservation(xc_interface *xch,
     /* may be NULL */
     set_xen_guest_handle(reservation.extent_start, extent_start);
 
-    err = xc_memory_op(xch, XENMEM_increase_reservation, &reservation);
+    err = do_memory_op(xch, XENMEM_increase_reservation, &reservation, sizeof(reservation));
 
     return err;
 }
@@ -657,7 +656,7 @@ int xc_domain_decrease_reservation(xc_interface *xch,
         return -1;
     }
 
-    err = xc_memory_op(xch, XENMEM_decrease_reservation, &reservation);
+    err = do_memory_op(xch, XENMEM_decrease_reservation, &reservation, sizeof(reservation));
 
     return err;
 }
@@ -699,7 +698,7 @@ int xc_domain_add_to_physmap(xc_interface *xch,
         .idx = idx,
         .gpfn = gpfn,
     };
-    return xc_memory_op(xch, XENMEM_add_to_physmap, &xatp);
+    return do_memory_op(xch, XENMEM_add_to_physmap, &xatp, sizeof(xatp));
 }
 
 int xc_domain_populate_physmap(xc_interface *xch,
@@ -718,7 +717,7 @@ int xc_domain_populate_physmap(xc_interface *xch,
     };
     set_xen_guest_handle(reservation.extent_start, extent_start);
 
-    err = xc_memory_op(xch, XENMEM_populate_physmap, &reservation);
+    err = do_memory_op(xch, XENMEM_populate_physmap, &reservation, sizeof(reservation));
 
     return err;
 }
@@ -774,7 +773,7 @@ int xc_domain_memory_exchange_pages(xc_interface *xch,
     set_xen_guest_handle(exchange.in.extent_start, in_extents);
     set_xen_guest_handle(exchange.out.extent_start, out_extents);
 
-    rc = xc_memory_op(xch, XENMEM_exchange, &exchange);
+    rc = do_memory_op(xch, XENMEM_exchange, &exchange, sizeof(exchange));
 
     return rc;
 }
@@ -794,7 +793,7 @@ static int xc_domain_pod_target(xc_interface *xch,
         .target_pages = target_pages
     };
 
-    err = xc_memory_op(xch, op, &pod_target);
+    err = do_memory_op(xch, op, &pod_target, sizeof(pod_target));
 
     if ( err < 0 )
     {

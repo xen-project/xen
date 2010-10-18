@@ -206,6 +206,8 @@ static inline int do_sysctl(xc_interface *xch, struct xen_sysctl *sysctl)
     return ret;
 }
 
+int do_memory_op(xc_interface *xch, int cmd, void *arg, size_t len);
+
 int xc_interface_open_core(xc_interface *xch); /* returns fd, logs errors */
 int xc_interface_close_core(xc_interface *xch, int fd); /* no logging */
 
