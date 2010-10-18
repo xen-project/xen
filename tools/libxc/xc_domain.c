@@ -599,9 +599,18 @@ int xc_domain_increase_reservation(xc_interface *xch,
     };
 
     /* may be NULL */
+    if ( extent_start && lock_pages(xch, extent_start, nr_extents * sizeof(xen_pfn_t)) != 0 )
+    {
+        PERROR("Could not lock memory for XENMEM_increase_reservation hypercall");
+        return -1;
+    }
+
     set_xen_guest_handle(reservation.extent_start, extent_start);
 
     err = do_memory_op(xch, XENMEM_increase_reservation, &reservation, sizeof(reservation));
+
+    if ( extent_start )
+        unlock_pages(xch, extent_start, nr_extents * sizeof(xen_pfn_t));
 
     return err;
 }
@@ -647,7 +656,11 @@ int xc_domain_decrease_reservation(xc_interface *xch,
         .domid        = domid
     };
 
-    set_xen_guest_handle(reservation.extent_start, extent_start);
+    if ( lock_pages(xch, extent_start, nr_extents * sizeof(xen_pfn_t)) != 0 )
+    {
+        PERROR("Could not lock memory for XENMEM_decrease_reservation hypercall");
+        return -1;
+    }
 
     if ( extent_start == NULL )
     {
@@ -656,7 +669,11 @@ int xc_domain_decrease_reservation(xc_interface *xch,
         return -1;
     }
 
+    set_xen_guest_handle(reservation.extent_start, extent_start);
+
     err = do_memory_op(xch, XENMEM_decrease_reservation, &reservation, sizeof(reservation));
+
+    unlock_pages(xch, extent_start, nr_extents * sizeof(xen_pfn_t));
 
     return err;
 }
@@ -715,9 +732,18 @@ int xc_domain_populate_physmap(xc_interface *xch,
         .mem_flags    = mem_flags,
         .domid        = domid
     };
+
+    if ( lock_pages(xch, extent_start, nr_extents * sizeof(xen_pfn_t)) != 0 )
+    {
+        PERROR("Could not lock memory for XENMEM_populate_physmap hypercall");
+        return -1;
+    }
+
     set_xen_guest_handle(reservation.extent_start, extent_start);
 
     err = do_memory_op(xch, XENMEM_populate_physmap, &reservation, sizeof(reservation));
+
+    unlock_pages(xch, extent_start, nr_extents * sizeof(xen_pfn_t));
 
     return err;
 }
