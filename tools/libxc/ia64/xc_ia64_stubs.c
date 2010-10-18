@@ -66,16 +66,6 @@ xc_get_pfn_list(xc_interface *xch, uint32_t domid, uint64_t *pfn_buf,
                                 0, max_pfns);
 }
 
-long
-xc_get_max_pages(xc_interface *xch, uint32_t domid)
-{
-    struct xen_domctl domctl;
-    domctl.cmd = XEN_DOMCTL_getdomaininfo;
-    domctl.domain = (domid_t)domid;
-    return ((do_domctl(xch, &domctl) < 0)
-            ? -1 : domctl.u.getdomaininfo.max_pages);
-}
-
 /* It is possible to get memmap_info and memmap by
    foreign domain page mapping. But it's racy. Use hypercall to avoid race. */
 static int

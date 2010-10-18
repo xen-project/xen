@@ -1078,13 +1078,6 @@ xc_hvm_build(xc_interface *xch, uint32_t domid, int memsize, const char *image_n
     vcpu_guest_context_t *ctxt = &st_ctxt_any.c;
     char *image = NULL;
     unsigned long image_size;
-    unsigned long nr_pages;
-
-    nr_pages = xc_get_max_pages(xch, domid);
-    if (nr_pages < 0) {
-        PERROR("Could not find total pages for domain");
-        goto error_out;
-    }
 
     image = xc_read_image(xch, image_name, &image_size);
     if (image == NULL) {
