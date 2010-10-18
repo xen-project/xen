@@ -167,20 +167,29 @@ int xc_mca_op(xc_interface *xch, struct xen_mc *mc)
 }
 #endif
 
-int xc_perfc_control(xc_interface *xch,
-                     uint32_t opcode,
-                     xc_perfc_desc_t *desc,
-                     xc_perfc_val_t *val,
-                     int *nbr_desc,
-                     int *nbr_val)
+int xc_perfc_reset(xc_interface *xch)
+{
+    DECLARE_SYSCTL;
+
+    sysctl.cmd = XEN_SYSCTL_perfc_op;
+    sysctl.u.perfc_op.cmd = XEN_SYSCTL_PERFCOP_reset;
+    set_xen_guest_handle(sysctl.u.perfc_op.desc, NULL);
+    set_xen_guest_handle(sysctl.u.perfc_op.val, NULL);
+
+    return do_sysctl(xch, &sysctl);
+}
+
+int xc_perfc_query_number(xc_interface *xch,
+                          int *nbr_desc,
+                          int *nbr_val)
 {
     int rc;
     DECLARE_SYSCTL;
 
     sysctl.cmd = XEN_SYSCTL_perfc_op;
-    sysctl.u.perfc_op.cmd = opcode;
-    set_xen_guest_handle(sysctl.u.perfc_op.desc, desc);
-    set_xen_guest_handle(sysctl.u.perfc_op.val, val);
+    sysctl.u.perfc_op.cmd = XEN_SYSCTL_PERFCOP_query;
+    set_xen_guest_handle(sysctl.u.perfc_op.desc, NULL);
+    set_xen_guest_handle(sysctl.u.perfc_op.val, NULL);
 
     rc = do_sysctl(xch, &sysctl);
 
@@ -190,6 +199,20 @@ int xc_perfc_control(xc_interface *xch,
         *nbr_val = sysctl.u.perfc_op.nr_vals;
 
     return rc;
+}
+
+int xc_perfc_query(xc_interface *xch,
+                   xc_perfc_desc_t *desc,
+                   xc_perfc_val_t *val)
+{
+    DECLARE_SYSCTL;
+
+    sysctl.cmd = XEN_SYSCTL_perfc_op;
+    sysctl.u.perfc_op.cmd = XEN_SYSCTL_PERFCOP_query;
+    set_xen_guest_handle(sysctl.u.perfc_op.desc, desc);
+    set_xen_guest_handle(sysctl.u.perfc_op.val, val);
+
+    return do_sysctl(xch, &sysctl);
 }
 
 int xc_lockprof_control(xc_interface *xch,

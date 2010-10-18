@@ -887,14 +887,15 @@ unsigned long xc_make_page_below_4G(xc_interface *xch, uint32_t domid,
 
 typedef xen_sysctl_perfc_desc_t xc_perfc_desc_t;
 typedef xen_sysctl_perfc_val_t xc_perfc_val_t;
+int xc_perfc_reset(xc_interface *xch);
+int xc_perfc_query_number(xc_interface *xch,
+                          int *nbr_desc,
+                          int *nbr_val);
 /* IMPORTANT: The caller is responsible for mlock()'ing the @desc and @val
    arrays. */
-int xc_perfc_control(xc_interface *xch,
-                     uint32_t op,
-                     xc_perfc_desc_t *desc,
-                     xc_perfc_val_t *val,
-                     int *nbr_desc,
-                     int *nbr_val);
+int xc_perfc_query(xc_interface *xch,
+                   xc_perfc_desc_t *desc,
+                   xc_perfc_val_t *val);
 
 typedef xen_sysctl_lockprof_data_t xc_lockprof_data_t;
 /* IMPORTANT: The caller is responsible for mlock()'ing the @data array. */
