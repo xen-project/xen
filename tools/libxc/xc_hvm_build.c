@@ -203,7 +203,7 @@ static int setup_guest(xc_interface *xch,
      * Under 2MB mode, we allocate pages in batches of no more than 8MB to 
      * ensure that we can be preempted and hence dom0 remains responsive.
      */
-    rc = xc_domain_memory_populate_physmap(
+    rc = xc_domain_populate_physmap_exact(
         xch, dom, 0xa0, 0, 0, &page_array[0x00]);
     cur_pages = 0xc0;
     stat_normal_pages = 0xc0;
@@ -233,20 +233,16 @@ static int setup_guest(xc_interface *xch,
                               SUPERPAGE_1GB_NR_PFNS << PAGE_SHIFT) )
         {
             long done;
-            xen_pfn_t sp_extents[count >> SUPERPAGE_1GB_SHIFT];
-            struct xen_memory_reservation sp_req = {
-                .nr_extents   = count >> SUPERPAGE_1GB_SHIFT,
-                .extent_order = SUPERPAGE_1GB_SHIFT,
-                .domid        = dom
-            };
+            unsigned long nr_extents = count >> SUPERPAGE_1GB_SHIFT;
+            xen_pfn_t sp_extents[nr_extents];
 
-            if ( pod_mode )
-                sp_req.mem_flags = XENMEMF_populate_on_demand;
-
-            set_xen_guest_handle(sp_req.extent_start, sp_extents);
-            for ( i = 0; i < sp_req.nr_extents; i++ )
+            for ( i = 0; i < nr_extents; i++ )
                 sp_extents[i] = page_array[cur_pages+(i<<SUPERPAGE_1GB_SHIFT)];
-            done = xc_memory_op(xch, XENMEM_populate_physmap, &sp_req);
+
+            done = xc_domain_populate_physmap(xch, dom, nr_extents, SUPERPAGE_1GB_SHIFT,
+                                              pod_mode ? XENMEMF_populate_on_demand : 0,
+                                              sp_extents);
+
             if ( done > 0 )
             {
                 stat_1gb_pages += done;
@@ -275,20 +271,16 @@ static int setup_guest(xc_interface *xch,
             if ( ((count | cur_pages) & (SUPERPAGE_2MB_NR_PFNS - 1)) == 0 )
             {
                 long done;
-                xen_pfn_t sp_extents[count >> SUPERPAGE_2MB_SHIFT];
-                struct xen_memory_reservation sp_req = {
-                    .nr_extents   = count >> SUPERPAGE_2MB_SHIFT,
-                    .extent_order = SUPERPAGE_2MB_SHIFT,
-                    .domid        = dom
-                };
+                unsigned long nr_extents = count >> SUPERPAGE_2MB_SHIFT;
+                xen_pfn_t sp_extents[nr_extents];
 
-                if ( pod_mode )
-                    sp_req.mem_flags = XENMEMF_populate_on_demand;
-
-                set_xen_guest_handle(sp_req.extent_start, sp_extents);
-                for ( i = 0; i < sp_req.nr_extents; i++ )
+                for ( i = 0; i < nr_extents; i++ )
                     sp_extents[i] = page_array[cur_pages+(i<<SUPERPAGE_2MB_SHIFT)];
-                done = xc_memory_op(xch, XENMEM_populate_physmap, &sp_req);
+
+                done = xc_domain_populate_physmap(xch, dom, nr_extents, SUPERPAGE_2MB_SHIFT,
+                                                  pod_mode ? XENMEMF_populate_on_demand : 0,
+                                                  sp_extents);
+
                 if ( done > 0 )
                 {
                     stat_2mb_pages += done;
@@ -302,7 +294,7 @@ static int setup_guest(xc_interface *xch,
         /* Fall back to 4kB extents. */
         if ( count != 0 )
         {
-            rc = xc_domain_memory_populate_physmap(
+            rc = xc_domain_populate_physmap_exact(
                 xch, dom, count, 0, 0, &page_array[cur_pages]);
             cur_pages += count;
             stat_normal_pages += count;
@@ -313,10 +305,8 @@ static int setup_guest(xc_interface *xch,
      * adjust the PoD cache size so that domain tot_pages will be
      * target_pages - 0x20 after this call. */
     if ( pod_mode )
-        rc = xc_domain_memory_set_pod_target(xch,
-                                             dom,
-                                             target_pages - 0x20,
-                                             NULL, NULL, NULL);
+        rc = xc_domain_set_pod_target(xch, dom, target_pages - 0x20,
+                                      NULL, NULL, NULL);
 
     if ( rc != 0 )
     {
@@ -344,7 +334,7 @@ static int setup_guest(xc_interface *xch,
     for ( i = 0; i < NR_SPECIAL_PAGES; i++ )
     {
         xen_pfn_t pfn = special_pfn(i);
-        rc = xc_domain_memory_populate_physmap(xch, dom, 1, 0, 0, &pfn);
+        rc = xc_domain_populate_physmap_exact(xch, dom, 1, 0, 0, &pfn);
         if ( rc != 0 )
         {
             PERROR("Could not allocate %d'th special page.", i);

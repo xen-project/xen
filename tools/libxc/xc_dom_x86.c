@@ -733,7 +733,7 @@ int arch_setup_meminit(struct xc_dom_image *dom)
         DOMPRINTF("Populating memory with %d superpages", count);
         for ( pfn = 0; pfn < count; pfn++ )
             extents[pfn] = pfn << SUPERPAGE_PFN_SHIFT;
-        rc = xc_domain_memory_populate_physmap(dom->xch, dom->guest_domid,
+        rc = xc_domain_populate_physmap_exact(dom->xch, dom->guest_domid,
                                                count, SUPERPAGE_PFN_SHIFT, 0,
                                                extents);
         if ( rc )
@@ -762,7 +762,7 @@ int arch_setup_meminit(struct xc_dom_image *dom)
             allocsz = dom->total_pages - i;
             if ( allocsz > 1024*1024 )
                 allocsz = 1024*1024;
-            rc = xc_domain_memory_populate_physmap(
+            rc = xc_domain_populate_physmap_exact(
                 dom->xch, dom->guest_domid, allocsz,
                 0, 0, &dom->p2m_host[i]);
         }

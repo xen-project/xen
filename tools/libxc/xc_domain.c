@@ -579,12 +579,12 @@ int xc_domain_get_tsc_info(xc_interface *xch,
 }
 
 
-int xc_domain_memory_increase_reservation(xc_interface *xch,
-                                          uint32_t domid,
-                                          unsigned long nr_extents,
-                                          unsigned int extent_order,
-                                          unsigned int mem_flags,
-                                          xen_pfn_t *extent_start)
+int xc_domain_increase_reservation(xc_interface *xch,
+                                   uint32_t domid,
+                                   unsigned long nr_extents,
+                                   unsigned int extent_order,
+                                   unsigned int mem_flags,
+                                   xen_pfn_t *extent_start)
 {
     int err;
     struct xen_memory_reservation reservation = {
@@ -598,6 +598,22 @@ int xc_domain_memory_increase_reservation(xc_interface *xch,
     set_xen_guest_handle(reservation.extent_start, extent_start);
 
     err = xc_memory_op(xch, XENMEM_increase_reservation, &reservation);
+
+    return err;
+}
+
+int xc_domain_increase_reservation_exact(xc_interface *xch,
+                                         uint32_t domid,
+                                         unsigned long nr_extents,
+                                         unsigned int extent_order,
+                                         unsigned int mem_flags,
+                                         xen_pfn_t *extent_start)
+{
+    int err;
+
+    err = xc_domain_increase_reservation(xch, domid, nr_extents,
+                                         extent_order, mem_flags, extent_start);
+
     if ( err == nr_extents )
         return 0;
 
@@ -613,11 +629,11 @@ int xc_domain_memory_increase_reservation(xc_interface *xch,
     return err;
 }
 
-int xc_domain_memory_decrease_reservation(xc_interface *xch,
-                                          uint32_t domid,
-                                          unsigned long nr_extents,
-                                          unsigned int extent_order,
-                                          xen_pfn_t *extent_start)
+int xc_domain_decrease_reservation(xc_interface *xch,
+                                   uint32_t domid,
+                                   unsigned long nr_extents,
+                                   unsigned int extent_order,
+                                   xen_pfn_t *extent_start)
 {
     int err;
     struct xen_memory_reservation reservation = {
@@ -637,6 +653,21 @@ int xc_domain_memory_decrease_reservation(xc_interface *xch,
     }
 
     err = xc_memory_op(xch, XENMEM_decrease_reservation, &reservation);
+
+    return err;
+}
+
+int xc_domain_decrease_reservation_exact(xc_interface *xch,
+                                         uint32_t domid,
+                                         unsigned long nr_extents,
+                                         unsigned int extent_order,
+                                         xen_pfn_t *extent_start)
+{
+    int err;
+
+    err = xc_domain_decrease_reservation(xch, domid, nr_extents,
+                                         extent_order, extent_start);
+
     if ( err == nr_extents )
         return 0;
 
@@ -651,12 +682,12 @@ int xc_domain_memory_decrease_reservation(xc_interface *xch,
     return err;
 }
 
-int xc_domain_memory_populate_physmap(xc_interface *xch,
-                                      uint32_t domid,
-                                      unsigned long nr_extents,
-                                      unsigned int extent_order,
-                                      unsigned int mem_flags,
-                                      xen_pfn_t *extent_start)
+int xc_domain_populate_physmap(xc_interface *xch,
+                               uint32_t domid,
+                               unsigned long nr_extents,
+                               unsigned int extent_order,
+                               unsigned int mem_flags,
+                               xen_pfn_t *extent_start)
 {
     int err;
     struct xen_memory_reservation reservation = {
@@ -668,6 +699,21 @@ int xc_domain_memory_populate_physmap(xc_interface *xch,
     set_xen_guest_handle(reservation.extent_start, extent_start);
 
     err = xc_memory_op(xch, XENMEM_populate_physmap, &reservation);
+
+    return err;
+}
+
+int xc_domain_populate_physmap_exact(xc_interface *xch,
+                                     uint32_t domid,
+                                     unsigned long nr_extents,
+                                     unsigned int extent_order,
+                                     unsigned int mem_flags,
+                                     xen_pfn_t *extent_start)
+{
+    int err;
+
+    err = xc_domain_populate_physmap(xch, domid, nr_extents,
+                                     extent_order, mem_flags, extent_start);
     if ( err == nr_extents )
         return 0;
 
@@ -682,13 +728,13 @@ int xc_domain_memory_populate_physmap(xc_interface *xch,
     return err;
 }
 
-static int xc_domain_memory_pod_target(xc_interface *xch,
-                                       int op,
-                                       uint32_t domid,
-                                       uint64_t target_pages,
-                                       uint64_t *tot_pages,
-                                       uint64_t *pod_cache_pages,
-                                       uint64_t *pod_entries)
+static int xc_domain_pod_target(xc_interface *xch,
+                                int op,
+                                uint32_t domid,
+                                uint64_t target_pages,
+                                uint64_t *tot_pages,
+                                uint64_t *pod_cache_pages,
+                                uint64_t *pod_entries)
 {
     int err;
 
@@ -701,7 +747,7 @@ static int xc_domain_memory_pod_target(xc_interface *xch,
 
     if ( err < 0 )
     {
-        DPRINTF("Failed %s_memory_target dom %d\n",
+        DPRINTF("Failed %s_pod_target dom %d\n",
                 (op==XENMEM_set_pod_target)?"set":"get",
                 domid);
         errno = -err;
@@ -719,37 +765,37 @@ static int xc_domain_memory_pod_target(xc_interface *xch,
 
     return err;
 }
-                                       
 
-int xc_domain_memory_set_pod_target(xc_interface *xch,
-                                    uint32_t domid,
-                                    uint64_t target_pages,
-                                    uint64_t *tot_pages,
-                                    uint64_t *pod_cache_pages,
-                                    uint64_t *pod_entries)
+
+int xc_domain_set_pod_target(xc_interface *xch,
+                             uint32_t domid,
+                             uint64_t target_pages,
+                             uint64_t *tot_pages,
+                             uint64_t *pod_cache_pages,
+                             uint64_t *pod_entries)
 {
-    return xc_domain_memory_pod_target(xch,
-                                       XENMEM_set_pod_target,
-                                       domid,
-                                       target_pages,
-                                       tot_pages,
-                                       pod_cache_pages,
-                                       pod_entries);
+    return xc_domain_pod_target(xch,
+                                XENMEM_set_pod_target,
+                                domid,
+                                target_pages,
+                                tot_pages,
+                                pod_cache_pages,
+                                pod_entries);
 }
 
-int xc_domain_memory_get_pod_target(xc_interface *xch,
-                                    uint32_t domid,
-                                    uint64_t *tot_pages,
-                                    uint64_t *pod_cache_pages,
-                                    uint64_t *pod_entries)
+int xc_domain_get_pod_target(xc_interface *xch,
+                             uint32_t domid,
+                             uint64_t *tot_pages,
+                             uint64_t *pod_cache_pages,
+                             uint64_t *pod_entries)
 {
-    return xc_domain_memory_pod_target(xch,
-                                       XENMEM_get_pod_target,
-                                       domid,
-                                       -1,
-                                       tot_pages,
-                                       pod_cache_pages,
-                                       pod_entries);
+    return xc_domain_pod_target(xch,
+                                XENMEM_get_pod_target,
+                                domid,
+                                -1,
+                                tot_pages,
+                                pod_cache_pages,
+                                pod_entries);
 }
 
 int xc_domain_max_vcpus(xc_interface *xch, uint32_t domid, unsigned int max)

@@ -147,7 +147,7 @@ static int uncanonicalize_pagetable(
 
     /* Allocate the requisite number of mfns. */
     if ( nr_mfns &&
-         (xc_domain_memory_populate_physmap(xch, dom, nr_mfns, 0, 0,
+         (xc_domain_populate_physmap_exact(xch, dom, nr_mfns, 0, 0,
                                             ctx->p2m_batch) != 0) )
     { 
         ERROR("Failed to allocate memory for batch.!\n"); 
@@ -888,7 +888,7 @@ static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
 
     /* Now allocate a bunch of mfns for this batch */
     if ( nr_mfns &&
-         (xc_domain_memory_populate_physmap(xch, dom, nr_mfns, 0,
+         (xc_domain_populate_physmap_exact(xch, dom, nr_mfns, 0,
                                             0, ctx->p2m_batch) != 0) )
     { 
         ERROR("Failed to allocate memory for batch.!\n"); 
@@ -1529,15 +1529,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
 
         if ( nr_frees > 0 )
         {
-            struct xen_memory_reservation reservation = {
-                .nr_extents   = nr_frees,
-                .extent_order = 0,
-                .domid        = dom
-            };
-            set_xen_guest_handle(reservation.extent_start, tailbuf.u.pv.pfntab);
-
-            if ( (frc = xc_memory_op(xch, XENMEM_decrease_reservation,
-                                     &reservation)) != nr_frees )
+            if ( (frc = xc_domain_decrease_reservation(xch, dom, nr_frees, 0, tailbuf.u.pv.pfntab)) != nr_frees )
             {
                 PERROR("Could not decrease reservation : %d", frc);
                 goto out;

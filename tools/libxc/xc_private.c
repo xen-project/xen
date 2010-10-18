@@ -675,14 +675,14 @@ unsigned long xc_make_page_below_4G(
     xen_pfn_t old_mfn = mfn;
     xen_pfn_t new_mfn;
 
-    if ( xc_domain_memory_decrease_reservation(
+    if ( xc_domain_decrease_reservation_exact(
         xch, domid, 1, 0, &old_mfn) != 0 )
     {
         DPRINTF("xc_make_page_below_4G decrease failed. mfn=%lx\n",mfn);
         return 0;
     }
 
-    if ( xc_domain_memory_increase_reservation(
+    if ( xc_domain_increase_reservation_exact(
         xch, domid, 1, 0, XENMEMF_address_bits(32), &new_mfn) != 0 )
     {
         DPRINTF("xc_make_page_below_4G increase failed. mfn=%lx\n",mfn);

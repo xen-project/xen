@@ -49,7 +49,7 @@ populate_page_if_necessary(xc_interface *xch, uint32_t dom, unsigned long gmfn,
     if (xc_ia64_p2m_present(p2m_table, gmfn))
         return 0;
 
-    return xc_domain_memory_populate_physmap(xch, dom, 1, 0, 0, &gmfn);
+    return xc_domain_populate_physmap_exact(xch, dom, 1, 0, 0, &gmfn);
 }
 
 static int
@@ -112,7 +112,7 @@ xc_ia64_recv_unallocated_list(xc_interface *xch, int io_fd, uint32_t dom,
         }
     }
     if (nr_frees > 0) {
-        if (xc_domain_memory_decrease_reservation(xch, dom, nr_frees,
+        if (xc_domain_decrease_reservation_exact(xch, dom, nr_frees,
                                                   0, pfntab) < 0) {
             PERROR("Could not decrease reservation");
             goto out;
@@ -546,7 +546,7 @@ xc_ia64_hvm_domain_setup(xc_interface *xch, uint32_t dom)
     };
     unsigned long nr_pages = sizeof(pfn_list) / sizeof(pfn_list[0]);
 
-    rc = xc_domain_memory_populate_physmap(xch, dom, nr_pages,
+    rc = xc_domain_populate_physmap_exact(xch, dom, nr_pages,
                                            0, 0, &pfn_list[0]);
     if (rc != 0)
         PERROR("Could not allocate IO page or buffer io page.");

@@ -186,7 +186,7 @@ int arch_setup_meminit(struct xc_dom_image *dom)
         dom->p2m_host[pfn] = start + pfn;
 
     /* allocate guest memory */
-    rc = xc_domain_memory_populate_physmap(dom->xch, dom->guest_domid,
+    rc = xc_domain_populate_physmap_exact(dom->xch, dom->guest_domid,
                                            nbr, 0, 0,
                                            dom->p2m_host);
     return rc;

@@ -1635,8 +1635,8 @@ static PyObject *pyxc_domain_set_target_mem(XcObject *self, PyObject *args)
 
     mem_pages = mem_kb / 4; 
 
-    if (xc_domain_memory_set_pod_target(self->xc_handle, dom, mem_pages,
-                                        NULL, NULL, NULL) != 0)
+    if (xc_domain_set_pod_target(self->xc_handle, dom, mem_pages,
+				 NULL, NULL, NULL) != 0)
         return pyxc_error_to_exception(self->xc_handle);
     
     Py_INCREF(zero);

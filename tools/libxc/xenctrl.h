@@ -785,38 +785,62 @@ int xc_domain_get_tsc_info(xc_interface *xch,
 
 int xc_domain_disable_migrate(xc_interface *xch, uint32_t domid);
 
-int xc_domain_memory_increase_reservation(xc_interface *xch,
-                                          uint32_t domid,
-                                          unsigned long nr_extents,
-                                          unsigned int extent_order,
-                                          unsigned int mem_flags,
-                                          xen_pfn_t *extent_start);
+int xc_domain_increase_reservation(xc_interface *xch,
+                                   uint32_t domid,
+                                   unsigned long nr_extents,
+                                   unsigned int extent_order,
+                                   unsigned int mem_flags,
+                                   xen_pfn_t *extent_start);
 
-int xc_domain_memory_decrease_reservation(xc_interface *xch,
-                                          uint32_t domid,
-                                          unsigned long nr_extents,
-                                          unsigned int extent_order,
-                                          xen_pfn_t *extent_start);
+int xc_domain_increase_reservation_exact(xc_interface *xch,
+                                         uint32_t domid,
+                                         unsigned long nr_extents,
+                                         unsigned int extent_order,
+                                         unsigned int mem_flags,
+                                         xen_pfn_t *extent_start);
 
-int xc_domain_memory_populate_physmap(xc_interface *xch,
-                                      uint32_t domid,
-                                      unsigned long nr_extents,
-                                      unsigned int extent_order,
-                                      unsigned int mem_flags,
-                                      xen_pfn_t *extent_start);
+int xc_domain_decrease_reservation(xc_interface *xch,
+                                   uint32_t domid,
+                                   unsigned long nr_extents,
+                                   unsigned int extent_order,
+                                   xen_pfn_t *extent_start);
 
-int xc_domain_memory_set_pod_target(xc_interface *xch,
-                                    uint32_t domid,
-                                    uint64_t target_pages,
-                                    uint64_t *tot_pages,
-                                    uint64_t *pod_cache_pages,
-                                    uint64_t *pod_entries);
+int xc_domain_decrease_reservation_exact(xc_interface *xch,
+                                         uint32_t domid,
+                                         unsigned long nr_extents,
+                                         unsigned int extent_order,
+                                         xen_pfn_t *extent_start);
 
-int xc_domain_memory_get_pod_target(xc_interface *xch,
-                                    uint32_t domid,
-                                    uint64_t *tot_pages,
-                                    uint64_t *pod_cache_pages,
-                                    uint64_t *pod_entries);
+int xc_domain_populate_physmap(xc_interface *xch,
+                               uint32_t domid,
+                               unsigned long nr_extents,
+                               unsigned int extent_order,
+                               unsigned int mem_flags,
+                               xen_pfn_t *extent_start);
+
+int xc_domain_populate_physmap_exact(xc_interface *xch,
+                                     uint32_t domid,
+                                     unsigned long nr_extents,
+                                     unsigned int extent_order,
+                                     unsigned int mem_flags,
+                                     xen_pfn_t *extent_start);
+
+/* Temporary for compatibility */
+#define xc_domain_memory_populate_physmap(x, d, nr, eo, mf, es) \
+    xc_domain_populate_physmap_exact(x, d, nr, eo, mf, es)
+
+int xc_domain_set_pod_target(xc_interface *xch,
+                             uint32_t domid,
+                             uint64_t target_pages,
+                             uint64_t *tot_pages,
+                             uint64_t *pod_cache_pages,
+                             uint64_t *pod_entries);
+
+int xc_domain_get_pod_target(xc_interface *xch,
+                             uint32_t domid,
+                             uint64_t *tot_pages,
+                             uint64_t *pod_cache_pages,
+                             uint64_t *pod_entries);
 
 int xc_domain_ioport_permission(xc_interface *xch,
                                 uint32_t domid,

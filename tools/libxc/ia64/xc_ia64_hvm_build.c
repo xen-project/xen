@@ -903,7 +903,7 @@ xc_ia64_setup_shared_info(xc_interface *xch, uint32_t dom,
  * In this function, we will allocate memory and build P2M/M2P table for VTI
  * guest.  Frist, a pfn list will be initialized discontiguous, normal memory
  * begins with 0, GFW memory and other five pages at their place defined in
- * xen/include/public/arch-ia64.h xc_domain_memory_populate_physmap() called
+ * xen/include/public/arch-ia64.h xc_domain_populate_physmap_exact() called
  * five times, to set parameter 'extent_order' to different value, this is
  * convenient to allocate discontiguous memory with different size.
  */
@@ -966,7 +966,7 @@ setup_guest(xc_interface *xch, uint32_t dom, unsigned long memsize,
          pfn++)
         pfn_list[i++] = pfn;
 
-    rc = xc_domain_memory_populate_physmap(xch, dom, nr_pages, 0, 0,
+    rc = xc_domain_populate_physmap_exact(xch, dom, nr_pages, 0, 0,
                                            &pfn_list[0]);
     if (rc != 0) {
         PERROR("Could not allocate normal memory for Vti guest.");
@@ -979,7 +979,7 @@ setup_guest(xc_interface *xch, uint32_t dom, unsigned long memsize,
     for (i = 0; i < GFW_PAGES; i++) 
         pfn_list[i] = (GFW_START >> PAGE_SHIFT) + i;
 
-    rc = xc_domain_memory_populate_physmap(xch, dom, GFW_PAGES,
+    rc = xc_domain_populate_physmap_exact(xch, dom, GFW_PAGES,
                                            0, 0, &pfn_list[0]);
     if (rc != 0) {
         PERROR("Could not allocate GFW memory for Vti guest.");
@@ -995,7 +995,7 @@ setup_guest(xc_interface *xch, uint32_t dom, unsigned long memsize,
     pfn_list[nr_special_pages] = memmap_info_pfn;
     nr_special_pages++;
 
-    rc = xc_domain_memory_populate_physmap(xch, dom, nr_special_pages,
+    rc = xc_domain_populate_physmap_exact(xch, dom, nr_special_pages,
                                            0, 0, &pfn_list[0]);
     if (rc != 0) {
         PERROR("Could not allocate IO page or store page or buffer io page.");
