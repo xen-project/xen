@@ -143,7 +143,7 @@ EXPORT int tmh_copy_from_client(pfp_t *pfp,
 {
     unsigned long tmem_mfn, cli_mfn = 0;
     void *tmem_va;
-    pfp_t *cli_pfp;
+    pfp_t *cli_pfp = NULL;
     bool_t tmemc = cli_va != NULL; /* if true, cli_va is control-op buffer */
 
     ASSERT(pfp != NULL);
@@ -179,7 +179,7 @@ EXPORT int tmh_compress_from_client(tmem_cli_mfn_t cmfn,
     int ret = 0;
     unsigned char *dmem = this_cpu(dstmem);
     unsigned char *wmem = this_cpu(workmem);
-    pfp_t *cli_pfp;
+    pfp_t *cli_pfp = NULL;
     unsigned long cli_mfn = 0;
     bool_t tmemc = cli_va != NULL; /* if true, cli_va is control-op buffer */
 
@@ -206,7 +206,7 @@ EXPORT int tmh_copy_to_client(tmem_cli_mfn_t cmfn, pfp_t *pfp,
 {
     unsigned long tmem_mfn, cli_mfn = 0;
     void *tmem_va;
-    pfp_t *cli_pfp;
+    pfp_t *cli_pfp = NULL;
     bool_t tmemc = cli_va != NULL; /* if true, cli_va is control-op buffer */
 
     ASSERT(pfp != NULL);
@@ -233,7 +233,7 @@ EXPORT int tmh_decompress_to_client(tmem_cli_mfn_t cmfn, void *tmem_va,
                                     size_t size, void *cli_va)
 {
     unsigned long cli_mfn = 0;
-    pfp_t *cli_pfp;
+    pfp_t *cli_pfp = NULL;
     size_t out_len = PAGE_SIZE;
     bool_t tmemc = cli_va != NULL; /* if true, cli_va is control-op buffer */
     int ret;
@@ -258,7 +258,7 @@ EXPORT int tmh_copy_tze_to_client(tmem_cli_mfn_t cmfn, void *tmem_va,
 {
     void *cli_va;
     unsigned long cli_mfn;
-    pfp_t *cli_pfp;
+    pfp_t *cli_pfp = NULL;
 
     ASSERT(!(len & (sizeof(uint64_t)-1)));
     ASSERT(len <= PAGE_SIZE);
