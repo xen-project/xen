@@ -533,6 +533,10 @@ int xc_memory_op(xc_interface *xch,
     return ret;
 }
 
+long xc_maximum_ram_page(xc_interface *xch)
+{
+    return xc_memory_op(xch, XENMEM_maximum_ram_page, NULL);
+}
 
 long long xc_domain_get_cpu_usage( xc_interface *xch, domid_t domid, int vcpu )
 {

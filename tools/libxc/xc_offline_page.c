@@ -271,7 +271,7 @@ static int init_mem_info(xc_interface *xch, int domid,
 
     dinfo->p2m_size = minfo->p2m_size;
 
-    minfo->max_mfn = xc_memory_op(xch, XENMEM_maximum_ram_page, NULL);
+    minfo->max_mfn = xc_maximum_ram_page(xch);
     if ( !(minfo->m2p_table =
         xc_map_m2p(xch, minfo->max_mfn, PROT_READ, NULL)) )
     {
