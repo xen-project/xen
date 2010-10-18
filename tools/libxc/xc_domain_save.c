@@ -623,7 +623,6 @@ xen_pfn_t *xc_map_m2p(xc_interface *xch,
                                  int prot,
                                  unsigned long *mfn0)
 {
-    struct xen_machphys_mfn_list xmml;
     privcmd_mmap_entry_t *entries;
     unsigned long m2p_chunks, m2p_size;
     xen_pfn_t *m2p;
@@ -634,18 +633,14 @@ xen_pfn_t *xc_map_m2p(xc_interface *xch,
     m2p_size   = M2P_SIZE(max_mfn);
     m2p_chunks = M2P_CHUNKS(max_mfn);
 
-    xmml.max_extents = m2p_chunks;
-
     extent_start = calloc(m2p_chunks, sizeof(xen_pfn_t));
     if ( !extent_start )
     {
         ERROR("failed to allocate space for m2p mfns");
         goto err0;
     }
-    set_xen_guest_handle(xmml.extent_start, extent_start);
 
-    if ( xc_memory_op(xch, XENMEM_machphys_mfn_list, &xmml) ||
-         (xmml.nr_extents != m2p_chunks) )
+    if ( xc_machphys_mfn_list(xch, m2p_chunks, extent_start) )
     {
         PERROR("xc_get_m2p_mfns");
         goto err1;

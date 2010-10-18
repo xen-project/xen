@@ -549,6 +549,20 @@ long long xc_domain_get_cpu_usage( xc_interface *xch, domid_t domid, int vcpu )
     return domctl.u.getvcpuinfo.cpu_time;
 }
 
+int xc_machphys_mfn_list(xc_interface *xch,
+			 unsigned long max_extents,
+			 xen_pfn_t *extent_start)
+{
+    int rc;
+    struct xen_machphys_mfn_list xmml = {
+        .max_extents = max_extents,
+    };
+    set_xen_guest_handle(xmml.extent_start, extent_start);
+    rc = xc_memory_op(xch, XENMEM_machphys_mfn_list, &xmml);
+    if (rc || xmml.nr_extents != max_extents)
+        return -1;
+    return 0;
+}
 
 #ifndef __ia64__
 int xc_get_pfn_list(xc_interface *xch,

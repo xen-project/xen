@@ -753,6 +753,10 @@ int xc_numainfo(xc_interface *xch, xc_numainfo_t *info);
 int xc_sched_id(xc_interface *xch,
                 int *sched_id);
 
+int xc_machphys_mfn_list(xc_interface *xch,
+                         unsigned long max_extents,
+                         xen_pfn_t *extent_start);
+
 typedef xen_sysctl_cpuinfo_t xc_cpuinfo_t;
 int xc_getcpuinfo(xc_interface *xch, int max_cpus,
                   xc_cpuinfo_t *info, int *nr_cpus); 
