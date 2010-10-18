@@ -153,7 +153,7 @@ int xc_mca_op(xc_interface *xch, struct xen_mc *mc)
     DECLARE_HYPERCALL;
 
     mc->interface_version = XEN_MCA_INTERFACE_VERSION;
-    if ( lock_pages(xch, mc, sizeof(mc)) )
+    if ( lock_pages(xch, mc, sizeof(*mc)) )
     {
         PERROR("Could not lock xen_mc memory");
         return -EINVAL;
@@ -162,7 +162,7 @@ int xc_mca_op(xc_interface *xch, struct xen_mc *mc)
     hypercall.op = __HYPERVISOR_mca;
     hypercall.arg[0] = (unsigned long)mc;
     ret = do_xen_hypercall(xch, &hypercall);
-    unlock_pages(xch, mc, sizeof(mc));
+    unlock_pages(xch, mc, sizeof(*mc));
     return ret;
 }
 #endif
