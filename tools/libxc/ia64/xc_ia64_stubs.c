@@ -34,37 +34,6 @@ xc_ia64_fpsr_default(void)
     return FPSR_DEFAULT;
 }
 
-static int
-xc_ia64_get_pfn_list(xc_interface *xch, uint32_t domid, xen_pfn_t *pfn_buf,
-                     unsigned int start_page, unsigned int nr_pages)
-{
-    DECLARE_DOMCTL;
-    int ret;
-
-    domctl.cmd = XEN_DOMCTL_getmemlist;
-    domctl.domain = (domid_t)domid;
-    domctl.u.getmemlist.max_pfns = nr_pages;
-    domctl.u.getmemlist.start_pfn = start_page;
-    domctl.u.getmemlist.num_pfns = 0;
-    set_xen_guest_handle(domctl.u.getmemlist.buffer, pfn_buf);
-
-    if (lock_pages(pfn_buf, nr_pages * sizeof(xen_pfn_t)) != 0) {
-        PERROR("Could not lock pfn list buffer");
-        return -1;
-    }
-    ret = do_domctl(xch, &domctl);
-    unlock_pages(pfn_buf, nr_pages * sizeof(xen_pfn_t));
-
-    return ret < 0 ? -1 : nr_pages;
-}
-
-int
-xc_get_pfn_list(xc_interface *xch, uint32_t domid, uint64_t *pfn_buf,
-                unsigned long max_pfns)
-{
-    return xc_ia64_get_pfn_list(xch, domid, (xen_pfn_t *)pfn_buf,
-                                0, max_pfns);
-}
 
 /* It is possible to get memmap_info and memmap by
    foreign domain page mapping. But it's racy. Use hypercall to avoid race. */

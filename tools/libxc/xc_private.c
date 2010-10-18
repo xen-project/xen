@@ -492,7 +492,6 @@ int xc_machphys_mfn_list(xc_interface *xch,
     return rc;
 }
 
-#ifndef __ia64__
 int xc_get_pfn_list(xc_interface *xch,
                     uint32_t domid,
                     uint64_t *pfn_buf,
@@ -521,7 +520,6 @@ int xc_get_pfn_list(xc_interface *xch,
 
     return (ret < 0) ? -1 : domctl.u.getmemlist.num_pfns;
 }
-#endif
 
 long xc_get_tot_pages(xc_interface *xch, uint32_t domid)
 {
