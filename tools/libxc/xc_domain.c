@@ -682,6 +682,21 @@ int xc_domain_decrease_reservation_exact(xc_interface *xch,
     return err;
 }
 
+int xc_domain_add_to_physmap(xc_interface *xch,
+                             uint32_t domid,
+                             unsigned int space,
+                             unsigned long idx,
+                             xen_pfn_t gpfn)
+{
+    struct xen_add_to_physmap xatp = {
+        .domid = domid,
+        .space = space,
+        .idx = idx,
+        .gpfn = gpfn,
+    };
+    return xc_memory_op(xch, XENMEM_add_to_physmap, &xatp);
+}
+
 int xc_domain_populate_physmap(xc_interface *xch,
                                uint32_t domid,
                                unsigned long nr_extents,

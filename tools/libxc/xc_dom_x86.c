@@ -815,31 +815,26 @@ int arch_setup_bootlate(struct xc_dom_image *dom)
     else
     {
         /* paravirtualized guest with auto-translation */
-        struct xen_add_to_physmap xatp;
         int i;
 
         /* Map shared info frame into guest physmap. */
-        xatp.domid = dom->guest_domid;
-        xatp.space = XENMAPSPACE_shared_info;
-        xatp.idx = 0;
-        xatp.gpfn = dom->shared_info_pfn;
-        rc = xc_memory_op(dom->xch, XENMEM_add_to_physmap, &xatp);
+        rc = xc_domain_add_to_physmap(dom->xch, dom->guest_domid,
+                                      XENMAPSPACE_shared_info,
+                                      0, dom->shared_info_pfn);
         if ( rc != 0 )
         {
             xc_dom_panic(dom->xch, XC_INTERNAL_ERROR, "%s: mapping"
                          " shared_info failed (pfn=0x%" PRIpfn ", rc=%d)",
-                         __FUNCTION__, xatp.gpfn, rc);
+                         __FUNCTION__, dom->shared_info_pfn, rc);
             return rc;
         }
 
         /* Map grant table frames into guest physmap. */
         for ( i = 0; ; i++ )
         {
-            xatp.domid = dom->guest_domid;
-            xatp.space = XENMAPSPACE_grant_table;
-            xatp.idx = i;
-            xatp.gpfn = dom->total_pages + i;
-            rc = xc_memory_op(dom->xch, XENMEM_add_to_physmap, &xatp);
+            rc = xc_domain_add_to_physmap(dom->xch, dom->guest_domid,
+                                          XENMAPSPACE_grant_table,
+                                          i, dom->total_pages + i);
             if ( rc != 0 )
             {
                 if ( (i > 0) && (errno == EINVAL) )
@@ -849,7 +844,7 @@ int arch_setup_bootlate(struct xc_dom_image *dom)
                 }
                 xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
                              "%s: mapping grant tables failed " "(pfn=0x%"
-                             PRIpfn ", rc=%d)", __FUNCTION__, xatp.gpfn, rc);
+                             PRIpfn ", rc=%d)", __FUNCTION__, dom->total_pages + i, rc);
                 return rc;
             }
         }

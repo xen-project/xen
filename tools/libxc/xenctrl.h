@@ -811,6 +811,12 @@ int xc_domain_decrease_reservation_exact(xc_interface *xch,
                                          unsigned int extent_order,
                                          xen_pfn_t *extent_start);
 
+int xc_domain_add_to_physmap(xc_interface *xch,
+                             uint32_t domid,
+                             unsigned int space,
+                             unsigned long idx,
+                             xen_pfn_t gpfn);
+
 int xc_domain_populate_physmap(xc_interface *xch,
                                uint32_t domid,
                                unsigned long nr_extents,
