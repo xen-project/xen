@@ -44,7 +44,7 @@ int xc_flask_op(xc_interface *xch, flask_op_t *op)
     hypercall.op     = __HYPERVISOR_xsm_op;
     hypercall.arg[0] = (unsigned long)op;
 
-    if ( mlock(op, sizeof(*op)) != 0 )
+    if ( lock_pages(op, sizeof(*op)) != 0 )
     {
         PERROR("Could not lock memory for Xen hypercall");
         goto out;
@@ -56,7 +56,7 @@ int xc_flask_op(xc_interface *xch, flask_op_t *op)
             fprintf(stderr, "XSM operation failed!\n");
     }
 
-    safe_munlock(op, sizeof(*op));
+    unlock_pages(op, sizeof(*op));
 
  out:
     return ret;

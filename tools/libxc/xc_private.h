@@ -106,13 +106,6 @@ void unlock_pages(void *addr, size_t len);
 int hcall_buf_prep(void **addr, size_t len);
 void hcall_buf_release(void **addr, size_t len);
 
-static inline void safe_munlock(const void *addr, size_t len)
-{
-    int saved_errno = errno;
-    (void)munlock(addr, len);
-    errno = saved_errno;
-}
-
 int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall);
 
 static inline int do_xen_version(xc_interface *xch, int cmd, void *dest)

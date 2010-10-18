@@ -218,7 +218,9 @@ void unlock_pages(void *addr, size_t len)
     void *laddr = (void *)((unsigned long)addr & PAGE_MASK);
     size_t llen = (len + ((unsigned long)addr - (unsigned long)laddr) +
                    PAGE_SIZE - 1) & PAGE_MASK;
-    safe_munlock(laddr, llen);
+    int saved_errno = errno;
+    (void)munlock(laddr, llen);
+    errno = saved_errno;
 }
 
 static pthread_key_t hcall_buf_pkey;
