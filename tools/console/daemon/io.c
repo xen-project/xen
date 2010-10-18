@@ -887,7 +887,7 @@ static void handle_hv_logs(void)
 	if ((port = xc_evtchn_pending(xce_handle)) == -1)
 		return;
 
-	if (xc_readconsolering(xch, &bufptr, &size, 0, 1, &index) == 0 && size > 0) {
+	if (xc_readconsolering(xch, bufptr, &size, 0, 1, &index) == 0 && size > 0) {
 		int logret;
 		if (log_time_hv)
 			logret = write_with_timestamp(log_hv_fd, buffer, size,

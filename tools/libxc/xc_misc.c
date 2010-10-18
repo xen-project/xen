@@ -22,13 +22,12 @@
 #include <xen/hvm/hvm_op.h>
 
 int xc_readconsolering(xc_interface *xch,
-                       char **pbuffer,
+                       char *buffer,
                        unsigned int *pnr_chars,
                        int clear, int incremental, uint32_t *pindex)
 {
     int ret;
     DECLARE_SYSCTL;
-    char *buffer = *pbuffer;
     unsigned int nr_chars = *pnr_chars;
 
     sysctl.cmd = XEN_SYSCTL_readconsole;

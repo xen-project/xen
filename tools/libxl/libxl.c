@@ -3464,7 +3464,7 @@ int libxl_xen_console_read_line(libxl_ctx *ctx,
     int ret;
 
     memset(cr->buffer, 0, cr->size);
-    ret = xc_readconsolering(ctx->xch, &cr->buffer, &cr->count,
+    ret = xc_readconsolering(ctx->xch, cr->buffer, &cr->count,
                              cr->clear, cr->incremental, &cr->index);
     if (ret < 0) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "reading console ring buffer");

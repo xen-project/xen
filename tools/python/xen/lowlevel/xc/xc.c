@@ -1116,7 +1116,7 @@ static PyObject *pyxc_readconsolering(XcObject *self,
          !str )
         return NULL;
 
-    ret = xc_readconsolering(self->xc_handle, &str, &count, clear,
+    ret = xc_readconsolering(self->xc_handle, str, &count, clear,
                              incremental, &index);
     if ( ret < 0 )
         return pyxc_error_to_exception(self->xc_handle);
@@ -1133,7 +1133,7 @@ static PyObject *pyxc_readconsolering(XcObject *self,
 
         str = ptr + count;
         count = size - count;
-        ret = xc_readconsolering(self->xc_handle, &str, &count, clear,
+        ret = xc_readconsolering(self->xc_handle, str, &count, clear,
                                  1, &index);
         if ( ret < 0 )
             break;

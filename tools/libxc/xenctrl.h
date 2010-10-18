@@ -729,7 +729,7 @@ int xc_physdev_pci_access_modify(xc_interface *xch,
                                  int enable);
 
 int xc_readconsolering(xc_interface *xch,
-                       char **pbuffer,
+                       char *buffer,
                        unsigned int *pnr_chars,
                        int clear, int incremental, uint32_t *pindex);
 
