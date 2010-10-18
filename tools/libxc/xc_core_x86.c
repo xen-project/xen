@@ -42,7 +42,7 @@ xc_core_arch_gpfn_may_present(struct xc_core_arch_context *arch_ctxt,
 
 static int nr_gpfns(xc_interface *xch, domid_t domid)
 {
-    return xc_memory_op(xch, XENMEM_maximum_gpfn, &domid) + 1;
+    return xc_domain_maximum_gpfn(xch, domid) + 1;
 }
 
 int

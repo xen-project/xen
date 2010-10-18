@@ -114,7 +114,7 @@ xc_ia64_copy_memmap(xc_interface *xch, uint32_t domid, shared_info_t *live_shinf
 
     int ret;
 
-    gpfn_max_prev = xc_memory_op(xch, XENMEM_maximum_gpfn, &domid);
+    gpfn_max_prev = xc_domain_maximum_gpfn(xch, domid);
     if (gpfn_max_prev < 0)
         return -1;
 
@@ -143,7 +143,7 @@ xc_ia64_copy_memmap(xc_interface *xch, uint32_t domid, shared_info_t *live_shinf
         goto again;
     }
 
-    gpfn_max_post = xc_memory_op(xch, XENMEM_maximum_gpfn, &domid);
+    gpfn_max_post = xc_domain_maximum_gpfn(xch, domid);
     if (gpfn_max_prev < 0) {
         free(memmap_info);
         return -1;
@@ -190,7 +190,7 @@ xc_ia64_map_foreign_p2m(xc_interface *xch, uint32_t dom,
     int ret;
     int saved_errno;
 
-    gpfn_max = xc_memory_op(xch, XENMEM_maximum_gpfn, &dom);
+    gpfn_max = xc_domain_maximum_gpfn(xch, dom);
     if (gpfn_max < 0)
         return NULL;
     p2m_size =
