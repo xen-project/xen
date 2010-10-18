@@ -837,10 +837,6 @@ int xc_domain_populate_physmap_exact(xc_interface *xch,
                                      unsigned int mem_flags,
                                      xen_pfn_t *extent_start);
 
-/* Temporary for compatibility */
-#define xc_domain_memory_populate_physmap(x, d, nr, eo, mf, es) \
-    xc_domain_populate_physmap_exact(x, d, nr, eo, mf, es)
-
 int xc_domain_memory_exchange_pages(xc_interface *xch,
                                     int domid,
                                     unsigned long nr_in_extents,
