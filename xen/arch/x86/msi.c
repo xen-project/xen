@@ -549,14 +549,14 @@ static u64 read_pci_mem_bar(u8 bus, u8 slot, u8 func, u8 bir)
         return 0;
     if ( (addr & PCI_BASE_ADDRESS_MEM_TYPE_MASK) == PCI_BASE_ADDRESS_MEM_TYPE_64 )
     {
-        addr &= ~PCI_BASE_ADDRESS_MEM_MASK;
+        addr &= PCI_BASE_ADDRESS_MEM_MASK;
         if ( ++bir >= limit )
             return 0;
         return addr |
                ((u64)pci_conf_read32(bus, slot, func,
                                      PCI_BASE_ADDRESS_0 + bir * 4) << 32);
     }
-    return addr & ~PCI_BASE_ADDRESS_MEM_MASK;
+    return addr & PCI_BASE_ADDRESS_MEM_MASK;
 }
 
 /**
