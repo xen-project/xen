@@ -185,9 +185,9 @@ endif
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= f95d202ed6444dacb15fbea4dee185eb0e048d9a
-# Tue Sep 14 17:31:43 2010 +0100
-# ioemu: fix VNC altgr-insert behavior
+QEMU_TAG ?= 706bc8c588cbda284a9579cdb7e494ad5c9d6383
+# Mon Oct 18 17:24:50 2010 +0100
+# use xc_domain_add_to_physmap instead of open coding xc_memory_op
 
 # Optional components
 XENSTAT_XENTOP     ?= y
