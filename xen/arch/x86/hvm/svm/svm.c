@@ -904,8 +904,8 @@ struct hvm_function_table * __init start_svm(void)
 
     svm_function_table.hap_supported = cpu_has_svm_npt;
     svm_function_table.hap_capabilities = HVM_HAP_SUPERPAGE_2MB |
-        ((CONFIG_PAGING_LEVELS == 4) && (cpuid_edx(0x80000001) & 0x04000000)) ?
-            HVM_HAP_SUPERPAGE_1GB : 0;
+        (((CONFIG_PAGING_LEVELS == 4) && (cpuid_edx(0x80000001) & 0x04000000)) ?
+            HVM_HAP_SUPERPAGE_1GB : 0);
 
     return &svm_function_table;
 }
