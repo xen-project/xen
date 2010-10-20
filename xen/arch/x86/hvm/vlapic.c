@@ -312,8 +312,8 @@ static int vlapic_accept_irq(struct vcpu *v, uint32_t icr_low)
         break;
 
     case APIC_DM_STARTUP:
-        /* Nothing to do if the VCPU is not on its way down. */
-        if ( !test_bit(_VPF_down, &v->pause_flags) )
+        /* Nothing to do if the VCPU is already initialised. */
+        if ( v->is_initialised )
             break;
         rc = vlapic_schedule_init_sipi_tasklet(v, icr_low);
         break;
