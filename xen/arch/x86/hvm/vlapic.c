@@ -230,29 +230,29 @@ bool_t vlapic_match_dest(
 
 static void vlapic_init_sipi_action(unsigned long _vcpu)
 {
-    struct vcpu *v = (struct vcpu *)_vcpu;
-    struct domain *d = v->domain;
-    uint32_t icr = vcpu_vlapic(v)->init_sipi_tasklet_icr;
+    struct vcpu *origin = (struct vcpu *)_vcpu;
+    struct vcpu *target = vcpu_vlapic(origin)->init_sipi.target;
+    uint32_t icr = vcpu_vlapic(origin)->init_sipi.icr;
 
-    vcpu_pause(v);
+    vcpu_pause(target);
 
     switch ( icr & APIC_MODE_MASK )
     {
     case APIC_DM_INIT: {
         bool_t fpu_initialised;
-        domain_lock(d);
+        domain_lock(target->domain);
         /* Reset necessary VCPU state. This does not include FPU state. */
-        fpu_initialised = v->fpu_initialised;
-        vcpu_reset(v);
-        v->fpu_initialised = fpu_initialised;
-        vlapic_reset(vcpu_vlapic(v));
-        domain_unlock(d);
+        fpu_initialised = target->fpu_initialised;
+        vcpu_reset(target);
+        target->fpu_initialised = fpu_initialised;
+        vlapic_reset(vcpu_vlapic(target));
+        domain_unlock(target->domain);
         break;
     }
 
     case APIC_DM_STARTUP: {
         uint16_t reset_cs = (icr & 0xffu) << 8;
-        hvm_vcpu_reset_state(v, reset_cs, 0);
+        hvm_vcpu_reset_state(target, reset_cs, 0);
         break;
     }
 
@@ -260,13 +260,28 @@ static void vlapic_init_sipi_action(unsigned long _vcpu)
         BUG();
     }
 
-    vcpu_unpause(v);
+    vcpu_unpause(target);
+
+    vcpu_vlapic(origin)->init_sipi.target = NULL;
+    vcpu_unpause(origin);
 }
 
-static int vlapic_schedule_init_sipi_tasklet(struct vcpu *v, uint32_t icr)
+static int vlapic_schedule_init_sipi_tasklet(struct vcpu *target, uint32_t icr)
 {
-    vcpu_vlapic(v)->init_sipi_tasklet_icr = icr;
-    tasklet_schedule(&vcpu_vlapic(v)->init_sipi_tasklet);
+    struct vcpu *origin = current;
+
+    if ( vcpu_vlapic(origin)->init_sipi.target != NULL )
+    {
+        WARN(); /* should be impossible but don't BUG, just in case */
+        return X86EMUL_UNHANDLEABLE;
+    }
+
+    vcpu_pause_nosync(origin);
+
+    vcpu_vlapic(origin)->init_sipi.target = target;
+    vcpu_vlapic(origin)->init_sipi.icr = icr;
+    tasklet_schedule(&vcpu_vlapic(origin)->init_sipi.tasklet);
+
     return X86EMUL_RETRY;
 }
 
@@ -990,7 +1005,7 @@ int vlapic_init(struct vcpu *v)
     if ( v->vcpu_id == 0 )
         vlapic->hw.apic_base_msr |= MSR_IA32_APICBASE_BSP;
 
-    tasklet_init(&vlapic->init_sipi_tasklet,
+    tasklet_init(&vlapic->init_sipi.tasklet,
                  vlapic_init_sipi_action,
                  (unsigned long)v);
 
@@ -1001,7 +1016,7 @@ void vlapic_destroy(struct vcpu *v)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
 
-    tasklet_kill(&vlapic->init_sipi_tasklet);
+    tasklet_kill(&vlapic->init_sipi.tasklet);
     destroy_periodic_time(&vlapic->pt);
     unmap_domain_page_global(vlapic->regs);
     free_domheap_page(vlapic->regs_page);
