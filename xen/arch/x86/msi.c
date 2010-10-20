@@ -527,7 +527,7 @@ static u64 read_pci_mem_bar(u8 bus, u8 slot, u8 func, u8 bir)
     u8 limit;
     u32 addr;
 
-    switch ( pci_conf_read8(bus, slot, func, PCI_HEADER_TYPE) )
+    switch ( pci_conf_read8(bus, slot, func, PCI_HEADER_TYPE) & 0x7f )
     {
     case PCI_HEADER_TYPE_NORMAL:
         limit = 6;
