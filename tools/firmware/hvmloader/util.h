@@ -35,6 +35,16 @@ static inline int test_bit(unsigned int b, void *p)
     return !!(((uint8_t *)p)[b>>3] & (1u<<(b&7)));
 }
 
+static inline int test_and_clear_bit(int nr, volatile void *addr)
+{
+    int oldbit;
+    asm volatile (
+        "lock ; btrl %2,%1 ; sbbl %0,%0"
+        : "=r" (oldbit), "=m" (*(volatile long *)addr)
+        : "Ir" (nr), "m" (*(volatile long *)addr) : "memory");
+    return oldbit;
+}
+
 /* MSR access */
 void wrmsr(uint32_t idx, uint64_t v);
 uint64_t rdmsr(uint32_t idx);

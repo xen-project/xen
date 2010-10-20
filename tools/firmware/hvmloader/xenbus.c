@@ -25,9 +25,9 @@
 #include <xen/hvm/params.h>
 #include <xen/io/xs_wire.h>
 
-struct xenstore_domain_interface *rings; /* Shared ring with dom0 */
-evtchn_port_t event;                     /* Event-channel to dom0 */
-char payload[XENSTORE_PAYLOAD_MAX + 1];  /* Unmarshalling area */
+static struct xenstore_domain_interface *rings; /* Shared ring with dom0 */
+static evtchn_port_t event;                     /* Event-channel to dom0 */
+static char payload[XENSTORE_PAYLOAD_MAX + 1];  /* Unmarshalling area */
 
 /* Connect our xenbus client to the backend.
  * Call once, before any other xenbus actions. */
@@ -69,6 +69,19 @@ void xenbus_shutdown(void)
     rings = NULL;
 }
 
+static void ring_wait(void)
+{
+    struct shared_info *shinfo = get_shared_info();
+    struct sched_poll poll;
+
+    memset(&poll, 0, sizeof(poll));
+    set_xen_guest_handle(poll.ports, &event);
+    poll.nr_ports = 1;
+
+    while ( !test_and_clear_bit(event, shinfo->evtchn_pending) )
+        hypercall_sched_op(SCHEDOP_poll, &poll);
+}
+
 /* Helper functions: copy data in and out of the ring */
 static void ring_write(char *data, uint32_t len)
 {
@@ -79,8 +92,9 @@ static void ring_write(char *data, uint32_t len)
     while ( len )
     {
         /* Don't overrun the consumer pointer */
-        part = (XENSTORE_RING_SIZE - 1) -
-            MASK_XENSTORE_IDX(rings->req_prod - rings->req_cons);
+        while ( (part = (XENSTORE_RING_SIZE - 1) -
+                 MASK_XENSTORE_IDX(rings->req_prod - rings->req_cons)) == 0 )
+            ring_wait();
         /* Don't overrun the end of the ring */
         if ( part > (XENSTORE_RING_SIZE - MASK_XENSTORE_IDX(rings->req_prod)) )
             part = XENSTORE_RING_SIZE - MASK_XENSTORE_IDX(rings->req_prod);
@@ -92,9 +106,6 @@ static void ring_write(char *data, uint32_t len)
         barrier(); /* = wmb before prod write, rmb before next cons read */
         rings->req_prod += part;
         len -= part;
-
-        if ( len )
-            hypercall_sched_op(SCHEDOP_yield, NULL);
     }
 }
 
@@ -107,7 +118,9 @@ static void ring_read(char *data, uint32_t len)
     while ( len )
     {
         /* Don't overrun the producer pointer */
-        part = MASK_XENSTORE_IDX(rings->rsp_prod - rings->rsp_cons);
+        while ( (part = MASK_XENSTORE_IDX(rings->rsp_prod -
+                                          rings->rsp_cons)) == 0 )
+            ring_wait();
         /* Don't overrun the end of the ring */
         if ( part > (XENSTORE_RING_SIZE - MASK_XENSTORE_IDX(rings->rsp_cons)) )
             part = XENSTORE_RING_SIZE - MASK_XENSTORE_IDX(rings->rsp_cons);
@@ -119,9 +132,6 @@ static void ring_read(char *data, uint32_t len)
         barrier(); /* = wmb before cons write, rmb before next prod read */
         rings->rsp_cons += part;
         len -= part;
-        
-        if ( len )
-            hypercall_sched_op(SCHEDOP_yield, NULL);
     }
 }
 
