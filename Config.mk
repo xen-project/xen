@@ -185,9 +185,9 @@ endif
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 706bc8c588cbda284a9579cdb7e494ad5c9d6383
-# Mon Oct 18 17:24:50 2010 +0100
-# use xc_domain_add_to_physmap instead of open coding xc_memory_op
+QEMU_TAG ?= 1a13c2df0c5c93f06c0f2286628b9b0f4d80ff4d
+# Thu Oct 21 17:59:20 2010 +0100
+# e1000: Handle IO Port.
 
 # Optional components
 XENSTAT_XENTOP     ?= y
