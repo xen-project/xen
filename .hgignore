@@ -262,6 +262,7 @@
 ^tools/xenstore/xenstore-write$
 ^tools/xenstore/xenstore-control$
 ^tools/xenstore/xenstore-ls$
+^tools/xenstore/xenstore-watch$
 ^tools/xenstore/xenstored$
 ^tools/xenstore/xenstored_test$
 ^tools/xenstore/xs_crashme$

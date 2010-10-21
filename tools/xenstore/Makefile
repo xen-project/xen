@@ -9,7 +9,7 @@ CFLAGS += -I.
 CFLAGS += $(CFLAGS_libxenctrl)
 
 CLIENTS := xenstore-exists xenstore-list xenstore-read xenstore-rm xenstore-chmod
-CLIENTS += xenstore-write xenstore-ls
+CLIENTS += xenstore-write xenstore-ls xenstore-watch
 
 XENSTORED_OBJS = xenstored_core.o xenstored_watch.o xenstored_domain.o xenstored_transaction.o xs_lib.o talloc.o utils.o tdb.o hashtable.o
 

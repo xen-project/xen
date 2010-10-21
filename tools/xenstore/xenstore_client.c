@@ -36,6 +36,7 @@ enum mode {
     MODE_read,
     MODE_rm,
     MODE_write,
+    MODE_watch,
 };
 
 static char *output_buf = NULL;
@@ -95,6 +96,9 @@ usage(enum mode mode, int incl_mode, const char *progname)
     case MODE_chmod:
 	mstr = incl_mode ? "chmod " : "";
 	errx(1, "Usage: %s %s[-h] [-u] [-r] [-s] key <mode [modes...]>", progname, mstr);
+    case MODE_watch:
+	mstr = incl_mode ? "watch " : "";
+	errx(1, "Usage: %s %s[-h] [-n NR] key", progname, mstr);
     }
 }
 
@@ -263,9 +267,28 @@ do_chmod(char *path, struct xs_permissions *perms, int nperms, int upto,
     }
 }
 
+static void
+do_watch(struct xs_handle *xsh, int max_events)
+{
+    int count = 0;
+    char **vec = NULL;
+
+    for ( count = 0; max_events == -1 || count < max_events; count++ ) {
+	unsigned int num;
+
+	vec = xs_read_watch(xsh, &num);
+	if (vec == NULL)
+	    continue;
+
+	printf("%s\n", vec[XS_WATCH_PATH]);
+	fflush(stdout);
+	free(vec);
+    }
+}
+
 static int
 perform(enum mode mode, int optind, int argc, char **argv, struct xs_handle *xsh,
-        xs_transaction_t xth, int prefix, int tidy, int upto, int recurse)
+        xs_transaction_t xth, int prefix, int tidy, int upto, int recurse, int nr_watches)
 {
     switch (mode) {
     case MODE_ls:
@@ -428,6 +451,15 @@ perform(enum mode mode, int optind, int argc, char **argv, struct xs_handle *xsh
             do_chmod(path, perms, nperms, upto, recurse, xsh, xth);
             break;
         }
+        case MODE_watch: {
+            for (; argv[optind]; optind++) {
+                const char *w = argv[optind];
+
+                if (!xs_watch(xsh, w, w))
+                    errx(1, "Unable to add watch on %s\n", w);
+            }
+            do_watch(xsh, nr_watches);
+        }
         }
     }
 
@@ -452,6 +484,8 @@ static enum mode lookup_mode(const char *m)
 	return MODE_write;
     else if (strcmp(m, "read") == 0)
 	return MODE_read;
+    else if (strcmp(m, "watch") == 0)
+	return MODE_watch;
 
     errx(1, "unknown mode %s\n", m);
     return 0;
@@ -467,6 +501,7 @@ main(int argc, char **argv)
     int tidy = 0;
     int upto = 0;
     int recurse = 0;
+    int nr_watches = -1;
     int transaction;
     struct winsize ws;
     enum mode mode;
@@ -500,10 +535,11 @@ main(int argc, char **argv)
 	    {"tidy",    0, 0, 't'}, /* MODE_rm */
 	    {"upto",    0, 0, 'u'}, /* MODE_chmod */
 	    {"recurse", 0, 0, 'r'}, /* MODE_chmod */
+	    {"number",  1, 0, 'n'}, /* MODE_watch */
 	    {0, 0, 0, 0}
 	};
 
-	c = getopt_long(argc - switch_argv, argv + switch_argv, "hfsptur",
+	c = getopt_long(argc - switch_argv, argv + switch_argv, "hfspturn:",
 			long_options, &index);
 	if (c == -1)
 	    break;
@@ -548,6 +584,12 @@ main(int argc, char **argv)
 	    else
 		usage(mode, switch_argv, argv[0]);
 	    break;
+	case 'n':
+	    if ( mode == MODE_watch )
+		nr_watches = atoi(optarg);
+	    else
+		usage(mode, switch_argv, argv[0]);
+	    break;
 	}
     }
 
@@ -575,6 +617,7 @@ main(int argc, char **argv)
 	transaction = (argc - switch_argv - optind) > 2;
 	break;
     case MODE_ls:
+    case MODE_watch:
 	transaction = 0;
 	break;
     default:
@@ -601,7 +644,7 @@ again:
 	    errx(1, "couldn't start transaction");
     }
 
-    ret = perform(mode, optind, argc - switch_argv, argv + switch_argv, xsh, xth, prefix, tidy, upto, recurse);
+    ret = perform(mode, optind, argc - switch_argv, argv + switch_argv, xsh, xth, prefix, tidy, upto, recurse, nr_watches);
 
     if (transaction && !xs_transaction_end(xsh, xth, ret)) {
 	if (ret == 0 && errno == EAGAIN) {
