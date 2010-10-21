@@ -1,0 +1,17 @@
+#============================================================================
+# Configuration setup for 'xm cpupool-create' or 'xl cpupool-create'.
+# This script sets the parameters used when a cpupool is created using
+# 'xm cpupool-create' or 'xl cpupool-create'.
+# You use a separate script for each cpupool you want to create, or 
+# you can set the parameters for the cpupool on the xm command line.
+#============================================================================
+
+# the name of the new cpupool
+name = "Example-Cpupool"
+
+# the scheduler to use: valid are e.g. credit, sedf, credit2
+sched = "credit"
+
+# list of cpus to use
+cpus = ["2", "3"]
+

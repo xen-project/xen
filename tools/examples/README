@@ -13,6 +13,7 @@ block               - called by xen-backend.agent to bind/unbind dev
 block-common.sh     - sourced by block, block-*
 block-enbd          - binds/unbinds network block devices
 block-nbd           - binds/unbinds network block devices
+cpupool             - example configuration script for 'xm cpupool-create'
 external-device-migrate - called by xend for migrating external devices
 locking.sh          - locking functions to prevent concurrent access to
                       critical sections inside script files
