@@ -15,7 +15,7 @@
 # Copyright (C) 2009 Fujitsu Technology Solutions
 #============================================================================
 
-""" Common function of cmds pool-new / pool-create.
+""" Common function of cmds cpupool-new / cpupool-create.
 """
 
 import sys
@@ -29,7 +29,7 @@ from xen.xm.opts import Opts, set_value, set_true, append_value, OptionError
 
 GOPTS = Opts(use="""[options] [vars]
 
-Create a pool.
+Create a cpupool.
 
 Pool creation parameters can be set by command-line switches, from
 a python configuration script or an SXP config file. See documentation
@@ -48,7 +48,7 @@ GOPTS.opt('help_config',
           "configuration script.")
 
 GOPTS.opt('path', val='PATH',
-          fn=set_value, default='.:/etc/xen/pool',
+          fn=set_value, default='.:/etc/xen/cpupool',
           use="Search path for configuration scripts. "
           "The value of PATH is a colon-separated directory list.")
 

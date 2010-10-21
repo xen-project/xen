@@ -15,12 +15,12 @@
 # Copyright (C) 2009 Fujitsu Technology Solutions
 #============================================================================
 
-""" Create a new managed pool.
+""" Create a new managed cpupool.
 """
 
 import sys
 from xen.xm.main import serverType, SERVER_XEN_API, server
-from xen.xm.pool import parseCommandLine, err, help as help_options
+from xen.xm.cpupool import parseCommandLine, err, help as help_options
 from xen.util.sxputils import sxp2map
 
 

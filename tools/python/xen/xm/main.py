@@ -242,20 +242,20 @@ SUBCOMMAND_HELP = {
     'tmem-shared-auth' :  ('[<Domain>|-a|--all] [--uuid=<uuid>] [--auth=<0|1>]', 'De/authenticate shared tmem pool.'),
 
     #
-    # pool commands
+    # cpupool commands
     #
-    'pool-create'   :  ('<ConfigFile> [vars]',
+    'cpupool-create'   :  ('<ConfigFile> [vars]',
                         'Create a CPU pool based an ConfigFile.'),
-    'pool-new'      :  ('<ConfigFile> [vars]',
+    'cpupool-new'      :  ('<ConfigFile> [vars]',
                         'Adds a CPU pool to Xend CPU pool management'),
-    'pool-start'    :  ('<CPU Pool>', 'Starts a Xend CPU pool'),
-    'pool-list'     :  ('[<CPU Pool>] [-l|--long] [-c|--cpus]', 'List CPU pools on host'),
-    'pool-destroy'  :  ('<CPU Pool>', 'Deactivates a CPU pool'),
-    'pool-delete'   :  ('<CPU Pool>',
+    'cpupool-start'    :  ('<CPU Pool>', 'Starts a Xend CPU pool'),
+    'cpupool-list'     :  ('[<CPU Pool>] [-l|--long] [-c|--cpus]', 'List CPU pools on host'),
+    'cpupool-destroy'  :  ('<CPU Pool>', 'Deactivates a CPU pool'),
+    'cpupool-delete'   :  ('<CPU Pool>',
                         'Removes a CPU pool from Xend management'),
-    'pool-cpu-add'  :  ('<CPU Pool> <CPU nr>', 'Adds a CPU to a CPU pool'),
-    'pool-cpu-remove': ('<CPU Pool> <CPU nr>', 'Removes a CPU from a CPU pool'),
-    'pool-migrate'  :  ('<Domain> <CPU Pool>',
+    'cpupool-cpu-add'  :  ('<CPU Pool> <CPU nr>', 'Adds a CPU to a CPU pool'),
+    'cpupool-cpu-remove': ('<CPU Pool> <CPU nr>', 'Removes a CPU from a CPU pool'),
+    'cpupool-migrate'  :  ('<Domain> <CPU Pool>',
                         'Moves a domain into a CPU pool'),
 
     # security
@@ -370,7 +370,7 @@ SUBCOMMAND_OPTIONS = {
        ('-u', '--uuid', 'Specify uuid (abcdef01-2345-6789-01234567890abcdef).'),
        ('-A', '--auth', '0=auth,1=deauth'),
     ),
-    'pool-list': (
+    'cpupool-list': (
        ('-l', '--long', 'Output all CPU pool details in SXP format'),
        ('-c', '--cpus', 'Output list of CPUs used by a pool'),
     ),
@@ -521,21 +521,21 @@ tmem_commands = [
     "tmem-shared-auth",
     ]
 
-pool_commands = [
-    "pool-create",
-    "pool-new",
-    "pool-start",
-    "pool-list",
-    "pool-destroy",
-    "pool-delete",
-    "pool-cpu-add",
-    "pool-cpu-remove",
-    "pool-migrate",
+cpupool_commands = [
+    "cpupool-create",
+    "cpupool-new",
+    "cpupool-start",
+    "cpupool-list",
+    "cpupool-destroy",
+    "cpupool-delete",
+    "cpupool-cpu-add",
+    "cpupool-cpu-remove",
+    "cpupool-migrate",
     ]
 
 all_commands = (domain_commands + host_commands + scheduler_commands +
                 device_commands + vnet_commands + security_commands +
-                acm_commands + flask_commands + tmem_commands + pool_commands +
+                acm_commands + flask_commands + tmem_commands + cpupool_commands +
                 ['shell', 'event-monitor'])
 
 
@@ -3625,7 +3625,7 @@ def xm_tmem_shared_auth(args):
     else:
         return server.xend.node.tmem_shared_auth(domid,uuid_str,auth)
 
-def get_pool_ref(name):
+def get_cpupool_ref(name):
     refs = server.xenapi.cpu_pool.get_by_name_label(name)
     if len(refs) > 0:
         return refs[0]
@@ -3633,15 +3633,15 @@ def get_pool_ref(name):
         err('unknown pool name')
         sys.exit(1)
 
-def xm_pool_start(args):
-    arg_check(args, "pool-start", 1)
+def xm_cpupool_start(args):
+    arg_check(args, "cpupool-start", 1)
     if serverType == SERVER_XEN_API:
-        ref = get_pool_ref(args[0])
+        ref = get_cpupool_ref(args[0])
         server.xenapi.cpu_pool.activate(ref)
     else:
         server.xend.cpu_pool.start(args[0])
 
-def brief_pool_list(sxprs):
+def brief_cpupool_list(sxprs):
     format_str = "%-16s   %3s  %8s       %s          %s"
     for sxpr in sxprs:
         if sxpr == sxprs[0]:
@@ -3665,7 +3665,7 @@ def brief_pool_list(sxprs):
             active = 'n'
         print format_str % (name, cpu_count, sched_policy, active, vm_count)
 
-def brief_pool_list_cpus(sxprs):
+def brief_cpupool_list_cpus(sxprs):
     format_str = "%-16s %s"
     for sxpr in sxprs:
         if sxpr == sxprs[0]:
@@ -3685,16 +3685,16 @@ def brief_pool_list_cpus(sxprs):
             cpus = "-"
         print format_str % (name, cpus)
 
-def xm_pool_list(args):
-    arg_check(args, "pool-list", 0, 2)
+def xm_cpupool_list(args):
+    arg_check(args, "cpupool-list", 0, 2)
     try:
         (options, params) = getopt.gnu_getopt(args, 'lc', ['long','cpus'])
     except getopt.GetoptError, opterr:
         err(opterr)
-        usage('pool-list')
+        usage('cpupool-list')
     if len(params) > 1:
-        err("Only one pool name for selection allowed")
-        usage('pool-list')
+        err("Only one cpupool name for selection allowed")
+        usage('cpupool-list')
 
     use_long = False
     show_cpus = False
@@ -3730,30 +3730,30 @@ def xm_pool_list(args):
         for sxpr in sxprs:
             PrettyPrint.prettyprint(sxpr)
     elif show_cpus:
-        brief_pool_list_cpus(sxprs)
+        brief_cpupool_list_cpus(sxprs)
     else:
-        brief_pool_list(sxprs)
+        brief_cpupool_list(sxprs)
 
-def xm_pool_destroy(args):
-    arg_check(args, "pool-destroy", 1)
+def xm_cpupool_destroy(args):
+    arg_check(args, "cpupool-destroy", 1)
     if serverType == SERVER_XEN_API:
-        ref = get_pool_ref(args[0])
+        ref = get_cpupool_ref(args[0])
         server.xenapi.cpu_pool.deactivate(ref)
     else:
         server.xend.cpu_pool.destroy(args[0])
 
-def xm_pool_delete(args):
-    arg_check(args, "pool-delete", 1)
+def xm_cpupool_delete(args):
+    arg_check(args, "cpupool-delete", 1)
     if serverType == SERVER_XEN_API:
-        ref = get_pool_ref(args[0])
+        ref = get_cpupool_ref(args[0])
         server.xenapi.cpu_pool.destroy(ref)
     else:
         server.xend.cpu_pool.delete(args[0])
 
-def xm_pool_cpu_add(args):
-    arg_check(args, "pool-cpu-add", 2)
+def xm_cpupool_cpu_add(args):
+    arg_check(args, "cpupool-cpu-add", 2)
     if serverType == SERVER_XEN_API:
-        ref = get_pool_ref(args[0])
+        ref = get_cpupool_ref(args[0])
         cpu_ref_list = server.xenapi.host_cpu.get_all_records()
         cpu_ref = [ c_rec['uuid'] for c_rec in cpu_ref_list.values()
                                   if c_rec['number'] == args[1] ]
@@ -3764,10 +3764,10 @@ def xm_pool_cpu_add(args):
     else:
         server.xend.cpu_pool.cpu_add(args[0], args[1])
 
-def xm_pool_cpu_remove(args):
-    arg_check(args, "pool-cpu-remove", 2)
+def xm_cpupool_cpu_remove(args):
+    arg_check(args, "cpupool-cpu-remove", 2)
     if serverType == SERVER_XEN_API:
-        ref = get_pool_ref(args[0])
+        ref = get_cpupool_ref(args[0])
         cpu_ref_list = server.xenapi.host_cpu.get_all_records()
         cpu_ref = [ c_rec['uuid'] for c_rec in cpu_ref_list.values()
                                   if c_rec['number'] ==  args[1] ]
@@ -3778,12 +3778,12 @@ def xm_pool_cpu_remove(args):
     else:
         server.xend.cpu_pool.cpu_remove(args[0], args[1])
 
-def xm_pool_migrate(args):
-    arg_check(args, "pool-migrate", 2)
+def xm_cpupool_migrate(args):
+    arg_check(args, "cpupool-migrate", 2)
     domname = args[0]
     poolname = args[1]
     if serverType == SERVER_XEN_API:
-        pool_ref = get_pool_ref(poolname)
+        pool_ref = get_cpupool_ref(poolname)
         server.xenapi.VM.cpu_pool_migrate(get_single_vm(domname), pool_ref)
     else:
         server.xend.cpu_pool.migrate(domname, poolname)
@@ -3874,14 +3874,14 @@ commands = {
     "usb-list-assignable-devices": xm_usb_list_assignable_devices,
     "usb-hc-create": xm_usb_hc_create,
     "usb-hc-destroy": xm_usb_hc_destroy,
-    # pool
-    "pool-start": xm_pool_start,
-    "pool-list": xm_pool_list,
-    "pool-destroy": xm_pool_destroy,
-    "pool-delete": xm_pool_delete,
-    "pool-cpu-add": xm_pool_cpu_add,
-    "pool-cpu-remove": xm_pool_cpu_remove,
-    "pool-migrate": xm_pool_migrate,
+    # cpupool
+    "cpupool-start": xm_cpupool_start,
+    "cpupool-list": xm_cpupool_list,
+    "cpupool-destroy": xm_cpupool_destroy,
+    "cpupool-delete": xm_cpupool_delete,
+    "cpupool-cpu-add": xm_cpupool_cpu_add,
+    "cpupool-cpu-remove": xm_cpupool_cpu_remove,
+    "cpupool-migrate": xm_cpupool_migrate,
     # tmem
     "tmem-thaw": xm_tmem_thaw,
     "tmem-freeze": xm_tmem_freeze,
@@ -3915,8 +3915,8 @@ IMPORTED_COMMANDS = [
     'resetpolicy',
     'getenforce',
     'setenforce',
-    'pool-create',
-    'pool-new',
+    'cpupool-create',
+    'cpupool-new',
     ]
 
 for c in IMPORTED_COMMANDS:
@@ -3924,6 +3924,15 @@ for c in IMPORTED_COMMANDS:
 
 aliases = {
     "balloon": "mem-set",
+    "pool-create": "cpupool-create",
+    "pool-new": "cpupool-new",
+    "pool-start": "cpupool-start",
+    "pool-list": "cpupool-list",
+    "pool-destroy": "cpupool-destroy",
+    "pool-delete": "cpupool-delete",
+    "pool-cpu-add": "cpupool-cpu-add",
+    "pool-cpu-remove": "cpupool-cpu-remove",
+    "pool-migrate": "cpupool-migrate",
     "set-vcpus": "vcpu-set",
     "vif-list": "network-list",
     "vbd-create": "block-attach",
