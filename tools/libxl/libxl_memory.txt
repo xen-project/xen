@@ -1,0 +1,70 @@
+/* === Domain memory breakdown: HVM guests ==================================
+                           
+             +  +----------+                                     +            
+             |  | shadow   |                                     |            
+             |  +----------+                                     |            
+    overhead |  | extra    |                                     |            
+             |  | external |                                     |            
+             |  +----------+                          +          |            
+             |  | extra    |                          |          |            
+             |  | internal |                          |          |            
+             +  +----------+                +         |          | footprint  
+             |  | video    |                |         |          |            
+             |  +----------+  +    +        |         | xen      |            
+             |  |          |  |    |        | actual  | maximum  |            
+             |  |          |  |    |        | target  |          |            
+             |  | guest    |  |    | build  |         |          |            
+             |  |          |  |    | start  |         |          |            
+      static |  |          |  |    |        |         |          |            
+     maximum |  +----------+  |    +        +         +          +            
+             |  |          |  |                                               
+             |  |          |  |                                               
+             |  | balloon  |  | build                                         
+             |  |          |  | maximum                                       
+             |  |          |  |                                               
+             +  +----------+  +                                               
+                
+                
+    extra internal = LIBXL_MAXMEM_CONSTANT
+    extra external = LIBXL_HVM_EXTRA_MEMORY
+    shadow = libxl_domain_build_info.shadow_memkb
+    static maximum = libxl_domain_build_info.max_memkb
+    video = libxl_domain_build_info.video_memkb
+    build start = libxl_domain_build_info.target_memkb
+    libxl_domain_setmaxmem -> xen maximum
+    libxl_set_memory_target -> actual target
+                
+                
+ === Domain memory breakdown: PV guests ==================================
+                
+                
+             +  +----------+                                     +            
+    overhead |  | extra    |                                     |            
+             |  | external |                                     |            
+             |  +----------+                          +          |            
+             |  | extra    |                          |          |            
+             |  | internal |                          |          |            
+             +  +----------+  +    +        +         |          | footprint  
+             |  |          |  |    |        |         | xen      |            
+             |  |          |  |    |        | actual  | maximum  | 
+             |  | guest    |  |    | build  | target  |          |            
+             |  |          |  |    | start  |         |          |            
+      static |  |          |  |    |        |         |          |            
+     maximum |  +----------+  |    +        +         +          +            
+             |  |          |  |                                               
+             |  |          |  |                                               
+             |  | balloon  |  | build                                         
+             |  |          |  | maximum                                       
+             |  |          |  |                                               
+             +  +----------+  +                                               
+                
+
+    extra internal = LIBXL_MAXMEM_CONSTANT
+    extra external = LIBXL_PV_EXTRA_MEMORY
+    static maximum = libxl_domain_build_info.max_memkb
+    build start = libxl_domain_build_info.target_memkb
+    libxl_domain_setmaxmem -> xen maximum
+    libxl_set_memory_target -> actual target
+
+
+ ========================================================================= */
