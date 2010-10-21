@@ -873,8 +873,7 @@ static int save_tsc_info(xc_interface *xch, uint32_t dom, int io_fd)
 
 int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iters,
                    uint32_t max_factor, uint32_t flags,
-                   struct save_callbacks* callbacks,
-                   int hvm, void (*switch_qemu_logdirty)(int, unsigned))
+                   struct save_callbacks* callbacks, int hvm)
 {
     xc_dominfo_t info;
     DECLARE_DOMCTL;
@@ -937,6 +936,13 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
     struct domain_info_context *dinfo = &ctx->dinfo;
 
     int completed = 0;
+
+    if ( hvm && !callbacks->switch_qemu_logdirty )
+    {
+        ERROR("No switch_qemu_logdirty callback provided.");
+        errno = EINVAL;
+        return 1;
+    }
 
     outbuf_init(xch, &ob, OUTBUF_SIZE);
 
@@ -1009,8 +1015,11 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
         }
 
         /* Enable qemu-dm logging dirty pages to xen */
-        if ( hvm )
-            switch_qemu_logdirty(dom, 1);
+        if ( hvm && !callbacks->switch_qemu_logdirty(dom, 1, callbacks->data) )
+        {
+            PERROR("Couldn't enable qemu log-dirty mode (errno %d)", errno);
+            goto out;
+        }
     }
     else
     {
@@ -1870,8 +1879,8 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
                                XEN_DOMCTL_SHADOW_OP_OFF,
                                NULL, 0, NULL, 0, NULL) < 0 )
             DPRINTF("Warning - couldn't disable shadow mode");
-        if ( hvm )
-            switch_qemu_logdirty(dom, 0);
+        if ( hvm && !callbacks->switch_qemu_logdirty(dom, 0, callbacks->data) )
+            DPRINTF("Warning - couldn't disable qemu log-dirty mode");
     }
 
     if ( live_shinfo )

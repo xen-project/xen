@@ -102,7 +102,7 @@ static int suspend(void* data)
  * active buffer. */
 
 
-static void switch_qemu_logdirty(int domid, unsigned int enable)
+static int switch_qemu_logdirty(int domid, unsigned int enable, void *data)
 {
     struct xs_handle *xs;
     char *path, *p, *ret_str, *cmd_str, **watch;
@@ -159,6 +159,8 @@ static void switch_qemu_logdirty(int domid, unsigned int enable)
     free(path);
     free(cmd_str);
     free(ret_str);
+
+    return 0;
 }
 
 int
@@ -205,9 +207,9 @@ main(int argc, char **argv)
     }
     memset(&callbacks, 0, sizeof(callbacks));
     callbacks.suspend = suspend;
+    callbacks.switch_qemu_logdirty = switch_qemu_logdirty;
     ret = xc_domain_save(si.xch, io_fd, si.domid, maxit, max_f, si.flags, 
-                         &callbacks, !!(si.flags & XCFLAGS_HVM),
-                         &switch_qemu_logdirty);
+                         &callbacks, !!(si.flags & XCFLAGS_HVM));
 
     if (si.suspend_evtchn > 0)
 	 xc_suspend_evtchn_release(si.xch, si.xce, si.domid, si.suspend_evtchn);

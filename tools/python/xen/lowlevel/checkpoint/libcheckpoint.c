@@ -164,9 +164,9 @@ void checkpoint_close(checkpoint_state* s)
 
 /* we toggle logdirty ourselves around the xc_domain_save call --
  * it avoids having to pass around checkpoint_state */
-static void noop_switch_logdirty(int domid, unsigned enable)
+static int noop_switch_logdirty(int domid, unsigned enable, void *data)
 {
-    return;
+    return 0;
 }
 
 int checkpoint_start(checkpoint_state* s, int fd,
@@ -185,12 +185,13 @@ int checkpoint_start(checkpoint_state* s, int fd,
     hvm = s->domtype > dt_pv;
     if (hvm) {
        flags |= XCFLAGS_HVM;
-       if ((rc = switch_qemu_logdirty(s, 1)))
-           return rc;
+       if (!switch_qemu_logdirty(s, 1))
+           return -1;
     }
 
-    rc = xc_domain_save(s->xch, fd, s->domid, 0, 0, flags, callbacks, hvm,
-       noop_switch_logdirty);
+    callbacks->switch_qemu_logdirty = noop_switch_logdirty;
+
+    rc = xc_domain_save(s->xch, fd, s->domid, 0, 0, flags, callbacks, hvm);
 
     if (hvm)
        switch_qemu_logdirty(s, 0);
@@ -540,7 +541,7 @@ static int switch_qemu_logdirty(checkpoint_state *s, int enable)
     strcpy(tail, "ret");
     if (!xs_watch(s->xsh, path, "qemu-logdirty-ret")) {
        s->errstr = "error watching qemu logdirty return";
-       return -1;
+       return 1;
     }
     /* null fire. XXX unify with shutdown watch! */
     vec = xs_read_watch(s->xsh, &len);
@@ -550,7 +551,7 @@ static int switch_qemu_logdirty(checkpoint_state *s, int enable)
     cmd = enable ? "enable" : "disable";
     if (!xs_write(s->xsh, XBT_NULL, path, cmd, strlen(cmd))) {
        s->errstr = "error signalling qemu logdirty";
-       return -1;
+       return 1;
     }
 
     vec = xs_read_watch(s->xsh, &len);
@@ -564,7 +565,7 @@ static int switch_qemu_logdirty(checkpoint_state *s, int enable)
        if (len)
            free(response);
        s->errstr = "qemu logdirty command failed";
-       return -1;
+       return 1;
     }
     free(response);
     fprintf(stderr, "qemu logdirty mode: %s\n", cmd);

@@ -40,7 +40,10 @@ struct save_callbacks {
      * 1: take another checkpoint */
     int (*checkpoint)(void* data);
 
-    /* to be provided as the first argument to each callback function */
+    /* Enable qemu-dm logging dirty pages to xen */
+    int (*switch_qemu_logdirty)(int domid, unsigned enable, void *data); /* HVM only */
+
+    /* to be provided as the last argument to each callback function */
     void* data;
 };
 
@@ -54,8 +57,7 @@ struct save_callbacks {
  */
 int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iters,
                    uint32_t max_factor, uint32_t flags /* XCFLAGS_xxx */,
-                   struct save_callbacks* callbacks,
-                   int hvm, void (*switch_qemu_logdirty)(int, unsigned)); /* HVM only */
+                   struct save_callbacks* callbacks, int hvm);
 
 
 /**

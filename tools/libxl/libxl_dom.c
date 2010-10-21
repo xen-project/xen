@@ -325,21 +325,23 @@ struct suspendinfo {
     unsigned int flags;
 };
 
-static void libxl__domain_suspend_common_switch_qemu_logdirty(int domid, unsigned int enable)
+static int libxl__domain_suspend_common_switch_qemu_logdirty(int domid, unsigned int enable, void *data)
 {
-    struct xs_handle *xsh;
-    char path[64];
+    struct suspendinfo *si = data;
+    libxl_ctx *ctx = libxl__gc_owner(si->gc);
+    char *path;
+    bool rc;
 
-    snprintf(path, sizeof(path), "/local/domain/0/device-model/%u/logdirty/cmd", domid);
-
-    xsh = xs_daemon_open();
+    path = libxl__sprintf(si->gc, "/local/domain/0/device-model/%u/logdirty/cmd", domid);
+    if (!path)
+        return 1;
 
     if (enable)
-        xs_write(xsh, XBT_NULL, path, "enable", strlen("enable"));
+        rc = xs_write(ctx->xsh, XBT_NULL, path, "enable", strlen("enable"));
     else
-        xs_write(xsh, XBT_NULL, path, "disable", strlen("disable"));
+        rc = xs_write(ctx->xsh, XBT_NULL, path, "disable", strlen("disable"));
 
-    xs_daemon_close(xsh);
+    return rc ? 0 : 1;
 }
 
 static int libxl__domain_suspend_common_callback(void *data)
@@ -437,11 +439,10 @@ int libxl__domain_suspend_common(libxl_ctx *ctx, uint32_t domid, int fd,
 
     memset(&callbacks, 0, sizeof(callbacks));
     callbacks.suspend = libxl__domain_suspend_common_callback;
+    callbacks.switch_qemu_logdirty = libxl__domain_suspend_common_switch_qemu_logdirty;
     callbacks.data = &si;
 
-    xc_domain_save(ctx->xch, fd, domid, 0, 0, flags,
-                   &callbacks, hvm,
-                   &libxl__domain_suspend_common_switch_qemu_logdirty);
+    xc_domain_save(ctx->xch, fd, domid, 0, 0, flags, &callbacks, hvm);
 
     if (si.suspend_eventchn > 0)
         xc_suspend_evtchn_release(ctx->xch, si.xce, domid, si.suspend_eventchn);
@@ -450,6 +451,7 @@ int libxl__domain_suspend_common(libxl_ctx *ctx, uint32_t domid, int fd,
 
     rc = 0;
 out:
+    libxl__free_all(&gc);
     return rc;
 }
 

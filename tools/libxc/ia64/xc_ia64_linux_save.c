@@ -397,8 +397,7 @@ out:
 int
 xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iters,
                uint32_t max_factor, uint32_t flags,
-               struct save_callbacks* callbacks,
-               int hvm, void (*switch_qemu_logdirty)(int, unsigned))
+               struct save_callbacks* callbacks, int hvm)
 {
     DECLARE_DOMCTL;
     xc_dominfo_t info;
@@ -450,6 +449,14 @@ xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iters,
     void *p;
     efi_memory_desc_t *md;
     struct xen_ia64_p2m_table p2m_table;
+
+    if ( hvm && !callbacks->switch_qemu_logdirty )
+    {
+        ERROR("No switch_qemu_logdirty callback given.");
+        errno = EINVAL;
+        return 1;
+    }
+
     xc_ia64_p2m_init(&p2m_table);
 
     if (debug)
@@ -556,8 +563,10 @@ xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iters,
         }
 
         /* Enable qemu-dm logging dirty pages to xen */
-        if (hvm)
-            switch_qemu_logdirty(dom, 1);
+        if (hvm && !callbacks->switch_qemu_logdirty(dom, 1, callbacks->data)) {
+            ERROR("Unable to enable qemu log-dirty mode");
+            goto out;
+        }
     } else {
 
         /* This is a non-live suspend. Issue the call back to get the
@@ -785,8 +794,9 @@ xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iters,
                               NULL, 0, NULL, 0, NULL ) < 0) {
             DPRINTF("Warning - couldn't disable shadow mode");
         }
-        if ( hvm )
-            switch_qemu_logdirty(dom, 0);
+        if ( hvm && !callbacks->switch_qemu_logdirty(dom, 0) ) {
+            DPRINTF("Warning - couldn't disable qemu log-dirty mode");
+        }
     }
 
     unlock_pages(to_send, bitmap_size);
