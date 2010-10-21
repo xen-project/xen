@@ -134,7 +134,7 @@ void do_watch(struct connection *conn, struct buffered_data *in)
 		relative = !strstarts(vec[0], "/");
 		vec[0] = canonicalize(conn, vec[0]);
 		if (!is_valid_nodename(vec[0])) {
-			send_error(conn, errno);
+			send_error(conn, EINVAL);
 			return;
 		}
 	}
