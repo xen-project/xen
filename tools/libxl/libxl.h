@@ -141,9 +141,13 @@ void libxl_string_list_destroy(libxl_string_list *sl);
 typedef char **libxl_key_value_list;
 void libxl_key_value_list_destroy(libxl_key_value_list *kvl);
 
-typedef uint64_t *libxl_cpumap;
-
 typedef uint32_t libxl_hwcap[8];
+
+typedef struct {
+    uint32_t size;          /* number of bytes in map */
+    uint64_t *map;
+} libxl_cpumap;
+void libxl_cpumap_destroy(libxl_cpumap *map);
 
 typedef enum {
     XENFV = 1,
@@ -361,7 +365,7 @@ int libxl_primary_console_exec(libxl_ctx *ctx, uint32_t domid_vm);
 int libxl_domain_info(libxl_ctx*, libxl_dominfo *info_r,
                       uint32_t domid);
 libxl_dominfo * libxl_list_domain(libxl_ctx*, int *nb_domain);
-libxl_poolinfo * libxl_list_pool(libxl_ctx*, int *nb_pool);
+libxl_cpupoolinfo * libxl_list_cpupool(libxl_ctx*, int *nb_pool);
 libxl_vminfo * libxl_list_vm(libxl_ctx *ctx, int *nb_vm);
 
 typedef struct libxl__device_model_starting libxl_device_model_starting;
@@ -503,6 +507,15 @@ libxl_net2info *libxl_device_net2_list(libxl_ctx *ctx, uint32_t domid,
                                        unsigned int *nb);
 int libxl_device_net2_del(libxl_ctx *ctx, libxl_device_net2 *net2,
                           int wait);
+
+int libxl_get_freecpus(libxl_ctx *ctx, libxl_cpumap *cpumap);
+int libxl_create_cpupool(libxl_ctx *ctx, char *name, int schedid,
+                         libxl_cpumap cpumap, libxl_uuid *uuid,
+                         uint32_t *poolid);
+int libxl_destroy_cpupool(libxl_ctx *ctx, uint32_t poolid);
+int libxl_cpupool_cpuadd(libxl_ctx *ctx, uint32_t poolid, int cpu);
+int libxl_cpupool_cpuremove(libxl_ctx *ctx, uint32_t poolid, int cpu);
+int libxl_cpupool_movedomain(libxl_ctx *ctx, uint32_t poolid, uint32_t domid);
 
 /* common paths */
 const char *libxl_sbindir_path(void);

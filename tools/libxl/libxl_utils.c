@@ -31,6 +31,17 @@
 #include "libxl_utils.h"
 #include "libxl_internal.h"
 
+struct schedid_name {
+    char *name;
+    int id;
+};
+
+static struct schedid_name schedid_name[] = {
+    { "credit", XEN_SCHEDULER_CREDIT },
+    { "sedf", XEN_SCHEDULER_SEDF },
+    { "credit2", XEN_SCHEDULER_CREDIT2 },
+    { NULL, -1 }
+};
 
 unsigned long libxl_get_required_shadow_memory(unsigned long maxmem_kb, unsigned int smp_cpus)
 {
@@ -90,7 +101,7 @@ int libxl_name_to_domid(libxl_ctx *ctx, const char *name,
     return ret;
 }
 
-char *libxl_poolid_to_name(libxl_ctx *ctx, uint32_t poolid)
+char *libxl_cpupoolid_to_name(libxl_ctx *ctx, uint32_t poolid)
 {
     unsigned int len;
     char path[strlen("/local/pool") + 12];
@@ -103,40 +114,61 @@ char *libxl_poolid_to_name(libxl_ctx *ctx, uint32_t poolid)
     return s;
 }
 
-char *libxl__poolid_to_name(libxl__gc *gc, uint32_t poolid)
+char *libxl__cpupoolid_to_name(libxl__gc *gc, uint32_t poolid)
 {
-    char *s = libxl_poolid_to_name(libxl__gc_owner(gc), poolid);
+    char *s = libxl_cpupoolid_to_name(libxl__gc_owner(gc), poolid);
     if ( s )
         libxl__ptr_add(gc, s);
     return s;
 }
 
-int libxl_name_to_poolid(libxl_ctx *ctx, const char *name,
+int libxl_name_to_cpupoolid(libxl_ctx *ctx, const char *name,
                         uint32_t *poolid)
 {
     int i, nb_pools;
     char *poolname;
-    libxl_poolinfo *poolinfo;
+    libxl_cpupoolinfo *poolinfo;
     int ret = -1;
 
-    poolinfo = libxl_list_pool(ctx, &nb_pools);
+    poolinfo = libxl_list_cpupool(ctx, &nb_pools);
     if (!poolinfo)
         return ERROR_NOMEM;
 
     for (i = 0; i < nb_pools; i++) {
-        poolname = libxl_poolid_to_name(ctx, poolinfo[i].poolid);
-        if (!poolname)
-            continue;
-        if (strcmp(poolname, name) == 0) {
-            *poolid = poolinfo[i].poolid;
-            ret = 0;
+        if (ret && ((poolname = libxl_cpupoolid_to_name(ctx,
+            poolinfo[i].poolid)) != NULL)) {
+            if (strcmp(poolname, name) == 0) {
+                *poolid = poolinfo[i].poolid;
+                ret = 0;
+            }
             free(poolname);
-            break;
         }
-        free(poolname);
+        libxl_cpupoolinfo_destroy(poolinfo + i);
     }
     free(poolinfo);
     return ret;
+}
+
+int libxl_name_to_schedid(libxl_ctx *ctx, const char *name)
+{
+    int i;
+
+    for (i = 0; schedid_name[i].name != NULL; i++)
+        if (strcmp(name, schedid_name[i].name) == 0)
+            return schedid_name[i].id;
+
+    return -1;
+}
+
+char *libxl_schedid_to_name(libxl_ctx *ctx, int schedid)
+{
+    int i;
+
+    for (i = 0; schedid_name[i].name != NULL; i++)
+        if (schedid_name[i].id == schedid)
+            return schedid_name[i].name;
+
+    return "unknown";
 }
 
 int libxl_get_stubdom_id(libxl_ctx *ctx, int guest_domid)
@@ -674,6 +706,44 @@ int libxl_check_device_model_version(libxl_ctx *ctx, char *path)
 out:
     libxl__free_all(&gc);
     return rc;
+}
+
+int libxl_cpumap_alloc(libxl_cpumap *cpumap, int max_cpus)
+{
+    int elems;
+
+    elems = (max_cpus + 63) / 64;
+    cpumap->map = calloc(elems, sizeof(*cpumap->map));
+    if (!cpumap->map)
+        return ERROR_NOMEM;
+    cpumap->size = elems * 8;     /* size in bytes */
+    return 0;
+}
+
+void libxl_cpumap_destroy(libxl_cpumap *map)
+{
+    free(map->map);
+}
+
+int libxl_cpumap_test(libxl_cpumap *cpumap, int cpu)
+{
+    if (cpu >= cpumap->size * 8)
+        return 0;
+    return (cpumap->map[cpu / 64] & (1L << (cpu & 63))) ? 1 : 0;
+}
+
+void libxl_cpumap_set(libxl_cpumap *cpumap, int cpu)
+{
+    if (cpu >= cpumap->size * 8)
+        return;
+    cpumap->map[cpu / 64] |= 1L << (cpu & 63);
+}
+
+void libxl_cpumap_reset(libxl_cpumap *cpumap, int cpu)
+{
+    if (cpu >= cpumap->size * 8)
+        return;
+    cpumap->map[cpu / 64] &= ~(1L << (cpu & 63));
 }
 
 int libxl_get_max_cpus(libxl_ctx *ctx)

@@ -131,7 +131,10 @@ class Reference(Type):
         kwargs.setdefault('passby', PASS_BY_VALUE)
         
         kwargs.setdefault('namespace', ty.namespace)
-        typename = ty.typename[len(kwargs['namespace']):]
+
+        typename = ty.typename
+        if ty.namespace:
+            typename = typename[len(kwargs['namespace']):]
         Type.__init__(self, typename + " *", **kwargs)
 
 #

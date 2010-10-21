@@ -338,6 +338,41 @@ struct cmd_spec cmd_table[] = {
       "destroy a domain's version 2 virtual network device",
       "<Domain> <DevId>",
     },
+    { "cpupool-create",
+      &main_cpupoolcreate,
+      "Create a CPU pool based an ConfigFile",
+      "[options] <ConfigFile> [vars]",
+      "-h, --help                   Print this help.\n"
+      "-f=FILE, --defconfig=FILE    Use the given configuration file.\n"
+      "-n, --dryrun                 Dry run - prints the resulting configuration."
+    },
+    { "cpupool-list",
+      &main_cpupoollist,
+      "List CPU pools on host",
+      "[-l|--long] [-c|--cpus] [<CPU Pool>]",
+      "-l, --long                     Output all CPU pool details.\n"
+      "-c, --cpus                     Output list of CPUs used by a pool"
+    },
+    { "cpupool-destroy",
+      &main_cpupooldestroy,
+      "Deactivates a CPU pool",
+      "<CPU Pool>",
+    },
+    { "cpupool-cpu-add",
+      &main_cpupoolcpuadd,
+      "Adds a CPU to a CPU pool",
+      "<CPU Pool> <CPU nr>",
+    },
+    { "cpupool-cpu-remove",
+      &main_cpupoolcpuremove,
+      "Removes a CPU from a CPU pool",
+      "<CPU Pool> <CPU nr>",
+    },
+    { "cpupool-migrate",
+      &main_cpupoolmigrate,
+      "Moves a domain into a CPU pool",
+      "<Domain> <CPU Pool>",
+    },
 };
 
 int cmdtable_len = sizeof(cmd_table)/sizeof(struct cmd_spec);

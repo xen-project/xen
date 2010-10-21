@@ -6,6 +6,7 @@
 libxl_ctx = Builtin("ctx")
 libxl_uuid = Builtin("uuid")
 libxl_mac = Builtin("mac")
+libxl_cpumap = Builtin("cpumap", destructor_fn="libxl_cpumap_destroy", passby=PASS_BY_REFERENCE)
 libxl_qemu_machine_type = Number("qemu_machine_type", namespace="libxl_")
 libxl_console_consback = Number("console_consback", namespace="libxl_")
 libxl_console_constype = Number("console_constype", namespace="libxl_")
@@ -16,8 +17,6 @@ libxl_cpuid_policy_list = Builtin("cpuid_policy_list", destructor_fn="libxl_cpui
 libxl_string_list = Builtin("string_list", destructor_fn="libxl_string_list_destroy", passby=PASS_BY_REFERENCE)
 libxl_key_value_list = Builtin("key_value_list", destructor_fn="libxl_key_value_list_destroy", passby=PASS_BY_REFERENCE)
 libxl_file_reference = Builtin("file_reference", destructor_fn="libxl_file_reference_destroy", passby=PASS_BY_REFERENCE)
-
-libxl_cpumap = Builtin("cpumap", destructor_fn="free")
 
 libxl_hwcap = Builtin("hwcap")
 
@@ -45,9 +44,12 @@ SHUTDOWN_* constant."""),
     ("vcpu_online", uint32),
     ], destructor_fn=None)
 
-libxl_poolinfo = Struct("poolinfo", [
-    ("poolid", uint32)
-    ], destructor_fn=None)
+libxl_cpupoolinfo = Struct("cpupoolinfo", [
+    ("poolid",      uint32),
+    ("sched_id",    uint32),
+    ("n_dom",       uint32),
+    ("cpumap",      libxl_cpumap)
+    ])
 
 libxl_vminfo = Struct("vminfo", [
     ("uuid", libxl_uuid),

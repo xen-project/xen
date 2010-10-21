@@ -21,8 +21,10 @@
 unsigned long libxl_get_required_shadow_memory(unsigned long maxmem_kb, unsigned int smp_cpus);
 int libxl_name_to_domid(libxl_ctx *ctx, const char *name, uint32_t *domid);
 char *libxl_domid_to_name(libxl_ctx *ctx, uint32_t domid);
-int libxl_name_to_poolid(libxl_ctx *ctx, const char *name, uint32_t *poolid);
-char *libxl_poolid_to_name(libxl_ctx *ctx, uint32_t poolid);
+int libxl_name_to_cpupoolid(libxl_ctx *ctx, const char *name, uint32_t *poolid);
+char *libxl_cpupoolid_to_name(libxl_ctx *ctx, uint32_t poolid);
+int libxl_name_to_schedid(libxl_ctx *ctx, const char *name);
+char *libxl_schedid_to_name(libxl_ctx *ctx, int schedid);
 int libxl_get_stubdom_id(libxl_ctx *ctx, int guest_domid);
 int libxl_is_stubdom(libxl_ctx *ctx, uint32_t domid, uint32_t *target_domid);
 int libxl_create_logfile(libxl_ctx *ctx, char *name, char **full_name);
@@ -74,5 +76,9 @@ int libxl_devid_to_device_net2(libxl_ctx *ctx, uint32_t domid,
  * return -1 if there are an error */
 int libxl_check_device_model_version(libxl_ctx *ctx, char *path);
 
+int libxl_cpumap_alloc(libxl_cpumap *cpumap, int max_cpus);
+int libxl_cpumap_test(libxl_cpumap *cpumap, int cpu);
+void libxl_cpumap_set(libxl_cpumap *cpumap, int cpu);
+void libxl_cpumap_reset(libxl_cpumap *cpumap, int cpu);
 #endif
 

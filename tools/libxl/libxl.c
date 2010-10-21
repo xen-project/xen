@@ -607,21 +607,26 @@ int libxl_domain_info(libxl_ctx *ctx, libxl_dominfo *info_r,
     return 0;
 }
 
-libxl_poolinfo * libxl_list_pool(libxl_ctx *ctx, int *nb_pool)
+libxl_cpupoolinfo * libxl_list_cpupool(libxl_ctx *ctx, int *nb_pool)
 {
-    libxl_poolinfo *ptr, *tmp;
-    int i;
+    libxl_cpupoolinfo *ptr, *tmp;
+    int i, m, ncpu;
     xc_cpupoolinfo_t *info;
     uint32_t poolid;
 
     ptr = NULL;
+    ncpu = xc_get_max_cpus(ctx->xch);
+    if (!ncpu) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting max cpu number");
+        return NULL;
+    }
 
     poolid = 0;
     for (i = 0;; i++) {
         info = xc_cpupool_getinfo(ctx->xch, poolid);
         if (info == NULL)
             break;
-        tmp = realloc(ptr, (i + 1) * sizeof(libxl_poolinfo));
+        tmp = realloc(ptr, (i + 1) * sizeof(libxl_cpupoolinfo));
         if (!tmp) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "allocating cpupool info");
             free(ptr);
@@ -629,6 +634,13 @@ libxl_poolinfo * libxl_list_pool(libxl_ctx *ctx, int *nb_pool)
         }
         ptr = tmp;
         ptr[i].poolid = info->cpupool_id;
+        ptr[i].sched_id = info->sched_id;
+        ptr[i].n_dom = info->n_dom;
+        if (libxl_cpumap_alloc(&ptr[i].cpumap, ncpu))
+            break;
+        for (m = 0; m < ptr[i].cpumap.size / sizeof(*ptr[i].cpumap.map); m++)
+            ptr[i].cpumap.map[m] = (info->cpumap_size > (m * sizeof(*ptr[i].cpumap.map))) ?
+                info->cpumap[m] : 0;
         poolid = info->cpupool_id + 1;
         free(info);
     }
@@ -3211,7 +3223,6 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
     libxl_vcpuinfo *ptr, *ret;
     xc_domaininfo_t domaininfo;
     xc_vcpuinfo_t vcpuinfo;
-    unsigned num_cpuwords;
 
     if (xc_domain_getinfolist(ctx->xch, domid, 1, &domaininfo) != 1) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting infolist");
@@ -3223,10 +3234,9 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
         return NULL;
     }
 
-    num_cpuwords = ((*nrcpus + 63) / 64);
     for (*nb_vcpu = 0; *nb_vcpu <= domaininfo.max_vcpu_id; ++*nb_vcpu, ++ptr) {
-        ptr->cpumap = malloc(num_cpuwords * sizeof(*ptr->cpumap));
-        if (!ptr->cpumap) {
+        if (libxl_cpumap_alloc(&ptr->cpumap, *nrcpus)) {
+            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "allocating cpumap");
             return NULL;
         }
         if (xc_vcpu_getinfo(ctx->xch, domid, *nb_vcpu, &vcpuinfo) == -1) {
@@ -3234,7 +3244,7 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
             return NULL;
         }
         if (xc_vcpu_getaffinity(ctx->xch, domid, *nb_vcpu,
-            ptr->cpumap, ((*nrcpus) + 7) / 8) == -1) {
+            ptr->cpumap.map, ((*nrcpus) + 7) / 8) == -1) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting vcpu affinity");
             return NULL;
         }
@@ -3916,4 +3926,177 @@ void libxl_file_reference_destroy(libxl_file_reference *f)
 {
     libxl__file_reference_unmap(f);
     free(f->path);
+}
+
+int libxl_get_freecpus(libxl_ctx *ctx, libxl_cpumap *cpumap)
+{
+    int ncpus;
+
+    cpumap->map = xc_cpupool_freeinfo(ctx->xch, &ncpus);
+    if (cpumap->map == NULL)
+        return ERROR_FAIL;
+
+    cpumap->size = (ncpus + 7) / 8;
+
+    return 0;
+}
+
+int libxl_create_cpupool(libxl_ctx *ctx, char *name, int schedid,
+                         libxl_cpumap cpumap, libxl_uuid *uuid,
+                         uint32_t *poolid)
+{
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    int rc;
+    int i;
+    xs_transaction_t t;
+    char *uuid_string;
+
+    uuid_string = libxl__uuid2string(&gc, *uuid);
+    if (!uuid_string)
+        return ERROR_NOMEM;
+
+    rc = xc_cpupool_create(ctx->xch, poolid, schedid);
+    if (rc) {
+        LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
+           "Could not create cpupool");
+        return ERROR_FAIL;
+    }
+
+    for (i = 0; i < cpumap.size * 8; i++)
+        if (cpumap.map[i / 64] & (1L << (i % 64))) {
+            rc = xc_cpupool_addcpu(ctx->xch, *poolid, i);
+            if (rc) {
+                LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
+                    "Error moving cpu to cpupool");
+                libxl_destroy_cpupool(ctx, *poolid);
+                return ERROR_FAIL;
+            }
+        }
+
+    for (;;) {
+        t = xs_transaction_start(ctx->xsh);
+
+        xs_mkdir(ctx->xsh, t, libxl__sprintf(&gc, "/local/pool/%d", *poolid));
+        libxl__xs_write(&gc, t, libxl__sprintf(&gc, "/local/pool/%d/uuid", *poolid),
+                 uuid_string);
+        libxl__xs_write(&gc, t, libxl__sprintf(&gc, "/local/pool/%d/name", *poolid),
+                 name);
+
+        if (xs_transaction_end(ctx->xsh, t, 0) || (errno != EAGAIN))
+            return 0;
+    }
+}
+
+int libxl_destroy_cpupool(libxl_ctx *ctx, uint32_t poolid)
+{
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    int rc, i;
+    xc_cpupoolinfo_t *info;
+    xs_transaction_t t;
+
+    info = xc_cpupool_getinfo(ctx->xch, poolid);
+    if (info == NULL)
+        return ERROR_NOMEM;
+
+    rc = ERROR_INVAL;
+    if ((info->cpupool_id != poolid) || (info->n_dom))
+        goto out;
+
+    for (i = 0; i < info->cpumap_size; i++)
+        if (info->cpumap[i / 64] & (1L << (i % 64))) {
+            rc = xc_cpupool_removecpu(ctx->xch, poolid, i);
+            if (rc) {
+                LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
+                    "Error removing cpu from cpupool");
+                rc = ERROR_FAIL;
+                goto out;
+            }
+        }
+
+    rc = xc_cpupool_destroy(ctx->xch, poolid);
+    if (rc) {
+        LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc, "Could not destroy cpupool");
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    for (;;) {
+        t = xs_transaction_start(ctx->xsh);
+
+        xs_rm(ctx->xsh, XBT_NULL, libxl__sprintf(&gc, "/local/pool/%d", poolid));
+
+        if (xs_transaction_end(ctx->xsh, t, 0) || (errno != EAGAIN))
+            break;
+    }
+
+    rc = 0;
+
+out:
+    free(info);
+
+    return rc;
+}
+
+int libxl_cpupool_cpuadd(libxl_ctx *ctx, uint32_t poolid, int cpu)
+{
+    int rc;
+
+    rc = xc_cpupool_addcpu(ctx->xch, poolid, cpu);
+    if (rc) {
+        LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
+            "Error moving cpu to cpupool");
+        return ERROR_FAIL;
+    }
+    return 0;
+}
+
+int libxl_cpupool_cpuremove(libxl_ctx *ctx, uint32_t poolid, int cpu)
+{
+    int rc;
+
+    rc = xc_cpupool_removecpu(ctx->xch, poolid, cpu);
+    if (rc) {
+        LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
+            "Error removing cpu from cpupool");
+        return ERROR_FAIL;
+    }
+    return 0;
+}
+
+int libxl_cpupool_movedomain(libxl_ctx *ctx, uint32_t poolid, uint32_t domid)
+{
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    int rc;
+    char *dom_path;
+    char *vm_path;
+    char *poolname;
+    xs_transaction_t t;
+
+    dom_path = libxl__xs_get_dompath(&gc, domid);
+    if (!dom_path) {
+        return ERROR_FAIL;
+    }
+
+    rc = xc_cpupool_movedomain(ctx->xch, poolid, domid);
+    if (rc) {
+        LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
+            "Error moving domain to cpupool");
+        return ERROR_FAIL;
+    }
+
+    for (;;) {
+        t = xs_transaction_start(ctx->xsh);
+
+        poolname = libxl__cpupoolid_to_name(&gc, poolid);
+        vm_path = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/vm", dom_path));
+        if (!vm_path)
+            break;
+
+        libxl__xs_write(&gc, t, libxl__sprintf(&gc, "%s/pool_name", vm_path), poolname);
+
+        if (xs_transaction_end(ctx->xsh, t, 0) || (errno != EAGAIN))
+            break;
+    }
+
+    return 0;
 }

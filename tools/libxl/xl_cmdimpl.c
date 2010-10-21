@@ -213,14 +213,14 @@ static int domain_qualifier_to_domid(const char *p, uint32_t *domid_r,
     return was_name ? libxl_name_to_domid(&ctx, p, domid_r) : 0;
 }
 
-static int pool_qualifier_to_poolid(const char *p, uint32_t *poolid_r,
+static int cpupool_qualifier_to_cpupoolid(const char *p, uint32_t *poolid_r,
                                      int *was_name_r)
 {
     int was_name;
 
     was_name = qualifier_to_id(p, poolid_r);
     if (was_name_r) *was_name_r = was_name;
-    return was_name ? libxl_name_to_poolid(&ctx, p, poolid_r) : 0;
+    return was_name ? libxl_name_to_cpupoolid(&ctx, p, poolid_r) : 0;
 }
 
 static void find_domain(const char *p)
@@ -494,7 +494,7 @@ static void printf_info(int domid,
         printf("\t(uuid <unknown>)\n");
     }
 
-    printf("\t(cpupool %s (%d))\n", c_info->poolname, c_info->poolid);
+    printf("\t(cpupool %s)\n", c_info->poolname);
     if (c_info->xsdata)
         printf("\t(xsdata contains data)\n");
     else
@@ -697,9 +697,9 @@ static void parse_config_data(const char *configfile_filename_report,
 
     if (!xlu_cfg_get_string (config, "pool", &buf)) {
         c_info->poolid = -1;
-        pool_qualifier_to_poolid(buf, &c_info->poolid, NULL);
+        cpupool_qualifier_to_cpupoolid(buf, &c_info->poolid, NULL);
     }
-    c_info->poolname = libxl_poolid_to_name(&ctx, c_info->poolid);
+    c_info->poolname = libxl_cpupoolid_to_name(&ctx, c_info->poolid);
     if (!c_info->poolname) {
         fprintf(stderr, "Illegal pool specified\n");
         exit(1);
@@ -3517,7 +3517,7 @@ static void print_vcpuinfo(uint32_t tdomid,
     printf("%9.1f  ", ((float)vcpuinfo->vcpu_time / 1e9));
     /* CPU AFFINITY */
     pcpumap = nr_cpus > 64 ? (uint64_t)-1 : ((1ULL << nr_cpus) - 1);
-    for (cpumap = vcpuinfo->cpumap; nr_cpus; ++cpumap) {
+    for (cpumap = vcpuinfo->cpumap.map; nr_cpus; ++cpumap) {
         if (*cpumap < pcpumap) {
             break;
         }
@@ -3532,7 +3532,7 @@ static void print_vcpuinfo(uint32_t tdomid,
     if (!nr_cpus) {
         printf("any cpu\n");
     } else {
-        for (cpumap = vcpuinfo->cpumap; nr_cpus; ++cpumap) {
+        for (cpumap = vcpuinfo->cpumap.map; nr_cpus; ++cpumap) {
             pcpumap = *cpumap;
             for (i = 0; !(pcpumap & 1); ++i, pcpumap >>= 1)
                 ;
@@ -3804,10 +3804,7 @@ static void output_xeninfo(void)
     printf("xen_minor              : %d\n", info->xen_version_minor);
     printf("xen_extra              : %s\n", info->xen_version_extra);
     printf("xen_caps               : %s\n", info->capabilities);
-    printf("xen_scheduler          : %s\n",
-        sched_id == XEN_SCHEDULER_SEDF ? "sedf" :
-        sched_id == XEN_SCHEDULER_CREDIT ? "credit" :
-        sched_id == XEN_SCHEDULER_CREDIT2 ? "credit2" : "unknown");
+    printf("xen_scheduler          : %s\n", libxl_schedid_to_name(&ctx, sched_id));
     printf("xen_pagesize           : %lu\n", info->pagesize);
     printf("platform_params        : virt_start=0x%lx\n", info->virt_start);
     printf("xen_changeset          : %s\n", info->changeset);
@@ -3838,6 +3835,8 @@ static void output_physinfo(void)
     libxl_physinfo info;
     const libxl_version_info *vinfo;
     unsigned int i;
+    libxl_cpumap cpumap;
+    int n = 0;
 
     if (libxl_get_physinfo(&ctx, &info) != 0) {
         fprintf(stderr, "libxl_physinfo failed.\n");
@@ -3863,6 +3862,13 @@ static void output_physinfo(void)
         i = (1 << 20) / vinfo->pagesize;
         printf("total_memory           : %"PRIu64"\n", info.total_pages / i);
         printf("free_memory            : %"PRIu64"\n", info.free_pages / i);
+    }
+    if (!libxl_get_freecpus(&ctx, &cpumap)) {
+        for (i = 0; i < cpumap.size * 8; i++)
+            if (libxl_cpumap_test(&cpumap, i))
+                n++;
+        printf("free_cpus              : %d\n", n);
+        free(cpumap.map);
     }
 
     return;
@@ -5278,4 +5284,446 @@ int main_tmem_freeable(int argc, char **argv)
 
     printf("%d\n", mb);
     return 0;
+}
+
+int main_cpupoolcreate(int argc, char **argv)
+{
+    char *filename = NULL;
+    char *p, extra_config[1024];
+    int dryrun = 0;
+    int opt;
+    int option_index = 0;
+    static struct option long_options[] = {
+        {"help", 0, 0, 'h'},
+        {"defconfig", 1, 0, 'f'},
+        {"dryrun", 0, 0, 'n'},
+        {0, 0, 0, 0}
+    };
+    int ret;
+    void *config_data = 0;
+    int config_len = 0;
+    XLU_Config *config;
+    const char *buf;
+    char *name, *sched;
+    uint32_t poolid;
+    int schedid = -1;
+    XLU_ConfigList *cpus;
+    int n_cpus, i, n;
+    libxl_cpumap freemap;
+    libxl_cpumap cpumap;
+    libxl_uuid uuid;
+
+    while (1) {
+        opt = getopt_long(argc, argv, "hnf:", long_options, &option_index);
+        if (opt == -1)
+            break;
+
+        switch (opt) {
+        case 'f':
+            filename = optarg;
+            break;
+        case 'h':
+            help("cpupool-create");
+            return 0;
+        case 'n':
+            dryrun = 1;
+            break;
+        default:
+            fprintf(stderr, "option not supported\n");
+            break;
+        }
+    }
+
+    memset(extra_config, 0, sizeof(extra_config));
+    while (optind < argc) {
+        if ((p = strchr(argv[optind], '='))) {
+            if (strlen(extra_config) + 1 < sizeof(extra_config)) {
+                if (strlen(extra_config))
+                    strcat(extra_config, "\n");
+                strcat(extra_config, argv[optind]);
+            }
+        } else if (!filename) {
+            filename = argv[optind];
+        } else {
+            help("cpupool-create");
+            return -ERROR_FAIL;
+        }
+        optind++;
+    }
+
+    if (!filename) {
+        help("cpupool-create");
+        return -ERROR_FAIL;
+    }
+
+    if (libxl_read_file_contents(&ctx, filename, &config_data, &config_len)) {
+        fprintf(stderr, "Failed to read config file: %s: %s\n",
+                filename, strerror(errno));
+        return -ERROR_FAIL;
+    }
+    if (strlen(extra_config)) {
+        if (config_len > INT_MAX - (strlen(extra_config) + 2)) {
+            fprintf(stderr, "Failed to attach extra configration\n");
+            return -ERROR_FAIL;
+        }
+        config_data = xrealloc(config_data,
+                              config_len + strlen(extra_config) + 2);
+        if (!config_data) {
+            fprintf(stderr, "Failed to realloc config_data\n");
+            return -ERROR_FAIL;
+        }
+        strcat(config_data, "\n");
+        strcat(config_data, extra_config);
+        strcat(config_data, "\n");
+        config_len += (strlen(extra_config) + 2);
+    }
+
+    config = xlu_cfg_init(stderr, filename);
+    if (!config) {
+        fprintf(stderr, "Failed to allocate for configuration\n");
+        return -ERROR_FAIL;
+    }
+
+    ret = xlu_cfg_readdata(config, config_data, config_len);
+    if (ret) {
+        fprintf(stderr, "Failed to parse config file: %s\n", strerror(ret));
+        return -ERROR_FAIL;
+    }
+
+    if (!xlu_cfg_get_string (config, "name", &buf))
+        name = strdup(buf);
+    else
+        name = basename(filename);
+    if (!libxl_name_to_cpupoolid(&ctx, name, &poolid)) {
+        fprintf(stderr, "Pool name \"%s\" already exists\n", name);
+        return -ERROR_FAIL;
+    }
+
+    if (!xlu_cfg_get_string (config, "sched", &buf)) {
+        if ((schedid = libxl_name_to_schedid(&ctx, buf)) < 0) {
+            fprintf(stderr, "Unknown scheduler\n");
+            return -ERROR_FAIL;
+        }
+    } else {
+        if ((schedid = libxl_get_sched_id(&ctx)) < 0) {
+            fprintf(stderr, "get_sched_id sysctl failed.\n");
+            return -ERROR_FAIL;
+        }
+    }
+    sched = libxl_schedid_to_name(&ctx, schedid);
+
+    if (libxl_get_freecpus(&ctx, &freemap)) {
+        fprintf(stderr, "libxl_get_freecpus failed\n");
+        return -ERROR_FAIL;
+    }
+    if (libxl_cpumap_alloc(&cpumap, freemap.size * 8)) {
+        fprintf(stderr, "Failed to allocate cpumap\n");
+        return -ERROR_FAIL;
+    }
+    if (!xlu_cfg_get_list(config, "cpus", &cpus, 0, 0)) {
+        n_cpus = 0;
+        while ((buf = xlu_cfg_get_listitem(cpus, n_cpus)) != NULL) {
+            i = atoi(buf);
+            if ((i < 0) || (i >= freemap.size * 8) ||
+                !libxl_cpumap_test(&freemap, i)) {
+                fprintf(stderr, "cpu %d illegal or not free\n", i);
+                return -ERROR_FAIL;
+            }
+            libxl_cpumap_set(&cpumap, i);
+            n_cpus++;
+        }
+    } else {
+        n_cpus = 1;
+        n = 0;
+        for (i = 0; i < freemap.size * 8; i++)
+            if (libxl_cpumap_test(&freemap, i)) {
+                n++;
+                libxl_cpumap_set(&cpumap, i);
+                break;
+            }
+        if (n < n_cpus) {
+            fprintf(stderr, "no free cpu found\n");
+            return -ERROR_FAIL;
+        }
+    }
+
+    libxl_uuid_generate(&uuid);
+
+    printf("Using config file \"%s\"\n", filename);
+    printf("cpupool name:   %s\n", name);
+    printf("scheduler:      %s\n", sched);
+    printf("number of cpus: %d\n", n_cpus);
+
+    if (dryrun)
+        return 0;
+
+    poolid = 0;
+    if (libxl_create_cpupool(&ctx, name, schedid, cpumap, &uuid, &poolid)) {
+        fprintf(stderr, "error on creating cpupool\n");
+        return -ERROR_FAIL;
+    }
+
+    return 0;
+}
+
+int main_cpupoollist(int argc, char **argv)
+{
+    int opt;
+    int option_index = 0;
+    static struct option long_options[] = {
+        {"help", 0, 0, 'h'},
+        {"long", 0, 0, 'l'},
+        {"cpus", 0, 0, 'c'},
+        {0, 0, 0, 0}
+    };
+    int opt_long = 0;
+    int opt_cpus = 0;
+    char *pool = NULL;
+    libxl_cpupoolinfo *poolinfo;
+    int n_pools, p, c, n;
+    uint32_t poolid;
+    char *name;
+    int ret = 0;
+
+    while (1) {
+        opt = getopt_long(argc, argv, "hlc", long_options, &option_index);
+        if (opt == -1)
+            break;
+
+        switch (opt) {
+        case 'h':
+            help("cpupool-list");
+            return 0;
+        case 'l':
+            opt_long = 1;
+            break;
+        case 'c':
+            opt_cpus = 1;
+            break;
+        default:
+            fprintf(stderr, "option not supported\n");
+            break;
+        }
+    }
+
+    if ((optind + 1) < argc) {
+        help("cpupool-list");
+        return -ERROR_FAIL;
+    }
+    if (optind < argc) {
+        pool = argv[optind];
+        if (libxl_name_to_cpupoolid(&ctx, pool, &poolid)) {
+            fprintf(stderr, "Pool \'%s\' does not exist\n", pool);
+            return -ERROR_FAIL;
+        }
+    }
+
+    poolinfo = libxl_list_cpupool(&ctx, &n_pools);
+    if (!poolinfo) {
+        fprintf(stderr, "error getting cpupool info\n");
+        return -ERROR_NOMEM;
+    }
+
+    if (!opt_long) {
+        printf("%-19s", "Name");
+        if (opt_cpus)
+            printf("CPU list\n");
+        else
+            printf("CPUs   Sched     Active   Domain count\n");
+    }
+
+    for (p = 0; p < n_pools; p++) {
+        if (!ret && (!pool || (poolinfo[p].poolid != poolid))) {
+            name = libxl_cpupoolid_to_name(&ctx, poolinfo[p].poolid);
+            if (!name) {
+                fprintf(stderr, "error getting cpupool info\n");
+                ret = -ERROR_NOMEM;
+            }
+            else if (opt_long) {
+                ret = -ERROR_NI;
+            } else {
+                printf("%-19s", name);
+                free(name);
+                n = 0;
+                for (c = 0; c < poolinfo[p].cpumap.size * 8; c++)
+                    if (poolinfo[p].cpumap.map[c / 64] & (1L << (c % 64))) {
+                        if (n && opt_cpus) printf(",");
+                        if (opt_cpus) printf("%d", c);
+                        n++;
+                    }
+                if (!opt_cpus) {
+                    printf("%3d %9s       y       %4d", n,
+                           libxl_schedid_to_name(&ctx, poolinfo[p].sched_id),
+                           poolinfo[p].n_dom);
+                }
+                printf("\n");
+            }
+        }
+        libxl_cpupoolinfo_destroy(poolinfo + p);
+    }
+
+    return ret;
+}
+
+int main_cpupooldestroy(int argc, char **argv)
+{
+    int opt;
+    char *pool;
+    uint32_t poolid;
+
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("cpupool-destroy");
+            return 0;
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    pool = argv[optind];
+    if (!pool) {
+        fprintf(stderr, "no cpupool specified\n");
+        help("cpupool-destroy");
+        return -ERROR_FAIL;
+    }
+
+    if (cpupool_qualifier_to_cpupoolid(pool, &poolid, NULL) ||
+        !libxl_cpupoolid_to_name(&ctx, poolid)) {
+        fprintf(stderr, "unknown cpupool \'%s\'\n", pool);
+        return -ERROR_FAIL;
+    }
+
+    return -libxl_destroy_cpupool(&ctx, poolid);
+}
+
+int main_cpupoolcpuadd(int argc, char **argv)
+{
+    int opt;
+    char *pool;
+    uint32_t poolid;
+    int cpu;
+
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("cpupool-cpu-add");
+            return 0;
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    pool = argv[optind++];
+    if (!pool) {
+        fprintf(stderr, "no cpupool specified\n");
+        help("cpupool-cpu-add");
+        return -ERROR_FAIL;
+    }
+
+    if (!argv[optind]) {
+        fprintf(stderr, "no cpu specified\n");
+        help("cpupool-cpu-add");
+        return -ERROR_FAIL;
+    }
+    cpu = atoi(argv[optind]);
+
+    if (cpupool_qualifier_to_cpupoolid(pool, &poolid, NULL) ||
+        !libxl_cpupoolid_to_name(&ctx, poolid)) {
+        fprintf(stderr, "unknown cpupool \'%s\'\n", pool);
+        return -ERROR_FAIL;
+    }
+
+    return -libxl_cpupool_cpuadd(&ctx, poolid, cpu);
+}
+
+int main_cpupoolcpuremove(int argc, char **argv)
+{
+    int opt;
+    char *pool;
+    uint32_t poolid;
+    int cpu;
+
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("cpupool-cpu-remove");
+            return 0;
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    pool = argv[optind++];
+    if (!pool) {
+        fprintf(stderr, "no cpupool specified\n");
+        help("cpupool-cpu-remove");
+        return -ERROR_FAIL;
+    }
+
+    if (!argv[optind]) {
+        fprintf(stderr, "no cpu specified\n");
+        help("cpupool-cpu-remove");
+        return -ERROR_FAIL;
+    }
+    cpu = atoi(argv[optind]);
+
+    if (cpupool_qualifier_to_cpupoolid(pool, &poolid, NULL) ||
+        !libxl_cpupoolid_to_name(&ctx, poolid)) {
+        fprintf(stderr, "unknown cpupool \'%s\'\n", pool);
+        return -ERROR_FAIL;
+    }
+
+    return -libxl_cpupool_cpuremove(&ctx, poolid, cpu);
+}
+
+int main_cpupoolmigrate(int argc, char **argv)
+{
+    int opt;
+    char *pool;
+    uint32_t poolid;
+    char *dom;
+    uint32_t domid;
+
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("cpupool-migrate");
+            return 0;
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    dom = argv[optind++];
+    if (!dom) {
+       fprintf(stderr, "no domain specified\n");
+        help("cpupool-migrate");
+        return -ERROR_FAIL;
+    }
+
+    pool = argv[optind++];
+    if (!pool) {
+        fprintf(stderr, "no cpupool specified\n");
+        help("cpupool-migrate");
+        return -ERROR_FAIL;
+    }
+
+    if (domain_qualifier_to_domid(dom, &domid, NULL) ||
+        !libxl_domid_to_name(&ctx, domid)) {
+        fprintf(stderr, "unknown domain \'%s\'\n", dom);
+        return -ERROR_FAIL;
+    }
+
+    if (cpupool_qualifier_to_cpupoolid(pool, &poolid, NULL) ||
+        !libxl_cpupoolid_to_name(&ctx, poolid)) {
+        fprintf(stderr, "unknown cpupool \'%s\'\n", pool);
+        return -ERROR_FAIL;
+    }
+
+    return -libxl_cpupool_movedomain(&ctx, poolid, domid);
 }

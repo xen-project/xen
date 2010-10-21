@@ -235,7 +235,7 @@ _hidden char *libxl__abs_path(libxl__gc *gc, char *s, const char *path);
 #define LIBXL__LOG_ERROR   XTL_ERROR
 
 _hidden char *libxl__domid_to_name(libxl__gc *gc, uint32_t domid);
-_hidden char *libxl__poolid_to_name(libxl__gc *gc, uint32_t poolid);
+_hidden char *libxl__cpupoolid_to_name(libxl__gc *gc, uint32_t poolid);
 
 
   /* holds the CPUID response for a single CPUID leaf
