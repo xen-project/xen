@@ -675,3 +675,8 @@ out:
     libxl__free_all(&gc);
     return rc;
 }
+
+int libxl_get_max_cpus(libxl_ctx *ctx)
+{
+    return xc_get_max_cpus(ctx->xch);
+}

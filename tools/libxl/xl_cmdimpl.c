@@ -3639,12 +3639,11 @@ int main_vcpulist(int argc, char **argv)
 static void vcpupin(char *d, const char *vcpu, char *cpu)
 {
     libxl_vcpuinfo *vcpuinfo;
-    libxl_physinfo physinfo;
     uint64_t *cpumap = NULL;
 
     uint32_t vcpuid, cpuida, cpuidb;
     char *endptr, *toka, *tokb;
-    int i, nb_vcpu, cpusize;
+    int i, nb_vcpu, cpusize, cpumapsize;
 
     vcpuid = strtoul(vcpu, &endptr, 10);
     if (vcpu == endptr) {
@@ -3657,12 +3656,13 @@ static void vcpupin(char *d, const char *vcpu, char *cpu)
 
     find_domain(d);
 
-    if (libxl_get_physinfo(&ctx, &physinfo) != 0) {
-        fprintf(stderr, "libxl_get_physinfo failed.\n");
+    if ((cpusize = libxl_get_max_cpus(&ctx)) == 0) {
+        fprintf(stderr, "libxl_get_max_cpus failed.\n");
         goto vcpupin_out1;
     }
+    cpumapsize = (cpusize + sizeof (uint64_t) - 1) / sizeof (uint64_t);
 
-    cpumap = calloc(physinfo.max_cpu_id + 1, sizeof (uint64_t));
+    cpumap = calloc(cpumapsize, sizeof (uint64_t));
     if (!cpumap) {
         goto vcpupin_out1;
     }
@@ -3690,24 +3690,24 @@ static void vcpupin(char *d, const char *vcpu, char *cpu)
         }
     }
     else {
-        memset(cpumap, -1, sizeof (uint64_t) * (physinfo.max_cpu_id + 1));
+        memset(cpumap, -1, sizeof (uint64_t) * cpumapsize);
     }
 
     if (vcpuid != -1) {
         if (libxl_set_vcpuaffinity(&ctx, domid, vcpuid,
-                                   cpumap, physinfo.max_cpu_id + 1) == -1) {
+                                   cpumap, cpusize) == -1) {
             fprintf(stderr, "Could not set affinity for vcpu `%u'.\n", vcpuid);
         }
     }
     else {
-        if (!(vcpuinfo = libxl_list_vcpu(&ctx, domid, &nb_vcpu, &cpusize))) {
+        if (!(vcpuinfo = libxl_list_vcpu(&ctx, domid, &nb_vcpu, &i))) {
             fprintf(stderr, "libxl_list_vcpu failed.\n");
             goto vcpupin_out;
         }
         for (; nb_vcpu > 0; --nb_vcpu, ++vcpuinfo) {
             if (libxl_set_vcpuaffinity(&ctx, domid, vcpuinfo->vcpuid,
-                                       cpumap, physinfo.max_cpu_id + 1) == -1) {
-                fprintf(stderr, "libxl_list_vcpu failed on vcpu `%u'.\n", vcpuinfo->vcpuid);
+                                       cpumap, cpusize) == -1) {
+                fprintf(stderr, "libxl_set_vcpuaffinity failed on vcpu `%u'.\n", vcpuinfo->vcpuid);
             }
         }
     }

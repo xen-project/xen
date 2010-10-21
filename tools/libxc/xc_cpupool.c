@@ -34,6 +34,11 @@ static int do_sysctl_save(xc_interface *xch, struct xen_sysctl *sysctl)
     return ret;
 }
 
+static int get_cpumap_size(xc_interface *xch)
+{
+    return (xc_get_max_cpus(xch) + 7) / 8;
+}
+
 int xc_cpupool_create(xc_interface *xch,
                       uint32_t *ppoolid,
                       uint32_t sched_id)
@@ -64,50 +69,61 @@ int xc_cpupool_destroy(xc_interface *xch,
     return do_sysctl_save(xch, &sysctl);
 }
 
-int xc_cpupool_getinfo(xc_interface *xch, 
-                       uint32_t first_poolid,
-                       uint32_t n_max, 
-                       xc_cpupoolinfo_t *info)
+xc_cpupoolinfo_t *xc_cpupool_getinfo(xc_interface *xch, 
+                       uint32_t poolid)
 {
     int err = 0;
-    int p;
-    uint32_t poolid = first_poolid;
-    uint8_t local[sizeof (info->cpumap)];
+    xc_cpupoolinfo_t *info;
+    uint8_t *local;
+    int local_size;
+    int cpumap_size;
+    int size;
     DECLARE_SYSCTL;
 
-    memset(info, 0, n_max * sizeof(xc_cpupoolinfo_t));
-
-    for (p = 0; p < n_max; p++)
+    local_size = get_cpumap_size(xch);
+    if (!local_size)
     {
-        sysctl.cmd = XEN_SYSCTL_cpupool_op;
-        sysctl.u.cpupool_op.op = XEN_SYSCTL_CPUPOOL_OP_INFO;
-        sysctl.u.cpupool_op.cpupool_id = poolid;
-        set_xen_guest_handle(sysctl.u.cpupool_op.cpumap.bitmap, local);
-        sysctl.u.cpupool_op.cpumap.nr_cpus = sizeof(info->cpumap) * 8;
+        PERROR("Could not get number of cpus");
+        return NULL;
+    }
+    local = alloca(local_size);
+    cpumap_size = (local_size + sizeof(*info->cpumap) - 1) / sizeof(*info->cpumap);
+    size = sizeof(xc_cpupoolinfo_t) + cpumap_size * sizeof(*info->cpumap);
+    info = malloc(size);
+    if ( !info )
+        return NULL;
 
-        if ( (err = lock_pages(xch, local, sizeof(local))) != 0 )
-        {
-            PERROR("Could not lock memory for Xen hypercall");
-            break;
-        }
-        err = do_sysctl_save(xch, &sysctl);
-        unlock_pages(xch, local, sizeof (local));
+    memset(info, 0, size);
+    info->cpumap_size = local_size * 8;
+    info->cpumap = (uint64_t *)(info + 1);
 
-        if ( err < 0 )
-            break;
+    sysctl.cmd = XEN_SYSCTL_cpupool_op;
+    sysctl.u.cpupool_op.op = XEN_SYSCTL_CPUPOOL_OP_INFO;
+    sysctl.u.cpupool_op.cpupool_id = poolid;
+    set_xen_guest_handle(sysctl.u.cpupool_op.cpumap.bitmap, local);
+    sysctl.u.cpupool_op.cpumap.nr_cpus = local_size * 8;
 
-        info->cpupool_id = sysctl.u.cpupool_op.cpupool_id;
-        info->sched_id = sysctl.u.cpupool_op.sched_id;
-        info->n_dom = sysctl.u.cpupool_op.n_dom;
-        bitmap_byte_to_64(&(info->cpumap), local, sizeof(local) * 8);
-        poolid = sysctl.u.cpupool_op.cpupool_id + 1;
-        info++;
+    if ( (err = lock_pages(xch, local, local_size)) != 0 )
+    {
+        PERROR("Could not lock memory for Xen hypercall");
+        free(info);
+        return NULL;
+    }
+    err = do_sysctl_save(xch, &sysctl);
+    unlock_pages(xch, local, local_size);
+
+    if ( err < 0 )
+    {
+        free(info);
+        return NULL;
     }
 
-    if ( p == 0 )
-        return err;
+    info->cpupool_id = sysctl.u.cpupool_op.cpupool_id;
+    info->sched_id = sysctl.u.cpupool_op.sched_id;
+    info->n_dom = sysctl.u.cpupool_op.n_dom;
+    bitmap_byte_to_64(info->cpumap, local, local_size * 8);
 
-    return p;
+    return info;
 }
 
 int xc_cpupool_addcpu(xc_interface *xch,
@@ -149,31 +165,41 @@ int xc_cpupool_movedomain(xc_interface *xch,
     return do_sysctl_save(xch, &sysctl);
 }
 
-int xc_cpupool_freeinfo(xc_interface *xch,
-                        uint64_t *cpumap)
+uint64_t * xc_cpupool_freeinfo(xc_interface *xch,
+                        int *cpusize)
 {
     int err;
-    uint8_t local[sizeof (*cpumap)];
+    uint8_t *local;
+    uint64_t *cpumap;
     DECLARE_SYSCTL;
+
+    *cpusize = get_cpumap_size(xch);
+    if (*cpusize == 0)
+        return NULL;
+    local = alloca(*cpusize);
+    cpumap = calloc((*cpusize + sizeof(*cpumap) - 1) / sizeof(*cpumap), sizeof(*cpumap));
+    if (cpumap == NULL)
+        return NULL;
 
     sysctl.cmd = XEN_SYSCTL_cpupool_op;
     sysctl.u.cpupool_op.op = XEN_SYSCTL_CPUPOOL_OP_FREEINFO;
     set_xen_guest_handle(sysctl.u.cpupool_op.cpumap.bitmap, local);
-    sysctl.u.cpupool_op.cpumap.nr_cpus = sizeof(*cpumap) * 8;
+    sysctl.u.cpupool_op.cpumap.nr_cpus = *cpusize * 8;
 
-    if ( (err = lock_pages(xch, local, sizeof(local))) != 0 )
+    if ( (err = lock_pages(xch, local, *cpusize)) != 0 )
     {
         PERROR("Could not lock memory for Xen hypercall");
-        return err;
+        free(cpumap);
+        return NULL;
     }
 
     err = do_sysctl_save(xch, &sysctl);
-    unlock_pages(xch, local, sizeof (local));
+    unlock_pages(xch, local, *cpusize);
+    bitmap_byte_to_64(cpumap, local, *cpusize * 8);
 
-    if (err < 0)
-        return err;
+    if (err >= 0)
+        return cpumap;
 
-    bitmap_byte_to_64(cpumap, local, sizeof(local) * 8);
-
-    return 0;
+    free(cpumap);
+    return NULL;
 }

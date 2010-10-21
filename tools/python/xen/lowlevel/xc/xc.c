@@ -229,7 +229,6 @@ static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
     uint64_t  *cpumap;
     PyObject *cpulist = NULL;
     int nr_cpus, size;
-    xc_physinfo_t info = {0}; 
     uint64_t cpumap_size = sizeof(*cpumap); 
 
     static char *kwd_list[] = { "domid", "vcpu", "cpumap", NULL };
@@ -238,10 +237,9 @@ static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
                                       &dom, &vcpu, &cpulist) )
         return NULL;
 
-    if ( xc_physinfo(self->xc_handle, &info) != 0 )
+    nr_cpus = xc_get_max_cpus(self->xc_handle);
+    if ( nr_cpus == 0 )
         return pyxc_error_to_exception(self->xc_handle);
-  
-    nr_cpus = info.nr_cpus;
 
     size = (nr_cpus + cpumap_size * 8 - 1)/ (cpumap_size * 8);
     cpumap = malloc(cpumap_size * size);
@@ -389,7 +387,6 @@ static PyObject *pyxc_vcpu_getinfo(XcObject *self,
     int rc, i;
     uint64_t *cpumap;
     int nr_cpus, size;
-    xc_physinfo_t pinfo = { 0 };
     uint64_t cpumap_size = sizeof(*cpumap);
 
     static char *kwd_list[] = { "domid", "vcpu", NULL };
@@ -398,9 +395,9 @@ static PyObject *pyxc_vcpu_getinfo(XcObject *self,
                                       &dom, &vcpu) )
         return NULL;
 
-    if ( xc_physinfo(self->xc_handle, &pinfo) != 0 ) 
+    nr_cpus = xc_get_max_cpus(self->xc_handle);
+    if ( nr_cpus == 0 )
         return pyxc_error_to_exception(self->xc_handle);
-    nr_cpus = pinfo.nr_cpus;
 
     rc = xc_vcpu_getinfo(self->xc_handle, dom, vcpu, &info);
     if ( rc < 0 )
@@ -1906,22 +1903,23 @@ static PyObject *pyxc_dom_set_memshr(XcObject *self, PyObject *args)
     return zero;
 }
 
-static PyObject *cpumap_to_cpulist(uint64_t cpumap)
+static PyObject *cpumap_to_cpulist(uint64_t *cpumap, int cpusize)
 {
     PyObject *cpulist = NULL;
-    uint32_t i;
+    int i;
 
     cpulist = PyList_New(0);
-    for ( i = 0; cpumap != 0; i++ )
+    for ( i = 0; i < cpusize; i++ )
     {
-        if ( cpumap & 1 )
+        if ( *cpumap & (1L << (i % 64)) )
         {
             PyObject* pyint = PyInt_FromLong(i);
 
             PyList_Append(cpulist, pyint);
             Py_DECREF(pyint);
         }
-        cpumap >>= 1;
+        if ( (i % 64) == 63 )
+            cpumap++;
     }
     return cpulist;
 }
@@ -1959,54 +1957,38 @@ static PyObject *pyxc_cpupool_destroy(XcObject *self,
     return zero;
 }
 
-static PyObject *pyxc_cpupool_getinfo(XcObject *self,
-                                      PyObject *args,
-                                      PyObject *kwds)
+static PyObject *pyxc_cpupool_getinfo(XcObject *self)
 {
     PyObject *list, *info_dict;
 
-    uint32_t first_pool = 0;
-    int max_pools = 1024, nr_pools, i;
+    uint32_t pool;
     xc_cpupoolinfo_t *info;
 
-    static char *kwd_list[] = { "first_pool", "max_pools", NULL };
-
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|ii", kwd_list,
-                                      &first_pool, &max_pools) )
-        return NULL;
-
-    info = calloc(max_pools, sizeof(xc_cpupoolinfo_t));
-    if (info == NULL)
-        return PyErr_NoMemory();
-
-    nr_pools = xc_cpupool_getinfo(self->xc_handle, first_pool, max_pools, info);
-
-    if (nr_pools < 0)
+    list = PyList_New(0);
+    for (pool = 0;;)
     {
-        free(info);
-        return pyxc_error_to_exception(self->xc_handle);
-    }
-
-    list = PyList_New(nr_pools);
-    for ( i = 0 ; i < nr_pools; i++ )
-    {
+        info = xc_cpupool_getinfo(self->xc_handle, pool);
+        if (info == NULL)
+            break;
         info_dict = Py_BuildValue(
             "{s:i,s:i,s:i,s:N}",
-            "cpupool",         (int)info[i].cpupool_id,
-            "sched",           info[i].sched_id,
-            "n_dom",           info[i].n_dom,
-            "cpulist",         cpumap_to_cpulist(info[i].cpumap));
+            "cpupool",         (int)info->cpupool_id,
+            "sched",           info->sched_id,
+            "n_dom",           info->n_dom,
+            "cpulist",         cpumap_to_cpulist(info->cpumap,
+                                                 info->cpumap_size));
+        pool = info->cpupool_id + 1;
+        free(info);
+
         if ( info_dict == NULL )
         {
             Py_DECREF(list);
-            if ( info_dict != NULL ) { Py_DECREF(info_dict); }
-            free(info);
             return NULL;
         }
-        PyList_SetItem(list, i, info_dict);
-    }
 
-    free(info);
+        PyList_Append(list, info_dict);
+        Py_DECREF(info_dict);
+    }
 
     return list;
 }
@@ -2072,12 +2054,19 @@ static PyObject *pyxc_cpupool_movedomain(XcObject *self,
 
 static PyObject *pyxc_cpupool_freeinfo(XcObject *self)
 {
-    uint64_t cpumap;
+    uint64_t *cpumap;
+    int mapsize;
+    PyObject *info = NULL;
 
-    if (xc_cpupool_freeinfo(self->xc_handle, &cpumap) != 0)
+    cpumap = xc_cpupool_freeinfo(self->xc_handle, &mapsize);
+    if (!cpumap)
         return pyxc_error_to_exception(self->xc_handle);
 
-    return cpumap_to_cpulist(cpumap);
+    info = cpumap_to_cpulist(cpumap, mapsize * 8);
+
+    free(cpumap);
+
+    return info;
 }
 
 static PyObject *pyflask_context_to_sid(PyObject *self, PyObject *args,
@@ -2832,14 +2821,9 @@ static PyMethodDef pyxc_methods[] = {
 
     { "cpupool_getinfo",
       (PyCFunction)pyxc_cpupool_getinfo,
-      METH_VARARGS | METH_KEYWORDS, "\n"
+      METH_NOARGS, "\n"
       "Get information regarding a set of cpupools, in increasing id order.\n"
-      " first_pool [int, 0]:    First cpupool to retrieve info about.\n"
-      " max_pools  [int, 1024]: Maximum number of cpupools to retrieve info"
-      " about.\n\n"
-      "Returns: [list of dicts] if list length is less than 'max_pools'\n"
-      "         parameter then there was an error, or the end of the\n"
-      "         cpupool-id space was reached.\n"
+      "Returns: [list of dicts]\n"
       " pool     [int]: Identifier of cpupool to which this info pertains\n"
       " sched    [int]:  Scheduler used for this cpupool\n"
       " n_dom    [int]:  Number of Domains in this cpupool\n"

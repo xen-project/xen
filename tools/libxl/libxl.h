@@ -249,6 +249,9 @@ int libxl_domain_shutdown(libxl_ctx *ctx, uint32_t domid, int req);
 int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid, int force);
 int libxl_domain_preserve(libxl_ctx *ctx, uint32_t domid, libxl_domain_create_info *info, const char *name_suffix, libxl_uuid new_uuid);
 
+/* get max. number of cpus supported by hypervisor */
+int libxl_get_max_cpus(libxl_ctx *ctx);
+
 /*
  * Run the configured bootloader for a PV domain and update
  * info->kernel, info->u.pv.ramdisk and info->u.pv.cmdline as

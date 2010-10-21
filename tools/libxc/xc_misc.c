@@ -21,6 +21,20 @@
 #include "xc_private.h"
 #include <xen/hvm/hvm_op.h>
 
+int xc_get_max_cpus(xc_interface *xch)
+{
+    static int max_cpus = 0;
+    xc_physinfo_t physinfo;
+
+    if ( max_cpus )
+        return max_cpus;
+
+    if ( !xc_physinfo(xch, &physinfo) )
+        max_cpus = physinfo.max_cpu_id + 1;
+
+    return max_cpus;
+}
+
 int xc_readconsolering(xc_interface *xch,
                        char *buffer,
                        unsigned int *pnr_chars,

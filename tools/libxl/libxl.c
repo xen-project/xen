@@ -609,27 +609,31 @@ int libxl_domain_info(libxl_ctx *ctx, libxl_dominfo *info_r,
 
 libxl_poolinfo * libxl_list_pool(libxl_ctx *ctx, int *nb_pool)
 {
-    libxl_poolinfo *ptr;
-    int i, ret;
-    xc_cpupoolinfo_t info[256];
-    int size = 256;
+    libxl_poolinfo *ptr, *tmp;
+    int i;
+    xc_cpupoolinfo_t *info;
+    uint32_t poolid;
 
-    ptr = calloc(size, sizeof(libxl_poolinfo));
-    if (!ptr) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "allocating cpupool info");
-        return NULL;
+    ptr = NULL;
+
+    poolid = 0;
+    for (i = 0;; i++) {
+        info = xc_cpupool_getinfo(ctx->xch, poolid);
+        if (info == NULL)
+            break;
+        tmp = realloc(ptr, (i + 1) * sizeof(libxl_poolinfo));
+        if (!tmp) {
+            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "allocating cpupool info");
+            free(ptr);
+            return NULL;
+        }
+        ptr = tmp;
+        ptr[i].poolid = info->cpupool_id;
+        poolid = info->cpupool_id + 1;
+        free(info);
     }
 
-    ret = xc_cpupool_getinfo(ctx->xch, 0, 256, info);
-    if (ret<0) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting cpupool info");
-        return NULL;
-    }
-
-    for (i = 0; i < ret; i++) {
-        ptr[i].poolid = info[i].cpupool_id;
-    }
-    *nb_pool = ret;
+    *nb_pool = i;
     return ptr;
 }
 
@@ -3207,24 +3211,19 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
     libxl_vcpuinfo *ptr, *ret;
     xc_domaininfo_t domaininfo;
     xc_vcpuinfo_t vcpuinfo;
-    xc_physinfo_t physinfo = { 0 };
     unsigned num_cpuwords;
 
     if (xc_domain_getinfolist(ctx->xch, domid, 1, &domaininfo) != 1) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting infolist");
         return NULL;
     }
-    if (xc_physinfo(ctx->xch, &physinfo) == -1) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting physinfo");
-        return NULL;
-    }
-    *nrcpus = physinfo.max_cpu_id + 1;
+    *nrcpus = xc_get_max_cpus(ctx->xch);
     ret = ptr = calloc(domaininfo.max_vcpu_id + 1, sizeof (libxl_vcpuinfo));
     if (!ptr) {
         return NULL;
     }
 
-    num_cpuwords = ((physinfo.max_cpu_id + 64) / 64);
+    num_cpuwords = ((*nrcpus + 63) / 64);
     for (*nb_vcpu = 0; *nb_vcpu <= domaininfo.max_vcpu_id; ++*nb_vcpu, ++ptr) {
         ptr->cpumap = malloc(num_cpuwords * sizeof(*ptr->cpumap));
         if (!ptr->cpumap) {

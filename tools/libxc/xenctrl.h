@@ -216,6 +216,9 @@ typedef union
 } start_info_any_t;
 
 
+/* return maximum number of cpus the hypervisor supports */
+int xc_get_max_cpus(xc_interface *xch);
+
 int xc_domain_create(xc_interface *xch,
                      uint32_t ssidref,
                      xen_domain_handle_t handle,
@@ -535,7 +538,8 @@ typedef struct xc_cpupoolinfo {
     uint32_t cpupool_id;
     uint32_t sched_id;
     uint32_t n_dom;
-    uint64_t cpumap;
+    uint32_t cpumap_size;    /* max number of cpus in map */
+    uint64_t *cpumap;
 } xc_cpupoolinfo_t;
 
 /**
@@ -564,15 +568,11 @@ int xc_cpupool_destroy(xc_interface *xch,
  * Get cpupool info. Returns info for up to the specified number of cpupools
  * starting at the given id.
  * @parm xc_handle a handle to an open hypervisor interface
- * @parm first_poolid lowest id for which info is returned
- * @parm n_max maximum number of cpupools to return info
- * @parm info pointer to xc_cpupoolinfo_t array
- * return number of cpupool infos
+ * @parm poolid lowest id for which info is returned
+ * return cpupool info ptr (obtained by malloc)
  */
-int xc_cpupool_getinfo(xc_interface *xch,
-                       uint32_t first_poolid,
-                       uint32_t n_max,
-                       xc_cpupoolinfo_t *info);
+xc_cpupoolinfo_t *xc_cpupool_getinfo(xc_interface *xch,
+                       uint32_t poolid);
 
 /**
  * Add cpu to a cpupool. cpu may be -1 indicating the first unassigned.
@@ -614,11 +614,11 @@ int xc_cpupool_movedomain(xc_interface *xch,
  * Return map of cpus not in any cpupool.
  *
  * @parm xc_handle a handle to an open hypervisor interface
- * @parm cpumap pointer where to store the cpumap
- * return 0 on success, -1 on failure
+ * @parm cpusize where to store array size in bytes
+ * return cpumap array on success, NULL else
  */
-int xc_cpupool_freeinfo(xc_interface *xch,
-                        uint64_t *cpumap);
+uint64_t *xc_cpupool_freeinfo(xc_interface *xch,
+                        int *cpusize);
 
 
 /*
