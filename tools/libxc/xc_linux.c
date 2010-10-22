@@ -612,21 +612,22 @@ int xc_gnttab_op(xc_interface *xch, int cmd, void * op, int op_size, int count)
 {
     int ret = 0;
     DECLARE_HYPERCALL;
+    DECLARE_HYPERCALL_BOUNCE(op, count * op_size, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
 
-    hypercall.op = __HYPERVISOR_grant_table_op;
-    hypercall.arg[0] = cmd;
-    hypercall.arg[1] = (unsigned long)op;
-    hypercall.arg[2] = count;
-
-    if ( lock_pages(xch, op, count* op_size) != 0 )
+    if ( xc_hypercall_bounce_pre(xch, op) )
     {
-        PERROR("Could not lock memory for Xen hypercall");
+        PERROR("Could not bounce buffer for grant table op hypercall");
         goto out1;
     }
 
+    hypercall.op = __HYPERVISOR_grant_table_op;
+    hypercall.arg[0] = cmd;
+    hypercall.arg[1] = HYPERCALL_BUFFER_AS_ARG(op);
+    hypercall.arg[2] = count;
+
     ret = do_xen_hypercall(xch, &hypercall);
 
-    unlock_pages(xch, op, count * op_size);
+    xc_hypercall_bounce_post(xch, op);
 
  out1:
     return ret;
@@ -651,7 +652,7 @@ static void *_gnttab_map_table(xc_interface *xch, int domid, int *gnt_num)
     int rc, i;
     struct gnttab_query_size query;
     struct gnttab_setup_table setup;
-    unsigned long *frame_list = NULL;
+    DECLARE_HYPERCALL_BUFFER(unsigned long, frame_list);
     xen_pfn_t *pfn_list = NULL;
     grant_entry_v1_t *gnt = NULL;
 
@@ -669,26 +670,23 @@ static void *_gnttab_map_table(xc_interface *xch, int domid, int *gnt_num)
 
     *gnt_num = query.nr_frames * (PAGE_SIZE / sizeof(grant_entry_v1_t) );
 
-    frame_list = malloc(query.nr_frames * sizeof(unsigned long));
-    if ( !frame_list || lock_pages(xch, frame_list,
-                                   query.nr_frames * sizeof(unsigned long)) )
+    frame_list = xc_hypercall_buffer_alloc(xch, frame_list, query.nr_frames * sizeof(unsigned long));
+    if ( !frame_list )
     {
-        ERROR("Alloc/lock frame_list in xc_gnttab_map_table\n");
-        if ( frame_list )
-            free(frame_list);
+        ERROR("Could not allocate frame_list in xc_gnttab_map_table\n");
         return NULL;
     }
 
     pfn_list = malloc(query.nr_frames * sizeof(xen_pfn_t));
     if ( !pfn_list )
     {
-        ERROR("Could not lock pfn_list in xc_gnttab_map_table\n");
+        ERROR("Could not allocate pfn_list in xc_gnttab_map_table\n");
         goto err;
     }
 
     setup.dom = domid;
     setup.nr_frames = query.nr_frames;
-    set_xen_guest_handle(setup.frame_list, frame_list);
+    xc_set_xen_guest_handle(setup.frame_list, frame_list);
 
     /* XXX Any race with other setup_table hypercall? */
     rc = xc_gnttab_op(xch, GNTTABOP_setup_table, &setup, sizeof(setup),
@@ -713,10 +711,7 @@ static void *_gnttab_map_table(xc_interface *xch, int domid, int *gnt_num)
 
 err:
     if ( frame_list )
-    {
-        unlock_pages(xch, frame_list, query.nr_frames * sizeof(unsigned long));
-        free(frame_list);
-    }
+        xc_hypercall_buffer_free(xch, frame_list);
     if ( pfn_list )
         free(pfn_list);
 

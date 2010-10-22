@@ -1290,7 +1290,7 @@ int xc_gnttab_set_max_grants(xc_interface *xch,
 
 int xc_gnttab_op(xc_interface *xch, int cmd,
                  void * op, int op_size, int count);
-/* Logs iff lock_pages failes, otherwise doesn't. */
+/* Logs iff hypercall bounce fails, otherwise doesn't. */
 
 int xc_gnttab_get_version(xc_interface *xch, int domid); /* Never logs */
 grant_entry_v1_t *xc_gnttab_map_table_v1(xc_interface *xch, int domid, int *gnt_num);
