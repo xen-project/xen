@@ -1172,10 +1172,8 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     ctx->p2m   = calloc(dinfo->p2m_size, sizeof(xen_pfn_t));
     pfn_type   = calloc(dinfo->p2m_size, sizeof(unsigned long));
 
-    region_mfn = xc_memalign(PAGE_SIZE, ROUNDUP(
-                              MAX_BATCH_SIZE * sizeof(xen_pfn_t), PAGE_SHIFT));
-    ctx->p2m_batch = xc_memalign(
-        PAGE_SIZE, ROUNDUP(MAX_BATCH_SIZE * sizeof(xen_pfn_t), PAGE_SHIFT));
+    region_mfn = malloc(ROUNDUP(MAX_BATCH_SIZE * sizeof(xen_pfn_t), PAGE_SHIFT));
+    ctx->p2m_batch = malloc(ROUNDUP(MAX_BATCH_SIZE * sizeof(xen_pfn_t), PAGE_SHIFT));
 
     if ( (ctx->p2m == NULL) || (pfn_type == NULL) ||
          (region_mfn == NULL) || (ctx->p2m_batch == NULL) )
@@ -1189,18 +1187,6 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
            ROUNDUP(MAX_BATCH_SIZE * sizeof(xen_pfn_t), PAGE_SHIFT)); 
     memset(ctx->p2m_batch, 0,
            ROUNDUP(MAX_BATCH_SIZE * sizeof(xen_pfn_t), PAGE_SHIFT)); 
-
-    if ( lock_pages(xch, region_mfn, sizeof(xen_pfn_t) * MAX_BATCH_SIZE) )
-    {
-        PERROR("Could not lock region_mfn");
-        goto out;
-    }
-
-    if ( lock_pages(xch, ctx->p2m_batch, sizeof(xen_pfn_t) * MAX_BATCH_SIZE) )
-    {
-        ERROR("Could not lock p2m_batch");
-        goto out;
-    }
 
     /* Get the domain's shared-info frame. */
     domctl.cmd = XEN_DOMCTL_getdomaininfo;

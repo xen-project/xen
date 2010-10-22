@@ -1071,8 +1071,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
     analysis_phase(xch, dom, ctx, HYPERCALL_BUFFER(to_skip), 0);
 
-    pfn_type   = xc_memalign(PAGE_SIZE, ROUNDUP(
-                              MAX_BATCH_SIZE * sizeof(*pfn_type), PAGE_SHIFT));
+    pfn_type   = malloc(ROUNDUP(MAX_BATCH_SIZE * sizeof(*pfn_type), PAGE_SHIFT));
     pfn_batch  = calloc(MAX_BATCH_SIZE, sizeof(*pfn_batch));
     pfn_err    = malloc(MAX_BATCH_SIZE * sizeof(*pfn_err));
     if ( (pfn_type == NULL) || (pfn_batch == NULL) || (pfn_err == NULL) )
@@ -1083,12 +1082,6 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
     }
     memset(pfn_type, 0,
            ROUNDUP(MAX_BATCH_SIZE * sizeof(*pfn_type), PAGE_SHIFT));
-
-    if ( lock_pages(xch, pfn_type, MAX_BATCH_SIZE * sizeof(*pfn_type)) )
-    {
-        PERROR("Unable to lock pfn_type array");
-        goto out;
-    }
 
     /* Setup the mfn_to_pfn table mapping */
     if ( !(ctx->live_m2p = xc_map_m2p(xch, ctx->max_mfn, PROT_READ, &ctx->m2p_mfn0)) )
