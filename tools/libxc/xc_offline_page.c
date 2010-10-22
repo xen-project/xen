@@ -294,12 +294,6 @@ static int init_mem_info(xc_interface *xch, int domid,
         minfo->pfn_type[i] = pfn_to_mfn(i, minfo->p2m_table,
                                         minfo->guest_width);
 
-    if ( lock_pages(xch, minfo->pfn_type, minfo->p2m_size * sizeof(*minfo->pfn_type)) )
-    {
-        ERROR("Unable to lock pfn_type array");
-        goto failed;
-    }
-
     for (i = 0; i < minfo->p2m_size ; i+=1024)
     {
         int count = ((dinfo->p2m_size - i ) > 1024 ) ? 1024: (dinfo->p2m_size - i);
@@ -307,13 +301,11 @@ static int init_mem_info(xc_interface *xch, int domid,
                   minfo->pfn_type + i)) )
         {
             ERROR("Failed to get pfn_type %x\n", rc);
-            goto unlock;
+            goto failed;
         }
     }
     return 0;
 
-unlock:
-    unlock_pages(xch, minfo->pfn_type, minfo->p2m_size * sizeof(*minfo->pfn_type));
 failed:
     if (minfo->pfn_type)
     {
