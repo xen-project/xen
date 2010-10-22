@@ -245,21 +245,22 @@ int xc_domain_getinfolist(xc_interface *xch,
 {
     int ret = 0;
     DECLARE_SYSCTL;
+    DECLARE_HYPERCALL_BOUNCE(info, max_domains*sizeof(*info), XC_HYPERCALL_BUFFER_BOUNCE_OUT);
 
-    if ( lock_pages(xch, info, max_domains*sizeof(xc_domaininfo_t)) != 0 )
+    if ( xc_hypercall_bounce_pre(xch, info) )
         return -1;
 
     sysctl.cmd = XEN_SYSCTL_getdomaininfolist;
     sysctl.u.getdomaininfolist.first_domain = first_domain;
     sysctl.u.getdomaininfolist.max_domains  = max_domains;
-    set_xen_guest_handle(sysctl.u.getdomaininfolist.buffer, info);
+    xc_set_xen_guest_handle(sysctl.u.getdomaininfolist.buffer, info);
 
     if ( xc_sysctl(xch, &sysctl) < 0 )
         ret = -1;
     else
         ret = sysctl.u.getdomaininfolist.num_domains;
 
-    unlock_pages(xch, info, max_domains*sizeof(xc_domaininfo_t));
+    xc_hypercall_bounce_post(xch, info);
 
     return ret;
 }

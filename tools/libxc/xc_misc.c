@@ -41,11 +41,15 @@ int xc_readconsolering(xc_interface *xch,
                        int clear, int incremental, uint32_t *pindex)
 {
     int ret;
-    DECLARE_SYSCTL;
     unsigned int nr_chars = *pnr_chars;
+    DECLARE_SYSCTL;
+    DECLARE_HYPERCALL_BOUNCE(buffer, nr_chars, XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+
+    if ( xc_hypercall_bounce_pre(xch, buffer) )
+        return -1;
 
     sysctl.cmd = XEN_SYSCTL_readconsole;
-    set_xen_guest_handle(sysctl.u.readconsole.buffer, buffer);
+    xc_set_xen_guest_handle(sysctl.u.readconsole.buffer, buffer);
     sysctl.u.readconsole.count = nr_chars;
     sysctl.u.readconsole.clear = clear;
     sysctl.u.readconsole.incremental = 0;
@@ -55,9 +59,6 @@ int xc_readconsolering(xc_interface *xch,
         sysctl.u.readconsole.incremental = incremental;
     }
 
-    if ( (ret = lock_pages(xch, buffer, nr_chars)) != 0 )
-        return ret;
-
     if ( (ret = do_sysctl(xch, &sysctl)) == 0 )
     {
         *pnr_chars = sysctl.u.readconsole.count;
@@ -65,7 +66,7 @@ int xc_readconsolering(xc_interface *xch,
             *pindex = sysctl.u.readconsole.index;
     }
 
-    unlock_pages(xch, buffer, nr_chars);
+    xc_hypercall_bounce_post(xch, buffer);
 
     return ret;
 }
@@ -74,17 +75,18 @@ int xc_send_debug_keys(xc_interface *xch, char *keys)
 {
     int ret, len = strlen(keys);
     DECLARE_SYSCTL;
+    DECLARE_HYPERCALL_BOUNCE(keys, len, XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+
+    if ( xc_hypercall_bounce_pre(xch, keys) )
+        return -1;
 
     sysctl.cmd = XEN_SYSCTL_debug_keys;
-    set_xen_guest_handle(sysctl.u.debug_keys.keys, keys);
+    xc_set_xen_guest_handle(sysctl.u.debug_keys.keys, keys);
     sysctl.u.debug_keys.nr_keys = len;
-
-    if ( (ret = lock_pages(xch, keys, len)) != 0 )
-        return ret;
 
     ret = do_sysctl(xch, &sysctl);
 
-    unlock_pages(xch, keys, len);
+    xc_hypercall_bounce_post(xch, keys);
 
     return ret;
 }
@@ -187,8 +189,8 @@ int xc_perfc_reset(xc_interface *xch)
 
     sysctl.cmd = XEN_SYSCTL_perfc_op;
     sysctl.u.perfc_op.cmd = XEN_SYSCTL_PERFCOP_reset;
-    set_xen_guest_handle(sysctl.u.perfc_op.desc, NULL);
-    set_xen_guest_handle(sysctl.u.perfc_op.val, NULL);
+    xc_set_xen_guest_handle(sysctl.u.perfc_op.desc, HYPERCALL_BUFFER_NULL);
+    xc_set_xen_guest_handle(sysctl.u.perfc_op.val, HYPERCALL_BUFFER_NULL);
 
     return do_sysctl(xch, &sysctl);
 }
@@ -202,8 +204,8 @@ int xc_perfc_query_number(xc_interface *xch,
 
     sysctl.cmd = XEN_SYSCTL_perfc_op;
     sysctl.u.perfc_op.cmd = XEN_SYSCTL_PERFCOP_query;
-    set_xen_guest_handle(sysctl.u.perfc_op.desc, NULL);
-    set_xen_guest_handle(sysctl.u.perfc_op.val, NULL);
+    xc_set_xen_guest_handle(sysctl.u.perfc_op.desc, HYPERCALL_BUFFER_NULL);
+    xc_set_xen_guest_handle(sysctl.u.perfc_op.val, HYPERCALL_BUFFER_NULL);
 
     rc = do_sysctl(xch, &sysctl);
 
@@ -216,15 +218,17 @@ int xc_perfc_query_number(xc_interface *xch,
 }
 
 int xc_perfc_query(xc_interface *xch,
-                   xc_perfc_desc_t *desc,
-                   xc_perfc_val_t *val)
+                   struct xc_hypercall_buffer *desc,
+                   struct xc_hypercall_buffer *val)
 {
     DECLARE_SYSCTL;
+    DECLARE_HYPERCALL_BUFFER_ARGUMENT(desc);
+    DECLARE_HYPERCALL_BUFFER_ARGUMENT(val);
 
     sysctl.cmd = XEN_SYSCTL_perfc_op;
     sysctl.u.perfc_op.cmd = XEN_SYSCTL_PERFCOP_query;
-    set_xen_guest_handle(sysctl.u.perfc_op.desc, desc);
-    set_xen_guest_handle(sysctl.u.perfc_op.val, val);
+    xc_set_xen_guest_handle(sysctl.u.perfc_op.desc, desc);
+    xc_set_xen_guest_handle(sysctl.u.perfc_op.val, val);
 
     return do_sysctl(xch, &sysctl);
 }
@@ -235,7 +239,7 @@ int xc_lockprof_reset(xc_interface *xch)
 
     sysctl.cmd = XEN_SYSCTL_lockprof_op;
     sysctl.u.lockprof_op.cmd = XEN_SYSCTL_LOCKPROF_reset;
-    set_xen_guest_handle(sysctl.u.lockprof_op.data, NULL);
+    xc_set_xen_guest_handle(sysctl.u.lockprof_op.data, HYPERCALL_BUFFER_NULL);
 
     return do_sysctl(xch, &sysctl);
 }
@@ -248,7 +252,7 @@ int xc_lockprof_query_number(xc_interface *xch,
 
     sysctl.cmd = XEN_SYSCTL_lockprof_op;
     sysctl.u.lockprof_op.cmd = XEN_SYSCTL_LOCKPROF_query;
-    set_xen_guest_handle(sysctl.u.lockprof_op.data, NULL);
+    xc_set_xen_guest_handle(sysctl.u.lockprof_op.data, HYPERCALL_BUFFER_NULL);
 
     rc = do_sysctl(xch, &sysctl);
 
@@ -258,17 +262,18 @@ int xc_lockprof_query_number(xc_interface *xch,
 }
 
 int xc_lockprof_query(xc_interface *xch,
-                        uint32_t *n_elems,
-                        uint64_t *time,
-                        xc_lockprof_data_t *data)
+                      uint32_t *n_elems,
+                      uint64_t *time,
+                      struct xc_hypercall_buffer *data)
 {
     int rc;
     DECLARE_SYSCTL;
+    DECLARE_HYPERCALL_BUFFER_ARGUMENT(data);
 
     sysctl.cmd = XEN_SYSCTL_lockprof_op;
     sysctl.u.lockprof_op.cmd = XEN_SYSCTL_LOCKPROF_query;
     sysctl.u.lockprof_op.max_elem = *n_elems;
-    set_xen_guest_handle(sysctl.u.lockprof_op.data, data);
+    xc_set_xen_guest_handle(sysctl.u.lockprof_op.data, data);
 
     rc = do_sysctl(xch, &sysctl);
 
@@ -282,20 +287,21 @@ int xc_getcpuinfo(xc_interface *xch, int max_cpus,
 {
     int rc;
     DECLARE_SYSCTL;
+    DECLARE_HYPERCALL_BOUNCE(info, max_cpus*sizeof(*info), XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+
+    if ( xc_hypercall_bounce_pre(xch, info) )
+        return -1;
 
     sysctl.cmd = XEN_SYSCTL_getcpuinfo;
-    sysctl.u.getcpuinfo.max_cpus = max_cpus; 
-    set_xen_guest_handle(sysctl.u.getcpuinfo.info, info); 
-
-    if ( (rc = lock_pages(xch, info, max_cpus*sizeof(*info))) != 0 )
-        return rc;
+    sysctl.u.getcpuinfo.max_cpus = max_cpus;
+    xc_set_xen_guest_handle(sysctl.u.getcpuinfo.info, info);
 
     rc = do_sysctl(xch, &sysctl);
 
-    unlock_pages(xch, info, max_cpus*sizeof(*info));
+    xc_hypercall_bounce_post(xch, info);
 
     if ( nr_cpus )
-        *nr_cpus = sysctl.u.getcpuinfo.nr_cpus; 
+        *nr_cpus = sysctl.u.getcpuinfo.nr_cpus;
 
     return rc;
 }

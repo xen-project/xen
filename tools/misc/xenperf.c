@@ -68,28 +68,12 @@ const char *hypercall_name_table[64] =
 };
 #undef X
 
-static int lock_pages(void *addr, size_t len)
-{
-    int e = 0;
-#ifndef __sun__
-    e = mlock(addr, len);
-#endif
-    return (e);
-}
-
-static void unlock_pages(void *addr, size_t len)
-{
-#ifndef __sun__
-    munlock(addr, len);
-#endif
-}
-
 int main(int argc, char *argv[])
 {
     int              i, j;
     xc_interface    *xc_handle;
-    xc_perfc_desc_t *pcd;
-    xc_perfc_val_t  *pcv;
+    DECLARE_HYPERCALL_BUFFER(xc_perfc_desc_t, pcd);
+    DECLARE_HYPERCALL_BUFFER(xc_perfc_val_t, pcv);
     xc_perfc_val_t  *val;
     int num_desc, num_val;
     unsigned int    sum, reset = 0, full = 0, pretty = 0;
@@ -154,28 +138,22 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    pcd = malloc(sizeof(*pcd) * num_desc);
-    pcv = malloc(sizeof(*pcv) * num_val);
+    pcd = xc_hypercall_buffer_alloc(xc_handle, pcd, sizeof(*pcd) * num_desc);
+    pcv = xc_hypercall_buffer_alloc(xc_handle, pcv, sizeof(*pcv) * num_val);
 
-    if ( pcd == NULL
-         || lock_pages(pcd, sizeof(*pcd) * num_desc) != 0
-         || pcv == NULL
-         || lock_pages(pcv, sizeof(*pcv) * num_val) != 0)
+    if ( pcd == NULL || pcv == NULL)
     {
-        fprintf(stderr, "Could not alloc or lock buffers: %d (%s)\n",
+        fprintf(stderr, "Could not allocate buffers: %d (%s)\n",
                 errno, strerror(errno));
         exit(-1);
     }
 
-    if ( xc_perfc_query(xc_handle, pcd, pcv) != 0 )
+    if ( xc_perfc_query(xc_handle, HYPERCALL_BUFFER(pcd), HYPERCALL_BUFFER(pcv)) != 0 )
     {
         fprintf(stderr, "Error getting perf counter: %d (%s)\n",
                 errno, strerror(errno));
         return 1;
     }
-
-    unlock_pages(pcd, sizeof(*pcd) * num_desc);
-    unlock_pages(pcv, sizeof(*pcv) * num_val);
 
     val = pcv;
     for ( i = 0; i < num_desc; i++ )
@@ -221,5 +199,7 @@ int main(int argc, char *argv[])
         val += pcd[i].nr_vals;
     }
 
+    xc_hypercall_buffer_free(xc_handle, pcd);
+    xc_hypercall_buffer_free(xc_handle, pcv);
     return 0;
 }

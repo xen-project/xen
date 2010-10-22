@@ -73,12 +73,12 @@ xc_cpupoolinfo_t *xc_cpupool_getinfo(xc_interface *xch,
                        uint32_t poolid)
 {
     int err = 0;
-    xc_cpupoolinfo_t *info;
-    uint8_t *local;
+    xc_cpupoolinfo_t *info = NULL;
     int local_size;
     int cpumap_size;
     int size;
     DECLARE_SYSCTL;
+    DECLARE_HYPERCALL_BUFFER(uint8_t, local);
 
     local_size = get_cpumap_size(xch);
     if (!local_size)
@@ -86,42 +86,42 @@ xc_cpupoolinfo_t *xc_cpupool_getinfo(xc_interface *xch,
         PERROR("Could not get number of cpus");
         return NULL;
     }
-    local = alloca(local_size);
+
+    local = xc_hypercall_buffer_alloc(xch, local, local_size);
+    if ( local == NULL ) {
+        PERROR("Could not allocate locked memory for xc_cpupool_getinfo");
+        return NULL;
+    }
+
     cpumap_size = (local_size + sizeof(*info->cpumap) - 1) / sizeof(*info->cpumap);
     size = sizeof(xc_cpupoolinfo_t) + cpumap_size * sizeof(*info->cpumap);
+
+    sysctl.cmd = XEN_SYSCTL_cpupool_op;
+    sysctl.u.cpupool_op.op = XEN_SYSCTL_CPUPOOL_OP_INFO;
+    sysctl.u.cpupool_op.cpupool_id = poolid;
+    xc_set_xen_guest_handle(sysctl.u.cpupool_op.cpumap.bitmap, local);
+    sysctl.u.cpupool_op.cpumap.nr_cpus = local_size * 8;
+
+    err = do_sysctl_save(xch, &sysctl);
+
+    if ( err < 0 )
+	goto out;
+
     info = malloc(size);
     if ( !info )
-        return NULL;
+	goto out;
 
     memset(info, 0, size);
     info->cpumap_size = local_size * 8;
     info->cpumap = (uint64_t *)(info + 1);
 
-    sysctl.cmd = XEN_SYSCTL_cpupool_op;
-    sysctl.u.cpupool_op.op = XEN_SYSCTL_CPUPOOL_OP_INFO;
-    sysctl.u.cpupool_op.cpupool_id = poolid;
-    set_xen_guest_handle(sysctl.u.cpupool_op.cpumap.bitmap, local);
-    sysctl.u.cpupool_op.cpumap.nr_cpus = local_size * 8;
-
-    if ( (err = lock_pages(xch, local, local_size)) != 0 )
-    {
-        PERROR("Could not lock memory for Xen hypercall");
-        free(info);
-        return NULL;
-    }
-    err = do_sysctl_save(xch, &sysctl);
-    unlock_pages(xch, local, local_size);
-
-    if ( err < 0 )
-    {
-        free(info);
-        return NULL;
-    }
-
     info->cpupool_id = sysctl.u.cpupool_op.cpupool_id;
     info->sched_id = sysctl.u.cpupool_op.sched_id;
     info->n_dom = sysctl.u.cpupool_op.n_dom;
     bitmap_byte_to_64(info->cpumap, local, local_size * 8);
+
+out:
+    xc_hypercall_buffer_free(xch, local);
 
     return info;
 }
@@ -168,38 +168,38 @@ int xc_cpupool_movedomain(xc_interface *xch,
 uint64_t * xc_cpupool_freeinfo(xc_interface *xch,
                         int *cpusize)
 {
-    int err;
-    uint8_t *local;
-    uint64_t *cpumap;
+    int err = -1;
+    uint64_t *cpumap = NULL;
     DECLARE_SYSCTL;
+    DECLARE_HYPERCALL_BUFFER(uint8_t, local);
 
     *cpusize = get_cpumap_size(xch);
     if (*cpusize == 0)
         return NULL;
-    local = alloca(*cpusize);
-    cpumap = calloc((*cpusize + sizeof(*cpumap) - 1) / sizeof(*cpumap), sizeof(*cpumap));
-    if (cpumap == NULL)
-        return NULL;
 
-    sysctl.cmd = XEN_SYSCTL_cpupool_op;
-    sysctl.u.cpupool_op.op = XEN_SYSCTL_CPUPOOL_OP_FREEINFO;
-    set_xen_guest_handle(sysctl.u.cpupool_op.cpumap.bitmap, local);
-    sysctl.u.cpupool_op.cpumap.nr_cpus = *cpusize * 8;
-
-    if ( (err = lock_pages(xch, local, *cpusize)) != 0 )
-    {
-        PERROR("Could not lock memory for Xen hypercall");
-        free(cpumap);
+    local = xc_hypercall_buffer_alloc(xch, local, *cpusize);
+    if ( local == NULL ) {
+        PERROR("Could not allocate locked memory for xc_cpupool_freeinfo");
         return NULL;
     }
 
+    sysctl.cmd = XEN_SYSCTL_cpupool_op;
+    sysctl.u.cpupool_op.op = XEN_SYSCTL_CPUPOOL_OP_FREEINFO;
+    xc_set_xen_guest_handle(sysctl.u.cpupool_op.cpumap.bitmap, local);
+    sysctl.u.cpupool_op.cpumap.nr_cpus = *cpusize * 8;
+
     err = do_sysctl_save(xch, &sysctl);
-    unlock_pages(xch, local, *cpusize);
+
+    if ( err < 0 )
+	goto out;
+
+    cpumap = calloc((*cpusize + sizeof(*cpumap) - 1) / sizeof(*cpumap), sizeof(*cpumap));
+    if (cpumap == NULL)
+	goto out;
+
     bitmap_byte_to_64(cpumap, local, *cpusize * 8);
 
-    if (err >= 0)
-        return cpumap;
-
-    free(cpumap);
-    return NULL;
+out:
+    xc_hypercall_buffer_free(xch, local);
+    return cpumap;
 }

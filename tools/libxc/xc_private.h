@@ -240,18 +240,18 @@ static inline int do_sysctl(xc_interface *xch, struct xen_sysctl *sysctl)
 {
     int ret = -1;
     DECLARE_HYPERCALL;
-
-    if ( hcall_buf_prep(xch, (void **)&sysctl, sizeof(*sysctl)) != 0 )
-    {
-        PERROR("Could not lock memory for Xen hypercall");
-        goto out1;
-    }
+    DECLARE_HYPERCALL_BOUNCE(sysctl, sizeof(*sysctl), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
 
     sysctl->interface_version = XEN_SYSCTL_INTERFACE_VERSION;
 
-    hypercall.op     = __HYPERVISOR_sysctl;
-    hypercall.arg[0] = (unsigned long)sysctl;
+    if ( xc_hypercall_bounce_pre(xch, sysctl) )
+    {
+        PERROR("Could not bounce buffer for sysctl hypercall");
+        goto out1;
+    }
 
+    hypercall.op     = __HYPERVISOR_sysctl;
+    hypercall.arg[0] = HYPERCALL_BUFFER_AS_ARG(sysctl);
     if ( (ret = do_xen_hypercall(xch, &hypercall)) < 0 )
     {
         if ( errno == EACCES )
@@ -259,8 +259,7 @@ static inline int do_sysctl(xc_interface *xch, struct xen_sysctl *sysctl)
                     " rebuild the user-space tool set?\n");
     }
 
-    hcall_buf_release(xch, (void **)&sysctl, sizeof(*sysctl));
-
+    xc_hypercall_bounce_post(xch, sysctl);
  out1:
     return ret;
 }

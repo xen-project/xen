@@ -1022,21 +1022,18 @@ int xc_perfc_reset(xc_interface *xch);
 int xc_perfc_query_number(xc_interface *xch,
                           int *nbr_desc,
                           int *nbr_val);
-/* IMPORTANT: The caller is responsible for mlock()'ing the @desc and @val
-   arrays. */
 int xc_perfc_query(xc_interface *xch,
-                   xc_perfc_desc_t *desc,
-                   xc_perfc_val_t *val);
+                   xc_hypercall_buffer_t *desc,
+                   xc_hypercall_buffer_t *val);
 
 typedef xen_sysctl_lockprof_data_t xc_lockprof_data_t;
 int xc_lockprof_reset(xc_interface *xch);
 int xc_lockprof_query_number(xc_interface *xch,
                              uint32_t *n_elems);
-/* IMPORTANT: The caller is responsible for mlock()'ing the @data array. */
 int xc_lockprof_query(xc_interface *xch,
                       uint32_t *n_elems,
                       uint64_t *time,
-                      xc_lockprof_data_t *data);
+                      xc_hypercall_buffer_t *data);
 
 /**
  * Memory maps a range within one domain to a local address range.  Mappings

@@ -116,9 +116,15 @@ int xc_tbuf_disable(xc_interface *xch)
 int xc_tbuf_set_cpu_mask(xc_interface *xch, uint32_t mask)
 {
     DECLARE_SYSCTL;
+    DECLARE_HYPERCALL_BUFFER(uint8_t, bytemap);
     int ret = -1;
     uint64_t mask64 = mask;
-    uint8_t bytemap[sizeof(mask64)];
+
+    bytemap = xc_hypercall_buffer_alloc(xch, bytemap, sizeof(mask64));
+    {
+        PERROR("Could not allocate memory for xc_tbuf_set_cpu_mask hypercall");
+        goto out;
+    }
 
     sysctl.cmd = XEN_SYSCTL_tbuf_op;
     sysctl.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
@@ -126,18 +132,12 @@ int xc_tbuf_set_cpu_mask(xc_interface *xch, uint32_t mask)
 
     bitmap_64_to_byte(bytemap, &mask64, sizeof (mask64) * 8);
 
-    set_xen_guest_handle(sysctl.u.tbuf_op.cpu_mask.bitmap, bytemap);
+    xc_set_xen_guest_handle(sysctl.u.tbuf_op.cpu_mask.bitmap, bytemap);
     sysctl.u.tbuf_op.cpu_mask.nr_cpus = sizeof(bytemap) * 8;
-
-    if ( lock_pages(xch, &bytemap, sizeof(bytemap)) != 0 )
-    {
-        PERROR("Could not lock memory for Xen hypercall");
-        goto out;
-    }
 
     ret = do_sysctl(xch, &sysctl);
 
-    unlock_pages(xch, &bytemap, sizeof(bytemap));
+    xc_hypercall_buffer_free(xch, bytemap);
 
  out:
     return ret;

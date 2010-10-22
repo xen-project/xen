@@ -45,6 +45,10 @@ int xc_pm_get_max_px(xc_interface *xch, int cpuid, int *max_px)
 int xc_pm_get_pxstat(xc_interface *xch, int cpuid, struct xc_px_stat *pxpt)
 {
     DECLARE_SYSCTL;
+    /* Sizes unknown until xc_pm_get_max_px */
+    DECLARE_NAMED_HYPERCALL_BOUNCE(trans, &pxpt->trans_pt, 0, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
+    DECLARE_NAMED_HYPERCALL_BOUNCE(pt, &pxpt->pt, 0, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
+
     int max_px, ret;
 
     if ( !pxpt || !(pxpt->trans_pt) || !(pxpt->pt) )
@@ -53,14 +57,15 @@ int xc_pm_get_pxstat(xc_interface *xch, int cpuid, struct xc_px_stat *pxpt)
     if ( (ret = xc_pm_get_max_px(xch, cpuid, &max_px)) != 0)
         return ret;
 
-    if ( (ret = lock_pages(xch, pxpt->trans_pt, 
-        max_px * max_px * sizeof(uint64_t))) != 0 )
+    HYPERCALL_BOUNCE_SET_SIZE(trans, max_px * max_px * sizeof(uint64_t));
+    HYPERCALL_BOUNCE_SET_SIZE(pt, max_px * sizeof(struct xc_px_val));
+
+    if ( xc_hypercall_bounce_pre(xch, trans) )
         return ret;
 
-    if ( (ret = lock_pages(xch, pxpt->pt, 
-        max_px * sizeof(struct xc_px_val))) != 0 )
+    if ( xc_hypercall_bounce_pre(xch, pt) )
     {
-        unlock_pages(xch, pxpt->trans_pt, max_px * max_px * sizeof(uint64_t));
+        xc_hypercall_bounce_post(xch, trans);
         return ret;
     }
 
@@ -68,15 +73,14 @@ int xc_pm_get_pxstat(xc_interface *xch, int cpuid, struct xc_px_stat *pxpt)
     sysctl.u.get_pmstat.type = PMSTAT_get_pxstat;
     sysctl.u.get_pmstat.cpuid = cpuid;
     sysctl.u.get_pmstat.u.getpx.total = max_px;
-    set_xen_guest_handle(sysctl.u.get_pmstat.u.getpx.trans_pt, pxpt->trans_pt);
-    set_xen_guest_handle(sysctl.u.get_pmstat.u.getpx.pt, 
-                        (pm_px_val_t *)pxpt->pt);
+    xc_set_xen_guest_handle(sysctl.u.get_pmstat.u.getpx.trans_pt, trans);
+    xc_set_xen_guest_handle(sysctl.u.get_pmstat.u.getpx.pt, pt);
 
     ret = xc_sysctl(xch, &sysctl);
     if ( ret )
     {
-        unlock_pages(xch, pxpt->trans_pt, max_px * max_px * sizeof(uint64_t));
-        unlock_pages(xch, pxpt->pt, max_px * sizeof(struct xc_px_val));
+	xc_hypercall_bounce_post(xch, trans);
+	xc_hypercall_bounce_post(xch, pt);
         return ret;
     }
 
@@ -85,8 +89,8 @@ int xc_pm_get_pxstat(xc_interface *xch, int cpuid, struct xc_px_stat *pxpt)
     pxpt->last = sysctl.u.get_pmstat.u.getpx.last;
     pxpt->cur = sysctl.u.get_pmstat.u.getpx.cur;
 
-    unlock_pages(xch, pxpt->trans_pt, max_px * max_px * sizeof(uint64_t));
-    unlock_pages(xch, pxpt->pt, max_px * sizeof(struct xc_px_val));
+    xc_hypercall_bounce_post(xch, trans);
+    xc_hypercall_bounce_post(xch, pt);
 
     return ret;
 }
@@ -120,6 +124,8 @@ int xc_pm_get_max_cx(xc_interface *xch, int cpuid, int *max_cx)
 int xc_pm_get_cxstat(xc_interface *xch, int cpuid, struct xc_cx_stat *cxpt)
 {
     DECLARE_SYSCTL;
+    DECLARE_NAMED_HYPERCALL_BOUNCE(triggers, &cxpt->triggers, 0, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
+    DECLARE_NAMED_HYPERCALL_BOUNCE(residencies, &cxpt->residencies, 0, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
     int max_cx, ret;
 
     if( !cxpt || !(cxpt->triggers) || !(cxpt->residencies) )
@@ -128,22 +134,23 @@ int xc_pm_get_cxstat(xc_interface *xch, int cpuid, struct xc_cx_stat *cxpt)
     if ( (ret = xc_pm_get_max_cx(xch, cpuid, &max_cx)) )
         goto unlock_0;
 
-    if ( (ret = lock_pages(xch, cxpt, sizeof(struct xc_cx_stat))) )
+    HYPERCALL_BOUNCE_SET_SIZE(triggers, max_cx * sizeof(uint64_t));
+    HYPERCALL_BOUNCE_SET_SIZE(residencies, max_cx * sizeof(uint64_t));
+
+    ret = -1;
+    if ( xc_hypercall_bounce_pre(xch, triggers) )
         goto unlock_0;
-    if ( (ret = lock_pages(xch, cxpt->triggers, max_cx * sizeof(uint64_t))) )
+    if ( xc_hypercall_bounce_pre(xch, residencies) )
         goto unlock_1;
-    if ( (ret = lock_pages(xch, cxpt->residencies, max_cx * sizeof(uint64_t))) )
-        goto unlock_2;
 
     sysctl.cmd = XEN_SYSCTL_get_pmstat;
     sysctl.u.get_pmstat.type = PMSTAT_get_cxstat;
     sysctl.u.get_pmstat.cpuid = cpuid;
-    set_xen_guest_handle(sysctl.u.get_pmstat.u.getcx.triggers, cxpt->triggers);
-    set_xen_guest_handle(sysctl.u.get_pmstat.u.getcx.residencies, 
-                         cxpt->residencies);
+    xc_set_xen_guest_handle(sysctl.u.get_pmstat.u.getcx.triggers, triggers);
+    xc_set_xen_guest_handle(sysctl.u.get_pmstat.u.getcx.residencies, residencies);
 
     if ( (ret = xc_sysctl(xch, &sysctl)) )
-        goto unlock_3;
+        goto unlock_2;
 
     cxpt->nr = sysctl.u.get_pmstat.u.getcx.nr;
     cxpt->last = sysctl.u.get_pmstat.u.getcx.last;
@@ -154,12 +161,10 @@ int xc_pm_get_cxstat(xc_interface *xch, int cpuid, struct xc_cx_stat *cxpt)
     cxpt->cc3 = sysctl.u.get_pmstat.u.getcx.cc3;
     cxpt->cc6 = sysctl.u.get_pmstat.u.getcx.cc6;
 
-unlock_3:
-    unlock_pages(xch, cxpt->residencies, max_cx * sizeof(uint64_t));
 unlock_2:
-    unlock_pages(xch, cxpt->triggers, max_cx * sizeof(uint64_t));
+    xc_hypercall_bounce_post(xch, residencies);
 unlock_1:
-    unlock_pages(xch, cxpt, sizeof(struct xc_cx_stat));
+    xc_hypercall_bounce_post(xch, triggers);
 unlock_0:
     return ret;
 }
@@ -186,12 +191,19 @@ int xc_get_cpufreq_para(xc_interface *xch, int cpuid,
     DECLARE_SYSCTL;
     int ret = 0;
     struct xen_get_cpufreq_para *sys_para = &sysctl.u.pm_op.u.get_para;
+    DECLARE_NAMED_HYPERCALL_BOUNCE(affected_cpus,
+			 user_para->affected_cpus,
+			 user_para->cpu_num * sizeof(uint32_t), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
+    DECLARE_NAMED_HYPERCALL_BOUNCE(scaling_available_frequencies,
+			 user_para->scaling_available_frequencies,
+			 user_para->freq_num * sizeof(uint32_t), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
+    DECLARE_NAMED_HYPERCALL_BOUNCE(scaling_available_governors,
+			 user_para->scaling_available_governors,
+			 user_para->gov_num * CPUFREQ_NAME_LEN * sizeof(char), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
+
     bool has_num = user_para->cpu_num &&
                      user_para->freq_num &&
                      user_para->gov_num;
-
-    if ( (xch < 0) || !user_para )
-        return -EINVAL;
 
     if ( has_num )
     {
@@ -200,22 +212,16 @@ int xc_get_cpufreq_para(xc_interface *xch, int cpuid,
              (!user_para->scaling_available_governors) )
             return -EINVAL;
 
-        if ( (ret = lock_pages(xch, user_para->affected_cpus,
-                               user_para->cpu_num * sizeof(uint32_t))) )
+        if ( xc_hypercall_bounce_pre(xch, affected_cpus) )
             goto unlock_1;
-        if ( (ret = lock_pages(xch, user_para->scaling_available_frequencies,
-                               user_para->freq_num * sizeof(uint32_t))) )
+        if ( xc_hypercall_bounce_pre(xch, scaling_available_frequencies) )
             goto unlock_2;
-        if ( (ret = lock_pages(xch, user_para->scaling_available_governors,
-                 user_para->gov_num * CPUFREQ_NAME_LEN * sizeof(char))) )
+        if ( xc_hypercall_bounce_pre(xch, scaling_available_governors) )
             goto unlock_3;
 
-        set_xen_guest_handle(sys_para->affected_cpus,
-                             user_para->affected_cpus);
-        set_xen_guest_handle(sys_para->scaling_available_frequencies,
-                             user_para->scaling_available_frequencies);
-        set_xen_guest_handle(sys_para->scaling_available_governors,
-                             user_para->scaling_available_governors);
+        xc_set_xen_guest_handle(sys_para->affected_cpus, affected_cpus);
+        xc_set_xen_guest_handle(sys_para->scaling_available_frequencies, scaling_available_frequencies);
+        xc_set_xen_guest_handle(sys_para->scaling_available_governors, scaling_available_governors);
     }
 
     sysctl.cmd = XEN_SYSCTL_pm_op;
@@ -250,7 +256,7 @@ int xc_get_cpufreq_para(xc_interface *xch, int cpuid,
         user_para->scaling_min_freq = sys_para->scaling_min_freq;
         user_para->turbo_enabled    = sys_para->turbo_enabled;
 
-        memcpy(user_para->scaling_driver, 
+        memcpy(user_para->scaling_driver,
                 sys_para->scaling_driver, CPUFREQ_NAME_LEN);
         memcpy(user_para->scaling_governor,
                 sys_para->scaling_governor, CPUFREQ_NAME_LEN);
@@ -263,14 +269,11 @@ int xc_get_cpufreq_para(xc_interface *xch, int cpuid,
     }
 
 unlock_4:
-    unlock_pages(xch, user_para->scaling_available_governors,
-                 user_para->gov_num * CPUFREQ_NAME_LEN * sizeof(char));
+    xc_hypercall_bounce_post(xch, scaling_available_governors);
 unlock_3:
-    unlock_pages(xch, user_para->scaling_available_frequencies,
-                 user_para->freq_num * sizeof(uint32_t));
+    xc_hypercall_bounce_post(xch, scaling_available_frequencies);
 unlock_2:
-    unlock_pages(xch, user_para->affected_cpus,
-                 user_para->cpu_num * sizeof(uint32_t));
+    xc_hypercall_bounce_post(xch, affected_cpus);
 unlock_1:
     return ret;
 }

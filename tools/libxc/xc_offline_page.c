@@ -66,14 +66,15 @@ int xc_mark_page_online(xc_interface *xch, unsigned long start,
                         unsigned long end, uint32_t *status)
 {
     DECLARE_SYSCTL;
+    DECLARE_HYPERCALL_BOUNCE(status, sizeof(uint32_t)*(end - start + 1), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
     int ret = -1;
 
     if ( !status || (end < start) )
         return -EINVAL;
 
-    if (lock_pages(xch, status, sizeof(uint32_t)*(end - start + 1)))
+    if ( xc_hypercall_bounce_pre(xch, status) )
     {
-        ERROR("Could not lock memory for xc_mark_page_online\n");
+        ERROR("Could not bounce memory for xc_mark_page_online\n");
         return -EINVAL;
     }
 
@@ -81,10 +82,10 @@ int xc_mark_page_online(xc_interface *xch, unsigned long start,
     sysctl.u.page_offline.start = start;
     sysctl.u.page_offline.cmd = sysctl_page_online;
     sysctl.u.page_offline.end = end;
-    set_xen_guest_handle(sysctl.u.page_offline.status, status);
+    xc_set_xen_guest_handle(sysctl.u.page_offline.status, status);
     ret = xc_sysctl(xch, &sysctl);
 
-    unlock_pages(xch, status, sizeof(uint32_t)*(end - start + 1));
+    xc_hypercall_bounce_post(xch, status);
 
     return ret;
 }
@@ -93,14 +94,15 @@ int xc_mark_page_offline(xc_interface *xch, unsigned long start,
                           unsigned long end, uint32_t *status)
 {
     DECLARE_SYSCTL;
+    DECLARE_HYPERCALL_BOUNCE(status, sizeof(uint32_t)*(end - start + 1), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
     int ret = -1;
 
     if ( !status || (end < start) )
         return -EINVAL;
 
-    if (lock_pages(xch, status, sizeof(uint32_t)*(end - start + 1)))
+    if ( xc_hypercall_bounce_pre(xch, status) )
     {
-        ERROR("Could not lock memory for xc_mark_page_offline");
+        ERROR("Could not bounce memory for xc_mark_page_offline");
         return -EINVAL;
     }
 
@@ -108,10 +110,10 @@ int xc_mark_page_offline(xc_interface *xch, unsigned long start,
     sysctl.u.page_offline.start = start;
     sysctl.u.page_offline.cmd = sysctl_page_offline;
     sysctl.u.page_offline.end = end;
-    set_xen_guest_handle(sysctl.u.page_offline.status, status);
+    xc_set_xen_guest_handle(sysctl.u.page_offline.status, status);
     ret = xc_sysctl(xch, &sysctl);
 
-    unlock_pages(xch, status, sizeof(uint32_t)*(end - start + 1));
+    xc_hypercall_bounce_post(xch, status);
 
     return ret;
 }
@@ -120,14 +122,15 @@ int xc_query_page_offline_status(xc_interface *xch, unsigned long start,
                                  unsigned long end, uint32_t *status)
 {
     DECLARE_SYSCTL;
+    DECLARE_HYPERCALL_BOUNCE(status, sizeof(uint32_t)*(end - start + 1), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
     int ret = -1;
 
     if ( !status || (end < start) )
         return -EINVAL;
 
-    if (lock_pages(xch, status, sizeof(uint32_t)*(end - start + 1)))
+    if ( xc_hypercall_bounce_pre(xch, status) )
     {
-        ERROR("Could not lock memory for xc_query_page_offline_status\n");
+        ERROR("Could not bounce memory for xc_query_page_offline_status\n");
         return -EINVAL;
     }
 
@@ -135,10 +138,10 @@ int xc_query_page_offline_status(xc_interface *xch, unsigned long start,
     sysctl.u.page_offline.start = start;
     sysctl.u.page_offline.cmd = sysctl_query_page_offline;
     sysctl.u.page_offline.end = end;
-    set_xen_guest_handle(sysctl.u.page_offline.status, status);
+    xc_set_xen_guest_handle(sysctl.u.page_offline.status, status);
     ret = xc_sysctl(xch, &sysctl);
 
-    unlock_pages(xch, status, sizeof(uint32_t)*(end - start + 1));
+    xc_hypercall_bounce_post(xch, status);
 
     return ret;
 }
