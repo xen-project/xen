@@ -181,18 +181,18 @@ static inline int do_xen_version(xc_interface *xch, int cmd, xc_hypercall_buffer
 static inline int do_physdev_op(xc_interface *xch, int cmd, void *op, size_t len)
 {
     int ret = -1;
-
     DECLARE_HYPERCALL;
+    DECLARE_HYPERCALL_BOUNCE(op, len, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
 
-    if ( hcall_buf_prep(xch, &op, len) != 0 )
+    if ( xc_hypercall_bounce_pre(xch, op) )
     {
-        PERROR("Could not lock memory for Xen hypercall");
+        PERROR("Could not bounce memory for physdev hypercall");
         goto out1;
     }
 
     hypercall.op = __HYPERVISOR_physdev_op;
     hypercall.arg[0] = (unsigned long) cmd;
-    hypercall.arg[1] = (unsigned long) op;
+    hypercall.arg[1] = HYPERCALL_BUFFER_AS_ARG(op);
 
     if ( (ret = do_xen_hypercall(xch, &hypercall)) < 0 )
     {
@@ -201,8 +201,7 @@ static inline int do_physdev_op(xc_interface *xch, int cmd, void *op, size_t len
                     " rebuild the user-space tool set?\n");
     }
 
-    hcall_buf_release(xch, &op, len);
-
+    xc_hypercall_bounce_post(xch, op);
 out1:
     return ret;
 }
