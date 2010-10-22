@@ -40,15 +40,16 @@ int xc_flask_op(xc_interface *xch, flask_op_t *op)
 {
     int ret = -1;
     DECLARE_HYPERCALL;
+    DECLARE_HYPERCALL_BOUNCE(op, sizeof(*op), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
 
-    hypercall.op     = __HYPERVISOR_xsm_op;
-    hypercall.arg[0] = (unsigned long)op;
-
-    if ( lock_pages(xch, op, sizeof(*op)) != 0 )
+    if ( xc_hypercall_bounce_pre(xch, op) )
     {
-        PERROR("Could not lock memory for Xen hypercall");
+        PERROR("Could not bounce memory for flask op hypercall");
         goto out;
     }
+
+    hypercall.op     = __HYPERVISOR_xsm_op;
+    hypercall.arg[0] = HYPERCALL_BUFFER_AS_ARG(op);
 
     if ( (ret = do_xen_hypercall(xch, &hypercall)) < 0 )
     {
@@ -56,7 +57,7 @@ int xc_flask_op(xc_interface *xch, flask_op_t *op)
             fprintf(stderr, "XSM operation failed!\n");
     }
 
-    unlock_pages(xch, op, sizeof(*op));
+    xc_hypercall_bounce_post(xch, op);
 
  out:
     return ret;
