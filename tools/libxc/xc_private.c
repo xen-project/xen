@@ -341,23 +341,24 @@ int xc_mmuext_op(
     domid_t dom)
 {
     DECLARE_HYPERCALL;
+    DECLARE_HYPERCALL_BOUNCE(op, nr_ops*sizeof(*op), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
     long ret = -EINVAL;
 
-    if ( hcall_buf_prep(xch, (void **)&op, nr_ops*sizeof(*op)) != 0 )
+    if ( xc_hypercall_bounce_pre(xch, op) )
     {
-        PERROR("Could not lock memory for Xen hypercall");
+        PERROR("Could not bounce memory for mmuext op hypercall");
         goto out1;
     }
 
     hypercall.op     = __HYPERVISOR_mmuext_op;
-    hypercall.arg[0] = (unsigned long)op;
+    hypercall.arg[0] = HYPERCALL_BUFFER_AS_ARG(op);
     hypercall.arg[1] = (unsigned long)nr_ops;
     hypercall.arg[2] = (unsigned long)0;
     hypercall.arg[3] = (unsigned long)dom;
 
     ret = do_xen_hypercall(xch, &hypercall);
 
-    hcall_buf_release(xch, (void **)&op, nr_ops*sizeof(*op));
+    xc_hypercall_bounce_post(xch, op);
 
  out1:
     return ret;
@@ -367,22 +368,23 @@ static int flush_mmu_updates(xc_interface *xch, struct xc_mmu *mmu)
 {
     int err = 0;
     DECLARE_HYPERCALL;
+    DECLARE_NAMED_HYPERCALL_BOUNCE(updates, mmu->updates, mmu->idx*sizeof(*mmu->updates), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
 
     if ( mmu->idx == 0 )
         return 0;
 
-    hypercall.op     = __HYPERVISOR_mmu_update;
-    hypercall.arg[0] = (unsigned long)mmu->updates;
-    hypercall.arg[1] = (unsigned long)mmu->idx;
-    hypercall.arg[2] = 0;
-    hypercall.arg[3] = mmu->subject;
-
-    if ( lock_pages(xch, mmu->updates, sizeof(mmu->updates)) != 0 )
+    if ( xc_hypercall_bounce_pre(xch, updates) )
     {
-        PERROR("flush_mmu_updates: mmu updates lock_pages failed");
+        PERROR("flush_mmu_updates: bounce buffer failed");
         err = 1;
         goto out;
     }
+
+    hypercall.op     = __HYPERVISOR_mmu_update;
+    hypercall.arg[0] = HYPERCALL_BUFFER_AS_ARG(updates);
+    hypercall.arg[1] = (unsigned long)mmu->idx;
+    hypercall.arg[2] = 0;
+    hypercall.arg[3] = mmu->subject;
 
     if ( do_xen_hypercall(xch, &hypercall) < 0 )
     {
@@ -392,7 +394,7 @@ static int flush_mmu_updates(xc_interface *xch, struct xc_mmu *mmu)
 
     mmu->idx = 0;
 
-    unlock_pages(xch, mmu->updates, sizeof(mmu->updates));
+    xc_hypercall_bounce_post(xch, updates);
 
  out:
     return err;
