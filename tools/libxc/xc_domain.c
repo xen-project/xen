@@ -1027,38 +1027,42 @@ int xc_domain_send_trigger(xc_interface *xch,
 int xc_set_hvm_param(xc_interface *handle, domid_t dom, int param, unsigned long value)
 {
     DECLARE_HYPERCALL;
-    xen_hvm_param_t arg;
+    DECLARE_HYPERCALL_BUFFER(xen_hvm_param_t, arg);
     int rc;
+
+    arg = xc_hypercall_buffer_alloc(handle, arg, sizeof(*arg));
+    if ( arg == NULL )
+        return -1;
 
     hypercall.op     = __HYPERVISOR_hvm_op;
     hypercall.arg[0] = HVMOP_set_param;
-    hypercall.arg[1] = (unsigned long)&arg;
-    arg.domid = dom;
-    arg.index = param;
-    arg.value = value;
-    if ( lock_pages(handle, &arg, sizeof(arg)) != 0 )
-        return -1;
+    hypercall.arg[1] = HYPERCALL_BUFFER_AS_ARG(arg);
+    arg->domid = dom;
+    arg->index = param;
+    arg->value = value;
     rc = do_xen_hypercall(handle, &hypercall);
-    unlock_pages(handle, &arg, sizeof(arg));
+    xc_hypercall_buffer_free(handle, arg);
     return rc;
 }
 
 int xc_get_hvm_param(xc_interface *handle, domid_t dom, int param, unsigned long *value)
 {
     DECLARE_HYPERCALL;
-    xen_hvm_param_t arg;
+    DECLARE_HYPERCALL_BUFFER(xen_hvm_param_t, arg);
     int rc;
+
+    arg = xc_hypercall_buffer_alloc(handle, arg, sizeof(*arg));
+    if ( arg == NULL )
+        return -1;
 
     hypercall.op     = __HYPERVISOR_hvm_op;
     hypercall.arg[0] = HVMOP_get_param;
-    hypercall.arg[1] = (unsigned long)&arg;
-    arg.domid = dom;
-    arg.index = param;
-    if ( lock_pages(handle, &arg, sizeof(arg)) != 0 )
-        return -1;
+    hypercall.arg[1] = HYPERCALL_BUFFER_AS_ARG(arg);
+    arg->domid = dom;
+    arg->index = param;
     rc = do_xen_hypercall(handle, &hypercall);
-    unlock_pages(handle, &arg, sizeof(arg));
-    *value = arg.value;
+    *value = arg->value;
+    xc_hypercall_buffer_free(handle, arg);
     return rc;
 }
 

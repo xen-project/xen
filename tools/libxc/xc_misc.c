@@ -313,18 +313,19 @@ int xc_hvm_set_pci_intx_level(
     unsigned int level)
 {
     DECLARE_HYPERCALL;
-    struct xen_hvm_set_pci_intx_level _arg, *arg = &_arg;
+    DECLARE_HYPERCALL_BUFFER(struct xen_hvm_set_pci_intx_level, arg);
     int rc;
 
-    if ( (rc = hcall_buf_prep(xch, (void **)&arg, sizeof(*arg))) != 0 )
+    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
+    if ( arg == NULL )
     {
-        PERROR("Could not lock memory");
-        return rc;
+        PERROR("Could not allocate memory for xc_hvm_set_pci_intx_level hypercall");
+        return -1;
     }
 
     hypercall.op     = __HYPERVISOR_hvm_op;
     hypercall.arg[0] = HVMOP_set_pci_intx_level;
-    hypercall.arg[1] = (unsigned long)arg;
+    hypercall.arg[1] = HYPERCALL_BUFFER_AS_ARG(arg);
 
     arg->domid  = dom;
     arg->domain = domain;
@@ -335,7 +336,7 @@ int xc_hvm_set_pci_intx_level(
 
     rc = do_xen_hypercall(xch, &hypercall);
 
-    hcall_buf_release(xch, (void **)&arg, sizeof(*arg));
+    xc_hypercall_buffer_free(xch, arg);
 
     return rc;
 }
@@ -346,18 +347,19 @@ int xc_hvm_set_isa_irq_level(
     unsigned int level)
 {
     DECLARE_HYPERCALL;
-    struct xen_hvm_set_isa_irq_level _arg, *arg = &_arg;
+    DECLARE_HYPERCALL_BUFFER(struct xen_hvm_set_isa_irq_level, arg);
     int rc;
 
-    if ( (rc = hcall_buf_prep(xch, (void **)&arg, sizeof(*arg))) != 0 )
+    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
+    if ( arg == NULL )
     {
-        PERROR("Could not lock memory");
-        return rc;
+        PERROR("Could not allocate memory for xc_hvm_set_isa_irq_level hypercall");
+        return -1;
     }
 
     hypercall.op     = __HYPERVISOR_hvm_op;
     hypercall.arg[0] = HVMOP_set_isa_irq_level;
-    hypercall.arg[1] = (unsigned long)arg;
+    hypercall.arg[1] = HYPERCALL_BUFFER_AS_ARG(arg);
 
     arg->domid   = dom;
     arg->isa_irq = isa_irq;
@@ -365,7 +367,7 @@ int xc_hvm_set_isa_irq_level(
 
     rc = do_xen_hypercall(xch, &hypercall);
 
-    hcall_buf_release(xch, (void **)&arg, sizeof(*arg));
+    xc_hypercall_buffer_free(xch, arg);
 
     return rc;
 }
@@ -374,26 +376,27 @@ int xc_hvm_set_pci_link_route(
     xc_interface *xch, domid_t dom, uint8_t link, uint8_t isa_irq)
 {
     DECLARE_HYPERCALL;
-    struct xen_hvm_set_pci_link_route arg;
+    DECLARE_HYPERCALL_BUFFER(struct xen_hvm_set_pci_link_route, arg);
     int rc;
+
+    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
+    if ( arg == NULL )
+    {
+        PERROR("Could not allocate memory for xc_hvm_set_pci_link_route hypercall");
+        return -1;
+    }
 
     hypercall.op     = __HYPERVISOR_hvm_op;
     hypercall.arg[0] = HVMOP_set_pci_link_route;
-    hypercall.arg[1] = (unsigned long)&arg;
+    hypercall.arg[1] = HYPERCALL_BUFFER_AS_ARG(arg);
 
-    arg.domid   = dom;
-    arg.link    = link;
-    arg.isa_irq = isa_irq;
-
-    if ( (rc = lock_pages(xch, &arg, sizeof(arg))) != 0 )
-    {
-        PERROR("Could not lock memory");
-        return rc;
-    }
+    arg->domid   = dom;
+    arg->link    = link;
+    arg->isa_irq = isa_irq;
 
     rc = do_xen_hypercall(xch, &hypercall);
 
-    unlock_pages(xch, &arg, sizeof(arg));
+    xc_hypercall_buffer_free(xch, arg);
 
     return rc;
 }
@@ -404,28 +407,32 @@ int xc_hvm_track_dirty_vram(
     unsigned long *dirty_bitmap)
 {
     DECLARE_HYPERCALL;
-    struct xen_hvm_track_dirty_vram arg;
+    DECLARE_HYPERCALL_BOUNCE(dirty_bitmap, (nr+31) / 32, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
+    DECLARE_HYPERCALL_BUFFER(struct xen_hvm_track_dirty_vram, arg);
     int rc;
+
+    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
+    if ( arg == NULL || xc_hypercall_bounce_pre(xch, dirty_bitmap) )
+    {
+        PERROR("Could not bounce memory for xc_hvm_track_dirty_vram hypercall");
+        rc = -1;
+        goto out;
+    }
 
     hypercall.op     = __HYPERVISOR_hvm_op;
     hypercall.arg[0] = HVMOP_track_dirty_vram;
-    hypercall.arg[1] = (unsigned long)&arg;
+    hypercall.arg[1] = HYPERCALL_BUFFER_AS_ARG(arg);
 
-    arg.domid     = dom;
-    arg.first_pfn = first_pfn;
-    arg.nr        = nr;
-    set_xen_guest_handle(arg.dirty_bitmap, (uint8_t *)dirty_bitmap);
-
-    if ( (rc = lock_pages(xch, &arg, sizeof(arg))) != 0 )
-    {
-        PERROR("Could not lock memory");
-        return rc;
-    }
+    arg->domid     = dom;
+    arg->first_pfn = first_pfn;
+    arg->nr        = nr;
+    xc_set_xen_guest_handle(arg->dirty_bitmap, dirty_bitmap);
 
     rc = do_xen_hypercall(xch, &hypercall);
 
-    unlock_pages(xch, &arg, sizeof(arg));
-
+out:
+    xc_hypercall_buffer_free(xch, arg);
+    xc_hypercall_bounce_post(xch, dirty_bitmap);
     return rc;
 }
 
@@ -433,26 +440,27 @@ int xc_hvm_modified_memory(
     xc_interface *xch, domid_t dom, uint64_t first_pfn, uint64_t nr)
 {
     DECLARE_HYPERCALL;
-    struct xen_hvm_modified_memory arg;
+    DECLARE_HYPERCALL_BUFFER(struct xen_hvm_modified_memory, arg);
     int rc;
+
+    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
+    if ( arg == NULL )
+    {
+        PERROR("Could not allocate memory for xc_hvm_modified_memory hypercall");
+        return -1;
+    }
 
     hypercall.op     = __HYPERVISOR_hvm_op;
     hypercall.arg[0] = HVMOP_modified_memory;
-    hypercall.arg[1] = (unsigned long)&arg;
+    hypercall.arg[1] = HYPERCALL_BUFFER_AS_ARG(arg);
 
-    arg.domid     = dom;
-    arg.first_pfn = first_pfn;
-    arg.nr        = nr;
-
-    if ( (rc = lock_pages(xch, &arg, sizeof(arg))) != 0 )
-    {
-        PERROR("Could not lock memory");
-        return rc;
-    }
+    arg->domid     = dom;
+    arg->first_pfn = first_pfn;
+    arg->nr        = nr;
 
     rc = do_xen_hypercall(xch, &hypercall);
 
-    unlock_pages(xch, &arg, sizeof(arg));
+    xc_hypercall_buffer_free(xch, arg);
 
     return rc;
 }
@@ -461,27 +469,28 @@ int xc_hvm_set_mem_type(
     xc_interface *xch, domid_t dom, hvmmem_type_t mem_type, uint64_t first_pfn, uint64_t nr)
 {
     DECLARE_HYPERCALL;
-    struct xen_hvm_set_mem_type arg;
+    DECLARE_HYPERCALL_BUFFER(struct xen_hvm_set_mem_type, arg);
     int rc;
+
+    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
+    if ( arg == NULL )
+    {
+        PERROR("Could not allocate memory for xc_hvm_set_mem_type hypercall");
+        return -1;
+    }
+
+    arg->domid        = dom;
+    arg->hvmmem_type  = mem_type;
+    arg->first_pfn    = first_pfn;
+    arg->nr           = nr;
 
     hypercall.op     = __HYPERVISOR_hvm_op;
     hypercall.arg[0] = HVMOP_set_mem_type;
-    hypercall.arg[1] = (unsigned long)&arg;
-
-    arg.domid        = dom;
-    arg.hvmmem_type  = mem_type;
-    arg.first_pfn    = first_pfn;
-    arg.nr           = nr;
-
-    if ( (rc = lock_pages(xch, &arg, sizeof(arg))) != 0 )
-    {
-        PERROR("Could not lock memory");
-        return rc;
-    }
+    hypercall.arg[1] = HYPERCALL_BUFFER_AS_ARG(arg);
 
     rc = do_xen_hypercall(xch, &hypercall);
 
-    unlock_pages(xch, &arg, sizeof(arg));
+    xc_hypercall_buffer_free(xch, arg);
 
     return rc;
 }
