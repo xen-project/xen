@@ -27,12 +27,19 @@ int xc_acm_op(xc_interface *xch, int cmd, void *arg, unsigned long arg_size)
 {
     int ret;
     DECLARE_HYPERCALL;
-    struct xen_acmctl acmctl;
+    DECLARE_HYPERCALL_BUFFER(struct xen_acmctl, acmctl);
+
+    acmctl = xc_hypercall_buffer_alloc(xch, acmctl, sizeof(*acmctl));
+    if ( acmctl == NULL )
+    {
+        PERROR("Could not allocate memory for ACM OP hypercall");
+        return -EFAULT;
+    }
 
     switch (cmd) {
         case ACMOP_setpolicy: {
             struct acm_setpolicy *setpolicy = (struct acm_setpolicy *)arg;
-            memcpy(&acmctl.u.setpolicy,
+            memcpy(&acmctl->u.setpolicy,
                    setpolicy,
                    sizeof(struct acm_setpolicy));
         }
@@ -40,7 +47,7 @@ int xc_acm_op(xc_interface *xch, int cmd, void *arg, unsigned long arg_size)
 
         case ACMOP_getpolicy: {
             struct acm_getpolicy *getpolicy = (struct acm_getpolicy *)arg;
-            memcpy(&acmctl.u.getpolicy,
+            memcpy(&acmctl->u.getpolicy,
                    getpolicy,
                    sizeof(struct acm_getpolicy));
         }
@@ -48,7 +55,7 @@ int xc_acm_op(xc_interface *xch, int cmd, void *arg, unsigned long arg_size)
 
         case ACMOP_dumpstats: {
             struct acm_dumpstats *dumpstats = (struct acm_dumpstats *)arg;
-            memcpy(&acmctl.u.dumpstats,
+            memcpy(&acmctl->u.dumpstats,
                    dumpstats,
                    sizeof(struct acm_dumpstats));
         }
@@ -56,7 +63,7 @@ int xc_acm_op(xc_interface *xch, int cmd, void *arg, unsigned long arg_size)
 
         case ACMOP_getssid: {
             struct acm_getssid *getssid = (struct acm_getssid *)arg;
-            memcpy(&acmctl.u.getssid,
+            memcpy(&acmctl->u.getssid,
                    getssid,
                    sizeof(struct acm_getssid));
         }
@@ -64,7 +71,7 @@ int xc_acm_op(xc_interface *xch, int cmd, void *arg, unsigned long arg_size)
 
         case ACMOP_getdecision: {
             struct acm_getdecision *getdecision = (struct acm_getdecision *)arg;
-            memcpy(&acmctl.u.getdecision,
+            memcpy(&acmctl->u.getdecision,
                    getdecision,
                    sizeof(struct acm_getdecision));
         }
@@ -72,7 +79,7 @@ int xc_acm_op(xc_interface *xch, int cmd, void *arg, unsigned long arg_size)
 
         case ACMOP_chgpolicy: {
             struct acm_change_policy *change_policy = (struct acm_change_policy *)arg;
-            memcpy(&acmctl.u.change_policy,
+            memcpy(&acmctl->u.change_policy,
                    change_policy,
                    sizeof(struct acm_change_policy));
         }
@@ -80,40 +87,36 @@ int xc_acm_op(xc_interface *xch, int cmd, void *arg, unsigned long arg_size)
 
         case ACMOP_relabeldoms: {
             struct acm_relabel_doms *relabel_doms = (struct acm_relabel_doms *)arg;
-            memcpy(&acmctl.u.relabel_doms,
+            memcpy(&acmctl->u.relabel_doms,
                    relabel_doms,
                    sizeof(struct acm_relabel_doms));
         }
         break;
     }
 
-    acmctl.cmd = cmd;
-    acmctl.interface_version = ACM_INTERFACE_VERSION;
+    acmctl->cmd = cmd;
+    acmctl->interface_version = ACM_INTERFACE_VERSION;
 
     hypercall.op = __HYPERVISOR_xsm_op;
-    hypercall.arg[0] = (unsigned long)&acmctl;
-    if ( lock_pages(xch, &acmctl, sizeof(acmctl)) != 0)
-    {
-        PERROR("Could not lock memory for Xen hypercall");
-        return -EFAULT;
-    }
+    hypercall.arg[0] = HYPERCALL_BUFFER_AS_ARG(acmctl);
     if ( (ret = do_xen_hypercall(xch, &hypercall)) < 0)
     {
         if ( errno == EACCES )
             DPRINTF("acmctl operation failed -- need to"
                     " rebuild the user-space tool set?\n");
     }
-    unlock_pages(xch, &acmctl, sizeof(acmctl));
 
     switch (cmd) {
         case ACMOP_getdecision: {
             struct acm_getdecision *getdecision = (struct acm_getdecision *)arg;
             memcpy(getdecision,
-                   &acmctl.u.getdecision,
+                   &acmctl->u.getdecision,
                    sizeof(struct acm_getdecision));
             break;
         }
     }
+
+    xc_hypercall_buffer_free(xch, acmctl);
 
     return ret;
 }
