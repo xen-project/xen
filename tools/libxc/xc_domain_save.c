@@ -411,7 +411,7 @@ static int print_stats(xc_interface *xch, uint32_t domid, int pages_sent,
 
 
 static int analysis_phase(xc_interface *xch, uint32_t domid, struct save_ctx *ctx,
-                          unsigned long *arr, int runs)
+                          xc_hypercall_buffer_t *arr, int runs)
 {
     long long start, now;
     xc_shadow_op_stats_t stats;
@@ -909,7 +909,9 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
        - that should be sent this iteration (unless later marked as skip);
        - to skip this iteration because already dirty;
        - to fixup by sending at the end if not already resent; */
-    unsigned long *to_send = NULL, *to_skip = NULL, *to_fix = NULL;
+    DECLARE_HYPERCALL_BUFFER(unsigned long, to_skip);
+    DECLARE_HYPERCALL_BUFFER(unsigned long, to_send);
+    unsigned long *to_fix = NULL;
 
     xc_shadow_op_stats_t stats;
 
@@ -1038,9 +1040,9 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
     sent_last_iter = dinfo->p2m_size;
 
     /* Setup to_send / to_fix and to_skip bitmaps */
-    to_send = xc_memalign(PAGE_SIZE, ROUNDUP(BITMAP_SIZE, PAGE_SHIFT)); 
+    to_send = xc_hypercall_buffer_alloc_pages(xch, to_send, NRPAGES(BITMAP_SIZE));
+    to_skip = xc_hypercall_buffer_alloc_pages(xch, to_skip, NRPAGES(BITMAP_SIZE));
     to_fix  = calloc(1, BITMAP_SIZE);
-    to_skip = xc_memalign(PAGE_SIZE, ROUNDUP(BITMAP_SIZE, PAGE_SHIFT)); 
 
     if ( !to_send || !to_fix || !to_skip )
     {
@@ -1050,20 +1052,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
     memset(to_send, 0xff, BITMAP_SIZE);
 
-    if ( lock_pages(xch, to_send, BITMAP_SIZE) )
-    {
-        PERROR("Unable to lock to_send");
-        return 1;
-    }
-
-    /* (to fix is local only) */
-    if ( lock_pages(xch, to_skip, BITMAP_SIZE) )
-    {
-        PERROR("Unable to lock to_skip");
-        return 1;
-    }
-
-    if ( hvm ) 
+    if ( hvm )
     {
         /* Need another buffer for HVM context */
         hvm_buf_size = xc_domain_hvm_getcontext(xch, dom, 0, 0);
@@ -1080,7 +1069,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
         }
     }
 
-    analysis_phase(xch, dom, ctx, to_skip, 0);
+    analysis_phase(xch, dom, ctx, HYPERCALL_BUFFER(to_skip), 0);
 
     pfn_type   = xc_memalign(PAGE_SIZE, ROUNDUP(
                               MAX_BATCH_SIZE * sizeof(*pfn_type), PAGE_SHIFT));
@@ -1192,7 +1181,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
                 /* Slightly wasteful to peek the whole array evey time,
                    but this is fast enough for the moment. */
                 frc = xc_shadow_control(
-                    xch, dom, XEN_DOMCTL_SHADOW_OP_PEEK, to_skip, 
+                    xch, dom, XEN_DOMCTL_SHADOW_OP_PEEK, HYPERCALL_BUFFER(to_skip),
                     dinfo->p2m_size, NULL, 0, NULL);
                 if ( frc != dinfo->p2m_size )
                 {
@@ -1532,8 +1521,8 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
             }
 
-            if ( xc_shadow_control(xch, dom, 
-                                   XEN_DOMCTL_SHADOW_OP_CLEAN, to_send, 
+            if ( xc_shadow_control(xch, dom,
+                                   XEN_DOMCTL_SHADOW_OP_CLEAN, HYPERCALL_BUFFER(to_send),
                                    dinfo->p2m_size, NULL, 0, &stats) != dinfo->p2m_size )
             {
                 PERROR("Error flushing shadow PT");
@@ -1861,7 +1850,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
         print_stats(xch, dom, 0, &stats, 1);
 
         if ( xc_shadow_control(xch, dom,
-                               XEN_DOMCTL_SHADOW_OP_CLEAN, to_send,
+                               XEN_DOMCTL_SHADOW_OP_CLEAN, HYPERCALL_BUFFER(to_send),
                                dinfo->p2m_size, NULL, 0, &stats) != dinfo->p2m_size )
         {
             PERROR("Error flushing shadow PT");
@@ -1892,12 +1881,13 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
     if ( ctx->live_m2p )
         munmap(ctx->live_m2p, M2P_SIZE(ctx->max_mfn));
 
+    xc_hypercall_buffer_free_pages(xch, to_send, NRPAGES(BITMAP_SIZE));
+    xc_hypercall_buffer_free_pages(xch, to_skip, NRPAGES(BITMAP_SIZE));
+
     free(pfn_type);
     free(pfn_batch);
     free(pfn_err);
-    free(to_send);
     free(to_fix);
-    free(to_skip);
 
     DPRINTF("Save exit rc=%d\n",rc);
 

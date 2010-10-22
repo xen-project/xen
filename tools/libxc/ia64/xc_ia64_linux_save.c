@@ -432,9 +432,9 @@ xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iters,
     int last_iter = 0;
 
     /* Bitmap of pages to be sent.  */
-    unsigned long *to_send = NULL;
+    DECLARE_HYPERCALL_BUFFER(unsigned long, to_send);
     /* Bitmap of pages not to be sent (because dirtied).  */
-    unsigned long *to_skip = NULL;
+    DECLARE_HYPERCALL_BUFFER(unsigned long, to_skip);
 
     char *mem;
 
@@ -542,8 +542,8 @@ xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iters,
         last_iter = 0;
 
         bitmap_size = ((p2m_size + BITS_PER_LONG-1) & ~(BITS_PER_LONG-1)) / 8;
-        to_send = malloc(bitmap_size);
-        to_skip = malloc(bitmap_size);
+        to_send = xc_hypercall_buffer_alloc(xch, to_send, bitmap_size);
+        to_skip = xc_hypercall_buffer_alloc(xch, to_skip, bitmap_size);
 
         if (!to_send || !to_skip) {
             ERROR("Couldn't allocate bitmap array");
@@ -552,15 +552,6 @@ xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iters,
 
         /* Initially all the pages must be sent.  */
         memset(to_send, 0xff, bitmap_size);
-
-        if (lock_pages(to_send, bitmap_size)) {
-            ERROR("Unable to lock_pages to_send");
-            goto out;
-        }
-        if (lock_pages(to_skip, bitmap_size)) {
-            ERROR("Unable to lock_pages to_skip");
-            goto out;
-        }
 
         /* Enable qemu-dm logging dirty pages to xen */
         if (hvm && !callbacks->switch_qemu_logdirty(dom, 1, callbacks->data)) {
@@ -621,7 +612,7 @@ xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iters,
         if (!last_iter) {
             if (xc_shadow_control(xch, dom,
                                   XEN_DOMCTL_SHADOW_OP_PEEK,
-                                  to_skip, p2m_size,
+                                  HYPERCALL_BUFFER(to_skip), p2m_size,
                                   NULL, 0, NULL) != p2m_size) {
                 ERROR("Error peeking shadow bitmap");
                 goto out;
@@ -713,7 +704,7 @@ xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iters,
             /* Pages to be sent are pages which were dirty.  */
             if (xc_shadow_control(xch, dom,
                                   XEN_DOMCTL_SHADOW_OP_CLEAN,
-                                  to_send, p2m_size,
+                                  HYPERCALL_BUFFER(to_send), p2m_size,
                                   NULL, 0, NULL ) != p2m_size) {
                 ERROR("Error flushing shadow PT");
                 goto out;
@@ -779,7 +770,7 @@ xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iters,
        //print_stats(xch, dom, 0, &stats, 1);
 
        if ( xc_shadow_control(xch, dom,
-                              XEN_DOMCTL_SHADOW_OP_CLEAN, to_send,
+                              XEN_DOMCTL_SHADOW_OP_CLEAN, HYPERCALL_BUFFER(to_send),
                               p2m_size, NULL, 0, NULL) != p2m_size )
        {
            ERROR("Error flushing shadow PT");
@@ -799,10 +790,8 @@ xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iters,
         }
     }
 
-    unlock_pages(to_send, bitmap_size);
-    free(to_send);
-    unlock_pages(to_skip, bitmap_size);
-    free(to_skip);
+    xc_hypercall_buffer_free(xch, to_send);
+    xc_hypercall_buffer_free(xch, to_skip);
     if (live_shinfo)
         munmap(live_shinfo, PAGE_SIZE);
     if (memmap_info)

@@ -601,7 +601,7 @@ typedef xen_domctl_shadow_op_stats_t xc_shadow_op_stats_t;
 int xc_shadow_control(xc_interface *xch,
                       uint32_t domid,
                       unsigned int sop,
-                      unsigned long *dirty_bitmap,
+                      xc_hypercall_buffer_t *dirty_bitmap,
                       unsigned long pages,
                       unsigned long *mb,
                       uint32_t mode,

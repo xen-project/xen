@@ -157,6 +157,7 @@ typedef l4_pgentry_64_t l4_pgentry_t;
 #define PAGE_MASK_IA64          (~(PAGE_SIZE_IA64-1))
 
 #define ROUNDUP(_x,_w) (((unsigned long)(_x)+(1UL<<(_w))-1) & ~((1UL<<(_w))-1))
+#define NRPAGES(x) (ROUNDUP(x, PAGE_SHIFT) >> PAGE_SHIFT)
 
 
 /* XXX SMH: following skanky macros rely on variable p2m_size being set */

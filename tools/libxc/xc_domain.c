@@ -400,7 +400,7 @@ int xc_watchdog(xc_interface *xch,
 int xc_shadow_control(xc_interface *xch,
                       uint32_t domid,
                       unsigned int sop,
-                      unsigned long *dirty_bitmap,
+                      xc_hypercall_buffer_t *dirty_bitmap,
                       unsigned long pages,
                       unsigned long *mb,
                       uint32_t mode,
@@ -408,14 +408,17 @@ int xc_shadow_control(xc_interface *xch,
 {
     int rc;
     DECLARE_DOMCTL;
+    DECLARE_HYPERCALL_BUFFER_ARGUMENT(dirty_bitmap);
+
     domctl.cmd = XEN_DOMCTL_shadow_op;
     domctl.domain = (domid_t)domid;
     domctl.u.shadow_op.op     = sop;
     domctl.u.shadow_op.pages  = pages;
     domctl.u.shadow_op.mb     = mb ? *mb : 0;
     domctl.u.shadow_op.mode   = mode;
-    set_xen_guest_handle(domctl.u.shadow_op.dirty_bitmap,
-                         (uint8_t *)dirty_bitmap);
+    if (dirty_bitmap != NULL)
+        xc_set_xen_guest_handle(domctl.u.shadow_op.dirty_bitmap,
+                                dirty_bitmap);
 
     rc = do_domctl(xch, &domctl);
 

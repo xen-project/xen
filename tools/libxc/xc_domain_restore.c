@@ -1063,7 +1063,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     shared_info_any_t *new_shared_info;
 
     /* A copy of the CPU context of the guest. */
-    vcpu_guest_context_any_t ctxt;
+    DECLARE_HYPERCALL_BUFFER(vcpu_guest_context_any_t, ctxt);
 
     /* A table containing the type of each PFN (/not/ MFN!). */
     unsigned long *pfn_type = NULL;
@@ -1112,6 +1112,15 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
 
     if ( superpages )
         return 1;
+
+    ctxt = xc_hypercall_buffer_alloc(xch, ctxt, sizeof(*ctxt));
+
+    if ( ctxt == NULL )
+    {
+        PERROR("Unable to allocate VCPU ctxt buffer");
+        return 1;
+    }
+
 
     if ( (orig_io_fd_flags = fcntl(io_fd, F_GETFL, 0)) < 0 ) {
         PERROR("unable to read IO FD flags");
@@ -1539,26 +1548,20 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
         }
     }
 
-    if ( lock_pages(xch, &ctxt, sizeof(ctxt)) )
-    {
-        PERROR("Unable to lock ctxt");
-        return 1;
-    }
-
     vcpup = tailbuf.u.pv.vcpubuf;
     for ( i = 0; i <= max_vcpu_id; i++ )
     {
         if ( !(vcpumap & (1ULL << i)) )
             continue;
 
-        memcpy(&ctxt, vcpup, ((dinfo->guest_width == 8) ? sizeof(ctxt.x64)
-                              : sizeof(ctxt.x32)));
-        vcpup += (dinfo->guest_width == 8) ? sizeof(ctxt.x64) : sizeof(ctxt.x32);
+        memcpy(ctxt, vcpup, ((dinfo->guest_width == 8) ? sizeof(ctxt->x64)
+                              : sizeof(ctxt->x32)));
+        vcpup += (dinfo->guest_width == 8) ? sizeof(ctxt->x64) : sizeof(ctxt->x32);
 
         DPRINTF("read VCPU %d\n", i);
 
         if ( !new_ctxt_format )
-            SET_FIELD(&ctxt, flags, GET_FIELD(&ctxt, flags) | VGCF_online);
+            SET_FIELD(ctxt, flags, GET_FIELD(ctxt, flags) | VGCF_online);
 
         if ( i == 0 )
         {
@@ -1566,7 +1569,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
              * Uncanonicalise the suspend-record frame number and poke
              * resume record.
              */
-            pfn = GET_FIELD(&ctxt, user_regs.edx);
+            pfn = GET_FIELD(ctxt, user_regs.edx);
             if ( (pfn >= dinfo->p2m_size) ||
                  (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB) )
             {
@@ -1574,7 +1577,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                 goto out;
             }
             mfn = ctx->p2m[pfn];
-            SET_FIELD(&ctxt, user_regs.edx, mfn);
+            SET_FIELD(ctxt, user_regs.edx, mfn);
             start_info = xc_map_foreign_range(
                 xch, dom, PAGE_SIZE, PROT_READ | PROT_WRITE, mfn);
             SET_FIELD(start_info, nr_pages, dinfo->p2m_size);
@@ -1589,15 +1592,15 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
             munmap(start_info, PAGE_SIZE);
         }
         /* Uncanonicalise each GDT frame number. */
-        if ( GET_FIELD(&ctxt, gdt_ents) > 8192 )
+        if ( GET_FIELD(ctxt, gdt_ents) > 8192 )
         {
             ERROR("GDT entry count out of range");
             goto out;
         }
 
-        for ( j = 0; (512*j) < GET_FIELD(&ctxt, gdt_ents); j++ )
+        for ( j = 0; (512*j) < GET_FIELD(ctxt, gdt_ents); j++ )
         {
-            pfn = GET_FIELD(&ctxt, gdt_frames[j]);
+            pfn = GET_FIELD(ctxt, gdt_frames[j]);
             if ( (pfn >= dinfo->p2m_size) ||
                  (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB) )
             {
@@ -1605,10 +1608,10 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                       j, (unsigned long)pfn);
                 goto out;
             }
-            SET_FIELD(&ctxt, gdt_frames[j], ctx->p2m[pfn]);
+            SET_FIELD(ctxt, gdt_frames[j], ctx->p2m[pfn]);
         }
         /* Uncanonicalise the page table base pointer. */
-        pfn = UNFOLD_CR3(GET_FIELD(&ctxt, ctrlreg[3]));
+        pfn = UNFOLD_CR3(GET_FIELD(ctxt, ctrlreg[3]));
 
         if ( pfn >= dinfo->p2m_size )
         {
@@ -1625,12 +1628,12 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                   (unsigned long)ctx->pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT);
             goto out;
         }
-        SET_FIELD(&ctxt, ctrlreg[3], FOLD_CR3(ctx->p2m[pfn]));
+        SET_FIELD(ctxt, ctrlreg[3], FOLD_CR3(ctx->p2m[pfn]));
 
         /* Guest pagetable (x86/64) stored in otherwise-unused CR1. */
-        if ( (ctx->pt_levels == 4) && (ctxt.x64.ctrlreg[1] & 1) )
+        if ( (ctx->pt_levels == 4) && (ctxt->x64.ctrlreg[1] & 1) )
         {
-            pfn = UNFOLD_CR3(ctxt.x64.ctrlreg[1] & ~1);
+            pfn = UNFOLD_CR3(ctxt->x64.ctrlreg[1] & ~1);
             if ( pfn >= dinfo->p2m_size )
             {
                 ERROR("User PT base is bad: pfn=%lu p2m_size=%lu",
@@ -1645,12 +1648,12 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                       (unsigned long)ctx->pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT);
                 goto out;
             }
-            ctxt.x64.ctrlreg[1] = FOLD_CR3(ctx->p2m[pfn]);
+            ctxt->x64.ctrlreg[1] = FOLD_CR3(ctx->p2m[pfn]);
         }
         domctl.cmd = XEN_DOMCTL_setvcpucontext;
         domctl.domain = (domid_t)dom;
         domctl.u.vcpucontext.vcpu = i;
-        set_xen_guest_handle(domctl.u.vcpucontext.ctxt, &ctxt.c);
+        xc_set_xen_guest_handle(domctl.u.vcpucontext.ctxt, ctxt);
         frc = xc_domctl(xch, &domctl);
         if ( frc != 0 )
         {
@@ -1791,6 +1794,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
  out:
     if ( (rc != 0) && (dom != 0) )
         xc_domain_destroy(xch, dom);
+    xc_hypercall_buffer_free(xch, ctxt);
     free(mmu);
     free(ctx->p2m);
     free(pfn_type);
