@@ -317,15 +317,25 @@ static void signal_int_handler(int signo)
     int i, j, k, ret;
     struct timeval tv;
     int cx_cap = 0, px_cap = 0;
-    uint32_t cpu_to_core[MAX_NR_CPU];
-    uint32_t cpu_to_socket[MAX_NR_CPU];
-    uint32_t cpu_to_node[MAX_NR_CPU];
+    DECLARE_HYPERCALL_BUFFER(uint32_t, cpu_to_core);
+    DECLARE_HYPERCALL_BUFFER(uint32_t, cpu_to_socket);
+    DECLARE_HYPERCALL_BUFFER(uint32_t, cpu_to_node);
     xc_topologyinfo_t info = { 0 };
+
+    cpu_to_core = xc_hypercall_buffer_alloc(xc_handle, cpu_to_core, sizeof(*cpu_to_core) * MAX_NR_CPU);
+    cpu_to_socket = xc_hypercall_buffer_alloc(xc_handle, cpu_to_socket, sizeof(*cpu_to_socket) * MAX_NR_CPU);
+    cpu_to_node = xc_hypercall_buffer_alloc(xc_handle, cpu_to_node, sizeof(*cpu_to_node) * MAX_NR_CPU);
+
+    if ( cpu_to_core == NULL || cpu_to_socket == NULL || cpu_to_node == NULL )
+    {
+	fprintf(stderr, "failed to allocate hypercall buffers\n");
+	goto out;
+    }
 
     if ( gettimeofday(&tv, NULL) == -1 )
     {
         fprintf(stderr, "failed to get timeofday\n");
-        return ;
+        goto out ;
     }
     usec_end = tv.tv_sec * 1000000UL + tv.tv_usec;
 
@@ -385,9 +395,9 @@ static void signal_int_handler(int signo)
         }
     }
 
-    set_xen_guest_handle(info.cpu_to_core, cpu_to_core);
-    set_xen_guest_handle(info.cpu_to_socket, cpu_to_socket);
-    set_xen_guest_handle(info.cpu_to_node, cpu_to_node);
+    xc_set_xen_guest_handle(info.cpu_to_core, cpu_to_core);
+    xc_set_xen_guest_handle(info.cpu_to_socket, cpu_to_socket);
+    xc_set_xen_guest_handle(info.cpu_to_node, cpu_to_node);
     info.max_cpu_index = MAX_NR_CPU - 1;
 
     ret = xc_topologyinfo(xc_handle, &info);
@@ -485,6 +495,10 @@ static void signal_int_handler(int signo)
     free(pxstat);
     free(sum);
     free(avgfreq);
+out:
+    xc_hypercall_buffer_free(xc_handle, cpu_to_core);
+    xc_hypercall_buffer_free(xc_handle, cpu_to_socket);
+    xc_hypercall_buffer_free(xc_handle, cpu_to_node);
     xc_interface_close(xc_handle);
     exit(0);
 }
@@ -934,21 +948,31 @@ out:
 
 void cpu_topology_func(int argc, char *argv[])
 {
-    uint32_t cpu_to_core[MAX_NR_CPU];
-    uint32_t cpu_to_socket[MAX_NR_CPU];
-    uint32_t cpu_to_node[MAX_NR_CPU];
+    DECLARE_HYPERCALL_BUFFER(uint32_t, cpu_to_core);
+    DECLARE_HYPERCALL_BUFFER(uint32_t, cpu_to_socket);
+    DECLARE_HYPERCALL_BUFFER(uint32_t, cpu_to_node);
     xc_topologyinfo_t info = { 0 };
     int i;
 
-    set_xen_guest_handle(info.cpu_to_core, cpu_to_core);
-    set_xen_guest_handle(info.cpu_to_socket, cpu_to_socket);
-    set_xen_guest_handle(info.cpu_to_node, cpu_to_node);
+    cpu_to_core = xc_hypercall_buffer_alloc(xc_handle, cpu_to_core, sizeof(*cpu_to_core) * MAX_NR_CPU);
+    cpu_to_socket = xc_hypercall_buffer_alloc(xc_handle, cpu_to_socket, sizeof(*cpu_to_socket) * MAX_NR_CPU);
+    cpu_to_node = xc_hypercall_buffer_alloc(xc_handle, cpu_to_node, sizeof(*cpu_to_node) * MAX_NR_CPU);
+
+    if ( cpu_to_core == NULL || cpu_to_socket == NULL || cpu_to_node == NULL )
+    {
+	fprintf(stderr, "failed to allocate hypercall buffers\n");
+	goto out;
+    }
+
+    xc_set_xen_guest_handle(info.cpu_to_core, cpu_to_core);
+    xc_set_xen_guest_handle(info.cpu_to_socket, cpu_to_socket);
+    xc_set_xen_guest_handle(info.cpu_to_node, cpu_to_node);
     info.max_cpu_index = MAX_NR_CPU-1;
 
     if ( xc_topologyinfo(xc_handle, &info) )
     {
         printf("Can not get Xen CPU topology: %d\n", errno);
-        return;
+        goto out;
     }
 
     if ( info.max_cpu_index > (MAX_NR_CPU-1) )
@@ -962,6 +986,10 @@ void cpu_topology_func(int argc, char *argv[])
         printf("CPU%d\t %d\t %d\t %d\n",
                i, cpu_to_core[i], cpu_to_socket[i], cpu_to_node[i]);
     }
+out:
+    xc_hypercall_buffer_free(xc_handle, cpu_to_core);
+    xc_hypercall_buffer_free(xc_handle, cpu_to_socket);
+    xc_hypercall_buffer_free(xc_handle, cpu_to_node);
 }
 
 void set_sched_smt_func(int argc, char *argv[])
