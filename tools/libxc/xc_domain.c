@@ -374,24 +374,25 @@ int xc_watchdog(xc_interface *xch,
                 uint32_t timeout)
 {
     int ret = -1;
-    sched_watchdog_t arg;
     DECLARE_HYPERCALL;
+    DECLARE_HYPERCALL_BUFFER(sched_watchdog_t, arg);
 
-    hypercall.op     = __HYPERVISOR_sched_op;
-    hypercall.arg[0] = (unsigned long)SCHEDOP_watchdog;
-    hypercall.arg[1] = (unsigned long)&arg;
-    arg.id = id;
-    arg.timeout = timeout;
-
-    if ( lock_pages(xch, &arg, sizeof(arg)) != 0 )
+    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
+    if ( arg == NULL )
     {
-        PERROR("Could not lock memory for Xen hypercall");
+        PERROR("Could not allocate memory for xc_watchdog hypercall");
         goto out1;
     }
 
+    hypercall.op     = __HYPERVISOR_sched_op;
+    hypercall.arg[0] = (unsigned long)SCHEDOP_watchdog;
+    hypercall.arg[1] = HYPERCALL_BUFFER_AS_ARG(arg);
+    arg->id = id;
+    arg->timeout = timeout;
+
     ret = do_xen_hypercall(xch, &hypercall);
 
-    unlock_pages(xch, &arg, sizeof(arg));
+    xc_hypercall_buffer_free(xch, arg);
 
  out1:
     return ret;
