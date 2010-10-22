@@ -85,24 +85,25 @@ int xc_domain_shutdown(xc_interface *xch,
                        int reason)
 {
     int ret = -1;
-    sched_remote_shutdown_t arg;
     DECLARE_HYPERCALL;
+    DECLARE_HYPERCALL_BUFFER(sched_remote_shutdown_t, arg);
 
-    hypercall.op     = __HYPERVISOR_sched_op;
-    hypercall.arg[0] = (unsigned long)SCHEDOP_remote_shutdown;
-    hypercall.arg[1] = (unsigned long)&arg;
-    arg.domain_id = domid;
-    arg.reason = reason;
-
-    if ( lock_pages(xch, &arg, sizeof(arg)) != 0 )
+    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
+    if ( arg == NULL )
     {
-        PERROR("Could not lock memory for Xen hypercall");
+        PERROR("Could not allocate memory for xc_domain_shutdown hypercall");
         goto out1;
     }
 
+    hypercall.op     = __HYPERVISOR_sched_op;
+    hypercall.arg[0] = (unsigned long)SCHEDOP_remote_shutdown;
+    hypercall.arg[1] = HYPERCALL_BUFFER_AS_ARG(arg);
+    arg->domain_id = domid;
+    arg->reason = reason;
+
     ret = do_xen_hypercall(xch, &hypercall);
 
-    unlock_pages(xch, &arg, sizeof(arg));
+    xc_hypercall_buffer_free(xch, arg);
 
  out1:
     return ret;
