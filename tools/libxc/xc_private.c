@@ -320,12 +320,18 @@ void hcall_buf_release(xc_interface *xch, void **addr, size_t len)
 int xc_get_pfn_type_batch(xc_interface *xch, uint32_t dom,
                           unsigned int num, xen_pfn_t *arr)
 {
+    int rc;
     DECLARE_DOMCTL;
+    DECLARE_HYPERCALL_BOUNCE(arr, sizeof(*arr) * num, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
+    if ( xc_hypercall_bounce_pre(xch, arr) )
+        return -1;
     domctl.cmd = XEN_DOMCTL_getpageframeinfo3;
     domctl.domain = (domid_t)dom;
     domctl.u.getpageframeinfo3.num = num;
-    set_xen_guest_handle(domctl.u.getpageframeinfo3.array, arr);
-    return do_domctl(xch, &domctl);
+    xc_set_xen_guest_handle(domctl.u.getpageframeinfo3.array, arr);
+    rc = do_domctl(xch, &domctl);
+    xc_hypercall_bounce_post(xch, arr);
+    return rc;
 }
 
 int xc_mmuext_op(
@@ -496,25 +502,27 @@ int xc_get_pfn_list(xc_interface *xch,
                     unsigned long max_pfns)
 {
     DECLARE_DOMCTL;
+    DECLARE_HYPERCALL_BOUNCE(pfn_buf, max_pfns * sizeof(*pfn_buf), XC_HYPERCALL_BUFFER_BOUNCE_OUT);
     int ret;
-    domctl.cmd = XEN_DOMCTL_getmemlist;
-    domctl.domain   = (domid_t)domid;
-    domctl.u.getmemlist.max_pfns = max_pfns;
-    set_xen_guest_handle(domctl.u.getmemlist.buffer, pfn_buf);
 
 #ifdef VALGRIND
     memset(pfn_buf, 0, max_pfns * sizeof(*pfn_buf));
 #endif
 
-    if ( lock_pages(xch, pfn_buf, max_pfns * sizeof(*pfn_buf)) != 0 )
+    if ( xc_hypercall_bounce_pre(xch, pfn_buf) )
     {
-        PERROR("xc_get_pfn_list: pfn_buf lock failed");
+        PERROR("xc_get_pfn_list: pfn_buf bounce failed");
         return -1;
     }
 
+    domctl.cmd = XEN_DOMCTL_getmemlist;
+    domctl.domain   = (domid_t)domid;
+    domctl.u.getmemlist.max_pfns = max_pfns;
+    xc_set_xen_guest_handle(domctl.u.getmemlist.buffer, pfn_buf);
+
     ret = do_domctl(xch, &domctl);
 
-    unlock_pages(xch, pfn_buf, max_pfns * sizeof(*pfn_buf));
+    xc_hypercall_bounce_post(xch, pfn_buf);
 
     return (ret < 0) ? -1 : domctl.u.getmemlist.num_pfns;
 }

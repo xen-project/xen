@@ -61,9 +61,10 @@ static int setup_hypercall_page(struct xc_dom_image *dom)
     return rc;
 }
 
-static int launch_vm(xc_interface *xch, domid_t domid, void *ctxt)
+static int launch_vm(xc_interface *xch, domid_t domid, xc_hypercall_buffer_t *ctxt)
 {
     DECLARE_DOMCTL;
+    DECLARE_HYPERCALL_BUFFER_ARGUMENT(ctxt);
     int rc;
 
     xc_dom_printf(xch, "%s: called, ctxt=%p", __FUNCTION__, ctxt);
@@ -71,7 +72,7 @@ static int launch_vm(xc_interface *xch, domid_t domid, void *ctxt)
     domctl.cmd = XEN_DOMCTL_setvcpucontext;
     domctl.domain = domid;
     domctl.u.vcpucontext.vcpu = 0;
-    set_xen_guest_handle(domctl.u.vcpucontext.ctxt, ctxt);
+    xc_set_xen_guest_handle(domctl.u.vcpucontext.ctxt, ctxt);
     rc = do_domctl(xch, &domctl);
     if ( rc != 0 )
         xc_dom_panic(xch, XC_INTERNAL_ERROR,
@@ -202,8 +203,12 @@ void *xc_dom_boot_domU_map(struct xc_dom_image *dom, xen_pfn_t pfn,
 int xc_dom_boot_image(struct xc_dom_image *dom)
 {
     DECLARE_DOMCTL;
-    vcpu_guest_context_any_t ctxt;
+    DECLARE_HYPERCALL_BUFFER(vcpu_guest_context_any_t, ctxt);
     int rc;
+
+    ctxt = xc_hypercall_buffer_alloc(dom->xch, ctxt, sizeof(*ctxt));
+    if ( ctxt == NULL )
+        return -1;
 
     DOMPRINTF_CALLED(dom->xch);
 
@@ -260,12 +265,13 @@ int xc_dom_boot_image(struct xc_dom_image *dom)
         return rc;
 
     /* let the vm run */
-    memset(&ctxt, 0, sizeof(ctxt));
-    if ( (rc = dom->arch_hooks->vcpu(dom, &ctxt)) != 0 )
+    memset(ctxt, 0, sizeof(ctxt));
+    if ( (rc = dom->arch_hooks->vcpu(dom, ctxt)) != 0 )
         return rc;
     xc_dom_unmap_all(dom);
-    rc = launch_vm(dom->xch, dom->guest_domid, &ctxt);
+    rc = launch_vm(dom->xch, dom->guest_domid, HYPERCALL_BUFFER(ctxt));
 
+    xc_hypercall_buffer_free(dom->xch, ctxt);
     return rc;
 }
 

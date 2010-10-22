@@ -115,36 +115,31 @@ int xc_vcpu_setaffinity(xc_interface *xch,
                         uint64_t *cpumap, int cpusize)
 {
     DECLARE_DOMCTL;
+    DECLARE_HYPERCALL_BUFFER(uint8_t, local);
     int ret = -1;
-    uint8_t *local = malloc(cpusize); 
 
-    if(local == NULL)
+    local = xc_hypercall_buffer_alloc(xch, local, cpusize);
+    if ( local == NULL )
     {
-        PERROR("Could not alloc memory for Xen hypercall");
+        PERROR("Could not allocate memory for setvcpuaffinity domctl hypercall");
         goto out;
     }
+
     domctl.cmd = XEN_DOMCTL_setvcpuaffinity;
     domctl.domain = (domid_t)domid;
     domctl.u.vcpuaffinity.vcpu    = vcpu;
 
     bitmap_64_to_byte(local, cpumap, cpusize * 8);
 
-    set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap.bitmap, local);
+    xc_set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap.bitmap, local);
 
     domctl.u.vcpuaffinity.cpumap.nr_cpus = cpusize * 8;
-    
-    if ( lock_pages(xch, local, cpusize) != 0 )
-    {
-        PERROR("Could not lock memory for Xen hypercall");
-        goto out;
-    }
 
     ret = do_domctl(xch, &domctl);
 
-    unlock_pages(xch, local, cpusize);
+    xc_hypercall_buffer_free(xch, local);
 
  out:
-    free(local);
     return ret;
 }
 
@@ -155,12 +150,13 @@ int xc_vcpu_getaffinity(xc_interface *xch,
                         uint64_t *cpumap, int cpusize)
 {
     DECLARE_DOMCTL;
+    DECLARE_HYPERCALL_BUFFER(uint8_t, local);
     int ret = -1;
-    uint8_t * local = malloc(cpusize);
 
+    local = xc_hypercall_buffer_alloc(xch, local, cpusize);
     if(local == NULL)
     {
-        PERROR("Could not alloc memory for Xen hypercall");
+        PERROR("Could not allocate memory for getvcpuaffinity domctl hypercall");
         goto out;
     }
 
@@ -168,22 +164,15 @@ int xc_vcpu_getaffinity(xc_interface *xch,
     domctl.domain = (domid_t)domid;
     domctl.u.vcpuaffinity.vcpu = vcpu;
 
-
-    set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap.bitmap, local);
+    xc_set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap.bitmap, local);
     domctl.u.vcpuaffinity.cpumap.nr_cpus = cpusize * 8;
-    
-    if ( lock_pages(xch, local, sizeof(local)) != 0 )
-    {
-        PERROR("Could not lock memory for Xen hypercall");
-        goto out;
-    }
 
     ret = do_domctl(xch, &domctl);
 
-    unlock_pages(xch, local, sizeof (local));
     bitmap_byte_to_64(cpumap, local, cpusize * 8);
+
+    xc_hypercall_buffer_free(xch, local);
 out:
-    free(local);
     return ret;
 }
 
@@ -283,20 +272,19 @@ int xc_domain_hvm_getcontext(xc_interface *xch,
 {
     int ret;
     DECLARE_DOMCTL;
+    DECLARE_HYPERCALL_BOUNCE(ctxt_buf, size, XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+
+    if ( xc_hypercall_bounce_pre(xch, ctxt_buf) )
+        return -1;
 
     domctl.cmd = XEN_DOMCTL_gethvmcontext;
     domctl.domain = (domid_t)domid;
     domctl.u.hvmcontext.size = size;
-    set_xen_guest_handle(domctl.u.hvmcontext.buffer, ctxt_buf);
-
-    if ( ctxt_buf ) 
-        if ( (ret = lock_pages(xch, ctxt_buf, size)) != 0 )
-            return ret;
+    xc_set_xen_guest_handle(domctl.u.hvmcontext.buffer, ctxt_buf);
 
     ret = do_domctl(xch, &domctl);
 
-    if ( ctxt_buf ) 
-        unlock_pages(xch, ctxt_buf, size);
+    xc_hypercall_bounce_post(xch, ctxt_buf);
 
     return (ret < 0 ? -1 : domctl.u.hvmcontext.size);
 }
@@ -312,23 +300,21 @@ int xc_domain_hvm_getcontext_partial(xc_interface *xch,
 {
     int ret;
     DECLARE_DOMCTL;
+    DECLARE_HYPERCALL_BOUNCE(ctxt_buf, size, XC_HYPERCALL_BUFFER_BOUNCE_OUT);
 
-    if ( !ctxt_buf ) 
-        return -EINVAL;
+    if ( !ctxt_buf || xc_hypercall_bounce_pre(xch, ctxt_buf) )
+        return -1;
 
     domctl.cmd = XEN_DOMCTL_gethvmcontext_partial;
     domctl.domain = (domid_t) domid;
     domctl.u.hvmcontext_partial.type = typecode;
     domctl.u.hvmcontext_partial.instance = instance;
-    set_xen_guest_handle(domctl.u.hvmcontext_partial.buffer, ctxt_buf);
+    xc_set_xen_guest_handle(domctl.u.hvmcontext_partial.buffer, ctxt_buf);
 
-    if ( (ret = lock_pages(xch, ctxt_buf, size)) != 0 )
-        return ret;
-    
     ret = do_domctl(xch, &domctl);
 
-    if ( ctxt_buf ) 
-        unlock_pages(xch, ctxt_buf, size);
+    if ( ctxt_buf )
+        xc_hypercall_bounce_post(xch, ctxt_buf);
 
     return ret ? -1 : 0;
 }
@@ -341,18 +327,19 @@ int xc_domain_hvm_setcontext(xc_interface *xch,
 {
     int ret;
     DECLARE_DOMCTL;
+    DECLARE_HYPERCALL_BOUNCE(ctxt_buf, size, XC_HYPERCALL_BUFFER_BOUNCE_IN);
+
+    if ( xc_hypercall_bounce_pre(xch, ctxt_buf) )
+        return -1;
 
     domctl.cmd = XEN_DOMCTL_sethvmcontext;
     domctl.domain = domid;
     domctl.u.hvmcontext.size = size;
-    set_xen_guest_handle(domctl.u.hvmcontext.buffer, ctxt_buf);
-
-    if ( (ret = lock_pages(xch, ctxt_buf, size)) != 0 )
-        return ret;
+    xc_set_xen_guest_handle(domctl.u.hvmcontext.buffer, ctxt_buf);
 
     ret = do_domctl(xch, &domctl);
 
-    unlock_pages(xch, ctxt_buf, size);
+    xc_hypercall_bounce_post(xch, ctxt_buf);
 
     return ret;
 }
@@ -364,18 +351,19 @@ int xc_vcpu_getcontext(xc_interface *xch,
 {
     int rc;
     DECLARE_DOMCTL;
-    size_t sz = sizeof(vcpu_guest_context_any_t);
+    DECLARE_HYPERCALL_BOUNCE(ctxt, sizeof(vcpu_guest_context_any_t), XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+
+    if ( xc_hypercall_bounce_pre(xch, ctxt) )
+        return -1;
 
     domctl.cmd = XEN_DOMCTL_getvcpucontext;
     domctl.domain = (domid_t)domid;
     domctl.u.vcpucontext.vcpu   = (uint16_t)vcpu;
-    set_xen_guest_handle(domctl.u.vcpucontext.ctxt, &ctxt->c);
+    xc_set_xen_guest_handle(domctl.u.vcpucontext.ctxt, ctxt);
 
-    
-    if ( (rc = lock_pages(xch, ctxt, sz)) != 0 )
-        return rc;
     rc = do_domctl(xch, &domctl);
-    unlock_pages(xch, ctxt, sz);
+
+    xc_hypercall_bounce_post(xch, ctxt);
 
     return rc;
 }
@@ -558,22 +546,24 @@ int xc_domain_get_tsc_info(xc_interface *xch,
 {
     int rc;
     DECLARE_DOMCTL;
-    xen_guest_tsc_info_t info = { 0 };
+    DECLARE_HYPERCALL_BUFFER(xen_guest_tsc_info_t, info);
+
+    info = xc_hypercall_buffer_alloc(xch, info, sizeof(*info));
+    if ( info == NULL )
+        return -ENOMEM;
 
     domctl.cmd = XEN_DOMCTL_gettscinfo;
     domctl.domain = (domid_t)domid;
-    set_xen_guest_handle(domctl.u.tsc_info.out_info, &info);
-    if ( (rc = lock_pages(xch, &info, sizeof(info))) != 0 )
-        return rc;
+    xc_set_xen_guest_handle(domctl.u.tsc_info.out_info, info);
     rc = do_domctl(xch, &domctl);
     if ( rc == 0 )
     {
-        *tsc_mode = info.tsc_mode;
-        *elapsed_nsec = info.elapsed_nsec;
-        *gtsc_khz = info.gtsc_khz;
-        *incarnation = info.incarnation;
+        *tsc_mode = info->tsc_mode;
+        *elapsed_nsec = info->elapsed_nsec;
+        *gtsc_khz = info->gtsc_khz;
+        *incarnation = info->incarnation;
     }
-    unlock_pages(xch, &info,sizeof(info));
+    xc_hypercall_buffer_free(xch, info);
     return rc;
 }
 
@@ -957,8 +947,8 @@ int xc_vcpu_setcontext(xc_interface *xch,
                        vcpu_guest_context_any_t *ctxt)
 {
     DECLARE_DOMCTL;
+    DECLARE_HYPERCALL_BOUNCE(ctxt, sizeof(vcpu_guest_context_any_t), XC_HYPERCALL_BUFFER_BOUNCE_IN);
     int rc;
-    size_t sz = sizeof(vcpu_guest_context_any_t);
 
     if (ctxt == NULL)
     {
@@ -966,16 +956,17 @@ int xc_vcpu_setcontext(xc_interface *xch,
         return -1;
     }
 
+    if ( xc_hypercall_bounce_pre(xch, ctxt) )
+        return -1;
+
     domctl.cmd = XEN_DOMCTL_setvcpucontext;
     domctl.domain = domid;
     domctl.u.vcpucontext.vcpu = vcpu;
-    set_xen_guest_handle(domctl.u.vcpucontext.ctxt, &ctxt->c);
+    xc_set_xen_guest_handle(domctl.u.vcpucontext.ctxt, ctxt);
 
-    if ( (rc = lock_pages(xch, ctxt, sz)) != 0 )
-        return rc;
     rc = do_domctl(xch, &domctl);
-    
-    unlock_pages(xch, ctxt, sz);
+
+    xc_hypercall_bounce_post(xch, ctxt);
 
     return rc;
 }
@@ -1101,6 +1092,13 @@ int xc_get_device_group(
 {
     int rc;
     DECLARE_DOMCTL;
+    DECLARE_HYPERCALL_BOUNCE(sdev_array, max_sdevs * sizeof(*sdev_array), XC_HYPERCALL_BUFFER_BOUNCE_IN);
+
+    if ( xc_hypercall_bounce_pre(xch, sdev_array) )
+    {
+        PERROR("Could not bounce buffer for xc_get_device_group");
+        return -1;
+    }
 
     domctl.cmd = XEN_DOMCTL_get_device_group;
     domctl.domain = (domid_t)domid;
@@ -1108,17 +1106,14 @@ int xc_get_device_group(
     domctl.u.get_device_group.machine_bdf = machine_bdf;
     domctl.u.get_device_group.max_sdevs = max_sdevs;
 
-    set_xen_guest_handle(domctl.u.get_device_group.sdev_array, sdev_array);
+    xc_set_xen_guest_handle(domctl.u.get_device_group.sdev_array, sdev_array);
 
-    if ( lock_pages(xch, sdev_array, max_sdevs * sizeof(*sdev_array)) != 0 )
-    {
-        PERROR("Could not lock memory for xc_get_device_group");
-        return -ENOMEM;
-    }
     rc = do_domctl(xch, &domctl);
-    unlock_pages(xch, sdev_array, max_sdevs * sizeof(*sdev_array));
 
     *num_sdevs = domctl.u.get_device_group.num_sdevs;
+
+    xc_hypercall_bounce_post(xch, sdev_array);
+
     return rc;
 }
 

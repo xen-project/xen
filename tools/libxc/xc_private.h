@@ -211,17 +211,18 @@ static inline int do_domctl(xc_interface *xch, struct xen_domctl *domctl)
 {
     int ret = -1;
     DECLARE_HYPERCALL;
-
-    if ( hcall_buf_prep(xch, (void **)&domctl, sizeof(*domctl)) != 0 )
-    {
-        PERROR("Could not lock memory for Xen hypercall");
-        goto out1;
-    }
+    DECLARE_HYPERCALL_BOUNCE(domctl, sizeof(*domctl), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
 
     domctl->interface_version = XEN_DOMCTL_INTERFACE_VERSION;
 
+    if ( xc_hypercall_bounce_pre(xch, domctl) )
+    {
+        PERROR("Could not bounce buffer for domctl hypercall");
+        goto out1;
+    }
+
     hypercall.op     = __HYPERVISOR_domctl;
-    hypercall.arg[0] = (unsigned long)domctl;
+    hypercall.arg[0] = HYPERCALL_BUFFER_AS_ARG(domctl);
 
     if ( (ret = do_xen_hypercall(xch, &hypercall)) < 0 )
     {
@@ -230,8 +231,7 @@ static inline int do_domctl(xc_interface *xch, struct xen_domctl *domctl)
                     " rebuild the user-space tool set?\n");
     }
 
-    hcall_buf_release(xch, (void **)&domctl, sizeof(*domctl));
-
+    xc_hypercall_bounce_post(xch, domctl);
  out1:
     return ret;
 }

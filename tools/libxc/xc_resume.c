@@ -196,12 +196,6 @@ static int xc_domain_resume_any(xc_interface *xch, uint32_t domid)
         goto out;
     }
 
-    if ( lock_pages(xch, &ctxt, sizeof(ctxt)) )
-    {
-        ERROR("Unable to lock ctxt");
-        goto out;
-    }
-
     if ( xc_vcpu_getcontext(xch, domid, 0, &ctxt) )
     {
         ERROR("Could not get vcpu context");
@@ -235,7 +229,6 @@ static int xc_domain_resume_any(xc_interface *xch, uint32_t domid)
 
 #if defined(__i386__) || defined(__x86_64__)
  out:
-    unlock_pages(xch, (void *)&ctxt, sizeof ctxt);
     if (p2m)
         munmap(p2m, P2M_FL_ENTRIES*PAGE_SIZE);
     if (p2m_frame_list)
