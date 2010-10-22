@@ -36,19 +36,21 @@ xen_ia64_fpswa_revision(struct xc_dom_image *dom, unsigned int *revision)
 {
     int ret;
     DECLARE_HYPERCALL;
-    hypercall.op     = __HYPERVISOR_ia64_dom0vp_op;
-    hypercall.arg[0] = IA64_DOM0VP_fpswa_revision;
-    hypercall.arg[1] = (unsigned long)revision;
+    DECLARE_HYPERCALL_BOUNCE(revision, sizeof(*revision), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
 
-    if (lock_pages(revision, sizeof(*revision)) != 0) {
-        xc_interface *xch = dom->xch;
+    if (xc_hypercall_bounce_pre(dom->xch, revision) )
+    {
         PERROR("Could not lock memory for xen fpswa hypercall");
         return -1;
     }
 
+    hypercall.op     = __HYPERVISOR_ia64_dom0vp_op;
+    hypercall.arg[0] = IA64_DOM0VP_fpswa_revision;
+    hypercall.arg[1] = HYPERCALL_BUFFER_AS_ARG(revision);
+
     ret = do_xen_hypercall(dom->xch, &hypercall);
-    
-    unlock_pages(revision, sizeof(*revision));
+
+    xc_hypercall_bounce_post(dom->xch, revision);
 
     return ret;
 }

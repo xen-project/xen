@@ -42,19 +42,24 @@ xc_ia64_get_memmap(xc_interface *xch,
                    uint32_t domid, char *buf, unsigned long bufsize)
 {
     privcmd_hypercall_t hypercall;
+    DECLARE_HYPERCALL_BOUNCE(buf, bufsize, XC_HYPERCALL_BUFFER_BOUNCE_OUT);
     int ret;
+
+    if ( xc_hypercall_bounce_pre(xch, pfn_buf) )
+    {
+        PERROR("xc_get_pfn_list: pfn_buf bounce failed");
+        return -1;
+    }
 
     hypercall.op = __HYPERVISOR_ia64_dom0vp_op;
     hypercall.arg[0] = IA64_DOM0VP_get_memmap;
     hypercall.arg[1] = domid;
-    hypercall.arg[2] = (unsigned long)buf;
+    hypercall.arg[2] = HYPERCALL_BUFFER_AS_ARG(buf);
     hypercall.arg[3] = bufsize;
     hypercall.arg[4] = 0;
 
-    if (lock_pages(buf, bufsize) != 0)
-        return -1;
     ret = do_xen_hypercall(xch, &hypercall);
-    unlock_pages(buf, bufsize);
+    xc_hypercall_bounce_post(xc, buf);
     return ret;
 }
 
@@ -142,6 +147,7 @@ xc_ia64_map_foreign_p2m(xc_interface *xch, uint32_t dom,
                         struct xen_ia64_memmap_info *memmap_info,
                         unsigned long flags, unsigned long *p2m_size_p)
 {
+    DECLARE_HYPERCALL_BOUNCE(memmap_info, sizeof(*memmap_info) + memmap_info->efi_memmap_size, XC_HYPERCALL_BOUNCE_BUFFER_IN);
     unsigned long gpfn_max;
     unsigned long p2m_size;
     void *addr;
@@ -157,25 +163,23 @@ xc_ia64_map_foreign_p2m(xc_interface *xch, uint32_t dom,
     addr = mmap(NULL, p2m_size, PROT_READ, MAP_SHARED, xch->fd, 0);
     if (addr == MAP_FAILED)
         return NULL;
-
-    hypercall.op = __HYPERVISOR_ia64_dom0vp_op;
-    hypercall.arg[0] = IA64_DOM0VP_expose_foreign_p2m;
-    hypercall.arg[1] = (unsigned long)addr;
-    hypercall.arg[2] = dom;
-    hypercall.arg[3] = (unsigned long)memmap_info;
-    hypercall.arg[4] = flags;
-
-    if (lock_pages(memmap_info,
-                   sizeof(*memmap_info) + memmap_info->efi_memmap_size) != 0) {
+    if (xc_hypercall_bounce_pre(xc, memmap_info)) {
         saved_errno = errno;
         munmap(addr, p2m_size);
         errno = saved_errno;
         return NULL;
     }
+
+    hypercall.op = __HYPERVISOR_ia64_dom0vp_op;
+    hypercall.arg[0] = IA64_DOM0VP_expose_foreign_p2m;
+    hypercall.arg[1] = (unsigned long)addr;
+    hypercall.arg[2] = dom;
+    hypercall.arg[3] = HYPERCALL_BUFFER_AS_ARG(memmap_info);
+    hypercall.arg[4] = flags;
+
     ret = do_xen_hypercall(xch, &hypercall);
     saved_errno = errno;
-    unlock_pages(memmap_info,
-                 sizeof(*memmap_info) + memmap_info->efi_memmap_size);
+    xc_hypercall_bounce_post(xch, memmap_info);
     if (ret < 0) {
         munmap(addr, p2m_size);
         errno = saved_errno;
