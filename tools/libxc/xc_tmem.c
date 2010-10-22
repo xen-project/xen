@@ -25,21 +25,23 @@ static int do_tmem_op(xc_interface *xch, tmem_op_t *op)
 {
     int ret;
     DECLARE_HYPERCALL;
+    DECLARE_HYPERCALL_BOUNCE(op, sizeof(*op), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
 
-    hypercall.op = __HYPERVISOR_tmem_op;
-    hypercall.arg[0] = (unsigned long)op;
-    if (lock_pages(xch, op, sizeof(*op)) != 0)
+    if ( xc_hypercall_bounce_pre(xch, op) )
     {
-        PERROR("Could not lock memory for Xen hypercall");
+        PERROR("Could not bounce buffer for tmem op hypercall");
         return -EFAULT;
     }
+
+    hypercall.op = __HYPERVISOR_tmem_op;
+    hypercall.arg[0] = HYPERCALL_BUFFER_AS_ARG(op);
     if ((ret = do_xen_hypercall(xch, &hypercall)) < 0)
     {
         if ( errno == EACCES )
             DPRINTF("tmem operation failed -- need to"
                     " rebuild the user-space tool set?\n");
     }
-    unlock_pages(xch, op, sizeof(*op));
+    xc_hypercall_bounce_post(xch, op);
 
     return ret;
 }
@@ -54,13 +56,13 @@ int xc_tmem_control(xc_interface *xch,
                     void *buf)
 {
     tmem_op_t op;
+    DECLARE_HYPERCALL_BOUNCE(buf, arg1, XC_HYPERCALL_BUFFER_BOUNCE_OUT);
     int rc;
 
     op.cmd = TMEM_CONTROL;
     op.pool_id = pool_id;
     op.u.ctrl.subop = subop;
     op.u.ctrl.cli_id = cli_id;
-    set_xen_guest_handle(op.u.ctrl.buf,buf);
     op.u.ctrl.arg1 = arg1;
     op.u.ctrl.arg2 = arg2;
     /* use xc_tmem_control_oid if arg3 is required */
@@ -68,25 +70,28 @@ int xc_tmem_control(xc_interface *xch,
     op.u.ctrl.oid[1] = 0;
     op.u.ctrl.oid[2] = 0;
 
-    if (subop == TMEMC_LIST) {
-        if ((arg1 != 0) && (lock_pages(xch, buf, arg1) != 0))
-        {
-            PERROR("Could not lock memory for Xen hypercall");
-            return -ENOMEM;
-        }
-    }
-
 #ifdef VALGRIND
     if (arg1 != 0)
         memset(buf, 0, arg1);
 #endif
 
+    if ( subop == TMEMC_LIST && arg1 != 0 )
+    {
+        if ( buf == NULL )
+            return -EINVAL;
+        if ( xc_hypercall_bounce_pre(xch, buf) )
+        {
+            PERROR("Could not bounce buffer for tmem control hypercall");
+            return -ENOMEM;
+        }
+    }
+
+    xc_set_xen_guest_handle(op.u.ctrl.buf, buf);
+
     rc = do_tmem_op(xch, &op);
 
-    if (subop == TMEMC_LIST) {
-        if (arg1 != 0)
-            unlock_pages(xch, buf, arg1);
-    }
+    if (subop == TMEMC_LIST && arg1 != 0)
+            xc_hypercall_bounce_post(xch, buf);
 
     return rc;
 }
@@ -101,6 +106,7 @@ int xc_tmem_control_oid(xc_interface *xch,
                         void *buf)
 {
     tmem_op_t op;
+    DECLARE_HYPERCALL_BOUNCE(buf, arg1, XC_HYPERCALL_BUFFER_BOUNCE_OUT);
     int rc;
 
     op.cmd = TMEM_CONTROL;
@@ -114,25 +120,28 @@ int xc_tmem_control_oid(xc_interface *xch,
     op.u.ctrl.oid[1] = oid.oid[1];
     op.u.ctrl.oid[2] = oid.oid[2];
 
-    if (subop == TMEMC_LIST) {
-        if ((arg1 != 0) && (lock_pages(xch, buf, arg1) != 0))
-        {
-            PERROR("Could not lock memory for Xen hypercall");
-            return -ENOMEM;
-        }
-    }
-
 #ifdef VALGRIND
     if (arg1 != 0)
         memset(buf, 0, arg1);
 #endif
 
+    if ( subop == TMEMC_LIST && arg1 != 0 )
+    {
+        if ( buf == NULL )
+            return -EINVAL;
+        if ( xc_hypercall_bounce_pre(xch, buf) )
+        {
+            PERROR("Could not bounce buffer for tmem control (OID) hypercall");
+            return -ENOMEM;
+        }
+    }
+
+    xc_set_xen_guest_handle(op.u.ctrl.buf, buf);
+
     rc = do_tmem_op(xch, &op);
 
-    if (subop == TMEMC_LIST) {
-        if (arg1 != 0)
-            unlock_pages(xch, buf, arg1);
-    }
+    if (subop == TMEMC_LIST && arg1 != 0)
+            xc_hypercall_bounce_post(xch, buf);
 
     return rc;
 }
