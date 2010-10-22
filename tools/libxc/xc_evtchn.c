@@ -22,31 +22,30 @@
 
 #include "xc_private.h"
 
-
 static int do_evtchn_op(xc_interface *xch, int cmd, void *arg,
                         size_t arg_size, int silently_fail)
 {
     int ret = -1;
     DECLARE_HYPERCALL;
+    DECLARE_HYPERCALL_BOUNCE(arg, arg_size, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
+
+    if ( xc_hypercall_bounce_pre(xch, arg) )
+    {
+        PERROR("do_evtchn_op: bouncing arg failed");
+        goto out;
+    }
 
     hypercall.op     = __HYPERVISOR_event_channel_op;
     hypercall.arg[0] = cmd;
-    hypercall.arg[1] = (unsigned long)arg;
-
-    if ( lock_pages(xch, arg, arg_size) != 0 )
-    {
-        PERROR("do_evtchn_op: arg lock failed");
-        goto out;
-    }
+    hypercall.arg[1] = HYPERCALL_BUFFER_AS_ARG(arg);
 
     if ((ret = do_xen_hypercall(xch, &hypercall)) < 0 && !silently_fail)
         ERROR("do_evtchn_op: HYPERVISOR_event_channel_op failed: %d", ret);
 
-    unlock_pages(xch, arg, arg_size);
+    xc_hypercall_bounce_post(xch, arg);
  out:
     return ret;
 }
-
 
 evtchn_port_or_error_t
 xc_evtchn_alloc_unbound(xc_interface *xch,
