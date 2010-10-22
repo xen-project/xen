@@ -567,42 +567,46 @@ int xc_sysctl(xc_interface *xch, struct xen_sysctl *sysctl)
 
 int xc_version(xc_interface *xch, int cmd, void *arg)
 {
-    int rc, argsize = 0;
+    DECLARE_HYPERCALL_BOUNCE(arg, 0, XC_HYPERCALL_BUFFER_BOUNCE_OUT); /* Size unknown until cmd decoded */
+    size_t sz = 0;
+    int rc;
 
     switch ( cmd )
     {
     case XENVER_extraversion:
-        argsize = sizeof(xen_extraversion_t);
+        sz = sizeof(xen_extraversion_t);
         break;
     case XENVER_compile_info:
-        argsize = sizeof(xen_compile_info_t);
+        sz = sizeof(xen_compile_info_t);
         break;
     case XENVER_capabilities:
-        argsize = sizeof(xen_capabilities_info_t);
+        sz = sizeof(xen_capabilities_info_t);
         break;
     case XENVER_changeset:
-        argsize = sizeof(xen_changeset_info_t);
+        sz = sizeof(xen_changeset_info_t);
         break;
     case XENVER_platform_parameters:
-        argsize = sizeof(xen_platform_parameters_t);
+        sz = sizeof(xen_platform_parameters_t);
         break;
     }
 
-    if ( (argsize != 0) && (lock_pages(xch, arg, argsize) != 0) )
+    HYPERCALL_BOUNCE_SET_SIZE(arg, sz);
+
+    if ( (sz != 0) && xc_hypercall_bounce_pre(xch, arg) )
     {
-        PERROR("Could not lock memory for version hypercall");
+        PERROR("Could not bounce buffer for version hypercall");
         return -ENOMEM;
     }
 
 #ifdef VALGRIND
-    if (argsize != 0)
-        memset(arg, 0, argsize);
+    if (sz != 0)
+        memset(hypercall_bounce_get(bounce), 0, sz);
 #endif
 
-    rc = do_xen_version(xch, cmd, arg);
+    rc = do_xen_version(xch, cmd, HYPERCALL_BUFFER(arg));
 
-    if ( argsize != 0 )
-        unlock_pages(xch, arg, argsize);
+    if ( sz != 0 )
+        xc_hypercall_bounce_post(xch, arg);
 
     return rc;
 }

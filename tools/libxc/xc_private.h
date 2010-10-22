@@ -166,13 +166,14 @@ void xc__hypercall_bounce_post(xc_interface *xch, xc_hypercall_buffer_t *bounce)
 
 int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall);
 
-static inline int do_xen_version(xc_interface *xch, int cmd, void *dest)
+static inline int do_xen_version(xc_interface *xch, int cmd, xc_hypercall_buffer_t *dest)
 {
     DECLARE_HYPERCALL;
+    DECLARE_HYPERCALL_BUFFER_ARGUMENT(dest);
 
     hypercall.op     = __HYPERVISOR_xen_version;
     hypercall.arg[0] = (unsigned long) cmd;
-    hypercall.arg[1] = (unsigned long) dest;
+    hypercall.arg[1] = HYPERCALL_BUFFER_AS_ARG(dest);
 
     return do_xen_hypercall(xch, &hypercall);
 }
