@@ -242,11 +242,14 @@ int acm_get_ssidref(xc_interface *xc_handle, int domid, uint16_t *chwall_ref,
                     uint16_t *ste_ref)
 {
     int ret;
+    DECLARE_HYPERCALL_BUFFER(struct acm_ssid_buffer, ssid);
+    size_t ssid_buffer_size = 4096;
     struct acm_getssid getssid;
-    char buf[4096];
-    struct acm_ssid_buffer *ssid = (struct acm_ssid_buffer *)buf;
-    set_xen_guest_handle(getssid.ssidbuf, buf);
-    getssid.ssidbuf_size = sizeof(buf);
+    ssid = xc_hypercall_buffer_alloc(xc_handle, ssid, ssid_buffer_size);
+    if ( ssid == NULL )
+        return 1;
+    xc_set_xen_guest_handle(getssid.ssidbuf, ssid);
+    getssid.ssidbuf_size = ssid_buffer_size;
     getssid.get_ssid_by = ACM_GETBY_domainid;
     getssid.id.domainid = domid;
     ret = xc_acm_op(xc_handle, ACMOP_getssid, &getssid, sizeof(getssid));
@@ -254,23 +257,27 @@ int acm_get_ssidref(xc_interface *xc_handle, int domid, uint16_t *chwall_ref,
         *chwall_ref = ssid->ssidref  & 0xffff;
         *ste_ref    = ssid->ssidref >> 16;
     }
+    xc_hypercall_buffer_free(xc_handle, ssid);
     return ret;
 }
 
 /******************************* get policy ******************************/
 
-#define PULL_CACHE_SIZE		8192
-uint8_t pull_buffer[PULL_CACHE_SIZE];
-
 int acm_domain_getpolicy(xc_interface *xc_handle)
 {
+    DECLARE_HYPERCALL_BUFFER(uint8_t, pull_buffer);
+    size_t pull_cache_size = 8192;
     struct acm_getpolicy getpolicy;
     int ret;
     uint16_t chwall_ref, ste_ref;
 
-    memset(pull_buffer, 0x00, sizeof(pull_buffer));
-    set_xen_guest_handle(getpolicy.pullcache, pull_buffer);
-    getpolicy.pullcache_size = sizeof(pull_buffer);
+    pull_buffer = xc_hypercall_buffer_alloc(xc_handle, pull_buffer, pull_cache_size);
+    if ( pull_buffer == NULL )
+        return -1;
+
+    memset(pull_buffer, 0x00, pull_cache_size);
+    xc_set_xen_guest_handle(getpolicy.pullcache, pull_buffer);
+    getpolicy.pullcache_size = pull_cache_size;
     ret = xc_acm_op(xc_handle, ACMOP_getpolicy, &getpolicy, sizeof(getpolicy));
     if (ret >= 0) {
         ret = acm_get_ssidref(xc_handle, 0, &chwall_ref, &ste_ref);
@@ -284,8 +291,10 @@ int acm_domain_getpolicy(xc_interface *xc_handle)
     }
 
     /* dump policy  */
-    acm_dump_policy_buffer(pull_buffer, sizeof(pull_buffer),
+    acm_dump_policy_buffer(pull_buffer, pull_cache_size,
                            chwall_ref, ste_ref);
+
+    xc_hypercall_buffer_free(xc_handle, pull_buffer);
 
     return ret;
 }
@@ -293,11 +302,14 @@ int acm_domain_getpolicy(xc_interface *xc_handle)
 /************************ dump binary policy ******************************/
 
 static int load_file(const char *filename,
-                     uint8_t **buffer, off_t *len)
+                     uint8_t **buffer, off_t *len,
+                     xc_interface *xc_handle,
+                     xc_hypercall_buffer_t *hcall)
 {
     struct stat mystat;
     int ret = 0;
     int fd;
+    DECLARE_HYPERCALL_BUFFER_ARGUMENT(hcall);
 
     if ((ret = stat(filename, &mystat)) != 0) {
         printf("File %s not found.\n", filename);
@@ -307,9 +319,16 @@ static int load_file(const char *filename,
 
     *len = mystat.st_size;
 
-    if ((*buffer = malloc(*len)) == NULL) {
-        ret = -ENOMEM;
-        goto out;
+    if ( hcall == NULL ) {
+        if ((*buffer = malloc(*len)) == NULL) {
+            ret = -ENOMEM;
+            goto out;
+        }
+    } else {
+        if ((*buffer = xc_hypercall_buffer_alloc(xc_handle, hcall, *len)) == NULL) {
+            ret = -ENOMEM;
+            goto out;
+        }
     }
 
     if ((fd = open(filename, O_RDONLY)) <= 0) {
@@ -322,7 +341,10 @@ static int load_file(const char *filename,
         return 0;
 
 free_out:
-    free(*buffer);
+    if ( hcall == NULL )
+        free(*buffer);
+    else
+        xc_hypercall_buffer_free(xc_handle, hcall);
     *buffer = NULL;
     *len = 0;
 out:
@@ -339,7 +361,7 @@ static int acm_domain_dumppolicy(const char *filename, uint32_t ssidref)
     chwall_ssidref = (ssidref      ) & 0xffff;
     ste_ssidref    = (ssidref >> 16) & 0xffff;
 
-    if ((ret = load_file(filename, &buffer, &len)) == 0) {
+    if ((ret = load_file(filename, &buffer, &len, NULL, NULL)) == 0) {
         acm_dump_policy_buffer(buffer, len, chwall_ssidref, ste_ssidref);
         free(buffer);
     }
@@ -353,11 +375,11 @@ int acm_domain_loadpolicy(xc_interface *xc_handle, const char *filename)
 {
     int ret;
     off_t len;
-    uint8_t *buffer;
+    DECLARE_HYPERCALL_BUFFER(uint8_t, buffer);
     uint16_t chwall_ssidref, ste_ssidref;
     struct acm_setpolicy setpolicy;
 
-    ret = load_file(filename, &buffer, &len);
+    ret = load_file(filename, &buffer, &len, xc_handle, HYPERCALL_BUFFER(buffer));
     if (ret != 0)
         goto out;
 
@@ -367,7 +389,7 @@ int acm_domain_loadpolicy(xc_interface *xc_handle, const char *filename)
 
     /* dump it and then push it down into xen/acm */
     acm_dump_policy_buffer(buffer, len, chwall_ssidref, ste_ssidref);
-    set_xen_guest_handle(setpolicy.pushcache, buffer);
+    xc_set_xen_guest_handle(setpolicy.pushcache, buffer);
     setpolicy.pushcache_size = len;
     ret = xc_acm_op(xc_handle, ACMOP_setpolicy, &setpolicy, sizeof(setpolicy));
 
@@ -378,7 +400,7 @@ int acm_domain_loadpolicy(xc_interface *xc_handle, const char *filename)
     }
 
   free_out:
-    free(buffer);
+    xc_hypercall_buffer_free(xc_handle, buffer);
   out:
     return ret;
 }
@@ -402,22 +424,27 @@ void dump_ste_stats(struct acm_ste_stats_buffer *ste_stats)
            ntohl(ste_stats->gt_cachehit_count));
 }
 
-#define PULL_STATS_SIZE		8192
 int acm_domain_dumpstats(xc_interface *xc_handle)
 {
-    uint8_t stats_buffer[PULL_STATS_SIZE];
+    DECLARE_HYPERCALL_BUFFER(uint8_t, stats_buffer);
+    size_t pull_stats_size = 8192;
     struct acm_dumpstats dumpstats;
     int ret;
     struct acm_stats_buffer *stats;
 
-    memset(stats_buffer, 0x00, sizeof(stats_buffer));
-    set_xen_guest_handle(dumpstats.pullcache, stats_buffer);
-    dumpstats.pullcache_size = sizeof(stats_buffer);
+    stats_buffer = xc_hypercall_buffer_alloc(xc_handle, stats_buffer, pull_stats_size);
+    if ( stats_buffer == NULL )
+        return -1;
+
+    memset(stats_buffer, 0x00, pull_stats_size);
+    xc_set_xen_guest_handle(dumpstats.pullcache, stats_buffer);
+    dumpstats.pullcache_size = pull_stats_size;
     ret = xc_acm_op(xc_handle, ACMOP_dumpstats, &dumpstats, sizeof(dumpstats));
 
     if (ret < 0) {
         printf
             ("ERROR dumping policy stats. Try 'xm dmesg' to see details.\n");
+        xc_hypercall_buffer_free(xc_handle, stats_buffer);
         return ret;
     }
     stats = (struct acm_stats_buffer *) stats_buffer;
@@ -464,6 +491,7 @@ int acm_domain_dumpstats(xc_interface *xc_handle)
     default:
         printf("UNKNOWN SECONDARY POLICY ERROR!\n");
     }
+    xc_hypercall_buffer_free(xc_handle, stats_buffer);
     return ret;
 }
 
@@ -472,7 +500,8 @@ int acm_domain_dumpstats(xc_interface *xc_handle)
 int main(int argc, char **argv)
 {
 
-    xc_interface *xc_handle, ret = 0;
+    xc_interface *xc_handle;
+    int ret = 0;
 
     if (argc < 2)
         usage(argv[0]);
