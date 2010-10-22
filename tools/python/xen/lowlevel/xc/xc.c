@@ -1219,9 +1219,9 @@ static PyObject *pyxc_topologyinfo(XcObject *self)
     if ( nodemap == NULL )
         goto out;
 
-    xc_set_xen_guest_handle(tinfo.cpu_to_core, coremap);
-    xc_set_xen_guest_handle(tinfo.cpu_to_socket, socketmap);
-    xc_set_xen_guest_handle(tinfo.cpu_to_node, nodemap);
+    set_xen_guest_handle(tinfo.cpu_to_core, coremap);
+    set_xen_guest_handle(tinfo.cpu_to_socket, socketmap);
+    set_xen_guest_handle(tinfo.cpu_to_node, nodemap);
     tinfo.max_cpu_index = MAX_CPU_INDEX;
 
     if ( xc_topologyinfo(self->xc_handle, &tinfo) != 0 )
@@ -1313,9 +1313,9 @@ static PyObject *pyxc_numainfo(XcObject *self)
     if ( nodes_dist == NULL )
         goto out;
 
-    xc_set_xen_guest_handle(ninfo.node_to_memsize, node_memsize);
-    xc_set_xen_guest_handle(ninfo.node_to_memfree, node_memfree);
-    xc_set_xen_guest_handle(ninfo.node_to_node_distance, nodes_dist);
+    set_xen_guest_handle(ninfo.node_to_memsize, node_memsize);
+    set_xen_guest_handle(ninfo.node_to_memfree, node_memfree);
+    set_xen_guest_handle(ninfo.node_to_node_distance, nodes_dist);
     ninfo.max_node_index = MAX_NODE_INDEX;
 
     if ( xc_numainfo(self->xc_handle, &ninfo) != 0 )

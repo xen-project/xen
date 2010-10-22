@@ -82,7 +82,7 @@ int xc_mark_page_online(xc_interface *xch, unsigned long start,
     sysctl.u.page_offline.start = start;
     sysctl.u.page_offline.cmd = sysctl_page_online;
     sysctl.u.page_offline.end = end;
-    xc_set_xen_guest_handle(sysctl.u.page_offline.status, status);
+    set_xen_guest_handle(sysctl.u.page_offline.status, status);
     ret = xc_sysctl(xch, &sysctl);
 
     xc_hypercall_bounce_post(xch, status);
@@ -110,7 +110,7 @@ int xc_mark_page_offline(xc_interface *xch, unsigned long start,
     sysctl.u.page_offline.start = start;
     sysctl.u.page_offline.cmd = sysctl_page_offline;
     sysctl.u.page_offline.end = end;
-    xc_set_xen_guest_handle(sysctl.u.page_offline.status, status);
+    set_xen_guest_handle(sysctl.u.page_offline.status, status);
     ret = xc_sysctl(xch, &sysctl);
 
     xc_hypercall_bounce_post(xch, status);
@@ -138,7 +138,7 @@ int xc_query_page_offline_status(xc_interface *xch, unsigned long start,
     sysctl.u.page_offline.start = start;
     sysctl.u.page_offline.cmd = sysctl_query_page_offline;
     sysctl.u.page_offline.end = end;
-    xc_set_xen_guest_handle(sysctl.u.page_offline.status, status);
+    set_xen_guest_handle(sysctl.u.page_offline.status, status);
     ret = xc_sysctl(xch, &sysctl);
 
     xc_hypercall_bounce_post(xch, status);

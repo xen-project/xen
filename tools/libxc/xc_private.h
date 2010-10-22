@@ -98,14 +98,6 @@ void xc_report_progress_step(xc_interface *xch,
 #define PERROR(_m, _a...) xc_report_error(xch,XC_INTERNAL_ERROR,_m \
                   " (%d = %s)", ## _a , errno, safe_strerror(errno))
 
-void *xc_memalign(size_t alignment, size_t size);
-
-int lock_pages(xc_interface *xch, void *addr, size_t len);
-void unlock_pages(xc_interface *xch, void *addr, size_t len);
-
-int hcall_buf_prep(xc_interface *xch, void **addr, size_t len);
-void hcall_buf_release(xc_interface *xch, void **addr, size_t len);
-
 /*
  * HYPERCALL ARGUMENT BUFFERS
  *

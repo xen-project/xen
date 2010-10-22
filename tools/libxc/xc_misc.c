@@ -49,7 +49,7 @@ int xc_readconsolering(xc_interface *xch,
         return -1;
 
     sysctl.cmd = XEN_SYSCTL_readconsole;
-    xc_set_xen_guest_handle(sysctl.u.readconsole.buffer, buffer);
+    set_xen_guest_handle(sysctl.u.readconsole.buffer, buffer);
     sysctl.u.readconsole.count = nr_chars;
     sysctl.u.readconsole.clear = clear;
     sysctl.u.readconsole.incremental = 0;
@@ -81,7 +81,7 @@ int xc_send_debug_keys(xc_interface *xch, char *keys)
         return -1;
 
     sysctl.cmd = XEN_SYSCTL_debug_keys;
-    xc_set_xen_guest_handle(sysctl.u.debug_keys.keys, keys);
+    set_xen_guest_handle(sysctl.u.debug_keys.keys, keys);
     sysctl.u.debug_keys.nr_keys = len;
 
     ret = do_sysctl(xch, &sysctl);
@@ -190,8 +190,8 @@ int xc_perfc_reset(xc_interface *xch)
 
     sysctl.cmd = XEN_SYSCTL_perfc_op;
     sysctl.u.perfc_op.cmd = XEN_SYSCTL_PERFCOP_reset;
-    xc_set_xen_guest_handle(sysctl.u.perfc_op.desc, HYPERCALL_BUFFER_NULL);
-    xc_set_xen_guest_handle(sysctl.u.perfc_op.val, HYPERCALL_BUFFER_NULL);
+    set_xen_guest_handle(sysctl.u.perfc_op.desc, HYPERCALL_BUFFER_NULL);
+    set_xen_guest_handle(sysctl.u.perfc_op.val, HYPERCALL_BUFFER_NULL);
 
     return do_sysctl(xch, &sysctl);
 }
@@ -205,8 +205,8 @@ int xc_perfc_query_number(xc_interface *xch,
 
     sysctl.cmd = XEN_SYSCTL_perfc_op;
     sysctl.u.perfc_op.cmd = XEN_SYSCTL_PERFCOP_query;
-    xc_set_xen_guest_handle(sysctl.u.perfc_op.desc, HYPERCALL_BUFFER_NULL);
-    xc_set_xen_guest_handle(sysctl.u.perfc_op.val, HYPERCALL_BUFFER_NULL);
+    set_xen_guest_handle(sysctl.u.perfc_op.desc, HYPERCALL_BUFFER_NULL);
+    set_xen_guest_handle(sysctl.u.perfc_op.val, HYPERCALL_BUFFER_NULL);
 
     rc = do_sysctl(xch, &sysctl);
 
@@ -228,8 +228,8 @@ int xc_perfc_query(xc_interface *xch,
 
     sysctl.cmd = XEN_SYSCTL_perfc_op;
     sysctl.u.perfc_op.cmd = XEN_SYSCTL_PERFCOP_query;
-    xc_set_xen_guest_handle(sysctl.u.perfc_op.desc, desc);
-    xc_set_xen_guest_handle(sysctl.u.perfc_op.val, val);
+    set_xen_guest_handle(sysctl.u.perfc_op.desc, desc);
+    set_xen_guest_handle(sysctl.u.perfc_op.val, val);
 
     return do_sysctl(xch, &sysctl);
 }
@@ -240,7 +240,7 @@ int xc_lockprof_reset(xc_interface *xch)
 
     sysctl.cmd = XEN_SYSCTL_lockprof_op;
     sysctl.u.lockprof_op.cmd = XEN_SYSCTL_LOCKPROF_reset;
-    xc_set_xen_guest_handle(sysctl.u.lockprof_op.data, HYPERCALL_BUFFER_NULL);
+    set_xen_guest_handle(sysctl.u.lockprof_op.data, HYPERCALL_BUFFER_NULL);
 
     return do_sysctl(xch, &sysctl);
 }
@@ -253,7 +253,7 @@ int xc_lockprof_query_number(xc_interface *xch,
 
     sysctl.cmd = XEN_SYSCTL_lockprof_op;
     sysctl.u.lockprof_op.cmd = XEN_SYSCTL_LOCKPROF_query;
-    xc_set_xen_guest_handle(sysctl.u.lockprof_op.data, HYPERCALL_BUFFER_NULL);
+    set_xen_guest_handle(sysctl.u.lockprof_op.data, HYPERCALL_BUFFER_NULL);
 
     rc = do_sysctl(xch, &sysctl);
 
@@ -274,7 +274,7 @@ int xc_lockprof_query(xc_interface *xch,
     sysctl.cmd = XEN_SYSCTL_lockprof_op;
     sysctl.u.lockprof_op.cmd = XEN_SYSCTL_LOCKPROF_query;
     sysctl.u.lockprof_op.max_elem = *n_elems;
-    xc_set_xen_guest_handle(sysctl.u.lockprof_op.data, data);
+    set_xen_guest_handle(sysctl.u.lockprof_op.data, data);
 
     rc = do_sysctl(xch, &sysctl);
 
@@ -295,7 +295,7 @@ int xc_getcpuinfo(xc_interface *xch, int max_cpus,
 
     sysctl.cmd = XEN_SYSCTL_getcpuinfo;
     sysctl.u.getcpuinfo.max_cpus = max_cpus;
-    xc_set_xen_guest_handle(sysctl.u.getcpuinfo.info, info);
+    set_xen_guest_handle(sysctl.u.getcpuinfo.info, info);
 
     rc = do_sysctl(xch, &sysctl);
 
@@ -427,7 +427,7 @@ int xc_hvm_track_dirty_vram(
     arg->domid     = dom;
     arg->first_pfn = first_pfn;
     arg->nr        = nr;
-    xc_set_xen_guest_handle(arg->dirty_bitmap, dirty_bitmap);
+    set_xen_guest_handle(arg->dirty_bitmap, dirty_bitmap);
 
     rc = do_xen_hypercall(xch, &hypercall);
 

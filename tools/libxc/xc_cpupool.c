@@ -99,7 +99,7 @@ xc_cpupoolinfo_t *xc_cpupool_getinfo(xc_interface *xch,
     sysctl.cmd = XEN_SYSCTL_cpupool_op;
     sysctl.u.cpupool_op.op = XEN_SYSCTL_CPUPOOL_OP_INFO;
     sysctl.u.cpupool_op.cpupool_id = poolid;
-    xc_set_xen_guest_handle(sysctl.u.cpupool_op.cpumap.bitmap, local);
+    set_xen_guest_handle(sysctl.u.cpupool_op.cpumap.bitmap, local);
     sysctl.u.cpupool_op.cpumap.nr_cpus = local_size * 8;
 
     err = do_sysctl_save(xch, &sysctl);
@@ -185,7 +185,7 @@ uint64_t * xc_cpupool_freeinfo(xc_interface *xch,
 
     sysctl.cmd = XEN_SYSCTL_cpupool_op;
     sysctl.u.cpupool_op.op = XEN_SYSCTL_CPUPOOL_OP_FREEINFO;
-    xc_set_xen_guest_handle(sysctl.u.cpupool_op.cpumap.bitmap, local);
+    set_xen_guest_handle(sysctl.u.cpupool_op.cpumap.bitmap, local);
     sysctl.u.cpupool_op.cpumap.nr_cpus = *cpusize * 8;
 
     err = do_sysctl_save(xch, &sysctl);

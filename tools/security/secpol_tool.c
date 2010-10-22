@@ -248,7 +248,7 @@ int acm_get_ssidref(xc_interface *xc_handle, int domid, uint16_t *chwall_ref,
     ssid = xc_hypercall_buffer_alloc(xc_handle, ssid, ssid_buffer_size);
     if ( ssid == NULL )
         return 1;
-    xc_set_xen_guest_handle(getssid.ssidbuf, ssid);
+    set_xen_guest_handle(getssid.ssidbuf, ssid);
     getssid.ssidbuf_size = ssid_buffer_size;
     getssid.get_ssid_by = ACM_GETBY_domainid;
     getssid.id.domainid = domid;
@@ -276,7 +276,7 @@ int acm_domain_getpolicy(xc_interface *xc_handle)
         return -1;
 
     memset(pull_buffer, 0x00, pull_cache_size);
-    xc_set_xen_guest_handle(getpolicy.pullcache, pull_buffer);
+    set_xen_guest_handle(getpolicy.pullcache, pull_buffer);
     getpolicy.pullcache_size = pull_cache_size;
     ret = xc_acm_op(xc_handle, ACMOP_getpolicy, &getpolicy, sizeof(getpolicy));
     if (ret >= 0) {
@@ -389,7 +389,7 @@ int acm_domain_loadpolicy(xc_interface *xc_handle, const char *filename)
 
     /* dump it and then push it down into xen/acm */
     acm_dump_policy_buffer(buffer, len, chwall_ssidref, ste_ssidref);
-    xc_set_xen_guest_handle(setpolicy.pushcache, buffer);
+    set_xen_guest_handle(setpolicy.pushcache, buffer);
     setpolicy.pushcache_size = len;
     ret = xc_acm_op(xc_handle, ACMOP_setpolicy, &setpolicy, sizeof(setpolicy));
 
@@ -437,7 +437,7 @@ int acm_domain_dumpstats(xc_interface *xc_handle)
         return -1;
 
     memset(stats_buffer, 0x00, pull_stats_size);
-    xc_set_xen_guest_handle(dumpstats.pullcache, stats_buffer);
+    set_xen_guest_handle(dumpstats.pullcache, stats_buffer);
     dumpstats.pullcache_size = pull_stats_size;
     ret = xc_acm_op(xc_handle, ACMOP_dumpstats, &dumpstats, sizeof(dumpstats));
 

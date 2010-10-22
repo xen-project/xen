@@ -69,8 +69,6 @@ xc_interface *xc_interface_open(xentoollog_logger *logger,
     return 0;
 }
 
-static void xc_clean_hcall_buf(xc_interface *xch);
-
 int xc_interface_close(xc_interface *xch)
 {
     int rc = 0;
@@ -82,8 +80,6 @@ int xc_interface_close(xc_interface *xch)
         rc = xc_interface_close_core(xch, xch->fd);
         if (rc) PERROR("Could not close hypervisor interface");
     }
-
-    xc_clean_hcall_buf(xch);
 
     free(xch);
     return rc;
@@ -189,133 +185,6 @@ void xc_report_progress_step(xc_interface *xch,
                  done, total);
 }
 
-#ifdef __sun__
-
-int lock_pages(xc_interface *xch, void *addr, size_t len) { return 0; }
-void unlock_pages(xc_interface *xch, void *addr, size_t len) { }
-
-int hcall_buf_prep(xc_interface *xch, void **addr, size_t len) { return 0; }
-void hcall_buf_release(xc_interface *xch, void **addr, size_t len) { }
-
-static void xc_clean_hcall_buf(xc_interface *xch) { }
-
-#else /* !__sun__ */
-
-int lock_pages(xc_interface *xch, void *addr, size_t len)
-{
-      int e;
-      void *laddr = (void *)((unsigned long)addr & PAGE_MASK);
-      size_t llen = (len + ((unsigned long)addr - (unsigned long)laddr) +
-                     PAGE_SIZE - 1) & PAGE_MASK;
-      e = mlock(laddr, llen);
-      return e;
-}
-
-void unlock_pages(xc_interface *xch, void *addr, size_t len)
-{
-    void *laddr = (void *)((unsigned long)addr & PAGE_MASK);
-    size_t llen = (len + ((unsigned long)addr - (unsigned long)laddr) +
-                   PAGE_SIZE - 1) & PAGE_MASK;
-    int saved_errno = errno;
-    (void)munlock(laddr, llen);
-    errno = saved_errno;
-}
-
-static pthread_key_t hcall_buf_pkey;
-static pthread_once_t hcall_buf_pkey_once = PTHREAD_ONCE_INIT;
-struct hcall_buf {
-    xc_interface *xch;
-    void *buf;
-    void *oldbuf;
-};
-
-static void _xc_clean_hcall_buf(void *m)
-{
-    struct hcall_buf *hcall_buf = m;
-
-    if ( hcall_buf )
-    {
-        if ( hcall_buf->buf )
-        {
-            unlock_pages(hcall_buf->xch, hcall_buf->buf, PAGE_SIZE);
-            free(hcall_buf->buf);
-        }
-
-        free(hcall_buf);
-    }
-
-    pthread_setspecific(hcall_buf_pkey, NULL);
-}
-
-static void _xc_init_hcall_buf(void)
-{
-    pthread_key_create(&hcall_buf_pkey, _xc_clean_hcall_buf);
-}
-
-static void xc_clean_hcall_buf(xc_interface *xch)
-{
-    pthread_once(&hcall_buf_pkey_once, _xc_init_hcall_buf);
-
-    _xc_clean_hcall_buf(pthread_getspecific(hcall_buf_pkey));
-}
-
-int hcall_buf_prep(xc_interface *xch, void **addr, size_t len)
-{
-    struct hcall_buf *hcall_buf;
-
-    pthread_once(&hcall_buf_pkey_once, _xc_init_hcall_buf);
-
-    hcall_buf = pthread_getspecific(hcall_buf_pkey);
-    if ( !hcall_buf )
-    {
-        hcall_buf = calloc(1, sizeof(*hcall_buf));
-        if ( !hcall_buf )
-            goto out;
-        hcall_buf->xch = xch;
-        pthread_setspecific(hcall_buf_pkey, hcall_buf);
-    }
-
-    if ( !hcall_buf->buf )
-    {
-        hcall_buf->buf = xc_memalign(PAGE_SIZE, PAGE_SIZE);
-        if ( !hcall_buf->buf || lock_pages(xch, hcall_buf->buf, PAGE_SIZE) )
-        {
-            free(hcall_buf->buf);
-            hcall_buf->buf = NULL;
-            goto out;
-        }
-    }
-
-    if ( (len < PAGE_SIZE) && !hcall_buf->oldbuf )
-    {
-        memcpy(hcall_buf->buf, *addr, len);
-        hcall_buf->oldbuf = *addr;
-        *addr = hcall_buf->buf;
-        return 0;
-    }
-
- out:
-    return lock_pages(xch, *addr, len);
-}
-
-void hcall_buf_release(xc_interface *xch, void **addr, size_t len)
-{
-    struct hcall_buf *hcall_buf = pthread_getspecific(hcall_buf_pkey);
-
-    if ( hcall_buf && (hcall_buf->buf == *addr) )
-    {
-        memcpy(hcall_buf->oldbuf, *addr, len);
-        *addr = hcall_buf->oldbuf;
-        hcall_buf->oldbuf = NULL;
-    }
-    else
-    {
-        unlock_pages(xch, *addr, len);
-    }
-}
-
-#endif
-
 /* NB: arr must be locked */
 int xc_get_pfn_type_batch(xc_interface *xch, uint32_t dom,
                           unsigned int num, xen_pfn_t *arr)
@@ -328,7 +197,7 @@ int xc_get_pfn_type_batch(xc_interface *xch, uint32_t dom,
     domctl.cmd = XEN_DOMCTL_getpageframeinfo3;
     domctl.domain = (domid_t)dom;
     domctl.u.getpageframeinfo3.num = num;
-    xc_set_xen_guest_handle(domctl.u.getpageframeinfo3.array, arr);
+    set_xen_guest_handle(domctl.u.getpageframeinfo3.array, arr);
     rc = do_domctl(xch, &domctl);
     xc_hypercall_bounce_post(xch, arr);
     return rc;
@@ -486,7 +355,7 @@ int xc_machphys_mfn_list(xc_interface *xch,
         return -1;
     }
 
-    xc_set_xen_guest_handle(xmml.extent_start, extent_start);
+    set_xen_guest_handle(xmml.extent_start, extent_start);
     rc = do_memory_op(xch, XENMEM_machphys_mfn_list, &xmml, sizeof(xmml));
     if (rc || xmml.nr_extents != max_extents)
         rc = -1;
@@ -520,7 +389,7 @@ int xc_get_pfn_list(xc_interface *xch,
     domctl.cmd = XEN_DOMCTL_getmemlist;
     domctl.domain   = (domid_t)domid;
     domctl.u.getmemlist.max_pfns = max_pfns;
-    xc_set_xen_guest_handle(domctl.u.getmemlist.buffer, pfn_buf);
+    set_xen_guest_handle(domctl.u.getmemlist.buffer, pfn_buf);
 
     ret = do_domctl(xch, &domctl);
 
@@ -778,22 +647,6 @@ int xc_ffs64(uint64_t x)
 {
     uint32_t h = x>>32, l = x;
     return l ? xc_ffs32(l) : h ? xc_ffs32(h) + 32 : 0;
-}
-
-void *xc_memalign(size_t alignment, size_t size)
-{
-#if defined(_POSIX_C_SOURCE) && !defined(__sun__)
-    int ret;
-    void *ptr;
-    ret = posix_memalign(&ptr, alignment, size);
-    if (ret != 0)
-        return NULL;
-    return ptr;
-#elif defined(__NetBSD__) || defined(__OpenBSD__)
-    return valloc(size);
-#else
-    return memalign(alignment, size);
-#endif
 }
 
 /*

@@ -395,9 +395,9 @@ static void signal_int_handler(int signo)
         }
     }
 
-    xc_set_xen_guest_handle(info.cpu_to_core, cpu_to_core);
-    xc_set_xen_guest_handle(info.cpu_to_socket, cpu_to_socket);
-    xc_set_xen_guest_handle(info.cpu_to_node, cpu_to_node);
+    set_xen_guest_handle(info.cpu_to_core, cpu_to_core);
+    set_xen_guest_handle(info.cpu_to_socket, cpu_to_socket);
+    set_xen_guest_handle(info.cpu_to_node, cpu_to_node);
     info.max_cpu_index = MAX_NR_CPU - 1;
 
     ret = xc_topologyinfo(xc_handle, &info);
@@ -964,9 +964,9 @@ void cpu_topology_func(int argc, char *argv[])
 	goto out;
     }
 
-    xc_set_xen_guest_handle(info.cpu_to_core, cpu_to_core);
-    xc_set_xen_guest_handle(info.cpu_to_socket, cpu_to_socket);
-    xc_set_xen_guest_handle(info.cpu_to_node, cpu_to_node);
+    set_xen_guest_handle(info.cpu_to_core, cpu_to_core);
+    set_xen_guest_handle(info.cpu_to_socket, cpu_to_socket);
+    set_xen_guest_handle(info.cpu_to_node, cpu_to_node);
     info.max_cpu_index = MAX_NR_CPU-1;
 
     if ( xc_topologyinfo(xc_handle, &info) )

@@ -132,7 +132,7 @@ int xc_vcpu_setaffinity(xc_interface *xch,
 
     bitmap_64_to_byte(local, cpumap, cpusize * 8);
 
-    xc_set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap.bitmap, local);
+    set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap.bitmap, local);
 
     domctl.u.vcpuaffinity.cpumap.nr_cpus = cpusize * 8;
 
@@ -165,7 +165,7 @@ int xc_vcpu_getaffinity(xc_interface *xch,
     domctl.domain = (domid_t)domid;
     domctl.u.vcpuaffinity.vcpu = vcpu;
 
-    xc_set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap.bitmap, local);
+    set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap.bitmap, local);
     domctl.u.vcpuaffinity.cpumap.nr_cpus = cpusize * 8;
 
     ret = do_domctl(xch, &domctl);
@@ -254,7 +254,7 @@ int xc_domain_getinfolist(xc_interface *xch,
     sysctl.cmd = XEN_SYSCTL_getdomaininfolist;
     sysctl.u.getdomaininfolist.first_domain = first_domain;
     sysctl.u.getdomaininfolist.max_domains  = max_domains;
-    xc_set_xen_guest_handle(sysctl.u.getdomaininfolist.buffer, info);
+    set_xen_guest_handle(sysctl.u.getdomaininfolist.buffer, info);
 
     if ( xc_sysctl(xch, &sysctl) < 0 )
         ret = -1;
@@ -282,7 +282,7 @@ int xc_domain_hvm_getcontext(xc_interface *xch,
     domctl.cmd = XEN_DOMCTL_gethvmcontext;
     domctl.domain = (domid_t)domid;
     domctl.u.hvmcontext.size = size;
-    xc_set_xen_guest_handle(domctl.u.hvmcontext.buffer, ctxt_buf);
+    set_xen_guest_handle(domctl.u.hvmcontext.buffer, ctxt_buf);
 
     ret = do_domctl(xch, &domctl);
 
@@ -311,7 +311,7 @@ int xc_domain_hvm_getcontext_partial(xc_interface *xch,
     domctl.domain = (domid_t) domid;
     domctl.u.hvmcontext_partial.type = typecode;
     domctl.u.hvmcontext_partial.instance = instance;
-    xc_set_xen_guest_handle(domctl.u.hvmcontext_partial.buffer, ctxt_buf);
+    set_xen_guest_handle(domctl.u.hvmcontext_partial.buffer, ctxt_buf);
 
     ret = do_domctl(xch, &domctl);
 
@@ -337,7 +337,7 @@ int xc_domain_hvm_setcontext(xc_interface *xch,
     domctl.cmd = XEN_DOMCTL_sethvmcontext;
     domctl.domain = domid;
     domctl.u.hvmcontext.size = size;
-    xc_set_xen_guest_handle(domctl.u.hvmcontext.buffer, ctxt_buf);
+    set_xen_guest_handle(domctl.u.hvmcontext.buffer, ctxt_buf);
 
     ret = do_domctl(xch, &domctl);
 
@@ -361,7 +361,7 @@ int xc_vcpu_getcontext(xc_interface *xch,
     domctl.cmd = XEN_DOMCTL_getvcpucontext;
     domctl.domain = (domid_t)domid;
     domctl.u.vcpucontext.vcpu   = (uint16_t)vcpu;
-    xc_set_xen_guest_handle(domctl.u.vcpucontext.ctxt, ctxt);
+    set_xen_guest_handle(domctl.u.vcpucontext.ctxt, ctxt);
 
     rc = do_domctl(xch, &domctl);
 
@@ -420,7 +420,7 @@ int xc_shadow_control(xc_interface *xch,
     domctl.u.shadow_op.mb     = mb ? *mb : 0;
     domctl.u.shadow_op.mode   = mode;
     if (dirty_bitmap != NULL)
-        xc_set_xen_guest_handle(domctl.u.shadow_op.dirty_bitmap,
+        set_xen_guest_handle(domctl.u.shadow_op.dirty_bitmap,
                                 dirty_bitmap);
 
     rc = do_domctl(xch, &domctl);
@@ -486,7 +486,7 @@ int xc_domain_set_memmap_limit(xc_interface *xch,
     e820->size = (uint64_t)map_limitkb << 10;
     e820->type = E820_RAM;
 
-    xc_set_xen_guest_handle(fmap.map.buffer, e820);
+    set_xen_guest_handle(fmap.map.buffer, e820);
 
     rc = do_memory_op(xch, XENMEM_set_memory_map, &fmap, sizeof(fmap));
 
@@ -559,7 +559,7 @@ int xc_domain_get_tsc_info(xc_interface *xch,
 
     domctl.cmd = XEN_DOMCTL_gettscinfo;
     domctl.domain = (domid_t)domid;
-    xc_set_xen_guest_handle(domctl.u.tsc_info.out_info, info);
+    set_xen_guest_handle(domctl.u.tsc_info.out_info, info);
     rc = do_domctl(xch, &domctl);
     if ( rc == 0 )
     {
@@ -601,7 +601,7 @@ int xc_domain_increase_reservation(xc_interface *xch,
         return -1;
     }
 
-    xc_set_xen_guest_handle(reservation.extent_start, extent_start);
+    set_xen_guest_handle(reservation.extent_start, extent_start);
 
     err = do_memory_op(xch, XENMEM_increase_reservation, &reservation, sizeof(reservation));
 
@@ -664,7 +664,7 @@ int xc_domain_decrease_reservation(xc_interface *xch,
         PERROR("Could not bounce memory for XENMEM_decrease_reservation hypercall");
         return -1;
     }
-    xc_set_xen_guest_handle(reservation.extent_start, extent_start);
+    set_xen_guest_handle(reservation.extent_start, extent_start);
 
     err = do_memory_op(xch, XENMEM_decrease_reservation, &reservation, sizeof(reservation));
 
@@ -734,7 +734,7 @@ int xc_domain_populate_physmap(xc_interface *xch,
         PERROR("Could not bounce memory for XENMEM_populate_physmap hypercall");
         return -1;
     }
-    xc_set_xen_guest_handle(reservation.extent_start, extent_start);
+    set_xen_guest_handle(reservation.extent_start, extent_start);
 
     err = do_memory_op(xch, XENMEM_populate_physmap, &reservation, sizeof(reservation));
 
@@ -796,8 +796,8 @@ int xc_domain_memory_exchange_pages(xc_interface *xch,
          xc_hypercall_bounce_pre(xch, out_extents))
         goto out;
 
-    xc_set_xen_guest_handle(exchange.in.extent_start, in_extents);
-    xc_set_xen_guest_handle(exchange.out.extent_start, out_extents);
+    set_xen_guest_handle(exchange.in.extent_start, in_extents);
+    set_xen_guest_handle(exchange.out.extent_start, out_extents);
 
     rc = do_memory_op(xch, XENMEM_exchange, &exchange, sizeof(exchange));
 
@@ -976,7 +976,7 @@ int xc_vcpu_setcontext(xc_interface *xch,
     domctl.cmd = XEN_DOMCTL_setvcpucontext;
     domctl.domain = domid;
     domctl.u.vcpucontext.vcpu = vcpu;
-    xc_set_xen_guest_handle(domctl.u.vcpucontext.ctxt, ctxt);
+    set_xen_guest_handle(domctl.u.vcpucontext.ctxt, ctxt);
 
     rc = do_domctl(xch, &domctl);
 
@@ -1124,7 +1124,7 @@ int xc_get_device_group(
     domctl.u.get_device_group.machine_bdf = machine_bdf;
     domctl.u.get_device_group.max_sdevs = max_sdevs;
 
-    xc_set_xen_guest_handle(domctl.u.get_device_group.sdev_array, sdev_array);
+    set_xen_guest_handle(domctl.u.get_device_group.sdev_array, sdev_array);
 
     rc = do_domctl(xch, &domctl);
 

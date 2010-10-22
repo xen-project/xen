@@ -86,7 +86,7 @@ int xc_tmem_control(xc_interface *xch,
         }
     }
 
-    xc_set_xen_guest_handle(op.u.ctrl.buf, buf);
+    set_xen_guest_handle(op.u.ctrl.buf, buf);
 
     rc = do_tmem_op(xch, &op);
 
@@ -136,7 +136,7 @@ int xc_tmem_control_oid(xc_interface *xch,
         }
     }
 
-    xc_set_xen_guest_handle(op.u.ctrl.buf, buf);
+    set_xen_guest_handle(op.u.ctrl.buf, buf);
 
     rc = do_tmem_op(xch, &op);
 

@@ -132,7 +132,7 @@ int xc_tbuf_set_cpu_mask(xc_interface *xch, uint32_t mask)
 
     bitmap_64_to_byte(bytemap, &mask64, sizeof (mask64) * 8);
 
-    xc_set_xen_guest_handle(sysctl.u.tbuf_op.cpu_mask.bitmap, bytemap);
+    set_xen_guest_handle(sysctl.u.tbuf_op.cpu_mask.bitmap, bytemap);
     sysctl.u.tbuf_op.cpu_mask.nr_cpus = sizeof(bytemap) * 8;
 
     ret = do_sysctl(xch, &sysctl);

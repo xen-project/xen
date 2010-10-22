@@ -53,7 +53,7 @@ static void *__getssid(xc_interface *xc_handle, int domid, uint32_t *buflen, xc_
     }
 
     memset(buf, 0, SSID_BUFFER_SIZE);
-    xc_set_xen_guest_handle(getssid.ssidbuf, buffer);
+    set_xen_guest_handle(getssid.ssidbuf, buffer);
     getssid.ssidbuf_size = SSID_BUFFER_SIZE;
     getssid.get_ssid_by = ACM_GETBY_domainid;
     getssid.id.domainid = domid;
@@ -254,10 +254,10 @@ static PyObject *chgpolicy(PyObject *self, PyObject *args)
     chgpolicy.delarray_size = del_arr_len;
     chgpolicy.chgarray_size = chg_arr_len;
     chgpolicy.errarray_size = sizeof(*error_array)*errarray_mbrs;
-    xc_set_xen_guest_handle(chgpolicy.policy_pushcache, bin_pol_buf);
-    xc_set_xen_guest_handle(chgpolicy.del_array, del_arr_buf);
-    xc_set_xen_guest_handle(chgpolicy.chg_array, chg_arr_buf);
-    xc_set_xen_guest_handle(chgpolicy.err_array, error_array);
+    set_xen_guest_handle(chgpolicy.policy_pushcache, bin_pol_buf);
+    set_xen_guest_handle(chgpolicy.del_array, del_arr_buf);
+    set_xen_guest_handle(chgpolicy.chg_array, chg_arr_buf);
+    set_xen_guest_handle(chgpolicy.err_array, error_array);
 
     rc = xc_acm_op(xc_handle, ACMOP_chgpolicy, &chgpolicy, sizeof(chgpolicy));
 
@@ -299,7 +299,7 @@ static PyObject *getpolicy(PyObject *self, PyObject *args)
 	goto out;
 
     memset(&getpolicy, 0x0, sizeof(getpolicy));
-    xc_set_xen_guest_handle(getpolicy.pullcache, pull_buffer);
+    set_xen_guest_handle(getpolicy.pullcache, pull_buffer);
     getpolicy.pullcache_size = sizeof(pull_buffer);
 
     rc = xc_acm_op(xc_handle, ACMOP_getpolicy, &getpolicy, sizeof(getpolicy));
@@ -356,8 +356,8 @@ static PyObject *relabel_domains(PyObject *self, PyObject *args)
     reldoms.relabel_map_size = rel_rules_len;
     reldoms.errarray_size = sizeof(error_array);
 
-    xc_set_xen_guest_handle(reldoms.relabel_map, relabel_rules_buf);
-    xc_set_xen_guest_handle(reldoms.err_array, error_array);
+    set_xen_guest_handle(reldoms.relabel_map, relabel_rules_buf);
+    set_xen_guest_handle(reldoms.err_array, error_array);
 
     rc = xc_acm_op(xc_handle, ACMOP_relabeldoms, &reldoms, sizeof(reldoms));
 

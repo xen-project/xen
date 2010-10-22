@@ -1639,7 +1639,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
         domctl.cmd = XEN_DOMCTL_setvcpucontext;
         domctl.domain = (domid_t)dom;
         domctl.u.vcpucontext.vcpu = i;
-        xc_set_xen_guest_handle(domctl.u.vcpucontext.ctxt, ctxt);
+        set_xen_guest_handle(domctl.u.vcpucontext.ctxt, ctxt);
         frc = xc_domctl(xch, &domctl);
         if ( frc != 0 )
         {

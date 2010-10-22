@@ -686,7 +686,7 @@ static void *_gnttab_map_table(xc_interface *xch, int domid, int *gnt_num)
 
     setup.dom = domid;
     setup.nr_frames = query.nr_frames;
-    xc_set_xen_guest_handle(setup.frame_list, frame_list);
+    set_xen_guest_handle(setup.frame_list, frame_list);
 
     /* XXX Any race with other setup_table hypercall? */
     rc = xc_gnttab_op(xch, GNTTABOP_setup_table, &setup, sizeof(setup),

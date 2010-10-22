@@ -73,8 +73,8 @@ int xc_pm_get_pxstat(xc_interface *xch, int cpuid, struct xc_px_stat *pxpt)
     sysctl.u.get_pmstat.type = PMSTAT_get_pxstat;
     sysctl.u.get_pmstat.cpuid = cpuid;
     sysctl.u.get_pmstat.u.getpx.total = max_px;
-    xc_set_xen_guest_handle(sysctl.u.get_pmstat.u.getpx.trans_pt, trans);
-    xc_set_xen_guest_handle(sysctl.u.get_pmstat.u.getpx.pt, pt);
+    set_xen_guest_handle(sysctl.u.get_pmstat.u.getpx.trans_pt, trans);
+    set_xen_guest_handle(sysctl.u.get_pmstat.u.getpx.pt, pt);
 
     ret = xc_sysctl(xch, &sysctl);
     if ( ret )
@@ -146,8 +146,8 @@ int xc_pm_get_cxstat(xc_interface *xch, int cpuid, struct xc_cx_stat *cxpt)
     sysctl.cmd = XEN_SYSCTL_get_pmstat;
     sysctl.u.get_pmstat.type = PMSTAT_get_cxstat;
     sysctl.u.get_pmstat.cpuid = cpuid;
-    xc_set_xen_guest_handle(sysctl.u.get_pmstat.u.getcx.triggers, triggers);
-    xc_set_xen_guest_handle(sysctl.u.get_pmstat.u.getcx.residencies, residencies);
+    set_xen_guest_handle(sysctl.u.get_pmstat.u.getcx.triggers, triggers);
+    set_xen_guest_handle(sysctl.u.get_pmstat.u.getcx.residencies, residencies);
 
     if ( (ret = xc_sysctl(xch, &sysctl)) )
         goto unlock_2;
@@ -219,9 +219,9 @@ int xc_get_cpufreq_para(xc_interface *xch, int cpuid,
         if ( xc_hypercall_bounce_pre(xch, scaling_available_governors) )
             goto unlock_3;
 
-        xc_set_xen_guest_handle(sys_para->affected_cpus, affected_cpus);
-        xc_set_xen_guest_handle(sys_para->scaling_available_frequencies, scaling_available_frequencies);
-        xc_set_xen_guest_handle(sys_para->scaling_available_governors, scaling_available_governors);
+        set_xen_guest_handle(sys_para->affected_cpus, affected_cpus);
+        set_xen_guest_handle(sys_para->scaling_available_frequencies, scaling_available_frequencies);
+        set_xen_guest_handle(sys_para->scaling_available_governors, scaling_available_governors);
     }
 
     sysctl.cmd = XEN_SYSCTL_pm_op;

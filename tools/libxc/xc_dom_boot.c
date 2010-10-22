@@ -72,7 +72,7 @@ static int launch_vm(xc_interface *xch, domid_t domid, xc_hypercall_buffer_t *ct
     domctl.cmd = XEN_DOMCTL_setvcpucontext;
     domctl.domain = domid;
     domctl.u.vcpucontext.vcpu = 0;
-    xc_set_xen_guest_handle(domctl.u.vcpucontext.ctxt, ctxt);
+    set_xen_guest_handle(domctl.u.vcpucontext.ctxt, ctxt);
     rc = do_domctl(xch, &domctl);
     if ( rc != 0 )
         xc_dom_panic(xch, XC_INTERNAL_ERROR,
