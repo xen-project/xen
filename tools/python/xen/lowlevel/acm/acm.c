@@ -40,22 +40,20 @@ fprintf(stderr, "ERROR: " _m " (%d = %s)\n" , ## _a ,    \
 static PyObject *acm_error_obj;
 
 /* generic shared function */
-static void *__getssid(int domid, uint32_t *buflen)
+static void *__getssid(xc_interface *xc_handle, int domid, uint32_t *buflen, xc_hypercall_buffer_t *buffer)
 {
     struct acm_getssid getssid;
-    xc_interface *xc_handle;
     #define SSID_BUFFER_SIZE    4096
-    void *buf = NULL;
+    void *buf;
+    DECLARE_HYPERCALL_BUFFER_ARGUMENT(buffer);
 
-    if ((xc_handle = xc_interface_open(0,0,0)) == 0) {
-        goto out1;
-    }
-    if ((buf = malloc(SSID_BUFFER_SIZE)) == NULL) {
+    if ((buf = xc_hypercall_buffer_alloc(xc_handle, buffer, SSID_BUFFER_SIZE)) == NULL) {
         PERROR("acm.policytype: Could not allocate ssid buffer!\n");
-        goto out2;
+	return NULL;
     }
+
     memset(buf, 0, SSID_BUFFER_SIZE);
-    set_xen_guest_handle(getssid.ssidbuf, buf);
+    xc_set_xen_guest_handle(getssid.ssidbuf, buffer);
     getssid.ssidbuf_size = SSID_BUFFER_SIZE;
     getssid.get_ssid_by = ACM_GETBY_domainid;
     getssid.id.domainid = domid;
@@ -63,16 +61,10 @@ static void *__getssid(int domid, uint32_t *buflen)
     if (xc_acm_op(xc_handle, ACMOP_getssid, &getssid, sizeof(getssid)) < 0) {
         if (errno == EACCES)
             PERROR("ACM operation failed.");
-        free(buf);
         buf = NULL;
-        goto out2;
     } else {
         *buflen = SSID_BUFFER_SIZE;
-        goto out2;
     }
- out2:
-    xc_interface_close(xc_handle);
- out1:
     return buf;
 }
 
@@ -81,52 +73,60 @@ static void *__getssid(int domid, uint32_t *buflen)
  * ssidref for domain 0 (always exists) */
 static PyObject *policy(PyObject * self, PyObject * args)
 {
-    /* out */
+    xc_interface *xc_handle;
     char *policyreference;
     PyObject *ret;
-    void *ssid_buffer;
     uint32_t buf_len;
+    DECLARE_HYPERCALL_BUFFER(void, ssid_buffer);
 
     if (!PyArg_ParseTuple(args, "", NULL)) {
         return NULL;
     }
-    ssid_buffer =  __getssid(0, &buf_len);
-    if (ssid_buffer == NULL || buf_len < sizeof(struct acm_ssid_buffer)) {
-        free(ssid_buffer);
+    if ((xc_handle = xc_interface_open(0,0,0)) == 0)
         return PyErr_SetFromErrno(acm_error_obj);
-    }
+
+    ssid_buffer =  __getssid(xc_handle, 0, &buf_len, HYPERCALL_BUFFER(ssid_buffer));
+    if (ssid_buffer == NULL || buf_len < sizeof(struct acm_ssid_buffer))
+        ret = PyErr_SetFromErrno(acm_error_obj);
     else {
         struct acm_ssid_buffer *ssid = (struct acm_ssid_buffer *)ssid_buffer;
         policyreference = (char *)(ssid_buffer + ssid->policy_reference_offset
                        + sizeof (struct acm_policy_reference_buffer));
         ret = Py_BuildValue("s", policyreference);
-        free(ssid_buffer);
-        return ret;
     }
+
+    xc_hypercall_buffer_free(xc_handle, ssid_buffer);
+    xc_interface_close(xc_handle);
+    return ret;
 }
 
 
 /* retrieve ssid info for a domain domid*/
 static PyObject *getssid(PyObject * self, PyObject * args)
 {
+    xc_interface *xc_handle;
+
     /* in */
     uint32_t    domid;
     /* out */
     char *policytype, *policyreference;
     uint32_t    ssidref;
+    PyObject *ret;
 
-    void *ssid_buffer;
+    DECLARE_HYPERCALL_BUFFER(void, ssid_buffer);
     uint32_t buf_len;
 
     if (!PyArg_ParseTuple(args, "i", &domid)) {
         return NULL;
     }
-    ssid_buffer =  __getssid(domid, &buf_len);
+    if ((xc_handle = xc_interface_open(0,0,0)) == 0)
+        return PyErr_SetFromErrno(acm_error_obj);
+
+    ssid_buffer =  __getssid(xc_handle, domid, &buf_len, HYPERCALL_BUFFER(ssid_buffer));
     if (ssid_buffer == NULL) {
-        return NULL;
+        ret = NULL;
     } else if (buf_len < sizeof(struct acm_ssid_buffer)) {
-        free(ssid_buffer);
-        return NULL;
+        ret = NULL;
     } else {
         struct acm_ssid_buffer *ssid = (struct acm_ssid_buffer *) ssid_buffer;
         policytype = ACM_POLICY_NAME(ssid->secondary_policy_code << 4 |
@@ -134,12 +134,14 @@ static PyObject *getssid(PyObject * self, PyObject * args)
         ssidref = ssid->ssidref;
         policyreference = (char *)(ssid_buffer + ssid->policy_reference_offset
                        + sizeof (struct acm_policy_reference_buffer));
+	ret = Py_BuildValue("{s:s,s:s,s:i}",
+			    "policyreference",   policyreference,
+			    "policytype",        policytype,
+			    "ssidref",           ssidref);
     }
-    free(ssid_buffer);
-    return Py_BuildValue("{s:s,s:s,s:i}",
-             "policyreference",   policyreference,
-             "policytype",        policytype,
-             "ssidref",           ssidref);
+    xc_hypercall_buffer_free(xc_handle, ssid_buffer);
+    xc_interface_close(xc_handle);
+    return ret;
 }
 
 
@@ -206,7 +208,6 @@ const char bad_arg[] = "Bad function argument.";
 const char ctrlif_op[] = "Could not open control interface.";
 const char hv_op_err[] = "Error from hypervisor operation.";
 
-
 static PyObject *chgpolicy(PyObject *self, PyObject *args)
 {
     struct acm_change_policy chgpolicy;
@@ -215,9 +216,12 @@ static PyObject *chgpolicy(PyObject *self, PyObject *args)
     char *bin_pol = NULL, *del_arr = NULL, *chg_arr = NULL;
     int bin_pol_len = 0, del_arr_len = 0, chg_arr_len = 0;
     uint errarray_mbrs = 20 * 2;
-    uint32_t error_array[errarray_mbrs];
-    PyObject *result;
+    PyObject *result = NULL;
     uint len;
+    DECLARE_HYPERCALL_BUFFER(char, bin_pol_buf);
+    DECLARE_HYPERCALL_BUFFER(char, del_arr_buf);
+    DECLARE_HYPERCALL_BUFFER(char, chg_arr_buf);
+    DECLARE_HYPERCALL_BUFFER(uint32_t, error_array);
 
     memset(&chgpolicy, 0x0, sizeof(chgpolicy));
 
@@ -228,24 +232,34 @@ static PyObject *chgpolicy(PyObject *self, PyObject *args)
         return NULL;
     }
 
-    chgpolicy.policy_pushcache_size = bin_pol_len;
-    chgpolicy.delarray_size = del_arr_len;
-    chgpolicy.chgarray_size = chg_arr_len;
-    chgpolicy.errarray_size = sizeof(error_array);
-
-    set_xen_guest_handle(chgpolicy.policy_pushcache, bin_pol);
-    set_xen_guest_handle(chgpolicy.del_array, del_arr);
-    set_xen_guest_handle(chgpolicy.chg_array, chg_arr);
-    set_xen_guest_handle(chgpolicy.err_array, error_array);
-
     if ((xc_handle = xc_interface_open(0,0,0)) == 0) {
         PyErr_SetString(PyExc_IOError, ctrlif_op);
         return NULL;
     }
 
-    rc = xc_acm_op(xc_handle, ACMOP_chgpolicy, &chgpolicy, sizeof(chgpolicy));
+    if ( (bin_pol_buf = xc_hypercall_buffer_alloc(xc_handle, bin_pol_buf, bin_pol_len)) == NULL )
+	goto out;
+    if ( (del_arr_buf = xc_hypercall_buffer_alloc(xc_handle, del_arr_buf, del_arr_len)) == NULL )
+	goto out;
+    if ( (chg_arr_buf = xc_hypercall_buffer_alloc(xc_handle, chg_arr_buf, chg_arr_len)) == NULL )
+	goto out;
+    if ( (error_array = xc_hypercall_buffer_alloc(xc_handle, error_array, sizeof(*error_array)*errarray_mbrs)) == NULL )
+	goto out;
 
-    xc_interface_close(xc_handle);
+    memcpy(bin_pol_buf, bin_pol, bin_pol_len);
+    memcpy(del_arr_buf, del_arr, del_arr_len);
+    memcpy(chg_arr_buf, chg_arr, chg_arr_len);
+
+    chgpolicy.policy_pushcache_size = bin_pol_len;
+    chgpolicy.delarray_size = del_arr_len;
+    chgpolicy.chgarray_size = chg_arr_len;
+    chgpolicy.errarray_size = sizeof(*error_array)*errarray_mbrs;
+    xc_set_xen_guest_handle(chgpolicy.policy_pushcache, bin_pol_buf);
+    xc_set_xen_guest_handle(chgpolicy.del_array, del_arr_buf);
+    xc_set_xen_guest_handle(chgpolicy.chg_array, chg_arr_buf);
+    xc_set_xen_guest_handle(chgpolicy.err_array, error_array);
+
+    rc = xc_acm_op(xc_handle, ACMOP_chgpolicy, &chgpolicy, sizeof(chgpolicy));
 
     /* only pass the filled error codes */
     for (len = 0; (len + 1) < errarray_mbrs; len += 2) {
@@ -256,6 +270,13 @@ static PyObject *chgpolicy(PyObject *self, PyObject *args)
     }
 
     result = Py_BuildValue("is#", rc, error_array, len);
+
+out:
+    xc_hypercall_buffer_free(xc_handle, bin_pol_buf);
+    xc_hypercall_buffer_free(xc_handle, del_arr_buf);
+    xc_hypercall_buffer_free(xc_handle, chg_arr_buf);
+    xc_hypercall_buffer_free(xc_handle, error_array);
+    xc_interface_close(xc_handle);
     return result;
 }
 
@@ -265,33 +286,37 @@ static PyObject *getpolicy(PyObject *self, PyObject *args)
     struct acm_getpolicy getpolicy;
     xc_interface *xc_handle;
     int rc;
-    uint8_t pull_buffer[8192];
-    PyObject *result;
-    uint32_t len = sizeof(pull_buffer);
-
-    memset(&getpolicy, 0x0, sizeof(getpolicy));
-    set_xen_guest_handle(getpolicy.pullcache, pull_buffer);
-    getpolicy.pullcache_size = sizeof(pull_buffer);
+    PyObject *result = NULL;
+    uint32_t len = 8192;
+    DECLARE_HYPERCALL_BUFFER(uint8_t, pull_buffer);
 
     if ((xc_handle = xc_interface_open(0,0,0)) == 0) {
         PyErr_SetString(PyExc_IOError, ctrlif_op);
         return NULL;
     }
 
-    rc = xc_acm_op(xc_handle, ACMOP_getpolicy, &getpolicy, sizeof(getpolicy));
+    if ((pull_buffer = xc_hypercall_buffer_alloc(xc_handle, pull_buffer, len)) == NULL)
+	goto out;
 
-    xc_interface_close(xc_handle);
+    memset(&getpolicy, 0x0, sizeof(getpolicy));
+    xc_set_xen_guest_handle(getpolicy.pullcache, pull_buffer);
+    getpolicy.pullcache_size = sizeof(pull_buffer);
+
+    rc = xc_acm_op(xc_handle, ACMOP_getpolicy, &getpolicy, sizeof(getpolicy));
 
     if (rc == 0) {
         struct acm_policy_buffer *header =
                        (struct acm_policy_buffer *)pull_buffer;
-        if (ntohl(header->len) < sizeof(pull_buffer))
+        if (ntohl(header->len) < 8192)
             len = ntohl(header->len);
     } else {
         len = 0;
     }
 
     result = Py_BuildValue("is#", rc, pull_buffer, len);
+out:
+    xc_hypercall_buffer_free(xc_handle, pull_buffer);
+    xc_interface_close(xc_handle);
     return result;
 }
 
@@ -304,8 +329,9 @@ static PyObject *relabel_domains(PyObject *self, PyObject *args)
     char *relabel_rules = NULL;
     int rel_rules_len = 0;
     uint errarray_mbrs = 20 * 2;
-    uint32_t error_array[errarray_mbrs];
-    PyObject *result;
+    DECLARE_HYPERCALL_BUFFER(uint32_t, error_array);
+    DECLARE_HYPERCALL_BUFFER(char, relabel_rules_buf);
+    PyObject *result = NULL;
     uint len;
 
     memset(&reldoms, 0x0, sizeof(reldoms));
@@ -315,21 +341,25 @@ static PyObject *relabel_domains(PyObject *self, PyObject *args)
         return NULL;
     }
 
-    reldoms.relabel_map_size = rel_rules_len;
-    reldoms.errarray_size = sizeof(error_array);
-
-    set_xen_guest_handle(reldoms.relabel_map, relabel_rules);
-    set_xen_guest_handle(reldoms.err_array, error_array);
-
     if ((xc_handle = xc_interface_open(0,0,0)) == 0) {
         PyErr_SetString(PyExc_IOError, ctrlif_op);
         return NULL;
     }
 
+    if ((relabel_rules_buf = xc_hypercall_buffer_alloc(xc_handle, relabel_rules_buf, rel_rules_len)) == NULL)
+	goto out;
+    if ((error_array = xc_hypercall_buffer_alloc(xc_handle, error_array, sizeof(*error_array)*errarray_mbrs)) == NULL)
+	goto out;
+
+    memcpy(relabel_rules_buf, relabel_rules, rel_rules_len);
+
+    reldoms.relabel_map_size = rel_rules_len;
+    reldoms.errarray_size = sizeof(error_array);
+
+    xc_set_xen_guest_handle(reldoms.relabel_map, relabel_rules_buf);
+    xc_set_xen_guest_handle(reldoms.err_array, error_array);
+
     rc = xc_acm_op(xc_handle, ACMOP_relabeldoms, &reldoms, sizeof(reldoms));
-
-    xc_interface_close(xc_handle);
-
 
     /* only pass the filled error codes */
     for (len = 0; (len + 1) < errarray_mbrs; len += 2) {
@@ -340,6 +370,11 @@ static PyObject *relabel_domains(PyObject *self, PyObject *args)
     }
 
     result = Py_BuildValue("is#", rc, error_array, len);
+out:
+    xc_hypercall_buffer_free(xc_handle, relabel_rules_buf);
+    xc_hypercall_buffer_free(xc_handle, error_array);
+    xc_interface_close(xc_handle);
+
     return result;
 }
 
