@@ -167,18 +167,19 @@ int xc_mca_op(xc_interface *xch, struct xen_mc *mc)
 {
     int ret = 0;
     DECLARE_HYPERCALL;
+    DECLARE_HYPERCALL_BOUNCE(mc, sizeof(*mc), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
 
-    mc->interface_version = XEN_MCA_INTERFACE_VERSION;
-    if ( lock_pages(xch, mc, sizeof(*mc)) )
+    if ( xc_hypercall_bounce_pre(xch, mc) )
     {
-        PERROR("Could not lock xen_mc memory");
-        return -EINVAL;
+        PERROR("Could not bounce xen_mc memory buffer");
+        return -1;
     }
+    mc->interface_version = XEN_MCA_INTERFACE_VERSION;
 
     hypercall.op = __HYPERVISOR_mca;
-    hypercall.arg[0] = (unsigned long)mc;
+    hypercall.arg[0] = HYPERCALL_BUFFER_AS_ARG(mc);
     ret = do_xen_hypercall(xch, &hypercall);
-    unlock_pages(xch, mc, sizeof(*mc));
+    xc_hypercall_bounce_post(xch, mc);
     return ret;
 }
 #endif
