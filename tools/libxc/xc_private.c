@@ -428,23 +428,22 @@ int xc_flush_mmu_updates(xc_interface *xch, struct xc_mmu *mmu)
 int do_memory_op(xc_interface *xch, int cmd, void *arg, size_t len)
 {
     DECLARE_HYPERCALL;
+    DECLARE_HYPERCALL_BOUNCE(arg, len, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
     long ret = -EINVAL;
 
-    hypercall.op     = __HYPERVISOR_memory_op;
-    hypercall.arg[0] = (unsigned long)cmd;
-    hypercall.arg[1] = (unsigned long)arg;
-
-    if ( len && lock_pages(xch, arg, len) != 0 )
+    if ( xc_hypercall_bounce_pre(xch, arg) )
     {
-        PERROR("Could not lock memory for XENMEM hypercall");
+        PERROR("Could not bounce memory for XENMEM hypercall");
         goto out1;
     }
 
+    hypercall.op     = __HYPERVISOR_memory_op;
+    hypercall.arg[0] = (unsigned long) cmd;
+    hypercall.arg[1] = HYPERCALL_BUFFER_AS_ARG(arg);
+
     ret = do_xen_hypercall(xch, &hypercall);
 
-    if ( len )
-        unlock_pages(xch, arg, len);
-
+    xc_hypercall_bounce_post(xch, arg);
  out1:
     return ret;
 }
@@ -474,24 +473,25 @@ int xc_machphys_mfn_list(xc_interface *xch,
 			 xen_pfn_t *extent_start)
 {
     int rc;
+    DECLARE_HYPERCALL_BOUNCE(extent_start, max_extents * sizeof(xen_pfn_t), XC_HYPERCALL_BUFFER_BOUNCE_OUT);
     struct xen_machphys_mfn_list xmml = {
         .max_extents = max_extents,
     };
 
-    if ( lock_pages(xch, extent_start, max_extents * sizeof(xen_pfn_t)) != 0 )
+    if ( xc_hypercall_bounce_pre(xch, extent_start) )
     {
-        PERROR("Could not lock memory for XENMEM_machphys_mfn_list hypercall");
+        PERROR("Could not bounce memory for XENMEM_machphys_mfn_list hypercall");
         return -1;
     }
 
-    set_xen_guest_handle(xmml.extent_start, extent_start);
+    xc_set_xen_guest_handle(xmml.extent_start, extent_start);
     rc = do_memory_op(xch, XENMEM_machphys_mfn_list, &xmml, sizeof(xmml));
     if (rc || xmml.nr_extents != max_extents)
         rc = -1;
     else
         rc = 0;
 
-    unlock_pages(xch, extent_start, max_extents * sizeof(xen_pfn_t));
+    xc_hypercall_bounce_post(xch, extent_start);
 
     return rc;
 }

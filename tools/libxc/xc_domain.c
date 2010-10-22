@@ -468,31 +468,30 @@ int xc_domain_set_memmap_limit(xc_interface *xch,
                                unsigned long map_limitkb)
 {
     int rc;
-
     struct xen_foreign_memory_map fmap = {
         .domid = domid,
         .map = { .nr_entries = 1 }
     };
+    DECLARE_HYPERCALL_BUFFER(struct e820entry, e820);
 
-    struct e820entry e820 = {
-        .addr = 0,
-        .size = (uint64_t)map_limitkb << 10,
-        .type = E820_RAM
-    };
+    e820 = xc_hypercall_buffer_alloc(xch, e820, sizeof(*e820));
 
-    set_xen_guest_handle(fmap.map.buffer, &e820);
-
-    if ( lock_pages(xch, &e820, sizeof(e820)) )
+    if ( e820 == NULL )
     {
-        PERROR("Could not lock memory for Xen hypercall");
-        rc = -1;
-        goto out;
+        PERROR("Could not allocate memory for xc_domain_set_memmap_limit hypercall");
+        return -1;
     }
+
+    e820->addr = 0;
+    e820->size = (uint64_t)map_limitkb << 10;
+    e820->type = E820_RAM;
+
+    xc_set_xen_guest_handle(fmap.map.buffer, e820);
 
     rc = do_memory_op(xch, XENMEM_set_memory_map, &fmap, sizeof(fmap));
 
- out:
-    unlock_pages(xch, &e820, sizeof(e820));
+    xc_hypercall_buffer_free(xch, e820);
+
     return rc;
 }
 #else
@@ -587,6 +586,7 @@ int xc_domain_increase_reservation(xc_interface *xch,
                                    xen_pfn_t *extent_start)
 {
     int err;
+    DECLARE_HYPERCALL_BOUNCE(extent_start, nr_extents * sizeof(*extent_start), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
     struct xen_memory_reservation reservation = {
         .nr_extents   = nr_extents,
         .extent_order = extent_order,
@@ -595,18 +595,17 @@ int xc_domain_increase_reservation(xc_interface *xch,
     };
 
     /* may be NULL */
-    if ( extent_start && lock_pages(xch, extent_start, nr_extents * sizeof(xen_pfn_t)) != 0 )
+    if ( xc_hypercall_bounce_pre(xch, extent_start) )
     {
-        PERROR("Could not lock memory for XENMEM_increase_reservation hypercall");
+        PERROR("Could not bounce memory for XENMEM_increase_reservation hypercall");
         return -1;
     }
 
-    set_xen_guest_handle(reservation.extent_start, extent_start);
+    xc_set_xen_guest_handle(reservation.extent_start, extent_start);
 
     err = do_memory_op(xch, XENMEM_increase_reservation, &reservation, sizeof(reservation));
 
-    if ( extent_start )
-        unlock_pages(xch, extent_start, nr_extents * sizeof(xen_pfn_t));
+    xc_hypercall_bounce_post(xch, extent_start);
 
     return err;
 }
@@ -645,18 +644,13 @@ int xc_domain_decrease_reservation(xc_interface *xch,
                                    xen_pfn_t *extent_start)
 {
     int err;
+    DECLARE_HYPERCALL_BOUNCE(extent_start, nr_extents * sizeof(*extent_start), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
     struct xen_memory_reservation reservation = {
         .nr_extents   = nr_extents,
         .extent_order = extent_order,
         .mem_flags    = 0,
         .domid        = domid
     };
-
-    if ( lock_pages(xch, extent_start, nr_extents * sizeof(xen_pfn_t)) != 0 )
-    {
-        PERROR("Could not lock memory for XENMEM_decrease_reservation hypercall");
-        return -1;
-    }
 
     if ( extent_start == NULL )
     {
@@ -665,11 +659,16 @@ int xc_domain_decrease_reservation(xc_interface *xch,
         return -1;
     }
 
-    set_xen_guest_handle(reservation.extent_start, extent_start);
+    if ( xc_hypercall_bounce_pre(xch, extent_start) )
+    {
+        PERROR("Could not bounce memory for XENMEM_decrease_reservation hypercall");
+        return -1;
+    }
+    xc_set_xen_guest_handle(reservation.extent_start, extent_start);
 
     err = do_memory_op(xch, XENMEM_decrease_reservation, &reservation, sizeof(reservation));
 
-    unlock_pages(xch, extent_start, nr_extents * sizeof(xen_pfn_t));
+    xc_hypercall_bounce_post(xch, extent_start);
 
     return err;
 }
@@ -722,6 +721,7 @@ int xc_domain_populate_physmap(xc_interface *xch,
                                xen_pfn_t *extent_start)
 {
     int err;
+    DECLARE_HYPERCALL_BOUNCE(extent_start, nr_extents * sizeof(*extent_start), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
     struct xen_memory_reservation reservation = {
         .nr_extents   = nr_extents,
         .extent_order = extent_order,
@@ -729,18 +729,16 @@ int xc_domain_populate_physmap(xc_interface *xch,
         .domid        = domid
     };
 
-    if ( lock_pages(xch, extent_start, nr_extents * sizeof(xen_pfn_t)) != 0 )
+    if ( xc_hypercall_bounce_pre(xch, extent_start) )
     {
-        PERROR("Could not lock memory for XENMEM_populate_physmap hypercall");
+        PERROR("Could not bounce memory for XENMEM_populate_physmap hypercall");
         return -1;
     }
-
-    set_xen_guest_handle(reservation.extent_start, extent_start);
+    xc_set_xen_guest_handle(reservation.extent_start, extent_start);
 
     err = do_memory_op(xch, XENMEM_populate_physmap, &reservation, sizeof(reservation));
 
-    unlock_pages(xch, extent_start, nr_extents * sizeof(xen_pfn_t));
-
+    xc_hypercall_bounce_post(xch, extent_start);
     return err;
 }
 
@@ -778,8 +776,9 @@ int xc_domain_memory_exchange_pages(xc_interface *xch,
                                     unsigned int out_order,
                                     xen_pfn_t *out_extents)
 {
-    int rc;
-
+    int rc = -1;
+    DECLARE_HYPERCALL_BOUNCE(in_extents, nr_in_extents*sizeof(*in_extents), XC_HYPERCALL_BUFFER_BOUNCE_IN);
+    DECLARE_HYPERCALL_BOUNCE(out_extents, nr_out_extents*sizeof(*out_extents), XC_HYPERCALL_BUFFER_BOUNCE_OUT);
     struct xen_memory_exchange exchange = {
         .in = {
             .nr_extents   = nr_in_extents,
@@ -792,10 +791,19 @@ int xc_domain_memory_exchange_pages(xc_interface *xch,
             .domid        = domid
         }
     };
-    set_xen_guest_handle(exchange.in.extent_start, in_extents);
-    set_xen_guest_handle(exchange.out.extent_start, out_extents);
+
+    if ( xc_hypercall_bounce_pre(xch, in_extents) ||
+         xc_hypercall_bounce_pre(xch, out_extents))
+        goto out;
+
+    xc_set_xen_guest_handle(exchange.in.extent_start, in_extents);
+    xc_set_xen_guest_handle(exchange.out.extent_start, out_extents);
 
     rc = do_memory_op(xch, XENMEM_exchange, &exchange, sizeof(exchange));
+
+out:
+    xc_hypercall_bounce_post(xch, in_extents);
+    xc_hypercall_bounce_post(xch, out_extents);
 
     return rc;
 }
