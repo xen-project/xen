@@ -142,10 +142,11 @@ shared_entry_header(struct grant_table *t, grant_ref_t ref)
 /* Check if the page has been paged out */
 static int __get_paged_frame(unsigned long gfn, unsigned long *frame, int readonly, struct domain *rd)
 {
+    int rc = GNTST_okay;
+#if defined(P2M_PAGED_TYPES) || defined(P2M_SHARED_TYPES)
     struct p2m_domain *p2m;
     p2m_type_t p2mt;
     mfn_t mfn;
-    int rc = GNTST_okay;
     
     p2m = p2m_get_hostp2m(rd);
     if ( readonly )
@@ -163,6 +164,9 @@ static int __get_paged_frame(unsigned long gfn, unsigned long *frame, int readon
        *frame = INVALID_MFN;
        rc = GNTST_bad_page;
     }
+#else
+    *frame = readonly ? gmfn_to_mfn(rd, gfn) : gfn_to_mfn_private(rd, gfn);
+#endif
     
     return rc;
 }

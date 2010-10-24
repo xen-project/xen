@@ -95,8 +95,8 @@ static inline void *cli_get_page(tmem_cli_mfn_t cmfn, unsigned long *pcli_mfn,
     return NULL;
 }
 
-static inline void cli_put_page(void *cli_va, struct page_info *cli_pfp,
-                                bool_t mark_dirty)
+static inline void cli_put_page(void *cli_va, pfp_t *cli_pfp,
+                                unsigned long cli_mfn, bool_t mark_dirty)
 {
     ASSERT(0);
 }
