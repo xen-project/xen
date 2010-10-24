@@ -195,7 +195,6 @@ extern int timer_uses_ioapic_pin_0;
 
 extern void init_ioapic_mappings(void);
 
-extern int (*ioapic_renumber_irq)(int ioapic, int irq);
 extern void ioapic_suspend(void);
 extern void ioapic_resume(void);
 
