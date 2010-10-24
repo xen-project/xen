@@ -83,6 +83,7 @@
 #define X86_CR4_OSXMMEXCPT	0x0400	/* enable unmasked SSE exceptions */
 #define X86_CR4_VMXE		0x2000  /* enable VMX */
 #define X86_CR4_SMXE		0x4000  /* enable SMX */
+#define X86_CR4_FSGSBASE	0x10000 /* enable {rd,wr}{fs,gs}base */
 #define X86_CR4_OSXSAVE	0x40000 /* enable XSAVE/XRSTOR */
 
 /*

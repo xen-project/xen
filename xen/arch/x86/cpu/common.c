@@ -311,6 +311,11 @@ void __cpuinit generic_identify(struct cpuinfo_x86 * c)
 			if ( xlvl >= 0x80000004 )
 				get_model_name(c); /* Default name */
 		}
+
+		/* Intel-defined flags: level 0x00000007 */
+		if ( c->cpuid_level >= 0x00000007 )
+			c->x86_capability[X86_FEATURE_FSGSBASE / 32]
+				= cpuid_ebx(0x00000007);
 	}
 
 	early_intel_workaround(c);

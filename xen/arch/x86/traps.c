@@ -2176,7 +2176,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             break;
 
         case 4: /* Write CR4 */
-            v->arch.guest_context.ctrlreg[4] = pv_guest_cr4_fixup(*reg);
+            v->arch.guest_context.ctrlreg[4] = pv_guest_cr4_fixup(v, *reg);
             write_cr4(pv_guest_cr4_to_real_cr4(v));
             break;
 

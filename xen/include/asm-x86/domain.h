@@ -429,7 +429,7 @@ void vcpu_show_execution_state(struct vcpu *);
 void vcpu_show_registers(const struct vcpu *);
 
 /* Clean up CR4 bits that are not under guest control. */
-unsigned long pv_guest_cr4_fixup(unsigned long guest_cr4);
+unsigned long pv_guest_cr4_fixup(const struct vcpu *, unsigned long guest_cr4);
 
 /* Convert between guest-visible and real CR4 values. */
 #define pv_guest_cr4_to_real_cr4(v)                         \

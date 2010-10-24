@@ -583,13 +583,15 @@ void arch_domain_destroy(struct domain *d)
     xfree(d->arch.irq_pirq);
 }
 
-unsigned long pv_guest_cr4_fixup(unsigned long guest_cr4)
+unsigned long pv_guest_cr4_fixup(const struct vcpu *v, unsigned long guest_cr4)
 {
     unsigned long hv_cr4_mask, hv_cr4 = real_cr4_to_pv_guest_cr4(read_cr4());
 
     hv_cr4_mask = ~X86_CR4_TSD;
     if ( cpu_has_de )
         hv_cr4_mask &= ~X86_CR4_DE;
+    if ( cpu_has_fsgsbase && !is_pv_32bit_domain(v->domain) )
+        hv_cr4_mask &= ~X86_CR4_FSGSBASE;
 
     if ( (guest_cr4 & hv_cr4_mask) != (hv_cr4 & hv_cr4_mask) )
         gdprintk(XENLOG_WARNING,
@@ -700,7 +702,7 @@ int arch_set_info_guest(
     v->arch.guest_context.user_regs.eflags |= X86_EFLAGS_IF;
 
     cr4 = v->arch.guest_context.ctrlreg[4];
-    v->arch.guest_context.ctrlreg[4] = cr4 ? pv_guest_cr4_fixup(cr4) :
+    v->arch.guest_context.ctrlreg[4] = cr4 ? pv_guest_cr4_fixup(v, cr4) :
         real_cr4_to_pv_guest_cr4(mmu_cr4_features);
 
     memset(v->arch.guest_context.debugreg, 0,

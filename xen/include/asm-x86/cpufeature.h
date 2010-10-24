@@ -9,7 +9,7 @@
 
 #include <xen/bitops.h>
 
-#define NCAPINTS	7	/* N 32-bit words worth of info */
+#define NCAPINTS	8	/* N 32-bit words worth of info */
 
 /* Intel-defined CPU features, CPUID level 0x00000001 (edx), word 0 */
 #define X86_FEATURE_FPU		(0*32+ 0) /* Onboard FPU */
@@ -131,6 +131,9 @@
 #define X86_FEATURE_SKINIT	(6*32+ 12) /* SKINIT, STGI/CLGI, DEV */
 #define X86_FEATURE_WDT		(6*32+ 13) /* Watchdog Timer */
 
+/* Intel-defined CPU features, CPUID level 0x00000007:0 (ebx), word 9 */
+#define X86_FEATURE_FSGSBASE	(7*32+ 0) /* {RD,WR}{FS,GS}BASE instructions */
+
 #define cpu_has(c, bit)		test_bit(bit, (c)->x86_capability)
 #define boot_cpu_has(bit)	test_bit(bit, boot_cpu_data.x86_capability)
 
@@ -159,6 +162,7 @@
 #define cpu_has_clflush		boot_cpu_has(X86_FEATURE_CLFLSH)
 #define cpu_has_page1gb		0
 #define cpu_has_efer		(boot_cpu_data.x86_capability[1] & 0x20100800)
+#define cpu_has_fsgsbase	0
 #else /* __x86_64__ */
 #define cpu_has_vme		0
 #define cpu_has_de		1
@@ -184,6 +188,7 @@
 #define cpu_has_clflush		boot_cpu_has(X86_FEATURE_CLFLSH)
 #define cpu_has_page1gb		boot_cpu_has(X86_FEATURE_PAGE1GB)
 #define cpu_has_efer		1
+#define cpu_has_fsgsbase	boot_cpu_has(X86_FEATURE_FSGSBASE)
 #endif
 
 #define cpu_has_ffxsr           ((boot_cpu_data.x86_vendor == X86_VENDOR_AMD) \
