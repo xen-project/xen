@@ -410,11 +410,6 @@ static void sedf_free_vdata(const struct scheduler *ops, void *priv)
     xfree(priv);
 }
 
-static void sedf_destroy_vcpu(const struct scheduler *ops, struct vcpu *v)
-{
-    sedf_free_vdata(ops, v->sched_priv);
-}
-
 static void *
 sedf_alloc_domdata(const struct scheduler *ops, struct domain *d)
 {
@@ -1503,8 +1498,6 @@ const struct scheduler sched_sedf_def = {
     
     .init_domain    = sedf_init_domain,
     .destroy_domain = sedf_destroy_domain,
-
-    .destroy_vcpu   = sedf_destroy_vcpu,
 
     .alloc_vdata    = sedf_alloc_vdata,
     .free_vdata     = sedf_free_vdata,

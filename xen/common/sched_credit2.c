@@ -592,7 +592,18 @@ static void
 csched_free_vdata(const struct scheduler *ops, void *priv)
 {
     struct csched_vcpu *svc = priv;
-    struct vcpu *vc = svc->vcpu;
+
+    xfree(svc);
+}
+
+static void
+csched_vcpu_remove(const struct scheduler *ops, struct vcpu *vc)
+{
+    struct csched_vcpu * const svc = CSCHED_VCPU(vc);
+    struct csched_dom * const sdom = svc->sdom;
+
+    BUG_ON( sdom == NULL );
+    BUG_ON( !list_empty(&svc->runq_elem) );
 
     if ( ! is_idle_vcpu(vc) )
     {
@@ -610,20 +621,6 @@ csched_free_vdata(const struct scheduler *ops, void *priv)
 
         svc->sdom->nr_vcpus--;
     }
-
-    xfree(svc);
-}
-
-static void
-csched_vcpu_destroy(const struct scheduler *ops, struct vcpu *vc)
-{
-    struct csched_vcpu * const svc = CSCHED_VCPU(vc);
-    struct csched_dom * const sdom = svc->sdom;
-
-    BUG_ON( sdom == NULL );
-    BUG_ON( !list_empty(&svc->runq_elem) );
-
-    csched_free_vdata(ops, svc);
 }
 
 static void
@@ -1199,7 +1196,7 @@ const struct scheduler sched_credit2_def = {
     .destroy_domain = csched_dom_destroy,
 
     .insert_vcpu    = csched_vcpu_insert,
-    .destroy_vcpu   = csched_vcpu_destroy,
+    .remove_vcpu    = csched_vcpu_remove,
 
     .sleep          = csched_vcpu_sleep,
     .wake           = csched_vcpu_wake,

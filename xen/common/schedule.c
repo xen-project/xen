@@ -219,6 +219,8 @@ int sched_init_vcpu(struct vcpu *v, unsigned int processor)
     if ( v->sched_priv == NULL )
         return 1;
 
+    SCHED_OP(VCPU2OP(v), insert_vcpu, v);
+
     return 0;
 }
 
@@ -266,7 +268,8 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
         migrate_timer(&v->singleshot_timer, new_p);
         migrate_timer(&v->poll_timer, new_p);
 
-        SCHED_OP(VCPU2OP(v), destroy_vcpu, v);
+        SCHED_OP(VCPU2OP(v), remove_vcpu, v);
+        SCHED_OP(VCPU2OP(v), free_vdata, v->sched_priv);
 
         cpus_setall(v->cpu_affinity);
         v->processor = new_p;
@@ -274,6 +277,8 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
         evtchn_move_pirqs(v);
 
         new_p = cycle_cpu(new_p, c->cpu_valid);
+
+        SCHED_OP(VCPU2OP(v), insert_vcpu, v);
     }
     domain_update_node_affinity(d);
 
@@ -295,7 +300,8 @@ void sched_destroy_vcpu(struct vcpu *v)
     kill_timer(&v->poll_timer);
     if ( test_and_clear_bool(v->is_urgent) )
         atomic_dec(&per_cpu(schedule_data, v->processor).urgent_count);
-    SCHED_OP(VCPU2OP(v), destroy_vcpu, v);
+    SCHED_OP(VCPU2OP(v), remove_vcpu, v);
+    SCHED_OP(VCPU2OP(v), free_vdata, v->sched_priv);
 }
 
 int sched_init_domain(struct domain *d)
