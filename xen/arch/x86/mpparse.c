@@ -1116,9 +1116,6 @@ int mp_register_gsi (u32 gsi, int triggering, int polarity)
 
 	ioapic_pin = gsi - mp_ioapic_routing[ioapic].gsi_base;
 
-	if (ioapic_renumber_irq)
-		gsi = ioapic_renumber_irq(ioapic, gsi);
-
 	desc = irq_to_desc(gsi);
 	spin_lock_irqsave(&desc->lock, flags);
 	if (!(desc->status & IRQ_DISABLED) && desc->handler != &no_irq_type) {

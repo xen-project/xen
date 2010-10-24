@@ -38,7 +38,6 @@
 #include <io_ports.h>
 #include <public/physdev.h>
 
-int (*ioapic_renumber_irq)(int ioapic, int irq);
 atomic_t irq_mis_count;
 
 /* Where if anywhere is the i8259 connect in external int mode */
@@ -877,13 +876,6 @@ static int pin_2_irq(int idx, int apic, int pin)
         while (i < apic)
             irq += nr_ioapic_registers[i++];
         irq += pin;
-
-        /*
-         * For MPS mode, so far only needed by ES7000 platform
-         */
-        if (ioapic_renumber_irq)
-            irq = ioapic_renumber_irq(apic, irq);
-
         break;
     }
     default:
