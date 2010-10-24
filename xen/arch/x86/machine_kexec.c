@@ -23,7 +23,11 @@
 typedef void (*relocate_new_kernel_t)(
                 unsigned long indirection_page,
                 unsigned long *page_list,
-                unsigned long start_address);
+                unsigned long start_address,
+#ifdef __i386__
+                unsigned int cpu_has_pae,
+#endif
+                unsigned int preserve_context);
 
 extern int machine_kexec_get_xen(xen_kexec_range_t *range);
 
@@ -121,7 +125,11 @@ void machine_kexec(xen_kexec_image_t *image)
 
         rnk = (relocate_new_kernel_t) image->page_list[1];
         (*rnk)(image->indirection_page, image->page_list,
-               image->start_address);
+               image->start_address,
+#ifdef __i386__
+               1 /* cpu_has_pae */,
+#endif
+               0 /* preserve_context */);
     }
 }
 

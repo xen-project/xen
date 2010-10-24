@@ -119,6 +119,7 @@ compatibility_mode:
         movl %eax, %ss
 
         /* Push arguments onto stack. */
+        pushl $0   /* 20(%esp) - preserve context */
         pushl $1   /* 16(%esp) - cpu has pae */
         pushl %ecx /* 12(%esp) - start address */
         pushl %edx /*  8(%esp) - page list */

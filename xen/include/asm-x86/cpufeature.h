@@ -139,7 +139,6 @@
 #define cpu_has_de		boot_cpu_has(X86_FEATURE_DE)
 #define cpu_has_pse		boot_cpu_has(X86_FEATURE_PSE)
 #define cpu_has_tsc		boot_cpu_has(X86_FEATURE_TSC)
-#define cpu_has_pae		boot_cpu_has(X86_FEATURE_PAE)
 #define cpu_has_pge		boot_cpu_has(X86_FEATURE_PGE)
 #define cpu_has_pat		boot_cpu_has(X86_FEATURE_PAT)
 #define cpu_has_apic		boot_cpu_has(X86_FEATURE_APIC)
@@ -165,7 +164,6 @@
 #define cpu_has_de		1
 #define cpu_has_pse		1
 #define cpu_has_tsc		1
-#define cpu_has_pae		1
 #define cpu_has_pge		1
 #define cpu_has_pat		1
 #define cpu_has_apic		boot_cpu_has(X86_FEATURE_APIC)
