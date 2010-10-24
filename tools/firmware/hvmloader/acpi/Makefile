@@ -27,7 +27,7 @@ vpath iasl $(PATH)
 all: acpi.a
 
 ssdt_pm.h ssdt_tpm.h: %.h: %.asl iasl
-	iasl -p $* -tc $<
+	iasl -vs -p $* -tc $<
 	sed -e 's/AmlCode/$*/g' $*.hex >$@
 	rm -f $*.hex $*.aml
 
@@ -36,7 +36,7 @@ dsdt_15cpu.c dsdt_anycpu.c: %.c: dsdt.asl mk_dsdt.c iasl
 	$(HOSTCC) $(HOSTCFLAGS) $(CFLAGS_include) -o mk_$* mk_dsdt.c
 	awk 'NR > 1 {print s} {s=$$0}' $< >$*.asl
 	./mk_$* >>$*.asl
-	iasl -p $* -tc $*.asl
+	iasl -vs -p $* -tc $*.asl
 	sed -e 's/AmlCode/$*/g' $*.hex >$@
 	echo "int $*_len=sizeof($*);" >>$@
 	rm -f $*.hex $*.aml $*.asl mk_$*
