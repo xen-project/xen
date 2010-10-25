@@ -1015,7 +1015,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
         }
 
         /* Enable qemu-dm logging dirty pages to xen */
-        if ( hvm && !callbacks->switch_qemu_logdirty(dom, 1, callbacks->data) )
+        if ( hvm && callbacks->switch_qemu_logdirty(dom, 1, callbacks->data) )
         {
             PERROR("Couldn't enable qemu log-dirty mode (errno %d)", errno);
             goto out;
@@ -1879,7 +1879,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
                                XEN_DOMCTL_SHADOW_OP_OFF,
                                NULL, 0, NULL, 0, NULL) < 0 )
             DPRINTF("Warning - couldn't disable shadow mode");
-        if ( hvm && !callbacks->switch_qemu_logdirty(dom, 0, callbacks->data) )
+        if ( hvm && callbacks->switch_qemu_logdirty(dom, 0, callbacks->data) )
             DPRINTF("Warning - couldn't disable qemu log-dirty mode");
     }
 
