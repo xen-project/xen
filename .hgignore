@@ -129,6 +129,7 @@
 ^tools/debugger/gdb/gdb-6\.2\.1/.*$
 ^tools/debugger/gdb/gdb-6\.2\.1\.tar\.bz2$
 ^tools/debugger/gdbsx/gdbsx$
+^tools/debugger/kdd/kdd$
 ^tools/debugger/xenitp/xenitp$
 ^tools/firmware/.*/biossums$
 ^tools/firmware/.*\.bin$

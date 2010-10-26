@@ -36,6 +36,7 @@ SUBDIRS-y += libxl
 SUBDIRS-y += remus
 SUBDIRS-$(CONFIG_X86) += xenpaging
 SUBDIRS-$(CONFIG_X86) += debugger/gdbsx
+SUBDIRS-$(CONFIG_X86) += debugger/kdd
 
 # These don't cross-compile
 ifeq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
@@ -127,6 +128,16 @@ subdir-install-debugger/gdbsx: .phony
 
 subdir-all-debugger/gdbsx: .phony
 	$(MAKE) -C debugger/gdbsx all
+
+
+subdir-clean-debugger/kdd subdir-distclean-debugger/kdd: .phony
+	$(MAKE) -C debugger/kdd clean
+
+subdir-install-debugger/kdd: .phony
+	$(MAKE) -C debugger/kdd install
+
+subdir-all-debugger/kdd: .phony
+	$(MAKE) -C debugger/kdd all
 
 subdir-distclean-firmware: .phony
 	$(MAKE) -C firmware distclean

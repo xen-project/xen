@@ -107,6 +107,11 @@ S:	Supported
 F:	xen/arch/x86/debug.c
 F:	tools/debugger/gdbsx/
 
+KDD DEBUGGER
+M:	Tim Deegan <Tim.Deegan@citrix.com>
+S:	Supported
+F:	tools/debugger/kdd/
+
 INTEL(R) TRUSTED EXECUTION TECHNOLOGY (TXT)
 M:	Joseph Cihula <joseph.cihula@intel.com>
 M:	Shane Wang <shane.wang@intel.com>
