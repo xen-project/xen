@@ -149,6 +149,137 @@ enum xc_open_flags {
 int xc_interface_close(xc_interface *xch);
 
 /*
+ * HYPERCALL SAFE MEMORY BUFFER
+ *
+ * Ensure that memory which is passed to a hypercall has been
+ * specially allocated in order to be safe to access from the
+ * hypervisor.
+ *
+ * Each user data pointer is shadowed by an xc_hypercall_buffer data
+ * structure. You should never define an xc_hypercall_buffer type
+ * directly, instead use the DECLARE_HYPERCALL_BUFFER* macros below.
+ *
+ * The strucuture should be considered opaque and all access should be
+ * via the macros and helper functions defined below.
+ *
+ * Once the buffer is declared the user is responsible for explicitly
+ * allocating and releasing the memory using
+ * xc_hypercall_buffer_alloc(_pages) and
+ * xc_hypercall_buffer_free(_pages).
+ *
+ * Once the buffer has been allocated the user can initialise the data
+ * via the normal pointer. The xc_hypercall_buffer structure is
+ * transparently referenced by the helper macros (such as
+ * xen_set_guest_handle) in order to check at compile time that the
+ * correct type of memory is being used.
+ */
+struct xc_hypercall_buffer {
+    /* Hypercall safe memory buffer. */
+    void *hbuf;
+
+    /*
+     * Reference to xc_hypercall_buffer passed as argument to the
+     * current function.
+     */
+    struct xc_hypercall_buffer *param_shadow;
+
+    /*
+     * Direction of copy for bounce buffering.
+     */
+    int dir;
+
+    /* Used iff dir != 0. */
+    void *ubuf;
+    size_t sz;
+};
+typedef struct xc_hypercall_buffer xc_hypercall_buffer_t;
+
+/*
+ * Construct the name of the hypercall buffer for a given variable.
+ * For internal use only
+ */
+#define XC__HYPERCALL_BUFFER_NAME(_name) xc__hypercall_buffer_##_name
+
+/*
+ * Returns the hypercall_buffer associated with a variable.
+ */
+#define HYPERCALL_BUFFER(_name)                                                              \
+    ({  xc_hypercall_buffer_t _val1;                                                         \
+        typeof(XC__HYPERCALL_BUFFER_NAME(_name)) *_val2 = &XC__HYPERCALL_BUFFER_NAME(_name); \
+        (void)(&_val1 == _val2);                                                             \
+        (_val2)->param_shadow ? (_val2)->param_shadow : (_val2);                             \
+     })
+
+#define HYPERCALL_BUFFER_INIT_NO_BOUNCE .dir = 0, .sz = 0, .ubuf = (void *)-1
+
+/*
+ * Defines a hypercall buffer and user pointer with _name of _type.
+ *
+ * The user accesses the data as normal via _name which will be
+ * transparently converted to the hypercall buffer as necessary.
+ */
+#define DECLARE_HYPERCALL_BUFFER(_type, _name)                 \
+    _type *_name = NULL;                                       \
+    xc_hypercall_buffer_t XC__HYPERCALL_BUFFER_NAME(_name) = { \
+        .hbuf = NULL,                                          \
+        .param_shadow = NULL,                                  \
+        HYPERCALL_BUFFER_INIT_NO_BOUNCE                        \
+    }
+
+/*
+ * Declare the necessary data structure to allow a hypercall buffer
+ * passed as an argument to a function to be used in the normal way.
+ */
+#define DECLARE_HYPERCALL_BUFFER_ARGUMENT(_name)               \
+    xc_hypercall_buffer_t XC__HYPERCALL_BUFFER_NAME(_name) = { \
+        .hbuf = (void *)-1,                                    \
+        .param_shadow = _name,                                 \
+        HYPERCALL_BUFFER_INIT_NO_BOUNCE                        \
+    }
+
+/*
+ * Get the hypercall buffer data pointer in a form suitable for use
+ * directly as a hypercall argument.
+ */
+#define HYPERCALL_BUFFER_AS_ARG(_name)                                             \
+    ({  xc_hypercall_buffer_t _val1;                                               \
+        typeof(XC__HYPERCALL_BUFFER_NAME(_name)) *_val2 = HYPERCALL_BUFFER(_name); \
+        (void)(&_val1 == _val2);                                                   \
+        (unsigned long)(_val2)->hbuf;                                              \
+     })
+
+/*
+ * Set a xen_guest_handle in a type safe manner, ensuring that the
+ * data pointer has been correctly allocated.
+ */
+#define xc_set_xen_guest_handle(_hnd, _val)                                      \
+    do {                                                                         \
+        xc_hypercall_buffer_t _val1;                                             \
+        typeof(XC__HYPERCALL_BUFFER_NAME(_val)) *_val2 = HYPERCALL_BUFFER(_val); \
+        (void) (&_val1 == _val2);                                                 \
+        set_xen_guest_handle_raw(_hnd, (_val2)->hbuf);                           \
+    } while (0)
+
+/* Use with xc_set_xen_guest_handle in place of NULL */
+extern xc_hypercall_buffer_t XC__HYPERCALL_BUFFER_NAME(HYPERCALL_BUFFER_NULL);
+
+/*
+ * Allocate and free hypercall buffers with byte granularity.
+ */
+void *xc__hypercall_buffer_alloc(xc_interface *xch, xc_hypercall_buffer_t *b, size_t size);
+#define xc_hypercall_buffer_alloc(_xch, _name, _size) xc__hypercall_buffer_alloc(_xch, HYPERCALL_BUFFER(_name), _size)
+void xc__hypercall_buffer_free(xc_interface *xch, xc_hypercall_buffer_t *b);
+#define xc_hypercall_buffer_free(_xch, _name) xc__hypercall_buffer_free(_xch, HYPERCALL_BUFFER(_name))
+
+/*
+ * Allocate and free hypercall buffers with page alignment.
+ */
+void *xc__hypercall_buffer_alloc_pages(xc_interface *xch, xc_hypercall_buffer_t *b, int nr_pages);
+#define xc_hypercall_buffer_alloc_pages(_xch, _name, _nr) xc__hypercall_buffer_alloc_pages(_xch, HYPERCALL_BUFFER(_name), _nr)
+void xc__hypercall_buffer_free_pages(xc_interface *xch, xc_hypercall_buffer_t *b, int nr_pages);
+#define xc_hypercall_buffer_free_pages(_xch, _name, _nr) xc__hypercall_buffer_free_pages(_xch, HYPERCALL_BUFFER(_name), _nr)
+
+/*
  * DOMAIN DEBUGGING FUNCTIONS
  */
 

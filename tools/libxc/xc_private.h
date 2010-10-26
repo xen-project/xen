@@ -106,6 +106,64 @@ void unlock_pages(xc_interface *xch, void *addr, size_t len);
 int hcall_buf_prep(xc_interface *xch, void **addr, size_t len);
 void hcall_buf_release(xc_interface *xch, void **addr, size_t len);
 
+/*
+ * HYPERCALL ARGUMENT BUFFERS
+ *
+ * Augment the public hypercall buffer interface with the ability to
+ * bounce between user provided buffers and hypercall safe memory.
+ *
+ * Use xc_hypercall_bounce_pre/post instead of
+ * xc_hypercall_buffer_alloc/free(_pages).  The specified user
+ * supplied buffer is automatically copied in/out of the hypercall
+ * safe memory.
+ */
+enum {
+    XC_HYPERCALL_BUFFER_BOUNCE_NONE = 0,
+    XC_HYPERCALL_BUFFER_BOUNCE_IN   = 1,
+    XC_HYPERCALL_BUFFER_BOUNCE_OUT  = 2,
+    XC_HYPERCALL_BUFFER_BOUNCE_BOTH = 3
+};
+
+/*
+ * Declare a named bounce buffer.
+ *
+ * Normally you should use DECLARE_HYPERCALL_BOUNCE (see below).
+ *
+ * This declaration should only be used when the user pointer is
+ * non-trivial, e.g. when it is contained within an existing data
+ * structure.
+ */
+#define DECLARE_NAMED_HYPERCALL_BOUNCE(_name, _ubuf, _sz, _dir) \
+    xc_hypercall_buffer_t XC__HYPERCALL_BUFFER_NAME(_name) = {  \
+        .hbuf = NULL,                                           \
+        .param_shadow = NULL,                                   \
+        .sz = _sz, .dir = _dir, .ubuf = _ubuf,                  \
+    }
+
+/*
+ * Declare a bounce buffer shadowing the named user data pointer.
+ */
+#define DECLARE_HYPERCALL_BOUNCE(_ubuf, _sz, _dir) DECLARE_NAMED_HYPERCALL_BOUNCE(_ubuf, _ubuf, _sz, _dir)
+
+/*
+ * Set the size of data to bounce. Useful when the size is not known
+ * when the bounce buffer is declared.
+ */
+#define HYPERCALL_BOUNCE_SET_SIZE(_buf, _sz) do { (HYPERCALL_BUFFER(_buf))->sz = _sz; } while (0)
+
+/*
+ * Initialise and free hypercall safe memory. Takes care of any required
+ * copying.
+ */
+int xc__hypercall_bounce_pre(xc_interface *xch, xc_hypercall_buffer_t *bounce);
+#define xc_hypercall_bounce_pre(_xch, _name) xc__hypercall_bounce_pre(_xch, HYPERCALL_BUFFER(_name))
+void xc__hypercall_bounce_post(xc_interface *xch, xc_hypercall_buffer_t *bounce);
+#define xc_hypercall_bounce_post(_xch, _name) xc__hypercall_bounce_post(_xch, HYPERCALL_BUFFER(_name))
+
+/*
+ * Hypercall interfaces.
+ */
+
 int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall);
 
 static inline int do_xen_version(xc_interface *xch, int cmd, void *dest)

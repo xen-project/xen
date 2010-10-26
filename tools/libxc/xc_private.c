@@ -18,13 +18,11 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include <inttypes.h>
 #include "xc_private.h"
 #include "xg_private.h"
 #include "xc_dom.h"
 #include <stdarg.h>
 #include <stdlib.h>
-#include <malloc.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <assert.h>

@@ -27,6 +27,7 @@ CTRL_SRCS-y       += xc_tmem.c
 CTRL_SRCS-y       += xc_mem_event.c
 CTRL_SRCS-y       += xc_mem_paging.c
 CTRL_SRCS-y       += xc_memshr.c
+CTRL_SRCS-y       += xc_hcall_buf.c
 CTRL_SRCS-y       += xtl_core.c
 CTRL_SRCS-y       += xtl_logger_stdio.c
 CTRL_SRCS-$(CONFIG_X86) += xc_pagetab.c
