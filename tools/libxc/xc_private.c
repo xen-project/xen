@@ -447,11 +447,14 @@ int xc_sysctl(xc_interface *xch, struct xen_sysctl *sysctl)
 int xc_version(xc_interface *xch, int cmd, void *arg)
 {
     DECLARE_HYPERCALL_BOUNCE(arg, 0, XC_HYPERCALL_BUFFER_BOUNCE_OUT); /* Size unknown until cmd decoded */
-    size_t sz = 0;
+    size_t sz;
     int rc;
 
     switch ( cmd )
     {
+    case XENVER_version:
+        sz = 0;
+        break;
     case XENVER_extraversion:
         sz = sizeof(xen_extraversion_t);
         break;
@@ -467,6 +470,21 @@ int xc_version(xc_interface *xch, int cmd, void *arg)
     case XENVER_platform_parameters:
         sz = sizeof(xen_platform_parameters_t);
         break;
+    case XENVER_get_features:
+        sz = sizeof(xen_feature_info_t);
+        break;
+    case XENVER_pagesize:
+        sz = 0;
+        break;
+    case XENVER_guest_handle:
+        sz = sizeof(xen_domain_handle_t);
+        break;
+    case XENVER_commandline:
+        sz = sizeof(xen_commandline_t);
+        break;
+    default:
+        ERROR("xc_version: unknown command %d\n", cmd);
+        return -EINVAL;
     }
 
     HYPERCALL_BOUNCE_SET_SIZE(arg, sz);
