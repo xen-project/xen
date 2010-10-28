@@ -2927,12 +2927,6 @@ retry_transaction:
         abort = 1;
         goto out;
     }
-    if (!domid && new_target_memkb < LIBXL_MIN_DOM0_MEM) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                "new target for dom0 is below the minimum threshold\n");
-        abort = 1;
-        goto out;
-    }
 
     if (relative)
         new_target_memkb = current_target_memkb + target_memkb;
@@ -2946,6 +2940,13 @@ retry_transaction:
         goto out;
     }
 
+    if (!domid && new_target_memkb < LIBXL_MIN_DOM0_MEM) {
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                "new target %d for dom0 is below the minimum threshold\n",
+                 new_target_memkb);
+        abort = 1;
+        goto out;
+    }
     videoram_s = libxl__xs_read(&gc, t, libxl__sprintf(&gc,
                 "%s/memory/videoram", dompath));
     videoram = videoram_s ? atoi(videoram_s) : 0;
