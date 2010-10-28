@@ -118,7 +118,7 @@ install: all
 .PHONY: clean
 clean:
 	$(RM) -f _*.h *.o *.so* *.a $(CLIENTS) $(DEPS)
-	$(RM) -f _*.c
+	$(RM) -f _*.c *.pyc _libxl_paths.*.tmp
 #	$(RM) -f $(AUTOSRCS) $(AUTOINCS)
 
 distclean: clean
