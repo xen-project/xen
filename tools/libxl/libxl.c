@@ -3978,10 +3978,12 @@ int libxl_create_cpupool(libxl_ctx *ctx, char *name, int schedid,
         t = xs_transaction_start(ctx->xsh);
 
         xs_mkdir(ctx->xsh, t, libxl__sprintf(&gc, "/local/pool/%d", *poolid));
-        libxl__xs_write(&gc, t, libxl__sprintf(&gc, "/local/pool/%d/uuid", *poolid),
-                 uuid_string);
-        libxl__xs_write(&gc, t, libxl__sprintf(&gc, "/local/pool/%d/name", *poolid),
-                 name);
+        libxl__xs_write(&gc, t,
+                        libxl__sprintf(&gc, "/local/pool/%d/uuid", *poolid),
+                        "%s", uuid_string);
+        libxl__xs_write(&gc, t,
+                        libxl__sprintf(&gc, "/local/pool/%d/name", *poolid),
+                        "%s", name);
 
         if (xs_transaction_end(ctx->xsh, t, 0) || (errno != EAGAIN))
             return 0;
@@ -4093,7 +4095,8 @@ int libxl_cpupool_movedomain(libxl_ctx *ctx, uint32_t poolid, uint32_t domid)
         if (!vm_path)
             break;
 
-        libxl__xs_write(&gc, t, libxl__sprintf(&gc, "%s/pool_name", vm_path), poolname);
+        libxl__xs_write(&gc, t, libxl__sprintf(&gc, "%s/pool_name", vm_path),
+                        "%s", poolname);
 
         if (xs_transaction_end(ctx->xsh, t, 0) || (errno != EAGAIN))
             break;
