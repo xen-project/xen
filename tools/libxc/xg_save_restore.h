@@ -104,8 +104,9 @@
  *  Qemu context:
  *     char[21]         : Signature:
  *       "QemuDeviceModelRecord" : Read Qemu save data until EOF
- *       "RemusDeviceModelState" : uint32_t length field followed by that many
+ *       "DeviceModelRecord0002" : uint32_t length field followed by that many
  *                                 bytes of Qemu save data
+ *       "RemusDeviceModelState" : Currently the same as "DeviceModelRecord0002".
  *
  * PV TAIL:
  *

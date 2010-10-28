@@ -442,14 +442,17 @@ int libxl__domain_suspend_common(libxl_ctx *ctx, uint32_t domid, int fd,
     callbacks.switch_qemu_logdirty = libxl__domain_suspend_common_switch_qemu_logdirty;
     callbacks.data = &si;
 
-    xc_domain_save(ctx->xch, fd, domid, 0, 0, flags, &callbacks, hvm);
+    rc = xc_domain_save(ctx->xch, fd, domid, 0, 0, flags, &callbacks, hvm);
+    if ( rc ) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "saving domain");
+        rc = ERROR_FAIL;
+    }
 
     if (si.suspend_eventchn > 0)
         xc_suspend_evtchn_release(ctx->xch, si.xce, domid, si.suspend_eventchn);
     if (si.xce > 0)
         xc_evtchn_close(si.xce);
 
-    rc = 0;
 out:
     libxl__free_all(&gc);
     return rc;
@@ -461,15 +464,32 @@ int libxl__domain_save_device_model(libxl_ctx *ctx, uint32_t domid, int fd)
     int fd2, c;
     char buf[1024];
     char *filename = libxl__sprintf(&gc, "/var/lib/xen/qemu-save.%d", domid);
+    struct stat st;
+    uint32_t qemu_state_len;
 
     LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Saving device model state to %s", filename);
     libxl__xs_write(&gc, XBT_NULL, libxl__sprintf(&gc, "/local/domain/0/device-model/%d/command", domid), "save");
     libxl__wait_for_device_model(ctx, domid, "paused", NULL, NULL);
 
+    if (stat(filename, &st) < 0)
+    {
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Unable to stat qemu save file\n");
+        return ERROR_FAIL;
+    }
+
+    qemu_state_len = st.st_size;
+    LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Qemu state is %d bytes\n", qemu_state_len);
+
     c = libxl_write_exactly(ctx, fd, QEMU_SIGNATURE, strlen(QEMU_SIGNATURE),
                             "saved-state file", "qemu signature");
     if (c)
         return c;
+
+    c = libxl_write_exactly(ctx, fd, &qemu_state_len, sizeof(qemu_state_len),
+                            "saved-state file", "saved-state length");
+    if (c)
+        return c;
+
     fd2 = open(filename, O_RDONLY);
     while ((c = read(fd2, buf, sizeof(buf))) != 0) {
         if (c < 0) {

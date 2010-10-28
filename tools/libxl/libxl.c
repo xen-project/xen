@@ -686,8 +686,8 @@ int libxl_domain_suspend(libxl_ctx *ctx, libxl_domain_suspend_info *info,
     int debug = info != NULL && info->flags & XL_SUSPEND_DEBUG;
     int rc = 0;
 
-    libxl__domain_suspend_common(ctx, domid, fd, hvm, live, debug);
-    if (hvm)
+    rc = libxl__domain_suspend_common(ctx, domid, fd, hvm, live, debug);
+    if (!rc && hvm)
         rc = libxl__domain_save_device_model(ctx, domid, fd);
     return rc;
 }

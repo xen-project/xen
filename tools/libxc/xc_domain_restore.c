@@ -494,13 +494,18 @@ static int buffer_tail_hvm(xc_interface *xch, struct restore_ctx *ctx,
         return -1;
     }
 
-    /* The normal live-migration QEMU record has no length information.
+    /* The legacy live-migration QEMU record has no length information.
      * Short of reimplementing the QEMU parser, we're forced to just read
-     * until EOF. Remus gets around this by sending a different signature
-     * which includes a length prefix */
+     * until EOF.
+     *
+     * Gets around this by sending a different signatures for the new
+     * live-migration QEMU record and Remus which includes a length
+     * prefix
+     */
     if ( !memcmp(qemusig, "QemuDeviceModelRecord", sizeof(qemusig)) )
         return compat_buffer_qemu(xch, ctx, fd, buf);
-    else if ( !memcmp(qemusig, "RemusDeviceModelState", sizeof(qemusig)) )
+    else if ( !memcmp(qemusig, "DeviceModelRecord0002", sizeof(qemusig)) ||
+              !memcmp(qemusig, "RemusDeviceModelState", sizeof(qemusig)) )
         return buffer_qemu(xch, ctx, fd, buf);
 
     qemusig[20] = '\0';
