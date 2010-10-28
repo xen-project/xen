@@ -185,9 +185,9 @@ endif
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 1a13c2df0c5c93f06c0f2286628b9b0f4d80ff4d
-# Thu Oct 21 17:59:20 2010 +0100
-# e1000: Handle IO Port.
+QEMU_TAG ?= bd5608d7ab3175af27070156871ffcdbe712d8af
+# Thu Oct 28 12:27:08 2010 +0100
+# eliminate compiler warnings
 
 # Optional components
 XENSTAT_XENTOP     ?= y
