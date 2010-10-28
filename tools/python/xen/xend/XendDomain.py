@@ -1412,7 +1412,7 @@ class XendDomain:
         try:
             try:
                 XendCheckpoint.save(p2cwrite, dominfo, True, live, dst,
-                                    node=node)
+                                    node=node,sock=sock)
             except Exception, ex:
                 m_dsterr = None
                 try:
@@ -1436,15 +1436,16 @@ class XendDomain:
                     raise XendError("%s (from %s)" % (m_dsterr.group(2), dst))
                 raise
         finally:
-            try:
-                sock.shutdown(2)
-            except:
-                # Probably the socket is already disconnected by sock.close
-                # in the destination side.
-                # Ignore the exception because it has nothing to do with
-                # an exception of XendCheckpoint.save.
-                pass
-            sock.close()
+            if not live:
+                try:
+                    sock.shutdown(2)
+                except:
+                    # Probably the socket is already disconnected by sock.close
+                    # in the destination side.
+                    # Ignore the exception because it has nothing to do with
+                    # an exception of XendCheckpoint.save.
+                    pass
+                sock.close()
 
         os.close(p2cread)
         os.close(p2cwrite)
@@ -1469,7 +1470,7 @@ class XendDomain:
         try:
             try:
                 XendCheckpoint.save(sock.fileno(), dominfo, True, live,
-                                    dst, node=node)
+                                    dst, node=node,sock=sock)
             except Exception, ex:
                 m_dsterr = None
                 try:
@@ -1493,15 +1494,16 @@ class XendDomain:
                     raise XendError("%s (from %s)" % (m_dsterr.group(2), dst))
                 raise
         finally:
-            try:
-                sock.shutdown(2)
-            except:
-                # Probably the socket is already disconnected by sock.close
-                # in the destination side.
-                # Ignore the exception because it has nothing to do with
-                # an exception of XendCheckpoint.save.
-                pass
-            sock.close()
+            if not live:
+                try:
+                    sock.shutdown(2)
+                except:
+                    # Probably the socket is already disconnected by sock.close
+                    # in the destination side.
+                    # Ignore the exception because it has nothing to do with
+                    # an exception of XendCheckpoint.save.
+                    pass
+                sock.close()
 
     def domain_save(self, domid, dst, checkpoint=False):
         """Start saving a domain to file.

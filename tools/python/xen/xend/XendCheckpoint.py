@@ -65,7 +65,7 @@ def insert_after(list, pred, value):
     return
 
 
-def save(fd, dominfo, network, live, dst, checkpoint=False, node=-1):
+def save(fd, dominfo, network, live, dst, checkpoint=False, node=-1,sock=None):
     from xen.xend import XendDomain
 
     try:
@@ -162,6 +162,13 @@ def save(fd, dominfo, network, live, dst, checkpoint=False, node=-1):
         if checkpoint:
             dominfo.resumeDomain()
         else:
+            if live and sock != None:
+                try:
+                    sock.shutdown(2)
+                except:
+                    pass
+                sock.close()
+
             dominfo.destroy()
             dominfo.testDeviceComplete()
         try:
