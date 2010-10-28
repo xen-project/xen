@@ -2748,7 +2748,7 @@ class XendDomainInfo:
                 return map(lambda x: x[0], sorted(enumerate(nodeload), key=lambda x:x[1]))
 
             info = xc.numainfo()
-            if info['max_node_index'] > 0:
+            if info['max_node_index'] > 0 and  XendCPUPool.number_of_pools() < 2:
                 node_memory_list = info['node_memfree']
                 node_to_cpu = []
                 for i in range(0, info['max_node_index'] + 1):

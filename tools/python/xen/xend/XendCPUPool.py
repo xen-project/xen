@@ -883,6 +883,11 @@ class XendCPUPool(XendBase):
     lookup_pool = classmethod(lookup_pool)
 
 
+    def number_of_pools(cls):
+        return len(xc.cpupool_getinfo())
+
+    number_of_pools = classmethod(number_of_pools)
+
     def _cpu_number_to_ref(cls, number):
         node = XendNode.instance()
         for cpu_ref in node.get_host_cpu_refs():
