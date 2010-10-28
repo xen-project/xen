@@ -30,7 +30,12 @@ SUBDIRS-y += libfsimage
 SUBDIRS-$(LIBXENAPI_BINDINGS) += libxen
 SUBDIRS-$(CONFIG_Linux) += fs-back
 SUBDIRS-$(CONFIG_NetBSD) += fs-back
+
+# do not recurse in to a dir we are about to delete
+ifneq "$(MAKECMDGOALS)" "distclean"
 SUBDIRS-$(CONFIG_IOEMU) += ioemu-dir
+endif
+
 SUBDIRS-y += xenpmd
 SUBDIRS-y += libxl
 SUBDIRS-y += remus
@@ -68,6 +73,7 @@ clean: subdirs-clean
 
 .PHONY: distclean
 distclean: subdirs-distclean
+	rm -rf ioemu-dir ioemu-remote
 
 ifneq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
 IOEMU_CONFIGURE_CROSS ?= --cpu=$(XEN_TARGET_ARCH) \
