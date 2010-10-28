@@ -9,7 +9,7 @@ all: gx_all.a
 
 .PHONY: clean
 clean:
-	rm -rf gx_all.a *.o 
+	rm -rf gx_all.a *.o .*.d
 
 
 #%.o: %.c $(GX_HDRS) Makefile

@@ -32,5 +32,5 @@ xen-headers:
 
 .PHONY: clean
 clean:
-	rm -rf xen xg_all.a $(XG_OBJS) 
+	rm -rf xen xg_all.a $(XG_OBJS)  .*.d
 
