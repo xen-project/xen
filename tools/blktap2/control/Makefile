@@ -73,6 +73,7 @@ install: $(IBIN) $(LIB_STATIC) $(LIB_SHARED)
 
 clean:
 	rm -f $(OBJS) $(PICS) $(DEPS) $(IBIN) $(LIB_STATIC) $(LIB_SHARED)
+	rm -f $(LIBNAME).so $(LIBSONAME)
 	rm -f *~
 
 .PHONY: all build clean install
