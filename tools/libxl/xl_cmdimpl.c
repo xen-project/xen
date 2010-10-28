@@ -2395,12 +2395,47 @@ static void destroy_domain(char *p)
     if (rc) { fprintf(stderr,"destroy failed (rc=%d)\n.",rc); exit(-1); }
 }
 
-static void shutdown_domain(char *p)
+static void shutdown_domain(char *p, int wait)
 {
     int rc;
+
     find_domain(p);
     rc=libxl_domain_shutdown(&ctx, domid, 0);
     if (rc) { fprintf(stderr,"shutdown failed (rc=%d)\n.",rc);exit(-1); }
+
+    if (wait) {
+        libxl_waiter waiter;
+        int fd;
+
+        libxl_wait_for_domain_death(&ctx, domid, &waiter);
+
+        libxl_get_wait_fd(&ctx, &fd);
+
+        while (wait) {
+            fd_set rfds;
+            libxl_event event;
+            libxl_dominfo info;
+
+            FD_ZERO(&rfds);
+            FD_SET(fd, &rfds);
+
+            if (!select(fd + 1, &rfds, NULL, NULL, NULL))
+                continue;
+
+            libxl_get_event(&ctx, &event);
+
+            if (event.type == LIBXL_EVENT_DOMAIN_DEATH) {
+                if (libxl_event_get_domain_death_info(&ctx, domid, &event, &info) < 0)
+                    continue;
+
+                LOG("Domain %d is dead", domid);
+                wait = 0;
+            }
+
+            libxl_free_event(&event);
+        }
+        libxl_free_waiter(&waiter);
+    }
 }
 
 static void reboot_domain(char *p)
@@ -3220,13 +3255,17 @@ int main_destroy(int argc, char **argv)
 int main_shutdown(int argc, char **argv)
 {
     int opt;
+    int wait = 0;
     char *p;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
+    while ((opt = getopt(argc, argv, "hw")) != -1) {
         switch (opt) {
         case 'h':
             help("shutdown");
             return 0;
+        case 'w':
+            wait = 1;
+            break;
         default:
             fprintf(stderr, "option not supported\n");
             break;
@@ -3239,7 +3278,7 @@ int main_shutdown(int argc, char **argv)
 
     p = argv[optind];
 
-    shutdown_domain(p);
+    shutdown_domain(p, wait);
     return 0;
 }
 
