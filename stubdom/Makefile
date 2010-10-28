@@ -200,7 +200,7 @@ cross-ocaml: $(OCAML_STAMPFILE)
 $(OCAML_STAMPFILE): ocaml-$(XEN_TARGET_ARCH)/.dirstamp
 	cd ocaml-$(XEN_TARGET_ARCH) &&  ./configure -prefix $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf \
 		-no-pthread -no-shared-libs -no-tk -no-curses \
-		-cc "$(CC) -U_FORTIFY_SOURCE -fno-stack-protector"
+		-cc "$(CC) -U_FORTIFY_SOURCE -fno-stack-protector -mno-red-zone"
 	$(foreach i,$(MINIOS_HASNOT),sed -i 's,^\(#define HAS_$(i)\),//\1,' ocaml-$(XEN_TARGET_ARCH)/config/s.h ; )
 	$(CROSS_MAKE) -C ocaml-$(XEN_TARGET_ARCH) world
 	$(CROSS_MAKE) -C ocaml-$(XEN_TARGET_ARCH) opt
