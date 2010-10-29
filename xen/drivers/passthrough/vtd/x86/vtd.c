@@ -28,6 +28,7 @@
 #include "../iommu.h"
 #include "../dmar.h"
 #include "../vtd.h"
+#include "../extern.h"
 
 /*
  * iommu_inclusive_mapping: when set, all memory below 4GB is included in dom0

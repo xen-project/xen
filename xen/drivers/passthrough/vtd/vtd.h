@@ -23,6 +23,10 @@
 
 #include <xen/iommu.h>
 
+#define INTEL_IGD_DEV            0
+#define MAP_ME_PHANTOM_FUNC      1
+#define UNMAP_ME_PHANTOM_FUNC    0
+
 /* Accomodate both IOAPIC and IOSAPIC. */
 struct IO_xAPIC_route_entry {
     __u32   vector      :  8,
@@ -96,19 +100,5 @@ struct msi_msg_remap_entry {
     u32	address_hi;	/* high 32 bits of msi message address */
     u32	data;		/* msi message data */
 };
-
-unsigned int get_cache_line_size(void);
-void cacheline_flush(char *);
-void flush_all_cache(void);
-u64 alloc_pgtable_maddr(struct acpi_drhd_unit *drhd, unsigned long npages);
-void free_pgtable_maddr(u64 maddr);
-void *map_vtd_domain_page(u64 maddr);
-void unmap_vtd_domain_page(void *va);
-
-void iommu_flush_cache_entry(void *addr, unsigned int size);
-void iommu_flush_cache_page(void *addr, unsigned long npages);
-
-int iommu_alloc(struct acpi_drhd_unit *drhd);
-void iommu_free(struct acpi_drhd_unit *drhd);
 
 #endif // _VTD_H_

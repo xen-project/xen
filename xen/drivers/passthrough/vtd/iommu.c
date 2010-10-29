@@ -44,7 +44,6 @@
 #endif
 
 int nr_iommus;
-static bool_t rwbf_quirk;
 
 static void setup_dom0_devices(struct domain *d);
 static void setup_dom0_rmrr(struct domain *d);
@@ -482,16 +481,36 @@ static int inline iommu_flush_iotlb_global(struct iommu *iommu,
     int flush_non_present_entry, int flush_dev_iotlb)
 {
     struct iommu_flush *flush = iommu_get_flush(iommu);
-    return flush->iotlb(iommu, 0, 0, 0, DMA_TLB_GLOBAL_FLUSH,
+    int status;
+
+    /* apply platform specific errata workarounds */
+    vtd_ops_preamble_quirk(iommu);
+
+    status = flush->iotlb(iommu, 0, 0, 0, DMA_TLB_GLOBAL_FLUSH,
                         flush_non_present_entry, flush_dev_iotlb);
+
+    /* undo platform specific errata workarounds */
+    vtd_ops_postamble_quirk(iommu);
+
+    return status;
 }
 
 static int inline iommu_flush_iotlb_dsi(struct iommu *iommu, u16 did,
     int flush_non_present_entry, int flush_dev_iotlb)
 {
     struct iommu_flush *flush = iommu_get_flush(iommu);
-    return flush->iotlb(iommu, did, 0, 0, DMA_TLB_DSI_FLUSH,
+    int status;
+
+    /* apply platform specific errata workarounds */
+    vtd_ops_preamble_quirk(iommu);
+
+    status =  flush->iotlb(iommu, did, 0, 0, DMA_TLB_DSI_FLUSH,
                         flush_non_present_entry, flush_dev_iotlb);
+
+    /* undo platform specific errata workarounds */
+    vtd_ops_postamble_quirk(iommu);
+
+    return status;
 }
 
 static int inline get_alignment(u64 base, unsigned int size)
@@ -515,6 +534,7 @@ static int inline iommu_flush_iotlb_psi(
 {
     unsigned int align;
     struct iommu_flush *flush = iommu_get_flush(iommu);
+    int status;
 
     ASSERT(!(addr & (~PAGE_MASK_4K)));
     ASSERT(pages > 0);
@@ -535,8 +555,16 @@ static int inline iommu_flush_iotlb_psi(
     addr >>= PAGE_SHIFT_4K + align;
     addr <<= PAGE_SHIFT_4K + align;
 
-    return flush->iotlb(iommu, did, addr, align, DMA_TLB_PSI_FLUSH,
+    /* apply platform specific errata workarounds */
+    vtd_ops_preamble_quirk(iommu);
+
+    status = flush->iotlb(iommu, did, addr, align, DMA_TLB_PSI_FLUSH,
                         flush_non_present_entry, flush_dev_iotlb);
+
+    /* undo platform specific errata workarounds */
+    vtd_ops_postamble_quirk(iommu);
+
+    return status;
 }
 
 static void iommu_flush_all(void)
@@ -689,24 +717,13 @@ static int iommu_set_root_entry(struct iommu *iommu)
     return 0;
 }
 
-#define GGC 0x52
-#define GGC_MEMORY_VT_ENABLED  (0x8 << 8)
-static int is_igd_vt_enabled(void)
-{
-    unsigned short ggc;
-
-    /* integrated graphics on Intel platforms is located at 0:2.0 */
-    ggc = pci_conf_read16(0, 2, 0, GGC);
-    return ( ggc & GGC_MEMORY_VT_ENABLED ? 1 : 0 );
-}
-
 static void iommu_enable_translation(struct acpi_drhd_unit *drhd)
 {
     u32 sts;
     unsigned long flags;
     struct iommu *iommu = drhd->iommu;
 
-    if ( !is_igd_vt_enabled() && is_igd_drhd(drhd) ) 
+    if ( is_igd_drhd(drhd) && !is_igd_vt_enabled_quirk() ) 
     {
         if ( force_iommu )
             panic("BIOS did not enable IGD for VT properly, crash Xen for security purpose!\n");
@@ -717,6 +734,9 @@ static void iommu_enable_translation(struct acpi_drhd_unit *drhd)
             return;
         }
     }
+
+    /* apply platform specific errata workarounds */
+    vtd_ops_preamble_quirk(iommu);
 
     if ( iommu_verbose )
         dprintk(VTDPREFIX,
@@ -730,6 +750,9 @@ static void iommu_enable_translation(struct acpi_drhd_unit *drhd)
                   (sts & DMA_GSTS_TES), sts);
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 
+    /* undo platform specific errata workarounds */
+    vtd_ops_postamble_quirk(iommu);
+
     /* Disable PMRs when VT-d engine takes effect per spec definition */
     disable_pmr(iommu);
 }
@@ -739,6 +762,9 @@ static void iommu_disable_translation(struct iommu *iommu)
     u32 sts;
     unsigned long flags;
 
+    /* apply platform specific errata workarounds */
+    vtd_ops_preamble_quirk(iommu);
+
     spin_lock_irqsave(&iommu->register_lock, flags);
     sts = dmar_readl(iommu->reg, DMAR_GSTS_REG);
     dmar_writel(iommu->reg, DMAR_GCMD_REG, sts & (~DMA_GCMD_TE));
@@ -747,6 +773,9 @@ static void iommu_disable_translation(struct iommu *iommu)
     IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
                   !(sts & DMA_GSTS_TES), sts);
     spin_unlock_irqrestore(&iommu->register_lock, flags);
+
+    /* undo platform specific errata workarounds */
+    vtd_ops_postamble_quirk(iommu);
 }
 
 enum faulttype {
@@ -1090,6 +1119,7 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
         xfree(iommu);
         return -ENOMEM;
     }
+    iommu->intel->drhd = drhd;
 
     iommu->reg = map_to_nocache_virt(nr_iommus, drhd->address);
     iommu->index = nr_iommus++;
@@ -1222,7 +1252,7 @@ static void intel_iommu_dom0_init(struct domain *d)
     }
 }
 
-static int domain_context_mapping_one(
+int domain_context_mapping_one(
     struct domain *domain,
     struct iommu *iommu,
     u8 bus, u8 devfn)
@@ -1324,6 +1354,8 @@ static int domain_context_mapping_one(
 
     unmap_vtd_domain_page(context_entries);
 
+    me_wifi_quirk(domain, bus, devfn, MAP_ME_PHANTOM_FUNC);
+
     return 0;
 }
 
@@ -1405,7 +1437,7 @@ static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
     return ret;
 }
 
-static int domain_context_unmap_one(
+int domain_context_unmap_one(
     struct domain *domain,
     struct iommu *iommu,
     u8 bus, u8 devfn)
@@ -1452,6 +1484,8 @@ static int domain_context_unmap_one(
 
     spin_unlock(&iommu->lock);
     unmap_vtd_domain_page(context_entries);
+
+    me_wifi_quirk(domain, bus, devfn, UNMAP_ME_PHANTOM_FUNC);
 
     return 0;
 }
@@ -1951,19 +1985,6 @@ static void setup_dom0_rmrr(struct domain *d)
     spin_unlock(&pcidevs_lock);
 }
 
-static void __init platform_quirks(void)
-{
-    u32 id;
-
-    /* Mobile 4 Series Chipset neglects to set RWBF capability. */
-    id = pci_conf_read32(0, 0, 0, 0);
-    if ( id == 0x2a408086 )
-    {
-        dprintk(XENLOG_INFO VTDPREFIX, "DMAR: Forcing write-buffer flush\n");
-        rwbf_quirk = 1;
-    }
-}
-
 int __init intel_vtd_setup(void)
 {
     struct acpi_drhd_unit *drhd;
@@ -1972,7 +1993,7 @@ int __init intel_vtd_setup(void)
     if ( list_empty(&acpi_drhd_units) )
         return -ENODEV;
 
-    platform_quirks();
+    platform_quirks_init();
 
     irq_to_iommu = xmalloc_array(struct iommu*, nr_irqs);
     BUG_ON(!irq_to_iommu);

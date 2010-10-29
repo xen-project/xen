@@ -501,6 +501,7 @@ struct intel_iommu {
     struct qi_ctrl qi_ctrl;
     struct ir_ctrl ir_ctrl;
     struct iommu_flush flush;
+    struct acpi_drhd_unit *drhd;
 };
 
 #endif
