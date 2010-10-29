@@ -4533,7 +4533,7 @@ static int handle_iomem_range(unsigned long s, unsigned long e, void *p)
         ent.size = (uint64_t)(s - ctxt->s) << PAGE_SHIFT;
         ent.type = E820_RESERVED;
         buffer = guest_handle_cast(ctxt->map.buffer, e820entry_t);
-        if ( __copy_to_guest_offset(buffer, ctxt->n, &ent, 1) < 0 )
+        if ( __copy_to_guest_offset(buffer, ctxt->n, &ent, 1) )
             return -EFAULT;
         ctxt->n++;
     }
@@ -4750,7 +4750,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
             }
             if ( ctxt.map.nr_entries <= ctxt.n + (e820.nr_map - i) )
                 return -EINVAL;
-            if ( __copy_to_guest_offset(buffer, ctxt.n, e820.map + i, 1) < 0 )
+            if ( __copy_to_guest_offset(buffer, ctxt.n, e820.map + i, 1) )
                 return -EFAULT;
             ctxt.s = PFN_UP(e820.map[i].addr + e820.map[i].size);
         }

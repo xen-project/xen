@@ -116,8 +116,7 @@ int cpufreq_limit_change(unsigned int cpu)
         !processor_pminfo[cpu])
         return -ENODEV;
 
-    if ((perf->platform_limit < 0) || 
-        (perf->platform_limit >= perf->state_count))
+    if (perf->platform_limit >= perf->state_count)
         return -EINVAL;
 
     memcpy(&policy, data, sizeof(struct cpufreq_policy)); 

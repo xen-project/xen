@@ -2102,7 +2102,7 @@ x86_emulate(
             _regs.edx = (uint32_t)(((int32_t)_regs.eax < 0) ? -1 : 0);
             break;
         case 8:
-            _regs.edx = (_regs.eax < 0) ? -1 : 0;
+            _regs.edx = ((int64_t)_regs.eax < 0) ? -1 : 0;
             break;
         }
         break;
