@@ -146,7 +146,7 @@ static void apei_post_unmap(paddr_t paddr, unsigned long size)
 
 	spin_lock_irqsave(&apei_iomaps_lock, flags);
 	map = __apei_find_iomap(paddr, size);
-	if (!map);
+	if (!map)
 		return;
 
 	list_del(&map->list);
