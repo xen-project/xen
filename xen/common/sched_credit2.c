@@ -1135,6 +1135,7 @@ make_runq_map(struct csched_private *prv)
     prv->runq_count = 1;
     prv->rqd[0].cpu_min = 0;
     prv->rqd[0].cpu_max = NR_CPUS;
+    memset(prv->runq_map, 0, sizeof(prv->runq_map));
 }
 
 static int
