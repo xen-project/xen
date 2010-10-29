@@ -77,6 +77,8 @@ class GrubDiskPart(object):
             self._part = val
             return
         val = val.replace("(", "").replace(")", "")
+        if val[:5] == "msdos":
+            val = val[5:]
         self._part = int(val)
     part = property(get_part, set_part)
 
