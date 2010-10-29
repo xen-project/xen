@@ -84,11 +84,7 @@ extern unsigned int PAGE_HYPERVISOR_NOCACHE;
 
 #endif
 
-#define pte_read_atomic(ptep) ({                              \
-    intpte_t __pte = *(ptep), __npte;                         \
-    while ( (__npte = cmpxchg(ptep, __pte, __pte)) != __pte ) \
-        __pte = __npte;                                       \
-    __pte; })
+#define pte_read_atomic(ptep) cmpxchg(ptep, 0, 0)
 #define pte_write_atomic(ptep, pte) do {                      \
     intpte_t __pte = *(ptep), __npte;                         \
     while ( (__npte = cmpxchg(ptep, __pte, (pte))) != __pte ) \
