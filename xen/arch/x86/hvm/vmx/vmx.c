@@ -2203,20 +2203,19 @@ static int vmx_handle_eoi_write(void)
 static int vmx_handle_xsetbv(u64 new_bv)
 {
     struct vcpu *v = current;
-    u64 xfeature = (((u64)xfeature_high) << 32) | xfeature_low;
     struct segment_register sreg;
 
     hvm_get_segment_register(v, x86_seg_ss, &sreg);
     if ( sreg.attr.fields.dpl != 0 )
         goto err;
 
-    if ( ((new_bv ^ xfeature) & ~xfeature) || !(new_bv & 1) )
+    if ( ((new_bv ^ xfeature_mask) & ~xfeature_mask) || !(new_bv & 1) )
         goto err;
 
-    if ( (xfeature & XSTATE_YMM & new_bv) && !(new_bv & XSTATE_SSE) )
+    if ( (xfeature_mask & XSTATE_YMM & new_bv) && !(new_bv & XSTATE_SSE) )
         goto err;
 
-    v->arch.hvm_vcpu.xfeature_mask = new_bv;
+    v->arch.hvm_vcpu.xcr0 = new_bv;
     set_xcr0(new_bv);
     return 0;
 err:

@@ -142,7 +142,7 @@ void restore_fpu(struct vcpu *v)
 u32 xsave_cntxt_size;
 
 /* A 64-bit bitmask of the XSAVE/XRSTOR features supported by processor. */
-u32 xfeature_low, xfeature_high;
+u64 xfeature_mask;
 
 void xsave_init(void)
 {
@@ -186,15 +186,15 @@ void xsave_init(void)
          * We know FP/SSE and YMM about eax, and nothing about edx at present.
          */
         xsave_cntxt_size = ebx;
-        xfeature_low = eax & XCNTXT_MASK;
-        xfeature_high = 0;
-        printk("%s: using cntxt_size: 0x%x and states: %08x:%08x\n",
-            __func__, xsave_cntxt_size, xfeature_high, xfeature_low);
+        xfeature_mask = eax + ((u64)edx << 32);
+        xfeature_mask &= XCNTXT_MASK;
+        printk("%s: using cntxt_size: 0x%x and states: 0x%"PRIx64"\n",
+            __func__, xsave_cntxt_size, xfeature_mask);
     }
     else
     {
         BUG_ON(xsave_cntxt_size != ebx);
-        BUG_ON(xfeature_low != (eax & XCNTXT_MASK));
+        BUG_ON(xfeature_mask != (xfeature_mask & XCNTXT_MASK));
     }
 }
 
@@ -202,11 +202,7 @@ void xsave_init_save_area(void *save_area)
 {
     memset(save_area, 0, xsave_cntxt_size);
 
-    ((u16 *)save_area)[0] = 0x37f;   /* FCW   */
-    ((u16 *)save_area)[2] = 0xffff;  /* FTW   */
     ((u32 *)save_area)[6] = 0x1f80;  /* MXCSR */
-
-    ((struct xsave_struct *)save_area)->xsave_hdr.xstate_bv = XSTATE_FP_SSE;
 }
 
 /*

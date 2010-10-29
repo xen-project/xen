@@ -56,7 +56,7 @@ struct hvm_vcpu {
      * #NM handler, we XRSTOR the states we XSAVE-ed;
      */
     void *xsave_area;
-    uint64_t xfeature_mask;
+    uint64_t xcr0;
 
     struct vlapic       vlapic;
     s64                 cache_tsc_offset;

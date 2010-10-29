@@ -814,7 +814,7 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
         xsave_init_save_area(xsave_area);
         v->arch.hvm_vcpu.xsave_area = xsave_area;
-        v->arch.hvm_vcpu.xfeature_mask = XSTATE_FP_SSE;
+        v->arch.hvm_vcpu.xcr0 = XSTATE_FP_SSE;
     }
 
     if ( (rc = vlapic_init(v)) != 0 )
@@ -2002,8 +2002,8 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         if ( cpu_has_xsave )
         {
             /*
-             *  Fix up "Processor Extended State Enumeration". We only present
-             *  FPU(bit0) and SSE(bit1) to HVM guest for now.
+             *  Fix up "Processor Extended State Enumeration". We present
+             *  FPU(bit0), SSE(bit1) and YMM(bit2) to HVM guest for now.
              */
             *eax = *ebx = *ecx = *edx = 0;
             switch ( count )
@@ -2012,14 +2012,14 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                 /* No HW defines bit in EDX yet. */
                 *edx = 0;
                 /* We only enable the features we know. */
-                *eax = xfeature_low;
+                *eax = xfeature_mask;
                 /* FP/SSE + XSAVE.HEADER + YMM. */
                 *ecx = 512 + 64 + ((*eax & XSTATE_YMM) ? XSTATE_YMM_SIZE : 0);
                 /* Let ebx equal ecx at present. */
                 *ebx = *ecx;
                 break;
             case 2:
-                if ( !(xfeature_low & XSTATE_YMM) )
+                if ( !(xfeature_mask & XSTATE_YMM) )
                     break;
                 *eax = XSTATE_YMM_SIZE;
                 *ebx = XSTATE_YMM_OFFSET;

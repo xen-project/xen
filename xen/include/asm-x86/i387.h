@@ -15,7 +15,7 @@
 #include <asm/processor.h>
 
 extern unsigned int xsave_cntxt_size;
-extern u32 xfeature_low, xfeature_high;
+extern u64 xfeature_mask;
 
 extern void xsave_init(void);
 extern void xsave_init_save_area(void *save_area);
@@ -49,45 +49,41 @@ struct xsave_struct
 #define REX_PREFIX
 #endif
 
-static inline void xsetbv(u32 index, u64 xfeature_mask)
+static inline void xsetbv(u32 index, u64 xfeatures)
 {
-    u32 hi = xfeature_mask >> 32;
-    u32 lo = (u32)xfeature_mask;
+    u32 hi = xfeatures >> 32;
+    u32 lo = (u32)xfeatures;
 
     asm volatile (".byte 0x0f,0x01,0xd1" :: "c" (index),
             "a" (lo), "d" (hi));
 }
 
-static inline void set_xcr0(u64 xfeature_mask)
+static inline void set_xcr0(u64 xfeatures)
 {
-    xsetbv(XCR_XFEATURE_ENABLED_MASK, xfeature_mask);
+    xsetbv(XCR_XFEATURE_ENABLED_MASK, xfeatures);
 }
 
 static inline void xsave(struct vcpu *v)
 {
-    u64 mask = v->arch.hvm_vcpu.xfeature_mask | XSTATE_FP_SSE;
-    u32 lo = mask, hi = mask >> 32;
     struct xsave_struct *ptr;
 
     ptr =(struct xsave_struct *)v->arch.hvm_vcpu.xsave_area;
 
     asm volatile (".byte " REX_PREFIX "0x0f,0xae,0x27"
         :
-        : "a" (lo), "d" (hi), "D"(ptr)
+        : "a" (-1), "d" (-1), "D"(ptr)
         : "memory");
 }
 
 static inline void xrstor(struct vcpu *v)
 {
-    u64 mask = v->arch.hvm_vcpu.xfeature_mask | XSTATE_FP_SSE;
-    u32 lo = mask, hi = mask >> 32;
     struct xsave_struct *ptr;
 
     ptr =(struct xsave_struct *)v->arch.hvm_vcpu.xsave_area;
 
     asm volatile (".byte " REX_PREFIX "0x0f,0xae,0x2f"
         :
-        : "m" (*ptr), "a" (lo), "d" (hi), "D"(ptr));
+        : "m" (*ptr), "a" (-1), "d" (-1), "D"(ptr));
 }
 
 extern void init_fpu(void);
@@ -117,9 +113,9 @@ static inline void setup_fpu(struct vcpu *v)
             if ( !v->fpu_initialised )
                 v->fpu_initialised = 1;
 
-            set_xcr0(v->arch.hvm_vcpu.xfeature_mask | XSTATE_FP_SSE);
+            set_xcr0(v->arch.hvm_vcpu.xcr0 | XSTATE_FP_SSE);
             xrstor(v);
-            set_xcr0(v->arch.hvm_vcpu.xfeature_mask);
+            set_xcr0(v->arch.hvm_vcpu.xcr0);
         }
         else
         {
