@@ -39,6 +39,7 @@
 #define TRC_CSCHED2_CREDIT_BURN TRC_SCHED_CLASS + 3
 #define TRC_CSCHED2_CREDIT_ADD  TRC_SCHED_CLASS + 4
 #define TRC_CSCHED2_TICKLE_CHECK TRC_SCHED_CLASS + 5
+#define TRC_CSCHED2_TICKLE       TRC_SCHED_CLASS + 6
 
 /*
  * WARNING: This is still in an experimental phase.  Status and work can be found at the
@@ -169,6 +170,8 @@ struct csched_runqueue_data {
     struct list_head svc;  /* List of all vcpus assigned to this runqueue */
     int max_weight;
     int cpu_min, cpu_max;  /* Range of physical cpus this runqueue runs */
+    cpumask_t idle,        /* Currently idle */
+        tickled;           /* Another cpu in the queue is already targeted for this one */
 };
 
 /*
@@ -328,7 +331,7 @@ runq_tickle(const struct scheduler *ops, unsigned int cpu, struct csched_vcpu *n
     int i, ipid=-1;
     s_time_t lowest=(1<<30);
     struct csched_runqueue_data *rqd = RQD(ops, cpu);
-    cpumask_t *online;
+    cpumask_t *online, mask;
 
     d2printk("rqt d%dv%d cd%dv%d\n",
              new->vcpu->domain->domain_id,
@@ -337,61 +340,74 @@ runq_tickle(const struct scheduler *ops, unsigned int cpu, struct csched_vcpu *n
              current->vcpu_id);
 
     online = CSCHED_CPUONLINE(per_cpu(cpupool, cpu));
-    /* Find the cpu in this queue group that has the lowest credits */
-    for ( i=rqd->cpu_min ; i < rqd->cpu_max ; i++ )
+
+    /* Get a mask of idle, but not tickled */
+    cpus_andnot(mask, rqd->idle, rqd->tickled);
+    
+    /* If it's not empty, choose one */
+    if ( !cpus_empty(mask) )
+    {
+        ipid=first_cpu(mask);
+        goto tickle;
+    }
+
+    /* Otherwise, look for the non-idle cpu with the lowest credit,
+     * skipping cpus which have been tickled but not scheduled yet */
+    cpus_andnot(mask, *online, rqd->idle);
+    cpus_andnot(mask, mask, rqd->tickled);
+
+    for_each_cpu_mask(i, mask)
     {
         struct csched_vcpu * cur;
 
-        /* Skip cpus that aren't online */
-        if ( !cpu_isset(i, *online) )
-            continue;
-
         cur = CSCHED_VCPU(per_cpu(schedule_data, i).curr);
 
-        /* FIXME: keep track of idlers, chose from the mask */
-        if ( is_idle_vcpu(cur->vcpu) )
+        BUG_ON(is_idle_vcpu(cur->vcpu));
+
+        /* Update credits for current to see if we want to preempt */
+        burn_credits(rqd, cur, now);
+
+        if ( cur->credit < lowest )
         {
             ipid = i;
-            lowest = CSCHED_IDLE_CREDIT;
-            break;
+            lowest = cur->credit;
         }
-        else
-        {
-            /* Update credits for current to see if we want to preempt */
-            burn_credits(rqd, cur, now);
 
-            if ( cur->credit < lowest )
-            {
-                ipid = i;
-                lowest = cur->credit;
-            }
-
-            /* TRACE */ {
-                struct {
-                    unsigned dom:16,vcpu:16;
-                    unsigned credit;
-                } d;
-                d.dom = cur->vcpu->domain->domain_id;
-                d.vcpu = cur->vcpu->vcpu_id;
-                d.credit = cur->credit;
-                trace_var(TRC_CSCHED2_TICKLE_CHECK, 1,
-                          sizeof(d),
-                          (unsigned char *)&d);
-            }
+        /* TRACE */ {
+            struct {
+                unsigned dom:16,vcpu:16;
+                unsigned credit;
+            } d;
+            d.dom = cur->vcpu->domain->domain_id;
+            d.vcpu = cur->vcpu->vcpu_id;
+            d.credit = cur->credit;
+            trace_var(TRC_CSCHED2_TICKLE_CHECK, 0,
+                      sizeof(d),
+                      (unsigned char *)&d);
         }
     }
 
-    if ( ipid != -1 )
-    {
-        int cdiff = lowest - new->credit;
+    /* At this point, if ipid is non-zero, see if the lowest is lower than new */
+    if ( ipid == -1 || lowest > new->credit )
+        goto no_tickle;
 
-        if ( lowest == CSCHED_IDLE_CREDIT || cdiff < 0 ) {
-            d2printk("si %d\n", ipid);
-            cpu_raise_softirq(ipid, SCHEDULE_SOFTIRQ);
-        }
-        else
-            /* FIXME: Wake up later? */;
+tickle:
+    BUG_ON(ipid == -1);
+
+    /* TRACE */ {
+        struct {
+            unsigned cpu:8;
+        } d;
+        d.cpu = ipid;
+        trace_var(TRC_CSCHED2_TICKLE, 0,
+                  sizeof(d),
+                  (unsigned char *)&d);
     }
+    cpu_set(ipid, rqd->tickled);
+    cpu_raise_softirq(ipid, SCHEDULE_SOFTIRQ);
+
+no_tickle:
+    return;
 }
 
 /*
@@ -915,6 +931,10 @@ csched_schedule(
 
     /* Protected by runqueue lock */
 
+    /* Clear "tickled" bit now that we've been scheduled */
+    if ( cpu_isset(cpu, rqd->tickled) )
+        cpu_clear(cpu, rqd->tickled);
+
     /* Update credits */
     burn_credits(rqd, scurr, now);
 
@@ -972,21 +992,19 @@ csched_schedule(
     if ( !is_idle_vcpu(snext->vcpu) && snext->credit <= CSCHED_CREDIT_RESET )
         reset_credit(ops, cpu, now);
 
-#if 0
     /*
      * Update idlers mask if necessary. When we're idling, other CPUs
      * will tickle us when they get extra work.
      */
     if ( is_idle_vcpu(snext->vcpu) )
     {
-        if ( !cpu_isset(cpu, csched_priv.idlers) )
-            cpu_set(cpu, csched_priv.idlers);
+        if ( !cpu_isset(cpu, rqd->idle) )
+            cpu_set(cpu, rqd->idle);
     }
-    else if ( cpu_isset(cpu, csched_priv.idlers) )
+    else if ( cpu_isset(cpu, rqd->idle) )
     {
-        cpu_clear(cpu, csched_priv.idlers);
+        cpu_clear(cpu, rqd->idle);
     }
-#endif
 
     ret.migrated = 0;
 
@@ -1103,6 +1121,8 @@ csched_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
 
     spin_lock_irqsave(&prv->lock, flags);
     prv->ncpus--;
+    cpu_clear(cpu, RQD(ops, cpu)->idle);
+    printk("Removing cpu %d to pool (%d total)\n", cpu, prv->ncpus);
     spin_unlock_irqrestore(&prv->lock, flags);
 
     return;
@@ -1123,6 +1143,8 @@ csched_alloc_pdata(const struct scheduler *ops, int cpu)
 
     spin_lock_irqsave(&prv->lock, flags);
     prv->ncpus++;
+    cpu_set(cpu, RQD(ops, cpu)->idle);
+    printk("Adding cpu %d to pool (%d total)\n", cpu, prv->ncpus);
     spin_unlock_irqrestore(&prv->lock, flags);
 
     return (void *)1;
