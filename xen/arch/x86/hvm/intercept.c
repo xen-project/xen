@@ -237,11 +237,28 @@ void register_io_handler(
 
     handler->hdl_list[num].addr = addr;
     handler->hdl_list[num].size = size;
-    if ( (handler->hdl_list[num].type = type) == HVM_PORTIO )
-        handler->hdl_list[num].action.portio = action;
-    else
-        handler->hdl_list[num].action.mmio = action;
+    handler->hdl_list[num].action.ptr = action;
     handler->num_slot++;
+}
+
+void unregister_io_handler(
+    struct domain *d, unsigned long addr, unsigned long size, int type)
+{
+    struct hvm_io_handler *handler = &d->arch.hvm_domain.io_handler;
+    int i;
+
+    for ( i = 0; i < handler->num_slot; i++ )
+        if ( (handler->hdl_list[i].addr == addr) &&
+             (handler->hdl_list[i].size == size) &&
+             (handler->hdl_list[i].type == type) )
+            goto found;
+    return;
+
+ found:
+    memcpy(&handler->hdl_list[i],
+           &handler->hdl_list[handler->num_slot-1],
+           sizeof(struct io_handler));
+    handler->num_slot--;
 }
 
 /*
