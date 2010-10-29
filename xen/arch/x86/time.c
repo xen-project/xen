@@ -662,26 +662,28 @@ static void __init init_platform_timer(void)
            freq_string(pts->frequency), pts->name);
 }
 
-void cstate_restore_tsc(void)
+u64 stime2tsc(s_time_t stime)
 {
     struct cpu_time *t;
     struct time_scale sys_to_tsc;
     s_time_t stime_delta;
-    u64 new_tsc;
-
-    if ( boot_cpu_has(X86_FEATURE_NONSTOP_TSC) )
-        return;
 
     t = &this_cpu(cpu_time);
     sys_to_tsc = scale_reciprocal(t->tsc_scale);
 
-    stime_delta = read_platform_stime() - t->stime_master_stamp;
+    stime_delta = stime - t->stime_local_stamp;
     if ( stime_delta < 0 )
         stime_delta = 0;
 
-    new_tsc = t->local_tsc_stamp + scale_delta(stime_delta, &sys_to_tsc);
+    return t->local_tsc_stamp + scale_delta(stime_delta, &sys_to_tsc);
+}
 
-    write_tsc(new_tsc);
+void cstate_restore_tsc(void)
+{
+    if ( boot_cpu_has(X86_FEATURE_NONSTOP_TSC) )
+        return;
+
+    write_tsc(stime2tsc(read_platform_stime()));
 }
 
 /***************************************************************************

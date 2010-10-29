@@ -74,4 +74,6 @@ int host_tsc_is_safe(void);
 void cpuid_time_leaf(uint32_t sub_idx, unsigned int *eax, unsigned int *ebx,
                       unsigned int *ecx, unsigned int *edx);
 
+u64 stime2tsc(s_time_t stime);
+
 #endif /* __X86_TIME_H__ */

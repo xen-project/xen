@@ -10,7 +10,6 @@
 
 #include <xen/types.h>
 #include <public/xen.h>
-#include <asm/time.h>
 
 extern int init_xen_time(void);
 extern void cstate_restore_tsc(void);
@@ -18,6 +17,7 @@ extern void cstate_restore_tsc(void);
 extern unsigned long cpu_khz;
 
 struct domain;
+struct vcpu;
 
 /*
  * System Time
@@ -62,6 +62,8 @@ extern void do_settime(
 extern void send_timer_event(struct vcpu *v);
 
 void domain_set_time_offset(struct domain *d, int32_t time_offset_seconds);
+
+#include <asm/time.h>
 
 #endif /* __XEN_TIME_H__ */
 

@@ -38,6 +38,15 @@
 #include <mach_apic.h>
 #include <io_ports.h>
 
+#define APIC_TIMER_MODE_ONESHOT         (0 << 17)
+#define APIC_TIMER_MODE_PERIODIC        (1 << 17)
+#define APIC_TIMER_MODE_TSC_DEADLINE    (2 << 17)
+#define APIC_TIMER_MODE_MASK            (3 << 17)
+
+static int tdt_enabled __read_mostly;
+static int tdt_enable __initdata = 1;
+boolean_param("tdt", tdt_enable);
+
 static struct {
     int active;
     /* r/w apic fields */
@@ -1198,6 +1207,13 @@ static void __setup_APIC_LVTT(unsigned int clocks)
     lvtt_value = /*APIC_LVT_TIMER_PERIODIC |*/ LOCAL_TIMER_VECTOR;
     if (!APIC_INTEGRATED(ver))
         lvtt_value |= SET_APIC_TIMER_BASE(APIC_TIMER_BASE_DIV);
+
+    if ( tdt_enabled )
+    {
+        lvtt_value &= (~APIC_TIMER_MODE_MASK);
+        lvtt_value |= APIC_TIMER_MODE_TSC_DEADLINE;
+    }
+
     apic_write_around(APIC_LVTT, lvtt_value);
 
     tmp_value = apic_read(APIC_TDCR);
@@ -1311,6 +1327,12 @@ void __init setup_boot_APIC_clock(void)
 
     calibrate_APIC_clock();
 
+    if ( tdt_enable && boot_cpu_has(X86_FEATURE_TSC_DEADLINE) )
+    {
+        printk(KERN_DEBUG "TSC deadline timer enabled\n");
+        tdt_enabled = 1;
+    }
+
     setup_APIC_timer();
     
     local_irq_restore(flags);
@@ -1359,6 +1381,12 @@ int reprogram_timer(s_time_t timeout)
     /* No local APIC: timer list is polled via the PIT interrupt. */
     if ( !cpu_has_apic )
         return 1;
+
+    if ( tdt_enabled )
+    {
+        wrmsrl(MSR_IA32_TSC_DEADLINE, timeout ? stime2tsc(timeout) : 0);
+        return 1;
+    }
 
     if ( timeout && ((expire = timeout - NOW()) > 0) )
         apic_tmict = min_t(u64, (bus_scale * expire) >> 18, UINT_MAX);
