@@ -202,7 +202,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         if ( copy_from_guest(&eoi, arg, 1) != 0 )
             break;
         ret = -EINVAL;
-        if ( eoi.irq < 0 || eoi.irq >= v->domain->nr_pirqs )
+        if ( eoi.irq >= v->domain->nr_pirqs )
             break;
         if ( v->domain->arch.pirq_eoi_map )
             evtchn_unmask(v->domain->pirq_to_evtchn[eoi.irq]);
