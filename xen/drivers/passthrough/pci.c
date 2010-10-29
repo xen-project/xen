@@ -445,6 +445,10 @@ int __init scan_pci_devices(void)
                         spin_unlock(&pcidevs_lock);
                         return -EINVAL;
                 }
+
+                if ( !func && !(pci_conf_read8(bus, dev, func,
+                                               PCI_HEADER_TYPE) & 0x80) )
+                    break;
             }
         }
     }
