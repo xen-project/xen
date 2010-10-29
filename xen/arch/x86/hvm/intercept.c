@@ -241,24 +241,18 @@ void register_io_handler(
     handler->num_slot++;
 }
 
-void unregister_io_handler(
-    struct domain *d, unsigned long addr, unsigned long size, int type)
+void relocate_io_handler(
+    struct domain *d, unsigned long old_addr, unsigned long new_addr,
+    unsigned long size, int type)
 {
     struct hvm_io_handler *handler = &d->arch.hvm_domain.io_handler;
     int i;
 
     for ( i = 0; i < handler->num_slot; i++ )
-        if ( (handler->hdl_list[i].addr == addr) &&
+        if ( (handler->hdl_list[i].addr == old_addr) &&
              (handler->hdl_list[i].size == size) &&
              (handler->hdl_list[i].type == type) )
-            goto found;
-    return;
-
- found:
-    memcpy(&handler->hdl_list[i],
-           &handler->hdl_list[handler->num_slot-1],
-           sizeof(struct io_handler));
-    handler->num_slot--;
+            handler->hdl_list[i].addr = new_addr;
 }
 
 /*

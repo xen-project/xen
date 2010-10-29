@@ -2991,6 +2991,9 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                     rc = -EINVAL;
 
                 break;
+            case HVM_PARAM_ACPI_IOPORTS_LOCATION:
+                rc = pmtimer_change_ioport(d, a.value);
+                break;
             }
 
             if ( rc == 0 )

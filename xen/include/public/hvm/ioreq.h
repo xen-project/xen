@@ -100,11 +100,21 @@ struct buffered_piopage {
 };
 #endif /* defined(__ia64__) */
 
-#define ACPI_PM1A_EVT_BLK_ADDRESS           0x0000000000001f40
-#define ACPI_PM1A_CNT_BLK_ADDRESS           (ACPI_PM1A_EVT_BLK_ADDRESS + 0x04)
-#define ACPI_PM_TMR_BLK_ADDRESS             (ACPI_PM1A_EVT_BLK_ADDRESS + 0x08)
-#define ACPI_GPE0_BLK_ADDRESS               (ACPI_PM_TMR_BLK_ADDRESS + 0x20)
-#define ACPI_GPE0_BLK_LEN                   0x08
+/*
+ * Value used by old qemu-dm, there have been replace to match
+ * the QEMU BIOS.
+ */
+#define ACPI_PM1A_EVT_BLK_ADDRESS_OLD 0x1f40
+#define ACPI_PM1A_CNT_BLK_ADDRESS_OLD (ACPI_PM1A_EVT_BLK_ADDRESS_OLD + 0x04)
+#define ACPI_PM_TMR_BLK_ADDRESS_OLD   (ACPI_PM1A_EVT_BLK_ADDRESS_OLD + 0x08)
+#define ACPI_GPE0_BLK_ADDRESS_OLD     (ACPI_PM_TMR_BLK_ADDRESS_OLD + 0x20)
+#define ACPI_GPE0_BLK_LEN_OLD         0x08
+
+#define ACPI_PM1A_EVT_BLK_ADDRESS     0xb000
+#define ACPI_PM1A_CNT_BLK_ADDRESS     (ACPI_PM1A_EVT_BLK_ADDRESS + 0x04)
+#define ACPI_PM_TMR_BLK_ADDRESS       (ACPI_PM1A_EVT_BLK_ADDRESS + 0x08)
+#define ACPI_GPE0_BLK_ADDRESS         0xafe0
+#define ACPI_GPE0_BLK_LEN             0x04
 
 #endif /* _IOREQ_H_ */
 

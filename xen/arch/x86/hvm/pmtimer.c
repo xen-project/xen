@@ -22,8 +22,12 @@
 #include <asm/hvm/io.h>
 #include <asm/hvm/support.h>
 #include <asm/acpi.h> /* for hvm_acpi_power_button prototype */
+#include <public/hvm/params.h>
 
 /* Slightly more readable port I/O addresses for the registers we intercept */
+#define PM1a_STS_ADDR_OLD (ACPI_PM1A_EVT_BLK_ADDRESS_OLD)
+#define PM1a_EN_ADDR_OLD  (ACPI_PM1A_EVT_BLK_ADDRESS_OLD + 2)
+#define TMR_VAL_ADDR_OLD  (ACPI_PM_TMR_BLK_ADDRESS_OLD)
 #define PM1a_STS_ADDR (ACPI_PM1A_EVT_BLK_ADDRESS)
 #define PM1a_EN_ADDR  (ACPI_PM1A_EVT_BLK_ADDRESS + 2)
 #define TMR_VAL_ADDR  (ACPI_PM_TMR_BLK_ADDRESS)
@@ -155,16 +159,20 @@ static int handle_evt_io(
             switch ( addr )
             {
                 /* PM1a_STS register bits are write-to-clear */
+            case PM1a_STS_ADDR_OLD:
             case PM1a_STS_ADDR:
                 s->pm.pm1a_sts &= ~byte;
                 break;
+            case PM1a_STS_ADDR_OLD + 1:
             case PM1a_STS_ADDR + 1:
                 s->pm.pm1a_sts &= ~(byte << 8);
                 break;
                 
+            case PM1a_EN_ADDR_OLD:
             case PM1a_EN_ADDR:
                 s->pm.pm1a_en = (s->pm.pm1a_en & 0xff00) | byte;
                 break;
+            case PM1a_EN_ADDR_OLD + 1:
             case PM1a_EN_ADDR + 1:
                 s->pm.pm1a_en = (s->pm.pm1a_en & 0xff) | (byte << 8);
                 break;
@@ -272,6 +280,35 @@ static int pmtimer_load(struct domain *d, hvm_domain_context_t *h)
 HVM_REGISTER_SAVE_RESTORE(PMTIMER, pmtimer_save, pmtimer_load, 
                           1, HVMSR_PER_DOM);
 
+int pmtimer_change_ioport(struct domain *d, unsigned int version)
+{
+    unsigned int old_version;
+
+    /* Check that version is changing. */
+    old_version = d->arch.hvm_domain.params[HVM_PARAM_ACPI_IOPORTS_LOCATION];
+    if ( version == old_version )
+        return 0;
+
+    /* Only allow changes between versions 0 and 1. */
+    if ( (version ^ old_version) != 1 )
+        return -EINVAL;
+
+    if ( version == 1 )
+    {
+        /* Moving from version 0 to version 1. */
+        relocate_portio_handler(d, TMR_VAL_ADDR_OLD, TMR_VAL_ADDR, 4);
+        relocate_portio_handler(d, PM1a_STS_ADDR_OLD, PM1a_STS_ADDR, 4);
+    }
+    else
+    {
+        /* Moving from version 1 to version 0. */
+        relocate_portio_handler(d, TMR_VAL_ADDR, TMR_VAL_ADDR_OLD, 4);
+        relocate_portio_handler(d, PM1a_STS_ADDR, PM1a_STS_ADDR_OLD, 4);
+    }
+
+    return 0;
+}
+
 void pmtimer_init(struct vcpu *v)
 {
     PMTState *s = &v->domain->arch.hvm_domain.pl_time.vpmt;
@@ -284,8 +321,8 @@ void pmtimer_init(struct vcpu *v)
 
     /* Intercept port I/O (need two handlers because PM1a_CNT is between
      * PM1a_EN and TMR_VAL and is handled by qemu) */
-    register_portio_handler(v->domain, TMR_VAL_ADDR, 4, handle_pmt_io);
-    register_portio_handler(v->domain, PM1a_STS_ADDR, 4, handle_evt_io);
+    register_portio_handler(v->domain, TMR_VAL_ADDR_OLD, 4, handle_pmt_io);
+    register_portio_handler(v->domain, PM1a_STS_ADDR_OLD, 4, handle_evt_io);
 
     /* Set up callback to fire SCIs when the MSB of TMR_VAL changes */
     init_timer(&s->timer, pmt_timer_callback, s, v->processor);

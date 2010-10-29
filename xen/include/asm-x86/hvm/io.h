@@ -69,8 +69,9 @@ int hvm_io_intercept(ioreq_t *p, int type);
 void register_io_handler(
     struct domain *d, unsigned long addr, unsigned long size,
     void *action, int type);
-void unregister_io_handler(
-    struct domain *d, unsigned long addr, unsigned long size, int type);
+void relocate_io_handler(
+    struct domain *d, unsigned long old_addr, unsigned long new_addr,
+    unsigned long size, int type);
 
 static inline int hvm_portio_intercept(ioreq_t *p)
 {
@@ -92,10 +93,11 @@ static inline void register_portio_handler(
     register_io_handler(d, addr, size, action, HVM_PORTIO);
 }
 
-static inline void unregister_portio_handler(
-    struct domain *d, unsigned long addr, unsigned long size)
+static inline void relocate_portio_handler(
+    struct domain *d, unsigned long old_addr, unsigned long new_addr,
+    unsigned long size)
 {
-    unregister_io_handler(d, addr, size, HVM_PORTIO);
+    relocate_io_handler(d, old_addr, new_addr, size, HVM_PORTIO);
 }
 
 static inline void register_buffered_io_handler(

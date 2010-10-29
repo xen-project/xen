@@ -179,6 +179,7 @@ void rtc_update_clock(struct domain *d);
 void pmtimer_init(struct vcpu *v);
 void pmtimer_deinit(struct domain *d);
 void pmtimer_reset(struct domain *d);
+int pmtimer_change_ioport(struct domain *d, unsigned int version);
 
 void hpet_init(struct vcpu *v);
 void hpet_deinit(struct domain *d);

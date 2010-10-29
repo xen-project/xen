@@ -113,6 +113,17 @@
 #define HVM_PARAM_CONSOLE_PFN    17
 #define HVM_PARAM_CONSOLE_EVTCHN 18
 
-#define HVM_NR_PARAMS          19
+/*
+ * Select location of ACPI PM1a and TMR control blocks. Currently two locations
+ * are supported, specified by version 0 or 1 in this parameter:
+ *   - 0: default, use the old addresses
+ *        PM1A_EVT == 0x1f40; PM1A_CNT == 0x1f44; PM_TMR == 0x1f48
+ *   - 1: use the new default qemu addresses
+ *        PM1A_EVT == 0xb000; PM1A_CNT == 0xb004; PM_TMR == 0xb008
+ * You can find these address definitions in <hvm/ioreq.h>
+ */
+#define HVM_PARAM_ACPI_IOPORTS_LOCATION 19
+
+#define HVM_NR_PARAMS          20
 
 #endif /* __XEN_PUBLIC_HVM_PARAMS_H__ */
