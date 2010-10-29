@@ -40,6 +40,8 @@
 #define TRC_CSCHED2_CREDIT_ADD  TRC_SCHED_CLASS + 4
 #define TRC_CSCHED2_TICKLE_CHECK TRC_SCHED_CLASS + 5
 #define TRC_CSCHED2_TICKLE       TRC_SCHED_CLASS + 6
+#define TRC_CSCHED2_CREDIT_RESET TRC_SCHED_CLASS + 7
+#define TRC_CSCHED2_SCHED_TASKLET TRC_SCHED_CLASS + 8
 
 /*
  * WARNING: This is still in an experimental phase.  Status and work can be found at the
@@ -306,7 +308,7 @@ runq_insert(const struct scheduler *ops, unsigned int cpu, struct csched_vcpu *s
         d.dom = svc->vcpu->domain->domain_id;
         d.vcpu = svc->vcpu->vcpu_id;
         d.pos = pos;
-        trace_var(TRC_CSCHED2_RUNQ_POS, 1,
+        trace_var(TRC_CSCHED2_RUNQ_POS, 0,
                   sizeof(d),
                   (unsigned char *)&d);
     }
@@ -421,7 +423,11 @@ static void reset_credit(const struct scheduler *ops, int cpu, s_time_t now)
     {
         struct csched_vcpu * svc = list_entry(iter, struct csched_vcpu, rqd_elem);
 
+        int start_credit;
+
         BUG_ON( is_idle_vcpu(svc->vcpu) );
+
+        start_credit = svc->credit;
 
         /* "Clip" credits to max carryover */
         if ( svc->credit > CSCHED_CARRYOVER_MAX )
@@ -430,7 +436,19 @@ static void reset_credit(const struct scheduler *ops, int cpu, s_time_t now)
         svc->credit += CSCHED_CREDIT_INIT;
         svc->start_time = now;
 
-        /* FIXME: Trace credit */
+        /* TRACE */ {
+            struct {
+                unsigned dom:16,vcpu:16;
+                unsigned credit_start, credit_end;
+            } d;
+            d.dom = svc->vcpu->domain->domain_id;
+            d.vcpu = svc->vcpu->vcpu_id;
+            d.credit_start = start_credit;
+            d.credit_end = svc->credit;
+            trace_var(TRC_CSCHED2_CREDIT_RESET, 0,
+                      sizeof(d),
+                      (unsigned char *)&d);
+        }
     }
 
     /* No need to resort runqueue, as everyone's order should be the same. */
@@ -476,7 +494,7 @@ void burn_credits(struct csched_runqueue_data *rqd, struct csched_vcpu *svc, s_t
         d.vcpu = svc->vcpu->vcpu_id;
         d.credit = svc->credit;
         d.delta = delta;
-        trace_var(TRC_CSCHED2_CREDIT_BURN, 1,
+        trace_var(TRC_CSCHED2_CREDIT_BURN, 0,
                   sizeof(d),
                   (unsigned char *)&d);
     }
@@ -961,16 +979,21 @@ csched_schedule(
     else
         snext = __runq_elem(runq->next);
 
+    if ( tasklet_work_scheduled )
+        trace_var(TRC_CSCHED2_SCHED_TASKLET, 0, 0,  NULL);
+
     if ( !is_idle_vcpu(current) && vcpu_runnable(current) )
     {
         /* If the current vcpu is runnable, and has higher credit
          * than the next on the runqueue, and isn't being preempted
          * by a tasklet, run him again.
          * Otherwise, set him for delayed runq add. */
+
         if ( !tasklet_work_scheduled && scurr->credit > snext->credit)
             snext = scurr;
         else
             set_bit(__CSFLAG_delayed_runq_add, &scurr->flags);
+        
     }
 
     if ( snext != scurr && !is_idle_vcpu(snext->vcpu) )
@@ -1095,12 +1118,17 @@ csched_dump(const struct scheduler *ops)
 
     /* FIXME: Locking! */
 
-    printk("active vcpus:\n");
+    printk("Domain info:\n");
     loop = 0;
     list_for_each( iter_sdom, &prv->sdom )
     {
         struct csched_dom *sdom;
         sdom = list_entry(iter_sdom, struct csched_dom, sdom_elem);
+
+       printk("\tDomain: %d w %d v %d\n\t", 
+              sdom->dom->domain_id, 
+              sdom->weight, 
+              sdom->nr_vcpus);
 
         list_for_each( iter_svc, &sdom->vcpu )
         {
