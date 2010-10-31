@@ -2101,9 +2101,11 @@ x86_emulate(
         case 4:
             _regs.edx = (uint32_t)(((int32_t)_regs.eax < 0) ? -1 : 0);
             break;
+#ifdef __x86_64__ /* compile warning with some versions of 32-bit gcc */
         case 8:
             _regs.edx = ((int64_t)_regs.eax < 0) ? -1 : 0;
             break;
+#endif
         }
         break;
 
