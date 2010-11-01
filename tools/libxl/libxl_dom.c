@@ -22,6 +22,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/time.h> /* for struct timeval */
+#include <sys/stat.h> /* for stat */
 #include <unistd.h> /* for sleep(2) */
 
 #include <xenctrl.h>
