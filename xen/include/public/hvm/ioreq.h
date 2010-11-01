@@ -101,20 +101,31 @@ struct buffered_piopage {
 #endif /* defined(__ia64__) */
 
 /*
- * Value used by old qemu-dm, there have been replace to match
- * the QEMU BIOS.
+ * ACPI Control/Event register locations. Location is controlled by a 
+ * version number in HVM_PARAM_ACPI_IOPORTS_LOCATION.
  */
-#define ACPI_PM1A_EVT_BLK_ADDRESS_OLD 0x1f40
-#define ACPI_PM1A_CNT_BLK_ADDRESS_OLD (ACPI_PM1A_EVT_BLK_ADDRESS_OLD + 0x04)
-#define ACPI_PM_TMR_BLK_ADDRESS_OLD   (ACPI_PM1A_EVT_BLK_ADDRESS_OLD + 0x08)
-#define ACPI_GPE0_BLK_ADDRESS_OLD     (ACPI_PM_TMR_BLK_ADDRESS_OLD + 0x20)
-#define ACPI_GPE0_BLK_LEN_OLD         0x08
 
-#define ACPI_PM1A_EVT_BLK_ADDRESS     0xb000
-#define ACPI_PM1A_CNT_BLK_ADDRESS     (ACPI_PM1A_EVT_BLK_ADDRESS + 0x04)
-#define ACPI_PM_TMR_BLK_ADDRESS       (ACPI_PM1A_EVT_BLK_ADDRESS + 0x08)
-#define ACPI_GPE0_BLK_ADDRESS         0xafe0
-#define ACPI_GPE0_BLK_LEN             0x04
+/* Version 0 (default): Traditional Xen locations. */
+#define ACPI_PM1A_EVT_BLK_ADDRESS_V0 0x1f40
+#define ACPI_PM1A_CNT_BLK_ADDRESS_V0 (ACPI_PM1A_EVT_BLK_ADDRESS_V0 + 0x04)
+#define ACPI_PM_TMR_BLK_ADDRESS_V0   (ACPI_PM1A_EVT_BLK_ADDRESS_V0 + 0x08)
+#define ACPI_GPE0_BLK_ADDRESS_V0     (ACPI_PM_TMR_BLK_ADDRESS_V0 + 0x20)
+#define ACPI_GPE0_BLK_LEN_V0         0x08
+
+/* Version 1: Locations preferred by modern Qemu. */
+#define ACPI_PM1A_EVT_BLK_ADDRESS_V1 0xb000
+#define ACPI_PM1A_CNT_BLK_ADDRESS_V1 (ACPI_PM1A_EVT_BLK_ADDRESS_V1 + 0x04)
+#define ACPI_PM_TMR_BLK_ADDRESS_V1   (ACPI_PM1A_EVT_BLK_ADDRESS_V1 + 0x08)
+#define ACPI_GPE0_BLK_ADDRESS_V1     0xafe0
+#define ACPI_GPE0_BLK_LEN_V1         0x04
+
+/* Compatibility definitions for the default location (version 0). */
+#define ACPI_PM1A_EVT_BLK_ADDRESS    ACPI_PM1A_EVT_BLK_ADDRESS_V0
+#define ACPI_PM1A_CNT_BLK_ADDRESS    ACPI_PM1A_CNT_BLK_ADDRESS_V0
+#define ACPI_PM_TMR_BLK_ADDRESS      ACPI_PM_TMR_BLK_ADDRESS_V0
+#define ACPI_GPE0_BLK_ADDRESS        ACPI_GPE0_BLK_ADDRESS_V0
+#define ACPI_GPE0_BLK_LEN            ACPI_GPE0_BLK_LEN_V0
+
 
 #endif /* _IOREQ_H_ */
 

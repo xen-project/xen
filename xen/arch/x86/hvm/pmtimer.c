@@ -25,12 +25,12 @@
 #include <public/hvm/params.h>
 
 /* Slightly more readable port I/O addresses for the registers we intercept */
-#define PM1a_STS_ADDR_OLD (ACPI_PM1A_EVT_BLK_ADDRESS_OLD)
-#define PM1a_EN_ADDR_OLD  (ACPI_PM1A_EVT_BLK_ADDRESS_OLD + 2)
-#define TMR_VAL_ADDR_OLD  (ACPI_PM_TMR_BLK_ADDRESS_OLD)
-#define PM1a_STS_ADDR (ACPI_PM1A_EVT_BLK_ADDRESS)
-#define PM1a_EN_ADDR  (ACPI_PM1A_EVT_BLK_ADDRESS + 2)
-#define TMR_VAL_ADDR  (ACPI_PM_TMR_BLK_ADDRESS)
+#define PM1a_STS_ADDR_V0 (ACPI_PM1A_EVT_BLK_ADDRESS_V0)
+#define PM1a_EN_ADDR_V0  (ACPI_PM1A_EVT_BLK_ADDRESS_V0 + 2)
+#define TMR_VAL_ADDR_V0  (ACPI_PM_TMR_BLK_ADDRESS_V0)
+#define PM1a_STS_ADDR_V1 (ACPI_PM1A_EVT_BLK_ADDRESS_V1)
+#define PM1a_EN_ADDR_V1  (ACPI_PM1A_EVT_BLK_ADDRESS_V1 + 2)
+#define TMR_VAL_ADDR_V1  (ACPI_PM_TMR_BLK_ADDRESS_V1)
 
 /* The interesting bits of the PM1a_STS register */
 #define TMR_STS    (1 << 0)
@@ -146,12 +146,17 @@ static int handle_evt_io(
     uint32_t addr, data, byte;
     int i;
 
+    addr = port -
+        ((v->domain->arch.hvm_domain.params[
+            HVM_PARAM_ACPI_IOPORTS_LOCATION] == 0) ?
+         PM1a_STS_ADDR_V0 : PM1a_STS_ADDR_V1);
+
     spin_lock(&s->lock);
 
     if ( dir == IOREQ_WRITE )
     {
         /* Handle this I/O one byte at a time */
-        for ( i = bytes, addr = port, data = *val;
+        for ( i = bytes, data = *val;
               i > 0;
               i--, addr++, data >>= 8 )
         {
@@ -159,24 +164,18 @@ static int handle_evt_io(
             switch ( addr )
             {
                 /* PM1a_STS register bits are write-to-clear */
-            case PM1a_STS_ADDR_OLD:
-            case PM1a_STS_ADDR:
+            case 0 /* PM1a_STS_ADDR */:
                 s->pm.pm1a_sts &= ~byte;
                 break;
-            case PM1a_STS_ADDR_OLD + 1:
-            case PM1a_STS_ADDR + 1:
+            case 1 /* PM1a_STS_ADDR + 1 */:
                 s->pm.pm1a_sts &= ~(byte << 8);
                 break;
-                
-            case PM1a_EN_ADDR_OLD:
-            case PM1a_EN_ADDR:
+            case 2 /* PM1a_EN_ADDR */:
                 s->pm.pm1a_en = (s->pm.pm1a_en & 0xff00) | byte;
                 break;
-            case PM1a_EN_ADDR_OLD + 1:
-            case PM1a_EN_ADDR + 1:
+            case 3 /* PM1a_EN_ADDR + 1 */:
                 s->pm.pm1a_en = (s->pm.pm1a_en & 0xff) | (byte << 8);
                 break;
-                
             default:
                 gdprintk(XENLOG_WARNING, 
                          "Bad ACPI PM register write: %x bytes (%x) at %x\n", 
@@ -189,7 +188,7 @@ static int handle_evt_io(
     else /* p->dir == IOREQ_READ */
     {
         data = s->pm.pm1a_sts | (((uint32_t) s->pm.pm1a_en) << 16);
-        data >>= 8 * (port - PM1a_STS_ADDR);
+        data >>= 8 * addr;
         if ( bytes == 1 ) data &= 0xff;
         else if ( bytes == 2 ) data &= 0xffff;
         *val = data;
@@ -296,14 +295,14 @@ int pmtimer_change_ioport(struct domain *d, unsigned int version)
     if ( version == 1 )
     {
         /* Moving from version 0 to version 1. */
-        relocate_portio_handler(d, TMR_VAL_ADDR_OLD, TMR_VAL_ADDR, 4);
-        relocate_portio_handler(d, PM1a_STS_ADDR_OLD, PM1a_STS_ADDR, 4);
+        relocate_portio_handler(d, TMR_VAL_ADDR_V0, TMR_VAL_ADDR_V1, 4);
+        relocate_portio_handler(d, PM1a_STS_ADDR_V0, PM1a_STS_ADDR_V1, 4);
     }
     else
     {
         /* Moving from version 1 to version 0. */
-        relocate_portio_handler(d, TMR_VAL_ADDR, TMR_VAL_ADDR_OLD, 4);
-        relocate_portio_handler(d, PM1a_STS_ADDR, PM1a_STS_ADDR_OLD, 4);
+        relocate_portio_handler(d, TMR_VAL_ADDR_V1, TMR_VAL_ADDR_V0, 4);
+        relocate_portio_handler(d, PM1a_STS_ADDR_V1, PM1a_STS_ADDR_V0, 4);
     }
 
     return 0;
@@ -321,8 +320,8 @@ void pmtimer_init(struct vcpu *v)
 
     /* Intercept port I/O (need two handlers because PM1a_CNT is between
      * PM1a_EN and TMR_VAL and is handled by qemu) */
-    register_portio_handler(v->domain, TMR_VAL_ADDR_OLD, 4, handle_pmt_io);
-    register_portio_handler(v->domain, PM1a_STS_ADDR_OLD, 4, handle_evt_io);
+    register_portio_handler(v->domain, TMR_VAL_ADDR_V0, 4, handle_pmt_io);
+    register_portio_handler(v->domain, PM1a_STS_ADDR_V0, 4, handle_evt_io);
 
     /* Set up callback to fire SCIs when the MSB of TMR_VAL changes */
     init_timer(&s->timer, pmt_timer_callback, s, v->processor);
