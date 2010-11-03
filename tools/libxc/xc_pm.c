@@ -46,8 +46,8 @@ int xc_pm_get_pxstat(xc_interface *xch, int cpuid, struct xc_px_stat *pxpt)
 {
     DECLARE_SYSCTL;
     /* Sizes unknown until xc_pm_get_max_px */
-    DECLARE_NAMED_HYPERCALL_BOUNCE(trans, &pxpt->trans_pt, 0, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
-    DECLARE_NAMED_HYPERCALL_BOUNCE(pt, &pxpt->pt, 0, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
+    DECLARE_NAMED_HYPERCALL_BOUNCE(trans, pxpt->trans_pt, 0, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
+    DECLARE_NAMED_HYPERCALL_BOUNCE(pt, pxpt->pt, 0, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
 
     int max_px, ret;
 
@@ -124,8 +124,8 @@ int xc_pm_get_max_cx(xc_interface *xch, int cpuid, int *max_cx)
 int xc_pm_get_cxstat(xc_interface *xch, int cpuid, struct xc_cx_stat *cxpt)
 {
     DECLARE_SYSCTL;
-    DECLARE_NAMED_HYPERCALL_BOUNCE(triggers, &cxpt->triggers, 0, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
-    DECLARE_NAMED_HYPERCALL_BOUNCE(residencies, &cxpt->residencies, 0, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
+    DECLARE_NAMED_HYPERCALL_BOUNCE(triggers, cxpt->triggers, 0, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
+    DECLARE_NAMED_HYPERCALL_BOUNCE(residencies, cxpt->residencies, 0, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
     int max_cx, ret;
 
     if( !cxpt || !(cxpt->triggers) || !(cxpt->residencies) )
