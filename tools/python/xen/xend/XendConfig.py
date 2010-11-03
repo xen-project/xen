@@ -689,9 +689,14 @@ class XendConfig(dict):
         if not cfg["vcpus_params"].has_key("weight"):
             cfg["vcpus_params"]["weight"] = \
                 int(sxp.child_value(sxp_cfg, "cpu_weight", 256))
+        else:
+            cfg["vcpus_params"]["weight"] = int(cfg["vcpus_params"]["weight"])
+           
         if not cfg["vcpus_params"].has_key("cap"):
             cfg["vcpus_params"]["cap"] = \
                 int(sxp.child_value(sxp_cfg, "cpu_cap", 0))
+        else:
+            cfg["vcpus_params"]["cap"] = int(cfg["vcpus_params"]["cap"])
 
         # Only extract options we know about.
         extract_keys = LEGACY_UNSUPPORTED_BY_XENAPI_CFG + \
