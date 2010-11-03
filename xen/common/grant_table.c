@@ -147,13 +147,13 @@ static int __get_paged_frame(unsigned long gfn, unsigned long *frame, int readon
     struct p2m_domain *p2m;
     p2m_type_t p2mt;
     mfn_t mfn;
-    
+
     p2m = p2m_get_hostp2m(rd);
     if ( readonly )
         mfn = gfn_to_mfn(p2m, gfn, &p2mt);
     else
         mfn = gfn_to_mfn_unshare(p2m, gfn, &p2mt, 1);
-    
+
     if ( p2m_is_valid(p2mt) ) {
         *frame = mfn_x(mfn);
         if ( p2m_is_paged(p2mt) )
@@ -167,7 +167,7 @@ static int __get_paged_frame(unsigned long gfn, unsigned long *frame, int readon
 #else
     *frame = readonly ? gmfn_to_mfn(rd, gfn) : gfn_to_mfn_private(rd, gfn);
 #endif
-    
+
     return rc;
 }
 
@@ -565,7 +565,7 @@ __gnttab_map_grant_ref(
             gfn = sha1 ? sha1->frame : sha2->full_page.frame;
             rc = __get_paged_frame(gfn, &frame, !!(op->flags & GNTMAP_readonly), rd);
             if ( rc != GNTST_okay )
-	         goto unlock_out;
+                goto unlock_out;
             act->gfn = gfn;
             act->domid = ld->domain_id;
             act->frame = frame;
@@ -1852,7 +1852,7 @@ __acquire_grant_for_copy(
             gfn = sha1->frame;
             rc = __get_paged_frame(gfn, &grant_frame, readonly, rd);
             if ( rc != GNTST_okay )
-		goto unlock_out;
+                goto unlock_out;
             act->gfn = gfn;
             is_sub_page = 0;
             trans_page_off = 0;
@@ -1864,7 +1864,7 @@ __acquire_grant_for_copy(
             gfn = sha2->full_page.frame;
             rc = __get_paged_frame(gfn, &grant_frame, readonly, rd);
             if ( rc != GNTST_okay )
-		    goto unlock_out;
+                goto unlock_out;
             act->gfn = gfn;
             is_sub_page = 0;
             trans_page_off = 0;
@@ -1876,7 +1876,7 @@ __acquire_grant_for_copy(
             gfn = sha2->sub_page.frame;
             rc = __get_paged_frame(gfn, &grant_frame, readonly, rd);
             if ( rc != GNTST_okay )
-		    goto unlock_out;
+                goto unlock_out;
             act->gfn = gfn;
             is_sub_page = 1;
             trans_page_off = sha2->sub_page.page_off;
@@ -1973,9 +1973,9 @@ __gnttab_copy(
     else
     {
 #ifdef CONFIG_X86
-	rc = __get_paged_frame(op->source.u.gmfn, &s_frame, 1, sd);
-	if ( rc != GNTST_okay )
-		goto error_out;
+        rc = __get_paged_frame(op->source.u.gmfn, &s_frame, 1, sd);
+        if ( rc != GNTST_okay )
+            goto error_out;
 #else
         s_frame = gmfn_to_mfn(sd, op->source.u.gmfn);        
 #endif
@@ -2012,9 +2012,9 @@ __gnttab_copy(
     else
     {
 #ifdef CONFIG_X86
-	rc = __get_paged_frame(op->dest.u.gmfn, &d_frame, 0, dd);
-	if ( rc != GNTST_okay )
-		goto error_out;
+        rc = __get_paged_frame(op->dest.u.gmfn, &d_frame, 0, dd);
+        if ( rc != GNTST_okay )
+            goto error_out;
 #else
         d_frame = gmfn_to_mfn(dd, op->dest.u.gmfn);
 #endif
