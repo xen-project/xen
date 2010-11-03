@@ -110,9 +110,9 @@ static unsigned long p2m_type_to_flags(p2m_type_t t, mfn_t mfn)
 }
 
 #if P2M_AUDIT
-static void audit_p2m(struct p2m_domain *p2m);
+static void audit_p2m(struct p2m_domain *p2m, int strict_m2p);
 #else
-# define audit_p2m(_p2m) do { (void)(_p2m); } while(0)
+# define audit_p2m(_p2m, _m2p) do { (void)(_p2m),(_m2p); } while (0)
 #endif /* P2M_AUDIT */
 
 // Find the next level's P2M entry, checking for out-of-range gfn's...
@@ -662,7 +662,7 @@ p2m_pod_decrease_reservation(struct domain *d,
     steal_for_cache =  ( p2m->pod.entry_count > p2m->pod.count );
 
     p2m_lock(p2m);
-    audit_p2m(p2m);
+    audit_p2m(p2m, 1);
 
     if ( unlikely(d->is_dying) )
         goto out_unlock;
@@ -754,7 +754,7 @@ out_entry_check:
     }
 
 out_unlock:
-    audit_p2m(p2m);
+    audit_p2m(p2m, 1);
     p2m_unlock(p2m);
 
 out:
@@ -1122,7 +1122,7 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
          */
         set_p2m_entry(p2m, gfn_aligned, _mfn(POPULATE_ON_DEMAND_MFN), 9,
                       p2m_populate_on_demand);
-        audit_p2m(p2m);
+        audit_p2m(p2m, 1);
         p2m_unlock(p2m);
         return 0;
     }
@@ -1228,7 +1228,7 @@ static int p2m_pod_check_and_populate(struct p2m_domain *p2m, unsigned long gfn,
     if ( do_locking )
         p2m_lock(p2m);
 
-    audit_p2m(p2m);
+    audit_p2m(p2m, 1);
 
     /* Check to make sure this is still PoD */
     if ( p2m_flags_to_type(l1e_get_flags(*p2m_entry)) != p2m_populate_on_demand )
@@ -1240,7 +1240,7 @@ static int p2m_pod_check_and_populate(struct p2m_domain *p2m, unsigned long gfn,
 
     r = p2m_pod_demand_populate(p2m, gfn, order, q);
 
-    audit_p2m(p2m);
+    audit_p2m(p2m, 1);
     if ( do_locking )
         p2m_unlock(p2m);
 
@@ -1914,7 +1914,10 @@ void p2m_final_teardown(struct domain *d)
 }
 
 #if P2M_AUDIT
-static void audit_p2m(struct p2m_domain *p2m)
+/* strict_m2p == 0 allows m2p mappings that don'#t match the p2m. 
+ * It's intended for add_to_physmap, when the domain has just been allocated 
+ * new mfns that might have stale m2p entries from previous owners */
+static void audit_p2m(struct p2m_domain *p2m, int strict_m2p)
 {
     struct page_info *page;
     struct domain *od;
@@ -1964,7 +1967,7 @@ static void audit_p2m(struct p2m_domain *p2m)
             continue;
         }
 
-        if ( gfn == 0x55555555 )
+        if ( gfn == 0x55555555 || gfn == 0x5555555555555555 )
         {
             orphans_d++;
             //P2M_PRINTK("orphaned guest page: mfn=%#lx has debug gfn\n",
@@ -1980,7 +1983,7 @@ static void audit_p2m(struct p2m_domain *p2m)
         }
 
         p2mfn = gfn_to_mfn_type_p2m(p2m, gfn, &type, p2m_query);
-        if ( mfn_x(p2mfn) != mfn )
+        if ( strict_m2p && mfn_x(p2mfn) != mfn )
         {
             mpbad++;
             P2M_PRINTK("map mismatch mfn %#lx -> gfn %#lx -> mfn %#lx"
@@ -2170,8 +2173,11 @@ static void audit_p2m(struct p2m_domain *p2m)
     //    P2M_PRINTK("p2m audit found %lu orphans (%lu inval %lu debug)\n",
     //                   orphans_i + orphans_d, orphans_i, orphans_d,
     if ( mpbad | pmbad )
+    {
         P2M_PRINTK("p2m audit found %lu odd p2m, %lu bad m2p entries\n",
                    pmbad, mpbad);
+        WARN();
+    }
 }
 #endif /* P2M_AUDIT */
 
@@ -2210,9 +2216,9 @@ guest_physmap_remove_entry(struct p2m_domain *p2m, unsigned long gfn,
                           unsigned long mfn, unsigned int page_order)
 {
     p2m_lock(p2m);
-    audit_p2m(p2m);
+    audit_p2m(p2m, 1);
     p2m_remove_page(p2m, gfn, mfn, page_order);
-    audit_p2m(p2m);
+    audit_p2m(p2m, 1);
     p2m_unlock(p2m);
 }
 
@@ -2258,7 +2264,7 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
         return rc;
 
     p2m_lock(p2m);
-    audit_p2m(p2m);
+    audit_p2m(p2m, 1);
 
     P2M_DEBUG("mark pod gfn=%#lx\n", gfn);
 
@@ -2291,7 +2297,7 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
         BUG_ON(p2m->pod.entry_count < 0);
     }
 
-    audit_p2m(p2m);
+    audit_p2m(p2m, 1);
     p2m_unlock(p2m);
 
 out:
@@ -2334,7 +2340,7 @@ guest_physmap_add_entry(struct p2m_domain *p2m, unsigned long gfn,
         return rc;
 
     p2m_lock(p2m);
-    audit_p2m(p2m);
+    audit_p2m(p2m, 0);
 
     P2M_DEBUG("adding gfn=%#lx mfn=%#lx\n", gfn, mfn);
 
@@ -2420,7 +2426,7 @@ guest_physmap_add_entry(struct p2m_domain *p2m, unsigned long gfn,
         }
     }
 
-    audit_p2m(p2m);
+    audit_p2m(p2m, 1);
     p2m_unlock(p2m);
 
     return rc;
@@ -2609,6 +2615,7 @@ set_mmio_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn)
     P2M_DEBUG("set mmio %lx %lx\n", gfn, mfn_x(mfn));
     p2m_lock(p2m);
     rc = set_p2m_entry(p2m, gfn, mfn, 0, p2m_mmio_direct);
+    audit_p2m(p2m, 1);
     p2m_unlock(p2m);
     if ( 0 == rc )
         gdprintk(XENLOG_ERR,
@@ -2638,6 +2645,7 @@ clear_mmio_p2m_entry(struct p2m_domain *p2m, unsigned long gfn)
     }
     p2m_lock(p2m);
     rc = set_p2m_entry(p2m, gfn, _mfn(INVALID_MFN), 0, 0);
+    audit_p2m(p2m, 1);
     p2m_unlock(p2m);
 
     return rc;
@@ -2706,6 +2714,7 @@ int p2m_mem_paging_nominate(struct p2m_domain *p2m, unsigned long gfn)
     /* Fix p2m entry */
     p2m_lock(p2m);
     set_p2m_entry(p2m, gfn, mfn, 0, p2m_ram_paging_out);
+    audit_p2m(p2m, 1);
     p2m_unlock(p2m);
 
     ret = 0;
@@ -2742,6 +2751,7 @@ int p2m_mem_paging_evict(struct p2m_domain *p2m, unsigned long gfn)
     /* Remove mapping from p2m table */
     p2m_lock(p2m);
     set_p2m_entry(p2m, gfn, _mfn(PAGING_MFN), 0, p2m_ram_paged);
+    audit_p2m(p2m, 1);
     p2m_unlock(p2m);
 
     /* Put the page back so it gets freed */
@@ -2771,6 +2781,7 @@ void p2m_mem_paging_populate(struct p2m_domain *p2m, unsigned long gfn)
     {
         p2m_lock(p2m);
         set_p2m_entry(p2m, gfn, _mfn(PAGING_MFN), 0, p2m_ram_paging_in_start);
+        audit_p2m(p2m, 1);
         p2m_unlock(p2m);
     }
 
@@ -2801,6 +2812,7 @@ int p2m_mem_paging_prep(struct p2m_domain *p2m, unsigned long gfn)
     /* Fix p2m mapping */
     p2m_lock(p2m);
     set_p2m_entry(p2m, gfn, page_to_mfn(page), 0, p2m_ram_paging_in);
+    audit_p2m(p2m, 1);
     p2m_unlock(p2m);
 
     return 0;
@@ -2820,6 +2832,7 @@ void p2m_mem_paging_resume(struct p2m_domain *p2m)
     mfn = gfn_to_mfn(p2m, rsp.gfn, &p2mt);
     p2m_lock(p2m);
     set_p2m_entry(p2m, rsp.gfn, mfn, 0, p2m_ram_rw);
+    audit_p2m(p2m, 1);
     p2m_unlock(p2m);
 
     /* Unpause domain */
