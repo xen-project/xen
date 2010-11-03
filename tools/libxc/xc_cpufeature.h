@@ -101,6 +101,7 @@
 #define X86_FEATURE_POPCNT	(4*32+23) /* POPCNT instruction */
 #define X86_FEATURE_AES		(4*32+25) /* AES acceleration instructions */
 #define X86_FEATURE_XSAVE	(4*32+26) /* XSAVE/XRSTOR/XSETBV/XGETBV */
+#define X86_FEATURE_AVX		(4*32+28) /* Advanced Vector Extensions */
 #define X86_FEATURE_HYPERVISOR	(4*32+31) /* Running under some hypervisor */
 
 /* VIA/Cyrix/Centaur-defined CPU features, CPUID level 0xC0000001, word 5 */
