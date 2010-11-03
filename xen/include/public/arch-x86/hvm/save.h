@@ -431,9 +431,32 @@ struct hvm_viridian_context {
 
 DECLARE_HVM_SAVE_TYPE(VIRIDIAN, 15, struct hvm_viridian_context);
 
+
+/*
+ * The save area of XSAVE/XRSTOR.
+ */
+
+struct hvm_hw_cpu_xsave {
+    uint64_t xfeature_mask;
+    uint64_t xcr0;                 /* Updated by XSETBV */
+    uint64_t xcr0_accum;           /* Updated by XSETBV */
+    struct {
+        struct { char x[512]; } fpu_sse;
+
+        struct {
+            uint64_t xstate_bv;         /* Updated by XRSTOR */
+            uint64_t reserved[7];
+        } xsave_hdr;                    /* The 64-byte header */
+
+        struct { char x[0]; } ymm;    /* YMM */
+    } save_area;
+} __attribute__((packed));
+
+#define CPU_XSAVE_CODE  16
+
 /* 
  * Largest type-code in use
  */
-#define HVM_SAVE_CODE_MAX 15
+#define HVM_SAVE_CODE_MAX 16
 
 #endif /* __XEN_PUBLIC_HVM_SAVE_X86_H__ */

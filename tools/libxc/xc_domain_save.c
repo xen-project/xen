@@ -810,14 +810,35 @@ static xen_pfn_t *map_and_save_p2m_table(xc_interface *xch,
                               ? sizeof(ctxt.x64) 
                               : sizeof(ctxt.x32));
         uint32_t chunk2_sz = 0;
-        uint32_t tot_sz    = (chunk1_sz + 8) + (chunk2_sz + 8);
+        uint32_t chunk3_sz = 4;
+        uint32_t xcnt_size = 0;
+        uint32_t tot_sz;
+        DECLARE_DOMCTL;
+
+        domctl.cmd = XEN_DOMCTL_getvcpuextstate;
+        domctl.domain = dom;
+        domctl.u.vcpuextstate.vcpu = 0;
+        domctl.u.vcpuextstate.size = 0;
+        domctl.u.vcpuextstate.xfeature_mask = 0;
+        if ( xc_domctl(xch, &domctl) < 0 )
+        {
+            PERROR("No extended context for VCPU%d", i);
+            goto out;
+        }
+        xcnt_size = domctl.u.vcpuextstate.size + 2 * sizeof(uint64_t);
+
+        tot_sz = (chunk1_sz + 8) + (chunk2_sz + 8) + (chunk3_sz + 8);
+
         if ( write_exact(io_fd, &signature, sizeof(signature)) ||
              write_exact(io_fd, &tot_sz, sizeof(tot_sz)) ||
              write_exact(io_fd, "vcpu", 4) ||
              write_exact(io_fd, &chunk1_sz, sizeof(chunk1_sz)) ||
              write_exact(io_fd, &ctxt, chunk1_sz) ||
              write_exact(io_fd, "extv", 4) ||
-             write_exact(io_fd, &chunk2_sz, sizeof(chunk2_sz)) )
+             write_exact(io_fd, &chunk2_sz, sizeof(chunk2_sz)) ||
+             write_exact(io_fd, "xcnt", 4) ||
+             write_exact(io_fd, &chunk3_sz, sizeof(chunk3_sz)) ||
+             write_exact(io_fd, &xcnt_size, 4) )
         {
             PERROR("write: extended info");
             goto out;
@@ -904,6 +925,9 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
     /* base of the region in which domain memory is mapped */
     unsigned char *region_base = NULL;
+
+    /* A copy of the CPU eXtended States of the guest. */
+    DECLARE_HYPERCALL_BUFFER(void, buffer);
 
     /* bitmap of pages:
        - that should be sent this iteration (unless later marked as skip);
@@ -1786,6 +1810,53 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
             PERROR("Error when writing to state file (2)");
             goto out;
         }
+
+        /* Start to fetch CPU eXtended States */
+        /* Get buffer size first */
+        domctl.cmd = XEN_DOMCTL_getvcpuextstate;
+        domctl.domain = dom;
+        domctl.u.vcpuextstate.vcpu = i;
+        domctl.u.vcpuextstate.xfeature_mask = 0;
+        domctl.u.vcpuextstate.size = 0;
+        if ( xc_domctl(xch, &domctl) < 0 )
+        {
+            PERROR("No eXtended states (XSAVE) for VCPU%d", i);
+            goto out;
+        }
+
+        /* Getting eXtended states data */
+        buffer = xc_hypercall_buffer_alloc(xch, buffer, domctl.u.vcpuextstate.size);
+        if ( !buffer )
+        {
+            PERROR("Insufficient memory for getting eXtended states for"
+                   "VCPU%d", i);
+            goto out;
+        }
+        set_xen_guest_handle(domctl.u.vcpuextstate.buffer, buffer);
+        if ( xc_domctl(xch, &domctl) < 0 )
+        {
+            PERROR("No eXtended states (XSAVE) for VCPU%d", i);
+            goto out;
+        }
+
+        if ( wrexact(io_fd, &domctl.u.vcpuextstate.xfeature_mask,
+                     sizeof(domctl.u.vcpuextstate.xfeature_mask)) )
+        {
+            PERROR("Error when writing to state file (2)");
+            goto out;
+        }
+        if ( wrexact(io_fd, &domctl.u.vcpuextstate.size,
+                     sizeof(domctl.u.vcpuextstate.size)) )
+        {
+            PERROR("Error when writing to state file (2)");
+            goto out;
+        }
+        if ( wrexact(io_fd, buffer, domctl.u.vcpuextstate.size) )
+        {
+            PERROR("Error when writing to state file (2)");
+            goto out;
+        }
+        xc_hypercall_buffer_free(xch, buffer);
     }
 
     /*

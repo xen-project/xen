@@ -149,6 +149,7 @@ struct xsm_operations {
     int (*bind_pt_irq) (struct domain *d, struct xen_domctl_bind_pt_irq *bind);
     int (*pin_mem_cacheattr) (struct domain *d);
     int (*ext_vcpucontext) (struct domain *d, uint32_t cmd);
+    int (*vcpuextstate) (struct domain *d, uint32_t cmd);
 #endif
 };
 
@@ -621,6 +622,10 @@ static inline int xsm_pin_mem_cacheattr(struct domain *d)
 static inline int xsm_ext_vcpucontext(struct domain *d, uint32_t cmd)
 {
     return xsm_call(ext_vcpucontext(d, cmd));
+}
+static inline int xsm_vcpuextstate(struct domain *d, uint32_t cmd)
+{
+    return xsm_call(vcpuextstate(d, cmd));
 }
 #endif /* CONFIG_X86 */
 

@@ -33,6 +33,7 @@
 #include <asm/mem_event.h>
 #include <public/mem_event.h>
 #include <asm/mem_sharing.h>
+#include <asm/i387.h>
 
 #ifdef XEN_KDB_CONFIG
 #include "../kdb/include/kdbdefs.h"
@@ -1406,6 +1407,135 @@ long arch_do_domctl(
     }
     break;
 
+    case XEN_DOMCTL_setvcpuextstate:
+    case XEN_DOMCTL_getvcpuextstate:
+    {
+        struct xen_domctl_vcpuextstate *evc;
+        struct domain *d;
+        struct vcpu *v;
+        uint32_t offset = 0;
+        uint64_t _xfeature_mask = 0;
+        uint64_t _xcr0, _xcr0_accum;
+        void *receive_buf = NULL, *_xsave_area;
+
+#define PV_XSAVE_SIZE (2 * sizeof(uint64_t) + xsave_cntxt_size)
+
+        evc = &domctl->u.vcpuextstate;
+
+        ret = -ESRCH;
+
+        if ( !cpu_has_xsave )
+            break;
+
+        d = rcu_lock_domain_by_id(domctl->domain);
+        if ( d == NULL )
+            break;
+
+        ret = xsm_vcpuextstate(d, domctl->cmd);
+        if ( ret )
+            goto vcpuextstate_out;
+
+        ret = -ESRCH;
+        if ( (evc->vcpu >= d->max_vcpus) ||
+             ((v = d->vcpu[evc->vcpu]) == NULL) )
+            goto vcpuextstate_out;
+
+        if ( domctl->cmd == XEN_DOMCTL_getvcpuextstate )
+        {
+            if ( !evc->size && !evc->xfeature_mask )
+            {
+                evc->xfeature_mask = xfeature_mask;
+                evc->size = PV_XSAVE_SIZE;
+                ret = 0;
+                goto vcpuextstate_out;
+            }
+            if ( evc->size != PV_XSAVE_SIZE ||
+                 evc->xfeature_mask != xfeature_mask )
+            {
+                ret = -EINVAL;
+                goto vcpuextstate_out;
+            }
+            if ( copy_to_guest_offset(domctl->u.vcpuextstate.buffer,
+                                      offset, (void *)&v->arch.xcr0,
+                                      sizeof(v->arch.xcr0)) )
+            {
+                ret = -EFAULT;
+                goto vcpuextstate_out;
+            }
+            offset += sizeof(v->arch.xcr0);
+            if ( copy_to_guest_offset(domctl->u.vcpuextstate.buffer,
+                                      offset, (void *)&v->arch.xcr0_accum,
+                                      sizeof(v->arch.xcr0_accum)) )
+            {
+                ret = -EFAULT;
+                goto vcpuextstate_out;
+            }
+            offset += sizeof(v->arch.xcr0_accum);
+            if ( copy_to_guest_offset(domctl->u.vcpuextstate.buffer,
+                                      offset, v->arch.xsave_area,
+                                      xsave_cntxt_size) )
+            {
+                ret = -EFAULT;
+                goto vcpuextstate_out;
+            }
+        }
+        else
+        {
+            ret = -EINVAL;
+
+            _xfeature_mask = evc->xfeature_mask;
+            /* xsave context must be restored on compatible target CPUs */
+            if ( (_xfeature_mask & xfeature_mask) != _xfeature_mask )
+                goto vcpuextstate_out;
+            if ( evc->size > PV_XSAVE_SIZE || evc->size < 2 * sizeof(uint64_t) )
+                goto vcpuextstate_out;
+
+            receive_buf = xmalloc_bytes(evc->size);
+            if ( !receive_buf )
+            {
+                ret = -ENOMEM;
+                goto vcpuextstate_out;
+            }
+            if ( copy_from_guest_offset(receive_buf, domctl->u.vcpuextstate.buffer,
+                                        offset, evc->size) )
+            {
+                ret = -EFAULT;
+                xfree(receive_buf);
+                goto vcpuextstate_out;
+            }
+
+            _xcr0 = *(uint64_t *)receive_buf;
+            _xcr0_accum = *(uint64_t *)(receive_buf + sizeof(uint64_t));
+            _xsave_area = receive_buf + 2 * sizeof(uint64_t);
+
+            if ( !(_xcr0 & XSTATE_FP) || _xcr0 & ~xfeature_mask )
+            {
+                xfree(receive_buf);
+                goto vcpuextstate_out;
+            }
+            if ( (_xcr0 & _xcr0_accum) != _xcr0 )
+            {
+                xfree(receive_buf);
+                goto vcpuextstate_out;
+            }
+
+            v->arch.xcr0 = _xcr0;
+            v->arch.xcr0_accum = _xcr0_accum;
+            memcpy(v->arch.xsave_area, _xsave_area, evc->size - 2 * sizeof(uint64_t) );
+
+            xfree(receive_buf);
+        }
+
+        ret = 0;
+
+    vcpuextstate_out:
+        rcu_unlock_domain(d);
+        if ( (domctl->cmd == XEN_DOMCTL_getvcpuextstate) &&
+             copy_to_guest(u_domctl, domctl, 1) )
+            ret = -EFAULT;
+    }
+    break;
+
 #ifdef __x86_64__
     case XEN_DOMCTL_mem_event_op:
     {
@@ -1454,6 +1584,11 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 #else
 #define c(fld) (c.nat->fld)
 #endif
+
+    /* Fill legacy context from xsave area first */
+    if ( cpu_has_xsave )
+        memcpy(v->arch.xsave_area, &v->arch.guest_context.fpu_ctxt,
+               sizeof(v->arch.guest_context.fpu_ctxt));
 
     if ( !is_pv_32on64_domain(v->domain) )
         memcpy(c.nat, &v->arch.guest_context, sizeof(*c.nat));
