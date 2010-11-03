@@ -652,10 +652,7 @@ static void vmx_ctxt_switch_to(struct vcpu *v)
     struct domain *d = v->domain;
     unsigned long old_cr4 = read_cr4(), new_cr4 = mmu_cr4_features;
 
-    /* HOST_CR4 in VMCS is always mmu_cr4_features and
-     * CR4_OSXSAVE(if supported). Sync CR4 now. */
-    if ( cpu_has_xsave )
-        new_cr4 |= X86_CR4_OSXSAVE;
+    /* HOST_CR4 in VMCS is always mmu_cr4_features. Sync CR4 now. */
     if ( old_cr4 != new_cr4 )
         write_cr4(new_cr4);
 
@@ -2215,7 +2212,8 @@ static int vmx_handle_xsetbv(u64 new_bv)
     if ( (xfeature_mask & XSTATE_YMM & new_bv) && !(new_bv & XSTATE_SSE) )
         goto err;
 
-    v->arch.hvm_vcpu.xcr0 = new_bv;
+    v->arch.xcr0 = new_bv;
+    v->arch.xcr0_accum |= new_bv;
     set_xcr0(new_bv);
     return 0;
 err:

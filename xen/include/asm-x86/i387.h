@@ -49,6 +49,8 @@ struct xsave_struct
 #define REX_PREFIX
 #endif
 
+DECLARE_PER_CPU(uint64_t, xcr0);
+
 static inline void xsetbv(u32 index, u64 xfeatures)
 {
     u32 hi = xfeatures >> 32;
@@ -60,14 +62,20 @@ static inline void xsetbv(u32 index, u64 xfeatures)
 
 static inline void set_xcr0(u64 xfeatures)
 {
+    this_cpu(xcr0) = xfeatures;
     xsetbv(XCR_XFEATURE_ENABLED_MASK, xfeatures);
+}
+
+static inline uint64_t get_xcr0(void)
+{
+    return this_cpu(xcr0);
 }
 
 static inline void xsave(struct vcpu *v)
 {
     struct xsave_struct *ptr;
 
-    ptr =(struct xsave_struct *)v->arch.hvm_vcpu.xsave_area;
+    ptr =(struct xsave_struct *)v->arch.xsave_area;
 
     asm volatile (".byte " REX_PREFIX "0x0f,0xae,0x27"
         :
@@ -79,7 +87,7 @@ static inline void xrstor(struct vcpu *v)
 {
     struct xsave_struct *ptr;
 
-    ptr =(struct xsave_struct *)v->arch.hvm_vcpu.xsave_area;
+    ptr =(struct xsave_struct *)v->arch.xsave_area;
 
     asm volatile (".byte " REX_PREFIX "0x0f,0xae,0x2f"
         :
@@ -108,14 +116,18 @@ static inline void setup_fpu(struct vcpu *v)
     if ( !v->fpu_dirtied )
     {
         v->fpu_dirtied = 1;
-        if ( cpu_has_xsave && is_hvm_vcpu(v) )
+        if ( cpu_has_xsave )
         {
             if ( !v->fpu_initialised )
                 v->fpu_initialised = 1;
 
-            set_xcr0(v->arch.hvm_vcpu.xcr0 | XSTATE_FP_SSE);
+            /* XCR0 normally represents what guest OS set. In case of Xen
+             * itself, we set all supported feature mask before doing
+             * save/restore.
+             */
+            set_xcr0(v->arch.xcr0_accum);
             xrstor(v);
-            set_xcr0(v->arch.hvm_vcpu.xcr0);
+            set_xcr0(v->arch.xcr0);
         }
         else
         {

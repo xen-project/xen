@@ -33,9 +33,14 @@ void save_init_fpu(struct vcpu *v)
     if ( cr0 & X86_CR0_TS )
         clts();
 
-    if ( cpu_has_xsave && is_hvm_vcpu(v) )
+    if ( cpu_has_xsave )
     {
+        /* XCR0 normally represents what guest OS set. In case of Xen itself,
+         * we set all accumulated feature mask before doing save/restore.
+         */
+        set_xcr0(v->arch.xcr0_accum);
         xsave(v);
+        set_xcr0(v->arch.xcr0);
     }
     else if ( cpu_has_fxsr )
     {
@@ -144,6 +149,9 @@ u32 xsave_cntxt_size;
 /* A 64-bit bitmask of the XSAVE/XRSTOR features supported by processor. */
 u64 xfeature_mask;
 
+/* Cached xcr0 for fast read */
+DEFINE_PER_CPU(uint64_t, xcr0);
+
 void xsave_init(void)
 {
     u32 eax, ebx, ecx, edx;
@@ -171,13 +179,11 @@ void xsave_init(void)
     BUG_ON(ecx < min_size);
 
     /*
-     * We will only enable the features we know for hvm guest. Here we use
-     * set/clear CR4_OSXSAVE and re-run cpuid to get xsave_cntxt_size.
+     * Set CR4_OSXSAVE and run "cpuid" to get xsave_cntxt_size.
      */
     set_in_cr4(X86_CR4_OSXSAVE);
     set_xcr0(eax & XCNTXT_MASK);
     cpuid_count(XSTATE_CPUID, 0, &eax, &ebx, &ecx, &edx);
-    clear_in_cr4(X86_CR4_OSXSAVE);
 
     if ( cpu == 0 )
     {

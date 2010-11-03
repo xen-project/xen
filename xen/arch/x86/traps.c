@@ -795,7 +795,6 @@ static void pv_cpuid(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_XTPR % 32, &c);
         __clear_bit(X86_FEATURE_PDCM % 32, &c);
         __clear_bit(X86_FEATURE_DCA % 32, &c);
-        __clear_bit(X86_FEATURE_XSAVE % 32, &c);
         if ( !cpu_has_apic )
            __clear_bit(X86_FEATURE_X2APIC % 32, &c);
         __set_bit(X86_FEATURE_HYPERVISOR % 32, &c);
@@ -1715,7 +1714,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     enum { lm_seg_none, lm_seg_fs, lm_seg_gs } lm_ovr = lm_seg_none;
     int rc;
     unsigned int port, i, data_sel, ar, data, bpmatch = 0;
-    unsigned int op_bytes, op_default, ad_bytes, ad_default;
+    unsigned int op_bytes, op_default, ad_bytes, ad_default, opsize_prefix= 0;
 #define rd_ad(reg) (ad_bytes >= sizeof(regs->reg) \
                     ? regs->reg \
                     : ad_bytes == 4 \
@@ -1751,6 +1750,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         switch ( opcode = insn_fetch(u8, code_base, eip, code_limit) )
         {
         case 0x66: /* operand-size override */
+            opsize_prefix = 1;
             op_bytes = op_default ^ 6; /* switch between 2/4 bytes */
             continue;
         case 0x67: /* address-size override */
@@ -2051,13 +2051,48 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         goto fail;
     switch ( opcode )
     {
-    case 0x1: /* RDTSCP */
-        if ( (v->arch.guest_context.ctrlreg[4] & X86_CR4_TSD) &&
-             !guest_kernel_mode(v, regs) )
+    case 0x1: /* RDTSCP and XSETBV */
+        switch ( insn_fetch(u8, code_base, eip, code_limit) )
+        {
+        case 0xf9: /* RDTSCP */
+            if ( (v->arch.guest_context.ctrlreg[4] & X86_CR4_TSD) &&
+                 !guest_kernel_mode(v, regs) )
+                goto fail;
+            pv_soft_rdtsc(v, regs, 1);
+            break;
+        case 0xd1: /* XSETBV */
+        {
+            u64 new_xfeature = (u32)regs->eax | ((u64)regs->edx << 32);
+
+            if ( lock || rep_prefix || opsize_prefix
+                 || !(v->arch.guest_context.ctrlreg[4] & X86_CR4_OSXSAVE) )
+            {
+                do_guest_trap(TRAP_invalid_op, regs, 0);
+                goto skip;
+            }
+
+            if ( !guest_kernel_mode(v, regs) )
+                goto fail;
+
+            switch ( (u32)regs->ecx )
+            {
+                case XCR_XFEATURE_ENABLED_MASK:
+                    /* bit 0 of XCR0 must be set and reserved bit must not be set */
+                    if ( !(new_xfeature & XSTATE_FP) || (new_xfeature & ~xfeature_mask) )
+                        goto fail;
+
+                    v->arch.xcr0 = new_xfeature;
+                    v->arch.xcr0_accum |= new_xfeature;
+                    set_xcr0(new_xfeature);
+                    break;
+                default:
+                    goto fail;
+            }
+            break;
+        }
+        default:
             goto fail;
-        if ( insn_fetch(u8, code_base, eip, code_limit) != 0xf9 )
-            goto fail;
-        pv_soft_rdtsc(v, regs, 1);
+        }
         break;
 
     case 0x06: /* CLTS */

@@ -400,6 +400,23 @@ struct arch_vcpu
     pagetable_t monitor_table;          /* (MFN) hypervisor PT (for HVM) */
     unsigned long cr3;                  /* (MA) value to install in HW CR3 */
 
+    /*
+     * The save area for Processor Extended States and the bitmask of the
+     * XSAVE/XRSTOR features. They are used by: 1) when a vcpu (which has
+     * dirtied FPU/SSE) is scheduled out we XSAVE the states here; 2) in
+     * #NM handler, we XRSTOR the states we XSAVE-ed;
+     */
+    void *xsave_area;
+    uint64_t xcr0;
+    /* Accumulated eXtended features mask for using XSAVE/XRESTORE by Xen
+     * itself, as we can never know whether guest OS depends on content
+     * preservation whenever guest OS clears one feature flag (for example,
+     * temporarily).
+     * However, processor should not be able to touch eXtended states before
+     * it explicitly enables it via xcr0.
+     */
+    uint64_t xcr0_accum;
+
     /* Current LDT details. */
     unsigned long shadow_ldt_mapcnt;
     spinlock_t shadow_ldt_lock;
@@ -435,7 +452,8 @@ unsigned long pv_guest_cr4_fixup(const struct vcpu *, unsigned long guest_cr4);
 #define pv_guest_cr4_to_real_cr4(v)                         \
     (((v)->arch.guest_context.ctrlreg[4]                    \
       | (mmu_cr4_features & (X86_CR4_PGE | X86_CR4_PSE))    \
-      | ((v)->domain->arch.vtsc ? X86_CR4_TSD : 0))         \
+      | ((v)->domain->arch.vtsc ? X86_CR4_TSD : 0)         \
+      | ((cpu_has_xsave)? X86_CR4_OSXSAVE : 0))              \
       & ~X86_CR4_DE)
 #define real_cr4_to_pv_guest_cr4(c) \
     ((c) & ~(X86_CR4_PGE | X86_CR4_PSE | X86_CR4_TSD | X86_CR4_OSXSAVE))

@@ -805,18 +805,6 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
     hvm_asid_flush_vcpu(v);
 
-    if ( cpu_has_xsave )
-    {
-        /* XSAVE/XRSTOR requires the save area be 64-byte-boundary aligned. */
-        void *xsave_area = _xmalloc(xsave_cntxt_size, 64);
-        if ( xsave_area == NULL )
-            return -ENOMEM;
-
-        xsave_init_save_area(xsave_area);
-        v->arch.hvm_vcpu.xsave_area = xsave_area;
-        v->arch.hvm_vcpu.xcr0 = XSTATE_FP_SSE;
-    }
-
     if ( (rc = vlapic_init(v)) != 0 )
         goto fail1;
 
@@ -879,7 +867,6 @@ void hvm_vcpu_destroy(struct vcpu *v)
     hvm_vcpu_cacheattr_destroy(v);
     vlapic_destroy(v);
     hvm_funcs.vcpu_destroy(v);
-    xfree(v->arch.hvm_vcpu.xsave_area);
 
     /* Event channel is already freed by evtchn_destroy(). */
     /*free_xen_event_channel(v, v->arch.hvm_vcpu.xen_port);*/

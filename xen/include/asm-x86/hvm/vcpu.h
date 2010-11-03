@@ -49,15 +49,6 @@ struct hvm_vcpu {
      */
     unsigned long       hw_cr[5];
 
-    /*
-     * The save area for Processor Extended States and the bitmask of the
-     * XSAVE/XRSTOR features. They are used by: 1) when a vcpu (which has
-     * dirtied FPU/SSE) is scheduled out we XSAVE the states here; 2) in
-     * #NM handler, we XRSTOR the states we XSAVE-ed;
-     */
-    void *xsave_area;
-    uint64_t xcr0;
-
     struct vlapic       vlapic;
     s64                 cache_tsc_offset;
     u64                 guest_time;

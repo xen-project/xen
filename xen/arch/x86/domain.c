@@ -343,10 +343,26 @@ int vcpu_initialise(struct vcpu *v)
 
     paging_vcpu_init(v);
 
+    if ( cpu_has_xsave )
+    {
+        /* XSAVE/XRSTOR requires the save area be 64-byte-boundary aligned. */
+        void *xsave_area = _xmalloc(xsave_cntxt_size, 64);
+        if ( xsave_area == NULL )
+            return -ENOMEM;
+
+        xsave_init_save_area(xsave_area);
+        v->arch.xsave_area = xsave_area;
+        v->arch.xcr0 = XSTATE_FP_SSE;
+        v->arch.xcr0_accum = XSTATE_FP_SSE;
+    }
+
     if ( is_hvm_domain(d) )
     {
         if ( (rc = hvm_vcpu_initialise(v)) != 0 )
+        {
+            xfree(v->arch.xsave_area);
             return rc;
+        }
     }
     else
     {
@@ -376,13 +392,21 @@ int vcpu_initialise(struct vcpu *v)
 
     spin_lock_init(&v->arch.shadow_ldt_lock);
 
-    return (is_pv_32on64_vcpu(v) ? setup_compat_l4(v) : 0);
+    rc = 0;
+    if ( is_pv_32on64_vcpu(v) )
+        rc = setup_compat_l4(v);
+    if ( !rc )
+        xfree(v->arch.xsave_area);
+
+    return rc;
 }
 
 void vcpu_destroy(struct vcpu *v)
 {
     if ( is_pv_32on64_vcpu(v) )
         release_compat_l4(v);
+
+    xfree(v->arch.xsave_area);
 
     if ( is_hvm_vcpu(v) )
         hvm_vcpu_destroy(v);
@@ -592,6 +616,8 @@ unsigned long pv_guest_cr4_fixup(const struct vcpu *v, unsigned long guest_cr4)
         hv_cr4_mask &= ~X86_CR4_DE;
     if ( cpu_has_fsgsbase && !is_pv_32bit_domain(v->domain) )
         hv_cr4_mask &= ~X86_CR4_FSGSBASE;
+    if ( cpu_has_xsave )
+        hv_cr4_mask &= ~X86_CR4_OSXSAVE;
 
     if ( (guest_cr4 & hv_cr4_mask) != (hv_cr4 & hv_cr4_mask) )
         gdprintk(XENLOG_WARNING,
@@ -1367,6 +1393,8 @@ static void __context_switch(void)
         memcpy(stack_regs,
                &n->arch.guest_context.user_regs,
                CTXT_SWITCH_STACK_BYTES);
+        if ( cpu_has_xsave && n->arch.xcr0 != get_xcr0() )
+            set_xcr0(n->arch.xcr0);
         n->arch.ctxt_switch_to(n);
     }
 
