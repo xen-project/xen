@@ -227,13 +227,19 @@ gx_getpkt (char *buf)
         
         gxprt("Bad checksum, sentsum=0x%x, csum=0x%x, buf=%s\n",
               (c1 << 4) + c2, csum, buf);
-        write(remote_fd, "-", 1);
+        if (write(remote_fd, "-", 1) != 1) {
+            perror("write");
+            return -1;
+        }
     }
     if (gx_remote_dbg) {
         gxprt("getpkt (\"%s\");  [sending ack] \n", buf);
     }
         
-    write(remote_fd, "+", 1);
+    if (write(remote_fd, "+", 1) != 1) {
+        perror("write");
+        return -1;
+    }
         
     if (gx_remote_dbg) {
         gxprt("[sent ack]\n");
