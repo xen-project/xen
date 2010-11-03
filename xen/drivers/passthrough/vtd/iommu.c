@@ -1403,23 +1403,16 @@ static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
         if ( find_upstream_bridge(&bus, &devfn, &secbus) < 1 )
             break;
 
-        /* PCIe to PCI/PCIx bridge */
-        if ( pdev_type(bus, devfn) == DEV_TYPE_PCIe2PCI_BRIDGE )
-        {
-            ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn);
-            if ( ret )
-                return ret;
+        ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn);
 
-            /*
-             * Devices behind PCIe-to-PCI/PCIx bridge may generate
-             * different requester-id. It may originate from devfn=0
-             * on the secondary bus behind the bridge. Map that id
-             * as well.
-             */
+        /*
+         * Devices behind PCIe-to-PCI/PCIx bridge may generate different
+         * requester-id. It may originate from devfn=0 on the secondary bus
+         * behind the bridge. Map that id as well if we didn't already.
+         */
+        if ( !ret && pdev_type(bus, devfn) == DEV_TYPE_PCIe2PCI_BRIDGE &&
+             (secbus != pdev->bus || pdev->devfn != 0) )
             ret = domain_context_mapping_one(domain, drhd->iommu, secbus, 0);
-        }
-        else /* Legacy PCI bridge */
-            ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn);
 
         break;
 
