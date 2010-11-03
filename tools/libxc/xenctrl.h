@@ -281,6 +281,20 @@ void xc__hypercall_buffer_free_pages(xc_interface *xch, xc_hypercall_buffer_t *b
 #define xc_hypercall_buffer_free_pages(_xch, _name, _nr) xc__hypercall_buffer_free_pages(_xch, HYPERCALL_BUFFER(_name), _nr)
 
 /*
+ * CPUMAP handling
+ */
+typedef uint8_t *xc_cpumap_t;
+
+/* return maximum number of cpus the hypervisor supports */
+int xc_get_max_cpus(xc_interface *xch);
+
+/* return array size for cpumap */
+int xc_get_cpumap_size(xc_interface *xch);
+
+/* allocate a cpumap */
+xc_cpumap_t xc_cpumap_alloc(xc_interface *xch);
+
+/*
  * DOMAIN DEBUGGING FUNCTIONS
  */
 
@@ -347,9 +361,6 @@ typedef union
     start_info_t s;
 } start_info_any_t;
 
-
-/* return maximum number of cpus the hypervisor supports */
-int xc_get_max_cpus(xc_interface *xch);
 
 int xc_domain_create(xc_interface *xch,
                      uint32_t ssidref,
@@ -462,13 +473,11 @@ int xc_watchdog(xc_interface *xch,
 int xc_vcpu_setaffinity(xc_interface *xch,
                         uint32_t domid,
                         int vcpu,
-                        uint64_t *cpumap,
-                        int cpusize);
+                        xc_cpumap_t cpumap);
 int xc_vcpu_getaffinity(xc_interface *xch,
                         uint32_t domid,
                         int vcpu,
-                        uint64_t *cpumap,
-                        int cpusize);
+                        xc_cpumap_t cpumap);
 
 /**
  * This function will return information about one or more domains. It is
@@ -670,8 +679,7 @@ typedef struct xc_cpupoolinfo {
     uint32_t cpupool_id;
     uint32_t sched_id;
     uint32_t n_dom;
-    uint32_t cpumap_size;    /* max number of cpus in map */
-    uint64_t *cpumap;
+    xc_cpumap_t cpumap;
 } xc_cpupoolinfo_t;
 
 /**
@@ -701,10 +709,18 @@ int xc_cpupool_destroy(xc_interface *xch,
  * starting at the given id.
  * @parm xc_handle a handle to an open hypervisor interface
  * @parm poolid lowest id for which info is returned
- * return cpupool info ptr (obtained by malloc)
+ * return cpupool info ptr (to be freed via xc_cpupool_infofree)
  */
 xc_cpupoolinfo_t *xc_cpupool_getinfo(xc_interface *xch,
                        uint32_t poolid);
+
+/**
+ * Free cpupool info. Used to free info obtained via xc_cpupool_getinfo.
+ * @parm xc_handle a handle to an open hypervisor interface
+ * @parm info area to free
+ */
+void xc_cpupool_infofree(xc_interface *xch,
+                         xc_cpupoolinfo_t *info);
 
 /**
  * Add cpu to a cpupool. cpu may be -1 indicating the first unassigned.
@@ -746,11 +762,9 @@ int xc_cpupool_movedomain(xc_interface *xch,
  * Return map of cpus not in any cpupool.
  *
  * @parm xc_handle a handle to an open hypervisor interface
- * @parm cpusize where to store array size in bytes
  * return cpumap array on success, NULL else
  */
-uint64_t *xc_cpupool_freeinfo(xc_interface *xch,
-                        int *cpusize);
+xc_cpumap_t xc_cpupool_freeinfo(xc_interface *xch);
 
 
 /*

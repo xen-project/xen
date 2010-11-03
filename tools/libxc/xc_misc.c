@@ -35,6 +35,21 @@ int xc_get_max_cpus(xc_interface *xch)
     return max_cpus;
 }
 
+int xc_get_cpumap_size(xc_interface *xch)
+{
+    return (xc_get_max_cpus(xch) + 7) / 8;
+}
+
+xc_cpumap_t xc_cpumap_alloc(xc_interface *xch)
+{
+    int sz;
+
+    sz = xc_get_cpumap_size(xch);
+    if (sz == 0)
+        return NULL;
+    return calloc(1, sz);
+}
+
 int xc_readconsolering(xc_interface *xch,
                        char *buffer,
                        unsigned int *pnr_chars,

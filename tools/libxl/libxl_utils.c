@@ -708,15 +708,20 @@ out:
     return rc;
 }
 
-int libxl_cpumap_alloc(libxl_cpumap *cpumap, int max_cpus)
+int libxl_cpumap_alloc(libxl_ctx *ctx, libxl_cpumap *cpumap)
 {
-    int elems;
+    int max_cpus;
+    int sz;
 
-    elems = (max_cpus + 63) / 64;
-    cpumap->map = calloc(elems, sizeof(*cpumap->map));
+    max_cpus = libxl_get_max_cpus(ctx);
+    if (max_cpus == 0)
+        return ERROR_FAIL;
+
+    sz = (max_cpus + 7) / 8;
+    cpumap->map = calloc(sz, sizeof(*cpumap->map));
     if (!cpumap->map)
         return ERROR_NOMEM;
-    cpumap->size = elems * 8;     /* size in bytes */
+    cpumap->size = sz;
     return 0;
 }
 
@@ -729,21 +734,21 @@ int libxl_cpumap_test(libxl_cpumap *cpumap, int cpu)
 {
     if (cpu >= cpumap->size * 8)
         return 0;
-    return (cpumap->map[cpu / 64] & (1L << (cpu & 63))) ? 1 : 0;
+    return (cpumap->map[cpu / 8] & (1 << (cpu & 7))) ? 1 : 0;
 }
 
 void libxl_cpumap_set(libxl_cpumap *cpumap, int cpu)
 {
     if (cpu >= cpumap->size * 8)
         return;
-    cpumap->map[cpu / 64] |= 1L << (cpu & 63);
+    cpumap->map[cpu / 8] |= 1 << (cpu & 7);
 }
 
 void libxl_cpumap_reset(libxl_cpumap *cpumap, int cpu)
 {
     if (cpu >= cpumap->size * 8)
         return;
-    cpumap->map[cpu / 64] &= ~(1L << (cpu & 63));
+    cpumap->map[cpu / 8] &= ~(1 << (cpu & 7));
 }
 
 int libxl_get_max_cpus(libxl_ctx *ctx)

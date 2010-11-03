@@ -3534,8 +3534,8 @@ static void print_vcpuinfo(uint32_t tdomid,
                            uint32_t nr_cpus)
 {
     int i, l;
-    uint64_t *cpumap;
-    uint64_t pcpumap;
+    uint8_t *cpumap;
+    uint8_t pcpumap;
     char *domname;
 
     /*      NAME  ID  VCPU */
@@ -3555,14 +3555,14 @@ static void print_vcpuinfo(uint32_t tdomid,
     /*      TIM */
     printf("%9.1f  ", ((float)vcpuinfo->vcpu_time / 1e9));
     /* CPU AFFINITY */
-    pcpumap = nr_cpus > 64 ? (uint64_t)-1 : ((1ULL << nr_cpus) - 1);
+    pcpumap = nr_cpus > 8 ? (uint8_t)-1 : ((1 << nr_cpus) - 1);
     for (cpumap = vcpuinfo->cpumap.map; nr_cpus; ++cpumap) {
         if (*cpumap < pcpumap) {
             break;
         }
-        if (nr_cpus > 64) {
+        if (nr_cpus > 8) {
             pcpumap = -1;
-            nr_cpus -= 64;
+            nr_cpus -= 8;
         } else {
             pcpumap = ((1 << nr_cpus) - 1);
             nr_cpus = 0;
@@ -3593,7 +3593,7 @@ static void print_vcpuinfo(uint32_t tdomid,
                 }
             }
             printf("\n");
-            nr_cpus = nr_cpus > 64 ? nr_cpus - 64 : 0;
+            nr_cpus = nr_cpus > 8 ? nr_cpus - 8 : 0;
         }
     }
 }
@@ -3678,11 +3678,11 @@ int main_vcpulist(int argc, char **argv)
 static void vcpupin(char *d, const char *vcpu, char *cpu)
 {
     libxl_vcpuinfo *vcpuinfo;
-    uint64_t *cpumap = NULL;
+    libxl_cpumap cpumap;
 
     uint32_t vcpuid, cpuida, cpuidb;
     char *endptr, *toka, *tokb;
-    int i, nb_vcpu, cpusize, cpumapsize;
+    int i, nb_vcpu;
 
     vcpuid = strtoul(vcpu, &endptr, 10);
     if (vcpu == endptr) {
@@ -3695,63 +3695,54 @@ static void vcpupin(char *d, const char *vcpu, char *cpu)
 
     find_domain(d);
 
-    if ((cpusize = libxl_get_max_cpus(&ctx)) == 0) {
-        fprintf(stderr, "libxl_get_max_cpus failed.\n");
-        goto vcpupin_out1;
-    }
-    cpumapsize = (cpusize + sizeof (uint64_t) - 1) / sizeof (uint64_t);
-
-    cpumap = calloc(cpumapsize, sizeof (uint64_t));
-    if (!cpumap) {
-        goto vcpupin_out1;
+    if (libxl_cpumap_alloc(&ctx, &cpumap)) {
+        goto vcpupin_out;
     }
     if (strcmp(cpu, "all")) {
         for (toka = strtok(cpu, ","), i = 0; toka; toka = strtok(NULL, ","), ++i) {
             cpuida = strtoul(toka, &endptr, 10);
             if (toka == endptr) {
                 fprintf(stderr, "Error: Invalid argument.\n");
-                goto vcpupin_out;
+                goto vcpupin_out1;
             }
             if (*endptr == '-') {
                 tokb = endptr + 1;
                 cpuidb = strtoul(tokb, &endptr, 10);
                 if ((tokb == endptr) || (cpuida > cpuidb)) {
                     fprintf(stderr, "Error: Invalid argument.\n");
-                    goto vcpupin_out;
+                    goto vcpupin_out1;
                 }
                 while (cpuida <= cpuidb) {
-                    cpumap[cpuida / 64] |= (1 << (cpuida % 64));
+                    libxl_cpumap_set(&cpumap, cpuida);
                     ++cpuida;
                 }
             } else {
-                cpumap[cpuida / 64] |= (1 << (cpuida % 64));
+                libxl_cpumap_set(&cpumap, cpuida);
             }
         }
     }
     else {
-        memset(cpumap, -1, sizeof (uint64_t) * cpumapsize);
+        memset(cpumap.map, -1, cpumap.size);
     }
 
     if (vcpuid != -1) {
-        if (libxl_set_vcpuaffinity(&ctx, domid, vcpuid,
-                                   cpumap, cpusize) == -1) {
+        if (libxl_set_vcpuaffinity(&ctx, domid, vcpuid, &cpumap) == -1) {
             fprintf(stderr, "Could not set affinity for vcpu `%u'.\n", vcpuid);
         }
     }
     else {
         if (!(vcpuinfo = libxl_list_vcpu(&ctx, domid, &nb_vcpu, &i))) {
             fprintf(stderr, "libxl_list_vcpu failed.\n");
-            goto vcpupin_out;
+            goto vcpupin_out1;
         }
         for (; nb_vcpu > 0; --nb_vcpu, ++vcpuinfo) {
-            if (libxl_set_vcpuaffinity(&ctx, domid, vcpuinfo->vcpuid,
-                                       cpumap, cpusize) == -1) {
+            if (libxl_set_vcpuaffinity(&ctx, domid, vcpuinfo->vcpuid, &cpumap) == -1) {
                 fprintf(stderr, "libxl_set_vcpuaffinity failed on vcpu `%u'.\n", vcpuinfo->vcpuid);
             }
         }
     }
   vcpupin_out1:
-    free(cpumap);
+    libxl_cpumap_destroy(&cpumap);
   vcpupin_out:
     ;
 }
@@ -3903,7 +3894,7 @@ static void output_physinfo(void)
         printf("free_memory            : %"PRIu64"\n", info.free_pages / i);
     }
     if (!libxl_get_freecpus(&ctx, &cpumap)) {
-        for (i = 0; i < cpumap.size * 8; i++)
+        libxl_for_each_cpu(i, cpumap)
             if (libxl_cpumap_test(&cpumap, i))
                 n++;
         printf("free_cpus              : %d\n", n);
@@ -5455,7 +5446,7 @@ int main_cpupoolcreate(int argc, char **argv)
         fprintf(stderr, "libxl_get_freecpus failed\n");
         return -ERROR_FAIL;
     }
-    if (libxl_cpumap_alloc(&cpumap, freemap.size * 8)) {
+    if (libxl_cpumap_alloc(&ctx, &cpumap)) {
         fprintf(stderr, "Failed to allocate cpumap\n");
         return -ERROR_FAIL;
     }
@@ -5474,7 +5465,7 @@ int main_cpupoolcreate(int argc, char **argv)
     } else {
         n_cpus = 1;
         n = 0;
-        for (i = 0; i < freemap.size * 8; i++)
+        libxl_for_each_cpu(i, freemap)
             if (libxl_cpumap_test(&freemap, i)) {
                 n++;
                 libxl_cpumap_set(&cpumap, i);
@@ -5584,8 +5575,8 @@ int main_cpupoollist(int argc, char **argv)
                 printf("%-19s", name);
                 free(name);
                 n = 0;
-                for (c = 0; c < poolinfo[p].cpumap.size * 8; c++)
-                    if (poolinfo[p].cpumap.map[c / 64] & (1L << (c % 64))) {
+                libxl_for_each_cpu(c, poolinfo[p].cpumap)
+                    if (libxl_cpumap_test(&poolinfo[p].cpumap, c)) {
                         if (n && opt_cpus) printf(",");
                         if (opt_cpus) printf("%d", c);
                         n++;

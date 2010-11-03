@@ -226,10 +226,8 @@ static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
 {
     uint32_t dom;
     int vcpu = 0, i;
-    uint64_t  *cpumap;
+    xc_cpumap_t cpumap;
     PyObject *cpulist = NULL;
-    int nr_cpus, size;
-    uint64_t cpumap_size = sizeof(*cpumap); 
 
     static char *kwd_list[] = { "domid", "vcpu", "cpumap", NULL };
 
@@ -237,29 +235,20 @@ static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
                                       &dom, &vcpu, &cpulist) )
         return NULL;
 
-    nr_cpus = xc_get_max_cpus(self->xc_handle);
-    if ( nr_cpus == 0 )
-        return pyxc_error_to_exception(self->xc_handle);
-
-    size = (nr_cpus + cpumap_size * 8 - 1)/ (cpumap_size * 8);
-    cpumap = malloc(cpumap_size * size);
+    cpumap = xc_cpumap_alloc(self->xc_handle);
     if(cpumap == NULL)
         return pyxc_error_to_exception(self->xc_handle);
 
     if ( (cpulist != NULL) && PyList_Check(cpulist) )
     {
-        for ( i = 0; i < size; i++)
-        {
-            cpumap[i] = 0ULL;
-        }
         for ( i = 0; i < PyList_Size(cpulist); i++ ) 
         {
             long cpu = PyInt_AsLong(PyList_GetItem(cpulist, i));
-            cpumap[cpu / (cpumap_size * 8)] |= (uint64_t)1 << (cpu % (cpumap_size * 8));
+            cpumap[cpu / 8] |= 1 << (cpu % 8);
         }
     }
   
-    if ( xc_vcpu_setaffinity(self->xc_handle, dom, vcpu, cpumap, size * cpumap_size) != 0 )
+    if ( xc_vcpu_setaffinity(self->xc_handle, dom, vcpu, cpumap) != 0 )
     {
         free(cpumap);
         return pyxc_error_to_exception(self->xc_handle);
@@ -385,9 +374,8 @@ static PyObject *pyxc_vcpu_getinfo(XcObject *self,
     uint32_t dom, vcpu = 0;
     xc_vcpuinfo_t info;
     int rc, i;
-    uint64_t *cpumap;
-    int nr_cpus, size;
-    uint64_t cpumap_size = sizeof(*cpumap);
+    xc_cpumap_t cpumap;
+    int nr_cpus;
 
     static char *kwd_list[] = { "domid", "vcpu", NULL };
     
@@ -403,12 +391,11 @@ static PyObject *pyxc_vcpu_getinfo(XcObject *self,
     if ( rc < 0 )
         return pyxc_error_to_exception(self->xc_handle);
 
-    size = (nr_cpus + cpumap_size * 8 - 1)/ (cpumap_size * 8); 
-    if((cpumap = malloc(cpumap_size * size)) == NULL)
-        return pyxc_error_to_exception(self->xc_handle); 
-    memset(cpumap, 0, cpumap_size * size);
+    cpumap = xc_cpumap_alloc(self->xc_handle);
+    if(cpumap == NULL)
+        return pyxc_error_to_exception(self->xc_handle);
 
-    rc = xc_vcpu_getaffinity(self->xc_handle, dom, vcpu, cpumap, cpumap_size * size);
+    rc = xc_vcpu_getaffinity(self->xc_handle, dom, vcpu, cpumap);
     if ( rc < 0 )
     {
         free(cpumap);
@@ -424,12 +411,12 @@ static PyObject *pyxc_vcpu_getinfo(XcObject *self,
     cpulist = PyList_New(0);
     for ( i = 0; i < nr_cpus; i++ )
     {
-        if (*(cpumap + i / (cpumap_size * 8)) & 1 ) {
+        if (*(cpumap + i / 8) & 1 ) {
             PyObject *pyint = PyInt_FromLong(i);
             PyList_Append(cpulist, pyint);
             Py_DECREF(pyint);
         }
-        cpumap[i / (cpumap_size * 8)] >>= 1;
+        cpumap[i / 8] >>= 1;
     }
     PyDict_SetItemString(info_dict, "cpumap", cpulist);
     Py_DECREF(cpulist);
@@ -1931,22 +1918,27 @@ static PyObject *pyxc_dom_set_memshr(XcObject *self, PyObject *args)
     return zero;
 }
 
-static PyObject *cpumap_to_cpulist(uint64_t *cpumap, int cpusize)
+static PyObject *cpumap_to_cpulist(XcObject *self, xc_cpumap_t cpumap)
 {
     PyObject *cpulist = NULL;
     int i;
+    int nr_cpus;
+
+    nr_cpus = xc_get_max_cpus(self->xc_handle);
+    if ( nr_cpus == 0 )
+        return pyxc_error_to_exception(self->xc_handle);
 
     cpulist = PyList_New(0);
-    for ( i = 0; i < cpusize; i++ )
+    for ( i = 0; i < nr_cpus; i++ )
     {
-        if ( *cpumap & (1L << (i % 64)) )
+        if ( *cpumap & (1 << (i % 8)) )
         {
             PyObject* pyint = PyInt_FromLong(i);
 
             PyList_Append(cpulist, pyint);
             Py_DECREF(pyint);
         }
-        if ( (i % 64) == 63 )
+        if ( (i % 8) == 7 )
             cpumap++;
     }
     return cpulist;
@@ -2003,10 +1995,9 @@ static PyObject *pyxc_cpupool_getinfo(XcObject *self)
             "cpupool",         (int)info->cpupool_id,
             "sched",           info->sched_id,
             "n_dom",           info->n_dom,
-            "cpulist",         cpumap_to_cpulist(info->cpumap,
-                                                 info->cpumap_size));
+            "cpulist",         cpumap_to_cpulist(self, info->cpumap));
         pool = info->cpupool_id + 1;
-        free(info);
+        xc_cpupool_infofree(self->xc_handle, info);
 
         if ( info_dict == NULL )
         {
@@ -2082,15 +2073,14 @@ static PyObject *pyxc_cpupool_movedomain(XcObject *self,
 
 static PyObject *pyxc_cpupool_freeinfo(XcObject *self)
 {
-    uint64_t *cpumap;
-    int mapsize;
+    xc_cpumap_t cpumap;
     PyObject *info = NULL;
 
-    cpumap = xc_cpupool_freeinfo(self->xc_handle, &mapsize);
+    cpumap = xc_cpupool_freeinfo(self->xc_handle);
     if (!cpumap)
         return pyxc_error_to_exception(self->xc_handle);
 
-    info = cpumap_to_cpulist(cpumap, mapsize * 8);
+    info = cpumap_to_cpulist(self, cpumap);
 
     free(cpumap);
 

@@ -113,11 +113,19 @@ int xc_domain_shutdown(xc_interface *xch,
 int xc_vcpu_setaffinity(xc_interface *xch,
                         uint32_t domid,
                         int vcpu,
-                        uint64_t *cpumap, int cpusize)
+                        xc_cpumap_t cpumap)
 {
     DECLARE_DOMCTL;
     DECLARE_HYPERCALL_BUFFER(uint8_t, local);
     int ret = -1;
+    int cpusize;
+
+    cpusize = xc_get_cpumap_size(xch);
+    if (!cpusize)
+    {
+        PERROR("Could not get number of cpus");
+        goto out;
+    }
 
     local = xc_hypercall_buffer_alloc(xch, local, cpusize);
     if ( local == NULL )
@@ -130,7 +138,7 @@ int xc_vcpu_setaffinity(xc_interface *xch,
     domctl.domain = (domid_t)domid;
     domctl.u.vcpuaffinity.vcpu    = vcpu;
 
-    bitmap_64_to_byte(local, cpumap, cpusize * 8);
+    memcpy(local, cpumap, cpusize);
 
     set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap.bitmap, local);
 
@@ -148,14 +156,22 @@ int xc_vcpu_setaffinity(xc_interface *xch,
 int xc_vcpu_getaffinity(xc_interface *xch,
                         uint32_t domid,
                         int vcpu,
-                        uint64_t *cpumap, int cpusize)
+                        xc_cpumap_t cpumap)
 {
     DECLARE_DOMCTL;
     DECLARE_HYPERCALL_BUFFER(uint8_t, local);
     int ret = -1;
+    int cpusize;
+
+    cpusize = xc_get_cpumap_size(xch);
+    if (!cpusize)
+    {
+        PERROR("Could not get number of cpus");
+        goto out;
+    }
 
     local = xc_hypercall_buffer_alloc(xch, local, cpusize);
-    if(local == NULL)
+    if (local == NULL)
     {
         PERROR("Could not allocate memory for getvcpuaffinity domctl hypercall");
         goto out;
@@ -170,7 +186,7 @@ int xc_vcpu_getaffinity(xc_interface *xch,
 
     ret = do_domctl(xch, &domctl);
 
-    bitmap_byte_to_64(cpumap, local, cpusize * 8);
+    memcpy(cpumap, local, cpusize);
 
     xc_hypercall_buffer_free(xch, local);
 out:

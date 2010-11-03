@@ -145,7 +145,7 @@ typedef uint32_t libxl_hwcap[8];
 
 typedef struct {
     uint32_t size;          /* number of bytes in map */
-    uint64_t *map;
+    uint8_t *map;
 } libxl_cpumap;
 void libxl_cpumap_destroy(libxl_cpumap *map);
 
@@ -464,7 +464,7 @@ int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo);
 libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
                                        int *nb_vcpu, int *nrcpus);
 int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
-                           uint64_t *cpumap, int nrcpus);
+                           libxl_cpumap *cpumap);
 int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid, uint32_t bitmask);
 
 int libxl_get_sched_id(libxl_ctx *ctx);

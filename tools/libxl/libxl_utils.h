@@ -76,9 +76,11 @@ int libxl_devid_to_device_net2(libxl_ctx *ctx, uint32_t domid,
  * return -1 if there are an error */
 int libxl_check_device_model_version(libxl_ctx *ctx, char *path);
 
-int libxl_cpumap_alloc(libxl_cpumap *cpumap, int max_cpus);
+int libxl_cpumap_alloc(libxl_ctx *ctx, libxl_cpumap *cpumap);
 int libxl_cpumap_test(libxl_cpumap *cpumap, int cpu);
 void libxl_cpumap_set(libxl_cpumap *cpumap, int cpu);
 void libxl_cpumap_reset(libxl_cpumap *cpumap, int cpu);
+#define libxl_for_each_cpu(var, map) for (var = 0; var < (map).size * 8; var++)
+
 #endif
 
