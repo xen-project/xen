@@ -37,6 +37,9 @@
 #include "extern.h"
 #include "vtd.h"
 
+#define IOH_DEV      0
+#define IGD_DEV      2
+
 #define IGD_BAR_MASK 0xFFFFFFFFFFFF0000
 #define GGC 0x52
 #define GGC_MEMORY_VT_ENABLED  (0x8 << 8)
@@ -45,7 +48,8 @@
 #define IS_ILK(id)    (id == 0x00408086 || id == 0x00448086 || id== 0x00628086 || id == 0x006A8086)
 #define IS_CPT(id)    (id == 0x01008086 || id == 0x01048086)
 
-u32 dev0_id;
+u32 ioh_id;
+u32 igd_id;
 bool_t rwbf_quirk;
 static int is_cantiga_b3;
 static u8 *igd_reg_va;
@@ -59,11 +63,11 @@ int is_igd_vt_enabled_quirk(void)
 {
     u16 ggc;
 
-    if ( !IS_ILK(dev0_id) )
+    if ( !IS_ILK(ioh_id) )
         return 1;
 
     /* integrated graphics on Intel platforms is located at 0:2.0 */
-    ggc = pci_conf_read16(0, INTEL_IGD_DEV, 0, GGC);
+    ggc = pci_conf_read16(0, IGD_DEV, 0, GGC);
     return ( ggc & GGC_MEMORY_VT_ENABLED ? 1 : 0 );
 }
 
@@ -77,12 +81,12 @@ static void cantiga_b3_errata_init(void)
     u16 vid;
     u8 did_hi, rid;
 
-    vid = pci_conf_read16(0, INTEL_IGD_DEV, 0, 0);
+    vid = pci_conf_read16(0, IGD_DEV, 0, 0);
     if ( vid != 0x8086 )
         return;
 
-    did_hi = pci_conf_read8(0, INTEL_IGD_DEV, 0, 3);
-    rid = pci_conf_read8(0, INTEL_IGD_DEV, 0, 8);
+    did_hi = pci_conf_read8(0, IGD_DEV, 0, 3);
+    rid = pci_conf_read8(0, IGD_DEV, 0, 8);
 
     if ( (did_hi == 0x2A) && (rid == 0x7) )
         is_cantiga_b3 = 1;
@@ -108,8 +112,8 @@ static void map_igd_reg(void)
         return;
 
     /* get IGD mmio address in PCI BAR */
-    igd_mmio = ((u64)pci_conf_read32(0, INTEL_IGD_DEV, 0, 0x14) << 32) +
-                     pci_conf_read32(0, INTEL_IGD_DEV, 0, 0x10);
+    igd_mmio = ((u64)pci_conf_read32(0, IGD_DEV, 0, 0x14) << 32) +
+                     pci_conf_read32(0, IGD_DEV, 0, 0x10);
 
     /* offset of IGD regster we want to access is in 0x2000 range */
     igd_reg = (igd_mmio & IGD_BAR_MASK) + 0x2000;
@@ -158,10 +162,11 @@ void vtd_ops_postamble_quirk(struct iommu* iommu)
 /* initialize platform identification flags */
 void __init platform_quirks_init(void)
 {
-    dev0_id = pci_conf_read32(0, 0, 0, 0);
+    ioh_id = pci_conf_read32(0, IOH_DEV, 0, 0);
+    igd_id = pci_conf_read32(0, IGD_DEV, 0, 0);
 
     /* Mobile 4 Series Chipset neglects to set RWBF capability. */
-    if ( dev0_id == 0x2a408086 )
+    if ( ioh_id == 0x2a408086 )
     {
         dprintk(XENLOG_INFO VTDPREFIX, "DMAR: Forcing write-buffer flush\n");
         rwbf_quirk = 1;

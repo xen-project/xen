@@ -23,7 +23,6 @@
 
 #include <xen/iommu.h>
 
-#define INTEL_IGD_DEV            0
 #define MAP_ME_PHANTOM_FUNC      1
 #define UNMAP_ME_PHANTOM_FUNC    0
 
