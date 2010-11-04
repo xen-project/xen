@@ -48,8 +48,12 @@ static unsigned long reset_value[NUM_COUNTERS];
 
 extern char svm_stgi_label[];
 
+#ifdef CONFIG_X86_64
 u32 ibs_caps = 0;
 static u64 ibs_op_ctl;
+#else
+#define ibs_op_ctl 0
+#endif
 
 /* IBS cpuid feature detection */
 #define IBS_CPUID_FEATURES              0x8000001b
@@ -324,6 +328,7 @@ static int athlon_check_ctrs(unsigned int const cpu,
 
 static inline void start_ibs(void)
 {
+#ifdef CONFIG_X86_64
 	u64 val = 0;
 
 	if (!ibs_caps)
@@ -361,6 +366,7 @@ static inline void start_ibs(void)
 		val = op_amd_randomize_ibs_op(ibs_op_ctl);
 		wrmsrl(MSR_AMD64_IBSOPCTL, val);
 	}
+#endif
 }
  
 static void athlon_start(struct op_msrs const * const msrs)
@@ -407,11 +413,13 @@ static void athlon_stop(struct op_msrs const * const msrs)
 	stop_ibs();
 }
 
+#ifdef CONFIG_X86_64
+
 #define IBSCTL_LVTOFFSETVAL             (1 << 8)
 #define APIC_EILVT_MSG_NMI              0x4
 #define APIC_EILVT_LVTOFF_IBS           1
 #define APIC_EILVTn(n)                  (0x500 + 0x10 * n)
-static inline void init_ibs_nmi_per_cpu(void *arg)
+static inline void __init init_ibs_nmi_per_cpu(void *arg)
 {
 	unsigned long reg;
 
@@ -422,7 +430,7 @@ static inline void init_ibs_nmi_per_cpu(void *arg)
 #define PCI_VENDOR_ID_AMD               0x1022
 #define PCI_DEVICE_ID_AMD_10H_NB_MISC   0x1203
 #define IBSCTL                          0x1cc
-static int init_ibs_nmi(void)
+static int __init init_ibs_nmi(void)
 {
 	int bus, dev, func;
 	u32 id, value;
@@ -438,10 +446,6 @@ static int init_ibs_nmi(void)
 			for (func = 0; func < 8; func++) {
 				id = pci_conf_read32(bus, dev, func, PCI_VENDOR_ID);
 
-				if ((id == 0xffffffff) || (id == 0x00000000) ||
-					(id == 0x0000ffff) || (id == 0xffff0000))
-					continue;
-
 				vendor_id = id & 0xffff;
 				dev_id = (id >> 16) & 0xffff;
 
@@ -456,7 +460,7 @@ static int init_ibs_nmi(void)
 					if (value != (IBSCTL_LVTOFFSETVAL |
 						APIC_EILVT_LVTOFF_IBS)) {
 						printk("Xenoprofile: Failed to setup IBS LVT offset, "
-							"IBSCTL = 0x%08x", value);
+							"IBSCTL = %#08x\n", value);
 						return 1;
 					}
 					nodes++;
@@ -466,55 +470,46 @@ static int init_ibs_nmi(void)
 	}
 
 	if (!nodes) {
-		printk("Xenoprofile: No CPU node configured for IBS");
+		printk("Xenoprofile: No CPU node configured for IBS\n");
 		return 1;
 	}
 
 	return 0;
 }
 
-static u32 get_ibs_caps(void)
+static void __init get_ibs_caps(void)
 {
-#ifdef	CONFIG_X86_32
-	return 0;
-#else
 	unsigned int max_level;
 
 	if (!boot_cpu_has(X86_FEATURE_IBS))
-		return 0;
+		return;
 
     /* check IBS cpuid feature flags */
 	max_level = cpuid_eax(0x80000000);
-	if (max_level < IBS_CPUID_FEATURES)
-		return IBS_CAPS_AVAIL;
-
-	ibs_caps = cpuid_eax(IBS_CPUID_FEATURES);
+	if (max_level >= IBS_CPUID_FEATURES)
+		ibs_caps = cpuid_eax(IBS_CPUID_FEATURES);
 	if (!(ibs_caps & IBS_CAPS_AVAIL))
 		/* cpuid flags not valid */
-		return IBS_CAPS_AVAIL;
-
-	return ibs_caps;
-#endif
+		ibs_caps = 0;
 }
 
-u32 ibs_init(void)
+void __init ibs_init(void)
 {
-	u32 ibs_caps = 0;
-
-	ibs_caps = get_ibs_caps();
+	get_ibs_caps();
 
 	if ( !ibs_caps )
-		return 0;
+		return;
 
 	if (init_ibs_nmi()) {
 		ibs_caps = 0;
-		return 0;
+		return;
 	}
 
 	printk("Xenoprofile: AMD IBS detected (0x%08x)\n",
 		(unsigned)ibs_caps);
-	return ibs_caps;
 }
+
+#endif /* CONFIG_X86_64 */
 
 struct op_x86_model_spec const op_athlon_spec = {
 	.num_counters = NUM_COUNTERS,

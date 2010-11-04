@@ -48,8 +48,13 @@ struct vcpu;
 struct cpu_user_regs;
 
 /* AMD IBS support */
-u32 ibs_init(void);
+#ifdef CONFIG_X86_64
+void ibs_init(void);
 extern u32 ibs_caps;
+#else
+static inline void ibs_init(void) {}
+#define ibs_caps 0
+#endif
 
 int xenoprofile_get_mode(struct vcpu *v, struct cpu_user_regs * const regs);
 
