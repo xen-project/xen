@@ -195,8 +195,7 @@ static void xc_cpuid_hvm_policy(
                     bitmaskof(X86_FEATURE_SSE4_1) |
                     bitmaskof(X86_FEATURE_SSE4_2) |
                     bitmaskof(X86_FEATURE_POPCNT) |
-                    bitmaskof(X86_FEATURE_AES) |
-                    bitmaskof(X86_FEATURE_AVX));
+                    bitmaskof(X86_FEATURE_AES));
 
         regs[2] |= bitmaskof(X86_FEATURE_HYPERVISOR);
 
@@ -324,6 +323,7 @@ static void xc_cpuid_pv_policy(
         clear_bit(X86_FEATURE_XTPR, regs[2]);
         clear_bit(X86_FEATURE_PDCM, regs[2]);
         clear_bit(X86_FEATURE_DCA, regs[2]);
+        clear_bit(X86_FEATURE_XSAVE, regs[2]);
         set_bit(X86_FEATURE_HYPERVISOR, regs[2]);
         break;
     case 0x80000001:
