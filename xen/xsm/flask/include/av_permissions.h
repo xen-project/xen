@@ -51,8 +51,6 @@
 #define DOMAIN__TRIGGER                           0x00800000UL
 #define DOMAIN__GETEXTVCPUCONTEXT                 0x01000000UL
 #define DOMAIN__SETEXTVCPUCONTEXT                 0x02000000UL
-#define DOMAIN__GETVCPUEXTSTATE                   0x04000000UL
-#define DOMAIN__SETVCPUEXTSTATE                   0x08000000UL
 
 #define HVM__SETHVMC                              0x00000001UL
 #define HVM__GETHVMC                              0x00000002UL
