@@ -120,7 +120,13 @@ SECTIONS
 	}
 
   .init.data : AT(ADDR(.init.data) - LOAD_OFFSET)
-	{ *(.init.data) }
+	{
+	  *(.init.rodata)
+	  *(.init.rodata.str*)
+	  *(.init.data)
+	  *(.init.data.rel)
+	  *(.init.data.rel.*)
+	}
 
   .init.ramfs : AT(ADDR(.init.ramfs) - LOAD_OFFSET)
 	{

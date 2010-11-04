@@ -79,7 +79,11 @@ SECTIONS
        _einittext = .;
   } :text
   .init.data : {
+       *(.init.rodata)
+       *(.init.rodata.str*)
        *(.init.data)
+       *(.init.data.rel)
+       *(.init.data.rel.*)
   } :text
   . = ALIGN(32);
   .init.setup : {
