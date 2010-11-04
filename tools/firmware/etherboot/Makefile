@@ -5,15 +5,15 @@ include $(XEN_ROOT)/tools/Rules.mk
 include Config
 
 ifeq ($(GIT_HTTP),y)
-GPXE_GIT_URL := http://git.etherboot.org/scm/gpxe.git
+IPXE_GIT_URL := http://git.ipxe.org/ipxe.git
 else
-GPXE_GIT_URL := git://git.etherboot.org/scm/gpxe.git
+IPXE_GIT_URL := git://git.ipxe.org/ipxe.git
 endif
 
-GPXE_GIT_TAG := v1.0.1
+IPXE_GIT_TAG := v1.0.0-rc1
 
-D=gpxe
-T=gpxe-git-snapshot.tar.gz
+D=ipxe
+T=ipxe-git-snapshot.tar.gz
 
 ROMS = $(addprefix $D/src/bin/, $(addsuffix .rom, $(NICS)))
 
@@ -33,9 +33,9 @@ eb-roms.h: Config
 	mv -f $@.new $@
 
 $T:
-	$(GIT) clone $(GPXE_GIT_URL) $D.git
+	$(GIT) clone $(IPXE_GIT_URL) $D.git
 	cd $D.git && \
-	$(GIT) archive --format=tar --prefix=$D/ $(GPXE_GIT_TAG) | gzip >../$T
+	$(GIT) archive --format=tar --prefix=$D/ $(IPXE_GIT_TAG) | gzip >../$T
 	rm -rf $D.git
 
 $D/src/arch/i386/Makefile: $T Config
