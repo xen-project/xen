@@ -26,7 +26,7 @@
 #include "mmconfig.h"
 
 static int __initdata known_bridge;
-static unsigned int pci_probe = PCI_PROBE_CONF1 | PCI_PROBE_MMCONF;
+unsigned int __cpuinitdata pci_probe = PCI_PROBE_CONF1 | PCI_PROBE_MMCONF;
 
 static void __init parse_mmcfg(char *s)
 {

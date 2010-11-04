@@ -607,6 +607,14 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 #ifdef __x86_64__
 	/* AMD CPUs do not support SYSENTER outside of legacy mode. */
 	clear_bit(X86_FEATURE_SEP, c->x86_capability);
+
+	if (c->x86 == 0x10) {
+		/* do this for boot cpu */
+		if (c == &boot_cpu_data)
+			check_enable_amd_mmconf_dmi();
+
+		fam10h_check_enable_mmcfg();
+	}
 #endif
 
 	/* Prevent TSC drift in non single-processor, single-core platforms. */

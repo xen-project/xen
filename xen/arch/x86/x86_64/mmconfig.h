@@ -34,6 +34,8 @@
 
 #define PCI_VENDOR_ID_NVIDIA       0x10de
 
+extern unsigned int pci_probe;
+
 /*
  * AMD Fam10h CPUs are buggy, and cannot access MMIO config space
  * on their northbrige except through the * %eax register. As such, you MUST

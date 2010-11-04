@@ -134,5 +134,12 @@
     AMD_OSVW_ERRATUM(3, AMD_MODEL_RANGE(0x10, 0x2, 0x1, 0xff, 0xf),	\
 		        AMD_MODEL_RANGE(0x12, 0x0, 0x0, 0x1, 0x0))
 
+struct cpuinfo_x86;
 int cpu_has_amd_erratum(const struct cpuinfo_x86 *, int, ...);
+
+#ifdef __x86_64__
+void fam10h_check_enable_mmcfg(void);
+void check_enable_amd_mmconf_dmi(void);
+#endif
+
 #endif /* __AMD_H__ */
