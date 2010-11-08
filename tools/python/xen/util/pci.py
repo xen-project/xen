@@ -240,10 +240,16 @@ def pci_convert_sxp_to_dict(dev_sxp):
         pci_dev_info = dict(pci_dev[1:])
         if 'opts' in pci_dev_info:
             pci_dev_info['opts'] = pci_opts_list_from_sxp(pci_dev)
-        # append uuid to each pci device that does't already have one.
+        # If necessary, initialize uuid, key, and vdevfn for each pci device
         if not pci_dev_info.has_key('uuid'):
-            dpci_uuid = pci_dev_info.get('uuid', uuid.createString())
-            pci_dev_info['uuid'] = dpci_uuid
+            pci_dev_info['uuid'] = uuid.createString()
+        if not pci_dev_info.has_key('key'):
+            pci_dev_info['key'] = "%02x:%02x.%x" % \
+            (int(pci_dev_info['bus'], 16),
+             int(pci_dev_info['slot'], 16),
+             int(pci_dev_info['func'], 16))
+        if not pci_dev_info.has_key('vdevfn'):
+            pci_dev_info['vdevfn'] =  "0x%02x" % AUTO_PHP_SLOT
         pci_devs.append(pci_dev_info)
     dev_config['devs'] = pci_devs
 
