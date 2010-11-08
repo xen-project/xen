@@ -1628,6 +1628,16 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
             PERROR("Error when writing the console pfn for guest");
             goto out;
         }
+
+        chunk.id = XC_SAVE_ID_HVM_ACPI_IOPORTS_LOCATION;
+        xc_get_hvm_param(xch, dom, HVM_PARAM_ACPI_IOPORTS_LOCATION,
+                         (unsigned long *)&chunk.data);
+
+        if ((chunk.data != 0) && wrexact(io_fd, &chunk, sizeof(chunk)))
+        {
+            PERROR("Error when writing the firmware ioport version");
+            goto out;
+        }
     }
 
     if ( !callbacks->checkpoint )

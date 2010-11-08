@@ -669,6 +669,7 @@ typedef struct {
     uint64_t identpt;
     uint64_t vm86_tss;
     uint64_t console_pfn;
+    uint64_t acpi_ioport_location;
 } pagebuf_t;
 
 static int pagebuf_init(pagebuf_t* buf)
@@ -791,6 +792,16 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
     case XC_SAVE_ID_LAST_CHECKPOINT:
         ctx->last_checkpoint = 1;
         // DPRINTF("last checkpoint indication received");
+        return pagebuf_get_one(xch, ctx, buf, fd, dom);
+
+    case XC_SAVE_ID_HVM_ACPI_IOPORTS_LOCATION:
+        /* Skip padding 4 bytes then read the acpi ioport location. */
+        if ( RDEXACT(fd, &buf->acpi_ioport_location, sizeof(uint32_t)) ||
+             RDEXACT(fd, &buf->acpi_ioport_location, sizeof(uint64_t)) )
+        {
+            PERROR("error read the acpi ioport location");
+            return -1;
+        }
         return pagebuf_get_one(xch, ctx, buf, fd, dom);
 
     default:
@@ -1340,6 +1351,15 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
          */
         if ( !ctx->last_checkpoint )
             fcntl(io_fd, F_SETFL, orig_io_fd_flags | O_NONBLOCK);
+    }
+
+    if (pagebuf.acpi_ioport_location == 1) {
+        DBGPRINTF("Use new firmware ioport from the checkpoint\n");
+        xc_set_hvm_param(xch, dom, HVM_PARAM_ACPI_IOPORTS_LOCATION, 1);
+    } else if (pagebuf.acpi_ioport_location == 0) {
+        DBGPRINTF("Use old firmware ioport from the checkpoint\n");
+    } else {
+        ERROR("Error, unknow acpi ioport location (%i)", pagebuf.acpi_ioport_location);
     }
 
     if ( ctx->last_checkpoint )
