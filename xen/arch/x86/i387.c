@@ -209,6 +209,7 @@ void xsave_init_save_area(void *save_area)
     memset(save_area, 0, xsave_cntxt_size);
 
     ((u32 *)save_area)[6] = 0x1f80;  /* MXCSR */
+    *(uint64_t *)(save_area + 512) = XSTATE_FP_SSE;  /* XSETBV */
 }
 
 /*

@@ -395,7 +395,7 @@ int vcpu_initialise(struct vcpu *v)
     rc = 0;
     if ( is_pv_32on64_vcpu(v) )
         rc = setup_compat_l4(v);
-    if ( !rc )
+    if ( rc )
         xfree(v->arch.xsave_area);
 
     return rc;
