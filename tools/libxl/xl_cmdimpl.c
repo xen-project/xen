@@ -112,7 +112,7 @@ enum action_on_shutdown {
     ACTION_COREDUMP_RESTART,
 };
 
-static char *action_on_shutdown_names[] = {
+static const char *action_on_shutdown_names[] = {
     [ACTION_DESTROY] = "destroy",
 
     [ACTION_RESTART] = "restart",
@@ -1100,7 +1100,7 @@ skip_vfb:
     case 0:
         {
             int i;
-            char *errstr;
+            const char *errstr;
 
             for (i = 0; (buf = xlu_cfg_get_listitem(cpuids, i)) != NULL; i++) {
                 e = libxl_cpuid_parse_config_xend(&b_info->cpuid, buf);
@@ -1132,7 +1132,8 @@ skip_vfb:
         break;
     case EINVAL:    /* config option is not a list, parse as a string */
         if (!xlu_cfg_get_string(config, "cpuid", &buf)) {
-            char *buf2, *p, *errstr, *strtok_ptr = NULL;
+            char *buf2, *p, *strtok_ptr = NULL;
+            const char *errstr;
 
             buf2 = strdup(buf);
             p = strtok_r(buf2, ",", &strtok_ptr);
@@ -1873,7 +1874,7 @@ waitpid_out:
     return ret;
 }
 
-void help(char *command)
+void help(const char *command)
 {
     int i;
     struct cmd_spec *cmd;
@@ -1900,7 +1901,7 @@ void help(char *command)
     }
 }
 
-static int64_t parse_mem_size_kb(char *mem)
+static int64_t parse_mem_size_kb(const char *mem)
 {
     char *endptr;
     int64_t kbytes;
@@ -1930,7 +1931,7 @@ static int64_t parse_mem_size_kb(char *mem)
     return kbytes;
 }
 
-static int set_memory_max(char *p, char *mem)
+static int set_memory_max(const char *p, const char *mem)
 {
     int64_t memorykb;
     int rc;
@@ -1981,7 +1982,7 @@ int main_memmax(int argc, char **argv)
     return 0;
 }
 
-static void set_memory_target(char *p, char *mem)
+static void set_memory_target(const char *p, const char *mem)
 {
     long long int memorykb;
 
@@ -1999,7 +2000,7 @@ static void set_memory_target(char *p, char *mem)
 int main_memset(int argc, char **argv)
 {
     int opt = 0;
-    char *p = NULL, *mem;
+    const char *p = NULL, *mem;
 
     while ((opt = getopt(argc, argv, "h:")) != -1) {
         switch (opt) {
@@ -2023,9 +2024,9 @@ int main_memset(int argc, char **argv)
     return 0;
 }
 
-static void cd_insert(char *dom, char *virtdev, char *phys)
+static void cd_insert(const char *dom, const char *virtdev, char *phys)
 {
-    libxl_device_disk disk;
+    libxl_device_disk disk; /* we don't free disk's contents */
     char *p;
 
     find_domain(dom);
@@ -2054,7 +2055,7 @@ static void cd_insert(char *dom, char *virtdev, char *phys)
             disk.physpath = NULL;
             disk.phystype = 0;
     }
-    disk.virtpath = virtdev;
+    disk.virtpath = (char*)virtdev;
     disk.unpluggable = 1;
     disk.readwrite = 0;
     disk.is_cdrom = 1;
@@ -2065,7 +2066,7 @@ static void cd_insert(char *dom, char *virtdev, char *phys)
 int main_cd_eject(int argc, char **argv)
 {
     int opt = 0;
-    char *p = NULL, *virtdev;
+    const char *p = NULL, *virtdev;
 
     while ((opt = getopt(argc, argv, "hn:")) != -1) {
         switch (opt) {
@@ -2092,7 +2093,8 @@ int main_cd_eject(int argc, char **argv)
 int main_cd_insert(int argc, char **argv)
 {
     int opt = 0;
-    char *p = NULL, *file = NULL, *virtdev;
+    const char *p = NULL, *virtdev;
+    char *file = NULL; /* modified by cd_insert tokenising it */
 
     while ((opt = getopt(argc, argv, "hn:")) != -1) {
         switch (opt) {
@@ -2159,7 +2161,7 @@ int main_console(int argc, char **argv)
     return 1;
 }
 
-static int vncviewer(const char *domain_spec, int autopass)
+static int vncviewer(const const char *domain_spec, int autopass)
 {
     find_domain(domain_spec);
     libxl_vncviewer_exec(&ctx, domid, autopass);
@@ -2238,7 +2240,7 @@ int main_pcilist_assignable(int argc, char **argv)
     return 0;
 }
 
-static void pcilist(char *dom)
+static void pcilist(const char *dom)
 {
     libxl_device_pci *pcidevs;
     int num, i;
@@ -2258,7 +2260,7 @@ static void pcilist(char *dom)
 int main_pcilist(int argc, char **argv)
 {
     int opt;
-    char *domname = NULL;
+    const char *domname = NULL;
 
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
@@ -2281,7 +2283,7 @@ int main_pcilist(int argc, char **argv)
     return 0;
 }
 
-static void pcidetach(char *dom, char *bdf, int force)
+static void pcidetach(const char *dom, const char *bdf, int force)
 {
     libxl_device_pci pcidev;
 
@@ -2300,7 +2302,7 @@ int main_pcidetach(int argc, char **argv)
 {
     int opt;
     int force = 0;
-    char *domname = NULL, *bdf = NULL;
+    const char *domname = NULL, *bdf = NULL;
 
     while ((opt = getopt(argc, argv, "hf")) != -1) {
         switch (opt) {
@@ -2326,7 +2328,7 @@ int main_pcidetach(int argc, char **argv)
     pcidetach(domname, bdf, force);
     return 0;
 }
-static void pciattach(char *dom, char *bdf, char *vs)
+static void pciattach(const char *dom, const char *bdf, const char *vs)
 {
     libxl_device_pci pcidev;
 
@@ -2344,7 +2346,7 @@ static void pciattach(char *dom, char *bdf, char *vs)
 int main_pciattach(int argc, char **argv)
 {
     int opt;
-    char *domname = NULL, *bdf = NULL, *vs = NULL;
+    const char *domname = NULL, *bdf = NULL, *vs = NULL;
 
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
@@ -2371,19 +2373,19 @@ int main_pciattach(int argc, char **argv)
     return 0;
 }
 
-static void pause_domain(char *p)
+static void pause_domain(const char *p)
 {
     find_domain(p);
     libxl_domain_pause(&ctx, domid);
 }
 
-static void unpause_domain(char *p)
+static void unpause_domain(const char *p)
 {
     find_domain(p);
     libxl_domain_unpause(&ctx, domid);
 }
 
-static void destroy_domain(char *p)
+static void destroy_domain(const char *p)
 {
     int rc;
     find_domain(p);
@@ -2395,7 +2397,7 @@ static void destroy_domain(char *p)
     if (rc) { fprintf(stderr,"destroy failed (rc=%d)\n.",rc); exit(-1); }
 }
 
-static void shutdown_domain(char *p, int wait)
+static void shutdown_domain(const char *p, int wait)
 {
     int rc;
 
@@ -2438,7 +2440,7 @@ static void shutdown_domain(char *p, int wait)
     }
 }
 
-static void reboot_domain(char *p)
+static void reboot_domain(const char *p)
 {
     int rc;
     find_domain(p);
@@ -2521,7 +2523,7 @@ static void list_vm(void)
     free(info);
 }
 
-static void save_domain_core_begin(char *domain_spec,
+static void save_domain_core_begin(const char *domain_spec,
                                    const char *override_config_file,
                                    uint8_t **config_data_r,
                                    int *config_len_r)
@@ -2586,7 +2588,7 @@ static void save_domain_core_writeconfig(int fd, const char *filename,
             hdr.optional_data_len);
 }
 
-static int save_domain(char *p, char *filename, int checkpoint,
+static int save_domain(const char *p, const char *filename, int checkpoint,
                 const char *override_config_file)
 {
     int fd;
@@ -2703,7 +2705,7 @@ static void migration_child_report(pid_t migration_child, int recv_fd) {
     migration_child = 0;
 }
 
-static void migrate_domain(char *domain_spec, const char *rune,
+static void migrate_domain(const char *domain_spec, const char *rune,
                            const char *override_config_file)
 {
     pid_t child = -1;
@@ -2978,8 +2980,8 @@ static void migrate_receive(int debug, int daemonize)
 
 int main_restore(int argc, char **argv)
 {
-    char *checkpoint_file = NULL;
-    char *config_file = NULL;
+    const char *checkpoint_file = NULL;
+    const char *config_file = NULL;
     struct domain_create dom_info;
     int paused = 0, debug = 0, daemonize = 1, console_autoconnect = 0;
     int opt, rc;
@@ -3066,7 +3068,7 @@ int main_migrate_receive(int argc, char **argv)
 
 int main_save(int argc, char **argv)
 {
-    char *filename = NULL, *p = NULL;
+    const char *filename = NULL, *p = NULL;
     const char *config_filename;
     int checkpoint = 0;
     int opt;
@@ -3099,7 +3101,7 @@ int main_save(int argc, char **argv)
 
 int main_migrate(int argc, char **argv)
 {
-    char *p = NULL;
+    const char *p = NULL;
     const char *config_filename = NULL;
     const char *ssh_command = "ssh";
     char *rune = NULL;
@@ -3175,7 +3177,7 @@ int main_dump_core(int argc, char **argv)
 int main_pause(int argc, char **argv)
 {
     int opt;
-    char *p;
+    const char *p;
     
 
     while ((opt = getopt(argc, argv, "h")) != -1) {
@@ -3202,7 +3204,7 @@ int main_pause(int argc, char **argv)
 int main_unpause(int argc, char **argv)
 {
     int opt;
-    char *p;
+    const char *p;
     
 
     while ((opt = getopt(argc, argv, "h")) != -1) {
@@ -3229,7 +3231,7 @@ int main_unpause(int argc, char **argv)
 int main_destroy(int argc, char **argv)
 {
     int opt;
-    char *p;
+    const char *p;
 
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
@@ -3256,7 +3258,7 @@ int main_shutdown(int argc, char **argv)
 {
     int opt;
     int wait = 0;
-    char *p;
+    const char *p;
 
     while ((opt = getopt(argc, argv, "hw")) != -1) {
         switch (opt) {
@@ -3285,7 +3287,7 @@ int main_shutdown(int argc, char **argv)
 int main_reboot(int argc, char **argv)
 {
     int opt;
-    char *p;
+    const char *p;
 
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
@@ -3401,8 +3403,9 @@ int main_list_vm(int argc, char **argv)
 
 int main_create(int argc, char **argv)
 {
-    char *filename = NULL;
-    char *p, extra_config[1024];
+    const char *filename = NULL;
+    char *p;
+    char extra_config[1024];
     struct domain_create dom_info;
     int paused = 0, debug = 0, daemonize = 1, console_autoconnect = 0,
         dryrun = 0, quiet = 0;
@@ -3483,7 +3486,7 @@ int main_create(int argc, char **argv)
     return 0;
 }
 
-static void button_press(char *p, char *b)
+static void button_press(const char *p, const char *b)
 {
     libxl_button button;
 
@@ -3504,8 +3507,8 @@ static void button_press(char *p, char *b)
 int main_button_press(int argc, char **argv)
 {
     int opt;
-    char *p;
-    char *b;
+    const char *p;
+    const char *b;
 
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
@@ -3675,7 +3678,7 @@ int main_vcpulist(int argc, char **argv)
     return 0;
 }
 
-static void vcpupin(char *d, const char *vcpu, char *cpu)
+static void vcpupin(const char *d, const char *vcpu, char *cpu)
 {
     libxl_vcpuinfo *vcpuinfo;
     libxl_cpumap cpumap;
@@ -3771,7 +3774,7 @@ int main_vcpupin(int argc, char **argv)
     return 0;
 }
 
-static void vcpuset(char *d, char* nr_vcpus)
+static void vcpuset(const char *d, const char* nr_vcpus)
 {
     char *endptr;
     unsigned int max_vcpus, i;
@@ -3978,7 +3981,7 @@ int main_sched_credit(int argc, char **argv)
     libxl_dominfo *info;
     libxl_sched_credit scinfo;
     int nb_domain, i;
-    char *dom = NULL;
+    const char *dom = NULL;
     int weight = 256, cap = 0, opt_w = 0, opt_c = 0;
     int opt, rc;
 
@@ -4050,7 +4053,7 @@ int main_sched_credit(int argc, char **argv)
 int main_domid(int argc, char **argv)
 {
     int opt;
-    char *domname = NULL;
+    const char *domname = NULL;
 
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
@@ -4124,8 +4127,8 @@ int main_domname(int argc, char **argv)
 int main_rename(int argc, char **argv)
 {
     int opt;
-    char *dom;
-    char *new_name;
+    const char *dom;
+    const char *new_name;
 
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
@@ -4161,7 +4164,7 @@ int main_trigger(int argc, char **argv)
     int opt;
     char *trigger_name = NULL;
     char *endptr = NULL;
-    char *dom = NULL;
+    const char *dom = NULL;
     int vcpuid = 0;
 
     while ((opt = getopt(argc, argv, "h")) != -1) {
@@ -4202,8 +4205,8 @@ int main_trigger(int argc, char **argv)
 int main_sysrq(int argc, char **argv)
 {
     int opt;
-    char *sysrq = NULL;
-    char *dom = NULL;
+    const char *sysrq = NULL;
+    const char *dom = NULL;
 
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
@@ -4323,7 +4326,8 @@ int main_networkattach(int argc, char **argv)
 {
     int opt;
     libxl_device_nic nic;
-    char *endptr, *tok;
+    char *endptr;
+    const char *tok;
     int i;
     unsigned int val;
 
@@ -4499,7 +4503,7 @@ int main_networkdetach(int argc, char **argv)
 int main_blockattach(int argc, char **argv)
 {
     int opt;
-    char *tok;
+    const char *tok;
     uint32_t fe_domid, be_domid = 0;
     libxl_device_disk disk = { 0 };
 
@@ -4654,8 +4658,9 @@ int main_blockdetach(int argc, char **argv)
 int main_network2attach(int argc, char **argv)
 {
     int opt;
-    char *tok, *endptr;
-    char *back_dom = NULL;
+    const char *tok;
+    char *endptr;
+    const char *back_dom = NULL;
     uint32_t domid, back_domid;
     unsigned int val, i;
     libxl_device_net2 net2;
@@ -4987,7 +4992,7 @@ static void print_uptime(int short_mode, uint32_t doms[], int nb_doms)
 
 int main_uptime(int argc, char **argv)
 {
-    char *dom = NULL;
+    const char *dom = NULL;
     int short_mode = 0;
     uint32_t domains[100];
     int nb_doms = 0;
@@ -5019,7 +5024,7 @@ int main_uptime(int argc, char **argv)
 
 int main_tmem_list(int argc, char **argv)
 {
-    char *dom = NULL;
+    const char *dom = NULL;
     char *buf = NULL;
     int use_long = 0;
     int all = 0;
@@ -5065,7 +5070,7 @@ int main_tmem_list(int argc, char **argv)
 
 int main_tmem_freeze(int argc, char **argv)
 {
-    char *dom = NULL;
+    const char *dom = NULL;
     int all = 0;
     int opt;
 
@@ -5101,7 +5106,7 @@ int main_tmem_freeze(int argc, char **argv)
 
 int main_tmem_destroy(int argc, char **argv)
 {
-    char *dom = NULL;
+    const char *dom = NULL;
     int all = 0;
     int opt;
 
@@ -5137,7 +5142,7 @@ int main_tmem_destroy(int argc, char **argv)
 
 int main_tmem_thaw(int argc, char **argv)
 {
-    char *dom = NULL;
+    const char *dom = NULL;
     int all = 0;
     int opt;
 
@@ -5173,7 +5178,7 @@ int main_tmem_thaw(int argc, char **argv)
 
 int main_tmem_set(int argc, char **argv)
 {
-    char *dom = NULL;
+    const char *dom = NULL;
     uint32_t weight = 0, cap = 0, compress = 0;
     int opt_w = 0, opt_c = 0, opt_p = 0;
     int all = 0;
@@ -5235,9 +5240,9 @@ int main_tmem_set(int argc, char **argv)
 
 int main_tmem_shared_auth(int argc, char **argv)
 {
-    char *autharg = NULL;
+    const char *autharg = NULL;
     char *endptr = NULL;
-    char *dom = NULL;
+    const char *dom = NULL;
     char *uuid = NULL;
     int auth = -1;
     int all = 0;
@@ -5318,8 +5323,9 @@ int main_tmem_freeable(int argc, char **argv)
 
 int main_cpupoolcreate(int argc, char **argv)
 {
-    char *filename = NULL;
-    char *p, extra_config[1024];
+    const const char *filename = NULL;
+    const char *p;
+    char extra_config[1024];
     int dryrun = 0;
     int opt;
     int option_index = 0;
@@ -5334,7 +5340,8 @@ int main_cpupoolcreate(int argc, char **argv)
     int config_len = 0;
     XLU_Config *config;
     const char *buf;
-    char *name, *sched;
+    char *name;
+    const char *sched;
     uint32_t poolid;
     int schedid = -1;
     XLU_ConfigList *cpus;
@@ -5508,7 +5515,7 @@ int main_cpupoollist(int argc, char **argv)
     };
     int opt_long = 0;
     int opt_cpus = 0;
-    char *pool = NULL;
+    const char *pool = NULL;
     libxl_cpupoolinfo *poolinfo;
     int n_pools, p, c, n;
     uint32_t poolid;
@@ -5598,7 +5605,7 @@ int main_cpupoollist(int argc, char **argv)
 int main_cpupooldestroy(int argc, char **argv)
 {
     int opt;
-    char *pool;
+    const char *pool;
     uint32_t poolid;
 
     while ((opt = getopt(argc, argv, "h")) != -1) {
@@ -5631,7 +5638,7 @@ int main_cpupooldestroy(int argc, char **argv)
 int main_cpupoolcpuadd(int argc, char **argv)
 {
     int opt;
-    char *pool;
+    const char *pool;
     uint32_t poolid;
     int cpu;
 
@@ -5672,7 +5679,7 @@ int main_cpupoolcpuadd(int argc, char **argv)
 int main_cpupoolcpuremove(int argc, char **argv)
 {
     int opt;
-    char *pool;
+    const char *pool;
     uint32_t poolid;
     int cpu;
 
@@ -5713,9 +5720,9 @@ int main_cpupoolcpuremove(int argc, char **argv)
 int main_cpupoolmigrate(int argc, char **argv)
 {
     int opt;
-    char *pool;
+    const char *pool;
     uint32_t poolid;
-    char *dom;
+    const char *dom;
     uint32_t domid;
 
     while ((opt = getopt(argc, argv, "h")) != -1) {

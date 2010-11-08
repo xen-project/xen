@@ -86,7 +86,7 @@ int main_cpupoolcpuadd(int argc, char **argv);
 int main_cpupoolcpuremove(int argc, char **argv);
 int main_cpupoolmigrate(int argc, char **argv);
 
-void help(char *command);
+void help(const char *command);
 
 extern struct cmd_spec cmd_table[];
 extern int cmdtable_len;
