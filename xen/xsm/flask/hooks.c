@@ -1177,6 +1177,25 @@ static int flask_ext_vcpucontext (struct domain *d, uint32_t cmd)
 
     return domain_has_perm(current->domain, d, SECCLASS_DOMAIN, perm);
 }
+
+static int flask_vcpuextstate (struct domain *d, uint32_t cmd)
+{
+    u32 perm;
+
+    switch ( cmd )
+    {
+        case XEN_DOMCTL_setvcpuextstate:
+            perm = DOMAIN__SETVCPUEXTSTATE;
+        break;
+        case XEN_DOMCTL_getvcpuextstate:
+            perm = DOMAIN__GETVCPUEXTSTATE;
+        break;
+        default:
+            return -EPERM;
+    }
+
+    return domain_has_perm(current->domain, d, SECCLASS_DOMAIN, perm);
+}
 #endif
 
 static int io_has_perm(struct domain *d, char *name, unsigned long s, 
@@ -1328,6 +1347,7 @@ static struct xsm_operations flask_ops = {
     .bind_pt_irq = flask_bind_pt_irq,
     .pin_mem_cacheattr = flask_pin_mem_cacheattr,
     .ext_vcpucontext = flask_ext_vcpucontext,
+    .vcpuextstate = flask_vcpuextstate,
 #endif
 };
 
