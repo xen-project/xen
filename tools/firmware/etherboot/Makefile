@@ -10,7 +10,7 @@ else
 IPXE_GIT_URL := git://git.ipxe.org/ipxe.git
 endif
 
-IPXE_GIT_TAG := v1.0.0-rc1
+IPXE_GIT_TAG := v1.0.0
 
 D=ipxe
 T=ipxe-git-snapshot.tar.gz
