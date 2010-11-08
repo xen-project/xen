@@ -185,9 +185,9 @@ endif
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= e995698610ef5f2d812db6b81d0a71b077bc9695
-# Wed Nov 3 12:46:45 2010 +0000
-# block-vvfat.c: fix warnings with _FORTIFY_SOURCE
+QEMU_TAG ?= 0442ec23f9efc4f8f9259351f612194f8f42900c
+# Mon Nov 8 17:09:54 2010 +0000
+# stubdom: fix handing of dependency files
 
 # Optional components
 XENSTAT_XENTOP     ?= y
