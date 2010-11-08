@@ -28,7 +28,7 @@ static struct pci_hostbridge_probe pci_probes[] __cpuinitdata = {
 	{ 0xff, 0, PCI_VENDOR_ID_AMD, 0x1200 },
 };
 
-#define UNIT (1ULL << (5 + 3 + 12))
+#define UNIT (1ULL << FAM10H_MMIO_CONF_BASE_SHIFT)
 #define MASK (~(UNIT - 1))
 #define SIZE (UNIT << 8)
 /* need to avoid (0xfd<<32) and (0xfe<<32), ht used space */
@@ -68,12 +68,12 @@ static void __init get_fam10h_pci_mmconf_base(void)
 
 	/* TOP_MEM2 is not enabled? */
 	if (!(val & (1<<21))) {
-		tom2 = 0;
+		tom2 = 1ULL << 32;
 	} else {
 		/* TOP_MEM2 */
 		address = MSR_K8_TOP_MEM2;
 		rdmsrl(address, val);
-		tom2 = val & 0xffffff800000ULL;
+		tom2 = max(val & 0xffffff800000ULL, 1ULL << 32);
 	}
 
 	/*
@@ -89,7 +89,7 @@ static void __init get_fam10h_pci_mmconf_base(void)
 		val = pci_conf_read32(bus, slot, 1, 0x84 + (i << 3));
 		end = ((val & 0xffffff00) << 8) | 0xffff; /* 39:16 on 31:8*/
 
-		if (!end)
+		if (end < tom2)
 			continue;
 
 		for (j = hi_mmio_num; j; --j) {
@@ -119,13 +119,13 @@ static void __init get_fam10h_pci_mmconf_base(void)
 	if (start > tom2 && BASE_VALID(start))
 		goto out;
 	start = (range[hi_mmio_num - 1].end + UNIT) & MASK;
-	if (start > tom2 && BASE_VALID(start))
+	if (BASE_VALID(start))
 		goto out;
 	/* need to find window between ranges */
 	for (i = 1; i < hi_mmio_num; i++) {
 		start = (range[i - 1].end + UNIT) & MASK;
 		end = range[i].start & MASK;
-		if (end >= start + SIZE && start > tom2 && BASE_VALID(start))
+		if (end >= start + SIZE && BASE_VALID(start))
 			goto out;
 	}
 	return;
