@@ -96,16 +96,10 @@ int libxl__build_post(libxl_ctx *ctx, uint32_t domid,
     xs_transaction_t t;
     char **ents;
     int i;
-    char *cpuid_res[4];
 
-#if defined(__i386__) || defined(__x86_64__)
-    xc_cpuid_apply_policy(ctx->xch, domid);
-    if (info->cpuid != NULL) {
-        for (i = 0; info->cpuid[i].input[0] != XEN_CPUID_INPUT_UNUSED; i++)
-            xc_cpuid_set(ctx->xch, domid, info->cpuid[i].input,
-                         (const char**)(info->cpuid[i].policy), cpuid_res);
-    }
-#endif
+    libxl_cpuid_apply_policy(ctx, domid);
+    if (info->cpuid != NULL)
+        libxl_cpuid_set(ctx, domid, info->cpuid);
 
     ents = libxl__calloc(&gc, 12 + (info->max_vcpus * 2) + 2, sizeof(char *));
     ents[0] = "memory/static-max";

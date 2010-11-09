@@ -26,6 +26,8 @@ LIBXL_OBJS-y += libxl_blktap2.o
 else
 LIBXL_OBJS-y += libxl_noblktap2.o
 endif
+LIBXL_OBJS-$(CONFIG_X86) += libxl_cpuid.o
+LIBXL_OBJS-$(CONFIG_IA64) += libxl_nocpuid.o
 
 LIBXL_OBJS = flexarray.o libxl.o libxl_pci.o libxl_dom.o libxl_exec.o libxl_xshelp.o libxl_device.o libxl_internal.o libxl_utils.o $(LIBXL_OBJS-y)
 LIBXL_OBJS += _libxl_types.o
