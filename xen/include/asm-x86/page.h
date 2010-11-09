@@ -302,6 +302,7 @@ extern l2_pgentry_t   idle_pg_table_l2[
 extern l2_pgentry_t  *compat_idle_pg_table_l2;
 extern unsigned int   m2p_compat_vstart;
 #endif
+extern l2_pgentry_t l2_identmap[4*L2_PAGETABLE_ENTRIES];
 void paging_init(void);
 void setup_idle_pagetable(void);
 #endif /* !defined(__ASSEMBLY__) */
@@ -397,6 +398,7 @@ static inline uint32_t cacheattr_to_pte_flags(uint32_t cacheattr)
 
 #define PFN_DOWN(x)   ((x) >> PAGE_SHIFT)
 #define PFN_UP(x)     (((x) + PAGE_SIZE-1) >> PAGE_SHIFT)
+#define PAGE_ALIGN(x) (((x) + PAGE_SIZE - 1) & PAGE_MASK)
 
 #endif /* __X86_PAGE_H__ */
 

@@ -31,6 +31,7 @@
 #include <asm/p2m.h>
 #include <asm/e820.h>
 #include <asm/acpi.h>
+#include <asm/setup.h>
 #include <asm/bzimage.h> /* for bzimage_parse */
 #include <asm/io_apic.h>
 
@@ -284,9 +285,9 @@ static void __init process_dom0_ioports_disable(void)
 
 int __init construct_dom0(
     struct domain *d,
-    unsigned long _image_base,
-    unsigned long _image_start, unsigned long image_len,
-    unsigned long _initrd_start, unsigned long initrd_len,
+    const module_t *image, unsigned long image_headroom,
+    const module_t *initrd,
+    void *(*bootstrap_map)(const module_t *),
     char *cmdline)
 {
     int i, cpu, rc, compatible, compat32, order, machine;
@@ -301,16 +302,14 @@ int __init construct_dom0(
     start_info_t *si;
     struct vcpu *v = d->vcpu[0];
     unsigned long long value;
-#if defined(__i386__)
-    char *image_base   = (char *)_image_base;   /* use lowmem mappings */
-    char *image_start  = (char *)_image_start;  /* use lowmem mappings */
-    char *initrd_start = (char *)_initrd_start; /* use lowmem mappings */
-#elif defined(__x86_64__)
-    char *image_base   = __va(_image_base);
-    char *image_start  = __va(_image_start);
-    char *initrd_start = __va(_initrd_start);
-#endif
-#if CONFIG_PAGING_LEVELS >= 4
+    char *image_base = bootstrap_map(image);
+    unsigned long image_len = image->mod_end;
+    char *image_start = image_base + image_headroom;
+    unsigned long initrd_len = initrd ? initrd->mod_end : 0;
+#if CONFIG_PAGING_LEVELS < 4
+    module_t mpt;
+    void *mpt_ptr;
+#else
     l4_pgentry_t *l4tab = NULL, *l4start = NULL;
 #endif
     l3_pgentry_t *l3tab = NULL, *l3start = NULL;
@@ -340,7 +339,7 @@ int __init construct_dom0(
     unsigned long v_end;
 
     /* Machine address of next candidate page-table page. */
-    unsigned long mpt_alloc;
+    paddr_t mpt_alloc;
 
     /* Sanity! */
     BUG_ON(d->domain_id != 0);
@@ -495,17 +494,17 @@ int __init construct_dom0(
     if ( (1UL << order) > nr_pages )
         panic("Domain 0 allocation is too small for kernel image.\n");
 
-#ifdef __i386__
-    /* Ensure that our low-memory 1:1 mapping covers the allocation. */
-    page = alloc_domheap_pages(d, order, MEMF_bits(30));
-#else
     if ( parms.p2m_base != UNSET_ADDR )
     {
         vphysmap_start = parms.p2m_base;
         vphysmap_end   = vphysmap_start + nr_pages * sizeof(unsigned long);
     }
-    page = alloc_domheap_pages(d, order, 0);
+#ifdef __i386__
+    if ( !test_bit(XENFEAT_pae_pgdir_above_4gb, parms.f_supported) )
+        page = alloc_domheap_pages(d, order, MEMF_bits(32));
+    else
 #endif
+        page = alloc_domheap_pages(d, order, 0);
     if ( page == NULL )
         panic("Not enough RAM for domain 0 allocation.\n");
     alloc_spfn = page_to_mfn(page);
@@ -534,8 +533,7 @@ int __init construct_dom0(
            _p(v_start), _p(v_end));
     printk(" ENTRY ADDRESS: %p\n", _p(parms.virt_entry));
 
-    mpt_alloc = (vpt_start - v_start) +
-        (unsigned long)pfn_to_paddr(alloc_spfn);
+    mpt_alloc = (vpt_start - v_start) + pfn_to_paddr(alloc_spfn);
 
 #if defined(__i386__)
     /*
@@ -548,17 +546,25 @@ int __init construct_dom0(
         return -EINVAL;
     }
 
+    mpt.mod_start = mpt_alloc >> PAGE_SHIFT;
+    mpt.mod_end   = vpt_end - vpt_start;
+    mpt_ptr = bootstrap_map(&mpt);
+#define MPT_ALLOC(n) (mpt_ptr += (n)*PAGE_SIZE, mpt_alloc += (n)*PAGE_SIZE)
+
     /* WARNING: The new domain must have its 'processor' field filled in! */
-    l3start = l3tab = (l3_pgentry_t *)mpt_alloc; mpt_alloc += PAGE_SIZE;
-    l2start = l2tab = (l2_pgentry_t *)mpt_alloc; mpt_alloc += 4*PAGE_SIZE;
+    l3start = l3tab = mpt_ptr; MPT_ALLOC(1);
+    l2start = l2tab = mpt_ptr; MPT_ALLOC(4);
     for (i = 0; i < L3_PAGETABLE_ENTRIES; i++) {
-        copy_page(l2tab + i * L2_PAGETABLE_ENTRIES,
-                  idle_pg_table_l2 + i * L2_PAGETABLE_ENTRIES);
-        l3tab[i] = l3e_from_paddr((u32)l2tab + i*PAGE_SIZE, L3_PROT);
+        if ( i < 3 )
+            clear_page(l2tab + i * L2_PAGETABLE_ENTRIES);
+        else
+            copy_page(l2tab + i * L2_PAGETABLE_ENTRIES,
+                      idle_pg_table_l2 + i * L2_PAGETABLE_ENTRIES);
+        l3tab[i] = l3e_from_pfn(mpt.mod_start + 1 + i, L3_PROT);
         l2tab[(LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT)+i] =
-            l2e_from_paddr((u32)l2tab + i*PAGE_SIZE, __PAGE_HYPERVISOR);
+            l2e_from_pfn(mpt.mod_start + 1 + i, __PAGE_HYPERVISOR);
     }
-    v->arch.guest_table = pagetable_from_paddr((unsigned long)l3start);
+    v->arch.guest_table = pagetable_from_pfn(mpt.mod_start);
 
     for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
         l2tab[l2_linear_offset(PERDOMAIN_VIRT_START) + i] =
@@ -570,9 +576,9 @@ int __init construct_dom0(
     {
         if ( !((unsigned long)l1tab & (PAGE_SIZE-1)) )
         {
-            l1start = l1tab = (l1_pgentry_t *)mpt_alloc;
-            mpt_alloc += PAGE_SIZE;
-            *l2tab = l2e_from_paddr((unsigned long)l1start, L2_PROT);
+            l1tab = mpt_ptr;
+            *l2tab = l2e_from_paddr(mpt_alloc, L2_PROT);
+            MPT_ALLOC(1);
             l2tab++;
             clear_page(l1tab);
             if ( count == 0 )
@@ -587,11 +593,14 @@ int __init construct_dom0(
 
         mfn++;
     }
+#undef MPT_ALLOC
 
     /* Pages that are part of page tables must be read only. */
+    mpt_alloc = (paddr_t)mpt.mod_start << PAGE_SHIFT;
+    mpt_ptr = l3start;
     l2tab = l2start + l2_linear_offset(vpt_start);
-    l1start = l1tab = (l1_pgentry_t *)(u32)l2e_get_paddr(*l2tab);
-    l1tab += l1_table_offset(vpt_start);
+    l1start = mpt_ptr + (l2e_get_paddr(*l2tab) - mpt_alloc);
+    l1tab = l1start + l1_table_offset(vpt_start);
     for ( count = 0; count < nr_pt_pages; count++ ) 
     {
         page = mfn_to_page(l1e_get_pfn(*l1tab));
@@ -627,8 +636,14 @@ int __init construct_dom0(
             break;
         }
         if ( !((unsigned long)++l1tab & (PAGE_SIZE - 1)) )
-            l1start = l1tab = (l1_pgentry_t *)(u32)l2e_get_paddr(*++l2tab);
+            l1tab = mpt_ptr + (l2e_get_paddr(*++l2tab) - mpt_alloc);
     }
+
+    /*
+     * Put Xen's first L3 entry into Dom0's page tables so that updates
+     * through bootstrap_map() will affect the page tables we will run on.
+     */
+    l3start[0] = l3e_from_paddr(__pa(idle_pg_table_l2), L3_PROT);
 
 #elif defined(__x86_64__)
 
@@ -807,6 +822,7 @@ int __init construct_dom0(
     /* Copy the OS image and free temporary buffer. */
     elf.dest = (void*)vkern_start;
     elf_load_binary(&elf);
+    bootstrap_map(NULL);
 
     if ( UNSET_ADDR != parms.virt_hypercall )
     {
@@ -823,7 +839,12 @@ int __init construct_dom0(
 
     /* Copy the initial ramdisk. */
     if ( initrd_len != 0 )
+    {
+        char *initrd_start = bootstrap_map(initrd);
+
         memcpy((void *)vinitrd_start, initrd_start, initrd_len);
+        bootstrap_map(NULL);
+    }
 
     /* Free temporary buffers. */
     discard_initial_images();
@@ -1033,7 +1054,22 @@ int __init construct_dom0(
     write_ptbase(current);
 
 #if defined(__i386__)
-    /* Destroy low mappings - they were only for our convenience. */
+    /* Restore Dom0's first L3 entry. */
+    mpt.mod_end = 5 * PAGE_SIZE;
+    l3start = mpt_ptr = bootstrap_map(&mpt);
+    l2start = mpt_ptr + PAGE_SIZE;
+    l3start[0] = l3e_from_pfn(mpt.mod_start + 1, L3_PROT);
+
+    /* Re-setup CR3  */
+    if ( paging_mode_enabled(d) )
+        paging_update_paging_modes(v);
+    else
+        update_cr3(v);
+
+    /*
+     * Destroy low mappings - they were only for our convenience. Note
+     * that zap_low_mappings() exceeds what bootstrap_map(NULL) would do.
+     */
     zap_low_mappings(l2start);
 #endif
 

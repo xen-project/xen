@@ -47,7 +47,7 @@ static void __init do_xsm_initcalls(void)
 }
 
 int __init xsm_init(unsigned int *initrdidx, const multiboot_info_t *mbi,
-                    unsigned long initial_images_start)
+                    void *(*bootstrap_map)(const module_t *))
 {
     int ret = 0;
 
@@ -55,9 +55,10 @@ int __init xsm_init(unsigned int *initrdidx, const multiboot_info_t *mbi,
 
     if ( XSM_MAGIC )
     {
-        ret = xsm_policy_init(initrdidx, mbi, initial_images_start);
+        ret = xsm_policy_init(initrdidx, mbi, bootstrap_map);
         if ( ret )
         {
+            bootstrap_map(NULL);
             printk("%s: Error initializing policy.\n", __FUNCTION__);
             return -EINVAL;
         }
@@ -65,6 +66,7 @@ int __init xsm_init(unsigned int *initrdidx, const multiboot_info_t *mbi,
 
     if ( verify(&dummy_xsm_ops) )
     {
+        bootstrap_map(NULL);
         printk("%s could not verify "
                "dummy_xsm_ops structure.\n", __FUNCTION__);
         return -EIO;
@@ -72,6 +74,7 @@ int __init xsm_init(unsigned int *initrdidx, const multiboot_info_t *mbi,
 
     xsm_ops = &dummy_xsm_ops;
     do_xsm_initcalls();
+    bootstrap_map(NULL);
 
     return 0;
 }

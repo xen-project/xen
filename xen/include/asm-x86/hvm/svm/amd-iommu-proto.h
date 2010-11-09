@@ -30,7 +30,6 @@
         &amd_iommu_head, list)
 
 #define DMA_32BIT_MASK  0x00000000ffffffffULL
-#define PAGE_ALIGN(addr)    (((addr) + PAGE_SIZE - 1) & PAGE_MASK)
 
 extern int amd_iommu_debug;
 extern int amd_iommu_perdev_intremap;

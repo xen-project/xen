@@ -1,6 +1,8 @@
 #ifndef __X86_SETUP_H_
 #define __X86_SETUP_H_
 
+#include <xen/multiboot.h>
+
 extern int early_boot;
 extern unsigned long xenheap_initial_phys_start;
 
@@ -24,5 +26,15 @@ void subarch_init_memory(void);
 void init_IRQ(void);
 void vesa_init(void);
 void vesa_mtrr_init(void);
+
+int construct_dom0(
+    struct domain *d,
+    const module_t *kernel, unsigned long kernel_headroom,
+    const module_t *initrd,
+    void *(*bootstrap_map)(const module_t *),
+    char *cmdline);
+
+unsigned long initial_images_nrpages(void);
+void discard_initial_images(void);
 
 #endif

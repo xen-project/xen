@@ -45,14 +45,6 @@
 #include <asm/setup.h>
 #include <xen/cpu.h>
 
-#if defined(CONFIG_X86_64)
-#define BOOTSTRAP_DIRECTMAP_END (1UL << 32) /* 4GB */
-#define maddr_to_bootstrap_virt(m) maddr_to_virt(m)
-#else
-#define BOOTSTRAP_DIRECTMAP_END (1UL << 30) /* 1GB */
-#define maddr_to_bootstrap_virt(m) ((void *)(long)(m))
-#endif
-
 extern u16 boot_edid_caps;
 extern u8 boot_edid_info[128];
 extern struct boot_video_info boot_vid_info;
@@ -152,21 +144,34 @@ static void __init parse_acpi_param(char *s)
     for ( ; ; ) halt();                         \
 } while (0)
 
-static unsigned long __initdata initial_images_base;
-static unsigned long __initdata initial_images_start;
-static unsigned long __initdata initial_images_end;
+static const module_t *__initdata initial_images;
+static unsigned int __initdata nr_initial_images;
 
 unsigned long __init initial_images_nrpages(void)
 {
-    ASSERT(!(initial_images_base & ~PAGE_MASK));
-    ASSERT(!(initial_images_end   & ~PAGE_MASK));
-    return ((initial_images_end >> PAGE_SHIFT) -
-            (initial_images_base >> PAGE_SHIFT));
+    unsigned long nr;
+    unsigned int i;
+
+    for ( nr = i = 0; i < nr_initial_images; ++i )
+        nr += PFN_UP(initial_images[i].mod_end);
+
+    return nr;
 }
 
 void __init discard_initial_images(void)
 {
-    init_domheap_pages(initial_images_base, initial_images_end);
+    unsigned int i;
+
+    for ( i = 0; i < nr_initial_images; ++i )
+    {
+        uint64_t start = (uint64_t)initial_images[i].mod_start << PAGE_SHIFT;
+
+        init_domheap_pages(start,
+                           start + PAGE_ALIGN(initial_images[i].mod_end));
+    }
+
+    nr_initial_images = 0;
+    initial_images = NULL;
 }
 
 static void free_xen_data(char *s, char *e)
@@ -257,33 +262,128 @@ static void __init normalise_cpu_order(void)
     }
 }
 
+#define BOOTSTRAP_MAP_BASE  (16UL << 20)
+#define BOOTSTRAP_MAP_LIMIT (1UL << L3_PAGETABLE_SHIFT)
+
 /*
  * Ensure a given physical memory range is present in the bootstrap mappings.
  * Use superpage mappings to ensure that pagetable memory needn't be allocated.
  */
-static void __init bootstrap_map(unsigned long start, unsigned long end)
+static void *__init bootstrap_map(const module_t *mod)
 {
-    unsigned long mask = (1UL << L2_PAGETABLE_SHIFT) - 1;
-    start = max_t(unsigned long, start & ~mask, 16UL << 20);
-    end   = (end + mask) & ~mask;
+    static unsigned long __initdata map_cur = BOOTSTRAP_MAP_BASE;
+    uint64_t start, end, mask = (1L << L2_PAGETABLE_SHIFT) - 1;
+    void *ret;
+
+#ifdef __x86_64__
+    if ( !early_boot )
+        return mod ? mfn_to_virt(mod->mod_start) : NULL;
+#endif
+
+    if ( !mod )
+    {
+        destroy_xen_mappings(BOOTSTRAP_MAP_BASE, BOOTSTRAP_MAP_LIMIT);
+        map_cur = BOOTSTRAP_MAP_BASE;
+        return NULL;
+    }
+
+    start = (uint64_t)mod->mod_start << PAGE_SHIFT;
+    end = start + mod->mod_end;
     if ( start >= end )
-        return;
-    if ( end > BOOTSTRAP_DIRECTMAP_END )
-        panic("Cannot access memory beyond end of "
-              "bootstrap direct-map area\n");
-    map_pages_to_xen(
-        (unsigned long)maddr_to_bootstrap_virt(start),
-        start >> PAGE_SHIFT, (end-start) >> PAGE_SHIFT, PAGE_HYPERVISOR);
+        return NULL;
+
+    if ( end <= BOOTSTRAP_MAP_BASE )
+        return (void *)(unsigned long)start;
+
+    ret = (void *)(map_cur + (unsigned long)(start & mask));
+    start &= ~mask;
+    end = (end + mask) & ~mask;
+    if ( end - start > BOOTSTRAP_MAP_LIMIT - map_cur )
+        return NULL;
+
+    map_pages_to_xen(map_cur, start >> PAGE_SHIFT,
+                     (end - start) >> PAGE_SHIFT, PAGE_HYPERVISOR);
+    map_cur += end - start;
+    return ret;
 }
 
-static void __init move_memory(
-    unsigned long dst, unsigned long src_start, unsigned long src_end)
+static void *__init move_memory(
+    uint64_t dst, uint64_t src, unsigned int size, bool_t keep)
 {
-    bootstrap_map(src_start, src_end);
-    bootstrap_map(dst, dst + src_end - src_start);
-    memmove(maddr_to_bootstrap_virt(dst),
-            maddr_to_bootstrap_virt(src_start),
-            src_end - src_start);
+    unsigned int blksz = BOOTSTRAP_MAP_LIMIT - BOOTSTRAP_MAP_BASE;
+    unsigned int mask = (1L << L2_PAGETABLE_SHIFT) - 1;
+
+    if ( src + size > BOOTSTRAP_MAP_BASE )
+        blksz >>= 1;
+
+    while ( size )
+    {
+        module_t mod;
+        unsigned int soffs = src & mask;
+        unsigned int doffs = dst & mask;
+        unsigned int sz;
+        void *d, *s;
+
+        mod.mod_start = (src - soffs) >> PAGE_SHIFT;
+        mod.mod_end = soffs + size;
+        if ( mod.mod_end > blksz )
+            mod.mod_end = blksz;
+        sz = mod.mod_end - soffs;
+        s = bootstrap_map(&mod);
+
+        mod.mod_start = (dst - doffs) >> PAGE_SHIFT;
+        mod.mod_end = doffs + size;
+        if ( mod.mod_end > blksz )
+            mod.mod_end = blksz;
+        if ( sz > mod.mod_end - doffs )
+            sz = mod.mod_end - doffs;
+        d = bootstrap_map(&mod);
+
+        memmove(d + doffs, s + soffs, sz);
+
+        dst += sz;
+        src += sz;
+        size -= sz;
+
+        if ( keep )
+            return size ? NULL : d + doffs;
+
+        bootstrap_map(NULL);
+    }
+
+    return NULL;
+}
+
+static uint64_t __init consider_modules(
+    uint64_t s, uint64_t e, uint32_t size, const module_t *mod,
+    unsigned int nr_mods, unsigned int this_mod)
+{
+    unsigned int i;
+
+    if ( s > e || e - s < size )
+        return 0;
+
+    for ( i = 0; i < nr_mods ; ++i )
+    {
+        uint64_t start = (uint64_t)mod[i].mod_start << PAGE_SHIFT;
+        uint64_t end = start + PAGE_ALIGN(mod[i].mod_end);
+
+        if ( i == this_mod )
+            continue;
+
+        if ( s < end && start < e )
+        {
+            end = consider_modules(end, e, size, mod + i + 1,
+                                   nr_mods - i - 1, this_mod - i - 1);
+            if ( end )
+                return end;
+
+            return consider_modules(s, start, size, mod + i + 1,
+                                    nr_mods - i - 1, this_mod - i - 1);
+        }
+    }
+
+    return e;
 }
 
 static void __init setup_max_pdx(void)
@@ -447,11 +547,10 @@ void __init __start_xen(unsigned long mbi_p)
 {
     char *memmap_type = NULL;
     char *cmdline, *kextra, *loader;
-    unsigned long _initrd_start = 0, _initrd_len = 0;
     unsigned int initrdidx = 1;
     multiboot_info_t *mbi = __va(mbi_p);
     module_t *mod = (module_t *)__va(mbi->mods_addr);
-    unsigned long nr_pages, modules_length, modules_headroom;
+    unsigned long nr_pages, modules_headroom;
     int i, j, e820_warn = 0, bytes = 0;
     bool_t acpi_boot_table_init_done = 0;
     struct ns16550_defaults ns16550 = {
@@ -647,6 +746,9 @@ void __init __start_xen(unsigned long mbi_p)
     set_kexec_crash_area_size((u64)nr_pages << PAGE_SHIFT);
     kexec_reserve_area(&boot_e820);
 
+    initial_images = mod;
+    nr_initial_images = mbi->mods_count;
+
     /*
      * Iterate backwards over all superpage-aligned RAM regions.
      * 
@@ -660,48 +762,64 @@ void __init __start_xen(unsigned long mbi_p)
      * we can relocate the dom0 kernel and other multiboot modules. Also, on
      * x86/64, we relocate Xen to higher memory.
      */
-    modules_length = 0;
     for ( i = 0; i < mbi->mods_count; i++ )
-        modules_length += mod[i].mod_end - mod[i].mod_start;
+    {
+        if ( mod[i].mod_start & (PAGE_SIZE - 1) )
+            EARLY_FAIL("Bootloader didn't honor module alignment request.\n");
+        mod[i].mod_end -= mod[i].mod_start;
+        mod[i].mod_start >>= PAGE_SHIFT;
+        mod[i].reserved = 0;
+    }
 
-    /* ensure mod[0] is mapped before parsing */
-    bootstrap_map(mod[0].mod_start, mod[0].mod_end);
-    modules_headroom = bzimage_headroom(
-                      (char *)(unsigned long)mod[0].mod_start,
-                      (unsigned long)(mod[0].mod_end - mod[0].mod_start));
+    modules_headroom = bzimage_headroom(bootstrap_map(mod), mod->mod_end);
+    bootstrap_map(NULL);
 
     for ( i = boot_e820.nr_map-1; i >= 0; i-- )
     {
         uint64_t s, e, mask = (1UL << L2_PAGETABLE_SHIFT) - 1;
+        uint64_t end, limit = ARRAY_SIZE(l2_identmap) << L2_PAGETABLE_SHIFT;
 
-        /* Superpage-aligned chunks from 16MB to BOOTSTRAP_DIRECTMAP_END. */
+        /* Superpage-aligned chunks from BOOTSTRAP_MAP_BASE. */
         s = (boot_e820.map[i].addr + mask) & ~mask;
         e = (boot_e820.map[i].addr + boot_e820.map[i].size) & ~mask;
-        s = max_t(uint64_t, s, 16 << 20);
-        e = min_t(uint64_t, e, BOOTSTRAP_DIRECTMAP_END);
+        s = max_t(uint64_t, s, BOOTSTRAP_MAP_BASE);
         if ( (boot_e820.map[i].type != E820_RAM) || (s >= e) )
             continue;
 
-        set_pdx_range(s >> PAGE_SHIFT, e >> PAGE_SHIFT);
-
-        /* Map the chunk. No memory will need to be allocated to do this. */
-        map_pages_to_xen(
-            (unsigned long)maddr_to_bootstrap_virt(s),
-            s >> PAGE_SHIFT, (e-s) >> PAGE_SHIFT, PAGE_HYPERVISOR);
+        if ( s < limit )
+        {
+            end = min(e, limit);
+            set_pdx_range(s >> PAGE_SHIFT, end >> PAGE_SHIFT);
+#ifdef CONFIG_X86_64
+            map_pages_to_xen((unsigned long)__va(s), s >> PAGE_SHIFT,
+                             (end - s) >> PAGE_SHIFT, PAGE_HYPERVISOR);
+#endif
+        }
 
 #if defined(CONFIG_X86_64)
+        e = min_t(uint64_t, e, 1ULL << (PAGE_SHIFT + 32));
 #define reloc_size ((__pa(&_end) + mask) & ~mask)
         /* Is the region suitable for relocating Xen? */
-        if ( !xen_phys_start && ((e-s) >= reloc_size) )
+        if ( !xen_phys_start && e <= limit )
+        {
+            /* Don't overlap with modules. */
+            end = consider_modules(s, e, reloc_size + mask,
+                                   mod, mbi->mods_count, -1);
+            end &= ~mask;
+        }
+        else
+            end = 0;
+        if ( end > s )
         {
             extern l2_pgentry_t l2_xenmap[];
             l4_pgentry_t *pl4e;
             l3_pgentry_t *pl3e;
             l2_pgentry_t *pl2e;
             int i, j, k;
+            void *dst;
 
             /* Select relocation address. */
-            e -= reloc_size;
+            e = end - reloc_size;
             xen_phys_start = e;
             bootsym(trampoline_xen_phys_start) = e;
 
@@ -712,10 +830,10 @@ void __init __start_xen(unsigned long mbi_p)
              * data until after we have switched to the relocated pagetables!
              */
             barrier();
-            move_memory(e, 0, __pa(&_end) - xen_phys_start);
+            dst = move_memory(e, 0, (unsigned long)&_end - XEN_VIRT_START, 1);
 
             /* Poison low 1MB to detect stray pointers to physical 0-1MB. */
-            memset(maddr_to_bootstrap_virt(e), 0x55, 1U<<20);
+            memset(dst, 0x55, 1U << 20);
 
             /* Walk initial pagetables, relocating page directory entries. */
             pl4e = __va(__pa(idle_pg_table));
@@ -772,38 +890,58 @@ void __init __start_xen(unsigned long mbi_p)
                 "movq %%rsi,%%cr4   " /* CR4.PGE == 1 */
                 : : "r" (__pa(idle_pg_table)), "S" (cpu0_stack),
                 "D" (__va(__pa(cpu0_stack))), "c" (STACK_SIZE) : "memory" );
+
+            bootstrap_map(NULL);
         }
 #endif
 
         /* Is the region suitable for relocating the multiboot modules? */
-        if ( !initial_images_start && (s < e) &&
-             ((e-s) >= (modules_length+modules_headroom)) )
+        for ( j = mbi->mods_count - 1; j >= 0; j-- )
         {
-            initial_images_end = e;
-            initial_images_start = initial_images_end - modules_length;
-            initial_images_base = initial_images_start - modules_headroom;
-            initial_images_base &= PAGE_MASK;
-            for ( j = mbi->mods_count-1; j >= 0; j-- )
+            unsigned long headroom = j ? 0 : modules_headroom;
+            unsigned long size = PAGE_ALIGN(headroom + mod[j].mod_end);
+
+            if ( mod[j].reserved )
+                continue;
+
+            /* Don't overlap with other modules. */
+            end = consider_modules(s, e, size, mod, mbi->mods_count, j);
+
+            if ( s < end &&
+                 (headroom ||
+                  ((end - size) >> PAGE_SHIFT) > mod[j].mod_start) )
             {
-                e -= mod[j].mod_end - mod[j].mod_start;
-                move_memory(e, mod[j].mod_start, mod[j].mod_end);
-                mod[j].mod_end += e - mod[j].mod_start;
-                mod[j].mod_start = e;
+                move_memory(end - size + headroom,
+                            (uint64_t)mod[j].mod_start << PAGE_SHIFT,
+                            mod[j].mod_end, 0);
+                mod[j].mod_start = (end - size) >> PAGE_SHIFT;
+                mod[j].mod_end += headroom;
+                mod[j].reserved = 1;
             }
-            e = initial_images_base;
         }
 
-        if ( !kexec_crash_area.start && (s < e) &&
-             ((e-s) >= kexec_crash_area.size) )
+#ifdef CONFIG_X86_32
+        /* Confine the kexec area to below 4Gb. */
+        e = min_t(uint64_t, e, 1ULL << 32);
+#endif
+        /* Don't overlap with modules. */
+        e = consider_modules(s, e, PAGE_ALIGN(kexec_crash_area.size),
+                             mod, mbi->mods_count, -1);
+        if ( !kexec_crash_area.start && (s < e) )
         {
             e = (e - kexec_crash_area.size) & PAGE_MASK;
             kexec_crash_area.start = e;
         }
     }
 
-    if ( !initial_images_start )
+    if ( modules_headroom && !mod->reserved )
         EARLY_FAIL("Not enough memory to relocate the dom0 kernel image.\n");
-    reserve_e820_ram(&boot_e820, initial_images_base, initial_images_end);
+    for ( i = 0; i < mbi->mods_count; ++i )
+    {
+        uint64_t s = (uint64_t)mod[i].mod_start << PAGE_SHIFT;
+
+        reserve_e820_ram(&boot_e820, s, s + PAGE_ALIGN(mod[i].mod_end));
+    }
 
 #if defined(CONFIG_X86_32)
     xenheap_initial_phys_start = (PFN_UP(__pa(&_end)) + 1) << PAGE_SHIFT;
@@ -827,7 +965,10 @@ void __init __start_xen(unsigned long mbi_p)
      */
     for ( i = 0; i < boot_e820.nr_map; i++ )
     {
-        uint64_t s, e, map_s, map_e, mask = PAGE_SIZE - 1;
+        uint64_t s, e, mask = PAGE_SIZE - 1;
+#ifdef CONFIG_X86_64
+        uint64_t map_s, map_e;
+#endif
 
         /* Only page alignment required now. */
         s = (boot_e820.map[i].addr + mask) & ~mask;
@@ -842,7 +983,7 @@ void __init __start_xen(unsigned long mbi_p)
 
 #ifdef __x86_64__
         if ( !acpi_boot_table_init_done &&
-             s >= BOOTSTRAP_DIRECTMAP_END &&
+             s >= (1ULL << 32) &&
              !acpi_boot_table_init() )
         {
             acpi_boot_table_init_done = 1;
@@ -881,26 +1022,60 @@ void __init __start_xen(unsigned long mbi_p)
 
         set_pdx_range(s >> PAGE_SHIFT, e >> PAGE_SHIFT);
 
-        /* Need to create mappings above 16MB. */
-        map_s = max_t(uint64_t, s, 16<<20);
-        map_e = e;
-#if defined(CONFIG_X86_32) /* mappings are truncated on x86_32 */
-        map_e = min_t(uint64_t, map_e, BOOTSTRAP_DIRECTMAP_END);
-#endif
+#ifdef CONFIG_X86_64
+        /* Need to create mappings above BOOTSTRAP_MAP_BASE. */
+        map_s = max_t(uint64_t, s, BOOTSTRAP_MAP_BASE);
+        map_e = min_t(uint64_t, e,
+                      ARRAY_SIZE(l2_identmap) << L2_PAGETABLE_SHIFT);
 
         /* Pass mapped memory to allocator /before/ creating new mappings. */
-        init_boot_pages(s, min_t(uint64_t, map_s, e));
+        init_boot_pages(s, min(map_s, e));
+        s = map_s;
+        if ( s < map_e )
+        {
+            uint64_t mask = (1UL << L2_PAGETABLE_SHIFT) - 1;
+
+            map_s = (s + mask) & ~mask;
+            map_e &= ~mask;
+            init_boot_pages(map_s, map_e);
+        }
+
+        if ( map_s > map_e )
+            map_s = map_e = s;
 
         /* Create new mappings /before/ passing memory to the allocator. */
-        if ( map_s < map_e )
-            map_pages_to_xen(
-                (unsigned long)maddr_to_bootstrap_virt(map_s),
-                map_s >> PAGE_SHIFT, (map_e-map_s) >> PAGE_SHIFT,
-                PAGE_HYPERVISOR);
-
-        /* Pass remainder of this memory chunk to the allocator. */
-        init_boot_pages(map_s, e);
+        if ( map_e < e )
+        {
+            map_pages_to_xen((unsigned long)__va(map_e), map_e >> PAGE_SHIFT,
+                             (e - map_e) >> PAGE_SHIFT, PAGE_HYPERVISOR);
+            init_boot_pages(map_e, e);
+        }
+        if ( s < map_s )
+        {
+            map_pages_to_xen((unsigned long)__va(s), s >> PAGE_SHIFT,
+                             (map_s - s) >> PAGE_SHIFT, PAGE_HYPERVISOR);
+            init_boot_pages(s, map_s);
+        }
+#else
+        init_boot_pages(s, e);
+#endif
     }
+
+    for ( i = 0; i < mbi->mods_count; ++i )
+    {
+        set_pdx_range(mod[i].mod_start,
+                      mod[i].mod_start + PFN_UP(mod[i].mod_end));
+#ifdef CONFIG_X86_64
+        map_pages_to_xen((unsigned long)mfn_to_virt(mod[i].mod_start),
+                         mod[i].mod_start,
+                         PFN_UP(mod[i].mod_end), PAGE_HYPERVISOR);
+#endif
+    }
+#ifdef CONFIG_X86_64
+    map_pages_to_xen((unsigned long)__va(kexec_crash_area.start),
+                     kexec_crash_area.start >> PAGE_SHIFT,
+                     PFN_UP(kexec_crash_area.size), PAGE_HYPERVISOR);
+#endif
 
     memguard_init();
 
@@ -1023,7 +1198,7 @@ void __init __start_xen(unsigned long mbi_p)
 
     init_IRQ();
 
-    xsm_init(&initrdidx, mbi, initial_images_start);
+    xsm_init(&initrdidx, mbi, bootstrap_map);
 
     timer_init();
 
@@ -1135,12 +1310,6 @@ void __init __start_xen(unsigned long mbi_p)
         cmdline = dom0_cmdline;
     }
 
-    if ( (initrdidx > 0) && (initrdidx < mbi->mods_count) )
-    {
-        _initrd_start = mod[initrdidx].mod_start;
-        _initrd_len   = mod[initrdidx].mod_end - mod[initrdidx].mod_start;
-    }
-
     if ( xen_cpuidle )
         xen_processor_pmbits |= XEN_PROCESSOR_PM_CX;
 
@@ -1148,13 +1317,10 @@ void __init __start_xen(unsigned long mbi_p)
      * We're going to setup domain0 using the module(s) that we stashed safely
      * above our heap. The second module, if present, is an initrd ramdisk.
      */
-    if ( construct_dom0(dom0,
-                        initial_images_base,
-                        initial_images_start,
-                        mod[0].mod_end-mod[0].mod_start,
-                        _initrd_start,
-                        _initrd_len,
-                        cmdline) != 0)
+    if ( construct_dom0(dom0, mod, modules_headroom,
+                        (initrdidx > 0) && (initrdidx < mbi->mods_count)
+                        ? mod + initrdidx : NULL,
+                        bootstrap_map, cmdline) != 0)
         panic("Could not set up DOM0 guest OS\n");
 
     /* Scrub RAM that is still free and so may go to an unprivileged domain. */

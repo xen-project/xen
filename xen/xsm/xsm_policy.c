@@ -22,11 +22,11 @@
 #include <xsm/xsm.h>
 #include <xen/multiboot.h>
 
-char *policy_buffer = NULL;
-u32 policy_size = 0;
+char *__initdata policy_buffer = NULL;
+u32 __initdata policy_size = 0;
 
 int xsm_policy_init(unsigned int *initrdidx, const multiboot_info_t *mbi,
-                           unsigned long initial_images_start)
+                    void *(*bootstrap_map)(const module_t *))
 {
     int i;
     module_t *mod = (module_t *)__va(mbi->mods_addr);
@@ -40,15 +40,8 @@ int xsm_policy_init(unsigned int *initrdidx, const multiboot_info_t *mbi,
      */
     for ( i = mbi->mods_count-1; i >= 1; i-- )
     {
-        start = initial_images_start + (mod[i].mod_start-mod[0].mod_start);
-#if defined(__i386__)
-        _policy_start = (u32 *)start;
-#elif defined(__x86_64__)
-        _policy_start = maddr_to_virt(start);
-#else
-        _policy_start = NULL;
-#endif
-        _policy_len   = mod[i].mod_end - mod[i].mod_start;
+        _policy_start = bootstrap_map(mod + i);
+        _policy_len   = mod[i].mod_end;
 
         if ( (xsm_magic_t)(*_policy_start) == XSM_MAGIC )
         {
@@ -63,6 +56,8 @@ int xsm_policy_init(unsigned int *initrdidx, const multiboot_info_t *mbi,
             break;
 
         }
+
+        bootstrap_map(NULL);
     }
 
     return rc;

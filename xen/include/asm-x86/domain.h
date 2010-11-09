@@ -466,16 +466,6 @@ void domain_cpuid(struct domain *d,
                   unsigned int  *ecx,
                   unsigned int  *edx);
 
-int construct_dom0(
-    struct domain *d,
-    unsigned long image_base,
-    unsigned long image_start, unsigned long image_len,
-    unsigned long initrd_start, unsigned long initrd_len,
-    char *cmdline);
-
-extern unsigned long initial_images_nrpages(void);
-extern void discard_initial_images(void);
-
 #endif /* __ASM_DOMAIN_H__ */
 
 /*

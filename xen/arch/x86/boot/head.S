@@ -110,12 +110,15 @@ __start:
         /* Initialise L2 identity-map and xen page table entries (16MB). */
         mov     $sym_phys(l2_identmap),%edi
         mov     $sym_phys(l2_xenmap),%esi
+        mov     $sym_phys(l2_bootmap),%edx
         mov     $0x1e3,%eax                  /* PRESENT+RW+A+D+2MB+GLOBAL */
         mov     $8,%ecx
 1:      mov     %eax,(%edi)
         add     $8,%edi
         mov     %eax,(%esi)
         add     $8,%esi
+        mov     %eax,(%edx)
+        add     $8,%edx
         add     $(1<<L2_PAGETABLE_SHIFT),%eax
         loop    1b
         /* Initialise L3 identity-map page directory entries. */
@@ -129,9 +132,13 @@ __start:
         /* Initialise L3 xen-map page directory entry. */
         mov     $(sym_phys(l2_xenmap)+7),%eax
         mov     %eax,sym_phys(l3_xenmap) + l3_table_offset(XEN_VIRT_START)*8
-        /* Hook identity-map and xen-map L3 tables into PML4. */
+        /* Initialise L3 boot-map page directory entry. */
+        mov     $(sym_phys(l2_bootmap)+7),%eax
+        mov     %eax,sym_phys(l3_bootmap) + 0*8
+        /* Hook identity-map, xen-map, and boot-map L3 tables into PML4. */
+        mov     $(sym_phys(l3_bootmap)+7),%eax
+        mov     %eax,sym_phys(idle_pg_table) + 0*8
         mov     $(sym_phys(l3_identmap)+7),%eax
-        mov     %eax,sym_phys(idle_pg_table) + (  0*8) /* PML4[  0]: 1:1 map */
         mov     %eax,sym_phys(idle_pg_table) + l4_table_offset(DIRECTMAP_VIRT_START)*8
         mov     $(sym_phys(l3_xenmap)+7),%eax
         mov     %eax,sym_phys(idle_pg_table) + l4_table_offset(XEN_VIRT_START)*8
@@ -176,6 +183,7 @@ __start:
 #if defined(__x86_64__)
         mov     %edi,sym_phys(l2_identmap)
         mov     %edi,sym_phys(l2_xenmap)
+        mov     %edi,sym_phys(l2_bootmap)
 #else
         mov     %edi,sym_phys(idle_pg_table_l2)
         mov     %edi,sym_phys(idle_pg_table_l2) + (__PAGE_OFFSET>>18)

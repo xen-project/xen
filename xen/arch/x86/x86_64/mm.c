@@ -65,6 +65,12 @@ l3_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
 l2_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
     l2_xenmap[L2_PAGETABLE_ENTRIES];
 
+/* Enough page directories to map into the bottom 1GB. */
+l3_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
+    l3_bootmap[L3_PAGETABLE_ENTRIES];
+l2_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
+    l2_bootmap[L2_PAGETABLE_ENTRIES];
+
 int __mfn_valid(unsigned long mfn)
 {
     return likely(mfn < max_page) &&
