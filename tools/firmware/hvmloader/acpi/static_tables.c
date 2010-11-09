@@ -56,14 +56,14 @@ struct acpi_20_fadt Fadt = {
 
     .sci_int = 9,
 
-    .pm1a_evt_blk = ACPI_PM1A_EVT_BLK_ADDRESS,
-    .pm1a_cnt_blk = ACPI_PM1A_CNT_BLK_ADDRESS,
-    .pm_tmr_blk = ACPI_PM_TMR_BLK_ADDRESS,
-    .gpe0_blk = ACPI_GPE0_BLK_ADDRESS,
+    .pm1a_evt_blk = ACPI_PM1A_EVT_BLK_ADDRESS_V1,
+    .pm1a_cnt_blk = ACPI_PM1A_CNT_BLK_ADDRESS_V1,
+    .pm_tmr_blk = ACPI_PM_TMR_BLK_ADDRESS_V1,
+    .gpe0_blk = ACPI_GPE0_BLK_ADDRESS_V1,
     .pm1_evt_len = ACPI_PM1A_EVT_BLK_BIT_WIDTH / 8,
     .pm1_cnt_len = ACPI_PM1A_CNT_BLK_BIT_WIDTH / 8,
     .pm_tmr_len = ACPI_PM_TMR_BLK_BIT_WIDTH / 8,
-    .gpe0_blk_len = ACPI_GPE0_BLK_LEN,
+    .gpe0_blk_len = ACPI_GPE0_BLK_LEN_V1,
 
     .p_lvl2_lat = 0x0fff, /* >100,  means we do not support C2 state */
     .p_lvl3_lat = 0x0fff, /* >1000, means we do not support C3 state */
@@ -85,21 +85,21 @@ struct acpi_20_fadt Fadt = {
         .address_space_id    = ACPI_SYSTEM_IO,
         .register_bit_width  = ACPI_PM1A_EVT_BLK_BIT_WIDTH,
         .register_bit_offset = ACPI_PM1A_EVT_BLK_BIT_OFFSET,
-        .address             = ACPI_PM1A_EVT_BLK_ADDRESS,
+        .address             = ACPI_PM1A_EVT_BLK_ADDRESS_V1,
     },
 
     .x_pm1a_cnt_blk = {
         .address_space_id    = ACPI_SYSTEM_IO,
         .register_bit_width  = ACPI_PM1A_CNT_BLK_BIT_WIDTH,
         .register_bit_offset = ACPI_PM1A_CNT_BLK_BIT_OFFSET,
-        .address             = ACPI_PM1A_CNT_BLK_ADDRESS,
+        .address             = ACPI_PM1A_CNT_BLK_ADDRESS_V1,
     },
 
     .x_pm_tmr_blk = {
         .address_space_id    = ACPI_SYSTEM_IO,
         .register_bit_width  = ACPI_PM_TMR_BLK_BIT_WIDTH,
         .register_bit_offset = ACPI_PM_TMR_BLK_BIT_OFFSET,
-        .address             = ACPI_PM_TMR_BLK_ADDRESS,
+        .address             = ACPI_PM_TMR_BLK_ADDRESS_V1,
     }
 };
 

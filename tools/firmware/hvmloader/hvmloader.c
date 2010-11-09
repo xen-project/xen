@@ -227,7 +227,7 @@ static void pci_setup(void)
             pci_writew(devfn, 0x22, 0x0000);
             pci_writew(devfn, 0x3c, 0x0009); /* Hardcoded IRQ9 */
             pci_writew(devfn, 0x3d, 0x0001);
-            pci_writel(devfn, 0x40, ACPI_PM1A_EVT_BLK_ADDRESS | 1);
+            pci_writel(devfn, 0x40, ACPI_PM1A_EVT_BLK_ADDRESS_V1 | 1);
             pci_writeb(devfn, 0x80, 0x01); /* enable PM io space */
             break;
         case 0x0101:
