@@ -117,6 +117,14 @@ ioemu-dir-find:
 		cd ioemu-dir; \
 		./xen-setup $(IOEMU_CONFIGURE_CROSS)
 
+.PHONY: ioemu-dir-force-update
+ioemu-dir-force-update:
+	set -ex; \
+	if [ "$(QEMU_TAG)" ]; then \
+		cd ioemu-remote; \
+		$(GIT) reset --hard $(QEMU_TAG); \
+	fi
+
 subdir-all-ioemu-dir subdir-install-ioemu-dir: ioemu-dir-find
 
 subdir-clean-ioemu-dir:

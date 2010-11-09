@@ -83,6 +83,10 @@ endif
 tools/ioemu-dir:
 	$(MAKE) -C tools ioemu-dir-find
 
+.PHONY: tools/ioemu-dir-force-update
+tools/ioemu-dir-force-update:
+	$(MAKE) -C tools ioemu-dir-force-update
+
 .PHONY: install-docs
 install-docs:
 	sh ./docs/check_pkgs && $(MAKE) -C docs install || true
