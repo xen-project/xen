@@ -2120,7 +2120,7 @@ int hvm_msr_write_intercept(struct cpu_user_regs *regs)
     case MSR_IA32_MTRR_PHYSBASE0...MSR_IA32_MTRR_PHYSMASK7:
         if ( !mtrr )
             goto gp_fault;
-        if ( !mtrr_var_range_msr_set(&v->arch.hvm_vcpu.mtrr,
+        if ( !mtrr_var_range_msr_set(v->domain, &v->arch.hvm_vcpu.mtrr,
                                      regs->ecx, msr_content) )
             goto gp_fault;
         break;
