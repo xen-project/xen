@@ -119,8 +119,12 @@ static void map_igd_reg(void)
     igd_reg = (igd_mmio & IGD_BAR_MASK) + 0x2000;
 
     /* ioremap this physical page */
+#if defined(CONFIG_X86)
     set_fixmap_nocache(FIX_IGD_MMIO, igd_reg);
     igd_reg_va = (u8 *)fix_to_virt(FIX_IGD_MMIO);
+#else
+    igd_reg_va = ioremap_nocache(igd_reg, 0x100);
+#endif
 }
 
 /*

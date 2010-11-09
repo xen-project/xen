@@ -27,6 +27,7 @@
 #include <asm/sal.h>
 #include "../iommu.h"
 #include "../dmar.h"
+#include "../extern.h"
 #include "../vtd.h"
 
 

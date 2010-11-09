@@ -24,10 +24,6 @@
 #include <public/arch-ia64/hvm/save.h> /* for struct vacpi_regs */
 #include <public/hvm/ioreq.h>
 
-#define ACPI_PM1A_EVT_BLK_ADDRESS 0x0000000000001f40
-#define ACPI_PM1A_CNT_BLK_ADDRESS (ACPI_PM1A_EVT_BLK_ADDRESS + 0x04)
-#define ACPI_PM_TMR_BLK_ADDRESS   (ACPI_PM1A_EVT_BLK_ADDRESS + 0x08)
-
 #define IS_ACPI_ADDR(X)  ((unsigned long)((X)-ACPI_PM1A_EVT_BLK_ADDRESS)<12)
 
 #define FREQUENCE_PMTIMER  3579545UL	/* Timer should run at 3.579545 MHz */
