@@ -30,10 +30,7 @@
 
 extern struct mtrr_state mtrr_state;
 
-static uint64_t phys_base_msr_mask;
-static uint64_t phys_mask_msr_mask;
 static uint32_t size_or_mask;
-static uint32_t size_and_mask;
 
 /* Get page attribute fields (PAn) from PAT MSR. */
 #define pat_cr_2_paf(pat_cr,n)  ((((uint64_t)pat_cr) >> ((n)<<3)) & 0xff)
@@ -181,11 +178,7 @@ static int hvm_mtrr_pat_init(void)
     if ( cpuid_eax(0x80000000) >= 0x80000008 )
         phys_addr = (uint8_t)cpuid_eax(0x80000008);
 
-    phys_base_msr_mask = ~((((uint64_t)1) << phys_addr) - 1) | 0xf00UL;
-    phys_mask_msr_mask = ~((((uint64_t)1) << phys_addr) - 1) | 0x7ffUL;
-
     size_or_mask = ~((1 << (phys_addr - PAGE_SHIFT)) - 1);
-    size_and_mask = ~size_or_mask & 0xfff00000;
 
     return 0;
 }
@@ -482,34 +475,39 @@ bool_t mtrr_fix_range_msr_set(struct mtrr_state *m, uint32_t row,
     return 1;
 }
 
-bool_t mtrr_var_range_msr_set(struct mtrr_state *m, uint32_t msr,
-                              uint64_t msr_content)
+bool_t mtrr_var_range_msr_set(
+    struct domain *d, struct mtrr_state *m, uint32_t msr, uint64_t msr_content)
 {
-    uint32_t index;
+    uint32_t index, type, phys_addr, eax, ebx, ecx, edx;
     uint64_t msr_mask;
     uint64_t *var_range_base = (uint64_t*)m->var_ranges;
 
     index = msr - MSR_IA32_MTRR_PHYSBASE0;
+    if ( var_range_base[index] == msr_content )
+        return 1;
 
-    if ( var_range_base[index] != msr_content )
+    type = (uint8_t)msr_content;
+    if ( unlikely(!(type == 0 || type == 1 ||
+                    type == 4 || type == 5 || type == 6)) )
+        return 0;
+
+    phys_addr = 36;
+    domain_cpuid(d, 0x80000000, 0, &eax, &ebx, &ecx, &edx);
+    if ( eax >= 0x80000008 )
     {
-        uint32_t type = msr_content & 0xff;
-
-        msr_mask = (index & 1) ? phys_mask_msr_mask : phys_base_msr_mask;
-
-        if ( unlikely(!(type == 0 || type == 1 ||
-                        type == 4 || type == 5 || type == 6)) )
-            return 0;
-
-        if ( unlikely(msr_content && (msr_content & msr_mask)) )
-        {
-            HVM_DBG_LOG(DBG_LEVEL_MSR, "invalid msr content:%"PRIx64"\n",
-                        msr_content);
-            return 0;
-        }
-
-        var_range_base[index] = msr_content;
+        domain_cpuid(d, 0x80000008, 0, &eax, &ebx, &ecx, &edx);
+        phys_addr = (uint8_t)eax;
     }
+    msr_mask = ~((((uint64_t)1) << phys_addr) - 1);
+    msr_mask |= (index & 1) ? 0x7ffUL : 0xf00UL;
+    if ( unlikely(msr_content && (msr_content & msr_mask)) )
+    {
+        HVM_DBG_LOG(DBG_LEVEL_MSR, "invalid msr content:%"PRIx64"\n",
+                    msr_content);
+        return 0;
+    }
+
+    var_range_base[index] = msr_content;
 
     m->overlapped = is_var_mtrr_overlapped(m);
 
@@ -692,9 +690,9 @@ static int hvm_load_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
 
     for ( i = 0; i < MTRR_VCNT; i++ )
     {
-        mtrr_var_range_msr_set(mtrr_state,
+        mtrr_var_range_msr_set(d, mtrr_state,
                 MTRRphysBase_MSR(i), hw_mtrr.msr_mtrr_var[i*2]);
-        mtrr_var_range_msr_set(mtrr_state,
+        mtrr_var_range_msr_set(d, mtrr_state,
                 MTRRphysMask_MSR(i), hw_mtrr.msr_mtrr_var[i*2+1]);
     }
 

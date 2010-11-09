@@ -74,8 +74,9 @@ extern void mtrr_aps_sync_begin(void);
 extern void mtrr_aps_sync_end(void);
 extern void mtrr_bp_restore(void);
 
-extern bool_t mtrr_var_range_msr_set(struct mtrr_state *v,
-				uint32_t msr, uint64_t msr_content);
+extern bool_t mtrr_var_range_msr_set(
+    struct domain *d, struct mtrr_state *m,
+    uint32_t msr, uint64_t msr_content);
 extern bool_t mtrr_fix_range_msr_set(struct mtrr_state *v,
 				uint32_t row, uint64_t msr_content);
 extern bool_t mtrr_def_type_msr_set(struct mtrr_state *v, uint64_t msr_content);

@@ -2337,7 +2337,7 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
     case MSR_IA32_MTRR_PHYSBASE0...MSR_IA32_MTRR_PHYSMASK7:
         if ( !mtrr )
             goto gp_fault;
-        if ( !mtrr_var_range_msr_set(&v->arch.hvm_vcpu.mtrr,
+        if ( !mtrr_var_range_msr_set(v->domain, &v->arch.hvm_vcpu.mtrr,
                                      msr, msr_content) )
             goto gp_fault;
         break;
