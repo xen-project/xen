@@ -580,22 +580,26 @@ static void dump_e820_table(void)
 {
     struct e820entry *e820 = E820;
     unsigned int nr = *E820_NR;
-    unsigned int last_end = 0;
+    uint64_t last_end = 0, start, end;
     int i;
 
     printf("E820 table:\n");
 
     for ( i = 0; i < nr; i++ )
     {
-        unsigned int start = e820[i].addr;
-        unsigned int end = e820[i].addr + e820[i].size;
+        start = e820[i].addr;
+        end = e820[i].addr + e820[i].size;
 
         if ( start < last_end )
             printf(" OVERLAP!!\n");
         else if ( start > last_end )
-            printf(" HOLE: %08x - %08x\n", last_end, start);
+            printf(" HOLE: %08x:%08x - %08x:%08x\n",
+                   (uint32_t)(last_end >> 32), (uint32_t)last_end,
+                   (uint32_t)(start >> 32), (uint32_t)start);
 
-        printf(" [%02d]: %08x - %08x: ", i, start, end);
+        printf(" [%02d]: %08x:%08x - %08x:%08x: ", i,
+               (uint32_t)(start >> 32), (uint32_t)start,
+               (uint32_t)(end >> 32), (uint32_t)end);
         switch ( e820[i].type )
         {
         case E820_RAM:
