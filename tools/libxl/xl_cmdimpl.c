@@ -2161,7 +2161,7 @@ int main_console(int argc, char **argv)
     return 1;
 }
 
-static int vncviewer(const const char *domain_spec, int autopass)
+static int vncviewer(const char *domain_spec, int autopass)
 {
     find_domain(domain_spec);
     libxl_vncviewer_exec(&ctx, domid, autopass);
@@ -5323,7 +5323,7 @@ int main_tmem_freeable(int argc, char **argv)
 
 int main_cpupoolcreate(int argc, char **argv)
 {
-    const const char *filename = NULL;
+    const char *filename = NULL;
     const char *p;
     char extra_config[1024];
     int dryrun = 0;
