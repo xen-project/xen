@@ -33,22 +33,22 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
      */
     Name (\_S3, Package (0x04)
     {
-        0x05,  /* PM1a_CNT.SLP_TYP */
-        0x05,  /* PM1b_CNT.SLP_TYP */
+        0x01,  /* PM1a_CNT.SLP_TYP */
+        0x01,  /* PM1b_CNT.SLP_TYP */
         0x0,   /* reserved */
         0x0    /* reserved */
     })
     Name (\_S4, Package (0x04)
     {
-        0x06,  /* PM1a_CNT.SLP_TYP */
-        0x06,  /* PM1b_CNT.SLP_TYP */
+        0x00,  /* PM1a_CNT.SLP_TYP */
+        0x00,  /* PM1b_CNT.SLP_TYP */
         0x00,  /* reserved */
         0x00   /* reserved */
     })
     Name (\_S5, Package (0x04)
     {
-        0x07,  /* PM1a_CNT.SLP_TYP */
-        0x07,  /* PM1b_CNT.SLP_TYP */
+        0x00,  /* PM1a_CNT.SLP_TYP */
+        0x00,  /* PM1b_CNT.SLP_TYP */
         0x00,  /* reserved */
         0x00   /* reserved */
     })

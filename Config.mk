@@ -185,9 +185,9 @@ endif
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 0442ec23f9efc4f8f9259351f612194f8f42900c
-# Mon Nov 8 17:09:54 2010 +0000
-# stubdom: fix handing of dependency files
+QEMU_TAG ?= ce3b7ce68426ea6249bb411f26b376d459c45450
+# Tue Nov 9 18:01:13 2010 +0000
+# piix4acpi, xen: change in ACPI to match the change in the BIOS.
 
 # Optional components
 XENSTAT_XENTOP     ?= y

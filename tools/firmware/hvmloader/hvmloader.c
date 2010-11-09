@@ -31,6 +31,7 @@
 #include "option_rom.h"
 #include <xen/version.h>
 #include <xen/hvm/params.h>
+#include <xen/hvm/ioreq.h>
 #include <xen/memory.h>
 
 asm (
@@ -222,9 +223,12 @@ static void pci_setup(void)
             /* PIIX4 ACPI PM. Special device with special PCI config space. */
             ASSERT((vendor_id == 0x8086) && (device_id == 0x7113));
             pci_writew(devfn, 0x20, 0x0000); /* No smb bus IO enable */
+            pci_writew(devfn, 0xd2, 0x0000); /* No smb bus IO enable */
             pci_writew(devfn, 0x22, 0x0000);
             pci_writew(devfn, 0x3c, 0x0009); /* Hardcoded IRQ9 */
             pci_writew(devfn, 0x3d, 0x0001);
+            pci_writel(devfn, 0x40, ACPI_PM1A_EVT_BLK_ADDRESS | 1);
+            pci_writeb(devfn, 0x80, 0x01); /* enable PM io space */
             break;
         case 0x0101:
             if ( vendor_id == 0x8086 )
@@ -763,8 +767,15 @@ int main(void)
 
     if ( hvm_info->acpi_enabled )
     {
+        struct xen_hvm_param p = {
+            .domid = DOMID_SELF,
+            .index = HVM_PARAM_ACPI_IOPORTS_LOCATION,
+            .value = 1,
+        };
+
         printf("Loading ACPI ...\n");
         acpi_build_tables();
+        hypercall_hvm_op(HVMOP_set_param, &p);
     }
 
     init_vm86_tss();
