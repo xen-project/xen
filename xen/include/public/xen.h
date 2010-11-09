@@ -581,7 +581,9 @@ struct start_info {
     unsigned long pt_base;      /* VIRTUAL address of page directory.     */
     unsigned long nr_pt_frames; /* Number of bootstrap p.t. frames.       */
     unsigned long mfn_list;     /* VIRTUAL address of page-frame list.    */
-    unsigned long mod_start;    /* VIRTUAL address of pre-loaded module.  */
+    unsigned long mod_start;    /* VIRTUAL address of pre-loaded module   */
+                                /* (PFN of pre-loaded module if           */
+                                /*  SIF_MOD_START_PFN set in flags).      */
     unsigned long mod_len;      /* Size (bytes) of pre-loaded module.     */
     int8_t cmd_line[MAX_GUEST_CMDLINE];
     /* The pfn range here covers both page table and p->m table frames.   */
@@ -600,6 +602,7 @@ typedef struct start_info start_info_t;
 #define SIF_PRIVILEGED    (1<<0)  /* Is the domain privileged? */
 #define SIF_INITDOMAIN    (1<<1)  /* Is this the initial control domain? */
 #define SIF_MULTIBOOT_MOD (1<<2)  /* Is mod_start a multiboot module? */
+#define SIF_MOD_START_PFN (1<<3)  /* Is mod_start a PFN? */
 #define SIF_PM_MASK       (0xFF<<8) /* reserve 1 byte for xen-pm options */
 
 /*

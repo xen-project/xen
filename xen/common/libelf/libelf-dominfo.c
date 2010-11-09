@@ -115,6 +115,7 @@ int elf_xen_parse_note(struct elf_binary *elf,
         [XEN_ELFNOTE_FEATURES] = { "FEATURES", 1},
         [XEN_ELFNOTE_BSD_SYMTAB] = { "BSD_SYMTAB", 1},
         [XEN_ELFNOTE_SUSPEND_CANCEL] = { "SUSPEND_CANCEL", 0 },
+        [XEN_ELFNOTE_MOD_START_PFN] = { "MOD_START_PFN", 0 },
     };
 /* *INDENT-ON* */
 

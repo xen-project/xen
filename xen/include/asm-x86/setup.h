@@ -30,7 +30,7 @@ void vesa_mtrr_init(void);
 int construct_dom0(
     struct domain *d,
     const module_t *kernel, unsigned long kernel_headroom,
-    const module_t *initrd,
+    module_t *initrd,
     void *(*bootstrap_map)(const module_t *),
     char *cmdline);
 

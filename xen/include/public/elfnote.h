@@ -173,9 +173,15 @@
 #define XEN_ELFNOTE_INIT_P2M      15
 
 /*
+ * Whether or not the guest can deal with being passed an initrd not
+ * mapped through its initial page tables.
+ */
+#define XEN_ELFNOTE_MOD_START_PFN 16
+
+/*
  * The number of the highest elfnote defined.
  */
-#define XEN_ELFNOTE_MAX XEN_ELFNOTE_INIT_P2M
+#define XEN_ELFNOTE_MAX XEN_ELFNOTE_MOD_START_PFN
 
 /*
  * System information exported through crash notes.

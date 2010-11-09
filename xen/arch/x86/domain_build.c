@@ -225,7 +225,9 @@ static unsigned long __init compute_dom0_nr_pages(
         size_t sizeof_long = is_pv_32bit_domain(d) ? sizeof(int) : sizeof(long);
 
         vstart = parms->virt_base;
-        vend = round_pgup(parms->virt_kend) + round_pgup(initrd_len);
+        vend = round_pgup(parms->virt_kend);
+        if ( !parms->elf_notes[XEN_ELFNOTE_MOD_START_PFN].data.num )
+            vend += round_pgup(initrd_len);
         end = vend + nr_pages * sizeof_long;
 
         if ( end > vstart )
@@ -286,7 +288,7 @@ static void __init process_dom0_ioports_disable(void)
 int __init construct_dom0(
     struct domain *d,
     const module_t *image, unsigned long image_headroom,
-    const module_t *initrd,
+    module_t *initrd,
     void *(*bootstrap_map)(const module_t *),
     char *cmdline)
 {
@@ -297,6 +299,7 @@ int __init construct_dom0(
     unsigned long nr_pt_pages;
     unsigned long alloc_spfn;
     unsigned long alloc_epfn;
+    unsigned long initrd_pfn = -1, initrd_mfn = 0;
     unsigned long count;
     struct page_info *page = NULL;
     start_info_t *si;
@@ -449,9 +452,17 @@ int __init construct_dom0(
     v_start          = parms.virt_base;
     vkern_start      = parms.virt_kstart;
     vkern_end        = parms.virt_kend;
-    vinitrd_start    = round_pgup(vkern_end);
-    vinitrd_end      = vinitrd_start + initrd_len;
-    vphysmap_start   = round_pgup(vinitrd_end);
+    if ( parms.elf_notes[XEN_ELFNOTE_MOD_START_PFN].data.num )
+    {
+        vinitrd_start  = vinitrd_end = 0;
+        vphysmap_start = round_pgup(vkern_end);
+    }
+    else
+    {
+        vinitrd_start  = round_pgup(vkern_end);
+        vinitrd_end    = vinitrd_start + initrd_len;
+        vphysmap_start = round_pgup(vinitrd_end);
+    }
     vphysmap_end     = vphysmap_start + (nr_pages * (!is_pv_32on64_domain(d) ?
                                                      sizeof(unsigned long) :
                                                      sizeof(unsigned int)));
@@ -490,8 +501,11 @@ int __init construct_dom0(
 #endif
     }
 
-    order = get_order_from_bytes(v_end - v_start);
-    if ( (1UL << order) > nr_pages )
+    count = v_end - v_start;
+    if ( vinitrd_start )
+        count -= PAGE_ALIGN(initrd_len);
+    order = get_order_from_bytes(count);
+    if ( (1UL << order) + PFN_UP(initrd_len) > nr_pages )
         panic("Domain 0 allocation is too small for kernel image.\n");
 
     if ( parms.p2m_base != UNSET_ADDR )
@@ -510,12 +524,54 @@ int __init construct_dom0(
     alloc_spfn = page_to_mfn(page);
     alloc_epfn = alloc_spfn + d->tot_pages;
 
+    if ( initrd_len )
+    {
+        initrd_pfn = vinitrd_start ?
+                     (vinitrd_start - v_start) >> PAGE_SHIFT :
+                     d->tot_pages;
+        initrd_mfn = mfn = initrd->mod_start;
+        count = PFN_UP(initrd_len);
+#ifdef __x86_64__
+        if ( d->arch.physaddr_bitsize &&
+             ((mfn + count - 1) >> (d->arch.physaddr_bitsize - PAGE_SHIFT)) )
+        {
+            order = get_order_from_pages(count);
+            page = alloc_domheap_pages(d, order, 0);
+            if ( !page )
+                panic("Not enough RAM for domain 0 initrd.\n");
+            for ( count = -count; order--; )
+                if ( count & (1UL << order) )
+                {
+                    free_domheap_pages(page, order);
+                    page += 1UL << order;
+                }
+            memcpy(page_to_virt(page), mfn_to_virt(initrd->mod_start),
+                   initrd_len);
+            mpt_alloc = (paddr_t)initrd->mod_start << PAGE_SHIFT;
+            init_domheap_pages(mpt_alloc,
+                               mpt_alloc + PAGE_ALIGN(initrd_len));
+            initrd->mod_start = initrd_mfn = page_to_mfn(page);
+        }
+        else
+#endif
+            while ( count-- )
+                if ( assign_pages(d, mfn_to_page(mfn++), 0, 0) )
+                    BUG();
+        initrd->mod_end = 0;
+    }
+
     printk("PHYSICAL MEMORY ARRANGEMENT:\n"
            " Dom0 alloc.:   %"PRIpaddr"->%"PRIpaddr,
            pfn_to_paddr(alloc_spfn), pfn_to_paddr(alloc_epfn));
     if ( d->tot_pages < nr_pages )
         printk(" (%lu pages to be allocated)",
                nr_pages - d->tot_pages);
+    if ( initrd )
+    {
+        mpt_alloc = (paddr_t)initrd->mod_start << PAGE_SHIFT;
+        printk("\n Init. ramdisk: %"PRIpaddr"->%"PRIpaddr,
+               mpt_alloc, mpt_alloc + initrd_len);
+    }
     printk("\nVIRTUAL MEMORY ARRANGEMENT:\n"
            " Loaded kernel: %p->%p\n"
            " Init. ramdisk: %p->%p\n"
@@ -534,6 +590,8 @@ int __init construct_dom0(
     printk(" ENTRY ADDRESS: %p\n", _p(parms.virt_entry));
 
     mpt_alloc = (vpt_start - v_start) + pfn_to_paddr(alloc_spfn);
+    if ( vinitrd_start )
+        mpt_alloc -= PAGE_ALIGN(initrd_len);
 
 #if defined(__i386__)
     /*
@@ -571,7 +629,7 @@ int __init construct_dom0(
             l2e_from_page(perdomain_pt_page(d, i), __PAGE_HYPERVISOR);
 
     l2tab += l2_linear_offset(v_start);
-    mfn = alloc_spfn;
+    pfn = alloc_spfn;
     for ( count = 0; count < ((v_end-v_start)>>PAGE_SHIFT); count++ )
     {
         if ( !((unsigned long)l1tab & (PAGE_SIZE-1)) )
@@ -584,14 +642,16 @@ int __init construct_dom0(
             if ( count == 0 )
                 l1tab += l1_table_offset(v_start);
         }
+        if ( count < initrd_pfn || count >= initrd_pfn + PFN_UP(initrd_len) )
+            mfn = pfn++;
+        else
+            mfn = initrd_mfn++;
         *l1tab = l1e_from_pfn(mfn, L1_PROT);
         l1tab++;
         
         page = mfn_to_page(mfn);
         if ( !get_page_and_type(page, d, PGT_writable_page) )
             BUG();
-
-        mfn++;
     }
 #undef MPT_ALLOC
 
@@ -688,7 +748,7 @@ int __init construct_dom0(
         v->arch.guest_table_user = v->arch.guest_table;
 
     l4tab += l4_table_offset(v_start);
-    mfn = alloc_spfn;
+    pfn = alloc_spfn;
     for ( count = 0; count < ((v_end-v_start)>>PAGE_SHIFT); count++ )
     {
         if ( !((unsigned long)l1tab & (PAGE_SIZE-1)) )
@@ -722,6 +782,10 @@ int __init construct_dom0(
             *l2tab = l2e_from_paddr(__pa(l1start), L2_PROT);
             l2tab++;
         }
+        if ( count < initrd_pfn || count >= initrd_pfn + PFN_UP(initrd_len) )
+            mfn = pfn++;
+        else
+            mfn = initrd_mfn++;
         *l1tab = l1e_from_pfn(mfn, (!is_pv_32on64_domain(d) ?
                                     L1_PROT : COMPAT_L1_PROT));
         l1tab++;
@@ -730,8 +794,6 @@ int __init construct_dom0(
         if ( (page->u.inuse.type_info == 0) &&
              !get_page_and_type(page, d, PGT_writable_page) )
             BUG();
-
-        mfn++;
     }
 
     if ( is_pv_32on64_domain(d) )
@@ -837,15 +899,6 @@ int __init construct_dom0(
             d, (void *)(unsigned long)parms.virt_hypercall);
     }
 
-    /* Copy the initial ramdisk. */
-    if ( initrd_len != 0 )
-    {
-        char *initrd_start = bootstrap_map(initrd);
-
-        memcpy((void *)vinitrd_start, initrd_start, initrd_len);
-        bootstrap_map(NULL);
-    }
-
     /* Free temporary buffers. */
     discard_initial_images();
 
@@ -857,6 +910,8 @@ int __init construct_dom0(
     si->shared_info = virt_to_maddr(d->shared_info);
 
     si->flags        = SIF_PRIVILEGED | SIF_INITDOMAIN;
+    if ( !vinitrd_start && initrd_len )
+        si->flags   |= SIF_MOD_START_PFN;
     si->flags       |= (xen_processor_pmbits << 8) & SIF_PM_MASK;
     si->pt_base      = vpt_start + 2 * PAGE_SIZE * !!is_pv_32on64_domain(d);
     si->nr_pt_frames = nr_pt_pages;
@@ -971,9 +1026,16 @@ int __init construct_dom0(
     for ( pfn = 0; pfn < count; pfn++ )
     {
         mfn = pfn + alloc_spfn;
+        if ( pfn >= initrd_pfn )
+        {
+            if ( pfn < initrd_pfn + PFN_UP(initrd_len) )
+                mfn = initrd->mod_start + (pfn - initrd_pfn);
+            else
+                mfn -= PFN_UP(initrd_len);
+        }
 #ifndef NDEBUG
 #define REVERSE_START ((v_end - v_start) >> PAGE_SHIFT)
-        if ( pfn > REVERSE_START )
+        if ( pfn > REVERSE_START && (vinitrd_start || pfn < initrd_pfn) )
             mfn = alloc_epfn - (pfn - REVERSE_START);
 #endif
         if ( !is_pv_32on64_domain(d) )
@@ -999,14 +1061,14 @@ int __init construct_dom0(
             ((unsigned long *)vphysmap_start)[pfn] = mfn;
             set_gpfn_from_mfn(mfn, pfn);
             ++pfn;
-#ifndef NDEBUG
-            ++alloc_epfn;
-#endif
             if (!(pfn & 0xfffff))
                 process_pending_softirqs();
         }
     }
     BUG_ON(pfn != d->tot_pages);
+#ifndef NDEBUG
+    alloc_epfn += PFN_UP(initrd_len) + si->nr_p2m_frames;
+#endif
     while ( pfn < nr_pages )
     {
         if ( (page = alloc_chunk(d, nr_pages - d->tot_pages)) == NULL )
@@ -1031,7 +1093,7 @@ int __init construct_dom0(
 
     if ( initrd_len != 0 )
     {
-        si->mod_start = vinitrd_start;
+        si->mod_start = vinitrd_start ?: initrd_pfn;
         si->mod_len   = initrd_len;
     }
 
