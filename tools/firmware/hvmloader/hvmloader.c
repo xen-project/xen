@@ -197,7 +197,7 @@ static void pci_setup(void)
     outb(0x4d1, (uint8_t)(PCI_ISA_IRQ_MASK >> 8));
 
     /* Scan the PCI bus and map resources. */
-    for ( devfn = 0; devfn < 128; devfn++ )
+    for ( devfn = 0; devfn < 256; devfn++ )
     {
         class     = pci_readw(devfn, PCI_CLASS_DEVICE);
         vendor_id = pci_readw(devfn, PCI_VENDOR_ID);
@@ -474,7 +474,7 @@ static int scan_etherboot_nic(uint32_t copy_rom_dest)
     uint16_t class, vendor_id, device_id;
     int rom_size = 0;
 
-    for ( devfn = 0; (devfn < 128) && !rom_size; devfn++ )
+    for ( devfn = 0; (devfn < 256) && !rom_size; devfn++ )
     {
         class     = pci_readw(devfn, PCI_CLASS_DEVICE);
         vendor_id = pci_readw(devfn, PCI_VENDOR_ID);
@@ -501,7 +501,7 @@ static int pci_load_option_roms(uint32_t rom_base_addr)
     uint16_t vendor_id, device_id;
     uint8_t devfn, class;
 
-    for ( devfn = 0; devfn < 128; devfn++ )
+    for ( devfn = 0; devfn < 256; devfn++ )
     {
         class     = pci_readb(devfn, PCI_CLASS_DEVICE + 1);
         vendor_id = pci_readw(devfn, PCI_VENDOR_ID);
