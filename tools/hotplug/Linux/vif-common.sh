@@ -105,10 +105,10 @@ frob_iptable()
     local c="-D"
   fi
 
-  iptables "$c" FORWARD -m physdev --physdev-in "$vif" "$@" -j ACCEPT \
+  iptables "$c" FORWARD -m physdev --physdev-is-bridged --physdev-in "$vif" "$@" -j ACCEPT \
     2>/dev/null &&
   iptables "$c" FORWARD -m state --state RELATED,ESTABLISHED -m physdev \
-    --physdev-out "$vif" -j ACCEPT 2>/dev/null
+    --physdev-is-bridged --physdev-out "$vif" -j ACCEPT 2>/dev/null
 
   if [ "$command" == "online" -a $? -ne 0 ]
   then
