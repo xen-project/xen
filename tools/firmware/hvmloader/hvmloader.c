@@ -470,8 +470,7 @@ static int scan_option_rom(
  */
 static int scan_etherboot_nic(uint32_t copy_rom_dest)
 {
-    uint8_t devfn;
-    uint16_t class, vendor_id, device_id;
+    uint16_t class, vendor_id, device_id, devfn;
     int rom_size = 0;
 
     for ( devfn = 0; (devfn < 256) && !rom_size; devfn++ )
@@ -498,8 +497,7 @@ static int scan_etherboot_nic(uint32_t copy_rom_dest)
 static int pci_load_option_roms(uint32_t rom_base_addr)
 {
     uint32_t option_rom_addr, rom_phys_addr = rom_base_addr;
-    uint16_t vendor_id, device_id;
-    uint8_t devfn, class;
+    uint16_t vendor_id, device_id, devfn, class;
 
     for ( devfn = 0; devfn < 256; devfn++ )
     {
