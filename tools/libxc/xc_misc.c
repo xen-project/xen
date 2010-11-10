@@ -423,7 +423,7 @@ int xc_hvm_track_dirty_vram(
     unsigned long *dirty_bitmap)
 {
     DECLARE_HYPERCALL;
-    DECLARE_HYPERCALL_BOUNCE(dirty_bitmap, (nr+31) / 32, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
+    DECLARE_HYPERCALL_BOUNCE(dirty_bitmap, (nr+7) / 8, XC_HYPERCALL_BUFFER_BOUNCE_OUT);
     DECLARE_HYPERCALL_BUFFER(struct xen_hvm_track_dirty_vram, arg);
     int rc;
 
