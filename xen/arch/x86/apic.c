@@ -1009,22 +1009,11 @@ static void enable_bsp_x2apic(void)
         }
         else
         {
-            if ( !iommu_enabled || !iommu_intremap || !iommu_qinval )
-                panic("Cannot enable x2APIC due to iommu or interrupt "
-                      "remapping or queued invalidation is disabled "
-                      "by command line!\n");
-            else
-            {
-                if ( x2apic_preenabled )
-                    panic("x2APIC: already enabled by BIOS, but "
-                          "iommu_supports_eim fails\n");
-                else
-                {
-                    printk("Not enable x2APIC due to "
-                           "iommu_supports_eim fails!\n");
-                    return;
-                }
-            }
+            if ( x2apic_preenabled )
+                panic("x2APIC: already enabled by BIOS, but "
+                      "iommu_supports_eim failed!\n");
+            printk("Not enabling x2APIC: depends oniommu_supports_eim\n");
+            return;
         }
     }
 
