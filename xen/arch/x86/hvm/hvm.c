@@ -2089,15 +2089,10 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
             __clear_bit(X86_FEATURE_APIC & 31, edx);
 
-        /* Fix up XSAVE and OSXSAVE. */
-        *ecx &= ~(bitmaskof(X86_FEATURE_XSAVE) |
-                  bitmaskof(X86_FEATURE_OSXSAVE));
+        /* Fix up OSXSAVE. */
         if ( cpu_has_xsave )
-        {
-            *ecx |= bitmaskof(X86_FEATURE_XSAVE);
             *ecx |= (v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_OSXSAVE) ?
                      bitmaskof(X86_FEATURE_OSXSAVE) : 0;
-        }
         break;
     case 0xb:
         /* Fix the x2APIC identifier. */

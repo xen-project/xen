@@ -795,7 +795,11 @@ static void pv_cpuid(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_XTPR % 32, &c);
         __clear_bit(X86_FEATURE_PDCM % 32, &c);
         __clear_bit(X86_FEATURE_DCA % 32, &c);
-        __clear_bit(X86_FEATURE_XSAVE % 32, &c);
+        if ( !cpu_has_xsave )
+        {
+            __clear_bit(X86_FEATURE_XSAVE % 32, &c);
+            __clear_bit(X86_FEATURE_AVX % 32, &c);
+        }
         if ( !cpu_has_apic )
            __clear_bit(X86_FEATURE_X2APIC % 32, &c);
         __set_bit(X86_FEATURE_HYPERVISOR % 32, &c);
