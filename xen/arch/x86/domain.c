@@ -1553,8 +1553,6 @@ void sync_vcpu_execstate(struct vcpu *v)
     __arg;                                                                  \
 })
 
-DEFINE_PER_CPU(char, hc_preempted);
-
 unsigned long hypercall_create_continuation(
     unsigned int op, const char *format, ...)
 {
@@ -1583,12 +1581,12 @@ unsigned long hypercall_create_continuation(
     {
         regs       = guest_cpu_user_regs();
         regs->eax  = op;
-        /*
-         * For PV guest, we update EIP to re-execute 'syscall' / 'int 0x82';
-         * HVM does not need this since 'vmcall' / 'vmmcall' is fault-like.
-         */
+
+        /* Ensure the hypercall trap instruction is re-executed. */
         if ( !is_hvm_vcpu(current) )
             regs->eip -= 2;  /* re-execute 'syscall' / 'int 0x82' */
+        else
+            current->arch.hvm_vcpu.hcall_preempted = 1;
 
 #ifdef __x86_64__
         if ( !is_hvm_vcpu(current) ?
@@ -1629,8 +1627,6 @@ unsigned long hypercall_create_continuation(
                 }
             }
         }
-
-        this_cpu(hc_preempted) = 1;
     }
 
     va_end(args);

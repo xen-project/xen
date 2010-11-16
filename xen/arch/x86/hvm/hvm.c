@@ -2028,16 +2028,13 @@ enum hvm_copy_result hvm_fetch_from_guest_virt_nofault(
                       PFEC_page_present | pfec);
 }
 
-#ifdef __x86_64__
-DEFINE_PER_CPU(bool_t, hvm_64bit_hcall);
-#endif
-
 unsigned long copy_to_user_hvm(void *to, const void *from, unsigned int len)
 {
     int rc;
 
 #ifdef __x86_64__
-    if ( !this_cpu(hvm_64bit_hcall) && is_compat_arg_xlat_range(to, len) )
+    if ( !current->arch.hvm_vcpu.hcall_64bit &&
+         is_compat_arg_xlat_range(to, len) )
     {
         memcpy(to, from, len);
         return 0;
@@ -2054,7 +2051,8 @@ unsigned long copy_from_user_hvm(void *to, const void *from, unsigned len)
     int rc;
 
 #ifdef __x86_64__
-    if ( !this_cpu(hvm_64bit_hcall) && is_compat_arg_xlat_range(from, len) )
+    if ( !current->arch.hvm_vcpu.hcall_64bit &&
+         is_compat_arg_xlat_range(from, len) )
     {
         memcpy(to, from, len);
         return 0;
@@ -2567,7 +2565,7 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
         return HVM_HCALL_completed;
     }
 
-    this_cpu(hc_preempted) = 0;
+    curr->arch.hvm_vcpu.hcall_preempted = 0;
 
 #ifdef __x86_64__
     if ( mode == 8 )
@@ -2575,13 +2573,13 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
         HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%u(%lx, %lx, %lx, %lx, %lx)", eax,
                     regs->rdi, regs->rsi, regs->rdx, regs->r10, regs->r8);
 
-        this_cpu(hvm_64bit_hcall) = 1;
+        curr->arch.hvm_vcpu.hcall_64bit = 1;
         regs->rax = hvm_hypercall64_table[eax](regs->rdi,
                                                regs->rsi,
                                                regs->rdx,
                                                regs->r10,
                                                regs->r8); 
-        this_cpu(hvm_64bit_hcall) = 0;
+        curr->arch.hvm_vcpu.hcall_64bit = 0;
     }
     else
 #endif
@@ -2601,7 +2599,7 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
     HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%u -> %lx",
                 eax, (unsigned long)regs->eax);
 
-    if ( this_cpu(hc_preempted) )
+    if ( curr->arch.hvm_vcpu.hcall_preempted )
         return HVM_HCALL_preempted;
 
     if ( unlikely(curr->domain->arch.hvm_domain.qemu_mapcache_invalidate) &&

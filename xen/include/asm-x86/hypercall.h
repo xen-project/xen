@@ -17,15 +17,6 @@
  */
 #define MMU_UPDATE_PREEMPTED          (~(~0U>>1))
 
-/*
- * This gets set to a non-zero value whenever hypercall_create_continuation()
- * is used (outside of multicall context; in multicall context the second call
- * from do_multicall() itself will have this effect). Internal callers of
- * hypercall handlers interested in this condition must clear the flag prior
- * to invoking the respective handler(s).
- */
-DECLARE_PER_CPU(char, hc_preempted);
-
 extern long
 do_event_channel_op_compat(
     XEN_GUEST_HANDLE(evtchn_op_t) uop);
