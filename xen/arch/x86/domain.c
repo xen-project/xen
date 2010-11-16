@@ -214,10 +214,18 @@ static int setup_compat_l4(struct vcpu *v)
 {
     struct page_info *pg;
     l4_pgentry_t *l4tab;
+    int rc;
 
     pg = alloc_domheap_page(NULL, MEMF_node(vcpu_to_node(v)));
     if ( pg == NULL )
         return -ENOMEM;
+
+    rc = setup_compat_arg_xlat(v);
+    if ( rc )
+    {
+        free_domheap_page(pg);
+        return rc;
+    }
 
     /* This page needs to look like a pagetable so that it can be shadowed */
     pg->u.inuse.type_info = PGT_l4_page_table|PGT_validated|1;
@@ -239,6 +247,7 @@ static int setup_compat_l4(struct vcpu *v)
 
 static void release_compat_l4(struct vcpu *v)
 {
+    free_compat_arg_xlat(v);
     free_domheap_page(pagetable_get_page(v->arch.guest_table));
     v->arch.guest_table = pagetable_null();
     v->arch.guest_table_user = pagetable_null();

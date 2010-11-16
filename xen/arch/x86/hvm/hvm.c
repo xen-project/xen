@@ -944,9 +944,15 @@ int hvm_vcpu_initialise(struct vcpu *v)
     spin_lock_init(&v->arch.hvm_vcpu.tm_lock);
     INIT_LIST_HEAD(&v->arch.hvm_vcpu.tm_list);
 
-    rc = hvm_vcpu_cacheattr_init(v);
+#ifdef CONFIG_COMPAT
+    rc = setup_compat_arg_xlat(v);
     if ( rc != 0 )
         goto fail3;
+#endif
+
+    rc = hvm_vcpu_cacheattr_init(v);
+    if ( rc != 0 )
+        goto fail4;
 
     tasklet_init(&v->arch.hvm_vcpu.assert_evtchn_irq_tasklet,
                  (void(*)(unsigned long))hvm_assert_evtchn_irq,
@@ -971,6 +977,10 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
     return 0;
 
+ fail4:
+#ifdef CONFIG_COMPAT
+    free_compat_arg_xlat(v);
+#endif
  fail3:
     hvm_funcs.vcpu_destroy(v);
  fail2:
@@ -981,6 +991,9 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
 void hvm_vcpu_destroy(struct vcpu *v)
 {
+#ifdef CONFIG_COMPAT
+    free_compat_arg_xlat(v);
+#endif
     tasklet_kill(&v->arch.hvm_vcpu.assert_evtchn_irq_tasklet);
     hvm_vcpu_cacheattr_destroy(v);
     vlapic_destroy(v);

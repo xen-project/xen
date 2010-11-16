@@ -47,8 +47,6 @@ unsigned int __read_mostly pfn_pdx_hole_shift = 0;
 
 unsigned int __read_mostly m2p_compat_vstart = __HYPERVISOR_COMPAT_VIRT_START;
 
-DEFINE_PER_CPU_READ_MOSTLY(void *, compat_arg_xlat);
-
 /* Top-level master (and idle-domain) page directory. */
 l4_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
     idle_pg_table[L4_PAGETABLE_ENTRIES];
@@ -819,25 +817,30 @@ void __init zap_low_mappings(void)
                      0x10, __PAGE_HYPERVISOR);
 }
 
-int __cpuinit setup_compat_arg_xlat(unsigned int cpu, int node)
+void *compat_arg_xlat_virt_base(void)
 {
-    unsigned int order = get_order_from_bytes(COMPAT_ARG_XLAT_SIZE);
-    unsigned int memflags = node != NUMA_NO_NODE ? MEMF_node(node) : 0;
-    struct page_info *pg;
-
-    BUG_ON((PAGE_SIZE << order) != COMPAT_ARG_XLAT_SIZE);
-
-    pg = alloc_domheap_pages(NULL, order, memflags);
-    per_cpu(compat_arg_xlat, cpu) = pg ? page_to_virt(pg) : NULL;
-    return pg ? 0 : -ENOMEM;
+    return current->arch.compat_arg_xlat;
 }
 
-void __cpuinit free_compat_arg_xlat(unsigned int cpu)
+int setup_compat_arg_xlat(struct vcpu *v)
 {
     unsigned int order = get_order_from_bytes(COMPAT_ARG_XLAT_SIZE);
-    if ( per_cpu(compat_arg_xlat, cpu) != NULL )
-        free_domheap_pages(virt_to_page(per_cpu(compat_arg_xlat, cpu)), order);
-    per_cpu(compat_arg_xlat, cpu) = NULL;
+    struct page_info *pg;
+
+    pg = alloc_domheap_pages(NULL, order, 0);
+    if ( pg == NULL )
+        return -ENOMEM;
+
+    v->arch.compat_arg_xlat = page_to_virt(pg);
+    return 0;
+}
+
+void free_compat_arg_xlat(struct vcpu *v)
+{
+    unsigned int order = get_order_from_bytes(COMPAT_ARG_XLAT_SIZE);
+    if ( v->arch.compat_arg_xlat != NULL )
+        free_domheap_pages(virt_to_page(v->arch.compat_arg_xlat), order);
+    v->arch.compat_arg_xlat = NULL;
 }
 
 void cleanup_frame_table(struct mem_hotadd_info *info)
@@ -1009,10 +1012,6 @@ void __init subarch_init_memory(void)
             share_xen_page_with_privileged_guests(page, XENSHARE_readonly);
         }
     }
-
-    if ( setup_compat_arg_xlat(smp_processor_id(),
-                               cpu_to_node[0]) )
-        panic("Could not setup argument translation area");
 }
 
 long subarch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
