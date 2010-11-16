@@ -204,12 +204,33 @@ void xsave_init(void)
     }
 }
 
-void xsave_init_save_area(void *save_area)
+int xsave_alloc_save_area(struct vcpu *v)
 {
-    memset(save_area, 0, xsave_cntxt_size);
+    void *save_area;
 
+    if ( !cpu_has_xsave )
+        return 0;
+
+    /* XSAVE/XRSTOR requires the save area be 64-byte-boundary aligned. */
+    save_area = _xmalloc(xsave_cntxt_size, 64);
+    if ( save_area == NULL )
+        return -ENOMEM;
+
+    memset(save_area, 0, xsave_cntxt_size);
     ((u32 *)save_area)[6] = 0x1f80;  /* MXCSR */
     *(uint64_t *)(save_area + 512) = XSTATE_FP_SSE;  /* XSETBV */
+
+    v->arch.xsave_area = save_area;
+    v->arch.xcr0 = XSTATE_FP_SSE;
+    v->arch.xcr0_accum = XSTATE_FP_SSE;
+
+    return 0;
+}
+
+void xsave_free_save_area(struct vcpu *v)
+{
+    xfree(v->arch.xsave_area);
+    v->arch.xsave_area = NULL;
 }
 
 /*

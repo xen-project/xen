@@ -343,60 +343,44 @@ int vcpu_initialise(struct vcpu *v)
 
     paging_vcpu_init(v);
 
-    if ( cpu_has_xsave )
-    {
-        /* XSAVE/XRSTOR requires the save area be 64-byte-boundary aligned. */
-        void *xsave_area = _xmalloc(xsave_cntxt_size, 64);
-        if ( xsave_area == NULL )
-            return -ENOMEM;
-
-        xsave_init_save_area(xsave_area);
-        v->arch.xsave_area = xsave_area;
-        v->arch.xcr0 = XSTATE_FP_SSE;
-        v->arch.xcr0_accum = XSTATE_FP_SSE;
-    }
-
-    if ( is_hvm_domain(d) )
-    {
-        if ( (rc = hvm_vcpu_initialise(v)) != 0 )
-        {
-            xfree(v->arch.xsave_area);
-            return rc;
-        }
-    }
-    else
-    {
-        /* PV guests by default have a 100Hz ticker. */
-        if ( !is_idle_domain(d) )
-            v->periodic_period = MILLISECS(10);
-
-        /* PV guests get an emulated PIT too for video BIOSes to use. */
-        if ( !is_idle_domain(d) && (v->vcpu_id == 0) )
-            pit_init(v, cpu_khz);
-
-        v->arch.schedule_tail = continue_nonidle_domain;
-        v->arch.ctxt_switch_from = paravirt_ctxt_switch_from;
-        v->arch.ctxt_switch_to   = paravirt_ctxt_switch_to;
-
-        if ( is_idle_domain(d) )
-        {
-            v->arch.schedule_tail = continue_idle_domain;
-            v->arch.cr3           = __pa(idle_pg_table);
-        }
-
-        v->arch.guest_context.ctrlreg[4] =
-            real_cr4_to_pv_guest_cr4(mmu_cr4_features);
-    }
-
     v->arch.perdomain_ptes = perdomain_ptes(d, v);
 
     spin_lock_init(&v->arch.shadow_ldt_lock);
 
-    rc = 0;
-    if ( is_pv_32on64_vcpu(v) )
-        rc = setup_compat_l4(v);
+    if ( (rc = xsave_alloc_save_area(v)) != 0 )
+        return rc;
+
+    if ( is_hvm_domain(d) )
+    {
+        if ( (rc = hvm_vcpu_initialise(v)) != 0 )
+            xsave_free_save_area(v);
+        return rc;
+    }
+
+    /* PV guests by default have a 100Hz ticker. */
+    if ( !is_idle_domain(d) )
+        v->periodic_period = MILLISECS(10);
+
+    /* PV guests get an emulated PIT too for video BIOSes to use. */
+    if ( !is_idle_domain(d) && (v->vcpu_id == 0) )
+        pit_init(v, cpu_khz);
+
+    v->arch.schedule_tail = continue_nonidle_domain;
+    v->arch.ctxt_switch_from = paravirt_ctxt_switch_from;
+    v->arch.ctxt_switch_to   = paravirt_ctxt_switch_to;
+
+    if ( is_idle_domain(d) )
+    {
+        v->arch.schedule_tail = continue_idle_domain;
+        v->arch.cr3           = __pa(idle_pg_table);
+    }
+
+    v->arch.guest_context.ctrlreg[4] =
+        real_cr4_to_pv_guest_cr4(mmu_cr4_features);
+
+    rc = is_pv_32on64_vcpu(v) ? setup_compat_l4(v) : 0;
     if ( rc )
-        xfree(v->arch.xsave_area);
+        xsave_free_save_area(v);
 
     return rc;
 }
@@ -406,7 +390,7 @@ void vcpu_destroy(struct vcpu *v)
     if ( is_pv_32on64_vcpu(v) )
         release_compat_l4(v);
 
-    xfree(v->arch.xsave_area);
+    xsave_free_save_area(v);
 
     if ( is_hvm_vcpu(v) )
         hvm_vcpu_destroy(v);

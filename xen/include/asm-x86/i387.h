@@ -17,8 +17,9 @@
 extern unsigned int xsave_cntxt_size;
 extern u64 xfeature_mask;
 
-extern void xsave_init(void);
-extern void xsave_init_save_area(void *save_area);
+void xsave_init(void);
+int xsave_alloc_save_area(struct vcpu *v);
+void xsave_free_save_area(struct vcpu *v);
 
 #define XSTATE_FP       (1 << 0)
 #define XSTATE_SSE      (1 << 1)
