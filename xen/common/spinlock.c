@@ -39,9 +39,22 @@ void spin_debug_disable(void)
     atomic_dec(&spin_debug);
 }
 
+static DEFINE_PER_CPU(atomic_t, lockdepth);
+
+#define lockdepth_inc() atomic_inc(&this_cpu(lockdepth))
+#define lockdepth_dec() atomic_dec(&this_cpu(lockdepth))
+
+unsigned int locking_depth(void)
+{
+    return atomic_read(&this_cpu(lockdepth));
+}
+
 #else /* defined(NDEBUG) */
 
 #define check_lock(l) ((void)0)
+#define lockdepth_inc() ((void)0)
+#define lockdepth_dec() ((void)0)
+unsigned int locking_depth(void) { return 0; }
 
 #endif
 
@@ -81,6 +94,7 @@ void _spin_lock(spinlock_t *lock)
             cpu_relax();
     }
     LOCK_PROFILE_GOT;
+    lockdepth_inc();
 }
 
 void _spin_lock_irq(spinlock_t *lock)
@@ -99,6 +113,7 @@ void _spin_lock_irq(spinlock_t *lock)
         local_irq_disable();
     }
     LOCK_PROFILE_GOT;
+    lockdepth_inc();
 }
 
 unsigned long _spin_lock_irqsave(spinlock_t *lock)
@@ -117,17 +132,20 @@ unsigned long _spin_lock_irqsave(spinlock_t *lock)
         local_irq_save(flags);
     }
     LOCK_PROFILE_GOT;
+    lockdepth_inc();
     return flags;
 }
 
 void _spin_unlock(spinlock_t *lock)
 {
+    lockdepth_dec();
     LOCK_PROFILE_REL;
     _raw_spin_unlock(&lock->raw);
 }
 
 void _spin_unlock_irq(spinlock_t *lock)
 {
+    lockdepth_dec();
     LOCK_PROFILE_REL;
     _raw_spin_unlock(&lock->raw);
     local_irq_enable();
@@ -135,6 +153,7 @@ void _spin_unlock_irq(spinlock_t *lock)
 
 void _spin_unlock_irqrestore(spinlock_t *lock, unsigned long flags)
 {
+    lockdepth_dec();
     LOCK_PROFILE_REL;
     _raw_spin_unlock(&lock->raw);
     local_irq_restore(flags);
@@ -149,13 +168,13 @@ int _spin_is_locked(spinlock_t *lock)
 int _spin_trylock(spinlock_t *lock)
 {
     check_lock(&lock->debug);
-#ifndef LOCK_PROFILE
-    return _raw_spin_trylock(&lock->raw);
-#else
-    if (!_raw_spin_trylock(&lock->raw)) return 0;
+    if ( !_raw_spin_trylock(&lock->raw) )
+        return 0;
+#ifdef LOCK_PROFILE
     lock->profile.time_locked = NOW();
-    return 1;
 #endif
+    lockdepth_inc();
+    return 1;
 }
 
 void _spin_barrier(spinlock_t *lock)
@@ -228,6 +247,7 @@ void _read_lock(rwlock_t *lock)
 {
     check_lock(&lock->debug);
     _raw_read_lock(&lock->raw);
+    lockdepth_inc();
 }
 
 void _read_lock_irq(rwlock_t *lock)
@@ -236,6 +256,7 @@ void _read_lock_irq(rwlock_t *lock)
     local_irq_disable();
     check_lock(&lock->debug);
     _raw_read_lock(&lock->raw);
+    lockdepth_inc();
 }
 
 unsigned long _read_lock_irqsave(rwlock_t *lock)
@@ -244,22 +265,26 @@ unsigned long _read_lock_irqsave(rwlock_t *lock)
     local_irq_save(flags);
     check_lock(&lock->debug);
     _raw_read_lock(&lock->raw);
+    lockdepth_inc();
     return flags;
 }
 
 void _read_unlock(rwlock_t *lock)
 {
+    lockdepth_dec();
     _raw_read_unlock(&lock->raw);
 }
 
 void _read_unlock_irq(rwlock_t *lock)
 {
+    lockdepth_dec();
     _raw_read_unlock(&lock->raw);
     local_irq_enable();
 }
 
 void _read_unlock_irqrestore(rwlock_t *lock, unsigned long flags)
 {
+    lockdepth_dec();
     _raw_read_unlock(&lock->raw);
     local_irq_restore(flags);
 }
@@ -268,6 +293,7 @@ void _write_lock(rwlock_t *lock)
 {
     check_lock(&lock->debug);
     _raw_write_lock(&lock->raw);
+    lockdepth_inc();
 }
 
 void _write_lock_irq(rwlock_t *lock)
@@ -276,6 +302,7 @@ void _write_lock_irq(rwlock_t *lock)
     local_irq_disable();
     check_lock(&lock->debug);
     _raw_write_lock(&lock->raw);
+    lockdepth_inc();
 }
 
 unsigned long _write_lock_irqsave(rwlock_t *lock)
@@ -284,28 +311,35 @@ unsigned long _write_lock_irqsave(rwlock_t *lock)
     local_irq_save(flags);
     check_lock(&lock->debug);
     _raw_write_lock(&lock->raw);
+    lockdepth_inc();
     return flags;
 }
 
 int _write_trylock(rwlock_t *lock)
 {
     check_lock(&lock->debug);
-    return _raw_write_trylock(&lock->raw);
+    if ( !_raw_write_trylock(&lock->raw) )
+        return 0;
+    lockdepth_inc();
+    return 1;
 }
 
 void _write_unlock(rwlock_t *lock)
 {
+    lockdepth_dec();
     _raw_write_unlock(&lock->raw);
 }
 
 void _write_unlock_irq(rwlock_t *lock)
 {
+    lockdepth_dec();
     _raw_write_unlock(&lock->raw);
     local_irq_enable();
 }
 
 void _write_unlock_irqrestore(rwlock_t *lock, unsigned long flags)
 {
+    lockdepth_dec();
     _raw_write_unlock(&lock->raw);
     local_irq_restore(flags);
 }

@@ -1047,7 +1047,7 @@ static void schedule(void)
     struct schedule_data *sd;
     struct task_slice     next_slice;
 
-    ASSERT(!in_irq());
+    ASSERT(!in_atomic());
 
     perfc_incr(sched_run);
 

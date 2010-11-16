@@ -119,4 +119,6 @@ extern void add_taint(unsigned);
 struct cpu_user_regs;
 void dump_execstate(struct cpu_user_regs *);
 
+#define in_atomic() (locking_depth() || in_irq() || !local_irq_is_enabled())
+
 #endif /* __LIB_H__ */
