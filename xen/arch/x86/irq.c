@@ -46,8 +46,6 @@ static DECLARE_BITMAP(used_vectors, NR_VECTORS);
 
 struct irq_cfg __read_mostly *irq_cfg = NULL;
 
-static struct timer *__read_mostly irq_guest_eoi_timer;
-
 static DEFINE_SPINLOCK(vector_lock);
 
 DEFINE_PER_CPU(vector_irq_t, vector_irq) = {
@@ -274,18 +272,15 @@ int init_irq_data(void)
     irq_desc = xmalloc_array(struct irq_desc, nr_irqs);
     irq_cfg = xmalloc_array(struct irq_cfg, nr_irqs);
     irq_status = xmalloc_array(int, nr_irqs);
-    irq_guest_eoi_timer = xmalloc_array(struct timer, nr_irqs);
     irq_vector = xmalloc_array(u8, nr_irqs_gsi);
     
-    if (!irq_desc || !irq_cfg || !irq_status ||! irq_vector ||
-        !irq_guest_eoi_timer)
+    if ( !irq_desc || !irq_cfg || !irq_status ||! irq_vector )
         return -ENOMEM;
 
     memset(irq_desc, 0,  nr_irqs * sizeof(*irq_desc));
     memset(irq_cfg, 0,  nr_irqs * sizeof(*irq_cfg));
     memset(irq_status, 0,  nr_irqs * sizeof(*irq_status));
     memset(irq_vector, 0, nr_irqs_gsi * sizeof(*irq_vector));
-    memset(irq_guest_eoi_timer, 0, nr_irqs * sizeof(*irq_guest_eoi_timer));
     
     for (irq = 0; irq < nr_irqs; irq++) {
         desc = irq_to_desc(irq);
@@ -735,6 +730,7 @@ typedef struct {
 #define ACKTYPE_UNMASK 1     /* Unmask PIC hardware (from any CPU)   */
 #define ACKTYPE_EOI    2     /* EOI on the CPU that was interrupted  */
     cpumask_t cpu_eoi_map;   /* CPUs that need to EOI this interrupt */
+    struct timer eoi_timer;
     struct domain *guest[IRQ_MAX_GUESTS];
 } irq_guest_action_t;
 
@@ -784,13 +780,55 @@ static void _irq_guest_eoi(struct irq_desc *desc)
     desc->handler->enable(irq);
 }
 
+static void set_eoi_ready(void *data);
+
 static void irq_guest_eoi_timer_fn(void *data)
 {
     struct irq_desc *desc = data;
+    unsigned int irq = desc - irq_desc;
+    irq_guest_action_t *action;
+    cpumask_t cpu_eoi_map;
     unsigned long flags;
 
     spin_lock_irqsave(&desc->lock, flags);
-    _irq_guest_eoi(desc);
+    
+    if ( !(desc->status & IRQ_GUEST) )
+        goto out;
+
+    action = (irq_guest_action_t *)desc->action;
+
+    if ( action->ack_type != ACKTYPE_NONE )
+    {
+        unsigned int i;
+        for ( i = 0; i < action->nr_guests; i++ )
+        {
+            struct domain *d = action->guest[i];
+            unsigned int pirq = domain_irq_to_pirq(d, irq);
+            if ( test_and_clear_bit(pirq, d->pirq_mask) )
+                action->in_flight--;
+        }
+    }
+
+    if ( action->in_flight != 0 )
+        goto out;
+
+    switch ( action->ack_type )
+    {
+    case ACKTYPE_UNMASK:
+        desc->handler->end(irq);
+        break;
+    case ACKTYPE_EOI:
+        cpu_eoi_map = action->cpu_eoi_map;
+        spin_unlock_irq(&desc->lock);
+        on_selected_cpus(&cpu_eoi_map, set_eoi_ready, desc, 0);
+        spin_lock_irq(&desc->lock);
+        break;
+    case ACKTYPE_NONE:
+        _irq_guest_eoi(desc);
+        break;
+    }
+
+ out:
     spin_unlock_irqrestore(&desc->lock, flags);
 }
 
@@ -847,9 +885,11 @@ static void __do_IRQ_guest(int irq)
         }
     }
 
-    if ( already_pending == action->nr_guests )
+    stop_timer(&action->eoi_timer);
+
+    if ( (action->ack_type == ACKTYPE_NONE) &&
+         (already_pending == action->nr_guests) )
     {
-        stop_timer(&irq_guest_eoi_timer[irq]);
         desc->handler->disable(irq);
         desc->status |= IRQ_GUEST_EOI_PENDING;
         for ( i = 0; i < already_pending; ++i )
@@ -865,10 +905,10 @@ static void __do_IRQ_guest(int irq)
              * - skip the timer setup below.
              */
         }
-        init_timer(&irq_guest_eoi_timer[irq],
-                   irq_guest_eoi_timer_fn, desc, smp_processor_id());
-        set_timer(&irq_guest_eoi_timer[irq], NOW() + MILLISECS(1));
     }
+
+    migrate_timer(&action->eoi_timer, smp_processor_id());
+    set_timer(&action->eoi_timer, NOW() + MILLISECS(1));
 }
 
 /*
@@ -978,7 +1018,7 @@ static void __pirq_guest_eoi(struct domain *d, int pirq)
     if ( action->ack_type == ACKTYPE_NONE )
     {
         ASSERT(!test_bit(pirq, d->pirq_mask));
-        stop_timer(&irq_guest_eoi_timer[irq]);
+        stop_timer(&action->eoi_timer);
         _irq_guest_eoi(desc);
     }
 
@@ -1162,6 +1202,7 @@ int pirq_guest_bind(struct vcpu *v, int pirq, int will_share)
         action->shareable   = will_share;
         action->ack_type    = pirq_acktype(v->domain, pirq);
         cpus_clear(action->cpu_eoi_map);
+        init_timer(&action->eoi_timer, irq_guest_eoi_timer_fn, desc, 0);
 
         desc->depth = 0;
         desc->status |= IRQ_GUEST;
@@ -1266,7 +1307,7 @@ static irq_guest_action_t *__pirq_guest_unbind(
         }
         break;
     case ACKTYPE_NONE:
-        stop_timer(&irq_guest_eoi_timer[irq]);
+        stop_timer(&action->eoi_timer);
         _irq_guest_eoi(desc);
         break;
     }
@@ -1306,9 +1347,7 @@ static irq_guest_action_t *__pirq_guest_unbind(
     BUG_ON(!cpus_empty(action->cpu_eoi_map));
 
     desc->action = NULL;
-    desc->status &= ~IRQ_GUEST;
-    desc->status &= ~IRQ_INPROGRESS;
-    kill_timer(&irq_guest_eoi_timer[irq]);
+    desc->status &= ~(IRQ_GUEST|IRQ_GUEST_EOI_PENDING|IRQ_INPROGRESS);
     desc->handler->shutdown(irq);
 
     /* Caller frees the old guest descriptor block. */
@@ -1342,7 +1381,10 @@ void pirq_guest_unbind(struct domain *d, int pirq)
     spin_unlock_irq(&desc->lock);
 
     if ( oldaction != NULL )
+    {
+        kill_timer(&oldaction->eoi_timer);
         xfree(oldaction);
+    }
 }
 
 static int pirq_guest_force_unbind(struct domain *d, int irq)
@@ -1380,7 +1422,10 @@ static int pirq_guest_force_unbind(struct domain *d, int irq)
     spin_unlock_irq(&desc->lock);
 
     if ( oldaction != NULL )
+    {
+        kill_timer(&oldaction->eoi_timer);
         xfree(oldaction);
+    }
 
     return bound;
 }
