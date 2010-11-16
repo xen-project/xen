@@ -25,6 +25,4 @@ struct mc_state {
     };
 };
 
-DECLARE_PER_CPU(struct mc_state, mc_state);
-
 #endif /* __XEN_MULTICALL_H__ */

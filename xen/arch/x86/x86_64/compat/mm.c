@@ -308,7 +308,7 @@ int compat_mmuext_op(XEN_GUEST_HANDLE(mmuext_op_compat_t) cmp_uops,
             if ( err == __HYPERVISOR_mmuext_op )
             {
                 struct cpu_user_regs *regs = guest_cpu_user_regs();
-                struct mc_state *mcs = &this_cpu(mc_state);
+                struct mc_state *mcs = &current->mc_state;
                 unsigned int arg1 = !test_bit(_MCSF_in_multicall, &mcs->flags)
                                     ? regs->ecx
                                     : mcs->call.args[1];

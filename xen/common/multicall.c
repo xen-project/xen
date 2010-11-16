@@ -15,7 +15,6 @@
 #include <asm/hardirq.h>
 
 #ifndef COMPAT
-DEFINE_PER_CPU(struct mc_state, mc_state);
 typedef long ret_t;
 #define xlat_multicall_entry(mcs)
 #endif
@@ -24,7 +23,7 @@ ret_t
 do_multicall(
     XEN_GUEST_HANDLE(multicall_entry_t) call_list, unsigned int nr_calls)
 {
-    struct mc_state *mcs = &this_cpu(mc_state);
+    struct mc_state *mcs = &current->mc_state;
     unsigned int     i;
 
     if ( unlikely(__test_and_set_bit(_MCSF_in_multicall, &mcs->flags)) )

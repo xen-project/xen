@@ -495,19 +495,6 @@ void __domain_crash_synchronous(void)
 {
     __domain_crash(current->domain);
 
-    /*
-     * Flush multicall state before dying if a multicall is in progress.
-     * This shouldn't be necessary, but some architectures are calling
-     * domain_crash_synchronous() when they really shouldn't (i.e., from
-     * within hypercall context).
-     */
-    if ( this_cpu(mc_state).flags != 0 )
-    {
-        dprintk(XENLOG_ERR,
-                "FIXME: synchronous domain crash during a multicall!\n");
-        this_cpu(mc_state).flags = 0;
-    }
-
     vcpu_end_shutdown_deferral(current);
 
     for ( ; ; )

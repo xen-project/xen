@@ -419,7 +419,7 @@ ia64_hypercall(struct pt_regs *regs)
 unsigned long hypercall_create_continuation(
 	unsigned int op, const char *format, ...)
 {
-    struct mc_state *mcs = &this_cpu(mc_state);
+    struct mc_state *mcs = &current->mc_state;
     struct vcpu *v = current;
     const char *p = format;
     unsigned long arg;

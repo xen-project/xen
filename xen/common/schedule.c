@@ -1048,7 +1048,6 @@ static void schedule(void)
     struct task_slice     next_slice;
 
     ASSERT(!in_irq());
-    ASSERT(this_cpu(mc_state).flags == 0);
 
     perfc_incr(sched_run);
 

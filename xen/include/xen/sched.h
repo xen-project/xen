@@ -25,6 +25,7 @@
 #include <public/mem_event.h>
 #include <xen/cpumask.h>
 #include <xen/nodemask.h>
+#include <xen/multicall.h>
 
 #ifdef CONFIG_COMPAT
 #include <compat/vcpu.h>
@@ -168,6 +169,9 @@ struct vcpu
 
     /* Tasklet for continue_hypercall_on_cpu(). */
     struct tasklet   continue_hypercall_tasklet;
+
+    /* Multicall information. */
+    struct mc_state  mc_state;
 
     struct arch_vcpu arch;
 };

@@ -1556,7 +1556,7 @@ void sync_vcpu_execstate(struct vcpu *v)
 unsigned long hypercall_create_continuation(
     unsigned int op, const char *format, ...)
 {
-    struct mc_state *mcs = &this_cpu(mc_state);
+    struct mc_state *mcs = &current->mc_state;
     struct cpu_user_regs *regs;
     const char *p = format;
     unsigned long arg;
@@ -1638,7 +1638,7 @@ unsigned long hypercall_create_continuation(
 int hypercall_xlat_continuation(unsigned int *id, unsigned int mask, ...)
 {
     int rc = 0;
-    struct mc_state *mcs = &this_cpu(mc_state);
+    struct mc_state *mcs = &current->mc_state;
     struct cpu_user_regs *regs;
     unsigned int i, cval = 0;
     unsigned long nval = 0;
