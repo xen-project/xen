@@ -97,43 +97,43 @@ void vpmu_initialise(struct vcpu *v)
 
     switch ( vendor )
     {
-        case X86_VENDOR_AMD:
+    case X86_VENDOR_AMD:
+        switch ( family )
         {
-            switch ( family )
-            {
-            case 0x10:
-                vpmu->arch_vpmu_ops = &amd_vpmu_ops;
-                break;
-            default:
-                printk("VMPU: Initialization failed. "
-                       "AMD processor family %d has not "
-                       "been supported\n", family);
-                return;
-            }
-        }
-        break;
-
-        case X86_VENDOR_INTEL:
-        {
-            if ( family == 6 )
-            {
-                switch ( cpu_model )
-                {
-                case 15:
-                case 23:
-                case 26:
-                case 29:
-                    vpmu->arch_vpmu_ops = &core2_vpmu_ops;
-                    break;
-                }
-            }
-        }
-        break;
-
+        case 0x10:
+            vpmu->arch_vpmu_ops = &amd_vpmu_ops;
+            break;
         default:
-            printk("VMPU: Initialization failed. "
-                   "Unknown CPU vendor %d\n", vendor);
+            printk("VPMU: Initialization failed. "
+                   "AMD processor family %d has not "
+                   "been supported\n", family);
             return;
+        }
+        break;
+
+    case X86_VENDOR_INTEL:
+        if ( family == 6 )
+        {
+            switch ( cpu_model )
+            {
+            case 15:
+            case 23:
+            case 26:
+            case 29:
+                vpmu->arch_vpmu_ops = &core2_vpmu_ops;
+                break;
+            }
+        }
+        if ( vpmu->arch_vpmu_ops == NULL )
+            printk("VPMU: Initialization failed. "
+                   "Intel processor family %d model %d has not "
+                   "been supported\n", family, cpu_model);
+        break;
+
+    default:
+        printk("VPMU: Initialization failed. "
+               "Unknown CPU vendor %d\n", vendor);
+        break;
     }
 
     if ( vpmu->arch_vpmu_ops != NULL )
