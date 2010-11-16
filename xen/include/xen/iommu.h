@@ -30,6 +30,8 @@ extern bool_t iommu_enabled;
 extern bool_t force_iommu, iommu_verbose;
 extern bool_t iommu_workaround_bios_bug, iommu_passthrough;
 extern bool_t iommu_snoop, iommu_qinval, iommu_intremap;
+extern bool_t amd_iommu_debug;
+extern bool_t amd_iommu_perdev_intremap;
 
 extern struct rangeset *mmio_ro_ranges;
 

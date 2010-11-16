@@ -31,9 +31,6 @@
 
 #define DMA_32BIT_MASK  0x00000000ffffffffULL
 
-extern int amd_iommu_debug;
-extern int amd_iommu_perdev_intremap;
-
 #define AMD_IOMMU_DEBUG(fmt, args...) \
     do  \
     {   \
