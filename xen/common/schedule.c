@@ -1396,6 +1396,11 @@ void sched_tick_resume(void)
     SCHED_OP(sched, tick_resume, cpu);
 }
 
+void wait(void)
+{
+    schedule();
+}
+
 #ifdef CONFIG_COMPAT
 #include "compat/schedule.c"
 #endif

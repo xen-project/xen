@@ -31,6 +31,7 @@ obj-y += timer.o
 obj-y += trace.o
 obj-y += version.o
 obj-y += vsprintf.o
+obj-y += wait.o
 obj-y += xmalloc_tlsf.o
 obj-y += rcupdate.o
 obj-y += tmem.o

@@ -80,6 +80,8 @@ int  evtchn_init(struct domain *d); /* from domain_create */
 void evtchn_destroy(struct domain *d); /* from domain_kill */
 void evtchn_destroy_final(struct domain *d); /* from complete_domain_destroy */
 
+struct waitqueue_vcpu;
+
 struct vcpu 
 {
     int              vcpu_id;
@@ -172,6 +174,8 @@ struct vcpu
 
     /* Multicall information. */
     struct mc_state  mc_state;
+
+    struct waitqueue_vcpu *waitqueue_vcpu;
 
     struct arch_vcpu arch;
 };

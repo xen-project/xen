@@ -27,6 +27,7 @@
 #include <xen/percpu.h>
 #include <xen/multicall.h>
 #include <xen/rcupdate.h>
+#include <xen/wait.h>
 #include <acpi/cpufreq/cpufreq.h>
 #include <asm/debugger.h>
 #include <public/sched.h>
@@ -162,10 +163,12 @@ struct vcpu *alloc_vcpu(
         v->vcpu_info = ((vcpu_id < XEN_LEGACY_MAX_VCPUS)
                         ? (vcpu_info_t *)&shared_info(d, vcpu_info[vcpu_id])
                         : &dummy_vcpu_info);
+        init_waitqueue_vcpu(v);
     }
 
     if ( sched_init_vcpu(v, cpu_id) != 0 )
     {
+        destroy_waitqueue_vcpu(v);
         free_vcpu_struct(v);
         return NULL;
     }
@@ -173,6 +176,7 @@ struct vcpu *alloc_vcpu(
     if ( vcpu_initialise(v) != 0 )
     {
         sched_destroy_vcpu(v);
+        destroy_waitqueue_vcpu(v);
         free_vcpu_struct(v);
         return NULL;
     }
@@ -617,6 +621,7 @@ static void complete_domain_destroy(struct rcu_head *head)
         tasklet_kill(&v->continue_hypercall_tasklet);
         vcpu_destroy(v);
         sched_destroy_vcpu(v);
+        destroy_waitqueue_vcpu(v);
     }
 
     grant_table_destroy(d);

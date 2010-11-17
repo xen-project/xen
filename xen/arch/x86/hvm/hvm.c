@@ -34,6 +34,7 @@
 #include <xen/event.h>
 #include <xen/paging.h>
 #include <xen/cpu.h>
+#include <xen/wait.h>
 #include <asm/shadow.h>
 #include <asm/hap.h>
 #include <asm/current.h>
@@ -282,6 +283,8 @@ void hvm_do_resume(struct vcpu *v)
     ioreq_t *p;
 
     pt_restore_timer(v);
+
+    check_wakeup_from_wait();
 
     /* NB. Optimised for common case (p->state == STATE_IOREQ_NONE). */
     p = get_ioreq(v);

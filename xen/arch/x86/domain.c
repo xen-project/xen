@@ -33,6 +33,7 @@
 #include <xen/pci.h>
 #include <xen/paging.h>
 #include <xen/cpu.h>
+#include <xen/wait.h>
 #include <public/sysctl.h>
 #include <asm/regs.h>
 #include <asm/mc146818rtc.h>
@@ -77,6 +78,7 @@ static void continue_idle_domain(struct vcpu *v)
 
 static void continue_nonidle_domain(struct vcpu *v)
 {
+    check_wakeup_from_wait();
     reset_stack_and_jump(ret_from_intr);
 }
 
