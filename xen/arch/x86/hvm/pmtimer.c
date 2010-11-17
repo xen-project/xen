@@ -88,7 +88,7 @@ void hvm_acpi_sleep_button(struct domain *d)
 static void pmt_update_time(PMTState *s)
 {
     uint64_t curr_gtime, tmp;
-    uint32_t msb = s->pm.tmr_val & TMR_VAL_MSB;
+    uint32_t tmr_val = s->pm.tmr_val, msb = tmr_val & TMR_VAL_MSB;
     
     ASSERT(spin_is_locked(&s->lock));
 
@@ -96,12 +96,15 @@ static void pmt_update_time(PMTState *s)
     curr_gtime = hvm_get_guest_time(s->vcpu);
     tmp = ((curr_gtime - s->last_gtime) * s->scale) + s->not_accounted;
     s->not_accounted = (uint32_t)tmp;
-    s->pm.tmr_val += tmp >> 32;
-    s->pm.tmr_val &= TMR_VAL_MASK;
+    tmr_val += tmp >> 32;
+    tmr_val &= TMR_VAL_MASK;
     s->last_gtime = curr_gtime;
-    
+
+    /* Update timer value atomically wrt lock-free reads in handle_pmt_io(). */
+    *(volatile uint32_t *)&s->pm.tmr_val = tmr_val;
+
     /* If the counter's MSB has changed, set the status bit */
-    if ( (s->pm.tmr_val & TMR_VAL_MSB) != msb )
+    if ( (tmr_val & TMR_VAL_MSB) != msb )
     {
         s->pm.pm1a_sts |= TMR_STS;
         pmt_update_sci(s);
@@ -215,10 +218,23 @@ static int handle_pmt_io(
     
     if ( dir == IOREQ_READ )
     {
-        spin_lock(&s->lock);
-        pmt_update_time(s);
-        *val = s->pm.tmr_val;
-        spin_unlock(&s->lock);
+        if ( spin_trylock(&s->lock) )
+        {
+            /* We hold the lock: update timer value and return it. */
+            pmt_update_time(s);
+            *val = s->pm.tmr_val;
+            spin_unlock(&s->lock);
+        }
+        else
+        {
+            /*
+             * Someone else is updating the timer: rather than do the work
+             * again ourselves, wait for them to finish and then steal their
+             * updated value with a lock-free atomic read.
+             */
+            spin_barrier(&s->lock);
+            *val = *(volatile uint32_t *)&s->pm.tmr_val;
+        }
         return X86EMUL_OKAY;
     }
 
