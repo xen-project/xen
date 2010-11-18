@@ -2,6 +2,8 @@
  * wait.h
  * 
  * Sleep in hypervisor context for some event to occur.
+ * 
+ * Copyright (c) 2010, Keir Fraser <keir@xen.org>
  */
 
 #ifndef __XEN_WAIT_H__
