@@ -36,6 +36,7 @@
 #include <xen/spinlock.h>
 #include <xen/percpu.h>
 #include <xen/cpumask.h>
+#include <xen/preempt.h>
 
 /**
  * struct rcu_head - callback structure for use with RCU
@@ -145,14 +146,14 @@ typedef struct _rcu_read_lock rcu_read_lock_t;
  *
  * It is illegal to block while in an RCU read-side critical section.
  */
-#define rcu_read_lock(x)       ((void)(x))
+#define rcu_read_lock(x)       ({ ((void)(x)); preempt_disable(); })
 
 /**
  * rcu_read_unlock - marks the end of an RCU read-side critical section.
  *
  * See rcu_read_lock() for more information.
  */
-#define rcu_read_unlock(x)     ((void)(x))
+#define rcu_read_unlock(x)     ({ ((void)(x)); preempt_enable(); })
 
 /*
  * So where is rcu_write_lock()?  It does not exist, as there is no

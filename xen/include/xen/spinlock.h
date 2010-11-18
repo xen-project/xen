@@ -223,6 +223,4 @@ int _rw_is_write_locked(rwlock_t *lock);
 #define rw_is_locked(l)               _rw_is_locked(l)
 #define rw_is_write_locked(l)         _rw_is_write_locked(l)
 
-unsigned int locking_depth(void);
-
 #endif /* __SPINLOCK_H__ */

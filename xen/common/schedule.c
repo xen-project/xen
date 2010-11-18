@@ -32,6 +32,7 @@
 #include <xen/guest_access.h>
 #include <xen/multicall.h>
 #include <xen/cpu.h>
+#include <xen/preempt.h>
 #include <public/sched.h>
 #include <xsm/xsm.h>
 
