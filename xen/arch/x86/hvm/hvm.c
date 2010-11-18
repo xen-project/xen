@@ -1905,6 +1905,13 @@ static enum hvm_copy_result __hvm_copy(
     char *p;
     int count, todo = size;
 
+    /*
+     * If the required guest memory is paged out, this function may sleep.
+     * Hence we bail immediately if called from atomic context.
+     */
+    if ( in_atomic() )
+        return HVMCOPY_unhandleable;
+
     while ( todo > 0 )
     {
         count = min_t(int, PAGE_SIZE - (addr & ~PAGE_MASK), todo);
