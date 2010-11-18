@@ -37,10 +37,8 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
     if ( !map )
         return -EINVAL;
 
-    if ( map->domid == DOMID_SELF )
-        d = rcu_lock_domain(current->domain);
-    else
-        d = rcu_lock_domain_by_id(map->domid);
+    d = (map->domid == DOMID_SELF) ? rcu_lock_current_domain()
+        : rcu_lock_domain_by_id(map->domid);
 
     if ( d == NULL )
         return -ESRCH;
@@ -165,10 +163,8 @@ static int physdev_unmap_pirq(struct physdev_unmap_pirq *unmap)
     struct domain *d;
     int ret;
 
-    if ( unmap->domid == DOMID_SELF )
-        d = rcu_lock_domain(current->domain);
-    else
-        d = rcu_lock_domain_by_id(unmap->domid);
+    d = (unmap->domid == DOMID_SELF) ? rcu_lock_current_domain()
+        : rcu_lock_domain_by_id(unmap->domid);
 
     if ( d == NULL )
         return -ESRCH;

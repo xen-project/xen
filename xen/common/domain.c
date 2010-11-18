@@ -398,7 +398,7 @@ struct domain *get_domain_by_id(domid_t dom)
 
 struct domain *rcu_lock_domain_by_id(domid_t dom)
 {
-    struct domain *d;
+    struct domain *d = NULL;
 
     rcu_read_lock(&domlist_read_lock);
 
@@ -407,12 +407,15 @@ struct domain *rcu_lock_domain_by_id(domid_t dom)
           d = rcu_dereference(d->next_in_hashbucket) )
     {
         if ( d->domain_id == dom )
-            return d;
+        {
+            rcu_lock_domain(d);
+            break;
+        }
     }
 
     rcu_read_unlock(&domlist_read_lock);
 
-    return NULL;
+    return d;
 }
 
 int rcu_lock_target_domain_by_id(domid_t dom, struct domain **d)

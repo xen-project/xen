@@ -439,18 +439,20 @@ int rcu_lock_target_domain_by_id(domid_t dom, struct domain **d);
 /* Finish a RCU critical region started by rcu_lock_domain_by_id(). */
 static inline void rcu_unlock_domain(struct domain *d)
 {
-    rcu_read_unlock(&domlist_read_lock);
+    if ( d != current->domain )
+        rcu_read_unlock(&domlist_read_lock);
 }
 
 static inline struct domain *rcu_lock_domain(struct domain *d)
 {
-    rcu_read_lock(d);
+    if ( d != current->domain )
+        rcu_read_lock(d);
     return d;
 }
 
 static inline struct domain *rcu_lock_current_domain(void)
 {
-    return rcu_lock_domain(current->domain);
+    return /*rcu_lock_domain*/(current->domain);
 }
 
 struct domain *get_domain_by_id(domid_t dom);

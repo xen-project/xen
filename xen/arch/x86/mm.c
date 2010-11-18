@@ -2759,7 +2759,7 @@ static struct domain *get_pg_owner(domid_t domid)
 
     if ( likely(domid == DOMID_SELF) )
     {
-        pg_owner = rcu_lock_domain(curr);
+        pg_owner = rcu_lock_current_domain();
         goto out;
     }
 
