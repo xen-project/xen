@@ -42,6 +42,15 @@
 #define physdev_manage_pci         compat_physdev_manage_pci
 #define physdev_manage_pci_t       physdev_manage_pci_compat_t
 
+#define physdev_manage_pci_ext     compat_physdev_manage_pci_ext
+#define physdev_manage_pci_ext_t   physdev_manage_pci_ext_compat_t
+
+#define physdev_restore_msi        compat_physdev_restore_msi
+#define physdev_restore_msi_t      physdev_restore_msi_compat_t
+
+#define physdev_setup_gsi          compat_physdev_setup_gsi
+#define physdev_setup_gsi_t        physdev_setup_gsi_compat_t
+
 #define physdev_get_free_pirq      compat_physdev_get_free_pirq
 #define physdev_get_free_pirq_t    physdev_get_free_pirq_compat_t
 
