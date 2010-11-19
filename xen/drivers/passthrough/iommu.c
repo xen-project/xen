@@ -40,7 +40,7 @@ static int iommu_populate_page_table(struct domain *d);
 custom_param("iommu", parse_iommu_param);
 bool_t __read_mostly iommu_enabled = 1;
 bool_t __read_mostly force_iommu;
-bool_t __read_mostly iommu_dom0_strict;
+bool_t __initdata iommu_dom0_strict;
 bool_t __read_mostly iommu_verbose;
 bool_t __read_mostly iommu_workaround_bios_bug;
 bool_t __read_mostly iommu_passthrough;
@@ -102,7 +102,7 @@ int iommu_domain_init(struct domain *d)
     return hd->platform_ops->init(d);
 }
 
-void iommu_dom0_init(struct domain *d)
+void __init iommu_dom0_init(struct domain *d)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
 

@@ -117,7 +117,7 @@ static void amd_iommu_setup_domain_device(
     spin_unlock_irqrestore(&iommu->lock, flags);
 }
 
-static void amd_iommu_setup_dom0_devices(struct domain *d)
+static void __init amd_iommu_setup_dom0_devices(struct domain *d)
 {
     struct amd_iommu *iommu;
     struct pci_dev *pdev;
@@ -232,7 +232,7 @@ static int amd_iommu_domain_init(struct domain *d)
     return 0;
 }
 
-static void amd_iommu_dom0_init(struct domain *d)
+static void __init amd_iommu_dom0_init(struct domain *d)
 {
     unsigned long i; 
 

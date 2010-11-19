@@ -28,7 +28,7 @@
 #include "../vtd.h"
 #include "../extern.h"
 
-LIST_HEAD(ats_dev_drhd_units);
+static LIST_HEAD(ats_dev_drhd_units);
 
 #define ATS_REG_CAP    4
 #define ATS_REG_CTL    6
@@ -47,9 +47,9 @@ static LIST_HEAD(ats_devices);
 static void parse_ats_param(char *s);
 custom_param("ats", parse_ats_param);
 
-int ats_enabled = 1;
+int __read_mostly ats_enabled = 1;
 
-static void parse_ats_param(char *s)
+static void __init parse_ats_param(char *s)
 {
     char *ss;
 

@@ -92,8 +92,8 @@ void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
     /* dummy */
 }
 
-static int do_dom0_iommu_mapping(unsigned long start, unsigned long end,
-				void *arg)
+static int __init do_dom0_iommu_mapping(unsigned long start,
+					unsigned long end, void *arg)
 {
     unsigned long tmp, pfn, j, page_addr = start;
     struct domain *d = (struct domain *)arg;
@@ -120,7 +120,7 @@ static int do_dom0_iommu_mapping(unsigned long start, unsigned long end,
     return 0;
 }
 
-void iommu_set_dom0_mapping(struct domain *d)
+void __init iommu_set_dom0_mapping(struct domain *d)
 {
 	if (dom0)
 	    BUG_ON(d != dom0);
