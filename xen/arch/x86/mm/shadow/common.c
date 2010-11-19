@@ -3311,15 +3311,21 @@ static int shadow_one_bit_enable(struct domain *d, u32 mode)
 
     mode |= PG_SH_enable;
 
-    if ( d->arch.paging.mode == 0 )
+    if ( d->arch.paging.shadow.total_pages == 0 )
     {
-        /* Init the shadow memory allocation and the hash table */
-        if ( sh_set_allocation(d, 1, NULL) != 0 
-             || shadow_hash_alloc(d) != 0 )
+        /* Init the shadow memory allocation if the user hasn't done so */
+        if ( sh_set_allocation(d, 1, NULL) != 0 )
         {
             sh_set_allocation(d, 0, NULL);
             return -ENOMEM;
         }
+    }
+
+    if ( d->arch.paging.mode == 0 )
+    {
+        /* Init the shadow hash table */
+        if ( shadow_hash_alloc(d) != 0 )
+            return -ENOMEM;
     }
 
     /* Update the bits */
