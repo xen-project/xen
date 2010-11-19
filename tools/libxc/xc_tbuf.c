@@ -121,6 +121,7 @@ int xc_tbuf_set_cpu_mask(xc_interface *xch, uint32_t mask)
     uint64_t mask64 = mask;
 
     bytemap = xc_hypercall_buffer_alloc(xch, bytemap, sizeof(mask64));
+    if (bytemap == NULL)
     {
         PERROR("Could not allocate memory for xc_tbuf_set_cpu_mask hypercall");
         goto out;
