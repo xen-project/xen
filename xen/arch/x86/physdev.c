@@ -121,7 +121,7 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
         }
 
         irq = domain_pirq_to_irq(current->domain, map->index);
-        if ( !irq )
+        if ( irq <= 0 )
         {
             if ( IS_PRIV(current->domain) )
                 irq = map->index;
@@ -556,6 +556,26 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         ret = mp_register_gsi(setup_gsi.gsi, setup_gsi.triggering,
                               setup_gsi.polarity);
         break; 
+    }
+    case PHYSDEVOP_get_free_pirq: {
+        struct physdev_get_free_pirq out;
+        struct domain *d;
+
+        d = rcu_lock_current_domain();
+        
+        ret = -EFAULT;
+        if ( copy_from_guest(&out, arg, 1) != 0 )
+            break;
+
+        spin_lock(&d->event_lock);
+        out.pirq = get_free_pirq(d, out.type, 0);
+        d->arch.pirq_irq[out.pirq] = PIRQ_ALLOCATED;
+        spin_unlock(&d->event_lock);
+
+        ret = copy_to_guest(arg, &out, 1) ? -EFAULT : 0;
+
+        rcu_unlock_domain(d);
+        break;
     }
     default:
         ret = -ENOSYS;

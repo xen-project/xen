@@ -2448,6 +2448,7 @@ static long hvm_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         case PHYSDEVOP_unmap_pirq:
         case PHYSDEVOP_eoi:
         case PHYSDEVOP_irq_status_query:
+        case PHYSDEVOP_get_free_pirq:
             return do_physdev_op(cmd, arg);
         default:
             return -ENOSYS;
@@ -2550,6 +2551,7 @@ static long hvm_physdev_op_compat32(
         case PHYSDEVOP_unmap_pirq:
         case PHYSDEVOP_eoi:
         case PHYSDEVOP_irq_status_query:
+        case PHYSDEVOP_get_free_pirq:
             return compat_physdev_op(cmd, arg);
         break;
     default:

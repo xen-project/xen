@@ -1505,7 +1505,7 @@ int map_domain_pirq(
     old_irq = domain_pirq_to_irq(d, pirq);
     old_pirq = domain_irq_to_pirq(d, irq);
 
-    if ( (old_irq && (old_irq != irq) ) ||
+    if ( (old_irq > 0 && (old_irq != irq) ) ||
          (old_pirq && (old_pirq != pirq)) )
     {
         dprintk(XENLOG_G_WARNING, "dom%d: pirq %d or irq %d already mapped\n",

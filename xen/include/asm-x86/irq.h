@@ -150,6 +150,7 @@ void irq_set_affinity(struct irq_desc *, const cpumask_t *mask);
 
 #define domain_pirq_to_irq(d, pirq) ((d)->arch.pirq_irq[pirq])
 #define domain_irq_to_pirq(d, irq) ((d)->arch.irq_pirq[irq])
+#define PIRQ_ALLOCATED -1
 #define domain_pirq_to_emuirq(d, pirq) ((d)->arch.pirq_emuirq[pirq])
 #define domain_emuirq_to_pirq(d, emuirq) ((d)->arch.emuirq_pirq[emuirq])
 #define IRQ_UNBOUND -1

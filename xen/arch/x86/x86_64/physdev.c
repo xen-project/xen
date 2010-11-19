@@ -42,6 +42,9 @@
 #define physdev_manage_pci         compat_physdev_manage_pci
 #define physdev_manage_pci_t       physdev_manage_pci_compat_t
 
+#define physdev_get_free_pirq      compat_physdev_get_free_pirq
+#define physdev_get_free_pirq_t    physdev_get_free_pirq_compat_t
+
 #define COMPAT
 #undef guest_handle_okay
 #define guest_handle_okay          compat_handle_okay
