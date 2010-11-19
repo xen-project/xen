@@ -375,6 +375,7 @@ int pt_irq_destroy_bind_vtd(
             hvm_irq_dpci->mirq[machine_gsi].dom   = NULL;
             hvm_irq_dpci->mirq[machine_gsi].flags = 0;
             clear_bit(machine_gsi, hvm_irq_dpci->mapping);
+            unmap_domain_pirq_emuirq(d, machine_gsi);
         }
     }
     spin_unlock(&d->event_lock);
@@ -454,7 +455,10 @@ void hvm_dpci_msi_eoi(struct domain *d, int vector)
 extern int vmsi_deliver(struct domain *d, int pirq);
 static int hvm_pci_msi_assert(struct domain *d, int pirq)
 {
-    return vmsi_deliver(d, pirq);
+    if ( hvm_domain_use_pirq(d, pirq) )
+        return send_guest_pirq(d, pirq);
+    else
+        return vmsi_deliver(d, pirq);
 }
 #endif
 
@@ -488,7 +492,10 @@ static void hvm_dirq_assist(unsigned long _d)
         {
             device = digl->device;
             intx = digl->intx;
-            hvm_pci_intx_assert(d, device, intx);
+            if ( hvm_domain_use_pirq(d, pirq) )
+                send_guest_pirq(d, pirq);
+            else
+                hvm_pci_intx_assert(d, device, intx);
             hvm_irq_dpci->mirq[pirq].pending++;
 
 #ifdef SUPPORT_MSI_REMAPPING

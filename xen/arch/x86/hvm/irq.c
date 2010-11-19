@@ -23,8 +23,29 @@
 #include <xen/types.h>
 #include <xen/event.h>
 #include <xen/sched.h>
+#include <xen/irq.h>
 #include <asm/hvm/domain.h>
 #include <asm/hvm/support.h>
+
+/* Must be called with hvm_domain->irq_lock hold */
+static void assert_irq(struct domain *d, unsigned ioapic_gsi, unsigned pic_irq)
+{
+    int pirq = domain_emuirq_to_pirq(d, ioapic_gsi);
+    if ( pirq != IRQ_UNBOUND )
+    {
+        send_guest_pirq(d, pirq);
+        return;
+    }
+    vioapic_irq_positive_edge(d, ioapic_gsi);
+    vpic_irq_positive_edge(d, pic_irq);
+}
+
+/* Must be called with hvm_domain->irq_lock hold */
+static void deassert_irq(struct domain *d, unsigned isa_irq)
+{
+    if ( domain_emuirq_to_pirq(d, isa_irq) != IRQ_UNBOUND )
+        vpic_irq_negative_edge(d, isa_irq);
+}
 
 static void __hvm_pci_intx_assert(
     struct domain *d, unsigned int device, unsigned int intx)
@@ -45,10 +66,7 @@ static void __hvm_pci_intx_assert(
     isa_irq = hvm_irq->pci_link.route[link];
     if ( (hvm_irq->pci_link_assert_count[link]++ == 0) && isa_irq &&
          (hvm_irq->gsi_assert_count[isa_irq]++ == 0) )
-    {
-        vioapic_irq_positive_edge(d, isa_irq);
-        vpic_irq_positive_edge(d, isa_irq);
-    }
+        assert_irq(d, isa_irq, isa_irq);
 }
 
 void hvm_pci_intx_assert(
@@ -77,7 +95,7 @@ static void __hvm_pci_intx_deassert(
     isa_irq = hvm_irq->pci_link.route[link];
     if ( (--hvm_irq->pci_link_assert_count[link] == 0) && isa_irq &&
          (--hvm_irq->gsi_assert_count[isa_irq] == 0) )
-        vpic_irq_negative_edge(d, isa_irq);
+        deassert_irq(d, isa_irq);
 }
 
 void hvm_pci_intx_deassert(
@@ -100,10 +118,7 @@ void hvm_isa_irq_assert(
 
     if ( !__test_and_set_bit(isa_irq, &hvm_irq->isa_irq.i) &&
          (hvm_irq->gsi_assert_count[gsi]++ == 0) )
-    {
-        vioapic_irq_positive_edge(d, gsi);
-        vpic_irq_positive_edge(d, isa_irq);
-    }
+        assert_irq(d, gsi, isa_irq);
 
     spin_unlock(&d->arch.hvm_domain.irq_lock);
 }
@@ -120,7 +135,7 @@ void hvm_isa_irq_deassert(
 
     if ( __test_and_clear_bit(isa_irq, &hvm_irq->isa_irq.i) &&
          (--hvm_irq->gsi_assert_count[gsi] == 0) )
-        vpic_irq_negative_edge(d, isa_irq);
+        deassert_irq(d, isa_irq);
 
     spin_unlock(&d->arch.hvm_domain.irq_lock);
 }

@@ -261,6 +261,9 @@ struct arch_domain
     /* NB. protected by d->event_lock and by irq_desc[irq].lock */
     int *irq_pirq;
     int *pirq_irq;
+    /* pirq to emulated irq and vice versa */
+    int *emuirq_pirq;
+    int *pirq_emuirq;
 
     /* Shared page for notifying that explicit PIRQ EOI is required. */
     unsigned long *pirq_eoi_map;

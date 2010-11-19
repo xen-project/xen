@@ -114,6 +114,9 @@ int map_domain_pirq(struct domain *d, int pirq, int irq, int type,
 int unmap_domain_pirq(struct domain *d, int pirq);
 int get_free_pirq(struct domain *d, int type, int index);
 void free_domain_pirqs(struct domain *d);
+int map_domain_emuirq_pirq(struct domain *d, int pirq, int irq);
+int unmap_domain_pirq_emuirq(struct domain *d, int pirq);
+int hvm_domain_use_pirq(struct domain *d, int irq);
 
 int  init_irq_data(void);
 
@@ -147,6 +150,10 @@ void irq_set_affinity(struct irq_desc *, const cpumask_t *mask);
 
 #define domain_pirq_to_irq(d, pirq) ((d)->arch.pirq_irq[pirq])
 #define domain_irq_to_pirq(d, irq) ((d)->arch.irq_pirq[irq])
+#define domain_pirq_to_emuirq(d, pirq) ((d)->arch.pirq_emuirq[pirq])
+#define domain_emuirq_to_pirq(d, emuirq) ((d)->arch.emuirq_pirq[emuirq])
+#define IRQ_UNBOUND -1
+#define IRQ_PT -2
 
 bool_t cpu_has_pending_apic_eoi(void);
 

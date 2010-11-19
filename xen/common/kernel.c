@@ -277,7 +277,8 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE(void) arg)
                              (1U << XENFEAT_gnttab_map_avail_bits);
             else
                 fi.submap |= (1U << XENFEAT_hvm_safe_pvclock) |
-                             (1U << XENFEAT_hvm_callback_vector);
+                             (1U << XENFEAT_hvm_callback_vector) |
+                             (1U << XENFEAT_hvm_pirqs);
 #endif
             break;
         default:

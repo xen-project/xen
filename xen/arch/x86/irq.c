@@ -1453,7 +1453,11 @@ int get_free_pirq(struct domain *d, int type, int index)
     {
         for ( i = 16; i < nr_irqs_gsi; i++ )
             if ( !d->arch.pirq_irq[i] )
-                break;
+            {
+                if ( !is_hvm_domain(d) ||
+                        d->arch.pirq_emuirq[i] == IRQ_UNBOUND )
+                    break;
+            }
         if ( i == nr_irqs_gsi )
             return -ENOSPC;
     }
@@ -1461,7 +1465,11 @@ int get_free_pirq(struct domain *d, int type, int index)
     {
         for ( i = d->nr_pirqs - 1; i >= nr_irqs_gsi; i-- )
             if ( !d->arch.pirq_irq[i] )
-                break;
+            {
+                if ( !is_hvm_domain(d) ||
+                        d->arch.pirq_emuirq[i] == IRQ_UNBOUND )
+                    break;
+            }
         if ( i < nr_irqs_gsi )
             return -ENOSPC;
     }
@@ -1791,4 +1799,83 @@ void fixup_irqs(void)
     for ( sp = 0; sp < pending_eoi_sp(peoi); sp++ )
         peoi[sp].ready = 1;
     flush_ready_eoi();
+}
+
+int map_domain_emuirq_pirq(struct domain *d, int pirq, int emuirq)
+{
+    int old_emuirq = IRQ_UNBOUND, old_pirq = IRQ_UNBOUND;
+
+    ASSERT(spin_is_locked(&d->event_lock));
+
+    if ( !is_hvm_domain(d) )
+        return -EINVAL;
+
+    if ( pirq < 0 || pirq >= d->nr_pirqs ||
+            emuirq == IRQ_UNBOUND || emuirq >= (int) nr_irqs )
+    {
+        dprintk(XENLOG_G_ERR, "dom%d: invalid pirq %d or emuirq %d\n",
+                d->domain_id, pirq, emuirq);
+        return -EINVAL;
+    }
+
+    old_emuirq = domain_pirq_to_emuirq(d, pirq);
+    if ( emuirq != IRQ_PT )
+        old_pirq = domain_emuirq_to_pirq(d, emuirq);
+
+    if ( (old_emuirq != IRQ_UNBOUND && (old_emuirq != emuirq) ) ||
+         (old_pirq != IRQ_UNBOUND && (old_pirq != pirq)) )
+    {
+        dprintk(XENLOG_G_WARNING, "dom%d: pirq %d or emuirq %d already mapped\n",
+                d->domain_id, pirq, emuirq);
+        return 0;
+    }
+
+    d->arch.pirq_emuirq[pirq] = emuirq;
+    /* do not store emuirq mappings for pt devices */
+    if ( emuirq != IRQ_PT )
+        d->arch.emuirq_pirq[emuirq] = pirq;
+
+    return 0;
+}
+
+int unmap_domain_pirq_emuirq(struct domain *d, int pirq)
+{
+    int emuirq, ret = 0;
+
+    if ( !is_hvm_domain(d) )
+        return -EINVAL;
+
+    if ( (pirq < 0) || (pirq >= d->nr_pirqs) )
+        return -EINVAL;
+
+    ASSERT(spin_is_locked(&d->event_lock));
+
+    emuirq = domain_pirq_to_emuirq(d, pirq);
+    if ( emuirq == IRQ_UNBOUND )
+    {
+        dprintk(XENLOG_G_ERR, "dom%d: pirq %d not mapped\n",
+                d->domain_id, pirq);
+        ret = -EINVAL;
+        goto done;
+    }
+
+    d->arch.pirq_emuirq[pirq] = IRQ_UNBOUND;
+    d->arch.emuirq_pirq[emuirq] = IRQ_UNBOUND;
+
+ done:
+    return ret;
+}
+
+int hvm_domain_use_pirq(struct domain *d, int pirq)
+{
+    int emuirq;
+    
+    if ( !is_hvm_domain(d) )
+        return 0;
+
+    emuirq = domain_pirq_to_emuirq(d, pirq);
+    if ( emuirq != IRQ_UNBOUND && d->pirq_to_evtchn[pirq] != 0 )
+        return 1;
+    else
+        return 0;
 }

@@ -331,7 +331,7 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
     if ( (pirq < 0) || (pirq >= d->nr_pirqs) )
         return -EINVAL;
 
-    if ( !irq_access_permitted(d, pirq) )
+    if ( !is_hvm_domain(d) && !irq_access_permitted(d, pirq) )
         return -EPERM;
 
     spin_lock(&d->event_lock);
@@ -345,12 +345,15 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
     chn = evtchn_from_port(d, port);
 
     d->pirq_to_evtchn[pirq] = port;
-    rc = pirq_guest_bind(v, pirq,
-                         !!(bind->flags & BIND_PIRQ__WILL_SHARE));
-    if ( rc != 0 )
+    if ( !is_hvm_domain(d) )
     {
-        d->pirq_to_evtchn[pirq] = 0;
-        goto out;
+        rc = pirq_guest_bind(
+            v, pirq, !!(bind->flags & BIND_PIRQ__WILL_SHARE));
+        if ( rc != 0 )
+        {
+            d->pirq_to_evtchn[pirq] = 0;
+            goto out;
+        }
     }
 
     chn->state  = ECS_PIRQ;
@@ -403,7 +406,8 @@ static long __evtchn_close(struct domain *d1, int port1)
         break;
 
     case ECS_PIRQ:
-        pirq_guest_unbind(d1, chn1->u.pirq.irq);
+        if ( !is_hvm_domain(d1) )
+            pirq_guest_unbind(d1, chn1->u.pirq.irq);
         d1->pirq_to_evtchn[chn1->u.pirq.irq] = 0;
         unlink_pirq_port(chn1, d1->vcpu[chn1->notify_vcpu_id]);
         break;
@@ -662,10 +666,16 @@ int send_guest_pirq(struct domain *d, int pirq)
     struct evtchn *chn;
 
     /*
-     * It should not be possible to race with __evtchn_close():
-     * The caller of this function must synchronise with pirq_guest_unbind().
+     * PV guests: It should not be possible to race with __evtchn_close(). The
+     *     caller of this function must synchronise with pirq_guest_unbind().
+     * HVM guests: Port is legitimately zero when the guest disables the
+     *     emulated interrupt/evtchn.
      */
-    ASSERT(port != 0);
+    if ( port == 0 )
+    {
+        BUG_ON(!is_hvm_domain(d));
+        return 0;
+    }
 
     chn = evtchn_from_port(d, port);
     return evtchn_set_pending(d->vcpu[chn->notify_vcpu_id], port);

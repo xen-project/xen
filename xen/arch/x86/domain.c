@@ -509,6 +509,19 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
             if ( !IO_APIC_IRQ(i) )
                 d->arch.irq_pirq[i] = d->arch.pirq_irq[i] = i;
 
+        if ( is_hvm_domain(d) )
+        {
+            d->arch.pirq_emuirq = xmalloc_array(int, d->nr_pirqs);
+            d->arch.emuirq_pirq = xmalloc_array(int, nr_irqs);
+            if ( !d->arch.pirq_emuirq || !d->arch.emuirq_pirq )
+                goto fail;
+            for (i = 0; i < d->nr_pirqs; i++)
+                d->arch.pirq_emuirq[i] = IRQ_UNBOUND;
+            for (i = 0; i < nr_irqs; i++)
+                d->arch.emuirq_pirq[i] = IRQ_UNBOUND;
+        }
+
+
         if ( (rc = iommu_domain_init(d)) != 0 )
             goto fail;
 
@@ -549,6 +562,8 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     vmce_destroy_msr(d);
     xfree(d->arch.pirq_irq);
     xfree(d->arch.irq_pirq);
+    xfree(d->arch.pirq_emuirq);
+    xfree(d->arch.emuirq_pirq);
     free_xenheap_page(d->shared_info);
     if ( paging_initialised )
         paging_final_teardown(d);
@@ -600,6 +615,8 @@ void arch_domain_destroy(struct domain *d)
     free_xenheap_page(d->shared_info);
     xfree(d->arch.pirq_irq);
     xfree(d->arch.irq_pirq);
+    xfree(d->arch.pirq_emuirq);
+    xfree(d->arch.emuirq_pirq);
 }
 
 unsigned long pv_guest_cr4_fixup(const struct vcpu *v, unsigned long guest_cr4)
