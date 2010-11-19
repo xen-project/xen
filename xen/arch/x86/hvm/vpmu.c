@@ -120,6 +120,7 @@ void vpmu_initialise(struct vcpu *v)
             case 23:
             case 26:
             case 29:
+            case 46:
                 vpmu->arch_vpmu_ops = &core2_vpmu_ops;
                 break;
             }
