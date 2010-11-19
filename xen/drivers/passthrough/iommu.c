@@ -59,8 +59,7 @@ static void __init parse_iommu_param(char *s)
         if ( ss )
             *ss = '\0';
 
-        if ( !strcmp(s, "off") || !strcmp(s, "no") || !strcmp(s, "false") ||
-             !strcmp(s, "0") || !strcmp(s, "disable") )
+        if ( !parse_bool(s) )
             iommu_enabled = 0;
         else if ( !strcmp(s, "force") || !strcmp(s, "required") )
             force_iommu = 1;

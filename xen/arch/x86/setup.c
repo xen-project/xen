@@ -113,7 +113,7 @@ static void __init parse_acpi_param(char *s)
     safe_strcpy(acpi_param, s);
 
     /* Interpret the parameter for use within Xen. */
-    if ( !strcmp(s, "off") )
+    if ( !parse_bool(s) )
     {
         disable_acpi();
     }

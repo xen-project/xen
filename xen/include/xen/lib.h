@@ -57,6 +57,7 @@ do {                                                            \
 struct domain;
 
 void cmdline_parse(char *cmdline);
+int parse_bool(const char *s);
 
 /*#define DEBUG_TRACE_DUMP*/
 #ifdef DEBUG_TRACE_DUMP

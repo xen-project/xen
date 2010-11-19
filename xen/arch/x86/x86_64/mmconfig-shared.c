@@ -37,8 +37,7 @@ static void __init parse_mmcfg(char *s)
         if ( ss )
             *ss = '\0';
 
-        if ( !strcmp(s, "off") || !strcmp(s, "no") || !strcmp(s, "false") ||
-             !strcmp(s, "0") || !strcmp(s, "disable") )
+        if ( !parse_bool(s) )
             pci_probe &= ~PCI_PROBE_MMCONF;
         else if ( !strcmp(s, "amd_fam10") || !strcmp(s, "amd-fam10") )
             pci_probe |= PCI_CHECK_ENABLE_AMD_MMCONF;

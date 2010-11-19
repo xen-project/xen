@@ -26,7 +26,7 @@ int tainted;
 
 xen_commandline_t saved_cmdline;
 
-void cmdline_parse(char *cmdline)
+void __init cmdline_parse(char *cmdline)
 {
     char opt[100], *optval, *optkey, *q;
     const char *p = cmdline;
@@ -83,10 +83,7 @@ void cmdline_parse(char *cmdline)
                 break;
             case OPT_BOOL:
             case OPT_INVBOOL:
-                if ( !strcmp("no", optval) ||
-                     !strcmp("off", optval) ||
-                     !strcmp("false", optval) ||
-                     !strcmp("0", optval) )
+                if ( !parse_bool(optval) )
                     bool_assert = !bool_assert;
                 if ( param->type == OPT_INVBOOL )
                     bool_assert = !bool_assert;
@@ -113,6 +110,25 @@ void cmdline_parse(char *cmdline)
             }
         }
     }
+}
+
+int __init parse_bool(const char *s)
+{
+    if ( !strcmp("no", s) ||
+         !strcmp("off", s) ||
+         !strcmp("false", s) ||
+         !strcmp("disable", s) ||
+         !strcmp("0", s) )
+        return 0;
+
+    if ( !strcmp("yes", s) ||
+         !strcmp("on", s) ||
+         !strcmp("true", s) ||
+         !strcmp("enable", s) ||
+         !strcmp("1", s) )
+        return 1;
+
+    return -1;
 }
 
 /**

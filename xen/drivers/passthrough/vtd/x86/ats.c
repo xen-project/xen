@@ -58,13 +58,15 @@ static void __init parse_ats_param(char *s)
         if ( ss )
             *ss = '\0';
 
-        if ( !strcmp(s, "off") || !strcmp(s, "no") || !strcmp(s, "false") ||
-             !strcmp(s, "0") || !strcmp(s, "disable") )
+        switch ( parse_bool(s) )
+        {
+        case 0:
             ats_enabled = 0;
-
-        if ( !strcmp(s, "on") || !strcmp(s, "yes") || !strcmp(s, "true") ||
-             !strcmp(s, "1") || !strcmp(s, "enable") )
+            break;
+        case 1:
             ats_enabled = 1;
+            break;
+        }
 
         s = ss + 1;
     } while ( ss );
