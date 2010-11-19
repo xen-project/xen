@@ -185,9 +185,9 @@ endif
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= ce3b7ce68426ea6249bb411f26b376d459c45450
-# Tue Nov 9 18:01:13 2010 +0000
-# piix4acpi, xen: change in ACPI to match the change in the BIOS.
+QEMU_TAG ?= 60766b459c41e429a4b2405124b42512ea362984
+# Fri Nov 19 18:50:43 2010 +0000
+# passthrough: let xen choose the pirq number
 
 # Optional components
 XENSTAT_XENTOP     ?= y
