@@ -142,8 +142,9 @@ p2m_alloc_ptp(struct p2m_domain *p2m, unsigned long type)
     struct page_info *pg;
 
     ASSERT(p2m);
-    ASSERT(p2m->alloc_page);
-    pg = p2m->alloc_page(p2m);
+    ASSERT(p2m->domain);
+    ASSERT(p2m->domain->arch.paging.alloc_page);
+    pg = p2m->domain->arch.paging.alloc_page(p2m->domain);
     if (pg == NULL)
         return NULL;
 
@@ -167,7 +168,6 @@ p2m_next_level(struct p2m_domain *p2m, mfn_t *table_mfn, void **table,
     l1_pgentry_t new_entry;
     void *next;
     int i;
-    ASSERT(p2m->alloc_page);
 
     if ( !(p2m_entry = p2m_find_entry(*table, gfn_remainder, gfn,
                                       shift, max)) )
@@ -1792,14 +1792,9 @@ int set_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
 // The structure of the p2m table is that of a pagetable for xen (i.e. it is
 // controlled by CONFIG_PAGING_LEVELS).
 //
-// The alloc_page and free_page functions will be used to get memory to
-// build the p2m, and to release it again at the end of day.
-//
 // Returns 0 for success or -errno.
 //
-int p2m_alloc_table(struct p2m_domain *p2m,
-               struct page_info * (*alloc_page)(struct p2m_domain *p2m),
-               void (*free_page)(struct p2m_domain *p2m, struct page_info *pg))
+int p2m_alloc_table(struct p2m_domain *p2m)
 {
     mfn_t mfn = _mfn(INVALID_MFN);
     struct page_info *page, *p2m_top;
@@ -1816,9 +1811,6 @@ int p2m_alloc_table(struct p2m_domain *p2m,
     }
 
     P2M_PRINTK("allocating p2m table\n");
-
-    p2m->alloc_page = alloc_page;
-    p2m->free_page = free_page;
 
     p2m_top = p2m_alloc_ptp(p2m,
 #if CONFIG_PAGING_LEVELS == 4
@@ -1882,6 +1874,7 @@ void p2m_teardown(struct p2m_domain *p2m)
  * We know we don't have any extra mappings to these pages */
 {
     struct page_info *pg;
+    struct domain *d = p2m->domain;
 #ifdef __x86_64__
     unsigned long gfn;
     p2m_type_t t;
@@ -1902,7 +1895,7 @@ void p2m_teardown(struct p2m_domain *p2m)
     p2m->phys_table = pagetable_null();
 
     while ( (pg = page_list_remove_head(&p2m->pages)) )
-        p2m->free_page(p2m, pg);
+        d->arch.paging.free_page(d, pg);
     p2m_unlock(p2m);
 }
 

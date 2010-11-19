@@ -1620,12 +1620,16 @@ void shadow_free(struct domain *d, mfn_t smfn)
  * That's OK because the p2m table only exists for translated domains,
  * and those domains can't ever turn off shadow mode. */
 static struct page_info *
-shadow_alloc_p2m_page(struct p2m_domain *p2m)
+shadow_alloc_p2m_page(struct domain *d)
 {
-    struct domain *d = p2m->domain;
     struct page_info *pg;
-    
-    shadow_lock(d);
+    int do_locking;
+
+    /* This is called both from the p2m code (which never holds the 
+     * shadow lock) and the log-dirty code (which sometimes does). */
+    do_locking = !shadow_locked_by_me(d);
+    if ( do_locking )
+        shadow_lock(d);
 
     if ( d->arch.paging.shadow.total_pages 
          < shadow_min_acceptable_pages(d) + 1 )
@@ -1639,7 +1643,8 @@ shadow_alloc_p2m_page(struct p2m_domain *p2m)
     d->arch.paging.shadow.p2m_pages++;
     d->arch.paging.shadow.total_pages--;
 
-    shadow_unlock(d);
+    if ( do_locking )
+        shadow_unlock(d);
 
     /* Unlike shadow pages, mark p2m pages as owned by the domain.
      * Marking the domain as the owner would normally allow the guest to
@@ -1652,9 +1657,10 @@ shadow_alloc_p2m_page(struct p2m_domain *p2m)
 }
 
 static void
-shadow_free_p2m_page(struct p2m_domain *p2m, struct page_info *pg)
+shadow_free_p2m_page(struct domain *d, struct page_info *pg)
 {
-    struct domain *d = p2m->domain;
+    int do_locking;
+
     ASSERT(page_get_owner(pg) == d);
     /* Should have just the one ref we gave it in alloc_p2m_page() */
     if ( (pg->count_info & PGC_count_mask) != 1 )
@@ -1666,11 +1672,18 @@ shadow_free_p2m_page(struct p2m_domain *p2m, struct page_info *pg)
     pg->u.sh.type = SH_type_p2m_table; /* p2m code reuses type-info */
     page_set_owner(pg, NULL); 
 
-    shadow_lock(d);
+    /* This is called both from the p2m code (which never holds the 
+     * shadow lock) and the log-dirty code (which sometimes does). */
+    do_locking = !shadow_locked_by_me(d);
+    if ( do_locking )
+        shadow_lock(d);
+
     shadow_free(d, page_to_mfn(pg));
     d->arch.paging.shadow.p2m_pages--;
     d->arch.paging.shadow.total_pages++;
-    shadow_unlock(d);
+
+    if ( do_locking )
+        shadow_unlock(d);
 }
 
 #if CONFIG_PAGING_LEVELS == 3
@@ -3032,6 +3045,7 @@ static void sh_new_mode(struct domain *d, u32 new_mode)
 
     ASSERT(shadow_locked_by_me(d));
     ASSERT(d != current->domain);
+
     d->arch.paging.mode = new_mode;
     for_each_vcpu(d, v)
         sh_update_paging_modes(v);
@@ -3079,12 +3093,15 @@ int shadow_enable(struct domain *d, u32 mode)
         shadow_unlock(d);
     }
 
+    /* Allow p2m and log-dirty code to borrow shadow memory */
+    d->arch.paging.alloc_page = shadow_alloc_p2m_page;
+    d->arch.paging.free_page = shadow_free_p2m_page;
+
     /* Init the P2M table.  Must be done before we take the shadow lock 
      * to avoid possible deadlock. */
     if ( mode & PG_translate )
     {
-        rv = p2m_alloc_table(p2m,
-            shadow_alloc_p2m_page, shadow_free_p2m_page);
+        rv = p2m_alloc_table(p2m);
         if (rv != 0)
             goto out_unlocked;
     }
@@ -3095,7 +3112,7 @@ int shadow_enable(struct domain *d, u32 mode)
     {
         /* Get a single page from the shadow pool.  Take it via the 
          * P2M interface to make freeing it simpler afterwards. */
-        pg = shadow_alloc_p2m_page(p2m);
+        pg = shadow_alloc_p2m_page(d);
         if ( pg == NULL )
         {
             rv = -ENOMEM;
@@ -3147,7 +3164,7 @@ int shadow_enable(struct domain *d, u32 mode)
     if ( rv != 0 && !pagetable_is_null(p2m_get_pagetable(p2m)) )
         p2m_teardown(p2m);
     if ( rv != 0 && pg != NULL )
-        shadow_free_p2m_page(p2m, pg);
+        shadow_free_p2m_page(d, pg);
     domain_unpause(d);
     return rv;
 }
@@ -3265,7 +3282,7 @@ void shadow_teardown(struct domain *d)
 
     /* Must be called outside the lock */
     if ( unpaged_pagetable ) 
-        shadow_free_p2m_page(p2m_get_hostp2m(d), unpaged_pagetable);
+        shadow_free_p2m_page(d, unpaged_pagetable);
 }
 
 void shadow_final_teardown(struct domain *d)
@@ -3319,6 +3336,10 @@ static int shadow_one_bit_enable(struct domain *d, u32 mode)
             sh_set_allocation(d, 0, NULL);
             return -ENOMEM;
         }
+
+        /* Allow p2m and log-dirty code to borrow shadow memory */
+        d->arch.paging.alloc_page = shadow_alloc_p2m_page;
+        d->arch.paging.free_page = shadow_free_p2m_page;
     }
 
     if ( d->arch.paging.mode == 0 )

@@ -134,8 +134,8 @@ struct paging_mode {
 /*****************************************************************************
  * Log dirty code */
 
-/* allocate log dirty bitmap resource for recording dirty pages */
-int paging_alloc_log_dirty_bitmap(struct domain *d);
+/* get the top of the log-dirty bitmap trie, allocating if necessary */
+mfn_t *paging_map_log_dirty_bitmap(struct domain *d);
 
 /* free log dirty bitmap resource */
 void paging_free_log_dirty_bitmap(struct domain *d);

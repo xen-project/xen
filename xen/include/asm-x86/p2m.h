@@ -179,10 +179,6 @@ struct p2m_domain {
     /* Pages used to construct the p2m */
     struct page_list_head pages;
 
-    /* Functions to call to get or free pages for the p2m */
-    struct page_info * (*alloc_page  )(struct p2m_domain *p2m);
-    void               (*free_page   )(struct p2m_domain *p2m,
-                                       struct page_info *pg);
     int                (*set_entry   )(struct p2m_domain *p2m,
                                        unsigned long gfn,
                                        mfn_t mfn, unsigned int page_order,
@@ -390,13 +386,8 @@ int p2m_init(struct domain *d);
 
 /* Allocate a new p2m table for a domain. 
  *
- * The alloc_page and free_page functions will be used to get memory to
- * build the p2m, and to release it again at the end of day. 
- *
  * Returns 0 for success or -errno. */
-int p2m_alloc_table(struct p2m_domain *p2m,
-               struct page_info * (*alloc_page)(struct p2m_domain *p2m),
-               void (*free_page)(struct p2m_domain *p2m, struct page_info *pg));
+int p2m_alloc_table(struct p2m_domain *p2m);
 
 /* Return all the p2m resources to Xen. */
 void p2m_teardown(struct p2m_domain *p2m);

@@ -201,6 +201,10 @@ struct paging_domain {
     struct hap_domain       hap;
     /* log dirty support */
     struct log_dirty_domain log_dirty;
+    /* alloc/free pages from the pool for paging-assistance structures
+     * (used by p2m and log-dirty code for their tries) */
+    struct page_info * (*alloc_page)(struct domain *d);
+    void (*free_page)(struct domain *d, struct page_info *pg);
 };
 
 struct paging_vcpu {

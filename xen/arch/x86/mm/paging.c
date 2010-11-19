@@ -99,10 +99,11 @@ static mfn_t paging_new_log_dirty_page(struct domain *d, void **mapping_p)
 {
     struct page_info *page;
 
-    page = alloc_domheap_page(NULL, MEMF_node(domain_to_node(d)));
+    page = d->arch.paging.alloc_page(d);
     if ( unlikely(page == NULL) )
     {
         d->arch.paging.log_dirty.failed_allocs++;
+        *mapping_p = NULL;
         return _mfn(INVALID_MFN);
     }
 
@@ -131,30 +132,23 @@ static mfn_t paging_new_log_dirty_node(struct domain *d, mfn_t **node_p)
     return mfn;
 }
 
-int paging_alloc_log_dirty_bitmap(struct domain *d)
+mfn_t *paging_map_log_dirty_bitmap(struct domain *d)
 {
     mfn_t *mapping;
 
-    if ( mfn_valid(d->arch.paging.log_dirty.top) )
-        return 0;
+    if ( likely(mfn_valid(d->arch.paging.log_dirty.top)) )
+        return map_domain_page(mfn_x(d->arch.paging.log_dirty.top));
 
     d->arch.paging.log_dirty.top = paging_new_log_dirty_node(d, &mapping);
-    if ( unlikely(!mfn_valid(d->arch.paging.log_dirty.top)) )
-    {
-        /* Clear error indicator since we're reporting this one */
-        d->arch.paging.log_dirty.failed_allocs = 0;
-        return -ENOMEM;
-    }
-    unmap_domain_page(mapping);
 
-    return 0;
+    return mapping;
 }
 
 static void paging_free_log_dirty_page(struct domain *d, mfn_t mfn)
 {
     d->arch.paging.log_dirty.allocs--;
-    free_domheap_page(mfn_to_page(mfn));
-}    
+    d->arch.paging.free_page(d, mfn_to_page(mfn));
+}
 
 void paging_free_log_dirty_bitmap(struct domain *d)
 {
@@ -204,36 +198,13 @@ int paging_log_dirty_enable(struct domain *d)
 {
     int ret;
 
-    domain_pause(d);
-    log_dirty_lock(d);
-
     if ( paging_mode_log_dirty(d) )
-    {
-        ret = -EINVAL;
-        goto out;
-    }
+        return -EINVAL;
 
-    ret = paging_alloc_log_dirty_bitmap(d);
-    if ( ret != 0 )
-    {
-        paging_free_log_dirty_bitmap(d);
-        goto out;
-    }
-
-    log_dirty_unlock(d);
-
-    /* Safe because the domain is paused. */
+    domain_pause(d);
     ret = d->arch.paging.log_dirty.enable_log_dirty(d);
-
-    /* Possibility of leaving the bitmap allocated here but it'll be
-     * tidied on domain teardown. */
-
     domain_unpause(d);
-    return ret;
 
- out:
-    log_dirty_unlock(d);
-    domain_unpause(d);
     return ret;
 }
 
@@ -271,8 +242,6 @@ void paging_mark_dirty(struct domain *d, unsigned long guest_mfn)
 
     log_dirty_lock(d);
 
-    ASSERT(mfn_valid(d->arch.paging.log_dirty.top));
-
     /* We /really/ mean PFN here, even for non-translated guests. */
     pfn = get_gpfn_from_mfn(mfn_x(gmfn));
     /* Shared MFNs should NEVER be marked dirty */
@@ -291,7 +260,9 @@ void paging_mark_dirty(struct domain *d, unsigned long guest_mfn)
     i3 = L3_LOGDIRTY_IDX(pfn);
     i4 = L4_LOGDIRTY_IDX(pfn);
 
-    l4 = map_domain_page(mfn_x(d->arch.paging.log_dirty.top));
+    l4 = paging_map_log_dirty_bitmap(d);
+    if ( !l4 )
+        goto out;
     mfn = l4[i4];
     if ( !mfn_valid(mfn) )
         mfn = l4[i4] = paging_new_log_dirty_node(d, &l3);
@@ -367,12 +338,6 @@ int paging_log_dirty_op(struct domain *d, struct xen_domctl_shadow_op *sc)
         /* caller may have wanted just to clean the state or access stats. */
         peek = 0;
 
-    if ( (peek || clean) && !mfn_valid(d->arch.paging.log_dirty.top) )
-    {
-        rv = -EINVAL; /* perhaps should be ENOMEM? */
-        goto out;
-    }
-
     if ( unlikely(d->arch.paging.log_dirty.failed_allocs) ) {
         printk("%s: %d failed page allocs while logging dirty pages\n",
                __FUNCTION__, d->arch.paging.log_dirty.failed_allocs);
@@ -381,8 +346,7 @@ int paging_log_dirty_op(struct domain *d, struct xen_domctl_shadow_op *sc)
     }
 
     pages = 0;
-    l4 = (mfn_valid(d->arch.paging.log_dirty.top) ?
-          map_domain_page(mfn_x(d->arch.paging.log_dirty.top)) : NULL);
+    l4 = paging_map_log_dirty_bitmap(d);
 
     for ( i4 = 0;
           (pages < sc->pages) && (i4 < LOGDIRTY_NODE_ENTRIES);
@@ -469,12 +433,6 @@ int paging_log_dirty_range(struct domain *d,
                  d->arch.paging.log_dirty.fault_count,
                  d->arch.paging.log_dirty.dirty_count);
 
-    if ( !mfn_valid(d->arch.paging.log_dirty.top) )
-    {
-        rv = -EINVAL; /* perhaps should be ENOMEM? */
-        goto out;
-    }
-
     if ( unlikely(d->arch.paging.log_dirty.failed_allocs) ) {
         printk("%s: %d failed page allocs while logging dirty pages\n",
                __FUNCTION__, d->arch.paging.log_dirty.failed_allocs);
@@ -500,13 +458,13 @@ int paging_log_dirty_range(struct domain *d,
     b2 = L2_LOGDIRTY_IDX(begin_pfn);
     b3 = L3_LOGDIRTY_IDX(begin_pfn);
     b4 = L4_LOGDIRTY_IDX(begin_pfn);
-    l4 = map_domain_page(mfn_x(d->arch.paging.log_dirty.top));
+    l4 = paging_map_log_dirty_bitmap(d);
 
     for ( i4 = b4;
           (pages < nr) && (i4 < LOGDIRTY_NODE_ENTRIES);
           i4++ )
     {
-        l3 = mfn_valid(l4[i4]) ? map_domain_page(mfn_x(l4[i4])) : NULL;
+        l3 = (l4 && mfn_valid(l4[i4])) ? map_domain_page(mfn_x(l4[i4])) : NULL;
         for ( i3 = b3;
               (pages < nr) && (i3 < LOGDIRTY_NODE_ENTRIES);
               i3++ )
@@ -590,7 +548,8 @@ int paging_log_dirty_range(struct domain *d,
         if ( l3 )
             unmap_domain_page(l3);
     }
-    unmap_domain_page(l4);
+    if ( l4 )
+        unmap_domain_page(l4);
 
     log_dirty_unlock(d);
 

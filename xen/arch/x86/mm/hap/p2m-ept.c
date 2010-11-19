@@ -125,6 +125,8 @@ static int ept_set_middle_entry(struct p2m_domain *p2m, ept_entry_t *ept_entry)
 /* free ept sub tree behind an entry */
 void ept_free_entry(struct p2m_domain *p2m, ept_entry_t *ept_entry, int level)
 {
+    struct domain *d = p2m->domain;
+
     /* End if the entry is a leaf entry. */
     if ( level == 0 || !is_epte_present(ept_entry) ||
          is_epte_superpage(ept_entry) )
@@ -138,7 +140,7 @@ void ept_free_entry(struct p2m_domain *p2m, ept_entry_t *ept_entry, int level)
         unmap_domain_page(epte);
     }
 
-    p2m->free_page(p2m, mfn_to_page(ept_entry->mfn));
+    d->arch.paging.free_page(d, mfn_to_page(ept_entry->mfn));
 }
 
 static int ept_split_super_page(struct p2m_domain *p2m, ept_entry_t *ept_entry,

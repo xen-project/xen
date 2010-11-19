@@ -584,7 +584,6 @@ sh_mfn_is_dirty(struct domain *d, mfn_t gmfn)
     int rv;
 
     ASSERT(shadow_mode_log_dirty(d));
-    ASSERT(mfn_valid(d->arch.paging.log_dirty.top));
 
     /* We /really/ mean PFN here, even for non-translated guests. */
     pfn = get_gpfn_from_mfn(mfn_x(gmfn));
@@ -602,7 +601,10 @@ sh_mfn_is_dirty(struct domain *d, mfn_t gmfn)
          */
         return 1;
 
-    l4 = map_domain_page(mfn_x(d->arch.paging.log_dirty.top));
+    l4 = paging_map_log_dirty_bitmap(d);
+    if ( !l4 ) 
+        return 0;
+
     mfn = l4[L4_LOGDIRTY_IDX(pfn)];
     unmap_domain_page(l4);
     if ( !mfn_valid(mfn) )
