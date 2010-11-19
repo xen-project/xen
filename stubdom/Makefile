@@ -155,8 +155,9 @@ cross-libpci: $(LIBPCI_STAMPFILE)
 $(LIBPCI_STAMPFILE): pciutils-$(XEN_TARGET_ARCH) $(NEWLIB_STAMPFILE) $(ZLIB_STAMPFILE)
 	( cd $< && \
 	  cp ../libpci.config.h lib/config.h && \
+	  chmod u+w lib/config.h && \
 	  echo '#define PCILIB_VERSION "$(LIBPCI_VERSION)"' >> lib/config.h && \
-	  cp ../libpci.config.mak lib/config.mk && \
+	  ln -sf ../../libpci.config.mak lib/config.mk && \
 	  $(CROSS_MAKE) CC="$(CC) $(TARGET_CPPFLAGS) $(TARGET_CFLAGS) -I$(realpath $(MINI_OS)/include)" lib/libpci.a && \
 	  $(INSTALL_DATA) lib/libpci.a $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/lib/ && \
 	  $(INSTALL_DIR) $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/include/pci && \
