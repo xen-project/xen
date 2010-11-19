@@ -33,7 +33,7 @@ static struct pci_hostbridge_probe pci_probes[] __cpuinitdata = {
 #define SIZE (UNIT << 8)
 /* need to avoid (0xfd<<32) and (0xfe<<32), ht used space */
 #define FAM10H_PCI_MMCONF_BASE (0xfcULL<<32)
-#define BASE_VALID(b) ((b != (0xfdULL << 32)) && (b != (0xfeULL << 32)))
+#define BASE_VALID(b) ((b) + SIZE <= (0xfdULL<<32) || (b) >= (1ULL<<40))
 static void __init get_fam10h_pci_mmconf_base(void)
 {
 	unsigned int i, j, bus, slot, hi_mmio_num;
