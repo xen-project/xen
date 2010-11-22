@@ -841,7 +841,8 @@ static void set_cx(
     {
     case ACPI_ADR_SPACE_FIXED_HARDWARE:
         if ( xen_cx->reg.bit_width == VENDOR_INTEL &&
-             xen_cx->reg.bit_offset == NATIVE_CSTATE_BEYOND_HALT )
+             xen_cx->reg.bit_offset == NATIVE_CSTATE_BEYOND_HALT &&
+             boot_cpu_has(X86_FEATURE_MWAIT) )
             cx->entry_method = ACPI_CSTATE_EM_FFH;
         else
             cx->entry_method = ACPI_CSTATE_EM_HALT;
