@@ -345,15 +345,14 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
     chn = evtchn_from_port(d, port);
 
     d->pirq_to_evtchn[pirq] = port;
-    if ( !is_hvm_domain(d) )
+    rc = (!is_hvm_domain(d)
+          ? pirq_guest_bind(
+              v, pirq, !!(bind->flags & BIND_PIRQ__WILL_SHARE))
+          : 0);
+    if ( rc != 0 )
     {
-        rc = pirq_guest_bind(
-            v, pirq, !!(bind->flags & BIND_PIRQ__WILL_SHARE));
-        if ( rc != 0 )
-        {
-            d->pirq_to_evtchn[pirq] = 0;
-            goto out;
-        }
+        d->pirq_to_evtchn[pirq] = 0;
+        goto out;
     }
 
     chn->state  = ECS_PIRQ;
