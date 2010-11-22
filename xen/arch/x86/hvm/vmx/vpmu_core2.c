@@ -36,6 +36,68 @@
 #include <asm/hvm/vpmu.h>
 #include <asm/hvm/vmx/vpmu_core2.h>
 
+/*
+ * QUIRK to workaround an issue on Nehalem processors currently seen
+ * on family 6 cpus E5520 (model 26) and X7542 (model 46).
+ * The issue leads to endless PMC interrupt loops on the processor.
+ * If the interrupt handler is running and a pmc reaches the value 0, this
+ * value remains forever and it triggers immediately a new interrupt after
+ * finishing the handler.
+ * A workaround is to read all flagged counters and if the value is 0 write
+ * 1 (or another value != 0) into it.
+ * There exist no errata and the real cause of this behaviour is unknown.
+ */
+bool_t __read_mostly is_pmc_quirk;
+
+static void check_pmc_quirk(void)
+{
+    u8 family = current_cpu_data.x86;
+    u8 cpu_model = current_cpu_data.x86_model;
+    is_pmc_quirk = 0;
+    if ( family == 6 )
+    {
+        if ( cpu_model == 46 || cpu_model == 26 )
+            is_pmc_quirk = 1;
+    }
+}
+
+static int core2_get_pmc_count(void);
+static void handle_pmc_quirk(u64 msr_content)
+{
+    int num_gen_pmc = core2_get_pmc_count();
+    int num_fix_pmc  = 3;
+    int i;
+    u64 val;
+
+    if ( !is_pmc_quirk )
+        return;
+
+    val = msr_content;
+    for ( i = 0; i < num_gen_pmc; i++ )
+    {
+        if ( val & 0x1 )
+        {
+            u64 cnt;
+            rdmsrl(MSR_P6_PERFCTR0 + i, cnt);
+            if ( cnt == 0 )
+                wrmsrl(MSR_P6_PERFCTR0 + i, 1);
+        }
+        val >>= 1;
+    }
+    val = msr_content >> 32;
+    for ( i = 0; i < num_fix_pmc; i++ )
+    {
+        if ( val & 0x1 )
+        {
+            u64 cnt;
+            rdmsrl(MSR_CORE_PERF_FIXED_CTR0 + i, cnt);
+            if ( cnt == 0 )
+                wrmsrl(MSR_CORE_PERF_FIXED_CTR0 + i, 1);
+        }
+        val >>= 1;
+    }
+}
+
 u32 core2_counters_msr[] =   {
     MSR_CORE_PERF_FIXED_CTR0,
     MSR_CORE_PERF_FIXED_CTR1,
@@ -494,6 +556,10 @@ static int core2_vpmu_do_interrupt(struct cpu_user_regs *regs)
     rdmsrl(MSR_CORE_PERF_GLOBAL_STATUS, msr_content);
     if ( !msr_content )
         return 0;
+
+    if ( is_pmc_quirk )
+        handle_pmc_quirk(msr_content);
+
     core2_vpmu_cxt->global_ovf_status |= msr_content;
     msr_content = 0xC000000700000000 | ((1 << core2_get_pmc_count()) - 1);
     wrmsrl(MSR_CORE_PERF_GLOBAL_OVF_CTRL, msr_content);
@@ -515,6 +581,7 @@ static int core2_vpmu_do_interrupt(struct cpu_user_regs *regs)
 
 static void core2_vpmu_initialise(struct vcpu *v)
 {
+    check_pmc_quirk();
 }
 
 static void core2_vpmu_destroy(struct vcpu *v)
