@@ -3026,7 +3026,7 @@ int libxl_domain_need_memory(libxl_ctx *ctx, libxl_domain_build_info *b_info,
         if (strstr(dm_info->device_model, "stubdom-dm"))
             *need_memkb += 32 * 1024;
     } else
-        *need_memkb += LIBXL_PV_EXTRA_MEMORY;
+        *need_memkb += b_info->shadow_memkb + LIBXL_PV_EXTRA_MEMORY;
     if (*need_memkb % (2 * 1024))
         *need_memkb += (2 * 1024) - (*need_memkb % (2 * 1024));
     return 0;
