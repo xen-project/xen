@@ -1856,7 +1856,10 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
             flexarray_set(back, boffset++, libxl__sprintf(&gc, "%s:%s",
                           libxl__device_disk_string_of_phystype(disk->phystype), disk->physpath));
 
-            device.backend_kind = DEVICE_TAP;
+            if (libxl__blktap_enabled(&gc))
+                device.backend_kind = DEVICE_TAP;
+            else
+                device.backend_kind = DEVICE_QDISK;
             break;
 
         default:

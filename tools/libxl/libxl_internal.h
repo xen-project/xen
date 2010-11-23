@@ -82,6 +82,7 @@ typedef enum {
     DEVICE_VIF2,
     DEVICE_VBD,
     DEVICE_TAP,
+    DEVICE_QDISK,
     DEVICE_PCI,
     DEVICE_VFB,
     DEVICE_VKBD,
