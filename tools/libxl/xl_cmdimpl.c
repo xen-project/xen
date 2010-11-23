@@ -2903,6 +2903,7 @@ static void migrate_receive(int debug, int daemonize)
     dom_info.daemonize = daemonize;
     dom_info.paused = 1;
     dom_info.restore_file = "incoming migration stream";
+    dom_info.migrate_fd = 0; /* stdin */
     dom_info.migration_domname_r = &migration_domname;
 
     rc = create_domain(&dom_info);
