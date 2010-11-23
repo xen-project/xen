@@ -81,15 +81,20 @@ IOEMU_CONFIGURE_CROSS ?= --cpu=$(XEN_TARGET_ARCH) \
 			 --interp-prefix=$(CROSS_SYS_ROOT)
 endif
 
-QEMU_ROOT := $(shell if [ -d "$(CONFIG_QEMU)" ]; then echo "$(CONFIG_QEMU)"; else echo .; fi)
-ifneq ($(QEMU_ROOT),.)
-export QEMU_ROOT
-endif
+ioemu/config-host.mak:
+	cd ioemu && XEN_TARGET_ARCH=$(XEN_TARGET_ARCH) sh configure \
+		--prefix=$(PREFIX) $(IOEMU_CONFIGURE_CROSS)
+
+subdir-all-ioemu subdir-install-ioemu: ioemu/config-host.mak
+
+subdir-clean-ioemu:
+	$(MAKE) -C ioemu distclean
 
 ioemu-dir-find:
 	set -ex; \
 	if test -d $(CONFIG_QEMU); then \
-		mkdir -p ioemu-dir; \
+		rm -f ioemu-dir; \
+		ln -sf $(CONFIG_QEMU) ioemu-dir; \
 	else \
 		if [ ! -d ioemu-remote ]; then \
 			rm -rf ioemu-remote ioemu-remote.tmp; \
@@ -110,7 +115,7 @@ ioemu-dir-find:
 		$(absolutify_xen_root); \
 		$(buildmakevars2shellvars); \
 		cd ioemu-dir; \
-		$(QEMU_ROOT)/xen-setup $(IOEMU_CONFIGURE_CROSS)
+		./xen-setup $(IOEMU_CONFIGURE_CROSS)
 
 .PHONY: ioemu-dir-force-update
 ioemu-dir-force-update:

@@ -185,9 +185,9 @@ endif
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= ad78ccc35617610bc43112788d28a05878fac91f
-# Tue Nov 23 16:40:08 2010 +0000
-# qemu-xen: build adjustments to support out-of-tree builds
+QEMU_TAG ?= 60766b459c41e429a4b2405124b42512ea362984
+# Fri Nov 19 18:50:43 2010 +0000
+# passthrough: let xen choose the pirq number
 
 # Optional components
 XENSTAT_XENTOP     ?= y
