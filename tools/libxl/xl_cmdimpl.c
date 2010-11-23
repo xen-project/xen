@@ -2484,11 +2484,16 @@ static void list_domains_details(const libxl_dominfo *info, int nb_domain)
 static void list_domains(int verbose, const libxl_dominfo *info, int nb_domain)
 {
     int i;
+    static const char shutdown_reason_letters[]= "-rscw";
 
-    printf("Name                                        ID   Mem VCPUs\tState\tTime(s)\n");
+    printf("Name                                        ID   Mem VCPUs\tState\tTime(s)");
+    if (verbose) printf("   UUID                            Reason-Code");
+    printf("\n");
     for (i = 0; i < nb_domain; i++) {
         char *domname;
+        unsigned shutdown_reason;
         domname = libxl_domid_to_name(&ctx, info[i].domid);
+        shutdown_reason = info[i].shutdown ? info[i].shutdown_reason : 0;
         printf("%-40s %5d %5lu %5d     %c%c%c%c%c%c  %8.1f",
                 domname,
                 info[i].domid,
@@ -2498,12 +2503,17 @@ static void list_domains(int verbose, const libxl_dominfo *info, int nb_domain)
                 info[i].blocked ? 'b' : '-',
                 info[i].paused ? 'p' : '-',
                 info[i].shutdown ? 's' : '-',
-                info[i].shutdown_reason == SHUTDOWN_crash ? 'c' : '-',
+                (shutdown_reason >= 0 &&
+                 shutdown_reason < sizeof(shutdown_reason_letters)-1
+                 ? shutdown_reason_letters[shutdown_reason] : '?'),
                 info[i].dying ? 'd' : '-',
                 ((float)info[i].cpu_time / 1e9));
         free(domname);
-        if (verbose)
+        if (verbose) {
             printf(" " LIBXL_UUID_FMT, LIBXL_UUID_BYTES(info[i].uuid));
+	    if (info[i].shutdown) printf(" %8x", shutdown_reason);
+	    else printf(" %8s", "-");
+	}
         putchar('\n');
     }
 }
