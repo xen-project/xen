@@ -214,7 +214,14 @@ int attrib__libxl_cpuid_policy_list_set(PyObject *v, libxl_cpuid_policy_list *pp
 
 int attrib__libxl_cpumap_set(PyObject *v, libxl_cpumap *pptr)
 {
-    return -1;
+    int i;
+    long cpu;
+
+    for (i = 0; i < PyList_Size(v); i++) {
+        cpu = PyInt_AsLong(PyList_GetItem(v, i));
+        libxl_cpumap_set(pptr, cpu);
+    }
+    return 0;
 }
 
 int attrib__libxl_domain_build_state_ptr_set(PyObject *v, libxl_domain_build_state **pptr)
@@ -264,7 +271,19 @@ PyObject *attrib__libxl_cpuid_policy_list_get(libxl_cpuid_policy_list *pptr)
 
 PyObject *attrib__libxl_cpumap_get(libxl_cpumap *pptr)
 {
-    return NULL;
+    PyObject *cpulist = NULL;
+    int i;
+
+    cpulist = PyList_New(0);
+    libxl_for_each_cpu(i, *pptr) {
+        if ( libxl_cpumap_test(pptr, i) ) {
+            PyObject* pyint = PyInt_FromLong(i);
+
+            PyList_Append(cpulist, pyint);
+            Py_DECREF(pyint);
+        }
+    }
+    return cpulist;
 }
 
 PyObject *attrib__libxl_domain_build_state_ptr_get(libxl_domain_build_state **pptr)
