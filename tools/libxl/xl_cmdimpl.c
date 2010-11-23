@@ -1822,6 +1822,9 @@ start:
                          */
                         dom_info->console_autoconnect = 0;
 
+                        /* Some settings only make sense on first boot. */
+                        paused = 0;
+
                         /*
                          * XXX FIXME: If this sleep is not there then domain
                          * re-creation fails sometimes.
