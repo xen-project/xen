@@ -215,6 +215,9 @@ $(OCAML_STAMPFILE): ocaml-$(XEN_TARGET_ARCH)/.dirstamp
 .PHONY: $(CROSS_ROOT)
 $(CROSS_ROOT): cross-newlib cross-zlib cross-libpci
 
+QEMU_ROOT := $(shell if [ -d "$(CONFIG_QEMU)" ]; then echo "$(CONFIG_QEMU)"; else echo .; fi)
+
+ifeq ($(QEMU_ROOT),.)
 $(XEN_ROOT)/tools/ioemu-dir:
 	$(CROSS_MAKE) -C $(XEN_ROOT)/tools ioemu-dir-find
 
@@ -231,6 +234,13 @@ ioemu/linkfarm.stamp: $(XEN_ROOT)/tools/ioemu-dir
 			)) |							\
 	    while read f; do rm -f "$$f"; ln -s "$$src/$$f" "$$f"; done
 	touch ioemu/linkfarm.stamp
+else
+export QEMU_ROOT
+
+ioemu/linkfarm.stamp:
+	mkdir -p ioemu
+	touch ioemu/linkfarm.stamp
+endif
 
 mk-headers-$(XEN_TARGET_ARCH): ioemu/linkfarm.stamp
 	mkdir -p include/xen && \
@@ -287,8 +297,8 @@ ioemu: cross-zlib cross-libpci libxc
 	    TARGET_CPPFLAGS="$(TARGET_CPPFLAGS)" \
 	    TARGET_CFLAGS="$(TARGET_CFLAGS)" \
 	    TARGET_LDFLAGS="$(TARGET_LDFLAGS)" \
-	    ./xen-setup-stubdom )
-	$(CROSS_MAKE) -C ioemu
+	    $(QEMU_ROOT)/xen-setup-stubdom )
+	$(CROSS_MAKE) -C ioemu -f $(QEMU_ROOT)/Makefile
 
 ######
 # caml
