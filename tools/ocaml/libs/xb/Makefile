@@ -33,10 +33,12 @@ OCAML_LIBRARY = xb
 
 .PHONY: install
 install: $(LIBS) META
-	ocamlfind install -destdir $(DESTDIR)$(shell ocamlfind printconf destdir) -ldconf ignore xb META $(INTF) $(LIBS) *.a *.so *.cmx
+	mkdir -p $(OCAMLDESTDIR)
+	ocamlfind remove -destdir $(OCAMLDESTDIR) xb
+	ocamlfind install -destdir $(OCAMLDESTDIR) -ldconf ignore xb META $(INTF) $(LIBS) *.a *.so *.cmx
 
 .PHONY: uninstall
 uninstall:
-	ocamlfind remove xb
+	ocamlfind remove -destdir $(OCAMLDESTDIR) xb
 
 include $(TOPLEVEL)/Makefile.rules

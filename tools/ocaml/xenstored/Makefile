@@ -52,4 +52,8 @@ all: $(INTF) $(PROGRAMS)
 
 bins: $(PROGRAMS)
 
+install: all
+	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
+	$(INSTALL_PROG) oxenstored $(DESTDIR)$(SBINDIR)
+
 include $(OCAML_TOPLEVEL)/Makefile.rules

@@ -1,43 +1,19 @@
 XEN_ROOT = ../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-SUBDIRS_LIBS = \
-	libs/uuid libs/mmap \
-	libs/log libs/xc libs/eventchn \
-	libs/xb libs/xs libs/xl
-
 SUBDIRS_PROGRAMS = xenstored
 
-SUBDIRS = $(SUBDIRS_LIBS) $(SUBDIRS_PROGRAMS)
+SUBDIRS = libs $(SUBDIRS_PROGRAMS)
 
 .NOTPARALLEL:
 # targets here must be run in order, otherwise we can try
 # to build programs before the libraries are done
 
 .PHONY: all
-all: build
+all: subdirs-all
 
-.PHONY: build
-build: SUBDIRS
-
-.PHONY: SUBDIRS SUBDIRS_PROGRAMS SUBDIRS_LIBS
-SUBDIRS SUBDIRS_PROGRAMS SUBDIRS_LIBS:
-	@set -e; for d in $($@); do			\
-		echo " === building $$d";		\
-		$(MAKE) --no-print-directory -C $$d;	\
-	done
-
-.PHONY: install install-libs install-program
-install: install-libs install-program
-
-install-program: SUBDIRS_PROGRAMS
-	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
-	$(INSTALL_PROG) xenstored/oxenstored $(DESTDIR)$(SBINDIR)
-
-install-libs: SUBDIRS_LIBS
+.PHONY: install
+install: subdirs-install
 
 .PHONY: clean
-clean:
-	@for dir in $(SUBDIRS); do \
-		$(MAKE) --no-print-directory -C $$dir clean; \
-	done
+clean: subdirs-clean

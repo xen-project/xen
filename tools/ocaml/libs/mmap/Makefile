@@ -18,11 +18,13 @@ OCAML_LIBRARY = mmap
 
 .PHONY: install
 install: $(LIBS) META
-	ocamlfind install -destdir $(DESTDIR)$(shell ocamlfind printconf destdir) -ldconf ignore mmap META $(INTF) $(LIBS) *.a *.so *.cmx
+	mkdir -p $(OCAMLDESTDIR)
+	ocamlfind remove -destdir $(OCAMLDESTDIR) mmap
+	ocamlfind install -destdir $(OCAMLDESTDIR) -ldconf ignore mmap META $(INTF) $(LIBS) *.a *.so *.cmx
 
 .PHONY: uninstall
 uninstall:
-	ocamlfind remove mmap
+	ocamlfind remove -destdir $(OCAMLDESTDIR) mmap
 
 include $(TOPLEVEL)/Makefile.rules
 

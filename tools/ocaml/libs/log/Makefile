@@ -32,11 +32,13 @@ syslog.mli : syslog.ml
 
 .PHONY: install
 install: $(LIBS) META
-	ocamlfind install -destdir $(DESTDIR)$(shell ocamlfind printconf destdir) -ldconf ignore log META $(INTF) $(LIBS) *.a *.so *.cmx
+	mkdir -p $(OCAMLDESTDIR)
+	ocamlfind remove -destdir $(OCAMLDESTDIR) log
+	ocamlfind install -destdir $(OCAMLDESTDIR) -ldconf ignore log META $(INTF) $(LIBS) *.a *.so *.cmx
 
 .PHONY: uninstall
 uninstall:
-	ocamlfind remove log
+	ocamlfind remove -destdir $(OCAMLDESTDIR) log
 
 include $(TOPLEVEL)/Makefile.rules
 

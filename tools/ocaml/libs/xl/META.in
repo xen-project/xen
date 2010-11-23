@@ -1,0 +1,4 @@
+version = "@VERSION@"
+description = "Xen Toolstack Library"
+archive(byte) = "xl.cma"
+archive(native) = "xl.cmxa"

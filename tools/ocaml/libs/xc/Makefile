@@ -20,10 +20,12 @@ libs: $(LIBS)
 
 .PHONY: install
 install: $(LIBS) META
-	ocamlfind install -destdir $(DESTDIR)$(shell ocamlfind printconf destdir) -ldconf ignore xc META $(INTF) $(LIBS) *.a *.so *.cmx
+	mkdir -p $(OCAMLDESTDIR)
+	ocamlfind remove -destdir $(OCAMLDESTDIR) xc
+	ocamlfind install -destdir $(OCAMLDESTDIR) -ldconf ignore xc META $(INTF) $(LIBS) *.a *.so *.cmx
 
 .PHONY: uninstall
 uninstall:
-	ocamlfind remove xc
+	ocamlfind remove -destdir $(OCAMLDESTDIR) xc
 
 include $(TOPLEVEL)/Makefile.rules

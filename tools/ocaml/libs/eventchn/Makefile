@@ -19,11 +19,13 @@ OCAML_LIBRARY = eventchn
 
 .PHONY: install
 install: $(LIBS) META
-	ocamlfind install -destdir $(DESTDIR)$(shell ocamlfind printconf destdir) -ldconf ignore eventchn META $(INTF) $(LIBS) *.a *.so *.cmx
+	mkdir -p $(OCAMLDESTDIR)
+	ocamlfind remove -destdir $(OCAMLDESTDIR) eventchn
+	ocamlfind install -destdir $(OCAMLDESTDIR) -ldconf ignore eventchn META $(INTF) $(LIBS) *.a *.so *.cmx
 
 .PHONY: uninstall
 uninstall:
-	ocamlfind remove eventchn
+	ocamlfind remove -destdir $(OCAMLDESTDIR) eventchn
 
 include $(TOPLEVEL)/Makefile.rules
 

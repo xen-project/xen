@@ -17,11 +17,13 @@ OCAML_NOC_LIBRARY = uuid
 
 .PHONY: install
 install: $(LIBS) META
-	ocamlfind install -destdir $(DESTDIR)$(shell ocamlfind printconf destdir) -ldconf ignore uuid META $(INTF) $(LIBS) *.a *.cmx
+	mkdir -p $(OCAMLDESTDIR)
+	ocamlfind remove -destdir $(OCAMLDESTDIR) uuid
+	ocamlfind install -destdir $(OCAMLDESTDIR) -ldconf ignore uuid META $(INTF) $(LIBS) *.a *.cmx
 
 .PHONY: uninstall
 uninstall:
-	ocamlfind remove uuid
+	ocamlfind remove -destdir $(OCAMLDESTDIR) uuid
 
 include $(TOPLEVEL)/Makefile.rules
 

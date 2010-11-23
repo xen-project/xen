@@ -33,11 +33,13 @@ OCAML_NOC_LIBRARY = xs
 
 .PHONY: install
 install: $(LIBS) META
-	ocamlfind install -destdir $(DESTDIR)$(shell ocamlfind printconf destdir) -ldconf ignore xs META $(INTF) xs.mli xst.mli xsraw.mli $(LIBS) *.a *.cmx
+	mkdir -p $(OCAMLDESTDIR)
+	ocamlfind remove -destdir $(OCAMLDESTDIR) xs
+	ocamlfind install -destdir $(OCAMLDESTDIR) -ldconf ignore xs META $(INTF) xs.mli xst.mli xsraw.mli $(LIBS) *.a *.cmx
 
 .PHONY: uninstall
 uninstall:
-	ocamlfind remove xs
+	ocamlfind remove -destdir $(OCAMLDESTDIR) xs
 
 include $(TOPLEVEL)/Makefile.rules
 

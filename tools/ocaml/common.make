@@ -17,13 +17,8 @@ OCAMLOPTFLAG_G := $(shell $(OCAMLOPT) -h 2>&1 | sed -n 's/^  *\(-g\) .*/\1/p')
 OCAMLOPTFLAGS = $(OCAMLOPTFLAG_G) -ccopt "$(LDFLAGS)" -dtypes $(OCAMLINCLUDE) -cc $(CC) -w F -warn-error F
 OCAMLCFLAGS += -g $(OCAMLINCLUDE) -w F -warn-error F
 
-#LDFLAGS = -cclib -L./
-
-DESTDIR ?= /
 VERSION := 4.1
 
-OCAMLABI = $(shell $(OCAMLC) -version)
-OCAMLLIBDIR = $(shell $(OCAMLC) -where)
-OCAMLDESTDIR ?= $(OCAMLLIBDIR)
+OCAMLDESTDIR ?= $(DESTDIR)$(shell ocamlfind printconf destdir)
 
 o= >$@.new && mv -f $@.new $@
