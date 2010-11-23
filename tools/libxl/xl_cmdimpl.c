@@ -1824,6 +1824,10 @@ start:
 
                         /* Some settings only make sense on first boot. */
                         paused = 0;
+                        if (common_domname 
+                            && strcmp(d_config.c_info.name, common_domname)) {
+                            d_config.c_info.name = strdup(common_domname);
+                        }
 
                         /*
                          * XXX FIXME: If this sleep is not there then domain
