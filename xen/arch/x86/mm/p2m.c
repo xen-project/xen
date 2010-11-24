@@ -2380,9 +2380,6 @@ guest_physmap_add_entry(struct p2m_domain *p2m, unsigned long gfn,
             P2M_DEBUG("aliased! mfn=%#lx, old gfn=%#lx, new gfn=%#lx\n",
                       mfn + i, ogfn, gfn + i);
             omfn = gfn_to_mfn_query(p2m, ogfn, &ot);
-            /* If we get here, we know the local domain owns the page,
-               so it can't have been grant mapped in. */
-            BUG_ON( p2m_is_grant(ot) );
             if ( p2m_is_ram(ot) )
             {
                 ASSERT(mfn_valid(omfn));
