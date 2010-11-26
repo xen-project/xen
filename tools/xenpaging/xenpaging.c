@@ -502,15 +502,6 @@ int main(int argc, char *argv[])
 
     victims = calloc(num_pages, sizeof(xenpaging_victim_t));
 
-    /* Open file */
-    sprintf(filename, "page_cache_%d", domain_id);
-    fd = open(filename, open_flags, open_mode);
-    if ( fd < 0 )
-    {
-        perror("failed to open file");
-        return -1;
-    }
-
     /* Seed random-number generator */
     srand(time(NULL));
 
@@ -520,6 +511,15 @@ int main(int argc, char *argv[])
     {
         ERROR("Error initialising paging");
         goto out;
+    }
+
+    /* Open file */
+    sprintf(filename, "page_cache_%d", domain_id);
+    fd = open(filename, open_flags, open_mode);
+    if ( fd < 0 )
+    {
+        perror("failed to open file");
+        return -1;
     }
 
     /* Evict pages */
