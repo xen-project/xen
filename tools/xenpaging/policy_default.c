@@ -30,8 +30,12 @@
 
 
 static unsigned long mru[MRU_SIZE];
-static unsigned int i_mru = 0;
+static unsigned int i_mru;
 static unsigned long *bitmap;
+static unsigned long *unconsumed;
+static unsigned long current_gfn;
+static unsigned long bitmap_size;
+static unsigned long max_pages;
 
 
 int policy_init(xenpaging_t *paging)
@@ -43,6 +47,14 @@ int policy_init(xenpaging_t *paging)
     rc = alloc_bitmap(&bitmap, paging->bitmap_size);
     if ( rc != 0 )
         goto out;
+    /* Allocate bitmap to track unusable pages */
+    rc = alloc_bitmap(&unconsumed, paging->bitmap_size);
+    if ( rc != 0 )
+        goto out;
+
+    /* record bitmap_size */
+    bitmap_size = paging->bitmap_size;
+    max_pages = paging->domain_info->max_pages;
 
     /* Initialise MRU list of paged in pages */
     for ( i = 0; i < MRU_SIZE; i++ )
@@ -50,8 +62,6 @@ int policy_init(xenpaging_t *paging)
 
     /* Don't page out page 0 */
     set_bit(0, bitmap);
-
-    rc = 0;
 
  out:
     return rc;
@@ -61,17 +71,27 @@ int policy_choose_victim(xc_interface *xch,
                          xenpaging_t *paging, domid_t domain_id,
                          xenpaging_victim_t *victim)
 {
+    unsigned long wrap = current_gfn;
     ASSERT(victim != NULL);
 
     /* Domain to pick on */
     victim->domain_id = domain_id;
-    
+
     do
     {
-        /* Randomly choose a gfn to evict */
-        victim->gfn = rand() % paging->domain_info->max_pages;
+        current_gfn++;
+        if ( current_gfn >= max_pages )
+            current_gfn = 0;
+        if ( wrap == current_gfn )
+        {
+            victim->gfn = INVALID_MFN;
+            return -ENOSPC;
+        }
     }
-    while ( test_bit(victim->gfn, bitmap) );
+    while ( test_bit(current_gfn, bitmap) || test_bit(current_gfn, unconsumed) );
+
+    set_bit(current_gfn, unconsumed);
+    victim->gfn = current_gfn;
 
     return 0;
 }
@@ -79,6 +99,7 @@ int policy_choose_victim(xc_interface *xch,
 void policy_notify_paged_out(domid_t domain_id, unsigned long gfn)
 {
     set_bit(gfn, bitmap);
+    clear_bit(gfn, unconsumed);
 }
 
 void policy_notify_paged_in(domid_t domain_id, unsigned long gfn)

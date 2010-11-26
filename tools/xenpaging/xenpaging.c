@@ -446,7 +446,8 @@ static int evict_victim(xc_interface *xch, xenpaging_t *paging, domid_t domain_i
         ret = policy_choose_victim(xch, paging, domain_id, victim);
         if ( ret != 0 )
         {
-            ERROR("Error choosing victim");
+            if ( ret != -ENOSPC )
+                ERROR("Error choosing victim");
             goto out;
         }
 
@@ -525,7 +526,9 @@ int main(int argc, char *argv[])
     memset(victims, 0, sizeof(xenpaging_victim_t) * num_pages);
     for ( i = 0; i < num_pages; i++ )
     {
-        evict_victim(xch, paging, domain_id, &victims[i], fd, i);
+        rc = evict_victim(xch, paging, domain_id, &victims[i], fd, i);
+        if ( rc == -ENOSPC )
+            break;
         if ( i % 100 == 0 )
             DPRINTF("%d pages evicted\n", i);
     }
