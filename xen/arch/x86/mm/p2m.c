@@ -2767,7 +2767,7 @@ void p2m_mem_paging_populate(struct p2m_domain *p2m, unsigned long gfn)
     /* XXX: It seems inefficient to have this here, as it's only needed
      *      in one case (ept guest accessing paging out page) */
     gfn_to_mfn(p2m, gfn, &p2mt);
-    if ( p2mt != p2m_ram_paging_out )
+    if ( p2mt == p2m_ram_paged )
     {
         p2m_lock(p2m);
         set_p2m_entry(p2m, gfn, _mfn(PAGING_MFN), 0, p2m_ram_paging_in_start);
