@@ -152,6 +152,11 @@ int mem_event_check_ring(struct domain *d)
     mem_event_ring_lock(d);
 
     free_requests = RING_FREE_REQUESTS(&d->mem_event.front_ring);
+    if ( unlikely(free_requests < 2) )
+    {
+        gdprintk(XENLOG_INFO, "free request slots: %d\n", free_requests);
+        WARN_ON(free_requests == 0);
+    }
     ring_full = free_requests < MEM_EVENT_RING_THRESHOLD;
 
     if ( (curr->domain->domain_id == d->domain_id) && ring_full )
