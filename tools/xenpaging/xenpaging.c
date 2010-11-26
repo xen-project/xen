@@ -26,6 +26,7 @@
 #include <stdarg.h>
 #include <time.h>
 #include <signal.h>
+#include <unistd.h>
 #include <xc_private.h>
 
 #include <xen/mem_event.h>
@@ -415,19 +416,31 @@ static int xenpaging_populate_page(
     unsigned long _gfn;
     void *page;
     int ret;
+    unsigned char oom = 0;
 
-    /* Tell Xen to allocate a page for the domain */
-    ret = xc_mem_paging_prep(paging->xc_handle, paging->mem_event.domain_id,
-                             *gfn);
-    if ( ret != 0 )
+    _gfn = *gfn;
+    do
     {
-        ERROR("Error preparing for page in");
-        goto out_map;
+        /* Tell Xen to allocate a page for the domain */
+        ret = xc_mem_paging_prep(paging->xc_handle, paging->mem_event.domain_id,
+                                 _gfn);
+        if ( ret != 0 )
+        {
+            if ( errno == ENOMEM )
+            {
+                if ( oom++ == 0 )
+                    DPRINTF("ENOMEM while preparing gfn %lx\n", _gfn);
+                sleep(1);
+                continue;
+            }
+            ERROR("Error preparing for page in");
+            goto out_map;
+        }
     }
+    while ( ret && !interrupted );
 
     /* Map page */
     ret = -EFAULT;
-    _gfn = *gfn;
     page = xc_map_foreign_pages(paging->xc_handle, paging->mem_event.domain_id,
                                 PROT_READ | PROT_WRITE, &_gfn, 1);
     *gfn = _gfn;

@@ -2802,7 +2802,7 @@ int p2m_mem_paging_prep(struct p2m_domain *p2m, unsigned long gfn)
     /* Get a free page */
     page = alloc_domheap_page(p2m->domain, 0);
     if ( unlikely(page == NULL) )
-        return -EINVAL;
+        return -ENOMEM;
 
     /* Fix p2m mapping */
     p2m_lock(p2m);
