@@ -385,7 +385,7 @@ int xenpaging_evict_page(xc_interface *xch, xenpaging_t *paging,
     return ret;
 }
 
-static int xenpaging_resume_page(xenpaging_t *paging, mem_event_response_t *rsp)
+static int xenpaging_resume_page(xenpaging_t *paging, mem_event_response_t *rsp, int notify_policy)
 {
     int ret;
 
@@ -395,7 +395,8 @@ static int xenpaging_resume_page(xenpaging_t *paging, mem_event_response_t *rsp)
         goto out;
 
     /* Notify policy of page being paged in */
-    policy_notify_paged_in(paging->mem_event.domain_id, rsp->gfn);
+    if ( notify_policy )
+        policy_notify_paged_in(paging->mem_event.domain_id, rsp->gfn);
 
     /* Tell Xen page is ready */
     ret = xc_mem_paging_resume(paging->xc_handle, paging->mem_event.domain_id,
@@ -621,7 +622,7 @@ int main(int argc, char *argv[])
                 rsp.vcpu_id = req.vcpu_id;
                 rsp.flags = req.flags;
 
-                rc = xenpaging_resume_page(paging, &rsp);
+                rc = xenpaging_resume_page(paging, &rsp, 1);
                 if ( rc != 0 )
                 {
                     ERROR("Error resuming page");
@@ -650,7 +651,7 @@ int main(int argc, char *argv[])
                     rsp.vcpu_id = req.vcpu_id;
                     rsp.flags = req.flags;
 
-                    rc = xenpaging_resume_page(paging, &rsp);
+                    rc = xenpaging_resume_page(paging, &rsp, 0);
                     if ( rc != 0 )
                     {
                         ERROR("Error resuming");
