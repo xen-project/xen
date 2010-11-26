@@ -156,10 +156,11 @@ static int __get_paged_frame(unsigned long gfn, unsigned long *frame, int readon
 
     if ( p2m_is_valid(p2mt) ) {
         *frame = mfn_x(mfn);
-        if ( p2m_is_paged(p2mt) )
-            p2m_mem_paging_populate(p2m, gfn);
         if ( p2m_is_paging(p2mt) )
+        {
+            p2m_mem_paging_populate(p2m, gfn);
             rc = GNTST_eagain;
+        }
     } else {
        *frame = INVALID_MFN;
        rc = GNTST_bad_page;
