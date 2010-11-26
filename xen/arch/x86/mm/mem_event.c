@@ -214,6 +214,13 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
             mfn_t ring_mfn;
             mfn_t shared_mfn;
 
+            /* Only one xenpaging at a time. If xenpaging crashed,
+             * the cache is in an undefined state and so is the guest
+             */
+            rc = -EBUSY;
+            if ( d->mem_event.ring_page )
+                break;
+
             /* Currently only EPT is supported */
             rc = -ENODEV;
             if ( !(hap_enabled(d) &&

@@ -123,7 +123,17 @@ xenpaging_t *xenpaging_init(xc_interface **xch_r, domid_t domain_id)
                              paging->mem_event.ring_page);
     if ( rc != 0 )
     {
-        ERROR("Error initialising shared page");
+        switch ( errno ) {
+            case EBUSY:
+                ERROR("xenpaging is (or was) active on this domain");
+                break;
+            case ENODEV:
+                ERROR("EPT not supported for this guest");
+                break;
+            default:
+                perror("Error initialising shared page");
+                break;
+        }
         goto err;
     }
 
