@@ -26,7 +26,7 @@
 #include "policy.h"
 
 
-#define MRU_SIZE 1024
+#define MRU_SIZE (1024 * 16)
 
 
 static unsigned long mru[MRU_SIZE];
