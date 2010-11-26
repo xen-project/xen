@@ -348,9 +348,6 @@ int __assign_irq_vector(int irq, struct irq_cfg *cfg, cpumask_t mask)
     int cpu, err;
     cpumask_t tmp_mask;
 
-    if ((cfg->move_in_progress) || cfg->move_cleanup_count)
-        return -EBUSY;
-
     old_vector = irq_to_vector(irq);
     if (old_vector) {
         cpus_and(tmp_mask, mask, cpu_online_map);
@@ -360,6 +357,9 @@ int __assign_irq_vector(int irq, struct irq_cfg *cfg, cpumask_t mask)
             return 0;
         }
     }
+
+    if ((cfg->move_in_progress) || cfg->move_cleanup_count)
+        return -EAGAIN;
 
     /* Only try and allocate irqs on cpus that are present */
     cpus_and(mask, mask, cpu_online_map);
