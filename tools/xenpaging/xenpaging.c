@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <time.h>
+#include <signal.h>
 #include <xc_private.h>
 
 #include <xen/mem_event.h>
@@ -43,6 +44,14 @@
 #define DPRINTF(...) ((void)0)
 #endif
 
+static char filename[80];
+static int interrupted;
+static void close_handler(int sig)
+{
+    interrupted = sig;
+    if ( filename[0] )
+        unlink(filename);
+}
 
 static void *init_page(void)
 {
@@ -248,7 +257,6 @@ int xenpaging_teardown(xc_interface *xch, xenpaging_t *paging)
     if ( rc != 0 )
     {
         ERROR("Error tearing down domain paging in xen");
-        goto err;
     }
 
     /* Unbind VIRQ */
@@ -256,7 +264,6 @@ int xenpaging_teardown(xc_interface *xch, xenpaging_t *paging)
     if ( rc != 0 )
     {
         ERROR("Error unbinding event port");
-        goto err;
     }
     paging->mem_event.port = -1;
 
@@ -265,7 +272,6 @@ int xenpaging_teardown(xc_interface *xch, xenpaging_t *paging)
     if ( rc != 0 )
     {
         ERROR("Error closing event channel");
-        goto err;
     }
     paging->mem_event.xce_handle = -1;
     
@@ -274,7 +280,6 @@ int xenpaging_teardown(xc_interface *xch, xenpaging_t *paging)
     if ( rc != 0 )
     {
         ERROR("Error closing connection to xen");
-        goto err;
     }
     paging->xc_handle = NULL;
 
@@ -380,7 +385,7 @@ int xenpaging_evict_page(xc_interface *xch, xenpaging_t *paging,
     return ret;
 }
 
-int xenpaging_resume_page(xenpaging_t *paging, mem_event_response_t *rsp)
+static int xenpaging_resume_page(xenpaging_t *paging, mem_event_response_t *rsp)
 {
     int ret;
 
@@ -461,6 +466,11 @@ static int evict_victim(xc_interface *xch, xenpaging_t *paging, domid_t domain_i
             goto out;
         }
 
+        if ( interrupted )
+        {
+            ret = -EINTR;
+            goto out;
+        }
         ret = xc_mem_paging_nominate(paging->xc_handle,
                                      paging->mem_event.domain_id, victim->gfn);
         if ( ret == 0 )
@@ -485,6 +495,7 @@ static int evict_victim(xc_interface *xch, xenpaging_t *paging, domid_t domain_i
 
 int main(int argc, char *argv[])
 {
+    struct sigaction act;
     domid_t domain_id;
     int num_pages;
     xenpaging_t *paging;
@@ -498,7 +509,6 @@ int main(int argc, char *argv[])
 
     int open_flags = O_CREAT | O_TRUNC | O_RDWR;
     mode_t open_mode = S_IRUSR | S_IRGRP | S_IROTH | S_IWUSR | S_IWGRP | S_IWOTH;
-    char filename[80];
     int fd;
 
     if ( argc != 3 )
@@ -520,7 +530,7 @@ int main(int argc, char *argv[])
     if ( paging == NULL )
     {
         ERROR("Error initialising paging");
-        goto out;
+        return 1;
     }
 
     /* Open file */
@@ -529,8 +539,17 @@ int main(int argc, char *argv[])
     if ( fd < 0 )
     {
         perror("failed to open file");
-        return -1;
+        return 2;
     }
+
+    /* ensure that if we get a signal, we'll do cleanup, then exit */
+    act.sa_handler = close_handler;
+    act.sa_flags = 0;
+    sigemptyset(&act.sa_mask);
+    sigaction(SIGHUP,  &act, NULL);
+    sigaction(SIGTERM, &act, NULL);
+    sigaction(SIGINT,  &act, NULL);
+    sigaction(SIGALRM, &act, NULL);
 
     /* Evict pages */
     memset(victims, 0, sizeof(xenpaging_victim_t) * num_pages);
@@ -539,6 +558,8 @@ int main(int argc, char *argv[])
         rc = evict_victim(xch, paging, domain_id, &victims[i], fd, i);
         if ( rc == -ENOSPC )
             break;
+        if ( rc == -EINTR )
+            break;
         if ( i % 100 == 0 )
             DPRINTF("%d pages evicted\n", i);
     }
@@ -546,7 +567,7 @@ int main(int argc, char *argv[])
     DPRINTF("pages evicted\n");
 
     /* Swap pages in and out */
-    while ( 1 )
+    while ( !interrupted )
     {
         /* Wait for Xen to signal that a page needs paged in */
         rc = xc_wait_for_event_or_timeout(xch, paging->mem_event.xce_handle, 100);
@@ -637,8 +658,10 @@ int main(int argc, char *argv[])
             }
         }
     }
+    DPRINTF("xenpaging got signal %d\n", interrupted);
 
  out:
+    close(fd);
     free(victims);
 
     /* Tear down domain paging */
@@ -651,6 +674,7 @@ int main(int argc, char *argv[])
 
     xc_interface_close(xch);
 
+    DPRINTF("xenpaging exit code %d\n", rc);
     return rc;
 }
 
