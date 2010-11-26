@@ -2757,11 +2757,11 @@ void p2m_mem_paging_populate(struct p2m_domain *p2m, unsigned long gfn)
     p2m_type_t p2mt;
     struct domain *d = p2m->domain;
 
-    memset(&req, 0, sizeof(req));
-
     /* Check that there's space on the ring for this request */
     if ( mem_event_check_ring(d) )
         return;
+
+    memset(&req, 0, sizeof(req));
 
     /* Fix p2m mapping */
     /* XXX: It seems inefficient to have this here, as it's only needed
@@ -2780,6 +2780,11 @@ void p2m_mem_paging_populate(struct p2m_domain *p2m, unsigned long gfn)
     {
         vcpu_pause_nosync(v);
         req.flags |= MEM_EVENT_FLAG_VCPU_PAUSED;
+    }
+    else if ( p2mt != p2m_ram_paging_out && p2mt != p2m_ram_paged )
+    {
+        /* gfn is already on its way back and vcpu is not paused */
+        return;
     }
 
     /* Send request to pager */
