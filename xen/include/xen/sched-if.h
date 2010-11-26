@@ -133,6 +133,7 @@ struct cpupool
     struct cpupool   *next;
     unsigned int     n_dom;
     struct scheduler *sched;
+    atomic_t         refcnt;
 };
 
 #endif /* __XEN_SCHED_IF_H__ */

@@ -999,13 +999,8 @@ long sched_adjust_global(struct xen_sysctl_scheduler_op *op)
     if ( pool == NULL )
         return -ESRCH;
 
-    if ( op->sched_id != pool->sched->sched_id )
-    {
-        cpupool_put(pool);
-        return -EINVAL;
-    }
-
-    rc = SCHED_OP(pool->sched, adjust_global, op);
+    rc = ((op->sched_id == pool->sched->sched_id)
+          ? SCHED_OP(pool->sched, adjust_global, op) : -EINVAL);
 
     cpupool_put(pool);
 

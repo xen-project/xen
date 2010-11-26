@@ -31,11 +31,7 @@ static int cpupool_moving_cpu = -1;
 static struct cpupool *cpupool_cpu_moving = NULL;
 static cpumask_t cpupool_locked_cpus = CPU_MASK_NONE;
 
-/* cpupool lock: be carefull, this lock is sometimes released on another cpu
- *               as it was obtained!
- */
 static DEFINE_SPINLOCK(cpupool_lock);
-static DEFINE_SPINLOCK(cpupool_ctl_lock);
 
 DEFINE_PER_CPU(struct cpupool *, cpupool);
 
@@ -61,30 +57,37 @@ static struct cpupool *cpupool_find_by_id(int id, int exact)
 {
     struct cpupool **q;
 
+    ASSERT(spin_is_locked(&cpupool_lock));
+
     for_each_cpupool(q)
-    {
-        if ( (*q)->cpupool_id == id )
-            return *q;
-        if ( (*q)->cpupool_id > id )
+        if ( (*q)->cpupool_id >= id )
             break;
-    }
-    return exact ? NULL : *q;
+
+    return (!exact || ((*q)->cpupool_id == id)) ? *q : NULL;
+}
+
+static struct cpupool *__cpupool_get_by_id(int poolid, int exact)
+{
+    struct cpupool *c;
+    spin_lock(&cpupool_lock);
+    c = cpupool_find_by_id(poolid, exact);
+    if ( c != NULL )
+        atomic_inc(&c->refcnt);
+    spin_unlock(&cpupool_lock);
+    return c;
 }
 
 struct cpupool *cpupool_get_by_id(int poolid)
 {
-    struct cpupool *c;
-    /* cpupool_ctl_lock protects against concurrent pool destruction */
-    spin_lock(&cpupool_ctl_lock);
-    c = cpupool_find_by_id(poolid, 1);
-    if ( c == NULL )
-        spin_unlock(&cpupool_ctl_lock);
-    return c;
+    return __cpupool_get_by_id(poolid, 1);
 }
 
 void cpupool_put(struct cpupool *pool)
 {
-    spin_unlock(&cpupool_ctl_lock);
+    if ( !atomic_dec_and_test(&pool->refcnt) )
+        return;
+    scheduler_free(pool->sched);
+    free_cpupool_struct(pool);
 }
 
 /*
@@ -106,6 +109,9 @@ static struct cpupool *cpupool_create(
     if ( (c = alloc_cpupool_struct()) == NULL )
         return NULL;
     memset(c, 0, sizeof(*c));
+
+    /* One reference for caller, one reference for cpupool_destroy(). */
+    atomic_set(&c->refcnt, 2);
 
     cpupool_dprintk("cpupool_create(pool=%d,sched=%u)\n", poolid, sched_id);
 
@@ -183,9 +189,10 @@ static int cpupool_destroy(struct cpupool *c)
     }
     *q = c->next;
     spin_unlock(&cpupool_lock);
+
+    cpupool_put(c);
+
     cpupool_dprintk("cpupool_destroy(pool=%d)\n", c->cpupool_id);
-    scheduler_free(c->sched);
-    free_cpupool_struct(c);
     return 0;
 }
 
@@ -203,6 +210,7 @@ static int cpupool_assign_cpu_locked(struct cpupool *c, unsigned int cpu)
     if (cpupool_moving_cpu == cpu)
     {
         cpupool_moving_cpu = -1;
+        cpupool_put(cpupool_cpu_moving);
         cpupool_cpu_moving = NULL;
     }
     cpu_set(cpu, c->cpu_valid);
@@ -217,6 +225,7 @@ static long cpupool_unassign_cpu_helper(void *info)
     cpupool_dprintk("cpupool_unassign_cpu(pool=%d,cpu=%d) ret %ld\n",
                     cpupool_id, cpu, ret);
 
+    spin_lock(&cpupool_lock);
     ret = cpu_disable_scheduler(cpu);
     cpu_set(cpu, cpupool_free_cpus);
     if ( !ret )
@@ -224,6 +233,7 @@ static long cpupool_unassign_cpu_helper(void *info)
         schedule_cpu_switch(cpu, NULL);
         per_cpu(cpupool, cpu) = NULL;
         cpupool_moving_cpu = -1;
+        cpupool_put(cpupool_cpu_moving);
         cpupool_cpu_moving = NULL;
     }
     spin_unlock(&cpupool_lock);
@@ -287,8 +297,11 @@ int cpupool_unassign_cpu(struct cpupool *c, unsigned int cpu)
             goto out;
     }
     cpupool_moving_cpu = cpu;
+    atomic_inc(&c->refcnt);
     cpupool_cpu_moving = c;
     cpu_clear(cpu, c->cpu_valid);
+    spin_unlock(&cpupool_lock);
+
     work_cpu = smp_processor_id();
     if ( work_cpu == cpu )
     {
@@ -395,8 +408,6 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
     int ret;
     struct cpupool *c;
 
-    spin_lock(&cpupool_ctl_lock);
-
     switch ( op->op )
     {
 
@@ -408,30 +419,35 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
             CPUPOOLID_NONE: op->cpupool_id;
         c = cpupool_create(poolid, op->sched_id, &ret);
         if ( c != NULL )
+        {
             op->cpupool_id = c->cpupool_id;
+            cpupool_put(c);
+        }
     }
     break;
 
     case XEN_SYSCTL_CPUPOOL_OP_DESTROY:
     {
-        c = cpupool_find_by_id(op->cpupool_id, 1);
+        c = cpupool_get_by_id(op->cpupool_id);
         ret = -ENOENT;
         if ( c == NULL )
             break;
         ret = cpupool_destroy(c);
+        cpupool_put(c);
     }
     break;
 
     case XEN_SYSCTL_CPUPOOL_OP_INFO:
     {
-        c = cpupool_find_by_id(op->cpupool_id, 0);
+        c = __cpupool_get_by_id(op->cpupool_id, 0);
         ret = -ENOENT;
         if ( c == NULL )
             break;
         op->cpupool_id = c->cpupool_id;
         op->sched_id = c->sched->sched_id;
         op->n_dom = c->n_dom;
-        ret = cpumask_to_xenctl_cpumap(&(op->cpumap), &(c->cpu_valid));
+        ret = cpumask_to_xenctl_cpumap(&op->cpumap, &c->cpu_valid);
+        cpupool_put(c);
     }
     break;
 
@@ -467,20 +483,15 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
     {
         unsigned cpu;
 
-        c = cpupool_find_by_id(op->cpupool_id, 0);
+        c = __cpupool_get_by_id(op->cpupool_id, 0);
         ret = -ENOENT;
         if ( c == NULL )
             break;
         cpu = op->cpu;
         if ( cpu == XEN_SYSCTL_CPUPOOL_PAR_ANY )
             cpu = last_cpu(c->cpu_valid);
-        ret = -EINVAL;
-        if ( cpu >= NR_CPUS )
-            break;
-        /* caution: cpupool_unassign_cpu uses continue_hypercall_on_cpu and
-         * will continue after the local return
-         */
-        ret = cpupool_unassign_cpu(c, cpu);
+        ret = (cpu < NR_CPUS) ? cpupool_unassign_cpu(c, cpu) : -EINVAL;
+        cpupool_put(c);
     }
     break;
 
@@ -539,8 +550,6 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
         ret = -ENOSYS;
         break;
     }
-
-    spin_unlock(&cpupool_ctl_lock);
 
     return ret;
 }
@@ -605,6 +614,7 @@ static int __init cpupool_presmp_init(void)
     void *cpu = (void *)(long)smp_processor_id();
     cpupool0 = cpupool_create(0, 0, &err);
     BUG_ON(cpupool0 == NULL);
+    cpupool_put(cpupool0);
     cpu_callback(&cpu_nfb, CPU_ONLINE, cpu);
     register_cpu_notifier(&cpu_nfb);
     return 0;
