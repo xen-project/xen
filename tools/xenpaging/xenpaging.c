@@ -521,8 +521,6 @@ int main(int argc, char *argv[])
     domain_id = atoi(argv[1]);
     num_pages = atoi(argv[2]);
 
-    victims = calloc(num_pages, sizeof(xenpaging_victim_t));
-
     /* Seed random-number generator */
     srand(time(NULL));
 
@@ -542,6 +540,13 @@ int main(int argc, char *argv[])
         perror("failed to open file");
         return 2;
     }
+
+    if ( num_pages < 0 || num_pages > paging->domain_info->max_pages )
+    {
+        num_pages = paging->domain_info->max_pages;
+        DPRINTF("setting num_pages to %d\n", num_pages);
+    }
+    victims = calloc(num_pages, sizeof(xenpaging_victim_t));
 
     /* ensure that if we get a signal, we'll do cleanup, then exit */
     act.sa_handler = close_handler;
