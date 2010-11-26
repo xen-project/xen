@@ -532,6 +532,8 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    DPRINTF("starting %s %u %d\n", argv[0], domain_id, num_pages);
+
     /* Open file */
     sprintf(filename, "page_cache_%d", domain_id);
     fd = open(filename, open_flags, open_mode);
