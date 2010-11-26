@@ -634,8 +634,10 @@ int main(int argc, char *argv[])
             else
             {
                 DPRINTF("page already populated (domain = %d; vcpu = %d;"
+                        " p2mt = %x;"
                         " gfn = %"PRIx64"; paused = %"PRId64")\n",
                         paging->mem_event.domain_id, req.vcpu_id,
+                        req.p2mt,
                         req.gfn, req.flags & MEM_EVENT_FLAG_VCPU_PAUSED);
 
                 /* Tell Xen to resume the vcpu */
