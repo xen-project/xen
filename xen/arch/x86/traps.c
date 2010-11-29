@@ -1250,13 +1250,20 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
     }
 
     if ( VM_ASSIST(d, VMASST_TYPE_writable_pagetables) &&
-         guest_kernel_mode(v, regs) &&
-         /* Do not check if access-protection fault since the page may 
-            legitimately be not present in shadow page tables */
-         ((regs->error_code & (PFEC_write_access|PFEC_reserved_bit)) ==
-          PFEC_write_access) &&
-         ptwr_do_page_fault(v, addr, regs) )
-        return EXCRET_fault_fixed;
+         guest_kernel_mode(v, regs) )
+    {
+        unsigned int mbs = PFEC_write_access;
+        unsigned int mbz = PFEC_reserved_bit | PFEC_insn_fetch;
+
+        /* Do not check if access-protection fault since the page may 
+           legitimately be not present in shadow page tables */
+        if ( !paging_mode_enabled(d) )
+            mbs |= PFEC_page_present;
+
+        if ( ((regs->error_code & (mbs | mbz)) == mbs) &&
+             ptwr_do_page_fault(v, addr, regs) )
+            return EXCRET_fault_fixed;
+    }
 
     /* For non-external shadowed guests, we fix up both their own 
      * pagefaults and Xen's, since they share the pagetables. */
