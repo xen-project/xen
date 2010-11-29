@@ -1064,8 +1064,14 @@ static int handle_gdt_ldt_mapping_fault(
     unsigned int is_ldt_area = (offset >> (GDT_LDT_VCPU_VA_SHIFT-1)) & 1;
     unsigned int vcpu_area   = (offset >> GDT_LDT_VCPU_VA_SHIFT);
 
-    /* Should never fault in another vcpu's area. */
-    BUG_ON(vcpu_area != curr->vcpu_id);
+    /*
+     * If the fault is in another vcpu's area, it cannot be due to
+     * a GDT/LDT descriptor load. Thus we can reasonably exit immediately, and
+     * indeed we have to since map_ldt_shadow_page() works correctly only on
+     * accesses to a vcpu's own area.
+     */
+    if ( vcpu_area != curr->vcpu_id )
+        return 0;
 
     /* Byte offset within the gdt/ldt sub-area. */
     offset &= (1UL << (GDT_LDT_VCPU_VA_SHIFT-1)) - 1UL;
@@ -1236,7 +1242,7 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
 
     if ( unlikely(IN_HYPERVISOR_RANGE(addr)) )
     {
-        if ( !(regs->error_code & PFEC_reserved_bit) &&
+        if ( !(regs->error_code & (PFEC_user_mode | PFEC_reserved_bit)) &&
              (addr >= GDT_LDT_VIRT_START) && (addr < GDT_LDT_VIRT_END) )
             return handle_gdt_ldt_mapping_fault(
                 addr - GDT_LDT_VIRT_START, regs);
