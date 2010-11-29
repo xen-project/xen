@@ -1860,7 +1860,8 @@ int unmap_domain_pirq_emuirq(struct domain *d, int pirq)
     }
 
     d->arch.pirq_emuirq[pirq] = IRQ_UNBOUND;
-    d->arch.emuirq_pirq[emuirq] = IRQ_UNBOUND;
+    if ( emuirq != IRQ_PT )
+        d->arch.emuirq_pirq[emuirq] = IRQ_UNBOUND;
 
  done:
     return ret;

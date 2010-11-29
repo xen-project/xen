@@ -236,7 +236,8 @@ static int physdev_unmap_pirq(struct physdev_unmap_pirq *unmap)
         spin_lock(&d->event_lock);
         ret = unmap_domain_pirq_emuirq(d, unmap->pirq);
         spin_unlock(&d->event_lock);
-        goto free_domain;
+        if ( unmap->domid == DOMID_SELF || ret )
+            goto free_domain;
     }
 
     ret = -EPERM;
