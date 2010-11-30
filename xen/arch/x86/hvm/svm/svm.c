@@ -889,9 +889,6 @@ void start_svm(struct cpuinfo_x86 *c)
         return;
     }
 
-    /* Xen does not fill x86_capability words except 0. */
-    boot_cpu_data.x86_capability[5] = cpuid_ecx(0x80000001);
-
     if ( !test_bit(X86_FEATURE_SVME, &boot_cpu_data.x86_capability) )
         return;
 

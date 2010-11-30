@@ -1433,9 +1433,6 @@ void start_vmx(void)
         return;
     }
 
-    /* Xen does not fill x86_capability words except 0. */
-    boot_cpu_data.x86_capability[4] = cpuid_ecx(1);
-
     if ( !test_bit(X86_FEATURE_VMXE, &boot_cpu_data.x86_capability) )
         return;
 
