@@ -1634,11 +1634,14 @@ static void mask_and_ack_level_ioapic_irq (unsigned int irq)
 
     ack_APIC_irq();
     
+    if ( directed_eoi_enabled )
+        return;
+
     if ((irq_desc[irq].status & IRQ_MOVE_PENDING) &&
        !io_apic_level_ack_pending(irq))
-        move_native_irq(irq);
+        move_masked_irq(irq);
 
-    if (!directed_eoi_enabled && !(v & (1 << (i & 0x1f)))) {
+    if ( !(v & (1 << (i & 0x1f))) ) {
         atomic_inc(&irq_mis_count);
         spin_lock(&ioapic_lock);
         __edge_IO_APIC_irq(irq);
@@ -1654,12 +1657,22 @@ static void end_level_ioapic_irq (unsigned int irq)
 
     if ( !ioapic_ack_new )
     {
-        if ( irq_desc[irq].status & IRQ_DISABLED )
-            return;
-
         if ( directed_eoi_enabled )
+        {
+            if ( !(irq_desc[irq].status & (IRQ_DISABLED|IRQ_MOVE_PENDING)) )
+            {
+                eoi_IO_APIC_irq(irq);
+                return;
+            }
+
+            mask_IO_APIC_irq(irq);
             eoi_IO_APIC_irq(irq);
-        else
+            if ( (irq_desc[irq].status & IRQ_MOVE_PENDING) &&
+                 !io_apic_level_ack_pending(irq) )
+                move_masked_irq(irq);
+        }
+
+        if ( !(irq_desc[irq].status & IRQ_DISABLED) )
             unmask_IO_APIC_irq(irq);
 
         return;
