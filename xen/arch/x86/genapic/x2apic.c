@@ -89,24 +89,24 @@ void clustered_apic_check_x2apic(void)
     return;
 }
 
-cpumask_t target_cpus_x2apic(void)
+const cpumask_t *target_cpus_x2apic(void)
 {
-    return cpu_online_map;
+    return &cpu_online_map;
 }
 
-cpumask_t vector_allocation_cpumask_x2apic(int cpu)
+const cpumask_t *vector_allocation_cpumask_x2apic(int cpu)
 {
-    return cpumask_of_cpu(cpu);
+    return cpumask_of(cpu);
 }
 
-unsigned int cpu_mask_to_apicid_x2apic_phys(cpumask_t cpumask)
+unsigned int cpu_mask_to_apicid_x2apic_phys(const cpumask_t *cpumask)
 {
-    return cpu_physical_id(first_cpu(cpumask));
+    return cpu_physical_id(cpumask_first(cpumask));
 }
 
-unsigned int cpu_mask_to_apicid_x2apic_cluster(cpumask_t cpumask)
+unsigned int cpu_mask_to_apicid_x2apic_cluster(const cpumask_t *cpumask)
 {
-    return cpu_2_logical_apicid[first_cpu(cpumask)];
+    return cpu_2_logical_apicid[cpumask_first(cpumask)];
 }
 
 static void __send_IPI_mask_x2apic(

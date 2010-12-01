@@ -1011,7 +1011,7 @@ static void dma_msi_set_affinity(unsigned int irq, cpumask_t mask)
     struct irq_cfg *cfg = desc->chip_data;
 
 #ifdef CONFIG_X86
-    dest = set_desc_affinity(desc, mask);
+    dest = set_desc_affinity(desc, &mask);
     if (dest == BAD_APICID){
         dprintk(XENLOG_ERR VTDPREFIX, "Set iommu interrupt affinity error!\n");
         return;

@@ -26,19 +26,19 @@ void clustered_apic_check_flat(void)
 	printk("Enabling APIC mode:  Flat.  Using %d I/O APICs\n", nr_ioapics);
 }
 
-cpumask_t target_cpus_flat(void)
+const cpumask_t *target_cpus_flat(void)
 {
-	return cpu_online_map;
+	return &cpu_online_map;
 }
 
-cpumask_t vector_allocation_cpumask_flat(int cpu)
+const cpumask_t *vector_allocation_cpumask_flat(int cpu)
 {
-	return cpu_online_map;
+	return &cpu_online_map;
 } 
 
-unsigned int cpu_mask_to_apicid_flat(cpumask_t cpumask)
+unsigned int cpu_mask_to_apicid_flat(const cpumask_t *cpumask)
 {
-	return cpus_addr(cpumask)[0]&0xFF;
+	return cpus_addr(*cpumask)[0]&0xFF;
 }
 
 /*
@@ -59,18 +59,18 @@ void clustered_apic_check_phys(void)
 	printk("Enabling APIC mode:  Phys.  Using %d I/O APICs\n", nr_ioapics);
 }
 
-cpumask_t target_cpus_phys(void)
+const cpumask_t *target_cpus_phys(void)
 {
-	return cpu_online_map;
+	return &cpu_online_map;
 }
 
-cpumask_t vector_allocation_cpumask_phys(int cpu)
+const cpumask_t *vector_allocation_cpumask_phys(int cpu)
 {
-	return cpumask_of_cpu(cpu);
+	return cpumask_of(cpu);
 }
 
-unsigned int cpu_mask_to_apicid_phys(cpumask_t cpumask)
+unsigned int cpu_mask_to_apicid_phys(const cpumask_t *cpumask)
 {
 	/* As we are using single CPU as destination, pick only one CPU here */
-	return cpu_physical_id(first_cpu(cpumask));
+	return cpu_physical_id(cpumask_first(cpumask));
 }

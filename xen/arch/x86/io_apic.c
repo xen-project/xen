@@ -460,7 +460,7 @@ void irq_complete_move(struct irq_desc **descp)
         send_cleanup_vector(cfg);
 }
 
-unsigned int set_desc_affinity(struct irq_desc *desc, cpumask_t mask)
+unsigned int set_desc_affinity(struct irq_desc *desc, const cpumask_t *mask)
 {
     struct irq_cfg *cfg;
     unsigned int irq;
@@ -468,7 +468,7 @@ unsigned int set_desc_affinity(struct irq_desc *desc, cpumask_t mask)
     unsigned long flags;
     cpumask_t dest_mask;
 
-    if (!cpus_intersects(mask, cpu_online_map))
+    if (!cpus_intersects(*mask, cpu_online_map))
         return BAD_APICID;
 
     irq = desc->irq;
@@ -483,15 +483,14 @@ unsigned int set_desc_affinity(struct irq_desc *desc, cpumask_t mask)
     if (ret < 0)
         return BAD_APICID;
 
-    cpus_copy(desc->affinity, mask);
-    cpus_and(dest_mask, desc->affinity, cfg->cpu_mask);
+    cpus_copy(desc->affinity, *mask);
+    cpus_and(dest_mask, *mask, cfg->cpu_mask);
 
-    return cpu_mask_to_apicid(dest_mask);
+    return cpu_mask_to_apicid(&dest_mask);
 }
 
 static void
-set_ioapic_affinity_irq_desc(struct irq_desc *desc,
-                                        const struct cpumask mask)
+set_ioapic_affinity_irq_desc(struct irq_desc *desc, const cpumask_t *mask)
 {
     unsigned long flags;
     unsigned int dest;
@@ -536,7 +535,7 @@ set_ioapic_affinity_irq(unsigned int irq, const struct cpumask mask)
 
     desc = irq_to_desc(irq);
 
-    set_ioapic_affinity_irq_desc(desc, mask);
+    set_ioapic_affinity_irq_desc(desc, &mask);
 }
 #endif /* CONFIG_SMP */
 
@@ -992,7 +991,7 @@ static void __init setup_IO_APIC_irqs(void)
             }
             cfg = irq_cfg(irq);
             SET_DEST(entry.dest.dest32, entry.dest.logical.logical_dest,
-                cpu_mask_to_apicid(cfg->cpu_mask));
+                     cpu_mask_to_apicid(&cfg->cpu_mask));
             spin_lock_irqsave(&ioapic_lock, flags);
             io_apic_write(apic, 0x11+2*pin, *(((int *)&entry)+1));
             io_apic_write(apic, 0x10+2*pin, *(((int *)&entry)+0));
@@ -2447,7 +2446,7 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
     rte.vector = cfg->vector;
 
     SET_DEST(rte.dest.dest32, rte.dest.logical.logical_dest,
-        cpu_mask_to_apicid(cfg->cpu_mask));
+             cpu_mask_to_apicid(&cfg->cpu_mask));
 
     io_apic_write(apic, 0x10 + 2 * pin, *(((int *)&rte) + 0));
     io_apic_write(apic, 0x11 + 2 * pin, *(((int *)&rte) + 1));

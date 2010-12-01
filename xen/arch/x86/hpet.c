@@ -336,7 +336,7 @@ static void hpet_msi_set_affinity(unsigned int irq, cpumask_t mask)
     struct irq_desc * desc = irq_to_desc(irq);
     struct irq_cfg *cfg= desc->chip_data;
 
-    dest = set_desc_affinity(desc, mask);
+    dest = set_desc_affinity(desc, &mask);
     if (dest == BAD_APICID)
         return;
 

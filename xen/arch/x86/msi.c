@@ -134,8 +134,7 @@ void msi_compose_msg(struct pci_dev *pdev, int irq,
     }
 
     if ( vector ) {
-
-        dest = cpu_mask_to_apicid(domain);
+        dest = cpu_mask_to_apicid(&domain);
 
         msg->address_hi = MSI_ADDR_BASE_HI;
         msg->address_lo =
@@ -275,7 +274,7 @@ void set_msi_affinity(unsigned int irq, cpumask_t mask)
     struct msi_desc *msi_desc = desc->msi_desc;
     struct irq_cfg *cfg = desc->chip_data;
 
-    dest = set_desc_affinity(desc, mask);
+    dest = set_desc_affinity(desc, &mask);
     if (dest == BAD_APICID || !msi_desc)
         return;
 

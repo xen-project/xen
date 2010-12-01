@@ -356,7 +356,7 @@ static void iommu_msi_set_affinity(unsigned int irq, cpumask_t mask)
     u8 dev = PCI_SLOT(iommu->bdf & 0xff);
     u8 func = PCI_FUNC(iommu->bdf & 0xff);
 
-    dest = set_desc_affinity(desc, mask);
+    dest = set_desc_affinity(desc, &mask);
     if (dest == BAD_APICID){
         dprintk(XENLOG_ERR, "Set iommu interrupt affinity error!\n");
         return;

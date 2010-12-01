@@ -330,7 +330,7 @@ hw_irq_controller no_irq_type = {
 
 atomic_t irq_err_count;
 
-int __assign_irq_vector(int irq, struct irq_cfg *cfg, cpumask_t mask)
+int __assign_irq_vector(int irq, struct irq_cfg *cfg, const cpumask_t *mask)
 {
     /*
      * NOTE! The local APIC isn't very good at handling
@@ -350,9 +350,8 @@ int __assign_irq_vector(int irq, struct irq_cfg *cfg, cpumask_t mask)
 
     old_vector = irq_to_vector(irq);
     if (old_vector) {
-        cpus_and(tmp_mask, mask, cpu_online_map);
-        cpus_and(tmp_mask, cfg->cpu_mask, tmp_mask);
-        if (!cpus_empty(tmp_mask)) {
+        cpus_and(tmp_mask, *mask, cpu_online_map);
+        if (cpus_intersects(tmp_mask, cfg->cpu_mask)) {
             cfg->vector = old_vector;
             return 0;
         }
@@ -361,16 +360,16 @@ int __assign_irq_vector(int irq, struct irq_cfg *cfg, cpumask_t mask)
     if ((cfg->move_in_progress) || cfg->move_cleanup_count)
         return -EAGAIN;
 
-    /* Only try and allocate irqs on cpus that are present */
-    cpus_and(mask, mask, cpu_online_map);
-
     err = -ENOSPC;
-    for_each_cpu_mask(cpu, mask) {
+    for_each_cpu_mask(cpu, *mask) {
         int new_cpu;
         int vector, offset;
 
-        tmp_mask = vector_allocation_cpumask(cpu);
-        cpus_and(tmp_mask, tmp_mask, cpu_online_map);
+        /* Only try and allocate irqs on cpus that are present. */
+        if (!cpu_online(cpu))
+            continue;
+
+        cpus_and(tmp_mask, *vector_allocation_cpumask(cpu), cpu_online_map);
 
         vector = current_vector;
         offset = current_offset;
@@ -1747,14 +1746,14 @@ void fixup_irqs(void)
         spin_lock(&desc->lock);
 
         affinity = desc->affinity;
-        if ( !desc->action || cpus_equal(affinity, cpu_online_map) )
+        if ( !desc->action || cpus_subset(affinity, cpu_online_map) )
         {
             spin_unlock(&desc->lock);
             continue;
         }
 
         cpus_and(affinity, affinity, cpu_online_map);
-        if ( any_online_cpu(affinity) == NR_CPUS )
+        if ( cpus_empty(affinity) )
         {
             break_affinity = 1;
             affinity = cpu_online_map;

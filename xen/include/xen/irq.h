@@ -143,16 +143,16 @@ extern void pirq_set_affinity(struct domain *d, int irq, const cpumask_t *);
 extern irq_desc_t *domain_spin_lock_irq_desc(
     struct domain *d, int irq, unsigned long *pflags);
 
-static inline void set_native_irq_info(unsigned int irq, cpumask_t mask)
+static inline void set_native_irq_info(unsigned int irq, const cpumask_t *mask)
 {
-    irq_desc[irq].affinity = mask;
+    irq_desc[irq].affinity = *mask;
 }
 
 static inline void set_irq_info(int irq, cpumask_t mask)
 {
-    set_native_irq_info(irq, mask);
+    set_native_irq_info(irq, &mask);
 }
 
-unsigned int set_desc_affinity(struct irq_desc *desc, cpumask_t mask);
+unsigned int set_desc_affinity(struct irq_desc *, const cpumask_t *);
 
 #endif /* __XEN_IRQ_H__ */
