@@ -645,6 +645,16 @@ int xc_sched_credit2_domain_get(xc_interface *xch,
                                uint32_t domid,
                                struct xen_domctl_sched_credit2 *sdom);
 
+int
+xc_sched_arinc653_schedule_set(
+    xc_interface *xch,
+    struct xen_sysctl_arinc653_schedule *schedule);
+
+int
+xc_sched_arinc653_schedule_get(
+    xc_interface *xch,
+    struct xen_sysctl_arinc653_schedule *schedule);
+
 /**
  * This function sends a trigger to a domain.
  *
