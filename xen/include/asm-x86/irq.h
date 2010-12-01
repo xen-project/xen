@@ -137,14 +137,11 @@ void unlock_vector_lock(void);
 void __setup_vector_irq(int cpu);
 
 void move_native_irq(int irq);
+void move_masked_irq(int irq);
 
 int __assign_irq_vector(int irq, struct irq_cfg *cfg, cpumask_t mask);
 
 int bind_irq_vector(int irq, int vector, cpumask_t domain);
-
-void move_native_irq(int irq);
-
-void move_masked_irq(int irq);
 
 void irq_set_affinity(struct irq_desc *, const cpumask_t *mask);
 
