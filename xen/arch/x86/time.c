@@ -1837,7 +1837,6 @@ static void dump_softtsc(unsigned char key)
 {
     struct domain *d;
     int domcnt = 0;
-    extern unsigned int max_cstate;
 
     tsc_check_reliability();
     if ( boot_cpu_has(X86_FEATURE_TSC_RELIABLE) )

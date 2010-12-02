@@ -556,7 +556,30 @@ extern void mtrr_ap_init(void);
 extern void mtrr_bp_init(void);
 
 void mcheck_init(struct cpuinfo_x86 *c);
-asmlinkage void do_machine_check(struct cpu_user_regs *regs);
+
+#define DECLARE_TRAP_HANDLER(_name)                     \
+asmlinkage void _name(void);                            \
+asmlinkage void do_ ## _name(struct cpu_user_regs *regs)
+DECLARE_TRAP_HANDLER(divide_error);
+DECLARE_TRAP_HANDLER(debug);
+DECLARE_TRAP_HANDLER(nmi);
+DECLARE_TRAP_HANDLER(int3);
+DECLARE_TRAP_HANDLER(overflow);
+DECLARE_TRAP_HANDLER(bounds);
+DECLARE_TRAP_HANDLER(invalid_op);
+DECLARE_TRAP_HANDLER(device_not_available);
+DECLARE_TRAP_HANDLER(coprocessor_segment_overrun);
+DECLARE_TRAP_HANDLER(invalid_TSS);
+DECLARE_TRAP_HANDLER(segment_not_present);
+DECLARE_TRAP_HANDLER(stack_segment);
+DECLARE_TRAP_HANDLER(general_protection);
+DECLARE_TRAP_HANDLER(page_fault);
+DECLARE_TRAP_HANDLER(coprocessor_error);
+DECLARE_TRAP_HANDLER(simd_coprocessor_error);
+DECLARE_TRAP_HANDLER(machine_check);
+DECLARE_TRAP_HANDLER(alignment_check);
+DECLARE_TRAP_HANDLER(spurious_interrupt_bug);
+#undef DECLARE_TRAP_HANDLER
 
 int cpuid_hypervisor_leaves( uint32_t idx, uint32_t sub_idx,
           uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx);

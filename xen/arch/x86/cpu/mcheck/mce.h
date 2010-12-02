@@ -170,8 +170,6 @@ int vmce_domain_inject(struct mcinfo_bank *bank, struct domain *d, struct mcinfo
 
 extern int vmce_init(struct cpuinfo_x86 *c);
 
-extern unsigned int nr_mce_banks;
-
 static inline int mce_vendor_bank_msr(uint32_t msr)
 {
     if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL &&

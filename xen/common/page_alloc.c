@@ -36,6 +36,7 @@
 #include <xen/numa.h>
 #include <xen/nodemask.h>
 #include <xen/tmem.h>
+#include <xen/tmem_xen.h>
 #include <public/sysctl.h>
 #include <asm/page.h>
 #include <asm/numa.h>

@@ -20,6 +20,7 @@
 #include <xen/hypercall.h>
 #include <xen/errno.h>
 #include <xen/tmem.h>
+#include <xen/tmem_xen.h>
 #include <asm/current.h>
 #include <asm/hardirq.h>
 #ifdef CONFIG_X86

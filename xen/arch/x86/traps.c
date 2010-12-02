@@ -97,30 +97,6 @@ idt_entry_t idt_table[IDT_ENTRIES];
 /* Pointer to the IDT of every CPU. */
 idt_entry_t *idt_tables[NR_CPUS] __read_mostly;
 
-#define DECLARE_TRAP_HANDLER(_name)                     \
-asmlinkage void _name(void);                            \
-asmlinkage void do_ ## _name(struct cpu_user_regs *regs)
-
-DECLARE_TRAP_HANDLER(divide_error);
-DECLARE_TRAP_HANDLER(debug);
-DECLARE_TRAP_HANDLER(nmi);
-DECLARE_TRAP_HANDLER(int3);
-DECLARE_TRAP_HANDLER(overflow);
-DECLARE_TRAP_HANDLER(bounds);
-DECLARE_TRAP_HANDLER(invalid_op);
-DECLARE_TRAP_HANDLER(device_not_available);
-DECLARE_TRAP_HANDLER(coprocessor_segment_overrun);
-DECLARE_TRAP_HANDLER(invalid_TSS);
-DECLARE_TRAP_HANDLER(segment_not_present);
-DECLARE_TRAP_HANDLER(stack_segment);
-DECLARE_TRAP_HANDLER(general_protection);
-DECLARE_TRAP_HANDLER(page_fault);
-DECLARE_TRAP_HANDLER(coprocessor_error);
-DECLARE_TRAP_HANDLER(simd_coprocessor_error);
-DECLARE_TRAP_HANDLER(machine_check);
-DECLARE_TRAP_HANDLER(alignment_check);
-DECLARE_TRAP_HANDLER(spurious_interrupt_bug);
-
 void (*ioemul_handle_quirk)(
     u8 opcode, char *io_emul_stub, struct cpu_user_regs *regs);
 
@@ -1570,9 +1546,6 @@ static uint32_t guest_io_read(
     unsigned int port, unsigned int bytes,
     struct vcpu *v, struct cpu_user_regs *regs)
 {
-    extern uint32_t pci_conf_read(
-        uint32_t cf8, uint8_t offset, uint8_t bytes);
-
     uint32_t data = 0;
     unsigned int shift = 0;
 
@@ -1626,9 +1599,6 @@ static void guest_io_write(
     unsigned int port, unsigned int bytes, uint32_t data,
     struct vcpu *v, struct cpu_user_regs *regs)
 {
-    extern void pci_conf_write(
-        uint32_t cf8, uint8_t offset, uint8_t bytes, uint32_t data);
-
     if ( admin_io_okay(port, bytes, v, regs) )
     {
         switch ( bytes ) {

@@ -16,7 +16,7 @@ ifneq ($(XEN_OS),SunOS)
 CFLAGS += -nostdinc
 endif
 
-CFLAGS += -fno-builtin -fno-common
+CFLAGS += -fno-builtin -fno-common -Wredundant-decls
 CFLAGS += -iwithprefix include -Werror -Wno-pointer-arith -pipe
 CFLAGS += -I$(BASEDIR)/include 
 CFLAGS += -I$(BASEDIR)/include/asm-x86/mach-generic
