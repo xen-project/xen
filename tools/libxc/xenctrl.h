@@ -132,8 +132,17 @@ xc_interface *xc_interface_open(xentoollog_logger *logger,
    * if dombuild_logger=NULL, will log to a file
    */
 
+/*
+ * Note: if XC_OPENFLAG_NON_REENTRANT is passed then libxc must not be
+ * called reentrantly and the calling application is responsible for
+ * providing mutual exclusion surrounding all libxc calls itself.
+ *
+ * In particular xc_{get,clear}_last_error only remain valid for the
+ * duration of the critical section containing the call which failed.
+ */
 enum xc_open_flags {
-    XC_OPENFLAG_DUMMY =  01, /* do not actually open a xenctrl interface */
+    XC_OPENFLAG_DUMMY =  1<<0, /* do not actually open a xenctrl interface */
+    XC_OPENFLAG_NON_REENTRANT = 1<<1, /* assume library is only every called from a single thread */
 };
 
 /**

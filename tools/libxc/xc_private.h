@@ -67,6 +67,7 @@
 
 struct xc_interface {
     int fd;
+    int flags;
     xentoollog_logger *error_handler,   *error_handler_tofree;
     xentoollog_logger *dombuild_logger, *dombuild_logger_tofree;
     struct xc_error last_error; /* for xc_get_last_error */

@@ -32,6 +32,7 @@ xc_interface *xc_interface_open(xentoollog_logger *logger,
                                 unsigned open_flags) {
     xc_interface xch_buf, *xch = &xch_buf;
 
+    xch->flags = open_flags;
     xch->fd = -1;
     xch->dombuild_logger_file = 0;
     xc_clear_last_error(xch);
@@ -546,30 +547,37 @@ _xc_init_errbuf(void)
 
 const char *xc_strerror(xc_interface *xch, int errcode)
 {
-#define XS_BUFSIZE 32
-    char *errbuf;
-    static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-    char *strerror_str;
-
-    pthread_once(&errbuf_pkey_once, _xc_init_errbuf);
-
-    errbuf = pthread_getspecific(errbuf_pkey);
-    if (errbuf == NULL) {
-        errbuf = malloc(XS_BUFSIZE);
-        pthread_setspecific(errbuf_pkey, errbuf);
+    if ( xch->flags & XC_OPENFLAG_NON_REENTRANT )
+    {
+        return strerror(errcode);
     }
+    else
+    {
+#define XS_BUFSIZE 32
+        char *errbuf;
+        static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+        char *strerror_str;
 
-    /*
-     * Thread-unsafe strerror() is protected by a local mutex. We copy
-     * the string to a thread-private buffer before releasing the mutex.
-     */
-    pthread_mutex_lock(&mutex);
-    strerror_str = strerror(errcode);
-    strncpy(errbuf, strerror_str, XS_BUFSIZE);
-    errbuf[XS_BUFSIZE-1] = '\0';
-    pthread_mutex_unlock(&mutex);
+        pthread_once(&errbuf_pkey_once, _xc_init_errbuf);
 
-    return errbuf;
+        errbuf = pthread_getspecific(errbuf_pkey);
+        if (errbuf == NULL) {
+            errbuf = malloc(XS_BUFSIZE);
+            pthread_setspecific(errbuf_pkey, errbuf);
+        }
+
+        /*
+         * Thread-unsafe strerror() is protected by a local mutex. We copy the
+         * string to a thread-private buffer before releasing the mutex.
+         */
+        pthread_mutex_lock(&mutex);
+        strerror_str = strerror(errcode);
+        strncpy(errbuf, strerror_str, XS_BUFSIZE);
+        errbuf[XS_BUFSIZE-1] = '\0';
+        pthread_mutex_unlock(&mutex);
+
+        return errbuf;
+    }
 }
 
 void bitmap_64_to_byte(uint8_t *bp, const uint64_t *lp, int nbits)
