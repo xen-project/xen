@@ -206,6 +206,21 @@ int xc_evtchn_notify(int xce_handle, evtchn_port_t port)
 }
 
 evtchn_port_or_error_t
+xc_evtchn_bind_unbound_port(int xce_handle, int domid)
+{
+    struct ioctl_evtchn_bind_unbound_port bind;
+    int ret;
+
+    bind.remote_domain = domid;
+
+    ret = ioctl(xce_handle, IOCTL_EVTCHN_BIND_UNBOUND_PORT, &bind);
+    if (ret == 0)
+	return bind.port;
+    else
+	return -1;
+}
+
+evtchn_port_or_error_t
 xc_evtchn_bind_interdomain(int xce_handle, int domid,
                            evtchn_port_t remote_port)
 {
