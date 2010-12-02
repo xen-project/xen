@@ -544,7 +544,7 @@ _xc_init_errbuf(void)
     pthread_key_create(&errbuf_pkey, _xc_clean_errbuf);
 }
 
-char *safe_strerror(int errcode)
+const char *xc_strerror(xc_interface *xch, int errcode)
 {
 #define XS_BUFSIZE 32
     char *errbuf;

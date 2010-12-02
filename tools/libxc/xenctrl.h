@@ -1411,6 +1411,11 @@ typedef struct xc_error {
  */
 const char *xc_error_code_to_desc(int code);
 
+/*
+ * Convert an errno value to a text description.
+ */
+const char *xc_strerror(xc_interface *xch, int errcode);
+
 
 /*
  * Return a pointer to the last error with level XC_REPORT_ERROR. This

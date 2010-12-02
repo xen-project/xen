@@ -74,7 +74,6 @@ struct xc_interface {
     const char *currently_progress_reporting;
 };
 
-char *safe_strerror(int errcode);
 void xc_report_error(xc_interface *xch, int code, const char *fmt, ...);
 void xc_reportv(xc_interface *xch, xentoollog_logger *lg, xentoollog_level,
                 int code, const char *fmt, va_list args)
@@ -96,7 +95,7 @@ void xc_report_progress_step(xc_interface *xch,
 
 #define ERROR(_m, _a...)  xc_report_error(xch,XC_INTERNAL_ERROR,_m , ## _a )
 #define PERROR(_m, _a...) xc_report_error(xch,XC_INTERNAL_ERROR,_m \
-                  " (%d = %s)", ## _a , errno, safe_strerror(errno))
+                  " (%d = %s)", ## _a , errno, xc_strerror(xch, errno))
 
 /*
  * HYPERCALL ARGUMENT BUFFERS
