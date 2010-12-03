@@ -83,10 +83,9 @@
     }
 
 #define NOFILE 32
-extern int xc_evtchn_close(int fd);
-struct xc_interface;
-extern int xc_interface_close_core(struct xc_interface*, int fd);
-extern int xc_gnttab_close(int fd);
+extern void minios_interface_close_fd(int fd);
+extern void minios_evtchn_close_fd(int fd);
+extern void minios_gnttab_close_fd(int fd);
 
 pthread_mutex_t fd_lock = PTHREAD_MUTEX_INITIALIZER;
 struct file files[NOFILE] = {
@@ -414,13 +413,13 @@ int close(int fd)
 	}
 #endif
 	case FTYPE_XC:
-	    xc_interface_close_core(0,fd);
+	    minios_interface_close_fd(fd);
 	    return 0;
 	case FTYPE_EVTCHN:
-            xc_evtchn_close(fd);
+	    minios_evtchn_close_fd(fd);
             return 0;
 	case FTYPE_GNTMAP:
-	    xc_gnttab_close(fd);
+	    minios_gnttab_close_fd(fd);
 	    return 0;
 	case FTYPE_TAP:
 	    shutdown_netfront(files[fd].tap.dev);

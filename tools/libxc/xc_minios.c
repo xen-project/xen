@@ -40,6 +40,10 @@
 
 #include "xc_private.h"
 
+void minios_interface_close_fd(int fd);
+void minios_evtchn_close_fd(int fd);
+void minios_gnttab_close_fd(int fd);
+
 extern struct wait_queue_head event_queue;
 
 int xc_interface_open_core(xc_interface *xch)
@@ -49,8 +53,12 @@ int xc_interface_open_core(xc_interface *xch)
 
 int xc_interface_close_core(xc_interface *xch, int fd)
 {
+    return close(fd);
+}
+
+void minios_interface_close_fd(int fd)
+{
     files[fd].type = FTYPE_NONE;
-    return 0;
 }
 
 void *xc_map_foreign_bulk(xc_interface *xch, uint32_t dom, int prot,
@@ -174,12 +182,16 @@ int xc_evtchn_open(void)
 
 int xc_evtchn_close(int xce_handle)
 {
+    return close(xce_handle);
+}
+
+void minios_evtchn_close_fd(int fd)
+{
     int i;
     for (i = 0; i < MAX_EVTCHN_PORTS; i++)
-        if (files[xce_handle].evtchn.ports[i].bound)
-            unbind_evtchn(files[xce_handle].evtchn.ports[i].port);
-    files[xce_handle].type = FTYPE_NONE;
-    return 0;
+        if (files[fd].evtchn.ports[i].bound)
+            unbind_evtchn(files[fd].evtchn.ports[i].port);
+    files[fd].type = FTYPE_NONE;
 }
 
 int xc_evtchn_fd(int xce_handle)
@@ -370,9 +382,13 @@ int xc_gnttab_open(xc_interface *xch)
 
 int xc_gnttab_close(xc_interface *xch, int xcg_handle)
 {
-    gntmap_fini(&files[xcg_handle].gntmap);
-    files[xcg_handle].type = FTYPE_NONE;
-    return 0;
+    return close(xcg_handle);
+}
+
+void minios_gnttab_close_fd(int fd)
+{
+    gntmap_fini(&files[fd].gntmap);
+    files[fd].type = FTYPE_NONE;
 }
 
 void *xc_gnttab_map_grant_ref(xc_interface *xch, int xcg_handle,
