@@ -68,7 +68,6 @@
 
 struct xc_interface_core {
     enum xc_osdep_type type;
-    int fd;
     int flags;
     xentoollog_logger *error_handler,   *error_handler_tofree;
     xentoollog_logger *dombuild_logger, *dombuild_logger_tofree;

@@ -51,8 +51,6 @@ static xc_osdep_handle netbsd_privcmd_open(xc_interface *xch)
         goto error;
     }
 
-    xch->fd = fd; /* Remove after transition to full xc_osdep_ops. */
-
     return (xc_osinteface_handle)fd;
 
  error:
@@ -200,7 +198,6 @@ static xc_osdep_handle netbsd_evtchn_open(xc_evtchn *xce)
     if ( fd == -1 )
         return XC_OSDEP_OPEN_ERROR;
 
-    xce->fd = fd; /* Remove after transition to full xc_osdep_ops. */
     return (xc_osdep_handle)fd;
 }
 

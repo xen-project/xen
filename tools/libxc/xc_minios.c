@@ -56,7 +56,6 @@ static xc_osdep_handle minios_privcmd_open(xc_interface *xch)
     if ( fd == -1)
         return XC_OSDEP_OPEN_ERROR;
 
-    xch->fd = fd; /* Remove after transition to full xc_osdep_ops. */
     return (xc_osdep_handle)fd;
 }
 
@@ -207,7 +206,6 @@ static xc_osdep_handle minios_evtchn_open(xc_evtchn *xce)
         files[fd].evtchn.ports[i].bound = 0;
     }
     printf("evtchn_open() -> %d\n", fd);
-    xce->fd = fd; /* Remove after transition to full xc_osdep_ops. */
     return (xc_osdep_handle)fd;
 }
 
@@ -431,7 +429,6 @@ static xc_osdep_handle minios_gnttab_open(xc_gnttab *xcg)
     if ( fd == -1 )
         return XC_OSDEP_OPEN_ERROR;
     gntmap_init(&files[fd].gntmap);
-    xcg->fd = fd; /* Remove after transition to full xc_osdep_ops. */
     return (xc_osdep_handle)fd;
 }
 

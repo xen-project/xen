@@ -59,7 +59,6 @@ static struct xc_interface_core *xc_interface_open_common(xentoollog_logger *log
 
     xch->type = type;
     xch->flags = open_flags;
-    xch->fd = -1;
     xch->dombuild_logger_file = 0;
     xc_clear_last_error(xch);
 
