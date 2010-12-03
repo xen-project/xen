@@ -59,6 +59,12 @@ struct xc_osdep_ops
     xc_osdep_handle (*open)(xc_interface *xch);
 
     int (*close)(xc_interface *xch, xc_osdep_handle h);
+
+    union {
+        struct {
+            int (*hypercall)(xc_interface *xch, xc_osdep_handle h, privcmd_hypercall_t *hypercall);
+        } privcmd;
+    } u;
 };
 typedef struct xc_osdep_ops xc_osdep_ops;
 

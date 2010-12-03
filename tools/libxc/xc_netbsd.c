@@ -68,6 +68,17 @@ static int netbsd_privcmd_close(xc_interface *xch, xc_osdep_handle h)
     return close(fd);
 }
 
+static int netbsd_privcmd_hypercall(xc_interface *xch, xc_osdep_handle h, privcmd_hypercall_t *hypercall)
+{
+    int fd = (int)h;
+    int error = ioctl(fd, IOCTL_PRIVCMD_HYPERCALL, hypercall);
+
+    if (error < 0)
+        return -errno;
+    else
+        return hypercall->retval;
+}
+
 void *xc_map_foreign_batch(xc_interface *xch, uint32_t dom, int prot,
                            xen_pfn_t *arr, int num)
 {
@@ -161,30 +172,13 @@ mmap_failed:
 	return NULL;
 }
 
-
-static int do_privcmd(xc_interface *xch, unsigned int cmd, unsigned long data)
-{
-    int err = ioctl(xch->fd, cmd, data);
-    if (err == 0)
-	return 0;
-    else
-	return -errno;
-}
-
-int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall)
-{
-    int error = do_privcmd(xch,
-                      IOCTL_PRIVCMD_HYPERCALL,
-                      (unsigned long)hypercall);
-    if (error)
-       return error;
-    else
-       return (hypercall->retval);
-}
-
 static struct xc_osdep_ops netbsd_privcmd_ops = {
     .open = &netbsd_privcmd_open,
     .close = &netbsd_privcmd_close,
+
+    .u.privcmd = {
+        .hypercall = &netbsd_privcmd_hypercall;
+    },
 };
 
 #define EVTCHN_DEV_NAME  "/dev/xenevt"

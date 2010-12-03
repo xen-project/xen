@@ -68,6 +68,12 @@ static int solaris_privcmd_close(xc_interface *xch, xc_osdep_handle h)
     return close(fd);
 }
 
+static int solaris_privcmd_hypercall(xc_interface *xch, xc_osdep_handle h, privcmd_hypercall_t *hypercall)
+{
+    int fd = (int)h;
+    return ioctl(fd, IOCTL_PRIVCMD_HYPERCALL, hypercall);
+}
+
 void *xc_map_foreign_batch(xc_interface *xch, uint32_t dom, int prot,
                            xen_pfn_t *arr, int num)
 {
@@ -156,21 +162,13 @@ mmap_failed:
     return NULL;
 }
 
-static int do_privcmd(xc_interface *xch, unsigned int cmd, unsigned long data)
-{
-    return ioctl(xch->fd, cmd, data);
-}
-
-int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall)
-{
-    return do_privcmd(xch,
-                      IOCTL_PRIVCMD_HYPERCALL,
-                      (unsigned long)hypercall);
-}
-
 static struct xc_osdep_ops solaris_privcmd_ops = {
     .open = &solaris_privcmd_open,
     .close = &solaris_privcmd_close,
+
+    .u.privcmd = {
+        .hypercall = &solaris_privcmd_hypercall;
+    },
 };
 
 static xc_osdep_handle solaris_evtchn_open(xc_evtchn *xce)

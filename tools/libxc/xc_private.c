@@ -139,6 +139,12 @@ int xc_interface_close(xc_interface *xch)
     return xc_interface_close_common(xch);
 }
 
+
+int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall)
+{
+    return xch->ops->u.privcmd.hypercall(xch, xch->ops_handle, hypercall);
+}
+
 xc_evtchn *xc_evtchn_open(xentoollog_logger *logger,
                              unsigned open_flags)
 {

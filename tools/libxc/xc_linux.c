@@ -75,6 +75,12 @@ static int linux_privcmd_close(xc_interface *xch, xc_osdep_handle h)
     return close(fd);
 }
 
+static int linux_privcmd_hypercall(xc_interface *xch, xc_osdep_handle h, privcmd_hypercall_t *hypercall)
+{
+    int fd = (int)h;
+    return ioctl(fd, IOCTL_PRIVCMD_HYPERCALL, hypercall);
+}
+
 static int xc_map_foreign_batch_single(xc_interface *xch, uint32_t dom,
                                        xen_pfn_t *mfn, unsigned long addr)
 {
@@ -316,20 +322,13 @@ void *xc_map_foreign_ranges(xc_interface *xch, uint32_t dom, size_t size, int pr
     return ret;
 }
 
-static int do_privcmd(xc_interface *xch, int cmd, unsigned long data)
-{
-    return ioctl(xch->fd, cmd, data);
-}
-
-int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall)
-{
-    return do_privcmd(xch, IOCTL_PRIVCMD_HYPERCALL,
-                      (unsigned long)hypercall);
-}
-
 static struct xc_osdep_ops linux_privcmd_ops = {
     .open = &linux_privcmd_open,
     .close = &linux_privcmd_close,
+
+    .u.privcmd = {
+        .hypercall = &linux_privcmd_hypercall,
+    },
 };
 
 #define DEVXEN "/dev/xen/"

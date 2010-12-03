@@ -71,6 +71,28 @@ void minios_interface_close_fd(int fd)
     files[fd].type = FTYPE_NONE;
 }
 
+static int minios_privcmd_hypercall(xc_interface *xch, xc_osdep_handle h, privcmd_hypercall_t *hypercall)
+{
+    multicall_entry_t call;
+    int i, ret;
+
+    call.op = hypercall->op;
+    for (i = 0; i < sizeof(hypercall->arg) / sizeof(*hypercall->arg); i++)
+	call.args[i] = hypercall->arg[i];
+
+    ret = HYPERVISOR_multicall(&call, 1);
+
+    if (ret < 0) {
+	errno = -ret;
+	return -1;
+    }
+    if ((long) call.result < 0) {
+        errno = - (long) call.result;
+        return -1;
+    }
+    return call.result;
+}
+
 void *xc_map_foreign_bulk(xc_interface *xch, uint32_t dom, int prot,
                           const xen_pfn_t *arr, int *err, unsigned int num)
 {
@@ -157,31 +179,13 @@ void *xc_map_foreign_ranges(xc_interface *xch, uint32_t dom,
 }
 
 
-int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall)
-{
-    multicall_entry_t call;
-    int i, ret;
-
-    call.op = hypercall->op;
-    for (i = 0; i < sizeof(hypercall->arg) / sizeof(*hypercall->arg); i++)
-	call.args[i] = hypercall->arg[i];
-
-    ret = HYPERVISOR_multicall(&call, 1);
-
-    if (ret < 0) {
-	errno = -ret;
-	return -1;
-    }
-    if ((long) call.result < 0) {
-        errno = - (long) call.result;
-        return -1;
-    }
-    return call.result;
-}
-
 static struct xc_osdep_ops minios_privcmd_ops = {
     .open = &minios_privcmd_open,
     .close = &minios_privcmd_close,
+
+    .u.privcmd = {
+        .hypercall = &minios_privcmd_hypercall,
+    },
 };
 
 static xc_osdep_handle minios_evtchn_open(xc_evtchn *xce)
