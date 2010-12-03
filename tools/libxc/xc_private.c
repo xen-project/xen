@@ -271,6 +271,14 @@ void xc_report_error(xc_interface *xch, int code, const char *fmt, ...)
     va_end(args);
 }
 
+void xc_osdep_log(xc_interface *xch, xentoollog_level level, int code, const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    xc_reportv(xch, xch->error_handler, level, code, fmt, args);
+    va_end(args);
+}
+
 void xc_report_progress_start(xc_interface *xch, const char *doing,
                               unsigned long total) {
     xch->currently_progress_reporting = doing;

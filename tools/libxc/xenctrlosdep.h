@@ -136,6 +136,9 @@ void *xc_map_foreign_bulk_compat(xc_interface *xch, xc_osdep_handle h,
                                  uint32_t dom, int prot,
                                  const xen_pfn_t *arr, int *err, unsigned int num);
 
+/* Report errors through xc_interface */
+void xc_osdep_log(xc_interface *xch, xentoollog_level level, int code, const char *fmt, ...);
+
 #endif
 
 /*
