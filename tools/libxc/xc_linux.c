@@ -399,14 +399,15 @@ linux_evtchn_bind_interdomain(xc_evtchn *xce, xc_osdep_handle h, int domid,
     return ioctl(fd, IOCTL_EVTCHN_BIND_INTERDOMAIN, &bind);
 }
 
-evtchn_port_or_error_t
-xc_evtchn_bind_virq(xc_evtchn *xce, unsigned int virq)
+static evtchn_port_or_error_t
+linux_evtchn_bind_virq(xc_evtchn *xce, xc_osdep_handle h, unsigned int virq)
 {
+    int fd = (int)h;
     struct ioctl_evtchn_bind_virq bind;
 
     bind.virq = virq;
 
-    return ioctl(xce->fd, IOCTL_EVTCHN_BIND_VIRQ, &bind);
+    return ioctl(fd, IOCTL_EVTCHN_BIND_VIRQ, &bind);
 }
 
 int xc_evtchn_unbind(xc_evtchn *xce, evtchn_port_t port)
@@ -443,6 +444,7 @@ static struct xc_osdep_ops linux_evtchn_ops = {
         .notify = &linux_evtchn_notify,
         .bind_unbound_port = &linux_evtchn_bind_unbound_port,
         .bind_interdomain = &linux_evtchn_bind_interdomain,
+        .bind_virq = &linux_evtchn_bind_virq,
     },
 };
 

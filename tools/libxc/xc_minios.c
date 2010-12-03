@@ -346,25 +346,26 @@ int xc_evtchn_unbind(xc_evtchn *xce, evtchn_port_t port)
     return 0;
 }
 
-evtchn_port_or_error_t xc_evtchn_bind_virq(xc_evtchn *xce, unsigned int virq)
+static evtchn_port_or_error_t minios_evtchn_bind_virq(xc_evtchn *xce, xc_osdep_handle h, unsigned int virq)
 {
+    int fd = (int)h;
     evtchn_port_t port;
     int i;
 
     assert(get_current() == main_thread);
-    i = port_alloc(xce->fd);
+    i = port_alloc(fd);
     if (i == -1)
 	return -1;
 
     printf("xc_evtchn_bind_virq(%d)", virq);
-    port = bind_virq(virq, evtchn_handler, (void*)(intptr_t)xce->fd);
+    port = bind_virq(virq, evtchn_handler, (void*)(intptr_t)fd);
 
     if (port < 0) {
 	errno = -port;
 	return -1;
     }
-    files[xce->fd].evtchn.ports[i].bound = 1;
-    files[xce->fd].evtchn.ports[i].port = port;
+    files[fd].evtchn.ports[i].bound = 1;
+    files[fd].evtchn.ports[i].port = port;
     unmask_evtchn(port);
     return port;
 }
@@ -408,6 +409,7 @@ static struct xc_osdep_ops minios_evtchn_ops = {
         .notify = &minios_evtchn_notify,
         .bind_unbound_port = &minios_evtchn_bind_unbound_port,
         .bind_interdomain = &minios_evtchn_bind_interdomain,
+        .bind_virq = &minios_evtchn_bind_virq,
     },
 };
 

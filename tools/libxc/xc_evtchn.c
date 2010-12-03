@@ -101,6 +101,12 @@ xc_evtchn_bind_interdomain(xc_evtchn *xce, int domid,
     return xce->ops->u.evtchn.bind_interdomain(xce, xce->ops_handle, domid, remote_port);
 }
 
+evtchn_port_or_error_t
+xc_evtchn_bind_virq(xc_evtchn *xce, unsigned int virq)
+{
+    return xce->ops->u.evtchn.bind_virq(xce, xce->ops_handle, virq);
+}
+
 /*
  * Local variables:
  * mode: C

@@ -268,15 +268,16 @@ int xc_evtchn_unbind(xc_evtchn *xce, evtchn_port_t port)
     return ioctl(xce->fd, IOCTL_EVTCHN_UNBIND, &unbind);
 }
 
-evtchn_port_or_error_t
-xc_evtchn_bind_virq(xc_evtchn *xce, unsigned int virq)
+static evtchn_port_or_error_t
+netbsd_evtchn_bind_virq(xc_evtchn *xce, xc_osdep_handle h, unsigned int virq)
 {
+    int fd = (int)h;
     struct ioctl_evtchn_bind_virq bind;
     int err;
 
     bind.virq = virq;
 
-    err = ioctl(xce->fd, IOCTL_EVTCHN_BIND_VIRQ, &bind);
+    err = ioctl(fd, IOCTL_EVTCHN_BIND_VIRQ, &bind);
     if (err)
 	return -1;
     else
@@ -308,6 +309,7 @@ static struct xc_osdep_ops netbsd_evtchn_ops = {
          .notify = &netbsd_evtchn_notify,
          .bind_unbound_port = &netbsd_evtchn_bind_unbound_port,
          .bind_interdomain = &netbsd_evtchn_bind_interdomain,
+         .bind_virq = &netbsd_evtchn_bind_virq,
     },
 };
 
