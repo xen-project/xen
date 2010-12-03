@@ -145,3 +145,41 @@ grant_entry_v2_t *xc_gnttab_map_table_v2(xc_interface *xch, int domid,
     return _gnttab_map_table(xch, domid, gnt_num);
 }
 
+void *xc_gnttab_map_grant_ref(xc_gnttab *xcg,
+                              uint32_t domid,
+                              uint32_t ref,
+                              int prot)
+{
+	return xcg->ops->u.gnttab.map_grant_ref(xcg, xcg->ops_handle,
+						domid, ref, prot);
+}
+
+void *xc_gnttab_map_grant_refs(xc_gnttab *xcg,
+                               uint32_t count,
+                               uint32_t *domids,
+                               uint32_t *refs,
+                               int prot)
+{
+	return xcg->ops->u.gnttab.map_grant_refs(xcg, xcg->ops_handle,
+						 count, domids, refs, prot);
+}
+
+void *xc_gnttab_map_domain_grant_refs(xc_gnttab *xcg,
+                                      uint32_t count,
+                                      uint32_t domid,
+                                      uint32_t *refs,
+                                      int prot)
+{
+	return xcg->ops->u.gnttab.map_domain_grant_refs(xcg, xcg->ops_handle,
+							count, domid, refs, prot);
+}
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

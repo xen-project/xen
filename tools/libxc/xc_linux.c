@@ -508,8 +508,10 @@ static int linux_gnttab_close(xc_gnttab *xcg, xc_osdep_handle h)
     return close(fd);
 }
 
-void *xc_gnttab_map_grant_ref(xc_gnttab *xch, uint32_t domid, uint32_t ref, int prot)
+static void *linux_gnttab_map_grant_ref(xc_gnttab *xch, xc_osdep_handle h,
+                                        uint32_t domid, uint32_t ref, int prot)
 {
+    int fd = (int)h;
     struct ioctl_gntdev_map_grant_ref map;
     void *addr;
 
@@ -517,13 +519,13 @@ void *xc_gnttab_map_grant_ref(xc_gnttab *xch, uint32_t domid, uint32_t ref, int 
     map.refs[0].domid = domid;
     map.refs[0].ref = ref;
 
-    if ( ioctl(xch->fd, IOCTL_GNTDEV_MAP_GRANT_REF, &map) ) {
+    if ( ioctl(fd, IOCTL_GNTDEV_MAP_GRANT_REF, &map) ) {
         PERROR("xc_gnttab_map_grant_ref: ioctl MAP_GRANT_REF failed");
         return NULL;
     }
 
 mmap_again:    
-    addr = mmap(NULL, PAGE_SIZE, prot, MAP_SHARED, xch->fd, map.index);
+    addr = mmap(NULL, PAGE_SIZE, prot, MAP_SHARED, fd, map.index);
     if ( addr == MAP_FAILED )
     {
         int saved_errno = errno;
@@ -538,7 +540,7 @@ mmap_again:
         PERROR("xc_gnttab_map_grant_ref: mmap failed");
         unmap_grant.index = map.index;
         unmap_grant.count = 1;
-        ioctl(xch->fd, IOCTL_GNTDEV_UNMAP_GRANT_REF, &unmap_grant);
+        ioctl(fd, IOCTL_GNTDEV_UNMAP_GRANT_REF, &unmap_grant);
         errno = saved_errno;
         return NULL;
     }
@@ -546,10 +548,12 @@ mmap_again:
     return addr;
 }
 
-static void *do_gnttab_map_grant_refs(xc_gnttab *xch, uint32_t count,
+static void *do_gnttab_map_grant_refs(xc_gnttab *xch, xc_osdep_handle h,
+                                      uint32_t count,
                                       uint32_t *domids, int domids_stride,
                                       uint32_t *refs, int prot)
 {
+    int fd = (int)h;
     struct ioctl_gntdev_map_grant_ref *map;
     void *addr = NULL;
     int i;
@@ -567,12 +571,12 @@ static void *do_gnttab_map_grant_refs(xc_gnttab *xch, uint32_t count,
 
     map->count = count;
 
-    if ( ioctl(xch->fd, IOCTL_GNTDEV_MAP_GRANT_REF, map) ) {
+    if ( ioctl(fd, IOCTL_GNTDEV_MAP_GRANT_REF, map) ) {
         PERROR("xc_gnttab_map_grant_refs: ioctl MAP_GRANT_REF failed");
         goto out;
     }
 
-    addr = mmap(NULL, PAGE_SIZE * count, prot, MAP_SHARED, xch->fd,
+    addr = mmap(NULL, PAGE_SIZE * count, prot, MAP_SHARED, fd,
                 map->index);
     if ( addr == MAP_FAILED )
     {
@@ -583,7 +587,7 @@ static void *do_gnttab_map_grant_refs(xc_gnttab *xch, uint32_t count,
         PERROR("xc_gnttab_map_grant_refs: mmap failed");
         unmap_grant.index = map->index;
         unmap_grant.count = count;
-        ioctl(xch->fd, IOCTL_GNTDEV_UNMAP_GRANT_REF, &unmap_grant);
+        ioctl(fd, IOCTL_GNTDEV_UNMAP_GRANT_REF, &unmap_grant);
         errno = saved_errno;
         addr = NULL;
     }
@@ -594,16 +598,18 @@ static void *do_gnttab_map_grant_refs(xc_gnttab *xch, uint32_t count,
     return addr;
 }
 
-void *xc_gnttab_map_grant_refs(xc_gnttab *xcg, uint32_t count, uint32_t *domids,
-                               uint32_t *refs, int prot)
+static void *linux_gnttab_map_grant_refs(xc_gnttab *xcg, xc_osdep_handle h,
+                                         uint32_t count, uint32_t *domids,
+                                         uint32_t *refs, int prot)
 {
-    return do_gnttab_map_grant_refs(xcg, count, domids, 1, refs, prot);
+    return do_gnttab_map_grant_refs(xcg, h, count, domids, 1, refs, prot);
 }
 
-void *xc_gnttab_map_domain_grant_refs(xc_gnttab *xcg, uint32_t count,
-                                      uint32_t domid, uint32_t *refs, int prot)
+static void *linux_gnttab_map_domain_grant_refs(xc_gnttab *xcg, xc_osdep_handle h,
+                                                uint32_t count,
+                                                uint32_t domid, uint32_t *refs, int prot)
 {
-    return do_gnttab_map_grant_refs(xcg, count, &domid, 0, refs, prot);
+    return do_gnttab_map_grant_refs(xcg, h, count, &domid, 0, refs, prot);
 }
 
 int xc_gnttab_munmap(xc_gnttab *xcg, void *start_address, uint32_t count)
@@ -660,6 +666,12 @@ int xc_gnttab_set_max_grants(xc_gnttab *xcg, uint32_t count)
 static struct xc_osdep_ops linux_gnttab_ops = {
     .open = &linux_gnttab_open,
     .close = &linux_gnttab_close,
+
+    .u.gnttab = {
+        .map_grant_ref = &linux_gnttab_map_grant_ref,
+        .map_grant_refs = &linux_gnttab_map_grant_refs,
+        .map_domain_grant_refs = &linux_gnttab_map_domain_grant_refs,
+    },
 };
 
 static struct xc_osdep_ops *linux_osdep_init(xc_interface *xch, enum xc_osdep_type type)

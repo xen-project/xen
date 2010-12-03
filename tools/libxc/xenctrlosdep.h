@@ -89,6 +89,22 @@ struct xc_osdep_ops
             evtchn_port_or_error_t (*pending)(xc_evtchn *xce, xc_osdep_handle h);
             int (*unmask)(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port);
         } evtchn;
+        struct {
+            void *(*map_grant_ref)(xc_gnttab *xcg, xc_osdep_handle h,
+                                   uint32_t domid,
+                                   uint32_t ref,
+                                   int prot);
+            void *(*map_grant_refs)(xc_gnttab *xcg, xc_osdep_handle h,
+                                    uint32_t count,
+                                    uint32_t *domids,
+                                    uint32_t *refs,
+                                    int prot);
+            void *(*map_domain_grant_refs)(xc_gnttab *xcg, xc_osdep_handle h,
+                                           uint32_t count,
+                                           uint32_t domid,
+                                           uint32_t *refs,
+                                           int prot);
+        } gnttab;
     } u;
 };
 typedef struct xc_osdep_ops xc_osdep_ops;

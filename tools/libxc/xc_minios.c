@@ -447,38 +447,41 @@ void minios_gnttab_close_fd(int fd)
     files[fd].type = FTYPE_NONE;
 }
 
-void *xc_gnttab_map_grant_ref(xc_gnttab *xcg,
-                              uint32_t domid,
-                              uint32_t ref,
-                              int prot)
+static void *minios_gnttab_map_grant_ref(xc_gnttab *xcg, xc_osdep_handle h,
+                                         uint32_t domid,
+                                         uint32_t ref,
+                                         int prot)
 {
-    return gntmap_map_grant_refs(&files[xcg->fd].gntmap,
+    int fd = (int)h;
+    return gntmap_map_grant_refs(&files[fd].gntmap,
                                  1,
                                  &domid, 0,
                                  &ref,
                                  prot & PROT_WRITE);
 }
 
-void *xc_gnttab_map_grant_refs(xc_gnttab *xcg,
-                               uint32_t count,
-                               uint32_t *domids,
-                               uint32_t *refs,
-                               int prot)
+static void *minios_gnttab_map_grant_refs(xc_gnttab *xcg, xc_osdep_handle h,
+                                          uint32_t count,
+                                          uint32_t *domids,
+                                          uint32_t *refs,
+                                          int prot)
 {
-    return gntmap_map_grant_refs(&files[xcg->fd].gntmap,
+    int fd = (int)h;
+    return gntmap_map_grant_refs(&files[fd].gntmap,
                                  count,
                                  domids, 1,
                                  refs,
                                  prot & PROT_WRITE);
 }
 
-void *xc_gnttab_map_domain_grant_refs(xc_gnttab *xcg,
-                                      uint32_t count,
-                                      uint32_t domid,
-                                      uint32_t *refs,
-                                      int prot)
+static void *minios_gnttab_map_domain_grant_refs(xc_gnttab *xcg, xc_osdep_handle h,
+                                                 uint32_t count,
+                                                 uint32_t domid,
+                                                 uint32_t *refs,
+                                                 int prot)
 {
-    return gntmap_map_grant_refs(&files[xcg->fd].gntmap,
+    int fd = (int)h;
+    return gntmap_map_grant_refs(&files[fd].gntmap,
                                  count,
                                  &domid, 0,
                                  refs,
@@ -516,6 +519,12 @@ int xc_gnttab_set_max_grants(xc_gnttab *xcg,
 static struct xc_osdep_ops minios_gnttab_ops = {
     .open = &minios_gnttab_open,
     .close = &minios_gnttab_close,
+
+    .u.gnttab = {
+        .map_grant_ref = &minios_gnttab_map_grant_ref,
+        .map_grant_refs = &minios_gnttab_map_grant_refs,
+        .map_domain_grant_refs = &minios_gnttab_map_domain_grant_refs,
+    },
 };
 
 static struct xc_osdep_ops *minios_osdep_init(xc_interface *xch, enum xc_osdep_type type)
