@@ -229,15 +229,16 @@ solaris_evtchn_bind_unbound_port(xc_evtchn *xce, xc_osdep_handle h, int domid)
 }
 
 evtchn_port_or_error_t
-xc_evtchn_bind_interdomain(xc_evtchn *xce, int domid,
+solaris_evtchn_bind_interdomain(xc_evtchn *xce, xc_osdep_handle h, int domid,
                            evtchn_port_t remote_port)
 {
+    int fd = (int)h;
     struct ioctl_evtchn_bind_interdomain bind;
 
     bind.remote_domain = domid;
     bind.remote_port = remote_port;
 
-    return ioctl(xce->fd, IOCTL_EVTCHN_BIND_INTERDOMAIN, &bind);
+    return ioctl(fd, IOCTL_EVTCHN_BIND_INTERDOMAIN, &bind);
 }
 
 evtchn_port_or_error_t
@@ -283,6 +284,7 @@ static struct xc_osdep_ops solaris_evtchn_ops = {
         .fd = &solaris_evtchn_fd,
         .notify = &solaris_evtchn_notify,
         .bind_unbound_port = &solaris_evtchn_bind_unbound_port,
+        .bind_interdomain = &solaris_evtchn_bind_interdomain,
     },
 };
 

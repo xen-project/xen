@@ -302,27 +302,28 @@ static evtchn_port_or_error_t minios_evtchn_bind_unbound_port(xc_evtchn *xce, xc
     return port;
 }
 
-evtchn_port_or_error_t xc_evtchn_bind_interdomain(xc_evtchn *xce, int domid,
+static evtchn_port_or_error_t minios_evtchn_bind_interdomain(xc_evtchn *xce, xc_osdep_handle h, int domid,
     evtchn_port_t remote_port)
 {
+    int fd = (int)h;
     evtchn_port_t local_port;
     int ret, i;
 
     assert(get_current() == main_thread);
-    i = port_alloc(xce->fd);
+    i = port_alloc(fd);
     if (i == -1)
 	return -1;
 
     printf("xc_evtchn_bind_interdomain(%d, %"PRId32")", domid, remote_port);
-    ret = evtchn_bind_interdomain(domid, remote_port, evtchn_handler, (void*)(intptr_t)xce->fd, &local_port);
+    ret = evtchn_bind_interdomain(domid, remote_port, evtchn_handler, (void*)(intptr_t)fd, &local_port);
     printf(" = %d\n", ret);
 
     if (ret < 0) {
 	errno = -ret;
 	return -1;
     }
-    files[xce->fd].evtchn.ports[i].bound = 1;
-    files[xce->fd].evtchn.ports[i].port = local_port;
+    files[fd].evtchn.ports[i].bound = 1;
+    files[fd].evtchn.ports[i].port = local_port;
     unmask_evtchn(local_port);
     return local_port;
 }
@@ -406,6 +407,7 @@ static struct xc_osdep_ops minios_evtchn_ops = {
         .fd = &minios_evtchn_fd,
         .notify = &minios_evtchn_notify,
         .bind_unbound_port = &minios_evtchn_bind_unbound_port,
+        .bind_interdomain = &minios_evtchn_bind_interdomain,
     },
 };
 

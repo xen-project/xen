@@ -80,6 +80,8 @@ struct xc_osdep_ops
             int (*notify)(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port);
 
             evtchn_port_or_error_t (*bind_unbound_port)(xc_evtchn *xce, xc_osdep_handle h, int domid);
+            evtchn_port_or_error_t (*bind_interdomain)(xc_evtchn *xce, xc_osdep_handle h, int domid,
+                                                       evtchn_port_t remote_port);
         } evtchn;
     } u;
 };

@@ -94,6 +94,13 @@ xc_evtchn_bind_unbound_port(xc_evtchn *xce, int domid)
     return xce->ops->u.evtchn.bind_unbound_port(xce, xce->ops_handle, domid);
 }
 
+evtchn_port_or_error_t
+xc_evtchn_bind_interdomain(xc_evtchn *xce, int domid,
+                           evtchn_port_t remote_port)
+{
+    return xce->ops->u.evtchn.bind_interdomain(xce, xce->ops_handle, domid, remote_port);
+}
+
 /*
  * Local variables:
  * mode: C
