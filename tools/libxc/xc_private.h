@@ -53,8 +53,8 @@
 #undef PAGE_SIZE
 #undef PAGE_MASK
 #define PAGE_SHIFT              XC_PAGE_SHIFT
-#define PAGE_SIZE               (1UL << PAGE_SHIFT)
-#define PAGE_MASK               (~(PAGE_SIZE-1))
+#define PAGE_SIZE               XC_PAGE_SIZE
+#define PAGE_MASK               XC_PAGE_MASK
 
 /* Force a compilation error if condition is true */
 #define XC_BUILD_BUG_ON(p) ((void)sizeof(struct { int:-!!(p); }))

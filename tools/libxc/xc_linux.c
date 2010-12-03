@@ -110,7 +110,7 @@ static void *linux_privcmd_map_foreign_batch(xc_interface *xch, xc_osdep_handle 
     void *addr;
     int rc;
 
-    addr = mmap(NULL, num << PAGE_SHIFT, prot, MAP_SHARED, fd, 0);
+    addr = mmap(NULL, num << XC_PAGE_SHIFT, prot, MAP_SHARED, fd, 0);
     if ( addr == MAP_FAILED )
     {
         PERROR("xc_map_foreign_batch: mmap failed");
@@ -132,7 +132,7 @@ static void *linux_privcmd_map_foreign_batch(xc_interface *xch, xc_osdep_handle 
             if ( (arr[i] & XEN_DOMCTL_PFINFO_LTAB_MASK) ==
                  XEN_DOMCTL_PFINFO_PAGEDTAB )
             {
-                unsigned long paged_addr = (unsigned long)addr + (i << PAGE_SHIFT);
+                unsigned long paged_addr = (unsigned long)addr + (i << XC_PAGE_SHIFT);
                 rc = xc_map_foreign_batch_single(fd, dom, &arr[i],
                                                  paged_addr);
                 if ( rc < 0 )
@@ -146,7 +146,7 @@ static void *linux_privcmd_map_foreign_batch(xc_interface *xch, xc_osdep_handle 
     {
         int saved_errno = errno;
         PERROR("xc_map_foreign_batch: ioctl failed");
-        (void)munmap(addr, num << PAGE_SHIFT);
+        (void)munmap(addr, num << XC_PAGE_SHIFT);
         errno = saved_errno;
         return NULL;
     }
@@ -164,7 +164,7 @@ static void *linux_privcmd_map_foreign_bulk(xc_interface *xch, xc_osdep_handle h
     unsigned int i;
     int rc;
 
-    addr = mmap(NULL, (unsigned long)num << PAGE_SHIFT, prot, MAP_SHARED,
+    addr = mmap(NULL, (unsigned long)num << XC_PAGE_SHIFT, prot, MAP_SHARED,
                 fd, 0);
     if ( addr == MAP_FAILED )
     {
@@ -189,7 +189,7 @@ static void *linux_privcmd_map_foreign_bulk(xc_interface *xch, xc_osdep_handle h
 
             ioctlx.num = 1;
             ioctlx.dom = dom;
-            ioctlx.addr = (unsigned long)addr + ((unsigned long)i<<PAGE_SHIFT);
+            ioctlx.addr = (unsigned long)addr + ((unsigned long)i<<XC_PAGE_SHIFT);
             ioctlx.arr = arr + i;
             ioctlx.err = err + i;
             do {
@@ -239,7 +239,7 @@ static void *linux_privcmd_map_foreign_bulk(xc_interface *xch, xc_osdep_handle h
                         continue;
                     }
                     rc = xc_map_foreign_batch_single(fd, dom, pfn + i,
-                        (unsigned long)addr + ((unsigned long)i<<PAGE_SHIFT));
+                        (unsigned long)addr + ((unsigned long)i<<XC_PAGE_SHIFT));
                     if ( rc < 0 )
                     {
                         rc = -errno;
@@ -273,7 +273,7 @@ static void *linux_privcmd_map_foreign_bulk(xc_interface *xch, xc_osdep_handle h
         int saved_errno = errno;
 
         PERROR("xc_map_foreign_bulk: ioctl failed");
-        (void)munmap(addr, (unsigned long)num << PAGE_SHIFT);
+        (void)munmap(addr, (unsigned long)num << XC_PAGE_SHIFT);
         errno = saved_errno;
         return NULL;
     }
@@ -290,7 +290,7 @@ static void *linux_privcmd_map_foreign_range(xc_interface *xch, xc_osdep_handle 
     int i;
     void *ret;
 
-    num = (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
+    num = (size + XC_PAGE_SIZE - 1) >> XC_PAGE_SHIFT;
     arr = calloc(num, sizeof(xen_pfn_t));
 
     for ( i = 0; i < num; i++ )
@@ -313,7 +313,7 @@ static void *linux_privcmd_map_foreign_ranges(xc_interface *xch, xc_osdep_handle
     int j;
     void *ret;
 
-    num_per_entry = chunksize >> PAGE_SHIFT;
+    num_per_entry = chunksize >> XC_PAGE_SHIFT;
     num = num_per_entry * nentries;
     arr = calloc(num, sizeof(xen_pfn_t));
 
@@ -474,7 +474,7 @@ void discard_file_cache(xc_interface *xch, int fd, int flush)
     {
         if ( (cur = lseek(fd, 0, SEEK_CUR)) == (off_t)-1 )
             cur = 0;
-        cur &= ~(PAGE_SIZE-1);
+        cur &= ~(XC_PAGE_SIZE-1);
     }
 
     /* Discard from the buffer cache. */
@@ -521,7 +521,7 @@ static void *linux_gnttab_map_grant_ref(xc_gnttab *xch, xc_osdep_handle h,
     }
 
 mmap_again:    
-    addr = mmap(NULL, PAGE_SIZE, prot, MAP_SHARED, fd, map.index);
+    addr = mmap(NULL, XC_PAGE_SIZE, prot, MAP_SHARED, fd, map.index);
     if ( addr == MAP_FAILED )
     {
         int saved_errno = errno;
@@ -572,7 +572,7 @@ static void *do_gnttab_map_grant_refs(xc_gnttab *xch, xc_osdep_handle h,
         goto out;
     }
 
-    addr = mmap(NULL, PAGE_SIZE * count, prot, MAP_SHARED, fd,
+    addr = mmap(NULL, XC_PAGE_SIZE * count, prot, MAP_SHARED, fd,
                 map->index);
     if ( addr == MAP_FAILED )
     {

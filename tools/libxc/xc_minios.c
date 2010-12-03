@@ -169,11 +169,11 @@ static void *minios_privcmd_map_foreign_ranges(xc_interface *xch, xc_osdep_handl
 	pt_prot = L1_PROT;
 #endif
 
-    mfns = malloc((size / PAGE_SIZE) * sizeof(*mfns));
+    mfns = malloc((size / XC_PAGE_SIZE) * sizeof(*mfns));
 
     n = 0;
     for (i = 0; i < nentries; i++)
-        for (j = 0; j < chunksize / PAGE_SIZE; j++)
+        for (j = 0; j < chunksize / XC_PAGE_SIZE; j++)
             mfns[n++] = entries[i].mfn + j;
 
     ret = map_frames_ex(mfns, n, 1, 0, 1, dom, NULL, pt_prot);

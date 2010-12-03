@@ -84,7 +84,7 @@ static void *netbsd_privcmd_map_foreign_batch(xc_interface *xch, xc_osdep_handle
     int fd = (int)h;
     privcmd_mmapbatch_t ioctlx;
     void *addr;
-    addr = mmap(NULL, num*PAGE_SIZE, prot, MAP_ANON | MAP_SHARED, -1, 0);
+    addr = mmap(NULL, num*XC_PAGE_SIZE, prot, MAP_ANON | MAP_SHARED, -1, 0);
     if ( addr == MAP_FAILED ) {
         PERROR("xc_map_foreign_batch: mmap failed");
         return NULL;
@@ -98,7 +98,7 @@ static void *netbsd_privcmd_map_foreign_batch(xc_interface *xch, xc_osdep_handle
     {
         int saved_errno = errno;
         PERROR("xc_map_foreign_batch: ioctl failed");
-        (void)munmap(addr, num*PAGE_SIZE);
+        (void)munmap(addr, num*XC_PAGE_SIZE);
         errno = saved_errno;
         return NULL;
     }
@@ -126,7 +126,7 @@ static void *netbsd_privcmd_map_foreign_range(xc_interface *xch, xc_osdep_handle
     ioctlx.entry=&entry;
     entry.va=(unsigned long) addr;
     entry.mfn=mfn;
-    entry.npages=(size+PAGE_SIZE-1)>>PAGE_SHIFT;
+    entry.npages=(size+XC_PAGE_SIZE-1)>>XC_PAGE_SHIFT;
     if ( ioctl(fd, IOCTL_PRIVCMD_MMAP, &ioctlx) < 0 )
     {
         int saved_errno = errno;
@@ -154,7 +154,7 @@ static void *netbsd_privcmd_map_foreign_ranges(xc_interface *xch, xc_osdep_handl
 
 	for (i = 0; i < nentries; i++) {
 		entries[i].va = (uintptr_t)addr + (i * chunksize);
-		entries[i].npages = chunksize >> PAGE_SHIFT;
+		entries[i].npages = chunksize >> XC_PAGE_SHIFT;
 	}
 
 	ioctlx.num   = nentries;
