@@ -104,6 +104,9 @@ struct xc_osdep_ops
                                            uint32_t domid,
                                            uint32_t *refs,
                                            int prot);
+            int (*munmap)(xc_gnttab *xcg, xc_osdep_handle h,
+                          void *start_address,
+                          uint32_t count);
         } gnttab;
     } u;
 };

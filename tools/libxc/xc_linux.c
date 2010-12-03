@@ -612,8 +612,10 @@ static void *linux_gnttab_map_domain_grant_refs(xc_gnttab *xcg, xc_osdep_handle 
     return do_gnttab_map_grant_refs(xcg, h, count, &domid, 0, refs, prot);
 }
 
-int xc_gnttab_munmap(xc_gnttab *xcg, void *start_address, uint32_t count)
+static int linux_gnttab_munmap(xc_gnttab *xcg, xc_osdep_handle h,
+                               void *start_address, uint32_t count)
 {
+    int fd = (int)h;
     struct ioctl_gntdev_get_offset_for_vaddr get_offset;
     struct ioctl_gntdev_unmap_grant_ref unmap_grant;
     int rc;
@@ -628,7 +630,7 @@ int xc_gnttab_munmap(xc_gnttab *xcg, void *start_address, uint32_t count)
      * mmap() the pages.
      */
     get_offset.vaddr = (unsigned long)start_address;
-    if ( (rc = ioctl(xcg->fd, IOCTL_GNTDEV_GET_OFFSET_FOR_VADDR,
+    if ( (rc = ioctl(fd, IOCTL_GNTDEV_GET_OFFSET_FOR_VADDR,
                      &get_offset)) )
         return rc;
 
@@ -645,7 +647,7 @@ int xc_gnttab_munmap(xc_gnttab *xcg, void *start_address, uint32_t count)
     /* Finally, unmap the driver slots used to store the grant information. */
     unmap_grant.index = get_offset.offset;
     unmap_grant.count = count;
-    if ( (rc = ioctl(xcg->fd, IOCTL_GNTDEV_UNMAP_GRANT_REF, &unmap_grant)) )
+    if ( (rc = ioctl(fd, IOCTL_GNTDEV_UNMAP_GRANT_REF, &unmap_grant)) )
         return rc;
 
     return 0;
@@ -671,6 +673,7 @@ static struct xc_osdep_ops linux_gnttab_ops = {
         .map_grant_ref = &linux_gnttab_map_grant_ref,
         .map_grant_refs = &linux_gnttab_map_grant_refs,
         .map_domain_grant_refs = &linux_gnttab_map_domain_grant_refs,
+        .munmap = &linux_gnttab_munmap,
     },
 };
 

@@ -174,6 +174,15 @@ void *xc_gnttab_map_domain_grant_refs(xc_gnttab *xcg,
 							count, domid, refs, prot);
 }
 
+int xc_gnttab_munmap(xc_gnttab *xcg,
+                     void *start_address,
+                     uint32_t count)
+{
+	return xcg->ops->u.gnttab.munmap(xcg, xcg->ops_handle,
+					 start_address, count);
+}
+
+
 /*
  * Local variables:
  * mode: C

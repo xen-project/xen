@@ -488,12 +488,13 @@ static void *minios_gnttab_map_domain_grant_refs(xc_gnttab *xcg, xc_osdep_handle
                                  prot & PROT_WRITE);
 }
 
-int xc_gnttab_munmap(xc_gnttab *xcg,
-                     void *start_address,
-                     uint32_t count)
+static int minios_gnttab_munmap(xc_gnttab *xcg, xc_osdep_handle h,
+                                void *start_address,
+                                uint32_t count)
 {
+    int fd = (int)h;
     int ret;
-    ret = gntmap_munmap(&files[xcg->fd].gntmap,
+    ret = gntmap_munmap(&files[fd].gntmap,
                         (unsigned long) start_address,
                         count);
     if (ret < 0) {
@@ -524,6 +525,7 @@ static struct xc_osdep_ops minios_gnttab_ops = {
         .map_grant_ref = &minios_gnttab_map_grant_ref,
         .map_grant_refs = &minios_gnttab_map_grant_refs,
         .map_domain_grant_refs = &minios_gnttab_map_domain_grant_refs,
+        .munmap = &minios_gnttab_munmap,
     },
 };
 
