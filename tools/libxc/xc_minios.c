@@ -277,26 +277,27 @@ static void evtchn_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
     wake_up(&event_queue);
 }
 
-evtchn_port_or_error_t xc_evtchn_bind_unbound_port(xc_evtchn *xce, int domid)
+static evtchn_port_or_error_t minios_evtchn_bind_unbound_port(xc_evtchn *xce, xc_osdep_handle h, int domid)
 {
+    int fd = (int)h;
     int ret, i;
     evtchn_port_t port;
 
     assert(get_current() == main_thread);
-    i = port_alloc(xce->fd);
+    i = port_alloc(fd);
     if (i == -1)
 	return -1;
 
     printf("xc_evtchn_bind_unbound_port(%d)", domid);
-    ret = evtchn_alloc_unbound(domid, evtchn_handler, (void*)(intptr_t)xce->fd, &port);
+    ret = evtchn_alloc_unbound(domid, evtchn_handler, (void*)(intptr_t)fd, &port);
     printf(" = %d\n", ret);
 
     if (ret < 0) {
 	errno = -ret;
 	return -1;
     }
-    files[xce->fd].evtchn.ports[i].bound = 1;
-    files[xce->fd].evtchn.ports[i].port = port;
+    files[fd].evtchn.ports[i].bound = 1;
+    files[fd].evtchn.ports[i].port = port;
     unmask_evtchn(port);
     return port;
 }
@@ -404,6 +405,7 @@ static struct xc_osdep_ops minios_evtchn_ops = {
     .u.evtchn = {
         .fd = &minios_evtchn_fd,
         .notify = &minios_evtchn_notify,
+        .bind_unbound_port = &minios_evtchn_bind_unbound_port,
     },
 };
 

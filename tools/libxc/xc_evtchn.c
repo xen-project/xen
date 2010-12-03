@@ -88,6 +88,12 @@ int xc_evtchn_notify(xc_evtchn *xce, evtchn_port_t port)
     return xce->ops->u.evtchn.notify(xce, xce->ops_handle, port);
 }
 
+evtchn_port_or_error_t
+xc_evtchn_bind_unbound_port(xc_evtchn *xce, int domid)
+{
+    return xce->ops->u.evtchn.bind_unbound_port(xce, xce->ops_handle, domid);
+}
+
 /*
  * Local variables:
  * mode: C

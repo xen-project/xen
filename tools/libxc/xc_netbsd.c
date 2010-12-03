@@ -225,15 +225,16 @@ static int netbsd_evtchn_notify(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t
     return ioctl(fd, IOCTL_EVTCHN_NOTIFY, &notify);
 }
 
-evtchn_port_or_error_t
-xc_evtchn_bind_unbound_port(xc_evtchn * xce, int domid)
+static evtchn_port_or_error_t
+netbsd_evtchn_bind_unbound_port(xc_evtchn * xce, xc_osdep_handle h, int domid)
 {
+    int fd = (int)h;
     struct ioctl_evtchn_bind_unbound_port bind;
     int ret;
 
     bind.remote_domain = domid;
 
-    ret = ioctl(xce->fd, IOCTL_EVTCHN_BIND_UNBOUND_PORT, &bind);
+    ret = ioctl(fd, IOCTL_EVTCHN_BIND_UNBOUND_PORT, &bind);
     if (ret == 0)
 	return bind.port;
     else
@@ -304,6 +305,7 @@ static struct xc_osdep_ops netbsd_evtchn_ops = {
     .u.evtchn = {
          .fd = &netbsd_evtchn_fd,
          .notify = &netbsd_evtchn_notify,
+         .bind_unbound_port = &netbsd_evtchn_bind_unbound_port,
     },
 };
 
