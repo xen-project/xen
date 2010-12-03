@@ -93,8 +93,9 @@ static int minios_privcmd_hypercall(xc_interface *xch, xc_osdep_handle h, privcm
     return call.result;
 }
 
-void *xc_map_foreign_bulk(xc_interface *xch, uint32_t dom, int prot,
-                          const xen_pfn_t *arr, int *err, unsigned int num)
+static void *minios_privcmd_map_foreign_bulk(xc_interface *xch, xc_osdep_handle h,
+                                             uint32_t dom, int prot,
+                                             const xen_pfn_t *arr, int *err, unsigned int num)
 {
     unsigned long pt_prot = 0;
 #ifdef __ia64__
@@ -108,8 +109,9 @@ void *xc_map_foreign_bulk(xc_interface *xch, uint32_t dom, int prot,
     return map_frames_ex(arr, num, 1, 0, 1, dom, err, pt_prot);    
 }
 
-void *xc_map_foreign_batch(xc_interface *xch, uint32_t dom, int prot,
-                           xen_pfn_t *arr, int num)
+static void *minios_privcmd_map_foreign_batch(xc_interface *xch,  xc_osdep_handle h,
+                                              uint32_t dom, int prot,
+                                              xen_pfn_t *arr, int num)
 {
     unsigned long pt_prot = 0;
     int err[num];
@@ -185,6 +187,9 @@ static struct xc_osdep_ops minios_privcmd_ops = {
 
     .u.privcmd = {
         .hypercall = &minios_privcmd_hypercall,
+
+        .map_foreign_batch = &minios_privcmd_map_foreign_batch,
+        .map_foreign_bulk = &minios_privcmd_map_foreign_bulk,
     },
 };
 

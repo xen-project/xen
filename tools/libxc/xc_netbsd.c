@@ -79,9 +79,11 @@ static int netbsd_privcmd_hypercall(xc_interface *xch, xc_osdep_handle h, privcm
         return hypercall->retval;
 }
 
-void *xc_map_foreign_batch(xc_interface *xch, uint32_t dom, int prot,
-                           xen_pfn_t *arr, int num)
+static void *netbsd_privcmd_map_foreign_batch(xc_interface *xch, xc_osdep_handle h,
+                                              uint32_t dom, int prot,
+                                              xen_pfn_t *arr, int num)
 {
+    int fd = (int)h;
     privcmd_mmapbatch_t ioctlx;
     void *addr;
     addr = mmap(NULL, num*PAGE_SIZE, prot, MAP_ANON | MAP_SHARED, -1, 0);
@@ -94,7 +96,7 @@ void *xc_map_foreign_batch(xc_interface *xch, uint32_t dom, int prot,
     ioctlx.dom=dom;
     ioctlx.addr=(unsigned long)addr;
     ioctlx.arr=arr;
-    if ( ioctl(xch->fd, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx) < 0 )
+    if ( ioctl(fd, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx) < 0 )
     {
         int saved_errno = errno;
         PERROR("xc_map_foreign_batch: ioctl failed");
@@ -178,6 +180,9 @@ static struct xc_osdep_ops netbsd_privcmd_ops = {
 
     .u.privcmd = {
         .hypercall = &netbsd_privcmd_hypercall;
+
+        .map_foreign_batch = &netbsd_privcmd_map_foreign_batch,
+        .map_foreign_bulk = &xc_map_foreign_bulk_compat,
     },
 };
 

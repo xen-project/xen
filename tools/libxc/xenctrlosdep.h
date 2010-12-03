@@ -63,6 +63,11 @@ struct xc_osdep_ops
     union {
         struct {
             int (*hypercall)(xc_interface *xch, xc_osdep_handle h, privcmd_hypercall_t *hypercall);
+
+            void *(*map_foreign_batch)(xc_interface *xch, xc_osdep_handle h, uint32_t dom, int prot,
+                                       xen_pfn_t *arr, int num);
+            void *(*map_foreign_bulk)(xc_interface *xch, xc_osdep_handle h, uint32_t dom, int prot,
+                                      const xen_pfn_t *arr, int *err, unsigned int num);
         } privcmd;
     } u;
 };
@@ -82,6 +87,11 @@ typedef struct xc_osdep_info xc_osdep_info_t;
 
 /* All backends, including the builtin backend, must supply this structure. */
 extern xc_osdep_info_t xc_osdep_info;
+
+/* Stub for not yet converted OSes */
+void *xc_map_foreign_bulk_compat(xc_interface *xch, xc_osdep_handle h,
+                                 uint32_t dom, int prot,
+                                 const xen_pfn_t *arr, int *err, unsigned int num);
 
 #endif
 

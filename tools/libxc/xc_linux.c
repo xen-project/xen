@@ -81,7 +81,7 @@ static int linux_privcmd_hypercall(xc_interface *xch, xc_osdep_handle h, privcmd
     return ioctl(fd, IOCTL_PRIVCMD_HYPERCALL, hypercall);
 }
 
-static int xc_map_foreign_batch_single(xc_interface *xch, uint32_t dom,
+static int xc_map_foreign_batch_single(int fd, uint32_t dom,
                                        xen_pfn_t *mfn, unsigned long addr)
 {
     privcmd_mmapbatch_t ioctlx;
@@ -96,21 +96,23 @@ static int xc_map_foreign_batch_single(xc_interface *xch, uint32_t dom,
     {
         *mfn ^= XEN_DOMCTL_PFINFO_PAGEDTAB;
         usleep(100);
-        rc = ioctl(xch->fd, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx);
+        rc = ioctl(fd, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx);
     }
     while ( (rc < 0) && (errno == ENOENT) );
 
     return rc;
 }
 
-void *xc_map_foreign_batch(xc_interface *xch, uint32_t dom, int prot,
-                           xen_pfn_t *arr, int num)
+static void *linux_privcmd_map_foreign_batch(xc_interface *xch, xc_osdep_handle h,
+                                             uint32_t dom, int prot,
+                                             xen_pfn_t *arr, int num)
 {
+    int fd = (int)h;
     privcmd_mmapbatch_t ioctlx;
     void *addr;
     int rc;
 
-    addr = mmap(NULL, num << PAGE_SHIFT, prot, MAP_SHARED, xch->fd, 0);
+    addr = mmap(NULL, num << PAGE_SHIFT, prot, MAP_SHARED, fd, 0);
     if ( addr == MAP_FAILED )
     {
         PERROR("xc_map_foreign_batch: mmap failed");
@@ -122,7 +124,7 @@ void *xc_map_foreign_batch(xc_interface *xch, uint32_t dom, int prot,
     ioctlx.addr = (unsigned long)addr;
     ioctlx.arr = arr;
 
-    rc = ioctl(xch->fd, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx);
+    rc = ioctl(fd, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx);
     if ( (rc < 0) && (errno == ENOENT) )
     {
         int i;
@@ -133,7 +135,7 @@ void *xc_map_foreign_batch(xc_interface *xch, uint32_t dom, int prot,
                  XEN_DOMCTL_PFINFO_PAGEDTAB )
             {
                 unsigned long paged_addr = (unsigned long)addr + (i << PAGE_SHIFT);
-                rc = xc_map_foreign_batch_single(xch, dom, &arr[i],
+                rc = xc_map_foreign_batch_single(fd, dom, &arr[i],
                                                  paged_addr);
                 if ( rc < 0 )
                     goto out;
@@ -154,16 +156,18 @@ void *xc_map_foreign_batch(xc_interface *xch, uint32_t dom, int prot,
     return addr;
 }
 
-void *xc_map_foreign_bulk(xc_interface *xch, uint32_t dom, int prot,
-                          const xen_pfn_t *arr, int *err, unsigned int num)
+static void *linux_privcmd_map_foreign_bulk(xc_interface *xch, xc_osdep_handle h,
+                                            uint32_t dom, int prot,
+                                            const xen_pfn_t *arr, int *err, unsigned int num)
 {
+    int fd = (int)h;
     privcmd_mmapbatch_v2_t ioctlx;
     void *addr;
     unsigned int i;
     int rc;
 
     addr = mmap(NULL, (unsigned long)num << PAGE_SHIFT, prot, MAP_SHARED,
-                xch->fd, 0);
+                fd, 0);
     if ( addr == MAP_FAILED )
     {
         PERROR("xc_map_foreign_batch: mmap failed");
@@ -176,7 +180,7 @@ void *xc_map_foreign_bulk(xc_interface *xch, uint32_t dom, int prot,
     ioctlx.arr = arr;
     ioctlx.err = err;
 
-    rc = ioctl(xch->fd, IOCTL_PRIVCMD_MMAPBATCH_V2, &ioctlx);
+    rc = ioctl(fd, IOCTL_PRIVCMD_MMAPBATCH_V2, &ioctlx);
 
     if ( rc < 0 && errno == ENOENT )
     {
@@ -192,7 +196,7 @@ void *xc_map_foreign_bulk(xc_interface *xch, uint32_t dom, int prot,
             ioctlx.err = err + i;
             do {
                 usleep(100);
-                rc = ioctl(xch->fd, IOCTL_PRIVCMD_MMAPBATCH_V2, &ioctlx);
+                rc = ioctl(fd, IOCTL_PRIVCMD_MMAPBATCH_V2, &ioctlx);
             } while ( rc < 0 && err[i] == -ENOENT );
         }
     }
@@ -216,7 +220,7 @@ void *xc_map_foreign_bulk(xc_interface *xch, uint32_t dom, int prot,
             ioctlx.addr = (unsigned long)addr;
             ioctlx.arr = pfn;
 
-            rc = ioctl(xch->fd, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx);
+            rc = ioctl(fd, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx);
 
             rc = rc < 0 ? -errno : 0;
 
@@ -236,7 +240,7 @@ void *xc_map_foreign_bulk(xc_interface *xch, uint32_t dom, int prot,
                         err[i] = rc ?: -EINVAL;
                         continue;
                     }
-                    rc = xc_map_foreign_batch_single(xch, dom, pfn + i,
+                    rc = xc_map_foreign_batch_single(fd, dom, pfn + i,
                         (unsigned long)addr + ((unsigned long)i<<PAGE_SHIFT));
                     if ( rc < 0 )
                     {
@@ -328,6 +332,9 @@ static struct xc_osdep_ops linux_privcmd_ops = {
 
     .u.privcmd = {
         .hypercall = &linux_privcmd_hypercall,
+
+        .map_foreign_batch = &linux_privcmd_map_foreign_batch,
+        .map_foreign_bulk = &linux_privcmd_map_foreign_bulk,
     },
 };
 
