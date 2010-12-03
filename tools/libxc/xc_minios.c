@@ -134,9 +134,10 @@ static void *minios_privcmd_map_foreign_batch(xc_interface *xch,  xc_osdep_handl
     return (void *) addr;
 }
 
-void *xc_map_foreign_range(xc_interface *xch, uint32_t dom,
-                           int size, int prot,
-                           unsigned long mfn)
+static void *minios_privcmd_map_foreign_range(xc_interface *xch, xc_osdep_handle h,
+                                              uint32_t dom,
+                                              int size, int prot,
+                                              unsigned long mfn)
 {
     unsigned long pt_prot = 0;
 #ifdef __ia64__
@@ -190,6 +191,7 @@ static struct xc_osdep_ops minios_privcmd_ops = {
 
         .map_foreign_batch = &minios_privcmd_map_foreign_batch,
         .map_foreign_bulk = &minios_privcmd_map_foreign_bulk,
+        .map_foreign_range = &minios_privcmd_map_foreign_range,
     },
 };
 

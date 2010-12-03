@@ -20,8 +20,15 @@
 
 #include "xc_private.h"
 
+void *xc_map_foreign_range(xc_interface *xch, uint32_t dom,
+                           int size, int prot, unsigned long mfn)
+{
+    return xch->ops->u.privcmd.map_foreign_range(xch, xch->ops_handle,
+                                                 dom, size, prot, mfn);
+}
+
 void *xc_map_foreign_batch(xc_interface *xch, uint32_t dom, int prot,
-                           xen_pfn_t *arr, int num )
+                           xen_pfn_t *arr, int num)
 {
     return xch->ops->u.privcmd.map_foreign_batch(xch, xch->ops_handle,
                                                  dom, prot, arr, num);
@@ -33,3 +40,13 @@ void *xc_map_foreign_bulk(xc_interface *xch, uint32_t dom, int prot,
     return xch->ops->u.privcmd.map_foreign_bulk(xch, xch->ops_handle,
                                                 dom, prot, arr, err, num);
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

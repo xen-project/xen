@@ -101,14 +101,16 @@ static void *solaris_privcmd_map_foreign_batch(xc_interface *xch, xc_osdep_handl
 
 }
 
-void *xc_map_foreign_range(xc_interface *xch, uint32_t dom,
-                           int size, int prot,
-                           unsigned long mfn)
+static void *xc_map_foreign_range(xc_interface *xch, xc_osdep_handle h,
+                                  uint32_t dom,
+                                  int size, int prot,
+                                  unsigned long mfn)
 {
+    int fd = (int)fd;
     privcmd_mmap_t ioctlx;
     privcmd_mmap_entry_t entry;
     void *addr;
-    addr = mmap(NULL, size, prot, MAP_SHARED, xch->fd, 0);
+    addr = mmap(NULL, size, prot, MAP_SHARED, fd, 0);
     if ( addr == MAP_FAILED )
         return NULL;
 
@@ -118,7 +120,7 @@ void *xc_map_foreign_range(xc_interface *xch, uint32_t dom,
     entry.va=(unsigned long) addr;
     entry.mfn=mfn;
     entry.npages=(size+PAGE_SIZE-1)>>PAGE_SHIFT;
-    if ( ioctl(xch->fd, IOCTL_PRIVCMD_MMAP, &ioctlx) < 0 )
+    if ( ioctl(fd, IOCTL_PRIVCMD_MMAP, &ioctlx) < 0 )
     {
         int saved_errno = errno;
         (void)munmap(addr, size);
@@ -173,6 +175,7 @@ static struct xc_osdep_ops solaris_privcmd_ops = {
 
         .map_foreign_batch = &solaris_privcmd_map_foreign_batch,
         .map_foreign_bulk = &xc_map_foreign_bulk_compat,
+        .map_foreign_range = &solaris_privcmd_map_foreign_range,
     },
 };
 
