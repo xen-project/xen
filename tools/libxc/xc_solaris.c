@@ -321,6 +321,7 @@ static struct xc_osdep_ops *solaris_osdep_init(xc_interface *xch, enum xc_osdep_
 xc_osdep_info_t xc_osdep_info = {
     .name = "Solaris Native OS interface",
     .init = &solaris_osdep_init,
+    .fake = 0,
 };
 
 /*

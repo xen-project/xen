@@ -697,6 +697,7 @@ static struct xc_osdep_ops *linux_osdep_init(xc_interface *xch, enum xc_osdep_ty
 xc_osdep_info_t xc_osdep_info = {
     .name = "Linux Native OS interface",
     .init = &linux_osdep_init,
+    .fake = 0,
 };
 
 /*

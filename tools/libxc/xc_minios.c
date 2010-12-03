@@ -549,6 +549,7 @@ static struct xc_osdep_ops *minios_osdep_init(xc_interface *xch, enum xc_osdep_t
 xc_osdep_info_t xc_osdep_info = {
     .name = "Minios Native OS interface",
     .init = &minios_osdep_init,
+    .fake = 0,
 };
 
 /*

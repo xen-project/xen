@@ -122,6 +122,9 @@ struct xc_osdep_info
 
     /* Returns ops function. */
     xc_osdep_init_fn init;
+
+    /* True if this interface backs onto a fake Xen. */
+    int fake;
 };
 typedef struct xc_osdep_info xc_osdep_info_t;
 

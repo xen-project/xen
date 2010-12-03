@@ -373,6 +373,7 @@ static struct xc_osdep_ops *netbsd_osdep_init(xc_interface *xch, enum xc_osdep_t
 xc_osdep_info_t xc_osdep_info = {
     .name = "Netbsd Native OS interface",
     .init = &netbsd_osdep_init,
+    .fake = 0,
 };
 
 /*

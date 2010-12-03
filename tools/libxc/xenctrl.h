@@ -159,6 +159,15 @@ enum xc_open_flags {
  */
 int xc_interface_close(xc_interface *xch);
 
+/**
+ * Query the active OS interface (i.e. that which would be returned by
+ * xc_interface_open) to find out if it is fake (i.e. backends onto
+ * something other than an actual Xen hypervisor).
+ *
+ * @return 0 is "real", >0 if fake, -1 on error.
+ */
+int xc_interface_is_fake(void);
+
 /*
  * HYPERCALL SAFE MEMORY BUFFER
  *

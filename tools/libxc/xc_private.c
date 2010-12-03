@@ -122,6 +122,19 @@ static int xc_interface_close_common(xc_interface *xch)
     return rc;
 }
 
+int xc_interface_is_fake(void)
+{
+    xc_osdep_info_t info;
+
+    if ( xc_osdep_get_info(NULL, &info) < 0 )
+        return -1;
+
+    /* Have a copy of info so can release the interface now. */
+    xc_osdep_put(&info);
+
+    return info.fake;
+}
+
 xc_interface *xc_interface_open(xentoollog_logger *logger,
                                 xentoollog_logger *dombuild_logger,
                                 unsigned open_flags)
