@@ -303,9 +303,10 @@ static void *linux_privcmd_map_foreign_range(xc_interface *xch, xc_osdep_handle 
     return ret;
 }
 
-void *xc_map_foreign_ranges(xc_interface *xch, uint32_t dom, size_t size, int prot,
-                            size_t chunksize, privcmd_mmap_entry_t entries[],
-                            int nentries)
+static void *linux_privcmd_map_foreign_ranges(xc_interface *xch, xc_osdep_handle h,
+                                              uint32_t dom, size_t size, int prot,
+                                              size_t chunksize, privcmd_mmap_entry_t entries[],
+                                              int nentries)
 {
     xen_pfn_t *arr;
     int num_per_entry;
@@ -337,6 +338,7 @@ static struct xc_osdep_ops linux_privcmd_ops = {
         .map_foreign_batch = &linux_privcmd_map_foreign_batch,
         .map_foreign_bulk = &linux_privcmd_map_foreign_bulk,
         .map_foreign_range = &linux_privcmd_map_foreign_range,
+        .map_foreign_ranges = &linux_privcmd_map_foreign_ranges,
     },
 };
 

@@ -152,9 +152,10 @@ static void *minios_privcmd_map_foreign_range(xc_interface *xch, xc_osdep_handle
     return map_frames_ex(&mfn, size / getpagesize(), 0, 1, 1, dom, NULL, pt_prot);
 }
 
-void *xc_map_foreign_ranges(xc_interface *xch, uint32_t dom,
-                            size_t size, int prot, size_t chunksize,
-                            privcmd_mmap_entry_t entries[], int nentries)
+static void *minios_privcmd_map_foreign_ranges(xc_interface *xch, xc_osdep_handle h,
+                                               uint32_t dom,
+                                               size_t size, int prot, size_t chunksize,
+                                               privcmd_mmap_entry_t entries[], int nentries)
 {
     unsigned long *mfns;
     int i, j, n;
@@ -192,6 +193,7 @@ static struct xc_osdep_ops minios_privcmd_ops = {
         .map_foreign_batch = &minios_privcmd_map_foreign_batch,
         .map_foreign_bulk = &minios_privcmd_map_foreign_bulk,
         .map_foreign_range = &minios_privcmd_map_foreign_range,
+        .map_foreign_ranges = &minios_privcmd_map_foreign_ranges,
     },
 };
 

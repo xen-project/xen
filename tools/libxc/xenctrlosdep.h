@@ -70,6 +70,9 @@ struct xc_osdep_ops
                                       const xen_pfn_t *arr, int *err, unsigned int num);
             void *(*map_foreign_range)(xc_interface *xch, xc_osdep_handle h, uint32_t dom, int size, int prot,
                                        unsigned long mfn);
+            void *(*map_foreign_ranges)(xc_interface *xch, xc_osdep_handle h, uint32_t dom, size_t size, int prot,
+                                        size_t chunksize, privcmd_mmap_entry_t entries[],
+                                        int nentries);
         } privcmd;
     } u;
 };

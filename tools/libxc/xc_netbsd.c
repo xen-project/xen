@@ -140,10 +140,12 @@ static void *netbsd_privcmd_map_foreign_range(xc_interface *xch, xc_osdep_handle
     return addr;
 }
 
-void *xc_map_foreign_ranges(xc_interface *xch, uint32_t dom,
-                            size_t size, int prot, size_t chunksize,
-                            privcmd_mmap_entry_t entries[], int nentries)
+static void *netbsd_privcmd_map_foreign_ranges(xc_interface *xch, xc_osdep_handle h,
+                                               uint32_t dom,
+                                               size_t size, int prot, size_t chunksize,
+                                               privcmd_mmap_entry_t entries[], int nentries)
 {
+    int fd = (int)h;
 	privcmd_mmap_t ioctlx;
 	int i, rc;
 	void *addr;
@@ -161,7 +163,7 @@ void *xc_map_foreign_ranges(xc_interface *xch, uint32_t dom,
 	ioctlx.dom   = dom;
 	ioctlx.entry = entries;
 
-	rc = ioctl(xch->fd, IOCTL_PRIVCMD_MMAP, &ioctlx);
+	rc = ioctl(fd, IOCTL_PRIVCMD_MMAP, &ioctlx);
 	if (rc)
 		goto ioctl_failed;
 
@@ -186,6 +188,7 @@ static struct xc_osdep_ops netbsd_privcmd_ops = {
         .map_foreign_batch = &netbsd_privcmd_map_foreign_batch,
         .map_foreign_bulk = &xc_map_foreign_bulk_compat,
         .map_foreign_range = &netbsd_privcmd_map_foreign_range,
+        .map_foreign_ranges = &netbsd_privcmd_map_foreign_ranges,
     },
 };
 

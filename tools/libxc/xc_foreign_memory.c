@@ -27,6 +27,14 @@ void *xc_map_foreign_range(xc_interface *xch, uint32_t dom,
                                                  dom, size, prot, mfn);
 }
 
+void *xc_map_foreign_ranges(xc_interface *xch, uint32_t dom,
+                            size_t size, int prot, size_t chunksize,
+                            privcmd_mmap_entry_t entries[], int nentries)
+{
+    return xch->ops->u.privcmd.map_foreign_ranges(xch, xch->ops_handle,
+                                                  dom, size, prot, chunksize, entries, nentries);
+}
+
 void *xc_map_foreign_batch(xc_interface *xch, uint32_t dom, int prot,
                            xen_pfn_t *arr, int num)
 {
