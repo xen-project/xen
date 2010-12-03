@@ -92,6 +92,10 @@ ifneq ($(stubdom),y)
 LIB += libxenguest.so libxenguest.so.$(MAJOR) libxenguest.so.$(MAJOR).$(MINOR)
 endif
 
+ifneq ($(stubdom),y)
+LIB += xenctrl_osdep_ENOSYS.so
+endif
+
 .PHONY: all
 all: build
 
@@ -148,7 +152,7 @@ libxenctrl.so.$(MAJOR): libxenctrl.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
 libxenctrl.so.$(MAJOR).$(MINOR): $(CTRL_PIC_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenctrl.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(PTHREAD_LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenctrl.so.$(MAJOR) -ldl $(SHLIB_LDFLAGS) -o $@ $^ $(PTHREAD_LIBS)
 
 # libxenguest
 
@@ -185,6 +189,9 @@ xc_dom_bzimageloader.opic: CFLAGS += $(call zlib-options,D)
 libxenguest.so.$(MAJOR).$(MINOR): COMPRESSION_LIBS = $(call zlib-options,l)
 libxenguest.so.$(MAJOR).$(MINOR): $(GUEST_PIC_OBJS) libxenctrl.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenguest.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $(GUEST_PIC_OBJS) $(COMPRESSION_LIBS) -lz -lxenctrl $(PTHREAD_LIBS)
+
+xenctrl_osdep_ENOSYS.so: xenctrl_osdep_ENOSYS.o libxenctrl.so
+	$(CC) -g $(CFLAGS) $(LDFLAGS) $(SHLIB_LDFLAGS) -o $@ xenctrl_osdep_ENOSYS.o -lxenctrl
 
 -include $(DEPS)
 

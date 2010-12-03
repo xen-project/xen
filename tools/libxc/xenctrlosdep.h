@@ -23,6 +23,18 @@
  * This interface defines the interactions between the Xen control
  * libraries and the OS facilities used to communicate with the
  * hypervisor.
+ *
+ * It is possible to override the default (native) implementation by
+ * setting the XENCTRL_OSDEP environment variable to point to a
+ * plugin library. Userspace can use this facility to intercept
+ * hypervisor operations. This can be used e.g. to implement a
+ * userspace simulator for Xen hypercalls.
+ *
+ * The plugin must contain a data structure:
+ *  xc_osdep_info_t xc_osdep_info;
+ *
+ * xc_osdep_init:
+ *   Must return a suitable struct xc_osdep_ops pointer or NULL on failure.
  */
 
 #ifndef XC_OSDEP_H
@@ -125,6 +137,9 @@ struct xc_osdep_info
 
     /* True if this interface backs onto a fake Xen. */
     int fake;
+
+    /* For internal use by loader. */
+    void *dl_handle;
 };
 typedef struct xc_osdep_info xc_osdep_info_t;
 

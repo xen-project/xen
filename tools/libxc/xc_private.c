@@ -27,9 +27,21 @@
 #include <pthread.h>
 #include <assert.h>
 
+#ifndef __MINIOS__
+#include <dlfcn.h>
+#endif
+
+#define XENCTRL_OSDEP "XENCTRL_OSDEP"
+
 /*
  * Returns a (shallow) copy of the xc_osdep_info_t for the
  * active OS interface.
+ *
+ * On success a handle to the relevant library is opened.  The user
+ * must subsequently call xc_osdep_put_info() when it is
+ * finished with the library.
+ *
+ * Logs IFF xch != NULL.
  *
  * Returns:
  *  0 - on success
@@ -38,16 +50,65 @@
 static int xc_osdep_get_info(xc_interface *xch, xc_osdep_info_t *info)
 {
     int rc = -1;
+#ifndef __MINIOS__
+    const char *lib = getenv(XENCTRL_OSDEP);
+    xc_osdep_info_t *pinfo;
+    void *dl_handle = NULL;
 
-    *info = xc_osdep_info;
+    if ( lib != NULL )
+    {
+        if ( getuid() != geteuid() )
+        {
+            if ( xch ) ERROR("cannot use %s=%s with setuid application", XENCTRL_OSDEP, lib);
+            abort();
+        }
+        if ( getgid() != getegid() )
+        {
+            if ( xch ) ERROR("cannot use %s=%s with setgid application", XENCTRL_OSDEP, lib);
+            abort();
+        }
+
+        dl_handle = dlopen(lib, RTLD_LAZY|RTLD_LOCAL);
+        if ( !dl_handle )
+        {
+            if ( xch ) ERROR("unable to open osdep library %s: %s", lib, dlerror());
+            goto out;
+        }
+
+        pinfo = dlsym(dl_handle, "xc_osdep_info");
+        if ( !pinfo )
+        {
+            if ( xch ) ERROR("unable to find xc_osinteface_info in %s: %s", lib, dlerror());
+            goto out;
+        }
+
+        *info = *pinfo;
+        info->dl_handle = dl_handle;
+    }
+    else
+#endif
+    {
+        *info = xc_osdep_info;
+        info->dl_handle = NULL;
+    }
 
     rc = 0;
+
+#ifndef __MINIOS__
+out:
+    if ( dl_handle && rc == -1 )
+        dlclose(dl_handle);
+#endif
 
     return rc;
 }
 
 static void xc_osdep_put(xc_osdep_info_t *info)
 {
+#ifndef __MINIOS__
+    if ( info->dl_handle )
+        dlclose(info->dl_handle);
+#endif
 }
 
 static struct xc_interface_core *xc_interface_open_common(xentoollog_logger *logger,
