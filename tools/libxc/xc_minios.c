@@ -49,14 +49,21 @@ extern void minios_evtchn_close_fd(int fd);
 
 extern struct wait_queue_head event_queue;
 
-int xc_interface_open_core(xc_interface *xch)
+static xc_osdep_handle minios_privcmd_open(xc_interface *xch)
 {
-    return alloc_fd(FTYPE_XC);
+    int fd = alloc_fd(FTYPE_XC);
+
+    if ( fd == -1)
+        return XC_OSDEP_OPEN_ERROR;
+
+    xch->fd = fd; /* Remove after transition to full xc_osdep_ops. */
+    return (xc_osdep_handle)fd;
 }
 
-int xc_interface_close_core(xc_interface *xch)
+static int minios_privcmd_close(xc_interface *xch, xc_osdep_handle h)
 {
-    return close(xch->fd);
+    int fd = (int)h;
+    return close(fd);
 }
 
 void minios_interface_close_fd(int fd)
@@ -172,20 +179,29 @@ int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall)
     return call.result;
 }
 
-int xc_evtchn_open_core(xc_evtchn *xce)
+static struct xc_osdep_ops minios_privcmd_ops = {
+    .open = &minios_privcmd_open,
+    .close = &minios_privcmd_close,
+};
+
+static xc_osdep_handle minios_evtchn_open(xc_evtchn *xce)
 {
     int fd = alloc_fd(FTYPE_EVTCHN), i;
+    if ( fd == -1 )
+        return XC_OSDEP_OPEN_ERROR;
     for (i = 0; i < MAX_EVTCHN_PORTS; i++) {
 	files[fd].evtchn.ports[i].port = -1;
         files[fd].evtchn.ports[i].bound = 0;
     }
     printf("evtchn_open() -> %d\n", fd);
-    return fd;
+    xce->fd = fd; /* Remove after transition to full xc_osdep_ops. */
+    return (xc_osdep_handle)fd;
 }
 
-int xc_evtchn_close_core(xc_evtchn *xce)
+static int minios_evtchn_close(xc_evtchn *xce, xc_osdep_handle h)
 {
-    return close(xce->fd);
+    int fd = (int)h;
+    return close(fd);
 }
 
 void minios_evtchn_close_fd(int fd)
@@ -368,6 +384,11 @@ int xc_evtchn_unmask(xc_evtchn *xce, evtchn_port_t port)
     return 0;
 }
 
+static struct xc_osdep_ops minios_evtchn_ops = {
+    .open = &minios_evtchn_open,
+    .close = &minios_evtchn_close,
+};
+
 /* Optionally flush file to disk and discard page cache */
 void discard_file_cache(xc_interface *xch, int fd, int flush)
 {
@@ -375,17 +396,20 @@ void discard_file_cache(xc_interface *xch, int fd, int flush)
         fsync(fd);
 }
 
-int xc_gnttab_open_core(xc_gnttab *xcg)
+static xc_osdep_handle minios_gnttab_open(xc_gnttab *xcg)
 {
-    int fd;
-    fd = alloc_fd(FTYPE_GNTMAP);
+    int fd = alloc_fd(FTYPE_GNTMAP);
+    if ( fd == -1 )
+        return XC_OSDEP_OPEN_ERROR;
     gntmap_init(&files[fd].gntmap);
-    return fd;
+    xcg->fd = fd; /* Remove after transition to full xc_osdep_ops. */
+    return (xc_osdep_handle)fd;
 }
 
-int xc_gnttab_close_core(xc_gnttab *xcg)
+static int minios_gnttab_close(xc_gnttab *xcg, xc_osdep_handle h)
 {
-    return close(xcg->fd);
+    int fd = (int)h;
+    return close(fd);
 }
 
 void minios_gnttab_close_fd(int fd)
@@ -459,6 +483,31 @@ int xc_gnttab_set_max_grants(xc_gnttab *xcg,
     }
     return ret;
 }
+
+static struct xc_osdep_ops minios_gnttab_ops = {
+    .open = &minios_gnttab_open,
+    .close = &minios_gnttab_close,
+};
+
+static struct xc_osdep_ops *minios_osdep_init(xc_interface *xch, enum xc_osdep_type type)
+{
+    switch ( type )
+    {
+    case XC_OSDEP_PRIVCMD:
+        return &minios_privcmd_ops;
+    case XC_OSDEP_EVTCHN:
+        return &minios_evtchn_ops;
+    case XC_OSDEP_GNTTAB:
+        return &minios_gnttab_ops;
+    default:
+        return NULL;
+    }
+}
+
+xc_osdep_info_t xc_osdep_info = {
+    .name = "Minios Native OS interface",
+    .init = &minios_osdep_init,
+};
 
 /*
  * Local variables:

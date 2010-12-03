@@ -24,7 +24,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-int xc_interface_open_core(xc_interface *xch)
+static xc_osdep_handle netbsd_privcmd_open(xc_interface *xch)
 {
     int flags, saved_errno;
     int fd = open("/kern/xen/privcmd", O_RDWR);
@@ -32,7 +32,7 @@ int xc_interface_open_core(xc_interface *xch)
     if ( fd == -1 )
     {
         PERROR("Could not obtain handle on privileged command interface");
-        return -1;
+        return XC_OSDEP_OPEN_ERROR;
     }
 
     /* Although we return the file handle as the 'xc handle' the API
@@ -51,18 +51,21 @@ int xc_interface_open_core(xc_interface *xch)
         goto error;
     }
 
-    return fd;
+    xch->fd = fd; /* Remove after transition to full xc_osdep_ops. */
+
+    return (xc_osinteface_handle)fd;
 
  error:
     saved_errno = errno;
     close(fd);
     errno = saved_errno;
-    return -1;
+    return XC_OSDEP_OPEN_ERROR;
 }
 
-int xc_interface_close_core(xc_interface *xch)
+static int netbsd_privcmd_close(xc_interface *xch, xc_osdep_handle h)
 {
-    return close(xch->fd);
+    int fd = (int)h;
+    return close(fd);
 }
 
 void *xc_map_foreign_batch(xc_interface *xch, uint32_t dom, int prot,
@@ -179,16 +182,27 @@ int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall)
        return (hypercall->retval);
 }
 
+static struct xc_osdep_ops netbsd_privcmd_ops = {
+    .open = &netbsd_privcmd_open,
+    .close = &netbsd_privcmd_close,
+};
+
 #define EVTCHN_DEV_NAME  "/dev/xenevt"
 
-int xc_evtchn_open_core(xc_evtchn *xce)
+static xc_osdep_handle netbsd_evtchn_open(xc_evtchn *xce)
 {
-    return open(EVTCHN_DEV_NAME, O_NONBLOCK|O_RDWR);
+    int fd = open(EVTCHN_DEV_NAME, O_NONBLOCK|O_RDWR);
+    if ( fd == -1 )
+        return XC_OSDEP_OPEN_ERROR;
+
+    xce->fd = fd; /* Remove after transition to full xc_osdep_ops. */
+    return (xc_osdep_handle)fd;
 }
 
-int xc_evtchn_close_core(xc_evtchn *xce)
+static int netbsd_evtchn_close(xc_evtchn *xce, xc_osdep_handle h)
 {
-    return close(xce->fd);
+    int fd = (int)h;
+    return close(fd);
 }
 
 int xc_evtchn_fd(xc_evtchn *xce)
@@ -277,6 +291,11 @@ int xc_evtchn_unmask(xc_evtchn *xce, evtchn_port_t port)
     return write_exact(xce->fd, (char *)&port, sizeof(port));
 }
 
+static struct xc_osdep_ops netbsd_evtchn_ops = {
+    .open = &netbsd_evtchn_open,
+    .close = &netbsd_evtchn_close,
+};
+
 /* Optionally flush file to disk and discard page cache */
 void discard_file_cache(xc_interface *xch, int fd, int flush) 
 {
@@ -311,6 +330,27 @@ void discard_file_cache(xc_interface *xch, int fd, int flush)
  out:
     errno = saved_errno;
 }
+
+static struct xc_osdep_ops *netbsd_osdep_init(xc_interface *xch, enum xc_osdep_type type)
+{
+    switch ( type )
+    {
+    case XC_OSDEP_PRIVCMD:
+        return &netbsd_privcmd_ops;
+    case XC_OSDEP_EVTCHN:
+        return &netbsd_evtchn_ops;
+    case XC_OSDEP_GNTTAB:
+        ERROR("GNTTAB interface not supported on this platform");
+        return NULL;
+    default:
+        return NULL;
+    }
+}
+
+xc_osdep_info_t xc_osdep_info = {
+    .name = "Netbsd Native OS interface",
+    .init = &netbsd_osdep_init,
+};
 
 /*
  * Local variables:

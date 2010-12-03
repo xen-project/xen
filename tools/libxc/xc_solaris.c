@@ -25,7 +25,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-int xc_interface_open_core(xc_interface *xch)
+static xc_osdep_handle solaris_privcmd_open(xc_interface *xch)
 {
     int flags, saved_errno;
     int fd = open("/dev/xen/privcmd", O_RDWR);
@@ -33,7 +33,7 @@ int xc_interface_open_core(xc_interface *xch)
     if ( fd == -1 )
     {
         PERROR("Could not obtain handle on privileged command interface");
-        return -1;
+        return XC_OSDEP_OPEN_ERROR;
     }
 
     /* Although we return the file handle as the 'xc handle' the API
@@ -52,17 +52,19 @@ int xc_interface_open_core(xc_interface *xch)
         goto error;
     }
 
-    return fd;
+    xch->fd = fd; /* Remove after transition to full xc_osdep_ops. */
+    return (xc_osdep_handle)fd;
 
  error:
     saved_errno = errno;
     close(fd);
     errno = saved_errno;
-    return -1;
+    return XC_OSDEP_OPEN_ERROR;
 }
 
-int xc_interface_close(xc_interface *xch, int fd)
+static int solaris_privcmd_close(xc_interface *xch, xc_osdep_handle h)
 {
+    int fd = (int)h;
     return close(fd);
 }
 
@@ -154,7 +156,6 @@ mmap_failed:
     return NULL;
 }
 
-
 static int do_privcmd(xc_interface *xch, unsigned int cmd, unsigned long data)
 {
     return ioctl(xch->fd, cmd, data);
@@ -167,22 +168,29 @@ int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall)
                       (unsigned long)hypercall);
 }
 
-int xc_evtchn_open_core(xc_evtchn *xce)
+static struct xc_osdep_ops solaris_privcmd_ops = {
+    .open = &solaris_privcmd_open,
+    .close = &solaris_privcmd_close,
+};
+
+static xc_osdep_handle solaris_evtchn_open(xc_evtchn *xce)
 {
     int fd;
 
     if ( (fd = open("/dev/xen/evtchn", O_RDWR)) == -1 )
     {
         PERROR("Could not open event channel interface");
-        return -1;
+        return XC_OSDEP_OPEN_ERROR;
     }
 
-    return fd;
+    xce->fd = fd; /* Remove after transition to full xc_osdep_ops. */
+    return (xc_osdep_handle)fd;
 }
 
-int xc_evtchn_close_core(xc_evtchn *xce)
+static int solaris_evtchn_close(xc_evtchn *xce, xc_osdep_handle h)
 {
-    return close(xce->fd);
+    int fd = (int)h;
+    return close(fd);
 }
 
 int xc_evtchn_fd(xc_evtchn *xce)
@@ -256,8 +264,44 @@ int xc_evtchn_unmask(xc_evtchn *xce, evtchn_port_t port)
     return write_exact(xce->fd, (char *)&port, sizeof(port));
 }
 
+static struct xc_osdep_ops solaris_evtchn_ops = {
+    .open = &solaris_evtchn_open,
+    .close = &solaris_evtchn_close,
+};
+
 /* Optionally flush file to disk and discard page cache */
 void discard_file_cache(xc_interface *xch, int fd, int flush) 
 {
     // TODO: Implement for Solaris!
 }
+
+static struct xc_osdep_ops *solaris_osdep_init(xc_interface *xch, enum xc_osdep_type type)
+{
+    switch ( type )
+    {
+    case XC_OSDEP_PRIVCMD:
+        return &solaris_privcmd_ops;
+    case XC_OSDEP_EVTCHN:
+        return &solaris_evtchn_ops;
+    case XC_OSDEP_GNTTAB:
+        ERROR("GNTTAB interface not supported on this platform");
+        return NULL;
+    default:
+        return NULL;
+    }
+}
+
+xc_osdep_info_t xc_osdep_info = {
+    .name = "Solaris Native OS interface",
+    .init = &solaris_osdep_init,
+};
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

@@ -30,6 +30,7 @@
 #include <sys/ioctl.h>
 
 #include "xenctrl.h"
+#include "xenctrlosdep.h"
 
 #include <xen/sys/privcmd.h>
 
@@ -65,14 +66,8 @@
 */
 #define MAX_PAGECACHE_USAGE (4*1024)
 
-enum xc_interface_type {
-	XC_INTERFACE_PRIVCMD,
-	XC_INTERFACE_EVTCHN,
-	XC_INTERFACE_GNTTAB,
-};
-
 struct xc_interface_core {
-    enum xc_interface_type type;
+    enum xc_osdep_type type;
     int fd;
     int flags;
     xentoollog_logger *error_handler,   *error_handler_tofree;
@@ -80,6 +75,10 @@ struct xc_interface_core {
     struct xc_error last_error; /* for xc_get_last_error */
     FILE *dombuild_logger_file;
     const char *currently_progress_reporting;
+
+    xc_osdep_info_t  osdep;
+    xc_osdep_ops    *ops; /* backend operations */
+    xc_osdep_handle  ops_handle; /* opaque data for xc_osdep_ops */
 };
 
 void xc_report_error(xc_interface *xch, int code, const char *fmt, ...);
@@ -263,15 +262,6 @@ static inline int do_sysctl(xc_interface *xch, struct xen_sysctl *sysctl)
 }
 
 int do_memory_op(xc_interface *xch, int cmd, void *arg, size_t len);
-
-int xc_interface_open_core(struct xc_interface_core *xch); /* returns fd, logs errors */
-int xc_interface_close_core(struct xc_interface_core *xch); /* no logging */
-
-int xc_evtchn_open_core(struct xc_interface_core *xce); /* returns fd, logs errors */
-int xc_evtchn_close_core(struct xc_interface_core *xce); /* no logging */
-
-int xc_gnttab_open_core(struct xc_interface_core *xcg); /* returns fd, logs errors */
-int xc_gnttab_close_core(struct xc_interface_core *xcg); /* no logging */
 
 void *xc_map_foreign_ranges(xc_interface *xch, uint32_t dom,
                             size_t size, int prot, size_t chunksize,
