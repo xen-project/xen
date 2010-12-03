@@ -82,3 +82,18 @@ int xc_evtchn_fd(xc_evtchn *xce)
 {
     return xce->ops->u.evtchn.fd(xce, xce->ops_handle);
 }
+
+int xc_evtchn_notify(xc_evtchn *xce, evtchn_port_t port)
+{
+    return xce->ops->u.evtchn.notify(xce, xce->ops_handle, port);
+}
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

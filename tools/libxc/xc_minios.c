@@ -231,7 +231,7 @@ static int minios_evtchn_fd(xc_evtchn *xce, xc_osdep_handle h)
     return (int)h;
 }
 
-int xc_evtchn_notify(xc_evtchn *xce, evtchn_port_t port)
+static int minios_evtchn_notify(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port)
 {
     int ret;
 
@@ -403,6 +403,7 @@ static struct xc_osdep_ops minios_evtchn_ops = {
 
     .u.evtchn = {
         .fd = &minios_evtchn_fd,
+        .notify = &minios_evtchn_notify,
     },
 };
 

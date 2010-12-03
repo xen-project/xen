@@ -76,6 +76,8 @@ struct xc_osdep_ops
         } privcmd;
         struct {
             int (*fd)(xc_evtchn *xce, xc_osdep_handle h);
+
+            int (*notify)(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port);
         } evtchn;
     } u;
 };

@@ -215,13 +215,14 @@ static int netbsd_evtchn_fd(xc_evtchn *xce, xc_osdep_handle h)
     return (int)h;
 }
 
-int xc_evtchn_notify(xc_evtchn *xce, evtchn_port_t port)
+static int netbsd_evtchn_notify(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port)
 {
+    int fd = (int)h;
     struct ioctl_evtchn_notify notify;
 
     notify.port = port;
 
-    return ioctl(xce->fd, IOCTL_EVTCHN_NOTIFY, &notify);
+    return ioctl(fd, IOCTL_EVTCHN_NOTIFY, &notify);
 }
 
 evtchn_port_or_error_t
@@ -301,7 +302,8 @@ static struct xc_osdep_ops netbsd_evtchn_ops = {
     .close = &netbsd_evtchn_close,
 
     .u.evtchn = {
-        .fd = &netbsd_evtchn_fd,
+         .fd = &netbsd_evtchn_fd,
+         .notify = &netbsd_evtchn_notify,
     },
 };
 
