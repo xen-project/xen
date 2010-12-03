@@ -371,22 +371,23 @@ static evtchn_port_or_error_t minios_evtchn_bind_virq(xc_evtchn *xce, xc_osdep_h
     return port;
 }
 
-evtchn_port_or_error_t xc_evtchn_pending(xc_evtchn *xce)
+static evtchn_port_or_error_t minios_evtchn_pending(xc_evtchn *xce, xc_osdep_handle h)
 {
+    int fd = (int)h;
     int i;
     unsigned long flags;
     evtchn_port_t ret = -1;
 
     local_irq_save(flags);
-    files[xce->fd].read = 0;
+    files[fd].read = 0;
     for (i = 0; i < MAX_EVTCHN_PORTS; i++) {
-        evtchn_port_t port = files[xce->fd].evtchn.ports[i].port;
-        if (port != -1 && files[xce->fd].evtchn.ports[i].pending) {
+        evtchn_port_t port = files[fd].evtchn.ports[i].port;
+        if (port != -1 && files[fd].evtchn.ports[i].pending) {
             if (ret == -1) {
                 ret = port;
-                files[xce->fd].evtchn.ports[i].pending = 0;
+                files[fd].evtchn.ports[i].pending = 0;
             } else {
-                files[xce->fd].read = 1;
+                files[fd].read = 1;
                 break;
             }
         }
@@ -395,7 +396,7 @@ evtchn_port_or_error_t xc_evtchn_pending(xc_evtchn *xce)
     return ret;
 }
 
-int xc_evtchn_unmask(xc_evtchn *xce, evtchn_port_t port)
+static int minios_evtchn_unmask(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port)
 {
     unmask_evtchn(port);
     return 0;
@@ -412,7 +413,9 @@ static struct xc_osdep_ops minios_evtchn_ops = {
         .bind_interdomain = &minios_evtchn_bind_interdomain,
         .bind_virq = &minios_evtchn_bind_virq,
         .unbind = &minios_evtchn_unbind,
-    },
+        .pending = &minios_evtchn_pending,
+        .unmask = &minios_evtchn_unmask,
+   },
 };
 
 /* Optionally flush file to disk and discard page cache */

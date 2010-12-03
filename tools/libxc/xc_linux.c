@@ -420,20 +420,24 @@ static int linux_evtchn_unbind(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t 
     return ioctl(fd, IOCTL_EVTCHN_UNBIND, &unbind);
 }
 
-evtchn_port_or_error_t
-xc_evtchn_pending(xc_evtchn *xce)
+static evtchn_port_or_error_t linux_evtchn_pending(xc_evtchn *xce, xc_osdep_handle h)
 {
+    int fd = (int)h;
     evtchn_port_t port;
 
-    if ( read_exact(xce->fd, (char *)&port, sizeof(port)) == -1 )
+    if ( read(fd, &port, sizeof(port)) != sizeof(port) )
         return -1;
 
     return port;
 }
 
-int xc_evtchn_unmask(xc_evtchn *xce, evtchn_port_t port)
+static int linux_evtchn_unmask(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port)
 {
-    return write_exact(xce->fd, (char *)&port, sizeof(port));
+    int fd = (int)h;
+
+    if ( write(fd, &port, sizeof(port)) != sizeof(port) )
+        return -1;
+    return 0;
 }
 
 static struct xc_osdep_ops linux_evtchn_ops = {
@@ -447,6 +451,8 @@ static struct xc_osdep_ops linux_evtchn_ops = {
         .bind_interdomain = &linux_evtchn_bind_interdomain,
         .bind_virq = &linux_evtchn_bind_virq,
         .unbind = &linux_evtchn_unbind,
+        .pending = &linux_evtchn_pending,
+        .unmask = &linux_evtchn_unmask,
     },
 };
 

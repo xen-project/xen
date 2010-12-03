@@ -112,6 +112,17 @@ int xc_evtchn_unbind(xc_evtchn *xce, evtchn_port_t port)
     return xce->ops->u.evtchn.unbind(xce, xce->ops_handle, port);
 }
 
+evtchn_port_or_error_t
+xc_evtchn_pending(xc_evtchn *xce)
+{
+    return xce->ops->u.evtchn.pending(xce, xce->ops_handle);
+}
+
+int xc_evtchn_unmask(xc_evtchn *xce, evtchn_port_t port)
+{
+    return xce->ops->u.evtchn.unmask(xce, xce->ops_handle, port);
+}
+
 /*
  * Local variables:
  * mode: C

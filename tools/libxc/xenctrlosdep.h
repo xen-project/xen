@@ -85,6 +85,9 @@ struct xc_osdep_ops
             evtchn_port_or_error_t (*bind_virq)(xc_evtchn *xce, xc_osdep_handle h, unsigned int virq);
 
             int (*unbind)(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port);
+
+            evtchn_port_or_error_t (*pending)(xc_evtchn *xce, xc_osdep_handle h);
+            int (*unmask)(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port);
         } evtchn;
     } u;
 };

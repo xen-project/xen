@@ -285,20 +285,22 @@ netbsd_evtchn_bind_virq(xc_evtchn *xce, xc_osdep_handle h, unsigned int virq)
 	return bind.port;
 }
 
-evtchn_port_or_error_t
-xc_evtchn_pending(xc_evtchn *xce)
+static evtchn_port_or_error_t
+netbsd_evtchn_pending(xc_evtchn *xce, xc_osdep_handle h)
 {
+    int fd = (int)h;
     evtchn_port_t port;
 
-    if ( read_exact(xce->fd, (char *)&port, sizeof(port)) == -1 )
+    if ( read_exact(fd, (char *)&port, sizeof(port)) == -1 )
         return -1;
 
     return port;
 }
 
-int xc_evtchn_unmask(xc_evtchn *xce, evtchn_port_t port)
+static int netbsd_evtchn_unmask(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port)
 {
-    return write_exact(xce->fd, (char *)&port, sizeof(port));
+    int fd = (int)h;
+    return write_exact(fd, (char *)&port, sizeof(port));
 }
 
 static struct xc_osdep_ops netbsd_evtchn_ops = {
@@ -312,6 +314,8 @@ static struct xc_osdep_ops netbsd_evtchn_ops = {
          .bind_interdomain = &netbsd_evtchn_bind_interdomain,
          .bind_virq = &netbsd_evtchn_bind_virq,
          .unbind = &netbsd_evtchn_unbind,
+         .pending = &netbsd_evtchn_pending,
+         .unmask = &netbsd_evtchn_unmask,
     },
 };
 
