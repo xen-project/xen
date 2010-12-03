@@ -252,13 +252,14 @@ solaris_evtchn_bind_virq(xc_evtchn *xce, xc_osdep_handle h, unsigned int virq)
     return ioctl(fd, IOCTL_EVTCHN_BIND_VIRQ, &bind);
 }
 
-int xc_evtchn_unbind(xc_evtchn *xce, evtchn_port_t port)
+static int solaris_evtchn_unbind(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port)
 {
+    int fd = (int)h;
     struct ioctl_evtchn_unbind unbind;
 
     unbind.port = port;
 
-    return ioctl(xce->fd, IOCTL_EVTCHN_UNBIND, &unbind);
+    return ioctl(fd, IOCTL_EVTCHN_UNBIND, &unbind);
 }
 
 evtchn_port_or_error_t
@@ -287,6 +288,7 @@ static struct xc_osdep_ops solaris_evtchn_ops = {
         .bind_unbound_port = &solaris_evtchn_bind_unbound_port,
         .bind_interdomain = &solaris_evtchn_bind_interdomain,
         .bind_virq = &solaris_evtchn_bind_virq,
+        .unbind = &solaris_evtchn_unbind,
     },
 };
 

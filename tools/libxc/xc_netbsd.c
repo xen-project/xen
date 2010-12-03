@@ -259,13 +259,14 @@ netbsd_evtchn_bind_interdomain(xc_evtchn *xce, xc_osdep_handle h, int domid,
 	return -1;
 }
 
-int xc_evtchn_unbind(xc_evtchn *xce, evtchn_port_t port)
+static int netbsd_evtchn_unbind(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port)
 {
+    int fd = (int)h;
     struct ioctl_evtchn_unbind unbind;
 
     unbind.port = port;
 
-    return ioctl(xce->fd, IOCTL_EVTCHN_UNBIND, &unbind);
+    return ioctl(fd, IOCTL_EVTCHN_UNBIND, &unbind);
 }
 
 static evtchn_port_or_error_t
@@ -310,6 +311,7 @@ static struct xc_osdep_ops netbsd_evtchn_ops = {
          .bind_unbound_port = &netbsd_evtchn_bind_unbound_port,
          .bind_interdomain = &netbsd_evtchn_bind_interdomain,
          .bind_virq = &netbsd_evtchn_bind_virq,
+         .unbind = &netbsd_evtchn_unbind,
     },
 };
 

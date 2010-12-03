@@ -107,6 +107,11 @@ xc_evtchn_bind_virq(xc_evtchn *xce, unsigned int virq)
     return xce->ops->u.evtchn.bind_virq(xce, xce->ops_handle, virq);
 }
 
+int xc_evtchn_unbind(xc_evtchn *xce, evtchn_port_t port)
+{
+    return xce->ops->u.evtchn.unbind(xce, xce->ops_handle, port);
+}
+
 /*
  * Local variables:
  * mode: C

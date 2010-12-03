@@ -328,20 +328,21 @@ static evtchn_port_or_error_t minios_evtchn_bind_interdomain(xc_evtchn *xce, xc_
     return local_port;
 }
 
-int xc_evtchn_unbind(xc_evtchn *xce, evtchn_port_t port)
+static int minios_evtchn_unbind(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port)
 {
+    int fd = (int)h;
     int i;
     for (i = 0; i < MAX_EVTCHN_PORTS; i++)
-	if (files[xce->fd].evtchn.ports[i].port == port) {
-	    files[xce->fd].evtchn.ports[i].port = -1;
+	if (files[fd].evtchn.ports[i].port == port) {
+	    files[fd].evtchn.ports[i].port = -1;
 	    break;
 	}
     if (i == MAX_EVTCHN_PORTS) {
-	printf("Warning: couldn't find port %"PRId32" for xc handle %x\n", port, xce->fd);
+	printf("Warning: couldn't find port %"PRId32" for xc handle %x\n", port, fd);
 	errno = -EINVAL;
 	return -1;
     }
-    files[xce->fd].evtchn.ports[i].bound = 0;
+    files[fd].evtchn.ports[i].bound = 0;
     unbind_evtchn(port);
     return 0;
 }
@@ -410,6 +411,7 @@ static struct xc_osdep_ops minios_evtchn_ops = {
         .bind_unbound_port = &minios_evtchn_bind_unbound_port,
         .bind_interdomain = &minios_evtchn_bind_interdomain,
         .bind_virq = &minios_evtchn_bind_virq,
+        .unbind = &minios_evtchn_unbind,
     },
 };
 
