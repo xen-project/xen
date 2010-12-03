@@ -77,3 +77,8 @@ int xc_evtchn_status(xc_interface *xch, xc_evtchn_status_t *status)
     return do_evtchn_op(xch, EVTCHNOP_status, status,
                         sizeof(*status), 1);
 }
+
+int xc_evtchn_fd(xc_evtchn *xce)
+{
+    return xce->ops->u.evtchn.fd(xce, xce->ops_handle);
+}

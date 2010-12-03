@@ -360,9 +360,9 @@ static int linux_evtchn_close(xc_evtchn *xce, xc_osdep_handle h)
     return close(fd);
 }
 
-int xc_evtchn_fd(xc_evtchn *xce)
+static int linux_evtchn_fd(xc_evtchn *xce, xc_osdep_handle h)
 {
-    return xce->fd;
+    return (int)h;
 }
 
 int xc_evtchn_notify(xc_evtchn *xce, evtchn_port_t port)
@@ -434,6 +434,10 @@ int xc_evtchn_unmask(xc_evtchn *xce, evtchn_port_t port)
 static struct xc_osdep_ops linux_evtchn_ops = {
     .open = &linux_evtchn_open,
     .close = &linux_evtchn_close,
+
+    .u.evtchn = {
+        .fd = &linux_evtchn_fd,
+    },
 };
 
 /* Optionally flush file to disk and discard page cache */

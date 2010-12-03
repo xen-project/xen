@@ -74,6 +74,9 @@ struct xc_osdep_ops
                                         size_t chunksize, privcmd_mmap_entry_t entries[],
                                         int nentries);
         } privcmd;
+        struct {
+            int (*fd)(xc_evtchn *xce, xc_osdep_handle h);
+        } evtchn;
     } u;
 };
 typedef struct xc_osdep_ops xc_osdep_ops;
