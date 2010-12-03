@@ -653,13 +653,14 @@ static int linux_gnttab_munmap(xc_gnttab *xcg, xc_osdep_handle h,
     return 0;
 }
 
-int xc_gnttab_set_max_grants(xc_gnttab *xcg, uint32_t count)
+static int linux_gnttab_set_max_grants(xc_gnttab *xcg, xc_osdep_handle h, uint32_t count)
 {
+    int fd = (int)h;
     struct ioctl_gntdev_set_max_grants set_max;
     int rc;
 
     set_max.count = count;
-    if ( (rc = ioctl(xcg->fd, IOCTL_GNTDEV_SET_MAX_GRANTS, &set_max)) )
+    if ( (rc = ioctl(fd, IOCTL_GNTDEV_SET_MAX_GRANTS, &set_max)) )
         return rc;
 
     return 0;
@@ -674,6 +675,7 @@ static struct xc_osdep_ops linux_gnttab_ops = {
         .map_grant_refs = &linux_gnttab_map_grant_refs,
         .map_domain_grant_refs = &linux_gnttab_map_domain_grant_refs,
         .munmap = &linux_gnttab_munmap,
+        .set_max_grants = &linux_gnttab_set_max_grants,
     },
 };
 

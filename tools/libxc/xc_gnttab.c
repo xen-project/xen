@@ -182,6 +182,10 @@ int xc_gnttab_munmap(xc_gnttab *xcg,
 					 start_address, count);
 }
 
+int xc_gnttab_set_max_grants(xc_gnttab *xcg, uint32_t count)
+{
+	return xcg->ops->u.gnttab.set_max_grants(xcg, xcg->ops_handle, count);
+}
 
 /*
  * Local variables:

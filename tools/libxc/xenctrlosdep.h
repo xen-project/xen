@@ -107,6 +107,7 @@ struct xc_osdep_ops
             int (*munmap)(xc_gnttab *xcg, xc_osdep_handle h,
                           void *start_address,
                           uint32_t count);
+            int (*set_max_grants)(xc_gnttab *xcg, xc_osdep_handle h, uint32_t count);
         } gnttab;
     } u;
 };
