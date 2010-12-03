@@ -11,9 +11,6 @@
 #define PCI_CONF_ADDRESS(bus, dev, func, reg) \
     (0x80000000 | (bus << 16) | (dev << 11) | (func << 8) | (reg & ~3))
 
-uint32_t pci_conf_read(uint32_t cf8, uint8_t offset, uint8_t bytes);
-void pci_conf_write(uint32_t cf8, uint8_t offset, uint8_t bytes, uint32_t data);
-
 uint8_t pci_conf_read8(
     unsigned int bus, unsigned int dev, unsigned int func, unsigned int reg)
 {

@@ -20,6 +20,8 @@
 
 #include <public/callback.h>
 
+extern asmlinkage int hypercall(void);
+
 static void print_xen_info(void)
 {
     char taint_str[TAINT_STRING_MAX_LEN];
@@ -333,7 +335,6 @@ static void set_task_gate(unsigned int n, unsigned int sel)
 void __devinit subarch_percpu_traps_init(void)
 {
     struct tss_struct *tss;
-    asmlinkage int hypercall(void);
     int cpu = smp_processor_id();
 
     if ( cpu == 0 )
@@ -549,7 +550,6 @@ long do_set_callbacks(unsigned long event_selector,
 
 static void hypercall_page_initialise_ring0_kernel(void *hypercall_page)
 {
-    extern asmlinkage int hypercall(void);
     char *p;
     int i;
 
