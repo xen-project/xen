@@ -364,4 +364,7 @@ bool_t hvm_hap_nested_page_fault(unsigned long gfn);
         ? (u32)__d->arch.incarnation : (u32)(v)->arch.hvm_vcpu.msr_tsc_aux; \
 })
 
+int hvm_x2apic_msr_read(struct vcpu *v, unsigned int msr, uint64_t *msr_content);
+int hvm_x2apic_msr_write(struct vcpu *v, unsigned int msr, uint64_t msr_content);
+
 #endif /* __ASM_X86_HVM_HVM_H__ */

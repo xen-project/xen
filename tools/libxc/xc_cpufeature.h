@@ -98,6 +98,7 @@
 #define X86_FEATURE_DCA		(4*32+18) /* Direct Cache Access */
 #define X86_FEATURE_SSE4_1	(4*32+19) /* Streaming SIMD Extensions 4.1 */
 #define X86_FEATURE_SSE4_2	(4*32+20) /* Streaming SIMD Extensions 4.2 */
+#define X86_FEATURE_X2APIC      (4*32+21) /* x2APIC */
 #define X86_FEATURE_POPCNT	(4*32+23) /* POPCNT instruction */
 #define X86_FEATURE_AES		(4*32+25) /* AES acceleration instructions */
 #define X86_FEATURE_XSAVE	(4*32+26) /* XSAVE/XRSTOR/XSETBV/XGETBV */

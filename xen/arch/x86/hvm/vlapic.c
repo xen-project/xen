@@ -172,7 +172,13 @@ static uint32_t vlapic_get_ppr(struct vlapic *vlapic)
 static int vlapic_match_logical_addr(struct vlapic *vlapic, uint8_t mda)
 {
     int result = 0;
-    uint8_t logical_id;
+    uint32_t logical_id;
+
+    if ( vlapic_x2apic_mode(vlapic) )
+    {
+        logical_id = vlapic_get_reg(vlapic, APIC_LDR);
+        return !!(logical_id & mda);
+    }
 
     logical_id = GET_xAPIC_LOGICAL_ID(vlapic_get_reg(vlapic, APIC_LDR));
 
@@ -392,7 +398,7 @@ void vlapic_EOI_set(struct vlapic *vlapic)
 int vlapic_ipi(
     struct vlapic *vlapic, uint32_t icr_low, uint32_t icr_high)
 {
-    unsigned int dest       = GET_xAPIC_DEST_FIELD(icr_high);
+    unsigned int dest;
     unsigned int short_hand = icr_low & APIC_SHORT_MASK;
     unsigned int dest_mode  = !!(icr_low & APIC_DEST_MASK);
     struct vlapic *target;
@@ -400,6 +406,10 @@ int vlapic_ipi(
     int rc = X86EMUL_OKAY;
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "icr = 0x%08x:%08x", icr_high, icr_low);
+
+    dest = (vlapic_x2apic_mode(vlapic)
+            ? icr_high
+            : GET_xAPIC_DEST_FIELD(icr_high));
 
     if ( (icr_low & APIC_MODE_MASK) == APIC_DM_LOWEST )
     {
@@ -528,65 +538,42 @@ static int vlapic_read(
     return X86EMUL_OKAY;
 }
 
+int hvm_x2apic_msr_read(struct vcpu *v, unsigned int msr, uint64_t *msr_content)
+{
+    struct vlapic *vlapic = vcpu_vlapic(v);
+    uint32_t low, high = 0, offset = (msr - MSR_IA32_APICBASE_MSR) << 4;
+
+    if ( !vlapic_x2apic_mode(vlapic) )
+        return 1;
+
+    vlapic_read_aligned(vlapic, offset, &low);
+    if ( offset == APIC_ICR )
+        vlapic_read_aligned(vlapic, APIC_ICR2, &high);
+
+    *msr_content = (((uint64_t)high) << 32) | low;
+    return 0;
+}
+
 static void vlapic_pt_cb(struct vcpu *v, void *data)
 {
     *(s_time_t *)data = hvm_get_guest_time(v);
 }
 
-static int vlapic_write(struct vcpu *v, unsigned long address,
-                        unsigned long len, unsigned long val)
+static int vlapic_reg_write(struct vcpu *v,
+                            unsigned int offset, unsigned long val)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
-    unsigned int offset = address - vlapic_base_address(vlapic);
     int rc = X86EMUL_OKAY;
-
-    if ( offset != 0xb0 )
-        HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
-                    "offset 0x%x with length 0x%lx, and value is 0x%lx",
-                    offset, len, val);
-
-    /*
-     * According to the IA32 Manual, all accesses should be 32 bits.
-     * Some OSes do 8- or 16-byte accesses, however.
-     */
-    val = (uint32_t)val;
-    if ( len != 4 )
-    {
-        unsigned int tmp;
-        unsigned char alignment;
-
-        gdprintk(XENLOG_INFO, "Notice: Local APIC write with len = %lx\n",len);
-
-        alignment = offset & 0x3;
-        (void)vlapic_read_aligned(vlapic, offset & ~0x3, &tmp);
-
-        switch ( len )
-        {
-        case 1:
-            val = ((tmp & ~(0xff << (8*alignment))) |
-                   ((val & 0xff) << (8*alignment)));
-            break;
-
-        case 2:
-            if ( alignment & 1 )
-                goto unaligned_exit_and_crash;
-            val = ((tmp & ~(0xffff << (8*alignment))) |
-                   ((val & 0xffff) << (8*alignment)));
-            break;
-
-        default:
-            gdprintk(XENLOG_ERR, "Local APIC write with len = %lx, "
-                     "should be 4 instead\n", len);
-            goto exit_and_crash;
-        }
-    }
-    else if ( (offset & 0x3) != 0 )
-        goto unaligned_exit_and_crash;
-
-    offset &= ~0x3;
 
     switch ( offset )
     {
+    case APIC_ID:
+        if ( !vlapic_x2apic_mode(vlapic) )
+            vlapic_set_reg(vlapic, APIC_ID, val);
+        else
+            rc = X86EMUL_UNHANDLEABLE;
+        break;
+
     case APIC_TASKPRI:
         vlapic_set_reg(vlapic, APIC_TASKPRI, val & 0xff);
         break;
@@ -596,11 +583,17 @@ static int vlapic_write(struct vcpu *v, unsigned long address,
         break;
 
     case APIC_LDR:
-        vlapic_set_reg(vlapic, APIC_LDR, val & APIC_LDR_MASK);
+        if ( !vlapic_x2apic_mode(vlapic) )
+            vlapic_set_reg(vlapic, APIC_LDR, val & APIC_LDR_MASK);
+        else
+            rc = X86EMUL_UNHANDLEABLE;
         break;
 
     case APIC_DFR:
-        vlapic_set_reg(vlapic, APIC_DFR, val | 0x0FFFFFFF);
+        if ( !vlapic_x2apic_mode(vlapic) )
+            vlapic_set_reg(vlapic, APIC_DFR, val | 0x0FFFFFFF);
+        else
+            rc = X86EMUL_UNHANDLEABLE;
         break;
 
     case APIC_SPIV:
@@ -628,7 +621,19 @@ static int vlapic_write(struct vcpu *v, unsigned long address,
         break;
 
     case APIC_ESR:
-        /* Nothing to do. */
+        if ( vlapic_x2apic_mode(vlapic) && (val != 0) )
+        {
+            gdprintk(XENLOG_ERR, "Local APIC write ESR with non-zero %lx\n",
+                    val);
+            rc = X86EMUL_UNHANDLEABLE;
+        }
+        break;
+
+    case APIC_SELF_IPI:
+        if ( vlapic_x2apic_mode(vlapic) )
+            vlapic_reg_write(v, APIC_ICR, 0x40000 | (val & 0xff));
+        else
+            rc = X86EMUL_UNHANDLEABLE;
         break;
 
     case APIC_ICR:
@@ -639,7 +644,9 @@ static int vlapic_write(struct vcpu *v, unsigned long address,
         break;
 
     case APIC_ICR2:
-        vlapic_set_reg(vlapic, APIC_ICR2, val & 0xff000000);
+        if ( !vlapic_x2apic_mode(vlapic) )
+            val &= 0xff000000;
+        vlapic_set_reg(vlapic, APIC_ICR2, val);
         break;
 
     case APIC_LVTT:         /* LVT Timer Reg */
@@ -696,12 +703,67 @@ static int vlapic_write(struct vcpu *v, unsigned long address,
         break;
 
     default:
-        gdprintk(XENLOG_DEBUG,
-                 "Local APIC Write to read-only register 0x%x\n", offset);
         break;
     }
-
+    if (rc == X86EMUL_UNHANDLEABLE)
+        gdprintk(XENLOG_DEBUG,
+                "Local APIC Write wrong to register 0x%x\n", offset);
     return rc;
+}
+
+static int vlapic_write(struct vcpu *v, unsigned long address,
+                        unsigned long len, unsigned long val)
+{
+    struct vlapic *vlapic = vcpu_vlapic(v);
+    unsigned int offset = address - vlapic_base_address(vlapic);
+    int rc = X86EMUL_OKAY;
+
+    if ( offset != 0xb0 )
+        HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
+                    "offset 0x%x with length 0x%lx, and value is 0x%lx",
+                    offset, len, val);
+
+    /*
+     * According to the IA32 Manual, all accesses should be 32 bits.
+     * Some OSes do 8- or 16-byte accesses, however.
+     */
+    val = (uint32_t)val;
+    if ( len != 4 )
+    {
+        unsigned int tmp;
+        unsigned char alignment;
+
+        gdprintk(XENLOG_INFO, "Notice: Local APIC write with len = %lx\n",len);
+
+        alignment = offset & 0x3;
+        (void)vlapic_read_aligned(vlapic, offset & ~0x3, &tmp);
+
+        switch ( len )
+        {
+        case 1:
+            val = ((tmp & ~(0xff << (8*alignment))) |
+                   ((val & 0xff) << (8*alignment)));
+            break;
+
+        case 2:
+            if ( alignment & 1 )
+                goto unaligned_exit_and_crash;
+            val = ((tmp & ~(0xffff << (8*alignment))) |
+                   ((val & 0xffff) << (8*alignment)));
+            break;
+
+        default:
+            gdprintk(XENLOG_ERR, "Local APIC write with len = %lx, "
+                     "should be 4 instead\n", len);
+            goto exit_and_crash;
+        }
+    }
+    else if ( (offset & 0x3) != 0 )
+        goto unaligned_exit_and_crash;
+
+    offset &= ~0x3;
+
+    return vlapic_reg_write(v, offset, val);
 
  unaligned_exit_and_crash:
     gdprintk(XENLOG_ERR, "Unaligned LAPIC write len=0x%lx at offset=0x%x.\n",
@@ -709,6 +771,25 @@ static int vlapic_write(struct vcpu *v, unsigned long address,
  exit_and_crash:
     domain_crash(v->domain);
     return rc;
+}
+
+int hvm_x2apic_msr_write(struct vcpu *v, unsigned int msr, uint64_t msr_content)
+{
+    struct vlapic *vlapic = vcpu_vlapic(v);
+    uint32_t offset = (msr - MSR_IA32_APICBASE_MSR) << 4;
+    int rc;
+
+    if ( !vlapic_x2apic_mode(vlapic) )
+        return 1;
+
+    if ( offset == APIC_ICR )
+        if ( vlapic_reg_write(v, APIC_ICR2 , (uint32_t)(msr_content >> 32)) )
+            return 1;
+
+    rc = vlapic_reg_write(v, offset, (uint32_t)msr_content);
+
+    /* X86EMUL_RETRY for SIPI */
+    return ((rc != X86EMUL_OKAY) && (rc != X86EMUL_RETRY));
 }
 
 static int vlapic_range(struct vcpu *v, unsigned long addr)
@@ -742,6 +823,13 @@ void vlapic_msr_set(struct vlapic *vlapic, uint64_t value)
     }
 
     vlapic->hw.apic_base_msr = value;
+
+    if ( vlapic_x2apic_mode(vlapic) )
+    {
+        u32 id = vlapic_get_reg(vlapic, APIC_ID);
+        u32 ldr = ((id & ~0xf) << 16) | (1 << (id & 0xf));
+        vlapic_set_reg(vlapic, APIC_LDR, ldr);
+    }
 
     vmx_vlapic_msr_changed(vlapic_vcpu(vlapic));
 

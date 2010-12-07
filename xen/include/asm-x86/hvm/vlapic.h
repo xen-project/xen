@@ -51,6 +51,8 @@
 
 #define vlapic_base_address(vlapic)                             \
     ((vlapic)->hw.apic_base_msr & MSR_IA32_APICBASE_BASE)
+#define vlapic_x2apic_mode(vlapic)                              \
+    ((vlapic)->hw.apic_base_msr & MSR_IA32_APICBASE_EXTD)
 
 struct vlapic {
     struct hvm_hw_lapic      hw;
