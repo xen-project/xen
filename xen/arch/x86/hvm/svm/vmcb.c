@@ -312,8 +312,8 @@ static void svm_dump_sel(char *name, svm_segment_register_t *s)
 void svm_dump_vmcb(const char *from, struct vmcb_struct *vmcb)
 {
     printk("Dumping guest's current state at %s...\n", from);
-    printk("Size of VMCB = %d, address = %p\n", 
-            (int) sizeof(struct vmcb_struct), vmcb);
+    printk("Size of VMCB = %d, paddr = 0x%016lx, vaddr = %p\n",
+           (int) sizeof(struct vmcb_struct),  virt_to_maddr(vmcb), vmcb);
 
     printk("cr_intercepts = 0x%08x dr_intercepts = 0x%08x "
            "exception_intercepts = 0x%08x\n", 
@@ -321,7 +321,7 @@ void svm_dump_vmcb(const char *from, struct vmcb_struct *vmcb)
            vmcb->exception_intercepts);
     printk("general1_intercepts = 0x%08x general2_intercepts = 0x%08x\n", 
            vmcb->general1_intercepts, vmcb->general2_intercepts);
-    printk("iopm_base_pa = %016llx msrpm_base_pa = 0x%016llx tsc_offset = "
+    printk("iopm_base_pa = 0x%016llx msrpm_base_pa = 0x%016llx tsc_offset = "
             "0x%016llx\n", 
            (unsigned long long) vmcb->iopm_base_pa,
            (unsigned long long) vmcb->msrpm_base_pa,
