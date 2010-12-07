@@ -20,9 +20,6 @@
 
 extern int trap_init_f00f_bug(void);
 
-static int use_xsave;
-boolean_param("xsave", use_xsave);
-
 #ifdef CONFIG_X86_INTEL_USERCOPY
 /*
  * Alignment at which movsl is preferred for bulk memory copies.
@@ -259,12 +256,6 @@ static void __devinit init_intel(struct cpuinfo_x86 *c)
 	if ((c->cpuid_level >= 0x00000006) &&
 	    (cpuid_eax(0x00000006) & (1u<<2)))
 		set_bit(X86_FEATURE_ARAT, c->x86_capability);
-
-	if ( !use_xsave )
-		clear_bit(X86_FEATURE_XSAVE, boot_cpu_data.x86_capability);
-
-	if ( cpu_has_xsave )
-		xsave_init();
 }
 
 
