@@ -430,7 +430,7 @@ static uint32_t vlapic_get_tmcct(struct vlapic *vlapic)
 
     counter_passed = ((hvm_get_guest_time(v) - vlapic->timer_last_update)
                       / APIC_BUS_CYCLE_NS / vlapic->hw.timer_divisor);
-    tmcct = tmict - counter_passed;
+    tmcct = (counter_passed < tmict) ? tmict - counter_passed : 0;
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC_TIMER,
                 "timer initial count %d, timer current count %d, "
@@ -677,7 +677,8 @@ static int vlapic_write(struct vcpu *v, unsigned long address,
                   (uint32_t)val * vlapic->hw.timer_divisor);
         create_periodic_time(current, &vlapic->pt, period, 
                              vlapic_lvtt_period(vlapic) ? period : 0,
-                             vlapic->pt.irq, vlapic_pt_cb,
+                             vlapic->pt.irq,
+                             vlapic_lvtt_period(vlapic) ? vlapic_pt_cb : NULL,
                              &vlapic->timer_last_update);
         vlapic->timer_last_update = vlapic->pt.last_plt_gtime;
 
@@ -874,7 +875,8 @@ static void lapic_rearm(struct vlapic *s)
     s->pt.irq = vlapic_get_reg(s, APIC_LVTT) & APIC_VECTOR_MASK;
     create_periodic_time(vlapic_vcpu(s), &s->pt, period,
                          vlapic_lvtt_period(s) ? period : 0,
-                         s->pt.irq, vlapic_pt_cb,
+                         s->pt.irq,
+                         vlapic_lvtt_period(s) ? vlapic_pt_cb : NULL,
                          &s->timer_last_update);
     s->timer_last_update = s->pt.last_plt_gtime;
 }
