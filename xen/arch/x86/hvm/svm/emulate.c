@@ -76,7 +76,7 @@ static unsigned long svm_nextrip_insn_length(struct vcpu *v)
         /* (exitcodes 84-95) are reserved */
     case VMEXIT_IDTR_READ ... VMEXIT_TR_WRITE:
     case VMEXIT_RDTSC ... VMEXIT_MSR:
-    case VMEXIT_VMRUN ...  VMEXIT_MWAIT_CONDITIONAL:
+    case VMEXIT_VMRUN ...  VMEXIT_XSETBV:
         /* ...and the rest of the #VMEXITs */
     case VMEXIT_CR0_SEL_WRITE:
     case VMEXIT_EXCEPTION_BP:
