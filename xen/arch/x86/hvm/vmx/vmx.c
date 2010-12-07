@@ -2194,30 +2194,6 @@ static int vmx_handle_eoi_write(void)
     return 0;
 }
 
-static int vmx_handle_xsetbv(u64 new_bv)
-{
-    struct vcpu *v = current;
-    struct segment_register sreg;
-
-    hvm_get_segment_register(v, x86_seg_ss, &sreg);
-    if ( sreg.attr.fields.dpl != 0 )
-        goto err;
-
-    if ( ((new_bv ^ xfeature_mask) & ~xfeature_mask) || !(new_bv & 1) )
-        goto err;
-
-    if ( (xfeature_mask & XSTATE_YMM & new_bv) && !(new_bv & XSTATE_SSE) )
-        goto err;
-
-    v->arch.xcr0 = new_bv;
-    v->arch.xcr0_accum |= new_bv;
-    set_xcr0(new_bv);
-    return 0;
-err:
-    vmx_inject_hw_exception(TRAP_gp_fault, 0);
-    return -1;
-}
-
 asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 {
     unsigned int exit_reason, idtv_info, intr_info = 0, vector = 0;
@@ -2610,7 +2586,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     case EXIT_REASON_XSETBV:
     {
         u64 new_bv = (((u64)regs->edx) << 32) | regs->eax;
-        if ( vmx_handle_xsetbv(new_bv) == 0 )
+        if ( hvm_handle_xsetbv(new_bv) == 0 )
             update_guest_eip(); /* Safe: XSETBV */
         break;
     }

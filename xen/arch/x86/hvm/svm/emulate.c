@@ -101,6 +101,7 @@ MAKE_INSTR(HLT,    1, 0xf4);
 MAKE_INSTR(INT3,   1, 0xcc);
 MAKE_INSTR(RDTSC,  2, 0x0f, 0x31);
 MAKE_INSTR(PAUSE,  1, 0x90);
+MAKE_INSTR(XSETBV, 3, 0x0f, 0x01, 0xd1);
 
 static const u8 *opc_bytes[INSTR_MAX_COUNT] = 
 {
@@ -114,6 +115,7 @@ static const u8 *opc_bytes[INSTR_MAX_COUNT] =
     [INSTR_INT3]   = OPCODE_INT3,
     [INSTR_RDTSC]  = OPCODE_RDTSC,
     [INSTR_PAUSE]  = OPCODE_PAUSE,
+    [INSTR_XSETBV] = OPCODE_XSETBV,
 };
 
 static int fetch(struct vcpu *v, u8 *buf, unsigned long addr, int len)

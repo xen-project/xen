@@ -1600,6 +1600,13 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         hvm_inject_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE, 0);
         break;
 
+    case VMEXIT_XSETBV:
+        if ( (inst_len = __get_instruction_length(current, INSTR_XSETBV))==0 )
+            break;
+        if ( hvm_handle_xsetbv((((u64)regs->edx) << 32) | regs->eax) == 0 )
+            __update_guest_eip(regs, inst_len);
+        break;
+
     case VMEXIT_NPF:
         perfc_incra(svmexits, VMEXIT_NPF_PERFC);
         regs->error_code = vmcb->exitinfo1;

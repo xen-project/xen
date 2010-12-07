@@ -299,6 +299,7 @@ enum VMEXIT_EXITCODE
     VMEXIT_MONITOR          = 138, /* 0x8a */
     VMEXIT_MWAIT            = 139, /* 0x8b */
     VMEXIT_MWAIT_CONDITIONAL= 140, /* 0x8c */
+    VMEXIT_XSETBV           = 141, /* 0x8d */
     VMEXIT_NPF              = 1024, /* 0x400, nested paging fault */
     VMEXIT_INVALID          =  -1
 };

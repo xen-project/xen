@@ -1144,6 +1144,31 @@ bool_t hvm_hap_nested_page_fault(unsigned long gfn)
     return 0;
 }
 
+int hvm_handle_xsetbv(u64 new_bv)
+{
+    struct vcpu *v = current;
+    struct segment_register sreg;
+
+    hvm_get_segment_register(v, x86_seg_ss, &sreg);
+    if ( sreg.attr.fields.dpl != 0 )
+        goto err;
+
+    if ( ((new_bv ^ xfeature_mask) & ~xfeature_mask) || !(new_bv & 1) )
+        goto err;
+
+    if ( (xfeature_mask & XSTATE_YMM & new_bv) && !(new_bv & XSTATE_SSE) )
+        goto err;
+
+    v->arch.xcr0 = new_bv;
+    v->arch.xcr0_accum |= new_bv;
+    set_xcr0(new_bv);
+
+    return 0;
+err:
+    hvm_inject_exception(TRAP_gp_fault, 0, 0);
+    return -1;
+}
+
 int hvm_set_efer(uint64_t value)
 {
     struct vcpu *v = current;
