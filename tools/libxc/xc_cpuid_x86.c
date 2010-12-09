@@ -204,9 +204,9 @@ static void xc_cpuid_hvm_policy(
                     bitmaskof(X86_FEATURE_SSE4_2) |
                     bitmaskof(X86_FEATURE_POPCNT) |
                     bitmaskof(X86_FEATURE_AES) |
-                    (xsave_supported)?
+                    (xsave_supported ?
                      (bitmaskof(X86_FEATURE_AVX) |
-                      bitmaskof(X86_FEATURE_XSAVE)) : 0);
+                      bitmaskof(X86_FEATURE_XSAVE)) : 0));
 
         regs[2] |= (bitmaskof(X86_FEATURE_HYPERVISOR) |
                     bitmaskof(X86_FEATURE_X2APIC));
