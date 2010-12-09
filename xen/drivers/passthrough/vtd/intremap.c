@@ -131,14 +131,9 @@ int iommu_supports_eim(void)
     struct acpi_drhd_unit *drhd;
     int apic;
 
-    if ( !iommu_enabled || !iommu_qinval || !iommu_intremap )
+    if ( !iommu_enabled || !iommu_qinval || !iommu_intremap ||
+         list_empty(&acpi_drhd_units) )
         return 0;
-
-    if ( list_empty(&acpi_drhd_units) )
-    {
-        dprintk(XENLOG_WARNING VTDPREFIX, "VT-d is not supported\n");
-        return 0;
-    }
 
     /* We MUST have a DRHD unit for each IOAPIC. */
     for ( apic = 0; apic < nr_ioapics; apic++ )

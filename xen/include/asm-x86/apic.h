@@ -25,21 +25,8 @@ extern int apic_verbosity;
 extern int x2apic_enabled;
 extern int directed_eoi_enabled;
 
-extern void check_x2apic_preenabled(void);
-extern int x2apic_cmdline_disable(void);
-extern void enable_x2apic(void);
-
-static __inline int x2apic_is_available(void)
-{
-    unsigned int op = 1, eax, ecx;
-
-    asm ( "cpuid"
-          : "=a" (eax), "=c" (ecx)
-          : "0" (op)
-          : "bx", "dx" );
-
-    return (ecx & (1U << 21));
-}
+void x2apic_setup(void);
+const struct genapic *apic_x2apic_probe(void);
 
 /*
  * Define the default level of output to be very little

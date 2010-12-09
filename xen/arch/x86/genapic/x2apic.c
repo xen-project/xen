@@ -27,84 +27,39 @@
 #include <xen/smp.h>
 #include <asm/mach-default/mach_mpparse.h>
 
-static int x2apic = 1;
-boolean_param("x2apic", x2apic);
-
-static int  x2apic_phys; /* By default we use logical cluster mode. */
+static int x2apic_phys; /* By default we use logical cluster mode. */
 boolean_param("x2apic_phys", x2apic_phys);
 
-int x2apic_cmdline_disable(void)
+static void init_apic_ldr_x2apic_phys(void)
 {
-    return (x2apic == 0);
 }
 
-static int probe_x2apic_phys(void)
-{
-    return x2apic && x2apic_phys && x2apic_is_available() &&
-        iommu_supports_eim();
-}
-
-static int probe_x2apic_cluster(void)
-{
-    return x2apic && !x2apic_phys && x2apic_is_available() &&
-        iommu_supports_eim();
-}
-
-const struct genapic apic_x2apic_phys = {
-    APIC_INIT("x2apic_phys", probe_x2apic_phys),
-    GENAPIC_X2APIC_PHYS
-};
-
-const struct genapic apic_x2apic_cluster = {
-    APIC_INIT("x2apic_cluster", probe_x2apic_cluster),
-    GENAPIC_X2APIC_CLUSTER
-};
-
-const struct genapic *apic_x2apic_probe(void)
-{
-    if ( !x2apic || !x2apic_is_available() )
-        return NULL;
-
-    if ( !iommu_supports_eim() )
-        return NULL;
-
-    if ( x2apic_phys )
-        return &apic_x2apic_phys;
-    else
-        return &apic_x2apic_cluster;
-}
-
-void init_apic_ldr_x2apic_phys(void)
-{
-    return;
-}
-
-void init_apic_ldr_x2apic_cluster(void)
+static void init_apic_ldr_x2apic_cluster(void)
 {
     int cpu = smp_processor_id();
     cpu_2_logical_apicid[cpu] = apic_read(APIC_LDR);
 }
-void clustered_apic_check_x2apic(void)
+
+static void clustered_apic_check_x2apic(void)
 {
-    return;
 }
 
-const cpumask_t *target_cpus_x2apic(void)
+static const cpumask_t *target_cpus_x2apic(void)
 {
     return &cpu_online_map;
 }
 
-const cpumask_t *vector_allocation_cpumask_x2apic(int cpu)
+static const cpumask_t *vector_allocation_cpumask_x2apic(int cpu)
 {
     return cpumask_of(cpu);
 }
 
-unsigned int cpu_mask_to_apicid_x2apic_phys(const cpumask_t *cpumask)
+static unsigned int cpu_mask_to_apicid_x2apic_phys(const cpumask_t *cpumask)
 {
     return cpu_physical_id(cpumask_first(cpumask));
 }
 
-unsigned int cpu_mask_to_apicid_x2apic_cluster(const cpumask_t *cpumask)
+static unsigned int cpu_mask_to_apicid_x2apic_cluster(const cpumask_t *cpumask)
 {
     return cpu_2_logical_apicid[cpumask_first(cpumask)];
 }
@@ -143,12 +98,43 @@ static void __send_IPI_mask_x2apic(
     local_irq_restore(flags);
 }
 
-void send_IPI_mask_x2apic_phys(const cpumask_t *cpumask, int vector)
+static void send_IPI_mask_x2apic_phys(const cpumask_t *cpumask, int vector)
 {
     __send_IPI_mask_x2apic(cpumask, vector, APIC_DEST_PHYSICAL);
 }
 
-void send_IPI_mask_x2apic_cluster(const cpumask_t *cpumask, int vector)
+static void send_IPI_mask_x2apic_cluster(const cpumask_t *cpumask, int vector)
 {
     __send_IPI_mask_x2apic(cpumask, vector, APIC_DEST_LOGICAL);
+}
+
+static const struct genapic apic_x2apic_phys = {
+    APIC_INIT("x2apic_phys", NULL),
+    .int_delivery_mode = dest_Fixed,
+    .int_dest_mode = 0 /* physical delivery */,
+    .init_apic_ldr = init_apic_ldr_x2apic_phys,
+    .clustered_apic_check = clustered_apic_check_x2apic,
+    .target_cpus = target_cpus_x2apic,
+    .vector_allocation_cpumask = vector_allocation_cpumask_x2apic,
+    .cpu_mask_to_apicid = cpu_mask_to_apicid_x2apic_phys,
+    .send_IPI_mask = send_IPI_mask_x2apic_phys,
+    .send_IPI_self = send_IPI_self_x2apic
+};
+
+static const struct genapic apic_x2apic_cluster = {
+    APIC_INIT("x2apic_cluster", NULL),
+    .int_delivery_mode = dest_LowestPrio,
+    .int_dest_mode = 1 /* logical delivery */,
+    .init_apic_ldr = init_apic_ldr_x2apic_cluster,
+    .clustered_apic_check = clustered_apic_check_x2apic,
+    .target_cpus = target_cpus_x2apic,
+    .vector_allocation_cpumask = vector_allocation_cpumask_x2apic,
+    .cpu_mask_to_apicid = cpu_mask_to_apicid_x2apic_cluster,
+    .send_IPI_mask = send_IPI_mask_x2apic_cluster,
+    .send_IPI_self = send_IPI_self_x2apic
+};
+
+const struct genapic *apic_x2apic_probe(void)
+{
+    return x2apic_phys ? &apic_x2apic_phys : &apic_x2apic_cluster;
 }

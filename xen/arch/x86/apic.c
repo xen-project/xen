@@ -76,11 +76,11 @@ static int enable_local_apic __initdata = 0; /* -1=force-disable, +1=force-enabl
  */
 int apic_verbosity;
 
+static int opt_x2apic = 1;
+boolean_param("x2apic", opt_x2apic);
+
 int x2apic_enabled __read_mostly = 0;
 int directed_eoi_enabled __read_mostly = 0;
-
-/* x2APIC is enabled in BIOS */
-static int x2apic_preenabled;
 
 /*
  * The following vectors are part of the Linux architecture, there
@@ -953,30 +953,24 @@ no_apic:
     return -1;
 }
 
-void check_x2apic_preenabled(void)
-{
-    uint64_t msr_content;
-
-    if ( !x2apic_is_available() )
-        return;
-
-    rdmsrl(MSR_IA32_APICBASE, msr_content);
-    if ( msr_content & MSR_IA32_APICBASE_EXTD )
-    {
-        printk("x2APIC mode is already enabled by BIOS.\n");
-        x2apic_preenabled = 1;
-        x2apic_enabled = 1;
-    }
-}
-
-static void enable_bsp_x2apic(void)
+void x2apic_setup(void)
 {
     struct IO_APIC_route_entry **ioapic_entries = NULL;
-    const struct genapic *x2apic_genapic = NULL;
+    uint64_t msr_content;
 
-    ASSERT(smp_processor_id() == 0);
+    if ( smp_processor_id() != 0 )
+    {
+        if ( x2apic_enabled )
+            __enable_x2apic();
+        return;
+    }
 
-    if ( x2apic_preenabled )
+    if ( !cpu_has_x2apic )
+        return;
+
+    /* Check whether x2apic mode was already enabled by the BIOS. */
+    rdmsrl(MSR_IA32_APICBASE, msr_content);
+    if ( msr_content & MSR_IA32_APICBASE_EXTD )
     {
         /*
          * Interrupt remapping should be also enabled by BIOS when
@@ -986,39 +980,33 @@ static void enable_bsp_x2apic(void)
         if ( !intremap_enabled() )
             panic("Interrupt remapping is not enabled by BIOS while "
                   "x2APIC is already enabled by BIOS!\n");
+
+        printk("x2APIC mode is already enabled by BIOS.\n");
+        x2apic_enabled = 1;
     }
 
-    x2apic_genapic = apic_x2apic_probe();
-    if ( x2apic_genapic )
-        genapic = x2apic_genapic;
-    else
+    if ( !opt_x2apic )
     {
-        if ( x2apic_cmdline_disable() )
+        if ( !x2apic_enabled )
         {
-            if ( x2apic_preenabled )
-            {
-                /* Ignore x2apic=0, and set default x2apic mode */
-                genapic = &apic_x2apic_cluster;
-                printk("x2APIC: already enabled by BIOS, ignore x2apic=0.\n");
-            }
-            else
-            {
-                printk("Not enable x2APIC due to x2apic=0 is set.\n");
-                return;
-            }
-        }
-        else
+            printk("Not enabling x2APIC: disabled by cmdline.\n");
+            return;
+        }        
+        printk("x2APIC: Already enabled by BIOS: Ignoring cmdline disable.\n");
+    }
+
+    if ( !iommu_supports_eim() )
+    {
+        if ( !x2apic_enabled )
         {
-            if ( x2apic_preenabled )
-                panic("x2APIC: already enabled by BIOS, but "
-                      "iommu_supports_eim failed!\n");
-            printk("Not enabling x2APIC: depends oniommu_supports_eim\n");
+            printk("Not enabling x2APIC: depends on iommu_supports_eim.\n");
             return;
         }
+        panic("x2APIC: already enabled by BIOS, but "
+              "iommu_supports_eim failed!\n");
     }
 
-    ioapic_entries = alloc_ioapic_entries();
-    if ( !ioapic_entries )
+    if ( (ioapic_entries = alloc_ioapic_entries()) == NULL )
     {
         printk("Allocate ioapic_entries failed\n");
         goto out;
@@ -1040,13 +1028,13 @@ static void enable_bsp_x2apic(void)
         goto restore_out;
     }
 
-    x2apic_enabled = 1;
+    genapic = apic_x2apic_probe();
     printk("Switched to APIC driver %s.\n", genapic->name);
 
-    if ( !x2apic_preenabled )
+    if ( !x2apic_enabled )
     {
+        x2apic_enabled = 1;
         __enable_x2apic();
-        printk("x2APIC mode enabled.\n");
     }
 
 restore_out:
@@ -1056,24 +1044,6 @@ restore_out:
 out:
     if ( ioapic_entries )
         free_ioapic_entries(ioapic_entries);
-}
-
-static void enable_ap_x2apic(void)
-{
-    ASSERT(smp_processor_id() != 0);
-
-    /* APs only enable x2apic when BSP did so. */
-    BUG_ON(!x2apic_enabled);
-
-    __enable_x2apic();
-}
-
-void enable_x2apic(void)
-{
-    if ( smp_processor_id() == 0 )
-        enable_bsp_x2apic();
-    else
-        enable_ap_x2apic();
 }
 
 void __init init_apic_mappings(void)

@@ -252,8 +252,8 @@ static void __init early_cpu_detect(void)
 
 	c->x86 = 4;
 	if (c->cpuid_level >= 0x00000001) {
-		u32 junk, tfms, cap0, misc;
-		cpuid(0x00000001, &tfms, &misc, &junk, &cap0);
+		u32 cap4, tfms, cap0, misc;
+		cpuid(0x00000001, &tfms, &misc, &cap4, &cap0);
 		c->x86 = (tfms >> 8) & 15;
 		c->x86_model = (tfms >> 4) & 15;
 		if (c->x86 == 0xf)
@@ -262,9 +262,12 @@ static void __init early_cpu_detect(void)
 			c->x86_model += ((tfms >> 16) & 0xF) << 4;
 		c->x86_mask = tfms & 15;
 		cap0 &= ~cleared_caps[0];
+		cap4 &= ~cleared_caps[4];
 		if (cap0 & (1<<19))
 			c->x86_cache_alignment = ((misc >> 8) & 0xff) * 8;
-		c->x86_capability[0] = cap0; /* Added for Xen bootstrap */
+		/* Leaf 0x1 capabilities filled in early for Xen. */
+		c->x86_capability[0] = cap0;
+		c->x86_capability[4] = cap4;
 	}
 }
 
