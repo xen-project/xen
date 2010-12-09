@@ -545,7 +545,7 @@ int mem_sharing_nominate_page(struct domain *d,
          * it a few lines above.
          * The mfn needs to revert back to rw type. This should never fail,
          * since no-one knew that the mfn was temporarily sharable */
-        ASSERT(page_make_private(d, page) == 0);
+        BUG_ON(page_make_private(d, page) != 0);
         mem_sharing_hash_destroy(hash_entry);
         mem_sharing_gfn_destroy(gfn_info, 0);
         shr_unlock();
@@ -699,7 +699,7 @@ gfn_found:
     unmap_domain_page(s);
     unmap_domain_page(t);
 
-    ASSERT(set_shared_p2m_entry(d, gfn, page_to_mfn(page)) != 0);
+    BUG_ON(set_shared_p2m_entry(d, gfn, page_to_mfn(page)) == 0);
     put_page_and_type(old_page);
 
 private_page_found:    
