@@ -241,7 +241,7 @@ arinc653_sched_set(
             found_dom0 = 1;
 
         /* Check for a valid VCPU ID and run time. */
-        if ( (schedule->sched_entries[i].vcpu_id < 0)
+        if ( (schedule->sched_entries[i].vcpu_id >= MAX_VIRT_CPUS)
              || (schedule->sched_entries[i].runtime <= 0) )
             goto fail;
 
