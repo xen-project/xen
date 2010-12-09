@@ -5412,10 +5412,12 @@ int main_cpupoolcreate(int argc, char **argv)
     uint32_t poolid;
     int schedid = -1;
     XLU_ConfigList *cpus;
-    int n_cpus, i, n;
+    XLU_ConfigList *nodes;
+    int n_cpus, n_nodes, i, n;
     libxl_cpumap freemap;
     libxl_cpumap cpumap;
     libxl_uuid uuid;
+    libxl_topologyinfo topology;
 
     while (1) {
         opt = getopt_long(argc, argv, "hnf:", long_options, &option_index);
@@ -5524,7 +5526,32 @@ int main_cpupoolcreate(int argc, char **argv)
         fprintf(stderr, "Failed to allocate cpumap\n");
         return -ERROR_FAIL;
     }
-    if (!xlu_cfg_get_list(config, "cpus", &cpus, 0, 0)) {
+    if (!xlu_cfg_get_list(config, "nodes", &nodes, 0, 0)) {
+        n_cpus = 0;
+        n_nodes = 0;
+        if (libxl_get_topologyinfo(&ctx, &topology)) {
+            fprintf(stderr, "libxl_get_topologyinfo failed\n");
+            return -ERROR_FAIL;
+        }
+        while ((buf = xlu_cfg_get_listitem(nodes, n_nodes)) != NULL) {
+            n = atoi(buf);
+            for (i = 0; i < topology.nodemap.entries; i++) {
+                if ((topology.nodemap.array[i] == n) &&
+                    libxl_cpumap_test(&freemap, i)) {
+                    libxl_cpumap_set(&cpumap, i);
+                    n_cpus++;
+                }
+            }
+            n_nodes++;
+        }
+
+        libxl_topologyinfo_destroy(&topology);
+
+        if (n_cpus == 0) {
+            fprintf(stderr, "no free cpu found\n");
+            return -ERROR_FAIL;
+        }
+    } else if (!xlu_cfg_get_list(config, "cpus", &cpus, 0, 0)) {
         n_cpus = 0;
         while ((buf = xlu_cfg_get_listitem(cpus, n_cpus)) != NULL) {
             i = atoi(buf);
@@ -5708,6 +5735,8 @@ int main_cpupoolcpuadd(int argc, char **argv)
     const char *pool;
     uint32_t poolid;
     int cpu;
+    int node;
+    int n;
 
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
@@ -5732,7 +5761,13 @@ int main_cpupoolcpuadd(int argc, char **argv)
         help("cpupool-cpu-add");
         return -ERROR_FAIL;
     }
-    cpu = atoi(argv[optind]);
+    node = -1;
+    cpu = -1;
+    if (strncmp(argv[optind], "node:", 5) == 0) {
+        node = atoi(argv[optind] + 5);
+    } else {
+        cpu = atoi(argv[optind]);
+    }
 
     if (cpupool_qualifier_to_cpupoolid(pool, &poolid, NULL) ||
         !libxl_cpupoolid_to_name(&ctx, poolid)) {
@@ -5740,7 +5775,21 @@ int main_cpupoolcpuadd(int argc, char **argv)
         return -ERROR_FAIL;
     }
 
-    return -libxl_cpupool_cpuadd(&ctx, poolid, cpu);
+    if (cpu >= 0) {
+        return -libxl_cpupool_cpuadd(&ctx, poolid, cpu);
+    }
+
+    if (libxl_cpupool_cpuadd_node(&ctx, poolid, node, &n)) {
+        fprintf(stderr, "libxl_cpupool_cpuadd_node failed\n");
+        return -ERROR_FAIL;
+    }
+
+    if (n > 0) {
+        return 0;
+    }
+
+    fprintf(stderr, "no free cpu found\n");
+    return -ERROR_FAIL;
 }
 
 int main_cpupoolcpuremove(int argc, char **argv)
@@ -5749,6 +5798,8 @@ int main_cpupoolcpuremove(int argc, char **argv)
     const char *pool;
     uint32_t poolid;
     int cpu;
+    int node;
+    int n;
 
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
@@ -5773,7 +5824,13 @@ int main_cpupoolcpuremove(int argc, char **argv)
         help("cpupool-cpu-remove");
         return -ERROR_FAIL;
     }
-    cpu = atoi(argv[optind]);
+    node = -1;
+    cpu = -1;
+    if (strncmp(argv[optind], "node:", 5) == 0) {
+        node = atoi(argv[optind] + 5);
+    } else {
+        cpu = atoi(argv[optind]);
+    }
 
     if (cpupool_qualifier_to_cpupoolid(pool, &poolid, NULL) ||
         !libxl_cpupoolid_to_name(&ctx, poolid)) {
@@ -5781,7 +5838,21 @@ int main_cpupoolcpuremove(int argc, char **argv)
         return -ERROR_FAIL;
     }
 
-    return -libxl_cpupool_cpuremove(&ctx, poolid, cpu);
+    if (cpu >= 0) {
+        return -libxl_cpupool_cpuremove(&ctx, poolid, cpu);
+    }
+
+    if (libxl_cpupool_cpuremove_node(&ctx, poolid, node, &n)) {
+        fprintf(stderr, "libxl_cpupool_cpuremove_node failed\n");
+        return -ERROR_FAIL;
+    }
+
+    if (n == 0) {
+        fprintf(stderr, "no cpu of node found in cpupool\n");
+        return -ERROR_FAIL;
+    }
+
+    return 0;
 }
 
 int main_cpupoolmigrate(int argc, char **argv)

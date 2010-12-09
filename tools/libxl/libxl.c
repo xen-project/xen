@@ -3898,6 +3898,38 @@ int libxl_cpupool_cpuadd(libxl_ctx *ctx, uint32_t poolid, int cpu)
     return 0;
 }
 
+int libxl_cpupool_cpuadd_node(libxl_ctx *ctx, uint32_t poolid, int node, int *cpus)
+{
+    int rc = 0;
+    int cpu;
+    libxl_cpumap freemap;
+    libxl_topologyinfo topology;
+
+    if (libxl_get_freecpus(ctx, &freemap)) {
+        return ERROR_FAIL;
+    }
+
+    if (libxl_get_topologyinfo(ctx, &topology)) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    *cpus = 0;
+    for (cpu = 0; cpu < topology.nodemap.entries; cpu++) {
+        if (libxl_cpumap_test(&freemap, cpu) &&
+            (topology.nodemap.array[cpu] == node) &&
+            !libxl_cpupool_cpuadd(ctx, poolid, cpu)) {
+                (*cpus)++;
+        }
+    }
+
+    libxl_topologyinfo_destroy(&topology);
+
+out:
+    libxl_cpumap_destroy(&freemap);
+    return rc;
+}
+
 int libxl_cpupool_cpuremove(libxl_ctx *ctx, uint32_t poolid, int cpu)
 {
     int rc;
@@ -3909,6 +3941,48 @@ int libxl_cpupool_cpuremove(libxl_ctx *ctx, uint32_t poolid, int cpu)
         return ERROR_FAIL;
     }
     return 0;
+}
+
+int libxl_cpupool_cpuremove_node(libxl_ctx *ctx, uint32_t poolid, int node, int *cpus)
+{
+    int ret = 0;
+    int n_pools;
+    int p;
+    int cpu;
+    libxl_topologyinfo topology;
+    libxl_cpupoolinfo *poolinfo;
+
+    poolinfo = libxl_list_cpupool(ctx, &n_pools);
+    if (!poolinfo) {
+        return ERROR_NOMEM;
+    }
+
+    if (libxl_get_topologyinfo(ctx, &topology)) {
+        ret = ERROR_FAIL;
+        goto out;
+    }
+
+    *cpus = 0;
+    for (p = 0; p < n_pools; p++) {
+        if (poolinfo[p].poolid == poolid) {
+            for (cpu = 0; cpu < topology.nodemap.entries; cpu++) {
+                if ((topology.nodemap.array[cpu] == node) &&
+                    libxl_cpumap_test(&poolinfo[p].cpumap, cpu) &&
+                    !libxl_cpupool_cpuremove(ctx, poolid, cpu)) {
+                        (*cpus)++;
+                }
+            }
+        }
+    }
+
+    libxl_topologyinfo_destroy(&topology);
+
+out:
+    for (p = 0; p < n_pools; p++) {
+        libxl_cpupoolinfo_destroy(poolinfo + p);
+    }
+
+    return ret;
 }
 
 int libxl_cpupool_movedomain(libxl_ctx *ctx, uint32_t poolid, uint32_t domid)

@@ -529,7 +529,9 @@ int libxl_create_cpupool(libxl_ctx *ctx, const char *name, int schedid,
                          uint32_t *poolid);
 int libxl_destroy_cpupool(libxl_ctx *ctx, uint32_t poolid);
 int libxl_cpupool_cpuadd(libxl_ctx *ctx, uint32_t poolid, int cpu);
+int libxl_cpupool_cpuadd_node(libxl_ctx *ctx, uint32_t poolid, int node, int *cpus);
 int libxl_cpupool_cpuremove(libxl_ctx *ctx, uint32_t poolid, int cpu);
+int libxl_cpupool_cpuremove_node(libxl_ctx *ctx, uint32_t poolid, int node, int *cpus);
 int libxl_cpupool_movedomain(libxl_ctx *ctx, uint32_t poolid, uint32_t domid);
 
 /* common paths */
