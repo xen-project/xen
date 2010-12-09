@@ -955,12 +955,12 @@ static void lapic_rearm(struct vlapic *s)
     unsigned long tmict = vlapic_get_reg(s, APIC_TMICT);
     uint64_t period;
 
+    s->pt.irq = vlapic_get_reg(s, APIC_LVTT) & APIC_VECTOR_MASK;
     if ( (tmict = vlapic_get_reg(s, APIC_TMICT)) == 0 )
         return;
 
     period = ((uint64_t)APIC_BUS_CYCLE_NS *
               (uint32_t)tmict * s->hw.timer_divisor);
-    s->pt.irq = vlapic_get_reg(s, APIC_LVTT) & APIC_VECTOR_MASK;
     create_periodic_time(vlapic_vcpu(s), &s->pt, period,
                          vlapic_lvtt_period(s) ? period : 0,
                          s->pt.irq,
