@@ -18,10 +18,10 @@ void register_cpu_notifier(struct notifier_block *nb);
 
 /*
  * Possible event sequences for a given CPU:
- *  CPU_UP_PREPARE -> CPU_UP_CANCELLED        -- failed CPU up
- *  CPU_UP_PREPARE -> CPU_ONLINE              -- successful CPU up
- *  CPU_DOWN_PREPARE -> CPU_DOWN_FAILED       -- failed CPU down
- *  CPU_DOWN_PREPARE -> CPU_DYING -> CPU_DEAD -- successful CPU down
+ *  CPU_UP_PREPARE -> CPU_UP_CANCELLED           -- failed CPU up
+ *  CPU_UP_PREPARE -> CPU_STARTING -> CPU_ONLINE -- successful CPU up
+ *  CPU_DOWN_PREPARE -> CPU_DOWN_FAILED          -- failed CPU down
+ *  CPU_DOWN_PREPARE -> CPU_DYING -> CPU_DEAD    -- successful CPU down
  * 
  * Hence note that only CPU_*_PREPARE handlers are allowed to fail. Also note
  * that once CPU_DYING is delivered, an offline action can no longer fail.
@@ -31,10 +31,12 @@ void register_cpu_notifier(struct notifier_block *nb);
  * Notifiers are called lowest-priority-first when:
  *  (a) A CPU is going down; or (b) CPU_UP_CANCELED
  */
-/* CPU_UP_PREPARE: CPU is coming up */
-#define CPU_UP_PREPARE   (0x0002 | NOTIFY_FORWARD)
-/* CPU_UP_CANCELED: CPU is no longer coming up. */
-#define CPU_UP_CANCELED  (0x0003 | NOTIFY_REVERSE)
+/* CPU_UP_PREPARE: Preparing to bring CPU online. */
+#define CPU_UP_PREPARE   (0x0001 | NOTIFY_FORWARD)
+/* CPU_UP_CANCELED: CPU is no longer being brought online. */
+#define CPU_UP_CANCELED  (0x0002 | NOTIFY_REVERSE)
+/* CPU_STARTING: CPU nearly online. Runs on new CPU, irqs still disabled. */
+#define CPU_STARTING     (0x0003 | NOTIFY_FORWARD)
 /* CPU_ONLINE: CPU is up. */
 #define CPU_ONLINE       (0x0004 | NOTIFY_FORWARD)
 /* CPU_DOWN_PREPARE: CPU is going down. */
@@ -49,6 +51,9 @@ void register_cpu_notifier(struct notifier_block *nb);
 /* Perform CPU hotplug. May return -EAGAIN. */
 int cpu_down(unsigned int cpu);
 int cpu_up(unsigned int cpu);
+
+/* From arch code, send CPU_STARTING notification. */
+void notify_cpu_starting(unsigned int cpu);
 
 /* Power management. */
 int disable_nonboot_cpus(void);

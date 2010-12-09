@@ -387,6 +387,7 @@ smp_callin (void)
 	fix_b0_for_bsp();
 
 #ifdef XEN
+	notify_cpu_starting(cpuid);
 	lock_ipi_calllock(&flags);
 #else
 	lock_ipi_calllock();

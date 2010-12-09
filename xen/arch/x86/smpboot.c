@@ -357,7 +357,8 @@ void start_secondary(void *unused)
 
     /* This must be done before setting cpu_online_map */
     spin_debug_enable();
-    set_cpu_sibling_map(smp_processor_id());
+    set_cpu_sibling_map(cpu);
+    notify_cpu_starting(cpu);
     wmb();
 
     /*
@@ -366,8 +367,8 @@ void start_secondary(void *unused)
      * this lock ensures we don't half assign or remove an irq from a cpu.
      */
     lock_vector_lock();
-    __setup_vector_irq(smp_processor_id());
-    cpu_set(smp_processor_id(), cpu_online_map);
+    __setup_vector_irq(cpu);
+    cpu_set(cpu, cpu_online_map);
     unlock_vector_lock();
 
     init_percpu_time();

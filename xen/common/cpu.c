@@ -155,6 +155,14 @@ int cpu_up(unsigned int cpu)
     return err;
 }
 
+void notify_cpu_starting(unsigned int cpu)
+{
+    void *hcpu = (void *)(long)cpu;
+    int notifier_rc = notifier_call_chain(
+        &cpu_chain, CPU_STARTING, hcpu, NULL);
+    BUG_ON(notifier_rc != NOTIFY_DONE);
+}
+
 static cpumask_t frozen_cpus;
 
 int disable_nonboot_cpus(void)
