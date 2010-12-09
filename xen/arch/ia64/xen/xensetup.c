@@ -567,7 +567,7 @@ skip_move:
 
     scheduler_init();
     idle_vcpu[0] = (struct vcpu*) ia64_r13;
-    idle_domain = domain_create(IDLE_DOMAIN_ID, 0, 0);
+    idle_domain = domain_create(DOMID_IDLE, 0, 0);
     if ( idle_domain == NULL )
         BUG();
     idle_domain->vcpu = idle_vcpu;

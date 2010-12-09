@@ -245,7 +245,7 @@ static void __init init_idle_domain(void)
     /* Domain creation requires that scheduler structures are initialised. */
     scheduler_init();
 
-    idle_domain = domain_create(IDLE_DOMAIN_ID, 0, 0);
+    idle_domain = domain_create(DOMID_IDLE, 0, 0);
     if ( idle_domain == NULL )
         BUG();
     idle_domain->vcpu = idle_vcpu;
