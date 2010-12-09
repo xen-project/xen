@@ -224,6 +224,11 @@ int attrib__libxl_cpumap_set(PyObject *v, libxl_cpumap *pptr)
     return 0;
 }
 
+int attrib__libxl_cpuarray_set(PyObject *v, libxl_cpuarray *pptr)
+{
+    return -1;
+}
+
 int attrib__libxl_domain_build_state_ptr_set(PyObject *v, libxl_domain_build_state **pptr)
 {
     return -1;
@@ -284,6 +289,25 @@ PyObject *attrib__libxl_cpumap_get(libxl_cpumap *pptr)
         }
     }
     return cpulist;
+}
+
+PyObject *attrib__libxl_cpuarray_get(libxl_cpuarray *pptr)
+{
+    PyObject *list = NULL;
+    int i;
+
+    list = PyList_New(0);
+    for (i = 0; i < pptr->entries; i++) {
+        if (pptr->array[i] == LIBXL_CPUARRAY_INVALID_ENTRY) {
+            PyList_Append(list, Py_None);
+        } else {
+            PyObject* pyint = PyInt_FromLong(pptr->array[i]);
+
+            PyList_Append(list, pyint);
+            Py_DECREF(pyint);
+        }
+    }
+    return list;
 }
 
 PyObject *attrib__libxl_domain_build_state_ptr_get(libxl_domain_build_state **pptr)

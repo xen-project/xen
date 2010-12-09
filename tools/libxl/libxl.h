@@ -149,6 +149,13 @@ typedef struct {
 } libxl_cpumap;
 void libxl_cpumap_destroy(libxl_cpumap *map);
 
+typedef struct {
+    uint32_t entries;
+    uint32_t *array;
+} libxl_cpuarray;
+#define LIBXL_CPUARRAY_INVALID_ENTRY  ~0
+void libxl_cpuarray_destroy(libxl_cpuarray *array);
+
 typedef enum {
     XENFV = 1,
     XENPV,
@@ -468,6 +475,7 @@ typedef enum {
 int libxl_button_press(libxl_ctx *ctx, uint32_t domid, libxl_button button);
 
 int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo);
+int libxl_get_topologyinfo(libxl_ctx *ctx, libxl_topologyinfo *info);
 libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
                                        int *nb_vcpu, int *nrcpus);
 int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,

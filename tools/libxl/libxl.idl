@@ -7,6 +7,7 @@ libxl_ctx = Builtin("ctx")
 libxl_uuid = Builtin("uuid")
 libxl_mac = Builtin("mac")
 libxl_cpumap = Builtin("cpumap", destructor_fn="libxl_cpumap_destroy", passby=PASS_BY_REFERENCE)
+libxl_cpuarray = Builtin("cpuarray", destructor_fn="libxl_cpuarray_destroy", passby=PASS_BY_REFERENCE)
 libxl_qemu_machine_type = Number("qemu_machine_type", namespace="libxl_")
 libxl_console_consback = Number("console_consback", namespace="libxl_")
 libxl_console_constype = Number("console_constype", namespace="libxl_")
@@ -301,6 +302,12 @@ libxl_physinfo = Struct("physinfo", [
     ("hw_cap", libxl_hwcap),
     ("phys_cap", uint32),
     ], destructor_fn=None)
+
+libxl_topologyinfo = Struct("topologyinfo", [
+    ("coremap", libxl_cpuarray,   False, "cpu to core map"),
+    ("socketmap", libxl_cpuarray, False, "cpu to socket map"),
+    ("nodemap", libxl_cpuarray,   False, "cpu to node map"),
+    ])
 
 libxl_sched_credit = Struct("sched_credit", [
     ("weight", integer),

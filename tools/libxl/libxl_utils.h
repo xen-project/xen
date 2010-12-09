@@ -82,5 +82,7 @@ void libxl_cpumap_set(libxl_cpumap *cpumap, int cpu);
 void libxl_cpumap_reset(libxl_cpumap *cpumap, int cpu);
 #define libxl_for_each_cpu(var, map) for (var = 0; var < (map).size * 8; var++)
 
+int libxl_cpuarray_alloc(libxl_ctx *ctx, libxl_cpuarray *cpuarray);
+
 #endif
 

@@ -3223,6 +3223,59 @@ int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo)
     return 0;
 }
 
+int libxl_get_topologyinfo(libxl_ctx *ctx, libxl_topologyinfo *info)
+{
+    xc_topologyinfo_t tinfo;
+    DECLARE_HYPERCALL_BUFFER(xc_cpu_to_core_t, coremap);
+    DECLARE_HYPERCALL_BUFFER(xc_cpu_to_socket_t, socketmap);
+    DECLARE_HYPERCALL_BUFFER(xc_cpu_to_node_t, nodemap);
+    int i;
+    int rc = 0;
+
+    rc += libxl_cpuarray_alloc(ctx, &info->coremap);
+    rc += libxl_cpuarray_alloc(ctx, &info->socketmap);
+    rc += libxl_cpuarray_alloc(ctx, &info->nodemap);
+    if (rc)
+        goto fail;
+
+    coremap = xc_hypercall_buffer_alloc(ctx->xch, coremap, sizeof(*coremap) * info->coremap.entries);
+    socketmap = xc_hypercall_buffer_alloc(ctx->xch, socketmap, sizeof(*socketmap) * info->socketmap.entries);
+    nodemap = xc_hypercall_buffer_alloc(ctx->xch, nodemap, sizeof(*nodemap) * info->nodemap.entries);
+    if ((coremap == NULL) || (socketmap == NULL) || (nodemap == NULL))
+        goto fail;
+
+    set_xen_guest_handle(tinfo.cpu_to_core, coremap);
+    set_xen_guest_handle(tinfo.cpu_to_socket, socketmap);
+    set_xen_guest_handle(tinfo.cpu_to_node, nodemap);
+    tinfo.max_cpu_index = info->coremap.entries - 1;
+    if (xc_topologyinfo(ctx->xch, &tinfo) != 0)
+        goto fail;
+
+    for (i = 0; i <= tinfo.max_cpu_index; i++) {
+        if (i < info->coremap.entries)
+            info->coremap.array[i] = (coremap[i] == INVALID_TOPOLOGY_ID) ?
+                LIBXL_CPUARRAY_INVALID_ENTRY : coremap[i];
+        if (i < info->socketmap.entries)
+            info->socketmap.array[i] = (socketmap[i] == INVALID_TOPOLOGY_ID) ?
+                LIBXL_CPUARRAY_INVALID_ENTRY : socketmap[i];
+        if (i < info->nodemap.entries)
+            info->nodemap.array[i] = (nodemap[i] == INVALID_TOPOLOGY_ID) ?
+                LIBXL_CPUARRAY_INVALID_ENTRY : nodemap[i];
+    }
+
+    xc_hypercall_buffer_free(ctx->xch, coremap);
+    xc_hypercall_buffer_free(ctx->xch, socketmap);
+    xc_hypercall_buffer_free(ctx->xch, nodemap);
+    return 0;
+
+fail:
+    xc_hypercall_buffer_free(ctx->xch, coremap);
+    xc_hypercall_buffer_free(ctx->xch, socketmap);
+    xc_hypercall_buffer_free(ctx->xch, nodemap);
+    libxl_topologyinfo_destroy(info);
+    return ERROR_FAIL;
+}
+
 const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx)
 {
     union {
