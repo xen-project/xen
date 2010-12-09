@@ -1276,7 +1276,7 @@ void __init scheduler_init(void)
     if ( SCHED_OP(&ops, init) )
         panic("scheduler returned error on init\n");
 
-    idle_domain = domain_create(IDLE_DOMAIN_ID, 0, 0);
+    idle_domain = domain_create(DOMID_IDLE, 0, 0);
     BUG_ON(idle_domain == NULL);
     idle_domain->vcpu = idle_vcpu;
     idle_domain->max_vcpus = NR_CPUS;

@@ -373,7 +373,7 @@ static void continue_cpu_idle_loop(void)
 void startup_cpu_idle_loop(void)
 {
 	/* Just some sanity to ensure that the scheduler is set up okay. */
-	ASSERT(current->domain->domain_id == IDLE_DOMAIN_ID);
+	ASSERT(is_idle_vcpu(current));
 	raise_softirq(SCHEDULE_SOFTIRQ);
 
 	continue_cpu_idle_loop();

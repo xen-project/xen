@@ -230,7 +230,7 @@ dbg_rw_guest_mem(dbgva_t addr, dbgbyte_t *buf, int len, struct domain *dp,
 }
 
 /* 
- * addr is hypervisor addr if domid == IDLE_DOMAIN_ID, else it's guest addr
+ * addr is hypervisor addr if domid == DOMID_IDLE, else it's guest addr
  * buf is debugger buffer.
  * if toaddr, then addr = buf (write to addr), else buf = addr (rd from guest)
  * pgd3: value of init_mm.pgd[3] in guest. see above.
@@ -241,7 +241,7 @@ dbg_rw_mem(dbgva_t addr, dbgbyte_t *buf, int len, domid_t domid, int toaddr,
            uint64_t pgd3)
 {
     struct domain *dp = get_domain_by_id(domid);
-    int hyp = (domid == IDLE_DOMAIN_ID);
+    int hyp = (domid == DOMID_IDLE);
 
     DBGP2("gmem:addr:%lx buf:%p len:$%d domid:%x toaddr:%x dp:%p\n", 
           addr, buf, len, domid, toaddr, dp);

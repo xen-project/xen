@@ -362,8 +362,7 @@ extern spinlock_t domlist_update_lock;
 extern rcu_read_lock_t domlist_read_lock;
 
 extern struct vcpu *idle_vcpu[NR_CPUS];
-#define IDLE_DOMAIN_ID   (0x7FFFU)
-#define is_idle_domain(d) ((d)->domain_id == IDLE_DOMAIN_ID)
+#define is_idle_domain(d) ((d)->domain_id == DOMID_IDLE)
 #define is_idle_vcpu(v)   (is_idle_domain((v)->domain))
 
 #define DOMAIN_DESTROYED (1<<31) /* assumes atomic_t is >= 32 bits */

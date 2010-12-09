@@ -74,7 +74,7 @@ static int flask_domain_alloc_security(struct domain *d)
 
     dsec->d = d;
 
-    if ( d->domain_id == IDLE_DOMAIN_ID )
+    if ( is_idle_domain(d) )
     {
         dsec->sid = SECINITSID_XEN;
         dsec->create_sid = SECINITSID_DOM0;

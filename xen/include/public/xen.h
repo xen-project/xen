@@ -380,8 +380,11 @@ typedef uint16_t domid_t;
  * DOMID_COW is used as the owner of sharable pages */
 #define DOMID_COW  (0x7FF3U)
 
-/* DOMID_INVALID is used to identity invalid domid */
-#define DOMID_INVALID (0x7FFFU)
+/* DOMID_INVALID is used to identify pages with unknown owner. */
+#define DOMID_INVALID (0x7FF4U)
+
+/* Idle domain. */
+#define DOMID_IDLE (0x7FFFU)
 
 /*
  * Send an array of these to HYPERVISOR_mmu_update().
