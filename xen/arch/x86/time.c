@@ -1779,11 +1779,12 @@ void tsc_set_info(struct domain *d,
                   uint32_t tsc_mode, uint64_t elapsed_nsec,
                   uint32_t gtsc_khz, uint32_t incarnation)
 {
-    if ( d->domain_id == 0 || d->domain_id == DOMID_INVALID )
+    if ( d->domain_id == 0 )
     {
         d->arch.vtsc = 0;
         return;
     }
+
     switch ( d->arch.tsc_mode = tsc_mode )
     {
     case TSC_MODE_NEVER_EMULATE:
