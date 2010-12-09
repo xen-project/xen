@@ -378,6 +378,11 @@ struct cmd_spec cmd_table[] = {
       "Moves a domain into a CPU pool",
       "<Domain> <CPU Pool>",
     },
+    { "cpupool-numa-split",
+      &main_cpupoolnumasplit,
+      "Splits up the machine into one CPU pool per NUMA node",
+      "",
+    },
 };
 
 int cmdtable_len = sizeof(cmd_table)/sizeof(struct cmd_spec);

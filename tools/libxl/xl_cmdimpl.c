@@ -5943,3 +5943,120 @@ int main_cpupoolmigrate(int argc, char **argv)
 
     return -libxl_cpupool_movedomain(&ctx, poolid, domid);
 }
+
+int main_cpupoolnumasplit(int argc, char **argv)
+{
+    int ret;
+    int opt;
+    int p;
+    int c;
+    int n;
+    uint32_t poolid;
+    int schedid;
+    int n_pools;
+    int node;
+    char name[16];
+    libxl_uuid uuid;
+    libxl_cpumap cpumap;
+    libxl_cpupoolinfo *poolinfo;
+    libxl_topologyinfo topology;
+
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("cpupool-numa-split");
+            return 0;
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+    ret = 0;
+
+    poolinfo = libxl_list_cpupool(&ctx, &n_pools);
+    if (!poolinfo) {
+        fprintf(stderr, "error getting cpupool info\n");
+        return -ERROR_NOMEM;
+    }
+    poolid = poolinfo[0].poolid;
+    schedid = poolinfo[0].sched_id;
+    for (p = 0; p < n_pools; p++) {
+        libxl_cpupoolinfo_destroy(poolinfo + p);
+    }
+    if (n_pools > 1) {
+        fprintf(stderr, "splitting not possible, already cpupools in use\n");
+        return -ERROR_FAIL;
+    }
+
+    if (libxl_get_topologyinfo(&ctx, &topology)) {
+        fprintf(stderr, "libxl_get_topologyinfo failed\n");
+        return -ERROR_FAIL;
+    }
+
+    if (libxl_cpumap_alloc(&ctx, &cpumap)) {
+        fprintf(stderr, "Failed to allocate cpumap\n");
+        libxl_topologyinfo_destroy(&topology);
+        return -ERROR_FAIL;
+    }
+
+    /* Reset Pool-0 to 1st node: first add cpus, then remove cpus to avoid
+       a cpupool without cpus in between */
+
+    node = topology.nodemap.array[0];
+    if (libxl_cpupool_cpuadd_node(&ctx, 0, node, &n)) {
+        fprintf(stderr, "error on adding cpu to Pool 0\n");
+        return -ERROR_FAIL;
+    }
+
+    snprintf(name, 15, "Pool-node%d", node);
+    ret = -libxl_cpupool_rename(&ctx, name, 0);
+    if (ret) {
+        fprintf(stderr, "error on renaming Pool 0\n");
+        goto out;
+    }
+
+    for (c = 0; c < topology.nodemap.entries; c++) {
+        if (topology.nodemap.array[c] == node) {
+            topology.nodemap.array[c] = LIBXL_CPUARRAY_INVALID_ENTRY;
+        }
+    }
+
+    for (c = 0; c < topology.nodemap.entries; c++) {
+        if (topology.nodemap.array[c] == LIBXL_CPUARRAY_INVALID_ENTRY) {
+            continue;
+        }
+
+        node = topology.nodemap.array[c];
+        ret = -libxl_cpupool_cpuremove_node(&ctx, 0, node, &n);
+        if (ret) {
+            fprintf(stderr, "error on removing cpu from Pool 0\n");
+            goto out;
+        }
+
+        snprintf(name, 15, "Pool-node%d", node);
+        libxl_uuid_generate(&uuid);
+        ret = -libxl_create_cpupool(&ctx, name, schedid, cpumap, &uuid, &poolid);
+        if (ret) {
+            fprintf(stderr, "error on creating cpupool\n");
+            goto out;
+        }
+
+        ret = -libxl_cpupool_cpuadd_node(&ctx, 0, node, &n);
+        if (ret) {
+            fprintf(stderr, "error on adding cpus to cpupool\n");
+            goto out;
+        }
+
+        for (p = c; p < topology.nodemap.entries; p++) {
+            if (topology.nodemap.array[p] == node) {
+                topology.nodemap.array[p] = LIBXL_CPUARRAY_INVALID_ENTRY;
+            }
+        }
+    }
+
+out:
+    libxl_topologyinfo_destroy(&topology);
+    libxl_cpumap_destroy(&cpumap);
+
+    return ret;
+}

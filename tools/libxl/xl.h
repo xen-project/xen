@@ -86,6 +86,7 @@ int main_cpupoolrename(int argc, char **argv);
 int main_cpupoolcpuadd(int argc, char **argv);
 int main_cpupoolcpuremove(int argc, char **argv);
 int main_cpupoolmigrate(int argc, char **argv);
+int main_cpupoolnumasplit(int argc, char **argv);
 
 void help(const char *command);
 
