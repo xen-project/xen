@@ -3935,11 +3935,40 @@ static void output_physinfo(void)
     return;
 }
 
-static void info(void)
+static void output_topologyinfo(void)
+{
+    libxl_topologyinfo info;
+    int i;
+
+    if (libxl_get_topologyinfo(&ctx, &info)) {
+        fprintf(stderr, "libxl_get_topologyinfo failed.\n");
+        return;
+    }
+
+    printf("cpu_topology           :\n");
+    printf("cpu:    core    socket     node\n");
+
+    for (i = 0; i < info.coremap.entries; i++) {
+        if (info.coremap.array[i] != LIBXL_CPUARRAY_INVALID_ENTRY)
+            printf("%3d:    %4d     %4d     %4d\n", i, info.coremap.array[i],
+                info.socketmap.array[i], info.nodemap.array[i]);
+    }
+
+    printf("numa_info              : none\n");
+
+    libxl_topologyinfo_destroy(&info);
+
+    return;
+}
+
+static void info(int numa)
 {
     output_nodeinfo();
 
     output_physinfo();
+
+    if (numa)
+        output_topologyinfo();
 
     output_xeninfo();
 
@@ -3951,19 +3980,29 @@ static void info(void)
 int main_info(int argc, char **argv)
 {
     int opt;
+    int option_index = 0;
+    static struct option long_options[] = {
+        {"help", 0, 0, 'h'},
+        {"numa", 0, 0, 'n'},
+        {0, 0, 0, 0}
+    };
+    int numa = 0;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
+    while ((opt = getopt_long(argc, argv, "hn", long_options, &option_index)) != -1) {
         switch (opt) {
         case 'h':
             help("info");
             return 0;
+        case 'n':
+            numa = 1;
+            break;
         default:
             fprintf(stderr, "option `%c' not supported.\n", opt);
             break;
         }
     }
 
-    info();
+    info(numa);
     return 0;
 }
 

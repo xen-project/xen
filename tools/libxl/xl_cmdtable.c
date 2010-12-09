@@ -185,7 +185,7 @@ struct cmd_spec cmd_table[] = {
     { "info",
       &main_info,
       "Get information about Xen host",
-      "",
+      "-n, --numa         List host NUMA topology information",
     },
     { "sched-credit",
       &main_sched_credit,
