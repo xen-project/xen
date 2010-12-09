@@ -514,7 +514,10 @@ int libxl_domain_preserve(libxl_ctx *ctx, uint32_t domid,
 
     xs_write(ctx->xsh, t, libxl__sprintf(&gc, "%s/vm", dom_path), vm_path, strlen(vm_path));
     rc = libxl_domain_rename(ctx, domid, info->name, preserved_name, t);
-    if (rc) return rc;
+    if (rc) {
+        libxl__free_all(&gc);
+        return rc;
+    }
 
     xs_write(ctx->xsh, t, libxl__sprintf(&gc, "%s/uuid", vm_path), uuid_string, strlen(uuid_string));
 
@@ -756,17 +759,20 @@ int libxl_domain_shutdown(libxl_ctx *ctx, uint32_t domid, int req)
         ret = xc_get_hvm_param(ctx->xch, domid, HVM_PARAM_ACPI_S_STATE, &acpi_s_state);
         if (ret<0) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting ACPI S-state");
+            libxl__free_all(&gc);
             return ERROR_FAIL;
         }
         ret = xc_get_hvm_param(ctx->xch, domid, HVM_PARAM_CALLBACK_IRQ, &pvdriver);
         if (ret<0) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting HVM callback IRQ");
+            libxl__free_all(&gc);
             return ERROR_FAIL;
         }
         if (!pvdriver || acpi_s_state != 0) {
             ret = xc_domain_shutdown(ctx->xch, domid, req);
             if (ret<0) {
                 LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "unpausing domain");
+                libxl__free_all(&gc);
                 return ERROR_FAIL;
             }
        }
@@ -3677,13 +3683,16 @@ int libxl_create_cpupool(libxl_ctx *ctx, char *name, int schedid,
     char *uuid_string;
 
     uuid_string = libxl__uuid2string(&gc, *uuid);
-    if (!uuid_string)
+    if (!uuid_string) {
+        libxl__free_all(&gc);
         return ERROR_NOMEM;
+    }
 
     rc = xc_cpupool_create(ctx->xch, poolid, schedid);
     if (rc) {
         LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
            "Could not create cpupool");
+        libxl__free_all(&gc);
         return ERROR_FAIL;
     }
 
@@ -3694,6 +3703,7 @@ int libxl_create_cpupool(libxl_ctx *ctx, char *name, int schedid,
                 LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
                     "Error moving cpu to cpupool");
                 libxl_destroy_cpupool(ctx, *poolid);
+                libxl__free_all(&gc);
                 return ERROR_FAIL;
             }
         }
@@ -3709,8 +3719,10 @@ int libxl_create_cpupool(libxl_ctx *ctx, char *name, int schedid,
                         libxl__sprintf(&gc, "/local/pool/%d/name", *poolid),
                         "%s", name);
 
-        if (xs_transaction_end(ctx->xsh, t, 0) || (errno != EAGAIN))
+        if (xs_transaction_end(ctx->xsh, t, 0) || (errno != EAGAIN)) {
+            libxl__free_all(&gc);
             return 0;
+        }
     }
 }
 
@@ -3723,8 +3735,10 @@ int libxl_destroy_cpupool(libxl_ctx *ctx, uint32_t poolid)
     libxl_cpumap cpumap;
 
     info = xc_cpupool_getinfo(ctx->xch, poolid);
-    if (info == NULL)
+    if (info == NULL) {
+        libxl__free_all(&gc);
         return ERROR_NOMEM;
+    }
 
     rc = ERROR_INVAL;
     if ((info->cpupool_id != poolid) || (info->n_dom))
@@ -3768,6 +3782,7 @@ out1:
     libxl_cpumap_destroy(&cpumap);
 out:
     xc_cpupool_infofree(ctx->xch, info);
+    libxl__free_all(&gc);
 
     return rc;
 }
@@ -3809,6 +3824,7 @@ int libxl_cpupool_movedomain(libxl_ctx *ctx, uint32_t poolid, uint32_t domid)
 
     dom_path = libxl__xs_get_dompath(&gc, domid);
     if (!dom_path) {
+        libxl__free_all(&gc);
         return ERROR_FAIL;
     }
 
@@ -3816,6 +3832,7 @@ int libxl_cpupool_movedomain(libxl_ctx *ctx, uint32_t poolid, uint32_t domid)
     if (rc) {
         LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
             "Error moving domain to cpupool");
+        libxl__free_all(&gc);
         return ERROR_FAIL;
     }
 
@@ -3834,5 +3851,6 @@ int libxl_cpupool_movedomain(libxl_ctx *ctx, uint32_t poolid, uint32_t domid)
             break;
     }
 
+    libxl__free_all(&gc);
     return 0;
 }

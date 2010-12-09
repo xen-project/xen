@@ -121,8 +121,10 @@ int libxl__build_post(libxl_ctx *ctx, uint32_t domid,
     }
 
     dom_path = libxl__xs_get_dompath(&gc, domid);
-    if (!dom_path)
+    if (!dom_path) {
+        libxl__free_all(&gc);
         return ERROR_FAIL;
+    }
 
     vm_path = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(&gc, "%s/vm", dom_path), NULL);
 retry_transaction:
@@ -469,6 +471,7 @@ int libxl__domain_save_device_model(libxl_ctx *ctx, uint32_t domid, int fd)
     if (stat(filename, &st) < 0)
     {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Unable to stat qemu save file\n");
+        libxl__free_all(&gc);
         return ERROR_FAIL;
     }
 
@@ -477,13 +480,17 @@ int libxl__domain_save_device_model(libxl_ctx *ctx, uint32_t domid, int fd)
 
     c = libxl_write_exactly(ctx, fd, QEMU_SIGNATURE, strlen(QEMU_SIGNATURE),
                             "saved-state file", "qemu signature");
-    if (c)
+    if (c) {
+        libxl__free_all(&gc);
         return c;
+    }
 
     c = libxl_write_exactly(ctx, fd, &qemu_state_len, sizeof(qemu_state_len),
                             "saved-state file", "saved-state length");
-    if (c)
+    if (c) {
+        libxl__free_all(&gc);
         return c;
+    }
 
     fd2 = open(filename, O_RDONLY);
     while ((c = read(fd2, buf, sizeof(buf))) != 0) {

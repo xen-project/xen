@@ -525,8 +525,10 @@ int libxl_device_pci_list_assignable(libxl_ctx *ctx, libxl_device_pci **list, in
     *list = NULL;
 
     rc = get_all_assigned_devices(&gc, &assigned, &num_assigned);
-    if ( rc )
+    if ( rc ) {
+        libxl__free_all(&gc);
         return rc;
+    }
 
     dir = opendir(SYSFS_PCIBACK_DRIVER);
     if ( NULL == dir ) {
