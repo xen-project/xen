@@ -5729,6 +5729,47 @@ int main_cpupooldestroy(int argc, char **argv)
     return -libxl_destroy_cpupool(&ctx, poolid);
 }
 
+int main_cpupoolrename(int argc, char **argv)
+{
+    int opt;
+    const char *pool;
+    const char *new_name;
+    uint32_t poolid;
+
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("cpupool-rename");
+            return 0;
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    pool = argv[optind++];
+    if (!pool || !argv[optind]) {
+        fprintf(stderr, "'xl cpupool-rename' requires 2 arguments.\n\n");
+        help("cpupool-rename");
+        return 1;
+    }
+
+    if (cpupool_qualifier_to_cpupoolid(pool, &poolid, NULL) ||
+        !libxl_cpupoolid_to_name(&ctx, poolid)) {
+        fprintf(stderr, "unknown cpupool \'%s\'\n", pool);
+        return -ERROR_FAIL;
+    }
+
+    new_name = argv[optind];
+
+    if (libxl_cpupool_rename(&ctx, new_name, poolid)) {
+        fprintf(stderr, "Can't rename cpupool '%s'.\n", pool);
+        return 1;
+    }
+
+    return 0;
+}
+
 int main_cpupoolcpuadd(int argc, char **argv)
 {
     int opt;

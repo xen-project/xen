@@ -82,6 +82,7 @@ int main_network2detach(int argc, char **argv);
 int main_cpupoolcreate(int argc, char **argv);
 int main_cpupoollist(int argc, char **argv);
 int main_cpupooldestroy(int argc, char **argv);
+int main_cpupoolrename(int argc, char **argv);
 int main_cpupoolcpuadd(int argc, char **argv);
 int main_cpupoolcpuremove(int argc, char **argv);
 int main_cpupoolmigrate(int argc, char **argv);

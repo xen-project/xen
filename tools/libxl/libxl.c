@@ -3885,6 +3885,49 @@ out:
     return rc;
 }
 
+int libxl_cpupool_rename(libxl_ctx *ctx, const char *name, uint32_t poolid)
+{
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    xs_transaction_t t;
+    xc_cpupoolinfo_t *info;
+    int rc;
+
+    info = xc_cpupool_getinfo(ctx->xch, poolid);
+    if (info == NULL) {
+        libxl__free_all(&gc);
+        return ERROR_NOMEM;
+    }
+
+    rc = ERROR_INVAL;
+    if (info->cpupool_id != poolid)
+        goto out;
+
+    rc = 0;
+
+    for (;;) {
+        t = xs_transaction_start(ctx->xsh);
+
+        libxl__xs_write(&gc, t,
+                        libxl__sprintf(&gc, "/local/pool/%d/name", poolid),
+                        "%s", name);
+
+        if (xs_transaction_end(ctx->xsh, t, 0))
+            break;
+
+        if (errno == EAGAIN)
+            continue;
+
+        rc = ERROR_FAIL;
+        break;
+    }
+
+out:
+    xc_cpupool_infofree(ctx->xch, info);
+    libxl__free_all(&gc);
+
+    return rc;
+}
+
 int libxl_cpupool_cpuadd(libxl_ctx *ctx, uint32_t poolid, int cpu)
 {
     int rc;
