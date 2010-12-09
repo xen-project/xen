@@ -1779,7 +1779,7 @@ void tsc_set_info(struct domain *d,
                   uint32_t tsc_mode, uint64_t elapsed_nsec,
                   uint32_t gtsc_khz, uint32_t incarnation)
 {
-    if ( d->domain_id == 0 )
+    if ( is_idle_domain(d) || (d->domain_id == 0) )
     {
         d->arch.vtsc = 0;
         return;
