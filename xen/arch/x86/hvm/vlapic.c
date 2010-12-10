@@ -435,12 +435,19 @@ int vlapic_ipi(
 static uint32_t vlapic_get_tmcct(struct vlapic *vlapic)
 {
     struct vcpu *v = current;
-    uint32_t tmcct, tmict = vlapic_get_reg(vlapic, APIC_TMICT);
+    uint32_t tmcct = 0, tmict = vlapic_get_reg(vlapic, APIC_TMICT);
     uint64_t counter_passed;
 
     counter_passed = ((hvm_get_guest_time(v) - vlapic->timer_last_update)
-                      / APIC_BUS_CYCLE_NS / vlapic->hw.timer_divisor);
-    tmcct = (counter_passed < tmict) ? tmict - counter_passed : 0;
+                      / (APIC_BUS_CYCLE_NS * vlapic->hw.timer_divisor));
+
+    if ( tmict != 0 )
+    {
+        if ( vlapic_lvtt_period(vlapic) )
+            counter_passed %= tmict;
+        if ( counter_passed < tmict )
+            tmcct = tmict - counter_passed;
+    }
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC_TIMER,
                 "timer initial count %d, timer current count %d, "
