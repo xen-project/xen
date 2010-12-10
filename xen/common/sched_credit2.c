@@ -383,7 +383,7 @@ runq_tickle(const struct scheduler *ops, unsigned int cpu, struct csched_vcpu *n
             d.dom = cur->vcpu->domain->domain_id;
             d.vcpu = cur->vcpu->vcpu_id;
             d.credit = cur->credit;
-            trace_var(TRC_CSCHED2_TICKLE_CHECK, 0,
+            trace_var(TRC_CSCHED2_TICKLE_CHECK, 1,
                       sizeof(d),
                       (unsigned char *)&d);
         }
@@ -445,7 +445,7 @@ static void reset_credit(const struct scheduler *ops, int cpu, s_time_t now)
             d.vcpu = svc->vcpu->vcpu_id;
             d.credit_start = start_credit;
             d.credit_end = svc->credit;
-            trace_var(TRC_CSCHED2_CREDIT_RESET, 0,
+            trace_var(TRC_CSCHED2_CREDIT_RESET, 1,
                       sizeof(d),
                       (unsigned char *)&d);
         }
@@ -494,7 +494,7 @@ void burn_credits(struct csched_runqueue_data *rqd, struct csched_vcpu *svc, s_t
         d.vcpu = svc->vcpu->vcpu_id;
         d.credit = svc->credit;
         d.delta = delta;
-        trace_var(TRC_CSCHED2_CREDIT_BURN, 0,
+        trace_var(TRC_CSCHED2_CREDIT_BURN, 1,
                   sizeof(d),
                   (unsigned char *)&d);
     }
