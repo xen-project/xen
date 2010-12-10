@@ -90,7 +90,7 @@ int xc_send_debug_keys(xc_interface *xch, char *keys)
 {
     int ret, len = strlen(keys);
     DECLARE_SYSCTL;
-    DECLARE_HYPERCALL_BOUNCE(keys, len, XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+    DECLARE_HYPERCALL_BOUNCE(keys, len, XC_HYPERCALL_BUFFER_BOUNCE_IN);
 
     if ( xc_hypercall_bounce_pre(xch, keys) )
         return -1;
