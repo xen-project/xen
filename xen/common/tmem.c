@@ -2669,14 +2669,14 @@ EXPORT long do_tmem_op(tmem_cli_op_t uops)
     } else if ( op.cmd == TMEM_AUTH ) {
         tmem_write_lock(&tmem_rwlock);
         tmem_write_lock_set = 1;
-        rc = tmemc_shared_pool_auth(op.u.new.arg1,op.u.new.uuid[0],
-                         op.u.new.uuid[1],op.u.new.flags);
+        rc = tmemc_shared_pool_auth(op.u.creat.arg1,op.u.creat.uuid[0],
+                         op.u.creat.uuid[1],op.u.creat.flags);
         goto out;
     } else if ( op.cmd == TMEM_RESTORE_NEW ) {
         tmem_write_lock(&tmem_rwlock);
         tmem_write_lock_set = 1;
-        rc = do_tmem_new_pool(op.u.new.arg1, op.pool_id, op.u.new.flags,
-                         op.u.new.uuid[0], op.u.new.uuid[1]);
+        rc = do_tmem_new_pool(op.u.creat.arg1, op.pool_id, op.u.creat.flags,
+                         op.u.creat.uuid[0], op.u.creat.uuid[1]);
         goto out;
     }
 
@@ -2722,8 +2722,8 @@ EXPORT long do_tmem_op(tmem_cli_op_t uops)
     switch ( op.cmd )
     {
     case TMEM_NEW_POOL:
-        rc = do_tmem_new_pool(CLI_ID_NULL, 0, op.u.new.flags,
-                              op.u.new.uuid[0], op.u.new.uuid[1]);
+        rc = do_tmem_new_pool(CLI_ID_NULL, 0, op.u.creat.flags,
+                              op.u.creat.uuid[0], op.u.creat.uuid[1]);
         break;
     case TMEM_NEW_PAGE:
         tmem_ensure_avail_pages();
