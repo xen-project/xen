@@ -91,6 +91,7 @@ case "$command" in
         ;;
 
     add)
+        setup_bridge_port "$dev"
         add_to_bridge "$bridge" "$dev"
         ;;
 esac

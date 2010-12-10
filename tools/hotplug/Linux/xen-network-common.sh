@@ -86,6 +86,12 @@ setup_bridge_port() {
     # take interface down ...
     ip link set ${dev} down
 
+    # Initialise a dummy MAC address. We choose the numerically
+    # largest non-broadcast address to prevent the address getting
+    # stolen by an Ethernet bridge for STP purposes.
+    # (FE:FF:FF:FF:FF:FF)
+    ip link set ${dev} address fe:ff:ff:ff:ff:ff
+
     # ... and configure it
     ip addr flush ${dev}
 }
