@@ -138,6 +138,14 @@ struct xen_hvm_pagetable_dying {
 typedef struct xen_hvm_pagetable_dying xen_hvm_pagetable_dying_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_pagetable_dying_t);
 
+/* Get the current Xen time, in nanoseconds since system boot. */
+#define HVMOP_get_time              10
+struct xen_hvm_get_time {
+    uint64_t now;      /* OUT */
+};
+typedef struct xen_hvm_get_time xen_hvm_get_time_t;
+DEFINE_XEN_GUEST_HANDLE(xen_hvm_get_time_t);
+
 #endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */
 
 #endif /* __XEN_PUBLIC_HVM_HVM_OP_H__ */
