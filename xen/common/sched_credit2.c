@@ -668,6 +668,8 @@ csched_vcpu_sleep(const struct scheduler *ops, struct vcpu *vc)
         cpu_raise_softirq(vc->processor, SCHEDULE_SOFTIRQ);
     else if ( __vcpu_on_runq(svc) )
         __runq_remove(svc);
+    else if ( test_bit(__CSFLAG_delayed_runq_add, &svc->flags) )
+        clear_bit(__CSFLAG_delayed_runq_add, &svc->flags);
 }
 
 static void
