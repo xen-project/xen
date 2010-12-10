@@ -1522,7 +1522,7 @@ int xc_domain_set_hpet(int handle, unsigned int domid, int hpet)
 
 int xc_domain_set_vpt_align(int handle, unsigned int domid, int vpt_align)
 {
-	return xc_set_hvm_param(handle, domid, HVM_PARAM_HPET_ENABLED, (unsigned long) vpt_align);
+	return xc_set_hvm_param(handle, domid, HVM_PARAM_VPT_ALIGN, (unsigned long) vpt_align);
 }
 
 int xc_domain_get_acpi_s_state(int handle, unsigned int domid)
