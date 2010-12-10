@@ -19,20 +19,28 @@ library_dirs = [ XEN_ROOT + "/tools/libxc",
 
 libraries = [ "xenctrl", "xenguest", "xenstore" ]
 
+depends = [ XEN_ROOT + "/tools/libxc/libxenctrl.so",
+            XEN_ROOT + "/tools/libxc/libxenguest.so",
+            XEN_ROOT + "/tools/xenstore/libxenstore.so"
+            ]
+
 plat = os.uname()[0]
 if plat == 'Linux':
     uuid_libs = ["uuid"]
     blktap_ctl_libs = ["blktapctl"]
     library_dirs.append(XEN_ROOT + "/tools/blktap2/control")
+    blktab_ctl_depends = [ XEN_ROOT + "/tools/blktap2/control/libblktapctl.so" ]
 else:
     uuid_libs = []
     blktap_ctl_libs = []
+    blktab_ctl_depends = []
 
 xc = Extension("xc",
                extra_compile_args = extra_compile_args,
                include_dirs       = include_dirs + [ "xen/lowlevel/xc" ],
                library_dirs       = library_dirs,
                libraries          = libraries,
+               depends            = depends,
                sources            = [ "xen/lowlevel/xc/xc.c" ])
 
 xs = Extension("xs",
@@ -40,6 +48,7 @@ xs = Extension("xs",
                include_dirs       = include_dirs + [ "xen/lowlevel/xs" ],
                library_dirs       = library_dirs,
                libraries          = libraries,
+               depends            = depends,
                sources            = [ "xen/lowlevel/xs/xs.c" ])
 
 scf = Extension("scf",
@@ -47,6 +56,7 @@ scf = Extension("scf",
                include_dirs       = include_dirs + [ "xen/lowlevel/scf" ],
                library_dirs       = library_dirs,
                libraries          = libraries,
+               depends            = depends,
                sources            = [ "xen/lowlevel/scf/scf.c" ])
              
 process = Extension("process",
@@ -54,6 +64,7 @@ process = Extension("process",
                include_dirs       = include_dirs + [ "xen/lowlevel/process" ],
                library_dirs       = library_dirs,
                libraries          = libraries + [ "contract" ],
+               depends            = depends,
                sources            = [ "xen/lowlevel/process/process.c" ])
 
 acm = Extension("acm",
@@ -61,6 +72,7 @@ acm = Extension("acm",
                include_dirs       = include_dirs + [ "xen/lowlevel/acm" ],
                library_dirs       = library_dirs,
                libraries          = libraries,
+               depends            = depends,
                sources            = [ "xen/lowlevel/acm/acm.c" ])
 
 flask = Extension("flask",
@@ -69,6 +81,7 @@ flask = Extension("flask",
                                         [ "../flask/libflask/include" ],
                library_dirs       = library_dirs + [ "../flask/libflask" ],
                libraries          = libraries + [ "flask" ],
+               depends            = depends + [ XEN_ROOT + "/tools/flask/libflask/libflask.so" ],
                sources            = [ "xen/lowlevel/flask/flask.c" ])
 
 ptsname = Extension("ptsname",
@@ -76,6 +89,7 @@ ptsname = Extension("ptsname",
                include_dirs       = include_dirs + [ "ptsname" ],
                library_dirs       = library_dirs,
                libraries          = libraries,
+               depends            = depends,
                sources            = [ "ptsname/ptsname.c" ])
 
 checkpoint = Extension("checkpoint",
@@ -83,6 +97,7 @@ checkpoint = Extension("checkpoint",
                        include_dirs       = include_dirs,
                        library_dirs       = library_dirs,
                        libraries          = libraries + [ "rt" ],
+                       depends            = depends,
                        sources            = [ "xen/lowlevel/checkpoint/checkpoint.c",
                                               "xen/lowlevel/checkpoint/libcheckpoint.c"])
 
@@ -91,6 +106,7 @@ netlink = Extension("netlink",
                     include_dirs       = include_dirs,
                     library_dirs       = library_dirs,
                     libraries          = libraries,
+                    depends            = depends,
                     sources            = [ "xen/lowlevel/netlink/netlink.c",
                                            "xen/lowlevel/netlink/libnetlink.c"])
 
@@ -99,6 +115,8 @@ xl = Extension("xl",
                include_dirs       = include_dirs + [ "xen/lowlevel/xl" ],
                library_dirs       = library_dirs,
                libraries          = libraries + ["xenlight" ] + blktap_ctl_libs + uuid_libs,
+               depends            = depends + blktab_ctl_depends +
+                                    [ XEN_ROOT + "/tools/libxl/libxenlight.so" ],
                sources            = [ "xen/lowlevel/xl/xl.c", "xen/lowlevel/xl/_pyxl_types.c" ])
 
 modules = [ xc, xs, ptsname, acm, flask, xl ]
