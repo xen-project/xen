@@ -910,7 +910,7 @@ static int libxl_destroy_device_model(libxl_ctx *ctx, uint32_t domid)
             ret = ERROR_INVAL;
             goto out;
         }
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Device model is a stubdom, domid=%d\n", stubdomid);
+        LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Device model is a stubdom, domid=%d\n", stubdomid);
         ret = libxl_domain_destroy(ctx, stubdomid, 0);
         if (ret)
             goto out;
