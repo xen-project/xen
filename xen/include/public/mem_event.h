@@ -23,21 +23,11 @@
 #ifndef _XEN_PUBLIC_MEM_EVENT_H
 #define _XEN_PUBLIC_MEM_EVENT_H
 
-
 #include "xen.h"
 #include "io/ring.h"
 
-
-/* Memory event notification modes */
-#define MEM_EVENT_MODE_ASYNC    0
-#define MEM_EVENT_MODE_SYNC     (1 << 0)
-#define MEM_EVENT_MODE_SYNC_ALL (1 << 1)
-
 /* Memory event flags */
 #define MEM_EVENT_FLAG_VCPU_PAUSED  (1 << 0)
-#define MEM_EVENT_FLAG_DOM_PAUSED   (1 << 1)
-#define MEM_EVENT_FLAG_OUT_OF_MEM   (1 << 2)
-
 
 typedef struct mem_event_shared_page {
     uint32_t port;
@@ -45,18 +35,14 @@ typedef struct mem_event_shared_page {
 
 typedef struct mem_event_st {
     uint64_t gfn;
-    uint64_t offset;
     uint32_t p2mt;
-    int32_t vcpu_id;
+    uint32_t vcpu_id;
     uint64_t flags;
 } mem_event_request_t, mem_event_response_t;
 
-
 DEFINE_RING_TYPES(mem_event, mem_event_request_t, mem_event_response_t);
 
-
 #endif
-
 
 /*
  * Local variables:
