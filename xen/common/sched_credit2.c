@@ -334,6 +334,7 @@ runq_tickle(const struct scheduler *ops, unsigned int cpu, struct csched_vcpu *n
     s_time_t lowest=(1<<30);
     struct csched_runqueue_data *rqd = RQD(ops, cpu);
     cpumask_t *online, mask;
+    struct csched_vcpu * cur;
 
     d2printk("rqt d%dv%d cd%dv%d\n",
              new->vcpu->domain->domain_id,
@@ -341,8 +342,18 @@ runq_tickle(const struct scheduler *ops, unsigned int cpu, struct csched_vcpu *n
              current->domain->domain_id,
              current->vcpu_id);
 
-    online = CSCHED_CPUONLINE(per_cpu(cpupool, cpu));
+    BUG_ON(new->vcpu->processor != cpu);
 
+    /* Look at the cpu it's running on first */
+    cur = CSCHED_VCPU(per_cpu(schedule_data, cpu).curr);
+    burn_credits(rqd, cur, now);
+
+    if ( cur->credit < new->credit )
+    {
+        ipid = cpu;
+        goto tickle;
+    }
+    
     /* Get a mask of idle, but not tickled */
     cpus_andnot(mask, rqd->idle, rqd->tickled);
     
@@ -355,12 +366,18 @@ runq_tickle(const struct scheduler *ops, unsigned int cpu, struct csched_vcpu *n
 
     /* Otherwise, look for the non-idle cpu with the lowest credit,
      * skipping cpus which have been tickled but not scheduled yet */
+    online = CSCHED_CPUONLINE(per_cpu(cpupool, cpu));
+
     cpus_andnot(mask, *online, rqd->idle);
     cpus_andnot(mask, mask, rqd->tickled);
 
     for_each_cpu_mask(i, mask)
     {
         struct csched_vcpu * cur;
+
+        /* Already looked at this one above */
+        if ( i == cpu )
+            continue;
 
         cur = CSCHED_VCPU(per_cpu(schedule_data, i).curr);
 
