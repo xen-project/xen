@@ -676,7 +676,6 @@ static void
 csched_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
 {
     struct csched_vcpu * const svc = CSCHED_VCPU(vc);
-    const unsigned int cpu = vc->processor;
     s_time_t now = 0;
 
     /* Schedule lock should be held at this point. */
@@ -686,7 +685,7 @@ csched_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
     BUG_ON( is_idle_vcpu(vc) );
 
     /* Make sure svc priority mod happens before runq check */
-    if ( unlikely(per_cpu(schedule_data, cpu).curr == vc) )
+    if ( unlikely(per_cpu(schedule_data, vc->processor).curr == vc) )
     {
         goto out;
     }
@@ -710,8 +709,8 @@ csched_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
     now = NOW();
 
     /* Put the VCPU on the runq */
-    runq_insert(ops, cpu, svc);
-    runq_tickle(ops, cpu, svc, now);
+    runq_insert(ops, vc->processor, svc);
+    runq_tickle(ops, vc->processor, svc, now);
 
 out:
     d2printk("w-\n");
@@ -722,6 +721,7 @@ static void
 csched_context_saved(const struct scheduler *ops, struct vcpu *vc)
 {
     struct csched_vcpu * const svc = CSCHED_VCPU(vc);
+    s_time_t now = NOW();
 
     vcpu_schedule_lock_irq(vc);
 
@@ -738,14 +738,11 @@ csched_context_saved(const struct scheduler *ops, struct vcpu *vc)
      */
     if ( test_bit(__CSFLAG_delayed_runq_add, &svc->flags) )
     {
-        const unsigned int cpu = vc->processor;
-
+        BUG_ON(__vcpu_on_runq(svc));
         clear_bit(__CSFLAG_delayed_runq_add, &svc->flags);
 
-        BUG_ON(__vcpu_on_runq(svc));
-
-        runq_insert(ops, cpu, svc);
-        runq_tickle(ops, cpu, svc, NOW());
+        runq_insert(ops, vc->processor, svc);
+        runq_tickle(ops, vc->processor, svc, now);
     }
 
     vcpu_schedule_unlock_irq(vc);
