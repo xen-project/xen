@@ -429,6 +429,11 @@ int libxl__wait_for_device_model(libxl_ctx *ctx,
     char **l = NULL;
 
     xsh = xs_daemon_open();
+    if (xsh == NULL) {
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Unable to open xenstore connection");
+        goto err;
+    }
+
     path = libxl__sprintf(&gc, "/local/domain/0/device-model/%d/state", domid);
     xs_watch(xsh, path, path);
     tv.tv_sec = LIBXL_DEVICE_MODEL_START_TIMEOUT;
@@ -469,6 +474,7 @@ again:
     xs_unwatch(xsh, path, path);
     xs_daemon_close(xsh);
     LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Device Model not ready");
+err:
     libxl__free_all(&gc);
     return -1;
 }
