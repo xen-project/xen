@@ -116,6 +116,11 @@
 /* Carryover: How much "extra" credit may be carried over after
  * a reset. */
 #define CSCHED_CARRYOVER_MAX        CSCHED_MIN_TIMER
+/* Stickiness: Cross-L2 migration resistance.  Should be less than
+ * MIN_TIMER. */
+#define CSCHED_MIGRATE_RESIST       ((opt_migrate_resist)*MICROSECS(1))
+/* How much to "compensate" a vcpu for L2 migration */
+#define CSCHED_MIGRATE_COMPENSATION MICROSECS(50)
 /* Reset: Value below which credit will be reset. */
 #define CSCHED_CREDIT_RESET         0
 /* Max timer: Maximum time a guest can be run for. */
@@ -148,6 +153,9 @@
 #define __CSFLAG_delayed_runq_add 2
 #define CSFLAG_delayed_runq_add (1<<__CSFLAG_delayed_runq_add)
 
+
+int opt_migrate_resist=500;
+integer_param("sched_credit2_migrate_resist", opt_migrate_resist);
 
 /*
  * Useful macros
@@ -406,8 +414,9 @@ runq_tickle(const struct scheduler *ops, unsigned int cpu, struct csched_vcpu *n
         }
     }
 
-    /* At this point, if ipid is non-zero, see if the lowest is lower than new */
-    if ( ipid == -1 || lowest > new->credit )
+    /* Only switch to another processor if the credit difference is greater
+     * than the migrate resistance */
+    if ( ipid == -1 || lowest + CSCHED_MIGRATE_RESIST > new->credit )
         goto no_tickle;
 
 tickle:
@@ -940,6 +949,46 @@ csched_runtime(const struct scheduler *ops, int cpu, struct csched_vcpu *snext)
 void __dump_execstate(void *unused);
 
 /*
+ * Find a candidate.
+ */
+static struct csched_vcpu *
+runq_candidate(struct csched_runqueue_data *rqd,
+               struct csched_vcpu *scurr,
+               int cpu, s_time_t now)
+{
+    struct list_head *iter;
+    struct csched_vcpu *snext = NULL;
+
+    /* Default to current if runnable, idle otherwise */
+    if ( vcpu_runnable(scurr->vcpu) )
+        snext = scurr;
+    else
+        snext = CSCHED_VCPU(idle_vcpu[cpu]);
+
+    list_for_each( iter, &rqd->runq )
+    {
+        struct csched_vcpu * svc = list_entry(iter, struct csched_vcpu, runq_elem);
+
+        /* If this is on a different processor, don't pull it unless
+         * its credit is at least CSCHED_MIGRATE_RESIST higher. */
+        if ( svc->vcpu->processor != cpu
+             && snext->credit + CSCHED_MIGRATE_RESIST > svc->credit )
+            continue;
+
+        /* If the next one on the list has more credit than current
+         * (or idle, if current is not runnable), choose it. */
+        if ( svc->credit > snext->credit )
+            snext = svc;
+
+        /* In any case, if we got this far, break. */
+        break;
+
+    }
+
+    return snext;
+}
+
+/*
  * This function is in the critical path. It is designed to be simple and
  * fast for the common case.
  */
@@ -949,7 +998,6 @@ csched_schedule(
 {
     const int cpu = smp_processor_id();
     struct csched_runqueue_data *rqd = RQD(ops, cpu);
-    struct list_head * const runq = &rqd->runq;
     struct csched_vcpu * const scurr = CSCHED_VCPU(current);
     struct csched_vcpu *snext = NULL;
     struct task_slice ret;
@@ -983,79 +1031,73 @@ csched_schedule(
      * for this processor, and mark the current for delayed runqueue
      * add.
      *
-     * If the current vcpu is runnable, and the next guy on the queue
-     * has higher credit, we want to mark current for delayed runqueue
-     * add, and remove the next guy from the queue.
+     * If the current vcpu is runnable, and there's another runnable
+     * candidate, we want to mark current for delayed runqueue add,
+     * and remove the next guy from the queue.
      *
      * If the current vcpu is not runnable, we want to chose the idle
      * vcpu for this processor.
      */
-    if ( list_empty(runq) || tasklet_work_scheduled )
-        snext = CSCHED_VCPU(idle_vcpu[cpu]);
-    else
-        snext = __runq_elem(runq->next);
-
     if ( tasklet_work_scheduled )
+    {
         trace_var(TRC_CSCHED2_SCHED_TASKLET, 0, 0,  NULL);
-
-    if ( !is_idle_vcpu(current) && vcpu_runnable(current) )
-    {
-        /* If the current vcpu is runnable, and has higher credit
-         * than the next on the runqueue, and isn't being preempted
-         * by a tasklet, run him again.
-         * Otherwise, set him for delayed runq add. */
-
-        if ( !tasklet_work_scheduled && scurr->credit > snext->credit)
-            snext = scurr;
-        else
-            set_bit(__CSFLAG_delayed_runq_add, &scurr->flags);
-        
+        snext = CSCHED_VCPU(idle_vcpu[cpu]);
     }
+    else
+        snext=runq_candidate(rqd, scurr, cpu, now);
 
-    if ( snext != scurr && !is_idle_vcpu(snext->vcpu) )
-    {
-        __runq_remove(snext);
-        if ( snext->vcpu->is_running )
-        {
-            printk("p%d: snext d%dv%d running on p%d! scurr d%dv%d\n",
-                   cpu,
-                   snext->vcpu->domain->domain_id, snext->vcpu->vcpu_id,
-                   snext->vcpu->processor,
-                   scurr->vcpu->domain->domain_id,
-                   scurr->vcpu->vcpu_id);
-            BUG();
-        }
-        set_bit(__CSFLAG_scheduled, &snext->flags);
-    }
-
-    if ( !is_idle_vcpu(snext->vcpu) && snext->credit <= CSCHED_CREDIT_RESET )
-        reset_credit(ops, cpu, now);
-
-    /*
-     * Update idlers mask if necessary. When we're idling, other CPUs
-     * will tickle us when they get extra work.
-     */
-    if ( is_idle_vcpu(snext->vcpu) )
-    {
-        if ( !cpu_isset(cpu, rqd->idle) )
-            cpu_set(cpu, rqd->idle);
-    }
-    else if ( cpu_isset(cpu, rqd->idle) )
-    {
-        cpu_clear(cpu, rqd->idle);
-    }
+    /* If switching from a non-idle runnable vcpu, put it
+     * back on the runqueue. */
+    if ( snext != scurr
+         && !is_idle_vcpu(scurr->vcpu)
+         && vcpu_runnable(current) )
+        set_bit(__CSFLAG_delayed_runq_add, &scurr->flags);
 
     ret.migrated = 0;
 
+    /* Accounting for non-idle tasks */
     if ( !is_idle_vcpu(snext->vcpu) )
     {
+        /* If switching, remove this from the runqueue and mark it scheduled */
+        if ( snext != scurr )
+        {
+            __runq_remove(snext);
+            if ( snext->vcpu->is_running )
+            {
+                printk("p%d: snext d%dv%d running on p%d! scurr d%dv%d\n",
+                       cpu,
+                       snext->vcpu->domain->domain_id, snext->vcpu->vcpu_id,
+                       snext->vcpu->processor,
+                       scurr->vcpu->domain->domain_id,
+                       scurr->vcpu->vcpu_id);
+                BUG();
+            }
+            set_bit(__CSFLAG_scheduled, &snext->flags);
+        }
+
+        /* Check for the reset condition */
+        if ( snext->credit <= CSCHED_CREDIT_RESET )
+            reset_credit(ops, cpu, now);
+
+        /* Clear the idle mask if necessary */
+        if ( cpu_isset(cpu, rqd->idle) )
+            cpu_clear(cpu, rqd->idle);
+
         snext->start_time = now;
+
         /* Safe because lock for old processor is held */
         if ( snext->vcpu->processor != cpu )
         {
+            snext->credit += CSCHED_MIGRATE_COMPENSATION;
             snext->vcpu->processor = cpu;
             ret.migrated = 1;
         }
+    }
+    else
+    {
+        /* Update the idle mask if necessary */
+        if ( !cpu_isset(cpu, rqd->idle) )
+            cpu_set(cpu, rqd->idle);
     }
 
     /*
