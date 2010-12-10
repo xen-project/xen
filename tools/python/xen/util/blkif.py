@@ -19,11 +19,6 @@ def blkdev_name_to_number(name):
     devname = 'virtual-device'
     devnum = None
 
-    try:
-        return (devname, os.stat(n).st_rdev)
-    except Exception, ex:
-        pass
-
     scsi_major = [ 8, 65, 66, 67, 68, 69, 70, 71, 128, 129, 130, 131, 132, 133, 134, 135 ]
     if re.match( '/dev/sd[a-z]([1-9]|1[0-5])?$', n):
         major = scsi_major[(ord(n[7:8]) - ord('a')) / 16]
