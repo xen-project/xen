@@ -302,7 +302,8 @@ static void __machine_restart(void *pdelay)
 
 void machine_restart(unsigned int delay_millisecs)
 {
-    int i;
+    unsigned int i, attempt;
+    enum reboot_type orig_reboot_type = reboot_type;
 
     watchdog_disable();
     console_start_sync();
@@ -337,7 +338,7 @@ void machine_restart(unsigned int delay_millisecs)
     /* Rebooting needs to touch the page at absolute address 0. */
     *((unsigned short *)__va(0x472)) = reboot_mode;
 
-    for ( ; ; )
+    for ( attempt = 0; ; attempt++ )
     {
         switch ( reboot_type )
         {
@@ -350,19 +351,29 @@ void machine_restart(unsigned int delay_millisecs)
                 outb(0xfe,0x64); /* pulse reset low */
                 udelay(50);
             }
-            /* fall through */
+            /*
+             * If this platform supports ACPI reset, we follow a Windows-style
+             * reboot attempt sequence:
+             *   ACPI -> KBD -> ACPI -> KBD
+             * After this we revert to our usual sequence:
+             *   KBD -> TRIPLE -> KBD -> TRIPLE -> KBD -> ...
+             */
+            reboot_type = (((attempt == 0) && (orig_reboot_type == BOOT_ACPI))
+                           ? BOOT_ACPI : BOOT_TRIPLE);
+            break;
         case BOOT_TRIPLE:
             asm volatile ( "lidt %0 ; int3" : "=m" (no_idt) );
+            reboot_type = BOOT_KBD;
             break;
         case BOOT_BIOS:
             machine_real_restart(jump_to_bios, sizeof(jump_to_bios));
+            reboot_type = BOOT_KBD;
             break;
         case BOOT_ACPI:
             acpi_reboot();
+            reboot_type = BOOT_KBD;
             break;
         }
-
-        reboot_type = BOOT_KBD;
     }
 }
 
