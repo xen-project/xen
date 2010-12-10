@@ -105,7 +105,7 @@ struct tmem_op {
             uint64_t uuid[2];
             uint32_t flags;
             uint32_t arg1;
-        } new; /* for cmd == TMEM_NEW_POOL, TMEM_AUTH, TMEM_RESTORE_NEW */
+        } creat; /* for cmd == TMEM_NEW_POOL, TMEM_AUTH, TMEM_RESTORE_NEW */
         struct { 
             uint32_t subop;
             uint32_t cli_id;

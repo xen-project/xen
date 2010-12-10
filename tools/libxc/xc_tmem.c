@@ -187,10 +187,10 @@ int xc_tmem_auth(xc_interface *xch,
 
     op.cmd = TMEM_AUTH;
     op.pool_id = 0;
-    op.u.new.arg1 = cli_id;
-    op.u.new.flags = arg1;
-    if ( xc_tmem_uuid_parse(uuid_str, &op.u.new.uuid[0],
-                                      &op.u.new.uuid[1]) < 0 )
+    op.u.creat.arg1 = cli_id;
+    op.u.creat.flags = arg1;
+    if ( xc_tmem_uuid_parse(uuid_str, &op.u.creat.uuid[0],
+                                      &op.u.creat.uuid[1]) < 0 )
     {
         PERROR("Can't parse uuid, use xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx");
         return -1;
@@ -380,10 +380,10 @@ static int xc_tmem_restore_new_pool(
 
     op.cmd = TMEM_RESTORE_NEW;
     op.pool_id = pool_id;
-    op.u.new.arg1 = cli_id;
-    op.u.new.flags = flags;
-    op.u.new.uuid[0] = uuid_lo;
-    op.u.new.uuid[1] = uuid_hi;
+    op.u.creat.arg1 = cli_id;
+    op.u.creat.flags = flags;
+    op.u.creat.uuid[0] = uuid_lo;
+    op.u.creat.uuid[1] = uuid_hi;
 
     return do_tmem_op(xch, &op);
 }
