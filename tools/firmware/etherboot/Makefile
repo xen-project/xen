@@ -12,8 +12,10 @@ endif
 
 IPXE_GIT_TAG := v1.0.0
 
+IPXE_TARBALL_URL := $(XEN_EXTFILES_URL)/ipxe-git-$(IPXE_GIT_TAG).tar.gz
+
 D=ipxe
-T=ipxe-git-snapshot.tar.gz
+T=ipxe.tar.gz
 
 ROMS = $(addprefix $D/src/bin/, $(addsuffix .rom, $(NICS)))
 
@@ -33,10 +35,13 @@ eb-roms.h: Config
 	mv -f $@.new $@
 
 $T:
-	$(GIT) clone $(IPXE_GIT_URL) $D.git
-	cd $D.git && \
-	$(GIT) archive --format=tar --prefix=$D/ $(IPXE_GIT_TAG) | gzip >../$T
-	rm -rf $D.git
+	if ! wget -O _$T $(IPXE_TARBALL_URL); then \
+		$(GIT) clone $(IPXE_GIT_URL) $D.git; \
+		(cd $D.git && $(GIT) archive --format=tar --prefix=$D/ \
+		$(IPXE_GIT_TAG) | gzip >../_$T); \
+		rm -rf $D.git; \
+	fi
+	mv _$T $T
 
 $D/src/arch/i386/Makefile: $T Config
 	rm -rf $D
@@ -51,7 +56,7 @@ $D/src/bin/NIC: $D/src/arch/i386/Makefile
 
 .PHONY: clean
 clean:
-	rm -rf $D $D.git *~ eb-roms.h
+	rm -rf $D $D.git *~ eb-roms.h _$T
 
 .PHONY: distclean
 distclean: clean
