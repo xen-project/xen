@@ -358,7 +358,7 @@ void machine_restart(unsigned int delay_millisecs)
              * After this we revert to our usual sequence:
              *   KBD -> TRIPLE -> KBD -> TRIPLE -> KBD -> ...
              */
-            reboot_type = (((attempt == 0) && (orig_reboot_type == BOOT_ACPI))
+            reboot_type = (((attempt == 1) && (orig_reboot_type == BOOT_ACPI))
                            ? BOOT_ACPI : BOOT_TRIPLE);
             break;
         case BOOT_TRIPLE:
