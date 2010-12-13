@@ -24,6 +24,8 @@
 
 #define XBT_NULL 0
 
+#define XS_OPEN_READONLY	1<<0
+
 struct xs_handle;
 typedef uint32_t xs_transaction_t;
 
@@ -34,18 +36,34 @@ typedef uint32_t xs_transaction_t;
 
 /* On failure, these routines set errno. */
 
+/* Open a connection to the xs daemon.
+ * Attempts to make a connection over the socket interface, 
+ * and if it fails, then over the  xenbus interface.
+ * Mode 0 specifies read-write access, XS_OPEN_READONLY for
+ * read-only access.
+ * Returns a handle or NULL.
+ */
+struct xs_handle *xs_open(unsigned long flags);
+
+/* Close the connection to the xs daemon. */
+void xs_close(struct xs_handle *xsh);
+
 /* Connect to the xs daemon.
  * Returns a handle or NULL.
+ * Deprecated, please use xs_open(0) instead
  */
 struct xs_handle *xs_daemon_open(void);
 struct xs_handle *xs_domain_open(void);
 
 /* Connect to the xs daemon (readonly for non-root clients).
  * Returns a handle or NULL.
+ * Deprecated, please use xs_open(XS_OPEN_READONLY) instead
  */
 struct xs_handle *xs_daemon_open_readonly(void);
 
-/* Close the connection to the xs daemon. */
+/* Close the connection to the xs daemon.
+ * Deprecated, please use xs_close() instead
+ */
 void xs_daemon_close(struct xs_handle *);
 
 /* Throw away the connection to the xs daemon, for use after fork(). */

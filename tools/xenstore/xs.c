@@ -182,12 +182,15 @@ error:
 	return -1;
 }
 
-static int get_dev(const char *connect_to)
+static int get_dev(const char *connect_to, unsigned long flags)
 {
-	return open(connect_to, O_RDWR);
+	if (flags & XS_OPEN_READONLY)
+		return open(connect_to, O_RDONLY);
+	else
+		return open(connect_to, O_RDWR);
 }
 
-static struct xs_handle *get_handle(const char *connect_to)
+static struct xs_handle *get_handle(const char *connect_to, unsigned long flags)
 {
 	struct stat buf;
 	struct xs_handle *h = NULL;
@@ -199,7 +202,7 @@ static struct xs_handle *get_handle(const char *connect_to)
 	if (S_ISSOCK(buf.st_mode))
 		fd = get_socket(connect_to);
 	else
-		fd = get_dev(connect_to);
+		fd = get_dev(connect_to, flags);
 
 	if (fd == -1)
 		return NULL;
@@ -237,17 +240,32 @@ static struct xs_handle *get_handle(const char *connect_to)
 
 struct xs_handle *xs_daemon_open(void)
 {
-	return get_handle(xs_daemon_socket());
+	return xs_open(0);
 }
 
 struct xs_handle *xs_daemon_open_readonly(void)
 {
-	return get_handle(xs_daemon_socket_ro());
+	return xs_open(XS_OPEN_READONLY);
 }
 
 struct xs_handle *xs_domain_open(void)
 {
-	return get_handle(xs_domain_dev());
+	return xs_open(0);
+}
+
+struct xs_handle *xs_open(unsigned long flags)
+{
+	struct xs_handle *xsh = NULL;
+
+	if (flags & XS_OPEN_READONLY)
+		xsh = get_handle(xs_daemon_socket_ro(), flags);
+	else
+		xsh = get_handle(xs_daemon_socket(), flags);
+
+	if (!xsh)
+		xsh = get_handle(xs_domain_dev(), flags);
+
+	return xsh;
 }
 
 static void close_free_msgs(struct xs_handle *h) {
@@ -301,6 +319,12 @@ void xs_daemon_close(struct xs_handle *h)
 	mutex_unlock(&h->watch_mutex);
 
         close_fds_free(h);
+}
+
+void xs_close(struct xs_handle* xsh)
+{
+	if (xsh)
+		xs_daemon_close(xsh);
 }
 
 static bool read_all(int fd, void *data, unsigned int len)
