@@ -1261,6 +1261,10 @@ static char ** libxl_build_device_model_args_new(libxl__gc *gc,
     flexarray_set(dm_args, num++, "-xen-domid");
     flexarray_set(dm_args, num++, libxl__sprintf(gc, "%d", info->domid));
 
+    if (info->type == XENPV) {
+        flexarray_set(dm_args, num++, "-xen-attach");
+    }
+
     if (info->dom_name) {
         flexarray_set(dm_args, num++, "-name");
         flexarray_set(dm_args, num++, info->dom_name);
@@ -1292,6 +1296,12 @@ static char ** libxl_build_device_model_args_new(libxl__gc *gc,
     if (info->sdl) {
         flexarray_set(dm_args, num++, "-sdl");
     }
+
+    if (info->type == XENPV && !info->nographic) {
+        flexarray_set(dm_args, num++, "-vga");
+        flexarray_set(dm_args, num++, "xenfb");
+    }
+
     if (info->keymap) {
         flexarray_set(dm_args, num++, "-k");
         flexarray_set(dm_args, num++, info->keymap);
@@ -1374,16 +1384,18 @@ static char ** libxl_build_device_model_args_new(libxl__gc *gc,
     else
         flexarray_set(dm_args, num++, "xenfv");
 
-    disks = libxl_device_disk_list(libxl__gc_owner(gc), info->domid, &nb);
-    for (i; i < nb; i++) {
-        if ( disks[i].is_cdrom ) {
-            flexarray_set(dm_args, num++, "-cdrom");
-            flexarray_set(dm_args, num++, libxl__strdup(gc, disks[i].physpath));
-        } else {
-            flexarray_set(dm_args, num++, libxl__sprintf(gc, "-%s", disks[i].virtpath));
-            flexarray_set(dm_args, num++, libxl__strdup(gc, disks[i].physpath));
+    if (info->type == XENFV) {
+        disks = libxl_device_disk_list(libxl__gc_owner(gc), info->domid, &nb);
+        for (i; i < nb; i++) {
+            if (disks[i].is_cdrom) {
+                flexarray_set(dm_args, num++, "-cdrom");
+                flexarray_set(dm_args, num++, libxl__strdup(gc, disks[i].physpath));
+            } else {
+                flexarray_set(dm_args, num++, libxl__sprintf(gc, "-%s", disks[i].virtpath));
+                flexarray_set(dm_args, num++, libxl__strdup(gc, disks[i].physpath));
+            }
+            libxl_device_disk_destroy(&disks[i]);
         }
-        libxl_device_disk_destroy(&disks[i]);
     }
     free(disks);
     flexarray_set(dm_args, num++, NULL);
