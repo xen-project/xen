@@ -1256,9 +1256,9 @@ static char ** libxl_build_device_model_args_new(libxl__gc *gc,
     if (!dm_args)
         return NULL;
 
-    flexarray_set(dm_args, num++, "qemu-system-xen");
-    flexarray_set(dm_args, num++, "-xen-domid");
+    flexarray_set(dm_args, num++, libxl__strdup(gc, info->device_model));
 
+    flexarray_set(dm_args, num++, "-xen-domid");
     flexarray_set(dm_args, num++, libxl__sprintf(gc, "%d", info->domid));
 
     if (info->dom_name) {
@@ -1378,10 +1378,10 @@ static char ** libxl_build_device_model_args_new(libxl__gc *gc,
     for (i; i < nb; i++) {
         if ( disks[i].is_cdrom ) {
             flexarray_set(dm_args, num++, "-cdrom");
-            flexarray_set(dm_args, num++, disks[i].physpath);
-        }else{
+            flexarray_set(dm_args, num++, libxl__strdup(gc, disks[i].physpath));
+        } else {
             flexarray_set(dm_args, num++, libxl__sprintf(gc, "-%s", disks[i].virtpath));
-            flexarray_set(dm_args, num++, disks[i].physpath);
+            flexarray_set(dm_args, num++, libxl__strdup(gc, disks[i].physpath));
         }
         libxl_device_disk_destroy(&disks[i]);
     }
