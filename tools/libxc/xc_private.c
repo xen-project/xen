@@ -186,7 +186,6 @@ void xc_report_progress_step(xc_interface *xch,
                  done, total);
 }
 
-/* NB: arr must be locked */
 int xc_get_pfn_type_batch(xc_interface *xch, uint32_t dom,
                           unsigned int num, xen_pfn_t *arr)
 {
