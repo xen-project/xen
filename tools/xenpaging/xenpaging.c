@@ -693,8 +693,6 @@ int main(int argc, char *argv[])
     if ( rc == 0 )
         rc = rc1;
 
-    xc_interface_close(xch);
-
     DPRINTF("xenpaging exit code %d\n", rc);
     return rc;
 }
