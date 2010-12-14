@@ -539,7 +539,7 @@ int main(int argc, char *argv[])
     paging = xenpaging_init(&xch, domain_id);
     if ( paging == NULL )
     {
-        ERROR("Error initialising paging");
+        fprintf(stderr, "Error initialising paging");
         return 1;
     }
 
@@ -688,12 +688,10 @@ int main(int argc, char *argv[])
     /* Tear down domain paging */
     rc1 = xenpaging_teardown(xch, paging);
     if ( rc1 != 0 )
-        ERROR("Error tearing down paging");
+        fprintf(stderr, "Error tearing down paging");
 
     if ( rc == 0 )
         rc = rc1;
-
-    DPRINTF("xenpaging exit code %d\n", rc);
     return rc;
 }
 
