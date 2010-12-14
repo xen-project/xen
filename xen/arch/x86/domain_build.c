@@ -191,6 +191,15 @@ static unsigned long __init compute_dom0_nr_pages(
     if ( is_pv_32on64_domain(d) )
         avail -= opt_dom0_max_vcpus - 1;
 
+    /* Reserve memory for iommu_dom0_init() (rough estimate). */
+    if ( iommu_enabled )
+    {
+        unsigned int s;
+
+        for ( s = 9; s < BITS_PER_LONG; s += 9 )
+            avail -= max_pdx >> s;
+    }
+
     /*
      * If domain 0 allocation isn't specified, reserve 1/16th of available
      * memory for things like DMA buffers. This reservation is clamped to 
