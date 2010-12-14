@@ -90,7 +90,7 @@ setup_bridge_port() {
     # largest non-broadcast address to prevent the address getting
     # stolen by an Ethernet bridge for STP purposes.
     # (FE:FF:FF:FF:FF:FF)
-    ip link set ${dev} address fe:ff:ff:ff:ff:ff
+    ip link set ${dev} address fe:ff:ff:ff:ff:ff || true
 
     # ... and configure it
     ip addr flush ${dev}
