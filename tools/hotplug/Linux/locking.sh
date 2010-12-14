@@ -61,6 +61,12 @@ _claim_lock()
     then
       owner="$new_owner"
       retries=0
+    else
+      local pid=$(echo $owner | cut -d : -f 1)
+      if [ ! -f "/proc/$pid/status" ]
+      then
+        _release_lock $lockdir
+      fi
     fi
 
     if [ $retries -gt $LOCK_SPINNING_RETRIES ]
