@@ -138,6 +138,7 @@ char *libxl__device_disk_backend_type_of_phystype(libxl_disk_phystype phystype)
 {
     switch (phystype) {
         case PHYSTYPE_QCOW: return "tap";
+        case PHYSTYPE_QCOW2: return "tap";
         case PHYSTYPE_VHD: return "tap";
         case PHYSTYPE_AIO: return "tap";
         /* let's pretend file is tap:aio */
