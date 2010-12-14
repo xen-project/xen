@@ -2822,18 +2822,25 @@ static int libxl__fill_dom0_memory_info(libxl__gc *gc, uint32_t *target_memkb)
     int rc;
     libxl_dominfo info;
     libxl_physinfo physinfo;
-    char *target = NULL, *endptr = NULL;
+    char *target = NULL, *staticmax = NULL, *freememslack = NULL, *endptr = NULL;
     char *target_path = "/local/domain/0/memory/target";
     char *max_path = "/local/domain/0/memory/static-max";
     char *free_mem_slack_path = "/local/domain/0/memory/freemem-slack";
     xs_transaction_t t;
     libxl_ctx *ctx = libxl__gc_owner(gc);
-    uint32_t free_mem_slack = 0;
+    uint32_t free_mem_slack_kb = 0;
 
 retry_transaction:
     t = xs_transaction_start(ctx->xsh);
 
     target = libxl__xs_read(gc, t, target_path);
+    staticmax = libxl__xs_read(gc, t, target_path);
+    freememslack = libxl__xs_read(gc, t, target_path);
+    if (target && staticmax && freememslack) {
+        rc = 0;
+        goto out;
+    }
+
     if (target) {
         *target_memkb = strtoul(target, &endptr, 10);
         if (*endptr != '\0') {
@@ -2842,38 +2849,43 @@ retry_transaction:
             rc = ERROR_FAIL;
             goto out;
         }
-        rc = 0;
-        goto out;
     }
 
     rc = libxl_domain_info(ctx, &info, 0);
     if (rc < 0)
-        return rc;
+        goto out;
 
     rc = libxl_get_physinfo(ctx, &physinfo);
     if (rc < 0)
-        return rc;
+        goto out;
 
-    libxl__xs_write(gc, t, target_path, "%"PRIu32,
-            (uint32_t) info.current_memkb);
-    libxl__xs_write(gc, t, max_path, "%"PRIu32,
-            (uint32_t) info.max_memkb);
+    if (target == NULL) {
+        libxl__xs_write(gc, t, target_path, "%"PRIu32,
+                (uint32_t) info.current_memkb);
+        *target_memkb = (uint32_t) info.current_memkb;
+    }
+    if (staticmax == NULL)
+        libxl__xs_write(gc, t, max_path, "%"PRIu32,
+                (uint32_t) info.max_memkb);
 
-    free_mem_slack = (uint32_t) (PAGE_TO_MEMKB(physinfo.total_pages) -
-            info.current_memkb);
-    /* From empirical measurements the free_mem_slack shouldn't be more
-     * than 15% of the total memory present on the system. */
-    if (free_mem_slack > PAGE_TO_MEMKB(physinfo.total_pages) * 0.15)
-        free_mem_slack = PAGE_TO_MEMKB(physinfo.total_pages) * 0.15;
-    libxl__xs_write(gc, t, free_mem_slack_path, "%"PRIu32, free_mem_slack);
-
-    *target_memkb = (uint32_t) info.current_memkb;
+    if (freememslack == NULL) {
+        free_mem_slack_kb = (uint32_t) (PAGE_TO_MEMKB(physinfo.total_pages) -
+                info.current_memkb);
+        /* From empirical measurements the free_mem_slack shouldn't be more
+         * than 15% of the total memory present on the system. */
+        if (free_mem_slack_kb > PAGE_TO_MEMKB(physinfo.total_pages) * 0.15)
+            free_mem_slack_kb = PAGE_TO_MEMKB(physinfo.total_pages) * 0.15;
+        libxl__xs_write(gc, t, free_mem_slack_path, "%"PRIu32, free_mem_slack_kb);
+    }
     rc = 0;
 
 out:
-    if (!xs_transaction_end(ctx->xsh, t, 0))
+    if (!xs_transaction_end(ctx->xsh, t, 0)) {
         if (errno == EAGAIN)
             goto retry_transaction;
+        else
+            rc = ERROR_FAIL;
+    }
 
 
     return rc;
