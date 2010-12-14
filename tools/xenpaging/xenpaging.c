@@ -39,12 +39,6 @@
 #include "policy.h"
 #include "xenpaging.h"
 
-
-#if 0
-#undef DPRINTF
-#define DPRINTF(...) ((void)0)
-#endif
-
 static char filename[80];
 static int interrupted;
 static void close_handler(int sig)
@@ -83,9 +77,12 @@ xenpaging_t *xenpaging_init(xc_interface **xch_r, domid_t domain_id)
 {
     xenpaging_t *paging;
     xc_interface *xch;
+    xentoollog_logger *dbg = NULL;
     int rc;
 
-    xch = xc_interface_open(NULL, NULL, 0);
+    if ( getenv("XENPAGING_DEBUG") )
+        dbg = (xentoollog_logger *)xtl_createlogger_stdiostream(stderr, XTL_DEBUG, 0);
+    xch = xc_interface_open(dbg, NULL, 0);
     if ( !xch )
         goto err_iface;
 
