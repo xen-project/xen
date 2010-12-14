@@ -1,0 +1,48 @@
+Warning:
+
+The xenpaging code is new and not fully debugged.
+Usage of xenpaging can crash Xen or cause severe data corruption in the
+guest memory and its filesystems!
+
+Description:
+
+xenpaging writes memory pages of a given guest to a file and moves the
+pages back to the pool of available memory.  Once the guests wants to
+access the paged-out memory, the page is read from disk and placed into
+memory.  This allows the sum of all running guests to use more memory
+than physically available on the host.
+
+Usage:
+
+Once the guest is running, run xenpaging with the guest_id and the
+number of pages to page-out:
+
+  chdir /var/lib/xen/xenpaging
+  xenpaging <guest_id>  <number_of_pages>
+
+To obtain the guest_id, run 'xm list'.
+xenpaging will write the pagefile to the current directory.
+Example with 128MB pagefile on guest 1:
+
+  xenpaging 1 32768
+
+Caution: stopping xenpaging manually will cause the guest to stall or
+crash because the paged-out memory is not written back into the guest!
+
+After a reboot of a guest, its guest_id changes, the current xenpaging
+binary has no target anymore. To automate restarting of xenpaging after
+guest reboot, specify the number if pages in the guest configuration
+file /etc/xen/vm/<guest_name>:
+
+xenpaging=32768
+
+Redo the guest with 'xm create /etc/xen/vm/<guest_name>' to activate the
+changes.
+
+
+Todo:
+- implement stopping of xenpaging
+- implement/test live migration
+
+
+# vim: tw=72
