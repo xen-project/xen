@@ -121,38 +121,28 @@ static void __init amd_iommu_setup_dom0_devices(struct domain *d)
 {
     struct amd_iommu *iommu;
     struct pci_dev *pdev;
-    int bus, dev, func;
-    u32 l;
-    int bdf;
+    int bus, devfn, bdf;
 
     spin_lock(&pcidevs_lock);
     for ( bus = 0; bus < 256; bus++ )
     {
-        for ( dev = 0; dev < 32; dev++ )
+        for ( devfn = 0; devfn < 256; devfn++ )
         {
-            for ( func = 0; func < 8; func++ )
-            {
-                l = pci_conf_read32(bus, dev, func, PCI_VENDOR_ID);
-                /* some broken boards return 0 or ~0 if a slot is empty: */
-                if ( (l == 0xffffffff) || (l == 0x00000000) ||
-                     (l == 0x0000ffff) || (l == 0xffff0000) )
-                    continue;
+            pdev = pci_get_pdev(bus, devfn);
+            if ( !pdev )
+                continue;
 
-                pdev = alloc_pdev(bus, PCI_DEVFN(dev, func));
-                pdev->domain = d;
-                list_add(&pdev->domain_list, &d->arch.pdev_list);
+            pdev->domain = d;
+            list_add(&pdev->domain_list, &d->arch.pdev_list);
 
-                bdf = (bus << 8) | pdev->devfn;
-                iommu = find_iommu_for_device(bdf);
+            bdf = (bus << 8) | devfn;
+            iommu = find_iommu_for_device(bdf);
 
-                if ( !iommu )
-                {
-                    AMD_IOMMU_DEBUG("Fail to find iommu for device"
-                        "%02x:%02x.%x\n", bus, dev, func);
-                    continue;
-                }
+            if ( likely(iommu != NULL) )
                 amd_iommu_setup_domain_device(d, iommu, bdf);
-            }
+            else
+                AMD_IOMMU_DEBUG("No iommu for device %02x:%02x.%x\n",
+                                bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         }
     }
     spin_unlock(&pcidevs_lock);
@@ -173,7 +163,8 @@ int __init amd_iov_detect(void)
         printk("Error initialization\n");
         return -ENODEV;
     }
-    return 0;
+
+    return scan_pci_devices();
 }
 
 static int allocate_domain_resources(struct hvm_iommu *hd)

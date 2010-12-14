@@ -43,7 +43,7 @@ static struct {
 /* bus2bridge_lock protects bus2bridge array */
 static DEFINE_SPINLOCK(bus2bridge_lock);
 
-struct pci_dev *alloc_pdev(u8 bus, u8 devfn)
+static struct pci_dev *alloc_pdev(u8 bus, u8 devfn)
 {
     struct pci_dev *pdev;
 
@@ -66,7 +66,7 @@ struct pci_dev *alloc_pdev(u8 bus, u8 devfn)
     return pdev;
 }
 
-void free_pdev(struct pci_dev *pdev)
+static void free_pdev(struct pci_dev *pdev)
 {
     list_del(&pdev->alldevs_list);
     xfree(pdev);
@@ -383,8 +383,7 @@ int pci_device_detect(u8 bus, u8 dev, u8 func)
 
 /*
  * scan pci devices to add all existed PCI devices to alldevs_list,
- * and setup pci hierarchy in array bus2bridge. This function is only
- * called in VT-d hardware setup
+ * and setup pci hierarchy in array bus2bridge.
  */
 int __init scan_pci_devices(void)
 {

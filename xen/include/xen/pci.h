@@ -82,8 +82,6 @@ int pci_device_detect(u8 bus, u8 dev, u8 func);
 int scan_pci_devices(void);
 int pdev_type(u8 bus, u8 devfn);
 int find_upstream_bridge(u8 *bus, u8 *devfn, u8 *secbus);
-struct pci_dev *alloc_pdev(u8 bus, u8 devfn);
-void free_pdev(struct pci_dev *pdev);
 struct pci_dev *pci_lock_pdev(int bus, int devfn);
 struct pci_dev *pci_lock_domain_pdev(struct domain *d, int bus, int devfn);
 
