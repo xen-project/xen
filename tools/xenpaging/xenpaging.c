@@ -73,7 +73,7 @@ static void *init_page(void)
     return NULL;
 }
 
-xenpaging_t *xenpaging_init(xc_interface **xch_r, domid_t domain_id)
+xenpaging_t *xenpaging_init(domid_t domain_id)
 {
     xenpaging_t *paging;
     xc_interface *xch;
@@ -87,7 +87,6 @@ xenpaging_t *xenpaging_init(xc_interface **xch_r, domid_t domain_id)
         goto err_iface;
 
     DPRINTF("xenpaging init\n");
-    *xch_r = xch;
 
     /* Allocate memory */
     paging = malloc(sizeof(xenpaging_t));
@@ -125,7 +124,7 @@ xenpaging_t *xenpaging_init(xc_interface **xch_r, domid_t domain_id)
     mem_event_ring_lock_init(&paging->mem_event);
     
     /* Initialise Xen */
-    rc = xc_mem_event_enable(paging->xc_handle, paging->mem_event.domain_id,
+    rc = xc_mem_event_enable(xch, paging->mem_event.domain_id,
                              paging->mem_event.shared_page,
                              paging->mem_event.ring_page);
     if ( rc != 0 )
@@ -172,7 +171,7 @@ xenpaging_t *xenpaging_init(xc_interface **xch_r, domid_t domain_id)
         goto err;
     }
 
-    rc = xc_get_platform_info(paging->xc_handle, domain_id,
+    rc = xc_get_platform_info(xch, domain_id,
                               paging->platform_info);
     if ( rc != 1 )
     {
@@ -188,7 +187,7 @@ xenpaging_t *xenpaging_init(xc_interface **xch_r, domid_t domain_id)
         goto err;
     }
 
-    rc = xc_domain_getinfolist(paging->xc_handle, domain_id, 1,
+    rc = xc_domain_getinfolist(xch, domain_id, 1,
                                paging->domain_info);
     if ( rc != 1 )
     {
@@ -244,15 +243,18 @@ xenpaging_t *xenpaging_init(xc_interface **xch_r, domid_t domain_id)
     return NULL;
 }
 
-int xenpaging_teardown(xc_interface *xch, xenpaging_t *paging)
+int xenpaging_teardown(xenpaging_t *paging)
 {
     int rc;
+    struct xc_interface *xch;
 
     if ( paging == NULL )
         return 0;
 
+    xch = paging->xc_handle;
+    paging->xc_handle = NULL;
     /* Tear down domain paging in Xen */
-    rc = xc_mem_event_disable(paging->xc_handle, paging->mem_event.domain_id);
+    rc = xc_mem_event_disable(xch, paging->mem_event.domain_id);
     if ( rc != 0 )
     {
         ERROR("Error tearing down domain paging in xen");
@@ -275,12 +277,11 @@ int xenpaging_teardown(xc_interface *xch, xenpaging_t *paging)
     paging->mem_event.xce_handle = -1;
     
     /* Close connection to Xen */
-    rc = xc_interface_close(paging->xc_handle);
+    rc = xc_interface_close(xch);
     if ( rc != 0 )
     {
         ERROR("Error closing connection to xen");
     }
-    paging->xc_handle = NULL;
 
     return 0;
 
@@ -334,9 +335,10 @@ static int put_response(mem_event_t *mem_event, mem_event_response_t *rsp)
     return 0;
 }
 
-int xenpaging_evict_page(xc_interface *xch, xenpaging_t *paging,
+int xenpaging_evict_page(xenpaging_t *paging,
                          xenpaging_victim_t *victim, int fd, int i)
 {
+    struct xc_interface *xch = paging->xc_handle;
     void *page;
     unsigned long gfn;
     int ret;
@@ -346,7 +348,7 @@ int xenpaging_evict_page(xc_interface *xch, xenpaging_t *paging,
     /* Map page */
     gfn = victim->gfn;
     ret = -EFAULT;
-    page = xc_map_foreign_pages(paging->xc_handle, victim->domain_id,
+    page = xc_map_foreign_pages(xch, victim->domain_id,
                                 PROT_READ | PROT_WRITE, &gfn, 1);
     if ( page == NULL )
     {
@@ -369,7 +371,7 @@ int xenpaging_evict_page(xc_interface *xch, xenpaging_t *paging,
     munmap(page, PAGE_SIZE);
 
     /* Tell Xen to evict page */
-    ret = xc_mem_paging_evict(paging->xc_handle, paging->mem_event.domain_id,
+    ret = xc_mem_paging_evict(xch, paging->mem_event.domain_id,
                               victim->gfn);
     if ( ret != 0 )
     {
@@ -407,10 +409,10 @@ static int xenpaging_resume_page(xenpaging_t *paging, mem_event_response_t *rsp,
     return ret;
 }
 
-static int xenpaging_populate_page(
-    xc_interface *xch, xenpaging_t *paging,
+static int xenpaging_populate_page(xenpaging_t *paging,
     uint64_t *gfn, int fd, int i)
 {
+    struct xc_interface *xch = paging->xc_handle;
     unsigned long _gfn;
     void *page;
     int ret;
@@ -420,7 +422,7 @@ static int xenpaging_populate_page(
     do
     {
         /* Tell Xen to allocate a page for the domain */
-        ret = xc_mem_paging_prep(paging->xc_handle, paging->mem_event.domain_id,
+        ret = xc_mem_paging_prep(xch, paging->mem_event.domain_id,
                                  _gfn);
         if ( ret != 0 )
         {
@@ -439,7 +441,7 @@ static int xenpaging_populate_page(
 
     /* Map page */
     ret = -EFAULT;
-    page = xc_map_foreign_pages(paging->xc_handle, paging->mem_event.domain_id,
+    page = xc_map_foreign_pages(xch, paging->mem_event.domain_id,
                                 PROT_READ | PROT_WRITE, &_gfn, 1);
     *gfn = _gfn;
     if ( page == NULL )
@@ -462,15 +464,16 @@ static int xenpaging_populate_page(
     return ret;
 }
 
-static int evict_victim(xc_interface *xch, xenpaging_t *paging, domid_t domain_id,
+static int evict_victim(xenpaging_t *paging, domid_t domain_id,
                         xenpaging_victim_t *victim, int fd, int i)
 {
+    struct xc_interface *xch = paging->xc_handle;
     int j = 0;
     int ret;
 
     do
     {
-        ret = policy_choose_victim(xch, paging, domain_id, victim);
+        ret = policy_choose_victim(paging, domain_id, victim);
         if ( ret != 0 )
         {
             if ( ret != -ENOSPC )
@@ -483,10 +486,10 @@ static int evict_victim(xc_interface *xch, xenpaging_t *paging, domid_t domain_i
             ret = -EINTR;
             goto out;
         }
-        ret = xc_mem_paging_nominate(paging->xc_handle,
+        ret = xc_mem_paging_nominate(xch,
                                      paging->mem_event.domain_id, victim->gfn);
         if ( ret == 0 )
-            ret = xenpaging_evict_page(xch, paging, victim, fd, i);
+            ret = xenpaging_evict_page(paging, victim, fd, i);
         else
         {
             if ( j++ % 1000 == 0 )
@@ -536,12 +539,13 @@ int main(int argc, char *argv[])
     srand(time(NULL));
 
     /* Initialise domain paging */
-    paging = xenpaging_init(&xch, domain_id);
+    paging = xenpaging_init(domain_id);
     if ( paging == NULL )
     {
         fprintf(stderr, "Error initialising paging");
         return 1;
     }
+    xch = paging->xc_handle;
 
     DPRINTF("starting %s %u %d\n", argv[0], domain_id, num_pages);
 
@@ -574,7 +578,7 @@ int main(int argc, char *argv[])
     memset(victims, 0, sizeof(xenpaging_victim_t) * num_pages);
     for ( i = 0; i < num_pages; i++ )
     {
-        rc = evict_victim(xch, paging, domain_id, &victims[i], fd, i);
+        rc = evict_victim(paging, domain_id, &victims[i], fd, i);
         if ( rc == -ENOSPC )
             break;
         if ( rc == -EINTR )
@@ -627,7 +631,7 @@ int main(int argc, char *argv[])
                 }
                 
                 /* Populate the page */
-                rc = xenpaging_populate_page(xch, paging, &req.gfn, fd, i);
+                rc = xenpaging_populate_page(paging, &req.gfn, fd, i);
                 if ( rc != 0 )
                 {
                     ERROR("Error populating page");
@@ -648,7 +652,7 @@ int main(int argc, char *argv[])
                 }
 
                 /* Evict a new page to replace the one we just paged in */
-                evict_victim(xch, paging, domain_id, &victims[i], fd, i);
+                evict_victim(paging, domain_id, &victims[i], fd, i);
             }
             else
             {
@@ -686,7 +690,7 @@ int main(int argc, char *argv[])
     free(victims);
 
     /* Tear down domain paging */
-    rc1 = xenpaging_teardown(xch, paging);
+    rc1 = xenpaging_teardown(paging);
     if ( rc1 != 0 )
         fprintf(stderr, "Error tearing down paging");
 

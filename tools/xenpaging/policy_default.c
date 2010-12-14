@@ -67,10 +67,10 @@ int policy_init(xenpaging_t *paging)
     return rc;
 }
 
-int policy_choose_victim(xc_interface *xch,
-                         xenpaging_t *paging, domid_t domain_id,
+int policy_choose_victim(xenpaging_t *paging, domid_t domain_id,
                          xenpaging_victim_t *victim)
 {
+    struct xc_interface *xch = paging->xc_handle;
     unsigned long wrap = current_gfn;
     ASSERT(victim != NULL);
 
