@@ -376,6 +376,10 @@ int libxl_create_device_model(libxl_ctx *ctx,
                               libxl_device_model_starting **starting_r);
 int libxl_create_xenpv_qemu(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb,
                             libxl_device_model_starting **starting_r);
+int libxl_need_xenpv_qemu(libxl_ctx *ctx,
+        int nr_consoles, libxl_device_console *consoles,
+        int nr_vfbs, libxl_device_vfb *vfbs,
+        int nr_disks, libxl_device_disk *disks);
   /* Caller must either: pass starting_r==0, or on successful
    * return pass *starting_r (which will be non-0) to
    * libxl_confirm_device_model or libxl_detach_device_model. */

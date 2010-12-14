@@ -2654,6 +2654,39 @@ static int libxl_build_xenpv_qemu_args(libxl__gc *gc,
     return 0;
 }
 
+int libxl_need_xenpv_qemu(libxl_ctx *ctx,
+        int nr_consoles, libxl_device_console *consoles,
+        int nr_vfbs, libxl_device_vfb *vfbs,
+        int nr_disks, libxl_device_disk *disks)
+{
+    int i, ret = 0;
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
+
+    if (nr_consoles > 1) {
+        ret = 1;
+        goto out;
+    }
+
+    for (i = 0; i < nr_consoles; i++) {
+        if (consoles[i].consback == LIBXL_CONSBACK_IOEMU) {
+            ret = 1;
+            goto out;
+        }
+    }
+
+    if (nr_vfbs > 0) {
+        ret = 1;
+        goto out;
+    }
+
+    if (nr_disks > 0 && !libxl__blktap_enabled(&gc))
+        ret = 1;
+
+out:
+    libxl__free_all(&gc);
+    return ret;
+}
+
 int libxl_create_xenpv_qemu(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb,
                             libxl_device_model_starting **starting_r)
 {

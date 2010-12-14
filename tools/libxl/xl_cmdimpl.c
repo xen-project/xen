@@ -1675,6 +1675,7 @@ start:
                                         d_config.vifs, d_config.num_vifs,
                                         &dm_starting) );
     } else {
+        int need_qemu = 0;
         libxl_device_console console;
 
         for (i = 0; i < d_config.num_vfbs; i++) {
@@ -1686,12 +1687,18 @@ start:
 
         init_console_info(&console, 0, &state);
         console.domid = domid;
-        if (d_config.num_vfbs)
+
+        need_qemu = libxl_need_xenpv_qemu(&ctx, 1, &console,
+                d_config.num_vfbs, d_config.vfbs,
+                d_config.num_disks, &d_config.disks[0]);
+
+        if (need_qemu)
              console.consback = LIBXL_CONSBACK_IOEMU;
+
         libxl_device_console_add(&ctx, domid, &console);
         libxl_device_console_destroy(&console);
 
-        if (d_config.num_vfbs)
+        if (need_qemu)
             libxl_create_xenpv_qemu(&ctx, domid, d_config.vfbs, &dm_starting);
     }
 
