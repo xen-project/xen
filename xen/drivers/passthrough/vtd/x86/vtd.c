@@ -129,14 +129,14 @@ void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
 
 void __init iommu_set_dom0_mapping(struct domain *d)
 {
-    u64 i, j, tmp, max_pfn;
+    unsigned long i, j, tmp, top;
     extern int xen_in_range(unsigned long mfn);
 
     BUG_ON(d->domain_id != 0);
 
-    max_pfn = max_t(u64, max_page, 0x100000000ull >> PAGE_SHIFT);
+    top = max(max_pdx, pfn_to_pdx(0xffffffffUL >> PAGE_SHIFT) + 1);
 
-    for ( i = 0; i < max_pfn; i++ )
+    for ( i = 0; i < top; i++ )
     {
         /*
          * Set up 1:1 mapping for dom0. Default to use only conventional RAM
@@ -144,18 +144,23 @@ void __init iommu_set_dom0_mapping(struct domain *d)
          * inclusive mapping maps in everything below 4GB except unusable
          * ranges.
          */
-        if ( !page_is_ram_type(i, RAM_TYPE_CONVENTIONAL) &&
-             (!iommu_inclusive_mapping ||
-              page_is_ram_type(i, RAM_TYPE_UNUSABLE)) )
+        unsigned long pfn = pdx_to_pfn(i);
+
+        if ( pfn > (0xffffffffUL >> PAGE_SHIFT) ?
+             (!mfn_valid(pfn) ||
+              !page_is_ram_type(pfn, RAM_TYPE_CONVENTIONAL)) :
+             iommu_inclusive_mapping ?
+             page_is_ram_type(pfn, RAM_TYPE_UNUSABLE) :
+             !page_is_ram_type(pfn, RAM_TYPE_CONVENTIONAL) )
             continue;
 
         /* Exclude Xen bits */
-        if ( xen_in_range(i) )
+        if ( xen_in_range(pfn) )
             continue;
 
         tmp = 1 << (PAGE_SHIFT - PAGE_SHIFT_4K);
         for ( j = 0; j < tmp; j++ )
-            iommu_map_page(d, (i*tmp+j), (i*tmp+j),
+            iommu_map_page(d, pfn * tmp + j, pfn * tmp + j,
                            IOMMUF_readable|IOMMUF_writable);
 
         if (!(i & (0xfffff >> (PAGE_SHIFT - PAGE_SHIFT_4K))))

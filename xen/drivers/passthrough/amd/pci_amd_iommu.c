@@ -239,8 +239,16 @@ static void __init amd_iommu_dom0_init(struct domain *d)
     if ( !iommu_passthrough && !need_iommu(d) )
     {
         /* Set up 1:1 page table for dom0 */
-        for ( i = 0; i < max_page; i++ )
-            amd_iommu_map_page(d, i, i, IOMMUF_readable|IOMMUF_writable);
+        for ( i = 0; i < max_pdx; i++ )
+        {
+            unsigned long pfn = pdx_to_pfn(i);
+
+            /*
+             * XXX Should we really map all non-RAM (above 4G)? Minimally
+             * a pfn_valid() check would seem desirable here.
+             */
+            amd_iommu_map_page(d, pfn, pfn, IOMMUF_readable|IOMMUF_writable);
+        }
     }
 
     amd_iommu_setup_dom0_devices(d);
