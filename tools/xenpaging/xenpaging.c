@@ -583,7 +583,7 @@ int main(int argc, char *argv[])
             DPRINTF("%d pages evicted\n", i);
     }
 
-    DPRINTF("pages evicted\n");
+    DPRINTF("%d pages evicted. Done.\n", i);
 
     /* Swap pages in and out */
     while ( !interrupted )
