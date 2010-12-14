@@ -262,7 +262,7 @@ struct xs_handle *xs_open(unsigned long flags)
 	else
 		xsh = get_handle(xs_daemon_socket(), flags);
 
-	if (!xsh)
+	if (!xsh && !(flags & XS_OPEN_SOCKETONLY))
 		xsh = get_handle(xs_domain_dev(), flags);
 
 	return xsh;

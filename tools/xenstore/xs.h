@@ -24,7 +24,8 @@
 
 #define XBT_NULL 0
 
-#define XS_OPEN_READONLY	1<<0
+#define XS_OPEN_READONLY	1UL<<0
+#define XS_OPEN_SOCKETONLY      1UL<<1
 
 struct xs_handle;
 typedef uint32_t xs_transaction_t;

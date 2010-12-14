@@ -633,9 +633,8 @@ main(int argc, char **argv)
 	    max_width = ws.ws_col - 2;
     }
 
-    xsh = socket ? xs_daemon_open() : xs_domain_open();
-    if (xsh == NULL)
-	err(1, socket ? "xs_daemon_open" : "xs_domain_open");
+    xsh = xs_open(socket ? XS_OPEN_SOCKETONLY : 0);
+    if (xsh == NULL) err(1, "xs_open");
 
 again:
     if (transaction) {
