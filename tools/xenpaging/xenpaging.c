@@ -141,7 +141,7 @@ xenpaging_t *xenpaging_init(xc_interface **xch_r, domid_t domain_id)
                 ERROR("EPT not supported for this guest");
                 break;
             default:
-                perror("Error initialising shared page");
+                ERROR("Error initialising shared page: %s", strerror(errno));
                 break;
         }
         goto err;
