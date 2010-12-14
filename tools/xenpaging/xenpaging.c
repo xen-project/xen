@@ -224,6 +224,7 @@ xenpaging_t *xenpaging_init(xc_interface **xch_r, domid_t domain_id)
  err:
     if ( paging )
     {
+        xc_interface_close(xch);
         if ( paging->mem_event.shared_page )
         {
             munlock(paging->mem_event.shared_page, PAGE_SIZE);
