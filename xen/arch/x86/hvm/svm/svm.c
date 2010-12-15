@@ -115,14 +115,14 @@ static void svm_save_dr(struct vcpu *v)
 
     /* Clear the DR dirty flag and re-enable intercepts for DR accesses. */
     v->arch.hvm_vcpu.flag_dr_dirty = 0;
-    v->arch.hvm_svm.vmcb->dr_intercepts = ~0u;
+    vmcb_set_dr_intercepts(vmcb, ~0u);
 
     v->arch.guest_context.debugreg[0] = read_debugreg(0);
     v->arch.guest_context.debugreg[1] = read_debugreg(1);
     v->arch.guest_context.debugreg[2] = read_debugreg(2);
     v->arch.guest_context.debugreg[3] = read_debugreg(3);
-    v->arch.guest_context.debugreg[6] = vmcb->dr6;
-    v->arch.guest_context.debugreg[7] = vmcb->dr7;
+    v->arch.guest_context.debugreg[6] = vmcb_get_dr6(vmcb);
+    v->arch.guest_context.debugreg[7] = vmcb_get_dr7(vmcb);
 }
 
 static void __restore_debug_registers(struct vcpu *v)
@@ -133,14 +133,14 @@ static void __restore_debug_registers(struct vcpu *v)
         return;
 
     v->arch.hvm_vcpu.flag_dr_dirty = 1;
-    vmcb->dr_intercepts = 0;
+    vmcb_set_dr_intercepts(vmcb, 0);
 
     write_debugreg(0, v->arch.guest_context.debugreg[0]);
     write_debugreg(1, v->arch.guest_context.debugreg[1]);
     write_debugreg(2, v->arch.guest_context.debugreg[2]);
     write_debugreg(3, v->arch.guest_context.debugreg[3]);
-    vmcb->dr6 = v->arch.guest_context.debugreg[6];
-    vmcb->dr7 = v->arch.guest_context.debugreg[7];
+    vmcb_set_dr6(vmcb, v->arch.guest_context.debugreg[6]);
+    vmcb_set_dr7(vmcb, v->arch.guest_context.debugreg[7]);
 }
 
 /*
@@ -230,9 +230,9 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
 
     if ( paging_mode_hap(v->domain) )
     {
-        vmcb->np_enable = 1;
-        vmcb->g_pat = MSR_IA32_CR_PAT_RESET; /* guest PAT */
-        vmcb->h_cr3 = pagetable_get_paddr(p2m_get_pagetable(p2m));
+        vmcb_set_np_enable(vmcb, 1);
+        vmcb_set_g_pat(vmcb, MSR_IA32_CR_PAT_RESET /* guest PAT */);
+        vmcb_set_h_cr3(vmcb, pagetable_get_paddr(p2m_get_pagetable(p2m)));
     }
 
     if ( c->pending_valid ) 
@@ -247,6 +247,7 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
         }
     }
 
+    vmcb->cleanbits.bytes = 0;
     paging_update_paging_modes(v);
 
     return 0;
@@ -307,7 +308,8 @@ static void svm_fpu_enter(struct vcpu *v)
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
     setup_fpu(v);
-    vmcb->exception_intercepts &= ~(1U << TRAP_no_device);
+    vmcb_set_exception_intercepts(
+        vmcb, vmcb_get_exception_intercepts(vmcb) & ~(1U << TRAP_no_device));
 }
 
 static void svm_fpu_leave(struct vcpu *v)
@@ -325,8 +327,10 @@ static void svm_fpu_leave(struct vcpu *v)
      */
     if ( !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) )
     {
-        v->arch.hvm_svm.vmcb->exception_intercepts |= 1U << TRAP_no_device;
-        vmcb->cr0 |= X86_CR0_TS;
+        vmcb_set_exception_intercepts(
+            vmcb,
+            vmcb_get_exception_intercepts(vmcb) | (1U << TRAP_no_device));
+        vmcb_set_cr0(vmcb, vmcb_get_cr0(vmcb) | X86_CR0_TS);
     }
 }
 
@@ -338,7 +342,7 @@ static unsigned int svm_get_interrupt_shadow(struct vcpu *v)
     if ( vmcb->interrupt_shadow )
         intr_shadow |= HVM_INTR_SHADOW_MOV_SS | HVM_INTR_SHADOW_STI;
 
-    if ( vmcb->general1_intercepts & GENERAL1_INTERCEPT_IRET )
+    if ( vmcb_get_general1_intercepts(vmcb) & GENERAL1_INTERCEPT_IRET )
         intr_shadow |= HVM_INTR_SHADOW_NMI;
 
     return intr_shadow;
@@ -347,13 +351,15 @@ static unsigned int svm_get_interrupt_shadow(struct vcpu *v)
 static void svm_set_interrupt_shadow(struct vcpu *v, unsigned int intr_shadow)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    u32 general1_intercepts = vmcb_get_general1_intercepts(vmcb);
 
     vmcb->interrupt_shadow =
         !!(intr_shadow & (HVM_INTR_SHADOW_MOV_SS|HVM_INTR_SHADOW_STI));
 
-    vmcb->general1_intercepts &= ~GENERAL1_INTERCEPT_IRET;
+    general1_intercepts &= ~GENERAL1_INTERCEPT_IRET;
     if ( intr_shadow & HVM_INTR_SHADOW_NMI )
-        vmcb->general1_intercepts |= GENERAL1_INTERCEPT_IRET;
+        general1_intercepts |= GENERAL1_INTERCEPT_IRET;
+    vmcb_set_general1_intercepts(vmcb, general1_intercepts);
 }
 
 static int svm_guest_x86_mode(struct vcpu *v)
@@ -377,6 +383,7 @@ static void svm_update_host_cr3(struct vcpu *v)
 static void svm_update_guest_cr(struct vcpu *v, unsigned int cr)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    uint64_t value;
 
     switch ( cr )
     {
@@ -387,27 +394,29 @@ static void svm_update_guest_cr(struct vcpu *v, unsigned int cr)
         {
             if ( v != current )
                 hw_cr0_mask |= X86_CR0_TS;
-            else if ( vmcb->cr0 & X86_CR0_TS )
+            else if ( vmcb_get_cr0(vmcb) & X86_CR0_TS )
                 svm_fpu_enter(v);
         }
 
-        vmcb->cr0 = v->arch.hvm_vcpu.guest_cr[0] | hw_cr0_mask;
+        value = v->arch.hvm_vcpu.guest_cr[0] | hw_cr0_mask;
         if ( !paging_mode_hap(v->domain) )
-            vmcb->cr0 |= X86_CR0_PG | X86_CR0_WP;
+            value |= X86_CR0_PG | X86_CR0_WP;
+        vmcb_set_cr0(vmcb, value);
         break;
     }
     case 2:
-        vmcb->cr2 = v->arch.hvm_vcpu.guest_cr[2];
+        vmcb_set_cr2(vmcb, v->arch.hvm_vcpu.guest_cr[2]);
         break;
     case 3:
-        vmcb->cr3 = v->arch.hvm_vcpu.hw_cr[3];
+        vmcb_set_cr3(vmcb, v->arch.hvm_vcpu.hw_cr[3]);
         hvm_asid_flush_vcpu(v);
         break;
     case 4:
-        vmcb->cr4 = HVM_CR4_HOST_MASK;
+        value = HVM_CR4_HOST_MASK;
         if ( paging_mode_hap(v->domain) )
-            vmcb->cr4 &= ~X86_CR4_PAE;
-        vmcb->cr4 |= v->arch.hvm_vcpu.guest_cr[4];
+            value &= ~X86_CR4_PAE;
+        value |= v->arch.hvm_vcpu.guest_cr[4];
+        vmcb_set_cr4(vmcb, value);
         break;
     default:
         BUG();
@@ -418,10 +427,12 @@ static void svm_update_guest_efer(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     bool_t lma = !!(v->arch.hvm_vcpu.guest_efer & EFER_LMA);
+    uint64_t new_efer;
 
-    vmcb->efer = (v->arch.hvm_vcpu.guest_efer | EFER_SVME) & ~EFER_LME;
+    new_efer = (v->arch.hvm_vcpu.guest_efer | EFER_SVME) & ~EFER_LME;
     if ( lma )
-        vmcb->efer |= EFER_LME;
+        new_efer |= EFER_LME;
+    vmcb_set_efer(vmcb, new_efer);
 
     /*
      * In legacy mode (EFER.LMA=0) we natively support SYSENTER/SYSEXIT with
@@ -481,7 +492,7 @@ static void svm_get_segment_register(struct vcpu *v, enum x86_segment seg,
         break;
     case x86_seg_ss:
         memcpy(reg, &vmcb->ss, sizeof(*reg));
-        reg->attr.fields.dpl = vmcb->cpl;
+        reg->attr.fields.dpl = vmcb->_cpl;
         if ( reg->attr.fields.type == 0 )
             reg->attr.fields.db = 0;
         break;
@@ -515,6 +526,16 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
 
     switch ( seg )
     {
+    case x86_seg_cs:
+    case x86_seg_ds:
+    case x86_seg_es:
+    case x86_seg_ss: /* cpl */
+        vmcb->cleanbits.fields.seg = 0;
+        break;
+    case x86_seg_gdtr:
+    case x86_seg_idtr:
+        vmcb->cleanbits.fields.dt = 0;
+        break;
     case x86_seg_fs:
     case x86_seg_gs:
     case x86_seg_tr:
@@ -547,7 +568,7 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
         break;
     case x86_seg_ss:
         memcpy(&vmcb->ss, reg, sizeof(*reg));
-        vmcb->cpl = vmcb->ss.attr.fields.dpl;
+        vmcb->_cpl = vmcb->ss.attr.fields.dpl;
         break;
     case x86_seg_tr:
         memcpy(&vmcb->tr, reg, sizeof(*reg));
@@ -573,15 +594,20 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
 
 static void svm_set_tsc_offset(struct vcpu *v, u64 offset)
 {
-    v->arch.hvm_svm.vmcb->tsc_offset = offset;
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    vmcb_set_tsc_offset(vmcb, offset);
 }
 
 static void svm_set_rdtsc_exiting(struct vcpu *v, bool_t enable)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    vmcb->general1_intercepts &= ~GENERAL1_INTERCEPT_RDTSC;
+    u32 general1_intercepts = vmcb_get_general1_intercepts(vmcb);
+
+    general1_intercepts &= ~GENERAL1_INTERCEPT_RDTSC;
     if ( enable )
-        vmcb->general1_intercepts |= GENERAL1_INTERCEPT_RDTSC;
+        general1_intercepts |= GENERAL1_INTERCEPT_RDTSC;
+
+    vmcb_set_general1_intercepts(vmcb, general1_intercepts);
 }
 
 static void svm_init_hypercall_page(struct domain *d, void *hypercall_page)
@@ -626,6 +652,7 @@ static void svm_ctxt_switch_from(struct vcpu *v)
 
 static void svm_ctxt_switch_to(struct vcpu *v)
 {
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     int cpu = smp_processor_id();
 
 #ifdef  __x86_64__
@@ -651,7 +678,8 @@ static void svm_ctxt_switch_to(struct vcpu *v)
     svm_restore_dr(v);
 
     svm_vmsave(per_cpu(root_vmcb, cpu));
-    svm_vmload(v->arch.hvm_svm.vmcb);
+    svm_vmload(vmcb);
+    vmcb->cleanbits.bytes = 0;
     vpmu_load(v);
 
     if ( cpu_has_rdtscp )
@@ -660,16 +688,17 @@ static void svm_ctxt_switch_to(struct vcpu *v)
 
 static void svm_do_resume(struct vcpu *v) 
 {
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     bool_t debug_state = v->domain->debugger_attached;
+    vintr_t intr;
 
     if ( unlikely(v->arch.hvm_vcpu.debug_state_latch != debug_state) )
     {
+        uint32_t intercepts = vmcb_get_exception_intercepts(vmcb);
         uint32_t mask = (1U << TRAP_debug) | (1U << TRAP_int3);
         v->arch.hvm_vcpu.debug_state_latch = debug_state;
-        if ( debug_state )
-            v->arch.hvm_svm.vmcb->exception_intercepts |= mask;
-        else
-            v->arch.hvm_svm.vmcb->exception_intercepts &= ~mask;
+        vmcb_set_exception_intercepts(
+            vmcb, debug_state ? (intercepts | mask) : (intercepts & ~mask));
     }
 
     if ( v->arch.hvm_svm.launch_core != smp_processor_id() )
@@ -682,8 +711,10 @@ static void svm_do_resume(struct vcpu *v)
     }
 
     /* Reflect the vlapic's TPR in the hardware vtpr */
-    v->arch.hvm_svm.vmcb->vintr.fields.tpr = 
+    intr = vmcb_get_vintr(vmcb);
+    intr.fields.tpr =
         (vlapic_get_reg(vcpu_vlapic(v), APIC_TASKPRI) & 0xFF) >> 4;
+    vmcb_set_vintr(vmcb, intr);
 
     hvm_do_resume(v);
     reset_stack_and_jump(svm_asm_do_resume);
@@ -740,7 +771,7 @@ static void svm_inject_exception(
         if ( guest_cpu_user_regs()->eflags & X86_EFLAGS_TF )
         {
             __restore_debug_registers(curr);
-            vmcb->dr6 |= 0x4000;
+            vmcb_set_dr6(vmcb, vmcb_get_dr6(vmcb) | 0x4000);
         }
     case TRAP_int3:
         if ( curr->domain->debugger_attached )
@@ -770,7 +801,8 @@ static void svm_inject_exception(
 
     if ( trapnr == TRAP_page_fault )
     {
-        vmcb->cr2 = curr->arch.hvm_vcpu.guest_cr[2] = cr2;
+        curr->arch.hvm_vcpu.guest_cr[2] = cr2;
+        vmcb_set_cr2(vmcb, cr2);
         HVMTRACE_LONG_2D(PF_INJECT, errcode, TRC_PAR_LONG(cr2));
     }
     else
@@ -885,6 +917,8 @@ static int svm_cpu_up(void)
 
 struct hvm_function_table * __init start_svm(void)
 {
+    bool_t printed = 0;
+
     if ( !test_bit(X86_FEATURE_SVME, &boot_cpu_data.x86_capability) )
         return NULL;
 
@@ -898,6 +932,19 @@ struct hvm_function_table * __init start_svm(void)
 
     svm_feature_flags = ((cpuid_eax(0x80000000) >= 0x8000000A) ?
                          cpuid_edx(0x8000000A) : 0);
+
+    printk("SVM: Supported advanced features:\n");
+
+#define P(p,s) if ( p ) { printk(" - %s\n", s); printed = 1; }
+    P(cpu_has_svm_npt, "Nested Page Tables (NPT)");
+    P(cpu_has_svm_lbrv, "Last Branch Record (LBR) Virtualisation");
+    P(cpu_has_svm_nrips, "Next-RIP Saved on #VMEXIT");
+    P(cpu_has_svm_cleanbits, "VMCB Clean Bits");
+    P(cpu_has_pause_filter, "Pause-Intercept Filter");
+#undef P
+
+    if ( !printed )
+        printk(" - none\n");
 
     svm_function_table.hap_supported = cpu_has_svm_npt;
     svm_function_table.hap_capabilities = HVM_HAP_SUPERPAGE_2MB |
@@ -950,7 +997,7 @@ static void svm_fpu_dirty_intercept(void)
     svm_fpu_enter(curr);
 
     if ( !(curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) )
-        vmcb->cr0 &= ~X86_CR0_TS;
+        vmcb_set_cr0(vmcb, vmcb_get_cr0(vmcb) & ~X86_CR0_TS);
 }
 
 #define bitmaskof(idx)  (1U << ((idx) & 31))
@@ -1040,23 +1087,23 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         goto gpf;
 
     case MSR_IA32_DEBUGCTLMSR:
-        *msr_content = vmcb->debugctlmsr;
+        *msr_content = vmcb_get_debugctlmsr(vmcb);
         break;
 
     case MSR_IA32_LASTBRANCHFROMIP:
-        *msr_content = vmcb->lastbranchfromip;
+        *msr_content = vmcb_get_lastbranchfromip(vmcb);
         break;
 
     case MSR_IA32_LASTBRANCHTOIP:
-        *msr_content = vmcb->lastbranchtoip;
+        *msr_content = vmcb_get_lastbranchtoip(vmcb);
         break;
 
     case MSR_IA32_LASTINTFROMIP:
-        *msr_content = vmcb->lastintfromip;
+        *msr_content = vmcb_get_lastintfromip(vmcb);
         break;
 
     case MSR_IA32_LASTINTTOIP:
-        *msr_content = vmcb->lastinttoip;
+        *msr_content = vmcb_get_lastinttoip(vmcb);
         break;
 
     case MSR_K7_PERFCTR0:
@@ -1112,7 +1159,7 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         break;
 
     case MSR_IA32_DEBUGCTLMSR:
-        vmcb->debugctlmsr = msr_content;
+        vmcb_set_debugctlmsr(vmcb, msr_content);
         if ( !msr_content || !cpu_has_svm_lbrv )
             break;
         vmcb->lbr_control.fields.enable = 1;
@@ -1124,19 +1171,19 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         break;
 
     case MSR_IA32_LASTBRANCHFROMIP:
-        vmcb->lastbranchfromip = msr_content;
+        vmcb_set_lastbranchfromip(vmcb, msr_content);
         break;
 
     case MSR_IA32_LASTBRANCHTOIP:
-        vmcb->lastbranchtoip = msr_content;
+        vmcb_set_lastbranchtoip(vmcb, msr_content);
         break;
 
     case MSR_IA32_LASTINTFROMIP:
-        vmcb->lastintfromip = msr_content;
+        vmcb_set_lastintfromip(vmcb, msr_content);
         break;
 
     case MSR_IA32_LASTINTTOIP:
-        vmcb->lastinttoip = msr_content;
+        vmcb_set_lastinttoip(vmcb, msr_content);
         break;
 
     case MSR_K7_PERFCTR0:
@@ -1379,9 +1426,11 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     eventinj_t eventinj;
     int inst_len, rc;
+    vintr_t intr;
 
     if ( paging_mode_hap(v->domain) )
-        v->arch.hvm_vcpu.guest_cr[3] = v->arch.hvm_vcpu.hw_cr[3] = vmcb->cr3;
+        v->arch.hvm_vcpu.guest_cr[3] = v->arch.hvm_vcpu.hw_cr[3] =
+            vmcb_get_cr3(vmcb);
 
     /*
      * Before doing anything else, we need to sync up the VLAPIC's TPR with
@@ -1390,8 +1439,9 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
      * NB. We need to preserve the low bits of the TPR to make checked builds
      * of Windows work, even though they don't actually do anything.
      */
+    intr = vmcb_get_vintr(vmcb);
     vlapic_set_reg(vcpu_vlapic(v), APIC_TASKPRI,
-                   ((vmcb->vintr.fields.tpr & 0x0F) << 4) |
+                   ((intr.fields.tpr & 0x0F) << 4) |
                    (vlapic_get_reg(vcpu_vlapic(v), APIC_TASKPRI) & 0x0F));
 
     exit_reason = vmcb->exitcode;
@@ -1414,6 +1464,8 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     perfc_incra(svmexits, exit_reason);
 
     hvm_maybe_deassert_evtchn_irq();
+
+    vmcb->cleanbits.bytes = cpu_has_svm_cleanbits ? ~0u : 0u;
 
     /* Event delivery caused this intercept? Queue for redelivery. */
     eventinj = vmcb->exitintinfo;
@@ -1495,10 +1547,17 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         svm_vmexit_mce_intercept(v, regs);
         break;
 
-    case VMEXIT_VINTR:
-        vmcb->vintr.fields.irq = 0;
-        vmcb->general1_intercepts &= ~GENERAL1_INTERCEPT_VINTR;
+    case VMEXIT_VINTR: {
+        u32 general1_intercepts = vmcb_get_general1_intercepts(vmcb);
+        intr = vmcb_get_vintr(vmcb);
+
+        intr.fields.irq = 0;
+        general1_intercepts &= ~GENERAL1_INTERCEPT_VINTR;
+
+        vmcb_set_vintr(vmcb, intr);
+        vmcb_set_general1_intercepts(vmcb, general1_intercepts);
         break;
+    }
 
     case VMEXIT_INVD:
     case VMEXIT_WBINVD:
@@ -1613,7 +1672,9 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         svm_do_nested_pgfault(vmcb->exitinfo2);
         break;
 
-    case VMEXIT_IRET:
+    case VMEXIT_IRET: {
+        u32 general1_intercepts = vmcb_get_general1_intercepts(vmcb);
+
         /*
          * IRET clears the NMI mask. However because we clear the mask
          * /before/ executing IRET, we set the interrupt shadow to prevent
@@ -1622,9 +1683,12 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
          * may inject an NMI before the NMI handler's IRET instruction is
          * retired.
          */
-        vmcb->general1_intercepts &= ~GENERAL1_INTERCEPT_IRET;
+        general1_intercepts &= ~GENERAL1_INTERCEPT_IRET;
         vmcb->interrupt_shadow = 1;
+
+        vmcb_set_general1_intercepts(vmcb, general1_intercepts);
         break;
+    }
 
     case VMEXIT_PAUSE:
         svm_vmexit_do_pause(regs);
@@ -1641,8 +1705,10 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     }
 
     /* The exit may have updated the TPR: reflect this in the hardware vtpr */
-    vmcb->vintr.fields.tpr = 
+    intr = vmcb_get_vintr(vmcb);
+    intr.fields.tpr =
         (vlapic_get_reg(vcpu_vlapic(v), APIC_TASKPRI) & 0xFF) >> 4;
+    vmcb_set_vintr(vmcb, intr);
 }
 
 asmlinkage void svm_trace_vmentry(void)

@@ -366,12 +366,44 @@ typedef union
     } fields;
 } __attribute__ ((packed)) lbrctrl_t;
 
+typedef union
+{
+    uint32_t bytes;
+    struct
+    {
+        /* cr_intercepts, dr_intercepts, exception_intercepts,
+         * general{1,2}_intercepts, pause_filter_count, tsc_offset */
+        uint32_t intercepts: 1;
+        /* iopm_base_pa, msrpm_base_pa */
+        uint32_t iopm: 1;
+        /* guest_asid */
+        uint32_t asid: 1;
+        /* vintr */
+        uint32_t tpr: 1;
+        /* np_enable, h_cr3, g_pat */
+        uint32_t np: 1;
+        /* cr0, cr3, cr4, efer */
+        uint32_t cr: 1;
+        /* dr6, dr7 */
+        uint32_t dr: 1;
+        /* gdtr, idtr */
+        uint32_t dt: 1;
+        /* cs, ds, es, ss, cpl */
+        uint32_t seg: 1;
+        /* cr2 */
+        uint32_t cr2: 1;
+        /* debugctlmsr, last{branch,int}{to,from}ip */
+        uint32_t lbr: 1;
+        uint32_t resv: 21;
+    } fields;
+} __attribute__ ((packed)) vmcbcleanbits_t;
+
 struct vmcb_struct {
-    u32 cr_intercepts;          /* offset 0x00 */
-    u32 dr_intercepts;          /* offset 0x04 */
-    u32 exception_intercepts;   /* offset 0x08 */
-    u32 general1_intercepts;    /* offset 0x0C */
-    u32 general2_intercepts;    /* offset 0x10 */
+    u32 _cr_intercepts;         /* offset 0x00 - cleanbit 0 */
+    u32 _dr_intercepts;         /* offset 0x04 - cleanbit 0 */
+    u32 _exception_intercepts;  /* offset 0x08 - cleanbit 0 */
+    u32 _general1_intercepts;   /* offset 0x0C - cleanbit 0 */
+    u32 _general2_intercepts;   /* offset 0x10 - cleanbit 0 */
     u32 res01;                  /* offset 0x14 */
     u64 res02;                  /* offset 0x18 */
     u64 res03;                  /* offset 0x20 */
@@ -379,49 +411,50 @@ struct vmcb_struct {
     u64 res05;                  /* offset 0x30 */
     u32 res06;                  /* offset 0x38 */
     u16 res06a;                 /* offset 0x3C */
-    u16 pause_filter_count;     /* offset 0x3E */
-    u64 iopm_base_pa;           /* offset 0x40 */
-    u64 msrpm_base_pa;          /* offset 0x48 */
-    u64 tsc_offset;             /* offset 0x50 */
-    u32 guest_asid;             /* offset 0x58 */
+    u16 _pause_filter_count;    /* offset 0x3E - cleanbit 0 */
+    u64 _iopm_base_pa;          /* offset 0x40 - cleanbit 1 */
+    u64 _msrpm_base_pa;         /* offset 0x48 - cleanbit 1 */
+    u64 _tsc_offset;            /* offset 0x50 - cleanbit 0 */
+    u32 _guest_asid;            /* offset 0x58 - cleanbit 2 */
     u8  tlb_control;            /* offset 0x5C */
     u8  res07[3];
-    vintr_t vintr;              /* offset 0x60 */
+    vintr_t _vintr;             /* offset 0x60 - cleanbit 3 */
     u64 interrupt_shadow;       /* offset 0x68 */
     u64 exitcode;               /* offset 0x70 */
     u64 exitinfo1;              /* offset 0x78 */
     u64 exitinfo2;              /* offset 0x80 */
     eventinj_t  exitintinfo;    /* offset 0x88 */
-    u64 np_enable;              /* offset 0x90 */
+    u64 _np_enable;             /* offset 0x90 - cleanbit 4 */
     u64 res08[2];
     eventinj_t  eventinj;       /* offset 0xA8 */
-    u64 h_cr3;                  /* offset 0xB0 */
+    u64 _h_cr3;                 /* offset 0xB0 - cleanbit 4 */
     lbrctrl_t lbr_control;      /* offset 0xB8 */
-    u64 res09;                  /* offset 0xC0 */
+    vmcbcleanbits_t cleanbits;  /* offset 0xC0 */
+    u32 res09;                  /* offset 0xC4 */
     u64 nextrip;                /* offset 0xC8 */
     u64 res10a[102];            /* offset 0xD0 pad to save area */
 
-    svm_segment_register_t es;      /* offset 1024 */
-    svm_segment_register_t cs;
-    svm_segment_register_t ss;
-    svm_segment_register_t ds;
+    svm_segment_register_t es;  /* offset 1024 - cleanbit 8 */
+    svm_segment_register_t cs;  /* cleanbit 8 */
+    svm_segment_register_t ss;  /* cleanbit 8 */
+    svm_segment_register_t ds;  /* cleanbit 8 */
     svm_segment_register_t fs;
     svm_segment_register_t gs;
-    svm_segment_register_t gdtr;
+    svm_segment_register_t gdtr; /* cleanbit 7 */
     svm_segment_register_t ldtr;
-    svm_segment_register_t idtr;
+    svm_segment_register_t idtr; /* cleanbit 7 */
     svm_segment_register_t tr;
     u64 res10[5];
     u8 res11[3];
-    u8 cpl;
+    u8 _cpl;                    /* cleanbit 8 */
     u32 res12;
-    u64 efer;                   /* offset 1024 + 0xD0 */
+    u64 _efer;                  /* offset 1024 + 0xD0  - cleanbit 5 */
     u64 res13[14];
-    u64 cr4;                    /* loffset 1024 + 0x148 */
-    u64 cr3;
-    u64 cr0;
-    u64 dr7;
-    u64 dr6;
+    u64 _cr4;                   /* offset 1024 + 0x148 - cleanbit 5 */
+    u64 _cr3;                   /* cleanbit 5 */
+    u64 _cr0;                   /* cleanbit 5 */
+    u64 _dr7;                   /* cleanbit 6 */
+    u64 _dr6;                   /* cleanbit 6 */
     u64 rflags;
     u64 rip;
     u64 res14[11];
@@ -436,17 +469,17 @@ struct vmcb_struct {
     u64 sysenter_cs;
     u64 sysenter_esp;
     u64 sysenter_eip;
-    u64 cr2;
+    u64 _cr2;                   /* cleanbit 9 */
     u64 pdpe0;
     u64 pdpe1;
     u64 pdpe2;
     u64 pdpe3;
-    u64 g_pat;
-    u64 debugctlmsr;
-    u64 lastbranchfromip;
-    u64 lastbranchtoip;
-    u64 lastintfromip;
-    u64 lastinttoip;
+    u64 _g_pat;                 /* cleanbit 4 */
+    u64 _debugctlmsr;           /* cleanbit 10 */
+    u64 _lastbranchfromip;      /* cleanbit 10 */
+    u64 _lastbranchtoip;        /* cleanbit 10 */
+    u64 _lastintfromip;         /* cleanbit 10 */
+    u64 _lastinttoip;           /* cleanbit 10 */
     u64 res16[301];
 } __attribute__ ((packed));
 
@@ -485,6 +518,58 @@ void setup_vmcb_dump(void);
 void svm_intercept_msr(struct vcpu *v, uint32_t msr, int enable);
 #define svm_disable_intercept_for_msr(v, msr) svm_intercept_msr((v), (msr), 0)
 #define svm_enable_intercept_for_msr(v, msr) svm_intercept_msr((v), (msr), 1)
+
+/*
+ * VMCB accessor functions.
+ */
+
+#define VMCB_ACCESSORS(_type, _name, _cleanbit)                             \
+static inline void vmcb_set_##_name(struct vmcb_struct *vmcb, _type value)  \
+{                                                                           \
+    vmcb->_##_name = value;                                                 \
+    vmcb->cleanbits.fields._cleanbit = 0;                                   \
+}                                                                           \
+static inline _type vmcb_get_##_name(struct vmcb_struct *vmcb)              \
+{                                                                           \
+    return vmcb->_##_name;                                                  \
+}
+
+VMCB_ACCESSORS(u32, cr_intercepts, intercepts)
+VMCB_ACCESSORS(u32, dr_intercepts, intercepts)
+VMCB_ACCESSORS(u32, exception_intercepts, intercepts)
+VMCB_ACCESSORS(u32, general1_intercepts, intercepts)
+VMCB_ACCESSORS(u32, general2_intercepts, intercepts)
+VMCB_ACCESSORS(u16, pause_filter_count, intercepts)
+VMCB_ACCESSORS(u64, tsc_offset, intercepts)
+VMCB_ACCESSORS(u64, iopm_base_pa, iopm)
+VMCB_ACCESSORS(u64, msrpm_base_pa, iopm)
+VMCB_ACCESSORS(u32, guest_asid, asid)
+VMCB_ACCESSORS(vintr_t, vintr, tpr)
+VMCB_ACCESSORS(u64, np_enable, np)
+VMCB_ACCESSORS(u64, h_cr3, np)
+VMCB_ACCESSORS(u64, g_pat, np)
+VMCB_ACCESSORS(u64, cr0, cr)
+VMCB_ACCESSORS(u64, cr3, cr)
+VMCB_ACCESSORS(u64, cr4, cr)
+VMCB_ACCESSORS(u64, efer, cr)
+VMCB_ACCESSORS(u64, dr6, dr)
+VMCB_ACCESSORS(u64, dr7, dr)
+/* Updates are all via hvm_set_segment_register(). */
+/* VMCB_ACCESSORS(svm_segment_register_t, gdtr, dt) */
+/* VMCB_ACCESSORS(svm_segment_register_t, idtr, dt) */
+/* VMCB_ACCESSORS(svm_segment_register_t, cs, seg) */
+/* VMCB_ACCESSORS(svm_segment_register_t, ds, seg) */
+/* VMCB_ACCESSORS(svm_segment_register_t, es, seg) */
+/* VMCB_ACCESSORS(svm_segment_register_t, ss, seg) */
+VMCB_ACCESSORS(u8, cpl, seg)
+VMCB_ACCESSORS(u64, cr2, cr2)
+VMCB_ACCESSORS(u64, debugctlmsr, lbr)
+VMCB_ACCESSORS(u64, lastbranchfromip, lbr)
+VMCB_ACCESSORS(u64, lastbranchtoip, lbr)
+VMCB_ACCESSORS(u64, lastintfromip, lbr)
+VMCB_ACCESSORS(u64, lastinttoip, lbr)
+
+#undef VMCB_ACCESSORS
 
 #endif /* ASM_X86_HVM_SVM_VMCS_H__ */
 
