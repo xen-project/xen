@@ -68,12 +68,14 @@ extern u32 svm_feature_flags;
 #define SVM_FEATURE_LBRV    1
 #define SVM_FEATURE_SVML    2
 #define SVM_FEATURE_NRIPS   3
+#define SVM_FEATURE_CLEAN   5
 #define SVM_FEATURE_PAUSEF  10
 
 #define cpu_has_svm_npt     test_bit(SVM_FEATURE_NPT, &svm_feature_flags)
 #define cpu_has_svm_lbrv    test_bit(SVM_FEATURE_LBRV, &svm_feature_flags)
 #define cpu_has_svm_svml    test_bit(SVM_FEATURE_SVML, &svm_feature_flags)
 #define cpu_has_svm_nrips   test_bit(SVM_FEATURE_NRIPS, &svm_feature_flags)
+#define cpu_has_svm_cleanbits test_bit(SVM_FEATURE_CLEAN, &svm_feature_flags)
 #define cpu_has_pause_filter  test_bit(SVM_FEATURE_PAUSEF, &svm_feature_flags)
 
 #endif /* __ASM_X86_HVM_SVM_H__ */

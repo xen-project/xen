@@ -120,7 +120,9 @@ static const u8 *opc_bytes[INSTR_MAX_COUNT] =
 
 static int fetch(struct vcpu *v, u8 *buf, unsigned long addr, int len)
 {
-    uint32_t pfec = (v->arch.hvm_svm.vmcb->cpl == 3) ? PFEC_user_mode : 0;
+    uint32_t pfec;
+
+    pfec = (vmcb_get_cpl(v->arch.hvm_svm.vmcb) == 3) ? PFEC_user_mode : 0;
 
     switch ( hvm_fetch_from_guest_virt(buf, addr, len, pfec) )
     {

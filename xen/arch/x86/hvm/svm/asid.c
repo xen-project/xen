@@ -41,18 +41,19 @@ void svm_asid_init(struct cpuinfo_x86 *c)
 asmlinkage void svm_asid_handle_vmrun(void)
 {
     struct vcpu *curr = current;
+    struct vmcb_struct *vmcb = curr->arch.hvm_svm.vmcb;
     bool_t need_flush = hvm_asid_handle_vmenter();
 
     /* ASID 0 indicates that ASIDs are disabled. */
     if ( curr->arch.hvm_vcpu.asid == 0 )
     {
-        curr->arch.hvm_svm.vmcb->guest_asid  = 1;
-        curr->arch.hvm_svm.vmcb->tlb_control = 1;
+        vmcb_set_guest_asid(vmcb, 1);
+        vmcb->tlb_control = 1;
         return;
     }
 
-    curr->arch.hvm_svm.vmcb->guest_asid  = curr->arch.hvm_vcpu.asid;
-    curr->arch.hvm_svm.vmcb->tlb_control = need_flush;
+    vmcb_set_guest_asid(vmcb, curr->arch.hvm_vcpu.asid);
+    vmcb->tlb_control = need_flush;
 }
 
 /*

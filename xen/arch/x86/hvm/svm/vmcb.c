@@ -109,12 +109,13 @@ void svm_intercept_msr(struct vcpu *v, uint32_t msr, int enable)
     }
 }
 
+/* This function can directly access fields which are covered by clean bits. */
 static int construct_vmcb(struct vcpu *v)
 {
     struct arch_svm_struct *arch_svm = &v->arch.hvm_svm;
     struct vmcb_struct *vmcb = arch_svm->vmcb;
 
-    vmcb->general1_intercepts = 
+    vmcb->_general1_intercepts = 
         GENERAL1_INTERCEPT_INTR        | GENERAL1_INTERCEPT_NMI         |
         GENERAL1_INTERCEPT_SMI         | GENERAL1_INTERCEPT_INIT        |
         GENERAL1_INTERCEPT_CPUID       | GENERAL1_INTERCEPT_INVD        |
@@ -122,7 +123,7 @@ static int construct_vmcb(struct vcpu *v)
         GENERAL1_INTERCEPT_INVLPGA     | GENERAL1_INTERCEPT_IOIO_PROT   |
         GENERAL1_INTERCEPT_MSR_PROT    | GENERAL1_INTERCEPT_SHUTDOWN_EVT|
         GENERAL1_INTERCEPT_TASK_SWITCH;
-    vmcb->general2_intercepts = 
+    vmcb->_general2_intercepts = 
         GENERAL2_INTERCEPT_VMRUN       | GENERAL2_INTERCEPT_VMMCALL     |
         GENERAL2_INTERCEPT_VMLOAD      | GENERAL2_INTERCEPT_VMSAVE      |
         GENERAL2_INTERCEPT_STGI        | GENERAL2_INTERCEPT_CLGI        |
@@ -131,13 +132,13 @@ static int construct_vmcb(struct vcpu *v)
         GENERAL2_INTERCEPT_XSETBV;
 
     /* Intercept all debug-register writes. */
-    vmcb->dr_intercepts = ~0u;
+    vmcb->_dr_intercepts = ~0u;
 
     /* Intercept all control-register accesses except for CR2 and CR8. */
-    vmcb->cr_intercepts = ~(CR_INTERCEPT_CR2_READ |
-                            CR_INTERCEPT_CR2_WRITE |
-                            CR_INTERCEPT_CR8_READ |
-                            CR_INTERCEPT_CR8_WRITE);
+    vmcb->_cr_intercepts = ~(CR_INTERCEPT_CR2_READ |
+                             CR_INTERCEPT_CR2_WRITE |
+                             CR_INTERCEPT_CR8_READ |
+                             CR_INTERCEPT_CR8_WRITE);
 
     /* I/O and MSR permission bitmaps. */
     arch_svm->msrpm = alloc_xenheap_pages(get_order_from_bytes(MSRPM_SIZE), 0);
@@ -153,21 +154,21 @@ static int construct_vmcb(struct vcpu *v)
     svm_disable_intercept_for_msr(v, MSR_STAR);
     svm_disable_intercept_for_msr(v, MSR_SYSCALL_MASK);
 
-    vmcb->msrpm_base_pa = (u64)virt_to_maddr(arch_svm->msrpm);
-    vmcb->iopm_base_pa  = (u64)virt_to_maddr(hvm_io_bitmap);
+    vmcb->_msrpm_base_pa = (u64)virt_to_maddr(arch_svm->msrpm);
+    vmcb->_iopm_base_pa  = (u64)virt_to_maddr(hvm_io_bitmap);
 
     /* Virtualise EFLAGS.IF and LAPIC TPR (CR8). */
-    vmcb->vintr.fields.intr_masking = 1;
+    vmcb->_vintr.fields.intr_masking = 1;
   
     /* Initialise event injection to no-op. */
     vmcb->eventinj.bytes = 0;
 
     /* TSC. */
-    vmcb->tsc_offset = 0;
+    vmcb->_tsc_offset = 0;
     if ( v->domain->arch.vtsc )
     {
-        vmcb->general1_intercepts |= GENERAL1_INTERCEPT_RDTSC;
-        vmcb->general2_intercepts |= GENERAL2_INTERCEPT_RDTSCP;
+        vmcb->_general1_intercepts |= GENERAL1_INTERCEPT_RDTSC;
+        vmcb->_general2_intercepts |= GENERAL2_INTERCEPT_RDTSCP;
     }
 
     /* Guest EFER. */
@@ -225,38 +226,42 @@ static int construct_vmcb(struct vcpu *v)
 
     paging_update_paging_modes(v);
 
-    vmcb->exception_intercepts =
+    vmcb->_exception_intercepts =
         HVM_TRAP_MASK
         | (1U << TRAP_no_device);
 
     if ( paging_mode_hap(v->domain) )
     {
-        vmcb->np_enable = 1; /* enable nested paging */
-        vmcb->g_pat = MSR_IA32_CR_PAT_RESET; /* guest PAT */
-        vmcb->h_cr3 = pagetable_get_paddr(p2m_get_pagetable(p2m_get_hostp2m(v->domain)));
+        vmcb->_np_enable = 1; /* enable nested paging */
+        vmcb->_g_pat = MSR_IA32_CR_PAT_RESET; /* guest PAT */
+        vmcb->_h_cr3 = pagetable_get_paddr(
+            p2m_get_pagetable(p2m_get_hostp2m(v->domain)));
 
         /* No point in intercepting CR3 reads/writes. */
-        vmcb->cr_intercepts &= ~(CR_INTERCEPT_CR3_READ|CR_INTERCEPT_CR3_WRITE);
+        vmcb->_cr_intercepts &=
+            ~(CR_INTERCEPT_CR3_READ|CR_INTERCEPT_CR3_WRITE);
 
         /*
          * No point in intercepting INVLPG if we don't have shadow pagetables
          * that need to be fixed up.
          */
-        vmcb->general1_intercepts &= ~GENERAL1_INTERCEPT_INVLPG;
+        vmcb->_general1_intercepts &= ~GENERAL1_INTERCEPT_INVLPG;
 
         /* PAT is under complete control of SVM when using nested paging. */
         svm_disable_intercept_for_msr(v, MSR_IA32_CR_PAT);
     }
     else
     {
-        vmcb->exception_intercepts |= (1U << TRAP_page_fault);
+        vmcb->_exception_intercepts |= (1U << TRAP_page_fault);
     }
 
     if ( cpu_has_pause_filter )
     {
-        vmcb->pause_filter_count = 3000;
-        vmcb->general1_intercepts |= GENERAL1_INTERCEPT_PAUSE;
+        vmcb->_pause_filter_count = 3000;
+        vmcb->_general1_intercepts |= GENERAL1_INTERCEPT_PAUSE;
     }
+
+    vmcb->cleanbits.bytes = 0;
 
     return 0;
 }
@@ -309,6 +314,7 @@ static void svm_dump_sel(char *name, svm_segment_register_t *s)
            (unsigned long long)s->base);
 }
 
+/* This function can directly access fields which are covered by clean bits. */
 void svm_dump_vmcb(const char *from, struct vmcb_struct *vmcb)
 {
     printk("Dumping guest's current state at %s...\n", from);
@@ -317,47 +323,48 @@ void svm_dump_vmcb(const char *from, struct vmcb_struct *vmcb)
 
     printk("cr_intercepts = 0x%08x dr_intercepts = 0x%08x "
            "exception_intercepts = 0x%08x\n", 
-           vmcb->cr_intercepts, vmcb->dr_intercepts, 
-           vmcb->exception_intercepts);
+           vmcb->_cr_intercepts, vmcb->_dr_intercepts, 
+           vmcb->_exception_intercepts);
     printk("general1_intercepts = 0x%08x general2_intercepts = 0x%08x\n", 
-           vmcb->general1_intercepts, vmcb->general2_intercepts);
+           vmcb->_general1_intercepts, vmcb->_general2_intercepts);
     printk("iopm_base_pa = 0x%016llx msrpm_base_pa = 0x%016llx tsc_offset = "
             "0x%016llx\n", 
-           (unsigned long long) vmcb->iopm_base_pa,
-           (unsigned long long) vmcb->msrpm_base_pa,
-           (unsigned long long) vmcb->tsc_offset);
+           (unsigned long long)vmcb->_iopm_base_pa,
+           (unsigned long long)vmcb->_msrpm_base_pa,
+           (unsigned long long)vmcb->_tsc_offset);
     printk("tlb_control = 0x%08x vintr = 0x%016llx interrupt_shadow = "
             "0x%016llx\n", vmcb->tlb_control,
-           (unsigned long long) vmcb->vintr.bytes,
-           (unsigned long long) vmcb->interrupt_shadow);
+           (unsigned long long)vmcb->_vintr.bytes,
+           (unsigned long long)vmcb->interrupt_shadow);
     printk("exitcode = 0x%016llx exitintinfo = 0x%016llx\n", 
-           (unsigned long long) vmcb->exitcode,
-           (unsigned long long) vmcb->exitintinfo.bytes);
+           (unsigned long long)vmcb->exitcode,
+           (unsigned long long)vmcb->exitintinfo.bytes);
     printk("exitinfo1 = 0x%016llx exitinfo2 = 0x%016llx \n",
-           (unsigned long long) vmcb->exitinfo1,
-           (unsigned long long) vmcb->exitinfo2);
+           (unsigned long long)vmcb->exitinfo1,
+           (unsigned long long)vmcb->exitinfo2);
     printk("np_enable = 0x%016llx guest_asid = 0x%03x\n", 
-           (unsigned long long) vmcb->np_enable, vmcb->guest_asid);
+           (unsigned long long)vmcb->_np_enable, vmcb->_guest_asid);
     printk("cpl = %d efer = 0x%016llx star = 0x%016llx lstar = 0x%016llx\n", 
-           vmcb->cpl, (unsigned long long) vmcb->efer,
-           (unsigned long long) vmcb->star, (unsigned long long) vmcb->lstar);
+           vmcb->_cpl, (unsigned long long)vmcb->_efer,
+           (unsigned long long)vmcb->star, (unsigned long long)vmcb->lstar);
     printk("CR0 = 0x%016llx CR2 = 0x%016llx\n",
-           (unsigned long long) vmcb->cr0, (unsigned long long) vmcb->cr2);
+           (unsigned long long)vmcb->_cr0, (unsigned long long)vmcb->_cr2);
     printk("CR3 = 0x%016llx CR4 = 0x%016llx\n", 
-           (unsigned long long) vmcb->cr3, (unsigned long long) vmcb->cr4);
+           (unsigned long long)vmcb->_cr3, (unsigned long long)vmcb->_cr4);
     printk("RSP = 0x%016llx  RIP = 0x%016llx\n", 
-           (unsigned long long) vmcb->rsp, (unsigned long long) vmcb->rip);
+           (unsigned long long)vmcb->rsp, (unsigned long long)vmcb->rip);
     printk("RAX = 0x%016llx  RFLAGS=0x%016llx\n",
-           (unsigned long long) vmcb->rax, (unsigned long long) vmcb->rflags);
+           (unsigned long long)vmcb->rax, (unsigned long long)vmcb->rflags);
     printk("DR6 = 0x%016llx, DR7 = 0x%016llx\n", 
-           (unsigned long long) vmcb->dr6, (unsigned long long) vmcb->dr7);
+           (unsigned long long)vmcb->_dr6, (unsigned long long)vmcb->_dr7);
     printk("CSTAR = 0x%016llx SFMask = 0x%016llx\n",
-           (unsigned long long) vmcb->cstar, 
-           (unsigned long long) vmcb->sfmask);
+           (unsigned long long)vmcb->cstar, 
+           (unsigned long long)vmcb->sfmask);
     printk("KernGSBase = 0x%016llx PAT = 0x%016llx \n", 
-           (unsigned long long) vmcb->kerngsbase,
-           (unsigned long long) vmcb->g_pat);
-    printk("H_CR3 = 0x%016llx\n", (unsigned long long)vmcb->h_cr3);
+           (unsigned long long)vmcb->kerngsbase,
+           (unsigned long long)vmcb->_g_pat);
+    printk("H_CR3 = 0x%016llx CleanBits = 0x%08x\n", 
+           (unsigned long long)vmcb->_h_cr3, vmcb->cleanbits.bytes);
 
     /* print out all the selectors */
     svm_dump_sel("CS", &vmcb->cs);

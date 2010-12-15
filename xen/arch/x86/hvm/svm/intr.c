@@ -42,6 +42,7 @@
 static void svm_inject_nmi(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    u32 general1_intercepts = vmcb_get_general1_intercepts(vmcb);
     eventinj_t event;
 
     event.bytes = 0;
@@ -56,9 +57,10 @@ static void svm_inject_nmi(struct vcpu *v)
      * SVM does not virtualise the NMI mask, so we emulate it by intercepting
      * the next IRET and blocking NMI injection until the intercept triggers.
      */
-    vmcb->general1_intercepts |= GENERAL1_INTERCEPT_IRET;
+    vmcb_set_general1_intercepts(
+        vmcb, general1_intercepts | GENERAL1_INTERCEPT_IRET);
 }
-    
+
 static void svm_inject_extint(struct vcpu *v, int vector)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
@@ -76,6 +78,7 @@ static void svm_inject_extint(struct vcpu *v, int vector)
 static void enable_intr_window(struct vcpu *v, struct hvm_intack intack)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    u32 general1_intercepts = vmcb_get_general1_intercepts(vmcb);
     vintr_t intr;
 
     ASSERT(intack.source != hvm_intsrc_none);
@@ -100,16 +103,17 @@ static void enable_intr_window(struct vcpu *v, struct hvm_intack intack)
      * we inject a VINTR, ...).
      */
     if ( (intack.source == hvm_intsrc_nmi) &&
-         (vmcb->general1_intercepts & GENERAL1_INTERCEPT_IRET) )
+         (general1_intercepts & GENERAL1_INTERCEPT_IRET) )
         return;
 
-    intr = vmcb->vintr;
+    intr = vmcb_get_vintr(vmcb);
     intr.fields.irq     = 1;
     intr.fields.vector  = 0;
     intr.fields.prio    = intack.vector >> 4;
     intr.fields.ign_tpr = (intack.source != hvm_intsrc_lapic);
-    vmcb->vintr = intr;
-    vmcb->general1_intercepts |= GENERAL1_INTERCEPT_VINTR;
+    vmcb_set_vintr(vmcb, intr);
+    vmcb_set_general1_intercepts(
+        vmcb, general1_intercepts | GENERAL1_INTERCEPT_VINTR);
 }
 
 asmlinkage void svm_intr_assist(void) 
