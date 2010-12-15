@@ -209,6 +209,7 @@ static void xc_cpuid_hvm_policy(
                       bitmaskof(X86_FEATURE_XSAVE)) : 0));
 
         regs[2] |= (bitmaskof(X86_FEATURE_HYPERVISOR) |
+                    bitmaskof(X86_FEATURE_TSC_DEADLINE) |
                     bitmaskof(X86_FEATURE_X2APIC));
 
         regs[3] &= (bitmaskof(X86_FEATURE_FPU) |
