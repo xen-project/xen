@@ -1800,6 +1800,7 @@ int p2m_alloc_table(struct p2m_domain *p2m)
     struct page_info *page, *p2m_top;
     unsigned int page_count = 0;
     unsigned long gfn = -1UL;
+    struct domain *d = p2m->domain;
 
     p2m_lock(p2m);
 
@@ -1827,6 +1828,10 @@ int p2m_alloc_table(struct p2m_domain *p2m)
     }
 
     p2m->phys_table = pagetable_from_mfn(page_to_mfn(p2m_top));
+
+    if ( is_hvm_domain(d) && d->arch.hvm_domain.hap_enabled &&
+         (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) )
+        iommu_set_pgd(d);
 
     P2M_PRINTK("populating p2m table\n");
 

@@ -68,15 +68,19 @@
 /*
  * Decoding Capability Register
  */
-#define cap_read_drain(c)    (((c) >> 55) & 1)
-#define cap_write_drain(c)    (((c) >> 54) & 1)
-#define cap_max_amask_val(c)    (((c) >> 48) & 0x3f)
-#define cap_num_fault_regs(c)    ((((c) >> 40) & 0xff) + 1)
+#define cap_read_drain(c)      (((c) >> 55) & 1)
+#define cap_write_drain(c)     (((c) >> 54) & 1)
+#define cap_max_amask_val(c)   (((c) >> 48) & 0x3f)
+#define cap_num_fault_regs(c)  ((((c) >> 40) & 0xff) + 1)
 #define cap_pgsel_inv(c)       (((c) >> 39) & 1)
 
-#define cap_super_page_val(c)    (((c) >> 34) & 0xf)
+#define cap_super_page_val(c)  (((c) >> 34) & 0xf)
 #define cap_super_offset(c)    (((find_first_bit(&cap_super_page_val(c), 4)) \
-                    * OFFSET_STRIDE) + 21)
+                                 * OFFSET_STRIDE) + 21)
+#define cap_sps_2mb(c)         ((c >> 34) & 1)
+#define cap_sps_1gb(c)         ((c >> 35) & 1)
+#define cap_sps_512gb(c)       ((c >> 36) & 1)
+#define cap_sps_1tb(c)         ((c >> 37) & 1)
 
 #define cap_fault_reg_offset(c)    ((((c) >> 24) & 0x3ff) * 16)
 

@@ -33,6 +33,8 @@
 #include <xen/keyhandler.h>
 #include <asm/msi.h>
 #include <asm/irq.h>
+#include <asm/hvm/vmx/vmx.h>
+#include <asm/p2m.h>
 #include <mach_apic.h>
 #include "iommu.h"
 #include "dmar.h"
@@ -42,6 +44,9 @@
 #ifdef __ia64__
 #define nr_ioapics              iosapic_get_nr_iosapics()
 #endif
+
+static int sharept = 1;
+boolean_param("sharept", sharept);
 
 int nr_iommus;
 
@@ -1627,6 +1632,9 @@ void iommu_domain_teardown(struct domain *d)
     if ( list_empty(&acpi_drhd_units) )
         return;
 
+    if ( iommu_hap_pt_share )
+        return;
+
     spin_lock(&hd->mapping_lock);
     iommu_free_pagetable(hd->pgd_maddr, agaw_to_level(hd->agaw));
     hd->pgd_maddr = 0;
@@ -1644,6 +1652,10 @@ static int intel_iommu_map_page(
     u64 pg_maddr;
     int flush_dev_iotlb;
     int iommu_domid;
+
+    /* Do nothing if VT-d shares EPT page table */
+    if ( iommu_hap_pt_share )
+        return 0;
 
     /* do nothing if dom0 and iommu supports pass thru */
     if ( iommu_passthrough && (d->domain_id == 0) )
@@ -1713,6 +1725,63 @@ static int intel_iommu_unmap_page(struct domain *d, unsigned long gfn)
     dma_pte_clear_one(d, (paddr_t)gfn << PAGE_SHIFT_4K);
 
     return 0;
+}
+
+void iommu_pte_flush(struct domain *d, u64 gfn, u64 *pte, int present)
+{
+    struct acpi_drhd_unit *drhd;
+    struct iommu *iommu = NULL;
+    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    int flush_dev_iotlb;
+    int iommu_domid;
+
+    iommu_flush_cache_entry(pte, sizeof(struct dma_pte));
+
+    for_each_drhd_unit ( drhd )
+    {
+        iommu = drhd->iommu;
+        if ( !test_bit(iommu->index, &hd->iommu_bitmap) )
+            continue;
+
+        flush_dev_iotlb = find_ats_dev_drhd(iommu) ? 1 : 0;
+        iommu_domid= domain_iommu_domid(d, iommu);
+        if ( iommu_domid == -1 )
+            continue;
+        if ( iommu_flush_iotlb_psi(iommu, iommu_domid,
+                                   (paddr_t)gfn << PAGE_SHIFT_4K, 1,
+                                   !present, flush_dev_iotlb) )
+            iommu_flush_write_buffer(iommu);
+    }
+}
+
+static int vtd_ept_page_compatible(struct iommu *iommu)
+{
+    u64 cap = iommu->cap;
+
+    if ( ept_has_2mb(cpu_has_vmx_ept_2mb) != cap_sps_2mb(cap) )
+        return 0;
+
+    if ( ept_has_1gb(cpu_has_vmx_ept_1gb) != cap_sps_1gb(cap) )
+        return 0;
+
+    return 1;
+}
+
+/*
+ * set VT-d page table directory to EPT table if allowed
+ */
+void iommu_set_pgd(struct domain *d)
+{
+    struct hvm_iommu *hd  = domain_hvm_iommu(d);
+    mfn_t pgd_mfn;
+
+    ASSERT( is_hvm_domain(d) && d->arch.hvm_domain.hap_enabled );
+
+    if ( !iommu_hap_pt_share )
+        return;
+
+    pgd_mfn = pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d)));
+    hd->pgd_maddr = pagetable_get_paddr(pagetable_from_mfn(pgd_mfn));
 }
 
 static int domain_rmrr_mapped(struct domain *d,
@@ -1871,6 +1940,9 @@ static int init_vtd_hw(void)
     unsigned long flags;
     struct irq_cfg *cfg;
 
+    /*
+     * Basic VT-d HW init: set VT-d interrupt, clear VT-d faults.  
+     */
     for_each_drhd_unit ( drhd )
     {
         iommu = drhd->iommu;
@@ -1895,6 +1967,9 @@ static int init_vtd_hw(void)
         spin_unlock_irqrestore(&iommu->register_lock, flags);
     }
 
+    /*
+     * Enable queue invalidation
+     */   
     for_each_drhd_unit ( drhd )
     {
         iommu = drhd->iommu;
@@ -1910,6 +1985,9 @@ static int init_vtd_hw(void)
         }
     }
 
+    /*
+     * Enable interrupt remapping
+     */  
     if ( iommu_intremap )
     {
         int apic;
@@ -1926,7 +2004,6 @@ static int init_vtd_hw(void)
             }
         }
     }
-
     if ( iommu_intremap )
     {
         for_each_drhd_unit ( drhd )
@@ -1941,6 +2018,11 @@ static int init_vtd_hw(void)
         }
     }
 
+    /*
+     * Set root entries for each VT-d engine.  After set root entry,
+     * must globally invalidate context cache, and then globally
+     * invalidate IOTLB
+     */
     for_each_drhd_unit ( drhd )
     {
         iommu = drhd->iommu;
@@ -1951,12 +2033,27 @@ static int init_vtd_hw(void)
             return -EIO;
         }
     }
+    iommu_flush_all();
 
     /*
-     * After set root entry, must globally invalidate context cache, and
-     * then globally invalidate IOTLB
+     * Determine whether EPT and VT-d page tables can be shared or not.
      */
-    iommu_flush_all();
+    iommu_hap_pt_share = TRUE;
+    for_each_drhd_unit ( drhd )
+    {
+        iommu = drhd->iommu;
+        if ( (drhd->iommu->nr_pt_levels != VTD_PAGE_TABLE_LEVEL_4) ||
+              !vtd_ept_page_compatible(drhd->iommu) )
+            iommu_hap_pt_share = FALSE;
+    }
+
+    /* keep boot flag sharept as safe fallback. remove after feature matures */
+    if ( !sharept )
+        iommu_hap_pt_share = FALSE;
+
+    gdprintk(XENLOG_INFO VTDPREFIX,
+             "VT-d page table %s with EPT table\n",
+             iommu_hap_pt_share ? "shares" : "not shares");
 
     return 0;
 }

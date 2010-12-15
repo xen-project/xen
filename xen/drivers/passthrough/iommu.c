@@ -47,6 +47,7 @@ bool_t __read_mostly iommu_passthrough;
 bool_t __read_mostly iommu_snoop = 1;
 bool_t __read_mostly iommu_qinval = 1;
 bool_t __read_mostly iommu_intremap = 1;
+bool_t __read_mostly iommu_hap_pt_share;
 bool_t __read_mostly amd_iommu_debug;
 bool_t __read_mostly amd_iommu_perdev_intremap;
 
@@ -174,10 +175,11 @@ int assign_device(struct domain *d, u8 bus, u8 devfn)
     if ( has_arch_pdevs(d) && !need_iommu(d) )
     {
         d->need_iommu = 1;
-        rc = iommu_populate_page_table(d);
+        if ( !iommu_hap_pt_share )
+            rc = iommu_populate_page_table(d);
         goto done;
     }
-done:    
+done:
     spin_unlock(&pcidevs_lock);
     return rc;
 }

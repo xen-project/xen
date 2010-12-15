@@ -30,15 +30,21 @@
 
 typedef union {
     struct {
-        u64 r       :   1,
-        w           :   1,
-        x           :   1,
-        emt         :   3, /* EPT Memory type */
-        ipat        :   1, /* Ignore PAT memory type */
-        sp          :   1, /* Is this a superpage? */
-        avail1      :   4,
-        mfn         :   40,
-        avail2      :   12;
+        u64 r       :   1,  /* bit 0 - Read permission */
+        w           :   1,  /* bit 1 - Write permission */
+        x           :   1,  /* bit 2 - Execute permission */
+        emt         :   3,  /* bits 5:3 - EPT Memory type */
+        ipat        :   1,  /* bit 6 - Ignore PAT memory type */
+        sp          :   1,  /* bit 7 - Is this a superpage? */
+        rsvd1       :   2,  /* bits 9:8 - Reserved for future use */
+        avail1      :   1,  /* bit 10 - Software available 1 */
+        rsvd2_snp   :   1,  /* bit 11 - Used for VT-d snoop control
+                               in shared EPT/VT-d usage */
+        mfn         :   40, /* bits 51:12 - Machine physical frame number */
+        sa_p2mt     :   10, /* bits 61:52 - Software available 2 */
+        rsvd3_tm    :   1,  /* bit 62 - Used for VT-d transient-mapping
+                               hint in shared EPT/VT-d usage */
+        avail3      :   1;  /* bit 63 - Software available 3 */
     };
     u64 epte;
 } ept_entry_t;
@@ -207,6 +213,11 @@ extern u64 vmx_ept_vpid_cap;
     (vmx_ept_vpid_cap & VMX_EPT_SUPERPAGE_2MB)
 #define cpu_has_vmx_ept_invept_single_context   \
     (vmx_ept_vpid_cap & VMX_EPT_INVEPT_SINGLE_CONTEXT)
+
+#define EPT_2MB_SHIFT     16
+#define EPT_1GB_SHIFT     17
+#define ept_has_2mb(c)    ((c >> EPT_2MB_SHIFT) & 1)
+#define ept_has_1gb(c)    ((c >> EPT_1GB_SHIFT) & 1)
 
 #define INVEPT_SINGLE_CONTEXT   1
 #define INVEPT_ALL_CONTEXT      2
