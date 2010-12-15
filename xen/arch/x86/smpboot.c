@@ -195,7 +195,7 @@ void smp_callin(void)
      * update until we finish. We are free to set up this CPU: first the APIC.
      */
     Dprintk("CALLIN, before setup_local_APIC().\n");
-    x2apic_setup();
+    x2apic_ap_setup();
     setup_local_APIC();
     map_cpu_to_logical_apicid();
 

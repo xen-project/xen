@@ -25,7 +25,8 @@ extern int apic_verbosity;
 extern int x2apic_enabled;
 extern int directed_eoi_enabled;
 
-void x2apic_setup(void);
+void x2apic_bsp_setup(void);
+void x2apic_ap_setup(void);
 const struct genapic *apic_x2apic_probe(void);
 
 /*

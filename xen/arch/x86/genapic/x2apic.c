@@ -27,7 +27,7 @@
 #include <xen/smp.h>
 #include <asm/mach-default/mach_mpparse.h>
 
-static int x2apic_phys; /* By default we use logical cluster mode. */
+static int __initdata x2apic_phys; /* By default we use logical cluster mode. */
 boolean_param("x2apic_phys", x2apic_phys);
 
 static void init_apic_ldr_x2apic_phys(void)
@@ -134,7 +134,7 @@ static const struct genapic apic_x2apic_cluster = {
     .send_IPI_self = send_IPI_self_x2apic
 };
 
-const struct genapic *apic_x2apic_probe(void)
+const struct genapic *__init apic_x2apic_probe(void)
 {
     return x2apic_phys ? &apic_x2apic_phys : &apic_x2apic_cluster;
 }

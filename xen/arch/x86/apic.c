@@ -948,17 +948,16 @@ no_apic:
     return -1;
 }
 
-void x2apic_setup(void)
+void x2apic_ap_setup(void)
+{
+    if ( x2apic_enabled )
+        __enable_x2apic();
+}
+
+void __init x2apic_bsp_setup(void)
 {
     struct IO_APIC_route_entry **ioapic_entries = NULL;
     uint64_t msr_content;
-
-    if ( smp_processor_id() != 0 )
-    {
-        if ( x2apic_enabled )
-            __enable_x2apic();
-        return;
-    }
 
     if ( !cpu_has_x2apic )
         return;

@@ -1190,7 +1190,7 @@ void __init __start_xen(unsigned long mbi_p)
 
     init_cpu_to_node();
 
-    x2apic_setup();
+    x2apic_bsp_setup();
 
     init_IRQ();
 
