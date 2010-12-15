@@ -304,6 +304,62 @@ void paging_mark_dirty(struct domain *d, unsigned long guest_mfn)
     log_dirty_unlock(d);
 }
 
+
+/* Is this guest page dirty? */
+int paging_mfn_is_dirty(struct domain *d, mfn_t gmfn)
+{
+    unsigned long pfn;
+    mfn_t mfn, *l4, *l3, *l2;
+    unsigned long *l1;
+    int rv;
+
+    ASSERT(paging_mode_log_dirty(d));
+
+    /* We /really/ mean PFN here, even for non-translated guests. */
+    pfn = get_gpfn_from_mfn(mfn_x(gmfn));
+    /* Page sharing not supported for shadow domains */
+    BUG_ON(SHARED_M2P(pfn));
+    if ( unlikely(!VALID_M2P(pfn)) )
+        return 0;
+    
+    if ( d->arch.paging.log_dirty.failed_allocs > 0 )
+        /* If we have any failed allocations our dirty log is bogus.
+         * Since we can't signal an error here, be conservative and
+         * report "dirty" in this case.  (The only current caller,
+         * _sh_propagate, leaves known-dirty pages writable, preventing
+         * subsequent dirty-logging faults from them.)
+         */
+        return 1;
+
+    l4 = paging_map_log_dirty_bitmap(d);
+    if ( !l4 ) 
+        return 0;
+
+    mfn = l4[L4_LOGDIRTY_IDX(pfn)];
+    unmap_domain_page(l4);
+    if ( !mfn_valid(mfn) )
+        return 0;
+
+    l3 = map_domain_page(mfn_x(mfn));
+    mfn = l3[L3_LOGDIRTY_IDX(pfn)];
+    unmap_domain_page(l3);
+    if ( !mfn_valid(mfn) )
+        return 0;
+
+    l2 = map_domain_page(mfn_x(mfn));
+    mfn = l2[L2_LOGDIRTY_IDX(pfn)];
+    unmap_domain_page(l2);
+    if ( !mfn_valid(mfn) )
+        return 0;
+
+    l1 = map_domain_page(mfn_x(mfn));
+    rv = test_bit(L1_LOGDIRTY_IDX(pfn), l1);
+    unmap_domain_page(l1);
+
+    return rv;
+}
+
+
 /* Read a domain's log-dirty bitmap and stats.  If the operation is a CLEAN,
  * clear the bitmap and stats as well. */
 int paging_log_dirty_op(struct domain *d, struct xen_domctl_shadow_op *sc)

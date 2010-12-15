@@ -161,6 +161,9 @@ void paging_log_dirty_init(struct domain *d,
 /* mark a page as dirty */
 void paging_mark_dirty(struct domain *d, unsigned long guest_mfn);
 
+/* is this guest page dirty? */
+int paging_mfn_is_dirty(struct domain *d, mfn_t gmfn);
+
 /*
  * Log-dirty radix tree indexing:
  *   All tree nodes are PAGE_SIZE bytes, mapped on-demand.

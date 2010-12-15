@@ -657,7 +657,7 @@ _sh_propagate(struct vcpu *v,
         if ( mfn_valid(target_mfn) ) {
             if ( ft & FETCH_TYPE_WRITE ) 
                 paging_mark_dirty(d, mfn_x(target_mfn));
-            else if ( !sh_mfn_is_dirty(d, target_mfn) )
+            else if ( !paging_mfn_is_dirty(d, target_mfn) )
                 sflags &= ~_PAGE_RW;
         }
     }
