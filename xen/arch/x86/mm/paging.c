@@ -132,7 +132,8 @@ static mfn_t paging_new_log_dirty_node(struct domain *d, mfn_t **node_p)
     return mfn;
 }
 
-mfn_t *paging_map_log_dirty_bitmap(struct domain *d)
+/* get the top of the log-dirty bitmap trie, allocating if necessary */
+static mfn_t *paging_map_log_dirty_bitmap(struct domain *d)
 {
     mfn_t *mapping;
 
