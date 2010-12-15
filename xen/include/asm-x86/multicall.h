@@ -22,6 +22,7 @@
             "    movq  %c2+2*%c3(%0),%%rdx; "                \
             "    movq  %c2+3*%c3(%0),%%rcx; "                \
             "    movq  %c2+4*%c3(%0),%%r8; "                 \
+            "    movq  %c2+5*%c3(%0),%%r9; "                 \
             "    callq *%%rax; "                             \
             "1:  movq  %%rax,%c4(%0)\n"                      \
             ".section .fixup,\"ax\"\n"                       \
@@ -51,6 +52,7 @@
             "    movl  %c2+2*%c3(%0),%%edx; "                \
             "    movl  %c2+3*%c3(%0),%%ecx; "                \
             "    movl  %c2+4*%c3(%0),%%r8d; "                \
+            "    movl  %c2+5*%c3(%0),%%r9d; "                \
             "    callq *%%rax; "                             \
             "1:  movl  %%eax,%c4(%0)\n"                      \
             ".section .fixup,\"ax\"\n"                       \
@@ -72,6 +74,7 @@
 #define do_multicall_call(_call)                             \
         __asm__ __volatile__ (                               \
             "    movl  %c1(%0),%%eax; "                      \
+            "    pushl %c2+5*%c3(%0); "                      \
             "    pushl %c2+4*%c3(%0); "                      \
             "    pushl %c2+3*%c3(%0); "                      \
             "    pushl %c2+2*%c3(%0); "                      \
@@ -81,7 +84,7 @@
             "    jae   2f; "                                 \
             "    call  *hypercall_table(,%%eax,4); "         \
             "1:  movl  %%eax,%c4(%0); "                      \
-            "    addl  $20,%%esp\n"                          \
+            "    addl  $24,%%esp\n"                          \
             ".section .fixup,\"ax\"\n"                       \
             "2:  movl  $-"STR(ENOSYS)",%%eax\n"              \
             "    jmp   1b\n"                                 \
