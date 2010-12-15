@@ -160,8 +160,8 @@ ENTRY(syscall_enter)
         movq  UREGS_rsi+SHADOW_BYTES(%rsp),%rsi   /* Arg 2        */
         movq  UREGS_rdx+SHADOW_BYTES(%rsp),%rdx   /* Arg 3        */
         movq  UREGS_r10+SHADOW_BYTES(%rsp),%rcx   /* Arg 4        */
-        movq  UREGS_rdi+SHADOW_BYTES(%rsp),%r8    /* Arg 5        */
-        movq  UREGS_rbp+SHADOW_BYTES(%rsp),%r9    /* Arg 6        */
+        movq  UREGS_r8 +SHADOW_BYTES(%rsp),%r8    /* Arg 5        */
+        movq  UREGS_r9 +SHADOW_BYTES(%rsp),%r9    /* Arg 6        */
 #undef SHADOW_BYTES
 1:      leaq  hypercall_table(%rip),%r10
         PERFC_INCR(PERFC_hypercalls, %rax, %rbx)
