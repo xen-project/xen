@@ -39,6 +39,8 @@ void raise_softirq(unsigned int nr);
  * Use this instead of do_softirq() when you do not want to be preempted.
  */
 void process_pending_softirqs(void);
+/* ... and use this instead when running inside a tasklet. */
+void process_pending_softirqs_nested(void);
 
 /*
  * TASKLETS -- dynamically-allocatable tasks run in softirq context

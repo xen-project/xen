@@ -54,6 +54,16 @@ void process_pending_softirqs(void)
     __do_softirq(1ul<<SCHEDULE_SOFTIRQ);
 }
 
+void process_pending_softirqs_nested(void)
+{
+    ASSERT(!in_irq() && local_irq_is_enabled());
+    /*
+     * Do not enter scheduler as it can preempt the calling context,
+     * and do not run tasklets as we're running one currently.
+     */
+    __do_softirq((1ul<<SCHEDULE_SOFTIRQ) | (1ul<<TASKLET_SOFTIRQ));
+}
+
 asmlinkage void do_softirq(void)
 {
     __do_softirq(0);
