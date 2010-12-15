@@ -14,7 +14,7 @@
 #define SMP_MAGIC_IDENT	(('_'<<24)|('P'<<16)|('M'<<8)|'_')
 
 #define MAX_MPC_ENTRY 1024
-#define MAX_APICS      256
+#define MAX_APICS     MAX(256, 4 * NR_CPUS)
 
 struct intel_mp_floating
 {

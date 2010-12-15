@@ -127,7 +127,6 @@ struct sedf_cpu_info {
 
 #define PERIOD_BEGIN(inf) ((inf)->deadl_abs - (inf)->period)
 
-#define MIN(x,y)    (((x)<(y))?(x):(y))
 #define DIV_UP(x,y) (((x) + (y) - 1) / y)
 
 #define extra_runs(inf)      ((inf->status) & 6)

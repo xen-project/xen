@@ -33,6 +33,13 @@
 #define max_t(type,x,y) \
         ({ type __x = (x); type __y = (y); __x > __y ? __x: __y; })
 
+/*
+ * pre-processor, array size, and bit field width suitable variants;
+ * please don't use in "normal" expressions.
+ */
+#define MIN(x,y) ((x) < (y) ? (x) : (y))
+#define MAX(x,y) ((x) > (y) ? (x) : (y))
+
 /**
  * container_of - cast a member of a structure out to the containing structure
  *

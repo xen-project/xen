@@ -99,7 +99,8 @@ static int mpc_record;
 static struct mpc_config_translation *translation_table[MAX_MPC_ENTRY] __initdata;
 
 /* Return xen's logical cpu_id of the new added cpu or <0 if error */
-static int __devinit MP_processor_info (struct mpc_config_processor *m)
+static int __devinit MP_processor_info_x(struct mpc_config_processor *m,
+					 u32 apicidx)
 {
  	int ver, apicid, cpu = 0;
 	physid_mask_t phys_cpu;
@@ -107,7 +108,7 @@ static int __devinit MP_processor_info (struct mpc_config_processor *m)
 	if (!(m->mpc_cpuflag & CPU_ENABLED))
 		return -EINVAL;
 
-	apicid = mpc_apic_id(m, translation_table[mpc_record]);
+	apicid = mpc_apic_id(m, apicidx, translation_table[mpc_record]);
 
 	if (m->mpc_featureflag&(1<<0))
 		Dprintk("    Floating point unit present.\n");
@@ -159,7 +160,7 @@ static int __devinit MP_processor_info (struct mpc_config_processor *m)
 
 	if (m->mpc_cpuflag & CPU_BOOTPROCESSOR) {
 		Dprintk("    Bootup CPU\n");
-		boot_cpu_physical_apicid = m->mpc_apicid;
+		boot_cpu_physical_apicid = apicid;
 	}
 
 	ver = m->mpc_apicver;
@@ -170,10 +171,10 @@ static int __devinit MP_processor_info (struct mpc_config_processor *m)
 	if (ver == 0x0) {
 		printk(KERN_WARNING "BIOS bug, APIC version is 0 for CPU#%d! "
 				"fixing up to 0x10. (tell your hw vendor)\n",
-				m->mpc_apicid);
+				apicid);
 		ver = 0x10;
 	}
-	apic_version[m->mpc_apicid] = ver;
+	apic_version[apicid] = ver;
 
 	phys_cpu = apicid_to_cpu_present(apicid);
 	physids_or(phys_cpu_present_map, phys_cpu_present_map, phys_cpu);
@@ -211,6 +212,11 @@ static int __devinit MP_processor_info (struct mpc_config_processor *m)
 	}
 
 	return cpu;
+}
+
+static int __devinit MP_processor_info(struct mpc_config_processor *m)
+{
+	return MP_processor_info_x(m, m->mpc_apicid);
 }
 
 static void __init MP_bus_info (struct mpc_config_bus *m)
@@ -839,7 +845,7 @@ int __devinit mp_register_lapic (
 	struct mpc_config_processor processor;
 	int			boot_cpu = 0;
 	
-	if (MAX_APICS - id <= 0) {
+	if (MAX_APICS <= id) {
 		printk(KERN_WARNING "Processor #%d invalid (max %d)\n",
 			id, MAX_APICS);
 		return -EINVAL;
@@ -859,7 +865,7 @@ int __devinit mp_register_lapic (
 	processor.mpc_reserved[0] = 0;
 	processor.mpc_reserved[1] = 0;
 
-	return MP_processor_info(&processor);
+	return MP_processor_info_x(&processor, id);
 }
 
 void mp_unregister_lapic(uint32_t apic_id, uint32_t cpu)

@@ -866,7 +866,7 @@ static void set_cx(
 int get_cpu_id(u8 acpi_id)
 {
     int i;
-    u8 apic_id;
+    u32 apic_id;
 
     apic_id = x86_acpiid_to_apicid[acpi_id];
     if ( apic_id == 0xff )
