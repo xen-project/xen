@@ -244,6 +244,63 @@ int hvm_load(struct domain *d, hvm_domain_context_t *h)
     /* Not reached */
 }
 
+int _hvm_init_entry(struct hvm_domain_context *h,
+                    uint16_t tc, uint16_t inst, uint32_t len)
+{
+    struct hvm_save_descriptor *d 
+        = (struct hvm_save_descriptor *)&h->data[h->cur];
+    if ( h->size - h->cur < len + sizeof (*d) )
+    {
+        gdprintk(XENLOG_WARNING,
+                 "HVM save: no room for %"PRIu32" + %u bytes "
+                 "for typecode %"PRIu16"\n",
+                 len, (unsigned) sizeof (*d), tc);
+        return -1;
+    }
+    d->typecode = tc;
+    d->instance = inst;
+    d->length = len;
+    h->cur += sizeof(*d);
+    return 0;
+}
+
+void _hvm_write_entry(struct hvm_domain_context *h,
+                      void *src, uint32_t src_len)
+{
+    memcpy(&h->data[h->cur], src, src_len);
+    h->cur += src_len;
+}
+
+int _hvm_check_entry(struct hvm_domain_context *h, 
+                     uint16_t type, uint32_t len)
+{
+    struct hvm_save_descriptor *d 
+        = (struct hvm_save_descriptor *)&h->data[h->cur];
+    if ( len + sizeof (*d) > h->size - h->cur)
+    {
+        gdprintk(XENLOG_WARNING, 
+                 "HVM restore: not enough data left to read %u bytes "
+                 "for type %u\n", len, type);
+        return -1;
+    }    
+    if ( (type != d->typecode) || (len != d->length) )
+    {
+        gdprintk(XENLOG_WARNING, 
+                 "HVM restore mismatch: expected type %u length %u, "
+                 "saw type %u length %u\n", type, len, d->typecode, d->length);
+        return -1;
+    }
+    h->cur += sizeof(*d);
+    return 0;
+}
+
+void _hvm_read_entry(struct hvm_domain_context *h,
+                     void *dest, uint32_t dest_len)
+{
+    memcpy(dest, &h->data[h->cur], dest_len);
+    h->cur += dest_len;
+}
+
 /*
  * Local variables:
  * mode: C
