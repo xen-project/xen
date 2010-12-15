@@ -25,7 +25,8 @@ ENTRY(compat_hypercall)
         pushq UREGS_rbx(%rsp); pushq %rcx; pushq %rdx; pushq %rsi; pushq %rdi
         pushq UREGS_rbp+5*8(%rsp)
         leaq  compat_hypercall_args_table(%rip),%r10
-        movq  $6,%rcx
+        movl  %eax,%eax
+        movl  $6,%ecx
         subb  (%r10,%rax,1),%cl
         movq  %rsp,%rdi
         movl  $0xDEADBEEF,%eax
