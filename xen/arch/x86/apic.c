@@ -160,7 +160,7 @@ void __init apic_intr_init(void)
 }
 
 /* Using APIC to generate smp_local_timer_interrupt? */
-int using_apic_timer = 0;
+static bool_t __read_mostly using_apic_timer;
 
 static int enabled_via_apicbase;
 
@@ -1083,9 +1083,7 @@ __next:
  *****************************************************************************/
 
 /* used for system time scaling */
-static unsigned long bus_freq;    /* KAF: pointer-size avoids compile warns. */
-static u32           bus_cycle;   /* length of one bus cycle in pico-seconds */
-static u32           bus_scale;   /* scaling factor convert ns to bus cycles */
+static u32 __read_mostly bus_scale; /* scaling factor convert ns to bus cycles */
 
 /*
  * The timer chip is already set up at HZ interrupts per second here,
@@ -1197,6 +1195,8 @@ static int __init calibrate_APIC_clock(void)
     long tt1, tt2;
     long result;
     int i;
+    unsigned long bus_freq; /* KAF: pointer-size avoids compile warns. */
+    u32 bus_cycle;          /* length of one bus cycle in pico-seconds */
     const int LOOPS = HZ/10;
 
     apic_printk(APIC_VERBOSE, "calibrating APIC timer ...\n");
@@ -1411,7 +1411,6 @@ fastcall void smp_error_interrupt(struct cpu_user_regs *regs)
     apic_write(APIC_ESR, 0);
     v1 = apic_read(APIC_ESR);
     ack_APIC_irq();
-    atomic_inc(&irq_err_count);
 
     /* Here is what the APIC error bits mean:
        0: Send CS error

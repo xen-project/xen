@@ -284,7 +284,6 @@ static void mask_and_ack_8259A_irq(unsigned int irq)
             printk("spurious 8259A interrupt: IRQ%d.\n", irq);
             spurious_irq_mask |= irqmask;
         }
-        atomic_inc(&irq_err_count);
         /*
          * Theoretically we do not have to handle this IRQ,
          * but in Linux this does not cause problems and is

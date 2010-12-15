@@ -128,8 +128,6 @@ hw_irq_controller no_irq_type = {
 	end_none
 };
 
-atomic_t irq_err_count;
-
 /*
  * Generic enable/disable code: this just calls
  * down into the PIC-specific version for the actual

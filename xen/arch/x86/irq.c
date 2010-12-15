@@ -74,7 +74,7 @@ void unlock_vector_lock(void)
     spin_unlock(&vector_lock);
 }
 
-static int __bind_irq_vector(int irq, int vector, cpumask_t cpu_mask)
+static int __init __bind_irq_vector(int irq, int vector, cpumask_t cpu_mask)
 {
     cpumask_t online_mask;
     int cpu;
@@ -100,7 +100,7 @@ static int __bind_irq_vector(int irq, int vector, cpumask_t cpu_mask)
     return 0;
 }
 
-int bind_irq_vector(int irq, int vector, cpumask_t cpu_mask)
+int __init bind_irq_vector(int irq, int vector, cpumask_t cpu_mask)
 {
     unsigned long flags;
     int ret;
@@ -327,8 +327,6 @@ hw_irq_controller no_irq_type = {
     ack_none,
     end_none
 };
-
-atomic_t irq_err_count;
 
 int __assign_irq_vector(int irq, struct irq_cfg *cfg, const cpumask_t *mask)
 {
