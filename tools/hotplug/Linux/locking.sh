@@ -63,7 +63,7 @@ _claim_lock()
       retries=0
     else
       local pid=$(echo $owner | cut -d : -f 1)
-      if [ ! -f "/proc/$pid/status" ]
+      if [ -n "$pid" -a "$pid" != "unknown" -a ! -f "/proc/$pid/status" ]
       then
         _release_lock $lockdir
       fi
