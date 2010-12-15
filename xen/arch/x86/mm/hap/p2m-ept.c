@@ -137,7 +137,7 @@ static int ept_next_level(struct domain *d, bool_t read_only,
                           ept_entry_t **table, unsigned long *gfn_remainder,
                           u32 shift)
 {
-    ept_entry_t *ept_entry;
+    ept_entry_t *ept_entry, e;
     ept_entry_t *next;
     u32 index;
 
@@ -145,9 +145,11 @@ static int ept_next_level(struct domain *d, bool_t read_only,
 
     ept_entry = (*table) + index;
 
-    if ( !is_epte_present(ept_entry) )
+    e=*ept_entry;
+
+    if ( !is_epte_present(&e) )
     {
-        if ( ept_entry->avail1 == p2m_populate_on_demand )
+        if ( e.avail1 == p2m_populate_on_demand )
             return GUEST_TABLE_POD_PAGE;
 
         if ( read_only )
@@ -155,15 +157,17 @@ static int ept_next_level(struct domain *d, bool_t read_only,
 
         if ( !ept_set_middle_entry(d, ept_entry) )
             return GUEST_TABLE_MAP_FAILED;
+        else
+            e=*ept_entry;
     }
 
     /* The only time sp would be set here is if we had hit a superpage */
-    if ( is_epte_superpage(ept_entry) )
+    if ( is_epte_superpage(&e) )
         return GUEST_TABLE_SUPER_PAGE;
     else
     {
         *gfn_remainder &= (1UL << shift) - 1;
-        next = map_domain_page(ept_entry->mfn);
+        next = map_domain_page(e.mfn);
         unmap_domain_page(*table);
         *table = next;
         return GUEST_TABLE_NORMAL_PAGE;
@@ -235,35 +239,39 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
         if ( mfn_valid(mfn_x(mfn)) || direct_mmio || p2m_is_paged(p2mt) ||
              (p2mt == p2m_ram_paging_in_start) )
         {
-            ept_entry->emt = epte_get_entry_emt(d, gfn, mfn, &ipat,
+            ept_entry_t new_entry;
+
+            new_entry.emt = epte_get_entry_emt(d, gfn, mfn, &ipat,
                                                 direct_mmio);
-            ept_entry->ipat = ipat;
-            ept_entry->sp = order ? 1 : 0;
+            new_entry.ipat = ipat;
+            new_entry.sp = order ? 1 : 0;
 
             if ( ret == GUEST_TABLE_SUPER_PAGE )
             {
-                if ( ept_entry->mfn == (mfn_x(mfn) - offset) )
+                if ( new_entry.mfn == (mfn_x(mfn) - offset) )
                     need_modify_vtd_table = 0;  
                 else                  
-                    ept_entry->mfn = mfn_x(mfn) - offset;
+                    new_entry.mfn = mfn_x(mfn) - offset;
 
-                if ( (ept_entry->avail1 == p2m_ram_logdirty)
+                if ( (new_entry.avail1 == p2m_ram_logdirty)
                      && (p2mt == p2m_ram_rw) )
                     for ( i = 0; i < 512; i++ )
                         paging_mark_dirty(d, mfn_x(mfn) - offset + i);
             }
             else
             {
-                if ( ept_entry->mfn == mfn_x(mfn) )
+                if ( new_entry.mfn == mfn_x(mfn) )
                     need_modify_vtd_table = 0;
                 else
-                    ept_entry->mfn = mfn_x(mfn);
+                    new_entry.mfn = mfn_x(mfn);
             }
 
-            ept_entry->avail1 = p2mt;
-            ept_entry->avail2 = 0;
+            new_entry.avail1 = p2mt;
+            new_entry.avail2 = 0;
 
-            ept_p2m_type_to_flags(ept_entry, p2mt);
+            ept_p2m_type_to_flags(&new_entry, p2mt);
+
+            ept_entry->epte = new_entry.epte;
         }
         else
             ept_entry->epte = 0;
