@@ -894,23 +894,3 @@ void iommu_disable_IR(void)
     for_each_drhd_unit ( drhd )
         disable_qinval(drhd->iommu);
 }
-
-/*
- * Check if interrupt remapping is enabled or not
- * return 1: enabled
- * return 0: not enabled
- */
-int intremap_enabled(void)
-{
-    struct acpi_drhd_unit *drhd;
-    u32 sts;
-
-    for_each_drhd_unit ( drhd )
-    {
-        sts = dmar_readl(drhd->iommu->reg, DMAR_GSTS_REG);
-        if ( !(sts & DMA_GSTS_IRES) )
-            return 0;
-    }
-
-    return 1;
-}

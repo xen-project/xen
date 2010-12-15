@@ -64,7 +64,6 @@ int iommu_setup(void);
 int iommu_supports_eim(void);
 int iommu_enable_IR(void);
 void iommu_disable_IR(void);
-int intremap_enabled(void);
 
 int iommu_add_device(struct pci_dev *pdev);
 int iommu_remove_device(struct pci_dev *pdev);

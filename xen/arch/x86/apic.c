@@ -967,15 +967,6 @@ void x2apic_setup(void)
     rdmsrl(MSR_IA32_APICBASE, msr_content);
     if ( msr_content & MSR_IA32_APICBASE_EXTD )
     {
-        /*
-         * Interrupt remapping should be also enabled by BIOS when
-         * x2APIC is already enabled by BIOS, otherwise it's a BIOS
-         * bug
-         */
-        if ( !intremap_enabled() )
-            panic("Interrupt remapping is not enabled by BIOS while "
-                  "x2APIC is already enabled by BIOS!\n");
-
         printk("x2APIC mode is already enabled by BIOS.\n");
         x2apic_enabled = 1;
     }
@@ -1018,6 +1009,10 @@ void x2apic_setup(void)
 
     if ( iommu_enable_IR() )
     {
+        if ( x2apic_enabled )
+            panic("Interrupt remapping could not be enabled while "
+                  "x2APIC is already enabled by BIOS!\n");
+
         printk("Would not enable x2APIC due to interrupt remapping "
                "cannot be enabled.\n");
         goto restore_out;
