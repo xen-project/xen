@@ -67,7 +67,8 @@ EXPORT_SYMBOL(cpu_online_map);
 
 struct cpuinfo_x86 cpu_data[NR_CPUS];
 
-u32 x86_cpu_to_apicid[NR_CPUS] __read_mostly = { [0 ... NR_CPUS-1] = -1U };
+u32 x86_cpu_to_apicid[NR_CPUS] __read_mostly =
+	{ [0 ... NR_CPUS-1] = BAD_APICID };
 
 static void map_cpu_to_logical_apicid(void);
 
@@ -882,7 +883,7 @@ int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm)
         return -EBUSY;
 
     /* Detect if the cpu has been added before */
-    if ( x86_acpiid_to_apicid[acpi_id] != 0xff )
+    if ( x86_acpiid_to_apicid[acpi_id] != BAD_APICID )
     {
         cpu = (x86_acpiid_to_apicid[acpi_id] != apic_id)
             ? -EINVAL : -EEXIST;
@@ -906,7 +907,7 @@ int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm)
         {
             dprintk(XENLOG_WARNING,
                     "Setup node failed for pxm %x\n", pxm);
-            x86_acpiid_to_apicid[acpi_id] = 0xff;
+            x86_acpiid_to_apicid[acpi_id] = BAD_APICID;
             mp_unregister_lapic(apic_id, cpu);
             cpu = node;
             goto out;

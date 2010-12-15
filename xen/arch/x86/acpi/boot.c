@@ -82,7 +82,7 @@ u8 acpi_enable_value, acpi_disable_value;
 #endif
 
 u32 x86_acpiid_to_apicid[MAX_MADT_ENTRIES] =
-    {[0 ... MAX_MADT_ENTRIES - 1] = 0xff };
+    {[0 ... MAX_MADT_ENTRIES - 1] = BAD_APICID };
 EXPORT_SYMBOL(x86_acpiid_to_apicid);
 
 /* --------------------------------------------------------------------------
@@ -534,6 +534,7 @@ static int __init acpi_parse_madt_lapic_entries(void)
 
 	mp_register_lapic_address(acpi_lapic_addr);
 
+	BUILD_BUG_ON(MAX_APICS != MAX_LOCAL_APIC);
 	count = acpi_table_parse_madt(ACPI_MADT_LAPIC, acpi_parse_lapic,
 				      MAX_APICS);
 	x2count = acpi_table_parse_madt(ACPI_MADT_X2APIC, acpi_parse_x2apic,
@@ -1000,12 +1001,12 @@ unsigned int acpi_get_processor_id(unsigned int cpu)
 {
 	unsigned int acpiid, apicid;
 
-	if ((apicid = x86_cpu_to_apicid[cpu]) == 0xff)
-		return 0xff;
+	if ((apicid = x86_cpu_to_apicid[cpu]) == BAD_APICID)
+		return INVALID_ACPIID;
 
 	for (acpiid = 0; acpiid < ARRAY_SIZE(x86_acpiid_to_apicid); acpiid++)
 		if (x86_acpiid_to_apicid[acpiid] == apicid)
 			return acpiid;
 
-	return 0xff;
+	return INVALID_ACPIID;
 }

@@ -869,7 +869,7 @@ int get_cpu_id(u8 acpi_id)
     u32 apic_id;
 
     apic_id = x86_acpiid_to_apicid[acpi_id];
-    if ( apic_id == 0xff )
+    if ( apic_id == BAD_APICID )
         return -1;
 
     for ( i = 0; i < NR_CPUS; i++ )

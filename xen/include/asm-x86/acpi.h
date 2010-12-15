@@ -150,9 +150,11 @@ struct acpi_sleep_info {
 
 #endif /* CONFIG_ACPI_SLEEP */
 
-#define MAX_MADT_ENTRIES	256
+#define MAX_MADT_ENTRIES	MAX(256, 2 * NR_CPUS)
 extern u32 x86_acpiid_to_apicid[];
-#define MAX_LOCAL_APIC 256
+#define MAX_LOCAL_APIC		MAX(256, 4 * NR_CPUS)
+
+#define INVALID_ACPIID		(-1U)
 
 extern u32 pmtmr_ioport;
 

@@ -37,7 +37,7 @@ extern int setup_node(int pxm);
 extern void srat_detect_node(int cpu);
 
 extern void setup_node_bootmem(int nodeid, u64 start, u64 end);
-extern unsigned char apicid_to_node[256];
+extern unsigned char apicid_to_node[];
 #ifdef CONFIG_NUMA
 extern void __init init_cpu_to_node(void);
 
