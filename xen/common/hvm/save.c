@@ -272,7 +272,7 @@ void _hvm_write_entry(struct hvm_domain_context *h,
 }
 
 int _hvm_check_entry(struct hvm_domain_context *h, 
-                     uint16_t type, uint32_t len)
+                     uint16_t type, uint32_t len, bool_t strict_length)
 {
     struct hvm_save_descriptor *d 
         = (struct hvm_save_descriptor *)&h->data[h->cur];
@@ -283,7 +283,8 @@ int _hvm_check_entry(struct hvm_domain_context *h,
                  "for type %u\n", len, type);
         return -1;
     }    
-    if ( (type != d->typecode) || (len != d->length) )
+    if ( (type != d->typecode) || (len < d->length) ||
+         (strict_length && (len != d->length)) )
     {
         gdprintk(XENLOG_WARNING, 
                  "HVM restore mismatch: expected type %u length %u, "
@@ -297,8 +298,13 @@ int _hvm_check_entry(struct hvm_domain_context *h,
 void _hvm_read_entry(struct hvm_domain_context *h,
                      void *dest, uint32_t dest_len)
 {
-    memcpy(dest, &h->data[h->cur], dest_len);
-    h->cur += dest_len;
+    struct hvm_save_descriptor *d 
+        = (struct hvm_save_descriptor *)&h->data[h->cur - sizeof(*d)];
+    BUG_ON(d->length > dest_len);
+    memcpy(dest, &h->data[h->cur], d->length);
+    if ( d->length < dest_len )
+        memset((char *)dest + d->length, 0, dest_len - d->length);
+    h->cur += d->length;
 }
 
 /*

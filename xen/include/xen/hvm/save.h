@@ -48,7 +48,7 @@ void _hvm_write_entry(struct hvm_domain_context *h,
 
 /* Unmarshalling: test an entry's size and typecode and record the instance */
 int _hvm_check_entry(struct hvm_domain_context *h, 
-                     uint16_t type, uint32_t len);
+                     uint16_t type, uint32_t len, bool_t strict_length);
 
 /* Unmarshalling: copy the contents in a type-safe way */
 void _hvm_read_entry(struct hvm_domain_context *h,
@@ -58,12 +58,17 @@ void _hvm_read_entry(struct hvm_domain_context *h,
  * Unmarshalling: check, then copy. Evaluates to zero on success. This load
  * function requires the save entry to be the same size as the dest structure.
  */
-#define hvm_load_entry(_x, _h, _dst) ({                                    \
-    int r;                                                                 \
-    r = _hvm_check_entry((_h), HVM_SAVE_CODE(_x), HVM_SAVE_LENGTH(_x));    \
-    if ( r == 0 )                                                          \
-        _hvm_read_entry((_h), (_dst), HVM_SAVE_LENGTH(_x));                \
+#define _hvm_load_entry(_x, _h, _dst, _strict) ({               \
+    int r;                                                      \
+    r = _hvm_check_entry((_h), HVM_SAVE_CODE(_x),               \
+                         HVM_SAVE_LENGTH(_x), (_strict));       \
+    if ( r == 0 )                                               \
+        _hvm_read_entry((_h), (_dst), HVM_SAVE_LENGTH(_x));     \
     r; })
+#define hvm_load_entry(_x, _h, _dst)            \
+    _hvm_load_entry(_x, _h, _dst, 1)
+#define hvm_load_entry_zeroextend(_x, _h, _dst) \
+    _hvm_load_entry(_x, _h, _dst, 0)
 
 /* Unmarshalling: what is the instance ID of the next entry? */
 static inline uint16_t hvm_load_instance(struct hvm_domain_context *h)
