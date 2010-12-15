@@ -56,7 +56,7 @@
 static unsigned int vlapic_lvt_mask[VLAPIC_LVT_NUM] =
 {
      /* LVTT */
-     LVT_MASK | APIC_LVT_TIMER_PERIODIC,
+     LVT_MASK | APIC_TIMER_MODE_PERIODIC,
      /* LVTTHMR */
      LVT_MASK | APIC_MODE_MASK,
      /* LVTPC */
@@ -79,7 +79,7 @@ static unsigned int vlapic_lvt_mask[VLAPIC_LVT_NUM] =
     (vlapic_get_reg(vlapic, lvt_type) & APIC_MODE_MASK)
 
 #define vlapic_lvtt_period(vlapic)                              \
-    (vlapic_get_reg(vlapic, APIC_LVTT) & APIC_LVT_TIMER_PERIODIC)
+    (vlapic_get_reg(vlapic, APIC_LVTT) & APIC_TIMER_MODE_PERIODIC)
 
 
 /*

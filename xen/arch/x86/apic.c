@@ -38,11 +38,6 @@
 #include <mach_apic.h>
 #include <io_ports.h>
 
-#define APIC_TIMER_MODE_ONESHOT         (0 << 17)
-#define APIC_TIMER_MODE_PERIODIC        (1 << 17)
-#define APIC_TIMER_MODE_TSC_DEADLINE    (2 << 17)
-#define APIC_TIMER_MODE_MASK            (3 << 17)
-
 static int tdt_enabled __read_mostly;
 static int tdt_enable __initdata = 1;
 boolean_param("tdt", tdt_enable);
@@ -1163,7 +1158,7 @@ static void __setup_APIC_LVTT(unsigned int clocks)
 
     ver = GET_APIC_VERSION(apic_read(APIC_LVR));
     /* NB. Xen uses local APIC timer in one-shot mode. */
-    lvtt_value = /*APIC_LVT_TIMER_PERIODIC |*/ LOCAL_TIMER_VECTOR;
+    lvtt_value = /*APIC_TIMER_MODE_PERIODIC |*/ LOCAL_TIMER_VECTOR;
     if (!APIC_INTEGRATED(ver))
         lvtt_value |= SET_APIC_TIMER_BASE(APIC_TIMER_BASE_DIV);
 
