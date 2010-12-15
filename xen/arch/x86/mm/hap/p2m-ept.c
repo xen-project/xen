@@ -211,7 +211,7 @@ static int ept_next_level(struct p2m_domain *p2m, bool_t read_only,
                           int next_level)
 {
     unsigned long mfn;
-    ept_entry_t *ept_entry;
+    ept_entry_t *ept_entry, e;
     u32 shift, index;
 
     shift = next_level * EPT_TABLE_ORDER;
@@ -223,9 +223,14 @@ static int ept_next_level(struct p2m_domain *p2m, bool_t read_only,
 
     ept_entry = (*table) + index;
 
-    if ( !is_epte_present(ept_entry) )
+    /* ept_next_level() is called (sometimes) without a lock.  Read
+     * the entry once, and act on the "cached" entry after that to
+     * avoid races. */
+    e=*ept_entry;
+
+    if ( !is_epte_present(&e) )
     {
-        if ( ept_entry->avail1 == p2m_populate_on_demand )
+        if ( e.avail1 == p2m_populate_on_demand )
             return GUEST_TABLE_POD_PAGE;
 
         if ( read_only )
@@ -233,13 +238,15 @@ static int ept_next_level(struct p2m_domain *p2m, bool_t read_only,
 
         if ( !ept_set_middle_entry(p2m, ept_entry) )
             return GUEST_TABLE_MAP_FAILED;
+        else
+            e=*ept_entry; /* Refresh */
     }
 
     /* The only time sp would be set here is if we had hit a superpage */
-    if ( is_epte_superpage(ept_entry) )
+    if ( is_epte_superpage(&e) )
         return GUEST_TABLE_SUPER_PAGE;
 
-    mfn = ept_entry->mfn;
+    mfn = e.mfn;
     unmap_domain_page(*table);
     *table = map_domain_page(mfn);
     *gfn_remainder &= (1UL << shift) - 1;
@@ -318,19 +325,24 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         if ( mfn_valid(mfn_x(mfn)) || direct_mmio || p2m_is_paged(p2mt) ||
              (p2mt == p2m_ram_paging_in_start) )
         {
-            ept_entry->emt = epte_get_entry_emt(p2m->domain, gfn, mfn, &ipat,
-                                                direct_mmio);
-            ept_entry->ipat = ipat;
-            ept_entry->sp = order ? 1 : 0;
-            ept_entry->avail1 = p2mt;
-            ept_entry->avail2 = 0;
+            ept_entry_t new_entry;
 
-            if ( ept_entry->mfn == mfn_x(mfn) )
+            /* Construct the new entry, and then write it once */
+            new_entry.emt = epte_get_entry_emt(p2m->domain, gfn, mfn, &ipat,
+                                                direct_mmio);
+            new_entry.ipat = ipat;
+            new_entry.sp = order ? 1 : 0;
+            new_entry.avail1 = p2mt;
+            new_entry.avail2 = 0;
+
+            if ( new_entry.mfn == mfn_x(mfn) )
                 need_modify_vtd_table = 0;
             else
-                ept_entry->mfn = mfn_x(mfn);
+                new_entry.mfn = mfn_x(mfn);
 
-            ept_p2m_type_to_flags(ept_entry, p2mt);
+            ept_p2m_type_to_flags(&new_entry, p2mt);
+
+            ept_entry->epte = new_entry.epte;
         }
         else
             ept_entry->epte = 0;
@@ -339,6 +351,7 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     {
         /* We need to split the original page. */
         ept_entry_t split_ept_entry;
+        ept_entry_t new_entry;
 
         ASSERT(is_epte_superpage(ept_entry));
 
@@ -365,18 +378,20 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
 
         ept_entry = table + index;
 
-        ept_entry->emt = epte_get_entry_emt(d, gfn, mfn, &ipat, direct_mmio);
-        ept_entry->ipat = ipat;
-        ept_entry->sp = i ? 1 : 0;
-        ept_entry->avail1 = p2mt;
-        ept_entry->avail2 = 0;
+        new_entry.emt = epte_get_entry_emt(d, gfn, mfn, &ipat, direct_mmio);
+        new_entry.ipat = ipat;
+        new_entry.sp = i ? 1 : 0;
+        new_entry.avail1 = p2mt;
+        new_entry.avail2 = 0;
 
-        if ( ept_entry->mfn == mfn_x(mfn) )
+        if ( new_entry.mfn == mfn_x(mfn) )
              need_modify_vtd_table = 0;
         else /* the caller should take care of the previous page */
-            ept_entry->mfn = mfn_x(mfn);
+            new_entry.mfn = mfn_x(mfn);
 
-        ept_p2m_type_to_flags(ept_entry, p2mt);
+        ept_p2m_type_to_flags(&new_entry, p2mt);
+
+        ept_entry->epte = new_entry.epte;
     }
 
     /* Track the highest gfn for which we have ever had a valid mapping */
@@ -437,10 +452,6 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
     int i;
     int ret = 0;
     mfn_t mfn = _mfn(INVALID_MFN);
-    int do_locking = !p2m_locked_by_me(p2m);
-
-    if ( do_locking )
-        p2m_lock(p2m);
 
     *t = p2m_mmio_dm;
 
@@ -517,8 +528,6 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
     }
 
 out:
-    if ( do_locking )
-        p2m_unlock(p2m);
     unmap_domain_page(table);
     return mfn;
 }
