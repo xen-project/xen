@@ -92,6 +92,8 @@ void vlapic_destroy(struct vcpu *v);
 void vlapic_reset(struct vlapic *vlapic);
 
 void vlapic_msr_set(struct vlapic *vlapic, uint64_t value);
+void vlapic_tdt_msr_set(struct vlapic *vlapic, uint64_t value);
+uint64_t vlapic_tdt_msr_get(struct vlapic *vlapic);
 
 int vlapic_accept_pic_intr(struct vcpu *v);
 

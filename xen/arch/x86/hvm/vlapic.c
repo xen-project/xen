@@ -79,7 +79,16 @@ static unsigned int vlapic_lvt_mask[VLAPIC_LVT_NUM] =
     (vlapic_get_reg(vlapic, lvt_type) & APIC_MODE_MASK)
 
 #define vlapic_lvtt_period(vlapic)                              \
-    (vlapic_get_reg(vlapic, APIC_LVTT) & APIC_TIMER_MODE_PERIODIC)
+    ((vlapic_get_reg(vlapic, APIC_LVTT) & APIC_TIMER_MODE_MASK) \
+     == APIC_TIMER_MODE_PERIODIC)
+
+#define vlapic_lvtt_oneshot(vlapic)                             \
+    ((vlapic_get_reg(vlapic, APIC_LVTT) & APIC_TIMER_MODE_MASK) \
+     == APIC_TIMER_MODE_ONESHOT)
+
+#define vlapic_lvtt_tdt(vlapic)                                 \
+    ((vlapic_get_reg(vlapic, APIC_LVTT) & APIC_TIMER_MODE_MASK) \
+     == APIC_TIMER_MODE_TSC_DEADLINE)
 
 
 /*
@@ -481,9 +490,20 @@ static void vlapic_read_aligned(
         break;
 
     case APIC_TMCCT: /* Timer CCR */
+        if ( !vlapic_lvtt_oneshot(vlapic) && !vlapic_lvtt_period(vlapic) )
+        {
+            *result = 0;
+            break;
+        }
         *result = vlapic_get_tmcct(vlapic);
         break;
 
+    case APIC_TMICT: /* Timer ICR */
+        if ( !vlapic_lvtt_oneshot(vlapic) && !vlapic_lvtt_period(vlapic) )
+        {
+            *result = 0;
+            break;
+        }
     default:
         *result = vlapic_get_reg(vlapic, offset);
         break;
@@ -564,6 +584,12 @@ int hvm_x2apic_msr_read(struct vcpu *v, unsigned int msr, uint64_t *msr_content)
 static void vlapic_pt_cb(struct vcpu *v, void *data)
 {
     *(s_time_t *)data = hvm_get_guest_time(v);
+}
+
+static void vlapic_tdt_pt_cb(struct vcpu *v, void *data)
+{
+    *(s_time_t *)data = hvm_get_guest_time(v);
+    vcpu_vlapic(v)->hw.tdt_msr = 0;
 }
 
 static int vlapic_reg_write(struct vcpu *v,
@@ -657,6 +683,14 @@ static int vlapic_reg_write(struct vcpu *v,
         break;
 
     case APIC_LVTT:         /* LVT Timer Reg */
+        if ( (vlapic_get_reg(vlapic, offset) & APIC_TIMER_MODE_MASK) !=
+             (val & APIC_TIMER_MODE_MASK) )
+        {
+            destroy_periodic_time(&vlapic->pt);
+            vlapic_set_reg(vlapic, APIC_TMICT, 0);
+            vlapic_set_reg(vlapic, APIC_TMCCT, 0);
+            vlapic->hw.tdt_msr = 0;
+        }
         vlapic->pt.irq = val & APIC_VECTOR_MASK;
     case APIC_LVTTHMR:      /* LVT Thermal Monitor */
     case APIC_LVTPC:        /* LVT Performance Counter */
@@ -679,6 +713,9 @@ static int vlapic_reg_write(struct vcpu *v,
     case APIC_TMICT:
     {
         uint64_t period;
+
+        if ( !vlapic_lvtt_oneshot(vlapic) && !vlapic_lvtt_period(vlapic) )
+            break;
 
         vlapic_set_reg(vlapic, APIC_TMICT, val);
         if ( val == 0 )
@@ -844,6 +881,73 @@ void vlapic_msr_set(struct vlapic *vlapic, uint64_t value)
                 "apic base msr is 0x%016"PRIx64, vlapic->hw.apic_base_msr);
 }
 
+uint64_t  vlapic_tdt_msr_get(struct vlapic *vlapic)
+{
+    if ( !vlapic_lvtt_tdt(vlapic) )
+        return 0;
+
+    return vlapic->hw.tdt_msr;
+}
+
+void vlapic_tdt_msr_set(struct vlapic *vlapic, uint64_t value)
+{
+    uint64_t guest_tsc;
+    uint64_t guest_time;
+    struct vcpu *v = vlapic_vcpu(vlapic);
+
+    /* may need to exclude some other conditions like vlapic->hw.disabled */
+    if ( !vlapic_lvtt_tdt(vlapic) )
+    {
+        HVM_DBG_LOG(DBG_LEVEL_VLAPIC_TIMER, "ignore tsc deadline msr write");
+        return;
+    }
+    
+    /* new_value = 0, >0 && <= now, > now */
+    guest_tsc = hvm_get_guest_tsc(v);
+    guest_time = hvm_get_guest_time(v);
+    if ( value > guest_tsc )
+    {
+        uint64_t delta = value - v->arch.hvm_vcpu.cache_tsc_offset;
+        delta = gtsc_to_gtime(v->domain, delta);
+        delta = max_t(s64, delta - guest_time, 0);
+
+        HVM_DBG_LOG(DBG_LEVEL_VLAPIC_TIMER, "delta[0x%016"PRIx64"]", delta);
+
+        vlapic->hw.tdt_msr = value;
+        /* .... reprogram tdt timer */
+        create_periodic_time(v, &vlapic->pt, delta, 0,
+                             vlapic->pt.irq, vlapic_tdt_pt_cb,
+                             &vlapic->timer_last_update);
+        vlapic->timer_last_update = vlapic->pt.last_plt_gtime;
+    }
+    else
+    {
+        vlapic->hw.tdt_msr = 0;
+
+        /* trigger a timer event if needed */
+        if ( value > 0 )
+        {
+            create_periodic_time(v, &vlapic->pt, 0, 0,
+                                 vlapic->pt.irq, vlapic_tdt_pt_cb,
+                                 &vlapic->timer_last_update);
+            vlapic->timer_last_update = vlapic->pt.last_plt_gtime;
+        }
+        else
+        {
+            /* .... stop tdt timer */
+            destroy_periodic_time(&vlapic->pt);
+        }
+
+        HVM_DBG_LOG(DBG_LEVEL_VLAPIC_TIMER, "value[0x%016"PRIx64"]", value);
+    }
+
+    HVM_DBG_LOG(DBG_LEVEL_VLAPIC_TIMER,
+                "tdt_msr[0x%016"PRIx64"],"
+                " gtsc[0x%016"PRIx64"],"
+                " gtime[0x%016"PRIx64"]",
+                vlapic->hw.tdt_msr, guest_tsc, guest_time);
+}
+
 static int __vlapic_accept_pic_intr(struct vcpu *v)
 {
     struct domain *d = v->domain;
@@ -959,10 +1063,18 @@ void vlapic_reset(struct vlapic *vlapic)
 /* rearm the actimer if needed, after a HVM restore */
 static void lapic_rearm(struct vlapic *s)
 {
-    unsigned long tmict = vlapic_get_reg(s, APIC_TMICT);
-    uint64_t period;
+    unsigned long tmict;
+    uint64_t period, tdt_msr;
 
     s->pt.irq = vlapic_get_reg(s, APIC_LVTT) & APIC_VECTOR_MASK;
+
+    if ( vlapic_lvtt_tdt(s) )
+    {
+        if ( (tdt_msr = vlapic_tdt_msr_get(s)) != 0 )
+            vlapic_tdt_msr_set(s, tdt_msr);
+        return;
+    }
+
     if ( (tmict = vlapic_get_reg(s, APIC_TMICT)) == 0 )
         return;
 
@@ -1023,7 +1135,7 @@ static int lapic_load_hidden(struct domain *d, hvm_domain_context_t *h)
     }
     s = vcpu_vlapic(v);
     
-    if ( hvm_load_entry(LAPIC, h, &s->hw) != 0 ) 
+    if ( hvm_load_entry_zeroextend(LAPIC, h, &s->hw) != 0 ) 
         return -EINVAL;
 
     vmx_vlapic_msr_changed(v);
