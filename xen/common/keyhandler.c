@@ -444,16 +444,15 @@ static void run_all_nonirq_keyhandlers(unsigned long unused)
     struct keyhandler *h;
     int k;
 
-    console_start_log_everything();
     for ( k = 0; k < ARRAY_SIZE(key_table); k++ )
     {
+        process_pending_softirqs();
         h = key_table[k];
         if ( (h == NULL) || !h->diagnostic || h->irq_callback )
             continue;
         printk("[%c: %s]\n", k, h->desc);
         (*h->u.fn)(k);
     }
-    console_end_log_everything();
 }
 
 static DECLARE_TASKLET(run_all_keyhandlers_tasklet,
@@ -464,10 +463,11 @@ static void run_all_keyhandlers(unsigned char key, struct cpu_user_regs *regs)
     struct keyhandler *h;
     int k;
 
+    watchdog_disable();
+
     printk("'%c' pressed -> firing all diagnostic keyhandlers\n", key);
 
     /* Fire all the IRQ-context diangostic keyhandlers now */
-    console_start_log_everything();
     for ( k = 0; k < ARRAY_SIZE(key_table); k++ )
     {
         h = key_table[k];
@@ -476,7 +476,8 @@ static void run_all_keyhandlers(unsigned char key, struct cpu_user_regs *regs)
         printk("[%c: %s]\n", k, h->desc);
         (*h->u.irq_fn)(k, regs);
     }
-    console_end_log_everything();
+
+    watchdog_enable();
 
     /* Trigger the others from a tasklet in non-IRQ context */
     tasklet_schedule(&run_all_keyhandlers_tasklet);
