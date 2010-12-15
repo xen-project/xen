@@ -863,17 +863,17 @@ int oid_compare(OID *left, OID *right)
         {
             if ( left->oid[0] == right->oid[0] )
                 return 0;
-            else if ( left->oid[0] < left->oid[0] )
+            else if ( left->oid[0] < right->oid[0] )
                 return -1;
             else
                 return 1;
         }
-        else if ( left->oid[1] < left->oid[1] )
+        else if ( left->oid[1] < right->oid[1] )
             return -1;
         else
             return 1;
     }
-    else if ( left->oid[2] < left->oid[2] )
+    else if ( left->oid[2] < right->oid[2] )
         return -1;
     else
         return 1;
@@ -970,7 +970,7 @@ static NOINLINE int obj_rb_insert(struct rb_root *root, obj_t *obj)
     {
         this = container_of(*new, obj_t, rb_tree_node);
         parent = *new;
-        switch ( oid_compare(&obj->oid, &this->oid) )
+        switch ( oid_compare(&this->oid, &obj->oid) )
         {
             case 0:
                 return 0;
