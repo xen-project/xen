@@ -2522,7 +2522,8 @@ static long hvm_vcpu_op(
 }
 
 typedef unsigned long hvm_hypercall_t(
-    unsigned long, unsigned long, unsigned long, unsigned long, unsigned long);
+    unsigned long, unsigned long, unsigned long, unsigned long, unsigned long,
+    unsigned long);
 
 #define HYPERCALL(x)                                        \
     [ __HYPERVISOR_ ## x ] = (hvm_hypercall_t *) do_ ## x
@@ -2672,30 +2673,33 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
 #ifdef __x86_64__
     if ( mode == 8 )
     {
-        HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%u(%lx, %lx, %lx, %lx, %lx)", eax,
-                    regs->rdi, regs->rsi, regs->rdx, regs->r10, regs->r8);
+        HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%u(%lx, %lx, %lx, %lx, %lx, %lx)",
+                    eax, regs->rdi, regs->rsi, regs->rdx,
+                    regs->r10, regs->r8, regs->r9);
 
         curr->arch.hvm_vcpu.hcall_64bit = 1;
         regs->rax = hvm_hypercall64_table[eax](regs->rdi,
                                                regs->rsi,
                                                regs->rdx,
                                                regs->r10,
-                                               regs->r8); 
+                                               regs->r8,
+                                               regs->r9); 
         curr->arch.hvm_vcpu.hcall_64bit = 0;
     }
     else
 #endif
     {
-        HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%u(%x, %x, %x, %x, %x)", eax,
+        HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%u(%x, %x, %x, %x, %x, %x)", eax,
                     (uint32_t)regs->ebx, (uint32_t)regs->ecx,
                     (uint32_t)regs->edx, (uint32_t)regs->esi,
-                    (uint32_t)regs->edi);
+                    (uint32_t)regs->edi, (uint32_t)regs->ebp);
 
         regs->eax = hvm_hypercall32_table[eax]((uint32_t)regs->ebx,
                                                (uint32_t)regs->ecx,
                                                (uint32_t)regs->edx,
                                                (uint32_t)regs->esi,
-                                               (uint32_t)regs->edi);
+                                               (uint32_t)regs->edi,
+                                               (uint32_t)regs->ebp);
     }
 
     HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%u -> %lx",
