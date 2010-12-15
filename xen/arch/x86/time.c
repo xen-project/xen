@@ -1634,11 +1634,20 @@ static void __init tsc_parse(const char *s)
 }
 custom_param("tsc", tsc_parse);
 
-u64 gtime_to_gtsc(struct domain *d, u64 tsc)
+u64 gtime_to_gtsc(struct domain *d, u64 time)
 {
     if ( !is_hvm_domain(d) )
-        tsc = max_t(s64, tsc - d->arch.vtsc_offset, 0);
-    return scale_delta(tsc, &d->arch.ns_to_vtsc);
+        time = max_t(s64, time - d->arch.vtsc_offset, 0);
+    return scale_delta(time, &d->arch.ns_to_vtsc);
+}
+
+u64 gtsc_to_gtime(struct domain *d, u64 tsc)
+{
+    u64 time = scale_delta(tsc, &d->arch.vtsc_to_ns);
+
+    if ( !is_hvm_domain(d) )
+        time += d->arch.vtsc_offset;
+    return time;
 }
 
 void pv_soft_rdtsc(struct vcpu *v, struct cpu_user_regs *regs, int rdtscp)
