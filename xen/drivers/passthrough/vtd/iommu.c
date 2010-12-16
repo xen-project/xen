@@ -2053,9 +2053,9 @@ static int init_vtd_hw(void)
     if ( !sharept )
         iommu_hap_pt_share = FALSE;
 
-    gdprintk(XENLOG_INFO VTDPREFIX,
-             "VT-d page table %s with EPT table\n",
-             iommu_hap_pt_share ? "shares" : "not shares");
+    dprintk(XENLOG_INFO VTDPREFIX,
+            "VT-d page table %sshared with EPT table\n",
+            iommu_hap_pt_share ? "" : "not ");
 
     return 0;
 }
