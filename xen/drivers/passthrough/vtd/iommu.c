@@ -1336,6 +1336,7 @@ int domain_context_mapping_one(
     if ( context_set_domain_id(context, domain, iommu) )
     {
         spin_unlock(&iommu->lock);
+        unmap_vtd_domain_page(context_entries);
         return -EFAULT;
     }
 
@@ -1684,6 +1685,7 @@ static int intel_iommu_map_page(
     if ( old.val == new.val )
     {
         spin_unlock(&hd->mapping_lock);
+        unmap_vtd_domain_page(page);
         return 0;
     }
     *pte = new;
