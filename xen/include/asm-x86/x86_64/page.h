@@ -113,9 +113,9 @@ typedef l4_pgentry_t root_pgentry_t;
 
 #endif /* !__ASSEMBLY__ */
 
-#define pte_read_atomic(ptep)       (*(ptep))
-#define pte_write_atomic(ptep, pte) (*(ptep) = (pte))
-#define pte_write(ptep, pte)        (*(ptep) = (pte))
+#define pte_read_atomic(ptep)       atomic_read64(ptep)
+#define pte_write_atomic(ptep, pte) atomic_write64(ptep, pte)
+#define pte_write(ptep, pte)        atomic_write64(ptep, pte)
 
 /* Given a virtual address, get an entry offset into a linear page table. */
 #define l1_linear_offset(_a) (((_a) & VADDR_MASK) >> L1_PAGETABLE_SHIFT)

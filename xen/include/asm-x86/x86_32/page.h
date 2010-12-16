@@ -84,19 +84,15 @@ extern unsigned int PAGE_HYPERVISOR_NOCACHE;
 
 #endif
 
-#define pte_read_atomic(ptep) cmpxchg(ptep, 0, 0)
-#define pte_write_atomic(ptep, pte) do {                      \
-    intpte_t __pte = *(ptep), __npte;                         \
-    while ( (__npte = cmpxchg(ptep, __pte, (pte))) != __pte ) \
-        __pte = __npte;                                       \
-} while ( 0 )
+#define pte_read_atomic(ptep)       atomic_read64(ptep)
+#define pte_write_atomic(ptep, pte) atomic_write64(ptep, pte)
 #define pte_write(ptep, pte) do {                             \
     u32 *__ptep_words = (u32 *)(ptep);                        \
-    __ptep_words[0] = 0;                                      \
+    atomic_write32(&__ptep_words[0], 0);                      \
     wmb();                                                    \
-    __ptep_words[1] = (pte) >> 32;                            \
+    atomic_write32(&__ptep_words[1], (pte) >> 32);            \
     wmb();                                                    \
-    __ptep_words[0] = (pte) >>  0;                            \
+    atomic_write32(&__ptep_words[0], (pte) >>  0);            \
 } while ( 0 )
 
 /* root table */
