@@ -47,11 +47,6 @@
     _rc;                                                                \
 })
 
-static inline void atomic_write64(uint64_t *p, uint64_t v)
-{
-    *p = v;
-}
-
 #define mb()                    \
     asm volatile ( "mfence" : : : "memory" )
 

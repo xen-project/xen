@@ -91,13 +91,6 @@ static always_inline unsigned long long __cmpxchg8b(
     _rc;                                                                \
 })
 
-static inline void atomic_write64(uint64_t *p, uint64_t v)
-{
-    uint64_t w = *p, x;
-    while ( (x = __cmpxchg8b(p, w, v)) != w )
-        w = x;
-}
-
 #define mb()                    \
     asm volatile ( "lock; addl $0,0(%%esp)" : : : "memory" )
 
