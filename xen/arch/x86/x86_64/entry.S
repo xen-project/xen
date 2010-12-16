@@ -591,11 +591,13 @@ ENTRY(double_fault)
         call  do_double_fault
         ud2
 
+        .pushsection .init.text, "ax", @progbits
 ENTRY(early_page_fault)
         SAVE_ALL
         movq  %rsp,%rdi
         call  do_early_page_fault
         jmp   restore_all_xen
+        .popsection
 
 handle_ist_exception:
         SAVE_ALL

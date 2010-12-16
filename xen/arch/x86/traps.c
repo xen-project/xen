@@ -1317,7 +1317,7 @@ asmlinkage void do_page_fault(struct cpu_user_regs *regs)
  * during early boot (an issue was seen once, but was most likely a hardware 
  * problem).
  */
-asmlinkage void do_early_page_fault(struct cpu_user_regs *regs)
+asmlinkage void __init do_early_page_fault(struct cpu_user_regs *regs)
 {
     static int stuck;
     static unsigned long prev_eip, prev_cr2;

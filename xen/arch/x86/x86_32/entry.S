@@ -549,6 +549,7 @@ ENTRY(spurious_interrupt_bug)
         pushl $TRAP_spurious_int<<16
         jmp   handle_exception
 
+        .pushsection .init.text, "ax", @progbits
 ENTRY(early_page_fault)
         SAVE_ALL(1f,1f)
 1:      movl  %esp,%eax
@@ -556,6 +557,7 @@ ENTRY(early_page_fault)
         call  do_early_page_fault
         addl  $4,%esp
         jmp   restore_all_xen
+        .popsection
 
 handle_nmi_mce:
 #ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL
