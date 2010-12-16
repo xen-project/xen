@@ -1848,6 +1848,9 @@ start:
                         ret = 0;
                         goto out;
                     }
+                } else {
+                    LOG("Unable to get domain death info, quitting");
+                    goto out;
                 }
                 break;
             case LIBXL_EVENT_DISK_EJECT:
