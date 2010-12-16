@@ -1199,7 +1199,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
             if ( !last_iter )
             {
-                /* Slightly wasteful to peek the whole array evey time,
+                /* Slightly wasteful to peek the whole array every time,
                    but this is fast enough for the moment. */
                 frc = xc_shadow_control(
                     xch, dom, XEN_DOMCTL_SHADOW_OP_PEEK, HYPERCALL_BUFFER(to_skip),
