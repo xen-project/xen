@@ -4,12 +4,6 @@
 #include <xen/config.h>
 #include <asm/system.h>
 
-#ifdef CONFIG_SMP
-#define LOCK "lock ; "
-#else
-#define LOCK ""
-#endif
-
 /*
  * NB. I've pushed the volatile qualifier into the operations. This allows
  * fast accessors such as _atomic_read() and _atomic_set() which don't give
@@ -48,7 +42,7 @@ typedef struct { int counter; } atomic_t;
 static __inline__ void atomic_add(int i, atomic_t *v)
 {
 	asm volatile(
-		LOCK "addl %1,%0"
+		"lock; addl %1,%0"
 		:"=m" (*(volatile int *)&v->counter)
 		:"ir" (i), "m" (*(volatile int *)&v->counter));
 }
@@ -63,7 +57,7 @@ static __inline__ void atomic_add(int i, atomic_t *v)
 static __inline__ void atomic_sub(int i, atomic_t *v)
 {
 	asm volatile(
-		LOCK "subl %1,%0"
+		"lock; subl %1,%0"
 		:"=m" (*(volatile int *)&v->counter)
 		:"ir" (i), "m" (*(volatile int *)&v->counter));
 }
@@ -82,7 +76,7 @@ static __inline__ int atomic_sub_and_test(int i, atomic_t *v)
 	unsigned char c;
 
 	asm volatile(
-		LOCK "subl %2,%0; sete %1"
+		"lock; subl %2,%0; sete %1"
 		:"=m" (*(volatile int *)&v->counter), "=qm" (c)
 		:"ir" (i), "m" (*(volatile int *)&v->counter) : "memory");
 	return c;
@@ -97,7 +91,7 @@ static __inline__ int atomic_sub_and_test(int i, atomic_t *v)
 static __inline__ void atomic_inc(atomic_t *v)
 {
 	asm volatile(
-		LOCK "incl %0"
+		"lock; incl %0"
 		:"=m" (*(volatile int *)&v->counter)
 		:"m" (*(volatile int *)&v->counter));
 }
@@ -111,7 +105,7 @@ static __inline__ void atomic_inc(atomic_t *v)
 static __inline__ void atomic_dec(atomic_t *v)
 {
 	asm volatile(
-		LOCK "decl %0"
+		"lock; decl %0"
 		:"=m" (*(volatile int *)&v->counter)
 		:"m" (*(volatile int *)&v->counter));
 }
@@ -129,7 +123,7 @@ static __inline__ int atomic_dec_and_test(atomic_t *v)
 	unsigned char c;
 
 	asm volatile(
-		LOCK "decl %0; sete %1"
+		"lock; decl %0; sete %1"
 		:"=m" (*(volatile int *)&v->counter), "=qm" (c)
 		:"m" (*(volatile int *)&v->counter) : "memory");
 	return c != 0;
@@ -148,7 +142,7 @@ static __inline__ int atomic_inc_and_test(atomic_t *v)
 	unsigned char c;
 
 	asm volatile(
-		LOCK "incl %0; sete %1"
+		"lock; incl %0; sete %1"
 		:"=m" (*(volatile int *)&v->counter), "=qm" (c)
 		:"m" (*(volatile int *)&v->counter) : "memory");
 	return c != 0;
@@ -168,7 +162,7 @@ static __inline__ int atomic_add_negative(int i, atomic_t *v)
 	unsigned char c;
 
 	asm volatile(
-		LOCK "addl %2,%0; sets %1"
+		"lock; addl %2,%0; sets %1"
 		:"=m" (*(volatile int *)&v->counter), "=qm" (c)
 		:"ir" (i), "m" (*(volatile int *)&v->counter) : "memory");
 	return c;

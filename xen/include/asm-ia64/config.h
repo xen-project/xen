@@ -85,9 +85,6 @@ typedef unsigned long paddr_t;
 #define CLEAR_BITMAP(name,bits) \
 	memset(name, 0, BITS_TO_LONGS(bits)*sizeof(unsigned long))
 
-// FIXME?: x86-ism used in xen/mm.h
-#define LOCK_PREFIX
-
 extern unsigned long total_pages;
 extern unsigned long xen_pstart;
 extern unsigned long xenheap_size;

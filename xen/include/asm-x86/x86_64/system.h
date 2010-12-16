@@ -13,7 +13,7 @@
  */
 #define __cmpxchg_user(_p,_o,_n,_isuff,_oppre,_regtype)                 \
     asm volatile (                                                      \
-        "1: " LOCK_PREFIX "cmpxchg"_isuff" %"_oppre"2,%3\n"             \
+        "1: lock; cmpxchg"_isuff" %"_oppre"2,%3\n"                      \
         "2:\n"                                                          \
         ".section .fixup,\"ax\"\n"                                      \
         "3:     movl $1,%1\n"                                           \

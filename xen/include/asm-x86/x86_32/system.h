@@ -6,7 +6,7 @@ static always_inline unsigned long long __cmpxchg8b(
 {
     unsigned long long prev;
     asm volatile (
-        LOCK_PREFIX "cmpxchg8b %3"
+        "lock; cmpxchg8b %3"
         : "=A" (prev)
         : "c" ((u32)(new>>32)), "b" ((u32)new),
           "m" (*__xg((volatile void *)ptr)), "0" (old)
@@ -43,7 +43,7 @@ static always_inline unsigned long long __cmpxchg8b(
  */
 #define __cmpxchg_user(_p,_o,_n,_isuff,_oppre,_regtype)                 \
     asm volatile (                                                      \
-        "1: " LOCK_PREFIX "cmpxchg"_isuff" %"_oppre"2,%3\n"             \
+        "1: lock; cmpxchg"_isuff" %"_oppre"2,%3\n"                      \
         "2:\n"                                                          \
         ".section .fixup,\"ax\"\n"                                      \
         "3:     movl $1,%1\n"                                           \
@@ -72,7 +72,7 @@ static always_inline unsigned long long __cmpxchg8b(
         break;                                                          \
     case 8:                                                             \
         asm volatile (                                                  \
-            "1: " LOCK_PREFIX "cmpxchg8b %4\n"                          \
+            "1: lock; cmpxchg8b %4\n"                                   \
             "2:\n"                                                      \
             ".section .fixup,\"ax\"\n"                                  \
             "3:     movl $1,%1\n"                                       \

@@ -7,12 +7,6 @@
 
 #include <xen/config.h>
 
-#ifdef CONFIG_SMP
-#define LOCK_PREFIX "lock ; "
-#else
-#define LOCK_PREFIX ""
-#endif
-
 /*
  * We specify the memory operand as both input and output because the memory
  * operand is both read from and written to. Since the operand is in fact a
@@ -41,8 +35,7 @@ extern void __bitop_bad_size(void);
 static inline void set_bit(int nr, volatile void *addr)
 {
     asm volatile (
-        LOCK_PREFIX
-        "btsl %1,%0"
+        "lock; btsl %1,%0"
         : "=m" (ADDR)
         : "Ir" (nr), "m" (ADDR) : "memory");
 }
@@ -85,8 +78,7 @@ static inline void __set_bit(int nr, volatile void *addr)
 static inline void clear_bit(int nr, volatile void *addr)
 {
     asm volatile (
-        LOCK_PREFIX
-        "btrl %1,%0"
+        "lock; btrl %1,%0"
         : "=m" (ADDR)
         : "Ir" (nr), "m" (ADDR) : "memory");
 }
@@ -152,8 +144,7 @@ static inline void __change_bit(int nr, volatile void *addr)
 static inline void change_bit(int nr, volatile void *addr)
 {
     asm volatile (
-        LOCK_PREFIX
-        "btcl %1,%0"
+        "lock; btcl %1,%0"
         : "=m" (ADDR)
         : "Ir" (nr), "m" (ADDR) : "memory");
 }
@@ -175,8 +166,7 @@ static inline int test_and_set_bit(int nr, volatile void *addr)
     int oldbit;
 
     asm volatile (
-        LOCK_PREFIX
-        "btsl %2,%1\n\tsbbl %0,%0"
+        "lock; btsl %2,%1\n\tsbbl %0,%0"
         : "=r" (oldbit), "=m" (ADDR)
         : "Ir" (nr), "m" (ADDR) : "memory");
     return oldbit;
@@ -223,8 +213,7 @@ static inline int test_and_clear_bit(int nr, volatile void *addr)
     int oldbit;
 
     asm volatile (
-        LOCK_PREFIX
-        "btrl %2,%1\n\tsbbl %0,%0"
+        "lock; btrl %2,%1\n\tsbbl %0,%0"
         : "=r" (oldbit), "=m" (ADDR)
         : "Ir" (nr), "m" (ADDR) : "memory");
     return oldbit;
@@ -287,8 +276,7 @@ static inline int test_and_change_bit(int nr, volatile void *addr)
     int oldbit;
 
     asm volatile (
-        LOCK_PREFIX
-        "btcl %2,%1\n\tsbbl %0,%0"
+        "lock; btcl %2,%1\n\tsbbl %0,%0"
         : "=r" (oldbit), "=m" (ADDR)
         : "Ir" (nr), "m" (ADDR) : "memory");
     return oldbit;

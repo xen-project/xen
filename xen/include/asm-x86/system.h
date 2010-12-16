@@ -91,14 +91,14 @@ static always_inline unsigned long __cmpxchg(
     switch ( size )
     {
     case 1:
-        asm volatile ( LOCK_PREFIX "cmpxchgb %b1,%2"
+        asm volatile ( "lock; cmpxchgb %b1,%2"
                        : "=a" (prev)
                        : "q" (new), "m" (*__xg((volatile void *)ptr)),
                        "0" (old)
                        : "memory" );
         return prev;
     case 2:
-        asm volatile ( LOCK_PREFIX "cmpxchgw %w1,%2"
+        asm volatile ( "lock; cmpxchgw %w1,%2"
                        : "=a" (prev)
                        : "r" (new), "m" (*__xg((volatile void *)ptr)),
                        "0" (old)
@@ -106,7 +106,7 @@ static always_inline unsigned long __cmpxchg(
         return prev;
 #if defined(__i386__)
     case 4:
-        asm volatile ( LOCK_PREFIX "cmpxchgl %1,%2"
+        asm volatile ( "lock; cmpxchgl %1,%2"
                        : "=a" (prev)
                        : "r" (new), "m" (*__xg((volatile void *)ptr)),
                        "0" (old)
@@ -114,14 +114,14 @@ static always_inline unsigned long __cmpxchg(
         return prev;
 #elif defined(__x86_64__)
     case 4:
-        asm volatile ( LOCK_PREFIX "cmpxchgl %k1,%2"
+        asm volatile ( "lock; cmpxchgl %k1,%2"
                        : "=a" (prev)
                        : "r" (new), "m" (*__xg((volatile void *)ptr)),
                        "0" (old)
                        : "memory" );
         return prev;
     case 8:
-        asm volatile ( LOCK_PREFIX "cmpxchgq %1,%2"
+        asm volatile ( "lock; cmpxchgq %1,%2"
                        : "=a" (prev)
                        : "r" (new), "m" (*__xg((volatile void *)ptr)),
                        "0" (old)
