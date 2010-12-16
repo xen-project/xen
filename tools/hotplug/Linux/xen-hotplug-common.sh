@@ -29,8 +29,8 @@ export LANG="POSIX"
 unset $(set | grep ^LC_ | cut -d= -f1)
 
 fatal() {
-  xenstore_write "$XENBUS_PATH/hotplug-error" "$*" \
-                 "$XENBUS_PATH/hotplug-status" error
+  _xenstore_write "$XENBUS_PATH/hotplug-error" "$*" \
+                  "$XENBUS_PATH/hotplug-status" error
   log err "$@"
   exit 1
 }
@@ -80,15 +80,23 @@ xenstore_read_default() {
 
 
 ##
+# _xenstore_write (<path> <value>)+
+#
+# Write each of the key/value pairs to the store.
+#
+_xenstore_write() {
+  log debug "Writing $@ to xenstore."
+  xenstore-write "$@"
+}
+
+##
 # xenstore_write (<path> <value>)+
 #
 # Write each of the key/value pairs to the store, and exit this script if any
 # such writing fails.
 #
 xenstore_write() {
-  log debug "Writing $@ to xenstore."
-  xenstore-write "$@" || fatal "Writing $@ to xenstore failed."
+  _xenstore_write "$@" || fatal "Writing $@ to xenstore failed."
 }
-
 
 log debug "$@" "XENBUS_PATH=$XENBUS_PATH"
