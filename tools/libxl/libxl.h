@@ -516,7 +516,7 @@ int libxl_device_net2_del(libxl_ctx *ctx, libxl_device_net2 *net2,
                           int wait);
 
 int libxl_get_freecpus(libxl_ctx *ctx, libxl_cpumap *cpumap);
-int libxl_create_cpupool(libxl_ctx *ctx, char *name, int schedid,
+int libxl_create_cpupool(libxl_ctx *ctx, const char *name, int schedid,
                          libxl_cpumap cpumap, libxl_uuid *uuid,
                          uint32_t *poolid);
 int libxl_destroy_cpupool(libxl_ctx *ctx, uint32_t poolid);
