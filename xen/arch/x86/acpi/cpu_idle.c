@@ -220,12 +220,6 @@ static uint64_t acpi_pm_ticks_elapsed(uint64_t t1, uint64_t t2)
         return ((0xFFFFFFFF - t1) + t2 +1);
 }
 
-static void acpi_safe_halt(void)
-{
-    smp_mb__after_clear_bit();
-    safe_halt();
-}
-
 #define MWAIT_ECX_INTERRUPT_BREAK   (0x1)
 
 /*
@@ -296,7 +290,7 @@ static void acpi_idle_do_entry(struct acpi_processor_cx *cx)
         unused = inl(pmtmr_ioport);
         return;
     case ACPI_CSTATE_EM_HALT:
-        acpi_safe_halt();
+        safe_halt();
         local_irq_disable();
         return;
     }
@@ -402,7 +396,7 @@ static void acpi_processor_idle(void)
         if ( pm_idle_save )
             pm_idle_save();
         else
-            acpi_safe_halt();
+            safe_halt();
         return;
     }
 
