@@ -185,9 +185,9 @@ endif
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= bb9c9a127a676b53210f71082330c5e94f7b8171
-# Tue Dec 14 18:42:20 2010 +0000
-# xen_disk: support empty write barriers
+QEMU_TAG ?= 47a25c461b6b5ab67397f7bbb209590a0839e213
+# Thu Dec 16 15:50:06 2010 +0000
+# stubdom: fix stubdom build following dd9d12dc
 
 # Optional components
 XENSTAT_XENTOP     ?= y
