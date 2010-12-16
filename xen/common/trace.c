@@ -80,14 +80,8 @@ static u32 tb_event_mask = TRC_ALL;
 
 static void calc_tinfo_first_offset(void)
 {
-    int offset_in_bytes;
-    
-    offset_in_bytes = offsetof(struct t_info, mfn_offset[NR_CPUS]);
-
+    int offset_in_bytes = offsetof(struct t_info, mfn_offset[NR_CPUS]);
     t_info_first_offset = fit_to_type(uint32_t, offset_in_bytes);
-
-    gdprintk(XENLOG_INFO, "%s: NR_CPUs %d, offset_in_bytes %d, t_info_first_offset %u\n",
-           __func__, NR_CPUS, offset_in_bytes, (unsigned)t_info_first_offset);
 }
 
 /**
@@ -122,20 +116,36 @@ static int alloc_trace_bufs(void)
     int           i, cpu, order;
     unsigned long nr_pages;
     /* Start after a fixed-size array of NR_CPUS */
-    uint32_t *t_info_mfn_list = (uint32_t *)t_info;
-    int offset = t_info_first_offset;
-
-    BUG_ON(check_tbuf_size(opt_tbuf_size));
+    uint32_t *t_info_mfn_list;
+    int offset;
 
     if ( opt_tbuf_size == 0 )
         return -EINVAL;
 
-    if ( !t_info )
+    if ( check_tbuf_size(opt_tbuf_size) )
     {
-        printk("%s: t_info not allocated, cannot allocate trace buffers!\n",
-               __func__);
+        printk("Xen trace buffers: tb size %d too large. "
+               "Tracing disabled.\n",
+               opt_tbuf_size);
         return -EINVAL;
     }
+
+    /* t_info size is fixed for now. Currently this works great, so there
+     * seems to be no need to make it dynamic. */
+    t_info = alloc_xenheap_pages(get_order_from_pages(T_INFO_PAGES), 0);
+    if ( t_info == NULL )
+    {
+        printk("Xen trace buffers: t_info allocation failed! "
+               "Tracing disabled.\n");
+        return -ENOMEM;
+    }
+
+    for ( i = 0; i < T_INFO_PAGES; i++ )
+        share_xen_page_with_privileged_guests(
+            virt_to_page(t_info) + i, XENSHARE_readonly);
+
+    t_info_mfn_list = (uint32_t *)t_info;
+    offset = t_info_first_offset;
 
     t_info->tbuf_size = opt_tbuf_size;
     printk(XENLOG_INFO "tbuf_size %d\n", t_info->tbuf_size);
@@ -240,7 +250,7 @@ static int tb_set_size(int size)
      */
     int ret = 0;
 
-    if ( (opt_tbuf_size != 0) )
+    if ( opt_tbuf_size != 0 )
     {
         if ( size != opt_tbuf_size )
             gdprintk(XENLOG_INFO, "tb_set_size from %d to %d not implemented\n",
@@ -251,20 +261,16 @@ static int tb_set_size(int size)
     if ( size <= 0 )
         return -EINVAL;
 
-    if ( check_tbuf_size(size) )
-    {
-        gdprintk(XENLOG_INFO, "tb size %d too large\n", size);
-        return -EINVAL;
-    }
-
     opt_tbuf_size = size;
 
-    if ( (ret = alloc_trace_bufs()) == 0 )
-        printk("Xen trace buffers: initialized\n");
-    else
+    if ( (ret = alloc_trace_bufs()) != 0 )
+    {
         opt_tbuf_size = 0;
+        return ret;
+    }
 
-    return ret;
+    printk("Xen trace buffers: initialized\n");
+    return 0;
 }
 
 int trace_will_trace_event(u32 event)
@@ -307,6 +313,7 @@ static int cpu_callback(
 static struct notifier_block cpu_nfb = {
     .notifier_call = cpu_callback
 };
+
 /**
  * init_trace_bufs - performs initialization of the per-cpu trace buffers.
  *
@@ -321,50 +328,32 @@ void __init init_trace_bufs(void)
     /* Calculate offset in u32 of first mfn */
     calc_tinfo_first_offset();
 
-    /* t_info size is fixed for now. Currently this works great, so there
-     * seems to be no need to make it dynamic. */
-    t_info = alloc_xenheap_pages(get_order_from_pages(T_INFO_PAGES), 0);
-
-    if ( t_info == NULL )
-    {
-        printk("Xen trace buffers: t_info allocation failed!  Tracing disabled.\n");
-        return;
-    }
-
+    /* Per-cpu t_lock initialisation. */
     for_each_online_cpu ( i )
         spin_lock_init(&per_cpu(t_lock, i));
     register_cpu_notifier(&cpu_nfb);
 
-    for(i=0; i<T_INFO_PAGES; i++)
-        share_xen_page_with_privileged_guests(
-            virt_to_page(t_info) + i, XENSHARE_readonly);
-
     if ( opt_tbuf_size == 0 )
     {
         printk("Xen trace buffers: disabled\n");
-        return;
-    }
-    else if ( check_tbuf_size(opt_tbuf_size) )
-    {
-        gdprintk(XENLOG_INFO, "Xen trace buffers: "
-                 "tb size %d too large, disabling\n",
-                 opt_tbuf_size);
-        opt_tbuf_size = 0;
+        goto fail;
     }
 
-    if ( alloc_trace_bufs() == 0 )
+    if ( alloc_trace_bufs() != 0 )
     {
-        printk("Xen trace buffers: initialised\n");
-        wmb(); /* above must be visible before tb_init_done flag set */
-        tb_init_done = 1;
+        dprintk(XENLOG_INFO, "Xen trace buffers: "
+                "allocation size %d failed, disabling\n",
+                opt_tbuf_size);
+        goto fail;
     }
-    else
-    {
-        gdprintk(XENLOG_INFO, "Xen trace buffers: "
-                 "allocation size %d failed, disabling\n",
-                 opt_tbuf_size);
-        opt_tbuf_size = 0;
-    }
+
+    printk("Xen trace buffers: initialised\n");
+    wmb(); /* above must be visible before tb_init_done flag set */
+    tb_init_done = 1;
+    return;
+
+ fail:
+    opt_tbuf_size = 0;
 }
 
 /**
