@@ -11,7 +11,7 @@
  */
 typedef struct { int counter; } atomic_t;
 
-#define ATOMIC_INIT(i)	{ (i) }
+#define ATOMIC_INIT(i) { (i) }
 
 /**
  * atomic_read - read atomic variable
@@ -19,8 +19,8 @@ typedef struct { int counter; } atomic_t;
  * 
  * Atomically reads the value of @v.
  */
-#define _atomic_read(v)		((v).counter)
-#define atomic_read(v)		(*(volatile int *)&((v)->counter))
+#define _atomic_read(v)  ((v).counter)
+#define atomic_read(v)   (*(volatile int *)&((v)->counter))
 
 /**
  * atomic_set - set atomic variable
@@ -29,8 +29,8 @@ typedef struct { int counter; } atomic_t;
  * 
  * Atomically sets the value of @v to @i.
  */ 
-#define _atomic_set(v,i)	(((v).counter) = (i))
-#define atomic_set(v,i)		(*(volatile int *)&((v)->counter) = (i))
+#define _atomic_set(v,i) (((v).counter) = (i))
+#define atomic_set(v,i)  (*(volatile int *)&((v)->counter) = (i))
 
 /**
  * atomic_add - add integer to atomic variable
@@ -39,12 +39,12 @@ typedef struct { int counter; } atomic_t;
  * 
  * Atomically adds @i to @v.
  */
-static __inline__ void atomic_add(int i, atomic_t *v)
+static inline void atomic_add(int i, atomic_t *v)
 {
-	asm volatile(
-		"lock; addl %1,%0"
-		:"=m" (*(volatile int *)&v->counter)
-		:"ir" (i), "m" (*(volatile int *)&v->counter));
+    asm volatile (
+        "lock; addl %1,%0"
+        : "=m" (*(volatile int *)&v->counter)
+        : "ir" (i), "m" (*(volatile int *)&v->counter) );
 }
 
 /**
@@ -54,12 +54,12 @@ static __inline__ void atomic_add(int i, atomic_t *v)
  * 
  * Atomically subtracts @i from @v.
  */
-static __inline__ void atomic_sub(int i, atomic_t *v)
+static inline void atomic_sub(int i, atomic_t *v)
 {
-	asm volatile(
-		"lock; subl %1,%0"
-		:"=m" (*(volatile int *)&v->counter)
-		:"ir" (i), "m" (*(volatile int *)&v->counter));
+    asm volatile (
+        "lock; subl %1,%0"
+        : "=m" (*(volatile int *)&v->counter)
+        : "ir" (i), "m" (*(volatile int *)&v->counter) );
 }
 
 /**
@@ -71,15 +71,15 @@ static __inline__ void atomic_sub(int i, atomic_t *v)
  * true if the result is zero, or false for all
  * other cases.
  */
-static __inline__ int atomic_sub_and_test(int i, atomic_t *v)
+static inline int atomic_sub_and_test(int i, atomic_t *v)
 {
-	unsigned char c;
+    unsigned char c;
 
-	asm volatile(
-		"lock; subl %2,%0; sete %1"
-		:"=m" (*(volatile int *)&v->counter), "=qm" (c)
-		:"ir" (i), "m" (*(volatile int *)&v->counter) : "memory");
-	return c;
+    asm volatile (
+        "lock; subl %2,%0; sete %1"
+        : "=m" (*(volatile int *)&v->counter), "=qm" (c)
+        : "ir" (i), "m" (*(volatile int *)&v->counter) : "memory" );
+    return c;
 }
 
 /**
@@ -88,12 +88,12 @@ static __inline__ int atomic_sub_and_test(int i, atomic_t *v)
  * 
  * Atomically increments @v by 1.
  */ 
-static __inline__ void atomic_inc(atomic_t *v)
+static inline void atomic_inc(atomic_t *v)
 {
-	asm volatile(
-		"lock; incl %0"
-		:"=m" (*(volatile int *)&v->counter)
-		:"m" (*(volatile int *)&v->counter));
+    asm volatile (
+        "lock; incl %0"
+        : "=m" (*(volatile int *)&v->counter)
+        : "m" (*(volatile int *)&v->counter) );
 }
 
 /**
@@ -102,12 +102,12 @@ static __inline__ void atomic_inc(atomic_t *v)
  * 
  * Atomically decrements @v by 1.
  */ 
-static __inline__ void atomic_dec(atomic_t *v)
+static inline void atomic_dec(atomic_t *v)
 {
-	asm volatile(
-		"lock; decl %0"
-		:"=m" (*(volatile int *)&v->counter)
-		:"m" (*(volatile int *)&v->counter));
+    asm volatile (
+        "lock; decl %0"
+        : "=m" (*(volatile int *)&v->counter)
+        : "m" (*(volatile int *)&v->counter) );
 }
 
 /**
@@ -118,15 +118,15 @@ static __inline__ void atomic_dec(atomic_t *v)
  * returns true if the result is 0, or false for all other
  * cases.
  */ 
-static __inline__ int atomic_dec_and_test(atomic_t *v)
+static inline int atomic_dec_and_test(atomic_t *v)
 {
-	unsigned char c;
+    unsigned char c;
 
-	asm volatile(
-		"lock; decl %0; sete %1"
-		:"=m" (*(volatile int *)&v->counter), "=qm" (c)
-		:"m" (*(volatile int *)&v->counter) : "memory");
-	return c != 0;
+    asm volatile (
+        "lock; decl %0; sete %1"
+        : "=m" (*(volatile int *)&v->counter), "=qm" (c)
+        : "m" (*(volatile int *)&v->counter) : "memory" );
+    return c != 0;
 }
 
 /**
@@ -137,15 +137,15 @@ static __inline__ int atomic_dec_and_test(atomic_t *v)
  * and returns true if the result is zero, or false for all
  * other cases.
  */ 
-static __inline__ int atomic_inc_and_test(atomic_t *v)
+static inline int atomic_inc_and_test(atomic_t *v)
 {
-	unsigned char c;
+    unsigned char c;
 
-	asm volatile(
-		"lock; incl %0; sete %1"
-		:"=m" (*(volatile int *)&v->counter), "=qm" (c)
-		:"m" (*(volatile int *)&v->counter) : "memory");
-	return c != 0;
+    asm volatile (
+        "lock; incl %0; sete %1"
+        : "=m" (*(volatile int *)&v->counter), "=qm" (c)
+        : "m" (*(volatile int *)&v->counter) : "memory" );
+    return c != 0;
 }
 
 /**
@@ -157,30 +157,23 @@ static __inline__ int atomic_inc_and_test(atomic_t *v)
  * if the result is negative, or false when
  * result is greater than or equal to zero.
  */ 
-static __inline__ int atomic_add_negative(int i, atomic_t *v)
+static inline int atomic_add_negative(int i, atomic_t *v)
 {
-	unsigned char c;
+    unsigned char c;
 
-	asm volatile(
-		"lock; addl %2,%0; sets %1"
-		:"=m" (*(volatile int *)&v->counter), "=qm" (c)
-		:"ir" (i), "m" (*(volatile int *)&v->counter) : "memory");
-	return c;
+    asm volatile (
+        "lock; addl %2,%0; sets %1"
+        : "=m" (*(volatile int *)&v->counter), "=qm" (c)
+        : "ir" (i), "m" (*(volatile int *)&v->counter) : "memory" );
+    return c;
 }
 
-static __inline__ atomic_t atomic_compareandswap(
-	atomic_t old, atomic_t new, atomic_t *v)
+static inline atomic_t atomic_compareandswap(
+    atomic_t old, atomic_t new, atomic_t *v)
 {
-	atomic_t rc;
-	rc.counter = 
-		__cmpxchg(&v->counter, old.counter, new.counter, sizeof(int));
-	return rc;
+    atomic_t rc;
+    rc.counter = __cmpxchg(&v->counter, old.counter, new.counter, sizeof(int));
+    return rc;
 }
-
-/* Atomic operations are already serializing on x86 */
-#define smp_mb__before_atomic_dec()	barrier()
-#define smp_mb__after_atomic_dec()	barrier()
-#define smp_mb__before_atomic_inc()	barrier()
-#define smp_mb__after_atomic_inc()	barrier()
 
 #endif /* __ARCH_X86_ATOMIC__ */
