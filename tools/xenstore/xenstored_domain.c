@@ -547,7 +547,7 @@ static int close_xc_handle(void *_handle)
 const char *get_implicit_path(const struct connection *conn)
 {
 	if (!conn->domain)
-		return NULL;
+		return "/local/domain/0";
 	return conn->domain->path;
 }
 
