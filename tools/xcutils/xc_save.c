@@ -201,7 +201,7 @@ main(int argc, char **argv)
               xc_suspend_evtchn_init(si.xch, si.xce, si.domid, port);
 
             if (si.suspend_evtchn < 0)
-                warnx("suspend event channel initialization failed"
+                warnx("suspend event channel initialization failed, "
                        "using slow path");
         }
     }
