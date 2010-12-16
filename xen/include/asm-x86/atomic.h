@@ -4,6 +4,46 @@
 #include <xen/config.h>
 #include <asm/system.h>
 
+#define build_atomic_read(name, size, type, reg, barrier) \
+static inline type name(const volatile type *addr) \
+{ type ret; asm volatile("mov" size " %1,%0":reg (ret) \
+:"m" (*(volatile type *)addr) barrier); return ret; }
+
+#define build_atomic_write(name, size, type, reg, barrier) \
+static inline void name(volatile type *addr, type val) \
+{ asm volatile("mov" size " %0,%1": :reg (val), \
+"m" (*(volatile type *)addr) barrier); }
+
+build_atomic_read(atomic_read8, "b", uint8_t, "=q", )
+build_atomic_read(atomic_read16, "w", uint16_t, "=r", )
+build_atomic_read(atomic_read32, "l", uint32_t, "=r", )
+build_atomic_read(atomic_read_int, "l", int, "=r", )
+
+build_atomic_write(atomic_write8, "b", uint8_t, "q", )
+build_atomic_write(atomic_write16, "w", uint16_t, "r", )
+build_atomic_write(atomic_write32, "l", uint32_t, "r", )
+build_atomic_write(atomic_write_int, "l", int, "r", )
+
+#ifdef __x86_64__
+build_atomic_read(atomic_read64, "q", uint64_t, "=r", )
+build_atomic_write(atomic_write64, "q", uint64_t, "r", )
+#else
+static inline uint64_t atomic_read64(const volatile uint64_t *addr)
+{
+    uint64_t *__addr = (uint64_t *)addr;
+    return __cmpxchg8b(__addr, 0, 0);
+}
+static inline void atomic_write64(volatile uint64_t *addr, uint64_t val)
+{
+    uint64_t old = *addr, new, *__addr = (uint64_t *)addr;
+    while ( (old = __cmpxchg8b(__addr, old, val)) != old )
+        old = new;
+}
+#endif
+
+#undef build_atomic_read
+#undef build_atomic_write
+
 /*
  * NB. I've pushed the volatile qualifier into the operations. This allows
  * fast accessors such as _atomic_read() and _atomic_set() which don't give
@@ -20,7 +60,7 @@ typedef struct { int counter; } atomic_t;
  * Atomically reads the value of @v.
  */
 #define _atomic_read(v)  ((v).counter)
-#define atomic_read(v)   (*(volatile int *)&((v)->counter))
+#define atomic_read(v)   atomic_read_int(&((v)->counter))
 
 /**
  * atomic_set - set atomic variable
@@ -30,7 +70,7 @@ typedef struct { int counter; } atomic_t;
  * Atomically sets the value of @v to @i.
  */ 
 #define _atomic_set(v,i) (((v).counter) = (i))
-#define atomic_set(v,i)  (*(volatile int *)&((v)->counter) = (i))
+#define atomic_set(v,i)  atomic_write_int(&((v)->counter), (i))
 
 /**
  * atomic_add - add integer to atomic variable
