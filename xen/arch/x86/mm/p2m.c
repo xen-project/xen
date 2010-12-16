@@ -2007,7 +2007,7 @@ static void audit_p2m(struct p2m_domain *p2m, int strict_m2p)
         }
 
         // P2M_PRINTK("OK: mfn=%#lx, gfn=%#lx, p2mfn=%#lx, lp2mfn=%#lx\n",
-        //                mfn, gfn, p2mfn, lp2mfn);
+        //                mfn, gfn, mfn_x(p2mfn), lp2mfn);
     }
 
     spin_unlock(&d->page_alloc_lock);
@@ -2169,7 +2169,7 @@ static void audit_p2m(struct p2m_domain *p2m, int strict_m2p)
     //P2M_PRINTK("p2m audit complete\n");
     //if ( orphans_i | orphans_d | mpbad | pmbad )
     //    P2M_PRINTK("p2m audit found %lu orphans (%lu inval %lu debug)\n",
-    //                   orphans_i + orphans_d, orphans_i, orphans_d,
+    //                   orphans_i + orphans_d, orphans_i, orphans_d);
     if ( mpbad | pmbad )
     {
         P2M_PRINTK("p2m audit found %lu odd p2m, %lu bad m2p entries\n",
