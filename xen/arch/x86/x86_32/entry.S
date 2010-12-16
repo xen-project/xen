@@ -146,7 +146,7 @@ restore_all_xen:
 ENTRY(hypercall)
         subl $4,%esp
         FIXUP_RING0_GUEST_STACK
-        SAVE_ALL(1f,1f)
+        SAVE_ALL(,1f)
 1:      sti
         GET_CURRENT(%ebx)
         cmpl  $NR_hypercalls,%eax
@@ -186,12 +186,14 @@ ENTRY(hypercall)
 #define SHADOW_BYTES 24 /* 6 shadow parameters */
 #endif
         cmpb  $0,tb_init_done
-        je    1f
+UNLIKELY_START(ne, trace)
         call  trace_hypercall
         /* Now restore all the registers that trace_hypercall clobbered */
         movl  UREGS_eax+SHADOW_BYTES(%esp),%eax /* Hypercall # */
+UNLIKELY_END(trace)
+        call *hypercall_table(,%eax,4)
+        movl  %eax,UREGS_eax+SHADOW_BYTES(%esp) # save the return value
 #undef SHADOW_BYTES
-1:      call *hypercall_table(,%eax,4)
         addl  $24,%esp     # Discard the shadow parameters
 #ifndef NDEBUG
         /* Deliberately corrupt real parameter regs used by this hypercall. */
@@ -201,13 +203,10 @@ ENTRY(hypercall)
         jne   skip_clobber # If EIP has changed then don't clobber
         movzb hypercall_args_table(,%ecx,1),%ecx
         movl  %esp,%edi
-        movl  %eax,%esi
         movl  $0xDEADBEEF,%eax
         rep   stosl
-        movl  %esi,%eax
 skip_clobber:
 #endif
-        movl %eax,UREGS_eax(%esp)       # save the return value
 
 test_all_events:
         xorl %ecx,%ecx
@@ -297,8 +296,8 @@ create_bounce_frame:
         jz   ring1 /* jump if returning to an existing ring-1 activation */
         movl VCPU_kernel_sp(%ebx),%esi
 .Lft6:  mov  VCPU_kernel_ss(%ebx),%gs
-        testl $X86_EFLAGS_VM,UREGS_eflags+4(%esp)
-        jz   .Lnvm86_1
+        testl $X86_EFLAGS_VM,%ecx
+UNLIKELY_START(nz, bounce_vm86_1)
         subl $16,%esi       /* push ES/DS/FS/GS (VM86 stack frame) */
         movl UREGS_es+4(%esp),%eax
 .Lft7:  movl %eax,%gs:(%esi)
@@ -308,7 +307,7 @@ create_bounce_frame:
 .Lft9:  movl %eax,%gs:8(%esi)
         movl UREGS_gs+4(%esp),%eax
 .Lft10: movl %eax,%gs:12(%esi)
-.Lnvm86_1:
+UNLIKELY_END(bounce_vm86_1)
         subl $8,%esi        /* push SS/ESP (inter-priv iret) */
         movl UREGS_esp+4(%esp),%eax
 .Lft11: movl %eax,%gs:(%esi)
@@ -350,17 +349,10 @@ ring1:  /* obtain ss/esp from oldss/oldesp -- a ring-1 activation exists */
         movl TRAPBOUNCE_error_code(%edx),%eax
 .Lft17: movl %eax,%gs:(%esi)
 1:      testb $TBF_FAILSAFE,%cl
-        jz   2f
+UNLIKELY_START(nz, bounce_failsafe)
         subl $16,%esi                # add DS/ES/FS/GS to failsafe stack frame
         testl $X86_EFLAGS_VM,UREGS_eflags+4(%esp)
-        jz   .Lnvm86_2
-        xorl %eax,%eax               # VM86: we write zero selector values
-.Lft18: movl %eax,%gs:(%esi)
-.Lft19: movl %eax,%gs:4(%esi)
-.Lft20: movl %eax,%gs:8(%esi)
-.Lft21: movl %eax,%gs:12(%esi)
-        jmp  2f
-.Lnvm86_2:
+        jnz  .Lvm86_2
         movl UREGS_ds+4(%esp),%eax   # non-VM86: write real selector values
 .Lft22: movl %eax,%gs:(%esi)
         movl UREGS_es+4(%esp),%eax
@@ -369,13 +361,22 @@ ring1:  /* obtain ss/esp from oldss/oldesp -- a ring-1 activation exists */
 .Lft24: movl %eax,%gs:8(%esi)
         movl UREGS_gs+4(%esp),%eax
 .Lft25: movl %eax,%gs:12(%esi)
-2:      testl $X86_EFLAGS_VM,UREGS_eflags+4(%esp)
-        jz   .Lnvm86_3
+        jmp  .Lnvm86_3
+.Lvm86_2:
+        xorl %eax,%eax               # VM86: we write zero selector values
+.Lft18: movl %eax,%gs:(%esi)
+.Lft19: movl %eax,%gs:4(%esi)
+.Lft20: movl %eax,%gs:8(%esi)
+.Lft21: movl %eax,%gs:12(%esi)
+UNLIKELY_END(bounce_failsafe)
+        testl $X86_EFLAGS_VM,UREGS_eflags+4(%esp)
+UNLIKELY_START(nz, bounce_vm86_3)
         xorl %eax,%eax      /* zero DS-GS, just as a real CPU would */
         movl %eax,UREGS_ds+4(%esp)
         movl %eax,UREGS_es+4(%esp)
         movl %eax,UREGS_fs+4(%esp)
         movl %eax,UREGS_gs+4(%esp)
+UNLIKELY_END(bounce_vm86_3)
 .Lnvm86_3:
         /* Rewrite our stack frame and return to ring 1. */
         /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */

@@ -12,4 +12,18 @@
 #include <asm/x86_32/asm_defns.h>
 #endif
 
+#ifdef __ASSEMBLY__
+
+#define UNLIKELY_START(cond, tag) \
+        j##cond .Lunlikely.tag;   \
+        .subsection 1;            \
+        .Lunlikely.tag:
+
+#define UNLIKELY_END(tag)         \
+        jmp .Llikely.tag;         \
+        .subsection 0;            \
+        .Llikely.tag:
+
+#endif
+
 #endif /* __X86_ASM_DEFNS_H__ */

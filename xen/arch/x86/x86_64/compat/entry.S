@@ -49,7 +49,7 @@ ENTRY(compat_hypercall)
 #define SHADOW_BYTES 0  /* No on-stack shadow state */
 #endif
         cmpb  $0,tb_init_done(%rip)
-        je    1f
+UNLIKELY_START(ne, compat_trace)
         call  trace_hypercall
         /* Now restore all the registers that trace_hypercall clobbered */
         movl  UREGS_rax+SHADOW_BYTES(%rsp),%eax   /* Hypercall #  */
@@ -60,7 +60,8 @@ ENTRY(compat_hypercall)
         movl  UREGS_rdi+SHADOW_BYTES(%rsp),%r8d   /* Arg 5        */
         movl  UREGS_rbp+SHADOW_BYTES(%rsp),%r9d   /* Arg 6        */
 #undef SHADOW_BYTES
-1:      leaq  compat_hypercall_table(%rip),%r10
+UNLIKELY_END(compat_trace)
+        leaq  compat_hypercall_table(%rip),%r10
         PERFC_INCR(PERFC_hypercalls, %rax, %rbx)
         callq *(%r10,%rax,8)
 #ifndef NDEBUG
@@ -299,7 +300,7 @@ compat_create_bounce_frame:
 .Lft8:  movl  %eax,%fs:(%rsi)           # ERROR CODE
 1:
         testb $TBF_FAILSAFE,%cl
-        jz    2f
+UNLIKELY_START(nz, compat_bounce_failsafe)
         subl  $4*4,%esi
         movl  %gs,%eax
 .Lft9:  movl  %eax,%fs:3*4(%rsi)        # GS
@@ -308,7 +309,7 @@ compat_create_bounce_frame:
 .Lft11: movl  %eax,%fs:1*4(%rsi)        # ES
         movl  %ds,%eax
 .Lft12: movl  %eax,%fs:0*4(%rsi)        # DS
-2:
+UNLIKELY_END(compat_bounce_failsafe)
         /* Rewrite our stack frame and return to guest-OS mode. */
         /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
         andl  $~(X86_EFLAGS_VM|X86_EFLAGS_RF|\

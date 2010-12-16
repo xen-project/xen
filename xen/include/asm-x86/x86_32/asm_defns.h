@@ -1,6 +1,7 @@
 #ifndef __X86_32_ASM_DEFNS_H__
 #define __X86_32_ASM_DEFNS_H__
 
+#include <xen/stringify.h>
 #include <asm/percpu.h>
 
 #ifdef CONFIG_FRAME_POINTER
@@ -53,12 +54,14 @@
         mov   %es,%esi;                                 \
         mov   $(__HYPERVISOR_DS),%ecx;                  \
         jnz   86f;                                      \
-        .text 1;                                        \
+        .subsection 1;                                  \
         86:   call setup_vm86_frame;                    \
         jmp   vm86_lbl;                                 \
         .previous;                                      \
+        .ifnes __stringify(xen_lbl), "";                \
         testb $3,UREGS_cs(%esp);                        \
         jz    xen_lbl;                                  \
+        .endif;                                         \
         /*                                              \
          * We are the outermost Xen context, but our    \
          * life is complicated by NMIs and MCEs. These  \

@@ -152,7 +152,7 @@ ENTRY(syscall_enter)
 #define SHADOW_BYTES 0  /* No on-stack shadow state */
 #endif
         cmpb  $0,tb_init_done(%rip)
-        je    1f
+UNLIKELY_START(ne, trace)
         call  trace_hypercall
         /* Now restore all the registers that trace_hypercall clobbered */
         movq  UREGS_rax+SHADOW_BYTES(%rsp),%rax   /* Hypercall #  */
@@ -163,7 +163,8 @@ ENTRY(syscall_enter)
         movq  UREGS_r8 +SHADOW_BYTES(%rsp),%r8    /* Arg 5        */
         movq  UREGS_r9 +SHADOW_BYTES(%rsp),%r9    /* Arg 6        */
 #undef SHADOW_BYTES
-1:      leaq  hypercall_table(%rip),%r10
+UNLIKELY_END(trace)
+        leaq  hypercall_table(%rip),%r10
         PERFC_INCR(PERFC_hypercalls, %rax, %rbx)
         callq *(%r10,%rax,8)
 #ifndef NDEBUG
@@ -345,11 +346,12 @@ create_bounce_frame:
 2:      andq  $~0xf,%rsi                # Stack frames are 16-byte aligned.
         movq  $HYPERVISOR_VIRT_START,%rax
         cmpq  %rax,%rsi
-        jb    1f                        # In +ve address space? Then okay.
         movq  $HYPERVISOR_VIRT_END+60,%rax
+        sbb   %ecx,%ecx                 # In +ve address space? Then okay.
         cmpq  %rax,%rsi
-        jb    domain_crash_synchronous  # Above Xen private area? Then okay.
-1:      movb  TRAPBOUNCE_flags(%rdx),%cl
+        adc   %ecx,%ecx                 # Above Xen private area? Then okay.
+        jg    domain_crash_synchronous
+        movb  TRAPBOUNCE_flags(%rdx),%cl
         subq  $40,%rsi
         movq  UREGS_ss+8(%rsp),%rax
 .Lft2:  movq  %rax,32(%rsi)             # SS
@@ -380,7 +382,7 @@ create_bounce_frame:
         movl  TRAPBOUNCE_error_code(%rdx),%eax
 .Lft7:  movq  %rax,(%rsi)               # ERROR CODE
 1:      testb $TBF_FAILSAFE,%cl
-        jz    2f
+UNLIKELY_START(nz, bounce_failsafe)
         subq  $32,%rsi
         movl  %gs,%eax
 .Lft8:  movq  %rax,24(%rsi)             # GS
@@ -390,7 +392,8 @@ create_bounce_frame:
 .Lft10: movq  %rax,8(%rsi)              # ES
         movl  %ds,%eax
 .Lft11: movq  %rax,(%rsi)               # DS
-2:      subq  $16,%rsi
+UNLIKELY_END(bounce_failsafe)
+        subq  $16,%rsi
         movq  UREGS_r11+8(%rsp),%rax
 .Lft12: movq  %rax,8(%rsi)              # R11
         movq  UREGS_rcx+8(%rsp),%rax
