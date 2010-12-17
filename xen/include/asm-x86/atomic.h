@@ -36,7 +36,7 @@ static inline uint64_t atomic_read64(const volatile uint64_t *addr)
 static inline void atomic_write64(volatile uint64_t *addr, uint64_t val)
 {
     uint64_t old = *addr, new, *__addr = (uint64_t *)addr;
-    while ( (old = __cmpxchg8b(__addr, old, val)) != old )
+    while ( (new = __cmpxchg8b(__addr, old, val)) != old )
         old = new;
 }
 #endif
