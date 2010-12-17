@@ -32,6 +32,11 @@
 #include <xen/keyhandler.h>
 #include <xen/softirq.h>
 
+#define atomic_read_ept_entry(__pepte)                              \
+    ( (ept_entry_t) { .epte = atomic_read64(&(__pepte)->epte) } )
+#define atomic_write_ept_entry(__pepte, __epte)                     \
+    atomic_write64(&(__pepte)->epte, (__epte).epte)
+
 #define is_epte_present(ept_entry)      ((ept_entry)->epte & 0x7)
 #define is_epte_superpage(ept_entry)    ((ept_entry)->sp)
 
@@ -222,7 +227,7 @@ static int ept_next_level(struct p2m_domain *p2m, bool_t read_only,
     /* ept_next_level() is called (sometimes) without a lock.  Read
      * the entry once, and act on the "cached" entry after that to
      * avoid races. */
-    e=*ept_entry;
+    e = atomic_read_ept_entry(ept_entry);
 
     if ( !is_epte_present(&e) )
     {
@@ -235,7 +240,7 @@ static int ept_next_level(struct p2m_domain *p2m, bool_t read_only,
         if ( !ept_set_middle_entry(p2m, ept_entry) )
             return GUEST_TABLE_MAP_FAILED;
         else
-            e=*ept_entry; /* Refresh */
+            e = atomic_read_ept_entry(ept_entry); /* Refresh */
     }
 
     /* The only time sp would be set here is if we had hit a superpage */
@@ -317,6 +322,7 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     if ( i == target )
     {
         /* We reached the target level. */
+        ept_entry_t new_entry = { .epte = 0 };
 
         /* No need to flush if the old entry wasn't valid */
         if ( !is_epte_present(ept_entry) )
@@ -325,8 +331,6 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         if ( mfn_valid(mfn_x(mfn)) || direct_mmio || p2m_is_paged(p2mt) ||
              (p2mt == p2m_ram_paging_in_start) )
         {
-            ept_entry_t new_entry = { .epte = 0 };
-
             /* Construct the new entry, and then write it once */
             new_entry.emt = epte_get_entry_emt(p2m->domain, gfn, mfn, &ipat,
                                                 direct_mmio);
@@ -341,11 +345,9 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
                 new_entry.mfn = mfn_x(mfn);
 
             ept_p2m_type_to_flags(&new_entry, p2mt);
-
-            ept_entry->epte = new_entry.epte;
         }
-        else
-            ept_entry->epte = 0;
+
+        atomic_write_ept_entry(ept_entry, new_entry);
     }
     else
     {
@@ -355,7 +357,7 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
 
         ASSERT(is_epte_superpage(ept_entry));
 
-        split_ept_entry = *ept_entry;
+        split_ept_entry = atomic_read_ept_entry(ept_entry);
 
         if ( !ept_split_super_page(p2m, &split_ept_entry, i, target) )
         {
@@ -365,7 +367,7 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
 
         /* now install the newly split ept sub-tree */
         /* NB: please make sure domian is paused and no in-fly VT-d DMA. */
-        *ept_entry = split_ept_entry;
+        atomic_write_ept_entry(ept_entry, split_ept_entry);
 
         /* then move to the level we want to make real changes */
         for ( ; i > target; i-- )
@@ -391,7 +393,7 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
 
         ept_p2m_type_to_flags(&new_entry, p2mt);
 
-        ept_entry->epte = new_entry.epte;
+        atomic_write_ept_entry(ept_entry, new_entry);
     }
 
     /* Track the highest gfn for which we have ever had a valid mapping */
@@ -711,7 +713,7 @@ void ept_change_entry_emt_with_range(struct domain *d,
 static void ept_change_entry_type_page(mfn_t ept_page_mfn, int ept_page_level,
                                        p2m_type_t ot, p2m_type_t nt)
 {
-    ept_entry_t *epte = map_domain_page(mfn_x(ept_page_mfn));
+    ept_entry_t e, *epte = map_domain_page(mfn_x(ept_page_mfn));
 
     for ( int i = 0; i < EPT_PAGETABLE_ENTRIES; i++ )
     {
@@ -723,11 +725,13 @@ static void ept_change_entry_type_page(mfn_t ept_page_mfn, int ept_page_level,
                                        ept_page_level - 1, ot, nt);
         else
         {
-            if ( epte[i].sa_p2mt != ot )
+            e = atomic_read_ept_entry(&epte[i]);
+            if ( e.sa_p2mt != ot )
                 continue;
 
-            epte[i].sa_p2mt = nt;
-            ept_p2m_type_to_flags(epte + i, nt);
+            e.sa_p2mt = nt;
+            ept_p2m_type_to_flags(&e, nt);
+            atomic_write_ept_entry(&epte[i], e);
         }
     }
 
