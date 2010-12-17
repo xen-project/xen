@@ -2144,41 +2144,6 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         /* Fix the x2APIC identifier. */
         *edx = v->vcpu_id * 2;
         break;
-    case 0xd:
-        if ( cpu_has_xsave )
-        {
-            /*
-             *  Fix up "Processor Extended State Enumeration". We present
-             *  FPU(bit0), SSE(bit1) and YMM(bit2) to HVM guest for now.
-             */
-            *eax = *ebx = *ecx = *edx = 0;
-            switch ( count )
-            {
-            case 0:
-                /* No HW defines bit in EDX yet. */
-                *edx = 0;
-                /* We only enable the features we know. */
-                *eax = xfeature_mask;
-                /* FP/SSE + XSAVE.HEADER + YMM. */
-                *ecx = 512 + 64 + ((*eax & XSTATE_YMM) ? XSTATE_YMM_SIZE : 0);
-                /* Let ebx equal ecx at present. */
-                *ebx = *ecx;
-                break;
-            case 2:
-                if ( !(xfeature_mask & XSTATE_YMM) )
-                    break;
-                *eax = XSTATE_YMM_SIZE;
-                *ebx = XSTATE_YMM_OFFSET;
-                break;
-            case 1:
-                if ( cpu_has_xsaveopt )
-                    *eax = XSAVEOPT;
-                break;
-            default:
-                break;
-            }
-        }
-        break;
     case 0x80000001:
         /* We expose RDTSCP feature to guest only when
            tsc_mode == TSC_MODE_DEFAULT and host_tsc_is_safe() returns 1 */

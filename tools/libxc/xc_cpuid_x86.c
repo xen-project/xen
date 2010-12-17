@@ -171,7 +171,8 @@ static void xc_cpuid_hvm_policy(
     DECLARE_DOMCTL;
     char brand[13];
     unsigned long pae;
-    int is_pae, xsave_supported;
+    int is_pae;
+    uint64_t xfeature_mask;
 
     xc_get_hvm_param(xch, domid, HVM_PARAM_PAE_ENABLED, &pae);
     is_pae = !!pae;
@@ -181,7 +182,7 @@ static void xc_cpuid_hvm_policy(
     domctl.cmd = XEN_DOMCTL_getvcpuextstate;
     domctl.domain = domid;
     do_domctl(xch, &domctl);
-    xsave_supported = (domctl.u.vcpuextstate.xfeature_mask != 0);
+    xfeature_mask = domctl.u.vcpuextstate.xfeature_mask;
 
     switch ( input[0] )
     {
@@ -204,7 +205,7 @@ static void xc_cpuid_hvm_policy(
                     bitmaskof(X86_FEATURE_SSE4_2) |
                     bitmaskof(X86_FEATURE_POPCNT) |
                     bitmaskof(X86_FEATURE_AES) |
-                    (xsave_supported ?
+                    ((xfeature_mask != 0) ?
                      (bitmaskof(X86_FEATURE_AVX) |
                       bitmaskof(X86_FEATURE_XSAVE)) : 0));
 
@@ -240,6 +241,46 @@ static void xc_cpuid_hvm_policy(
 
         if ( !is_pae )
             clear_bit(X86_FEATURE_PAE, regs[3]);
+        break;
+
+    case 0x0000000d:
+#define XSTATE_FP       (1 << 0)
+#define XSTATE_SSE      (1 << 1)
+#define XSTATE_YMM      (1 << 2)
+#define XSAVEOPT        (1 << 0)
+#define XSTATE_YMM_SIZE 256
+        if ( xfeature_mask == 0 )
+        {
+            regs[0] = regs[1] = regs[2] = regs[3] = 0;
+            break;
+        }
+        switch ( input[1] )
+        {
+        case 0:
+            /* We only enable the features we know. */
+            regs[0] = xfeature_mask;
+            /* FP/SSE + XSAVE.HEADER + YMM. */
+            regs[2] = 512 + 64;
+            if ( regs[0] & XSTATE_YMM )
+                regs[2] += XSTATE_YMM_SIZE;
+            regs[1] = regs[2];
+            regs[3] = 0;
+            break;
+        case 1:
+            regs[0] &= XSAVEOPT;
+            regs[1] = regs[2] = regs[3] = 0;
+            break;
+        case 2:
+            if ( !(xfeature_mask & XSTATE_YMM) )
+                break;
+            regs[0] = XSTATE_YMM_SIZE;
+            regs[1] = 512 + 64; /* FP/SSE + XSAVE.HEADER */
+            regs[2] = regs[3] = 0;
+            break;
+        default:
+            regs[0] = regs[1] = regs[2] = regs[3] = 0;
+            break;
+        }
         break;
 
     case 0x80000000:
@@ -373,6 +414,7 @@ static void xc_cpuid_pv_policy(
         break;
     case 5: /* MONITOR/MWAIT */
     case 0xa: /* Architectural Performance Monitor Features */
+    case 0xd: /* XSAVE */
     case 0x8000000a: /* SVM revision and features */
     case 0x8000001b: /* Instruction Based Sampling */
         regs[0] = regs[1] = regs[2] = regs[3] = 0;
@@ -468,12 +510,19 @@ int xc_cpuid_apply_policy(xc_interface *xch, domid_t domid)
                 if ( (regs[0] & 0x1f) != 0 )
                     continue;
             }
+
+            /* XSAVE information, subleaves 0-2. */
+            if ( (input[0] == 0xd) && (input[1]++ < 2) )
+                continue;
         }
 
         input[0]++;
-        input[1] = (input[0] == 4) ? 0 : XEN_CPUID_INPUT_UNUSED;
         if ( !(input[0] & 0x80000000u) && (input[0] > base_max ) )
             input[0] = 0x80000000u;
+
+        input[1] = XEN_CPUID_INPUT_UNUSED;
+        if ( (input[0] == 4) || (input[0] == 0xd) )
+            input[1] = 0;
 
         if ( (input[0] & 0x80000000u) && (input[0] > ext_max) )
             break;
