@@ -112,6 +112,7 @@ ioemu-dir-force-update:
 	set -ex; \
 	if [ "$(QEMU_TAG)" ]; then \
 		cd ioemu-remote; \
+		$(GIT) fetch origin; \
 		$(GIT) reset --hard $(QEMU_TAG); \
 	fi
 
