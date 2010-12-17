@@ -5,6 +5,7 @@
 #include <xen/sched.h>
 #include <xen/domain_page.h>
 #include <xen/iommu.h>
+#include <xen/acpi.h>
 #include <asm/fixmap.h>
 #include <asm/page.h>
 #include <asm/processor.h>
@@ -475,13 +476,7 @@ int __init tboot_parse_dmar_table(acpi_table_handler dmar_handler)
 
     /* acpi_parse_dmar() zaps APCI DMAR signature in TXT heap table */
     /* but dom0 will read real table, so must zap it there too */
-    dmar_table = NULL;
-    acpi_get_table(ACPI_SIG_DMAR, 0, &dmar_table);
-    if ( dmar_table != NULL )
-    {
-        dmar_table->signature[0] = 'X';
-        dmar_table->checksum -= 'X'-'D';
-    }
+    acpi_dmar_zap();
 
     return rc;
 }

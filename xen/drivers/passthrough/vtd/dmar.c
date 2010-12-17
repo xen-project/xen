@@ -771,3 +771,34 @@ int __init acpi_dmar_init(void)
 {
     return parse_dmar_table(acpi_parse_dmar);
 }
+
+static struct acpi_table_header *get_dmar(void)
+{
+    struct acpi_table_header *dmar_table = NULL;
+    unsigned long flags;
+
+    /* Disabling IRQs avoids cross-CPU TLB flush in map_pages_to_xen(). */
+    local_irq_save(flags);
+    acpi_get_table(ACPI_SIG_DMAR, 0, &dmar_table);
+    local_irq_restore(flags);
+
+    return dmar_table;
+}
+
+void acpi_dmar_reinstate(void)
+{
+    struct acpi_table_header *dmar_table = get_dmar();
+    if ( dmar_table == NULL )
+        return;
+    dmar_table->signature[0] = 'D';
+    dmar_table->checksum += 'X'-'D';
+}
+
+void acpi_dmar_zap(void)
+{
+    struct acpi_table_header *dmar_table = get_dmar();
+    if ( dmar_table == NULL )
+        return;
+    dmar_table->signature[0] = 'X';
+    dmar_table->checksum -= 'X'-'D';
+}

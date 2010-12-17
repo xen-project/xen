@@ -444,4 +444,7 @@ extern int pnpacpi_disabled;
 
 void acpi_reboot(void);
 
+void acpi_dmar_zap(void);
+void acpi_dmar_reinstate(void);
+
 #endif /*_LINUX_ACPI_H*/

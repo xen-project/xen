@@ -12,7 +12,6 @@
 
 #include <xen/config.h>
 #include <asm/io.h>
-#include <asm/acpi.h>
 #include <xen/acpi.h>
 #include <xen/errno.h>
 #include <xen/iocap.h>
@@ -140,6 +139,8 @@ static int enter_state(u32 state)
 
     freeze_domains();
 
+    acpi_dmar_reinstate();
+
     if ( (error = disable_nonboot_cpus()) )
         goto enable_cpu;
 
@@ -208,6 +209,7 @@ static int enter_state(u32 state)
     mtrr_aps_sync_begin();
     enable_nonboot_cpus();
     mtrr_aps_sync_end();
+    acpi_dmar_zap();
     thaw_domains();
     spin_unlock(&pm_lock);
     return error;

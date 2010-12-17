@@ -309,6 +309,8 @@ void machine_restart(unsigned int delay_millisecs)
     console_start_sync();
     spin_debug_disable();
 
+    acpi_dmar_reinstate();
+
     local_irq_enable();
 
     /* Ensure we are the boot CPU. */

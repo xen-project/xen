@@ -203,20 +203,13 @@ crash_xen_info_t *kexec_crash_save_info(void)
     return out;
 }
 
-static int acpi_dmar_reinstate(struct acpi_table_header *table)
-{
-    table->signature[0] = 'D';
-    table->checksum += 'X'-'D';
-    return 0;
-}
-
 static void kexec_common_shutdown(void)
 {
     watchdog_disable();
     console_start_sync();
     spin_debug_disable();
     one_cpu_only();
-    acpi_table_parse(ACPI_SIG_DMAR, acpi_dmar_reinstate);
+    acpi_dmar_reinstate();
 }
 
 void kexec_crash(void)
