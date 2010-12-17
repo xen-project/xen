@@ -141,7 +141,7 @@ def getBugTitle(bug):
     finally:
         f.close()
 
-    raise "Could not find title of bug %d!" % bug
+    raise ValueError("Could not find title of bug %d!" % bug)
 
 
 def send(bug, conn, fd, filename, username, password):
