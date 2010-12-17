@@ -2171,6 +2171,9 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                 *ebx = XSTATE_YMM_OFFSET;
                 break;
             case 1:
+                if ( cpu_has_xsaveopt )
+                    *eax = XSAVEOPT;
+                break;
             default:
                 break;
             }

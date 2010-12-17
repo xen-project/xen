@@ -16,6 +16,7 @@
 
 extern unsigned int xsave_cntxt_size;
 extern u64 xfeature_mask;
+extern bool_t cpu_has_xsaveopt;
 
 void xsave_init(void);
 int xsave_alloc_save_area(struct vcpu *v);
@@ -28,6 +29,7 @@ void xsave_free_save_area(struct vcpu *v);
 #define XCNTXT_MASK     (XSTATE_FP | XSTATE_SSE | XSTATE_YMM)
 #define XSTATE_YMM_OFFSET  (512 + 64)
 #define XSTATE_YMM_SIZE    256
+#define XSAVEOPT        (1 << 0)
 
 struct xsave_struct
 {
@@ -79,6 +81,18 @@ static inline void xsave(struct vcpu *v)
     ptr =(struct xsave_struct *)v->arch.xsave_area;
 
     asm volatile (".byte " REX_PREFIX "0x0f,0xae,0x27"
+        :
+        : "a" (-1), "d" (-1), "D"(ptr)
+        : "memory");
+}
+
+static inline void xsaveopt(struct vcpu *v)
+{
+    struct xsave_struct *ptr;
+
+    ptr =(struct xsave_struct *)v->arch.xsave_area;
+
+    asm volatile (".byte " REX_PREFIX "0x0f,0xae,0x37"
         :
         : "a" (-1), "d" (-1), "D"(ptr)
         : "memory");

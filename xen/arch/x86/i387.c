@@ -39,7 +39,10 @@ void save_init_fpu(struct vcpu *v)
          * we set all accumulated feature mask before doing save/restore.
          */
         set_xcr0(v->arch.xcr0_accum);
-        xsave(v);
+        if ( cpu_has_xsaveopt )
+            xsaveopt(v);
+        else
+            xsave(v);
         set_xcr0(v->arch.xcr0);
     }
     else if ( cpu_has_fxsr )
@@ -152,6 +155,8 @@ u64 xfeature_mask;
 /* Cached xcr0 for fast read */
 DEFINE_PER_CPU(uint64_t, xcr0);
 
+bool_t __read_mostly cpu_has_xsaveopt;
+
 void xsave_init(void)
 {
     u32 eax, ebx, ecx, edx;
@@ -196,6 +201,10 @@ void xsave_init(void)
         xfeature_mask &= XCNTXT_MASK;
         printk("%s: using cntxt_size: 0x%x and states: 0x%"PRIx64"\n",
             __func__, xsave_cntxt_size, xfeature_mask);
+
+        /* Check XSAVEOPT feature. */
+        cpuid_count(XSTATE_CPUID, 1, &eax, &ebx, &ecx, &edx);
+        cpu_has_xsaveopt = !!(eax & XSAVEOPT);
     }
     else
     {
