@@ -12,7 +12,6 @@
 
 #include <xen/config.h>
 #include <asm/io.h>
-#include <asm/acpi.h>
 #include <xen/acpi.h>
 #include <xen/errno.h>
 #include <xen/iocap.h>
@@ -159,6 +158,8 @@ static int enter_state(u32 state)
 
     freeze_domains();
 
+    acpi_dmar_reinstate();
+
     disable_nonboot_cpus();
     if ( num_online_cpus() != 1 )
     {
@@ -229,6 +230,7 @@ static int enter_state(u32 state)
     cpufreq_add_cpu(0);
     microcode_resume_cpu(0);
     enable_nonboot_cpus();
+    acpi_dmar_zap();
     thaw_domains();
     spin_unlock(&pm_lock);
     return error;
