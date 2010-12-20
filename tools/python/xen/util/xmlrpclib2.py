@@ -58,6 +58,9 @@ def stringify(value):
 # some bugs in Keep-Alive handling and also enabled it by default
 class XMLRPCRequestHandler(SimpleXMLRPCRequestHandler):
     protocol_version = "HTTP/1.1"
+    # xend crashes in python 2.7 unless disable_nagle_algorithm = False
+    # it isn't used in earlier versions so it is harmless to set it generally
+    disable_nagle_algorithm = False
 
     def __init__(self, hosts_allowed, request, client_address, server):
         self.hosts_allowed = hosts_allowed
