@@ -45,7 +45,7 @@
 #define nr_ioapics              iosapic_get_nr_iosapics()
 #endif
 
-static int sharept = 1;
+static int sharept = 0;
 boolean_param("sharept", sharept);
 
 int nr_iommus;
