@@ -2079,8 +2079,7 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
         __trace_var(TRC_HVM_NPF, 0, sizeof(_d), &_d);
     }
 
-    if ( (qualification & EPT_GLA_VALID) &&
-         hvm_hap_nested_page_fault(gfn) )
+    if ( hvm_hap_nested_page_fault(gfn) )
         return;
 
     /* Everything else is an error. */
