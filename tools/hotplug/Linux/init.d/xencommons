@@ -18,7 +18,13 @@
 # Description:       Starts and stops the daemons neeeded for xl/xend
 ### END INIT INFO
 
-test -f /etc/sysconfig/xencommons && . /etc/sysconfig/xencommons
+if [ -d /etc/sysconfig ]; then
+	xencommons_config=/etc/sysconfig
+else
+	xencommons_config=/etc/default
+fi
+
+test -f $xencommons_config/xencommons && . $xencommons_config/xencommons
 
 XENCONSOLED_PIDFILE=/var/run/xenconsoled.pid
 shopt -s extglob
