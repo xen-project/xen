@@ -68,6 +68,7 @@
 enum xc_interface_type {
 	XC_INTERFACE_PRIVCMD,
 	XC_INTERFACE_EVTCHN,
+	XC_INTERFACE_GNTTAB,
 };
 
 struct xc_interface_core {
@@ -268,6 +269,9 @@ int xc_interface_close_core(struct xc_interface_core *xch); /* no logging */
 
 int xc_evtchn_open_core(struct xc_interface_core *xce); /* returns fd, logs errors */
 int xc_evtchn_close_core(struct xc_interface_core *xce); /* no logging */
+
+int xc_gnttab_open_core(struct xc_interface_core *xcg); /* returns fd, logs errors */
+int xc_gnttab_close_core(struct xc_interface_core *xcg); /* no logging */
 
 void *xc_map_foreign_ranges(xc_interface *xch, uint32_t dom,
                             size_t size, int prot, size_t chunksize,

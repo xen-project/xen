@@ -106,6 +106,7 @@
 
 typedef struct xc_interface_core xc_interface;
 typedef struct xc_interface_core xc_evtchn;
+typedef struct xc_interface_core xc_gnttab;
 typedef enum xc_error_code xc_error_code;
 
 
@@ -1239,25 +1240,25 @@ int xc_domain_subscribe_for_suspend(
 /*
  * Return an fd onto the grant table driver.  Logs errors.
  */
-int xc_gnttab_open(xc_interface *xch);
+xc_gnttab *xc_gnttab_open(xentoollog_logger *logger,
+			  unsigned open_flags);
 
 /*
  * Close a handle previously allocated with xc_gnttab_open().
  * Never logs errors.
  */
-int xc_gnttab_close(xc_interface *xch, int xcg_handle);
+int xc_gnttab_close(xc_gnttab *xcg);
 
 /*
  * Memory maps a grant reference from one domain to a local address range.
  * Mappings should be unmapped with xc_gnttab_munmap.  Logs errors.
  *
- * @parm xcg_handle a handle on an open grant table interface
+ * @parm xcg a handle on an open grant table interface
  * @parm domid the domain to map memory from
  * @parm ref the grant reference ID to map
  * @parm prot same flag as in mmap()
  */
-void *xc_gnttab_map_grant_ref(xc_interface *xch,
-                              int xcg_handle,
+void *xc_gnttab_map_grant_ref(xc_gnttab *xcg,
                               uint32_t domid,
                               uint32_t ref,
                               int prot);
@@ -1267,15 +1268,14 @@ void *xc_gnttab_map_grant_ref(xc_interface *xch,
  * contiguous local address range. Mappings should be unmapped with
  * xc_gnttab_munmap.  Logs errors.
  *
- * @parm xcg_handle a handle on an open grant table interface
+ * @parm xcg a handle on an open grant table interface
  * @parm count the number of grant references to be mapped
  * @parm domids an array of @count domain IDs by which the corresponding @refs
  *              were granted
  * @parm refs an array of @count grant references to be mapped
  * @parm prot same flag as in mmap()
  */
-void *xc_gnttab_map_grant_refs(xc_interface *xch,
-                               int xcg_handle,
+void *xc_gnttab_map_grant_refs(xc_gnttab *xcg,
                                uint32_t count,
                                uint32_t *domids,
                                uint32_t *refs,
@@ -1286,14 +1286,13 @@ void *xc_gnttab_map_grant_refs(xc_interface *xch,
  * contiguous local address range. Mappings should be unmapped with
  * xc_gnttab_munmap.  Logs errors.
  *
- * @parm xcg_handle a handle on an open grant table interface
+ * @parm xcg a handle on an open grant table interface
  * @parm count the number of grant references to be mapped
  * @parm domid the domain to map memory from
  * @parm refs an array of @count grant references to be mapped
  * @parm prot same flag as in mmap()
  */
-void *xc_gnttab_map_domain_grant_refs(xc_interface *xch,
-                                      int xcg_handle,
+void *xc_gnttab_map_domain_grant_refs(xc_gnttab *xcg,
                                       uint32_t count,
                                       uint32_t domid,
                                       uint32_t *refs,
@@ -1303,8 +1302,7 @@ void *xc_gnttab_map_domain_grant_refs(xc_interface *xch,
  * Unmaps the @count pages starting at @start_address, which were mapped by a
  * call to xc_gnttab_map_grant_ref or xc_gnttab_map_grant_refs. Never logs.
  */
-int xc_gnttab_munmap(xc_interface *xch,
-                     int xcg_handle,
+int xc_gnttab_munmap(xc_gnttab *xcg,
                      void *start_address,
                      uint32_t count);
 
@@ -1319,8 +1317,7 @@ int xc_gnttab_munmap(xc_interface *xch,
  *      and it may not be possible to satisfy requests up to the maximum number
  *      of grants.
  */
-int xc_gnttab_set_max_grants(xc_interface *xch,
-                             int xcg_handle,
+int xc_gnttab_set_max_grants(xc_gnttab *xcg,
 			     uint32_t count);
 
 int xc_gnttab_op(xc_interface *xch, int cmd,

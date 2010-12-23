@@ -47,7 +47,7 @@ struct fs_mount
     xc_interface *xch; /* just for error logging, so a dummy */
     xc_evtchn *evth;               /* Handle to the event channel */
     evtchn_port_t local_evtchn;
-    int gnth;
+    xc_gnttab *gnth;
     int shared_ring_size;             /* in pages */
     struct fsif_back_ring ring;
     int nr_entries;

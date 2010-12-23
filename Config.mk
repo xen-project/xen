@@ -185,9 +185,9 @@ endif
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= b7754ca4a80e9a53b848796c860d19d6fa7a6d08
-# Thu Dec 23 15:21:52 2010 +0000
-# qemu-xen: update for libxc evtchn interface change
+QEMU_TAG ?= ead83f3f9bc4516f845fbbe23204872eed3e8432
+# Thu Dec 23 15:29:37 2010 +0000
+# qemu-xen: update for libxc gnttab interface change
 
 # Optional components
 XENSTAT_XENTOP     ?= y

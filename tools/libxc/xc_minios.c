@@ -375,17 +375,17 @@ void discard_file_cache(xc_interface *xch, int fd, int flush)
         fsync(fd);
 }
 
-int xc_gnttab_open(xc_interface *xch)
+int xc_gnttab_open_core(xc_gnttab *xcg)
 {
-    int xcg_handle;
-    xcg_handle = alloc_fd(FTYPE_GNTMAP);
-    gntmap_init(&files[xcg_handle].gntmap);
-    return xcg_handle;
+    int fd;
+    fd = alloc_fd(FTYPE_GNTMAP);
+    gntmap_init(&files[fd].gntmap);
+    return fd;
 }
 
-int xc_gnttab_close(xc_interface *xch, int xcg_handle)
+int xc_gnttab_close_core(xc_gnttab *xcg)
 {
-    return close(xcg_handle);
+    return close(xcg->fd);
 }
 
 void minios_gnttab_close_fd(int fd)
@@ -394,50 +394,50 @@ void minios_gnttab_close_fd(int fd)
     files[fd].type = FTYPE_NONE;
 }
 
-void *xc_gnttab_map_grant_ref(xc_interface *xch, int xcg_handle,
+void *xc_gnttab_map_grant_ref(xc_gnttab *xcg,
                               uint32_t domid,
                               uint32_t ref,
                               int prot)
 {
-    return gntmap_map_grant_refs(&files[xcg_handle].gntmap,
+    return gntmap_map_grant_refs(&files[xcg->fd].gntmap,
                                  1,
                                  &domid, 0,
                                  &ref,
                                  prot & PROT_WRITE);
 }
 
-void *xc_gnttab_map_grant_refs(xc_interface *xch, int xcg_handle,
+void *xc_gnttab_map_grant_refs(xc_gnttab *xcg,
                                uint32_t count,
                                uint32_t *domids,
                                uint32_t *refs,
                                int prot)
 {
-    return gntmap_map_grant_refs(&files[xcg_handle].gntmap,
+    return gntmap_map_grant_refs(&files[xcg->fd].gntmap,
                                  count,
                                  domids, 1,
                                  refs,
                                  prot & PROT_WRITE);
 }
 
-void *xc_gnttab_map_domain_grant_refs(xc_interface *xch, int xcg_handle,
+void *xc_gnttab_map_domain_grant_refs(xc_gnttab *xcg,
                                       uint32_t count,
                                       uint32_t domid,
                                       uint32_t *refs,
                                       int prot)
 {
-    return gntmap_map_grant_refs(&files[xcg_handle].gntmap,
+    return gntmap_map_grant_refs(&files[xcg->fd].gntmap,
                                  count,
                                  &domid, 0,
                                  refs,
                                  prot & PROT_WRITE);
 }
 
-int xc_gnttab_munmap(xc_interface *xch, int xcg_handle,
+int xc_gnttab_munmap(xc_gnttab *xcg,
                      void *start_address,
                      uint32_t count)
 {
     int ret;
-    ret = gntmap_munmap(&files[xcg_handle].gntmap,
+    ret = gntmap_munmap(&files[xcg->fd].gntmap,
                         (unsigned long) start_address,
                         count);
     if (ret < 0) {
@@ -447,11 +447,11 @@ int xc_gnttab_munmap(xc_interface *xch, int xcg_handle,
     return ret;
 }
 
-int xc_gnttab_set_max_grants(xc_interface *xch, int xcg_handle,
+int xc_gnttab_set_max_grants(xc_gnttab *xcg,
                              uint32_t count)
 {
     int ret;
-    ret = gntmap_set_max_grants(&files[xcg_handle].gntmap,
+    ret = gntmap_set_max_grants(&files[xcg->fd].gntmap,
                                 count);
     if (ret < 0) {
         errno = -ret;

@@ -75,7 +75,7 @@ static void dispatch_file_open(struct fs_mount *mount, struct fsif_request *req)
 
     FS_DEBUG("Dispatching file open operation (gref=%d).\n", req->u.fopen.gref);
     /* Read the request, and open file */
-    file_name = xc_gnttab_map_grant_ref(mount->xch, mount->gnth,
+    file_name = xc_gnttab_map_grant_ref(mount->gnth,
                                         mount->dom_id,
                                         req->u.fopen.gref,
                                         PROT_READ);
@@ -99,7 +99,7 @@ static void dispatch_file_open(struct fs_mount *mount, struct fsif_request *req)
         }
     }
 out:
-    if (xc_gnttab_munmap(mount->xch, mount->gnth, file_name, 1) != 0) {
+    if (xc_gnttab_munmap(mount->gnth, file_name, 1) != 0) {
         FS_DEBUG("ERROR: xc_gnttab_munmap failed errno=%d\n", errno);
         terminate_mount_request(mount);
     }
@@ -159,7 +159,7 @@ static void dispatch_file_read(struct fs_mount *mount, struct fsif_request *req)
     assert(req->u.fread.len > 0); 
     count = (req->u.fread.len - 1) / XC_PAGE_SIZE + 1;
     assert(count <= FSIF_NR_READ_GNTS);
-    buf = xc_gnttab_map_domain_grant_refs(mount->xch, mount->gnth,
+    buf = xc_gnttab_map_domain_grant_refs(mount->gnth,
                                           count,
                                           mount->dom_id,
                                           req->u.fread.grefs,
@@ -192,8 +192,7 @@ static void dispatch_file_read(struct fs_mount *mount, struct fsif_request *req)
     priv_req->aiocb.aio_sigevent.sigev_value.sival_ptr = priv_req;
     if (aio_read(&priv_req->aiocb) < 0) {
         FS_DEBUG("ERROR: aio_read failed errno=%d\n", errno);
-        xc_gnttab_munmap(mount->xch, mount->gnth,
-                         priv_req->page, priv_req->count);
+        xc_gnttab_munmap(mount->gnth, priv_req->page, priv_req->count);
         terminate_mount_request(mount);
     }
 
@@ -209,7 +208,7 @@ static void end_file_read(struct fs_mount *mount, struct fs_request *priv_req)
     uint16_t req_id;
 
     /* Release the grant */
-    if (xc_gnttab_munmap(mount->xch, mount->gnth,
+    if (xc_gnttab_munmap(mount->gnth,
                          priv_req->page, priv_req->count) != 0) {
         FS_DEBUG("ERROR: xc_gnttab_munmap failed errno=%d\n", errno);
         terminate_mount_request(mount);
@@ -236,7 +235,7 @@ static void dispatch_file_write(struct fs_mount *mount, struct fsif_request *req
     assert(req->u.fwrite.len > 0); 
     count = (req->u.fwrite.len - 1) / XC_PAGE_SIZE + 1;
     assert(count <= FSIF_NR_WRITE_GNTS);
-    buf = xc_gnttab_map_domain_grant_refs(mount->xch, mount->gnth,
+    buf = xc_gnttab_map_domain_grant_refs(mount->gnth,
                                           count,
                                           mount->dom_id,
                                           req->u.fwrite.grefs,
@@ -269,7 +268,7 @@ static void dispatch_file_write(struct fs_mount *mount, struct fsif_request *req
     priv_req->aiocb.aio_sigevent.sigev_value.sival_ptr = priv_req;
     if (aio_write(&priv_req->aiocb) < 0) {
         FS_DEBUG("ERROR: aio_write failed errno=%d\n", errno);
-        xc_gnttab_munmap(mount->xch, mount->gnth,
+        xc_gnttab_munmap(mount->gnth,
                          priv_req->page, priv_req->count);
         terminate_mount_request(mount);
     }
@@ -287,7 +286,7 @@ static void end_file_write(struct fs_mount *mount, struct fs_request *priv_req)
     uint16_t req_id;
 
     /* Release the grant */
-    if (xc_gnttab_munmap(mount->xch, mount->gnth,
+    if (xc_gnttab_munmap(mount->gnth,
                          priv_req->page, priv_req->count) != 0) {
         FS_DEBUG("ERROR: xc_gnttab_munmap failed errno=%d\n", errno);
         terminate_mount_request(mount);
@@ -395,7 +394,7 @@ static void dispatch_remove(struct fs_mount *mount, struct fsif_request *req)
 
     FS_DEBUG("Dispatching remove operation (gref=%d).\n", req->u.fremove.gref);
     /* Read the request, and open file */
-    file_name = xc_gnttab_map_grant_ref(mount->xch, mount->gnth,
+    file_name = xc_gnttab_map_grant_ref(mount->gnth,
                                         mount->dom_id,
                                         req->u.fremove.gref,
                                         PROT_READ);
@@ -409,7 +408,7 @@ static void dispatch_remove(struct fs_mount *mount, struct fsif_request *req)
         ret = remove(file_name);
     }
     FS_DEBUG("Got ret: %d\n", ret);
-    if (xc_gnttab_munmap(mount->xch, mount->gnth, file_name, 1) != 0) {
+    if (xc_gnttab_munmap(mount->gnth, file_name, 1) != 0) {
         FS_DEBUG("ERROR: xc_gnttab_munmap failed errno=%d\n", errno);
         terminate_mount_request(mount);
     }
@@ -437,7 +436,7 @@ static void dispatch_rename(struct fs_mount *mount, struct fsif_request *req)
 
     FS_DEBUG("Dispatching rename operation (gref=%d).\n", req->u.fremove.gref);
     /* Read the request, and open file */
-    buf = xc_gnttab_map_grant_ref(mount->xch, mount->gnth,
+    buf = xc_gnttab_map_grant_ref(mount->gnth,
                                   mount->dom_id,
                                   req->u.frename.gref,
                                   PROT_READ);
@@ -455,7 +454,7 @@ static void dispatch_rename(struct fs_mount *mount, struct fsif_request *req)
         ret = rename(old_file_name, new_file_name);
     }
     FS_DEBUG("Got ret: %d\n", ret);
-    if (xc_gnttab_munmap(mount->xch, mount->gnth, buf, 1) != 0) {
+    if (xc_gnttab_munmap(mount->gnth, buf, 1) != 0) {
         FS_DEBUG("ERROR: xc_gnttab_munmap failed errno=%d\n", errno);
         terminate_mount_request(mount);
     }
@@ -487,7 +486,7 @@ static void dispatch_create(struct fs_mount *mount, struct fsif_request *req)
     /* Read the request, and create file/directory */
     mode = req->u.fcreate.mode;
     directory = req->u.fcreate.directory;
-    file_name = xc_gnttab_map_grant_ref(mount->xch, mount->gnth,
+    file_name = xc_gnttab_map_grant_ref(mount->gnth,
                                         mount->dom_id,
                                         req->u.fcreate.gref,
                                         PROT_READ);
@@ -523,7 +522,7 @@ static void dispatch_create(struct fs_mount *mount, struct fsif_request *req)
         }
     }
 out:
-    if (xc_gnttab_munmap(mount->xch, mount->gnth, file_name, 1) != 0) {
+    if (xc_gnttab_munmap(mount->gnth, file_name, 1) != 0) {
         FS_DEBUG("ERROR: xc_gnttab_munmap failed errno=%d\n", errno);
         terminate_mount_request(mount);
     }
@@ -551,7 +550,7 @@ static void dispatch_list(struct fs_mount *mount, struct fsif_request *req)
     FS_DEBUG("Dispatching list operation (gref=%d).\n", req->u.flist.gref);
     /* Read the request, and list directory */
     offset = req->u.flist.offset;
-    buf = file_name = xc_gnttab_map_grant_ref(mount->xch, mount->gnth,
+    buf = file_name = xc_gnttab_map_grant_ref(mount->gnth,
                                         mount->dom_id,
                                         req->u.flist.gref,
                                         PROT_READ | PROT_WRITE);
@@ -599,7 +598,7 @@ error_out:
     ret_val = ((nr_files << NR_FILES_SHIFT) & NR_FILES_MASK) | 
               ((error_code << ERROR_SHIFT) & ERROR_MASK) | 
               (dirent != NULL ? HAS_MORE_FLAG : 0);
-    if (xc_gnttab_munmap(mount->xch, mount->gnth, file_name, 1) != 0) {
+    if (xc_gnttab_munmap(mount->gnth, file_name, 1) != 0) {
         FS_DEBUG("ERROR: xc_gnttab_munmap failed errno=%d\n", errno);
         terminate_mount_request(mount);
     }
@@ -654,7 +653,7 @@ static void dispatch_fs_space(struct fs_mount *mount, struct fsif_request *req)
 
     FS_DEBUG("Dispatching fs space operation (gref=%d).\n", req->u.fspace.gref);
     /* Read the request, and open file */
-    file_name = xc_gnttab_map_grant_ref(mount->xch, mount->gnth,
+    file_name = xc_gnttab_map_grant_ref(mount->gnth,
                                         mount->dom_id,
                                         req->u.fspace.gref,
                                         PROT_READ);
@@ -670,7 +669,7 @@ static void dispatch_fs_space(struct fs_mount *mount, struct fsif_request *req)
     if(ret >= 0)
         ret = stat.f_bsize * stat.f_bfree;
 
-    if (xc_gnttab_munmap(mount->xch, mount->gnth, file_name, 1) != 0) {
+    if (xc_gnttab_munmap(mount->gnth, file_name, 1) != 0) {
         FS_DEBUG("ERROR: xc_gnttab_munmap failed errno=%d\n", errno);
         terminate_mount_request(mount);
     }

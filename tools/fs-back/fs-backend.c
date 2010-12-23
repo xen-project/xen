@@ -168,9 +168,8 @@ void terminate_mount_request(struct fs_mount *mount)
     }
     xenbus_write_backend_state(mount, STATE_CLOSED);
 
-    xc_gnttab_munmap(mount->xch, mount->gnth,
-                     mount->ring.sring, mount->shared_ring_size);
-    xc_gnttab_close(mount->xch, mount->gnth);
+    xc_gnttab_munmap(mount->gnth, mount->ring.sring, mount->shared_ring_size);
+    xc_gnttab_close(mount->gnth);
     xc_evtchn_unbind(mount->evth, mount->local_evtchn);
     xc_evtchn_close(mount->evth);
 
@@ -242,15 +241,15 @@ static void handle_connection(int frontend_dom_id, int export_id, char *frontend
         FS_DEBUG("ERROR: Couldn't bind evtchn!\n");
         goto error;
     }
-    mount->gnth = -1;
-    mount->gnth = xc_gnttab_open(mount->xch);
-    if (mount->gnth < 0) {
+    mount->gnth = NULL;
+    mount->gnth = xc_gnttab_open(NULL, 0);
+    if (mount->gnth == NULL) {
         FS_DEBUG("ERROR: Couldn't open gnttab!\n");
         goto error;
     }
     for(i=0; i<mount->shared_ring_size; i++)
         dom_ids[i] = mount->dom_id;
-    sring = xc_gnttab_map_grant_refs(mount->xch, mount->gnth,
+    sring = xc_gnttab_map_grant_refs(mount->gnth,
                                      mount->shared_ring_size,
                                      dom_ids,
                                      mount->grefs,
@@ -283,10 +282,9 @@ static void handle_connection(int frontend_dom_id, int export_id, char *frontend
 error:
     xenbus_write_backend_state(mount, STATE_CLOSED);
     if (sring)
-        xc_gnttab_munmap(mount->xch, mount->gnth,
-                         mount->ring.sring, mount->shared_ring_size);
-    if (mount->gnth > 0)
-        xc_gnttab_close(mount->xch, mount->gnth);
+        xc_gnttab_munmap(mount->gnth, mount->ring.sring, mount->shared_ring_size);
+    if (mount->gnth != NULL)
+        xc_gnttab_close(mount->gnth);
     if (mount->local_evtchn > 0)
         xc_evtchn_unbind(mount->evth, mount->local_evtchn);
     if (mount->evth != NULL)
