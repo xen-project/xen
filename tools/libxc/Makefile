@@ -11,6 +11,7 @@ CTRL_SRCS-$(CONFIG_IA64) += xc_core_ia64.c
 CTRL_SRCS-y       += xc_cpupool.c
 CTRL_SRCS-y       += xc_domain.c
 CTRL_SRCS-y       += xc_evtchn.c
+CTRL_SRCS-y       += xc_gnttab.c
 CTRL_SRCS-y       += xc_misc.c
 CTRL_SRCS-y       += xc_acm.c
 CTRL_SRCS-y       += xc_flask.c

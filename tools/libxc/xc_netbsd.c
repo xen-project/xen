@@ -312,18 +312,6 @@ void discard_file_cache(xc_interface *xch, int fd, int flush)
     errno = saved_errno;
 }
 
-grant_entry_v1_t *xc_gnttab_map_table_v1(
-    xc_interface *xch, int domid, int *gnt_num)
-{
-    return NULL;
-}
-
-grant_entry_v2_t *xc_gnttab_map_table_v2(
-    xc_interface *xch, int domid, int *gnt_num)
-{
-    return NULL;
-}
-
 /*
  * Local variables:
  * mode: C
