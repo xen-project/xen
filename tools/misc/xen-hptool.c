@@ -98,7 +98,7 @@ static int hp_mem_query_func(int argc, char *argv[])
 
 extern int xs_suspend_evtchn_port(int domid);
 
-static int suspend_guest(xc_interface *xch, int xce, int domid, int *evtchn)
+static int suspend_guest(xc_interface *xch, xc_evtchn *xce, int domid, int *evtchn)
 {
     int port, rc, suspend_evtchn = -1;
 
@@ -192,10 +192,11 @@ static int hp_mem_offline_func(int argc, char *argv[])
                 }
                 else if (status & PG_OFFLINE_OWNED)
                 {
-                    int result, xce, suspend_evtchn = -1;
-                    xce = xc_evtchn_open();
+                    int result, suspend_evtchn = -1;
+                    xc_evtchn *xce;
+                    xce = xc_evtchn_open(NULL, 0);
 
-                    if (xce < 0)
+                    if (xce == NULL)
                     {
                         fprintf(stderr, "When exchange page, fail"
                                 " to open evtchn\n");

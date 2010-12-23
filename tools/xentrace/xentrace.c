@@ -73,7 +73,7 @@ settings_t opts;
 int interrupted = 0; /* gets set if we get a SIGHUP */
 
 static xc_interface *xc_handle;
-static int event_fd = -1;
+static xc_evtchn *xce_handle = NULL;
 static int virq_port = -1;
 static int outfd = 1;
 
@@ -576,14 +576,13 @@ static void event_init(void)
 {
     int rc;
 
-    rc = xc_evtchn_open();
-    if (rc < 0) {
+    xce_handle = xc_evtchn_open(NULL, 0);
+    if (xce_handle == NULL) {
         perror("event channel open");
         exit(EXIT_FAILURE);
     }
-    event_fd = rc;
 
-    rc = xc_evtchn_bind_virq(event_fd, VIRQ_TBUF);
+    rc = xc_evtchn_bind_virq(xce_handle, VIRQ_TBUF);
     if (rc == -1) {
         PERROR("failed to bind to VIRQ port");
         exit(EXIT_FAILURE);
@@ -598,7 +597,7 @@ static void event_init(void)
 static void wait_for_event_or_timeout(unsigned long milliseconds)
 {
     int rc;
-    struct pollfd fd = { .fd = event_fd,
+    struct pollfd fd = { .fd = xc_evtchn_fd(xce_handle),
                          .events = POLLIN | POLLERR };
     int port;
 
@@ -611,7 +610,7 @@ static void wait_for_event_or_timeout(unsigned long milliseconds)
     }
 
     if (rc == 1) {
-        port = xc_evtchn_pending(event_fd);
+        port = xc_evtchn_pending(xce_handle);
         if (port == -1) {
             PERROR("failed to read port from evtchn");
             exit(EXIT_FAILURE);
@@ -622,7 +621,7 @@ static void wait_for_event_or_timeout(unsigned long milliseconds)
                     port, virq_port);
             exit(EXIT_FAILURE);
         }
-        rc = xc_evtchn_unmask(event_fd, port);
+        rc = xc_evtchn_unmask(xce_handle, port);
         if (rc == -1) {
             PERROR("failed to write port to evtchn");
             exit(EXIT_FAILURE);

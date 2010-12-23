@@ -315,7 +315,7 @@ int libxl__domain_restore_common(libxl_ctx *ctx, uint32_t domid,
 
 struct suspendinfo {
     libxl__gc *gc;
-    int xce; /* event channel handle */
+    xc_evtchn *xce; /* event channel handle */
     int suspend_eventchn;
     int domid;
     int hvm;
@@ -419,11 +419,11 @@ int libxl__domain_suspend_common(libxl_ctx *ctx, uint32_t domid, int fd,
     si.gc = &gc;
     si.suspend_eventchn = -1;
 
-    si.xce = xc_evtchn_open();
-    if (si.xce < 0)
+    si.xce = xc_evtchn_open(NULL, 0);
+    if (si.xce == NULL)
         goto out;
-
-    if (si.xce > 0) {
+    else
+    {
         port = xs_suspend_evtchn_port(si.domid);
 
         if (port >= 0) {
@@ -447,7 +447,7 @@ int libxl__domain_suspend_common(libxl_ctx *ctx, uint32_t domid, int fd,
 
     if (si.suspend_eventchn > 0)
         xc_suspend_evtchn_release(ctx->xch, si.xce, domid, si.suspend_eventchn);
-    if (si.xce > 0)
+    if (si.xce != NULL)
         xc_evtchn_close(si.xce);
 
 out:

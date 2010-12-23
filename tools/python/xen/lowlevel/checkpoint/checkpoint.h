@@ -19,7 +19,7 @@ typedef enum {
 
 typedef struct {
     xc_interface *xch;
-    int xce;               /* event channel handle */
+    xc_evtchn *xce;        /* event channel handle */
     struct xs_handle* xsh; /* xenstore handle */
     int watching_shutdown; /* state of watch on @releaseDomain */
 

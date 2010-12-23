@@ -173,11 +173,11 @@ int xc_hvm_build_mem(xc_interface *xch,
                      const char *image_buffer,
                      unsigned long image_size);
 
-int xc_suspend_evtchn_release(xc_interface *xch, int xce, int domid, int suspend_evtchn);
+int xc_suspend_evtchn_release(xc_interface *xch, xc_evtchn *xce, int domid, int suspend_evtchn);
 
-int xc_suspend_evtchn_init(xc_interface *xch, int xce, int domid, int port);
+int xc_suspend_evtchn_init(xc_interface *xch, xc_evtchn *xce, int domid, int port);
 
-int xc_await_suspend(xc_interface *xch, int xce, int suspend_evtchn);
+int xc_await_suspend(xc_interface *xch, xc_evtchn *xce, int suspend_evtchn);
 
 int xc_get_bit_size(xc_interface *xch,
                     const char *image_name, const char *cmdline,

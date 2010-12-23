@@ -35,7 +35,7 @@
 
 static void log_callback(struct elf_binary *elf, void *caller_data,
                          int iserr, const char *fmt, va_list al) {
-    struct xc_interface *xch = caller_data;
+    xc_interface *xch = caller_data;
 
     xc_reportv(xch,
           xch->dombuild_logger ? xch->dombuild_logger : xch->error_handler,
@@ -44,7 +44,7 @@ static void log_callback(struct elf_binary *elf, void *caller_data,
                        fmt, al);
 }
 
-void xc_elf_set_logfile(struct xc_interface *xch, struct elf_binary *elf,
+void xc_elf_set_logfile(xc_interface *xch, struct elf_binary *elf,
                         int verbose) {
     elf_set_log(elf, log_callback, xch, verbose);
 }

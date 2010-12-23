@@ -40,7 +40,7 @@
 
 typedef struct mem_event {
     domid_t domain_id;
-    int xce_handle;
+    xc_evtchn *xce_handle;
     int port;
     mem_event_back_ring_t back_ring;
     mem_event_shared_page_t *shared_page;

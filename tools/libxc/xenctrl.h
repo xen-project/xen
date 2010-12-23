@@ -104,7 +104,8 @@
  * the callback.
  */
 
-typedef struct xc_interface xc_interface;
+typedef struct xc_interface_core xc_interface;
+typedef struct xc_interface_core xc_evtchn;
 typedef enum xc_error_code xc_error_code;
 
 
@@ -826,38 +827,38 @@ int xc_evtchn_status(xc_interface *xch, xc_evtchn_status_t *status);
  *
  * Before Xen pre-4.1 this function would sometimes report errors with perror.
  */
-int xc_evtchn_open(void);
+xc_evtchn *xc_evtchn_open(xentoollog_logger *logger,
+                             unsigned open_flags);
 
 /*
  * Close a handle previously allocated with xc_evtchn_open().
  */
-int xc_evtchn_close(int xce_handle);
+int xc_evtchn_close(xc_evtchn *xce);
 
 /*
- * Return an fd that can be select()ed on for further calls to
- * xc_evtchn_pending().
+ * Return an fd that can be select()ed on.
  */
-int xc_evtchn_fd(int xce_handle);
+int xc_evtchn_fd(xc_evtchn *xce);
 
 /*
  * Notify the given event channel. Returns -1 on failure, in which case
  * errno will be set appropriately.
  */
-int xc_evtchn_notify(int xce_handle, evtchn_port_t port);
+int xc_evtchn_notify(xc_evtchn *xce, evtchn_port_t port);
 
 /*
  * Returns a new event port awaiting interdomain connection from the given
  * domain ID, or -1 on failure, in which case errno will be set appropriately.
  */
 evtchn_port_or_error_t
-xc_evtchn_bind_unbound_port(int xce_handle, int domid);
+xc_evtchn_bind_unbound_port(xc_evtchn *xce, int domid);
 
 /*
  * Returns a new event port bound to the remote port for the given domain ID,
  * or -1 on failure, in which case errno will be set appropriately.
  */
 evtchn_port_or_error_t
-xc_evtchn_bind_interdomain(int xce_handle, int domid,
+xc_evtchn_bind_interdomain(xc_evtchn *xce, int domid,
                            evtchn_port_t remote_port);
 
 /*
@@ -865,26 +866,26 @@ xc_evtchn_bind_interdomain(int xce_handle, int domid,
  * the VIRQ, or -1 on failure, in which case errno will be set appropriately.
  */
 evtchn_port_or_error_t
-xc_evtchn_bind_virq(int xce_handle, unsigned int virq);
+xc_evtchn_bind_virq(xc_evtchn *xce, unsigned int virq);
 
 /*
  * Unbind the given event channel. Returns -1 on failure, in which case errno
  * will be set appropriately.
  */
-int xc_evtchn_unbind(int xce_handle, evtchn_port_t port);
+int xc_evtchn_unbind(xc_evtchn *xce, evtchn_port_t port);
 
 /*
  * Return the next event channel to become pending, or -1 on failure, in which
  * case errno will be set appropriately.  
  */
 evtchn_port_or_error_t
-xc_evtchn_pending(int xce_handle);
+xc_evtchn_pending(xc_evtchn *xce);
 
 /*
  * Unmask the given event channel. Returns -1 on failure, in which case errno
  * will be set appropriately.
  */
-int xc_evtchn_unmask(int xce_handle, evtchn_port_t port);
+int xc_evtchn_unmask(xc_evtchn *xce, evtchn_port_t port);
 
 int xc_physdev_pci_access_modify(xc_interface *xch,
                                  uint32_t domid,
@@ -1754,7 +1755,7 @@ int xc_flask_getavc_threshold(xc_interface *xc_handle);
 int xc_flask_setavc_threshold(xc_interface *xc_handle, int threshold);
 
 struct elf_binary;
-void xc_elf_set_logfile(struct xc_interface *xch, struct elf_binary *elf,
+void xc_elf_set_logfile(xc_interface *xch, struct elf_binary *elf,
                         int verbose);
 /* Useful for callers who also use libelf. */
 

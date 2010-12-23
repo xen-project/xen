@@ -25,7 +25,7 @@
 
 static struct suspendinfo {
     xc_interface *xch;
-    int xce; /* event channel handle */
+    xc_evtchn *xce; /* event channel handle */
     int suspend_evtchn;
     int domid;
     unsigned int flags;
@@ -183,13 +183,12 @@ main(int argc, char **argv)
     max_f = atoi(argv[4]);
     si.flags = atoi(argv[5]);
 
-    si.suspend_evtchn = si.xce = -1;
+    si.suspend_evtchn = -1;
 
-    si.xce = xc_evtchn_open();
-    if (si.xce < 0)
+    si.xce = xc_evtchn_open(NULL, 0);
+    if (si.xce == NULL)
         warnx("failed to open event channel handle");
-
-    if (si.xce > 0)
+    else
     {
         port = xs_suspend_evtchn_port(si.domid);
 

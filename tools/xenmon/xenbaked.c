@@ -268,7 +268,7 @@ static void log_event(int event_id)
 }
 
 int virq_port;
-int xce_handle = -1;
+xc_evtchn *xce_handle = NULL;
 
 /* Returns the event channel handle. */
 /* Stolen from xenstore code */
@@ -280,16 +280,16 @@ static int eventchn_init(void)
     if (0)
         return -1;
   
-    xce_handle = xc_evtchn_open();
+    xce_handle = xc_evtchn_open(NULL, 0);
 
-    if (xce_handle < 0)
+    if (xce_handle == NULL)
         perror("Failed to open evtchn device");
   
     if ((rc = xc_evtchn_bind_virq(xce_handle, VIRQ_TBUF)) == -1)
         perror("Failed to bind to domain exception virq port");
     virq_port = rc;
   
-    return xce_handle;
+    return xce_handle == NULL ? -1 : 0;
 }
 
 static void wait_for_event(void)
@@ -300,7 +300,7 @@ static void wait_for_event(void)
     struct timeval tv;
     int evtchn_fd;
   
-    if (xce_handle < 0) {
+    if (xce_handle == NULL) {
         nanosleep(&opts.poll_sleep, NULL);
         return;
     }

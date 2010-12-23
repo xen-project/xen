@@ -45,7 +45,7 @@ struct fs_mount
     grant_ref_t grefs[MAX_RING_SIZE];
     evtchn_port_t remote_evtchn;
     xc_interface *xch; /* just for error logging, so a dummy */
-    int evth;                         /* Handle to the event channel */
+    xc_evtchn *evth;               /* Handle to the event channel */
     evtchn_port_t local_evtchn;
     int gnth;
     int shared_ring_size;             /* in pages */

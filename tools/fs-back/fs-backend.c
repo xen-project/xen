@@ -228,9 +228,9 @@ static void handle_connection(int frontend_dom_id, int export_id, char *frontend
         FS_DEBUG("ERROR: failed to write backend node on xenbus\n");
         goto error;
     }
-    mount->evth = -1;
-    mount->evth = xc_evtchn_open(); 
-    if (mount->evth < 0) {
+    mount->evth = NULL;
+    mount->evth = xc_evtchn_open(NULL, 0);
+    if (mount->evth == NULL) {
         FS_DEBUG("ERROR: Couldn't open evtchn!\n");
         goto error;
     }
@@ -289,7 +289,7 @@ error:
         xc_gnttab_close(mount->xch, mount->gnth);
     if (mount->local_evtchn > 0)
         xc_evtchn_unbind(mount->evth, mount->local_evtchn);
-    if (mount->evth > 0)
+    if (mount->evth != NULL)
         xc_evtchn_close(mount->evth);
     if (mount->xch)
         xc_interface_close(mount->xch);
@@ -343,8 +343,8 @@ static void await_connections(void)
                     FD_SET(tfd, &fds);
                     ret = select(tfd + 1, &fds, NULL, NULL, &timeout);
                     if (ret < 0) {
-                        FS_DEBUG("fd %d is bogus, closing the related connection\n", tfd);
-                        pointer->evth = fd;
+                        FS_DEBUG("fd %d is bogus, closing the related connection %p\n", tfd, pointer->evth);
+                        /*pointer->evth = fd;*/
                         terminate_mount_request(pointer);
                         continue;
                     }

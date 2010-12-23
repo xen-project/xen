@@ -36,7 +36,7 @@
 static xc_interface **xc_handle;
 static evtchn_port_t virq_port;
 
-int xce_handle = -1; 
+xc_evtchn *xce_handle = NULL;
 
 struct domain
 {
@@ -580,8 +580,7 @@ static int dom0_init(void)
 	return 0; 
 }
 
-/* Returns the event channel handle. */
-int domain_init(void)
+void domain_init(void)
 {
 	int rc;
 
@@ -595,9 +594,9 @@ int domain_init(void)
 
 	talloc_set_destructor(xc_handle, close_xc_handle);
 
-	xce_handle = xc_evtchn_open();
+	xce_handle = xc_evtchn_open(NULL, 0);
 
-	if (xce_handle < 0)
+	if (xce_handle == NULL)
 		barf_perror("Failed to open evtchn device");
 
 	if (dom0_init() != 0) 
@@ -606,8 +605,6 @@ int domain_init(void)
 	if ((rc = xc_evtchn_bind_virq(xce_handle, VIRQ_DOM_EXC)) == -1)
 		barf_perror("Failed to bind to domain exception virq port");
 	virq_port = rc;
-
-	return xce_handle;
 }
 
 void domain_entry_inc(struct connection *conn, struct node *node)

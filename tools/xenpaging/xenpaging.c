@@ -144,8 +144,8 @@ xenpaging_t *xenpaging_init(domid_t domain_id)
     }
 
     /* Open event channel */
-    paging->mem_event.xce_handle = xc_evtchn_open();
-    if ( paging->mem_event.xce_handle < 0 )
+    paging->mem_event.xce_handle = xc_evtchn_open(NULL, 0);
+    if ( paging->mem_event.xce_handle == NULL )
     {
         ERROR("Failed to open event channel");
         goto err;
@@ -246,7 +246,7 @@ xenpaging_t *xenpaging_init(domid_t domain_id)
 int xenpaging_teardown(xenpaging_t *paging)
 {
     int rc;
-    struct xc_interface *xch;
+    xc_interface *xch;
 
     if ( paging == NULL )
         return 0;
@@ -274,7 +274,7 @@ int xenpaging_teardown(xenpaging_t *paging)
     {
         ERROR("Error closing event channel");
     }
-    paging->mem_event.xce_handle = -1;
+    paging->mem_event.xce_handle = NULL;
     
     /* Close connection to Xen */
     rc = xc_interface_close(xch);
@@ -338,7 +338,7 @@ static int put_response(mem_event_t *mem_event, mem_event_response_t *rsp)
 int xenpaging_evict_page(xenpaging_t *paging,
                          xenpaging_victim_t *victim, int fd, int i)
 {
-    struct xc_interface *xch = paging->xc_handle;
+    xc_interface *xch = paging->xc_handle;
     void *page;
     unsigned long gfn;
     int ret;
@@ -412,7 +412,7 @@ static int xenpaging_resume_page(xenpaging_t *paging, mem_event_response_t *rsp,
 static int xenpaging_populate_page(xenpaging_t *paging,
     uint64_t *gfn, int fd, int i)
 {
-    struct xc_interface *xch = paging->xc_handle;
+    xc_interface *xch = paging->xc_handle;
     unsigned long _gfn;
     void *page;
     int ret;
@@ -467,7 +467,7 @@ static int xenpaging_populate_page(xenpaging_t *paging,
 static int evict_victim(xenpaging_t *paging, domid_t domain_id,
                         xenpaging_victim_t *victim, int fd, int i)
 {
-    struct xc_interface *xch = paging->xc_handle;
+    xc_interface *xch = paging->xc_handle;
     int j = 0;
     int ret;
 

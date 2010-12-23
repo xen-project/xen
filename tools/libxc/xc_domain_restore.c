@@ -49,7 +49,7 @@ struct restore_ctx {
 #define HEARTBEAT_MS 1000
 
 #ifndef __MINIOS__
-static ssize_t rdexact(struct xc_interface *xch, struct restore_ctx *ctx,
+static ssize_t rdexact(xc_interface *xch, struct restore_ctx *ctx,
                        int fd, void* buf, size_t size)
 {
     size_t offset = 0;

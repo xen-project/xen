@@ -185,9 +185,9 @@ endif
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 47a25c461b6b5ab67397f7bbb209590a0839e213
-# Thu Dec 16 15:50:06 2010 +0000
-# stubdom: fix stubdom build following dd9d12dc
+QEMU_TAG ?= b7754ca4a80e9a53b848796c860d19d6fa7a6d08
+# Thu Dec 23 15:21:52 2010 +0000
+# qemu-xen: update for libxc evtchn interface change
 
 # Optional components
 XENSTAT_XENTOP     ?= y

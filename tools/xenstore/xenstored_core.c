@@ -52,7 +52,7 @@
 
 #include "hashtable.h"
 
-extern int xce_handle; /* in xenstored_domain.c */
+extern xc_evtchn *xce_handle; /* in xenstored_domain.c */
 
 static bool verbose = false;
 LIST_HEAD(connections);
@@ -323,7 +323,7 @@ static int initialize_set(fd_set *inset, fd_set *outset, int sock, int ro_sock,
 	set_fd(ro_sock,            inset, &max);
 	set_fd(reopen_log_pipe[0], inset, &max);
 
-	if (xce_handle != -1)
+	if (xce_handle != NULL)
 		set_fd(xc_evtchn_fd(xce_handle), inset, &max);
 
 	list_for_each_entry(conn, &connections, list) {
@@ -1901,7 +1901,7 @@ int main(int argc, char *argv[])
 
 	signal(SIGHUP, trigger_reopen_log);
 
-	if (xce_handle != -1)
+	if (xce_handle != NULL)
 		evtchn_fd = xc_evtchn_fd(xce_handle);
 
 	/* Get ready to listen to the tools. */

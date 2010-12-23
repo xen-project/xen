@@ -68,7 +68,7 @@ static int log_time_guest_needts = 1;
 static int log_hv_fd = -1;
 static evtchn_port_or_error_t log_hv_evtchn = -1;
 static xc_interface *xch; /* why does xenconsoled have two xc handles ? */
-static int xce_handle = -1;
+static xc_evtchn *xce_handle = NULL;
 
 struct buffer {
 	char *data;
@@ -90,7 +90,7 @@ struct domain {
 	int ring_ref;
 	evtchn_port_or_error_t local_port;
 	evtchn_port_or_error_t remote_port;
-	int xce_handle;
+	xc_evtchn *xce_handle;
 	struct xencons_interface *interface;
 	int event_count;
 	long long next_period;
@@ -547,13 +547,13 @@ static int domain_create_ring(struct domain *dom)
 
 	dom->local_port = -1;
 	dom->remote_port = -1;
-	if (dom->xce_handle != -1)
+	if (dom->xce_handle != NULL)
 		xc_evtchn_close(dom->xce_handle);
 
 	/* Opening evtchn independently for each console is a bit
 	 * wasteful, but that's how the code is structured... */
-	dom->xce_handle = xc_evtchn_open();
-	if (dom->xce_handle == -1) {
+	dom->xce_handle = xc_evtchn_open(NULL, 0);
+	if (dom->xce_handle == NULL) {
 		err = errno;
 		goto out;
 	}
@@ -564,7 +564,7 @@ static int domain_create_ring(struct domain *dom)
 	if (rc == -1) {
 		err = errno;
 		xc_evtchn_close(dom->xce_handle);
-		dom->xce_handle = -1;
+		dom->xce_handle = NULL;
 		goto out;
 	}
 	dom->local_port = rc;
@@ -574,7 +574,7 @@ static int domain_create_ring(struct domain *dom)
 		if (!domain_create_tty(dom)) {
 			err = errno;
 			xc_evtchn_close(dom->xce_handle);
-			dom->xce_handle = -1;
+			dom->xce_handle = NULL;
 			dom->local_port = -1;
 			dom->remote_port = -1;
 			goto out;
@@ -655,7 +655,7 @@ static struct domain *create_domain(int domid)
 	dom->local_port = -1;
 	dom->remote_port = -1;
 	dom->interface = NULL;
-	dom->xce_handle = -1;
+	dom->xce_handle = NULL;
 
 	if (!watch_domain(dom, true))
 		goto out;
@@ -722,9 +722,9 @@ static void shutdown_domain(struct domain *d)
 	if (d->interface != NULL)
 		munmap(d->interface, getpagesize());
 	d->interface = NULL;
-	if (d->xce_handle != -1)
+	if (d->xce_handle != NULL)
 		xc_evtchn_close(d->xce_handle);
-	d->xce_handle = -1;
+	d->xce_handle = NULL;
 }
 
 void enum_domains(void)
@@ -933,8 +933,8 @@ void handle_io(void)
 			      errno, strerror(errno));
 			goto out;
 		}
-		xce_handle = xc_evtchn_open();
-		if (xce_handle == -1) {
+		xce_handle = xc_evtchn_open(NULL, 0);
+		if (xce_handle == NULL) {
 			dolog(LOG_ERR, "Failed to open xce handle: %d (%s)",
 			      errno, strerror(errno));
 			goto out;
@@ -994,7 +994,7 @@ void handle_io(void)
 				if (!next_timeout ||
 				    d->next_period < next_timeout)
 					next_timeout = d->next_period;
-			} else if (d->xce_handle != -1) {
+			} else if (d->xce_handle != NULL) {
 				if (discard_overflowed_data ||
 				    !d->buffer.max_capacity ||
 				    d->buffer.size < d->buffer.max_capacity) {
@@ -1055,7 +1055,7 @@ void handle_io(void)
 		for (d = dom_head; d; d = n) {
 			n = d->next;
 			if (d->event_count < RATE_LIMIT_ALLOWANCE) {
-				if (d->xce_handle != -1 &&
+				if (d->xce_handle != NULL &&
 				    FD_ISSET(xc_evtchn_fd(d->xce_handle),
 					     &readfds))
 					handle_ring_read(d);
@@ -1083,9 +1083,9 @@ void handle_io(void)
 		xc_interface_close(xch);
 		xch = 0;
 	}
-	if (xce_handle != -1) {
+	if (xce_handle != NULL) {
 		xc_evtchn_close(xce_handle);
-		xce_handle = -1;
+		xce_handle = NULL;
 	}
 	log_hv_evtchn = -1;
 }

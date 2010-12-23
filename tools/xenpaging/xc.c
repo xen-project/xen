@@ -65,9 +65,9 @@ int xc_mem_paging_flush_ioemu_cache(domid_t domain_id)
     return rc;
 }
 
-int xc_wait_for_event_or_timeout(xc_interface *xch, int xce_handle, unsigned long ms)
+int xc_wait_for_event_or_timeout(xc_interface *xch, xc_evtchn *xce, unsigned long ms)
 {
-    struct pollfd fd = { .fd = xce_handle, .events = POLLIN | POLLERR };
+    struct pollfd fd = { .fd = xc_evtchn_fd(xce), .events = POLLIN | POLLERR };
     int port;
     int rc;
     
@@ -83,14 +83,14 @@ int xc_wait_for_event_or_timeout(xc_interface *xch, int xce_handle, unsigned lon
     
     if ( rc == 1 )
     {
-        port = xc_evtchn_pending(xce_handle);
+        port = xc_evtchn_pending(xce);
         if ( port == -1 )
         {
             ERROR("Failed to read port from event channel");
             goto err;
         }
         
-        rc = xc_evtchn_unmask(xce_handle, port);
+        rc = xc_evtchn_unmask(xce, port);
         if ( rc != 0 )
         {
             ERROR("Failed to unmask event channel port");
@@ -106,9 +106,9 @@ int xc_wait_for_event_or_timeout(xc_interface *xch, int xce_handle, unsigned lon
     return -errno;
 }
 
-int xc_wait_for_event(xc_interface *xch, int xce_handle)
+int xc_wait_for_event(xc_interface *xch, xc_evtchn *xce)
 {
-    return xc_wait_for_event_or_timeout(xch, xce_handle, -1);
+    return xc_wait_for_event_or_timeout(xch, xce, -1);
 }
 
 int xc_get_platform_info(xc_interface *xc_handle, domid_t domain_id,

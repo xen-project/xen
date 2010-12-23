@@ -48,7 +48,7 @@ char* checkpoint_error(checkpoint_state* s)
 void checkpoint_init(checkpoint_state* s)
 {
     s->xch = NULL;
-    s->xce = -1;
+    s->xce = NULL;
     s->xsh = NULL;
     s->watching_shutdown = 0;
 
@@ -89,8 +89,8 @@ int checkpoint_open(checkpoint_state* s, unsigned int domid)
        return -1;
     }
 
-    s->xce = xc_evtchn_open();
-    if (s->xce < 0) {
+    s->xce = xc_evtchn_open(NULL, 0);
+    if (s->xce == NULL) {
        checkpoint_close(s);
        s->errstr = "could not open event channel handle";
 
@@ -149,9 +149,9 @@ void checkpoint_close(checkpoint_state* s)
     xc_interface_close(s->xch);
     s->xch = NULL;
   }
-  if (s->xce >= 0) {
+  if (s->xce != NULL) {
     xc_evtchn_close(s->xce);
-    s->xce = -1;
+    s->xce = NULL;
   }
   if (s->xsh) {
     xs_daemon_close(s->xsh);
@@ -360,7 +360,7 @@ static int setup_suspend_evtchn(checkpoint_state* s)
 static void release_suspend_evtchn(checkpoint_state *s)
 {
   /* TODO: teach xen to clean up if port is unbound */
-  if (s->xce >= 0 && s->suspend_evtchn >= 0) {
+  if (s->xce != NULL && s->suspend_evtchn >= 0) {
     xc_suspend_evtchn_release(s->xch, s->xce, s->domid, s->suspend_evtchn);
     s->suspend_evtchn = -1;
   }

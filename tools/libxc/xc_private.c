@@ -27,11 +27,15 @@
 #include <pthread.h>
 #include <assert.h>
 
-xc_interface *xc_interface_open(xentoollog_logger *logger,
-                                xentoollog_logger *dombuild_logger,
-                                unsigned open_flags) {
-    xc_interface xch_buf, *xch = &xch_buf;
+static struct xc_interface_core *xc_interface_open_common(xentoollog_logger *logger,
+                                              xentoollog_logger *dombuild_logger,
+                                              unsigned open_flags,
+                                              enum xc_interface_type type,
+                                              int (*open_core)(struct xc_interface_core *xch))
+{
+    struct xc_interface_core xch_buf, *xch = &xch_buf;
 
+    xch->type = type;
     xch->flags = open_flags;
     xch->fd = -1;
     xch->dombuild_logger_file = 0;
@@ -57,7 +61,7 @@ xc_interface *xc_interface_open(xentoollog_logger *logger,
     *xch = xch_buf;
 
     if (!(open_flags & XC_OPENFLAG_DUMMY)) {
-        xch->fd = xc_interface_open_core(xch);
+        xch->fd = open_core(xch);
         if (xch->fd < 0)
             goto err;
     }
@@ -70,7 +74,7 @@ xc_interface *xc_interface_open(xentoollog_logger *logger,
     return 0;
 }
 
-int xc_interface_close(xc_interface *xch)
+static int xc_interface_close_common(xc_interface *xch, int (*close_core)(struct xc_interface_core *xch))
 {
     int rc = 0;
 
@@ -78,12 +82,37 @@ int xc_interface_close(xc_interface *xch)
     xtl_logger_destroy(xch->error_handler_tofree);
 
     if (xch->fd >= 0) {
-        rc = xc_interface_close_core(xch, xch->fd);
+        rc = close_core(xch);
         if (rc) PERROR("Could not close hypervisor interface");
     }
 
     free(xch);
     return rc;
+}
+
+xc_interface *xc_interface_open(xentoollog_logger *logger,
+                                xentoollog_logger *dombuild_logger,
+                                unsigned open_flags)
+{
+    return xc_interface_open_common(logger, dombuild_logger, open_flags,
+                                    XC_INTERFACE_PRIVCMD, &xc_interface_open_core);
+}
+
+int xc_interface_close(xc_interface *xch)
+{
+    return xc_interface_close_common(xch, &xc_interface_close_core);
+}
+
+xc_evtchn *xc_evtchn_open(xentoollog_logger *logger,
+                             unsigned open_flags)
+{
+    return xc_interface_open_common(logger, NULL, open_flags,
+                                    XC_INTERFACE_EVTCHN, &xc_evtchn_open_core);
+}
+
+int xc_evtchn_close(xc_evtchn *xce)
+{
+    return xc_interface_close_common(xce, &xc_evtchn_close_core);
 }
 
 static pthread_key_t errbuf_pkey;

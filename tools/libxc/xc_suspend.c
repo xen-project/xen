@@ -75,7 +75,7 @@ static int unlock_suspend_event(xc_interface *xch, int domid)
     return -EPERM;
 }
 
-int xc_await_suspend(xc_interface *xch, int xce, int suspend_evtchn)
+int xc_await_suspend(xc_interface *xch, xc_evtchn *xce, int suspend_evtchn)
 {
     int rc;
 
@@ -94,7 +94,7 @@ int xc_await_suspend(xc_interface *xch, int xce, int suspend_evtchn)
     return 0;
 }
 
-int xc_suspend_evtchn_release(xc_interface *xch, int xce, int domid, int suspend_evtchn)
+int xc_suspend_evtchn_release(xc_interface *xch, xc_evtchn *xce, int domid, int suspend_evtchn)
 {
     if (suspend_evtchn >= 0)
         xc_evtchn_unbind(xce, suspend_evtchn);
@@ -102,7 +102,7 @@ int xc_suspend_evtchn_release(xc_interface *xch, int xce, int domid, int suspend
     return unlock_suspend_event(xch, domid);
 }
 
-int xc_suspend_evtchn_init(xc_interface *xch, int xce, int domid, int port)
+int xc_suspend_evtchn_init(xc_interface *xch, xc_evtchn *xce, int domid, int port)
 {
     int rc, suspend_evtchn = -1;
 

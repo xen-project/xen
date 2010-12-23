@@ -65,7 +65,13 @@
 */
 #define MAX_PAGECACHE_USAGE (4*1024)
 
-struct xc_interface {
+enum xc_interface_type {
+	XC_INTERFACE_PRIVCMD,
+	XC_INTERFACE_EVTCHN,
+};
+
+struct xc_interface_core {
+    enum xc_interface_type type;
     int fd;
     int flags;
     xentoollog_logger *error_handler,   *error_handler_tofree;
@@ -257,8 +263,11 @@ static inline int do_sysctl(xc_interface *xch, struct xen_sysctl *sysctl)
 
 int do_memory_op(xc_interface *xch, int cmd, void *arg, size_t len);
 
-int xc_interface_open_core(xc_interface *xch); /* returns fd, logs errors */
-int xc_interface_close_core(xc_interface *xch, int fd); /* no logging */
+int xc_interface_open_core(struct xc_interface_core *xch); /* returns fd, logs errors */
+int xc_interface_close_core(struct xc_interface_core *xch); /* no logging */
+
+int xc_evtchn_open_core(struct xc_interface_core *xce); /* returns fd, logs errors */
+int xc_evtchn_close_core(struct xc_interface_core *xce); /* no logging */
 
 void *xc_map_foreign_ranges(xc_interface *xch, uint32_t dom,
                             size_t size, int prot, size_t chunksize,
