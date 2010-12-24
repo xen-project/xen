@@ -176,10 +176,14 @@ integer_param("sched_credit2_migrate_resist", opt_migrate_resist);
  */
 struct csched_runqueue_data {
     int id;
+
+    spinlock_t lock;      /* Lock for this runqueue. */
+    cpumask_t active;      /* CPUs enabled for this runqueue */
+
     struct list_head runq; /* Ordered list of runnable vms */
     struct list_head svc;  /* List of all vcpus assigned to this runqueue */
     int max_weight;
-    int cpu_min, cpu_max;  /* Range of physical cpus this runqueue runs */
+
     cpumask_t idle,        /* Currently idle */
         tickled;           /* Another cpu in the queue is already targeted for this one */
 };
@@ -189,12 +193,12 @@ struct csched_runqueue_data {
  */
 struct csched_private {
     spinlock_t lock;
-    uint32_t ncpus;
-
+    cpumask_t initialized; /* CPU is initialized for this pool */
+    
     struct list_head sdom; /* Used mostly for dump keyhandler. */
 
     int runq_map[NR_CPUS];
-    uint32_t runq_count;
+    cpumask_t active_queues; /* Queues which may have active cpus */
     struct csched_runqueue_data rqd[NR_CPUS];
 };
 
@@ -341,7 +345,7 @@ runq_tickle(const struct scheduler *ops, unsigned int cpu, struct csched_vcpu *n
     int i, ipid=-1;
     s_time_t lowest=(1<<30);
     struct csched_runqueue_data *rqd = RQD(ops, cpu);
-    cpumask_t *online, mask;
+    cpumask_t mask;
     struct csched_vcpu * cur;
 
     d2printk("rqt d%dv%d cd%dv%d\n",
@@ -374,9 +378,7 @@ runq_tickle(const struct scheduler *ops, unsigned int cpu, struct csched_vcpu *n
 
     /* Otherwise, look for the non-idle cpu with the lowest credit,
      * skipping cpus which have been tickled but not scheduled yet */
-    online = CSCHED_CPUONLINE(per_cpu(cpupool, cpu));
-
-    cpus_andnot(mask, *online, rqd->idle);
+    cpus_andnot(mask, rqd->active, rqd->idle);
     cpus_andnot(mask, mask, rqd->tickled);
 
     for_each_cpu_mask(i, mask)
@@ -997,7 +999,7 @@ csched_schedule(
     const struct scheduler *ops, s_time_t now, bool_t tasklet_work_scheduled)
 {
     const int cpu = smp_processor_id();
-    struct csched_runqueue_data *rqd = RQD(ops, cpu);
+    struct csched_runqueue_data *rqd;
     struct csched_vcpu * const scurr = CSCHED_VCPU(current);
     struct csched_vcpu *snext = NULL;
     struct task_slice ret;
@@ -1010,6 +1012,10 @@ csched_schedule(
              scurr->vcpu->vcpu_id,
              now);
 
+    BUG_ON(!cpu_isset(cpu, CSCHED_PRIV(ops)->initialized));
+
+    rqd = RQD(ops, cpu);
+    BUG_ON(!cpu_isset(cpu, rqd->active));
 
     /* Protected by runqueue lock */
 
@@ -1166,14 +1172,22 @@ csched_dump(const struct scheduler *ops)
 {
     struct list_head *iter_sdom, *iter_svc;
     struct csched_private *prv = CSCHED_PRIV(ops);
-    int loop;
+    int i, loop;
 
-    printk("info:\n"
-           "\tncpus              = %u\n"
+    printk("Active queues: %d\n"
            "\tdefault-weight     = %d\n",
-           prv->ncpus,
+           cpus_weight(prv->active_queues),
            CSCHED_DEFAULT_WEIGHT);
+    for_each_cpu_mask(i, prv->active_queues)
+    {
+        printk("Runqueue %d:\n"
+               "\tncpus              = %u\n"
+               "\tmax_weight         = %d\n",
+               i,
+               cpus_weight(prv->rqd[i].active),
+               prv->rqd[i].max_weight);
 
+    }
     /* FIXME: Locking! */
 
     printk("Domain info:\n");
@@ -1199,16 +1213,82 @@ csched_dump(const struct scheduler *ops)
     }
 }
 
-static void
-csched_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
+static void activate_runqueue(struct csched_private *prv, int rqi)
 {
-    unsigned long flags;
+    struct csched_runqueue_data *rqd;
+
+    rqd = prv->rqd + rqi;
+
+    BUG_ON(!cpus_empty(rqd->active));
+
+    rqd->max_weight = 1;
+    rqd->id = rqi;
+    INIT_LIST_HEAD(&rqd->svc);
+    INIT_LIST_HEAD(&rqd->runq);
+    spin_lock_init(&rqd->lock);
+
+    cpu_set(rqi, prv->active_queues);
+}
+
+static void deactivate_runqueue(struct csched_private *prv, int rqi)
+{
+    struct csched_runqueue_data *rqd;
+
+    rqd = prv->rqd + rqi;
+
+    BUG_ON(!cpus_empty(rqd->active));
+    
+    rqd->id = -1;
+
+    cpu_clear(rqi, prv->active_queues);
+}
+
+static void init_pcpu(const struct scheduler *ops, int cpu)
+{
+    int rqi, old_rqi, flags;
     struct csched_private *prv = CSCHED_PRIV(ops);
+    struct csched_runqueue_data *rqd;
+    spinlock_t *old_lock;
 
     spin_lock_irqsave(&prv->lock, flags);
-    prv->ncpus--;
-    cpu_clear(cpu, RQD(ops, cpu)->idle);
-    printk("Removing cpu %d to pool (%d total)\n", cpu, prv->ncpus);
+
+    if ( cpu_isset(cpu, prv->initialized) )
+    {
+        printk("%s: Strange, cpu %d already initialized!\n", __func__, cpu);
+        spin_unlock_irqrestore(&prv->lock, flags);
+        return;
+    }
+
+    old_rqi = prv->runq_map[cpu];
+
+    /* Figure out which runqueue to put it in */
+    rqi = 0;
+
+    rqd=prv->rqd + rqi;
+
+    printk("Adding cpu %d to runqueue %d\n", cpu, rqi);
+    if ( ! cpu_isset(rqi, prv->active_queues) )
+    {
+        printk(" First cpu on runqueue, activating\n");
+        activate_runqueue(prv, rqi);
+    }
+    
+    /* IRQs already disabled */
+    old_lock=pcpu_schedule_lock(cpu);
+
+    /* Move spinlock to new runq lock.  */
+    per_cpu(schedule_data, cpu).schedule_lock = &rqd->lock;
+
+    /* Set the runqueue map */
+    prv->runq_map[cpu]=rqi;
+    
+    cpu_set(cpu, rqd->idle);
+    cpu_set(cpu, rqd->active);
+
+    spin_unlock(old_lock);
+
+    cpu_set(cpu, prv->initialized);
+
     spin_unlock_irqrestore(&prv->lock, flags);
 
     return;
@@ -1217,33 +1297,51 @@ csched_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
 static void *
 csched_alloc_pdata(const struct scheduler *ops, int cpu)
 {
-    spinlock_t *new_lock;
-    spinlock_t *old_lock = per_cpu(schedule_data, cpu).schedule_lock;
-    unsigned long flags;
-    struct csched_private *prv = CSCHED_PRIV(ops);
-
-    spin_lock_irqsave(old_lock, flags);
-    new_lock = &per_cpu(schedule_data, prv->runq_map[cpu])._lock;
-    per_cpu(schedule_data, cpu).schedule_lock = new_lock;
-    spin_unlock_irqrestore(old_lock, flags);
-
-    spin_lock_irqsave(&prv->lock, flags);
-    prv->ncpus++;
-    cpu_set(cpu, RQD(ops, cpu)->idle);
-    printk("Adding cpu %d to pool (%d total)\n", cpu, prv->ncpus);
-    spin_unlock_irqrestore(&prv->lock, flags);
+    init_pcpu(ops, cpu);
 
     return (void *)1;
 }
 
 static void
-make_runq_map(struct csched_private *prv)
+csched_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
 {
-    /* FIXME: Read pcpu layout and do this properly */
-    prv->runq_count = 1;
-    prv->rqd[0].cpu_min = 0;
-    prv->rqd[0].cpu_max = NR_CPUS;
-    memset(prv->runq_map, 0, sizeof(prv->runq_map));
+    unsigned long flags;
+    struct csched_private *prv = CSCHED_PRIV(ops);
+    struct csched_runqueue_data *rqd;
+    int rqi;
+
+    spin_lock_irqsave(&prv->lock, flags);
+
+    BUG_ON( !cpu_isset(cpu, prv->initialized));
+    
+    /* Find the old runqueue and remove this cpu from it */
+    rqi = prv->runq_map[cpu];
+
+    rqd = prv->rqd + rqi;
+
+    /* No need to save IRQs here, they're already disabled */
+    spin_lock(&rqd->lock);
+
+    BUG_ON(!cpu_isset(cpu, rqd->idle));
+
+    printk("Removing cpu %d from runqueue %d\n", cpu, rqi);
+
+    cpu_clear(cpu, rqd->idle);
+    cpu_clear(cpu, rqd->active);
+
+    if ( cpus_empty(rqd->active) )
+    {
+        printk(" No cpus left on runqueue, disabling\n");
+        deactivate_runqueue(prv, rqi);
+    }
+
+    spin_unlock(&rqd->lock);
+
+    cpu_clear(cpu, prv->initialized);
+
+    spin_unlock_irqrestore(&prv->lock, flags);
+
+    return;
 }
 
 static int
@@ -1265,18 +1363,11 @@ csched_init(struct scheduler *ops)
     spin_lock_init(&prv->lock);
     INIT_LIST_HEAD(&prv->sdom);
 
-    prv->ncpus = 0;
-
-    make_runq_map(prv);
-
-    for ( i=0; i<prv->runq_count ; i++ )
+    /* But un-initialize all runqueues */
+    for ( i=0; i<NR_CPUS; i++)
     {
-        struct csched_runqueue_data *rqd = prv->rqd + i;
-
-        rqd->max_weight = 1;
-        rqd->id = i;
-        INIT_LIST_HEAD(&rqd->svc);
-        INIT_LIST_HEAD(&rqd->runq);
+        prv->runq_map[i] = -1;
+        prv->rqd[i].id = -1;
     }
 
     return 0;
