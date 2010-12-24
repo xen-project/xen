@@ -872,13 +872,75 @@ csched_context_saved(const struct scheduler *ops, struct vcpu *vc)
     vcpu_schedule_unlock_irq(vc);
 }
 
+#define MAX_LOAD (1<<30);
 static int
 choose_cpu(const struct scheduler *ops, struct vcpu *vc)
 {
-    /* FIXME: Chose a schedule group based on load */
-    /* FIXME: Migrate the vcpu to the new runqueue list, updating
-       max_weight for each runqueue */
-    return 0;
+    struct csched_private *prv = CSCHED_PRIV(ops);
+    int i, min_load, min_rqi = -1, new_cpu;
+    struct csched_vcpu *svc = CSCHED_VCPU(vc);
+
+    BUG_ON(cpus_empty(prv->active_queues));
+
+    /* Locking:
+     * - vc->processor is already locked
+     * - Need to grab prv lock to make sure active runqueues don't
+     *   change
+     * - Need to grab locks for other runqueues while checking
+     *   avgload
+     * Locking constraint is:
+     * - Lock prv before runqueue locks
+     * - Trylock between runqueue locks (no ordering)
+     *
+     * Since one of the runqueue locks is already held, we can't
+     * just grab the prv lock.  Instead, we'll have to trylock, and
+     * do something else reasonable if we fail.
+     */
+
+    if ( !spin_trylock(&prv->lock) )
+    {
+        /* Leave it where it is for now.  When we actually pay attention
+         * to affinity we'll have to figure something out... */
+        return vc->processor;
+    }
+
+    /* FIXME: Pay attention to cpu affinity */                                                                                      
+
+    min_load = MAX_LOAD;
+
+    /* Find the runqueue with the lowest instantaneous load */
+    for_each_cpu_mask(i, prv->active_queues)
+    {
+        struct csched_runqueue_data *rqd;
+
+        rqd = prv->rqd + i;
+
+        /* If checking a different runqueue, grab the lock,
+         * read the avg, and then release the lock. */
+        if ( rqd != svc->rqd
+             && ! spin_trylock(&rqd->lock) )
+            continue;
+        if ( prv->rqd[i].load < min_load )
+        {
+            min_load=prv->rqd[i].load;
+            min_rqi=i;
+        }
+        if ( rqd != svc->rqd )
+            spin_unlock(&rqd->lock);
+    }
+
+    /* We didn't find anyone (most likely because of spinlock contention); leave it where it is */
+    if ( min_rqi == -1 )
+        new_cpu = vc->processor;
+    else
+    {
+        BUG_ON(cpus_empty(prv->rqd[min_rqi].active));
+        new_cpu = first_cpu(prv->rqd[min_rqi].active);
+    }
+ 
+    spin_unlock(&prv->lock);
+
+    return new_cpu;
 }
 
 static int
@@ -894,13 +956,12 @@ csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
      * runqueue is held.  It can't be actively waiting to run.  It
      * will be added to the new runqueue when it next wakes.
      *
-     * If we want to be able to call pick() separately, we need
-     * to add a mechansim to remove a vcpu from an old processor /
-     * runqueue before releasing the lock. */
+     * If we want to be able to call pick() separately, we need to add
+     * a mechansim to remove a vcpu from an old processor / runqueue
+     * before releasing the lock. */
     BUG_ON(__vcpu_on_runq(svc));
 
     new_cpu = choose_cpu(ops, vc);
-
     /* If we're suggesting moving to a different runqueue, remove it
      * from the old runqueue while we have the lock.  It will be added
      * to the new one when it wakes. */
