@@ -24,6 +24,7 @@
 #include <asm/atomic.h>
 #include <xen/errno.h>
 #include <xen/trace.h>
+#include <xen/cpu.h>
 
 #if __i386__
 #define PRI_stime "lld"
@@ -712,13 +713,15 @@ csched_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
     printk("%s: Inserting d%dv%d\n",
            __func__, dom->domain_id, vc->vcpu_id);
 
+    /* NB: On boot, idle vcpus are inserted before alloc_pdata() has
+     * been called for that cpu.
+     */
     if ( ! is_idle_vcpu(vc) )
     {
         /* FIXME: Do we need the private lock here? */
         list_add_tail(&svc->sdom_elem, &svc->sdom->vcpu);
 
         /* Add vcpu to runqueue of initial processor */
-        /* FIXME: Abstract for multiple runqueues */
         vcpu_schedule_lock_irq(vc);
 
         runq_assign(ops, vc);
@@ -1462,6 +1465,20 @@ static void init_pcpu(const struct scheduler *ops, int cpu)
     /* Figure out which runqueue to put it in */
     rqi = 0;
 
+    /* Figure out which runqueue to put it in */
+    /* NB: cpu 0 doesn't get a STARTING callback, so we hard-code it to runqueue 0. */
+    if ( cpu == 0 )
+        rqi = 0;
+    else
+        rqi = cpu_to_socket(cpu);
+
+    if ( rqi < 0 )
+    {
+        printk("%s: cpu_to_socket(%d) returned %d!\n",
+               __func__, cpu, rqi);
+        BUG();
+    }
+
     rqd=prv->rqd + rqi;
 
     printk("Adding cpu %d to runqueue %d\n", cpu, rqi);
@@ -1495,7 +1512,13 @@ static void init_pcpu(const struct scheduler *ops, int cpu)
 static void *
 csched_alloc_pdata(const struct scheduler *ops, int cpu)
 {
-    init_pcpu(ops, cpu);
+    /* Check to see if the cpu is online yet */
+    /* Note: cpu 0 doesn't get a STARTING callback */
+    if ( cpu == 0 || cpu_to_socket(cpu) >= 0 )
+        init_pcpu(ops, cpu);
+    else
+        printk("%s: cpu %d not online yet, deferring initializatgion\n",
+               __func__, cpu);
 
     return (void *)1;
 }
@@ -1543,6 +1566,41 @@ csched_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
 }
 
 static int
+csched_cpu_starting(int cpu)
+{
+    struct scheduler *ops;
+
+    /* Hope this is safe from cpupools switching things around. :-) */
+    ops = per_cpu(scheduler, cpu);
+
+    init_pcpu(ops, cpu);
+
+    return NOTIFY_DONE;
+}
+
+static int cpu_credit2_callback(
+    struct notifier_block *nfb, unsigned long action, void *hcpu)
+{
+    unsigned int cpu = (unsigned long)hcpu;
+    int rc = 0;
+
+    switch ( action )
+    {
+    case CPU_STARTING:
+        csched_cpu_starting(cpu);
+        break;
+    default:
+        break;
+    }
+
+    return !rc ? NOTIFY_DONE : notifier_from_errno(rc);
+}
+
+static struct notifier_block cpu_credit2_nfb = {
+    .notifier_call = cpu_credit2_callback
+};
+
+static int
 csched_init(struct scheduler *ops)
 {
     int i;
@@ -1552,14 +1610,19 @@ csched_init(struct scheduler *ops)
            " WARNING: This is experimental software in development.\n" \
            " Use at your own risk.\n");
 
+    /* Basically no CPU information is available at this point; just
+     * set up basic structures, and a callback when the CPU info is
+     * available. */
+
     prv = xmalloc(struct csched_private);
     if ( prv == NULL )
         return -ENOMEM;
     memset(prv, 0, sizeof(*prv));
     ops->sched_data = prv;
-
     spin_lock_init(&prv->lock);
     INIT_LIST_HEAD(&prv->sdom);
+
+    register_cpu_notifier(&cpu_credit2_nfb);
 
     /* But un-initialize all runqueues */
     for ( i=0; i<NR_CPUS; i++)
