@@ -206,6 +206,7 @@ struct csched_runqueue_data {
     int load;              /* Instantaneous load: Length of queue  + num non-idle threads */
     s_time_t load_last_update;  /* Last time average was updated */
     s_time_t avgload;           /* Decaying queue load */
+    s_time_t b_avgload;         /* Decaying queue load modified by balancing */
 };
 
 /*
@@ -302,6 +303,7 @@ __update_runq_load(const struct scheduler *ops,
     if ( rqd->load_last_update + (1ULL<<prv->load_window_shift) < now )
     {
         rqd->avgload = (unsigned long long)rqd->load << prv->load_window_shift;
+        rqd->b_avgload = (unsigned long long)rqd->load << prv->load_window_shift;
     }
     else
     {
@@ -310,6 +312,10 @@ __update_runq_load(const struct scheduler *ops,
         rqd->avgload =
             ( ( delta * ( (unsigned long long)rqd->load << prv->load_window_shift ) )
               + ( ((1ULL<<prv->load_window_shift) - delta) * rqd->avgload ) ) >> prv->load_window_shift;
+
+        rqd->b_avgload =
+            ( ( delta * ( (unsigned long long)rqd->load << prv->load_window_shift ) )
+              + ( ((1ULL<<prv->load_window_shift) - delta) * rqd->b_avgload ) ) >> prv->load_window_shift;
     }
     rqd->load += change;
     rqd->load_last_update = now;
@@ -317,11 +323,12 @@ __update_runq_load(const struct scheduler *ops,
     {
         struct {
             unsigned rq_load:4, rq_avgload:28;
-            unsigned rq_id:4;
+            unsigned rq_id:4, b_avgload:28;
         } d;
         d.rq_id=rqd->id;
         d.rq_load = rqd->load;
         d.rq_avgload = rqd->avgload;
+        d.b_avgload = rqd->b_avgload;
         trace_var(TRC_CSCHED2_UPDATE_RUNQ_LOAD, 1,
                   sizeof(d),
                   (unsigned char *)&d);
@@ -756,6 +763,9 @@ __runq_assign(struct csched_vcpu *svc, struct csched_runqueue_data *rqd)
 
     update_max_weight(svc->rqd, svc->weight, 0);
 
+    /* Expected new load based on adding this vcpu */
+    rqd->b_avgload += svc->avgload;
+
     /* TRACE */
     {
         struct {
@@ -789,6 +799,9 @@ __runq_deassign(struct csched_vcpu *svc)
 
     list_del_init(&svc->rqd_elem);
     update_max_weight(svc->rqd, 0, svc->weight);
+
+    /* Expected new load based on removing this vcpu */
+    svc->rqd->b_avgload -= svc->avgload;
 
     svc->rqd = NULL;
 }
