@@ -713,7 +713,7 @@ int erst_clear(u64 record_id)
 	return rc;
 }
 
-static int erst_check_table(struct acpi_table_erst *erst_tab)
+static int __init erst_check_table(struct acpi_table_erst *erst_tab)
 {
 	if (erst_tab->header_length != sizeof(struct acpi_table_erst))
 		return -EINVAL;
@@ -727,7 +727,7 @@ static int erst_check_table(struct acpi_table_erst *erst_tab)
 	return 0;
 }
 
-int erst_init(void)
+int __init erst_init(void)
 {
 	int rc = 0;
 	acpi_status status;

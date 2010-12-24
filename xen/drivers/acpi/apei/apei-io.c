@@ -75,7 +75,7 @@ static void __iomem *__apei_ioremap_fast(paddr_t paddr,
 
 static int apei_range_nr;
 
-static void __iomem *apei_range_map(paddr_t paddr, unsigned long size)
+static void __iomem *__init apei_range_map(paddr_t paddr, unsigned long size)
 {
 	int i, pg;
 	int start_nr, cur_nr;
@@ -101,7 +101,7 @@ static void __iomem *apei_range_map(paddr_t paddr, unsigned long size)
  * whether the area is already pre-mapped, if it is, return; otherwise,
  * do the real map, and add the mapping into apei_iomaps list.
  */
-void __iomem *apei_pre_map(paddr_t paddr, unsigned long size)
+void __iomem *__init apei_pre_map(paddr_t paddr, unsigned long size)
 {
 	void __iomem *vaddr;
 	struct apei_iomap *map;
@@ -139,7 +139,7 @@ void __iomem *apei_pre_map(paddr_t paddr, unsigned long size)
 /*
  * Used to post-unmap the specified IO memory area.
  */
-static void apei_post_unmap(paddr_t paddr, unsigned long size)
+static void __init apei_post_unmap(paddr_t paddr, unsigned long size)
 {
 	struct apei_iomap *map;
 	unsigned long flags;
@@ -191,7 +191,7 @@ static int apei_check_gar(struct acpi_generic_address *reg,
 }
 
 /* Pre-map, working on GAR */
-int apei_pre_map_gar(struct acpi_generic_address *reg)
+int __init apei_pre_map_gar(struct acpi_generic_address *reg)
 {
 	u64 paddr;
 	void __iomem *vaddr;
@@ -212,7 +212,7 @@ int apei_pre_map_gar(struct acpi_generic_address *reg)
 }
 
 /* Post-unmap, working on GAR */
-int apei_post_unmap_gar(struct acpi_generic_address *reg)
+int __init apei_post_unmap_gar(struct acpi_generic_address *reg)
 {
 	u64 paddr;
 	int rc;

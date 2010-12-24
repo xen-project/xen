@@ -37,6 +37,7 @@
 #include <xen/string.h>
 #include <xen/types.h>
 #include <xen/spinlock.h>
+#include <xen/init.h>
 #include <xen/cper.h>
 #include <asm/io.h>
 #include <acpi/acpi.h>
@@ -201,10 +202,10 @@ typedef int (*apei_exec_entry_func_t)(struct apei_exec_context *ctx,
 				      struct acpi_whea_header *entry,
 				      void *data);
 
-static int apei_exec_for_each_entry(struct apei_exec_context *ctx,
-				    apei_exec_entry_func_t func,
-				    void *data,
-				    int *end)
+static int __init apei_exec_for_each_entry(struct apei_exec_context *ctx,
+					   apei_exec_entry_func_t func,
+					   void *data,
+					   int *end)
 {
 	u8 ins;
 	int i, rc;
@@ -229,9 +230,9 @@ static int apei_exec_for_each_entry(struct apei_exec_context *ctx,
 	return 0;
 }
 
-static int pre_map_gar_callback(struct apei_exec_context *ctx,
-				struct acpi_whea_header *entry,
-				void *data)
+static int __init pre_map_gar_callback(struct apei_exec_context *ctx,
+				       struct acpi_whea_header *entry,
+				       void *data)
 {
 	u8 ins = entry->instruction;
 
@@ -242,7 +243,7 @@ static int pre_map_gar_callback(struct apei_exec_context *ctx,
 }
 
 /* Pre-map all GARs in action table. */
-int apei_exec_pre_map_gars(struct apei_exec_context *ctx)
+int __init apei_exec_pre_map_gars(struct apei_exec_context *ctx)
 {
 	int rc, end;
 
@@ -258,9 +259,9 @@ int apei_exec_pre_map_gars(struct apei_exec_context *ctx)
 	return rc;
 }
 
-static int post_unmap_gar_callback(struct apei_exec_context *ctx,
-				   struct acpi_whea_header *entry,
-				   void *data)
+static int __init post_unmap_gar_callback(struct apei_exec_context *ctx,
+					  struct acpi_whea_header *entry,
+					  void *data)
 {
 	u8 ins = entry->instruction;
 
@@ -271,7 +272,7 @@ static int post_unmap_gar_callback(struct apei_exec_context *ctx,
 }
 
 /* Post-unmap all GAR in action table. */
-int apei_exec_post_unmap_gars(struct apei_exec_context *ctx)
+int __init apei_exec_post_unmap_gars(struct apei_exec_context *ctx)
 {
 	return apei_exec_for_each_entry(ctx, post_unmap_gar_callback,
 					NULL, NULL);
