@@ -22,8 +22,8 @@
 #define IO_APIC_REDIR_DEST_PHYSICAL	0x00000
 
 extern int apic_verbosity;
-extern int x2apic_enabled;
-extern int directed_eoi_enabled;
+extern bool_t x2apic_enabled;
+extern bool_t directed_eoi_enabled;
 
 void x2apic_bsp_setup(void);
 void x2apic_ap_setup(void);

@@ -38,8 +38,8 @@
 #include <mach_apic.h>
 #include <io_ports.h>
 
-static int tdt_enabled __read_mostly;
-static int tdt_enable __initdata = 1;
+static bool_t tdt_enabled __read_mostly;
+static bool_t tdt_enable __initdata = 1;
 boolean_param("tdt", tdt_enable);
 
 static struct {
@@ -71,11 +71,11 @@ static int enable_local_apic __initdata = 0; /* -1=force-disable, +1=force-enabl
  */
 int apic_verbosity;
 
-static int opt_x2apic = 1;
+static bool_t __initdata opt_x2apic = 1;
 boolean_param("x2apic", opt_x2apic);
 
-int x2apic_enabled __read_mostly = 0;
-int directed_eoi_enabled __read_mostly = 0;
+bool_t __read_mostly x2apic_enabled = 0;
+bool_t __read_mostly directed_eoi_enabled = 0;
 
 /*
  * The following vectors are part of the Linux architecture, there
@@ -162,7 +162,7 @@ void __init apic_intr_init(void)
 /* Using APIC to generate smp_local_timer_interrupt? */
 static bool_t __read_mostly using_apic_timer;
 
-static int enabled_via_apicbase;
+static bool_t __read_mostly enabled_via_apicbase;
 
 void enable_NMI_through_LVT0 (void * dummy)
 {

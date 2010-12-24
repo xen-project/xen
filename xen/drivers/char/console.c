@@ -49,15 +49,15 @@ static unsigned char __read_mostly opt_conswitch[3] = "a";
 string_param("conswitch", opt_conswitch);
 
 /* sync_console: force synchronous console output (useful for debugging). */
-static int __read_mostly opt_sync_console;
+static bool_t __initdata opt_sync_console;
 boolean_param("sync_console", opt_sync_console);
 
 /* console_to_ring: send guest (incl. dom 0) console data to console ring. */
-static int __read_mostly opt_console_to_ring;
+static bool_t __read_mostly opt_console_to_ring;
 boolean_param("console_to_ring", opt_console_to_ring);
 
 /* console_timestamps: include a timestamp prefix on every Xen console line. */
-static int __read_mostly opt_console_timestamps;
+static bool_t __read_mostly opt_console_timestamps;
 boolean_param("console_timestamps", opt_console_timestamps);
 
 /* conring_size: allows a large console ring than default (16kB). */

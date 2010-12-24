@@ -62,7 +62,7 @@
 #include <public/version.h>
 #include <public/memory.h>
 
-int hvm_enabled __read_mostly;
+bool_t __read_mostly hvm_enabled;
 
 unsigned int opt_hvm_debug_level __read_mostly;
 integer_param("hvm_debug", opt_hvm_debug_level);

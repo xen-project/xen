@@ -23,13 +23,12 @@
 
 #include "mce.h"
 
-int mce_disabled;
+bool_t __read_mostly mce_disabled;
 invbool_param("mce", mce_disabled);
-int is_mc_panic;
-unsigned int nr_mce_banks;
-
-int mce_broadcast = 0;
-int firstbank;
+bool_t __read_mostly mce_broadcast = 0;
+bool_t is_mc_panic;
+unsigned int __read_mostly nr_mce_banks;
+int __read_mostly firstbank;
 
 static void intpose_init(void);
 static void mcinfo_clear(struct mc_info *);

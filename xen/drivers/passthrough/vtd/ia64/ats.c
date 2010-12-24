@@ -30,7 +30,7 @@
 
 struct pci_ats_dev;
 
-int ats_enabled = 0;
+bool_t __read_mostly ats_enabled = 0;
 
 struct acpi_drhd_unit * find_ats_dev_drhd(struct iommu *iommu)
 {

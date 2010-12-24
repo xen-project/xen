@@ -42,7 +42,7 @@
 unsigned int xen_processor_pmbits = XEN_PROCESSOR_PM_PX;
 
 /* opt_dom0_vcpus_pin: If true, dom0 VCPUs are pinned. */
-static unsigned int opt_dom0_vcpus_pin;
+static bool_t opt_dom0_vcpus_pin;
 boolean_param("dom0_vcpus_pin", opt_dom0_vcpus_pin);
 
 /* set xen as default cpufreq */

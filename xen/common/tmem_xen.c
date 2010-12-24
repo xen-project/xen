@@ -15,22 +15,22 @@
 
 #define EXPORT /* indicates code other modules are dependent upon */
 
-EXPORT int opt_tmem = 1;
+EXPORT bool_t __read_mostly opt_tmem = 1;
 boolean_param("tmem", opt_tmem);
 
-EXPORT int opt_tmem_compress = 0;
+EXPORT bool_t __read_mostly opt_tmem_compress = 0;
 boolean_param("tmem_compress", opt_tmem_compress);
 
-EXPORT int opt_tmem_dedup = 0;
+EXPORT bool_t __read_mostly opt_tmem_dedup = 0;
 boolean_param("tmem_dedup", opt_tmem_dedup);
 
-EXPORT int opt_tmem_tze = 0;
+EXPORT bool_t __read_mostly opt_tmem_tze = 0;
 boolean_param("tmem_tze", opt_tmem_tze);
 
-EXPORT int opt_tmem_shared_auth = 0;
+EXPORT bool_t __read_mostly opt_tmem_shared_auth = 0;
 boolean_param("tmem_shared_auth", opt_tmem_shared_auth);
 
-EXPORT int opt_tmem_lock = 0;
+EXPORT int __read_mostly opt_tmem_lock = 0;
 integer_param("tmem_lock", opt_tmem_lock);
 
 EXPORT atomic_t freeable_page_count = ATOMIC_INIT(0);

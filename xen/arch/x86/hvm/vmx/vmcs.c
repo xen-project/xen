@@ -38,10 +38,10 @@
 #include <asm/shadow.h>
 #include <asm/tboot.h>
 
-static int __read_mostly opt_vpid_enabled = 1;
+static bool_t __read_mostly opt_vpid_enabled = 1;
 boolean_param("vpid", opt_vpid_enabled);
 
-static int __read_mostly opt_unrestricted_guest_enabled = 1;
+static bool_t __read_mostly opt_unrestricted_guest_enabled = 1;
 boolean_param("unrestricted_guest", opt_unrestricted_guest_enabled);
 
 /*

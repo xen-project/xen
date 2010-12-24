@@ -27,7 +27,7 @@
 #include <xen/smp.h>
 #include <asm/mach-default/mach_mpparse.h>
 
-static int __initdata x2apic_phys; /* By default we use logical cluster mode. */
+static bool_t __initdata x2apic_phys; /* By default we use logical cluster mode. */
 boolean_param("x2apic_phys", x2apic_phys);
 
 static void init_apic_ldr_x2apic_phys(void)

@@ -103,7 +103,7 @@ void (*ioemul_handle_quirk)(
 static int debug_stack_lines = 20;
 integer_param("debug_stack_lines", debug_stack_lines);
 
-static int opt_ler;
+static bool_t __devinitdata opt_ler;
 boolean_param("ler", opt_ler);
 
 #ifdef CONFIG_X86_32

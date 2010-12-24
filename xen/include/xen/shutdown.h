@@ -2,7 +2,7 @@
 #define __XEN_SHUTDOWN_H__
 
 /* opt_noreboot: If true, machine will need manual reset on error. */
-extern int opt_noreboot;
+extern bool_t opt_noreboot;
 
 void dom0_shutdown(u8 reason);
 

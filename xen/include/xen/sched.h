@@ -639,7 +639,7 @@ void watchdog_domain_destroy(struct domain *d);
 void set_vcpu_migration_delay(unsigned int delay);
 unsigned int get_vcpu_migration_delay(void);
 
-extern int sched_smt_power_savings;
+extern bool_t sched_smt_power_savings;
 
 extern enum cpufreq_controller {
     FREQCTL_none, FREQCTL_dom0_kernel, FREQCTL_xen

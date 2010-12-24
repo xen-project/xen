@@ -137,7 +137,7 @@ l1_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
 #define PTE_UPDATE_WITH_CMPXCHG
 #endif
 
-int mem_hotplug = 0;
+bool_t __read_mostly mem_hotplug = 0;
 
 /* Private domain structs for DOMID_XEN and DOMID_IO. */
 struct domain *dom_xen, *dom_io, *dom_cow;
@@ -152,7 +152,7 @@ unsigned long __read_mostly pdx_group_valid[BITS_TO_LONGS(
 
 #define PAGE_CACHE_ATTRS (_PAGE_PAT|_PAGE_PCD|_PAGE_PWT)
 
-int opt_allow_superpage;
+bool_t __read_mostly opt_allow_superpage;
 boolean_param("allowsuperpage", opt_allow_superpage);
 
 #ifdef __i386__

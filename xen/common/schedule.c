@@ -44,7 +44,7 @@ string_param("sched", opt_sched);
  * scheduler will give preferrence to partially idle package compared to
  * the full idle package, when picking pCPU to schedule vCPU.
  */
-int sched_smt_power_savings = 0;
+bool_t sched_smt_power_savings = 0;
 boolean_param("sched_smt_power_savings", sched_smt_power_savings);
 
 /* Various timer handlers. */

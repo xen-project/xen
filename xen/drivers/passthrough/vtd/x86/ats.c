@@ -47,7 +47,7 @@ static LIST_HEAD(ats_devices);
 static void parse_ats_param(char *s);
 custom_param("ats", parse_ats_param);
 
-int __read_mostly ats_enabled = 1;
+bool_t __read_mostly ats_enabled = 1;
 
 static void __init parse_ats_param(char *s)
 {

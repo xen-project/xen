@@ -78,15 +78,10 @@ int __acpi_release_global_lock(unsigned int *lock);
 	    :"=r"(n_hi), "=r"(n_lo)	\
 	    :"0"(n_hi), "1"(n_lo))
 
-extern int acpi_lapic;
-extern int acpi_ioapic;
-extern int acpi_noirq;
-extern int acpi_strict;
-extern int acpi_disabled;
-extern int acpi_ht;
-extern int acpi_pci_disabled;
-extern int acpi_skip_timer_override;
-extern int acpi_use_timer_override;
+extern bool_t acpi_lapic, acpi_ioapic, acpi_noirq;
+extern bool_t acpi_force, acpi_ht;
+extern bool_t acpi_disabled, acpi_pci_disabled;
+extern bool_t acpi_skip_timer_override;
 extern u32 acpi_smi_cmd;
 extern u8 acpi_enable_value, acpi_disable_value;
 extern u8 acpi_sci_flags;

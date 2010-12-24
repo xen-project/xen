@@ -234,7 +234,7 @@ int cpu_has_amd_erratum(const struct cpuinfo_x86 *cpu, int osvw, ...)
  * amd_flush_filter={on,off}. Forcibly Enable or disable the TLB flush
  * filter on AMD 64-bit processors.
  */
-static int __read_mostly flush_filter_force;
+static s8 __devinit flush_filter_force;
 static void __init flush_filter(char *s)
 {
 	switch (parse_bool(s))

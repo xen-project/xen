@@ -30,7 +30,7 @@
 	((1UL << (PAGE_SHIFT - 3)) - 1)))
 
 static unsigned long table_size;
-static int opt_contig_mem = 0;
+static bool_t __read_mostly opt_contig_mem;
 boolean_param("contig_mem", opt_contig_mem);
 #else
 #define opt_contig_mem 1

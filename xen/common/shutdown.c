@@ -11,7 +11,7 @@
 #include <public/sched.h>
 
 /* opt_noreboot: If true, machine will need manual reset on error. */
-int opt_noreboot;
+bool_t __read_mostly opt_noreboot;
 boolean_param("noreboot", opt_noreboot);
 
 static void maybe_reboot(void)

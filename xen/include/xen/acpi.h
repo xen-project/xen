@@ -440,8 +440,6 @@ static inline int acpi_get_pxm(acpi_handle handle)
 }
 #endif
 
-extern int pnpacpi_disabled;
-
 void acpi_reboot(void);
 
 void acpi_dmar_zap(void);

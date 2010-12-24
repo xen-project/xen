@@ -50,7 +50,7 @@ extern u8 boot_edid_info[128];
 extern struct boot_video_info boot_vid_info;
 
 /* opt_nosmp: If true, secondary processors are ignored. */
-static int __initdata opt_nosmp = 0;
+static bool_t __initdata opt_nosmp;
 boolean_param("nosmp", opt_nosmp);
 
 /* maxcpus: maximum number of CPUs to activate. */
@@ -58,7 +58,7 @@ static unsigned int __initdata max_cpus = NR_CPUS;
 integer_param("maxcpus", max_cpus);
 
 /* opt_watchdog: If true, run a watchdog NMI on each processor. */
-static int __initdata opt_watchdog = 0;
+static bool_t __initdata opt_watchdog;
 boolean_param("watchdog", opt_watchdog);
 
 /* **** Linux config option: propagated to domain0. */
@@ -80,10 +80,10 @@ boolean_param("noapic", skip_ioapic_setup);
 
 /* **** Linux config option: propagated to domain0. */
 /* xen_cpuidle: xen control cstate. */
-/*static*/ int xen_cpuidle = -1;
+s8 __read_mostly xen_cpuidle = -1;
 boolean_param("cpuidle", xen_cpuidle);
 
-int early_boot = 1;
+bool_t __read_mostly early_boot = 1;
 
 cpumask_t __read_mostly cpu_present_map;
 
@@ -103,9 +103,8 @@ struct cpuinfo_x86 __read_mostly boot_cpu_data = { 0, 0, 0, 0, -1 };
 
 unsigned long __read_mostly mmu_cr4_features = X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE;
 
-int __read_mostly acpi_disabled;
-
-int __read_mostly acpi_force;
+bool_t __initdata acpi_disabled;
+bool_t __initdata acpi_force;
 static char __initdata acpi_param[10] = "";
 static void __init parse_acpi_param(char *s)
 {
@@ -122,10 +121,6 @@ static void __init parse_acpi_param(char *s)
         acpi_force = 1;
         acpi_ht = 1;
         acpi_disabled = 0;
-    }
-    else if ( !strcmp(s, "strict") )
-    {
-        acpi_strict = 1;
     }
     else if ( !strcmp(s, "ht") )
     {

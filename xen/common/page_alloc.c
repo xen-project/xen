@@ -52,7 +52,7 @@ string_param("badpage", opt_badpage);
 /*
  * no-bootscrub -> Free pages are not zeroed during boot.
  */
-static int opt_bootscrub __initdata = 1;
+static bool_t opt_bootscrub __initdata = 1;
 boolean_param("bootscrub", opt_bootscrub);
 
 /*

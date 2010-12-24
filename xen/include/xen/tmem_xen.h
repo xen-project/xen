@@ -51,20 +51,20 @@ extern int tmh_init(void);
 extern void tmh_release_avail_pages_to_host(void);
 extern void tmh_scrub_page(struct page_info *pi, unsigned int memflags);
 
-extern int opt_tmem_compress;
-static inline int tmh_compression_enabled(void)
+extern bool_t opt_tmem_compress;
+static inline bool_t tmh_compression_enabled(void)
 {
     return opt_tmem_compress;
 }
 
-extern int opt_tmem_dedup;
-static inline int tmh_dedup_enabled(void)
+extern bool_t opt_tmem_dedup;
+static inline bool_t tmh_dedup_enabled(void)
 {
     return opt_tmem_dedup;
 }
 
-extern int opt_tmem_tze;
-static inline int tmh_tze_enabled(void)
+extern bool_t opt_tmem_tze;
+static inline bool_t tmh_tze_enabled(void)
 {
     return opt_tmem_tze;
 }
@@ -74,21 +74,19 @@ static inline void tmh_tze_disable(void)
     opt_tmem_tze = 0;
 }
 
-extern int opt_tmem_shared_auth;
-static inline int tmh_shared_auth(void)
+extern bool_t opt_tmem_shared_auth;
+static inline bool_t tmh_shared_auth(void)
 {
     return opt_tmem_shared_auth;
 }
 
-extern int opt_tmem;
-static inline int tmh_enabled(void)
+extern bool_t opt_tmem;
+static inline bool_t tmh_enabled(void)
 {
     return opt_tmem;
 }
 
 extern int opt_tmem_lock;
-
-extern int opt_tmem_flush_dups;
 
 /*
  * Memory free page list management
@@ -289,7 +287,6 @@ static inline void tmh_free_infra(void *p)
 }
 
 #define tmh_lock_all  opt_tmem_lock
-#define tmh_flush_dups  opt_tmem_flush_dups
 #define tmh_called_from_tmem(_memflags) (_memflags & MEMF_tmem)
 
 /*  "Client" (==domain) abstraction */

@@ -24,8 +24,7 @@
 #include "dmar.h"
 #include <xen/keyhandler.h>
 
-extern int qinval_enabled;
-extern int ats_enabled;
+extern bool_t ats_enabled;
 extern bool_t rwbf_quirk;
 
 void print_iommu_regs(struct acpi_drhd_unit *drhd);

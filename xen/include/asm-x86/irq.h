@@ -38,6 +38,8 @@ DECLARE_PER_CPU(vector_irq_t, vector_irq);
 
 extern u8 *irq_vector;
 
+extern bool_t opt_noirqbalance;
+
 /*
  * Per-cpu current frame pointer - the location of the last exception frame on
  * the stack

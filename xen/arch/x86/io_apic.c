@@ -43,7 +43,7 @@ static struct { int pin, apic; } ioapic_i8259 = { -1, -1 };
 
 static DEFINE_SPINLOCK(ioapic_lock);
 
-int skip_ioapic_setup;
+bool_t __read_mostly skip_ioapic_setup;
 
 #ifndef sis_apic_bug
 /*
@@ -619,7 +619,7 @@ void /*__init*/ setup_ioapic_dest(void)
     int pin, ioapic, irq, irq_entry;
     struct irq_cfg *cfg;
 
-    if (skip_ioapic_setup == 1)
+    if (skip_ioapic_setup)
         return;
 
     for (ioapic = 0; ioapic < nr_ioapics; ioapic++) {

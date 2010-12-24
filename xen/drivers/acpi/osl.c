@@ -63,9 +63,6 @@ EXPORT_SYMBOL(acpi_in_debugger);
 extern char line_buf[80];
 #endif				/*ENABLE_DEBUGGER */
 
-int acpi_specific_hotkey_enabled = TRUE;
-EXPORT_SYMBOL(acpi_specific_hotkey_enabled);
-
 void acpi_os_printf(const char *fmt, ...)
 {
 	va_list args;

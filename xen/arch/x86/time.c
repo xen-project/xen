@@ -175,7 +175,6 @@ static inline struct time_scale scale_reciprocal(struct time_scale scale)
  * cpu_mask that denotes the CPUs that needs timer interrupt coming in as
  * IPIs in place of local APIC timers
  */
-extern int xen_cpuidle;
 static cpumask_t pit_broadcast_mask;
 
 static void smp_send_timer_broadcast_ipi(void)

@@ -195,7 +195,7 @@ extern struct cpuinfo_x86 cpu_data[];
 extern u64 host_pat;
 extern int phys_proc_id[NR_CPUS];
 extern int cpu_core_id[NR_CPUS];
-extern int opt_cpu_info;
+extern bool_t opt_cpu_info;
 
 /* Maximum width of physical addresses supported by the hardware */
 extern unsigned int paddr_bits;

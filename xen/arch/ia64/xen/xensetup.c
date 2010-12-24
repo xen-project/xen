@@ -56,7 +56,7 @@ extern void trap_init(void);
 extern void xen_patch_kernel(void);
 
 /* nosmp: ignore secondary processors */
-static int __initdata opt_nosmp;
+static bool_t __initdata opt_nosmp;
 boolean_param("nosmp", opt_nosmp);
 
 /* maxcpus: maximum number of CPUs to activate */
@@ -70,7 +70,7 @@ static int __initdata opt_xencons = 1;
 integer_param("xencons", opt_xencons);
 
 /* xencons_poll: toggle non-legacy xencons UARTs to run in polling mode */
-static int __initdata opt_xencons_poll;
+static bool_t __initdata opt_xencons_poll;
 boolean_param("xencons_poll", opt_xencons_poll);
 
 #define XENHEAP_DEFAULT_SIZE    KERNEL_TR_PAGE_SIZE
@@ -148,7 +148,7 @@ struct ns16550_defaults ns16550_com2 = {
 };
 
 /* efi_print: print efi table at boot */
-static int __initdata opt_efi_print;
+static bool_t __initdata opt_efi_print;
 boolean_param("efi_print", opt_efi_print);
 
 /* print EFI memory map: */

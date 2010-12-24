@@ -34,7 +34,7 @@
  * iommu_inclusive_mapping: when set, all memory below 4GB is included in dom0
  * 1:1 iommu mappings except xen and unusable regions.
  */
-static int __read_mostly iommu_inclusive_mapping = 1;
+static bool_t __initdata iommu_inclusive_mapping = 1;
 boolean_param("iommu_inclusive_mapping", iommu_inclusive_mapping);
 
 void *map_vtd_domain_page(u64 maddr)

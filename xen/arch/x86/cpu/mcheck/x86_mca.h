@@ -179,7 +179,7 @@ struct mca_error_handler
 };
 
 /* Global variables */
-extern int mce_disabled;
+extern bool_t mce_disabled;
 extern unsigned int nr_mce_banks;
 
 #endif /* X86_MCA_H */

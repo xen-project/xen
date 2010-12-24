@@ -72,7 +72,7 @@ unsigned long hpet_address;
  * if RTC interrupts are enabled. Enable this option if want to always enable
  * legacy hpet broadcast for deep C state
  */
-int force_hpet_broadcast;
+static bool_t __read_mostly force_hpet_broadcast;
 boolean_param("hpetbroadcast", force_hpet_broadcast);
 
 /*

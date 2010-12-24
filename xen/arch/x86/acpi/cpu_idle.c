@@ -79,7 +79,7 @@ extern void menu_get_trace_data(u32 *expected, u32 *pred);
 static void (*pm_idle_save) (void) __read_mostly;
 unsigned int max_cstate __read_mostly = ACPI_PROCESSOR_MAX_POWER - 1;
 integer_param("max_cstate", max_cstate);
-static int local_apic_timer_c2_ok __read_mostly = 0;
+static bool_t __read_mostly local_apic_timer_c2_ok;
 boolean_param("lapic_timer_c2_ok", local_apic_timer_c2_ok);
 
 static struct acpi_processor_power *__read_mostly processor_powers[NR_CPUS];

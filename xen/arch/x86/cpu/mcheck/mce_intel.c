@@ -20,9 +20,9 @@
 DEFINE_PER_CPU(struct mca_banks *, mce_banks_owned);
 DEFINE_PER_CPU(struct mca_banks *, no_cmci_banks);
 DEFINE_PER_CPU(struct mca_banks *, mce_clear_banks);
-int cmci_support = 0;
-int ser_support = 0;
-static int mce_force_broadcast;
+bool_t __read_mostly cmci_support = 0;
+static bool_t __read_mostly ser_support = 0;
+static bool_t __read_mostly mce_force_broadcast;
 boolean_param("mce_fb", mce_force_broadcast);
 
 static int nr_intel_ext_msrs = 0;
@@ -1135,7 +1135,8 @@ static int mce_is_broadcast(struct cpuinfo_x86 *c)
 /* Check and init MCA */
 static void intel_init_mca(struct cpuinfo_x86 *c)
 {
-    int broadcast, cmci=0, ser=0, ext_num = 0, first;
+    bool_t broadcast, cmci = 0, ser = 0;
+    int ext_num = 0, first;
     uint64_t msr_content;
 
     broadcast = mce_is_broadcast(c);

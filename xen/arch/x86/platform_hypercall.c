@@ -177,7 +177,6 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
 
     case XENPF_platform_quirk:
     {
-        extern int opt_noirqbalance;
         int quirk_id = op->u.platform_quirk.quirk_id;
 
         ret = xsm_platform_quirk(quirk_id);

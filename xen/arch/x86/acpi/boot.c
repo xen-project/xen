@@ -53,22 +53,20 @@ int sbf_port;
 #define PREFIX			"ACPI: "
 
 #ifdef CONFIG_ACPI_PCI
-int acpi_noirq __initdata;	/* skip ACPI IRQ initialization */
-int acpi_pci_disabled __initdata; /* skip ACPI PCI scan and IRQ initialization */
+bool_t __initdata acpi_noirq;	/* skip ACPI IRQ initialization */
+bool_t __initdata acpi_pci_disabled; /* skip ACPI PCI scan and IRQ initialization */
 #else
-int acpi_noirq __initdata = 1;
-int acpi_pci_disabled __initdata = 1;
+bool_t __initdata acpi_noirq = 1;
+bool_t __initdata acpi_pci_disabled = 1;
 #endif
-int acpi_ht __initdata = 1;	/* enable HT */
+bool_t __initdata acpi_ht = 1;	/* enable HT */
 
-int acpi_lapic;
-int acpi_ioapic;
-int acpi_strict;
-EXPORT_SYMBOL(acpi_strict);
+bool_t __initdata acpi_lapic;
+bool_t __initdata acpi_ioapic;
 
 u8 acpi_sci_flags __initdata;
 int acpi_sci_override_gsi __initdata;
-int acpi_skip_timer_override __initdata;
+bool_t acpi_skip_timer_override __initdata;
 
 #ifdef CONFIG_X86_LOCAL_APIC
 static u64 acpi_lapic_addr __initdata = APIC_DEFAULT_PHYS_BASE;
@@ -686,8 +684,6 @@ static void __init acpi_process_madt(void)
 #endif
 	return;
 }
-
-extern int acpi_force;
 
 #ifdef __i386__
 

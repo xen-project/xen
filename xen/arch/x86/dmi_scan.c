@@ -200,8 +200,6 @@ static __init int reset_videomode_after_s3(struct dmi_blacklist *d)
 
 
 #ifdef	CONFIG_ACPI_BOOT
-extern int acpi_force;
-
 static __init __attribute__((unused)) int dmi_disable_acpi(struct dmi_blacklist *d) 
 { 
 	if (!acpi_force) { 

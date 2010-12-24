@@ -19,10 +19,13 @@
 #define disable_pse 0
 
 static int cachesize_override __cpuinitdata = -1;
-static int disable_x86_fxsr __cpuinitdata;
-static int disable_x86_serial_nr __cpuinitdata;
+size_param("cachesize", cachesize_override);
+static bool_t __cpuinitdata disable_x86_fxsr;
+boolean_param("nofxsr", disable_x86_fxsr);
+static bool_t __cpuinitdata disable_x86_serial_nr;
+boolean_param("noserialnumber", disable_x86_serial_nr);
 
-static int use_xsave;
+static bool_t __cpuinitdata use_xsave;
 boolean_param("xsave", use_xsave);
 unsigned int __devinitdata opt_cpuid_mask_ecx = ~0u;
 integer_param("cpuid_mask_ecx", opt_cpuid_mask_ecx);
@@ -68,9 +71,7 @@ static struct cpu_dev default_cpu = {
 };
 static struct cpu_dev * this_cpu = &default_cpu;
 
-integer_param("cachesize", cachesize_override);
-
-int __cpuinitdata opt_cpu_info;
+bool_t __cpuinitdata opt_cpu_info;
 boolean_param("cpuinfo", opt_cpu_info);
 
 int __cpuinit get_model_name(struct cpuinfo_x86 *c)
@@ -194,9 +195,6 @@ static void __cpuinit get_cpu_vendor(struct cpuinfo_x86 *c, int early)
 	c->x86_vendor = X86_VENDOR_UNKNOWN;
 	this_cpu = &default_cpu;
 }
-
-
-boolean_param("nofxsr", disable_x86_fxsr);
 
 
 /* Standard macro to see if a specific flag is changeable */
@@ -344,9 +342,6 @@ static void __cpuinit squash_the_stupid_serial_number(struct cpuinfo_x86 *c)
 		c->cpuid_level = cpuid_eax(0);
 	}
 }
-
-boolean_param("noserialnumber", disable_x86_serial_nr);
-
 
 
 /*

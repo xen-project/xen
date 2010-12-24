@@ -33,7 +33,7 @@
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/svm/vmcb.h>
 
-static int __read_mostly opt_vpmu_enabled;
+static bool_t __read_mostly opt_vpmu_enabled;
 boolean_param("vpmu", opt_vpmu_enabled);
 
 int vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)

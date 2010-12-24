@@ -26,6 +26,28 @@ int tainted;
 
 xen_commandline_t saved_cmdline;
 
+static void __init assign_integer_param(
+    struct kernel_param *param, uint64_t val)
+{
+    switch ( param->len )
+    {
+    case sizeof(uint8_t):
+        *(uint8_t *)param->var = val;
+        break;
+    case sizeof(uint16_t):
+        *(uint16_t *)param->var = val;
+        break;
+    case sizeof(uint32_t):
+        *(uint32_t *)param->var = val;
+        break;
+    case sizeof(uint64_t):
+        *(uint64_t *)param->var = val;
+        break;
+    default:
+        BUG();
+    }
+}
+
 void __init cmdline_parse(char *cmdline)
 {
     char opt[100], *optval, *optkey, *q;
@@ -79,33 +101,28 @@ void __init cmdline_parse(char *cmdline)
                 strlcpy(param->var, optval, param->len);
                 break;
             case OPT_UINT:
-                *(unsigned int *)param->var = simple_strtol(optval, NULL, 0);
+                assign_integer_param(
+                    param,
+                    simple_strtoll(optval, NULL, 0));
                 break;
             case OPT_BOOL:
             case OPT_INVBOOL:
                 if ( !parse_bool(optval) )
                     bool_assert = !bool_assert;
-                if ( param->type == OPT_INVBOOL )
-                    bool_assert = !bool_assert;
-                *(int *)param->var = bool_assert;
+                assign_integer_param(
+                    param,
+                    (param->type == OPT_BOOL) == bool_assert);
                 break;
-            case OPT_SIZE: {
-                uint64_t sz = parse_size_and_unit(optval, NULL);
-                switch ( param->len )
-                {
-                case sizeof(uint32_t):
-                    *(uint32_t *)param->var = sz;
-                    break;
-                case sizeof(uint64_t):
-                    *(uint64_t *)param->var = sz;
-                    break;
-                default:
-                    BUG();
-                }
+            case OPT_SIZE:
+                assign_integer_param(
+                    param,
+                    parse_size_and_unit(optval, NULL));
                 break;
-            }
             case OPT_CUSTOM:
                 ((void (*)(const char *))param->var)(optval);
+                break;
+            default:
+                BUG();
                 break;
             }
         }
