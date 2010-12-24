@@ -175,6 +175,18 @@ integer_param("sched_credit2_migrate_resist", opt_migrate_resist);
 #define RQD(_ops, _cpu)     (&CSCHED_PRIV(_ops)->rqd[c2r(_ops, _cpu)])
 
 /*
+ * Shifts for load average.
+ * - granularity: Reduce granularity of time by a factor of 1000, so we can use 32-bit maths
+ * - window shift: Given granularity shift, make the window about 1 second
+ * - scale shift: Shift up load by this amount rather than using fractions; 128 corresponds 
+ *   to a load of 1.
+ */
+#define LOADAVG_GRANULARITY_SHIFT (10)
+int opt_load_window_shift=18;
+#define  LOADAVG_WINDOW_SHIFT_MIN 4
+integer_param("credit2_load_window_shift", opt_load_window_shift);
+
+/*
  * Per-runqueue data
  */
 struct csched_runqueue_data {
@@ -190,6 +202,8 @@ struct csched_runqueue_data {
     cpumask_t idle,        /* Currently idle */
         tickled;           /* Another cpu in the queue is already targeted for this one */
     int load;              /* Instantaneous load: Length of queue  + num non-idle threads */
+    s_time_t load_last_update;  /* Last time average was updated */
+    s_time_t avgload;           /* Decaying queue load */
 };
 
 /*
@@ -204,6 +218,8 @@ struct csched_private {
     int runq_map[NR_CPUS];
     cpumask_t active_queues; /* Queues which may have active cpus */
     struct csched_runqueue_data rqd[NR_CPUS];
+
+    int load_window_shift;
 };
 
 /*
@@ -273,13 +289,34 @@ static void
 update_load(const struct scheduler *ops,
             struct csched_runqueue_data *rqd, int change, s_time_t now)
 {
-    rqd->load += change;
+    struct csched_private *prv = CSCHED_PRIV(ops);
+    s_time_t delta=-1;
 
+    now >>= LOADAVG_GRANULARITY_SHIFT;
+
+    if ( rqd->load_last_update + (1ULL<<prv->load_window_shift) < now )
+    {
+        rqd->avgload = rqd->load << (1ULL<prv->load_window_shift);
+    }
+    else
+    {
+        delta = now - rqd->load_last_update;
+
+        rqd->avgload =
+            ( ( delta * ( (unsigned long long)rqd->load << prv->load_window_shift ) )
+              + ( ((1ULL<<prv->load_window_shift) - delta) * rqd->avgload ) ) >> prv->load_window_shift;
+    }
+
+    rqd->load += change;
+    rqd->load_last_update = now;
     {
         struct {
-            unsigned load:4;
+            unsigned load:4, avgload:28;
+            int delta;
         } d;
         d.load = rqd->load;
+        d.avgload = rqd->avgload;
+        d.delta = delta;
         trace_var(TRC_CSCHED2_UPDATE_LOAD, 0,
                   sizeof(d),
                   (unsigned char *)&d);
@@ -1610,6 +1647,15 @@ csched_init(struct scheduler *ops)
            " WARNING: This is experimental software in development.\n" \
            " Use at your own risk.\n");
 
+    printk(" load_window_shift: %d\n", opt_load_window_shift);
+
+    if ( opt_load_window_shift < LOADAVG_WINDOW_SHIFT_MIN )
+    {
+        printk("%s: opt_load_window_shift %d below min %d, resetting\n",
+               __func__, opt_load_window_shift, LOADAVG_WINDOW_SHIFT_MIN);
+        opt_load_window_shift = LOADAVG_WINDOW_SHIFT_MIN;
+    }
+
     /* Basically no CPU information is available at this point; just
      * set up basic structures, and a callback when the CPU info is
      * available. */
@@ -1630,6 +1676,8 @@ csched_init(struct scheduler *ops)
         prv->runq_map[i] = -1;
         prv->rqd[i].id = -1;
     }
+
+    prv->load_window_shift = opt_load_window_shift;
 
     return 0;
 }
