@@ -41,23 +41,25 @@ DECLARE_PER_CPU(struct cpupool *, cpupool);
 
 static inline void vcpu_schedule_lock(struct vcpu *v)
 {
-    unsigned int cpu;
+    spinlock_t * lock;
 
     for ( ; ; )
     {
-        /* NB: For schedulers with multiple cores per runqueue,
-         * a vcpu may change processor w/o changing runqueues;
-         * so we may release a lock only to grab it again.
+        /* v->processor may change when grabbing the lock; but
+         * per_cpu(v->processor) may also change, if changing
+         * cpu pool also changes the scheduler lock.  Retry
+         * until they match.
          *
-         * If that is measured to be an issue, then the check
-         * should be changed to checking if the locks pointed to
-         * by cpu and v->processor are still the same.
+         * It may also be the case that v->processor may change
+         * but the lock may be the same; this will succeed
+         * in that case.
          */
-        cpu = v->processor;
-        spin_lock(per_cpu(schedule_data, cpu).schedule_lock);
-        if ( likely(v->processor == cpu) )
+        lock=per_cpu(schedule_data, v->processor).schedule_lock;
+
+        spin_lock(lock);
+        if ( likely(lock == per_cpu(schedule_data, v->processor).schedule_lock) )
             break;
-        spin_unlock(per_cpu(schedule_data, cpu).schedule_lock);
+        spin_unlock(lock);
     }
 }
 
