@@ -538,7 +538,7 @@ void update_max_weight(struct csched_runqueue_data *rqd, int new_weight, int old
     if ( new_weight > rqd->max_weight )
     {
         rqd->max_weight = new_weight;
-        printk("%s: Runqueue id %d max weight %d\n", __func__, rqd->id, rqd->max_weight);
+        d2printk("%s: Runqueue id %d max weight %d\n", __func__, rqd->id, rqd->max_weight);
     }
     else if ( old_weight == rqd->max_weight )
     {
@@ -554,7 +554,7 @@ void update_max_weight(struct csched_runqueue_data *rqd, int new_weight, int old
         }
 
         rqd->max_weight = max_weight;
-        printk("%s: Runqueue %d max weight %d\n", __func__, rqd->id, rqd->max_weight);
+        d2printk("%s: Runqueue %d max weight %d\n", __func__, rqd->id, rqd->max_weight);
     }
 }
 
