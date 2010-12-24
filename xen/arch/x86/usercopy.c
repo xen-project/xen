@@ -36,12 +36,9 @@ unsigned long __copy_to_user_ll(void __user *to, const void *from, unsigned n)
         "3:  lea 0(%3,%0,"STR(BYTES_PER_LONG)"),%0\n"
         "    jmp 2b\n"
         ".previous\n"
-        ".section __ex_table,\"a\"\n"
-        "    "__FIXUP_ALIGN"\n"
-        "    "__FIXUP_WORD" 4b,5b\n"
-        "    "__FIXUP_WORD" 0b,3b\n"
-        "    "__FIXUP_WORD" 1b,2b\n"
-        ".previous"
+        _ASM_EXTABLE(4b, 5b)
+        _ASM_EXTABLE(0b, 3b)
+        _ASM_EXTABLE(1b, 2b)
         : "=&c" (__n), "=&D" (__d0), "=&S" (__d1), "=&r" (__d2)
         : "0" (__n), "1" (to), "2" (from), "3" (__n)
         : "memory" );
@@ -82,12 +79,9 @@ __copy_from_user_ll(void *to, const void __user *from, unsigned n)
         "    pop  %0\n"
         "    jmp 2b\n"
         ".previous\n"
-        ".section __ex_table,\"a\"\n"
-        "    "__FIXUP_ALIGN"\n"
-        "    "__FIXUP_WORD" 4b,5b\n"
-        "    "__FIXUP_WORD" 0b,3b\n"
-        "    "__FIXUP_WORD" 1b,6b\n"
-        ".previous"
+        _ASM_EXTABLE(4b, 5b)
+        _ASM_EXTABLE(0b, 3b)
+        _ASM_EXTABLE(1b, 6b)
         : "=&c" (__n), "=&D" (__d0), "=&S" (__d1), "=&r" (__d2)
         : "0" (__n), "1" (to), "2" (from), "3" (__n)
         : "memory" );

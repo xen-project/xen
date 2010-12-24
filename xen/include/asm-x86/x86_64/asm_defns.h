@@ -130,4 +130,10 @@ STR(IRQ) #nr "_interrupt:\n\t"                  \
         GET_CPUINFO_FIELD(CPUINFO_current_vcpu,reg)     \
         movq (reg),reg;
 
+#ifdef __ASSEMBLY__
+# define _ASM_EX(p) p-.
+#else
+# define _ASM_EX(p) #p "-."
+#endif
+
 #endif /* __X86_64_ASM_DEFNS_H__ */

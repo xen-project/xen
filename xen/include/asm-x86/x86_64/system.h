@@ -19,10 +19,7 @@
         "3:     movl $1,%1\n"                                           \
         "       jmp 2b\n"                                               \
         ".previous\n"                                                   \
-        ".section __ex_table,\"a\"\n"                                   \
-        "       .align 8\n"                                             \
-        "       .quad 1b,3b\n"                                          \
-        ".previous"                                                     \
+        _ASM_EXTABLE(1b, 3b)                                            \
         : "=a" (_o), "=r" (_rc)                                         \
         : _regtype (_n), "m" (*__xg((volatile void *)_p)), "0" (_o), "1" (0) \
         : "memory");

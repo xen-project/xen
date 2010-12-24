@@ -53,10 +53,7 @@ static inline int rdmsr_amd_safe(unsigned int msr, unsigned int *lo,
 		     "3: movl %6,%2\n"
 		     "   jmp 2b\n"
 		     ".previous\n"
-		     ".section __ex_table,\"a\"\n"
-		     __FIXUP_ALIGN "\n"
-		     __FIXUP_WORD " 1b,3b\n"
-		     ".previous\n"
+		     _ASM_EXTABLE(1b, 3b)
 		     : "=a" (*lo), "=d" (*hi), "=r" (err)
 		     : "c" (msr), "D" (0x9c5a203a), "2" (0), "i" (-EFAULT));
 
@@ -73,10 +70,7 @@ static inline int wrmsr_amd_safe(unsigned int msr, unsigned int lo,
 		     "3: movl %6,%0\n"
 		     "   jmp 2b\n"
 		     ".previous\n"
-		     ".section __ex_table,\"a\"\n"
-		     __FIXUP_ALIGN "\n"
-		     __FIXUP_WORD " 1b,3b\n"
-		     ".previous\n"
+		     _ASM_EXTABLE(1b, 3b)
 		     : "=r" (err)
 		     : "c" (msr), "a" (lo), "d" (hi), "D" (0x9c5a203a),
 		       "0" (0), "i" (-EFAULT));

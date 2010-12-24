@@ -122,10 +122,7 @@ void restore_fpu(struct vcpu *v)
             "   pop  %%"__OP"ax       \n"
             "   jmp  1b               \n"
             ".previous                \n"
-            ".section __ex_table,\"a\"\n"
-            "   "__FIXUP_ALIGN"       \n"
-            "   "__FIXUP_WORD" 1b,2b  \n"
-            ".previous                \n"
+            _ASM_EXTABLE(1b, 2b)
             : 
             : "m" (*fpu_ctxt),
               "i" (sizeof(v->arch.guest_context.fpu_ctxt)/4)

@@ -84,12 +84,8 @@ failsafe_callback:
 1:      call  create_bounce_frame
         jmp   test_all_events
 .previous
-.section __pre_ex_table,"a"
-        .quad .Lft0,.Lfx0
-.previous
-.section __ex_table,"a"
-        .quad .Ldf0,failsafe_callback
-.previous
+        _ASM_PRE_EXTABLE(.Lft0, .Lfx0)
+        _ASM_EXTABLE(.Ldf0, failsafe_callback)
 
         ALIGN
 /* No special register assumptions. */
@@ -412,14 +408,18 @@ UNLIKELY_END(bounce_failsafe)
         jz    domain_crash_synchronous
         movq  %rax,UREGS_rip+8(%rsp)
         ret
-.section __ex_table,"a"
-        .quad  .Lft2,domain_crash_synchronous ,  .Lft3,domain_crash_synchronous
-        .quad  .Lft4,domain_crash_synchronous ,  .Lft5,domain_crash_synchronous
-        .quad  .Lft6,domain_crash_synchronous ,  .Lft7,domain_crash_synchronous
-        .quad  .Lft8,domain_crash_synchronous ,  .Lft9,domain_crash_synchronous
-        .quad .Lft10,domain_crash_synchronous , .Lft11,domain_crash_synchronous
-        .quad .Lft12,domain_crash_synchronous , .Lft13,domain_crash_synchronous
-.previous
+        _ASM_EXTABLE(.Lft2,  domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft3,  domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft4,  domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft5,  domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft6,  domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft7,  domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft8,  domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft9,  domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft10, domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft11, domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft12, domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft13, domain_crash_synchronous)
 
 domain_crash_synchronous_string:
         .asciz "domain_crash_sync called from entry.S\n"

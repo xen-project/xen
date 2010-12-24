@@ -33,11 +33,8 @@ extern void __uaccess_var_not_u64(void);
 		"4:	movl %3,%0\n"				\
 		"	jmp 3b\n"				\
 		".previous\n"					\
-		".section __ex_table,\"a\"\n"			\
-		"	.align 4\n"				\
-		"	.long 1b,4b\n"				\
-		"	.long 2b,4b\n"				\
-		".previous"					\
+		_ASM_EXTABLE(1b, 4b)				\
+		_ASM_EXTABLE(2b, 4b)				\
 		: "=r"(retval)					\
 		: "A" (x), "r" (addr), "i"(errret), "0"(retval))
 
@@ -65,11 +62,8 @@ do {									\
 		"	xorl %%edx,%%edx\n"			\
 		"	jmp 3b\n"				\
 		".previous\n"					\
-		".section __ex_table,\"a\"\n"			\
-		"	.align 4\n"				\
-		"	.long 1b,4b\n"				\
-		"	.long 2b,4b\n"				\
-		".previous"					\
+		_ASM_EXTABLE(1b, 4b)				\
+		_ASM_EXTABLE(2b, 4b)				\
 		: "=r" (retval), "=&A" (x)			\
 		: "r" (addr), "i"(errret), "0"(retval))
 

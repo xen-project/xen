@@ -1119,10 +1119,7 @@ long do_set_segment_base(unsigned int which, unsigned long base)
             "2:   xorl %k0,%k0        \n"
             "     jmp  1b             \n"
             ".previous                \n"
-            ".section __ex_table,\"a\"\n"
-            "    .align 8             \n"
-            "    .quad 1b,2b          \n"
-            ".previous                  "
+            _ASM_EXTABLE(1b, 2b)
             : : "r" (base&0xffff) );
         break;
 

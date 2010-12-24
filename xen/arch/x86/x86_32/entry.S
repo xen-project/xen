@@ -119,16 +119,12 @@ failsafe_callback:
         movl  %eax,UREGS_gs(%esp)
         jmp   test_all_events
 .previous
-.section __pre_ex_table,"a"
-        .long .Lft1,.Lfx1
-        .long .Lft2,.Lfx1
-        .long .Lft3,.Lfx1
-        .long .Lft4,.Lfx1
-        .long .Lft5,.Lfx1
-.previous
-.section __ex_table,"a"
-        .long .Ldf1,failsafe_callback
-.previous
+        _ASM_PRE_EXTABLE(.Lft1, .Lfx1)
+        _ASM_PRE_EXTABLE(.Lft2, .Lfx1)
+        _ASM_PRE_EXTABLE(.Lft3, .Lfx1)
+        _ASM_PRE_EXTABLE(.Lft4, .Lfx1)
+        _ASM_PRE_EXTABLE(.Lft5, .Lfx1)
+        _ASM_EXTABLE(.Ldf1, failsafe_callback)
 
         ALIGN
 restore_all_xen:
@@ -392,18 +388,26 @@ UNLIKELY_END(bounce_vm86_3)
         movl TRAPBOUNCE_eip(%edx),%eax
         movl %eax,UREGS_eip+4(%esp)
         ret
-.section __ex_table,"a"
-        .long  .Lft6,domain_crash_synchronous ,  .Lft7,domain_crash_synchronous
-        .long  .Lft8,domain_crash_synchronous ,  .Lft9,domain_crash_synchronous
-        .long .Lft10,domain_crash_synchronous , .Lft11,domain_crash_synchronous
-        .long .Lft12,domain_crash_synchronous , .Lft13,domain_crash_synchronous
-        .long .Lft14,domain_crash_synchronous , .Lft15,domain_crash_synchronous
-        .long .Lft16,domain_crash_synchronous , .Lft17,domain_crash_synchronous
-        .long .Lft18,domain_crash_synchronous , .Lft19,domain_crash_synchronous
-        .long .Lft20,domain_crash_synchronous , .Lft21,domain_crash_synchronous
-        .long .Lft22,domain_crash_synchronous , .Lft23,domain_crash_synchronous
-        .long .Lft24,domain_crash_synchronous , .Lft25,domain_crash_synchronous
-.previous
+        _ASM_EXTABLE(.Lft6,  domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft7,  domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft8,  domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft9,  domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft10, domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft11, domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft12, domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft13, domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft14, domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft15, domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft16, domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft17, domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft18, domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft19, domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft20, domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft21, domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft22, domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft23, domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft24, domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft25, domain_crash_synchronous)
 
 domain_crash_synchronous_string:
         .asciz "domain_crash_sync called from entry.S (%lx)\n"

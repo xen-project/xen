@@ -2,6 +2,7 @@
 #include <xen/config.h>
 #include <xen/init.h>
 #include <xen/perfc.h>
+#include <xen/sort.h>
 #include <xen/spinlock.h>
 #include <asm/uaccess.h>
 
@@ -10,29 +11,58 @@ extern struct exception_table_entry __stop___ex_table[];
 extern struct exception_table_entry __start___pre_ex_table[];
 extern struct exception_table_entry __stop___pre_ex_table[];
 
-static void __init sort_exception_table(struct exception_table_entry *start,
-                                        struct exception_table_entry *end)
-{
-    struct exception_table_entry *p, *q, tmp;
+#ifdef __i386__
+#define EX_FIELD(ptr, field) (ptr)->field
+#define swap_ex NULL
+#else
+#define EX_FIELD(ptr, field) ((unsigned long)&(ptr)->field + (ptr)->field)
+#endif
 
-    for ( p = start; p < end; p++ )
-    {
-        for ( q = p-1; q > start; q-- )
-            if ( p->insn > q->insn )
-                break;
-        if ( ++q != p )
-        {
-            tmp = *p;
-            memmove(q+1, q, (p-q)*sizeof(*p));
-            *q = tmp;
-        }
-    }
+static inline unsigned long ex_addr(const struct exception_table_entry *x)
+{
+	return EX_FIELD(x, addr);
 }
+
+static inline unsigned long ex_cont(const struct exception_table_entry *x)
+{
+	return EX_FIELD(x, cont);
+}
+
+static int __init cmp_ex(const void *a, const void *b)
+{
+	const struct exception_table_entry *l = a, *r = b;
+	unsigned long lip = ex_addr(l);
+	unsigned long rip = ex_addr(r);
+
+	/* avoid overflow */
+	if (lip > rip)
+		return 1;
+	if (lip < rip)
+		return -1;
+	return 0;
+}
+
+#ifndef swap_ex
+static void __init swap_ex(void *a, void *b, int size)
+{
+	struct exception_table_entry *l = a, *r = b, tmp;
+	long delta = b - a;
+
+	tmp = *l;
+	l->addr = r->addr + delta;
+	l->cont = r->cont + delta;
+	r->addr = tmp.addr - delta;
+	r->cont = tmp.cont - delta;
+}
+#endif
 
 void __init sort_exception_tables(void)
 {
-    sort_exception_table(__start___ex_table, __stop___ex_table);
-    sort_exception_table(__start___pre_ex_table, __stop___pre_ex_table);
+    sort(__start___ex_table, __stop___ex_table - __start___ex_table,
+         sizeof(struct exception_table_entry), cmp_ex, swap_ex);
+    sort(__start___pre_ex_table,
+         __stop___pre_ex_table - __start___pre_ex_table,
+         sizeof(struct exception_table_entry), cmp_ex, swap_ex);
 }
 
 static inline unsigned long
@@ -46,9 +76,9 @@ search_one_table(const struct exception_table_entry *first,
     while ( first <= last )
     {
         mid = (last - first) / 2 + first;
-        diff = mid->insn - value;
+        diff = ex_addr(mid) - value;
         if (diff == 0)
-            return mid->fixup;
+            return ex_cont(mid);
         else if (diff < 0)
             first = mid+1;
         else

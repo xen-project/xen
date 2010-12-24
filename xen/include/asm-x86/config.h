@@ -274,8 +274,6 @@ extern unsigned int video_mode, video_flags;
 /* For generic assembly code: use macros to define operation/operand sizes. */
 #define __OS          "q"  /* Operation Suffix */
 #define __OP          "r"  /* Operand Prefix */
-#define __FIXUP_ALIGN ".align 8"
-#define __FIXUP_WORD  ".quad"
 
 #elif defined(__i386__)
 
@@ -351,8 +349,6 @@ extern unsigned int video_mode, video_flags;
 /* For generic assembly code: use macros to define operation/operand sizes. */
 #define __OS          "l"  /* Operation Suffix */
 #define __OP          "e"  /* Operand Prefix */
-#define __FIXUP_ALIGN ".align 4"
-#define __FIXUP_WORD  ".long"
 
 #endif /* __i386__ */
 

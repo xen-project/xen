@@ -8,6 +8,7 @@
 #include <xen/types.h>
 #include <xen/percpu.h>
 #include <xen/errno.h>
+#include <asm/asm_defns.h>
 
 #define rdmsr(msr,val1,val2) \
      __asm__ __volatile__("rdmsr" \
@@ -44,10 +45,7 @@ static inline void wrmsrl(unsigned int msr, __u64 val)
         "3: xorl %0,%0\n; xorl %1,%1\n" \
         "   movl %5,%2\n; jmp 2b\n" \
         ".previous\n" \
-        ".section __ex_table,\"a\"\n" \
-        "   "__FIXUP_ALIGN"\n" \
-        "   "__FIXUP_WORD" 1b,3b\n" \
-        ".previous\n" \
+        _ASM_EXTABLE(1b, 3b) \
         : "=a" (lo), "=d" (hi), "=&r" (_rc) \
         : "c" (msr), "2" (0), "i" (-EFAULT)); \
     val = lo | ((uint64_t)hi << 32); \
@@ -66,10 +64,7 @@ static inline int wrmsr_safe(unsigned int msr, uint64_t val)
         ".section .fixup,\"ax\"\n"
         "3: movl %5,%0\n; jmp 2b\n"
         ".previous\n"
-        ".section __ex_table,\"a\"\n"
-        "   "__FIXUP_ALIGN"\n"
-        "   "__FIXUP_WORD" 1b,3b\n"
-        ".previous\n"
+        _ASM_EXTABLE(1b, 3b)
         : "=&r" (_rc)
         : "c" (msr), "a" (lo), "d" (hi), "0" (0), "i" (-EFAULT));
     return _rc;

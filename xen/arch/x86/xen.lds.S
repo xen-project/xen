@@ -38,18 +38,19 @@ SECTIONS
        *(.rodata.*)
   } :text
 
-  . = ALIGN(32);               /* Exception table */
-  __ex_table : {
+  . = ALIGN(SMP_CACHE_BYTES);
+  .data.read_mostly : {
+       /* Exception table */
        __start___ex_table = .;
-       *(__ex_table)
+       *(.ex_table)
        __stop___ex_table = .;
-  } :text
 
-  . = ALIGN(32);               /* Pre-exception table */
-  __pre_ex_table : {
+       /* Pre-exception table */
        __start___pre_ex_table = .;
-       *(__pre_ex_table)
+       *(.ex_table.pre)
        __stop___pre_ex_table = .;
+
+       *(.data.read_mostly)
   } :text
 
   .data : {                    /* Data */
@@ -57,11 +58,6 @@ SECTIONS
        *(.data.page_aligned)
        *(.data)
        CONSTRUCTORS
-  } :text
-
-  . = ALIGN(SMP_CACHE_BYTES);
-  .data.read_mostly : {
-       *(.data.read_mostly)
   } :text
 
 #ifdef LOCK_PROFILE

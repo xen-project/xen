@@ -22,6 +22,7 @@
 #include <xen/sched.h>
 #include <asm/types.h>
 #include <asm/regs.h>
+#include <asm/asm_defns.h>
 #include <asm/processor.h>
 #include <asm/i387.h>
 #include <asm/hvm/support.h>
@@ -341,10 +342,7 @@ static inline void __invvpid(int type, u16 vpid, u64 gva)
     asm volatile ( "1: " INVVPID_OPCODE MODRM_EAX_08
                    /* CF==1 or ZF==1 --> crash (ud2) */
                    "ja 2f ; ud2 ; 2:\n"
-                   ".section __ex_table,\"a\"\n"
-                   "    "__FIXUP_ALIGN"\n"
-                   "    "__FIXUP_WORD" 1b,2b\n"
-                   ".previous"
+                   _ASM_EXTABLE(1b, 2b)
                    :
                    : "a" (&operand), "c" (type)
                    : "memory" );
@@ -404,10 +402,7 @@ static inline int __vmxon(u64 addr)
         ".section .fixup,\"ax\"\n"
         "3: sub $2,%0 ; jmp 2b\n"    /* #UD or #GP --> rc = -2 */
         ".previous\n"
-        ".section __ex_table,\"a\"\n"
-        "   "__FIXUP_ALIGN"\n"
-        "   "__FIXUP_WORD" 1b,3b\n"
-        ".previous\n"
+        _ASM_EXTABLE(1b, 3b)
         : "=q" (rc)
         : "0" (0), "a" (&addr)
         : "memory");

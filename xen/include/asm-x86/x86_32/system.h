@@ -49,10 +49,7 @@ static always_inline unsigned long long __cmpxchg8b(
         "3:     movl $1,%1\n"                                           \
         "       jmp 2b\n"                                               \
         ".previous\n"                                                   \
-        ".section __ex_table,\"a\"\n"                                   \
-        "       .align 4\n"                                             \
-        "       .long 1b,3b\n"                                          \
-        ".previous"                                                     \
+        _ASM_EXTABLE(1b, 3b)                                            \
         : "=a" (_o), "=r" (_rc)                                         \
         : _regtype (_n), "m" (*__xg((volatile void *)_p)), "0" (_o), "1" (0) \
         : "memory");
@@ -78,10 +75,7 @@ static always_inline unsigned long long __cmpxchg8b(
             "3:     movl $1,%1\n"                                       \
             "       jmp 2b\n"                                           \
             ".previous\n"                                               \
-            ".section __ex_table,\"a\"\n"                               \
-            "       .align 4\n"                                         \
-            "       .long 1b,3b\n"                                      \
-            ".previous"                                                 \
+            _ASM_EXTABLE(1b, 3b)                                        \
             : "=A" (_o), "=r" (_rc)                                     \
             : "c" ((u32)((u64)(_n)>>32)), "b" ((u32)(_n)),              \
               "m" (*__xg((volatile void *)(_p))), "0" (_o), "1" (0)     \

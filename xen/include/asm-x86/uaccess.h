@@ -6,6 +6,7 @@
 #include <xen/compiler.h>
 #include <xen/errno.h>
 #include <xen/prefetch.h>
+#include <asm/asm_defns.h>
 #include <asm/page.h>
 
 #ifdef __x86_64__
@@ -155,10 +156,7 @@ struct __large_struct { unsigned long buf[100]; };
 		"3:	mov %3,%0\n"					\
 		"	jmp 2b\n"					\
 		".previous\n"						\
-		".section __ex_table,\"a\"\n"				\
-		"	"__FIXUP_ALIGN"\n"				\
-		"	"__FIXUP_WORD" 1b,3b\n"				\
-		".previous"						\
+		_ASM_EXTABLE(1b, 3b)					\
 		: "=r"(err)						\
 		: ltype (x), "m"(__m(addr)), "i"(errret), "0"(err))
 
@@ -171,10 +169,7 @@ struct __large_struct { unsigned long buf[100]; };
 		"	xor"itype" %"rtype"1,%"rtype"1\n"		\
 		"	jmp 2b\n"					\
 		".previous\n"						\
-		".section __ex_table,\"a\"\n"				\
-		"	"__FIXUP_ALIGN"\n"				\
-		"	"__FIXUP_WORD" 1b,3b\n"				\
-		".previous"						\
+		_ASM_EXTABLE(1b, 3b)					\
 		: "=r"(err), ltype (x)					\
 		: "m"(__m(addr)), "i"(errret), "0"(err))
 
@@ -272,7 +267,7 @@ __copy_from_user(void *to, const void __user *from, unsigned long n)
 
 struct exception_table_entry
 {
-	unsigned long insn, fixup;
+	s32 addr, cont;
 };
 
 extern unsigned long search_exception_table(unsigned long);

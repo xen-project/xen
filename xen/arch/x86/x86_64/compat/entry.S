@@ -197,12 +197,8 @@ compat_failsafe_callback:
 1:      call  compat_create_bounce_frame
         jmp   compat_test_all_events
 .previous
-.section __pre_ex_table,"a"
-	.quad .Lft0,.Lfx0
-.previous
-.section __ex_table,"a"
-        .quad .Ldf0,compat_failsafe_callback
-.previous
+        _ASM_PRE_EXTABLE(.Lft0, .Lfx0)
+        _ASM_EXTABLE(.Ldf0, compat_failsafe_callback)
 
 /* %rdx: trap_bounce, %rbx: struct vcpu */
 ENTRY(compat_post_handle_exception)
@@ -330,15 +326,19 @@ UNLIKELY_END(compat_bounce_failsafe)
         xorl  %edi,%edi
         jmp   .Lft13
 .previous
-.section __ex_table,"a"
-        .quad  .Lft1,domain_crash_synchronous  ,  .Lft2,compat_crash_page_fault
-        .quad  .Lft3,compat_crash_page_fault_4 ,  .Lft4,domain_crash_synchronous
-        .quad  .Lft5,compat_crash_page_fault_4 ,  .Lft6,compat_crash_page_fault_8
-        .quad  .Lft7,compat_crash_page_fault   ,  .Lft8,compat_crash_page_fault
-        .quad  .Lft9,compat_crash_page_fault_12, .Lft10,compat_crash_page_fault_8
-        .quad .Lft11,compat_crash_page_fault_4 , .Lft12,compat_crash_page_fault
-        .quad .Lft13,.Lfx13
-.previous
+        _ASM_EXTABLE(.Lft1,  domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft2,  compat_crash_page_fault)
+        _ASM_EXTABLE(.Lft3,  compat_crash_page_fault_4)
+        _ASM_EXTABLE(.Lft4,  domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft5,  compat_crash_page_fault_4)
+        _ASM_EXTABLE(.Lft6,  compat_crash_page_fault_8)
+        _ASM_EXTABLE(.Lft7,  compat_crash_page_fault)
+        _ASM_EXTABLE(.Lft8,  compat_crash_page_fault)
+        _ASM_EXTABLE(.Lft9,  compat_crash_page_fault_12)
+        _ASM_EXTABLE(.Lft10, compat_crash_page_fault_8)
+        _ASM_EXTABLE(.Lft11, compat_crash_page_fault_4)
+        _ASM_EXTABLE(.Lft12, compat_crash_page_fault)
+        _ASM_EXTABLE(.Lft13, .Lfx13)
 
 compat_crash_page_fault_12:
         addl  $4,%esi
@@ -356,9 +356,7 @@ compat_crash_page_fault:
         xorl  %edi,%edi
         jmp   .Lft14
 .previous
-.section __ex_table,"a"
-        .quad .Lft14,.Lfx14
-.previous
+        _ASM_EXTABLE(.Lft14, .Lfx14)
 
 .section .rodata, "a", @progbits
 

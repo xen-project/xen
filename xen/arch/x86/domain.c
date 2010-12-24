@@ -1070,10 +1070,7 @@ arch_do_vcpu_op(
         "   movl %k0,%%" #seg "\n"              \
         "   jmp 2b\n"                           \
         ".previous\n"                           \
-        ".section __ex_table,\"a\"\n"           \
-        "   .align 8\n"                         \
-        "   .quad 1b,3b\n"                      \
-        ".previous"                             \
+        _ASM_EXTABLE(1b, 3b)                    \
         : "=r" (__r) : "r" (value), "0" (__r) );\
     __r; })
 
