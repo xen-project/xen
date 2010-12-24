@@ -1,0 +1,24 @@
+Xen Machine Check Exception(MCE) error inject tool
+----------------------------------------------
+
+xen-mceinj is a software MCE injection tool, which is based on Xen 
+MCE injection mechanism. It allows to inject machine check errors on the
+software level into a running Xen/dom0/VM. This is intended for
+validation of the Xen machine check handler.
+
+With the help of the Makefile, it is possible to compile a binary file 
+named "xen-mceinj".
+
+Usage
+-----
+$make (make install) --Note: make sure compile xen/tools before do this step
+$./xen-mceinj [OPTION]...
+
+OPTION arguments can be:
+  -D, --dump           dump addr info without error injection
+  -c, --cpu=CPU_ID     target CPU, the default is CPU0
+  -d, --domain=DomID   target domain, the default is Xen itself
+  -p, --page           physical page address, the default is 0x180020
+  -t, --type=error     error type
+
+For detail help, please refer to "./xen-mceinj -h"
