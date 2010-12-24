@@ -1782,7 +1782,7 @@ csched_dump(const struct scheduler *ops)
                "\tncpus              = %u\n"
                "\tmax_weight         = %d\n"
                "\tinstload           = %d\n"
-               "\taveload            = %3ld\n",
+               "\taveload            = %3"PRI_stime"\n",
                i,
                cpus_weight(prv->rqd[i].active),
                prv->rqd[i].max_weight,
