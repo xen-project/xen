@@ -42,6 +42,7 @@
 #define TRC_CSCHED2_TICKLE       TRC_SCHED_CLASS + 6
 #define TRC_CSCHED2_CREDIT_RESET TRC_SCHED_CLASS + 7
 #define TRC_CSCHED2_SCHED_TASKLET TRC_SCHED_CLASS + 8
+#define TRC_CSCHED2_UPDATE_LOAD   TRC_SCHED_CLASS + 9
 #define TRC_CSCHED2_RUNQ_ASSIGN   TRC_SCHED_CLASS + 10
 
 /*
@@ -187,6 +188,7 @@ struct csched_runqueue_data {
 
     cpumask_t idle,        /* Currently idle */
         tickled;           /* Another cpu in the queue is already targeted for this one */
+    int load;              /* Instantaneous load: Length of queue  + num non-idle threads */
 };
 
 /*
@@ -264,6 +266,23 @@ static /*inline*/ struct csched_vcpu *
 __runq_elem(struct list_head *elem)
 {
     return list_entry(elem, struct csched_vcpu, runq_elem);
+}
+
+static void
+update_load(const struct scheduler *ops,
+            struct csched_runqueue_data *rqd, int change, s_time_t now)
+{
+    rqd->load += change;
+
+    {
+        struct {
+            unsigned load:4;
+        } d;
+        d.load = rqd->load;
+        trace_var(TRC_CSCHED2_UPDATE_LOAD, 0,
+                  sizeof(d),
+                  (unsigned char *)&d);
+    }
 }
 
 static int
@@ -756,7 +775,11 @@ csched_vcpu_sleep(const struct scheduler *ops, struct vcpu *vc)
     if ( per_cpu(schedule_data, vc->processor).curr == vc )
         cpu_raise_softirq(vc->processor, SCHEDULE_SOFTIRQ);
     else if ( __vcpu_on_runq(svc) )
+    {
+        BUG_ON(svc->rqd != RQD(ops, vc->processor));
+        update_load(ops, svc->rqd, -1, NOW());
         __runq_remove(svc);
+    }
     else if ( test_bit(__CSFLAG_delayed_runq_add, &svc->flags) )
         clear_bit(__CSFLAG_delayed_runq_add, &svc->flags);
 }
@@ -803,6 +826,8 @@ csched_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
 
     now = NOW();
 
+    update_load(ops, svc->rqd, 1, now);
+        
     /* Put the VCPU on the runq */
     runq_insert(ops, vc->processor, svc);
     runq_tickle(ops, vc->processor, svc, now);
@@ -841,6 +866,8 @@ csched_context_saved(const struct scheduler *ops, struct vcpu *vc)
         runq_insert(ops, vc->processor, svc);
         runq_tickle(ops, vc->processor, svc, now);
     }
+    else if ( !is_idle_vcpu(vc) )
+        update_load(ops, svc->rqd, -1, now);
 
     vcpu_schedule_unlock_irq(vc);
 }
@@ -1209,6 +1236,9 @@ csched_schedule(
         /* Update the idle mask if necessary */
         if ( !cpu_isset(cpu, rqd->idle) )
             cpu_set(cpu, rqd->idle);
+        /* Make sure avgload gets updated periodically even
+         * if there's no activity */
+        update_load(ops, rqd, 0, now);
     }
 
     /*
@@ -1287,10 +1317,12 @@ csched_dump(const struct scheduler *ops)
     {
         printk("Runqueue %d:\n"
                "\tncpus              = %u\n"
-               "\tmax_weight         = %d\n",
+               "\tmax_weight         = %d\n"
+               "\tload               = %d\n",
                i,
                cpus_weight(prv->rqd[i].active),
-               prv->rqd[i].max_weight);
+               prv->rqd[i].max_weight,
+               prv->rqd[i].load);
 
     }
     /* FIXME: Locking! */
