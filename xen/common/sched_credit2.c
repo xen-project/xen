@@ -193,6 +193,10 @@ integer_param("sched_credit2_migrate_resist", opt_migrate_resist);
 int opt_load_window_shift=18;
 #define  LOADAVG_WINDOW_SHIFT_MIN 4
 integer_param("credit2_load_window_shift", opt_load_window_shift);
+int opt_underload_balance_tolerance=0;
+integer_param("credit2_balance_under", opt_underload_balance_tolerance);
+int opt_overload_balance_tolerance=-3;
+integer_param("credit2_balance_over", opt_overload_balance_tolerance);
 
 /*
  * Per-runqueue data
@@ -1232,14 +1236,34 @@ retry:
 
     /* Minimize holding the big lock */
     spin_unlock(&prv->lock);
-
     if ( max_delta_rqi == -1 )
         goto out;
 
-    /* Don't bother with load differences less than 25%. */
-    if ( load_delta < (1ULL<<(prv->load_window_shift - 2)) )
-        goto out;
+    {
+        s_time_t load_max;
+        int cpus_max;
 
+        
+        load_max = lrqd->b_avgload;
+        if ( orqd->b_avgload > load_max )
+            load_max = orqd->b_avgload;
+
+        cpus_max=cpus_weight(lrqd->active);
+        if ( cpus_weight(orqd->active) > cpus_max )
+            cpus_max = cpus_weight(orqd->active);
+
+        /* If we're under 100% capacaty, only shift if load difference
+         * is > 1.  otherwise, shift if under 12.5% */
+        if ( load_max < (1ULL<<(prv->load_window_shift))*cpus_max )
+        {
+            if ( load_delta < (1ULL<<(prv->load_window_shift+opt_underload_balance_tolerance) ) )
+                 goto out;
+        }
+        else
+            if ( load_delta < (1ULL<<(prv->load_window_shift+opt_overload_balance_tolerance)) )
+                goto out;
+    }
+             
     /* Try to grab the other runqueue lock; if it's been taken in the
      * meantime, try the process over again.  This can't deadlock
      * because if it doesn't get any other rqd locks, it will simply
@@ -1982,6 +2006,8 @@ csched_init(struct scheduler *ops)
            " Use at your own risk.\n");
 
     printk(" load_window_shift: %d\n", opt_load_window_shift);
+    printk(" underload_balance_tolerance: %d\n", opt_underload_balance_tolerance);
+    printk(" overload_balance_tolerance: %d\n", opt_overload_balance_tolerance);
 
     if ( opt_load_window_shift < LOADAVG_WINDOW_SHIFT_MIN )
     {
