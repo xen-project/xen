@@ -42,6 +42,7 @@
 #define TRC_CSCHED2_TICKLE       TRC_SCHED_CLASS + 6
 #define TRC_CSCHED2_CREDIT_RESET TRC_SCHED_CLASS + 7
 #define TRC_CSCHED2_SCHED_TASKLET TRC_SCHED_CLASS + 8
+#define TRC_CSCHED2_RUNQ_ASSIGN   TRC_SCHED_CLASS + 10
 
 /*
  * WARNING: This is still in an experimental phase.  Status and work can be found at the
@@ -209,6 +210,7 @@ struct csched_vcpu {
     struct list_head rqd_elem;  /* On the runqueue data list */
     struct list_head sdom_elem; /* On the domain vcpu list */
     struct list_head runq_elem; /* On the runqueue         */
+    struct csched_runqueue_data *rqd; /* Up-pointer to the runqueue */
 
     /* Up-pointers */
     struct csched_dom *sdom;
@@ -274,6 +276,7 @@ __runq_insert(struct list_head *runq, struct csched_vcpu *svc)
            svc->vcpu->domain->domain_id,
            svc->vcpu->vcpu_id);
 
+    BUG_ON(&svc->rqd->runq != runq);
     /* Idle vcpus not allowed on the runqueue anymore */
     BUG_ON(is_idle_vcpu(svc->vcpu));
     BUG_ON(svc->vcpu->is_running);
@@ -355,6 +358,7 @@ runq_tickle(const struct scheduler *ops, unsigned int cpu, struct csched_vcpu *n
              current->vcpu_id);
 
     BUG_ON(new->vcpu->processor != cpu);
+    BUG_ON(new->rqd != rqd);
 
     /* Look at the cpu it's running on first */
     cur = CSCHED_VCPU(per_cpu(schedule_data, cpu).curr);
@@ -445,15 +449,17 @@ no_tickle:
  */
 static void reset_credit(const struct scheduler *ops, int cpu, s_time_t now)
 {
+    struct csched_runqueue_data *rqd = RQD(ops, cpu);
     struct list_head *iter;
 
-    list_for_each( iter, &RQD(ops, cpu)->svc )
+    list_for_each( iter, &rqd->svc )
     {
         struct csched_vcpu * svc = list_entry(iter, struct csched_vcpu, rqd_elem);
 
         int start_credit;
 
         BUG_ON( is_idle_vcpu(svc->vcpu) );
+        BUG_ON( svc->rqd != rqd );
 
         start_credit = svc->credit;
 
@@ -620,12 +626,69 @@ csched_alloc_vdata(const struct scheduler *ops, struct vcpu *vc, void *dd)
     return svc;
 }
 
+/* Add and remove from runqueue assignment (not active run queue) */
+static void
+__runq_assign(struct csched_vcpu *svc, struct csched_runqueue_data *rqd)
+{
+
+    svc->rqd = rqd;
+    list_add_tail(&svc->rqd_elem, &svc->rqd->svc);
+
+    update_max_weight(svc->rqd, svc->weight, 0);
+
+    /* TRACE */
+    {
+        struct {
+            unsigned dom:16,vcpu:16;
+            unsigned rqi:16;
+        } d;
+        d.dom = svc->vcpu->domain->domain_id;
+        d.vcpu = svc->vcpu->vcpu_id;
+        d.rqi=rqd->id;
+        trace_var(TRC_CSCHED2_RUNQ_ASSIGN, 1,
+                  sizeof(d),
+                  (unsigned char *)&d);
+    }
+
+}
+
+static void
+runq_assign(const struct scheduler *ops, struct vcpu *vc)
+{
+    struct csched_vcpu *svc = vc->sched_priv;
+
+    BUG_ON(svc->rqd != NULL);
+
+    __runq_assign(svc, RQD(ops, vc->processor));
+}
+
+static void
+__runq_deassign(struct csched_vcpu *svc)
+{
+    BUG_ON(__vcpu_on_runq(svc));
+
+    list_del_init(&svc->rqd_elem);
+    update_max_weight(svc->rqd, 0, svc->weight);
+
+    svc->rqd = NULL;
+}
+
+static void
+runq_deassign(const struct scheduler *ops, struct vcpu *vc)
+{
+    struct csched_vcpu *svc = vc->sched_priv;
+
+    BUG_ON(svc->rqd != RQD(ops, vc->processor));
+
+    __runq_deassign(svc);
+}
+
 static void
 csched_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
 {
     struct csched_vcpu *svc = vc->sched_priv;
     struct domain * const dom = vc->domain;
-    struct csched_dom *sdom = CSCHED_DOM(dom);
+    struct csched_dom * const sdom = svc->sdom;
 
     printk("%s: Inserting d%dv%d\n",
            __func__, dom->domain_id, vc->vcpu_id);
@@ -639,8 +702,7 @@ csched_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
         /* FIXME: Abstract for multiple runqueues */
         vcpu_schedule_lock_irq(vc);
 
-        list_add_tail(&svc->rqd_elem, &RQD(ops, vc->processor)->svc);
-        update_max_weight(RQD(ops, vc->processor), svc->weight, 0);
+        runq_assign(ops, vc);
 
         vcpu_schedule_unlock_irq(vc);
 
@@ -672,8 +734,7 @@ csched_vcpu_remove(const struct scheduler *ops, struct vcpu *vc)
         /* Remove from runqueue */
         vcpu_schedule_lock_irq(vc);
 
-        list_del_init(&svc->rqd_elem);
-        update_max_weight(RQD(ops, vc->processor), 0, svc->weight);
+        runq_deassign(ops, vc);
 
         vcpu_schedule_unlock_irq(vc);
 
@@ -734,6 +795,12 @@ csched_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
         goto out;
     }
 
+    /* Add into the new runqueue if necessary */
+    if ( svc->rqd == NULL )
+        runq_assign(ops, vc);
+    else
+        BUG_ON(RQD(ops, vc->processor) != svc->rqd );
+
     now = NOW();
 
     /* Put the VCPU on the runq */
@@ -752,6 +819,8 @@ csched_context_saved(const struct scheduler *ops, struct vcpu *vc)
     s_time_t now = NOW();
 
     vcpu_schedule_lock_irq(vc);
+
+    BUG_ON( !is_idle_vcpu(vc) && svc->rqd != RQD(ops, vc->processor));
 
     /* This vcpu is now eligible to be put on the runqueue again */
     clear_bit(__CSFLAG_scheduled, &svc->flags);
@@ -777,12 +846,42 @@ csched_context_saved(const struct scheduler *ops, struct vcpu *vc)
 }
 
 static int
-csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
+choose_cpu(const struct scheduler *ops, struct vcpu *vc)
 {
     /* FIXME: Chose a schedule group based on load */
     /* FIXME: Migrate the vcpu to the new runqueue list, updating
        max_weight for each runqueue */
     return 0;
+}
+
+static int
+csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
+{
+    struct csched_vcpu * const svc = CSCHED_VCPU(vc);
+    int new_cpu;
+
+    /* The scheduler interface doesn't have an explicit mechanism to
+     * involve the choosable scheduler in the migrate process, so we
+     * infer that a change may happen by the call to cpu_pick, and
+     * remove it from the old runqueue while the lock for the old
+     * runqueue is held.  It can't be actively waiting to run.  It
+     * will be added to the new runqueue when it next wakes.
+     *
+     * If we want to be able to call pick() separately, we need
+     * to add a mechansim to remove a vcpu from an old processor /
+     * runqueue before releasing the lock. */
+    BUG_ON(__vcpu_on_runq(svc));
+
+    new_cpu = choose_cpu(ops, vc);
+
+    /* If we're suggesting moving to a different runqueue, remove it
+     * from the old runqueue while we have the lock.  It will be added
+     * to the new one when it wakes. */
+    if ( svc->rqd != NULL
+         && RQD(ops, new_cpu) != svc->rqd )
+        runq_deassign(ops, vc);
+
+    return new_cpu;
 }
 
 static int
@@ -826,8 +925,10 @@ csched_dom_cntl(
                  * lock. */
                 vcpu_schedule_lock_irq(svc->vcpu);
 
+                BUG_ON(svc->rqd != RQD(ops, svc->vcpu->processor));
+
                 svc->weight = sdom->weight;
-                update_max_weight(RQD(ops, svc->vcpu->processor), svc->weight, old_weight);
+                update_max_weight(svc->rqd, svc->weight, old_weight);
 
                 vcpu_schedule_unlock_irq(svc->vcpu);
             }
@@ -1017,7 +1118,9 @@ csched_schedule(
     rqd = RQD(ops, cpu);
     BUG_ON(!cpu_isset(cpu, rqd->active));
 
-    /* Protected by runqueue lock */
+    /* Protected by runqueue lock */        
+
+    BUG_ON(!is_idle_vcpu(scurr->vcpu) && scurr->rqd != rqd);
 
     /* Clear "tickled" bit now that we've been scheduled */
     if ( cpu_isset(cpu, rqd->tickled) )
@@ -1067,6 +1170,8 @@ csched_schedule(
         /* If switching, remove this from the runqueue and mark it scheduled */
         if ( snext != scurr )
         {
+            BUG_ON(snext->rqd != rqd);
+    
             __runq_remove(snext);
             if ( snext->vcpu->is_running )
             {
