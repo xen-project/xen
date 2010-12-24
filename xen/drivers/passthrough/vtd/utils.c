@@ -103,7 +103,7 @@ void print_vtd_entries(struct iommu *iommu, int bus, int devfn, u64 gmfn)
     struct context_entry *ctxt_entry;
     struct root_entry *root_entry;
     struct dma_pte pte;
-    u64 *l;
+    u64 *l, val;
     u32 l_index, level;
 
     printk("print_vtd_entries: iommu = %p bdf = %x:%x.%x gmfn = %"PRIx64"\n",
@@ -116,6 +116,11 @@ void print_vtd_entries(struct iommu *iommu, int bus, int devfn, u64 gmfn)
     }
 
     root_entry = (struct root_entry *)map_vtd_domain_page(iommu->root_maddr);
+    if ( root_entry == NULL )
+    {
+        printk("    root_entry == NULL\n");
+        return;
+    }
 
     printk("    root_entry = %p\n", root_entry);
     printk("    root_entry[%x] = %"PRIx64"\n", bus, root_entry[bus].val);
@@ -126,61 +131,57 @@ void print_vtd_entries(struct iommu *iommu, int bus, int devfn, u64 gmfn)
         return;
     }
 
-    ctxt_entry =
-        (struct context_entry *)map_vtd_domain_page(root_entry[bus].val);
+    val = root_entry[bus].val;
+    unmap_vtd_domain_page(root_entry);
+    ctxt_entry = map_vtd_domain_page(val);
     if ( ctxt_entry == NULL )
     {
-        unmap_vtd_domain_page(root_entry);
         printk("    ctxt_entry == NULL\n");
         return;
     }
 
     printk("    context = %p\n", ctxt_entry);
+    val = ctxt_entry[devfn].lo;
     printk("    context[%x] = %"PRIx64"_%"PRIx64"\n",
-           devfn, ctxt_entry[devfn].hi, ctxt_entry[devfn].lo);
+           devfn, ctxt_entry[devfn].hi, val);
     if ( !context_present(ctxt_entry[devfn]) )
     {
         unmap_vtd_domain_page(ctxt_entry);
-        unmap_vtd_domain_page(root_entry);
         printk("    ctxt_entry[%x] not present\n", devfn);
         return;
     }
 
     level = agaw_to_level(context_address_width(ctxt_entry[devfn]));
+    unmap_vtd_domain_page(ctxt_entry);
     if ( level != VTD_PAGE_TABLE_LEVEL_3 &&
          level != VTD_PAGE_TABLE_LEVEL_4)
     {
-        unmap_vtd_domain_page(ctxt_entry);
-        unmap_vtd_domain_page(root_entry);
         printk("Unsupported VTD page table level (%d)!\n", level);
+        return;
     }
 
-    l = maddr_to_virt(ctxt_entry[devfn].lo);
     do
     {
-        l = (u64*)(((unsigned long)l >> PAGE_SHIFT_4K) << PAGE_SHIFT_4K);
+        l = map_vtd_domain_page(val);
         printk("    l%d = %p\n", level, l);
         if ( l == NULL )
         {
-            unmap_vtd_domain_page(ctxt_entry);
-            unmap_vtd_domain_page(root_entry);
             printk("    l%d == NULL\n", level);
             break;
         }
         l_index = get_level_index(gmfn, level);
         printk("    l%d_index = %x\n", level, l_index);
-        printk("    l%d[%x] = %"PRIx64"\n", level, l_index, l[l_index]);
 
-        pte.val = l[l_index];
+        pte.val = val = l[l_index];
+        unmap_vtd_domain_page(l);
+        printk("    l%d[%x] = %"PRIx64"\n", level, l_index, val);
+
+        pte.val = val;
         if ( !dma_pte_present(pte) )
         {
-            unmap_vtd_domain_page(ctxt_entry);
-            unmap_vtd_domain_page(root_entry);
             printk("    l%d[%x] not present\n", level, l_index);
             break;
         }
-
-        l = maddr_to_virt(l[l_index]);
     } while ( --level );
 }
 
