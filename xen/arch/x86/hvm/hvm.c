@@ -2144,6 +2144,24 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         /* Fix the x2APIC identifier. */
         *edx = v->vcpu_id * 2;
         break;
+    case 0xd:
+    {
+        unsigned int sub_leaf, _eax, _ebx, _ecx, _edx;
+        /* EBX value of main leaf 0 depends on enabled xsave features */
+        if ( count == 0 && v->arch.xcr0 ) 
+        {
+            for ( sub_leaf = 2; 
+                  (sub_leaf < 64) && (v->arch.xcr0 & (1ULL << sub_leaf));
+                  sub_leaf++ ) 
+            {
+                domain_cpuid(v->domain, input, sub_leaf, &_eax, &_ebx, &_ecx, 
+                             &_edx);
+                if ( (_eax + _ebx) > *ebx )
+                    *ebx = _eax + _ebx;
+            }
+        }
+        break;
+    }
     case 0x80000001:
         /* We expose RDTSCP feature to guest only when
            tsc_mode == TSC_MODE_DEFAULT and host_tsc_is_safe() returns 1 */

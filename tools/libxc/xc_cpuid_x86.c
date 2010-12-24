@@ -164,6 +164,58 @@ static void intel_xc_cpuid_policy(
     }
 }
 
+#define XSAVEOPT        (1 << 0)
+/* Configure extended state enumeration leaves (0x0000000D for xsave) */
+static void xc_cpuid_config_xsave(
+    xc_interface *xch, domid_t domid, uint64_t xfeature_mask,
+    const unsigned int *input, unsigned int *regs)
+{
+    if ( xfeature_mask == 0 )
+    {
+        regs[0] = regs[1] = regs[2] = regs[3] = 0;
+        return;
+    }
+
+    switch ( input[1] )
+    {
+    case 0: 
+        /* EAX: low 32bits of xfeature_enabled_mask */
+        regs[0] = xfeature_mask & 0xFFFFFFFF;
+        /* EDX: high 32bits of xfeature_enabled_mask */
+        regs[3] = (xfeature_mask >> 32) & 0xFFFFFFFF;
+        /* ECX: max size required by all HW features */
+        {
+            unsigned int _input[2] = {0xd, 0x0}, _regs[4];
+            regs[2] = 0;
+            for ( _input[1] = 2; _input[1] < 64; _input[1]++ )
+            {
+                cpuid(_input, _regs);
+                if ( (_regs[0] + _regs[1]) > regs[2] )
+                    regs[2] = _regs[0] + _regs[1];
+            }
+        }
+        /* EBX: max size required by enabled features. 
+         * This register contains a dynamic value, which varies when a guest 
+         * enables or disables XSTATE features (via xsetbv). The default size 
+         * after reset is 576. */ 
+        regs[1] = 512 + 64; /* FP/SSE + XSAVE.HEADER */
+        break;
+    case 1: /* leaf 1 */
+        regs[0] &= XSAVEOPT;
+        regs[1] = regs[2] = regs[3] = 0;
+        break;
+    case 2 ... 63: /* sub-leaves */
+        if ( !(xfeature_mask & (1ULL << input[1])) )
+        {
+            regs[0] = regs[1] = regs[2] = regs[3] = 0;
+            break;
+        }
+        /* Don't touch EAX, EBX. Also cleanup ECX and EDX */
+        regs[2] = regs[3] = 0;
+        break;
+    }
+}
+
 static void xc_cpuid_hvm_policy(
     xc_interface *xch, domid_t domid,
     const unsigned int *input, unsigned int *regs)
@@ -244,43 +296,7 @@ static void xc_cpuid_hvm_policy(
         break;
 
     case 0x0000000d:
-#define XSTATE_FP       (1 << 0)
-#define XSTATE_SSE      (1 << 1)
-#define XSTATE_YMM      (1 << 2)
-#define XSAVEOPT        (1 << 0)
-#define XSTATE_YMM_SIZE 256
-        if ( xfeature_mask == 0 )
-        {
-            regs[0] = regs[1] = regs[2] = regs[3] = 0;
-            break;
-        }
-        switch ( input[1] )
-        {
-        case 0:
-            /* We only enable the features we know. */
-            regs[0] = xfeature_mask;
-            /* FP/SSE + XSAVE.HEADER + YMM. */
-            regs[2] = 512 + 64;
-            if ( regs[0] & XSTATE_YMM )
-                regs[2] += XSTATE_YMM_SIZE;
-            regs[1] = regs[2];
-            regs[3] = 0;
-            break;
-        case 1:
-            regs[0] &= XSAVEOPT;
-            regs[1] = regs[2] = regs[3] = 0;
-            break;
-        case 2:
-            if ( !(xfeature_mask & XSTATE_YMM) )
-                break;
-            regs[0] = XSTATE_YMM_SIZE;
-            regs[1] = 512 + 64; /* FP/SSE + XSAVE.HEADER */
-            regs[2] = regs[3] = 0;
-            break;
-        default:
-            regs[0] = regs[1] = regs[2] = regs[3] = 0;
-            break;
-        }
+        xc_cpuid_config_xsave(xch, domid, xfeature_mask, input, regs);
         break;
 
     case 0x80000000:
@@ -501,20 +517,20 @@ int xc_cpuid_apply_policy(xc_interface *xch, domid_t domid)
             rc = xc_cpuid_do_domctl(xch, domid, input, regs);
             if ( rc )
                 return rc;
+        }
 
-            /* Intel cache descriptor leaves. */
-            if ( input[0] == 4 )
-            {
-                input[1]++;
-                /* More to do? Then loop keeping %%eax==0x00000004. */
-                if ( (regs[0] & 0x1f) != 0 )
-                    continue;
-            }
-
-            /* XSAVE information, subleaves 0-2. */
-            if ( (input[0] == 0xd) && (input[1]++ < 2) )
+        /* Intel cache descriptor leaves. */
+        if ( input[0] == 4 )
+        {
+            input[1]++;
+            /* More to do? Then loop keeping %%eax==0x00000004. */
+            if ( (regs[0] & 0x1f) != 0 )
                 continue;
         }
+
+        /* XSAVE information, subleaves 0-63. */
+        if ( (input[0] == 0xd) && (input[1]++ < 63) )
+            continue;
 
         input[0]++;
         if ( !(input[0] & 0x80000000u) && (input[0] > base_max ) )
