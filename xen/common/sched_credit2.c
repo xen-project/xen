@@ -1774,14 +1774,20 @@ csched_dump(const struct scheduler *ops)
            CSCHED_DEFAULT_WEIGHT);
     for_each_cpu_mask(i, prv->active_queues)
     {
+        s_time_t fraction;
+        
+        fraction = prv->rqd[i].avgload * 100 / (1ULL<<prv->load_window_shift);
+
         printk("Runqueue %d:\n"
                "\tncpus              = %u\n"
                "\tmax_weight         = %d\n"
-               "\tload               = %d\n",
+               "\tinstload           = %d\n"
+               "\taveload            = %3ld\n",
                i,
                cpus_weight(prv->rqd[i].active),
                prv->rqd[i].max_weight,
-               prv->rqd[i].load);
+               prv->rqd[i].load,
+               fraction);
 
     }
     /* FIXME: Locking! */
