@@ -1,0 +1,75 @@
+Xen MCE test suite
+---------------
+
+The Xen MCE test suite is a collection of tools and test scripts for
+testing the Xen MCE processing features. The goal is to cover
+most Xen MCE processing code paths and features with automation tests.
+
+
+In the Package
+--------------
+
+Here is a short description of what is included in the package
+
+README
+	This is document
+
+Makefile
+	For compile
+
+cases/*
+	Contains all test cases, which may be organized in sub-directories, 
+	the interface of test case is a shell script under cases/, such as:
+	   -- cases/srao_mem/dom0/cases.sh
+
+config/*
+	Contains test configuration files, which specifies the parameters 
+	for test cases, etc.
+
+lib/*
+	Contains some shell scripts, in which some common shell
+	functions and variable definitions are defined to be used by
+	test cases.
+
+tools/*
+	Tools used by MCE test suites, now only xen-mceinj tool.
+
+results/
+	When test is done, the test result will be placed in this
+	directory, test results	of various cases may be in corresponding 
+	directory. 
+	For example, files in
+	    results/srao_mem_dom0/result
+	is the result for test case cases/srao_mem/dom0/cases.sh, there will
+	be 3 result conditions: PASSED/FAILED/NORESULT.
+		results/<test_case>/testlog   #the test log during testing
+		results/<test_case>/mcelog    #mcelog output during testing
+		results/<test_case>/xenlog    #Xen log during testing
+		results/<test_case>/gklog     #VM guest kernel log during testing
+		results/<test_case>/guest_config   #config file used to create guest
+
+
+Test Instruction
+----------------
+
+1.	make sure you have a dom0 with mce support
+	CONFIG_X86_MCE=y
+	CONFIG_X86_MCE_INTEL=y
+	CONFIG_X86_MCE_AMD=y
+	CONFIG_X86_MCE_THRESHOLD=y
+	CONFIG_X86_MCE_INJECT=y
+
+2.	run system at xen and start xend. A installed guest image is
+	necessary when do guest MCE error injection.
+3.	compile tools that used to test. in mce-test, $make.
+	Note: make sure compile xen/tools before do this step
+4.	run test cases that you want.
+	e.g. $sh cases/srao_mem/dom0/cases.sh -d 0 -p 0x0200 -c 2 -t 1
+5.	get test result in results directory
+
+
+Notes
+----------------
+All test cases fake a error and inject this error in 0x180020, For Xen
+test cases(e.g. cases/srao_mem/xen/cases.sh), error happen on every page 
+may cause a Xen panic. 
