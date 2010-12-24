@@ -187,7 +187,7 @@ void xsave_init(void)
      * Set CR4_OSXSAVE and run "cpuid" to get xsave_cntxt_size.
      */
     set_in_cr4(X86_CR4_OSXSAVE);
-    set_xcr0(eax & XCNTXT_MASK);
+    set_xcr0((((u64)edx << 32) | eax) & XCNTXT_MASK);
     cpuid_count(XSTATE_CPUID, 0, &eax, &ebx, &ecx, &edx);
 
     if ( cpu == 0 )
