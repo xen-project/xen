@@ -394,7 +394,7 @@ static void ptc_ga_remote_func (void *varg)
     if (cpu != current->processor)
         return;
     local_irq_save(flags);
-    if (!spin_trylock(per_cpu(schedule_data, cpu).schedule_lock))
+    if (!pcpu_schedule_trylock(cpu))
         goto bail2;
     if (v->processor != cpu)
         goto bail1;
@@ -416,7 +416,7 @@ static void ptc_ga_remote_func (void *varg)
     ia64_dv_serialize_data();
     args->vcpu = NULL;
 bail1:
-    spin_unlock(per_cpu(schedule_data, cpu).schedule_lock);
+    pcpu_schedule_unlock(cpu);
 bail2:
     local_irq_restore(flags);
 }

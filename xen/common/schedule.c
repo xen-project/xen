@@ -424,7 +424,8 @@ static void vcpu_migrate(struct vcpu *v)
         atomic_dec(&per_cpu(schedule_data, old_cpu).urgent_count);
     }
 
-    /* Switch to new CPU, then unlock old CPU. */
+    /* Switch to new CPU, then unlock old CPU.  This is safe because
+     * the lock pointer cant' change while the current lock is held. */
     v->processor = new_cpu;
     spin_unlock_irqrestore(
         per_cpu(schedule_data, old_cpu).schedule_lock, flags);
@@ -1302,7 +1303,7 @@ void schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
     ppriv = SCHED_OP(new_ops, alloc_pdata, cpu);
     vpriv = SCHED_OP(new_ops, alloc_vdata, idle, idle->domain->sched_priv);
 
-    spin_lock_irqsave(per_cpu(schedule_data, cpu).schedule_lock, flags);
+    pcpu_schedule_lock_irqsave(cpu, flags);
 
     SCHED_OP(old_ops, tick_suspend, cpu);
     vpriv_old = idle->sched_priv;
@@ -1313,7 +1314,7 @@ void schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
     SCHED_OP(new_ops, tick_resume, cpu);
     SCHED_OP(new_ops, insert_vcpu, idle);
 
-    spin_unlock_irqrestore(per_cpu(schedule_data, cpu).schedule_lock, flags);
+    pcpu_schedule_unlock_irqrestore(cpu, flags);
 
     SCHED_OP(old_ops, free_vdata, vpriv_old);
     SCHED_OP(old_ops, free_pdata, ppriv_old, cpu);
@@ -1369,10 +1370,10 @@ void schedule_dump(struct cpupool *c)
 
     for_each_cpu_mask (i, *cpus)
     {
-        spin_lock(per_cpu(schedule_data, i).schedule_lock);
+        pcpu_schedule_lock(i);
         printk("CPU[%02d] ", i);
         SCHED_OP(sched, dump_cpu_state, i);
-        spin_unlock(per_cpu(schedule_data, i).schedule_lock);
+        pcpu_schedule_unlock(i);
     }
 }
 
