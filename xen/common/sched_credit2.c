@@ -996,13 +996,14 @@ csched_context_saved(const struct scheduler *ops, struct vcpu *vc)
     vcpu_schedule_unlock_irq(vc);
 }
 
-#define MAX_LOAD (1<<30);
+#define MAX_LOAD (1ULL<<60);
 static int
 choose_cpu(const struct scheduler *ops, struct vcpu *vc)
 {
     struct csched_private *prv = CSCHED_PRIV(ops);
-    int i, min_load, min_rqi = -1, new_cpu;
+    int i, min_rqi = -1, new_cpu;
     struct csched_vcpu *svc = CSCHED_VCPU(vc);
+    s_time_t min_avgload;
 
     BUG_ON(cpus_empty(prv->active_queues));
 
@@ -1053,27 +1054,39 @@ choose_cpu(const struct scheduler *ops, struct vcpu *vc)
 
     /* FIXME: Pay attention to cpu affinity */                                                                                      
 
-    min_load = MAX_LOAD;
+    min_avgload = MAX_LOAD;
 
     /* Find the runqueue with the lowest instantaneous load */
     for_each_cpu_mask(i, prv->active_queues)
     {
         struct csched_runqueue_data *rqd;
+        s_time_t rqd_avgload;
 
         rqd = prv->rqd + i;
 
         /* If checking a different runqueue, grab the lock,
-         * read the avg, and then release the lock. */
-        if ( rqd != svc->rqd
-             && ! spin_trylock(&rqd->lock) )
-            continue;
-        if ( prv->rqd[i].load < min_load )
+         * read the avg, and then release the lock.
+         *
+         * If on our own runqueue, don't grab or release the lock;
+         * but subtract our own load from the runqueue load to simulate
+         * impartiality */
+        if ( rqd == svc->rqd )
         {
-            min_load=prv->rqd[i].load;
+            rqd_avgload = rqd->b_avgload - svc->avgload;
+        }
+        else if ( spin_trylock(&rqd->lock) )
+        {
+            rqd_avgload = rqd->b_avgload;
+            spin_unlock(&rqd->lock);
+        }
+        else
+            continue;
+
+        if ( rqd_avgload < min_avgload )
+        {
+            min_avgload = rqd_avgload;
             min_rqi=i;
         }
-        if ( rqd != svc->rqd )
-            spin_unlock(&rqd->lock);
     }
 
     /* We didn't find anyone (most likely because of spinlock contention); leave it where it is */
