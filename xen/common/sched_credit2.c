@@ -157,6 +157,12 @@
  */
 #define __CSFLAG_delayed_runq_add 2
 #define CSFLAG_delayed_runq_add (1<<__CSFLAG_delayed_runq_add)
+/* CSFLAG_runq_migrate_request: This vcpu is being migrated as a result of a
+ * credit2-initiated runq migrate request; migrate it to the runqueue indicated
+ * in the svc struct. 
+ */
+#define __CSFLAG_runq_migrate_request 3
+#define CSFLAG_runq_migrate_request (1<<__CSFLAG_runq_migrate_request)
 
 
 int opt_migrate_resist=500;
@@ -247,6 +253,8 @@ struct csched_vcpu {
     /* Individual contribution to load */
     s_time_t load_last_update;  /* Last time average was updated */
     s_time_t avgload;           /* Decaying queue load */
+
+    struct csched_runqueue_data *migrate_rqd; /* Pre-determined rqd to which to migrate */
 };
 
 /*
@@ -974,10 +982,10 @@ csched_context_saved(const struct scheduler *ops, struct vcpu *vc)
      * it seems a bit pointless; especially as we have plenty of
      * bits free.
      */
-    if ( test_bit(__CSFLAG_delayed_runq_add, &svc->flags) )
+    if ( test_and_clear_bit(__CSFLAG_delayed_runq_add, &svc->flags)
+         && likely(vcpu_runnable(vc)) )
     {
         BUG_ON(__vcpu_on_runq(svc));
-        clear_bit(__CSFLAG_delayed_runq_add, &svc->flags);
 
         runq_insert(ops, vc->processor, svc);
         runq_tickle(ops, vc->processor, svc, now);
@@ -1015,9 +1023,32 @@ choose_cpu(const struct scheduler *ops, struct vcpu *vc)
 
     if ( !spin_trylock(&prv->lock) )
     {
+        if ( test_and_clear_bit(__CSFLAG_runq_migrate_request, &svc->flags) )
+        {
+            d2printk("d%dv%d -\n", svc->vcpu->domain->domain_id, svc->vcpu->vcpu_id);
+            clear_bit(__CSFLAG_runq_migrate_request, &svc->flags);
+        }
         /* Leave it where it is for now.  When we actually pay attention
          * to affinity we'll have to figure something out... */
         return vc->processor;
+    }
+
+    /* First check to see if we're here because someone else suggested a place
+     * for us to move. */
+    if ( test_and_clear_bit(__CSFLAG_runq_migrate_request, &svc->flags) )
+    {
+        if ( unlikely(svc->migrate_rqd->id < 0) )
+        {
+            printk("%s: Runqueue migrate aborted because target runqueue disappeared!\n",
+                   __func__);
+            /* Fall-through to normal cpu pick */
+        }
+        else
+        {
+            d2printk("d%dv%d +\n", svc->vcpu->domain->domain_id, svc->vcpu->vcpu_id);
+            new_cpu = first_cpu(svc->migrate_rqd->active);
+            goto out_up;
+        }
     }
 
     /* FIXME: Pay attention to cpu affinity */                                                                                      
@@ -1053,7 +1084,8 @@ choose_cpu(const struct scheduler *ops, struct vcpu *vc)
         BUG_ON(cpus_empty(prv->rqd[min_rqi].active));
         new_cpu = first_cpu(prv->rqd[min_rqi].active);
     }
- 
+
+out_up:
     spin_unlock(&prv->lock);
 
     return new_cpu;
