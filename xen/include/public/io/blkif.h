@@ -76,6 +76,11 @@
  * "feature-flush-cache" node!
  */
 #define BLKIF_OP_FLUSH_DISKCACHE   3
+/*
+ * Used in SLES sources for device specific command packet
+ * contained within the request. Reserved for that purpose.
+ */
+#define BLKIF_OP_RESERVED_1        4
 
 /*
  * Maximum scatter/gather segments per request.
