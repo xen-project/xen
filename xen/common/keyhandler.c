@@ -375,6 +375,8 @@ static void run_all_nonirq_keyhandlers(unsigned long unused)
     struct keyhandler *h;
     int k;
 
+    console_start_log_everything();
+
     for ( k = 0; k < ARRAY_SIZE(key_table); k++ )
     {
         process_pending_softirqs_nested();
@@ -384,6 +386,8 @@ static void run_all_nonirq_keyhandlers(unsigned long unused)
         printk("[%c: %s]\n", k, h->desc);
         (*h->u.fn)(k);
     }
+
+    console_end_log_everything();
 }
 
 static DECLARE_TASKLET(run_all_keyhandlers_tasklet,
