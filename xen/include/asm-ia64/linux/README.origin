@@ -16,7 +16,6 @@ notifier.h		-> linux/include/linux/notifier.h
 percpu.h		-> linux/include/linux/percpu.h
 preempt.h		-> linux/include/linux/preempt.h
 seqlock.h		-> linux/include/linux/seqlock.h
-sort.h			-> linux/include/linux/sort.h
 stddef.h		-> linux/include/linux/stddef.h
 thread_info.h		-> linux/include/linux/thread_info.h
 time.h			-> linux/include/linux/time.h

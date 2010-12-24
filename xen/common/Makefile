@@ -22,6 +22,7 @@ obj-y += sched_arinc653.o
 obj-y += schedule.o
 obj-y += shutdown.o
 obj-y += softirq.o
+obj-y += sort.o
 obj-y += spinlock.o
 obj-y += stop_machine.o
 obj-y += string.o

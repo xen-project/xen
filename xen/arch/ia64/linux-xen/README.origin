@@ -21,7 +21,6 @@ sal.c			-> linux/arch/ia64/kernel/sal.c
 setup.c			-> linux/arch/ia64/kernel/setup.c
 smp.c			-> linux/arch/ia64/kernel/smp.c
 smpboot.c		-> linux/arch/ia64/kernel/smpboot.c
-sort.c			-> linux/lib/sort.c
 time.c			-> linux/arch/ia64/kernel/time.c
 tlb.c			-> linux/arch/ia64/mm/tlb.c
 unaligned.c		-> linux/arch/ia64/kernel/unaligned.c

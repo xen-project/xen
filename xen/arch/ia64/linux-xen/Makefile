@@ -12,7 +12,6 @@ obj-y += sal.o
 obj-y += setup.o
 obj-y += smpboot.o
 obj-y += smp.o
-obj-y += sort.o
 obj-y += time.o
 obj-y += tlb.o
 obj-y += unaligned.o
