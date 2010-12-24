@@ -7,6 +7,11 @@
 #include <mach_apic.h>
 
 
+const cpumask_t *target_cpus_all(void)
+{
+	return &cpu_online_map;
+}
+
 /*
  * LOGICAL FLAT DELIVERY MODE (multicast via bitmask to <= 8 logical APIC IDs).
  */
@@ -21,14 +26,9 @@ void init_apic_ldr_flat(void)
 	apic_write_around(APIC_LDR, val);
 }
 
-void clustered_apic_check_flat(void)
+void __init clustered_apic_check_flat(void)
 {
 	printk("Enabling APIC mode:  Flat.  Using %d I/O APICs\n", nr_ioapics);
-}
-
-const cpumask_t *target_cpus_flat(void)
-{
-	return &cpu_online_map;
 }
 
 const cpumask_t *vector_allocation_cpumask_flat(int cpu)
@@ -54,14 +54,9 @@ void init_apic_ldr_phys(void)
 	apic_write_around(APIC_LDR, val);
 }
 
-void clustered_apic_check_phys(void)
+void __init clustered_apic_check_phys(void)
 {
 	printk("Enabling APIC mode:  Phys.  Using %d I/O APICs\n", nr_ioapics);
-}
-
-const cpumask_t *target_cpus_phys(void)
-{
-	return &cpu_online_map;
 }
 
 const cpumask_t *vector_allocation_cpumask_phys(int cpu)

@@ -50,9 +50,10 @@ struct genapic {
 
 extern const struct genapic *genapic;
 
+const cpumask_t *target_cpus_all(void);
+
 void init_apic_ldr_flat(void);
 void clustered_apic_check_flat(void);
-const cpumask_t *target_cpus_flat(void);
 unsigned int cpu_mask_to_apicid_flat(const cpumask_t *cpumask);
 void send_IPI_mask_flat(const cpumask_t *mask, int vector);
 void send_IPI_self_flat(int vector);
@@ -62,7 +63,7 @@ const cpumask_t *vector_allocation_cpumask_flat(int cpu);
 	.int_dest_mode = 1 /* logical delivery */, \
 	.init_apic_ldr = init_apic_ldr_flat, \
 	.clustered_apic_check = clustered_apic_check_flat, \
-	.target_cpus = target_cpus_flat, \
+	.target_cpus = target_cpus_all, \
 	.vector_allocation_cpumask = vector_allocation_cpumask_flat, \
 	.cpu_mask_to_apicid = cpu_mask_to_apicid_flat, \
 	.send_IPI_mask = send_IPI_mask_flat, \
@@ -70,7 +71,6 @@ const cpumask_t *vector_allocation_cpumask_flat(int cpu);
 
 void init_apic_ldr_phys(void);
 void clustered_apic_check_phys(void);
-const cpumask_t *target_cpus_phys(void);
 unsigned int cpu_mask_to_apicid_phys(const cpumask_t *cpumask);
 void send_IPI_mask_phys(const cpumask_t *mask, int vector);
 void send_IPI_self_phys(int vector);
@@ -80,7 +80,7 @@ const cpumask_t *vector_allocation_cpumask_phys(int cpu);
 	.int_dest_mode = 0 /* physical delivery */, \
 	.init_apic_ldr = init_apic_ldr_phys, \
 	.clustered_apic_check = clustered_apic_check_phys, \
-	.target_cpus = target_cpus_phys, \
+	.target_cpus = target_cpus_all, \
 	.vector_allocation_cpumask = vector_allocation_cpumask_phys, \
 	.cpu_mask_to_apicid = cpu_mask_to_apicid_phys, \
 	.send_IPI_mask = send_IPI_mask_phys, \

@@ -40,23 +40,8 @@ static void init_apic_ldr_x2apic_cluster(void)
     cpu_2_logical_apicid[cpu] = apic_read(APIC_LDR);
 }
 
-static void clustered_apic_check_x2apic(void)
+static void __init clustered_apic_check_x2apic(void)
 {
-}
-
-static const cpumask_t *target_cpus_x2apic(void)
-{
-    return &cpu_online_map;
-}
-
-static const cpumask_t *vector_allocation_cpumask_x2apic(int cpu)
-{
-    return cpumask_of(cpu);
-}
-
-static unsigned int cpu_mask_to_apicid_x2apic_phys(const cpumask_t *cpumask)
-{
-    return cpu_physical_id(cpumask_first(cpumask));
 }
 
 static unsigned int cpu_mask_to_apicid_x2apic_cluster(const cpumask_t *cpumask)
@@ -114,9 +99,9 @@ static const struct genapic apic_x2apic_phys = {
     .int_dest_mode = 0 /* physical delivery */,
     .init_apic_ldr = init_apic_ldr_x2apic_phys,
     .clustered_apic_check = clustered_apic_check_x2apic,
-    .target_cpus = target_cpus_x2apic,
-    .vector_allocation_cpumask = vector_allocation_cpumask_x2apic,
-    .cpu_mask_to_apicid = cpu_mask_to_apicid_x2apic_phys,
+    .target_cpus = target_cpus_all,
+    .vector_allocation_cpumask = vector_allocation_cpumask_phys,
+    .cpu_mask_to_apicid = cpu_mask_to_apicid_phys,
     .send_IPI_mask = send_IPI_mask_x2apic_phys,
     .send_IPI_self = send_IPI_self_x2apic
 };
@@ -127,8 +112,8 @@ static const struct genapic apic_x2apic_cluster = {
     .int_dest_mode = 1 /* logical delivery */,
     .init_apic_ldr = init_apic_ldr_x2apic_cluster,
     .clustered_apic_check = clustered_apic_check_x2apic,
-    .target_cpus = target_cpus_x2apic,
-    .vector_allocation_cpumask = vector_allocation_cpumask_x2apic,
+    .target_cpus = target_cpus_all,
+    .vector_allocation_cpumask = vector_allocation_cpumask_phys,
     .cpu_mask_to_apicid = cpu_mask_to_apicid_x2apic_cluster,
     .send_IPI_mask = send_IPI_mask_x2apic_cluster,
     .send_IPI_self = send_IPI_self_x2apic
