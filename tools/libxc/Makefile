@@ -62,6 +62,8 @@ GUEST_SRCS-$(CONFIG_X86)     += xc_dom_x86.c
 GUEST_SRCS-$(CONFIG_X86)     += xc_cpuid_x86.c
 GUEST_SRCS-$(CONFIG_IA64)    += xc_dom_ia64.c
 
+OSDEP_SRCS-y                 += xenctrl_osdep_ENOSYS.c
+
 -include $(XEN_TARGET_ARCH)/Makefile
 
 CFLAGS   += -Werror -Wmissing-prototypes
@@ -81,6 +83,9 @@ CTRL_PIC_OBJS := $(patsubst %.c,%.opic,$(CTRL_SRCS-y))
 
 GUEST_LIB_OBJS := $(patsubst %.c,%.o,$(GUEST_SRCS-y))
 GUEST_PIC_OBJS := $(patsubst %.c,%.opic,$(GUEST_SRCS-y))
+
+OSDEP_LIB_OBJS := $(patsubst %.c,%.o,$(OSDEP_SRCS-y))
+OSDEP_PIC_OBJS := $(patsubst %.c,%.opic,$(OSDEP_SRCS-y))
 
 LIB := libxenctrl.a
 ifneq ($(stubdom),y)
@@ -129,7 +134,8 @@ TAGS:
 clean:
 	rm -rf *.rpm $(LIB) *~ $(DEPS) \
             $(CTRL_LIB_OBJS) $(CTRL_PIC_OBJS) \
-            $(GUEST_LIB_OBJS) $(GUEST_PIC_OBJS)
+            $(GUEST_LIB_OBJS) $(GUEST_PIC_OBJS) \
+            $(OSDEP_LIB_OBJS) $(OSDEP_PIC_OBJS)
 
 .PHONY: rpm
 rpm: build
@@ -190,8 +196,8 @@ libxenguest.so.$(MAJOR).$(MINOR): COMPRESSION_LIBS = $(call zlib-options,l)
 libxenguest.so.$(MAJOR).$(MINOR): $(GUEST_PIC_OBJS) libxenctrl.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenguest.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $(GUEST_PIC_OBJS) $(COMPRESSION_LIBS) -lz -lxenctrl $(PTHREAD_LIBS)
 
-xenctrl_osdep_ENOSYS.so: xenctrl_osdep_ENOSYS.o libxenctrl.so
-	$(CC) -g $(CFLAGS) $(LDFLAGS) $(SHLIB_LDFLAGS) -o $@ xenctrl_osdep_ENOSYS.o -lxenctrl
+xenctrl_osdep_ENOSYS.so: $(OSDEP_PIC_OBJS) libxenctrl.so
+	$(CC) -g $(CFLAGS) $(LDFLAGS) $(SHLIB_LDFLAGS) -o $@ $(OSDEP_PIC_OBJS) -lxenctrl
 
 -include $(DEPS)
 
