@@ -51,12 +51,16 @@ SECTIONS
        __stop___pre_ex_table = .;
 
        *(.data.read_mostly)
+       *(.data.rel.ro)
+       *(.data.rel.ro.*)
   } :text
 
   .data : {                    /* Data */
        . = ALIGN(PAGE_SIZE);
        *(.data.page_aligned)
        *(.data)
+       *(.data.rel)
+       *(.data.rel.*)
        CONSTRUCTORS
   } :text
 
