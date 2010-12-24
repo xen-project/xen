@@ -45,6 +45,8 @@
 #define TRC_CSCHED2_SCHED_TASKLET TRC_SCHED_CLASS + 8
 #define TRC_CSCHED2_UPDATE_LOAD   TRC_SCHED_CLASS + 9
 #define TRC_CSCHED2_RUNQ_ASSIGN   TRC_SCHED_CLASS + 10
+#define TRC_CSCHED2_UPDATE_VCPU_LOAD   TRC_SCHED_CLASS + 11
+#define TRC_CSCHED2_UPDATE_RUNQ_LOAD   TRC_SCHED_CLASS + 12
 
 /*
  * WARNING: This is still in an experimental phase.  Status and work can be found at the
@@ -241,6 +243,9 @@ struct csched_vcpu {
     s_time_t start_time; /* When we were scheduled (used for credit) */
     unsigned flags;      /* 16 bits doesn't seem to play well with clear_bit() */
 
+    /* Individual contribution to load */
+    s_time_t load_last_update;  /* Last time average was updated */
+    s_time_t avgload;           /* Decaying queue load */
 };
 
 /*
@@ -286,8 +291,8 @@ __runq_elem(struct list_head *elem)
 }
 
 static void
-update_load(const struct scheduler *ops,
-            struct csched_runqueue_data *rqd, int change, s_time_t now)
+__update_runq_load(const struct scheduler *ops,
+                  struct csched_runqueue_data *rqd, int change, s_time_t now)
 {
     struct csched_private *prv = CSCHED_PRIV(ops);
     s_time_t delta=-1;
@@ -296,7 +301,7 @@ update_load(const struct scheduler *ops,
 
     if ( rqd->load_last_update + (1ULL<<prv->load_window_shift) < now )
     {
-        rqd->avgload = rqd->load << (1ULL<prv->load_window_shift);
+        rqd->avgload = (unsigned long long)rqd->load << prv->load_window_shift;
     }
     else
     {
@@ -306,21 +311,76 @@ update_load(const struct scheduler *ops,
             ( ( delta * ( (unsigned long long)rqd->load << prv->load_window_shift ) )
               + ( ((1ULL<<prv->load_window_shift) - delta) * rqd->avgload ) ) >> prv->load_window_shift;
     }
-
     rqd->load += change;
     rqd->load_last_update = now;
+
     {
         struct {
-            unsigned load:4, avgload:28;
-            int delta;
+            unsigned rq_load:4, rq_avgload:28;
+            unsigned rq_id:4;
         } d;
-        d.load = rqd->load;
-        d.avgload = rqd->avgload;
-        d.delta = delta;
-        trace_var(TRC_CSCHED2_UPDATE_LOAD, 0,
+        d.rq_id=rqd->id;
+        d.rq_load = rqd->load;
+        d.rq_avgload = rqd->avgload;
+        trace_var(TRC_CSCHED2_UPDATE_RUNQ_LOAD, 1,
                   sizeof(d),
                   (unsigned char *)&d);
     }
+}
+
+static void
+__update_svc_load(const struct scheduler *ops,
+                  struct csched_vcpu *svc, int change, s_time_t now)
+{
+    struct csched_private *prv = CSCHED_PRIV(ops);
+    s_time_t delta=-1;
+    int vcpu_load;
+
+    if ( change == -1 )
+        vcpu_load = 1;
+    else if ( change == 1 )
+        vcpu_load = 0;
+    else
+        vcpu_load = vcpu_runnable(svc->vcpu);
+
+    now >>= LOADAVG_GRANULARITY_SHIFT;
+
+    if ( svc->load_last_update + (1ULL<<prv->load_window_shift) < now )
+    {
+        svc->avgload = (unsigned long long)vcpu_load << prv->load_window_shift;
+    }
+    else
+    {
+        delta = now - svc->load_last_update;
+
+        svc->avgload =
+            ( ( delta * ( (unsigned long long)vcpu_load << prv->load_window_shift ) )
+              + ( ((1ULL<<prv->load_window_shift) - delta) * svc->avgload ) ) >> prv->load_window_shift;
+    }
+    svc->load_last_update = now;
+
+    {
+        struct {
+            unsigned dom:16,vcpu:16;
+            unsigned v_avgload:32;
+        } d;
+        d.dom = svc->vcpu->domain->domain_id;
+        d.vcpu = svc->vcpu->vcpu_id;
+        d.v_avgload = svc->avgload;
+        trace_var(TRC_CSCHED2_UPDATE_VCPU_LOAD, 1,
+                  sizeof(d),
+                  (unsigned char *)&d);
+    }
+}
+
+static void
+update_load(const struct scheduler *ops,
+            struct csched_runqueue_data *rqd,
+            struct csched_vcpu *svc, int change, s_time_t now)
+{
+    __update_runq_load(ops, rqd, change, now);
+    if ( svc )
+        __update_svc_load(ops, svc, change, now);
 }
 
 static int
@@ -672,6 +732,9 @@ csched_alloc_vdata(const struct scheduler *ops, struct vcpu *vc, void *dd)
 
         svc->credit = CSCHED_CREDIT_INIT;
         svc->weight = svc->sdom->weight;
+        /* Starting load of 50% */
+        svc->avgload = 1ULL << (CSCHED_PRIV(ops)->load_window_shift - 1);
+        svc->load_last_update = NOW();
     }
     else
     {
@@ -817,7 +880,7 @@ csched_vcpu_sleep(const struct scheduler *ops, struct vcpu *vc)
     else if ( __vcpu_on_runq(svc) )
     {
         BUG_ON(svc->rqd != RQD(ops, vc->processor));
-        update_load(ops, svc->rqd, -1, NOW());
+        update_load(ops, svc->rqd, svc, -1, NOW());
         __runq_remove(svc);
     }
     else if ( test_bit(__CSFLAG_delayed_runq_add, &svc->flags) )
@@ -866,7 +929,7 @@ csched_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
 
     now = NOW();
 
-    update_load(ops, svc->rqd, 1, now);
+    update_load(ops, svc->rqd, svc, 1, now);
         
     /* Put the VCPU on the runq */
     runq_insert(ops, vc->processor, svc);
@@ -907,7 +970,7 @@ csched_context_saved(const struct scheduler *ops, struct vcpu *vc)
         runq_tickle(ops, vc->processor, svc, now);
     }
     else if ( !is_idle_vcpu(vc) )
-        update_load(ops, svc->rqd, -1, now);
+        update_load(ops, svc->rqd, svc, -1, now);
 
     vcpu_schedule_unlock_irq(vc);
 }
@@ -1339,7 +1402,7 @@ csched_schedule(
             cpu_set(cpu, rqd->idle);
         /* Make sure avgload gets updated periodically even
          * if there's no activity */
-        update_load(ops, rqd, 0, now);
+        update_load(ops, rqd, NULL, 0, now);
     }
 
     /*
