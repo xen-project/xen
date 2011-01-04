@@ -2650,6 +2650,7 @@ int
 set_shared_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn)
 {
     int rc = 0;
+    int need_lock = !p2m_locked_by_me(p2m);
     p2m_type_t ot;
     mfn_t omfn;
 
@@ -2665,7 +2666,11 @@ set_shared_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn)
     set_gpfn_from_mfn(mfn_x(omfn), INVALID_M2P_ENTRY);
 
     P2M_DEBUG("set shared %lx %lx\n", gfn, mfn_x(mfn));
+    if ( need_lock ) 
+        p2m_lock(p2m);
     rc = set_p2m_entry(p2m, gfn, mfn, 0, p2m_ram_shared);
+    if ( need_lock ) 
+        p2m_unlock(p2m);
     if ( 0 == rc )
         gdprintk(XENLOG_ERR,
             "set_mmio_p2m_entry: set_p2m_entry failed! mfn=%08lx\n",
