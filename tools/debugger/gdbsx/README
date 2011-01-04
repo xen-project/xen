@@ -13,9 +13,6 @@ create a plug in for any other debugger or binary type.
 
 
 USAGE:
-   - boot with gdbsx enabled hypervisor (eg, on OVM: xen-64bit-debug.gz)
-   - copy gdbsx binary to the dom0 (assume hostname is "dom0"), then:
-
    USAGE 1:
    - dom0> gdbsx -c 1 64 : displays VCPU contexts for 64bit guest with domid 1
 
@@ -59,16 +56,6 @@ TIPS:
    - make sure firewall is disabled on dom0 if running gdb on a different host.
    - Must be at least gdb version 6.5-16.x to debug el5 kernels.
 
-BUILD: (if you don't have access to binary):
-   - first compile the hypervisor: xen> make gdbsx=y
-         To have both kdb and gdbsx, xen> make kdb=y gdbsx=y
-	 (NOTE: kdb is not required for gdbsx)
-   - install the hypervisor and reboot
-   - now go to, tools/debugger/gdbsx and do make
-     On 32bit system, a 32bit binary will be built with support for both 32
-     and 64bit guests. On 64bit system, a 64bit binary will be built with 
-     support for both.
-
 
 Mukesh Rathor
 Oracle Corporation,
@@ -89,12 +76,12 @@ define ps
 	set $task = $tasks
 	set $task_entry = (struct task_struct *)((unsigned long)$task - $offset)
 	printf "Pointer       PID      Command\n"
-	printf "%-14p%-9d%s\n", $task_entry, $task_entry->pid, $task_entry->comm
+	printf "%p %-9d%s\n", $task_entry, $task_entry->pid, $task_entry->comm
 	set $task = $task->next
 	while $task != $tasks
 		set $task_entry = (struct task_struct *)((unsigned long)$task - $offset)
 		if ($task_entry->pid) != 0
-			printf "%-14p%-9d%s\n", $task_entry, $task_entry->pid, $task_entry->comm
+			printf "%p %-9d%s\n", $task_entry, $task_entry->pid, $task_entry->comm
 		end
 		set $task = $task->next
 	end
