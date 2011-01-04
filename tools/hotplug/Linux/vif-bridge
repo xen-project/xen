@@ -81,7 +81,7 @@ fi
 
 case "$command" in
     online)
-        setup_bridge_port "$dev"
+        setup_virtual_bridge_port "$dev"
         add_to_bridge "$bridge" "$dev"
         ;;
 
@@ -91,7 +91,7 @@ case "$command" in
         ;;
 
     add)
-        setup_bridge_port "$dev"
+        setup_virtual_bridge_port "$dev"
         add_to_bridge "$bridge" "$dev"
         ;;
 esac

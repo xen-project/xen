@@ -23,7 +23,7 @@ case "$command" in
     "online")
 	if [ "$bridge" != "-" ]
 	    then
-	    setup_bridge_port "$vif"
+	    setup_virtual_bridge_port "$vif"
 	    add_to_bridge "$bridge" "$vif"
 	else
 	    # Just let the normal udev rules for interfaces handle it.

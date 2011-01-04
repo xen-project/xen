@@ -244,7 +244,7 @@ op_start () {
     ip link set ${netdev} name ${pdev}
     ip link set ${tdev} name ${bridge}
 
-    setup_bridge_port ${pdev}
+    setup_physical_bridge_port ${pdev}
 
     # Restore slaves
     if [ -n "${slaves}" ]; then
