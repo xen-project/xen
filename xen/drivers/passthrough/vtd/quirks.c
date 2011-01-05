@@ -256,6 +256,7 @@ void me_wifi_quirk(struct domain *domain, u8 bus, u8 devfn, int map)
             case 0x00858086:
             case 0x42388086:
             case 0x422b8086:
+            case 0x422c8086:
                 map_me_phantom_function(domain, 22, map);
                 break;
             default:
