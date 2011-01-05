@@ -3249,16 +3249,6 @@ class XendDomainInfo:
             disk = devinfo[1]['uname']
 
             fn = blkdev_uname_to_file(disk)
-
-            # If this is a drbd volume, check if we need to activate it
-            if disk.find(":") != -1:
-                (disktype, diskname) = disk.split(':', 1)
-                if disktype == 'drbd':
-                    (drbdadmstdin, drbdadmstdout) = os.popen2(["/sbin/drbdadm", "state", diskname])
-                    (state, junk) = drbdadmstdout.readline().split('/', 1)
-                    if state == 'Secondary':
-                        os.system('/sbin/drbdadm primary ' + diskname)
-
             taptype = blkdev_uname_to_taptype(disk)
             mounted = devtype in ['tap', 'tap2'] and taptype != 'aio' and taptype != 'sync' and not os.stat(fn).st_rdev
             mounted_vbd_uuid = 0

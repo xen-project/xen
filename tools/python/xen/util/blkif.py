@@ -71,15 +71,8 @@ def _parse_uname(uname):
     if uname.find(":") != -1:
         (typ, fn) = uname.split(":", 1)
 
-        if typ == "phy" and not fn.startswith("/"):
+        if typ in ("phy", "drbd") and not fn.startswith("/"):
             fn = "/dev/%s" %(fn,)
-
-        if typ == "drbd":
-            if not fn.startswith("drbd"):
-                (drbdadmstdin, drbdadmstdout) = os.popen2(["/sbin/drbdadm", "sh-dev", fn])
-                fn = drbdadmstdout.readline().strip()
-            else:
-                fn = "/dev/%s" %(fn,)
                
         if typ in ("tap", "tap2"):
             (taptype, fn) = fn.split(":", 1)
