@@ -238,6 +238,7 @@ void register_io_handler(
     handler->hdl_list[num].addr = addr;
     handler->hdl_list[num].size = size;
     handler->hdl_list[num].action.ptr = action;
+    handler->hdl_list[num].type = type;
     handler->num_slot++;
 }
 
