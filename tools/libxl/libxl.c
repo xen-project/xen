@@ -1402,8 +1402,8 @@ static char ** libxl_build_device_model_args_new(libxl__gc *gc,
             }
             libxl_device_disk_destroy(&disks[i]);
         }
+        free(disks);
     }
-    free(disks);
     flexarray_set(dm_args, num++, NULL);
     return (char **) flexarray_contents(dm_args);
 }
