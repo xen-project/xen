@@ -185,9 +185,9 @@ endif
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= ead83f3f9bc4516f845fbbe23204872eed3e8432
-# Thu Dec 23 15:29:37 2010 +0000
-# qemu-xen: update for libxc gnttab interface change
+QEMU_TAG ?= 99d53fbb69d3e03be61ae10506a304a3d08d792f
+# Wed Jan 5 23:48:36 2011 +0000
+# fix '|' key display problem in en-us with altgr processing
 
 # Optional components
 XENSTAT_XENTOP     ?= y
