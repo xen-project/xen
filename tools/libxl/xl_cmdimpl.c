@@ -641,6 +641,134 @@ static int parse_action_on_shutdown(const char *buf, enum action_on_shutdown *a)
     return 0;
 }
 
+#define DSTATE_INITIAL   0
+#define DSTATE_TAP       1
+#define DSTATE_PHYSPATH  2
+#define DSTATE_VIRTPATH  3
+#define DSTATE_VIRTTYPE  4
+#define DSTATE_RW        5
+#define DSTATE_TERMINAL  6
+
+static int parse_disk_config(libxl_device_disk *disk, char *buf2)
+{
+    int state = DSTATE_INITIAL;
+    char *p, *end, *tok;
+
+    memset(disk, 0, sizeof(*disk));
+
+    for(tok = p = buf2, end = buf2 + strlen(buf2) + 1; p < end; p++) {
+        switch(state){
+        case DSTATE_INITIAL:
+            if ( *p == ':' ) {
+                *p = '\0';
+                if ( !strcmp(tok, "phy") ) {
+                    state = DSTATE_PHYSPATH;
+                    disk->phystype = PHYSTYPE_PHY;
+                }else if ( !strcmp(tok, "file") ) {
+                    state = DSTATE_PHYSPATH;
+                    disk->phystype = PHYSTYPE_FILE;
+                }else if ( !strcmp(tok, "tap") ) {
+                    state = DSTATE_TAP;
+                }else{
+                    fprintf(stderr, "Unknown disk type: %s\n", tok);
+                    return 0;
+                }
+                tok = p + 1;
+            }
+            break;
+        case DSTATE_TAP:
+            if ( *p == ':' ) {
+                *p = '\0';
+                if ( !strcmp(tok, "aio") ) {
+                    disk->phystype = PHYSTYPE_AIO;
+                }else if ( !strcmp(tok, "vhd") ) {
+                    disk->phystype = PHYSTYPE_VHD;
+                }else if ( !strcmp(tok, "qcow") ) {
+                    disk->phystype = PHYSTYPE_QCOW;
+                }else if ( !strcmp(tok, "qcow2") ) {
+                    disk->phystype = PHYSTYPE_QCOW2;
+                }else {
+                    fprintf(stderr, "Unknown tapdisk type: %s\n", tok);
+                    return 0;
+                }
+
+                tok = p + 1;
+                state = DSTATE_PHYSPATH;
+            }
+            break;
+        case DSTATE_PHYSPATH:
+            if ( *p == ',' ) {
+                int ioemu_len;
+
+                *p = '\0';
+                disk->physpath = (*tok) ? strdup(tok) : NULL;
+                tok = p + 1;
+
+                /* hack for ioemu disk spec */
+                ioemu_len = strlen("ioemu:");
+                state = DSTATE_VIRTPATH;
+                if ( tok + ioemu_len < end &&
+                    !strncmp(tok, "ioemu:", ioemu_len)) {
+                    tok += ioemu_len;
+                    p += ioemu_len;
+                }
+            }
+            break;
+        case DSTATE_VIRTPATH:
+            if ( *p == ',' || *p == ':' || *p == '\0' ) {
+                switch(*p) {
+                case ':':
+                    state = DSTATE_VIRTTYPE;
+                    break;
+                case ',':
+                    state = DSTATE_RW;
+                    break;
+                case '\0':
+                    state = DSTATE_TERMINAL;
+                    break;
+                }
+                if ( tok == p )
+                    goto out;
+                *p = '\0';
+                disk->virtpath = (*tok) ? strdup(tok) : NULL;
+                tok = p + 1;
+            }
+            break;
+        case DSTATE_VIRTTYPE:
+            if ( *p == ',' || *p == '\0' ) {
+                *p = '\0';
+                if ( !strcmp(tok, "cdrom") ) {
+                    disk->is_cdrom = 1;
+                    disk->unpluggable = 1;
+                }else{
+                    fprintf(stderr, "Unknown virtual disk type: %s\n", tok);
+                    return 0;
+                }
+                tok = p + 1;
+                state = (*p == ',') ? DSTATE_RW : DSTATE_TERMINAL;
+            }
+            break;
+        case DSTATE_RW:
+            if ( *p == '\0' ) {
+                disk->readwrite = (tok[0] == 'w');
+                tok = p + 1;
+                state = DSTATE_TERMINAL;
+            }
+            break;
+        case DSTATE_TERMINAL:
+            goto out;
+        }
+    }
+
+out:
+    if ( tok != p || state != DSTATE_TERMINAL ) {
+        fprintf(stderr, "parse error in disk config near '%s'\n", tok);
+        return 0;
+    }
+
+    return 1;
+}
+
 static void parse_config_data(const char *configfile_filename_report,
                               const char *configfile_data,
                               int configfile_len,
@@ -826,59 +954,13 @@ static void parse_config_data(const char *configfile_filename_report,
         while ((buf = xlu_cfg_get_listitem (vbds, d_config->num_disks)) != NULL) {
             libxl_device_disk *disk;
             char *buf2 = strdup(buf);
-            char *p, *p2;
 
             d_config->disks = (libxl_device_disk *) realloc(d_config->disks, sizeof (libxl_device_disk) * (d_config->num_disks + 1));
             disk = d_config->disks + d_config->num_disks;
-
-            disk->backend_domid = 0;
-            disk->domid = 0;
-            disk->unpluggable = 0;
-
-            p = strtok(buf2, ",:");
-            while (*p == ' ')
-                p++;
-            if (!strcmp(p, "phy")) {
-                disk->phystype = PHYSTYPE_PHY;
-            } else if (!strcmp(p, "file")) {
-                disk->phystype = PHYSTYPE_FILE;
-            } else if (!strcmp(p, "tap")) {
-                p = strtok(NULL, ":");
-                if (!strcmp(p, "aio")) {
-                    disk->phystype = PHYSTYPE_AIO;
-                } else if (!strcmp(p, "vhd")) {
-                    disk->phystype = PHYSTYPE_VHD;
-                } else if (!strcmp(p, "qcow")) {
-                    disk->phystype = PHYSTYPE_QCOW;
-                } else if (!strcmp(p, "qcow2")) {
-                    disk->phystype = PHYSTYPE_QCOW2;
-                }
+            if ( !parse_disk_config(disk, buf2) ) {
+                exit(1);
             }
-            p = strtok(NULL, ",");
-            while (*p == ' ')
-                p++;
-            disk->physpath= strdup(p);
-            p = strtok(NULL, ",");
-            while (*p == ' ')
-                p++;
-            p2 = strchr(p, ':');
-            if (p2 == NULL) {
-                disk->virtpath = strdup(p);
-                disk->is_cdrom = 0;
-                disk->unpluggable = 1;
-            } else {
-                *p2 = '\0';
-                disk->virtpath = strdup(p);
-                if (!strcmp(p2 + 1, "cdrom")) {
-                    disk->is_cdrom = 1;
-                    disk->unpluggable = 1;
-                } else
-                    disk->is_cdrom = 0;
-            }
-            p = strtok(NULL, ",");
-            while (*p == ' ')
-                p++;
-            disk->readwrite = (p[0] == 'w') ? 1 : 0;
+
             free(buf2);
             d_config->num_disks++;
         }
