@@ -634,6 +634,8 @@ void watchdog_domain_destroy(struct domain *d);
 
 #define is_hvm_domain(d) ((d)->is_hvm)
 #define is_hvm_vcpu(v)   (is_hvm_domain(v->domain))
+#define is_pinned_vcpu(v) ((v)->domain->is_pinned || \
+                           cpus_weight((v)->cpu_affinity) == 1)
 #define need_iommu(d)    ((d)->need_iommu)
 
 void set_vcpu_migration_delay(unsigned int delay);

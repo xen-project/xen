@@ -1036,7 +1036,7 @@ arch_do_vcpu_op(
         struct vcpu_get_physid cpu_id;
 
         rc = -EINVAL;
-        if ( !v->domain->is_pinned )
+        if ( !is_pinned_vcpu(v) )
             break;
 
         cpu_id.phys_id =
