@@ -39,8 +39,8 @@
 #define P2M_AUDIT     0
 #define P2M_DEBUGGING 0
 
-/* turn on/off 1GB host page table support for hap */
-static bool_t __read_mostly opt_hap_1gb;
+/* turn on/off 1GB host page table support for hap, default on */
+static bool_t __read_mostly opt_hap_1gb = 1;
 boolean_param("hap_1gb", opt_hap_1gb);
 
 /* Printouts */
