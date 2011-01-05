@@ -2333,6 +2333,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 goto fail;
             break;
         case MSR_IA32_THERM_CONTROL:
+        case MSR_IA32_ENERGY_PERF_BIAS:
             if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
                 goto fail;
             if ( (v->domain->domain_id != 0) || !v->domain->is_pinned )
