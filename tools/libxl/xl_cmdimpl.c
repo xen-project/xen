@@ -5489,7 +5489,7 @@ int main_cpupoolcreate(int argc, char **argv)
     int config_len = 0;
     XLU_Config *config;
     const char *buf;
-    char *name;
+    const char *name;
     const char *sched;
     uint32_t poolid;
     int schedid = -1;
@@ -5581,7 +5581,7 @@ int main_cpupoolcreate(int argc, char **argv)
     if (!xlu_cfg_get_string (config, "name", &buf))
         name = strdup(buf);
     else
-        name = basename(filename);
+        name = libxl_basename(filename);
     if (!libxl_name_to_cpupoolid(&ctx, name, &poolid)) {
         fprintf(stderr, "Pool name \"%s\" already exists\n", name);
         return -ERROR_FAIL;

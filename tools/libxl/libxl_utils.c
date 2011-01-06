@@ -43,6 +43,20 @@ static struct schedid_name schedid_name[] = {
     { NULL, -1 }
 };
 
+const char *libxl_basename(const char *name)
+{
+    const char *filename;
+    if (name == NULL)
+        return strdup(".");
+    if (name[0] == '\0')
+        return strdup(".");
+
+    filename = strrchr(name, '/');
+    if (filename)
+        return strdup(filename+1);
+    return strdup(name);
+}
+
 unsigned long libxl_get_required_shadow_memory(unsigned long maxmem_kb, unsigned int smp_cpus)
 {
     /* 256 pages (1MB) per vcpu,
