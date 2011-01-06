@@ -2495,61 +2495,62 @@ int libxl_device_vkb_hard_shutdown(libxl_ctx *ctx, uint32_t domid)
     return ERROR_NI;
 }
 
-libxl_device_disk *libxl_device_disk_list(libxl_ctx *ctx, uint32_t domid, int *num)
+static unsigned int libxl_append_disk_list_of_type(libxl_ctx *ctx,
+                                                   uint32_t domid,
+                                                   const char *type,
+                                                   libxl_device_disk **disks,
+                                                   unsigned int *ndisks)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
-    char *be_path_tap, *be_path_vbd;
-    libxl_device_disk *dend, *disks, *ret = NULL;
-    char **b, **l = NULL;
-    unsigned int numl, len;
-    char *type;
+    char *be_path = NULL;
+    char **dir = NULL;
+    unsigned int n = 0, len = 0;
+    libxl_device_disk *pdisk = NULL, *pdisk_end = NULL;
+    char *physpath_tmp = NULL;
 
-    be_path_vbd = libxl__sprintf(&gc, "%s/backend/vbd/%d", libxl__xs_get_dompath(&gc, 0), domid);
-    be_path_tap = libxl__sprintf(&gc, "%s/backend/tap/%d", libxl__xs_get_dompath(&gc, 0), domid);
-
-    b = l = libxl__xs_directory(&gc, XBT_NULL, be_path_vbd, &numl);
-    if (l) {
-        ret = realloc(ret, sizeof(libxl_device_disk) * numl);
-        disks = ret;
-        *num = numl;
-        dend = ret + *num;
-        for (; disks < dend; ++disks, ++l) {
-            disks->backend_domid = 0;
-            disks->domid = domid;
-            disks->physpath = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(&gc, "%s/%s/params", be_path_vbd, *l), &len);
-            libxl_string_to_phystype(ctx, libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/%s/type", be_path_vbd, *l)), &(disks->phystype));
-            disks->virtpath = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(&gc, "%s/%s/dev", be_path_vbd, *l), &len);
-            disks->unpluggable = atoi(libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/%s/removable", be_path_vbd, *l)));
-            if (!strcmp(libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/%s/mode", be_path_vbd, *l)), "w"))
-                disks->readwrite = 1;
+    be_path = libxl__sprintf(&gc, "%s/backend/%s/%d",
+                             libxl__xs_get_dompath(&gc, 0), type, domid);
+    dir = libxl__xs_directory(&gc, XBT_NULL, be_path, &n);
+    if (dir) {
+        *disks = realloc(*disks, sizeof (libxl_device_disk) * (*ndisks + n));
+        pdisk = *disks + *ndisks;
+        *ndisks += n;
+        pdisk_end = *disks + *ndisks;
+        for (; pdisk < pdisk_end; pdisk++, dir++) {
+            pdisk->backend_domid = 0;
+            pdisk->domid = domid;
+            physpath_tmp = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(&gc, "%s/%s/params", be_path, *dir), &len);
+            if (strchr(physpath_tmp, ':')) {
+                pdisk->physpath = strdup(strchr(physpath_tmp, ':') + 1);
+                free(physpath_tmp);
+            } else {
+                pdisk->physpath = physpath_tmp;
+            }
+            libxl_string_to_phystype(ctx, libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/%s/type", be_path, *dir)), &(pdisk->phystype));
+            pdisk->virtpath = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(&gc, "%s/%s/dev", be_path, *dir), &len);
+            pdisk->unpluggable = atoi(libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/%s/removable", be_path, *dir)));
+            if (!strcmp(libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/%s/mode", be_path, *dir)), "w"))
+                pdisk->readwrite = 1;
             else
-                disks->readwrite = 0;
-            type = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/device-type", libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/%s/frontend", be_path_vbd, *l))));
-            disks->is_cdrom = !strcmp(type, "cdrom");
+                pdisk->readwrite = 0;
+            type = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/device-type", libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/%s/frontend", be_path, *dir))));
+            pdisk->is_cdrom = !strcmp(type, "cdrom");
         }
     }
-    b = l = libxl__xs_directory(&gc, XBT_NULL, be_path_tap, &numl);
-    if (l) {
-        ret = realloc(ret, sizeof(libxl_device_disk) * (*num + numl));
-        disks = ret + *num;
-        *num += numl;
-        for (dend = ret + *num; disks < dend; ++disks, ++l) {
-            disks->backend_domid = 0;
-            disks->domid = domid;
-            disks->physpath = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(&gc, "%s/%s/params", be_path_tap, *l), &len);
-            libxl_string_to_phystype(ctx, libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/%s/type", be_path_tap, *l)), &(disks->phystype));
-            disks->virtpath = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(&gc, "%s/%s/dev", be_path_tap, *l), &len);
-            disks->unpluggable = atoi(libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/%s/removable", be_path_tap, *l)));
-            if (!strcmp(libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/%s/mode", be_path_tap, *l)), "w"))
-                disks->readwrite = 1;
-            else
-                disks->readwrite = 0;
-            type = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/device-type", libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/%s/frontend", be_path_tap, *l))));
-            disks->is_cdrom = !strcmp(type, "cdrom");
-        }
-    }
+
     libxl__free_all(&gc);
-    return ret;
+    return n;
+}
+
+libxl_device_disk *libxl_device_disk_list(libxl_ctx *ctx, uint32_t domid, int *num)
+{
+    libxl_device_disk *disks = NULL;
+    unsigned int ndisks = 0;
+
+    *num = libxl_append_disk_list_of_type(ctx, domid, "vbd", &disks, &ndisks);
+    *num += libxl_append_disk_list_of_type(ctx, domid, "tap", &disks, &ndisks);
+
+    return disks;
 }
 
 int libxl_device_disk_getinfo(libxl_ctx *ctx, uint32_t domid,
