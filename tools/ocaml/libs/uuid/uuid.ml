@@ -1,6 +1,5 @@
 (*
- * Copyright (C) 2006-2007 XenSource Ltd.
- * Copyright (C) 2008      Citrix Ltd.
+ * Copyright (C) 2006-2010 Citrix Systems Inc.
  * Author Vincent Hanquez <vincent.hanquez@eu.citrix.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -14,15 +13,15 @@
  * GNU Lesser General Public License for more details.
  *)
 
-(** Type-safe UUIDs. *)
-
-(** Internally, a UUID is simply a string. *)
+(* Internally, a UUID is simply a string. *)
 type 'a t = string
 
 type cookie = string
 
 let of_string s = s
 let to_string s = s
+
+let null = ""
 
 (* deprecated: we don't need to duplicate the uuid prefix/suffix *)
 let uuid_of_string = of_string
@@ -32,12 +31,34 @@ let string_of_cookie s = s
 
 let cookie_of_string s = s
 
-(** FIXME: using /dev/random is too slow but using /dev/urandom is too
-    deterministic. *)
-let dev_random = "/dev/urandom"
+let dev_random = "/dev/random"
+let dev_urandom = "/dev/urandom"
 
-let read_random n = 
-  let ic = open_in_bin dev_random in
+let rnd_array n =
+	let fstbyte i = 0xff land i in
+	let sndbyte i = fstbyte (i lsr 8) in
+	let thdbyte i = sndbyte (i lsr 8) in
+	let rec rnd_list n acc = match n with
+		| 0 -> acc
+		| 1 ->
+			let b = fstbyte (Random.bits ()) in
+			b :: acc
+		| 2 ->
+			let r = Random.bits () in
+			let b1 = fstbyte r in
+			let b2 = sndbyte r in
+			b1 :: b2 :: acc
+		| n -> 
+			let r = Random.bits () in
+			let b1 = fstbyte r in
+			let b2 = sndbyte r in
+			let b3 = thdbyte r in
+			rnd_list (n - 3) (b1 :: b2 :: b3 :: acc)
+	in
+	Array.of_list (rnd_list n [])
+
+let read_array dev n = 
+  let ic = open_in_bin dev in
   try
     let result = Array.init n (fun _ -> input_byte ic) in
     close_in ic;
@@ -52,30 +73,14 @@ let uuid_of_int_array uuid =
     uuid.(6) uuid.(7) uuid.(8) uuid.(9) uuid.(10) uuid.(11)
     uuid.(12) uuid.(13) uuid.(14) uuid.(15)
 
-(** Return a new random UUID *)
-let make_uuid() = uuid_of_int_array (read_random 16)
+let make_uuid_prng () = uuid_of_int_array (rnd_array 16)
+let make_uuid_urnd () = uuid_of_int_array (read_array dev_urandom 16)
+let make_uuid_rnd () = uuid_of_int_array (read_array dev_random 16)
+let make_uuid = make_uuid_urnd
 
-(** Return a new random, big UUID (hopefully big and random enough to be
-    unguessable) *)
 let make_cookie() =
-  let bytes = Array.to_list (read_random 64) in
+  let bytes = Array.to_list (read_array dev_urandom 64) in
   String.concat "" (List.map (Printf.sprintf "%1x") bytes)
-(*
-  let hexencode x = 
-    let nibble x =
-      char_of_int (if x < 10 
-		   then int_of_char '0' + x
-		   else int_of_char 'a' + (x - 10)) in
-    let result = String.make (String.length x * 2) ' ' in
-    for i = 0 to String.length x - 1 do
-      let byte = int_of_char x.[i] in
-      result.[i * 2 + 0] <- nibble((byte lsr 4) land 15);
-      result.[i * 2 + 1] <- nibble((byte lsr 0) land 15);
-    done;
-    result in
-  let n = 64 in
-  hexencode (String.concat "" (List.map (fun x -> String.make 1 (char_of_int x)) (Array.to_list (read_n_random_bytes n))))
-*)
 
 let int_array_of_uuid s =
   try
@@ -86,3 +91,10 @@ let int_array_of_uuid s =
              a10; a11; a12; a13; a14; a15; ]);
     Array.of_list !l
   with _ -> invalid_arg "Uuid.int_array_of_uuid"
+
+let is_uuid str =
+	try
+		Scanf.sscanf str
+			"%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x"
+			(fun _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ -> true)
+	with _ -> false
