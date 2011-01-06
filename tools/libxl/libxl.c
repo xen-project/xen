@@ -2838,8 +2838,8 @@ retry_transaction:
     t = xs_transaction_start(ctx->xsh);
 
     target = libxl__xs_read(gc, t, target_path);
-    staticmax = libxl__xs_read(gc, t, target_path);
-    freememslack = libxl__xs_read(gc, t, target_path);
+    staticmax = libxl__xs_read(gc, t, max_path);
+    freememslack = libxl__xs_read(gc, t, free_mem_slack_path);
     if (target && staticmax && freememslack) {
         rc = 0;
         goto out;
