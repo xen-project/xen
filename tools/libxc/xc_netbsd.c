@@ -51,7 +51,7 @@ static xc_osdep_handle netbsd_privcmd_open(xc_interface *xch)
         goto error;
     }
 
-    return (xc_osinteface_handle)fd;
+    return (xc_osdep_handle)fd;
 
  error:
     saved_errno = errno;
@@ -181,7 +181,7 @@ static struct xc_osdep_ops netbsd_privcmd_ops = {
     .close = &netbsd_privcmd_close,
 
     .u.privcmd = {
-        .hypercall = &netbsd_privcmd_hypercall;
+        .hypercall = &netbsd_privcmd_hypercall,
 
         .map_foreign_batch = &netbsd_privcmd_map_foreign_batch,
         .map_foreign_bulk = &xc_map_foreign_bulk_compat,

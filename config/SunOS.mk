@@ -50,6 +50,8 @@ SOCKET_LIBS = -lsocket
 CURSES_LIBS = -lcurses
 PTHREAD_LIBS = -lpthread
 UTIL_LIBS =
+DLOPEN_LIBS = -ldl
+
 SONAME_LDFLAG = -h
 SHLIB_LDFLAGS = -R $(SunOS_LIBDIR) -shared
 

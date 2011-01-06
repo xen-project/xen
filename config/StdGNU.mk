@@ -60,6 +60,8 @@ SOCKET_LIBS =
 CURSES_LIBS = -lncurses
 PTHREAD_LIBS = -lpthread
 UTIL_LIBS = -lutil
+DLOPEN_LIBS = -ldl
+
 SONAME_LDFLAG = -soname
 SHLIB_LDFLAGS = -shared
 

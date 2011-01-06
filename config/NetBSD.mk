@@ -7,6 +7,8 @@ LIBLEAFDIR_x86_64 = lib
 LIBEXEC = $(PREFIX)/libexec
 PRIVATE_BINDIR = $(BINDIR)
 
+DLOPEN_LIBS =
+
 ifeq ($(PREFIX),/usr)
 XEN_LOCK_DIR = /var/lib
 else

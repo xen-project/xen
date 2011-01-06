@@ -158,7 +158,7 @@ libxenctrl.so.$(MAJOR): libxenctrl.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
 libxenctrl.so.$(MAJOR).$(MINOR): $(CTRL_PIC_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenctrl.so.$(MAJOR) -ldl $(SHLIB_LDFLAGS) -o $@ $^ $(PTHREAD_LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenctrl.so.$(MAJOR) $(DLOPEN_LIBS) $(SHLIB_LDFLAGS) -o $@ $^ $(PTHREAD_LIBS)
 
 # libxenguest
 
