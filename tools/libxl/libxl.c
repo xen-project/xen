@@ -2549,6 +2549,7 @@ libxl_device_disk *libxl_device_disk_list(libxl_ctx *ctx, uint32_t domid, int *n
 
     *num = libxl_append_disk_list_of_type(ctx, domid, "vbd", &disks, &ndisks);
     *num += libxl_append_disk_list_of_type(ctx, domid, "tap", &disks, &ndisks);
+    *num += libxl_append_disk_list_of_type(ctx, domid, "qdisk", &disks, &ndisks);
 
     return disks;
 }
