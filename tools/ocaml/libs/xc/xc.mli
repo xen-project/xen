@@ -71,7 +71,7 @@ external sizeof_vcpu_guest_context : unit -> int
   = "stub_sizeof_vcpu_guest_context"
 external sizeof_xen_pfn : unit -> int = "stub_sizeof_xen_pfn"
 external interface_open : unit -> handle = "stub_xc_interface_open"
-external using_injection : unit -> bool = "stub_xc_using_injection"
+external is_fake : unit -> bool = "stub_xc_interface_is_fake"
 external interface_close : handle -> unit = "stub_xc_interface_close"
 val with_intf : (handle -> 'a) -> 'a
 external _domain_create : handle -> int32 -> domain_create_flag list -> int array -> domid
@@ -80,8 +80,6 @@ val domain_create : handle -> int32 -> domain_create_flag list -> 'a Uuid.t -> d
 external _domain_sethandle : handle -> domid -> int array -> unit
   = "stub_xc_domain_sethandle"
 val domain_sethandle : handle -> domid -> 'a Uuid.t -> unit
-external domain_setvmxassist: handle -> domid -> bool -> unit
-  = "stub_xc_domain_setvmxassist"
 external domain_max_vcpus : handle -> domid -> int -> unit
   = "stub_xc_domain_max_vcpus"
 external domain_pause : handle -> domid -> unit = "stub_xc_domain_pause"
@@ -104,9 +102,9 @@ external domain_iomem_permission: handle -> domid -> nativeint -> nativeint -> b
        = "stub_xc_domain_iomem_permission"
 external domain_irq_permission: handle -> domid -> int -> bool -> unit
        = "stub_xc_domain_irq_permission"
-external vcpu_affinity_set : handle -> domid -> int -> int64 -> unit
+external vcpu_affinity_set : handle -> domid -> int -> bool array -> unit
   = "stub_xc_vcpu_setaffinity"
-external vcpu_affinity_get : handle -> domid -> int -> int64
+external vcpu_affinity_get : handle -> domid -> int -> bool array
   = "stub_xc_vcpu_getaffinity"
 external vcpu_context_get : handle -> domid -> int -> string
   = "stub_xc_vcpu_context_get"
@@ -147,16 +145,6 @@ external domain_deassign_device: handle -> domid -> (int * int * int * int) -> u
 external domain_test_assign_device: handle -> domid -> (int * int * int * int) -> bool
        = "stub_xc_domain_test_assign_device"
 
-external domain_set_timer_mode: handle -> domid -> int -> unit = "stub_xc_domain_set_timer_mode"
-external domain_set_hpet: handle -> domid -> int -> unit = "stub_xc_domain_set_hpet"
-external domain_set_vpt_align: handle -> domid -> int -> unit = "stub_xc_domain_set_vpt_align"
-
-external domain_send_s3resume: handle -> domid -> unit
-  = "stub_xc_domain_send_s3resume"
-external domain_get_acpi_s_state: handle -> domid -> int = "stub_xc_domain_get_acpi_s_state"
-
-external hvm_check_pvdriver : handle -> domid -> bool
-  = "stub_xc_hvm_check_pvdriver"
 external version : handle -> version = "stub_xc_version_version"
 external version_compile_info : handle -> compile_info
   = "stub_xc_version_compile_info"
@@ -185,12 +173,12 @@ external domain_set_machine_address_size: handle -> domid -> int -> unit
 external domain_get_machine_address_size: handle -> domid -> int
        = "stub_xc_domain_get_machine_address_size"
 
-external domain_cpuid_set: handle -> domid -> bool -> (int64 * (int64 option))
+external domain_cpuid_set: handle -> domid -> (int64 * (int64 option))
                         -> string option array
                         -> string option array
        = "stub_xc_domain_cpuid_set"
-external domain_cpuid_apply: handle -> domid -> bool -> unit
-       = "stub_xc_domain_cpuid_apply"
-external cpuid_check: (int64 * (int64 option)) -> string option array -> (bool * string option array)
+external domain_cpuid_apply_policy: handle -> domid -> unit
+       = "stub_xc_domain_cpuid_apply_policy"
+external cpuid_check: handle -> (int64 * (int64 option)) -> string option array -> (bool * string option array)
        = "stub_xc_cpuid_check"
 

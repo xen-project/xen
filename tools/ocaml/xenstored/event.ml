@@ -16,14 +16,15 @@
 
 (**************** high level binding ****************)
 type t = {
-	fd: Unix.file_descr;
+	handle: Eventchn.handle;
 	mutable virq_port: int;
 }
 
-let init () = { fd = Eventchn.init (); virq_port = -1; }
-let bind_dom_exc_virq eventchn = eventchn.virq_port <- Eventchn.bind_dom_exc_virq eventchn.fd
-let bind_interdomain eventchn domid port = Eventchn.bind_interdomain eventchn.fd domid port
-let unbind eventchn port = Eventchn.unbind eventchn.fd port
-let notify eventchn port = Eventchn.notify eventchn.fd port
-let read_port eventchn = Eventchn.read_port eventchn.fd
-let write_port eventchn port = Eventchn.write_port eventchn.fd port
+let init () = { handle = Eventchn.init (); virq_port = -1; }
+let fd eventchn = Eventchn.fd eventchn.handle
+let bind_dom_exc_virq eventchn = eventchn.virq_port <- Eventchn.bind_dom_exc_virq eventchn.handle
+let bind_interdomain eventchn domid port = Eventchn.bind_interdomain eventchn.handle domid port
+let unbind eventchn port = Eventchn.unbind eventchn.handle port
+let notify eventchn port = Eventchn.notify eventchn.handle port
+let pending eventchn = Eventchn.pending eventchn.handle
+let unmask eventchn port = Eventchn.unmask eventchn.handle port

@@ -15,12 +15,17 @@
  *)
 
 exception Error of string
-external init : unit -> Unix.file_descr = "stub_eventchn_init"
-external notify : Unix.file_descr -> int -> unit = "stub_eventchn_notify"
-external bind_interdomain : Unix.file_descr -> int -> int -> int
+
+type handle
+
+external init : unit -> handle = "stub_eventchn_init"
+external fd: handle -> Unix.file_descr = "stub_eventchn_fd"
+
+external notify : handle -> int -> unit = "stub_eventchn_notify"
+external bind_interdomain : handle -> int -> int -> int
   = "stub_eventchn_bind_interdomain"
-external bind_dom_exc_virq : Unix.file_descr -> int = "stub_eventchn_bind_dom_exc_virq"
-external unbind : Unix.file_descr -> int -> unit = "stub_eventchn_unbind"
-external read_port : Unix.file_descr -> int = "stub_eventchn_read_port"
-external write_port : Unix.file_descr -> int -> unit
-  = "stub_eventchn_write_port"
+external bind_dom_exc_virq : handle -> int = "stub_eventchn_bind_dom_exc_virq"
+external unbind : handle -> int -> unit = "stub_eventchn_unbind"
+external pending : handle -> int = "stub_eventchn_pending"
+external unmask : handle -> int -> unit
+  = "stub_eventchn_unmask"

@@ -2,15 +2,17 @@ TOPLEVEL=../..
 XEN_ROOT=$(TOPLEVEL)/../..
 include $(TOPLEVEL)/common.make
 
-CFLAGS += -I../mmap -I./
-OCAMLINCLUDE += -I ../mmap -I ../uuid
+CFLAGS += -I../mmap -I./ -I$(XEN_ROOT)/tools/libxc
+OCAMLINCLUDE += -I ../mmap -I ../uuid -I $(XEN_ROOT)/tools/libxc
 
 OBJS = xc
 INTF = xc.cmi
 LIBS = xc.cma xc.cmxa
 
+LIBS_xc = -L$(XEN_ROOT)/tools/libxc -lxenctrl -lxenguest
+
 xc_OBJS = $(OBJS)
-xc_C_OBJS = xc_lib xc_stubs
+xc_C_OBJS = xc_stubs
 
 OCAML_LIBRARY = xc
 

@@ -54,18 +54,18 @@ mk-caml-lib-bytecode = $(call quiet-command, $(OCAMLC) $(OCAMLCFLAGS) -a -o $1 $
 
 mk-caml-stubs = $(call quiet-command, $(OCAMLMKLIB) -o `basename $1 .a` $2,MKLIB,$1)
 mk-caml-lib-stubs = \
-	$(call quiet-command, $(AR) rcs $1 $2 && $(OCAMLMKLIB) -o `basename $1 .a | sed -e 's/^lib//'` $2,MKLIB,$1)
+	$(call quiet-command, $(AR) rcs $1 $2 && $(OCAMLMKLIB) -o `basename $1 .a | sed -e 's/^lib//'` $3 $2,MKLIB,$1)
 
 # define a library target <name>.cmxa and <name>.cma
 define OCAML_LIBRARY_template
  $(1).cmxa: lib$(1)_stubs.a $(foreach obj,$($(1)_OBJS),$(obj).cmx)
-	$(call mk-caml-lib-native,$$@, -cclib -l$(1)_stubs, $(foreach obj,$($(1)_OBJS),$(obj).cmx))
+	$(call mk-caml-lib-native,$$@, -cclib -l$(1)_stubs $(foreach lib,$(LIBS_$(1)),-cclib $(lib)), $(foreach obj,$($(1)_OBJS),$(obj).cmx))
  $(1).cma: $(foreach obj,$($(1)_OBJS),$(obj).cmo)
 	$(call mk-caml-lib-bytecode,$$@, -dllib dll$(1)_stubs.so -cclib -l$(1)_stubs, $$+)
  $(1)_stubs.a: $(foreach obj,$$($(1)_C_OBJS),$(obj).o)
 	$(call mk-caml-stubs,$$@, $$+)
  lib$(1)_stubs.a: $(foreach obj,$($(1)_C_OBJS),$(obj).o)
-	$(call mk-caml-lib-stubs,$$@, $$+)
+	$(call mk-caml-lib-stubs,$$@, $$+, $(LIBS_$(1)))
 endef
 
 define OCAML_NOC_LIBRARY_template

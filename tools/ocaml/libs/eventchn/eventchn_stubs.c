@@ -34,119 +34,110 @@
 #include <caml/callback.h>
 #include <caml/fail.h>
 
-#define EVENTCHN_PATH "/dev/xen/evtchn"
+#define _H(__h) ((xc_interface *)(__h))
 
-static int do_ioctl(int handle, int cmd, void *arg)
+CAMLprim value stub_eventchn_init(void)
 {
-	return ioctl(handle, cmd, arg);
-}
+	CAMLparam0();
+	CAMLlocal1(result);
 
-static int do_read_port(int handle, evtchn_port_t *port)
-{
-	return (read(handle, port, sizeof(evtchn_port_t)) != sizeof(evtchn_port_t));
-}
-
-static int do_write_port(int handle, evtchn_port_t port)
-{
-	return (write(handle, &port, sizeof(evtchn_port_t)) != sizeof(evtchn_port_t));
-}
-
-int eventchn_do_open(void)
-{
-	return open(EVENTCHN_PATH, O_RDWR);
-}
-
-CAMLprim value stub_eventchn_init(value unit)
-{
-	CAMLparam1(unit);
-	int fd = eventchn_do_open();
-	if (fd == -1)
+	xc_interface *xce = xc_evtchn_open(NULL, XC_OPENFLAG_NON_REENTRANT);
+	if (xce == NULL)
 		caml_failwith("open failed");
-	CAMLreturn(Val_int(fd));
+
+	result = (value)xce;
+	CAMLreturn(result);
 }
 
-CAMLprim value stub_eventchn_notify(value fd, value port)
+CAMLprim value stub_eventchn_fd(value xce)
 {
-	CAMLparam2(fd, port);
-	struct ioctl_evtchn_notify notify;
+	CAMLparam1(xce);
+	CAMLlocal1(result);
+	int fd;
+
+	fd = xc_evtchn_fd(_H(xce));
+	if (fd == -1)
+		caml_failwith("evtchn fd failed");
+
+	result = Val_int(fd);
+
+	CAMLreturn(result);
+}
+
+CAMLprim value stub_eventchn_notify(value xce, value port)
+{
+	CAMLparam2(xce, port);
 	int rc;
 
-	notify.port = Int_val(port);
-	rc = do_ioctl(Int_val(fd), IOCTL_EVTCHN_NOTIFY, &notify);
+	rc = xc_evtchn_notify(_H(xce), Int_val(port));
 	if (rc == -1)
-		caml_failwith("ioctl notify failed");
+		caml_failwith("evtchn notify failed");
 
 	CAMLreturn(Val_unit);
 }
 
-CAMLprim value stub_eventchn_bind_interdomain(value fd, value domid,
+CAMLprim value stub_eventchn_bind_interdomain(value xce, value domid,
                                               value remote_port)
 {
-	CAMLparam3(fd, domid, remote_port);
+	CAMLparam3(xce, domid, remote_port);
 	CAMLlocal1(port);
-	struct ioctl_evtchn_bind_interdomain bind;
-	int rc;
+	evtchn_port_or_error_t rc;
 
-	bind.remote_domain = Int_val(domid);
-	bind.remote_port = Int_val(remote_port);
-	rc = do_ioctl(Int_val(fd), IOCTL_EVTCHN_BIND_INTERDOMAIN, &bind);
+	rc = xc_evtchn_bind_interdomain(_H(xce), Int_val(domid), Int_val(remote_port));
 	if (rc == -1)
-		caml_failwith("ioctl bind_interdomain failed");
+		caml_failwith("evtchn bind_interdomain failed");
 	port = Val_int(rc);
 
 	CAMLreturn(port);
 }
 
-CAMLprim value stub_eventchn_bind_dom_exc_virq(value fd)
+CAMLprim value stub_eventchn_bind_dom_exc_virq(value xce)
 {
-	CAMLparam1(fd);
+	CAMLparam1(xce);
 	CAMLlocal1(port);
-	struct ioctl_evtchn_bind_virq bind;
-	int rc;
+	evtchn_port_or_error_t rc;
 
-	bind.virq = VIRQ_DOM_EXC;
-	rc = do_ioctl(Int_val(fd), IOCTL_EVTCHN_BIND_VIRQ, &bind);
+	rc = xc_evtchn_bind_virq(_H(xce), VIRQ_DOM_EXC);
 	if (rc == -1)
-		caml_failwith("ioctl bind_virq failed");
+		caml_failwith("evtchn bind_dom_exc_virq failed");
 	port = Val_int(rc);
 
 	CAMLreturn(port);
 }
 
-CAMLprim value stub_eventchn_unbind(value fd, value port)
+CAMLprim value stub_eventchn_unbind(value xce, value port)
 {
-	CAMLparam2(fd, port);
-	struct ioctl_evtchn_unbind unbind;
+	CAMLparam2(xce, port);
 	int rc;
 
-	unbind.port = Int_val(port);
-	rc = do_ioctl(Int_val(fd), IOCTL_EVTCHN_UNBIND, &unbind);
+	rc = xc_evtchn_unbind(_H(xce), Int_val(port));
 	if (rc == -1)
-		caml_failwith("ioctl unbind failed");
+		caml_failwith("evtchn unbind failed");
 
 	CAMLreturn(Val_unit);
 }
 
-CAMLprim value stub_eventchn_read_port(value fd)
+CAMLprim value stub_eventchn_pending(value xce)
 {
-	CAMLparam1(fd);
+	CAMLparam1(xce);
 	CAMLlocal1(result);
-	evtchn_port_t port;
+	evtchn_port_or_error_t port;
 
-	if (do_read_port(Int_val(fd), &port))
-		caml_failwith("read port failed");
+	port = xc_evtchn_pending(_H(xce));
+	if (port == -1)
+		caml_failwith("evtchn pending failed");
 	result = Val_int(port);
 
 	CAMLreturn(result);
 }
 
-CAMLprim value stub_eventchn_write_port(value fd, value _port)
+CAMLprim value stub_eventchn_unmask(value xce, value _port)
 {
-	CAMLparam2(fd, _port);
+	CAMLparam2(xce, _port);
 	evtchn_port_t port;
 
 	port = Int_val(_port);
-	if (do_write_port(Int_val(fd), port))
-		caml_failwith("write port failed");
+	if (xc_evtchn_unmask(_H(xce), port))
+		caml_failwith("evtchn unmask failed");
 	CAMLreturn(Val_unit);
 }
