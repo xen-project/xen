@@ -140,6 +140,7 @@ libxl_device_model_info = Struct("device_model_info",[
     ("device_model",     string),
     ("saved_state",      string),
     ("type",             libxl_qemu_machine_type),
+    ("target_ram",       uint32),
     ("videoram",         integer,           False, "size of the videoram in MB"),
     ("stdvga",           bool,              False, "stdvga enabled or disabled"),
     ("vnc",              bool,              False, "vnc enabled or disabled"),

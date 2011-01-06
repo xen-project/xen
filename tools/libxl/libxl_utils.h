@@ -85,5 +85,9 @@ void libxl_cpumap_reset(libxl_cpumap *cpumap, int cpu);
 
 int libxl_cpuarray_alloc(libxl_ctx *ctx, libxl_cpuarray *cpuarray);
 
+static inline uint32_t libxl__sizekb_to_mb(uint32_t s) {
+    return (s + 1023) / 1024;
+}
+
 #endif
 

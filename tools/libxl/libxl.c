@@ -1390,6 +1390,10 @@ static char ** libxl_build_device_model_args_new(libxl__gc *gc,
     else
         flexarray_set(dm_args, num++, "xenfv");
 
+    /* RAM Size */
+    flexarray_set(dm_args, num++, "-m");
+    flexarray_set(dm_args, num++, libxl__sprintf(gc, "%d", info->target_ram));
+
     if (info->type == XENFV) {
         disks = libxl_device_disk_list(libxl__gc_owner(gc), info->domid, &nb);
         for (i; i < nb; i++) {

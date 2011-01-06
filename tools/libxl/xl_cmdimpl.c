@@ -359,7 +359,8 @@ static void init_dm_info(libxl_device_model_info *dm_info,
 
     dm_info->dom_name = strdup(c_info->name);
     dm_info->device_model = strdup("qemu-dm");
-    dm_info->videoram = b_info->video_memkb / 1024;
+    dm_info->target_ram = libxl__sizekb_to_mb(b_info->target_memkb);
+    dm_info->videoram = libxl__sizekb_to_mb(b_info->video_memkb);
     dm_info->apic = b_info->u.hvm.apic;
     dm_info->vcpus = b_info->max_vcpus;
     dm_info->vcpu_avail = b_info->cur_vcpus;
