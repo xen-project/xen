@@ -270,7 +270,7 @@ let _ =
 
 	if cf.restart then (
 		DB.from_file store domains cons "/var/run/xenstored/db";
-		Event.bind_virq eventchn
+		Event.bind_dom_exc_virq eventchn
 	) else (
 		if !Disk.enable then (
 			info "reading store from disk";
@@ -284,7 +284,7 @@ let _ =
 		if cf.domain_init then (
 			let usingxiu = Xc.using_injection () in
 			Connections.add_domain cons (Domains.create0 usingxiu domains);
-			Event.bind_virq eventchn
+			Event.bind_dom_exc_virq eventchn
 		);
 	);
 

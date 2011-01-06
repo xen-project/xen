@@ -21,7 +21,7 @@ type t = {
 }
 
 let init () = { fd = Eventchn.init (); virq_port = -1; }
-let bind_virq eventchn = eventchn.virq_port <- Eventchn.bind_virq eventchn.fd
+let bind_dom_exc_virq eventchn = eventchn.virq_port <- Eventchn.bind_dom_exc_virq eventchn.fd
 let bind_interdomain eventchn domid port = Eventchn.bind_interdomain eventchn.fd domid port
 let unbind eventchn port = Eventchn.unbind eventchn.fd port
 let notify eventchn port = Eventchn.notify eventchn.fd port

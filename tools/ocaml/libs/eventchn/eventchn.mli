@@ -19,7 +19,7 @@ external init : unit -> Unix.file_descr = "stub_eventchn_init"
 external notify : Unix.file_descr -> int -> unit = "stub_eventchn_notify"
 external bind_interdomain : Unix.file_descr -> int -> int -> int
   = "stub_eventchn_bind_interdomain"
-external bind_virq : Unix.file_descr -> int = "stub_eventchn_bind_virq"
+external bind_dom_exc_virq : Unix.file_descr -> int = "stub_eventchn_bind_dom_exc_virq"
 external unbind : Unix.file_descr -> int -> unit = "stub_eventchn_unbind"
 external read_port : Unix.file_descr -> int = "stub_eventchn_read_port"
 external write_port : Unix.file_descr -> int -> unit

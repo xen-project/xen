@@ -97,7 +97,7 @@ CAMLprim value stub_eventchn_bind_interdomain(value fd, value domid,
 	CAMLreturn(port);
 }
 
-CAMLprim value stub_eventchn_bind_virq(value fd)
+CAMLprim value stub_eventchn_bind_dom_exc_virq(value fd)
 {
 	CAMLparam1(fd);
 	CAMLlocal1(port);
