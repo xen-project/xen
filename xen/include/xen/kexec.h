@@ -52,9 +52,9 @@ void vmcoreinfo_append_str(const char *fmt, ...)
 #define VMCOREINFO_OFFSET(name, field) \
        vmcoreinfo_append_str("OFFSET(%s.%s)=%lu\n", #name, #field, \
                              (unsigned long)offsetof(struct name, field))
-#define VMCOREINFO_OFFSET_ALIAS(name, field, alias) \
-       vmcoreinfo_append_str("OFFSET(%s.%s)=%lu\n", #name, #alias, \
-                             (unsigned long)offsetof(struct name, field))
+#define VMCOREINFO_OFFSET_SUB(name, sub, field) \
+       vmcoreinfo_append_str("OFFSET(%s.%s)=%lu\n", #name, #field, \
+                             (unsigned long)offsetof(struct name, sub.field))
 
 #endif /* __XEN_KEXEC_H__ */
 
