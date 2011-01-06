@@ -502,6 +502,7 @@ int mem_sharing_nominate_page(struct p2m_domain *p2m,
 
     *phandle = 0UL;
 
+    shr_lock(); 
     mfn = gfn_to_mfn(p2m, gfn, &p2mt);
 
     /* Check if mfn is valid */
@@ -509,29 +510,33 @@ int mem_sharing_nominate_page(struct p2m_domain *p2m,
     if (!mfn_valid(mfn))
         goto out;
 
+    /* Return the handle if the page is already shared */
+    page = mfn_to_page(mfn);
+    if (p2m_is_shared(p2mt)) {
+        *phandle = page->shr_handle;
+        ret = 0;
+        goto out;
+    }
+
     /* Check p2m type */
     if (!p2m_is_sharable(p2mt))
         goto out;
 
     /* Try to convert the mfn to the sharable type */
-    page = mfn_to_page(mfn);
     ret = page_make_sharable(d, page, expected_refcnt); 
     if(ret) 
         goto out;
 
     /* Create the handle */
     ret = -ENOMEM;
-    shr_lock(); 
     handle = next_handle++;  
     if((hash_entry = mem_sharing_hash_insert(handle, mfn)) == NULL)
     {
-        shr_unlock();
         goto out;
     }
     if((gfn_info = mem_sharing_gfn_alloc()) == NULL)
     {
         mem_sharing_hash_destroy(hash_entry);
-        shr_unlock();
         goto out;
     }
 
@@ -545,7 +550,6 @@ int mem_sharing_nominate_page(struct p2m_domain *p2m,
         BUG_ON(page_make_private(d, page) != 0);
         mem_sharing_hash_destroy(hash_entry);
         mem_sharing_gfn_destroy(gfn_info, 0);
-        shr_unlock();
         goto out;
     }
 
@@ -559,11 +563,11 @@ int mem_sharing_nominate_page(struct p2m_domain *p2m,
     gfn_info->domain = d->domain_id;
     page->shr_handle = handle;
     *phandle = handle;
-    shr_unlock();
 
     ret = 0;
 
 out:
+    shr_unlock();
     return ret;
 }
 
@@ -633,14 +637,21 @@ int mem_sharing_unshare_page(struct p2m_domain *p2m,
     struct list_head *le;
     struct domain *d = p2m->domain;
 
+    mem_sharing_audit();
+    /* Remove the gfn_info from the list */
+    shr_lock();
+    
     mfn = gfn_to_mfn(p2m, gfn, &p2mt);
+    
+    /* Has someone already unshared it? */
+    if (!p2m_is_shared(p2mt)) {
+        shr_unlock();
+        return 0;
+    }
 
     page = mfn_to_page(mfn);
     handle = page->shr_handle;
  
-    mem_sharing_audit();
-    /* Remove the gfn_info from the list */
-    shr_lock();
     hash_entry = mem_sharing_hash_lookup(handle); 
     list_for_each(le, &hash_entry->gfns)
     {
@@ -707,7 +718,6 @@ private_page_found:
         mem_sharing_hash_delete(handle);
     else
         atomic_dec(&nr_saved_mfns);
-    shr_unlock();
 
     if(p2m_change_type(p2m, gfn, p2m_ram_shared, p2m_ram_rw) != 
                                                 p2m_ram_shared) 
@@ -718,6 +728,7 @@ private_page_found:
     /* Update m2p entry */
     set_gpfn_from_mfn(mfn_x(page_to_mfn(page)), gfn);
 
+    shr_unlock();
     return 0;
 }
 
