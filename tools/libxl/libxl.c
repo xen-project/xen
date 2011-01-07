@@ -1075,8 +1075,6 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
     flexarray_t *front;
     flexarray_t *back;
     char *backend_type;
-    unsigned int boffset = 0;
-    unsigned int foffset = 0;
     int devid;
     libxl__device device;
     int major, minor, rc;
@@ -1111,11 +1109,11 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
         case PHYSTYPE_PHY: {
 
             libxl__device_physdisk_major_minor(disk->physpath, &major, &minor);
-            flexarray_set(back, boffset++, "physical-device");
-            flexarray_set(back, boffset++, libxl__sprintf(&gc, "%x:%x", major, minor));
+            flexarray_append(back, "physical-device");
+            flexarray_append(back, libxl__sprintf(&gc, "%x:%x", major, minor));
 
-            flexarray_set(back, boffset++, "params");
-            flexarray_set(back, boffset++, disk->physpath);
+            flexarray_append(back, "params");
+            flexarray_append(back, disk->physpath);
 
             device.backend_kind = DEVICE_VBD;
             break;
@@ -1134,20 +1132,20 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
                     rc = ERROR_FAIL;
                     goto out_free;
                 }
-                flexarray_set(back, boffset++, "tapdisk-params");
-                flexarray_set(back, boffset++, libxl__sprintf(&gc, "%s:%s", libxl__device_disk_string_of_phystype(disk->phystype), disk->physpath));
-                flexarray_set(back, boffset++, "params");
-                flexarray_set(back, boffset++, libxl__strdup(&gc, dev));
+                flexarray_append(back, "tapdisk-params");
+                flexarray_append(back, libxl__sprintf(&gc, "%s:%s", libxl__device_disk_string_of_phystype(disk->phystype), disk->physpath));
+                flexarray_append(back, "params");
+                flexarray_append(back, libxl__strdup(&gc, dev));
                 backend_type = "phy";
                 libxl__device_physdisk_major_minor(dev, &major, &minor);
-                flexarray_set(back, boffset++, "physical-device");
-                flexarray_set(back, boffset++, libxl__sprintf(&gc, "%x:%x", major, minor));
+                flexarray_append(back, "physical-device");
+                flexarray_append(back, libxl__sprintf(&gc, "%x:%x", major, minor));
                 device.backend_kind = DEVICE_VBD;
 
                 break;
             }
-            flexarray_set(back, boffset++, "params");
-            flexarray_set(back, boffset++, libxl__sprintf(&gc, "%s:%s",
+            flexarray_append(back, "params");
+            flexarray_append(back, libxl__sprintf(&gc, "%s:%s",
                           libxl__device_disk_string_of_phystype(disk->phystype), disk->physpath));
 
             if (libxl__blktap_enabled(&gc))
@@ -1162,40 +1160,40 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
             goto out_free;
     }
 
-    flexarray_set(back, boffset++, "frontend-id");
-    flexarray_set(back, boffset++, libxl__sprintf(&gc, "%d", disk->domid));
-    flexarray_set(back, boffset++, "online");
-    flexarray_set(back, boffset++, "1");
-    flexarray_set(back, boffset++, "removable");
-    flexarray_set(back, boffset++, libxl__sprintf(&gc, "%d", (disk->unpluggable) ? 1 : 0));
-    flexarray_set(back, boffset++, "bootable");
-    flexarray_set(back, boffset++, libxl__sprintf(&gc, "%d", 1));
-    flexarray_set(back, boffset++, "state");
-    flexarray_set(back, boffset++, libxl__sprintf(&gc, "%d", 1));
-    flexarray_set(back, boffset++, "dev");
-    flexarray_set(back, boffset++, disk->virtpath);
-    flexarray_set(back, boffset++, "type");
-    flexarray_set(back, boffset++, backend_type);
-    flexarray_set(back, boffset++, "mode");
-    flexarray_set(back, boffset++, disk->readwrite ? "w" : "r");
+    flexarray_append(back, "frontend-id");
+    flexarray_append(back, libxl__sprintf(&gc, "%d", disk->domid));
+    flexarray_append(back, "online");
+    flexarray_append(back, "1");
+    flexarray_append(back, "removable");
+    flexarray_append(back, libxl__sprintf(&gc, "%d", (disk->unpluggable) ? 1 : 0));
+    flexarray_append(back, "bootable");
+    flexarray_append(back, libxl__sprintf(&gc, "%d", 1));
+    flexarray_append(back, "state");
+    flexarray_append(back, libxl__sprintf(&gc, "%d", 1));
+    flexarray_append(back, "dev");
+    flexarray_append(back, disk->virtpath);
+    flexarray_append(back, "type");
+    flexarray_append(back, backend_type);
+    flexarray_append(back, "mode");
+    flexarray_append(back, disk->readwrite ? "w" : "r");
 
-    flexarray_set(front, foffset++, "backend-id");
-    flexarray_set(front, foffset++, libxl__sprintf(&gc, "%d", disk->backend_domid));
-    flexarray_set(front, foffset++, "state");
-    flexarray_set(front, foffset++, libxl__sprintf(&gc, "%d", 1));
-    flexarray_set(front, foffset++, "virtual-device");
-    flexarray_set(front, foffset++, libxl__sprintf(&gc, "%d", devid));
-    flexarray_set(front, foffset++, "device-type");
-    flexarray_set(front, foffset++, disk->is_cdrom ? "cdrom" : "disk");
+    flexarray_append(front, "backend-id");
+    flexarray_append(front, libxl__sprintf(&gc, "%d", disk->backend_domid));
+    flexarray_append(front, "state");
+    flexarray_append(front, libxl__sprintf(&gc, "%d", 1));
+    flexarray_append(front, "virtual-device");
+    flexarray_append(front, libxl__sprintf(&gc, "%d", devid));
+    flexarray_append(front, "device-type");
+    flexarray_append(front, disk->is_cdrom ? "cdrom" : "disk");
 
     if (0 /* protocol != native*/) {
-        flexarray_set(front, foffset++, "protocol");
-        flexarray_set(front, foffset++, "x86_32-abi"); /* hardcoded ! */
+        flexarray_append(front, "protocol");
+        flexarray_append(front, "x86_32-abi"); /* hardcoded ! */
     }
 
     libxl__device_generic_add(ctx, &device,
-                             libxl__xs_kvs_of_flexarray(&gc, back, boffset),
-                             libxl__xs_kvs_of_flexarray(&gc, front, foffset));
+                             libxl__xs_kvs_of_flexarray(&gc, back, back->count),
+                             libxl__xs_kvs_of_flexarray(&gc, front, front->count));
 
     rc = 0;
 
@@ -1274,8 +1272,6 @@ int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic)
     libxl__gc gc = LIBXL_INIT_GC(ctx);
     flexarray_t *front;
     flexarray_t *back;
-    unsigned int boffset = 0;
-    unsigned int foffset = 0;
     libxl__device device;
     char *dompath, **l;
     unsigned int nb, rc;
@@ -1311,41 +1307,41 @@ int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic)
     device.domid = nic->domid;
     device.kind = DEVICE_VIF;
 
-    flexarray_set(back, boffset++, "frontend-id");
-    flexarray_set(back, boffset++, libxl__sprintf(&gc, "%d", nic->domid));
-    flexarray_set(back, boffset++, "online");
-    flexarray_set(back, boffset++, "1");
-    flexarray_set(back, boffset++, "state");
-    flexarray_set(back, boffset++, libxl__sprintf(&gc, "%d", 1));
-    flexarray_set(back, boffset++, "script");
-    flexarray_set(back, boffset++, nic->script);
-    flexarray_set(back, boffset++, "mac");
-    flexarray_set(back, boffset++, libxl__sprintf(&gc, "%02x:%02x:%02x:%02x:%02x:%02x",
+    flexarray_append(back, "frontend-id");
+    flexarray_append(back, libxl__sprintf(&gc, "%d", nic->domid));
+    flexarray_append(back, "online");
+    flexarray_append(back, "1");
+    flexarray_append(back, "state");
+    flexarray_append(back, libxl__sprintf(&gc, "%d", 1));
+    flexarray_append(back, "script");
+    flexarray_append(back, nic->script);
+    flexarray_append(back, "mac");
+    flexarray_append(back, libxl__sprintf(&gc, "%02x:%02x:%02x:%02x:%02x:%02x",
                                                  nic->mac[0], nic->mac[1], nic->mac[2],
                                                  nic->mac[3], nic->mac[4], nic->mac[5]));
-    flexarray_set(back, boffset++, "bridge");
-    flexarray_set(back, boffset++, libxl__strdup(&gc, nic->bridge));
-    flexarray_set(back, boffset++, "handle");
-    flexarray_set(back, boffset++, libxl__sprintf(&gc, "%d", nic->devid));
+    flexarray_append(back, "bridge");
+    flexarray_append(back, libxl__strdup(&gc, nic->bridge));
+    flexarray_append(back, "handle");
+    flexarray_append(back, libxl__sprintf(&gc, "%d", nic->devid));
 
-    flexarray_set(front, foffset++, "backend-id");
-    flexarray_set(front, foffset++, libxl__sprintf(&gc, "%d", nic->backend_domid));
-    flexarray_set(front, foffset++, "state");
-    flexarray_set(front, foffset++, libxl__sprintf(&gc, "%d", 1));
-    flexarray_set(front, foffset++, "handle");
-    flexarray_set(front, foffset++, libxl__sprintf(&gc, "%d", nic->devid));
-    flexarray_set(front, foffset++, "mac");
-    flexarray_set(front, foffset++, libxl__sprintf(&gc, "%02x:%02x:%02x:%02x:%02x:%02x",
+    flexarray_append(front, "backend-id");
+    flexarray_append(front, libxl__sprintf(&gc, "%d", nic->backend_domid));
+    flexarray_append(front, "state");
+    flexarray_append(front, libxl__sprintf(&gc, "%d", 1));
+    flexarray_append(front, "handle");
+    flexarray_append(front, libxl__sprintf(&gc, "%d", nic->devid));
+    flexarray_append(front, "mac");
+    flexarray_append(front, libxl__sprintf(&gc, "%02x:%02x:%02x:%02x:%02x:%02x",
                                                   nic->mac[0], nic->mac[1], nic->mac[2],
                                                   nic->mac[3], nic->mac[4], nic->mac[5]));
     if (0 /* protocol != native*/) {
-        flexarray_set(front, foffset++, "protocol");
-        flexarray_set(front, foffset++, "x86_32-abi"); /* hardcoded ! */
+        flexarray_append(front, "protocol");
+        flexarray_append(front, "x86_32-abi"); /* hardcoded ! */
     }
 
     libxl__device_generic_add(ctx, &device,
-                             libxl__xs_kvs_of_flexarray(&gc, back, boffset),
-                             libxl__xs_kvs_of_flexarray(&gc, front, foffset));
+                             libxl__xs_kvs_of_flexarray(&gc, back, back->count),
+                             libxl__xs_kvs_of_flexarray(&gc, front, front->count));
 
     /* FIXME: wait for plug */
     rc = 0;
@@ -1433,7 +1429,6 @@ int libxl_device_net2_add(libxl_ctx *ctx, uint32_t domid, libxl_device_net2 *net
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
     flexarray_t *front, *back;
-    unsigned int boffset = 0, foffset = 0;
     libxl__device device;
     char *dompath, *dom, **l;
     unsigned int nb;
@@ -1472,65 +1467,65 @@ int libxl_device_net2_add(libxl_ctx *ctx, uint32_t domid, libxl_device_net2 *net
     device.domid = net2->domid;
     device.kind = DEVICE_VIF2;
 
-    flexarray_set(back, boffset++, "domain");
-    flexarray_set(back, boffset++, dom);
-    flexarray_set(back, boffset++, "frontend-id");
-    flexarray_set(back, boffset++, libxl__sprintf(&gc, "%d", net2->domid));
+    flexarray_append(back, "domain");
+    flexarray_append(back, dom);
+    flexarray_append(back, "frontend-id");
+    flexarray_append(back, libxl__sprintf(&gc, "%d", net2->domid));
 
-    flexarray_set(back, boffset++, "local-trusted");
-    flexarray_set(back, boffset++, libxl__sprintf(&gc, "%d", net2->back_trusted));
-    flexarray_set(back, boffset++, "mac");
-    flexarray_set(back, boffset++, libxl__sprintf(&gc, "%02x:%02x:%02x:%02x:%02x:%02x",
+    flexarray_append(back, "local-trusted");
+    flexarray_append(back, libxl__sprintf(&gc, "%d", net2->back_trusted));
+    flexarray_append(back, "mac");
+    flexarray_append(back, libxl__sprintf(&gc, "%02x:%02x:%02x:%02x:%02x:%02x",
                                                  net2->back_mac[0], net2->back_mac[1],
                                                  net2->back_mac[2], net2->back_mac[3],
                                                  net2->back_mac[4], net2->back_mac[5]));
 
-    flexarray_set(back, boffset++, "remote-trusted");
-    flexarray_set(back, boffset++, libxl__sprintf(&gc, "%d", net2->trusted));
-    flexarray_set(back, boffset++, "remote-mac");
-    flexarray_set(back, boffset++, libxl__sprintf(&gc, "%02x:%02x:%02x:%02x:%02x:%02x",
+    flexarray_append(back, "remote-trusted");
+    flexarray_append(back, libxl__sprintf(&gc, "%d", net2->trusted));
+    flexarray_append(back, "remote-mac");
+    flexarray_append(back, libxl__sprintf(&gc, "%02x:%02x:%02x:%02x:%02x:%02x",
                                                  net2->front_mac[0], net2->front_mac[1],
                                                  net2->front_mac[2], net2->front_mac[3],
                                                  net2->front_mac[4], net2->front_mac[5]));
 
-    flexarray_set(back, boffset++, "max-bypasses");
-    flexarray_set(back, boffset++, libxl__sprintf(&gc, "%d", net2->max_bypasses));
-    flexarray_set(back, boffset++, "filter-mac");
-    flexarray_set(back, boffset++, libxl__sprintf(&gc, "%d", !!(net2->filter_mac)));
-    flexarray_set(back, boffset++, "handle");
-    flexarray_set(back, boffset++, libxl__sprintf(&gc, "%d", net2->devid));
-    flexarray_set(back, boffset++, "online");
-    flexarray_set(back, boffset++, "1");
-    flexarray_set(back, boffset++, "state");
-    flexarray_set(back, boffset++, "1");
+    flexarray_append(back, "max-bypasses");
+    flexarray_append(back, libxl__sprintf(&gc, "%d", net2->max_bypasses));
+    flexarray_append(back, "filter-mac");
+    flexarray_append(back, libxl__sprintf(&gc, "%d", !!(net2->filter_mac)));
+    flexarray_append(back, "handle");
+    flexarray_append(back, libxl__sprintf(&gc, "%d", net2->devid));
+    flexarray_append(back, "online");
+    flexarray_append(back, "1");
+    flexarray_append(back, "state");
+    flexarray_append(back, "1");
 
-    flexarray_set(front, foffset++, "backend-id");
-    flexarray_set(front, foffset++, libxl__sprintf(&gc, "%d", net2->backend_domid));
+    flexarray_append(front, "backend-id");
+    flexarray_append(front, libxl__sprintf(&gc, "%d", net2->backend_domid));
 
-    flexarray_set(front, foffset++, "local-trusted");
-    flexarray_set(front, foffset++, libxl__sprintf(&gc, "%d", net2->trusted));
-    flexarray_set(front, foffset++, "mac");
-    flexarray_set(front, foffset++, libxl__sprintf(&gc, "%02x:%02x:%02x:%02x:%02x:%02x",
+    flexarray_append(front, "local-trusted");
+    flexarray_append(front, libxl__sprintf(&gc, "%d", net2->trusted));
+    flexarray_append(front, "mac");
+    flexarray_append(front, libxl__sprintf(&gc, "%02x:%02x:%02x:%02x:%02x:%02x",
                                                   net2->front_mac[0], net2->front_mac[1],
                                                   net2->front_mac[2], net2->front_mac[3],
                                                   net2->front_mac[4], net2->front_mac[5]));
 
-    flexarray_set(front, foffset++, "remote-trusted");
-    flexarray_set(front, foffset++, libxl__sprintf(&gc, "%d", net2->back_trusted));
-    flexarray_set(front, foffset++, "remote-mac");
-    flexarray_set(front, foffset++, libxl__sprintf(&gc, "%02x:%02x:%02x:%02x:%02x:%02x",
+    flexarray_append(front, "remote-trusted");
+    flexarray_append(front, libxl__sprintf(&gc, "%d", net2->back_trusted));
+    flexarray_append(front, "remote-mac");
+    flexarray_append(front, libxl__sprintf(&gc, "%02x:%02x:%02x:%02x:%02x:%02x",
                                                   net2->back_mac[0], net2->back_mac[1],
                                                   net2->back_mac[2], net2->back_mac[3],
                                                   net2->back_mac[4], net2->back_mac[5]));
 
-    flexarray_set(front, foffset++, "filter-mac");
-    flexarray_set(front, foffset++, libxl__sprintf(&gc, "%d", !!(net2->filter_mac)));
-    flexarray_set(front, foffset++, "state");
-    flexarray_set(front, foffset++, "1");
+    flexarray_append(front, "filter-mac");
+    flexarray_append(front, libxl__sprintf(&gc, "%d", !!(net2->filter_mac)));
+    flexarray_append(front, "state");
+    flexarray_append(front, "1");
 
     libxl__device_generic_add(ctx, &device,
-                             libxl__xs_kvs_of_flexarray(&gc, back, boffset),
-                             libxl__xs_kvs_of_flexarray(&gc, front, foffset));
+                             libxl__xs_kvs_of_flexarray(&gc, back, back->count),
+                             libxl__xs_kvs_of_flexarray(&gc, front, front->count));
 
     /* FIXME: wait for plug */
     rc = 0;
@@ -1624,8 +1619,6 @@ int libxl_device_console_add(libxl_ctx *ctx, uint32_t domid, libxl_device_consol
     libxl__gc gc = LIBXL_INIT_GC(ctx);
     flexarray_t *front;
     flexarray_t *back;
-    unsigned int boffset = 0;
-    unsigned int foffset = 0;
     libxl__device device;
     int rc;
 
@@ -1647,48 +1640,48 @@ int libxl_device_console_add(libxl_ctx *ctx, uint32_t domid, libxl_device_consol
     device.domid = console->domid;
     device.kind = DEVICE_CONSOLE;
 
-    flexarray_set(back, boffset++, "frontend-id");
-    flexarray_set(back, boffset++, libxl__sprintf(&gc, "%d", console->domid));
-    flexarray_set(back, boffset++, "online");
-    flexarray_set(back, boffset++, "1");
-    flexarray_set(back, boffset++, "state");
-    flexarray_set(back, boffset++, libxl__sprintf(&gc, "%d", 1));
-    flexarray_set(back, boffset++, "domain");
-    flexarray_set(back, boffset++, libxl__domid_to_name(&gc, domid));
-    flexarray_set(back, boffset++, "protocol");
-    flexarray_set(back, boffset++, LIBXL_XENCONSOLE_PROTOCOL);
+    flexarray_append(back, "frontend-id");
+    flexarray_append(back, libxl__sprintf(&gc, "%d", console->domid));
+    flexarray_append(back, "online");
+    flexarray_append(back, "1");
+    flexarray_append(back, "state");
+    flexarray_append(back, libxl__sprintf(&gc, "%d", 1));
+    flexarray_append(back, "domain");
+    flexarray_append(back, libxl__domid_to_name(&gc, domid));
+    flexarray_append(back, "protocol");
+    flexarray_append(back, LIBXL_XENCONSOLE_PROTOCOL);
 
-    flexarray_set(front, foffset++, "backend-id");
-    flexarray_set(front, foffset++, libxl__sprintf(&gc, "%d", console->backend_domid));
-    flexarray_set(front, foffset++, "limit");
-    flexarray_set(front, foffset++, libxl__sprintf(&gc, "%d", LIBXL_XENCONSOLE_LIMIT));
-    flexarray_set(front, foffset++, "type");
+    flexarray_append(front, "backend-id");
+    flexarray_append(front, libxl__sprintf(&gc, "%d", console->backend_domid));
+    flexarray_append(front, "limit");
+    flexarray_append(front, libxl__sprintf(&gc, "%d", LIBXL_XENCONSOLE_LIMIT));
+    flexarray_append(front, "type");
     if (console->consback == LIBXL_CONSBACK_XENCONSOLED)
-        flexarray_set(front, foffset++, "xenconsoled");
+        flexarray_append(front, "xenconsoled");
     else
-        flexarray_set(front, foffset++, "ioemu");
-    flexarray_set(front, foffset++, "output");
-    flexarray_set(front, foffset++, console->output);
+        flexarray_append(front, "ioemu");
+    flexarray_append(front, "output");
+    flexarray_append(front, console->output);
 
     if (device.devid == 0) {
         if (console->build_state == NULL) {
             rc = ERROR_INVAL;
             goto out_free;
         }
-        flexarray_set(front, foffset++, "port");
-        flexarray_set(front, foffset++, libxl__sprintf(&gc, "%"PRIu32, console->build_state->console_port));
-        flexarray_set(front, foffset++, "ring-ref");
-        flexarray_set(front, foffset++, libxl__sprintf(&gc, "%lu", console->build_state->console_mfn));
+        flexarray_append(front, "port");
+        flexarray_append(front, libxl__sprintf(&gc, "%"PRIu32, console->build_state->console_port));
+        flexarray_append(front, "ring-ref");
+        flexarray_append(front, libxl__sprintf(&gc, "%lu", console->build_state->console_mfn));
     } else {
-        flexarray_set(front, foffset++, "state");
-        flexarray_set(front, foffset++, libxl__sprintf(&gc, "%d", 1));
-        flexarray_set(front, foffset++, "protocol");
-        flexarray_set(front, foffset++, LIBXL_XENCONSOLE_PROTOCOL);
+        flexarray_append(front, "state");
+        flexarray_append(front, libxl__sprintf(&gc, "%d", 1));
+        flexarray_append(front, "protocol");
+        flexarray_append(front, LIBXL_XENCONSOLE_PROTOCOL);
     }
 
     libxl__device_generic_add(ctx, &device,
-                             libxl__xs_kvs_of_flexarray(&gc, back, boffset),
-                             libxl__xs_kvs_of_flexarray(&gc, front, foffset));
+                             libxl__xs_kvs_of_flexarray(&gc, back, back->count),
+                             libxl__xs_kvs_of_flexarray(&gc, front, front->count));
     rc = 0;
 out_free:
     flexarray_free(back);
@@ -1704,8 +1697,6 @@ int libxl_device_vkb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb)
     libxl__gc gc = LIBXL_INIT_GC(ctx);
     flexarray_t *front;
     flexarray_t *back;
-    unsigned int boffset = 0;
-    unsigned int foffset = 0;
     libxl__device device;
     int rc;
 
@@ -1727,23 +1718,23 @@ int libxl_device_vkb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb)
     device.domid = vkb->domid;
     device.kind = DEVICE_VKBD;
 
-    flexarray_set(back, boffset++, "frontend-id");
-    flexarray_set(back, boffset++, libxl__sprintf(&gc, "%d", vkb->domid));
-    flexarray_set(back, boffset++, "online");
-    flexarray_set(back, boffset++, "1");
-    flexarray_set(back, boffset++, "state");
-    flexarray_set(back, boffset++, libxl__sprintf(&gc, "%d", 1));
-    flexarray_set(back, boffset++, "domain");
-    flexarray_set(back, boffset++, libxl__domid_to_name(&gc, domid));
+    flexarray_append(back, "frontend-id");
+    flexarray_append(back, libxl__sprintf(&gc, "%d", vkb->domid));
+    flexarray_append(back, "online");
+    flexarray_append(back, "1");
+    flexarray_append(back, "state");
+    flexarray_append(back, libxl__sprintf(&gc, "%d", 1));
+    flexarray_append(back, "domain");
+    flexarray_append(back, libxl__domid_to_name(&gc, domid));
 
-    flexarray_set(front, foffset++, "backend-id");
-    flexarray_set(front, foffset++, libxl__sprintf(&gc, "%d", vkb->backend_domid));
-    flexarray_set(front, foffset++, "state");
-    flexarray_set(front, foffset++, libxl__sprintf(&gc, "%d", 1));
+    flexarray_append(front, "backend-id");
+    flexarray_append(front, libxl__sprintf(&gc, "%d", vkb->backend_domid));
+    flexarray_append(front, "state");
+    flexarray_append(front, libxl__sprintf(&gc, "%d", 1));
 
     libxl__device_generic_add(ctx, &device,
-                             libxl__xs_kvs_of_flexarray(&gc, back, boffset),
-                             libxl__xs_kvs_of_flexarray(&gc, front, foffset));
+                             libxl__xs_kvs_of_flexarray(&gc, back, back->count),
+                             libxl__xs_kvs_of_flexarray(&gc, front, front->count));
     rc = 0;
 out_free:
     flexarray_free(back);
@@ -1904,8 +1895,6 @@ int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb)
     libxl__gc gc = LIBXL_INIT_GC(ctx);
     flexarray_t *front;
     flexarray_t *back;
-    unsigned int boffset = 0;
-    unsigned int foffset = 0;
     libxl__device device;
     int rc;
 
@@ -1927,45 +1916,31 @@ int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb)
     device.domid = vfb->domid;
     device.kind = DEVICE_VFB;
 
-    flexarray_set(back, boffset++, "frontend-id");
-    flexarray_set(back, boffset++, libxl__sprintf(&gc, "%d", vfb->domid));
-    flexarray_set(back, boffset++, "online");
-    flexarray_set(back, boffset++, "1");
-    flexarray_set(back, boffset++, "state");
-    flexarray_set(back, boffset++, libxl__sprintf(&gc, "%d", 1));
-    flexarray_set(back, boffset++, "domain");
-    flexarray_set(back, boffset++, libxl__domid_to_name(&gc, domid));
-    flexarray_set(back, boffset++, "vnc");
-    flexarray_set(back, boffset++, libxl__sprintf(&gc, "%d", vfb->vnc));
-    flexarray_set(back, boffset++, "vnclisten");
-    flexarray_set(back, boffset++, vfb->vnclisten);
-    flexarray_set(back, boffset++, "vncpasswd");
-    flexarray_set(back, boffset++, vfb->vncpasswd);
-    flexarray_set(back, boffset++, "vncdisplay");
-    flexarray_set(back, boffset++, libxl__sprintf(&gc, "%d", vfb->vncdisplay));
-    flexarray_set(back, boffset++, "vncunused");
-    flexarray_set(back, boffset++, libxl__sprintf(&gc, "%d", vfb->vncunused));
-    flexarray_set(back, boffset++, "sdl");
-    flexarray_set(back, boffset++, libxl__sprintf(&gc, "%d", vfb->sdl));
-    flexarray_set(back, boffset++, "opengl");
-    flexarray_set(back, boffset++, libxl__sprintf(&gc, "%d", vfb->opengl));
+    flexarray_vappend(back, "frontend-id", libxl__sprintf(&gc, "%d", vfb->domid), NULL);
+    flexarray_vappend(back, "online", "1", NULL);
+    flexarray_vappend(back, "state", libxl__sprintf(&gc, "%d", 1), NULL);
+    flexarray_vappend(back, "domain", libxl__domid_to_name(&gc, domid), NULL);
+    flexarray_vappend(back, "vnc", libxl__sprintf(&gc, "%d", vfb->vnc), NULL);
+    flexarray_vappend(back, "vnclisten", vfb->vnclisten, NULL);
+    flexarray_append(back, "vncpasswd");
+    flexarray_append(back, vfb->vncpasswd);
+    flexarray_vappend(back, "vncdisplay", libxl__sprintf(&gc, "%d", vfb->vncdisplay), NULL);
+    flexarray_vappend(back, "vncunused", libxl__sprintf(&gc, "%d", vfb->vncunused), NULL);
+    flexarray_vappend(back, "sdl", libxl__sprintf(&gc, "%d", vfb->sdl), NULL);
+    flexarray_vappend(back, "opengl", libxl__sprintf(&gc, "%d", vfb->opengl), NULL);
     if (vfb->xauthority) {
-        flexarray_set(back, boffset++, "xauthority");
-        flexarray_set(back, boffset++, vfb->xauthority);
+        flexarray_vappend(back, "xauthority", vfb->xauthority, NULL);
     }
     if (vfb->display) {
-        flexarray_set(back, boffset++, "display");
-        flexarray_set(back, boffset++, vfb->display);
+        flexarray_vappend(back, "display", vfb->display, NULL);
     }
 
-    flexarray_set(front, foffset++, "backend-id");
-    flexarray_set(front, foffset++, libxl__sprintf(&gc, "%d", vfb->backend_domid));
-    flexarray_set(front, foffset++, "state");
-    flexarray_set(front, foffset++, libxl__sprintf(&gc, "%d", 1));
+    flexarray_vappend(front, "backend-id", libxl__sprintf(&gc, "%d", vfb->backend_domid), NULL);
+    flexarray_vappend(front, "state", libxl__sprintf(&gc, "%d", 1), NULL);
 
     libxl__device_generic_add(ctx, &device,
-                             libxl__xs_kvs_of_flexarray(&gc, back, boffset),
-                             libxl__xs_kvs_of_flexarray(&gc, front, foffset));
+                             libxl__xs_kvs_of_flexarray(&gc, back, back->count),
+                             libxl__xs_kvs_of_flexarray(&gc, front, front->count));
     rc = 0;
 out_free:
     flexarray_free(front);

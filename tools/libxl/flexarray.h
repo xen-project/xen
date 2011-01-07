@@ -19,6 +19,7 @@
 typedef struct flexarray {
     int size;
     int autogrow;
+    unsigned int count;
     void **data; /* array of pointer */
 } flexarray_t;
 
@@ -26,6 +27,8 @@ _hidden flexarray_t *flexarray_make(int size, int autogrow);
 _hidden void flexarray_free(flexarray_t *array);
 _hidden int flexarray_grow(flexarray_t *array, int extents);
 _hidden int flexarray_set(flexarray_t *array, unsigned int index, void *ptr);
+_hidden int flexarray_append(flexarray_t *array, void *ptr);
+_hidden int flexarray_vappend(flexarray_t *array, ...);
 _hidden int flexarray_get(flexarray_t *array, int index, void **ptr);
 
 _hidden void **flexarray_contents(flexarray_t *array);

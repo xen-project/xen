@@ -14,6 +14,7 @@
  */
 
 #include "libxl_internal.h"
+#include <stdarg.h>
 
 flexarray_t *flexarray_make(int size, int autogrow)
 {
@@ -21,6 +22,7 @@ flexarray_t *flexarray_make(int size, int autogrow)
     if (array) {
         array->size = size;
         array->autogrow = autogrow;
+        array->count = 0;
         array->data = calloc(size, sizeof(void *));
     }
     return array;
@@ -56,8 +58,30 @@ int flexarray_set(flexarray_t *array, unsigned int index, void *ptr)
         if (flexarray_grow(array, newsize - array->size))
             return 2;
     }
+    if ( index + 1 > array->count )
+        array->count = index + 1;
     array->data[index] = ptr;
     return 0;
+}
+
+int flexarray_append(flexarray_t *array, void *ptr)
+{
+    return flexarray_set(array, array->count, ptr);
+}
+
+int flexarray_vappend(flexarray_t *array, ...)
+{
+    va_list va;
+    void *ptr;
+    int ret;
+
+    va_start(va, array);
+    for(ret = 0; (ptr = va_arg(va, void *)); ret++) {
+        if ( flexarray_append(array, ptr) )
+            break;
+    }
+    va_end(va);
+    return ret;
 }
 
 int flexarray_get(flexarray_t *array, int index, void **ptr)

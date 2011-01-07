@@ -226,8 +226,6 @@ static int libxl_create_pci_backend(libxl__gc *gc, uint32_t domid, libxl_device_
     libxl_ctx *ctx = libxl__gc_owner(gc);
     flexarray_t *front;
     flexarray_t *back;
-    unsigned int boffset = 0;
-    unsigned int foffset = 0;
     libxl__device device;
     int i;
 
@@ -248,39 +246,28 @@ static int libxl_create_pci_backend(libxl__gc *gc, uint32_t domid, libxl_device_
     device.domid = domid;
     device.kind = DEVICE_PCI;
 
-    flexarray_set(back, boffset++, "frontend-id");
-    flexarray_set(back, boffset++, libxl__sprintf(gc, "%d", domid));
-    flexarray_set(back, boffset++, "online");
-    flexarray_set(back, boffset++, "1");
-    flexarray_set(back, boffset++, "state");
-    flexarray_set(back, boffset++, libxl__sprintf(gc, "%d", 1));
-    flexarray_set(back, boffset++, "domain");
-    flexarray_set(back, boffset++, libxl__domid_to_name(gc, domid));
+    flexarray_vappend(back, "frontend-id", libxl__sprintf(gc, "%d", domid),
+                     "online", "1", "state", libxl__sprintf(gc, "%d", 1),
+                    "domain", libxl__domid_to_name(gc, domid), NULL);
     for (i = 0; i < num; i++) {
-        flexarray_set(back, boffset++, libxl__sprintf(gc, "key-%d", i));
-        flexarray_set(back, boffset++, libxl__sprintf(gc, PCI_BDF, pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func));
-        flexarray_set(back, boffset++, libxl__sprintf(gc, "dev-%d", i));
-        flexarray_set(back, boffset++, libxl__sprintf(gc, PCI_BDF, pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func));
+        flexarray_append(back, libxl__sprintf(gc, "key-%d", i));
+        flexarray_append(back, libxl__sprintf(gc, PCI_BDF, pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func));
+        flexarray_append(back, libxl__sprintf(gc, "dev-%d", i));
+        flexarray_append(back, libxl__sprintf(gc, PCI_BDF, pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func));
         if (pcidev->vdevfn) {
-            flexarray_set(back, boffset++, libxl__sprintf(gc, "vdevfn-%d", i));
-            flexarray_set(back, boffset++, libxl__sprintf(gc, "%x", pcidev->vdevfn));
+            flexarray_vappend(back, libxl__sprintf(gc, "vdevfn-%d", i), libxl__sprintf(gc, "%x", pcidev->vdevfn), NULL);
         }
-        flexarray_set(back, boffset++, libxl__sprintf(gc, "opts-%d", i));
-        flexarray_set(back, boffset++, libxl__sprintf(gc, "msitranslate=%d,power_mgmt=%d", pcidev->msitranslate, pcidev->power_mgmt));
-        flexarray_set(back, boffset++, libxl__sprintf(gc, "state-%d", i));
-        flexarray_set(back, boffset++, libxl__sprintf(gc, "%d", 1));
+        flexarray_append(back, libxl__sprintf(gc, "opts-%d", i));
+        flexarray_append(back, libxl__sprintf(gc, "msitranslate=%d,power_mgmt=%d", pcidev->msitranslate, pcidev->power_mgmt));
+        flexarray_vappend(back, libxl__sprintf(gc, "state-%d", i), libxl__sprintf(gc, "%d", 1), NULL);
     }
-    flexarray_set(back, boffset++, "num_devs");
-    flexarray_set(back, boffset++, libxl__sprintf(gc, "%d", num));
-
-    flexarray_set(front, foffset++, "backend-id");
-    flexarray_set(front, foffset++, libxl__sprintf(gc, "%d", 0));
-    flexarray_set(front, foffset++, "state");
-    flexarray_set(front, foffset++, libxl__sprintf(gc, "%d", 1));
+    flexarray_vappend(back, "num_devs", libxl__sprintf(gc, "%d", num),
+                    "backend-id", libxl__sprintf(gc, "%d", 0),
+                    "state", libxl__sprintf(gc, "%d", 1), NULL);
 
     libxl__device_generic_add(ctx, &device,
-                             libxl__xs_kvs_of_flexarray(gc, back, boffset),
-                             libxl__xs_kvs_of_flexarray(gc, front, foffset));
+                             libxl__xs_kvs_of_flexarray(gc, back, back->count),
+                             libxl__xs_kvs_of_flexarray(gc, front, front->count));
 
     flexarray_free(back);
     flexarray_free(front);
@@ -293,7 +280,6 @@ static int libxl_device_pci_add_xenstore(libxl__gc *gc, uint32_t domid, libxl_de
     flexarray_t *back;
     char *num_devs, *be_path;
     int num = 0;
-    unsigned int boffset = 0;
     xs_transaction_t t;
 
     be_path = libxl__sprintf(gc, "%s/backend/pci/%d/0", libxl__xs_get_dompath(gc, 0), domid);
@@ -312,27 +298,24 @@ static int libxl_device_pci_add_xenstore(libxl__gc *gc, uint32_t domid, libxl_de
 
     LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Adding new pci device to xenstore");
     num = atoi(num_devs);
-    flexarray_set(back, boffset++, libxl__sprintf(gc, "key-%d", num));
-    flexarray_set(back, boffset++, libxl__sprintf(gc, PCI_BDF, pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func));
-    flexarray_set(back, boffset++, libxl__sprintf(gc, "dev-%d", num));
-    flexarray_set(back, boffset++, libxl__sprintf(gc, PCI_BDF, pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func));
+    flexarray_append(back, libxl__sprintf(gc, "key-%d", num));
+    flexarray_append(back, libxl__sprintf(gc, PCI_BDF, pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func));
+    flexarray_append(back, libxl__sprintf(gc, "dev-%d", num));
+    flexarray_append(back, libxl__sprintf(gc, PCI_BDF, pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func));
     if (pcidev->vdevfn) {
-        flexarray_set(back, boffset++, libxl__sprintf(gc, "vdevfn-%d", num));
-        flexarray_set(back, boffset++, libxl__sprintf(gc, "%x", pcidev->vdevfn));
+        flexarray_append(back, libxl__sprintf(gc, "vdevfn-%d", num));
+        flexarray_append(back, libxl__sprintf(gc, "%x", pcidev->vdevfn));
     }
-    flexarray_set(back, boffset++, libxl__sprintf(gc, "opts-%d", num));
-    flexarray_set(back, boffset++, libxl__sprintf(gc, "msitranslate=%d,power_mgmt=%d", pcidev->msitranslate, pcidev->power_mgmt));
-    flexarray_set(back, boffset++, libxl__sprintf(gc, "state-%d", num));
-    flexarray_set(back, boffset++, libxl__sprintf(gc, "%d", 1));
-    flexarray_set(back, boffset++, "num_devs");
-    flexarray_set(back, boffset++, libxl__sprintf(gc, "%d", num + 1));
-    flexarray_set(back, boffset++, "state");
-    flexarray_set(back, boffset++, libxl__sprintf(gc, "%d", 7));
+    flexarray_append(back, libxl__sprintf(gc, "opts-%d", num));
+    flexarray_append(back, libxl__sprintf(gc, "msitranslate=%d,power_mgmt=%d", pcidev->msitranslate, pcidev->power_mgmt));
+    flexarray_vappend(back, libxl__sprintf(gc, "state-%d", num), libxl__sprintf(gc, "%d", 1), NULL);
+    flexarray_vappend(back, "num_devs", libxl__sprintf(gc, "%d", num + 1), NULL);
+    flexarray_vappend(back, "state", libxl__sprintf(gc, "%d", 7), NULL);
 
 retry_transaction:
     t = xs_transaction_start(ctx->xsh);
     libxl__xs_writev(gc, t, be_path,
-                    libxl__xs_kvs_of_flexarray(gc, back, boffset));
+                    libxl__xs_kvs_of_flexarray(gc, back, back->count));
     if (!xs_transaction_end(ctx->xsh, t, 0))
         if (errno == EAGAIN)
             goto retry_transaction;

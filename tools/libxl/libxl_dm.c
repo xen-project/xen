@@ -32,101 +32,88 @@ static char ** libxl_build_device_model_args_old(libxl__gc *gc,
                                              libxl_device_nic *vifs,
                                              int num_vifs)
 {
-    int num = 0, i;
+    int i;
     flexarray_t *dm_args;
     dm_args = flexarray_make(16, 1);
 
     if (!dm_args)
         return NULL;
 
-    flexarray_set(dm_args, num++, "qemu-dm");
-    flexarray_set(dm_args, num++, "-d");
+    flexarray_vappend(dm_args, "qemu-dm", "-d", libxl__sprintf(gc, "%d", info->domid), NULL);
 
-    flexarray_set(dm_args, num++, libxl__sprintf(gc, "%d", info->domid));
+    if (info->dom_name)
+        flexarray_vappend(dm_args, "-domain-name", info->dom_name, NULL);
 
-    if (info->dom_name) {
-        flexarray_set(dm_args, num++, "-domain-name");
-        flexarray_set(dm_args, num++, info->dom_name);
-    }
     if (info->vnc || info->vncdisplay || info->vnclisten || info->vncunused) {
-        flexarray_set(dm_args, num++, "-vnc");
+        flexarray_append(dm_args, "-vnc");
         if (info->vncdisplay) {
             if (info->vnclisten && strchr(info->vnclisten, ':') == NULL) {
-                flexarray_set(
-                    dm_args, num++,
+                flexarray_append(dm_args, 
                     libxl__sprintf(gc, "%s:%d%s",
                                   info->vnclisten,
                                   info->vncdisplay,
                                   info->vncpasswd ? ",password" : ""));
             } else {
-                flexarray_set(dm_args, num++, libxl__sprintf(gc, "127.0.0.1:%d", info->vncdisplay));
+                flexarray_append(dm_args, libxl__sprintf(gc, "127.0.0.1:%d", info->vncdisplay));
             }
         } else if (info->vnclisten) {
             if (strchr(info->vnclisten, ':') != NULL) {
-                flexarray_set(dm_args, num++, info->vnclisten);
+                flexarray_append(dm_args, info->vnclisten);
             } else {
-                flexarray_set(dm_args, num++, libxl__sprintf(gc, "%s:0", info->vnclisten));
+                flexarray_append(dm_args, libxl__sprintf(gc, "%s:0", info->vnclisten));
             }
         } else {
-            flexarray_set(dm_args, num++, "127.0.0.1:0");
+            flexarray_append(dm_args, "127.0.0.1:0");
         }
         if (info->vncunused) {
-            flexarray_set(dm_args, num++, "-vncunused");
+            flexarray_append(dm_args, "-vncunused");
         }
     }
     if (info->sdl) {
-        flexarray_set(dm_args, num++, "-sdl");
+        flexarray_append(dm_args, "-sdl");
         if (!info->opengl) {
-            flexarray_set(dm_args, num++, "-disable-opengl");
+            flexarray_append(dm_args, "-disable-opengl");
         }
     }
     if (info->keymap) {
-        flexarray_set(dm_args, num++, "-k");
-        flexarray_set(dm_args, num++, info->keymap);
+        flexarray_vappend(dm_args, "-k", info->keymap, NULL);
     }
     if (info->nographic && (!info->sdl && !info->vnc)) {
-        flexarray_set(dm_args, num++, "-nographic");
+        flexarray_append(dm_args, "-nographic");
     }
     if (info->serial) {
-        flexarray_set(dm_args, num++, "-serial");
-        flexarray_set(dm_args, num++, info->serial);
+        flexarray_vappend(dm_args, "-serial", info->serial, NULL);
     }
     if (info->type == XENFV) {
         int ioemu_vifs = 0;
 
         if (info->videoram) {
-            flexarray_set(dm_args, num++, "-videoram");
-            flexarray_set(dm_args, num++, libxl__sprintf(gc, "%d", info->videoram));
+            flexarray_vappend(dm_args, "-videoram", libxl__sprintf(gc, "%d", info->videoram), NULL);
         }
         if (info->stdvga) {
-            flexarray_set(dm_args, num++, "-std-vga");
+            flexarray_append(dm_args, "-std-vga");
         }
 
         if (info->boot) {
-            flexarray_set(dm_args, num++, "-boot");
-            flexarray_set(dm_args, num++, info->boot);
+            flexarray_vappend(dm_args, "-boot", info->boot, NULL);
         }
         if (info->usb || info->usbdevice) {
-            flexarray_set(dm_args, num++, "-usb");
+            flexarray_append(dm_args, "-usb");
             if (info->usbdevice) {
-                flexarray_set(dm_args, num++, "-usbdevice");
-                flexarray_set(dm_args, num++, info->usbdevice);
+                flexarray_vappend(dm_args, "-usbdevice", info->usbdevice, NULL);
             }
         }
         if (info->soundhw) {
-            flexarray_set(dm_args, num++, "-soundhw");
-            flexarray_set(dm_args, num++, info->soundhw);
+            flexarray_vappend(dm_args, "-soundhw", info->soundhw, NULL);
         }
         if (info->apic) {
-            flexarray_set(dm_args, num++, "-acpi");
+            flexarray_append(dm_args, "-acpi");
         }
         if (info->vcpus > 1) {
-            flexarray_set(dm_args, num++, "-vcpus");
-            flexarray_set(dm_args, num++, libxl__sprintf(gc, "%d", info->vcpus));
+            flexarray_vappend(dm_args, "-vcpus", libxl__sprintf(gc, "%d", info->vcpus), NULL);
         }
         if (info->vcpu_avail) {
-            flexarray_set(dm_args, num++, "-vcpu_avail");
-            flexarray_set(dm_args, num++, libxl__sprintf(gc, "0x%x", info->vcpu_avail));
+            flexarray_vappend(dm_args, "-vcpu_avail", libxl__sprintf(gc, "0x%x", info->vcpu_avail), NULL);
         }
         for (i = 0; i < num_vifs; i++) {
             if (vifs[i].nictype == NICTYPE_IOEMU) {
@@ -138,33 +125,30 @@ static char ** libxl_build_device_model_args_old(libxl__gc *gc,
                     ifname = libxl__sprintf(gc, "tap%d.%d", info->domid, vifs[i].devid);
                 else
                     ifname = vifs[i].ifname;
-                flexarray_set(dm_args, num++, "-net");
-                flexarray_set(dm_args, num++, libxl__sprintf(gc, "nic,vlan=%d,macaddr=%s,model=%s",
-                            vifs[i].devid, smac, vifs[i].model));
-                flexarray_set(dm_args, num++, "-net");
-                flexarray_set(dm_args, num++, libxl__sprintf(gc, "tap,vlan=%d,ifname=%s,bridge=%s,script=no",
-                            vifs[i].devid, ifname, vifs[i].bridge));
+                flexarray_vappend(dm_args,
+                                "-net", libxl__sprintf(gc, "nic,vlan=%d,macaddr=%s,model=%s",
+                                                       vifs[i].devid, smac, vifs[i].model),
+                                "-net", libxl__sprintf(gc, "tap,vlan=%d,ifname=%s,bridge=%s,script=no",
+                                                       vifs[i].devid, ifname, vifs[i].bridge), NULL);
                 ioemu_vifs++;
             }
         }
         /* If we have no emulated nics, tell qemu not to create any */
         if ( ioemu_vifs == 0 ) {
-            flexarray_set(dm_args, num++, "-net");
-            flexarray_set(dm_args, num++, "none");
+            flexarray_vappend(dm_args, "-net", "none", NULL);
         }
     }
     if (info->saved_state) {
-        flexarray_set(dm_args, num++, "-loadvm");
-        flexarray_set(dm_args, num++, info->saved_state);
+        flexarray_vappend(dm_args, "-loadvm", info->saved_state, NULL);
     }
     for (i = 0; info->extra && info->extra[i] != NULL; i++)
-        flexarray_set(dm_args, num++, info->extra[i]);
-    flexarray_set(dm_args, num++, "-M");
+        flexarray_append(dm_args, info->extra[i]);
+    flexarray_append(dm_args, "-M");
     if (info->type == XENPV)
-        flexarray_set(dm_args, num++, "xenpv");
+        flexarray_append(dm_args, "xenpv");
     else
-        flexarray_set(dm_args, num++, "xenfv");
-    flexarray_set(dm_args, num++, NULL);
+        flexarray_append(dm_args, "xenfv");
+    flexarray_append(dm_args, NULL);
     return (char **) flexarray_contents(dm_args);
 }
 
@@ -173,33 +157,29 @@ static char ** libxl_build_device_model_args_new(libxl__gc *gc,
                                              libxl_device_nic *vifs,
                                              int num_vifs)
 {
-    int num = 0, i;
     flexarray_t *dm_args;
-    int nb;
     libxl_device_disk *disks;
+    int nb, i;
 
     dm_args = flexarray_make(16, 1);
     if (!dm_args)
         return NULL;
 
-    flexarray_set(dm_args, num++, libxl__strdup(gc, info->device_model));
-
-    flexarray_set(dm_args, num++, "-xen-domid");
-    flexarray_set(dm_args, num++, libxl__sprintf(gc, "%d", info->domid));
+    flexarray_vappend(dm_args, libxl__strdup(gc, info->device_model),
+                        "-xen-domid", libxl__sprintf(gc, "%d", info->domid), NULL);
 
     if (info->type == XENPV) {
-        flexarray_set(dm_args, num++, "-xen-attach");
+        flexarray_append(dm_args, "-xen-attach");
     }
 
     if (info->dom_name) {
-        flexarray_set(dm_args, num++, "-name");
-        flexarray_set(dm_args, num++, info->dom_name);
+        flexarray_vappend(dm_args, "-name", info->dom_name, NULL);
     }
     if (info->vnc || info->vncdisplay || info->vnclisten || info->vncunused) {
         int display = 0;
         const char *listen = "127.0.0.1";
 
-        flexarray_set(dm_args, num++, "-vnc");
+        flexarray_append(dm_args, "-vnc");
 
         if (info->vncdisplay) {
             display = info->vncdisplay;
@@ -211,66 +191,59 @@ static char ** libxl_build_device_model_args_new(libxl__gc *gc,
         }
 
         if (strchr(listen, ':') != NULL)
-            flexarray_set(dm_args, num++,
+            flexarray_append(dm_args, 
                     libxl__sprintf(gc, "%s%s", listen,
                         info->vncunused ? ",to=99" : ""));
         else
-            flexarray_set(dm_args, num++,
+            flexarray_append(dm_args, 
                     libxl__sprintf(gc, "%s:%d%s", listen, display,
                         info->vncunused ? ",to=99" : ""));
     }
     if (info->sdl) {
-        flexarray_set(dm_args, num++, "-sdl");
+        flexarray_append(dm_args, "-sdl");
     }
 
     if (info->type == XENPV && !info->nographic) {
-        flexarray_set(dm_args, num++, "-vga");
-        flexarray_set(dm_args, num++, "xenfb");
+        flexarray_vappend(dm_args, "-vga", "xenfb", NULL);
     }
 
     if (info->keymap) {
-        flexarray_set(dm_args, num++, "-k");
-        flexarray_set(dm_args, num++, info->keymap);
+        flexarray_vappend(dm_args, "-k", info->keymap, NULL);
     }
     if (info->nographic && (!info->sdl && !info->vnc)) {
-        flexarray_set(dm_args, num++, "-nographic");
+        flexarray_append(dm_args, "-nographic");
     }
     if (info->serial) {
-        flexarray_set(dm_args, num++, "-serial");
-        flexarray_set(dm_args, num++, info->serial);
+        flexarray_vappend(dm_args, "-serial", info->serial, NULL);
     }
     if (info->type == XENFV) {
         int ioemu_vifs = 0;
 
         if (info->stdvga) {
-                flexarray_set(dm_args, num++, "-vga");
-                flexarray_set(dm_args, num++, "std");
+                flexarray_vappend(dm_args, "-vga", "std", NULL);
         }
 
         if (info->boot) {
-            flexarray_set(dm_args, num++, "-boot");
-            flexarray_set(dm_args, num++, libxl__sprintf(gc, "order=%s", info->boot));
+            flexarray_vappend(dm_args, "-boot", libxl__sprintf(gc, "order=%s", info->boot), NULL);
         }
         if (info->usb || info->usbdevice) {
-            flexarray_set(dm_args, num++, "-usb");
+            flexarray_append(dm_args, "-usb");
             if (info->usbdevice) {
-                flexarray_set(dm_args, num++, "-usbdevice");
-                flexarray_set(dm_args, num++, info->usbdevice);
+                flexarray_vappend(dm_args, "-usbdevice", info->usbdevice, NULL);
             }
         }
         if (info->soundhw) {
-            flexarray_set(dm_args, num++, "-soundhw");
-            flexarray_set(dm_args, num++, info->soundhw);
+            flexarray_vappend(dm_args, "-soundhw", info->soundhw, NULL);
         }
         if (!info->apic) {
-            flexarray_set(dm_args, num++, "-no-acpi");
+            flexarray_append(dm_args, "-no-acpi");
         }
         if (info->vcpus > 1) {
-            flexarray_set(dm_args, num++, "-smp");
+            flexarray_append(dm_args, "-smp");
             if (info->vcpu_avail)
-                flexarray_set(dm_args, num++, libxl__sprintf(gc, "%d,maxcpus=%d", info->vcpus, info->vcpu_avail));
+                flexarray_append(dm_args, libxl__sprintf(gc, "%d,maxcpus=%d", info->vcpus, info->vcpu_avail));
             else
-                flexarray_set(dm_args, num++, libxl__sprintf(gc, "%d", info->vcpus));
+                flexarray_append(dm_args, libxl__sprintf(gc, "%d", info->vcpus));
         }
         for (i = 0; i < num_vifs; i++) {
             if (vifs[i].nictype == NICTYPE_IOEMU) {
@@ -283,52 +256,52 @@ static char ** libxl_build_device_model_args_new(libxl__gc *gc,
                 } else {
                     ifname = vifs[i].ifname;
                 }
-                flexarray_set(dm_args, num++, "-net");
-                flexarray_set(dm_args, num++, libxl__sprintf(gc, "nic,vlan=%d,macaddr=%s,model=%s",
+                flexarray_append(dm_args, "-net");
+                flexarray_append(dm_args, libxl__sprintf(gc, "nic,vlan=%d,macaddr=%s,model=%s",
                             vifs[i].devid, smac, vifs[i].model));
-                flexarray_set(dm_args, num++, "-net");
-                flexarray_set(dm_args, num++, libxl__sprintf(gc, "tap,vlan=%d,ifname=%s,script=no",
+                flexarray_append(dm_args, "-net");
+                flexarray_append(dm_args, libxl__sprintf(gc, "tap,vlan=%d,ifname=%s,script=no",
                             vifs[i].devid, ifname));
                 ioemu_vifs++;
             }
         }
         /* If we have no emulated nics, tell qemu not to create any */
         if ( ioemu_vifs == 0 ) {
-            flexarray_set(dm_args, num++, "-net");
-            flexarray_set(dm_args, num++, "none");
+            flexarray_append(dm_args, "-net");
+            flexarray_append(dm_args, "none");
         }
     }
     if (info->saved_state) {
-        flexarray_set(dm_args, num++, "-loadvm");
-        flexarray_set(dm_args, num++, info->saved_state);
+        flexarray_append(dm_args, "-loadvm");
+        flexarray_append(dm_args, info->saved_state);
     }
     for (i = 0; info->extra && info->extra[i] != NULL; i++)
-        flexarray_set(dm_args, num++, info->extra[i]);
-    flexarray_set(dm_args, num++, "-M");
+        flexarray_append(dm_args, info->extra[i]);
+    flexarray_append(dm_args, "-M");
     if (info->type == XENPV)
-        flexarray_set(dm_args, num++, "xenpv");
+        flexarray_append(dm_args, "xenpv");
     else
-        flexarray_set(dm_args, num++, "xenfv");
+        flexarray_append(dm_args, "xenfv");
 
     /* RAM Size */
-    flexarray_set(dm_args, num++, "-m");
-    flexarray_set(dm_args, num++, libxl__sprintf(gc, "%d", info->target_ram));
+    flexarray_append(dm_args, "-m");
+    flexarray_append(dm_args, libxl__sprintf(gc, "%d", info->target_ram));
 
     if (info->type == XENFV) {
         disks = libxl_device_disk_list(libxl__gc_owner(gc), info->domid, &nb);
         for (i; i < nb; i++) {
             if (disks[i].is_cdrom) {
-                flexarray_set(dm_args, num++, "-cdrom");
-                flexarray_set(dm_args, num++, libxl__strdup(gc, disks[i].physpath));
+                flexarray_append(dm_args, "-cdrom");
+                flexarray_append(dm_args, libxl__strdup(gc, disks[i].physpath));
             } else {
-                flexarray_set(dm_args, num++, libxl__sprintf(gc, "-%s", disks[i].virtpath));
-                flexarray_set(dm_args, num++, libxl__strdup(gc, disks[i].physpath));
+                flexarray_append(dm_args, libxl__sprintf(gc, "-%s", disks[i].virtpath));
+                flexarray_append(dm_args, libxl__strdup(gc, disks[i].physpath));
             }
             libxl_device_disk_destroy(&disks[i]);
         }
         free(disks);
     }
-    flexarray_set(dm_args, num++, NULL);
+    flexarray_append(dm_args, NULL);
     return (char **) flexarray_contents(dm_args);
 }
 
