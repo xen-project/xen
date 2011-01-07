@@ -6,7 +6,7 @@
  * Copyright (c) 2008, Citrix Systems, Inc.
  * 
  * Authors:
- *    Keir Fraser <keir.fraser@citrix.com>
+ *    Keir Fraser <keir@xen.org>
  */
 
 #ifndef __ASM_X86_X86_EMULATE_H__

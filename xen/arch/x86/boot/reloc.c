@@ -7,7 +7,7 @@
  * Copyright (c) 2009, Citrix Systems, Inc.
  * 
  * Authors:
- *    Keir Fraser <keir.fraser@citrix.com>
+ *    Keir Fraser <keir@xen.org>
  */
 
 asm (
