@@ -3781,6 +3781,7 @@ int hvm_debug_op(struct vcpu *v, int32_t op)
     return rc;
 }
 
+#ifdef __x86_64__
 static int hvm_memory_event_traps(long p, uint32_t reason,
                                   unsigned long value, unsigned long old, 
                                   bool_t gla_valid, unsigned long gla) 
@@ -3859,6 +3860,7 @@ int hvm_memory_event_int3(unsigned long gla)
                                   MEM_EVENT_REASON_INT3,
                                   gfn, 0, 1, gla);
 }
+#endif /* __x86_64__ */
 
 /*
  * Local variables:

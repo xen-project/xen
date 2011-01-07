@@ -522,12 +522,19 @@ static inline void p2m_mem_paging_populate(struct p2m_domain *p2m, unsigned long
 { }
 #endif
 
+#ifdef __x86_64__
 /* Send mem event based on the access (gla is -1ull if not available).  Handles
  * the rw2rx conversion */
 void p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long gla, 
                           bool_t access_r, bool_t access_w, bool_t access_x);
 /* Resumes the running of the VCPU, restarting the last instruction */
 void p2m_mem_access_resume(struct p2m_domain *p2m);
+#else
+static inline void p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, 
+                                        unsigned long gla, bool_t access_r, 
+                                        bool_t access_w, bool_t access_x)
+{ }
+#endif
 
 struct page_info *p2m_alloc_ptp(struct p2m_domain *p2m, unsigned long type);
 

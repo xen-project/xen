@@ -2857,7 +2857,6 @@ void p2m_mem_paging_resume(struct p2m_domain *p2m)
     /* Unpause any domains that were paused because the ring was full */
     mem_event_unpause_vcpus(d);
 }
-#endif /* __x86_64__ */
 
 void p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long gla, 
                           bool_t access_r, bool_t access_w, bool_t access_x)
@@ -2949,6 +2948,7 @@ void p2m_mem_access_resume(struct p2m_domain *p2m)
      * was available */
     mem_event_unpause_vcpus(d);
 }
+#endif /* __x86_64__ */
 
 /*
  * Local variables:
