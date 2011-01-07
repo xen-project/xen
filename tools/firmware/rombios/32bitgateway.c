@@ -22,7 +22,7 @@
  * Copyright (c) 2008, Citrix Systems, Inc.
  *
  * Author: Stefan Berger <stefanb@us.ibm.com>
- * Author: Keir Fraser <keir.fraser@citrix.com>
+ * Author: Keir Fraser <keir@xen.org>
  */
 
 /*

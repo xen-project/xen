@@ -201,7 +201,7 @@ F:	tools/xentrace/
 F:	xen/common/trace.c
 
 THE REST
-M:	Keir Fraser <keir.fraser@citrix.com>
+M:	Keir Fraser <keir@xen.org>
 S:	Supported
 F:	*
 F:	*/

@@ -4,7 +4,7 @@
  * Copyright (c) 2008, Citrix Systems, Inc.
  * 
  * Authors:
- *    Keir Fraser <keir.fraser@citrix.com>
+ *    Keir Fraser <keir@xen.org>
  * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,

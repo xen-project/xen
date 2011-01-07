@@ -6,7 +6,7 @@
  * Copyright (c) 2007-2008 Citrix Systems, Inc.
  * 
  * Authors:
- *    Keir Fraser <keir.fraser@citrix.com>
+ *    Keir Fraser <keir@xen.org>
  */
 
 #include <xen/config.h>

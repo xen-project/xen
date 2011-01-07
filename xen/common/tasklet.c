@@ -8,7 +8,7 @@
  * Copyright (c) 1992, Linus Torvalds
  * 
  * Authors:
- *    Keir Fraser <keir.fraser@citrix.com>
+ *    Keir Fraser <keir@xen.org>
  */
 
 #include <xen/config.h>
