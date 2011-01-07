@@ -52,7 +52,6 @@ struct hvm_asid_data {
    u32 next_asid;
    u32 max_asid;
    bool_t disabled;
-   bool_t initialised;
 };
 
 static DEFINE_PER_CPU(struct hvm_asid_data, hvm_asid_data);
@@ -61,14 +60,6 @@ void hvm_asid_init(int nasids)
 {
     static s8 g_disabled = -1;
     struct hvm_asid_data *data = &this_cpu(hvm_asid_data);
-
-    /*
-     * If already initialised, we just bump the generation to force a TLB
-     * flush. Resetting the generation could be dangerous, if VCPUs still
-     * exist that reference earlier generations on this CPU.
-     */
-    if ( test_and_set_bool(data->initialised) )
-        return hvm_asid_flush_core();
 
     data->max_asid = nasids - 1;
     data->disabled = (nasids <= 1);
