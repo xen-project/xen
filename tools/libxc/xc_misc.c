@@ -572,6 +572,38 @@ int xc_hvm_get_mem_access(
     return rc;
 }
 
+int xc_hvm_inject_trap(
+    xc_interface *xch, domid_t dom, int vcpu, uint32_t trap, uint32_t error_code, 
+    uint64_t cr2)
+{
+    DECLARE_HYPERCALL;
+    DECLARE_HYPERCALL_BUFFER(struct xen_hvm_inject_trap, arg);
+    int rc;
+
+    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
+    if ( arg == NULL )
+    {
+        PERROR("Could not allocate memory for xc_hvm_inject_trap hypercall");
+        return -1;
+    }
+
+    arg->domid       = dom;
+    arg->vcpuid      = vcpu;
+    arg->trap        = trap;
+    arg->error_code  = error_code;
+    arg->cr2         = cr2;
+
+    hypercall.op     = __HYPERVISOR_hvm_op;
+    hypercall.arg[0] = HVMOP_inject_trap;
+    hypercall.arg[1] = HYPERCALL_BUFFER_AS_ARG(arg);
+
+    rc = do_xen_hypercall(xch, &hypercall);
+
+    xc_hypercall_buffer_free(xch, arg);
+
+    return rc;
+}
+
 /*
  * Local variables:
  * mode: C

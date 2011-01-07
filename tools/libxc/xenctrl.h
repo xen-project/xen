@@ -1426,6 +1426,14 @@ int xc_hvm_get_mem_access(
     xc_interface *xch, domid_t dom, uint64_t pfn, hvmmem_access_t* memaccess);
 
 /*
+ * Injects a hardware/software CPU trap, to take effect the next time the HVM 
+ * resumes. 
+ */
+int xc_hvm_inject_trap(
+    xc_interface *xch, domid_t dom, int vcpu, uint32_t trap, uint32_t error_code, 
+    uint64_t cr2);
+
+/*
  *  LOGGING AND ERROR REPORTING
  */
 
