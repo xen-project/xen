@@ -119,7 +119,7 @@ struct xen_hvm_set_mem_type {
     /* Domain to be updated. */
     domid_t domid;
     /* Memory type */
-    hvmmem_type_t hvmmem_type;
+    uint64_aligned_t hvmmem_type;
     /* First pfn. */
     uint64_aligned_t first_pfn;
     /* Number of pages. */
