@@ -158,4 +158,46 @@ struct xen_hvm_xentrace {
 typedef struct xen_hvm_xentrace xen_hvm_xentrace_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_xentrace_t);
 
+#define HVMOP_set_mem_access        12
+typedef enum {
+    HVMMEM_access_n,
+    HVMMEM_access_r,
+    HVMMEM_access_w,
+    HVMMEM_access_rw,
+    HVMMEM_access_x,
+    HVMMEM_access_rx,
+    HVMMEM_access_wx,
+    HVMMEM_access_rwx,
+    HVMMEM_access_rx2rw,       /* Page starts off as read-execute, but automatically change
+				* to read-write on a write */
+    HVMMEM_access_default      /* Take the domain default */
+} hvmmem_access_t;
+/* Notify that a region of memory is to have specific access types */
+struct xen_hvm_set_mem_access {
+    /* Domain to be updated. */
+    domid_t domid;
+    uint16_t pad[3]; /* align next field on 8-byte boundary */
+    /* Memory type */
+    uint64_t hvmmem_access; /* hvm_access_t */
+    /* First pfn, or ~0ull to set the default access for new pages */
+    uint64_t first_pfn;
+    /* Number of pages, ignored on setting default access */
+    uint64_t nr;
+};
+typedef struct xen_hvm_set_mem_access xen_hvm_set_mem_access_t;
+DEFINE_XEN_GUEST_HANDLE(xen_hvm_set_mem_access_t);
+
+#define HVMOP_get_mem_access        13
+/* Get the specific access type for that region of memory */
+struct xen_hvm_get_mem_access {
+    /* Domain to be queried. */
+    domid_t domid;
+    uint16_t pad[3]; /* align next field on 8-byte boundary */
+    /* Memory type: OUT */
+    uint64_t hvmmem_access; /* hvm_access_t */
+    /* pfn, or ~0ull for default access for new pages.  IN */
+    uint64_t pfn;
+};
+typedef struct xen_hvm_get_mem_access xen_hvm_get_mem_access_t;
+DEFINE_XEN_GUEST_HANDLE(xen_hvm_get_mem_access_t);
 #endif /* __XEN_PUBLIC_HVM_HVM_OP_H__ */

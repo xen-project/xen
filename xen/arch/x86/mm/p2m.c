@@ -2781,6 +2781,7 @@ void p2m_mem_paging_populate(struct p2m_domain *p2m, unsigned long gfn)
         return;
 
     memset(&req, 0, sizeof(req));
+    req.type = MEM_EVENT_TYPE_PAGING;
 
     /* Fix p2m mapping */
     /* XXX: It seems inefficient to have this here, as it's only needed

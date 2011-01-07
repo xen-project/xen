@@ -511,6 +511,66 @@ int xc_hvm_set_mem_type(
     return rc;
 }
 
+int xc_hvm_set_mem_access(
+    xc_interface *xch, domid_t dom, hvmmem_access_t mem_access, uint64_t first_pfn, uint64_t nr)
+{
+    DECLARE_HYPERCALL;
+    DECLARE_HYPERCALL_BUFFER(struct xen_hvm_set_mem_access, arg);
+    int rc;
+
+    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
+    if ( arg == NULL )
+    {
+        PERROR("Could not allocate memory for xc_hvm_set_mem_access hypercall");
+        return -1;
+    }
+
+    arg->domid         = dom;
+    arg->hvmmem_access = mem_access;
+    arg->first_pfn     = first_pfn;
+    arg->nr            = nr;
+
+    hypercall.op     = __HYPERVISOR_hvm_op;
+    hypercall.arg[0] = HVMOP_set_mem_access;
+    hypercall.arg[1] = HYPERCALL_BUFFER_AS_ARG(arg);
+
+    rc = do_xen_hypercall(xch, &hypercall);
+
+    xc_hypercall_buffer_free(xch, arg);
+
+    return rc;
+}
+
+int xc_hvm_get_mem_access(
+    xc_interface *xch, domid_t dom, uint64_t pfn, hvmmem_access_t* mem_access)
+{
+    DECLARE_HYPERCALL;
+    DECLARE_HYPERCALL_BUFFER(struct xen_hvm_get_mem_access, arg);
+    int rc;
+
+    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
+    if ( arg == NULL )
+    {
+        PERROR("Could not allocate memory for xc_hvm_get_mem_access hypercall");
+        return -1;
+    }
+
+    arg->domid       = dom;
+    arg->pfn         = pfn;
+
+    hypercall.op     = __HYPERVISOR_hvm_op;
+    hypercall.arg[0] = HVMOP_get_mem_access;
+    hypercall.arg[1] = HYPERCALL_BUFFER_AS_ARG(arg);
+
+    rc = do_xen_hypercall(xch, &hypercall);
+
+    if ( !rc )
+        *mem_access = arg->hvmmem_access;
+
+    xc_hypercall_buffer_free(xch, arg);
+
+    return rc;
+}
 
 /*
  * Local variables:

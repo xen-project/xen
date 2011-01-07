@@ -701,6 +701,19 @@ int xc_domain_setdebugging(xc_interface *xch,
                            uint32_t domid,
                            unsigned int enable);
 
+/**
+ * This function sets or clears the requirement that an access memory
+ * event listener is required on the domain.
+ *
+ * @parm xch a handle to an open hypervisor interface
+ * @parm domid the domain id to send trigger
+ * @parm enable true to require a listener
+ * return 0 on success, -1 on failure
+ */
+int xc_domain_set_access_required(xc_interface *xch,
+				  uint32_t domid,
+				  unsigned int required);
+
 /*
  * CPUPOOL MANAGEMENT FUNCTIONS
  */
@@ -1398,6 +1411,19 @@ int xc_hvm_modified_memory(
 int xc_hvm_set_mem_type(
     xc_interface *xch, domid_t dom, hvmmem_type_t memtype, uint64_t first_pfn, uint64_t nr);
 
+/*
+ * Set a range of memory to a specific access.
+ * Allowed types are HVMMEM_access_default, HVMMEM_access_n, any combination of 
+ * HVM_access_ + (rwx), and HVM_access_rx2rw
+ */
+int xc_hvm_set_mem_access(
+    xc_interface *xch, domid_t dom, hvmmem_access_t memaccess, uint64_t first_pfn, uint64_t nr);
+
+/*
+ * Gets the mem access for the given page (returned in memacess on success)
+ */
+int xc_hvm_get_mem_access(
+    xc_interface *xch, domid_t dom, uint64_t pfn, hvmmem_access_t* memaccess);
 
 /*
  *  LOGGING AND ERROR REPORTING
@@ -1703,6 +1729,8 @@ int xc_mem_paging_nominate(xc_interface *xch, domid_t domain_id,
 int xc_mem_paging_evict(xc_interface *xch, domid_t domain_id, unsigned long gfn);
 int xc_mem_paging_prep(xc_interface *xch, domid_t domain_id, unsigned long gfn);
 int xc_mem_paging_resume(xc_interface *xch, domid_t domain_id,
+                         unsigned long gfn);
+int xc_mem_access_resume(xc_interface *xch, domid_t domain_id,
                          unsigned long gfn);
 
 /**

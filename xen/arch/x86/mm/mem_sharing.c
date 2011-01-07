@@ -304,6 +304,8 @@ static struct page_info* mem_sharing_alloc_page(struct domain *d,
     if(page != NULL) return page;
 
     memset(&req, 0, sizeof(req));
+    req.type = MEM_EVENT_TYPE_SHARED;
+
     if(must_succeed) 
     {
         /* We do not support 'must_succeed' any more. External operations such

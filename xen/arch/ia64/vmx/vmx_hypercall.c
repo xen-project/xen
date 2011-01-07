@@ -218,6 +218,9 @@ do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
     }
 
     case HVMOP_set_mem_type:
+    case HVMOP_set_mem_access:
+    case HVMOP_get_mem_access:
+
         rc = -ENOSYS;
         break;
 

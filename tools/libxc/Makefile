@@ -28,6 +28,7 @@ CTRL_SRCS-y       += xc_resume.c
 CTRL_SRCS-y       += xc_tmem.c
 CTRL_SRCS-y       += xc_mem_event.c
 CTRL_SRCS-y       += xc_mem_paging.c
+CTRL_SRCS-y       += xc_mem_access.c
 CTRL_SRCS-y       += xc_memshr.c
 CTRL_SRCS-y       += xc_hcall_buf.c
 CTRL_SRCS-y       += xc_foreign_memory.c

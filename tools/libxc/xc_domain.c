@@ -1442,6 +1442,17 @@ int xc_domain_debug_control(xc_interface *xc, uint32_t domid, uint32_t sop, uint
     return do_domctl(xc, &domctl);
 }
 
+int xc_domain_set_access_required(xc_interface *xch,
+                                  uint32_t domid,
+                                  unsigned int required)
+{
+    DECLARE_DOMCTL;
+
+    domctl.cmd = XEN_DOMCTL_set_access_required;
+    domctl.domain = domid;
+    domctl.u.access_required.access_required = required;
+    return do_domctl(xch, &domctl);
+}
 
 /*
  * Local variables:
