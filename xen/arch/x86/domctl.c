@@ -1566,6 +1566,26 @@ long arch_do_domctl(
     break;
 #endif /* __x86_64__ */
 
+    case XEN_DOMCTL_set_access_required:
+    {
+        struct domain *d;
+        struct p2m_domain* p2m;
+        
+        ret = -EPERM;
+        if ( current->domain->domain_id == domctl->domain )
+            break;
+
+        ret = -ESRCH;
+        d = rcu_lock_domain_by_id(domctl->domain);
+        if ( d != NULL )
+        {
+            p2m = p2m_get_hostp2m(d);
+            p2m->access_required = domctl->u.access_required.access_required;
+            rcu_unlock_domain(d);
+        } 
+    }
+    break;
+
     default:
         ret = -ENOSYS;
         break;

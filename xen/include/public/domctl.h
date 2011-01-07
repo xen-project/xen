@@ -820,6 +820,16 @@ typedef struct xen_domctl_vcpuextstate xen_domctl_vcpuextstate_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_vcpuextstate_t);
 #endif
 
+/* XEN_DOMCTL_set_access_required: sets whether a memory event listener
+ * must be present to handle page access events: if false, the page
+ * access will revert to full permissions if no one is listening;
+ *  */
+struct xen_domctl_set_access_required {
+    uint8_t access_required;
+};
+typedef struct xen_domctl_set_access_required xen_domctl_set_access_required_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_set_access_required_t);
+
 struct xen_domctl {
     uint32_t cmd;
 #define XEN_DOMCTL_createdomain                   1
@@ -882,6 +892,7 @@ struct xen_domctl {
 #define XEN_DOMCTL_getpageframeinfo3             61
 #define XEN_DOMCTL_setvcpuextstate               62
 #define XEN_DOMCTL_getvcpuextstate               63
+#define XEN_DOMCTL_set_access_required           64
 #define XEN_DOMCTL_gdbsx_guestmemio            1000
 #define XEN_DOMCTL_gdbsx_pausevcpu             1001
 #define XEN_DOMCTL_gdbsx_unpausevcpu           1002
@@ -934,6 +945,7 @@ struct xen_domctl {
         struct xen_domctl_cpuid             cpuid;
         struct xen_domctl_vcpuextstate      vcpuextstate;
 #endif
+        struct xen_domctl_set_access_required access_required;
         struct xen_domctl_gdbsx_memio       gdbsx_guest_memio;
         struct xen_domctl_gdbsx_pauseunp_vcpu gdbsx_pauseunp_vcpu;
         struct xen_domctl_gdbsx_domstatus   gdbsx_domstatus;
