@@ -356,7 +356,12 @@ static inline void hvm_set_info_guest(struct vcpu *v)
 
 int hvm_debug_op(struct vcpu *v, int32_t op);
 
-bool_t hvm_hap_nested_page_fault(unsigned long gfn);
+bool_t hvm_hap_nested_page_fault(unsigned long gpa,
+                                 bool_t gla_valid, unsigned long gla,
+                                 bool_t access_valid, 
+                                 bool_t access_r,
+                                 bool_t access_w,
+                                 bool_t access_x);
 
 #define hvm_msr_tsc_aux(v) ({                                               \
     struct domain *__d = (v)->domain;                                       \

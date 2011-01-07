@@ -714,13 +714,26 @@ struct xen_domctl_gdbsx_domstatus {
 /*
  * Page memory in and out. 
  */
-#define XEN_DOMCTL_MEM_EVENT_OP_PAGING (1 << 0)
+#define XEN_DOMCTL_MEM_EVENT_OP_PAGING            1
 
 /* Domain memory paging */
 #define XEN_DOMCTL_MEM_EVENT_OP_PAGING_NOMINATE   0
 #define XEN_DOMCTL_MEM_EVENT_OP_PAGING_EVICT      1
 #define XEN_DOMCTL_MEM_EVENT_OP_PAGING_PREP       2
 #define XEN_DOMCTL_MEM_EVENT_OP_PAGING_RESUME     3
+
+/*
+ * Access permissions.
+ *
+ * There are HVM hypercalls to set the per-page access permissions of every
+ * page in a domain.  When one of these permissions--independent, read, 
+ * write, and execute--is violated, the VCPU is paused and a memory event 
+ * is sent with what happened.  (See public/mem_event.h)  The memory event 
+ * handler can then resume the VCPU and redo the access with an 
+ * ACCESS_RESUME mode for the following domctl.
+ */
+#define XEN_DOMCTL_MEM_EVENT_OP_ACCESS            2
+#define XEN_DOMCTL_MEM_EVENT_OP_ACCESS_RESUME     0 
 
 struct xen_domctl_mem_event_op {
     uint32_t       op;           /* XEN_DOMCTL_MEM_EVENT_OP_* */

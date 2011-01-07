@@ -9,6 +9,7 @@ obj-$(x86_64) += guest_walk_4.o
 obj-$(x86_64) += mem_event.o
 obj-$(x86_64) += mem_paging.o
 obj-$(x86_64) += mem_sharing.o
+obj-$(x86_64) += mem_access.o
 
 guest_walk_%.o: guest_walk.c Makefile
 	$(CC) $(CFLAGS) -DGUEST_PAGING_LEVELS=$* -c $< -o $@

@@ -2858,6 +2858,97 @@ void p2m_mem_paging_resume(struct p2m_domain *p2m)
 }
 #endif /* __x86_64__ */
 
+void p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long gla, 
+                          bool_t access_r, bool_t access_w, bool_t access_x)
+{
+    struct vcpu *v = current;
+    mem_event_request_t req;
+    unsigned long gfn = gpa >> PAGE_SHIFT;
+    struct domain *d = v->domain;    
+    struct p2m_domain* p2m = p2m_get_hostp2m(d);
+    int res;
+    mfn_t mfn;
+    p2m_type_t p2mt;
+    p2m_access_t p2ma;
+    
+    /* First, handle rx2rw conversion automatically */
+    p2m_lock(p2m);
+    mfn = p2m->get_entry(p2m, gfn, &p2mt, &p2ma, p2m_query);
+
+    if ( access_w && p2ma == p2m_access_rx2rw ) 
+    {
+        p2m->set_entry(p2m, gfn, mfn, 0, p2mt, p2m_access_rw);
+        p2m_unlock(p2m);
+        return;
+    }
+    p2m_unlock(p2m);
+
+    /* Otherwise, check if there is a memory event listener, and send the message along */
+    res = mem_event_check_ring(d);
+    if ( res < 0 ) 
+    {
+        /* No listener */
+        if ( p2m->access_required ) 
+        {
+            printk(XENLOG_INFO 
+                   "Memory access permissions failure, no mem_event listener: pausing VCPU %d, dom %d\n",
+                   v->vcpu_id, d->domain_id);
+
+            mem_event_mark_and_pause(v);
+        }
+        else
+        {
+            /* A listener is not required, so clear the access restrictions */
+            p2m_lock(p2m);
+            p2m->set_entry(p2m, gfn, mfn, 0, p2mt, p2m_access_rwx);
+            p2m_unlock(p2m);
+        }
+
+        return;
+    }
+    else if ( res > 0 )
+        return;  /* No space in buffer; VCPU paused */
+
+    memset(&req, 0, sizeof(req));
+    req.type = MEM_EVENT_TYPE_ACCESS;
+    req.reason = MEM_EVENT_REASON_VIOLATION;
+
+    /* Pause the current VCPU unconditionally */
+    vcpu_pause_nosync(v);
+    req.flags |= MEM_EVENT_FLAG_VCPU_PAUSED;    
+
+    /* Send request to mem event */
+    req.gfn = gfn;
+    req.offset = gpa & ((1 << PAGE_SHIFT) - 1);
+    req.gla_valid = gla_valid;
+    req.gla = gla;
+    req.access_r = access_r;
+    req.access_w = access_w;
+    req.access_x = access_x;
+    
+    req.vcpu_id = v->vcpu_id;
+
+    mem_event_put_request(d, &req);   
+
+    /* VCPU paused, mem event request sent */
+}
+
+void p2m_mem_access_resume(struct p2m_domain *p2m)
+{
+    struct domain *d = p2m->domain;
+    mem_event_response_t rsp;
+
+    mem_event_get_response(d, &rsp);
+
+    /* Unpause domain */
+    if ( rsp.flags & MEM_EVENT_FLAG_VCPU_PAUSED )
+        vcpu_unpause(d->vcpu[rsp.vcpu_id]);
+
+    /* Unpause any domains that were paused because the ring was full or no listener 
+     * was available */
+    mem_event_unpause_vcpus(d);
+}
+
 /*
  * Local variables:
  * mode: C

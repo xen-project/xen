@@ -26,6 +26,7 @@
 #include <asm/p2m.h>
 #include <asm/mem_event.h>
 #include <asm/mem_paging.h>
+#include <asm/mem_access.h>
 
 /* for public/io/ring.h macros */
 #define xen_mb()   mb()
@@ -66,6 +67,9 @@ static int mem_event_enable(struct domain *d, mfn_t ring_mfn, mfn_t shared_mfn)
                     PAGE_SIZE);
 
     mem_event_ring_lock_init(d);
+
+    /* Wake any VCPUs paused for memory events */
+    mem_event_unpause_vcpus(d);
 
     return 0;
 
@@ -143,11 +147,20 @@ void mem_event_unpause_vcpus(struct domain *d)
             vcpu_wake(v);
 }
 
+void mem_event_mark_and_pause(struct vcpu *v)
+{
+    set_bit(_VPF_mem_event, &v->pause_flags);
+    vcpu_sleep_nosync(v);
+}
+
 int mem_event_check_ring(struct domain *d)
 {
     struct vcpu *curr = current;
     int free_requests;
     int ring_full;
+
+    if ( !d->mem_event.ring_page )
+        return -1;
 
     mem_event_ring_lock(d);
 
@@ -157,7 +170,7 @@ int mem_event_check_ring(struct domain *d)
         gdprintk(XENLOG_INFO, "free request slots: %d\n", free_requests);
         WARN_ON(free_requests == 0);
     }
-    ring_full = free_requests < MEM_EVENT_RING_THRESHOLD;
+    ring_full = free_requests < MEM_EVENT_RING_THRESHOLD ? 1 : 0;
 
     if ( (curr->domain->domain_id == d->domain_id) && ring_full )
     {
@@ -203,7 +216,11 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
         return rc;
 #endif
 
-    if ( mec->mode == 0 )
+    rc = -ENOSYS;
+
+    switch ( mec-> mode ) 
+    {
+    case 0:
     {
         switch( mec->op )
         {
@@ -268,13 +285,18 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
             rc = -ENOSYS;
             break;
         }
+        break;
     }
-    else
+    case XEN_DOMCTL_MEM_EVENT_OP_PAGING:
     {
-        rc = -ENOSYS;
-
-        if ( mec->mode & XEN_DOMCTL_MEM_EVENT_OP_PAGING )
-            rc = mem_paging_domctl(d, mec, u_domctl);
+        rc = mem_paging_domctl(d, mec, u_domctl);
+        break;
+    }
+    case XEN_DOMCTL_MEM_EVENT_OP_ACCESS: 
+    {
+        rc = mem_access_domctl(d, mec, u_domctl);
+        break;
+    }
     }
 
     return rc;

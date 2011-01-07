@@ -1,9 +1,9 @@
 /******************************************************************************
- * include/asm-x86/mem_event.h
+ * arch/x86/mm/mem_access.c
  *
- * Common interface for memory event support.
+ * Memory access support.
  *
- * Copyright (c) 2009 Citrix Systems, Inc. (Patrick Colp)
+ * Copyright (c) 2011 Virtuata, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,21 +21,32 @@
  */
 
 
-#ifndef __MEM_EVENT_H__
-#define __MEM_EVENT_H__
-
-/* Pauses VCPU while marking pause flag for mem event */
-void mem_event_mark_and_pause(struct vcpu *v);
-int mem_event_check_ring(struct domain *d);
-void mem_event_put_request(struct domain *d, mem_event_request_t *req);
-void mem_event_get_response(struct domain *d, mem_event_response_t *rsp);
-void mem_event_unpause_vcpus(struct domain *d);
-
-int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
-                     XEN_GUEST_HANDLE(void) u_domctl);
+#include <asm/p2m.h>
+#include <asm/mem_event.h>
 
 
-#endif /* __MEM_EVENT_H__ */
+int mem_access_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
+                      XEN_GUEST_HANDLE(void) u_domctl)
+{
+    int rc;
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+
+    switch( mec->op )
+    {
+    case XEN_DOMCTL_MEM_EVENT_OP_ACCESS_RESUME:
+    {
+        p2m_mem_access_resume(p2m);
+        rc = 0;
+    }
+    break;
+
+    default:
+        rc = -ENOSYS;
+        break;
+    }
+
+    return rc;
+}
 
 
 /*

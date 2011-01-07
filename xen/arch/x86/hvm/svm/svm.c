@@ -979,7 +979,7 @@ static void svm_do_nested_pgfault(paddr_t gpa)
         __trace_var(TRC_HVM_NPF, 0, sizeof(_d), &_d);
     }
 
-    if ( hvm_hap_nested_page_fault(gfn) )
+    if ( hvm_hap_nested_page_fault(gpa, 0, ~0ull, 0, 0, 0, 0) )
         return;
 
     /* Everything else is an error. */

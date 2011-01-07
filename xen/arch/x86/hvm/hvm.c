@@ -61,6 +61,8 @@
 #include <public/hvm/ioreq.h>
 #include <public/version.h>
 #include <public/memory.h>
+#include <asm/mem_event.h>
+#include <public/mem_event.h>
 
 bool_t __read_mostly hvm_enabled;
 
@@ -1086,14 +1088,64 @@ void hvm_triple_fault(void)
     domain_shutdown(v->domain, SHUTDOWN_reboot);
 }
 
-bool_t hvm_hap_nested_page_fault(unsigned long gfn)
+bool_t hvm_hap_nested_page_fault(unsigned long gpa,
+                                 bool_t gla_valid,
+                                 unsigned long gla,
+                                 bool_t access_valid,
+                                 bool_t access_r,
+                                 bool_t access_w,
+                                 bool_t access_x)
 {
+    unsigned long gfn = gpa >> PAGE_SHIFT;
     p2m_type_t p2mt;
+    p2m_access_t p2ma;
     mfn_t mfn;
     struct vcpu *v = current;
     struct p2m_domain *p2m = p2m_get_hostp2m(v->domain);
 
-    mfn = gfn_to_mfn_guest(p2m, gfn, &p2mt);
+    mfn = gfn_to_mfn_type_current(p2m, gfn, &p2mt, &p2ma, p2m_guest);
+
+    /* Check access permissions first, then handle faults */
+    if ( access_valid && (mfn_x(mfn) != INVALID_MFN) )
+    {
+        int violation = 0;
+        /* If the access is against the permissions, then send to mem_event */
+        switch (p2ma) 
+        {
+        case p2m_access_n:
+        default:
+            violation = access_r || access_w || access_x;
+            break;
+        case p2m_access_r:
+            violation = access_w || access_x;
+            break;
+        case p2m_access_w:
+            violation = access_r || access_x;
+            break;
+        case p2m_access_x:
+            violation = access_r || access_w;
+            break;
+        case p2m_access_rx:
+        case p2m_access_rx2rw:
+            violation = access_w;
+            break;
+        case p2m_access_wx:
+            violation = access_r;
+            break;
+        case p2m_access_rw:
+            violation = access_x;
+            break;
+        case p2m_access_rwx:
+            break;
+        }
+
+        if ( violation )
+        {
+            p2m_mem_access_check(gpa, gla_valid, gla, access_r, access_w, access_x);
+
+            return 1;
+        }
+    }
 
     /*
      * If this GFN is emulated MMIO or marked as read-only, pass the fault

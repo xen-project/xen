@@ -2079,7 +2079,14 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
         __trace_var(TRC_HVM_NPF, 0, sizeof(_d), &_d);
     }
 
-    if ( hvm_hap_nested_page_fault(gfn) )
+    if ( hvm_hap_nested_page_fault(gpa,
+                                   qualification & EPT_GLA_VALID       ? 1 : 0,
+                                   qualification & EPT_GLA_VALID
+                                     ? __vmread(GUEST_LINEAR_ADDRESS) : ~0ull,
+                                   1, /* access types are as follows */
+                                   qualification & EPT_READ_VIOLATION  ? 1 : 0,
+                                   qualification & EPT_WRITE_VIOLATION ? 1 : 0,
+                                   qualification & EPT_EXEC_VIOLATION  ? 1 : 0) )
         return;
 
     /* Everything else is an error. */
