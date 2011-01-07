@@ -204,6 +204,8 @@ _hidden int libxl__spawn_spawn(libxl_ctx *ctx,
                       libxl_device_model_starting *starting,
                       const char *what,
                       void (*intermediate_hook)(void *for_spawn, pid_t innerchild));
+_hidden int libxl__destroy_device_model(libxl_ctx *ctx, uint32_t domid);
+
   /* Logs errors.  A copy of "what" is taken.  Return values:
    *  < 0   error, for_spawn need not be detached
    *   +1   caller is the parent, must call detach on *for_spawn eventually
