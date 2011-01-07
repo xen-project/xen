@@ -100,10 +100,7 @@ void hvm_asid_flush_core(void)
         return;
 
     if ( likely(++data->core_asid_generation != 0) )
-    {
-        data->next_asid = 1;
         return;
-    }
 
     /*
      * ASID generations are 64 bit.  Overflow of generations never happens.
@@ -122,10 +119,7 @@ bool_t hvm_asid_handle_vmenter(void)
     /* On erratum #170 systems we must flush the TLB. 
      * Generation overruns are taken here, too. */
     if ( data->disabled )
-    {
-        curr->arch.hvm_vcpu.asid = 0;
-        return 0;
-    }
+        goto disabled;
 
     /* Test if VCPU has valid ASID. */
     if ( curr->arch.hvm_vcpu.asid_generation == data->core_asid_generation )
@@ -133,7 +127,12 @@ bool_t hvm_asid_handle_vmenter(void)
 
     /* If there are no free ASIDs, need to go to a new generation */
     if ( unlikely(data->next_asid > data->max_asid) )
+    {
         hvm_asid_flush_core();
+        data->next_asid = 1;
+        if ( data->disabled )
+            goto disabled;
+    }
 
     /* Now guaranteed to be a free ASID. */
     curr->arch.hvm_vcpu.asid = data->next_asid++;
@@ -144,6 +143,10 @@ bool_t hvm_asid_handle_vmenter(void)
      * generation, and all old ASID allocations are now stale. 
      */
     return (curr->arch.hvm_vcpu.asid == 1);
+
+ disabled:
+    curr->arch.hvm_vcpu.asid = 0;
+    return 0;
 }
 
 /*
