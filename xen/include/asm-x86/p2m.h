@@ -88,6 +88,31 @@ typedef enum {
     p2m_ram_broken  =14,          /* Broken page, access cause domain crash */
 } p2m_type_t;
 
+/*
+ * Additional access types, which are used to further restrict
+ * the permissions given my the p2m_type_t memory type.  Violations
+ * caused by p2m_access_t restrictions are sent to the mem_event
+ * interface.
+ *
+ * The access permissions are soft state: when any ambigious change of page
+ * type or use occurs, or when pages are flushed, swapped, or at any other
+ * convenient type, the access permissions can get reset to the p2m_domain
+ * default.
+ */
+typedef enum {
+    p2m_access_n     = 0, /* No access permissions allowed */
+    p2m_access_r     = 1,
+    p2m_access_w     = 2, 
+    p2m_access_rw    = 3,
+    p2m_access_x     = 4, 
+    p2m_access_rx    = 5,
+    p2m_access_wx    = 6, 
+    p2m_access_rwx   = 7,
+    p2m_access_rx2rw = 8, /* Special: page goes from RX to RW on write */
+
+    /* NOTE: Assumed to be only 4 bits right now */
+} p2m_access_t;
+
 typedef enum {
     p2m_query = 0,              /* Do not populate a PoD entries      */
     p2m_alloc = 1,              /* Automatically populate PoD entries */
@@ -182,18 +207,30 @@ struct p2m_domain {
     int                (*set_entry   )(struct p2m_domain *p2m,
                                        unsigned long gfn,
                                        mfn_t mfn, unsigned int page_order,
-                                       p2m_type_t p2mt);
+                                       p2m_type_t p2mt,
+                                       p2m_access_t p2ma);
     mfn_t              (*get_entry   )(struct p2m_domain *p2m,
                                        unsigned long gfn,
                                        p2m_type_t *p2mt,
+                                       p2m_access_t *p2ma,
                                        p2m_query_t q);
     mfn_t              (*get_entry_current)(struct p2m_domain *p2m,
                                             unsigned long gfn,
                                             p2m_type_t *p2mt,
+                                            p2m_access_t *p2ma,
                                             p2m_query_t q);
     void               (*change_entry_type_global)(struct p2m_domain *p2m,
                                                    p2m_type_t ot,
                                                    p2m_type_t nt);
+    
+    /* Default P2M access type for each page in the the domain: new pages,
+     * swapped in pages, cleared pages, and pages that are ambiquously
+     * retyped get this access type.  See definition of p2m_access_t. */
+    p2m_access_t default_access;
+
+    /* If true, and an access fault comes in and there is no mem_event listener, 
+     * pause domain.  Otherwise, remove access restrictions. */
+    bool_t       access_required;
 
     /* Highest guest frame that's ever been mapped in the p2m */
     unsigned long max_mapped_pfn;
@@ -284,9 +321,10 @@ static inline p2m_type_t p2m_flags_to_type(unsigned long flags)
 /* Read the current domain's p2m table.  Do not populate PoD pages. */
 static inline mfn_t gfn_to_mfn_type_current(struct p2m_domain *p2m,
                                             unsigned long gfn, p2m_type_t *t,
+                                            p2m_access_t *a,
                                             p2m_query_t q)
 {
-    return p2m->get_entry_current(p2m, gfn, t, q);
+    return p2m->get_entry_current(p2m, gfn, t, a, q);
 }
 
 /* Read P2M table, mapping pages as we go.
@@ -295,7 +333,8 @@ static inline mfn_t
 gfn_to_mfn_type_p2m(struct p2m_domain *p2m, unsigned long gfn,
                               p2m_type_t *t, p2m_query_t q)
 {
-    return p2m->get_entry(p2m, gfn, t, q);
+    p2m_access_t a = 0;
+    return p2m->get_entry(p2m, gfn, t, &a, q);
 }
 
 
@@ -305,6 +344,7 @@ static inline mfn_t _gfn_to_mfn_type(struct p2m_domain *p2m,
                                      p2m_query_t q)
 {
     mfn_t mfn;
+    p2m_access_t a;
 
     if ( !p2m || !paging_mode_translate(p2m->domain) )
     {
@@ -314,7 +354,7 @@ static inline mfn_t _gfn_to_mfn_type(struct p2m_domain *p2m,
         mfn = _mfn(gfn);
     }
     else if ( likely(current->domain == p2m->domain) )
-        mfn = gfn_to_mfn_type_current(p2m, gfn, t, q);
+        mfn = gfn_to_mfn_type_current(p2m, gfn, t, &a, q);
     else
         mfn = gfn_to_mfn_type_p2m(p2m, gfn, t, q);
 

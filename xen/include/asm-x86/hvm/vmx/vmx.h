@@ -42,7 +42,8 @@ typedef union {
         rsvd2_snp   :   1,  /* bit 11 - Used for VT-d snoop control
                                in shared EPT/VT-d usage */
         mfn         :   40, /* bits 51:12 - Machine physical frame number */
-        sa_p2mt     :   10, /* bits 61:52 - Software available 2 */
+        sa_p2mt     :   6,  /* bits 57:52 - Software available 2 */
+        access      :   4,  /* bits 61:58 - p2m_access_t */
         rsvd3_tm    :   1,  /* bit 62 - Used for VT-d transient-mapping
                                hint in shared EPT/VT-d usage */
         avail3      :   1;  /* bit 63 - Software available 3 */

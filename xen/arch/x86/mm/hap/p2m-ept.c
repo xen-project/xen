@@ -62,8 +62,9 @@ static int ept_pod_check_and_populate(struct p2m_domain *p2m, unsigned long gfn,
     return r;
 }
 
-static void ept_p2m_type_to_flags(ept_entry_t *entry, p2m_type_t type)
+static void ept_p2m_type_to_flags(ept_entry_t *entry, p2m_type_t type, p2m_access_t access)
 {
+    /* First apply type permissions */
     switch(type)
     {
         case p2m_invalid:
@@ -75,30 +76,61 @@ static void ept_p2m_type_to_flags(ept_entry_t *entry, p2m_type_t type)
         case p2m_ram_paging_in_start:
         default:
             entry->r = entry->w = entry->x = 0;
-            return;
+            break;
         case p2m_ram_rw:
             entry->r = entry->w = entry->x = 1;
-            return;
+            break;
         case p2m_mmio_direct:
             entry->r = entry->x = 1;
             entry->w = !rangeset_contains_singleton(mmio_ro_ranges,
                                                     entry->mfn);
-            return;
+            break;
         case p2m_ram_logdirty:
         case p2m_ram_ro:
         case p2m_ram_shared:
             entry->r = entry->x = 1;
             entry->w = 0;
-            return;
+            break;
         case p2m_grant_map_rw:
             entry->r = entry->w = 1;
             entry->x = 0;
-            return;
+            break;
         case p2m_grant_map_ro:
             entry->r = 1;
             entry->w = entry->x = 0;
-            return;
+            break;
     }
+
+
+    /* Then restrict with access permissions */
+    switch (access) 
+    {
+        case p2m_access_n:
+            entry->r = entry->w = entry->x = 0;
+            break;
+        case p2m_access_r:
+            entry->w = entry->x = 0;
+            break;
+        case p2m_access_w:
+            entry->r = entry->x = 0;
+            break;
+        case p2m_access_x:
+            entry->r = entry->w = 0;
+            break;
+        case p2m_access_rx:
+        case p2m_access_rx2rw:
+            entry->w = 0;
+            break;
+        case p2m_access_wx:
+            entry->r = 0;
+            break;
+        case p2m_access_rw:
+            entry->x = 0;
+            break;           
+        case p2m_access_rwx:
+            break;
+    }
+    
 }
 
 #define GUEST_TABLE_MAP_FAILED  0
@@ -117,6 +149,8 @@ static int ept_set_middle_entry(struct p2m_domain *p2m, ept_entry_t *ept_entry)
 
     ept_entry->epte = 0;
     ept_entry->mfn = page_to_mfn(pg);
+    ept_entry->access = p2m->default_access;
+
     ept_entry->r = ept_entry->w = ept_entry->x = 1;
 
     return 1;
@@ -170,11 +204,12 @@ static int ept_split_super_page(struct p2m_domain *p2m, ept_entry_t *ept_entry,
         epte->emt = ept_entry->emt;
         epte->ipat = ept_entry->ipat;
         epte->sp = (level > 1) ? 1 : 0;
+        epte->access = ept_entry->access;
         epte->sa_p2mt = ept_entry->sa_p2mt;
         epte->mfn = ept_entry->mfn + i * trunk;
         epte->rsvd2_snp = ( iommu_enabled && iommu_snoop ) ? 1 : 0;
 
-        ept_p2m_type_to_flags(epte, epte->sa_p2mt);
+        ept_p2m_type_to_flags(epte, epte->sa_p2mt, epte->access);
 
         if ( (level - 1) == target )
             continue;
@@ -260,7 +295,7 @@ static int ept_next_level(struct p2m_domain *p2m, bool_t read_only,
  */
 static int
 ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn, 
-              unsigned int order, p2m_type_t p2mt)
+              unsigned int order, p2m_type_t p2mt, p2m_access_t p2ma)
 {
     ept_entry_t *table, *ept_entry = NULL;
     unsigned long gfn_remainder = gfn;
@@ -334,9 +369,11 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
             /* Construct the new entry, and then write it once */
             new_entry.emt = epte_get_entry_emt(p2m->domain, gfn, mfn, &ipat,
                                                 direct_mmio);
+
             new_entry.ipat = ipat;
             new_entry.sp = order ? 1 : 0;
             new_entry.sa_p2mt = p2mt;
+            new_entry.access = p2ma;
             new_entry.rsvd2_snp = (iommu_enabled && iommu_snoop);
 
             if ( new_entry.mfn == mfn_x(mfn) )
@@ -344,7 +381,7 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
             else
                 new_entry.mfn = mfn_x(mfn);
 
-            ept_p2m_type_to_flags(&new_entry, p2mt);
+            ept_p2m_type_to_flags(&new_entry, p2mt, p2ma);
         }
 
         atomic_write_ept_entry(ept_entry, new_entry);
@@ -384,6 +421,7 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         new_entry.ipat = ipat;
         new_entry.sp = i ? 1 : 0;
         new_entry.sa_p2mt = p2mt;
+        new_entry.access = p2ma;
         new_entry.rsvd2_snp = (iommu_enabled && iommu_snoop);
 
         if ( new_entry.mfn == mfn_x(mfn) )
@@ -391,7 +429,7 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         else /* the caller should take care of the previous page */
             new_entry.mfn = mfn_x(mfn);
 
-        ept_p2m_type_to_flags(&new_entry, p2mt);
+        ept_p2m_type_to_flags(&new_entry, p2mt, p2ma);
 
         atomic_write_ept_entry(ept_entry, new_entry);
     }
@@ -447,7 +485,7 @@ out:
 
 /* Read ept p2m entries */
 static mfn_t ept_get_entry(struct p2m_domain *p2m,
-                           unsigned long gfn, p2m_type_t *t,
+                           unsigned long gfn, p2m_type_t *t, p2m_access_t* a,
                            p2m_query_t q)
 {
     struct domain *d = p2m->domain;
@@ -460,6 +498,7 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
     mfn_t mfn = _mfn(INVALID_MFN);
 
     *t = p2m_mmio_dm;
+    *a = p2m_access_n;
 
     /* This pfn is higher than the highest the p2m map currently holds */
     if ( gfn > p2m->max_mapped_pfn )
@@ -519,6 +558,8 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
     if ( ept_entry->sa_p2mt != p2m_invalid )
     {
         *t = ept_entry->sa_p2mt;
+        *a = ept_entry->access;
+
         mfn = _mfn(ept_entry->mfn);
         if ( i )
         {
@@ -626,10 +667,10 @@ out:
 }
 
 static mfn_t ept_get_entry_current(struct p2m_domain *p2m,
-                                   unsigned long gfn, p2m_type_t *t,
+                                   unsigned long gfn, p2m_type_t *t, p2m_access_t *a,
                                    p2m_query_t q)
 {
-    return ept_get_entry(p2m, gfn, t, q);
+    return ept_get_entry(p2m, gfn, t, a, q);
 }
 
 /*
@@ -689,7 +730,7 @@ void ept_change_entry_emt_with_range(struct domain *d,
                     order = level * EPT_TABLE_ORDER;
                     if ( need_modify_ept_entry(p2m, gfn, mfn, 
                           e.ipat, e.emt, e.sa_p2mt) )
-                        ept_set_entry(p2m, gfn, mfn, order, e.sa_p2mt);
+                        ept_set_entry(p2m, gfn, mfn, order, e.sa_p2mt, e.access);
                     gfn += trunk;
                     break;
                 }
@@ -699,7 +740,7 @@ void ept_change_entry_emt_with_range(struct domain *d,
         else /* gfn assigned with 4k */
         {
             if ( need_modify_ept_entry(p2m, gfn, mfn, e.ipat, e.emt, e.sa_p2mt) )
-                ept_set_entry(p2m, gfn, mfn, order, e.sa_p2mt);
+                ept_set_entry(p2m, gfn, mfn, order, e.sa_p2mt, e.access);
         }
     }
     p2m_unlock(p2m);
@@ -730,7 +771,7 @@ static void ept_change_entry_type_page(mfn_t ept_page_mfn, int ept_page_level,
                 continue;
 
             e.sa_p2mt = nt;
-            ept_p2m_type_to_flags(&e, nt);
+            ept_p2m_type_to_flags(&e, nt, e.access);
             atomic_write_ept_entry(&epte[i], e);
         }
     }
