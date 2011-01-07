@@ -200,4 +200,26 @@ struct xen_hvm_get_mem_access {
 };
 typedef struct xen_hvm_get_mem_access xen_hvm_get_mem_access_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_get_mem_access_t);
+
+#define HVMOP_inject_trap            14
+/* Inject a trap into a VCPU, which will get taken up on the next
+ * scheduling of it. Note that the caller should know enough of the
+ * state of the CPU before injecting, to know what the effect of
+ * injecting the trap will be.
+ */
+struct xen_hvm_inject_trap {
+    /* Domain to be queried. */
+    domid_t domid;
+    /* VCPU */
+    uint32_t vcpuid;
+    /* Trap number */
+    uint32_t trap;
+    /* Error code, or -1 to skip */
+    uint32_t error_code;
+    /* CR2 for page faults */
+    uint64_t cr2;
+};
+typedef struct xen_hvm_inject_trap xen_hvm_inject_trap_t;
+DEFINE_XEN_GUEST_HANDLE(xen_hvm_inject_trap_t);
+
 #endif /* __XEN_PUBLIC_HVM_HVM_OP_H__ */

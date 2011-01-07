@@ -1064,12 +1064,16 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
 
         if ( paging_mode_hap(v->domain) )
         {
-            /* We manage GUEST_CR3 when guest CR0.PE is zero. */
+            /* We manage GUEST_CR3 when guest CR0.PE is zero or when cr3 memevents are on */            
             uint32_t cr3_ctls = (CPU_BASED_CR3_LOAD_EXITING |
                                  CPU_BASED_CR3_STORE_EXITING);
             v->arch.hvm_vmx.exec_control &= ~cr3_ctls;
             if ( !hvm_paging_enabled(v) )
                 v->arch.hvm_vmx.exec_control |= cr3_ctls;
+
+            if ( v->domain->arch.hvm_domain.params[HVM_PARAM_MEMORY_EVENT_CR3] )
+                v->arch.hvm_vmx.exec_control |= CPU_BASED_CR3_LOAD_EXITING;
+
             vmx_update_cpu_exec_control(v);
 
             /* Changing CR0.PE can change some bits in real CR4. */
@@ -1252,9 +1256,12 @@ void vmx_inject_hw_exception(int trap, int error_code)
     unsigned long intr_info = __vmread(VM_ENTRY_INTR_INFO);
     struct vcpu *curr = current;
 
+    int type = X86_EVENTTYPE_HW_EXCEPTION;
+
     switch ( trap )
     {
     case TRAP_debug:
+        type = X86_EVENTTYPE_SW_EXCEPTION;
         if ( guest_cpu_user_regs()->eflags & X86_EFLAGS_TF )
         {
             __restore_debug_registers(curr);
@@ -1269,6 +1276,9 @@ void vmx_inject_hw_exception(int trap, int error_code)
             domain_pause_for_debugger();
             return;
         }
+
+        type = X86_EVENTTYPE_SW_EXCEPTION;
+        __vmwrite(VM_ENTRY_INSTRUCTION_LEN, 1); /* int3 */
     }
 
     if ( unlikely(intr_info & INTR_INFO_VALID_MASK) &&
@@ -1279,7 +1289,7 @@ void vmx_inject_hw_exception(int trap, int error_code)
             error_code = 0;
     }
 
-    __vmx_inject_exception(trap, X86_EVENTTYPE_HW_EXCEPTION, error_code);
+    __vmx_inject_exception(trap, type, error_code);
 
     if ( trap == TRAP_page_fault )
         HVMTRACE_LONG_2D(PF_INJECT, error_code,
@@ -1565,6 +1575,8 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
     unsigned long value;
     struct vcpu *v = current;
     struct vlapic *vlapic = vcpu_vlapic(v);
+    int rc = 0;
+    unsigned long old;
 
     switch ( gp )
     {
@@ -1589,13 +1601,25 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
     switch ( cr )
     {
     case 0:
-        return !hvm_set_cr0(value);
+        old = v->arch.hvm_vcpu.guest_cr[0];
+        rc = !hvm_set_cr0(value);
+        if (rc)
+            hvm_memory_event_cr0(value, old);
+        return rc;
 
     case 3:
-        return !hvm_set_cr3(value);
+        old = v->arch.hvm_vcpu.guest_cr[3];
+        rc = !hvm_set_cr3(value);
+        if (rc)
+            hvm_memory_event_cr3(value, old);        
+        return rc;
 
     case 4:
-        return !hvm_set_cr4(value);
+        old = v->arch.hvm_vcpu.guest_cr[4];
+        rc = !hvm_set_cr4(value);
+        if (rc)
+            hvm_memory_event_cr4(value, old);
+        return rc; 
 
     case 8:
         vlapic_set_reg(vlapic, APIC_TASKPRI, ((value & 0x0F) << 4));
@@ -1676,11 +1700,17 @@ static int vmx_cr_access(unsigned long exit_qualification,
         cr = exit_qualification & VMX_CONTROL_REG_ACCESS_NUM;
         mov_from_cr(cr, gp, regs);
         break;
-    case VMX_CONTROL_REG_ACCESS_TYPE_CLTS:
+    case VMX_CONTROL_REG_ACCESS_TYPE_CLTS: 
+    {
+        unsigned long old = v->arch.hvm_vcpu.guest_cr[0];
         v->arch.hvm_vcpu.guest_cr[0] &= ~X86_CR0_TS;
         vmx_update_guest_cr(v, 0);
+
+        hvm_memory_event_cr0(v->arch.hvm_vcpu.guest_cr[0], old);
+
         HVMTRACE_0D(CLTS);
         break;
+    }
     case VMX_CONTROL_REG_ACCESS_TYPE_LMSW:
         value = v->arch.hvm_vcpu.guest_cr[0];
         /* LMSW can: (1) set bits 0-3; (2) clear bits 1-3. */
@@ -2351,13 +2381,29 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
                 goto exit_and_crash;
             domain_pause_for_debugger();
             break;
-        case TRAP_int3:
-            if ( !v->domain->debugger_attached )
-                goto exit_and_crash;
-            update_guest_eip(); /* Safe: INT3 */
-            current->arch.gdbsx_vcpu_event = TRAP_int3;
-            domain_pause_for_debugger();
-            break;
+        case TRAP_int3: 
+        {
+            if ( v->domain->debugger_attached )
+            {
+                update_guest_eip(); /* Safe: INT3 */            
+                current->arch.gdbsx_vcpu_event = TRAP_int3;
+                domain_pause_for_debugger();
+                break;
+            }
+            else {
+                int handled = hvm_memory_event_int3(regs->eip);
+                
+                if ( handled < 0 ) 
+                {
+                    vmx_inject_exception(TRAP_int3, HVM_DELIVER_NO_ERROR_CODE, 0);
+                    break;
+                }
+                else if ( handled )
+                    break;
+            }
+
+            goto exit_and_crash;
+        }
         case TRAP_no_device:
             vmx_fpu_dirty_intercept();
             break;

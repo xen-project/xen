@@ -309,6 +309,15 @@ void hvm_do_resume(struct vcpu *v)
             return; /* bail */
         }
     }
+
+    /* Inject pending hw/sw trap */
+    if (v->arch.hvm_vcpu.inject_trap != -1) 
+    {
+        hvm_inject_exception(v->arch.hvm_vcpu.inject_trap, 
+                             v->arch.hvm_vcpu.inject_error_code, 
+                             v->arch.hvm_vcpu.inject_cr2);
+        v->arch.hvm_vcpu.inject_trap = -1;
+    }
 }
 
 static void hvm_init_ioreq_page(
@@ -948,6 +957,8 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
     spin_lock_init(&v->arch.hvm_vcpu.tm_lock);
     INIT_LIST_HEAD(&v->arch.hvm_vcpu.tm_list);
+
+    v->arch.hvm_vcpu.inject_trap = -1;
 
 #ifdef CONFIG_COMPAT
     rc = setup_compat_arg_xlat(v);
@@ -3236,10 +3247,45 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             case HVM_PARAM_ACPI_IOPORTS_LOCATION:
                 rc = pmtimer_change_ioport(d, a.value);
                 break;
+            case HVM_PARAM_MEMORY_EVENT_CR0:
+            case HVM_PARAM_MEMORY_EVENT_CR3:
+            case HVM_PARAM_MEMORY_EVENT_CR4:
+                if ( d->domain_id == current->domain->domain_id )
+                    rc = -EPERM;
+                break;
+            case HVM_PARAM_MEMORY_EVENT_INT3:
+                if ( d->domain_id == current->domain->domain_id ) 
+                {
+                    rc = -EPERM;
+                    break;
+                }
+                if ( a.value & HVMPME_onchangeonly )
+                    rc = -EINVAL;
+                break;
             }
 
-            if ( rc == 0 )
+            if ( rc == 0 ) 
+            {
                 d->arch.hvm_domain.params[a.index] = a.value;
+
+                switch( a.index )
+                {
+                case HVM_PARAM_MEMORY_EVENT_INT3:
+                {
+                    domain_pause(d);
+                    domain_unpause(d); /* Causes guest to latch new status */
+                    break;
+                }
+                case HVM_PARAM_MEMORY_EVENT_CR3:
+                {
+                    for_each_vcpu ( d, v )
+                        hvm_funcs.update_guest_cr(v, 0); /* Latches new CR3 mask through CR0 code */
+                    break;
+                }
+                }
+
+            }
+
         }
         else
         {
@@ -3657,6 +3703,44 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
+    case HVMOP_inject_trap: 
+    {
+        xen_hvm_inject_trap_t tr;
+        struct domain *d;
+        struct vcpu *v;
+
+        if ( copy_from_guest(&tr, arg, 1 ) )
+            return -EFAULT;
+
+        if ( current->domain->domain_id == tr.domid )
+            return -EPERM;
+
+        rc = rcu_lock_target_domain_by_id(tr.domid, &d);
+        if ( rc != 0 )
+            return rc;
+
+        rc = -EINVAL;
+        if ( !is_hvm_domain(d) )
+            goto param_fail8;
+
+        rc = -ENOENT;
+        if ( tr.vcpuid >= d->max_vcpus || (v = d->vcpu[tr.vcpuid]) == NULL )
+            goto param_fail8;
+        
+        if ( v->arch.hvm_vcpu.inject_trap != -1 )
+            rc = -EBUSY;
+        else 
+        {
+            v->arch.hvm_vcpu.inject_trap       = tr.trap;
+            v->arch.hvm_vcpu.inject_error_code = tr.error_code;
+            v->arch.hvm_vcpu.inject_cr2        = tr.cr2;
+        }
+
+    param_fail8:
+        rcu_unlock_domain(d);
+        break;
+    }
+
     default:
     {
         gdprintk(XENLOG_WARNING, "Bad HVM op %ld.\n", op);
@@ -3697,6 +3781,84 @@ int hvm_debug_op(struct vcpu *v, int32_t op)
     return rc;
 }
 
+static int hvm_memory_event_traps(long p, uint32_t reason,
+                                  unsigned long value, unsigned long old, 
+                                  bool_t gla_valid, unsigned long gla) 
+{
+    struct vcpu* v = current;
+    struct domain *d = v->domain;
+    mem_event_request_t req;
+    int rc;
+
+    if ( !(p & HVMPME_MODE_MASK) ) 
+        return 0;
+
+    if ( (p & HVMPME_onchangeonly) && (value == old) )
+        return 1;
+    
+    rc = mem_event_check_ring(d);
+    if ( rc )
+        return rc;
+    
+    memset(&req, 0, sizeof(req));
+    req.type = MEM_EVENT_TYPE_ACCESS;
+    req.reason = reason;
+    
+    if ( (p & HVMPME_MODE_MASK) == HVMPME_mode_sync ) 
+    {
+        req.flags |= MEM_EVENT_FLAG_VCPU_PAUSED;    
+        vcpu_pause_nosync(v);   
+    }
+
+    req.gfn = value;
+    req.vcpu_id = v->vcpu_id;
+    if ( gla_valid ) 
+    {
+        req.offset = gla & ((1 << PAGE_SHIFT) - 1);
+        req.gla = gla;
+        req.gla_valid = 1;
+    }
+    
+    mem_event_put_request(d, &req);      
+    
+    return 1;
+}
+
+void hvm_memory_event_cr0(unsigned long value, unsigned long old) 
+{
+    hvm_memory_event_traps(current->domain->arch.hvm_domain
+                             .params[HVM_PARAM_MEMORY_EVENT_CR0],
+                           MEM_EVENT_REASON_CR0,
+                           value, old, 0, 0);
+}
+
+void hvm_memory_event_cr3(unsigned long value, unsigned long old) 
+{
+    hvm_memory_event_traps(current->domain->arch.hvm_domain
+                             .params[HVM_PARAM_MEMORY_EVENT_CR3],
+                           MEM_EVENT_REASON_CR3,
+                           value, old, 0, 0);
+}
+
+void hvm_memory_event_cr4(unsigned long value, unsigned long old) 
+{
+    hvm_memory_event_traps(current->domain->arch.hvm_domain
+                             .params[HVM_PARAM_MEMORY_EVENT_CR4],
+                           MEM_EVENT_REASON_CR4,
+                           value, old, 0, 0);
+}
+
+int hvm_memory_event_int3(unsigned long gla) 
+{
+    uint32_t pfec = PFEC_page_present;
+    unsigned long gfn;
+    gfn = paging_gva_to_gfn(current, gla, &pfec);
+
+    return hvm_memory_event_traps(current->domain->arch.hvm_domain
+                                    .params[HVM_PARAM_MEMORY_EVENT_INT3],
+                                  MEM_EVENT_REASON_INT3,
+                                  gfn, 0, 1, gla);
+}
 
 /*
  * Local variables:

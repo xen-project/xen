@@ -124,6 +124,19 @@
  */
 #define HVM_PARAM_ACPI_IOPORTS_LOCATION 19
 
-#define HVM_NR_PARAMS          20
+/* Enable blocking memory events, async or sync (pause vcpu until response) 
+ * onchangeonly indicates messages only on a change of value */
+#define HVM_PARAM_MEMORY_EVENT_CR0   20
+#define HVM_PARAM_MEMORY_EVENT_CR3   21
+#define HVM_PARAM_MEMORY_EVENT_CR4   22
+#define HVM_PARAM_MEMORY_EVENT_INT3  23
+
+#define HVMPME_MODE_MASK       (3 << 0)
+#define HVMPME_mode_disabled   0
+#define HVMPME_mode_async      1
+#define HVMPME_mode_sync       2
+#define HVMPME_onchangeonly    (1 << 2)
+
+#define HVM_NR_PARAMS          24
 
 #endif /* __XEN_PUBLIC_HVM_PARAMS_H__ */

@@ -114,6 +114,11 @@ struct hvm_vcpu {
     /* We may write up to m128 as a number of device-model transactions. */
     paddr_t mmio_large_write_pa;
     unsigned int mmio_large_write_bytes;
+
+    /* Pending hw/sw interrupt */
+    int           inject_trap;       /* -1 for nothing to inject */
+    int           inject_error_code;
+    unsigned long inject_cr2;
 };
 
 #endif /* __ASM_X86_HVM_VCPU_H__ */

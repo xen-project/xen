@@ -37,6 +37,10 @@
 /* Reasons for the memory event request */
 #define MEM_EVENT_REASON_UNKNOWN     0    /* typical reason */
 #define MEM_EVENT_REASON_VIOLATION   1    /* access violation, GFN is address */
+#define MEM_EVENT_REASON_CR0         2    /* CR0 was hit: gfn is CR0 value */
+#define MEM_EVENT_REASON_CR3         3    /* CR3 was hit: gfn is CR3 value */
+#define MEM_EVENT_REASON_CR4         4    /* CR4 was hit: gfn is CR4 value */
+#define MEM_EVENT_REASON_INT3        5    /* int3 was hit: gla/gfn are RIP */
 
 typedef struct mem_event_shared_page {
     uint32_t port;
