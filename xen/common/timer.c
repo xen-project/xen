@@ -23,6 +23,7 @@
 #include <xen/symbols.h>
 #include <asm/system.h>
 #include <asm/desc.h>
+#include <asm/atomic.h>
 
 /* We program the time hardware this far behind the closest deadline. */
 static unsigned int timer_slop __read_mostly = 50000; /* 50 us */
@@ -238,15 +239,14 @@ static inline bool_t timer_lock(struct timer *timer)
 
     for ( ; ; )
     {
-        cpu = timer->cpu;
-        if ( unlikely(timer->status == TIMER_STATUS_killed) )
+        cpu = atomic_read16(&timer->cpu);
+        if ( unlikely(cpu == TIMER_CPU_status_killed) )
         {
             rcu_read_unlock(&timer_cpu_read_lock);
             return 0;
         }
         spin_lock(&per_cpu(timers, cpu).lock);
-        if ( likely(timer->cpu == cpu) &&
-             likely(timer->status != TIMER_STATUS_killed) )
+        if ( likely(timer->cpu == cpu) )
             break;
         spin_unlock(&per_cpu(timers, cpu).lock);
     }
@@ -292,7 +292,7 @@ void init_timer(
     memset(timer, 0, sizeof(*timer));
     timer->function = function;
     timer->data = data;
-    timer->cpu = cpu;
+    atomic_write16(&timer->cpu, cpu);
     timer->status = TIMER_STATUS_inactive;
     if ( !timer_lock_irqsave(timer, flags) )
         BUG();
@@ -335,7 +335,7 @@ void stop_timer(struct timer *timer)
 
 void migrate_timer(struct timer *timer, unsigned int new_cpu)
 {
-    int old_cpu;
+    unsigned int old_cpu;
     bool_t active;
     unsigned long flags;
 
@@ -343,8 +343,8 @@ void migrate_timer(struct timer *timer, unsigned int new_cpu)
 
     for ( ; ; )
     {
-        if ( ((old_cpu = timer->cpu) == new_cpu) ||
-             unlikely(timer->status == TIMER_STATUS_killed) )
+        old_cpu = atomic_read16(&timer->cpu);
+        if ( (old_cpu == new_cpu) || (old_cpu == TIMER_CPU_status_killed) )
         {
             rcu_read_unlock(&timer_cpu_read_lock);
             return;
@@ -361,8 +361,7 @@ void migrate_timer(struct timer *timer, unsigned int new_cpu)
             spin_lock(&per_cpu(timers, old_cpu).lock);
         }
 
-        if ( likely(timer->cpu == old_cpu) &&
-             likely(timer->status != TIMER_STATUS_killed) )
+        if ( likely(timer->cpu == old_cpu) )
              break;
 
         spin_unlock(&per_cpu(timers, old_cpu).lock);
@@ -376,7 +375,7 @@ void migrate_timer(struct timer *timer, unsigned int new_cpu)
         deactivate_timer(timer);
 
     list_del(&timer->inactive);
-    timer->cpu = new_cpu;
+    atomic_write16(&timer->cpu, new_cpu);
     list_add(&timer->inactive, &per_cpu(timers, new_cpu).inactive);
 
     if ( active )
@@ -389,7 +388,7 @@ void migrate_timer(struct timer *timer, unsigned int new_cpu)
 
 void kill_timer(struct timer *timer)
 {
-    int           cpu;
+    unsigned int old_cpu, cpu;
     unsigned long flags;
 
     BUG_ON(this_cpu(timers).running == timer);
@@ -402,8 +401,10 @@ void kill_timer(struct timer *timer)
 
     list_del(&timer->inactive);
     timer->status = TIMER_STATUS_killed;
+    old_cpu = timer->cpu;
+    atomic_write16(&timer->cpu, TIMER_CPU_status_killed);
 
-    timer_unlock_irqrestore(timer, flags);
+    spin_unlock_irqrestore(&per_cpu(timers, old_cpu).lock, flags);
 
     for_each_online_cpu ( cpu )
         while ( per_cpu(timers, cpu).running == timer )
@@ -561,7 +562,7 @@ static void migrate_timers_from_cpu(unsigned int cpu)
     while ( (t = GET_HEAP_SIZE(ts->heap) ? ts->heap[1] : ts->list) != NULL )
     {
         remove_entry(t);
-        t->cpu = 0;
+        atomic_write16(&t->cpu, 0);
         notify |= add_entry(t);
     }
 
@@ -569,7 +570,7 @@ static void migrate_timers_from_cpu(unsigned int cpu)
     {
         t = list_entry(ts->inactive.next, struct timer, inactive);
         list_del(&t->inactive);
-        t->cpu = 0;
+        atomic_write16(&t->cpu, 0);
         list_add(&t->inactive, &per_cpu(timers, 0).inactive);
     }
 

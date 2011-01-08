@@ -32,6 +32,7 @@ struct timer {
     void *data;
 
     /* CPU on which this timer will be installed and executed. */
+#define TIMER_CPU_status_killed 0xffffu /* Timer is TIMER_STATUS_killed */
     uint16_t cpu;
 
     /* Timer status. */
