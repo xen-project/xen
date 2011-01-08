@@ -1,5 +1,5 @@
 
-XEN_ROOT = ../..
+XEN_ROOT = ../../..
 CFLAGS =
 include $(XEN_ROOT)/tools/Rules.mk
 
