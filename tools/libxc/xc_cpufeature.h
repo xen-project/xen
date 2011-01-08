@@ -119,19 +119,24 @@
 #define X86_FEATURE_PMM_EN	(5*32+ 13) /* PMM enabled */
 
 /* More extended AMD flags: CPUID level 0x80000001, ecx, word 6 */
-#define X86_FEATURE_LAHF_LM	(6*32+ 0) /* LAHF/SAHF in long mode */
-#define X86_FEATURE_CMP_LEGACY	(6*32+ 1) /* If yes HyperThreading not valid */
-#define X86_FEATURE_SVME        (6*32+ 2) /* Secure Virtual Machine */
-#define X86_FEATURE_EXTAPICSPACE (6*32+ 3) /* Extended APIC space */
-#define X86_FEATURE_ALTMOVCR	(6*32+ 4) /* LOCK MOV CR accesses CR+8 */
-#define X86_FEATURE_ABM		(6*32+ 5) /* Advanced Bit Manipulation */
-#define X86_FEATURE_SSE4A	(6*32+ 6) /* AMD Streaming SIMD Extensions-4a */
-#define X86_FEATURE_MISALIGNSSE	(6*32+ 7) /* Misaligned SSE Access */
-#define X86_FEATURE_3DNOWPF	(6*32+ 8) /* 3DNow! Prefetch */
-#define X86_FEATURE_OSVW	(6*32+ 9) /* OS Visible Workaround */
-#define X86_FEATURE_IBS		(6*32+ 10) /* Instruction Based Sampling */
-#define X86_FEATURE_SSE5	(6*32+ 11) /* AMD Streaming SIMD Extensions-5 */
-#define X86_FEATURE_SKINIT	(6*32+ 12) /* SKINIT, STGI/CLGI, DEV */
-#define X86_FEATURE_WDT		(6*32+ 13) /* Watchdog Timer */
+#define X86_FEATURE_LAHF_LM     (6*32+ 0) /* LAHF/SAHF in long mode */
+#define X86_FEATURE_CMP_LEGACY  (6*32+ 1) /* If yes HyperThreading not valid */
+#define X86_FEATURE_SVM         (6*32+ 2) /* Secure virtual machine */
+#define X86_FEATURE_EXTAPIC     (6*32+ 3) /* Extended APIC space */
+#define X86_FEATURE_CR8_LEGACY  (6*32+ 4) /* CR8 in 32-bit mode */
+#define X86_FEATURE_ABM         (6*32+ 5) /* Advanced bit manipulation */
+#define X86_FEATURE_SSE4A       (6*32+ 6) /* SSE-4A */
+#define X86_FEATURE_MISALIGNSSE (6*32+ 7) /* Misaligned SSE mode */
+#define X86_FEATURE_3DNOWPREFETCH (6*32+ 8) /* 3DNow prefetch instructions */
+#define X86_FEATURE_OSVW        (6*32+ 9) /* OS Visible Workaround */
+#define X86_FEATURE_IBS         (6*32+10) /* Instruction Based Sampling */
+#define X86_FEATURE_XOP         (6*32+11) /* extended AVX instructions */
+#define X86_FEATURE_SKINIT      (6*32+12) /* SKINIT/STGI instructions */
+#define X86_FEATURE_WDT         (6*32+13) /* Watchdog timer */
+#define X86_FEATURE_LWP         (6*32+15) /* Light Weight Profiling */
+#define X86_FEATURE_FMA4        (6*32+16) /* 4 operands MAC instructions */
+#define X86_FEATURE_NODEID_MSR  (6*32+19) /* NodeId MSR */
+#define X86_FEATURE_TBM         (6*32+21) /* trailing bit manipulations */
+#define X86_FEATURE_TOPOEXT     (6*32+22) /* topology extensions CPUID leafs */
 
 #endif /* __LIBXC_CPUFEATURE_H */

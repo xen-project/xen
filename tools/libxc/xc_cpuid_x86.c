@@ -97,11 +97,11 @@ static void amd_xc_cpuid_policy(
         /* Filter all other features according to a whitelist. */
         regs[2] &= ((is_64bit ? bitmaskof(X86_FEATURE_LAHF_LM) : 0) |
                     bitmaskof(X86_FEATURE_CMP_LEGACY) |
-                    bitmaskof(X86_FEATURE_ALTMOVCR) |
+                    bitmaskof(X86_FEATURE_CR8_LEGACY) |
                     bitmaskof(X86_FEATURE_ABM) |
                     bitmaskof(X86_FEATURE_SSE4A) |
                     bitmaskof(X86_FEATURE_MISALIGNSSE) |
-                    bitmaskof(X86_FEATURE_3DNOWPF));
+                    bitmaskof(X86_FEATURE_3DNOWPREFETCH));
         regs[3] &= (0x0183f3ff | /* features shared with 0x00000001:EDX */
                     (is_pae ? bitmaskof(X86_FEATURE_NX) : 0) |
                     (is_64bit ? bitmaskof(X86_FEATURE_LM) : 0) |
@@ -422,7 +422,7 @@ static void xc_cpuid_pv_policy(
         clear_bit(X86_FEATURE_PAGE1GB, regs[3]);
         clear_bit(X86_FEATURE_RDTSCP, regs[3]);
 
-        clear_bit(X86_FEATURE_SVME, regs[2]);
+        clear_bit(X86_FEATURE_SVM, regs[2]);
         clear_bit(X86_FEATURE_OSVW, regs[2]);
         clear_bit(X86_FEATURE_IBS, regs[2]);
         clear_bit(X86_FEATURE_SKINIT, regs[2]);
