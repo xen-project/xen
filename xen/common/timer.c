@@ -19,6 +19,7 @@
 #include <xen/keyhandler.h>
 #include <xen/percpu.h>
 #include <xen/cpu.h>
+#include <xen/rcupdate.h>
 #include <xen/symbols.h>
 #include <asm/system.h>
 #include <asm/desc.h>
@@ -37,7 +38,8 @@ struct timers {
 
 static DEFINE_PER_CPU(struct timers, timers);
 
-static cpumask_t timer_valid_cpumask;
+/* Protects lock-free access to per-timer cpu field against cpu offlining. */
+static DEFINE_RCU_READ_LOCK(timer_cpu_read_lock);
 
 DEFINE_PER_CPU(s_time_t, timer_deadline);
 
@@ -232,12 +234,16 @@ static inline bool_t timer_lock(struct timer *timer)
 {
     unsigned int cpu;
 
+    rcu_read_lock(&timer_cpu_read_lock);
+
     for ( ; ; )
     {
         cpu = timer->cpu;
         if ( unlikely(timer->status == TIMER_STATUS_killed) )
+        {
+            rcu_read_unlock(&timer_cpu_read_lock);
             return 0;
-        ASSERT(cpu_isset(cpu, timer_valid_cpumask));
+        }
         spin_lock(&per_cpu(timers, cpu).lock);
         if ( likely(timer->cpu == cpu) &&
              likely(timer->status != TIMER_STATUS_killed) )
@@ -245,6 +251,7 @@ static inline bool_t timer_lock(struct timer *timer)
         spin_unlock(&per_cpu(timers, cpu).lock);
     }
 
+    rcu_read_unlock(&timer_cpu_read_lock);
     return 1;
 }
 
@@ -332,14 +339,16 @@ void migrate_timer(struct timer *timer, unsigned int new_cpu)
     bool_t active;
     unsigned long flags;
 
+    rcu_read_lock(&timer_cpu_read_lock);
+
     for ( ; ; )
     {
         if ( ((old_cpu = timer->cpu) == new_cpu) ||
              unlikely(timer->status == TIMER_STATUS_killed) )
+        {
+            rcu_read_unlock(&timer_cpu_read_lock);
             return;
-
-        ASSERT(cpu_isset(old_cpu, timer_valid_cpumask));
-        ASSERT(cpu_isset(new_cpu, timer_valid_cpumask));
+        }
 
         if ( old_cpu < new_cpu )
         {
@@ -359,6 +368,8 @@ void migrate_timer(struct timer *timer, unsigned int new_cpu)
         spin_unlock(&per_cpu(timers, old_cpu).lock);
         spin_unlock_irqrestore(&per_cpu(timers, new_cpu).lock, flags);
     }
+
+    rcu_read_unlock(&timer_cpu_read_lock);
 
     active = active_timer(timer);
     if ( active )
@@ -534,19 +545,17 @@ static struct keyhandler dump_timerq_keyhandler = {
     .desc = "dump timer queues"
 };
 
-static unsigned int migrate_timers_from_cpu(unsigned int cpu)
+static void migrate_timers_from_cpu(unsigned int cpu)
 {
     struct timers *ts;
     struct timer *t;
     bool_t notify = 0;
-    unsigned int nr_migrated = 0;
-    unsigned long flags;
 
     ASSERT((cpu != 0) && cpu_online(0));
 
     ts = &per_cpu(timers, cpu);
 
-    spin_lock_irqsave(&per_cpu(timers, 0).lock, flags);
+    spin_lock_irq(&per_cpu(timers, 0).lock);
     spin_lock(&ts->lock);
 
     while ( (t = GET_HEAP_SIZE(ts->heap) ? ts->heap[1] : ts->list) != NULL )
@@ -554,7 +563,6 @@ static unsigned int migrate_timers_from_cpu(unsigned int cpu)
         remove_entry(t);
         t->cpu = 0;
         notify |= add_entry(t);
-        nr_migrated++;
     }
 
     while ( !list_empty(&ts->inactive) )
@@ -563,16 +571,13 @@ static unsigned int migrate_timers_from_cpu(unsigned int cpu)
         list_del(&t->inactive);
         t->cpu = 0;
         list_add(&t->inactive, &per_cpu(timers, 0).inactive);
-        nr_migrated++;
     }
 
     spin_unlock(&ts->lock);
-    spin_unlock_irqrestore(&per_cpu(timers, 0).lock, flags);
+    spin_unlock_irq(&per_cpu(timers, 0).lock);
 
     if ( notify )
         cpu_raise_softirq(0, TIMER_SOFTIRQ);
-
-    return nr_migrated;
 }
 
 static struct timer *dummy_heap;
@@ -589,17 +594,10 @@ static int cpu_callback(
         INIT_LIST_HEAD(&ts->inactive);
         spin_lock_init(&ts->lock);
         ts->heap = &dummy_heap;
-        cpu_set(cpu, timer_valid_cpumask);
-        break;
-    case CPU_DYING:
-        cpu_clear(cpu, timer_valid_cpumask);
-        migrate_timers_from_cpu(cpu);
         break;
     case CPU_UP_CANCELED:
     case CPU_DEAD:
-        cpu_clear(cpu, timer_valid_cpumask);
-        if ( migrate_timers_from_cpu(cpu) )
-            BUG();
+        migrate_timers_from_cpu(cpu);
         break;
     default:
         break;
