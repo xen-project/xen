@@ -11,8 +11,8 @@ static inline type name(const volatile type *addr) \
 
 #define build_atomic_write(name, size, type, reg, barrier) \
 static inline void name(volatile type *addr, type val) \
-{ asm volatile("mov" size " %0,%1": :reg (val), \
-"m" (*(volatile type *)addr) barrier); }
+{ asm volatile("mov" size " %1,%0": "=m" (*(volatile type *)addr) \
+:reg (val) barrier); }
 
 build_atomic_read(atomic_read8, "b", uint8_t, "=q", )
 build_atomic_read(atomic_read16, "w", uint16_t, "=r", )
