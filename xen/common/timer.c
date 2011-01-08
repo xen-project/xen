@@ -546,39 +546,51 @@ static struct keyhandler dump_timerq_keyhandler = {
     .desc = "dump timer queues"
 };
 
-static void migrate_timers_from_cpu(unsigned int cpu)
+static void migrate_timers_from_cpu(unsigned int old_cpu)
 {
-    struct timers *ts;
+    unsigned int new_cpu = first_cpu(cpu_online_map);
+    struct timers *old_ts, *new_ts;
     struct timer *t;
     bool_t notify = 0;
 
-    ASSERT((cpu != 0) && cpu_online(0));
+    ASSERT(!cpu_online(old_cpu) && cpu_online(new_cpu));
 
-    ts = &per_cpu(timers, cpu);
+    old_ts = &per_cpu(timers, old_cpu);
+    new_ts = &per_cpu(timers, new_cpu);
 
-    spin_lock_irq(&per_cpu(timers, 0).lock);
-    spin_lock(&ts->lock);
+    if ( old_cpu < new_cpu )
+    {
+        spin_lock_irq(&old_ts->lock);
+        spin_lock(&new_ts->lock);
+    }
+    else
+    {
+        spin_lock_irq(&new_ts->lock);
+        spin_lock(&old_ts->lock);
+    }
 
-    while ( (t = GET_HEAP_SIZE(ts->heap) ? ts->heap[1] : ts->list) != NULL )
+    while ( (t = GET_HEAP_SIZE(old_ts->heap)
+             ? old_ts->heap[1] : old_ts->list) != NULL )
     {
         remove_entry(t);
-        atomic_write16(&t->cpu, 0);
+        atomic_write16(&t->cpu, new_cpu);
         notify |= add_entry(t);
     }
 
-    while ( !list_empty(&ts->inactive) )
+    while ( !list_empty(&old_ts->inactive) )
     {
-        t = list_entry(ts->inactive.next, struct timer, inactive);
+        t = list_entry(old_ts->inactive.next, struct timer, inactive);
         list_del(&t->inactive);
-        atomic_write16(&t->cpu, 0);
-        list_add(&t->inactive, &per_cpu(timers, 0).inactive);
+        atomic_write16(&t->cpu, new_cpu);
+        list_add(&t->inactive, &new_ts->inactive);
     }
 
-    spin_unlock(&ts->lock);
-    spin_unlock_irq(&per_cpu(timers, 0).lock);
+    spin_unlock(&old_ts->lock);
+    spin_unlock_irq(&new_ts->lock);
+    local_irq_enable();
 
     if ( notify )
-        cpu_raise_softirq(0, TIMER_SOFTIRQ);
+        cpu_raise_softirq(new_cpu, TIMER_SOFTIRQ);
 }
 
 static struct timer *dummy_heap;
