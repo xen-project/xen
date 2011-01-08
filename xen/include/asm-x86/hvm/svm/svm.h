@@ -64,18 +64,22 @@ static inline void svm_vmsave(void *vmcb)
 
 extern u32 svm_feature_flags;
 
-#define SVM_FEATURE_NPT     0
-#define SVM_FEATURE_LBRV    1
-#define SVM_FEATURE_SVML    2
-#define SVM_FEATURE_NRIPS   3
-#define SVM_FEATURE_CLEAN   5
-#define SVM_FEATURE_PAUSEF  10
+#define SVM_FEATURE_NPT            0 /* Nested page table support */
+#define SVM_FEATURE_LBRV           1 /* LBR virtualization support */
+#define SVM_FEATURE_SVML           2 /* SVM locking MSR support */
+#define SVM_FEATURE_NRIPS          3 /* Next RIP save on VMEXIT support */
+#define SVM_FEATURE_TSCRATEMSR     4 /* TSC ratio MSR support */
+#define SVM_FEATURE_VMCBCLEAN      5 /* VMCB clean bits support */
+#define SVM_FEATURE_FLUSHBYASID    6 /* TLB flush by ASID support */
+#define SVM_FEATURE_DECODEASSISTS  7 /* Decode assists support */
+#define SVM_FEATURE_PAUSEFILTER   10 /* Pause intercept filter support */
 
-#define cpu_has_svm_npt     test_bit(SVM_FEATURE_NPT, &svm_feature_flags)
-#define cpu_has_svm_lbrv    test_bit(SVM_FEATURE_LBRV, &svm_feature_flags)
-#define cpu_has_svm_svml    test_bit(SVM_FEATURE_SVML, &svm_feature_flags)
-#define cpu_has_svm_nrips   test_bit(SVM_FEATURE_NRIPS, &svm_feature_flags)
-#define cpu_has_svm_cleanbits test_bit(SVM_FEATURE_CLEAN, &svm_feature_flags)
-#define cpu_has_pause_filter  test_bit(SVM_FEATURE_PAUSEF, &svm_feature_flags)
+#define cpu_has_svm_feature(f) test_bit(f, &svm_feature_flags)
+#define cpu_has_svm_npt       cpu_has_svm_feature(SVM_FEATURE_NPT)
+#define cpu_has_svm_lbrv      cpu_has_svm_feature(SVM_FEATURE_LBRV)
+#define cpu_has_svm_svml      cpu_has_svm_feature(SVM_FEATURE_SVML)
+#define cpu_has_svm_nrips     cpu_has_svm_feature(SVM_FEATURE_NRIPS)
+#define cpu_has_svm_cleanbits cpu_has_svm_feature(SVM_FEATURE_VMCBCLEAN)
+#define cpu_has_pause_filter  cpu_has_svm_feature(SVM_FEATURE_PAUSEFILTER)
 
 #endif /* __ASM_X86_HVM_SVM_H__ */
