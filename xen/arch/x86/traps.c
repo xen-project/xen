@@ -795,9 +795,9 @@ static void pv_cpuid(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_PAGE1GB % 32, &d);
         __clear_bit(X86_FEATURE_RDTSCP % 32, &d);
 
-        __clear_bit(X86_FEATURE_SVME % 32, &c);
+        __clear_bit(X86_FEATURE_SVM % 32, &c);
         if ( !cpu_has_apic )
-           __clear_bit(X86_FEATURE_EXTAPICSPACE % 32, &c);
+           __clear_bit(X86_FEATURE_EXTAPIC % 32, &c);
         __clear_bit(X86_FEATURE_OSVW % 32, &c);
         __clear_bit(X86_FEATURE_IBS % 32, &c);
         __clear_bit(X86_FEATURE_SKINIT % 32, &c);

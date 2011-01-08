@@ -212,7 +212,7 @@ void amd_nonfatal_mcheck_init(struct cpuinfo_x86 *c)
 
 	/* The threshold bitfields in MSR_IA32_MC4_MISC has
 	 * been introduced along with the SVME feature bit. */
-	if (variable_period && cpu_has(c, X86_FEATURE_SVME)) {
+	if (variable_period && cpu_has(c, X86_FEATURE_SVM)) {
 		uint64_t value;
 
 		/* hw threshold registers present */

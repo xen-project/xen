@@ -919,7 +919,7 @@ struct hvm_function_table * __init start_svm(void)
 {
     bool_t printed = 0;
 
-    if ( !test_bit(X86_FEATURE_SVME, &boot_cpu_data.x86_capability) )
+    if ( !test_bit(X86_FEATURE_SVM, &boot_cpu_data.x86_capability) )
         return NULL;
 
     if ( svm_cpu_up() )
