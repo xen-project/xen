@@ -518,24 +518,9 @@ static int inline iommu_flush_iotlb_dsi(struct iommu *iommu, u16 did,
     return status;
 }
 
-static int inline get_alignment(u64 base, unsigned int size)
-{
-    int t = 0;
-    u64 end;
-
-    end = base + size - 1;
-    while ( base != end )
-    {
-        t++;
-        base >>= 1;
-        end >>= 1;
-    }
-    return t;
-}
-
 static int inline iommu_flush_iotlb_psi(
     struct iommu *iommu, u16 did, u64 addr, unsigned int pages,
-    int flush_non_present_entry, int flush_dev_iotlb)
+    int order, int flush_non_present_entry, int flush_dev_iotlb)
 {
     unsigned int align;
     struct iommu_flush *flush = iommu_get_flush(iommu);
@@ -548,17 +533,12 @@ static int inline iommu_flush_iotlb_psi(
     if ( !cap_pgsel_inv(iommu->cap) )
         return iommu_flush_iotlb_dsi(iommu, did, flush_non_present_entry, flush_dev_iotlb);
 
-    /*
-     * PSI requires page size is 2 ^ x, and the base address is naturally
-     * aligned to the size
-     */
-    align = get_alignment(addr >> PAGE_SHIFT_4K, pages);
     /* Fallback to domain selective flush if size is too big */
-    if ( align > cap_max_amask_val(iommu->cap) )
+    if ( order > cap_max_amask_val(iommu->cap) )
         return iommu_flush_iotlb_dsi(iommu, did, flush_non_present_entry, flush_dev_iotlb);
 
-    addr >>= PAGE_SHIFT_4K + align;
-    addr <<= PAGE_SHIFT_4K + align;
+    addr >>= PAGE_SHIFT_4K + order;
+    addr <<= PAGE_SHIFT_4K + order;
 
     /* apply platform specific errata workarounds */
     vtd_ops_preamble_quirk(iommu);
@@ -634,8 +614,8 @@ static void dma_pte_clear_one(struct domain *domain, u64 addr)
             iommu_domid= domain_iommu_domid(domain, iommu);
             if ( iommu_domid == -1 )
                 continue;
-            if ( iommu_flush_iotlb_psi(iommu, iommu_domid,
-                                       addr, 1, 0, flush_dev_iotlb) )
+            if ( iommu_flush_iotlb_psi(iommu, iommu_domid, addr,
+                                       1, 0, 0, flush_dev_iotlb) )
                 iommu_flush_write_buffer(iommu);
         }
     }
@@ -1710,7 +1690,7 @@ static int intel_iommu_map_page(
         if ( iommu_domid == -1 )
             continue;
         if ( iommu_flush_iotlb_psi(iommu, iommu_domid,
-                                   (paddr_t)gfn << PAGE_SHIFT_4K, 1,
+                                   (paddr_t)gfn << PAGE_SHIFT_4K, 1, 0,
                                    !dma_pte_present(old), flush_dev_iotlb) )
             iommu_flush_write_buffer(iommu);
     }
@@ -1729,7 +1709,8 @@ static int intel_iommu_unmap_page(struct domain *d, unsigned long gfn)
     return 0;
 }
 
-void iommu_pte_flush(struct domain *d, u64 gfn, u64 *pte, int present)
+void iommu_pte_flush(struct domain *d, u64 gfn, u64 *pte,
+                     int order, int present)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu = NULL;
@@ -1751,7 +1732,7 @@ void iommu_pte_flush(struct domain *d, u64 gfn, u64 *pte, int present)
             continue;
         if ( iommu_flush_iotlb_psi(iommu, iommu_domid,
                                    (paddr_t)gfn << PAGE_SHIFT_4K, 1,
-                                   !present, flush_dev_iotlb) )
+                                   order, !present, flush_dev_iotlb) )
             iommu_flush_write_buffer(iommu);
     }
 }
@@ -1769,6 +1750,28 @@ static int vtd_ept_page_compatible(struct iommu *iommu)
     return 1;
 }
 
+static bool_t vtd_ept_share(void)
+{
+    struct acpi_drhd_unit *drhd;
+    struct iommu *iommu;
+    bool_t share = TRUE;
+
+    /* sharept defaults to 0 for now, default to 1 when feature matures */
+    if ( !sharept )
+        share = FALSE;
+
+    /*
+     * Determine whether EPT and VT-d page tables can be shared or not.
+     */
+    for_each_drhd_unit ( drhd )
+    {
+        iommu = drhd->iommu;
+        if ( !vtd_ept_page_compatible(drhd->iommu) )
+            share = FALSE;
+    }
+    return share;
+}
+
 /*
  * set VT-d page table directory to EPT table if allowed
  */
@@ -1779,11 +1782,13 @@ void iommu_set_pgd(struct domain *d)
 
     ASSERT( is_hvm_domain(d) && d->arch.hvm_domain.hap_enabled );
 
-    if ( !iommu_hap_pt_share )
-        return;
-
+    iommu_hap_pt_share = vtd_ept_share();
     pgd_mfn = pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d)));
     hd->pgd_maddr = pagetable_get_paddr(pagetable_from_mfn(pgd_mfn));
+
+    dprintk(XENLOG_INFO VTDPREFIX,
+            "VT-d page table %s with EPT table\n",
+            iommu_hap_pt_share ? "shares" : "not sharing");
 }
 
 static int domain_rmrr_mapped(struct domain *d,
@@ -2036,27 +2041,6 @@ static int init_vtd_hw(void)
         }
     }
     iommu_flush_all();
-
-    /*
-     * Determine whether EPT and VT-d page tables can be shared or not.
-     */
-    iommu_hap_pt_share = TRUE;
-    for_each_drhd_unit ( drhd )
-    {
-        iommu = drhd->iommu;
-        if ( (drhd->iommu->nr_pt_levels != VTD_PAGE_TABLE_LEVEL_4) ||
-              !vtd_ept_page_compatible(drhd->iommu) )
-            iommu_hap_pt_share = FALSE;
-    }
-
-    /* keep boot flag sharept as safe fallback. remove after feature matures */
-    if ( !sharept )
-        iommu_hap_pt_share = FALSE;
-
-    dprintk(XENLOG_INFO VTDPREFIX,
-            "VT-d page table %sshared with EPT table\n",
-            iommu_hap_pt_share ? "" : "not ");
-
     return 0;
 }
 

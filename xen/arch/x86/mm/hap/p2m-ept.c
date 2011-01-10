@@ -451,12 +451,12 @@ out:
     if ( rv && iommu_enabled && need_iommu(p2m->domain) && need_modify_vtd_table )
     {
         if ( iommu_hap_pt_share )
-            iommu_pte_flush(d, gfn, (u64*)ept_entry, vtd_pte_present);
+            iommu_pte_flush(d, gfn, (u64*)ept_entry, order, vtd_pte_present);
         else
         {
             if ( p2mt == p2m_ram_rw )
             {
-                if ( order == EPT_TABLE_ORDER )
+                if ( order > 0 )
                 {
                     for ( i = 0; i < (1 << order); i++ )
                         iommu_map_page(
@@ -469,7 +469,7 @@ out:
             }
             else
             {
-                if ( order == EPT_TABLE_ORDER )
+                if ( order > 0 )
                 {
                     for ( i = 0; i < (1 << order); i++ )
                         iommu_unmap_page(p2m->domain, gfn - offset + i);

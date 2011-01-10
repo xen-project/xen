@@ -85,7 +85,7 @@ int iommu_get_device_group(struct domain *d, u8 bus, u8 devfn,
 int iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
                    unsigned int flags);
 int iommu_unmap_page(struct domain *d, unsigned long gfn);
-void iommu_pte_flush(struct domain *d, u64 gfn, u64 *pte, int present);
+void iommu_pte_flush(struct domain *d, u64 gfn, u64 *pte, int order, int present);
 void iommu_set_pgd(struct domain *d);
 void iommu_domain_teardown(struct domain *d);
 int hvm_do_IRQ_dpci(struct domain *d, unsigned int irq);

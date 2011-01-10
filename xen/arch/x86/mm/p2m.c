@@ -43,6 +43,9 @@
 static bool_t __read_mostly opt_hap_1gb = 1;
 boolean_param("hap_1gb", opt_hap_1gb);
 
+static bool_t __read_mostly opt_hap_2mb = 1;
+boolean_param("hap_2mb", opt_hap_2mb);
+
 /* Printouts */
 #define P2M_PRINTK(_f, _a...)                                \
     debugtrace_printk("p2m: %s(): " _f, __func__, ##_a)
@@ -1779,7 +1782,7 @@ int set_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
             order = ( (((gfn | mfn_x(mfn) | todo) & ((1ul << 18) - 1)) == 0) &&
                       hvm_hap_has_1gb(d) && opt_hap_1gb ) ? 18 :
                       ((((gfn | mfn_x(mfn) | todo) & ((1ul << 9) - 1)) == 0) &&
-                      hvm_hap_has_2mb(d)) ? 9 : 0;
+                      hvm_hap_has_2mb(d) && opt_hap_2mb) ? 9 : 0;
         else
             order = 0;
 
