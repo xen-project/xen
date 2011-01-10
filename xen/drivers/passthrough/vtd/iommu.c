@@ -519,15 +519,14 @@ static int inline iommu_flush_iotlb_dsi(struct iommu *iommu, u16 did,
 }
 
 static int inline iommu_flush_iotlb_psi(
-    struct iommu *iommu, u16 did, u64 addr, unsigned int pages,
-    int order, int flush_non_present_entry, int flush_dev_iotlb)
+    struct iommu *iommu, u16 did, u64 addr, unsigned int order,
+    int flush_non_present_entry, int flush_dev_iotlb)
 {
     unsigned int align;
     struct iommu_flush *flush = iommu_get_flush(iommu);
     int status;
 
     ASSERT(!(addr & (~PAGE_MASK_4K)));
-    ASSERT(pages > 0);
 
     /* Fallback to domain selective flush if no PSI support */
     if ( !cap_pgsel_inv(iommu->cap) )
@@ -543,7 +542,7 @@ static int inline iommu_flush_iotlb_psi(
     /* apply platform specific errata workarounds */
     vtd_ops_preamble_quirk(iommu);
 
-    status = flush->iotlb(iommu, did, addr, align, DMA_TLB_PSI_FLUSH,
+    status = flush->iotlb(iommu, did, addr, order, DMA_TLB_PSI_FLUSH,
                         flush_non_present_entry, flush_dev_iotlb);
 
     /* undo platform specific errata workarounds */
@@ -615,7 +614,7 @@ static void dma_pte_clear_one(struct domain *domain, u64 addr)
             if ( iommu_domid == -1 )
                 continue;
             if ( iommu_flush_iotlb_psi(iommu, iommu_domid, addr,
-                                       1, 0, 0, flush_dev_iotlb) )
+                                       0, 0, flush_dev_iotlb) )
                 iommu_flush_write_buffer(iommu);
         }
     }
@@ -1690,7 +1689,7 @@ static int intel_iommu_map_page(
         if ( iommu_domid == -1 )
             continue;
         if ( iommu_flush_iotlb_psi(iommu, iommu_domid,
-                                   (paddr_t)gfn << PAGE_SHIFT_4K, 1, 0,
+                                   (paddr_t)gfn << PAGE_SHIFT_4K, 0,
                                    !dma_pte_present(old), flush_dev_iotlb) )
             iommu_flush_write_buffer(iommu);
     }
@@ -1731,7 +1730,7 @@ void iommu_pte_flush(struct domain *d, u64 gfn, u64 *pte,
         if ( iommu_domid == -1 )
             continue;
         if ( iommu_flush_iotlb_psi(iommu, iommu_domid,
-                                   (paddr_t)gfn << PAGE_SHIFT_4K, 1,
+                                   (paddr_t)gfn << PAGE_SHIFT_4K,
                                    order, !present, flush_dev_iotlb) )
             iommu_flush_write_buffer(iommu);
     }
