@@ -389,7 +389,7 @@ static int flush_context_reg(
     return 0;
 }
 
-static int inline iommu_flush_context_global(
+static int iommu_flush_context_global(
     struct iommu *iommu, int flush_non_present_entry)
 {
     struct iommu_flush *flush = iommu_get_flush(iommu);
@@ -397,15 +397,7 @@ static int inline iommu_flush_context_global(
                                  flush_non_present_entry);
 }
 
-static int inline iommu_flush_context_domain(
-    struct iommu *iommu, u16 did, int flush_non_present_entry)
-{
-    struct iommu_flush *flush = iommu_get_flush(iommu);
-    return flush->context(iommu, did, 0, 0, DMA_CCMD_DOMAIN_INVL,
-                                 flush_non_present_entry);
-}
-
-static int inline iommu_flush_context_device(
+static int iommu_flush_context_device(
     struct iommu *iommu, u16 did, u16 source_id,
     u8 function_mask, int flush_non_present_entry)
 {
@@ -482,7 +474,7 @@ static int flush_iotlb_reg(void *_iommu, u16 did,
     return 0;
 }
 
-static int inline iommu_flush_iotlb_global(struct iommu *iommu,
+static int iommu_flush_iotlb_global(struct iommu *iommu,
     int flush_non_present_entry, int flush_dev_iotlb)
 {
     struct iommu_flush *flush = iommu_get_flush(iommu);
@@ -500,7 +492,7 @@ static int inline iommu_flush_iotlb_global(struct iommu *iommu,
     return status;
 }
 
-static int inline iommu_flush_iotlb_dsi(struct iommu *iommu, u16 did,
+static int iommu_flush_iotlb_dsi(struct iommu *iommu, u16 did,
     int flush_non_present_entry, int flush_dev_iotlb)
 {
     struct iommu_flush *flush = iommu_get_flush(iommu);
@@ -518,7 +510,7 @@ static int inline iommu_flush_iotlb_dsi(struct iommu *iommu, u16 did,
     return status;
 }
 
-static int inline iommu_flush_iotlb_psi(
+static int iommu_flush_iotlb_psi(
     struct iommu *iommu, u16 did, u64 addr, unsigned int order,
     int flush_non_present_entry, int flush_dev_iotlb)
 {
