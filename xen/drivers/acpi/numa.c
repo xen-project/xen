@@ -120,14 +120,15 @@ static int __init acpi_parse_slit(struct acpi_table_header *table)
 	return 0;
 }
 
-void __init __attribute__ ((weak))
+#ifndef CONFIG_X86
+void __init
 acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa)
 {
 	printk(KERN_WARNING PREFIX
 	       "Found unsupported x2apic [0x%08x] SRAT entry\n", pa->apic_id);
 	return;
 }
-
+#endif
 
 static int __init
 acpi_parse_x2apic_affinity(struct acpi_subtable_header *header,
