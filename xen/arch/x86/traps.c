@@ -1694,6 +1694,10 @@ static int is_cpufreq_controller(struct domain *d)
             (d->domain_id == 0));
 }
 
+#ifdef CONFIG_X86_64
+#include "x86_64/mmconfig.h"
+#endif
+
 static int emulate_privileged_op(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
@@ -2288,7 +2292,14 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 goto fail;
             if ( !IS_PRIV(v->domain) )
                 break;
-            if ( (rdmsr_safe(MSR_FAM10H_MMIO_CONF_BASE, val) != 0) ||
+            if ( (rdmsr_safe(MSR_FAM10H_MMIO_CONF_BASE, val) != 0) )
+                goto fail;
+            if (
+#ifdef CONFIG_X86_64
+                 (pci_probe & PCI_PROBE_MMCONF) &&
+                 (pci_probe & PCI_CHECK_ENABLE_AMD_MMCONF) ?
+                 val != msr_content :
+#endif
                  ((val ^ msr_content) &
                   ~( FAM10H_MMIO_CONF_ENABLE |
                     (FAM10H_MMIO_CONF_BUSRANGE_MASK <<
