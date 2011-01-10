@@ -522,7 +522,6 @@ static int inline iommu_flush_iotlb_psi(
     struct iommu *iommu, u16 did, u64 addr, unsigned int order,
     int flush_non_present_entry, int flush_dev_iotlb)
 {
-    unsigned int align;
     struct iommu_flush *flush = iommu_get_flush(iommu);
     int status;
 
