@@ -957,18 +957,9 @@ void x2apic_ap_setup(void)
 void __init x2apic_bsp_setup(void)
 {
     struct IO_APIC_route_entry **ioapic_entries = NULL;
-    uint64_t msr_content;
 
     if ( !cpu_has_x2apic )
         return;
-
-    /* Check whether x2apic mode was already enabled by the BIOS. */
-    rdmsrl(MSR_IA32_APICBASE, msr_content);
-    if ( msr_content & MSR_IA32_APICBASE_EXTD )
-    {
-        printk("x2APIC mode is already enabled by BIOS.\n");
-        x2apic_enabled = 1;
-    }
 
     if ( !opt_x2apic )
     {

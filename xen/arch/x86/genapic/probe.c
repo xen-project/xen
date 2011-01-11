@@ -59,8 +59,10 @@ custom_param("apic", genapic_apic_force);
 
 void __init generic_apic_probe(void) 
 { 
-	int i;
-	int changed = cmdline_apic = (genapic != NULL);
+	int i, changed;
+
+	check_x2apic_preenabled();
+	cmdline_apic = changed = (genapic != NULL);
 
 	for (i = 0; !changed && apic_probe[i]; i++) { 
 		if (apic_probe[i]->probe()) {

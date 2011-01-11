@@ -24,6 +24,8 @@
 #include <asm/genapic.h>
 #include <asm/apic.h>
 #include <asm/io_apic.h>
+#include <asm/msr.h>
+#include <asm/processor.h>
 #include <xen/smp.h>
 #include <asm/mach-default/mach_mpparse.h>
 
@@ -122,4 +124,21 @@ static const struct genapic apic_x2apic_cluster = {
 const struct genapic *__init apic_x2apic_probe(void)
 {
     return x2apic_phys ? &apic_x2apic_phys : &apic_x2apic_cluster;
+}
+
+void __init check_x2apic_preenabled(void)
+{
+    u32 lo, hi;
+
+    if ( !cpu_has_x2apic )
+        return;
+
+    /* Check whether x2apic mode was already enabled by the BIOS. */
+    rdmsr(MSR_IA32_APICBASE, lo, hi);
+    if ( lo & MSR_IA32_APICBASE_EXTD )
+    {
+        printk("x2APIC mode is already enabled by BIOS.\n");
+        x2apic_enabled = 1;
+        genapic = apic_x2apic_probe();
+    }
 }
