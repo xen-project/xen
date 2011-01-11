@@ -281,7 +281,7 @@ static void build_pagetable(unsigned long *start_pfn, unsigned long *max_pfn)
 /*
  * Mark portion of the address space read only.
  */
-extern void shared_info;
+extern struct shared_info shared_info;
 static void set_readonly(void *text, void *etext)
 {
     unsigned long start_address =
