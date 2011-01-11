@@ -628,7 +628,7 @@ static PyTypeObject PyXlType = {
     NULL,                         /* tp_getattro       */
     NULL,                         /* tp_setattro       */
     NULL,                         /* tp_as_buffer      */
-    Py_TPFLAGS_DEFAULT,           /* tp_flags          */
+    Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE, /* tp_flags          */
     "libxenlight connection",     /* tp_doc            */
     NULL,                         /* tp_traverse       */
     NULL,                         /* tp_clear          */
