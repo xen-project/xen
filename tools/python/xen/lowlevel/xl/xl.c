@@ -537,6 +537,75 @@ static PyObject *pyxl_pci_parse(XlObject *self, PyObject *args)
     return (PyObject *)pci;
 }
 
+static PyObject *pyxl_pci_list_assignable(XlObject *self, PyObject *args)
+{
+    libxl_device_pci *dev;
+    PyObject *list;
+    int nr_dev, i;
+
+    if ( libxl_device_pci_list_assignable(&self->ctx, &dev, &nr_dev) ) {
+        PyErr_SetString(xl_error_obj, "Cannot list assignable devices");
+        return NULL;
+    }
+
+    list = PyList_New(nr_dev);
+    if ( NULL == list )
+        return NULL;
+
+    for(i = 0; i < nr_dev; i++) {
+        Py_device_pci *pd;
+        pd = Pydevice_pci_New();
+        if ( NULL == pd )
+            goto err_mem;
+        memcpy(&pd->obj, &dev[i], sizeof(pd->obj));
+        /* SetItem steals a reference */
+        PyList_SetItem(list, i, (PyObject *)pd);
+    }
+
+    free(dev);
+    return list;
+err_mem:
+    Py_DECREF(list);
+    PyErr_SetString(PyExc_MemoryError, "Allocating PCI device list");
+    return NULL;
+}
+
+static PyObject *pyxl_pci_list(XlObject *self, PyObject *args)
+{
+    libxl_device_pci *dev;
+    PyObject *list;
+    int nr_dev, i, domid;
+
+    if ( !PyArg_ParseTuple(args, "i", &domid) )
+        return NULL;
+
+    if ( libxl_device_pci_list_assigned(&self->ctx, &dev, domid, &nr_dev) ) {
+        PyErr_SetString(xl_error_obj, "Cannot list assignable devices");
+        return NULL;
+    }
+
+    list = PyList_New(nr_dev);
+    if ( NULL == list )
+        return NULL;
+
+    for(i = 0; i < nr_dev; i++) {
+        Py_device_pci *pd;
+        pd = Pydevice_pci_New();
+        if ( NULL == pd )
+            goto err_mem;
+        memcpy(&pd->obj, &dev[i], sizeof(pd->obj));
+        /* SetItem steals a reference */
+        PyList_SetItem(list, i, (PyObject *)pd);
+    }
+
+    free(dev);
+    return list;
+err_mem:
+    Py_DECREF(list);
+    PyErr_SetString(PyExc_MemoryError, "Allocating PCI device list");
+    return NULL;
+}
+
 static PyMethodDef pyxl_methods[] = {
     {"list_domains", (PyCFunction)pyxl_list_domains, METH_NOARGS,
          "List domains"},
@@ -558,6 +627,11 @@ static PyMethodDef pyxl_methods[] = {
          "Remove a pass-through PCI device"},
     {"device_pci_parse_bdf", (PyCFunction)pyxl_pci_parse, METH_VARARGS,
          "Parse pass-through PCI device spec (BDF)"},
+    {"device_pci_list", (PyCFunction)pyxl_pci_list, METH_VARARGS,
+        "List PCI devices assigned to a domain"},
+    {"device_pci_list_assignable",
+        (PyCFunction)pyxl_pci_list_assignable, METH_NOARGS,
+        "List assignable PCI devices"},
     { NULL, NULL, 0, NULL }
 };
 
