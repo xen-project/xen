@@ -2296,8 +2296,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 goto fail;
             if (
 #ifdef CONFIG_X86_64
-                 (pci_probe & PCI_PROBE_MMCONF) &&
-                 (pci_probe & PCI_CHECK_ENABLE_AMD_MMCONF) ?
+                 (pci_probe & PCI_PROBE_MASK) == PCI_PROBE_MMCONF ?
                  val != msr_content :
 #endif
                  ((val ^ msr_content) &
