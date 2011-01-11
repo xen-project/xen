@@ -49,12 +49,8 @@ typedef struct xenpaging {
 
 
 typedef struct xenpaging_victim {
-    /* the domain to evict a page from */
-    domid_t domain_id;
     /* the gfn of the page to evict */
     unsigned long gfn;
-    /* the mfn of evicted page */
-    unsigned long mfn;
 } xenpaging_victim_t;
 
 

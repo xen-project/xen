@@ -171,7 +171,7 @@ xenpaging_t *xenpaging_init(domid_t domain_id)
         goto err;
     }
 
-    rc = xc_get_platform_info(xch, domain_id,
+    rc = xc_get_platform_info(xch, paging->mem_event.domain_id,
                               paging->platform_info);
     if ( rc != 1 )
     {
@@ -187,7 +187,7 @@ xenpaging_t *xenpaging_init(domid_t domain_id)
         goto err;
     }
 
-    rc = xc_domain_getinfolist(xch, domain_id, 1,
+    rc = xc_domain_getinfolist(xch, paging->mem_event.domain_id, 1,
                                paging->domain_info);
     if ( rc != 1 )
     {
@@ -348,7 +348,7 @@ int xenpaging_evict_page(xenpaging_t *paging,
     /* Map page */
     gfn = victim->gfn;
     ret = -EFAULT;
-    page = xc_map_foreign_pages(xch, victim->domain_id,
+    page = xc_map_foreign_pages(xch, paging->mem_event.domain_id,
                                 PROT_READ | PROT_WRITE, &gfn, 1);
     if ( page == NULL )
     {
@@ -380,7 +380,7 @@ int xenpaging_evict_page(xenpaging_t *paging,
     }
 
     /* Notify policy of page being paged out */
-    policy_notify_paged_out(paging->mem_event.domain_id, victim->gfn);
+    policy_notify_paged_out(victim->gfn);
 
  out:
     return ret;
@@ -397,7 +397,7 @@ static int xenpaging_resume_page(xenpaging_t *paging, mem_event_response_t *rsp,
 
     /* Notify policy of page being paged in */
     if ( notify_policy )
-        policy_notify_paged_in(paging->mem_event.domain_id, rsp->gfn);
+        policy_notify_paged_in(rsp->gfn);
 
     /* Tell Xen page is ready */
     ret = xc_mem_paging_resume(paging->xc_handle, paging->mem_event.domain_id,
@@ -464,7 +464,7 @@ static int xenpaging_populate_page(xenpaging_t *paging,
     return ret;
 }
 
-static int evict_victim(xenpaging_t *paging, domid_t domain_id,
+static int evict_victim(xenpaging_t *paging,
                         xenpaging_victim_t *victim, int fd, int i)
 {
     xc_interface *xch = paging->xc_handle;
@@ -473,7 +473,7 @@ static int evict_victim(xenpaging_t *paging, domid_t domain_id,
 
     do
     {
-        ret = policy_choose_victim(paging, domain_id, victim);
+        ret = policy_choose_victim(paging, victim);
         if ( ret != 0 )
         {
             if ( ret != -ENOSPC )
@@ -486,14 +486,13 @@ static int evict_victim(xenpaging_t *paging, domid_t domain_id,
             ret = -EINTR;
             goto out;
         }
-        ret = xc_mem_paging_nominate(xch,
-                                     paging->mem_event.domain_id, victim->gfn);
+        ret = xc_mem_paging_nominate(xch, paging->mem_event.domain_id, victim->gfn);
         if ( ret == 0 )
             ret = xenpaging_evict_page(paging, victim, fd, i);
         else
         {
             if ( j++ % 1000 == 0 )
-                if ( xc_mem_paging_flush_ioemu_cache(domain_id) )
+                if ( xc_mem_paging_flush_ioemu_cache(paging->mem_event.domain_id) )
                     ERROR("Error flushing ioemu cache");
         }
     }
@@ -578,7 +577,7 @@ int main(int argc, char *argv[])
     memset(victims, 0, sizeof(xenpaging_victim_t) * num_pages);
     for ( i = 0; i < num_pages; i++ )
     {
-        rc = evict_victim(paging, domain_id, &victims[i], fd, i);
+        rc = evict_victim(paging, &victims[i], fd, i);
         if ( rc == -ENOSPC )
             break;
         if ( rc == -EINTR )
@@ -619,8 +618,7 @@ int main(int argc, char *argv[])
                 /* Find where in the paging file to read from */
                 for ( i = 0; i < num_pages; i++ )
                 {
-                    if ( (victims[i].domain_id == paging->mem_event.domain_id) &&
-                         (victims[i].gfn == req.gfn) )
+                    if ( victims[i].gfn == req.gfn )
                         break;
                 }
     
@@ -652,7 +650,7 @@ int main(int argc, char *argv[])
                 }
 
                 /* Evict a new page to replace the one we just paged in */
-                evict_victim(paging, domain_id, &victims[i], fd, i);
+                evict_victim(paging, &victims[i], fd, i);
             }
             else
             {

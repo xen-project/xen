@@ -67,15 +67,11 @@ int policy_init(xenpaging_t *paging)
     return rc;
 }
 
-int policy_choose_victim(xenpaging_t *paging, domid_t domain_id,
-                         xenpaging_victim_t *victim)
+int policy_choose_victim(xenpaging_t *paging, xenpaging_victim_t *victim)
 {
     xc_interface *xch = paging->xc_handle;
     unsigned long wrap = current_gfn;
     ASSERT(victim != NULL);
-
-    /* Domain to pick on */
-    victim->domain_id = domain_id;
 
     do
     {
@@ -96,13 +92,13 @@ int policy_choose_victim(xenpaging_t *paging, domid_t domain_id,
     return 0;
 }
 
-void policy_notify_paged_out(domid_t domain_id, unsigned long gfn)
+void policy_notify_paged_out(unsigned long gfn)
 {
     set_bit(gfn, bitmap);
     clear_bit(gfn, unconsumed);
 }
 
-void policy_notify_paged_in(domid_t domain_id, unsigned long gfn)
+void policy_notify_paged_in(unsigned long gfn)
 {
     unsigned long old_gfn = mru[i_mru & (MRU_SIZE - 1)];
 

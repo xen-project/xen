@@ -29,10 +29,9 @@
 
 
 int policy_init(xenpaging_t *paging);
-int policy_choose_victim(xenpaging_t *paging, domid_t domain_id,
-                         xenpaging_victim_t *victim);
-void policy_notify_paged_out(domid_t domain_id, unsigned long gfn);
-void policy_notify_paged_in(domid_t domain_id, unsigned long gfn);
+int policy_choose_victim(xenpaging_t *paging, xenpaging_victim_t *victim);
+void policy_notify_paged_out(unsigned long gfn);
+void policy_notify_paged_in(unsigned long gfn);
 
 #endif // __XEN_PAGING_POLICY_H__
 
