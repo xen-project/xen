@@ -249,152 +249,6 @@ static void dolog(const char *file, int line, const char *func, char *fmt, ...)
         libxl_write_exactly(NULL, logfile, s, rc, NULL, NULL);
 }
 
-static void init_create_info(libxl_domain_create_info *c_info)
-{
-    memset(c_info, '\0', sizeof(*c_info));
-    c_info->xsdata = NULL;
-    c_info->platformdata = NULL;
-    c_info->hap = 1;
-    c_info->hvm = 1;
-    c_info->oos = 1;
-    c_info->ssidref = 0;
-    c_info->poolid = 0;
-}
-
-static void init_build_info(libxl_domain_build_info *b_info, libxl_domain_create_info *c_info)
-{
-    memset(b_info, '\0', sizeof(*b_info));
-    b_info->max_vcpus = 1;
-    b_info->max_memkb = 32 * 1024;
-    b_info->target_memkb = b_info->max_memkb;
-    b_info->disable_migrate = 0;
-    b_info->cpuid = NULL;
-    b_info->shadow_memkb = 0;
-    if (c_info->hvm) {
-        b_info->video_memkb = 8 * 1024;
-        b_info->kernel.path = strdup("hvmloader");
-        b_info->hvm = 1;
-        b_info->u.hvm.pae = 1;
-        b_info->u.hvm.apic = 1;
-        b_info->u.hvm.acpi = 1;
-        b_info->u.hvm.nx = 1;
-        b_info->u.hvm.viridian = 0;
-        b_info->u.hvm.hpet = 1;
-        b_info->u.hvm.vpt_align = 1;
-        b_info->u.hvm.timer_mode = 1;
-    } else {
-        b_info->u.pv.slack_memkb = 8 * 1024;
-    }
-}
-
-static void init_dm_info(libxl_device_model_info *dm_info,
-        libxl_domain_create_info *c_info, libxl_domain_build_info *b_info)
-{
-    memset(dm_info, '\0', sizeof(*dm_info));
-
-    libxl_uuid_generate(&dm_info->uuid);
-
-    dm_info->dom_name = strdup(c_info->name);
-    dm_info->device_model = strdup("qemu-dm");
-    dm_info->target_ram = libxl__sizekb_to_mb(b_info->target_memkb);
-    dm_info->videoram = libxl__sizekb_to_mb(b_info->video_memkb);
-    dm_info->apic = b_info->u.hvm.apic;
-    dm_info->vcpus = b_info->max_vcpus;
-    dm_info->vcpu_avail = b_info->cur_vcpus;
-
-    dm_info->stdvga = 0;
-    dm_info->vnc = 1;
-    dm_info->vnclisten = strdup("127.0.0.1");
-    dm_info->vncdisplay = 0;
-    dm_info->vncunused = 1;
-    dm_info->keymap = NULL;
-    dm_info->sdl = 0;
-    dm_info->opengl = 0;
-    dm_info->nographic = 0;
-    dm_info->serial = NULL;
-    dm_info->boot = strdup("cda");
-    dm_info->usb = 0;
-    dm_info->usbdevice = NULL;
-    dm_info->xen_platform_pci = 1;
-}
-
-static void init_nic_info(libxl_device_nic *nic_info, int devnum)
-{
-    const uint8_t *r;
-    libxl_uuid uuid;
-
-    libxl_uuid_generate(&uuid);
-    r = libxl_uuid_bytearray(&uuid);
-    memset(nic_info, '\0', sizeof(*nic_info));
-
-    nic_info->backend_domid = 0;
-    nic_info->domid = 0;
-    nic_info->devid = devnum;
-    nic_info->mtu = 1492;
-    nic_info->model = strdup("e1000");
-    nic_info->mac[0] = 0x00;
-    nic_info->mac[1] = 0x16;
-    nic_info->mac[2] = 0x3e;
-    nic_info->mac[3] = r[0] & 0x7f;
-    nic_info->mac[4] = r[1];
-    nic_info->mac[5] = r[2];
-    nic_info->ifname = NULL;
-    nic_info->bridge = strdup("xenbr0");
-    CHK_ERRNO( asprintf(&nic_info->script, "%s/vif-bridge",
-               libxl_xen_script_dir_path()) );
-    nic_info->nictype = NICTYPE_IOEMU;
-}
-
-static void init_net2_info(libxl_device_net2 *net2_info, int devnum)
-{
-    const uint8_t *r;
-    libxl_uuid uuid;
-
-    libxl_uuid_generate(&uuid);
-    r = libxl_uuid_bytearray(&uuid);
-    memset(net2_info, '\0', sizeof(*net2_info));
-
-    net2_info->devid = devnum;
-    net2_info->front_mac[0] = 0x00;
-    net2_info->front_mac[1] = 0x16;
-    net2_info->front_mac[2] = 0x3e;;
-    net2_info->front_mac[3] = 0x7f & r[0];
-    net2_info->front_mac[4] = r[1];
-    net2_info->front_mac[5] = r[2];
-    net2_info->back_mac[0] = 0x00;
-    net2_info->back_mac[1] = 0x16;
-    net2_info->back_mac[2] = 0x3e;
-    net2_info->back_mac[3] = 0x7f & r[3];
-    net2_info->back_mac[4] = r[4];
-    net2_info->back_mac[5] = r[5];
-    net2_info->back_trusted = 1;
-    net2_info->filter_mac = 1;
-    net2_info->max_bypasses = 5;
-    net2_info->bridge = strdup("xenbr0");
-}
-
-static void init_vfb_info(libxl_device_vfb *vfb, int dev_num)
-{
-    memset(vfb, 0x00, sizeof(libxl_device_vfb));
-    vfb->devid = dev_num;
-    vfb->display = NULL;
-    vfb->xauthority = NULL;
-    vfb->vnc = 1;
-    vfb->vncpasswd = NULL;
-    vfb->vnclisten = strdup("127.0.0.1");
-    vfb->vncdisplay = 0;
-    vfb->vncunused = 1;
-    vfb->keymap = NULL;
-    vfb->sdl = 0;
-    vfb->opengl = 0;
-}
-
-static void init_vkb_info(libxl_device_vkb *vkb, int dev_num)
-{
-    memset(vkb, 0x00, sizeof(libxl_device_vkb));
-    vkb->devid = dev_num;
-}
-
 static void printf_info(int domid,
                         libxl_domain_config *d_config,
                         libxl_device_model_info *dm_info)
@@ -727,7 +581,7 @@ static void parse_config_data(const char *configfile_filename_report,
         exit(1);
     }
 
-    init_create_info(c_info);
+    libxl_init_create_info(c_info);
 
     c_info->hvm = 0;
     if (!xlu_cfg_get_string (config, "builder", &buf) &&
@@ -762,7 +616,7 @@ static void parse_config_data(const char *configfile_filename_report,
         exit(1);
     }
 
-    init_build_info(b_info, c_info);
+    libxl_init_build_info(b_info, c_info);
 
     /* the following is the actual config parsing with overriding values in the structures */
     if (!xlu_cfg_get_long (config, "vcpus", &l)) {
@@ -905,7 +759,7 @@ static void parse_config_data(const char *configfile_filename_report,
 
             d_config->vifs = (libxl_device_nic *) realloc(d_config->vifs, sizeof (libxl_device_nic) * (d_config->num_vifs+1));
             nic = d_config->vifs + d_config->num_vifs;
-            init_nic_info(nic, d_config->num_vifs);
+            CHK_ERRNO( libxl_device_nic_init(nic, d_config->num_vifs) );
 
             p = strtok(buf2, ",");
             if (!p)
@@ -982,7 +836,7 @@ skip:
             d_config->vif2s = realloc(d_config->vif2s, sizeof (libxl_device_net2) * (d_config->num_vif2s + 1));
             net2 = d_config->vif2s + d_config->num_vif2s;
 
-            init_net2_info(net2, d_config->num_vif2s);
+            libxl_device_net2_init(net2, d_config->num_vif2s);
 
             for (p = strtok(buf2, ","); p; p = strtok(NULL, ",")) {
                 char* val;
@@ -1034,11 +888,11 @@ skip:
 
             d_config->vfbs = (libxl_device_vfb *) realloc(d_config->vfbs, sizeof(libxl_device_vfb) * (d_config->num_vfbs + 1));
             vfb = d_config->vfbs + d_config->num_vfbs;
-            init_vfb_info(vfb, d_config->num_vfbs);
+            libxl_device_vfb_init(vfb, d_config->num_vfbs);
 
             d_config->vkbs = (libxl_device_vkb *) realloc(d_config->vkbs, sizeof(libxl_device_vkb) * (d_config->num_vkbs + 1));
             vkb = d_config->vkbs + d_config->num_vkbs;
-            init_vkb_info(vkb, d_config->num_vkbs);
+            libxl_device_vkb_init(vkb, d_config->num_vkbs);
 
             p = strtok(buf2, ",");
             if (!p)
@@ -1188,7 +1042,7 @@ skip_vfb:
 
     if (c_info->hvm == 1) {
         /* init dm from c and b */
-        init_dm_info(dm_info, c_info, b_info);
+        libxl_init_dm_info(dm_info, c_info, b_info);
 
         /* then process config related to dm */
         xlu_cfg_replace_string (config, "device_model", &dm_info->device_model);
@@ -4325,7 +4179,7 @@ int main_networkattach(int argc, char **argv)
         fprintf(stderr, "%s is an invalid domain identifier\n", argv[optind]);
         return 1;
     }
-    init_nic_info(&nic, -1);
+    libxl_device_nic_init(&nic, -1);
     for (argv += optind+1, argc -= optind+1; argc > 0; ++argv, --argc) {
         if (!strncmp("type=", *argv, 5)) {
             if (!strncmp("vif", (*argv) + 5, 4)) {
@@ -4659,7 +4513,7 @@ int main_network2attach(int argc, char **argv)
         fprintf(stderr, "%s is an invalid domain identifier\n", argv[optind]);
         return 1;
     }
-    init_net2_info(&net2, -1);
+    libxl_device_net2_init(&net2, -1);
     for (argv += optind+1, argc -= optind+1; argc > 0; --argc, ++argv) {
         if (!strncmp("front_mac=", *argv, 10)) {
             tok = strtok((*argv) + 10, ":");

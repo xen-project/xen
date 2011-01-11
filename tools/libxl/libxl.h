@@ -280,6 +280,9 @@ int libxl_ctx_set_log(libxl_ctx *ctx, xentoollog_logger*);
 int libxl_ctx_postfork(libxl_ctx *ctx);
 
 /* domain related functions */
+void libxl_init_create_info(libxl_domain_create_info *c_info);
+void libxl_init_build_info(libxl_domain_build_info *b_info, libxl_domain_create_info *c_info);
+void libxl_init_dm_info(libxl_device_model_info *dm_info, libxl_domain_create_info *c_info, libxl_domain_build_info *b_info);
 typedef int (*libxl_console_ready)(libxl_ctx *ctx, uint32_t domid, void *priv);
 int libxl_domain_create_new(libxl_ctx *ctx, libxl_domain_config *d_config, libxl_console_ready cb, void *priv, uint32_t *domid);
 int libxl_domain_create_restore(libxl_ctx *ctx, libxl_domain_config *d_config, libxl_console_ready cb, void *priv, uint32_t *domid, int restore_fd);
@@ -419,16 +422,19 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk);
 char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *disk);
 int libxl_device_disk_local_detach(libxl_ctx *ctx, libxl_device_disk *disk);
 
+int libxl_device_nic_init(libxl_device_nic *nic, int dev_num);
 int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic);
 int libxl_device_nic_del(libxl_ctx *ctx, libxl_device_nic *nic, int wait);
 libxl_nicinfo *libxl_list_nics(libxl_ctx *ctx, uint32_t domid, unsigned int *nb);
 
 int libxl_device_console_add(libxl_ctx *ctx, uint32_t domid, libxl_device_console *console);
 
+void libxl_device_vkb_init(libxl_device_vkb *vkb, int dev_num);
 int libxl_device_vkb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb);
 int libxl_device_vkb_clean_shutdown(libxl_ctx *ctx, uint32_t domid);
 int libxl_device_vkb_hard_shutdown(libxl_ctx *ctx, uint32_t domid);
 
+void libxl_device_vfb_init(libxl_device_vfb *vfb, int dev_num);
 int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb);
 int libxl_device_vfb_clean_shutdown(libxl_ctx *ctx, uint32_t domid);
 int libxl_device_vfb_hard_shutdown(libxl_ctx *ctx, uint32_t domid);
@@ -526,6 +532,7 @@ int libxl_tmem_shared_auth(libxl_ctx *ctx, uint32_t domid, char* uuid,
                            int auth);
 int libxl_tmem_freeable(libxl_ctx *ctx);
 
+void libxl_device_net2_init(libxl_device_net2 *net2, int dev_num);
 int libxl_device_net2_add(libxl_ctx *ctx, uint32_t domid,
                           libxl_device_net2 *net2);
 libxl_net2info *libxl_device_net2_list(libxl_ctx *ctx, uint32_t domid,

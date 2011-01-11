@@ -1024,6 +1024,35 @@ int libxl_device_disk_local_detach(libxl_ctx *ctx, libxl_device_disk *disk)
 }
 
 /******************************************************************************/
+int libxl_device_nic_init(libxl_device_nic *nic_info, int devnum)
+{
+    const uint8_t *r;
+    libxl_uuid uuid;
+
+    libxl_uuid_generate(&uuid);
+    r = libxl_uuid_bytearray(&uuid);
+    memset(nic_info, '\0', sizeof(*nic_info));
+
+    nic_info->backend_domid = 0;
+    nic_info->domid = 0;
+    nic_info->devid = devnum;
+    nic_info->mtu = 1492;
+    nic_info->model = strdup("e1000");
+    nic_info->mac[0] = 0x00;
+    nic_info->mac[1] = 0x16;
+    nic_info->mac[2] = 0x3e;
+    nic_info->mac[3] = r[0] & 0x7f;
+    nic_info->mac[4] = r[1];
+    nic_info->mac[5] = r[2];
+    nic_info->ifname = NULL;
+    nic_info->bridge = strdup("xenbr0");
+    if ( asprintf(&nic_info->script, "%s/vif-bridge",
+               libxl_xen_script_dir_path()) < 0 )
+        return ERROR_FAIL;
+    nic_info->nictype = NICTYPE_IOEMU;
+    return 0;
+}
+
 int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
@@ -1182,6 +1211,34 @@ err:
 }
 
 /******************************************************************************/
+void libxl_device_net2_init(libxl_device_net2 *net2_info, int devnum)
+{
+    const uint8_t *r;
+    libxl_uuid uuid;
+
+    libxl_uuid_generate(&uuid);
+    r = libxl_uuid_bytearray(&uuid);
+    memset(net2_info, '\0', sizeof(*net2_info));
+
+    net2_info->devid = devnum;
+    net2_info->front_mac[0] = 0x00;
+    net2_info->front_mac[1] = 0x16;
+    net2_info->front_mac[2] = 0x3e;;
+    net2_info->front_mac[3] = 0x7f & r[0];
+    net2_info->front_mac[4] = r[1];
+    net2_info->front_mac[5] = r[2];
+    net2_info->back_mac[0] = 0x00;
+    net2_info->back_mac[1] = 0x16;
+    net2_info->back_mac[2] = 0x3e;
+    net2_info->back_mac[3] = 0x7f & r[3];
+    net2_info->back_mac[4] = r[4];
+    net2_info->back_mac[5] = r[5];
+    net2_info->back_trusted = 1;
+    net2_info->filter_mac = 1;
+    net2_info->max_bypasses = 5;
+    net2_info->bridge = strdup("xenbr0");
+}
+
 int libxl_device_net2_add(libxl_ctx *ctx, uint32_t domid, libxl_device_net2 *net2)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
@@ -1449,6 +1506,12 @@ out:
 }
 
 /******************************************************************************/
+void libxl_device_vkb_init(libxl_device_vkb *vkb, int dev_num)
+{
+    memset(vkb, 0x00, sizeof(libxl_device_vkb));
+    vkb->devid = dev_num;
+}
+
 int libxl_device_vkb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
@@ -1647,6 +1710,22 @@ out:
 }
 
 /******************************************************************************/
+void libxl_device_vfb_init(libxl_device_vfb *vfb, int dev_num)
+{
+    memset(vfb, 0x00, sizeof(libxl_device_vfb));
+    vfb->devid = dev_num;
+    vfb->display = NULL;
+    vfb->xauthority = NULL;
+    vfb->vnc = 1;
+    vfb->vncpasswd = NULL;
+    vfb->vnclisten = strdup("127.0.0.1");
+    vfb->vncdisplay = 0;
+    vfb->vncunused = 1;
+    vfb->keymap = NULL;
+    vfb->sdl = 0;
+    vfb->opengl = 0;
+}
+
 int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);

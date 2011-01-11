@@ -60,6 +60,75 @@ void libxl_domain_config_destroy(libxl_domain_config *d_config)
     libxl_device_model_info_destroy(&d_config->dm_info);
 }
 
+void libxl_init_create_info(libxl_domain_create_info *c_info)
+{
+    memset(c_info, '\0', sizeof(*c_info));
+    c_info->xsdata = NULL;
+    c_info->platformdata = NULL;
+    c_info->hap = 1;
+    c_info->hvm = 1;
+    c_info->oos = 1;
+    c_info->ssidref = 0;
+    c_info->poolid = 0;
+}
+
+void libxl_init_build_info(libxl_domain_build_info *b_info, libxl_domain_create_info *c_info)
+{
+    memset(b_info, '\0', sizeof(*b_info));
+    b_info->max_vcpus = 1;
+    b_info->max_memkb = 32 * 1024;
+    b_info->target_memkb = b_info->max_memkb;
+    b_info->disable_migrate = 0;
+    b_info->cpuid = NULL;
+    b_info->shadow_memkb = 0;
+    if (c_info->hvm) {
+        b_info->video_memkb = 8 * 1024;
+        b_info->kernel.path = strdup("hvmloader");
+        b_info->hvm = 1;
+        b_info->u.hvm.pae = 1;
+        b_info->u.hvm.apic = 1;
+        b_info->u.hvm.acpi = 1;
+        b_info->u.hvm.nx = 1;
+        b_info->u.hvm.viridian = 0;
+        b_info->u.hvm.hpet = 1;
+        b_info->u.hvm.vpt_align = 1;
+        b_info->u.hvm.timer_mode = 1;
+    } else {
+        b_info->u.pv.slack_memkb = 8 * 1024;
+    }
+}
+
+void libxl_init_dm_info(libxl_device_model_info *dm_info,
+        libxl_domain_create_info *c_info, libxl_domain_build_info *b_info)
+{
+    memset(dm_info, '\0', sizeof(*dm_info));
+
+    libxl_uuid_generate(&dm_info->uuid);
+
+    dm_info->dom_name = strdup(c_info->name);
+    dm_info->device_model = strdup("qemu-dm");
+    dm_info->target_ram = libxl__sizekb_to_mb(b_info->target_memkb);
+    dm_info->videoram = libxl__sizekb_to_mb(b_info->video_memkb);
+    dm_info->apic = b_info->u.hvm.apic;
+    dm_info->vcpus = b_info->max_vcpus;
+    dm_info->vcpu_avail = b_info->cur_vcpus;
+
+    dm_info->stdvga = 0;
+    dm_info->vnc = 1;
+    dm_info->vnclisten = strdup("127.0.0.1");
+    dm_info->vncdisplay = 0;
+    dm_info->vncunused = 1;
+    dm_info->keymap = NULL;
+    dm_info->sdl = 0;
+    dm_info->opengl = 0;
+    dm_info->nographic = 0;
+    dm_info->serial = NULL;
+    dm_info->boot = strdup("cda");
+    dm_info->usb = 0;
+    dm_info->usbdevice = NULL;
+    dm_info->xen_platform_pci = 1;
+}
+
 static int init_console_info(libxl_device_console *console, int dev_num, libxl_domain_build_state *state)
 {
     memset(console, 0x00, sizeof(libxl_device_console));
