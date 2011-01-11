@@ -2211,12 +2211,15 @@ p2m_remove_page(struct p2m_domain *p2m, unsigned long gfn, unsigned long mfn,
 
     P2M_DEBUG("removing gfn=%#lx mfn=%#lx\n", gfn, mfn);
 
-    for ( i = 0; i < (1UL << page_order); i++ )
+    if ( mfn_valid(_mfn(mfn)) )
     {
-        mfn_return = p2m->get_entry(p2m, gfn + i, &t, &a, p2m_query);
-        if ( !p2m_is_grant(t) )
-            set_gpfn_from_mfn(mfn+i, INVALID_M2P_ENTRY);
-        ASSERT( !p2m_is_valid(t) || mfn + i == mfn_x(mfn_return) );
+        for ( i = 0; i < (1UL << page_order); i++ )
+        {
+            mfn_return = p2m->get_entry(p2m, gfn + i, &t, &a, p2m_query);
+            if ( !p2m_is_grant(t) )
+                set_gpfn_from_mfn(mfn+i, INVALID_M2P_ENTRY);
+            ASSERT( !p2m_is_valid(t) || mfn + i == mfn_x(mfn_return) );
+        }
     }
     set_p2m_entry(p2m, gfn, _mfn(INVALID_MFN), page_order, p2m_invalid, p2m->default_access);
 }
@@ -2772,6 +2775,25 @@ int p2m_mem_paging_evict(struct p2m_domain *p2m, unsigned long gfn)
     return 0;
 }
 
+void p2m_mem_paging_drop_page(struct p2m_domain *p2m, unsigned long gfn)
+{
+    struct vcpu *v = current;
+    mem_event_request_t req;
+    struct domain *d = p2m->domain;
+
+    /* Check that there's space on the ring for this request */
+    if ( mem_event_check_ring(d) == 0)
+    {
+        /* Send release notification to pager */
+        memset(&req, 0, sizeof(req));
+        req.flags |= MEM_EVENT_FLAG_DROP_PAGE;
+        req.gfn = gfn;
+        req.vcpu_id = v->vcpu_id;
+
+        mem_event_put_request(d, &req);
+    }
+}
+
 void p2m_mem_paging_populate(struct p2m_domain *p2m, unsigned long gfn)
 {
     struct vcpu *v = current;
@@ -2846,13 +2868,16 @@ void p2m_mem_paging_resume(struct p2m_domain *p2m)
     /* Pull the response off the ring */
     mem_event_get_response(d, &rsp);
 
-    /* Fix p2m entry */
-    mfn = gfn_to_mfn(p2m, rsp.gfn, &p2mt);
-    p2m_lock(p2m);
-    set_p2m_entry(p2m, rsp.gfn, mfn, 0, p2m_ram_rw, p2m->default_access);
-    set_gpfn_from_mfn(mfn_x(mfn), gfn);
-    audit_p2m(p2m, 1);
-    p2m_unlock(p2m);
+    /* Fix p2m entry if the page was not dropped */
+    if ( !(rsp.flags & MEM_EVENT_FLAG_DROP_PAGE) )
+    {
+        mfn = gfn_to_mfn(p2m, rsp.gfn, &p2mt);
+        p2m_lock(p2m);
+        set_p2m_entry(p2m, rsp.gfn, mfn, 0, p2m_ram_rw, p2m->default_access);
+        set_gpfn_from_mfn(mfn_x(mfn), rsp.gfn);
+        audit_p2m(p2m, 1);
+        p2m_unlock(p2m);
+    }
 
     /* Unpause domain */
     if ( rsp.flags & MEM_EVENT_FLAG_VCPU_PAUSED )

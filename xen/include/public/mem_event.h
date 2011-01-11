@@ -33,6 +33,7 @@
 
 /* Memory event flags */
 #define MEM_EVENT_FLAG_VCPU_PAUSED  (1 << 0)
+#define MEM_EVENT_FLAG_DROP_PAGE    (1 << 1)
 
 /* Reasons for the memory event request */
 #define MEM_EVENT_REASON_UNKNOWN     0    /* typical reason */

@@ -511,6 +511,8 @@ int set_shared_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn);
 int p2m_mem_paging_nominate(struct p2m_domain *p2m, unsigned long gfn);
 /* Evict a frame */
 int p2m_mem_paging_evict(struct p2m_domain *p2m, unsigned long gfn);
+/* Tell xenpaging to drop a paged out frame */
+void p2m_mem_paging_drop_page(struct p2m_domain *p2m, unsigned long gfn);
 /* Start populating a paged out frame */
 void p2m_mem_paging_populate(struct p2m_domain *p2m, unsigned long gfn);
 /* Prepare the p2m for paging a frame in */
@@ -518,6 +520,8 @@ int p2m_mem_paging_prep(struct p2m_domain *p2m, unsigned long gfn);
 /* Resume normal operation (in case a domain was paused) */
 void p2m_mem_paging_resume(struct p2m_domain *p2m);
 #else
+static inline void p2m_mem_paging_drop_page(struct p2m_domain *p2m, unsigned long gfn)
+{ }
 static inline void p2m_mem_paging_populate(struct p2m_domain *p2m, unsigned long gfn)
 { }
 #endif

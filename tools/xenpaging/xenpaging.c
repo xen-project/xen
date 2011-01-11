@@ -638,25 +638,34 @@ int main(int argc, char *argv[])
                     goto out;
                 }
                 
-                /* Populate the page */
-                rc = xenpaging_populate_page(paging, &req.gfn, fd, i);
-                if ( rc != 0 )
+                if ( req.flags & MEM_EVENT_FLAG_DROP_PAGE )
                 {
-                    ERROR("Error populating page");
-                    goto out;
+                    DPRINTF("drop_page ^ gfn %"PRIx64" pageslot %d\n", req.gfn, i);
+                    /* Notify policy of page being dropped */
+                    policy_notify_paged_in(req.gfn);
                 }
-
-                /* Prepare the response */
-                rsp.gfn = req.gfn;
-                rsp.p2mt = req.p2mt;
-                rsp.vcpu_id = req.vcpu_id;
-                rsp.flags = req.flags;
-
-                rc = xenpaging_resume_page(paging, &rsp, 1);
-                if ( rc != 0 )
+                else
                 {
-                    ERROR("Error resuming page");
-                    goto out;
+                    /* Populate the page */
+                    rc = xenpaging_populate_page(paging, &req.gfn, fd, i);
+                    if ( rc != 0 )
+                    {
+                        ERROR("Error populating page");
+                        goto out;
+                    }
+
+                    /* Prepare the response */
+                    rsp.gfn = req.gfn;
+                    rsp.p2mt = req.p2mt;
+                    rsp.vcpu_id = req.vcpu_id;
+                    rsp.flags = req.flags;
+
+                    rc = xenpaging_resume_page(paging, &rsp, 1);
+                    if ( rc != 0 )
+                    {
+                        ERROR("Error resuming page");
+                        goto out;
+                    }
                 }
 
                 /* Evict a new page to replace the one we just paged in */
