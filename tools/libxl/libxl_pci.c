@@ -221,6 +221,19 @@ parse_error:
     return ERROR_INVAL;
 }
 
+static void libxl_create_pci_backend_device(libxl__gc *gc, flexarray_t *back, int num, libxl_device_pci *pcidev)
+{
+    flexarray_append(back, libxl__sprintf(gc, "key-%d", num));
+    flexarray_append(back, libxl__sprintf(gc, PCI_BDF, pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func));
+    flexarray_append(back, libxl__sprintf(gc, "dev-%d", num));
+    flexarray_append(back, libxl__sprintf(gc, PCI_BDF, pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func));
+    if (pcidev->vdevfn)
+        flexarray_vappend(back, libxl__sprintf(gc, "vdevfn-%d", num), libxl__sprintf(gc, "%x", pcidev->vdevfn), NULL);
+    flexarray_append(back, libxl__sprintf(gc, "opts-%d", num));
+    flexarray_append(back, libxl__sprintf(gc, "msitranslate=%d,power_mgmt=%d", pcidev->msitranslate, pcidev->power_mgmt));
+    flexarray_vappend(back, libxl__sprintf(gc, "state-%d", num), libxl__sprintf(gc, "%d", 1), NULL);
+}
+
 static int libxl_create_pci_backend(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, int num)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
@@ -249,20 +262,12 @@ static int libxl_create_pci_backend(libxl__gc *gc, uint32_t domid, libxl_device_
     device.kind = DEVICE_PCI;
 
     flexarray_vappend(back, "frontend-id", libxl__sprintf(gc, "%d", domid),
-                     "online", "1", "state", libxl__sprintf(gc, "%d", 1),
-                    "domain", libxl__domid_to_name(gc, domid), NULL);
-    for (i = 0; i < num; i++) {
-        flexarray_append(back, libxl__sprintf(gc, "key-%d", i));
-        flexarray_append(back, libxl__sprintf(gc, PCI_BDF, pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func));
-        flexarray_append(back, libxl__sprintf(gc, "dev-%d", i));
-        flexarray_append(back, libxl__sprintf(gc, PCI_BDF, pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func));
-        if (pcidev->vdevfn) {
-            flexarray_vappend(back, libxl__sprintf(gc, "vdevfn-%d", i), libxl__sprintf(gc, "%x", pcidev->vdevfn), NULL);
-        }
-        flexarray_append(back, libxl__sprintf(gc, "opts-%d", i));
-        flexarray_append(back, libxl__sprintf(gc, "msitranslate=%d,power_mgmt=%d", pcidev->msitranslate, pcidev->power_mgmt));
-        flexarray_vappend(back, libxl__sprintf(gc, "state-%d", i), libxl__sprintf(gc, "%d", 1), NULL);
-    }
+                      "online", "1", "state", libxl__sprintf(gc, "%d", 1),
+                      "domain", libxl__domid_to_name(gc, domid), NULL);
+
+    for (i = 0; i < num; i++, pcidev++)
+        libxl_create_pci_backend_device(gc, back, i, pcidev);
+
     flexarray_vappend(back, "num_devs", libxl__sprintf(gc, "%d", num));
 
     flexarray_vappend(front,
@@ -305,17 +310,7 @@ static int libxl_device_pci_add_xenstore(libxl__gc *gc, uint32_t domid, libxl_de
 
     LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Adding new pci device to xenstore");
     num = atoi(num_devs);
-    flexarray_append(back, libxl__sprintf(gc, "key-%d", num));
-    flexarray_append(back, libxl__sprintf(gc, PCI_BDF, pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func));
-    flexarray_append(back, libxl__sprintf(gc, "dev-%d", num));
-    flexarray_append(back, libxl__sprintf(gc, PCI_BDF, pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func));
-    if (pcidev->vdevfn) {
-        flexarray_append(back, libxl__sprintf(gc, "vdevfn-%d", num));
-        flexarray_append(back, libxl__sprintf(gc, "%x", pcidev->vdevfn));
-    }
-    flexarray_append(back, libxl__sprintf(gc, "opts-%d", num));
-    flexarray_append(back, libxl__sprintf(gc, "msitranslate=%d,power_mgmt=%d", pcidev->msitranslate, pcidev->power_mgmt));
-    flexarray_vappend(back, libxl__sprintf(gc, "state-%d", num), libxl__sprintf(gc, "%d", 1), NULL);
+    libxl_create_pci_backend_device(gc, back, num, pcidev);
     flexarray_vappend(back, "num_devs", libxl__sprintf(gc, "%d", num + 1), NULL);
     flexarray_vappend(back, "state", libxl__sprintf(gc, "%d", 7), NULL);
 
