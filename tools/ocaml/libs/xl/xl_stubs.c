@@ -68,16 +68,6 @@ void log_destroy(struct xentoollog_logger *logger)
 	caml_leave_blocking_section(); \
 	libxl_ctx_free(&ctx)
 
-static void * gc_calloc(caml_gc *gc, size_t nmemb, size_t size)
-{
-	void *ptr;
-	ptr = calloc(nmemb, size);
-	if (!ptr)
-		caml_raise_out_of_memory();
-	gc->ptrs[gc->offset++] = ptr;
-	return ptr;
-}
-
 static char * dup_String_val(caml_gc *gc, value s)
 {
 	int len;
@@ -104,6 +94,17 @@ void failwith_xl(char *fname, struct caml_logger *lg)
 	char *s;
 	s = (lg) ? lg->log_buf : fname;
 	caml_raise_with_string(*caml_named_value("xl.error"), s);
+}
+
+#if 0 /* TODO: wrap libxl_domain_create(), these functions will be needed then */
+static void * gc_calloc(caml_gc *gc, size_t nmemb, size_t size)
+{
+	void *ptr;
+	ptr = calloc(nmemb, size);
+	if (!ptr)
+		caml_raise_out_of_memory();
+	gc->ptrs[gc->offset++] = ptr;
+	return ptr;
 }
 
 static int string_string_tuple_array_val (caml_gc *gc, char ***c_val, value v)
@@ -163,7 +164,7 @@ static int domain_build_info_val (caml_gc *gc, libxl_domain_build_info *c_val, v
 	c_val->video_memkb = Int64_val(Field(v, 4));
 	c_val->shadow_memkb = Int64_val(Field(v, 5));
 	c_val->kernel.path = dup_String_val(gc, Field(v, 6));
-	c_val->hvm = Tag_val(Field(v, 7)) == 0;
+	c_val->is_hvm = Tag_val(Field(v, 7)) == 0;
 	infopriv = Field(Field(v, 7), 0);
 	if (c_val->hvm) {
 		c_val->u.hvm.pae = Bool_val(Field(infopriv, 0));
@@ -184,6 +185,7 @@ static int domain_build_info_val (caml_gc *gc, libxl_domain_build_info *c_val, v
 
 	CAMLreturn(0);
 }
+#endif
 
 static int device_disk_val(caml_gc *gc, libxl_device_disk *c_val, value v)
 {
@@ -332,21 +334,6 @@ static value Val_sched_credit(libxl_sched_credit *c_val)
 	CAMLreturn(v);
 }
 
-static value Val_domain_build_state(libxl_domain_build_state *c_val)
-{
-	CAMLparam0();
-	CAMLlocal1(v);
-
-	v = caml_alloc_tuple(4);
-
-	Store_field(v, 0, Val_int(c_val->store_port));
-	Store_field(v, 1, caml_copy_int64(c_val->store_mfn));
-	Store_field(v, 2, Val_int(c_val->console_port));
-	Store_field(v, 3, caml_copy_int64(c_val->console_mfn));
-
-	CAMLreturn(v);
-}
-
 static value Val_physinfo(libxl_physinfo *c_val)
 {
 	CAMLparam0();
@@ -371,52 +358,6 @@ static value Val_physinfo(libxl_physinfo *c_val)
 	Store_field(v, 10, caml_copy_int32(c_val->phys_cap));
 
 	CAMLreturn(v);
-}
-
-value stub_xl_domain_make(value info)
-{
-	CAMLparam1(info);
-	uint32_t domid;
-	libxl_domain_create_info c_info;
-	int ret;
-	INIT_STRUCT();
-
-	domain_create_info_val (&gc, &c_info, info);
-
-	INIT_CTX();
-
-	ret = libxl_domain_make(&ctx, &c_info, &domid);
-	if (ret != 0)
-		failwith_xl("domain make", &lg);
-
-	FREE_CTX();
-
-	CAMLreturn(Val_int(domid));
-}
-
-value stub_xl_domain_build(value info, value domid)
-{
-	CAMLparam2(info, domid);
-	CAMLlocal1(result);
-	libxl_domain_build_info c_info;
-	libxl_domain_build_state c_state;
-	int ret;
-	int c_domid;
-	INIT_STRUCT();
-
-	domain_build_info_val (&gc, &c_info, info);
-	c_domid = Int_val(domid);
-
-	INIT_CTX();
-
-	ret = libxl_domain_build(&ctx, &c_info, c_domid, &c_state);
-	if (ret != 0)
-		failwith_xl("domain_build", &lg);
-
-	result = Val_domain_build_state(&c_state);
-	FREE_CTX();
-
-	CAMLreturn(result);
 }
 
 value stub_xl_disk_add(value info, value domid)

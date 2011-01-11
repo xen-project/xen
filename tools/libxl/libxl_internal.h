@@ -194,14 +194,37 @@ typedef struct {
     char *what; /* malloc'd in spawn_spawn */
 } libxl__spawn_starting;
 
-struct libxl__device_model_starting {
+typedef struct {
     libxl__spawn_starting *for_spawn; /* first! */
     char *dom_path; /* from libxl_malloc, only for dm_xenstore_record_pid */
     int domid;
-};
+} libxl__device_model_starting;
+
+/* from xl_create */
+_hidden int libxl__domain_make(libxl_ctx *ctx, libxl_domain_create_info *info, uint32_t *domid);
+_hidden int libxl__domain_build(libxl_ctx *ctx, libxl_domain_build_info *info, uint32_t domid, /* out */ libxl_domain_build_state *state);
+
+/* for device model creation */
+_hidden int libxl__create_device_model(libxl_ctx *ctx,
+                              libxl_device_model_info *info,
+                              libxl_device_disk *disk, int num_disks,
+                              libxl_device_nic *vifs, int num_vifs,
+                              libxl__device_model_starting **starting_r);
+_hidden int libxl__create_xenpv_qemu(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb,
+                            libxl__device_model_starting **starting_r);
+_hidden int libxl__need_xenpv_qemu(libxl_ctx *ctx,
+        int nr_consoles, libxl_device_console *consoles,
+        int nr_vfbs, libxl_device_vfb *vfbs,
+        int nr_disks, libxl_device_disk *disks);
+
+  /* Caller must either: pass starting_r==0, or on successful
+   * return pass *starting_r (which will be non-0) to
+   * libxl_confirm_device_model or libxl_detach_device_model. */
+_hidden int libxl__confirm_device_model_startup(libxl_ctx *ctx,
+                              libxl__device_model_starting *starting);
 
 _hidden int libxl__spawn_spawn(libxl_ctx *ctx,
-                      libxl_device_model_starting *starting,
+                      libxl__device_model_starting *starting,
                       const char *what,
                       void (*intermediate_hook)(void *for_spawn, pid_t innerchild));
 _hidden int libxl__destroy_device_model(libxl_ctx *ctx, uint32_t domid);

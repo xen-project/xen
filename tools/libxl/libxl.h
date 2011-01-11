@@ -241,6 +241,38 @@ enum {
 
 #define LIBXL_VERSION 0
 
+enum libxl_action_on_shutdown {
+    LIBXL_ACTION_DESTROY,
+
+    LIBXL_ACTION_RESTART,
+    LIBXL_ACTION_RESTART_RENAME,
+
+    LIBXL_ACTION_PRESERVE,
+
+    LIBXL_ACTION_COREDUMP_DESTROY,
+    LIBXL_ACTION_COREDUMP_RESTART,
+};
+
+typedef struct {
+    libxl_domain_create_info c_info;
+    libxl_domain_build_info b_info;
+    libxl_device_model_info dm_info;
+
+    int num_disks, num_vifs, num_vif2s, num_pcidevs, num_vfbs, num_vkbs;
+
+    libxl_device_disk *disks;
+    libxl_device_nic *vifs;
+    libxl_device_net2 *vif2s;
+    libxl_device_pci *pcidevs;
+    libxl_device_vfb *vfbs;
+    libxl_device_vkb *vkbs;
+
+    enum libxl_action_on_shutdown on_poweroff;
+    enum libxl_action_on_shutdown on_reboot;
+    enum libxl_action_on_shutdown on_watchdog;
+    enum libxl_action_on_shutdown on_crash;
+} libxl_domain_config;
+
 /* context functions */
 int libxl_ctx_init(libxl_ctx *ctx, int version, xentoollog_logger*);
 int libxl_ctx_free(libxl_ctx *ctx);
@@ -248,11 +280,10 @@ int libxl_ctx_set_log(libxl_ctx *ctx, xentoollog_logger*);
 int libxl_ctx_postfork(libxl_ctx *ctx);
 
 /* domain related functions */
-int libxl_domain_make(libxl_ctx *ctx, libxl_domain_create_info *info, uint32_t *domid);
-int libxl_domain_build(libxl_ctx *ctx, libxl_domain_build_info *info, uint32_t domid, /* out */ libxl_domain_build_state *state);
-int libxl_domain_restore(libxl_ctx *ctx, libxl_domain_build_info *info,
-                         uint32_t domid, int fd, libxl_domain_build_state *state,
-                         libxl_device_model_info *dm_info);
+typedef int (*libxl_console_ready)(libxl_ctx *ctx, uint32_t domid, void *priv);
+int libxl_domain_create_new(libxl_ctx *ctx, libxl_domain_config *d_config, libxl_console_ready cb, void *priv, uint32_t *domid);
+int libxl_domain_create_restore(libxl_ctx *ctx, libxl_domain_config *d_config, libxl_console_ready cb, void *priv, uint32_t *domid, int restore_fd);
+void libxl_domain_config_destroy(libxl_domain_config *d_config);
 int libxl_domain_suspend(libxl_ctx *ctx, libxl_domain_suspend_info *info,
                           uint32_t domid, int fd);
 int libxl_domain_resume(libxl_ctx *ctx, uint32_t domid);
@@ -374,27 +405,6 @@ int libxl_domain_info(libxl_ctx*, libxl_dominfo *info_r,
 libxl_dominfo * libxl_list_domain(libxl_ctx*, int *nb_domain);
 libxl_cpupoolinfo * libxl_list_cpupool(libxl_ctx*, int *nb_pool);
 libxl_vminfo * libxl_list_vm(libxl_ctx *ctx, int *nb_vm);
-
-typedef struct libxl__device_model_starting libxl_device_model_starting;
-int libxl_create_device_model(libxl_ctx *ctx,
-                              libxl_device_model_info *info,
-                              libxl_device_disk *disk, int num_disks,
-                              libxl_device_nic *vifs, int num_vifs,
-                              libxl_device_model_starting **starting_r);
-int libxl_create_xenpv_qemu(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb,
-                            libxl_device_model_starting **starting_r);
-int libxl_need_xenpv_qemu(libxl_ctx *ctx,
-        int nr_consoles, libxl_device_console *consoles,
-        int nr_vfbs, libxl_device_vfb *vfbs,
-        int nr_disks, libxl_device_disk *disks);
-  /* Caller must either: pass starting_r==0, or on successful
-   * return pass *starting_r (which will be non-0) to
-   * libxl_confirm_device_model or libxl_detach_device_model. */
-int libxl_confirm_device_model_startup(libxl_ctx *ctx,
-                              libxl_device_model_starting *starting);
-int libxl_detach_device_model(libxl_ctx *ctx,
-                              libxl_device_model_starting *starting);
-  /* DM is detached even if error is returned */
 
 int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk);
 int libxl_device_disk_del(libxl_ctx *ctx, libxl_device_disk *disk, int wait);
