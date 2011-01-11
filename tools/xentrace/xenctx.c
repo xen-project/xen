@@ -178,12 +178,12 @@ static void read_symbol_table(const char *symtab)
 
         /* need more checks for syntax here... */
         symbol->address = strtoull(line, &p, 16);
-        if (!isspace(*p++))
+        if (!isspace((uint8_t)*p++))
             continue;
         type = *p++;
-        if (!isalpha(type) && type != '?')
+        if (!isalpha((uint8_t)type) && type != '?')
             continue;
-        if (!isspace(*p++))
+        if (!isspace((uint8_t)*p++))
             continue;
 
         /* in the future we should handle the module name
