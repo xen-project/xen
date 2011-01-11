@@ -18,7 +18,7 @@ XEN_BLKTAP2        = $(XEN_ROOT)/tools/blktap2
 CFLAGS_include = -I$(XEN_INCLUDE)
 
 CFLAGS_libxenctrl = -I$(XEN_LIBXC) $(CFLAGS_include)
-LDLIBS_libxenctrl = -L$(XEN_LIBXC) -lxenctrl
+LDLIBS_libxenctrl = -L$(XEN_LIBXC) -lxenctrl $(DLOPEN_LIBS)
 
 CFLAGS_libxenguest = -I$(XEN_LIBXC) $(CFLAGS_include)
 LDLIBS_libxenguest = -L$(XEN_LIBXC) -lxenguest
