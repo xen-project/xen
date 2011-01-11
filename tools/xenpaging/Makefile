@@ -27,6 +27,7 @@ xenpaging: $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 install: all
+	$(INSTALL_DIR) $(DESTDIR)/var/lib/xen/xenpaging
 	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
 	$(INSTALL_PROG) $(IBINS) $(DESTDIR)$(SBINDIR)
 
