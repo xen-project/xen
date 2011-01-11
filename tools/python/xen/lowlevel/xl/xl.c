@@ -651,6 +651,8 @@ static PyTypeObject PyXlType = {
 
 static PyMethodDef xl_methods[] = { { NULL } };
 
+#define  _INT_CONST(m, c) PyModule_AddIntConstant(m, #c, c)
+#define  _INT_CONST_LIBXL(m, c) PyModule_AddIntConstant(m, #c, LIBXL_ ## c)
 PyMODINIT_FUNC initxl(void)
 {
     PyObject *m;
@@ -671,6 +673,36 @@ PyMODINIT_FUNC initxl(void)
     Py_INCREF(xl_error_obj);
     PyModule_AddObject(m, "Error", xl_error_obj);
 
+    _INT_CONST(m, SHUTDOWN_poweroff);
+    _INT_CONST(m, SHUTDOWN_reboot);
+    _INT_CONST(m, SHUTDOWN_suspend);
+    _INT_CONST(m, SHUTDOWN_crash);
+    _INT_CONST(m, SHUTDOWN_watchdog);
+
+    _INT_CONST(m, XENFV);
+    _INT_CONST(m, XENPV);
+
+    _INT_CONST_LIBXL(m, CONSTYPE_SERIAL);
+    _INT_CONST_LIBXL(m, CONSTYPE_PV);
+
+    _INT_CONST_LIBXL(m, CONSBACK_XENCONSOLED);
+    _INT_CONST_LIBXL(m, CONSBACK_IOEMU);
+
+    _INT_CONST(m, PHYSTYPE_QCOW);
+    _INT_CONST(m, PHYSTYPE_QCOW2);
+    _INT_CONST(m, PHYSTYPE_VHD);
+    _INT_CONST(m, PHYSTYPE_AIO);
+    _INT_CONST(m, PHYSTYPE_FILE);
+    _INT_CONST(m, PHYSTYPE_PHY);
+
+    _INT_CONST(m, NICTYPE_IOEMU);
+    _INT_CONST(m, NICTYPE_VIF);
+
+    _INT_CONST_LIBXL(m, EVENT_DOMAIN_DEATH);
+    _INT_CONST_LIBXL(m, EVENT_DISK_EJECT);
+
+    _INT_CONST(m, POWER_BUTTON);
+    _INT_CONST(m, SLEEP_BUTTON);
     genwrap__init(m);
 }
 
