@@ -76,7 +76,7 @@ int genwrap__obj_init(PyObject *self, PyObject *args, PyObject *kwds)
 int genwrap__string_set(PyObject *v, char **str)
 {
     char *tmp;
-    if ( NULL == v ) {
+    if ( NULL == v || Py_None == v ) {
         free(*str);
         *str = NULL;
         return 0;
@@ -211,6 +211,7 @@ static PyObject *fixed_bytearray_get(const uint8_t *ptr, size_t len)
 
 int attrib__libxl_cpuid_policy_list_set(PyObject *v, libxl_cpuid_policy_list *pptr)
 {
+    PyErr_SetString(PyExc_NotImplementedError, "Setting cpuid_policy_list");
     return -1;
 }
 
@@ -233,21 +234,29 @@ int attrib__libxl_cpuarray_set(PyObject *v, libxl_cpuarray *pptr)
 
 int attrib__libxl_domain_build_state_ptr_set(PyObject *v, libxl_domain_build_state **pptr)
 {
+    PyErr_SetString(PyExc_NotImplementedError, "Setting domain_build_state_ptr");
     return -1;
 }
 
 int attrib__libxl_file_reference_set(PyObject *v, libxl_file_reference *pptr)
 {
-    return -1;
+    return genwrap__string_set(v, &pptr->path);
 }
 
 int attrib__libxl_hwcap_set(PyObject *v, libxl_hwcap *pptr)
 {
+    PyErr_SetString(PyExc_NotImplementedError, "Setting hwcap");
     return -1;
 }
 
 int attrib__libxl_key_value_list_set(PyObject *v, libxl_key_value_list *pptr)
 {
+    if ( *pptr ) {
+        libxl_key_value_list_destroy(pptr);
+        *pptr = NULL;
+    }
+    if ( v == Py_None )
+        return 0;
     return -1;
 }
 
@@ -258,6 +267,7 @@ int attrib__libxl_mac_set(PyObject *v, libxl_mac *pptr)
 
 int attrib__libxl_string_list_set(PyObject *v, libxl_string_list *pptr)
 {
+    PyErr_SetString(PyExc_NotImplementedError, "Setting string_list");
     return -1;
 }
 
@@ -268,11 +278,13 @@ int attrib__libxl_uuid_set(PyObject *v, libxl_uuid *pptr)
 
 int attrib__struct_in_addr_set(PyObject *v, struct in_addr *pptr)
 {
+    PyErr_SetString(PyExc_NotImplementedError, "Setting in_addr");
     return -1;
 }
 
 PyObject *attrib__libxl_cpuid_policy_list_get(libxl_cpuid_policy_list *pptr)
 {
+    PyErr_SetString(PyExc_NotImplementedError, "Getting cpuid_policy_list");
     return NULL;
 }
 
@@ -314,21 +326,24 @@ PyObject *attrib__libxl_cpuarray_get(libxl_cpuarray *pptr)
 
 PyObject *attrib__libxl_domain_build_state_ptr_get(libxl_domain_build_state **pptr)
 {
+    PyErr_SetString(PyExc_NotImplementedError, "Getting domain_build_state_ptr");
     return NULL;
 }
 
 PyObject *attrib__libxl_file_reference_get(libxl_file_reference *pptr)
 {
-    return NULL;
+    return genwrap__string_get(&pptr->path);
 }
 
 PyObject *attrib__libxl_hwcap_get(libxl_hwcap *pptr)
 {
+    PyErr_SetString(PyExc_NotImplementedError, "Getting hwcap");
     return NULL;
 }
 
 PyObject *attrib__libxl_key_value_list_get(libxl_key_value_list *pptr)
 {
+    PyErr_SetString(PyExc_NotImplementedError, "Getting key_value_list");
     return NULL;
 }
 
@@ -339,6 +354,7 @@ PyObject *attrib__libxl_mac_get(libxl_mac *pptr)
 
 PyObject *attrib__libxl_string_list_get(libxl_string_list *pptr)
 {
+    PyErr_SetString(PyExc_NotImplementedError, "Getting string_list");
     return NULL;
 }
 
@@ -349,6 +365,7 @@ PyObject *attrib__libxl_uuid_get(libxl_uuid *pptr)
 
 PyObject *attrib__struct_in_addr_get(struct in_addr *pptr)
 {
+    PyErr_SetString(PyExc_NotImplementedError, "Getting in_addr");
     return NULL;
 }
 
