@@ -18,59 +18,68 @@ XLU_Config *xlu_cfg_init(FILE *report, const char *report_filename) {
     return cfg;
 }
 
-int xlu_cfg_readfile(XLU_Config *cfg, const char *real_filename) {
-    CfgParseContext ctx;
-    FILE *f;
-    int e, r;
+static int ctx_prep(CfgParseContext *ctx, XLU_Config *cfg) {
+    int e;
 
-    ctx.cfg= cfg;
-    ctx.err= 0;
-    ctx.lexerrlineno= -1;
+    ctx->cfg= cfg;
+    ctx->err= 0;
+    ctx->lexerrlineno= -1;
+    ctx->scanner= 0;
     
-    f= fopen(real_filename, "r");
-    if (!f) {
-        e= errno;
-        fprintf(cfg->report,"%s: unable to open configuration file: %s\n",
-                real_filename, strerror(e));
-        return e;
-    }
-
-    e= xlu__cfg_yylex_init_extra(&ctx, &ctx.scanner);
+    e= xlu__cfg_yylex_init_extra(ctx, &ctx->scanner);
     if (e) {
         fprintf(cfg->report,"%s: unable to create scanner: %s\n",
                 cfg->filename, strerror(e));
         return e;
     }
+    return 0;
+}
+
+static void ctx_dispose(CfgParseContext *ctx) {
+    if (ctx->scanner) xlu__cfg_yylex_destroy(ctx->scanner);
+}
+
+static void parse(CfgParseContext *ctx) {
+    /* On return, ctx.err will be updated with the error status. */
+    int r;
+    r= xlu__cfg_yyparse(ctx);
+    if (r) assert(ctx->err);
+}
+
+int xlu_cfg_readfile(XLU_Config *cfg, const char *real_filename) {
+    FILE *f = 0;
+    int e;
+
+    CfgParseContext ctx;
+    e = ctx_prep(&ctx, cfg);
+    if (e) { ctx.err= e; goto xe; }
+
+    f= fopen(real_filename, "r");
+    if (!f) {
+        ctx.err = errno;
+        fprintf(cfg->report,"%s: unable to open configuration file: %s\n",
+                real_filename, strerror(e));
+        goto xe;
+    }
 
     xlu__cfg_yyrestart(f, ctx.scanner);
 
-    r= xlu__cfg_yyparse(&ctx);
-    if (r) assert(ctx.err);
+    parse(&ctx);
 
-    xlu__cfg_yylex_destroy(ctx.scanner);
-    fclose(f);
+ xe:
+    ctx_dispose(&ctx);
+    if (f) fclose(f);
 
     return ctx.err;
 }
 
 int xlu_cfg_readdata(XLU_Config *cfg, const char *data, int length) {
-    CfgParseContext ctx;
-    int e, r;
+    int e;
     YY_BUFFER_STATE buf= 0;
 
-    ctx.scanner= 0;
-    ctx.cfg= cfg;
-    ctx.err= 0;
-    ctx.lexerrlineno= -1;
-
-    e= xlu__cfg_yylex_init_extra(&ctx, &ctx.scanner);
-    if (e) {
-        fprintf(cfg->report,"%s: unable to create scanner: %s\n",
-                cfg->filename, strerror(e));
-        ctx.err= e;
-        ctx.scanner= 0;
-        goto xe;
-    }
+    CfgParseContext ctx;
+    e= ctx_prep(&ctx, cfg);
+    if (e) { ctx.err= e; goto xe; }
 
     buf = xlu__cfg_yy_scan_bytes(data, length, ctx.scanner);
     if (!buf) {
@@ -80,12 +89,11 @@ int xlu_cfg_readdata(XLU_Config *cfg, const char *data, int length) {
         goto xe;
     }
 
-    r= xlu__cfg_yyparse(&ctx);
-    if (r) assert(ctx.err);
+    parse(&ctx);
 
  xe:
     if (buf) xlu__cfg_yy_delete_buffer(buf, ctx.scanner);
-    if (ctx.scanner) xlu__cfg_yylex_destroy(ctx.scanner);
+    ctx_dispose(&ctx);
 
     return ctx.err;
 }
