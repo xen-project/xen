@@ -97,8 +97,10 @@ int genwrap__string_set(PyObject *v, char **str)
 
 PyObject *genwrap__string_get(char **str)
 {
-    if ( NULL == *str )
+    if ( NULL == *str ) {
+        Py_INCREF(Py_None);
         return Py_None;
+    }
     return PyString_FromString(*str);
 }
 
@@ -377,6 +379,7 @@ static PyObject *pyxl_list_domains(XlObject *self)
         if ( NULL == di )
             goto err_mem;
         memcpy(&di->obj, cur, sizeof(di->obj));
+        /* SetItem steals a reference */
         PyList_SetItem(list, i, (PyObject *)di);
     }
 
@@ -413,6 +416,7 @@ static PyObject *pyxl_domain_shutdown(XlObject *self, PyObject *args)
         PyErr_SetString(xl_error_obj, "cannot shutdown domain");
         return NULL;
     }
+    Py_INCREF(Py_None);
     return Py_None;
 }
 
@@ -425,6 +429,7 @@ static PyObject *pyxl_domain_destroy(XlObject *self, PyObject *args)
         PyErr_SetString(xl_error_obj, "cannot destroy domain");
         return NULL;
     }
+    Py_INCREF(Py_None);
     return Py_None;
 }
 
@@ -437,6 +442,7 @@ static PyObject *pyxl_domain_pause(XlObject *self, PyObject *args)
         PyErr_SetString(xl_error_obj, "cannot pause domain");
         return NULL;
     }
+    Py_INCREF(Py_None);
     return Py_None;
 }
 
@@ -449,6 +455,7 @@ static PyObject *pyxl_domain_unpause(XlObject *self, PyObject *args)
         PyErr_SetString(xl_error_obj, "cannot unpause domain");
         return NULL;
     }
+    Py_INCREF(Py_None);
     return Py_None;
 }
 
@@ -462,6 +469,7 @@ static PyObject *pyxl_domain_rename(XlObject *self, PyObject *args)
         PyErr_SetString(xl_error_obj, "cannot rename domain");
         return NULL;
     }
+    Py_INCREF(Py_None);
     return Py_None;
 }
 
@@ -481,6 +489,7 @@ static PyObject *pyxl_pci_add(XlObject *self, PyObject *args)
         PyErr_SetString(xl_error_obj, "cannot add pci device");
         return NULL;
     }
+    Py_INCREF(Py_None);
     return Py_None;
 }
 
@@ -501,6 +510,7 @@ static PyObject *pyxl_pci_del(XlObject *self, PyObject *args)
         PyErr_SetString(xl_error_obj, "cannot remove pci device");
         return NULL;
     }
+    Py_INCREF(Py_None);
     return Py_None;
 }
 

@@ -51,7 +51,10 @@ def py_attrib_get(ty, f):
     l.append('static PyObject *py_%s_%s_get(Py_%s *self, void *priv)'%(ty.rawname, f.name, ty.rawname))
     l.append('{')
     if t == TYPE_BOOL:
-        l.append('    return (self->obj.%s) ? Py_True : Py_False;'%f.name)
+        l.append('    PyObject *ret;')
+        l.append('    ret = (self->obj.%s) ? Py_True : Py_False;'%f.name)
+        l.append('    Py_INCREF(ret);')
+        l.append('    return ret;')
     elif t == TYPE_INT:
         l.append('    return genwrap__ll_get(self->obj.%s);'%f.name)
     elif t == TYPE_UINT:
