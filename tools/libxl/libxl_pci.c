@@ -224,17 +224,19 @@ parse_error:
 static int libxl_create_pci_backend(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, int num)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
-    flexarray_t *front;
-    flexarray_t *back;
+    flexarray_t *front = NULL;
+    flexarray_t *back = NULL;
     libxl__device device;
-    int i;
+    int ret = ERROR_NOMEM, i;
 
     front = flexarray_make(16, 1);
     if (!front)
-        return ERROR_NOMEM;
+        goto out;
     back = flexarray_make(16, 1);
     if (!back)
-        return ERROR_NOMEM;
+        goto out;
+
+    ret = 0;
 
     LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Creating pci backend");
 
@@ -271,8 +273,11 @@ static int libxl_create_pci_backend(libxl__gc *gc, uint32_t domid, libxl_device_
                              libxl__xs_kvs_of_flexarray(gc, back, back->count),
                              libxl__xs_kvs_of_flexarray(gc, front, front->count));
 
-    flexarray_free(back);
-    flexarray_free(front);
+out:
+    if (back)
+        flexarray_free(back);
+    if (front)
+        flexarray_free(front);
     return 0;
 }
 
