@@ -64,6 +64,12 @@ void xlu__cfg_yyset_column(int  column_no, yyscan_t yyscanner);
                           GOT(STRING);
                         }
 
+[+-.():]                {
+                          ctx->likely_python= 1;
+                          BEGIN(lexerr);
+                          yymore();
+                        }
+
 .                       {
                           BEGIN(lexerr);
                           yymore();

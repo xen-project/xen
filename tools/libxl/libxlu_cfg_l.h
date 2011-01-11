@@ -350,7 +350,7 @@ extern int xlu__cfg_yylex \
 #undef YY_DECL
 #endif
 
-#line 82 "libxlu_cfg_l.l"
+#line 88 "libxlu_cfg_l.l"
 
 #line 356 "libxlu_cfg_l.h"
 #undef xlu__cfg_yyIN_HEADER

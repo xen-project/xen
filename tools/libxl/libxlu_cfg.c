@@ -24,6 +24,7 @@ static int ctx_prep(CfgParseContext *ctx, XLU_Config *cfg) {
     ctx->cfg= cfg;
     ctx->err= 0;
     ctx->lexerrlineno= -1;
+    ctx->likely_python= 0;
     ctx->scanner= 0;
     
     e= xlu__cfg_yylex_init_extra(ctx, &ctx->scanner);
@@ -44,6 +45,14 @@ static void parse(CfgParseContext *ctx) {
     int r;
     r= xlu__cfg_yyparse(ctx);
     if (r) assert(ctx->err);
+
+    if (ctx->err && ctx->likely_python) {
+        fputs(
+ "warning: Config file looks like it contains Python code.\n"
+ "warning:  Arbitrary Python is no longer supported.\n"
+ "warning:  See http://wiki.xen.org/xenwiki/PythonInXlConfig\n",
+              ctx->cfg->report);
+    }
 }
 
 int xlu_cfg_readfile(XLU_Config *cfg, const char *real_filename) {

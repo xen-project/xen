@@ -41,7 +41,7 @@ struct XLU_Config {
 
 typedef struct {
     XLU_Config *cfg;
-    int err, lexerrlineno;
+    int err, lexerrlineno, likely_python;
     void *scanner;
 } CfgParseContext;
 
