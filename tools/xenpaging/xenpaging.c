@@ -78,6 +78,7 @@ xenpaging_t *xenpaging_init(domid_t domain_id)
     xenpaging_t *paging;
     xc_interface *xch;
     xentoollog_logger *dbg = NULL;
+    char *p;
     int rc;
 
     if ( getenv("XENPAGING_DEBUG") )
@@ -91,6 +92,13 @@ xenpaging_t *xenpaging_init(domid_t domain_id)
     /* Allocate memory */
     paging = malloc(sizeof(xenpaging_t));
     memset(paging, 0, sizeof(xenpaging_t));
+
+    p = getenv("XENPAGING_POLICY_MRU_SIZE");
+    if ( p && *p )
+    {
+         paging->policy_mru_size = atoi(p);
+         DPRINTF("Setting policy mru_size to %d\n", paging->policy_mru_size);
+    }
 
     /* Open connection to xen */
     paging->xc_handle = xch;

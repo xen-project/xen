@@ -26,11 +26,12 @@
 #include "policy.h"
 
 
-#define MRU_SIZE (1024 * 16)
+#define DEFAULT_MRU_SIZE (1024 * 16)
 
 
-static unsigned long mru[MRU_SIZE];
+static unsigned long *mru;
 static unsigned int i_mru;
+static unsigned int mru_size;
 static unsigned long *bitmap;
 static unsigned long *unconsumed;
 static unsigned long current_gfn;
@@ -57,7 +58,19 @@ int policy_init(xenpaging_t *paging)
     max_pages = paging->domain_info->max_pages;
 
     /* Initialise MRU list of paged in pages */
-    for ( i = 0; i < MRU_SIZE; i++ )
+    if ( paging->policy_mru_size > 0 )
+        mru_size = paging->policy_mru_size;
+    else
+        mru_size = DEFAULT_MRU_SIZE;
+
+    mru = malloc(sizeof(*mru) * mru_size);
+    if ( mru == NULL )
+    {
+        rc = -ENOMEM;
+        goto out;
+    }
+
+    for ( i = 0; i < mru_size; i++ )
         mru[i] = INVALID_MFN;
 
     /* Don't page out page 0 */
@@ -100,12 +113,12 @@ void policy_notify_paged_out(unsigned long gfn)
 
 void policy_notify_paged_in(unsigned long gfn)
 {
-    unsigned long old_gfn = mru[i_mru & (MRU_SIZE - 1)];
+    unsigned long old_gfn = mru[i_mru & (mru_size - 1)];
 
     if ( old_gfn != INVALID_MFN )
         clear_bit(old_gfn, bitmap);
     
-    mru[i_mru & (MRU_SIZE - 1)] = gfn;
+    mru[i_mru & (mru_size - 1)] = gfn;
     i_mru++;
 }
 

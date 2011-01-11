@@ -45,6 +45,7 @@ typedef struct xenpaging {
     unsigned long *bitmap;
 
     mem_event_t mem_event;
+    int policy_mru_size;
 } xenpaging_t;
 
 
