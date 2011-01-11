@@ -756,7 +756,7 @@ static int libxl_device_pci_reset(libxl__gc *gc, unsigned int domain, unsigned i
         return rc < 0 ? rc : 0;
     }
     if (errno == ENOENT) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "The kernel doesn't support PCI device reset from sysfs");
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "The kernel doesn't support reset from sysfs for PCI device "PCI_BDF, domain, bus, dev, func);
     } else {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Failed to access reset path %s", reset);
     }
