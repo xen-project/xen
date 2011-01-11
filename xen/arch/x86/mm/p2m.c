@@ -2850,6 +2850,7 @@ void p2m_mem_paging_resume(struct p2m_domain *p2m)
     mfn = gfn_to_mfn(p2m, rsp.gfn, &p2mt);
     p2m_lock(p2m);
     set_p2m_entry(p2m, rsp.gfn, mfn, 0, p2m_ram_rw, p2m->default_access);
+    set_gpfn_from_mfn(mfn_x(mfn), gfn);
     audit_p2m(p2m, 1);
     p2m_unlock(p2m);
 
