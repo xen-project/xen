@@ -543,6 +543,7 @@ static void printf_info(int domid,
         printf("\t\t\t(vncunused %d)\n", dm_info->vncunused);
         printf("\t\t\t(keymap %s)\n", dm_info->keymap);
         printf("\t\t\t(sdl %d)\n", dm_info->sdl);
+        printf("\t\t\t(gfx_passthru %d)\n", dm_info->gfx_passthru);
         printf("\t\t\t(opengl %d)\n", dm_info->opengl);
         printf("\t\t\t(nographic %d)\n", dm_info->nographic);
         printf("\t\t\t(serial %s)\n", dm_info->serial);
@@ -1281,6 +1282,8 @@ skip_vfb:
             dm_info->opengl = l;
         if (!xlu_cfg_get_long (config, "nographic", &l))
             dm_info->nographic = l;
+        if (!xlu_cfg_get_long (config, "gfx_passthru", &l))
+            dm_info->gfx_passthru = l;
         xlu_cfg_replace_string (config, "serial", &dm_info->serial);
         xlu_cfg_replace_string (config, "boot", &dm_info->boot);
         if (!xlu_cfg_get_long (config, "usb", &l))
