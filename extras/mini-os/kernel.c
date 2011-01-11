@@ -41,7 +41,6 @@
 #include <mini-os/blkfront.h>
 #include <mini-os/fbfront.h>
 #include <mini-os/pcifront.h>
-#include <mini-os/fs.h>
 #include <mini-os/xmalloc.h>
 #include <fcntl.h>
 #include <xen/features.h>
@@ -456,11 +455,6 @@ static void pcifront_thread(void *p)
     pcifront_scan(pci_dev, print_pcidev);
 }
 
-static void fs_thread(void *p)
-{
-    init_fs_frontend();
-}
-
 /* This should be overridden by the application we are linked against. */
 __attribute__((weak)) int app_main(start_info_t *si)
 {
@@ -472,7 +466,6 @@ __attribute__((weak)) int app_main(start_info_t *si)
     create_thread("fbfront", fbfront_thread, si);
     create_thread("kbdfront", kbdfront_thread, si);
     create_thread("pcifront", pcifront_thread, si);
-    create_thread("fs-frontend", fs_thread, si);
     return 0;
 }
 
