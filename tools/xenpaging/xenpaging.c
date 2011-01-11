@@ -387,6 +387,7 @@ int xenpaging_evict_page(xenpaging_t *paging,
         goto out;
     }
 
+    DPRINTF("evict_page > gfn %lx pageslot %d\n", victim->gfn, i);
     /* Notify policy of page being paged out */
     policy_notify_paged_out(victim->gfn);
 
@@ -427,6 +428,7 @@ static int xenpaging_populate_page(xenpaging_t *paging,
     unsigned char oom = 0;
 
     _gfn = *gfn;
+    DPRINTF("populate_page < gfn %lx pageslot %d\n", _gfn, i);
     do
     {
         /* Tell Xen to allocate a page for the domain */
