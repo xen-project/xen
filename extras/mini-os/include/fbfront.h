@@ -1,5 +1,6 @@
 #include <xen/io/kbdif.h>
 #include <xen/io/fbif.h>
+#include <mini-os/semaphore.h>
 #include <mini-os/wait.h>
 
 /* from <linux/input.h> */

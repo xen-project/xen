@@ -91,7 +91,7 @@ trap term SIGHUP
 ############
 # stubdomain
 # Wait for any previous stubdom to terminate
-while xm list | grep $domname-dm
+while xm list | grep -w $domname-dm
 do
 	sleep 1
 done

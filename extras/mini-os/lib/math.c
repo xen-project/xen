@@ -70,8 +70,8 @@
 union uu {
         int64_t           q;              /* as a (signed) quad */
         int64_t          uq;             /* as an unsigned quad */
-        long           sl[2];          /* as two signed longs */
-        unsigned long  ul[2];          /* as two unsigned longs */
+        int32_t        sl[2];          /* as two signed ints */
+        uint32_t       ul[2];          /* as two unsigned ints */
 };
 /* XXX RN: Yuck hardcoded endianess :) */
 #define _QUAD_HIGHWORD 1
@@ -91,17 +91,17 @@ union uu {
 #define CHAR_BIT        8               /* number of bits in a char */
 #endif
 #define QUAD_BITS       (sizeof(int64_t) * CHAR_BIT)
-#define LONG_BITS       (sizeof(long) * CHAR_BIT)
-#define HALF_BITS       (sizeof(long) * CHAR_BIT / 2)
+#define LONG_BITS       (sizeof(int32_t) * CHAR_BIT)
+#define HALF_BITS       (sizeof(int32_t) * CHAR_BIT / 2)
 
 /*
- * Extract high and low shortwords from longword, and move low shortword of
- * longword to upper half of long, i.e., produce the upper longword of
- * ((quad_t)(x) << (number_of_bits_in_long/2)).  (`x' must actually be u_long.)
+ * Extract high and low shortwords from intword, and move low shortword of
+ * intword to upper half of int32_t, i.e., produce the upper intword of
+ * ((quad_t)(x) << (number_of_bits_in_int/2)).  (`x' must actually be uint32_t.)
  *
- * These are used in the multiply code, to split a longword into upper
+ * These are used in the multiply code, to split a intword into upper
  * and lower halves, and to reassemble a product as a quad_t, shifted left
- * (sizeof(long)*CHAR_BIT/2).
+ * (sizeof(int32_t)*CHAR_BIT/2).
  */
 #define HHALF(x)        ((x) >> HALF_BITS)
 #define LHALF(x)        ((x) & ((1UL << HALF_BITS) - 1))
@@ -114,14 +114,10 @@ union uu {
 #define	B	(1UL << HALF_BITS)	/* digit base */
 
 /* Combine two `digits' to make a single two-digit number. */
-#define	COMBINE(a, b) (((u_long)(a) << HALF_BITS) | (b))
+#define	COMBINE(a, b) (((uint32_t)(a) << HALF_BITS) | (b))
 
-/* select a type for digits in base B: use unsigned short if they fit */
-#if ULONG_MAX == 0xffffffff && USHRT_MAX >= 0xffff
-typedef unsigned short digit;
-#else
-typedef u_long digit;
-#endif
+/* select a type for digits in base B: */
+typedef uint16_t digit;
 
 
 /*
@@ -143,7 +139,7 @@ shl(register digit *p, register int len, register int sh)
  * __qdivrem(u, v, rem) returns u/v and, optionally, sets *rem to u%v.
  *
  * We do this in base 2-sup-HALF_BITS, so that all intermediate products
- * fit within u_long.  As a consequence, the maximum length dividend and
+ * fit within uint32_t.  As a consequence, the maximum length dividend and
  * divisor are 4 `digits' in this base (they are shorter if they have
  * leading zeros).
  */
@@ -153,7 +149,7 @@ __qdivrem(uint64_t uq, uint64_t vq, uint64_t *arq)
 	union uu tmp;
 	digit *u, *v, *q;
 	register digit v1, v2;
-	u_long qhat, rhat, t;
+	uint32_t qhat, rhat, t;
 	int m, n, d, j, i;
 	digit uspace[5], vspace[5], qspace[5];
 
@@ -204,7 +200,7 @@ __qdivrem(uint64_t uq, uint64_t vq, uint64_t *arq)
 	v[4] = LHALF(tmp.ul[L]);
 	for (n = 4; v[1] == 0; v++) {
 		if (--n == 1) {
-			u_long rbj;	/* r*B+u[j] (not root boy jim) */
+			uint32_t rbj;	/* r*B+u[j] (not root boy jim) */
 			digit q1, q2, q3, q4;
 
 			/*
@@ -280,7 +276,7 @@ __qdivrem(uint64_t uq, uint64_t vq, uint64_t *arq)
 			rhat = uj1;
 			goto qhat_too_big;
 		} else {
-			u_long nn = COMBINE(uj0, uj1);
+			uint32_t nn = COMBINE(uj0, uj1);
 			qhat = nn / v1;
 			rhat = nn % v1;
 		}

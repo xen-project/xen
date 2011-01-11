@@ -100,80 +100,17 @@ struct save_file_header {
 };
 
 
-enum action_on_shutdown {
-    ACTION_DESTROY,
-
-    ACTION_RESTART,
-    ACTION_RESTART_RENAME,
-
-    ACTION_PRESERVE,
-
-    ACTION_COREDUMP_DESTROY,
-    ACTION_COREDUMP_RESTART,
-};
-
 static const char *action_on_shutdown_names[] = {
-    [ACTION_DESTROY] = "destroy",
+    [LIBXL_ACTION_DESTROY] = "destroy",
 
-    [ACTION_RESTART] = "restart",
-    [ACTION_RESTART_RENAME] = "rename-restart",
+    [LIBXL_ACTION_RESTART] = "restart",
+    [LIBXL_ACTION_RESTART_RENAME] = "rename-restart",
 
-    [ACTION_PRESERVE] = "preserve",
+    [LIBXL_ACTION_PRESERVE] = "preserve",
 
-    [ACTION_COREDUMP_DESTROY] = "coredump-destroy",
-    [ACTION_COREDUMP_RESTART] = "coredump-restart",
+    [LIBXL_ACTION_COREDUMP_DESTROY] = "coredump-destroy",
+    [LIBXL_ACTION_COREDUMP_RESTART] = "coredump-restart",
 };
-
-struct domain_config {
-    libxl_domain_create_info c_info;
-    libxl_domain_build_info b_info;
-
-    int num_disks, num_vifs, num_vif2s, num_pcidevs, num_vfbs, num_vkbs;
-
-    libxl_device_disk *disks;
-    libxl_device_nic *vifs;
-    libxl_device_net2 *vif2s;
-    libxl_device_pci *pcidevs;
-    libxl_device_vfb *vfbs;
-    libxl_device_vkb *vkbs;
-
-    enum action_on_shutdown on_poweroff;
-    enum action_on_shutdown on_reboot;
-    enum action_on_shutdown on_watchdog;
-    enum action_on_shutdown on_crash;
-};
-
-static void free_domain_config(struct domain_config *d_config)
-{
-    int i;
-
-    for (i=0; i<d_config->num_disks; i++)
-        libxl_device_disk_destroy(&d_config->disks[i]);
-    free(d_config->disks);
-
-    for (i=0; i<d_config->num_vifs; i++)
-        libxl_device_nic_destroy(&d_config->vifs[i]);
-    free(d_config->vifs);
-
-    for (i=0; i<d_config->num_vif2s; i++)
-        libxl_device_net2_destroy(&d_config->vif2s[i]);
-    free(d_config->vif2s);
-
-    for (i=0; i<d_config->num_pcidevs; i++)
-        libxl_device_pci_destroy(&d_config->pcidevs[i]);
-    free(d_config->pcidevs);
-
-    for (i=0; i<d_config->num_vfbs; i++)
-        libxl_device_vfb_destroy(&d_config->vfbs[i]);
-    free(d_config->vfbs);
-
-    for (i=0; i<d_config->num_vkbs; i++)
-        libxl_device_vkb_destroy(&d_config->vkbs[i]);
-    free(d_config->vkbs);
-
-    libxl_domain_create_info_destroy(&d_config->c_info);
-    libxl_domain_build_info_destroy(&d_config->b_info);
-}
 
 /* Optional data, in order:
  *   4 bytes uint32_t  config file size
@@ -312,164 +249,8 @@ static void dolog(const char *file, int line, const char *func, char *fmt, ...)
         libxl_write_exactly(NULL, logfile, s, rc, NULL, NULL);
 }
 
-static void init_create_info(libxl_domain_create_info *c_info)
-{
-    memset(c_info, '\0', sizeof(*c_info));
-    c_info->xsdata = NULL;
-    c_info->platformdata = NULL;
-    c_info->hap = 1;
-    c_info->hvm = 1;
-    c_info->oos = 1;
-    c_info->ssidref = 0;
-    c_info->poolid = 0;
-}
-
-static void init_build_info(libxl_domain_build_info *b_info, libxl_domain_create_info *c_info)
-{
-    memset(b_info, '\0', sizeof(*b_info));
-    b_info->max_vcpus = 1;
-    b_info->max_memkb = 32 * 1024;
-    b_info->target_memkb = b_info->max_memkb;
-    b_info->disable_migrate = 0;
-    b_info->cpuid = NULL;
-    b_info->shadow_memkb = 0;
-    if (c_info->hvm) {
-        b_info->video_memkb = 8 * 1024;
-        b_info->kernel.path = strdup("hvmloader");
-        b_info->hvm = 1;
-        b_info->u.hvm.pae = 1;
-        b_info->u.hvm.apic = 1;
-        b_info->u.hvm.acpi = 1;
-        b_info->u.hvm.nx = 1;
-        b_info->u.hvm.viridian = 0;
-        b_info->u.hvm.hpet = 1;
-        b_info->u.hvm.vpt_align = 1;
-        b_info->u.hvm.timer_mode = 1;
-    } else {
-        b_info->u.pv.slack_memkb = 8 * 1024;
-    }
-}
-
-static void init_dm_info(libxl_device_model_info *dm_info,
-        libxl_domain_create_info *c_info, libxl_domain_build_info *b_info)
-{
-    memset(dm_info, '\0', sizeof(*dm_info));
-
-    libxl_uuid_generate(&dm_info->uuid);
-
-    dm_info->dom_name = strdup(c_info->name);
-    dm_info->device_model = strdup("qemu-dm");
-    dm_info->target_ram = libxl__sizekb_to_mb(b_info->target_memkb);
-    dm_info->videoram = libxl__sizekb_to_mb(b_info->video_memkb);
-    dm_info->apic = b_info->u.hvm.apic;
-    dm_info->vcpus = b_info->max_vcpus;
-    dm_info->vcpu_avail = b_info->cur_vcpus;
-
-    dm_info->stdvga = 0;
-    dm_info->vnc = 1;
-    dm_info->vnclisten = strdup("127.0.0.1");
-    dm_info->vncdisplay = 0;
-    dm_info->vncunused = 1;
-    dm_info->keymap = NULL;
-    dm_info->sdl = 0;
-    dm_info->opengl = 0;
-    dm_info->nographic = 0;
-    dm_info->serial = NULL;
-    dm_info->boot = strdup("cda");
-    dm_info->usb = 0;
-    dm_info->usbdevice = NULL;
-    dm_info->xen_platform_pci = 1;
-}
-
-static void init_nic_info(libxl_device_nic *nic_info, int devnum)
-{
-    const uint8_t *r;
-    libxl_uuid uuid;
-
-    libxl_uuid_generate(&uuid);
-    r = libxl_uuid_bytearray(&uuid);
-    memset(nic_info, '\0', sizeof(*nic_info));
-
-    nic_info->backend_domid = 0;
-    nic_info->domid = 0;
-    nic_info->devid = devnum;
-    nic_info->mtu = 1492;
-    nic_info->model = strdup("e1000");
-    nic_info->mac[0] = 0x00;
-    nic_info->mac[1] = 0x16;
-    nic_info->mac[2] = 0x3e;
-    nic_info->mac[3] = r[0] & 0x7f;
-    nic_info->mac[4] = r[1];
-    nic_info->mac[5] = r[2];
-    nic_info->ifname = NULL;
-    nic_info->bridge = strdup("xenbr0");
-    CHK_ERRNO( asprintf(&nic_info->script, "%s/vif-bridge",
-               libxl_xen_script_dir_path()) );
-    nic_info->nictype = NICTYPE_IOEMU;
-}
-
-static void init_net2_info(libxl_device_net2 *net2_info, int devnum)
-{
-    const uint8_t *r;
-    libxl_uuid uuid;
-
-    libxl_uuid_generate(&uuid);
-    r = libxl_uuid_bytearray(&uuid);
-    memset(net2_info, '\0', sizeof(*net2_info));
-
-    net2_info->devid = devnum;
-    net2_info->front_mac[0] = 0x00;
-    net2_info->front_mac[1] = 0x16;
-    net2_info->front_mac[2] = 0x3e;;
-    net2_info->front_mac[3] = 0x7f & r[0];
-    net2_info->front_mac[4] = r[1];
-    net2_info->front_mac[5] = r[2];
-    net2_info->back_mac[0] = 0x00;
-    net2_info->back_mac[1] = 0x16;
-    net2_info->back_mac[2] = 0x3e;
-    net2_info->back_mac[3] = 0x7f & r[3];
-    net2_info->back_mac[4] = r[4];
-    net2_info->back_mac[5] = r[5];
-    net2_info->back_trusted = 1;
-    net2_info->filter_mac = 1;
-    net2_info->max_bypasses = 5;
-    net2_info->bridge = strdup("xenbr0");
-}
-
-static void init_vfb_info(libxl_device_vfb *vfb, int dev_num)
-{
-    memset(vfb, 0x00, sizeof(libxl_device_vfb));
-    vfb->devid = dev_num;
-    vfb->display = NULL;
-    vfb->xauthority = NULL;
-    vfb->vnc = 1;
-    vfb->vncpasswd = NULL;
-    vfb->vnclisten = strdup("127.0.0.1");
-    vfb->vncdisplay = 0;
-    vfb->vncunused = 1;
-    vfb->keymap = NULL;
-    vfb->sdl = 0;
-    vfb->opengl = 0;
-}
-
-static void init_vkb_info(libxl_device_vkb *vkb, int dev_num)
-{
-    memset(vkb, 0x00, sizeof(libxl_device_vkb));
-    vkb->devid = dev_num;
-}
-
-static void init_console_info(libxl_device_console *console, int dev_num, libxl_domain_build_state *state)
-{
-    memset(console, 0x00, sizeof(libxl_device_console));
-    console->devid = dev_num;
-    console->consback = LIBXL_CONSBACK_XENCONSOLED;
-    console->output = strdup("pty");
-    if (state)
-        console->build_state = state;
-}
-
 static void printf_info(int domid,
-                        struct domain_config *d_config,
+                        libxl_domain_config *d_config,
                         libxl_device_model_info *dm_info)
 {
     int i;
@@ -543,6 +324,7 @@ static void printf_info(int domid,
         printf("\t\t\t(vncunused %d)\n", dm_info->vncunused);
         printf("\t\t\t(keymap %s)\n", dm_info->keymap);
         printf("\t\t\t(sdl %d)\n", dm_info->sdl);
+        printf("\t\t\t(gfx_passthru %d)\n", dm_info->gfx_passthru);
         printf("\t\t\t(opengl %d)\n", dm_info->opengl);
         printf("\t\t\t(nographic %d)\n", dm_info->nographic);
         printf("\t\t\t(serial %s)\n", dm_info->serial);
@@ -626,7 +408,7 @@ static void printf_info(int domid,
        printf(")\n");
 }
 
-static int parse_action_on_shutdown(const char *buf, enum action_on_shutdown *a)
+static int parse_action_on_shutdown(const char *buf, enum libxl_action_on_shutdown *a)
 {
     int i;
     const char *n;
@@ -773,7 +555,7 @@ out:
 static void parse_config_data(const char *configfile_filename_report,
                               const char *configfile_data,
                               int configfile_len,
-                              struct domain_config *d_config,
+                              libxl_domain_config *d_config,
                               libxl_device_model_info *dm_info)
 {
     const char *buf;
@@ -799,7 +581,7 @@ static void parse_config_data(const char *configfile_filename_report,
         exit(1);
     }
 
-    init_create_info(c_info);
+    libxl_init_create_info(c_info);
 
     c_info->hvm = 0;
     if (!xlu_cfg_get_string (config, "builder", &buf) &&
@@ -834,7 +616,7 @@ static void parse_config_data(const char *configfile_filename_report,
         exit(1);
     }
 
-    init_build_info(b_info, c_info);
+    libxl_init_build_info(b_info, c_info);
 
     /* the following is the actual config parsing with overriding values in the structures */
     if (!xlu_cfg_get_long (config, "vcpus", &l)) {
@@ -977,7 +759,7 @@ static void parse_config_data(const char *configfile_filename_report,
 
             d_config->vifs = (libxl_device_nic *) realloc(d_config->vifs, sizeof (libxl_device_nic) * (d_config->num_vifs+1));
             nic = d_config->vifs + d_config->num_vifs;
-            init_nic_info(nic, d_config->num_vifs);
+            CHK_ERRNO( libxl_device_nic_init(nic, d_config->num_vifs) );
 
             p = strtok(buf2, ",");
             if (!p)
@@ -1054,7 +836,7 @@ skip:
             d_config->vif2s = realloc(d_config->vif2s, sizeof (libxl_device_net2) * (d_config->num_vif2s + 1));
             net2 = d_config->vif2s + d_config->num_vif2s;
 
-            init_net2_info(net2, d_config->num_vif2s);
+            libxl_device_net2_init(net2, d_config->num_vif2s);
 
             for (p = strtok(buf2, ","); p; p = strtok(NULL, ",")) {
                 char* val;
@@ -1106,11 +888,11 @@ skip:
 
             d_config->vfbs = (libxl_device_vfb *) realloc(d_config->vfbs, sizeof(libxl_device_vfb) * (d_config->num_vfbs + 1));
             vfb = d_config->vfbs + d_config->num_vfbs;
-            init_vfb_info(vfb, d_config->num_vfbs);
+            libxl_device_vfb_init(vfb, d_config->num_vfbs);
 
             d_config->vkbs = (libxl_device_vkb *) realloc(d_config->vkbs, sizeof(libxl_device_vkb) * (d_config->num_vkbs + 1));
             vkb = d_config->vkbs + d_config->num_vkbs;
-            init_vkb_info(vkb, d_config->num_vkbs);
+            libxl_device_vkb_init(vkb, d_config->num_vkbs);
 
             p = strtok(buf2, ",");
             if (!p)
@@ -1260,7 +1042,7 @@ skip_vfb:
 
     if (c_info->hvm == 1) {
         /* init dm from c and b */
-        init_dm_info(dm_info, c_info, b_info);
+        libxl_init_dm_info(dm_info, c_info, b_info);
 
         /* then process config related to dm */
         xlu_cfg_replace_string (config, "device_model", &dm_info->device_model);
@@ -1281,6 +1063,8 @@ skip_vfb:
             dm_info->opengl = l;
         if (!xlu_cfg_get_long (config, "nographic", &l))
             dm_info->nographic = l;
+        if (!xlu_cfg_get_long (config, "gfx_passthru", &l))
+            dm_info->gfx_passthru = l;
         xlu_cfg_replace_string (config, "serial", &dm_info->serial);
         xlu_cfg_replace_string (config, "boot", &dm_info->boot);
         if (!xlu_cfg_get_long (config, "usb", &l))
@@ -1316,32 +1100,12 @@ static void *xrealloc(void *ptr, size_t sz) {
     return r;
 }
 
-static pid_t autoconnect_console(void)
-{
-    pid_t pid;
-
-    pid = fork();
-    if (pid < 0) {
-        perror("unable to fork xenconsole");
-        return ERROR_FAIL;
-    } else if (pid > 0)
-        return pid;
-
-    libxl_ctx_postfork(&ctx);
-
-    sleep(1);
-    libxl_primary_console_exec(&ctx, domid);
-    /* Do not return. xl continued in child process */
-    fprintf(stderr, "Unable to attach console\n");
-    _exit(1);
-}
-
 /* Returns 1 if domain should be restarted, 2 if domain should be renamed then restarted  */
 static int handle_domain_death(libxl_ctx *ctx, uint32_t domid, libxl_event *event,
-                               struct domain_config *d_config, libxl_dominfo *info)
+                               libxl_domain_config *d_config, libxl_dominfo *info)
 {
     int restart = 0;
-    enum action_on_shutdown action;
+    enum libxl_action_on_shutdown action;
 
     switch (info->shutdown_reason) {
     case SHUTDOWN_poweroff:
@@ -1360,12 +1124,12 @@ static int handle_domain_death(libxl_ctx *ctx, uint32_t domid, libxl_event *even
         break;
     default:
         LOG("Unknown shutdown reason code %d. Destroying domain.", info->shutdown_reason);
-        action = ACTION_DESTROY;
+        action = LIBXL_ACTION_DESTROY;
     }
 
     LOG("Action for shutdown reason code %d is %s", info->shutdown_reason, action_on_shutdown_names[action]);
 
-    if (action == ACTION_COREDUMP_DESTROY || action == ACTION_COREDUMP_RESTART) {
+    if (action == LIBXL_ACTION_COREDUMP_DESTROY || action == LIBXL_ACTION_COREDUMP_RESTART) {
         char *corefile;
         int rc;
 
@@ -1378,30 +1142,30 @@ static int handle_domain_death(libxl_ctx *ctx, uint32_t domid, libxl_event *even
         }
         /* No point crying over spilled milk, continue on failure. */
 
-        if (action == ACTION_COREDUMP_DESTROY)
-            action = ACTION_DESTROY;
+        if (action == LIBXL_ACTION_COREDUMP_DESTROY)
+            action = LIBXL_ACTION_DESTROY;
         else
-            action = ACTION_RESTART;
+            action = LIBXL_ACTION_RESTART;
     }
 
     switch (action) {
-    case ACTION_PRESERVE:
+    case LIBXL_ACTION_PRESERVE:
         break;
 
-    case ACTION_RESTART_RENAME:
+    case LIBXL_ACTION_RESTART_RENAME:
         restart = 2;
         break;
 
-    case ACTION_RESTART:
+    case LIBXL_ACTION_RESTART:
         restart = 1;
         /* fall-through */
-    case ACTION_DESTROY:
+    case LIBXL_ACTION_DESTROY:
         LOG("Domain %d needs to be cleaned up: destroying the domain", domid);
         libxl_domain_destroy(ctx, domid, 0);
         break;
 
-    case ACTION_COREDUMP_DESTROY:
-    case ACTION_COREDUMP_RESTART:
+    case LIBXL_ACTION_COREDUMP_DESTROY:
+    case LIBXL_ACTION_COREDUMP_RESTART:
         /* Already handled these above. */
         abort();
     }
@@ -1410,7 +1174,7 @@ static int handle_domain_death(libxl_ctx *ctx, uint32_t domid, libxl_event *even
 }
 
 static int preserve_domain(libxl_ctx *ctx, uint32_t domid, libxl_event *event,
-                           struct domain_config *d_config, libxl_dominfo *info)
+                           libxl_domain_config *d_config, libxl_dominfo *info)
 {
     time_t now;
     struct tm tm;
@@ -1501,12 +1265,29 @@ static int freemem(libxl_domain_build_info *b_info, libxl_device_model_info *dm_
     return ERROR_NOMEM;
 }
 
+static int autoconnect_console(libxl_ctx *ctx, uint32_t domid, void *priv)
+{
+    pid_t *pid = priv;
+
+    *pid = fork();
+    if (*pid < 0) {
+        perror("unable to fork xenconsole");
+        return ERROR_FAIL;
+    } else if (*pid > 0)
+        return 0;
+
+    libxl_ctx_postfork(ctx);
+
+    sleep(1);
+    libxl_primary_console_exec(ctx, domid);
+    /* Do not return. xl continued in child process */
+    fprintf(stderr, "Unable to attach console\n");
+    _exit(1);
+}
+
 static int create_domain(struct domain_create *dom_info)
 {
-    struct domain_config d_config;
-
-    libxl_domain_build_state state;
-    libxl_device_model_info dm_info;
+    libxl_domain_config d_config;
 
     int debug = dom_info->debug;
     int daemonize = dom_info->daemonize;
@@ -1516,20 +1297,19 @@ static int create_domain(struct domain_create *dom_info)
     const char *restore_file = dom_info->restore_file;
     int migrate_fd = dom_info->migrate_fd;
 
-    int i, fd;
+    int fd;
     int need_daemon = 1;
     int ret, rc;
-    libxl_device_model_starting *dm_starting = 0;
     libxl_waiter *w1 = NULL, *w2 = NULL;
     void *config_data = 0;
     int config_len = 0;
     int restore_fd = -1;
-    struct save_file_header hdr;
-    pid_t child_console_pid = -1;
     int status = 0;
+    libxl_console_ready cb;
+    pid_t child_console_pid = -1;
+    struct save_file_header hdr;
 
     memset(&d_config, 0x00, sizeof(d_config));
-    memset(&dm_info, 0x00, sizeof(dm_info));
 
     if (restore_file) {
         uint8_t *optdata_begin = 0;
@@ -1629,7 +1409,7 @@ static int create_domain(struct domain_create *dom_info)
     if (!dom_info->quiet)
         printf("Parsing config file %s\n", config_file);
 
-    parse_config_data(config_file, config_data, config_len, &d_config, &dm_info);
+    parse_config_data(config_file, config_data, config_len, &d_config, &d_config.dm_info);
 
     ret = 0;
     if (dom_info->dryrun)
@@ -1654,7 +1434,7 @@ static int create_domain(struct domain_create *dom_info)
     }
 
     if (debug)
-        printf_info(-1, &d_config, &dm_info);
+        printf_info(-1, &d_config, &d_config.dm_info);
 
 start:
     domid = 0;
@@ -1663,16 +1443,9 @@ start:
     if (rc < 0)
         goto error_out;
 
-    ret = freemem(&d_config.b_info, &dm_info);
+    ret = freemem(&d_config.b_info, &d_config.dm_info);
     if (ret < 0) {
         fprintf(stderr, "failed to free memory for the domain\n");
-        ret = ERROR_FAIL;
-        goto error_out;
-    }
-
-    ret = libxl_domain_make(&ctx, &d_config.c_info, &domid);
-    if (ret) {
-        fprintf(stderr, "cannot make domain: %d\n", ret);
         ret = ERROR_FAIL;
         goto error_out;
     }
@@ -1685,116 +1458,22 @@ start:
         goto error_out;
     }
 
-    if (dom_info->console_autoconnect && !d_config.c_info.hvm) {
-        child_console_pid = autoconnect_console();
-        if (child_console_pid < 0)
-            goto error_out;
+    if ( dom_info->console_autoconnect ) {
+        cb = autoconnect_console;
+    }else{
+        cb = NULL;
     }
 
-    if (!restore_file) {
-        ret = libxl_run_bootloader(&ctx, &d_config.b_info, d_config.num_disks > 0 ? &d_config.disks[0] : NULL, domid);
-        if (ret) {
-            fprintf(stderr, "failed to run bootloader: %d\n", ret);
-            goto error_out;
-        }
+    if ( restore_file ) {
+        ret = libxl_domain_create_restore(&ctx, &d_config,
+                                            cb, &child_console_pid,
+                                            &domid, restore_fd);
+    }else{
+        ret = libxl_domain_create_new(&ctx, &d_config,
+                                        cb, &child_console_pid, &domid);
     }
-
-    if (!restore_file || !need_daemon) {
-        if (dm_info.saved_state) {
-            free(dm_info.saved_state);
-            dm_info.saved_state = NULL;
-        }
-        ret = libxl_domain_build(&ctx, &d_config.b_info, domid, &state);
-    } else {
-        ret = libxl_domain_restore(&ctx, &d_config.b_info, domid, restore_fd, &state, &dm_info);
-    }
-
-    if (ret) {
-        fprintf(stderr, "cannot (re-)build domain: %d\n", ret);
-        ret = ERROR_FAIL;
+    if ( ret )
         goto error_out;
-    }
-
-    for (i = 0; i < d_config.num_disks; i++) {
-        d_config.disks[i].domid = domid;
-        ret = libxl_device_disk_add(&ctx, domid, &d_config.disks[i]);
-        if (ret) {
-            fprintf(stderr, "cannot add disk %d to domain: %d\n", i, ret);
-            ret = ERROR_FAIL;
-            goto error_out;
-        }
-    }
-    for (i = 0; i < d_config.num_vifs; i++) {
-        d_config.vifs[i].domid = domid;
-        ret = libxl_device_nic_add(&ctx, domid, &d_config.vifs[i]);
-        if (ret) {
-            fprintf(stderr, "cannot add nic %d to domain: %d\n", i, ret);
-            ret = ERROR_FAIL;
-            goto error_out;
-        }
-    }
-    if (!d_config.c_info.hvm) {
-        for (i = 0; i < d_config.num_vif2s; i++) {
-            d_config.vif2s[i].domid = domid;
-            ret = libxl_device_net2_add(&ctx, domid, &d_config.vif2s[i]);
-            if (ret) {
-                fprintf(stderr, "cannot add net2 %d to domain: %d\n", i, ret);
-                ret = ERROR_FAIL;
-                goto error_out;
-            }
-        }
-    }
-    if (d_config.c_info.hvm) {
-        libxl_device_console console;
-
-        init_console_info(&console, 0, &state);
-        console.domid = domid;
-        libxl_device_console_add(&ctx, domid, &console);
-        libxl_device_console_destroy(&console);
-
-        dm_info.domid = domid;
-        MUST( libxl_create_device_model(&ctx, &dm_info,
-                                        d_config.disks, d_config.num_disks,
-                                        d_config.vifs, d_config.num_vifs,
-                                        &dm_starting) );
-    } else {
-        int need_qemu = 0;
-        libxl_device_console console;
-
-        for (i = 0; i < d_config.num_vfbs; i++) {
-            d_config.vfbs[i].domid = domid;
-            libxl_device_vfb_add(&ctx, domid, &d_config.vfbs[i]);
-            d_config.vkbs[i].domid = domid;
-            libxl_device_vkb_add(&ctx, domid, &d_config.vkbs[i]);
-        }
-
-        init_console_info(&console, 0, &state);
-        console.domid = domid;
-
-        need_qemu = libxl_need_xenpv_qemu(&ctx, 1, &console,
-                d_config.num_vfbs, d_config.vfbs,
-                d_config.num_disks, &d_config.disks[0]);
-
-        if (need_qemu)
-             console.consback = LIBXL_CONSBACK_IOEMU;
-
-        libxl_device_console_add(&ctx, domid, &console);
-        libxl_device_console_destroy(&console);
-
-        if (need_qemu)
-            libxl_create_xenpv_qemu(&ctx, domid, d_config.vfbs, &dm_starting);
-    }
-
-    if (dm_starting)
-        MUST( libxl_confirm_device_model_startup(&ctx, dm_starting) );
-    for (i = 0; i < d_config.num_pcidevs; i++)
-        libxl_device_pci_add(&ctx, domid, &d_config.pcidevs[i]);
-
-    if (dom_info->console_autoconnect && d_config.c_info.hvm) {
-        child_console_pid = autoconnect_console();
-        if (child_console_pid < 0)
-            goto error_out;
-    }
 
     release_lock();
 
@@ -1812,6 +1491,8 @@ start:
 
         child1 = libxl_fork(&ctx);
         if (child1) {
+            printf("Daemon running with PID %d\n", child1);
+
             for (;;) {
                 got_child = waitpid(child1, &status, 0);
                 if (got_child == child1) break;
@@ -1953,9 +1634,7 @@ out:
     if (logfile != 2)
         close(logfile);
 
-    libxl_device_model_info_destroy(&dm_info);
-
-    free_domain_config(&d_config);
+    libxl_domain_config_destroy(&d_config);
 
     free(config_data);
 
@@ -2550,7 +2229,7 @@ static void reboot_domain(const char *p)
 
 static void list_domains_details(const libxl_dominfo *info, int nb_domain)
 {
-    struct domain_config d_config;
+    libxl_domain_config d_config;
 
     char *config_file;
     uint8_t *data;
@@ -2568,7 +2247,7 @@ static void list_domains_details(const libxl_dominfo *info, int nb_domain)
         memset(&d_config, 0x00, sizeof(d_config));
         parse_config_data(config_file, (char *)data, len, &d_config, &dm_info);
         printf_info(info[i].domid, &d_config, &dm_info);
-        free_domain_config(&d_config);
+        libxl_domain_config_destroy(&d_config);
         free(data);
         free(config_file);
     }
@@ -4500,7 +4179,7 @@ int main_networkattach(int argc, char **argv)
         fprintf(stderr, "%s is an invalid domain identifier\n", argv[optind]);
         return 1;
     }
-    init_nic_info(&nic, -1);
+    libxl_device_nic_init(&nic, -1);
     for (argv += optind+1, argc -= optind+1; argc > 0; ++argv, --argc) {
         if (!strncmp("type=", *argv, 5)) {
             if (!strncmp("vif", (*argv) + 5, 4)) {
@@ -4834,7 +4513,7 @@ int main_network2attach(int argc, char **argv)
         fprintf(stderr, "%s is an invalid domain identifier\n", argv[optind]);
         return 1;
     }
-    init_net2_info(&net2, -1);
+    libxl_device_net2_init(&net2, -1);
     for (argv += optind+1, argc -= optind+1; argc > 0; --argc, ++argv) {
         if (!strncmp("front_mac=", *argv, 10)) {
             tok = strtok((*argv) + 10, ":");

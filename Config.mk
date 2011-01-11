@@ -185,9 +185,9 @@ endif
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 99d53fbb69d3e03be61ae10506a304a3d08d792f
-# Wed Jan 5 23:48:36 2011 +0000
-# fix '|' key display problem in en-us with altgr processing
+QEMU_TAG ?= 1c304816043c0ffe14d20d6006d6165cb7fddb9b
+# Tue Jan 11 18:48:58 2011 +0000
+# qemu-xen: use dynticks instead of a static 10ms timeout
 
 # Optional components
 XENSTAT_XENTOP     ?= y

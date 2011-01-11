@@ -13,7 +13,6 @@
 #include <time.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <fs.h>
 #include <xenbus.h>
 #include <events.h>
 
@@ -66,7 +65,6 @@ static void call_main(void *p)
 #if defined(HAVE_LWIP) && !defined(CONFIG_QEMU)
     start_networking();
 #endif
-    init_fs_frontend();
 #endif
     create_thread("pcifront", pcifront_watches, NULL);
 

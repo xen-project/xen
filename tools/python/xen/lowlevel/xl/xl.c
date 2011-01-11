@@ -76,7 +76,7 @@ int genwrap__obj_init(PyObject *self, PyObject *args, PyObject *kwds)
 int genwrap__string_set(PyObject *v, char **str)
 {
     char *tmp;
-    if ( NULL == v ) {
+    if ( NULL == v || Py_None == v ) {
         free(*str);
         *str = NULL;
         return 0;
@@ -97,8 +97,10 @@ int genwrap__string_set(PyObject *v, char **str)
 
 PyObject *genwrap__string_get(char **str)
 {
-    if ( NULL == *str )
+    if ( NULL == *str ) {
+        Py_INCREF(Py_None);
         return Py_None;
+    }
     return PyString_FromString(*str);
 }
 
@@ -209,6 +211,7 @@ static PyObject *fixed_bytearray_get(const uint8_t *ptr, size_t len)
 
 int attrib__libxl_cpuid_policy_list_set(PyObject *v, libxl_cpuid_policy_list *pptr)
 {
+    PyErr_SetString(PyExc_NotImplementedError, "Setting cpuid_policy_list");
     return -1;
 }
 
@@ -231,21 +234,29 @@ int attrib__libxl_cpuarray_set(PyObject *v, libxl_cpuarray *pptr)
 
 int attrib__libxl_domain_build_state_ptr_set(PyObject *v, libxl_domain_build_state **pptr)
 {
+    PyErr_SetString(PyExc_NotImplementedError, "Setting domain_build_state_ptr");
     return -1;
 }
 
 int attrib__libxl_file_reference_set(PyObject *v, libxl_file_reference *pptr)
 {
-    return -1;
+    return genwrap__string_set(v, &pptr->path);
 }
 
 int attrib__libxl_hwcap_set(PyObject *v, libxl_hwcap *pptr)
 {
+    PyErr_SetString(PyExc_NotImplementedError, "Setting hwcap");
     return -1;
 }
 
 int attrib__libxl_key_value_list_set(PyObject *v, libxl_key_value_list *pptr)
 {
+    if ( *pptr ) {
+        libxl_key_value_list_destroy(pptr);
+        *pptr = NULL;
+    }
+    if ( v == Py_None )
+        return 0;
     return -1;
 }
 
@@ -256,6 +267,7 @@ int attrib__libxl_mac_set(PyObject *v, libxl_mac *pptr)
 
 int attrib__libxl_string_list_set(PyObject *v, libxl_string_list *pptr)
 {
+    PyErr_SetString(PyExc_NotImplementedError, "Setting string_list");
     return -1;
 }
 
@@ -266,11 +278,13 @@ int attrib__libxl_uuid_set(PyObject *v, libxl_uuid *pptr)
 
 int attrib__struct_in_addr_set(PyObject *v, struct in_addr *pptr)
 {
+    PyErr_SetString(PyExc_NotImplementedError, "Setting in_addr");
     return -1;
 }
 
 PyObject *attrib__libxl_cpuid_policy_list_get(libxl_cpuid_policy_list *pptr)
 {
+    PyErr_SetString(PyExc_NotImplementedError, "Getting cpuid_policy_list");
     return NULL;
 }
 
@@ -312,21 +326,24 @@ PyObject *attrib__libxl_cpuarray_get(libxl_cpuarray *pptr)
 
 PyObject *attrib__libxl_domain_build_state_ptr_get(libxl_domain_build_state **pptr)
 {
+    PyErr_SetString(PyExc_NotImplementedError, "Getting domain_build_state_ptr");
     return NULL;
 }
 
 PyObject *attrib__libxl_file_reference_get(libxl_file_reference *pptr)
 {
-    return NULL;
+    return genwrap__string_get(&pptr->path);
 }
 
 PyObject *attrib__libxl_hwcap_get(libxl_hwcap *pptr)
 {
+    PyErr_SetString(PyExc_NotImplementedError, "Getting hwcap");
     return NULL;
 }
 
 PyObject *attrib__libxl_key_value_list_get(libxl_key_value_list *pptr)
 {
+    PyErr_SetString(PyExc_NotImplementedError, "Getting key_value_list");
     return NULL;
 }
 
@@ -337,6 +354,7 @@ PyObject *attrib__libxl_mac_get(libxl_mac *pptr)
 
 PyObject *attrib__libxl_string_list_get(libxl_string_list *pptr)
 {
+    PyErr_SetString(PyExc_NotImplementedError, "Getting string_list");
     return NULL;
 }
 
@@ -347,6 +365,7 @@ PyObject *attrib__libxl_uuid_get(libxl_uuid *pptr)
 
 PyObject *attrib__struct_in_addr_get(struct in_addr *pptr)
 {
+    PyErr_SetString(PyExc_NotImplementedError, "Getting in_addr");
     return NULL;
 }
 
@@ -377,6 +396,7 @@ static PyObject *pyxl_list_domains(XlObject *self)
         if ( NULL == di )
             goto err_mem;
         memcpy(&di->obj, cur, sizeof(di->obj));
+        /* SetItem steals a reference */
         PyList_SetItem(list, i, (PyObject *)di);
     }
 
@@ -413,6 +433,7 @@ static PyObject *pyxl_domain_shutdown(XlObject *self, PyObject *args)
         PyErr_SetString(xl_error_obj, "cannot shutdown domain");
         return NULL;
     }
+    Py_INCREF(Py_None);
     return Py_None;
 }
 
@@ -425,6 +446,7 @@ static PyObject *pyxl_domain_destroy(XlObject *self, PyObject *args)
         PyErr_SetString(xl_error_obj, "cannot destroy domain");
         return NULL;
     }
+    Py_INCREF(Py_None);
     return Py_None;
 }
 
@@ -437,6 +459,7 @@ static PyObject *pyxl_domain_pause(XlObject *self, PyObject *args)
         PyErr_SetString(xl_error_obj, "cannot pause domain");
         return NULL;
     }
+    Py_INCREF(Py_None);
     return Py_None;
 }
 
@@ -449,6 +472,7 @@ static PyObject *pyxl_domain_unpause(XlObject *self, PyObject *args)
         PyErr_SetString(xl_error_obj, "cannot unpause domain");
         return NULL;
     }
+    Py_INCREF(Py_None);
     return Py_None;
 }
 
@@ -462,6 +486,7 @@ static PyObject *pyxl_domain_rename(XlObject *self, PyObject *args)
         PyErr_SetString(xl_error_obj, "cannot rename domain");
         return NULL;
     }
+    Py_INCREF(Py_None);
     return Py_None;
 }
 
@@ -481,6 +506,7 @@ static PyObject *pyxl_pci_add(XlObject *self, PyObject *args)
         PyErr_SetString(xl_error_obj, "cannot add pci device");
         return NULL;
     }
+    Py_INCREF(Py_None);
     return Py_None;
 }
 
@@ -501,6 +527,7 @@ static PyObject *pyxl_pci_del(XlObject *self, PyObject *args)
         PyErr_SetString(xl_error_obj, "cannot remove pci device");
         return NULL;
     }
+    Py_INCREF(Py_None);
     return Py_None;
 }
 
@@ -527,6 +554,75 @@ static PyObject *pyxl_pci_parse(XlObject *self, PyObject *args)
     return (PyObject *)pci;
 }
 
+static PyObject *pyxl_pci_list_assignable(XlObject *self, PyObject *args)
+{
+    libxl_device_pci *dev;
+    PyObject *list;
+    int nr_dev, i;
+
+    if ( libxl_device_pci_list_assignable(&self->ctx, &dev, &nr_dev) ) {
+        PyErr_SetString(xl_error_obj, "Cannot list assignable devices");
+        return NULL;
+    }
+
+    list = PyList_New(nr_dev);
+    if ( NULL == list )
+        return NULL;
+
+    for(i = 0; i < nr_dev; i++) {
+        Py_device_pci *pd;
+        pd = Pydevice_pci_New();
+        if ( NULL == pd )
+            goto err_mem;
+        memcpy(&pd->obj, &dev[i], sizeof(pd->obj));
+        /* SetItem steals a reference */
+        PyList_SetItem(list, i, (PyObject *)pd);
+    }
+
+    free(dev);
+    return list;
+err_mem:
+    Py_DECREF(list);
+    PyErr_SetString(PyExc_MemoryError, "Allocating PCI device list");
+    return NULL;
+}
+
+static PyObject *pyxl_pci_list(XlObject *self, PyObject *args)
+{
+    libxl_device_pci *dev;
+    PyObject *list;
+    int nr_dev, i, domid;
+
+    if ( !PyArg_ParseTuple(args, "i", &domid) )
+        return NULL;
+
+    if ( libxl_device_pci_list_assigned(&self->ctx, &dev, domid, &nr_dev) ) {
+        PyErr_SetString(xl_error_obj, "Cannot list assignable devices");
+        return NULL;
+    }
+
+    list = PyList_New(nr_dev);
+    if ( NULL == list )
+        return NULL;
+
+    for(i = 0; i < nr_dev; i++) {
+        Py_device_pci *pd;
+        pd = Pydevice_pci_New();
+        if ( NULL == pd )
+            goto err_mem;
+        memcpy(&pd->obj, &dev[i], sizeof(pd->obj));
+        /* SetItem steals a reference */
+        PyList_SetItem(list, i, (PyObject *)pd);
+    }
+
+    free(dev);
+    return list;
+err_mem:
+    Py_DECREF(list);
+    PyErr_SetString(PyExc_MemoryError, "Allocating PCI device list");
+    return NULL;
+}
+
 static PyMethodDef pyxl_methods[] = {
     {"list_domains", (PyCFunction)pyxl_list_domains, METH_NOARGS,
          "List domains"},
@@ -536,9 +632,9 @@ static PyMethodDef pyxl_methods[] = {
          "Shutdown a domain"},
     {"domain_destroy", (PyCFunction)pyxl_domain_destroy, METH_VARARGS,
          "Destroy a domain"},
-    {"domain_pause", (PyCFunction)pyxl_domain_unpause, METH_VARARGS,
+    {"domain_pause", (PyCFunction)pyxl_domain_pause, METH_VARARGS,
          "Pause a domain"},
-    {"domain_unpause", (PyCFunction)pyxl_domain_pause, METH_VARARGS,
+    {"domain_unpause", (PyCFunction)pyxl_domain_unpause, METH_VARARGS,
          "Unpause a domain"},
     {"domain_rename", (PyCFunction)pyxl_domain_rename, METH_VARARGS,
          "Rename a domain"},
@@ -548,6 +644,11 @@ static PyMethodDef pyxl_methods[] = {
          "Remove a pass-through PCI device"},
     {"device_pci_parse_bdf", (PyCFunction)pyxl_pci_parse, METH_VARARGS,
          "Parse pass-through PCI device spec (BDF)"},
+    {"device_pci_list", (PyCFunction)pyxl_pci_list, METH_VARARGS,
+        "List PCI devices assigned to a domain"},
+    {"device_pci_list_assignable",
+        (PyCFunction)pyxl_pci_list_assignable, METH_NOARGS,
+        "List assignable PCI devices"},
     { NULL, NULL, 0, NULL }
 };
 
@@ -618,7 +719,7 @@ static PyTypeObject PyXlType = {
     NULL,                         /* tp_getattro       */
     NULL,                         /* tp_setattro       */
     NULL,                         /* tp_as_buffer      */
-    Py_TPFLAGS_DEFAULT,           /* tp_flags          */
+    Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE, /* tp_flags          */
     "libxenlight connection",     /* tp_doc            */
     NULL,                         /* tp_traverse       */
     NULL,                         /* tp_clear          */
@@ -641,6 +742,8 @@ static PyTypeObject PyXlType = {
 
 static PyMethodDef xl_methods[] = { { NULL } };
 
+#define  _INT_CONST(m, c) PyModule_AddIntConstant(m, #c, c)
+#define  _INT_CONST_LIBXL(m, c) PyModule_AddIntConstant(m, #c, LIBXL_ ## c)
 PyMODINIT_FUNC initxl(void)
 {
     PyObject *m;
@@ -661,6 +764,36 @@ PyMODINIT_FUNC initxl(void)
     Py_INCREF(xl_error_obj);
     PyModule_AddObject(m, "Error", xl_error_obj);
 
+    _INT_CONST(m, SHUTDOWN_poweroff);
+    _INT_CONST(m, SHUTDOWN_reboot);
+    _INT_CONST(m, SHUTDOWN_suspend);
+    _INT_CONST(m, SHUTDOWN_crash);
+    _INT_CONST(m, SHUTDOWN_watchdog);
+
+    _INT_CONST(m, XENFV);
+    _INT_CONST(m, XENPV);
+
+    _INT_CONST_LIBXL(m, CONSTYPE_SERIAL);
+    _INT_CONST_LIBXL(m, CONSTYPE_PV);
+
+    _INT_CONST_LIBXL(m, CONSBACK_XENCONSOLED);
+    _INT_CONST_LIBXL(m, CONSBACK_IOEMU);
+
+    _INT_CONST(m, PHYSTYPE_QCOW);
+    _INT_CONST(m, PHYSTYPE_QCOW2);
+    _INT_CONST(m, PHYSTYPE_VHD);
+    _INT_CONST(m, PHYSTYPE_AIO);
+    _INT_CONST(m, PHYSTYPE_FILE);
+    _INT_CONST(m, PHYSTYPE_PHY);
+
+    _INT_CONST(m, NICTYPE_IOEMU);
+    _INT_CONST(m, NICTYPE_VIF);
+
+    _INT_CONST_LIBXL(m, EVENT_DOMAIN_DEATH);
+    _INT_CONST_LIBXL(m, EVENT_DISK_EJECT);
+
+    _INT_CONST(m, POWER_BUTTON);
+    _INT_CONST(m, SLEEP_BUTTON);
     genwrap__init(m);
 }
 

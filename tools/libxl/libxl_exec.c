@@ -90,7 +90,7 @@ void libxl_report_child_exitstatus(libxl_ctx *ctx,
 }
 
 int libxl__spawn_spawn(libxl_ctx *ctx,
-                      libxl_device_model_starting *starting,
+                      libxl__device_model_starting *starting,
                       const char *what,
                       void (*intermediate_hook)(void *for_spawn,
                                                 pid_t innerchild))

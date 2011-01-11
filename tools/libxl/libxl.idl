@@ -152,6 +152,7 @@ libxl_device_model_info = Struct("device_model_info",[
     ("sdl",              bool,              False, "sdl enabled or disabled"),
     ("opengl",           bool,              False, "opengl enabled or disabled (if enabled requires sdl enabled)"),
     ("nographic",        bool,              False, "no graphics, use serial port"),
+    ("gfx_passthru",     bool,              False, "disable qemu graphics for PCI passthru of GPU from host"),
     ("serial",           string,            False, "serial port re-direct to pty deivce"),
     ("boot",             string,            False, "boot order, for example dca"),
     ("usb",              bool,              False, "usb support enabled or disabled"),
