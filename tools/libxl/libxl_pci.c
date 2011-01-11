@@ -261,9 +261,11 @@ static int libxl_create_pci_backend(libxl__gc *gc, uint32_t domid, libxl_device_
         flexarray_append(back, libxl__sprintf(gc, "msitranslate=%d,power_mgmt=%d", pcidev->msitranslate, pcidev->power_mgmt));
         flexarray_vappend(back, libxl__sprintf(gc, "state-%d", i), libxl__sprintf(gc, "%d", 1), NULL);
     }
-    flexarray_vappend(back, "num_devs", libxl__sprintf(gc, "%d", num),
-                    "backend-id", libxl__sprintf(gc, "%d", 0),
-                    "state", libxl__sprintf(gc, "%d", 1), NULL);
+    flexarray_vappend(back, "num_devs", libxl__sprintf(gc, "%d", num));
+
+    flexarray_vappend(front,
+                      "backend-id", libxl__sprintf(gc, "%d", 0),
+                      "state", libxl__sprintf(gc, "%d", 1), NULL);
 
     libxl__device_generic_add(ctx, &device,
                              libxl__xs_kvs_of_flexarray(gc, back, back->count),
