@@ -73,7 +73,7 @@ static void *init_page(void)
     return NULL;
 }
 
-xenpaging_t *xenpaging_init(domid_t domain_id)
+static xenpaging_t *xenpaging_init(domid_t domain_id)
 {
     xenpaging_t *paging;
     xc_interface *xch;
@@ -251,7 +251,7 @@ xenpaging_t *xenpaging_init(domid_t domain_id)
     return NULL;
 }
 
-int xenpaging_teardown(xenpaging_t *paging)
+static int xenpaging_teardown(xenpaging_t *paging)
 {
     int rc;
     xc_interface *xch;
@@ -343,7 +343,7 @@ static int put_response(mem_event_t *mem_event, mem_event_response_t *rsp)
     return 0;
 }
 
-int xenpaging_evict_page(xenpaging_t *paging,
+static int xenpaging_evict_page(xenpaging_t *paging,
                          xenpaging_victim_t *victim, int fd, int i)
 {
     xc_interface *xch = paging->xc_handle;
