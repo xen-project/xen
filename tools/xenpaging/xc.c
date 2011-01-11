@@ -62,7 +62,7 @@ int xc_mem_paging_flush_ioemu_cache(domid_t domain_id)
 
     xs_daemon_close(xsh);
 
-    return rc;
+    return rc ? 0 : -1;
 }
 
 int xc_wait_for_event_or_timeout(xc_interface *xch, xc_evtchn *xce, unsigned long ms)
