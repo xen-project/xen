@@ -19,6 +19,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <signal.h>
+#include <ctype.h>
 #include <string.h>
 #include <inttypes.h>
 #include <getopt.h>
@@ -58,7 +59,6 @@ int disp_tlb;
 
 struct symbol {
     guest_word_t address;
-    char type;
     char *name;
     struct symbol *next;
 } *symbol_table = NULL;
@@ -112,12 +112,12 @@ static void insert_symbol(struct symbol *symbol)
 
     /* The System.map is usually already sorted... */
     if (prev
-        && prev->address < symbol->address
+        && prev->address <= symbol->address
         && (!prev->next || prev->next->address > symbol->address)) {
         s = prev;
     } else {
         /* ... otherwise do crappy/slow search for the correct place */
-        while(s && s->next && s->next->address < symbol->address)
+        while (s->next && s->next->address <= symbol->address)
             s = s->next;
     }
 
@@ -130,13 +130,13 @@ static struct symbol *lookup_symbol(guest_word_t address)
 {
     struct symbol *s = symbol_table;
 
-    while(s && s->next && s->next->address < address)
+    if (!s)
+        return NULL;
+
+    while (s->next && s->next->address < address)
         s = s->next;
 
-    if (s && s->address < address)
-        return s;
-
-    return NULL;
+    return s->next && s->next->address <= address ? s->next : s;
 }
 
 static void print_symbol(guest_word_t addr)
@@ -159,7 +159,7 @@ static void print_symbol(guest_word_t addr)
 
 static void read_symbol_table(const char *symtab)
 {
-    char line[256];
+    char type, line[256];
     char *p;
     struct symbol *symbol;
     FILE *f;
@@ -178,9 +178,13 @@ static void read_symbol_table(const char *symtab)
 
         /* need more checks for syntax here... */
         symbol->address = strtoull(line, &p, 16);
-        p++;
-        symbol->type = *p++;
-        p++;
+        if (!isspace(*p++))
+            continue;
+        type = *p++;
+        if (!isalpha(type) && type != '?')
+            continue;
+        if (!isspace(*p++))
+            continue;
 
         /* in the future we should handle the module name
          * being appended here, this would allow us to use
@@ -190,7 +194,18 @@ static void read_symbol_table(const char *symtab)
             p[strlen(p)-1] = '\0';
         symbol->name = strdup(p);
 
-        insert_symbol(symbol);
+        switch (type) {
+        case 'A': /* global absolute */
+        case 'a': /* local absolute */
+            break;
+        case 'U': /* undefined */
+        case 'v': /* undefined weak object */
+        case 'w': /* undefined weak function */
+            continue;
+        default:
+            insert_symbol(symbol);
+            break;
+        }
 
         if (strcmp(symbol->name, "_stext") == 0)
             kernel_stext = symbol->address;
