@@ -498,6 +498,10 @@ class XendConfig(dict):
             if os.path.dirname(self['platform']['device_model']) == "":
                 self['platform']['device_model'] = \
                     auxbin.pathTo(self['platform']['device_model'])
+            # If the device_model is not set the os.path.exists() would raise
+            # an exception so we return our error message instead if applicable
+            if not self['platform']['device_model']:
+                raise VmError("No valid device model specified")
             if not os.path.exists(self['platform']['device_model']):
                 raise VmError("device model '%s' not found" % str(self['platform']['device_model']))
 
