@@ -527,7 +527,7 @@ static int reserve_offlined_page(struct page_info *head)
 static void free_heap_pages(
     struct page_info *pg, unsigned int order)
 {
-    unsigned long mask, mfn = page_to_mfn(pg);
+    unsigned long mask;
     unsigned int i, node = phys_to_nid(page_to_maddr(pg)), tainted = 0;
     unsigned int zone = page_to_zone(pg);
 
@@ -538,10 +538,6 @@ static void free_heap_pages(
 
     for ( i = 0; i < (1 << order); i++ )
     {
-        /* This page is not a guest frame any more. */
-        page_set_owner(&pg[i], NULL); /* set_gpfn_from_mfn snoops pg owner */
-        set_gpfn_from_mfn(mfn + i, INVALID_M2P_ENTRY);
-
         /*
          * Cannot assume that count_info == 0, as there are some corner cases
          * where it isn't the case and yet it isn't a bug:
