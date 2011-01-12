@@ -379,12 +379,12 @@ struct yy_trans_info
 	flex_int32_t yy_verify;
 	flex_int32_t yy_nxt;
 	};
-static yyconst flex_int16_t yy_accept[34] =
+static yyconst flex_int16_t yy_accept[35] =
     {   0,
-        0,    0,   13,   13,   16,   12,    3,    9,   12,   12,
-       12,    4,    2,    8,    7,    5,    6,    1,   13,   13,
-       14,    0,   11,    0,    0,    9,    0,   10,    0,    2,
-        1,   13,    0
+        0,    0,   14,   14,   17,   13,    3,    9,   13,   13,
+       13,   12,    4,    2,    8,    7,    5,    6,    1,   14,
+       14,   15,    0,   11,    0,    0,    9,    0,   10,    0,
+        2,    1,   14,    0
     } ;
 
 static yyconst flex_int32_t yy_ec[256] =
@@ -809,13 +809,13 @@ yy_match:
 			while ( yy_chk[yy_base[yy_current_state] + yy_c] != yy_current_state )
 				{
 				yy_current_state = (int) yy_def[yy_current_state];
-				if ( yy_current_state >= 34 )
+				if ( yy_current_state >= 35 )
 					yy_c = yy_meta[(unsigned int) yy_c];
 				}
 			yy_current_state = yy_nxt[yy_base[yy_current_state] + (unsigned int) yy_c];
 			++yy_cp;
 			}
-		while ( yy_current_state != 33 );
+		while ( yy_current_state != 34 );
 		yy_cp = yyg->yy_last_accepting_cpos;
 		yy_current_state = yyg->yy_last_accepting_state;
 
@@ -919,34 +919,43 @@ case 12:
 YY_RULE_SETUP
 #line 67 "libxlu_cfg_l.l"
 {
+                          ctx->likely_python= 1;
                           BEGIN(lexerr);
                           yymore();
                         }
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 72 "libxlu_cfg_l.l"
+#line 73 "libxlu_cfg_l.l"
+{
+                          BEGIN(lexerr);
+                          yymore();
+                        }
+	YY_BREAK
+case 14:
+YY_RULE_SETUP
+#line 78 "libxlu_cfg_l.l"
 {
                           xlu__cfgl_lexicalerror(ctx,"lexical error");
                           BEGIN(0);
                         }
 	YY_BREAK
-case 14:
-/* rule 14 can match eol */
+case 15:
+/* rule 15 can match eol */
 YY_RULE_SETUP
-#line 77 "libxlu_cfg_l.l"
+#line 83 "libxlu_cfg_l.l"
 {
                           xlu__cfgl_lexicalerror(ctx,"lexical error");
                           BEGIN(0);
                           GOT(NEWLINE);
                         }
 	YY_BREAK
-case 15:
+case 16:
 YY_RULE_SETUP
-#line 82 "libxlu_cfg_l.l"
+#line 88 "libxlu_cfg_l.l"
 YY_FATAL_ERROR( "flex scanner jammed" );
 	YY_BREAK
-#line 948 "libxlu_cfg_l.c"
+#line 959 "libxlu_cfg_l.c"
 case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(lexerr):
 	yyterminate();
@@ -1242,7 +1251,7 @@ static int yy_get_next_buffer (yyscan_t yyscanner)
 		while ( yy_chk[yy_base[yy_current_state] + yy_c] != yy_current_state )
 			{
 			yy_current_state = (int) yy_def[yy_current_state];
-			if ( yy_current_state >= 34 )
+			if ( yy_current_state >= 35 )
 				yy_c = yy_meta[(unsigned int) yy_c];
 			}
 		yy_current_state = yy_nxt[yy_base[yy_current_state] + (unsigned int) yy_c];
@@ -1271,11 +1280,11 @@ static int yy_get_next_buffer (yyscan_t yyscanner)
 	while ( yy_chk[yy_base[yy_current_state] + yy_c] != yy_current_state )
 		{
 		yy_current_state = (int) yy_def[yy_current_state];
-		if ( yy_current_state >= 34 )
+		if ( yy_current_state >= 35 )
 			yy_c = yy_meta[(unsigned int) yy_c];
 		}
 	yy_current_state = yy_nxt[yy_base[yy_current_state] + (unsigned int) yy_c];
-	yy_is_jam = (yy_current_state == 33);
+	yy_is_jam = (yy_current_state == 34);
 
 	return yy_is_jam ? 0 : yy_current_state;
 }
