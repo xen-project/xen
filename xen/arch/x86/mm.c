@@ -2367,7 +2367,7 @@ static int __get_page_type(struct page_info *page, unsigned long type,
 
                 /* No special validation needed for writable pages. */
                 /* Page tables and GDT/LDT need to be scanned for validity. */
-                if ( type == PGT_writable_page )
+                if ( type == PGT_writable_page || type == PGT_shared_page )
                     nx |= PGT_validated;
             }
         }
@@ -4167,32 +4167,25 @@ int page_make_sharable(struct domain *d,
                        struct page_info *page, 
                        int expected_refcnt)
 {
-    unsigned long x, nx, y;
-
-    /* Acquire ref first, so that the page doesn't dissapear from us */
-    if(!get_page(page, d))
-        return -EINVAL;
-
     spin_lock(&d->page_alloc_lock);
 
     /* Change page type and count atomically */
-    y = page->u.inuse.type_info;
-    nx = PGT_shared_page | PGT_validated | 1; 
-    do {
-        x = y;
-        /* We can only change the type if count is zero, and 
-           type is PGT_none */
-        if((x & (PGT_type_mask | PGT_count_mask)) != PGT_none)
-        {
-            put_page(page);
-            spin_unlock(&d->page_alloc_lock);
-            return -EEXIST;
-        }
-        y = cmpxchg(&page->u.inuse.type_info, x, nx);
-    } while(x != y);
+    if ( !get_page_and_type(page, d, PGT_shared_page) )
+    {
+        spin_unlock(&d->page_alloc_lock);
+        return -EINVAL;
+    }
 
-    /* Check if the ref count is 2. The first from PGT_allocated, and the second
-     * from get_page at the top of this function */
+    /* Check it wasn't already sharable and undo if it was */
+    if ( (page->u.inuse.type_info & PGT_count_mask) != 1 )
+    {
+        put_page_and_type(page);
+        spin_unlock(&d->page_alloc_lock);
+        return -EEXIST;
+    }
+
+    /* Check if the ref count is 2. The first from PGT_allocated, and
+     * the second from get_page_and_type at the top of this function */
     if(page->count_info != (PGC_allocated | (2 + expected_refcnt)))
     {
         /* Return type count back to zero */
@@ -4205,39 +4198,27 @@ int page_make_sharable(struct domain *d,
     d->tot_pages--;
     page_list_del(page, &d->page_list);
     spin_unlock(&d->page_alloc_lock);
-
-    /* NOTE: We are not putting the page back. In effect this function acquires
-     * one ref and type ref for the caller */
-
     return 0;
 }
 
 int page_make_private(struct domain *d, struct page_info *page)
 {
-    unsigned long x, y;
-
     if(!get_page(page, dom_cow))
         return -EINVAL;
     
     spin_lock(&d->page_alloc_lock);
 
-    /* Change page type and count atomically */
-    y = page->u.inuse.type_info;
-    do {
-        x = y;
-        /* We can only change the type if count is one */
-        if((x & (PGT_type_mask | PGT_count_mask)) != 
-                (PGT_shared_page | 1))
-        {
-            put_page(page);
-            spin_unlock(&d->page_alloc_lock);
-            return -EEXIST;
-        }
-        y = cmpxchg(&page->u.inuse.type_info, x, PGT_none);
-    } while(x != y);
+    /* We can only change the type if count is one */
+    if ( (page->u.inuse.type_info & (PGT_type_mask | PGT_count_mask))
+         != (PGT_shared_page | 1) )
+    {
+        put_page(page);
+        spin_unlock(&d->page_alloc_lock);
+        return -EEXIST;
+    }
 
-    /* We dropped type ref above, drop one ref count too */
-    put_page(page);
+    /* Drop the final typecount */
+    put_page_and_type(page);
 
     /* Change the owner */
     ASSERT(page_get_owner(page) == dom_cow);
