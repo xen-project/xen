@@ -1437,7 +1437,7 @@ static int create_domain(struct domain_create *dom_info)
         printf_info(-1, &d_config, &d_config.dm_info);
 
 start:
-    domid = 0;
+    domid = -1;
 
     rc = acquire_lock();
     if (rc < 0)
@@ -1446,14 +1446,6 @@ start:
     ret = freemem(&d_config.b_info, &d_config.dm_info);
     if (ret < 0) {
         fprintf(stderr, "failed to free memory for the domain\n");
-        ret = ERROR_FAIL;
-        goto error_out;
-    }
-
-    ret = libxl_userdata_store(&ctx, domid, "xl",
-                                    config_data, config_len);
-    if (ret) {
-        perror("cannot save config file");
         ret = ERROR_FAIL;
         goto error_out;
     }
@@ -1474,6 +1466,14 @@ start:
     }
     if ( ret )
         goto error_out;
+
+    ret = libxl_userdata_store(&ctx, domid, "xl",
+                                    config_data, config_len);
+    if (ret) {
+        perror("cannot save config file");
+        ret = ERROR_FAIL;
+        goto error_out;
+    }
 
     release_lock();
 
