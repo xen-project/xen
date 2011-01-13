@@ -45,19 +45,26 @@ static int ept_pod_check_and_populate(struct p2m_domain *p2m, unsigned long gfn,
                                       ept_entry_t *entry, int order,
                                       p2m_query_t q)
 {
+    /* Only take the lock if we don't already have it.  Otherwise it
+     * wouldn't be safe to do p2m lookups with the p2m lock held */
+    int do_locking = !p2m_locked_by_me(p2m);
     int r;
-    p2m_lock(p2m);
+
+    if ( do_locking )
+        p2m_lock(p2m);
 
     /* Check to make sure this is still PoD */
     if ( entry->sa_p2mt != p2m_populate_on_demand )
     {
-        p2m_unlock(p2m);
+        if ( do_locking )
+            p2m_unlock(p2m);
         return 0;
     }
 
     r = p2m_pod_demand_populate(p2m, gfn, order, q);
 
-    p2m_unlock(p2m);
+    if ( do_locking )
+        p2m_unlock(p2m);
 
     return r;
 }
