@@ -1627,7 +1627,7 @@ start:
 
 error_out:
     release_lock();
-    if (domid)
+    if (domid > 0)
         libxl_domain_destroy(&ctx, domid, 0);
 
 out:
