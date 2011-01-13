@@ -185,7 +185,8 @@ endif
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 1c304816043c0ffe14d20d6006d6165cb7fddb9b
+QEMU_TAG := xen-4.1.0-rc1
+#QEMU_TAG ?= 1c304816043c0ffe14d20d6006d6165cb7fddb9b
 # Tue Jan 11 18:48:58 2011 +0000
 # qemu-xen: use dynticks instead of a static 10ms timeout
 
