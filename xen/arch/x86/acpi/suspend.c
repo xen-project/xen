@@ -24,8 +24,7 @@ static uint16_t saved_segs[4];
 
 void save_rest_processor_state(void)
 {
-    if ( !is_idle_vcpu(current) )
-        unlazy_fpu(current);
+    save_init_fpu(current);
 
 #if defined(CONFIG_X86_64)
     asm volatile (

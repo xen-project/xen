@@ -16,7 +16,6 @@
 
 extern unsigned int xsave_cntxt_size;
 extern u64 xfeature_mask;
-extern bool_t cpu_has_xsaveopt;
 
 void xsave_init(void);
 int xsave_alloc_save_area(struct vcpu *v);
@@ -75,54 +74,7 @@ static inline uint64_t get_xcr0(void)
     return this_cpu(xcr0);
 }
 
-static inline void xsave(struct vcpu *v)
-{
-    struct xsave_struct *ptr;
-
-    ptr =(struct xsave_struct *)v->arch.xsave_area;
-
-    asm volatile (".byte " REX_PREFIX "0x0f,0xae,0x27"
-        :
-        : "a" (-1), "d" (-1), "D"(ptr)
-        : "memory");
-}
-
-static inline void xsaveopt(struct vcpu *v)
-{
-    struct xsave_struct *ptr;
-
-    ptr =(struct xsave_struct *)v->arch.xsave_area;
-
-    asm volatile (".byte " REX_PREFIX "0x0f,0xae,0x37"
-        :
-        : "a" (-1), "d" (-1), "D"(ptr)
-        : "memory");
-}
-
-static inline void xrstor(struct vcpu *v)
-{
-    struct xsave_struct *ptr;
-
-    ptr =(struct xsave_struct *)v->arch.xsave_area;
-
-    asm volatile (".byte " REX_PREFIX "0x0f,0xae,0x2f"
-        :
-        : "m" (*ptr), "a" (-1), "d" (-1), "D"(ptr));
-}
-
 extern void setup_fpu(struct vcpu *v);
-extern void init_fpu(void);
 extern void save_init_fpu(struct vcpu *v);
-extern void restore_fpu(struct vcpu *v);
-
-#define unlazy_fpu(v) do {                      \
-    if ( (v)->fpu_dirtied )                     \
-        save_init_fpu(v);                       \
-} while ( 0 )
-
-#define load_mxcsr(val) do {                                    \
-    unsigned long __mxcsr = ((unsigned long)(val) & 0xffbf);    \
-    __asm__ __volatile__ ( "ldmxcsr %0" : : "m" (__mxcsr) );    \
-} while ( 0 )
 
 #endif /* __ASM_I386_I387_H */
