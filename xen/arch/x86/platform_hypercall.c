@@ -55,11 +55,9 @@ static long cpu_frequency_change_helper(void *data)
     return cpu_frequency_change(this_cpu(freq));
 }
 
-static long cpu_down_helper(void *data)
-{
-    int cpu = (unsigned long)data;
-    return cpu_down(cpu);
-}
+/* from sysctl.c */
+long cpu_up_helper(void *data);
+long cpu_down_helper(void *data);
 
 ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
 {
@@ -443,40 +441,43 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
 
     case XENPF_cpu_online:
     {
-        int cpu;
+        int cpu = op->u.cpu_ol.cpuid;
 
-        cpu = op->u.cpu_ol.cpuid;
-        if (!cpu_present(cpu))
+        if ( !cpu_present(cpu) )
         {
             ret = -EINVAL;
             break;
         }
-        else if (cpu_online(cpu))
+
+        if ( cpu_online(cpu) )
         {
             ret = 0;
             break;
         }
 
-        ret = cpu_up(cpu);
+        ret = continue_hypercall_on_cpu(
+            0, cpu_up_helper, (void *)(unsigned long)cpu);
         break;
     }
 
     case XENPF_cpu_offline:
     {
-        int cpu;
+        int cpu = op->u.cpu_ol.cpuid;
 
-        cpu = op->u.cpu_ol.cpuid;
-        if (!cpu_present(cpu))
+        if ( !cpu_present(cpu) )
         {
             ret = -EINVAL;
             break;
-        } else if (!cpu_online(cpu))
+        }
+
+        if ( !cpu_online(cpu) )
         {
             ret = 0;
             break;
         }
+
         ret = continue_hypercall_on_cpu(
-          0, cpu_down_helper, (void *)(unsigned long)cpu);
+            0, cpu_down_helper, (void *)(unsigned long)cpu);
         break;
     }
     break;

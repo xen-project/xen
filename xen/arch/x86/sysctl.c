@@ -30,10 +30,30 @@
 
 #define get_xen_guest_handle(val, hnd)  do { val = (hnd).p; } while (0)
 
-static long cpu_down_helper(void *data)
+long cpu_up_helper(void *data)
 {
     int cpu = (unsigned long)data;
-    return cpu_down(cpu);
+    int ret = cpu_up(cpu);
+    if ( ret == -EBUSY )
+    {
+        /* On EBUSY, flush RCU work and have one more go. */
+        rcu_barrier();
+        ret = cpu_up(cpu);
+    }
+    return ret;
+}
+
+long cpu_down_helper(void *data)
+{
+    int cpu = (unsigned long)data;
+    int ret = cpu_down(cpu);
+    if ( ret == -EBUSY )
+    {
+        /* On EBUSY, flush RCU work and have one more go. */
+        rcu_barrier();
+        ret = cpu_down(cpu);
+    }
+    return ret;
 }
 
 extern int __node_distance(int a, int b);
@@ -170,7 +190,8 @@ long arch_do_sysctl(
         switch ( sysctl->u.cpu_hotplug.op )
         {
         case XEN_SYSCTL_CPU_HOTPLUG_ONLINE:
-            ret = cpu_up(cpu);
+            ret = continue_hypercall_on_cpu(
+                0, cpu_up_helper, (void *)(unsigned long)cpu);
             break;
         case XEN_SYSCTL_CPU_HOTPLUG_OFFLINE:
             ret = continue_hypercall_on_cpu(
