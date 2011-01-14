@@ -61,16 +61,34 @@ static int qhimark = 10000;
 static int qlowmark = 100;
 static int rsinterval = 1000;
 
-static int rcu_barrier_action(void *unused)
+struct rcu_barrier_data {
+    struct rcu_head head;
+    atomic_t *cpu_count;
+};
+
+static void rcu_barrier_callback(struct rcu_head *head)
 {
-    unsigned int cpu = smp_processor_id();
+    struct rcu_barrier_data *data = container_of(
+        head, struct rcu_barrier_data, head);
+    atomic_inc(data->cpu_count);
+}
+
+static int rcu_barrier_action(void *_cpu_count)
+{
+    struct rcu_barrier_data data = { .cpu_count = _cpu_count };
 
     ASSERT(!local_irq_is_enabled());
     local_irq_enable();
 
-    while ( rcu_needs_cpu(cpu) )
+    /*
+     * When callback is executed, all previously-queued RCU work on this CPU
+     * is completed. When all CPUs have executed their callback, data.cpu_count
+     * will have been incremented to include every online CPU.
+     */
+    call_rcu(&data.head, rcu_barrier_callback);
+
+    while ( atomic_read(data.cpu_count) != cpus_weight(cpu_online_map) )
     {
-        rcu_check_callbacks(cpu);
         process_pending_softirqs();
         cpu_relax();
     }
@@ -82,7 +100,8 @@ static int rcu_barrier_action(void *unused)
 
 int rcu_barrier(void)
 {
-    return stop_machine_run(rcu_barrier_action, NULL, NR_CPUS);
+    atomic_t cpu_count = ATOMIC_INIT(0);
+    return stop_machine_run(rcu_barrier_action, &cpu_count, NR_CPUS);
 }
 
 static void force_quiescent_state(struct rcu_data *rdp,
