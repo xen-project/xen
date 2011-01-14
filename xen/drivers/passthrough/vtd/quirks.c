@@ -47,11 +47,13 @@
 #define IS_CTG(id)    (id == 0x2a408086)
 #define IS_ILK(id)    (id == 0x00408086 || id == 0x00448086 || id== 0x00628086 || id == 0x006A8086)
 #define IS_CPT(id)    (id == 0x01008086 || id == 0x01048086)
+#define IS_SNB_GFX(id) (id == 0x01068086 || id == 0x01168086 || id == 0x01268086 || id == 0x01028086 || id == 0x01128086 || id == 0x01228086 || id == 0x010A8086)
 
 u32 ioh_id;
 u32 igd_id;
 bool_t rwbf_quirk;
 static int is_cantiga_b3;
+static int is_snb_gfx;
 static u8 *igd_reg_va;
 
 /*
@@ -92,6 +94,12 @@ static void cantiga_b3_errata_init(void)
         is_cantiga_b3 = 1;
 }
 
+/* check for Sandybridge IGD device ID's */
+static void snb_errata_init(void)
+{
+    is_snb_gfx = IS_SNB_GFX(igd_id);
+}
+
 /*
  * QUIRK to workaround Cantiga IGD VT-d low power errata.
  * This errata impacts IGD assignment on Cantiga systems
@@ -104,12 +112,15 @@ static void cantiga_b3_errata_init(void)
 /*
  * map IGD MMIO+0x2000 page to allow Xen access to IGD 3D register.
  */
-static void map_igd_reg(void)
+static void *map_igd_reg(void)
 {
     u64 igd_mmio, igd_reg;
 
-    if ( !is_cantiga_b3 || igd_reg_va != NULL )
-        return;
+    if ( !is_cantiga_b3 && !is_snb_gfx )
+        return NULL;
+
+    if ( igd_reg_va )
+        return igd_reg_va;
 
     /* get IGD mmio address in PCI BAR */
     igd_mmio = ((u64)pci_conf_read32(0, IGD_DEV, 0, 0x14) << 32) +
@@ -125,6 +136,7 @@ static void map_igd_reg(void)
 #else
     igd_reg_va = ioremap_nocache(igd_reg, 0x100);
 #endif
+    return igd_reg_va;
 }
 
 /*
@@ -138,6 +150,9 @@ static int cantiga_vtd_ops_preamble(struct iommu* iommu)
     if ( !is_igd_drhd(drhd) || !is_cantiga_b3 )
         return 0;
 
+    if ( !map_igd_reg() )
+        return 0;
+
     /*
      * read IGD register at IGD MMIO + 0x20A4 to force IGD
      * to exit low power state.  Since map_igd_reg()
@@ -148,11 +163,64 @@ static int cantiga_vtd_ops_preamble(struct iommu* iommu)
 }
 
 /*
+ * Sandybridge RC6 power management inhibit state erratum.
+ * This can cause power high power consumption.
+ * Workaround is to prevent graphics get into RC6
+ * state when doing VT-d IOTLB operations, do the VT-d
+ * IOTLB operation, and then re-enable RC6 state.
+ */
+static void snb_vtd_ops_preamble(struct iommu* iommu)
+{
+    struct intel_iommu *intel = iommu->intel;
+    struct acpi_drhd_unit *drhd = intel ? intel->drhd : NULL;
+    s_time_t start_time;
+
+    if ( !is_igd_drhd(drhd) || !is_snb_gfx )
+        return;
+
+    if ( !map_igd_reg() )
+        return;
+
+    *((volatile u32 *)(igd_reg_va + 0x54)) = 0x000FFFFF;
+    *((volatile u32 *)(igd_reg_va + 0x700)) = 0;
+
+    start_time = NOW();
+    while ( (*((volatile u32 *)(igd_reg_va + 0x2AC)) & 0xF) != 0 )
+    {
+        if ( NOW() > start_time + DMAR_OPERATION_TIMEOUT )
+        {
+            dprintk(XENLOG_INFO VTDPREFIX,
+                    "snb_vtd_ops_preamble: failed to disable idle handshake\n");
+            break;
+        }
+        cpu_relax();
+    }
+
+    *((volatile u32*)(igd_reg_va + 0x50)) = 0x10001;
+}
+
+static void snb_vtd_ops_postamble(struct iommu* iommu)
+{
+    struct intel_iommu *intel = iommu->intel;
+    struct acpi_drhd_unit *drhd = intel ? intel->drhd : NULL;
+
+    if ( !is_igd_drhd(drhd) || !is_snb_gfx )
+        return;
+
+    if ( !map_igd_reg() )
+        return;
+
+    *((volatile u32 *)(igd_reg_va + 0x54)) = 0xA;
+    *((volatile u32 *)(igd_reg_va + 0x50)) = 0x10000;
+}
+
+/*
  * call before VT-d translation enable and IOTLB flush operations.
  */
 void vtd_ops_preamble_quirk(struct iommu* iommu)
 {
     cantiga_vtd_ops_preamble(iommu);
+    snb_vtd_ops_preamble(iommu);
 }
 
 /*
@@ -160,7 +228,7 @@ void vtd_ops_preamble_quirk(struct iommu* iommu)
  */
 void vtd_ops_postamble_quirk(struct iommu* iommu)
 {
-    return;
+    snb_vtd_ops_postamble(iommu);
 }
 
 /* initialize platform identification flags */
@@ -178,6 +246,8 @@ void __init platform_quirks_init(void)
 
     /* initialize cantiga B3 identification */
     cantiga_b3_errata_init();
+
+    snb_errata_init();
 
     /* ioremap IGD MMIO+0x2000 page */
     map_igd_reg();
@@ -250,11 +320,14 @@ void me_wifi_quirk(struct domain *domain, u8 bus, u8 devfn, int map)
         id = pci_conf_read32(bus, PCI_SLOT(devfn), PCI_FUNC(devfn), 0);
         switch (id)
         {
-            case 0x00878086:
+            case 0x00878086:        /* Kilmer Peak */
             case 0x00898086:
-            case 0x00828086:
+            case 0x00828086:        /* Taylor Peak */
             case 0x00858086:
-            case 0x42388086:
+            case 0x008F8086:        /* Rainbow Peak */
+            case 0x00908086:
+            case 0x00918086:
+            case 0x42388086:        /* Puma Peak */
             case 0x422b8086:
             case 0x422c8086:
                 map_me_phantom_function(domain, 22, map);
@@ -262,6 +335,26 @@ void me_wifi_quirk(struct domain *domain, u8 bus, u8 devfn, int map)
             default:
                 break;
         }
+    }
+}
 
+/*
+ * Mask reporting Intel VT-d faults to IOH core logic:
+ *   - Some platform escalates VT-d faults to platform errors 
+ *   - This can cause system failure upon non-fatal VT-d faults
+ *   - Potential security issue if malicious guest trigger VT-d faults
+ */
+void pci_vtd_quirk(struct pci_dev *pdev)
+{
+    int bus = pdev->bus;
+    int dev = PCI_SLOT(pdev->devfn);
+    int func = PCI_FUNC(pdev->devfn);
+    int id, val;
+
+    id = pci_conf_read32(bus, dev, func, 0);
+    if ( id == 0x342e8086 || id == 0x3c288086 )
+    {
+        val = pci_conf_read32(bus, dev, func, 0x1AC);
+        pci_conf_write32(bus, dev, func, 0x1AC, val | (1 << 31));
     }
 }

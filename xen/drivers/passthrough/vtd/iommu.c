@@ -1914,6 +1914,7 @@ static void __init setup_dom0_devices(struct domain *d)
             list_add(&pdev->domain_list, &d->arch.pdev_list);
             domain_context_mapping(d, pdev->bus, pdev->devfn);
             pci_enable_acs(pdev);
+            pci_vtd_quirk(pdev);
         }
     }
     spin_unlock(&pcidevs_lock);
