@@ -425,10 +425,10 @@ static char *printnum(char *p, unsigned long num, int base)
 
 static void _doprint(void (*put)(char), const char *fmt, va_list ap)
 {
-    register char *str, c;
+    char *str, c;
     int lflag, zflag, nflag;
     char buffer[17];
-    unsigned value;
+    unsigned long value;
     int i, slen, pad;
 
     for ( ; *fmt != '\0'; fmt++ )
@@ -457,29 +457,40 @@ static void _doprint(void (*put)(char), const char *fmt, va_list ap)
             lflag = 1;
             c = *++fmt;
         }
-        if ( (c == 'd') || (c == 'u') || (c == 'o') || (c == 'x') )
+        if ( (c == 'd') || (c == 'u') || (c == 'o') ||
+             (c == 'x') || (c == 'X') )
         {
             if ( lflag )
-                value = va_arg(ap, unsigned);
+            {
+                value = va_arg(ap, unsigned long);
+                if ( (c == 'd') && ((long)value < 0) )
+                {
+                    value = -value;
+                    put('-');
+                }
+            }
             else
-                value = (unsigned) va_arg(ap, unsigned int);
+            {
+                value = va_arg(ap, unsigned int);
+                if ( (c == 'd') && ((int)value < 0) )
+                {
+                    value = -(int)value;
+                    put('-');
+                }
+            }
             str = buffer;
             printnum(str, value,
-                     c == 'o' ? 8 : (c == 'x' ? 16 : 10));
-            goto printn;
-        }
-        else if ( (c == 'O') || (c == 'D') || (c == 'X') )
-        {
-            value = va_arg(ap, unsigned);
-            str = buffer;
-            printnum(str, value,
-                     c == 'O' ? 8 : (c == 'X' ? 16 : 10));
-        printn:
+                     c == 'o' ? 8 : ((c == 'x') || (c == 'X') ? 16 : 10));
             slen = strlen(str);
             for ( i = pad - slen; i > 0; i-- )
                 put(zflag ? '0' : ' ');
             while ( *str )
-                put(*str++);
+            {
+                char ch = *str++;
+                if ( (ch >= 'a') && (c == 'X') )
+                    ch += 'A'-'a';
+                put(ch);
+            }
         }
         else if ( c == 's' )
         {
