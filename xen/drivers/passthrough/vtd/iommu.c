@@ -1773,9 +1773,13 @@ void iommu_set_pgd(struct domain *d)
     ASSERT( is_hvm_domain(d) && d->arch.hvm_domain.hap_enabled );
 
     iommu_hap_pt_share = vtd_ept_share();
+    if ( !iommu_hap_pt_share )
+        goto out;
+
     pgd_mfn = pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d)));
     hd->pgd_maddr = pagetable_get_paddr(pagetable_from_mfn(pgd_mfn));
 
+out:
     dprintk(XENLOG_INFO VTDPREFIX,
             "VT-d page table %s with EPT table\n",
             iommu_hap_pt_share ? "shares" : "not sharing");
