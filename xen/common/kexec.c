@@ -487,7 +487,12 @@ static int kexec_exec(XEN_GUEST_HANDLE(void) uarg)
     {
     case KEXEC_TYPE_DEFAULT:
         image = &kexec_image[base + pos];
+#ifdef CONFIG_X86
         ret = continue_hypercall_on_cpu(0, kexec_reboot, image);
+#else
+        one_cpu_only();
+        machine_reboot_kexec(image); /* Does not return */
+#endif
         break;
     case KEXEC_TYPE_CRASH:
         kexec_crash(); /* Does not return */
