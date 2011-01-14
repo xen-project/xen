@@ -27,10 +27,10 @@ static int ENOSYS_privcmd_close(xc_interface *xch, xc_osdep_handle h)
 
 static int ENOSYS_privcmd_hypercall(xc_interface *xch, xc_osdep_handle h, privcmd_hypercall_t *hypercall)
 {
-    IPRINTF(xch, "ENOSYS_privcmd %p: hypercall: %02lld(%#llx,%#llx,%#llx,%#llx,%#llx,%#llx)\n",
+    IPRINTF(xch, "ENOSYS_privcmd %p: hypercall: %02lld(%#llx,%#llx,%#llx,%#llx,%#llx)\n",
             h, hypercall->op,
             hypercall->arg[0], hypercall->arg[1], hypercall->arg[2],
-            hypercall->arg[3], hypercall->arg[4], hypercall->arg[5]);
+            hypercall->arg[3], hypercall->arg[4]);
     return -ENOSYS;
 }
 
