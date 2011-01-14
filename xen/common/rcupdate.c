@@ -44,6 +44,7 @@
 #include <xen/percpu.h>
 #include <xen/softirq.h>
 #include <xen/cpu.h>
+#include <xen/stop_machine.h>
 
 /* Definition for rcupdate control block. */
 struct rcu_ctrlblk rcu_ctrlblk = {
@@ -59,6 +60,30 @@ static int blimit = 10;
 static int qhimark = 10000;
 static int qlowmark = 100;
 static int rsinterval = 1000;
+
+static int rcu_barrier_action(void *unused)
+{
+    unsigned int cpu = smp_processor_id();
+
+    ASSERT(!local_irq_is_enabled());
+    local_irq_enable();
+
+    while ( rcu_needs_cpu(cpu) )
+    {
+        rcu_check_callbacks(cpu);
+        process_pending_softirqs();
+        cpu_relax();
+    }
+
+    local_irq_disable();
+
+    return 0;
+}
+
+int rcu_barrier(void)
+{
+    return stop_machine_run(rcu_barrier_action, NULL, NR_CPUS);
+}
 
 static void force_quiescent_state(struct rcu_data *rdp,
                                   struct rcu_ctrlblk *rcp)
