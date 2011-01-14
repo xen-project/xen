@@ -16,6 +16,39 @@
 #include <asm/i387.h>
 #include <asm/asm_defns.h>
 
+void setup_fpu(struct vcpu *v)
+{
+    ASSERT(!is_idle_vcpu(v));
+
+    /* Avoid recursion. */
+    clts();
+
+    if ( !v->fpu_dirtied )
+    {
+        v->fpu_dirtied = 1;
+        if ( cpu_has_xsave )
+        {
+            if ( !v->fpu_initialised )
+                v->fpu_initialised = 1;
+
+            /* XCR0 normally represents what guest OS set. In case of Xen
+             * itself, we set all supported feature mask before doing
+             * save/restore.
+             */
+            set_xcr0(v->arch.xcr0_accum);
+            xrstor(v);
+            set_xcr0(v->arch.xcr0);
+        }
+        else
+        {
+            if ( v->fpu_initialised )
+                restore_fpu(v);
+            else
+                init_fpu();
+        }
+    }
+}
+
 void init_fpu(void)
 {
     asm volatile ( "fninit" );
@@ -28,6 +61,8 @@ void save_init_fpu(struct vcpu *v)
 {
     unsigned long cr0 = read_cr0();
     char *fpu_ctxt = v->arch.guest_context.fpu_ctxt.x;
+
+    ASSERT(!is_idle_vcpu(v));
 
     /* This can happen, if a paravirtualised guest OS has set its CR0.TS. */
     if ( cr0 & X86_CR0_TS )
@@ -138,6 +173,7 @@ void restore_fpu(struct vcpu *v)
 }
 
 #define XSTATE_CPUID 0xd
+#define XSAVE_AREA_MIN_SIZE (512 + 64) /* FP/SSE + XSAVE.HEADER */
 
 /*
  * Maximum size (in byte) of the XSAVE/XRSTOR save area required by all
@@ -177,7 +213,9 @@ void xsave_init(void)
     }
 
     /* FP/SSE, XSAVE.HEADER, YMM */
-    min_size =  512 + 64 + ((eax & XSTATE_YMM) ? XSTATE_YMM_SIZE : 0);
+    min_size =  XSAVE_AREA_MIN_SIZE;
+    if ( eax & XSTATE_YMM )
+        min_size += XSTATE_YMM_SIZE;
     BUG_ON(ecx < min_size);
 
     /*
@@ -214,8 +252,10 @@ int xsave_alloc_save_area(struct vcpu *v)
 {
     void *save_area;
 
-    if ( !cpu_has_xsave )
+    if ( !cpu_has_xsave || is_idle_vcpu(v) )
         return 0;
+
+    BUG_ON(xsave_cntxt_size < XSAVE_AREA_MIN_SIZE);
 
     /* XSAVE/XRSTOR requires the save area be 64-byte-boundary aligned. */
     save_area = _xmalloc(xsave_cntxt_size, 64);
