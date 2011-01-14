@@ -2,6 +2,7 @@
 #include <xc_private.h>
 #include <xc_core.h>
 #include <errno.h>
+#include <unistd.h>
 
 #define ARRAY_SIZE(a) (sizeof (a) / sizeof ((a)[0]))
 
@@ -241,6 +242,20 @@ static int hp_mem_offline_func(int argc, char *argv[])
     return ret;
 }
 
+static int exec_cpu_hp_fn(int (*hp_fn)(xc_interface *, int), int cpu)
+{
+    int ret;
+
+    for ( ; ; )
+    {
+        ret = (*hp_fn)(xch, cpu);
+        if ( (ret >= 0) || (errno != EBUSY) )
+            break;
+        usleep(100000); /* 100ms */
+    }
+
+    return ret;
+}
 
 static int hp_cpu_online_func(int argc, char *argv[])
 {
@@ -254,7 +269,7 @@ static int hp_cpu_online_func(int argc, char *argv[])
 
     cpu = atoi(argv[0]);
     printf("Prepare to online CPU %d\n", cpu);
-    ret = xc_cpu_online(xch, cpu);
+    ret = exec_cpu_hp_fn(xc_cpu_online, cpu);
     if (ret < 0)
         fprintf(stderr, "CPU %d online failed (error %d: %s)\n",
                 cpu, errno, strerror(errno));
@@ -275,7 +290,7 @@ static int hp_cpu_offline_func(int argc, char *argv[])
     }
     cpu = atoi(argv[0]);
     printf("Prepare to offline CPU %d\n", cpu);
-    ret = xc_cpu_offline(xch, cpu);
+    ret = exec_cpu_hp_fn(xc_cpu_offline, cpu);
     if (ret < 0)
         fprintf(stderr, "CPU %d offline failed (error %d: %s)\n",
                 cpu, errno, strerror(errno));
