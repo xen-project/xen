@@ -1,6 +1,6 @@
 #include <inttypes.h>
 #include <sys/ioctl.h>
-#include <linux/fs.h>
+#include <sys/mount.h>
 #include "tapdisk.h"
 #include "blk.h"
 
