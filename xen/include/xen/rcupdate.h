@@ -197,4 +197,6 @@ void rcu_check_callbacks(int cpu);
 void fastcall call_rcu(struct rcu_head *head, 
                        void (*func)(struct rcu_head *head));
 
+int rcu_barrier(void);
+
 #endif /* __XEN_RCUPDATE_H */

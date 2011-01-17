@@ -30,10 +30,30 @@
 
 #define get_xen_guest_handle(val, hnd)  do { val = (hnd).p; } while (0)
 
-static long cpu_down_helper(void *data)
+long cpu_up_helper(void *data)
 {
     int cpu = (unsigned long)data;
-    return cpu_down(cpu);
+    int ret = cpu_up(cpu);
+    if ( ret == -EBUSY )
+    {
+        /* On EBUSY, flush RCU work and have one more go. */
+        rcu_barrier();
+        ret = cpu_up(cpu);
+    }
+    return ret;
+}
+
+long cpu_down_helper(void *data)
+{
+    int cpu = (unsigned long)data;
+    int ret = cpu_down(cpu);
+    if ( ret == -EBUSY )
+    {
+        /* On EBUSY, flush RCU work and have one more go. */
+        rcu_barrier();
+        ret = cpu_down(cpu);
+    }
+    return ret;
 }
 
 extern int __node_distance(int a, int b);
@@ -41,7 +61,7 @@ extern int __node_distance(int a, int b);
 long arch_do_sysctl(
     struct xen_sysctl *sysctl, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 {
-    long ret = 0, status;
+    long ret = 0;
 
     switch ( sysctl->cmd )
     {
@@ -167,41 +187,20 @@ long arch_do_sysctl(
     {
         unsigned int cpu = sysctl->u.cpu_hotplug.cpu;
 
-        if (cpu_present(cpu)) {
-            status = cpu_online(cpu) ? XEN_CPU_HOTPLUG_STATUS_ONLINE :
-                XEN_CPU_HOTPLUG_STATUS_OFFLINE;
-        } else {
-            status = -EINVAL;
-        }
-
         switch ( sysctl->u.cpu_hotplug.op )
         {
         case XEN_SYSCTL_CPU_HOTPLUG_ONLINE:
-            ret = cpu_up(cpu);
-            /*
-             * In the case of a true hotplug, this CPU wasn't present
-             * before, so return the 'new' status for it.
-             */
-            if (ret == 0 && status == -EINVAL)
-                status = XEN_CPU_HOTPLUG_STATUS_NEW;
+            ret = continue_hypercall_on_cpu(
+                0, cpu_up_helper, (void *)(unsigned long)cpu);
             break;
         case XEN_SYSCTL_CPU_HOTPLUG_OFFLINE:
             ret = continue_hypercall_on_cpu(
                 0, cpu_down_helper, (void *)(unsigned long)cpu);
             break;
-        case XEN_SYSCTL_CPU_HOTPLUG_STATUS:
-            ret = 0;
-            break;
         default:
             ret = -EINVAL;
             break;
         }
-
-        /*
-         * If the operation was successful, return the old status.
-         */
-        if (ret >= 0)
-            ret = status;
     }
     break;
 

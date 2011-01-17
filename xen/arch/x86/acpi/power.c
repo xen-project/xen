@@ -206,6 +206,7 @@ static int enter_state(u32 state)
  enable_cpu:
     cpufreq_add_cpu(0);
     microcode_resume_cpu(0);
+    rcu_barrier();
     mtrr_aps_sync_begin();
     enable_nonboot_cpus();
     mtrr_aps_sync_end();

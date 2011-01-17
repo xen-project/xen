@@ -1773,9 +1773,13 @@ void iommu_set_pgd(struct domain *d)
     ASSERT( is_hvm_domain(d) && d->arch.hvm_domain.hap_enabled );
 
     iommu_hap_pt_share = vtd_ept_share();
+    if ( !iommu_hap_pt_share )
+        goto out;
+
     pgd_mfn = pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d)));
     hd->pgd_maddr = pagetable_get_paddr(pagetable_from_mfn(pgd_mfn));
 
+out:
     dprintk(XENLOG_INFO VTDPREFIX,
             "VT-d page table %s with EPT table\n",
             iommu_hap_pt_share ? "shares" : "not sharing");
@@ -1910,6 +1914,7 @@ static void __init setup_dom0_devices(struct domain *d)
             list_add(&pdev->domain_list, &d->arch.pdev_list);
             domain_context_mapping(d, pdev->bus, pdev->devfn);
             pci_enable_acs(pdev);
+            pci_vtd_quirk(pdev);
         }
     }
     spin_unlock(&pcidevs_lock);

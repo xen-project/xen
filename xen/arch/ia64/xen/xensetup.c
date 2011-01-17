@@ -606,7 +606,11 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
         if ( num_online_cpus() >= max_cpus )
             break;
         if ( !cpu_online(i) )
-            cpu_up(i);
+        {
+            int ret = cpu_up(i);
+            if ( ret != 0 )
+                printk("Failed to bring up CPU %u (error %d)\n", i, ret);
+        }
     }
 
     local_irq_disable();

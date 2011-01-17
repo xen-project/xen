@@ -209,7 +209,7 @@ struct domain
     spinlock_t       domain_lock;
 
     spinlock_t       page_alloc_lock; /* protects all the following fields  */
-    struct page_list_head page_list;  /* linked list, of size tot_pages     */
+    struct page_list_head page_list;  /* linked list */
     struct page_list_head xenpage_list; /* linked list (size xenheap_pages) */
     unsigned int     tot_pages;       /* number of pages currently possesed */
     unsigned int     max_pages;       /* maximum value for tot_pages        */

@@ -1994,11 +1994,20 @@ static enum hvm_copy_result __hvm_copy(
     int count, todo = size;
 
     /*
+     * XXX Disable for 4.1.0: PV-on-HVM drivers will do grant-table ops
+     * such as query_size. Grant-table code currently does copy_to/from_guest
+     * accesses under the big per-domain lock, which this test would disallow.
+     * The test is not needed until we implement sleeping-on-waitqueue when
+     * we access a paged-out frame, and that's post 4.1.0 now.
+     */
+#if 0
+    /*
      * If the required guest memory is paged out, this function may sleep.
      * Hence we bail immediately if called from atomic context.
      */
     if ( in_atomic() )
         return HVMCOPY_unhandleable;
+#endif
 
     while ( todo > 0 )
     {

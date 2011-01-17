@@ -1384,7 +1384,7 @@ static void __context_switch(void)
         memcpy(&p->arch.guest_context.user_regs,
                stack_regs,
                CTXT_SWITCH_STACK_BYTES);
-        unlazy_fpu(p);
+        save_init_fpu(p);
         p->arch.ctxt_switch_from(p);
     }
 

@@ -61,6 +61,10 @@ static void stopmachine_set_state(enum stopmachine_state state)
     atomic_set(&stopmachine_data.done, 0);
     smp_wmb();
     stopmachine_data.state = state;
+}
+
+static void stopmachine_wait_state(void)
+{
     while ( atomic_read(&stopmachine_data.done) != stopmachine_data.nr_cpus )
         cpu_relax();
 }
@@ -101,16 +105,20 @@ int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
         tasklet_schedule_on_cpu(&per_cpu(stopmachine_tasklet, i), i);
 
     stopmachine_set_state(STOPMACHINE_PREPARE);
+    stopmachine_wait_state();
 
     local_irq_disable();
     stopmachine_set_state(STOPMACHINE_DISABLE_IRQ);
+    stopmachine_wait_state();
 
-    if ( cpu == smp_processor_id() )
-        stopmachine_data.fn_result = (*fn)(data);
     stopmachine_set_state(STOPMACHINE_INVOKE);
+    if ( (cpu == smp_processor_id()) || (cpu == NR_CPUS) )
+        stopmachine_data.fn_result = (*fn)(data);
+    stopmachine_wait_state();
     ret = stopmachine_data.fn_result;
 
     stopmachine_set_state(STOPMACHINE_EXIT);
+    stopmachine_wait_state();
     local_irq_enable();
 
     spin_unlock(&stopmachine_lock);
@@ -140,7 +148,8 @@ static void stopmachine_action(unsigned long cpu)
             local_irq_disable();
             break;
         case STOPMACHINE_INVOKE:
-            if ( stopmachine_data.fn_cpu == smp_processor_id() )
+            if ( (stopmachine_data.fn_cpu == smp_processor_id()) ||
+                 (stopmachine_data.fn_cpu == NR_CPUS) )
                 stopmachine_data.fn_result =
                     stopmachine_data.fn(stopmachine_data.fn_data);
             break;

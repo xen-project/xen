@@ -377,18 +377,13 @@ static int __devinit platform_pci_init(struct pci_dev *pdev,
 		return -ENOENT;
 	}
 
-	if (request_mem_region(mmio_addr, mmio_len, DRV_NAME) == NULL) {
-		printk(KERN_ERR ":MEM I/O resource 0x%lx @ 0x%lx busy\n",
-		       mmio_addr, mmio_len);
-		return -EBUSY;
-	}
+	ret = pci_request_region(pdev, 1, DRV_NAME);
+	if (ret < 0)
+		return ret;
 
-	if (request_region(ioaddr, iolen, DRV_NAME) == NULL) {
-		printk(KERN_ERR DRV_NAME ":I/O resource 0x%lx @ 0x%lx busy\n",
-		       iolen, ioaddr);
-		release_mem_region(mmio_addr, mmio_len);
-		return -EBUSY;
-	}
+	ret = pci_request_region(pdev, 0, DRV_NAME);
+	if (ret < 0)
+		goto mem_out;
 
 	platform_mmio = mmio_addr;
 	platform_mmiolen = mmio_len;
@@ -424,8 +419,9 @@ static int __devinit platform_pci_init(struct pci_dev *pdev,
 
  out:
 	if (ret) {
-		release_mem_region(mmio_addr, mmio_len);
-		release_region(ioaddr, iolen);
+		pci_release_region(pdev, 0);
+mem_out:
+		pci_release_region(pdev, 1);
 	}
 
 	return ret;

@@ -16,7 +16,6 @@
 
 extern unsigned int xsave_cntxt_size;
 extern u64 xfeature_mask;
-extern bool_t cpu_has_xsaveopt;
 
 void xsave_init(void);
 int xsave_alloc_save_area(struct vcpu *v);
@@ -75,84 +74,7 @@ static inline uint64_t get_xcr0(void)
     return this_cpu(xcr0);
 }
 
-static inline void xsave(struct vcpu *v)
-{
-    struct xsave_struct *ptr;
-
-    ptr =(struct xsave_struct *)v->arch.xsave_area;
-
-    asm volatile (".byte " REX_PREFIX "0x0f,0xae,0x27"
-        :
-        : "a" (-1), "d" (-1), "D"(ptr)
-        : "memory");
-}
-
-static inline void xsaveopt(struct vcpu *v)
-{
-    struct xsave_struct *ptr;
-
-    ptr =(struct xsave_struct *)v->arch.xsave_area;
-
-    asm volatile (".byte " REX_PREFIX "0x0f,0xae,0x37"
-        :
-        : "a" (-1), "d" (-1), "D"(ptr)
-        : "memory");
-}
-
-static inline void xrstor(struct vcpu *v)
-{
-    struct xsave_struct *ptr;
-
-    ptr =(struct xsave_struct *)v->arch.xsave_area;
-
-    asm volatile (".byte " REX_PREFIX "0x0f,0xae,0x2f"
-        :
-        : "m" (*ptr), "a" (-1), "d" (-1), "D"(ptr));
-}
-
-extern void init_fpu(void);
+extern void setup_fpu(struct vcpu *v);
 extern void save_init_fpu(struct vcpu *v);
-extern void restore_fpu(struct vcpu *v);
-
-#define unlazy_fpu(v) do {                      \
-    if ( (v)->fpu_dirtied )                     \
-        save_init_fpu(v);                       \
-} while ( 0 )
-
-#define load_mxcsr(val) do {                                    \
-    unsigned long __mxcsr = ((unsigned long)(val) & 0xffbf);    \
-    __asm__ __volatile__ ( "ldmxcsr %0" : : "m" (__mxcsr) );    \
-} while ( 0 )
-
-static inline void setup_fpu(struct vcpu *v)
-{
-    /* Avoid recursion. */
-    clts();
-
-    if ( !v->fpu_dirtied )
-    {
-        v->fpu_dirtied = 1;
-        if ( cpu_has_xsave )
-        {
-            if ( !v->fpu_initialised )
-                v->fpu_initialised = 1;
-
-            /* XCR0 normally represents what guest OS set. In case of Xen
-             * itself, we set all supported feature mask before doing
-             * save/restore.
-             */
-            set_xcr0(v->arch.xcr0_accum);
-            xrstor(v);
-            set_xcr0(v->arch.xcr0);
-        }
-        else
-        {
-            if ( v->fpu_initialised )
-                restore_fpu(v);
-            else
-                init_fpu();
-        }
-    }
-}
 
 #endif /* __ASM_I386_I387_H */

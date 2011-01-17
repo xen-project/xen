@@ -108,7 +108,6 @@ int cpu_down(unsigned int cpu)
  fail:
     notifier_rc = notifier_call_chain(&cpu_chain, CPU_DOWN_FAILED, hcpu, &nb);
     BUG_ON(notifier_rc != NOTIFY_DONE);
-    printk("Failed to take down CPU %u (error %d)\n", cpu, err);
     cpu_hotplug_done();
     return err;
 }
@@ -150,7 +149,6 @@ int cpu_up(unsigned int cpu)
  fail:
     notifier_rc = notifier_call_chain(&cpu_chain, CPU_UP_CANCELED, hcpu, &nb);
     BUG_ON(notifier_rc != NOTIFY_DONE);
-    printk("Failed to bring up CPU %u (error %d)\n", cpu, err);
     cpu_hotplug_done();
     return err;
 }

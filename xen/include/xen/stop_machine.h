@@ -5,7 +5,7 @@
  * stop_machine_run: freeze the machine on all CPUs and run this function
  * @fn: the function to run
  * @data: the data ptr for the @fn()
- * @cpu: the cpu to run @fn() on (or any, if @cpu == NR_CPUS).
+ * @cpu: the cpu to run @fn() on (or all, if @cpu == NR_CPUS).
  *
  * Description: This causes every other cpu to enter a safe point, with
  * each of which disables interrupts, and finally interrupts are disabled

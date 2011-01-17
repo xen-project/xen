@@ -253,21 +253,12 @@ struct xen_sysctl_get_pmstat {
 typedef struct xen_sysctl_get_pmstat xen_sysctl_get_pmstat_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_get_pmstat_t);
 
-/*
- * Status codes. Must be greater than 0 to avoid confusing
- * sysctl callers that see 0 as a plain successful return.
- */
-#define XEN_CPU_HOTPLUG_STATUS_OFFLINE 1
-#define XEN_CPU_HOTPLUG_STATUS_ONLINE  2
-#define XEN_CPU_HOTPLUG_STATUS_NEW     3
-
 /* XEN_SYSCTL_cpu_hotplug */
 struct xen_sysctl_cpu_hotplug {
     /* IN variables */
     uint32_t cpu;   /* Physical cpu. */
 #define XEN_SYSCTL_CPU_HOTPLUG_ONLINE  0
 #define XEN_SYSCTL_CPU_HOTPLUG_OFFLINE 1
-#define XEN_SYSCTL_CPU_HOTPLUG_STATUS 2
     uint32_t op;    /* hotplug opcode */
 };
 typedef struct xen_sysctl_cpu_hotplug xen_sysctl_cpu_hotplug_t;

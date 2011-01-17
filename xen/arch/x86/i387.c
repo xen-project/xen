@@ -16,18 +16,101 @@
 #include <asm/i387.h>
 #include <asm/asm_defns.h>
 
-void init_fpu(void)
+static bool_t __read_mostly cpu_has_xsaveopt;
+
+static void xsave(struct vcpu *v)
+{
+    struct xsave_struct *ptr = v->arch.xsave_area;
+
+    asm volatile (
+        ".byte " REX_PREFIX "0x0f,0xae,0x27"
+        :
+        : "a" (-1), "d" (-1), "D"(ptr)
+        : "memory" );
+}
+
+static void xsaveopt(struct vcpu *v)
+{
+    struct xsave_struct *ptr = v->arch.xsave_area;
+
+    asm volatile (
+        ".byte " REX_PREFIX "0x0f,0xae,0x37"
+        :
+        : "a" (-1), "d" (-1), "D"(ptr)
+        : "memory" );
+}
+
+static void xrstor(struct vcpu *v)
+{
+    struct xsave_struct *ptr = v->arch.xsave_area;
+
+    asm volatile (
+        ".byte " REX_PREFIX "0x0f,0xae,0x2f"
+        :
+        : "m" (*ptr), "a" (-1), "d" (-1), "D"(ptr) );
+}
+
+static void load_mxcsr(unsigned long val)
+{
+    val &= 0xffbf;
+    asm volatile ( "ldmxcsr %0" : : "m" (val) );
+}
+
+static void init_fpu(void);
+static void restore_fpu(struct vcpu *v);
+
+void setup_fpu(struct vcpu *v)
+{
+    ASSERT(!is_idle_vcpu(v));
+
+    /* Avoid recursion. */
+    clts();
+
+    if ( v->fpu_dirtied )
+        return;
+
+    if ( cpu_has_xsave )
+    {
+        /*
+         * XCR0 normally represents what guest OS set. In case of Xen itself, 
+         * we set all supported feature mask before doing save/restore.
+         */
+        set_xcr0(v->arch.xcr0_accum);
+        xrstor(v);
+        set_xcr0(v->arch.xcr0);
+    }
+    else if ( v->fpu_initialised )
+    {
+        restore_fpu(v);
+    }
+    else
+    {
+        init_fpu();
+    }
+
+    v->fpu_initialised = 1;
+    v->fpu_dirtied = 1;
+}
+
+static void init_fpu(void)
 {
     asm volatile ( "fninit" );
     if ( cpu_has_xmm )
         load_mxcsr(0x1f80);
-    current->fpu_initialised = 1;
 }
 
 void save_init_fpu(struct vcpu *v)
 {
-    unsigned long cr0 = read_cr0();
-    char *fpu_ctxt = v->arch.guest_context.fpu_ctxt.x;
+    unsigned long cr0;
+    char *fpu_ctxt;
+
+    if ( !v->fpu_dirtied )
+        return;
+
+    ASSERT(!is_idle_vcpu(v));
+
+    cr0 = read_cr0();
+    fpu_ctxt = v->arch.guest_context.fpu_ctxt.x;
 
     /* This can happen, if a paravirtualised guest OS has set its CR0.TS. */
     if ( cr0 & X86_CR0_TS )
@@ -91,7 +174,7 @@ void save_init_fpu(struct vcpu *v)
     write_cr0(cr0|X86_CR0_TS);
 }
 
-void restore_fpu(struct vcpu *v)
+static void restore_fpu(struct vcpu *v)
 {
     char *fpu_ctxt = v->arch.guest_context.fpu_ctxt.x;
 
@@ -138,6 +221,7 @@ void restore_fpu(struct vcpu *v)
 }
 
 #define XSTATE_CPUID 0xd
+#define XSAVE_AREA_MIN_SIZE (512 + 64) /* FP/SSE + XSAVE.HEADER */
 
 /*
  * Maximum size (in byte) of the XSAVE/XRSTOR save area required by all
@@ -152,32 +236,24 @@ u64 xfeature_mask;
 /* Cached xcr0 for fast read */
 DEFINE_PER_CPU(uint64_t, xcr0);
 
-bool_t __read_mostly cpu_has_xsaveopt;
-
 void xsave_init(void)
 {
     u32 eax, ebx, ecx, edx;
     int cpu = smp_processor_id();
     u32 min_size;
 
-    if ( boot_cpu_data.cpuid_level < XSTATE_CPUID ) {
-        printk(XENLOG_ERR "XSTATE_CPUID missing\n");
+    if ( boot_cpu_data.cpuid_level < XSTATE_CPUID )
         return;
-    }
 
     cpuid_count(XSTATE_CPUID, 0, &eax, &ebx, &ecx, &edx);
 
-    printk("%s: cpu%d: cntxt_max_size: 0x%x and states: %08x:%08x\n",
-        __func__, cpu, ecx, edx, eax);
-
-    if ( ((eax & XSTATE_FP_SSE) != XSTATE_FP_SSE) ||
-         ((eax & XSTATE_YMM) && !(eax & XSTATE_SSE)) )
-    {
-        BUG();
-    }
+    BUG_ON((eax & XSTATE_FP_SSE) != XSTATE_FP_SSE);
+    BUG_ON((eax & XSTATE_YMM) && !(eax & XSTATE_SSE));
 
     /* FP/SSE, XSAVE.HEADER, YMM */
-    min_size =  512 + 64 + ((eax & XSTATE_YMM) ? XSTATE_YMM_SIZE : 0);
+    min_size =  XSAVE_AREA_MIN_SIZE;
+    if ( eax & XSTATE_YMM )
+        min_size += XSTATE_YMM_SIZE;
     BUG_ON(ecx < min_size);
 
     /*
@@ -214,8 +290,10 @@ int xsave_alloc_save_area(struct vcpu *v)
 {
     void *save_area;
 
-    if ( !cpu_has_xsave )
+    if ( !cpu_has_xsave || is_idle_vcpu(v) )
         return 0;
+
+    BUG_ON(xsave_cntxt_size < XSAVE_AREA_MIN_SIZE);
 
     /* XSAVE/XRSTOR requires the save area be 64-byte-boundary aligned. */
     save_area = _xmalloc(xsave_cntxt_size, 64);

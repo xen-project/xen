@@ -1246,7 +1246,11 @@ void __init __start_xen(unsigned long mbi_p)
         numa_add_cpu(i);        
 
         if ( (num_online_cpus() < max_cpus) && !cpu_online(i) )
-            cpu_up(i);
+        {
+            int ret = cpu_up(i);
+            if ( ret != 0 )
+                printk("Failed to bring up CPU %u (error %d)\n", i, ret);
+        }
     }
 
     printk("Brought up %ld CPUs\n", (long)num_online_cpus());

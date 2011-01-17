@@ -431,8 +431,9 @@ int xc_hvm_build(xc_interface *xch,
 /* xc_hvm_build_target_mem: 
  * Create a domain for a pre-ballooned virtualized Linux, using
  * files/filenames.  If target < memsize, domain is created with
- * memsize pages marked populate-on-demand, and with a PoD cache size
- * of target.  If target == memsize, pages are populated normally.
+ * memsize pages marked populate-on-demand, 
+ * calculating pod cache size based on target.
+ * If target == memsize, pages are populated normally.
  */
 int xc_hvm_build_target_mem(xc_interface *xch,
                            uint32_t domid,
