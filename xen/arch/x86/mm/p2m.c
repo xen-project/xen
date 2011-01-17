@@ -1142,14 +1142,22 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
         return 0;
     }
 
-    /* If we're low, start a sweep */
-    if ( order == 9 && page_list_empty(&p2m->pod.super) )
-        p2m_pod_emergency_sweep_super(p2m);
+    /* Once we've ballooned down enough that we can fill the remaining
+     * PoD entries from the cache, don't sweep even if the particular
+     * list we want to use is empty: that can lead to thrashing zero pages 
+     * through the cache for no good reason.  */
+    if ( p2m->pod.entry_count > p2m->pod.count )
+    {
 
-    if ( page_list_empty(&p2m->pod.single) &&
-         ( ( order == 0 )
-           || (order == 9 && page_list_empty(&p2m->pod.super) ) ) )
-        p2m_pod_emergency_sweep(p2m);
+        /* If we're low, start a sweep */
+        if ( order == 9 && page_list_empty(&p2m->pod.super) )
+            p2m_pod_emergency_sweep_super(p2m);
+
+        if ( page_list_empty(&p2m->pod.single) &&
+             ( ( order == 0 )
+               || (order == 9 && page_list_empty(&p2m->pod.super) ) ) )
+            p2m_pod_emergency_sweep(p2m);
+    }
 
     /* Keep track of the highest gfn demand-populated by a guest fault */
     if ( q == p2m_guest && gfn > p2m->pod.max_guest )
@@ -1176,7 +1184,10 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
     set_p2m_entry(p2m, gfn_aligned, mfn, order, p2m_ram_rw, p2m->default_access);
 
     for( i = 0; i < (1UL << order); i++ )
+    {
         set_gpfn_from_mfn(mfn_x(mfn) + i, gfn_aligned + i);
+        paging_mark_dirty(d, mfn_x(mfn) + i);
+    }
     
     p2m->pod.entry_count -= (1 << order); /* Lock: p2m */
     BUG_ON(p2m->pod.entry_count < 0);
