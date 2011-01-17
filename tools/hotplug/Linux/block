@@ -279,8 +279,8 @@ mount it read-write in a guest domain."
             fatal "Unable to lookup $file: dev: $dev inode: $inode"
           fi
 
-          shared_list=$(losetup -a | grep ' \[0*'${dev}'\]:'${inode} |
-                cut -d : -f 1)
+          shared_list=$(losetup -a |
+                sed -n -e "s@^\([^:]\+\)\(:[[:blank:]]\[${dev}\]:${inode}[[:blank:]](${file})\)@\1@p" )
           for dev in "$shared_list"
           do
             if [ -n "$dev" ]
