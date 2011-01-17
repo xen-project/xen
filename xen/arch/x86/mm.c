@@ -4799,15 +4799,23 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
             rc = p2m_pod_set_mem_target(d, target.target_pages);
         }
 
-        p2m = p2m_get_hostp2m(d);
-        target.tot_pages       = d->tot_pages;
-        target.pod_cache_pages = p2m->pod.count;
-        target.pod_entries     = p2m->pod.entry_count;
-
-        if ( copy_to_guest(arg, &target, 1) )
+        if ( rc == -EAGAIN )
         {
-            rc= -EFAULT;
-            goto pod_target_out_unlock;
+            rc = hypercall_create_continuation(
+                __HYPERVISOR_memory_op, "lh", op, arg);
+        }
+        else if ( rc >= 0 )
+        {
+            p2m = p2m_get_hostp2m(d);
+            target.tot_pages       = d->tot_pages;
+            target.pod_cache_pages = p2m->pod.count;
+            target.pod_entries     = p2m->pod.entry_count;
+
+            if ( copy_to_guest(arg, &target, 1) )
+            {
+                rc= -EFAULT;
+                goto pod_target_out_unlock;
+            }
         }
         
     pod_target_out_unlock:

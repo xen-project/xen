@@ -435,7 +435,7 @@ static struct page_info * p2m_pod_cache_get(struct p2m_domain *p2m,
 
 /* Set the size of the cache, allocating or freeing as necessary. */
 static int
-p2m_pod_set_cache_target(struct p2m_domain *p2m, unsigned long pod_target)
+p2m_pod_set_cache_target(struct p2m_domain *p2m, unsigned long pod_target, int preemptible)
 {
     struct domain *d = p2m->domain;
     int ret = 0;
@@ -468,6 +468,12 @@ p2m_pod_set_cache_target(struct p2m_domain *p2m, unsigned long pod_target)
         }
 
         p2m_pod_cache_add(p2m, page, order);
+
+        if ( hypercall_preempt_check() && preemptible )
+        {
+            ret = -EAGAIN;
+            goto out;
+        }
     }
 
     /* Decreasing the target */
@@ -512,6 +518,12 @@ p2m_pod_set_cache_target(struct p2m_domain *p2m, unsigned long pod_target)
                 put_page(page+i);
 
             put_page(page+i);
+
+            if ( hypercall_preempt_check() && preemptible )
+            {
+                ret = -EAGAIN;
+                goto out;
+            }
         }
     }
 
@@ -589,7 +601,7 @@ p2m_pod_set_mem_target(struct domain *d, unsigned long target)
 
     ASSERT( pod_target >= p2m->pod.count );
 
-    ret = p2m_pod_set_cache_target(p2m, pod_target);
+    ret = p2m_pod_set_cache_target(p2m, pod_target, 1/*preemptible*/);
 
 out:
     p2m_unlock(p2m);
@@ -753,7 +765,7 @@ out_entry_check:
     /* If we've reduced our "liabilities" beyond our "assets", free some */
     if ( p2m->pod.entry_count < p2m->pod.count )
     {
-        p2m_pod_set_cache_target(p2m, p2m->pod.entry_count);
+        p2m_pod_set_cache_target(p2m, p2m->pod.entry_count, 0/*can't preempt*/);
     }
 
 out_unlock:

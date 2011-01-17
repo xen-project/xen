@@ -1653,8 +1653,8 @@ int hypercall_xlat_continuation(unsigned int *id, unsigned int mask, ...)
     unsigned long nval = 0;
     va_list args;
 
-    BUG_ON(*id > 5);
-    BUG_ON(mask & (1U << *id));
+    BUG_ON(id && *id > 5);
+    BUG_ON(id && (mask & (1U << *id)));
 
     va_start(args, mask);
 
