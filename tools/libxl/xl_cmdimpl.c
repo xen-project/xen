@@ -683,6 +683,9 @@ static void parse_config_data(const char *configfile_filename_report,
 
     xlu_cfg_replace_string (config, "kernel", &b_info->kernel.path);
 
+    if (!xlu_cfg_get_long (config, "gfx_passthru", &l))
+        dm_info->gfx_passthru = l;
+
     if (c_info->hvm == 1) {
         if (!xlu_cfg_get_long (config, "pae", &l))
             b_info->u.hvm.pae = l;
