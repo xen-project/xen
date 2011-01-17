@@ -28,6 +28,15 @@
 #include "libxl.h"
 #include "flexarray.h"
 
+static const char *libxl_tapif_script(libxl__gc *gc)
+{
+#ifdef __linux__
+    return libxl__strdup(gc, "no");
+#else
+    return libxl__sprintf(gc, "%s/qemu-ifup", libxl_xen_script_dir_path());
+#endif
+}
+
 static char ** libxl_build_device_model_args_old(libxl__gc *gc,
                                              libxl_device_model_info *info,
                                              libxl_device_nic *vifs,
@@ -129,8 +138,9 @@ static char ** libxl_build_device_model_args_old(libxl__gc *gc,
                 flexarray_vappend(dm_args,
                                 "-net", libxl__sprintf(gc, "nic,vlan=%d,macaddr=%s,model=%s",
                                                        vifs[i].devid, smac, vifs[i].model),
-                                "-net", libxl__sprintf(gc, "tap,vlan=%d,ifname=%s,bridge=%s,script=no",
-                                                       vifs[i].devid, ifname, vifs[i].bridge), NULL);
+                                "-net", libxl__sprintf(gc, "tap,vlan=%d,ifname=%s,bridge=%s,script=%s",
+                                                       vifs[i].devid, ifname, vifs[i].bridge, libxl_tapif_script(gc)),
+                                NULL);
                 ioemu_vifs++;
             }
         }
@@ -261,8 +271,8 @@ static char ** libxl_build_device_model_args_new(libxl__gc *gc,
                 flexarray_append(dm_args, libxl__sprintf(gc, "nic,vlan=%d,macaddr=%s,model=%s",
                             vifs[i].devid, smac, vifs[i].model));
                 flexarray_append(dm_args, "-net");
-                flexarray_append(dm_args, libxl__sprintf(gc, "tap,vlan=%d,ifname=%s,script=no",
-                            vifs[i].devid, ifname));
+                flexarray_append(dm_args, libxl__sprintf(gc, "tap,vlan=%d,ifname=%s,script=%s",
+                            vifs[i].devid, ifname, libxl_tapif_script(gc)));
                 ioemu_vifs++;
             }
         }
