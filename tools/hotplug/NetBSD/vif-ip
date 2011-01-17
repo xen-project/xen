@@ -23,7 +23,7 @@ case $xstatus in
 	xip=$(xenstore-read "$xpath/ip")
 	xfid=$(xenstore-read "$xpath/frontend-id")
 	xhandle=$(xenstore-read "$xpath/handle")
-	iface=xvif$xfid.$xhandle
+	iface=$(xenstore-read "$xpath/vifname")
 	echo ifconfig $iface $xip up
 	ifconfig $iface $xip up
 	xenstore-write $xpath/hotplug-status connected

@@ -23,7 +23,7 @@ case $xstatus in
 	xbridge=$(xenstore-read "$xpath/bridge")
 	xfid=$(xenstore-read "$xpath/frontend-id")
 	xhandle=$(xenstore-read "$xpath/handle")
-	iface=xvif$xfid.$xhandle
+	iface=$(xenstore-read "$xpath/vifname")
 	echo ifconfig $iface up
 	ifconfig $iface up
 	brconfig $xbridge add $iface
