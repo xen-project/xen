@@ -93,6 +93,9 @@ int ats_device(int seg, int bus, int devfn)
         return 0;
 
     pdev = pci_get_pdev(bus, devfn);
+    if ( !pdev )
+        return 0;
+
     drhd = acpi_find_matched_drhd_unit(pdev);
     if ( !drhd )
         return 0;
@@ -110,6 +113,8 @@ int ats_device(int seg, int bus, int devfn)
     if ( pos && (ats_drhd == NULL) )
     {
         new_drhd = xmalloc(struct acpi_drhd_unit);
+        if ( !new_drhd )
+            return 0;
         memcpy(new_drhd, drhd, sizeof(struct acpi_drhd_unit));
         list_add_tail(&new_drhd->list, &ats_dev_drhd_units);
     }
@@ -118,9 +123,8 @@ int ats_device(int seg, int bus, int devfn)
 
 int enable_ats_device(int seg, int bus, int devfn)
 {
-    struct pci_ats_dev *pdev;
+    struct pci_ats_dev *pdev = NULL;
     u32 value;
-    u16 queue_depth;
     int pos;
 
     if ( !acpi_find_matched_atsr_unit(bus, devfn) )
@@ -144,26 +148,43 @@ int enable_ats_device(int seg, int bus, int devfn)
 
     /* BUGBUG: add back seg when multi-seg platform support is enabled */
     value = pci_conf_read16(bus, PCI_SLOT(devfn),
-                            PCI_FUNC(devfn), pos + ATS_REG_CAP);
-    queue_depth = value & ATS_QUEUE_DEPTH_MASK;
-
-    value = pci_conf_read16(bus, PCI_SLOT(devfn),
                             PCI_FUNC(devfn), pos + ATS_REG_CTL);
     if ( value & ATS_ENABLE )
-        return 0;
+    {
+        list_for_each_entry ( pdev, &ats_devices, list )
+        {
+            if ( pdev->bus == bus && pdev->devfn == devfn )
+            {
+                pos = 0;
+                break;
+            }
+        }
+    }
+    if ( pos )
+        pdev = xmalloc(struct pci_ats_dev);
+    if ( !pdev )
+        return -ENOMEM;
 
-    value |= ATS_ENABLE;
-    pci_conf_write16(bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-                     pos + ATS_REG_CTL, value);
+    if ( !(value & ATS_ENABLE) )
+    {
+        value |= ATS_ENABLE;
+        pci_conf_write16(bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+                         pos + ATS_REG_CTL, value);
+    }
 
-    pdev = xmalloc(struct pci_ats_dev);
-    pdev->bus = bus;
-    pdev->devfn = devfn;
-    pdev->ats_queue_depth = queue_depth;
-    list_add(&(pdev->list), &ats_devices);
+    if ( pos )
+    {
+        pdev->bus = bus;
+        pdev->devfn = devfn;
+        value = pci_conf_read16(bus, PCI_SLOT(devfn),
+                                PCI_FUNC(devfn), pos + ATS_REG_CAP);
+        pdev->ats_queue_depth = value & ATS_QUEUE_DEPTH_MASK;
+        list_add(&pdev->list, &ats_devices);
+    }
+
     if ( iommu_verbose )
-        dprintk(XENLOG_INFO VTDPREFIX, "%x:%x.%x: ATS is enabled\n",
-                bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        dprintk(XENLOG_INFO VTDPREFIX, "%x:%x.%x: ATS %s enabled\n",
+                bus, PCI_SLOT(devfn), PCI_FUNC(devfn), pos ? "is" : "was");
 
     return pos;
 }
