@@ -38,7 +38,7 @@ from types import StringTypes
 
 import xen.lowlevel.xc
 from xen.util import asserts, auxbin, mkdir
-from xen.util.blkif import blkdev_uname_to_file, blkdev_uname_to_taptype
+from xen.util.blkif import parse_uname
 import xen.util.xsm.xsm as security
 from xen.util import xsconstants
 from xen.util import mkdir
@@ -3248,9 +3248,18 @@ class XendDomainInfo:
             devtype = devinfo[0]
             disk = devinfo[1]['uname']
 
-            fn = blkdev_uname_to_file(disk)
-            taptype = blkdev_uname_to_taptype(disk)
-            mounted = devtype in ['tap', 'tap2'] and taptype != 'aio' and taptype != 'sync' and not os.stat(fn).st_rdev
+            (fn, types) = parse_uname(disk)
+            def _shouldMount(types):
+                if types[0] in ('file', 'phy'):
+                    return False
+                if types[0] in ('tap', 'tap2'):
+                    if types[1] in ('aio', 'sync'):
+                        return False
+                    else:
+                        return True
+                return os.access('/etc/xen/scripts/block-%s' % types[0], os.X_OK)
+
+            mounted = _shouldMount(types)
             mounted_vbd_uuid = 0
             if mounted:
                 # This is a file, not a device.  pygrub can cope with a
