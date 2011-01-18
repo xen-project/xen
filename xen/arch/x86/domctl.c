@@ -965,13 +965,13 @@ long arch_do_domctl(
         if ( (mfn + nr_mfns - 1) < mfn ) /* wrap? */
             break;
 
-        ret = -ESRCH;
-        if ( unlikely((d = rcu_lock_domain_by_id(domctl->domain)) == NULL) )
-            break;
-
         ret = -EPERM;
         if ( !IS_PRIV(current->domain) &&
              !iomem_access_permitted(current->domain, mfn, mfn + nr_mfns - 1) )
+            break;
+
+        ret = -ESRCH;
+        if ( unlikely((d = rcu_lock_domain_by_id(domctl->domain)) == NULL) )
             break;
 
         ret=0;
