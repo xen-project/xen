@@ -81,6 +81,26 @@
  * contained within the request. Reserved for that purpose.
  */
 #define BLKIF_OP_RESERVED_1        4
+/*
+ * Recognised only if "feature-trim" is present in backend xenbus info.
+ * The "feature-trim" node contains a boolean indicating whether trim
+ * requests are likely to succeed or fail. Either way, a trim request
+ * may fail at any time with BLKIF_RSP_EOPNOTSUPP if it is unsupported by
+ * the underlying block-device hardware. The boolean simply indicates whether
+ * or not it is worthwhile for the frontend to attempt trim requests.
+ * If a backend does not recognise BLKIF_OP_TRIM, it should *not*
+ * create the "feature-trim" node!
+ * 
+ * Trim operation is a request for the underlying block device to mark
+ * extents to be erased. Trim operations are passed with sector_number as the
+ * sector index to begin trim operations at and nr_sectors as the number of
+ * sectors to be trimmed. The specified sectors should be trimmed if the
+ * underlying block device supports trim operations, or a BLKIF_RSP_EOPNOTSUPP
+ * should be returned. More information about trim operations at:
+ * http://t13.org/Documents/UploadedDocuments/docs2008/
+ *     e07154r6-Data_Set_Management_Proposal_for_ATA-ACS2.doc
+ */
+#define BLKIF_OP_TRIM              5
 
 /*
  * Maximum scatter/gather segments per request.
@@ -112,6 +132,20 @@ struct blkif_request {
     struct blkif_request_segment seg[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 };
 typedef struct blkif_request blkif_request_t;
+
+/*
+ * Cast to this structure when blkif_request.operation == BLKIF_OP_TRIM
+ * sizeof(struct blkif_request_trim) <= sizeof(struct blkif_request)
+ */
+struct blkif_request_trim {
+    uint8_t        operation;    /* BLKIF_OP_TRIM                        */
+    uint8_t        reserved;     /*                                      */
+    blkif_vdev_t   handle;       /* same as for read/write requests      */
+    uint64_t       id;           /* private guest value, echoed in resp  */
+    blkif_sector_t sector_number;/* start sector idx on disk             */
+    uint64_t       nr_sectors;   /* number of contiguous sectors to trim */
+};
+typedef struct blkif_request_trim blkif_request_trim_t;
 
 struct blkif_response {
     uint64_t        id;              /* copied from request */
