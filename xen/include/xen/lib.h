@@ -27,7 +27,7 @@ void __warn(char *file, int line);
 #ifndef assert_failed
 #define assert_failed(p)                                        \
 do {                                                            \
-    printk("Assertion '%s' failed, line %d, file %s\n", #p ,    \
+    printk("Assertion '%s' failed, line %d, file %s\n", p ,     \
                    __LINE__, __FILE__);                         \
     BUG();                                                      \
 } while (0)
@@ -35,7 +35,7 @@ do {                                                            \
 
 #ifndef NDEBUG
 #define ASSERT(p) \
-    do { if ( unlikely(!(p)) ) assert_failed(p); } while (0)
+    do { if ( unlikely(!(p)) ) assert_failed(#p); } while (0)
 #else
 #define ASSERT(p) ((void)0)
 #endif
