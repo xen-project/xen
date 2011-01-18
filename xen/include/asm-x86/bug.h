@@ -40,7 +40,7 @@ struct bug_frame {
     asm volatile (                                 \
         "ud2 ; ret %0" BUG_STR(1) BUG_STR(2)       \
         : : "i" (BUGFRAME_assert | (__LINE__<<2)), \
-            "i" (__FILE__), "i" (#p) )
+            "i" (__FILE__), "i" (p) )
 
 
 #endif /* __X86_BUG_H__ */
