@@ -15,7 +15,7 @@
 
 #define EXPORT /* indicates code other modules are dependent upon */
 
-EXPORT bool_t __read_mostly opt_tmem = 1;
+EXPORT bool_t __read_mostly opt_tmem = 0;
 boolean_param("tmem", opt_tmem);
 
 EXPORT bool_t __read_mostly opt_tmem_compress = 0;
