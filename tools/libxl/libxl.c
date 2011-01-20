@@ -506,34 +506,26 @@ int libxl_domain_shutdown(libxl_ctx *ctx, uint32_t domid, int req)
         return ERROR_FAIL;
     }
 
-    shutdown_path = libxl__sprintf(&gc, "%s/control/shutdown", dom_path);
-
-    xs_write(ctx->xsh, XBT_NULL, shutdown_path, req_table[req], strlen(req_table[req]));
     if (libxl__domain_is_hvm(ctx,domid)) {
-        unsigned long acpi_s_state = 0;
         unsigned long pvdriver = 0;
         int ret;
-        ret = xc_get_hvm_param(ctx->xch, domid, HVM_PARAM_ACPI_S_STATE, &acpi_s_state);
-        if (ret<0) {
-            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting ACPI S-state");
-            libxl__free_all(&gc);
-            return ERROR_FAIL;
-        }
         ret = xc_get_hvm_param(ctx->xch, domid, HVM_PARAM_CALLBACK_IRQ, &pvdriver);
         if (ret<0) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting HVM callback IRQ");
             libxl__free_all(&gc);
             return ERROR_FAIL;
         }
-        if (!pvdriver || acpi_s_state != 0) {
-            ret = xc_domain_shutdown(ctx->xch, domid, req);
-            if (ret<0) {
-                LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "unpausing domain");
-                libxl__free_all(&gc);
-                return ERROR_FAIL;
-            }
-       }
+        if (!pvdriver) {
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "HVM domain without PV drivers:"
+                       " graceful shutdown not possible, use destroy");
+            libxl__free_all(&gc);
+            return ERROR_FAIL;
+        }
     }
+
+    shutdown_path = libxl__sprintf(&gc, "%s/control/shutdown", dom_path);
+    xs_write(ctx->xsh, XBT_NULL, shutdown_path, req_table[req], strlen(req_table[req]));
+
     libxl__free_all(&gc);
     return 0;
 }
