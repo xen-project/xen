@@ -922,10 +922,12 @@ class PciDevice:
         pos = PCI_CAPABILITY_LIST
 
         try:
+            fd = None
             fd = os.open(path, os.O_RDONLY)
             os.lseek(fd, PCI_STATUS, 0)
             status = struct.unpack('H', os.read(fd, 2))[0]
             if (status & 0x10) == 0:
+                os.close(fd)
                 # The device doesn't support PCI_STATUS_CAP_LIST
                 return 0
 
@@ -952,6 +954,8 @@ class PciDevice:
 
             os.close(fd)
         except OSError, (errno, strerr):
+            if fd is not None:
+                os.close(fd)
             raise PciDeviceParseError(('Error when accessing sysfs: %s (%d)' %
                 (strerr, errno)))
         return pos
