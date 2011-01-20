@@ -682,11 +682,6 @@ int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid, int force)
 
     if (libxl_device_pci_shutdown(ctx, domid) < 0)
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "pci shutdown failed for domid %d", domid);
-    if (dm_present) {
-        xs_write(ctx->xsh, XBT_NULL,
-                 libxl__sprintf(&gc, "/local/domain/0/device-model/%d/command", domid),
-                 "shutdown", strlen("shutdown"));
-    }
     rc = xc_domain_pause(ctx->xch, domid);
     if (rc < 0) {
         LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc, "xc_domain_pause failed for %d", domid);
