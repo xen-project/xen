@@ -153,9 +153,43 @@ p2m_alloc_ptp(struct p2m_domain *p2m, unsigned long type)
 
     page_list_add_tail(pg, &p2m->pages);
     pg->u.inuse.type_info = type | 1 | PGT_validated;
-    pg->count_info |= 1;
 
     return pg;
+}
+
+void
+p2m_free_ptp(struct p2m_domain *p2m, struct page_info *pg)
+{
+    ASSERT(pg);
+    ASSERT(p2m);
+    ASSERT(p2m->domain);
+    ASSERT(p2m->domain->arch.paging.free_page);
+
+    page_list_del(pg, &p2m->pages);
+    p2m->domain->arch.paging.free_page(p2m->domain, pg);
+
+    return;
+}
+
+/* Free intermediate tables from a p2m sub-tree */
+void
+p2m_free_entry(struct p2m_domain *p2m, l1_pgentry_t *p2m_entry, int page_order)
+{
+    /* End if the entry is a leaf entry. */
+    if ( page_order == 0
+         || !(l1e_get_flags(*p2m_entry) & _PAGE_PRESENT)
+         || (l1e_get_flags(*p2m_entry) & _PAGE_PSE) )
+        return;
+
+    if ( page_order > 9 )
+    {
+        l1_pgentry_t *l3_table = map_domain_page(l1e_get_pfn(*p2m_entry));
+        for ( int i = 0; i < L3_PAGETABLE_ENTRIES; i++ )
+            p2m_free_entry(p2m, l3_table + i, page_order - 9);
+        unmap_domain_page(l3_table);
+    }
+
+    p2m_free_ptp(p2m, mfn_to_page(_mfn(l1e_get_pfn(*p2m_entry))));
 }
 
 // Walk one level of the P2M table, allocating a new table if required.
@@ -1316,6 +1350,7 @@ p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
      */
     if ( page_order == 18 )
     {
+        l1_pgentry_t old_entry = l1e_empty();
         p2m_entry = p2m_find_entry(table, &gfn_remainder, gfn,
                                    L3_PAGETABLE_SHIFT - PAGE_SHIFT,
                                    L3_PAGETABLE_ENTRIES);
@@ -1323,10 +1358,11 @@ p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         if ( (l1e_get_flags(*p2m_entry) & _PAGE_PRESENT) &&
              !(l1e_get_flags(*p2m_entry) & _PAGE_PSE) )
         {
-            P2M_ERROR("configure P2M table L3 entry with large page\n");
-            domain_crash(p2m->domain);
-            goto out;
+            /* We're replacing a non-SP page with a superpage.  Make sure to
+             * handle freeing the table properly. */
+            old_entry = *p2m_entry;
         }
+
         ASSERT(!mfn_valid(mfn) || p2mt != p2m_mmio_direct);
         l3e_content = mfn_valid(mfn) 
             ? l3e_from_pfn(mfn_x(mfn),
@@ -1335,7 +1371,11 @@ p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         entry_content.l1 = l3e_content.l3;
         paging_write_p2m_entry(p2m->domain, gfn, p2m_entry,
                                table_mfn, entry_content, 3);
+        /* NB: paging_write_p2m_entry() handles tlb flushes properly */
 
+        /* Free old intermediate tables if necessary */
+        if ( l1e_get_flags(old_entry) & _PAGE_PRESENT )
+            p2m_free_entry(p2m, &old_entry, page_order);
     }
     /*
      * When using PAE Xen, we only allow 33 bits of pseudo-physical
@@ -1372,9 +1412,11 @@ p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         /* level 1 entry */
         paging_write_p2m_entry(p2m->domain, gfn, p2m_entry,
                                table_mfn, entry_content, 1);
+        /* NB: paging_write_p2m_entry() handles tlb flushes properly */
     }
     else if ( page_order == 9 )
     {
+        l1_pgentry_t old_entry = l1e_empty();
         p2m_entry = p2m_find_entry(table, &gfn_remainder, gfn,
                                    L2_PAGETABLE_SHIFT - PAGE_SHIFT,
                                    L2_PAGETABLE_ENTRIES);
@@ -1384,9 +1426,9 @@ p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         if ( (l1e_get_flags(*p2m_entry) & _PAGE_PRESENT) &&
              !(l1e_get_flags(*p2m_entry) & _PAGE_PSE) )
         {
-            P2M_ERROR("configure P2M table 4KB L2 entry with large page\n");
-            domain_crash(p2m->domain);
-            goto out;
+            /* We're replacing a non-SP page with a superpage.  Make sure to
+             * handle freeing the table properly. */
+            old_entry = *p2m_entry;
         }
         
         ASSERT(!mfn_valid(mfn) || p2mt != p2m_mmio_direct);
@@ -1400,6 +1442,11 @@ p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         entry_content.l1 = l2e_content.l2;
         paging_write_p2m_entry(p2m->domain, gfn, p2m_entry,
                                table_mfn, entry_content, 2);
+        /* NB: paging_write_p2m_entry() handles tlb flushes properly */
+
+        /* Free old intermediate tables if necessary */
+        if ( l1e_get_flags(old_entry) & _PAGE_PRESENT )
+            p2m_free_entry(p2m, &old_entry, page_order);
     }
 
     /* Track the highest gfn for which we have ever had a valid mapping */

@@ -541,6 +541,7 @@ static inline void p2m_mem_access_check(unsigned long gpa, bool_t gla_valid,
 #endif
 
 struct page_info *p2m_alloc_ptp(struct p2m_domain *p2m, unsigned long type);
+void p2m_free_ptp(struct p2m_domain *p2m, struct page_info *pg);
 
 #endif /* _XEN_P2M_H */
 

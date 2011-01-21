@@ -333,9 +333,11 @@ static void hap_free_p2m_page(struct domain *d, struct page_info *pg)
 
     ASSERT(page_get_owner(pg) == d);
     /* Should have just the one ref we gave it in alloc_p2m_page() */
-    if ( (pg->count_info & PGC_count_mask) != 1 )
-        HAP_ERROR("Odd p2m page count c=%#lx t=%"PRtype_info"\n",
-                  pg->count_info, pg->u.inuse.type_info);
+    if ( (pg->count_info & PGC_count_mask) != 1 ) {
+        HAP_ERROR("Odd p2m page %p count c=%#lx t=%"PRtype_info"\n",
+                     pg, pg->count_info, pg->u.inuse.type_info);
+        WARN();
+    }
     pg->count_info &= ~PGC_count_mask;
     /* Free should not decrement domain's total allocation, since
      * these pages were allocated without an owner. */

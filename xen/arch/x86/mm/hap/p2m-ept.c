@@ -166,8 +166,6 @@ static int ept_set_middle_entry(struct p2m_domain *p2m, ept_entry_t *ept_entry)
 /* free ept sub tree behind an entry */
 void ept_free_entry(struct p2m_domain *p2m, ept_entry_t *ept_entry, int level)
 {
-    struct domain *d = p2m->domain;
-
     /* End if the entry is a leaf entry. */
     if ( level == 0 || !is_epte_present(ept_entry) ||
          is_epte_superpage(ept_entry) )
@@ -180,8 +178,8 @@ void ept_free_entry(struct p2m_domain *p2m, ept_entry_t *ept_entry, int level)
             ept_free_entry(p2m, epte + i, level - 1);
         unmap_domain_page(epte);
     }
-
-    d->arch.paging.free_page(d, mfn_to_page(ept_entry->mfn));
+    
+    p2m_free_ptp(p2m, mfn_to_page(ept_entry->mfn));
 }
 
 static int ept_split_super_page(struct p2m_domain *p2m, ept_entry_t *ept_entry,
@@ -317,6 +315,7 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     int vtd_pte_present = 0;
     int needs_sync = 1;
     struct domain *d = p2m->domain;
+    ept_entry_t old_entry = { .epte = 0 };
 
     /*
      * the caller must make sure:
@@ -357,8 +356,12 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     vtd_pte_present = is_epte_present(ept_entry) ? 1 : 0;
 
     /*
-     * When we are here, we must be on a leaf ept entry
-     * with i == target or i > target.
+     * If we're here with i > target, we must be at a leaf node, and
+     * we need to break up the superpage.
+     *
+     * If we're here with i == target and i > 0, we need to check to see
+     * if we're replacing a non-leaf entry (i.e., pointing to an N-1 table)
+     * with a leaf entry (a 1GiB or 2MiB page), and handle things appropriately.
      */
 
     if ( i == target )
@@ -369,6 +372,10 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         /* No need to flush if the old entry wasn't valid */
         if ( !is_epte_present(ept_entry) )
             needs_sync = 0;
+
+        /* If we're replacing a non-leaf entry with a leaf entry (1GiB or 2MiB),
+         * the intermediate tables will be freed below after the ept flush */
+        old_entry = *ept_entry;
 
         if ( mfn_valid(mfn_x(mfn)) || direct_mmio || p2m_is_paged(p2mt) ||
              (p2mt == p2m_ram_paging_in_start) )
@@ -486,6 +493,13 @@ out:
             }
         }
     }
+
+    /* Release the old intermediate tables, if any.  This has to be the
+       last thing we do, after the ept_sync_domain() and removal
+       from the iommu tables, so as to avoid a potential
+       use-after-free. */
+    if ( is_epte_present(&old_entry) )
+        ept_free_entry(p2m, &old_entry, target);
 
     return rv;
 }
