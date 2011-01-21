@@ -217,10 +217,15 @@ static void snb_vtd_ops_postamble(struct iommu* iommu)
 /*
  * call before VT-d translation enable and IOTLB flush operations.
  */
+
+static int snb_igd_quirk;
+boolean_param("snb_igd_quirk", snb_igd_quirk);
+
 void vtd_ops_preamble_quirk(struct iommu* iommu)
 {
     cantiga_vtd_ops_preamble(iommu);
-    snb_vtd_ops_preamble(iommu);
+    if ( snb_igd_quirk )
+        snb_vtd_ops_preamble(iommu);
 }
 
 /*
@@ -228,7 +233,8 @@ void vtd_ops_preamble_quirk(struct iommu* iommu)
  */
 void vtd_ops_postamble_quirk(struct iommu* iommu)
 {
-    snb_vtd_ops_postamble(iommu);
+    if ( snb_igd_quirk )
+        snb_vtd_ops_postamble(iommu);
 }
 
 /* initialize platform identification flags */

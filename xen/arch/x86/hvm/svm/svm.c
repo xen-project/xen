@@ -705,7 +705,7 @@ static void svm_do_resume(struct vcpu *v)
     {
         v->arch.hvm_svm.launch_core = smp_processor_id();
         hvm_migrate_timers(v);
-
+        hvm_migrate_pirqs(v);
         /* Migrating to another ASID domain.  Request a new ASID. */
         hvm_asid_flush_vcpu(v);
     }

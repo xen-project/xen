@@ -53,6 +53,8 @@ void *map_domain_page(unsigned long mfn)
     perfc_incr(map_domain_page_count);
 
     v = mapcache_current_vcpu();
+    /* Prevent vcpu pointer being used before initialize. */
+    ASSERT((unsigned long)v != 0xfffff000);
 
     dcache = &v->domain->arch.mapcache;
     vcache = &v->arch.mapcache;
