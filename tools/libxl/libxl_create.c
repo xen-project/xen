@@ -22,6 +22,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <xenctrl.h>
+#include <xc_dom.h>
+#include <xenguest.h>
 #include "libxl.h"
 #include "libxl_utils.h"
 #include "libxl_internal.h"
@@ -252,7 +255,7 @@ static int domain_restore(libxl_ctx *ctx, libxl_domain_build_info *info,
     dm_info->saved_state = NULL;
     if (info->hvm) {
         ret = asprintf(&dm_info->saved_state,
-                       "/var/lib/xen/qemu-save.%d", domid);
+                       XC_DEVICE_MODEL_RESTORE_FILE".%d", domid);
         ret = (ret < 0) ? ERROR_FAIL : 0;
     }
 

@@ -77,6 +77,14 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                       unsigned int store_evtchn, unsigned long *store_mfn,
                       unsigned int console_evtchn, unsigned long *console_mfn,
                       unsigned int hvm, unsigned int pae, int superpages);
+/**
+ * xc_domain_restore writes a file to disk that contains the device
+ * model saved state.
+ * The pathname of this file is XC_DEVICE_MODEL_RESTORE_FILE; The domid
+ * of the new domain is automatically appended to the filename,
+ * separated by a ".".
+ */
+#define XC_DEVICE_MODEL_RESTORE_FILE "/var/lib/xen/qemu-resume"
 
 /**
  * This function will create a domain for a paravirtualized Linux

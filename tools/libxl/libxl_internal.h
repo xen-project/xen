@@ -45,6 +45,7 @@
 #define LIBXL_HVM_EXTRA_MEMORY 2048
 #define LIBXL_MIN_DOM0_MEM (128*1024)
 #define QEMU_SIGNATURE "DeviceModelRecord0002"
+#define SAVEFILE "/var/lib/xen/qemu-save"
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
 

@@ -436,7 +436,7 @@ static int dump_qemu(xc_interface *xch, uint32_t dom, struct tailbuf_hvm *buf)
     char path[256];
     FILE *fp;
 
-    sprintf(path, "/var/lib/xen/qemu-save.%u", dom);
+    sprintf(path, XC_DEVICE_MODEL_RESTORE_FILE".%u", dom);
     fp = fopen(path, "wb");
     if ( !fp )
         return -1;

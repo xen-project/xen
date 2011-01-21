@@ -936,7 +936,7 @@ class HVMImageHandler(ImageHandler):
         args = ImageHandler.getDeviceModelArgs(self, restore)
         args = args + ([ "-M", "xenfv"])
         if restore:
-            args = args + ([ "-loadvm", "/var/lib/xen/qemu-save.%d" %
+            args = args + ([ "-loadvm", "/var/lib/xen/qemu-resume.%d" %
                              self.vm.getDomid() ])
         return args
 
