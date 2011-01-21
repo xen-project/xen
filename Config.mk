@@ -185,9 +185,9 @@ endif
 # CONFIG_QEMU ?= $(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 72d42d2ff65106fe61b8a4004a289a1be8ec8dc4
-# Thu Jan 20 16:34:47 2011 +0000
-# fix segfault on con_disconnect
+QEMU_TAG ?= cd080a4f177f2cb61a23ed8dfa5ae546a88529c7
+# Fri Jan 21 17:39:03 2011 +0000
+# Disable xen_be_init in stubdom
 
 # Optional components
 XENSTAT_XENTOP     ?= y
