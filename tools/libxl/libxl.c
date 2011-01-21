@@ -1663,7 +1663,7 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk)
     int ret = ERROR_FAIL;
 
     if (!disk->physpath) {
-        disk->physpath = "";
+        disk->physpath = strdup("");
         disk->phystype = PHYSTYPE_PHY;
     }
     disks = libxl_device_disk_list(ctx, domid, &num);
