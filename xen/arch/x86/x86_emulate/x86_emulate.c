@@ -3555,8 +3555,7 @@ x86_emulate(
                 goto done;
             break;
         case 4: /* smsw */
-            if ( ea.type == OP_MEM )
-                ea.bytes = 2;
+            ea.bytes = (ea.type == OP_MEM) ? 2 : op_bytes;
             dst = ea;
             fail_if(ops->read_cr == NULL);
             if ( (rc = ops->read_cr(0, &dst.val, ctxt)) )
