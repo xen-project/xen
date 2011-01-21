@@ -737,7 +737,8 @@ int libxl_primary_console_exec(libxl_ctx *ctx, uint32_t domid_vm)
 {
     uint32_t stubdomid = libxl_get_stubdom_id(ctx, domid_vm);
     if (stubdomid)
-        return libxl_console_exec(ctx, stubdomid, 1, LIBXL_CONSTYPE_PV);
+        return libxl_console_exec(ctx, stubdomid,
+                STUBDOM_CONSOLE_SERIAL, LIBXL_CONSTYPE_PV);
     else {
         if (libxl__domain_is_hvm(ctx, domid_vm))
             return libxl_console_exec(ctx, domid_vm, 0, LIBXL_CONSTYPE_SERIAL);

@@ -154,6 +154,9 @@ char *getcwd(char *buf, size_t size)
 }
 
 #define LOG_PATH "/var/log/"
+#define SAVE_PATH "/var/lib/xen"
+#define SAVE_CONSOLE 1
+#define RESTORE_CONSOLE 2
 
 int mkdir(const char *pathname, mode_t mode)
 {
@@ -175,6 +178,21 @@ int posix_openpt(int flags)
     return(dev->fd);
 }
 
+int open_savefile(char *path, int save)
+{
+    struct consfront_dev *dev;
+    char *nodename[64];
+
+    snprintf(nodename, sizeof(nodename), "device/console/%d", save ? SAVE_CONSOLE : RESTORE_CONSOLE);
+
+    dev = init_consfront(nodename);
+    dev->fd = alloc_fd(FTYPE_SAVEFILE);
+    files[dev->fd].cons.dev = dev;
+
+    printk("fd(%d) = open_savefile\n", dev->fd);
+    return(dev->fd);
+}
+
 int open(const char *pathname, int flags, ...)
 {
     int fd;
@@ -191,6 +209,8 @@ int open(const char *pathname, int flags, ...)
     }
     if (!strncmp(pathname, "/dev/ptmx", strlen("/dev/ptmx")))
         return posix_openpt(flags);
+    if (!strncmp(pathname,SAVE_PATH,strlen(SAVE_PATH)))
+        return open_savefile(pathname, flags & O_WRONLY);
     errno = EIO;
     return -1;
 }
@@ -203,6 +223,7 @@ int isatty(int fd)
 int read(int fd, void *buf, size_t nbytes)
 {
     switch (files[fd].type) {
+        case FTYPE_SAVEFILE:
 	case FTYPE_CONSOLE: {
 	    int ret;
             DEFINE_WAIT(w);
@@ -260,6 +281,15 @@ int read(int fd, void *buf, size_t nbytes)
 int write(int fd, const void *buf, size_t nbytes)
 {
     switch (files[fd].type) {
+        case FTYPE_SAVEFILE: {
+                int ret = 0, tot = nbytes;
+                while (nbytes > 0) {
+                    ret = xencons_ring_send(files[fd].cons.dev, (char *)buf, nbytes);
+                    nbytes -= ret;
+                    buf += ret;
+                }
+                return tot - nbytes;
+            }
 	case FTYPE_CONSOLE:
 	    console_print(files[fd].cons.dev, (char *)buf, nbytes);
 	    return nbytes;
@@ -331,6 +361,7 @@ int close(int fd)
             shutdown_fbfront(files[fd].fb.dev);
             files[fd].type = FTYPE_NONE;
             return 0;
+        case FTYPE_SAVEFILE:
         case FTYPE_CONSOLE:
             fini_console(files[fd].cons.dev);
             files[fd].type = FTYPE_NONE;
@@ -364,9 +395,15 @@ int fstat(int fd, struct stat *buf)
 {
     init_stat(buf);
     switch (files[fd].type) {
+	case FTYPE_SAVEFILE:
 	case FTYPE_CONSOLE:
 	case FTYPE_SOCKET: {
-	    buf->st_mode = (files[fd].type == FTYPE_CONSOLE?S_IFCHR:S_IFSOCK) | S_IRUSR|S_IWUSR;
+            if (files[fd].type == FTYPE_CONSOLE)
+                buf->st_mode = S_IFCHR|S_IRUSR|S_IWUSR;
+            else if (files[fd].type == FTYPE_SOCKET)
+                buf->st_mode = S_IFSOCK|S_IRUSR|S_IWUSR;
+            else if (files[fd].type == FTYPE_SAVEFILE)
+                buf->st_mode = S_IFREG|S_IRUSR|S_IWUSR;
 	    buf->st_uid = 0;
 	    buf->st_gid = 0;
 	    buf->st_size = 0;

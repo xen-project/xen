@@ -184,16 +184,43 @@ struct consfront_dev *xencons_ring_init(void)
 
 void free_consfront(struct consfront_dev *dev)
 {
-    mask_evtchn(dev->evtchn);
+    char* err = NULL;
+    XenbusState state;
 
+    char path[strlen(dev->backend) + 1 + 5 + 1];
+    char nodename[strlen(dev->nodename) + 1 + 5 + 1];
+
+    snprintf(path, sizeof(path), "%s/state", dev->backend);
+    snprintf(nodename, sizeof(nodename), "%s/state", dev->nodename);
+
+    if ((err = xenbus_switch_state(XBT_NIL, nodename, XenbusStateClosing)) != NULL) {
+        printk("free_consfront: error changing state to %d: %s\n",
+                XenbusStateClosing, err);
+        goto close;
+    }
+    state = xenbus_read_integer(path);
+    while (err == NULL && state < XenbusStateClosing)
+        err = xenbus_wait_for_state_change(path, &state, &dev->events);
+    if (err) free(err);
+
+    if ((err = xenbus_switch_state(XBT_NIL, nodename, XenbusStateClosed)) != NULL) {
+        printk("free_consfront: error changing state to %d: %s\n",
+                XenbusStateClosed, err);
+        goto close;
+    }
+
+close:
+    if (err) free(err);
+    xenbus_unwatch_path_token(XBT_NIL, path, path);
+
+    mask_evtchn(dev->evtchn);
+    unbind_evtchn(dev->evtchn);
     free(dev->backend);
+    free(dev->nodename);
 
     gnttab_end_access(dev->ring_ref);
+
     free_page(dev->ring);
-
-    unbind_evtchn(dev->evtchn);
-
-    free(dev->nodename);
     free(dev);
 }
 
@@ -206,7 +233,7 @@ struct consfront_dev *init_consfront(char *_nodename)
     char* msg = NULL;
     char nodename[256];
     char path[256];
-    static int consfrontends = 1;
+    static int consfrontends = 3;
     struct consfront_dev *dev;
     int res;
 

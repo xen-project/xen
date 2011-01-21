@@ -440,7 +440,7 @@ static int libxl_create_stubdom(libxl_ctx *ctx,
                                 libxl__device_model_starting **starting_r)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
-    int i, num_console = 1, ret;
+    int i, num_console = STUBDOM_SPECIAL_CONSOLES, ret;
     libxl_device_console *console;
     libxl_domain_create_info c_info;
     libxl_domain_build_info b_info;
@@ -543,15 +543,31 @@ retry_transaction:
         console[i].devid = i;
         console[i].consback = LIBXL_CONSBACK_IOEMU;
         console[i].domid = domid;
-        if (!i) {
+        /* STUBDOM_CONSOLE_LOGGING (console 0) is for minios logging
+         * STUBDOM_CONSOLE_SAVE (console 1) is for writing the save file
+         * STUBDOM_CONSOLE_RESTORE (console 2) is for reading the save file
+         */
+        switch (i) {
             char *filename;
-            char *name = libxl__sprintf(&gc, "qemu-dm-%s", libxl_domid_to_name(ctx, info->domid));
-            libxl_create_logfile(ctx, name, &filename);
-            console[i].output = libxl__sprintf(&gc, "file:%s", filename);
-            console[i].build_state = &state;
-            free(filename);
-        } else
-            console[i].output = "pty";
+            char *name;
+            case STUBDOM_CONSOLE_LOGGING:
+                name = libxl__sprintf(&gc, "qemu-dm-%s", libxl_domid_to_name(ctx, info->domid));
+                libxl_create_logfile(ctx, name, &filename);
+                console[i].output = libxl__sprintf(&gc, "file:%s", filename);
+                console[i].build_state = &state;
+                free(filename);
+                break;
+            case STUBDOM_CONSOLE_SAVE:
+                console[i].output = libxl__sprintf(&gc, "file:"SAVEFILE".%d", info->domid);
+                break;
+            case STUBDOM_CONSOLE_RESTORE:
+                if (info->saved_state)
+                    console[i].output = libxl__sprintf(&gc, "pipe:%s", info->saved_state);
+                break;
+            default:
+                console[i].output = "pty";
+                break;
+        }
         ret = libxl_device_console_add(ctx, domid, &console[i]);
         if (ret)
             goto out_free;
