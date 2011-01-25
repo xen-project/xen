@@ -2181,7 +2181,7 @@ static void destroy_domain(const char *p)
         exit(-1);
     }
     rc = libxl_domain_destroy(&ctx, domid, 0);
-    if (rc) { fprintf(stderr,"destroy failed (rc=%d)\n.",rc); exit(-1); }
+    if (rc) { fprintf(stderr,"destroy failed (rc=%d)\n",rc); exit(-1); }
 }
 
 static void shutdown_domain(const char *p, int wait)
@@ -2190,7 +2190,7 @@ static void shutdown_domain(const char *p, int wait)
 
     find_domain(p);
     rc=libxl_domain_shutdown(&ctx, domid, 0);
-    if (rc) { fprintf(stderr,"shutdown failed (rc=%d)\n.",rc);exit(-1); }
+    if (rc) { fprintf(stderr,"shutdown failed (rc=%d)\n",rc);exit(-1); }
 
     if (wait) {
         libxl_waiter waiter;
@@ -2232,7 +2232,7 @@ static void reboot_domain(const char *p)
     int rc;
     find_domain(p);
     rc=libxl_domain_shutdown(&ctx, domid, 1);
-    if (rc) { fprintf(stderr,"reboot failed (rc=%d)\n.",rc);exit(-1); }
+    if (rc) { fprintf(stderr,"reboot failed (rc=%d)\n",rc);exit(-1); }
 }
 
 static void list_domains_details(const libxl_dominfo *info, int nb_domain)
@@ -2674,7 +2674,7 @@ static void core_dump_domain(const char *domain_spec, const char *filename)
     int rc;
     find_domain(domain_spec);
     rc=libxl_domain_core_dump(&ctx, domid, filename);
-    if (rc) { fprintf(stderr,"core dump failed (rc=%d)\n.",rc);exit(-1); }
+    if (rc) { fprintf(stderr,"core dump failed (rc=%d)\n",rc);exit(-1); }
 }
 
 static void migrate_receive(int debug, int daemonize)
