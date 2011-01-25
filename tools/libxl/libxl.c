@@ -833,6 +833,31 @@ skip_autopass:
 
 /******************************************************************************/
 
+static int validate_virtual_disk(libxl_ctx *ctx, char *file_name, libxl_disk_phystype disk_type)
+{
+    struct stat stat_buf;
+
+    if ( (file_name[0] == '\0') && (disk_type == PHYSTYPE_EMPTY) )
+        return 0;
+
+    if ( stat(file_name, &stat_buf) != 0 ) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "failed to stat %s", file_name);
+        return ERROR_INVAL;
+    }
+    if ( disk_type == PHYSTYPE_PHY ) {
+        if ( !(S_ISBLK(stat_buf.st_mode)) ) {
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Virtual disk %s is not a block device!\n",
+                file_name);
+            return ERROR_INVAL;
+        }
+    } else if ( stat_buf.st_size == 0 ) {
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Virtual disk %s size is 0!\n", file_name);
+        return ERROR_INVAL;
+    }
+
+    return 0;
+}
+
 int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
@@ -842,6 +867,10 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
     int devid;
     libxl__device device;
     int major, minor, rc;
+
+    rc = validate_virtual_disk(ctx, disk->physpath, disk->phystype);
+    if (rc)
+        return rc;
 
     front = flexarray_make(16, 1);
     if (!front) {
