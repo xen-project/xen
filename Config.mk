@@ -185,7 +185,8 @@ endif
 # CONFIG_QEMU ?= $(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 6a6ffc07f465d5abc94b45ce6fe389369d1395ab
+QEMU_TAG := xen-4.1.0-rc2
+#QEMU_TAG ?= 6a6ffc07f465d5abc94b45ce6fe389369d1395ab
 # Fri Jan 21 18:01:53 2011 +0000
 # qemu-xen: disable buffering on the save file for stubdoms
 
