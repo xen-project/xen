@@ -646,8 +646,8 @@ int libxl_event_get_disk_eject_info(libxl_ctx *ctx, uint32_t domid, libxl_event 
 
     disk->backend_domid = 0;
     disk->domid = domid;
-    disk->physpath = NULL;
-    disk->phystype = 0;
+    disk->physpath = strdup("");
+    disk->phystype = PHYSTYPE_EMPTY;
     /* this value is returned to the user: do not free right away */
     disk->virtpath = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/dev", backend));
     disk->unpluggable = 1;
@@ -882,6 +882,8 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
             device.backend_kind = DEVICE_VBD;
             break;
         }
+        case PHYSTYPE_EMPTY:
+            break;
         case PHYSTYPE_FILE:
             /* let's pretend is tap:aio for the moment */
             disk->phystype = PHYSTYPE_AIO;
@@ -1606,7 +1608,7 @@ static unsigned int libxl_append_disk_list_of_type(libxl_ctx *ctx,
             pdisk->backend_domid = 0;
             pdisk->domid = domid;
             physpath_tmp = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(&gc, "%s/%s/params", be_path, *dir), &len);
-            if (strchr(physpath_tmp, ':')) {
+            if (physpath_tmp && strchr(physpath_tmp, ':')) {
                 pdisk->physpath = strdup(strchr(physpath_tmp, ':') + 1);
                 free(physpath_tmp);
             } else {
@@ -1684,7 +1686,7 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk)
 
     if (!disk->physpath) {
         disk->physpath = strdup("");
-        disk->phystype = PHYSTYPE_PHY;
+        disk->phystype = PHYSTYPE_EMPTY;
     }
     disks = libxl_device_disk_list(ctx, domid, &num);
     for (i = 0; i < num; i++) {

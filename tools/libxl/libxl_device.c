@@ -130,6 +130,7 @@ char *libxl__device_disk_string_of_phystype(libxl_disk_phystype phystype)
         case PHYSTYPE_AIO: return "aio";
         case PHYSTYPE_FILE: return "file";
         case PHYSTYPE_PHY: return "phy";
+        case PHYSTYPE_EMPTY: return "file";
         default: return NULL;
     }
 }
@@ -143,6 +144,7 @@ char *libxl__device_disk_backend_type_of_phystype(libxl_disk_phystype phystype)
         case PHYSTYPE_AIO: return "tap";
         /* let's pretend file is tap:aio */
         case PHYSTYPE_FILE: return "tap";
+        case PHYSTYPE_EMPTY: return "tap";
         case PHYSTYPE_PHY: return "phy";
         default: return NULL;
     }

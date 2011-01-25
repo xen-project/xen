@@ -457,6 +457,11 @@ static int parse_disk_config(libxl_device_disk *disk, char *buf2)
                     return 0;
                 }
                 tok = p + 1;
+            } else if (*p == ',') {
+                state = DSTATE_VIRTPATH;
+                disk->phystype = PHYSTYPE_EMPTY;
+                disk->physpath = strdup("");
+                tok = p + 1;
             }
             break;
         case DSTATE_TAP:
@@ -1834,8 +1839,8 @@ static void cd_insert(const char *dom, const char *virtdev, char *phys)
             libxl_string_to_phystype(&ctx, phys, &disk.phystype);
         }
     } else {
-            disk.physpath = NULL;
-            disk.phystype = 0;
+            disk.physpath = strdup("");
+            disk.phystype = PHYSTYPE_EMPTY;
     }
     disk.virtpath = (char*)virtdev;
     disk.unpluggable = 1;

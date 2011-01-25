@@ -178,6 +178,7 @@ typedef enum {
     PHYSTYPE_AIO,
     PHYSTYPE_FILE,
     PHYSTYPE_PHY,
+    PHYSTYPE_EMPTY,
 } libxl_disk_phystype;
 
 typedef enum {
