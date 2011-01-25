@@ -662,9 +662,20 @@ int libxl_event_get_disk_eject_info(libxl_ctx *ctx, uint32_t domid, libxl_event 
 int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid, int force)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
+    libxl_dominfo dominfo;
     char *dom_path;
     char *vm_path;
     int rc, dm_present;
+
+    rc = libxl_domain_info(ctx, &dominfo, domid);
+    switch(rc) {
+    case 0:
+        break;
+    case ERROR_INVAL:
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "non-existant domain %d", domid);
+    default:
+        return rc;
+    }
 
     if (libxl__domain_is_hvm(ctx, domid)) {
         dm_present = 1;
