@@ -268,7 +268,7 @@ static int libxl_create_pci_backend(libxl__gc *gc, uint32_t domid, libxl_device_
     for (i = 0; i < num; i++, pcidev++)
         libxl_create_pci_backend_device(gc, back, i, pcidev);
 
-    flexarray_vappend(back, "num_devs", libxl__sprintf(gc, "%d", num));
+    flexarray_vappend(back, "num_devs", libxl__sprintf(gc, "%d", num), NULL);
 
     flexarray_vappend(front,
                       "backend-id", libxl__sprintf(gc, "%d", 0),
