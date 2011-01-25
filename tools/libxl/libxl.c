@@ -40,11 +40,19 @@
 
 int libxl_ctx_init(libxl_ctx *ctx, int version, xentoollog_logger *lg)
 {
+    struct stat stat_buf;
+
     if (version != LIBXL_VERSION)
         return ERROR_VERSION;
     memset(ctx, 0, sizeof(libxl_ctx));
     ctx->lg = lg;
     memset(&ctx->version_info, 0, sizeof(libxl_version_info));
+
+    if ( stat(XENSTORE_PID_FILE, &stat_buf) != 0 ) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Is xenstore daemon running?\n"
+                     "failed to stat %s", XENSTORE_PID_FILE);
+        return ERROR_FAIL;
+    }
 
     ctx->xch = xc_interface_open(lg,lg,0);
     if (!ctx->xch) {
