@@ -143,11 +143,25 @@ static int qualifier_to_id(const char *p, uint32_t *id_r)
 static int domain_qualifier_to_domid(const char *p, uint32_t *domid_r,
                                      int *was_name_r)
 {
-    int was_name;
+    libxl_dominfo dominfo;
+    int was_name, rc;
 
     was_name = qualifier_to_id(p, domid_r);
-    if (was_name_r) *was_name_r = was_name;
-    return was_name ? libxl_name_to_domid(&ctx, p, domid_r) : 0;
+    if (was_name_r)
+        *was_name_r = was_name;
+
+    if (was_name) {
+        rc = libxl_name_to_domid(&ctx, p, domid_r);
+        if (rc)
+            return rc;
+    } else {
+        rc = libxl_domain_info(&ctx, &dominfo, *domid_r);
+        /* error only if domain does not exist */
+        if (rc == ERROR_INVAL)
+            return rc;
+    }
+
+    return 0;
 }
 
 static int cpupool_qualifier_to_cpupoolid(const char *p, uint32_t *poolid_r,
