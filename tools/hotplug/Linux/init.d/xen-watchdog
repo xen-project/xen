@@ -17,6 +17,9 @@
 ### END INIT INFO
 #
 
+DAEMON=/usr/sbin/xenwatchdogd
+base=$(basename $DAEMON)
+
 # Source function library.
 if [ -e  /etc/init.d/functions ] ; then
     . /etc/init.d/functions
@@ -39,10 +42,9 @@ fi
 
 start() {
 	local r
-	base="watchdogd"
 	echo -n $"Starting domain watchdog daemon: "
 
-	/usr/sbin/xenwatchdogd 30 15
+	$DAEMON 30 15
 	r=$?
 	[ "$r" -eq 0 ] && success $"$base startup" || failure $"$base startup"
 	echo
@@ -52,10 +54,9 @@ start() {
 
 stop() {
 	local r
-	base="watchdogd"
 	echo -n $"Stopping domain watchdog daemon: "
 
-	killall -USR1 watchdogd 2>/dev/null
+	killall -USR1 $base 2>/dev/null
 	r=$?
 	[ "$r" -eq 0 ] && success $"$base stop" || failure $"$base stop"
 	echo
