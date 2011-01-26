@@ -146,8 +146,8 @@ void __dummy__(void)
     BLANK();
 
 #if PERF_COUNTERS
-    DEFINE(PERFC_hypercalls, PERFC_hypercalls);
-    DEFINE(PERFC_exceptions, PERFC_exceptions);
+    DEFINE(ASM_PERFC_hypercalls, PERFC_hypercalls);
+    DEFINE(ASM_PERFC_exceptions, PERFC_exceptions);
     BLANK();
 #endif
 

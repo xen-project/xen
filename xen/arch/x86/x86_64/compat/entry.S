@@ -62,7 +62,7 @@ UNLIKELY_START(ne, compat_trace)
 #undef SHADOW_BYTES
 UNLIKELY_END(compat_trace)
         leaq  compat_hypercall_table(%rip),%r10
-        PERFC_INCR(PERFC_hypercalls, %rax, %rbx)
+        PERFC_INCR(hypercalls, %rax, %rbx)
         callq *(%r10,%rax,8)
 #ifndef NDEBUG
         /* Deliberately corrupt parameter regs used by this hypercall. */
