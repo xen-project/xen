@@ -583,6 +583,7 @@ static void parse_config_data(const char *configfile_filename_report,
     XLU_ConfigList *vbds, *nics, *pcis, *cvfbs, *net2s, *cpuids;
     int pci_power_mgmt = 0;
     int pci_msitranslate = 1;
+    uint32_t domid_e;
     int e;
 
     libxl_domain_create_info *c_info = &d_config->c_info;
@@ -612,6 +613,15 @@ static void parse_config_data(const char *configfile_filename_report,
 
     if (xlu_cfg_replace_string (config, "name", &c_info->name))
         c_info->name = strdup("test");
+    e = libxl_name_to_domid(&ctx, c_info->name, &domid_e);
+    if (!e) {
+        fprintf(stderr, "A domain with name \"%s\" already exists.\n", c_info->name);
+        exit(1);
+    }
+    if (e != ERROR_INVAL) {
+        fprintf(stderr, "Unexpected error checking for existing domain"
+                " (error=%d)", e);
+    }
 
     if (!xlu_cfg_get_string (config, "uuid", &buf) ) {
         if ( libxl_uuid_from_string(&c_info->uuid, buf) ) {
