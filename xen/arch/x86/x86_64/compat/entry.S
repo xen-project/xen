@@ -72,7 +72,7 @@ ENTRY(compat_hypercall)
         movl  UREGS_rbp+SHADOW_BYTES(%rsp),%r9d   /* Arg 6        */
 #undef SHADOW_BYTES
 1:      leaq  compat_hypercall_table(%rip),%r10
-        PERFC_INCR(PERFC_hypercalls, %rax, %rbx)
+        PERFC_INCR(hypercalls, %rax, %rbx)
         callq *(%r10,%rax,8)
 #ifndef NDEBUG
         /* Deliberately corrupt parameter regs used by this hypercall. */

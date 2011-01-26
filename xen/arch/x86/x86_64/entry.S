@@ -175,7 +175,7 @@ ENTRY(syscall_enter)
         movq  UREGS_r9 +SHADOW_BYTES(%rsp),%r9    /* Arg 6        */
 #undef SHADOW_BYTES
 1:      leaq  hypercall_table(%rip),%r10
-        PERFC_INCR(PERFC_hypercalls, %rax, %rbx)
+        PERFC_INCR(hypercalls, %rax, %rbx)
         callq *(%r10,%rax,8)
 #ifndef NDEBUG
         /* Deliberately corrupt parameter regs used by this hypercall. */
@@ -472,7 +472,7 @@ handle_exception_saved:
         movl  UREGS_entry_vector(%rsp),%eax
         leaq  exception_table(%rip),%rdx
         GET_CURRENT(%rbx)
-        PERFC_INCR(PERFC_exceptions, %rax, %rbx)
+        PERFC_INCR(exceptions, %rax, %rbx)
         callq *(%rdx,%rax,8)
         testb $3,UREGS_cs(%rsp)
         jz    restore_all_xen

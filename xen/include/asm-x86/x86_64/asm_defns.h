@@ -71,7 +71,7 @@
         shlq $PERCPU_SHIFT,_cur;                \
         addq %rdx,_cur;                         \
         popq %rdx;                              \
-        incl _name*4(_cur,_idx,4);              \
+        incl ASM_PERFC_##_name*4(_cur,_idx,4);  \
         popq _cur
 #else
 #define PERFC_INCR(_name,_idx,_cur)
