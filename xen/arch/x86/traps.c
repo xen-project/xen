@@ -802,11 +802,16 @@ static void pv_cpuid(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_IBS % 32, &c);
         __clear_bit(X86_FEATURE_SKINIT % 32, &c);
         __clear_bit(X86_FEATURE_WDT % 32, &c);
+        __clear_bit(X86_FEATURE_LWP % 32, &c);
+        __clear_bit(X86_FEATURE_NODEID_MSR % 32, &c);
+        __clear_bit(X86_FEATURE_TOPOEXT % 32, &c);
         break;
     case 5: /* MONITOR/MWAIT */
     case 0xa: /* Architectural Performance Monitor Features */
     case 0x8000000a: /* SVM revision and features */
     case 0x8000001b: /* Instruction Based Sampling */
+    case 0x8000001c: /* Light Weight Profiling */
+    case 0x8000001e: /* Extended topology reporting */
         a = b = c = d = 0;
         break;
     default:

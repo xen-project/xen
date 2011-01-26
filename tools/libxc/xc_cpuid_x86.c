@@ -427,12 +427,17 @@ static void xc_cpuid_pv_policy(
         clear_bit(X86_FEATURE_IBS, regs[2]);
         clear_bit(X86_FEATURE_SKINIT, regs[2]);
         clear_bit(X86_FEATURE_WDT, regs[2]);
+        clear_bit(X86_FEATURE_LWP, regs[2]);
+        clear_bit(X86_FEATURE_NODEID_MSR, regs[2]);
+        clear_bit(X86_FEATURE_TOPOEXT, regs[2]);
         break;
     case 5: /* MONITOR/MWAIT */
     case 0xa: /* Architectural Performance Monitor Features */
     case 0xd: /* XSAVE */
     case 0x8000000a: /* SVM revision and features */
     case 0x8000001b: /* Instruction Based Sampling */
+    case 0x8000001c: /* Light Weight Profiling */
+    case 0x8000001e: /* Extended topology reporting */
         regs[0] = regs[1] = regs[2] = regs[3] = 0;
         break;
     }
