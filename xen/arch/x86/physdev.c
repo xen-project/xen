@@ -87,14 +87,9 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
     struct msi_info _msi;
     void *map_data = NULL;
 
-    if ( !map )
-        return -EINVAL;
-
-    d = (map->domid == DOMID_SELF) ? rcu_lock_current_domain()
-        : rcu_lock_domain_by_id(map->domid);
-
-    if ( d == NULL )
-        return -ESRCH;
+    ret = rcu_lock_target_domain_by_id(map->domid, &d);
+    if ( ret )
+        return ret;
 
     if ( map->domid == DOMID_SELF && is_hvm_domain(d) )
     {
@@ -225,11 +220,9 @@ static int physdev_unmap_pirq(struct physdev_unmap_pirq *unmap)
     struct domain *d;
     int ret;
 
-    d = (unmap->domid == DOMID_SELF) ? rcu_lock_current_domain()
-        : rcu_lock_domain_by_id(unmap->domid);
-
-    if ( d == NULL )
-        return -ESRCH;
+    ret = rcu_lock_target_domain_by_id(unmap->domid, &d);
+    if ( ret )
+        return ret;
 
     if ( is_hvm_domain(d) )
     {
