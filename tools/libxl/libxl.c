@@ -850,7 +850,7 @@ static int validate_virtual_disk(libxl_ctx *ctx, char *file_name, libxl_disk_phy
                 file_name);
             return ERROR_INVAL;
         }
-    } else if ( stat_buf.st_size == 0 ) {
+    } else if ( S_ISREG(stat_buf.st_mode) && stat_buf.st_size == 0 ) {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Virtual disk %s size is 0!\n", file_name);
         return ERROR_INVAL;
     }
