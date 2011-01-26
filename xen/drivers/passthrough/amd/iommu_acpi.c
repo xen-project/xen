@@ -289,16 +289,16 @@ static int __init parse_ivmd_device_range(
     first_bdf = ivmd_block->header.dev_id;
     if ( first_bdf >= ivrs_bdf_entries )
     {
-        AMD_IOMMU_DEBUG(
-            "IVMD Error: Invalid Range_First Dev_Id 0x%x\n", first_bdf);
+        AMD_IOMMU_DEBUG("IVMD Error: "
+                        "Invalid Range_First Dev_Id 0x%x\n", first_bdf);
         return -ENODEV;
     }
 
     last_bdf = ivmd_block->last_dev_id;
     if ( (last_bdf >= ivrs_bdf_entries) || (last_bdf <= first_bdf) )
     {
-        AMD_IOMMU_DEBUG(
-            "IVMD Error: Invalid Range_Last Dev_Id 0x%x\n", last_bdf);
+        AMD_IOMMU_DEBUG("IVMD Error: "
+                        "Invalid Range_Last Dev_Id 0x%x\n", last_bdf);
         return -ENODEV;
     }
 
@@ -321,7 +321,7 @@ static int __init parse_ivmd_device_iommu(
     if ( !iommu )
     {
         AMD_IOMMU_DEBUG("IVMD Error: No IOMMU for Dev_Id 0x%x  Cap 0x%x\n",
-                ivmd_block->header.dev_id, ivmd_block->cap_offset);
+                        ivmd_block->header.dev_id, ivmd_block->cap_offset);
         return -ENODEV;
     }
 
@@ -441,24 +441,24 @@ static u16 __init parse_ivhd_device_range(
          AMD_IOMMU_ACPI_IVHD_DEV_RANGE_END )
     {
         AMD_IOMMU_DEBUG("IVHD Error: "
-                "Invalid Range: End_Type 0x%x\n",
-                ivhd_device->range.trailer.type);
+                        "Invalid Range: End_Type 0x%x\n",
+                        ivhd_device->range.trailer.type);
         return 0;
     }
 
     first_bdf = ivhd_device->header.dev_id;
     if ( first_bdf >= ivrs_bdf_entries )
     {
-        AMD_IOMMU_DEBUG(
-            "IVHD Error: Invalid Range: First Dev_Id 0x%x\n", first_bdf);
+        AMD_IOMMU_DEBUG("IVHD Error: "
+                        "Invalid Range: First Dev_Id 0x%x\n", first_bdf);
         return 0;
     }
 
     last_bdf = ivhd_device->range.trailer.dev_id;
     if ( (last_bdf >= ivrs_bdf_entries) || (last_bdf <= first_bdf) )
     {
-        AMD_IOMMU_DEBUG(
-            "IVHD Error: Invalid Range: Last Dev_Id 0x%x\n", last_bdf);
+        AMD_IOMMU_DEBUG("IVHD Error: "
+                        "Invalid Range: Last Dev_Id 0x%x\n", last_bdf);
         return 0;
     }
 
@@ -522,16 +522,16 @@ static u16 __init parse_ivhd_device_alias_range(
          AMD_IOMMU_ACPI_IVHD_DEV_RANGE_END )
     {
         AMD_IOMMU_DEBUG("IVHD Error: "
-                "Invalid Range: End_Type 0x%x\n",
-                ivhd_device->alias_range.trailer.type);
+                        "Invalid Range: End_Type 0x%x\n",
+                        ivhd_device->alias_range.trailer.type);
         return 0;
     }
 
     first_bdf = ivhd_device->header.dev_id;
     if ( first_bdf >= ivrs_bdf_entries )
     {
-        AMD_IOMMU_DEBUG(
-            "IVHD Error: Invalid Range: First Dev_Id 0x%x\n", first_bdf);
+        AMD_IOMMU_DEBUG("IVHD Error: "
+                        "Invalid Range: First Dev_Id 0x%x\n", first_bdf);
         return 0;
     }
 
@@ -601,29 +601,29 @@ static u16 __init parse_ivhd_device_extended_range(
          AMD_IOMMU_ACPI_IVHD_DEV_RANGE_END )
     {
         AMD_IOMMU_DEBUG("IVHD Error: "
-                "Invalid Range: End_Type 0x%x\n",
-                ivhd_device->extended_range.trailer.type);
+                        "Invalid Range: End_Type 0x%x\n",
+                        ivhd_device->extended_range.trailer.type);
         return 0;
     }
 
     first_bdf = ivhd_device->header.dev_id;
     if ( first_bdf >= ivrs_bdf_entries )
     {
-        AMD_IOMMU_DEBUG(
-            "IVHD Error: Invalid Range: First Dev_Id 0x%x\n", first_bdf);
+        AMD_IOMMU_DEBUG("IVHD Error: "
+                        "Invalid Range: First Dev_Id 0x%x\n", first_bdf);
         return 0;
     }
 
     last_bdf = ivhd_device->extended_range.trailer.dev_id;
     if ( (last_bdf >= ivrs_bdf_entries) || (last_bdf <= first_bdf) )
     {
-        AMD_IOMMU_DEBUG(
-            "IVHD Error: Invalid Range: Last Dev_Id 0x%x\n", last_bdf);
+        AMD_IOMMU_DEBUG("IVHD Error: "
+                        "Invalid Range: Last Dev_Id 0x%x\n", last_bdf);
         return 0;
     }
 
     AMD_IOMMU_DEBUG(" Dev_Id Range: 0x%x -> 0x%x\n",
-            first_bdf, last_bdf);
+                    first_bdf, last_bdf);
 
     for ( bdf = first_bdf; bdf <= last_bdf; bdf++ )
         add_ivrs_mapping_entry(bdf, bdf, ivhd_device->header.flags, iommu);
@@ -675,7 +675,7 @@ static int __init parse_ivhd_block(struct acpi_ivhd_block_header *ivhd_block)
     if ( !iommu )
     {
         AMD_IOMMU_DEBUG("IVHD Error: No IOMMU for Dev_Id 0x%x  Cap 0x%x\n",
-                ivhd_block->header.dev_id, ivhd_block->cap_offset);
+                        ivhd_block->header.dev_id, ivhd_block->cap_offset);
         return -ENODEV;
     }
 
@@ -809,7 +809,7 @@ static void __init dump_acpi_table_header(struct acpi_table_header *table)
     printk("\n");
 
     AMD_IOMMU_DEBUG(" Creator_Revision 0x%x\n",
-           table->asl_compiler_revision);
+                    table->asl_compiler_revision);
 
 }
 
@@ -841,9 +841,9 @@ static int __init parse_ivrs_table(struct acpi_table_header *_table)
         if ( table->length < (length + ivrs_block->length) )
         {
             AMD_IOMMU_DEBUG("IVRS Error: "
-                    "Table Length Exceeded: 0x%x -> 0x%lx\n",
-                    table->length,
-                    (length + ivrs_block->length));
+                            "Table Length Exceeded: 0x%x -> 0x%lx\n",
+                            table->length,
+                            (length + ivrs_block->length));
             return -ENODEV;
         }
 
@@ -869,8 +869,7 @@ static int __init detect_iommu_acpi(struct acpi_table_header *_table)
         checksum += raw_table[i];
     if ( checksum )
     {
-        AMD_IOMMU_DEBUG("IVRS Error: "
-                "Invalid Checksum 0x%x\n", checksum);
+        AMD_IOMMU_DEBUG("IVRS Error: Invalid Checksum 0x%x\n", checksum);
         return -ENODEV;
     }
 

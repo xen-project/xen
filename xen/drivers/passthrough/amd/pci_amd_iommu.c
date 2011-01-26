@@ -109,9 +109,11 @@ static void amd_iommu_setup_domain_device(
         invalidate_dev_table_entry(iommu, req_id);
         flush_command_buffer(iommu);
 
-        AMD_IOMMU_DEBUG("Setup I/O page table at DTE:0x%x, root_table:%"PRIx64","
-        "domain_id:%d, paging_mode:%d\n", req_id,
-        page_to_maddr(hd->root_table), hd->domain_id, hd->paging_mode);
+        AMD_IOMMU_DEBUG("Setup I/O page table: device id = 0x%04x, "
+                        "root table = 0x%"PRIx64", "
+                        "domain = %d, paging mode = %d\n", req_id,
+                        page_to_maddr(hd->root_table),
+                        hd->domain_id, hd->paging_mode);
     }
 
     spin_unlock_irqrestore(&iommu->lock, flags);
@@ -160,7 +162,7 @@ int __init amd_iov_detect(void)
 
     if ( amd_iommu_init() != 0 )
     {
-        printk("Error initialization\n");
+        printk("AMD-Vi: Error initialization\n");
         return -ENODEV;
     }
 
@@ -262,10 +264,10 @@ static void amd_iommu_disable_domain_device(
         disable_translation((u32 *)dte);
         invalidate_dev_table_entry(iommu, req_id);
         flush_command_buffer(iommu);
-        AMD_IOMMU_DEBUG("Disable DTE:0x%x,"
-                " domain_id:%d, paging_mode:%d\n",
-                req_id,  domain_hvm_iommu(domain)->domain_id,
-                domain_hvm_iommu(domain)->paging_mode);
+        AMD_IOMMU_DEBUG("Disable: device id = 0x%04x, "
+                        "domain = %d, paging mode = %d\n",
+                        req_id,  domain_hvm_iommu(domain)->domain_id,
+                        domain_hvm_iommu(domain)->paging_mode);
     }
     spin_unlock_irqrestore(&iommu->lock, flags);
 }
@@ -287,8 +289,9 @@ static int reassign_device( struct domain *source, struct domain *target,
     if ( !iommu )
     {
         AMD_IOMMU_DEBUG("Fail to find iommu."
-            " %x:%x.%x cannot be assigned to domain %d\n", 
-            bus, PCI_SLOT(devfn), PCI_FUNC(devfn), target->domain_id);
+                        " %02x:%x02.%x cannot be assigned to domain %d\n", 
+                        bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+                        target->domain_id);
         return -ENODEV;
     }
 
@@ -298,9 +301,9 @@ static int reassign_device( struct domain *source, struct domain *target,
     pdev->domain = target;
 
     amd_iommu_setup_domain_device(target, iommu, bdf);
-    AMD_IOMMU_DEBUG("reassign %x:%x.%x domain %d -> domain %d\n",
-                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-                 source->domain_id, target->domain_id);
+    AMD_IOMMU_DEBUG("Re-assign %02x:%02x.%x from domain %d to domain %d\n",
+                    bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+                    source->domain_id, target->domain_id);
 
     return 0;
 }
@@ -387,9 +390,9 @@ static int amd_iommu_add_device(struct pci_dev *pdev)
     if ( !iommu )
     {
         AMD_IOMMU_DEBUG("Fail to find iommu."
-            " %x:%x.%x cannot be assigned to domain %d\n", 
-            pdev->bus, PCI_SLOT(pdev->devfn),
-            PCI_FUNC(pdev->devfn), pdev->domain->domain_id);
+                        " %02x:%02x.%x cannot be assigned to domain %d\n", 
+                        pdev->bus, PCI_SLOT(pdev->devfn),
+                        PCI_FUNC(pdev->devfn), pdev->domain->domain_id);
         return -ENODEV;
     }
 
@@ -409,9 +412,9 @@ static int amd_iommu_remove_device(struct pci_dev *pdev)
     if ( !iommu )
     {
         AMD_IOMMU_DEBUG("Fail to find iommu."
-            " %x:%x.%x cannot be removed from domain %d\n", 
-            pdev->bus, PCI_SLOT(pdev->devfn),
-            PCI_FUNC(pdev->devfn), pdev->domain->domain_id);
+                        " %02x:%02x.%x cannot be removed from domain %d\n", 
+                        pdev->bus, PCI_SLOT(pdev->devfn),
+                        PCI_FUNC(pdev->devfn), pdev->domain->domain_id);
         return -ENODEV;
     }
 

@@ -324,7 +324,7 @@ static void amd_iommu_reset_event_log(struct amd_iommu *iommu)
     if ( log_run )
     {
         AMD_IOMMU_DEBUG("Warning: EventLogRun bit is not cleared"
-                       "before reset!\n");
+                        "before reset!\n");
         return;
     }
 
@@ -357,7 +357,9 @@ static void iommu_msi_set_affinity(unsigned int irq, cpumask_t mask)
     u8 func = PCI_FUNC(iommu->bdf & 0xff);
 
     dest = set_desc_affinity(desc, &mask);
-    if (dest == BAD_APICID){
+
+    if ( dest == BAD_APICID )
+    {
         dprintk(XENLOG_ERR, "Set iommu interrupt affinity error!\n");
         return;
     }
@@ -448,7 +450,7 @@ static void iommu_msi_end(unsigned int irq)
 
 
 static hw_irq_controller iommu_msi_type = {
-    .typename = "AMD_IOV_MSI",
+    .typename = "AMD-IOMMU-MSI",
     .startup = iommu_msi_startup,
     .shutdown = iommu_msi_mask,
     .enable = iommu_msi_unmask,
@@ -464,7 +466,7 @@ static void parse_event_log_entry(u32 entry[])
     u32 code;
     u64 *addr;
     char * event_str[] = {"ILLEGAL_DEV_TABLE_ENTRY",
-                          "IO_PAGE_FALT",
+                          "IO_PAGE_FAULT",
                           "DEV_TABLE_HW_ERROR",
                           "PAGE_TABLE_HW_ERROR",
                           "ILLEGAL_COMMAND_ERROR",
@@ -482,7 +484,7 @@ static void parse_event_log_entry(u32 entry[])
         return;
     }
 
-    if ( code == IOMMU_EVENT_IO_PAGE_FALT )
+    if ( code == IOMMU_EVENT_IO_PAGE_FAULT )
     {
         device_id = get_field_from_reg_u32(entry[0],
                                            IOMMU_EVENT_DEVICE_ID_MASK,
@@ -491,9 +493,10 @@ static void parse_event_log_entry(u32 entry[])
                                            IOMMU_EVENT_DOMAIN_ID_MASK,
                                            IOMMU_EVENT_DOMAIN_ID_SHIFT);
         addr= (u64*) (entry + 2);
-        printk(XENLOG_ERR "AMD_IOV: "
-            "%s: domain:%d, device id:0x%x, fault address:0x%"PRIx64"\n",
-            event_str[code-1], domain_id, device_id, *addr);
+        printk(XENLOG_ERR "AMD-Vi: "
+               "%s: domain = %d, device id = 0x%04x, "
+               "fault address = 0x%"PRIx64"\n",
+               event_str[code-1], domain_id, device_id, *addr);
     }
     else
     {
@@ -810,9 +813,9 @@ static int __init amd_iommu_setup_device_table(void)
             amd_iommu_set_intremap_table(
                 dte, (u64)virt_to_maddr(intr_tb), iommu_intremap);
 
-            AMD_IOMMU_DEBUG("Add device table entry at DTE:0x%x, "
-                "intremap_table:%"PRIx64"\n", bdf,
-                (u64)virt_to_maddr(intr_tb));
+            AMD_IOMMU_DEBUG("Add device table entry: device id = 0x%04x, "
+                            "interupt table = 0x%"PRIx64"\n", bdf,
+                            (u64)virt_to_maddr(intr_tb));
         }
     }
 

@@ -183,8 +183,8 @@ int __init amd_iommu_setup_ioapic_remapping(void)
             iommu = find_iommu_for_device(bdf);
             if ( !iommu )
             {
-                AMD_IOMMU_DEBUG(
-                "Fail to find iommu for ioapic device id = 0x%x\n", bdf);
+                AMD_IOMMU_DEBUG("Fail to find iommu for ioapic "
+                                "device id = 0x%x\n", bdf);
                 continue;
             }
 
@@ -233,8 +233,8 @@ void amd_iommu_ioapic_update_ire(
     iommu = find_iommu_for_device(bdf);
     if ( !iommu )
     {
-        AMD_IOMMU_DEBUG(
-            "Fail to find iommu for ioapic device id = 0x%x\n", bdf);
+        AMD_IOMMU_DEBUG("Fail to find iommu for ioapic device id = 0x%x\n",
+                        bdf);
         return;
     }
     if ( rte_upper )
@@ -350,9 +350,8 @@ void amd_iommu_msi_msg_update_ire(
 
     if ( !iommu )
     {
-        AMD_IOMMU_DEBUG(
-            "Fail to find iommu for MSI device id = 0x%x\n",
-            (pdev->bus << 8) | pdev->devfn);
+        AMD_IOMMU_DEBUG("Fail to find iommu for MSI device id = 0x%x\n",
+                       (pdev->bus << 8) | pdev->devfn);
         return;
     }
 

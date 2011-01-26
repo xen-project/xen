@@ -535,7 +535,7 @@ int amd_iommu_reserve_domain_unity_map(
         {
             spin_unlock(&hd->mapping_lock);
             AMD_IOMMU_DEBUG("Invalid IO pagetable entry phys_addr = %lx\n",
-                          phys_addr);
+                            phys_addr);
             domain_crash(domain);
             return -EFAULT;
         }
