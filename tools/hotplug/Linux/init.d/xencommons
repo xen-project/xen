@@ -52,7 +52,7 @@ do_start () {
 		test -z "$XENSTORED_TRACE" || XENSTORED_ARGS=" -T /var/log/xen/xenstored-trace.log"
 
 		echo -n Starting xenstored...
-		xenstored --pid-file=/var/run/xenstore.pid $XENSTORED_ARGS
+		xenstored --pid-file=/var/run/xenstored.pid $XENSTORED_ARGS
 
 		# Wait for xenstored to actually come up, timing out after 30 seconds
                 while [ $time -lt $timeout ] && ! `xenstore-read -s / >/dev/null 2>&1` ; do
