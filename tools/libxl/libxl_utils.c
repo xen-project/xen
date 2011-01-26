@@ -93,7 +93,7 @@ int libxl_name_to_domid(libxl_ctx *ctx, const char *name,
     int i, nb_domains;
     char *domname;
     libxl_dominfo *dominfo;
-    int ret = -1;
+    int ret = ERROR_INVAL;
 
     dominfo = libxl_list_domain(ctx, &nb_domains);
     if (!dominfo)
@@ -142,7 +142,7 @@ int libxl_name_to_cpupoolid(libxl_ctx *ctx, const char *name,
     int i, nb_pools;
     char *poolname;
     libxl_cpupoolinfo *poolinfo;
-    int ret = -1;
+    int ret = ERROR_INVAL;
 
     poolinfo = libxl_list_cpupool(ctx, &nb_pools);
     if (!poolinfo)
@@ -171,7 +171,7 @@ int libxl_name_to_schedid(libxl_ctx *ctx, const char *name)
         if (strcmp(name, schedid_name[i].name) == 0)
             return schedid_name[i].id;
 
-    return -1;
+    return ERROR_INVAL;
 }
 
 char *libxl_schedid_to_name(libxl_ctx *ctx, int schedid)
@@ -287,7 +287,7 @@ int libxl_string_to_phystype(libxl_ctx *ctx, char *s, libxl_disk_phystype *physt
     } else if (!strcmp(s, "tap")) {
         p = strchr(s, ':');
         if (!p) {
-            rc = -1;
+            rc = ERROR_INVAL;
             goto out;
         }
         p++;

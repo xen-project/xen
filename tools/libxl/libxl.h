@@ -232,12 +232,13 @@ typedef struct {
 } libxl_domain_suspend_info;
 
 enum {
-    ERROR_VERSION = -1,
-    ERROR_FAIL = -2,
-    ERROR_NI = -3,
-    ERROR_NOMEM = -4,
-    ERROR_INVAL = -5,
-    ERROR_BADFAIL = -6,
+    ERROR_NONSPECIFIC = -1,
+    ERROR_VERSION = -2,
+    ERROR_FAIL = -3,
+    ERROR_NI = -4,
+    ERROR_NOMEM = -5,
+    ERROR_INVAL = -6,
+    ERROR_BADFAIL = -7,
 };
 
 #define LIBXL_VERSION 0
