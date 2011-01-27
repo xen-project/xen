@@ -88,6 +88,16 @@
 #endif
 
 
+#define XENCTRL_HAS_XC_INTERFACE 1
+/* In Xen 4.0 and earlier, xc_interface_open and xc_evtchn_open would
+ * both return ints being the file descriptor.  In 4.1 and later, they
+ * return an xc_interface* and xc_evtchn*, respectively - ie, a
+ * pointer to an opaque struct.  This #define is provided in 4.1 and
+ * later, allowing out-of-tree callers to more easily distinguish
+ * between, and be compatible with, both versions.
+ */
+
+
 /*
  *  GENERAL
  *
