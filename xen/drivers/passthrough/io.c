@@ -375,7 +375,6 @@ int pt_irq_destroy_bind_vtd(
             hvm_irq_dpci->mirq[machine_gsi].dom   = NULL;
             hvm_irq_dpci->mirq[machine_gsi].flags = 0;
             clear_bit(machine_gsi, hvm_irq_dpci->mapping);
-            unmap_domain_pirq_emuirq(d, machine_gsi);
         }
     }
     spin_unlock(&d->event_lock);
