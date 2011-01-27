@@ -518,38 +518,26 @@ int amd_iommu_unmap_page(struct domain *d, unsigned long gfn)
     return 0;
 }
 
-int amd_iommu_reserve_domain_unity_map(
-    struct domain *domain,
-    unsigned long phys_addr,
-    unsigned long size, int iw, int ir)
+int amd_iommu_reserve_domain_unity_map(struct domain *domain,
+                                       u64 phys_addr,
+                                       unsigned long size, int iw, int ir)
 {
-    u64 iommu_l2e;
     unsigned long npages, i;
-    struct hvm_iommu *hd = domain_hvm_iommu(domain);
+    unsigned long gfn;
+    unsigned int flags = !!ir;
+    int rt = 0;
+
+    if ( iw )
+        flags |= IOMMUF_writable;
 
     npages = region_to_pages(phys_addr, size);
-
-    spin_lock(&hd->mapping_lock);
-    for ( i = 0; i < npages; ++i )
+    gfn = phys_addr >> PAGE_SHIFT;
+    for ( i = 0; i < npages; i++ )
     {
-        iommu_l2e = iommu_l2e_from_pfn(
-            hd->root_table, hd->paging_mode, phys_addr >> PAGE_SHIFT);
-
-        if ( iommu_l2e == 0 )
-        {
-            spin_unlock(&hd->mapping_lock);
-            AMD_IOMMU_DEBUG("Invalid IO pagetable entry phys_addr = %lx\n",
-                            phys_addr);
-            domain_crash(domain);
-            return -EFAULT;
-        }
-
-        set_iommu_l1e_present(iommu_l2e,
-            (phys_addr >> PAGE_SHIFT), phys_addr, iw, ir);
-
-        phys_addr += PAGE_SIZE;
+        rt = amd_iommu_map_page(domain, gfn +i, gfn +i, flags);
+        if ( rt != 0 )
+            return rt;
     }
-    spin_unlock(&hd->mapping_lock);
     return 0;
 }
 
