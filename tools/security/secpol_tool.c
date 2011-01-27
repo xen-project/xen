@@ -511,7 +511,7 @@ int main(int argc, char **argv)
         if (argc != 2)
             usage(argv[0]);
 
-        if ((xc_handle = xc_interface_open()) == 0) {
+        if ((xc_handle = xc_interface_open(0, 0, 0)) == 0) {
             printf("ERROR: Could not open xen privcmd device!\n");
             exit(-1);
         }
@@ -523,7 +523,7 @@ int main(int argc, char **argv)
         if (argc != 3)
             usage(argv[0]);
 
-        if ((xc_handle = xc_interface_open()) == 0) {
+        if ((xc_handle = xc_interface_open(0, 0, 0)) == 0) {
             printf("ERROR: Could not open xen privcmd device!\n");
             exit(-1);
         }
@@ -535,7 +535,7 @@ int main(int argc, char **argv)
         if (argc != 2)
             usage(argv[0]);
 
-        if ((xc_handle = xc_interface_open()) == 0) {
+        if ((xc_handle = xc_interface_open(0, 0, 0)) == 0) {
             printf("ERROR: Could not open xen privcmd device!\n");
             exit(-1);
         }
