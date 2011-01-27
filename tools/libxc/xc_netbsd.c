@@ -23,6 +23,9 @@
 #include <xen/sys/evtchn.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <stdio.h>
+#include <errno.h>
+#include <sys/sysctl.h>
 
 static xc_osdep_handle netbsd_privcmd_open(xc_interface *xch)
 {
@@ -349,6 +352,24 @@ void discard_file_cache(xc_interface *xch, int fd, int flush)
 
  out:
     errno = saved_errno;
+}
+
+uint64_t xc_get_physmem(void)
+{
+    int mib[2], rc;
+    size_t len;
+    uint64_t physmem;
+
+    mib[0] = CTL_HW;
+    mib[1] = HW_PHYSMEM64;
+    rc = sysctl(mib, 2, &physmem, &len, NULL, 0);
+
+    if (rc == -1) {
+        /* PERROR("%s: Failed to get hw.physmem64: %s\n", strerror(errno)); */
+        return 0;
+    }
+
+    return physmem;
 }
 
 static struct xc_osdep_ops *netbsd_osdep_init(xc_interface *xch, enum xc_osdep_type type)

@@ -140,27 +140,6 @@ static int xc_try_bzip2_decode(
 
 #include <lzma.h>
 
-static uint64_t physmem(void)
-{
-    uint64_t ret = 0;
-    const long pagesize = sysconf(_SC_PAGESIZE);
-    const long pages = sysconf(_SC_PHYS_PAGES);
-
-    if ( (pagesize != -1) || (pages != -1) )
-    {
-        /*
-         * According to docs, pagesize * pages can overflow.
-         * Simple case is 32-bit box with 4 GiB or more RAM,
-         * which may report exactly 4 GiB of RAM, and "long"
-         * being 32-bit will overflow. Casting to uint64_t
-         * hopefully avoids overflows in the near future.
-         */
-        ret = (uint64_t)(pagesize) * (uint64_t)(pages);
-    }
-
-    return ret;
-}
-
 static int xc_try_lzma_decode(
     struct xc_dom_image *dom, void **blob, size_t *size)
 {
@@ -173,7 +152,7 @@ static int xc_try_lzma_decode(
     int outsize;
     const char *msg;
 
-    ret = lzma_alone_decoder(&stream, physmem() / 3);
+    ret = lzma_alone_decoder(&stream, xc_get_physmem() / 3);
     if ( ret != LZMA_OK )
     {
         DOMPRINTF("LZMA: Failed to init stream decoder");
