@@ -182,7 +182,7 @@ endif
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
-# CONFIG_QEMU ?= $(XEN_ROOT)/../qemu-xen.git
+# CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
 QEMU_TAG := xen-4.1.0-rc2
