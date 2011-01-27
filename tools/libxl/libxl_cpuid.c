@@ -115,6 +115,7 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
         {"dscpl",        0x00000001, NA, CPUID_REG_ECX,  4,  1},
         {"monitor",      0x00000001, NA, CPUID_REG_ECX,  3,  1},
         {"dtes64",       0x00000001, NA, CPUID_REG_ECX,  2,  1},
+        {"pclmulqdq",    0x00000001, NA, CPUID_REG_ECX,  1,  1},
         {"sse3",         0x00000001, NA, CPUID_REG_ECX,  0,  1},
         {"pbe",          0x00000001, NA, CPUID_REG_EDX, 31,  1},
         {"ia64",         0x00000001, NA, CPUID_REG_EDX, 30,  1},

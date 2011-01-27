@@ -82,6 +82,7 @@
 
 /* Intel-defined CPU features, CPUID level 0x00000001 (ecx), word 4 */
 #define X86_FEATURE_XMM3	(4*32+ 0) /* Streaming SIMD Extensions-3 */
+#define X86_FEATURE_PCLMULQDQ	(4*32+ 1) /* Carry-less mulitplication */
 #define X86_FEATURE_DTES64	(4*32+ 2) /* 64-bit Debug Store */
 #define X86_FEATURE_MWAIT	(4*32+ 3) /* Monitor/Mwait support */
 #define X86_FEATURE_DSCPL	(4*32+ 4) /* CPL Qualified Debug Store */
@@ -103,6 +104,7 @@
 #define X86_FEATURE_XSAVE	(4*32+26) /* XSAVE/XRSTOR/XSETBV/XGETBV */
 #define X86_FEATURE_OSXSAVE	(4*32+27) /* OSXSAVE */
 #define X86_FEATURE_AVX 	(4*32+28) /* Advanced Vector Extensions */
+#define X86_FEATURE_F16C 	(4*32+29) /* Half-precision convert instruction */
 #define X86_FEATURE_HYPERVISOR	(4*32+31) /* Running under some hypervisor */
 
 /* VIA/Cyrix/Centaur-defined CPU features, CPUID level 0xC0000001, word 5 */

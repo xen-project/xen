@@ -101,7 +101,10 @@ static void amd_xc_cpuid_policy(
                     bitmaskof(X86_FEATURE_ABM) |
                     bitmaskof(X86_FEATURE_SSE4A) |
                     bitmaskof(X86_FEATURE_MISALIGNSSE) |
-                    bitmaskof(X86_FEATURE_3DNOWPREFETCH));
+                    bitmaskof(X86_FEATURE_3DNOWPREFETCH) |
+                    bitmaskof(X86_FEATURE_XOP) |
+                    bitmaskof(X86_FEATURE_FMA4) |
+                    bitmaskof(X86_FEATURE_TBM));
         regs[3] &= (0x0183f3ff | /* features shared with 0x00000001:EDX */
                     (is_pae ? bitmaskof(X86_FEATURE_NX) : 0) |
                     (is_64bit ? bitmaskof(X86_FEATURE_LM) : 0) |
@@ -251,12 +254,14 @@ static void xc_cpuid_hvm_policy(
         regs[1] = (regs[1] & 0x0000ffffu) | ((regs[1] & 0x007f0000u) << 1);
 
         regs[2] &= (bitmaskof(X86_FEATURE_XMM3) |
+                    bitmaskof(X86_FEATURE_PCLMULQDQ) |
                     bitmaskof(X86_FEATURE_SSSE3) |
                     bitmaskof(X86_FEATURE_CX16) |
                     bitmaskof(X86_FEATURE_SSE4_1) |
                     bitmaskof(X86_FEATURE_SSE4_2) |
                     bitmaskof(X86_FEATURE_POPCNT) |
                     bitmaskof(X86_FEATURE_AES) |
+                    bitmaskof(X86_FEATURE_F16C) |
                     ((xfeature_mask != 0) ?
                      (bitmaskof(X86_FEATURE_AVX) |
                       bitmaskof(X86_FEATURE_XSAVE)) : 0));
