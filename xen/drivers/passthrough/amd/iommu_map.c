@@ -71,11 +71,29 @@ int send_iommu_command(struct amd_iommu *iommu, u32 cmd[])
     return 0;
 }
 
-static void invalidate_iommu_page(struct amd_iommu *iommu,
-                                  u64 io_addr, u16 domain_id)
+static void invalidate_iommu_pages(struct amd_iommu *iommu,
+                                   u64 io_addr, u16 domain_id, u16 order)
 {
     u64 addr_lo, addr_hi;
     u32 cmd[4], entry;
+    u64 mask = 0;
+    int sflag = 0, pde = 0;
+
+    /* If sflag == 1, the size of the invalidate command is determined
+     by the first zero bit in the address starting from Address[12] */
+    if ( order == 9 || order == 18 )
+    {
+        mask = ((1ULL << (order - 1)) - 1) << PAGE_SHIFT;
+        io_addr |= mask;
+        sflag = 1;
+    }
+
+    /* All pages associated with the domainID are invalidated */
+    else if ( io_addr == 0x7FFFFFFFFFFFF000ULL )
+    {
+        sflag = 1;
+        pde = 1;
+    }
 
     addr_lo = io_addr & DMA_32BIT_MASK;
     addr_hi = io_addr >> 32;
@@ -88,10 +106,10 @@ static void invalidate_iommu_page(struct amd_iommu *iommu,
                          &entry);
     cmd[1] = entry;
 
-    set_field_in_reg_u32(IOMMU_CONTROL_DISABLED, 0,
+    set_field_in_reg_u32(sflag, 0,
                          IOMMU_INV_IOMMU_PAGES_S_FLAG_MASK,
                          IOMMU_INV_IOMMU_PAGES_S_FLAG_SHIFT, &entry);
-    set_field_in_reg_u32(IOMMU_CONTROL_DISABLED, entry,
+    set_field_in_reg_u32(pde, entry,
                          IOMMU_INV_IOMMU_PAGES_PDE_FLAG_MASK,
                          IOMMU_INV_IOMMU_PAGES_PDE_FLAG_SHIFT, &entry);
     set_field_in_reg_u32((u32)addr_lo >> PAGE_SHIFT, entry,
@@ -510,7 +528,7 @@ int amd_iommu_unmap_page(struct domain *d, unsigned long gfn)
     for_each_amd_iommu ( iommu )
     {
         spin_lock_irqsave(&iommu->lock, flags);
-        invalidate_iommu_page(iommu, (u64)gfn << PAGE_SHIFT, hd->domain_id);
+        invalidate_iommu_pages(iommu, (u64)gfn << PAGE_SHIFT, hd->domain_id, 0);
         flush_command_buffer(iommu);
         spin_unlock_irqrestore(&iommu->lock, flags);
     }
@@ -543,43 +561,14 @@ int amd_iommu_reserve_domain_unity_map(struct domain *domain,
 
 void invalidate_all_iommu_pages(struct domain *d)
 {
-    u32 cmd[4], entry;
     unsigned long flags;
     struct amd_iommu *iommu;
-    int domain_id = d->domain_id;
-    u64 addr_lo = 0x7FFFFFFFFFFFF000ULL & DMA_32BIT_MASK;
-    u64 addr_hi = 0x7FFFFFFFFFFFF000ULL >> 32;
-
-    set_field_in_reg_u32(domain_id, 0,
-                         IOMMU_INV_IOMMU_PAGES_DOMAIN_ID_MASK,
-                         IOMMU_INV_IOMMU_PAGES_DOMAIN_ID_SHIFT, &entry);
-    set_field_in_reg_u32(IOMMU_CMD_INVALIDATE_IOMMU_PAGES, entry,
-                         IOMMU_CMD_OPCODE_MASK, IOMMU_CMD_OPCODE_SHIFT,
-                         &entry);
-    cmd[1] = entry;
-
-    set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, 0,
-                         IOMMU_INV_IOMMU_PAGES_S_FLAG_MASK,
-                         IOMMU_INV_IOMMU_PAGES_S_FLAG_SHIFT, &entry);
-    set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
-                         IOMMU_INV_IOMMU_PAGES_PDE_FLAG_MASK,
-                         IOMMU_INV_IOMMU_PAGES_PDE_FLAG_SHIFT, &entry);
-    set_field_in_reg_u32((u32)addr_lo >> PAGE_SHIFT, entry,
-                         IOMMU_INV_IOMMU_PAGES_ADDR_LOW_MASK,
-                         IOMMU_INV_IOMMU_PAGES_ADDR_LOW_SHIFT, &entry);
-    cmd[2] = entry;
-
-    set_field_in_reg_u32((u32)addr_hi, 0,
-                         IOMMU_INV_IOMMU_PAGES_ADDR_HIGH_MASK,
-                         IOMMU_INV_IOMMU_PAGES_ADDR_HIGH_SHIFT, &entry);
-    cmd[3] = entry;
-
-    cmd[0] = 0;
 
     for_each_amd_iommu ( iommu )
     {
         spin_lock_irqsave(&iommu->lock, flags);
-        send_iommu_command(iommu, cmd);
+        invalidate_iommu_pages(iommu, 0x7FFFFFFFFFFFF000ULL,
+                               d->domain_id, 0);
         flush_command_buffer(iommu);
         spin_unlock_irqrestore(&iommu->lock, flags);
     }
