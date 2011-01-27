@@ -190,10 +190,7 @@ static int get_paging_mode(unsigned long entries)
 {
     int level = 1;
 
-    BUG_ON(!max_page);
-
-    if ( entries > max_page )
-        entries = max_page;
+    BUG_ON( !entries );
 
     while ( entries > PTE_PER_TABLE_SIZE )
     {
@@ -278,6 +275,7 @@ static int reassign_device( struct domain *source, struct domain *target,
     struct pci_dev *pdev;
     struct amd_iommu *iommu;
     int bdf;
+    struct hvm_iommu *t = domain_hvm_iommu(target);
 
     ASSERT(spin_is_locked(&pcidevs_lock));
     pdev = pci_get_pdev_by_domain(source, bus, devfn);
@@ -299,6 +297,9 @@ static int reassign_device( struct domain *source, struct domain *target,
 
     list_move(&pdev->domain_list, &target->arch.pdev_list);
     pdev->domain = target;
+
+    if ( target->max_pages > 0 )
+        t->paging_mode = get_paging_mode(target->max_pages);
 
     amd_iommu_setup_domain_device(target, iommu, bdf);
     AMD_IOMMU_DEBUG("Re-assign %02x:%02x.%x from domain %d to domain %d\n",

@@ -411,10 +411,14 @@ static u64 iommu_l2e_from_pfn(struct page_info *table, int level,
     void *pde = NULL;
     void *table_vaddr;
     u64 next_table_maddr = 0;
+    unsigned int lowest = 1;
 
-    BUG_ON( table == NULL || level == 0 );
+    BUG_ON( table == NULL || level < lowest );
 
-    while ( level > 1 )
+    if ( level == lowest )
+        return page_to_maddr(table);
+
+    while ( level > lowest )
     {
         offset = io_pfn >> ((PTE_PER_TABLE_SHIFT *
                              (level - IOMMU_PAGING_MODE_LEVEL_1)));
