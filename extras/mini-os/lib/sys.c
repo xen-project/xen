@@ -178,10 +178,10 @@ int posix_openpt(int flags)
     return(dev->fd);
 }
 
-int open_savefile(char *path, int save)
+int open_savefile(const char *path, int save)
 {
     struct consfront_dev *dev;
-    char *nodename[64];
+    char nodename[64];
 
     snprintf(nodename, sizeof(nodename), "device/console/%d", save ? SAVE_CONSOLE : RESTORE_CONSOLE);
 
@@ -286,7 +286,7 @@ int write(int fd, const void *buf, size_t nbytes)
                 while (nbytes > 0) {
                     ret = xencons_ring_send(files[fd].cons.dev, (char *)buf, nbytes);
                     nbytes -= ret;
-                    buf += ret;
+                    buf = (char *)buf + ret;
                 }
                 return tot - nbytes;
             }
