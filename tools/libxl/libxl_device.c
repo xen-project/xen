@@ -324,8 +324,12 @@ int libxl__devices_destroy(libxl_ctx *ctx, uint32_t domid, int force)
     path = libxl__sprintf(&gc, "/local/domain/%d/device", domid);
     l1 = libxl__xs_directory(&gc, XBT_NULL, path, &num1);
     if (!l1) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "%s is empty", path);
-        goto out;
+        if (errno != ENOENT) {
+            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "unable to get xenstore"
+                             " device listing %s", path);
+            goto out;
+        }
+        num1 = 0;
     }
     for (i = 0; i < num1; i++) {
         if (!strcmp("vfs", l1[i]))
