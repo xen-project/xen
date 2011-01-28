@@ -137,7 +137,7 @@ static int setup_guest(xc_interface *xch,
     xen_pfn_t *page_array = NULL;
     unsigned long i, nr_pages = (unsigned long)memsize << (20 - PAGE_SHIFT);
     unsigned long target_pages = (unsigned long)target << (20 - PAGE_SHIFT);
-    unsigned long entry_eip, cur_pages;
+    unsigned long entry_eip, cur_pages, cur_pfn;
     void *hvm_info_page;
     uint32_t *ident_pt;
     struct elf_binary elf;
@@ -215,11 +215,13 @@ static int setup_guest(xc_interface *xch,
 
         if ( count > max_pages )
             count = max_pages;
-        
+
+        cur_pfn = page_array[cur_pages];
+
         /* Take care the corner cases of super page tails */
-        if ( ((cur_pages & (SUPERPAGE_1GB_NR_PFNS-1)) != 0) &&
-             (count > (-cur_pages & (SUPERPAGE_1GB_NR_PFNS-1))) )
-            count = -cur_pages & (SUPERPAGE_1GB_NR_PFNS-1);
+        if ( ((cur_pfn & (SUPERPAGE_1GB_NR_PFNS-1)) != 0) &&
+             (count > (-cur_pfn & (SUPERPAGE_1GB_NR_PFNS-1))) )
+            count = -cur_pfn & (SUPERPAGE_1GB_NR_PFNS-1);
         else if ( ((count & (SUPERPAGE_1GB_NR_PFNS-1)) != 0) &&
                   (count > SUPERPAGE_1GB_NR_PFNS) )
             count &= ~(SUPERPAGE_1GB_NR_PFNS - 1);
@@ -227,9 +229,9 @@ static int setup_guest(xc_interface *xch,
         /* Attemp to allocate 1GB super page. Because in each pass we only
          * allocate at most 1GB, we don't have to clip super page boundaries.
          */
-        if ( ((count | cur_pages) & (SUPERPAGE_1GB_NR_PFNS - 1)) == 0 &&
+        if ( ((count | cur_pfn) & (SUPERPAGE_1GB_NR_PFNS - 1)) == 0 &&
              /* Check if there exists MMIO hole in the 1GB memory range */
-             !check_mmio_hole(cur_pages << PAGE_SHIFT,
+             !check_mmio_hole(cur_pfn << PAGE_SHIFT,
                               SUPERPAGE_1GB_NR_PFNS << PAGE_SHIFT) )
         {
             long done;
@@ -260,15 +262,15 @@ static int setup_guest(xc_interface *xch,
                 count = max_pages;
             
             /* Clip partial superpage extents to superpage boundaries. */
-            if ( ((cur_pages & (SUPERPAGE_2MB_NR_PFNS-1)) != 0) &&
-                 (count > (-cur_pages & (SUPERPAGE_2MB_NR_PFNS-1))) )
-                count = -cur_pages & (SUPERPAGE_2MB_NR_PFNS-1);
+            if ( ((cur_pfn & (SUPERPAGE_2MB_NR_PFNS-1)) != 0) &&
+                 (count > (-cur_pfn & (SUPERPAGE_2MB_NR_PFNS-1))) )
+                count = -cur_pfn & (SUPERPAGE_2MB_NR_PFNS-1);
             else if ( ((count & (SUPERPAGE_2MB_NR_PFNS-1)) != 0) &&
                       (count > SUPERPAGE_2MB_NR_PFNS) )
                 count &= ~(SUPERPAGE_2MB_NR_PFNS - 1); /* clip non-s.p. tail */
 
             /* Attempt to allocate superpage extents. */
-            if ( ((count | cur_pages) & (SUPERPAGE_2MB_NR_PFNS - 1)) == 0 )
+            if ( ((count | cur_pfn) & (SUPERPAGE_2MB_NR_PFNS - 1)) == 0 )
             {
                 long done;
                 unsigned long nr_extents = count >> SUPERPAGE_2MB_SHIFT;
