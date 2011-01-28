@@ -152,7 +152,7 @@ static int xc_try_lzma_decode(
     int outsize;
     const char *msg;
 
-    ret = lzma_alone_decoder(&stream, xc_get_physmem() / 3);
+    ret = lzma_alone_decoder(&stream, 32*1024*1024);
     if ( ret != LZMA_OK )
     {
         DOMPRINTF("LZMA: Failed to init stream decoder");

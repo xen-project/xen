@@ -55,27 +55,6 @@ void discard_file_cache(xc_interface *xch, int fd, int flush)
     errno = saved_errno;
 }
 
-uint64_t xc_get_physmem(void)
-{
-    uint64_t ret = 0;
-    const long pagesize = sysconf(_SC_PAGESIZE);
-    const long pages = sysconf(_SC_PHYS_PAGES);
-
-    if ( (pagesize != -1) || (pages != -1) )
-    {
-        /*
-         * According to docs, pagesize * pages can overflow.
-         * Simple case is 32-bit box with 4 GiB or more RAM,
-         * which may report exactly 4 GiB of RAM, and "long"
-         * being 32-bit will overflow. Casting to uint64_t
-         * hopefully avoids overflows in the near future.
-         */
-        ret = (uint64_t)(pagesize) * (uint64_t)(pages);
-    }
-
-    return ret;
-}
-
 /*
  * Local variables:
  * mode: C
