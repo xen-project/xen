@@ -140,13 +140,21 @@ _hidden char *libxl__strdup(libxl__gc *gc, const char *c);
 _hidden char *libxl__dirname(libxl__gc *gc, const char *s);
 
 _hidden char **libxl__xs_kvs_of_flexarray(libxl__gc *gc, flexarray_t *array, int length);
+
 _hidden int libxl__xs_writev(libxl__gc *gc, xs_transaction_t t,
                     char *dir, char **kvs);
 _hidden int libxl__xs_write(libxl__gc *gc, xs_transaction_t t,
                    char *path, char *fmt, ...) PRINTF_ATTRIBUTE(4, 5);
-_hidden char *libxl__xs_get_dompath(libxl__gc *gc, uint32_t domid); // logs errs
+   /* Each fn returns 0 on success.
+    * On error: returns -1, sets errno (no logging) */
+
+_hidden char *libxl__xs_get_dompath(libxl__gc *gc, uint32_t domid);
+   /* On error: logs, returns NULL, sets errno. */
+
 _hidden char *libxl__xs_read(libxl__gc *gc, xs_transaction_t t, char *path);
-_hidden char **libxl__xs_directory(libxl__gc *gc, xs_transaction_t t, char *path, unsigned int *nb);
+_hidden char **libxl__xs_directory(libxl__gc *gc, xs_transaction_t t,
+                                   char *path, unsigned int *nb);
+   /* On error: returns NULL, sets errno (no logging) */
 
 /* from xl_dom */
 _hidden int libxl__domain_is_hvm(libxl_ctx *ctx, uint32_t domid);
