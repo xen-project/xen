@@ -141,6 +141,28 @@ int libxl_domain_rename(libxl_ctx *ctx, uint32_t domid,
         }
     }
 
+    if (new_name[0]) {
+        /* nonempty names must be unique */
+        uint32_t domid_e;
+        rc = libxl_name_to_domid(ctx, new_name, &domid_e);
+        if (rc == ERROR_INVAL) {
+            /* no such domain, good */
+        } else if (rc != 0) {
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "unexpected error"
+                       "checking for existing domain");
+            goto x_rc;
+        } else if (domid_e == domid) {
+            /* domain already has this name, ok (but we do still
+             * need the rest of the code as we may need to check
+             * old_name, for example). */
+        } else {
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "domain with name \"%s\""
+                       " already exists.", new_name);
+            rc = ERROR_INVAL;
+            goto x_rc;
+        }
+    }
+
     if (old_name) {
         got_old_name = xs_read(ctx->xsh, trans, name_path, &got_old_len);
         if (!got_old_name) {

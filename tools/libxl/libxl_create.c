@@ -351,6 +351,7 @@ int libxl__domain_make(libxl_ctx *ctx, libxl_domain_create_info *info,
 
 retry_transaction:
     t = xs_transaction_start(ctx->xsh);
+
     xs_rm(ctx->xsh, t, dom_path);
     xs_mkdir(ctx->xsh, t, dom_path);
     xs_set_permissions(ctx->xsh, t, dom_path, roperm, ARRAY_SIZE(roperm));
