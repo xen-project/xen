@@ -25,6 +25,7 @@
 #include <xenctrl.h>
 #include <xc_dom.h>
 #include <xenguest.h>
+#include <assert.h>
 #include "libxl.h"
 #include "libxl_utils.h"
 #include "libxl_internal.h"
@@ -283,6 +284,8 @@ out:
 
 int libxl__domain_make(libxl_ctx *ctx, libxl_domain_create_info *info,
                        uint32_t *domid)
+ /* on entry, libxl_domid_valid_guest(domid) must be false;
+  * on exit (even error exit), domid may be valid and refer to a domain */
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx); /* fixme: should be done by caller */
     int flags, ret, i, rc;
@@ -295,6 +298,8 @@ int libxl__domain_make(libxl_ctx *ctx, libxl_domain_create_info *info,
     struct xs_permissions rwperm[1];
     xs_transaction_t t = 0;
     xen_domain_handle_t handle;
+
+    assert(!libxl_domid_valid_guest(*domid));
 
     uuid_string = libxl__uuid2string(&gc, info->uuid);
     if (!uuid_string) {

@@ -473,6 +473,8 @@ static int libxl_create_stubdom(libxl_ctx *ctx,
     b_info.u.pv.features = "";
     b_info.hvm = 0;
 
+    /* fixme: this function can leak the stubdom if it fails */
+
     ret = libxl__domain_make(ctx, &c_info, &domid);
     if (ret)
         goto out_free;

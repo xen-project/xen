@@ -1649,7 +1649,7 @@ start:
 
 error_out:
     release_lock();
-    if (domid > 0)
+    if (libxl_domid_valid_guest(domid))
         libxl_domain_destroy(&ctx, domid, 0);
 
 out:
