@@ -5439,13 +5439,11 @@ int main_cpupoollist(int argc, char **argv)
         return -ERROR_NOMEM;
     }
 
-    if (!opt_long) {
-        printf("%-19s", "Name");
-        if (opt_cpus)
-            printf("CPU list\n");
-        else
-            printf("CPUs   Sched     Active   Domain count\n");
-    }
+    printf("%-19s", "Name");
+    if (opt_cpus)
+        printf("CPU list\n");
+    else
+        printf("CPUs   Sched     Active   Domain count\n");
 
     for (p = 0; p < n_pools; p++) {
         if (!ret && (!pool || (poolinfo[p].poolid != poolid))) {
@@ -5453,9 +5451,6 @@ int main_cpupoollist(int argc, char **argv)
             if (!name) {
                 fprintf(stderr, "error getting cpupool info\n");
                 ret = -ERROR_NOMEM;
-            }
-            else if (opt_long) {
-                ret = -ERROR_NI;
             } else {
                 printf("%-19s", name);
                 free(name);

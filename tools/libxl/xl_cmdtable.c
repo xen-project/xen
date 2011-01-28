@@ -349,8 +349,7 @@ struct cmd_spec cmd_table[] = {
     { "cpupool-list",
       &main_cpupoollist,
       "List CPU pools on host",
-      "[-l|--long] [-c|--cpus] [<CPU Pool>]",
-      "-l, --long                     Output all CPU pool details.\n"
+      "[-c|--cpus] [<CPU Pool>]",
       "-c, --cpus                     Output list of CPUs used by a pool"
     },
     { "cpupool-destroy",
