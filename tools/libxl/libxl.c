@@ -1021,7 +1021,7 @@ char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *disk)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
     const char *dev = NULL;
-    char *ret;
+    char *ret = NULL;
     int phystype = disk->phystype;
     switch (phystype) {
         case PHYSTYPE_PHY: {
@@ -1033,18 +1033,27 @@ char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *disk)
             /* let's pretend is tap:aio for the moment */
             phystype = PHYSTYPE_AIO;
         case PHYSTYPE_AIO:
-        case PHYSTYPE_QCOW:
-        case PHYSTYPE_QCOW2:
+            if (!libxl__blktap_enabled(&gc)) {
+                dev = disk->physpath;
+                break;
+            }
         case PHYSTYPE_VHD:
             if (libxl__blktap_enabled(&gc))
                 dev = libxl__blktap_devpath(&gc, disk->physpath, phystype);
+            else
+                LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "tapdisk2 is required to open a vhd disk\n");
+            break;
+        case PHYSTYPE_QCOW:
+        case PHYSTYPE_QCOW2:
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "cannot locally attach a qcow or qcow2 disk image\n");
             break;
 
         default:
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "unrecognized disk physical type: %d\n", phystype);
             break;
     }
-    ret = strdup(dev);
+    if (dev != NULL)
+        ret = strdup(dev);
     libxl__free_all(&gc);
     return ret;
 }
