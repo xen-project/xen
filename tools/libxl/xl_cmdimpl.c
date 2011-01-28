@@ -5446,7 +5446,7 @@ int main_cpupoollist(int argc, char **argv)
         printf("CPUs   Sched     Active   Domain count\n");
 
     for (p = 0; p < n_pools; p++) {
-        if (!ret && (!pool || (poolinfo[p].poolid != poolid))) {
+        if (!ret && (!pool || (poolinfo[p].poolid == poolid))) {
             name = libxl_cpupoolid_to_name(&ctx, poolinfo[p].poolid);
             if (!name) {
                 fprintf(stderr, "error getting cpupool info\n");
