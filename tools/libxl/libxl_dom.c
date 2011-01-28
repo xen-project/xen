@@ -671,7 +671,10 @@ int libxl_userdata_retrieve(libxl_ctx *ctx, uint32_t domid,
     }
 
     e = libxl_read_file_contents(ctx, filename, data_r ? &data : 0, &datalen);
-
+    if (e && errno != ENOENT) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
     if (!e && !datalen) {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "userdata file %s is empty", filename);
         if (data_r) assert(!*data_r);

@@ -36,7 +36,7 @@ int libxl_read_file_contents(libxl_ctx *ctx, const char *filename,
   /* Reads the contents of the plain file filename into a mallocd
    * buffer.  Returns 0 or errno.  Any errors other than ENOENT are logged.
    * If the file is empty, *data_r and *datalen_r are set to 0.
-   * On error, *data_r and *datalen_r are undefined.
+   * On error, *data_r and *datalen_r are unchanged.
    * data_r and/or datalen_r may be 0.
    */
 
