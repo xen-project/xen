@@ -284,7 +284,7 @@ out:
 int libxl__domain_make(libxl_ctx *ctx, libxl_domain_create_info *info,
                        uint32_t *domid)
 {
-    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    libxl__gc gc = LIBXL_INIT_GC(ctx); /* fixme: should be done by caller */
     int flags, ret, i, rc;
     char *uuid_string;
     char *rw_paths[] = { "device", "device/suspend/event-channel" , "data"};
@@ -293,13 +293,13 @@ int libxl__domain_make(libxl_ctx *ctx, libxl_domain_create_info *info,
     char *dom_path, *vm_path;
     struct xs_permissions roperm[2];
     struct xs_permissions rwperm[1];
-    xs_transaction_t t;
+    xs_transaction_t t = 0;
     xen_domain_handle_t handle;
 
     uuid_string = libxl__uuid2string(&gc, info->uuid);
     if (!uuid_string) {
-        libxl__free_all(&gc);
-        return ERROR_NOMEM;
+        rc = ERROR_NOMEM;
+        goto out;
     }
 
     flags = info->hvm ? XEN_DOMCTL_CDF_hvm_guest : 0;
@@ -313,28 +313,28 @@ int libxl__domain_make(libxl_ctx *ctx, libxl_domain_create_info *info,
     ret = xc_domain_create(ctx->xch, info->ssidref, handle, flags, domid);
     if (ret < 0) {
         LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, ret, "domain creation fail");
-        libxl__free_all(&gc);
-        return ERROR_FAIL;
+        rc = ERROR_FAIL;
+        goto out;
     }
 
     ret = xc_cpupool_movedomain(ctx->xch, info->poolid, *domid);
     if (ret < 0) {
         LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, ret, "domain move fail");
-        libxl__free_all(&gc);
-        return ERROR_FAIL;
+        rc = ERROR_FAIL;
+        goto out;
     }
 
     dom_path = libxl__xs_get_dompath(&gc, *domid);
     if (!dom_path) {
-        libxl__free_all(&gc);
-        return ERROR_FAIL;
+        rc = ERROR_FAIL;
+        goto out;
     }
 
     vm_path = libxl__sprintf(&gc, "/vm/%s", uuid_string);
     if (!vm_path) {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "cannot allocate create paths");
-        libxl__free_all(&gc);
-        return ERROR_FAIL;
+        rc = ERROR_FAIL;
+        goto out;
     }
 
     roperm[0].id = 0;
@@ -356,10 +356,8 @@ retry_transaction:
 
     xs_write(ctx->xsh, t, libxl__sprintf(&gc, "%s/vm", dom_path), vm_path, strlen(vm_path));
     rc = libxl_domain_rename(ctx, *domid, 0, info->name, t);
-    if (rc) {
-        libxl__free_all(&gc);
-        return rc;
-    }
+    if (rc)
+        goto out;
 
     for (i = 0; i < ARRAY_SIZE(rw_paths); i++) {
         char *path = libxl__sprintf(&gc, "%s/%s", dom_path, rw_paths[i]);
@@ -381,12 +379,23 @@ retry_transaction:
     libxl__xs_writev(&gc, t, libxl__sprintf(&gc, "%s/platform", dom_path), info->platformdata);
 
     xs_write(ctx->xsh, t, libxl__sprintf(&gc, "%s/control/platform-feature-multiprocessor-suspend", dom_path), "1", 1);
-    if (!xs_transaction_end(ctx->xsh, t, 0))
-        if (errno == EAGAIN)
+    if (!xs_transaction_end(ctx->xsh, t, 0)) {
+        if (errno == EAGAIN) {
+            t = 0;
             goto retry_transaction;
+        }
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "domain creation "
+                         "xenstore transaction commit failed");
+        rc = ERROR_FAIL;
+        goto out;
+    }
+    t = 0;
 
-    libxl__free_all(&gc);
-    return 0;
+    rc = 0;
+ out:
+    if (t) xs_transaction_end(ctx->xsh, t, 1);
+    libxl__free_all(&gc); /* fixme: should be done by caller */
+    return rc;
 }
 
 static int do_domain_create(libxl_ctx *ctx, libxl_domain_config *d_config,
