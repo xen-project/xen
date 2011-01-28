@@ -5825,7 +5825,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
             goto out;
         }
 
-        ret = -libxl_cpupool_cpuadd_node(&ctx, 0, node, &n);
+        ret = -libxl_cpupool_cpuadd_node(&ctx, poolid, node, &n);
         if (ret) {
             fprintf(stderr, "error on adding cpus to cpupool\n");
             goto out;
