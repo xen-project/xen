@@ -63,7 +63,7 @@ libvhd.a: $(LIB-OBJS)
 
 install: all
 	$(INSTALL_DIR) -p $(DESTDIR)$(INST-DIR)
-	$(INSTALL_DATA) $(LIBVHD) $(DESTDIR)$(INST-DIR)
+	$(INSTALL_PROG) $(LIBVHD) $(DESTDIR)$(INST-DIR)
 	ln -sf libvhd.so.$(LIBVHD-MAJOR).$(LIBVHD-MINOR) $(DESTDIR)$(INST-DIR)/libvhd.so.$(LIBVHD-MAJOR)
 	ln -sf libvhd.so.$(LIBVHD-MAJOR) $(DESTDIR)$(INST-DIR)/libvhd.so
 

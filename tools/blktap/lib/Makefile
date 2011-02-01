@@ -36,7 +36,7 @@ all: $(LIB)
 install: all
 	$(INSTALL_DIR) $(DESTDIR)$(LIBDIR)
 	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)
-	$(INSTALL_DATA) $(LIB) $(DESTDIR)$(LIBDIR)
+	$(INSTALL_PROG) $(LIB) $(DESTDIR)$(LIBDIR)
 	ln -sf libblktap.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libblktap.so.$(MAJOR)
 	ln -sf libblktap.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libblktap.so
 	$(INSTALL_DATA) blktaplib.h $(DESTDIR)$(INCLUDEDIR)
