@@ -352,6 +352,7 @@ void me_wifi_quirk(struct domain *domain, u8 bus, u8 devfn, int map)
  */
 void pci_vtd_quirk(struct pci_dev *pdev)
 {
+#ifdef CONFIG_X86_64
     int bus = pdev->bus;
     int dev = PCI_SLOT(pdev->devfn);
     int func = PCI_FUNC(pdev->devfn);
@@ -363,4 +364,5 @@ void pci_vtd_quirk(struct pci_dev *pdev)
         val = pci_conf_read32(bus, dev, func, 0x1AC);
         pci_conf_write32(bus, dev, func, 0x1AC, val | (1 << 31));
     }
+#endif
 }
