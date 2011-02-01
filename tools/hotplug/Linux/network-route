@@ -22,7 +22,7 @@ dir=$(dirname "$0")
 
 evalVariables "$@"
 
-netdev=${netdev:-eth${vifnum}}
+netdev=${netdev:-eth0}
 
 echo 1 >/proc/sys/net/ipv4/ip_forward
 echo 1 >/proc/sys/net/ipv4/conf/${netdev}/proxy_arp
