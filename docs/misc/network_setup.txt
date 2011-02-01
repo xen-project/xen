@@ -30,8 +30,9 @@ present in Fedora or RHEL distros and their derivatives
 Disabling NetworkManager
 ------------------------
 
-As of time of writing (Fedora 11) NetworkManager does not support bridging,
-so it is neccessary to disable it, and revert to "classic" network initscripts
+As of time of writing (Fedora 14) NetworkManager does not support bridging,
+so it is neccessary to disable NetworkManager, and revert to "classic"
+network initscripts
 
  # chkconfig NetworkManager off
  # chkconfig network on
