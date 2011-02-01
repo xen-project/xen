@@ -1762,7 +1762,7 @@ int main_memmax(int argc, char **argv)
             help("mem-max");
             exit(0);
         default:
-            fprintf(stderr, "option not supported\n");
+            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -1809,7 +1809,7 @@ int main_memset(int argc, char **argv)
             help("mem-set");
             return 0;
         default:
-            fprintf(stderr, "option not supported\n");
+            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -1875,7 +1875,7 @@ int main_cd_eject(int argc, char **argv)
             help("cd-eject");
             return 0;
         default:
-            fprintf(stderr, "option not supported\n");
+            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -1903,7 +1903,7 @@ int main_cd_insert(int argc, char **argv)
             help("cd-insert");
             return 0;
         default:
-            fprintf(stderr, "option not supported\n");
+            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -1944,7 +1944,7 @@ int main_console(int argc, char **argv)
             num = atoi(optarg);
             break;
         default:
-            fprintf(stderr, "option not supported\n");
+            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -1993,7 +1993,7 @@ int main_vncviewer(int argc, char **argv)
             help("vncviewer");
             return 0;
         default:
-            fprintf(stderr, "option not supported\n");
+            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -2032,7 +2032,7 @@ int main_pcilist_assignable(int argc, char **argv)
             help("pci-list-assignable-devices");
             return 0;
         default:
-            fprintf(stderr, "option not supported\n");
+            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -2069,7 +2069,7 @@ int main_pcilist(int argc, char **argv)
             help("pci-list");
             return 0;
         default:
-            fprintf(stderr, "option not supported\n");
+            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -2114,7 +2114,7 @@ int main_pcidetach(int argc, char **argv)
             force = 1;
             break;
         default:
-            fprintf(stderr, "option not supported\n");
+            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -2155,7 +2155,7 @@ int main_pciattach(int argc, char **argv)
             help("pci-attach");
             return 0;
         default:
-            fprintf(stderr, "option not supported\n");
+            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -2816,7 +2816,7 @@ int main_restore(int argc, char **argv)
             help("restore");
             return 0;
         default:
-            fprintf(stderr, "option not supported\n");
+            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -2865,7 +2865,7 @@ int main_migrate_receive(int argc, char **argv)
             debug = 1;
             break;
         default:
-            fprintf(stderr, "option not supported\n");
+            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -2894,7 +2894,7 @@ int main_save(int argc, char **argv)
             help("save");
             return 0;
         default:
-            fprintf(stderr, "option not supported\n");
+            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -2938,7 +2938,7 @@ int main_migrate(int argc, char **argv)
             debug = 1;
             break;
         default:
-            fprintf(stderr, "option not supported\n");
+            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -2998,7 +2998,7 @@ int main_pause(int argc, char **argv)
             help("pause");
             return 0;
         default:
-            fprintf(stderr, "option not supported\n");
+            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -3025,7 +3025,7 @@ int main_unpause(int argc, char **argv)
             help("unpause");
             return 0;
         default:
-            fprintf(stderr, "option not supported\n");
+            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -3051,7 +3051,7 @@ int main_destroy(int argc, char **argv)
             help("destroy");
             return 0;
         default:
-            fprintf(stderr, "option not supported\n");
+            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -3081,7 +3081,7 @@ int main_shutdown(int argc, char **argv)
             wait = 1;
             break;
         default:
-            fprintf(stderr, "option not supported\n");
+            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -3107,7 +3107,7 @@ int main_reboot(int argc, char **argv)
             help("reboot");
             return 0;
         default:
-            fprintf(stderr, "option not supported\n");
+            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -3153,7 +3153,7 @@ int main_list(int argc, char **argv)
             verbose = 1;
             break;
         default:
-            fprintf(stderr, "option not supported\n");
+            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -3204,7 +3204,7 @@ int main_list_vm(int argc, char **argv)
             help("list-vm");
             return 0;
         default:
-            fprintf(stderr, "option not supported\n");
+            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -3262,7 +3262,7 @@ int main_create(int argc, char **argv)
             quiet = 1;
             break;
         default:
-            fprintf(stderr, "option not supported\n");
+            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -3328,7 +3328,7 @@ int main_button_press(int argc, char **argv)
             help("button-press");
             return 0;
         default:
-            fprintf(stderr, "option not supported\n");
+            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -4103,7 +4103,7 @@ int main_debug_keys(int argc, char **argv)
             help("debug-keys");
             return 0;
         default:
-            fprintf(stderr, "option not supported\n");
+            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -4138,7 +4138,7 @@ int main_dmesg(int argc, char **argv)
             help("dmesg");
             return 0;
         default:
-            fprintf(stderr, "option not supported\n");
+            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -5219,7 +5219,7 @@ int main_cpupoolcreate(int argc, char **argv)
             dryrun = 1;
             break;
         default:
-            fprintf(stderr, "option not supported\n");
+            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -5416,7 +5416,7 @@ int main_cpupoollist(int argc, char **argv)
             opt_cpus = 1;
             break;
         default:
-            fprintf(stderr, "option not supported\n");
+            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
