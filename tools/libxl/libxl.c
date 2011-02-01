@@ -2059,9 +2059,12 @@ retry_transaction:
         goto out;
     }
 
-    if (relative)
-        new_target_memkb = current_target_memkb + target_memkb;
-    else
+    if (relative) {
+        if (target_memkb < 0 && abs(target_memkb) > current_target_memkb)
+            new_target_memkb = 0;
+        else
+            new_target_memkb = current_target_memkb + target_memkb;
+    } else
         new_target_memkb = target_memkb;
     if (new_target_memkb > memorykb) {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
