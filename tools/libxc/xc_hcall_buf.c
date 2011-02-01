@@ -18,6 +18,7 @@
 
 #include <stdlib.h>
 #include <malloc.h>
+#include <pthread.h>
 
 #include "xc_private.h"
 #include "xg_private.h"
@@ -28,31 +29,137 @@ xc_hypercall_buffer_t XC__HYPERCALL_BUFFER_NAME(HYPERCALL_BUFFER_NULL) = {
     HYPERCALL_BUFFER_INIT_NO_BOUNCE
 };
 
+pthread_mutex_t hypercall_buffer_cache_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+static void hypercall_buffer_cache_lock(xc_interface *xch)
+{
+    if ( xch->flags & XC_OPENFLAG_NON_REENTRANT )
+        return;
+    pthread_mutex_lock(&hypercall_buffer_cache_mutex);
+}
+
+static void hypercall_buffer_cache_unlock(xc_interface *xch)
+{
+    if ( xch->flags & XC_OPENFLAG_NON_REENTRANT )
+        return;
+    pthread_mutex_unlock(&hypercall_buffer_cache_mutex);
+}
+
+static void *hypercall_buffer_cache_alloc(xc_interface *xch, int nr_pages)
+{
+    void *p = NULL;
+
+    hypercall_buffer_cache_lock(xch);
+
+    xch->hypercall_buffer_total_allocations++;
+    xch->hypercall_buffer_current_allocations++;
+    if ( xch->hypercall_buffer_current_allocations > xch->hypercall_buffer_maximum_allocations )
+        xch->hypercall_buffer_maximum_allocations = xch->hypercall_buffer_current_allocations;
+
+    if ( nr_pages > 1 )
+    {
+        xch->hypercall_buffer_cache_toobig++;
+    }
+    else if ( xch->hypercall_buffer_cache_nr > 0 )
+    {
+        p = xch->hypercall_buffer_cache[--xch->hypercall_buffer_cache_nr];
+        xch->hypercall_buffer_cache_hits++;
+    }
+    else
+    {
+        xch->hypercall_buffer_cache_misses++;
+    }
+
+    hypercall_buffer_cache_unlock(xch);
+
+    return p;
+}
+
+static int hypercall_buffer_cache_free(xc_interface *xch, void *p, int nr_pages)
+{
+    int rc = 0;
+
+    hypercall_buffer_cache_lock(xch);
+
+    xch->hypercall_buffer_total_releases++;
+    xch->hypercall_buffer_current_allocations--;
+
+    if ( nr_pages == 1 && xch->hypercall_buffer_cache_nr < HYPERCALL_BUFFER_CACHE_SIZE )
+    {
+        xch->hypercall_buffer_cache[xch->hypercall_buffer_cache_nr++] = p;
+        rc = 1;
+    }
+
+    hypercall_buffer_cache_unlock(xch);
+
+    return rc;
+}
+
+static void do_hypercall_buffer_free_pages(void *ptr, int nr_pages)
+{
+#ifndef __sun__
+    (void) munlock(ptr, nr_pages * PAGE_SIZE);
+#endif
+
+    free(ptr);
+}
+
+void xc__hypercall_buffer_cache_release(xc_interface *xch)
+{
+    void *p;
+
+    hypercall_buffer_cache_lock(xch);
+
+    DBGPRINTF("hypercall buffer: total allocations:%d total releases:%d",
+              xch->hypercall_buffer_total_allocations,
+              xch->hypercall_buffer_total_releases);
+    DBGPRINTF("hypercall buffer: current allocations:%d maximum allocations:%d",
+              xch->hypercall_buffer_current_allocations,
+              xch->hypercall_buffer_maximum_allocations);
+    DBGPRINTF("hypercall buffer: cache current size:%d",
+              xch->hypercall_buffer_cache_nr);
+    DBGPRINTF("hypercall buffer: cache hits:%d misses:%d toobig:%d",
+              xch->hypercall_buffer_cache_hits,
+              xch->hypercall_buffer_cache_misses,
+              xch->hypercall_buffer_cache_toobig);
+
+    while ( xch->hypercall_buffer_cache_nr > 0 )
+    {
+        p = xch->hypercall_buffer_cache[--xch->hypercall_buffer_cache_nr];
+        do_hypercall_buffer_free_pages(p, 1);
+    }
+
+    hypercall_buffer_cache_unlock(xch);
+}
+
 void *xc__hypercall_buffer_alloc_pages(xc_interface *xch, xc_hypercall_buffer_t *b, int nr_pages)
 {
     size_t size = nr_pages * PAGE_SIZE;
-    void *p;
+    void *p = hypercall_buffer_cache_alloc(xch, nr_pages);
+
+    if ( !p ) {
 #if defined(_POSIX_C_SOURCE) && !defined(__sun__)
-    int ret;
-    ret = posix_memalign(&p, PAGE_SIZE, size);
-    if (ret != 0)
-        return NULL;
+        int ret;
+        ret = posix_memalign(&p, PAGE_SIZE, size);
+        if (ret != 0)
+            return NULL;
 #elif defined(__NetBSD__) || defined(__OpenBSD__)
-    p = valloc(size);
+        p = valloc(size);
 #else
-    p = memalign(PAGE_SIZE, size);
+        p = memalign(PAGE_SIZE, size);
 #endif
 
-    if (!p)
-        return NULL;
+        if (!p)
+            return NULL;
 
 #ifndef __sun__
-    if ( mlock(p, size) < 0 )
-    {
-        free(p);
-        return NULL;
-    }
+        if ( mlock(p, size) < 0 )
+        {
+            free(p);
+            return NULL;
+        }
 #endif
+    }
 
     b->hbuf = p;
 
@@ -65,11 +172,8 @@ void xc__hypercall_buffer_free_pages(xc_interface *xch, xc_hypercall_buffer_t *b
     if ( b->hbuf == NULL )
         return;
 
-#ifndef __sun__
-    (void) munlock(b->hbuf, nr_pages * PAGE_SIZE);
-#endif
-
-    free(b->hbuf);
+    if ( !hypercall_buffer_cache_free(xch, b->hbuf, nr_pages) )
+        do_hypercall_buffer_free_pages(b->hbuf, nr_pages);
 }
 
 struct allocation_header {

@@ -126,6 +126,16 @@ static struct xc_interface_core *xc_interface_open_common(xentoollog_logger *log
     xch->error_handler   = logger;           xch->error_handler_tofree   = 0;
     xch->dombuild_logger = dombuild_logger;  xch->dombuild_logger_tofree = 0;
 
+    xch->hypercall_buffer_cache_nr = 0;
+
+    xch->hypercall_buffer_total_allocations = 0;
+    xch->hypercall_buffer_total_releases = 0;
+    xch->hypercall_buffer_current_allocations = 0;
+    xch->hypercall_buffer_maximum_allocations = 0;
+    xch->hypercall_buffer_cache_hits = 0;
+    xch->hypercall_buffer_cache_misses = 0;
+    xch->hypercall_buffer_cache_toobig = 0;
+
     xch->ops_handle = XC_OSDEP_OPEN_ERROR;
     xch->ops = NULL;
 
@@ -171,6 +181,8 @@ err_put_iface:
 static int xc_interface_close_common(xc_interface *xch)
 {
     int rc = 0;
+
+    xc__hypercall_buffer_cache_release(xch);
 
     xtl_logger_destroy(xch->dombuild_logger_tofree);
     xtl_logger_destroy(xch->error_handler_tofree);

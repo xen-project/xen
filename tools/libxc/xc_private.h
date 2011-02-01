@@ -75,6 +75,28 @@ struct xc_interface_core {
     FILE *dombuild_logger_file;
     const char *currently_progress_reporting;
 
+    /*
+     * A simple cache of unused, single page, hypercall buffers
+     *
+     * Protected by a global lock.
+     */
+#define HYPERCALL_BUFFER_CACHE_SIZE 4
+    int hypercall_buffer_cache_nr;
+    void *hypercall_buffer_cache[HYPERCALL_BUFFER_CACHE_SIZE];
+
+    /*
+     * Hypercall buffer statistics. All protected by the global
+     * hypercall_buffer_cache lock.
+     */
+    int hypercall_buffer_total_allocations;
+    int hypercall_buffer_total_releases;
+    int hypercall_buffer_current_allocations;
+    int hypercall_buffer_maximum_allocations;
+    int hypercall_buffer_cache_hits;
+    int hypercall_buffer_cache_misses;
+    int hypercall_buffer_cache_toobig;
+
+    /* Low lovel OS interface */
     xc_osdep_info_t  osdep;
     xc_osdep_ops    *ops; /* backend operations */
     xc_osdep_handle  ops_handle; /* opaque data for xc_osdep_ops */
@@ -156,6 +178,11 @@ int xc__hypercall_bounce_pre(xc_interface *xch, xc_hypercall_buffer_t *bounce);
 #define xc_hypercall_bounce_pre(_xch, _name) xc__hypercall_bounce_pre(_xch, HYPERCALL_BUFFER(_name))
 void xc__hypercall_bounce_post(xc_interface *xch, xc_hypercall_buffer_t *bounce);
 #define xc_hypercall_bounce_post(_xch, _name) xc__hypercall_bounce_post(_xch, HYPERCALL_BUFFER(_name))
+
+/*
+ * Release hypercall buffer cache
+ */
+void xc__hypercall_buffer_cache_release(xc_interface *xch);
 
 /*
  * Hypercall interfaces.
