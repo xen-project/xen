@@ -5814,6 +5814,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
 
         snprintf(name, 15, "Pool-node%d", node);
         libxl_uuid_generate(&uuid);
+        poolid = 0;
         ret = -libxl_create_cpupool(&ctx, name, schedid, cpumap, &uuid, &poolid);
         if (ret) {
             fprintf(stderr, "error on creating cpupool\n");
