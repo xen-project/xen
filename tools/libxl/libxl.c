@@ -1106,7 +1106,7 @@ int libxl_device_nic_init(libxl_device_nic *nic_info, int devnum)
     nic_info->domid = 0;
     nic_info->devid = devnum;
     nic_info->mtu = 1492;
-    nic_info->model = strdup("e1000");
+    nic_info->model = strdup("rtl8139");
     nic_info->mac[0] = 0x00;
     nic_info->mac[1] = 0x16;
     nic_info->mac[2] = 0x3e;
