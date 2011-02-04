@@ -3344,13 +3344,60 @@ int main_button_press(int argc, char **argv)
     return 0;
 }
 
+static void print_bitmap(uint8_t *map, int maplen, FILE *stream)
+{
+    int i;
+    uint8_t pmap, bitmask;
+    int firstset, state = 0;
+
+    for (i = 0; i < maplen; i++) {
+        if (i % 8 == 0) {
+            pmap = *map++;
+            bitmask = 1;
+        } else bitmask <<= 1;
+
+        switch (state) {
+        case 0:
+        case 2:
+            if ((pmap & bitmask) != 0) {
+                firstset = i;
+                state++;
+            }
+            continue;
+        case 1:
+        case 3:
+            if ((pmap & bitmask) == 0) {
+                fprintf(stream, "%s%d", state > 1 ? "," : "", firstset);
+                if (i - 1 > firstset)
+                    fprintf(stream, "-%d", i - 1);
+                state = 2;
+            }
+            continue;
+        }
+    }
+    switch (state) {
+        case 0:
+            fprintf(stream, "none");
+            break;
+        case 2:
+            break;
+        case 1:
+            if (firstset == 0) {
+                fprintf(stream, "any cpu");
+                break;
+            }
+        case 3:
+            fprintf(stream, "%s%d", state > 1 ? "," : "", firstset);
+            if (i - 1 > firstset)
+                fprintf(stream, "-%d", i - 1);
+            break;
+    }
+}
+
 static void print_vcpuinfo(uint32_t tdomid,
                            const libxl_vcpuinfo *vcpuinfo,
                            uint32_t nr_cpus)
 {
-    int i, l;
-    uint8_t *cpumap;
-    uint8_t pcpumap;
     char *domname;
 
     /*      NAME  ID  VCPU */
@@ -3370,47 +3417,8 @@ static void print_vcpuinfo(uint32_t tdomid,
     /*      TIM */
     printf("%9.1f  ", ((float)vcpuinfo->vcpu_time / 1e9));
     /* CPU AFFINITY */
-    pcpumap = nr_cpus > 8 ? (uint8_t)-1 : ((1 << nr_cpus) - 1);
-    for (cpumap = vcpuinfo->cpumap.map; nr_cpus; ++cpumap) {
-        if (*cpumap < pcpumap) {
-            break;
-        }
-        if (nr_cpus > 8) {
-            pcpumap = -1;
-            nr_cpus -= 8;
-        } else {
-            pcpumap = ((1 << nr_cpus) - 1);
-            nr_cpus = 0;
-        }
-    }
-    if (!nr_cpus) {
-        printf("any cpu\n");
-    } else {
-        for (cpumap = vcpuinfo->cpumap.map; nr_cpus; ++cpumap) {
-            pcpumap = *cpumap;
-            for (i = 0; !(pcpumap & 1); ++i, pcpumap >>= 1)
-                ;
-            printf("%u", i);
-            for (l = i, pcpumap = (pcpumap >> 1); (pcpumap & 1); ++i, pcpumap >>= 1)
-                ;
-            if (l < i) {
-                printf("-%u", i);
-            }
-            for (++i; pcpumap; ++i, pcpumap >>= 1) {
-                if (pcpumap & 1) {
-                    printf(",%u", i);
-                    for (l = i, pcpumap = (pcpumap >> 1); (pcpumap & 1); ++i, pcpumap >>= 1)
-                        ;
-                    if (l < i) {
-                        printf("-%u", i);
-                    }
-                    ++i;
-                }
-            }
-            printf("\n");
-            nr_cpus = nr_cpus > 8 ? nr_cpus - 8 : 0;
-        }
-    }
+    print_bitmap(vcpuinfo->cpumap.map, nr_cpus, stdout);
+    printf("\n");
 }
 
 static void print_domain_vcpuinfo(uint32_t domid, uint32_t nr_cpus)
