@@ -791,7 +791,7 @@ int libxl_primary_console_exec(libxl_ctx *ctx, uint32_t domid_vm)
 int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
-    const char *vnc_port, *vfb_back;
+    const char *vnc_port;
     const char *vnc_listen = NULL, *vnc_pass = NULL;
     int port = 0, autopass_fd = -1;
     char *vnc_bin, *args[] = {
@@ -807,18 +807,14 @@ int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass)
     if ( vnc_port )
         port = atoi(vnc_port) - 5900;
 
-    vfb_back = libxl__xs_read(&gc, XBT_NULL,
-                            libxl__sprintf(&gc,
-                            "/local/domain/%d/device/vfb/0/backend", domid));
-    if ( vfb_back ) {
-        vnc_listen = libxl__xs_read(&gc, XBT_NULL,
-                            libxl__sprintf(&gc,
+    vnc_listen = libxl__xs_read(&gc, XBT_NULL,
+                                libxl__sprintf(&gc,
                             "/local/domain/%d/console/vnc-listen", domid));
-        if ( autopass )
-            vnc_pass = libxl__xs_read(&gc, XBT_NULL,
-                            libxl__sprintf(&gc,
+
+    if ( autopass )
+        vnc_pass = libxl__xs_read(&gc, XBT_NULL,
+                                  libxl__sprintf(&gc,
                             "/local/domain/%d/console/vnc-pass", domid));
-    }
 
     if ( NULL == vnc_listen )
         vnc_listen = "localhost";
