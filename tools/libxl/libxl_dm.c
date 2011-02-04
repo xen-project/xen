@@ -23,6 +23,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <assert.h>
 #include "libxl_utils.h"
 #include "libxl_internal.h"
 #include "libxl.h"
@@ -55,26 +56,29 @@ static char ** libxl_build_device_model_args_old(libxl__gc *gc,
         flexarray_vappend(dm_args, "-domain-name", info->dom_name, NULL);
 
     if (info->vnc || info->vncdisplay || info->vnclisten || info->vncunused) {
-        flexarray_append(dm_args, "-vnc");
+        char *vncarg;
         if (info->vncdisplay) {
             if (info->vnclisten && strchr(info->vnclisten, ':') == NULL) {
-                flexarray_append(dm_args, 
-                    libxl__sprintf(gc, "%s:%d%s",
+                vncarg = libxl__sprintf(gc, "%s:%d",
                                   info->vnclisten,
-                                  info->vncdisplay,
-                                  info->vncpasswd ? ",password" : ""));
+                                  info->vncdisplay);
             } else {
-                flexarray_append(dm_args, libxl__sprintf(gc, "127.0.0.1:%d", info->vncdisplay));
+                vncarg = libxl__sprintf(gc, "127.0.0.1:%d", info->vncdisplay);
             }
         } else if (info->vnclisten) {
             if (strchr(info->vnclisten, ':') != NULL) {
-                flexarray_append(dm_args, info->vnclisten);
+                vncarg = info->vnclisten;
             } else {
-                flexarray_append(dm_args, libxl__sprintf(gc, "%s:0", info->vnclisten));
+                vncarg = libxl__sprintf(gc, "%s:0", info->vnclisten);
             }
         } else {
-            flexarray_append(dm_args, "127.0.0.1:0");
+            vncarg = "127.0.0.1:0";
         }
+        if (info->vncpasswd)
+            vncarg = libxl__sprintf(gc, "%s,password", vncarg);
+        flexarray_append(dm_args, "-vnc");
+        flexarray_append(dm_args, vncarg);
+        
         if (info->vncunused) {
             flexarray_append(dm_args, "-vncunused");
         }
@@ -193,6 +197,9 @@ static char ** libxl_build_device_model_args_new(libxl__gc *gc,
         int display = 0;
         const char *listen = "127.0.0.1";
 
+        if (info->vncpasswd && info->vncpasswd[0]) {
+            assert(!"missing code for supplying vnc password to qemu");
+        }
         flexarray_append(dm_args, "-vnc");
 
         if (info->vncdisplay) {
