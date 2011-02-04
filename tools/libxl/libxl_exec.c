@@ -55,6 +55,8 @@ void libxl__exec(int stdinfd, int stdoutfd, int stderrfd, const char *arg0,
      * to assume they got DFL. */
 
     execvp(arg0, args);
+
+    fprintf(stderr, "libxl: cannot execute %s: %s\n", arg0, strerror(errno));
     _exit(-1);
 }
 
