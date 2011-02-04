@@ -827,25 +827,38 @@ int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass)
     if ( vnc_pass ) {
         char tmpname[] = "/tmp/vncautopass.XXXXXX";
         autopass_fd = mkstemp(tmpname);
-        if ( autopass_fd < 0 )
-            goto skip_autopass;
+        if ( autopass_fd < 0 ) {
+            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                             "mkstemp %s failed", tmpname);
+            goto x_fail;
+        }
 
-        if ( unlink(tmpname) )
+        if ( unlink(tmpname) ) {
             /* should never happen */
-            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "unlink %s failed", tmpname);
+            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                             "unlink %s failed", tmpname);
+            goto x_fail;
+        }
 
         if ( libxl_write_exactly(ctx, autopass_fd, vnc_pass, strlen(vnc_pass),
-                                    tmpname, "vnc password") ) {
-            do { close(autopass_fd); } while(errno == EINTR);
-            goto skip_autopass;
+                                    tmpname, "vnc password") )
+            goto x_fail;
+
+        if ( lseek(autopass_fd, SEEK_SET, 0) ) {
+            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                             "rewind %s (autopass) failed", tmpname);
+            goto x_fail; 
         }
 
         args[2] = "-autopass";
     }
 
-skip_autopass:
     libxl__exec(autopass_fd, -1, -1, args[0], args);
     abort();
+
+ x_fail:
+    libxl__free_all(&gc);
+    return ERROR_FAIL;
 }
 
 /******************************************************************************/
