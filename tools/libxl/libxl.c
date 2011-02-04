@@ -848,9 +848,8 @@ int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass)
     }
 
 skip_autopass:
-    libxl__free_all(&gc);
     libxl__exec(autopass_fd, -1, -1, args[0], args);
-    return 0;
+    abort();
 }
 
 /******************************************************************************/
