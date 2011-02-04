@@ -543,7 +543,7 @@ static int do_domain_create(libxl_ctx *ctx, libxl_domain_config *d_config,
     for (i = 0; i < d_config->num_pcidevs; i++)
         libxl_device_pci_add(ctx, domid, &d_config->pcidevs[i]);
 
-    if ( d_config->c_info.hvm && cb ) {
+    if ( cb && (d_config->c_info.hvm || d_config->b_info.u.pv.bootloader )) {
         if ( (*cb)(ctx, domid, priv) )
             goto error_out;
     }
