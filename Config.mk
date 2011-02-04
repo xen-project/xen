@@ -185,10 +185,9 @@ endif
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG := xen-4.1.0-rc3
-#QEMU_TAG ?= 6a6ffc07f465d5abc94b45ce6fe389369d1395ab
-# Fri Jan 21 18:01:53 2011 +0000
-# qemu-xen: disable buffering on the save file for stubdoms
+QEMU_TAG ?= ad7d28519de7cdc604efefac5c22fe9f88040586
+# Tue Feb 1 17:32:38 2011 +0000
+# vnc, xen: write vnc address and password to xenstore
 
 # Optional components
 XENSTAT_XENTOP     ?= y
