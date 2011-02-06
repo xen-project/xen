@@ -224,10 +224,11 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     hvm_update_guest_cr(v, 2);
     hvm_update_guest_cr(v, 4);
 
-    v->arch.hvm_svm.guest_sysenter_cs = c->sysenter_cs;
-    v->arch.hvm_svm.guest_sysenter_esp = c->sysenter_esp;
-    v->arch.hvm_svm.guest_sysenter_eip = c->sysenter_eip;
-
+    /* Load sysenter MSRs into both VMCB save area and VCPU fields. */
+    vmcb->sysenter_cs = v->arch.hvm_svm.guest_sysenter_cs = c->sysenter_cs;
+    vmcb->sysenter_esp = v->arch.hvm_svm.guest_sysenter_esp = c->sysenter_esp;
+    vmcb->sysenter_eip = v->arch.hvm_svm.guest_sysenter_eip = c->sysenter_eip;
+    
     if ( paging_mode_hap(v->domain) )
     {
         vmcb_set_np_enable(vmcb, 1);
@@ -433,14 +434,6 @@ static void svm_update_guest_efer(struct vcpu *v)
     if ( lma )
         new_efer |= EFER_LME;
     vmcb_set_efer(vmcb, new_efer);
-
-    /*
-     * In legacy mode (EFER.LMA=0) we natively support SYSENTER/SYSEXIT with
-     * no need for MSR intercepts. When EFER.LMA=1 we must trap and emulate.
-     */
-    svm_intercept_msr(v, MSR_IA32_SYSENTER_CS, lma);
-    svm_intercept_msr(v, MSR_IA32_SYSENTER_ESP, lma);
-    svm_intercept_msr(v, MSR_IA32_SYSENTER_EIP, lma);
 }
 
 static void svm_sync_vmcb(struct vcpu *v)
@@ -1142,6 +1135,21 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 {
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    int sync = 0;
+
+    switch ( msr )
+    {
+    case MSR_IA32_SYSENTER_CS:
+    case MSR_IA32_SYSENTER_ESP:
+    case MSR_IA32_SYSENTER_EIP:
+        sync = 1;
+        break;
+    default:
+        break;
+    }
+
+    if ( sync )
+        svm_sync_vmcb(v);    
 
     switch ( msr )
     {
@@ -1149,13 +1157,13 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         goto gpf;
 
     case MSR_IA32_SYSENTER_CS:
-        v->arch.hvm_svm.guest_sysenter_cs = msr_content;
+        vmcb->sysenter_cs = v->arch.hvm_svm.guest_sysenter_cs = msr_content;
         break;
     case MSR_IA32_SYSENTER_ESP:
-        v->arch.hvm_svm.guest_sysenter_esp = msr_content;
+        vmcb->sysenter_esp = v->arch.hvm_svm.guest_sysenter_esp = msr_content;
         break;
     case MSR_IA32_SYSENTER_EIP:
-        v->arch.hvm_svm.guest_sysenter_eip = msr_content;
+        vmcb->sysenter_eip = v->arch.hvm_svm.guest_sysenter_eip = msr_content;
         break;
 
     case MSR_IA32_DEBUGCTLMSR:
@@ -1213,6 +1221,10 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         wrmsr_hypervisor_regs(msr, msr_content);
         break;
     }
+
+    if ( sync )
+        svm_vmload(vmcb);
+
     return X86EMUL_OKAY;
 
  gpf:
