@@ -1288,7 +1288,7 @@ void __init scheduler_init(void)
         BUG();
 }
 
-void schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
+int schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
 {
     unsigned long flags;
     struct vcpu *idle;
@@ -1297,11 +1297,18 @@ void schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
     struct scheduler *new_ops = (c == NULL) ? &ops : c->sched;
 
     if ( old_ops == new_ops )
-        return;
+        return 0;
 
     idle = idle_vcpu[cpu];
     ppriv = SCHED_OP(new_ops, alloc_pdata, cpu);
+    if ( ppriv == NULL )
+        return -ENOMEM;
     vpriv = SCHED_OP(new_ops, alloc_vdata, idle, idle->domain->sched_priv);
+    if ( vpriv == NULL )
+    {
+        SCHED_OP(new_ops, free_pdata, ppriv, cpu);
+        return -ENOMEM;
+    }
 
     pcpu_schedule_lock_irqsave(cpu, flags);
 
@@ -1318,6 +1325,8 @@ void schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
 
     SCHED_OP(old_ops, free_vdata, vpriv_old);
     SCHED_OP(old_ops, free_pdata, ppriv_old, cpu);
+
+    return 0;
 }
 
 struct scheduler *scheduler_get_default(void)

@@ -607,7 +607,7 @@ struct scheduler;
 struct scheduler *scheduler_get_default(void);
 struct scheduler *scheduler_alloc(unsigned int sched_id, int *perr);
 void scheduler_free(struct scheduler *sched);
-void schedule_cpu_switch(unsigned int cpu, struct cpupool *c);
+int schedule_cpu_switch(unsigned int cpu, struct cpupool *c);
 void vcpu_force_reschedule(struct vcpu *v);
 int cpu_disable_scheduler(unsigned int cpu);
 int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity);

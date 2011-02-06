@@ -202,10 +202,20 @@ static int cpupool_destroy(struct cpupool *c)
  */
 static int cpupool_assign_cpu_locked(struct cpupool *c, unsigned int cpu)
 {
+    int ret;
+    struct cpupool *old;
+
     if ( (cpupool_moving_cpu == cpu) && (c != cpupool_cpu_moving) )
         return -EBUSY;
+    old = per_cpu(cpupool, cpu);
     per_cpu(cpupool, cpu) = c;
-    schedule_cpu_switch(cpu, c);
+    ret = schedule_cpu_switch(cpu, c);
+    if ( ret )
+    {
+        per_cpu(cpupool, cpu) = old;
+        return ret;
+    }
+
     cpu_clear(cpu, cpupool_free_cpus);
     if (cpupool_moving_cpu == cpu)
     {
@@ -230,12 +240,19 @@ static long cpupool_unassign_cpu_helper(void *info)
     cpu_set(cpu, cpupool_free_cpus);
     if ( !ret )
     {
-        schedule_cpu_switch(cpu, NULL);
+        ret = schedule_cpu_switch(cpu, NULL);
+        if ( ret )
+        {
+            cpu_clear(cpu, cpupool_free_cpus);
+            goto out;
+        }
         per_cpu(cpupool, cpu) = NULL;
         cpupool_moving_cpu = -1;
         cpupool_put(cpupool_cpu_moving);
         cpupool_cpu_moving = NULL;
     }
+
+out:
     spin_unlock(&cpupool_lock);
     return ret;
 }
