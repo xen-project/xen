@@ -2222,10 +2222,12 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         /* EBX value of main leaf 0 depends on enabled xsave features */
         if ( count == 0 && v->arch.xcr0 ) 
         {
-            for ( sub_leaf = 2; 
-                  (sub_leaf < 64) && (v->arch.xcr0 & (1ULL << sub_leaf));
-                  sub_leaf++ ) 
+            /* reset EBX to default value first */
+            *ebx = 576; 
+            for ( sub_leaf = 2; sub_leaf < 64; sub_leaf++ )
             {
+                if ( !(v->arch.xcr0 & (1ULL << sub_leaf)) )
+                    continue;
                 domain_cpuid(v->domain, input, sub_leaf, &_eax, &_ebx, &_ecx, 
                              &_edx);
                 if ( (_eax + _ebx) > *ebx )
