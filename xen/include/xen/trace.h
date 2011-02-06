@@ -39,7 +39,7 @@ int trace_will_trace_event(u32 event);
 void __trace_var(u32 event, bool_t cycles, unsigned int extra, const void *);
 
 static inline void trace_var(u32 event, int cycles, int extra,
-                               unsigned char *extra_data)
+                             const void *extra_data)
 {
     if ( unlikely(tb_init_done) )
         __trace_var(event, cycles, extra, extra_data);
