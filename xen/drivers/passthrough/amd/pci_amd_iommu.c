@@ -301,6 +301,11 @@ static int reassign_device( struct domain *source, struct domain *target,
     if ( target->max_pages > 0 )
         t->paging_mode = get_paging_mode(target->max_pages);
 
+    /* IO page tables might be destroyed after pci-detach the last device
+     * In this case, we have to re-allocate root table for next pci-attach.*/
+    if ( t->root_table == NULL )
+        allocate_domain_resources(t);
+
     amd_iommu_setup_domain_device(target, iommu, bdf);
     AMD_IOMMU_DEBUG("Re-assign %02x:%02x.%x from domain %d to domain %d\n",
                     bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
