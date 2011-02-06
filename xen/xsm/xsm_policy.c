@@ -32,7 +32,7 @@ int xsm_policy_init(unsigned int *initrdidx, const multiboot_info_t *mbi,
     module_t *mod = (module_t *)__va(mbi->mods_addr);
     int rc = 0;
     u32 *_policy_start;
-    unsigned long start, _policy_len;
+    unsigned long _policy_len;
 
     /*
      * Try all modules and see whichever could be the binary policy.
