@@ -75,6 +75,8 @@ class domain
 	trigger
 	getextvcpucontext
 	setextvcpucontext
+	getvcpuextstate
+	setvcpuextstate
 }
 
 class hvm
