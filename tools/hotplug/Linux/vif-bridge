@@ -82,6 +82,11 @@ fi
 case "$command" in
     online)
         setup_virtual_bridge_port "$dev"
+        mtu="`ip link show $bridge | awk '/mtu/ { print $5 }'`"
+        if [ -n "$mtu" ] && [ "$mtu" -gt 0 ]
+        then
+                ip link set $dev mtu $mtu || :
+        fi
         add_to_bridge "$bridge" "$dev"
         ;;
 
