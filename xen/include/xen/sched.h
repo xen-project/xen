@@ -435,6 +435,13 @@ struct domain *rcu_lock_domain_by_id(domid_t dom);
  */
 int rcu_lock_target_domain_by_id(domid_t dom, struct domain **d);
 
+/*
+ * As rcu_lock_target_domain_by_id(), but will fail EPERM rather than resolve
+ * to local domain. Successful return always resolves to a remote domain that
+ * the local domain is privileged to control.
+ */
+int rcu_lock_remote_target_domain_by_id(domid_t dom, struct domain **d);
+
 /* Finish a RCU critical region started by rcu_lock_domain_by_id(). */
 static inline void rcu_unlock_domain(struct domain *d)
 {
