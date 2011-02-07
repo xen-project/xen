@@ -164,6 +164,7 @@ typedef struct { volatile int counter; } atomic_t;
 
 
 /************************** i386 *******************************/
+#ifdef __INSIDE_MINIOS__
 #if defined (__i386__)
 
 #define xchg(ptr,v) ((__typeof__(*(ptr)))__xchg((unsigned long)(v),(ptr),sizeof(*(ptr))))
@@ -451,7 +452,7 @@ static __inline__ unsigned long __ffs(unsigned long word)
 #else /* ifdef __x86_64__ */
 #error "Unsupported architecture"
 #endif
-
+#endif /* ifdef __INSIDE_MINIOS */
 
 /********************* common i386 and x86_64  ****************************/
 struct __synch_xchg_dummy { unsigned long a[100]; };
