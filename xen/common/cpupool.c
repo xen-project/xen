@@ -232,8 +232,8 @@ static long cpupool_unassign_cpu_helper(void *info)
     int cpu = cpupool_moving_cpu;
     long ret;
 
-    cpupool_dprintk("cpupool_unassign_cpu(pool=%d,cpu=%d) ret %ld\n",
-                    cpupool_id, cpu, ret);
+    cpupool_dprintk("cpupool_unassign_cpu(pool=%d,cpu=%d)\n",
+                    cpupool_cpu_moving->cpupool_id, cpu);
 
     spin_lock(&cpupool_lock);
     ret = cpu_disable_scheduler(cpu);
@@ -254,6 +254,7 @@ static long cpupool_unassign_cpu_helper(void *info)
 
 out:
     spin_unlock(&cpupool_lock);
+    cpupool_dprintk("cpupool_unassign_cpu ret=%ld\n", ret);
     return ret;
 }
 
@@ -331,7 +332,7 @@ int cpupool_unassign_cpu(struct cpupool *c, unsigned int cpu)
 out:
     spin_unlock(&cpupool_lock);
     cpupool_dprintk("cpupool_unassign_cpu(pool=%d,cpu=%d) ret %d\n",
-                    cpupool_id, cpu, ret);
+                    c->cpupool_id, cpu, ret);
     return ret;
 }
 
@@ -345,7 +346,7 @@ int cpupool_add_domain(struct domain *d, int poolid)
 {
     struct cpupool *c;
     int rc = 1;
-    int n_dom;
+    int n_dom = 0;
 
     if ( poolid == CPUPOOLID_NONE )
         return 0;
