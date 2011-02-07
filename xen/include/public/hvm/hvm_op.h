@@ -119,11 +119,11 @@ struct xen_hvm_set_mem_type {
     /* Domain to be updated. */
     domid_t domid;
     /* Memory type */
-    uint64_aligned_t hvmmem_type;
+    uint16_t hvmmem_type;
+    /* Number of pages. */
+    uint32_t nr;
     /* First pfn. */
     uint64_aligned_t first_pfn;
-    /* Number of pages. */
-    uint64_aligned_t nr;
 };
 typedef struct xen_hvm_set_mem_type xen_hvm_set_mem_type_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_set_mem_type_t);
@@ -179,13 +179,12 @@ typedef enum {
 struct xen_hvm_set_mem_access {
     /* Domain to be updated. */
     domid_t domid;
-    uint16_t pad[3]; /* align next field on 8-byte boundary */
     /* Memory type */
-    uint64_t hvmmem_access; /* hvm_access_t */
-    /* First pfn, or ~0ull to set the default access for new pages */
-    uint64_t first_pfn;
+    uint16_t hvmmem_access; /* hvm_access_t */
     /* Number of pages, ignored on setting default access */
-    uint64_t nr;
+    uint32_t nr;
+    /* First pfn, or ~0ull to set the default access for new pages */
+    uint64_aligned_t first_pfn;
 };
 typedef struct xen_hvm_set_mem_access xen_hvm_set_mem_access_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_set_mem_access_t);
@@ -195,11 +194,10 @@ DEFINE_XEN_GUEST_HANDLE(xen_hvm_set_mem_access_t);
 struct xen_hvm_get_mem_access {
     /* Domain to be queried. */
     domid_t domid;
-    uint16_t pad[3]; /* align next field on 8-byte boundary */
     /* Memory type: OUT */
-    uint64_t hvmmem_access; /* hvm_access_t */
+    uint16_t hvmmem_access; /* hvm_access_t */
     /* pfn, or ~0ull for default access for new pages.  IN */
-    uint64_t pfn;
+    uint64_aligned_t pfn;
 };
 typedef struct xen_hvm_get_mem_access xen_hvm_get_mem_access_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_get_mem_access_t);
@@ -220,7 +218,7 @@ struct xen_hvm_inject_trap {
     /* Error code, or -1 to skip */
     uint32_t error_code;
     /* CR2 for page faults */
-    uint64_t cr2;
+    uint64_aligned_t cr2;
 };
 typedef struct xen_hvm_inject_trap xen_hvm_inject_trap_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_inject_trap_t);
