@@ -3347,8 +3347,8 @@ int main_button_press(int argc, char **argv)
 static void print_bitmap(uint8_t *map, int maplen, FILE *stream)
 {
     int i;
-    uint8_t pmap, bitmask;
-    int firstset, state = 0;
+    uint8_t pmap = 0, bitmask = 0;
+    int firstset = 0, state = 0;
 
     for (i = 0; i < maplen; i++) {
         if (i % 8 == 0) {
