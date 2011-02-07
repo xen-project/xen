@@ -3461,6 +3461,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         if ( rc != 0 )
             return rc;
 
+        rc = -EPERM;
+        if ( d == current->domain )
+            goto param_fail4;
+
         rc = -EINVAL;
         if ( !is_hvm_domain(d) )
             goto param_fail4;
