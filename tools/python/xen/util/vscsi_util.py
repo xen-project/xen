@@ -159,6 +159,8 @@ def vscsi_get_scsidevices(mask=""):
 
 
 def vscsi_get_hctl_and_devname_by(target, scsi_devices = None):
+    if target.startswith('/dev/'):
+        target = os.path.realpath(target)
     if scsi_devices is None:
         if len(target.split(':')) == 4:
             scsi_devices = _vscsi_get_scsidevices_by_lsscsi(target)
