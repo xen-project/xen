@@ -386,8 +386,6 @@
 #define IOMMU_PAGES                 (MMIO_PAGES_PER_IOMMU * MAX_AMD_IOMMUS)
 #define DEFAULT_DOMAIN_ADDRESS_WIDTH    48
 #define MAX_AMD_IOMMUS                  32
-#define IOMMU_PAGE_TABLE_LEVEL_3        3
-#define IOMMU_PAGE_TABLE_LEVEL_4        4
 
 /* interrupt remapping table */
 #define INT_REMAP_INDEX_DM_MASK         0x1C00

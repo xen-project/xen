@@ -472,6 +472,89 @@ static u64 iommu_l2e_from_pfn(struct page_info *table, int level,
     return next_table_maddr;
 }
 
+static int update_paging_mode(struct domain *d, unsigned long gfn)
+{
+    u16 bdf;
+    void *device_entry;
+    unsigned int req_id, level, offset;
+    unsigned long flags;
+    struct pci_dev *pdev;
+    struct amd_iommu *iommu = NULL;
+    struct page_info *new_root = NULL;
+    struct page_info *old_root = NULL;
+    void *new_root_vaddr;
+    u64 old_root_maddr;
+    struct hvm_iommu *hd = domain_hvm_iommu(d);
+
+    level = hd->paging_mode;
+    old_root = hd->root_table;
+    offset = gfn >> (PTE_PER_TABLE_SHIFT * (level - 1));
+
+    ASSERT(spin_is_locked(&hd->mapping_lock) && is_hvm_domain(d));
+
+    while ( offset >= PTE_PER_TABLE_SIZE )
+    {
+        /* Allocate and install a new root table.
+         * Only upper I/O page table grows, no need to fix next level bits */
+        new_root = alloc_amd_iommu_pgtable();
+        if ( new_root == NULL )
+        {
+            AMD_IOMMU_DEBUG("%s Cannot allocate I/O page table\n",
+                            __func__);
+            return -ENOMEM;
+        }
+
+        new_root_vaddr = __map_domain_page(new_root);
+        old_root_maddr = page_to_maddr(old_root);
+        amd_iommu_set_page_directory_entry((u32 *)new_root_vaddr,
+                                           old_root_maddr, level);
+        level++;
+        old_root = new_root;
+        offset >>= PTE_PER_TABLE_SHIFT;
+    }
+
+    if ( new_root != NULL )
+    {
+        hd->paging_mode = level;
+        hd->root_table = new_root;
+
+        if ( !spin_is_locked(&pcidevs_lock) )
+            AMD_IOMMU_DEBUG("%s Try to access pdev_list "
+                            "without aquiring pcidevs_lock.\n", __func__);
+
+        /* Update device table entries using new root table and paging mode */
+        for_each_pdev( d, pdev )
+        {
+            bdf = (pdev->bus << 8) | pdev->devfn;
+            req_id = get_dma_requestor_id(bdf);
+            iommu = find_iommu_for_device(bdf);
+            if ( !iommu )
+            {
+                AMD_IOMMU_DEBUG("%s Fail to find iommu.\n", __func__);
+                return -ENODEV;
+            }
+
+            spin_lock_irqsave(&iommu->lock, flags);
+            device_entry = iommu->dev_table.buffer +
+                           (req_id * IOMMU_DEV_TABLE_ENTRY_SIZE);
+
+            /* valid = 0 only works for dom0 passthrough mode */
+            amd_iommu_set_root_page_table((u32 *)device_entry,
+                                          page_to_maddr(hd->root_table),
+                                          hd->domain_id,
+                                          hd->paging_mode, 1);
+
+            invalidate_dev_table_entry(iommu, req_id);
+            flush_command_buffer(iommu);
+            spin_unlock_irqrestore(&iommu->lock, flags);
+        }
+
+        /* For safety, invalidate all entries */
+        invalidate_all_iommu_pages(d);
+    }
+    return 0;
+}
+
 int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
                        unsigned int flags)
 {
@@ -481,6 +564,18 @@ int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
     BUG_ON( !hd->root_table );
 
     spin_lock(&hd->mapping_lock);
+
+    /* Since HVM domain is initialized with 2 level IO page table,
+     * we might need a deeper page table for lager gfn now */
+    if ( is_hvm_domain(d) )
+    {
+        if ( update_paging_mode(d, gfn) )
+        {
+            AMD_IOMMU_DEBUG("Update page mode failed gfn = %lx\n", gfn);
+            domain_crash(d);
+            return -EFAULT;
+        }
+    }
 
     iommu_l2e = iommu_l2e_from_pfn(hd->root_table, hd->paging_mode, gfn);
     if ( iommu_l2e == 0 )
@@ -509,6 +604,18 @@ int amd_iommu_unmap_page(struct domain *d, unsigned long gfn)
     BUG_ON( !hd->root_table );
 
     spin_lock(&hd->mapping_lock);
+
+    /* Since HVM domain is initialized with 2 level IO page table,
+     * we might need a deeper page table for lager gfn now */
+    if ( is_hvm_domain(d) )
+    {
+        if ( update_paging_mode(d, gfn) )
+        {
+            AMD_IOMMU_DEBUG("Update page mode failed gfn = %lx\n", gfn);
+            domain_crash(d);
+            return -EFAULT;
+        }
+    }
 
     iommu_l2e = iommu_l2e_from_pfn(hd->root_table, hd->paging_mode, gfn);
 

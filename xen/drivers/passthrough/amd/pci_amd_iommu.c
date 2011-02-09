@@ -214,8 +214,11 @@ static int amd_iommu_domain_init(struct domain *d)
         return -ENOMEM;
     }
 
+    /* For pv and dom0, stick with get_paging_mode(max_page)
+     * For HVM dom0, use 2 level page table at first */
     hd->paging_mode = is_hvm_domain(d) ?
-        IOMMU_PAGE_TABLE_LEVEL_4 : get_paging_mode(max_page);
+                      IOMMU_PAGING_MODE_LEVEL_2 :
+                      get_paging_mode(max_page);
 
     hd->domain_id = d->domain_id;
 
@@ -297,9 +300,6 @@ static int reassign_device( struct domain *source, struct domain *target,
 
     list_move(&pdev->domain_list, &target->arch.pdev_list);
     pdev->domain = target;
-
-    if ( target->max_pages > 0 )
-        t->paging_mode = get_paging_mode(target->max_pages);
 
     /* IO page tables might be destroyed after pci-detach the last device
      * In this case, we have to re-allocate root table for next pci-attach.*/
