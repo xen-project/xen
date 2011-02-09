@@ -55,6 +55,7 @@ bool_t rwbf_quirk;
 static int is_cantiga_b3;
 static int is_snb_gfx;
 static u8 *igd_reg_va;
+static spinlock_t igd_lock;
 
 /*
  * QUIRK to workaround Xen boot issue on Calpella/Ironlake OEM BIOS
@@ -98,6 +99,7 @@ static void cantiga_b3_errata_init(void)
 static void snb_errata_init(void)
 {
     is_snb_gfx = IS_SNB_GFX(igd_id);
+    spin_lock_init(&igd_lock);
 }
 
 /*
@@ -225,7 +227,12 @@ void vtd_ops_preamble_quirk(struct iommu* iommu)
 {
     cantiga_vtd_ops_preamble(iommu);
     if ( snb_igd_quirk )
+    {
+        spin_lock(&igd_lock);
+
+        /* match unlock in postamble */
         snb_vtd_ops_preamble(iommu);
+    }
 }
 
 /*
@@ -234,7 +241,12 @@ void vtd_ops_preamble_quirk(struct iommu* iommu)
 void vtd_ops_postamble_quirk(struct iommu* iommu)
 {
     if ( snb_igd_quirk )
+    {
         snb_vtd_ops_postamble(iommu);
+
+        /* match the lock in preamble */
+        spin_unlock(&igd_lock);
+    }
 }
 
 /* initialize platform identification flags */
