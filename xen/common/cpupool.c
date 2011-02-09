@@ -53,7 +53,7 @@ static void free_cpupool_struct(struct cpupool *c)
  * the searched id is returned
  * returns NULL if not found.
  */
-static struct cpupool *cpupool_find_by_id(int id, int exact)
+static struct cpupool *__cpupool_find_by_id(int id, int exact)
 {
     struct cpupool **q;
 
@@ -63,14 +63,19 @@ static struct cpupool *cpupool_find_by_id(int id, int exact)
         if ( (*q)->cpupool_id >= id )
             break;
 
-    return (!exact || ((*q)->cpupool_id == id)) ? *q : NULL;
+    return (!exact || (*q == NULL) || ((*q)->cpupool_id == id)) ? *q : NULL;
+}
+
+static struct cpupool *cpupool_find_by_id(int poolid)
+{
+    return __cpupool_find_by_id(poolid, 1);
 }
 
 static struct cpupool *__cpupool_get_by_id(int poolid, int exact)
 {
     struct cpupool *c;
     spin_lock(&cpupool_lock);
-    c = cpupool_find_by_id(poolid, exact);
+    c = __cpupool_find_by_id(poolid, exact);
     if ( c != NULL )
         atomic_inc(&c->refcnt);
     spin_unlock(&cpupool_lock);
@@ -80,6 +85,11 @@ static struct cpupool *__cpupool_get_by_id(int poolid, int exact)
 struct cpupool *cpupool_get_by_id(int poolid)
 {
     return __cpupool_get_by_id(poolid, 1);
+}
+
+static struct cpupool *cpupool_get_next_by_id(int poolid)
+{
+    return __cpupool_get_by_id(poolid, 0);
 }
 
 void cpupool_put(struct cpupool *pool)
@@ -351,7 +361,7 @@ int cpupool_add_domain(struct domain *d, int poolid)
     if ( poolid == CPUPOOLID_NONE )
         return 0;
     spin_lock(&cpupool_lock);
-    c = cpupool_find_by_id(poolid, 1);
+    c = cpupool_find_by_id(poolid);
     if ( (c != NULL) && cpus_weight(c->cpu_valid) )
     {
         c->n_dom++;
@@ -457,7 +467,7 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
 
     case XEN_SYSCTL_CPUPOOL_OP_INFO:
     {
-        c = __cpupool_get_by_id(op->cpupool_id, 0);
+        c = cpupool_get_next_by_id(op->cpupool_id);
         ret = -ENOENT;
         if ( c == NULL )
             break;
@@ -485,7 +495,7 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
         ret = -EBUSY;
         if ( !cpu_isset(cpu, cpupool_free_cpus) )
             goto addcpu_out;
-        c = cpupool_find_by_id(op->cpupool_id, 1);
+        c = cpupool_find_by_id(op->cpupool_id);
         ret = -ENOENT;
         if ( c == NULL )
             goto addcpu_out;
@@ -501,7 +511,7 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
     {
         unsigned cpu;
 
-        c = __cpupool_get_by_id(op->cpupool_id, 1);
+        c = cpupool_get_by_id(op->cpupool_id);
         ret = -ENOENT;
         if ( c == NULL )
             break;
@@ -540,7 +550,7 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
                         d->domain_id, op->cpupool_id);
         ret = -ENOENT;
         spin_lock(&cpupool_lock);
-        c = cpupool_find_by_id(op->cpupool_id, 1);
+        c = cpupool_find_by_id(op->cpupool_id);
         if ( (c != NULL) && cpus_weight(c->cpu_valid) )
         {
             d->cpupool->n_dom--;
