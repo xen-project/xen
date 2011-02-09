@@ -485,7 +485,7 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
         ret = -EBUSY;
         if ( !cpu_isset(cpu, cpupool_free_cpus) )
             goto addcpu_out;
-        c = cpupool_find_by_id(op->cpupool_id, 0);
+        c = cpupool_find_by_id(op->cpupool_id, 1);
         ret = -ENOENT;
         if ( c == NULL )
             goto addcpu_out;
@@ -501,7 +501,7 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
     {
         unsigned cpu;
 
-        c = __cpupool_get_by_id(op->cpupool_id, 0);
+        c = __cpupool_get_by_id(op->cpupool_id, 1);
         ret = -ENOENT;
         if ( c == NULL )
             break;
