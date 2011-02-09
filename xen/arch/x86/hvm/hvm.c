@@ -2223,7 +2223,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         if ( count == 0 && v->arch.xcr0 ) 
         {
             /* reset EBX to default value first */
-            *ebx = 576; 
+            *ebx = XSAVE_AREA_MIN_SIZE; 
             for ( sub_leaf = 2; sub_leaf < 64; sub_leaf++ )
             {
                 if ( !(v->arch.xcr0 & (1ULL << sub_leaf)) )

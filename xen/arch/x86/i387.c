@@ -221,7 +221,6 @@ static void restore_fpu(struct vcpu *v)
 }
 
 #define XSTATE_CPUID 0xd
-#define XSAVE_AREA_MIN_SIZE (512 + 64) /* FP/SSE + XSAVE.HEADER */
 
 /*
  * Maximum size (in byte) of the XSAVE/XRSTOR save area required by all

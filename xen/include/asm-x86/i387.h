@@ -21,13 +21,14 @@ void xsave_init(void);
 int xsave_alloc_save_area(struct vcpu *v);
 void xsave_free_save_area(struct vcpu *v);
 
+#define XSAVE_AREA_MIN_SIZE (512 + 64) /* FP/SSE + XSAVE.HEADER */
 #define XSTATE_FP       (1ULL << 0)
 #define XSTATE_SSE      (1ULL << 1)
 #define XSTATE_YMM      (1ULL << 2)
 #define XSTATE_LWP      (1ULL << 62) /* AMD lightweight profiling */
 #define XSTATE_FP_SSE   (XSTATE_FP | XSTATE_SSE)
 #define XCNTXT_MASK     (XSTATE_FP | XSTATE_SSE | XSTATE_YMM | XSTATE_LWP)
-#define XSTATE_YMM_OFFSET  (512 + 64)
+#define XSTATE_YMM_OFFSET  XSAVE_AREA_MIN_SIZE
 #define XSTATE_YMM_SIZE    256
 #define XSAVEOPT        (1 << 0)
 
