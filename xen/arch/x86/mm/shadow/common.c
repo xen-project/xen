@@ -1634,7 +1634,8 @@ shadow_alloc_p2m_page(struct domain *d)
     if ( d->arch.paging.shadow.total_pages 
          < shadow_min_acceptable_pages(d) + 1 )
     {
-        shadow_unlock(d);
+        if ( do_locking )
+            shadow_unlock(d);
         return NULL;
     }
  
