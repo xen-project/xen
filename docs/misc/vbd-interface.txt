@@ -1,0 +1,126 @@
+Xen guest interface
+-------------------
+
+A Xen guest can be provided with block devices.  These are always
+provided as Xen VBDs; for HVM guests they may also be provided as
+emulated IDE or SCSI disks.
+
+The abstract interface involves specifying, for each block device:
+
+ * Nominal disk type: Xen virtual disk (aka xvd*, the default); SCSI
+   (sd*); IDE (hd*).
+
+   For HVM guests, each whole-disk hd* and and sd* device is made
+   available _both_ via emulated IDE resp. SCSI controller, _and_ as a
+   Xen VBD.  The HVM guest is entitled to assume that the IDE or SCSI
+   disks available via the emulated IDE controller target the same
+   underlying devices as the corresponding Xen VBD (ie, multipath).
+
+   For PV guests every device is made available to the guest only as a
+   Xen VBD.  For these domains the type is advisory, for use by the
+   guest's device naming scheme.
+
+   The Xen interface does not specify what name a device should have
+   in the guest (nor what major/minor device number it should have in
+   the guest, if the guest has such a concept).
+
+ * Disk number, which is a nonnegative integer,
+   conventionally starting at 0 for the first disk.
+
+ * Partition number, which is a nonnegative integer where by
+   convention partition 0 indicates the "whole disk".
+
+   Normally for any disk _either_ partition 0 should be supplied in
+   which case the guest is expected to treat it as they would a native
+   whole disk (for example by putting or expecting a partition table
+   or disk label on it);
+
+   _Or_ only non-0 partitions should be supplied in which case the
+   guest should expect storage management to be done by the host and
+   treat each vbd as it would a partition or slice or LVM volume (for
+   example by putting or expecting a filesystem on it).
+
+   Non-whole disk devices cannot be passed through to HVM guests via
+   the emulated IDE or SCSI controllers.
+
+
+Configuration file syntax
+-------------------------
+
+The config file syntaxes are, for example
+
+       d0 d0p0  xvda     Xen virtual disk 0 partition 0 (whole disk)
+       d1p2     xvda2    Xen virtual disk 1 partition 2
+       d536p37  xvdtq37  Xen virtual disk 536 partition 37
+       sdb3              SCSI disk 1 partition 3
+       hdc2              IDE disk 2 partition 2
+
+The d*p* syntax is not supported by xm/xend.
+
+To cope with guests which predate this specification we preserve the
+existing facility to specify the xenstore numerical value directly by
+putting a single number (hex, decimal or octal) in the domain config
+file instead of the disk identifier; this number is written directly
+to xenstore (after conversion to the canonical decimal format).
+
+
+Concrete encoding in the VBD interface (in xenstore)
+----------------------------------------------------
+
+The information above is encoded in the concrete interface as an
+integer (in a canonical decimal format in xenstore), whose value
+encodes the information above as follows:
+
+    1 << 28 | disk << 8 | partition      xvd, disks or partitions 16 onwards
+   202 << 8 | disk << 4 | partition      xvd, disks and partitions up to 15
+     8 << 8 | disk << 4 | partition      sd, disks and partitions up to 15
+     3 << 8 | disk << 6 | partition      hd, disks 0..1, partitions 0..63
+    22 << 8 | (disk-2) << 6 | partition  hd, disks 2..3, partitions 0..63
+    2 << 28 onwards                      reserved for future use
+   other values less than 1 << 28        deprecated / reserved
+
+The 1<<28 format handles disks up to (1<<20)-1 and partitions up to
+255.  It will be used only where the 202<<8 format does not have
+enough bits.
+
+Guests MAY support any subset of the formats above except that if they
+support 1<<28 they MUST also support 202<<8.  PV-on-HVM drivers MUST
+support at least one of 3<<8 or 8<<8; 3<<8 is recommended.
+
+Some software has used or understood Linux-specific encodings for SCSI
+disks beyond disk 15 partition 15, and IDE disks beyond disk 3
+partition 63.  These vbds, and the corresponding encoded integers, are
+deprecated.
+
+Guests SHOULD ignore numbers that they do not understand or
+recognise.  They SHOULD check supplied numbers for validity.
+
+
+Notes on Linux as a guest
+-------------------------
+
+Very old Linux guests (PV and PV-on-HVM) are able to "steal" the
+device numbers and names normally used by the IDE and SCSI
+controllers, so that writing "hda1" in the config file results in
+/dev/hda1 in the guest.  These systems interpret the xenstore integer
+as
+       major << 8 | minor
+where major and minor are the Linux-specific device numbers.  Some old
+configurations may depend on deprecated high-numbered SCSI and IDE
+disks.  This does not work in recent versions of Linux.
+
+So for Linux PV guests, users are recommended to supply xvd* devices
+only.  Modern PV drivers will map these to identically-named devices
+in the guest.
+
+For Linux HVM guests using PV-on-HVM drivers, users are recommended to
+supply as few hd* devices as possible and use pure xvd* devices for
+the rest.  Modern PV-on-HVM drivers will map the hd* devices to
+/dev/xvdHDa etc.
+
+Some Linux HVM guests with broken PV-on-HVM drivers do not cope
+properly if both hda and hdc are supplied, nor with both hda and xvda,
+because they directly map the bottom 8 bits of the xenstore integer
+directly to the Linux guest's device number and throw away the rest;
+they can crash due to minor number clashes.  With these guests, the
+workaround is not to supply problematic combinations of devices.
