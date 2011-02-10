@@ -138,7 +138,19 @@ void __init check_x2apic_preenabled(void)
     if ( lo & MSR_IA32_APICBASE_EXTD )
     {
         printk("x2APIC mode is already enabled by BIOS.\n");
+#ifndef __i386__
         x2apic_enabled = 1;
         genapic = apic_x2apic_probe();
+#else
+        lo &= ~(MSR_IA32_APICBASE_ENABLE | MSR_IA32_APICBASE_EXTD);
+        wrmsr(MSR_IA32_APICBASE, lo, hi);
+        lo |= MSR_IA32_APICBASE_ENABLE;
+        wrmsr(MSR_IA32_APICBASE, lo, hi);
+        printk("x2APIC disabled permanently on x86_32.\n");
+#endif
     }
+
+#ifdef __i386__
+    clear_bit(X86_FEATURE_X2APIC, boot_cpu_data.x86_capability);
+#endif
 }

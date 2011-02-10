@@ -961,22 +961,6 @@ void __init x2apic_bsp_setup(void)
     if ( !cpu_has_x2apic )
         return;
 
-#ifdef __i386__
-    clear_bit(X86_FEATURE_X2APIC, boot_cpu_data.x86_capability);
-    if ( x2apic_enabled )
-    {
-        uint64_t msr_content;
-        rdmsrl(MSR_IA32_APICBASE, msr_content);
-        msr_content &= ~(MSR_IA32_APICBASE_ENABLE | MSR_IA32_APICBASE_EXTD);
-        wrmsrl(MSR_IA32_APICBASE, msr_content);
-        msr_content |= MSR_IA32_APICBASE_ENABLE;
-        wrmsrl(MSR_IA32_APICBASE, msr_content);
-        x2apic_enabled = 0;
-    }
-    printk("x2APIC disabled permanently on x86_32.\n");
-    return;
-#endif
-
     if ( !opt_x2apic )
     {
         if ( !x2apic_enabled )
