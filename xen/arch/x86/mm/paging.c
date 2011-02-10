@@ -132,17 +132,12 @@ static mfn_t paging_new_log_dirty_node(struct domain *d, mfn_t **node_p)
     return mfn;
 }
 
-/* get the top of the log-dirty bitmap trie, allocating if necessary */
+/* get the top of the log-dirty bitmap trie */
 static mfn_t *paging_map_log_dirty_bitmap(struct domain *d)
 {
-    mfn_t *mapping;
-
     if ( likely(mfn_valid(d->arch.paging.log_dirty.top)) )
         return map_domain_page(mfn_x(d->arch.paging.log_dirty.top));
-
-    d->arch.paging.log_dirty.top = paging_new_log_dirty_node(d, &mapping);
-
-    return mapping;
+    return NULL;
 }
 
 static void paging_free_log_dirty_page(struct domain *d, mfn_t mfn)
@@ -262,8 +257,12 @@ void paging_mark_dirty(struct domain *d, unsigned long guest_mfn)
     i4 = L4_LOGDIRTY_IDX(pfn);
 
     l4 = paging_map_log_dirty_bitmap(d);
-    if ( !l4 )
-        goto out;
+    if ( unlikely(!l4) )
+    {
+        d->arch.paging.log_dirty.top = paging_new_log_dirty_node(d, &l4);
+        if ( !l4 )
+            goto out;
+    }
     mfn = l4[i4];
     if ( !mfn_valid(mfn) )
         mfn = l4[i4] = paging_new_log_dirty_node(d, &l3);
