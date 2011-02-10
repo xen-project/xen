@@ -2282,7 +2282,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             if ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD ||
                  boot_cpu_data.x86 < 0x10 || boot_cpu_data.x86 > 0x17 )
                 goto fail;
-            if ( !IS_PRIV(v->domain) )
+            if ( !IS_PRIV(v->domain) || !is_pinned_vcpu(v) )
                 break;
             if ( (rdmsr_safe(MSR_AMD64_NB_CFG, val) != 0) ||
                  (eax != (uint32_t)val) ||
@@ -2295,7 +2295,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             if ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD ||
                  boot_cpu_data.x86 < 0x10 || boot_cpu_data.x86 > 0x17 )
                 goto fail;
-            if ( !IS_PRIV(v->domain) )
+            if ( !IS_PRIV(v->domain) || !is_pinned_vcpu(v) )
                 break;
             if ( (rdmsr_safe(MSR_FAM10H_MMIO_CONF_BASE, val) != 0) )
                 goto fail;
@@ -2317,6 +2317,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case MSR_IA32_UCODE_REV:
             if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
                 goto fail;
+            if ( !IS_PRIV(v->domain) || !is_pinned_vcpu(v) )
+                break;
             if ( rdmsr_safe(regs->ecx, val) )
                 goto fail;
             if ( msr_content )
@@ -2324,7 +2326,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             break;
         case MSR_IA32_MISC_ENABLE:
             if ( rdmsr_safe(regs->ecx, val) )
-                goto invalid;
+                goto fail;
             val = guest_misc_enable(val);
             if ( msr_content != val )
                 goto invalid;
@@ -2351,7 +2353,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case MSR_IA32_ENERGY_PERF_BIAS:
             if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
                 goto fail;
-            if ( (v->domain->domain_id != 0) || !is_pinned_vcpu(v) )
+            if ( !IS_PRIV(v->domain) || !is_pinned_vcpu(v) )
                 break;
             if ( wrmsr_safe(regs->ecx, msr_content) != 0 )
                 goto fail;
