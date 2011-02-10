@@ -277,6 +277,7 @@ static int reassign_device( struct domain *source, struct domain *target,
     struct pci_dev *pdev;
     struct amd_iommu *iommu;
     int bdf;
+    struct hvm_iommu *t = domain_hvm_iommu(target);
 
     ASSERT(spin_is_locked(&pcidevs_lock));
     pdev = pci_get_pdev_by_domain(source, bus, devfn);
@@ -297,6 +298,11 @@ static int reassign_device( struct domain *source, struct domain *target,
 
     list_move(&pdev->domain_list, &target->arch.pdev_list);
     pdev->domain = target;
+
+    /* IO page tables might be destroyed after pci-detach the last device
+     * In this case, we have to re-allocate root table for next pci-attach.*/
+    if ( t->root_table == NULL )
+        allocate_domain_resources(t);
 
     amd_iommu_setup_domain_device(target, iommu, bdf);
     AMD_IOMMU_DEBUG("reassign %x:%x.%x domain %d -> domain %d\n",
