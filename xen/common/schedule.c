@@ -466,6 +466,7 @@ int cpu_disable_scheduler(unsigned int cpu)
     struct domain *d;
     struct vcpu *v;
     struct cpupool *c;
+    cpumask_t online_affinity;
     int    ret = 0;
     bool_t affinity_broken;
 
@@ -484,7 +485,8 @@ int cpu_disable_scheduler(unsigned int cpu)
         {
             vcpu_schedule_lock_irq(v);
 
-            if ( (cpus_weight(v->cpu_affinity) == 1) &&
+            cpus_and(online_affinity, v->cpu_affinity, c->cpu_valid);
+            if ( cpus_empty(online_affinity) &&
                  cpu_isset(cpu, v->cpu_affinity) )
             {
                 printk("Breaking vcpu affinity for domain %d vcpu %d\n",
