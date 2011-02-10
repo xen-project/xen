@@ -95,7 +95,7 @@
         spin_unlock(&(_d)->arch.paging.log_dirty.lock);                   \
     } while (0)
 
-static mfn_t paging_new_log_dirty_page(struct domain *d, void **mapping_p)
+static mfn_t paging_new_log_dirty_page(struct domain *d)
 {
     struct page_info *page;
 
@@ -103,33 +103,38 @@ static mfn_t paging_new_log_dirty_page(struct domain *d, void **mapping_p)
     if ( unlikely(page == NULL) )
     {
         d->arch.paging.log_dirty.failed_allocs++;
-        *mapping_p = NULL;
         return _mfn(INVALID_MFN);
     }
 
     d->arch.paging.log_dirty.allocs++;
-    *mapping_p = __map_domain_page(page);
 
     return page_to_mfn(page);
 }
 
-static mfn_t paging_new_log_dirty_leaf(
-    struct domain *d, unsigned long **leaf_p)
+/* Init a new leaf node; returns a mapping or NULL */
+static unsigned long *paging_new_log_dirty_leaf(mfn_t mfn)
 {
-    mfn_t mfn = paging_new_log_dirty_page(d, (void **)leaf_p);
+    unsigned long *leaf = NULL;
     if ( mfn_valid(mfn) )
-        clear_page(*leaf_p);
-    return mfn;
+    {
+        leaf = map_domain_page(mfn_x(mfn));
+        clear_page(leaf);
+    }
+    return leaf;
 }
 
-static mfn_t paging_new_log_dirty_node(struct domain *d, mfn_t **node_p)
+/* Init a new non-leaf node; returns a mapping or NULL */
+static mfn_t *paging_new_log_dirty_node(mfn_t mfn)
 {
     int i;
-    mfn_t mfn = paging_new_log_dirty_page(d, (void **)node_p);
+    mfn_t *node = NULL;
     if ( mfn_valid(mfn) )
+    {
+        node = map_domain_page(mfn_x(mfn));
         for ( i = 0; i < LOGDIRTY_NODE_ENTRIES; i++ )
-            (*node_p)[i] = _mfn(INVALID_MFN);
-    return mfn;
+            node[i] = _mfn(INVALID_MFN);
+    }
+    return node;
 }
 
 /* get the top of the log-dirty bitmap trie */
@@ -224,7 +229,7 @@ int paging_log_dirty_disable(struct domain *d)
 void paging_mark_dirty(struct domain *d, unsigned long guest_mfn)
 {
     unsigned long pfn;
-    mfn_t gmfn;
+    mfn_t gmfn, new_mfn;
     int changed;
     mfn_t mfn, *l4, *l3, *l2;
     unsigned long *l1;
@@ -235,8 +240,6 @@ void paging_mark_dirty(struct domain *d, unsigned long guest_mfn)
     if ( !paging_mode_log_dirty(d) || !mfn_valid(gmfn) ||
          page_get_owner(mfn_to_page(gmfn)) != d )
         return;
-
-    log_dirty_lock(d);
 
     /* We /really/ mean PFN here, even for non-translated guests. */
     pfn = get_gpfn_from_mfn(mfn_x(gmfn));
@@ -249,46 +252,70 @@ void paging_mark_dirty(struct domain *d, unsigned long guest_mfn)
      * Nothing to do here...
      */
     if ( unlikely(!VALID_M2P(pfn)) )
-        goto out;
+        return;
 
     i1 = L1_LOGDIRTY_IDX(pfn);
     i2 = L2_LOGDIRTY_IDX(pfn);
     i3 = L3_LOGDIRTY_IDX(pfn);
     i4 = L4_LOGDIRTY_IDX(pfn);
 
+    /* We can't call paging.alloc_page() with the log-dirty lock held
+     * and we almost never need to call it anyway, so assume that we
+     * won't.  If we do hit a missing page, we'll unlock, allocate one
+     * and start again. */
+    new_mfn = _mfn(INVALID_MFN);
+
+again:
+    log_dirty_lock(d);
+
     l4 = paging_map_log_dirty_bitmap(d);
     if ( unlikely(!l4) )
     {
-        d->arch.paging.log_dirty.top = paging_new_log_dirty_node(d, &l4);
-        if ( !l4 )
-            goto out;
+        l4 = paging_new_log_dirty_node(new_mfn);
+        d->arch.paging.log_dirty.top = new_mfn;
+        new_mfn = _mfn(INVALID_MFN);
     }
+    if ( unlikely(!l4) )
+        goto oom;
+
     mfn = l4[i4];
     if ( !mfn_valid(mfn) )
-        mfn = l4[i4] = paging_new_log_dirty_node(d, &l3);
+    {
+        l3 = paging_new_log_dirty_node(new_mfn);
+        mfn = l4[i4] = new_mfn;
+        new_mfn = _mfn(INVALID_MFN);
+    }
     else
         l3 = map_domain_page(mfn_x(mfn));
     unmap_domain_page(l4);
-    if ( unlikely(!mfn_valid(mfn)) )
-        goto out;
+    if ( unlikely(!l3) )
+        goto oom;
 
     mfn = l3[i3];
     if ( !mfn_valid(mfn) )
-        mfn = l3[i3] = paging_new_log_dirty_node(d, &l2);
+    {
+        l2 = paging_new_log_dirty_node(new_mfn);
+        mfn = l3[i3] = new_mfn;
+        new_mfn = _mfn(INVALID_MFN);
+    }
     else
         l2 = map_domain_page(mfn_x(mfn));
     unmap_domain_page(l3);
-    if ( unlikely(!mfn_valid(mfn)) )
-        goto out;
+    if ( unlikely(!l2) )
+        goto oom;
 
     mfn = l2[i2];
     if ( !mfn_valid(mfn) )
-        mfn = l2[i2] = paging_new_log_dirty_leaf(d, &l1);
+    {
+        l1 = paging_new_log_dirty_leaf(new_mfn);
+        mfn = l2[i2] = new_mfn;
+        new_mfn = _mfn(INVALID_MFN);
+    }
     else
         l1 = map_domain_page(mfn_x(mfn));
     unmap_domain_page(l2);
-    if ( unlikely(!mfn_valid(mfn)) )
-        goto out;
+    if ( unlikely(!l1) )
+        goto oom;
 
     changed = !__test_and_set_bit(i1, l1);
     unmap_domain_page(l1);
@@ -300,8 +327,18 @@ void paging_mark_dirty(struct domain *d, unsigned long guest_mfn)
         d->arch.paging.log_dirty.dirty_count++;
     }
 
- out:
     log_dirty_unlock(d);
+    if ( mfn_valid(new_mfn) )
+        paging_free_log_dirty_page(d, mfn);
+    return;
+
+oom:
+    log_dirty_unlock(d);
+    new_mfn = paging_new_log_dirty_page(d);
+    if ( !mfn_valid(new_mfn) )
+        /* we've already recorded the failed allocation */
+        return;
+    goto again;
 }
 
 
