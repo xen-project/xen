@@ -557,6 +557,9 @@ void hpet_broadcast_init(void)
     u32 hpet_id, cfg;
     int i;
 
+    if ( boot_cpu_has(X86_FEATURE_ARAT) )
+        return;
+
     if ( irq_channel == NULL )
     {
         irq_channel = xmalloc_array(int, nr_irqs);
