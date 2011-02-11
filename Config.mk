@@ -185,10 +185,9 @@ endif
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG := xen-4.1.0-rc4
-#QEMU_TAG ?= ad7d28519de7cdc604efefac5c22fe9f88040586
-# Tue Feb 1 17:32:38 2011 +0000
-# vnc, xen: write vnc address and password to xenstore
+QEMU_TAG ?= e073e69457b4d99b6da0b6536296e3498f7f6599
+# Fri Feb 11 17:54:51 2011 +0000
+# qemu-xen: fix segfault with empty cdroms
 
 # Optional components
 XENSTAT_XENTOP     ?= y
