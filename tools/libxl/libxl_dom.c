@@ -320,6 +320,7 @@ struct suspendinfo {
     int domid;
     int hvm;
     unsigned int flags;
+    int guest_responded;
 };
 
 static int libxl__domain_suspend_common_switch_qemu_logdirty(int domid, unsigned int enable, void *data)
@@ -347,8 +348,9 @@ static int libxl__domain_suspend_common_callback(void *data)
     unsigned long s_state = 0;
     int ret;
     char *path, *state = "suspend";
-    int watchdog = 60;
+    int watchdog;
     libxl_ctx *ctx = libxl__gc_owner(si->gc);
+    xs_transaction_t t;
 
     if (si->hvm)
         xc_get_hvm_param(ctx->xch, si->domid, HVM_PARAM_ACPI_S_STATE, &s_state);
@@ -363,6 +365,7 @@ static int libxl__domain_suspend_common_callback(void *data)
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "xc_await_suspend failed ret=%d", ret);
             return 0;
         }
+        si->guest_responded = 1;
         return 1;
     }
     path = libxl__sprintf(si->gc, "%s/control/shutdown", libxl__xs_get_dompath(si->gc, si->domid));
@@ -376,8 +379,56 @@ static int libxl__domain_suspend_common_callback(void *data)
             xc_domain_shutdown(ctx->xch, si->domid, SHUTDOWN_suspend);
         }
     }
-    LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "wait for the guest to suspend");
+
+    LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "wait for the guest to acknowledge suspend request");
+    watchdog = 60;
     while (!strcmp(state, "suspend") && watchdog > 0) {
+        usleep(100000);
+
+        state = libxl__xs_read(si->gc, XBT_NULL, path);
+
+        watchdog--;
+    }
+
+    /*
+     * Guest appears to not be responding. Cancel the suspend request.
+     *
+     * We re-read the suspend node and clear it within a transaction
+     * in order to handle the case where we race against the guest
+     * catching up and acknowledging the request at the last minute.
+     */
+    if (!strcmp(state, "suspend")) {
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "guest didn't acknowledge suspend, cancelling request");
+    retry_transaction:
+        t = xs_transaction_start(ctx->xsh);
+
+        state = libxl__xs_read(si->gc, t, path);
+
+        if (!strcmp(state, "suspend"))
+            libxl__xs_write(si->gc, t, path, "");
+
+        if (!xs_transaction_end(ctx->xsh, t, 0))
+            if (errno == EAGAIN)
+                goto retry_transaction;
+
+    }
+
+    /*
+     * Final check for guest acknowledgement. The guest may have
+     * acknowledged while we were cancelling the request in which case
+     * we lost the race while cancelling and should continue.
+     */
+    if (!strcmp(state, "suspend")) {
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "guest didn't acknowledge suspend, request cancelled");
+        return 0;
+    }
+
+    LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "guest acknowledged suspend request");
+    si->guest_responded = 1;
+
+    LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "wait for the guest to suspend");
+    watchdog = 60;
+    while (watchdog > 0) {
         xc_domaininfo_t info;
 
         usleep(100000);
@@ -386,17 +437,17 @@ static int libxl__domain_suspend_common_callback(void *data)
             int shutdown_reason;
 
             shutdown_reason = (info.flags >> XEN_DOMINF_shutdownshift) & XEN_DOMINF_shutdownmask;
-            if (shutdown_reason == SHUTDOWN_suspend)
+            if (shutdown_reason == SHUTDOWN_suspend) {
+                LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "guest has suspended");
                 return 1;
+            }
         }
-        state = libxl__xs_read(si->gc, XBT_NULL, path);
+
         watchdog--;
     }
-    if (!strcmp(state, "suspend")) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "guest didn't suspend in time");
-        libxl__xs_write(si->gc, XBT_NULL, path, "");
-    }
-    return 1;
+
+    LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "guest did not suspend");
+    return 0;
 }
 
 int libxl__domain_suspend_common(libxl_ctx *ctx, uint32_t domid, int fd,
@@ -418,6 +469,7 @@ int libxl__domain_suspend_common(libxl_ctx *ctx, uint32_t domid, int fd,
     si.hvm = hvm;
     si.gc = &gc;
     si.suspend_eventchn = -1;
+    si.guest_responded = 0;
 
     si.xce = xc_evtchn_open(NULL, 0);
     if (si.xce == NULL)
@@ -441,8 +493,14 @@ int libxl__domain_suspend_common(libxl_ctx *ctx, uint32_t domid, int fd,
 
     rc = xc_domain_save(ctx->xch, fd, domid, 0, 0, flags, &callbacks, hvm);
     if ( rc ) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "saving domain");
-        rc = ERROR_FAIL;
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "saving domain: %s",
+                         si.guest_responded ?
+                         "domain responded to suspend request" :
+                         "domain did not respond to suspend request");
+        if ( !si.guest_responded )
+            rc = ERROR_GUEST_TIMEDOUT;
+        else
+            rc = ERROR_FAIL;
     }
 
     if (si.suspend_eventchn > 0)

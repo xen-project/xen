@@ -2583,7 +2583,10 @@ static void migrate_domain(const char *domain_spec, const char *rune,
     if (rc) {
         fprintf(stderr, "migration sender: libxl_domain_suspend failed"
                 " (rc=%d)\n", rc);
-        goto failed_resume;
+        if (rc == ERROR_GUEST_TIMEDOUT)
+            goto failed_suspend;
+        else
+            goto failed_resume;
     }
 
     //fprintf(stderr, "migration sender: Transfer complete.\n");
@@ -2661,6 +2664,12 @@ static void migrate_domain(const char *domain_spec, const char *rune,
     libxl_domain_destroy(&ctx, domid, 1); /* bang! */
     fprintf(stderr, "Migration successful.\n");
     exit(0);
+
+ failed_suspend:
+    close(send_fd);
+    migration_child_report(child, recv_fd);
+    fprintf(stderr, "Migration failed, failed to suspend at sender.\n");
+    exit(-ERROR_FAIL);
 
  failed_resume:
     close(send_fd);
