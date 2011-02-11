@@ -196,9 +196,6 @@ int libxl__domain_build(libxl_ctx *ctx, libxl_domain_build_info *info, uint32_t 
     }
     ret = libxl__build_post(ctx, domid, info, state, vments, localents);
 out:
-    libxl__file_reference_unmap(&info->kernel);
-    if (!info->hvm)
-	    libxl__file_reference_unmap(&info->u.pv.ramdisk);
 
     libxl__free_all(&gc);
     return ret;
