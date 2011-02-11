@@ -12,7 +12,7 @@
 # vif-nat (add|remove|online|offline)
 #
 # Environment vars:
-# vif         vif interface name (required).
+# dev         vif interface name (required).
 # XENBUS_PATH path to this device's details in the XenStore (required).
 #
 # Parameters:
@@ -98,7 +98,7 @@ fi
 dhcparg_remove_entry()
 {
   local tmpfile=$(mktemp)
-  sed -e "s/$vif //" "$dhcpd_arg_file" >"$tmpfile"
+  sed -e "s/${dev} //" "$dhcpd_arg_file" >"$tmpfile"
   if diff "$tmpfile" "$dhcpd_arg_file" >/dev/null
   then
     rm "$tmpfile"
@@ -112,11 +112,11 @@ dhcparg_add_entry()
   dhcparg_remove_entry
   local tmpfile=$(mktemp)
   # handle Red Hat, SUSE, and Debian styles, with or without quotes
-  sed -e 's/^DHCPDARGS="*\([^"]*\)"*/DHCPDARGS="\1'"$vif "'"/' \
+  sed -e 's/^DHCPDARGS="*\([^"]*\)"*/DHCPDARGS="\1'"${dev} "'"/' \
      "$dhcpd_arg_file" >"$tmpfile" && mv "$tmpfile" "$dhcpd_arg_file"
-  sed -e 's/^DHCPD_INTERFACE="*\([^"]*\)"*/DHCPD_INTERFACE="\1'"$vif "'"/' \
+  sed -e 's/^DHCPD_INTERFACE="*\([^"]*\)"*/DHCPD_INTERFACE="\1'"${dev} "'"/' \
      "$dhcpd_arg_file" >"$tmpfile" && mv "$tmpfile" "$dhcpd_arg_file"
-  sed -e 's/^INTERFACES="*\([^"]*\)"*/INTERFACES="\1'"$vif "'"/' \
+  sed -e 's/^INTERFACES="*\([^"]*\)"*/INTERFACES="\1'"${dev} "'"/' \
      "$dhcpd_arg_file" >"$tmpfile" && mv "$tmpfile" "$dhcpd_arg_file"
   rm -f "$tmpfile"
 }
@@ -164,28 +164,28 @@ dhcp_down()
 
 case "$command" in
     online)
-        if ip route | grep -q "dev $vif"
+        if ip route | grep -q "dev ${dev}"
         then
-          log debug "$vif already up"
+          log debug "${dev} already up"
           exit 0
         fi
 
-        do_or_die ip link set "$vif" up arp on
-        do_or_die ip addr add "$router_ip" dev "$vif"
-        do_or_die ip route add "$vif_ip" dev "$vif" src "$router_ip"
-        echo 1 >/proc/sys/net/ipv4/conf/${vif}/proxy_arp
+        do_or_die ip link set "${dev}" up arp on
+        do_or_die ip addr add "$router_ip" dev "${dev}"
+        do_or_die ip route add "$vif_ip" dev "${dev}" src "$router_ip"
+        echo 1 >/proc/sys/net/ipv4/conf/${dev}/proxy_arp
         [ "$dhcp" != 'no' ] && dhcp_up
         ;;
     offline)
         [ "$dhcp" != 'no' ] && dhcp_down
-        do_without_error ifconfig "$vif" down
+        do_without_error ifconfig "${dev}" down
         ;;
 esac
 
 
 handle_iptable
 
-log debug "Successful vif-nat $command for $vif."
+log debug "Successful vif-nat $command for ${dev}."
 if [ "$command" = "online" ]
 then
   success

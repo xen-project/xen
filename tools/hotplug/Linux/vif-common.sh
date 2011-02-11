@@ -69,16 +69,16 @@ esac
 if [ "$type_if" = vif ]; then
     # Check presence of compulsory args.
     XENBUS_PATH="${XENBUS_PATH:?}"
-    vif="${vif:?}"
+    dev="${dev:?}"
 
     vifname=$(xenstore_read_default "$XENBUS_PATH/vifname" "")
     if [ "$vifname" ]
     then
         if [ "$command" == "online" ] && ! ip link show "$vifname" >&/dev/null
         then
-            do_or_die ip link set "$vif" name "$vifname"
+            do_or_die ip link set "$dev" name "$vifname"
         fi
-        vif="$vifname"
+        dev="$vifname"
     fi
 elif [ "$type_if" = tap ]; then
     # Check presence of compulsory args.
@@ -105,9 +105,9 @@ frob_iptable()
     local c="-D"
   fi
 
-  iptables "$c" FORWARD -m physdev --physdev-is-bridged --physdev-in "$vif" \
+  iptables "$c" FORWARD -m physdev --physdev-is-bridged --physdev-in "$dev" \
     "$@" -j ACCEPT 2>/dev/null &&
-  iptables "$c" FORWARD -m physdev --physdev-is-bridged --physdev-out "$vif" \
+  iptables "$c" FORWARD -m physdev --physdev-is-bridged --physdev-out "$dev" \
     -j ACCEPT 2>/dev/null
 
   if [ "$command" == "online" -a $? -ne 0 ]

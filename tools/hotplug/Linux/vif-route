@@ -12,7 +12,7 @@
 # vif-route (add|remove|online|offline)
 #
 # Environment vars:
-# vif         vif interface name (required).
+# dev         vif interface name (required).
 # XENBUS_PATH path to this device's details in the XenStore (required).
 #
 # Read from the store:
@@ -21,19 +21,19 @@
 #============================================================================
 
 dir=$(dirname "$0")
-. "$dir/vif-common.sh"
+. "${dir}/vif-common.sh"
 
 main_ip=$(dom0_ip)
 
-case "$command" in
+case "${command}" in
     online)
-        ifconfig ${vif} ${main_ip} netmask 255.255.255.255 up
-        echo 1 >/proc/sys/net/ipv4/conf/${vif}/proxy_arp
+        ifconfig ${dev} ${main_ip} netmask 255.255.255.255 up
+        echo 1 >/proc/sys/net/ipv4/conf/${dev}/proxy_arp
         ipcmd='add'
         cmdprefix=''
         ;;
     offline)
-        do_without_error ifdown ${vif}
+        do_without_error ifdown ${dev}
         ipcmd='del'
         cmdprefix='do_without_error'
         ;;
@@ -43,14 +43,14 @@ if [ "${ip}" ] ; then
     # If we've been given a list of IP addresses, then add routes from dom0 to
     # the guest using those addresses.
     for addr in ${ip} ; do
-      ${cmdprefix} ip route ${ipcmd} ${addr} dev ${vif} src ${main_ip}
-    done 
+      ${cmdprefix} ip route ${ipcmd} ${addr} dev ${dev} src ${main_ip}
+    done
 fi
 
 handle_iptable
 
-log debug "Successful vif-route $command for $vif."
-if [ "$command" = "online" ]
+log debug "Successful vif-route ${command} for ${dev}."
+if [ "${command}" = "online" ]
 then
   success
 fi
