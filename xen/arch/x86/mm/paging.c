@@ -329,7 +329,7 @@ again:
 
     log_dirty_unlock(d);
     if ( mfn_valid(new_mfn) )
-        paging_free_log_dirty_page(d, mfn);
+        paging_free_log_dirty_page(d, new_mfn);
     return;
 
 oom:
