@@ -287,7 +287,7 @@ int libxl__domain_make(libxl_ctx *ctx, libxl_domain_create_info *info,
     libxl__gc gc = LIBXL_INIT_GC(ctx); /* fixme: should be done by caller */
     int flags, ret, i, rc;
     char *uuid_string;
-    char *rw_paths[] = { "device", "device/suspend/event-channel" , "data"};
+    char *rw_paths[] = { "control/shutdown", "device", "device/suspend/event-channel" , "data"};
     char *ro_paths[] = { "cpu", "memory", "device", "error", "drivers",
                          "control", "attr", "messages" };
     char *dom_path, *vm_path;
