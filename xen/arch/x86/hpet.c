@@ -367,12 +367,20 @@ static int hpet_setup_msi_irq(unsigned int irq)
     int ret;
     struct msi_msg msg;
     struct hpet_event_channel *ch = &hpet_events[irq_to_channel(irq)];
+    irq_desc_t *desc = irq_to_desc(irq);
 
-    irq_desc[irq].handler = &hpet_msi_type;
-    ret = request_irq(irq, hpet_interrupt_handler,
-                      0, "HPET", ch);
-    if ( ret < 0 )
-        return ret;
+    if ( desc->handler == &no_irq_type )
+    {
+        desc->handler = &hpet_msi_type;
+        ret = request_irq(irq, hpet_interrupt_handler,
+                          0, "HPET", ch);
+        if ( ret < 0 )
+            return ret;
+    }
+    else if ( desc->handler != &hpet_msi_type )
+    {
+        return -EINVAL;
+    }
 
     msi_compose_msg(NULL, irq, &msg);
     hpet_msi_write(irq, &msg);
