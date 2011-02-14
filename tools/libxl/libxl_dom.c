@@ -345,16 +345,21 @@ static int libxl__domain_suspend_common_switch_qemu_logdirty(int domid, unsigned
 static int libxl__domain_suspend_common_callback(void *data)
 {
     struct suspendinfo *si = data;
-    unsigned long s_state = 0;
+    unsigned long hvm_s_state = 0, hvm_pvdrv = 0;
     int ret;
     char *path, *state = "suspend";
     int watchdog;
     libxl_ctx *ctx = libxl__gc_owner(si->gc);
     xs_transaction_t t;
 
-    if (si->hvm)
-        xc_get_hvm_param(ctx->xch, si->domid, HVM_PARAM_ACPI_S_STATE, &s_state);
-    if ((s_state == 0) && (si->suspend_eventchn >= 0)) {
+    if (si->hvm) {
+        xc_get_hvm_param(ctx->xch, si->domid, HVM_PARAM_CALLBACK_IRQ, &hvm_pvdrv);
+        xc_get_hvm_param(ctx->xch, si->domid, HVM_PARAM_ACPI_S_STATE, &hvm_s_state);
+    }
+
+    if ((hvm_s_state == 0) && (si->suspend_eventchn >= 0)) {
+        LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "issuing %s suspend request via event channel",
+                   si->hvm ? "PVHVM" : "PV");
         ret = xc_evtchn_notify(si->xce, si->suspend_eventchn);
         if (ret < 0) {
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "xc_evtchn_notify failed ret=%d", ret);
@@ -368,63 +373,67 @@ static int libxl__domain_suspend_common_callback(void *data)
         si->guest_responded = 1;
         return 1;
     }
-    path = libxl__sprintf(si->gc, "%s/control/shutdown", libxl__xs_get_dompath(si->gc, si->domid));
-    libxl__xs_write(si->gc, XBT_NULL, path, "suspend");
-    if (si->hvm) {
-        unsigned long hvm_pvdrv, hvm_s_state;
-        xc_get_hvm_param(ctx->xch, si->domid, HVM_PARAM_CALLBACK_IRQ, &hvm_pvdrv);
-        xc_get_hvm_param(ctx->xch, si->domid, HVM_PARAM_ACPI_S_STATE, &hvm_s_state);
-        if (!hvm_pvdrv || hvm_s_state) {
-            LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Calling xc_domain_shutdown on the domain");
-            xc_domain_shutdown(ctx->xch, si->domid, SHUTDOWN_suspend);
+
+    if (si->hvm && (!hvm_pvdrv || hvm_s_state)) {
+        LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Calling xc_domain_shutdown on HVM domain");
+        xc_domain_shutdown(ctx->xch, si->domid, SHUTDOWN_suspend);
+        /* The guest does not (need to) respond to this sort of request. */
+        si->guest_responded = 1;
+    } else {
+        LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "issuing %s suspend request via XenBus control node",
+                   si->hvm ? "PVHVM" : "PV");
+
+        path = libxl__sprintf(si->gc, "%s/control/shutdown", libxl__xs_get_dompath(si->gc, si->domid));
+        libxl__xs_write(si->gc, XBT_NULL, path, "suspend");
+
+        LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "wait for the guest to acknowledge suspend request");
+        watchdog = 60;
+        while (!strcmp(state, "suspend") && watchdog > 0) {
+            usleep(100000);
+
+            state = libxl__xs_read(si->gc, XBT_NULL, path);
+
+            watchdog--;
         }
+
+        /*
+         * Guest appears to not be responding. Cancel the suspend
+         * request.
+         *
+         * We re-read the suspend node and clear it within a
+         * transaction in order to handle the case where we race
+         * against the guest catching up and acknowledging the request
+         * at the last minute.
+         */
+        if (!strcmp(state, "suspend")) {
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "guest didn't acknowledge suspend, cancelling request");
+        retry_transaction:
+            t = xs_transaction_start(ctx->xsh);
+
+            state = libxl__xs_read(si->gc, t, path);
+
+            if (!strcmp(state, "suspend"))
+                libxl__xs_write(si->gc, t, path, "");
+
+            if (!xs_transaction_end(ctx->xsh, t, 0))
+                if (errno == EAGAIN)
+                    goto retry_transaction;
+
+        }
+
+        /*
+         * Final check for guest acknowledgement. The guest may have
+         * acknowledged while we were cancelling the request in which
+         * case we lost the race while cancelling and should continue.
+         */
+        if (!strcmp(state, "suspend")) {
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "guest didn't acknowledge suspend, request cancelled");
+            return 0;
+        }
+
+        LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "guest acknowledged suspend request");
+        si->guest_responded = 1;
     }
-
-    LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "wait for the guest to acknowledge suspend request");
-    watchdog = 60;
-    while (!strcmp(state, "suspend") && watchdog > 0) {
-        usleep(100000);
-
-        state = libxl__xs_read(si->gc, XBT_NULL, path);
-
-        watchdog--;
-    }
-
-    /*
-     * Guest appears to not be responding. Cancel the suspend request.
-     *
-     * We re-read the suspend node and clear it within a transaction
-     * in order to handle the case where we race against the guest
-     * catching up and acknowledging the request at the last minute.
-     */
-    if (!strcmp(state, "suspend")) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "guest didn't acknowledge suspend, cancelling request");
-    retry_transaction:
-        t = xs_transaction_start(ctx->xsh);
-
-        state = libxl__xs_read(si->gc, t, path);
-
-        if (!strcmp(state, "suspend"))
-            libxl__xs_write(si->gc, t, path, "");
-
-        if (!xs_transaction_end(ctx->xsh, t, 0))
-            if (errno == EAGAIN)
-                goto retry_transaction;
-
-    }
-
-    /*
-     * Final check for guest acknowledgement. The guest may have
-     * acknowledged while we were cancelling the request in which case
-     * we lost the race while cancelling and should continue.
-     */
-    if (!strcmp(state, "suspend")) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "guest didn't acknowledge suspend, request cancelled");
-        return 0;
-    }
-
-    LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "guest acknowledged suspend request");
-    si->guest_responded = 1;
 
     LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "wait for the guest to suspend");
     watchdog = 60;
