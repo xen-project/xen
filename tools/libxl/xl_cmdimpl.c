@@ -3607,7 +3607,7 @@ static void vcpuset(const char *d, const char* nr_vcpus)
 {
     char *endptr;
     unsigned int max_vcpus, i;
-    uint32_t bitmask = 0;
+    libxl_cpumap cpumap;
 
     max_vcpus = strtoul(nr_vcpus, &endptr, 10);
     if (nr_vcpus == endptr) {
@@ -3617,11 +3617,17 @@ static void vcpuset(const char *d, const char* nr_vcpus)
 
     find_domain(d);
 
+    if (libxl_cpumap_alloc(&ctx, &cpumap)) {
+        fprintf(stderr, "libxl_cpumap_alloc failed\n");
+        return;
+    }
     for (i = 0; i < max_vcpus; i++)
-        bitmask |= 1 << i;
+        libxl_cpumap_set(&cpumap, i);
 
-    if (libxl_set_vcpuonline(&ctx, domid, bitmask) < 0)
-        fprintf(stderr, "libxl_set_vcpuonline failed domid=%d bitmask=%x\n", domid, bitmask);
+    if (libxl_set_vcpuonline(&ctx, domid, &cpumap) < 0)
+        fprintf(stderr, "libxl_set_vcpuonline failed domid=%d max_vcpus=%d\n", domid, max_vcpus);
+
+    libxl_cpumap_destroy(&cpumap);
 }
 
 int main_vcpuset(int argc, char **argv)

@@ -2463,7 +2463,7 @@ int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
     return 0;
 }
 
-int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid, uint32_t bitmask)
+int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid, libxl_cpumap *cpumap)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
     libxl_dominfo info;
@@ -2483,7 +2483,7 @@ retry_transaction:
     for (i = 0; i <= info.vcpu_max_id; i++)
         libxl__xs_write(&gc, t,
                        libxl__sprintf(&gc, "%s/cpu/%u/availability", dompath, i),
-                       "%s", ((1 << i) & bitmask) ? "online" : "offline");
+                       "%s", libxl_cpumap_test(cpumap, i) ? "online" : "offline");
     if (!xs_transaction_end(ctx->xsh, t, 0)) {
         if (errno == EAGAIN)
             goto retry_transaction;
