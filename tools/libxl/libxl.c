@@ -2584,8 +2584,14 @@ static int trigger_type_from_string(char *trigger_name)
 int libxl_send_trigger(libxl_ctx *ctx, uint32_t domid, char *trigger_name, uint32_t vcpuid)
 {
     int rc = -1;
-    int trigger_type = trigger_type_from_string(trigger_name);
+    int trigger_type = -1;
 
+    if (!strcmp(trigger_name, "s3resume")) {
+        xc_set_hvm_param(ctx->xch, domid, HVM_PARAM_ACPI_S_STATE, 0);
+        return 0;
+    }
+
+    trigger_type = trigger_type_from_string(trigger_name);
     if (trigger_type == -1) {
         LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, -1,
             "Invalid trigger, valid triggers are <nmi|reset|init|power|sleep>");
