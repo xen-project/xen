@@ -5204,7 +5204,7 @@ int main_cpupoolcreate(int argc, char **argv)
         {0, 0, 0, 0}
     };
     int ret;
-    void *config_data = 0;
+    char *config_data = 0;
     int config_len = 0;
     XLU_Config *config;
     const char *buf;
@@ -5244,9 +5244,8 @@ int main_cpupoolcreate(int argc, char **argv)
     memset(extra_config, 0, sizeof(extra_config));
     while (optind < argc) {
         if ((p = strchr(argv[optind], '='))) {
-            if (strlen(extra_config) + 1 < sizeof(extra_config)) {
-                if (strlen(extra_config))
-                    strcat(extra_config, "\n");
+            if (strlen(extra_config) + 1 + strlen(argv[optind]) < sizeof(extra_config)) {
+                strcat(extra_config, "\n");
                 strcat(extra_config, argv[optind]);
             }
         } else if (!filename) {
@@ -5263,7 +5262,7 @@ int main_cpupoolcreate(int argc, char **argv)
         return -ERROR_FAIL;
     }
 
-    if (libxl_read_file_contents(&ctx, filename, &config_data, &config_len)) {
+    if (libxl_read_file_contents(&ctx, filename, (void **)&config_data, &config_len)) {
         fprintf(stderr, "Failed to read config file: %s: %s\n",
                 filename, strerror(errno));
         return -ERROR_FAIL;
@@ -5279,10 +5278,10 @@ int main_cpupoolcreate(int argc, char **argv)
             fprintf(stderr, "Failed to realloc config_data\n");
             return -ERROR_FAIL;
         }
-        strcat(config_data, "\n");
+        config_data[config_len] = 0;
         strcat(config_data, extra_config);
         strcat(config_data, "\n");
-        config_len += (strlen(extra_config) + 2);
+        config_len += strlen(extra_config) + 1;
     }
 
     config = xlu_cfg_init(stderr, filename);
