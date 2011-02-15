@@ -22,6 +22,7 @@ XEN_CONFIGS += xmexample.vti
 XEN_CONFIGS += xend-pci-quirks.sxp
 XEN_CONFIGS += xend-pci-permissive.sxp
 XEN_CONFIGS += xl.conf
+XEN_CONFIGS += cpupool
 
 .PHONY: all
 all:
