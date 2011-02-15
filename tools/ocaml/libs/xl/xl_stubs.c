@@ -192,12 +192,13 @@ static int device_disk_val(caml_gc *gc, libxl_device_disk *c_val, value v)
 	CAMLparam1(v);
 
 	c_val->backend_domid = Int_val(Field(v, 0));
-	c_val->physpath = dup_String_val(gc, Field(v, 1));
-	c_val->phystype = (Int_val(Field(v, 2))) + PHYSTYPE_QCOW;
-	c_val->virtpath = dup_String_val(gc, Field(v, 3));
-	c_val->unpluggable = Bool_val(Field(v, 4));
-	c_val->readwrite = Bool_val(Field(v, 5));
-	c_val->is_cdrom = Bool_val(Field(v, 6));
+	c_val->pdev_path = dup_String_val(gc, Field(v, 1));
+	c_val->vdev = dup_String_val(gc, Field(v, 2));
+        c_val->backend = (Int_val(Field(v, 3)));
+        c_val->format = (Int_val(Field(v, 4)));
+	c_val->unpluggable = Bool_val(Field(v, 5));
+	c_val->readwrite = Bool_val(Field(v, 6));
+	c_val->is_cdrom = Bool_val(Field(v, 7));
 
 	CAMLreturn(0);
 }

@@ -316,10 +316,10 @@ static char ** libxl_build_device_model_args_new(libxl__gc *gc,
         for (i; i < nb; i++) {
             if (disks[i].is_cdrom) {
                 flexarray_append(dm_args, "-cdrom");
-                flexarray_append(dm_args, libxl__strdup(gc, disks[i].physpath));
+                flexarray_append(dm_args, libxl__strdup(gc, disks[i].pdev_path));
             } else {
-                flexarray_append(dm_args, libxl__sprintf(gc, "-%s", disks[i].virtpath));
-                flexarray_append(dm_args, libxl__strdup(gc, disks[i].physpath));
+                flexarray_append(dm_args, libxl__sprintf(gc, "-%s", disks[i].vdev));
+                flexarray_append(dm_args, libxl__strdup(gc, disks[i].pdev_path));
             }
             libxl_device_disk_destroy(&disks[i]);
         }

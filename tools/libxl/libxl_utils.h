@@ -29,7 +29,7 @@ char *libxl_schedid_to_name(libxl_ctx *ctx, int schedid);
 int libxl_get_stubdom_id(libxl_ctx *ctx, int guest_domid);
 int libxl_is_stubdom(libxl_ctx *ctx, uint32_t domid, uint32_t *target_domid);
 int libxl_create_logfile(libxl_ctx *ctx, char *name, char **full_name);
-int libxl_string_to_phystype(libxl_ctx *ctx, char *s, libxl_disk_phystype *phystype);
+int libxl_string_to_backend(libxl_ctx *ctx, char *s, libxl_disk_backend *backend);
 
 int libxl_read_file_contents(libxl_ctx *ctx, const char *filename,
                              void **data_r, int *datalen_r);

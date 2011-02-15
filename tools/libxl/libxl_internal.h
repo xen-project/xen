@@ -178,8 +178,8 @@ _hidden int libxl__domain_save_device_model(libxl_ctx *ctx, uint32_t domid, int 
 _hidden void libxl__userdata_destroyall(libxl_ctx *ctx, uint32_t domid);
 
 /* from xl_device */
-_hidden char *libxl__device_disk_backend_type_of_phystype(libxl_disk_phystype phystype);
-_hidden char *libxl__device_disk_string_of_phystype(libxl_disk_phystype phystype);
+_hidden char *libxl__device_disk_string_of_backend(libxl_disk_backend backend);
+_hidden char *libxl__device_disk_string_of_format(libxl_disk_format format);
 
 _hidden int libxl__device_physdisk_major_minor(const char *physpath, int *major, int *minor);
 _hidden int libxl__device_disk_dev_number(char *virtpath);
@@ -306,7 +306,7 @@ _hidden int libxl__blktap_enabled(libxl__gc *gc);
  */
 _hidden const char *libxl__blktap_devpath(libxl__gc *gc,
                                  const char *disk,
-                                 libxl_disk_phystype phystype);
+                                 libxl_disk_format format);
 
 _hidden char *libxl__uuid2string(libxl__gc *gc, const libxl_uuid uuid);
 

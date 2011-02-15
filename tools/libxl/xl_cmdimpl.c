@@ -361,9 +361,9 @@ static void printf_info(int domid,
         printf("\t\t(tap\n");
         printf("\t\t\t(backend_domid %d)\n", d_config->disks[i].backend_domid);
         printf("\t\t\t(domid %d)\n", d_config->disks[i].domid);
-        printf("\t\t\t(physpath %s)\n", d_config->disks[i].physpath);
-        printf("\t\t\t(phystype %d)\n", d_config->disks[i].phystype);
-        printf("\t\t\t(virtpath %s)\n", d_config->disks[i].virtpath);
+        printf("\t\t\t(physpath %s)\n", d_config->disks[i].pdev_path);
+        printf("\t\t\t(phystype %d)\n", d_config->disks[i].backend);
+        printf("\t\t\t(virtpath %s)\n", d_config->disks[i].vdev);
         printf("\t\t\t(unpluggable %d)\n", d_config->disks[i].unpluggable);
         printf("\t\t\t(readwrite %d)\n", d_config->disks[i].readwrite);
         printf("\t\t\t(is_cdrom %d)\n", d_config->disks[i].is_cdrom);
@@ -452,6 +452,8 @@ static int parse_disk_config(libxl_device_disk *disk, char *buf2)
     char *p, *end, *tok;
 
     memset(disk, 0, sizeof(*disk));
+    disk->format = DISK_FORMAT_RAW;
+    disk->backend = DISK_BACKEND_TAP;
 
     for(tok = p = buf2, end = buf2 + strlen(buf2) + 1; p < end; p++) {
         switch(state){
@@ -460,11 +462,14 @@ static int parse_disk_config(libxl_device_disk *disk, char *buf2)
                 *p = '\0';
                 if ( !strcmp(tok, "phy") ) {
                     state = DSTATE_PHYSPATH;
-                    disk->phystype = PHYSTYPE_PHY;
+                    disk->format = DISK_FORMAT_RAW;
+                    disk->backend = DISK_BACKEND_PHY;
                 }else if ( !strcmp(tok, "file") ) {
                     state = DSTATE_PHYSPATH;
-                    disk->phystype = PHYSTYPE_FILE;
-                }else if ( !strcmp(tok, "tap") ) {
+                    disk->format = DISK_FORMAT_RAW;
+                    disk->backend = DISK_BACKEND_TAP;
+                }else if ((!strcmp(tok, "tap")) ||
+                          (!strcmp(tok, "tap2"))) {
                     state = DSTATE_TAP;
                 }else{
                     fprintf(stderr, "Unknown disk type: %s\n", tok);
@@ -473,23 +478,33 @@ static int parse_disk_config(libxl_device_disk *disk, char *buf2)
                 tok = p + 1;
             } else if (*p == ',') {
                 state = DSTATE_VIRTPATH;
-                disk->phystype = PHYSTYPE_EMPTY;
-                disk->physpath = strdup("");
+                disk->format = DISK_FORMAT_EMPTY;
+                disk->backend = DISK_BACKEND_TAP;
+                disk->pdev_path = strdup("");
                 tok = p + 1;
             }
             break;
         case DSTATE_TAP:
             if ( *p == ':' ) {
                 *p = '\0';
-                if ( !strcmp(tok, "aio") ) {
-                    disk->phystype = PHYSTYPE_AIO;
-                }else if ( !strcmp(tok, "vhd") ) {
-                    disk->phystype = PHYSTYPE_VHD;
+                if (!strcmp(tok, "aio")) {
+                    tok = p + 1;
+                    break;
+                }
+                if (!strcmp(tok, "vhd")) {
+                    disk->format = DISK_FORMAT_VHD;
+                    disk->backend = DISK_BACKEND_TAP;
                 }else if ( !strcmp(tok, "qcow") ) {
-                    disk->phystype = PHYSTYPE_QCOW;
+                    disk->format = DISK_FORMAT_QCOW;
+                    disk->backend = DISK_BACKEND_QDISK;
                 }else if ( !strcmp(tok, "qcow2") ) {
-                    disk->phystype = PHYSTYPE_QCOW2;
-                }else {
+                    disk->format = DISK_FORMAT_QCOW2;
+                    disk->backend = DISK_BACKEND_QDISK;
+                }else if (!strcmp(tok, "raw")) {
+                    disk->format = DISK_FORMAT_RAW;
+                    disk->backend = DISK_BACKEND_TAP;
+                }
+                else {
                     fprintf(stderr, "Unknown tapdisk type: %s\n", tok);
                     return 0;
                 }
@@ -503,7 +518,7 @@ static int parse_disk_config(libxl_device_disk *disk, char *buf2)
                 int ioemu_len;
 
                 *p = '\0';
-                disk->physpath = (*tok) ? strdup(tok) : NULL;
+                disk->pdev_path = (*tok) ? strdup(tok) : NULL;
                 tok = p + 1;
 
                 /* hack for ioemu disk spec */
@@ -532,7 +547,7 @@ static int parse_disk_config(libxl_device_disk *disk, char *buf2)
                 if ( tok == p )
                     goto out;
                 *p = '\0';
-                disk->virtpath = (*tok) ? strdup(tok) : NULL;
+                disk->vdev = (*tok) ? strdup(tok) : NULL;
                 tok = p + 1;
             }
             break;
@@ -1838,25 +1853,25 @@ static void cd_insert(const char *dom, const char *virtdev, char *phys)
         p = strchr(phys, ':');
         if (!p) {
             fprintf(stderr, "No type specified, ");
-            disk.physpath = phys;
+            disk.pdev_path = phys;
             if (!strncmp(phys, "/dev", 4)) {
                 fprintf(stderr, "assuming phy:\n");
-                disk.phystype = PHYSTYPE_PHY;
+                disk.backend = DISK_BACKEND_PHY;
             } else {
                 fprintf(stderr, "assuming file:\n");
-                disk.phystype = PHYSTYPE_FILE;
+                disk.backend = DISK_BACKEND_TAP; 
             }
         } else {
             *p = '\0';
             p++;
-            disk.physpath = p;
-            libxl_string_to_phystype(&ctx, phys, &disk.phystype);
+            disk.pdev_path = p;
+            libxl_string_to_backend(&ctx, phys, &disk.backend);
         }
     } else {
-            disk.physpath = strdup("");
-            disk.phystype = PHYSTYPE_EMPTY;
+            disk.pdev_path = strdup("");
+            disk.format = DISK_FORMAT_EMPTY;
     }
-    disk.virtpath = (char*)virtdev;
+    disk.vdev = (char*)virtdev;
     disk.unpluggable = 1;
     disk.readwrite = 0;
     disk.is_cdrom = 1;
@@ -4398,19 +4413,22 @@ int main_blockattach(int argc, char **argv)
 
     tok = strtok(argv[optind+1], ":");
     if (!strcmp(tok, "phy")) {
-        disk.phystype = PHYSTYPE_PHY;
+        disk.backend = DISK_BACKEND_PHY;
     } else if (!strcmp(tok, "file")) {
-        disk.phystype = PHYSTYPE_FILE;
+        disk.backend = DISK_BACKEND_TAP;
     } else if (!strcmp(tok, "tap")) {
         tok = strtok(NULL, ":");
         if (!strcmp(tok, "aio")) {
-            disk.phystype = PHYSTYPE_AIO;
+            disk.backend = DISK_BACKEND_TAP;
         } else if (!strcmp(tok, "vhd")) {
-            disk.phystype = PHYSTYPE_VHD;
+            disk.format = DISK_FORMAT_VHD;
+            disk.backend = DISK_BACKEND_TAP;
         } else if (!strcmp(tok, "qcow")) {
-            disk.phystype = PHYSTYPE_QCOW;
+            disk.format = DISK_FORMAT_QCOW;
+            disk.backend = DISK_BACKEND_QDISK;
         } else if (!strcmp(tok, "qcow2")) {
-            disk.phystype = PHYSTYPE_QCOW2;
+            disk.format = DISK_FORMAT_QCOW2;
+            disk.backend = DISK_BACKEND_QDISK;
         } else {
             fprintf(stderr, "Error: `%s' is not a valid disk image.\n", tok);
             return 1;
@@ -4419,12 +4437,12 @@ int main_blockattach(int argc, char **argv)
         fprintf(stderr, "Error: `%s' is not a valid block device.\n", tok);
         return 1;
     }
-    disk.physpath = strtok(NULL, "\0");
-    if (!disk.physpath) {
+    disk.pdev_path = strtok(NULL, "\0");
+    if (!disk.pdev_path) {
         fprintf(stderr, "Error: missing path to disk image.\n");
         return 1;
     }
-    disk.virtpath = argv[optind+2];
+    disk.vdev = argv[optind+2];
     disk.unpluggable = 1;
     disk.readwrite = ((argc-optind <= 3) || (argv[optind+3][0] == 'w'));
 

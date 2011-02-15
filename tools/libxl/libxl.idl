@@ -11,7 +11,8 @@ libxl_cpuarray = Builtin("cpuarray", destructor_fn="libxl_cpuarray_destroy", pas
 libxl_qemu_machine_type = Number("qemu_machine_type", namespace="libxl_")
 libxl_console_consback = Number("console_consback", namespace="libxl_")
 libxl_console_constype = Number("console_constype", namespace="libxl_")
-libxl_disk_phystype = Number("disk_phystype", namespace="libxl_")
+libxl_disk_format = Number("disk_format", namespace="libxl_")
+libxl_disk_backend = Number("disk_backend", namespace="libxl_")
 libxl_nic_type = Number("nic_type", namespace="libxl_")
 libxl_cpuid_policy_list = Builtin("cpuid_policy_list", destructor_fn="libxl_cpuid_destroy", passby=PASS_BY_REFERENCE)
 
@@ -203,9 +204,10 @@ libxl_device_console = Struct("device_console", [
 libxl_device_disk = Struct("device_disk", [
     ("backend_domid", uint32),
     ("domid", domid),
-    ("physpath", string),
-    ("phystype", libxl_disk_phystype),
-    ("virtpath", string),
+    ("pdev_path", string),
+    ("vdev", string),
+    ("backend", libxl_disk_backend),
+    ("format", libxl_disk_format),
     ("unpluggable", integer),
     ("readwrite", integer),
     ("is_cdrom", integer),

@@ -275,15 +275,15 @@ out:
     return rc;
 }
 
-int libxl_string_to_phystype(libxl_ctx *ctx, char *s, libxl_disk_phystype *phystype)
+int libxl_string_to_backend(libxl_ctx *ctx, char *s, libxl_disk_backend *backend)
 {
     char *p;
     int rc = 0;
 
     if (!strcmp(s, "phy")) {
-        *phystype = PHYSTYPE_PHY;
+        *backend = DISK_BACKEND_PHY;
     } else if (!strcmp(s, "file")) {
-        *phystype = PHYSTYPE_FILE;
+        *backend = DISK_BACKEND_TAP;
     } else if (!strcmp(s, "tap")) {
         p = strchr(s, ':');
         if (!p) {
@@ -291,14 +291,12 @@ int libxl_string_to_phystype(libxl_ctx *ctx, char *s, libxl_disk_phystype *physt
             goto out;
         }
         p++;
-        if (!strcmp(p, "aio")) {
-            *phystype = PHYSTYPE_AIO;
-        } else if (!strcmp(p, "vhd")) {
-            *phystype = PHYSTYPE_VHD;
+        if (!strcmp(p, "vhd")) {
+            *backend = DISK_BACKEND_TAP;
         } else if (!strcmp(p, "qcow")) {
-            *phystype = PHYSTYPE_QCOW;
+            *backend = DISK_BACKEND_QDISK;
         } else if (!strcmp(p, "qcow2")) {
-            *phystype = PHYSTYPE_QCOW2;
+            *backend = DISK_BACKEND_QDISK;
         }
     }
 out:
@@ -553,10 +551,10 @@ int libxl_devid_to_device_disk(libxl_ctx *ctx, uint32_t domid,
     disk->backend_domid = strtoul(val, NULL, 10);
     disk->domid = domid;
     be_path = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/backend", diskpath));
-    disk->physpath = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/params", be_path));
+    disk->pdev_path = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/params", be_path));
     val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/type", be_path));
-    libxl_string_to_phystype(ctx, val, &(disk->phystype));
-    disk->virtpath = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/dev", be_path));
+    libxl_string_to_backend(ctx, val, &(disk->backend));
+    disk->vdev = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/dev", be_path));
     val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/removable", be_path));
     disk->unpluggable = !strcmp(val, "1");
     val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/mode", be_path));

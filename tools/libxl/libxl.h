@@ -172,14 +172,20 @@ typedef enum {
 } libxl_console_consback;
 
 typedef enum {
-    PHYSTYPE_QCOW = 1,
-    PHYSTYPE_QCOW2,
-    PHYSTYPE_VHD,
-    PHYSTYPE_AIO,
-    PHYSTYPE_FILE,
-    PHYSTYPE_PHY,
-    PHYSTYPE_EMPTY,
-} libxl_disk_phystype;
+    DISK_FORMAT_UNKNOWN = 0,
+    DISK_FORMAT_QCOW,
+    DISK_FORMAT_QCOW2,
+    DISK_FORMAT_VHD,
+    DISK_FORMAT_RAW,
+    DISK_FORMAT_EMPTY,
+} libxl_disk_format;
+
+typedef enum {
+    DISK_BACKEND_UNKNOWN = 0,
+    DISK_BACKEND_PHY,
+    DISK_BACKEND_TAP,
+    DISK_BACKEND_QDISK,
+} libxl_disk_backend;
 
 typedef enum {
     NICTYPE_IOEMU = 1,

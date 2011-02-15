@@ -26,13 +26,13 @@ int libxl__blktap_enabled(libxl__gc *gc)
 
 const char *libxl__blktap_devpath(libxl__gc *gc,
                                  const char *disk,
-                                 libxl_disk_phystype phystype)
+                                 libxl_disk_format format)
 {
     const char *type;
     char *params, *devname = NULL;
     int minor, err;
 
-    type = libxl__device_disk_string_of_phystype(phystype);
+    type = libxl__device_disk_string_of_format(format);
     minor = tap_ctl_find_minor(type, disk);
     if (minor >= 0) {
         devname = libxl__sprintf(gc, "/dev/xen/blktap-2/tapdev%d", minor);

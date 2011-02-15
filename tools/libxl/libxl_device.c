@@ -121,31 +121,24 @@ out:
     return rc;
 }
 
-char *libxl__device_disk_string_of_phystype(libxl_disk_phystype phystype)
+char *libxl__device_disk_string_of_format(libxl_disk_format format)
 {
-    switch (phystype) {
-        case PHYSTYPE_QCOW: return "qcow";
-        case PHYSTYPE_QCOW2: return "qcow2";
-        case PHYSTYPE_VHD: return "vhd";
-        case PHYSTYPE_AIO: return "aio";
-        case PHYSTYPE_FILE: return "file";
-        case PHYSTYPE_PHY: return "phy";
-        case PHYSTYPE_EMPTY: return "file";
-        default: return NULL;
+    switch (format) {
+        case DISK_FORMAT_QCOW: return "qcow";
+        case DISK_FORMAT_QCOW2: return "qcow2"; 
+        case DISK_FORMAT_VHD: return "vhd"; 
+        case DISK_FORMAT_RAW:
+        case DISK_FORMAT_EMPTY: return "aio"; 
+        default: return NULL; 
     }
 }
 
-char *libxl__device_disk_backend_type_of_phystype(libxl_disk_phystype phystype)
+char *libxl__device_disk_string_of_backend(libxl_disk_backend backend)
 {
-    switch (phystype) {
-        case PHYSTYPE_QCOW: return "tap";
-        case PHYSTYPE_QCOW2: return "tap";
-        case PHYSTYPE_VHD: return "tap";
-        case PHYSTYPE_AIO: return "tap";
-        /* let's pretend file is tap:aio */
-        case PHYSTYPE_FILE: return "tap";
-        case PHYSTYPE_EMPTY: return "tap";
-        case PHYSTYPE_PHY: return "phy";
+    switch (backend) {
+        case DISK_BACKEND_QDISK: return "qdisk";
+        case DISK_BACKEND_TAP: return "tap";
+        case DISK_BACKEND_PHY: return "phy";
         default: return NULL;
     }
 }

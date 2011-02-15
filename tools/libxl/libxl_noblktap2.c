@@ -23,7 +23,7 @@ int libxl__blktap_enabled(libxl__gc *gc)
 
 const char *libxl__blktap_devpath(libxl__gc *gc,
                                  const char *disk,
-                                 libxl_disk_phystype phystype)
+                                 libxl_disk_format format)
 {
     return NULL;
 }
