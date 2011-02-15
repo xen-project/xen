@@ -863,19 +863,30 @@ int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass)
 
 /******************************************************************************/
 
-static int validate_virtual_disk(libxl_ctx *ctx, char *file_name, 
-    libxl_disk_backend backend_type, libxl_disk_format format)
+static int validate_virtual_disk(libxl_ctx *ctx, char *file_name,
+    libxl_device_disk *disk) 
 {
     struct stat stat_buf;
+    char *delimiter;
 
-    if ((file_name[0] == '\0') && (format == DISK_FORMAT_EMPTY))
+    if (disk->format == DISK_FORMAT_EMPTY)
         return 0;
+
+    if (disk->format == DISK_FORMAT_RAW) {
+        delimiter = strchr(file_name, ':');
+        if (delimiter) {
+            if (!strncmp(file_name, "vhd:", sizeof("vhd:")-1)) {
+                disk->format = DISK_FORMAT_VHD;
+                file_name = ++delimiter;
+            }
+        }
+    }
 
     if ( stat(file_name, &stat_buf) != 0 ) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "failed to stat %s", file_name);
         return ERROR_INVAL;
     }
-    if (backend_type == DISK_BACKEND_PHY) {
+    if (disk->backend == DISK_BACKEND_PHY) {
         if ( !(S_ISBLK(stat_buf.st_mode)) ) {
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Virtual disk %s is not a block device!\n",
                 file_name);
@@ -899,8 +910,7 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
     libxl__device device;
     int major, minor, rc;
 
-    rc = validate_virtual_disk(ctx, disk->pdev_path, disk->backend, 
-             disk->format);
+    rc = validate_virtual_disk(ctx, disk->pdev_path, disk); 
     if (rc)
         return rc;
 
