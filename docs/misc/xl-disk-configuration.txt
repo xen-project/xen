@@ -1,0 +1,154 @@
+
+
+                         ----------------------------
+                         xl Disk Configuration Option
+                         ----------------------------
+
+This document provides a brief description of xl disk configuration
+option, different attributes that can be passed through it and the
+format in which they need to be specified.
+
+At a higher level, xl disk configuration option takes the following
+format:
+
+    disk = [ '[format:][path],vdev[:type],attrib',
+             '[format:][path],vdev[:type],attrib', ... ]
+
+Not all attributes are required (the attributes enclosed within square
+brackets above are optional) and some are deprecated.  Following is a
+brief description of each of the attribute along with information on
+whether or not they are mandatory.
+
+
+------------------
+Attribute Details
+------------------
+
+
+format:
+------
+
+Description:           Specifies the format of image file.
+Supported values:      raw, qcow, qcow2, vhd
+Deprecated values:     None
+Mandatory:             No.  When not specified raw format is assumed.
+                       For a physical block device the format must be
+                       raw and need not be explicitly specified.  For
+                       an image file the format could be one of the
+                       supported values and when not specified assumed
+                       to be raw.
+path:
+----
+
+Description:           Block  device or image file path.  For a
+                       physical block device a /dev  will be prepended
+                       when not specified and when the path doesn't
+                       start  with a '/'.
+Supported values:      N/A
+Deprecated values:     N/A
+Mandatory:             No.  While a path is provided in most cases
+                       there is an exception.  For a cdrom device, lack
+                       of this attribute would imply an empty cdrom
+                       drive.
+
+vdev:
+----
+
+Description:           Virtual device as seen by the guest (also
+                       referred to as guest drive designation in some
+                       specifications).  See docs/misc/vbd-interface.txt.
+Supported values:      hd[x], xvd[x], sd[x] etc.  Please refer to the
+                       above specification for further details.
+Deprecated values:     None
+Mandatory:             Yes
+
+type:
+----
+
+Description:           Qualifies virtual device type.
+Supported values:      cdrom
+Deprecated values:     None
+Mandatory:             No
+
+attrib:
+------
+
+Description:           Specified access control information.  Whether
+                       or not the block device is provided to the
+                       guest in read-only or read-write mode depends
+                       on this attribute.
+Supported values:      'r', 'w'
+Deprecated values:     None
+Mandatory:             Yes
+
+
+--------------
+Example usages
+--------------
+
+disk = [ 'vhd:/path/to/dev,hda,w', '/path/to/iso,hdc:cdrom,r' ]
+disk = [ 'path/to/phy/dev,hda,w', '/dev/cdrom,hdc:cdrom,r' ]
+disk = [ 'qcow:/path/to/file,hda,w' ]
+disk = [ 'qcow2:/path/to/file,hda,w', 'raw:/path/to/dev,hdc:cdrom,r' ]
+
+
+-------------------------
+Miscellaneous Information
+-------------------------
+
+---------------------
+Deprecated Attributes
+---------------------
+
+Deprecated values are acceptable and will work the way they did
+earlier except with a warning message printed to the xl log or screen.
+However it's usage is supported purely for backward compatibility
+purpose and not recommended. Also, support for these deprecated
+attributes are likely to be dropped in future versions of xl.
+
+The block-dev-type and access-type deprecated attributes described
+below are prepended to the format attribute.  Example - tap:aio:qcow
+Further details on the deprecated attributes are below:
+
+block-dev-type:
+--------------
+
+Description:           Specifies the block device type.
+Supported values:      phy,file, tap, tap2
+
+access-type:
+-----------
+
+Description:           Backend implementation option to choose from
+                       while accessing block device.
+                       Example: tap:aio:vhd:/path/to/file
+Supported values:      'aio', 'tapdisk', 'ioemu'
+
+---------------------
+Impementation Details
+---------------------
+
+Backend Details:
+---------------
+
+For 'phy' block device type, blkback is always used as the backend.
+When the running dom0 instance does not support blkback, block device
+access will fail.  For block device type 'file' with format raw or
+when no format specfied, tapdisk2 is used when present otherwise qemu
+fallback option is used.  For 'file', 'tap' or 'tap2' block device
+type with format 'vhd', only tapdisk2 is used as qemu does not support
+vhd format.  Absence of tapdisk2 support in this case will result in
+failure.  When it comes to image format and how that affects the
+backend choice, for qcow/qcow2 qemu backend is used as tapdisk2 does
+not work with these formats. For raw format image file, tapdisk2 is
+used and when not available qemu backend is used as fallback.  For vhd
+format, as mentioned earlier tapdisk2 is used and tapdisk2
+unavailability will result in failure as qemu fallback option does not
+support vhd file format.
+
+
+
+
+
+
+
