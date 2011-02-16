@@ -3337,11 +3337,11 @@ static int shadow_one_bit_enable(struct domain *d, u32 mode)
             sh_set_allocation(d, 0, NULL);
             return -ENOMEM;
         }
-
-        /* Allow p2m and log-dirty code to borrow shadow memory */
-        d->arch.paging.alloc_page = shadow_alloc_p2m_page;
-        d->arch.paging.free_page = shadow_free_p2m_page;
     }
+
+    /* Allow p2m and log-dirty code to borrow shadow memory */
+    d->arch.paging.alloc_page = shadow_alloc_p2m_page;
+    d->arch.paging.free_page = shadow_free_p2m_page;
 
     if ( d->arch.paging.mode == 0 )
     {
