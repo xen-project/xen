@@ -112,6 +112,14 @@ M:	Tim Deegan <Tim.Deegan@citrix.com>
 S:	Supported
 F:	tools/debugger/kdd/
 
+IA64 ARCHITECTURE
+M:	Supported
+M:	KUWAMURA Shin'ya <kuwa@jp.fujitsu.com>
+L:	xen-ia64-devel@lists.xensource.com
+F:	xen/arch/ia64/*
+F:	xen/include/asm-ia64/*
+F:	tools/libxc/ia64/*
+
 INTEL(R) TRUSTED EXECUTION TECHNOLOGY (TXT)
 M:	Joseph Cihula <joseph.cihula@intel.com>
 M:	Shane Wang <shane.wang@intel.com>
@@ -197,6 +205,13 @@ S:	Supported
 T:	hg http://xenbits.xen.org/linux-2.6.18-xen.hg
 F:	drivers/xen/usb*/
 
+X86 ARCHITECTURE
+M:	Supported
+M:	Keir Fraser <keir@xen.org>
+L:	xen-devel@lists.xensource.com
+F:	xen/arch/x86/*
+F:	xen/include/asm-x86/*
+
 X86 MEMORY MANAGEMENT
 M:	Tim Deegan <tim.deegan@citrix.com>
 S:	Supported
@@ -210,6 +225,7 @@ F:	xen/common/trace.c
 
 THE REST
 M:	Keir Fraser <keir@xen.org>
+L:	xen-devel@lists.xensource.com
 S:	Supported
 F:	*
 F:	*/
