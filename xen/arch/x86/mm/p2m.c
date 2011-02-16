@@ -2313,7 +2313,7 @@ static int gfn_check_limit(
      * hardware translation limit. This limitation is checked by comparing
      * gfn with 0xfffffUL.
      */
-    if ( !hap_enabled(d) || ((gfn + (1ul << order)) <= 0x100000UL)
+    if ( !hap_enabled(d) || ((gfn + (1ul << order)) <= 0x100000UL) ||
          (boot_cpu_data.x86_vendor != X86_VENDOR_AMD) )
         return 0;
 
