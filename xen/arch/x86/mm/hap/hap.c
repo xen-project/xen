@@ -583,12 +583,8 @@ int hap_enable(struct domain *d, u32 mode)
 {
     unsigned int old_pages;
     int rv = 0;
-    uint32_t oldmode;
 
     domain_pause(d);
-
-    oldmode = d->arch.paging.mode;
-    d->arch.paging.mode = mode | PG_HAP_enable;
 
     /* error check */
     if ( (d == current->domain) )
@@ -624,9 +620,10 @@ int hap_enable(struct domain *d, u32 mode)
             goto out;
     }
 
+    /* Now let other users see the new mode */
+    d->arch.paging.mode = mode | PG_HAP_enable;
+
  out:
-    if (rv)
-        d->arch.paging.mode = oldmode;
     domain_unpause(d);
     return rv;
 }

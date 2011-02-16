@@ -1387,7 +1387,7 @@ p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     else if ( !p2m_next_level(p2m, &table_mfn, &table, &gfn_remainder, gfn,
                               L3_PAGETABLE_SHIFT - PAGE_SHIFT,
                               ((CONFIG_PAGING_LEVELS == 3)
-                               ? (paging_mode_hap(p2m->domain) ? 4 : 8)
+                               ? (hap_enabled(p2m->domain) ? 4 : 8)
                                : L3_PAGETABLE_ENTRIES),
                               PGT_l2_page_table) )
         goto out;
@@ -1848,7 +1848,7 @@ int set_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
 
     while ( todo )
     {
-        if ( is_hvm_domain(d) && paging_mode_hap(d) )
+        if ( hap_enabled(d) )
             order = ( (((gfn | mfn_x(mfn) | todo) & ((1ul << 18) - 1)) == 0) &&
                       hvm_hap_has_1gb(d) && opt_hap_1gb ) ? 18 :
                       ((((gfn | mfn_x(mfn) | todo) & ((1ul << 9) - 1)) == 0) &&
@@ -1909,8 +1909,7 @@ int p2m_alloc_table(struct p2m_domain *p2m)
 
     p2m->phys_table = pagetable_from_mfn(page_to_mfn(p2m_top));
 
-    if ( is_hvm_domain(d) && d->arch.hvm_domain.hap_enabled &&
-         (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) )
+    if ( hap_enabled(d) && (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) )
         iommu_set_pgd(d);
 
     P2M_PRINTK("populating p2m table\n");
@@ -2314,7 +2313,7 @@ static int gfn_check_limit(
      * hardware translation limit. This limitation is checked by comparing
      * gfn with 0xfffffUL.
      */
-    if ( !paging_mode_hap(d) || ((gfn + (1ul << order)) <= 0x100000UL) ||
+    if ( !hap_enabled(d) || ((gfn + (1ul << order)) <= 0x100000UL)
          (boot_cpu_data.x86_vendor != X86_VENDOR_AMD) )
         return 0;
 
