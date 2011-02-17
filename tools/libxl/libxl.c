@@ -226,7 +226,7 @@ int libxl_domain_resume(libxl_ctx *ctx, uint32_t domid)
         rc = ERROR_NI;
         goto out;
     }
-    if (xc_domain_resume(ctx->xch, domid, 1)) {
+    if (xc_domain_resume(ctx->xch, domid, 0)) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, 
                         "xc_domain_resume failed for domain %u", 
                         domid);
