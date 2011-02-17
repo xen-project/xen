@@ -5785,6 +5785,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
     libxl_cpumap cpumap;
     libxl_cpupoolinfo *poolinfo;
     libxl_topologyinfo topology;
+    libxl_dominfo info;
 
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
@@ -5840,11 +5841,33 @@ int main_cpupoolnumasplit(int argc, char **argv)
         goto out;
     }
 
+    n = 0;
     for (c = 0; c < topology.nodemap.entries; c++) {
         if (topology.nodemap.array[c] == node) {
             topology.nodemap.array[c] = LIBXL_CPUARRAY_INVALID_ENTRY;
+            libxl_cpumap_set(&cpumap, n);
+            n++;
         }
     }
+    if (libxl_set_vcpuonline(&ctx, 0, &cpumap)) {
+        fprintf(stderr, "error on removing vcpus for Domain-0\n");
+        goto out;
+    }
+    for (c = 0; c < 10; c++) {
+        if (libxl_domain_info(&ctx, &info, 0)) {
+            fprintf(stderr, "error on getting info for Domain-0\n");
+            goto out;
+        }
+        if (info.vcpu_online == n) {
+            break;
+        }
+        sleep(1);
+    }
+    if (info.vcpu_online > n) {
+        fprintf(stderr, "failed to offline vcpus\n");
+        goto out;
+    }
+    memset(cpumap.map, 0, cpumap.size);
 
     for (c = 0; c < topology.nodemap.entries; c++) {
         if (topology.nodemap.array[c] == LIBXL_CPUARRAY_INVALID_ENTRY) {
