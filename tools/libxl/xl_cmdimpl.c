@@ -1334,7 +1334,7 @@ static int create_domain(struct domain_create *dom_info)
     const char *restore_file = dom_info->restore_file;
     int migrate_fd = dom_info->migrate_fd;
 
-    int fd;
+    int fd, i;
     int need_daemon = 1;
     int ret, rc;
     libxl_waiter *w1 = NULL, *w2 = NULL;
@@ -1603,7 +1603,10 @@ start:
             case LIBXL_EVENT_DOMAIN_DEATH:
                 ret = libxl_event_get_domain_death_info(&ctx, domid, &event, &info);
 
-                if (ret < 0) continue;
+                if (ret < 0) {
+                    libxl_free_event(&event);
+                    continue;
+                }
 
                 LOG("Domain %d is dead", domid);
 
@@ -1619,7 +1622,8 @@ start:
                         /* Otherwise fall through and restart. */
                     case 1:
 
-                        libxl_free_waiter(w1);
+                        for (i = 0; i < d_config.num_disks; i++)
+                            libxl_free_waiter(&w1[i]);
                         libxl_free_waiter(w2);
                         free(w1);
                         free(w2);
@@ -1655,8 +1659,10 @@ start:
                 }
                 break;
             case LIBXL_EVENT_DISK_EJECT:
-                if (libxl_event_get_disk_eject_info(&ctx, domid, &event, &disk))
+                if (libxl_event_get_disk_eject_info(&ctx, domid, &event, &disk)) {
                     libxl_cdrom_insert(&ctx, domid, &disk);
+                    libxl_device_disk_destroy(&disk);
+                }
                 break;
         }
         libxl_free_event(&event);
