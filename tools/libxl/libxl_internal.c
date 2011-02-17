@@ -233,6 +233,12 @@ int libxl__file_reference_unmap(libxl_file_reference *f)
 		return 0;
 
 	ret = munmap(f->data, f->size);
+	if (ret == 0) {
+		f->mapped = 0;
+		f->data = NULL;
+		f->size = 0;
+		return 0;
+	}
 
-	return ret == 0 ? 0 : ERROR_FAIL;
+	return ERROR_FAIL;
 }
