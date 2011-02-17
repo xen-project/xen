@@ -953,9 +953,7 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
             break;
         case DISK_BACKEND_TAP:
         case DISK_BACKEND_QDISK: 
-            if (disk->format == DISK_FORMAT_EMPTY)
-                break;
-            if (libxl__blktap_enabled(&gc)) {
+            if (libxl__blktap_enabled(&gc) && disk->format != DISK_FORMAT_EMPTY) {
                 const char *dev = libxl__blktap_devpath(&gc,
                                                disk->pdev_path, disk->format);
                 if (!dev) {
