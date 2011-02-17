@@ -1038,8 +1038,9 @@ out:
 int libxl_device_disk_del(libxl_ctx *ctx, 
                           libxl_device_disk *disk, int wait)
 {
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
     libxl__device device;
-    int devid;
+    int devid, rc;
 
     devid = libxl__device_disk_dev_number(disk->vdev);
     device.backend_domid    = disk->backend_domid;
@@ -1049,7 +1050,11 @@ int libxl_device_disk_del(libxl_ctx *ctx,
     device.domid            = disk->domid;
     device.devid            = devid;
     device.kind             = DEVICE_VBD;
-    return libxl__device_del(ctx, &device, wait);
+    rc = libxl__device_del(ctx, &device, wait);
+    xs_rm(ctx->xsh, XBT_NULL, libxl__device_backend_path(&gc, &device));
+    xs_rm(ctx->xsh, XBT_NULL, libxl__device_frontend_path(&gc, &device));
+    libxl__free_all(&gc);
+    return rc;
 }
 
 char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *disk)

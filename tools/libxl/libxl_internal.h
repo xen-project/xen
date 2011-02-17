@@ -186,6 +186,8 @@ _hidden int libxl__device_disk_dev_number(char *virtpath);
 
 _hidden int libxl__device_generic_add(libxl_ctx *ctx, libxl__device *device,
                              char **bents, char **fents);
+_hidden char *libxl__device_backend_path(libxl__gc *gc, libxl__device *device);
+_hidden char *libxl__device_frontend_path(libxl__gc *gc, libxl__device *device);
 _hidden int libxl__device_del(libxl_ctx *ctx, libxl__device *dev, int wait);
 _hidden int libxl__device_destroy(libxl_ctx *ctx, char *be_path, int force);
 _hidden int libxl__devices_destroy(libxl_ctx *ctx, uint32_t domid, int force);

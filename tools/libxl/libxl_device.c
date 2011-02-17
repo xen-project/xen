@@ -40,7 +40,7 @@ static const char *string_of_kinds[] = {
     [DEVICE_CONSOLE] = "console",
 };
 
-static char *libxl__device_frontend_path(libxl__gc *gc, libxl__device *device)
+char *libxl__device_frontend_path(libxl__gc *gc, libxl__device *device)
 {
     char *dom_path = libxl__xs_get_dompath(gc, device->domid);
 
@@ -52,7 +52,7 @@ static char *libxl__device_frontend_path(libxl__gc *gc, libxl__device *device)
                           string_of_kinds[device->kind], device->devid);
 }
 
-static char *libxl__device_backend_path(libxl__gc *gc, libxl__device *device)
+char *libxl__device_backend_path(libxl__gc *gc, libxl__device *device)
 {
     char *dom_path = libxl__xs_get_dompath(gc, device->backend_domid);
 
