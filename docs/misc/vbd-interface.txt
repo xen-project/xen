@@ -114,9 +114,10 @@ only.  Modern PV drivers will map these to identically-named devices
 in the guest.
 
 For Linux HVM guests using PV-on-HVM drivers, users are recommended to
-supply as few hd* devices as possible and use pure xvd* devices for
-the rest.  Modern PV-on-HVM drivers will map the hd* devices to
-/dev/xvdHDa etc.
+supply as few hd* devices as possible, and for the rest of the disks,
+to use pure xvd* devices starting at xvde.  Modern PV-on-HVM drivers
+will map provided hd* devices to the corresponding /dev/xvd* (for
+example, hda is presented also as /dev/xvda).
 
 Some Linux HVM guests with broken PV-on-HVM drivers do not cope
 properly if both hda and hdc are supplied, nor with both hda and xvda,
