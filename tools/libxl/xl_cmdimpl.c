@@ -1849,40 +1849,23 @@ int main_memset(int argc, char **argv)
 static void cd_insert(const char *dom, const char *virtdev, char *phys)
 {
     libxl_device_disk disk; /* we don't free disk's contents */
-    char *p;
+    char *buf = NULL;
 
     find_domain(dom);
 
+    if (asprintf(&buf, "%s,%s:cdrom,r", phys ? phys : "", virtdev) < 0) {
+        fprintf(stderr, "out of memory\n");
+        return;
+    }
+    if (!parse_disk_config(&disk, buf)) {
+        fprintf(stderr, "format error\n");
+        return;
+    }
     disk.backend_domid = 0;
     disk.domid = domid;
-    if (phys) {
-        p = strchr(phys, ':');
-        if (!p) {
-            fprintf(stderr, "No type specified, ");
-            disk.pdev_path = phys;
-            if (!strncmp(phys, "/dev", 4)) {
-                fprintf(stderr, "assuming phy:\n");
-                disk.backend = DISK_BACKEND_PHY;
-            } else {
-                fprintf(stderr, "assuming file:\n");
-                disk.backend = DISK_BACKEND_TAP; 
-            }
-        } else {
-            *p = '\0';
-            p++;
-            disk.pdev_path = p;
-            libxl_string_to_backend(&ctx, phys, &disk.backend);
-        }
-    } else {
-            disk.pdev_path = strdup("");
-            disk.format = DISK_FORMAT_EMPTY;
-    }
-    disk.vdev = (char*)virtdev;
-    disk.unpluggable = 1;
-    disk.readwrite = 0;
-    disk.is_cdrom = 1;
 
     libxl_cdrom_insert(&ctx, domid, &disk);
+    free(buf);
 }
 
 int main_cd_eject(int argc, char **argv)
