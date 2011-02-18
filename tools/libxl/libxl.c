@@ -37,6 +37,9 @@
 #include "flexarray.h"
 
 #define PAGE_TO_MEMKB(pages) ((pages) * 4)
+#define BACKEND_STRING_SIZE 5
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
 
 int libxl_ctx_init(libxl_ctx *ctx, int version, xentoollog_logger *lg)
 {
@@ -592,7 +595,7 @@ int libxl_wait_for_disk_ejects(libxl_ctx *ctx, uint32_t guest_domid, libxl_devic
             goto out;
         if (asprintf(&(waiter[i].token), "%d", LIBXL_EVENT_DISK_EJECT) < 0)
             goto out;
-        xs_watch(ctx->xsh, waiter->path, waiter->token);
+        xs_watch(ctx->xsh, waiter[i].path, waiter[i].token);
     }
     rc = 0;
 out:
@@ -654,6 +657,7 @@ int libxl_event_get_disk_eject_info(libxl_ctx *ctx, uint32_t domid, libxl_event 
     char *path;
     char *backend;
     char *value;
+    char backend_type[BACKEND_STRING_SIZE+1];
 
     value = libxl__xs_read(&gc, XBT_NULL, event->path);
 
@@ -666,12 +670,22 @@ int libxl_event_get_disk_eject_info(libxl_ctx *ctx, uint32_t domid, libxl_event 
     path[strlen(path) - 6] = '\0';
     backend = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/backend", path));
 
-    disk->backend_domid = 0;
+    sscanf(backend,
+            "/local/domain/%d/backend/%" TOSTRING(BACKEND_STRING_SIZE) "[a-z]/%*d/%*d",
+            &disk->backend_domid, backend_type);
+	if (!strcmp(backend_type, "tap") || !strcmp(backend_type, "vbd")) {
+		disk->backend = DISK_BACKEND_TAP;
+	} else if (!strcmp(backend_type, "qdisk")) {
+		disk->backend = DISK_BACKEND_QDISK;
+	} else {
+		disk->backend = DISK_BACKEND_UNKNOWN;
+	} 
+
     disk->domid = domid;
     disk->pdev_path = strdup("");
     disk->format = DISK_FORMAT_EMPTY;
     /* this value is returned to the user: do not free right away */
-    disk->vdev = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/dev", backend));
+    disk->vdev = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(&gc, "%s/dev", backend), NULL);
     disk->unpluggable = 1;
     disk->readwrite = 0;
     disk->is_cdrom = 1;
