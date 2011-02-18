@@ -48,6 +48,7 @@ mk-symlinks-acpi: $(IA64_HDR_DIRS) $(IA64_EMPTY_FILES) $(DOMFW_ASM_HDRS)
 	( cd ia64/xen && ln -sf ../../$(XEN_ROOT)/xen/include/xen/acpi.h .)
 mk-symlinks-misc: $(IA64_HDR_DIRS)
 	( cd ia64/asm && ln -sf ../../$(XEN_ROOT)/xen/include/asm-ia64/linux-xen/asm/kregs.h .)
+	( cd ia64/asm && ln -sf ../../$(XEN_ROOT)/xen/include/asm-ia64/linux/asm/fpswa.h .)
 build: mk-symlinks-acpi mk-symlinks-misc
 
 clean: ia64-clean
