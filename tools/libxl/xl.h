@@ -101,5 +101,6 @@ extern xentoollog_logger_stdiostream *logger;
 /* global options */
 extern int autoballoon;
 extern char *lockfile;
+extern char *default_vifscript;
 
 #endif /* XL_H */

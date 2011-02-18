@@ -35,6 +35,7 @@
 xentoollog_logger_stdiostream *logger;
 int autoballoon = 1;
 char *lockfile;
+char *default_vifscript = NULL;
 
 static xentoollog_level minmsglevel = XTL_PROGRESS;
 
@@ -71,6 +72,9 @@ static void parse_global_config(const char *configfile,
             exit(1);
         }
     }
+
+    if (!xlu_cfg_get_string (config, "vifscript", &buf))
+        default_vifscript = strdup(buf);
 
     xlu_cfg_destroy(config);
 }

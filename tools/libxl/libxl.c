@@ -31,6 +31,8 @@
 #include <inttypes.h>
 #include <assert.h>
 
+#include <arpa/inet.h>
+
 #include "libxl.h"
 #include "libxl_utils.h"
 #include "libxl_internal.h"
@@ -1173,6 +1175,7 @@ int libxl_device_nic_init(libxl_device_nic *nic_info, int devnum)
     nic_info->mac[5] = r[2];
     nic_info->ifname = NULL;
     nic_info->bridge = strdup("xenbr0");
+    nic_info->ip.s_addr = 0UL;
     if ( asprintf(&nic_info->script, "%s/vif-bridge",
                libxl_xen_script_dir_path()) < 0 )
         return ERROR_FAIL;
@@ -1232,6 +1235,16 @@ int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic)
     flexarray_append(back, libxl__sprintf(&gc, "%02x:%02x:%02x:%02x:%02x:%02x",
                                                  nic->mac[0], nic->mac[1], nic->mac[2],
                                                  nic->mac[3], nic->mac[4], nic->mac[5]));
+    if (nic->ip.s_addr != 0UL) {
+        char dst[INET_ADDRSTRLEN];
+        const char *addr = inet_ntop(AF_INET, &nic->ip.s_addr, &dst[0], INET_ADDRSTRLEN);
+        if (addr) {
+            flexarray_append(back, "ip");
+            flexarray_append(back, libxl__strdup(&gc, addr));
+        } else {
+            LIBXL__LOG(ctx, LIBXL__LOG_WARNING, "Unable to format IP address");
+        }
+    }
     flexarray_append(back, "bridge");
     flexarray_append(back, libxl__strdup(&gc, nic->bridge));
     flexarray_append(back, "handle");

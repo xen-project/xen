@@ -798,6 +798,11 @@ static void parse_config_data(const char *configfile_filename_report,
             nic = d_config->vifs + d_config->num_vifs;
             CHK_ERRNO( libxl_device_nic_init(nic, d_config->num_vifs) );
 
+            if (default_vifscript) {
+                free(nic->script);
+                nic->script = strdup(default_vifscript);
+            }
+
             p = strtok(buf2, ",");
             if (!p)
                 goto skip;
