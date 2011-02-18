@@ -74,7 +74,7 @@ static char ** libxl_build_device_model_args_old(libxl__gc *gc,
         } else {
             vncarg = "127.0.0.1:0";
         }
-        if (info->vncpasswd)
+        if (info->vncpasswd && (info->vncpasswd[0] != '\0'))
             vncarg = libxl__sprintf(gc, "%s,password", vncarg);
         flexarray_append(dm_args, "-vnc");
         flexarray_append(dm_args, vncarg);
