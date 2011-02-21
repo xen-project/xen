@@ -1603,7 +1603,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 #endif
 
     /* Fill legacy context from xsave area first */
-    if ( cpu_has_xsave )
+    if ( xsave_enabled(v) )
         memcpy(v->arch.xsave_area, &v->arch.guest_context.fpu_ctxt,
                sizeof(v->arch.guest_context.fpu_ctxt));
 

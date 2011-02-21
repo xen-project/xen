@@ -464,7 +464,7 @@ unsigned long pv_guest_cr4_fixup(const struct vcpu *, unsigned long guest_cr4);
     (((v)->arch.guest_context.ctrlreg[4]                    \
       | (mmu_cr4_features & (X86_CR4_PGE | X86_CR4_PSE))    \
       | ((v)->domain->arch.vtsc ? X86_CR4_TSD : 0)         \
-      | ((cpu_has_xsave)? X86_CR4_OSXSAVE : 0))              \
+      | ((xsave_enabled(v))? X86_CR4_OSXSAVE : 0))              \
       & ~X86_CR4_DE)
 #define real_cr4_to_pv_guest_cr4(c) \
     ((c) & ~(X86_CR4_PGE | X86_CR4_PSE | X86_CR4_TSD | X86_CR4_OSXSAVE))

@@ -771,7 +771,7 @@ static void pv_cpuid(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_XTPR % 32, &c);
         __clear_bit(X86_FEATURE_PDCM % 32, &c);
         __clear_bit(X86_FEATURE_DCA % 32, &c);
-        if ( !cpu_has_xsave )
+        if ( !xsave_enabled(current) )
         {
             __clear_bit(X86_FEATURE_XSAVE % 32, &c);
             __clear_bit(X86_FEATURE_AVX % 32, &c);

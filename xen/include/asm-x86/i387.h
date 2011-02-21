@@ -11,8 +11,10 @@
 #ifndef __ASM_I386_I387_H
 #define __ASM_I386_I387_H
 
-#include <xen/sched.h>
-#include <asm/processor.h>
+#include <xen/types.h>
+#include <xen/percpu.h>
+
+struct vcpu;
 
 extern unsigned int xsave_cntxt_size;
 extern u64 xfeature_mask;
@@ -20,6 +22,7 @@ extern u64 xfeature_mask;
 void xsave_init(void);
 int xsave_alloc_save_area(struct vcpu *v);
 void xsave_free_save_area(struct vcpu *v);
+bool_t xsave_enabled(const struct vcpu *v);
 
 #define XSAVE_AREA_MIN_SIZE (512 + 64) /* FP/SSE + XSAVE.HEADER */
 #define XSTATE_FP       (1ULL << 0)

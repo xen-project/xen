@@ -285,13 +285,13 @@ static inline int hvm_do_pmu_interrupt(struct cpu_user_regs *regs)
     (X86_CR4_VMXE | X86_CR4_PAE | X86_CR4_MCE))
 
 /* These bits in CR4 cannot be set by the guest. */
-#define HVM_CR4_GUEST_RESERVED_BITS                     \
+#define HVM_CR4_GUEST_RESERVED_BITS(_v)                 \
     (~((unsigned long)                                  \
        (X86_CR4_VME | X86_CR4_PVI | X86_CR4_TSD |       \
         X86_CR4_DE  | X86_CR4_PSE | X86_CR4_PAE |       \
         X86_CR4_MCE | X86_CR4_PGE | X86_CR4_PCE |       \
         X86_CR4_OSFXSR | X86_CR4_OSXMMEXCPT |           \
-        (cpu_has_xsave ? X86_CR4_OSXSAVE : 0))))
+        (xsave_enabled(_v) ? X86_CR4_OSXSAVE : 0))))
 
 /* These exceptions must always be intercepted. */
 #define HVM_TRAP_MASK ((1U << TRAP_machine_check) | (1U << TRAP_invalid_op))

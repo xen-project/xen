@@ -676,7 +676,7 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         return -EINVAL;
     }
 
-    if ( ctxt.cr4 & HVM_CR4_GUEST_RESERVED_BITS )
+    if ( ctxt.cr4 & HVM_CR4_GUEST_RESERVED_BITS(v) )
     {
         gdprintk(XENLOG_ERR, "HVM restore: bad CR4 0x%"PRIx64"\n",
                  ctxt.cr4);
@@ -773,7 +773,7 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     memcpy(&vc->fpu_ctxt, ctxt.fpu_regs, sizeof(ctxt.fpu_regs));
 
     /* In case xsave-absent save file is restored on a xsave-capable host */
-    if ( cpu_has_xsave )
+    if ( xsave_enabled(v) )
     {
         struct xsave_struct *xsave_area = v->arch.xsave_area;
 
@@ -836,6 +836,8 @@ static int hvm_save_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
 
     for_each_vcpu ( d, v )
     {
+        if ( !xsave_enabled(v) )
+            continue;
         if ( _hvm_init_entry(h, CPU_XSAVE_CODE, v->vcpu_id, HVM_CPU_XSAVE_SIZE) )
             return 1;
         ctxt = (struct hvm_hw_cpu_xsave *)&h->data[h->cur];
@@ -861,11 +863,6 @@ static int hvm_load_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
     struct hvm_save_descriptor *desc;
     uint64_t _xfeature_mask;
 
-    /* fails since we can't restore an img saved on xsave-capable host */
-//XXX: 
-    if ( !cpu_has_xsave )
-        return -EINVAL;
-
     /* Which vcpu is this? */
     vcpuid = hvm_load_instance(h);
     if ( vcpuid >= d->max_vcpus || (v = d->vcpu[vcpuid]) == NULL )
@@ -873,6 +870,10 @@ static int hvm_load_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
         gdprintk(XENLOG_ERR, "HVM restore: domain has no vcpu %u\n", vcpuid);
         return -EINVAL;
     }
+
+    /* Fails since we can't restore an img saved on xsave-capable host. */
+    if ( !xsave_enabled(v) )
+        return -EINVAL;
 
     /* Customized checking for entry since our entry is of variable length */
     desc = (struct hvm_save_descriptor *)&h->data[h->cur];
@@ -1453,7 +1454,7 @@ int hvm_set_cr4(unsigned long value)
     struct vcpu *v = current;
     unsigned long old_cr;
 
-    if ( value & HVM_CR4_GUEST_RESERVED_BITS )
+    if ( value & HVM_CR4_GUEST_RESERVED_BITS(v) )
     {
         HVM_DBG_LOG(DBG_LEVEL_1,
                     "Guest attempts to set reserved bit in CR4: %lx",
@@ -2208,7 +2209,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
             __clear_bit(X86_FEATURE_APIC & 31, edx);
 
         /* Fix up OSXSAVE. */
-        if ( cpu_has_xsave )
+        if ( xsave_enabled(v) )
             *ecx |= (v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_OSXSAVE) ?
                      bitmaskof(X86_FEATURE_OSXSAVE) : 0;
         break;

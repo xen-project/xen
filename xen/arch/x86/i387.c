@@ -69,7 +69,7 @@ void setup_fpu(struct vcpu *v)
     if ( v->fpu_dirtied )
         return;
 
-    if ( cpu_has_xsave )
+    if ( xsave_enabled(v) )
     {
         /*
          * XCR0 normally represents what guest OS set. In case of Xen itself, 
@@ -116,7 +116,7 @@ void save_init_fpu(struct vcpu *v)
     if ( cr0 & X86_CR0_TS )
         clts();
 
-    if ( cpu_has_xsave )
+    if ( xsave_enabled(v) )
     {
         /* XCR0 normally represents what guest OS set. In case of Xen itself,
          * we set all accumulated feature mask before doing save/restore.
@@ -314,6 +314,17 @@ void xsave_free_save_area(struct vcpu *v)
 {
     xfree(v->arch.xsave_area);
     v->arch.xsave_area = NULL;
+}
+
+bool_t xsave_enabled(const struct vcpu *v)
+{
+    if ( cpu_has_xsave )
+    {
+        ASSERT(xsave_cntxt_size >= XSAVE_AREA_MIN_SIZE);
+        ASSERT(v->arch.xsave_area);
+    }
+
+    return cpu_has_xsave;	
 }
 
 /*
