@@ -569,7 +569,8 @@ static void acpi_dead_idle(void)
         {
             case ACPI_CSTATE_EM_FFH:
                 /* Not treat interrupt as break event */
-                mwait_idle_with_hints(cx->address, 0);
+                __monitor((void *)&mwait_wakeup(smp_processor_id()), 0, 0);
+                __mwait(cx->address, 0);
                 break;
             case ACPI_CSTATE_EM_SYSIO:
                 inb(cx->address);
