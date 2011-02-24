@@ -92,7 +92,6 @@ enum mcheck_type amd_k8_mcheck_init(struct cpuinfo_x86 *c)
 			/* Enable error reporting of all errors */
 			wrmsrl(MSR_IA32_MCx_CTL(i), 0xffffffffffffffffULL);
 			wrmsrl(MSR_IA32_MCx_STATUS(i), 0x0ULL);
-			break;
 		}
 	}
 
