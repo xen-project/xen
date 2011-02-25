@@ -1597,6 +1597,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
         } chunk = { 0, };
 
         chunk.id = XC_SAVE_ID_HVM_IDENT_PT;
+        chunk.data = 0;
         xc_get_hvm_param(xch, dom, HVM_PARAM_IDENT_PT,
                          (unsigned long *)&chunk.data);
 
@@ -1608,6 +1609,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
         }
 
         chunk.id = XC_SAVE_ID_HVM_VM86_TSS;
+        chunk.data = 0;
         xc_get_hvm_param(xch, dom, HVM_PARAM_VM86_TSS,
                          (unsigned long *)&chunk.data);
 
@@ -1619,6 +1621,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
         }
 
         chunk.id = XC_SAVE_ID_HVM_CONSOLE_PFN;
+        chunk.data = 0;
         xc_get_hvm_param(xch, dom, HVM_PARAM_CONSOLE_PFN,
                          (unsigned long *)&chunk.data);
 
@@ -1630,6 +1633,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
         }
 
         chunk.id = XC_SAVE_ID_HVM_ACPI_IOPORTS_LOCATION;
+        chunk.data = 0;
         xc_get_hvm_param(xch, dom, HVM_PARAM_ACPI_IOPORTS_LOCATION,
                          (unsigned long *)&chunk.data);
 
