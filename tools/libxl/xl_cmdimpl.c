@@ -451,8 +451,6 @@ static int parse_disk_config(libxl_device_disk *disk, char *buf2)
     char *p, *end, *tok;
 
     memset(disk, 0, sizeof(*disk));
-    disk->format = DISK_FORMAT_RAW;
-    disk->backend = DISK_BACKEND_TAP;
 
     for(tok = p = buf2, end = buf2 + strlen(buf2) + 1; p < end; p++) {
         switch(state){
@@ -484,7 +482,11 @@ static int parse_disk_config(libxl_device_disk *disk, char *buf2)
             }
             break;
         case DSTATE_TAP:
-            if ( *p == ':' ) {
+            if (*p == ',') {
+                disk->format = DISK_FORMAT_RAW;
+                disk->backend = DISK_BACKEND_TAP;
+                state = DSTATE_PHYSPATH;
+            } else if ( *p == ':' ) {
                 *p = '\0';
                 if (!strcmp(tok, "aio")) {
                     tok = p + 1;
@@ -510,8 +512,10 @@ static int parse_disk_config(libxl_device_disk *disk, char *buf2)
 
                 tok = p + 1;
                 state = DSTATE_PHYSPATH;
+                break;
+            } else {
+                break;
             }
-            break;
         case DSTATE_PHYSPATH:
             if ( *p == ',' ) {
                 int ioemu_len;
