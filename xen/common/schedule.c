@@ -394,8 +394,32 @@ static void vcpu_migrate(struct vcpu *v)
 {
     unsigned long flags;
     int old_cpu, new_cpu;
+    int same_lock;
 
-    vcpu_schedule_lock_irqsave(v, flags);
+    for (;;)
+    {
+        vcpu_schedule_lock_irqsave(v, flags);
+
+        /* Select new CPU. */
+        old_cpu = v->processor;
+        new_cpu = SCHED_OP(VCPU2OP(v), pick_cpu, v);
+        same_lock = (per_cpu(schedule_data, new_cpu).schedule_lock ==
+                     per_cpu(schedule_data, old_cpu).schedule_lock);
+
+        if ( same_lock )
+            break;
+
+        if ( !pcpu_schedule_trylock(new_cpu) )
+        {
+            vcpu_schedule_unlock_irqrestore(v, flags);
+            continue;
+        }
+        if ( cpu_isset(new_cpu, v->domain->cpupool->cpu_valid) )
+            break;
+
+        pcpu_schedule_unlock(new_cpu);
+        vcpu_schedule_unlock_irqrestore(v, flags);
+    }
 
     /*
      * NB. Check of v->running happens /after/ setting migration flag
@@ -405,13 +429,12 @@ static void vcpu_migrate(struct vcpu *v)
     if ( v->is_running ||
          !test_and_clear_bit(_VPF_migrating, &v->pause_flags) )
     {
+        if ( !same_lock )
+            pcpu_schedule_unlock(new_cpu);
+
         vcpu_schedule_unlock_irqrestore(v, flags);
         return;
     }
-
-    /* Select new CPU. */
-    old_cpu = v->processor;
-    new_cpu = SCHED_OP(VCPU2OP(v), pick_cpu, v);
 
     /*
      * Transfer urgency status to new CPU before switching CPUs, as once
@@ -424,9 +447,15 @@ static void vcpu_migrate(struct vcpu *v)
         atomic_dec(&per_cpu(schedule_data, old_cpu).urgent_count);
     }
 
-    /* Switch to new CPU, then unlock old CPU.  This is safe because
-     * the lock pointer cant' change while the current lock is held. */
+    /*
+     * Switch to new CPU, then unlock new and old CPU.  This is safe because
+     * the lock pointer cant' change while the current lock is held.
+     */
     v->processor = new_cpu;
+
+    if ( !same_lock )
+        pcpu_schedule_unlock(new_cpu);
+
     spin_unlock_irqrestore(
         per_cpu(schedule_data, old_cpu).schedule_lock, flags);
 

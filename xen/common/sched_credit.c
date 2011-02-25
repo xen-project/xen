@@ -1268,7 +1268,8 @@ csched_load_balance(struct csched_private *prv, int cpu,
         /*
          * Any work over there to steal?
          */
-        speer = csched_runq_steal(peer_cpu, cpu, snext->pri);
+        speer = cpu_isset(peer_cpu, *online) ?
+            csched_runq_steal(peer_cpu, cpu, snext->pri) : NULL;
         pcpu_schedule_unlock(peer_cpu);
         if ( speer != NULL )
         {
