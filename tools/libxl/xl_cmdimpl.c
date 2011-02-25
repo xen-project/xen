@@ -30,7 +30,6 @@
 #include <signal.h>
 #include <sys/socket.h>
 #include <sys/select.h>
-#include <arpa/inet.h>
 #include <sys/utsname.h> /* for utsname in xl info */
 #include <xenctrl.h>
 #include <ctype.h>
@@ -843,7 +842,8 @@ static void parse_config_data(const char *configfile_filename_report,
                     else
                         nic->nictype = NICTYPE_VIF;
                 } else if (!strcmp(p, "ip")) {
-                    inet_pton(AF_INET, p2 + 1, &nic->ip);
+                    free(nic->ip);
+                    nic->ip = strdup(p2 + 1);
                 } else if (!strcmp(p, "script")) {
                     free(nic->script);
                     nic->script = strdup(p2 + 1);
@@ -4257,10 +4257,8 @@ int main_networkattach(int argc, char **argv)
         } else if (!strncmp("bridge=", *argv, 7)) {
             nic.bridge = (*argv) + 7;
         } else if (!strncmp("ip=", *argv, 3)) {
-            if (!inet_aton((*argv) + 3, &(nic.ip))) {
-                fprintf(stderr, "Invalid parameter `ip'.\n");
-                return 1;
-            }
+            free(nic.ip);
+            nic.ip = strdup((*argv) + 3);
         } else if (!strncmp("script=", *argv, 6)) {
             nic.script = (*argv) + 6;
         } else if (!strncmp("backend=", *argv, 8)) {

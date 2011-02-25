@@ -220,7 +220,7 @@ libxl_device_nic = Struct("device_nic", [
     ("mtu", integer),
     ("model", string),
     ("mac", libxl_mac),
-    ("ip", inaddr_ip),
+    ("ip", string),
     ("bridge", string),
     ("ifname", string),
     ("script", string),

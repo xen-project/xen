@@ -159,8 +159,6 @@ domid = UInt(32)
 
 string = Builtin("char *", namespace = None, destructor_fn = "free")
 
-inaddr_ip = Builtin("struct in_addr", namespace = None)
-
 class OrderedDict(dict):
     """A dictionary which remembers insertion order.
 
