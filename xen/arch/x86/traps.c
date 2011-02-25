@@ -3075,23 +3075,12 @@ static void nmi_dom0_report(unsigned int reason_idx)
     send_guest_trap(d, 0, TRAP_nmi);
 }
 
-static void mem_parity_error(struct cpu_user_regs *regs)
+static void pci_serr_error(struct cpu_user_regs *regs)
 {
-    switch ( opt_nmi[0] )
-    {
-    case 'd': /* 'dom0' */
-        nmi_dom0_report(_XEN_NMIREASON_parity_error);
-    case 'i': /* 'ignore' */
-        break;
-    default:  /* 'fatal' */
-        console_force_unlock();
-        printk("\n\nNMI - MEMORY ERROR\n");
-        fatal_trap(TRAP_nmi, regs);
-    }
+    console_force_unlock();
+    printk("\n\nNMI - PCI system error (SERR)\n");
 
-    outb((inb(0x61) & 0x0f) | 0x04, 0x61); /* clear-and-disable parity check */
-    mdelay(1);
-    outb((inb(0x61) & 0x0b) | 0x00, 0x61); /* enable parity check */
+    outb((inb(0x61) & 0x0f) | 0x04, 0x61); /* clear-and-disable the PCI SERR error line. */
 }
 
 static void io_check_error(struct cpu_user_regs *regs)
@@ -3154,7 +3143,7 @@ asmlinkage void do_nmi(struct cpu_user_regs *regs)
     {
         reason = inb(0x61);
         if ( reason & 0x80 )
-            mem_parity_error(regs);
+            pci_serr_error(regs);
         else if ( reason & 0x40 )
             io_check_error(regs);
         else if ( !nmi_watchdog )
