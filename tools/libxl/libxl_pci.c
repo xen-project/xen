@@ -718,8 +718,8 @@ out:
         }
     }
 
-    libxl_device_pci_add_xenstore(gc, domid, pcidev);
-    return 0;
+    rc = libxl_device_pci_add_xenstore(gc, domid, pcidev, starting);
+    return rc;
 }
 
 static int libxl_device_pci_reset(libxl__gc *gc, unsigned int domain, unsigned int bus,
