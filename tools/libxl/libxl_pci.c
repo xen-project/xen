@@ -286,7 +286,7 @@ out:
     return 0;
 }
 
-static int libxl_device_pci_add_xenstore(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev)
+static int libxl_device_pci_add_xenstore(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, int starting)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     flexarray_t *back;
@@ -299,7 +299,7 @@ static int libxl_device_pci_add_xenstore(libxl__gc *gc, uint32_t domid, libxl_de
     if (!num_devs)
         return libxl_create_pci_backend(gc, domid, pcidev, 1);
 
-    if (!libxl__domain_is_hvm(ctx, domid)) {
+    if (!starting && !libxl__domain_is_hvm(ctx, domid)) {
         if (libxl__wait_for_backend(ctx, be_path, "4") < 0)
             return ERROR_FAIL;
     }
@@ -312,7 +312,8 @@ static int libxl_device_pci_add_xenstore(libxl__gc *gc, uint32_t domid, libxl_de
     num = atoi(num_devs);
     libxl_create_pci_backend_device(gc, back, num, pcidev);
     flexarray_vappend(back, "num_devs", libxl__sprintf(gc, "%d", num + 1), NULL);
-    flexarray_vappend(back, "state", libxl__sprintf(gc, "%d", 7), NULL);
+    if (!starting)
+        flexarray_vappend(back, "state", libxl__sprintf(gc, "%d", 7), NULL);
 
 retry_transaction:
     t = xs_transaction_start(ctx->xsh);
@@ -616,7 +617,7 @@ static int pci_ins_check(libxl_ctx *ctx, uint32_t domid, const char *state, void
     return 1;
 }
  
-static int do_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev)
+static int do_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, int starting)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     char *path;
@@ -760,6 +761,11 @@ static int libxl_device_pci_reset(libxl__gc *gc, unsigned int domain, unsigned i
 
 int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
 {
+    return libxl__device_pci_add(ctx, domid, pcidev, 0);
+}
+
+int libxl__device_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev, int starting)
+{
     libxl__gc gc = LIBXL_INIT_GC(ctx);
     unsigned int orig_vdev, pfunc_mask;
     libxl_device_pci *assigned;
@@ -783,7 +789,7 @@ int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcide
     stubdomid = libxl_get_stubdom_id(ctx, domid);
     if (stubdomid != 0) {
         libxl_device_pci pcidev_s = *pcidev;
-        rc = do_pci_add(&gc, stubdomid, &pcidev_s);
+        rc = do_pci_add(&gc, stubdomid, &pcidev_s, starting);
         if ( rc )
             goto out;
     }
@@ -818,7 +824,7 @@ int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcide
                  */
                 pcidev->vdevfn = orig_vdev;
             }
-            if ( do_pci_add(&gc, domid, pcidev) )
+            if ( do_pci_add(&gc, domid, pcidev, starting) )
                 rc = ERROR_FAIL;
         }
     }

@@ -200,6 +200,10 @@ _hidden int libxl__wait_for_device_model(libxl_ctx *ctx,
                                 void *check_callback_userdata);
 _hidden int libxl__wait_for_backend(libxl_ctx *ctx, char *be_path, char *state);
 
+/* from libxl_pci */
+
+_hidden int libxl__device_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev, int starting);
+
 /* xl_exec */
 
  /* higher-level double-fork and separate detach eg as for device models */
