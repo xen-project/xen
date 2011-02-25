@@ -3253,6 +3253,11 @@ int main_create(int argc, char **argv)
         {0, 0, 0, 0}
     };
 
+    if (argv[1] && argv[1][0] != '-' && !strchr(argv[1], '=')) {
+        filename = argv[1];
+        argc--; argv++;
+    }
+
     while (1) {
         opt = getopt_long(argc, argv, "hnqf:pcde", long_options, &option_index);
         if (opt == -1)
