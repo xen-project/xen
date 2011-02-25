@@ -94,9 +94,9 @@ static const disk_info_t log_disk = {
 	0,
 };
 
-static disk_info_t remus_disk = {
-       "remus disk replicator (remus)",
+static const disk_info_t remus_disk = {
        "remus",
+       "remus disk replicator (remus)",
        0,
 };
 
