@@ -145,6 +145,27 @@ struct hvm_function_table {
     void (*set_uc_mode)(struct vcpu *v);
     void (*set_info_guest)(struct vcpu *v);
     void (*set_rdtsc_exiting)(struct vcpu *v, bool_t);
+
+    /* Nested HVM */
+    int (*nhvm_vcpu_initialise)(struct vcpu *v);
+    int (*nhvm_vcpu_destroy)(struct vcpu *v);
+    int (*nhvm_vcpu_reset)(struct vcpu *v);
+    int (*nhvm_vcpu_hostrestore)(struct vcpu *v,
+                                struct cpu_user_regs *regs);
+    int (*nhvm_vcpu_vmexit)(struct vcpu *v, struct cpu_user_regs *regs,
+                                uint64_t exitcode);
+    int (*nhvm_vcpu_vmexit_trap)(struct vcpu *v,
+                                unsigned int trapnr,
+                                int errcode,
+                                unsigned long cr2);
+    uint64_t (*nhvm_vcpu_guestcr3)(struct vcpu *v);
+    uint64_t (*nhvm_vcpu_hostcr3)(struct vcpu *v);
+    uint32_t (*nhvm_vcpu_asid)(struct vcpu *v);
+    int (*nhvm_vmcx_guest_intercepts_trap)(struct vcpu *v, unsigned int trapnr);
+
+    bool_t (*nhvm_vmcx_hap_enabled)(struct vcpu *v);
+
+    enum hvm_intblk (*nhvm_intr_blocked)(struct vcpu *v);
 };
 
 extern struct hvm_function_table hvm_funcs;
@@ -378,7 +399,6 @@ int hvm_x2apic_msr_write(struct vcpu *v, unsigned int msr, uint64_t msr_content)
 void hvm_memory_event_cr0(unsigned long value, unsigned long old);
 void hvm_memory_event_cr3(unsigned long value, unsigned long old);
 void hvm_memory_event_cr4(unsigned long value, unsigned long old);
-
 /* Called for current VCPU on int3: returns -1 if no listener */
 int hvm_memory_event_int3(unsigned long gla);
 #else
@@ -391,5 +411,45 @@ static inline void hvm_memory_event_cr4(unsigned long value, unsigned long old)
 static inline int hvm_memory_event_int3(unsigned long gla)
 { return 0; }
 #endif
+
+/*
+ * Nested HVM
+ */
+
+/* Initialize vcpu's struct nestedhvm */
+int nhvm_vcpu_initialise(struct vcpu *v);
+/* Destroy and free vcpu's struct nestedhvm */
+int nhvm_vcpu_destroy(struct vcpu *v);
+/* Reset vcpu's state when l1 guest disables nested virtualization */
+int nhvm_vcpu_reset(struct vcpu *v);
+/* Restores l1 guest state */
+int nhvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs);
+/* Fill l1 guest's VMCB/VMCS with data provided by generic exit codes
+ * (do conversion as needed), other misc SVM/VMX specific tweaks to make
+ * it work */
+int nhvm_vcpu_vmexit(struct vcpu *v, struct cpu_user_regs *regs,
+                     uint64_t exitcode);
+/* inject vmexit into l1 guest. l1 guest will see a VMEXIT due to
+ * 'trapnr' exception.
+ */ 
+int nhvm_vcpu_vmexit_trap(struct vcpu *v,
+    unsigned int trapnr, int errcode, unsigned long cr2);
+
+/* returns l2 guest cr3 in l2 guest physical address space. */
+uint64_t nhvm_vcpu_guestcr3(struct vcpu *v);
+/* returns l1 guest's cr3 that points to the page table used to
+ * translate l2 guest physical address to l1 guest physical address.
+ */
+uint64_t nhvm_vcpu_hostcr3(struct vcpu *v);
+/* returns the asid number l1 guest wants to use to run the l2 guest */
+uint32_t nhvm_vcpu_asid(struct vcpu *v);
+
+/* returns true, when l1 guest intercepts the specified trap */
+int nhvm_vmcx_guest_intercepts_trap(struct vcpu *v, unsigned int trapnr);
+
+/* returns true when l1 guest wants to use hap to run l2 guest */
+bool_t nhvm_vmcx_hap_enabled(struct vcpu *v);
+/* interrupt */
+enum hvm_intblk nhvm_interrupt_blocked(struct vcpu *v);
 
 #endif /* __ASM_X86_HVM_HVM_H__ */

@@ -3889,6 +3889,89 @@ int hvm_memory_event_int3(unsigned long gla)
 }
 #endif /* __x86_64__ */
 
+int nhvm_vcpu_initialise(struct vcpu *v)
+{
+    if (hvm_funcs.nhvm_vcpu_initialise)
+        return hvm_funcs.nhvm_vcpu_initialise(v);
+    return -EOPNOTSUPP;
+}
+
+int nhvm_vcpu_destroy(struct vcpu *v)
+{
+    if (hvm_funcs.nhvm_vcpu_destroy)
+        return hvm_funcs.nhvm_vcpu_destroy(v);
+    return -EOPNOTSUPP;
+}
+
+int nhvm_vcpu_reset(struct vcpu *v)
+{
+    if (hvm_funcs.nhvm_vcpu_reset)
+        return hvm_funcs.nhvm_vcpu_reset(v);
+    return -EOPNOTSUPP;
+}
+
+int nhvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)
+{
+    if (hvm_funcs.nhvm_vcpu_hostrestore)
+        return hvm_funcs.nhvm_vcpu_hostrestore(v, regs);
+    return -EOPNOTSUPP;
+}
+
+int nhvm_vcpu_vmexit(struct vcpu *v, struct cpu_user_regs *regs,
+                     uint64_t exitcode)
+{
+    if (hvm_funcs.nhvm_vcpu_vmexit)
+        return hvm_funcs.nhvm_vcpu_vmexit(v, regs, exitcode);
+    return -EOPNOTSUPP;
+}
+
+int
+nhvm_vcpu_vmexit_trap(struct vcpu *v, unsigned int trapnr,
+                       int errcode, unsigned long cr2)
+{
+    return hvm_funcs.nhvm_vcpu_vmexit_trap(v, trapnr, errcode, cr2);
+}
+
+uint64_t nhvm_vcpu_guestcr3(struct vcpu *v)
+{
+    if (hvm_funcs.nhvm_vcpu_guestcr3)
+        return hvm_funcs.nhvm_vcpu_guestcr3(v);
+    return -EOPNOTSUPP;
+}
+
+uint64_t nhvm_vcpu_hostcr3(struct vcpu *v)
+{
+    if (hvm_funcs.nhvm_vcpu_hostcr3)
+        return hvm_funcs.nhvm_vcpu_hostcr3(v);
+    return -EOPNOTSUPP;
+}
+
+uint32_t nhvm_vcpu_asid(struct vcpu *v)
+{
+    if (hvm_funcs.nhvm_vcpu_asid)
+        return hvm_funcs.nhvm_vcpu_asid(v);
+    return -EOPNOTSUPP;
+}
+
+int nhvm_vmcx_guest_intercepts_trap(struct vcpu *v, unsigned int trap)
+{
+    if (hvm_funcs.nhvm_vmcx_guest_intercepts_trap)
+        return hvm_funcs.nhvm_vmcx_guest_intercepts_trap(v, trap);
+    return -EOPNOTSUPP;
+}
+
+bool_t nhvm_vmcx_hap_enabled(struct vcpu *v)
+{
+    if (hvm_funcs.nhvm_vmcx_hap_enabled)
+        return hvm_funcs.nhvm_vmcx_hap_enabled(v);
+    return -EOPNOTSUPP;
+}
+
+enum hvm_intblk nhvm_interrupt_blocked(struct vcpu *v)
+{
+    return hvm_funcs.nhvm_intr_blocked(v);
+}
+
 /*
  * Local variables:
  * mode: C
