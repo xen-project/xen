@@ -2555,6 +2555,14 @@ enum hvm_intblk hvm_interrupt_blocked(struct vcpu *v, struct hvm_intack intack)
 
     ASSERT(v == current);
 
+    if ( nestedhvm_enabled(v->domain) ) {
+        enum hvm_intblk intr;
+
+        intr = nhvm_interrupt_blocked(v);
+        if ( intr != hvm_intblk_none )
+            return intr;
+    }
+
     if ( (intack.source != hvm_intsrc_nmi) &&
          !(guest_cpu_user_regs()->eflags & X86_EFLAGS_IF) )
         return hvm_intblk_rflags_ie;
