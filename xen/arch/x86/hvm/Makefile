@@ -10,6 +10,7 @@ obj-y += intercept.o
 obj-y += io.o
 obj-y += irq.o
 obj-y += mtrr.o
+obj-y += nestedhvm.o
 obj-y += pmtimer.o
 obj-y += quirks.o
 obj-y += rtc.o
