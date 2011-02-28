@@ -185,7 +185,7 @@ endif
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG := xen-4.1.0-rc5
+QEMU_TAG := xen-4.1.0-rc6
 #QEMU_TAG ?= e073e69457b4d99b6da0b6536296e3498f7f6599
 # Fri Feb 11 17:54:51 2011 +0000
 # qemu-xen: fix segfault with empty cdroms
