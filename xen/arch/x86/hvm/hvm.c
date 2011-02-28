@@ -1117,6 +1117,47 @@ void hvm_triple_fault(void)
     domain_shutdown(v->domain, SHUTDOWN_reboot);
 }
 
+void hvm_inject_exception(unsigned int trapnr, int errcode, unsigned long cr2)
+{
+    struct vcpu *v = current;
+
+    if ( !nestedhvm_enabled(v->domain) ) {
+        hvm_funcs.inject_exception(trapnr, errcode, cr2);
+        return;
+    }
+
+    if ( nestedhvm_vmswitch_in_progress(v) ) {
+        hvm_funcs.inject_exception(trapnr, errcode, cr2);
+        return;
+    }
+
+    if ( !nestedhvm_vcpu_in_guestmode(v) ) {
+        hvm_funcs.inject_exception(trapnr, errcode, cr2);
+        return;
+    }
+
+    if ( nhvm_vmcx_guest_intercepts_trap(v, trapnr) )
+    {
+        enum nestedhvm_vmexits nsret;
+
+        nsret = nhvm_vcpu_vmexit_trap(v, trapnr, errcode, cr2);
+
+        switch (nsret) {
+        case NESTEDHVM_VMEXIT_DONE:
+        case NESTEDHVM_VMEXIT_ERROR: /* L1 guest will crash L2 guest */
+            return;
+        case NESTEDHVM_VMEXIT_HOST:
+        case NESTEDHVM_VMEXIT_CONTINUE:
+        case NESTEDHVM_VMEXIT_FATALERROR:
+        default:
+            gdprintk(XENLOG_ERR, "unexpected nestedhvm error %i\n", nsret);
+            return;
+        }
+    }
+
+    hvm_funcs.inject_exception(trapnr, errcode, cr2);
+}
+
 bool_t hvm_hap_nested_page_fault(unsigned long gpa,
                                  bool_t gla_valid,
                                  unsigned long gla,

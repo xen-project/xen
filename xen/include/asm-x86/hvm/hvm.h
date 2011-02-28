@@ -278,11 +278,7 @@ void hvm_migrate_timers(struct vcpu *v);
 void hvm_do_resume(struct vcpu *v);
 void hvm_migrate_pirqs(struct vcpu *v);
 
-static inline void
-hvm_inject_exception(unsigned int trapnr, int errcode, unsigned long cr2)
-{
-    hvm_funcs.inject_exception(trapnr, errcode, cr2);
-}
+void hvm_inject_exception(unsigned int trapnr, int errcode, unsigned long cr2);
 
 static inline int hvm_event_pending(struct vcpu *v)
 {
