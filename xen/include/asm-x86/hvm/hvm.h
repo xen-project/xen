@@ -52,7 +52,8 @@ enum hvm_intblk {
     hvm_intblk_shadow,    /* MOV-SS or STI shadow */
     hvm_intblk_rflags_ie, /* RFLAGS.IE == 0 */
     hvm_intblk_tpr,       /* LAPIC TPR too high */
-    hvm_intblk_nmi_iret   /* NMI blocked until IRET */
+    hvm_intblk_nmi_iret,  /* NMI blocked until IRET */
+    hvm_intblk_arch,      /* SVM/VMX specific reason */
 };
 
 /* These happen to be the same as the VMX interrupt shadow definitions. */

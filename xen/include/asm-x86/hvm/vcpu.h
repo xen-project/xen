@@ -36,6 +36,38 @@ enum hvm_io_state {
     HVMIO_completed
 };
 
+#define VMCX_EADDR    (~0ULL)
+
+struct nestedvcpu {
+    bool_t nv_guestmode; /* vcpu in guestmode? */
+    void *nv_vvmcx; /* l1 guest virtual VMCB/VMCS */
+    void *nv_n1vmcx; /* VMCB/VMCS used to run l1 guest */
+    void *nv_n2vmcx; /* shadow VMCB/VMCS used to run l2 guest */
+
+    uint64_t nv_vvmcxaddr; /* l1 guest physical address of nv_vvmcx */
+    uint64_t nv_n1vmcx_pa; /* host physical address of nv_n1vmcx */
+    uint64_t nv_n2vmcx_pa; /* host physical address of nv_n2vmcx */
+
+    /* SVM/VMX arch specific */
+    union {
+    } u;
+
+    bool_t nv_flushp2m; /* True, when p2m table must be flushed */
+    struct p2m_domain *nv_p2m; /* used p2m table for this vcpu */
+
+    bool_t nv_vmentry_pending;
+    bool_t nv_vmexit_pending;
+    bool_t nv_vmswitch_in_progress; /* true during vmentry/vmexit emulation */
+
+    /* Does l1 guest intercept io ports 0x80 and/or 0xED ?
+     * Useful to optimize io permission handling.
+     */
+    bool_t nv_ioport80;
+    bool_t nv_ioportED;
+};
+
+#define vcpu_nestedhvm(v) ((v)->arch.hvm_vcpu.nvcpu)
+
 struct hvm_vcpu {
     /* Guest control-register and EFER values, just as the guest sees them. */
     unsigned long       guest_cr[5];
@@ -80,6 +112,8 @@ struct hvm_vcpu {
     } u;
 
     struct tasklet      assert_evtchn_irq_tasklet;
+
+    struct nestedvcpu   nvcpu;
 
     struct mtrr_state   mtrr;
     u64                 pat_cr;
