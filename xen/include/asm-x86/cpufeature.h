@@ -212,6 +212,8 @@
 
 #define cpu_has_rdtscp          boot_cpu_has(X86_FEATURE_RDTSCP)
 
+#define cpu_has_svm		boot_cpu_has(X86_FEATURE_SVM)
+
 #endif /* __ASM_I386_CPUFEATURE_H */
 
 /* 

@@ -645,10 +645,15 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     return 0;
 }
 
-static bool_t hvm_efer_valid(uint64_t value, uint64_t efer_validbits)
+static bool_t hvm_efer_valid(struct domain *d,
+                             uint64_t value, uint64_t efer_validbits)
 {
+    if ( nestedhvm_enabled(d) && cpu_has_svm )
+        efer_validbits |= EFER_SVME;
+
     return !((value & ~efer_validbits) ||
              ((sizeof(long) != 8) && (value & EFER_LME)) ||
+             (!cpu_has_svm && (value & EFER_SVME)) ||
              (!cpu_has_nx && (value & EFER_NX)) ||
              (!cpu_has_syscall && (value & EFER_SCE)) ||
              (!cpu_has_lmsl && (value & EFER_LMSLE)) ||
@@ -662,6 +667,7 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     struct vcpu *v;
     struct hvm_hw_cpu ctxt;
     struct segment_register seg;
+    uint64_t efer_validbits;
 
     /* Which vcpu is this? */
     vcpuid = hvm_load_instance(h);
@@ -700,9 +706,9 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         return -EINVAL;
     }
 
-    if ( !hvm_efer_valid(
-        ctxt.msr_efer,
-        EFER_FFXSE | EFER_LMSLE | EFER_LME | EFER_LMA | EFER_NX | EFER_SCE) )
+    efer_validbits = EFER_FFXSE | EFER_LMSLE | EFER_LME | EFER_LMA
+                   | EFER_NX | EFER_SCE;
+    if ( !hvm_efer_valid(d, ctxt.msr_efer, efer_validbits) )
     {
         gdprintk(XENLOG_ERR, "HVM restore: bad EFER 0x%"PRIx64"\n",
                  ctxt.msr_efer);
@@ -1294,14 +1300,15 @@ err:
 int hvm_set_efer(uint64_t value)
 {
     struct vcpu *v = current;
+    uint64_t efer_validbits;
 
     value &= ~EFER_LMA;
 
-    if ( !hvm_efer_valid(value,
-            EFER_FFXSE | EFER_LMSLE | EFER_LME | EFER_NX | EFER_SCE) )
+    efer_validbits = EFER_FFXSE | EFER_LMSLE | EFER_LME | EFER_NX | EFER_SCE;
+    if ( !hvm_efer_valid(v->domain, value, efer_validbits) )
     {
         gdprintk(XENLOG_WARNING, "Trying to set reserved bit in "
-                 "EFER: %"PRIx64"\n", value);
+                 "EFER: 0x%"PRIx64"\n", value);
         hvm_inject_exception(TRAP_gp_fault, 0, 0);
         return X86EMUL_EXCEPTION;
     }
