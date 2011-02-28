@@ -30,7 +30,8 @@
 #define set_bit(idx, dst)   ((dst) |= (1u << ((idx) & 31)))
 
 #define DEF_MAX_BASE 0x0000000du
-#define DEF_MAX_EXT  0x80000008u
+#define DEF_MAX_INTELEXT  0x80000008u
+#define DEF_MAX_AMDEXT    0x8000000au
 
 static int hypervisor_is_64bit(xc_interface *xch)
 {
@@ -78,13 +79,18 @@ static void xc_cpuid_brand_get(char *str)
 static void amd_xc_cpuid_policy(
     xc_interface *xch, domid_t domid,
     const unsigned int *input, unsigned int *regs,
-    int is_pae)
+    int is_pae, int is_nestedhvm)
 {
     switch ( input[0] )
     {
     case 0x00000002:
     case 0x00000004:
         regs[0] = regs[1] = regs[2] = 0;
+        break;
+
+    case 0x80000000:
+        if ( regs[0] > DEF_MAX_AMDEXT )
+            regs[0] = DEF_MAX_AMDEXT;
         break;
 
     case 0x80000001: {
@@ -97,6 +103,7 @@ static void amd_xc_cpuid_policy(
         /* Filter all other features according to a whitelist. */
         regs[2] &= ((is_64bit ? bitmaskof(X86_FEATURE_LAHF_LM) : 0) |
                     bitmaskof(X86_FEATURE_CMP_LEGACY) |
+                    (is_nestedhvm ? bitmaskof(X86_FEATURE_SVM) : 0) |
                     bitmaskof(X86_FEATURE_CR8_LEGACY) |
                     bitmaskof(X86_FEATURE_ABM) |
                     bitmaskof(X86_FEATURE_SSE4A) |
@@ -124,16 +131,50 @@ static void amd_xc_cpuid_policy(
          */
         regs[2] = ((regs[2] & 0xf000u) + 1) | ((regs[2] & 0xffu) << 1) | 1u;
         break;
+
+    case 0x8000000a: {
+        if (!is_nestedhvm) {
+            regs[0] = regs[1] = regs[2] = regs[3] = 0;
+            break;
+        }
+
+#define SVM_FEATURE_NPT            0x00000001 /* Nested page table support */
+#define SVM_FEATURE_LBRV           0x00000002 /* LBR virtualization support */
+#define SVM_FEATURE_SVML           0x00000004 /* SVM locking MSR support */
+#define SVM_FEATURE_NRIPS          0x00000008 /* Next RIP save on VMEXIT */
+#define SVM_FEATURE_TSCRATEMSR     0x00000010 /* TSC ratio MSR support */
+#define SVM_FEATURE_VMCBCLEAN      0x00000020 /* VMCB clean bits support */
+#define SVM_FEATURE_FLUSHBYASID    0x00000040 /* TLB flush by ASID support */
+#define SVM_FEATURE_DECODEASSISTS  0x00000080 /* Decode assists support */
+#define SVM_FEATURE_PAUSEFILTER    0x00000400 /* Pause intercept filter */
+
+        /* Pass 1: Only passthrough SVM features which are
+         * available in hw and which are implemented
+         */
+        regs[3] &= (SVM_FEATURE_NPT | SVM_FEATURE_LBRV | \
+            SVM_FEATURE_NRIPS | SVM_FEATURE_PAUSEFILTER);
+
+        /* Pass 2: Always enable SVM features which are emulated */
+        regs[3] |= SVM_FEATURE_VMCBCLEAN;
+        break;
+    }
+
     }
 }
 
 static void intel_xc_cpuid_policy(
     xc_interface *xch, domid_t domid,
     const unsigned int *input, unsigned int *regs,
-    int is_pae)
+    int is_pae, int is_nestedhvm)
 {
     switch ( input[0] )
     {
+    case 0x00000001:
+        /* ECX[5] is availability of VMX */
+        if (is_nestedhvm)
+            set_bit(X86_FEATURE_VMXE, regs[2]);
+        break;
+
     case 0x00000004:
         /*
          * EAX[31:26] is Maximum Cores Per Package (minus one).
@@ -142,6 +183,11 @@ static void intel_xc_cpuid_policy(
         regs[0] = (((regs[0] & 0x7c000000u) << 1) | 0x04000000u |
                    (regs[0] & 0x3ffu));
         regs[3] &= 0x3ffu;
+        break;
+
+    case 0x80000000:
+        if ( regs[0] > DEF_MAX_INTELEXT )
+            regs[0] = DEF_MAX_INTELEXT;
         break;
 
     case 0x80000001: {
@@ -225,8 +271,9 @@ static void xc_cpuid_hvm_policy(
 {
     DECLARE_DOMCTL;
     char brand[13];
+    unsigned long nestedhvm;
     unsigned long pae;
-    int is_pae;
+    int is_pae, is_nestedhvm;
     uint64_t xfeature_mask;
 
     xc_get_hvm_param(xch, domid, HVM_PARAM_PAE_ENABLED, &pae);
@@ -238,6 +285,9 @@ static void xc_cpuid_hvm_policy(
     domctl.domain = domid;
     do_domctl(xch, &domctl);
     xfeature_mask = domctl.u.vcpuextstate.xfeature_mask;
+
+    xc_get_hvm_param(xch, domid, HVM_PARAM_NESTEDHVM, &nestedhvm);
+    is_nestedhvm = !!nestedhvm;
 
     switch ( input[0] )
     {
@@ -305,8 +355,7 @@ static void xc_cpuid_hvm_policy(
         break;
 
     case 0x80000000:
-        if ( regs[0] > DEF_MAX_EXT )
-            regs[0] = DEF_MAX_EXT;
+        /* Passthrough to cpu vendor specific functions */
         break;
 
     case 0x80000001:
@@ -335,6 +384,7 @@ static void xc_cpuid_hvm_policy(
     case 0x80000004: /* ... continued         */
     case 0x80000005: /* AMD L1 cache/TLB info (dumped by Intel policy) */
     case 0x80000006: /* AMD L2/3 cache/TLB info ; Intel L2 cache features */
+    case 0x8000000a: /* AMD SVM feature bits */
         break;
 
     default:
@@ -344,9 +394,9 @@ static void xc_cpuid_hvm_policy(
 
     xc_cpuid_brand_get(brand);
     if ( strstr(brand, "AMD") )
-        amd_xc_cpuid_policy(xch, domid, input, regs, is_pae);
+        amd_xc_cpuid_policy(xch, domid, input, regs, is_pae, is_nestedhvm);
     else
-        intel_xc_cpuid_policy(xch, domid, input, regs, is_pae);
+        intel_xc_cpuid_policy(xch, domid, input, regs, is_pae, is_nestedhvm);
 
 }
 
@@ -507,13 +557,20 @@ int xc_cpuid_apply_policy(xc_interface *xch, domid_t domid)
 {
     unsigned int input[2] = { 0, 0 }, regs[4];
     unsigned int base_max, ext_max;
+    char brand[13];
     int rc;
+
 
     cpuid(input, regs);
     base_max = (regs[0] <= DEF_MAX_BASE) ? regs[0] : DEF_MAX_BASE;
     input[0] = 0x80000000;
     cpuid(input, regs);
-    ext_max = (regs[0] <= DEF_MAX_EXT) ? regs[0] : DEF_MAX_EXT;
+
+    xc_cpuid_brand_get(brand);
+    if ( strstr(brand, "AMD") )
+        ext_max = (regs[0] <= DEF_MAX_AMDEXT) ? regs[0] : DEF_MAX_AMDEXT;
+    else
+        ext_max = (regs[0] <= DEF_MAX_INTELEXT) ? regs[0] : DEF_MAX_INTELEXT;
 
     input[0] = 0;
     input[1] = XEN_CPUID_INPUT_UNUSED;

@@ -137,6 +137,9 @@
 #define HVMPME_mode_sync       2
 #define HVMPME_onchangeonly    (1 << 2)
 
-#define HVM_NR_PARAMS          24
+/* Boolean: Enable nestedhvm (hvm only) */
+#define HVM_PARAM_NESTEDHVM    24
+
+#define HVM_NR_PARAMS          25
 
 #endif /* __XEN_PUBLIC_HVM_PARAMS_H__ */

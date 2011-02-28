@@ -98,6 +98,7 @@ void libxl_init_build_info(libxl_domain_build_info *b_info, libxl_domain_create_
         b_info->u.hvm.hpet = 1;
         b_info->u.hvm.vpt_align = 1;
         b_info->u.hvm.timer_mode = 1;
+        b_info->u.hvm.nested_hvm = 0;
     } else {
         b_info->u.pv.slack_memkb = 8 * 1024;
     }

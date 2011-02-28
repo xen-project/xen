@@ -633,6 +633,11 @@ gopts.var('hap', val='HAP',
           use="""Hap status (0=hap is disabled;
           1=hap is enabled.""")
 
+gopts.var('nestedhvm', val='NESTEDHVM',
+          fn=set_int, default=0,
+          use="""Nested HVM status (0=Nested HVM is disabled;
+          1=Nested HVM is enabled.""")
+
 gopts.var('s3_integrity', val='TBOOT_MEMORY_PROTECT',
           fn=set_int, default=1,
           use="""Should domain memory integrity be verified during S3?
@@ -1083,7 +1088,7 @@ def configure_hvm(config_image, vals):
              'isa',
              'keymap',
              'localtime',
-             'nographic',
+             'nestedhvm', 'nographic',
              'opengl', 'oos',
              'pae', 'pci', 'pci_msitranslate', 'pci_power_mgmt',
              'rtc_timeoffset',

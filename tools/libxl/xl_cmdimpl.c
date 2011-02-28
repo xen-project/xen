@@ -347,6 +347,7 @@ static void printf_info(int domid,
         printf("\t\t\t(hpet %d)\n", b_info->u.hvm.hpet);
         printf("\t\t\t(vpt_align %d)\n", b_info->u.hvm.vpt_align);
         printf("\t\t\t(timer_mode %d)\n", b_info->u.hvm.timer_mode);
+        printf("\t\t\t(nestedhvm %d)\n", b_info->u.hvm.nested_hvm);
 
         printf("\t\t\t(device_model %s)\n", dm_info->device_model);
         printf("\t\t\t(videoram %d)\n", dm_info->videoram);
@@ -760,6 +761,8 @@ static void parse_config_data(const char *configfile_filename_report,
             b_info->u.hvm.vpt_align = l;
         if (!xlu_cfg_get_long (config, "timer_mode", &l))
             b_info->u.hvm.timer_mode = l;
+        if (!xlu_cfg_get_long (config, "nestedhvm", &l))
+            b_info->u.hvm.nested_hvm = l;
     } else {
         char *cmdline = NULL;
         const char *root = NULL, *extra = "";

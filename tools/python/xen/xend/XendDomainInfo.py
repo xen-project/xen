@@ -2585,10 +2585,15 @@ class XendDomainInfo:
             xc.hvm_set_param(self.domid, HVM_PARAM_TIMER_MODE,
                              long(timer_mode))
 
-        # Set Viridian interface configuration of domain
-        viridian = self.info["platform"].get("viridian")
-        if arch.type == "x86" and hvm and viridian is not None:
-            xc.hvm_set_param(self.domid, HVM_PARAM_VIRIDIAN, long(viridian))
+        if arch.type == "x86" and hvm:
+            # Set Viridian interface configuration of domain
+            viridian = self.info["platform"].get("viridian")
+            if viridian is not None:
+                xc.hvm_set_param(self.domid, HVM_PARAM_VIRIDIAN, long(viridian))
+            # Set nestedhvm of domain
+            nestedhvm = self.info["platform"].get("nestedhvm")
+            if nestedhvm is not None:
+                xc.hvm_set_param(self.domid, HVM_PARAM_NESTEDHVM, long(nestedhvm))
 
         # If nomigrate is set, disable migration
         nomigrate = self.info["platform"].get("nomigrate")

@@ -258,6 +258,7 @@ static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
 #endif
     xc_set_hvm_param(handle, domid, HVM_PARAM_TIMER_MODE, (unsigned long) info->u.hvm.timer_mode);
     xc_set_hvm_param(handle, domid, HVM_PARAM_VPT_ALIGN, (unsigned long) info->u.hvm.vpt_align);
+    xc_set_hvm_param(handle, domid, HVM_PARAM_NESTEDHVM, info->u.hvm.nested_hvm);
     xc_set_hvm_param(handle, domid, HVM_PARAM_STORE_EVTCHN, store_evtchn);
     xc_set_hvm_param(handle, domid, HVM_PARAM_CONSOLE_EVTCHN, console_evtchn);
     return 0;

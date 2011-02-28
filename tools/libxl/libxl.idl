@@ -109,6 +109,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                         ("hpet", bool),
                                         ("vpt_align", bool),
                                         ("timer_mode", integer),
+                                        ("nested_hvm", bool),
                                         ])),
                  ("pv", "!%s", Struct(None,
                                        [("slack_memkb", uint32),

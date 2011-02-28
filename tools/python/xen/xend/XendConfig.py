@@ -185,6 +185,7 @@ XENAPI_PLATFORM_CFG_TYPES = {
     'vhpt': int,
     'guest_os_type': str,
     'hap': int,
+    'nestedhvm' : int,
     'xen_extended_power_mgmt': int,
     'pci_msitranslate': int,
     'pci_power_mgmt': int,
