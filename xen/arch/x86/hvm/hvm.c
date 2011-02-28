@@ -55,6 +55,7 @@
 #include <asm/hvm/support.h>
 #include <asm/hvm/cacheattr.h>
 #include <asm/hvm/trace.h>
+#include <asm/hvm/nestedhvm.h>
 #include <asm/mtrr.h>
 #include <asm/apic.h>
 #include <public/sched.h>
@@ -1335,7 +1336,8 @@ int hvm_set_cr0(unsigned long value)
     /* ET is reserved and should be always be 1. */
     value |= X86_CR0_ET;
 
-    if ( (value & (X86_CR0_PE | X86_CR0_PG)) == X86_CR0_PG )
+    if ( !nestedhvm_vmswitch_in_progress(v) &&
+         (value & (X86_CR0_PE | X86_CR0_PG)) == X86_CR0_PG )
         goto gpf;
 
     if ( (value & X86_CR0_PG) && !(old_value & X86_CR0_PG) )
