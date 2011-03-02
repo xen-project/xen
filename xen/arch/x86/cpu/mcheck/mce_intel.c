@@ -1227,9 +1227,24 @@ static void intel_init_mce(void)
     mce_uhandler_num = sizeof(intel_mce_uhandlers)/sizeof(struct mca_error_handler);
 }
 
-static int intel_init_mca_banks(void)
+static void cpu_mcabank_free(unsigned int cpu)
 {
-    struct mca_banks *mb1, *mb2, * mb3;
+    struct mca_banks *mb1, *mb2, *mb3, *mb4;
+
+    mb1 = per_cpu(mce_clear_banks, cpu);
+    mb2 = per_cpu(no_cmci_banks, cpu);
+    mb3 = per_cpu(mce_banks_owned, cpu);
+    mb4 = per_cpu(poll_bankmask, cpu);
+
+    mcabanks_free(mb1);
+    mcabanks_free(mb2);
+    mcabanks_free(mb3);
+    mcabanks_free(mb4);
+}
+
+static int cpu_mcabank_alloc(unsigned int cpu)
+{
+    struct mca_banks *mb1, *mb2, *mb3;
 
     mb1 = mcabanks_alloc();
     mb2 = mcabanks_alloc();
@@ -1237,9 +1252,9 @@ static int intel_init_mca_banks(void)
     if (!mb1 || !mb2 || !mb3)
         goto out;
 
-    __get_cpu_var(mce_clear_banks) = mb1;
-    __get_cpu_var(no_cmci_banks) = mb2;
-    __get_cpu_var(mce_banks_owned) = mb3;
+    per_cpu(mce_clear_banks, cpu) = mb1;
+    per_cpu(no_cmci_banks, cpu) = mb2;
+    per_cpu(mce_banks_owned, cpu) = mb3;
 
     return 0;
 out:
@@ -1249,11 +1264,46 @@ out:
     return -ENOMEM;
 }
 
+static int cpu_callback(
+    struct notifier_block *nfb, unsigned long action, void *hcpu)
+{
+    unsigned int cpu = (unsigned long)hcpu;
+    int rc = 0;
+
+    switch ( action )
+    {
+    case CPU_UP_PREPARE:
+        rc = cpu_mcabank_alloc(cpu);
+        break;
+    case CPU_DYING:
+        cpu_mcheck_disable();
+        break;
+    case CPU_UP_CANCELED:
+    case CPU_DEAD:
+        cpu_mcheck_distribute_cmci();
+        cpu_mcabank_free(cpu);
+        break;
+    default:
+        break;
+    }
+
+    return !rc ? NOTIFY_DONE : notifier_from_errno(rc);
+}
+
+static struct notifier_block cpu_nfb = {
+    .notifier_call = cpu_callback
+};
+
 /* p4/p6 family have similar MCA initialization process */
 enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c)
 {
-    if (intel_init_mca_banks())
-         return mcheck_none;
+    if ( smp_processor_id() == 0 )
+    {
+        /* Early MCE initialisation for BSP. */
+        if ( cpu_mcabank_alloc(0) )
+            BUG();
+        register_cpu_notifier(&cpu_nfb);
+    }
 
     intel_init_mca(c);
 
@@ -1298,31 +1348,3 @@ int intel_mce_rdmsr(uint32_t msr, uint64_t *val)
     return ret;
 }
 
-static int cpu_callback(
-    struct notifier_block *nfb, unsigned long action, void *hcpu)
-{
-    switch ( action )
-    {
-    case CPU_DYING:
-        cpu_mcheck_disable();
-        break;
-    case CPU_DEAD:
-        cpu_mcheck_distribute_cmci();
-        break;
-    default:
-        break;
-    }
-
-    return NOTIFY_DONE;
-}
-
-static struct notifier_block cpu_nfb = {
-    .notifier_call = cpu_callback
-};
-
-static int __init intel_mce_initcall(void)
-{
-    register_cpu_notifier(&cpu_nfb);
-    return 0;
-}
-presmp_initcall(intel_mce_initcall);
