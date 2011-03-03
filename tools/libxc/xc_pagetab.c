@@ -61,11 +61,12 @@ unsigned long xc_translate_foreign_address(xc_interface *xch, uint32_t dom,
             return 0;
         if (domctl.u.address_size.size == 64) {
             pt_levels = 4;
-            paddr = ctx.x64.ctrlreg[3] & ~0xfffull;
+            paddr = (uint64_t)xen_cr3_to_pfn_x86_64(ctx.x64.ctrlreg[3])
+                << PAGE_SHIFT;
         } else {
             pt_levels = 3;
-            paddr = (((uint64_t) xen_cr3_to_pfn(ctx.x32.ctrlreg[3])) 
-                     << PAGE_SHIFT);
+            paddr = (uint64_t)xen_cr3_to_pfn_x86_32(ctx.x32.ctrlreg[3])
+                << PAGE_SHIFT;
         }
     }
 
