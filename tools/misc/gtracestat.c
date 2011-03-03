@@ -137,9 +137,13 @@ int main(int argc, char *argv[])
         { NULL, 0, NULL, 0 },
     };
 
+    if ( argc == 1 ) {
+        show_help();
+        exit(EXIT_SUCCESS);
+    }
     while (1) {
         int ch, opt_idx;
-        ch = getopt_long(argc, argv, "vhds:e:l:bcmaupnzx",
+        ch = getopt_long(argc, argv, "vhds:e:l:bcmau:pn:zx",
                          long_options, &opt_idx);
         if (ch == -1)
             break;
@@ -435,13 +439,13 @@ int load_file(char *fname)
 
 void show_version(void)
 {
-    printf("gtracestat - (C) 2009 Intel Corporation\n");
+    printf("gtracestat - (C) 2009-2011 Intel Corporation\n");
 }
 
 void show_help(void)
 {
     show_version();
-    printf("tracestat <trace.data> [-vhdselbcmau]\n");
+    printf("gtracestat <trace.data> [-vhdselbcmau]\n");
     printf("  trace.data       raw data got by 'xentrace -e 0x80f000 trace.dat'\n");
     printf("  -v / --version   show version message\n");
     printf("  -h / --help      show this message\n");
@@ -453,9 +457,9 @@ void show_help(void)
     printf("  -c / --count       give count summary info\n");
     printf("  -a / --average     give total/average residency info\n");
     printf("  -m / --maxmin      show man/min residency summary info\n");
-    printf("  -u / --tsc2us      specify how many tsc is a us unit\n");
+    printf("  -u / --tsc2us <tsc-per-us> specify how many tsc is a us unit\n");
     printf("  -p / --px          operate on Px entries\n");
-    printf("  -n / --tsc2phase   specify how many tsc is a phase unit (only in px)\n");
+    printf("  -n / --tsc2phase <tsc-per-phase> specify how many tsc is a phase unit (only in px)\n");
     printf("  -z / --exp-ratio   show the ratio of early break events\n");
     printf("  -x / --exp-pred    show the ratio of expected / predicted in Cx entry\n");
 }
@@ -745,21 +749,22 @@ void do_maxmin(void)
 
 void do_count(void)
 {
-    uint64_t scale[100] = { 50000UL, 100000UL, 200000UL, 400000UL, 800000UL, 1000000UL };
-    int a[100];
+    uint64_t scale[100] = { 50UL, 100UL, 200UL, 400UL, 800UL, 1000UL };
+    int a;
     int scale_len = 6;
     int len = 0;
     int i, j;
 
     printf("Please input the period:  (Ctrl+D to quit)\n");
-    printf("The default is 50us, 100us, 200us, 400us, 800us, 1000us.\n(unit is us, you DO NOT need to add us and specify ZERO us and please be in INCREASING order.)\n");
-    while (scanf("%d", &a[len]) == 1)
-        len++;
-    if (len) {
-        for (i = 0; i < len; i++)
-            scale[i] = a[i] * tsc2us;
+    printf("The default is: 50 100 200 400 800 1000\n"
+           "(unit is us, DO NOT specify ZERO as any entry, keep entries in INCREASING order.)\n");
+    while (scanf("%d", &a) == 1) {
+        scale[len++] = a;
         scale_len = len;
     }
+    for (i = 0; i < scale_len; i++)
+        scale[i] = scale[i] * tsc2us;
+
     for (i = 0; i < max_cpu_num; i++) {
         struct cond_rec *r[MAX_CX_NR];
         uint64_t sum[MAX_CX_NR];
