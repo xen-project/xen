@@ -907,8 +907,8 @@ static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
     for ( i = 0; i < j; i++ )
     {
         unsigned long pfn, pagetype;
-        pfn      = pagebuf->pfn_types[i] & ~XEN_DOMCTL_PFINFO_LTAB_MASK;
-        pagetype = pagebuf->pfn_types[i] &  XEN_DOMCTL_PFINFO_LTAB_MASK;
+        pfn      = pagebuf->pfn_types[i + curbatch] & ~XEN_DOMCTL_PFINFO_LTAB_MASK;
+        pagetype = pagebuf->pfn_types[i + curbatch] &  XEN_DOMCTL_PFINFO_LTAB_MASK;
 
         if ( (pagetype != XEN_DOMCTL_PFINFO_XTAB) && 
              (ctx->p2m[pfn] == INVALID_P2M_ENTRY) )
@@ -934,8 +934,8 @@ static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
     for ( i = 0; i < j; i++ )
     {
         unsigned long pfn, pagetype;
-        pfn      = pagebuf->pfn_types[i] & ~XEN_DOMCTL_PFINFO_LTAB_MASK;
-        pagetype = pagebuf->pfn_types[i] &  XEN_DOMCTL_PFINFO_LTAB_MASK;
+        pfn      = pagebuf->pfn_types[i + curbatch] & ~XEN_DOMCTL_PFINFO_LTAB_MASK;
+        pagetype = pagebuf->pfn_types[i + curbatch] &  XEN_DOMCTL_PFINFO_LTAB_MASK;
 
         if ( pagetype == XEN_DOMCTL_PFINFO_XTAB )
             region_mfn[i] = ~0UL; /* map will fail but we don't care */
