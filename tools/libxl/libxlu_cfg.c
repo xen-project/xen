@@ -43,6 +43,9 @@ static void ctx_dispose(CfgParseContext *ctx) {
 static void parse(CfgParseContext *ctx) {
     /* On return, ctx.err will be updated with the error status. */
     int r;
+
+    xlu__cfg_yyset_lineno(1, ctx->scanner);
+
     r= xlu__cfg_yyparse(ctx);
     if (r) assert(ctx->err);
 
