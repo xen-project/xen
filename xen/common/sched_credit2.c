@@ -808,6 +808,7 @@ static void
 __runq_deassign(struct csched_vcpu *svc)
 {
     BUG_ON(__vcpu_on_runq(svc));
+    BUG_ON(test_bit(__CSFLAG_scheduled, &svc->flags));
 
     list_del_init(&svc->rqd_elem);
     update_max_weight(svc->rqd, 0, svc->weight);
@@ -1603,6 +1604,31 @@ csched_schedule(
 
     /* Protected by runqueue lock */        
 
+    /* DEBUG */
+    if ( !is_idle_vcpu(scurr->vcpu) && scurr->rqd != rqd)
+    {
+        int other_rqi = -1, this_rqi = c2r(ops, cpu);
+
+        if ( scurr->rqd )
+        {
+            int rq;
+            other_rqi = -2;
+            for_each_cpu_mask ( rq, CSCHED_PRIV(ops)->active_queues )
+            {
+                if ( scurr->rqd == &CSCHED_PRIV(ops)->rqd[rq] )
+                {
+                    other_rqi = rq;
+                    break;
+                }
+            }
+        }
+        printk("%s: pcpu %d rq %d, but scurr d%dv%d assigned to "
+               "pcpu %d rq %d!\n",
+               __func__,
+               cpu, this_rqi,
+               scurr->vcpu->domain->domain_id, scurr->vcpu->vcpu_id,
+               scurr->vcpu->processor, other_rqi);
+    }
     BUG_ON(!is_idle_vcpu(scurr->vcpu) && scurr->rqd != rqd);
 
     /* Clear "tickled" bit now that we've been scheduled */
