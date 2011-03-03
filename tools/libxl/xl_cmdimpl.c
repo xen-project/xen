@@ -244,6 +244,26 @@ release_lock:
     return rc;
 }
 
+static void *xmalloc(size_t sz) {
+    void *r;
+    r = malloc(sz);
+    if (!r) { fprintf(stderr,"xl: Unable to malloc %lu bytes.\n",
+                      (unsigned long)sz); exit(-ERROR_FAIL); }
+    return r;
+}
+
+static void *xrealloc(void *ptr, size_t sz) {
+    void *r;
+    if (!sz) { free(ptr); return 0; }
+      /* realloc(non-0, 0) has a useless return value;
+       * but xrealloc(anything, 0) is like free
+       */
+    r = realloc(ptr, sz);
+    if (!r) { fprintf(stderr,"xl: Unable to realloc to %lu bytes.\n",
+                      (unsigned long)sz); exit(-ERROR_FAIL); }
+    return r;
+}
+
 #define LOG(_f, _a...)   dolog(__FILE__, __LINE__, __func__, _f "\n", ##_a)
 
 static void dolog(const char *file, int line, const char *func, char *fmt, ...)
@@ -1087,6 +1107,9 @@ skip_vfb:
     }
 
     if (c_info->hvm == 1) {
+        XLU_ConfigList *dmargs;
+        int nr_dmargs = 0;
+
         /* init dm from c and b */
         libxl_init_dm_info(dm_info, c_info, b_info);
 
@@ -1119,31 +1142,22 @@ skip_vfb:
         xlu_cfg_replace_string (config, "soundhw", &dm_info->soundhw);
         if (!xlu_cfg_get_long (config, "xen_platform_pci", &l))
             dm_info->xen_platform_pci = l;
+
+        if (!xlu_cfg_get_list(config, "device_model_args", &dmargs, &nr_dmargs, 0))
+        {
+            int i;
+            dm_info->extra = xmalloc(sizeof(char *) * (nr_dmargs + 1));
+            dm_info->extra[nr_dmargs] = NULL;
+            for (i=0; i<nr_dmargs; i++) {
+                const char *a = xlu_cfg_get_listitem(dmargs, i);
+                dm_info->extra[i] = a ? strdup(a) : NULL;
+            }
+        }
     }
 
     dm_info->type = c_info->hvm ? XENFV : XENPV;
 
     xlu_cfg_destroy(config);
-}
-
-static void *xmalloc(size_t sz) {
-    void *r;
-    r = malloc(sz);
-    if (!r) { fprintf(stderr,"xl: Unable to malloc %lu bytes.\n",
-                      (unsigned long)sz); exit(-ERROR_FAIL); }
-    return r;
-}
-
-static void *xrealloc(void *ptr, size_t sz) {
-    void *r;
-    if (!sz) { free(ptr); return 0; }
-      /* realloc(non-0, 0) has a useless return value;
-       * but xrealloc(anything, 0) is like free
-       */
-    r = realloc(ptr, sz);
-    if (!r) { fprintf(stderr,"xl: Unable to realloc to %lu bytes.\n",
-                      (unsigned long)sz); exit(-ERROR_FAIL); }
-    return r;
 }
 
 /* Returns 1 if domain should be restarted, 2 if domain should be renamed then restarted  */
