@@ -1165,7 +1165,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
         goto out;
     }
 
-    if ( read_exact(io_fd, &dinfo->p2m_size, sizeof(unsigned long)) )
+    if ( RDEXACT(io_fd, &dinfo->p2m_size, sizeof(unsigned long)) )
     {
         PERROR("read: p2m_size");
         goto out;
