@@ -1,7 +1,7 @@
 # -*- mode: Makefile; -*-
 
 # A debug build of Xen and tools?
-debug ?= y
+debug ?= n
 
 XEN_COMPILE_ARCH    ?= $(shell uname -m | sed -e s/i.86/x86_32/ \
                          -e s/i86pc/x86_32/ -e s/amd64/x86_64/)
