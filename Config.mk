@@ -175,9 +175,9 @@ XEN_EXTFILES_URL=http://xenbits.xensource.com/xen-extfiles
 # near the place in the Xen Makefiles where the file is used.
 
 ifeq ($(GIT_HTTP),y)
-QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
+QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-4.1-testing.git
 else
-QEMU_REMOTE=git://xenbits.xensource.com/qemu-xen-unstable.git
+QEMU_REMOTE=git://xenbits.xensource.com/qemu-xen-4.1-testing.git
 endif
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
