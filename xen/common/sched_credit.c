@@ -1452,6 +1452,10 @@ csched_dump(const struct scheduler *ops)
     struct list_head *iter_sdom, *iter_svc;
     struct csched_private *prv = CSCHED_PRIV(ops);
     int loop;
+    unsigned long flags;
+
+    spin_lock_irqsave(&(prv->lock), flags);
+
 #define idlers_buf keyhandler_scratch
 
     printk("info:\n"
@@ -1500,6 +1504,8 @@ csched_dump(const struct scheduler *ops)
         }
     }
 #undef idlers_buf
+
+    spin_unlock_irqrestore(&(prv->lock), flags);
 }
 
 static int
