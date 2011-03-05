@@ -74,7 +74,8 @@ static void map_cpu_to_logical_apicid(void);
 
 static int cpu_error;
 static enum cpu_state {
-    CPU_STATE_DEAD = 0, /* slave -> master: I am completely dead */
+    CPU_STATE_DYING,    /* slave -> master: I am dying */
+    CPU_STATE_DEAD,     /* slave -> master: I am completely dead */
     CPU_STATE_INIT,     /* master -> slave: Early bringup phase 1 */
     CPU_STATE_CALLOUT,  /* master -> slave: Early bringup phase 2 */
     CPU_STATE_CALLIN,   /* slave -> master: Completed phase 2 */
@@ -834,6 +835,8 @@ void __cpu_disable(void)
     extern void fixup_irqs(void);
     int cpu = smp_processor_id();
 
+    set_cpu_state(CPU_STATE_DYING);
+
     local_irq_disable();
     clear_local_APIC();
     /* Allow any queued timer interrupts to get serviced */
@@ -861,6 +864,7 @@ void __cpu_die(unsigned int cpu)
 
     while ( cpu_state != CPU_STATE_DEAD )
     {
+        BUG_ON(cpu_state != CPU_STATE_DYING);
         mdelay(100);
         cpu_relax();
         process_pending_softirqs();
