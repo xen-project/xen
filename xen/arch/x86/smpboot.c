@@ -861,10 +861,11 @@ void __cpu_die(unsigned int cpu)
 {
     /* We don't do anything here: idle task is faking death itself. */
     unsigned int i = 0;
+    enum cpu_state seen_state;
 
-    while ( cpu_state != CPU_STATE_DEAD )
+    while ( (seen_state = cpu_state) != CPU_STATE_DEAD )
     {
-        BUG_ON(cpu_state != CPU_STATE_DYING);
+        BUG_ON(seen_state != CPU_STATE_DYING);
         mdelay(100);
         cpu_relax();
         process_pending_softirqs();
