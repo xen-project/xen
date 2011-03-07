@@ -28,7 +28,7 @@ void save_rest_processor_state(void)
 
 #if defined(CONFIG_X86_64)
     asm volatile (
-        "mov %%ds,(%0); mov %%es,2(%0); mov %%fs,4(%0); mov %%gs,6(%0)"
+        "movw %%ds,(%0); movw %%es,2(%0); movw %%fs,4(%0); movw %%gs,6(%0)"
         : : "r" (saved_segs) : "memory" );
     rdmsrl(MSR_FS_BASE, saved_fs_base);
     rdmsrl(MSR_GS_BASE, saved_gs_base);
@@ -75,7 +75,7 @@ void restore_rest_processor_state(void)
     if ( !is_idle_vcpu(curr) )
     {
         asm volatile (
-            "mov (%0),%%ds; mov 2(%0),%%es; mov 4(%0),%%fs"
+            "movw (%0),%%ds; movw 2(%0),%%es; movw 4(%0),%%fs"
             : : "r" (saved_segs) : "memory" );
         do_set_segment_base(SEGBASE_GS_USER_SEL, saved_segs[3]);
     }

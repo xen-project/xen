@@ -2678,7 +2678,7 @@ x86_emulate(
                 emulate_fpu_insn_memsrc("fiaddl", src.val);
                 break;
             case 1: /* fimul m64i */
-                emulate_fpu_insn_memsrc("fimul", src.val);
+                emulate_fpu_insn_memsrc("fimuls", src.val);
                 break;
             case 2: /* ficom m64i */
                 emulate_fpu_insn_memsrc("ficoml", src.val);
@@ -2897,28 +2897,28 @@ x86_emulate(
             switch ( modrm_reg & 7 )
             {
             case 0: /* fiadd m16i */
-                emulate_fpu_insn_memsrc("fiadd", src.val);
+                emulate_fpu_insn_memsrc("fiadds", src.val);
                 break;
             case 1: /* fimul m16i */
-                emulate_fpu_insn_memsrc("fimul", src.val);
+                emulate_fpu_insn_memsrc("fimuls", src.val);
                 break;
             case 2: /* ficom m16i */
-                emulate_fpu_insn_memsrc("ficom", src.val);
+                emulate_fpu_insn_memsrc("ficoms", src.val);
                 break;
             case 3: /* ficomp m16i */
-                emulate_fpu_insn_memsrc("ficomp", src.val);
+                emulate_fpu_insn_memsrc("ficomps", src.val);
                 break;
             case 4: /* fisub m16i */
-                emulate_fpu_insn_memsrc("fisub", src.val);
+                emulate_fpu_insn_memsrc("fisubs", src.val);
                 break;
             case 5: /* fisubr m16i */
-                emulate_fpu_insn_memsrc("fisubr", src.val);
+                emulate_fpu_insn_memsrc("fisubrs", src.val);
                 break;
             case 6: /* fidiv m16i */
-                emulate_fpu_insn_memsrc("fidiv", src.val);
+                emulate_fpu_insn_memsrc("fidivs", src.val);
                 break;
             case 7: /* fidivr m16i */
-                emulate_fpu_insn_memsrc("fidivr", src.val);
+                emulate_fpu_insn_memsrc("fidivrs", src.val);
                 break;
             default:
                 goto cannot_emulate;
@@ -2950,25 +2950,25 @@ x86_emulate(
                 if ( (rc = ops->read(src.mem.seg, src.mem.off, &src.val,
                                      src.bytes, ctxt)) != 0 )
                     goto done;
-                emulate_fpu_insn_memsrc("fild", src.val);
+                emulate_fpu_insn_memsrc("filds", src.val);
                 break;
             case 1: /* fisttp m16i */
                 ea.bytes = 2;
                 dst = ea;
                 dst.type = OP_MEM;
-                emulate_fpu_insn_memdst("fisttp", dst.val);
+                emulate_fpu_insn_memdst("fisttps", dst.val);
                 break;
             case 2: /* fist m16i */
                 ea.bytes = 2;
                 dst = ea;
                 dst.type = OP_MEM;
-                emulate_fpu_insn_memdst("fist", dst.val);
+                emulate_fpu_insn_memdst("fists", dst.val);
                 break;
             case 3: /* fistp m16i */
                 ea.bytes = 2;
                 dst = ea;
                 dst.type = OP_MEM;
-                emulate_fpu_insn_memdst("fistp", dst.val);
+                emulate_fpu_insn_memdst("fistps", dst.val);
                 break;
             case 4: /* fbld m80dec */
                 ea.bytes = 10;
