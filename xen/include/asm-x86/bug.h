@@ -22,7 +22,7 @@ struct bug_frame {
     asm volatile (                                 \
         "ud2 ; ret %0" BUG_STR(1)                  \
         : : "i" (BUGFRAME_run_fn),                 \
-            "i" (fn) )
+            "i" (&(fn)) )
 
 #define WARN()                                     \
     asm volatile (                                 \
