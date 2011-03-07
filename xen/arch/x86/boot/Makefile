@@ -1,4 +1,4 @@
-obj-y += head.o
+obj-bin-y += head.o
 
 head.o: reloc.S
 

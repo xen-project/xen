@@ -1,6 +1,6 @@
 obj-y += domain_page.o
-obj-y += entry.o
-obj-y += gpr_switch.o
+obj-bin-y += entry.o
+obj-bin-y += gpr_switch.o
 obj-y += mm.o
 obj-y += seg_fixup.o
 obj-y += traps.o
@@ -9,4 +9,4 @@ obj-y += pci.o
 
 obj-$(crash_debug) += gdbstub.o
 
-obj-$(supervisor_mode_kernel) += supervisor_mode_kernel.o
+obj-bin-$(supervisor_mode_kernel) += supervisor_mode_kernel.o

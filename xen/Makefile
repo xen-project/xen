@@ -159,4 +159,4 @@ FORCE:
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C $(*D) $(@F)
 
 %/: FORCE
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C $* built_in.o
+	$(MAKE) -f $(BASEDIR)/Rules.mk -C $* built_in.o built_in_bin.o

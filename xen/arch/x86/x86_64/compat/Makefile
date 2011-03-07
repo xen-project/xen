@@ -1,2 +1,2 @@
-obj-y += entry.o
+obj-bin-y += entry.o
 

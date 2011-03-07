@@ -1,4 +1,4 @@
-obj-y := libelf.o
+obj-bin-y := libelf.o
 
 SECTIONS := text data rodata $(foreach n,1 2 4 8,rodata.str1.$(n)) $(foreach r,rel rel.ro,data.$(r) data.$(r).local)
 

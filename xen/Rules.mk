@@ -9,6 +9,8 @@ perfc_arrays  ?= n
 lock_profile  ?= n
 crash_debug   ?= n
 frame_pointer ?= n
+clang         ?= n
+lto           ?= n
 
 XEN_ROOT=$(BASEDIR)/..
 include $(XEN_ROOT)/Config.mk
@@ -75,7 +77,8 @@ CFLAGS += $(CFLAGS-y)
 
 # Most CFLAGS are safe for assembly files:
 #  -std=gnu{89,99} gets confused by #-prefixed end-of-line comments
-AFLAGS += $(AFLAGS-y) $(filter-out -std=gnu%,$(CFLAGS))
+#  -flto makes no sense and annoys clang
+AFLAGS += $(AFLAGS-y) $(filter-out -std=gnu%,$(filter-out -flto,$(CFLAGS)))
 
 # LDFLAGS are only passed directly to $(LD)
 LDFLAGS += $(LDFLAGS_DIRECT)
@@ -86,18 +89,45 @@ include Makefile
 subdir-n := $(patsubst %,%/,$(patsubst %/,%,$(subdir-n) $(subdir-)))
 subdir-y := $(patsubst %,%/,$(patsubst %/,%,$(subdir-y)))
 
-# Add explicitly declared subdirectories to the object list.
+# Add explicitly declared subdirectories to the object lists.
 obj-y += $(patsubst %/,%/built_in.o,$(subdir-y))
 
-# Add implicitly declared subdirectories (in the object list) to the
+# Add implicitly declared subdirectories (in the object lists) to the
 # subdirectory list, and rewrite the object-list entry.
 subdir-y += $(filter %/,$(obj-y))
 obj-y    := $(patsubst %/,%/built-in.o,$(obj-y))
 
 subdir-all := $(subdir-y) $(subdir-n)
 
+ifeq ($(lto),y)
+# Would like to handle all object files as bitcode, but objects made from
+# pure asm are in a different format and have to be collected separately.
+# Mirror the directory tree, collecting them as built_in_bin.o.
+# If there are no binary objects in a given directory, make a dummy .o
+obj-bin-y += $(patsubst %/built_in.o,%/built_in_bin.o,$(filter %/built_in.o,$(obj-y)))
+else
+# For a non-LTO build, bundle obj-bin targets in with the normal objs.
+obj-y += $(obj-bin-y)
+obj-bin-y :=
+endif
+
 built_in.o: $(obj-y)
+ifeq ($(obj-y),)
+	$(CC) $(CFLAGS) -c -x c /dev/null -o $@
+else
+ifeq ($(lto),y)
+	$(LD_LTO) -r -o $@ $^
+else
 	$(LD) $(LDFLAGS) -r -o $@ $^
+endif
+endif
+
+built_in_bin.o: $(obj-bin-y)
+ifeq ($(obj-bin-y),)
+	$(CC) $(AFLAGS) -c -x assembler /dev/null -o $@
+else
+	$(LD) $(LDFLAGS) -r -o $@ $^
+endif
 
 # Force execution of pattern rules (for which PHONY cannot be directly used).
 .PHONY: FORCE
@@ -105,6 +135,9 @@ FORCE:
 
 %/built_in.o: FORCE
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C $* built_in.o
+
+%/built_in_bin.o: FORCE
+	$(MAKE) -f $(BASEDIR)/Rules.mk -C $* built_in_bin.o
 
 .PHONY: clean
 clean:: $(addprefix _clean_, $(subdir-all))

@@ -1,10 +1,11 @@
 AS         = $(CROSS_COMPILE)as
-ifeq ($(clang),y)
-LD         = $(CROSS_COMPILE)gold
-CC         = $(CROSS_COMPILE)clang
-else
 LD         = $(CROSS_COMPILE)ld
+ifeq ($(clang),y)
+CC         = $(CROSS_COMPILE)clang
+LD_LTO     = $(CROSS_COMPILE)llvm-ld
+else
 CC         = $(CROSS_COMPILE)gcc
+LD_LTO     = $(CROSS_COMPILE)ld
 endif
 CPP        = $(CC) -E
 AR         = $(CROSS_COMPILE)ar
@@ -77,5 +78,12 @@ else
 CFLAGS += -O1 -fno-omit-frame-pointer
 ifneq ($(clang),y)
 CFLAGS += -fno-optimize-sibling-calls
+endif
+endif
+
+ifeq ($(lto),y)
+CFLAGS += -flto
+ifeq ($(clang),y)
+LDFLAGS += -plugin LLVMgold.so
 endif
 endif

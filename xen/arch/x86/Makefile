@@ -10,8 +10,8 @@ subdir-$(x86_64) += x86_64
 
 obj-y += apic.o
 obj-y += bitops.o
-obj-y += clear_page.o
-obj-y += copy_page.o
+obj-bin-y += clear_page.o
+obj-bin-y += copy_page.o
 obj-y += compat.o
 obj-y += debug.o
 obj-y += delay.o
@@ -65,24 +65,38 @@ $(TARGET): $(TARGET)-syms boot/mkelf32
 	./boot/mkelf32 $(TARGET)-syms $(TARGET) 0x100000 \
 	`$(NM) -nr $(TARGET)-syms | head -n 1 | sed -e 's/^\([^ ]*\).*/0x\1/'`
 
+
 ALL_OBJS := $(BASEDIR)/arch/x86/boot/built_in.o $(ALL_OBJS)
 
-$(TARGET)-syms: $(ALL_OBJS) xen.lds
+ifeq ($(lto),y)
+# Gather all LTO objects together
+prelink_lto.o: $(ALL_OBJS)
+	$(LD_LTO) -r -o $@ $^
+
+# Link it with all the binary objects
+prelink.o: $(patsubst %/built_in.o,%/built_in_bin.o,$(ALL_OBJS)) prelink_lto.o
+	$(LD) $(LDFLAGS) -r -o $@ $^
+else
+prelink.o: $(ALL_OBJS)
+	$(LD) $(LDFLAGS) -r -o $@ $^
+endif
+
+$(TARGET)-syms: prelink.o xen.lds
 	$(MAKE) -f $(BASEDIR)/Rules.mk $(BASEDIR)/common/symbols-dummy.o
-	$(LD) $(LDFLAGS) -T xen.lds -N $(ALL_OBJS) \
+	$(LD) $(LDFLAGS) -T xen.lds -N prelink.o \
 	    $(BASEDIR)/common/symbols-dummy.o -o $(@D)/.$(@F).0
 	$(NM) -n $(@D)/.$(@F).0 | $(BASEDIR)/tools/symbols >$(@D)/.$(@F).0.S
 	$(MAKE) -f $(BASEDIR)/Rules.mk $(@D)/.$(@F).0.o
-	$(LD) $(LDFLAGS) -T xen.lds -N $(ALL_OBJS) \
+	$(LD) $(LDFLAGS) -T xen.lds -N prelink.o \
 	    $(@D)/.$(@F).0.o -o $(@D)/.$(@F).1
 	$(NM) -n $(@D)/.$(@F).1 | $(BASEDIR)/tools/symbols >$(@D)/.$(@F).1.S
 	$(MAKE) -f $(BASEDIR)/Rules.mk $(@D)/.$(@F).1.o
-	$(LD) $(LDFLAGS) -T xen.lds -N $(ALL_OBJS) \
+	$(LD) $(LDFLAGS) -T xen.lds -N prelink.o \
 	    $(@D)/.$(@F).1.o -o $@
 	rm -f $(@D)/.$(@F).[0-9]*
 
 asm-offsets.s: $(TARGET_SUBARCH)/asm-offsets.c
-	$(CC) $(CFLAGS) -S -o $@ $<
+	$(CC) $(filter-out -flto,$(CFLAGS)) -S -o $@ $<
 
 xen.lds: xen.lds.S
 	$(CC) -P -E -Ui386 $(AFLAGS) -o $@ $<
