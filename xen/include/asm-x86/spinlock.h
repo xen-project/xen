@@ -27,7 +27,7 @@ static always_inline int _raw_spin_trylock(raw_spinlock_t *lock)
     asm volatile (
         "xchgw %w0,%1"
         :"=r" (oldval), "=m" (lock->lock)
-        :"0" (0) : "memory" );
+        :"0" ((s16)0) : "memory" );
     return (oldval > 0);
 }
 
