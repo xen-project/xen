@@ -296,7 +296,7 @@ static inline const cpumask_t *cpumask_of(unsigned int cpu)
 
 #define CPU_MASK_NONE							\
 /*(cpumask_t)*/ { {							\
-	[0 ... BITS_TO_LONGS(NR_CPUS)-1] =  0UL				\
+	0UL								\
 } }
 
 #define CPU_MASK_CPU0							\
