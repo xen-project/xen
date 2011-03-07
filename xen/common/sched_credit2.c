@@ -1109,86 +1109,96 @@ out_up:
     return new_cpu;
 }
 
+/* Working state of the load-balancing algorithm */
+typedef struct {
+    /* NB: Modified by consider() */
+    s_time_t load_delta;
+    struct csched_vcpu * best_push_svc, *best_pull_svc;
+    /* NB: Read by consider() */
+    struct csched_runqueue_data *lrqd;
+    struct csched_runqueue_data *orqd;                  
+} balance_state_t;
+
+static void consider(balance_state_t *st, 
+                     struct csched_vcpu *push_svc,
+                     struct csched_vcpu *pull_svc)
+{
+    s_time_t l_load, o_load, delta;
+
+    l_load = st->lrqd->b_avgload;
+    o_load = st->orqd->b_avgload;
+    if ( push_svc )
+    {
+        /* What happens to the load on both if we push? */
+        l_load -= push_svc->avgload;
+        o_load += push_svc->avgload;
+    }
+    if ( pull_svc )
+    {
+        /* What happens to the load on both if we pull? */
+        l_load += pull_svc->avgload;
+        o_load -= pull_svc->avgload;
+    }
+
+    delta = l_load - o_load;
+    if ( delta < 0 )
+        delta = -delta;
+
+    if ( delta < st->load_delta )
+    {
+        st->load_delta = delta;
+        st->best_push_svc=push_svc;
+        st->best_pull_svc=pull_svc;
+    }
+}
+
+
+void migrate(const struct scheduler *ops,
+             struct csched_vcpu *svc, 
+             struct csched_runqueue_data *trqd, 
+             s_time_t now)
+{
+    if ( test_bit(__CSFLAG_scheduled, &svc->flags) )
+    {
+        d2printk("d%dv%d %d-%d a\n", svc->vcpu->domain->domain_id, svc->vcpu->vcpu_id,
+                 svc->rqd->id, trqd->id);
+        /* It's running; mark it to migrate. */
+        svc->migrate_rqd = trqd;
+        set_bit(_VPF_migrating, &svc->vcpu->pause_flags);
+        set_bit(__CSFLAG_runq_migrate_request, &svc->flags);
+    }
+    else
+    {
+        int on_runq=0;
+        /* It's not running; just move it */
+        d2printk("d%dv%d %d-%d i\n", svc->vcpu->domain->domain_id, svc->vcpu->vcpu_id,
+                 svc->rqd->id, trqd->id);
+        if ( __vcpu_on_runq(svc) )
+        {
+            __runq_remove(svc);
+            update_load(ops, svc->rqd, svc, -1, now);
+            on_runq=1;
+        }
+        __runq_deassign(svc);
+        svc->vcpu->processor = first_cpu(trqd->active);
+        __runq_assign(svc, trqd);
+        if ( on_runq )
+        {
+            update_load(ops, svc->rqd, svc, 1, now);
+            runq_insert(ops, svc->vcpu->processor, svc);
+            runq_tickle(ops, svc->vcpu->processor, svc, now);
+        }
+    }
+}
+
+
 static void balance_load(const struct scheduler *ops, int cpu, s_time_t now)
 {
     struct csched_private *prv = CSCHED_PRIV(ops);
     int i, max_delta_rqi = -1;
     struct list_head *push_iter, *pull_iter;
 
-    /* NB: Modified by consider() */
-    s_time_t load_delta;
-    struct csched_vcpu * best_push_svc=NULL, *best_pull_svc=NULL;
-    /* NB: Read by consider() */
-    struct csched_runqueue_data *lrqd;
-    struct csched_runqueue_data *orqd;
-    
-    void consider(struct csched_vcpu *push_svc,
-                  struct csched_vcpu *pull_svc)
-    {
-        s_time_t l_load, o_load, delta;
-
-        l_load = lrqd->b_avgload;
-        o_load = orqd->b_avgload;
-        if ( push_svc )
-        {
-            /* What happens to the load on both if we push? */
-            l_load -= push_svc->avgload;
-            o_load += push_svc->avgload;
-        }
-        if ( pull_svc )
-        {
-            /* What happens to the load on both if we pull? */
-            l_load += pull_svc->avgload;
-            o_load -= pull_svc->avgload;
-        }
-        
-        delta = l_load - o_load;
-        if ( delta < 0 )
-            delta = -delta;
-
-        if ( delta < load_delta )
-        {
-            load_delta = delta;
-            best_push_svc=push_svc;
-            best_pull_svc=pull_svc;
-        }
-    }
-
-    void migrate(struct csched_vcpu *svc, struct csched_runqueue_data *trqd)
-    {
-        if ( test_bit(__CSFLAG_scheduled, &svc->flags) )
-        {
-            d2printk("d%dv%d %d-%d a\n", svc->vcpu->domain->domain_id, svc->vcpu->vcpu_id,
-                     svc->rqd->id, trqd->id);
-            /* It's running; mark it to migrate. */
-            svc->migrate_rqd = trqd;
-            set_bit(_VPF_migrating, &svc->vcpu->pause_flags);
-            set_bit(__CSFLAG_runq_migrate_request, &svc->flags);
-        }
-        else
-        {
-            int on_runq=0;
-            /* It's not running; just move it */
-            d2printk("d%dv%d %d-%d i\n", svc->vcpu->domain->domain_id, svc->vcpu->vcpu_id,
-                     svc->rqd->id, trqd->id);
-            if ( __vcpu_on_runq(svc) )
-            {
-                __runq_remove(svc);
-                update_load(ops, svc->rqd, svc, -1, now);
-                on_runq=1;
-            }
-            __runq_deassign(svc);
-            svc->vcpu->processor = first_cpu(trqd->active);
-            __runq_assign(svc, trqd);
-            if ( on_runq )
-            {
-                update_load(ops, svc->rqd, svc, 1, now);
-                runq_insert(ops, svc->vcpu->processor, svc);
-                runq_tickle(ops, svc->vcpu->processor, svc, now);
-            }
-        }
-    }
-                  
+    balance_state_t st = { .best_push_svc = NULL, .best_pull_svc = NULL };
     
     /*
      * Basic algorithm: Push, pull, or swap.
@@ -1200,39 +1210,39 @@ static void balance_load(const struct scheduler *ops, int cpu, s_time_t now)
     /* Locking:
      * - pcpu schedule lock should be already locked
      */
-    lrqd = RQD(ops, cpu);
+    st.lrqd = RQD(ops, cpu);
 
-    __update_runq_load(ops, lrqd, 0, now);
+    __update_runq_load(ops, st.lrqd, 0, now);
 
 retry:
     if ( !spin_trylock(&prv->lock) )
         return;
 
-    load_delta = 0;
+    st.load_delta = 0;
 
     for_each_cpu_mask(i, prv->active_queues)
     {
         s_time_t delta;
         
-        orqd = prv->rqd + i;
+        st.orqd = prv->rqd + i;
 
-        if ( orqd == lrqd
-             || !spin_trylock(&orqd->lock) )
+        if ( st.orqd == st.lrqd
+             || !spin_trylock(&st.orqd->lock) )
             continue;
 
-        __update_runq_load(ops, orqd, 0, now);
+        __update_runq_load(ops, st.orqd, 0, now);
     
-        delta = lrqd->b_avgload - orqd->b_avgload;
+        delta = st.lrqd->b_avgload - st.orqd->b_avgload;
         if ( delta < 0 )
             delta = -delta;
 
-        if ( delta > load_delta )
+        if ( delta > st.load_delta )
         {
-            load_delta = delta;
+            st.load_delta = delta;
             max_delta_rqi = i;
         }
 
-        spin_unlock(&orqd->lock);
+        spin_unlock(&st.orqd->lock);
     }
 
     /* Minimize holding the big lock */
@@ -1245,23 +1255,23 @@ retry:
         int cpus_max;
 
         
-        load_max = lrqd->b_avgload;
-        if ( orqd->b_avgload > load_max )
-            load_max = orqd->b_avgload;
+        load_max = st.lrqd->b_avgload;
+        if ( st.orqd->b_avgload > load_max )
+            load_max = st.orqd->b_avgload;
 
-        cpus_max=cpus_weight(lrqd->active);
-        if ( cpus_weight(orqd->active) > cpus_max )
-            cpus_max = cpus_weight(orqd->active);
+        cpus_max=cpus_weight(st.lrqd->active);
+        if ( cpus_weight(st.orqd->active) > cpus_max )
+            cpus_max = cpus_weight(st.orqd->active);
 
         /* If we're under 100% capacaty, only shift if load difference
          * is > 1.  otherwise, shift if under 12.5% */
         if ( load_max < (1ULL<<(prv->load_window_shift))*cpus_max )
         {
-            if ( load_delta < (1ULL<<(prv->load_window_shift+opt_underload_balance_tolerance) ) )
+            if ( st.load_delta < (1ULL<<(prv->load_window_shift+opt_underload_balance_tolerance) ) )
                  goto out;
         }
         else
-            if ( load_delta < (1ULL<<(prv->load_window_shift+opt_overload_balance_tolerance)) )
+            if ( st.load_delta < (1ULL<<(prv->load_window_shift+opt_overload_balance_tolerance)) )
                 goto out;
     }
              
@@ -1269,19 +1279,19 @@ retry:
      * meantime, try the process over again.  This can't deadlock
      * because if it doesn't get any other rqd locks, it will simply
      * give up and return. */
-    orqd = prv->rqd + max_delta_rqi;
-    if ( !spin_trylock(&orqd->lock) )
+    st.orqd = prv->rqd + max_delta_rqi;
+    if ( !spin_trylock(&st.orqd->lock) )
         goto retry;
 
     /* Make sure the runqueue hasn't been deactivated since we released prv->lock */
-    if ( unlikely(orqd->id < 0) )
+    if ( unlikely(st.orqd->id < 0) )
         goto out_up;
 
     /* Look for "swap" which gives the best load average
      * FIXME: O(n^2)! */
 
     /* Reuse load delta (as we're trying to minimize it) */
-    list_for_each( push_iter, &lrqd->svc )
+    list_for_each( push_iter, &st.lrqd->svc )
     {
         int inner_load_updated = 0;
         struct csched_vcpu * push_svc = list_entry(push_iter, struct csched_vcpu, rqd_elem);
@@ -1292,7 +1302,7 @@ retry:
         if ( test_bit(__CSFLAG_runq_migrate_request, &push_svc->flags) )
             continue;
 
-        list_for_each( pull_iter, &orqd->svc )
+        list_for_each( pull_iter, &st.orqd->svc )
         {
             struct csched_vcpu * pull_svc = list_entry(pull_iter, struct csched_vcpu, rqd_elem);
             
@@ -1305,16 +1315,16 @@ retry:
             if ( test_bit(__CSFLAG_runq_migrate_request, &pull_svc->flags) )
                 continue;
 
-            consider(push_svc, pull_svc);
+            consider(&st, push_svc, pull_svc);
         }
 
         inner_load_updated = 1;
 
         /* Consider push only */
-        consider(push_svc, NULL);
+        consider(&st, push_svc, NULL);
     }
 
-    list_for_each( pull_iter, &orqd->svc )
+    list_for_each( pull_iter, &st.orqd->svc )
     {
         struct csched_vcpu * pull_svc = list_entry(pull_iter, struct csched_vcpu, rqd_elem);
         
@@ -1323,17 +1333,17 @@ retry:
             continue;
 
         /* Consider pull only */
-        consider(NULL, pull_svc);
+        consider(&st, NULL, pull_svc);
     }
 
     /* OK, now we have some candidates; do the moving */
-    if ( best_push_svc )
-        migrate(best_push_svc, orqd);
-    if ( best_pull_svc )
-        migrate(best_pull_svc, lrqd);
+    if ( st.best_push_svc )
+        migrate(ops, st.best_push_svc, st.orqd, now);
+    if ( st.best_pull_svc )
+        migrate(ops, st.best_pull_svc, st.lrqd, now);
 
 out_up:
-    spin_unlock(&orqd->lock);
+    spin_unlock(&st.orqd->lock);
 
 out:
     return;
