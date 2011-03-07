@@ -12,8 +12,11 @@ xenoprof := y
 supervisor_mode_kernel ?= n
 
 # Solaris grabs stdarg.h and friends from the system include directory.
+# Clang likewise.
 ifneq ($(XEN_OS),SunOS)
+ifneq ($(clang),y)
 CFLAGS += -nostdinc
+endif
 endif
 
 CFLAGS += -fno-builtin -fno-common -Wredundant-decls
@@ -49,5 +52,7 @@ x86_32 := n
 x86_64 := y
 endif
 
+ifneq ($(clang),y)
 # Require GCC v3.4+ (to avoid issues with alignment constraints in Xen headers)
 $(call cc-ver-check,CC,0x030400,"Xen requires at least gcc-3.4")
+endif

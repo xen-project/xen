@@ -148,6 +148,13 @@ CFLAGS += -Wall -Wstrict-prototypes
 # result of any casted expression causes a warning.
 CFLAGS += -Wno-unused-value
 
+ifeq ($(clang),y)
+# Clang complains about macros that expand to 'if ( ( foo == bar ) ) ...'
+CFLAGS += -Wno-parentheses
+# And is over-zealous with the printf format lint
+CFLAGS += -Wno-format
+endif
+
 $(call cc-option-add,HOSTCFLAGS,HOSTCC,-Wdeclaration-after-statement)
 $(call cc-option-add,CFLAGS,CC,-Wdeclaration-after-statement)
 

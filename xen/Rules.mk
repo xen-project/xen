@@ -62,6 +62,9 @@ endif
 
 AFLAGS-y                += -D__ASSEMBLY__
 
+# Clang's built-in assembler can't handle .code16/.code32/.code64 yet
+AFLAGS-$(clang)         += -no-integrated-as
+
 ALL_OBJS := $(ALL_OBJS-y)
 
 # Get gcc to generate the dependencies for us.

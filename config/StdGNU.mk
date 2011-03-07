@@ -1,6 +1,11 @@
 AS         = $(CROSS_COMPILE)as
+ifeq ($(clang),y)
+LD         = $(CROSS_COMPILE)gold
+CC         = $(CROSS_COMPILE)clang
+else
 LD         = $(CROSS_COMPILE)ld
 CC         = $(CROSS_COMPILE)gcc
+endif
 CPP        = $(CC) -E
 AR         = $(CROSS_COMPILE)ar
 RANLIB     = $(CROSS_COMPILE)ranlib
@@ -69,5 +74,8 @@ ifneq ($(debug),y)
 CFLAGS += -O2 -fomit-frame-pointer
 else
 # Less than -O1 produces bad code and large stack frames
-CFLAGS += -O1 -fno-omit-frame-pointer -fno-optimize-sibling-calls
+CFLAGS += -O1 -fno-omit-frame-pointer
+ifneq ($(clang),y)
+CFLAGS += -fno-optimize-sibling-calls
+endif
 endif

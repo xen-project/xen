@@ -88,7 +88,7 @@ include/xen/compile.h: include/xen/compile.h.in .banner
 	    -e 's/@@whoami@@/$(XEN_WHOAMI)/g' \
 	    -e 's/@@domain@@/$(XEN_DOMAIN)/g' \
 	    -e 's/@@hostname@@/$(shell hostname)/g' \
-	    -e 's!@@compiler@@!$(shell $(CC) $(CFLAGS) -v 2>&1 | tail -1)!g' \
+	    -e 's!@@compiler@@!$(shell $(CC) $(CFLAGS) -v 2>&1 | grep version | tail -1)!g' \
 	    -e 's/@@version@@/$(XEN_VERSION)/g' \
 	    -e 's/@@subversion@@/$(XEN_SUBVERSION)/g' \
 	    -e 's/@@extraversion@@/$(XEN_EXTRAVERSION)/g' \
