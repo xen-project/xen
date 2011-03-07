@@ -6,7 +6,7 @@
 #include <asm/fixmap.h>
 #include <asm/msr.h>
 
-#define Dprintk(x...)
+#define Dprintk(x...) do {} while (0)
 
 /*
  * Debugging macros

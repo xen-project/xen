@@ -61,7 +61,7 @@ extern unsigned int opt_hvm_debug_level;
                    ## _a);                                                    \
     } while (0)
 #else
-#define HVM_DBG_LOG(level, _f, _a...)
+#define HVM_DBG_LOG(level, _f, _a...) do {} while (0)
 #endif
 
 extern unsigned long hvm_io_bitmap[];
