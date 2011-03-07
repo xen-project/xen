@@ -907,15 +907,6 @@ asmlinkage void do_invalid_op(struct cpu_user_regs *regs)
         goto die;
     eip += sizeof(bug);
 
-    id = bug.id & 3;
-
-    if ( id == BUGFRAME_state )
-    {
-        show_execution_state(regs);
-        regs->eip = (unsigned long)eip;
-        return;
-    }
-
     /* Decode first pointer argument. */
     if ( !is_kernel(eip) ||
          __copy_from_user(&bug_str, eip, sizeof(bug_str)) ||
@@ -925,6 +916,16 @@ asmlinkage void do_invalid_op(struct cpu_user_regs *regs)
     if ( !is_kernel(p) )
         goto die;
     eip += sizeof(bug_str);
+
+    id = bug.id & 3;
+
+    if ( id == BUGFRAME_run_fn )
+    {
+        void (*fn)(struct cpu_user_regs *) = (void *)p;
+        (*fn)(regs);
+        regs->eip = (unsigned long)eip;
+        return;
+    }
 
     /* WARN, BUG or ASSERT: decode the filename pointer and line number. */
     filename = p;
