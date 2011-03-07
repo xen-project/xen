@@ -84,6 +84,8 @@
 
 #ifdef __sun__
 #define REX64_PREFIX "rex64\\"
+#elif defined(__clang__)
+#define REX64_PREFIX ".byte 0x48; "
 #else
 #define REX64_PREFIX "rex64/"
 #endif
