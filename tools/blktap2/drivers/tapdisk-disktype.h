@@ -37,9 +37,9 @@
 #define DISK_TYPE_RAM         5
 #define DISK_TYPE_QCOW        6
 #define DISK_TYPE_BLOCK_CACHE 7
-#define DISK_TYPE_LOG         9
-#define DISK_TYPE_REMUS       10
-#define DISK_TYPE_VINDEX      11
+#define DISK_TYPE_LOG         8
+#define DISK_TYPE_REMUS       9
+#define DISK_TYPE_VINDEX      10
 
 #define DISK_TYPE_NAME_MAX    32
 
