@@ -23,6 +23,15 @@ DESTDIR     ?= /
 # Allow phony attribute to be listed as dependency rather than fake target
 .PHONY: .phony
 
+# Use Clang/LLVM instead of GCC?
+clang ?= n
+ifeq ($(clang),n)
+gcc := y
+else
+gcc := n
+endif
+
+
 include $(XEN_ROOT)/config/$(XEN_OS).mk
 include $(XEN_ROOT)/config/$(XEN_TARGET_ARCH).mk
 
@@ -148,12 +157,9 @@ CFLAGS += -Wall -Wstrict-prototypes
 # result of any casted expression causes a warning.
 CFLAGS += -Wno-unused-value
 
-ifeq ($(clang),y)
 # Clang complains about macros that expand to 'if ( ( foo == bar ) ) ...'
-CFLAGS += -Wno-parentheses
-# And is over-zealous with the printf format lint
-CFLAGS += -Wno-format
-endif
+# and is over-zealous with the printf format lint
+CFLAGS-$(clang) += -Wno-parentheses -Wno-format
 
 $(call cc-option-add,HOSTCFLAGS,HOSTCC,-Wdeclaration-after-statement)
 $(call cc-option-add,CFLAGS,CC,-Wdeclaration-after-statement)

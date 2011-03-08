@@ -9,7 +9,6 @@ perfc_arrays  ?= n
 lock_profile  ?= n
 crash_debug   ?= n
 frame_pointer ?= n
-clang         ?= n
 lto           ?= n
 
 XEN_ROOT=$(BASEDIR)/..
@@ -82,6 +81,8 @@ AFLAGS += $(AFLAGS-y) $(filter-out -std=gnu%,$(filter-out -flto,$(CFLAGS)))
 
 # LDFLAGS are only passed directly to $(LD)
 LDFLAGS += $(LDFLAGS_DIRECT)
+
+LDFLAGS += $(LDFLAGS-y)
 
 include Makefile
 

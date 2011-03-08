@@ -76,14 +76,10 @@ CFLAGS += -O2 -fomit-frame-pointer
 else
 # Less than -O1 produces bad code and large stack frames
 CFLAGS += -O1 -fno-omit-frame-pointer
-ifneq ($(clang),y)
-CFLAGS += -fno-optimize-sibling-calls
-endif
+CFLAGS-$(gcc) += -fno-optimize-sibling-calls
 endif
 
 ifeq ($(lto),y)
 CFLAGS += -flto
-ifeq ($(clang),y)
-LDFLAGS += -plugin LLVMgold.so
-endif
+LDFLAGS-$(clang) += -plugin LLVMgold.so
 endif
