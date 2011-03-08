@@ -53,6 +53,7 @@ defines = [ "__i386__",
 
             # all archs
             "xen_pfn_to_cr3",
+            "xen_cr3_to_pfn",
             "XEN_LEGACY_MAX_VCPUS",
             "MAX_GUEST_CMDLINE" ];
 
