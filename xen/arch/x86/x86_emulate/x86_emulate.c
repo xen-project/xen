@@ -2678,7 +2678,7 @@ x86_emulate(
                 emulate_fpu_insn_memsrc("fiaddl", src.val);
                 break;
             case 1: /* fimul m64i */
-                emulate_fpu_insn_memsrc("fimuls", src.val);
+                emulate_fpu_insn_memsrc("fimull", src.val);
                 break;
             case 2: /* ficom m64i */
                 emulate_fpu_insn_memsrc("ficoml", src.val);
