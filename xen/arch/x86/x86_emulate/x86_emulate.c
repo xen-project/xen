@@ -2667,35 +2667,35 @@ x86_emulate(
             break;
         default:
             fail_if(modrm >= 0xc0);
-            ea.bytes = 8;
+            ea.bytes = 4;
             src = ea;
             if ( (rc = ops->read(src.mem.seg, src.mem.off, &src.val,
                                  src.bytes, ctxt)) != 0 )
                 goto done;
             switch ( modrm_reg & 7 )
             {
-            case 0: /* fiadd m64i */
+            case 0: /* fiadd m32i */
                 emulate_fpu_insn_memsrc("fiaddl", src.val);
                 break;
-            case 1: /* fimul m64i */
+            case 1: /* fimul m32i */
                 emulate_fpu_insn_memsrc("fimull", src.val);
                 break;
-            case 2: /* ficom m64i */
+            case 2: /* ficom m32i */
                 emulate_fpu_insn_memsrc("ficoml", src.val);
                 break;
-            case 3: /* ficomp m64i */
+            case 3: /* ficomp m32i */
                 emulate_fpu_insn_memsrc("ficompl", src.val);
                 break;
-            case 4: /* fisub m64i */
+            case 4: /* fisub m32i */
                 emulate_fpu_insn_memsrc("fisubl", src.val);
                 break;
-            case 5: /* fisubr m64i */
+            case 5: /* fisubr m32i */
                 emulate_fpu_insn_memsrc("fisubrl", src.val);
                 break;
-            case 6: /* fidiv m64i */
+            case 6: /* fidiv m32i */
                 emulate_fpu_insn_memsrc("fidivl", src.val);
                 break;
-            case 7: /* fidivr m64i */
+            case 7: /* fidivr m32i */
                 emulate_fpu_insn_memsrc("fidivrl", src.val);
                 break;
             default:
