@@ -1626,11 +1626,10 @@ __release_grant_for_copy(
     struct active_grant_entry *act;
     unsigned long r_frame;
     uint16_t *status;
-    domid_t trans_domid;
     grant_ref_t trans_gref;
     int released_read;
     int released_write;
-    struct domain *trans_dom;
+    struct domain *td;
 
     released_read = 0;
     released_write = 0;
@@ -1644,15 +1643,13 @@ __release_grant_for_copy(
     if (rd->grant_table->gt_version == 1)
     {
         status = &sha->flags;
-        trans_domid = rd->domain_id;
-        /* Shut the compiler up.  This'll never be used, because
-           trans_domid == rd->domain_id, but gcc doesn't know that. */
-        trans_gref = 0x1234567;
+        td = rd;
+        trans_gref = gref;
     }
     else
     {
         status = &status_entry(rd->grant_table, gref);
-        trans_domid = act->trans_dom;
+        td = act->trans_domain;
         trans_gref = act->trans_gref;
     }
 
@@ -1680,21 +1677,16 @@ __release_grant_for_copy(
 
     spin_unlock(&rd->grant_table->lock);
 
-    if ( trans_domid != rd->domain_id )
+    if ( td != rd )
     {
-        if ( released_write || released_read )
-        {
-            trans_dom = rcu_lock_domain_by_id(trans_domid);
-            if ( trans_dom != NULL )
-            {
-                /* Recursive calls, but they're tail calls, so it's
-                   okay. */
-                if ( released_write )
-                    __release_grant_for_copy(trans_dom, trans_gref, 0);
-                else if ( released_read )
-                    __release_grant_for_copy(trans_dom, trans_gref, 1);
-            }
-        }
+        /* Recursive calls, but they're tail calls, so it's
+           okay. */
+        if ( released_write )
+            __release_grant_for_copy(td, trans_gref, 0);
+        else if ( released_read )
+            __release_grant_for_copy(td, trans_gref, 1);
+
+	rcu_unlock_domain(td);
     }
 }
 
@@ -1731,7 +1723,7 @@ __acquire_grant_for_copy(
     uint32_t old_pin;
     domid_t trans_domid;
     grant_ref_t trans_gref;
-    struct domain *rrd;
+    struct domain *td;
     unsigned long gfn;
     unsigned long grant_frame;
     unsigned trans_page_off;
@@ -1785,8 +1777,8 @@ __acquire_grant_for_copy(
                                status) ) != GNTST_okay )
              goto unlock_out;
 
-        trans_domid = ld->domain_id;
-        trans_gref = 0;
+        td = rd;
+        trans_gref = gref;
         if ( sha2 && (shah->flags & GTF_type_mask) == GTF_transitive )
         {
             if ( !allow_transitive )
@@ -1808,14 +1800,15 @@ __acquire_grant_for_copy(
                that you don't need to go out of your way to avoid it
                in the guest. */
 
-            rrd = rcu_lock_domain_by_id(trans_domid);
-            if ( rrd == NULL )
+            /* We need to leave the rrd locked during the grant copy */
+            td = rcu_lock_domain_by_id(trans_domid);
+            if ( td == NULL )
                 PIN_FAIL(unlock_out, GNTST_general_error,
                          "transitive grant referenced bad domain %d\n",
                          trans_domid);
             spin_unlock(&rd->grant_table->lock);
 
-            rc = __acquire_grant_for_copy(rrd, trans_gref, rd,
+            rc = __acquire_grant_for_copy(td, trans_gref, rd,
                                           readonly, &grant_frame,
                                           &trans_page_off, &trans_length,
                                           0, &ignore);
@@ -1823,6 +1816,7 @@ __acquire_grant_for_copy(
             spin_lock(&rd->grant_table->lock);
             if ( rc != GNTST_okay ) {
                 __fixup_status_for_pin(act, status);
+	        rcu_unlock_domain(td);
                 spin_unlock(&rd->grant_table->lock);
                 return rc;
             }
@@ -1834,6 +1828,7 @@ __acquire_grant_for_copy(
             if ( act->pin != old_pin )
             {
                 __fixup_status_for_pin(act, status);
+	        rcu_unlock_domain(td);
                 spin_unlock(&rd->grant_table->lock);
                 return __acquire_grant_for_copy(rd, gref, ld, readonly,
                                                 frame, page_off, length,
@@ -1845,7 +1840,7 @@ __acquire_grant_for_copy(
                sub-page, but we always treat it as one because that
                blocks mappings of transitive grants. */
             is_sub_page = 1;
-            *owning_domain = rrd;
+            *owning_domain = td;
             act->gfn = -1ul;
         }
         else if ( sha1 )
@@ -1891,7 +1886,7 @@ __acquire_grant_for_copy(
             act->is_sub_page = is_sub_page;
             act->start = trans_page_off;
             act->length = trans_length;
-            act->trans_dom = trans_domid;
+            act->trans_domain = td;
             act->trans_gref = trans_gref;
             act->frame = grant_frame;
         }
