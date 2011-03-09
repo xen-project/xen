@@ -24,7 +24,6 @@
 #include "dmar.h"
 #include <xen/keyhandler.h>
 
-extern bool_t ats_enabled;
 extern bool_t rwbf_quirk;
 
 void print_iommu_regs(struct acpi_drhd_unit *drhd);
@@ -56,17 +55,50 @@ struct iommu * ioapic_to_iommu(unsigned int apic_id);
 struct acpi_drhd_unit * ioapic_to_drhd(unsigned int apic_id);
 struct acpi_drhd_unit * iommu_to_drhd(struct iommu *iommu);
 struct acpi_rhsa_unit * drhd_to_rhsa(struct acpi_drhd_unit *drhd);
+
+#ifdef CONFIG_X86_64
+extern bool_t ats_enabled;
+
 struct acpi_drhd_unit * find_ats_dev_drhd(struct iommu *iommu);
 
 int ats_device(int seg, int bus, int devfn);
 int enable_ats_device(int seg, int bus, int devfn);
-int disable_ats_device(int seg, int bus, int devfn);
+void disable_ats_device(int seg, int bus, int devfn);
 int invalidate_ats_tcs(struct iommu *iommu);
+
+int dev_invalidate_iotlb(struct iommu *iommu, u16 did,
+                         u64 addr, unsigned int size_order, u64 type);
+#else
+#define ats_enabled 0
+
+static inline struct acpi_drhd_unit *find_ats_dev_drhd(struct iommu *iommu)
+{
+    return NULL;
+}
+
+static inline int ats_device(int seg, int bus, int devfn)
+{
+    return 0;
+}
+static inline int enable_ats_device(int seg, int bus, int devfn)
+{
+    BUG();
+    return -ENOSYS;
+}
+static inline void disable_ats_device(int seg, int bus, int devfn)
+{
+    BUG();
+}
+
+static inline int dev_invalidate_iotlb(struct iommu *iommu, u16 did, u64 addr,
+                                       unsigned int size_order, u64 type)
+{
+    return 0;
+}
+#endif
 
 int qinval_device_iotlb(struct iommu *iommu,
                         u32 max_invs_pend, u16 sid, u16 size, u64 addr);
-int dev_invalidate_iotlb(struct iommu *iommu, u16 did,
-                         u64 addr, unsigned int size_order, u64 type);
 
 unsigned int get_cache_line_size(void);
 void cacheline_flush(char *);

@@ -127,23 +127,11 @@ int enable_ats_device(int seg, int bus, int devfn)
     u32 value;
     int pos;
 
-    if ( !acpi_find_matched_atsr_unit(bus, devfn) )
-    {
-        dprintk(XENLOG_WARNING VTDPREFIX,
-                "cannot find matched atsr for %x:%x.%x\n",
-                bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
-        return 0;
-    }
-
     pos = pci_find_ext_capability(seg, bus, devfn, PCI_EXT_CAP_ID_ATS);
-    if ( !pos )
-    {
-        dprintk(XENLOG_ERR VTDPREFIX, "ats capability not found %x:%x.%x\n",
-                bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
-        return 0;
-    }
-    else
-        dprintk(XENLOG_ERR VTDPREFIX, "ats capability found %x:%x.%x\n",
+    BUG_ON(!pos);
+
+    if ( iommu_verbose )
+        dprintk(XENLOG_INFO VTDPREFIX, "%x:%x.%x: ATS capability found\n",
                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
 
     /* BUGBUG: add back seg when multi-seg platform support is enabled */
@@ -189,16 +177,14 @@ int enable_ats_device(int seg, int bus, int devfn)
     return pos;
 }
 
-int disable_ats_device(int seg, int bus, int devfn)
+void disable_ats_device(int seg, int bus, int devfn)
 {
-    struct list_head *pdev_list, *tmp;
     struct pci_ats_dev *pdev;
     u32 value;
     int pos;
 
     pos = pci_find_ext_capability(seg, bus, devfn, PCI_EXT_CAP_ID_ATS);
-    if ( !pos )
-        return 0;
+    BUG_ON(!pos);
 
     /* BUGBUG: add back seg when multi-seg platform support is enabled */
     value = pci_conf_read16(bus, PCI_SLOT(devfn),
@@ -207,9 +193,8 @@ int disable_ats_device(int seg, int bus, int devfn)
     pci_conf_write16(bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
                      pos + ATS_REG_CTL, value);
 
-    list_for_each_safe( pdev_list, tmp, &ats_devices )
+    list_for_each_entry ( pdev, &ats_devices, list )
     {
-        pdev = list_entry(pdev_list, struct pci_ats_dev, list);
         if ( pdev->bus == bus && pdev->devfn == devfn )
         {
             list_del(&pdev->list);
@@ -221,8 +206,6 @@ int disable_ats_device(int seg, int bus, int devfn)
     if ( iommu_verbose )
         dprintk(XENLOG_INFO VTDPREFIX, "%x:%x.%x: ATS is disabled\n",
                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
-
-    return 0;
 }
 
 
@@ -257,10 +240,7 @@ out:
     if ( ctxt_entry )
         unmap_vtd_domain_page(ctxt_entry);
 
-    if ( found )
-        return 1;
-
-    return 0;
+    return found;
 }
 
 int dev_invalidate_iotlb(struct iommu *iommu, u16 did,
