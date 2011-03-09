@@ -24,8 +24,6 @@
 #include <xen/list.h>
 #include <xen/iommu.h>
 
-extern u8 dmar_host_address_width;
-
 /* This one is for interrupt remapping */
 struct acpi_ioapic_unit {
     struct list_head list;

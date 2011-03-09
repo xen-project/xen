@@ -41,13 +41,12 @@
 #define MIN_SCOPE_LEN (sizeof(struct acpi_pci_path) + \
                        sizeof(struct acpi_dev_scope))
 
-LIST_HEAD(acpi_drhd_units);
-LIST_HEAD(acpi_rmrr_units);
-LIST_HEAD(acpi_atsr_units);
-LIST_HEAD(acpi_rhsa_units);
+LIST_HEAD_READ_MOSTLY(acpi_drhd_units);
+LIST_HEAD_READ_MOSTLY(acpi_rmrr_units);
+static LIST_HEAD_READ_MOSTLY(acpi_atsr_units);
+static LIST_HEAD_READ_MOSTLY(acpi_rhsa_units);
 
-static u64 igd_drhd_address;
-u8 dmar_host_address_width;
+static u64 __read_mostly igd_drhd_address;
 
 void dmar_scope_add_buses(struct dmar_scope *scope, u16 sec_bus, u16 sub_bus)
 {
@@ -679,6 +678,7 @@ static int __init acpi_parse_dmar(struct acpi_table_header *table)
 {
     struct acpi_table_dmar *dmar;
     struct acpi_dmar_entry_header *entry_header;
+    u8 dmar_host_address_width;
     int ret = 0;
 
     dmar = (struct acpi_table_dmar *)table;
