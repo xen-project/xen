@@ -84,8 +84,9 @@ void *alloc_xen_pagetable(void)
     if ( !early_boot )
     {
         struct page_info *pg = alloc_domheap_page(NULL, 0);
-        BUG_ON(pg == NULL);
-        return page_to_virt(pg);
+
+        BUG_ON(!dom0 && !pg);
+        return pg ? page_to_virt(pg) : NULL;
     }
 
     mfn = alloc_boot_pages(1, 1);
@@ -100,6 +101,9 @@ l3_pgentry_t *virt_to_xen_l3e(unsigned long v)
     if ( !(l4e_get_flags(*pl4e) & _PAGE_PRESENT) )
     {
         l3_pgentry_t *pl3e = alloc_xen_pagetable();
+
+        if ( !pl3e )
+            return NULL;
         clear_page(pl3e);
         l4e_write(pl4e, l4e_from_paddr(__pa(pl3e), __PAGE_HYPERVISOR));
     }
@@ -112,9 +116,15 @@ l2_pgentry_t *virt_to_xen_l2e(unsigned long v)
     l3_pgentry_t *pl3e;
 
     pl3e = virt_to_xen_l3e(v);
+    if ( !pl3e )
+        return NULL;
+
     if ( !(l3e_get_flags(*pl3e) & _PAGE_PRESENT) )
     {
         l2_pgentry_t *pl2e = alloc_xen_pagetable();
+
+        if ( !pl2e )
+            return NULL;
         clear_page(pl2e);
         l3e_write(pl3e, l3e_from_paddr(__pa(pl2e), __PAGE_HYPERVISOR));
     }

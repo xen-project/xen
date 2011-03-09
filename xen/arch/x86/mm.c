@@ -5141,8 +5141,11 @@ int map_pages_to_xen(
     while ( nr_mfns != 0 )
     {
 #ifdef __x86_64__
-        l3_pgentry_t *pl3e = virt_to_xen_l3e(virt);
-        l3_pgentry_t ol3e = *pl3e;
+        l3_pgentry_t ol3e, *pl3e = virt_to_xen_l3e(virt);
+
+        if ( !pl3e )
+            return -ENOMEM;
+        ol3e = *pl3e;
 
         if ( cpu_has_page1gb &&
              !(((virt >> PAGE_SHIFT) | mfn) &
@@ -5262,6 +5265,8 @@ int map_pages_to_xen(
 #endif
 
         pl2e = virt_to_xen_l2e(virt);
+        if ( !pl2e )
+            return -ENOMEM;
 
         if ( ((((virt>>PAGE_SHIFT) | mfn) & ((1<<PAGETABLE_ORDER)-1)) == 0) &&
              (nr_mfns >= (1<<PAGETABLE_ORDER)) &&
