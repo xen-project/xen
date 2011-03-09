@@ -50,7 +50,6 @@ x86_32 := n
 x86_64 := y
 endif
 
-ifeq ($(gcc),y)
 # Require GCC v3.4+ (to avoid issues with alignment constraints in Xen headers)
-$(call cc-ver-check,CC,0x030400,"Xen requires at least gcc-3.4")
-endif
+check-$(gcc) = $(call cc-ver-check,CC,0x030400,"Xen requires at least gcc-3.4")
+$(eval $(check-y))
