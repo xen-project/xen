@@ -212,4 +212,6 @@ static inline void ioapic_resume(void) {}
 extern int assign_irq_vector(int irq);
 extern int free_irq_vector(int vector);
 
+unsigned highest_gsi(void);
+
 #endif

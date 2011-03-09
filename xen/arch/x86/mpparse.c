@@ -21,7 +21,6 @@
 #include <xen/delay.h>
 #include <xen/sched.h>
 
-#include <asm/mc146818rtc.h>
 #include <asm/bitops.h>
 #include <asm/smp.h>
 #include <asm/acpi.h>
@@ -34,36 +33,31 @@
 #include <bios_ebda.h>
 
 /* Have we found an MP table */
-int smp_found_config;
-unsigned int __devinitdata maxcpus = NR_CPUS;
+bool_t __initdata smp_found_config;
 
 /*
  * Various Linux-internal data structures created from the
  * MP-table.
  */
-int apic_version [MAX_APICS];
-int mp_bus_id_to_type [MAX_MP_BUSSES];
-int mp_bus_id_to_node [MAX_MP_BUSSES];
-int mp_bus_id_to_local [MAX_MP_BUSSES];
-int mp_bus_id_to_pci_bus [MAX_MP_BUSSES] = { [0 ... MAX_MP_BUSSES-1] = -1 };
-static int mp_current_pci_id;
+unsigned char __read_mostly apic_version[MAX_APICS];
+unsigned char __read_mostly mp_bus_id_to_type[MAX_MP_BUSSES];
 
 /* I/O APIC entries */
-struct mpc_config_ioapic mp_ioapics[MAX_IO_APICS];
+struct mpc_config_ioapic __read_mostly mp_ioapics[MAX_IO_APICS];
 
 /* # of MP IRQ source entries */
-struct mpc_config_intsrc mp_irqs[MAX_IRQ_SOURCES];
+struct mpc_config_intsrc __read_mostly mp_irqs[MAX_IRQ_SOURCES];
 
 /* MP IRQ source entries */
-int mp_irq_entries;
+int __read_mostly mp_irq_entries;
 
-int pic_mode;
-unsigned long mp_lapic_addr;
-
-unsigned int def_to_bigsmp = 0;
+bool_t __read_mostly pic_mode;
+bool_t __read_mostly def_to_bigsmp = 0;
+unsigned long __read_mostly mp_lapic_addr;
 
 /* Processor that is doing the boot up */
-unsigned int boot_cpu_physical_apicid = -1U;
+unsigned int __read_mostly boot_cpu_physical_apicid = BAD_APICID;
+
 /* Internal processor count */
 static unsigned int __devinitdata num_processors;
 
@@ -89,18 +83,9 @@ static int __init mpf_checksum(unsigned char *mp, int len)
 	return sum & 0xFF;
 }
 
-/*
- * Have to match translation table entries to main table entries by counter
- * hence the mpc_record variable .... can't see a less disgusting way of
- * doing this ....
- */
-
-static int mpc_record; 
-static struct mpc_config_translation *translation_table[MAX_MPC_ENTRY] __initdata;
-
 /* Return xen's logical cpu_id of the new added cpu or <0 if error */
 static int __devinit MP_processor_info_x(struct mpc_config_processor *m,
-					 u32 apicidx)
+					 u32 apicidx, bool_t hotplug)
 {
  	int ver, apicid, cpu = 0;
 	physid_mask_t phys_cpu;
@@ -108,55 +93,7 @@ static int __devinit MP_processor_info_x(struct mpc_config_processor *m,
 	if (!(m->mpc_cpuflag & CPU_ENABLED))
 		return -EINVAL;
 
-	apicid = mpc_apic_id(m, apicidx, translation_table[mpc_record]);
-
-	if (m->mpc_featureflag&(1<<0))
-		Dprintk("    Floating point unit present.\n");
-	if (m->mpc_featureflag&(1<<7))
-		Dprintk("    Machine Exception supported.\n");
-	if (m->mpc_featureflag&(1<<8))
-		Dprintk("    64 bit compare & exchange supported.\n");
-	if (m->mpc_featureflag&(1<<9))
-		Dprintk("    Internal APIC present.\n");
-	if (m->mpc_featureflag&(1<<11))
-		Dprintk("    SEP present.\n");
-	if (m->mpc_featureflag&(1<<12))
-		Dprintk("    MTRR  present.\n");
-	if (m->mpc_featureflag&(1<<13))
-		Dprintk("    PGE  present.\n");
-	if (m->mpc_featureflag&(1<<14))
-		Dprintk("    MCA  present.\n");
-	if (m->mpc_featureflag&(1<<15))
-		Dprintk("    CMOV  present.\n");
-	if (m->mpc_featureflag&(1<<16))
-		Dprintk("    PAT  present.\n");
-	if (m->mpc_featureflag&(1<<17))
-		Dprintk("    PSE  present.\n");
-	if (m->mpc_featureflag&(1<<18))
-		Dprintk("    PSN  present.\n");
-	if (m->mpc_featureflag&(1<<19))
-		Dprintk("    Cache Line Flush Instruction present.\n");
-	/* 20 Reserved */
-	if (m->mpc_featureflag&(1<<21))
-		Dprintk("    Debug Trace and EMON Store present.\n");
-	if (m->mpc_featureflag&(1<<22))
-		Dprintk("    ACPI Thermal Throttle Registers  present.\n");
-	if (m->mpc_featureflag&(1<<23))
-		Dprintk("    MMX  present.\n");
-	if (m->mpc_featureflag&(1<<24))
-		Dprintk("    FXSR  present.\n");
-	if (m->mpc_featureflag&(1<<25))
-		Dprintk("    XMM  present.\n");
-	if (m->mpc_featureflag&(1<<26))
-		Dprintk("    Willamette New Instructions  present.\n");
-	if (m->mpc_featureflag&(1<<27))
-		Dprintk("    Self Snoop  present.\n");
-	if (m->mpc_featureflag&(1<<28))
-		Dprintk("    HT  present.\n");
-	if (m->mpc_featureflag&(1<<29))
-		Dprintk("    Thermal Monitor present.\n");
-	/* 30, 31 Reserved */
-
+	apicid = mpc_apic_id(m, apicidx);
 
 	if (m->mpc_cpuflag & CPU_BOOTPROCESSOR) {
 		Dprintk("    Bootup CPU\n");
@@ -185,9 +122,9 @@ static int __devinit MP_processor_info_x(struct mpc_config_processor *m,
 		return -ENOSPC;
 	}
 
-	if (num_processors >= maxcpus) {
-		printk(KERN_WARNING "WARNING: maxcpus limit of %i reached."
-			" Processor ignored.\n", maxcpus);
+	if (num_processors >= 8 && hotplug && genapic == &apic_default) {
+		printk(KERN_WARNING "WARNING: CPUs limit of 8 reached."
+			" Processor ignored.\n");
 		return -ENOSPC;
 	}
 
@@ -216,7 +153,7 @@ static int __devinit MP_processor_info_x(struct mpc_config_processor *m,
 
 static int __devinit MP_processor_info(struct mpc_config_processor *m)
 {
-	return MP_processor_info_x(m, m->mpc_apicid);
+	return MP_processor_info_x(m, m->mpc_apicid, 0);
 }
 
 static void __init MP_bus_info (struct mpc_config_bus *m)
@@ -225,8 +162,6 @@ static void __init MP_bus_info (struct mpc_config_bus *m)
 
 	memcpy(str, m->mpc_bustype, 6);
 	str[6] = 0;
-
-	mpc_oem_bus_info(m, str, translation_table[mpc_record]);
 
 #if 0 /* size of mpc_busid (8 bits) makes this check unnecessary */
 	if (m->mpc_busid >= MAX_MP_BUSSES) {
@@ -242,10 +177,7 @@ static void __init MP_bus_info (struct mpc_config_bus *m)
 	} else if (strncmp(str, BUSTYPE_EISA, sizeof(BUSTYPE_EISA)-1) == 0) {
 		mp_bus_id_to_type[m->mpc_busid] = MP_BUS_EISA;
 	} else if (strncmp(str, BUSTYPE_PCI, sizeof(BUSTYPE_PCI)-1) == 0) {
-		mpc_oem_pci_bus(m, translation_table[mpc_record]);
 		mp_bus_id_to_type[m->mpc_busid] = MP_BUS_PCI;
-		mp_bus_id_to_pci_bus[m->mpc_busid] = mp_current_pci_id;
-		mp_current_pci_id++;
 	} else if (strncmp(str, BUSTYPE_MCA, sizeof(BUSTYPE_MCA)-1) == 0) {
 		mp_bus_id_to_type[m->mpc_busid] = MP_BUS_MCA;
 	} else if (strncmp(str, BUSTYPE_NEC98, sizeof(BUSTYPE_NEC98)-1) == 0) {
@@ -310,77 +242,6 @@ static void __init MP_lintsrc_info (struct mpc_config_lintsrc *m)
 			BUG();
 }
 
-#ifdef CONFIG_X86_NUMAQ
-static void __init MP_translation_info (struct mpc_config_translation *m)
-{
-	printk(KERN_INFO "Translation: record %d, type %d, quad %d, global %d, local %d\n", mpc_record, m->trans_type, m->trans_quad, m->trans_global, m->trans_local);
-
-	if (mpc_record >= MAX_MPC_ENTRY) 
-		printk(KERN_ERR "MAX_MPC_ENTRY exceeded!\n");
-	else
-		translation_table[mpc_record] = m; /* stash this for later */
-	if (m->trans_quad < MAX_NUMNODES && !node_online(m->trans_quad))
-		node_set_online(m->trans_quad);
-}
-
-/*
- * Read/parse the MPC oem tables
- */
-
-static void __init smp_read_mpc_oem(struct mp_config_oemtable *oemtable, \
-	unsigned short oemsize)
-{
-	int count = sizeof (*oemtable); /* the header size */
-	unsigned char *oemptr = ((unsigned char *)oemtable)+count;
-	
-	mpc_record = 0;
-	printk(KERN_INFO "Found an OEM MPC table at %8p - parsing it ... \n", oemtable);
-	if (memcmp(oemtable->oem_signature,MPC_OEM_SIGNATURE,4))
-	{
-		printk(KERN_WARNING "SMP mpc oemtable: bad signature [%c%c%c%c]!\n",
-			oemtable->oem_signature[0],
-			oemtable->oem_signature[1],
-			oemtable->oem_signature[2],
-			oemtable->oem_signature[3]);
-		return;
-	}
-	if (mpf_checksum((unsigned char *)oemtable,oemtable->oem_length))
-	{
-		printk(KERN_WARNING "SMP oem mptable: checksum error!\n");
-		return;
-	}
-	while (count < oemtable->oem_length) {
-		switch (*oemptr) {
-			case MP_TRANSLATION:
-			{
-				struct mpc_config_translation *m=
-					(struct mpc_config_translation *)oemptr;
-				MP_translation_info(m);
-				oemptr += sizeof(*m);
-				count += sizeof(*m);
-				++mpc_record;
-				break;
-			}
-			default:
-			{
-				printk(KERN_WARNING "Unrecognised OEM table entry type! - %d\n", (int) *oemptr);
-				return;
-			}
-		}
-	}
-}
-
-static inline void mps_oem_check(struct mp_config_table *mpc, char *oem,
-		char *productid)
-{
-	if (strncmp(oem, "IBM NUMA", 8))
-		printk("Warning!  May not be a NUMA-Q system!\n");
-	if (mpc->mpc_oemptr)
-		smp_read_mpc_oem((struct mp_config_oemtable *) mpc->mpc_oemptr,
-				mpc->mpc_oemsize);
-}
-#endif	/* CONFIG_X86_NUMAQ */
-
 /*
  * Read/parse the MPC
  */
@@ -432,7 +293,6 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 	/*
 	 *	Now process the configuration blocks.
 	 */
-	mpc_record = 0;
 	while (count < mpc->mpc_length) {
 		switch(*mpt) {
 			case MP_PROCESSOR:
@@ -489,7 +349,6 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 				break;
 			}
 		}
-		++mpc_record;
 	}
 	clustered_apic_check();
 	if (!num_processors)
@@ -655,7 +514,7 @@ static inline void __init construct_default_ISA_mptable(int mpc_default_type)
 	}
 }
 
-static struct intel_mp_floating *mpf_found;
+static struct intel_mp_floating *__initdata mpf_found;
 
 /*
  * Scan the memory blocks for an SMP configuration block.
@@ -840,7 +699,8 @@ void __init mp_register_lapic_address (
 
 int __devinit mp_register_lapic (
 	u32			id,
-	u8			enabled)
+	bool_t			enabled,
+	bool_t			hotplug)
 {
 	struct mpc_config_processor processor;
 	int			boot_cpu = 0;
@@ -865,7 +725,7 @@ int __devinit mp_register_lapic (
 	processor.mpc_reserved[0] = 0;
 	processor.mpc_reserved[1] = 0;
 
-	return MP_processor_info_x(&processor, id);
+	return MP_processor_info_x(&processor, id, hotplug);
 }
 
 void mp_unregister_lapic(uint32_t apic_id, uint32_t cpu)
@@ -888,17 +748,16 @@ void mp_unregister_lapic(uint32_t apic_id, uint32_t cpu)
 #define MP_MAX_IOAPIC_PIN	127
 
 static struct mp_ioapic_routing {
-	int			apic_id;
-	int			gsi_base;
-	int			gsi_end;
-	u32			pin_programmed[4];
+	int		gsi_base;
+	int		gsi_end;
+	unsigned long	pin_programmed[BITS_TO_LONGS(MP_MAX_IOAPIC_PIN + 1)];
 } mp_ioapic_routing[MAX_IO_APICS];
 
 
 static int mp_find_ioapic (
 	int			gsi)
 {
-	int			i = 0;
+	unsigned int		i;
 
 	/* Find the IOAPIC that manages this GSI. */
 	for (i = 0; i < nr_ioapics; i++) {
@@ -955,7 +814,6 @@ void __init mp_register_ioapic (
 	 * Build basic GSI lookup table to facilitate gsi->io_apic lookups
 	 * and to prevent reprogramming of IOAPIC pins (PCI GSIs).
 	 */
-	mp_ioapic_routing[idx].apic_id = mp_ioapics[idx].mpc_apicid;
 	mp_ioapic_routing[idx].gsi_base = gsi_base;
 	mp_ioapic_routing[idx].gsi_end = gsi_base + 
 		io_apic_get_redir_entries(idx);
@@ -969,7 +827,7 @@ void __init mp_register_ioapic (
 	return;
 }
 
-unsigned highest_gsi(void)
+unsigned __init highest_gsi(void)
 {
 	unsigned x, res = 0;
 	for (x = 0; x < nr_ioapics; x++)
@@ -1096,9 +954,8 @@ void __init mp_config_acpi_legacy_irqs (void)
 
 int mp_register_gsi (u32 gsi, int triggering, int polarity)
 {
-	int			ioapic = -1;
-	int			ioapic_pin = 0;
-	int			idx, bit = 0;
+	int			ioapic;
+	int			ioapic_pin;
 	struct irq_desc *	desc;
 	unsigned long		flags;
 
@@ -1135,21 +992,18 @@ int mp_register_gsi (u32 gsi, int triggering, int polarity)
 	 * with redundant pin->gsi mappings (but unique PCI devices);
 	 * we only program the IOAPIC on the first.
 	 */
-	bit = ioapic_pin % 32;
-	idx = (ioapic_pin < 32) ? 0 : (ioapic_pin / 32);
-	if (idx > 3) {
+	if (ioapic_pin > MP_MAX_IOAPIC_PIN) {
 		printk(KERN_ERR "Invalid reference to IOAPIC pin "
-			"%d-%d\n", mp_ioapic_routing[ioapic].apic_id, 
+			"%d-%d\n", mp_ioapics[ioapic].mpc_apicid,
 			ioapic_pin);
 		return -EINVAL;
 	}
-	if ((1<<bit) & mp_ioapic_routing[ioapic].pin_programmed[idx]) {
+	if (test_and_set_bit(ioapic_pin,
+			     mp_ioapic_routing[ioapic].pin_programmed)) {
 		Dprintk(KERN_DEBUG "Pin %d-%d already programmed\n",
-			mp_ioapic_routing[ioapic].apic_id, ioapic_pin);
+			mp_ioapics[ioapic].mpc_apicid, ioapic_pin);
 		return -EEXIST;
 	}
-
-	mp_ioapic_routing[ioapic].pin_programmed[idx] |= (1<<bit);
 
 	return io_apic_set_pci_routing(ioapic, ioapic_pin, gsi,
 				       triggering, polarity);

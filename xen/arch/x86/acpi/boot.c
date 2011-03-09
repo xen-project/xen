@@ -177,7 +177,8 @@ acpi_parse_x2apic(struct acpi_subtable_header *header, const unsigned long end)
 	 * when we use CPU hotplug.
 	 */
 	mp_register_lapic(processor->id,	/* X2APIC ID */
-			  processor->flags.enabled);	/* Enabled? */
+			  processor->flags.enabled,	/* Enabled? */
+			  0);
 
 	return 0;
 }
@@ -206,7 +207,8 @@ acpi_parse_lapic(struct acpi_subtable_header * header, const unsigned long end)
 	 * when we use CPU hotplug.
 	 */
 	mp_register_lapic(processor->id,	/* APIC ID */
-			  processor->flags.enabled);	/* Enabled? */
+			  processor->flags.enabled,	/* Enabled? */
+			  0);
 
 	return 0;
 }

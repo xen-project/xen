@@ -2492,8 +2492,6 @@ void dump_ioapic_irq_info(void)
     }
 }
 
-unsigned highest_gsi(void);
-
 static unsigned int __initdata max_gsi_irqs;
 integer_param("max_gsi_irqs", max_gsi_irqs);
 

@@ -28,8 +28,7 @@ static inline void enable_apic_mode(void)
 
 extern u32 bios_cpu_apicid[];
 
-static inline int mpc_apic_id(struct mpc_config_processor *m, u32 apicid,
-			struct mpc_config_translation *translation_record)
+static inline int mpc_apic_id(struct mpc_config_processor *m, u32 apicid)
 {
 	printk("Processor #%d %d:%d APIC version %d\n",
 			apicid,

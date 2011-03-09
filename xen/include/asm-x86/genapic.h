@@ -49,6 +49,7 @@ struct genapic {
 	APICFUNC(acpi_madt_oem_check)
 
 extern const struct genapic *genapic;
+extern const struct genapic apic_default;
 
 const cpumask_t *target_cpus_all(void);
 

@@ -18,7 +18,6 @@
 
 extern const struct genapic apic_summit;
 extern const struct genapic apic_bigsmp;
-extern const struct genapic apic_default;
 
 const struct genapic *__read_mostly genapic;
 

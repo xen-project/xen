@@ -901,7 +901,7 @@ int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm)
         goto out;
     }
 
-    if ( (cpu = mp_register_lapic(apic_id, 1)) < 0 )
+    if ( (cpu = mp_register_lapic(apic_id, 1, 1)) < 0 )
         goto out;
 
     x86_acpiid_to_apicid[acpi_id] = apic_id;
