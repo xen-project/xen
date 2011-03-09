@@ -799,12 +799,12 @@ get_page_from_l1e(
     bool_t write;
 
     if ( !(l1f & _PAGE_PRESENT) )
-        return 1;
+        return 0;
 
     if ( unlikely(l1f & l1_disallow_mask(l1e_owner)) )
     {
         MEM_LOG("Bad L1 flags %x", l1f & l1_disallow_mask(l1e_owner));
-        return 0;
+        return -EINVAL;
     }
 
     if ( !mfn_valid(mfn) ||
@@ -821,18 +821,21 @@ get_page_from_l1e(
         if ( !iomem_access_permitted(pg_owner, mfn, mfn) )
         {
             if ( mfn != (PADDR_MASK >> PAGE_SHIFT) ) /* INVALID_MFN? */
+            {
                 MEM_LOG("Non-privileged (%u) attempt to map I/O space %08lx", 
                         pg_owner->domain_id, mfn);
-            return 0;
+                return -EPERM;
+            }
+            return -EINVAL;
         }
 
         if ( !(l1f & _PAGE_RW) || IS_PRIV(pg_owner) ||
              !rangeset_contains_singleton(mmio_ro_ranges, mfn) )
-            return 1;
+            return 0;
         dprintk(XENLOG_G_WARNING,
                 "d%d: Forcing read-only access to MFN %lx\n",
                 l1e_owner->domain_id, mfn);
-        return -1;
+        return 1;
     }
 
     if ( unlikely(real_pg_owner != pg_owner) )
@@ -863,6 +866,7 @@ get_page_from_l1e(
     {
         unsigned long x, nx, y = page->count_info;
         unsigned long cacheattr = pte_flags_to_cacheattr(l1f);
+        int err;
 
         if ( is_xen_heap_page(page) )
         {
@@ -870,7 +874,7 @@ get_page_from_l1e(
                 put_page_type(page);
             put_page(page);
             MEM_LOG("Attempt to change cache attributes of Xen heap page");
-            return 0;
+            return -EACCES;
         }
 
         do {
@@ -878,7 +882,8 @@ get_page_from_l1e(
             nx = (x & ~PGC_cacheattr_mask) | (cacheattr << PGC_cacheattr_base);
         } while ( (y = cmpxchg(&page->count_info, x, nx)) != x );
 
-        if ( unlikely(update_xen_mappings(mfn, cacheattr) != 0) )
+        err = update_xen_mappings(mfn, cacheattr);
+        if ( unlikely(err) )
         {
             cacheattr = y & PGC_cacheattr_mask;
             do {
@@ -894,11 +899,11 @@ get_page_from_l1e(
                     " from L1 entry %" PRIpte ") for %d",
                     mfn, get_gpfn_from_mfn(mfn),
                     l1e_get_intpte(l1e), l1e_owner->domain_id);
-            return 0;
+            return err;
         }
     }
 
-    return 1;
+    return 0;
 
  could_not_pin:
     MEM_LOG("Error getting mfn %lx (pfn %lx) from L1 entry %" PRIpte
@@ -907,7 +912,7 @@ get_page_from_l1e(
             l1e_get_intpte(l1e), l1e_owner->domain_id, pg_owner->domain_id);
     if ( real_pg_owner != NULL )
         put_page(page);
-    return 0;
+    return -EBUSY;
 }
 
 
@@ -1197,17 +1202,20 @@ static int alloc_l1_table(struct page_info *page)
     unsigned long  pfn = page_to_mfn(page);
     l1_pgentry_t  *pl1e;
     unsigned int   i;
+    int            ret = 0;
 
     pl1e = map_domain_page(pfn);
 
     for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
     {
         if ( is_guest_l1_slot(i) )
-            switch ( get_page_from_l1e(pl1e[i], d, d) )
+            switch ( ret = get_page_from_l1e(pl1e[i], d, d) )
             {
-            case 0:
+            default:
                 goto fail;
-            case -1:
+            case 0:
+                break;
+            case 1:
                 l1e_remove_flags(pl1e[i], _PAGE_RW);
                 break;
             }
@@ -1225,7 +1233,7 @@ static int alloc_l1_table(struct page_info *page)
             put_page_from_l1e(pl1e[i], d);
 
     unmap_domain_page(pl1e);
-    return -EINVAL;
+    return ret;
 }
 
 static int create_pae_xen_mappings(struct domain *d, l3_pgentry_t *pl3e)
@@ -1794,11 +1802,13 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
             return rc;
         }
 
-        switch ( get_page_from_l1e(nl1e, pt_dom, pg_dom) )
+        switch ( rc = get_page_from_l1e(nl1e, pt_dom, pg_dom) )
         {
-        case 0:
+        default:
             return 0;
-        case -1:
+        case 0:
+            break;
+        case 1:
             l1e_remove_flags(nl1e, _PAGE_RW);
             break;
         }
@@ -4948,7 +4958,7 @@ static int ptwr_emulated_update(
     nl1e = l1e_from_intpte(val);
     switch ( get_page_from_l1e(nl1e, d, d) )
     {
-    case 0:
+    default:
         if ( is_pv_32bit_domain(d) && (bytes == 4) && (unaligned_addr & 4) &&
              !do_cmpxchg && (l1e_get_flags(nl1e) & _PAGE_PRESENT) )
         {
@@ -4968,7 +4978,9 @@ static int ptwr_emulated_update(
             return X86EMUL_UNHANDLEABLE;
         }
         break;
-    case -1:
+    case 0:
+        break;
+    case 1:
         l1e_remove_flags(nl1e, _PAGE_RW);
         break;
     }

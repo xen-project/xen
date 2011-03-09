@@ -872,7 +872,7 @@ shadow_get_page_from_l1e(shadow_l1e_t sl1e, struct domain *d, p2m_type_t type)
     // If a privileged domain is attempting to install a map of a page it does
     // not own, we let it succeed anyway.
     //
-    if ( unlikely(!res) &&
+    if ( unlikely(res < 0) &&
          !shadow_mode_translate(d) &&
          mfn_valid(mfn = shadow_l1e_get_mfn(sl1e)) &&
          (owner = page_get_owner(mfn_to_page(mfn))) &&
@@ -883,11 +883,11 @@ shadow_get_page_from_l1e(shadow_l1e_t sl1e, struct domain *d, p2m_type_t type)
         SHADOW_PRINTK("privileged domain %d installs map of mfn %05lx "
                        "which is owned by domain %d: %s\n",
                        d->domain_id, mfn_x(mfn), owner->domain_id,
-                       res ? "success" : "failed");
+                       res >= 0 ? "success" : "failed");
     }
 
     /* Okay, it might still be a grant mapping PTE.  Try it. */
-    if ( unlikely(!res) &&
+    if ( unlikely(res < 0) &&
          (type == p2m_grant_map_rw ||
           (type == p2m_grant_map_ro &&
            !(shadow_l1e_get_flags(sl1e) & _PAGE_RW))) )
@@ -900,7 +900,7 @@ shadow_get_page_from_l1e(shadow_l1e_t sl1e, struct domain *d, p2m_type_t type)
             res = get_page_from_l1e(sl1e, d, page_get_owner(mfn_to_page(mfn)));
     }
 
-    if ( unlikely(!res) )
+    if ( unlikely(res < 0) )
     {
         perfc_incr(shadow_get_page_fail);
         SHADOW_PRINTK("failed: l1e=" SH_PRI_pte "\n");
@@ -1229,15 +1229,15 @@ static int shadow_set_l1e(struct vcpu *v,
             TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_SHADOW_L1_GET_REF);
             switch ( shadow_get_page_from_l1e(new_sl1e, d, new_type) )
             {
-            case 0:
+            default:
                 /* Doesn't look like a pagetable. */
                 flags |= SHADOW_SET_ERROR;
                 new_sl1e = shadow_l1e_empty();
                 break;
-            case -1:
+            case 1:
                 shadow_l1e_remove_flags(new_sl1e, _PAGE_RW);
                 /* fall through */
-            default:
+            case 0:
                 shadow_vram_get_l1e(new_sl1e, sl1e, sl1mfn, d);
                 break;
             }
