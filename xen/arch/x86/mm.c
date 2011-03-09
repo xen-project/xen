@@ -1765,15 +1765,16 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
     struct domain *pt_dom = pt_vcpu->domain;
     unsigned long mfn;
     p2m_type_t p2mt;
-    int rc = 1;
+    int rc = 0;
 
     if ( unlikely(__copy_from_user(&ol1e, pl1e, sizeof(ol1e)) != 0) )
-        return 0;
+        return -EFAULT;
 
     if ( unlikely(paging_mode_refcounts(pt_dom)) )
     {
-        rc = UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, pt_vcpu, preserve_ad);
-        return rc;
+        if ( UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, pt_vcpu, preserve_ad) )
+            return 0;
+        return -EBUSY;
     }
 
     if ( l1e_get_flags(nl1e) & _PAGE_PRESENT )
@@ -1782,7 +1783,7 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
         mfn = mfn_x(gfn_to_mfn(p2m_get_hostp2m(pg_dom),
             l1e_get_pfn(nl1e), &p2mt));
         if ( !p2m_is_ram(p2mt) || unlikely(mfn == INVALID_MFN) )
-            return 0;
+            return -EINVAL;
         ASSERT((mfn & ~(PADDR_MASK >> PAGE_SHIFT)) == 0);
         nl1e = l1e_from_pfn(mfn, l1e_get_flags(nl1e));
 
@@ -1790,22 +1791,23 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
         {
             MEM_LOG("Bad L1 flags %x",
                     l1e_get_flags(nl1e) & l1_disallow_mask(pt_dom));
-            return 0;
+            return -EINVAL;
         }
 
         /* Fast path for identical mapping, r/w and presence. */
         if ( !l1e_has_changed(ol1e, nl1e, _PAGE_RW | _PAGE_PRESENT) )
         {
             adjust_guest_l1e(nl1e, pt_dom);
-            rc = UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, pt_vcpu,
-                              preserve_ad);
-            return rc;
+            if ( UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, pt_vcpu,
+                              preserve_ad) )
+                return 0;
+            return -EBUSY;
         }
 
         switch ( rc = get_page_from_l1e(nl1e, pt_dom, pg_dom) )
         {
         default:
-            return 0;
+            return rc;
         case 0:
             break;
         case 1:
@@ -1818,13 +1820,13 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
                                     preserve_ad)) )
         {
             ol1e = nl1e;
-            rc = 0;
+            rc = -EBUSY;
         }
     }
     else if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, pt_vcpu,
                                      preserve_ad)) )
     {
-        return 0;
+        return -EBUSY;
     }
 
     put_page_from_l1e(ol1e, pt_dom);
@@ -3516,9 +3518,10 @@ int do_mmu_update(
                     } 
 #endif
 
-                    okay = mod_l1_entry(va, l1e, mfn,
-                                        cmd == MMU_PT_UPDATE_PRESERVE_AD, v,
-                                        pg_owner);
+                    rc = mod_l1_entry(va, l1e, mfn,
+                                      cmd == MMU_PT_UPDATE_PRESERVE_AD, v,
+                                      pg_owner);
+                    okay = !rc;
                 }
                 break;
                 case PGT_l2_page_table:
@@ -4300,7 +4303,7 @@ static int __do_update_va_mapping(
         goto out;
     }
 
-    rc = mod_l1_entry(pl1e, val, gl1mfn, 0, v, pg_owner) ? 0 : -EINVAL;
+    rc = mod_l1_entry(pl1e, val, gl1mfn, 0, v, pg_owner);
 
     page_unlock(gl1pg);
     put_page(gl1pg);
