@@ -49,12 +49,12 @@
 #define IS_CPT(id)    (id == 0x01008086 || id == 0x01048086)
 #define IS_SNB_GFX(id) (id == 0x01068086 || id == 0x01168086 || id == 0x01268086 || id == 0x01028086 || id == 0x01128086 || id == 0x01228086 || id == 0x010A8086)
 
-u32 ioh_id;
-u32 igd_id;
-bool_t rwbf_quirk;
-static int is_cantiga_b3;
-static int is_snb_gfx;
-static u8 *igd_reg_va;
+static u32 __read_mostly ioh_id;
+static u32 __initdata igd_id;
+bool_t __read_mostly rwbf_quirk;
+static bool_t __read_mostly is_cantiga_b3;
+static bool_t __read_mostly is_snb_gfx;
+static u8 *__read_mostly igd_reg_va;
 static spinlock_t igd_lock;
 
 /*
@@ -79,7 +79,7 @@ int is_igd_vt_enabled_quirk(void)
  * The workaround is to force write buffer flush even if
  * VT-d capability indicates it is not required.
  */
-static void cantiga_b3_errata_init(void)
+static void __init cantiga_b3_errata_init(void)
 {
     u16 vid;
     u8 did_hi, rid;
@@ -96,7 +96,7 @@ static void cantiga_b3_errata_init(void)
 }
 
 /* check for Sandybridge IGD device ID's */
-static void snb_errata_init(void)
+static void __init snb_errata_init(void)
 {
     is_snb_gfx = IS_SNB_GFX(igd_id);
     spin_lock_init(&igd_lock);
@@ -114,15 +114,15 @@ static void snb_errata_init(void)
 /*
  * map IGD MMIO+0x2000 page to allow Xen access to IGD 3D register.
  */
-static void *map_igd_reg(void)
+static void __init map_igd_reg(void)
 {
     u64 igd_mmio, igd_reg;
 
     if ( !is_cantiga_b3 && !is_snb_gfx )
-        return NULL;
+        return;
 
     if ( igd_reg_va )
-        return igd_reg_va;
+        return;
 
     /* get IGD mmio address in PCI BAR */
     igd_mmio = ((u64)pci_conf_read32(0, IGD_DEV, 0, 0x14) << 32) +
@@ -136,9 +136,8 @@ static void *map_igd_reg(void)
     set_fixmap_nocache(FIX_IGD_MMIO, igd_reg);
     igd_reg_va = (u8 *)fix_to_virt(FIX_IGD_MMIO);
 #else
-    igd_reg_va = ioremap_nocache(igd_reg, 0x100);
+    igd_reg_va = ioremap_nocache(igd_reg, 0x1000);
 #endif
-    return igd_reg_va;
 }
 
 /*
@@ -152,7 +151,7 @@ static int cantiga_vtd_ops_preamble(struct iommu* iommu)
     if ( !is_igd_drhd(drhd) || !is_cantiga_b3 )
         return 0;
 
-    if ( !map_igd_reg() )
+    if ( !igd_reg_va )
         return 0;
 
     /*
@@ -180,7 +179,7 @@ static void snb_vtd_ops_preamble(struct iommu* iommu)
     if ( !is_igd_drhd(drhd) || !is_snb_gfx )
         return;
 
-    if ( !map_igd_reg() )
+    if ( !igd_reg_va )
         return;
 
     *((volatile u32 *)(igd_reg_va + 0x54)) = 0x000FFFFF;
@@ -209,7 +208,7 @@ static void snb_vtd_ops_postamble(struct iommu* iommu)
     if ( !is_igd_drhd(drhd) || !is_snb_gfx )
         return;
 
-    if ( !map_igd_reg() )
+    if ( !igd_reg_va )
         return;
 
     *((volatile u32 *)(igd_reg_va + 0x54)) = 0xA;
@@ -362,7 +361,7 @@ void me_wifi_quirk(struct domain *domain, u8 bus, u8 devfn, int map)
  *   - This can cause system failure upon non-fatal VT-d faults
  *   - Potential security issue if malicious guest trigger VT-d faults
  */
-void pci_vtd_quirk(struct pci_dev *pdev)
+void __init pci_vtd_quirk(struct pci_dev *pdev)
 {
 #ifdef CONFIG_X86_64
     int bus = pdev->bus;
