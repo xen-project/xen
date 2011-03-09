@@ -967,10 +967,23 @@ int hvm_vcpu_initialise(struct vcpu *v)
     if ( (rc = hvm_funcs.vcpu_initialise(v)) != 0 )
         goto fail2;
 
+    /* When I start the l1 guest with 'xm/xend' then HVM_PARAM_NESTEDHVM
+     * is already evaluated.
+     *
+     * When I start the l1 guest with 'xl' then HVM_PARAM_NESTEDHVM
+     * has not been evaluated yet so we have to initialise nested
+     * virtualization unconditionally here.
+     */
+    rc = nestedhvm_vcpu_initialise(v);
+    if ( rc < 0 ) {
+        printk("%s: nestedhvm_vcpu_initialise returned %i\n", __func__, rc);
+        goto fail3;
+    }
+
     /* Create ioreq event channel. */
     rc = alloc_unbound_xen_event_channel(v, 0);
     if ( rc < 0 )
-        goto fail3;
+        goto fail4;
 
     /* Register ioreq event channel. */
     v->arch.hvm_vcpu.xen_port = rc;
@@ -987,12 +1000,12 @@ int hvm_vcpu_initialise(struct vcpu *v)
 #ifdef CONFIG_COMPAT
     rc = setup_compat_arg_xlat(v);
     if ( rc != 0 )
-        goto fail3;
+        goto fail4;
 #endif
 
     rc = hvm_vcpu_cacheattr_init(v);
     if ( rc != 0 )
-        goto fail4;
+        goto fail5;
 
     tasklet_init(&v->arch.hvm_vcpu.assert_evtchn_irq_tasklet,
                  (void(*)(unsigned long))hvm_assert_evtchn_irq,
@@ -1017,10 +1030,12 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
     return 0;
 
- fail4:
+ fail5:
 #ifdef CONFIG_COMPAT
     free_compat_arg_xlat(v);
 #endif
+ fail4:
+    nestedhvm_vcpu_destroy(v);
  fail3:
     hvm_funcs.vcpu_destroy(v);
  fail2:
@@ -1031,9 +1046,16 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
 void hvm_vcpu_destroy(struct vcpu *v)
 {
+    int rc;
+
+    rc = nestedhvm_vcpu_destroy(v);
+    if (rc)
+	gdprintk(XENLOG_ERR, "nestedhvm_vcpu_destroy() failed with %i\n", rc);
+
 #ifdef CONFIG_COMPAT
     free_compat_arg_xlat(v);
 #endif
+
     tasklet_kill(&v->arch.hvm_vcpu.assert_evtchn_irq_tasklet);
     hvm_vcpu_cacheattr_destroy(v);
     vlapic_destroy(v);
@@ -3354,6 +3376,17 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                     break;
                 }
                 if ( a.value & HVMPME_onchangeonly )
+                    rc = -EINVAL;
+                break;
+            case HVM_PARAM_NESTEDHVM:
+                if ( a.value > 1 )
+                    rc = -EINVAL;
+                if ( !is_hvm_domain(d) )
+                    rc = -EINVAL;
+                /* Remove the check below once we have
+                 * shadow-on-shadow.
+                 */
+                if ( !paging_mode_hap(d) && a.value )
                     rc = -EINVAL;
                 break;
             }
