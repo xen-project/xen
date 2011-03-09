@@ -20,11 +20,11 @@
 
 #define dom_vmce(x)   ((x)->arch.vmca_msrs)
 
-uint64_t g_mcg_cap;
+static uint64_t __read_mostly g_mcg_cap;
 
 /* Real value in physical CTL MSR */
-uint64_t h_mcg_ctl = 0UL;
-uint64_t *h_mci_ctrl;
+static uint64_t __read_mostly h_mcg_ctl;
+static uint64_t *__read_mostly h_mci_ctrl;
 
 int vmce_init_msr(struct domain *d)
 {
@@ -425,6 +425,7 @@ int fill_vmsr_data(struct mcinfo_bank *mc_bank, struct domain *d,
     return 0;
 }
 
+#if 0 /* currently unused */
 int vmce_domain_inject(
     struct mcinfo_bank *bank, struct domain *d, struct mcinfo_global *global)
 {
@@ -436,6 +437,7 @@ int vmce_domain_inject(
 
     return inject_vmce(d);
 }
+#endif
 
 int vmce_init(struct cpuinfo_x86 *c)
 {

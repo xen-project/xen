@@ -25,7 +25,7 @@ static bool_t __read_mostly ser_support = 0;
 static bool_t __read_mostly mce_force_broadcast;
 boolean_param("mce_fb", mce_force_broadcast);
 
-static int nr_intel_ext_msrs = 0;
+static int __read_mostly nr_intel_ext_msrs;
 
 /* Thermal Hanlding */
 #ifdef CONFIG_X86_MCE_THERMAL
@@ -60,7 +60,7 @@ static void intel_thermal_interrupt(struct cpu_user_regs *regs)
 }
 
 /* Thermal interrupt handler for this CPU setup */
-static void (*vendor_thermal_interrupt)(struct cpu_user_regs *regs) 
+static void (*__read_mostly vendor_thermal_interrupt)(struct cpu_user_regs *regs)
         = unexpected_thermal_interrupt;
 
 fastcall void smp_thermal_interrupt(struct cpu_user_regs *regs)
@@ -156,8 +156,10 @@ static cpumask_t mce_fatal_cpus;
 static void mce_barrier_enter(struct mce_softirq_barrier *);
 static void mce_barrier_exit(struct mce_softirq_barrier *);
 
-struct mca_error_handler *mce_dhandlers, *mce_uhandlers;
-int mce_dhandler_num, mce_uhandler_num;
+static const struct mca_error_handler *__read_mostly mce_dhandlers;
+static const struct mca_error_handler *__read_mostly mce_uhandlers;
+static unsigned int __read_mostly mce_dhandler_num;
+static unsigned int __read_mostly mce_uhandler_num;
 
 enum mce_result
 {
@@ -174,12 +176,11 @@ static enum mce_result mce_action(struct cpu_user_regs *regs,
 {
     struct mc_info *local_mi;
     enum mce_result ret = MCER_NOERROR;
-    uint32_t i;
     struct mcinfo_common *mic = NULL;
     struct mca_handle_result mca_res;
     struct mca_binfo binfo;
-    struct mca_error_handler *handlers = mce_dhandlers;
-    int handler_num = mce_dhandler_num;
+    const struct mca_error_handler *handlers = mce_dhandlers;
+    unsigned int i, handler_num = mce_dhandler_num;
 
     /* When in mce context, regs is valid */
     if (regs)
@@ -724,8 +725,10 @@ static void intel_default_dhandler(int bnum,
         result->result = MCA_NO_ACTION;
 }
 
-struct mca_error_handler intel_mce_dhandlers[] =
-            {{is_async_memerr, intel_memerr_dhandler}, {default_check, intel_default_dhandler}};
+static const struct mca_error_handler intel_mce_dhandlers[] = {
+    {is_async_memerr, intel_memerr_dhandler},
+    {default_check, intel_default_dhandler}
+};
 
 static void intel_default_uhandler(int bnum,
              struct mca_binfo *binfo,
@@ -749,8 +752,9 @@ static void intel_default_uhandler(int bnum,
     }
 }
 
-struct mca_error_handler intel_mce_uhandlers[] =
-            {{default_check, intel_default_uhandler}};
+static const struct mca_error_handler intel_mce_uhandlers[] = {
+    {default_check, intel_default_uhandler}
+};
 
 static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
 {
@@ -1222,9 +1226,9 @@ static void intel_init_mce(void)
     mce_need_clearbank_register(intel_need_clearbank_scan);
 
     mce_dhandlers = intel_mce_dhandlers;
-    mce_dhandler_num = sizeof(intel_mce_dhandlers)/sizeof(struct mca_error_handler);
+    mce_dhandler_num = ARRAY_SIZE(intel_mce_dhandlers);
     mce_uhandlers = intel_mce_uhandlers;
-    mce_uhandler_num = sizeof(intel_mce_uhandlers)/sizeof(struct mca_error_handler);
+    mce_uhandler_num = ARRAY_SIZE(intel_mce_uhandlers);
 }
 
 static void cpu_mcabank_free(unsigned int cpu)
