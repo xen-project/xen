@@ -1845,16 +1845,16 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
     struct domain *d = vcpu->domain;
     struct page_info *l2pg = mfn_to_page(pfn);
     unsigned long type = l2pg->u.inuse.type_info;
-    int rc = 1;
+    int rc = 0;
 
     if ( unlikely(!is_guest_l2_slot(d, type, pgentry_ptr_to_slot(pl2e))) )
     {
         MEM_LOG("Illegal L2 update attempt in Xen-private area %p", pl2e);
-        return 0;
+        return -EPERM;
     }
 
     if ( unlikely(__copy_from_user(&ol2e, pl2e, sizeof(ol2e)) != 0) )
-        return 0;
+        return -EFAULT;
 
     if ( l2e_get_flags(nl2e) & _PAGE_PRESENT )
     {
@@ -1862,32 +1862,33 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
         {
             MEM_LOG("Bad L2 flags %x",
                     l2e_get_flags(nl2e) & L2_DISALLOW_MASK);
-            return 0;
+            return -EINVAL;
         }
 
         /* Fast path for identical mapping and presence. */
         if ( !l2e_has_changed(ol2e, nl2e, _PAGE_PRESENT) )
         {
             adjust_guest_l2e(nl2e, d);
-            rc = UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn, vcpu, preserve_ad);
-            return rc;
+            if ( UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn, vcpu, preserve_ad) )
+                return 0;
+            return -EBUSY;
         }
 
-        if ( unlikely(get_page_from_l2e(nl2e, pfn, d) < 0) )
-            return 0;
+        if ( unlikely((rc = get_page_from_l2e(nl2e, pfn, d)) < 0) )
+            return rc;
 
         adjust_guest_l2e(nl2e, d);
         if ( unlikely(!UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn, vcpu,
                                     preserve_ad)) )
         {
             ol2e = nl2e;
-            rc = 0;
+            rc = -EBUSY;
         }
     }
     else if ( unlikely(!UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn, vcpu,
                                      preserve_ad)) )
     {
-        return 0;
+        return -EBUSY;
     }
 
     put_page_from_l2e(ol2e, pfn);
@@ -3367,7 +3368,7 @@ int do_mmu_update(
     void *va;
     unsigned long gpfn, gmfn, mfn;
     struct page_info *page;
-    int rc = 0, okay = 1, i = 0;
+    int rc = 0, i = 0;
     unsigned int cmd, done = 0, pt_dom;
     struct vcpu *v = current;
     struct domain *d = v->domain, *pt_owner = d, *pg_owner;
@@ -3434,7 +3435,6 @@ int do_mmu_update(
         }
 
         cmd = req.ptr & (sizeof(l1_pgentry_t)-1);
-        okay = 0;
 
         switch ( cmd )
         {
@@ -3451,6 +3451,7 @@ int do_mmu_update(
             rc = xsm_mmu_normal_update(d, pg_owner, req.val);
             if ( rc )
                 break;
+            rc = -EINVAL;
 
             req.ptr -= cmd;
             gmfn = req.ptr >> PAGE_SHIFT;
@@ -3521,7 +3522,6 @@ int do_mmu_update(
                     rc = mod_l1_entry(va, l1e, mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, v,
                                       pg_owner);
-                    okay = !rc;
                 }
                 break;
                 case PGT_l2_page_table:
@@ -3545,13 +3545,12 @@ int do_mmu_update(
                     else if ( p2m_ram_shared == l2e_p2mt )
                     {
                         MEM_LOG("Unexpected attempt to map shared page.\n");
-                        rc = -EINVAL;
                         break;
                     }
 
 
-                    okay = mod_l2_entry(va, l2e, mfn,
-                                        cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
+                    rc = mod_l2_entry(va, l2e, mfn,
+                                      cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
                 }
                 break;
                 case PGT_l3_page_table:
@@ -3575,13 +3574,11 @@ int do_mmu_update(
                     else if ( p2m_ram_shared == l3e_p2mt )
                     {
                         MEM_LOG("Unexpected attempt to map shared page.\n");
-                        rc = -EINVAL;
                         break;
                     }
 
                     rc = mod_l3_entry(va, l3e, mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, 1, v);
-                    okay = !rc;
                 }
                 break;
 #if CONFIG_PAGING_LEVELS >= 4
@@ -3607,20 +3604,18 @@ int do_mmu_update(
                     else if ( p2m_ram_shared == l4e_p2mt )
                     {
                         MEM_LOG("Unexpected attempt to map shared page.\n");
-                        rc = -EINVAL;
                         break;
                     }
 
                     rc = mod_l4_entry(va, l4e, mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, 1, v);
-                    okay = !rc;
                 }
                 break;
 #endif
                 case PGT_writable_page:
                     perfc_incr(writable_mmu_updates);
-                    okay = paging_write_guest_entry(
-                        v, va, req.val, _mfn(mfn));
+                    if ( paging_write_guest_entry(v, va, req.val, _mfn(mfn)) )
+                        rc = 0;
                     break;
                 }
                 page_unlock(page);
@@ -3630,8 +3625,8 @@ int do_mmu_update(
             else if ( get_page_type(page, PGT_writable_page) )
             {
                 perfc_incr(writable_mmu_updates);
-                okay = paging_write_guest_entry(
-                    v, va, req.val, _mfn(mfn));
+                if ( paging_write_guest_entry(v, va, req.val, _mfn(mfn)) )
+                    rc = 0;
                 put_page_type(page);
             }
 
@@ -3652,17 +3647,18 @@ int do_mmu_update(
             if ( unlikely(!get_page_from_pagenr(mfn, pg_owner)) )
             {
                 MEM_LOG("Could not get page for mach->phys update");
+                rc = -EINVAL;
                 break;
             }
 
             if ( unlikely(paging_mode_translate(pg_owner)) )
             {
                 MEM_LOG("Mach-phys update on auto-translate guest");
+                rc = -EINVAL;
                 break;
             }
 
             set_gpfn_from_mfn(mfn, gpfn);
-            okay = 1;
 
             paging_mark_dirty(pg_owner, mfn);
 
@@ -3672,15 +3668,11 @@ int do_mmu_update(
         default:
             MEM_LOG("Invalid page update command %x", cmd);
             rc = -ENOSYS;
-            okay = 0;
             break;
         }
 
-        if ( unlikely(!okay) )
-        {
-            rc = rc ? rc : -EINVAL;
+        if ( unlikely(rc) )
             break;
-        }
 
         guest_handle_add_offset(ureqs, 1);
     }
