@@ -64,12 +64,12 @@ static struct {
 /*
  * Knob to control our willingness to enable the local APIC.
  */
-static int enable_local_apic __initdata = 0; /* -1=force-disable, +1=force-enable */
+static s8 __initdata enable_local_apic; /* -1=force-disable, +1=force-enable */
 
 /*
  * Debug level
  */
-int apic_verbosity;
+u8 __read_mostly apic_verbosity;
 
 static bool_t __initdata opt_x2apic = 1;
 boolean_param("x2apic", opt_x2apic);
@@ -442,8 +442,6 @@ void __init sync_Arb_IDs(void)
                       | APIC_DM_INIT);
 }
 
-extern void __error_in_apic_c (void);
-
 /*
  * An initial setup of the virtual wire mode.
  */
@@ -558,8 +556,7 @@ void __devinit setup_local_APIC(void)
     value = apic_read(APIC_LVR);
     ver = GET_APIC_VERSION(value);
 
-    if ((SPURIOUS_APIC_VECTOR & 0x0f) != 0x0f)
-        __error_in_apic_c();
+    BUILD_BUG_ON((SPURIOUS_APIC_VECTOR & 0x0f) != 0x0f);
 
     /*
      * Double-check whether this APIC is really registered.
@@ -1117,12 +1114,6 @@ static void __init wait_8254_wraparound(void)
 }
 
 /*
- * Default initialization for 8254 timers. If we use other timers like HPET,
- * we override this later
- */
-void (*wait_timer_tick)(void) __initdata = wait_8254_wraparound;
-
-/*
  * This function sets up the local APIC timer, with a timeout of
  * 'clocks' APIC bus clock. During calibration we actually call
  * this function twice on the boot CPU, once with a bogus timeout
@@ -1204,7 +1195,7 @@ static int __init calibrate_APIC_clock(void)
      * for a wraparound to start exact measurement:
      * (the current tick might have been already half done)
      */
-    wait_timer_tick();
+    wait_8254_wraparound();
 
     /*
      * We wrapped around just now. Let's start:
@@ -1217,7 +1208,7 @@ static int __init calibrate_APIC_clock(void)
      * Let's wait LOOPS wraprounds:
      */
     for (i = 0; i < LOOPS; i++)
-        wait_timer_tick();
+        wait_8254_wraparound();
 
     tt2 = apic_read(APIC_TMCCT);
     if (cpu_has_tsc)

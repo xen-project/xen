@@ -28,7 +28,7 @@ const struct genapic *apic_probe[] __initdata = {
 	NULL,
 };
 
-static int cmdline_apic;
+static bool_t __initdata cmdline_apic;
 
 void __init generic_bigsmp_probe(void)
 {

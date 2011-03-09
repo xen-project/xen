@@ -21,7 +21,7 @@
 #define IO_APIC_REDIR_DEST_LOGICAL	0x00800
 #define IO_APIC_REDIR_DEST_PHYSICAL	0x00000
 
-extern int apic_verbosity;
+extern u8 apic_verbosity;
 extern bool_t x2apic_enabled;
 extern bool_t directed_eoi_enabled;
 
@@ -176,8 +176,6 @@ static inline void ack_APIC_irq(void)
 	/* Docs say use 0 for future compatibility */
 	apic_write_around(APIC_EOI, 0);
 }
-
-extern void (*wait_timer_tick)(void);
 
 extern int get_maxlvt(void);
 extern void clear_local_APIC(void);

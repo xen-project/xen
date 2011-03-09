@@ -12,12 +12,10 @@
 #include <asm/mach-default/mach_mpparse.h>
 #include <asm/io_apic.h>
 
-static int dmi_bigsmp; /* can be set by dmi scanners */
-
 static __init int force_bigsmp(struct dmi_system_id *d)
 {
 	printk(KERN_NOTICE "%s detected: force use of apic=bigsmp\n", d->ident);
-	dmi_bigsmp = 1;
+	def_to_bigsmp = 1;
 	return 0;
 }
 
@@ -42,11 +40,9 @@ static struct dmi_system_id __initdata bigsmp_dmi_table[] = {
 
 static __init int probe_bigsmp(void)
 { 
-	if (def_to_bigsmp)
-		dmi_bigsmp = 1;
-	else
+	if (!def_to_bigsmp)
 		dmi_check_system(bigsmp_dmi_table);
-	return dmi_bigsmp;
+	return def_to_bigsmp;
 } 
 
 const struct genapic apic_bigsmp = {
