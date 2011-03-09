@@ -394,7 +394,7 @@ static struct platform_timesource __initdata plt_hpet =
  * PLATFORM TIMER 3: IBM 'CYCLONE' TIMER
  */
 
-int use_cyclone;
+bool_t __initdata use_cyclone;
 
 /*
  * Although the counter is read via a 64-bit register, I believe it is actually

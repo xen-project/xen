@@ -711,7 +711,7 @@ void arch_get_xen_caps(xen_capabilities_info_t *info)
     }
 }
 
-int xen_in_range(paddr_t start, paddr_t end)
+int __init xen_in_range(paddr_t start, paddr_t end)
 {
     paddr_t xs = __pa(&_start);
     paddr_t xe = __pa(&_end);

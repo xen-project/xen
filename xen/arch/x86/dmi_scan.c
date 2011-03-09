@@ -150,7 +150,7 @@ static int __init dmi_iterate(void (*decode)(struct dmi_header *))
 	return -1;
 }
 
-static char *dmi_ident[DMI_STRING_MAX];
+static char *__initdata dmi_ident[DMI_STRING_MAX];
 
 /*
  *	Save a DMI string
@@ -456,7 +456,7 @@ void __init dmi_scan_machine(void)
  *	returns non zero or we hit the end. Callback function is called for
  *	each successfull match. Returns the number of matches.
  */
-int dmi_check_system(struct dmi_system_id *list)
+int __init dmi_check_system(struct dmi_system_id *list)
 {
 	int i, count = 0;
 	struct dmi_system_id *d = list;
@@ -480,18 +480,10 @@ fail:		d++;
 	return count;
 }
 
-EXPORT_SYMBOL(dmi_check_system);
-
-/**
- *	dmi_get_system_info - return DMI data value
- *	@field: data index (see enum dmi_filed)
- *
- *	Returns one DMI data value, can be used to perform
- *	complex DMI data checks.
- */
-char * dmi_get_system_info(int field)
+void __init dmi_end_boot(void)
 {
-	return dmi_ident[field];
-}
+    unsigned int i;
 
-EXPORT_SYMBOL(dmi_get_system_info);
+    for ( i = 0; i < DMI_STRING_MAX; ++i )
+        xfree(dmi_ident[i]);
+}

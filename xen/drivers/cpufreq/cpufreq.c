@@ -76,7 +76,7 @@ struct cpufreq_governor *__find_governor(const char *governor)
     return NULL;
 }
 
-int cpufreq_register_governor(struct cpufreq_governor *governor)
+int __init cpufreq_register_governor(struct cpufreq_governor *governor)
 {
     if (!governor)
         return -EINVAL;
@@ -85,24 +85,6 @@ int cpufreq_register_governor(struct cpufreq_governor *governor)
         return -EEXIST;
 
     list_add(&governor->governor_list, &cpufreq_governor_list);
-    return 0;
-}
-
-int cpufreq_unregister_governor(struct cpufreq_governor *governor)
-{
-    struct cpufreq_policy *policy = this_cpu(cpufreq_cpu_policy);
-
-    if (!governor || !policy)
-        return -EINVAL;
-
-    /* error if unregister current cpufreq governor */
-    if (governor == policy->governor)
-        return -EBUSY;
-
-    if (__find_governor(governor->name) == NULL)
-        return -ENOENT;
-
-    list_del(&governor->governor_list);
     return 0;
 }
 

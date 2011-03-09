@@ -102,9 +102,6 @@ void serial_end_sync(int handle);
 void serial_start_log_everything(int handle);
 void serial_end_log_everything(int handle);
 
-/* Return number of bytes headroom in transmit buffer. */
-int serial_tx_space(int handle);
-
 /* Return irq number for specified serial port (identified by index). */
 int serial_irq(int idx);
 

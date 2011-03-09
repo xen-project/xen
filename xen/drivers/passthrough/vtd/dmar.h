@@ -84,8 +84,6 @@ struct acpi_rhsa_unit {
 
 struct acpi_drhd_unit * acpi_find_matched_drhd_unit(struct pci_dev *pdev);
 struct acpi_atsr_unit * acpi_find_matched_atsr_unit(u8 bus, u8 devfn);
-void dmar_scope_add_buses(struct dmar_scope *scope, u16 sec, u16 sub);
-void dmar_scope_remove_buses(struct dmar_scope *scope, u16 sec, u16 sub);
 
 #define DMAR_TYPE 1
 #define RMRR_TYPE 2

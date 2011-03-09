@@ -164,18 +164,6 @@ static bool_t __read_mostly using_apic_timer;
 
 static bool_t __read_mostly enabled_via_apicbase;
 
-void enable_NMI_through_LVT0 (void * dummy)
-{
-    unsigned int v, ver;
-
-    ver = apic_read(APIC_LVR);
-    ver = GET_APIC_VERSION(ver);
-    v = APIC_DM_NMI;			/* unmask and set to NMI */
-    if (!APIC_INTEGRATED(ver))		/* 82489DX */
-        v |= APIC_LVT_LEVEL_TRIGGER;
-    apic_write_around(APIC_LVT0, v);
-}
-
 int get_physical_broadcast(void)
 {
     if (modern_apic())
@@ -807,29 +795,6 @@ int lapic_resume(void)
     return 0;
 }
 
-
-/*
- * If Linux enabled the LAPIC against the BIOS default
- * disable it down before re-entering the BIOS on shutdown.
- * Otherwise the BIOS may get confused and not power-off.
- * Additionally clear all LVT entries before disable_local_APIC
- * for the case where Linux didn't enable the LAPIC.
- */
-void lapic_shutdown(void)
-{
-    unsigned long flags;
-
-    if (!cpu_has_apic)
-        return;
-
-    local_irq_save(flags);
-    clear_local_APIC();
-
-    if (enabled_via_apicbase)
-        disable_local_APIC();
-
-    local_irq_restore(flags);
-}
 
 /*
  * Detect and enable local APICs on non-SMP boards.

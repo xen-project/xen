@@ -237,7 +237,7 @@ int irq_to_vector(int irq)
     return vector;
 }
 
-static void init_one_irq_desc(struct irq_desc *desc)
+static void __init init_one_irq_desc(struct irq_desc *desc)
 {
     desc->status  = IRQ_DISABLED;
     desc->handler = &no_irq_type;
@@ -254,14 +254,14 @@ static void init_one_irq_status(int irq)
     irq_status[irq] = IRQ_UNUSED;
 }
 
-static void init_one_irq_cfg(struct irq_cfg *cfg)
+static void __init init_one_irq_cfg(struct irq_cfg *cfg)
 {
     cfg->vector = IRQ_VECTOR_UNASSIGNED;
     cpus_clear(cfg->cpu_mask);
     cpus_clear(cfg->old_cpu_mask);
 }
 
-int init_irq_data(void)
+int __init init_irq_data(void)
 {
     struct irq_desc *desc;
     struct irq_cfg *cfg;

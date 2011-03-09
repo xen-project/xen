@@ -24,6 +24,7 @@
 
 #include <xen/types.h>
 #include <xen/errno.h>
+#include <xen/init.h>
 #include <xen/delay.h>
 #include <xen/cpumask.h>
 #include <xen/timer.h>
@@ -311,7 +312,7 @@ static struct cpufreq_driver powernow_cpufreq_driver = {
     .exit   = powernow_cpufreq_cpu_exit
 };
 
-unsigned int powernow_register_driver()
+unsigned int __init powernow_register_driver()
 {
     unsigned int i, ret = 0;
 

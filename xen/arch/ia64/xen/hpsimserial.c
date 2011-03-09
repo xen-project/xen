@@ -6,6 +6,7 @@
  */
 
 #include <linux/config.h>
+#include <xen/init.h>
 #include <xen/sched.h>
 #include <xen/serial.h>
 #include "hpsim_ssc.h"
@@ -17,7 +18,7 @@ static void hp_ski_putc(struct serial_port *port, char c)
 
 static struct uart_driver hp_ski = { .putc = hp_ski_putc };
 
-void hpsim_serial_init(void)
+void __init hpsim_serial_init(void)
 {
 	serial_register_uart(0, &hp_ski, 0);
 }

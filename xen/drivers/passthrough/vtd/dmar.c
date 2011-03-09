@@ -48,7 +48,8 @@ static LIST_HEAD_READ_MOSTLY(acpi_rhsa_units);
 
 static u64 __read_mostly igd_drhd_address;
 
-void dmar_scope_add_buses(struct dmar_scope *scope, u16 sec_bus, u16 sub_bus)
+static void __init dmar_scope_add_buses(struct dmar_scope *scope, u16 sec_bus,
+                                        u16 sub_bus)
 {
     sub_bus &= 0xff;
     if (sec_bus > sub_bus)
@@ -56,16 +57,6 @@ void dmar_scope_add_buses(struct dmar_scope *scope, u16 sec_bus, u16 sub_bus)
 
     while ( sec_bus <= sub_bus )
         set_bit(sec_bus++, scope->buses);
-}
-
-void dmar_scope_remove_buses(struct dmar_scope *scope, u16 sec_bus, u16 sub_bus)
-{
-    sub_bus &= 0xff;
-    if (sec_bus > sub_bus)
-        return;
-
-    while ( sec_bus <= sub_bus )
-        clear_bit(sec_bus++, scope->buses);
 }
 
 static int __init acpi_register_drhd_unit(struct acpi_drhd_unit *drhd)

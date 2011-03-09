@@ -253,7 +253,7 @@ char serial_getc(int handle)
     return c & 0x7f;
 }
 
-int serial_parse_handle(char *conf)
+int __init serial_parse_handle(char *conf)
 {
     int handle;
 
@@ -288,7 +288,7 @@ int serial_parse_handle(char *conf)
     return -1;
 }
 
-void serial_set_rx_handler(int handle, serial_rx_fn fn)
+void __init serial_set_rx_handler(int handle, serial_rx_fn fn)
 {
     struct serial_port *port;
     unsigned long flags;
@@ -420,15 +420,6 @@ void serial_end_log_everything(int handle)
     spin_unlock_irqrestore(&port->tx_lock, flags);
 }
 
-int serial_tx_space(int handle)
-{
-    struct serial_port *port;
-    if ( handle == -1 )
-        return serial_txbufsz;
-    port = &com[handle & SERHND_IDX];
-    return serial_txbufsz - (port->txbufp - port->txbufc);
-}
-
 void __devinit serial_init_preirq(void)
 {
     int i;
@@ -476,7 +467,8 @@ void serial_resume(void)
     serial_init_postirq();
 }
 
-void serial_register_uart(int idx, struct uart_driver *driver, void *uart)
+void __init serial_register_uart(int idx, struct uart_driver *driver,
+                                 void *uart)
 {
     /* Store UART-specific info. */
     com[idx].driver = driver;

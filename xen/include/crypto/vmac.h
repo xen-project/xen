@@ -163,12 +163,6 @@ uint64_t vhash(unsigned char m[],
 
 void vmac_set_key(unsigned char user_key[], vmac_ctx_t *ctx);
 
-/* --------------------------------------------------------------------------
- * This function aborts current hash and resets ctx, ready for a new message.
- * ----------------------------------------------------------------------- */
-
-void vhash_abort(vmac_ctx_t *ctx);
-
 /* --------------------------------------------------------------------- */
 
 #ifdef  __cplusplus

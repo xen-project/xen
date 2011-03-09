@@ -70,8 +70,8 @@ typedef struct __packed {
     uint32_t     vtd_dmars_off;
 } sinit_mle_data_t;
 
-static void tboot_copy_memory(unsigned char *va, uint32_t size,
-                              unsigned long pa)
+static void __init tboot_copy_memory(unsigned char *va, uint32_t size,
+                                     unsigned long pa)
 {
     unsigned long map_base = 0;
     unsigned char *map_addr = NULL;

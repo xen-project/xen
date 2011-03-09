@@ -182,7 +182,6 @@ extern void clear_local_APIC(void);
 extern void connect_bsp_APIC (void);
 extern void disconnect_bsp_APIC (int virt_wire_setup);
 extern void disable_local_APIC (void);
-extern void lapic_shutdown (void);
 extern int verify_local_APIC (void);
 extern void cache_APIC_registers (void);
 extern void sync_Arb_IDs (void);
@@ -206,7 +205,6 @@ extern int lapic_suspend(void);
 extern int lapic_resume(void);
 
 extern int check_nmi_watchdog (void);
-extern void enable_NMI_through_LVT0 (void * dummy);
 
 extern unsigned int nmi_watchdog;
 #define NMI_NONE	0
@@ -215,7 +213,6 @@ extern unsigned int nmi_watchdog;
 #define NMI_INVALID	3
 
 #else /* !CONFIG_X86_LOCAL_APIC */
-static inline void lapic_shutdown(void) { }
 static inline int lapic_suspend(void) {return 0;}
 static inline int lapic_resume(void) {return 0;}
 

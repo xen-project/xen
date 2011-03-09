@@ -722,7 +722,7 @@ static void poly_step_func(uint64_t *ahi, uint64_t *alo, const uint64_t *kh,
 
 /* ----------------------------------------------------------------------- */
 
-void vhash_abort(vmac_ctx_t *ctx)
+static void vhash_abort(vmac_ctx_t *ctx)
 {
     ctx->polytmp[0] = ctx->polykey[0] ;
     ctx->polytmp[1] = ctx->polykey[1] ;

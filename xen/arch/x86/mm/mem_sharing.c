@@ -124,7 +124,7 @@ static inline struct gfn_info* gfn_get_info(struct list_head *list)
         spin_unlock(&shr_lock.lock);                      \
     } while (0)
 
-static void mem_sharing_hash_init(void)
+static void __init mem_sharing_hash_init(void)
 {
     int i;
 
@@ -827,7 +827,7 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
     return rc;
 }
 
-void mem_sharing_init(void)
+void __init mem_sharing_init(void)
 {
     printk("Initing memory sharing.\n");
     mem_sharing_hash_init();

@@ -62,7 +62,7 @@ void flush_all_cache()
     wbinvd();
 }
 
-void *map_to_nocache_virt(int nr_iommus, u64 maddr)
+void *__init map_to_nocache_virt(int nr_iommus, u64 maddr)
 {
     set_fixmap_nocache(FIX_IOMMU_REGS_BASE_0 + nr_iommus, maddr);
     return (void *)fix_to_virt(FIX_IOMMU_REGS_BASE_0 + nr_iommus);

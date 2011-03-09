@@ -1,7 +1,7 @@
 #ifndef __ASM_MACH_MPPARSE_H
 #define __ASM_MACH_MPPARSE_H
 
-extern int use_cyclone;
+extern bool_t use_cyclone;
 
 #ifdef CONFIG_X86_SUMMIT_NUMA
 extern void setup_summit(void);
@@ -10,8 +10,8 @@ extern void setup_summit(void);
 #endif
 
 extern int usb_early_handoff;
-static inline int mps_oem_check(struct mp_config_table *mpc, char *oem, 
-		char *productid)
+static inline int __init mps_oem_check(struct mp_config_table *mpc, char *oem,
+				       char *productid)
 {
 	if (!strncmp(oem, "IBM ENSW", 8) && 
 			(!strncmp(productid, "VIGIL SMP", 9) 
@@ -26,7 +26,7 @@ static inline int mps_oem_check(struct mp_config_table *mpc, char *oem,
 }
 
 /* Hook from generic ACPI tables.c */
-static inline int acpi_madt_oem_check(char *oem_id, char *oem_table_id)
+static inline int __init acpi_madt_oem_check(char *oem_id, char *oem_table_id)
 {
 	if (!strncmp(oem_id, "IBM", 3) &&
 	    (!strncmp(oem_table_id, "SERVIGIL", 8)

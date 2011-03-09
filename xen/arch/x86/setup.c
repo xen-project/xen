@@ -1328,6 +1328,8 @@ void __init __start_xen(unsigned long mbi_p)
     /* Hide UART from DOM0 if we're using it */
     serial_endboot();
 
+    dmi_end_boot();
+
     domain_unpause_by_systemcontroller(dom0);
 
     reset_stack_and_jump(init_done);
@@ -1360,7 +1362,7 @@ void arch_get_xen_caps(xen_capabilities_info_t *info)
     }
 }
 
-int xen_in_range(unsigned long mfn)
+int __init xen_in_range(unsigned long mfn)
 {
     paddr_t start, end;
     int i;

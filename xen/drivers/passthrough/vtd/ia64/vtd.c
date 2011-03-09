@@ -65,7 +65,7 @@ void flush_all_cache()
     ia64_sal_cache_flush(3);
 }
 
-void * map_to_nocache_virt(int nr_iommus, u64 maddr)
+void *__init map_to_nocache_virt(int nr_iommus, u64 maddr)
 {
   return (void *) ( maddr + __IA64_UNCACHED_OFFSET);
 }

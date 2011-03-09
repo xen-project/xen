@@ -212,7 +212,7 @@ void __init numa_init_array(void)
 static int numa_fake __initdata = 0;
 
 /* Numa emulation */
-static int numa_emulation(u64 start_pfn, u64 end_pfn)
+static int __init numa_emulation(u64 start_pfn, u64 end_pfn)
 {
  	int i;
  	struct node nodes[MAX_NUMNODES];

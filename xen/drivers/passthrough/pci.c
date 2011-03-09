@@ -369,7 +369,7 @@ out:
 /*
  * detect pci device, return 0 if it exists, or return 0
  */
-int pci_device_detect(u8 bus, u8 dev, u8 func)
+int __init pci_device_detect(u8 bus, u8 dev, u8 func)
 {
     u32 vendor;
 
