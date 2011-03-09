@@ -2077,9 +2077,11 @@ static void pcilist(const char *dom)
 
     if (libxl_device_pci_list_assigned(&ctx, &pcidevs, domid, &num))
         return;
-    printf("VFn  domain bus  slot func\n");
+    printf("Vdev Device\n");
     for (i = 0; i < num; i++) {
-        printf("0x%02x 0x%04x 0x%02x 0x%02x 0x%01x\n", pcidevs[i].vdevfn, pcidevs[i].domain, pcidevs[i].bus, pcidevs[i].dev, pcidevs[i].func);
+        printf("%02x.%01x %04x:%02x:%02x.%01x\n",
+               (pcidevs[i].vdevfn >> 3) & 0x1f, pcidevs[i].vdevfn & 0x7,
+               pcidevs[i].domain, pcidevs[i].bus, pcidevs[i].dev, pcidevs[i].func);
         libxl_device_pci_destroy(&pcidevs[i]);
     }
     free(pcidevs);
