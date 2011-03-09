@@ -50,16 +50,15 @@
 #define	get_cpu()	smp_processor_id()
 #define put_cpu()	do {} while(0)
 
-u32 num_var_ranges = 0;
+u32 __read_mostly num_var_ranges = 0;
 
-unsigned int *usage_table;
+unsigned int *__read_mostly usage_table;
 static DEFINE_MUTEX(mtrr_mutex);
 
-u64 size_or_mask, size_and_mask;
+u64 __read_mostly size_or_mask;
+u64 __read_mostly size_and_mask;
 
-static struct mtrr_ops * mtrr_ops[X86_VENDOR_NUM] = {};
-
-struct mtrr_ops * mtrr_if = NULL;
+const struct mtrr_ops *__read_mostly mtrr_if = NULL;
 
 static void set_mtrr(unsigned int reg, unsigned long base,
 		     unsigned long size, mtrr_type type);
@@ -70,7 +69,7 @@ extern int arr3_protected;
 #define arr3_protected 0
 #endif
 
-static const char *mtrr_strings[MTRR_NUM_TYPES] =
+static const char *const mtrr_strings[MTRR_NUM_TYPES] =
 {
     "uncachable",               /* 0 */
     "write-combining",          /* 1 */
@@ -81,16 +80,20 @@ static const char *mtrr_strings[MTRR_NUM_TYPES] =
     "write-back",               /* 6 */
 };
 
-const char *mtrr_attrib_to_str(int x)
+static const char *mtrr_attrib_to_str(int x)
 {
 	return (x <= 6) ? mtrr_strings[x] : "?";
 }
 
-void set_mtrr_ops(struct mtrr_ops * ops)
+#ifndef CONFIG_X86_64
+static const struct mtrr_ops *mtrr_ops[X86_VENDOR_NUM];
+
+void set_mtrr_ops(const struct mtrr_ops * ops)
 {
 	if (ops->vendor && ops->vendor < X86_VENDOR_NUM)
 		mtrr_ops[ops->vendor] = ops;
 }
+#endif
 
 /*  Returns non-zero if we have the write-combining memory type  */
 static int have_wrcomb(void)
@@ -472,7 +475,7 @@ static int mtrr_check(unsigned long base, unsigned long size)
  *	failures and do not wish system log messages to be sent.
  */
 
-int
+int __init
 mtrr_add(unsigned long base, unsigned long size, unsigned int type,
 	 char increment)
 {
@@ -565,16 +568,13 @@ int mtrr_del_page(int reg, unsigned long base, unsigned long size)
  *	code.
  */
 
-int
+int __init
 mtrr_del(int reg, unsigned long base, unsigned long size)
 {
 	if (mtrr_check(base, size))
 		return -EINVAL;
 	return mtrr_del_page(reg, base >> PAGE_SHIFT, size >> PAGE_SHIFT);
 }
-
-EXPORT_SYMBOL(mtrr_add);
-EXPORT_SYMBOL(mtrr_del);
 
 /* HACK ALERT!
  * These should be called implicitly, but we can't yet until all the initcall

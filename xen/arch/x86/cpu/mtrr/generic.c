@@ -467,7 +467,7 @@ int positive_have_wrcomb(void)
 
 /* generic structure...
  */
-struct mtrr_ops generic_mtrr_ops = {
+const struct mtrr_ops generic_mtrr_ops = {
 	.use_intel_if      = 1,
 	.set_all	   = generic_set_all,
 	.get               = generic_get_mtrr,
