@@ -2483,18 +2483,16 @@ def xm_pci_list(args):
     has_vdevfn = False
     for x in devs:
         if x['vdevfn'] & AUTO_PHP_SLOT:
-            x['show_vslot'] = '-'
-            x['show_vfunc'] = '-'
+            x['show_vdevfn'] = '-'
         else:
-            x['show_vslot'] = "0x%02x" % PCI_SLOT(x['vdevfn'])
-            x['show_vfunc'] = "0x%x" % PCI_FUNC(x['vdevfn'])
+            x['show_vdevfn'] = "%02x.%01x" % (PCI_SLOT(x['vdevfn']), PCI_FUNC(x['vdevfn']))
             has_vdevfn = True
 
-    hdr_str = 'domain bus  slot func'
-    fmt_str = '0x%(domain)04x 0x%(bus)02x 0x%(slot)02x 0x%(func)x'
+    hdr_str = 'Device'
+    fmt_str = '%(domain)04x:%(bus)02x:%(slot)02x.%(func)x'
     if has_vdevfn:
-        hdr_str = 'VSlt VFn ' + hdr_str
-        fmt_str = '%(show_vslot)-4s %(show_vfunc)-3s ' + fmt_str
+        hdr_str = 'Vdev ' + hdr_str
+        fmt_str = '%(show_vdevfn)-4s ' + fmt_str
 
     print hdr_str
     for x in devs:
