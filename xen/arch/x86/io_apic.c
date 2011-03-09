@@ -44,13 +44,14 @@ static struct { int pin, apic; } ioapic_i8259 = { -1, -1 };
 static DEFINE_SPINLOCK(ioapic_lock);
 
 bool_t __read_mostly skip_ioapic_setup;
+bool_t __read_mostly ioapic_ack_new = 1;
 
 #ifndef sis_apic_bug
 /*
  * Is the SiS APIC rmw bug present?
  * -1 = don't know, 0 = no, 1 = yes
  */
-int sis_apic_bug = -1;
+s8 __read_mostly sis_apic_bug = -1;
 #endif
 
 /*
@@ -76,7 +77,7 @@ int __read_mostly nr_ioapics;
 static struct irq_pin_list {
     int apic, pin;
     unsigned int next;
-} *irq_2_pin;
+} *__read_mostly irq_2_pin;
 
 static unsigned int irq_2_pin_free_entry;
 
@@ -1191,7 +1192,7 @@ static void /*__init*/ __print_IO_APIC(void)
     return;
 }
 
-void print_IO_APIC(void)
+static void __init print_IO_APIC(void)
 {
     if (apic_verbosity != APIC_QUIET)
         __print_IO_APIC();
@@ -1321,7 +1322,6 @@ void disable_IO_APIC(void)
  * by Matt Domsch <Matt_Domsch@dell.com>  Tue Dec 21 12:25:05 CST 1999
  */
 
-#ifndef CONFIG_X86_NUMAQ
 static void __init setup_ioapic_ids_from_mpc(void)
 {
     union IO_APIC_reg_00 reg_00;
@@ -1428,9 +1428,6 @@ static void __init setup_ioapic_ids_from_mpc(void)
             apic_printk(APIC_VERBOSE, " ok.\n");
     }
 }
-#else
-static void __init setup_ioapic_ids_from_mpc(void) { }
-#endif
 
 /*
  * There is a nasty bug in some older SMP boards, their mptable lies
@@ -1546,8 +1543,7 @@ static unsigned int startup_level_ioapic_irq (unsigned int irq)
     return 0; /* don't check for pending */
 }
 
-int __read_mostly ioapic_ack_new = 1;
-static void setup_ioapic_ack(char *s)
+static void __init setup_ioapic_ack(char *s)
 {
     if ( !strcmp(s, "old") )
         ioapic_ack_new = 0;
@@ -1716,9 +1712,7 @@ static void disable_edge_ioapic_irq(unsigned int irq)
 {
 }
 
-static void end_edge_ioapic_irq(unsigned int irq)
- {
- }
+#define end_edge_ioapic_irq disable_edge_ioapic_irq
 
 /*
  * Level and edge triggered IO-APIC interrupts need different handling,
@@ -1820,7 +1814,7 @@ static void ack_lapic_irq(unsigned int irq)
     ack_APIC_irq();
 }
 
-static void end_lapic_irq(unsigned int irq) { /* nothing */ }
+#define end_lapic_irq end_edge_ioapic_irq
 
 static hw_irq_controller lapic_irq_type = {
     .typename 	= "local-APIC-edge",

@@ -129,7 +129,7 @@ static unsigned int cached_irq_mask = 0xffff;
  * this 'mixed mode' IRQ handling costs nothing because it's only used
  * at IRQ setup time.
  */
-unsigned long io_apic_irqs;
+unsigned int __read_mostly io_apic_irqs;
 
 void disable_8259A_irq(unsigned int irq)
 {

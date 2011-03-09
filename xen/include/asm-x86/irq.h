@@ -99,10 +99,9 @@ int i8259A_resume(void);
 
 void setup_IO_APIC(void);
 void disable_IO_APIC(void);
-void print_IO_APIC(void);
 void setup_ioapic_dest(void);
 
-extern unsigned long io_apic_irqs;
+extern unsigned int io_apic_irqs;
 
 DECLARE_PER_CPU(unsigned int, irq_count);
 

@@ -1092,7 +1092,6 @@ int pirq_guest_unmask(struct domain *d)
     return 0;
 }
 
-extern int ioapic_ack_new;
 static int pirq_acktype(struct domain *d, int pirq)
 {
     struct irq_desc  *desc;

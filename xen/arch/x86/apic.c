@@ -355,7 +355,6 @@ void disable_local_APIC(void)
     }
 }
 
-extern int ioapic_ack_new;
 /*
  * This is to verify that we're looking at a real local APIC.
  * Check these against your board if the CPUs aren't getting
