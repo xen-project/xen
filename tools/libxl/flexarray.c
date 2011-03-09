@@ -69,6 +69,14 @@ int flexarray_append(flexarray_t *array, void *ptr)
     return flexarray_set(array, array->count, ptr);
 }
 
+int flexarray_append_pair(flexarray_t *array, void *ptr1, void *ptr2)
+{
+    int rc = flexarray_append(array, ptr1);
+    if (!rc)
+        rc = flexarray_append(array, ptr2);
+    return rc;
+}
+
 int flexarray_vappend(flexarray_t *array, ...)
 {
     va_list va;

@@ -1887,27 +1887,26 @@ int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb)
     device.domid = vfb->domid;
     device.kind = DEVICE_VFB;
 
-    flexarray_vappend(back, "frontend-id", libxl__sprintf(&gc, "%d", vfb->domid), NULL);
-    flexarray_vappend(back, "online", "1", NULL);
-    flexarray_vappend(back, "state", libxl__sprintf(&gc, "%d", 1), NULL);
-    flexarray_vappend(back, "domain", libxl__domid_to_name(&gc, domid), NULL);
-    flexarray_vappend(back, "vnc", libxl__sprintf(&gc, "%d", vfb->vnc), NULL);
-    flexarray_vappend(back, "vnclisten", vfb->vnclisten, NULL);
-    flexarray_append(back, "vncpasswd");
-    flexarray_append(back, vfb->vncpasswd);
-    flexarray_vappend(back, "vncdisplay", libxl__sprintf(&gc, "%d", vfb->vncdisplay), NULL);
-    flexarray_vappend(back, "vncunused", libxl__sprintf(&gc, "%d", vfb->vncunused), NULL);
-    flexarray_vappend(back, "sdl", libxl__sprintf(&gc, "%d", vfb->sdl), NULL);
-    flexarray_vappend(back, "opengl", libxl__sprintf(&gc, "%d", vfb->opengl), NULL);
+    flexarray_append_pair(back, "frontend-id", libxl__sprintf(&gc, "%d", vfb->domid));
+    flexarray_append_pair(back, "online", "1");
+    flexarray_append_pair(back, "state", libxl__sprintf(&gc, "%d", 1));
+    flexarray_append_pair(back, "domain", libxl__domid_to_name(&gc, domid));
+    flexarray_append_pair(back, "vnc", libxl__sprintf(&gc, "%d", vfb->vnc));
+    flexarray_append_pair(back, "vnclisten", vfb->vnclisten);
+    flexarray_append_pair(back, "vncpasswd", vfb->vncpasswd);
+    flexarray_append_pair(back, "vncdisplay", libxl__sprintf(&gc, "%d", vfb->vncdisplay));
+    flexarray_append_pair(back, "vncunused", libxl__sprintf(&gc, "%d", vfb->vncunused));
+    flexarray_append_pair(back, "sdl", libxl__sprintf(&gc, "%d", vfb->sdl));
+    flexarray_append_pair(back, "opengl", libxl__sprintf(&gc, "%d", vfb->opengl));
     if (vfb->xauthority) {
-        flexarray_vappend(back, "xauthority", vfb->xauthority, NULL);
+        flexarray_append_pair(back, "xauthority", vfb->xauthority);
     }
     if (vfb->display) {
-        flexarray_vappend(back, "display", vfb->display, NULL);
+        flexarray_append_pair(back, "display", vfb->display);
     }
 
-    flexarray_vappend(front, "backend-id", libxl__sprintf(&gc, "%d", vfb->backend_domid), NULL);
-    flexarray_vappend(front, "state", libxl__sprintf(&gc, "%d", 1), NULL);
+    flexarray_append_pair(front, "backend-id", libxl__sprintf(&gc, "%d", vfb->backend_domid));
+    flexarray_append_pair(front, "state", libxl__sprintf(&gc, "%d", 1));
 
     libxl__device_generic_add(ctx, &device,
                              libxl__xs_kvs_of_flexarray(&gc, back, back->count),

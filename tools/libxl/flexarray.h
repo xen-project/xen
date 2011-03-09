@@ -28,6 +28,7 @@ _hidden void flexarray_free(flexarray_t *array);
 _hidden int flexarray_grow(flexarray_t *array, int extents);
 _hidden int flexarray_set(flexarray_t *array, unsigned int index, void *ptr);
 _hidden int flexarray_append(flexarray_t *array, void *ptr);
+_hidden int flexarray_append_pair(flexarray_t *array, void *ptr1, void *ptr2);
 _hidden int flexarray_vappend(flexarray_t *array, ...);
 _hidden int flexarray_get(flexarray_t *array, int index, void **ptr);
 
