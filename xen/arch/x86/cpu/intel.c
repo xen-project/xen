@@ -18,8 +18,6 @@
 
 #define select_idle_routine(x) ((void)0)
 
-extern int trap_init_f00f_bug(void);
-
 #ifdef CONFIG_X86_INTEL_USERCOPY
 /*
  * Alignment at which movsl is preferred for bulk memory copies.
@@ -146,25 +144,6 @@ static void __devinit init_intel(struct cpuinfo_x86 *c)
 	unsigned int l2 = 0;
 	char *p = NULL;
 
-#ifdef CONFIG_X86_F00F_BUG
-	/*
-	 * All current models of Pentium and Pentium with MMX technology CPUs
-	 * have the F0 0F bug, which lets nonprivileged users lock up the system.
-	 * Note that the workaround only should be initialized once...
-	 */
-	c->f00f_bug = 0;
-	if ( c->x86 == 5 ) {
-		static int f00f_workaround_enabled = 0;
-
-		c->f00f_bug = 1;
-		if ( !f00f_workaround_enabled ) {
-			trap_init_f00f_bug();
-			printk(KERN_NOTICE "Intel Pentium with F0 0F bug - workaround enabled.\n");
-			f00f_workaround_enabled = 1;
-		}
-	}
-#endif
-
 	/* Detect the extended topology information if available */
 	detect_extended_topology(c);
 
@@ -228,10 +207,6 @@ static void __devinit init_intel(struct cpuinfo_x86 *c)
 	 * Set up the preferred alignment for movsl bulk memory moves
 	 */
 	switch (c->x86) {
-	case 4:		/* 486: untested */
-		break;
-	case 5:		/* Old Pentia: untested */
-		break;
 	case 6:		/* PII/PIII only like movsl with 8-byte alignment */
 		movsl_mask.mask = 7;
 		break;
@@ -275,30 +250,6 @@ static struct cpu_dev intel_cpu_dev __devinitdata = {
 	.c_vendor	= "Intel",
 	.c_ident 	= { "GenuineIntel" },
 	.c_models = {
-		{ .vendor = X86_VENDOR_INTEL, .family = 4, .model_names = 
-		  { 
-			  [0] = "486 DX-25/33", 
-			  [1] = "486 DX-50", 
-			  [2] = "486 SX", 
-			  [3] = "486 DX/2", 
-			  [4] = "486 SL", 
-			  [5] = "486 SX/2", 
-			  [7] = "486 DX/2-WB", 
-			  [8] = "486 DX/4", 
-			  [9] = "486 DX/4-WB"
-		  }
-		},
-		{ .vendor = X86_VENDOR_INTEL, .family = 5, .model_names =
-		  { 
-			  [0] = "Pentium 60/66 A-step", 
-			  [1] = "Pentium 60/66", 
-			  [2] = "Pentium 75 - 200",
-			  [3] = "OverDrive PODP5V83", 
-			  [4] = "Pentium MMX",
-			  [7] = "Mobile Pentium 75 - 200", 
-			  [8] = "Mobile Pentium MMX"
-		  }
-		},
 		{ .vendor = X86_VENDOR_INTEL, .family = 6, .model_names =
 		  { 
 			  [0] = "Pentium Pro A-step",

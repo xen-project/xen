@@ -48,9 +48,6 @@
 
 #define setup_trampoline()    (bootsym_phys(trampoline_realmode_entry))
 
-/* Set if we find a B stepping CPU */
-static int smp_b_stepping;
-
 /* Package ID of each logical CPU */
 int phys_proc_id[NR_CPUS] __read_mostly = {[0 ... NR_CPUS-1] = BAD_APICID};
 
@@ -92,13 +89,6 @@ static void smp_store_cpu_info(int id)
     *c = boot_cpu_data;
     if ( id != 0 )
         identify_cpu(c);
-
-    /* Mask B, Pentium, but not Pentium MMX -- remember it, as it has bugs. */
-    if ( (c->x86_vendor == X86_VENDOR_INTEL) &&
-         (c->x86 == 5) &&
-         ((c->x86_mask >= 1) && (c->x86_mask <= 4)) &&
-         (c->x86_model <= 3) )
-        smp_b_stepping = 1;
 
     /*
      * Certain Athlons might work (for various values of 'work') in SMP
@@ -965,10 +955,6 @@ int __cpu_up(unsigned int cpu)
 
 void __init smp_cpus_done(unsigned int max_cpus)
 {
-    if ( smp_b_stepping )
-        printk(KERN_WARNING "WARNING: SMP operation may be "
-               "unreliable with B stepping processors.\n");
-
     /*
      * Don't taint if we are running SMP kernel on a single non-MP
      * approved Athlon

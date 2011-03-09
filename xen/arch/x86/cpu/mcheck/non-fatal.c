@@ -113,15 +113,8 @@ static int __init init_nonfatal_mce_checker(void)
 		break;
 
 	case X86_VENDOR_INTEL:
-		/*
-		 * The P5 family is different. P4/P6 and latest CPUs share the
-		 * same polling methods.
-		 */
-		if ( c->x86 != 5 )
-		{
-			init_timer(&mce_timer, mce_work_fn, NULL, 0);
-			set_timer(&mce_timer, NOW() + MCE_PERIOD);
-		}
+		init_timer(&mce_timer, mce_work_fn, NULL, 0);
+		set_timer(&mce_timer, NOW() + MCE_PERIOD);
 		break;
 	}
 

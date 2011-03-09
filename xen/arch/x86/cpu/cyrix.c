@@ -13,7 +13,7 @@
  */
 void __init do_cyrix_devid(unsigned char *dir0, unsigned char *dir1)
 {
-	unsigned char ccr2, ccr3;
+	unsigned char ccr3;
 	unsigned long flags;
 	
 	/* we test for DEVID by checking whether CCR3 is writable */
@@ -22,18 +22,8 @@ void __init do_cyrix_devid(unsigned char *dir0, unsigned char *dir1)
 	setCx86(CX86_CCR3, ccr3 ^ 0x80);
 	getCx86(0xc0);   /* dummy to change bus */
 
-	if (getCx86(CX86_CCR3) == ccr3) {       /* no DEVID regs. */
-		ccr2 = getCx86(CX86_CCR2);
-		setCx86(CX86_CCR2, ccr2 ^ 0x04);
-		getCx86(0xc0);  /* dummy */
-
-		if (getCx86(CX86_CCR2) == ccr2) /* old Cx486SLC/DLC */
-			*dir0 = 0xfd;
-		else {                          /* Cx486S A step */
-			setCx86(CX86_CCR2, ccr2);
-			*dir0 = 0xfe;
-		}
-	}
+	if (getCx86(CX86_CCR3) == ccr3)       /* no DEVID regs. */
+		BUG();
 	else {
 		setCx86(CX86_CCR3, ccr3);  /* restore CCR3 */
 
@@ -56,16 +46,6 @@ static unsigned char Cx86_dir0_msb __initdata = 0;
 static char Cx86_model[][9] __initdata = {
 	"Cx486", "Cx486", "5x86 ", "6x86", "MediaGX ", "6x86MX ",
 	"M II ", "Unknown"
-};
-static char Cx486_name[][5] __initdata = {
-	"SLC", "DLC", "SLC2", "DLC2", "SRx", "DRx",
-	"SRx2", "DRx2"
-};
-static char Cx486S_name[][4] __initdata = {
-	"S", "S2", "Se", "S2e"
-};
-static char Cx486D_name[][4] __initdata = {
-	"DX", "DX2", "?", "?", "?", "DX4"
 };
 static char Cx86_cb[] __initdata = "?.5x Core/Bus Clock";
 static char cyrix_model_mult1[] __initdata = "12??43";
@@ -213,20 +193,6 @@ static void __init init_cyrix(struct cpuinfo_x86 *c)
 	switch (dir0_msn) {
 		unsigned char tmp;
 
-	case 0: /* Cx486SLC/DLC/SRx/DRx */
-		p = Cx486_name[dir0_lsn & 7];
-		break;
-
-	case 1: /* Cx486S/DX/DX2/DX4 */
-		p = (dir0_lsn & 8) ? Cx486D_name[dir0_lsn & 5]
-			: Cx486S_name[dir0_lsn & 3];
-		break;
-
-	case 2: /* 5x86 */
-		Cx86_cb[2] = cyrix_model_mult1[dir0_lsn & 5];
-		p = Cx86_cb+2;
-		break;
-
 	case 3: /* 6x86/6x86L */
 		Cx86_cb[1] = ' ';
 		Cx86_cb[2] = cyrix_model_mult1[dir0_lsn & 5];
@@ -283,20 +249,6 @@ static void __init init_cyrix(struct cpuinfo_x86 *c)
 		set_bit(X86_FEATURE_CYRIX_ARR, c->x86_capability);
 		break;
 
-	case 0xf:  /* Cyrix 486 without DEVID registers */
-		switch (dir0_lsn) {
-		case 0xd:  /* either a 486SLC or DLC w/o DEVID */
-			dir0_msn = 0;
-			p = Cx486_name[/*(c->hard_math) ? 1 : 0*/1];
-			break;
-
-		case 0xe:  /* a 486S A step */
-			dir0_msn = 0;
-			p = Cx486S_name[0];
-			break;
-		}
-		break;
-
 	default:  /* unknown (shouldn't happen, we know everyone ;-) */
 		dir0_msn = 7;
 		break;
@@ -332,47 +284,11 @@ static inline int test_cyrix_52div(void)
 	return (unsigned char) (test >> 8) == 0x02;
 }
 
-static void cyrix_identify(struct cpuinfo_x86 * c)
-{
-	/* Detect Cyrix with disabled CPUID */
-	if ( c->x86 == 4 && test_cyrix_52div() ) {
-		unsigned char dir0, dir1;
-		
-		safe_strcpy(c->x86_vendor_id, "CyrixInstead");
-	        c->x86_vendor = X86_VENDOR_CYRIX;
-	        
-	        /* Actually enable cpuid on the older cyrix */
-	    
-	    	/* Retrieve CPU revisions */
-	    	
-		do_cyrix_devid(&dir0, &dir1);
-
-		dir0>>=4;		
-		
-		/* Check it is an affected model */
-		
-   	        if (dir0 == 5 || dir0 == 3)
-   	        {
-			unsigned char ccr3, ccr4;
-			unsigned long flags;
-			printk(KERN_INFO "Enabling CPUID on Cyrix processor.\n");
-			local_irq_save(flags);
-			ccr3 = getCx86(CX86_CCR3);
-			setCx86(CX86_CCR3, (ccr3 & 0x0f) | 0x10); /* enable MAPEN  */
-			ccr4 = getCx86(CX86_CCR4);
-			setCx86(CX86_CCR4, ccr4 | 0x80);          /* enable cpuid  */
-			setCx86(CX86_CCR3, ccr3);                 /* disable MAPEN */
-			local_irq_restore(flags);
-		}
-	}
-	generic_identify(c);
-}
-
 static struct cpu_dev cyrix_cpu_dev __initdata = {
 	.c_vendor	= "Cyrix",
 	.c_ident 	= { "CyrixInstead" },
 	.c_init		= init_cyrix,
-	.c_identify	= cyrix_identify,
+	.c_identify	= generic_identify,
 };
 
 int __init cyrix_init_cpu(void)

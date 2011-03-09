@@ -56,13 +56,7 @@ static void default_init(struct cpuinfo_x86 * c)
 {
 	/* Not much we can do here... */
 	/* Check if at least it has cpuid */
-	if (c->cpuid_level == -1) {
-		/* No cpuid. It must be an ancient CPU */
-		if (c->x86 == 4)
-			safe_strcpy(c->x86_model_id, "486");
-		else if (c->x86 == 3)
-			safe_strcpy(c->x86_model_id, "386");
-	}
+	BUG_ON(c->cpuid_level == -1);
 }
 
 static struct cpu_dev default_cpu = {
@@ -219,12 +213,6 @@ static inline int flag_is_changeable_p(unsigned long flag)
 }
 
 
-/* Probe for the CPUID instruction */
-static int __cpuinit have_cpuid_p(void)
-{
-	return flag_is_changeable_p(X86_EFLAGS_ID);
-}
-
 /* Do minimum CPU detection early.
    Fields really needed: vendor, cpuid_level, family, model, mask, cache alignment.
    The others are not touched to avoid unwanted side effects.
@@ -234,11 +222,9 @@ static int __cpuinit have_cpuid_p(void)
 static void __init early_cpu_detect(void)
 {
 	struct cpuinfo_x86 *c = &boot_cpu_data;
+	u32 cap4, tfms, cap0, misc;
 
 	c->x86_cache_alignment = 32;
-
-	if (!have_cpuid_p())
-		return;
 
 	/* Get vendor name */
 	cpuid(0x00000000, &c->cpuid_level,
@@ -248,78 +234,66 @@ static void __init early_cpu_detect(void)
 
 	get_cpu_vendor(c, 1);
 
-	c->x86 = 4;
-	if (c->cpuid_level >= 0x00000001) {
-		u32 cap4, tfms, cap0, misc;
-		cpuid(0x00000001, &tfms, &misc, &cap4, &cap0);
-		c->x86 = (tfms >> 8) & 15;
-		c->x86_model = (tfms >> 4) & 15;
-		if (c->x86 == 0xf)
-			c->x86 += (tfms >> 20) & 0xff;
-		if (c->x86 >= 0x6)
-			c->x86_model += ((tfms >> 16) & 0xF) << 4;
-		c->x86_mask = tfms & 15;
-		cap0 &= ~cleared_caps[0];
-		cap4 &= ~cleared_caps[4];
-		if (cap0 & (1<<19))
-			c->x86_cache_alignment = ((misc >> 8) & 0xff) * 8;
-		/* Leaf 0x1 capabilities filled in early for Xen. */
-		c->x86_capability[0] = cap0;
-		c->x86_capability[4] = cap4;
-	}
+	cpuid(0x00000001, &tfms, &misc, &cap4, &cap0);
+	c->x86 = (tfms >> 8) & 15;
+	c->x86_model = (tfms >> 4) & 15;
+	if (c->x86 == 0xf)
+		c->x86 += (tfms >> 20) & 0xff;
+	if (c->x86 >= 0x6)
+		c->x86_model += ((tfms >> 16) & 0xF) << 4;
+	c->x86_mask = tfms & 15;
+	cap0 &= ~cleared_caps[0];
+	cap4 &= ~cleared_caps[4];
+	if (cap0 & (1<<19))
+		c->x86_cache_alignment = ((misc >> 8) & 0xff) * 8;
+	/* Leaf 0x1 capabilities filled in early for Xen. */
+	c->x86_capability[0] = cap0;
+	c->x86_capability[4] = cap4;
 }
 
 void __cpuinit generic_identify(struct cpuinfo_x86 * c)
 {
-	u32 tfms, xlvl;
+	u32 tfms, xlvl, capability, excap, ebx;
 
-	if (have_cpuid_p()) {
-		/* Get vendor name */
-		cpuid(0x00000000, &c->cpuid_level,
-		      (int *)&c->x86_vendor_id[0],
-		      (int *)&c->x86_vendor_id[8],
-		      (int *)&c->x86_vendor_id[4]);
+	/* Get vendor name */
+	cpuid(0x00000000, &c->cpuid_level,
+	      (int *)&c->x86_vendor_id[0],
+	      (int *)&c->x86_vendor_id[8],
+	      (int *)&c->x86_vendor_id[4]);
 		
-		get_cpu_vendor(c, 0);
-		/* Initialize the standard set of capabilities */
-		/* Note that the vendor-specific code below might override */
+	get_cpu_vendor(c, 0);
+	/* Initialize the standard set of capabilities */
+	/* Note that the vendor-specific code below might override */
 	
-		/* Intel-defined flags: level 0x00000001 */
-		if ( c->cpuid_level >= 0x00000001 ) {
-			u32 capability, excap, ebx;
-			cpuid(0x00000001, &tfms, &ebx, &excap, &capability);
-			c->x86_capability[0] = capability;
-			c->x86_capability[4] = excap;
-			c->x86 = (tfms >> 8) & 15;
-			c->x86_model = (tfms >> 4) & 15;
-			if (c->x86 == 0xf)
-				c->x86 += (tfms >> 20) & 0xff;
-			if (c->x86 >= 0x6)
-				c->x86_model += ((tfms >> 16) & 0xF) << 4;
-			c->x86_mask = tfms & 15;
-			if ( cpu_has(c, X86_FEATURE_CLFLSH) )
-				c->x86_clflush_size = ((ebx >> 8) & 0xff) * 8;
-		} else {
-			/* Have CPUID level 0 only - unheard of */
-			c->x86 = 4;
-		}
+	/* Intel-defined flags: level 0x00000001 */
+	cpuid(0x00000001, &tfms, &ebx, &excap, &capability);
+	c->x86_capability[0] = capability;
+	c->x86_capability[4] = excap;
+	c->x86 = (tfms >> 8) & 15;
+	c->x86_model = (tfms >> 4) & 15;
+	if (c->x86 == 0xf)
+		c->x86 += (tfms >> 20) & 0xff;
+	if (c->x86 >= 0x6)
+		c->x86_model += ((tfms >> 16) & 0xF) << 4;
+	c->x86_mask = tfms & 15;
+	if ( cpu_has(c, X86_FEATURE_CLFLSH) )
+		c->x86_clflush_size = ((ebx >> 8) & 0xff) * 8;
 
-		/* AMD-defined flags: level 0x80000001 */
-		xlvl = cpuid_eax(0x80000000);
-		if ( (xlvl & 0xffff0000) == 0x80000000 ) {
-			if ( xlvl >= 0x80000001 ) {
-				c->x86_capability[1] = cpuid_edx(0x80000001);
-				c->x86_capability[6] = cpuid_ecx(0x80000001);
-			}
-			if ( xlvl >= 0x80000004 )
-				get_model_name(c); /* Default name */
+	/* AMD-defined flags: level 0x80000001 */
+	xlvl = cpuid_eax(0x80000000);
+	if ( (xlvl & 0xffff0000) == 0x80000000 ) {
+		if ( xlvl >= 0x80000001 ) {
+			c->x86_capability[1] = cpuid_edx(0x80000001);
+			c->x86_capability[6] = cpuid_ecx(0x80000001);
 		}
-
-		/* Intel-defined flags: level 0x00000007 */
-		if ( c->cpuid_level >= 0x00000007 )
-			c->x86_capability[X86_FEATURE_FSGSBASE / 32]
-				= cpuid_ebx(0x00000007);
+		if ( xlvl >= 0x80000004 )
+			get_model_name(c); /* Default name */
 	}
+
+	/* Intel-defined flags: level 0x00000007 */
+	if ( c->cpuid_level >= 0x00000007 )
+		c->x86_capability[X86_FEATURE_FSGSBASE / 32]
+			= cpuid_ebx(0x00000007);
 
 	early_intel_workaround(c);
 
@@ -361,15 +335,6 @@ void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 	c->x86_num_siblings = 1;
 	c->x86_clflush_size = 0;
 	memset(&c->x86_capability, 0, sizeof c->x86_capability);
-
-	if (!have_cpuid_p()) {
-		/* First of all, decide if this is a 486 or higher */
-		/* It's a 486 if we can modify the AC flag */
-		if ( flag_is_changeable_p(X86_EFLAGS_AC) )
-			c->x86 = 4;
-		else
-			c->x86 = 3;
-	}
 
 	generic_identify(c);
 
@@ -628,7 +593,7 @@ void __cpuinit print_cpu_info(unsigned int cpu)
 
 	if (c->x86_vendor < X86_VENDOR_NUM)
 		vendor = this_cpu->c_vendor;
-	else if (c->cpuid_level >= 0)
+	else
 		vendor = c->x86_vendor_id;
 
 	if (vendor && strncmp(c->x86_model_id, vendor, strlen(vendor)))
@@ -639,10 +604,7 @@ void __cpuinit print_cpu_info(unsigned int cpu)
 	else
 		printk("%s", c->x86_model_id);
 
-	if (c->x86_mask || c->cpuid_level >= 0) 
-		printk(" stepping %02x\n", c->x86_mask);
-	else
-		printk("\n");
+	printk(" stepping %02x\n", c->x86_mask);
 }
 
 static cpumask_t cpu_initialized;
