@@ -228,10 +228,10 @@ static void libxl_create_pci_backend_device(libxl__gc *gc, flexarray_t *back, in
     flexarray_append(back, libxl__sprintf(gc, "dev-%d", num));
     flexarray_append(back, libxl__sprintf(gc, PCI_BDF, pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func));
     if (pcidev->vdevfn)
-        flexarray_vappend(back, libxl__sprintf(gc, "vdevfn-%d", num), libxl__sprintf(gc, "%x", pcidev->vdevfn), NULL);
+        flexarray_append_pair(back, libxl__sprintf(gc, "vdevfn-%d", num), libxl__sprintf(gc, "%x", pcidev->vdevfn));
     flexarray_append(back, libxl__sprintf(gc, "opts-%d", num));
     flexarray_append(back, libxl__sprintf(gc, "msitranslate=%d,power_mgmt=%d", pcidev->msitranslate, pcidev->power_mgmt));
-    flexarray_vappend(back, libxl__sprintf(gc, "state-%d", num), libxl__sprintf(gc, "%d", 1), NULL);
+    flexarray_append_pair(back, libxl__sprintf(gc, "state-%d", num), libxl__sprintf(gc, "%d", 1));
 }
 
 static int libxl_create_pci_backend(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, int num)
@@ -261,18 +261,17 @@ static int libxl_create_pci_backend(libxl__gc *gc, uint32_t domid, libxl_device_
     device.domid = domid;
     device.kind = DEVICE_PCI;
 
-    flexarray_vappend(back, "frontend-id", libxl__sprintf(gc, "%d", domid),
-                      "online", "1", "state", libxl__sprintf(gc, "%d", 1),
-                      "domain", libxl__domid_to_name(gc, domid), NULL);
+    flexarray_append_pair(back, "frontend-id", libxl__sprintf(gc, "%d", domid));
+    flexarray_append_pair(back, "online", "1");
+    flexarray_append_pair(back, "state", libxl__sprintf(gc, "%d", 1));
+    flexarray_append_pair(back, "domain", libxl__domid_to_name(gc, domid));
 
     for (i = 0; i < num; i++, pcidev++)
         libxl_create_pci_backend_device(gc, back, i, pcidev);
 
-    flexarray_vappend(back, "num_devs", libxl__sprintf(gc, "%d", num), NULL);
-
-    flexarray_vappend(front,
-                      "backend-id", libxl__sprintf(gc, "%d", 0),
-                      "state", libxl__sprintf(gc, "%d", 1), NULL);
+    flexarray_append_pair(back, "num_devs", libxl__sprintf(gc, "%d", num));
+    flexarray_append_pair(front, "backend-id", libxl__sprintf(gc, "%d", 0));
+    flexarray_append_pair(front, "state", libxl__sprintf(gc, "%d", 1));
 
     libxl__device_generic_add(ctx, &device,
                              libxl__xs_kvs_of_flexarray(gc, back, back->count),
@@ -311,9 +310,9 @@ static int libxl_device_pci_add_xenstore(libxl__gc *gc, uint32_t domid, libxl_de
     LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Adding new pci device to xenstore");
     num = atoi(num_devs);
     libxl_create_pci_backend_device(gc, back, num, pcidev);
-    flexarray_vappend(back, "num_devs", libxl__sprintf(gc, "%d", num + 1), NULL);
+    flexarray_append_pair(back, "num_devs", libxl__sprintf(gc, "%d", num + 1));
     if (!starting)
-        flexarray_vappend(back, "state", libxl__sprintf(gc, "%d", 7), NULL);
+        flexarray_append_pair(back, "state", libxl__sprintf(gc, "%d", 7));
 
 retry_transaction:
     t = xs_transaction_start(ctx->xsh);
