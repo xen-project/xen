@@ -61,7 +61,7 @@ ACPI_MODULE_NAME("utmisc")
  *              an ASCII string.
  *
  ******************************************************************************/
-const char *acpi_ut_validate_exception(acpi_status status)
+const char *__init acpi_ut_validate_exception(acpi_status status)
 {
 	acpi_status sub_status;
 	const char *exception = NULL;
@@ -122,40 +122,6 @@ const char *acpi_ut_validate_exception(acpi_status status)
 
 /*******************************************************************************
  *
- * FUNCTION:    acpi_ut_set_integer_width
- *
- * PARAMETERS:  Revision            From DSDT header
- *
- * RETURN:      None
- *
- * DESCRIPTION: Set the global integer bit width based upon the revision
- *              of the DSDT.  For Revision 1 and 0, Integers are 32 bits.
- *              For Revision 2 and above, Integers are 64 bits.  Yes, this
- *              makes a difference.
- *
- ******************************************************************************/
-
-void acpi_ut_set_integer_width(u8 revision)
-{
-
-	if (revision < 2) {
-
-		/* 32-bit case */
-
-		acpi_gbl_integer_bit_width = 32;
-		acpi_gbl_integer_nybble_width = 8;
-		acpi_gbl_integer_byte_width = 4;
-	} else {
-		/* 64-bit case (ACPI 2.0+) */
-
-		acpi_gbl_integer_bit_width = 64;
-		acpi_gbl_integer_nybble_width = 16;
-		acpi_gbl_integer_byte_width = 8;
-	}
-}
-
-/*******************************************************************************
- *
  * FUNCTION:    acpi_ut_error, acpi_ut_warning, acpi_ut_info
  *
  * PARAMETERS:  module_name         - Caller's module name (for error output)
@@ -168,7 +134,7 @@ void acpi_ut_set_integer_width(u8 revision)
  *
  ******************************************************************************/
 
-void ACPI_INTERNAL_VAR_XFACE
+void ACPI_INTERNAL_VAR_XFACE __init
 acpi_ut_error(char *module_name, u32 line_number, char *format, ...)
 {
 	va_list args;
@@ -181,23 +147,7 @@ acpi_ut_error(char *module_name, u32 line_number, char *format, ...)
 	va_end(args);
 }
 
-void ACPI_INTERNAL_VAR_XFACE
-acpi_ut_exception(char *module_name,
-		  u32 line_number, acpi_status status, char *format, ...)
-{
-	va_list args;
-
-	acpi_os_printf("ACPI Exception (%s-%04d): %s, ", module_name,
-		       line_number, acpi_format_exception(status));
-
-	va_start(args, format);
-	acpi_os_vprintf(format, args);
-	acpi_os_printf(" [%X]\n", ACPI_CA_VERSION);
-}
-
-EXPORT_SYMBOL(acpi_ut_exception);
-
-void ACPI_INTERNAL_VAR_XFACE
+void ACPI_INTERNAL_VAR_XFACE __init
 acpi_ut_warning(char *module_name, u32 line_number, char *format, ...)
 {
 	va_list args;
@@ -211,7 +161,7 @@ acpi_ut_warning(char *module_name, u32 line_number, char *format, ...)
 	va_end(args);
 }
 
-void ACPI_INTERNAL_VAR_XFACE
+void ACPI_INTERNAL_VAR_XFACE __init
 acpi_ut_info(char *module_name, u32 line_number, char *format, ...)
 {
 	va_list args;

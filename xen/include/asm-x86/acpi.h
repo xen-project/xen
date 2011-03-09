@@ -84,8 +84,6 @@ extern bool_t acpi_disabled, acpi_pci_disabled;
 extern bool_t acpi_skip_timer_override;
 extern u32 acpi_smi_cmd;
 extern u8 acpi_enable_value, acpi_disable_value;
-extern u8 acpi_sci_flags;
-extern int acpi_sci_override_gsi;
 void acpi_pic_sci_set_trigger(unsigned int, u16);
 
 static inline void disable_acpi(void)

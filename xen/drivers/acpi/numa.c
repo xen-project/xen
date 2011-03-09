@@ -28,7 +28,6 @@
 #include <xen/errno.h>
 #include <xen/acpi.h>
 #include <xen/numa.h>
-#include <acpi/acpi_bus.h>
 #include <acpi/acmacros.h>
 
 #define ACPI_NUMA	0x80000000

@@ -64,7 +64,8 @@ ACPI_MODULE_NAME("hwregs")
  * DESCRIPTION: Map register_id into a register bitmask.
  *
  ******************************************************************************/
-struct acpi_bit_register_info *acpi_hw_get_bit_register_info(u32 register_id)
+static struct acpi_bit_register_info *
+acpi_hw_get_bit_register_info(u32 register_id)
 {
 	ACPI_FUNCTION_ENTRY();
 
@@ -91,7 +92,7 @@ struct acpi_bit_register_info *acpi_hw_get_bit_register_info(u32 register_id)
  *
  ******************************************************************************/
 
-acpi_status acpi_get_register_unlocked(u32 register_id, u32 * return_value)
+acpi_status acpi_get_register(u32 register_id, u32 * return_value)
 {
 	u32 register_value = 0;
 	struct acpi_bit_register_info *bit_reg_info;
@@ -129,16 +130,6 @@ acpi_status acpi_get_register_unlocked(u32 register_id, u32 * return_value)
 	return_ACPI_STATUS(status);
 }
 
-acpi_status acpi_get_register(u32 register_id, u32 * return_value)
-{
-	acpi_status status;
-	//acpi_cpu_flags flags;
-	//flags = acpi_os_acquire_lock(acpi_gbl_hardware_lock);
-	status = acpi_get_register_unlocked(register_id, return_value);
-	//acpi_os_release_lock(acpi_gbl_hardware_lock, flags);
-	return status;
-}
-
 /*******************************************************************************
  *
  * FUNCTION:    acpi_set_register
@@ -157,7 +148,6 @@ acpi_status acpi_set_register(u32 register_id, u32 value)
 	u32 register_value = 0;
 	struct acpi_bit_register_info *bit_reg_info;
 	acpi_status status;
-	//acpi_cpu_flags lock_flags;
 
 	ACPI_FUNCTION_TRACE_U32(acpi_set_register, register_id);
 
@@ -169,8 +159,6 @@ acpi_status acpi_set_register(u32 register_id, u32 value)
 			    register_id));
 		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
-
-	//lock_flags = acpi_os_acquire_lock(acpi_gbl_hardware_lock);
 
 	/* Always do a register read first so we can insert the new bits  */
 
@@ -275,8 +263,6 @@ acpi_status acpi_set_register(u32 register_id, u32 value)
 	}
 
       unlock_and_exit:
-
-	//acpi_os_release_lock(acpi_gbl_hardware_lock, lock_flags);
 
 	/* Normalize the value that was read */
 

@@ -431,7 +431,6 @@
  */
 #define ACPI_INFO(plist)                acpi_ut_info plist
 #define ACPI_WARNING(plist)             acpi_ut_warning plist
-#define ACPI_EXCEPTION(plist)           acpi_ut_exception plist
 #define ACPI_ERROR(plist)               acpi_ut_error plist
 #define ACPI_ERROR_NAMESPACE(s,e)       acpi_ns_report_error (AE_INFO, s, e);
 #define ACPI_ERROR_METHOD(s,n,p,e)      acpi_ns_report_method_error (AE_INFO, s, n, p, e);
@@ -442,7 +441,6 @@
 
 #define ACPI_INFO(plist)
 #define ACPI_WARNING(plist)
-#define ACPI_EXCEPTION(plist)
 #define ACPI_ERROR(plist)
 #define ACPI_ERROR_NAMESPACE(s,e)
 #define ACPI_ERROR_METHOD(s,n,p,e)
@@ -595,16 +593,6 @@
 #define ACPI_DEBUG_ONLY_MEMBERS(a)      a;
 #define _VERBOSE_STRUCTURES
 
-/* Stack and buffer dumping */
-
-#define ACPI_DUMP_STACK_ENTRY(a)        acpi_ex_dump_operand((a),0)
-#define ACPI_DUMP_OPERANDS(a,b,c,d,e)   acpi_ex_dump_operands(a,b,c,d,e,_acpi_module_name,__LINE__)
-
-#define ACPI_DUMP_ENTRY(a,b)            acpi_ns_dump_entry (a,b)
-#define ACPI_DUMP_PATHNAME(a,b,c,d)     acpi_ns_dump_pathname(a,b,c,d)
-#define ACPI_DUMP_RESOURCE_LIST(a)      acpi_rs_dump_resource_list(a)
-#define ACPI_DUMP_BUFFER(a,b)           acpi_ut_dump_buffer((u8 *)a,b,DB_BYTE_DISPLAY,_COMPONENT)
-
 /*
  * Master debug print macros
  * Print iff:
@@ -633,13 +621,6 @@
 #define ACPI_FUNCTION_STATUS_EXIT(s)	do { } while(0)
 #define ACPI_FUNCTION_VALUE_EXIT(s)	do { } while(0)
 #define ACPI_FUNCTION_ENTRY()		do { } while(0)
-#define ACPI_DUMP_STACK_ENTRY(a)	do { } while(0)
-#define ACPI_DUMP_OPERANDS(a,b,c,d,e)	do { } while(0)
-#define ACPI_DUMP_ENTRY(a,b)		do { } while(0)
-#define ACPI_DUMP_TABLES(a,b)		do { } while(0)
-#define ACPI_DUMP_PATHNAME(a,b,c,d)	do { } while(0)
-#define ACPI_DUMP_RESOURCE_LIST(a)	do { } while(0)
-#define ACPI_DUMP_BUFFER(a,b)		do { } while(0)
 #define ACPI_DEBUG_PRINT(pl)		do { } while(0)
 #define ACPI_DEBUG_PRINT_RAW(pl)	do { } while(0)
 
@@ -651,57 +632,5 @@
 #define return_PTR(s)                   return(s)
 
 #endif
-
-/*
- * Some code only gets executed when the debugger is built in.
- * Note that this is entirely independent of whether the
- * DEBUG_PRINT stuff (set by ACPI_DEBUG_OUTPUT) is on, or not.
- */
-#ifdef ACPI_DEBUGGER
-#define ACPI_DEBUGGER_EXEC(a)           a
-#else
-#define ACPI_DEBUGGER_EXEC(a)
-#endif
-
-#ifdef ACPI_DEBUG_OUTPUT
-/*
- * 1) Set name to blanks
- * 2) Copy the object name
- */
-#define ACPI_ADD_OBJECT_NAME(a,b)       ACPI_MEMSET (a->common.name, ' ', sizeof (a->common.name));\
-										ACPI_STRNCPY (a->common.name, acpi_gbl_ns_type_names[b], sizeof (a->common.name))
-#else
-
-#define ACPI_ADD_OBJECT_NAME(a,b)
-#endif
-
-/*
- * Memory allocation tracking (DEBUG ONLY)
- */
-#ifndef ACPI_DBG_TRACK_ALLOCATIONS
-
-/* Memory allocation */
-
-#ifndef ACPI_ALLOCATE
-#define ACPI_ALLOCATE(a)            acpi_ut_allocate((acpi_size)(a),_COMPONENT,_acpi_module_name,__LINE__)
-#endif
-#ifndef ACPI_ALLOCATE_ZEROED
-#define ACPI_ALLOCATE_ZEROED(a)     acpi_ut_allocate_zeroed((acpi_size)(a), _COMPONENT,_acpi_module_name,__LINE__)
-#endif
-#ifndef ACPI_FREE
-#define ACPI_FREE(a)                acpio_os_free(a)
-#endif
-#define ACPI_MEM_TRACKING(a)
-
-#else
-
-/* Memory allocation */
-
-#define ACPI_ALLOCATE(a)            acpi_ut_allocate_and_track((acpi_size)(a),_COMPONENT,_acpi_module_name,__LINE__)
-#define ACPI_ALLOCATE_ZEROED(a)     acpi_ut_allocate_zeroed_and_track((acpi_size)(a), _COMPONENT,_acpi_module_name,__LINE__)
-#define ACPI_FREE(a)                acpi_ut_free_and_track(a,_COMPONENT,_acpi_module_name,__LINE__)
-#define ACPI_MEM_TRACKING(a)        a
-
-#endif				/* ACPI_DBG_TRACK_ALLOCATIONS */
 
 #endif				/* ACMACROS_H */

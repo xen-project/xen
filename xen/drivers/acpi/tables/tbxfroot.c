@@ -52,8 +52,6 @@ ACPI_MODULE_NAME("tbxfroot")
 /* Local prototypes */
 static u8 *acpi_tb_scan_memory_for_rsdp(u8 * start_address, u32 length);
 
-static acpi_status acpi_tb_validate_rsdp(struct acpi_table_rsdp *rsdp);
-
 /*******************************************************************************
  *
  * FUNCTION:    acpi_tb_validate_rsdp
@@ -66,7 +64,7 @@ static acpi_status acpi_tb_validate_rsdp(struct acpi_table_rsdp *rsdp);
  *
  ******************************************************************************/
 
-static acpi_status acpi_tb_validate_rsdp(struct acpi_table_rsdp *rsdp)
+static acpi_status __init acpi_tb_validate_rsdp(struct acpi_table_rsdp *rsdp)
 {
 	ACPI_FUNCTION_ENTRY();
 

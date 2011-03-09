@@ -32,20 +32,9 @@
 #include <xen/list.h>
 
 #include <acpi/acpi.h>
-#include <acpi/acpi_bus.h>
-#include <acpi/acpi_drivers.h>
 #include <asm/acpi.h>
 
 #ifdef CONFIG_ACPI_BOOT
-
-enum acpi_irq_model_id {
-	ACPI_IRQ_MODEL_PIC = 0,
-	ACPI_IRQ_MODEL_IOAPIC,
-	ACPI_IRQ_MODEL_IOSAPIC,
-	ACPI_IRQ_MODEL_COUNT
-};
-
-extern enum acpi_irq_model_id	acpi_irq_model;
 
 enum acpi_madt_entry_id {
 	ACPI_MADT_LAPIC = 0,
@@ -316,8 +305,6 @@ extern int acpi_mp_config;
 
 extern u32 pci_mmcfg_base_addr;
 
-extern int sbf_port ;
-
 #else	/*!CONFIG_ACPI_BOOT*/
 
 #define acpi_mp_config	0
@@ -345,67 +332,6 @@ int acpi_gsi_to_irq (u32 gsi, unsigned int *irq);
 #ifdef CONFIG_ACPI_DEALLOCATE_IRQ
 void acpi_unregister_gsi (u32 gsi);
 #endif
-
-#ifdef CONFIG_ACPI_PCI
-
-struct acpi_prt_entry {
-	struct list_head	node;
-	struct acpi_pci_id	id;
-	u8			pin;
-	struct {
-		acpi_handle		handle;
-		u32			index;
-	}			link;
-	u32			irq;
-};
-
-struct acpi_prt_list {
-	int			count;
-	struct list_head	entries;
-};
-
-extern struct acpi_prt_list	acpi_prt;
-
-struct pci_dev;
-
-int acpi_pci_irq_enable (struct pci_dev *dev);
-void acpi_penalize_isa_irq(int irq);
-
-#ifdef CONFIG_ACPI_DEALLOCATE_IRQ
-void acpi_pci_irq_disable (struct pci_dev *dev);
-#endif
-
-struct acpi_pci_driver {
-	struct acpi_pci_driver *next;
-	int (*add)(acpi_handle handle);
-	void (*remove)(acpi_handle handle);
-};
-
-int acpi_pci_register_driver(struct acpi_pci_driver *driver);
-void acpi_pci_unregister_driver(struct acpi_pci_driver *driver);
-
-#endif /*CONFIG_ACPI_PCI*/
-
-#ifdef CONFIG_ACPI_EC
-
-extern int ec_read(u8 addr, u8 *val);
-extern int ec_write(u8 addr, u8 val);
-
-#endif /*CONFIG_ACPI_EC*/
-
-#ifdef CONFIG_ACPI_INTERPRETER
-
-extern int acpi_blacklisted(void);
-extern void acpi_bios_year(char *s);
-
-#else /*!CONFIG_ACPI_INTERPRETER*/
-
-static inline int acpi_blacklisted(void)
-{
-	return 0;
-}
-
-#endif /*!CONFIG_ACPI_INTERPRETER*/
 
 #ifdef	CONFIG_ACPI_CSTATE
 /*

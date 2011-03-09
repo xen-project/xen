@@ -46,6 +46,7 @@ LIST_HEAD_READ_MOSTLY(acpi_rmrr_units);
 static LIST_HEAD_READ_MOSTLY(acpi_atsr_units);
 static LIST_HEAD_READ_MOSTLY(acpi_rhsa_units);
 
+static struct acpi_table_header *__read_mostly dmar_table;
 static u64 __read_mostly igd_drhd_address;
 
 static void __init dmar_scope_add_buses(struct dmar_scope *scope, u16 sec_bus,
@@ -672,6 +673,7 @@ static int __init acpi_parse_dmar(struct acpi_table_header *table)
     u8 dmar_host_address_width;
     int ret = 0;
 
+    dmar_table = table;
     dmar = (struct acpi_table_dmar *)table;
 
     if ( !iommu_enabled )
@@ -763,22 +765,8 @@ int __init acpi_dmar_init(void)
     return parse_dmar_table(acpi_parse_dmar);
 }
 
-static struct acpi_table_header *get_dmar(void)
-{
-    struct acpi_table_header *dmar_table = NULL;
-    unsigned long flags;
-
-    /* Disabling IRQs avoids cross-CPU TLB flush in map_pages_to_xen(). */
-    local_irq_save(flags);
-    acpi_get_table(ACPI_SIG_DMAR, 0, &dmar_table);
-    local_irq_restore(flags);
-
-    return dmar_table;
-}
-
 void acpi_dmar_reinstate(void)
 {
-    struct acpi_table_header *dmar_table = get_dmar();
     if ( dmar_table == NULL )
         return;
     dmar_table->signature[0] = 'D';
@@ -787,7 +775,6 @@ void acpi_dmar_reinstate(void)
 
 void acpi_dmar_zap(void)
 {
-    struct acpi_table_header *dmar_table = get_dmar();
     if ( dmar_table == NULL )
         return;
     dmar_table->signature[0] = 'X';

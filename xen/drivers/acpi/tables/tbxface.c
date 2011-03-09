@@ -45,7 +45,6 @@
 #include <xen/config.h>
 #include <xen/init.h>
 #include <acpi/acpi.h>
-#include <acpi/acnamesp.h>
 #include <acpi/actables.h>
 
 #define _COMPONENT          ACPI_TABLES
@@ -164,7 +163,7 @@ acpi_initialize_tables(struct acpi_table_desc * initial_table_array,
  * DESCRIPTION: Finds and verifies an ACPI table.
  *
  *****************************************************************************/
-acpi_status
+acpi_status __init
 acpi_get_table(char *signature,
 	       acpi_native_uint instance, struct acpi_table_header **out_table)
 {
@@ -198,14 +197,10 @@ acpi_get_table(char *signature,
 			*out_table = acpi_gbl_root_table_list.tables[i].pointer;
 		}
 
-		/*if (!acpi_gbl_permanent_mmap)*/ {
-			acpi_gbl_root_table_list.tables[i].pointer = NULL;
-		}
+		acpi_gbl_root_table_list.tables[i].pointer = NULL;
 
 		return (status);
 	}
 
 	return (AE_NOT_FOUND);
 }
-
-ACPI_EXPORT_SYMBOL(acpi_get_table)

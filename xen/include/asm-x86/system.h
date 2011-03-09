@@ -132,8 +132,6 @@ static always_inline unsigned long __cmpxchg(
     return old;
 }
 
-#define __HAVE_ARCH_CMPXCHG
-
 #define cmpxchgptr(ptr,o,n) ({                                          \
     const __typeof__(**(ptr)) *__o = (o);                               \
     __typeof__(**(ptr)) *__n = (n);                                     \

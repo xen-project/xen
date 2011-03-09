@@ -43,7 +43,6 @@
 #include <mach_apic.h>
 #include <mach_mpparse.h>
 
-int sbf_port;
 #define CONFIG_ACPI_PCI
 
 #define BAD_MADT_ENTRY(entry, end) (					    \
@@ -64,34 +63,22 @@ bool_t __initdata acpi_ht = 1;	/* enable HT */
 bool_t __initdata acpi_lapic;
 bool_t __initdata acpi_ioapic;
 
-u8 acpi_sci_flags __initdata;
-int acpi_sci_override_gsi __initdata;
 bool_t acpi_skip_timer_override __initdata;
 
 #ifdef CONFIG_X86_LOCAL_APIC
 static u64 acpi_lapic_addr __initdata = APIC_DEFAULT_PHYS_BASE;
 #endif
 
-u32 acpi_smi_cmd;
-u8 acpi_enable_value, acpi_disable_value;
+u32 __read_mostly acpi_smi_cmd;
+u8 __read_mostly acpi_enable_value;
+u8 __read_mostly acpi_disable_value;
 
-#ifndef __HAVE_ARCH_CMPXCHG
-#warning ACPI uses CMPXCHG, i486 and later hardware
-#endif
-
-u32 x86_acpiid_to_apicid[MAX_MADT_ENTRIES] =
+u32 __read_mostly x86_acpiid_to_apicid[MAX_MADT_ENTRIES] =
     {[0 ... MAX_MADT_ENTRIES - 1] = BAD_APICID };
-EXPORT_SYMBOL(x86_acpiid_to_apicid);
 
 /* --------------------------------------------------------------------------
                               Boot-time Configuration
    -------------------------------------------------------------------------- */
-
-/*
- * The default interrupt routing model is PIC (8259).  This gets
- * overriden if IOAPICs are enumerated (below).
- */
-enum acpi_irq_model_id		acpi_irq_model = ACPI_IRQ_MODEL_PIC;
 
 /*
  * Temporarily use the virtual area starting from FIX_IO_APIC_BASE_END,
@@ -333,21 +320,6 @@ acpi_parse_nmi_src(struct acpi_subtable_header * header, const unsigned long end
 
 #endif /* CONFIG_X86_IO_APIC */
 
-static int __init acpi_parse_sbf(struct acpi_table_header *table)
-{
-	struct acpi_table_boot *sb;
-
-	sb = (struct acpi_table_boot *)table;
-	if (!sb) {
-		printk(KERN_WARNING PREFIX "Unable to map SBF\n");
-		return -ENODEV;
-	}
-
-	sbf_port = sb->cmos_index;	/* Save CMOS port */
-
-	return 0;
-}
-
 #ifdef CONFIG_HPET_TIMER
 
 static int __init acpi_parse_hpet(struct acpi_table_header *table)
@@ -360,18 +332,9 @@ static int __init acpi_parse_hpet(struct acpi_table_header *table)
 		return -1;
 	}
 
-#if 0/*def	CONFIG_X86_64*/
-	vxtime.hpet_address = hpet_tbl->address.address;
-
+	hpet_address = hpet_tbl->address.address;
 	printk(KERN_INFO PREFIX "HPET id: %#x base: %#lx\n",
-	       hpet_tbl->id, vxtime.hpet_address);
-#else	/* X86 */
-	{
-		hpet_address = hpet_tbl->address.address;
-		printk(KERN_INFO PREFIX "HPET id: %#x base: %#lx\n",
-		       hpet_tbl->id, hpet_address);
-	}
-#endif	/* X86 */
+	       hpet_tbl->id, hpet_address);
 
 	return 0;
 }
@@ -563,7 +526,7 @@ static int __init acpi_parse_madt_lapic_entries(void)
 }
 #endif /* CONFIG_X86_LOCAL_APIC */
 
-#if defined(CONFIG_X86_IO_APIC) /*&& defined(CONFIG_ACPI_INTERPRETER)*/
+#ifdef CONFIG_X86_IO_APIC
 /*
  * Parse IOAPIC related entries in MADT
  * returns 0 on success, < 0 on error
@@ -615,15 +578,6 @@ static int __init acpi_parse_madt_ioapic_entries(void)
 		return count;
 	}
 
-#ifdef CONFIG_ACPI_INTERPRETER
-	/*
-	 * If BIOS did not supply an INT_SRC_OVR for the SCI
-	 * pretend we got one so we can set the SCI flags.
-	 */
-	if (!acpi_sci_override_gsi)
-		acpi_sci_ioapic_setup(acpi_fadt.sci_int, 0, 0);
-#endif
-
 	/* Fill in identity legacy mapings where no override */
 	mp_config_acpi_legacy_irqs();
 
@@ -643,7 +597,7 @@ static inline int acpi_parse_madt_ioapic_entries(void)
 {
 	return -1;
 }
-#endif /* !(CONFIG_X86_IO_APIC && CONFIG_ACPI_INTERPRETER) */
+#endif /* !CONFIG_X86_IO_APIC */
 
 
 static void __init acpi_process_madt(void)
@@ -666,7 +620,6 @@ static void __init acpi_process_madt(void)
 			 */
 			error = acpi_parse_madt_ioapic_entries();
 			if (!error) {
-				acpi_irq_model = ACPI_IRQ_MODEL_IOAPIC;
 				acpi_irq_balance_set(NULL);
 				acpi_ioapic = 1;
 
@@ -911,8 +864,6 @@ static struct dmi_system_id __initdata acpi_dmi_table[] = {
  *	acpi_lapic = 1 if LAPIC found
  *	acpi_ioapic = 1 if IOAPIC found
  *	if (acpi_lapic && acpi_ioapic) smp_found_config = 1;
- *	if acpi_blacklisted() acpi_disabled = 1;
- *	acpi_irq_model=...
  *	...
  *
  * return value: (currently ignored)
@@ -944,22 +895,6 @@ int __init acpi_boot_table_init(void)
 		return error;
 	}
 
-	acpi_table_parse(ACPI_SIG_BOOT, acpi_parse_sbf);
-
-	/*
-	 * blacklist may disable ACPI entirely
-	 */
-	error = acpi_blacklisted();
-	if (error) {
-		if (acpi_force) {
-			printk(KERN_WARNING PREFIX "acpi=force override\n");
-		} else {
-			printk(KERN_WARNING PREFIX "Disabling ACPI support\n");
-			disable_acpi();
-			return error;
-		}
-	}
-
 	return 0;
 }
 
@@ -971,8 +906,6 @@ int __init acpi_boot_init(void)
 	 */
 	if (acpi_disabled && !acpi_ht)
 		return 1;
-
-	acpi_table_parse(ACPI_SIG_BOOT, acpi_parse_sbf);
 
 	/*
 	 * set sci_int and PM timer address

@@ -31,7 +31,6 @@
 #include <xen/errno.h>
 #include <xen/acpi.h>
 #include <xen/numa.h>
-#include <acpi/acpi_bus.h>
 #include <acpi/acmacros.h>
 #include <acpi/acpiosxf.h>
 #include <acpi/platform/aclinux.h>
@@ -43,27 +42,12 @@
 
 #define _COMPONENT		ACPI_OS_SERVICES
 ACPI_MODULE_NAME("osl")
-#define PREFIX		"ACPI: "
-struct acpi_os_dpc {
-	acpi_osd_exec_callback function;
-	void *context;
-};
 
 #ifdef CONFIG_ACPI_CUSTOM_DSDT
 #include CONFIG_ACPI_CUSTOM_DSDT_FILE
 #endif
 
-#ifdef ENABLE_DEBUGGER
-#include <linux/kdb.h>
-
-/* stuff for debugger support */
-int acpi_in_debugger;
-EXPORT_SYMBOL(acpi_in_debugger);
-
-extern char line_buf[80];
-#endif				/*ENABLE_DEBUGGER */
-
-void acpi_os_printf(const char *fmt, ...)
+void __init acpi_os_printf(const char *fmt, ...)
 {
 	va_list args;
 	va_start(args, fmt);
@@ -71,7 +55,7 @@ void acpi_os_printf(const char *fmt, ...)
 	va_end(args);
 }
 
-void acpi_os_vprintf(const char *fmt, va_list args)
+void __init acpi_os_vprintf(const char *fmt, va_list args)
 {
 	static char buffer[512];
 
@@ -103,17 +87,15 @@ acpi_physical_address __init acpi_os_get_root_pointer(void)
 	}
 }
 
-void __iomem *
+void __iomem *__init
 acpi_os_map_memory(acpi_physical_address phys, acpi_size size)
 {
 	return __acpi_map_table((unsigned long)phys, size);
 }
-EXPORT_SYMBOL_GPL(acpi_os_map_memory);
 
-void acpi_os_unmap_memory(void __iomem * virt, acpi_size size)
+void __init acpi_os_unmap_memory(void __iomem * virt, acpi_size size)
 {
 }
-EXPORT_SYMBOL_GPL(acpi_os_unmap_memory);
 
 acpi_status acpi_os_read_port(acpi_io_address port, u32 * value, u32 width)
 {
@@ -136,8 +118,6 @@ acpi_status acpi_os_read_port(acpi_io_address port, u32 * value, u32 width)
 	return AE_OK;
 }
 
-EXPORT_SYMBOL(acpi_os_read_port);
-
 acpi_status acpi_os_write_port(acpi_io_address port, u32 value, u32 width)
 {
 	if (width <= 8) {
@@ -152,8 +132,6 @@ acpi_status acpi_os_write_port(acpi_io_address port, u32 value, u32 width)
 
 	return AE_OK;
 }
-
-EXPORT_SYMBOL(acpi_os_write_port);
 
 acpi_status
 acpi_os_read_memory(acpi_physical_address phys_addr, u32 * value, u32 width)
@@ -209,26 +187,3 @@ acpi_os_write_memory(acpi_physical_address phys_addr, u32 value, u32 width)
 
 	return AE_OK;
 }
-
-/*
- * Acquire a spinlock.
- *
- * handle is a pointer to the spinlock_t.
- */
-
-acpi_cpu_flags acpi_os_acquire_lock(acpi_spinlock lockp)
-{
-	acpi_cpu_flags flags;
-	spin_lock_irqsave(lockp, flags);
-	return flags;
-}
-
-/*
- * Release a spinlock. See above.
- */
-
-void acpi_os_release_lock(acpi_spinlock lockp, acpi_cpu_flags flags)
-{
-	spin_unlock_irqrestore(lockp, flags);
-}
-

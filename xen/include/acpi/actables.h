@@ -81,15 +81,6 @@ void acpi_tb_delete_table(struct acpi_table_desc *table_desc);
 
 void acpi_tb_terminate(void);
 
-void acpi_tb_delete_namespace_by_owner(acpi_native_uint table_index);
-
-acpi_status acpi_tb_allocate_owner_id(acpi_native_uint table_index);
-
-acpi_status acpi_tb_release_owner_id(acpi_native_uint table_index);
-
-acpi_status
-acpi_tb_get_owner_id(acpi_native_uint table_index, acpi_owner_id * owner_id);
-
 u8 acpi_tb_is_table_loaded(acpi_native_uint table_index);
 
 void acpi_tb_set_table_loaded_flag(acpi_native_uint table_index, u8 is_loaded);
@@ -97,8 +88,6 @@ void acpi_tb_set_table_loaded_flag(acpi_native_uint table_index, u8 is_loaded);
 /*
  * tbutils - table manager utilities
  */
-u8 acpi_tb_tables_loaded(void);
-
 void
 acpi_tb_print_table_header(acpi_physical_address address,
 			   struct acpi_table_header *header);

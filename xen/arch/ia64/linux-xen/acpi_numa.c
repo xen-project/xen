@@ -28,7 +28,6 @@
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/acpi.h>
-#include <acpi/acpi_bus.h>
 #include <acpi/acmacros.h>
 
 #ifndef XEN

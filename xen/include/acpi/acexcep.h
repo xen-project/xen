@@ -189,7 +189,7 @@
  * String versions of the exception codes above
  * These strings must match the corresponding defines exactly
  */
-char const *acpi_gbl_exception_names_env[] = {
+char const *__initdata acpi_gbl_exception_names_env[] = {
 	"AE_OK",
 	"AE_ERROR",
 	"AE_NO_ACPI_TABLES",
@@ -224,7 +224,7 @@ char const *acpi_gbl_exception_names_env[] = {
 	"AE_OWNER_ID_LIMIT"
 };
 
-char const *acpi_gbl_exception_names_pgm[] = {
+char const *__initdata acpi_gbl_exception_names_pgm[] = {
 	"AE_BAD_PARAMETER",
 	"AE_BAD_CHARACTER",
 	"AE_BAD_PATHNAME",
@@ -236,7 +236,7 @@ char const *acpi_gbl_exception_names_pgm[] = {
 	"AE_BAD_DECIMAL_CONSTANT"
 };
 
-char const *acpi_gbl_exception_names_tbl[] = {
+char const *__initdata acpi_gbl_exception_names_tbl[] = {
 	"AE_BAD_SIGNATURE",
 	"AE_BAD_HEADER",
 	"AE_BAD_CHECKSUM",
@@ -245,7 +245,7 @@ char const *acpi_gbl_exception_names_tbl[] = {
 	"AE_INVALID_TABLE_LENGTH"
 };
 
-char const *acpi_gbl_exception_names_aml[] = {
+char const *__initdata acpi_gbl_exception_names_aml[] = {
 	"AE_AML_ERROR",
 	"AE_AML_PARSE",
 	"AE_AML_BAD_OPCODE",
@@ -282,7 +282,7 @@ char const *acpi_gbl_exception_names_aml[] = {
 	"AE_AML_ILLEGAL_ADDRESS"
 };
 
-char const *acpi_gbl_exception_names_ctrl[] = {
+char const *__initdata acpi_gbl_exception_names_ctrl[] = {
 	"AE_CTRL_RETURN_VALUE",
 	"AE_CTRL_PENDING",
 	"AE_CTRL_TERMINATE",

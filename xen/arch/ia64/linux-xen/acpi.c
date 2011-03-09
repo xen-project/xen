@@ -165,8 +165,6 @@ int platform_intr_list[ACPI_MAX_PLATFORM_INTERRUPTS] = {
 	[0 ... ACPI_MAX_PLATFORM_INTERRUPTS - 1] = -1
 };
 
-enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_IOSAPIC;
-
 /*
  * Interrupt routing API for device drivers.  Provides interrupt vector for
  * a generic platform event.  Currently only CPEI is implemented.
