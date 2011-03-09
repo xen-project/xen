@@ -23,7 +23,12 @@
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/svm/vmcb.h>
 
+/* SVM specific intblk types, cannot be an enum because gcc 4.5 complains */
+/* GIF cleared */
+#define hvm_intblk_svm_gif      hvm_intblk_arch
+
 struct nestedsvm {
+    bool_t ns_gif;
     uint64_t ns_msr_hsavepa; /* MSR HSAVE_PA value */
 
     /* l1 guest physical address of virtual vmcb used by prior VMRUN.
@@ -111,10 +116,22 @@ int nsvm_vmcb_guest_intercepts_exitcode(struct vcpu *v,
     struct cpu_user_regs *regs, uint64_t exitcode);
 int nsvm_vmcb_guest_intercepts_trap(struct vcpu *v, unsigned int trapnr);
 bool_t nsvm_vmcb_hap_enabled(struct vcpu *v);
+enum hvm_intblk nsvm_intr_blocked(struct vcpu *v);
 
 /* MSRs */
 int nsvm_rdmsr(struct vcpu *v, unsigned int msr, uint64_t *msr_content);
 int nsvm_wrmsr(struct vcpu *v, unsigned int msr, uint64_t msr_content);
+
+/* Interrupts, vGIF */
+void svm_vmexit_do_clgi(struct cpu_user_regs *regs, struct vcpu *v);
+void svm_vmexit_do_stgi(struct cpu_user_regs *regs, struct vcpu *v);
+bool_t nestedsvm_gif_isset(struct vcpu *v);
+
+#define NSVM_INTR_NOTHANDLED     3
+#define NSVM_INTR_NOTINTERCEPTED 2
+#define NSVM_INTR_FORCEVMEXIT    1
+#define NSVM_INTR_MASKED         0
+int nestedsvm_vcpu_interrupt(struct vcpu *v, const struct hvm_intack intack);
 
 #endif /* ASM_X86_HVM_SVM_NESTEDSVM_H__ */
 

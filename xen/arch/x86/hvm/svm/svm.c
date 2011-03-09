@@ -78,8 +78,7 @@ static DEFINE_PER_CPU_READ_MOSTLY(void *, root_vmcb);
 
 static bool_t amd_erratum383_found __read_mostly;
 
-static void inline __update_guest_eip(
-    struct cpu_user_regs *regs, unsigned int inst_len)
+void __update_guest_eip(struct cpu_user_regs *regs, unsigned int inst_len)
 {
     struct vcpu *curr = current;
 
@@ -1618,6 +1617,7 @@ static struct hvm_function_table __read_mostly svm_function_table = {
     .nhvm_vcpu_asid = nsvm_vcpu_asid,
     .nhvm_vmcx_guest_intercepts_trap = nsvm_vmcb_guest_intercepts_trap,
     .nhvm_vmcx_hap_enabled = nsvm_vmcb_hap_enabled,
+    .nhvm_intr_blocked = nsvm_intr_blocked,
 };
 
 asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
@@ -1929,7 +1929,11 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         svm_vmexit_do_vmsave(vmcb, regs, v, regs->eax);
         break;
     case VMEXIT_STGI:
+        svm_vmexit_do_stgi(regs, v);
+        break;
     case VMEXIT_CLGI:
+        svm_vmexit_do_clgi(regs, v);
+        break;
     case VMEXIT_SKINIT:
         hvm_inject_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE, 0);
         break;

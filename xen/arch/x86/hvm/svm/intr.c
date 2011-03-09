@@ -33,6 +33,7 @@
 #include <asm/hvm/vlapic.h>
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/svm/intr.h>
+#include <asm/hvm/nestedhvm.h> /* for nestedhvm_vcpu_in_guestmode */
 #include <xen/event.h>
 #include <xen/kernel.h>
 #include <public/hvm/ioreq.h>
@@ -74,14 +75,29 @@ static void svm_inject_extint(struct vcpu *v, int vector)
     ASSERT(vmcb->eventinj.fields.v == 0);
     vmcb->eventinj = event;
 }
-    
+
 static void enable_intr_window(struct vcpu *v, struct hvm_intack intack)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    u32 general1_intercepts = vmcb_get_general1_intercepts(vmcb);
+    uint32_t general1_intercepts = vmcb_get_general1_intercepts(vmcb);
     vintr_t intr;
 
     ASSERT(intack.source != hvm_intsrc_none);
+
+    if ( nestedhvm_enabled(v->domain) ) {
+        struct nestedvcpu *nv = &vcpu_nestedhvm(v);
+        if ( nv->nv_vmentry_pending ) {
+            struct vmcb_struct *gvmcb = nv->nv_vvmcx;
+
+            /* check if l1 guest injects interrupt into l2 guest via vintr.
+             * return here or l2 guest looses interrupts, otherwise.
+             */
+            ASSERT(gvmcb != NULL);
+            intr = vmcb_get_vintr(gvmcb);
+            if ( intr.fields.irq )
+                return;
+        }
+    }
 
     HVMTRACE_3D(INTR_WINDOW, intack.vector, intack.source,
                 vmcb->eventinj.fields.v?vmcb->eventinj.fields.vector:-1);
@@ -121,6 +137,7 @@ asmlinkage void svm_intr_assist(void)
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     struct hvm_intack intack;
+    enum hvm_intblk intblk;
 
     /* Crank the handle on interrupt state. */
     pt_update_irq(v);
@@ -129,6 +146,39 @@ asmlinkage void svm_intr_assist(void)
         intack = hvm_vcpu_has_pending_irq(v);
         if ( likely(intack.source == hvm_intsrc_none) )
             return;
+
+        intblk = hvm_interrupt_blocked(v, intack);
+        if ( intblk == hvm_intblk_svm_gif ) {
+            ASSERT(nestedhvm_enabled(v->domain));
+            return;
+        }
+
+        /* Interrupts for the nested guest are already
+         * in the vmcb.
+         */
+        if ( nestedhvm_enabled(v->domain) && nestedhvm_vcpu_in_guestmode(v) )
+        {
+            int rc;
+
+            /* l2 guest was running when an interrupt for
+             * the l1 guest occured.
+             */
+            rc = nestedsvm_vcpu_interrupt(v, intack);
+            switch (rc) {
+            case NSVM_INTR_NOTINTERCEPTED:
+                /* Inject interrupt into 2nd level guest directly. */
+                break;	
+            case NSVM_INTR_NOTHANDLED:
+            case NSVM_INTR_FORCEVMEXIT:
+                return;
+            case NSVM_INTR_MASKED:
+                /* Guest already enabled an interrupt window. */
+                return;
+            default:
+                panic("%s: nestedsvm_vcpu_interrupt can't handle value 0x%x\n",
+                    __func__, rc);
+            }
+        }
 
         /*
          * Pending IRQs must be delayed if:
@@ -144,8 +194,7 @@ asmlinkage void svm_intr_assist(void)
          *      have cleared the interrupt out of the IRR.
          * 2. The IRQ is masked.
          */
-        if ( unlikely(vmcb->eventinj.fields.v) ||
-             hvm_interrupt_blocked(v, intack) )
+        if ( unlikely(vmcb->eventinj.fields.v) || intblk )
         {
             enable_intr_window(v, intack);
             return;

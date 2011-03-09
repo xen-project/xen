@@ -25,6 +25,23 @@
 #include <asm/hvm/svm/nestedsvm.h>
 #include <asm/hvm/svm/svmdebug.h>
 #include <asm/paging.h> /* paging_mode_hap */
+#include <asm/event.h> /* for local_event_delivery_(en|dis)able */
+
+static void
+nestedsvm_vcpu_clgi(struct vcpu *v)
+{
+    /* clear gif flag */
+    vcpu_nestedsvm(v).ns_gif = 0;
+    local_event_delivery_disable(); /* mask events for PV drivers */
+}
+
+static void
+nestedsvm_vcpu_stgi(struct vcpu *v)
+{
+    /* enable gif flag */
+    vcpu_nestedsvm(v).ns_gif = 1;
+    local_event_delivery_enable(); /* unmask events for PV drivers */
+}
 
 static int
 nestedsvm_vmcb_isvalid(struct vcpu *v, uint64_t vmcxaddr)
@@ -145,6 +162,7 @@ int nsvm_vcpu_reset(struct vcpu *v)
     if (svm->ns_iomap)
         svm->ns_iomap = NULL;
 
+    nestedsvm_vcpu_stgi(v);
     return 0;
 }
 
@@ -601,6 +619,7 @@ nsvm_vcpu_vmentry(struct vcpu *v, struct cpu_user_regs *regs,
         return ret;
     }
 
+    nestedsvm_vcpu_stgi(v);
     return 0;
 }
 
@@ -646,6 +665,7 @@ nsvm_vcpu_vmexit_inject(struct vcpu *v, struct cpu_user_regs *regs,
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
     struct vmcb_struct *ns_vmcb;
 
+    ASSERT(svm->ns_gif == 0);
     ns_vmcb = nv->nv_vvmcx;
 
     if (nv->nv_vmexit_pending) {
@@ -1035,6 +1055,32 @@ nsvm_vmcb_hap_enabled(struct vcpu *v)
     return vcpu_nestedsvm(v).ns_hap_enabled;
 }
 
+enum hvm_intblk nsvm_intr_blocked(struct vcpu *v)
+{
+    struct nestedsvm *svm = &vcpu_nestedsvm(v);
+    struct nestedvcpu *nv = &vcpu_nestedhvm(v);
+
+    ASSERT(nestedhvm_enabled(v->domain));
+
+    if ( !nestedsvm_gif_isset(v) )
+        return hvm_intblk_svm_gif;
+
+    if ( nestedhvm_vcpu_in_guestmode(v) ) {
+        if ( svm->ns_hostflags.fields.vintrmask )
+            if ( !svm->ns_hostflags.fields.rflagsif )
+                return hvm_intblk_rflags_ie;
+    }
+
+    if ( nv->nv_vmexit_pending ) {
+        /* hvm_inject_exception() must have run before.
+         * exceptions have higher priority than interrupts.
+         */
+        return hvm_intblk_rflags_ie;
+    }
+
+    return hvm_intblk_none;
+}
+
 /* MSR handling */
 int nsvm_rdmsr(struct vcpu *v, unsigned int msr, uint64_t *msr_content)
 {
@@ -1090,6 +1136,7 @@ nestedsvm_vmexit_defer(struct vcpu *v,
 {
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
 
+    nestedsvm_vcpu_clgi(v);
     svm->ns_vmexit.exitcode = exitcode;
     svm->ns_vmexit.exitinfo1 = exitinfo1;
     svm->ns_vmexit.exitinfo2 = exitinfo2;
@@ -1276,4 +1323,98 @@ asmlinkage void nsvm_vcpu_switch(struct cpu_user_regs *regs)
     }
 }
 
+/* Interrupts, Virtual GIF */
+int
+nestedsvm_vcpu_interrupt(struct vcpu *v, const struct hvm_intack intack)
+{
+    int ret;
+    enum hvm_intblk intr;
+    uint64_t exitcode = VMEXIT_INTR;
+    uint64_t exitinfo2 = 0;
+    ASSERT(nestedhvm_vcpu_in_guestmode(v));
 
+    intr = nhvm_interrupt_blocked(v);
+    if ( intr != hvm_intblk_none )
+        return NSVM_INTR_MASKED;
+
+    switch (intack.source) {
+    case hvm_intsrc_pic:
+    case hvm_intsrc_lapic:
+        exitcode = VMEXIT_INTR;
+        exitinfo2 = intack.vector;
+        break;
+    case hvm_intsrc_nmi:
+        exitcode = VMEXIT_NMI;
+        exitinfo2 = intack.vector;
+        break;
+    case hvm_intsrc_mce:
+        exitcode = VMEXIT_EXCEPTION_MC;
+        exitinfo2 = intack.vector;
+        break;
+    case hvm_intsrc_none:
+        return NSVM_INTR_NOTHANDLED;
+    default:
+        BUG();
+    }
+
+    ret = nsvm_vmcb_guest_intercepts_exitcode(v,
+                                     guest_cpu_user_regs(), exitcode);
+    if (ret) {
+        nestedsvm_vmexit_defer(v, exitcode, intack.source, exitinfo2);
+        return NSVM_INTR_FORCEVMEXIT;
+    }
+
+    return NSVM_INTR_NOTINTERCEPTED;
+}
+
+bool_t
+nestedsvm_gif_isset(struct vcpu *v)
+{
+    struct nestedsvm *svm = &vcpu_nestedsvm(v);
+
+    return (!!svm->ns_gif);
+}
+
+void svm_vmexit_do_stgi(struct cpu_user_regs *regs, struct vcpu *v)
+{
+    unsigned int inst_len;
+
+    if ( !nestedhvm_enabled(v->domain) ) {
+        hvm_inject_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE, 0);
+        return;
+    }
+
+    if ( (inst_len = __get_instruction_length(v, INSTR_STGI)) == 0 )
+        return;
+
+    nestedsvm_vcpu_stgi(v);
+
+    __update_guest_eip(regs, inst_len);
+}
+
+void svm_vmexit_do_clgi(struct cpu_user_regs *regs, struct vcpu *v)
+{
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    unsigned int inst_len;
+    uint32_t general1_intercepts = vmcb_get_general1_intercepts(vmcb);
+    vintr_t intr;
+
+    if ( !nestedhvm_enabled(v->domain) ) {
+        hvm_inject_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE, 0);
+        return;
+    }
+
+    if ( (inst_len = __get_instruction_length(v, INSTR_CLGI)) == 0 )
+        return;
+
+    nestedsvm_vcpu_clgi(v);
+
+    /* After a CLGI no interrupts should come */
+    intr = vmcb_get_vintr(vmcb);
+    intr.fields.irq = 0;
+    general1_intercepts &= ~GENERAL1_INTERCEPT_VINTR;
+    vmcb_set_vintr(vmcb, intr);
+    vmcb_set_general1_intercepts(vmcb, general1_intercepts);
+
+    __update_guest_eip(regs, inst_len);
+}

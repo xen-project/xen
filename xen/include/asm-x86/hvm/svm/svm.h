@@ -61,6 +61,7 @@ static inline void svm_vmsave(void *vmcb)
 }
 
 unsigned long *svm_msrbit(unsigned long *msr_bitmap, uint32_t msr);
+void __update_guest_eip(struct cpu_user_regs *regs, unsigned int inst_len);
 
 extern u32 svm_feature_flags;
 
