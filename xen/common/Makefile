@@ -43,7 +43,7 @@ obj-y += radix-tree.o
 obj-y += rbtree.o
 obj-y += lzo.o
 
-obj-$(CONFIG_X86) += decompress.o bunzip2.o unxz.o unlzma.o unlzo.o
+obj-bin-$(CONFIG_X86) += $(foreach n,decompress bunzip2 unxz unlzma unlzo,$(n).init.o)
 
 obj-$(perfc)       += perfc.o
 obj-$(crash_debug) += gdbstub.o

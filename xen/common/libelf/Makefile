@@ -1,6 +1,6 @@
 obj-bin-y := libelf.o
 
-SECTIONS := text data rodata $(foreach n,1 2 4 8,rodata.str1.$(n)) $(foreach r,rel rel.ro,data.$(r) data.$(r).local)
+SECTIONS := text data $(SPECIAL_DATA_SECTIONS)
 
 libelf.o: libelf-temp.o Makefile
 	$(OBJCOPY) $(foreach s,$(SECTIONS),--rename-section .$(s)=.init.$(s)) $< $@

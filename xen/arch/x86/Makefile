@@ -10,6 +10,7 @@ subdir-$(x86_64) += x86_64
 
 obj-y += apic.o
 obj-y += bitops.o
+obj-bin-y += bzimage.init.o
 obj-bin-y += clear_page.o
 obj-bin-y += copy_page.o
 obj-y += compat.o
@@ -55,7 +56,6 @@ obj-y += machine_kexec.o
 obj-y += crash.o
 obj-y += tboot.o
 obj-y += hpet.o
-obj-y += bzimage.o
 
 obj-$(crash_debug) += gdbstub.o
 

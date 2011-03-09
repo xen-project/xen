@@ -9,21 +9,21 @@
 
 #define HEAPORDER 3
 
-static unsigned char *window;
+static unsigned char *__initdata window;
 #define memptr long
-static memptr free_mem_ptr;
-static memptr free_mem_end_ptr;
+static memptr __initdata free_mem_ptr;
+static memptr __initdata free_mem_end_ptr;
 
 #define WSIZE           0x80000000
 
-static unsigned char    *inbuf;
-static unsigned         insize;
+static unsigned char *__initdata inbuf;
+static unsigned __initdata insize;
 
 /* Index of next byte to be processed in inbuf: */
-static unsigned         inptr;
+static unsigned __initdata inptr;
 
 /* Bytes in output buffer: */
-static unsigned         outcnt;
+static unsigned __initdata outcnt;
 
 #define OF(args)        args
 #define STATIC          static
@@ -34,7 +34,8 @@ typedef unsigned char   uch;
 typedef unsigned short  ush;
 typedef unsigned long   ulg;
 
-#define INIT __init
+#define INIT            __init
+#define INITDATA        __initdata
 
 #define get_byte()      (inptr < insize ? inbuf[inptr++] : fill_inbuf())
 
@@ -55,7 +56,7 @@ typedef unsigned long   ulg;
 #  define Tracecv(c, x)
 #endif
 
-static long bytes_out;
+static long __initdata bytes_out;
 static void flush_window(void);
 
 static __init void error(char *x)

@@ -87,11 +87,10 @@ static inline int INIT bcj_x86_test_msbyte(uint8_t b)
 
 static size_t INIT bcj_x86(struct xz_dec_bcj *s, uint8_t *buf, size_t size)
 {
-	static /*const*/ bool_t INITDATA mask_to_allowed_status[8]
+	static const bool_t mask_to_allowed_status[8]
 		= { true, true, true, false, true, false, false, false };
 
-	static /*const*/ uint8_t INITDATA mask_to_bit_num[8]
-		= { 0, 1, 2, 2, 3, 3, 3, 3 };
+	static const uint8_t mask_to_bit_num[8] = { 0, 1, 2, 2, 3, 3, 3, 3 };
 
 	size_t i;
 	size_t prev_pos = (size_t)-1;
