@@ -398,6 +398,9 @@ typedef union
     } fields;
 } __attribute__ ((packed)) vmcbcleanbits_t;
 
+#define IOPM_SIZE   (12 * 1024)
+#define MSRPM_SIZE  (8  * 1024)
+
 struct vmcb_struct {
     u32 _cr_intercepts;         /* offset 0x00 - cleanbit 0 */
     u32 _dr_intercepts;         /* offset 0x04 - cleanbit 0 */

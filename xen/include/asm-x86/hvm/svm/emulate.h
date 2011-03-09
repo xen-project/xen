@@ -33,6 +33,11 @@ enum instruction_index {
     INSTR_RDTSC,
     INSTR_PAUSE,
     INSTR_XSETBV,
+    INSTR_VMRUN,
+    INSTR_VMLOAD,
+    INSTR_VMSAVE,
+    INSTR_STGI,
+    INSTR_CLGI,
     INSTR_MAX_COUNT /* Must be last - Number of instructions supported */
 };
 

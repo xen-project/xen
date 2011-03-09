@@ -49,6 +49,9 @@
 #include <asm/hvm/svm/vmcb.h>
 #include <asm/hvm/svm/emulate.h>
 #include <asm/hvm/svm/intr.h>
+#include <asm/hvm/svm/svmdebug.h>
+#include <asm/hvm/svm/nestedsvm.h>
+#include <asm/hvm/nestedhvm.h>
 #include <asm/x86_emulate.h>
 #include <public/sched.h>
 #include <asm/hvm/vpt.h>
@@ -104,6 +107,44 @@ static void inline __update_guest_eip(
 static void svm_cpu_down(void)
 {
     write_efer(read_efer() & ~EFER_SVME);
+}
+
+unsigned long *
+svm_msrbit(unsigned long *msr_bitmap, uint32_t msr)
+{
+    unsigned long *msr_bit = NULL;
+
+    /*
+     * See AMD64 Programmers Manual, Vol 2, Section 15.10 (MSR-Bitmap Address).
+     */
+    if ( msr <= 0x1fff )
+        msr_bit = msr_bitmap + 0x0000 / BYTES_PER_LONG;
+    else if ( (msr >= 0xc0000000) && (msr <= 0xc0001fff) )
+        msr_bit = msr_bitmap + 0x0800 / BYTES_PER_LONG;
+    else if ( (msr >= 0xc0010000) && (msr <= 0xc0011fff) )
+        msr_bit = msr_bitmap + 0x1000 / BYTES_PER_LONG;
+
+    return msr_bit;
+}
+
+void svm_intercept_msr(struct vcpu *v, uint32_t msr, int enable)
+{
+    unsigned long *msr_bit;
+
+    msr_bit = svm_msrbit(v->arch.hvm_svm.msrpm, msr);
+    BUG_ON(msr_bit == NULL);
+    msr &= 0x1fff;
+
+    if ( enable )
+    {
+        __set_bit(msr * 2, msr_bit);
+        __set_bit(msr * 2 + 1, msr_bit);
+    }
+    else
+    {
+        __clear_bit(msr * 2, msr_bit);
+        __clear_bit(msr * 2 + 1, msr_bit);
+    }
 }
 
 static void svm_save_dr(struct vcpu *v)
@@ -296,7 +337,7 @@ static int svm_load_vmcb_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
 {
     svm_load_cpu_state(v, ctxt);
     if (svm_vmcb_restore(v, ctxt)) {
-        printk("svm_vmcb restore failed!\n");
+        gdprintk(XENLOG_ERR, "svm_vmcb restore failed!\n");
         domain_crash(v->domain);
         return -EINVAL;
     }
@@ -588,7 +629,24 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
 static void svm_set_tsc_offset(struct vcpu *v, u64 offset)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    vmcb_set_tsc_offset(vmcb, offset);
+    struct vmcb_struct *n1vmcb, *n2vmcb;
+    uint64_t n2_tsc_offset = 0;
+
+    if ( !nestedhvm_enabled(v->domain) ) {
+        vmcb_set_tsc_offset(vmcb, offset);
+        return;
+    }
+
+    n1vmcb = vcpu_nestedhvm(v).nv_n1vmcx;
+    n2vmcb = vcpu_nestedhvm(v).nv_n2vmcx;
+
+    if ( nestedhvm_vcpu_in_guestmode(v) ) {
+        n2_tsc_offset = vmcb_get_tsc_offset(n2vmcb) -
+            vmcb_get_tsc_offset(n1vmcb);
+        vmcb_set_tsc_offset(n1vmcb, offset);
+    }
+
+    vmcb_set_tsc_offset(vmcb, offset + n2_tsc_offset);
 }
 
 static void svm_set_rdtsc_exiting(struct vcpu *v, bool_t enable)
@@ -683,9 +741,13 @@ static void svm_do_resume(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     bool_t debug_state = v->domain->debugger_attached;
-    vintr_t intr;
+    bool_t vcpu_guestmode = 0;
 
-    if ( unlikely(v->arch.hvm_vcpu.debug_state_latch != debug_state) )
+    if ( nestedhvm_enabled(v->domain) && nestedhvm_vcpu_in_guestmode(v) )
+        vcpu_guestmode = 1;
+
+    if ( !vcpu_guestmode &&
+        unlikely(v->arch.hvm_vcpu.debug_state_latch != debug_state) )
     {
         uint32_t intercepts = vmcb_get_exception_intercepts(vmcb);
         uint32_t mask = (1U << TRAP_debug) | (1U << TRAP_int3);
@@ -703,13 +765,19 @@ static void svm_do_resume(struct vcpu *v)
         hvm_asid_flush_vcpu(v);
     }
 
-    /* Reflect the vlapic's TPR in the hardware vtpr */
-    intr = vmcb_get_vintr(vmcb);
-    intr.fields.tpr =
-        (vlapic_get_reg(vcpu_vlapic(v), APIC_TASKPRI) & 0xFF) >> 4;
-    vmcb_set_vintr(vmcb, intr);
+    if ( !vcpu_guestmode )
+    {
+        vintr_t intr;
+
+        /* Reflect the vlapic's TPR in the hardware vtpr */
+        intr = vmcb_get_vintr(vmcb);
+        intr.fields.tpr =
+            (vlapic_get_reg(vcpu_vlapic(v), APIC_TASKPRI) & 0xFF) >> 4;
+        vmcb_set_vintr(vmcb, intr);
+    }
 
     hvm_do_resume(v);
+
     reset_stack_and_jump(svm_asm_do_resume);
 }
 
@@ -961,8 +1029,8 @@ static void svm_do_nested_pgfault(paddr_t gpa)
         struct {
             uint64_t gpa;
             uint64_t mfn;
-            u32 qualification;
-            u32 p2mt;
+            uint32_t qualification;
+            uint32_t p2mt;
         } _d;
 
         _d.gpa = gpa;
@@ -984,12 +1052,21 @@ static void svm_do_nested_pgfault(paddr_t gpa)
 
 static void svm_fpu_dirty_intercept(void)
 {
-    struct vcpu *curr = current;
-    struct vmcb_struct *vmcb = curr->arch.hvm_svm.vmcb;
+    struct vcpu *v = current;
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    svm_fpu_enter(curr);
+    svm_fpu_enter(v);
 
-    if ( !(curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) )
+    if ( nestedhvm_enabled(v->domain) && nestedhvm_vcpu_in_guestmode(v) ) {
+       /* Check if guest must make FPU ready for the nested guest */
+       if ( v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS )
+           hvm_inject_exception(TRAP_no_device, HVM_DELIVER_NO_ERROR_CODE, 0);
+       else
+           vmcb_set_cr0(vmcb, vmcb_get_cr0(vmcb) & ~X86_CR0_TS);
+       return;
+    }
+
+    if ( !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) )
         vmcb_set_cr0(vmcb, vmcb_get_cr0(vmcb) & ~X86_CR0_TS);
 }
 
@@ -1003,11 +1080,14 @@ static void svm_cpuid_intercept(
 
     hvm_cpuid(input, eax, ebx, ecx, edx);
 
-    if ( input == 0x80000001 )
-    {
+    switch (input) {
+    case 0x80000001:
         /* Fix up VLAPIC details. */
         if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
             __clear_bit(X86_FEATURE_APIC & 31, edx);
+        break;
+    default:
+        break;
     }
 
     HVMTRACE_5D (CPUID, input, *eax, *ebx, *ecx, *edx);
@@ -1043,6 +1123,7 @@ static void svm_dr_access(struct vcpu *v, struct cpu_user_regs *regs)
 
 static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 {
+    int ret;
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
@@ -1076,9 +1157,6 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         *msr_content = 0;
         break;
 
-    case MSR_K8_VM_HSAVE_PA:
-        goto gpf;
-
     case MSR_IA32_DEBUGCTLMSR:
         *msr_content = vmcb_get_debugctlmsr(vmcb);
         break;
@@ -1111,6 +1189,11 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         break;
 
     default:
+        ret = nsvm_rdmsr(v, msr, msr_content);
+        if ( ret < 0 )
+            goto gpf;
+        else if ( ret )
+            break;
 
         if ( rdmsr_viridian_regs(msr, msr_content) ||
              rdmsr_hypervisor_regs(msr, msr_content) )
@@ -1133,6 +1216,7 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 
 static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 {
+    int ret;
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     int sync = 0;
@@ -1153,9 +1237,6 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 
     switch ( msr )
     {
-    case MSR_K8_VM_HSAVE_PA:
-        goto gpf;
-
     case MSR_IA32_SYSENTER_CS:
         vmcb->sysenter_cs = v->arch.hvm_svm.guest_sysenter_cs = msr_content;
         break;
@@ -1215,6 +1296,12 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         break;
 
     default:
+        ret = nsvm_wrmsr(v, msr, msr_content);
+        if ( ret < 0 )
+            goto gpf;
+        else if ( ret )
+            break;
+
         if ( wrmsr_viridian_regs(msr, msr_content) )
             break;
 
@@ -1296,6 +1383,96 @@ static void svm_vmexit_do_pause(struct cpu_user_regs *regs)
      */
     perfc_incr(pauseloop_exits);
     do_sched_op_compat(SCHEDOP_yield, 0);
+}
+
+static void
+svm_vmexit_do_vmrun(struct cpu_user_regs *regs,
+                    struct vcpu *v, uint64_t vmcbaddr)
+{
+    if (!nestedhvm_enabled(v->domain)) {
+        gdprintk(XENLOG_ERR, "VMRUN: nestedhvm disabled, injecting #UD\n");
+        hvm_inject_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE, 0);
+        return;
+    }
+
+    if (!nestedsvm_vmcb_map(v, vmcbaddr)) {
+        gdprintk(XENLOG_ERR, "VMRUN: mapping vmcb failed, injecting #UD\n");
+        hvm_inject_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE, 0);
+        return;
+    }
+
+    vcpu_nestedhvm(v).nv_vmentry_pending = 1;
+    return;
+}
+
+static void
+svm_vmexit_do_vmload(struct vmcb_struct *vmcb,
+                     struct cpu_user_regs *regs,
+                     struct vcpu *v, uint64_t vmcbaddr)
+{
+    int ret;
+    unsigned int inst_len;
+    struct nestedvcpu *nv = &vcpu_nestedhvm(v);
+
+    if ( (inst_len = __get_instruction_length(v, INSTR_VMLOAD)) == 0 )
+        return;
+
+    if (!nestedhvm_enabled(v->domain)) {
+        gdprintk(XENLOG_ERR, "VMLOAD: nestedhvm disabled, injecting #UD\n");
+        ret = TRAP_invalid_op;
+        goto inject;
+    }
+
+    if (!nestedsvm_vmcb_map(v, vmcbaddr)) {
+        gdprintk(XENLOG_ERR, "VMLOAD: mapping vmcb failed, injecting #UD\n");
+        ret = TRAP_invalid_op;
+        goto inject;
+    }
+
+    svm_vmload(nv->nv_vvmcx);
+    /* State in L1 VMCB is stale now */
+    v->arch.hvm_svm.vmcb_in_sync = 0;
+
+    __update_guest_eip(regs, inst_len);
+    return;
+
+ inject:
+    hvm_inject_exception(ret, HVM_DELIVER_NO_ERROR_CODE, 0);
+    return;
+}
+
+static void
+svm_vmexit_do_vmsave(struct vmcb_struct *vmcb,
+                     struct cpu_user_regs *regs,
+                     struct vcpu *v, uint64_t vmcbaddr)
+{
+    int ret;
+    unsigned int inst_len;
+    struct nestedvcpu *nv = &vcpu_nestedhvm(v);
+
+    if ( (inst_len = __get_instruction_length(v, INSTR_VMSAVE)) == 0 )
+        return;
+
+    if (!nestedhvm_enabled(v->domain)) {
+        gdprintk(XENLOG_ERR, "VMSAVE: nestedhvm disabled, injecting #UD\n");
+        ret = TRAP_invalid_op;
+        goto inject;
+    }
+
+    if (!nestedsvm_vmcb_map(v, vmcbaddr)) {
+        gdprintk(XENLOG_ERR, "VMSAVE: mapping vmcb failed, injecting #UD\n");
+        ret = TRAP_invalid_op;
+        goto inject;
+    }
+
+    svm_vmsave(nv->nv_vvmcx);
+
+    __update_guest_eip(regs, inst_len);
+    return;
+
+ inject:
+    hvm_inject_exception(ret, HVM_DELIVER_NO_ERROR_CODE, 0);
+    return;
 }
 
 static void svm_vmexit_ud_intercept(struct cpu_user_regs *regs)
@@ -1428,21 +1605,37 @@ static struct hvm_function_table __read_mostly svm_function_table = {
     .msr_read_intercept   = svm_msr_read_intercept,
     .msr_write_intercept  = svm_msr_write_intercept,
     .invlpg_intercept     = svm_invlpg_intercept,
-    .set_rdtsc_exiting    = svm_set_rdtsc_exiting
+    .set_rdtsc_exiting    = svm_set_rdtsc_exiting,
+
+    .nhvm_vcpu_initialise = nsvm_vcpu_initialise,
+    .nhvm_vcpu_destroy = nsvm_vcpu_destroy,
+    .nhvm_vcpu_reset = nsvm_vcpu_reset,
+    .nhvm_vcpu_hostrestore = nsvm_vcpu_hostrestore,
+    .nhvm_vcpu_vmexit = nsvm_vcpu_vmexit_inject,
+    .nhvm_vcpu_vmexit_trap = nsvm_vcpu_vmexit_trap,
+    .nhvm_vcpu_guestcr3 = nsvm_vcpu_guestcr3,
+    .nhvm_vcpu_hostcr3 = nsvm_vcpu_hostcr3,
+    .nhvm_vcpu_asid = nsvm_vcpu_asid,
+    .nhvm_vmcx_guest_intercepts_trap = nsvm_vmcb_guest_intercepts_trap,
+    .nhvm_vmcx_hap_enabled = nsvm_vmcb_hap_enabled,
 };
 
 asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 {
-    unsigned int exit_reason;
+    uint64_t exit_reason;
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     eventinj_t eventinj;
     int inst_len, rc;
     vintr_t intr;
+    bool_t vcpu_guestmode = 0;
 
     if ( paging_mode_hap(v->domain) )
         v->arch.hvm_vcpu.guest_cr[3] = v->arch.hvm_vcpu.hw_cr[3] =
             vmcb_get_cr3(vmcb);
+
+    if ( nestedhvm_enabled(v->domain) && nestedhvm_vcpu_in_guestmode(v) )
+        vcpu_guestmode = 1;
 
     /*
      * Before doing anything else, we need to sync up the VLAPIC's TPR with
@@ -1451,12 +1644,72 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
      * NB. We need to preserve the low bits of the TPR to make checked builds
      * of Windows work, even though they don't actually do anything.
      */
-    intr = vmcb_get_vintr(vmcb);
-    vlapic_set_reg(vcpu_vlapic(v), APIC_TASKPRI,
+    if ( !vcpu_guestmode ) {
+        intr = vmcb_get_vintr(vmcb);
+        vlapic_set_reg(vcpu_vlapic(v), APIC_TASKPRI,
                    ((intr.fields.tpr & 0x0F) << 4) |
                    (vlapic_get_reg(vcpu_vlapic(v), APIC_TASKPRI) & 0x0F));
+    }
 
     exit_reason = vmcb->exitcode;
+
+    if ( vcpu_guestmode ) {
+        enum nestedhvm_vmexits nsret;
+        struct nestedvcpu *nv = &vcpu_nestedhvm(v);
+        struct vmcb_struct *ns_vmcb = nv->nv_vvmcx;
+        uint64_t exitinfo1, exitinfo2;
+
+        /* Write real exitinfo1 back into virtual vmcb.
+         * nestedsvm_check_intercepts() expects to have the correct
+         * exitinfo1 value there.
+         */
+        exitinfo1 = ns_vmcb->exitinfo1;
+        ns_vmcb->exitinfo1 = vmcb->exitinfo1;
+        nsret = nestedsvm_check_intercepts(v, regs, exit_reason);
+        switch (nsret) {
+        case NESTEDHVM_VMEXIT_CONTINUE:
+            BUG();
+            break;
+        case NESTEDHVM_VMEXIT_HOST:
+            break;
+        case NESTEDHVM_VMEXIT_INJECT:
+            /* Switch vcpu from l2 to l1 guest. We must perform
+             * the switch here to have svm_do_resume() working
+             * as intended.
+             */
+            exitinfo1 = vmcb->exitinfo1;
+            exitinfo2 = vmcb->exitinfo2;
+            nv->nv_vmswitch_in_progress = 1;
+            nsret = nestedsvm_vmexit_n2n1(v, regs);
+            nv->nv_vmswitch_in_progress = 0;
+            switch (nsret) {
+            case NESTEDHVM_VMEXIT_DONE:
+                /* defer VMEXIT injection */
+                nestedsvm_vmexit_defer(v, exit_reason, exitinfo1, exitinfo2);
+                goto out;
+            case NESTEDHVM_VMEXIT_FATALERROR:
+                gdprintk(XENLOG_ERR, "unexpected nestedsvm_vmexit() error\n");
+                goto exit_and_crash;
+
+            default:
+                BUG();
+            case NESTEDHVM_VMEXIT_ERROR:
+                break;
+            }
+        case NESTEDHVM_VMEXIT_ERROR:
+            gdprintk(XENLOG_ERR,
+                "nestedsvm_check_intercepts() returned NESTEDHVM_VMEXIT_ERROR\n");
+            goto out;
+        case NESTEDHVM_VMEXIT_FATALERROR:
+            gdprintk(XENLOG_ERR,
+                "unexpected nestedsvm_check_intercepts() error\n");
+            goto exit_and_crash;
+        default:
+            gdprintk(XENLOG_INFO, "nestedsvm_check_intercepts() returned %i\n",
+                nsret);
+            goto exit_and_crash;
+        }
+    }
 
     if ( hvm_long_mode_enabled(v) )
         HVMTRACE_ND(VMEXIT64, 1/*cycles*/, 3, exit_reason,
@@ -1469,7 +1722,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     if ( unlikely(exit_reason == VMEXIT_INVALID) )
     {
-        svm_dump_vmcb(__func__, vmcb);
+        svm_vmcb_dump(__func__, vmcb);
         goto exit_and_crash;
     }
 
@@ -1630,6 +1883,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     case VMEXIT_VMMCALL:
         if ( (inst_len = __get_instruction_length(v, INSTR_VMCALL)) == 0 )
             break;
+        BUG_ON(vcpu_guestmode);
         HVMTRACE_1D(VMMCALL, regs->eax);
         rc = hvm_do_hypercall(regs);
         if ( rc != HVM_HCALL_preempted )
@@ -1662,9 +1916,18 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     case VMEXIT_MONITOR:
     case VMEXIT_MWAIT:
+        hvm_inject_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE, 0);
+        break;
+
     case VMEXIT_VMRUN:
+        svm_vmexit_do_vmrun(regs, v, regs->eax);
+        break;
     case VMEXIT_VMLOAD:
+        svm_vmexit_do_vmload(vmcb, regs, v, regs->eax);
+        break;
     case VMEXIT_VMSAVE:
+        svm_vmexit_do_vmsave(vmcb, regs, v, regs->eax);
+        break;
     case VMEXIT_STGI:
     case VMEXIT_CLGI:
     case VMEXIT_SKINIT:
@@ -1708,13 +1971,18 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     default:
     exit_and_crash:
-        gdprintk(XENLOG_ERR, "unexpected VMEXIT: exit reason = 0x%x, "
+        gdprintk(XENLOG_ERR, "unexpected VMEXIT: exit reason = 0x%"PRIx64", "
                  "exitinfo1 = %"PRIx64", exitinfo2 = %"PRIx64"\n",
                  exit_reason, 
                  (u64)vmcb->exitinfo1, (u64)vmcb->exitinfo2);
         domain_crash(v->domain);
         break;
     }
+
+  out:
+    if ( vcpu_guestmode )
+        /* Don't clobber TPR of the nested guest. */
+        return;
 
     /* The exit may have updated the TPR: reflect this in the hardware vtpr */
     intr = vmcb_get_vintr(vmcb);

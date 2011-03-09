@@ -25,6 +25,7 @@
 #include <asm/hvm/vlapic.h>
 #include <asm/hvm/vmx/vmcs.h>
 #include <asm/hvm/svm/vmcb.h>
+#include <asm/hvm/svm/nestedsvm.h>
 #include <asm/mtrr.h>
 
 enum hvm_io_state {
@@ -50,6 +51,7 @@ struct nestedvcpu {
 
     /* SVM/VMX arch specific */
     union {
+        struct nestedsvm nsvm;
     } u;
 
     bool_t nv_flushp2m; /* True, when p2m table must be flushed */

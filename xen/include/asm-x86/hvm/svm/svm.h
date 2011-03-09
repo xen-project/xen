@@ -29,8 +29,6 @@
 #include <asm/i387.h>
 #include <asm/hvm/vpmu.h>
 
-void svm_dump_vmcb(const char *from, struct vmcb_struct *vmcb);
-
 #define SVM_REG_EAX (0) 
 #define SVM_REG_ECX (1) 
 #define SVM_REG_EDX (2) 
@@ -62,6 +60,8 @@ static inline void svm_vmsave(void *vmcb)
         : : "a" (__pa(vmcb)) : "memory" );
 }
 
+unsigned long *svm_msrbit(unsigned long *msr_bitmap, uint32_t msr);
+
 extern u32 svm_feature_flags;
 
 #define SVM_FEATURE_NPT            0 /* Nested page table support */
@@ -81,5 +81,7 @@ extern u32 svm_feature_flags;
 #define cpu_has_svm_nrips     cpu_has_svm_feature(SVM_FEATURE_NRIPS)
 #define cpu_has_svm_cleanbits cpu_has_svm_feature(SVM_FEATURE_VMCBCLEAN)
 #define cpu_has_pause_filter  cpu_has_svm_feature(SVM_FEATURE_PAUSEFILTER)
+
+#define SVM_PAUSEFILTER_INIT    3000
 
 #endif /* __ASM_X86_HVM_SVM_H__ */

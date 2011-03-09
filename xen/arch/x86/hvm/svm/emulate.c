@@ -102,6 +102,11 @@ MAKE_INSTR(INT3,   1, 0xcc);
 MAKE_INSTR(RDTSC,  2, 0x0f, 0x31);
 MAKE_INSTR(PAUSE,  1, 0x90);
 MAKE_INSTR(XSETBV, 3, 0x0f, 0x01, 0xd1);
+MAKE_INSTR(VMRUN,  3, 0x0f, 0x01, 0xd8);
+MAKE_INSTR(VMLOAD, 3, 0x0f, 0x01, 0xda);
+MAKE_INSTR(VMSAVE, 3, 0x0f, 0x01, 0xdb);
+MAKE_INSTR(STGI,   3, 0x0f, 0x01, 0xdc);
+MAKE_INSTR(CLGI,   3, 0x0f, 0x01, 0xdd);
 
 static const u8 *opc_bytes[INSTR_MAX_COUNT] = 
 {
@@ -116,6 +121,11 @@ static const u8 *opc_bytes[INSTR_MAX_COUNT] =
     [INSTR_RDTSC]  = OPCODE_RDTSC,
     [INSTR_PAUSE]  = OPCODE_PAUSE,
     [INSTR_XSETBV] = OPCODE_XSETBV,
+    [INSTR_VMRUN]  = OPCODE_VMRUN,
+    [INSTR_VMLOAD] = OPCODE_VMLOAD,
+    [INSTR_VMSAVE] = OPCODE_VMSAVE,
+    [INSTR_STGI]   = OPCODE_STGI,
+    [INSTR_CLGI]   = OPCODE_CLGI,
 };
 
 static int fetch(struct vcpu *v, u8 *buf, unsigned long addr, int len)

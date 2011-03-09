@@ -33,15 +33,13 @@
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/svm/intr.h>
 #include <asm/hvm/svm/asid.h>
+#include <asm/hvm/svm/svmdebug.h>
 #include <xen/event.h>
 #include <xen/kernel.h>
 #include <xen/domain_page.h>
 #include <xen/keyhandler.h>
 
 extern int svm_dbg_on;
-
-#define IOPM_SIZE   (12 * 1024)
-#define MSRPM_SIZE  (8  * 1024)
 
 struct vmcb_struct *alloc_vmcb(void) 
 {
@@ -76,37 +74,6 @@ struct host_save_area *alloc_host_save_area(void)
 
     clear_page(hsa);
     return hsa;
-}
-
-void svm_intercept_msr(struct vcpu *v, uint32_t msr, int enable)
-{
-    unsigned long *msr_bitmap = v->arch.hvm_svm.msrpm;
-    unsigned long *msr_bit = NULL;
-
-    /*
-     * See AMD64 Programmers Manual, Vol 2, Section 15.10 (MSR-Bitmap Address).
-     */
-    if ( msr <= 0x1fff )
-        msr_bit = msr_bitmap + 0x0000 / BYTES_PER_LONG;
-    else if ( (msr >= 0xc0000000) && (msr <= 0xc0001fff) )
-        msr_bit = msr_bitmap + 0x0800 / BYTES_PER_LONG;
-    else if ( (msr >= 0xc0010000) && (msr <= 0xc0011fff) )
-        msr_bit = msr_bitmap + 0x1000 / BYTES_PER_LONG;
-
-    BUG_ON(msr_bit == NULL);
-
-    msr &= 0x1fff;
-
-    if ( enable )
-    {
-        __set_bit(msr * 2, msr_bit);
-        __set_bit(msr * 2 + 1, msr_bit);
-    }
-    else
-    {
-        __clear_bit(msr * 2, msr_bit);
-        __clear_bit(msr * 2 + 1, msr_bit);
-    }
 }
 
 /* This function can directly access fields which are covered by clean bits. */
@@ -257,7 +224,7 @@ static int construct_vmcb(struct vcpu *v)
 
     if ( cpu_has_pause_filter )
     {
-        vmcb->_pause_filter_count = 3000;
+        vmcb->_pause_filter_count = SVM_PAUSEFILTER_INIT;
         vmcb->_general1_intercepts |= GENERAL1_INTERCEPT_PAUSE;
     }
 
@@ -268,34 +235,38 @@ static int construct_vmcb(struct vcpu *v)
 
 int svm_create_vmcb(struct vcpu *v)
 {
+    struct nestedvcpu *nv = &vcpu_nestedhvm(v);
     struct arch_svm_struct *arch_svm = &v->arch.hvm_svm;
     int rc;
 
-    if ( (arch_svm->vmcb == NULL) &&
-         (arch_svm->vmcb = alloc_vmcb()) == NULL )
+    if ( (nv->nv_n1vmcx == NULL) &&
+         (nv->nv_n1vmcx = alloc_vmcb()) == NULL )
     {
         printk("Failed to create a new VMCB\n");
         return -ENOMEM;
     }
 
-    if ( (rc = construct_vmcb(v)) != 0 )
+    arch_svm->vmcb = nv->nv_n1vmcx;
+    rc = construct_vmcb(v);
+    if ( rc != 0 )
     {
-        free_vmcb(arch_svm->vmcb);
+        free_vmcb(nv->nv_n1vmcx);
+        nv->nv_n1vmcx = NULL;
         arch_svm->vmcb = NULL;
         return rc;
     }
 
-    arch_svm->vmcb_pa = virt_to_maddr(arch_svm->vmcb);
-
+    arch_svm->vmcb_pa = nv->nv_n1vmcx_pa = virt_to_maddr(arch_svm->vmcb);
     return 0;
 }
 
 void svm_destroy_vmcb(struct vcpu *v)
 {
+    struct nestedvcpu *nv = &vcpu_nestedhvm(v);
     struct arch_svm_struct *arch_svm = &v->arch.hvm_svm;
 
-    if ( arch_svm->vmcb != NULL )
-        free_vmcb(arch_svm->vmcb);
+    if ( nv->nv_n1vmcx != NULL )
+        free_vmcb(nv->nv_n1vmcx);
 
     if ( arch_svm->msrpm != NULL )
     {
@@ -304,79 +275,9 @@ void svm_destroy_vmcb(struct vcpu *v)
         arch_svm->msrpm = NULL;
     }
 
+    nv->nv_n1vmcx = NULL;
+    nv->nv_n1vmcx_pa = VMCX_EADDR;
     arch_svm->vmcb = NULL;
-}
-
-static void svm_dump_sel(char *name, svm_segment_register_t *s)
-{
-    printk("%s: sel=0x%04x, attr=0x%04x, limit=0x%08x, base=0x%016llx\n", 
-           name, s->sel, s->attr.bytes, s->limit,
-           (unsigned long long)s->base);
-}
-
-/* This function can directly access fields which are covered by clean bits. */
-void svm_dump_vmcb(const char *from, struct vmcb_struct *vmcb)
-{
-    printk("Dumping guest's current state at %s...\n", from);
-    printk("Size of VMCB = %d, paddr = 0x%016lx, vaddr = %p\n",
-           (int) sizeof(struct vmcb_struct),  virt_to_maddr(vmcb), vmcb);
-
-    printk("cr_intercepts = 0x%08x dr_intercepts = 0x%08x "
-           "exception_intercepts = 0x%08x\n", 
-           vmcb->_cr_intercepts, vmcb->_dr_intercepts, 
-           vmcb->_exception_intercepts);
-    printk("general1_intercepts = 0x%08x general2_intercepts = 0x%08x\n", 
-           vmcb->_general1_intercepts, vmcb->_general2_intercepts);
-    printk("iopm_base_pa = 0x%016llx msrpm_base_pa = 0x%016llx tsc_offset = "
-            "0x%016llx\n", 
-           (unsigned long long)vmcb->_iopm_base_pa,
-           (unsigned long long)vmcb->_msrpm_base_pa,
-           (unsigned long long)vmcb->_tsc_offset);
-    printk("tlb_control = 0x%08x vintr = 0x%016llx interrupt_shadow = "
-            "0x%016llx\n", vmcb->tlb_control,
-           (unsigned long long)vmcb->_vintr.bytes,
-           (unsigned long long)vmcb->interrupt_shadow);
-    printk("exitcode = 0x%016llx exitintinfo = 0x%016llx\n", 
-           (unsigned long long)vmcb->exitcode,
-           (unsigned long long)vmcb->exitintinfo.bytes);
-    printk("exitinfo1 = 0x%016llx exitinfo2 = 0x%016llx \n",
-           (unsigned long long)vmcb->exitinfo1,
-           (unsigned long long)vmcb->exitinfo2);
-    printk("np_enable = 0x%016llx guest_asid = 0x%03x\n", 
-           (unsigned long long)vmcb->_np_enable, vmcb->_guest_asid);
-    printk("cpl = %d efer = 0x%016llx star = 0x%016llx lstar = 0x%016llx\n", 
-           vmcb->_cpl, (unsigned long long)vmcb->_efer,
-           (unsigned long long)vmcb->star, (unsigned long long)vmcb->lstar);
-    printk("CR0 = 0x%016llx CR2 = 0x%016llx\n",
-           (unsigned long long)vmcb->_cr0, (unsigned long long)vmcb->_cr2);
-    printk("CR3 = 0x%016llx CR4 = 0x%016llx\n", 
-           (unsigned long long)vmcb->_cr3, (unsigned long long)vmcb->_cr4);
-    printk("RSP = 0x%016llx  RIP = 0x%016llx\n", 
-           (unsigned long long)vmcb->rsp, (unsigned long long)vmcb->rip);
-    printk("RAX = 0x%016llx  RFLAGS=0x%016llx\n",
-           (unsigned long long)vmcb->rax, (unsigned long long)vmcb->rflags);
-    printk("DR6 = 0x%016llx, DR7 = 0x%016llx\n", 
-           (unsigned long long)vmcb->_dr6, (unsigned long long)vmcb->_dr7);
-    printk("CSTAR = 0x%016llx SFMask = 0x%016llx\n",
-           (unsigned long long)vmcb->cstar, 
-           (unsigned long long)vmcb->sfmask);
-    printk("KernGSBase = 0x%016llx PAT = 0x%016llx \n", 
-           (unsigned long long)vmcb->kerngsbase,
-           (unsigned long long)vmcb->_g_pat);
-    printk("H_CR3 = 0x%016llx CleanBits = 0x%08x\n", 
-           (unsigned long long)vmcb->_h_cr3, vmcb->cleanbits.bytes);
-
-    /* print out all the selectors */
-    svm_dump_sel("CS", &vmcb->cs);
-    svm_dump_sel("DS", &vmcb->ds);
-    svm_dump_sel("SS", &vmcb->ss);
-    svm_dump_sel("ES", &vmcb->es);
-    svm_dump_sel("FS", &vmcb->fs);
-    svm_dump_sel("GS", &vmcb->gs);
-    svm_dump_sel("GDTR", &vmcb->gdtr);
-    svm_dump_sel("LDTR", &vmcb->ldtr);
-    svm_dump_sel("IDTR", &vmcb->idtr);
-    svm_dump_sel("TR", &vmcb->tr);
 }
 
 static void vmcb_dump(unsigned char ch)
@@ -396,7 +297,7 @@ static void vmcb_dump(unsigned char ch)
         for_each_vcpu ( d, v )
         {
             printk("\tVCPU %d\n", v->vcpu_id);
-            svm_dump_vmcb("key_handler", v->arch.hvm_svm.vmcb);
+            svm_vmcb_dump("key_handler", v->arch.hvm_svm.vmcb);
         }
     }
 

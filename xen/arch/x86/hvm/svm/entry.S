@@ -54,6 +54,7 @@
 
 ENTRY(svm_asm_do_resume)
         call svm_intr_assist
+        call_with_regs(nsvm_vcpu_switch)
 
         get_current(bx)
         CLGI
