@@ -865,7 +865,7 @@ static int do_pci_remove(libxl__gc *gc, uint32_t domid,
 
         /* Remove all functions at once atomically by only signalling
          * device-model for function 0 */
-        if ( (pcidev->vdevfn & 0x7) == 0 ) {
+        if ( !force && (pcidev->vdevfn & 0x7) == 0 ) {
             xs_write(ctx->xsh, XBT_NULL, path, "pci-rem", strlen("pci-rem"));
             if (libxl__wait_for_device_model(ctx, domid, "pci-removed", NULL, NULL) < 0) {
                 LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Device Model didn't respond in time");
@@ -873,8 +873,7 @@ static int do_pci_remove(libxl__gc *gc, uint32_t domid,
                  * SCI, if it doesn't respond in time then we may wish to 
                  * force the removal.
                  */
-                if ( !force )
-                    return ERROR_FAIL;
+                return ERROR_FAIL;
             }
         }
         path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/state", domid);
