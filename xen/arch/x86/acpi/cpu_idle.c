@@ -457,6 +457,19 @@ static void acpi_processor_idle(void)
 
     case ACPI_STATE_C3:
         /*
+         * Before invoking C3, be aware that TSC/APIC timer may be 
+         * stopped by H/W. Without carefully handling of TSC/APIC stop issues,
+         * deep C state can't work correctly.
+         */
+        /* preparing APIC stop */
+        lapic_timer_off();
+
+        /* Get start time (ticks) */
+        t1 = get_tick();
+        /* Trace cpu idle entry */
+        TRACE_4D(TRC_PM_IDLE_ENTRY, cx->idx, t1, exp, pred);
+
+        /*
          * disable bus master
          * bm_check implies we need ARB_DIS
          * !bm_check implies we need cache flush
@@ -485,20 +498,18 @@ static void acpi_processor_idle(void)
             ACPI_FLUSH_CPU_CACHE();
         }
 
-        /*
-         * Before invoking C3, be aware that TSC/APIC timer may be 
-         * stopped by H/W. Without carefully handling of TSC/APIC stop issues,
-         * deep C state can't work correctly.
-         */
-        /* preparing APIC stop */
-        lapic_timer_off();
-
-        /* Get start time (ticks) */
-        t1 = get_tick();
-        /* Trace cpu idle entry */
-        TRACE_4D(TRC_PM_IDLE_ENTRY, cx->idx, t1, exp, pred);
         /* Invoke C3 */
         acpi_idle_do_entry(cx);
+
+        if ( power->flags.bm_check && power->flags.bm_control )
+        {
+            /* Enable bus master arbitration */
+            spin_lock(&c3_cpu_status.lock);
+            acpi_set_register(ACPI_BITREG_ARB_DISABLE, 0);
+            c3_cpu_status.count--;
+            spin_unlock(&c3_cpu_status.lock);
+        }
+
         /* Get end time (ticks) */
         t2 = get_tick();
 
@@ -508,15 +519,6 @@ static void acpi_processor_idle(void)
         /* Trace cpu idle exit */
         TRACE_6D(TRC_PM_IDLE_EXIT, cx->idx, t2,
                  irq_traced[0], irq_traced[1], irq_traced[2], irq_traced[3]);
-
-        if ( power->flags.bm_check && power->flags.bm_control )
-        {
-            /* Enable bus master arbitration */
-            spin_lock(&c3_cpu_status.lock);
-            if ( c3_cpu_status.count-- == num_online_cpus() )
-                acpi_set_register(ACPI_BITREG_ARB_DISABLE, 0);
-            spin_unlock(&c3_cpu_status.lock);
-        }
 
         /* Re-enable interrupts */
         local_irq_enable();
