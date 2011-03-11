@@ -554,7 +554,6 @@ static void acpi_dead_idle(void)
 {
     struct acpi_processor_power *power;
     struct acpi_processor_cx *cx;
-    int unused;
 
     if ( (power = processor_powers[smp_processor_id()]) == NULL )
         goto default_halt;
@@ -573,10 +572,6 @@ static void acpi_dead_idle(void)
                 /* Not treat interrupt as break event */
                 __monitor((void *)&mwait_wakeup(smp_processor_id()), 0, 0);
                 __mwait(cx->address, 0);
-                break;
-            case ACPI_CSTATE_EM_SYSIO:
-                inb(cx->address);
-                unused = inl(pmtmr_ioport);
                 break;
             default:
                 goto default_halt;
