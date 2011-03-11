@@ -37,6 +37,7 @@
 #include <assert.h>
 #include <stdint.h>
 #include <inttypes.h>
+#include <malloc.h>
 
 #include "xc_private.h"
 
@@ -68,6 +69,16 @@ static int minios_privcmd_close(xc_interface *xch, xc_osdep_handle h)
 void minios_interface_close_fd(int fd)
 {
     files[fd].type = FTYPE_NONE;
+}
+
+static void *minios_privcmd_alloc_hypercall_buffer(xc_interface *xch, xc_osdep_handle h, int npages)
+{
+    return memalign(PAGE_SIZE, npages * PAGE_SIZE);
+}
+
+static void minios_privcmd_free_hypercall_buffer(xc_interface *xch, xc_osdep_handle h, void *ptr, int npages)
+{
+    free(ptr);
 }
 
 static int minios_privcmd_hypercall(xc_interface *xch, xc_osdep_handle h, privcmd_hypercall_t *hypercall)
@@ -187,6 +198,9 @@ static struct xc_osdep_ops minios_privcmd_ops = {
     .close = &minios_privcmd_close,
 
     .u.privcmd = {
+        .alloc_hypercall_buffer = &minios_privcmd_alloc_hypercall_buffer,
+        .free_hypercall_buffer = &minios_privcmd_free_hypercall_buffer,
+
         .hypercall = &minios_privcmd_hypercall,
 
         .map_foreign_batch = &minios_privcmd_map_foreign_batch,

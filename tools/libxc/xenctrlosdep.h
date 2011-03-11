@@ -74,6 +74,9 @@ struct xc_osdep_ops
 
     union {
         struct {
+            void *(*alloc_hypercall_buffer)(xc_interface *xch, xc_osdep_handle h, int npages);
+            void (*free_hypercall_buffer)(xc_interface *xch, xc_osdep_handle h, void *ptr, int npages);
+
             int (*hypercall)(xc_interface *xch, xc_osdep_handle h, privcmd_hypercall_t *hypercall);
 
             void *(*map_foreign_batch)(xc_interface *xch, xc_osdep_handle h, uint32_t dom, int prot,

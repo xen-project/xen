@@ -23,6 +23,8 @@
 #include <xen/sys/evtchn.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <malloc.h>
+#include <sys/mman.h>
 
 static xc_osdep_handle netbsd_privcmd_open(xc_interface *xch)
 {
@@ -64,6 +66,28 @@ static int netbsd_privcmd_close(xc_interface *xch, xc_osdep_handle h)
 {
     int fd = (int)h;
     return close(fd);
+}
+
+static void *netbsd_privcmd_alloc_hypercall_buffer(xc_interface *xch, xc_osdep_handle h, int npages)
+{
+    size_t size = npages * XC_PAGE_SIZE;
+    void *p = valloc(size);
+
+    if (!p)
+        return NULL;
+
+    if ( mlock(p, size) < 0 )
+    {
+        free(p);
+        return NULL;
+    }
+    return p;
+}
+
+static void netbsd_privcmd_free_hypercall_buffer(xc_interface *xch, xc_osdep_handle h, void *ptr, int npages)
+{
+    (void) munlock(ptr, npages * XC_PAGE_SIZE);
+    free(ptr);
 }
 
 static int netbsd_privcmd_hypercall(xc_interface *xch, xc_osdep_handle h, privcmd_hypercall_t *hypercall)
@@ -181,6 +205,9 @@ static struct xc_osdep_ops netbsd_privcmd_ops = {
     .close = &netbsd_privcmd_close,
 
     .u.privcmd = {
+        .alloc_hypercall_buffer = &netbsd_privcmd_alloc_hypercall_buffer,
+        .free_hypercall_buffer = &netbsd_privcmd_free_hypercall_buffer,
+
         .hypercall = &netbsd_privcmd_hypercall,
 
         .map_foreign_batch = &netbsd_privcmd_map_foreign_batch,

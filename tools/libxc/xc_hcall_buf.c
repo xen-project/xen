@@ -17,7 +17,7 @@
  */
 
 #include <stdlib.h>
-#include <malloc.h>
+#include <string.h>
 #include <pthread.h>
 
 #include "xc_private.h"
@@ -95,15 +95,6 @@ static int hypercall_buffer_cache_free(xc_interface *xch, void *p, int nr_pages)
     return rc;
 }
 
-static void do_hypercall_buffer_free_pages(void *ptr, int nr_pages)
-{
-#ifndef __sun__
-    (void) munlock(ptr, nr_pages * PAGE_SIZE);
-#endif
-
-    free(ptr);
-}
-
 void xc__hypercall_buffer_cache_release(xc_interface *xch)
 {
     void *p;
@@ -126,7 +117,7 @@ void xc__hypercall_buffer_cache_release(xc_interface *xch)
     while ( xch->hypercall_buffer_cache_nr > 0 )
     {
         p = xch->hypercall_buffer_cache[--xch->hypercall_buffer_cache_nr];
-        do_hypercall_buffer_free_pages(p, 1);
+        xch->ops->u.privcmd.free_hypercall_buffer(xch, xch->ops_handle, p, 1);
     }
 
     hypercall_buffer_cache_unlock(xch);
@@ -134,36 +125,18 @@ void xc__hypercall_buffer_cache_release(xc_interface *xch)
 
 void *xc__hypercall_buffer_alloc_pages(xc_interface *xch, xc_hypercall_buffer_t *b, int nr_pages)
 {
-    size_t size = nr_pages * PAGE_SIZE;
     void *p = hypercall_buffer_cache_alloc(xch, nr_pages);
 
-    if ( !p ) {
-#if defined(_POSIX_C_SOURCE) && !defined(__sun__)
-        int ret;
-        ret = posix_memalign(&p, PAGE_SIZE, size);
-        if (ret != 0)
-            return NULL;
-#elif defined(__NetBSD__) || defined(__OpenBSD__)
-        p = valloc(size);
-#else
-        p = memalign(PAGE_SIZE, size);
-#endif
+    if ( !p )
+        p = xch->ops->u.privcmd.alloc_hypercall_buffer(xch, xch->ops_handle, nr_pages);
 
-        if (!p)
-            return NULL;
-
-#ifndef __sun__
-        if ( mlock(p, size) < 0 )
-        {
-            free(p);
-            return NULL;
-        }
-#endif
-    }
+    if (!p)
+        return NULL;
 
     b->hbuf = p;
 
-    memset(p, 0, size);
+    memset(p, 0, nr_pages * PAGE_SIZE);
+
     return b->hbuf;
 }
 
@@ -173,7 +146,7 @@ void xc__hypercall_buffer_free_pages(xc_interface *xch, xc_hypercall_buffer_t *b
         return;
 
     if ( !hypercall_buffer_cache_free(xch, b->hbuf, nr_pages) )
-        do_hypercall_buffer_free_pages(b->hbuf, nr_pages);
+        xch->ops->u.privcmd.free_hypercall_buffer(xch, xch->ops_handle, b->hbuf, nr_pages);
 }
 
 struct allocation_header {

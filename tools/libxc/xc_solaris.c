@@ -24,6 +24,7 @@
 #include <xen/sys/evtchn.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <malloc.h>
 
 static xc_osdep_handle solaris_privcmd_open(xc_interface *xch)
 {
@@ -65,6 +66,16 @@ static int solaris_privcmd_close(xc_interface *xch, xc_osdep_handle h)
 {
     int fd = (int)h;
     return close(fd);
+}
+
+static void *solaris_privcmd_alloc_hypercall_buffer(xc_interface *xch, xc_osdep_handle h, int npages)
+{
+    return memalign(XC_PAGE_SIZE, npages * XC_PAGE_SIZE);
+}
+
+static void solaris_privcmd_free_hypercall_buffer(xc_interface *xch, xc_osdep_handle h, void *ptr, int npages)
+{
+    free(ptr);
 }
 
 static int solaris_privcmd_hypercall(xc_interface *xch, xc_osdep_handle h, privcmd_hypercall_t *hypercall)
@@ -172,6 +183,9 @@ static struct xc_osdep_ops solaris_privcmd_ops = {
     .close = &solaris_privcmd_close,
 
     .u.privcmd = {
+        .alloc_hypercall_buffer = &solaris_privcmd_alloc_hypercall_buffer,
+        .free_hypercall_buffer = &solaris_privcmd_free_hypercall_buffer,
+
         .hypercall = &solaris_privcmd_hypercall;
 
         .map_foreign_batch = &solaris_privcmd_map_foreign_batch,

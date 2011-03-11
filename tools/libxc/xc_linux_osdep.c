@@ -86,6 +86,30 @@ static int linux_privcmd_close(xc_interface *xch, xc_osdep_handle h)
     return close(fd);
 }
 
+static void *linux_privcmd_alloc_hypercall_buffer(xc_interface *xch, xc_osdep_handle h, int npages)
+{
+    size_t size = npages * XC_PAGE_SIZE;
+    void *p;
+    int ret;
+
+    ret = posix_memalign(&p, XC_PAGE_SIZE, size);
+    if (ret != 0 || !p)
+        return NULL;
+
+    if ( mlock(p, size) < 0 )
+    {
+        free(p);
+        return NULL;
+    }
+    return p;
+}
+
+static void linux_privcmd_free_hypercall_buffer(xc_interface *xch, xc_osdep_handle h, void *ptr, int npages)
+{
+    (void) munlock(ptr, npages * XC_PAGE_SIZE);
+    free(ptr);
+}
+
 static int linux_privcmd_hypercall(xc_interface *xch, xc_osdep_handle h, privcmd_hypercall_t *hypercall)
 {
     int fd = (int)h;
@@ -344,6 +368,9 @@ static struct xc_osdep_ops linux_privcmd_ops = {
     .close = &linux_privcmd_close,
 
     .u.privcmd = {
+        .alloc_hypercall_buffer = &linux_privcmd_alloc_hypercall_buffer,
+        .free_hypercall_buffer = &linux_privcmd_free_hypercall_buffer,
+
         .hypercall = &linux_privcmd_hypercall,
 
         .map_foreign_batch = &linux_privcmd_map_foreign_batch,
