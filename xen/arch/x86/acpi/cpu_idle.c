@@ -567,8 +567,8 @@ static void acpi_dead_idle(void)
     if ( cx->entry_method == ACPI_CSTATE_EM_FFH )
     {
         /*
-         * cache must be flashed as the last ops before cpu going into dead,
-         * otherwise, cpu may dead with dirty data breaking cache coherency,
+         * Cache must be flushed as the last operation before sleeping.
+         * Otherwise, CPU may still hold dirty data, breaking cache coherency,
          * leading to strange errors.
          */
         wbinvd();
@@ -593,7 +593,6 @@ static void acpi_dead_idle(void)
     }
 
 default_halt:
-    wbinvd();
     for ( ; ; )
         halt();
 }
