@@ -554,7 +554,7 @@ static void acpi_dead_idle(void)
 {
     struct acpi_processor_power *power;
     struct acpi_processor_cx *cx;
-    int unused;
+    void *mwait_ptr;
 
     if ( (power = processor_powers[smp_processor_id()]) == NULL )
         goto default_halt;
@@ -562,28 +562,38 @@ static void acpi_dead_idle(void)
     if ( (cx = &power->states[power->count-1]) == NULL )
         goto default_halt;
 
-    for ( ; ; )
-    {
-        if ( !power->flags.bm_check && cx->type == ACPI_STATE_C3 )
-            ACPI_FLUSH_CPU_CACHE();
+    mwait_ptr = (void *)&mwait_wakeup(smp_processor_id());
 
-        switch ( cx->entry_method )
+    if ( cx->entry_method == ACPI_CSTATE_EM_FFH )
+    {
+        /*
+         * cache must be flashed as the last ops before cpu going into dead,
+         * otherwise, cpu may dead with dirty data breaking cache coherency,
+         * leading to strange errors.
+         */
+        wbinvd();
+
+        while ( 1 )
         {
-            case ACPI_CSTATE_EM_FFH:
-                /* Not treat interrupt as break event */
-                __monitor((void *)&mwait_wakeup(smp_processor_id()), 0, 0);
-                __mwait(cx->address, 0);
-                break;
-            case ACPI_CSTATE_EM_SYSIO:
-                inb(cx->address);
-                unused = inl(pmtmr_ioport);
-                break;
-            default:
-                goto default_halt;
+            /*
+             * 1. The CLFLUSH is a workaround for erratum AAI65 for
+             * the Xeon 7400 series.  
+             * 2. The WBINVD is insufficient due to the spurious-wakeup
+             * case where we return around the loop.
+             * 3. Unlike wbinvd, clflush is a light weight but not serializing 
+             * instruction, hence memory fence is necessary to make sure all 
+             * load/store visible before flush cache line.
+             */
+            mb();
+            clflush(mwait_ptr);
+            __monitor(mwait_ptr, 0, 0);
+            mb();
+            __mwait(cx->address, 0);
         }
     }
 
 default_halt:
+    wbinvd();
     for ( ; ; )
         halt();
 }
