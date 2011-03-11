@@ -457,6 +457,19 @@ static void acpi_processor_idle(void)
 
     case ACPI_STATE_C3:
         /*
+         * Before invoking C3, be aware that TSC/APIC timer may be 
+         * stopped by H/W. Without carefully handling of TSC/APIC stop issues,
+         * deep C state can't work correctly.
+         */
+        /* preparing APIC stop */
+        lapic_timer_off();
+
+        /* Get start time (ticks) */
+        t1 = get_tick();
+        /* Trace cpu idle entry */
+        TRACE_4D(TRC_PM_IDLE_ENTRY, cx->idx, t1, exp, pred);
+
+        /*
          * disable bus master
          * bm_check implies we need ARB_DIS
          * !bm_check implies we need cache flush
@@ -485,20 +498,18 @@ static void acpi_processor_idle(void)
             ACPI_FLUSH_CPU_CACHE();
         }
 
-        /*
-         * Before invoking C3, be aware that TSC/APIC timer may be 
-         * stopped by H/W. Without carefully handling of TSC/APIC stop issues,
-         * deep C state can't work correctly.
-         */
-        /* preparing APIC stop */
-        lapic_timer_off();
-
-        /* Get start time (ticks) */
-        t1 = get_tick();
-        /* Trace cpu idle entry */
-        TRACE_4D(TRC_PM_IDLE_ENTRY, cx->idx, t1, exp, pred);
         /* Invoke C3 */
         acpi_idle_do_entry(cx);
+
+        if ( power->flags.bm_check && power->flags.bm_control )
+        {
+            /* Enable bus master arbitration */
+            spin_lock(&c3_cpu_status.lock);
+            acpi_set_register(ACPI_BITREG_ARB_DISABLE, 0);
+            c3_cpu_status.count--;
+            spin_unlock(&c3_cpu_status.lock);
+        }
+
         /* Get end time (ticks) */
         t2 = get_tick();
 
@@ -508,15 +519,6 @@ static void acpi_processor_idle(void)
         /* Trace cpu idle exit */
         TRACE_6D(TRC_PM_IDLE_EXIT, cx->idx, t2,
                  irq_traced[0], irq_traced[1], irq_traced[2], irq_traced[3]);
-
-        if ( power->flags.bm_check && power->flags.bm_control )
-        {
-            /* Enable bus master arbitration */
-            spin_lock(&c3_cpu_status.lock);
-            if ( c3_cpu_status.count-- == num_online_cpus() )
-                acpi_set_register(ACPI_BITREG_ARB_DISABLE, 0);
-            spin_unlock(&c3_cpu_status.lock);
-        }
 
         /* Re-enable interrupts */
         local_irq_enable();
@@ -552,7 +554,7 @@ static void acpi_dead_idle(void)
 {
     struct acpi_processor_power *power;
     struct acpi_processor_cx *cx;
-    int unused;
+    void *mwait_ptr;
 
     if ( (power = processor_powers[smp_processor_id()]) == NULL )
         goto default_halt;
@@ -560,24 +562,33 @@ static void acpi_dead_idle(void)
     if ( (cx = &power->states[power->count-1]) == NULL )
         goto default_halt;
 
-    for ( ; ; )
-    {
-        if ( !power->flags.bm_check && cx->type == ACPI_STATE_C3 )
-            ACPI_FLUSH_CPU_CACHE();
+    mwait_ptr = (void *)&mwait_wakeup(smp_processor_id());
 
-        switch ( cx->entry_method )
+    if ( cx->entry_method == ACPI_CSTATE_EM_FFH )
+    {
+        /*
+         * Cache must be flushed as the last operation before sleeping.
+         * Otherwise, CPU may still hold dirty data, breaking cache coherency,
+         * leading to strange errors.
+         */
+        wbinvd();
+
+        while ( 1 )
         {
-            case ACPI_CSTATE_EM_FFH:
-                /* Not treat interrupt as break event */
-                __monitor((void *)&mwait_wakeup(smp_processor_id()), 0, 0);
-                __mwait(cx->address, 0);
-                break;
-            case ACPI_CSTATE_EM_SYSIO:
-                inb(cx->address);
-                unused = inl(pmtmr_ioport);
-                break;
-            default:
-                goto default_halt;
+            /*
+             * 1. The CLFLUSH is a workaround for erratum AAI65 for
+             * the Xeon 7400 series.  
+             * 2. The WBINVD is insufficient due to the spurious-wakeup
+             * case where we return around the loop.
+             * 3. Unlike wbinvd, clflush is a light weight but not serializing 
+             * instruction, hence memory fence is necessary to make sure all 
+             * load/store visible before flush cache line.
+             */
+            mb();
+            clflush(mwait_ptr);
+            __monitor(mwait_ptr, 0, 0);
+            mb();
+            __mwait(cx->address, 0);
         }
     }
 

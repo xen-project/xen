@@ -100,7 +100,6 @@ static void default_dead_idle(void)
 static void play_dead(void)
 {
     local_irq_disable();
-    wbinvd();
 
     /*
      * NOTE: After cpu_exit_clear, per-cpu variables are no longer accessible,
