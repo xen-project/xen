@@ -142,20 +142,15 @@ static int xc_try_bzip2_decode(
 
 static int _xc_try_lzma_decode(
     struct xc_dom_image *dom, void **blob, size_t *size,
-    lzma_stream *stream, lzma_ret ret, const char *what)
+    lzma_stream *stream, const char *what)
 {
+    lzma_ret ret;
     lzma_action action = LZMA_RUN;
     unsigned char *out_buf;
     unsigned char *tmp_buf;
     int retval = -1;
     int outsize;
     const char *msg;
-
-    if ( ret != LZMA_OK )
-    {
-        DOMPRINTF("%s: Failed to init decoder", what);
-        return -1;
-    }
 
     /* sigh.  We don't know up-front how much memory we are going to need
      * for the output buffer.  Allocate the output buffer to be equal
@@ -259,18 +254,28 @@ static int xc_try_xz_decode(
     struct xc_dom_image *dom, void **blob, size_t *size)
 {
     lzma_stream stream = LZMA_STREAM_INIT;
-    lzma_ret ret = lzma_stream_decoder(&stream, LZMA_BLOCK_SIZE, 0);
 
-    return _xc_try_lzma_decode(dom, blob, size, &stream, ret, "XZ");
+    if ( lzma_stream_decoder(&stream, LZMA_BLOCK_SIZE, 0) != LZMA_OK )
+    {
+        DOMPRINTF("XZ: Failed to init decoder");
+        return -1;
+    }
+
+    return _xc_try_lzma_decode(dom, blob, size, &stream, "XZ");
 }
 
 static int xc_try_lzma_decode(
     struct xc_dom_image *dom, void **blob, size_t *size)
 {
     lzma_stream stream = LZMA_STREAM_INIT;
-    lzma_ret ret = lzma_alone_decoder(&stream, LZMA_BLOCK_SIZE);
 
-    return _xc_try_lzma_decode(dom, blob, size, &stream, ret, "LZMA");
+    if ( lzma_alone_decoder(&stream, LZMA_BLOCK_SIZE) != LZMA_OK )
+    {
+        DOMPRINTF("LZMA: Failed to init decoder");
+        return -1;
+    }
+
+    return _xc_try_lzma_decode(dom, blob, size, &stream, "LZMA");
 }
 
 #else /* !defined(HAVE_LZMA) */
