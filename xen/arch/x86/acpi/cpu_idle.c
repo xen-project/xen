@@ -561,11 +561,14 @@ static void acpi_dead_idle(void)
     if ( (cx = &power->states[power->count-1]) == NULL )
         goto default_halt;
 
+    /*
+     * cache must be flashed as the last ops before cpu going into dead,
+     * otherwise, cpu may dead with dirty data breaking cache coherency,
+     * leading to strange errors.
+     */
+    wbinvd();
     for ( ; ; )
     {
-        if ( !power->flags.bm_check && cx->type == ACPI_STATE_C3 )
-            ACPI_FLUSH_CPU_CACHE();
-
         switch ( cx->entry_method )
         {
             case ACPI_CSTATE_EM_FFH:
@@ -579,6 +582,7 @@ static void acpi_dead_idle(void)
     }
 
 default_halt:
+    wbinvd();
     for ( ; ; )
         halt();
 }
