@@ -966,7 +966,6 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
             device.backend_kind = DEVICE_VBD;
             break;
         case DISK_BACKEND_TAP:
-        case DISK_BACKEND_QDISK: 
             if (libxl__blktap_enabled(&gc) && disk->format != DISK_FORMAT_EMPTY) {
                 const char *dev = libxl__blktap_devpath(&gc,
                                                disk->pdev_path, disk->format);
@@ -988,6 +987,7 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
 
                 break;
             }
+        case DISK_BACKEND_QDISK: 
             flexarray_append(back, "params");
             flexarray_append(back, libxl__sprintf(&gc, "%s:%s",
                           libxl__device_disk_string_of_format(disk->format), disk->pdev_path));
