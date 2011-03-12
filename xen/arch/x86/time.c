@@ -21,6 +21,7 @@
 #include <xen/smp.h>
 #include <xen/irq.h>
 #include <xen/softirq.h>
+#include <xen/symbols.h>
 #include <xen/keyhandler.h>
 #include <xen/guest_access.h>
 #include <asm/io.h>
@@ -374,10 +375,7 @@ static int __init init_hpet(struct platform_timesource *pts)
 
 static void resume_hpet(struct platform_timesource *pts)
 {
-    u64 hpet_rate = hpet_setup();
-
-    BUG_ON(hpet_rate == 0);
-    pts->frequency = hpet_rate;
+    hpet_resume();
 }
 
 static struct platform_timesource __initdata plt_hpet =
@@ -1440,10 +1438,12 @@ void __init early_time_init(void)
 }
 
 /* keep pit enabled for pit_broadcast working while cpuidle enabled */
-static int disable_pit_irq(void)
+static int _disable_pit_irq(void(*hpet_broadcast_setup)(void))
 {
+    int ret = 1;
+
     if ( using_pit || !cpu_has_apic )
-        return 0;
+        return -1;
 
     /*
      * If we do not rely on PIT CH0 then we can use HPET for one-shot timer 
@@ -1453,20 +1453,16 @@ static int disable_pit_irq(void)
      */
     if ( xen_cpuidle && !boot_cpu_has(X86_FEATURE_ARAT) )
     {
-        hpet_broadcast_init();
+        hpet_broadcast_setup();
         if ( !hpet_broadcast_is_available() )
         {
-            if ( xen_cpuidle == -1 )
+            if ( xen_cpuidle > 0 )
             {
-                xen_cpuidle = 0;
-                printk("CPUIDLE: disabled due to no HPET. "
-                       "Force enable with 'cpuidle'.\n");
+                print_symbol("%s() failed, turning to PIT broadcast\n",
+                             (unsigned long)hpet_broadcast_setup);
+                return -1;
             }
-            else
-            {
-                printk("HPET broadcast init failed, turn to PIT broadcast.\n");
-                return 0;
-            }
+            ret = 0;
         }
     }
 
@@ -1474,6 +1470,18 @@ static int disable_pit_irq(void)
     outb_p(0x30, PIT_MODE);
     outb_p(0, PIT_CH0);
     outb_p(0, PIT_CH0);
+
+    return ret;
+}
+
+static int __init disable_pit_irq(void)
+{
+    if ( !_disable_pit_irq(hpet_broadcast_init) )
+    {
+        xen_cpuidle = 0;
+        printk("CPUIDLE: disabled due to no HPET. "
+               "Force enable with 'cpuidle'.\n");
+    }
 
     return 0;
 }
@@ -1541,7 +1549,8 @@ int time_resume(void)
 
     resume_platform_timer();
 
-    disable_pit_irq();
+    if ( !_disable_pit_irq(hpet_broadcast_resume) )
+        BUG();
 
     init_percpu_time();
 
