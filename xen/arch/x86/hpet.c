@@ -567,8 +567,9 @@ void hpet_broadcast_init(void)
                                          1000000000ul, 32);
             hpet_events[i].shift = 32;
             hpet_events[i].next_event = STIME_MAX;
-            hpet_events[i].event_handler = handle_hpet_broadcast;
             spin_lock_init(&hpet_events[i].lock);
+            wmb();
+            hpet_events[i].event_handler = handle_hpet_broadcast;
         }
 
         if ( num_hpets_used < num_possible_cpus() )
@@ -605,10 +606,11 @@ void hpet_broadcast_init(void)
     legacy_hpet_event.mult = div_sc((unsigned long)hpet_rate, 1000000000ul, 32);
     legacy_hpet_event.shift = 32;
     legacy_hpet_event.next_event = STIME_MAX;
-    legacy_hpet_event.event_handler = handle_hpet_broadcast;
     legacy_hpet_event.idx = 0;
     legacy_hpet_event.flags = 0;
     spin_lock_init(&legacy_hpet_event.lock);
+    wmb();
+    legacy_hpet_event.event_handler = handle_hpet_broadcast;
 
     for_each_possible_cpu(i)
         per_cpu(cpu_bc_channel, i) = &legacy_hpet_event;
