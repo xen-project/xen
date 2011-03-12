@@ -597,9 +597,10 @@ void hpet_broadcast_init(void)
                                          1000000000ul, 32);
             hpet_events[i].shift = 32;
             hpet_events[i].next_event = STIME_MAX;
-            hpet_events[i].event_handler = handle_hpet_broadcast;
             spin_lock_init(&hpet_events[i].lock);
             rwlock_init(&hpet_events[i].cpumask_lock);
+            wmb();
+            hpet_events[i].event_handler = handle_hpet_broadcast;
         }
 
         return;
@@ -630,11 +631,12 @@ void hpet_broadcast_init(void)
     legacy_hpet_event.mult = div_sc((unsigned long)hpet_rate, 1000000000ul, 32);
     legacy_hpet_event.shift = 32;
     legacy_hpet_event.next_event = STIME_MAX;
-    legacy_hpet_event.event_handler = handle_hpet_broadcast;
     legacy_hpet_event.idx = 0;
     legacy_hpet_event.flags = 0;
     spin_lock_init(&legacy_hpet_event.lock);
     rwlock_init(&legacy_hpet_event.cpumask_lock);
+    wmb();
+    legacy_hpet_event.event_handler = handle_hpet_broadcast;
 
     if ( !force_hpet_broadcast )
         pv_rtc_handler = handle_rtc_once;
