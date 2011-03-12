@@ -21,8 +21,6 @@
 #define MAX_DELTA_NS MILLISECS(10*1000)
 #define MIN_DELTA_NS MICROSECS(20)
 
-#define MAX_HPET_NUM 32
-
 #define HPET_EVT_USED_BIT    0
 #define HPET_EVT_USED       (1 << HPET_EVT_USED_BIT)
 #define HPET_EVT_DISABLE_BIT 1
@@ -56,8 +54,7 @@ struct hpet_event_channel
     int irq;            /* msi irq */
     unsigned int flags; /* HPET_EVT_x */
 } __cacheline_aligned;
-static struct hpet_event_channel hpet_events[MAX_HPET_NUM] = 
-    { [0 ... MAX_HPET_NUM-1].irq = -1 };
+static struct hpet_event_channel *__read_mostly hpet_events;
 
 /* msi hpet channels used for broadcast */
 static unsigned int __read_mostly num_hpets_used;
@@ -426,6 +423,11 @@ static int __init hpet_fsb_cap_lookup(void)
     num_chs = ((id & HPET_ID_NUMBER) >> HPET_ID_NUMBER_SHIFT);
     num_chs++; /* Value read out starts from 0 */
 
+    hpet_events = xmalloc_array(struct hpet_event_channel, num_chs);
+    if ( !hpet_events )
+        return 0;
+    memset(hpet_events, 0, num_chs * sizeof(*hpet_events));
+
     num_chs_used = 0;
     for ( i = 0; i < num_chs; i++ )
     {
@@ -585,10 +587,16 @@ void __init hpet_broadcast_init(void)
         if ( !(hpet_id & HPET_ID_LEGSUP) )
             return;
 
+        if ( !hpet_events )
+            hpet_events = xmalloc(struct hpet_event_channel);
+        if ( !hpet_events )
+            return;
+        memset(hpet_events, 0, sizeof(*hpet_events));
+        hpet_events->irq = -1;
+
         /* Start HPET legacy interrupts */
         cfg |= HPET_CFG_LEGACY;
         n = 1;
-        hpet_events->idx = 0;
 
         if ( !force_hpet_broadcast )
             pv_rtc_handler = handle_rtc_once;
@@ -626,6 +634,9 @@ void hpet_broadcast_resume(void)
 {
     u32 cfg;
     unsigned int i, n;
+
+    if ( !hpet_events )
+        return;
 
     hpet_resume();
 
@@ -668,7 +679,7 @@ void hpet_disable_legacy_broadcast(void)
     u32 cfg;
     unsigned long flags;
 
-    if ( !(hpet_events->flags & HPET_EVT_LEGACY) )
+    if ( !hpet_events || !(hpet_events->flags & HPET_EVT_LEGACY) )
         return;
 
     spin_lock_irqsave(&hpet_events->lock, flags);
@@ -751,7 +762,7 @@ void hpet_broadcast_exit(void)
 
 int hpet_broadcast_is_available(void)
 {
-    return ((hpet_events->flags & HPET_EVT_LEGACY)
+    return ((hpet_events && (hpet_events->flags & HPET_EVT_LEGACY))
             || num_hpets_used > 0);
 }
 
@@ -759,7 +770,8 @@ int hpet_legacy_irq_tick(void)
 {
     this_cpu(irq_count)--;
 
-    if ( (hpet_events->flags & (HPET_EVT_DISABLE|HPET_EVT_LEGACY)) !=
+    if ( !hpet_events ||
+         (hpet_events->flags & (HPET_EVT_DISABLE|HPET_EVT_LEGACY)) !=
          HPET_EVT_LEGACY )
         return 0;
     hpet_events->event_handler(hpet_events);
