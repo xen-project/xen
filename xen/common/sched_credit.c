@@ -526,10 +526,9 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
         weight_cpu = cpus_weight(cpu_idlers);
         weight_nxt = cpus_weight(nxt_idlers);
         /* smt_power_savings: consolidate work rather than spreading it */
-        if ( ( sched_smt_power_savings
-               && (weight_cpu > weight_nxt) )
-             || ( !sched_smt_power_savings
-                  && (weight_cpu * migrate_factor < weight_nxt) ) )
+        if ( sched_smt_power_savings ?
+             weight_cpu > weight_nxt :
+             weight_cpu * migrate_factor < weight_nxt )
         {
             cpus_and(nxt_idlers, cpus, nxt_idlers);
             spc = CSCHED_PCPU(nxt);
