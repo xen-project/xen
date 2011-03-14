@@ -820,6 +820,11 @@ int arch_set_info_guest(
 
             v->arch.guest_table_user = pagetable_from_pfn(cr3_pfn);
         }
+        else if ( !(flags & VGCF_in_kernel) )
+        {
+            destroy_gdt(v);
+            return -EINVAL;
+        }
     }
     else
     {
