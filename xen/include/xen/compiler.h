@@ -14,6 +14,15 @@
 #define always_inline __inline__ __attribute__ ((always_inline))
 #define noinline      __attribute__((noinline))
 
+#ifdef INIT_SECTIONS_ONLY
+/*
+ * For sources indicated to have only init code, make sure even
+ * inline functions not expanded inline get placed in .init.text.
+ */
+#include <xen/init.h>
+#define __inline__ __inline__ __init
+#endif
+
 #define __attribute_pure__  __attribute__((pure))
 #define __attribute_const__ __attribute__((__const__))
 

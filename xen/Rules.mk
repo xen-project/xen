@@ -100,6 +100,8 @@ obj-y    := $(patsubst %/,%/built-in.o,$(obj-y))
 
 subdir-all := $(subdir-y) $(subdir-n)
 
+$(filter %.init.o,$(obj-y) $(obj-bin-y)): CFLAGS += -DINIT_SECTIONS_ONLY
+
 ifeq ($(lto),y)
 # Would like to handle all object files as bitcode, but objects made from
 # pure asm are in a different format and have to be collected separately.
@@ -158,8 +160,10 @@ SPECIAL_DATA_SECTIONS := rodata $(foreach n,1 2 4 8,rodata.str1.$(n)) \
 %.init.o: %.o Makefile
 	$(OBJDUMP) -h $< | sed -n '/[0-9]/{s,00*,0,g;p}' | while read idx name sz rest; do \
 		case "$$name" in \
-		.text|.data|.bss) test $$sz = 0 || \
-			{ echo "Error: size of $<:$$name is 0x$$sz" >&2; exit $$idx; };; \
+		.text|.text.*|.data|.data.*|.bss) \
+			test $$sz != 0 || continue; \
+			echo "Error: size of $<:$$name is 0x$$sz" >&2; \
+			exit $(shell expr $$idx + 1);; \
 		esac; \
 	done
 	$(OBJCOPY) $(foreach s,$(SPECIAL_DATA_SECTIONS),--rename-section .$(s)=.init.$(s)) $< $@
