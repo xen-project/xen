@@ -451,6 +451,7 @@ _csched_cpu_pick(struct vcpu *vc, bool_t commit)
              || ( !sched_smt_power_savings
                   && (weight_cpu * migrate_factor < weight_nxt) ) )
         {
+            cpus_and(nxt_idlers, cpus, nxt_idlers);
             cpu = cycle_cpu(CSCHED_PCPU(nxt)->idle_bias, nxt_idlers);
             if ( commit )
                CSCHED_PCPU(nxt)->idle_bias = cpu;
