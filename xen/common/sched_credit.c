@@ -464,6 +464,7 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
     cpumask_t cpus;
     cpumask_t idlers;
     cpumask_t *online;
+    struct csched_pcpu *spc = NULL;
     int cpu;
 
     /*
@@ -531,9 +532,8 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
                   && (weight_cpu * migrate_factor < weight_nxt) ) )
         {
             cpus_and(nxt_idlers, cpus, nxt_idlers);
-            cpu = cycle_cpu(CSCHED_PCPU(nxt)->idle_bias, nxt_idlers);
-            if ( commit )
-               CSCHED_PCPU(nxt)->idle_bias = cpu;
+            spc = CSCHED_PCPU(nxt);
+            cpu = cycle_cpu(spc->idle_bias, nxt_idlers);
             cpus_andnot(cpus, cpus, per_cpu(cpu_sibling_map, cpu));
         }
         else
@@ -541,6 +541,9 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
             cpus_andnot(cpus, cpus, nxt_idlers);
         }
     }
+
+    if ( commit && spc )
+       spc->idle_bias = cpu;
 
     return cpu;
 }
