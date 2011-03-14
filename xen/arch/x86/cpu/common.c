@@ -477,7 +477,7 @@ void __cpuinit detect_extended_topology(struct cpuinfo_x86 *c)
 {
 	unsigned int eax, ebx, ecx, edx, sub_index;
 	unsigned int ht_mask_width, core_plus_mask_width;
-	unsigned int core_select_mask, core_level_siblings, smp_num_siblings;
+	unsigned int core_select_mask, core_level_siblings;
 	unsigned int initial_apicid;
 	int cpu = smp_processor_id();
 
@@ -495,7 +495,7 @@ void __cpuinit detect_extended_topology(struct cpuinfo_x86 *c)
 	initial_apicid = edx;
 
 	/* Populate HT related information from sub-leaf level 0 */
-	core_level_siblings = smp_num_siblings = LEVEL_MAX_SIBLINGS(ebx);
+	core_level_siblings = c->x86_num_siblings = LEVEL_MAX_SIBLINGS(ebx);
 	core_plus_mask_width = ht_mask_width = BITS_SHIFT_NEXT_LEVEL(eax);
 
 	sub_index = 1;
@@ -519,7 +519,7 @@ void __cpuinit detect_extended_topology(struct cpuinfo_x86 *c)
 	phys_proc_id[cpu] = phys_pkg_id(initial_apicid, core_plus_mask_width);
 
 	c->apicid = phys_pkg_id(initial_apicid, 0);
-	c->x86_max_cores = (core_level_siblings / smp_num_siblings);
+	c->x86_max_cores = (core_level_siblings / c->x86_num_siblings);
 
 	if ( opt_cpu_info )
 	{
