@@ -428,10 +428,8 @@ static unsigned int __init hpet_fsb_cap_lookup(void)
         ch->flags = 0;
         ch->idx = i;
 
-        if ( (ch->irq = hpet_assign_irq(num_chs_used)) < 0 )
-            continue;
-
-        num_chs_used++;
+        if ( (ch->irq = hpet_assign_irq(num_chs_used++)) < 0 )
+            num_chs_used--;
     }
 
     printk(XENLOG_INFO "HPET: %u timers (%u will be used for broadcast)\n",
