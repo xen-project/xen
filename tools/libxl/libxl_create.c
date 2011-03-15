@@ -147,44 +147,43 @@ static int init_console_info(libxl_device_console *console, int dev_num, libxl_d
     return 0;
 }
 
-int libxl__domain_build(libxl_ctx *ctx, libxl_domain_build_info *info, uint32_t domid, libxl_domain_build_state *state)
+int libxl__domain_build(libxl__gc *gc, libxl_domain_build_info *info, uint32_t domid, libxl_domain_build_state *state)
 {
-    libxl__gc gc = LIBXL_INIT_GC(ctx);
     char **vments = NULL, **localents = NULL;
     struct timeval start_time;
     int i, ret;
 
-    ret = libxl__build_pre(ctx, domid, info, state);
+    ret = libxl__build_pre(gc, domid, info, state);
     if (ret)
         goto out;
 
     gettimeofday(&start_time, NULL);
 
     if (info->hvm) {
-        ret = libxl__build_hvm(ctx, domid, info, state);
+        ret = libxl__build_hvm(gc, domid, info, state);
         if (ret)
             goto out;
 
-        vments = libxl__calloc(&gc, 7, sizeof(char *));
+        vments = libxl__calloc(gc, 7, sizeof(char *));
         vments[0] = "rtc/timeoffset";
         vments[1] = (info->u.hvm.timeoffset) ? info->u.hvm.timeoffset : "";
         vments[2] = "image/ostype";
         vments[3] = "hvm";
         vments[4] = "start_time";
-        vments[5] = libxl__sprintf(&gc, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
+        vments[5] = libxl__sprintf(gc, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
     } else {
-        ret = libxl__build_pv(ctx, domid, info, state);
+        ret = libxl__build_pv(gc, domid, info, state);
         if (ret)
             goto out;
 
-        vments = libxl__calloc(&gc, 11, sizeof(char *));
+        vments = libxl__calloc(gc, 11, sizeof(char *));
         i = 0;
         vments[i++] = "image/ostype";
         vments[i++] = "linux";
         vments[i++] = "image/kernel";
         vments[i++] = (char*) info->kernel.path;
         vments[i++] = "start_time";
-        vments[i++] = libxl__sprintf(&gc, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
+        vments[i++] = libxl__sprintf(gc, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
         if (info->u.pv.ramdisk.path) {
             vments[i++] = "image/ramdisk";
             vments[i++] = (char*) info->u.pv.ramdisk.path;
@@ -194,49 +193,47 @@ int libxl__domain_build(libxl_ctx *ctx, libxl_domain_build_info *info, uint32_t 
             vments[i++] = (char*) info->u.pv.cmdline;
         }
     }
-    ret = libxl__build_post(ctx, domid, info, state, vments, localents);
+    ret = libxl__build_post(gc, domid, info, state, vments, localents);
 out:
-
-    libxl__free_all(&gc);
     return ret;
 }
 
-static int domain_restore(libxl_ctx *ctx, libxl_domain_build_info *info,
-                         uint32_t domid, int fd, libxl_domain_build_state *state,
-                         libxl_device_model_info *dm_info)
+static int domain_restore(libxl__gc *gc, libxl_domain_build_info *info,
+                          uint32_t domid, int fd, libxl_domain_build_state *state,
+                          libxl_device_model_info *dm_info)
 {
-    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    libxl_ctx *ctx = libxl__gc_owner(gc);
     char **vments = NULL, **localents = NULL;
     struct timeval start_time;
     int i, ret, esave, flags;
 
-    ret = libxl__build_pre(ctx, domid, info, state);
+    ret = libxl__build_pre(gc, domid, info, state);
     if (ret)
         goto out;
 
-    ret = libxl__domain_restore_common(ctx, domid, info, state, fd);
+    ret = libxl__domain_restore_common(gc, domid, info, state, fd);
     if (ret)
         goto out;
 
     gettimeofday(&start_time, NULL);
 
     if (info->hvm) {
-        vments = libxl__calloc(&gc, 7, sizeof(char *));
+        vments = libxl__calloc(gc, 7, sizeof(char *));
         vments[0] = "rtc/timeoffset";
         vments[1] = (info->u.hvm.timeoffset) ? info->u.hvm.timeoffset : "";
         vments[2] = "image/ostype";
         vments[3] = "hvm";
         vments[4] = "start_time";
-        vments[5] = libxl__sprintf(&gc, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
+        vments[5] = libxl__sprintf(gc, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
     } else {
-        vments = libxl__calloc(&gc, 11, sizeof(char *));
+        vments = libxl__calloc(gc, 11, sizeof(char *));
         i = 0;
         vments[i++] = "image/ostype";
         vments[i++] = "linux";
         vments[i++] = "image/kernel";
         vments[i++] = (char*) info->kernel.path;
         vments[i++] = "start_time";
-        vments[i++] = libxl__sprintf(&gc, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
+        vments[i++] = libxl__sprintf(gc, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
         if (info->u.pv.ramdisk.path) {
             vments[i++] = "image/ramdisk";
             vments[i++] = (char*) info->u.pv.ramdisk.path;
@@ -246,7 +243,7 @@ static int domain_restore(libxl_ctx *ctx, libxl_domain_build_info *info,
             vments[i++] = (char*) info->u.pv.cmdline;
         }
     }
-    ret = libxl__build_post(ctx, domid, info, state, vments, localents);
+    ret = libxl__build_post(gc, domid, info, state, vments, localents);
     if (ret)
         goto out;
 
@@ -275,16 +272,15 @@ out:
     }
 
     errno = esave;
-    libxl__free_all(&gc);
     return ret;
 }
 
-int libxl__domain_make(libxl_ctx *ctx, libxl_domain_create_info *info,
+int libxl__domain_make(libxl__gc *gc, libxl_domain_create_info *info,
                        uint32_t *domid)
  /* on entry, libxl_domid_valid_guest(domid) must be false;
   * on exit (even error exit), domid may be valid and refer to a domain */
 {
-    libxl__gc gc = LIBXL_INIT_GC(ctx); /* fixme: should be done by caller */
+    libxl_ctx *ctx = libxl__gc_owner(gc);
     int flags, ret, i, rc;
     char *uuid_string;
     char *rw_paths[] = { "control/shutdown", "device", "device/suspend/event-channel" , "data"};
@@ -298,7 +294,7 @@ int libxl__domain_make(libxl_ctx *ctx, libxl_domain_create_info *info,
 
     assert(!libxl_domid_valid_guest(*domid));
 
-    uuid_string = libxl__uuid2string(&gc, info->uuid);
+    uuid_string = libxl__uuid2string(gc, info->uuid);
     if (!uuid_string) {
         rc = ERROR_NOMEM;
         goto out;
@@ -326,13 +322,13 @@ int libxl__domain_make(libxl_ctx *ctx, libxl_domain_create_info *info,
         goto out;
     }
 
-    dom_path = libxl__xs_get_dompath(&gc, *domid);
+    dom_path = libxl__xs_get_dompath(gc, *domid);
     if (!dom_path) {
         rc = ERROR_FAIL;
         goto out;
     }
 
-    vm_path = libxl__sprintf(&gc, "/vm/%s", uuid_string);
+    vm_path = libxl__sprintf(gc, "/vm/%s", uuid_string);
     if (!vm_path) {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "cannot allocate create paths");
         rc = ERROR_FAIL;
@@ -357,31 +353,31 @@ retry_transaction:
     xs_mkdir(ctx->xsh, t, vm_path);
     xs_set_permissions(ctx->xsh, t, vm_path, roperm, ARRAY_SIZE(roperm));
 
-    xs_write(ctx->xsh, t, libxl__sprintf(&gc, "%s/vm", dom_path), vm_path, strlen(vm_path));
+    xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/vm", dom_path), vm_path, strlen(vm_path));
     rc = libxl_domain_rename(ctx, *domid, 0, info->name, t);
     if (rc)
         goto out;
 
     for (i = 0; i < ARRAY_SIZE(rw_paths); i++) {
-        char *path = libxl__sprintf(&gc, "%s/%s", dom_path, rw_paths[i]);
+        char *path = libxl__sprintf(gc, "%s/%s", dom_path, rw_paths[i]);
         xs_mkdir(ctx->xsh, t, path);
         xs_set_permissions(ctx->xsh, t, path, rwperm, ARRAY_SIZE(rwperm));
     }
     for (i = 0; i < ARRAY_SIZE(ro_paths); i++) {
-        char *path = libxl__sprintf(&gc, "%s/%s", dom_path, ro_paths[i]);
+        char *path = libxl__sprintf(gc, "%s/%s", dom_path, ro_paths[i]);
         xs_mkdir(ctx->xsh, t, path);
         xs_set_permissions(ctx->xsh, t, path, roperm, ARRAY_SIZE(roperm));
     }
 
-    xs_write(ctx->xsh, t, libxl__sprintf(&gc, "%s/uuid", vm_path), uuid_string, strlen(uuid_string));
-    xs_write(ctx->xsh, t, libxl__sprintf(&gc, "%s/name", vm_path), info->name, strlen(info->name));
+    xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/uuid", vm_path), uuid_string, strlen(uuid_string));
+    xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/name", vm_path), info->name, strlen(info->name));
     if (info->poolname)
-        xs_write(ctx->xsh, t, libxl__sprintf(&gc, "%s/pool_name", vm_path), info->poolname, strlen(info->poolname));
+        xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/pool_name", vm_path), info->poolname, strlen(info->poolname));
 
-    libxl__xs_writev(&gc, t, dom_path, info->xsdata);
-    libxl__xs_writev(&gc, t, libxl__sprintf(&gc, "%s/platform", dom_path), info->platformdata);
+    libxl__xs_writev(gc, t, dom_path, info->xsdata);
+    libxl__xs_writev(gc, t, libxl__sprintf(gc, "%s/platform", dom_path), info->platformdata);
 
-    xs_write(ctx->xsh, t, libxl__sprintf(&gc, "%s/control/platform-feature-multiprocessor-suspend", dom_path), "1", 1);
+    xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/control/platform-feature-multiprocessor-suspend", dom_path), "1", 1);
     if (!xs_transaction_end(ctx->xsh, t, 0)) {
         if (errno == EAGAIN) {
             t = 0;
@@ -397,14 +393,14 @@ retry_transaction:
     rc = 0;
  out:
     if (t) xs_transaction_end(ctx->xsh, t, 1);
-    libxl__free_all(&gc); /* fixme: should be done by caller */
     return rc;
 }
 
-static int do_domain_create(libxl_ctx *ctx, libxl_domain_config *d_config,
+static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
                             libxl_console_ready cb, void *priv,
                             uint32_t *domid_out, int restore_fd)
 {
+    libxl_ctx *ctx = libxl__gc_owner(gc);
     libxl__device_model_starting *dm_starting = 0;
     libxl_device_model_info *dm_info = &d_config->dm_info;
     libxl_domain_build_state state;
@@ -413,7 +409,7 @@ static int do_domain_create(libxl_ctx *ctx, libxl_domain_config *d_config,
 
     domid = 0;
 
-    ret = libxl__domain_make(ctx, &d_config->c_info, &domid);
+    ret = libxl__domain_make(gc, &d_config->c_info, &domid);
     if (ret) {
         fprintf(stderr, "cannot make domain: %d\n", ret);
         ret = ERROR_FAIL;
@@ -434,13 +430,13 @@ static int do_domain_create(libxl_ctx *ctx, libxl_domain_config *d_config,
     }
 
     if ( restore_fd >= 0 ) {
-        ret = domain_restore(ctx, &d_config->b_info, domid, restore_fd, &state, dm_info);
+        ret = domain_restore(gc, &d_config->b_info, domid, restore_fd, &state, dm_info);
     } else {
         if (dm_info->saved_state) {
             free(dm_info->saved_state);
             dm_info->saved_state = NULL;
         }
-        ret = libxl__domain_build(ctx, &d_config->b_info, domid, &state);
+        ret = libxl__domain_build(gc, &d_config->b_info, domid, &state);
     }
 
     if (ret) {
@@ -489,7 +485,7 @@ static int do_domain_create(libxl_ctx *ctx, libxl_domain_config *d_config,
         libxl_device_console_destroy(&console);
 
         dm_info->domid = domid;
-        ret = libxl__create_device_model(ctx, dm_info,
+        ret = libxl__create_device_model(gc, dm_info,
                                         d_config->disks, d_config->num_disks,
                                         d_config->vifs, d_config->num_vifs,
                                         &dm_starting);
@@ -514,7 +510,7 @@ static int do_domain_create(libxl_ctx *ctx, libxl_domain_config *d_config,
             goto error_out;
         console.domid = domid;
 
-        need_qemu = libxl__need_xenpv_qemu(ctx, 1, &console,
+        need_qemu = libxl__need_xenpv_qemu(gc, 1, &console,
                 d_config->num_vfbs, d_config->vfbs,
                 d_config->num_disks, &d_config->disks[0]);
 
@@ -525,11 +521,11 @@ static int do_domain_create(libxl_ctx *ctx, libxl_domain_config *d_config,
         libxl_device_console_destroy(&console);
 
         if (need_qemu)
-            libxl__create_xenpv_qemu(ctx, domid, d_config->vfbs, &dm_starting);
+            libxl__create_xenpv_qemu(gc, domid, d_config->vfbs, &dm_starting);
     }
 
     if (dm_starting) {
-        ret = libxl__confirm_device_model_startup(ctx, dm_starting);
+        ret = libxl__confirm_device_model_startup(gc, dm_starting);
         if (ret < 0) {
             fprintf(stderr,"xl: fatal error: %s:%d, rc=%d: libxl__confirm_device_model_startup\n",
                     __FILE__,__LINE__, ret);
@@ -538,7 +534,7 @@ static int do_domain_create(libxl_ctx *ctx, libxl_domain_config *d_config,
     }
 
     for (i = 0; i < d_config->num_pcidevs; i++)
-        libxl__device_pci_add(ctx, domid, &d_config->pcidevs[i], 1);
+        libxl__device_pci_add(gc, domid, &d_config->pcidevs[i], 1);
 
     if ( cb && (d_config->c_info.hvm || d_config->b_info.u.pv.bootloader )) {
         if ( (*cb)(ctx, domid, priv) )
@@ -554,14 +550,23 @@ error_out:
 
     return ret;
 }
+
 int libxl_domain_create_new(libxl_ctx *ctx, libxl_domain_config *d_config,
                             libxl_console_ready cb, void *priv, uint32_t *domid)
 {
-    return do_domain_create(ctx, d_config, cb, priv, domid, -1);
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    int rc;
+    rc = do_domain_create(&gc, d_config, cb, priv, domid, -1);
+    libxl__free_all(&gc);
+    return rc;
 }
 
 int libxl_domain_create_restore(libxl_ctx *ctx, libxl_domain_config *d_config,
                                 libxl_console_ready cb, void *priv, uint32_t *domid, int restore_fd)
 {
-    return do_domain_create(ctx, d_config, cb, priv, domid, restore_fd);
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    int rc;
+    rc = do_domain_create(&gc, d_config, cb, priv, domid, restore_fd);
+    libxl__free_all(&gc);
+    return rc;
 }

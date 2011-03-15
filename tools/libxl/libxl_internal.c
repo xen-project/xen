@@ -29,7 +29,7 @@
 #include "libxl_internal.h"
 #include "libxl_utils.h"
 
-int libxl__error_set(libxl_ctx *ctx, int code)
+int libxl__error_set(libxl__gc *gc, int code)
 {
     return 0;
 }
@@ -82,7 +82,7 @@ void *libxl__zalloc(libxl__gc *gc, int bytes)
 {
     void *ptr = calloc(bytes, 1);
     if (!ptr) {
-        libxl__error_set(libxl__gc_owner(gc), ENOMEM);
+        libxl__error_set(gc, ENOMEM);
         return NULL;
     }
 
@@ -94,7 +94,7 @@ void *libxl__calloc(libxl__gc *gc, size_t nmemb, size_t size)
 {
     void *ptr = calloc(nmemb, size);
     if (!ptr) {
-        libxl__error_set(libxl__gc_owner(gc), ENOMEM);
+        libxl__error_set(gc, ENOMEM);
         return NULL;
     }
 

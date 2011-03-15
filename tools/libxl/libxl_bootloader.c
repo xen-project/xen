@@ -271,7 +271,7 @@ out_err:
     return NULL;
 }
 
-static void parse_bootloader_result(libxl_ctx *ctx,
+static void parse_bootloader_result(libxl__gc *gc,
                                     libxl_domain_build_info *info,
                                     const char *o)
 {
@@ -414,7 +414,7 @@ int libxl_run_bootloader(libxl_ctx *ctx,
         goto out_close;
     }
 
-    parse_bootloader_result(ctx, info, blout);
+    parse_bootloader_result(&gc, info, blout);
 
     rc = 0;
 out_close:

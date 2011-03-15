@@ -35,8 +35,9 @@
 #include "libxl.h"
 #include "libxl_internal.h"
 
-int libxl__domain_is_hvm(libxl_ctx *ctx, uint32_t domid)
+int libxl__domain_is_hvm(libxl__gc *gc, uint32_t domid)
 {
+    libxl_ctx *ctx = libxl__gc_owner(gc);
     xc_domaininfo_t info;
     int ret;
 
@@ -48,8 +49,9 @@ int libxl__domain_is_hvm(libxl_ctx *ctx, uint32_t domid)
     return !!(info.flags & XEN_DOMINF_hvm_guest);
 }
 
-int libxl__domain_shutdown_reason(libxl_ctx *ctx, uint32_t domid)
+int libxl__domain_shutdown_reason(libxl__gc *gc, uint32_t domid)
 {
+    libxl_ctx *ctx = libxl__gc_owner(gc);
     xc_domaininfo_t info;
     int ret;
 
@@ -64,9 +66,10 @@ int libxl__domain_shutdown_reason(libxl_ctx *ctx, uint32_t domid)
     return (info.flags >> XEN_DOMINF_shutdownshift) & XEN_DOMINF_shutdownmask;
 }
 
-int libxl__build_pre(libxl_ctx *ctx, uint32_t domid,
+int libxl__build_pre(libxl__gc *gc, uint32_t domid,
               libxl_domain_build_info *info, libxl_domain_build_state *state)
 {
+    libxl_ctx *ctx = libxl__gc_owner(gc);
     xc_domain_max_vcpus(ctx->xch, domid, info->max_vcpus);
     xc_domain_setmaxmem(ctx->xch, domid, info->target_memkb + LIBXL_MAXMEM_CONSTANT);
     xc_domain_set_memmap_limit(ctx->xch, domid, 
@@ -87,11 +90,11 @@ int libxl__build_pre(libxl_ctx *ctx, uint32_t domid,
     return 0;
 }
 
-int libxl__build_post(libxl_ctx *ctx, uint32_t domid,
+int libxl__build_post(libxl__gc *gc, uint32_t domid,
                libxl_domain_build_info *info, libxl_domain_build_state *state,
                char **vms_ents, char **local_ents)
 {
-    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    libxl_ctx *ctx = libxl__gc_owner(gc);
     char *dom_path, *vm_path;
     xs_transaction_t t;
     char **ents;
@@ -101,51 +104,50 @@ int libxl__build_post(libxl_ctx *ctx, uint32_t domid,
     if (info->cpuid != NULL)
         libxl_cpuid_set(ctx, domid, info->cpuid);
 
-    ents = libxl__calloc(&gc, 12 + (info->max_vcpus * 2) + 2, sizeof(char *));
+    ents = libxl__calloc(gc, 12 + (info->max_vcpus * 2) + 2, sizeof(char *));
     ents[0] = "memory/static-max";
-    ents[1] = libxl__sprintf(&gc, "%d", info->max_memkb);
+    ents[1] = libxl__sprintf(gc, "%d", info->max_memkb);
     ents[2] = "memory/target";
-    ents[3] = libxl__sprintf(&gc, "%d", info->target_memkb - info->video_memkb);
+    ents[3] = libxl__sprintf(gc, "%d", info->target_memkb - info->video_memkb);
     ents[4] = "memory/videoram";
-    ents[5] = libxl__sprintf(&gc, "%d", info->video_memkb);
+    ents[5] = libxl__sprintf(gc, "%d", info->video_memkb);
     ents[6] = "domid";
-    ents[7] = libxl__sprintf(&gc, "%d", domid);
+    ents[7] = libxl__sprintf(gc, "%d", domid);
     ents[8] = "store/port";
-    ents[9] = libxl__sprintf(&gc, "%"PRIu32, state->store_port);
+    ents[9] = libxl__sprintf(gc, "%"PRIu32, state->store_port);
     ents[10] = "store/ring-ref";
-    ents[11] = libxl__sprintf(&gc, "%lu", state->store_mfn);
+    ents[11] = libxl__sprintf(gc, "%lu", state->store_mfn);
     for (i = 0; i < info->max_vcpus; i++) {
-        ents[12+(i*2)]   = libxl__sprintf(&gc, "cpu/%d/availability", i);
+        ents[12+(i*2)]   = libxl__sprintf(gc, "cpu/%d/availability", i);
         ents[12+(i*2)+1] = (i && info->cur_vcpus && !(info->cur_vcpus & (1 << i)))
                             ? "offline" : "online";
     }
 
-    dom_path = libxl__xs_get_dompath(&gc, domid);
+    dom_path = libxl__xs_get_dompath(gc, domid);
     if (!dom_path) {
-        libxl__free_all(&gc);
         return ERROR_FAIL;
     }
 
-    vm_path = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(&gc, "%s/vm", dom_path), NULL);
+    vm_path = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(gc, "%s/vm", dom_path), NULL);
 retry_transaction:
     t = xs_transaction_start(ctx->xsh);
 
-    libxl__xs_writev(&gc, t, dom_path, ents);
-    libxl__xs_writev(&gc, t, dom_path, local_ents);
-    libxl__xs_writev(&gc, t, vm_path, vms_ents);
+    libxl__xs_writev(gc, t, dom_path, ents);
+    libxl__xs_writev(gc, t, dom_path, local_ents);
+    libxl__xs_writev(gc, t, vm_path, vms_ents);
 
     if (!xs_transaction_end(ctx->xsh, t, 0))
         if (errno == EAGAIN)
             goto retry_transaction;
     xs_introduce_domain(ctx->xsh, domid, state->store_mfn, state->store_port);
     free(vm_path);
-    libxl__free_all(&gc);
     return 0;
 }
 
-int libxl__build_pv(libxl_ctx *ctx, uint32_t domid,
+int libxl__build_pv(libxl__gc *gc, uint32_t domid,
              libxl_domain_build_info *info, libxl_domain_build_state *state)
 {
+    libxl_ctx *ctx = libxl__gc_owner(gc);
     struct xc_dom_image *dom;
     int ret;
     int flags = 0;
@@ -261,10 +263,10 @@ static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
     return 0;
 }
 
-int libxl__build_hvm(libxl_ctx *ctx, uint32_t domid,
+int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
               libxl_domain_build_info *info, libxl_domain_build_state *state)
 {
-    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    libxl_ctx *ctx = libxl__gc_owner(gc);
     int ret, rc = ERROR_INVAL;
 
     if (info->kernel.mapped) {
@@ -278,7 +280,7 @@ int libxl__build_hvm(libxl_ctx *ctx, uint32_t domid,
         domid,
         (info->max_memkb - info->video_memkb) / 1024,
         (info->target_memkb - info->video_memkb) / 1024,
-        libxl__abs_path(&gc, (char *)info->kernel.path,
+        libxl__abs_path(gc, (char *)info->kernel.path,
                        libxl_xenfirmwaredir_path()));
     if (ret) {
         LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, ret, "hvm building failed");
@@ -292,14 +294,14 @@ int libxl__build_hvm(libxl_ctx *ctx, uint32_t domid,
     }
     rc = 0;
 out:
-    libxl__free_all(&gc);
     return 0;
 }
 
-int libxl__domain_restore_common(libxl_ctx *ctx, uint32_t domid,
+int libxl__domain_restore_common(libxl__gc *gc, uint32_t domid,
                    libxl_domain_build_info *info, libxl_domain_build_state *state,
                    int fd)
 {
+    libxl_ctx *ctx = libxl__gc_owner(gc);
     /* read signature */
     int rc;
     rc = xc_domain_restore(ctx->xch, fd, domid,
@@ -459,10 +461,10 @@ static int libxl__domain_suspend_common_callback(void *data)
     return 0;
 }
 
-int libxl__domain_suspend_common(libxl_ctx *ctx, uint32_t domid, int fd,
+int libxl__domain_suspend_common(libxl__gc *gc, uint32_t domid, int fd,
 		int hvm, int live, int debug)
 {
-    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    libxl_ctx *ctx = libxl__gc_owner(gc);
     int flags;
     int port;
     struct save_callbacks callbacks;
@@ -476,7 +478,7 @@ int libxl__domain_suspend_common(libxl_ctx *ctx, uint32_t domid, int fd,
     si.domid = domid;
     si.flags = flags;
     si.hvm = hvm;
-    si.gc = &gc;
+    si.gc = gc;
     si.suspend_eventchn = -1;
     si.guest_responded = 0;
 
@@ -518,27 +520,25 @@ int libxl__domain_suspend_common(libxl_ctx *ctx, uint32_t domid, int fd,
         xc_evtchn_close(si.xce);
 
 out:
-    libxl__free_all(&gc);
     return rc;
 }
 
-int libxl__domain_save_device_model(libxl_ctx *ctx, uint32_t domid, int fd)
+int libxl__domain_save_device_model(libxl__gc *gc, uint32_t domid, int fd)
 {
-    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    libxl_ctx *ctx = libxl__gc_owner(gc);
     int fd2, c;
     char buf[1024];
-    char *filename = libxl__sprintf(&gc, "/var/lib/xen/qemu-save.%d", domid);
+    char *filename = libxl__sprintf(gc, "/var/lib/xen/qemu-save.%d", domid);
     struct stat st;
     uint32_t qemu_state_len;
 
     LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Saving device model state to %s", filename);
-    libxl__xs_write(&gc, XBT_NULL, libxl__sprintf(&gc, "/local/domain/0/device-model/%d/command", domid), "save");
-    libxl__wait_for_device_model(ctx, domid, "paused", NULL, NULL);
+    libxl__xs_write(gc, XBT_NULL, libxl__sprintf(gc, "/local/domain/0/device-model/%d/command", domid), "save");
+    libxl__wait_for_device_model(gc, domid, "paused", NULL, NULL);
 
     if (stat(filename, &st) < 0)
     {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Unable to stat qemu save file\n");
-        libxl__free_all(&gc);
         return ERROR_FAIL;
     }
 
@@ -547,36 +547,28 @@ int libxl__domain_save_device_model(libxl_ctx *ctx, uint32_t domid, int fd)
 
     c = libxl_write_exactly(ctx, fd, QEMU_SIGNATURE, strlen(QEMU_SIGNATURE),
                             "saved-state file", "qemu signature");
-    if (c) {
-        libxl__free_all(&gc);
+    if (c)
         return c;
-    }
 
     c = libxl_write_exactly(ctx, fd, &qemu_state_len, sizeof(qemu_state_len),
                             "saved-state file", "saved-state length");
-    if (c) {
-        libxl__free_all(&gc);
+    if (c)
         return c;
-    }
 
     fd2 = open(filename, O_RDONLY);
     while ((c = read(fd2, buf, sizeof(buf))) != 0) {
         if (c < 0) {
             if (errno == EINTR)
                 continue;
-            libxl__free_all(&gc);
             return errno;
         }
         c = libxl_write_exactly(
             ctx, fd, buf, c, "saved-state file", "qemu state");
-        if (c) {
-            libxl__free_all(&gc);
+        if (c)
             return c;
-        }
     }
     close(fd2);
     unlink(filename);
-    libxl__free_all(&gc);
     return 0;
 }
 
@@ -614,7 +606,9 @@ static const char *userdata_path(libxl__gc *gc, uint32_t domid,
     return path;
 }
 
-static int userdata_delete(libxl_ctx *ctx, const char *path) {
+static int userdata_delete(libxl__gc *gc, const char *path)
+{
+    libxl_ctx *ctx = libxl__gc_owner(gc);
     int r;
     r = unlink(path);
     if (r) {
@@ -624,14 +618,14 @@ static int userdata_delete(libxl_ctx *ctx, const char *path) {
     return 0;
 }
 
-void libxl__userdata_destroyall(libxl_ctx *ctx, uint32_t domid)
+void libxl__userdata_destroyall(libxl__gc *gc, uint32_t domid)
 {
-    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    libxl_ctx *ctx = libxl__gc_owner(gc);
     const char *pattern;
     glob_t gl;
     int r, i;
 
-    pattern = userdata_path(&gc, domid, "*", "?");
+    pattern = userdata_path(gc, domid, "*", "?");
     if (!pattern)
         goto out;
 
@@ -645,11 +639,11 @@ void libxl__userdata_destroyall(libxl_ctx *ctx, uint32_t domid)
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "glob failed for %s", pattern);
 
     for (i=0; i<gl.gl_pathc; i++) {
-        userdata_delete(ctx, gl.gl_pathv[i]);
+        userdata_delete(gc, gl.gl_pathv[i]);
     }
     globfree(&gl);
 out:
-    libxl__free_all(&gc);
+    return;
 }
 
 int libxl_userdata_store(libxl_ctx *ctx, uint32_t domid,
@@ -671,7 +665,7 @@ int libxl_userdata_store(libxl_ctx *ctx, uint32_t domid,
     }
 
     if (!datalen) {
-        rc = userdata_delete(ctx, filename);
+        rc = userdata_delete(&gc, filename);
         goto out;
     }
 

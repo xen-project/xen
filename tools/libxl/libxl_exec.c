@@ -91,12 +91,13 @@ void libxl_report_child_exitstatus(libxl_ctx *ctx,
     }
 }
 
-int libxl__spawn_spawn(libxl_ctx *ctx,
+int libxl__spawn_spawn(libxl__gc *gc,
                       libxl__device_model_starting *starting,
                       const char *what,
                       void (*intermediate_hook)(void *for_spawn,
                                                 pid_t innerchild))
 {
+    libxl_ctx *ctx = libxl__gc_owner(gc);
     pid_t child, got;
     int status;
     pid_t intermediate;
@@ -138,11 +139,12 @@ int libxl__spawn_spawn(libxl_ctx *ctx,
           ? WTERMSIG(status)+128 : -1);
 }
 
-static void report_spawn_intermediate_status(libxl_ctx *ctx,
-                                 libxl__spawn_starting *for_spawn,
-                                 int status)
+static void report_spawn_intermediate_status(libxl__gc *gc,
+                                             libxl__spawn_starting *for_spawn,
+                                             int status)
 {
     if (!WIFEXITED(status)) {
+        libxl_ctx *ctx = libxl__gc_owner(gc);
         char *intermediate_what;
         /* intermediate process did the logging itself if it exited */
         if ( asprintf(&intermediate_what,
@@ -154,9 +156,10 @@ static void report_spawn_intermediate_status(libxl_ctx *ctx,
     }
 }
 
-int libxl__spawn_detach(libxl_ctx *ctx,
+int libxl__spawn_detach(libxl__gc *gc,
                        libxl__spawn_starting *for_spawn)
 {
+    libxl_ctx *ctx = libxl__gc_owner(gc);
     int r, status;
     pid_t got;
     int rc = 0;
@@ -175,7 +178,7 @@ int libxl__spawn_detach(libxl_ctx *ctx,
         got = call_waitpid(ctx->waitpid_instead, for_spawn->intermediate, &status, 0);
         assert(got == for_spawn->intermediate);
         if (!(WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL)) {
-            report_spawn_intermediate_status(ctx, for_spawn, status);
+            report_spawn_intermediate_status(gc, for_spawn, status);
             rc = ERROR_FAIL;
         }
         for_spawn->intermediate = 0;
@@ -187,8 +190,9 @@ int libxl__spawn_detach(libxl_ctx *ctx,
     return rc;
 }
 
-int libxl__spawn_check(libxl_ctx *ctx, void *for_spawn_void)
+int libxl__spawn_check(libxl__gc *gc, void *for_spawn_void)
 {
+    libxl_ctx *ctx = libxl__gc_owner(gc);
     libxl__spawn_starting *for_spawn = for_spawn_void;
     pid_t got;
     int status;
@@ -200,7 +204,7 @@ int libxl__spawn_check(libxl_ctx *ctx, void *for_spawn_void)
     if (!got) return 0;
 
     assert(got == for_spawn->intermediate);
-    report_spawn_intermediate_status(ctx, for_spawn, status);
+    report_spawn_intermediate_status(gc, for_spawn, status);
 
     for_spawn->intermediate = 0;
     return ERROR_FAIL;

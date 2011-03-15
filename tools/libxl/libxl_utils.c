@@ -223,7 +223,9 @@ out:
     return ret;
 }
 
-static int logrename(libxl_ctx *ctx, const char *old, const char *new) {
+static int logrename(libxl__gc *gc, const char *old, const char *new)
+{
+    libxl_ctx *ctx = libxl__gc_owner(gc);
     int r;
 
     r = rename(old, new);
@@ -252,14 +254,14 @@ int libxl_create_logfile(libxl_ctx *ctx, char *name, char **full_name)
         for (i = 9; i > 0; i--) {
             logfile = libxl__sprintf(&gc, "/var/log/xen/%s.log.%d", name, i);
             logfile_new = libxl__sprintf(&gc, "/var/log/xen/%s.log.%d", name, i + 1);
-            rc = logrename(ctx, logfile, logfile_new);
+            rc = logrename(&gc, logfile, logfile_new);
             if (rc)
                 goto out;
         }
         logfile = libxl__sprintf(&gc, "/var/log/xen/%s.log", name);
         logfile_new = libxl__sprintf(&gc, "/var/log/xen/%s.log.1", name);
 
-        rc = logrename(ctx, logfile, logfile_new);
+        rc = logrename(&gc, logfile, logfile_new);
         if (rc)
             goto out;
     } else {

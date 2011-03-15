@@ -157,25 +157,25 @@ _hidden char **libxl__xs_directory(libxl__gc *gc, xs_transaction_t t,
    /* On error: returns NULL, sets errno (no logging) */
 
 /* from xl_dom */
-_hidden int libxl__domain_is_hvm(libxl_ctx *ctx, uint32_t domid);
-_hidden int libxl__domain_shutdown_reason(libxl_ctx *ctx, uint32_t domid);
+_hidden int libxl__domain_is_hvm(libxl__gc *gc, uint32_t domid);
+_hidden int libxl__domain_shutdown_reason(libxl__gc *gc, uint32_t domid);
 
-_hidden int libxl__build_pre(libxl_ctx *ctx, uint32_t domid,
+_hidden int libxl__build_pre(libxl__gc *gc, uint32_t domid,
               libxl_domain_build_info *info, libxl_domain_build_state *state);
-_hidden int libxl__build_post(libxl_ctx *ctx, uint32_t domid,
+_hidden int libxl__build_post(libxl__gc *gc, uint32_t domid,
                libxl_domain_build_info *info, libxl_domain_build_state *state,
                char **vms_ents, char **local_ents);
 
-_hidden int libxl__build_pv(libxl_ctx *ctx, uint32_t domid,
+_hidden int libxl__build_pv(libxl__gc *gc, uint32_t domid,
              libxl_domain_build_info *info, libxl_domain_build_state *state);
-_hidden int libxl__build_hvm(libxl_ctx *ctx, uint32_t domid,
+_hidden int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
               libxl_domain_build_info *info, libxl_domain_build_state *state);
 
-_hidden int libxl__domain_restore_common(libxl_ctx *ctx, uint32_t domid,
+_hidden int libxl__domain_restore_common(libxl__gc *gc, uint32_t domid,
                    libxl_domain_build_info *info, libxl_domain_build_state *state, int fd);
-_hidden int libxl__domain_suspend_common(libxl_ctx *ctx, uint32_t domid, int fd, int hvm, int live, int debug);
-_hidden int libxl__domain_save_device_model(libxl_ctx *ctx, uint32_t domid, int fd);
-_hidden void libxl__userdata_destroyall(libxl_ctx *ctx, uint32_t domid);
+_hidden int libxl__domain_suspend_common(libxl__gc *gc, uint32_t domid, int fd, int hvm, int live, int debug);
+_hidden int libxl__domain_save_device_model(libxl__gc *gc, uint32_t domid, int fd);
+_hidden void libxl__userdata_destroyall(libxl__gc *gc, uint32_t domid);
 
 /* from xl_device */
 _hidden char *libxl__device_disk_string_of_backend(libxl_disk_backend backend);
@@ -184,25 +184,18 @@ _hidden char *libxl__device_disk_string_of_format(libxl_disk_format format);
 _hidden int libxl__device_physdisk_major_minor(const char *physpath, int *major, int *minor);
 _hidden int libxl__device_disk_dev_number(char *virtpath);
 
-_hidden int libxl__device_generic_add(libxl_ctx *ctx, libxl__device *device,
+_hidden int libxl__device_generic_add(libxl__gc *gc, libxl__device *device,
                              char **bents, char **fents);
 _hidden char *libxl__device_backend_path(libxl__gc *gc, libxl__device *device);
 _hidden char *libxl__device_frontend_path(libxl__gc *gc, libxl__device *device);
-_hidden int libxl__device_del(libxl_ctx *ctx, libxl__device *dev, int wait);
-_hidden int libxl__device_destroy(libxl_ctx *ctx, char *be_path, int force);
-_hidden int libxl__devices_destroy(libxl_ctx *ctx, uint32_t domid, int force);
-_hidden int libxl__wait_for_device_model(libxl_ctx *ctx,
-                                uint32_t domid, char *state,
-                                int (*check_callback)(libxl_ctx *ctx,
-                                                      uint32_t domid,
-                                                      const char *state,
-                                                      void *userdata),
-                                void *check_callback_userdata);
-_hidden int libxl__wait_for_backend(libxl_ctx *ctx, char *be_path, char *state);
+_hidden int libxl__device_del(libxl__gc *gc, libxl__device *dev, int wait);
+_hidden int libxl__device_destroy(libxl__gc *gc, char *be_path, int force);
+_hidden int libxl__devices_destroy(libxl__gc *gc, uint32_t domid, int force);
+_hidden int libxl__wait_for_backend(libxl__gc *gc, char *be_path, char *state);
 
 /* from libxl_pci */
 
-_hidden int libxl__device_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev, int starting);
+_hidden int libxl__device_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, int starting);
 
 /* xl_exec */
 
@@ -222,33 +215,40 @@ typedef struct {
 } libxl__device_model_starting;
 
 /* from xl_create */
-_hidden int libxl__domain_make(libxl_ctx *ctx, libxl_domain_create_info *info, uint32_t *domid);
-_hidden int libxl__domain_build(libxl_ctx *ctx, libxl_domain_build_info *info, uint32_t domid, /* out */ libxl_domain_build_state *state);
+_hidden int libxl__domain_make(libxl__gc *gc, libxl_domain_create_info *info, uint32_t *domid);
+_hidden int libxl__domain_build(libxl__gc *gc, libxl_domain_build_info *info, uint32_t domid, /* out */ libxl_domain_build_state *state);
 
 /* for device model creation */
-_hidden int libxl__create_device_model(libxl_ctx *ctx,
+_hidden int libxl__create_device_model(libxl__gc *gc,
                               libxl_device_model_info *info,
                               libxl_device_disk *disk, int num_disks,
                               libxl_device_nic *vifs, int num_vifs,
                               libxl__device_model_starting **starting_r);
-_hidden int libxl__create_xenpv_qemu(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb,
+_hidden int libxl__create_xenpv_qemu(libxl__gc *gc, uint32_t domid, libxl_device_vfb *vfb,
                             libxl__device_model_starting **starting_r);
-_hidden int libxl__need_xenpv_qemu(libxl_ctx *ctx,
+_hidden int libxl__need_xenpv_qemu(libxl__gc *gc,
         int nr_consoles, libxl_device_console *consoles,
         int nr_vfbs, libxl_device_vfb *vfbs,
         int nr_disks, libxl_device_disk *disks);
-
   /* Caller must either: pass starting_r==0, or on successful
    * return pass *starting_r (which will be non-0) to
    * libxl_confirm_device_model or libxl_detach_device_model. */
-_hidden int libxl__confirm_device_model_startup(libxl_ctx *ctx,
+_hidden int libxl__confirm_device_model_startup(libxl__gc *gc,
                               libxl__device_model_starting *starting);
+_hidden int libxl__detach_device_model(libxl__gc *gc, libxl__device_model_starting *starting);
+_hidden int libxl__wait_for_device_model(libxl__gc *gc,
+                                uint32_t domid, char *state,
+                                int (*check_callback)(libxl__gc *gc,
+                                                      uint32_t domid,
+                                                      const char *state,
+                                                      void *userdata),
+                                void *check_callback_userdata);
 
-_hidden int libxl__spawn_spawn(libxl_ctx *ctx,
+_hidden int libxl__spawn_spawn(libxl__gc *gc,
                       libxl__device_model_starting *starting,
                       const char *what,
                       void (*intermediate_hook)(void *for_spawn, pid_t innerchild));
-_hidden int libxl__destroy_device_model(libxl_ctx *ctx, uint32_t domid);
+_hidden int libxl__destroy_device_model(libxl__gc *gc, uint32_t domid);
 
   /* Logs errors.  A copy of "what" is taken.  Return values:
    *  < 0   error, for_spawn need not be detached
@@ -256,11 +256,11 @@ _hidden int libxl__destroy_device_model(libxl_ctx *ctx, uint32_t domid);
    *    0   caller is now the inner child, should probably call libxl__exec
    * Caller, may pass 0 for for_spawn, in which case no need to detach.
    */
-_hidden int libxl__spawn_detach(libxl_ctx *ctx,
+_hidden int libxl__spawn_detach(libxl__gc *gc,
                        libxl__spawn_starting *for_spawn);
   /* Logs errors.  Idempotent, but only permitted after successful
    * call to libxl__spawn_spawn, and no point calling it again if it fails. */
-_hidden int libxl__spawn_check(libxl_ctx *ctx,
+_hidden int libxl__spawn_check(libxl__gc *gc,
                       void *for_spawn);
   /* Logs errors but also returns them.
    * for_spawn must actually be a  libxl__spawn_starting*  but
@@ -325,7 +325,7 @@ struct libxl__xen_console_reader {
     unsigned int index;
 };
 
-_hidden int libxl__error_set(libxl_ctx *ctx, int code);
+_hidden int libxl__error_set(libxl__gc *gc, int code);
 
 _hidden int libxl__file_reference_map(libxl_file_reference *f);
 _hidden int libxl__file_reference_unmap(libxl_file_reference *f);
