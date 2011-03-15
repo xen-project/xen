@@ -48,7 +48,8 @@ void *alloc_xen_pagetable(void)
     if ( !early_boot )
     {
         void *v = alloc_xenheap_page();
-        BUG_ON(v == NULL);
+
+        BUG_ON(!dom0 && !v);
         return v;
     }
 

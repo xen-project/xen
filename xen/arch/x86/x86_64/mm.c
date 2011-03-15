@@ -84,8 +84,9 @@ void *alloc_xen_pagetable(void)
     if ( !early_boot )
     {
         struct page_info *pg = alloc_domheap_page(NULL, 0);
-        BUG_ON(pg == NULL);
-        return page_to_virt(pg);
+
+        BUG_ON(!dom0 && !pg);
+        return pg ? page_to_virt(pg) : NULL;
     }
 
     mfn = alloc_boot_pages(1, 1);
@@ -100,6 +101,9 @@ l3_pgentry_t *virt_to_xen_l3e(unsigned long v)
     if ( !(l4e_get_flags(*pl4e) & _PAGE_PRESENT) )
     {
         l3_pgentry_t *pl3e = alloc_xen_pagetable();
+
+        if ( !pl3e )
+            return NULL;
         clear_page(pl3e);
         l4e_write(pl4e, l4e_from_paddr(__pa(pl3e), __PAGE_HYPERVISOR));
     }
@@ -112,9 +116,15 @@ l2_pgentry_t *virt_to_xen_l2e(unsigned long v)
     l3_pgentry_t *pl3e;
 
     pl3e = virt_to_xen_l3e(v);
+    if ( !pl3e )
+        return NULL;
+
     if ( !(l3e_get_flags(*pl3e) & _PAGE_PRESENT) )
     {
         l2_pgentry_t *pl2e = alloc_xen_pagetable();
+
+        if ( !pl2e )
+            return NULL;
         clear_page(pl2e);
         l3e_write(pl3e, l3e_from_paddr(__pa(pl2e), __PAGE_HYPERVISOR));
     }
@@ -429,6 +439,7 @@ static int setup_compat_m2p_table(struct mem_hotadd_info *info)
     l3_pgentry_t *l3_ro_mpt = NULL;
     l2_pgentry_t *l2_ro_mpt = NULL;
     struct page_info *l1_pg;
+    int err = 0;
 
     smap = info->spfn & (~((1UL << (L2_PAGETABLE_SHIFT - 2)) -1));
 
@@ -479,24 +490,25 @@ static int setup_compat_m2p_table(struct mem_hotadd_info *info)
         memflags = MEMF_node(phys_to_nid(i << PAGE_SHIFT));
 
         l1_pg = mfn_to_page(alloc_hotadd_mfn(info));
-        map_pages_to_xen(rwva,
-                    page_to_mfn(l1_pg),
-                    1UL << PAGETABLE_ORDER,
-                    PAGE_HYPERVISOR);
+        err = map_pages_to_xen(rwva, page_to_mfn(l1_pg),
+                               1UL << PAGETABLE_ORDER,
+                               PAGE_HYPERVISOR);
+        if ( err )
+            break;
         memset((void *)rwva, 0x55, 1UL << L2_PAGETABLE_SHIFT);
         /* NB. Cannot be GLOBAL as the ptes get copied into per-VM space. */
         l2e_write(&l2_ro_mpt[l2_table_offset(va)], l2e_from_page(l1_pg, _PAGE_PSE|_PAGE_PRESENT));
     }
 #undef CNT
 #undef MFN
-    return 0;
+    return err;
 }
 
 /*
  * Allocate and map the machine-to-phys table.
  * The L3 for RO/RWRW MPT and the L2 for compatible MPT should be setup already
  */
-int setup_m2p_table(struct mem_hotadd_info *info)
+static int setup_m2p_table(struct mem_hotadd_info *info)
 {
     unsigned long i, va, smap, emap;
     unsigned int n, memflags;
@@ -550,11 +562,13 @@ int setup_m2p_table(struct mem_hotadd_info *info)
         else
         {
             l1_pg = mfn_to_page(alloc_hotadd_mfn(info));
-            map_pages_to_xen(
+            ret = map_pages_to_xen(
                         RDWR_MPT_VIRT_START + i * sizeof(unsigned long),
                         page_to_mfn(l1_pg),
                         1UL << PAGETABLE_ORDER,
                         PAGE_HYPERVISOR);
+            if ( ret )
+                goto error;
             memset((void *)(RDWR_MPT_VIRT_START + i * sizeof(unsigned long)),
                    0x55, 1UL << L2_PAGETABLE_SHIFT);
 
@@ -898,13 +912,13 @@ void cleanup_frame_table(struct mem_hotadd_info *info)
     flush_tlb_all();
 }
 
-/* Should we be paraniod failure in map_pages_to_xen? */
 static int setup_frametable_chunk(void *start, void *end,
                                   struct mem_hotadd_info *info)
 {
     unsigned long s = (unsigned long)start;
     unsigned long e = (unsigned long)end;
     unsigned long mfn;
+    int err;
 
     ASSERT(!(s & ((1 << L2_PAGETABLE_SHIFT) - 1)));
     ASSERT(!(e & ((1 << L2_PAGETABLE_SHIFT) - 1)));
@@ -912,14 +926,17 @@ static int setup_frametable_chunk(void *start, void *end,
     for ( ; s < e; s += (1UL << L2_PAGETABLE_SHIFT))
     {
         mfn = alloc_hotadd_mfn(info);
-        map_pages_to_xen(s, mfn, 1UL << PAGETABLE_ORDER, PAGE_HYPERVISOR);
+        err = map_pages_to_xen(s, mfn, 1UL << PAGETABLE_ORDER,
+                               PAGE_HYPERVISOR);
+        if ( err )
+            return err;
     }
     memset(start, -1, s - (unsigned long)start);
 
     return 0;
 }
 
-int extend_frame_table(struct mem_hotadd_info *info)
+static int extend_frame_table(struct mem_hotadd_info *info)
 {
     unsigned long cidx, nidx, eidx, spfn, epfn;
 
@@ -940,12 +957,16 @@ int extend_frame_table(struct mem_hotadd_info *info)
 
     while ( cidx < eidx )
     {
+        int err;
+
         nidx = find_next_bit(pdx_group_valid, eidx, cidx);
         if ( nidx >= eidx )
             nidx = eidx;
-        setup_frametable_chunk(pdx_to_page(cidx * PDX_GROUP_COUNT ),
+        err = setup_frametable_chunk(pdx_to_page(cidx * PDX_GROUP_COUNT ),
                                      pdx_to_page(nidx * PDX_GROUP_COUNT),
                                      info);
+        if ( err )
+            return err;
 
         cidx = find_next_zero_bit(pdx_group_valid, eidx, nidx);
     }
