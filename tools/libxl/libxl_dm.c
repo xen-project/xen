@@ -828,8 +828,29 @@ int libxl__need_xenpv_qemu(libxl_ctx *ctx,
         goto out;
     }
 
-    if (nr_disks > 0 && !libxl__blktap_enabled(&gc))
-        ret = 1;
+    if (nr_disks > 0) {
+        int blktap_enabled = -1;
+        for (i = 0; i < nr_disks; i++) {
+            switch (disks[i].backend) {
+            case DISK_BACKEND_TAP:
+                if (blktap_enabled == -1)
+                    blktap_enabled = libxl__blktap_enabled(&gc);
+                if (!blktap_enabled) {
+                    ret = 1;
+                    goto out;
+                }
+                break;
+
+            case DISK_BACKEND_QDISK:
+                ret = 1;
+                goto out;
+
+            case DISK_BACKEND_PHY:
+            case DISK_BACKEND_UNKNOWN:
+                break;
+            }
+        }
+    }
 
 out:
     libxl__free_all(&gc);
