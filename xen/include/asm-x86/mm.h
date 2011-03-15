@@ -301,8 +301,6 @@ int free_page_type(struct page_info *page, unsigned long type,
                    int preemptible);
 int _shadow_mode_refcounts(struct domain *d);
 
-void cleanup_page_cacheattr(struct page_info *page);
-
 int is_iomem_page(unsigned long mfn);
 
 struct domain *page_get_owner_and_reference(struct page_info *page);

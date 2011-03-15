@@ -744,8 +744,9 @@ int is_iomem_page(unsigned long mfn)
     return (page_get_owner(page) == dom_io);
 }
 
-static void update_xen_mappings(unsigned long mfn, unsigned long cacheattr)
+static int update_xen_mappings(unsigned long mfn, unsigned long cacheattr)
 {
+    int err = 0;
 #ifdef __x86_64__
     bool_t alias = mfn >= PFN_DOWN(xen_phys_start) &&
          mfn < PFN_UP(xen_phys_start + (unsigned long)_end - XEN_VIRT_START);
@@ -753,12 +754,14 @@ static void update_xen_mappings(unsigned long mfn, unsigned long cacheattr)
         XEN_VIRT_START + ((mfn - PFN_DOWN(xen_phys_start)) << PAGE_SHIFT);
 
     if ( unlikely(alias) && cacheattr )
-        map_pages_to_xen(xen_va, mfn, 1, 0);
-    map_pages_to_xen((unsigned long)mfn_to_virt(mfn), mfn, 1,
+        err = map_pages_to_xen(xen_va, mfn, 1, 0);
+    if ( !err )
+        err = map_pages_to_xen((unsigned long)mfn_to_virt(mfn), mfn, 1,
                      PAGE_HYPERVISOR | cacheattr_to_pte_flags(cacheattr));
-    if ( unlikely(alias) && !cacheattr )
-        map_pages_to_xen(xen_va, mfn, 1, PAGE_HYPERVISOR);
+    if ( unlikely(alias) && !cacheattr && !err )
+        err = map_pages_to_xen(xen_va, mfn, 1, PAGE_HYPERVISOR);
 #endif
+    return err;
 }
 
 int
@@ -770,6 +773,7 @@ get_page_from_l1e(
     uint32_t l1f = l1e_get_flags(l1e);
     struct vcpu *curr = current;
     struct domain *real_pg_owner;
+    bool_t write;
 
     if ( !(l1f & _PAGE_PRESENT) )
         return 1;
@@ -820,9 +824,9 @@ get_page_from_l1e(
      * contribute to writeable mapping refcounts.  (This allows the
      * qemu-dm helper process in dom0 to map the domain's memory without
      * messing up the count of "real" writable mappings.) */
-    if ( (l1f & _PAGE_RW) &&
-         ((l1e_owner == pg_owner) || !paging_mode_external(pg_owner)) &&
-         !get_page_type(page, PGT_writable_page) )
+    write = (l1f & _PAGE_RW) &&
+            ((l1e_owner == pg_owner) || !paging_mode_external(pg_owner));
+    if ( write && !get_page_type(page, PGT_writable_page) )
         goto could_not_pin;
 
     if ( pte_flags_to_cacheattr(l1f) !=
@@ -833,22 +837,36 @@ get_page_from_l1e(
 
         if ( is_xen_heap_page(page) )
         {
-            if ( (l1f & _PAGE_RW) &&
-                 ((l1e_owner == pg_owner) || !paging_mode_external(pg_owner)) )
+            if ( write )
                 put_page_type(page);
             put_page(page);
             MEM_LOG("Attempt to change cache attributes of Xen heap page");
             return 0;
         }
 
-        while ( ((y & PGC_cacheattr_mask) >> PGC_cacheattr_base) != cacheattr )
-        {
+        do {
             x  = y;
             nx = (x & ~PGC_cacheattr_mask) | (cacheattr << PGC_cacheattr_base);
-            y  = cmpxchg(&page->count_info, x, nx);
-        }
+        } while ( (y = cmpxchg(&page->count_info, x, nx)) != x );
 
-        update_xen_mappings(mfn, cacheattr);
+        if ( unlikely(update_xen_mappings(mfn, cacheattr) != 0) )
+        {
+            cacheattr = y & PGC_cacheattr_mask;
+            do {
+                x  = y;
+                nx = (x & ~PGC_cacheattr_mask) | cacheattr;
+            } while ( (y = cmpxchg(&page->count_info, x, nx)) != x );
+
+            if ( write )
+                put_page_type(page);
+            put_page(page);
+
+            MEM_LOG("Error updating mappings for mfn %lx (pfn %lx,"
+                    " from L1 entry %" PRIpte ") for %d",
+                    mfn, get_gpfn_from_mfn(mfn),
+                    l1e_get_intpte(l1e), l1e_owner->domain_id);
+            return 0;
+        }
     }
 
     return 1;
@@ -1980,6 +1998,21 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
 
 #endif
 
+static int cleanup_page_cacheattr(struct page_info *page)
+{
+    uint32_t cacheattr =
+        (page->count_info & PGC_cacheattr_mask) >> PGC_cacheattr_base;
+
+    if ( likely(cacheattr == 0) )
+        return 0;
+
+    page->count_info &= ~PGC_cacheattr_mask;
+
+    BUG_ON(is_xen_heap_page(page));
+
+    return update_xen_mappings(page_to_mfn(page), 0);
+}
+
 void put_page(struct page_info *page)
 {
     unsigned long nx, x, y = page->count_info;
@@ -1993,8 +2026,10 @@ void put_page(struct page_info *page)
 
     if ( unlikely((nx & PGC_count_mask) == 0) )
     {
-        cleanup_page_cacheattr(page);
-        free_domheap_page(page);
+        if ( cleanup_page_cacheattr(page) == 0 )
+            free_domheap_page(page);
+        else
+            MEM_LOG("Leaking pfn %lx", page_to_mfn(page));
     }
 }
 
@@ -2444,21 +2479,6 @@ int put_page_type_preemptible(struct page_info *page)
 int get_page_type_preemptible(struct page_info *page, unsigned long type)
 {
     return __get_page_type(page, type, 1);
-}
-
-void cleanup_page_cacheattr(struct page_info *page)
-{
-    uint32_t cacheattr =
-        (page->count_info & PGC_cacheattr_mask) >> PGC_cacheattr_base;
-
-    if ( likely(cacheattr == 0) )
-        return;
-
-    page->count_info &= ~PGC_cacheattr_mask;
-
-    BUG_ON(is_xen_heap_page(page));
-
-    update_xen_mappings(page_to_mfn(page), 0);
 }
 
 
@@ -4834,8 +4854,11 @@ int map_pages_to_xen(
     while ( nr_mfns != 0 )
     {
 #ifdef __x86_64__
-        l3_pgentry_t *pl3e = virt_to_xen_l3e(virt);
-        l3_pgentry_t ol3e = *pl3e;
+        l3_pgentry_t ol3e, *pl3e = virt_to_xen_l3e(virt);
+
+        if ( !pl3e )
+            return -ENOMEM;
+        ol3e = *pl3e;
 
         if ( cpu_has_page1gb &&
              !(((virt >> PAGE_SHIFT) | mfn) &
@@ -4955,6 +4978,8 @@ int map_pages_to_xen(
 #endif
 
         pl2e = virt_to_xen_l2e(virt);
+        if ( !pl2e )
+            return -ENOMEM;
 
         if ( ((((virt>>PAGE_SHIFT) | mfn) & ((1<<PAGETABLE_ORDER)-1)) == 0) &&
              (nr_mfns >= (1<<PAGETABLE_ORDER)) &&
