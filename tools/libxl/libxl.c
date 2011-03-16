@@ -1234,8 +1234,13 @@ int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic)
     flexarray_append(back, "1");
     flexarray_append(back, "state");
     flexarray_append(back, libxl__sprintf(&gc, "%d", 1));
-    flexarray_append(back, "script");
-    flexarray_append(back, nic->script);
+    if (nic->script) {
+        flexarray_append(back, "script");
+        flexarray_append(back, nic->script[0]=='/' ? nic->script
+                         : libxl__sprintf(&gc, "%s/%s",
+                                          libxl_xen_script_dir_path(),
+                                          nic->script));
+    }
     flexarray_append(back, "mac");
     flexarray_append(back, libxl__sprintf(&gc, "%02x:%02x:%02x:%02x:%02x:%02x",
                                                  nic->mac[0], nic->mac[1], nic->mac[2],
