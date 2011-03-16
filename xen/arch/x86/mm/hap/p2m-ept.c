@@ -374,7 +374,9 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
             needs_sync = 0;
 
         /* If we're replacing a non-leaf entry with a leaf entry (1GiB or 2MiB),
-         * the intermediate tables will be freed below after the ept flush */
+         * the intermediate tables will be freed below after the ept flush
+         *
+         * Read-then-write is OK because we hold the p2m lock. */
         old_entry = *ept_entry;
 
         if ( mfn_valid(mfn_x(mfn)) || direct_mmio || p2m_is_paged(p2mt) ||
@@ -390,10 +392,10 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
             new_entry.access = p2ma;
             new_entry.rsvd2_snp = (iommu_enabled && iommu_snoop);
 
-            if ( new_entry.mfn == mfn_x(mfn) )
+            new_entry.mfn = mfn_x(mfn);
+
+            if ( old_entry.mfn == new_entry.mfn )
                 need_modify_vtd_table = 0;
-            else
-                new_entry.mfn = mfn_x(mfn);
 
             ept_p2m_type_to_flags(&new_entry, p2mt, p2ma);
         }
@@ -438,10 +440,12 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         new_entry.access = p2ma;
         new_entry.rsvd2_snp = (iommu_enabled && iommu_snoop);
 
-        if ( new_entry.mfn == mfn_x(mfn) )
+        /* the caller should take care of the previous page */
+        new_entry.mfn = mfn_x(mfn);
+
+        /* Safe to read-then-write because we hold the p2m lock */
+        if ( ept_entry->mfn == new_entry.mfn )
              need_modify_vtd_table = 0;
-        else /* the caller should take care of the previous page */
-            new_entry.mfn = mfn_x(mfn);
 
         ept_p2m_type_to_flags(&new_entry, p2mt, p2ma);
 
