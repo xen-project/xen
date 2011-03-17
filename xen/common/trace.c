@@ -42,14 +42,14 @@ CHECK_t_buf;
 #define compat_t_rec t_rec
 #endif
 
-/* opt_tbuf_size: trace buffer size (in pages) */
-static unsigned int opt_tbuf_size = 0;
+/* opt_tbuf_size: trace buffer size (in pages) for each cpu */
+static unsigned int opt_tbuf_size;
 integer_param("tbuf_size", opt_tbuf_size);
 
 /* Pointers to the meta-data objects for all system trace buffers */
 static struct t_info *t_info;
-#define T_INFO_PAGES 2  /* Size fixed at 2 pages for now. */
-#define T_INFO_SIZE ((T_INFO_PAGES)*(PAGE_SIZE))
+static unsigned int t_info_pages;
+
 static DEFINE_PER_CPU_READ_MOSTLY(struct t_buf *, t_bufs);
 static DEFINE_PER_CPU_READ_MOSTLY(unsigned char *, t_data);
 static DEFINE_PER_CPU_READ_MOSTLY(spinlock_t, t_lock);
@@ -78,6 +78,21 @@ static u32 tb_event_mask = TRC_ALL;
  * i.e., sizeof(_type) * ans >= _x. */
 #define fit_to_type(_type, _x) (((_x)+sizeof(_type)-1) / sizeof(_type))
 
+static int cpu_callback(
+    struct notifier_block *nfb, unsigned long action, void *hcpu)
+{
+    unsigned int cpu = (unsigned long)hcpu;
+
+    if ( action == CPU_UP_PREPARE )
+        spin_lock_init(&per_cpu(t_lock, cpu));
+
+    return NOTIFY_DONE;
+}
+
+static struct notifier_block cpu_nfb = {
+    .notifier_call = cpu_callback
+};
+
 static void calc_tinfo_first_offset(void)
 {
     int offset_in_bytes = offsetof(struct t_info, mfn_offset[NR_CPUS]);
@@ -85,20 +100,34 @@ static void calc_tinfo_first_offset(void)
 }
 
 /**
- * check_tbuf_size - check to make sure that the proposed size will fit
+ * calculate_tbuf_size - check to make sure that the proposed size will fit
  * in the currently sized struct t_info and allows prod and cons to
  * reach double the value without overflow.
+ * Initialize t_info_pages based on number of trace pages.
  */
-static int check_tbuf_size(u32 pages)
+static int calculate_tbuf_size(unsigned int pages)
 {
     struct t_buf dummy;
     typeof(dummy.prod) size;
-    
-    size = ((typeof(dummy.prod))pages)  * PAGE_SIZE;
-    
-    return (size / PAGE_SIZE != pages)
-           || (size + size < size)
-           || (num_online_cpus() * pages + t_info_first_offset > T_INFO_SIZE / sizeof(uint32_t));
+
+    /* force maximum value for an unsigned type */
+    size = -1;
+
+    /* max size holds up to n pages */
+    size /= PAGE_SIZE;
+    if ( pages > size )
+    {
+        gdprintk(XENLOG_INFO, "%s: requested number of %u pages reduced to %u\n",
+               __func__, pages, (unsigned int)size);
+        pages = size;
+    }
+
+    t_info_pages = num_online_cpus() * pages + t_info_first_offset;
+    t_info_pages *= sizeof(uint32_t);
+    t_info_pages /= PAGE_SIZE;
+    if ( t_info_pages % PAGE_SIZE )
+        t_info_pages++;
+    return pages;
 }
 
 /**
@@ -111,47 +140,28 @@ static int check_tbuf_size(u32 pages)
  * This function may also be called later when enabling trace buffers 
  * via the SET_SIZE hypercall.
  */
-static int alloc_trace_bufs(void)
+static int alloc_trace_bufs(unsigned int pages)
 {
-    int           i, cpu, order;
-    unsigned long nr_pages;
+    int i, cpu, order;
     /* Start after a fixed-size array of NR_CPUS */
     uint32_t *t_info_mfn_list;
     int offset;
 
-    if ( opt_tbuf_size == 0 )
+    if ( t_info )
+        return -EBUSY;
+
+    if ( pages == 0 )
         return -EINVAL;
 
-    if ( check_tbuf_size(opt_tbuf_size) )
-    {
-        printk("Xen trace buffers: tb size %d too large. "
-               "Tracing disabled.\n",
-               opt_tbuf_size);
-        return -EINVAL;
-    }
+    /* Calculate offset in u32 of first mfn */
+    calc_tinfo_first_offset();
 
-    /* t_info size is fixed for now. Currently this works great, so there
-     * seems to be no need to make it dynamic. */
-    t_info = alloc_xenheap_pages(get_order_from_pages(T_INFO_PAGES), 0);
+    pages = calculate_tbuf_size(pages);
+    order = get_order_from_pages(pages);
+
+    t_info = alloc_xenheap_pages(get_order_from_pages(t_info_pages), 0);
     if ( t_info == NULL )
-    {
-        printk("Xen trace buffers: t_info allocation failed! "
-               "Tracing disabled.\n");
-        return -ENOMEM;
-    }
-
-    for ( i = 0; i < T_INFO_PAGES; i++ )
-        share_xen_page_with_privileged_guests(
-            virt_to_page(t_info) + i, XENSHARE_readonly);
-
-    t_info_mfn_list = (uint32_t *)t_info;
-    offset = t_info_first_offset;
-
-    t_info->tbuf_size = opt_tbuf_size;
-    printk(XENLOG_INFO "tbuf_size %d\n", t_info->tbuf_size);
-
-    nr_pages = opt_tbuf_size;
-    order = get_order_from_pages(nr_pages);
+        goto out_dealloc;
 
     /*
      * First, allocate buffers for all of the cpus.  If any
@@ -159,27 +169,29 @@ static int alloc_trace_bufs(void)
      */
     for_each_online_cpu(cpu)
     {
-        int flags;
-        char         *rawbuf;
+        void *rawbuf;
         struct t_buf *buf;
 
         if ( (rawbuf = alloc_xenheap_pages(
                 order, MEMF_bits(32 + PAGE_SHIFT))) == NULL )
         {
-            printk("Xen trace buffers: memory allocation failed\n");
-            opt_tbuf_size = 0;
+            printk("Xen trace buffers: memory allocation failed on cpu %d\n", cpu);
             goto out_dealloc;
         }
 
-        spin_lock_irqsave(&per_cpu(t_lock, cpu), flags);
-
-        per_cpu(t_bufs, cpu) = buf = (struct t_buf *)rawbuf;
+        per_cpu(t_bufs, cpu) = buf = rawbuf;
         buf->cons = buf->prod = 0;
         per_cpu(t_data, cpu) = (unsigned char *)(buf + 1);
-
-        spin_unlock_irqrestore(&per_cpu(t_lock, cpu), flags);
-
     }
+
+    offset = t_info_first_offset;
+    t_info_mfn_list = (uint32_t *)t_info;
+
+    for(i = 0; i < t_info_pages; i++)
+        share_xen_page_with_privileged_guests(
+            virt_to_page(t_info) + i, XENSHARE_readonly);
+
+    t_info->tbuf_size = pages;
 
     /*
      * Now share the pages to xentrace can map them, and write them in
@@ -188,89 +200,75 @@ static int alloc_trace_bufs(void)
     for_each_online_cpu(cpu)
     {
         /* Share pages so that xentrace can map them. */
-        char         *rawbuf;
+        void *rawbuf = per_cpu(t_bufs, cpu);
+        struct page_info *p = virt_to_page(rawbuf);
+        uint32_t mfn = virt_to_mfn(rawbuf);
 
-        if ( (rawbuf = (char *)per_cpu(t_bufs, cpu)) )
+        for ( i = 0; i < pages; i++ )
         {
-            struct page_info *p = virt_to_page(rawbuf);
-            uint32_t mfn = virt_to_mfn(rawbuf);
+            share_xen_page_with_privileged_guests(p + i, XENSHARE_writable);
 
-            for ( i = 0; i < nr_pages; i++ )
-            {
-                share_xen_page_with_privileged_guests(
-                    p + i, XENSHARE_writable);
-            
-                t_info_mfn_list[offset + i]=mfn + i;
-            }
-            /* Write list first, then write per-cpu offset. */
-            wmb();
-            t_info->mfn_offset[cpu]=offset;
-            printk(XENLOG_INFO "p%d mfn %"PRIx32" offset %d\n",
-                   cpu, mfn, offset);
-            offset+=i;
+            t_info_mfn_list[offset + i]=mfn + i;
         }
+        t_info->mfn_offset[cpu]=offset;
+        printk(XENLOG_INFO "p%d mfn %"PRIx32" offset %d\n",
+               cpu, mfn, offset);
+        offset+=i;
+
+        spin_lock_init(&per_cpu(t_lock, cpu));
     }
 
-    data_size  = (opt_tbuf_size * PAGE_SIZE - sizeof(struct t_buf));
+    data_size  = (pages * PAGE_SIZE - sizeof(struct t_buf));
     t_buf_highwater = data_size >> 1; /* 50% high water */
+    opt_tbuf_size = pages;
+
+    register_cpu_notifier(&cpu_nfb);
+
+    printk("Xen trace buffers: initialised\n");
+    wmb(); /* above must be visible before tb_init_done flag set */
+    tb_init_done = 1;
 
     return 0;
+
 out_dealloc:
     for_each_online_cpu(cpu)
     {
-        int flags;
-        char * rawbuf;
-
-        spin_lock_irqsave(&per_cpu(t_lock, cpu), flags);
-        if ( (rawbuf = (char *)per_cpu(t_bufs, cpu)) )
+        void *rawbuf = per_cpu(t_bufs, cpu);
+        per_cpu(t_bufs, cpu) = NULL;
+        printk("Xen trace buffers: cpu %d p %p\n", cpu, rawbuf);
+        if ( rawbuf )
         {
-            per_cpu(t_bufs, cpu) = NULL;
             ASSERT(!(virt_to_page(rawbuf)->count_info & PGC_allocated));
             free_xenheap_pages(rawbuf, order);
         }
-        spin_unlock_irqrestore(&per_cpu(t_lock, cpu), flags);
     }
-    
+    free_xenheap_pages(t_info, get_order_from_pages(t_info_pages));
+    t_info = NULL;
+    printk("Xen trace buffers: allocation failed! Tracing disabled.\n");
     return -ENOMEM;
 }
 
 
 /**
- * tb_set_size - handle the logic involved with dynamically
- * allocating and deallocating tbufs
+ * tb_set_size - handle the logic involved with dynamically allocating tbufs
  *
  * This function is called when the SET_SIZE hypercall is done.
  */
-static int tb_set_size(int size)
+static int tb_set_size(unsigned int pages)
 {
     /*
      * Setting size is a one-shot operation. It can be done either at
      * boot time or via control tools, but not by both. Once buffers
      * are created they cannot be destroyed.
      */
-    int ret = 0;
-
-    if ( opt_tbuf_size != 0 )
+    if ( opt_tbuf_size && pages != opt_tbuf_size )
     {
-        if ( size != opt_tbuf_size )
-            gdprintk(XENLOG_INFO, "tb_set_size from %d to %d not implemented\n",
-                     opt_tbuf_size, size);
+        gdprintk(XENLOG_INFO, "tb_set_size from %d to %d not implemented\n",
+                     opt_tbuf_size, pages);
         return -EINVAL;
     }
 
-    if ( size <= 0 )
-        return -EINVAL;
-
-    opt_tbuf_size = size;
-
-    if ( (ret = alloc_trace_bufs()) != 0 )
-    {
-        opt_tbuf_size = 0;
-        return ret;
-    }
-
-    printk("Xen trace buffers: initialized\n");
-    return 0;
+    return alloc_trace_bufs(pages);
 }
 
 int trace_will_trace_event(u32 event)
@@ -299,21 +297,6 @@ int trace_will_trace_event(u32 event)
     return 1;
 }
 
-static int cpu_callback(
-    struct notifier_block *nfb, unsigned long action, void *hcpu)
-{
-    unsigned int cpu = (unsigned long)hcpu;
-
-    if ( action == CPU_UP_PREPARE )
-        spin_lock_init(&per_cpu(t_lock, cpu));
-
-    return NOTIFY_DONE;
-}
-
-static struct notifier_block cpu_nfb = {
-    .notifier_call = cpu_callback
-};
-
 /**
  * init_trace_bufs - performs initialization of the per-cpu trace buffers.
  *
@@ -323,37 +306,13 @@ static struct notifier_block cpu_nfb = {
  */
 void __init init_trace_bufs(void)
 {
-    int i;
-
-    /* Calculate offset in u32 of first mfn */
-    calc_tinfo_first_offset();
-
-    /* Per-cpu t_lock initialisation. */
-    for_each_online_cpu ( i )
-        spin_lock_init(&per_cpu(t_lock, i));
-    register_cpu_notifier(&cpu_nfb);
-
-    if ( opt_tbuf_size == 0 )
+    if ( opt_tbuf_size && alloc_trace_bufs(opt_tbuf_size) )
     {
-        printk("Xen trace buffers: disabled\n");
-        goto fail;
+        gdprintk(XENLOG_INFO, "Xen trace buffers: "
+                 "allocation size %d failed, disabling\n",
+                 opt_tbuf_size);
+        opt_tbuf_size = 0;
     }
-
-    if ( alloc_trace_bufs() != 0 )
-    {
-        dprintk(XENLOG_INFO, "Xen trace buffers: "
-                "allocation size %d failed, disabling\n",
-                opt_tbuf_size);
-        goto fail;
-    }
-
-    printk("Xen trace buffers: initialised\n");
-    wmb(); /* above must be visible before tb_init_done flag set */
-    tb_init_done = 1;
-    return;
-
- fail:
-    opt_tbuf_size = 0;
 }
 
 /**
@@ -372,7 +331,7 @@ int tb_control(xen_sysctl_tbuf_op_t *tbc)
     case XEN_SYSCTL_TBUFOP_get_info:
         tbc->evt_mask   = tb_event_mask;
         tbc->buffer_mfn = t_info ? virt_to_mfn(t_info) : 0;
-        tbc->size = T_INFO_PAGES * PAGE_SIZE;
+        tbc->size = t_info_pages * PAGE_SIZE;
         break;
     case XEN_SYSCTL_TBUFOP_set_cpu_mask:
         rc = xenctl_cpumap_to_cpumask(&tb_cpu_mask, &tbc->cpu_mask);
