@@ -57,7 +57,7 @@ build: $(LIBVHD-BUILD)
 
 libvhd.a: $(LIB-OBJS)
 	$(CC) $(CFLAGS) -Wl,$(SONAME_LDFLAG),$(LIBVHD-SONAME) $(SHLIB_LDFLAGS) \
-		$(LDFLAGS) -o libvhd.so.$(LIBVHD-MAJOR).$(LIBVHD-MINOR) $(LIBS) $^
+		$(LDFLAGS) -o libvhd.so.$(LIBVHD-MAJOR).$(LIBVHD-MINOR) $^ $(LIBS)
 	ln -sf libvhd.so.$(LIBVHD-MAJOR).$(LIBVHD-MINOR) libvhd.so.$(LIBVHD-MAJOR)
 	ln -sf libvhd.so.$(LIBVHD-MAJOR) libvhd.so
 	$(AR) rc $@ $^
