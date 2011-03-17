@@ -59,7 +59,7 @@ struct hd_ftr {
   u32    geometry;        /* Disk geometry                                */
   u32    type;            /* Disk type                                    */
   u32    checksum;        /* 1's comp sum of this struct.                 */
-  blk_uuid_t uuid;        /* Unique disk ID, used for naming parents      */
+  vhd_uuid_t uuid;        /* Unique disk ID, used for naming parents      */
   char   saved;           /* one-bit -- is this disk/VM in a saved state? */
   char   hidden;          /* tapdisk-specific field: is this vdi hidden?  */
   char   reserved[426];   /* padding                                      */
@@ -147,7 +147,7 @@ struct dd_hdr {
   u32    max_bat_size;    /* Maximum number of entries in the BAT         */
   u32    block_size;      /* Block size in bytes. Must be power of 2.     */
   u32    checksum;        /* Header checksum.  1's comp of all fields.    */
-  blk_uuid_t prt_uuid;    /* ID of the parent disk.                       */
+  vhd_uuid_t prt_uuid;    /* ID of the parent disk.                       */
   u32    prt_ts;          /* Modification time of the parent disk         */
   u32    res1;            /* Reserved.                                    */
   char   prt_name[512];   /* Parent unicode name.                         */

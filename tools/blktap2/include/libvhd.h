@@ -36,7 +36,7 @@
 #include <sys/bswap.h>
 #endif
 
-#include "blk_uuid.h"
+#include "vhd-uuid.h"
 #include "vhd.h"
 
 #ifndef O_LARGEFILE
@@ -216,7 +216,7 @@ vhd_parent_locator_size(vhd_parent_locator_t *loc)
 static inline int
 vhd_parent_raw(vhd_context_t *ctx)
 {
-	return blk_uuid_is_nil(&ctx->header.prt_uuid);
+	return vhd_uuid_is_nil(&ctx->header.prt_uuid);
 }
 
 void libvhd_set_log_level(int);

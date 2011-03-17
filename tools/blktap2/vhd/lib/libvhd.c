@@ -2454,7 +2454,7 @@ vhd_initialize_footer(vhd_context_t *ctx, int type, uint64_t size)
 	ctx->footer.saved        = 0;
 	ctx->footer.data_offset  = 0xFFFFFFFFFFFFFFFF;
 	strcpy(ctx->footer.crtr_app, "tap");
-	blk_uuid_generate(&ctx->footer.uuid);
+	vhd_uuid_generate(&ctx->footer.uuid);
 }
 
 static int
@@ -2569,7 +2569,7 @@ vhd_initialize_header(vhd_context_t *ctx, const char *parent_path,
 			return err;
 
 		ctx->header.prt_ts = vhd_time(stats.st_mtime);
-		blk_uuid_copy(&ctx->header.prt_uuid, &parent.footer.uuid);
+		vhd_uuid_copy(&ctx->header.prt_uuid, &parent.footer.uuid);
 		if (!size)
 			size = parent.footer.curr_size;
 		vhd_close(&parent);
@@ -2651,7 +2651,7 @@ vhd_change_parent(vhd_context_t *child, char *parent_path, int raw)
 	}
 
 	if (raw) {
-		blk_uuid_clear(&child->header.prt_uuid);
+		vhd_uuid_clear(&child->header.prt_uuid);
 	} else {
 		err = vhd_open(&parent, ppath, VHD_OPEN_RDONLY);
 		if (err) {
@@ -2659,7 +2659,7 @@ vhd_change_parent(vhd_context_t *child, char *parent_path, int raw)
 			       ppath, child->file, err);
 			goto out;
 		}
-		blk_uuid_copy(&child->header.prt_uuid, &parent.footer.uuid);
+		vhd_uuid_copy(&child->header.prt_uuid, &parent.footer.uuid);
 		vhd_close(&parent);
 	}
 

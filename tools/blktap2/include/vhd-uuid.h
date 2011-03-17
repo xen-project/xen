@@ -24,8 +24,8 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#ifndef __BLKTAP2_UUID_H__
-#define __BLKTAP2_UUID_H__
+#ifndef __BLKTAP2_VHD_UUID_H__
+#define __BLKTAP2_VHDUUID_H__
 
 #if defined(__linux__)
 
@@ -33,39 +33,39 @@
 
 typedef struct {
     uuid_t uuid;
-} blk_uuid_t;
+} vhd_uuid_t;
 
-static inline int blk_uuid_is_nil(blk_uuid_t *uuid)
+static inline int vhd_uuid_is_nil(vhd_uuid_t *uuid)
 {
 	return uuid_is_null(uuid->uuid);
 }
 
-static inline void blk_uuid_generate(blk_uuid_t *uuid)
+static inline void vhd_uuid_generate(vhd_uuid_t *uuid)
 {
 	uuid_generate(uuid->uuid);
 }
 
-static inline void blk_uuid_to_string(blk_uuid_t *uuid, char *out, size_t size)
+static inline void vhd_uuid_to_string(vhd_uuid_t *uuid, char *out, size_t size)
 {
 	uuid_unparse(uuid->uuid, out);
 }
 
-static inline void blk_uuid_from_string(blk_uuid_t *uuid, const char *in)
+static inline void vhd_uuid_from_string(vhd_uuid_t *uuid, const char *in)
 {
 	uuid_parse(in, uuid->uuid);
 }
 
-static inline void blk_uuid_copy(blk_uuid_t *dst, blk_uuid_t *src)
+static inline void vhd_uuid_copy(vhd_uuid_t *dst, vhd_uuid_t *src)
 {
 	uuid_copy(dst->uuid, src->uuid);
 }
 
-static inline void blk_uuid_clear(blk_uuid_t *uuid)
+static inline void vhd_uuid_clear(vhd_uuid_t *uuid)
 {
 	uuid_clear(uuid->uuid);
 }
 
-static inline int blk_uuid_compare(blk_uuid_t *uuid1, blk_uuid_t *uuid2)
+static inline int vhd_uuid_compare(vhd_uuid_t *uuid1, vhd_uuid_t *uuid2)
 {
 	return uuid_compare(uuid1->uuid, uuid2->uuid);
 }
@@ -76,21 +76,21 @@ static inline int blk_uuid_compare(blk_uuid_t *uuid1, blk_uuid_t *uuid2)
 #include <string.h>
 #include <stdlib.h>
 
-typedef uuid_t blk_uuid_t;
+typedef uuid_t vhd_uuid_t;
 
-static inline int blk_uuid_is_nil(blk_uuid_t *uuid)
+static inline int vhd_uuid_is_nil(vhd_uuid_t *uuid)
 {
 	uint32_t status;
 	return uuid_is_nil((uuid_t *)uuid, &status);
 }
 
-static inline void blk_uuid_generate(blk_uuid_t *uuid)
+static inline void vhd_uuid_generate(vhd_uuid_t *uuid)
 {
 	uint32_t status;
 	uuid_create((uuid_t *)uuid, &status);
 }
 
-static inline void blk_uuid_to_string(blk_uuid_t *uuid, char *out, size_t size)
+static inline void vhd_uuid_to_string(vhd_uuid_t *uuid, char *out, size_t size)
 {
 	uint32_t status;
 	char *_out = NULL;
@@ -99,23 +99,23 @@ static inline void blk_uuid_to_string(blk_uuid_t *uuid, char *out, size_t size)
 	free(_out);
 }
 
-static inline void blk_uuid_from_string(blk_uuid_t *uuid, const char *in)
+static inline void vhd_uuid_from_string(vhd_uuid_t *uuid, const char *in)
 {
 	uint32_t status;
 	uuid_from_string(in, (uuid_t *)uuid, &status);
 }
 
-static inline void blk_uuid_copy(blk_uuid_t *dst, blk_uuid_t *src)
+static inline void vhd_uuid_copy(vhd_uuid_t *dst, vhd_uuid_t *src)
 {
 	memcpy((uuid_t *)dst, (uuid_t *)src, sizeof(uuid_t));
 }
 
-static inline void blk_uuid_clear(blk_uuid_t *uuid)
+static inline void vhd_uuid_clear(vhd_uuid_t *uuid)
 {
 	memset((uuid_t *)uuid, 0, sizeof(uuid_t));
 }
 
-static inline int blk_uuid_compare(blk_uuid_t *uuid1, blk_uuid_t *uuid2)
+static inline int vhd_uuid_compare(vhd_uuid_t *uuid1, vhd_uuid_t *uuid2)
 {
 	uint32_t status;
 	return uuid_compare((uuid_t *)uuid1, (uuid_t *)uuid2, &status);
@@ -123,8 +123,8 @@ static inline int blk_uuid_compare(blk_uuid_t *uuid1, blk_uuid_t *uuid2)
 
 #else
 
-#error "Please update blk_uuid.h for your OS"
+#error "Please update vhd-uuid.h for your OS"
 
 #endif
 
-#endif /* __BLKTAP2_UUID_H__ */
+#endif /* __BLKTAP2_VHD_UUID_H__ */

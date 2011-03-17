@@ -237,7 +237,7 @@ vhd_journal_add_journal_header(vhd_journal_t *j)
 	if (err)
 		return err;
 
-	blk_uuid_copy(&j->header.uuid, &vhd->footer.uuid);
+	vhd_uuid_copy(&j->header.uuid, &vhd->footer.uuid);
 	memcpy(j->header.cookie,
 	       VHD_JOURNAL_HEADER_COOKIE, sizeof(j->header.cookie));
 	j->header.vhd_footer_offset = off - sizeof(vhd_footer_t);

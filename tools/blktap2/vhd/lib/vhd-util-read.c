@@ -78,7 +78,7 @@ vhd_print_header(vhd_context_t *vhd, vhd_header_t *h, int hex)
 	       (err ? "failed to read name" : name));
 	free(name);
 
-	blk_uuid_to_string(&h->prt_uuid, uuid, sizeof(uuid));
+	vhd_uuid_to_string(&h->prt_uuid, uuid, sizeof(uuid));
 	printf("Parent UUID         : %s\n", uuid);
     
 	vhd_time_to_string(h->prt_ts, time_str);
@@ -153,7 +153,7 @@ vhd_print_footer(vhd_footer_t *f, int hex)
 	printf("Checksum            : 0x%x|0x%x (%s)\n", f->checksum, cksm,
 		f->checksum == cksm ? "Good!" : "Bad!");
 
-	blk_uuid_to_string(&f->uuid, uuid, sizeof(uuid));
+	vhd_uuid_to_string(&f->uuid, uuid, sizeof(uuid));
 	printf("UUID                : %s\n", uuid);
 
 	printf("Saved state         : %s\n", f->saved == 0 ? "No" : "Yes");

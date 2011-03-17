@@ -218,7 +218,7 @@ vhd_util_check_validate_differencing_header(vhd_context_t *vhd)
 		if (vhd_util_check_zeros(header->loc, sizeof(header->loc)))
 			return "invalid non-null parent locators";
 
-		if (!blk_uuid_is_nil(&header->prt_uuid))
+		if (!vhd_uuid_is_nil(&header->prt_uuid))
 			return "invalid non-null parent uuid";
 
 		if (header->prt_ts)
@@ -320,7 +320,7 @@ vhd_util_check_validate_parent(vhd_context_t *vhd, const char *ppath)
 				VHD_OPEN_RDONLY | VHD_OPEN_IGNORE_DISABLED))
 		return "error opening parent";
 
-	if (blk_uuid_compare(&vhd->header.prt_uuid, &parent.footer.uuid)) {
+	if (vhd_uuid_compare(&vhd->header.prt_uuid, &parent.footer.uuid)) {
 		msg = "invalid parent uuid";
 		goto out;
 	}

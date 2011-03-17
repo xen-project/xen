@@ -807,7 +807,7 @@ vhd_validate_parent(td_driver_t *child_driver,
 	}
 	*/
 
-	if (blk_uuid_compare(&child->vhd.header.prt_uuid, &parent->vhd.footer.uuid)) {
+	if (vhd_uuid_compare(&child->vhd.header.prt_uuid, &parent->vhd.footer.uuid)) {
 		DPRINTF("ERROR: %s: %s, %s: parent uuid has changed since "
 			"snapshot.  Child image no longer valid.\n",
 			__func__, child->vhd.file, parent->vhd.file);
