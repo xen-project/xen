@@ -23,11 +23,7 @@ ifeq ($(CONFIG_X86_64),y)
 CFLAGS            += -fPIC
 endif
 
-LIBS      += -lrt -lz
-
-LBLIBS_img := $(LDLIBS_libxenctrl) $(CRYPT_LIB) -lpthread -lz -lm
-
-LIBS += -L$(LIBVHDDIR) -lvhd
+VHDLIBS    := -L$(LIBVHDDIR) -lvhd
 
 REMUS-OBJS  := block-remus.o
 REMUS-OBJS  += hashtable.o
@@ -88,26 +84,26 @@ BLK-OBJS-y  += $(REMUS-OBJS)
 all: $(IBIN) lock-util qcow-util
 
 
-tapdisk2: $(TAP-OBJS-y) $(BLK-OBJS-y) $(MISC-OBJS-y) tapdisk2.c
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(AIOLIBS) $(MEMSHRLIBS) $(LBLIBS_img)
+tapdisk2: $(TAP-OBJS-y) $(BLK-OBJS-y) $(MISC-OBJS-y) tapdisk2.o
+	$(CC) -o $@ $^ $(LDFLAGS) -lrt -lz $(VHDLIBS) $(AIOLIBS) $(MEMSHRLIBS) -lm 
 
 tapdisk-client: tapdisk-client.o
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)  $(LBLIBS_img)
+	$(CC) -o $@ $^ $(LDFLAGS) -lrt
 
 tapdisk-stream tapdisk-diff: %: %.o $(TAP-OBJS-y) $(BLK-OBJS-y)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(AIOLIBS) $(MEMSHRLIBS) $(LBLIBS_img)
+	$(CC) -o $@ $^ $(LDFLAGS) -lrt -lz $(VHDLIBS) $(AIOLIBS) $(MEMSHRLIBS) -lm
 
 td-util: td.o tapdisk-utils.o tapdisk-log.o $(PORTABLE-OBJS-y)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)  $(LBLIBS_img)
+	$(CC) -o $@ $^ $(LDFLAGS) $(VHDLIBS)
 
 lock-util: lock.c
-	$(CC) $(CFLAGS) -DUTIL -o lock-util lock.c $(LDFLAGS) $(LIBS)
+	$(CC) $(CFLAGS) -DUTIL -o lock-util lock.c $(LDFLAGS)
 
 .PHONY: qcow-util
 qcow-util: img2qcow qcow2raw qcow-create
 
 img2qcow qcow2raw qcow-create: %: %.o $(TAP-OBJS-y) $(BLK-OBJS-y)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(AIOLIBS) $(MEMSHRLIBS) $(LBLIBS_img)
+	$(CC) -o $@ $^ $(LDFLAGS) -lrt -lz $(VHDLIBS) $(AIOLIBS) $(MEMSHRLIBS) -lm
 
 install: all
 	$(INSTALL_DIR) -p $(DESTDIR)$(INST_DIR)

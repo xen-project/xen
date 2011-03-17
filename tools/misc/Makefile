@@ -15,6 +15,14 @@ TARGETS-$(CONFIG_X86) += xen-detect xen-hvmctx xen-hvmcrash
 TARGETS-$(CONFIG_MIGRATE) += xen-hptool
 TARGETS := $(TARGETS-y)
 
+LDLIBS_xenperf      := $(LDLIBS_libxenctrl)
+LDLIBS_xenpm        := $(LDLIBS_libxenctrl)
+LDLIBS_xenlockprof  := $(LDLIBS_libxenctrl)
+LDLIBS_xenwatchdogd := $(LDLIBS_libxenctrl)
+LDLIBS_xen-hvmctx   := $(LDLIBS_libxenctrl)
+LDLIBS_xen-hvmcrash := $(LDLIBS_libxenctrl)
+LDLIBS_xen-hptool   := $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore)
+
 SUBDIRS-$(CONFIG_LOMOUNT) += lomount
 SUBDIRS-$(CONFIG_MINITERM) += miniterm
 SUBDIRS := $(SUBDIRS-y)
@@ -52,7 +60,7 @@ clean:
 	$(CC) -c $(CFLAGS) -o $@ $<
 
 xen-hvmctx xen-hvmcrash xenperf xenpm gtracestat xenlockprof xen-hptool xenwatchdogd: %: %.o Makefile
-	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS) $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore)
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS) $(LDLIBS_$*)
 
 gtraceview: %: %.o Makefile
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS) $(CURSES_LIBS)

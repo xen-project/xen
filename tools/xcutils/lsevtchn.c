@@ -4,9 +4,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#include <xs.h>
 #include <xenctrl.h>
-#include <xenguest.h>
 
 int main(int argc, char **argv)
 {

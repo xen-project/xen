@@ -1,4 +1,3 @@
-
 XEN_ROOT=$(CURDIR)/../..
 include $(XEN_ROOT)/tools/Rules.mk
 
@@ -8,9 +7,10 @@ CFLAGS  += $(CFLAGS_libxenctrl)
 CFLAGS  += $(CFLAGS_libxenstore)
 LDLIBS += $(LDLIBS_libxenctrl)
 LDLIBS += $(LDLIBS_libxenstore)
-LDLIBS += $(UTIL_LIBS)
 LDLIBS += $(SOCKET_LIBS)
-LDLIBS += -lrt
+
+LDLIBS_xenconsoled += $(UTIL_LIBS)
+LDLIBS_xenconsoled += -lrt
 
 BIN      = xenconsoled xenconsole
 
@@ -23,10 +23,10 @@ clean:
 	$(RM) client/*.o daemon/*.o
 
 xenconsoled: $(patsubst %.c,%.o,$(wildcard daemon/*.c))
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS) $(LDLIBS_xenconsoled)
 
 xenconsole: $(patsubst %.c,%.o,$(wildcard client/*.c))
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS) $(LDLIBS_xenconsole)
 
 .PHONY: install
 install: $(BIN)
