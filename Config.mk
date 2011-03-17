@@ -102,27 +102,10 @@ define cc-ver-check-closure
     endif
 endef
 
-define absolutify_xen_root
-    case "$(XEN_ROOT)" in                                          \
-    /*) XEN_ROOT=$(XEN_ROOT) ;;                                    \
-    *)  xen_root_lhs=`pwd`;                                        \
-        xen_root_rhs=$(XEN_ROOT)/;                                 \
-        while [ "x$${xen_root_rhs#../}" != "x$$xen_root_rhs" ]; do \
-            xen_root_rhs="$${xen_root_rhs#../}";                   \
-            xen_root_rhs="$${xen_root_rhs#/}";                     \
-            xen_root_rhs="$${xen_root_rhs#/}";                     \
-            xen_root_lhs="$${xen_root_lhs%/*}";                    \
-        done;                                                      \
-        XEN_ROOT="$$xen_root_lhs/$$xen_root_rhs" ;;                \
-    esac;                                                          \
-    export XEN_ROOT
-endef
-
 define buildmakevars2shellvars
-    PREFIX="$(PREFIX)";                                            \
-    XEN_SCRIPT_DIR="$(XEN_SCRIPT_DIR)";                            \
-    export PREFIX;                                                 \
-    export XEN_SCRIPT_DIR
+    export PREFIX="$(PREFIX)";                                            \
+    export XEN_SCRIPT_DIR="$(XEN_SCRIPT_DIR)";                            \
+    export XEN_ROOT="$(XEN_ROOT)"
 endef
 
 buildmakevars2file = $(eval $(call buildmakevars2file-closure,$(1)))

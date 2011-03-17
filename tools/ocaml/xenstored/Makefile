@@ -1,5 +1,5 @@
-XEN_ROOT = ../../..
-OCAML_TOPLEVEL = ..
+XEN_ROOT = $(CURDIR)/../../..
+OCAML_TOPLEVEL = $(CURDIR)/..
 include $(OCAML_TOPLEVEL)/common.make
 
 OCAMLINCLUDE += \

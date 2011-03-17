@@ -1,6 +1,6 @@
 #!/usr/bin/make -f
 # -*- mode: Makefile; -*-
-XEN_ROOT        = ../../..
+XEN_ROOT        = $(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 VERSION = 1.0

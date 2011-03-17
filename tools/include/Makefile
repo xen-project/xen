@@ -1,4 +1,4 @@
-XEN_ROOT = ../..
+XEN_ROOT = $(CURDIR)/../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 .PHONY: all
@@ -11,11 +11,11 @@ xen-foreign:
 xen/.dir:
 	@rm -rf xen
 	mkdir -p xen/libelf
-	ln -sf ../$(XEN_ROOT)/xen/include/public/COPYING xen
-	ln -sf $(addprefix ../,$(wildcard $(XEN_ROOT)/xen/include/public/*.h)) xen
-	ln -sf $(addprefix ../$(XEN_ROOT)/xen/include/public/,arch-ia64 arch-x86 hvm io xsm) xen
+	ln -sf $(XEN_ROOT)/xen/include/public/COPYING xen
+	ln -sf $(wildcard $(XEN_ROOT)/xen/include/public/*.h) xen
+	ln -sf $(addprefix $(XEN_ROOT)/xen/include/public/,arch-ia64 arch-x86 hvm io xsm) xen
 	ln -sf ../xen-sys/$(XEN_OS) xen/sys
-	ln -sf $(addprefix ../../$(XEN_ROOT)/xen/include/xen/,libelf.h elfstructs.h) xen/libelf/
+	ln -sf $(addprefix $(XEN_ROOT)/xen/include/xen/,libelf.h elfstructs.h) xen/libelf/
 	ln -s ../xen-foreign xen/foreign
 	touch $@
 

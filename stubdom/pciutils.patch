@@ -38,7 +38,7 @@ diff -urN pciutils-2.2.9.orig/lib/access.c pciutils-2.2.9/lib/access.c
  endif
  
 +ifdef PCI_OS_MINIOS
-+XEN_ROOT=../../..
++XEN_ROOT=$(CURDIR)/../../..
 +include $(XEN_ROOT)/Config.mk
 +OBJS += minios.o
 +endif

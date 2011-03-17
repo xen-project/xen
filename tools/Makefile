@@ -1,4 +1,4 @@
-XEN_ROOT = ..
+XEN_ROOT = $(CURDIR)/..
 include $(XEN_ROOT)/tools/Rules.mk
 
 SUBDIRS-y :=
@@ -105,7 +105,6 @@ ioemu-dir-find:
 		ln -sf ioemu-remote ioemu-dir; \
 	fi
 	set -e; \
-		$(absolutify_xen_root); \
 		$(buildmakevars2shellvars); \
 		cd ioemu-dir; \
 		$(QEMU_ROOT)/xen-setup $(IOEMU_CONFIGURE_CROSS)
@@ -123,7 +122,6 @@ subdir-all-ioemu-dir subdir-install-ioemu-dir: ioemu-dir-find
 
 subdir-clean-ioemu-dir:
 	set -e; if test -d ioemu-dir/.; then \
-		$(absolutify_xen_root); \
 		$(buildmakevars2shellvars); \
 		$(MAKE) -C ioemu-dir clean; \
 	fi

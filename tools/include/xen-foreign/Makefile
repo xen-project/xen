@@ -1,4 +1,4 @@
-XEN_ROOT=../../..
+XEN_ROOT=$(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 ROOT = $(XEN_ROOT)/xen/include/public

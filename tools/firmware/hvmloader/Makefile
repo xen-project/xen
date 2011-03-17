@@ -18,7 +18,7 @@
 # Place - Suite 330, Boston, MA 02111-1307 USA.
 #
 
-XEN_ROOT = ../../..
+XEN_ROOT = $(CURDIR)/../../..
 include $(XEN_ROOT)/tools/firmware/Rules.mk
 
 SUBDIRS := acpi

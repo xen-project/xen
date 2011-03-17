@@ -1,6 +1,6 @@
 
 override XEN_TARGET_ARCH = x86_32
-XEN_ROOT = ../../..
+XEN_ROOT = $(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 include Config
 

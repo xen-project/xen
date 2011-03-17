@@ -1,4 +1,4 @@
-TOPLEVEL=../..
+TOPLEVEL=$(CURDIR)/../..
 XEN_ROOT=$(TOPLEVEL)/../..
 include $(TOPLEVEL)/common.make
 

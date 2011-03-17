@@ -1,4 +1,4 @@
-XEN_ROOT = ../../../..
+XEN_ROOT = $(CURDIR)/../../../..
 include ../Rules.mk
 
 GX_OBJS := gx_comm.o gx_main.o gx_utils.o gx_local.o

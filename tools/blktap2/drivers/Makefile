@@ -1,4 +1,4 @@
-XEN_ROOT=../../..
+XEN_ROOT=$(CURDIR)/../../..
 BLKTAP_ROOT= ..
 include $(XEN_ROOT)/tools/Rules.mk
 
