@@ -392,17 +392,17 @@ static int __init hpet_assign_irq(unsigned int idx)
     return irq;
 }
 
-static unsigned int __init hpet_fsb_cap_lookup(void)
+static void __init hpet_fsb_cap_lookup(void)
 {
     u32 id;
-    unsigned int i, num_chs, num_chs_used;
+    unsigned int i, num_chs;
 
     /* TODO. */
     if ( iommu_intremap )
     {
         printk(XENLOG_INFO "HPET's MSI mode hasn't been supported when "
             "Interrupt Remapping is enabled.\n");
-        return 0;
+        return;
     }
 
     id = hpet_read32(HPET_ID);
@@ -412,13 +412,12 @@ static unsigned int __init hpet_fsb_cap_lookup(void)
 
     hpet_events = xmalloc_array(struct hpet_event_channel, num_chs);
     if ( !hpet_events )
-        return 0;
+        return;
     memset(hpet_events, 0, num_chs * sizeof(*hpet_events));
 
-    num_chs_used = 0;
     for ( i = 0; i < num_chs; i++ )
     {
-        struct hpet_event_channel *ch = &hpet_events[num_chs_used];
+        struct hpet_event_channel *ch = &hpet_events[num_hpets_used];
         u32 cfg = hpet_read32(HPET_Tn_CFG(i));
 
         /* Only consider HPET timer with MSI support */
@@ -428,14 +427,12 @@ static unsigned int __init hpet_fsb_cap_lookup(void)
         ch->flags = 0;
         ch->idx = i;
 
-        if ( (ch->irq = hpet_assign_irq(num_chs_used++)) < 0 )
-            num_chs_used--;
+        if ( (ch->irq = hpet_assign_irq(num_hpets_used++)) < 0 )
+            num_hpets_used--;
     }
 
     printk(XENLOG_INFO "HPET: %u timers (%u will be used for broadcast)\n",
-           num_chs, num_chs_used);
-
-    return num_chs_used;
+           num_chs, num_hpets_used);
 }
 
 static struct hpet_event_channel *hpet_get_channel(unsigned int cpu)
@@ -555,7 +552,7 @@ void __init hpet_broadcast_init(void)
 
     cfg = hpet_read32(HPET_CFG);
 
-    num_hpets_used = hpet_fsb_cap_lookup();
+    hpet_fsb_cap_lookup();
     if ( num_hpets_used > 0 )
     {
         /* Stop HPET legacy interrupts */
