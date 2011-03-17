@@ -1233,17 +1233,15 @@ static void intel_init_mce(void)
 
 static void cpu_mcabank_free(unsigned int cpu)
 {
-    struct mca_banks *mb1, *mb2, *mb3, *mb4;
+    struct mca_banks *mb1, *mb2, *mb3;
 
     mb1 = per_cpu(mce_clear_banks, cpu);
     mb2 = per_cpu(no_cmci_banks, cpu);
     mb3 = per_cpu(mce_banks_owned, cpu);
-    mb4 = per_cpu(poll_bankmask, cpu);
 
     mcabanks_free(mb1);
     mcabanks_free(mb2);
     mcabanks_free(mb3);
-    mcabanks_free(mb4);
 }
 
 static int cpu_mcabank_alloc(unsigned int cpu)
