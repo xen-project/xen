@@ -22,9 +22,6 @@ CFLAGS            += -static
 endif
 
 LIBS              := -Llib -lvhd
-ifeq ($(CONFIG_Linux),y)
-LIBS              += -luuid
-endif
 
 # Get gcc to generate the dependencies for us.
 CFLAGS            += -Wp,-MD,.$(@F).d

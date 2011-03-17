@@ -30,7 +30,6 @@
 #include <fcntl.h>
 #include <errno.h>
 
-#include <xenctrl.h>
 #include "xs.h"
 
 /** @file

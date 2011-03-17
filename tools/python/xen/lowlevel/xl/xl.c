@@ -35,7 +35,6 @@
 #include <sys/socket.h>
 #include <sys/select.h>
 #include <arpa/inet.h>
-#include <xenctrl.h>
 #include <ctype.h>
 #include <inttypes.h>
 

@@ -15,10 +15,16 @@ CFLAGS += -Werror -Wno-format-zero-length -Wmissing-declarations
 CFLAGS += -I. -fPIC
 CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) $(CFLAGS_libxenstore) $(CFLAGS_libblktapctl)
 
-LIBS = $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore) $(LDLIBS_libblktapctl) $(UTIL_LIBS)
 ifeq ($(CONFIG_Linux),y)
-LIBS += -luuid
+LIBUUID_LIBS += -luuid
 endif
+
+LIBXL_LIBS =
+LIBXL_LIBS = $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore) $(LDLIBS_libblktapctl) $(UTIL_LIBS) $(LIBUUID_LIBS)
+
+LIBXLU_LIBS =
+
+CLIENT_LIBS = $(LDLIBS_libxenlight)
 
 LIBXL_OBJS-y = osdeps.o libxl_paths.o libxl_bootloader.o flexarray.o
 ifeq ($(LIBXL_BLKTAP),y)
@@ -81,7 +87,7 @@ libxenlight.so.$(MAJOR): libxenlight.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
 libxenlight.so.$(MAJOR).$(MINOR): $(LIBXL_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenlight.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -Wl,-rpath-link -Wl,$(XEN_ROOT)/tools/libxc $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenlight.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(LIBXL_LIBS)
 
 libxenlight.a: $(LIBXL_OBJS)
 	$(AR) rcs libxenlight.a $^
@@ -93,13 +99,13 @@ libxlutil.so.$(XLUMAJOR): libxlutil.so.$(XLUMAJOR).$(XLUMINOR)
 	ln -sf $< $@
 
 libxlutil.so.$(XLUMAJOR).$(XLUMINOR): $(LIBXLU_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxlutil.so.$(XLUMAJOR) $(SHLIB_LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxlutil.so.$(XLUMAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(LIBXLU_LIBS)
 
 libxlutil.a: $(LIBXLU_OBJS)
 	$(AR) rcs libxlutil.a $^
 
 $(CLIENTS): $(XL_OBJS) libxlutil.so libxenlight.so
-	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
+	$(CC) $(LDFLAGS) -o $@ $(XL_OBJS) libxlutil.so libxenlight.so $(CLIENT_LIBS)
 
 .PHONY: install
 install: all

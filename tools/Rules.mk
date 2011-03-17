@@ -11,6 +11,7 @@ INSTALL = $(XEN_ROOT)/tools/cross-install
 XEN_INCLUDE        = $(XEN_ROOT)/tools/include
 XEN_XC             = $(XEN_ROOT)/tools/python/xen/lowlevel/xc
 XEN_LIBXC          = $(XEN_ROOT)/tools/libxc
+XEN_XENLIGHT       = $(XEN_ROOT)/tools/libxl
 XEN_XENSTORE       = $(XEN_ROOT)/tools/xenstore
 XEN_LIBXENSTAT     = $(XEN_ROOT)/tools/xenstat/libxenstat/src
 XEN_BLKTAP2        = $(XEN_ROOT)/tools/blktap2
@@ -18,13 +19,16 @@ XEN_BLKTAP2        = $(XEN_ROOT)/tools/blktap2
 CFLAGS_include = -I$(XEN_INCLUDE)
 
 CFLAGS_libxenctrl = -I$(XEN_LIBXC) $(CFLAGS_include)
-LDLIBS_libxenctrl = -L$(XEN_LIBXC) -lxenctrl $(DLOPEN_LIBS)
+LDLIBS_libxenctrl = -L$(XEN_LIBXC) -lxenctrl
+SHLIB_libxenctrl  = -Wl,-rpath-link=$(XEN_LIBXC)
 
 CFLAGS_libxenguest = -I$(XEN_LIBXC) $(CFLAGS_include)
 LDLIBS_libxenguest = -L$(XEN_LIBXC) -lxenguest
+SHLIB_libxenguest  = -Wl,-rpath-link=L$(XEN_LIBXC)
 
 CFLAGS_libxenstore = -I$(XEN_XENSTORE) $(CFLAGS_include)
 LDLIBS_libxenstore = -L$(XEN_XENSTORE) -lxenstore
+SHLIB_libxenstore  = -Wl,-rpath-link=$(XEN_XENSTORE)
 
 ifeq ($(CONFIG_Linux),y)
 LIBXL_BLKTAP = y
@@ -35,10 +39,16 @@ endif
 ifeq ($(LIBXL_BLKTAP),y)
 CFLAGS_libblktapctl = -I$(XEN_BLKTAP2)/control -I$(XEN_BLKTAP2)/include $(CFLAGS_include)
 LDLIBS_libblktapctl = -L$(XEN_BLKTAP2)/control -lblktapctl
+SHLIB_libblktapctl  = -Wl,-rpath-link=$(XEN_BLKTAP2)/control
 else
 CFLAGS_libblktapctl =
 LDLIBS_libblktapctl =
+SHLIB_libblktapctl  =
 endif
+
+CFLAGS_libxenlight = -I$(XEN_XENLIGHT) $(CFLAGS_include)
+LDLIBS_libxenlight = -L$(XEN_XENLIGHT) $(SHLIB_libxenctrl) $(SHLIB_libxenstore) $(SHLIB_libblktapctl) -lxenlight
+SHLIB_libxenlight  = -Wl,-rpath-link=$(XEN_XENLIGHT)
 
 X11_LDPATH = -L/usr/X11R6/$(LIBLEAFDIR)
 

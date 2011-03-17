@@ -29,10 +29,6 @@ LBLIBS_img := $(LDLIBS_libxenctrl) $(CRYPT_LIB) -lpthread -lz -lm
 
 LIBS += -L$(LIBVHDDIR) -lvhd
 
-ifeq ($(CONFIG_Linux),y)
-LIBS += -luuid
-endif
-
 REMUS-OBJS  := block-remus.o
 REMUS-OBJS  += hashtable.o
 REMUS-OBJS  += hashtable_itr.o
