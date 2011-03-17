@@ -11,7 +11,6 @@ crash_debug   ?= n
 frame_pointer ?= n
 lto           ?= n
 
-XEN_ROOT=$(BASEDIR)/..
 include $(XEN_ROOT)/Config.mk
 
 # Hardcoded configuration implications and dependencies.

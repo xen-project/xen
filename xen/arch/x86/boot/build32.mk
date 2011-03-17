@@ -1,4 +1,3 @@
-XEN_ROOT=../../../..
 override XEN_TARGET_ARCH=x86_32
 CFLAGS =
 include $(XEN_ROOT)/Config.mk
