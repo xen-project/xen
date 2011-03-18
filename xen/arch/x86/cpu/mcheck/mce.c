@@ -16,6 +16,7 @@
 #include <xen/event.h>
 #include <xen/guest_access.h>
 #include <xen/hypercall.h> /* for do_mca */
+#include <xen/cpu.h>
 
 #include <asm/processor.h>
 #include <asm/system.h>
@@ -695,14 +696,13 @@ int show_mca_info(int inited, struct cpuinfo_x86 *c)
     return 0;
 }
 
-int set_poll_bankmask(struct cpuinfo_x86 *c)
+static void set_poll_bankmask(struct cpuinfo_x86 *c)
 {
     int cpu = smp_processor_id();
     struct mca_banks *mb;
 
-    mb = mcabanks_alloc();
-    if (!mb)
-        return -ENOMEM;
+    mb = per_cpu(poll_bankmask, cpu);
+    BUG_ON(!mb);
 
     if (cmci_support && !mce_disabled) {
         mb->num = per_cpu(no_cmci_banks, cpu)->num;
@@ -714,9 +714,6 @@ int set_poll_bankmask(struct cpuinfo_x86 *c)
         if (mce_firstbank(c))
             mcabanks_clear(0, mb);
     }
-    per_cpu(poll_bankmask, cpu) = mb;
-
-    return 0;
 }
 
 /* The perbank ctl/status init is platform specific because of AMD's quirk */
@@ -749,6 +746,51 @@ int mca_cap_init(void)
 
     return mca_allbanks ? 0:-ENOMEM;
 }
+
+static void cpu_poll_bankmask_free(unsigned int cpu)
+{
+    struct mca_banks *mb = per_cpu(poll_bankmask, cpu);
+
+    mcabanks_free(mb);
+}
+
+static int cpu_poll_bankmask_alloc(unsigned int cpu)
+{
+    struct mca_banks *mb;
+
+    mb = mcabanks_alloc();
+    if ( !mb )
+        return -ENOMEM;
+
+    per_cpu(poll_bankmask, cpu) = mb;
+    return 0;
+}
+
+static int cpu_callback(
+    struct notifier_block *nfb, unsigned long action, void *hcpu)
+{
+    unsigned int cpu = (unsigned long)hcpu;
+    int rc = 0;
+
+    switch ( action )
+    {
+    case CPU_UP_PREPARE:
+        rc = cpu_poll_bankmask_alloc(cpu);
+        break;
+    case CPU_UP_CANCELED:
+    case CPU_DEAD:
+        cpu_poll_bankmask_free(cpu);
+        break;
+    default:
+        break;
+    }
+
+    return !rc ? NOTIFY_DONE : notifier_from_errno(rc);
+}
+
+static struct notifier_block cpu_nfb = {
+    .notifier_call = cpu_callback
+};
 
 /* This has to be run for each processor */
 void mcheck_init(struct cpuinfo_x86 *c)
@@ -802,6 +844,13 @@ void mcheck_init(struct cpuinfo_x86 *c)
     /* Turn on MCE now */
     set_in_cr4(X86_CR4_MCE);
 
+    if ( smp_processor_id() == 0 )
+    {
+        /* Early MCE initialisation for BSP. */
+        if ( cpu_poll_bankmask_alloc(0) )
+            BUG();
+        register_cpu_notifier(&cpu_nfb);
+    }
     set_poll_bankmask(c);
 
     return;
