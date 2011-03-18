@@ -156,13 +156,13 @@ _clean_%/: FORCE
 SPECIAL_DATA_SECTIONS := rodata $(foreach n,1 2 4 8,rodata.str1.$(n)) \
 			 $(foreach r,rel rel.ro,data.$(r) data.$(r).local)
 
-%.init.o: %.o Makefile
+$(filter %.init.o,$(obj-y) $(obj-bin-y)): %.init.o: %.o Makefile
 	$(OBJDUMP) -h $< | sed -n '/[0-9]/{s,00*,0,g;p}' | while read idx name sz rest; do \
 		case "$$name" in \
 		.text|.text.*|.data|.data.*|.bss) \
 			test $$sz != 0 || continue; \
 			echo "Error: size of $<:$$name is 0x$$sz" >&2; \
-			exit $(shell expr $$idx + 1);; \
+			exit $$(expr $$idx + 1);; \
 		esac; \
 	done
 	$(OBJCOPY) $(foreach s,$(SPECIAL_DATA_SECTIONS),--rename-section .$(s)=.init.$(s)) $< $@
