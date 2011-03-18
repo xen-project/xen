@@ -187,7 +187,7 @@ static int enter_state(u32 state)
 
     device_power_up();
 
-    mcheck_init(&boot_cpu_data);
+    mcheck_init(&boot_cpu_data, 0);
     write_cr4(cr4);
 
     printk(XENLOG_INFO "Finishing wakeup from ACPI S%d state.\n", state);

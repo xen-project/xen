@@ -1297,9 +1297,9 @@ static struct notifier_block cpu_nfb = {
 };
 
 /* p4/p6 family have similar MCA initialization process */
-enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c)
+enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c, bool_t bsp)
 {
-    if ( smp_processor_id() == 0 )
+    if ( bsp )
     {
         /* Early MCE initialisation for BSP. */
         if ( cpu_mcabank_alloc(0) )

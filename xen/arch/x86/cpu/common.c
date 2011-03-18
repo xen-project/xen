@@ -431,19 +431,13 @@ void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 		/* AND the already accumulated flags with these */
 		for ( i = 0 ; i < NCAPINTS ; i++ )
 			boot_cpu_data.x86_capability[i] &= c->x86_capability[i];
-	}
 
-	/* Init Machine Check Exception if available. */
-	mcheck_init(c);
+		mcheck_init(c, 0);
+	} else {
+		mcheck_init(c, 1);
 
-#if 0
-	if (c == &boot_cpu_data)
-		sysenter_setup();
-	enable_sep_cpu();
-#endif
-
-	if (c == &boot_cpu_data)
 		mtrr_bp_init();
+	}
 }
 
 /* cpuid returns the value latched in the HW at reset, not the APIC ID
