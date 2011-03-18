@@ -118,7 +118,7 @@ static void register_iommu_cmd_buffer_in_mmio_space(struct amd_iommu *iommu)
     writel(entry, iommu->mmio_base+IOMMU_CMD_BUFFER_BASE_HIGH_OFFSET);
 }
 
-static void __init register_iommu_event_log_in_mmio_space(struct amd_iommu *iommu)
+static void register_iommu_event_log_in_mmio_space(struct amd_iommu *iommu)
 {
     u64 addr_64, addr_lo, addr_hi;
     u32 power_of2_entries;
