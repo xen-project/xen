@@ -42,7 +42,7 @@ enum mcheck_type amd_k7_mcheck_init(struct cpuinfo_x86 *c);
 enum mcheck_type amd_k8_mcheck_init(struct cpuinfo_x86 *c);
 enum mcheck_type amd_f10_mcheck_init(struct cpuinfo_x86 *c);
 
-enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c);
+enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c, bool_t bsp);
 
 void intel_mcheck_timer(struct cpuinfo_x86 *c);
 void mce_intel_feature_init(struct cpuinfo_x86 *c);

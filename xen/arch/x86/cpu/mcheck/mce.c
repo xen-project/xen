@@ -793,7 +793,7 @@ static struct notifier_block cpu_nfb = {
 };
 
 /* This has to be run for each processor */
-void mcheck_init(struct cpuinfo_x86 *c)
+void mcheck_init(struct cpuinfo_x86 *c, bool_t bsp)
 {
     enum mcheck_type inited = mcheck_none;
 
@@ -822,7 +822,7 @@ void mcheck_init(struct cpuinfo_x86 *c)
         switch (c->x86) {
         case 6:
         case 15:
-            inited = intel_mcheck_init(c);
+            inited = intel_mcheck_init(c, bsp);
             break;
         }
         break;
@@ -844,7 +844,7 @@ void mcheck_init(struct cpuinfo_x86 *c)
     /* Turn on MCE now */
     set_in_cr4(X86_CR4_MCE);
 
-    if ( smp_processor_id() == 0 )
+    if ( bsp )
     {
         /* Early MCE initialisation for BSP. */
         if ( cpu_poll_bankmask_alloc(0) )

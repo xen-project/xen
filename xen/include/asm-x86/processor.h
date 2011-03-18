@@ -555,7 +555,7 @@ void compat_show_guest_stack(struct vcpu *, struct cpu_user_regs *, int lines);
 extern void mtrr_ap_init(void);
 extern void mtrr_bp_init(void);
 
-void mcheck_init(struct cpuinfo_x86 *c);
+void mcheck_init(struct cpuinfo_x86 *c, bool_t bsp);
 
 #define DECLARE_TRAP_HANDLER(_name)                     \
 asmlinkage void _name(void);                            \
