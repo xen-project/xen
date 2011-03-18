@@ -395,6 +395,7 @@ static void vcpu_migrate(struct vcpu *v)
     unsigned long flags;
     unsigned int old_cpu, new_cpu;
     spinlock_t *old_lock, *new_lock;
+    bool_t pick_called = 0;
 
     old_cpu = new_cpu = v->processor;
     for ( ; ; )
@@ -426,14 +427,33 @@ static void vcpu_migrate(struct vcpu *v)
             spin_lock(old_lock);
         }
 
-        /* Select new CPU. */
         old_cpu = v->processor;
         if ( old_lock == per_cpu(schedule_data, old_cpu).schedule_lock )
         {
+            /*
+             * If we selected a CPU on the previosu iteration, check if it
+             * remains suitable for running this vCPU.
+             */
+            if ( pick_called &&
+                 (new_lock == per_cpu(schedule_data, new_cpu).schedule_lock) &&
+                 cpu_isset(new_cpu, v->cpu_affinity) &&
+                 cpu_isset(new_cpu, v->domain->cpupool->cpu_valid) )
+                break;
+
+            /* Select a new CPU. */
             new_cpu = SCHED_OP(VCPU2OP(v), pick_cpu, v);
             if ( (new_lock == per_cpu(schedule_data, new_cpu).schedule_lock) &&
                  cpu_isset(new_cpu, v->domain->cpupool->cpu_valid) )
                 break;
+            pick_called = 1;
+        }
+        else
+        {
+            /*
+             * We do not hold the scheduler lock appropriate for this vCPU.
+             * Thus we cannot select a new CPU on this iteration. Try again.
+             */
+            pick_called = 0;
         }
 
         if ( old_lock != new_lock )
