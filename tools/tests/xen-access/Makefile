@@ -1,12 +1,11 @@
 XEN_ROOT=$(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-CFLAGS   += -Werror
+CFLAGS += -Werror
 
-INCLUDES += -I $(XEN_XC)
-INCLUDES += -I $(XEN_LIBXC)
-INCLUDES += -I $(XEN_INCLUDE)
-CFLAGS   += $(INCLUDES)
+CFLAGS += -I $(XEN_XC)
+CFLAGS += -I $(XEN_LIBXC)
+CFLAGS += -I $(XEN_INCLUDE)
 
 TARGETS-y := 
 TARGETS-$(CONFIG_X86) += xen-access

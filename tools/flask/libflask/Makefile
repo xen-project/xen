@@ -11,7 +11,7 @@ SRCS       += flask_op.c
 
 CFLAGS   += -Werror
 CFLAGS   += -fno-strict-aliasing
-CFLAGS   += $(INCLUDES) -I./include -I$(XEN_LIBXC) -I$(XEN_INCLUDE)
+CFLAGS   += -I./include -I$(XEN_LIBXC) -I$(XEN_INCLUDE)
 
 # Get gcc to generate the dependencies for us.
 CFLAGS   += -Wp,-MD,.$(@F).d

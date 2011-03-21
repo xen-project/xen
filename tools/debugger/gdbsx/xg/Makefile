@@ -4,7 +4,7 @@ include ../Rules.mk
 XG_HDRS := xg_public.h 
 XG_OBJS := xg_main.o 
 
-CFLAGS += $(INCLUDES) -I. -I../../../include 
+CFLAGS += -I. -I../../../include 
 
 
 .PHONY: all
