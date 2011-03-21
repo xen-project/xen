@@ -5,9 +5,6 @@ include $(XEN_ROOT)/tools/Rules.mk
 # Tool definitions
 #
 
-# Xen tools installation directory
-TOOLS_INSTALL_DIR = $(DESTDIR)/usr/bin
-
 # General compiler flags
 CFLAGS   = -Werror -g3 -I.
 
