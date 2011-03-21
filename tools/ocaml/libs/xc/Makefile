@@ -2,14 +2,14 @@ TOPLEVEL=$(CURDIR)/../..
 XEN_ROOT=$(TOPLEVEL)/../..
 include $(TOPLEVEL)/common.make
 
-CFLAGS += -I../mmap -I$(XEN_ROOT)/tools/libxc
-OCAMLINCLUDE += -I ../mmap -I ../uuid -I $(XEN_ROOT)/tools/libxc
+CFLAGS += -I../mmap $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest)
+OCAMLINCLUDE += -I ../mmap -I ../uuid
 
 OBJS = xc
 INTF = xc.cmi
 LIBS = xc.cma xc.cmxa
 
-LIBS_xc = -L$(XEN_ROOT)/tools/libxc -lxenctrl -lxenguest
+LIBS_xc = $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest)
 
 xc_OBJS = $(OBJS)
 xc_C_OBJS = xc_stubs

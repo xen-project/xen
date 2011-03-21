@@ -4,14 +4,12 @@ MINOR    = 0
 XEN_ROOT = $(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-XEN_LIBXC = $(XEN_ROOT)/tools/libxc
-
 SRCS       :=
 SRCS       += flask_op.c
 
 CFLAGS   += -Werror
 CFLAGS   += -fno-strict-aliasing
-CFLAGS   += -I./include -I$(XEN_LIBXC) $(CFLAGS_xeninclude)
+CFLAGS   += -I./include $(CFLAGS_libxenctrl) $(CFLAGS_xeninclude)
 
 # Get gcc to generate the dependencies for us.
 CFLAGS   += -Wp,-MD,.$(@F).d
@@ -58,6 +56,6 @@ libflask.so.$(MAJOR): libflask.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
 libflask.so.$(MAJOR).$(MINOR): $(PIC_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libflask.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libflask.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(LDLIBS_libxenctrl)
 
 -include $(DEPS)

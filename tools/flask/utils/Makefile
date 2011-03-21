@@ -1,8 +1,6 @@
 XEN_ROOT=$(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
-XEN_LIBXC          = $(XEN_ROOT)/tools/libxc
 
-LIBXC_ROOT = $(XEN_ROOT)/tools/libxc
 LIBFLASK_ROOT = $(XEN_ROOT)/tools/flask/libflask
 
 PROFILE=#-pg
@@ -12,7 +10,7 @@ BASECFLAGS+= $(CFLAGS_libxenctrl)
 BASECFLAGS+= -I$(LIBFLASK_ROOT)/include
 
 CFLAGS  += $(BASECFLAGS)
-LDLIBS += $(PROFILE) -L$(XEN_LIBXC) -L$(LIBFLASK_ROOT)
+LDLIBS += $(PROFILE)
 TESTDIR  = testsuite/tmp
 TESTFLAGS= -DTESTING
 TESTENV  = XENSTORED_ROOTDIR=$(TESTDIR) XENSTORED_RUNDIR=$(TESTDIR)
@@ -25,7 +23,7 @@ CLIENTS_OBJS := $(patsubst flask-%,%.o,$(CLIENTS))
 all: $(CLIENTS)
 
 $(CLIENTS): flask-%: %.o
-	$(CC) $(CFLAGS) $(LDFLAGS) $< $(LOADLIBES) $(LDLIBS) -lflask $(LDLIBS_libxenctrl) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $< $(LOADLIBES) $(LDLIBS) -L$(LIBFLASK_ROOT) -lflask $(LDLIBS_libxenctrl) -o $@
 
 .PHONY: clean
 clean: 

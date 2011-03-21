@@ -12,7 +12,7 @@ CFLAGS            += -Werror
 CFLAGS            += -Wno-unused
 CFLAGS            += -I../include -I../drivers
 CFLAGS            += $(CFLAGS_xeninclude)
-CFLAGS            += -I$(XEN_LIBXC)
+CFLAGS            += $(CFLAGS_libxenctrl)
 CFLAGS            += -D_GNU_SOURCE
 CFLAGS            += -DTAPCTL
 

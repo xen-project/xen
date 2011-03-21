@@ -42,7 +42,7 @@ MEMSHRLIBS += $(MEMSHR_DIR)/libmemshr.a
 endif
 
 tapdisk2 tapdisk-stream tapdisk-diff $(QCOW_UTIL): AIOLIBS := $(LIBAIO_DIR)/libaio.a 
-tapdisk-client tapdisk-stream tapdisk-diff $(QCOW_UTIL): CFLAGS  += -I$(LIBAIO_DIR) -I$(XEN_LIBXC)
+tapdisk-client tapdisk-stream tapdisk-diff $(QCOW_UTIL): CFLAGS  += -I$(LIBAIO_DIR)
 
 ifeq ($(VHD_STATIC),y)
 td-util: CFLAGS += -static
