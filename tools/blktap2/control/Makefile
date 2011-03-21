@@ -11,7 +11,8 @@ IBIN               = tap-ctl
 CFLAGS            += -Werror
 CFLAGS            += -Wno-unused
 CFLAGS            += -I../include -I../drivers
-CFLAGS            += -I$(XEN_INCLUDE) -I$(XEN_LIBXC)
+CFLAGS            += $(CFLAGS_xeninclude)
+CFLAGS            += -I$(XEN_LIBXC)
 CFLAGS            += -D_GNU_SOURCE
 CFLAGS            += -DTAPCTL
 

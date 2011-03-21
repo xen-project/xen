@@ -3,7 +3,7 @@ include $(XEN_ROOT)/tools/firmware/Rules.mk
 
 TARGET  = tcgbiosext.o
 
-CFLAGS += $(CFLAGS_include) -I.. -I../..
+CFLAGS += $(CFLAGS_xeninclude) -I.. -I../..
 
 .PHONY: all
 all: $(TARGET)

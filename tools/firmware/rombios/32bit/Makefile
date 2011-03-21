@@ -3,7 +3,7 @@ include $(XEN_ROOT)/tools/firmware/Rules.mk
 
 TARGET = 32bitbios_flat.h
 
-CFLAGS += $(CFLAGS_include) -I..
+CFLAGS += $(CFLAGS_xeninclude) -I..
 
 SUBDIRS = tcgbios
 

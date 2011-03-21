@@ -5,7 +5,7 @@ LIBMEMSHR-BUILD := libmemshr.a
 
 CFLAGS          += -Werror
 CFLAGS          += -Wno-unused
-CFLAGS          += -I../include
+CFLAGS          += $(CFLAGS_xeninclude)
 CFLAGS          += $(CFLAGS_libxenctrl)
 CFLAGS          += -D_GNU_SOURCE
 CFLAGS          += -fPIC

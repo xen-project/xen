@@ -36,7 +36,7 @@ SONAME_FLAGS=-Wl,$(SONAME_LDFLAG) -Wl,libxenstat.so.$(MAJOR)
 
 WARN_FLAGS=-Wall -Werror
 
-CFLAGS+=-Isrc -I$(XEN_LIBXC) -I$(XEN_XENSTORE) -I$(XEN_INCLUDE)
+CFLAGS+=-Isrc -I$(XEN_LIBXC) -I$(XEN_XENSTORE) $(CFLAGS_xeninclude)
 LDFLAGS+=-Lsrc -L$(XEN_XENSTORE)/ -L$(XEN_LIBXC)/
 LDLIBS-y = -lxenstore -lxenctrl
 LDLIBS-$(CONFIG_SunOS) += -lkstat

@@ -26,7 +26,7 @@ SUBDIRS := acpi
 # The HVM loader is started in 32-bit mode at the address below:
 LOADADDR = 0x100000
 
-CFLAGS += $(CFLAGS_include)
+CFLAGS += $(CFLAGS_xeninclude)
 
 SRCS  = hvmloader.c mp_tables.c util.c smbios.c 
 SRCS += 32bitbios_support.c smp.c cacheattr.c xenbus.c

@@ -21,7 +21,7 @@ include $(XEN_ROOT)/tools/firmware/Rules.mk
 C_SRC = build.c dsdt_anycpu.c dsdt_15cpu.c static_tables.c
 OBJS  = $(patsubst %.c,%.o,$(C_SRC))
 
-CFLAGS += $(CFLAGS_include)
+CFLAGS += $(CFLAGS_xeninclude)
 
 vpath iasl $(PATH)
 all: acpi.a
@@ -33,7 +33,7 @@ ssdt_pm.h ssdt_tpm.h: %.h: %.asl iasl
 
 # NB. awk invocation is a portable alternative to 'head -n -1'
 dsdt_15cpu.c dsdt_anycpu.c: %.c: dsdt.asl mk_dsdt.c iasl
-	$(HOSTCC) $(HOSTCFLAGS) $(CFLAGS_include) -o mk_$* mk_dsdt.c
+	$(HOSTCC) $(HOSTCFLAGS) $(CFLAGS_xeninclude) -o mk_$* mk_dsdt.c
 	awk 'NR > 1 {print s} {s=$$0}' $< >$*.asl
 	./mk_$* >>$*.asl
 	iasl -vs -p $* -tc $*.asl

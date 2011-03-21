@@ -15,17 +15,17 @@ XEN_XENSTORE       = $(XEN_ROOT)/tools/xenstore
 XEN_LIBXENSTAT     = $(XEN_ROOT)/tools/xenstat/libxenstat/src
 XEN_BLKTAP2        = $(XEN_ROOT)/tools/blktap2
 
-CFLAGS_include = -I$(XEN_INCLUDE)
+CFLAGS_xeninclude = -I$(XEN_INCLUDE)
 
-CFLAGS_libxenctrl = -I$(XEN_LIBXC) $(CFLAGS_include)
+CFLAGS_libxenctrl = -I$(XEN_LIBXC) $(CFLAGS_xeninclude)
 LDLIBS_libxenctrl = -L$(XEN_LIBXC) -lxenctrl
 SHLIB_libxenctrl  = -Wl,-rpath-link=$(XEN_LIBXC)
 
-CFLAGS_libxenguest = -I$(XEN_LIBXC) $(CFLAGS_include)
+CFLAGS_libxenguest = -I$(XEN_LIBXC) $(CFLAGS_xeninclude)
 LDLIBS_libxenguest = -L$(XEN_LIBXC) -lxenguest
 SHLIB_libxenguest  = -Wl,-rpath-link=L$(XEN_LIBXC)
 
-CFLAGS_libxenstore = -I$(XEN_XENSTORE) $(CFLAGS_include)
+CFLAGS_libxenstore = -I$(XEN_XENSTORE) $(CFLAGS_xeninclude)
 LDLIBS_libxenstore = -L$(XEN_XENSTORE) -lxenstore
 SHLIB_libxenstore  = -Wl,-rpath-link=$(XEN_XENSTORE)
 
@@ -36,7 +36,7 @@ LIBXL_BLKTAP = n
 endif
 
 ifeq ($(LIBXL_BLKTAP),y)
-CFLAGS_libblktapctl = -I$(XEN_BLKTAP2)/control -I$(XEN_BLKTAP2)/include $(CFLAGS_include)
+CFLAGS_libblktapctl = -I$(XEN_BLKTAP2)/control -I$(XEN_BLKTAP2)/include $(CFLAGS_xeninclude)
 LDLIBS_libblktapctl = -L$(XEN_BLKTAP2)/control -lblktapctl
 SHLIB_libblktapctl  = -Wl,-rpath-link=$(XEN_BLKTAP2)/control
 else
@@ -45,7 +45,7 @@ LDLIBS_libblktapctl =
 SHLIB_libblktapctl  =
 endif
 
-CFLAGS_libxenlight = -I$(XEN_XENLIGHT) $(CFLAGS_include)
+CFLAGS_libxenlight = -I$(XEN_XENLIGHT) $(CFLAGS_xeninclude)
 LDLIBS_libxenlight = -L$(XEN_XENLIGHT) $(SHLIB_libxenctrl) $(SHLIB_libxenstore) $(SHLIB_libblktapctl) -lxenlight
 SHLIB_libxenlight  = -Wl,-rpath-link=$(XEN_XENLIGHT)
 

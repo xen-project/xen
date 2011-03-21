@@ -8,7 +8,6 @@ LIBFLASK_ROOT = $(XEN_ROOT)/tools/flask/libflask
 PROFILE=#-pg
 BASECFLAGS=-Wall -g -Werror
 BASECFLAGS+= $(PROFILE)
-#BASECFLAGS+= -I$(XEN_ROOT)/tools
 BASECFLAGS+= $(CFLAGS_libxenctrl)
 BASECFLAGS+= -I$(LIBFLASK_ROOT)/include
 
