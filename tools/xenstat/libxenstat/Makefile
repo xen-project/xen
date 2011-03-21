@@ -36,9 +36,9 @@ SONAME_FLAGS=-Wl,$(SONAME_LDFLAG) -Wl,libxenstat.so.$(MAJOR)
 
 WARN_FLAGS=-Wall -Werror
 
-CFLAGS+=-Isrc $(CFLAGS_libxenctrl) -I$(XEN_XENSTORE) $(CFLAGS_xeninclude)
+CFLAGS+=-Isrc $(CFLAGS_libxenctrl) $(CFLAGS_libxenstore) $(CFLAGS_xeninclude)
 LDFLAGS+=-Lsrc -L$(XEN_XENSTORE)/
-LDLIBS-y = -lxenstore $(LDLIBS_libxenctrl)
+LDLIBS-y = $(LDLIBS_libxenstore) $(LDLIBS_libxenctrl)
 LDLIBS-$(CONFIG_SunOS) += -lkstat
 ARLIBS-y = $(XEN_XENSTORE)/libxenstore.so $(XEN_LIBXC)/libxenctrl.so
 ARLIBS-x86_64 = /usr/lib/amd64/libkstat.so

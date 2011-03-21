@@ -53,10 +53,10 @@ $(CLIENTS): xenstore
 	ln -f xenstore $@
 
 xenstore: xenstore_client.o $(LIBXENSTORE)
-	$(CC) $(CFLAGS) $(LDFLAGS) $< -L. -lxenstore $(SOCKET_LIBS) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $< $(LDLIBS_libxenstore) $(SOCKET_LIBS) -o $@
 
 xenstore-control: xenstore_control.o $(LIBXENSTORE)
-	$(CC) $(CFLAGS) $(LDFLAGS) $< -L. -lxenstore $(SOCKET_LIBS) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $< $(LDLIBS_libxenstore) $(SOCKET_LIBS) -o $@
 
 xs_tdb_dump: xs_tdb_dump.o utils.o tdb.o talloc.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
