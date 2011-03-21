@@ -2,7 +2,6 @@ XEN_ROOT=$(CURDIR)/../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 CFLAGS   += -I $(XEN_XC)
-CFLAGS   += -I ./
 CFLAGS   += $(CFLAGS_libxenctrl) $(CFLAGS_libxenstore)
 LDLIBS  += $(LDLIBS_libxenctrl) $(LDLIBS_libxenstore)
 

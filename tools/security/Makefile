@@ -3,7 +3,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 CFLAGS   += -Werror
 CFLAGS   += -fno-strict-aliasing
-CFLAGS   += -I. $(CFLAGS_libxenctrl)
+CFLAGS   += $(CFLAGS_libxenctrl)
 
 CPPFLAGS += -MMD -MF .$*.d
 PROG_DEPS = .*.d

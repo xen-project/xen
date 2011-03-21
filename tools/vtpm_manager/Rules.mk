@@ -6,7 +6,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 #
 
 # General compiler flags
-CFLAGS	= -Werror -g3 -I.
+CFLAGS	= -Werror -g3
 
 # Generic project files
 HDRS	= $(wildcard *.h)

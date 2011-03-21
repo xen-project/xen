@@ -21,7 +21,7 @@ include $(XEN_ROOT)/tools/firmware/Rules.mk
 C_SRC = build.c dsdt_anycpu.c dsdt_15cpu.c static_tables.c
 OBJS  = $(patsubst %.c,%.o,$(C_SRC))
 
-CFLAGS += -I. -I.. $(CFLAGS_include)
+CFLAGS += $(CFLAGS_include)
 
 vpath iasl $(PATH)
 all: acpi.a

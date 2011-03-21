@@ -2,7 +2,7 @@ TOPLEVEL=$(CURDIR)/../..
 XEN_ROOT=$(TOPLEVEL)/../..
 include $(TOPLEVEL)/common.make
 
-CFLAGS += -I../mmap -I./ -I$(XEN_ROOT)/tools/libxc
+CFLAGS += -I../mmap -I$(XEN_ROOT)/tools/libxc
 OCAMLINCLUDE += -I ../mmap -I ../uuid -I $(XEN_ROOT)/tools/libxc
 
 OBJS = xc
