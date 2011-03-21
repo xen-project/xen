@@ -27,7 +27,7 @@ CLIENTS_OBJS := $(patsubst flask-%,%.o,$(CLIENTS))
 all: $(CLIENTS)
 
 $(CLIENTS): flask-%: %.o
-	$(CC) $(CFLAGS) $(LDFLAGS) $< $(LOADLIBES) $(LDLIBS) -L. -lflask $(LDLIBS_libxenctrl) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $< $(LOADLIBES) $(LDLIBS) -lflask $(LDLIBS_libxenctrl) -o $@
 
 .PHONY: clean
 clean: 

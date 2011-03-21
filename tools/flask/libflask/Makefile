@@ -15,7 +15,6 @@ CFLAGS   += -I./include -I$(XEN_LIBXC) -I$(XEN_INCLUDE)
 
 # Get gcc to generate the dependencies for us.
 CFLAGS   += -Wp,-MD,.$(@F).d
-LDFLAGS  += -L.
 
 LIB_OBJS := $(patsubst %.c,%.o,$(SRCS))
 PIC_OBJS := $(patsubst %.c,%.opic,$(SRCS))
