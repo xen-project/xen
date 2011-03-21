@@ -24,7 +24,7 @@ LIBXL_LIBS = $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore) $(
 
 LIBXLU_LIBS =
 
-CLIENT_LIBS = $(LDLIBS_libxenlight)
+CLIENT_LIBS = $(LDLIBS_libxenlight) $(LDLIBS_libxenctrl)
 
 LIBXL_OBJS-y = osdeps.o libxl_paths.o libxl_bootloader.o flexarray.o
 ifeq ($(LIBXL_BLKTAP),y)
