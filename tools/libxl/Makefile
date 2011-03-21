@@ -24,8 +24,6 @@ LIBXL_LIBS = $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore) $(
 
 LIBXLU_LIBS =
 
-CLIENT_LIBS = $(LDLIBS_libxenlight) $(LDLIBS_libxenctrl)
-
 LIBXL_OBJS-y = osdeps.o libxl_paths.o libxl_bootloader.o flexarray.o
 ifeq ($(LIBXL_BLKTAP),y)
 LIBXL_OBJS-y += libxl_blktap2.o
@@ -105,7 +103,7 @@ libxlutil.a: $(LIBXLU_OBJS)
 	$(AR) rcs libxlutil.a $^
 
 $(CLIENTS): $(XL_OBJS) libxlutil.so libxenlight.so
-	$(CC) $(LDFLAGS) -o $@ $(XL_OBJS) libxlutil.so libxenlight.so $(CLIENT_LIBS)
+	$(CC) $(LDFLAGS) -o $@ $(XL_OBJS) libxlutil.so $(LDLIBS_libxenlight) $(LDLIBS_libxenctrl)
 
 .PHONY: install
 install: all
