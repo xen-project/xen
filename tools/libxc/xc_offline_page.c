@@ -26,7 +26,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/time.h>
-#include <xs.h>
 #include <xc_core.h>
 
 #include "xc_private.h"
