@@ -1,6 +1,6 @@
 /******************************************************************************
  * xl.c
- * 
+ *
  * Copyright (c) 2010 Citrix Ltd.
  * Author: Gianni Tedesco
  *
@@ -481,7 +481,7 @@ static PyObject *pyxl_domain_rename(XlObject *self, PyObject *args)
     int domid;
     if ( !PyArg_ParseTuple(args, "is|s", &domid, &new_name, &old_name) )
         return NULL;
-    if ( libxl_domain_rename(&self->ctx, domid, old_name, new_name, 0) ) {
+    if ( libxl_domain_rename(&self->ctx, domid, old_name, new_name) ) {
         PyErr_SetString(xl_error_obj, "cannot rename domain");
         return NULL;
     }

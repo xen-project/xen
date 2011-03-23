@@ -171,6 +171,10 @@ _hidden int libxl__build_pv(libxl__gc *gc, uint32_t domid,
 _hidden int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
               libxl_domain_build_info *info, libxl_domain_build_state *state);
 
+_hidden int libxl__domain_rename(libxl__gc *gc, uint32_t domid,
+                                 const char *old_name, const char *new_name,
+                                 xs_transaction_t trans);
+
 _hidden int libxl__domain_restore_common(libxl__gc *gc, uint32_t domid,
                    libxl_domain_build_info *info, libxl_domain_build_state *state, int fd);
 _hidden int libxl__domain_suspend_common(libxl__gc *gc, uint32_t domid, int fd, int hvm, int live, int debug);

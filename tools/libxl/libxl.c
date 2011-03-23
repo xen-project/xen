@@ -116,11 +116,11 @@ void libxl_key_value_list_destroy(libxl_key_value_list *pkvl)
 /******************************************************************************/
 
 
-int libxl_domain_rename(libxl_ctx *ctx, uint32_t domid,
-                        const char *old_name, const char *new_name,
-                        xs_transaction_t trans)
+int libxl__domain_rename(libxl__gc *gc, uint32_t domid,
+                         const char *old_name, const char *new_name,
+                         xs_transaction_t trans)
 {
-    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    libxl_ctx *ctx = libxl__gc_owner(gc);
     char *dom_path = 0;
     const char *name_path;
     char *got_old_name;
@@ -128,10 +128,10 @@ int libxl_domain_rename(libxl_ctx *ctx, uint32_t domid,
     xs_transaction_t our_trans = 0;
     int rc;
 
-    dom_path = libxl__xs_get_dompath(&gc, domid);
+    dom_path = libxl__xs_get_dompath(gc, domid);
     if (!dom_path) goto x_nomem;
 
-    name_path= libxl__sprintf(&gc, "%s/name", dom_path);
+    name_path= libxl__sprintf(gc, "%s/name", dom_path);
     if (!name_path) goto x_nomem;
 
  retry_transaction:
@@ -211,11 +211,20 @@ int libxl_domain_rename(libxl_ctx *ctx, uint32_t domid,
     rc = 0;
  x_rc:
     if (our_trans) xs_transaction_end(ctx->xsh, our_trans, 1);
-    libxl__free_all(&gc);
     return rc;
 
  x_fail:  rc = ERROR_FAIL;  goto x_rc;
  x_nomem: rc = ERROR_NOMEM; goto x_rc;
+}
+
+int libxl_domain_rename(libxl_ctx *ctx, uint32_t domid,
+                        const char *old_name, const char *new_name)
+{
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    int rc;
+    rc = libxl__domain_rename(&gc, domid, old_name, new_name, XBT_NULL);
+    libxl__free_all(&gc);
+    return rc;
 }
 
 int libxl_domain_resume(libxl_ctx *ctx, uint32_t domid)
@@ -303,7 +312,7 @@ int libxl_domain_preserve(libxl_ctx *ctx, uint32_t domid,
     xs_set_permissions(ctx->xsh, t, vm_path, roperm, ARRAY_SIZE(roperm));
 
     xs_write(ctx->xsh, t, libxl__sprintf(&gc, "%s/vm", dom_path), vm_path, strlen(vm_path));
-    rc = libxl_domain_rename(ctx, domid, info->name, preserved_name, t);
+    rc = libxl__domain_rename(&gc, domid, info->name, preserved_name, t);
     if (rc) {
         libxl__free_all(&gc);
         return rc;

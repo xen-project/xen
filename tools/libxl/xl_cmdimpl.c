@@ -2638,8 +2638,7 @@ static void migrate_domain(const char *domain_spec, const char *rune,
     if (common_domname) {
         if (asprintf(&away_domname, "%s--migratedaway", common_domname) < 0)
             goto failed_resume;
-        rc = libxl_domain_rename(&ctx, domid,
-                                 common_domname, away_domname, 0);
+        rc = libxl_domain_rename(&ctx, domid, common_domname, away_domname);
         if (rc) goto failed_resume;
     }
 
@@ -2679,8 +2678,7 @@ static void migrate_domain(const char *domain_spec, const char *rune,
         fprintf(stderr, "migration sender: Trying to resume at our end.\n");
 
         if (common_domname) {
-            libxl_domain_rename(&ctx, domid,
-                                away_domname, common_domname, 0);
+            libxl_domain_rename(&ctx, domid, away_domname, common_domname);
         }
         rc = libxl_domain_resume(&ctx, domid);
         if (!rc) fprintf(stderr, "migration sender: Resumed OK.\n");
@@ -2779,8 +2777,7 @@ static void migrate_receive(int debug, int daemonize)
     fprintf(stderr, "migration target: Got permission, starting domain.\n");
 
     if (migration_domname) {
-        rc = libxl_domain_rename(&ctx, domid,
-                                 migration_domname, common_domname, 0);
+        rc = libxl_domain_rename(&ctx, domid, migration_domname, common_domname);
         if (rc) goto perhaps_destroy_notify_rc;
     }
 
@@ -4059,7 +4056,7 @@ int main_rename(int argc, char **argv)
     find_domain(dom);
     new_name = argv[optind];
 
-    if (libxl_domain_rename(&ctx, domid, common_domname, new_name, 0)) {
+    if (libxl_domain_rename(&ctx, domid, common_domname, new_name)) {
         fprintf(stderr, "Can't rename domain '%s'.\n", dom);
         return 1;
     }

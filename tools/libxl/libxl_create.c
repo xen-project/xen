@@ -354,7 +354,7 @@ retry_transaction:
     xs_set_permissions(ctx->xsh, t, vm_path, roperm, ARRAY_SIZE(roperm));
 
     xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/vm", dom_path), vm_path, strlen(vm_path));
-    rc = libxl_domain_rename(ctx, *domid, 0, info->name, t);
+    rc = libxl__domain_rename(gc, *domid, 0, info->name, t);
     if (rc)
         goto out;
 

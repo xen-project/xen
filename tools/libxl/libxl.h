@@ -376,8 +376,8 @@ int libxl_event_get_domain_death_info(libxl_ctx *ctx, uint32_t domid, libxl_even
 int libxl_event_get_disk_eject_info(libxl_ctx *ctx, uint32_t domid, libxl_event *event, libxl_device_disk *disk);
 
 int libxl_domain_rename(libxl_ctx *ctx, uint32_t domid,
-                        const char *old_name, const char *new_name,
-                        xs_transaction_t trans);
+                        const char *old_name, const char *new_name);
+
   /* if old_name is NULL, any old name is OK; otherwise we check
    * transactionally that the domain has the old old name; if
    * trans is not 0 we use caller's transaction and caller must do retries */
