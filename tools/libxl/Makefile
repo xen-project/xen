@@ -35,7 +35,7 @@ LIBXL_OBJS-$(CONFIG_IA64) += libxl_nocpuid.o
 
 LIBXL_OBJS = flexarray.o libxl.o libxl_create.o libxl_dm.o libxl_pci.o \
 			libxl_dom.o libxl_exec.o libxl_xshelp.o libxl_device.o \
-			libxl_internal.o libxl_utils.o $(LIBXL_OBJS-y)
+			libxl_internal.o libxl_utils.o libxl_uuid.o $(LIBXL_OBJS-y)
 LIBXL_OBJS += _libxl_types.o
 
 AUTOINCS= libxlu_cfg_y.h libxlu_cfg_l.h
