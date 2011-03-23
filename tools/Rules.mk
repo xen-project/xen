@@ -29,6 +29,10 @@ CFLAGS_libxenstore = -I$(XEN_XENSTORE) $(CFLAGS_xeninclude)
 LDLIBS_libxenstore = -L$(XEN_XENSTORE) -lxenstore
 SHLIB_libxenstore  = -Wl,-rpath-link=$(XEN_XENSTORE)
 
+CFLAGS_libxenstat  = -I$(XEN_LIBXENSTAT)
+LDLIBS_libxenstat  = $(SHLIB_libxenctrl) $(SHLIB_libxenstore) -L$(XEN_LIBXENSTAT) -lxenstat
+SHLIB_libxenstat  = -Wl,-rpath-link=$(XEN_LIBXENSTAT)
+
 ifeq ($(CONFIG_Linux),y)
 LIBXL_BLKTAP = y
 else

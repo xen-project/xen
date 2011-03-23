@@ -37,19 +37,15 @@ SONAME_FLAGS=-Wl,$(SONAME_LDFLAG) -Wl,libxenstat.so.$(MAJOR)
 WARN_FLAGS=-Wall -Werror
 
 CFLAGS+=-Isrc $(CFLAGS_libxenctrl) $(CFLAGS_libxenstore) $(CFLAGS_xeninclude)
-LDFLAGS+=-Lsrc -L$(XEN_XENSTORE)/
+
 LDLIBS-y = $(LDLIBS_libxenstore) $(LDLIBS_libxenctrl)
 LDLIBS-$(CONFIG_SunOS) += -lkstat
-ARLIBS-y = $(XEN_XENSTORE)/libxenstore.so $(XEN_LIBXC)/libxenctrl.so
-ARLIBS-x86_64 = /usr/lib/amd64/libkstat.so
-ARLIBS-x86_32 = /usr/lib/libkstat.so
-ARLIBS-$(CONFIG_SunOS) += $(ARLIBS-$(XEN_TARGET_ARCH))
 
 .PHONY: all
-all: $(LIB)
+all: $(LIB) $(SHLIB) $(SHLIB_LINKS)
 
 $(LIB): $(OBJECTS-y)
-	$(AR) rc $@ $^ $(ARLIBS-y)
+	$(AR) rc $@ $^
 	$(RANLIB) $@
 
 $(SHLIB): $(OBJECTS-y)
@@ -65,7 +61,7 @@ src/xenstat_linux.o: src/xenstat_linux.c src/xenstat_priv.h
 src/xenstat_solaris.o: src/xenstat_solaris.c src/xenstat_priv.h
 	$(CC) $(CFLAGS) $(WARN_FLAGS) -c -o $@ $<
 
-src/libxenstat.so.$(MAJOR): $(LIB)
+src/libxenstat.so.$(MAJOR): $(SHLIB)
 	$(MAKE_LINK) $(<F) $@
 
 src/libxenstat.so: src/libxenstat.so.$(MAJOR)
@@ -73,16 +69,11 @@ src/libxenstat.so: src/libxenstat.so.$(MAJOR)
 
 .PHONY: install
 install: all
-#install: all
-#	$(INSTALL_DATA) src/xenstat.h $(DESTDIR)$(includedir)/xenstat.h
-#	$(INSTALL_PROG) $(LIB) $(DESTDIR)$(libdir)/libxenstat.a
-#	$(INSTALL_PROG) $(SHLIB) \
-#	                $(DESTDIR)$(libdir)/libxenstat.so.$(MAJOR).$(MINOR)
-#	$(MAKE_LINK) libxenstat.so.$(MAJOR).$(MINOR) \
-#	             $(DESTDIR)$(libdir)/libxenstat.so.$(MAJOR)
-#	$(MAKE_LINK) libxenstat.so.$(MAJOR) \
-#	             $(DESTDIR)$(libdir)/libxenstat.so
-#	-$(LDCONFIG)
+	$(INSTALL_DATA) src/xenstat.h $(DESTDIR)$(INCLUDEDIR)
+	$(INSTALL_DATA) $(LIB) $(DESTDIR)$(LIBDIR)/libxenstat.a
+	$(INSTALL_PROG) src/libxenstat.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)
+	ln -sf libxenstat.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libxenstat.so.$(MAJOR)
+	ln -sf libxenstat.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libxenstat.so
 
 PYLIB=bindings/swig/python/_xenstat.so
 PYMOD=bindings/swig/python/xenstat.py
@@ -156,7 +147,7 @@ endif
 
 .PHONY: clean
 clean:
-	rm -f $(LIB) $(SHLIB) $(SHLIB_LINKS) $(OBJECTS-y) \
+	rm -f $(SHLIB) $(SHLIB_LINKS) $(OBJECTS-y) \
 	      $(BINDINGS) $(BINDINGSRC) $(DEPS)
 
 -include $(DEPS)
