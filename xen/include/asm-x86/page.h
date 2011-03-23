@@ -396,8 +396,6 @@ static inline uint32_t cacheattr_to_pte_flags(uint32_t cacheattr)
 
 #endif /* !__ASSEMBLY__ */
 
-#define PFN_DOWN(x)   ((x) >> PAGE_SHIFT)
-#define PFN_UP(x)     (((x) + PAGE_SIZE-1) >> PAGE_SHIFT)
 #define PAGE_ALIGN(x) (((x) + PAGE_SIZE - 1) & PAGE_MASK)
 
 #endif /* __X86_PAGE_H__ */

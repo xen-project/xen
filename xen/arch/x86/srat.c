@@ -17,6 +17,7 @@
 #include <xen/nodemask.h>
 #include <xen/acpi.h>
 #include <xen/numa.h>
+#include <xen/pfn.h>
 #include <asm/e820.h>
 #include <asm/page.h>
 

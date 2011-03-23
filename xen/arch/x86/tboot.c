@@ -6,6 +6,7 @@
 #include <xen/domain_page.h>
 #include <xen/iommu.h>
 #include <xen/acpi.h>
+#include <xen/pfn.h>
 #include <asm/fixmap.h>
 #include <asm/page.h>
 #include <asm/processor.h>

@@ -21,6 +21,7 @@
 #include <xen/bitops.h>
 #include <xen/compat.h>
 #include <xen/libelf.h>
+#include <xen/pfn.h>
 #include <asm/regs.h>
 #include <asm/system.h>
 #include <asm/io.h>

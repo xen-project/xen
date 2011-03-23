@@ -21,6 +21,7 @@
 #include <xen/rcupdate.h>
 #include <xen/vga.h>
 #include <xen/dmi.h>
+#include <xen/pfn.h>
 #include <xen/nodemask.h>
 #include <public/version.h>
 #ifdef CONFIG_COMPAT

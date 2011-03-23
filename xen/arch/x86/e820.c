@@ -4,6 +4,7 @@
 #include <xen/mm.h>
 #include <xen/compat.h>
 #include <xen/dmi.h>
+#include <xen/pfn.h>
 #include <asm/e820.h>
 #include <asm/page.h>
 #include <asm/processor.h>
