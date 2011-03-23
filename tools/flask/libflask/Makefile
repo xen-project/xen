@@ -11,9 +11,6 @@ CFLAGS   += -Werror
 CFLAGS   += -fno-strict-aliasing
 CFLAGS   += -I./include $(CFLAGS_libxenctrl) $(CFLAGS_xeninclude)
 
-# Get gcc to generate the dependencies for us.
-CFLAGS   += -Wp,-MD,.$(@F).d
-
 LIB_OBJS := $(patsubst %.c,%.o,$(SRCS))
 PIC_OBJS := $(patsubst %.c,%.opic,$(SRCS))
 

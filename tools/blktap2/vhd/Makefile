@@ -23,10 +23,6 @@ endif
 
 LIBS              := -Llib -lvhd
 
-# Get gcc to generate the dependencies for us.
-CFLAGS            += -Wp,-MD,.$(@F).d
-DEPS               = .*.d
-
 all: subdirs-all build
 
 build: $(IBIN)

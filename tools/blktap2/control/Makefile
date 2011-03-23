@@ -16,10 +16,6 @@ CFLAGS            += $(CFLAGS_libxenctrl)
 CFLAGS            += -D_GNU_SOURCE
 CFLAGS            += -DTAPCTL
 
-# Get gcc to generate the dependencies for us.
-CFLAGS            += -Wp,-MD,.$(@F).d
-DEPS               = .*.d
-
 CTL_OBJS  := tap-ctl-ipc.o
 CTL_OBJS  += tap-ctl-list.o
 CTL_OBJS  += tap-ctl-allocate.o

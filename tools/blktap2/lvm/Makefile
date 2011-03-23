@@ -15,10 +15,6 @@ ifeq ($(CONFIG_X86_64),y)
 CFLAGS            += -fPIC
 endif
 
-# Get gcc to generate the dependencies for us.
-CFLAGS            += -Wp,-MD,.$(@F).d
-DEPS               = .*.d
-
 LVM-OBJS          := lvm-util.o
 
 all: build

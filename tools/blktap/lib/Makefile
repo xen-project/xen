@@ -19,10 +19,6 @@ CFLAGS   += -fPIC
 # get asprintf():
 CFLAGS   += -D _GNU_SOURCE
 
-# Get gcc to generate the dependencies for us.
-CFLAGS   += -Wp,-MD,.$(@F).d
-DEPS     = .*.d
-
 OBJS     = $(SRCS:.c=.o)
 OBJS_PIC = $(SRCS:.c=.opic)
 IBINS   :=

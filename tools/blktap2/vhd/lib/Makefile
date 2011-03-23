@@ -23,10 +23,6 @@ ifeq ($(CONFIG_Linux),y)
 LIBS            := -luuid
 endif
 
-# Get gcc to generate the dependencies for us.
-CFLAGS          += -Wp,-MD,.$(@F).d
-DEPS             = .*.d
-
 LIB-SRCS        := libvhd.c
 LIB-SRCS        += libvhd-journal.c
 LIB-SRCS        += vhd-util-coalesce.c

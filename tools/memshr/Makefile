@@ -11,10 +11,6 @@ CFLAGS          += -D_GNU_SOURCE
 CFLAGS          += -fPIC
 CFLAGS          += -g
 
-# Get gcc to generate the dependencies for us.
-CFLAGS          += -Wp,-MD,.$(@F).d
-DEPS             = .*.d
-
 LIB-SRCS        := interface.c
 LIB-SRCS        += shm.c
 LIB-SRCS        += bidir-daemon.c

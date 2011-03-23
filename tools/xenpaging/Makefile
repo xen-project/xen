@@ -13,9 +13,6 @@ CFLAGS   += -Werror
 CFLAGS   += -Wno-unused
 CFLAGS   += -g
 
-CFLAGS   += -Wp,-MD,.$(@F).d
-DEPS     = .*.d
-
 OBJS     = $(SRCS:.c=.o)
 IBINS    = xenpaging
 
