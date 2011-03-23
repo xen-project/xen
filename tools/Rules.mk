@@ -81,13 +81,13 @@ INSTALL_PYTHON_PROG = \
 	$(XEN_ROOT)/tools/python/install-wrap "$(PYTHON_PATH)" $(INSTALL_PROG)
 
 %.opic: %.c
-	$(CC) $(CPPFLAGS) -DPIC $(CFLAGS) -fPIC -c -o $@ $<
+	$(CC) $(CPPFLAGS) -DPIC $(CFLAGS) $(CFLAGS_$*.opic) -fPIC -c -o $@ $<
 
 %.o: %.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(CFLAGS_$*.o) -c -o $@ $<
 
 %.o: %.cc
-	$(CC) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
+	$(CC) $(CPPFLAGS) $(CXXFLAGS) $(CXXFLAGS_$*.o) -c -o $@ $<
 
 subdirs-all subdirs-clean subdirs-install subdirs-distclean: .phony
 	@set -e; for subdir in $(SUBDIRS) $(SUBDIRS-y); do \
