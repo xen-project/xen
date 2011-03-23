@@ -53,8 +53,6 @@ CFLAGS_libxenlight = -I$(XEN_XENLIGHT) $(CFLAGS_xeninclude)
 LDLIBS_libxenlight = -L$(XEN_XENLIGHT) $(SHLIB_libxenctrl) $(SHLIB_libxenstore) $(SHLIB_libblktapctl) -lxenlight
 SHLIB_libxenlight  = -Wl,-rpath-link=$(XEN_XENLIGHT)
 
-X11_LDPATH = -L/usr/X11R6/$(LIBLEAFDIR)
-
 CFLAGS += -D__XEN_TOOLS__
 
 # Get gcc to generate the dependencies for us.
