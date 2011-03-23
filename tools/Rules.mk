@@ -49,7 +49,7 @@ LDLIBS_libblktapctl =
 SHLIB_libblktapctl  =
 endif
 
-CFLAGS_libxenlight = -I$(XEN_XENLIGHT) $(CFLAGS_xeninclude)
+CFLAGS_libxenlight = -I$(XEN_XENLIGHT) $(CFLAGS_libxenctrl) $(CFLAGS_libxenstore) $(CFLAGS_xeninclude)
 LDLIBS_libxenlight = -L$(XEN_XENLIGHT) $(SHLIB_libxenctrl) $(SHLIB_libxenstore) $(SHLIB_libblktapctl) -lxenlight
 SHLIB_libxenlight  = -Wl,-rpath-link=$(XEN_XENLIGHT)
 
