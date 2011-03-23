@@ -6,6 +6,8 @@ OBJS = xl
 INTF = xl.cmi
 LIBS = xl.cma xl.cmxa
 
+LIBS_xl = $(LDLIBS_libxenlight)
+
 xl_OBJS = $(OBJS)
 xl_C_OBJS = xl_stubs
 
