@@ -285,7 +285,6 @@ typedef struct {
 /* context functions */
 int libxl_ctx_init(libxl_ctx *ctx, int version, xentoollog_logger*);
 int libxl_ctx_free(libxl_ctx *ctx);
-int libxl_ctx_set_log(libxl_ctx *ctx, xentoollog_logger*);
 int libxl_ctx_postfork(libxl_ctx *ctx);
 
 /* domain related functions */
