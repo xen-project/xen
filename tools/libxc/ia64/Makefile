@@ -16,13 +16,7 @@ DOMFW_SRCS := $(addprefix ia64/, $(DOMFW_SRCS_BASE))
 $(DOMFW_SRCS):
 	ln -sf $(XEN_ROOT)/xen/arch/ia64/xen/$(@F) $@
 
-# XXX kludge: libxc/Makefile doesn't understand .S.
 GUEST_SRCS-y += $(patsubst %.S, %.c, $(DOMFW_SRCS))
-%.o: %.S
-	$(CC) $(CFLAGS) -c $< -o $@
-%.opic: %.S
-	$(CC) $(CPPFLAGS) -DPIC $(CFLAGS) -fPIC -c -o $@ $<
-
 
 CFLAGS	+= -Iia64
 

@@ -89,6 +89,11 @@ INSTALL_PYTHON_PROG = \
 %.o: %.cc
 	$(CC) $(CPPFLAGS) $(CXXFLAGS) $(CXXFLAGS_$*.o) -c -o $@ $<
 
+%.o: %.S
+	$(CC) $(CFLAGS) $(CFLAGS_$*.o) -c $< -o $@
+%.opic: %.S
+	$(CC) $(CPPFLAGS) -DPIC $(CFLAGS) $(CFLAGS.opic) -fPIC -c -o $@ $<
+
 subdirs-all subdirs-clean subdirs-install subdirs-distclean: .phony
 	@set -e; for subdir in $(SUBDIRS) $(SUBDIRS-y); do \
 		$(MAKE) subdir-$(patsubst subdirs-%,%,$@)-$$subdir; \
