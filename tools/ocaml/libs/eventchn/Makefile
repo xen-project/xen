@@ -6,6 +6,8 @@ OBJS = eventchn
 INTF = $(foreach obj, $(OBJS),$(obj).cmi)
 LIBS = eventchn.cma eventchn.cmxa
 
+LIBS_evtchn = $(LDLIBS_libxenctrl)
+
 all: $(INTF) $(LIBS) $(PROGRAMS)
 
 bins: $(PROGRAMS)
