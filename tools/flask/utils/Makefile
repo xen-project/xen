@@ -3,14 +3,10 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 LIBFLASK_ROOT = $(XEN_ROOT)/tools/flask/libflask
 
-PROFILE=#-pg
-BASECFLAGS=-Wall -g -Werror
-BASECFLAGS+= $(PROFILE)
-BASECFLAGS+= $(CFLAGS_libxenctrl)
-BASECFLAGS+= -I$(LIBFLASK_ROOT)/include
+CFLAGS += -Wall -g -Werror
+CFLAGS += $(CFLAGS_libxenctrl)
+CFLAGS += -I$(LIBFLASK_ROOT)/include
 
-CFLAGS  += $(BASECFLAGS)
-LDLIBS += $(PROFILE)
 TESTDIR  = testsuite/tmp
 TESTFLAGS= -DTESTING
 TESTENV  = XENSTORED_ROOTDIR=$(TESTDIR) XENSTORED_RUNDIR=$(TESTDIR)
