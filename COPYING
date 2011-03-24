@@ -9,6 +9,15 @@ the files in this repository are concerned is _this_ particular
 version of the license (i.e., *only* v2, not v2.2 or v3.x or
 whatever), unless explicitly otherwise stated.
 
+Some code fragments in the hypervisor and associated subsystems
+include the 2- or 3-clause BSD license stanzas (also known as Modified
+BSD licenses). When these code sections are compiled as part of a
+GPLv2-licensed program, such as Xen, the result is licensed under
+GPLv2. See the FSF's definition of GPL compatibility:
+ http://www.gnu.org/licenses/gpl-faq.html#WhatDoesCompatMean
+And how this applies to a range of open source licenses:
+ http://www.gnu.org/licenses/license-list.html
+
 Licensing Exceptions (the relaxed BSD-style license)
 ----------------------------------------------------
 
