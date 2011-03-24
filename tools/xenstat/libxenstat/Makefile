@@ -36,6 +36,7 @@ SONAME_FLAGS=-Wl,$(SONAME_LDFLAG) -Wl,libxenstat.so.$(MAJOR)
 
 WARN_FLAGS=-Wall -Werror
 
+CFLAGS+=-fPIC
 CFLAGS+=-Isrc $(CFLAGS_libxenctrl) $(CFLAGS_libxenstore) $(CFLAGS_xeninclude)
 
 LDLIBS-y = $(LDLIBS_libxenstore) $(LDLIBS_libxenctrl)
