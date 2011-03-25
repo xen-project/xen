@@ -29,6 +29,7 @@
 #include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/percpu.h>
+#include <xen/pfn.h>
 #include <xen/cpu.h>
 #include <asm/atomic.h>
 #include <public/sysctl.h>
@@ -109,6 +110,7 @@ static int calculate_tbuf_size(unsigned int pages)
 {
     struct t_buf dummy;
     typeof(dummy.prod) size;
+    unsigned int t_info_words, t_info_bytes;
 
     /* force maximum value for an unsigned type */
     size = -1;
@@ -122,11 +124,9 @@ static int calculate_tbuf_size(unsigned int pages)
         pages = size;
     }
 
-    t_info_pages = num_online_cpus() * pages + t_info_first_offset;
-    t_info_pages *= sizeof(uint32_t);
-    t_info_pages /= PAGE_SIZE;
-    if ( t_info_pages % PAGE_SIZE )
-        t_info_pages++;
+    t_info_words = num_online_cpus() * pages + t_info_first_offset;
+    t_info_bytes = t_info_words * sizeof(uint32_t);
+    t_info_pages = PFN_UP(t_info_bytes);
     return pages;
 }
 
