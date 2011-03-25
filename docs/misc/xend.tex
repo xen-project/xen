@@ -377,22 +377,6 @@ Python client interface in {\tt xen.xend.XendClient}.
   {\tt xend\_console\_disconnect(self, id)}:\\
   Disconnect any console TCP connection.
 
-\item {\tt GET /vnet}\\
-  {\tt xend\_vnets()}:\\
-  Get list of vnets (virtual networks).
-
-\item {\tt GET /vnet/[id]}\\
-  {\tt xend\_vnet(id)}:\\
-  Get information about a virtual network.
-
-\item {\tt POST /vnet create(config)}\\
-  {\tt xend\_vnet\_create(conf)}:\\
-  Create a vnet.
-
-\item {\tt POST /vnet/[id] delete()}\\
-  {\tt xend\_vnet\_delete(id)}:\\
-  Delete a vnet.
-
 \item {\tt POST /event inject(event)}\\
   {\tt xend\_event\_inject(sxpr)}:\\
   Inject an event.

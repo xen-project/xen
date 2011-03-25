@@ -137,14 +137,6 @@ Defines a pci device.
 The bus, dev or func may be given in hex,
 e.g. 0xff. With no leading 0x they are interpreted as decimal.
 
-<h2>(vnet) element</h2>
-Defines the virtual networks associated with vifs (may go away soon).
-Contains a list of vif elements:
-<ul>
-  <li>id: id of the vif being configured.
-  <li>vnet: id of vnet the vif is assigned to.
-</ul>
-
 <h1>Examples</h1>
 <p> A vm  with 64 MB memory, root on /dev/xda1 (mapped from /dev/hda1),
 one vif with default MAC.
@@ -162,31 +154,6 @@ one vif with default MAC.
     )
     (device (vif))
     (device (vbd (uname phy:hda1) (dev xda1) (mode w)))
-)
-</pre></code>
-
-<p>A vm with 64 MB memory, NFS root, and 2 vifs on separate vnets.
-<code><pre>
-(vm 
-   (name xendom2)
-   (memory 64)
-    # Define a linux image.
-    (image
-        (linux 
-            (kernel "/boot/vmlinuz-2.4.26-xen")
-            (ip     "::::xendom2:eth0:dhcp")
-            (root   "/dev/nfs")
-            (args   "rw fastboot nfsroot=15.144.25.79:/opt/xen/xendom2 4")
-         )
-    )
-    # Define some vifs, with ids for use later.
-    (device (vif (@ (id vif1)) (mac aa:00:00:00:00:12)))
-    (device (vif (@ (id vif2)) (mac aa:00:00:00:10:12)))
-
-     # Configure vnets. Refer to vifs by id.
-     (vnet (vif (id vif1) (vnet 1))
-           (vif (id vif2) (vnet 2)))
-
 )
 </pre></code>
 
