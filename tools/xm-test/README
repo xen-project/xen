@@ -137,38 +137,6 @@ Xm-test will look for disk.img in the ramdisk directory when run by
 default.
 
 
-BUILDING for ACM Security Testing
-=================================
-
-A number of tests have been added to test the access control module (ACM)
-in the Xen hypervisor and the tools for supporting ACM. Those tests are
-located in the security-acm directory. If ACM support is compiled into Xen
-(see the user guide for how to do this) those tests can be run with the
-following command from the xm-test directory
-
-./runtest.sh [...] -g security <report>
-
-Some of these tests will work even without support of ACM by Xen.
-
-The xm test suite has been extended to support labeling of resources
-as required by the existing tests. However, by default the test suite
-is not allowed to automatically label resources since this may affect
-existing labels. To enable this, the test suite must be configured with
-the following parameter passed to the configure scripts (in addition to
-any other desired parameters)
-
-./configure --enable-full-labeling
-
-To revoke the privilege at a later time run the configure scripts without
-this parameter:
-
-./configure
-
-If a 'make' has previously been run for building the test suite, it is not
-necessary to run 'make' again just for enabling or disabling the automatic
-labeling of resources.
-
-
 Running
 =======
 

@@ -36,7 +36,6 @@
 #include <asm/desc.h>
 #include <asm/paging.h>
 #include <asm/e820.h>
-#include <xsm/acm/acm_hooks.h>
 #include <xen/kexec.h>
 #include <asm/edd.h>
 #include <xsm/xsm.h>
@@ -1266,7 +1265,7 @@ void __init __start_xen(unsigned long mbi_p)
         panic("Could not protect TXT memory regions\n");
 
     /* Create initial domain 0. */
-    dom0 = domain_create(0, DOMCRF_s3_integrity, DOM0_SSIDREF);
+    dom0 = domain_create(0, DOMCRF_s3_integrity, 0);
     if ( (dom0 == NULL) || (alloc_dom0_vcpu0() == NULL) )
         panic("Error creating domain 0\n");
 

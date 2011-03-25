@@ -153,11 +153,9 @@ CFLAGS += $(foreach i, $(EXTRA_INCLUDES), -I$(i))
 EMBEDDED_EXTRA_CFLAGS := -nopie -fno-stack-protector -fno-stack-protector-all
 EMBEDDED_EXTRA_CFLAGS += -fno-exceptions
 
-# Enable XSM security module.  Enabling XSM requires selection of an 
-# XSM security module (FLASK_ENABLE or ACM_SECURITY).
+# Enable XSM security module (by default, Flask).
 XSM_ENABLE ?= n
-FLASK_ENABLE ?= n
-ACM_SECURITY ?= n
+FLASK_ENABLE ?= $(XSM_ENABLE)
 
 # Download GIT repositories via HTTP or GIT's own protocol?
 # GIT's protocol is faster and more robust, when it works at all (firewalls

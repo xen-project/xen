@@ -212,7 +212,7 @@ static void __init parse_extra_guest_irqs(const char *s)
 custom_param("extra_guest_irqs", parse_extra_guest_irqs);
 
 struct domain *domain_create(
-    domid_t domid, unsigned int domcr_flags, ssidref_t ssidref)
+    domid_t domid, unsigned int domcr_flags, uint32_t ssidref)
 {
     struct domain *d, **pd;
     enum { INIT_xsm = 1u<<0, INIT_watchdog = 1u<<1, INIT_rangeset = 1u<<2,

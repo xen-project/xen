@@ -30,7 +30,6 @@ from config import *
 from Console import *
 from XenDevice import *
 from DomainTracking import *
-from acm import *
 
 
 DOM0_UUID = "00000000-0000-0000-0000-000000000000"
@@ -61,9 +60,6 @@ class XenConfig:
         self.defaultOpts["disk"] = []
         self.defaultOpts["vif"]  = []
         self.defaultOpts["vtpm"] = []
-        if isACMEnabled():
-            #A default so every VM can start with ACM enabled
-            self.defaultOpts["access_control"] = ['policy=xm-test,label=red']
 
         self.opts = self.defaultOpts
 
@@ -91,7 +87,6 @@ class XenConfig:
         output = file(filename, "w")
         output.write(self.toString())
         output.close()
-        ACMPrepareSystem(self.opts)
 
     def __str__(self):
         """When used as a string, we represent ourself by a config

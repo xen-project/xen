@@ -19,7 +19,6 @@ SUBDIRS = 	               	\
 		pause		\
 		reboot 		\
 		sched-credit	\
-		security-acm    \
 		sedf		\
 		shutdown	\
 		sysrq		\

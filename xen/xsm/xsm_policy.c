@@ -15,7 +15,6 @@
  *
  *
  *  This file contains the XSM policy init functions for Xen.
- *  This file is based on the ACM functions of the same name.
  *
  */
 

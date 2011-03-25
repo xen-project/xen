@@ -41,20 +41,6 @@ fi
 AM_CONDITIONAL(HVM, test x$ENABLE_HVM = xTrue)
 AC_SUBST(ENABLE_HVM)
 
-AC_ARG_ENABLE(full-labeling,
-	[[  --enable-full-labeling         allows the test suite to label all resources]],
-	[
-		ENABLE_LABELING=True
-	],[
-		ENABLE_LABELING=False
-	])
-
-if test "x$ENABLE_LABELING" = "xTrue"; then
-	echo "ACM_LABEL_RESOURCES = True" > lib/XmTestLib/acm_config.py
-else
-	rm -f lib/XmTestLib/acm_config.py*
-fi
-
 # Network needs to know ips to use: dhcp or a range of IPs in the form
 # of: 192.0.2.1-192.0.2.100
 # If not dhcp, a netmask and network address must be supplied. Defaults to
@@ -151,7 +137,6 @@ AC_CONFIG_FILES([
     tests/restore/Makefile
     tests/save/Makefile
     tests/sched-credit/Makefile
-    tests/security-acm/Makefile
     tests/sedf/Makefile
     tests/shutdown/Makefile
     tests/sysrq/Makefile

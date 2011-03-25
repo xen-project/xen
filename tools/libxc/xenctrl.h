@@ -44,8 +44,6 @@
 #include <xen/memory.h>
 #include <xen/grant_table.h>
 #include <xen/hvm/params.h>
-#include <xen/xsm/acm.h>
-#include <xen/xsm/acm_ops.h>
 #include <xen/xsm/flask_op.h>
 #include <xen/tmem.h>
 
@@ -1249,8 +1247,6 @@ int xc_domctl(xc_interface *xch, struct xen_domctl *domctl);
 int xc_sysctl(xc_interface *xch, struct xen_sysctl *sysctl);
 
 int xc_version(xc_interface *xch, int cmd, void *arg);
-
-int xc_acm_op(xc_interface *xch, int cmd, void *arg, unsigned long arg_size);
 
 int xc_flask_op(xc_interface *xch, flask_op_t *op);
 

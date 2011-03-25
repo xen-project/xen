@@ -13,7 +13,6 @@ SUBDIRS-y += hotplug
 SUBDIRS-y += xentrace
 SUBDIRS-$(CONFIG_XCUTILS) += xcutils
 SUBDIRS-$(CONFIG_X86) += firmware
-SUBDIRS-$(ACM_SECURITY) += security
 SUBDIRS-y += console
 SUBDIRS-y += xenmon
 SUBDIRS-$(VTPM_TOOLS) += vtpm_manager

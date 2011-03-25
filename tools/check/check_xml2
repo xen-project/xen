@@ -3,7 +3,7 @@
 
 . ./funcs.sh
 
-if [ ! "$LIBXENAPI_BINDINGS" = "y" -a ! "$ACM_SECURITY" = "y" ]
+if [ ! "$LIBXENAPI_BINDINGS" = "y" ]
 then
     echo -n "unused, "
     exit 0

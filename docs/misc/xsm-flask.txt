@@ -11,7 +11,6 @@ Xen XSM:FLASK configuration
 
 	XSM_ENABLE ?= y
 	FLASK_ENABLE ?= y
-	ACM_SECURITY ?= n
 	
 NB: Only one security module can be selected at a time.  If no module is
 selected, then the default DUMMY module will be enforced.  The DUMMY module

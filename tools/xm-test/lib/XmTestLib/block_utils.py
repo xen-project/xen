@@ -6,7 +6,6 @@
 import time
 
 from XmTestLib import *
-from acm import *
 
 import xen.util.blkif
 
@@ -27,7 +26,6 @@ def get_state(domain, devname):
 
 
 def block_attach(domain, phy, virt):
-    ACMLabelResource(phy)
     status, output = traceCommand("xm block-attach %s %s %s w" %
                                   (domain.getName(), phy, virt))
     if status != 0:

@@ -29,7 +29,6 @@
 #include <asm/iosapic.h>
 #include <xen/softirq.h>
 #include <xen/rcupdate.h>
-#include <xsm/acm/acm_hooks.h>
 #include <asm/sn/simulator.h>
 #include <asm/sal.h>
 #include <xen/cpu.h>
@@ -645,7 +644,7 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
     expose_p2m_init();
 
     /* Create initial domain 0. */
-    dom0 = domain_create(0, 0, DOM0_SSIDREF);
+    dom0 = domain_create(0, 0, 0);
     if (dom0 == NULL)
         panic("Error creating domain 0\n");
     domain_set_vhpt_size(dom0, dom0_vhpt_size_log2);

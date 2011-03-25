@@ -221,12 +221,6 @@ run=yes
 unsafe=no
 GROUPENTERED=default
 
-#Prepare for usage with ACM
-if [ -d /etc/xen/acm-security/policies ]; then
-	cp -f tests/security-acm/xm-test-security_policy.xml \
-	      /etc/xen/acm-security/policies
-fi
-
 unset XM_MANAGED_DOMAINS
 
 # Resolve options

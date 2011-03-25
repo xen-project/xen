@@ -43,14 +43,6 @@ process = Extension("process",
                depends            = [ ],
                sources            = [ "xen/lowlevel/process/process.c" ])
 
-acm = Extension("acm",
-               extra_compile_args = extra_compile_args,
-               include_dirs       = [ PATH_XEN, PATH_LIBXC, "xen/lowlevel/acm" ],
-               library_dirs       = [ PATH_LIBXC ],
-               libraries          = [ "xenctrl" ],
-               depends            = [ PATH_LIBXC + "/libxenctrl.so" ],
-               sources            = [ "xen/lowlevel/acm/acm.c" ])
-
 flask = Extension("flask",
                extra_compile_args = extra_compile_args,
                include_dirs       = [ PATH_XEN, PATH_LIBXC, "xen/lowlevel/flask",
@@ -98,7 +90,7 @@ xl = Extension("xl",
                sources            = [ "xen/lowlevel/xl/xl.c", "xen/lowlevel/xl/_pyxl_types.c" ])
 
 plat = os.uname()[0]
-modules = [ xc, xs, ptsname, acm, flask, xl ]
+modules = [ xc, xs, ptsname, flask, xl ]
 if plat == 'SunOS':
     modules.extend([ scf, process ])
 if plat == 'Linux':
@@ -113,7 +105,6 @@ setup(name            = 'xen',
                          'xen.util.xsm',
                          'xen.util.xsm.dummy',
                          'xen.util.xsm.flask',
-                         'xen.util.xsm.acm',
                          'xen.xend',
                          'xen.xend.server',
                          'xen.xend.xenstore',

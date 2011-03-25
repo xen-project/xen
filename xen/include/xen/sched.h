@@ -11,7 +11,6 @@
 #include <public/domctl.h>
 #include <public/sysctl.h>
 #include <public/vcpu.h>
-#include <public/xsm/acm.h>
 #include <xen/time.h>
 #include <xen/timer.h>
 #include <xen/grant_table.h>
@@ -401,7 +400,7 @@ static inline void get_knownalive_domain(struct domain *d)
 void domain_update_node_affinity(struct domain *d);
 
 struct domain *domain_create(
-    domid_t domid, unsigned int domcr_flags, ssidref_t ssidref);
+    domid_t domid, unsigned int domcr_flags, uint32_t ssidref);
  /* DOMCRF_hvm: Create an HVM domain, as opposed to a PV domain. */
 #define _DOMCRF_hvm           0
 #define DOMCRF_hvm            (1U<<_DOMCRF_hvm)

@@ -2177,47 +2177,6 @@ Most of the above are best understood by looking at the code
 implementing them (in {\tt xen/common/dom0\_ops.c}) and in 
 the user-space tools that use them (mostly in {\tt tools/libxc}). 
 
-\section{Access Control Module Hypercalls}
-\label{s:acmops}
-
-Hypercalls relating to the management of the Access Control Module are
-also restricted to domain 0 access for now. For more details on any or
-all of these, please see {\tt xen/include/public/acm\_ops.h}.  A
-complete list is given below:
-
-\begin{quote}
-
-\hypercall{acm\_op(int cmd, void *args)}
-
-This hypercall can be used to configure the state of the ACM, query
-that state, request access control decisions and dump additional
-information.
-
-\begin{description}
-
-\item [ACMOP\_SETPOLICY:] set the access control policy
-
-\item [ACMOP\_GETPOLICY:] get the current access control policy and
-  status
-
-\item [ACMOP\_DUMPSTATS:] get current access control hook invocation
-  statistics
-
-\item [ACMOP\_GETSSID:] get security access control information for a
-  domain
-
-\item [ACMOP\_GETDECISION:] get access decision based on the currently
-  enforced access control policy
-
-\end{description}
-\end{quote}
-
-Most of the above are best understood by looking at the code
-implementing them (in {\tt xen/common/acm\_ops.c}) and in the
-user-space tools that use them (mostly in {\tt tools/security} and
-{\tt tools/python/xen/lowlevel/acm}).
-
-
 \section{Debugging Hypercalls} 
 
 A few additional hypercalls are mainly useful for debugging: 
