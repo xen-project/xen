@@ -119,7 +119,7 @@ static int calculate_tbuf_size(unsigned int pages)
     size /= PAGE_SIZE;
     if ( pages > size )
     {
-        gdprintk(XENLOG_INFO, "%s: requested number of %u pages reduced to %u\n",
+        printk(XENLOG_INFO "%s: requested number of %u pages reduced to %u\n",
                __func__, pages, (unsigned int)size);
         pages = size;
     }
@@ -265,7 +265,7 @@ static int tb_set_size(unsigned int pages)
      */
     if ( opt_tbuf_size && pages != opt_tbuf_size )
     {
-        gdprintk(XENLOG_INFO, "tb_set_size from %d to %d not implemented\n",
+        printk(XENLOG_INFO "tb_set_size from %d to %d not implemented\n",
                      opt_tbuf_size, pages);
         return -EINVAL;
     }
@@ -310,7 +310,7 @@ void __init init_trace_bufs(void)
 {
     if ( opt_tbuf_size && alloc_trace_bufs(opt_tbuf_size) )
     {
-        gdprintk(XENLOG_INFO, "Xen trace buffers: "
+        printk(XENLOG_INFO "Xen trace buffers: "
                  "allocation size %d failed, disabling\n",
                  opt_tbuf_size);
         opt_tbuf_size = 0;
