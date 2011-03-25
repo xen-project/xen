@@ -34,18 +34,6 @@ struct hpet_event_channel
     int           shift;
     s_time_t      next_event;
     cpumask_t     cpumask;
-    /*
-     * cpumask_lock is used to prevent hpet intr handler from accessing other
-     * cpu's timer_deadline after the other cpu's mask was cleared --
-     * mask cleared means cpu waken up, then accessing timer_deadline from
-     * other cpu is not safe.
-     * It is not used for protecting cpumask, so set ops needn't take it.
-     * Multiple cpus clear cpumask simultaneously is ok due to the atomic
-     * feature of cpu_clear, so hpet_broadcast_exit() can take read lock for 
-     * clearing cpumask, and handle_hpet_broadcast() have to take write lock 
-     * for read cpumask & access timer_deadline.
-     */
-    rwlock_t      cpumask_lock;
     spinlock_t    lock;
     void          (*event_handler)(struct hpet_event_channel *);
 
@@ -199,17 +187,18 @@ again:
     /* find all expired events */
     for_each_cpu_mask(cpu, ch->cpumask)
     {
-        write_lock_irq(&ch->cpumask_lock);
+        s_time_t deadline;
 
-        if ( cpu_isset(cpu, ch->cpumask) )
-        {
-            if ( per_cpu(timer_deadline, cpu) <= now )
-                cpu_set(cpu, mask);
-            else if ( per_cpu(timer_deadline, cpu) < next_event )
-                next_event = per_cpu(timer_deadline, cpu);
-        }
+        rmb();
+        deadline = per_cpu(timer_deadline, cpu);
+        rmb();
+        if ( !cpu_isset(cpu, ch->cpumask) )
+            continue;
 
-        write_unlock_irq(&ch->cpumask_lock);
+        if ( deadline <= now )
+            cpu_set(cpu, mask);
+        else if ( deadline < next_event )
+            next_event = deadline;
     }
 
     /* wakeup the cpus which have an expired event. */
@@ -602,7 +591,6 @@ void __init hpet_broadcast_init(void)
         hpet_events[i].shift = 32;
         hpet_events[i].next_event = STIME_MAX;
         spin_lock_init(&hpet_events[i].lock);
-        rwlock_init(&hpet_events[i].cpumask_lock);
         wmb();
         hpet_events[i].event_handler = handle_hpet_broadcast;
     }
@@ -729,9 +717,7 @@ void hpet_broadcast_exit(void)
     if ( !reprogram_timer(per_cpu(timer_deadline, cpu)) )
         raise_softirq(TIMER_SOFTIRQ);
 
-    read_lock_irq(&ch->cpumask_lock);
     cpu_clear(cpu, ch->cpumask);
-    read_unlock_irq(&ch->cpumask_lock);
 
     if ( !(ch->flags & HPET_EVT_LEGACY) )
     {
