@@ -196,12 +196,11 @@ static int alloc_trace_bufs(unsigned int pages)
     t_info->tbuf_size = pages;
 
     /*
-     * Now share the pages to xentrace can map them, and write them in
+     * Now share the pages so xentrace can map them, and write them in
      * the global t_info structure.
      */
     for_each_online_cpu(cpu)
     {
-        /* Share pages so that xentrace can map them. */
         void *rawbuf = per_cpu(t_bufs, cpu);
         struct page_info *p = virt_to_page(rawbuf);
         uint32_t mfn = virt_to_mfn(rawbuf);
