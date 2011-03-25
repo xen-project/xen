@@ -119,16 +119,18 @@ static int calculate_tbuf_size(unsigned int pages)
     size /= PAGE_SIZE;
     if ( pages > size )
     {
-        printk(XENLOG_INFO "%s: requested number of %u pages reduced to %u\n",
-               __func__, pages, (unsigned int)size);
+        printk(XENLOG_INFO "xentrace: requested number of %u pages "
+               "reduced to %u\n",
+               pages, (unsigned int)size);
         pages = size;
     }
 
     t_info_words = num_online_cpus() * pages + t_info_first_offset;
     t_info_bytes = t_info_words * sizeof(uint32_t);
     t_info_pages = PFN_UP(t_info_bytes);
-    printk(XENLOG_INFO "xentrace: requesting %u t_info pages for %u trace pages on %u cpus\n",
-               t_info_pages, pages, num_online_cpus());
+    printk(XENLOG_INFO "xentrace: requesting %u t_info pages "
+           "for %u trace pages on %u cpus\n",
+           t_info_pages, pages, num_online_cpus());
     return pages;
 }
 
@@ -177,7 +179,8 @@ static int alloc_trace_bufs(unsigned int pages)
         if ( (rawbuf = alloc_xenheap_pages(
                 order, MEMF_bits(32 + PAGE_SHIFT))) == NULL )
         {
-            printk("Xen trace buffers: memory allocation failed on cpu %d\n", cpu);
+            printk(XENLOG_INFO "xentrace: memory allocation failed "
+                   "on cpu %d\n", cpu);
             goto out_dealloc;
         }
 
@@ -212,7 +215,7 @@ static int alloc_trace_bufs(unsigned int pages)
             t_info_mfn_list[offset + i]=mfn + i;
         }
         t_info->mfn_offset[cpu]=offset;
-        printk(XENLOG_INFO "p%d mfn %"PRIx32" offset %d\n",
+        printk(XENLOG_INFO "xentrace: p%d mfn %"PRIx32" offset %d\n",
                cpu, mfn, offset);
         offset+=i;
 
@@ -225,7 +228,7 @@ static int alloc_trace_bufs(unsigned int pages)
 
     register_cpu_notifier(&cpu_nfb);
 
-    printk("Xen trace buffers: initialised\n");
+    printk("xentrace: initialised\n");
     wmb(); /* above must be visible before tb_init_done flag set */
     tb_init_done = 1;
 
@@ -236,7 +239,7 @@ out_dealloc:
     {
         void *rawbuf = per_cpu(t_bufs, cpu);
         per_cpu(t_bufs, cpu) = NULL;
-        printk("Xen trace buffers: cpu %d p %p\n", cpu, rawbuf);
+        printk(XENLOG_DEBUG "xentrace: cpu %d p %p\n", cpu, rawbuf);
         if ( rawbuf )
         {
             ASSERT(!(virt_to_page(rawbuf)->count_info & PGC_allocated));
@@ -245,7 +248,7 @@ out_dealloc:
     }
     free_xenheap_pages(t_info, get_order_from_pages(t_info_pages));
     t_info = NULL;
-    printk("Xen trace buffers: allocation failed! Tracing disabled.\n");
+    printk(XENLOG_WARNING "xentrace: allocation failed! Tracing disabled.\n");
     return -ENOMEM;
 }
 
@@ -264,8 +267,9 @@ static int tb_set_size(unsigned int pages)
      */
     if ( opt_tbuf_size && pages != opt_tbuf_size )
     {
-        printk(XENLOG_INFO "tb_set_size from %d to %d not implemented\n",
-                     opt_tbuf_size, pages);
+        printk(XENLOG_INFO "xentrace: tb_set_size from %d to %d "
+               "not implemented\n",
+               opt_tbuf_size, pages);
         return -EINVAL;
     }
 
@@ -309,9 +313,8 @@ void __init init_trace_bufs(void)
 {
     if ( opt_tbuf_size && alloc_trace_bufs(opt_tbuf_size) )
     {
-        printk(XENLOG_INFO "Xen trace buffers: "
-                 "allocation size %d failed, disabling\n",
-                 opt_tbuf_size);
+        printk(XENLOG_INFO "xentrace: allocation size %d failed, disabling\n",
+               opt_tbuf_size);
         opt_tbuf_size = 0;
     }
 }
