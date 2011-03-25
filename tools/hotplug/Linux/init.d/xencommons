@@ -5,7 +5,7 @@
 #
 # Author:       Ian Jackson <ian.jackson@eu.citrix.com>
 #
-# chkconfig: 2345
+# chkconfig: 2345 70 10
 # description: Starts and stops the Xen control daemon.
 ### BEGIN INIT INFO
 # Provides:          xenstored xenconsoled
