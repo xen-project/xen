@@ -127,6 +127,8 @@ static int calculate_tbuf_size(unsigned int pages)
     t_info_words = num_online_cpus() * pages + t_info_first_offset;
     t_info_bytes = t_info_words * sizeof(uint32_t);
     t_info_pages = PFN_UP(t_info_bytes);
+    printk(XENLOG_INFO "xentrace: requesting %u t_info pages for %u trace pages on %u cpus\n",
+               t_info_pages, pages, num_online_cpus());
     return pages;
 }
 
