@@ -1,7 +1,7 @@
 #include <inttypes.h>
+#include <errno.h>
 #include <sys/ioctl.h>
-#include <linux/fs.h>
-#include <linux/errno.h>
+#include <sys/mount.h>
 #include "tapdisk.h"
 #include "blk.h"
 
