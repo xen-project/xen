@@ -35,17 +35,6 @@ typedef struct {
 } raw_rwlock_t;
 #define _RAW_RW_LOCK_UNLOCKED /*(raw_rwlock_t)*/ { 0, 0 }
 
-#define _raw_read_lock(rw)								\
-do {											\
-	raw_rwlock_t *__read_lock_ptr = (rw);						\
-											\
-	while (unlikely(ia64_fetchadd(1, (int *) __read_lock_ptr, acq) < 0)) {		\
-		ia64_fetchadd(-1, (int *) __read_lock_ptr, rel);			\
-		while (*(volatile int *)__read_lock_ptr < 0)				\
-			cpu_relax();							\
-	}										\
-} while (0)
-
 #define _raw_read_unlock(rw)					\
 do {								\
 	raw_rwlock_t *__read_lock_ptr = (rw);			\
@@ -53,20 +42,6 @@ do {								\
 } while (0)
 
 #ifdef ASM_SUPPORTED
-#define _raw_write_lock(rw)							\
-do {										\
- 	__asm__ __volatile__ (							\
-		"mov ar.ccv = r0\n"						\
-		"dep r29 = -1, r0, 31, 1;;\n"					\
-		"1:\n"								\
-		"ld4 r2 = [%0];;\n"						\
-		"cmp4.eq p0,p7 = r0,r2\n"					\
-		"(p7) br.cond.spnt.few 1b \n"					\
-		"cmpxchg4.acq r2 = [%0], r29, ar.ccv;;\n"			\
-		"cmp4.eq p0,p7 = r0, r2\n"					\
-		"(p7) br.cond.spnt.few 1b;;\n"					\
-		:: "r"(rw) : "ar.ccv", "p7", "r2", "r29", "memory");		\
-} while(0)
 
 #define _raw_write_trylock(rw)							\
 ({										\
@@ -82,16 +57,6 @@ do {										\
 
 #else /* !ASM_SUPPORTED */
 
-#define _raw_write_lock(l)								\
-({											\
-	__u64 ia64_val, ia64_set_val = ia64_dep_mi(-1, 0, 31, 1);			\
-	__u32 *ia64_write_lock_ptr = (__u32 *) (l);					\
-	do {										\
-		while (*ia64_write_lock_ptr)						\
-			ia64_barrier();							\
-		ia64_val = ia64_cmpxchg4_acq(ia64_write_lock_ptr, ia64_set_val, 0);	\
-	} while (ia64_val);								\
-})
 
 #define _raw_write_trylock(rw)						\
 ({									\

@@ -157,6 +157,7 @@ unsigned long _read_lock_irqsave(rwlock_t *lock);
 void _read_unlock(rwlock_t *lock);
 void _read_unlock_irq(rwlock_t *lock);
 void _read_unlock_irqrestore(rwlock_t *lock, unsigned long flags);
+int _read_trylock(rwlock_t *lock);
 
 void _write_lock(rwlock_t *lock);
 void _write_lock_irq(rwlock_t *lock);
@@ -210,6 +211,7 @@ int _rw_is_write_locked(rwlock_t *lock);
 #define read_unlock(l)                _read_unlock(l)
 #define read_unlock_irq(l)            _read_unlock_irq(l)
 #define read_unlock_irqrestore(l, f)  _read_unlock_irqrestore(l, f)
+#define read_trylock(l)               _read_trylock(l)
 
 #define write_lock(l)                 _write_lock(l)
 #define write_lock_irq(l)             _write_lock_irq(l)
