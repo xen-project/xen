@@ -1022,6 +1022,12 @@ static void __pirq_guest_eoi(struct domain *d, int pirq)
     if ( desc == NULL )
         return;
 
+    if ( !(desc->status & IRQ_GUEST) )
+    {
+        spin_unlock_irq(&desc->lock);
+        return;
+    }
+
     action = (irq_guest_action_t *)desc->action;
     irq = desc - irq_desc;
 
