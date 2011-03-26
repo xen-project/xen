@@ -40,7 +40,6 @@ struct pci_ats_dev {
     u8 bus;
     u8 devfn;
     u16 ats_queue_depth;    /* ATS device invalidation queue depth */
-    spinlock_t lock;
 };
 static LIST_HEAD(ats_devices);
 
