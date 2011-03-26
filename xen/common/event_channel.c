@@ -417,7 +417,7 @@ static long __evtchn_close(struct domain *d1, int port1)
             if ( v->virq_to_evtchn[chn1->u.virq] != port1 )
                 continue;
             v->virq_to_evtchn[chn1->u.virq] = 0;
-            spin_barrier_irq(&v->virq_lock);
+            spin_barrier(&v->virq_lock);
         }
         break;
 

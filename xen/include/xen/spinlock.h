@@ -144,7 +144,6 @@ void _spin_unlock_irqrestore(spinlock_t *lock, unsigned long flags);
 int _spin_is_locked(spinlock_t *lock);
 int _spin_trylock(spinlock_t *lock);
 void _spin_barrier(spinlock_t *lock);
-void _spin_barrier_irq(spinlock_t *lock);
 
 int _spin_trylock_recursive(spinlock_t *lock);
 void _spin_lock_recursive(spinlock_t *lock);
@@ -191,7 +190,6 @@ int _rw_is_write_locked(rwlock_t *lock);
 
 /* Ensure a lock is quiescent between two critical operations. */
 #define spin_barrier(l)               _spin_barrier(l)
-#define spin_barrier_irq(l)           _spin_barrier_irq(l)
 
 /*
  * spin_[un]lock_recursive(): Use these forms when the lock can (safely!) be

@@ -23,11 +23,48 @@ static void check_lock(struct lock_debug *debug)
     /* A few places take liberties with this. */
     /* BUG_ON(in_irq() && !irq_safe); */
 
+    /*
+     * We partition locks into IRQ-safe (always held with IRQs disabled) and
+     * IRQ-unsafe (always held with IRQs enabled) types. The convention for
+     * every lock must be consistently observed else we can deadlock in
+     * IRQ-context rendezvous functions (a rendezvous which gets every CPU
+     * into IRQ context before any CPU is released from the rendezvous).
+     * 
+     * If we can mix IRQ-disabled and IRQ-enabled callers, the following can
+     * happen:
+     *  * Lock is held by CPU A, with IRQs enabled
+     *  * CPU B is spinning on same lock, with IRQs disabled
+     *  * Rendezvous starts -- CPU A takes interrupt and enters rendezbous spin
+     *  * DEADLOCK -- CPU B will never enter rendezvous, CPU A will never exit
+     *                the rendezvous, and will hence never release the lock.
+     * 
+     * To guard against this subtle bug we latch the IRQ safety of every
+     * spinlock in the system, on first use.
+     */
     if ( unlikely(debug->irq_safe != irq_safe) )
     {
         int seen = cmpxchg(&debug->irq_safe, -1, irq_safe);
         BUG_ON(seen == !irq_safe);
     }
+}
+
+static void check_barrier(struct lock_debug *debug)
+{
+    if ( unlikely(atomic_read(&spin_debug) <= 0) )
+        return;
+
+    /*
+     * For a barrier, we have a relaxed IRQ-safety-consistency check.
+     * 
+     * It is always safe to spin at the barrier with IRQs enabled -- that does
+     * not prevent us from entering an IRQ-context rendezvous, and nor are
+     * we preventing anyone else from doing so (since we do not actually
+     * acquire the lock during a barrier operation).
+     * 
+     * However, if we spin on an IRQ-unsafe lock with IRQs disabled then that
+     * is clearly wrong, for the same reason outlined in check_lock() above.
+     */
+    BUG_ON(!local_irq_is_enabled() && (debug->irq_safe == 0));
 }
 
 void spin_debug_enable(void)
@@ -171,7 +208,7 @@ void _spin_barrier(spinlock_t *lock)
     s_time_t block = NOW();
     u64      loop = 0;
 
-    check_lock(&lock->debug);
+    check_barrier(&lock->debug);
     do { mb(); loop++;} while ( _raw_spin_is_locked(&lock->raw) );
     if (loop > 1)
     {
@@ -179,18 +216,10 @@ void _spin_barrier(spinlock_t *lock)
         lock->profile.block_cnt++;
     }
 #else
-    check_lock(&lock->debug);
+    check_barrier(&lock->debug);
     do { mb(); } while ( _raw_spin_is_locked(&lock->raw) );
 #endif
     mb();
-}
-
-void _spin_barrier_irq(spinlock_t *lock)
-{
-    unsigned long flags;
-    local_irq_save(flags);
-    _spin_barrier(lock);
-    local_irq_restore(flags);
 }
 
 int _spin_trylock_recursive(spinlock_t *lock)
