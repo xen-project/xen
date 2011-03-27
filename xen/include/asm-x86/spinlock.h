@@ -40,14 +40,14 @@ typedef struct {
 
 static always_inline int _raw_read_trylock(raw_rwlock_t *rw)
 {
-    bool_t acquired;
+    int acquired;
 
     asm volatile (
         "    lock; decl %0         \n"
         "    jns 2f                \n"
         "1:  .subsection 1         \n"
         "2:  lock; incl %0         \n"
-        "    dec %1                \n"
+        "    decl %1               \n"
         "    jmp 1b                \n"
         "    .subsection 0         \n"
         : "=m" (rw->lock), "=r" (acquired) : "1" (1) : "memory" );
