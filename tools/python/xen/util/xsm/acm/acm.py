@@ -25,7 +25,6 @@ import threading
 import struct
 import stat
 import base64
-from xen.lowlevel import acm
 from xen.xend import sxp
 from xen.xend import XendConstants
 from xen.xend import XendOptions
@@ -140,10 +139,7 @@ def refresh_security_policy():
     active_policy = 'INACCESSIBLE'
 
     if os.access("/proc/xen/privcmd", os.R_OK|os.W_OK):
-        try:
-            active_policy = acm.policy()
-        except:
-            active_policy = "INACTIVE"
+        active_policy = "INACTIVE"
 
 def get_active_policy_name():
     refresh_security_policy()
@@ -439,26 +435,7 @@ def get_ssid(domain):
     """
     enables domains to retrieve the label / ssidref of a running domain
     """
-    if not on():
-        err("No policy active.")
-
-    if isinstance(domain, str):
-        domain_int = int(domain)
-    elif isinstance(domain, int):
-        domain_int = domain
-    else:
-        err("Illegal parameter type.")
-    try:
-        ssid_info = acm.getssid(int(domain_int))
-    except:
-        err("Cannot determine security information.")
-
-    label = ssidref2label(ssid_info["ssidref"])
-
-    return(ssid_info["policyreference"],
-           label,
-           ssid_info["policytype"],
-           ssid_info["ssidref"])
+    err("No policy active.")
 
 
 
@@ -469,40 +446,7 @@ def get_decision(arg1, arg2):
     IN: args format = ['domid', id] or ['ssidref', ssidref]
     or ['access_control', ['policy', policy], ['label', label], ['type', type]]
     """
-
-    if not on():
-        err("No policy active.")
-
-    #translate labels before calling low-level function
-    if arg1[0] == 'access_control':
-        if (arg1[1][0] != 'policy') or (arg1[2][0] != 'label') or (arg1[3][0] != 'type'):
-            err("Argument type not supported.")
-        ssidref = label2ssidref(arg1[2][1], arg1[1][1], arg1[3][1])
-        arg1 = ['ssidref', str(ssidref)]
-    if arg2[0] == 'access_control':
-        if (arg2[1][0] != 'policy') or (arg2[2][0] != 'label') or (arg2[3][0] != 'type'):
-            err("Argument type not supported.")
-        ssidref = label2ssidref(arg2[2][1], arg2[1][1], arg2[3][1])
-        arg2 = ['ssidref', str(ssidref)]
-
-    # accept only int or string types for domid and ssidref
-    if isinstance(arg1[1], int):
-        arg1[1] = str(arg1[1])
-    if isinstance(arg2[1], int):
-        arg2[1] = str(arg2[1])
-    if not isinstance(arg1[1], str) or not isinstance(arg2[1], str):
-        err("Invalid id or ssidref type, string or int required")
-
-    try:
-        decision = acm.getdecision(arg1[0], arg1[1], arg2[0], arg2[1],
-                                   ACMHOOK_sharing)
-    except:
-        err("Cannot determine decision.")
-
-    if decision:
-        return decision
-    else:
-        err("Cannot determine decision (Invalid parameter).")
+    err("No policy active.")
 
 
 def has_authorization(ssidref):
@@ -510,14 +454,7 @@ def has_authorization(ssidref):
         run on this system. To have authoriztion dom0's STE types must
         be a superset of that of the domain's given through its ssidref.
     """
-    rc = True
-    dom0_ssidref = int(acm.getssid(0)['ssidref'])
-    decision = acm.getdecision('ssidref', str(dom0_ssidref),
-                               'ssidref', str(ssidref),
-                               ACMHOOK_authorization)
-    if decision == "DENIED":
-        rc = False
-    return rc
+    return True
 
 
 def hv_chg_policy(bin_pol, del_array, chg_array):
@@ -527,44 +464,19 @@ def hv_chg_policy(bin_pol, del_array, chg_array):
         and changed ssidrefs which can be due to deleted VM labels
         or reordered VM labels
     """
-    rc = -xsconstants.XSERR_GENERAL_FAILURE
-    errors = ""
-    if not on():
-        err("No policy active.")
-    try:
-        rc, errors = acm.chgpolicy(bin_pol, del_array, chg_array)
-    except Exception, e:
-        pass
-    if len(errors) > 0:
-        rc = -xsconstants.XSERR_HV_OP_FAILED
-    return rc, errors
+    err("No policy active.")
 
 def hv_get_policy():
     """
         Gte the binary policy enforced in the hypervisor
     """
-    rc = -xsconstants.XSERR_GENERAL_FAILURE
-    bin_pol = ""
-    if not on():
-        err("No policy active.")
-    try:
-        rc, bin_pol = acm.getpolicy()
-    except Exception, e:
-        pass
-    if len(bin_pol) == 0:
-        bin_pol = None
-    return rc, bin_pol
+    err("No policy active.")
 
 
 def is_in_conflict(ssidref):
     """ Check whether the given ssidref is in conflict with any running
         domain.
     """
-    decision = acm.getdecision('ssidref', str(ssidref),
-                               'ssidref', str(ssidref),
-                               ACMHOOK_conflictset)
-    if decision == "DENIED":
-        return True
     return False
 
 
@@ -1375,19 +1287,8 @@ def relabel_domains(relabel_list):
       @param relabel_list: a list containing tuples of domid, ssidref
                            example: [ [0, 0x00020002] ]
     """
-    rel_rules = ""
-    for r in relabel_list:
-        log.info("Relabeling domain with domid %d to new ssidref 0x%08x",
-                r[0], r[1])
-        rel_rules += struct.pack("ii", r[0], r[1])
-    try:
-        rc, errors = acm.relabel_domains(rel_rules)
-    except Exception, e:
-        log.info("Error after relabel_domains: %s" % str(e))
-        rc = -xsconstants.XSERR_GENERAL_FAILURE
-        errors = ""
-    if (len(errors) > 0):
-        rc = -xsconstants.XSERR_HV_OP_FAILED
+    rc = -xsconstants.XSERR_GENERAL_FAILURE
+    errors = ""
     return rc, errors
 
 
