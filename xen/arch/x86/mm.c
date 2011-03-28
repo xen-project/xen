@@ -161,6 +161,30 @@ static int get_superpage(unsigned long mfn, struct domain *d);
 #endif
 static void put_superpage(unsigned long mfn);
 
+static uint32_t base_disallow_mask;
+#define L1_DISALLOW_MASK (base_disallow_mask | _PAGE_GNTTAB)
+#define L2_DISALLOW_MASK (base_disallow_mask & ~_PAGE_PSE)
+
+#if defined(__x86_64__)
+
+#define l3_disallow_mask(d) (!is_pv_32on64_domain(d) ?  \
+                             base_disallow_mask :       \
+                             0xFFFFF198U)
+
+#define L4_DISALLOW_MASK (base_disallow_mask)
+
+#ifdef USER_MAPPINGS_ARE_GLOBAL
+/* Global bit is allowed to be set on L1 PTEs. Intended for user mappings. */
+#undef L1_DISALLOW_MASK
+#define L1_DISALLOW_MASK ((base_disallow_mask | _PAGE_GNTTAB) & ~_PAGE_GLOBAL)
+#endif
+
+#elif defined (__i386__)
+
+#define l3_disallow_mask(d) 0xFFFFF1FEU /* must-be-zero */
+
+#endif
+
 #define l1_disallow_mask(d)                                     \
     ((d != dom_io) &&                                           \
      (rangeset_is_empty((d)->iomem_caps) &&                     \
@@ -168,15 +192,6 @@ static void put_superpage(unsigned long mfn);
       !has_arch_pdevs(d) &&                                     \
       !is_hvm_domain(d)) ?                                      \
      L1_DISALLOW_MASK : (L1_DISALLOW_MASK & ~PAGE_CACHE_ATTRS))
-
-#ifdef __x86_64__
-l2_pgentry_t *compat_idle_pg_table_l2 = NULL;
-#define l3_disallow_mask(d) (!is_pv_32on64_domain(d) ?  \
-                             L3_DISALLOW_MASK :         \
-                             COMPAT_L3_DISALLOW_MASK)
-#else
-#define l3_disallow_mask(d) L3_DISALLOW_MASK
-#endif
 
 #ifdef __x86_64__
 static void __init init_spagetable(void)
@@ -272,6 +287,16 @@ void __init init_frametable(void)
 void __init arch_init_memory(void)
 {
     unsigned long i, pfn, rstart_pfn, rend_pfn, iostart_pfn, ioend_pfn;
+
+    /* Basic guest-accessible flags: PRESENT, R/W, USER, A/D, AVAIL[0,1,2] */
+    base_disallow_mask = ~(_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|
+                           _PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_AVAIL);
+    /* Allow guest access to the NX flag if hardware supports it. */
+    if ( cpu_has_nx )
+        base_disallow_mask &= ~_PAGE_NX_BIT;
+    /* On x86/64, range [62:52] is available for guest software use. */
+    if ( CONFIG_PAGING_LEVELS == 4 )
+        base_disallow_mask &= ~get_pte_flags((intpte_t)0x7ff << 52);
 
     /*
      * Initialise our DOMID_XEN domain.
@@ -3982,11 +4007,17 @@ int create_grant_host_mapping(uint64_t addr, unsigned long frame,
                               unsigned int flags, unsigned int cache_flags)
 {
     l1_pgentry_t pte;
+    uint32_t grant_pte_flags;
 
     if ( paging_mode_external(current->domain) )
         return create_grant_p2m_mapping(addr, frame, flags, cache_flags);
 
-    pte = l1e_from_pfn(frame, GRANT_PTE_FLAGS);
+    grant_pte_flags =
+        _PAGE_PRESENT | _PAGE_ACCESSED | _PAGE_DIRTY | _PAGE_GNTTAB;
+    if ( cpu_has_nx )
+        grant_pte_flags |= _PAGE_NX_BIT;
+
+    pte = l1e_from_pfn(frame, grant_pte_flags);
     if ( (flags & GNTMAP_application_map) )
         l1e_add_flags(pte,_PAGE_USER);
     if ( !(flags & GNTMAP_readonly) )

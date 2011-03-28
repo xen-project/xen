@@ -342,9 +342,6 @@ void setup_idle_pagetable(void);
 #define __PAGE_HYPERVISOR_NOCACHE \
     (_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_PCD | _PAGE_ACCESSED)
 
-#define GRANT_PTE_FLAGS \
-    (_PAGE_PRESENT | _PAGE_ACCESSED | _PAGE_DIRTY | _PAGE_NX | _PAGE_GNTTAB)
-
 #ifndef __ASSEMBLY__
 
 static inline int get_order_from_bytes(paddr_t size)

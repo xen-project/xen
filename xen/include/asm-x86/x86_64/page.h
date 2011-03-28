@@ -154,24 +154,9 @@ typedef l4_pgentry_t root_pgentry_t;
 
 /* Bit 23 of a 24-bit flag mask. This corresponds to bit 63 of a pte.*/
 #define _PAGE_NX_BIT (1U<<23)
-#define _PAGE_NX     (cpu_has_nx ? _PAGE_NX_BIT : 0U)
 
 /* Bit 22 of a 24-bit flag mask. This corresponds to bit 62 of a pte.*/
 #define _PAGE_GNTTAB (1U<<22)
-
-/*
- * Disallow unused flag bits plus PAT/PSE, PCD, PWT and GLOBAL.
- * Permit the NX bit if the hardware supports it.
- * Note that range [62:52] is available for software use on x86/64.
- */
-#define BASE_DISALLOW_MASK (0xFF800198U & ~_PAGE_NX)
-
-#define L1_DISALLOW_MASK (BASE_DISALLOW_MASK | _PAGE_GNTTAB)
-#define L2_DISALLOW_MASK (BASE_DISALLOW_MASK & ~_PAGE_PSE)
-#define L3_DISALLOW_MASK (BASE_DISALLOW_MASK)
-#define L4_DISALLOW_MASK (BASE_DISALLOW_MASK)
-
-#define COMPAT_L3_DISALLOW_MASK 0xFFFFF198U
 
 #define PAGE_HYPERVISOR         (__PAGE_HYPERVISOR         | _PAGE_GLOBAL)
 #define PAGE_HYPERVISOR_NOCACHE (__PAGE_HYPERVISOR_NOCACHE | _PAGE_GLOBAL)
@@ -184,9 +169,6 @@ typedef l4_pgentry_t root_pgentry_t;
  * is asserted for both.
  */
 #define _PAGE_GUEST_KERNEL (1U<<12)
-/* Global bit is allowed to be set on L1 PTEs. Intended for user mappings. */
-#undef L1_DISALLOW_MASK
-#define L1_DISALLOW_MASK ((BASE_DISALLOW_MASK | _PAGE_GNTTAB) & ~_PAGE_GLOBAL)
 #else
 #define _PAGE_GUEST_KERNEL 0
 #endif

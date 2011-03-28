@@ -1129,7 +1129,7 @@ static int __spurious_page_fault(
 
     disallowed_flags = 0;
     if ( error_code & PFEC_insn_fetch )
-        disallowed_flags |= _PAGE_NX;
+        disallowed_flags |= _PAGE_NX_BIT;
 
     mfn = cr3 >> PAGE_SHIFT;
 

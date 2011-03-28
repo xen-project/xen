@@ -69,6 +69,8 @@ l3_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
 l2_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
     l2_bootmap[L2_PAGETABLE_ENTRIES];
 
+l2_pgentry_t *compat_idle_pg_table_l2;
+
 int __mfn_valid(unsigned long mfn)
 {
     return likely(mfn < max_page) &&

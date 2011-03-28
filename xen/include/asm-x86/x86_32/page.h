@@ -116,22 +116,12 @@ extern unsigned int PAGE_HYPERVISOR_NOCACHE;
  *  32-bit flags = (pte[63:44],pte[11:0])
  */
 
-#define _PAGE_NX_BIT (1U<<31)
-#define _PAGE_NX     (cpu_has_nx ? _PAGE_NX_BIT : 0)
-
 /* Extract flags into 32-bit integer, or turn 32-bit flags into a pte mask. */
 #define get_pte_flags(x) (((int)((x) >> 32) & ~0xFFF) | ((int)(x) & 0xFFF))
 #define put_pte_flags(x) (((intpte_t)((x) & ~0xFFF) << 32) | ((x) & 0xFFF))
 
-/*
- * Disallow unused flag bits plus PAT/PSE, PCD, PWT and GLOBAL.
- * Permit the NX bit if the hardware supports it.
- */
-#define BASE_DISALLOW_MASK (0xFFFFF198U & ~_PAGE_NX)
-
-#define L1_DISALLOW_MASK (BASE_DISALLOW_MASK | _PAGE_GNTTAB)
-#define L2_DISALLOW_MASK (BASE_DISALLOW_MASK & ~_PAGE_PSE)
-#define L3_DISALLOW_MASK 0xFFFFF1FEU /* must-be-zero */
+/* Bit 31 of a 32-bit flag mask. This corresponds to bit 63 of a pte.*/
+#define _PAGE_NX_BIT (1U<<31)
 
 #endif /* __X86_32_PAGE_H__ */
 

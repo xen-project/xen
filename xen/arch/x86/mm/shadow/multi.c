@@ -842,8 +842,8 @@ perms_strictly_increased(u32 old_flags, u32 new_flags)
 /* Given the flags of two entries, are the new flags a strict
  * increase in rights over the old ones? */
 {
-    u32 of = old_flags & (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_NX);
-    u32 nf = new_flags & (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_NX);
+    u32 of = old_flags & (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_NX_BIT);
+    u32 nf = new_flags & (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_NX_BIT);
     /* Flip the NX bit, since it's the only one that decreases rights;
      * we calculate as if it were an "X" bit. */
     of ^= _PAGE_NX_BIT;
