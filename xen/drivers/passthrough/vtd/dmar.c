@@ -761,12 +761,7 @@ out:
 
 int __init acpi_dmar_init(void)
 {
-    unsigned long flags;
-
-    /* Disabling IRQs avoids cross-CPU TLB flush in map_pages_to_xen(). */
-    local_irq_save(flags);
     acpi_get_table(ACPI_SIG_DMAR, 0, &dmar_table);
-    local_irq_restore(flags);
 
     return parse_dmar_table(acpi_parse_dmar);
 }
