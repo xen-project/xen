@@ -80,6 +80,7 @@ void spin_debug_disable(void)
 #else /* defined(NDEBUG) */
 
 #define check_lock(l) ((void)0)
+#define check_barrier(l) ((void)0)
 
 #endif
 
