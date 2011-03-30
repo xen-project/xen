@@ -192,20 +192,24 @@ module Device_pci : sig
 	external shutdown : domid -> unit = "stub_xl_device_pci_shutdown"
 end
 
-type physinfo =
-{
-	threads_per_core: int;
-	cores_per_socket: int;
-	max_cpu_id: int;
-	nr_cpus: int;
-	cpu_khz: int;
-	total_pages: int64;
-	free_pages: int64;
-	scrub_pages: int64;
-	nr_nodes: int;
-	hwcap: int32 array;
-	physcap: int32;
-}
+module Physinfo : sig
+	type t =
+	{
+		threads_per_core: int;
+		cores_per_socket: int;
+		max_cpu_id: int;
+		nr_cpus: int;
+		cpu_khz: int;
+		total_pages: int64;
+		free_pages: int64;
+		scrub_pages: int64;
+		nr_nodes: int;
+		hwcap: int32 array;
+		physcap: int32;
+	}
+	external get : unit -> t = "stub_xl_physinfo"
+
+end
 
 type topology = 
 {
@@ -227,7 +231,6 @@ type button =
 	| Button_Sleep
 
 external button_press : domid -> button -> unit = "stub_xl_button_press"
-external physinfo : unit -> physinfo = "stub_xl_physinfo"
 
 external topologyinfo: unit -> topologyinfo = "stub_xl_topologyinfo"
 
