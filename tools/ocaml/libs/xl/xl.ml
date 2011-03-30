@@ -220,11 +220,15 @@ type topology =
 
 type topologyinfo = topology option array
 
-type sched_credit =
-{
-	weight: int;
-	cap: int;
-}
+module Sched_credit = struct
+	type t =
+	{
+		weight: int;
+		cap: int;
+	}
+	external domain_get : domid -> t = "stub_xl_sched_credit_domain_get"
+	external domain_set : domid -> t -> unit = "stub_xl_sched_credit_domain_set"
+end
 
 type button =
 	| Button_Power
@@ -233,9 +237,6 @@ type button =
 external button_press : domid -> button -> unit = "stub_xl_button_press"
 
 external topologyinfo: unit -> topologyinfo = "stub_xl_topologyinfo"
-
-external domain_sched_credit_get : domid -> sched_credit = "stub_xl_sched_credit_domain_get"
-external domain_sched_credit_set : domid -> sched_credit -> unit = "stub_xl_sched_credit_domain_set"
 
 external send_trigger : domid -> string -> int -> unit = "stub_xl_send_trigger"
 external send_sysrq : domid -> char -> unit = "stub_xl_send_sysrq"
