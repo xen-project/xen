@@ -214,9 +214,6 @@ type sched_credit =
 	cap: int;
 }
 
-external domain_make : create_info -> domid = "stub_xl_domain_make"
-external domain_build : build_info -> domid -> build_state = "stub_xl_domain_build"
-
 type button =
 	| Button_Power
 	| Button_Sleep
