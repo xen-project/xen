@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Citrix Ltd.
+ * Copyright (C) 2009-2011 Citrix Ltd.
  * Author Vincent Hanquez <vincent.hanquez@eu.citrix.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -402,7 +402,7 @@ value stub_xl_disk_remove(value info, value domid)
 	CAMLreturn(Val_unit);
 }
 
-value stub_xl_nic_add(value info, value domid)
+value stub_xl_device_nic_add(value info, value domid)
 {
 	CAMLparam2(info, domid);
 	libxl_device_nic c_info;
@@ -419,7 +419,7 @@ value stub_xl_nic_add(value info, value domid)
 	CAMLreturn(Val_unit);
 }
 
-value stub_xl_nic_remove(value info, value domid)
+value stub_xl_device_nic_del(value info, value domid)
 {
 	CAMLparam2(info, domid);
 	libxl_device_nic c_info;
@@ -431,7 +431,7 @@ value stub_xl_nic_remove(value info, value domid)
 	INIT_CTX();
 	ret = libxl_device_nic_del(ctx, Int_val(domid), &c_info, 0);
 	if (ret != 0)
-		failwith_xl("nic_remove", &lg);
+		failwith_xl("nic_del", &lg);
 	FREE_CTX();
 	CAMLreturn(Val_unit);
 }

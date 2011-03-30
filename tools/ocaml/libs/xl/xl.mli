@@ -1,5 +1,5 @@
 (*
- * Copyright (C) 2009-2010 Citrix Ltd.
+ * Copyright (C) 2009-2011 Citrix Ltd.
  * Author Vincent Hanquez <vincent.hanquez@eu.citrix.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -97,18 +97,22 @@ type nic_type =
 	| NICTYPE_IOEMU
 	| NICTYPE_VIF
 
-type nic_info =
-{
-	backend_domid : domid;
-	devid : int;
-	mtu : int;
-	model : string;
-	mac : int array;
-	bridge : string;
-	ifname : string;
-	script : string;
-	nictype : nic_type;
-}
+module Device_nic : sig
+	type t =
+	{
+		backend_domid : domid;
+		devid : int;
+		mtu : int;
+		model : string;
+		mac : int array;
+		bridge : string;
+		ifname : string;
+		script : string;
+		nictype : nic_type;
+	}
+	external add : t -> domid -> unit = "stub_xl_device_nic_add"
+	external del : t -> domid -> unit = "stub_xl_device_nic_del"
+end
 
 type console_type =
 	| CONSOLETYPE_XENCONSOLED
@@ -189,9 +193,6 @@ external domain_build : build_info -> domid -> build_state = "stub_xl_domain_bui
 
 external disk_add : disk_info -> domid -> unit = "stub_xl_disk_add"
 external disk_remove : disk_info -> domid -> unit = "stub_xl_disk_remove"
-
-external nic_add : nic_info -> domid -> unit = "stub_xl_nic_add"
-external nic_remove : disk_info -> domid -> unit = "stub_xl_nic_remove"
 
 external console_add : console_info -> build_state -> domid -> unit = "stub_xl_console_add"
 
