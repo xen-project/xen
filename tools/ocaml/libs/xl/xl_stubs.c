@@ -436,7 +436,7 @@ value stub_xl_device_nic_del(value info, value domid)
 	CAMLreturn(Val_unit);
 }
 
-value stub_xl_console_add(value info, value state, value domid)
+value stub_xl_device_console_add(value info, value state, value domid)
 {
 	CAMLparam3(info, state, domid);
 	libxl_device_console c_info;

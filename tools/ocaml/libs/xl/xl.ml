@@ -123,12 +123,16 @@ type console_type =
 	| CONSOLETYPE_XENCONSOLED
 	| CONSOLETYPE_IOEMU
 
-type console_info =
-{
-	backend_domid : domid;
-	devid : int;
-	consoletype : console_type;
-}
+module Device_console = struct
+	type t =
+	{
+		backend_domid : domid;
+		devid : int;
+		consoletype : console_type;
+	}
+
+	external add : t -> build_state -> domid -> unit = "stub_xl_device_console_add"
+end
 
 type vkb_info =
 {
@@ -195,8 +199,6 @@ type sched_credit =
 
 external domain_make : create_info -> domid = "stub_xl_domain_make"
 external domain_build : build_info -> domid -> build_state = "stub_xl_domain_build"
-
-external console_add : console_info -> build_state -> domid -> unit = "stub_xl_console_add"
 
 external vkb_add : vkb_info -> domid -> unit = "stub_xl_vkb_add"
 external vkb_clean_shutdown : domid -> unit = "stub_vkb_clean_shutdown"
