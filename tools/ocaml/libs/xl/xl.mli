@@ -31,40 +31,44 @@ module Domain_create_info : sig
 	}
 end
 
-type build_pv_info =
-{
-	slack_memkb : int64;
-	cmdline : string;
-	ramdisk : string;
-	features : string;
-}
+module Domain_build_info : sig
+	module Hvm : sig
+		type t =
+		{
+			pae : bool;
+			apic : bool;
+			acpi : bool;
+			nx : bool;
+			viridian : bool;
+			timeoffset : string;
+			timer_mode : int;
+			hpet : int;
+			vpt_align : int;
+		}
+	end
 
-type build_hvm_info =
-{
-	pae : bool;
-	apic : bool;
-	acpi : bool;
-	nx : bool;
-	viridian : bool;
-	timeoffset : string;
-	timer_mode : int;
-	hpet : int;
-	vpt_align : int;
-}
+	module Pv : sig
+		type t =
+		{
+			slack_memkb : int64;
+			cmdline : string;
+			ramdisk : string;
+			features : string;
+		}
+	end
 
-type build_spec = BuildHVM of build_hvm_info | BuildPV of build_pv_info
-
-type build_info =
-{
-	max_vcpus : int;
-	cur_vcpus : int;
-	max_memkb : int64;
-	target_memkb : int64;
-	video_memkb : int64;
-	shadow_memkb : int64;
-	kernel : string;
-	priv: build_spec;
-}
+	type t =
+	{
+		max_vcpus : int;
+		cur_vcpus : int;
+		max_memkb : int64;
+		target_memkb : int64;
+		video_memkb : int64;
+		shadow_memkb : int64;
+		kernel : string;
+		u : [ `HVM of Hvm.t | `PV of Pv.t ];
+	}
+end
 
 type build_state =
 {
