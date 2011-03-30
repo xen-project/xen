@@ -167,17 +167,22 @@ module Device_vfb = struct
 	external hard_shutdown : domid -> unit = "stub_xl_device_vfb_hard_shutdown"
 end
 
+module Device_pci = struct
+	type t =
+	{
+		func : int;
+		dev : int;
+		bus : int;
+		domain : int;
+		vdevfn : int;
+		msitranslate : bool;
+		power_mgmt : bool;
+	}
 
-type pci_info =
-{
-	func : int;
-	dev : int;
-	bus : int;
-	domain : int;
-	vdevfn : int;
-	msitranslate : bool;
-	power_mgmt : bool;
-}
+	external add : t -> domid -> unit = "stub_xl_device_pci_add"
+	external remove : t -> domid -> unit = "stub_xl_device_pci_remove"
+	external shutdown : domid -> unit = "stub_xl_device_pci_shutdown"
+end
 
 type physinfo =
 {
@@ -211,10 +216,6 @@ type sched_credit =
 
 external domain_make : create_info -> domid = "stub_xl_domain_make"
 external domain_build : build_info -> domid -> build_state = "stub_xl_domain_build"
-
-external pci_add : pci_info -> domid -> unit = "stub_xl_pci_add"
-external pci_remove : pci_info -> domid -> unit = "stub_xl_pci_remove"
-external pci_shutdown : domid -> unit = "stub_xl_pci_shutdown"
 
 type button =
 	| Button_Power

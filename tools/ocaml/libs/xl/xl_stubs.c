@@ -552,7 +552,7 @@ value stub_xl_device_vfb_hard_shutdown(value domid)
 	CAMLreturn(Val_unit);
 }
 
-value stub_xl_pci_add(value info, value domid)
+value stub_xl_device_pci_add(value info, value domid)
 {
 	CAMLparam2(info, domid);
 	libxl_device_pci c_info;
@@ -570,7 +570,7 @@ value stub_xl_pci_add(value info, value domid)
 	CAMLreturn(Val_unit);
 }
 
-value stub_xl_pci_remove(value info, value domid)
+value stub_xl_device_pci_remove(value info, value domid)
 {
 	CAMLparam2(info, domid);
 	libxl_device_pci c_info;
@@ -588,7 +588,7 @@ value stub_xl_pci_remove(value info, value domid)
 	CAMLreturn(Val_unit);
 }
 
-value stub_xl_pci_shutdown(value domid)
+value stub_xl_device_pci_shutdown(value domid)
 {
 	CAMLparam1(domid);
 	int ret;
