@@ -368,7 +368,7 @@ static value Val_topologyinfo(libxl_topologyinfo *c_val)
 	CAMLreturn(topologyinfo);
 }
 
-value stub_xl_disk_add(value info, value domid)
+value stub_xl_device_disk_add(value info, value domid)
 {
 	CAMLparam2(info, domid);
 	libxl_device_disk c_info;
@@ -385,7 +385,7 @@ value stub_xl_disk_add(value info, value domid)
 	CAMLreturn(Val_unit);
 }
 
-value stub_xl_disk_remove(value info, value domid)
+value stub_xl_device_disk_del(value info, value domid)
 {
 	CAMLparam2(info, domid);
 	libxl_device_disk c_info;
@@ -397,7 +397,7 @@ value stub_xl_disk_remove(value info, value domid)
 	INIT_CTX();
 	ret = libxl_device_disk_del(ctx, Int_val(domid), &c_info, 0);
 	if (ret != 0)
-		failwith_xl("disk_remove", &lg);
+		failwith_xl("disk_del", &lg);
 	FREE_CTX();
 	CAMLreturn(Val_unit);
 }

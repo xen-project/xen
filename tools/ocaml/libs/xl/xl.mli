@@ -82,16 +82,21 @@ type disk_phystype =
 	| PHYSTYPE_FILE
 	| PHYSTYPE_PHY
 
-type disk_info =
-{
-	backend_domid : domid;
-	physpath : string;
-	phystype : disk_phystype;
-	virtpath : string;
-	unpluggable : bool;
-	readwrite : bool;
-	is_cdrom : bool;
-}
+module Device_disk : sig
+	type t =
+	{
+		backend_domid : domid;
+		physpath : string;
+		phystype : disk_phystype;
+		virtpath : string;
+		unpluggable : bool;
+		readwrite : bool;
+		is_cdrom : bool;
+	}
+
+	external add : t -> domid -> unit = "stub_xl_device_disk_add"
+	external del : t -> domid -> unit = "stub_xl_device_disk_del"
+end
 
 type nic_type =
 	| NICTYPE_IOEMU
@@ -190,9 +195,6 @@ type sched_credit =
 
 external domain_make : create_info -> domid = "stub_xl_domain_make"
 external domain_build : build_info -> domid -> build_state = "stub_xl_domain_build"
-
-external disk_add : disk_info -> domid -> unit = "stub_xl_disk_add"
-external disk_remove : disk_info -> domid -> unit = "stub_xl_disk_remove"
 
 external console_add : console_info -> build_state -> domid -> unit = "stub_xl_console_add"
 
