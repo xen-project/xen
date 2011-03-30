@@ -70,13 +70,15 @@ module Domain_build_info = struct
 	}
 end
 
-type build_state =
-{
-	store_port : int;
-	store_mfn : int64;
-	console_port : int;
-	console_mfn : int64;
-}
+module Domain_build_state = struct
+	type t =
+	{
+		store_port : int;
+		store_mfn : int64;
+		console_port : int;
+		console_mfn : int64;
+	}
+end
 
 type domid = int
 
@@ -137,7 +139,7 @@ module Device_console = struct
 		consoletype : console_type;
 	}
 
-	external add : t -> build_state -> domid -> unit = "stub_xl_device_console_add"
+	external add : t -> Domain_build_state.t -> domid -> unit = "stub_xl_device_console_add"
 end
 
 module Device_vkb = struct
