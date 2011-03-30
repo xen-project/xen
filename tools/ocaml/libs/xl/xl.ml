@@ -134,27 +134,39 @@ module Device_console = struct
 	external add : t -> build_state -> domid -> unit = "stub_xl_device_console_add"
 end
 
-type vkb_info =
-{
-	backend_domid : domid;
-	devid : int;
-}
+module Device_vkb = struct
+	type t =
+	{
+		backend_domid : domid;
+		devid : int;
+	}
+	
+	external add : t -> domid -> unit = "stub_xl_device_vkb_add"
+	external clean_shutdown : domid -> unit = "stub_xl_device_vkb_clean_shutdown"
+	external hard_shutdown : domid -> unit = "stub_xl_device_vkb_hard_shutdown"
+end
 
-type vfb_info =
-{
-	backend_domid : domid;
-	devid : int;
-	vnc : bool;
-	vnclisten : string;
-	vncpasswd : string;
-	vncdisplay : int;
-	vncunused : bool;
-	keymap : string;
-	sdl : bool;
-	opengl : bool;
-	display : string;
-	xauthority : string;
-}
+module Device_vfb = struct
+	type t =
+	{
+		backend_domid : domid;
+		devid : int;
+		vnc : bool;
+		vnclisten : string;
+		vncpasswd : string;
+		vncdisplay : int;
+		vncunused : bool;
+		keymap : string;
+		sdl : bool;
+		opengl : bool;
+		display : string;
+		xauthority : string;
+	}
+	external add : t -> domid -> unit = "stub_xl_device_vfb_add"
+	external clean_shutdown : domid -> unit = "stub_xl_device_vfb_clean_shutdown"
+	external hard_shutdown : domid -> unit = "stub_xl_device_vfb_hard_shutdown"
+end
+
 
 type pci_info =
 {
@@ -199,14 +211,6 @@ type sched_credit =
 
 external domain_make : create_info -> domid = "stub_xl_domain_make"
 external domain_build : build_info -> domid -> build_state = "stub_xl_domain_build"
-
-external vkb_add : vkb_info -> domid -> unit = "stub_xl_vkb_add"
-external vkb_clean_shutdown : domid -> unit = "stub_vkb_clean_shutdown"
-external vkb_hard_shutdown : domid -> unit = "stub_vkb_hard_shutdown"
-
-external vfb_add : vfb_info -> domid -> unit = "stub_xl_vfb_add"
-external vfb_clean_shutdown : domid -> unit = "stub_vfb_clean_shutdown"
-external vfb_hard_shutdown : domid -> unit = "stub_vfb_hard_shutdown"
 
 external pci_add : pci_info -> domid -> unit = "stub_xl_pci_add"
 external pci_remove : pci_info -> domid -> unit = "stub_xl_pci_remove"

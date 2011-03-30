@@ -456,7 +456,7 @@ value stub_xl_device_console_add(value info, value state, value domid)
 	CAMLreturn(Val_unit);
 }
 
-value stub_xl_vkb_add(value info, value domid)
+value stub_xl_device_vkb_add(value info, value domid)
 {
 	CAMLparam2(info, domid);
 	libxl_device_vkb c_info;
@@ -474,7 +474,7 @@ value stub_xl_vkb_add(value info, value domid)
 	CAMLreturn(Val_unit);
 }
 
-value stub_xl_vkb_clean_shutdown(value domid)
+value stub_xl_device_vkb_clean_shutdown(value domid)
 {
 	CAMLparam1(domid);
 	int ret;
@@ -489,7 +489,7 @@ value stub_xl_vkb_clean_shutdown(value domid)
 	CAMLreturn(Val_unit);
 }
 
-value stub_xl_vkb_hard_shutdown(value domid)
+value stub_xl_device_vkb_hard_shutdown(value domid)
 {
 	CAMLparam1(domid);
 	int ret;
@@ -504,7 +504,7 @@ value stub_xl_vkb_hard_shutdown(value domid)
 	CAMLreturn(Val_unit);
 }
 
-value stub_xl_vfb_add(value info, value domid)
+value stub_xl_device_vfb_add(value info, value domid)
 {
 	CAMLparam2(info, domid);
 	libxl_device_vfb c_info;
@@ -522,7 +522,7 @@ value stub_xl_vfb_add(value info, value domid)
 	CAMLreturn(Val_unit);
 }
 
-value stub_xl_vfb_clean_shutdown(value domid)
+value stub_xl_device_vfb_clean_shutdown(value domid)
 {
 	CAMLparam1(domid);
 	int ret;
@@ -537,7 +537,7 @@ value stub_xl_vfb_clean_shutdown(value domid)
 	CAMLreturn(Val_unit);
 }
 
-value stub_xl_vfb_hard_shutdown(value domid)
+value stub_xl_device_vfb_hard_shutdown(value domid)
 {
 	CAMLparam1(domid);
 	int ret;
