@@ -15,19 +15,21 @@
 
 exception Error of string
 
-type create_info =
-{
-	hvm : bool;
-	hap : bool;
-	oos : bool;
-	ssidref : int32;
-	name : string;
-	uuid : int array;
-	xsdata : (string * string) list;
-	platformdata : (string * string) list;
-	poolid : int32;
-	poolname : string;
-}
+module Domain_create_info = struct
+	type t =
+	{
+		hvm : bool;
+		hap : bool;
+		oos : bool;
+		ssidref : int32;
+		name : string;
+		uuid : int array;
+		xsdata : (string * string) list;
+		platformdata : (string * string) list;
+		poolid : int32;
+		poolname : string;
+	}
+end
 
 type build_pv_info =
 {
