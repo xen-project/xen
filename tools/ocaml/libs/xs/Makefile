@@ -23,14 +23,6 @@ libs: $(LIBS)
 xs_OBJS = $(OBJS)
 OCAML_NOC_LIBRARY = xs
 
-#xs.cmxa: $(foreach obj,$(OBJS),$(obj).cmx)
-#	$(E) " MLLIB     $@"
-#	$(Q)$(OCAMLOPT) $(OCAMLOPTFLAGS) -a -o $@ $(foreach obj,$(OBJS),$(obj).cmx)
-#
-#xs.cma: $(foreach obj,$(OBJS),$(obj).cmo)
-#	$(E) " MLLIB     $@"
-#	$(Q)$(OCAMLC) -a -o $@ $(foreach obj,$(OBJS),$(obj).cmo)
-
 .PHONY: install
 install: $(LIBS) META
 	mkdir -p $(OCAMLDESTDIR)
