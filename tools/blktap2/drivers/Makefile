@@ -30,8 +30,6 @@ REMUS-OBJS  += hashtable.o
 REMUS-OBJS  += hashtable_itr.o
 REMUS-OBJS  += hashtable_utility.o
 
-$(REMUS-OBJS): CFLAGS += -I$(XEN_XENSTORE)
-
 LIBAIO_DIR = $(XEN_ROOT)/tools/libaio/src
 MEMSHR_DIR = $(XEN_ROOT)/tools/memshr
 

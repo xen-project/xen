@@ -32,6 +32,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+/*
+ * There are duplicates of this code in:
+ *  - tools/xenstore/hashtable_private.h
+ *  - tools/blktap2/drivers/hashtable_private.h
+ */
+
 #ifndef __HASHTABLE_PRIVATE_CWC22_H__
 #define __HASHTABLE_PRIVATE_CWC22_H__
 

@@ -32,6 +32,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+/*
+ * There are duplicates of this code in:
+ *  - tools/blktap2/drivers/hashtable_itr.c
+ */
+
 #include "hashtable.h"
 #include "hashtable_private.h"
 #include "hashtable_itr.h"

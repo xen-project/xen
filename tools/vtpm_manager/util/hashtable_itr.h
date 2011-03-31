@@ -32,6 +32,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+/*
+ * There are duplicates of this code in:
+ *  - tools/blktap2/drivers/hashtable_itr.h
+ */
+
 
 #ifndef __HASHTABLE_ITR_CWC22__
 #define __HASHTABLE_ITR_CWC22__

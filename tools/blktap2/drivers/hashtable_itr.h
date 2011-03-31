@@ -1,5 +1,10 @@
 /* Copyright (C) 2002, 2004 Christopher Clark <firstname.lastname@cl.cam.ac.uk> */
 
+/*
+ * There are duplicates of this code in:
+ *  - tools/vtpm_manager/util/hashtable_itr.h
+ */
+
 #ifndef __HASHTABLE_ITR_CWC22__
 #define __HASHTABLE_ITR_CWC22__
 #include "hashtable.h"

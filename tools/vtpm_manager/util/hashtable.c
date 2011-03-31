@@ -32,6 +32,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+/*
+ * There are duplicates of this code in:
+ *  - tools/xenstore/hashtable.c
+ *  - tools/blktap2/drivers/hashtable.c
+ */
+
 #include "hashtable.h"
 #include "hashtable_private.h"
 #include <stdlib.h>
