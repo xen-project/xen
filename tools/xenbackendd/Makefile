@@ -17,13 +17,11 @@ CFLAGS  += $(CFLAGS_libxenstore)
 CPPFLAGS += -DXEN_SCRIPT_DIR="\"$(XEN_SCRIPT_DIR)\""
 LDLIBS  += $(LDLIBS_libxenstore)
 
-SBIN = xenbackendd
-
 .PHONY: all
 all: build
 
 .PHONY: build
-build: $(SBIN)
+build: xenbackendd
 
 .PHONY: install
 install: build
@@ -32,10 +30,9 @@ install: build
 
 .PHONY: clean
 clean:
-	rm -f $(SBIN) $(DEPS)
+	rm -f $(DEPS)
 
-
-%: %.o Makefile
+xenbackendd: xenbackendd.o
 	$(CC) $(LDFLAGS) $< -o $@ $(LDLIBS)
 
 -include $(DEPS)

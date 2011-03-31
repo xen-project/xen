@@ -6,26 +6,11 @@ CFLAGS += -Werror
 CFLAGS += $(CFLAGS_libxenctrl)
 LDLIBS += $(LDLIBS_libxenctrl)
 
-HDRS     = $(wildcard *.h)
-OBJS     = $(patsubst %.c,%.o,$(wildcard *.c))
-
 BIN      = xentrace xentrace_setsize
-LIBBIN   = 
+LIBBIN   = xenctx
 SCRIPTS  = xentrace_format
 MAN1     = $(wildcard *.1)
 MAN8     = $(wildcard *.8)
-
-ifeq ($(XEN_TARGET_ARCH),x86_32)
-LIBBIN  += xenctx
-endif
-
-ifeq ($(XEN_TARGET_ARCH),x86_64)
-LIBBIN  += xenctx
-endif
-
-ifeq ($(XEN_TARGET_ARCH),ia64)
-LIBBIN  += xenctx
-endif
 
 .PHONY: all
 all: build
@@ -49,9 +34,13 @@ install: build
 clean:
 	$(RM) *.a *.so *.o *.rpm $(BIN) $(LIBBIN) $(DEPS)
 
-%: %.o $(HDRS) Makefile
+xentrace: xentrace.o
 	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS)
-xentrace_%: %.o $(HDRS) Makefile
+
+xenctx: xenctx.o
+	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS)
+
+xentrace_setsize: setsize.o
 	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS)
 
 -include $(DEPS)

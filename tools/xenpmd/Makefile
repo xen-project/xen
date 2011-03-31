@@ -6,21 +6,19 @@ CFLAGS += $(CFLAGS_libxenstore)
 
 LDLIBS += $(LDLIBS_libxenstore)
 
-BIN      = xenpmd
-
 .PHONY: all
-all: $(BIN)
+all: xenpmd
 
 .PHONY: install
 install: all
 	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
-	$(INSTALL_PROG) $(BIN) $(DESTDIR)$(SBINDIR)
+	$(INSTALL_PROG) xenpmd $(DESTDIR)$(SBINDIR)
 
 .PHONY: clean
 clean:
-	$(RM) -f $(BIN) $(DEPS)
+	$(RM) -f xenpmd $(DEPS)
 
-%: %.o Makefile
+xenpmd: xenpmd.o Makefile
 	$(CC) $(LDFLAGS) $< -o $@ $(LDLIBS)
 
 -include $(DEPS)

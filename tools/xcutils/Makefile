@@ -20,19 +20,23 @@ CFLAGS_xc_save.o    := $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) $(CFLAGS_libxe
 CFLAGS_readnotes.o  := $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest)
 CFLAGS_lsevtchn.o   := $(CFLAGS_libxenctrl)
 
-LDLIBS_xc_restore := $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest)
-LDLIBS_xc_save    := $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore)
-LDLIBS_readnotes  := $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest)
-LDLIBS_lsevtchn   := $(LDLIBS_libxenctrl)
-
 .PHONY: all
 all: build
 
 .PHONY: build
 build: $(PROGRAMS)
 
-$(PROGRAMS): %: %.o
-	$(CC) $(LDFLAGS) $^ $(LDLIBS) $(LDLIBS_$*) -o $@
+xc_restore: xc_restore.o
+	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest)
+
+xc_save: xc_save.o
+	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore)
+
+readnotes: readnotes.o
+	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest)
+
+lsevtchn: lsevtchn.o
+	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS_libxenctrl)
 
 .PHONY: install
 install: build

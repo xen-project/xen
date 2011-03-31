@@ -3,16 +3,11 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 CFLAGS  += -Werror
 
-HDRS     = $(wildcard *.h)
-OBJS     = $(patsubst %.c,%.o,$(wildcard *.c))
-
-BIN      = lomount
-
 .PHONY: all
 all: build
 
 .PHONY: build
-build: $(BIN)
+build: lomount
 
 .PHONY: install
 install install-recurse: build
@@ -22,6 +17,7 @@ install install-recurse: build
 clean:
 	$(RM) *.a *.so *.o *.rpm $(BIN)
 
-%: %.c $(HDRS) Makefile
+lomount: lomount.o
 	$(CC) $(CFLAGS) -o $@ $< 
 
+-include $(DEPS)

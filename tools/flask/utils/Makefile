@@ -18,7 +18,13 @@ CLIENTS_OBJS := $(patsubst flask-%,%.o,$(CLIENTS))
 .PHONY: all
 all: $(CLIENTS)
 
-$(CLIENTS): flask-%: %.o
+flask-loadpolicy: loadpolicy.o
+	$(CC) $(LDFLAGS) $< $(LDLIBS) -L$(LIBFLASK_ROOT) -lflask $(LDLIBS_libxenctrl) -o $@
+
+flask-setenforce: setenforce.o
+	$(CC) $(LDFLAGS) $< $(LDLIBS) -L$(LIBFLASK_ROOT) -lflask $(LDLIBS_libxenctrl) -o $@
+
+flask-getenforce: getenforce.o
 	$(CC) $(LDFLAGS) $< $(LDLIBS) -L$(LIBFLASK_ROOT) -lflask $(LDLIBS_libxenctrl) -o $@
 
 .PHONY: clean
@@ -41,6 +47,3 @@ install: all
 	$(INSTALL_PROG) $(CLIENTS) $(DESTDIR)$(SBINDIR)
 
 -include $(DEPS)
-
-# never delete any intermediate files.
-.SECONDARY:

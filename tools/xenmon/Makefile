@@ -17,14 +17,13 @@ CFLAGS  += -Werror
 CFLAGS  += $(CFLAGS_libxenctrl)
 LDLIBS  += $(LDLIBS_libxenctrl)
 
-BIN = xentrace_setmask xenbaked
 SCRIPTS = xenmon.py
 
 .PHONY: all
 all: build
 
 .PHONY: build
-build: $(BIN)
+build: xentrace_setmask xenbaked
 
 .PHONY: install
 install: build
@@ -37,13 +36,12 @@ install: build
 
 .PHONY: clean
 clean:
-	rm -f $(BIN) $(DEPS)
+	rm -f  $(DEPS)
 
-
-%: %.o Makefile
+xenbaked: xenbaked.o Makefile
 	$(CC) $(LDFLAGS) $< -o $@ $(LDLIBS)
 
-xentrace_%: %.o Makefile
+xentrace_setmask: setmask.o Makefile
 	$(CC) $(LDFLAGS) $< -o $@ $(LDLIBS)
 
 -include $(DEPS)
