@@ -345,6 +345,29 @@ static value Val_physinfo(libxl_physinfo *c_val)
 	CAMLreturn(v);
 }
 
+static value Val_topologyinfo(libxl_topologyinfo *c_val)
+{
+	CAMLparam0();
+	CAMLlocal3(v, topology, topologyinfo);
+	int i;
+
+	topologyinfo = caml_alloc_tuple(c_val->coremap.entries);
+	for (i = 0; i < c_val->coremap.entries; i++) {	
+		v = Val_int(0); /* None */
+		if (c_val->coremap.array[i] != LIBXL_CPUARRAY_INVALID_ENTRY) {
+			topology = caml_alloc_tuple(3);
+			Store_field(topology, 0, Val_int(c_val->coremap.array[i]));
+			Store_field(topology, 1, Val_int(c_val->socketmap.array[i]));
+			Store_field(topology, 2, Val_int(c_val->nodemap.array[i]));
+			v = caml_alloc(1, 0); /* Some */
+			Store_field(v, 0, topology);
+		}
+		Store_field(topologyinfo, i, v);
+	}
+
+	CAMLreturn(topologyinfo);
+}
+
 value stub_xl_disk_add(value info, value domid)
 {
 	CAMLparam2(info, domid);
@@ -618,6 +641,24 @@ value stub_xl_physinfo(value unit)
 	
 	physinfo = Val_physinfo(&c_physinfo);
 	CAMLreturn(physinfo);
+}
+
+value stub_xl_topologyinfo(value unit)
+{
+	CAMLparam1(unit);
+	CAMLlocal1(topologyinfo);
+	libxl_topologyinfo c_topologyinfo;
+	int ret;
+	INIT_STRUCT();
+
+	INIT_CTX();
+	ret = libxl_get_topologyinfo(&ctx, &c_topologyinfo);
+	if (ret != 0)
+		failwith_xl("topologyinfo", &lg);
+	FREE_CTX();
+	
+	topologyinfo = Val_topologyinfo(&c_topologyinfo);
+	CAMLreturn(topologyinfo);
 }
 
 value stub_xl_sched_credit_domain_get(value domid)

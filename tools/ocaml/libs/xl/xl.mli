@@ -169,6 +169,15 @@ type physinfo =
 	physcap: int32;
 }
 
+type topology = 
+{
+	core: int;
+	socket: int;
+	node: int;
+}
+
+type topologyinfo = topology option array
+
 type sched_credit =
 {
 	weight: int;
@@ -204,6 +213,8 @@ type button =
 
 external button_press : domid -> button -> unit = "stub_xl_button_press"
 external physinfo : unit -> physinfo = "stub_xl_physinfo"
+
+external topologyinfo: unit -> topologyinfo = "stub_xl_topologyinfo"
 
 external domain_sched_credit_get : domid -> sched_credit = "stub_xl_sched_credit_domain_get"
 external domain_sched_credit_set : domid -> sched_credit -> unit = "stub_xl_sched_credit_domain_set"
