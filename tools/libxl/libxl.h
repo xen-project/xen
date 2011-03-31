@@ -131,7 +131,7 @@
 #include <xs.h>
 #include <sys/wait.h> /* for pid_t */
 
-#include "libxl_uuid.h"
+#include <libxl_uuid.h>
 
 typedef uint8_t libxl_mac[6];
 
