@@ -1719,7 +1719,7 @@ static void usage(void)
 "  --trace-file <file> giving the file for logging, and\n"
 "  --entry-nb <nb>     limit the number of entries per domain,\n"
 "  --entry-size <size> limit the size of entry per domain, and\n"
-"  --entry-watch <nb>  limit the number of watches per domain,\n"
+"  --watch-nb <nb>     limit the number of watches per domain,\n"
 "  --transaction <nb>  limit the number of transaction allowed per domain,\n"
 "  --no-recovery       to request that no recovery should be attempted when\n"
 "                      the store is corrupted (debug only),\n"
