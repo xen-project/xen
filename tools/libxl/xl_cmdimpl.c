@@ -4277,12 +4277,14 @@ int main_networkattach(int argc, char **argv)
                 nic.mac[i] = val;
             }
         } else if (!strncmp("bridge=", *argv, 7)) {
-            nic.bridge = (*argv) + 7;
+            free(nic.bridge);
+            nic.bridge = strdup((*argv) + 7);
         } else if (!strncmp("ip=", *argv, 3)) {
             free(nic.ip);
             nic.ip = strdup((*argv) + 3);
         } else if (!strncmp("script=", *argv, 6)) {
-            nic.script = (*argv) + 6;
+            free(nic.script);
+            nic.script = strdup((*argv) + 6);
         } else if (!strncmp("backend=", *argv, 8)) {
             if(libxl_name_to_domid(&ctx, ((*argv) + 8), &val)) {
                 fprintf(stderr, "Specified backend domain does not exist, defaulting to Dom0\n");
@@ -4290,9 +4292,11 @@ int main_networkattach(int argc, char **argv)
             }
             nic.backend_domid = val;
         } else if (!strncmp("vifname=", *argv, 8)) {
-            nic.ifname = (*argv) + 8;
+            free(nic.ifname);
+            nic.ifname = strdup((*argv) + 8);
         } else if (!strncmp("model=", *argv, 6)) {
-            nic.model = (*argv) + 6;
+            free(nic.model);
+            nic.model = strdup((*argv) + 6);
         } else if (!strncmp("rate=", *argv, 5)) {
         } else if (!strncmp("accel=", *argv, 6)) {
         } else {
