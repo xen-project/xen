@@ -320,9 +320,9 @@ class BufferedNIC(CheckpointedDevice):
             if q['kind'] == 'plug':
                 self.installed = True
                 return
-            if q['kind'] not in ('ingress', 'pfifo_fast'):
+            if q['kind'] not in ('ingress', 'pfifo_fast', 'mq'):
                 raise BufferedNICException('there is already a queueing '
-                                           'discipline on %s' % devname)
+                                           'discipline %s on %s' % (q['kind'], devname))
 
         print ('installing buffer on %s... ' % devname),
         req = qdisc.addrequest(self.bufdevno, self.handle, self.q)
