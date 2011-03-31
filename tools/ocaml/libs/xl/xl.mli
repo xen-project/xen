@@ -145,7 +145,9 @@ type vfb_info =
 
 type pci_info =
 {
-	v : int; (* domain * bus * dev * func multiplexed *)
+	func : int;
+	dev : int;
+	bus : int;
 	domain : int;
 	vdevfn : int;
 	msitranslate : bool;
