@@ -3,6 +3,8 @@ XEN_ROOT=$(TOPLEVEL)/../..
 include $(TOPLEVEL)/common.make
 
 CFLAGS += -I../mmap
+CFLAGS += $(CFLAGS_libxenctrl) # For xen_mb()
+CFLAGS += $(CFLAGS_xeninclude)
 OCAMLINCLUDE += -I ../mmap
 
 .NOTPARALLEL:

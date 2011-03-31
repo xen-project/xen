@@ -9,7 +9,6 @@ OCAMLLEX ?= ocamllex
 OCAMLYACC ?= ocamlyacc
 
 CFLAGS += -fPIC -Werror
-CFLAGS += $(CFLAGS_xeninclude) $(CFLAGS_libxenctrl) $(CFLAGS_libxenstore) $(CFLAGS_libxenlight)
 CFLAGS-$(CONFIG_Linux) += -I/usr/lib64/ocaml -I/usr/lib/ocaml
 CFLAGS-$(CONFIG_NetBSD) += -I/usr/pkg/lib/ocaml -fPIC
 

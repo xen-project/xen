@@ -2,6 +2,8 @@ TOPLEVEL=$(CURDIR)/../..
 XEN_ROOT=$(TOPLEVEL)/../..
 include $(TOPLEVEL)/common.make
 
+CFLAGS += $(CFLAGS_libxenlight)
+
 OBJS = xl
 INTF = xl.cmi
 LIBS = xl.cma xl.cmxa
