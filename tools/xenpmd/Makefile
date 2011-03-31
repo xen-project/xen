@@ -16,7 +16,7 @@ install: all
 
 .PHONY: clean
 clean:
-	$(RM) -f xenpmd $(DEPS)
+	$(RM) -f xenpmd xenpmd.o $(DEPS)
 
 xenpmd: xenpmd.o Makefile
 	$(CC) $(LDFLAGS) $< -o $@ $(LDLIBS)

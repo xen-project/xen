@@ -36,7 +36,9 @@ install: build
 
 .PHONY: clean
 clean:
-	rm -f  $(DEPS)
+	$(RM) -f $(DEPS)
+	$(RM) -f xenbaked xenbaked.o
+	$(RM) -f xentrace_setmake setmask.o
 
 xenbaked: xenbaked.o Makefile
 	$(CC) $(LDFLAGS) $< -o $@ $(LDLIBS)
