@@ -35,10 +35,6 @@
 
 #define GET_C_STRUCT(a) ((struct mmap_interface *) a)
 
-#ifndef xen_mb
-#define xen_mb()	mb()
-#endif
-
 static int xs_ring_read(struct mmap_interface *interface,
                              char *buffer, int len)
 {
