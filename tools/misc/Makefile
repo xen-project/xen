@@ -58,9 +58,9 @@ clean:
 	$(CC) -c $(CFLAGS) -o $@ $<
 
 xen-hvmctx xen-hvmcrash xenperf xenpm gtracestat xenlockprof xen-hptool xenwatchdogd: %: %.o Makefile
-	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS) $(LDLIBS_$*)
+	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_$*)
 
 gtraceview: %: %.o Makefile
-	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS) $(CURSES_LIBS)
+	$(CC) $(LDFLAGS) -o $@ $< $(CURSES_LIBS)
 
 -include $(DEPS)

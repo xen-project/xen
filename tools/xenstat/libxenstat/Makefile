@@ -50,17 +50,8 @@ $(LIB): $(OBJECTS-y)
 	$(RANLIB) $@
 
 $(SHLIB): $(OBJECTS-y)
-	$(CC) $(CFLAGS) $(LDFLAGS) $(SONAME_FLAGS) $(SHLIB_LDFLAGS) -o $@ \
+	$(CC) $(LDFLAGS) $(SONAME_FLAGS) $(SHLIB_LDFLAGS) -o $@ \
 	    $(OBJECTS-y) $(LDLIBS-y)
-
-src/xenstat.o: src/xenstat.c src/xenstat.h src/xenstat_priv.h
-	$(CC) $(CFLAGS) $(WARN_FLAGS) -c -o $@ $<
-
-src/xenstat_linux.o: src/xenstat_linux.c src/xenstat_priv.h
-	$(CC) $(CFLAGS) $(WARN_FLAGS) -c -o $@ $<
-
-src/xenstat_solaris.o: src/xenstat_solaris.c src/xenstat_priv.h
-	$(CC) $(CFLAGS) $(WARN_FLAGS) -c -o $@ $<
 
 src/libxenstat.so.$(MAJOR): $(SHLIB)
 	$(MAKE_LINK) $(<F) $@

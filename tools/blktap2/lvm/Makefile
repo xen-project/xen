@@ -24,7 +24,7 @@ build: $(TEST) $(LVM-OBJS)
 install: all
 
 lvm-util: lvm-util.o
-	$(CC) $(CFLAGS) -DLVM_UTIL $(LDFLAGS) -o lvm-util lvm-util.c
+	$(CC) -DLVM_UTIL $(LDFLAGS) -o lvm-util lvm-util.c
 
 clean:
 	rm -rf *.o *~ $(DEPS) $(IBIN)

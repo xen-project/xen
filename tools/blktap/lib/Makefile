@@ -42,7 +42,7 @@ clean:
 	rm -rf *.a *.so* *.o *.opic *.rpm $(LIB) *~ $(DEPS) xen TAGS
 
 libblktap.so.$(MAJOR).$(MINOR): $(OBJS_PIC) 
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,$(SONAME) $(SHLIB_LDFLAGS) \
+	$(CC) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,$(SONAME) $(SHLIB_LDFLAGS) \
 	      -o $@ $^ $(LDLIBS)
 	ln -sf libblktap.so.$(MAJOR).$(MINOR) libblktap.so.$(MAJOR)
 	ln -sf libblktap.so.$(MAJOR) libblktap.so

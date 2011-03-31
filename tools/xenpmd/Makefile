@@ -1,8 +1,9 @@
 XEN_ROOT=$(CURDIR)/../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-CFLAGS  += -Werror
-CFLAGS  += $(CFLAGS_libxenstore)
+CFLAGS += -Werror
+CFLAGS += $(CFLAGS_libxenstore)
+
 LDLIBS += $(LDLIBS_libxenstore)
 
 BIN      = xenpmd
@@ -19,7 +20,7 @@ install: all
 clean:
 	$(RM) -f $(BIN) $(DEPS)
 
-%: %.c Makefile
-	$(CC) $(CFLAGS) $(LDFLAGS) $< -o $@ $(LDLIBS)
+%: %.o Makefile
+	$(CC) $(LDFLAGS) $< -o $@ $(LDLIBS)
 
 -include $(DEPS)

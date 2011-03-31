@@ -47,19 +47,19 @@ CFLAGS += -DHAVE_DTRACE=1
 endif
  
 xenstored: $(XENSTORED_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LDLIBS_libxenctrl) $(SOCKET_LIBS) -o $@
+	$(CC) $(LDFLAGS) $^ $(LDLIBS_libxenctrl) $(SOCKET_LIBS) -o $@
 
 $(CLIENTS): xenstore
 	ln -f xenstore $@
 
 xenstore: xenstore_client.o $(LIBXENSTORE)
-	$(CC) $(CFLAGS) $(LDFLAGS) $< $(LDLIBS_libxenstore) $(SOCKET_LIBS) -o $@
+	$(CC) $(LDFLAGS) $< $(LDLIBS_libxenstore) $(SOCKET_LIBS) -o $@
 
 xenstore-control: xenstore_control.o $(LIBXENSTORE)
-	$(CC) $(CFLAGS) $(LDFLAGS) $< $(LDLIBS_libxenstore) $(SOCKET_LIBS) -o $@
+	$(CC) $(LDFLAGS) $< $(LDLIBS_libxenstore) $(SOCKET_LIBS) -o $@
 
 xs_tdb_dump: xs_tdb_dump.o utils.o tdb.o talloc.o
-	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
+	$(CC) $(LDFLAGS) $^ -o $@
 
 libxenstore.so: libxenstore.so.$(MAJOR)
 	ln -sf $< $@
@@ -69,7 +69,7 @@ libxenstore.so.$(MAJOR): libxenstore.so.$(MAJOR).$(MINOR)
 xs.opic: CFLAGS += -DUSE_PTHREAD
 
 libxenstore.so.$(MAJOR).$(MINOR): xs.opic xs_lib.opic
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenstore.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(SOCKET_LIBS) -lpthread
+	$(CC) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenstore.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(SOCKET_LIBS) -lpthread
 
 libxenstore.a: xs.o xs_lib.o
 	$(AR) rcs $@ $^

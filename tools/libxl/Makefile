@@ -85,7 +85,7 @@ libxenlight.so.$(MAJOR): libxenlight.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
 libxenlight.so.$(MAJOR).$(MINOR): $(LIBXL_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenlight.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(LIBXL_LIBS)
+	$(CC) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenlight.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(LIBXL_LIBS)
 
 libxenlight.a: $(LIBXL_OBJS)
 	$(AR) rcs libxenlight.a $^
@@ -97,7 +97,7 @@ libxlutil.so.$(XLUMAJOR): libxlutil.so.$(XLUMAJOR).$(XLUMINOR)
 	ln -sf $< $@
 
 libxlutil.so.$(XLUMAJOR).$(XLUMINOR): $(LIBXLU_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxlutil.so.$(XLUMAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(LIBXLU_LIBS)
+	$(CC) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxlutil.so.$(XLUMAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(LIBXLU_LIBS)
 
 libxlutil.a: $(LIBXLU_OBJS)
 	$(AR) rcs libxlutil.a $^

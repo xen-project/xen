@@ -23,10 +23,10 @@ clean:
 	$(RM) client/*.o daemon/*.o
 
 xenconsoled: $(patsubst %.c,%.o,$(wildcard daemon/*.c))
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS) $(LDLIBS_xenconsoled)
+	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS) $(LDLIBS_xenconsoled)
 
 xenconsole: $(patsubst %.c,%.o,$(wildcard client/*.c))
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBS) $(LDLIBS_xenconsole)
+	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS) $(LDLIBS_xenconsole)
 
 .PHONY: install
 install: $(BIN)

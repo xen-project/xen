@@ -53,6 +53,6 @@ libflask.so.$(MAJOR): libflask.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
 libflask.so.$(MAJOR).$(MINOR): $(PIC_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libflask.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(LDLIBS_libxenctrl)
+	$(CC) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libflask.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(LDLIBS_libxenctrl)
 
 -include $(DEPS)

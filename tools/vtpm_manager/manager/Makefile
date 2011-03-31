@@ -29,7 +29,7 @@ mrproper: clean
 	rm -f *~
 
 $(BIN): $(OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LIBS) -o $@
+	$(CC) $(LDFLAGS) $^ $(LIBS) -o $@
 
 # libraries
 LIBS += ../tcs/libTCS.a ../util/libTCGUtils.a ../crypto/libtcpaCrypto.a

@@ -35,7 +35,7 @@ clean:
 	rm -f $(SBIN) $(DEPS)
 
 
-%: %.c Makefile
-	$(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS) $< -o $@ $(LDLIBS)
+%: %.o Makefile
+	$(CC) $(LDFLAGS) $< -o $@ $(LDLIBS)
 
 -include $(DEPS)

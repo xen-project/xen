@@ -33,10 +33,10 @@ mrproper: clean
 	rm -f *~
 
 $(BIND): $(OBJSD)
-	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LIBS) -o $@
+	$(CC) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(BINC): $(OBJSC)
-	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LIBS) -o $@
+	$(CC) $(LDFLAGS) $^ $(LIBS) -o $@
 
 # libraries
 LIBS += ../util/libTCGUtils.a

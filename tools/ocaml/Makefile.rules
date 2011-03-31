@@ -84,7 +84,7 @@ endef
 
 define C_PROGRAM_template
  $(1): $(foreach obj,$($(1)_OBJS),$(obj).o)
-	$(call quiet-command, $(CC) $(CFLAGS) -o $$@ $$+,BIN,$$@)
+	$(call quiet-command, $(CC) $(LDFLAGS) -o $$@ $$+,BIN,$$@)
 endef
 
 -include .ocamldep.make

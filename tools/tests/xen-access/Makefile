@@ -25,10 +25,7 @@ clean:
 	$(RM) *.o $(TARGETS) *~ $(DEPS)
 	set -e; for d in $(SUBDIRS); do $(MAKE) -C $$d clean; done
 
-%.o: %.c Makefile
-	$(CC) -c $(CFLAGS) -o $@ $<
-
 xen-access: %: %.o Makefile
-	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS) $(LDLIBS_libxenctrl)
-# $(LDLIBS_libxenguest) $(LDLIBS_libxenstore)
+	$(CC) -o $@ $< $(LDFLAGS) $(LDLIBS_libxenctrl)
+
 -include $(DEPS)

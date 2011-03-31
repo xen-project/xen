@@ -40,9 +40,10 @@ clean:
 	rm -f $(BIN) $(DEPS)
 
 
-%: %.c Makefile
-	$(CC) $(CFLAGS) $(LDFLAGS) $< -o $@ $(LDLIBS)
-xentrace_%: %.c Makefile
-	$(CC) $(CFLAGS) $(LDFLAGS) $< -o $@ $(LDLIBS)
+%: %.o Makefile
+	$(CC) $(LDFLAGS) $< -o $@ $(LDLIBS)
+
+xentrace_%: %.o Makefile
+	$(CC) $(LDFLAGS) $< -o $@ $(LDLIBS)
 
 -include $(DEPS)

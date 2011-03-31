@@ -52,13 +52,13 @@ $(LIBSONAME): $(LIB_SHARED)
 	ln -sf $< $@
 
 tap-ctl: tap-ctl.o $(LIBNAME).so
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(CC) $(LDFLAGS) -o $@ $^
 
 $(LIB_STATIC): $(CTL_OBJS)
 	$(AR) r $@ $^
 
 $(LIB_SHARED): $(CTL_PICS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -fPIC  -Wl,$(SONAME_LDFLAG) -Wl,$(LIBSONAME) $(SHLIB_LDFLAGS) -rdynamic $^ -o $@
+	$(CC) $(LDFLAGS) -fPIC  -Wl,$(SONAME_LDFLAG) -Wl,$(LIBSONAME) $(SHLIB_LDFLAGS) -rdynamic $^ -o $@
 
 install: $(IBIN) $(LIB_STATIC) $(LIB_SHARED)
 	$(INSTALL_DIR) -p $(DESTDIR)$(SBINDIR)

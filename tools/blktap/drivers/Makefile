@@ -48,16 +48,16 @@ BLKTAB-OBJS-$(CONFIG_Linux) += blktapctrl_linux.o
 all: $(IBIN) qcow-util
 
 blktapctrl: $(BLKTAB-OBJS-y)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS_blktapctrl)
+	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS_blktapctrl)
 
 tapdisk: tapdisk.o $(BLK-OBJS-y)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS_img)
+	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS_img)
 
 .PHONY: qcow-util
 qcow-util: img2qcow qcow2raw qcow-create
 
 img2qcow qcow2raw qcow-create: %: %.o $(BLK-OBJS-y)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $* $^ $(LDLIBS_img)
+	$(CC) $(LDFLAGS) -o $* $^ $(LDLIBS_img)
 
 install: all
 	$(INSTALL_PROG) $(IBIN) $(QCOW_UTIL) $(VHD_UTIL) $(DESTDIR)$(SBINDIR)

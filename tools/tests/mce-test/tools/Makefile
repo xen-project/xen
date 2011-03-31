@@ -18,8 +18,5 @@ install:
 clean:
 	$(RM) *.o xen-mceinj
 
-%.o: %.c $(HDRS) Makefile
-	$(CC) -c $(CFLAGS) -o $@ $<
-
 xen-mceinj: %: %.o Makefile
-	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS) $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore)
+	$(CC) -o $@ $< $(LDFLAGS) $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore)

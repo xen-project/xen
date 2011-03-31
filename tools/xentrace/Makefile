@@ -1,9 +1,9 @@
 XEN_ROOT=$(CURDIR)/../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-CFLAGS  += -Werror
+CFLAGS += -Werror
 
-CFLAGS  += $(CFLAGS_libxenctrl)
+CFLAGS += $(CFLAGS_libxenctrl)
 LDLIBS += $(LDLIBS_libxenctrl)
 
 HDRS     = $(wildcard *.h)
@@ -49,10 +49,10 @@ install: build
 clean:
 	$(RM) *.a *.so *.o *.rpm $(BIN) $(LIBBIN) $(DEPS)
 
-%: %.c $(HDRS) Makefile
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LDLIBS)
-xentrace_%: %.c $(HDRS) Makefile
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LDLIBS)
+%: %.o $(HDRS) Makefile
+	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS)
+xentrace_%: %.o $(HDRS) Makefile
+	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS)
 
 -include $(DEPS)
 
