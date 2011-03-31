@@ -41,29 +41,16 @@
 #define PCI_BDF_SHORT          "%02x:%02x.%01x"
 #define PCI_BDF_VDEVFN         "%04x:%02x:%02x.%01x@%02x"
 
-static unsigned int pcidev_value(libxl_device_pci *pcidev)
+static unsigned int pcidev_encode_bdf(libxl_device_pci *pcidev)
 {
-    union {
-        unsigned int value;
-        struct {
-            unsigned int reserved1:2;
-            unsigned int reg:6;
-            unsigned int func:3;
-            unsigned int dev:5;
-            unsigned int bus:8;
-            unsigned int reserved2:7;
-            unsigned int enable:1;
-        }fields;
-    }u;
+    unsigned int value;
 
-    u.value = 0;
-    u.fields.reg = pcidev->reg;
-    u.fields.func = pcidev->func;
-    u.fields.dev = pcidev->dev;
-    u.fields.bus = pcidev->bus;
-    u.fields.enable = pcidev->enable;
+    value = 0;
+    value |= (pcidev->bus & 0xff) << 16;
+    value |= (pcidev->dev & 0x1f) << (8+3);
+    value |= (pcidev->func & 0x3) << (8+0);
 
-    return u.value;
+    return value;
 }
 
 static int pcidev_init(libxl_device_pci *pcidev, unsigned int domain,
@@ -711,7 +698,7 @@ static int do_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, i
     }
 out:
     if (!libxl_is_stubdom(ctx, domid, NULL)) {
-        rc = xc_assign_device(ctx->xch, domid, pcidev_value(pcidev));
+        rc = xc_assign_device(ctx->xch, domid, pcidev_encode_bdf(pcidev));
         if (rc < 0 && (hvm || errno != ENOSYS)) {
             LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc, "xc_assign_device failed");
             return ERROR_FAIL;
@@ -938,7 +925,7 @@ out:
     }
 
     if (!libxl_is_stubdom(ctx, domid, NULL)) {
-        rc = xc_deassign_device(ctx->xch, domid, pcidev_value(pcidev));
+        rc = xc_deassign_device(ctx->xch, domid, pcidev_encode_bdf(pcidev));
         if (rc < 0 && (hvm || errno != ENOSYS))
             LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc, "xc_deassign_device failed");
     }

@@ -243,11 +243,9 @@ libxl_device_net2 = Struct("device_net2", [
     ])
 
 libxl_device_pci = Struct("device_pci", [
-    ("reg",       uint8),
     ("func",      uint8),
     ("dev",       uint8),
     ("bus",       uint8),
-    ("enable",    bool),
     ("domain", unsigned_integer),
     ("vdevfn", unsigned_integer),
     ("vfunc_mask", unsigned_integer),

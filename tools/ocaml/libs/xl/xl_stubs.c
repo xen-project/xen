@@ -288,11 +288,9 @@ static int device_pci_val(caml_gc *gc, libxl_device_pci *c_val, value v)
 
 	/* FIXME: propagate API change to ocaml */
 	u.value = Int_val(Field(v, 0));
-	c_val->reg = u.fields.reg;
 	c_val->func = u.fields.func;
 	c_val->dev = u.fields.dev;
 	c_val->bus = u.fields.bus;
-	c_val->enable = u.fields.enable;
 
 	c_val->domain = Int_val(Field(v, 1));
 	c_val->vdevfn = Int_val(Field(v, 2));
