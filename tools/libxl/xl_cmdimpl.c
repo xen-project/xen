@@ -441,7 +441,7 @@ static void printf_info(int domid,
        printf(")\n");
 }
 
-static int parse_action_on_shutdown(const char *buf, enum libxl_action_on_shutdown *a)
+static int parse_action_on_shutdown(const char *buf, libxl_action_on_shutdown *a)
 {
     int i;
     const char *n;
@@ -1165,7 +1165,7 @@ static int handle_domain_death(libxl_ctx *ctx, uint32_t domid, libxl_event *even
                                libxl_domain_config *d_config, libxl_dominfo *info)
 {
     int restart = 0;
-    enum libxl_action_on_shutdown action;
+    libxl_action_on_shutdown action;
 
     switch (info->shutdown_reason) {
     case SHUTDOWN_poweroff:

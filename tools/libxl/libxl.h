@@ -250,7 +250,7 @@ enum {
 
 #define LIBXL_VERSION 0
 
-enum libxl_action_on_shutdown {
+typedef enum libxl_action_on_shutdown {
     LIBXL_ACTION_DESTROY,
 
     LIBXL_ACTION_RESTART,
@@ -260,7 +260,7 @@ enum libxl_action_on_shutdown {
 
     LIBXL_ACTION_COREDUMP_DESTROY,
     LIBXL_ACTION_COREDUMP_RESTART,
-};
+} libxl_action_on_shutdown;
 
 typedef struct {
     libxl_domain_create_info c_info;
@@ -276,10 +276,10 @@ typedef struct {
     libxl_device_vfb *vfbs;
     libxl_device_vkb *vkbs;
 
-    enum libxl_action_on_shutdown on_poweroff;
-    enum libxl_action_on_shutdown on_reboot;
-    enum libxl_action_on_shutdown on_watchdog;
-    enum libxl_action_on_shutdown on_crash;
+    libxl_action_on_shutdown on_poweroff;
+    libxl_action_on_shutdown on_reboot;
+    libxl_action_on_shutdown on_watchdog;
+    libxl_action_on_shutdown on_crash;
 } libxl_domain_config;
 
 /* context functions */
