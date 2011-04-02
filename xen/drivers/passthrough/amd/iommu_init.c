@@ -28,10 +28,8 @@
 #include <asm-x86/fixmap.h>
 #include <mach_apic.h>
 
-static struct amd_iommu **irq_to_iommu;
-static int nr_amd_iommus;
-static long amd_iommu_cmd_buffer_entries = IOMMU_CMD_BUFFER_DEFAULT_ENTRIES;
-static long amd_iommu_event_log_entries = IOMMU_EVENT_LOG_DEFAULT_ENTRIES;
+static struct amd_iommu **__read_mostly irq_to_iommu;
+static int __initdata nr_amd_iommus;
 
 unsigned short ivrs_bdf_entries;
 struct ivrs_mappings *ivrs_mappings;
@@ -629,8 +627,8 @@ static int __init allocate_cmd_buffer(struct amd_iommu *iommu)
     iommu->cmd_buffer_tail = 0;
     iommu->cmd_buffer.alloc_size = PAGE_SIZE <<
                                    get_order_from_bytes(
-                                   PAGE_ALIGN(amd_iommu_cmd_buffer_entries *
-                                   IOMMU_CMD_BUFFER_ENTRY_SIZE));
+                                   PAGE_ALIGN(IOMMU_CMD_BUFFER_DEFAULT_ENTRIES
+                                              * IOMMU_CMD_BUFFER_ENTRY_SIZE));
     iommu->cmd_buffer.entries = iommu->cmd_buffer.alloc_size /
                                 IOMMU_CMD_BUFFER_ENTRY_SIZE;
 
@@ -643,7 +641,7 @@ static int __init allocate_event_log(struct amd_iommu *iommu)
     iommu->event_log_head = 0;
     iommu->event_log.alloc_size = PAGE_SIZE <<
                                   get_order_from_bytes(
-                                  PAGE_ALIGN(amd_iommu_event_log_entries *
+                                  PAGE_ALIGN(IOMMU_EVENT_LOG_DEFAULT_ENTRIES *
                                   IOMMU_EVENT_LOG_ENTRY_SIZE));
     iommu->event_log.entries = iommu->event_log.alloc_size /
                                IOMMU_EVENT_LOG_ENTRY_SIZE;

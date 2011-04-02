@@ -28,11 +28,12 @@
 extern unsigned long amd_iommu_page_entries;
 extern unsigned short ivrs_bdf_entries;
 extern struct ivrs_mappings *ivrs_mappings;
-extern unsigned short last_bdf;
 extern int ioapic_bdf[MAX_IO_APICS];
 extern void *shared_intremap_table;
 
-static void add_ivrs_mapping_entry(
+static unsigned short __initdata last_bdf;
+
+static void __init add_ivrs_mapping_entry(
     u16 bdf, u16 alias_id, u8 flags, struct amd_iommu *iommu)
 {
     u8 sys_mgt, lint1_pass, lint0_pass, nmi_pass, ext_int_pass, init_pass;
