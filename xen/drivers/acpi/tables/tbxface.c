@@ -67,7 +67,8 @@ ACPI_MODULE_NAME("tbxface")
 acpi_status __init acpi_allocate_root_table(u32 initial_table_count)
 {
 
-	acpi_gbl_root_table_list.size = initial_table_count;
+	acpi_gbl_root_table_list.size = initial_table_count -
+					ACPI_ROOT_TABLE_SIZE_INCREMENT;
 	acpi_gbl_root_table_list.flags = ACPI_ROOT_ALLOW_RESIZE;
 
 	return (acpi_tb_resize_root_table_list());

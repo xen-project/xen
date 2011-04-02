@@ -121,41 +121,41 @@ void acpi_ut_track_stack_ptr(void);
 
 void
 acpi_ut_trace(u32 line_number,
-	      const char *function_name, char *module_name, u32 component_id);
+	      const char *function_name, const char *module_name, u32 component_id);
 
 void
 acpi_ut_trace_ptr(u32 line_number,
 		  const char *function_name,
-		  char *module_name, u32 component_id, void *pointer);
+		  const char *module_name, u32 component_id, void *pointer);
 
 void
 acpi_ut_trace_u32(u32 line_number,
 		  const char *function_name,
-		  char *module_name, u32 component_id, u32 integer);
+		  const char *module_name, u32 component_id, u32 integer);
 
 void
 acpi_ut_trace_str(u32 line_number,
 		  const char *function_name,
-		  char *module_name, u32 component_id, char *string);
+		  const char *module_name, u32 component_id, char *string);
 
 void
 acpi_ut_exit(u32 line_number,
-	     const char *function_name, char *module_name, u32 component_id);
+	     const char *function_name, const char *module_name, u32 component_id);
 
 void
 acpi_ut_status_exit(u32 line_number,
 		    const char *function_name,
-		    char *module_name, u32 component_id, acpi_status status);
+		    const char *module_name, u32 component_id, acpi_status status);
 
 void
 acpi_ut_value_exit(u32 line_number,
 		   const char *function_name,
-		   char *module_name, u32 component_id, acpi_integer value);
+		   const char *module_name, u32 component_id, acpi_integer value);
 
 void
 acpi_ut_ptr_exit(u32 line_number,
 		 const char *function_name,
-		 char *module_name, u32 component_id, u8 * ptr);
+		 const char *module_name, u32 component_id, u8 * ptr);
 
 /* Error and message reporting interfaces */
 
@@ -163,32 +163,32 @@ void ACPI_INTERNAL_VAR_XFACE
 acpi_ut_debug_print(u32 requested_debug_level,
 		    u32 line_number,
 		    const char *function_name,
-		    char *module_name,
+		    const char *module_name,
 		    u32 component_id, char *format, ...) ACPI_PRINTF_LIKE(6);
 
 void ACPI_INTERNAL_VAR_XFACE
 acpi_ut_debug_print_raw(u32 requested_debug_level,
 			u32 line_number,
 			const char *function_name,
-			char *module_name,
+			const char *module_name,
 			u32 component_id,
 			char *format, ...) ACPI_PRINTF_LIKE(6);
 
 void ACPI_INTERNAL_VAR_XFACE
-acpi_ut_error(char *module_name,
+acpi_ut_error(const char *module_name,
 	      u32 line_number, char *format, ...) ACPI_PRINTF_LIKE(3);
 
 void ACPI_INTERNAL_VAR_XFACE
-acpi_ut_exception(char *module_name,
+acpi_ut_exception(const char *module_name,
 		  u32 line_number,
 		  acpi_status status, char *format, ...) ACPI_PRINTF_LIKE(4);
 
 void ACPI_INTERNAL_VAR_XFACE
-acpi_ut_warning(char *module_name,
+acpi_ut_warning(const char *module_name,
 		u32 line_number, char *format, ...) ACPI_PRINTF_LIKE(3);
 
 void ACPI_INTERNAL_VAR_XFACE
-acpi_ut_info(char *module_name,
+acpi_ut_info(const char *module_name,
 	     u32 line_number, char *format, ...) ACPI_PRINTF_LIKE(3);
 
 /*

@@ -69,57 +69,9 @@ bool_t acpi_skip_timer_override __initdata;
 static u64 acpi_lapic_addr __initdata = APIC_DEFAULT_PHYS_BASE;
 #endif
 
-u32 __read_mostly acpi_smi_cmd;
-u8 __read_mostly acpi_enable_value;
-u8 __read_mostly acpi_disable_value;
-
-u32 __read_mostly x86_acpiid_to_apicid[MAX_MADT_ENTRIES] =
-    {[0 ... MAX_MADT_ENTRIES - 1] = BAD_APICID };
-
 /* --------------------------------------------------------------------------
                               Boot-time Configuration
    -------------------------------------------------------------------------- */
-
-/*
- * Temporarily use the virtual area starting from FIX_IO_APIC_BASE_END,
- * to map the target physical address. The problem is that set_fixmap()
- * provides a single page, and it is possible that the page is not
- * sufficient.
- * By using this area, we can map up to MAX_IO_APICS pages temporarily,
- * i.e. until the next __va_range() call.
- *
- * Important Safety Note:  The fixed I/O APIC page numbers are *subtracted*
- * from the fixed base.  That's why we start at FIX_IO_APIC_BASE_END and
- * count idx down while incrementing the phys address.
- */
-char *__acpi_map_table(unsigned long phys, unsigned long size)
-{
-	unsigned long base, offset, mapped_size;
-	int idx;
-
-	/* XEN: RAM holes above 1MB are not permanently mapped. */
-	if ((phys + size) <= (1 * 1024 * 1024))
-		return __va(phys);
-
-	offset = phys & (PAGE_SIZE - 1);
-	mapped_size = PAGE_SIZE - offset;
-	set_fixmap(FIX_ACPI_END, phys);
-	base = fix_to_virt(FIX_ACPI_END);
-
-	/*
-	 * Most cases can be covered by the below.
-	 */
-	idx = FIX_ACPI_END;
-	while (mapped_size < size) {
-		if (--idx < FIX_ACPI_BEGIN)
-			return NULL;	/* cannot handle this */
-		phys += PAGE_SIZE;
-		set_fixmap(idx, phys);
-		mapped_size += PAGE_SIZE;
-	}
-
-	return ((char *) base + offset);
-}
 
 #ifdef CONFIG_X86_LOCAL_APIC
 static int __init acpi_parse_madt(struct acpi_table_header *table)
@@ -926,18 +878,4 @@ int __init acpi_boot_init(void)
 	erst_init();
 
 	return 0;
-}
-
-unsigned int acpi_get_processor_id(unsigned int cpu)
-{
-	unsigned int acpiid, apicid;
-
-	if ((apicid = x86_cpu_to_apicid[cpu]) == BAD_APICID)
-		return INVALID_ACPIID;
-
-	for (acpiid = 0; acpiid < ARRAY_SIZE(x86_acpiid_to_apicid); acpiid++)
-		if (x86_acpiid_to_apicid[acpiid] == apicid)
-			return acpiid;
-
-	return INVALID_ACPIID;
 }

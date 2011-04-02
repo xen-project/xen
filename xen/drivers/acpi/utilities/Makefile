@@ -1,2 +1,2 @@
 obj-y += utglobal.o
-obj-y += utmisc.o
+obj-bin-y += utmisc.init.o
