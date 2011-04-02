@@ -677,7 +677,7 @@ int __init request_irq(unsigned int irq,
     return retval;
 }
 
-void release_irq(unsigned int irq)
+void __init release_irq(unsigned int irq)
 {
     struct irq_desc *desc;
     unsigned long flags;
@@ -700,7 +700,7 @@ void release_irq(unsigned int irq)
         xfree(action);
 }
 
-int setup_irq(unsigned int irq, struct irqaction *new)
+int __init setup_irq(unsigned int irq, struct irqaction *new)
 {
     struct irq_desc *desc;
     unsigned long flags;

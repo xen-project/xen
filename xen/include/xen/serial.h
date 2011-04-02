@@ -51,6 +51,9 @@ struct uart_driver {
     void (*init_postirq)(struct serial_port *);
     /* Hook to clean up after Xen bootstrap (before domain 0 runs). */
     void (*endboot)(struct serial_port *);
+    /* Driver suspend/resume. */
+    void (*suspend)(struct serial_port *);
+    void (*resume)(struct serial_port *);
     /* Transmit FIFO ready to receive up to @tx_fifo_size characters? */
     int  (*tx_empty)(struct serial_port *);
     /* Put a character onto the serial line. */

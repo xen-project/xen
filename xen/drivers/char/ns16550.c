@@ -224,17 +224,12 @@ static void pci_serial_early_init(struct ns16550 *uart)
         0x4, 0x1);
 }
 
-static void __devinit ns16550_init_preirq(struct serial_port *port)
+static void ns16550_setup_preirq(struct ns16550 *uart)
 {
-    struct ns16550 *uart = port->uart;
     unsigned char lcr;
     unsigned int  divisor;
 
     pci_serial_early_init(uart);
-
-    /* I/O ports are distinguished by their size (16 bits). */
-    if ( uart->io_base >= 0x10000 )
-        uart->remapped_io_base = (char *)ioremap(uart->io_base, 8);
 
     lcr = (uart->data_bits - 5) | ((uart->stop_bits - 1) << 2) | uart->parity;
 
@@ -264,6 +259,17 @@ static void __devinit ns16550_init_preirq(struct serial_port *port)
 
     /* Enable and clear the FIFOs. Set a large trigger threshold. */
     ns_write_reg(uart, FCR, FCR_ENABLE | FCR_CLRX | FCR_CLTX | FCR_TRG14);
+}
+
+static void __init ns16550_init_preirq(struct serial_port *port)
+{
+    struct ns16550 *uart = port->uart;
+
+    /* I/O ports are distinguished by their size (16 bits). */
+    if ( uart->io_base >= 0x10000 )
+        uart->remapped_io_base = (char *)ioremap(uart->io_base, 8);
+
+    ns16550_setup_preirq(uart);
 
     /* Check this really is a 16550+. Otherwise we have no FIFOs. */
     if ( ((ns_read_reg(uart, IIR) & 0xc0) == 0xc0) &&
@@ -271,34 +277,10 @@ static void __devinit ns16550_init_preirq(struct serial_port *port)
         port->tx_fifo_size = 16;
 }
 
-static void __devinit ns16550_init_postirq(struct serial_port *port)
+static void ns16550_setup_postirq(struct ns16550 *uart)
 {
-    struct ns16550 *uart = port->uart;
-    int rc, bits;
-
-    if ( uart->irq < 0 )
-        return;
-
-    serial_async_transmit(port);
-
-    if ( !uart->timer.function )
-        init_timer(&uart->timer, ns16550_poll, port, 0);
-
-    /* Calculate time to fill RX FIFO and/or empty TX FIFO for polling. */
-    bits = uart->data_bits + uart->stop_bits + !!uart->parity;
-    uart->timeout_ms = max_t(
-        unsigned int, 1, (bits * port->tx_fifo_size * 1000) / uart->baud);
-
-    if ( uart->irq == 0 )
-        set_timer(&uart->timer, NOW() + MILLISECS(uart->timeout_ms));
-    else
+    if ( uart->irq > 0 )
     {
-        uart->irqaction.handler = ns16550_interrupt;
-        uart->irqaction.name    = "ns16550";
-        uart->irqaction.dev_id  = port;
-        if ( (rc = setup_irq(uart->irq, &uart->irqaction)) != 0 )
-            printk("ERROR: Failed to allocate ns16550 IRQ %d\n", uart->irq);
-
         /* Master interrupt enable; also keep DTR/RTS asserted. */
         ns_write_reg(uart, MCR, MCR_OUT2 | MCR_DTR | MCR_RTS);
 
@@ -309,8 +291,45 @@ static void __devinit ns16550_init_postirq(struct serial_port *port)
         uart->probing = 1;
         uart->intr_works = 0;
         ns_write_reg(uart, THR, 0xff);
-        set_timer(&uart->timer, NOW() + MILLISECS(uart->timeout_ms));
     }
+
+    if ( uart->irq >= 0 )
+        set_timer(&uart->timer, NOW() + MILLISECS(uart->timeout_ms));
+}
+
+static void __init ns16550_init_postirq(struct serial_port *port)
+{
+    struct ns16550 *uart = port->uart;
+    int rc, bits;
+
+    if ( uart->irq < 0 )
+        return;
+
+    serial_async_transmit(port);
+
+    init_timer(&uart->timer, ns16550_poll, port, 0);
+
+    /* Calculate time to fill RX FIFO and/or empty TX FIFO for polling. */
+    bits = uart->data_bits + uart->stop_bits + !!uart->parity;
+    uart->timeout_ms = max_t(
+        unsigned int, 1, (bits * port->tx_fifo_size * 1000) / uart->baud);
+
+    if ( uart->irq > 0 )
+    {
+        uart->irqaction.handler = ns16550_interrupt;
+        uart->irqaction.name    = "ns16550";
+        uart->irqaction.dev_id  = port;
+        if ( (rc = setup_irq(uart->irq, &uart->irqaction)) != 0 )
+            printk("ERROR: Failed to allocate ns16550 IRQ %d\n", uart->irq);
+    }
+
+    ns16550_setup_postirq(uart);
+}
+
+static void ns16550_resume(struct serial_port *port)
+{
+    ns16550_setup_preirq(port->uart);
+    ns16550_setup_postirq(port->uart);
 }
 
 #ifdef CONFIG_X86
@@ -334,6 +353,7 @@ static struct uart_driver __read_mostly ns16550_driver = {
     .init_preirq  = ns16550_init_preirq,
     .init_postirq = ns16550_init_postirq,
     .endboot      = ns16550_endboot,
+    .resume       = ns16550_resume,
     .tx_empty     = ns16550_tx_empty,
     .putc         = ns16550_putc,
     .getc         = ns16550_getc,

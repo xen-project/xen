@@ -46,7 +46,7 @@ static int sn_getc(struct serial_port *port, char *pc)
 	return 1;
 }
 
-static void sn_endboot(struct serial_port *port)
+static void __init sn_endboot(struct serial_port *port)
 {
 	struct sn_console_data *sndata = port->uart;
 
@@ -69,7 +69,7 @@ static void sn_poll(void *data)
 }
 
 
-static void sn_init_postirq(struct serial_port *port)
+static void __init sn_init_postirq(struct serial_port *port)
 {
 	struct sn_console_data *sndata = port->uart;
 
@@ -77,9 +77,16 @@ static void sn_init_postirq(struct serial_port *port)
         set_timer(&sndata->timer, NOW() + MILLISECS(console_data.timeout_ms));
 }
 
+static void sn_resume(struct serial_port *port)
+{
+	struct sn_console_data *sndata = port->uart;
+
+	set_timer(&sndata->timer, NOW() + MILLISECS(console_data.timeout_ms));
+}
 
 static struct uart_driver sn_sal_console = {
 	.init_postirq = sn_init_postirq,
+	.resume = sn_resume,
 	.putc = sn_putc,
 	.getc = sn_getc,
 	.endboot = sn_endboot,

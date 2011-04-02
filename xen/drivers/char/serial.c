@@ -420,7 +420,7 @@ void serial_end_log_everything(int handle)
     spin_unlock_irqrestore(&port->tx_lock, flags);
 }
 
-void __devinit serial_init_preirq(void)
+void __init serial_init_preirq(void)
 {
     int i;
     for ( i = 0; i < ARRAY_SIZE(com); i++ )
@@ -428,7 +428,7 @@ void __devinit serial_init_preirq(void)
             com[i].driver->init_preirq(&com[i]);
 }
 
-void __devinit serial_init_postirq(void)
+void __init serial_init_postirq(void)
 {
     int i;
     for ( i = 0; i < ARRAY_SIZE(com); i++ )
@@ -455,16 +455,18 @@ int serial_irq(int idx)
 
 void serial_suspend(void)
 {
-    int i, irq;
+    int i;
     for ( i = 0; i < ARRAY_SIZE(com); i++ )
-        if ( (irq = serial_irq(i)) >= 0 )
-            release_irq(irq);
+        if ( com[i].driver && com[i].driver->suspend )
+            com[i].driver->suspend(&com[i]);
 }
 
 void serial_resume(void)
 {
-    serial_init_preirq();
-    serial_init_postirq();
+    int i;
+    for ( i = 0; i < ARRAY_SIZE(com); i++ )
+        if ( com[i].driver && com[i].driver->resume )
+            com[i].driver->resume(&com[i]);
 }
 
 void __init serial_register_uart(int idx, struct uart_driver *driver,
@@ -478,7 +480,7 @@ void __init serial_register_uart(int idx, struct uart_driver *driver,
     com[idx].tx_fifo_size = 1;
 }
 
-void serial_async_transmit(struct serial_port *port)
+void __init serial_async_transmit(struct serial_port *port)
 {
     BUG_ON(!port->driver->tx_empty);
     if ( port->txbuf != NULL )

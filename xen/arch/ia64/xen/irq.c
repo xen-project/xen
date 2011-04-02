@@ -266,7 +266,7 @@ int setup_vector(unsigned int vector, struct irqaction * new)
 /* Vectors reserved by xen (and thus not sharable with domains).  */
 unsigned long ia64_xen_vector[BITS_TO_LONGS(NR_IRQS)];
 
-int setup_irq_vector(unsigned int vec, struct irqaction * new)
+int __init setup_irq_vector(unsigned int vec, struct irqaction * new)
 {
 	int res;
 
@@ -279,7 +279,7 @@ int setup_irq_vector(unsigned int vec, struct irqaction * new)
 	return res;
 }
 
-void release_irq_vector(unsigned int vec)
+void __init release_irq_vector(unsigned int vec)
 {
 	unsigned long flags;
 	irq_desc_t *desc;
