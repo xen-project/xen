@@ -643,7 +643,7 @@ static int __init irq_ratelimit_init(void)
 }
 __initcall(irq_ratelimit_init);
 
-int request_irq(unsigned int irq,
+int __init request_irq(unsigned int irq,
         void (*handler)(int, void *, struct cpu_user_regs *),
         unsigned long irqflags, const char * devname, void *dev_id)
 {

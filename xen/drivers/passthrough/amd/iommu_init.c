@@ -535,7 +535,7 @@ static void amd_iommu_page_fault(int irq, void *dev_id,
     spin_unlock_irqrestore(&iommu->lock, flags);
 }
 
-static int set_iommu_interrupt_handler(struct amd_iommu *iommu)
+static int __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
 {
     int irq, ret;
 

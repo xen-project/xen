@@ -267,7 +267,7 @@ register_percpu_irq (ia64_vector vec, struct irqaction *action)
 }
 
 #ifdef XEN
-int request_irq_vector(unsigned int vector,
+int __init request_irq_vector(unsigned int vector,
 		void (*handler)(int, void *, struct cpu_user_regs *),
 		unsigned long irqflags, const char * devname, void *dev_id)
 {

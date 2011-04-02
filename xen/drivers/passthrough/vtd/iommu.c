@@ -1038,7 +1038,7 @@ static hw_irq_controller dma_msi_type = {
     .set_affinity = dma_msi_set_affinity,
 };
 
-static int iommu_set_interrupt(struct iommu *iommu)
+static int __init iommu_set_interrupt(struct iommu *iommu)
 {
     int irq, ret;
 
@@ -1937,7 +1937,6 @@ static int init_vtd_hw(void)
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
     struct iommu_flush *flush = NULL;
-    int irq;
     int ret;
     unsigned long flags;
     struct irq_cfg *cfg;
@@ -1948,16 +1947,6 @@ static int init_vtd_hw(void)
     for_each_drhd_unit ( drhd )
     {
         iommu = drhd->iommu;
-        if ( iommu->irq < 0 )
-        {
-            irq = iommu_set_interrupt(iommu);
-            if ( irq < 0 )
-            {
-                dprintk(XENLOG_ERR VTDPREFIX, "IOMMU: interrupt setup failed\n");
-                return irq;
-            }
-            iommu->irq = irq;
-        }
 
         cfg = irq_cfg(iommu->irq);
         dma_msi_set_affinity(iommu->irq, cfg->cpu_mask);
@@ -2060,6 +2049,7 @@ int __init intel_vtd_setup(void)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
+    int ret;
 
     if ( list_empty(&acpi_drhd_units) )
         return -ENODEV;
@@ -2092,6 +2082,14 @@ int __init intel_vtd_setup(void)
 
         if ( iommu_intremap && !ecap_intr_remap(iommu->ecap) )
             iommu_intremap = 0;
+
+        ret = iommu_set_interrupt(iommu);
+        if ( ret < 0 )
+        {
+            dprintk(XENLOG_ERR VTDPREFIX, "IOMMU: interrupt setup failed\n");
+            goto error;
+        }
+        iommu->irq = ret;
     }
 
     if ( !iommu_qinval && iommu_intremap )
@@ -2110,7 +2108,8 @@ int __init intel_vtd_setup(void)
 
     scan_pci_devices();
 
-    if ( init_vtd_hw() )
+    ret = init_vtd_hw();
+    if ( ret )
         goto error;
 
     register_keyhandler('V', &dump_iommu_info_keyhandler);
@@ -2123,7 +2122,7 @@ int __init intel_vtd_setup(void)
     iommu_passthrough = 0;
     iommu_qinval = 0;
     iommu_intremap = 0;
-    return -ENOMEM;
+    return ret;
 }
 
 /*
