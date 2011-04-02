@@ -9,8 +9,8 @@ CFLAGS := $(filter-out -flto,$(CFLAGS))
 
 # NB. awk invocation is a portable alternative to 'head -n -1'
 %.S: %.bin
-	(od -v -t x $< | awk 'NR > 1 {print s} {s=$$0}' | \
-	sed 's/ /,0x/g' | sed 's/^[0-9]*,/ .long /') >$@
+	(od -v -t x $< | tr -s ' ' | awk 'NR > 1 {print s} {s=$$0}' | \
+	sed 's/ /,0x/g' | sed 's/,0x$$//' | sed 's/^[0-9]*,/ .long /') >$@
 
 %.bin: %.lnk
 	$(OBJCOPY) -O binary $< $@
