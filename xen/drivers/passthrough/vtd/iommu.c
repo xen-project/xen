@@ -2014,7 +2014,7 @@ static int init_vtd_hw(void)
             if ( enable_intremap(iommu, 0) != 0 )
             {
                 dprintk(XENLOG_WARNING VTDPREFIX,
-                        "Failed to enable Interrupt Remapping!\n");
+                        "Interrupt Remapping not enabled\n");
                 break;
             }
         }

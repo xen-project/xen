@@ -735,6 +735,13 @@ int enable_intremap(struct iommu *iommu, int eim)
 
     ASSERT(ecap_intr_remap(iommu->ecap) && iommu_intremap);
 
+    if ( !platform_supports_intremap() )
+    {
+        dprintk(XENLOG_ERR VTDPREFIX,
+                "Platform firmware does not support interrupt remapping\n");
+        return -EINVAL;
+    }
+
     ir_ctrl = iommu_ir_ctrl(iommu);
     sts = dmar_readl(iommu->reg, DMAR_GSTS_REG);
 
@@ -821,15 +828,18 @@ out:
 }
 
 /*
- * This function is used to enable Interrutp remapping when
+ * This function is used to enable Interrupt remapping when
  * enable x2apic
  */
-int iommu_enable_IR(void)
+int iommu_enable_x2apic_IR(void)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
 
     if ( !iommu_supports_eim() )
+        return -1;
+
+    if ( !platform_supports_x2apic() )
         return -1;
 
     for_each_drhd_unit ( drhd )
@@ -881,7 +891,7 @@ int iommu_enable_IR(void)
  * This function is used to disable Interrutp remapping when
  * suspend local apic
  */
-void iommu_disable_IR(void)
+void iommu_disable_x2apic_IR(void)
 {
     struct acpi_drhd_unit *drhd;
 

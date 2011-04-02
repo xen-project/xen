@@ -47,6 +47,7 @@ static LIST_HEAD_READ_MOSTLY(acpi_atsr_units);
 static LIST_HEAD_READ_MOSTLY(acpi_rhsa_units);
 
 static struct acpi_table_header *__read_mostly dmar_table;
+static int __read_mostly dmar_flags;
 static u64 __read_mostly igd_drhd_address;
 
 static void __init dmar_scope_add_buses(struct dmar_scope *scope, u16 sec_bus,
@@ -761,7 +762,11 @@ out:
 
 int __init acpi_dmar_init(void)
 {
+    struct acpi_table_dmar *dmar;
+
     acpi_get_table(ACPI_SIG_DMAR, 0, &dmar_table);
+    dmar = (struct acpi_table_dmar *) dmar_table;
+    dmar_flags = dmar->flags;
 
     return parse_dmar_table(acpi_parse_dmar);
 }
@@ -780,4 +785,23 @@ void acpi_dmar_zap(void)
         return;
     dmar_table->signature[0] = 'X';
     dmar_table->checksum -= 'X'-'D';
+}
+
+int __init platform_supports_intremap(void)
+{
+    unsigned int flags = 0;
+
+    flags = DMAR_INTR_REMAP;
+    return ((dmar_flags & flags) == DMAR_INTR_REMAP);
+}
+
+int __init platform_supports_x2apic(void)
+{
+    unsigned int flags = 0;
+
+    if (!cpu_has_x2apic)
+        return 0;
+
+    flags = DMAR_INTR_REMAP | DMAR_X2APIC_OPT_OUT;
+    return ((dmar_flags & flags) == DMAR_INTR_REMAP);
 }

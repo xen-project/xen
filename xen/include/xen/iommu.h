@@ -63,8 +63,8 @@ struct iommu {
 
 int iommu_setup(void);
 int iommu_supports_eim(void);
-int iommu_enable_IR(void);
-void iommu_disable_IR(void);
+int iommu_enable_x2apic_IR(void);
+void iommu_disable_x2apic_IR(void);
 
 int iommu_add_device(struct pci_dev *pdev);
 int iommu_remove_device(struct pci_dev *pdev);
