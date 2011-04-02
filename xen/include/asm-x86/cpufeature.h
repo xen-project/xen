@@ -101,6 +101,7 @@
 #define X86_FEATURE_X2APIC	(4*32+21) /* Extended xAPIC */
 #define X86_FEATURE_POPCNT	(4*32+23) /* POPCNT instruction */
 #define X86_FEATURE_TSC_DEADLINE (4*32+24) /* "tdt" TSC Deadline Timer */
+#define X86_FEATURE_AES		(4*32+25) /* AES instructions */
 #define X86_FEATURE_XSAVE	(4*32+26) /* XSAVE/XRSTOR/XSETBV/XGETBV */
 #define X86_FEATURE_OSXSAVE	(4*32+27) /* OSXSAVE */
 #define X86_FEATURE_AVX 	(4*32+28) /* Advanced Vector Extensions */

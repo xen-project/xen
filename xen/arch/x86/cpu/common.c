@@ -15,15 +15,8 @@
 
 #include "cpu.h"
 
-#define tsc_disable 0
-#define disable_pse 0
-
 static int cachesize_override __cpuinitdata = -1;
 size_param("cachesize", cachesize_override);
-static bool_t __cpuinitdata disable_x86_fxsr;
-boolean_param("nofxsr", disable_x86_fxsr);
-static bool_t __cpuinitdata disable_x86_serial_nr;
-boolean_param("noserialnumber", disable_x86_serial_nr);
 
 static bool_t __cpuinitdata use_xsave;
 boolean_param("xsave", use_xsave);
@@ -191,28 +184,6 @@ static void __cpuinit get_cpu_vendor(struct cpuinfo_x86 *c, int early)
 }
 
 
-/* Standard macro to see if a specific flag is changeable */
-static inline int flag_is_changeable_p(unsigned long flag)
-{
-	unsigned long f1, f2;
-
-	asm("pushf\n\t"
-	    "pushf\n\t"
-	    "pop %0\n\t"
-	    "mov %0,%1\n\t"
-	    "xor %2,%0\n\t"
-	    "push %0\n\t"
-	    "popf\n\t"
-	    "pushf\n\t"
-	    "pop %0\n\t"
-	    "popf\n\t"
-	    : "=&r" (f1), "=&r" (f2)
-	    : "ir" (flag));
-
-	return ((f1^f2) & flag) != 0;
-}
-
-
 /* Do minimum CPU detection early.
    Fields really needed: vendor, cpuid_level, family, model, mask, cache alignment.
    The others are not touched to avoid unwanted side effects.
@@ -302,6 +273,14 @@ void __cpuinit generic_identify(struct cpuinfo_x86 * c)
 #endif
 }
 
+#ifdef __i386__
+
+static bool_t __cpuinitdata disable_x86_fxsr;
+boolean_param("nofxsr", disable_x86_fxsr);
+
+static bool_t __cpuinitdata disable_x86_serial_nr;
+boolean_param("noserialnumber", disable_x86_serial_nr);
+
 static void __cpuinit squash_the_stupid_serial_number(struct cpuinfo_x86 *c)
 {
 	if (cpu_has(c, X86_FEATURE_PN) && disable_x86_serial_nr ) {
@@ -317,6 +296,7 @@ static void __cpuinit squash_the_stupid_serial_number(struct cpuinfo_x86 *c)
 	}
 }
 
+#endif
 
 /*
  * This does the hard work of actually picking apart the CPU stuff...
@@ -376,26 +356,24 @@ void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 	if ( cpu_has_xsave )
 		xsave_init();
 
-	/* Disable the PN if appropriate */
-	squash_the_stupid_serial_number(c);
-
 	/*
 	 * The vendor-specific functions might have changed features.  Now
 	 * we do "generic changes."
 	 */
 
-	/* TSC disabled? */
-	if ( tsc_disable )
-		clear_bit(X86_FEATURE_TSC, c->x86_capability);
+#ifdef __i386__
+	/* Disable the PN if appropriate */
+	squash_the_stupid_serial_number(c);
 
 	/* FXSR disabled? */
 	if (disable_x86_fxsr) {
 		clear_bit(X86_FEATURE_FXSR, c->x86_capability);
-		clear_bit(X86_FEATURE_XMM, c->x86_capability);
+		if (!cpu_has_xsave) {
+			clear_bit(X86_FEATURE_XMM, c->x86_capability);
+			clear_bit(X86_FEATURE_AES, c->x86_capability);
+		}
 	}
-
-	if (disable_pse)
-		clear_bit(X86_FEATURE_PSE, c->x86_capability);
+#endif
 
 	for (i = 0 ; i < NCAPINTS ; ++i)
 		c->x86_capability[i] &= ~cleared_caps[i];
