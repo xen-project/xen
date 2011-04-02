@@ -141,6 +141,8 @@ struct scheduler {
     unsigned int sched_id;  /* ID for this scheduler             */
     void *sched_data;       /* global data pointer               */
 
+    int          (*global_init)    (void);
+
     int          (*init)           (struct scheduler *);
     void         (*deinit)         (const struct scheduler *);
 

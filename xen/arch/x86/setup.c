@@ -1259,7 +1259,7 @@ void __init __start_xen(unsigned long mbi_p)
     do_initcalls();
 
     if ( opt_watchdog ) 
-        watchdog_enable();
+        watchdog_setup();
     
     if ( !tboot_protect_mem_regions() )
         panic("Could not protect TXT memory regions\n");

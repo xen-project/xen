@@ -389,12 +389,12 @@ void watchdog_disable(void)
 
 void watchdog_enable(void)
 {
-    static unsigned long heartbeat_initialised;
-    unsigned int cpu;
+    atomic_dec(&watchdog_disable_count);
+}
 
-    if ( !atomic_dec_and_test(&watchdog_disable_count) ||
-         test_and_set_bit(0, &heartbeat_initialised) )
-        return;
+void __init watchdog_setup(void)
+{
+    unsigned int cpu;
 
     /*
      * Activate periodic heartbeats. We cannot do this earlier during 
@@ -403,6 +403,8 @@ void watchdog_enable(void)
     for_each_online_cpu ( cpu )
         cpu_nmi_callback(&cpu_nmi_nfb, CPU_UP_PREPARE, (void *)(long)cpu);
     register_cpu_notifier(&cpu_nmi_nfb);
+
+    watchdog_enable();
 }
 
 void nmi_watchdog_tick(struct cpu_user_regs * regs)

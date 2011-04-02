@@ -2010,7 +2010,8 @@ csched_cpu_starting(int cpu)
     /* Hope this is safe from cpupools switching things around. :-) */
     ops = per_cpu(scheduler, cpu);
 
-    init_pcpu(ops, cpu);
+    if ( ops->alloc_pdata == csched_alloc_pdata )
+        init_pcpu(ops, cpu);
 
     return NOTIFY_DONE;
 }
@@ -2036,6 +2037,13 @@ static int cpu_credit2_callback(
 static struct notifier_block cpu_credit2_nfb = {
     .notifier_call = cpu_credit2_callback
 };
+
+static int
+csched_global_init(void)
+{
+    register_cpu_notifier(&cpu_credit2_nfb);
+    return 0;
+}
 
 static int
 csched_init(struct scheduler *ops)
@@ -2069,8 +2077,6 @@ csched_init(struct scheduler *ops)
     ops->sched_data = prv;
     spin_lock_init(&prv->lock);
     INIT_LIST_HEAD(&prv->sdom);
-
-    register_cpu_notifier(&cpu_credit2_nfb);
 
     /* But un-initialize all runqueues */
     for ( i=0; i<NR_CPUS; i++)
@@ -2120,6 +2126,7 @@ const struct scheduler sched_credit2_def = {
 
     .dump_cpu_state = csched_dump_pcpu,
     .dump_settings  = csched_dump,
+    .global_init    = csched_global_init,
     .init           = csched_init,
     .deinit         = csched_deinit,
     .alloc_vdata    = csched_alloc_vdata,

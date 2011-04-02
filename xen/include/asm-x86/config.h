@@ -393,6 +393,7 @@ extern unsigned long xenheap_phys_end;
 #ifndef __ASSEMBLY__
 extern void watchdog_disable(void);
 extern void watchdog_enable(void);
+extern void watchdog_setup(void);
 #endif
 
 #endif /* __X86_CONFIG_H__ */

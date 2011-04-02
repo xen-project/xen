@@ -2,6 +2,7 @@
 #include <xen/cpumask.h>
 #include <xen/cpu.h>
 #include <xen/event.h>
+#include <xen/init.h>
 #include <xen/sched.h>
 #include <xen/stop_machine.h>
 
@@ -53,7 +54,7 @@ void cpu_hotplug_done(void)
 
 static NOTIFIER_HEAD(cpu_chain);
 
-void register_cpu_notifier(struct notifier_block *nb)
+void __init register_cpu_notifier(struct notifier_block *nb)
 {
     if ( !spin_trylock(&cpu_add_remove_lock) )
         BUG(); /* Should never fail as we are called only during boot. */

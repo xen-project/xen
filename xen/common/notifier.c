@@ -19,7 +19,7 @@
  * Adds a notifier to a raw notifier chain.
  * All locking must be provided by the caller.
  */
-void notifier_chain_register(
+void __init notifier_chain_register(
     struct notifier_head *nh, struct notifier_block *n)
 {
     struct list_head *chain = &nh->head.chain;
@@ -44,7 +44,7 @@ void notifier_chain_register(
  * Removes a notifier from a raw notifier chain.
  * All locking must be provided by the caller.
  */
-void notifier_chain_unregister(
+void __init notifier_chain_unregister(
     struct notifier_head *nh, struct notifier_block *n)
 {
     list_del(&n->chain);

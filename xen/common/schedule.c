@@ -66,7 +66,6 @@ static const struct scheduler *schedulers[] = {
     &sched_credit_def,
     &sched_credit2_def,
     &sched_arinc653_def,
-    NULL
 };
 
 static struct scheduler __read_mostly ops;
@@ -1324,17 +1323,25 @@ void __init scheduler_init(void)
 
     open_softirq(SCHEDULE_SOFTIRQ, schedule);
 
-    for ( i = 0; schedulers[i] != NULL; i++ )
+    for ( i = 0; i < ARRAY_SIZE(schedulers); i++ )
     {
-        ops = *schedulers[i];
-        if ( strcmp(ops.opt_name, opt_sched) == 0 )
-            break;
+        if ( schedulers[i]->global_init && schedulers[i]->global_init() < 0 )
+            schedulers[i] = NULL;
+        else if ( !ops.name && !strcmp(schedulers[i]->opt_name, opt_sched) )
+            ops = *schedulers[i];
     }
 
-    if ( schedulers[i] == NULL )
+    if ( !ops.name )
     {
         printk("Could not find scheduler: %s\n", opt_sched);
-        ops = *schedulers[0];
+        for ( i = 0; i < ARRAY_SIZE(schedulers); i++ )
+            if ( schedulers[i] )
+            {
+                ops = *schedulers[i];
+                break;
+            }
+        BUG_ON(!ops.name);
+        printk("Using '%s' (%s)\n", ops.name, ops.opt_name);
     }
 
     if ( cpu_schedule_up(0) )
@@ -1407,8 +1414,8 @@ struct scheduler *scheduler_alloc(unsigned int sched_id, int *perr)
     int i;
     struct scheduler *sched;
 
-    for ( i = 0; schedulers[i] != NULL; i++ )
-        if ( schedulers[i]->sched_id == sched_id )
+    for ( i = 0; i < ARRAY_SIZE(schedulers); i++ )
+        if ( schedulers[i] && schedulers[i]->sched_id == sched_id )
             goto found;
     *perr = -ENOENT;
     return NULL;
