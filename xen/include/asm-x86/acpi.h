@@ -79,8 +79,7 @@ int __acpi_release_global_lock(unsigned int *lock);
 	    :"0"(n_hi), "1"(n_lo))
 
 extern bool_t acpi_lapic, acpi_ioapic, acpi_noirq;
-extern bool_t acpi_force, acpi_ht;
-extern bool_t acpi_disabled, acpi_pci_disabled;
+extern bool_t acpi_force, acpi_ht, acpi_disabled;
 extern bool_t acpi_skip_timer_override;
 extern u32 acpi_smi_cmd;
 extern u8 acpi_enable_value, acpi_disable_value;
@@ -90,7 +89,6 @@ static inline void disable_acpi(void)
 {
 	acpi_disabled = 1;
 	acpi_ht = 0;
-	acpi_pci_disabled = 1;
 	acpi_noirq = 1;
 }
 
@@ -98,12 +96,6 @@ static inline void disable_acpi(void)
 #define FIX_ACPI_PAGES 4
 
 static inline void acpi_noirq_set(void) { acpi_noirq = 1; }
-static inline void acpi_disable_pci(void)
-{
-	acpi_pci_disabled = 1;
-	acpi_noirq_set();
-}
-static inline int acpi_irq_balance_set(char *str) { return 0; }
 
 /* routines for saving/restoring kernel state */
 extern int acpi_save_state_mem(void);

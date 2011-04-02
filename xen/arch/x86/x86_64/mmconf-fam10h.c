@@ -146,21 +146,14 @@ void __cpuinit fam10h_check_enable_mmcfg(void)
 
 	/* try to make sure that AP's setting is identical to BSP setting */
 	if (val & FAM10H_MMIO_CONF_ENABLE) {
-		unsigned busnbits;
-		busnbits = (val >> FAM10H_MMIO_CONF_BUSRANGE_SHIFT) &
-			FAM10H_MMIO_CONF_BUSRANGE_MASK;
+		u64 base = val & MASK;
 
-		/* only trust the one handle 256 buses, if acpi=off */
-		if (!acpi_pci_disabled || busnbits >= 8) {
-			u64 base = val & MASK;
-
-			if (!fam10h_pci_mmconf_base) {
-				fam10h_pci_mmconf_base = base;
-				return;
-			}
-			if (fam10h_pci_mmconf_base == base)
-				return;
+		if (!fam10h_pci_mmconf_base) {
+			fam10h_pci_mmconf_base = base;
+			return;
 		}
+		if (fam10h_pci_mmconf_base == base)
+			return;
 	}
 
 	/*

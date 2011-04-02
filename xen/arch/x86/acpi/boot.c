@@ -43,21 +43,13 @@
 #include <mach_apic.h>
 #include <mach_mpparse.h>
 
-#define CONFIG_ACPI_PCI
-
 #define BAD_MADT_ENTRY(entry, end) (					    \
 		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
 		((struct acpi_subtable_header *)entry)->length != sizeof(*entry))
 
 #define PREFIX			"ACPI: "
 
-#ifdef CONFIG_ACPI_PCI
 bool_t __initdata acpi_noirq;	/* skip ACPI IRQ initialization */
-bool_t __initdata acpi_pci_disabled; /* skip ACPI PCI scan and IRQ initialization */
-#else
-bool_t __initdata acpi_noirq = 1;
-bool_t __initdata acpi_pci_disabled = 1;
-#endif
 bool_t __initdata acpi_ht = 1;	/* enable HT */
 
 bool_t __initdata acpi_lapic;
@@ -572,7 +564,6 @@ static void __init acpi_process_madt(void)
 			 */
 			error = acpi_parse_madt_ioapic_entries();
 			if (!error) {
-				acpi_irq_balance_set(NULL);
 				acpi_ioapic = 1;
 
 				smp_found_config = 1;
@@ -600,16 +591,6 @@ static int __init disable_acpi_irq(struct dmi_system_id *d)
 		printk(KERN_NOTICE "%s detected: force use of acpi=noirq\n",
 		       d->ident);
 		acpi_noirq_set();
-	}
-	return 0;
-}
-
-static int __init disable_acpi_pci(struct dmi_system_id *d)
-{
-	if (!acpi_force) {
-		printk(KERN_NOTICE "%s detected: force use of pci=noacpi\n",
-		       d->ident);
-		/*acpi_disable_pci();*/
 	}
 	return 0;
 }
@@ -772,29 +753,6 @@ static struct dmi_system_id __initdata acpi_dmi_table[] = {
 		     /* newer BIOS, Revision 1011, does work */
 		     DMI_MATCH(DMI_BIOS_VERSION,
 			       "ASUS A7V ACPI BIOS Revision 1007"),
-		     },
-	 },
-
-	/*
-	 * Boxes that need ACPI PCI IRQ routing and PCI scan disabled
-	 */
-	{			/* _BBN 0 bug */
-	 .callback = disable_acpi_pci,
-	 .ident = "ASUS PR-DLS",
-	 .matches = {
-		     DMI_MATCH(DMI_BOARD_VENDOR, "ASUSTeK Computer INC."),
-		     DMI_MATCH(DMI_BOARD_NAME, "PR-DLS"),
-		     DMI_MATCH(DMI_BIOS_VERSION,
-			       "ASUS PR-DLS ACPI BIOS Revision 1010"),
-		     DMI_MATCH(DMI_BIOS_DATE, "03/21/2003")
-		     },
-	 },
-	{
-	 .callback = disable_acpi_pci,
-	 .ident = "Acer TravelMate 36x Laptop",
-	 .matches = {
-		     DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
-		     DMI_MATCH(DMI_PRODUCT_NAME, "TravelMate 360"),
 		     },
 	 },
 	{}
