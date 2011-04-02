@@ -238,7 +238,6 @@ out_dealloc:
     {
         void *rawbuf = per_cpu(t_bufs, cpu);
         per_cpu(t_bufs, cpu) = NULL;
-        printk(XENLOG_DEBUG "xentrace: cpu %d p %p\n", cpu, rawbuf);
         if ( rawbuf )
         {
             ASSERT(!(virt_to_page(rawbuf)->count_info & PGC_allocated));
