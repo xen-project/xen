@@ -16,6 +16,7 @@
 #include <asm/apicdef.h>
 #include <asm/acpi.h>
 #include <asm/page.h>
+#include <xen/pfn.h>
 #include <xen/kexec.h>
 #include <xen/iommu.h>
 #include <asm/amd-iommu.h>
@@ -34,6 +35,12 @@ enum fixed_addresses {
 #ifdef __i386__
     FIX_PAE_HIGHMEM_0,
     FIX_PAE_HIGHMEM_END = FIX_PAE_HIGHMEM_0 + NR_CPUS-1,
+#define FIX_VGC_END FIX_PAE_HIGHMEM_0
+#define FIX_VGC_BEGIN FIX_PAE_HIGHMEM_END
+#else
+    FIX_VGC_END,
+    FIX_VGC_BEGIN = FIX_VGC_END
+      + PFN_UP(sizeof(struct vcpu_guest_context)) * NR_CPUS - 1,
 #endif
     FIX_APIC_BASE,
     FIX_IO_APIC_BASE_0,

@@ -832,12 +832,12 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
         if ( v->vcpu_info == &dummy_vcpu_info )
             return -EINVAL;
 
-        if ( (ctxt = xmalloc(struct vcpu_guest_context)) == NULL )
+        if ( (ctxt = alloc_vcpu_guest_context()) == NULL )
             return -ENOMEM;
 
         if ( copy_from_guest(ctxt, arg, 1) )
         {
-            xfree(ctxt);
+            free_vcpu_guest_context(ctxt);
             return -EFAULT;
         }
 
@@ -847,7 +847,7 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
             rc = boot_vcpu(d, vcpuid, ctxt);
         domain_unlock(d);
 
-        xfree(ctxt);
+        free_vcpu_guest_context(ctxt);
         break;
 
     case VCPUOP_up:

@@ -25,6 +25,9 @@ struct vcpu;
 extern void relinquish_vcpu_resources(struct vcpu *v);
 extern int vcpu_late_initialise(struct vcpu *v);
 
+#define alloc_vcpu_guest_context() xmalloc(struct vcpu_guest_context)
+#define free_vcpu_guest_context(vgc) xfree(vgc)
+
 /* given a current domain metaphysical address, return the physical address */
 extern unsigned long translate_domain_mpaddr(unsigned long mpaddr,
                                              struct p2m_entry* entry);

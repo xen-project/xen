@@ -295,7 +295,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
                      < sizeof(struct compat_vcpu_guest_context));
 #endif
         ret = -ENOMEM;
-        if ( (c.nat = xmalloc(struct vcpu_guest_context)) == NULL )
+        if ( (c.nat = alloc_vcpu_guest_context()) == NULL )
             goto svc_out;
 
 #ifdef CONFIG_COMPAT
@@ -318,7 +318,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         }
 
     svc_out:
-        xfree(c.nat);
+        free_vcpu_guest_context(c.nat);
         rcu_unlock_domain(d);
     }
     break;
