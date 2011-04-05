@@ -40,8 +40,8 @@ static const char *libxl_tapif_script(libxl__gc *gc)
 
 static char ** libxl__build_device_model_args_old(libxl__gc *gc,
                                                   libxl_device_model_info *info,
-                                                  libxl_device_nic *vifs,
-                                                  int num_vifs)
+                                                  libxl_device_disk *disks, int num_disks,
+                                                  libxl_device_nic *vifs, int num_vifs)
 {
     int i;
     flexarray_t *dm_args;
@@ -172,12 +172,11 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
 
 static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                                                   libxl_device_model_info *info,
-                                                  libxl_device_nic *vifs,
-                                                  int num_vifs)
+                                                  libxl_device_disk *disks, int num_disks,
+                                                  libxl_device_nic *vifs, int num_vifs)
 {
     flexarray_t *dm_args;
-    libxl_device_disk *disks;
-    int nb, i;
+    int i;
 
     dm_args = flexarray_make(16, 1);
     if (!dm_args)
@@ -312,8 +311,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     flexarray_append(dm_args, libxl__sprintf(gc, "%d", info->target_ram));
 
     if (info->type == XENFV) {
-        disks = libxl_device_disk_list(libxl__gc_owner(gc), info->domid, &nb);
-        for (i; i < nb; i++) {
+        for (i; i < num_disks; i++) {
             if (disks[i].is_cdrom) {
                 flexarray_append(dm_args, "-cdrom");
                 flexarray_append(dm_args, libxl__strdup(gc, disks[i].pdev_path));
@@ -321,9 +319,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                 flexarray_append(dm_args, libxl__sprintf(gc, "-%s", disks[i].vdev));
                 flexarray_append(dm_args, libxl__strdup(gc, disks[i].pdev_path));
             }
-            libxl_device_disk_destroy(&disks[i]);
         }
-        free(disks);
     }
     flexarray_append(dm_args, NULL);
     return (char **) flexarray_contents(dm_args);
@@ -331,8 +327,8 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
 
 static char ** libxl__build_device_model_args(libxl__gc *gc,
                                               libxl_device_model_info *info,
-                                              libxl_device_nic *vifs,
-                                              int num_vifs)
+                                              libxl_device_disk *disks, int num_disks,
+                                              libxl_device_nic *vifs, int num_vifs)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     int new_qemu;
@@ -340,9 +336,9 @@ static char ** libxl__build_device_model_args(libxl__gc *gc,
     new_qemu = libxl_check_device_model_version(ctx, info->device_model);
 
     if (new_qemu == 1) {
-        return libxl__build_device_model_args_new(gc, info, vifs, num_vifs);
+        return libxl__build_device_model_args_new(gc, info, disks, num_disks, vifs, num_vifs);
     } else {
-        return libxl__build_device_model_args_old(gc, info, vifs, num_vifs);
+        return libxl__build_device_model_args_old(gc, info, disks, num_disks, vifs, num_vifs);
     }
 }
 
@@ -463,7 +459,8 @@ static int libxl__create_stubdom(libxl__gc *gc,
     xs_transaction_t t;
     libxl__device_model_starting *dm_starting = 0;
 
-    args = libxl__build_device_model_args(gc, info, vifs, num_vifs);
+    args = libxl__build_device_model_args(gc, info, disks, num_disks,
+                                          vifs, num_vifs);
     if (!args) {
         ret = ERROR_FAIL;
         goto out;
@@ -637,7 +634,8 @@ int libxl__create_device_model(libxl__gc *gc,
         goto out;
     }
 
-    args = libxl__build_device_model_args(gc, info, vifs, num_vifs);
+    args = libxl__build_device_model_args(gc, info, disks, num_disks,
+                                          vifs, num_vifs);
     if (!args) {
         rc = ERROR_FAIL;
         goto out;
