@@ -170,6 +170,18 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
     return (char **) flexarray_contents(dm_args);
 }
 
+static const char *qemu_disk_format_string(libxl_disk_format format)
+{
+    switch (format) {
+    case DISK_FORMAT_QCOW: return "qcow";
+    case DISK_FORMAT_QCOW2: return "qcow2";
+    case DISK_FORMAT_VHD: return "vpc";
+    case DISK_FORMAT_RAW: return "raw";
+    case DISK_FORMAT_EMPTY: return NULL;
+    default: return NULL;
+    }
+}
+
 static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                                                   libxl_device_model_info *info,
                                                   libxl_device_disk *disks, int num_disks,
@@ -316,6 +328,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             int disk, part;
             int dev_number =
                 libxl__device_disk_dev_number(disks[i].vdev, &disk, &part);
+            const char *format = qemu_disk_format_string(disks[i].format);
             char *drive;
 
             if (dev_number == -1) {
@@ -330,11 +343,20 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                         (gc, "if=ide,index=%d,media=cdrom", disk);
                 else
                     drive = libxl__sprintf
-                        (gc, "file=%s,if=ide,index=%d,media=cdrom",
-                         disks[i].pdev_path, disk);
+                        (gc, "file=%s,if=ide,index=%d,media=cdrom,format=%s",
+                         disks[i].pdev_path, disk, format);
             } else {
-                if (disks[i].format == DISK_FORMAT_EMPTY)
+                if (disks[i].format == DISK_FORMAT_EMPTY) {
+                    LIBXL__LOG(ctx, LIBXL__LOG_WARNING, "cannot support"
+                               " empty disk format for %s", disks[i].vdev);
                     continue;
+                }
+
+                if (format == NULL) {
+                    LIBXL__LOG(ctx, LIBXL__LOG_WARNING, "unable to determine"
+                               " disk image format %s", disks[i].vdev);
+                    continue;
+                }
 
                 /*
                  * Explicit sd disks are passed through as is.
@@ -343,12 +365,13 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                  * hd[a-d] and ignore the rest.
                  */
                 if (strncmp(disks[i].vdev, "sd", 2) == 0)
-                    drive = libxl__sprintf(gc, "file=%s,if=scsi,bus=0,unit=%d",
-                                           disks[i].pdev_path, disk);
+                    drive = libxl__sprintf
+                        (gc, "file=%s,if=scsi,bus=0,unit=%d,format=%s",
+                         disks[i].pdev_path, disk, format);
                 else if (disk < 4)
                     drive = libxl__sprintf
-                        (gc, "file=%s,if=ide,index=%d,media=disk",
-                         disks[i].pdev_path, disk);
+                        (gc, "file=%s,if=ide,index=%d,media=disk,format=%s",
+                         disks[i].pdev_path, disk, format);
                 else
                     continue; /* Do not emulate this disk */
             }
