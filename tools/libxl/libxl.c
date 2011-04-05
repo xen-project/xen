@@ -602,7 +602,8 @@ int libxl_wait_for_disk_ejects(libxl_ctx *ctx, uint32_t guest_domid, libxl_devic
     for (i = 0; i < num_disks; i++) {
         if (asprintf(&(waiter[i].path), "%s/device/vbd/%d/eject",
                      libxl__xs_get_dompath(&gc, domid),
-                     libxl__device_disk_dev_number(disks[i].vdev)) < 0)
+                     libxl__device_disk_dev_number(disks[i].vdev,
+                                                   NULL, NULL)) < 0)
             goto out;
         if (asprintf(&(waiter[i].token), "%d", LIBXL_EVENT_DISK_EJECT) < 0)
             goto out;
@@ -956,7 +957,7 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
     }
 
     backend_type = libxl__device_disk_string_of_backend(disk->backend);
-    devid = libxl__device_disk_dev_number(disk->vdev);
+    devid = libxl__device_disk_dev_number(disk->vdev, NULL, NULL);
     if (devid==-1) {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Invalid or unsupported"
                " virtual disk identifier %s", disk->vdev);
@@ -1072,7 +1073,7 @@ int libxl_device_disk_del(libxl_ctx *ctx,
     libxl__device device;
     int devid, rc;
 
-    devid = libxl__device_disk_dev_number(disk->vdev);
+    devid = libxl__device_disk_dev_number(disk->vdev, NULL, NULL);
     device.backend_domid    = disk->backend_domid;
     device.backend_devid    = devid;
     device.backend_kind     =
@@ -1807,7 +1808,7 @@ int libxl_device_disk_getinfo(libxl_ctx *ctx, uint32_t domid,
     char *val;
 
     dompath = libxl__xs_get_dompath(&gc, domid);
-    diskinfo->devid = libxl__device_disk_dev_number(disk->vdev);
+    diskinfo->devid = libxl__device_disk_dev_number(disk->vdev, NULL, NULL);
 
     /* tap devices entries in xenstore are written as vbd devices. */
     diskpath = libxl__sprintf(&gc, "%s/device/vbd/%d", dompath, diskinfo->devid);

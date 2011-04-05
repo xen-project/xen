@@ -200,7 +200,7 @@ static int device_virtdisk_matches(const char *virtpath, const char *devtype,
     return 1;
 }
 
-int libxl__device_disk_dev_number(char *virtpath)
+int libxl__device_disk_dev_number(char *virtpath, int *pdisk, int *ppartition)
 {
     int disk, partition;
     char *ep;
@@ -214,6 +214,8 @@ int libxl__device_disk_dev_number(char *virtpath)
         device_virtdisk_matches(virtpath, "xvd",
                                 &disk, (1<<20)-1,
                                 &partition, 255)) {
+        if (pdisk) *pdisk = disk;
+        if (ppartition) *ppartition = partition;
         if (disk <= 15 && partition <= 15)
             return (202 << 8) | (disk << 4) | partition;
         else
@@ -228,11 +230,15 @@ int libxl__device_disk_dev_number(char *virtpath)
     if (device_virtdisk_matches(virtpath, "hd",
                                 &disk, 3,
                                 &partition, 63)) {
+        if (pdisk) *pdisk = disk;
+        if (ppartition) *ppartition = partition;
         return ((disk<2 ? 3 : 22) << 8) | ((disk & 1) << 6) | partition;
     }
     if (device_virtdisk_matches(virtpath, "sd",
                                 &disk, 15,
                                 &partition, 15)) {
+        if (pdisk) *pdisk = disk;
+        if (ppartition) *ppartition = partition;
         return (8 << 8) | (disk << 4) | partition;
     }
     return -1;
