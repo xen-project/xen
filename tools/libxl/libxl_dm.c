@@ -175,6 +175,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                                                   libxl_device_disk *disks, int num_disks,
                                                   libxl_device_nic *vifs, int num_vifs)
 {
+    libxl_ctx *ctx = libxl__gc_owner(gc);
     flexarray_t *dm_args;
     int i;
 
@@ -312,13 +313,48 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
 
     if (info->type == XENFV) {
         for (i; i < num_disks; i++) {
-            if (disks[i].is_cdrom) {
-                flexarray_append(dm_args, "-cdrom");
-                flexarray_append(dm_args, libxl__strdup(gc, disks[i].pdev_path));
-            } else {
-                flexarray_append(dm_args, libxl__sprintf(gc, "-%s", disks[i].vdev));
-                flexarray_append(dm_args, libxl__strdup(gc, disks[i].pdev_path));
+            int disk, part;
+            int dev_number =
+                libxl__device_disk_dev_number(disks[i].vdev, &disk, &part);
+            char *drive;
+
+            if (dev_number == -1) {
+                LIBXL__LOG(ctx, LIBXL__LOG_WARNING, "unable to determine"
+                           " disk number for %s", disks[i].vdev);
+                continue;
             }
+
+            if (disks[i].is_cdrom) {
+                if (disks[i].format == DISK_FORMAT_EMPTY)
+                    drive = libxl__sprintf
+                        (gc, "if=ide,index=%d,media=cdrom", disk);
+                else
+                    drive = libxl__sprintf
+                        (gc, "file=%s,if=ide,index=%d,media=cdrom",
+                         disks[i].pdev_path, disk);
+            } else {
+                if (disks[i].format == DISK_FORMAT_EMPTY)
+                    continue;
+
+                /*
+                 * Explicit sd disks are passed through as is.
+                 *
+                 * For other disks we translate devices 0..3 into
+                 * hd[a-d] and ignore the rest.
+                 */
+                if (strncmp(disks[i].vdev, "sd", 2) == 0)
+                    drive = libxl__sprintf(gc, "file=%s,if=scsi,bus=0,unit=%d",
+                                           disks[i].pdev_path, disk);
+                else if (disk < 4)
+                    drive = libxl__sprintf
+                        (gc, "file=%s,if=ide,index=%d,media=disk",
+                         disks[i].pdev_path, disk);
+                else
+                    continue; /* Do not emulate this disk */
+            }
+
+            flexarray_append(dm_args, "-drive");
+            flexarray_append(dm_args, drive);
         }
     }
     flexarray_append(dm_args, NULL);
