@@ -81,24 +81,26 @@
 
 typedef struct cpumask{ DECLARE_BITMAP(bits, NR_CPUS); } cpumask_t;
 
-#define cpu_set(cpu, dst) __cpu_set((cpu), &(dst))
-static inline void __cpu_set(int cpu, volatile cpumask_t *dstp)
+#define cpu_set(cpu, dst) cpumask_set_cpu(cpu, &(dst))
+static inline void cpumask_set_cpu(int cpu, volatile cpumask_t *dstp)
 {
 	set_bit(cpu, dstp->bits);
 }
 
-#define cpu_clear(cpu, dst) __cpu_clear((cpu), &(dst))
-static inline void __cpu_clear(int cpu, volatile cpumask_t *dstp)
+#define cpu_clear(cpu, dst) cpumask_clear_cpu(cpu, &(dst))
+static inline void cpumask_clear_cpu(int cpu, volatile cpumask_t *dstp)
 {
 	clear_bit(cpu, dstp->bits);
 }
 
+#define cpumask_setall(dst) __cpus_setall(dst, NR_CPUS)
 #define cpus_setall(dst) __cpus_setall(&(dst), NR_CPUS)
 static inline void __cpus_setall(cpumask_t *dstp, int nbits)
 {
 	bitmap_fill(dstp->bits, nbits);
 }
 
+#define cpumask_clear(dst) __cpus_clear(dst, NR_CPUS)
 #define cpus_clear(dst) __cpus_clear(&(dst), NR_CPUS)
 static inline void __cpus_clear(cpumask_t *dstp, int nbits)
 {
@@ -109,18 +111,21 @@ static inline void __cpus_clear(cpumask_t *dstp, int nbits)
 #define cpumask_test_cpu(cpu, cpumask) test_bit(cpu, (cpumask)->bits)
 #define cpu_isset(cpu, cpumask) test_bit((cpu), (cpumask).bits)
 
-#define cpu_test_and_set(cpu, cpumask) __cpu_test_and_set((cpu), &(cpumask))
-static inline int __cpu_test_and_set(int cpu, cpumask_t *addr)
+#define cpu_test_and_set(cpu, cpumask) \
+	cpumask_test_and_set_cpu(cpu, &(cpumask))
+static inline int cpumask_test_and_set_cpu(int cpu, cpumask_t *addr)
 {
 	return test_and_set_bit(cpu, addr->bits);
 }
 
-#define cpu_test_and_clear(cpu, cpumask) __cpu_test_and_clear((cpu), &(cpumask))
-static inline int __cpu_test_and_clear(int cpu, cpumask_t *addr)
+#define cpu_test_and_clear(cpu, cpumask) \
+	cpumask_test_and_clear_cpu(cpu, &(cpumask))
+static inline int cpumask_test_and_clear_cpu(int cpu, cpumask_t *addr)
 {
 	return test_and_clear_bit(cpu, addr->bits);
 }
 
+#define cpumask_and(dst, src1, src2) __cpus_and(dst, src1, src2, NR_CPUS)
 #define cpus_and(dst, src1, src2) __cpus_and(&(dst), &(src1), &(src2), NR_CPUS)
 static inline void __cpus_and(cpumask_t *dstp, const cpumask_t *src1p,
 					const cpumask_t *src2p, int nbits)
@@ -128,6 +133,7 @@ static inline void __cpus_and(cpumask_t *dstp, const cpumask_t *src1p,
 	bitmap_and(dstp->bits, src1p->bits, src2p->bits, nbits);
 }
 
+#define cpumask_or(dst, src1, src2) __cpus_or(dst, src1, src2, NR_CPUS)
 #define cpus_or(dst, src1, src2) __cpus_or(&(dst), &(src1), &(src2), NR_CPUS)
 static inline void __cpus_or(cpumask_t *dstp, const cpumask_t *src1p,
 					const cpumask_t *src2p, int nbits)
@@ -135,6 +141,7 @@ static inline void __cpus_or(cpumask_t *dstp, const cpumask_t *src1p,
 	bitmap_or(dstp->bits, src1p->bits, src2p->bits, nbits);
 }
 
+#define cpumask_xor(dst, src1, src2) __cpus_xor(dst, src1, src2, NR_CPUS)
 #define cpus_xor(dst, src1, src2) __cpus_xor(&(dst), &(src1), &(src2), NR_CPUS)
 static inline void __cpus_xor(cpumask_t *dstp, const cpumask_t *src1p,
 					const cpumask_t *src2p, int nbits)
@@ -142,6 +149,7 @@ static inline void __cpus_xor(cpumask_t *dstp, const cpumask_t *src1p,
 	bitmap_xor(dstp->bits, src1p->bits, src2p->bits, nbits);
 }
 
+#define cpumask_andnot(dst, src1, src2) __cpus_andnot(dst, src1, src2, NR_CPUS)
 #define cpus_andnot(dst, src1, src2) \
 				__cpus_andnot(&(dst), &(src1), &(src2), NR_CPUS)
 static inline void __cpus_andnot(cpumask_t *dstp, const cpumask_t *src1p,
@@ -150,6 +158,7 @@ static inline void __cpus_andnot(cpumask_t *dstp, const cpumask_t *src1p,
 	bitmap_andnot(dstp->bits, src1p->bits, src2p->bits, nbits);
 }
 
+#define cpumask_complement(dst, src) __cpus_complement(dst, src, NR_CPUS)
 #define cpus_complement(dst, src) __cpus_complement(&(dst), &(src), NR_CPUS)
 static inline void __cpus_complement(cpumask_t *dstp,
 					const cpumask_t *srcp, int nbits)
@@ -186,6 +195,7 @@ static inline int __cpus_empty(const cpumask_t *srcp, int nbits)
 	return bitmap_empty(srcp->bits, nbits);
 }
 
+#define cpumask_full(cpumask) __cpus_full(cpumask, NR_CPUS)
 #define cpus_full(cpumask) __cpus_full(&(cpumask), NR_CPUS)
 static inline int __cpus_full(const cpumask_t *srcp, int nbits)
 {
@@ -199,8 +209,8 @@ static inline int __cpus_weight(const cpumask_t *srcp, int nbits)
 	return bitmap_weight(srcp->bits, nbits);
 }
 
-#define cpus_copy(dest, src) __cpus_copy(&(dest), &(src))
-static inline void __cpus_copy(cpumask_t *dstp, const cpumask_t *srcp)
+#define cpus_copy(dest, src) cpumask_copy(&(dest), &(src))
+static inline void cpumask_copy(cpumask_t *dstp, const cpumask_t *srcp)
 {
 	bitmap_copy(dstp->bits, srcp->bits, NR_CPUS);
 }
@@ -320,6 +330,57 @@ static inline int __cpulist_scnprintf(char *buf, int len,
 					const cpumask_t *srcp, int nbits)
 {
 	return bitmap_scnlistprintf(buf, len, srcp->bits, nbits);
+}
+
+/*
+ * cpumask_var_t: struct cpumask for stack usage.
+ *
+ * Oh, the wicked games we play!  In order to make kernel coding a
+ * little more difficult, we typedef cpumask_var_t to an array or a
+ * pointer: doing &mask on an array is a noop, so it still works.
+ *
+ * ie.
+ *	cpumask_var_t tmpmask;
+ *	if (!alloc_cpumask_var(&tmpmask, GFP_KERNEL))
+ *		return -ENOMEM;
+ *
+ *	  ... use 'tmpmask' like a normal struct cpumask * ...
+ *
+ *	free_cpumask_var(tmpmask);
+ */
+#if NR_CPUS > 2 * BITS_PER_LONG
+#include <xen/xmalloc.h>
+
+typedef cpumask_t *cpumask_var_t;
+
+static inline bool_t alloc_cpumask_var(cpumask_var_t *mask)
+{
+	return (*mask = xmalloc(cpumask_t)) != NULL;
+}
+
+static inline void free_cpumask_var(cpumask_var_t mask)
+{
+	xfree(mask);
+}
+#else
+typedef cpumask_t cpumask_var_t[1];
+
+static inline bool_t alloc_cpumask_var(cpumask_var_t *mask)
+{
+	return 1;
+}
+
+static inline void free_cpumask_var(cpumask_var_t mask)
+{
+}
+#endif
+
+static inline bool_t zalloc_cpumask_var(cpumask_var_t *mask)
+{
+	if (!alloc_cpumask_var(mask))
+		return 0;
+	cpumask_clear(*mask);
+	return 1;
 }
 
 #if NR_CPUS > 1

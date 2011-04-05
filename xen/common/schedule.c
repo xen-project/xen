@@ -196,9 +196,9 @@ int sched_init_vcpu(struct vcpu *v, unsigned int processor)
      */
     v->processor = processor;
     if ( is_idle_domain(d) || d->is_pinned )
-        v->cpu_affinity = cpumask_of_cpu(processor);
+        cpumask_copy(v->cpu_affinity, cpumask_of(processor));
     else
-        cpus_setall(v->cpu_affinity);
+        cpumask_setall(v->cpu_affinity);
 
     /* Initialise the per-vcpu timers. */
     init_timer(&v->periodic_timer, vcpu_periodic_timer_fn,
@@ -273,7 +273,7 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
         SCHED_OP(VCPU2OP(v), remove_vcpu, v);
         SCHED_OP(VCPU2OP(v), free_vdata, v->sched_priv);
 
-        cpus_setall(v->cpu_affinity);
+        cpumask_setall(v->cpu_affinity);
         v->processor = new_p;
         v->sched_priv = vcpu_priv[v->vcpu_id];
         evtchn_move_pirqs(v);
@@ -435,7 +435,7 @@ static void vcpu_migrate(struct vcpu *v)
              */
             if ( pick_called &&
                  (new_lock == per_cpu(schedule_data, new_cpu).schedule_lock) &&
-                 cpu_isset(new_cpu, v->cpu_affinity) &&
+                 cpumask_test_cpu(new_cpu, v->cpu_affinity) &&
                  cpu_isset(new_cpu, v->domain->cpupool->cpu_valid) )
                 break;
 
@@ -550,13 +550,13 @@ int cpu_disable_scheduler(unsigned int cpu)
         {
             vcpu_schedule_lock_irq(v);
 
-            cpus_and(online_affinity, v->cpu_affinity, c->cpu_valid);
+            cpumask_and(&online_affinity, v->cpu_affinity, &c->cpu_valid);
             if ( cpus_empty(online_affinity) &&
-                 cpu_isset(cpu, v->cpu_affinity) )
+                 cpumask_test_cpu(cpu, v->cpu_affinity) )
             {
                 printk("Breaking vcpu affinity for domain %d vcpu %d\n",
                         v->domain->domain_id, v->vcpu_id);
-                cpus_setall(v->cpu_affinity);
+                cpumask_setall(v->cpu_affinity);
                 affinity_broken = 1;
             }
 
@@ -602,10 +602,10 @@ int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity)
 
     vcpu_schedule_lock_irq(v);
 
-    old_affinity = v->cpu_affinity;
-    v->cpu_affinity = *affinity;
-    *affinity = old_affinity;
-    if ( !cpu_isset(v->processor, v->cpu_affinity) )
+    cpumask_copy(&old_affinity, v->cpu_affinity);
+    cpumask_copy(v->cpu_affinity, affinity);
+    cpumask_copy(affinity, &old_affinity);
+    if ( !cpumask_test_cpu(v->processor, v->cpu_affinity) )
         set_bit(_VPF_migrating, &v->pause_flags);
 
     vcpu_schedule_unlock_irq(v);

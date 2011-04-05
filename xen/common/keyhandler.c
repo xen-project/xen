@@ -243,7 +243,7 @@ static void dump_domains(unsigned char key)
     {
         unsigned int i;
         printk("General information for domain %u:\n", d->domain_id);
-        cpuset_print(tmpstr, sizeof(tmpstr), d->domain_dirty_cpumask);
+        cpuset_print(tmpstr, sizeof(tmpstr), *d->domain_dirty_cpumask);
         printk("    refcnt=%d dying=%d nr_pages=%d xenheap_pages=%d "
                "dirty_cpus=%s max_pages=%u\n",
                atomic_read(&d->refcnt), d->is_dying,
@@ -277,9 +277,9 @@ static void dump_domains(unsigned char key)
                    v->pause_flags, v->poll_evtchn,
                    vcpu_info(v, evtchn_upcall_pending),
                    vcpu_info(v, evtchn_upcall_mask));
-            cpuset_print(tmpstr, sizeof(tmpstr), v->vcpu_dirty_cpumask);
+            cpuset_print(tmpstr, sizeof(tmpstr), *v->vcpu_dirty_cpumask);
             printk("dirty_cpus=%s ", tmpstr);
-            cpuset_print(tmpstr, sizeof(tmpstr), v->cpu_affinity);
+            cpuset_print(tmpstr, sizeof(tmpstr), *v->cpu_affinity);
             printk("cpu_affinity=%s\n", tmpstr);
             arch_dump_vcpu_info(v);
             periodic_timer_print(tmpstr, sizeof(tmpstr), v->periodic_period);

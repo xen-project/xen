@@ -589,7 +589,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         else
         {
             ret = cpumask_to_xenctl_cpumap(
-                &op->u.vcpuaffinity.cpumap, &v->cpu_affinity);
+                &op->u.vcpuaffinity.cpumap, v->cpu_affinity);
         }
 
     vcpuaffinity_out:

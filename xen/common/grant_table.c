@@ -1013,7 +1013,7 @@ gnttab_unmap_grant_ref(
                 goto fault;
         }
 
-        flush_tlb_mask(&current->domain->domain_dirty_cpumask);
+        flush_tlb_mask(current->domain->domain_dirty_cpumask);
 
         for ( i = 0; i < partial_done; i++ )
             __gnttab_unmap_common_complete(&(common[i]));
@@ -1028,7 +1028,7 @@ gnttab_unmap_grant_ref(
     return 0;
 
 fault:
-    flush_tlb_mask(&current->domain->domain_dirty_cpumask);
+    flush_tlb_mask(current->domain->domain_dirty_cpumask);
 
     for ( i = 0; i < partial_done; i++ )
         __gnttab_unmap_common_complete(&(common[i]));
@@ -1075,7 +1075,7 @@ gnttab_unmap_and_replace(
                 goto fault;
         }
         
-        flush_tlb_mask(&current->domain->domain_dirty_cpumask);
+        flush_tlb_mask(current->domain->domain_dirty_cpumask);
         
         for ( i = 0; i < partial_done; i++ )
             __gnttab_unmap_common_complete(&(common[i]));
@@ -1090,7 +1090,7 @@ gnttab_unmap_and_replace(
     return 0;
 
 fault:
-    flush_tlb_mask(&current->domain->domain_dirty_cpumask);
+    flush_tlb_mask(current->domain->domain_dirty_cpumask);
 
     for ( i = 0; i < partial_done; i++ )
         __gnttab_unmap_common_complete(&(common[i]));
@@ -1496,7 +1496,7 @@ gnttab_transfer(
 #ifndef __ia64__ /* IA64 implicitly replaces the old page in steal_page(). */
         guest_physmap_remove_page(d, gop.mfn, mfn, 0);
 #endif
-        flush_tlb_mask(&d->domain_dirty_cpumask);
+        flush_tlb_mask(d->domain_dirty_cpumask);
 
         /* Find the target domain. */
         if ( unlikely((e = rcu_lock_domain_by_id(gop.domid)) == NULL) )

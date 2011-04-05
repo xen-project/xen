@@ -3089,7 +3089,7 @@ static int hvmop_flush_tlb_all(void)
         paging_update_cr3(v);
 
     /* Flush all dirty TLBs. */
-    flush_tlb_mask(&d->domain_dirty_cpumask);
+    flush_tlb_mask(d->domain_dirty_cpumask);
 
     /* Done. */
     for_each_vcpu ( d, v )

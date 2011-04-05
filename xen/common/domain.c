@@ -151,6 +151,11 @@ struct vcpu *alloc_vcpu(
 
     tasklet_init(&v->continue_hypercall_tasklet, NULL, 0);
 
+    if ( !zalloc_cpumask_var(&v->cpu_affinity) ||
+         !zalloc_cpumask_var(&v->cpu_affinity_tmp) ||
+         !zalloc_cpumask_var(&v->vcpu_dirty_cpumask) )
+        goto fail_free;
+
     if ( is_idle_domain(d) )
     {
         v->runstate.state = RUNSTATE_running;
@@ -167,16 +172,17 @@ struct vcpu *alloc_vcpu(
     }
 
     if ( sched_init_vcpu(v, cpu_id) != 0 )
-    {
-        destroy_waitqueue_vcpu(v);
-        free_vcpu_struct(v);
-        return NULL;
-    }
+        goto fail_wq;
 
     if ( vcpu_initialise(v) != 0 )
     {
         sched_destroy_vcpu(v);
+ fail_wq:
         destroy_waitqueue_vcpu(v);
+ fail_free:
+        free_cpumask_var(v->cpu_affinity);
+        free_cpumask_var(v->cpu_affinity_tmp);
+        free_cpumask_var(v->vcpu_dirty_cpumask);
         free_vcpu_struct(v);
         return NULL;
     }
@@ -245,6 +251,9 @@ struct domain *domain_create(
 
     spin_lock_init(&d->shutdown_lock);
     d->shutdown_code = -1;
+
+    if ( !zalloc_cpumask_var(&d->domain_dirty_cpumask) )
+        goto fail;
 
     if ( domcr_flags & DOMCRF_hvm )
         d->is_hvm = 1;
@@ -346,6 +355,7 @@ struct domain *domain_create(
         xsm_free_security_domain(d);
     xfree(d->pirq_mask);
     xfree(d->pirq_to_evtchn);
+    free_cpumask_var(d->domain_dirty_cpumask);
     free_domain_struct(d);
     return NULL;
 }
@@ -361,7 +371,7 @@ void domain_update_node_affinity(struct domain *d)
     spin_lock(&d->node_affinity_lock);
 
     for_each_vcpu ( d, v )
-        cpus_or(cpumask, cpumask, v->cpu_affinity);
+        cpumask_or(&cpumask, &cpumask, v->cpu_affinity);
 
     for_each_online_node ( node )
         if ( cpus_intersects(node_to_cpumask(node), cpumask) )
@@ -658,7 +668,12 @@ static void complete_domain_destroy(struct rcu_head *head)
 
     for ( i = d->max_vcpus - 1; i >= 0; i-- )
         if ( (v = d->vcpu[i]) != NULL )
+        {
+            free_cpumask_var(v->cpu_affinity);
+            free_cpumask_var(v->cpu_affinity_tmp);
+            free_cpumask_var(v->vcpu_dirty_cpumask);
             free_vcpu_struct(v);
+        }
 
     if ( d->target != NULL )
         put_domain(d->target);
@@ -669,6 +684,7 @@ static void complete_domain_destroy(struct rcu_head *head)
     xfree(d->pirq_to_evtchn);
 
     xsm_free_security_domain(d);
+    free_cpumask_var(d->domain_dirty_cpumask);
     free_domain_struct(d);
 
     send_guest_global_virq(dom0, VIRQ_DOM_EXC);
@@ -789,7 +805,7 @@ void vcpu_reset(struct vcpu *v)
     v->async_exception_mask = 0;
     memset(v->async_exception_state, 0, sizeof(v->async_exception_state));
 #endif
-    cpus_clear(v->cpu_affinity_tmp);
+    cpumask_clear(v->cpu_affinity_tmp);
     clear_bit(_VPF_blocked, &v->pause_flags);
 
     domain_unlock(v->domain);

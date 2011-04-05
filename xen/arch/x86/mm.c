@@ -612,7 +612,7 @@ static void invalidate_shadow_ldt(struct vcpu *v, int flush)
 
     /* Rid TLBs of stale mappings (guest mappings and shadow mappings). */
     if ( flush )
-        flush_tlb_mask(&v->vcpu_dirty_cpumask);
+        flush_tlb_mask(v->vcpu_dirty_cpumask);
 
  out:
     spin_unlock(&v->arch.shadow_ldt_lock);
@@ -1338,7 +1338,7 @@ static void pae_flush_pgd(
             if ( pagetable_get_pfn(v->arch.guest_table) == mfn )
             {
                 paging_update_cr3(v);
-                cpus_or(m, m, v->vcpu_dirty_cpumask);
+                cpumask_or(&m, &m, v->vcpu_dirty_cpumask);
             }
         flush_tlb_mask(&m);
     }
@@ -1365,7 +1365,7 @@ static void pae_flush_pgd(
         spin_unlock(&cache->lock);
     }
 
-    flush_tlb_mask(&d->domain_dirty_cpumask);
+    flush_tlb_mask(d->domain_dirty_cpumask);
 }
 #else
 # define pae_flush_pgd(mfn, idx, nl3e) ((void)0)
@@ -2421,7 +2421,9 @@ static int __get_page_type(struct page_info *page, unsigned long type,
                  * may be unnecessary (e.g., page was GDT/LDT) but those 
                  * circumstances should be very rare.
                  */
-                cpumask_t mask = d->domain_dirty_cpumask;
+                cpumask_t mask;
+
+                cpumask_copy(&mask, d->domain_dirty_cpumask);
 
                 /* Don't flush if the timestamp is old enough */
                 tlbflush_filter(mask, page->tlbflush_timestamp);
@@ -2903,7 +2905,7 @@ static inline int vcpumask_to_pcpumask(
             if ( (vcpu_id >= d->max_vcpus) )
                 return 0;
             if ( ((v = d->vcpu[vcpu_id]) != NULL) )
-                cpus_or(*pmask, *pmask, v->vcpu_dirty_cpumask);
+                cpumask_or(pmask, pmask, v->vcpu_dirty_cpumask);
         }
     }
 }
@@ -3161,11 +3163,11 @@ int do_mmuext_op(
         }
 
         case MMUEXT_TLB_FLUSH_ALL:
-            flush_tlb_mask(&d->domain_dirty_cpumask);
+            flush_tlb_mask(d->domain_dirty_cpumask);
             break;
     
         case MMUEXT_INVLPG_ALL:
-            flush_tlb_one_mask(&d->domain_dirty_cpumask, op.arg1.linear_addr);
+            flush_tlb_one_mask(d->domain_dirty_cpumask, op.arg1.linear_addr);
             break;
 
         case MMUEXT_FLUSH_CACHE:
@@ -4345,7 +4347,7 @@ static int __do_update_va_mapping(
             flush_tlb_local();
             break;
         case UVMF_ALL:
-            flush_tlb_mask(&d->domain_dirty_cpumask);
+            flush_tlb_mask(d->domain_dirty_cpumask);
             break;
         default:
             rc = vcpumask_to_pcpumask(d, const_guest_handle_from_ptr(bmap_ptr,
@@ -4365,7 +4367,7 @@ static int __do_update_va_mapping(
                 flush_tlb_one_local(va);
             break;
         case UVMF_ALL:
-            flush_tlb_one_mask(&d->domain_dirty_cpumask, va);
+            flush_tlb_one_mask(d->domain_dirty_cpumask, va);
             break;
         default:
             rc = vcpumask_to_pcpumask(d, const_guest_handle_from_ptr(bmap_ptr,

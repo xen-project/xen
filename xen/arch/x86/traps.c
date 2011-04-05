@@ -2965,7 +2965,7 @@ static void nmi_mce_softirq(void)
 
     /* Set the tmp value unconditionally, so that
      * the check in the iret hypercall works. */
-    st->vcpu->cpu_affinity_tmp = st->vcpu->cpu_affinity;
+    cpumask_copy(st->vcpu->cpu_affinity_tmp, st->vcpu->cpu_affinity);
 
     if ((cpu != st->processor)
        || (st->processor != st->vcpu->processor))
@@ -2996,11 +2996,11 @@ void async_exception_cleanup(struct vcpu *curr)
         return;
 
     /* Restore affinity.  */
-    if ( !cpus_empty(curr->cpu_affinity_tmp) &&
-         !cpus_equal(curr->cpu_affinity_tmp, curr->cpu_affinity) )
+    if ( !cpumask_empty(curr->cpu_affinity_tmp) &&
+         !cpumask_equal(curr->cpu_affinity_tmp, curr->cpu_affinity) )
     {
-        vcpu_set_affinity(curr, &curr->cpu_affinity_tmp);
-        cpus_clear(curr->cpu_affinity_tmp);
+        vcpu_set_affinity(curr, curr->cpu_affinity_tmp);
+        cpumask_clear(curr->cpu_affinity_tmp);
     }
 
     if ( !(curr->async_exception_mask & (curr->async_exception_mask - 1)) )
@@ -3048,7 +3048,7 @@ void async_exception_cleanup(struct vcpu *curr)
                 int cpu = smp_processor_id();
                 cpumask_t affinity;
 
-                curr->cpu_affinity_tmp = curr->cpu_affinity;
+                cpumask_copy(curr->cpu_affinity_tmp, curr->cpu_affinity);
                 cpus_clear(affinity);
                 cpu_set(cpu, affinity);
                 printk(XENLOG_DEBUG "MCE: CPU%d set affinity, old %d\n",

@@ -3191,8 +3191,9 @@ int get_page_type(struct page_info *page, unsigned long type)
                  * may be unnecessary (e.g., page was GDT/LDT) but those 
                  * circumstances should be very rare.
                  */
-                cpumask_t mask =
-                    page_get_owner(page)->domain_dirty_cpumask;
+                cpumask_t mask;
+
+                cpumask_copy(&mask, page_get_owner(page)->domain_dirty_cpumask);
                 tlbflush_filter(mask, page->tlbflush_timestamp);
 
                 if ( unlikely(!cpus_empty(mask)) )

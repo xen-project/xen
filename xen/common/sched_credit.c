@@ -292,7 +292,7 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
         {
             cpumask_t idle_mask;
 
-            cpus_and(idle_mask, prv->idlers, new->vcpu->cpu_affinity);
+            cpumask_and(&idle_mask, &prv->idlers, new->vcpu->cpu_affinity);
             if ( !cpus_empty(idle_mask) )
             {
                 CSCHED_STAT_CRANK(tickle_idlers_some);
@@ -305,7 +305,7 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
                 else
                     cpus_or(mask, mask, idle_mask);
             }
-            cpus_and(mask, mask, new->vcpu->cpu_affinity);
+            cpumask_and(&mask, &mask, new->vcpu->cpu_affinity);
         }
     }
 
@@ -455,7 +455,7 @@ __csched_vcpu_is_migrateable(struct vcpu *vc, int dest_cpu)
      */
     return !vc->is_running &&
            !__csched_vcpu_is_cache_hot(vc) &&
-           cpu_isset(dest_cpu, vc->cpu_affinity);
+           cpumask_test_cpu(dest_cpu, vc->cpu_affinity);
 }
 
 static int
@@ -472,7 +472,7 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
      * preference to its current processor if it's in there.
      */
     online = CSCHED_CPUONLINE(vc->domain->cpupool);
-    cpus_and(cpus, *online, vc->cpu_affinity);
+    cpumask_and(&cpus, online, vc->cpu_affinity);
     cpu = cpu_isset(vc->processor, cpus)
             ? vc->processor
             : cycle_cpu(vc->processor, cpus);

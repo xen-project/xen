@@ -1348,7 +1348,7 @@ static int svm_is_erratum_383(struct cpu_user_regs *regs)
     wrmsrl(MSR_IA32_MCG_STATUS, msr_content & ~(1ULL << 2));
 
     /* flush TLB */
-    flush_tlb_mask(&v->domain->domain_dirty_cpumask);
+    flush_tlb_mask(v->domain->domain_dirty_cpumask);
 
     return 1;
 }

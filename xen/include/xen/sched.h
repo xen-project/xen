@@ -161,12 +161,12 @@ struct vcpu
     spinlock_t       virq_lock;
 
     /* Bitmask of CPUs on which this VCPU may run. */
-    cpumask_t        cpu_affinity;
+    cpumask_var_t    cpu_affinity;
     /* Used to change affinity temporarily. */
-    cpumask_t        cpu_affinity_tmp;
+    cpumask_var_t    cpu_affinity_tmp;
 
     /* Bitmask of CPUs which are holding onto this VCPU's state. */
-    cpumask_t        vcpu_dirty_cpumask;
+    cpumask_var_t    vcpu_dirty_cpumask;
 
     /* Tasklet for continue_hypercall_on_cpu(). */
     struct tasklet   continue_hypercall_tasklet;
@@ -289,7 +289,7 @@ struct domain
     struct vcpu    **vcpu;
 
     /* Bitmask of CPUs which are holding onto this domain's state. */
-    cpumask_t        domain_dirty_cpumask;
+    cpumask_var_t    domain_dirty_cpumask;
 
     struct arch_domain arch;
 
@@ -641,7 +641,7 @@ void watchdog_domain_destroy(struct domain *d);
 #define is_hvm_domain(d) ((d)->is_hvm)
 #define is_hvm_vcpu(v)   (is_hvm_domain(v->domain))
 #define is_pinned_vcpu(v) ((v)->domain->is_pinned || \
-                           cpus_weight((v)->cpu_affinity) == 1)
+                           cpumask_weight((v)->cpu_affinity) == 1)
 #define need_iommu(d)    ((d)->need_iommu)
 
 void set_vcpu_migration_delay(unsigned int delay);

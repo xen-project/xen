@@ -132,8 +132,8 @@ void startup_cpu_idle_loop(void)
     struct vcpu *v = current;
 
     ASSERT(is_idle_vcpu(v));
-    cpu_set(smp_processor_id(), v->domain->domain_dirty_cpumask);
-    cpu_set(smp_processor_id(), v->vcpu_dirty_cpumask);
+    cpumask_set_cpu(v->processor, v->domain->domain_dirty_cpumask);
+    cpumask_set_cpu(v->processor, v->vcpu_dirty_cpumask);
 
     reset_stack_and_jump(idle_loop);
 }
@@ -1391,7 +1391,7 @@ static void __context_switch(void)
     struct desc_ptr       gdt_desc;
 
     ASSERT(p != n);
-    ASSERT(cpus_empty(n->vcpu_dirty_cpumask));
+    ASSERT(cpumask_empty(n->vcpu_dirty_cpumask));
 
     if ( !is_idle_vcpu(p) )
     {
@@ -1408,8 +1408,8 @@ static void __context_switch(void)
      * which is synchronised on that function.
      */
     if ( p->domain != n->domain )
-        cpu_set(cpu, n->domain->domain_dirty_cpumask);
-    cpu_set(cpu, n->vcpu_dirty_cpumask);
+        cpumask_set_cpu(cpu, n->domain->domain_dirty_cpumask);
+    cpumask_set_cpu(cpu, n->vcpu_dirty_cpumask);
 
     if ( !is_idle_vcpu(n) )
     {
@@ -1452,8 +1452,8 @@ static void __context_switch(void)
     }
 
     if ( p->domain != n->domain )
-        cpu_clear(cpu, p->domain->domain_dirty_cpumask);
-    cpu_clear(cpu, p->vcpu_dirty_cpumask);
+        cpumask_clear_cpu(cpu, p->domain->domain_dirty_cpumask);
+    cpumask_clear_cpu(cpu, p->vcpu_dirty_cpumask);
 
     per_cpu(curr_vcpu, cpu) = n;
 }
@@ -1462,10 +1462,11 @@ static void __context_switch(void)
 void context_switch(struct vcpu *prev, struct vcpu *next)
 {
     unsigned int cpu = smp_processor_id();
-    cpumask_t dirty_mask = next->vcpu_dirty_cpumask;
+    cpumask_t dirty_mask;
 
     ASSERT(local_irq_is_enabled());
 
+    cpumask_copy(&dirty_mask, next->vcpu_dirty_cpumask);
     /* Allow at most one CPU at a time to be dirty. */
     ASSERT(cpus_weight(dirty_mask) <= 1);
     if ( unlikely(!cpu_isset(cpu, dirty_mask) && !cpus_empty(dirty_mask)) )
@@ -1557,11 +1558,11 @@ void sync_local_execstate(void)
 
 void sync_vcpu_execstate(struct vcpu *v)
 {
-    if ( cpu_isset(smp_processor_id(), v->vcpu_dirty_cpumask) )
+    if ( cpumask_test_cpu(smp_processor_id(), v->vcpu_dirty_cpumask) )
         sync_local_execstate();
 
     /* Other cpus call __sync_local_execstate from flush ipi handler. */
-    flush_tlb_mask(&v->vcpu_dirty_cpumask);
+    flush_tlb_mask(v->vcpu_dirty_cpumask);
 }
 
 #define next_arg(fmt, args) ({                                              \
@@ -1922,7 +1923,7 @@ int domain_relinquish_resources(struct domain *d)
     int ret;
     struct vcpu *v;
 
-    BUG_ON(!cpus_empty(d->domain_dirty_cpumask));
+    BUG_ON(!cpumask_empty(d->domain_dirty_cpumask));
 
     switch ( d->arch.relmem )
     {

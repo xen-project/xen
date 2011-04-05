@@ -88,8 +88,14 @@ static int vmx_domain_initialise(struct domain *d)
     d->arch.hvm_domain.vmx.ept_control.asr  =
         pagetable_get_pfn(p2m_get_pagetable(p2m_get_hostp2m(d)));
 
+    if ( !zalloc_cpumask_var(&d->arch.hvm_domain.vmx.ept_synced) )
+        return -ENOMEM;
+
     if ( (rc = vmx_alloc_vlapic_mapping(d)) != 0 )
+    {
+        free_cpumask_var(d->arch.hvm_domain.vmx.ept_synced);
         return rc;
+    }
 
     return 0;
 }
@@ -98,6 +104,7 @@ static void vmx_domain_destroy(struct domain *d)
 {
     if ( paging_mode_hap(d) )
         on_each_cpu(__ept_sync_domain, d, 1);
+    free_cpumask_var(d->arch.hvm_domain.vmx.ept_synced);
     vmx_free_vlapic_mapping(d);
 }
 
@@ -660,8 +667,9 @@ static void vmx_ctxt_switch_to(struct vcpu *v)
     {
         unsigned int cpu = smp_processor_id();
         /* Test-and-test-and-set this CPU in the EPT-is-synced mask. */
-        if ( !cpu_isset(cpu, d->arch.hvm_domain.vmx.ept_synced) &&
-             !cpu_test_and_set(cpu, d->arch.hvm_domain.vmx.ept_synced) )
+        if ( !cpumask_test_cpu(cpu, d->arch.hvm_domain.vmx.ept_synced) &&
+             !cpumask_test_and_set_cpu(cpu,
+                                       d->arch.hvm_domain.vmx.ept_synced) )
             __invept(INVEPT_SINGLE_CONTEXT, ept_get_eptp(d), 0);
     }
 
@@ -1217,10 +1225,10 @@ void ept_sync_domain(struct domain *d)
      * the ept_synced mask before on_selected_cpus() reads it, resulting in
      * unnecessary extra flushes, to avoid allocating a cpumask_t on the stack.
      */
-    cpus_and(d->arch.hvm_domain.vmx.ept_synced,
-             d->domain_dirty_cpumask, cpu_online_map);
+    cpumask_and(d->arch.hvm_domain.vmx.ept_synced,
+                d->domain_dirty_cpumask, &cpu_online_map);
 
-    on_selected_cpus(&d->arch.hvm_domain.vmx.ept_synced,
+    on_selected_cpus(d->arch.hvm_domain.vmx.ept_synced,
                      __ept_sync_domain, d, 1);
 }
 

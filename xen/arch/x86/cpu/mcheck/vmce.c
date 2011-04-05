@@ -321,8 +321,8 @@ int inject_vmce(struct domain *d)
                        d->domain_id);
             if ( guest_has_trap_callback(d, 0, TRAP_machine_check) )
             {
-                d->vcpu[0]->cpu_affinity_tmp =
-                    d->vcpu[0]->cpu_affinity;
+                cpumask_copy(d->vcpu[0]->cpu_affinity_tmp,
+                             d->vcpu[0]->cpu_affinity);
                 cpus_clear(affinity);
                 cpu_set(cpu, affinity);
                 mce_printk(MCE_VERBOSE, "MCE: CPU%d set affinity, old %d\n",

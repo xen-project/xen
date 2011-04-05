@@ -516,7 +516,7 @@ void domain_flush_tlb_vhpt(struct domain *d)
 		on_each_cpu((void (*)(void *))local_flush_tlb_all, NULL, 1);
 	else
 		on_each_cpu((void (*)(void *))flush_tlb_vhpt_all, d, 1);
-	cpus_clear (d->domain_dirty_cpumask);
+	cpumask_clear_cpu(d->domain_dirty_cpumask);
 }
 
 void flush_tlb_for_log_dirty(struct domain *d)
@@ -545,7 +545,7 @@ void flush_tlb_for_log_dirty(struct domain *d)
 	} else {
 		on_each_cpu((void (*)(void *))flush_tlb_vhpt_all, d, 1);
 	}
-	cpus_clear (d->domain_dirty_cpumask);
+	cpumask_clear_cpu(d->domain_dirty_cpumask);
 }
 
 void flush_tlb_mask(const cpumask_t *mask)
