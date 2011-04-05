@@ -132,7 +132,7 @@ static int vmx_vcpu_initialise(struct vcpu *v)
 
     /* %eax == 1 signals full real-mode support to the guest loader. */
     if ( v->vcpu_id == 0 )
-        v->arch.guest_context.user_regs.eax = 1;
+        v->arch.user_regs.eax = 1;
 
     return 0;
 }
@@ -400,13 +400,13 @@ static void vmx_save_dr(struct vcpu *v)
     v->arch.hvm_vmx.exec_control |= CPU_BASED_MOV_DR_EXITING;
     vmx_update_cpu_exec_control(v);
 
-    v->arch.guest_context.debugreg[0] = read_debugreg(0);
-    v->arch.guest_context.debugreg[1] = read_debugreg(1);
-    v->arch.guest_context.debugreg[2] = read_debugreg(2);
-    v->arch.guest_context.debugreg[3] = read_debugreg(3);
-    v->arch.guest_context.debugreg[6] = read_debugreg(6);
+    v->arch.debugreg[0] = read_debugreg(0);
+    v->arch.debugreg[1] = read_debugreg(1);
+    v->arch.debugreg[2] = read_debugreg(2);
+    v->arch.debugreg[3] = read_debugreg(3);
+    v->arch.debugreg[6] = read_debugreg(6);
     /* DR7 must be saved as it is used by vmx_restore_dr(). */
-    v->arch.guest_context.debugreg[7] = __vmread(GUEST_DR7);
+    v->arch.debugreg[7] = __vmread(GUEST_DR7);
 }
 
 static void __restore_debug_registers(struct vcpu *v)
@@ -416,11 +416,11 @@ static void __restore_debug_registers(struct vcpu *v)
 
     v->arch.hvm_vcpu.flag_dr_dirty = 1;
 
-    write_debugreg(0, v->arch.guest_context.debugreg[0]);
-    write_debugreg(1, v->arch.guest_context.debugreg[1]);
-    write_debugreg(2, v->arch.guest_context.debugreg[2]);
-    write_debugreg(3, v->arch.guest_context.debugreg[3]);
-    write_debugreg(6, v->arch.guest_context.debugreg[6]);
+    write_debugreg(0, v->arch.debugreg[0]);
+    write_debugreg(1, v->arch.debugreg[1]);
+    write_debugreg(2, v->arch.debugreg[2]);
+    write_debugreg(3, v->arch.debugreg[3]);
+    write_debugreg(6, v->arch.debugreg[6]);
     /* DR7 is loaded from the VMCS. */
 }
 
@@ -433,7 +433,7 @@ static void __restore_debug_registers(struct vcpu *v)
 static void vmx_restore_dr(struct vcpu *v)
 {
     /* NB. __vmread() is not usable here, so we cannot read from the VMCS. */
-    if ( unlikely(v->arch.guest_context.debugreg[7] & DR7_ACTIVE_MASK) )
+    if ( unlikely(v->arch.debugreg[7] & DR7_ACTIVE_MASK) )
         __restore_debug_registers(v);
 }
 
@@ -1352,7 +1352,7 @@ static void vmx_set_info_guest(struct vcpu *v)
 
     vmx_vmcs_enter(v);
 
-    __vmwrite(GUEST_DR7, v->arch.guest_context.debugreg[7]);
+    __vmwrite(GUEST_DR7, v->arch.debugreg[7]);
 
     /* 
      * If the interruptibility-state field indicates blocking by STI,
@@ -1364,7 +1364,7 @@ static void vmx_set_info_guest(struct vcpu *v)
      */
     intr_shadow = __vmread(GUEST_INTERRUPTIBILITY_INFO);
     if ( v->domain->debugger_attached &&
-         (v->arch.guest_context.user_regs.eflags & X86_EFLAGS_TF) &&
+         (v->arch.user_regs.eflags & X86_EFLAGS_TF) &&
          (intr_shadow & VMX_INTR_SHADOW_STI) )
     {
         intr_shadow &= ~VMX_INTR_SHADOW_STI;

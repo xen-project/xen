@@ -352,11 +352,52 @@ struct pae_l3_cache { };
 #define pae_l3_cache_init(c) ((void)0)
 #endif
 
+struct pv_vcpu
+{
+    struct trap_info *trap_ctxt;
+
+    unsigned long gdt_frames[FIRST_RESERVED_GDT_PAGE];
+    unsigned long ldt_base;
+    unsigned int gdt_ents, ldt_ents;
+
+    unsigned long kernel_ss, kernel_sp;
+    unsigned long ctrlreg[8];
+
+    unsigned long event_callback_eip;
+    unsigned long failsafe_callback_eip;
+    union {
+#ifdef CONFIG_X86_64
+        unsigned long syscall_callback_eip;
+#endif
+        struct {
+            unsigned int event_callback_cs;
+            unsigned int failsafe_callback_cs;
+        };
+    };
+
+    unsigned long vm_assist;
+
+#ifdef CONFIG_X86_64
+    /* Segment base addresses. */
+    unsigned long fs_base;
+    unsigned long gs_base_kernel;
+    unsigned long gs_base_user;
+#endif
+};
+
 struct arch_vcpu
 {
-    /* Needs 16-byte aligment for FXSAVE/FXRSTOR. */
-    struct vcpu_guest_context guest_context
-    __attribute__((__aligned__(16)));
+    /*
+     * guest context (mirroring struct vcpu_guest_context) common
+     * between pv and hvm guests
+     */
+
+    void              *fpu_ctxt;
+    unsigned long      vgc_flags;
+    struct cpu_user_regs user_regs;
+    unsigned long      debugreg[8];
+
+    /* other state */
 
     struct pae_l3_cache pae_l3_cache;
 
@@ -389,7 +430,10 @@ struct arch_vcpu
 #endif
 
     /* Virtual Machine Extensions */
-    struct hvm_vcpu hvm_vcpu;
+    union {
+        struct pv_vcpu pv_vcpu;
+        struct hvm_vcpu hvm_vcpu;
+    };
 
     /*
      * Every domain has a L1 pagetable of its own. Per-domain mappings
@@ -413,7 +457,7 @@ struct arch_vcpu
      * dirtied FPU/SSE) is scheduled out we XSAVE the states here; 2) in
      * #NM handler, we XRSTOR the states we XSAVE-ed;
      */
-    void *xsave_area;
+    struct xsave_struct *xsave_area;
     uint64_t xcr0;
     /* Accumulated eXtended features mask for using XSAVE/XRESTORE by Xen
      * itself, as we can never know whether guest OS depends on content
@@ -461,7 +505,7 @@ unsigned long pv_guest_cr4_fixup(const struct vcpu *, unsigned long guest_cr4);
 
 /* Convert between guest-visible and real CR4 values. */
 #define pv_guest_cr4_to_real_cr4(v)                         \
-    (((v)->arch.guest_context.ctrlreg[4]                    \
+    (((v)->arch.pv_vcpu.ctrlreg[4]                          \
       | (mmu_cr4_features & (X86_CR4_PGE | X86_CR4_PSE))    \
       | ((v)->domain->arch.vtsc ? X86_CR4_TSD : 0)         \
       | ((xsave_enabled(v))? X86_CR4_OSXSAVE : 0))              \

@@ -516,7 +516,6 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     struct vcpu *v;
     struct hvm_hw_cpu ctxt;
     struct segment_register seg;
-    struct vcpu_guest_context *vc;
 
     for_each_vcpu ( d, v )
     {
@@ -586,39 +585,37 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         ctxt.ldtr_base = seg.base;
         ctxt.ldtr_arbytes = seg.attr.bytes;
 
-        vc = &v->arch.guest_context;
-
         if ( v->fpu_initialised )
-            memcpy(ctxt.fpu_regs, &vc->fpu_ctxt, sizeof(ctxt.fpu_regs));
+            memcpy(ctxt.fpu_regs, v->arch.fpu_ctxt, sizeof(ctxt.fpu_regs));
         else 
             memset(ctxt.fpu_regs, 0, sizeof(ctxt.fpu_regs));
 
-        ctxt.rax = vc->user_regs.eax;
-        ctxt.rbx = vc->user_regs.ebx;
-        ctxt.rcx = vc->user_regs.ecx;
-        ctxt.rdx = vc->user_regs.edx;
-        ctxt.rbp = vc->user_regs.ebp;
-        ctxt.rsi = vc->user_regs.esi;
-        ctxt.rdi = vc->user_regs.edi;
-        ctxt.rsp = vc->user_regs.esp;
-        ctxt.rip = vc->user_regs.eip;
-        ctxt.rflags = vc->user_regs.eflags;
+        ctxt.rax = v->arch.user_regs.eax;
+        ctxt.rbx = v->arch.user_regs.ebx;
+        ctxt.rcx = v->arch.user_regs.ecx;
+        ctxt.rdx = v->arch.user_regs.edx;
+        ctxt.rbp = v->arch.user_regs.ebp;
+        ctxt.rsi = v->arch.user_regs.esi;
+        ctxt.rdi = v->arch.user_regs.edi;
+        ctxt.rsp = v->arch.user_regs.esp;
+        ctxt.rip = v->arch.user_regs.eip;
+        ctxt.rflags = v->arch.user_regs.eflags;
 #ifdef __x86_64__
-        ctxt.r8  = vc->user_regs.r8;
-        ctxt.r9  = vc->user_regs.r9;
-        ctxt.r10 = vc->user_regs.r10;
-        ctxt.r11 = vc->user_regs.r11;
-        ctxt.r12 = vc->user_regs.r12;
-        ctxt.r13 = vc->user_regs.r13;
-        ctxt.r14 = vc->user_regs.r14;
-        ctxt.r15 = vc->user_regs.r15;
+        ctxt.r8  = v->arch.user_regs.r8;
+        ctxt.r9  = v->arch.user_regs.r9;
+        ctxt.r10 = v->arch.user_regs.r10;
+        ctxt.r11 = v->arch.user_regs.r11;
+        ctxt.r12 = v->arch.user_regs.r12;
+        ctxt.r13 = v->arch.user_regs.r13;
+        ctxt.r14 = v->arch.user_regs.r14;
+        ctxt.r15 = v->arch.user_regs.r15;
 #endif
-        ctxt.dr0 = vc->debugreg[0];
-        ctxt.dr1 = vc->debugreg[1];
-        ctxt.dr2 = vc->debugreg[2];
-        ctxt.dr3 = vc->debugreg[3];
-        ctxt.dr6 = vc->debugreg[6];
-        ctxt.dr7 = vc->debugreg[7];
+        ctxt.dr0 = v->arch.debugreg[0];
+        ctxt.dr1 = v->arch.debugreg[1];
+        ctxt.dr2 = v->arch.debugreg[2];
+        ctxt.dr3 = v->arch.debugreg[3];
+        ctxt.dr6 = v->arch.debugreg[6];
+        ctxt.dr7 = v->arch.debugreg[7];
 
         if ( hvm_save_entry(CPU, v->vcpu_id, h, &ctxt) != 0 )
             return 1; 
@@ -643,7 +640,6 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     struct vcpu *v;
     struct hvm_hw_cpu ctxt;
     struct segment_register seg;
-    struct vcpu_guest_context *vc;
 
     /* Which vcpu is this? */
     vcpuid = hvm_load_instance(h);
@@ -652,13 +648,12 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         gdprintk(XENLOG_ERR, "HVM restore: domain has no vcpu %u\n", vcpuid);
         return -EINVAL;
     }
-    vc = &v->arch.guest_context;
 
     /* Need to init this vcpu before loading its contents */
     rc = 0;
     domain_lock(d);
     if ( !v->is_initialised )
-        rc = boot_vcpu(d, vcpuid, vc);
+        rc = boot_vcpu(d, vcpuid, NULL);
     domain_unlock(d);
     if ( rc != 0 )
         return rc;
@@ -770,8 +765,6 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     seg.attr.bytes = ctxt.ldtr_arbytes;
     hvm_set_segment_register(v, x86_seg_ldtr, &seg);
 
-    memcpy(&vc->fpu_ctxt, ctxt.fpu_regs, sizeof(ctxt.fpu_regs));
-
     /* In case xsave-absent save file is restored on a xsave-capable host */
     if ( xsave_enabled(v) )
     {
@@ -782,35 +775,37 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         v->arch.xcr0_accum = XSTATE_FP_SSE;
         v->arch.xcr0 = XSTATE_FP_SSE;
     }
+    else
+        memcpy(v->arch.fpu_ctxt, ctxt.fpu_regs, sizeof(ctxt.fpu_regs));
 
-    vc->user_regs.eax = ctxt.rax;
-    vc->user_regs.ebx = ctxt.rbx;
-    vc->user_regs.ecx = ctxt.rcx;
-    vc->user_regs.edx = ctxt.rdx;
-    vc->user_regs.ebp = ctxt.rbp;
-    vc->user_regs.esi = ctxt.rsi;
-    vc->user_regs.edi = ctxt.rdi;
-    vc->user_regs.esp = ctxt.rsp;
-    vc->user_regs.eip = ctxt.rip;
-    vc->user_regs.eflags = ctxt.rflags | 2;
+    v->arch.user_regs.eax = ctxt.rax;
+    v->arch.user_regs.ebx = ctxt.rbx;
+    v->arch.user_regs.ecx = ctxt.rcx;
+    v->arch.user_regs.edx = ctxt.rdx;
+    v->arch.user_regs.ebp = ctxt.rbp;
+    v->arch.user_regs.esi = ctxt.rsi;
+    v->arch.user_regs.edi = ctxt.rdi;
+    v->arch.user_regs.esp = ctxt.rsp;
+    v->arch.user_regs.eip = ctxt.rip;
+    v->arch.user_regs.eflags = ctxt.rflags | 2;
 #ifdef __x86_64__
-    vc->user_regs.r8  = ctxt.r8; 
-    vc->user_regs.r9  = ctxt.r9; 
-    vc->user_regs.r10 = ctxt.r10;
-    vc->user_regs.r11 = ctxt.r11;
-    vc->user_regs.r12 = ctxt.r12;
-    vc->user_regs.r13 = ctxt.r13;
-    vc->user_regs.r14 = ctxt.r14;
-    vc->user_regs.r15 = ctxt.r15;
+    v->arch.user_regs.r8  = ctxt.r8;
+    v->arch.user_regs.r9  = ctxt.r9;
+    v->arch.user_regs.r10 = ctxt.r10;
+    v->arch.user_regs.r11 = ctxt.r11;
+    v->arch.user_regs.r12 = ctxt.r12;
+    v->arch.user_regs.r13 = ctxt.r13;
+    v->arch.user_regs.r14 = ctxt.r14;
+    v->arch.user_regs.r15 = ctxt.r15;
 #endif
-    vc->debugreg[0] = ctxt.dr0;
-    vc->debugreg[1] = ctxt.dr1;
-    vc->debugreg[2] = ctxt.dr2;
-    vc->debugreg[3] = ctxt.dr3;
-    vc->debugreg[6] = ctxt.dr6;
-    vc->debugreg[7] = ctxt.dr7;
+    v->arch.debugreg[0] = ctxt.dr0;
+    v->arch.debugreg[1] = ctxt.dr1;
+    v->arch.debugreg[2] = ctxt.dr2;
+    v->arch.debugreg[3] = ctxt.dr3;
+    v->arch.debugreg[6] = ctxt.dr6;
+    v->arch.debugreg[7] = ctxt.dr7;
 
-    vc->flags = VGCF_online;
+    v->arch.vgc_flags = VGCF_online;
     v->fpu_initialised = 1;
 
     /* Auxiliary processors should be woken immediately. */
@@ -975,7 +970,7 @@ int hvm_vcpu_initialise(struct vcpu *v)
                  (void(*)(unsigned long))hvm_assert_evtchn_irq,
                  (unsigned long)v);
 
-    v->arch.guest_context.user_regs.eflags = 2;
+    v->arch.user_regs.eflags = 2;
 
     if ( v->vcpu_id == 0 )
     {
@@ -2863,7 +2858,6 @@ static int hvmop_set_pci_intx_level(
 void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
 {
     struct domain *d = v->domain;
-    struct vcpu_guest_context *ctxt;
     struct segment_register reg;
 
     BUG_ON(vcpu_runnable(v));
@@ -2880,12 +2874,13 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
         v->arch.guest_table = pagetable_null();
     }
 
-    ctxt = &v->arch.guest_context;
-    memset(ctxt, 0, sizeof(*ctxt));
-    ctxt->flags = VGCF_online;
-    ctxt->user_regs.eflags = 2;
-    ctxt->user_regs.edx = 0x00000f00;
-    ctxt->user_regs.eip = ip;
+    memset(v->arch.fpu_ctxt, 0, sizeof(v->arch.xsave_area->fpu_sse));
+    v->arch.vgc_flags = VGCF_online;
+    memset(&v->arch.user_regs, 0, sizeof(v->arch.user_regs));
+    v->arch.user_regs.eflags = 2;
+    v->arch.user_regs.edx = 0x00000f00;
+    v->arch.user_regs.eip = ip;
+    memset(&v->arch.debugreg, 0, sizeof(v->arch.debugreg));
 
     v->arch.hvm_vcpu.guest_cr[0] = X86_CR0_ET;
     hvm_update_guest_cr(v, 0);

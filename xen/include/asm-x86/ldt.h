@@ -9,7 +9,7 @@ static inline void load_LDT(struct vcpu *v)
     struct desc_struct *desc;
     unsigned long ents;
 
-    if ( (ents = v->arch.guest_context.ldt_ents) == 0 )
+    if ( (ents = v->arch.pv_vcpu.ldt_ents) == 0 )
     {
         __asm__ __volatile__ ( "lldt %%ax" : : "a" (0) );
     }

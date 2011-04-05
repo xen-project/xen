@@ -87,14 +87,14 @@ void restore_rest_processor_state(void)
 
     /* Maybe load the debug registers. */
     BUG_ON(is_hvm_vcpu(curr));
-    if ( !is_idle_vcpu(curr) && curr->arch.guest_context.debugreg[7] )
+    if ( !is_idle_vcpu(curr) && curr->arch.debugreg[7] )
     {
-        write_debugreg(0, curr->arch.guest_context.debugreg[0]);
-        write_debugreg(1, curr->arch.guest_context.debugreg[1]);
-        write_debugreg(2, curr->arch.guest_context.debugreg[2]);
-        write_debugreg(3, curr->arch.guest_context.debugreg[3]);
-        write_debugreg(6, curr->arch.guest_context.debugreg[6]);
-        write_debugreg(7, curr->arch.guest_context.debugreg[7]);
+        write_debugreg(0, curr->arch.debugreg[0]);
+        write_debugreg(1, curr->arch.debugreg[1]);
+        write_debugreg(2, curr->arch.debugreg[2]);
+        write_debugreg(3, curr->arch.debugreg[3]);
+        write_debugreg(6, curr->arch.debugreg[6]);
+        write_debugreg(7, curr->arch.debugreg[7]);
     }
 
     /* Reload FPU state on next FPU use. */

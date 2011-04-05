@@ -646,7 +646,7 @@ int map_ldt_shadow_page(unsigned int off)
     struct domain *d = v->domain;
     unsigned long gmfn, mfn;
     l1_pgentry_t l1e, nl1e;
-    unsigned long gva = v->arch.guest_context.ldt_base + (off << PAGE_SHIFT);
+    unsigned long gva = v->arch.pv_vcpu.ldt_base + (off << PAGE_SHIFT);
     int okay;
 
     BUG_ON(unlikely(in_irq()));
@@ -3220,13 +3220,13 @@ int do_mmuext_op(
                 okay = 0;
                 MEM_LOG("Bad args to SET_LDT: ptr=%lx, ents=%lx", ptr, ents);
             }
-            else if ( (curr->arch.guest_context.ldt_ents != ents) || 
-                      (curr->arch.guest_context.ldt_base != ptr) )
+            else if ( (curr->arch.pv_vcpu.ldt_ents != ents) ||
+                      (curr->arch.pv_vcpu.ldt_base != ptr) )
             {
                 invalidate_shadow_ldt(curr, 0);
                 flush_tlb_local();
-                curr->arch.guest_context.ldt_base = ptr;
-                curr->arch.guest_context.ldt_ents = ents;
+                curr->arch.pv_vcpu.ldt_base = ptr;
+                curr->arch.pv_vcpu.ldt_ents = ents;
                 load_LDT(curr);
                 if ( ents != 0 )
                     (void)map_ldt_shadow_page(0);
@@ -4416,13 +4416,13 @@ void destroy_gdt(struct vcpu *v)
     int i;
     unsigned long pfn;
 
-    v->arch.guest_context.gdt_ents = 0;
+    v->arch.pv_vcpu.gdt_ents = 0;
     for ( i = 0; i < FIRST_RESERVED_GDT_PAGE; i++ )
     {
         if ( (pfn = l1e_get_pfn(v->arch.perdomain_ptes[i])) != 0 )
             put_page_and_type(mfn_to_page(pfn));
         l1e_write(&v->arch.perdomain_ptes[i], l1e_empty());
-        v->arch.guest_context.gdt_frames[i] = 0;
+        v->arch.pv_vcpu.gdt_frames[i] = 0;
     }
 }
 
@@ -4452,10 +4452,10 @@ long set_gdt(struct vcpu *v,
     destroy_gdt(v);
 
     /* Install the new GDT. */
-    v->arch.guest_context.gdt_ents = entries;
+    v->arch.pv_vcpu.gdt_ents = entries;
     for ( i = 0; i < nr_pages; i++ )
     {
-        v->arch.guest_context.gdt_frames[i] = frames[i];
+        v->arch.pv_vcpu.gdt_frames[i] = frames[i];
         l1e_write(&v->arch.perdomain_ptes[i],
                   l1e_from_pfn(frames[i], __PAGE_HYPERVISOR));
     }

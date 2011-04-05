@@ -68,16 +68,14 @@ void __dummy__(void)
     OFFSET(VCPU_trap_bounce, struct vcpu, arch.trap_bounce);
     OFFSET(VCPU_int80_bounce, struct vcpu, arch.int80_bounce);
     OFFSET(VCPU_thread_flags, struct vcpu, arch.flags);
-    OFFSET(VCPU_event_addr, struct vcpu,
-           arch.guest_context.event_callback_eip);
-    OFFSET(VCPU_event_sel, struct vcpu,
-           arch.guest_context.event_callback_cs);
+    OFFSET(VCPU_event_addr, struct vcpu, arch.pv_vcpu.event_callback_eip);
+    OFFSET(VCPU_event_sel, struct vcpu, arch.pv_vcpu.event_callback_cs);
     OFFSET(VCPU_failsafe_addr, struct vcpu,
-           arch.guest_context.failsafe_callback_eip);
+           arch.pv_vcpu.failsafe_callback_eip);
     OFFSET(VCPU_failsafe_sel, struct vcpu,
-           arch.guest_context.failsafe_callback_cs);
+           arch.pv_vcpu.failsafe_callback_cs);
     OFFSET(VCPU_syscall_addr, struct vcpu,
-           arch.guest_context.syscall_callback_eip);
+           arch.pv_vcpu.syscall_callback_eip);
     OFFSET(VCPU_syscall32_addr, struct vcpu, arch.syscall32_callback_eip);
     OFFSET(VCPU_syscall32_sel, struct vcpu, arch.syscall32_callback_cs);
     OFFSET(VCPU_syscall32_disables_events, struct vcpu,
@@ -86,13 +84,10 @@ void __dummy__(void)
     OFFSET(VCPU_sysenter_sel, struct vcpu, arch.sysenter_callback_cs);
     OFFSET(VCPU_sysenter_disables_events, struct vcpu,
            arch.sysenter_disables_events);
-    OFFSET(VCPU_gp_fault_addr, struct vcpu,
-           arch.guest_context.trap_ctxt[TRAP_gp_fault].address);
-    OFFSET(VCPU_gp_fault_sel, struct vcpu,
-           arch.guest_context.trap_ctxt[TRAP_gp_fault].cs);
-    OFFSET(VCPU_kernel_sp, struct vcpu, arch.guest_context.kernel_sp);
-    OFFSET(VCPU_kernel_ss, struct vcpu, arch.guest_context.kernel_ss);
-    OFFSET(VCPU_guest_context_flags, struct vcpu, arch.guest_context.flags);
+    OFFSET(VCPU_trap_ctxt, struct vcpu, arch.pv_vcpu.trap_ctxt);
+    OFFSET(VCPU_kernel_sp, struct vcpu, arch.pv_vcpu.kernel_sp);
+    OFFSET(VCPU_kernel_ss, struct vcpu, arch.pv_vcpu.kernel_ss);
+    OFFSET(VCPU_guest_context_flags, struct vcpu, arch.vgc_flags);
     OFFSET(VCPU_nmi_pending, struct vcpu, nmi_pending);
     OFFSET(VCPU_mce_pending, struct vcpu, mce_pending);
     OFFSET(VCPU_nmi_old_mask, struct vcpu, nmi_state.old_mask);
@@ -137,6 +132,11 @@ void __dummy__(void)
     OFFSET(CPUINFO_processor_id, struct cpu_info, processor_id);
     OFFSET(CPUINFO_current_vcpu, struct cpu_info, current_vcpu);
     DEFINE(CPUINFO_sizeof, sizeof(struct cpu_info));
+    BLANK();
+
+    OFFSET(TRAPINFO_eip, struct trap_info, address);
+    OFFSET(TRAPINFO_cs, struct trap_info, cs);
+    DEFINE(TRAPINFO_sizeof, sizeof(struct trap_info));
     BLANK();
 
     OFFSET(TRAPBOUNCE_error_code, struct trap_bounce, error_code);

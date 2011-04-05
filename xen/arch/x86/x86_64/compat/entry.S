@@ -222,18 +222,20 @@ ENTRY(compat_syscall)
         movb  %cl,TRAPBOUNCE_flags(%rdx)
         call  compat_create_bounce_frame
         jmp   compat_test_all_events
-2:      movl  $TRAP_gp_fault,UREGS_entry_vector(%rsp)
+2:      movq  VCPU_trap_ctxt(%rbx),%rsi
+        movl  $TRAP_gp_fault,UREGS_entry_vector(%rsp)
         subl  $2,UREGS_rip(%rsp)
-        movq  VCPU_gp_fault_addr(%rbx),%rax
-        movzwl VCPU_gp_fault_sel(%rbx),%esi
+        movl  TRAP_gp_fault * TRAPINFO_sizeof + TRAPINFO_eip(%rsi),%eax
+        movzwl TRAP_gp_fault * TRAPINFO_sizeof + TRAPINFO_cs(%rsi),%esi
         movb  $(TBF_EXCEPTION|TBF_EXCEPTION_ERRCODE|TBF_INTERRUPT),%cl
         movl  $0,TRAPBOUNCE_error_code(%rdx)
         jmp   1b
 
 ENTRY(compat_sysenter)
+        movq  VCPU_trap_ctxt(%rbx),%rcx
         cmpl  $TRAP_gp_fault,UREGS_entry_vector(%rsp)
         movzwl VCPU_sysenter_sel(%rbx),%eax
-        movzwl VCPU_gp_fault_sel(%rbx),%ecx
+        movzwl TRAP_gp_fault * TRAPINFO_sizeof + TRAPINFO_cs(%rcx),%ecx
         cmovel %ecx,%eax
         testl $~3,%eax
         movl  $FLAT_COMPAT_USER_SS,UREGS_ss(%rsp)

@@ -110,7 +110,7 @@ void save_init_fpu(struct vcpu *v)
     ASSERT(!is_idle_vcpu(v));
 
     cr0 = read_cr0();
-    fpu_ctxt = v->arch.guest_context.fpu_ctxt.x;
+    fpu_ctxt = v->arch.fpu_ctxt;
 
     /* This can happen, if a paravirtualised guest OS has set its CR0.TS. */
     if ( cr0 & X86_CR0_TS )
@@ -176,7 +176,7 @@ void save_init_fpu(struct vcpu *v)
 
 static void restore_fpu(struct vcpu *v)
 {
-    char *fpu_ctxt = v->arch.guest_context.fpu_ctxt.x;
+    const char *fpu_ctxt = v->arch.fpu_ctxt;
 
     /*
      * FXRSTOR can fault if passed a corrupted data block. We handle this
@@ -208,7 +208,7 @@ static void restore_fpu(struct vcpu *v)
             _ASM_EXTABLE(1b, 2b)
             : 
             : "m" (*fpu_ctxt),
-              "i" (sizeof(v->arch.guest_context.fpu_ctxt)/4)
+              "i" (sizeof(v->arch.xsave_area->fpu_sse)/4)
 #ifdef __x86_64__
              ,"cdaSDb" (fpu_ctxt)
 #endif
@@ -216,7 +216,7 @@ static void restore_fpu(struct vcpu *v)
     }
     else
     {
-        asm volatile ( "frstor %0" : : "m" (v->arch.guest_context.fpu_ctxt) );
+        asm volatile ( "frstor %0" : : "m" (*fpu_ctxt) );
     }
 }
 

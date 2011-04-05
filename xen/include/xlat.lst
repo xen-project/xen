@@ -10,7 +10,6 @@
 ?	vcpu_time_info			xen.h
 !	cpu_user_regs			arch-x86/xen-@arch@.h
 !	trap_info			arch-x86/xen.h
-!	vcpu_guest_context		arch-x86/xen.h
 ?	cpu_offline_action		arch-x86/xen-mca.h
 ?	mc				arch-x86/xen-mca.h
 ?	mcinfo_bank			arch-x86/xen-mca.h

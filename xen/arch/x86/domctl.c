@@ -1469,7 +1469,7 @@ long arch_do_domctl(
             }
             offset += sizeof(v->arch.xcr0_accum);
             if ( copy_to_guest_offset(domctl->u.vcpuextstate.buffer,
-                                      offset, v->arch.xsave_area,
+                                      offset, (void *)v->arch.xsave_area,
                                       xsave_cntxt_size) )
             {
                 ret = -EFAULT;
@@ -1594,36 +1594,56 @@ long arch_do_domctl(
     return ret;
 }
 
+#ifdef CONFIG_COMPAT
+#define xen_vcpu_guest_context vcpu_guest_context
+#define fpu_ctxt fpu_ctxt.x
+CHECK_FIELD_(struct, vcpu_guest_context, fpu_ctxt);
+#undef fpu_ctxt
+#undef xen_vcpu_guest_context
+#endif
+
 void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 {
+    unsigned int i;
+    bool_t compat = is_pv_32on64_domain(v->domain);
 #ifdef CONFIG_COMPAT
-#define c(fld) (!is_pv_32on64_domain(v->domain) ? (c.nat->fld) : (c.cmp->fld))
+#define c(fld) (!compat ? (c.nat->fld) : (c.cmp->fld))
 #else
 #define c(fld) (c.nat->fld)
 #endif
 
-    /* Fill legacy context from xsave area first */
-    if ( xsave_enabled(v) )
-        memcpy(v->arch.xsave_area, &v->arch.guest_context.fpu_ctxt,
-               sizeof(v->arch.guest_context.fpu_ctxt));
-
-    if ( !is_pv_32on64_domain(v->domain) )
-        memcpy(c.nat, &v->arch.guest_context, sizeof(*c.nat));
-#ifdef CONFIG_COMPAT
-    else
-        XLAT_vcpu_guest_context(c.cmp, &v->arch.guest_context);
-#endif
-
-    c(flags &= ~(VGCF_i387_valid|VGCF_in_kernel));
+    if ( is_hvm_vcpu(v) )
+        memset(c.nat, 0, sizeof(*c.nat));
+    memcpy(&c.nat->fpu_ctxt, v->arch.fpu_ctxt, sizeof(c.nat->fpu_ctxt));
+    c(flags = v->arch.vgc_flags & ~(VGCF_i387_valid|VGCF_in_kernel));
     if ( v->fpu_initialised )
         c(flags |= VGCF_i387_valid);
     if ( !test_bit(_VPF_down, &v->pause_flags) )
         c(flags |= VGCF_online);
+    if ( !compat )
+    {
+        memcpy(&c.nat->user_regs, &v->arch.user_regs, sizeof(c.nat->user_regs));
+        if ( !is_hvm_vcpu(v) )
+            memcpy(c.nat->trap_ctxt, v->arch.pv_vcpu.trap_ctxt,
+                   sizeof(c.nat->trap_ctxt));
+    }
+#ifdef CONFIG_COMPAT
+    else
+    {
+        XLAT_cpu_user_regs(&c.cmp->user_regs, &v->arch.user_regs);
+        for ( i = 0; i < ARRAY_SIZE(c.cmp->trap_ctxt); ++i )
+            XLAT_trap_info(c.cmp->trap_ctxt + i,
+                           v->arch.pv_vcpu.trap_ctxt + i);
+    }
+#endif
+
+    for ( i = 0; i < ARRAY_SIZE(v->arch.debugreg); ++i )
+        c(debugreg[i] = v->arch.debugreg[i]);
 
     if ( is_hvm_vcpu(v) )
     {
         struct segment_register sreg;
-        memset(c.nat->ctrlreg, 0, sizeof(c.nat->ctrlreg));
+
         c.nat->ctrlreg[0] = v->arch.hvm_vcpu.guest_cr[0];
         c.nat->ctrlreg[2] = v->arch.hvm_vcpu.guest_cr[2];
         c.nat->ctrlreg[3] = v->arch.hvm_vcpu.guest_cr[3];
@@ -1643,6 +1663,39 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     }
     else
     {
+        c(ldt_base = v->arch.pv_vcpu.ldt_base);
+        c(ldt_ents = v->arch.pv_vcpu.ldt_ents);
+        for ( i = 0; i < ARRAY_SIZE(v->arch.pv_vcpu.gdt_frames); ++i )
+            c(gdt_frames[i] = v->arch.pv_vcpu.gdt_frames[i]);
+#ifdef CONFIG_COMPAT
+        BUILD_BUG_ON(ARRAY_SIZE(c.nat->gdt_frames) !=
+                     ARRAY_SIZE(c.cmp->gdt_frames));
+#endif
+        for ( ; i < ARRAY_SIZE(c.nat->gdt_frames); ++i )
+            c(gdt_frames[i] = 0);
+        c(gdt_ents = v->arch.pv_vcpu.gdt_ents);
+        c(kernel_ss = v->arch.pv_vcpu.kernel_ss);
+        c(kernel_sp = v->arch.pv_vcpu.kernel_sp);
+        for ( i = 0; i < ARRAY_SIZE(v->arch.pv_vcpu.ctrlreg); ++i )
+            c(ctrlreg[i] = v->arch.pv_vcpu.ctrlreg[i]);
+        c(event_callback_eip = v->arch.pv_vcpu.event_callback_eip);
+        c(failsafe_callback_eip = v->arch.pv_vcpu.failsafe_callback_eip);
+#ifdef CONFIG_X86_64
+        if ( !compat )
+        {
+            c.nat->syscall_callback_eip = v->arch.pv_vcpu.syscall_callback_eip;
+            c.nat->fs_base = v->arch.pv_vcpu.fs_base;
+            c.nat->gs_base_kernel = v->arch.pv_vcpu.gs_base_kernel;
+            c.nat->gs_base_user = v->arch.pv_vcpu.gs_base_user;
+        }
+        else
+#endif
+        {
+            c(event_callback_cs = v->arch.pv_vcpu.event_callback_cs);
+            c(failsafe_callback_cs = v->arch.pv_vcpu.failsafe_callback_cs);
+        }
+        c(vm_assist = v->arch.pv_vcpu.vm_assist);
+
         /* IOPL privileges are virtualised: merge back into returned eflags. */
         BUG_ON((c(user_regs.eflags) & X86_EFLAGS_IOPL) != 0);
         c(user_regs.eflags |= v->arch.iopl << 12);
@@ -1673,7 +1726,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
         }
 #endif
 
-        if ( guest_kernel_mode(v, &v->arch.guest_context.user_regs) )
+        if ( guest_kernel_mode(v, &v->arch.user_regs) )
             c(flags |= VGCF_in_kernel);
     }
 

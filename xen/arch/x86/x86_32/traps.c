@@ -141,12 +141,12 @@ void vcpu_show_registers(const struct vcpu *v)
     if ( is_hvm_vcpu(v) )
         return;
 
-    crs[0] = v->arch.guest_context.ctrlreg[0];
+    crs[0] = v->arch.pv_vcpu.ctrlreg[0];
     crs[2] = v->vcpu_info->arch.cr2;
     crs[3] = pagetable_get_paddr(v->arch.guest_table);
-    crs[4] = v->arch.guest_context.ctrlreg[4];
+    crs[4] = v->arch.pv_vcpu.ctrlreg[4];
 
-    _show_registers(&v->arch.guest_context.user_regs, crs, CTXT_pv_guest, v);
+    _show_registers(&v->arch.user_regs, crs, CTXT_pv_guest, v);
 }
 
 void show_page_walk(unsigned long addr)
@@ -372,7 +372,7 @@ void __devinit subarch_percpu_traps_init(void)
 
 void init_int80_direct_trap(struct vcpu *v)
 {
-    struct trap_info *ti = &v->arch.guest_context.trap_ctxt[0x80];
+    struct trap_info *ti = &v->arch.pv_vcpu.trap_ctxt[0x80];
 
     /*
      * We can't virtualise interrupt gates, as there's no way to get
@@ -419,19 +419,19 @@ static long register_guest_callback(struct callback_register *reg)
     switch ( reg->type )
     {
     case CALLBACKTYPE_event:
-        v->arch.guest_context.event_callback_cs     = reg->address.cs;
-        v->arch.guest_context.event_callback_eip    = reg->address.eip;
+        v->arch.pv_vcpu.event_callback_cs     = reg->address.cs;
+        v->arch.pv_vcpu.event_callback_eip    = reg->address.eip;
         break;
 
     case CALLBACKTYPE_failsafe:
-        v->arch.guest_context.failsafe_callback_cs  = reg->address.cs;
-        v->arch.guest_context.failsafe_callback_eip = reg->address.eip;
+        v->arch.pv_vcpu.failsafe_callback_cs  = reg->address.cs;
+        v->arch.pv_vcpu.failsafe_callback_eip = reg->address.eip;
         if ( reg->flags & CALLBACKF_mask_events )
             set_bit(_VGCF_failsafe_disables_events,
-                    &v->arch.guest_context.flags);
+                    &v->arch.vgc_flags);
         else
             clear_bit(_VGCF_failsafe_disables_events,
-                      &v->arch.guest_context.flags);
+                      &v->arch.vgc_flags);
         break;
 
 #ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL

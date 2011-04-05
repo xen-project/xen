@@ -731,8 +731,8 @@ int __init construct_dom0(
 
     if ( is_pv_32on64_domain(d) )
     {
-        v->arch.guest_context.failsafe_callback_cs = FLAT_COMPAT_KERNEL_CS;
-        v->arch.guest_context.event_callback_cs    = FLAT_COMPAT_KERNEL_CS;
+        v->arch.pv_vcpu.failsafe_callback_cs = FLAT_COMPAT_KERNEL_CS;
+        v->arch.pv_vcpu.event_callback_cs    = FLAT_COMPAT_KERNEL_CS;
     }
 
     /* WARNING: The new domain must have its 'processor' field filled in! */
@@ -1160,7 +1160,7 @@ int __init construct_dom0(
      *          ESI = start_info
      *  [EAX,EBX,ECX,EDX,EDI,EBP are zero]
      */
-    regs = &v->arch.guest_context.user_regs;
+    regs = &v->arch.user_regs;
     regs->ds = regs->es = regs->fs = regs->gs =
         !is_pv_32on64_domain(d) ? FLAT_KERNEL_DS : FLAT_COMPAT_KERNEL_DS;
     regs->ss = (!is_pv_32on64_domain(d) ?
@@ -1178,12 +1178,12 @@ int __init construct_dom0(
 
     if ( supervisor_mode_kernel )
     {
-        v->arch.guest_context.kernel_ss &= ~3;
-        v->arch.guest_context.user_regs.ss &= ~3;
-        v->arch.guest_context.user_regs.es &= ~3;
-        v->arch.guest_context.user_regs.ds &= ~3;
-        v->arch.guest_context.user_regs.fs &= ~3;
-        v->arch.guest_context.user_regs.gs &= ~3;
+        v->arch.pv_vcpu.kernel_ss &= ~3;
+        v->arch.user_regs.ss &= ~3;
+        v->arch.user_regs.es &= ~3;
+        v->arch.user_regs.ds &= ~3;
+        v->arch.user_regs.fs &= ~3;
+        v->arch.user_regs.gs &= ~3;
         printk("Dom0 runs in ring 0 (supervisor mode)\n");
         if ( !test_bit(XENFEAT_supervisor_mode_kernel,
                        parms.f_supported) )

@@ -97,7 +97,7 @@ unsigned int compat_iret(void)
          * mode frames).
          */
         const struct trap_info *ti;
-        u32 x, ksp = v->arch.guest_context.kernel_sp - 40;
+        u32 x, ksp = v->arch.pv_vcpu.kernel_sp - 40;
         unsigned int i;
         int rc = 0;
 
@@ -122,9 +122,9 @@ unsigned int compat_iret(void)
         if ( rc )
             goto exit_and_crash;
         regs->_esp = ksp;
-        regs->ss = v->arch.guest_context.kernel_ss;
+        regs->ss = v->arch.pv_vcpu.kernel_ss;
 
-        ti = &v->arch.guest_context.trap_ctxt[13];
+        ti = &v->arch.pv_vcpu.trap_ctxt[TRAP_gp_fault];
         if ( TI_GET_IF(ti) )
             eflags &= ~X86_EFLAGS_IF;
         regs->_eflags &= ~(X86_EFLAGS_VM|X86_EFLAGS_RF|
@@ -174,19 +174,19 @@ static long compat_register_guest_callback(
     switch ( reg->type )
     {
     case CALLBACKTYPE_event:
-        v->arch.guest_context.event_callback_cs     = reg->address.cs;
-        v->arch.guest_context.event_callback_eip    = reg->address.eip;
+        v->arch.pv_vcpu.event_callback_cs     = reg->address.cs;
+        v->arch.pv_vcpu.event_callback_eip    = reg->address.eip;
         break;
 
     case CALLBACKTYPE_failsafe:
-        v->arch.guest_context.failsafe_callback_cs  = reg->address.cs;
-        v->arch.guest_context.failsafe_callback_eip = reg->address.eip;
+        v->arch.pv_vcpu.failsafe_callback_cs  = reg->address.cs;
+        v->arch.pv_vcpu.failsafe_callback_eip = reg->address.eip;
         if ( reg->flags & CALLBACKF_mask_events )
             set_bit(_VGCF_failsafe_disables_events,
-                    &v->arch.guest_context.flags);
+                    &v->arch.vgc_flags);
         else
             clear_bit(_VGCF_failsafe_disables_events,
-                      &v->arch.guest_context.flags);
+                      &v->arch.vgc_flags);
         break;
 
     case CALLBACKTYPE_syscall32:
@@ -311,7 +311,7 @@ DEFINE_XEN_GUEST_HANDLE(trap_info_compat_t);
 int compat_set_trap_table(XEN_GUEST_HANDLE(trap_info_compat_t) traps)
 {
     struct compat_trap_info cur;
-    struct trap_info *dst = current->arch.guest_context.trap_ctxt;
+    struct trap_info *dst = current->arch.pv_vcpu.trap_ctxt;
     long rc = 0;
 
     /* If no table is presented then clear the entire virtual IDT. */

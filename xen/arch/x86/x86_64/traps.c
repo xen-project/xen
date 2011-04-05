@@ -146,19 +146,19 @@ void show_registers(struct cpu_user_regs *regs)
 
 void vcpu_show_registers(const struct vcpu *v)
 {
-    const struct cpu_user_regs *regs = &v->arch.guest_context.user_regs;
+    const struct cpu_user_regs *regs = &v->arch.user_regs;
     unsigned long crs[8];
 
     /* No need to handle HVM for now. */
     if ( is_hvm_vcpu(v) )
         return;
 
-    crs[0] = v->arch.guest_context.ctrlreg[0];
+    crs[0] = v->arch.pv_vcpu.ctrlreg[0];
     crs[2] = arch_get_cr2(v);
     crs[3] = pagetable_get_paddr(guest_kernel_mode(v, regs) ?
                                  v->arch.guest_table :
                                  v->arch.guest_table_user);
-    crs[4] = v->arch.guest_context.ctrlreg[4];
+    crs[4] = v->arch.pv_vcpu.ctrlreg[4];
 
     _show_registers(regs, crs, CTXT_pv_guest, v);
 }
@@ -421,7 +421,7 @@ void __devinit subarch_percpu_traps_init(void)
 
 void init_int80_direct_trap(struct vcpu *v)
 {
-    struct trap_info *ti = &v->arch.guest_context.trap_ctxt[0x80];
+    struct trap_info *ti = &v->arch.pv_vcpu.trap_ctxt[0x80];
     struct trap_bounce *tb = &v->arch.int80_bounce;
 
     tb->flags = TBF_EXCEPTION;
@@ -443,27 +443,27 @@ static long register_guest_callback(struct callback_register *reg)
     switch ( reg->type )
     {
     case CALLBACKTYPE_event:
-        v->arch.guest_context.event_callback_eip    = reg->address;
+        v->arch.pv_vcpu.event_callback_eip    = reg->address;
         break;
 
     case CALLBACKTYPE_failsafe:
-        v->arch.guest_context.failsafe_callback_eip = reg->address;
+        v->arch.pv_vcpu.failsafe_callback_eip = reg->address;
         if ( reg->flags & CALLBACKF_mask_events )
             set_bit(_VGCF_failsafe_disables_events,
-                    &v->arch.guest_context.flags);
+                    &v->arch.vgc_flags);
         else
             clear_bit(_VGCF_failsafe_disables_events,
-                      &v->arch.guest_context.flags);
+                      &v->arch.vgc_flags);
         break;
 
     case CALLBACKTYPE_syscall:
-        v->arch.guest_context.syscall_callback_eip  = reg->address;
+        v->arch.pv_vcpu.syscall_callback_eip  = reg->address;
         if ( reg->flags & CALLBACKF_mask_events )
             set_bit(_VGCF_syscall_disables_events,
-                    &v->arch.guest_context.flags);
+                    &v->arch.vgc_flags);
         else
             clear_bit(_VGCF_syscall_disables_events,
-                      &v->arch.guest_context.flags);
+                      &v->arch.vgc_flags);
         break;
 
     case CALLBACKTYPE_syscall32:

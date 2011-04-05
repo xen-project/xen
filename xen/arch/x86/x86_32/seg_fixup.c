@@ -175,13 +175,13 @@ static int get_baselimit(u16 seg, unsigned long *base, unsigned long *limit)
     if ( ldt )
     {
         table = (uint32_t *)LDT_VIRT_START(curr);
-        if ( idx >= curr->arch.guest_context.ldt_ents )
+        if ( idx >= curr->arch.pv_vcpu.ldt_ents )
             goto fail;
     }
     else /* gdt */
     {
         table = (uint32_t *)GDT_VIRT_START(curr);
-        if ( idx >= curr->arch.guest_context.gdt_ents )
+        if ( idx >= curr->arch.pv_vcpu.gdt_ents )
             goto fail;
     }
 
@@ -241,20 +241,20 @@ static int fixup_seg(u16 seg, unsigned long offset)
     if ( ldt )
     {
         table = (uint32_t *)LDT_VIRT_START(curr);
-        if ( idx >= curr->arch.guest_context.ldt_ents )
+        if ( idx >= curr->arch.pv_vcpu.ldt_ents )
         {
-            dprintk(XENLOG_DEBUG, "Segment %04x out of LDT range (%ld)\n",
-                    seg, curr->arch.guest_context.ldt_ents);
+            dprintk(XENLOG_DEBUG, "Segment %04x out of LDT range (%u)\n",
+                    seg, curr->arch.pv_vcpu.ldt_ents);
             goto fail;
         }
     }
     else /* gdt */
     {
         table = (uint32_t *)GDT_VIRT_START(curr);
-        if ( idx >= curr->arch.guest_context.gdt_ents )
+        if ( idx >= curr->arch.pv_vcpu.gdt_ents )
         {
-            dprintk(XENLOG_DEBUG, "Segment %04x out of GDT range (%ld)\n",
-                    seg, curr->arch.guest_context.gdt_ents);
+            dprintk(XENLOG_DEBUG, "Segment %04x out of GDT range (%u)\n",
+                    seg, curr->arch.pv_vcpu.gdt_ents);
             goto fail;
         }
     }
@@ -545,7 +545,7 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
     /* If requested, give a callback on otherwise unused vector 15. */
     if ( VM_ASSIST(curr->domain, VMASST_TYPE_4gb_segments_notify) )
     {
-        struct trap_info   *ti  = &curr->arch.guest_context.trap_ctxt[15];
+        struct trap_info   *ti  = &curr->arch.pv_vcpu.trap_ctxt[15];
         struct trap_bounce *tb  = &curr->arch.trap_bounce;
 
         tb->flags      = TBF_EXCEPTION | TBF_EXCEPTION_ERRCODE;

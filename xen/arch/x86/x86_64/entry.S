@@ -286,8 +286,9 @@ sysenter_eflags_saved:
         jnz   compat_sysenter
         call  create_bounce_frame
         jmp   test_all_events
-2:      movl  %eax,TRAPBOUNCE_error_code(%rdx)
-        movq  VCPU_gp_fault_addr(%rbx),%rax
+2:      movq  VCPU_trap_ctxt(%rbx),%rcx
+        movl  %eax,TRAPBOUNCE_error_code(%rdx)
+        movq  TRAP_gp_fault * TRAPINFO_sizeof + TRAPINFO_eip(%rcx),%rax
         movb  $(TBF_EXCEPTION|TBF_EXCEPTION_ERRCODE|TBF_INTERRUPT),%cl
         movl  $TRAP_gp_fault,UREGS_entry_vector(%rsp)
         jmp   1b

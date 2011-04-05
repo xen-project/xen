@@ -252,8 +252,8 @@ long do_stack_switch(unsigned long ss, unsigned long esp)
 
     fixup_guest_stack_selector(current->domain, ss);
 
-    current->arch.guest_context.kernel_ss = ss;
-    current->arch.guest_context.kernel_sp = esp;
+    current->arch.pv_vcpu.kernel_ss = ss;
+    current->arch.pv_vcpu.kernel_sp = esp;
     t->ss1  = ss;
     t->esp1 = esp;
 

@@ -362,8 +362,8 @@ void vcpu_show_execution_state(struct vcpu *v)
     vcpu_pause(v); /* acceptably dangerous */
 
     vcpu_show_registers(v);
-    if ( guest_kernel_mode(v, &v->arch.guest_context.user_regs) )
-        show_guest_stack(v, &v->arch.guest_context.user_regs);
+    if ( guest_kernel_mode(v, &v->arch.user_regs) )
+        show_guest_stack(v, &v->arch.user_regs);
 
     vcpu_unpause(v);
 }
@@ -430,7 +430,7 @@ static void do_guest_trap(
     trace_pv_trap(trapnr, regs->eip, use_error_code, regs->error_code);
 
     tb = &v->arch.trap_bounce;
-    ti = &v->arch.guest_context.trap_ctxt[trapnr];
+    ti = &v->arch.pv_vcpu.trap_ctxt[trapnr];
 
     tb->flags = TBF_EXCEPTION;
     tb->cs    = ti->cs;
@@ -458,9 +458,9 @@ static void instruction_done(
     regs->eflags &= ~X86_EFLAGS_RF;
     if ( bpmatch || (regs->eflags & X86_EFLAGS_TF) )
     {
-        current->arch.guest_context.debugreg[6] |= bpmatch | 0xffff0ff0;
+        current->arch.debugreg[6] |= bpmatch | 0xffff0ff0;
         if ( regs->eflags & X86_EFLAGS_TF )
-            current->arch.guest_context.debugreg[6] |= 0x4000;
+            current->arch.debugreg[6] |= 0x4000;
         do_guest_trap(TRAP_debug, regs, 0);
     }
 }
@@ -471,20 +471,20 @@ static unsigned int check_guest_io_breakpoint(struct vcpu *v,
     unsigned int width, i, match = 0;
     unsigned long start;
 
-    if ( !(v->arch.guest_context.debugreg[5]) || 
-         !(v->arch.guest_context.ctrlreg[4] & X86_CR4_DE) )
+    if ( !(v->arch.debugreg[5]) ||
+         !(v->arch.pv_vcpu.ctrlreg[4] & X86_CR4_DE) )
         return 0;
 
     for ( i = 0; i < 4; i++ )
     {
-        if ( !(v->arch.guest_context.debugreg[5] &
+        if ( !(v->arch.debugreg[5] &
                (3 << (i * DR_ENABLE_SIZE))) )
             continue;
 
-        start = v->arch.guest_context.debugreg[i];
+        start = v->arch.debugreg[i];
         width = 0;
 
-        switch ( (v->arch.guest_context.debugreg[7] >>
+        switch ( (v->arch.debugreg[7] >>
                   (DR_CONTROL_SHIFT + i * DR_CONTROL_SIZE)) & 0xc )
         {
         case DR_LEN_1: width = 1; break;
@@ -1009,7 +1009,7 @@ void propagate_page_fault(unsigned long addr, u16 error_code)
     struct vcpu *v = current;
     struct trap_bounce *tb = &v->arch.trap_bounce;
 
-    v->arch.guest_context.ctrlreg[2] = addr;
+    v->arch.pv_vcpu.ctrlreg[2] = addr;
     arch_set_cr2(v, addr);
 
     /* Re-set error_code.user flag appropriately for the guest. */
@@ -1019,7 +1019,7 @@ void propagate_page_fault(unsigned long addr, u16 error_code)
 
     trace_pv_page_fault(addr, error_code);
 
-    ti = &v->arch.guest_context.trap_ctxt[TRAP_page_fault];
+    ti = &v->arch.pv_vcpu.trap_ctxt[TRAP_page_fault];
     tb->flags = TBF_EXCEPTION | TBF_EXCEPTION_ERRCODE;
     tb->error_code = error_code;
     tb->cs         = ti->cs;
@@ -1073,7 +1073,7 @@ static int handle_gdt_ldt_mapping_fault(
                 return 0;
             /* In guest mode? Propagate #PF to guest, with adjusted %cr2. */
             propagate_page_fault(
-                curr->arch.guest_context.ldt_base + offset,
+                curr->arch.pv_vcpu.ldt_base + offset,
                 regs->error_code);
         }
     }
@@ -1356,12 +1356,12 @@ long do_fpu_taskswitch(int set)
 
     if ( set )
     {
-        v->arch.guest_context.ctrlreg[0] |= X86_CR0_TS;
+        v->arch.pv_vcpu.ctrlreg[0] |= X86_CR0_TS;
         stts();
     }
     else
     {
-        v->arch.guest_context.ctrlreg[0] &= ~X86_CR0_TS;
+        v->arch.pv_vcpu.ctrlreg[0] &= ~X86_CR0_TS;
         if ( v->fpu_dirtied )
             clts();
     }
@@ -1843,13 +1843,13 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                     data_base = 0UL;
                     break;
                 case lm_seg_fs:
-                    data_base = v->arch.guest_context.fs_base;
+                    data_base = v->arch.pv_vcpu.fs_base;
                     break;
                 case lm_seg_gs:
                     if ( guest_kernel_mode(v, regs) )
-                        data_base = v->arch.guest_context.gs_base_kernel;
+                        data_base = v->arch.pv_vcpu.gs_base_kernel;
                     else
-                        data_base = v->arch.guest_context.gs_base_user;
+                        data_base = v->arch.pv_vcpu.gs_base_user;
                     break;
                 }
             }
@@ -2052,7 +2052,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         switch ( insn_fetch(u8, code_base, eip, code_limit) )
         {
         case 0xf9: /* RDTSCP */
-            if ( (v->arch.guest_context.ctrlreg[4] & X86_CR4_TSD) &&
+            if ( (v->arch.pv_vcpu.ctrlreg[4] & X86_CR4_TSD) &&
                  !guest_kernel_mode(v, regs) )
                 goto fail;
             pv_soft_rdtsc(v, regs, 1);
@@ -2062,7 +2062,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             u64 new_xfeature = (u32)regs->eax | ((u64)regs->edx << 32);
 
             if ( lock || rep_prefix || opsize_prefix
-                 || !(v->arch.guest_context.ctrlreg[4] & X86_CR4_OSXSAVE) )
+                 || !(v->arch.pv_vcpu.ctrlreg[4] & X86_CR4_OSXSAVE) )
             {
                 do_guest_trap(TRAP_invalid_op, regs, 0);
                 goto skip;
@@ -2117,11 +2117,11 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         {
         case 0: /* Read CR0 */
             *reg = (read_cr0() & ~X86_CR0_TS) |
-                v->arch.guest_context.ctrlreg[0];
+                v->arch.pv_vcpu.ctrlreg[0];
             break;
 
         case 2: /* Read CR2 */
-            *reg = v->arch.guest_context.ctrlreg[2];
+            *reg = v->arch.pv_vcpu.ctrlreg[2];
             break;
             
         case 3: /* Read CR3 */
@@ -2148,7 +2148,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         break;
 
         case 4: /* Read CR4 */
-            *reg = v->arch.guest_context.ctrlreg[4];
+            *reg = v->arch.pv_vcpu.ctrlreg[4];
             break;
 
         default:
@@ -2190,7 +2190,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             break;
 
         case 2: /* Write CR2 */
-            v->arch.guest_context.ctrlreg[2] = *reg;
+            v->arch.pv_vcpu.ctrlreg[2] = *reg;
             arch_set_cr2(v, *reg);
             break;
 
@@ -2208,7 +2208,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             break;
 
         case 4: /* Write CR4 */
-            v->arch.guest_context.ctrlreg[4] = pv_guest_cr4_fixup(v, *reg);
+            v->arch.pv_vcpu.ctrlreg[4] = pv_guest_cr4_fixup(v, *reg);
             write_cr4(pv_guest_cr4_to_real_cr4(v));
             break;
 
@@ -2240,21 +2240,21 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 goto fail;
             if ( wrmsr_safe(MSR_FS_BASE, msr_content) )
                 goto fail;
-            v->arch.guest_context.fs_base = msr_content;
+            v->arch.pv_vcpu.fs_base = msr_content;
             break;
         case MSR_GS_BASE:
             if ( is_pv_32on64_vcpu(v) )
                 goto fail;
             if ( wrmsr_safe(MSR_GS_BASE, msr_content) )
                 goto fail;
-            v->arch.guest_context.gs_base_kernel = msr_content;
+            v->arch.pv_vcpu.gs_base_kernel = msr_content;
             break;
         case MSR_SHADOW_GS_BASE:
             if ( is_pv_32on64_vcpu(v) )
                 goto fail;
             if ( wrmsr_safe(MSR_SHADOW_GS_BASE, msr_content) )
                 goto fail;
-            v->arch.guest_context.gs_base_user = msr_content;
+            v->arch.pv_vcpu.gs_base_user = msr_content;
             break;
 #endif
         case MSR_K7_FID_VID_STATUS:
@@ -2379,7 +2379,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     }
 
     case 0x31: /* RDTSC */
-        if ( (v->arch.guest_context.ctrlreg[4] & X86_CR4_TSD) &&
+        if ( (v->arch.pv_vcpu.ctrlreg[4] & X86_CR4_TSD) &&
              !guest_kernel_mode(v, regs) )
             goto fail;
         if ( v->domain->arch.vtsc )
@@ -2395,20 +2395,20 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case MSR_FS_BASE:
             if ( is_pv_32on64_vcpu(v) )
                 goto fail;
-            regs->eax = v->arch.guest_context.fs_base & 0xFFFFFFFFUL;
-            regs->edx = v->arch.guest_context.fs_base >> 32;
+            regs->eax = v->arch.pv_vcpu.fs_base & 0xFFFFFFFFUL;
+            regs->edx = v->arch.pv_vcpu.fs_base >> 32;
             break;
         case MSR_GS_BASE:
             if ( is_pv_32on64_vcpu(v) )
                 goto fail;
-            regs->eax = v->arch.guest_context.gs_base_kernel & 0xFFFFFFFFUL;
-            regs->edx = v->arch.guest_context.gs_base_kernel >> 32;
+            regs->eax = v->arch.pv_vcpu.gs_base_kernel & 0xFFFFFFFFUL;
+            regs->edx = v->arch.pv_vcpu.gs_base_kernel >> 32;
             break;
         case MSR_SHADOW_GS_BASE:
             if ( is_pv_32on64_vcpu(v) )
                 goto fail;
-            regs->eax = v->arch.guest_context.gs_base_user & 0xFFFFFFFFUL;
-            regs->edx = v->arch.guest_context.gs_base_user >> 32;
+            regs->eax = v->arch.pv_vcpu.gs_base_user & 0xFFFFFFFFUL;
+            regs->edx = v->arch.pv_vcpu.gs_base_user >> 32;
             break;
 #endif
         case MSR_K7_FID_VID_CTL:
@@ -2763,8 +2763,8 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
                 do_guest_trap(TRAP_gp_fault, regs, 1);
                 return;
             }
-            esp = v->arch.guest_context.kernel_sp;
-            ss = v->arch.guest_context.kernel_ss;
+            esp = v->arch.pv_vcpu.kernel_sp;
+            ss = v->arch.pv_vcpu.kernel_ss;
             if ( (ss & 3) != (sel & 3) ||
                  !read_descriptor(ss, v, regs, &base, &limit, &ar, 0) ||
                  ((ar >> 13) & 3) != (sel & 3) ||
@@ -2899,7 +2899,7 @@ asmlinkage void do_general_protection(struct cpu_user_regs *regs)
         /* This fault must be due to <INT n> instruction. */
         const struct trap_info *ti;
         unsigned char vector = regs->error_code >> 3;
-        ti = &v->arch.guest_context.trap_ctxt[vector];
+        ti = &v->arch.pv_vcpu.trap_ctxt[vector];
         if ( permit_softint(TI_GET_DPL(ti), v, regs) )
         {
             regs->eip += 2;
@@ -3169,10 +3169,10 @@ asmlinkage void do_device_not_available(struct cpu_user_regs *regs)
 
     setup_fpu(curr);
 
-    if ( curr->arch.guest_context.ctrlreg[0] & X86_CR0_TS )
+    if ( curr->arch.pv_vcpu.ctrlreg[0] & X86_CR0_TS )
     {
         do_guest_trap(TRAP_no_device, regs, 0);
-        curr->arch.guest_context.ctrlreg[0] &= ~X86_CR0_TS;
+        curr->arch.pv_vcpu.ctrlreg[0] &= ~X86_CR0_TS;
     }
     else
         TRACE_0D(TRC_PV_MATH_STATE_RESTORE);
@@ -3244,7 +3244,7 @@ asmlinkage void do_debug(struct cpu_user_regs *regs)
     }
 
     /* Save debug status register where guest OS can peek at it */
-    v->arch.guest_context.debugreg[6] = read_debugreg(6);
+    v->arch.debugreg[6] = read_debugreg(6);
 
     ler_enable();
     do_guest_trap(TRAP_debug, regs, 0);
@@ -3389,7 +3389,7 @@ long register_guest_nmi_callback(unsigned long address)
 {
     struct vcpu *v = current;
     struct domain *d = v->domain;
-    struct trap_info *t = &v->arch.guest_context.trap_ctxt[TRAP_nmi];
+    struct trap_info *t = &v->arch.pv_vcpu.trap_ctxt[TRAP_nmi];
 
     t->vector  = TRAP_nmi;
     t->flags   = 0;
@@ -3411,7 +3411,7 @@ long register_guest_nmi_callback(unsigned long address)
 long unregister_guest_nmi_callback(void)
 {
     struct vcpu *v = current;
-    struct trap_info *t = &v->arch.guest_context.trap_ctxt[TRAP_nmi];
+    struct trap_info *t = &v->arch.pv_vcpu.trap_ctxt[TRAP_nmi];
 
     memset(t, 0, sizeof(*t));
 
@@ -3430,7 +3430,7 @@ int guest_has_trap_callback(struct domain *d, uint16_t vcpuid, unsigned int trap
     BUG_ON(trap_nr > TRAP_syscall);
 
     v = d->vcpu[vcpuid];
-    t = &v->arch.guest_context.trap_ctxt[trap_nr];
+    t = &v->arch.pv_vcpu.trap_ctxt[trap_nr];
 
     return (t->address != 0);
 }
@@ -3489,7 +3489,7 @@ long do_set_trap_table(XEN_GUEST_HANDLE(const_trap_info_t) traps)
 {
     struct trap_info cur;
     struct vcpu *curr = current;
-    struct trap_info *dst = curr->arch.guest_context.trap_ctxt;
+    struct trap_info *dst = curr->arch.pv_vcpu.trap_ctxt;
     long rc = 0;
 
     /* If no table is presented then clear the entire virtual IDT. */
@@ -3594,7 +3594,7 @@ long set_debugreg(struct vcpu *v, int reg, unsigned long value)
             {
                 if ( ((value >> i) & 3) == DR_IO )
                 {
-                    if ( !(v->arch.guest_context.ctrlreg[4] & X86_CR4_DE) )
+                    if ( !(v->arch.pv_vcpu.ctrlreg[4] & X86_CR4_DE) )
                         return -EPERM;
                     io_enable |= value & (3 << ((i - 16) >> 1));
                 }
@@ -3607,7 +3607,7 @@ long set_debugreg(struct vcpu *v, int reg, unsigned long value)
             }
 
             /* Guest DR5 is a handy stash for I/O intercept information. */
-            v->arch.guest_context.debugreg[5] = io_enable;
+            v->arch.debugreg[5] = io_enable;
             value &= ~io_enable;
 
             /*
@@ -3616,13 +3616,13 @@ long set_debugreg(struct vcpu *v, int reg, unsigned long value)
              * context switch.
              */
             if ( (v == curr) &&
-                 !(v->arch.guest_context.debugreg[7] & DR7_ACTIVE_MASK) )
+                 !(v->arch.debugreg[7] & DR7_ACTIVE_MASK) )
             {
-                write_debugreg(0, v->arch.guest_context.debugreg[0]);
-                write_debugreg(1, v->arch.guest_context.debugreg[1]);
-                write_debugreg(2, v->arch.guest_context.debugreg[2]);
-                write_debugreg(3, v->arch.guest_context.debugreg[3]);
-                write_debugreg(6, v->arch.guest_context.debugreg[6]);
+                write_debugreg(0, v->arch.debugreg[0]);
+                write_debugreg(1, v->arch.debugreg[1]);
+                write_debugreg(2, v->arch.debugreg[2]);
+                write_debugreg(3, v->arch.debugreg[3]);
+                write_debugreg(6, v->arch.debugreg[6]);
             }
         }
         if ( v == curr )
@@ -3632,7 +3632,7 @@ long set_debugreg(struct vcpu *v, int reg, unsigned long value)
         return -EINVAL;
     }
 
-    v->arch.guest_context.debugreg[reg] = value;
+    v->arch.debugreg[reg] = value;
     return 0;
 }
 
@@ -3649,13 +3649,13 @@ unsigned long do_get_debugreg(int reg)
     {
     case 0 ... 3:
     case 6:
-        return curr->arch.guest_context.debugreg[reg];
+        return curr->arch.debugreg[reg];
     case 7:
-        return (curr->arch.guest_context.debugreg[7] |
-                curr->arch.guest_context.debugreg[5]);
+        return (curr->arch.debugreg[7] |
+                curr->arch.debugreg[5]);
     case 4 ... 5:
-        return ((curr->arch.guest_context.ctrlreg[4] & X86_CR4_DE) ?
-                curr->arch.guest_context.debugreg[reg + 2] : 0);
+        return ((curr->arch.pv_vcpu.ctrlreg[4] & X86_CR4_DE) ?
+                curr->arch.debugreg[reg + 2] : 0);
     }
 
     return -EINVAL;

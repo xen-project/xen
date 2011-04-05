@@ -1128,7 +1128,7 @@ static void vmx_dump_sel2(char *name, uint32_t lim)
 
 void vmcs_dump_vcpu(struct vcpu *v)
 {
-    struct cpu_user_regs *regs = &v->arch.guest_context.user_regs;
+    struct cpu_user_regs *regs = &v->arch.user_regs;
     unsigned long long x;
 
     if ( v == current )

@@ -1100,8 +1100,8 @@ long subarch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 long do_stack_switch(unsigned long ss, unsigned long esp)
 {
     fixup_guest_stack_selector(current->domain, ss);
-    current->arch.guest_context.kernel_ss = ss;
-    current->arch.guest_context.kernel_sp = esp;
+    current->arch.pv_vcpu.kernel_ss = ss;
+    current->arch.pv_vcpu.kernel_sp = esp;
     return 0;
 }
 
@@ -1116,21 +1116,21 @@ long do_set_segment_base(unsigned int which, unsigned long base)
         if ( wrmsr_safe(MSR_FS_BASE, base) )
             ret = -EFAULT;
         else
-            v->arch.guest_context.fs_base = base;
+            v->arch.pv_vcpu.fs_base = base;
         break;
 
     case SEGBASE_GS_USER:
         if ( wrmsr_safe(MSR_SHADOW_GS_BASE, base) )
             ret = -EFAULT;
         else
-            v->arch.guest_context.gs_base_user = base;
+            v->arch.pv_vcpu.gs_base_user = base;
         break;
 
     case SEGBASE_GS_KERNEL:
         if ( wrmsr_safe(MSR_GS_BASE, base) )
             ret = -EFAULT;
         else
-            v->arch.guest_context.gs_base_kernel = base;
+            v->arch.pv_vcpu.gs_base_kernel = base;
         break;
 
     case SEGBASE_GS_USER_SEL:
