@@ -34,6 +34,7 @@
 #include <public/mem_event.h>
 #include <asm/mem_sharing.h>
 #include <xen/event.h>
+#include <asm/hvm/nestedhvm.h>
 
 /* Debugging and auditing of the P2M code? */
 #define P2M_AUDIT     0
@@ -75,7 +76,7 @@ boolean_param("hap_2mb", opt_hap_2mb);
 #define SUPERPAGE_PAGES (1UL << 9)
 #define superpage_aligned(_x)  (((_x)&(SUPERPAGE_PAGES-1))==0)
 
-static unsigned long p2m_type_to_flags(p2m_type_t t, mfn_t mfn)
+unsigned long p2m_type_to_flags(p2m_type_t t, mfn_t mfn)
 {
     unsigned long flags;
 #ifdef __x86_64__
@@ -121,9 +122,9 @@ static void audit_p2m(struct p2m_domain *p2m, int strict_m2p);
 // Find the next level's P2M entry, checking for out-of-range gfn's...
 // Returns NULL on error.
 //
-static l1_pgentry_t *
+l1_pgentry_t *
 p2m_find_entry(void *table, unsigned long *gfn_remainder,
-                   unsigned long gfn, u32 shift, u32 max)
+                   unsigned long gfn, uint32_t shift, uint32_t max)
 {
     u32 index;
 
@@ -224,20 +225,17 @@ p2m_next_level(struct p2m_domain *p2m, mfn_t *table_mfn, void **table,
 
         switch ( type ) {
         case PGT_l3_page_table:
-            paging_write_p2m_entry(p2m->domain, gfn,
-                                   p2m_entry, *table_mfn, new_entry, 4);
+            p2m->write_p2m_entry(p2m, gfn, p2m_entry, *table_mfn, new_entry, 4);
             break;
         case PGT_l2_page_table:
 #if CONFIG_PAGING_LEVELS == 3
             /* for PAE mode, PDPE only has PCD/PWT/P bits available */
             new_entry = l1e_from_pfn(mfn_x(page_to_mfn(pg)), _PAGE_PRESENT);
 #endif
-            paging_write_p2m_entry(p2m->domain, gfn,
-                                   p2m_entry, *table_mfn, new_entry, 3);
+            p2m->write_p2m_entry(p2m, gfn, p2m_entry, *table_mfn, new_entry, 3);
             break;
         case PGT_l1_page_table:
-            paging_write_p2m_entry(p2m->domain, gfn,
-                                   p2m_entry, *table_mfn, new_entry, 2);
+            p2m->write_p2m_entry(p2m, gfn, p2m_entry, *table_mfn, new_entry, 2);
             break;
         default:
             BUG();
@@ -264,14 +262,13 @@ p2m_next_level(struct p2m_domain *p2m, mfn_t *table_mfn, void **table,
         for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
         {
             new_entry = l1e_from_pfn(pfn + (i * L1_PAGETABLE_ENTRIES), flags);
-            paging_write_p2m_entry(p2m->domain, gfn,
-                                   l1_entry+i, *table_mfn, new_entry, 2);
+            p2m->write_p2m_entry(p2m, gfn,
+                l1_entry+i, *table_mfn, new_entry, 2);
         }
         unmap_domain_page(l1_entry);
         new_entry = l1e_from_pfn(mfn_x(page_to_mfn(pg)),
                                  __PAGE_HYPERVISOR|_PAGE_USER); //disable PSE
-        paging_write_p2m_entry(p2m->domain, gfn,
-                               p2m_entry, *table_mfn, new_entry, 3);
+        p2m->write_p2m_entry(p2m, gfn, p2m_entry, *table_mfn, new_entry, 3);
     }
 
 
@@ -298,15 +295,15 @@ p2m_next_level(struct p2m_domain *p2m, mfn_t *table_mfn, void **table,
         for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
         {
             new_entry = l1e_from_pfn(pfn + i, flags);
-            paging_write_p2m_entry(p2m->domain, gfn,
-                                   l1_entry+i, *table_mfn, new_entry, 1);
+            p2m->write_p2m_entry(p2m, gfn,
+                l1_entry+i, *table_mfn, new_entry, 1);
         }
         unmap_domain_page(l1_entry);
         
         new_entry = l1e_from_pfn(mfn_x(page_to_mfn(pg)),
                                  __PAGE_HYPERVISOR|_PAGE_USER);
-        paging_write_p2m_entry(p2m->domain, gfn,
-                               p2m_entry, *table_mfn, new_entry, 2);
+        p2m->write_p2m_entry(p2m, gfn,
+            p2m_entry, *table_mfn, new_entry, 2);
     }
 
     *table_mfn = _mfn(l1e_get_pfn(*p2m_entry));
@@ -1369,8 +1366,7 @@ p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
                            p2m_type_to_flags(p2mt, mfn) | _PAGE_PSE)
             : l3e_empty();
         entry_content.l1 = l3e_content.l3;
-        paging_write_p2m_entry(p2m->domain, gfn, p2m_entry,
-                               table_mfn, entry_content, 3);
+        p2m->write_p2m_entry(p2m, gfn, p2m_entry, table_mfn, entry_content, 3);
         /* NB: paging_write_p2m_entry() handles tlb flushes properly */
 
         /* Free old intermediate tables if necessary */
@@ -1410,8 +1406,7 @@ p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
             entry_content = l1e_empty();
         
         /* level 1 entry */
-        paging_write_p2m_entry(p2m->domain, gfn, p2m_entry,
-                               table_mfn, entry_content, 1);
+        p2m->write_p2m_entry(p2m, gfn, p2m_entry, table_mfn, entry_content, 1);
         /* NB: paging_write_p2m_entry() handles tlb flushes properly */
     }
     else if ( page_order == 9 )
@@ -1440,8 +1435,7 @@ p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
             l2e_content = l2e_empty();
         
         entry_content.l1 = l2e_content.l2;
-        paging_write_p2m_entry(p2m->domain, gfn, p2m_entry,
-                               table_mfn, entry_content, 2);
+        p2m->write_p2m_entry(p2m, gfn, p2m_entry, table_mfn, entry_content, 2);
         /* NB: paging_write_p2m_entry() handles tlb flushes properly */
 
         /* Free old intermediate tables if necessary */
@@ -1806,15 +1800,37 @@ static void p2m_initialise(struct domain *d, struct p2m_domain *p2m)
     p2m->domain = d;
     p2m->default_access = p2m_access_rwx;
 
+    p2m->cr3 = CR3_EADDR;
     p2m->set_entry = p2m_set_entry;
     p2m->get_entry = p2m_gfn_to_mfn;
     p2m->get_entry_current = p2m_gfn_to_mfn_current;
     p2m->change_entry_type_global = p2m_change_type_global;
+    p2m->write_p2m_entry = paging_write_p2m_entry;
+    cpus_clear(p2m->p2m_dirty_cpumask);
 
     if ( hap_enabled(d) && (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) )
         ept_p2m_init(d);
 
     return;
+}
+
+static int
+p2m_init_nestedp2m(struct domain *d)
+{
+    uint8_t i;
+    struct p2m_domain *p2m;
+
+    nestedp2m_lock_init(d);
+    for (i = 0; i < MAX_NESTEDP2M; i++) {
+        d->arch.nested_p2m[i] = p2m = xmalloc(struct p2m_domain);
+        if (p2m == NULL)
+            return -ENOMEM;
+        p2m_initialise(d, p2m);
+        p2m->get_entry_current = p2m->get_entry;
+        p2m->write_p2m_entry = nestedp2m_write_p2m_entry;
+    }
+
+    return 0;
 }
 
 int p2m_init(struct domain *d)
@@ -1825,8 +1841,12 @@ int p2m_init(struct domain *d)
     if ( p2m == NULL )
         return -ENOMEM;
     p2m_initialise(d, p2m);
-    
-    return 0;
+
+    /* Must initialise nestedp2m unconditionally
+     * since nestedhvm_enabled(d) returns false here.
+     * (p2m_init runs too early for HVM_PARAM_* options)
+     */
+    return p2m_init_nestedp2m(d);
 }
 
 void p2m_change_entry_type_global(struct p2m_domain *p2m,
@@ -1919,6 +1939,9 @@ int p2m_alloc_table(struct p2m_domain *p2m)
                         p2m_invalid, p2m->default_access) )
         goto error;
 
+    if (p2m_is_nestedp2m(p2m))
+        goto nesteddone;
+
     /* Copy all existing mappings from the page list and m2p */
     spin_lock(&p2m->domain->page_alloc_lock);
     page_list_for_each(page, &p2m->domain->page_list)
@@ -1940,6 +1963,7 @@ int p2m_alloc_table(struct p2m_domain *p2m)
     }
     spin_unlock(&p2m->domain->page_alloc_lock);
 
+ nesteddone:
     P2M_PRINTK("p2m table initialised (%u pages)\n", page_count);
     p2m_unlock(p2m);
     return 0;
@@ -1966,6 +1990,9 @@ void p2m_teardown(struct p2m_domain *p2m)
     mfn_t mfn;
 #endif
 
+    if (p2m == NULL)
+        return;
+
     p2m_lock(p2m);
 
 #ifdef __x86_64__
@@ -1984,11 +2011,26 @@ void p2m_teardown(struct p2m_domain *p2m)
     p2m_unlock(p2m);
 }
 
+static void p2m_teardown_nestedp2m(struct domain *d)
+{
+    uint8_t i;
+
+    for (i = 0; i < MAX_NESTEDP2M; i++) {
+        xfree(d->arch.nested_p2m[i]);
+        d->arch.nested_p2m[i] = NULL;
+    }
+}
+
 void p2m_final_teardown(struct domain *d)
 {
     /* Iterate over all p2m tables per domain */
     xfree(d->arch.p2m);
     d->arch.p2m = NULL;
+
+    /* We must teardown unconditionally because
+     * we initialise them unconditionally.
+     */
+    p2m_teardown_nestedp2m(d);
 }
 
 #if P2M_AUDIT
@@ -2573,9 +2615,9 @@ void p2m_change_type_global(struct p2m_domain *p2m, p2m_type_t ot, p2m_type_t nt
                 gfn = get_gpfn_from_mfn(mfn);
                 flags = p2m_type_to_flags(nt, _mfn(mfn));
                 l1e_content = l1e_from_pfn(mfn, flags | _PAGE_PSE);
-                paging_write_p2m_entry(p2m->domain, gfn,
-                                       (l1_pgentry_t *)&l3e[i3],
-                                       l3mfn, l1e_content, 3);
+                p2m->write_p2m_entry(p2m, gfn,
+                                     (l1_pgentry_t *)&l3e[i3],
+                                     l3mfn, l1e_content, 3);
                 continue;
             }
 
@@ -2604,9 +2646,9 @@ void p2m_change_type_global(struct p2m_domain *p2m, p2m_type_t ot, p2m_type_t nt
                            * L2_PAGETABLE_ENTRIES) * L1_PAGETABLE_ENTRIES; 
                     flags = p2m_type_to_flags(nt, _mfn(mfn));
                     l1e_content = l1e_from_pfn(mfn, flags | _PAGE_PSE);
-                    paging_write_p2m_entry(p2m->domain, gfn,
-                                           (l1_pgentry_t *)&l2e[i2],
-                                           l2mfn, l1e_content, 2);
+                    p2m->write_p2m_entry(p2m, gfn,
+                                         (l1_pgentry_t *)&l2e[i2],
+                                         l2mfn, l1e_content, 2);
                     continue;
                 }
 
@@ -2628,8 +2670,8 @@ void p2m_change_type_global(struct p2m_domain *p2m, p2m_type_t ot, p2m_type_t nt
                     /* create a new 1le entry with the new type */
                     flags = p2m_type_to_flags(nt, _mfn(mfn));
                     l1e_content = l1e_from_pfn(mfn, flags);
-                    paging_write_p2m_entry(p2m->domain, gfn, &l1e[i1],
-                                           l1mfn, l1e_content, 1);
+                    p2m->write_p2m_entry(p2m, gfn, &l1e[i1],
+                                         l1mfn, l1e_content, 1);
                 }
                 unmap_domain_page(l1e);
             }
@@ -3047,6 +3089,182 @@ void p2m_mem_access_resume(struct p2m_domain *p2m)
     mem_event_unpause_vcpus(d);
 }
 #endif /* __x86_64__ */
+
+static struct p2m_domain *
+p2m_getlru_nestedp2m(struct domain *d, struct p2m_domain *p2m)
+{
+    int i, lru_index = -1;
+    struct p2m_domain *lrup2m, *tmp;
+
+    if (p2m == NULL) {
+        lru_index = MAX_NESTEDP2M - 1;
+        lrup2m = d->arch.nested_p2m[lru_index];
+    } else {
+        lrup2m = p2m;
+        for (i = 0; i < MAX_NESTEDP2M; i++) {
+            if (d->arch.nested_p2m[i] == p2m) {
+                lru_index = i;
+                break;
+            }
+        }
+    }
+
+    ASSERT(lru_index >= 0);
+    if (lru_index == 0) {
+        return lrup2m;
+    }
+
+    /* move the other's down the array "list" */
+    for (i = lru_index - 1; i >= 0; i--) {
+        tmp = d->arch.nested_p2m[i];
+        d->arch.nested_p2m[i+1] = tmp;        
+    }
+
+    /* make the entry the first one */
+    d->arch.nested_p2m[0] = lrup2m;
+
+    return lrup2m;
+}
+
+static int 
+p2m_flush_locked(struct p2m_domain *p2m)
+{
+    ASSERT(p2m);
+    if (p2m->cr3 == CR3_EADDR)
+        /* Microoptimisation: p2m is already empty.
+         * => about 0.3% speedup of overall system performance.
+         */
+        return 0;
+
+    p2m_teardown(p2m);
+    p2m_initialise(p2m->domain, p2m);
+    p2m->get_entry_current = p2m->get_entry;
+    p2m->write_p2m_entry = nestedp2m_write_p2m_entry;
+    return p2m_alloc_table(p2m);
+}
+
+void
+p2m_flush(struct vcpu *v, struct p2m_domain *p2m)
+{
+    struct domain *d = p2m->domain;
+
+    ASSERT(v->domain == d);
+    vcpu_nestedhvm(v).nv_p2m = NULL;
+    nestedp2m_lock(d);
+    BUG_ON(p2m_flush_locked(p2m) != 0);
+    hvm_asid_flush_vcpu(v);
+    nestedhvm_vmcx_flushtlb(p2m);
+    nestedp2m_unlock(d);
+}
+
+void
+p2m_flush_nestedp2m(struct domain *d)
+{
+    int i;
+
+    nestedp2m_lock(d);
+    for (i = 0; i < MAX_NESTEDP2M; i++) {
+        struct p2m_domain *p2m = d->arch.nested_p2m[i];
+        BUG_ON(p2m_flush_locked(p2m) != 0);
+        cpus_clear(p2m->p2m_dirty_cpumask);
+    }
+    nestedhvm_vmcx_flushtlbdomain(d);
+    nestedp2m_unlock(d);
+}
+
+struct p2m_domain *
+p2m_get_nestedp2m(struct vcpu *v, uint64_t cr3)
+{
+    /* Use volatile to prevent gcc to cache nv->nv_p2m in a cpu register as
+     * this may change within the loop by an other (v)cpu.
+     */
+    volatile struct nestedvcpu *nv = &vcpu_nestedhvm(v);
+    struct domain *d;
+    struct p2m_domain *p2m;
+    int i, rv;
+
+    if (cr3 == 0 || cr3 == CR3_EADDR)
+        cr3 = v->arch.hvm_vcpu.guest_cr[3];
+
+    if (nv->nv_flushp2m && nv->nv_p2m) {
+        nv->nv_p2m = NULL;
+    }
+
+    d = v->domain;
+    nestedp2m_lock(d);
+    for (i = 0; i < MAX_NESTEDP2M; i++) {
+        p2m = d->arch.nested_p2m[i];
+        if ((p2m->cr3 != cr3 && p2m->cr3 != CR3_EADDR) || (p2m != nv->nv_p2m))
+            continue;
+
+        nv->nv_flushp2m = 0;
+        p2m_getlru_nestedp2m(d, p2m);
+        nv->nv_p2m = p2m;
+        if (p2m->cr3 == CR3_EADDR)
+            hvm_asid_flush_vcpu(v);
+        p2m->cr3 = cr3;
+        cpu_set(v->processor, p2m->p2m_dirty_cpumask);
+        nestedp2m_unlock(d);
+        return p2m;
+    }
+
+    /* All p2m's are or were in use. Take the least recent used one,
+     * flush it and reuse.
+     */
+    for (i = 0; i < MAX_NESTEDP2M; i++) {
+        p2m = p2m_getlru_nestedp2m(d, NULL);
+        rv = p2m_flush_locked(p2m);
+        if (rv == 0)
+            break;
+    }
+    nv->nv_p2m = p2m;
+    p2m->cr3 = cr3;
+    nv->nv_flushp2m = 0;
+    hvm_asid_flush_vcpu(v);
+    nestedhvm_vmcx_flushtlb(nv->nv_p2m);
+    cpu_set(v->processor, p2m->p2m_dirty_cpumask);
+    nestedp2m_unlock(d);
+
+    return p2m;
+}
+
+struct p2m_domain *
+p2m_get_p2m(struct vcpu *v)
+{
+    if (!nestedhvm_is_n2(v))
+        return p2m_get_hostp2m(v->domain);
+
+    return p2m_get_nestedp2m(v, nhvm_vcpu_hostcr3(v));
+}
+
+unsigned long paging_gva_to_gfn(struct vcpu *v,
+                                unsigned long va,
+                                uint32_t *pfec)
+{
+    struct p2m_domain *hostp2m = p2m_get_hostp2m(v->domain);
+    const struct paging_mode *hostmode = paging_get_hostmode(v);
+
+    if ( is_hvm_domain(v->domain)
+        && paging_mode_hap(v->domain) 
+        && nestedhvm_is_n2(v) )
+    {
+        unsigned long gfn;
+        struct p2m_domain *p2m;
+        const struct paging_mode *mode;
+        uint64_t ncr3 = nhvm_vcpu_hostcr3(v);
+
+        /* translate l2 guest va into l2 guest gfn */
+        p2m = p2m_get_nestedp2m(v, ncr3);
+        mode = paging_get_nestedmode(v);
+        gfn = mode->gva_to_gfn(v, p2m, va, pfec);
+
+        /* translate l2 guest gfn into l1 guest gfn */
+        return hostmode->p2m_ga_to_gfn(v, hostp2m, ncr3,
+            gfn << PAGE_SHIFT, pfec);
+    }
+
+    return hostmode->gva_to_gfn(v, hostp2m, va, pfec);
+}
 
 /*
  * Local variables:

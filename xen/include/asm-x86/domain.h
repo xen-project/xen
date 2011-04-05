@@ -210,6 +210,8 @@ struct paging_domain {
 struct paging_vcpu {
     /* Pointers to mode-specific entry points. */
     const struct paging_mode *mode;
+    /* Nested Virtualization: paging mode of nested guest */
+    const struct paging_mode *nestedmode;
     /* HVM guest: last emulate was to a pagetable */
     unsigned int last_write_was_pt:1;
     /* HVM guest: last write emulation succeeds */
@@ -225,6 +227,7 @@ struct paging_vcpu {
 #define MAX_CPUID_INPUT 40
 typedef xen_domctl_cpuid_t cpuid_input_t;
 
+#define MAX_NESTEDP2M 10
 struct p2m_domain;
 struct time_scale {
     int shift;
@@ -272,6 +275,12 @@ struct arch_domain
 
     struct paging_domain paging;
     struct p2m_domain *p2m;
+
+    /* nestedhvm: translate l2 guest physical to host physical */
+    struct p2m_domain *nested_p2m[MAX_NESTEDP2M];
+    spinlock_t nested_p2m_lock;
+    int nested_p2m_locker;
+    const char *nested_p2m_function;
 
     /* NB. protected by d->event_lock and by irq_desc[irq].lock */
     int *irq_pirq;

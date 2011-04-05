@@ -1186,21 +1186,50 @@ void hvm_inject_exception(unsigned int trapnr, int errcode, unsigned long cr2)
     hvm_funcs.inject_exception(trapnr, errcode, cr2);
 }
 
-bool_t hvm_hap_nested_page_fault(unsigned long gpa,
-                                 bool_t gla_valid,
-                                 unsigned long gla,
-                                 bool_t access_valid,
-                                 bool_t access_r,
-                                 bool_t access_w,
-                                 bool_t access_x)
+int hvm_hap_nested_page_fault(unsigned long gpa,
+                              bool_t gla_valid,
+                              unsigned long gla,
+                              bool_t access_valid,
+                              bool_t access_r,
+                              bool_t access_w,
+                              bool_t access_x)
 {
     unsigned long gfn = gpa >> PAGE_SHIFT;
     p2m_type_t p2mt;
     p2m_access_t p2ma;
     mfn_t mfn;
     struct vcpu *v = current;
-    struct p2m_domain *p2m = p2m_get_hostp2m(v->domain);
+    struct p2m_domain *p2m = NULL;
 
+    /* On Nested Virtualization, walk the guest page table.
+     * If this succeeds, all is fine.
+     * If this fails, inject a nested page fault into the guest.
+     */
+    if ( nestedhvm_enabled(v->domain)
+        && nestedhvm_vcpu_in_guestmode(v)
+        && nestedhvm_paging_mode_hap(v) )
+    {
+        int rv;
+
+        /* The vcpu is in guest mode and the l1 guest
+         * uses hap. That means 'gpa' is in l2 guest
+         * physical address space.
+         * Fix the nested p2m or inject nested page fault
+         * into l1 guest if not fixable. The algorithm is
+         * the same as for shadow paging.
+         */
+        rv = nestedhvm_hap_nested_page_fault(v, gpa);
+        switch (rv) {
+        case NESTEDHVM_PAGEFAULT_DONE:
+            return 1;
+        case NESTEDHVM_PAGEFAULT_ERROR:
+            return 0;
+        case NESTEDHVM_PAGEFAULT_INJECT:
+            return -1;
+        }
+    }
+
+    p2m = p2m_get_hostp2m(v->domain);
     mfn = gfn_to_mfn_type_current(p2m, gfn, &p2mt, &p2ma, p2m_guest);
 
     /* Check access permissions first, then handle faults */
@@ -1342,6 +1371,15 @@ int hvm_set_efer(uint64_t value)
                  "Trying to change EFER.LME with paging enabled\n");
         hvm_inject_exception(TRAP_gp_fault, 0, 0);
         return X86EMUL_EXCEPTION;
+    }
+
+    if ( nestedhvm_enabled(v->domain) && cpu_has_svm &&
+       ((value & EFER_SVME) == 0 ) &&
+       ((value ^ v->arch.hvm_vcpu.guest_efer) & EFER_SVME) )
+    {
+        /* Cleared EFER.SVME: Flush all nestedp2m tables */
+        p2m_flush_nestedp2m(v->domain);
+        nestedhvm_vcpu_reset(v);
     }
 
     value |= v->arch.hvm_vcpu.guest_efer & EFER_LMA;
@@ -1494,8 +1532,12 @@ int hvm_set_cr0(unsigned long value)
     v->arch.hvm_vcpu.guest_cr[0] = value;
     hvm_update_guest_cr(v, 0);
 
-    if ( (value ^ old_value) & X86_CR0_PG )
-        paging_update_paging_modes(v);
+    if ( (value ^ old_value) & X86_CR0_PG ) {
+        if ( !nestedhvm_vmswitch_in_progress(v) && nestedhvm_vcpu_in_guestmode(v) )
+            paging_update_nestedmode(v);
+        else
+            paging_update_paging_modes(v);
+    }
 
     return X86EMUL_OKAY;
 
@@ -1562,8 +1604,12 @@ int hvm_set_cr4(unsigned long value)
     hvm_update_guest_cr(v, 4);
 
     /* Modifying CR4.{PSE,PAE,PGE} invalidates all TLB entries, inc. Global. */
-    if ( (old_cr ^ value) & (X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE) )
-        paging_update_paging_modes(v);
+    if ( (old_cr ^ value) & (X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE) ) {
+        if ( !nestedhvm_vmswitch_in_progress(v) && nestedhvm_vcpu_in_guestmode(v) )
+            paging_update_nestedmode(v);
+        else
+            paging_update_paging_modes(v);
+    }
 
     return X86EMUL_OKAY;
 
@@ -2076,7 +2122,7 @@ static enum hvm_copy_result __hvm_copy(
     void *buf, paddr_t addr, int size, unsigned int flags, uint32_t pfec)
 {
     struct vcpu *curr = current;
-    struct p2m_domain *p2m = p2m_get_hostp2m(curr->domain);
+    struct p2m_domain *p2m;
     unsigned long gfn, mfn;
     p2m_type_t p2mt;
     char *p;
@@ -2097,6 +2143,8 @@ static enum hvm_copy_result __hvm_copy(
     if ( in_atomic() )
         return HVMCOPY_unhandleable;
 #endif
+
+    p2m = p2m_get_hostp2m(curr->domain);
 
     while ( todo > 0 )
     {

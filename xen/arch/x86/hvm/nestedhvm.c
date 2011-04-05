@@ -20,6 +20,7 @@
 #include <asm/msr.h>
 #include <asm/hvm/support.h>	/* for HVM_DELIVER_NO_ERROR_CODE */
 #include <asm/hvm/hvm.h>
+#include <asm/p2m.h>    /* for struct p2m_domain */
 #include <asm/hvm/nestedhvm.h>
 #include <asm/event.h>  /* for local_event_delivery_(en|dis)able */
 #include <asm/paging.h> /* for paging_mode_hap() */
@@ -94,6 +95,54 @@ nestedhvm_vcpu_destroy(struct vcpu *v)
         return 0;
 
     return nhvm_vcpu_destroy(v);
+}
+
+static void
+nestedhvm_flushtlb_ipi(void *info)
+{
+    struct vcpu *v = current;
+    struct domain *d = info;
+
+    ASSERT(d != NULL);
+    if (v->domain != d) {
+        /* This cpu doesn't belong to the domain */
+        return;
+    }
+
+    /* Just flush the ASID (or request a new one).
+     * This is cheaper than flush_tlb_local() and has
+     * the same desired effect.
+     */
+    hvm_asid_flush_core();
+    vcpu_nestedhvm(v).nv_p2m = NULL;
+}
+
+void
+nestedhvm_vmcx_flushtlb(struct p2m_domain *p2m)
+{
+    on_selected_cpus(&p2m->p2m_dirty_cpumask, nestedhvm_flushtlb_ipi,
+        p2m->domain, 1);
+    cpus_clear(p2m->p2m_dirty_cpumask);
+}
+
+void
+nestedhvm_vmcx_flushtlbdomain(struct domain *d)
+{
+    on_selected_cpus(d->domain_dirty_cpumask, nestedhvm_flushtlb_ipi, d, 1);
+}
+
+bool_t
+nestedhvm_is_n2(struct vcpu *v)
+{
+    if (!nestedhvm_enabled(v->domain)
+      || nestedhvm_vmswitch_in_progress(v)
+      || !nestedhvm_paging_mode_hap(v))
+        return 0;
+
+    if (nestedhvm_vcpu_in_guestmode(v))
+        return 1;
+
+    return 0;
 }
 
 /* Common shadow IO Permission bitmap */

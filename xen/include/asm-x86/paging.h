@@ -108,8 +108,14 @@ struct paging_mode {
     int           (*page_fault            )(struct vcpu *v, unsigned long va,
                                             struct cpu_user_regs *regs);
     int           (*invlpg                )(struct vcpu *v, unsigned long va);
-    unsigned long (*gva_to_gfn            )(struct vcpu *v, unsigned long va,
+    unsigned long (*gva_to_gfn            )(struct vcpu *v,
+                                            struct p2m_domain *p2m,
+                                            unsigned long va,
                                             uint32_t *pfec);
+    unsigned long (*p2m_ga_to_gfn         )(struct vcpu *v,
+                                            struct p2m_domain *p2m,
+                                            unsigned long cr3,
+                                            paddr_t ga, uint32_t *pfec);
     void          (*update_cr3            )(struct vcpu *v, int do_locking);
     void          (*update_paging_modes   )(struct vcpu *v);
     void          (*write_p2m_entry       )(struct vcpu *v, unsigned long gfn,
@@ -219,6 +225,10 @@ void paging_final_teardown(struct domain *d);
  * creation. */
 int paging_enable(struct domain *d, u32 mode);
 
+#define paging_get_hostmode(v)		((v)->arch.paging.mode)
+#define paging_get_nestedmode(v)	((v)->arch.paging.nestedmode)
+const struct paging_mode *paging_get_mode(struct vcpu *v);
+void paging_update_nestedmode(struct vcpu *v);
 
 /* Page fault handler
  * Called from pagefault handler in Xen, and from the HVM trap handlers
@@ -233,7 +243,7 @@ static inline int
 paging_fault(unsigned long va, struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
-    return v->arch.paging.mode->page_fault(v, va, regs);
+    return paging_get_hostmode(v)->page_fault(v, va, regs);
 }
 
 /* Handle invlpg requests on vcpus.
@@ -241,7 +251,7 @@ paging_fault(unsigned long va, struct cpu_user_regs *regs)
  * or 0 if it's safe not to do so. */
 static inline int paging_invlpg(struct vcpu *v, unsigned long va)
 {
-    return v->arch.paging.mode->invlpg(v, va);
+    return paging_get_hostmode(v)->invlpg(v, va);
 }
 
 /* Translate a guest virtual address to the frame number that the
@@ -251,11 +261,30 @@ static inline int paging_invlpg(struct vcpu *v, unsigned long va)
  * walking the tables.  The caller should set the PFEC_page_present bit
  * in pfec[0]; in the failure case, that bit will be cleared if appropriate. */
 #define INVALID_GFN (-1UL)
-static inline unsigned long paging_gva_to_gfn(struct vcpu *v, 
-                                              unsigned long va,
-                                              uint32_t *pfec)
+unsigned long paging_gva_to_gfn(struct vcpu *v,
+                                unsigned long va,
+                                uint32_t *pfec);
+
+/* Translates a guest virtual address to guest physical address
+ * where the specified cr3 is translated to host physical address
+ * using the specified p2m table.
+ * This allows to do page walks in the guest or even in the nested guest.
+ * It returns the guest's gfn or the nested guest's gfn.
+ * Use 'paddr_t' for the guest address so it won't overflow when
+ * guest or nested guest is in 32bit PAE mode.
+ */
+static inline unsigned long paging_p2m_ga_to_gfn(struct vcpu *v,
+                                                 struct p2m_domain *p2m,
+                                                 const struct paging_mode *mode,
+                                                 unsigned long cr3,
+                                                 paddr_t ga,
+                                                 uint32_t *pfec)
 {
-    return v->arch.paging.mode->gva_to_gfn(v, va, pfec);
+    if ( is_hvm_domain(v->domain) && paging_mode_hap(v->domain) )
+        return mode->p2m_ga_to_gfn(v, p2m, cr3, ga, pfec);
+
+    /* shadow paging */
+    return paging_gva_to_gfn(v, ga, pfec);
 }
 
 /* Update all the things that are derived from the guest's CR3.
@@ -263,7 +292,7 @@ static inline unsigned long paging_gva_to_gfn(struct vcpu *v,
  * as the value to load into the host CR3 to schedule this vcpu */
 static inline void paging_update_cr3(struct vcpu *v)
 {
-    v->arch.paging.mode->update_cr3(v, 1);
+    paging_get_hostmode(v)->update_cr3(v, 1);
 }
 
 /* Update all the things that are derived from the guest's CR0/CR3/CR4.
@@ -271,7 +300,7 @@ static inline void paging_update_cr3(struct vcpu *v)
  * has changed, and when bringing up a VCPU for the first time. */
 static inline void paging_update_paging_modes(struct vcpu *v)
 {
-    v->arch.paging.mode->update_paging_modes(v);
+    paging_get_hostmode(v)->update_paging_modes(v);
 }
 
 
@@ -283,7 +312,7 @@ static inline int paging_write_guest_entry(struct vcpu *v, intpte_t *p,
 {
     if ( unlikely(paging_mode_enabled(v->domain) 
                   && v->arch.paging.mode != NULL) )
-        return v->arch.paging.mode->write_guest_entry(v, p, new, gmfn);
+        return paging_get_hostmode(v)->write_guest_entry(v, p, new, gmfn);
     else 
         return (!__copy_to_user(p, &new, sizeof(new)));
 }
@@ -299,7 +328,7 @@ static inline int paging_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p,
 {
     if ( unlikely(paging_mode_enabled(v->domain) 
                   && v->arch.paging.mode != NULL) )
-        return v->arch.paging.mode->cmpxchg_guest_entry(v, p, old, new, gmfn);
+        return paging_get_hostmode(v)->cmpxchg_guest_entry(v, p, old, new, gmfn);
     else 
         return (!cmpxchg_user(p, *old, new));
 }
@@ -327,21 +356,11 @@ static inline void safe_write_pte(l1_pgentry_t *p, l1_pgentry_t new)
  * a pointer to the entry to be written, the MFN in which the entry resides, 
  * the new contents of the entry, and the level in the p2m tree at which 
  * we are writing. */
-static inline void paging_write_p2m_entry(struct domain *d, unsigned long gfn, 
-                                          l1_pgentry_t *p, mfn_t table_mfn,
-                                          l1_pgentry_t new, unsigned int level)
-{
-    struct vcpu *v = current;
-    if ( v->domain != d )
-        v = d->vcpu ? d->vcpu[0] : NULL;
-    if ( likely(v && paging_mode_enabled(d) && v->arch.paging.mode != NULL) )
-    {
-        return v->arch.paging.mode->write_p2m_entry(v, gfn, p, table_mfn,
-                                                    new, level);
-    }
-    else 
-        safe_write_pte(p, new);
-}
+struct p2m_domain;
+
+void paging_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, 
+                            l1_pgentry_t *p, mfn_t table_mfn,
+                            l1_pgentry_t new, unsigned int level);
 
 /* Called from the guest to indicate that the a process is being
  * torn down and its pagetables will soon be discarded */
@@ -362,7 +381,7 @@ guest_map_l1e(struct vcpu *v, unsigned long addr, unsigned long *gl1mfn)
     l2_pgentry_t l2e;
 
     if ( unlikely(paging_mode_translate(v->domain)) )
-        return v->arch.paging.mode->guest_map_l1e(v, addr, gl1mfn);
+        return paging_get_hostmode(v)->guest_map_l1e(v, addr, gl1mfn);
 
     /* Find this l1e and its enclosing l1mfn in the linear map */
     if ( __copy_from_user(&l2e, 
@@ -398,7 +417,7 @@ guest_get_eff_l1e(struct vcpu *v, unsigned long addr, void *eff_l1e)
         return;
     }
         
-    v->arch.paging.mode->guest_get_eff_l1e(v, addr, eff_l1e);
+    paging_get_hostmode(v)->guest_get_eff_l1e(v, addr, eff_l1e);
 }
 
 /* Read the guest's l1e that maps this address, from the kernel-mode

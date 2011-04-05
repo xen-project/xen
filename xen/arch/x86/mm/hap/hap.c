@@ -40,6 +40,7 @@
 #include <asm/p2m.h>
 #include <asm/domain.h>
 #include <xen/numa.h>
+#include <asm/hvm/nestedhvm.h>
 
 #include "private.h"
 
@@ -582,6 +583,7 @@ void hap_domain_init(struct domain *d)
 int hap_enable(struct domain *d, u32 mode)
 {
     unsigned int old_pages;
+    uint8_t i;
     int rv = 0;
 
     domain_pause(d);
@@ -620,6 +622,12 @@ int hap_enable(struct domain *d, u32 mode)
             goto out;
     }
 
+    for (i = 0; i < MAX_NESTEDP2M; i++) {
+        rv = p2m_alloc_table(d->arch.nested_p2m[i]);
+        if ( rv != 0 )
+           goto out;
+    }
+
     /* Now let other users see the new mode */
     d->arch.paging.mode = mode | PG_HAP_enable;
 
@@ -630,6 +638,13 @@ int hap_enable(struct domain *d, u32 mode)
 
 void hap_final_teardown(struct domain *d)
 {
+    uint8_t i;
+
+    /* Destroy nestedp2m's first */
+    for (i = 0; i < MAX_NESTEDP2M; i++) {
+        p2m_teardown(d->arch.nested_p2m[i]);
+    }
+
     if ( d->arch.paging.hap.total_pages != 0 )
         hap_teardown(d);
 
@@ -657,7 +672,7 @@ void hap_teardown(struct domain *d)
         /* release the monitor table held by each vcpu */
         for_each_vcpu ( d, v )
         {
-            if ( v->arch.paging.mode && paging_mode_external(d) )
+            if ( paging_get_hostmode(v) && paging_mode_external(d) )
             {
                 mfn = pagetable_get_mfn(v->arch.monitor_table);
                 if ( mfn_valid(mfn) && (mfn_x(mfn) != 0) )
@@ -725,6 +740,7 @@ static const struct paging_mode hap_paging_long_mode;
 void hap_vcpu_init(struct vcpu *v)
 {
     v->arch.paging.mode = &hap_paging_real_mode;
+    v->arch.paging.nestedmode = &hap_paging_real_mode;
 }
 
 /************************************************/
@@ -751,6 +767,15 @@ static int hap_page_fault(struct vcpu *v, unsigned long va,
  */
 static int hap_invlpg(struct vcpu *v, unsigned long va)
 {
+    if (nestedhvm_enabled(v->domain)) {
+        /* Emulate INVLPGA:
+         * Must perform the flush right now or an other vcpu may
+         * use it when we use the next VMRUN emulation, otherwise.
+         */
+        p2m_flush(v, vcpu_nestedhvm(v).nv_p2m);
+        return 1;
+    }
+
     HAP_ERROR("Intercepted a guest INVLPG (%u:%u) with HAP enabled.\n",
               v->domain->domain_id, v->vcpu_id);
     domain_crash(v->domain);
@@ -763,17 +788,22 @@ static void hap_update_cr3(struct vcpu *v, int do_locking)
     hvm_update_guest_cr(v, 3);
 }
 
+const struct paging_mode *
+hap_paging_get_mode(struct vcpu *v)
+{
+    return !hvm_paging_enabled(v)   ? &hap_paging_real_mode :
+        hvm_long_mode_enabled(v) ? &hap_paging_long_mode :
+        hvm_pae_enabled(v)       ? &hap_paging_pae_mode  :
+                                   &hap_paging_protected_mode;
+}
+
 static void hap_update_paging_modes(struct vcpu *v)
 {
     struct domain *d = v->domain;
 
     hap_lock(d);
 
-    v->arch.paging.mode =
-        !hvm_paging_enabled(v)   ? &hap_paging_real_mode :
-        hvm_long_mode_enabled(v) ? &hap_paging_long_mode :
-        hvm_pae_enabled(v)       ? &hap_paging_pae_mode  :
-                                   &hap_paging_protected_mode;
+    v->arch.paging.mode = hap_paging_get_mode(v);
 
     if ( pagetable_is_null(v->arch.monitor_table) )
     {
@@ -834,31 +864,57 @@ static void
 hap_write_p2m_entry(struct vcpu *v, unsigned long gfn, l1_pgentry_t *p,
                     mfn_t table_mfn, l1_pgentry_t new, unsigned int level)
 {
+    struct domain *d = v->domain;
     uint32_t old_flags;
+    bool_t flush_nestedp2m = 0;
 
-    hap_lock(v->domain);
+    /* We know always use the host p2m here, regardless if the vcpu
+     * is in host or guest mode. The vcpu can be in guest mode by
+     * a hypercall which passes a domain and chooses mostly the first
+     * vcpu. */
 
+    hap_lock(d);
     old_flags = l1e_get_flags(*p);
+
+    if ( nestedhvm_enabled(d) && (old_flags & _PAGE_PRESENT) ) {
+        /* We are replacing a valid entry so we need to flush nested p2ms,
+         * unless the only change is an increase in access rights. */
+        mfn_t omfn = _mfn(l1e_get_pfn(*p));
+        mfn_t nmfn = _mfn(l1e_get_pfn(new));
+        flush_nestedp2m = !( mfn_x(omfn) == mfn_x(nmfn)
+            && perms_strictly_increased(old_flags, l1e_get_flags(new)) );
+    }
+
     safe_write_pte(p, new);
     if ( (old_flags & _PAGE_PRESENT)
          && (level == 1 || (level == 2 && (old_flags & _PAGE_PSE))) )
-             flush_tlb_mask(v->domain->domain_dirty_cpumask);
+             flush_tlb_mask(d->domain_dirty_cpumask);
 
 #if CONFIG_PAGING_LEVELS == 3
     /* install P2M in monitor table for PAE Xen */
     if ( level == 3 )
         /* We have written to the p2m l3: need to sync the per-vcpu
          * copies of it in the monitor tables */
-        p2m_install_entry_in_monitors(v->domain, (l3_pgentry_t *)p);
+        p2m_install_entry_in_monitors(d, (l3_pgentry_t *)p);
 #endif
 
-    hap_unlock(v->domain);
+    hap_unlock(d);
+
+    if ( flush_nestedp2m )
+        p2m_flush_nestedp2m(d);
 }
 
 static unsigned long hap_gva_to_gfn_real_mode(
-    struct vcpu *v, unsigned long gva, uint32_t *pfec)
+    struct vcpu *v, struct p2m_domain *p2m, unsigned long gva, uint32_t *pfec)
 {
     return ((paddr_t)gva >> PAGE_SHIFT);
+}
+
+static unsigned long hap_p2m_ga_to_gfn_real_mode(
+    struct vcpu *v, struct p2m_domain *p2m, unsigned long cr3,
+    paddr_t ga, uint32_t *pfec)
+{
+    return (ga >> PAGE_SHIFT);
 }
 
 /* Entry points into this mode of the hap code. */
@@ -866,6 +922,7 @@ static const struct paging_mode hap_paging_real_mode = {
     .page_fault             = hap_page_fault,
     .invlpg                 = hap_invlpg,
     .gva_to_gfn             = hap_gva_to_gfn_real_mode,
+    .p2m_ga_to_gfn          = hap_p2m_ga_to_gfn_real_mode,
     .update_cr3             = hap_update_cr3,
     .update_paging_modes    = hap_update_paging_modes,
     .write_p2m_entry        = hap_write_p2m_entry,
@@ -876,6 +933,7 @@ static const struct paging_mode hap_paging_protected_mode = {
     .page_fault             = hap_page_fault,
     .invlpg                 = hap_invlpg,
     .gva_to_gfn             = hap_gva_to_gfn_2_levels,
+    .p2m_ga_to_gfn          = hap_p2m_ga_to_gfn_2_levels,
     .update_cr3             = hap_update_cr3,
     .update_paging_modes    = hap_update_paging_modes,
     .write_p2m_entry        = hap_write_p2m_entry,
@@ -886,6 +944,7 @@ static const struct paging_mode hap_paging_pae_mode = {
     .page_fault             = hap_page_fault,
     .invlpg                 = hap_invlpg,
     .gva_to_gfn             = hap_gva_to_gfn_3_levels,
+    .p2m_ga_to_gfn          = hap_p2m_ga_to_gfn_3_levels,
     .update_cr3             = hap_update_cr3,
     .update_paging_modes    = hap_update_paging_modes,
     .write_p2m_entry        = hap_write_p2m_entry,
@@ -896,6 +955,7 @@ static const struct paging_mode hap_paging_long_mode = {
     .page_fault             = hap_page_fault,
     .invlpg                 = hap_invlpg,
     .gva_to_gfn             = hap_gva_to_gfn_4_levels,
+    .p2m_ga_to_gfn          = hap_p2m_ga_to_gfn_4_levels,
     .update_cr3             = hap_update_cr3,
     .update_paging_modes    = hap_update_paging_modes,
     .write_p2m_entry        = hap_write_p2m_entry,

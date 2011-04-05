@@ -837,22 +837,6 @@ shadow_write_entries(void *d, void *s, int entries, mfn_t mfn)
     if ( map != NULL ) sh_unmap_domain_page(map);
 }
 
-static inline int
-perms_strictly_increased(u32 old_flags, u32 new_flags) 
-/* Given the flags of two entries, are the new flags a strict
- * increase in rights over the old ones? */
-{
-    u32 of = old_flags & (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_NX_BIT);
-    u32 nf = new_flags & (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_NX_BIT);
-    /* Flip the NX bit, since it's the only one that decreases rights;
-     * we calculate as if it were an "X" bit. */
-    of ^= _PAGE_NX_BIT;
-    nf ^= _PAGE_NX_BIT;
-    /* If the changed bits are all set in the new flags, then rights strictly 
-     * increased between old and new. */
-    return ((of | (of ^ nf)) == nf);
-}
-
 /* type is only used to distinguish grant map pages from ordinary RAM
  * i.e. non-p2m_is_grant() pages are treated as p2m_ram_rw.  */
 static int inline
@@ -3768,7 +3752,8 @@ sh_invlpg(struct vcpu *v, unsigned long va)
 
 
 static unsigned long
-sh_gva_to_gfn(struct vcpu *v, unsigned long va, uint32_t *pfec)
+sh_gva_to_gfn(struct vcpu *v, struct p2m_domain *p2m,
+    unsigned long va, uint32_t *pfec)
 /* Called to translate a guest virtual address to what the *guest*
  * pagetables would map it to. */
 {
@@ -4820,7 +4805,7 @@ static mfn_t emulate_gva_to_mfn(struct vcpu *v,
     struct p2m_domain *p2m = p2m_get_hostp2m(v->domain);
 
     /* Translate the VA to a GFN */
-    gfn = sh_gva_to_gfn(v, vaddr, &pfec);
+    gfn = sh_gva_to_gfn(v, p2m, vaddr, &pfec);
     if ( gfn == INVALID_GFN ) 
     {
         if ( is_hvm_vcpu(v) )

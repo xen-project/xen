@@ -29,24 +29,32 @@
 #define _hap_gva_to_gfn(levels) hap_gva_to_gfn_##levels##_levels
 #define hap_gva_to_gfn(levels) _hap_gva_to_gfn(levels)
 
+#define _hap_p2m_ga_to_gfn(levels) hap_p2m_ga_to_gfn_##levels##_levels
+#define hap_p2m_ga_to_gfn(levels) _hap_p2m_ga_to_gfn(levels)
+
 #if GUEST_PAGING_LEVELS <= CONFIG_PAGING_LEVELS
 
 #include <asm/guest_pt.h>
 #include <asm/p2m.h>
 
 unsigned long hap_gva_to_gfn(GUEST_PAGING_LEVELS)(
-    struct vcpu *v, unsigned long gva, uint32_t *pfec)
+    struct vcpu *v, struct p2m_domain *p2m, unsigned long gva, uint32_t *pfec)
 {
-    unsigned long cr3;
+    unsigned long cr3 = v->arch.hvm_vcpu.guest_cr[3];
+    return hap_p2m_ga_to_gfn(GUEST_PAGING_LEVELS)(v, p2m, cr3, gva, pfec);
+}
+
+unsigned long hap_p2m_ga_to_gfn(GUEST_PAGING_LEVELS)(
+    struct vcpu *v, struct p2m_domain *p2m, unsigned long cr3,
+    paddr_t ga, uint32_t *pfec)
+{
     uint32_t missing;
     mfn_t top_mfn;
     void *top_map;
     p2m_type_t p2mt;
     walk_t gw;
-    struct p2m_domain *p2m = p2m_get_hostp2m(v->domain);
 
     /* Get the top-level table's MFN */
-    cr3 = v->arch.hvm_vcpu.guest_cr[3];
     top_mfn = gfn_to_mfn_unshare(p2m, cr3 >> PAGE_SHIFT, &p2mt, 0);
     if ( p2m_is_paging(p2mt) )
     {
@@ -72,7 +80,7 @@ unsigned long hap_gva_to_gfn(GUEST_PAGING_LEVELS)(
 #if GUEST_PAGING_LEVELS == 3
     top_map += (cr3 & ~(PAGE_MASK | 31));
 #endif
-    missing = guest_walk_tables(v, p2m, gva, &gw, pfec[0], top_mfn, top_map);
+    missing = guest_walk_tables(v, p2m, ga, &gw, pfec[0], top_mfn, top_map);
     unmap_domain_page(top_map);
 
     /* Interpret the answer */
@@ -122,6 +130,15 @@ unsigned long hap_gva_to_gfn(GUEST_PAGING_LEVELS)(
     return INVALID_GFN;
 }
 
+unsigned long hap_p2m_ga_to_gfn(GUEST_PAGING_LEVELS)(
+    struct vcpu *v, struct p2m_domain *p2m, unsigned long cr3,
+    paddr_t ga, uint32_t *pfec)
+{
+    gdprintk(XENLOG_ERR,
+             "Guest paging level is greater than host paging level!\n");
+    domain_crash(v->domain);
+    return INVALID_GFN;
+}
 #endif
 
 

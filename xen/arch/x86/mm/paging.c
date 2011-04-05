@@ -26,6 +26,7 @@
 #include <asm/p2m.h>
 #include <asm/hap.h>
 #include <asm/guest_access.h>
+#include <asm/hvm/nestedhvm.h>
 #include <xen/numa.h>
 #include <xsm/xsm.h>
 
@@ -851,21 +852,58 @@ void paging_dump_vcpu_info(struct vcpu *v)
         printk("    paging assistance: ");
         if ( paging_mode_shadow(v->domain) )
         {
-            if ( v->arch.paging.mode )
+            if ( paging_get_hostmode(v) )
                 printk("shadowed %u-on-%u\n",
-                       v->arch.paging.mode->guest_levels,
-                       v->arch.paging.mode->shadow.shadow_levels);
+                       paging_get_hostmode(v)->guest_levels,
+                       paging_get_hostmode(v)->shadow.shadow_levels);
             else
                 printk("not shadowed\n");
         }
-        else if ( paging_mode_hap(v->domain) && v->arch.paging.mode )
+        else if ( paging_mode_hap(v->domain) && paging_get_hostmode(v) )
             printk("hap, %u levels\n",
-                   v->arch.paging.mode->guest_levels);
+                   paging_get_hostmode(v)->guest_levels);
         else
             printk("none\n");
     }
 }
 
+const struct paging_mode *paging_get_mode(struct vcpu *v)
+{
+    if (!nestedhvm_is_n2(v))
+        return paging_get_hostmode(v);
+
+    return paging_get_nestedmode(v);
+}
+
+extern const struct paging_mode *hap_paging_get_mode(struct vcpu *);
+
+void paging_update_nestedmode(struct vcpu *v)
+{
+    ASSERT(nestedhvm_enabled(v->domain));
+    if (nestedhvm_paging_mode_hap(v))
+        /* nested-on-nested */
+        v->arch.paging.nestedmode = hap_paging_get_mode(v);
+    else
+        /* TODO: shadow-on-shadow */
+        v->arch.paging.nestedmode = NULL;
+}
+
+void paging_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
+                            l1_pgentry_t *p, mfn_t table_mfn,
+                            l1_pgentry_t new, unsigned int level)
+{
+    struct domain *d = p2m->domain;
+    struct vcpu *v = current;
+    if ( v->domain != d )
+        v = d->vcpu ? d->vcpu[0] : NULL;
+    if ( likely(v && paging_mode_enabled(d) && paging_get_hostmode(v) != NULL) )
+    {
+        return paging_get_hostmode(v)->write_p2m_entry(v, gfn, p, table_mfn,
+                                                       new, level);
+    }
+    else
+        safe_write_pte(p, new);
+}
 
 /*
  * Local variables:

@@ -199,7 +199,15 @@ struct p2m_domain {
     /* Shadow translated domain: p2m mapping */
     pagetable_t        phys_table;
 
+    /* Same as domain_dirty_cpumask but limited to
+     * this p2m and those physical cpus whose vcpu's are in
+     * guestmode.
+     */
+    cpumask_t          p2m_dirty_cpumask;
+
     struct domain     *domain;   /* back pointer to domain */
+#define CR3_EADDR     (~0ULL)
+    uint64_t           cr3;      /* to identify this p2m for re-use */
 
     /* Pages used to construct the p2m */
     struct page_list_head pages;
@@ -223,6 +231,11 @@ struct p2m_domain {
                                                    p2m_type_t ot,
                                                    p2m_type_t nt);
     
+    void               (*write_p2m_entry)(struct p2m_domain *p2m,
+                                          unsigned long gfn, l1_pgentry_t *p,
+                                          mfn_t table_mfn, l1_pgentry_t new,
+                                          unsigned int level);
+
     /* Default P2M access type for each page in the the domain: new pages,
      * swapped in pages, cleared pages, and pages that are ambiquously
      * retyped get this access type.  See definition of p2m_access_t. */
@@ -264,7 +277,25 @@ struct p2m_domain {
 /* get host p2m table */
 #define p2m_get_hostp2m(d)      ((d)->arch.p2m)
 
+/* Get p2m table (re)usable for specified cr3.
+ * Automatically destroys and re-initializes a p2m if none found.
+ * If cr3 == 0 then v->arch.hvm_vcpu.guest_cr[3] is used.
+ */
+struct p2m_domain *p2m_get_nestedp2m(struct vcpu *v, uint64_t cr3);
+
+/* If vcpu is in host mode then behaviour matches p2m_get_hostp2m().
+ * If vcpu is in guest mode then behaviour matches p2m_get_nestedp2m().
+ */
+struct p2m_domain *p2m_get_p2m(struct vcpu *v);
+
+#define p2m_is_nestedp2m(p2m)   ((p2m) != p2m_get_hostp2m((p2m->domain)))
+
 #define p2m_get_pagetable(p2m)  ((p2m)->phys_table)
+
+/* Flushes specified p2m table */
+void p2m_flush(struct vcpu *v, struct p2m_domain *p2m);
+/* Flushes all nested p2m tables */
+void p2m_flush_nestedp2m(struct domain *d);
 
 /*
  * The P2M lock.  This protects all updates to the p2m table.
@@ -306,6 +337,38 @@ struct p2m_domain {
 #define p2m_locked_by_me(_p2m)                            \
     (current->processor == (_p2m)->locker)
 
+
+#define nestedp2m_lock_init(_domain)                                  \
+    do {                                                              \
+        spin_lock_init(&(_domain)->arch.nested_p2m_lock);             \
+        (_domain)->arch.nested_p2m_locker = -1;                       \
+        (_domain)->arch.nested_p2m_function = "nobody";               \
+    } while (0)
+
+#define nestedp2m_locked_by_me(_domain)                \
+    (current->processor == (_domain)->arch.nested_p2m_locker)
+
+#define nestedp2m_lock(_domain)                                       \
+    do {                                                              \
+        if ( nestedp2m_locked_by_me(_domain) )                        \
+        {                                                             \
+            printk("Error: p2m lock held by %s\n",                    \
+                   (_domain)->arch.nested_p2m_function);              \
+            BUG();                                                    \
+        }                                                             \
+        spin_lock(&(_domain)->arch.nested_p2m_lock);                  \
+        ASSERT((_domain)->arch.nested_p2m_locker == -1);              \
+        (_domain)->arch.nested_p2m_locker = current->processor;       \
+        (_domain)->arch.nested_p2m_function = __func__;               \
+    } while (0)
+
+#define nestedp2m_unlock(_domain)                                      \
+    do {                                                               \
+        ASSERT(nestedp2m_locked_by_me(_domain));                       \
+        (_domain)->arch.nested_p2m_locker = -1;                        \
+        (_domain)->arch.nested_p2m_function = "nobody";                \
+        spin_unlock(&(_domain)->arch.nested_p2m_lock);                 \
+    } while (0)
 
 /* Extract the type from the PTE flags that store it */
 static inline p2m_type_t p2m_flags_to_type(unsigned long flags)
@@ -424,10 +487,20 @@ static inline unsigned long mfn_to_gfn(struct domain *d, mfn_t mfn)
 /* Init the datastructures for later use by the p2m code */
 int p2m_init(struct domain *d);
 
+/* PTE flags for various types of p2m entry */
+unsigned long p2m_type_to_flags(p2m_type_t t, mfn_t mfn);
+
 /* Allocate a new p2m table for a domain. 
  *
  * Returns 0 for success or -errno. */
 int p2m_alloc_table(struct p2m_domain *p2m);
+
+/* Find the next level's P2M entry, checking for out-of-range gfn's...
+ * Returns NULL on error.
+ */
+l1_pgentry_t *
+p2m_find_entry(void *table, unsigned long *gfn_remainder,
+               unsigned long gfn, uint32_t shift, uint32_t max);
 
 /* Return all the p2m resources to Xen. */
 void p2m_teardown(struct p2m_domain *p2m);
@@ -502,6 +575,8 @@ p2m_type_t p2m_change_type(struct p2m_domain *p2m, unsigned long gfn,
 int set_mmio_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn);
 int clear_mmio_p2m_entry(struct p2m_domain *p2m, unsigned long gfn);
 
+void nestedp2m_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
+    l1_pgentry_t *p, mfn_t table_mfn, l1_pgentry_t new, unsigned int level);
 
 #ifdef __x86_64__
 /* Modify p2m table for shared gfn */

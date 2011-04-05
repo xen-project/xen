@@ -1014,14 +1014,16 @@ struct hvm_function_table * __init start_svm(void)
     return &svm_function_table;
 }
 
-static void svm_do_nested_pgfault(paddr_t gpa)
+static void svm_do_nested_pgfault(struct vcpu *v,
+    struct cpu_user_regs *regs, paddr_t gpa)
 {
+    int ret;
     unsigned long gfn = gpa >> PAGE_SHIFT;
     mfn_t mfn;
     p2m_type_t p2mt;
-    struct p2m_domain *p2m;
+    struct p2m_domain *p2m = NULL;
 
-    p2m = p2m_get_hostp2m(current->domain);
+    ret = hvm_hap_nested_page_fault(gpa, 0, ~0ul, 0, 0, 0, 0);
 
     if ( tb_init_done )
     {
@@ -1032,6 +1034,7 @@ static void svm_do_nested_pgfault(paddr_t gpa)
             uint32_t p2mt;
         } _d;
 
+        p2m = p2m_get_p2m(v);
         _d.gpa = gpa;
         _d.qualification = 0;
         _d.mfn = mfn_x(gfn_to_mfn_query(p2m, gfn, &_d.p2mt));
@@ -1039,14 +1042,26 @@ static void svm_do_nested_pgfault(paddr_t gpa)
         __trace_var(TRC_HVM_NPF, 0, sizeof(_d), &_d);
     }
 
-    if ( hvm_hap_nested_page_fault(gpa, 0, ~0ul, 0, 0, 0, 0) )
+    switch (ret) {
+    case 0:
+        break;
+    case 1:
         return;
+    case -1:
+        ASSERT(nestedhvm_enabled(v->domain) && nestedhvm_vcpu_in_guestmode(v));
+        /* inject #VMEXIT(NPF) into guest. */
+        nestedsvm_vmexit_defer(v, VMEXIT_NPF, regs->error_code, gpa);
+        return;
+    }
 
+    if ( p2m == NULL )
+        p2m = p2m_get_p2m(v);
     /* Everything else is an error. */
     mfn = gfn_to_mfn_guest(p2m, gfn, &p2mt);
-    gdprintk(XENLOG_ERR, "SVM violation gpa %#"PRIpaddr", mfn %#lx, type %i\n",
-             gpa, mfn_x(mfn), p2mt);
-    domain_crash(current->domain);
+    gdprintk(XENLOG_ERR,
+         "SVM violation gpa %#"PRIpaddr", mfn %#lx, type %i\n",
+         gpa, mfn_x(mfn), p2mt);
+    domain_crash(v->domain);
 }
 
 static void svm_fpu_dirty_intercept(void)
@@ -1659,6 +1674,8 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         struct vmcb_struct *ns_vmcb = nv->nv_vvmcx;
         uint64_t exitinfo1, exitinfo2;
 
+        paging_update_nestedmode(v);
+
         /* Write real exitinfo1 back into virtual vmcb.
          * nestedsvm_check_intercepts() expects to have the correct
          * exitinfo1 value there.
@@ -1948,7 +1965,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     case VMEXIT_NPF:
         perfc_incra(svmexits, VMEXIT_NPF_PERFC);
         regs->error_code = vmcb->exitinfo1;
-        svm_do_nested_pgfault(vmcb->exitinfo2);
+        svm_do_nested_pgfault(v, regs, vmcb->exitinfo2);
         break;
 
     case VMEXIT_IRET: {

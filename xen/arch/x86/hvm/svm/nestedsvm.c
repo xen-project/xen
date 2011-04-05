@@ -26,6 +26,7 @@
 #include <asm/hvm/svm/svmdebug.h>
 #include <asm/paging.h> /* paging_mode_hap */
 #include <asm/event.h> /* for local_event_delivery_(en|dis)able */
+#include <asm/p2m.h> /* p2m_get_pagetable, p2m_get_nestedp2m */
 
 static void
 nestedsvm_vcpu_clgi(struct vcpu *v)
@@ -320,6 +321,18 @@ static int nsvm_vmrun_permissionmap(struct vcpu *v, bool_t viopm)
     return 0;
 }
 
+static void nestedsvm_vmcb_set_nestedp2m(struct vcpu *v,
+    struct vmcb_struct *vvmcb, struct vmcb_struct *n2vmcb)
+{
+    struct p2m_domain *p2m;
+
+    ASSERT(v != NULL);
+    ASSERT(vvmcb != NULL);
+    ASSERT(n2vmcb != NULL);
+    p2m = p2m_get_nestedp2m(v, vvmcb->_h_cr3);
+    n2vmcb->_h_cr3 = pagetable_get_paddr(p2m_get_pagetable(p2m));
+}
+
 static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
 {
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
@@ -475,6 +488,9 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
     /* Nested paging mode */
     if (nestedhvm_paging_mode_hap(v)) {
         /* host nested paging + guest nested paging. */
+        n2vmcb->_np_enable = 1;
+
+        nestedsvm_vmcb_set_nestedp2m(v, ns_vmcb, n2vmcb);
 
         /* hvm_set_cr3() below sets v->arch.hvm_vcpu.guest_cr[3] for us. */
         rc = hvm_set_cr3(ns_vmcb->_cr3);
@@ -1318,8 +1334,20 @@ asmlinkage void nsvm_vcpu_switch(struct cpu_user_regs *regs)
         ret = nsvm_vcpu_vmrun(v, regs);
         if (ret < 0)
             goto vmexit;
+
+        ASSERT(nestedhvm_vcpu_in_guestmode(v));
         nv->nv_vmentry_pending = 0;
-        return;
+    }
+
+    if (nestedhvm_vcpu_in_guestmode(v)
+       && nestedhvm_paging_mode_hap(v))
+    {
+        /* In case left the l2 guest due to a physical interrupt (e.g. IPI)
+         * that is not for the l1 guest then we continue running the l2 guest
+         * but check if the nestedp2m is still valid.
+         */
+        if (nv->nv_p2m == NULL)
+            nestedsvm_vmcb_set_nestedp2m(v, nv->nv_vvmcx, nv->nv_n2vmcx);
     }
 }
 

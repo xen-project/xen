@@ -391,6 +391,23 @@ static inline uint32_t cacheattr_to_pte_flags(uint32_t cacheattr)
     return ((cacheattr & 4) << 5) | ((cacheattr & 3) << 3);
 }
 
+/* return true if permission increased */
+static inline bool_t
+perms_strictly_increased(uint32_t old_flags, uint32_t new_flags)
+/* Given the flags of two entries, are the new flags a strict
+ * increase in rights over the old ones? */
+{
+    uint32_t of = old_flags & (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_NX_BIT);
+    uint32_t nf = new_flags & (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_NX_BIT);
+    /* Flip the NX bit, since it's the only one that decreases rights;
+     * we calculate as if it were an "X" bit. */
+    of ^= _PAGE_NX_BIT;
+    nf ^= _PAGE_NX_BIT;
+    /* If the changed bits are all set in the new flags, then rights strictly
+     * increased between old and new. */
+    return ((of | (of ^ nf)) == nf);
+}
+
 #endif /* !__ASSEMBLY__ */
 
 #define PAGE_ALIGN(x) (((x) + PAGE_SIZE - 1) & PAGE_MASK)
