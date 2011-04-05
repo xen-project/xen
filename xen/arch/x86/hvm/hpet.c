@@ -237,8 +237,7 @@ static void hpet_set_timer(HPETState *h, unsigned int tn)
     {
         /* HPET specification requires PIT shouldn't generate
          * interrupts if LegacyReplacementRoute is set for timer0 */
-        PITState *pit = &vhpet_domain(h)->arch.hvm_domain.pl_time.vpit;
-        pit_stop_channel0_irq(pit);
+        pit_stop_channel0_irq(&vhpet_domain(h)->arch.vpit);
     }
 
     if ( !timer_enabled(h, tn) )

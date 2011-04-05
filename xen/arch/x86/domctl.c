@@ -900,6 +900,10 @@ long arch_do_domctl(
             break;
         bind = &(domctl->u.bind_pt_irq);
 
+        ret = -EINVAL;
+        if ( !is_hvm_domain(d) )
+            goto bind_out;
+
         ret = xsm_bind_pt_irq(d, bind);
         if ( ret )
             goto bind_out;

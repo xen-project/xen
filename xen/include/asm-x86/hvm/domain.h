@@ -47,7 +47,7 @@ struct hvm_domain {
 
     struct pl_time         pl_time;
 
-    struct hvm_io_handler  io_handler;
+    struct hvm_io_handler *io_handler;
 
     /* Lock protects access to irq, vpic and vioapic. */
     spinlock_t             irq_lock;
@@ -60,11 +60,12 @@ struct hvm_domain {
     struct vcpu           *i8259_target;
 
     /* hvm_print_line() logging. */
-    char                   pbuf[80];
+#define HVM_PBUF_SIZE 80
+    char                  *pbuf;
     int                    pbuf_idx;
     spinlock_t             pbuf_lock;
 
-    uint64_t               params[HVM_NR_PARAMS];
+    uint64_t              *params;
 
     /* Memory ranges with pinned cache attributes. */
     struct list_head       pinned_cacheattr_ranges;

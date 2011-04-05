@@ -68,23 +68,6 @@ void *__init map_to_nocache_virt(int nr_iommus, u64 maddr)
     return (void *)fix_to_virt(FIX_IOMMU_REGS_BASE_0 + nr_iommus);
 }
 
-struct hvm_irq_dpci *domain_get_irq_dpci(struct domain *domain)
-{
-    if ( !domain )
-        return NULL;
-
-    return domain->arch.hvm_domain.irq.dpci;
-}
-
-int domain_set_irq_dpci(struct domain *domain, struct hvm_irq_dpci *dpci)
-{
-    if ( !domain || !dpci )
-        return 0;
-
-    domain->arch.hvm_domain.irq.dpci = dpci;
-    return 1;
-}
-
 void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
 {
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;

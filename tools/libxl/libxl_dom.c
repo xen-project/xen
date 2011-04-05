@@ -72,9 +72,9 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
     libxl_ctx *ctx = libxl__gc_owner(gc);
     xc_domain_max_vcpus(ctx->xch, domid, info->max_vcpus);
     xc_domain_setmaxmem(ctx->xch, domid, info->target_memkb + LIBXL_MAXMEM_CONSTANT);
-    xc_domain_set_memmap_limit(ctx->xch, domid, 
-            (info->hvm) ? info->max_memkb : 
-            (info->max_memkb + info->u.pv.slack_memkb));
+    if (!info->hvm)
+        xc_domain_set_memmap_limit(ctx->xch, domid,
+                (info->max_memkb + info->u.pv.slack_memkb));
     xc_domain_set_tsc_info(ctx->xch, domid, info->tsc_mode, 0, 0, 0);
     if ( info->disable_migrate )
         xc_domain_disable_migrate(ctx->xch, domid);

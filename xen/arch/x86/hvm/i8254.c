@@ -38,10 +38,9 @@
 #include <asm/hvm/vpt.h>
 #include <asm/current.h>
 
-#define domain_vpit(x) (&(x)->arch.hvm_domain.pl_time.vpit)
+#define domain_vpit(x) (&(x)->arch.vpit)
 #define vcpu_vpit(x)   (domain_vpit((x)->domain))
-#define vpit_domain(x) (container_of((x), struct domain, \
-                                     arch.hvm_domain.pl_time.vpit))
+#define vpit_domain(x) (container_of((x), struct domain, arch.vpit))
 #define vpit_vcpu(x)   (pt_global_vcpu_target(vpit_domain(x)))
 
 #define RW_STATE_LSB 1
@@ -450,14 +449,18 @@ void pit_reset(struct domain *d)
 
 void pit_init(struct vcpu *v, unsigned long cpu_khz)
 {
-    PITState *pit = vcpu_vpit(v);
+    struct domain *d = v->domain;
+    PITState *pit = domain_vpit(d);
 
     spin_lock_init(&pit->lock);
 
-    register_portio_handler(v->domain, PIT_BASE, 4, handle_pit_io);
-    register_portio_handler(v->domain, 0x61, 1, handle_speaker_io);
+    if ( is_hvm_domain(d) )
+    {
+        register_portio_handler(d, PIT_BASE, 4, handle_pit_io);
+        register_portio_handler(d, 0x61, 1, handle_speaker_io);
+    }
 
-    pit_reset(v->domain);
+    pit_reset(d);
 }
 
 void pit_deinit(struct domain *d)

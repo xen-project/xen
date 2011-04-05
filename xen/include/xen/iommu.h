@@ -106,8 +106,7 @@ struct qi_ctrl *iommu_qi_ctrl(struct iommu *iommu);
 struct ir_ctrl *iommu_ir_ctrl(struct iommu *iommu);
 struct iommu_flush *iommu_get_flush(struct iommu *iommu);
 void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq);
-struct hvm_irq_dpci *domain_get_irq_dpci(struct domain *domain);
-int domain_set_irq_dpci(struct domain *domain, struct hvm_irq_dpci *dpci);
+struct hvm_irq_dpci *domain_get_irq_dpci(const struct domain *);
 void free_hvm_irq_dpci(struct hvm_irq_dpci *dpci);
 bool_t pt_irq_need_timer(uint32_t flags);
 

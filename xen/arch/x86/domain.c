@@ -187,16 +187,17 @@ struct domain *alloc_domain_struct(void)
 #ifdef __x86_64__
     bits += pfn_pdx_hole_shift;
 #endif
-    d = alloc_xenheap_pages(get_order_from_bytes(sizeof(*d)), MEMF_bits(bits));
+    BUILD_BUG_ON(sizeof(*d) > PAGE_SIZE);
+    d = alloc_xenheap_pages(0, MEMF_bits(bits));
     if ( d != NULL )
-        memset(d, 0, sizeof(*d));
+        clear_page(d);
     return d;
 }
 
 void free_domain_struct(struct domain *d)
 {
     lock_profile_deregister_struct(LOCKPROF_TYPE_PERDOM, d);
-    free_xenheap_pages(d, get_order_from_bytes(sizeof(*d)));
+    free_xenheap_page(d);
 }
 
 struct vcpu *alloc_vcpu_struct(void)
@@ -531,6 +532,17 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 
     if ( !is_idle_domain(d) )
     {
+        d->arch.cpuids = xmalloc_array(cpuid_input_t, MAX_CPUID_INPUT);
+        rc = -ENOMEM;
+        if ( d->arch.cpuids == NULL )
+            goto fail;
+        memset(d->arch.cpuids, 0, MAX_CPUID_INPUT * sizeof(*d->arch.cpuids));
+        for ( i = 0; i < MAX_CPUID_INPUT; i++ )
+        {
+            d->arch.cpuids[i].input[0] = XEN_CPUID_INPUT_UNUSED;
+            d->arch.cpuids[i].input[1] = XEN_CPUID_INPUT_UNUSED;
+        }
+
         d->arch.ioport_caps = 
             rangeset_new(d, "I/O Ports", RANGESETF_prettyprint_hex);
         rc = -ENOMEM;
@@ -597,13 +609,6 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
         /* 32-bit PV guest by default only if Xen is not 64-bit. */
         d->arch.is_32bit_pv = d->arch.has_32bit_shinfo =
             (CONFIG_PAGING_LEVELS != 4);
-    }
-
-    memset(d->arch.cpuids, 0, sizeof(d->arch.cpuids));
-    for ( i = 0; i < MAX_CPUID_INPUT; i++ )
-    {
-        d->arch.cpuids[i].input[0] = XEN_CPUID_INPUT_UNUSED;
-        d->arch.cpuids[i].input[1] = XEN_CPUID_INPUT_UNUSED;
     }
 
     /* initialize default tsc behavior in case tools don't */
@@ -2067,11 +2072,12 @@ int domain_relinquish_resources(struct domain *d)
                 unmap_vcpu_info(v);
             }
 
-            if ( d->arch.pirq_eoi_map != NULL )
+            if ( d->arch.pv_domain.pirq_eoi_map != NULL )
             {
-                unmap_domain_page_global(d->arch.pirq_eoi_map);
-                put_page_and_type(mfn_to_page(d->arch.pirq_eoi_map_mfn));
-                d->arch.pirq_eoi_map = NULL;
+                unmap_domain_page_global(d->arch.pv_domain.pirq_eoi_map);
+                put_page_and_type(
+                    mfn_to_page(d->arch.pv_domain.pirq_eoi_map_mfn));
+                d->arch.pv_domain.pirq_eoi_map = NULL;
             }
         }
 

@@ -264,7 +264,8 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         ret = -EINVAL;
         if ( eoi.irq >= v->domain->nr_pirqs )
             break;
-        if ( v->domain->arch.pirq_eoi_map )
+        if ( !is_hvm_domain(v->domain) &&
+             v->domain->arch.pv_domain.pirq_eoi_map )
             evtchn_unmask(v->domain->pirq_to_evtchn[eoi.irq]);
         if ( !is_hvm_domain(v->domain) ||
              domain_pirq_to_emuirq(v->domain, eoi.irq) == IRQ_PT )
@@ -289,17 +290,18 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
                                 PGT_writable_page) )
             break;
 
-        if ( cmpxchg(&v->domain->arch.pirq_eoi_map_mfn, 0, mfn) != 0 )
+        if ( cmpxchg(&v->domain->arch.pv_domain.pirq_eoi_map_mfn,
+                     0, mfn) != 0 )
         {
             put_page_and_type(mfn_to_page(mfn));
             ret = -EBUSY;
             break;
         }
 
-        v->domain->arch.pirq_eoi_map = map_domain_page_global(mfn);
-        if ( v->domain->arch.pirq_eoi_map == NULL )
+        v->domain->arch.pv_domain.pirq_eoi_map = map_domain_page_global(mfn);
+        if ( v->domain->arch.pv_domain.pirq_eoi_map == NULL )
         {
-            v->domain->arch.pirq_eoi_map_mfn = 0;
+            v->domain->arch.pv_domain.pirq_eoi_map_mfn = 0;
             put_page_and_type(mfn_to_page(mfn));
             ret = -ENOSPC;
             break;

@@ -4710,7 +4710,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         if ( copy_from_guest(&fmap, arg, 1) )
             return -EFAULT;
 
-        if ( fmap.map.nr_entries > ARRAY_SIZE(d->arch.e820) )
+        if ( fmap.map.nr_entries > ARRAY_SIZE(d->arch.pv_domain.e820) )
             return -EINVAL;
 
         rc = rcu_lock_target_domain_by_id(fmap.domid, &d);
@@ -4724,9 +4724,15 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
             return rc;
         }
 
-        rc = copy_from_guest(d->arch.e820, fmap.map.buffer,
+        if ( is_hvm_domain(d) )
+        {
+            rcu_unlock_domain(d);
+            return -EPERM;
+        }
+
+        rc = copy_from_guest(d->arch.pv_domain.e820, fmap.map.buffer,
                              fmap.map.nr_entries) ? -EFAULT : 0;
-        d->arch.nr_e820 = fmap.map.nr_entries;
+        d->arch.pv_domain.nr_e820 = fmap.map.nr_entries;
 
         rcu_unlock_domain(d);
         return rc;
@@ -4738,14 +4744,15 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         struct domain *d = current->domain;
 
         /* Backwards compatibility. */
-        if ( d->arch.nr_e820 == 0 )
+        if ( d->arch.pv_domain.nr_e820 == 0 )
             return -ENOSYS;
 
         if ( copy_from_guest(&map, arg, 1) )
             return -EFAULT;
 
-        map.nr_entries = min(map.nr_entries, d->arch.nr_e820);
-        if ( copy_to_guest(map.buffer, d->arch.e820, map.nr_entries) ||
+        map.nr_entries = min(map.nr_entries, d->arch.pv_domain.nr_e820);
+        if ( copy_to_guest(map.buffer, d->arch.pv_domain.e820,
+                           map.nr_entries) ||
              copy_to_guest(arg, &map, 1) )
             return -EFAULT;
 

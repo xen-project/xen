@@ -85,6 +85,14 @@ static void pt_irq_time_out(void *data)
     }
 }
 
+struct hvm_irq_dpci *domain_get_irq_dpci(const struct domain *d)
+{
+    if ( !d || !is_hvm_domain(d) )
+        return NULL;
+
+    return d->arch.hvm_domain.irq.dpci;
+}
+
 void free_hvm_irq_dpci(struct hvm_irq_dpci *dpci)
 {
     xfree(dpci->mirq);
@@ -150,12 +158,7 @@ int pt_irq_create_bind_vtd(
         for ( int i = 0; i < NR_HVM_IRQS; i++ )
             INIT_LIST_HEAD(&hvm_irq_dpci->girq[i]);
 
-        if ( domain_set_irq_dpci(d, hvm_irq_dpci) == 0 )
-        {
-            spin_unlock(&d->event_lock);
-            free_hvm_irq_dpci(hvm_irq_dpci);
-            return -EINVAL;
-        }
+        d->arch.hvm_domain.irq.dpci = hvm_irq_dpci;
     }
 
     if ( pt_irq_bind->irq_type == PT_IRQ_TYPE_MSI )
@@ -392,8 +395,7 @@ int hvm_do_IRQ_dpci(struct domain *d, unsigned int mirq)
     struct hvm_irq_dpci *dpci = domain_get_irq_dpci(d);
 
     ASSERT(spin_is_locked(&irq_desc[domain_pirq_to_irq(d, mirq)].lock));
-    if ( !iommu_enabled || (d == dom0) || !dpci ||
-         !test_bit(mirq, dpci->mapping))
+    if ( !iommu_enabled || !dpci || !test_bit(mirq, dpci->mapping))
         return 0;
 
     set_bit(mirq, dpci->dirq_mask);

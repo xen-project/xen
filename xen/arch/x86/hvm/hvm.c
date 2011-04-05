@@ -412,7 +412,7 @@ static int hvm_print_line(
 
     spin_lock(&hd->pbuf_lock);
     hd->pbuf[hd->pbuf_idx++] = c;
-    if ( (hd->pbuf_idx == (sizeof(hd->pbuf) - 2)) || (c == '\n') )
+    if ( (hd->pbuf_idx == (HVM_PBUF_SIZE - 2)) || (c == '\n') )
     {
         if ( c != '\n' )
             hd->pbuf[hd->pbuf_idx++] = '\n';
@@ -442,6 +442,19 @@ int hvm_domain_initialise(struct domain *d)
 
     INIT_LIST_HEAD(&d->arch.hvm_domain.msixtbl_list);
     spin_lock_init(&d->arch.hvm_domain.msixtbl_list_lock);
+
+    d->arch.hvm_domain.pbuf = xmalloc_array(char, HVM_PBUF_SIZE);
+    d->arch.hvm_domain.params = xmalloc_array(uint64_t, HVM_NR_PARAMS);
+    d->arch.hvm_domain.io_handler = xmalloc(struct hvm_io_handler);
+    rc = -ENOMEM;
+    if ( !d->arch.hvm_domain.pbuf || !d->arch.hvm_domain.params ||
+         !d->arch.hvm_domain.io_handler )
+        goto fail0;
+    memset(d->arch.hvm_domain.pbuf, 0,
+           HVM_PBUF_SIZE * sizeof(*d->arch.hvm_domain.pbuf));
+    memset(d->arch.hvm_domain.params, 0,
+           HVM_NR_PARAMS * sizeof(*d->arch.hvm_domain.params));
+    d->arch.hvm_domain.io_handler->num_slot = 0;
 
     hvm_init_guest_time(d);
 
@@ -480,6 +493,10 @@ int hvm_domain_initialise(struct domain *d)
     vioapic_deinit(d);
  fail1:
     hvm_destroy_cacheattr_region_list(d);
+ fail0:
+    xfree(d->arch.hvm_domain.io_handler);
+    xfree(d->arch.hvm_domain.params);
+    xfree(d->arch.hvm_domain.pbuf);
     return rc;
 }
 
@@ -500,6 +517,10 @@ void hvm_domain_relinquish_resources(struct domain *d)
         pmtimer_deinit(d);
         hpet_deinit(d);
     }
+
+    xfree(d->arch.hvm_domain.io_handler);
+    xfree(d->arch.hvm_domain.params);
+    xfree(d->arch.hvm_domain.pbuf);
 }
 
 void hvm_domain_destroy(struct domain *d)
@@ -2533,10 +2554,20 @@ static long hvm_grant_table_op(
 
 static long hvm_memory_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 {
-    long rc = do_memory_op(cmd, arg);
-    if ( (cmd & MEMOP_CMD_MASK) == XENMEM_decrease_reservation )
+    long rc;
+
+    switch ( cmd & MEMOP_CMD_MASK )
+    {
+    case XENMEM_memory_map:
+    case XENMEM_machine_memory_map:
+    case XENMEM_machphys_mapping:
+        return -ENOSYS;
+    case XENMEM_decrease_reservation:
+        rc = do_memory_op(cmd, arg);
         current->domain->arch.hvm_domain.qemu_mapcache_invalidate = 1;
-    return rc;
+        return rc;
+    }
+    return do_memory_op(cmd, arg);
 }
 
 static long hvm_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
@@ -2613,10 +2644,20 @@ static long hvm_grant_table_op_compat32(unsigned int cmd,
 
 static long hvm_memory_op_compat32(int cmd, XEN_GUEST_HANDLE(void) arg)
 {
-    long rc = compat_memory_op(cmd, arg);
-    if ( (cmd & MEMOP_CMD_MASK) == XENMEM_decrease_reservation )
+    int rc;
+
+    switch ( cmd & MEMOP_CMD_MASK )
+    {
+    case XENMEM_memory_map:
+    case XENMEM_machine_memory_map:
+    case XENMEM_machphys_mapping:
+        return -ENOSYS;
+    case XENMEM_decrease_reservation:
+        rc = compat_memory_op(cmd, arg);
         current->domain->arch.hvm_domain.qemu_mapcache_invalidate = 1;
-    return rc;
+        return rc;
+    }
+    return compat_memory_op(cmd, arg);
 }
 
 static long hvm_vcpu_op_compat32(

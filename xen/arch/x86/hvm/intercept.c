@@ -195,8 +195,7 @@ static int process_portio_intercept(portio_action_t action, ioreq_t *p)
 int hvm_io_intercept(ioreq_t *p, int type)
 {
     struct vcpu *v = current;
-    struct hvm_io_handler *handler =
-        &v->domain->arch.hvm_domain.io_handler;
+    struct hvm_io_handler *handler = v->domain->arch.hvm_domain.io_handler;
     int i;
     unsigned long addr, size;
 
@@ -230,7 +229,7 @@ void register_io_handler(
     struct domain *d, unsigned long addr, unsigned long size,
     void *action, int type)
 {
-    struct hvm_io_handler *handler = &d->arch.hvm_domain.io_handler;
+    struct hvm_io_handler *handler = d->arch.hvm_domain.io_handler;
     int num = handler->num_slot;
 
     BUG_ON(num >= MAX_IO_HANDLER);
@@ -246,7 +245,7 @@ void relocate_io_handler(
     struct domain *d, unsigned long old_addr, unsigned long new_addr,
     unsigned long size, int type)
 {
-    struct hvm_io_handler *handler = &d->arch.hvm_domain.io_handler;
+    struct hvm_io_handler *handler = d->arch.hvm_domain.io_handler;
     int i;
 
     for ( i = 0; i < handler->num_slot; i++ )

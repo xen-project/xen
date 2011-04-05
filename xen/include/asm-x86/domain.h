@@ -231,6 +231,17 @@ struct time_scale {
     u32 mul_frac;
 };
 
+struct pv_domain
+{
+    /* Shared page for notifying that explicit PIRQ EOI is required. */
+    unsigned long *pirq_eoi_map;
+    unsigned long pirq_eoi_map_mfn;
+
+    /* Pseudophysical e820 map (XENMEM_memory_map).  */
+    struct e820entry e820[3];
+    unsigned int nr_e820;
+};
+
 struct arch_domain
 {
 #ifdef CONFIG_X86_64
@@ -253,7 +264,11 @@ struct arch_domain
     uint32_t pci_cf8;
 
     struct list_head pdev_list;
-    struct hvm_domain hvm_domain;
+
+    union {
+        struct pv_domain pv_domain;
+        struct hvm_domain hvm_domain;
+    };
 
     struct paging_domain paging;
     struct p2m_domain *p2m;
@@ -264,14 +279,6 @@ struct arch_domain
     /* pirq to emulated irq and vice versa */
     int *emuirq_pirq;
     int *pirq_emuirq;
-
-    /* Shared page for notifying that explicit PIRQ EOI is required. */
-    unsigned long *pirq_eoi_map;
-    unsigned long pirq_eoi_map_mfn;
-
-    /* Pseudophysical e820 map (XENMEM_memory_map).  */
-    struct e820entry e820[3];
-    unsigned int nr_e820;
 
     /* Maximum physical-address bitwidth supported by this guest. */
     unsigned int physaddr_bitsize;
@@ -294,7 +301,9 @@ struct arch_domain
     } relmem;
     struct page_list_head relmem_list;
 
-    cpuid_input_t cpuids[MAX_CPUID_INPUT];
+    cpuid_input_t *cpuids;
+
+    struct PITState vpit;
 
     /* For Guest vMCA handling */
     struct domain_mca_msrs *vmca_msrs;

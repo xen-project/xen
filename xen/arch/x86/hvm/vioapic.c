@@ -272,8 +272,7 @@ static void ioapic_inj_irq(
 
 static inline int pit_channel0_enabled(void)
 {
-    PITState *pit = &current->domain->arch.hvm_domain.pl_time.vpit;
-    return pt_active(&pit->pt0);
+    return pt_active(&current->domain->arch.vpit.pt0);
 }
 
 static void vioapic_deliver(struct hvm_hw_vioapic *vioapic, int irq)

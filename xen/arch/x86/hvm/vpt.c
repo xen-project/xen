@@ -463,17 +463,20 @@ static void pt_adjust_vcpu(struct periodic_time *pt, struct vcpu *v)
 
 void pt_adjust_global_vcpu_target(struct vcpu *v)
 {
+    struct PITState *vpit;
     struct pl_time *pl_time;
     int i;
 
     if ( v == NULL )
         return;
 
-    pl_time = &v->domain->arch.hvm_domain.pl_time;
+    vpit = &v->domain->arch.vpit;
 
-    spin_lock(&pl_time->vpit.lock);
-    pt_adjust_vcpu(&pl_time->vpit.pt0, v);
-    spin_unlock(&pl_time->vpit.lock);
+    spin_lock(&vpit->lock);
+    pt_adjust_vcpu(&vpit->pt0, v);
+    spin_unlock(&vpit->lock);
+
+    pl_time = &v->domain->arch.hvm_domain.pl_time;
 
     spin_lock(&pl_time->vrtc.lock);
     pt_adjust_vcpu(&pl_time->vrtc.pt, v);
@@ -507,7 +510,7 @@ void pt_may_unmask_irq(struct domain *d, struct periodic_time *vlapic_pt)
 
     if ( d )
     {
-        pt_resume(&d->arch.hvm_domain.pl_time.vpit.pt0);
+        pt_resume(&d->arch.vpit.pt0);
         pt_resume(&d->arch.hvm_domain.pl_time.vrtc.pt);
         for ( i = 0; i < HPET_TIMER_NUM; i++ )
             pt_resume(&d->arch.hvm_domain.pl_time.vhpet.pt[i]);
