@@ -1778,6 +1778,7 @@ static unsigned int libxl__append_disk_list_of_type(libxl__gc *gc,
                 pdisk->readwrite = 0;
             type = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/device-type", libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/%s/frontend", be_path, *dir))));
             pdisk->is_cdrom = !strcmp(type, "cdrom");
+            pdisk->format = DISK_FORMAT_UNKNOWN;
         }
     }
 
