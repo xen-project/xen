@@ -1123,20 +1123,31 @@ long arch_do_domctl(
         {
             evc->size = sizeof(*evc);
 #ifdef __x86_64__
-            evc->sysenter_callback_cs      = v->arch.sysenter_callback_cs;
-            evc->sysenter_callback_eip     = v->arch.sysenter_callback_eip;
-            evc->sysenter_disables_events  = v->arch.sysenter_disables_events;
-            evc->syscall32_callback_cs     = v->arch.syscall32_callback_cs;
-            evc->syscall32_callback_eip    = v->arch.syscall32_callback_eip;
-            evc->syscall32_disables_events = v->arch.syscall32_disables_events;
-#else
-            evc->sysenter_callback_cs      = 0;
-            evc->sysenter_callback_eip     = 0;
-            evc->sysenter_disables_events  = 0;
-            evc->syscall32_callback_cs     = 0;
-            evc->syscall32_callback_eip    = 0;
-            evc->syscall32_disables_events = 0;
+            if ( !is_hvm_domain(d) )
+            {
+                evc->sysenter_callback_cs      =
+                    v->arch.pv_vcpu.sysenter_callback_cs;
+                evc->sysenter_callback_eip     =
+                    v->arch.pv_vcpu.sysenter_callback_eip;
+                evc->sysenter_disables_events  =
+                    v->arch.pv_vcpu.sysenter_disables_events;
+                evc->syscall32_callback_cs     =
+                    v->arch.pv_vcpu.syscall32_callback_cs;
+                evc->syscall32_callback_eip    =
+                    v->arch.pv_vcpu.syscall32_callback_eip;
+                evc->syscall32_disables_events =
+                    v->arch.pv_vcpu.syscall32_disables_events;
+            }
+            else
 #endif
+            {
+                evc->sysenter_callback_cs      = 0;
+                evc->sysenter_callback_eip     = 0;
+                evc->sysenter_disables_events  = 0;
+                evc->syscall32_callback_cs     = 0;
+                evc->syscall32_callback_eip    = 0;
+                evc->syscall32_disables_events = 0;
+            }
         }
         else
         {
@@ -1144,22 +1155,31 @@ long arch_do_domctl(
             if ( evc->size != sizeof(*evc) )
                 goto ext_vcpucontext_out;
 #ifdef __x86_64__
-            fixup_guest_code_selector(d, evc->sysenter_callback_cs);
-            v->arch.sysenter_callback_cs      = evc->sysenter_callback_cs;
-            v->arch.sysenter_callback_eip     = evc->sysenter_callback_eip;
-            v->arch.sysenter_disables_events  = evc->sysenter_disables_events;
-            fixup_guest_code_selector(d, evc->syscall32_callback_cs);
-            v->arch.syscall32_callback_cs     = evc->syscall32_callback_cs;
-            v->arch.syscall32_callback_eip    = evc->syscall32_callback_eip;
-            v->arch.syscall32_disables_events = evc->syscall32_disables_events;
-#else
+            if ( !is_hvm_domain(d) )
+            {
+                fixup_guest_code_selector(d, evc->sysenter_callback_cs);
+                v->arch.pv_vcpu.sysenter_callback_cs      =
+                    evc->sysenter_callback_cs;
+                v->arch.pv_vcpu.sysenter_callback_eip     =
+                    evc->sysenter_callback_eip;
+                v->arch.pv_vcpu.sysenter_disables_events  =
+                    evc->sysenter_disables_events;
+                fixup_guest_code_selector(d, evc->syscall32_callback_cs);
+                v->arch.pv_vcpu.syscall32_callback_cs     =
+                    evc->syscall32_callback_cs;
+                v->arch.pv_vcpu.syscall32_callback_eip    =
+                    evc->syscall32_callback_eip;
+                v->arch.pv_vcpu.syscall32_disables_events =
+                    evc->syscall32_disables_events;
+            }
+            else
+#endif
             /* We do not support syscall/syscall32/sysenter on 32-bit Xen. */
             if ( (evc->sysenter_callback_cs & ~3) ||
                  evc->sysenter_callback_eip ||
                  (evc->syscall32_callback_cs & ~3) ||
                  evc->syscall32_callback_eip )
                 goto ext_vcpucontext_out;
-#endif
         }
 
         ret = 0;
@@ -1698,7 +1718,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 
         /* IOPL privileges are virtualised: merge back into returned eflags. */
         BUG_ON((c(user_regs.eflags) & X86_EFLAGS_IOPL) != 0);
-        c(user_regs.eflags |= v->arch.iopl << 12);
+        c(user_regs.eflags |= v->arch.pv_vcpu.iopl << 12);
 
         if ( !is_pv_32on64_domain(v->domain) )
         {

@@ -429,7 +429,7 @@ static void do_guest_trap(
 
     trace_pv_trap(trapnr, regs->eip, use_error_code, regs->error_code);
 
-    tb = &v->arch.trap_bounce;
+    tb = &v->arch.pv_vcpu.trap_bounce;
     ti = &v->arch.pv_vcpu.trap_ctxt[trapnr];
 
     tb->flags = TBF_EXCEPTION;
@@ -507,7 +507,7 @@ static unsigned int check_guest_io_breakpoint(struct vcpu *v,
 asmlinkage int set_guest_machinecheck_trapbounce(void)
 {
     struct vcpu *v = current;
-    struct trap_bounce *tb = &v->arch.trap_bounce;
+    struct trap_bounce *tb = &v->arch.pv_vcpu.trap_bounce;
  
     do_guest_trap(TRAP_machine_check, guest_cpu_user_regs(), 0);
     tb->flags &= ~TBF_EXCEPTION; /* not needed for MCE delivery path */
@@ -521,7 +521,7 @@ asmlinkage int set_guest_machinecheck_trapbounce(void)
 asmlinkage int set_guest_nmi_trapbounce(void)
 {
     struct vcpu *v = current;
-    struct trap_bounce *tb = &v->arch.trap_bounce;
+    struct trap_bounce *tb = &v->arch.pv_vcpu.trap_bounce;
     do_guest_trap(TRAP_nmi, guest_cpu_user_regs(), 0);
     tb->flags &= ~TBF_EXCEPTION; /* not needed for NMI delivery path */
     return !null_trap_bounce(v, tb);
@@ -1007,7 +1007,7 @@ void propagate_page_fault(unsigned long addr, u16 error_code)
 {
     struct trap_info *ti;
     struct vcpu *v = current;
-    struct trap_bounce *tb = &v->arch.trap_bounce;
+    struct trap_bounce *tb = &v->arch.pv_vcpu.trap_bounce;
 
     v->arch.pv_vcpu.ctrlreg[2] = addr;
     arch_set_cr2(v, addr);
@@ -1504,10 +1504,10 @@ static int guest_io_okay(
 #endif
 
     if ( !vm86_mode(regs) &&
-         (v->arch.iopl >= (guest_kernel_mode(v, regs) ? 1 : 3)) )
+         (v->arch.pv_vcpu.iopl >= (guest_kernel_mode(v, regs) ? 1 : 3)) )
         return 1;
 
-    if ( v->arch.iobmp_limit > (port + bytes) )
+    if ( v->arch.pv_vcpu.iobmp_limit > (port + bytes) )
     {
         union { uint8_t bytes[2]; uint16_t mask; } x;
 
@@ -1516,7 +1516,7 @@ static int guest_io_okay(
          * read as 0xff (no access allowed).
          */
         TOGGLE_MODE();
-        switch ( __copy_from_guest_offset(x.bytes, v->arch.iobmp,
+        switch ( __copy_from_guest_offset(x.bytes, v->arch.pv_vcpu.iobmp,
                                           port>>3, 2) )
         {
         default: x.bytes[0] = ~0;
@@ -2020,7 +2020,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
     case 0xfa: /* CLI */
     case 0xfb: /* STI */
-        if ( v->arch.iopl < (guest_kernel_mode(v, regs) ? 1 : 3) )
+        if ( v->arch.pv_vcpu.iopl < (guest_kernel_mode(v, regs) ? 1 : 3) )
             goto fail;
         /*
          * This is just too dangerous to allow, in my opinion. Consider if the

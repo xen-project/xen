@@ -474,7 +474,7 @@ extern void init_int80_direct_trap(struct vcpu *v);
 
 #define set_int80_direct_trap(_ed)                  \
     (memcpy(idt_tables[(_ed)->processor] + 0x80,    \
-            &((_ed)->arch.int80_desc), 8))
+            &((_ed)->arch.pv_vcpu.int80_desc), 8))
 
 #else
 

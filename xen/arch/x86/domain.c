@@ -342,8 +342,6 @@ int vcpu_initialise(struct vcpu *v)
     struct domain *d = v->domain;
     int rc;
 
-    v->arch.vcpu_info_mfn = INVALID_MFN;
-
     v->arch.flags = TF_kernel_mode;
 
 #if defined(__i386__)
@@ -372,8 +370,6 @@ int vcpu_initialise(struct vcpu *v)
 
     v->arch.perdomain_ptes = perdomain_ptes(d, v);
 
-    spin_lock_init(&v->arch.shadow_ldt_lock);
-
     if ( (rc = xsave_alloc_save_area(v)) != 0 )
         return rc;
     if ( v->arch.xsave_area )
@@ -394,6 +390,10 @@ int vcpu_initialise(struct vcpu *v)
         rc = hvm_vcpu_initialise(v);
         goto done;
     }
+
+    v->arch.pv_vcpu.vcpu_info_mfn = INVALID_MFN;
+
+    spin_lock_init(&v->arch.pv_vcpu.shadow_ldt_lock);
 
     if ( !is_idle_domain(d) )
     {
@@ -868,7 +868,7 @@ int arch_set_info_guest(
     init_int80_direct_trap(v);
 
     /* IOPL privileges are virtualised. */
-    v->arch.iopl = (v->arch.user_regs.eflags >> 12) & 3;
+    v->arch.pv_vcpu.iopl = (v->arch.user_regs.eflags >> 12) & 3;
     v->arch.user_regs.eflags &= ~X86_EFLAGS_IOPL;
 
     /* Ensure real hardware interrupts are enabled. */
@@ -1016,14 +1016,14 @@ unmap_vcpu_info(struct vcpu *v)
 {
     unsigned long mfn;
 
-    if ( v->arch.vcpu_info_mfn == INVALID_MFN )
+    if ( v->arch.pv_vcpu.vcpu_info_mfn == INVALID_MFN )
         return;
 
-    mfn = v->arch.vcpu_info_mfn;
+    mfn = v->arch.pv_vcpu.vcpu_info_mfn;
     unmap_domain_page_global(v->vcpu_info);
 
     v->vcpu_info = &dummy_vcpu_info;
-    v->arch.vcpu_info_mfn = INVALID_MFN;
+    v->arch.pv_vcpu.vcpu_info_mfn = INVALID_MFN;
 
     put_page_and_type(mfn_to_page(mfn));
 }
@@ -1045,7 +1045,7 @@ map_vcpu_info(struct vcpu *v, unsigned long mfn, unsigned offset)
     if ( offset > (PAGE_SIZE - sizeof(vcpu_info_t)) )
         return -EINVAL;
 
-    if ( v->arch.vcpu_info_mfn != INVALID_MFN )
+    if ( v->arch.pv_vcpu.vcpu_info_mfn != INVALID_MFN )
         return -EINVAL;
 
     /* Run this command on yourself or on other offline VCPUS. */
@@ -1077,7 +1077,7 @@ map_vcpu_info(struct vcpu *v, unsigned long mfn, unsigned offset)
     }
 
     v->vcpu_info = new_info;
-    v->arch.vcpu_info_mfn = mfn;
+    v->arch.pv_vcpu.vcpu_info_mfn = mfn;
 
     /* Set new vcpu_info pointer /before/ setting pending flags. */
     wmb();

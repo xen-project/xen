@@ -387,12 +387,12 @@ void init_int80_direct_trap(struct vcpu *v)
     if ( TI_GET_IF(ti) || !guest_gate_selector_okay(v->domain, ti->cs) ||
          supervisor_mode_kernel )
     {
-        v->arch.int80_desc.a = v->arch.int80_desc.b = 0;
+        v->arch.pv_vcpu.int80_desc.a = v->arch.pv_vcpu.int80_desc.b = 0;
         return;
     }
 
-    v->arch.int80_desc.a = (ti->cs << 16) | (ti->address & 0xffff);
-    v->arch.int80_desc.b =
+    v->arch.pv_vcpu.int80_desc.a = (ti->cs << 16) | (ti->address & 0xffff);
+    v->arch.pv_vcpu.int80_desc.b =
         (ti->address & 0xffff0000) | 0x8f00 | ((TI_GET_DPL(ti) & 3) << 13);
 
     if ( v == current )

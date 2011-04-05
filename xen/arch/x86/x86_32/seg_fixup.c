@@ -546,7 +546,7 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
     if ( VM_ASSIST(curr->domain, VMASST_TYPE_4gb_segments_notify) )
     {
         struct trap_info   *ti  = &curr->arch.pv_vcpu.trap_ctxt[15];
-        struct trap_bounce *tb  = &curr->arch.trap_bounce;
+        struct trap_bounce *tb  = &curr->arch.pv_vcpu.trap_bounce;
 
         tb->flags      = TBF_EXCEPTION | TBF_EXCEPTION_ERRCODE;
         tb->error_code = pb - eip;

@@ -65,8 +65,8 @@ void __dummy__(void)
     OFFSET(VCPU_processor, struct vcpu, processor);
     OFFSET(VCPU_domain, struct vcpu, domain);
     OFFSET(VCPU_vcpu_info, struct vcpu, vcpu_info);
-    OFFSET(VCPU_trap_bounce, struct vcpu, arch.trap_bounce);
-    OFFSET(VCPU_int80_bounce, struct vcpu, arch.int80_bounce);
+    OFFSET(VCPU_trap_bounce, struct vcpu, arch.pv_vcpu.trap_bounce);
+    OFFSET(VCPU_int80_bounce, struct vcpu, arch.pv_vcpu.int80_bounce);
     OFFSET(VCPU_thread_flags, struct vcpu, arch.flags);
     OFFSET(VCPU_event_addr, struct vcpu, arch.pv_vcpu.event_callback_eip);
     OFFSET(VCPU_event_sel, struct vcpu, arch.pv_vcpu.event_callback_cs);
@@ -76,14 +76,18 @@ void __dummy__(void)
            arch.pv_vcpu.failsafe_callback_cs);
     OFFSET(VCPU_syscall_addr, struct vcpu,
            arch.pv_vcpu.syscall_callback_eip);
-    OFFSET(VCPU_syscall32_addr, struct vcpu, arch.syscall32_callback_eip);
-    OFFSET(VCPU_syscall32_sel, struct vcpu, arch.syscall32_callback_cs);
+    OFFSET(VCPU_syscall32_addr, struct vcpu,
+           arch.pv_vcpu.syscall32_callback_eip);
+    OFFSET(VCPU_syscall32_sel, struct vcpu,
+           arch.pv_vcpu.syscall32_callback_cs);
     OFFSET(VCPU_syscall32_disables_events, struct vcpu,
-           arch.syscall32_disables_events);
-    OFFSET(VCPU_sysenter_addr, struct vcpu, arch.sysenter_callback_eip);
-    OFFSET(VCPU_sysenter_sel, struct vcpu, arch.sysenter_callback_cs);
+           arch.pv_vcpu.syscall32_disables_events);
+    OFFSET(VCPU_sysenter_addr, struct vcpu,
+           arch.pv_vcpu.sysenter_callback_eip);
+    OFFSET(VCPU_sysenter_sel, struct vcpu,
+           arch.pv_vcpu.sysenter_callback_cs);
     OFFSET(VCPU_sysenter_disables_events, struct vcpu,
-           arch.sysenter_disables_events);
+           arch.pv_vcpu.sysenter_disables_events);
     OFFSET(VCPU_trap_ctxt, struct vcpu, arch.pv_vcpu.trap_ctxt);
     OFFSET(VCPU_kernel_sp, struct vcpu, arch.pv_vcpu.kernel_sp);
     OFFSET(VCPU_kernel_ss, struct vcpu, arch.pv_vcpu.kernel_ss);

@@ -592,12 +592,12 @@ static void invalidate_shadow_ldt(struct vcpu *v, int flush)
 
     BUG_ON(unlikely(in_irq()));
 
-    spin_lock(&v->arch.shadow_ldt_lock);
+    spin_lock(&v->arch.pv_vcpu.shadow_ldt_lock);
 
-    if ( v->arch.shadow_ldt_mapcnt == 0 )
+    if ( v->arch.pv_vcpu.shadow_ldt_mapcnt == 0 )
         goto out;
 
-    v->arch.shadow_ldt_mapcnt = 0;
+    v->arch.pv_vcpu.shadow_ldt_mapcnt = 0;
 
     for ( i = 16; i < 32; i++ )
     {
@@ -615,7 +615,7 @@ static void invalidate_shadow_ldt(struct vcpu *v, int flush)
         flush_tlb_mask(v->vcpu_dirty_cpumask);
 
  out:
-    spin_unlock(&v->arch.shadow_ldt_lock);
+    spin_unlock(&v->arch.pv_vcpu.shadow_ldt_lock);
 }
 
 
@@ -666,10 +666,10 @@ int map_ldt_shadow_page(unsigned int off)
 
     nl1e = l1e_from_pfn(mfn, l1e_get_flags(l1e) | _PAGE_RW);
 
-    spin_lock(&v->arch.shadow_ldt_lock);
+    spin_lock(&v->arch.pv_vcpu.shadow_ldt_lock);
     l1e_write(&v->arch.perdomain_ptes[off + 16], nl1e);
-    v->arch.shadow_ldt_mapcnt++;
-    spin_unlock(&v->arch.shadow_ldt_lock);
+    v->arch.pv_vcpu.shadow_ldt_mapcnt++;
+    spin_unlock(&v->arch.pv_vcpu.shadow_ldt_lock);
 
     return 1;
 }

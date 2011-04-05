@@ -378,11 +378,38 @@ struct pv_vcpu
     unsigned long vm_assist;
 
 #ifdef CONFIG_X86_64
+    unsigned long syscall32_callback_eip;
+    unsigned long sysenter_callback_eip;
+    unsigned short syscall32_callback_cs;
+    unsigned short sysenter_callback_cs;
+    bool_t syscall32_disables_events;
+    bool_t sysenter_disables_events;
+
     /* Segment base addresses. */
     unsigned long fs_base;
     unsigned long gs_base_kernel;
     unsigned long gs_base_user;
 #endif
+
+    /* Bounce information for propagating an exception to guest OS. */
+    struct trap_bounce trap_bounce;
+#ifdef CONFIG_X86_64
+    struct trap_bounce int80_bounce;
+#else
+    struct desc_struct int80_desc;
+#endif
+
+    /* I/O-port access bitmap. */
+    XEN_GUEST_HANDLE(uint8) iobmp; /* Guest kernel vaddr of the bitmap. */
+    unsigned int iobmp_limit; /* Number of ports represented in the bitmap. */
+    unsigned int iopl;        /* Current IOPL for this VCPU. */
+
+    /* Current LDT details. */
+    unsigned long shadow_ldt_mapcnt;
+    spinlock_t shadow_ldt_lock;
+
+    /* Guest-specified relocation of vcpu_info. */
+    unsigned long vcpu_info_mfn;
 };
 
 struct arch_vcpu
@@ -407,27 +434,6 @@ struct arch_vcpu
 
     void (*ctxt_switch_from) (struct vcpu *);
     void (*ctxt_switch_to) (struct vcpu *);
-
-    /* Bounce information for propagating an exception to guest OS. */
-    struct trap_bounce trap_bounce;
-
-    /* I/O-port access bitmap. */
-    XEN_GUEST_HANDLE(uint8) iobmp; /* Guest kernel vaddr of the bitmap. */
-    int iobmp_limit;  /* Number of ports represented in the bitmap.  */
-    int iopl;         /* Current IOPL for this VCPU. */
-
-#ifdef CONFIG_X86_32
-    struct desc_struct int80_desc;
-#endif
-#ifdef CONFIG_X86_64
-    struct trap_bounce int80_bounce;
-    unsigned long      syscall32_callback_eip;
-    unsigned long      sysenter_callback_eip;
-    unsigned short     syscall32_callback_cs;
-    unsigned short     sysenter_callback_cs;
-    bool_t             syscall32_disables_events;
-    bool_t             sysenter_disables_events;
-#endif
 
     /* Virtual Machine Extensions */
     union {
@@ -468,14 +474,7 @@ struct arch_vcpu
      */
     uint64_t xcr0_accum;
 
-    /* Current LDT details. */
-    unsigned long shadow_ldt_mapcnt;
-    spinlock_t shadow_ldt_lock;
-
     struct paging_vcpu paging;
-
-    /* Guest-specified relocation of vcpu_info. */
-    unsigned long vcpu_info_mfn;
 
 #ifdef CONFIG_X86_32
     /* map_domain_page() mapping cache. */

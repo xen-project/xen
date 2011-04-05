@@ -190,16 +190,16 @@ static long compat_register_guest_callback(
         break;
 
     case CALLBACKTYPE_syscall32:
-        v->arch.syscall32_callback_cs     = reg->address.cs;
-        v->arch.syscall32_callback_eip    = reg->address.eip;
-        v->arch.syscall32_disables_events =
+        v->arch.pv_vcpu.syscall32_callback_cs     = reg->address.cs;
+        v->arch.pv_vcpu.syscall32_callback_eip    = reg->address.eip;
+        v->arch.pv_vcpu.syscall32_disables_events =
             (reg->flags & CALLBACKF_mask_events) != 0;
         break;
 
     case CALLBACKTYPE_sysenter:
-        v->arch.sysenter_callback_cs     = reg->address.cs;
-        v->arch.sysenter_callback_eip    = reg->address.eip;
-        v->arch.sysenter_disables_events =
+        v->arch.pv_vcpu.sysenter_callback_cs     = reg->address.cs;
+        v->arch.pv_vcpu.sysenter_callback_eip    = reg->address.eip;
+        v->arch.pv_vcpu.sysenter_disables_events =
             (reg->flags & CALLBACKF_mask_events) != 0;
         break;
 

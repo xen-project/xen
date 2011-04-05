@@ -422,7 +422,7 @@ void __devinit subarch_percpu_traps_init(void)
 void init_int80_direct_trap(struct vcpu *v)
 {
     struct trap_info *ti = &v->arch.pv_vcpu.trap_ctxt[0x80];
-    struct trap_bounce *tb = &v->arch.int80_bounce;
+    struct trap_bounce *tb = &v->arch.pv_vcpu.int80_bounce;
 
     tb->flags = TBF_EXCEPTION;
     tb->cs    = ti->cs;
@@ -467,14 +467,14 @@ static long register_guest_callback(struct callback_register *reg)
         break;
 
     case CALLBACKTYPE_syscall32:
-        v->arch.syscall32_callback_eip = reg->address;
-        v->arch.syscall32_disables_events =
+        v->arch.pv_vcpu.syscall32_callback_eip = reg->address;
+        v->arch.pv_vcpu.syscall32_disables_events =
             !!(reg->flags & CALLBACKF_mask_events);
         break;
 
     case CALLBACKTYPE_sysenter:
-        v->arch.sysenter_callback_eip = reg->address;
-        v->arch.sysenter_disables_events =
+        v->arch.pv_vcpu.sysenter_callback_eip = reg->address;
+        v->arch.pv_vcpu.sysenter_disables_events =
             !!(reg->flags & CALLBACKF_mask_events);
         break;
 

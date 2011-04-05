@@ -53,7 +53,7 @@ void __dummy__(void)
 
     OFFSET(VCPU_processor, struct vcpu, processor);
     OFFSET(VCPU_vcpu_info, struct vcpu, vcpu_info);
-    OFFSET(VCPU_trap_bounce, struct vcpu, arch.trap_bounce);
+    OFFSET(VCPU_trap_bounce, struct vcpu, arch.pv_vcpu.trap_bounce);
     OFFSET(VCPU_thread_flags, struct vcpu, arch.flags);
     OFFSET(VCPU_event_sel, struct vcpu, arch.pv_vcpu.event_callback_cs);
     OFFSET(VCPU_event_addr, struct vcpu, arch.pv_vcpu.event_callback_eip);
