@@ -135,7 +135,7 @@ int pt_irq_create_bind_vtd(
                                                 BITS_TO_LONGS(d->nr_pirqs));
         hvm_irq_dpci->mapping = xmalloc_array(unsigned long,
                                               BITS_TO_LONGS(d->nr_pirqs));
-        hvm_irq_dpci->hvm_timer = xmalloc_array(struct timer, nr_irqs);
+        hvm_irq_dpci->hvm_timer = xmalloc_array(struct timer, d->nr_pirqs);
         if ( !hvm_irq_dpci->mirq ||
              !hvm_irq_dpci->dirq_mask ||
              !hvm_irq_dpci->mapping ||
@@ -150,7 +150,7 @@ int pt_irq_create_bind_vtd(
         bitmap_zero(hvm_irq_dpci->dirq_mask, d->nr_pirqs);
         bitmap_zero(hvm_irq_dpci->mapping, d->nr_pirqs);
         memset(hvm_irq_dpci->hvm_timer, 0,
-                nr_irqs * sizeof(*hvm_irq_dpci->hvm_timer));
+                d->nr_pirqs * sizeof(*hvm_irq_dpci->hvm_timer));
         for ( int i = 0; i < d->nr_pirqs; i++ ) {
             INIT_LIST_HEAD(&hvm_irq_dpci->mirq[i].digl_list);
             hvm_irq_dpci->mirq[i].gmsi.dest_vcpu_id = -1;
@@ -258,7 +258,6 @@ int pt_irq_create_bind_vtd(
         /* Bind the same mirq once in the same domain */
         if ( !test_and_set_bit(machine_gsi, hvm_irq_dpci->mapping))
         {
-            unsigned int irq = domain_pirq_to_irq(d, machine_gsi);
             unsigned int share;
 
             hvm_irq_dpci->mirq[machine_gsi].dom = d;
@@ -278,14 +277,14 @@ int pt_irq_create_bind_vtd(
 
             /* Init timer before binding */
             if ( pt_irq_need_timer(hvm_irq_dpci->mirq[machine_gsi].flags) )
-                init_timer(&hvm_irq_dpci->hvm_timer[irq],
+                init_timer(&hvm_irq_dpci->hvm_timer[machine_gsi],
                            pt_irq_time_out, &hvm_irq_dpci->mirq[machine_gsi], 0);
             /* Deal with gsi for legacy devices */
             rc = pirq_guest_bind(d->vcpu[0], machine_gsi, share);
             if ( unlikely(rc) )
             {
                 if ( pt_irq_need_timer(hvm_irq_dpci->mirq[machine_gsi].flags) )
-                    kill_timer(&hvm_irq_dpci->hvm_timer[irq]);
+                    kill_timer(&hvm_irq_dpci->hvm_timer[machine_gsi]);
                 hvm_irq_dpci->mirq[machine_gsi].dom = NULL;
                 clear_bit(machine_gsi, hvm_irq_dpci->mapping);
                 list_del(&girq->list);
@@ -374,7 +373,7 @@ int pt_irq_destroy_bind_vtd(
             pirq_guest_unbind(d, machine_gsi);
             msixtbl_pt_unregister(d, machine_gsi);
             if ( pt_irq_need_timer(hvm_irq_dpci->mirq[machine_gsi].flags) )
-                kill_timer(&hvm_irq_dpci->hvm_timer[domain_pirq_to_irq(d, machine_gsi)]);
+                kill_timer(&hvm_irq_dpci->hvm_timer[machine_gsi]);
             hvm_irq_dpci->mirq[machine_gsi].dom   = NULL;
             hvm_irq_dpci->mirq[machine_gsi].flags = 0;
             clear_bit(machine_gsi, hvm_irq_dpci->mapping);
@@ -516,7 +515,7 @@ static void hvm_dirq_assist(unsigned long _d)
          * will never be deasserted.
          */
         if ( pt_irq_need_timer(hvm_irq_dpci->mirq[pirq].flags) )
-            set_timer(&hvm_irq_dpci->hvm_timer[domain_pirq_to_irq(d, pirq)],
+            set_timer(&hvm_irq_dpci->hvm_timer[pirq],
                       NOW() + PT_IRQ_TIME_OUT);
         spin_unlock(&d->event_lock);
     }
@@ -544,7 +543,7 @@ static void __hvm_dpci_eoi(struct domain *d,
          ! pt_irq_need_timer(hvm_irq_dpci->mirq[machine_gsi].flags) )
         return;
 
-    stop_timer(&hvm_irq_dpci->hvm_timer[domain_pirq_to_irq(d, machine_gsi)]);
+    stop_timer(&hvm_irq_dpci->hvm_timer[machine_gsi]);
     pirq_guest_eoi(d, machine_gsi);
 }
 

@@ -101,7 +101,7 @@ void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
                 hvm_pci_intx_deassert(d, digl->device, digl->intx);
                 if ( --dpci->mirq[i].pending == 0 )
                 {
-                    stop_timer(&dpci->hvm_timer[domain_pirq_to_irq(d, i)]);
+                    stop_timer(&dpci->hvm_timer[i]);
                     pirq_guest_eoi(d, i);
                 }
             }
