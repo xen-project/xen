@@ -300,6 +300,32 @@ static void check_disable_c1e(unsigned int port, u8 value)
 		on_each_cpu(disable_c1e, NULL, 1);
 }
 
+/*
+ * BIOS is expected to clear MtrrFixDramModEn bit. According to AMD BKDG : 
+ * "The MtrrFixDramModEn bit should be set to 1 during BIOS initalization of 
+ * the fixed MTRRs, then cleared to 0 for operation."
+ */
+static void check_syscfg_dram_mod_en(void)
+{
+	uint64_t syscfg;
+	static bool_t printed = 0;
+
+	if (!((boot_cpu_data.x86_vendor == X86_VENDOR_AMD) &&
+		(boot_cpu_data.x86 >= 0x0f)))
+		return;
+
+	rdmsrl(MSR_K8_SYSCFG, syscfg);
+	if (!(syscfg & K8_MTRRFIXRANGE_DRAM_MODIFY))
+		return;
+
+	if (!test_and_set_bool(printed))
+		printk(KERN_ERR "MTRR: SYSCFG[MtrrFixDramModEn] not "
+			"cleared by BIOS, clearing this bit\n");
+
+	syscfg &= ~K8_MTRRFIXRANGE_DRAM_MODIFY;
+	wrmsrl(MSR_K8_SYSCFG, syscfg);
+}
+
 static void __devinit init_amd(struct cpuinfo_x86 *c)
 {
 	u32 l, h;
@@ -453,6 +479,8 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 		disable_c1_ramping();
 
 	set_cpuidmask(c);
+
+	check_syscfg_dram_mod_en();
 }
 
 static struct cpu_dev amd_cpu_dev __cpuinitdata = {
