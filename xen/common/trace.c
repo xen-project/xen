@@ -225,8 +225,6 @@ static int alloc_trace_bufs(unsigned int pages)
     t_buf_highwater = data_size >> 1; /* 50% high water */
     opt_tbuf_size = pages;
 
-    register_cpu_notifier(&cpu_nfb);
-
     printk("xentrace: initialised\n");
     wmb(); /* above must be visible before tb_init_done flag set */
     tb_init_done = 1;
@@ -309,6 +307,8 @@ int trace_will_trace_event(u32 event)
  */
 void __init init_trace_bufs(void)
 {
+    register_cpu_notifier(&cpu_nfb);
+
     if ( opt_tbuf_size && alloc_trace_bufs(opt_tbuf_size) )
     {
         printk(XENLOG_INFO "xentrace: allocation size %d failed, disabling\n",
