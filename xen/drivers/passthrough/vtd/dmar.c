@@ -675,6 +675,7 @@ static int __init acpi_parse_dmar(struct acpi_table_header *table)
     int ret = 0;
 
     dmar = (struct acpi_table_dmar *)table;
+    dmar_flags = dmar->flags;
 
     if ( !iommu_enabled )
     {
@@ -762,12 +763,7 @@ out:
 
 int __init acpi_dmar_init(void)
 {
-    struct acpi_table_dmar *dmar;
-
     acpi_get_table(ACPI_SIG_DMAR, 0, &dmar_table);
-    dmar = (struct acpi_table_dmar *) dmar_table;
-    dmar_flags = dmar->flags;
-
     return parse_dmar_table(acpi_parse_dmar);
 }
 
@@ -787,7 +783,7 @@ void acpi_dmar_zap(void)
     dmar_table->checksum -= 'X'-'D';
 }
 
-int __init platform_supports_intremap(void)
+int platform_supports_intremap(void)
 {
     unsigned int flags = 0;
 
@@ -795,7 +791,7 @@ int __init platform_supports_intremap(void)
     return ((dmar_flags & flags) == DMAR_INTR_REMAP);
 }
 
-int __init platform_supports_x2apic(void)
+int platform_supports_x2apic(void)
 {
     unsigned int flags = 0;
 

@@ -119,7 +119,7 @@ void vtd_ops_preamble_quirk(struct iommu* iommu);
 void vtd_ops_postamble_quirk(struct iommu* iommu);
 void me_wifi_quirk(struct domain *domain, u8 bus, u8 devfn, int map);
 void pci_vtd_quirk(struct pci_dev *pdev);
-int __init platform_supports_intremap(void);
-int __init platform_supports_x2apic(void);
+int platform_supports_intremap(void);
+int platform_supports_x2apic(void);
 
 #endif // _VTD_EXTERN_H_
