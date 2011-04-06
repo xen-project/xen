@@ -115,6 +115,10 @@ void __dummy__(void)
     OFFSET(VCPU_hvm_guest_cr2, struct vcpu, arch.hvm_vcpu.guest_cr[2]);
     BLANK();
 
+    OFFSET(VCPU_nhvm_guestmode, struct vcpu, arch.hvm_vcpu.nvcpu.nv_guestmode);
+    OFFSET(VCPU_nhvm_p2m, struct vcpu, arch.hvm_vcpu.nvcpu.nv_p2m);
+    BLANK();
+
     OFFSET(DOMAIN_is_32bit_pv, struct domain, arch.is_32bit_pv);
     BLANK();
 

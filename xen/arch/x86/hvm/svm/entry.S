@@ -65,6 +65,12 @@ ENTRY(svm_asm_do_resume)
         testl $~0,(r(dx),r(ax),1)
         jnz  .Lsvm_process_softirqs
 
+        mov  VCPU_nhvm_p2m(r(bx)),r(ax)
+        test r(ax),r(ax)
+        sete %al
+        andb VCPU_nhvm_guestmode(r(bx)),%al
+        jnz  .Lsvm_nsvm_no_p2m
+
         call svm_asid_handle_vmrun
 
         cmpb $0,addr_of(tb_init_done)
@@ -174,3 +180,9 @@ svm_stgi_label:
 .Lsvm_trace:
         call svm_trace_vmentry
         jmp  .Lsvm_trace_done
+
+.Lsvm_nsvm_no_p2m:
+        /* Someone shot down our nested p2m table; go round again
+         * and nsvm_vcpu_switch() will fix it for us. */
+        STGI
+        jmp  svm_asm_do_resume
