@@ -1164,9 +1164,8 @@ nestedsvm_check_intercepts(struct vcpu *v, struct cpu_user_regs *regs,
     uint64_t exitcode)
 {
     bool_t is_intercepted;
-    struct nestedvcpu *nv = &vcpu_nestedhvm(v);
 
-    ASSERT(nv->nv_vmexit_pending == 0);
+    ASSERT(vcpu_nestedhvm(v).nv_vmexit_pending == 0);
     is_intercepted = nsvm_vmcb_guest_intercepts_exitcode(v, regs, exitcode);
 
     switch (exitcode) {

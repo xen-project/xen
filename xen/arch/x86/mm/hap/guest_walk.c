@@ -122,7 +122,7 @@ unsigned long hap_p2m_ga_to_gfn(GUEST_PAGING_LEVELS)(
 #else
 
 unsigned long hap_gva_to_gfn(GUEST_PAGING_LEVELS)(
-    struct vcpu *v, unsigned long gva, uint32_t *pfec)
+    struct vcpu *v, struct p2m_domain *p2m, unsigned long gva, uint32_t *pfec)
 {
     gdprintk(XENLOG_ERR,
              "Guest paging level is greater than host paging level!\n");
