@@ -39,13 +39,13 @@
     } while(0)
 
 /* amd-iommu-detect functions */
-int __init amd_iommu_get_ivrs_dev_entries(void);
-int __init amd_iommu_detect_one_acpi(void *ivhd);
-int __init amd_iommu_detect_acpi(void);
+int amd_iommu_get_ivrs_dev_entries(void);
+int amd_iommu_detect_one_acpi(void *ivhd);
+int amd_iommu_detect_acpi(void);
 
 /* amd-iommu-init functions */
-int __init amd_iommu_init(void);
-int __init amd_iommu_update_ivrs_mapping_acpi(void);
+int amd_iommu_init(void);
+int amd_iommu_update_ivrs_mapping_acpi(void);
 
 /* mapping functions */
 int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
@@ -74,10 +74,10 @@ void flush_command_buffer(struct amd_iommu *iommu);
 /* find iommu for bdf */
 struct amd_iommu *find_iommu_for_device(int bdf);
 
-/*interrupt remapping */
-int __init amd_iommu_setup_ioapic_remapping(void);
-void*__init amd_iommu_alloc_intremap_table(void);
-void __init amd_iommu_free_intremap_table(int bdf);
+/* interrupt remapping */
+int amd_iommu_setup_ioapic_remapping(void);
+void *amd_iommu_alloc_intremap_table(void);
+void amd_iommu_free_intremap_table(int bdf);
 void invalidate_interrupt_table(struct amd_iommu *iommu, u16 device_id);
 void amd_iommu_ioapic_update_ire(
     unsigned int apic, unsigned int reg, unsigned int value);

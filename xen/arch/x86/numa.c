@@ -332,7 +332,7 @@ static __init int numa_setup(char *opt)
  * prior to this call, and this initialization is good enough
  * for the fake NUMA cases.
  */
-void __devinit init_cpu_to_node(void)
+void __init init_cpu_to_node(void)
 {
 	int i, node;
  	for (i = 0; i < NR_CPUS; i++) {
