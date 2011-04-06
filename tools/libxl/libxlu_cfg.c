@@ -1,3 +1,4 @@
+#include <limits.h>
 
 #include "libxlu_internal.h"
 #include "libxlu_cfg_y.h"

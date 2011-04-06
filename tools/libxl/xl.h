@@ -95,7 +95,7 @@ extern int cmdtable_len;
 /* Look up a command in the table, allowing unambiguous truncation */
 struct cmd_spec *cmdtable_lookup(const char *s);
 
-extern libxl_ctx ctx;
+extern libxl_ctx *ctx;
 extern xentoollog_logger_stdiostream *logger;
 
 /* global options */

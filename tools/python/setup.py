@@ -83,7 +83,7 @@ netlink = Extension("netlink",
 
 xl = Extension("xl",
                extra_compile_args = extra_compile_args,
-               include_dirs       = [ PATH_XEN, PATH_LIBXL, PATH_LIBXC, PATH_XENSTORE, "xen/lowlevel/xl" ],
+               include_dirs       = [ PATH_XEN, PATH_LIBXL, PATH_LIBXC, "xen/lowlevel/xl" ],
                library_dirs       = [ PATH_LIBXL ],
                libraries          = [ "xenlight" ],
                depends            = [ PATH_LIBXL + "/libxenlight.so" ],

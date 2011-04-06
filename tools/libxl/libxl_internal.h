@@ -82,6 +82,17 @@ _hidden void libxl__log(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
 
      /* these functions preserve errno (saving and restoring) */
 
+struct libxl__ctx {
+    xentoollog_logger *lg;
+    xc_interface *xch;
+    struct xs_handle *xsh;
+
+    /* for callers who reap children willy-nilly; caller must only
+     * set this after libxl_init and before any other call - or
+     * may leave them untouched */
+    int (*waitpid_instead)(pid_t pid, int *status, int flags);
+    libxl_version_info version_info;
+};
 
 typedef enum {
     DEVICE_VIF = 1,

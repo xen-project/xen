@@ -52,21 +52,21 @@ void log_destroy(struct xentoollog_logger *logger)
 {
 }
 
-#define INIT_STRUCT() libxl_ctx ctx; struct caml_logger lg; struct caml_gc gc; gc.offset = 0;
+#define INIT_STRUCT() libxl_ctx *ctx; struct caml_logger lg; struct caml_gc gc; gc.offset = 0;
 
 #define INIT_CTX()  \
 	lg.logger.vmessage = log_vmessage; \
 	lg.logger.destroy = log_destroy; \
 	lg.logger.progress = NULL; \
 	caml_enter_blocking_section(); \
-	ret = libxl_ctx_init(&ctx, LIBXL_VERSION, (struct xentoollog_logger *) &lg); \
+	ret = libxl_ctx_alloc(&ctx, LIBXL_VERSION, (struct xentoollog_logger *) &lg); \
 	if (ret != 0) \
 		failwith_xl("cannot init context", &lg);
 
 #define FREE_CTX()  \
 	gc_free(&gc); \
 	caml_leave_blocking_section(); \
-	libxl_ctx_free(&ctx)
+	libxl_ctx_free(ctx)
 
 static char * dup_String_val(caml_gc *gc, value s)
 {
@@ -379,7 +379,7 @@ value stub_xl_disk_add(value info, value domid)
 	c_info.domid = Int_val(domid);
 
 	INIT_CTX();
-	ret = libxl_device_disk_add(&ctx, Int_val(domid), &c_info);
+	ret = libxl_device_disk_add(ctx, Int_val(domid), &c_info);
 	if (ret != 0)
 		failwith_xl("disk_add", &lg);
 	FREE_CTX();
@@ -397,7 +397,7 @@ value stub_xl_disk_remove(value info, value domid)
 	c_info.domid = Int_val(domid);
 
 	INIT_CTX();
-	ret = libxl_device_disk_del(&ctx, &c_info, 0);
+	ret = libxl_device_disk_del(ctx, &c_info, 0);
 	if (ret != 0)
 		failwith_xl("disk_remove", &lg);
 	FREE_CTX();
@@ -415,7 +415,7 @@ value stub_xl_nic_add(value info, value domid)
 	c_info.domid = Int_val(domid);
 
 	INIT_CTX();
-	ret = libxl_device_nic_add(&ctx, Int_val(domid), &c_info);
+	ret = libxl_device_nic_add(ctx, Int_val(domid), &c_info);
 	if (ret != 0)
 		failwith_xl("nic_add", &lg);
 	FREE_CTX();
@@ -433,7 +433,7 @@ value stub_xl_nic_remove(value info, value domid)
 	c_info.domid = Int_val(domid);
 
 	INIT_CTX();
-	ret = libxl_device_nic_del(&ctx, &c_info, 0);
+	ret = libxl_device_nic_del(ctx, &c_info, 0);
 	if (ret != 0)
 		failwith_xl("nic_remove", &lg);
 	FREE_CTX();
@@ -454,7 +454,7 @@ value stub_xl_console_add(value info, value state, value domid)
 	c_info.build_state = &c_state;
 
 	INIT_CTX();
-	ret = libxl_device_console_add(&ctx, Int_val(domid), &c_info);
+	ret = libxl_device_console_add(ctx, Int_val(domid), &c_info);
 	if (ret != 0)
 		failwith_xl("console_add", &lg);
 	FREE_CTX();
@@ -472,7 +472,7 @@ value stub_xl_vkb_add(value info, value domid)
 	c_info.domid = Int_val(domid);
 
 	INIT_CTX();
-	ret = libxl_device_vkb_add(&ctx, Int_val(domid), &c_info);
+	ret = libxl_device_vkb_add(ctx, Int_val(domid), &c_info);
 	if (ret != 0)
 		failwith_xl("vkb_add", &lg);
 	FREE_CTX();
@@ -487,7 +487,7 @@ value stub_xl_vkb_clean_shutdown(value domid)
 	INIT_STRUCT();
 
 	INIT_CTX();
-	ret = libxl_device_vkb_clean_shutdown(&ctx, Int_val(domid));
+	ret = libxl_device_vkb_clean_shutdown(ctx, Int_val(domid));
 	if (ret != 0)
 		failwith_xl("vkb_clean_shutdown", &lg);
 	FREE_CTX();
@@ -502,7 +502,7 @@ value stub_xl_vkb_hard_shutdown(value domid)
 	INIT_STRUCT();
 
 	INIT_CTX();
-	ret = libxl_device_vkb_hard_shutdown(&ctx, Int_val(domid));
+	ret = libxl_device_vkb_hard_shutdown(ctx, Int_val(domid));
 	if (ret != 0)
 		failwith_xl("vkb_hard_shutdown", &lg);
 	FREE_CTX();
@@ -521,7 +521,7 @@ value stub_xl_vfb_add(value info, value domid)
 	c_info.domid = Int_val(domid);
 
 	INIT_CTX();
-	ret = libxl_device_vfb_add(&ctx, Int_val(domid), &c_info);
+	ret = libxl_device_vfb_add(ctx, Int_val(domid), &c_info);
 	if (ret != 0)
 		failwith_xl("vfb_add", &lg);
 	FREE_CTX();
@@ -536,7 +536,7 @@ value stub_xl_vfb_clean_shutdown(value domid)
 	INIT_STRUCT();
 
 	INIT_CTX();
-	ret = libxl_device_vfb_clean_shutdown(&ctx, Int_val(domid));
+	ret = libxl_device_vfb_clean_shutdown(ctx, Int_val(domid));
 	if (ret != 0)
 		failwith_xl("vfb_clean_shutdown", &lg);
 	FREE_CTX();
@@ -551,7 +551,7 @@ value stub_xl_vfb_hard_shutdown(value domid)
 	INIT_STRUCT();
 
 	INIT_CTX();
-	ret = libxl_device_vfb_hard_shutdown(&ctx, Int_val(domid));
+	ret = libxl_device_vfb_hard_shutdown(ctx, Int_val(domid));
 	if (ret != 0)
 		failwith_xl("vfb_hard_shutdown", &lg);
 	FREE_CTX();
@@ -569,7 +569,7 @@ value stub_xl_pci_add(value info, value domid)
 	device_pci_val(&gc, &c_info, info);
 
 	INIT_CTX();
-	ret = libxl_device_pci_add(&ctx, Int_val(domid), &c_info);
+	ret = libxl_device_pci_add(ctx, Int_val(domid), &c_info);
 	if (ret != 0)
 		failwith_xl("pci_add", &lg);
 	FREE_CTX();
@@ -587,7 +587,7 @@ value stub_xl_pci_remove(value info, value domid)
 	device_pci_val(&gc, &c_info, info);
 
 	INIT_CTX();
-	ret = libxl_device_pci_remove(&ctx, Int_val(domid), &c_info, 0);
+	ret = libxl_device_pci_remove(ctx, Int_val(domid), &c_info, 0);
 	if (ret != 0)
 		failwith_xl("pci_remove", &lg);
 	FREE_CTX();
@@ -602,7 +602,7 @@ value stub_xl_pci_shutdown(value domid)
 	INIT_STRUCT();
 
 	INIT_CTX();
-	ret = libxl_device_pci_shutdown(&ctx, Int_val(domid));
+	ret = libxl_device_pci_shutdown(ctx, Int_val(domid));
 	if (ret != 0)
 		failwith_xl("pci_shutdown", &lg);
 	FREE_CTX();
@@ -617,7 +617,7 @@ value stub_xl_button_press(value domid, value button)
 	INIT_STRUCT();
 	
 	INIT_CTX();
-	ret = libxl_button_press(&ctx, Int_val(domid), Int_val(button) + POWER_BUTTON);
+	ret = libxl_button_press(ctx, Int_val(domid), Int_val(button) + POWER_BUTTON);
 	if (ret != 0)
 		failwith_xl("button_press", &lg);
 	FREE_CTX();
@@ -634,7 +634,7 @@ value stub_xl_physinfo(value unit)
 	INIT_STRUCT();
 
 	INIT_CTX();
-	ret = libxl_get_physinfo(&ctx, &c_physinfo);
+	ret = libxl_get_physinfo(ctx, &c_physinfo);
 	if (ret != 0)
 		failwith_xl("physinfo", &lg);
 	FREE_CTX();
@@ -652,7 +652,7 @@ value stub_xl_topologyinfo(value unit)
 	INIT_STRUCT();
 
 	INIT_CTX();
-	ret = libxl_get_topologyinfo(&ctx, &c_topologyinfo);
+	ret = libxl_get_topologyinfo(ctx, &c_topologyinfo);
 	if (ret != 0)
 		failwith_xl("topologyinfo", &lg);
 	FREE_CTX();
@@ -670,7 +670,7 @@ value stub_xl_sched_credit_domain_get(value domid)
 	INIT_STRUCT();
 
 	INIT_CTX();
-	ret = libxl_sched_credit_domain_get(&ctx, Int_val(domid), &c_scinfo);
+	ret = libxl_sched_credit_domain_get(ctx, Int_val(domid), &c_scinfo);
 	if (ret != 0)
 		failwith_xl("sched_credit_domain_get", &lg);
 	FREE_CTX();
@@ -689,7 +689,7 @@ value stub_xl_sched_credit_domain_set(value domid, value scinfo)
 	sched_credit_val(&gc, &c_scinfo, scinfo);
 
 	INIT_CTX();
-	ret = libxl_sched_credit_domain_set(&ctx, Int_val(domid), &c_scinfo);
+	ret = libxl_sched_credit_domain_set(ctx, Int_val(domid), &c_scinfo);
 	if (ret != 0)
 		failwith_xl("sched_credit_domain_set", &lg);
 	FREE_CTX();
@@ -707,7 +707,7 @@ value stub_xl_send_trigger(value domid, value trigger, value vcpuid)
 	c_trigger = dup_String_val(&gc, trigger);
 
 	INIT_CTX();
-	ret = libxl_send_trigger(&ctx, Int_val(domid), c_trigger, Int_val(vcpuid));
+	ret = libxl_send_trigger(ctx, Int_val(domid), c_trigger, Int_val(vcpuid));
 	if (ret != 0)
 		failwith_xl("send_trigger", &lg);
 	FREE_CTX();
@@ -721,7 +721,7 @@ value stub_xl_send_sysrq(value domid, value sysrq)
 	INIT_STRUCT();
 
 	INIT_CTX();
-	ret = libxl_send_sysrq(&ctx, Int_val(domid), Int_val(sysrq));
+	ret = libxl_send_sysrq(ctx, Int_val(domid), Int_val(sysrq));
 	if (ret != 0)
 		failwith_xl("send_sysrq", &lg);
 	FREE_CTX();
@@ -738,7 +738,7 @@ value stub_xl_send_debug_keys(value keys)
 	c_keys = dup_String_val(&gc, keys);
 
 	INIT_CTX();
-	ret = libxl_send_debug_keys(&ctx, c_keys);
+	ret = libxl_send_debug_keys(ctx, c_keys);
 	if (ret != 0)
 		failwith_xl("send_debug_keys", &lg);
 	FREE_CTX();

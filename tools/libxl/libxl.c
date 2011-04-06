@@ -41,15 +41,22 @@
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 
-int libxl_ctx_init(libxl_ctx *ctx, int version, xentoollog_logger *lg)
+int libxl_ctx_alloc(libxl_ctx **pctx, int version, xentoollog_logger * lg)
 {
+    libxl_ctx *ctx;
     struct stat stat_buf;
 
     if (version != LIBXL_VERSION)
         return ERROR_VERSION;
+
+    ctx = malloc(sizeof(*ctx));
+    if (!ctx) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Failed to allocate context\n");
+        return ERROR_NOMEM;
+    }
+
     memset(ctx, 0, sizeof(libxl_ctx));
     ctx->lg = lg;
-    memset(&ctx->version_info, 0, sizeof(libxl_version_info));
 
     if ( stat(XENSTORE_PID_FILE, &stat_buf) != 0 ) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Is xenstore daemon running?\n"
@@ -73,6 +80,8 @@ int libxl_ctx_init(libxl_ctx *ctx, int version, xentoollog_logger *lg)
         xc_interface_close(ctx->xch);
         return ERROR_FAIL;
     }
+
+    *pctx = ctx;
     return 0;
 }
 

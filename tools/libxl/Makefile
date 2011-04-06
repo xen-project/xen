@@ -13,7 +13,6 @@ XLUMINOR = 0
 
 CFLAGS += -Werror -Wno-format-zero-length -Wmissing-declarations
 CFLAGS += -I. -fPIC
-CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) $(CFLAGS_libxenstore) $(CFLAGS_libblktapctl)
 
 ifeq ($(CONFIG_Linux),y)
 LIBUUID_LIBS += -luuid
@@ -38,13 +37,18 @@ LIBXL_OBJS = flexarray.o libxl.o libxl_create.o libxl_dm.o libxl_pci.o \
 			libxl_internal.o libxl_utils.o libxl_uuid.o $(LIBXL_OBJS-y)
 LIBXL_OBJS += _libxl_types.o
 
+$(LIBXL_OBJS): CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) $(CFLAGS_libxenstore) $(CFLAGS_libblktapctl)
+
 AUTOINCS= libxlu_cfg_y.h libxlu_cfg_l.h
 AUTOSRCS= libxlu_cfg_y.c libxlu_cfg_l.c
 LIBXLU_OBJS = libxlu_cfg_y.o libxlu_cfg_l.o libxlu_cfg.o
+$(LIBXLU_OBJS): CFLAGS += $(CFLAGS_libxenctrl) # For xentoollog.h
 
 CLIENTS = xl
 
 XL_OBJS = xl.o xl_cmdimpl.o xl_cmdtable.o
+$(XL_OBJS): CFLAGS += $(CFLAGS_libxenctrl) # For xentoollog.h
+$(XL_OBJS): CFLAGS += $(CFLAGS_libxenlight)
 
 .PHONY: all
 all: $(CLIENTS) libxenlight.so libxenlight.a libxlutil.so libxlutil.a \

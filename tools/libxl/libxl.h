@@ -124,12 +124,17 @@
 #ifndef LIBXL_H
 #define LIBXL_H
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdarg.h>
+#include <errno.h>
 #include <netinet/in.h>
-#include <xenctrl.h>
-#include <xs.h>
 #include <sys/wait.h> /* for pid_t */
+
+#include <xentoollog.h>
+
+#include <xen/sched.h>
+#include <xen/sysctl.h>
 
 #include <libxl_uuid.h>
 
@@ -216,17 +221,7 @@ void libxl_cpuid_destroy(libxl_cpuid_policy_list *cpuid_list);
 
 #include "_libxl_types.h"
 
-typedef struct {
-    xentoollog_logger *lg;
-    xc_interface *xch;
-    struct xs_handle *xsh;
-
-    /* for callers who reap children willy-nilly; caller must only
-     * set this after libxl_init and before any other call - or
-     * may leave them untouched */
-    int (*waitpid_instead)(pid_t pid, int *status, int flags);
-    libxl_version_info version_info;
-} libxl_ctx;
+typedef struct libxl__ctx libxl_ctx;
 
 const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx);
 
@@ -283,7 +278,7 @@ typedef struct {
 } libxl_domain_config;
 
 /* context functions */
-int libxl_ctx_init(libxl_ctx *ctx, int version, xentoollog_logger*);
+int libxl_ctx_alloc(libxl_ctx **pctx, int version, xentoollog_logger *lg);
 int libxl_ctx_free(libxl_ctx *ctx);
 int libxl_ctx_postfork(libxl_ctx *ctx);
 

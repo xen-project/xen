@@ -370,7 +370,7 @@ PyObject *attrib__struct_in_addr_get(struct in_addr *pptr)
 
 typedef struct {
     PyObject_HEAD;
-    libxl_ctx ctx;
+    libxl_ctx *ctx;
     xentoollog_logger_stdiostream *logger;
     xentoollog_level minmsglevel;
 } XlObject;
@@ -381,7 +381,7 @@ static PyObject *pyxl_list_domains(XlObject *self)
     PyObject *list;
     int nr_dom, i;
 
-    info = libxl_list_domain(&self->ctx, &nr_dom);
+    info = libxl_list_domain(self->ctx, &nr_dom);
     if ( NULL == info )
         return PyList_New(0);
 
@@ -416,7 +416,7 @@ static PyObject *pyxl_domid_to_name(XlObject *self, PyObject *args)
     if ( !PyArg_ParseTuple(args, "i", &domid) )
         return NULL;
 
-    domname = libxl_domid_to_name(&self->ctx, domid);
+    domname = libxl_domid_to_name(self->ctx, domid);
     ret = PyString_FromString(domname);
     free(domname);
 
@@ -428,7 +428,7 @@ static PyObject *pyxl_domain_shutdown(XlObject *self, PyObject *args)
     int domid, req = 0;
     if ( !PyArg_ParseTuple(args, "i|i", &domid, &req) )
         return NULL;
-    if ( libxl_domain_shutdown(&self->ctx, domid, req) ) {
+    if ( libxl_domain_shutdown(self->ctx, domid, req) ) {
         PyErr_SetString(xl_error_obj, "cannot shutdown domain");
         return NULL;
     }
@@ -441,7 +441,7 @@ static PyObject *pyxl_domain_destroy(XlObject *self, PyObject *args)
     int domid, force = 1;
     if ( !PyArg_ParseTuple(args, "i|i", &domid, &force) )
         return NULL;
-    if ( libxl_domain_destroy(&self->ctx, domid, force) ) {
+    if ( libxl_domain_destroy(self->ctx, domid, force) ) {
         PyErr_SetString(xl_error_obj, "cannot destroy domain");
         return NULL;
     }
@@ -454,7 +454,7 @@ static PyObject *pyxl_domain_pause(XlObject *self, PyObject *args)
     int domid;
     if ( !PyArg_ParseTuple(args, "i", &domid) )
         return NULL;
-    if ( libxl_domain_pause(&self->ctx, domid) ) {
+    if ( libxl_domain_pause(self->ctx, domid) ) {
         PyErr_SetString(xl_error_obj, "cannot pause domain");
         return NULL;
     }
@@ -467,7 +467,7 @@ static PyObject *pyxl_domain_unpause(XlObject *self, PyObject *args)
     int domid;
     if ( !PyArg_ParseTuple(args, "i", &domid) )
         return NULL;
-    if ( libxl_domain_unpause(&self->ctx, domid) ) {
+    if ( libxl_domain_unpause(self->ctx, domid) ) {
         PyErr_SetString(xl_error_obj, "cannot unpause domain");
         return NULL;
     }
@@ -481,7 +481,7 @@ static PyObject *pyxl_domain_rename(XlObject *self, PyObject *args)
     int domid;
     if ( !PyArg_ParseTuple(args, "is|s", &domid, &new_name, &old_name) )
         return NULL;
-    if ( libxl_domain_rename(&self->ctx, domid, old_name, new_name) ) {
+    if ( libxl_domain_rename(self->ctx, domid, old_name, new_name) ) {
         PyErr_SetString(xl_error_obj, "cannot rename domain");
         return NULL;
     }
@@ -501,7 +501,7 @@ static PyObject *pyxl_pci_add(XlObject *self, PyObject *args)
         return NULL;
     }
     pci = (Py_device_pci *)obj;
-    if ( libxl_device_pci_add(&self->ctx, domid, &pci->obj) ) {
+    if ( libxl_device_pci_add(self->ctx, domid, &pci->obj) ) {
         PyErr_SetString(xl_error_obj, "cannot add pci device");
         return NULL;
     }
@@ -522,7 +522,7 @@ static PyObject *pyxl_pci_del(XlObject *self, PyObject *args)
         return NULL;
     }
     pci = (Py_device_pci *)obj;
-    if ( libxl_device_pci_remove(&self->ctx, domid, &pci->obj, force) ) {
+    if ( libxl_device_pci_remove(self->ctx, domid, &pci->obj, force) ) {
         PyErr_SetString(xl_error_obj, "cannot remove pci device");
         return NULL;
     }
@@ -544,7 +544,7 @@ static PyObject *pyxl_pci_parse(XlObject *self, PyObject *args)
         return NULL;
     }
 
-    if ( libxl_device_pci_parse_bdf(&self->ctx, &pci->obj, str) ) {
+    if ( libxl_device_pci_parse_bdf(self->ctx, &pci->obj, str) ) {
         PyErr_SetString(xl_error_obj, "cannot parse pci device spec (BDF)");
         Py_DECREF(pci);
         return NULL;
@@ -559,7 +559,7 @@ static PyObject *pyxl_pci_list_assignable(XlObject *self, PyObject *args)
     PyObject *list;
     int nr_dev, i;
 
-    if ( libxl_device_pci_list_assignable(&self->ctx, &dev, &nr_dev) ) {
+    if ( libxl_device_pci_list_assignable(self->ctx, &dev, &nr_dev) ) {
         PyErr_SetString(xl_error_obj, "Cannot list assignable devices");
         return NULL;
     }
@@ -595,7 +595,7 @@ static PyObject *pyxl_pci_list(XlObject *self, PyObject *args)
     if ( !PyArg_ParseTuple(args, "i", &domid) )
         return NULL;
 
-    if ( libxl_device_pci_list_assigned(&self->ctx, &dev, domid, &nr_dev) ) {
+    if ( libxl_device_pci_list_assigned(self->ctx, &dev, domid, &nr_dev) ) {
         PyErr_SetString(xl_error_obj, "Cannot list assignable devices");
         return NULL;
     }
@@ -663,7 +663,7 @@ static PyObject *PyXl_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (self == NULL)
         return NULL;
 
-    memset(&self->ctx, 0, sizeof(self->ctx));
+    self->ctx = NULL;
     self->logger = NULL;
     self->minmsglevel = XTL_PROGRESS;
 
@@ -679,7 +679,7 @@ PyXl_init(XlObject *self, PyObject *args, PyObject *kwds)
         return -1;
     }
 
-    if ( libxl_ctx_init(&self->ctx, LIBXL_VERSION,
+    if ( libxl_ctx_alloc(&self->ctx, LIBXL_VERSION,
                 (xentoollog_logger*)self->logger) ) {
         PyErr_SetString(xl_error_obj, "cannot init xl context");
         return -1;
@@ -690,7 +690,7 @@ PyXl_init(XlObject *self, PyObject *args, PyObject *kwds)
 
 static void PyXl_dealloc(XlObject *self)
 {
-    libxl_ctx_free(&self->ctx);
+    libxl_ctx_free(self->ctx);
     if ( self->logger )
         xtl_logger_destroy((xentoollog_logger*)self->logger);
 

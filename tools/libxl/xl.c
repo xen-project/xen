@@ -26,6 +26,7 @@
 #include <fcntl.h>
 #include <ctype.h>
 #include <inttypes.h>
+#include <xenctrl.h>
 
 #include "libxl.h"
 #include "libxl_utils.h"
@@ -111,7 +112,7 @@ int main(int argc, char **argv)
     logger = xtl_createlogger_stdiostream(stderr, minmsglevel,  0);
     if (!logger) exit(1);
 
-    if (libxl_ctx_init(&ctx, LIBXL_VERSION, (xentoollog_logger*)logger)) {
+    if (libxl_ctx_alloc(&ctx, LIBXL_VERSION, (xentoollog_logger*)logger)) {
         fprintf(stderr, "cannot init xl context\n");
         exit(1);
     }
@@ -123,7 +124,7 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    ret = libxl_read_file_contents(&ctx, config_file,
+    ret = libxl_read_file_contents(ctx, config_file,
             &config_data, &config_len);
     if (ret)
         fprintf(stderr, "Failed to read config file: %s: %s\n",
@@ -147,7 +148,7 @@ int main(int argc, char **argv)
         ret = 1;
     }
 
-    libxl_ctx_free(&ctx);
+    libxl_ctx_free(ctx);
     xtl_logger_destroy((xentoollog_logger*)logger);
 
     return ret;
