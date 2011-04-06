@@ -116,20 +116,6 @@ void mtrr_wrmsr(unsigned int msr, uint64_t msr_content)
 }
 
 /**
- * Enable and allow read/write of extended fixed-range MTRR bits on K8 CPUs
- * see AMD publication no. 24593, chapter 3.2.1 for more information
- */
-static inline void k8_enable_fixed_iorrs(void)
-{
-	uint64_t msr_content;
-
-	rdmsrl(MSR_K8_SYSCFG, msr_content);
-	mtrr_wrmsr(MSR_K8_SYSCFG, msr_content 
-				| K8_MTRRFIXRANGE_DRAM_ENABLE
-				| K8_MTRRFIXRANGE_DRAM_MODIFY);
-}
-
-/**
  * Checks and updates an fixed-range MTRR if it differs from the value it
  * should have. If K8 extenstions are wanted, update the K8 SYSCFG MSR also.
  * see AMD publication no. 24593, chapter 7.8.1, page 233 for more information
@@ -145,10 +131,6 @@ static void set_fixed_range(int msr, int * changed, unsigned int * msrwords)
 	val = ((uint64_t)msrwords[1] << 32) | msrwords[0];
 
 	if (msr_content != val) {
-		if (boot_cpu_data.x86_vendor == X86_VENDOR_AMD &&
-		    boot_cpu_data.x86 == 15 &&
-		    ((msrwords[0] | msrwords[1]) & K8_MTRR_RDMEM_WRMEM_MASK))
-			k8_enable_fixed_iorrs();
 		mtrr_wrmsr(msr, val);
 		*changed = TRUE;
 	}
