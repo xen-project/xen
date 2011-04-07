@@ -74,9 +74,6 @@ nestedhvm_vcpu_initialise(struct vcpu *v)
 {
     int rc;
 
-    if ( !nestedhvm_enabled(v->domain) )
-        return 0;
-
     if ( (rc = nhvm_vcpu_initialise(v)) )
     {
         nhvm_vcpu_destroy(v);

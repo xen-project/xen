@@ -967,7 +967,8 @@ int hvm_vcpu_initialise(struct vcpu *v)
     if ( (rc = hvm_funcs.vcpu_initialise(v)) != 0 )
         goto fail2;
 
-    if ( (rc = nestedhvm_vcpu_initialise(v)) < 0 ) 
+    if ( nestedhvm_enabled(v->domain) 
+         && (rc = nestedhvm_vcpu_initialise(v)) < 0 ) 
         goto fail3;
 
     /* Create ioreq event channel. */
