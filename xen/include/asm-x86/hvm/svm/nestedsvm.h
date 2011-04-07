@@ -100,7 +100,7 @@ nestedsvm_check_intercepts(struct vcpu *v, struct cpu_user_regs *regs,
     uint64_t exitcode);
 
 /* Interface methods */
-int nsvm_vcpu_destroy(struct vcpu *v);
+void nsvm_vcpu_destroy(struct vcpu *v);
 int nsvm_vcpu_initialise(struct vcpu *v);
 int nsvm_vcpu_reset(struct vcpu *v);
 int nsvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs);

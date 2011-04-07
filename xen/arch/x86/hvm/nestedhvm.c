@@ -33,12 +33,8 @@ nestedhvm_enabled(struct domain *d)
     bool_t enabled;
 
     enabled = !!(d->arch.hvm_domain.params[HVM_PARAM_NESTEDHVM]);
-    /* sanity check */
     BUG_ON(enabled && !is_hvm_domain(d));
-
-    if (!is_hvm_domain(d))
-        return 0;
-
+    
     return enabled;
 }
 
@@ -78,8 +74,11 @@ nestedhvm_vcpu_initialise(struct vcpu *v)
 {
     int rc;
 
-    rc = nhvm_vcpu_initialise(v); 
-    if (rc) {
+    if ( !nestedhvm_enabled(v->domain) )
+        return 0;
+
+    if ( (rc = nhvm_vcpu_initialise(v)) )
+    {
         nhvm_vcpu_destroy(v);
         return rc;
     }
@@ -88,13 +87,11 @@ nestedhvm_vcpu_initialise(struct vcpu *v)
     return 0;
 }
 
-int
+void
 nestedhvm_vcpu_destroy(struct vcpu *v)
 {
-    if (!nestedhvm_enabled(v->domain))
-        return 0;
-
-    return nhvm_vcpu_destroy(v);
+    if ( nestedhvm_enabled(v->domain) )
+        nhvm_vcpu_destroy(v);
 }
 
 static void

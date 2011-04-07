@@ -38,7 +38,7 @@ bool_t nestedhvm_enabled(struct domain *d);
 
 /* Nested VCPU */
 int nestedhvm_vcpu_initialise(struct vcpu *v);
-int nestedhvm_vcpu_destroy(struct vcpu *v);
+void nestedhvm_vcpu_destroy(struct vcpu *v);
 void nestedhvm_vcpu_reset(struct vcpu *v);
 bool_t nestedhvm_vcpu_in_guestmode(struct vcpu *v);
 #define nestedhvm_vcpu_enter_guestmode(v) \

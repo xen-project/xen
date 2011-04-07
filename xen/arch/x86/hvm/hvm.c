@@ -967,18 +967,8 @@ int hvm_vcpu_initialise(struct vcpu *v)
     if ( (rc = hvm_funcs.vcpu_initialise(v)) != 0 )
         goto fail2;
 
-    /* When I start the l1 guest with 'xm/xend' then HVM_PARAM_NESTEDHVM
-     * is already evaluated.
-     *
-     * When I start the l1 guest with 'xl' then HVM_PARAM_NESTEDHVM
-     * has not been evaluated yet so we have to initialise nested
-     * virtualization unconditionally here.
-     */
-    rc = nestedhvm_vcpu_initialise(v);
-    if ( rc < 0 ) {
-        printk("%s: nestedhvm_vcpu_initialise returned %i\n", __func__, rc);
+    if ( (rc = nestedhvm_vcpu_initialise(v)) < 0 ) 
         goto fail3;
-    }
 
     /* Create ioreq event channel. */
     rc = alloc_unbound_xen_event_channel(v, 0);
@@ -1046,11 +1036,7 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
 void hvm_vcpu_destroy(struct vcpu *v)
 {
-    int rc;
-
-    rc = nestedhvm_vcpu_destroy(v);
-    if (rc)
-	gdprintk(XENLOG_ERR, "nestedhvm_vcpu_destroy() failed with %i\n", rc);
+    nestedhvm_vcpu_destroy(v);
 
 #ifdef CONFIG_COMPAT
     free_compat_arg_xlat(v);
@@ -3436,6 +3422,11 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                  */
                 if ( !paging_mode_hap(d) && a.value )
                     rc = -EINVAL;
+                /* Set up NHVM state for any vcpus that are already up */
+                if ( !d->arch.hvm_domain.params[HVM_PARAM_NESTEDHVM] )
+                    for_each_vcpu(d, v)
+                        if ( rc == 0 )
+                            rc = nestedhvm_vcpu_initialise(v);
                 break;
             }
 
@@ -4035,11 +4026,10 @@ int nhvm_vcpu_initialise(struct vcpu *v)
     return -EOPNOTSUPP;
 }
 
-int nhvm_vcpu_destroy(struct vcpu *v)
+void nhvm_vcpu_destroy(struct vcpu *v)
 {
-    if (hvm_funcs.nhvm_vcpu_destroy)
-        return hvm_funcs.nhvm_vcpu_destroy(v);
-    return -EOPNOTSUPP;
+    if ( hvm_funcs.nhvm_vcpu_destroy )
+        hvm_funcs.nhvm_vcpu_destroy(v);
 }
 
 int nhvm_vcpu_reset(struct vcpu *v)

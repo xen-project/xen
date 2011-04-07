@@ -148,7 +148,7 @@ struct hvm_function_table {
 
     /* Nested HVM */
     int (*nhvm_vcpu_initialise)(struct vcpu *v);
-    int (*nhvm_vcpu_destroy)(struct vcpu *v);
+    void (*nhvm_vcpu_destroy)(struct vcpu *v);
     int (*nhvm_vcpu_reset)(struct vcpu *v);
     int (*nhvm_vcpu_hostrestore)(struct vcpu *v,
                                 struct cpu_user_regs *regs);
@@ -415,7 +415,7 @@ static inline int hvm_memory_event_int3(unsigned long gla)
 /* Initialize vcpu's struct nestedhvm */
 int nhvm_vcpu_initialise(struct vcpu *v);
 /* Destroy and free vcpu's struct nestedhvm */
-int nhvm_vcpu_destroy(struct vcpu *v);
+void nhvm_vcpu_destroy(struct vcpu *v);
 /* Reset vcpu's state when l1 guest disables nested virtualization */
 int nhvm_vcpu_reset(struct vcpu *v);
 /* Restores l1 guest state */

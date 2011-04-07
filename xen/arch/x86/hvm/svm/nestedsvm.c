@@ -112,7 +112,7 @@ err:
     return -ENOMEM;
 }
 
-int nsvm_vcpu_destroy(struct vcpu *v)
+void nsvm_vcpu_destroy(struct vcpu *v)
 {
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
@@ -134,8 +134,6 @@ int nsvm_vcpu_destroy(struct vcpu *v)
     }
     if (svm->ns_iomap)
         svm->ns_iomap = NULL;
-
-    return 0;
 }
 
 int nsvm_vcpu_reset(struct vcpu *v)
