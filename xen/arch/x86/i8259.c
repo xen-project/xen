@@ -33,6 +33,8 @@
  * interrupt-controller happy.
  */
 
+__asm__(".section .text");
+
 BUILD_COMMON_IRQ()
 
 #define BI(x,y) \

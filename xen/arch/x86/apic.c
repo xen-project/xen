@@ -82,6 +82,7 @@ bool_t __read_mostly directed_eoi_enabled = 0;
  * is no hardware IRQ pin equivalent for them, they are triggered
  * through the ICC by us (IPIs)
  */
+__asm__(".section .text");
 BUILD_SMP_INTERRUPT(irq_move_cleanup_interrupt,IRQ_MOVE_CLEANUP_VECTOR)
 BUILD_SMP_INTERRUPT(event_check_interrupt,EVENT_CHECK_VECTOR)
 BUILD_SMP_INTERRUPT(invalidate_interrupt,INVALIDATE_TLB_VECTOR)
