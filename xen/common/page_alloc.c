@@ -41,6 +41,7 @@
 #include <asm/page.h>
 #include <asm/numa.h>
 #include <asm/flushtlb.h>
+#include <asm/p2m.h>
 
 /*
  * Comma-separated list of hexadecimal page numbers containing bad bytes.
@@ -714,10 +715,15 @@ int offline_page(unsigned long mfn, int broken, uint32_t *status)
     }
     else if ( (owner = page_get_owner_and_reference(pg)) )
     {
+        if ( p2m_pod_offline_or_broken_hit(pg) )
+            goto pod_replace;
+        else
+        {
             *status = PG_OFFLINE_OWNED | PG_OFFLINE_PENDING |
               (owner->domain_id << PG_OFFLINE_OWNER_SHIFT);
             /* Release the reference since it will not be allocated anymore */
             put_page(pg);
+        }
     }
     else if ( old_info & PGC_xen_heap )
     {
@@ -742,6 +748,18 @@ int offline_page(unsigned long mfn, int broken, uint32_t *status)
         *status |= PG_OFFLINE_BROKEN;
 
     spin_unlock(&heap_lock);
+
+    return ret;
+
+pod_replace:
+    put_page(pg);
+    spin_unlock(&heap_lock);
+
+    p2m_pod_offline_or_broken_replace(pg);
+    *status = PG_OFFLINE_OFFLINED;
+
+    if ( broken )
+        *status |= PG_OFFLINE_BROKEN;
 
     return ret;
 }
