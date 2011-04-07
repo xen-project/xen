@@ -611,10 +611,6 @@ static void free_heap_pages(
 
 
 /*
- * Following possible status for a page:
- * free and Online; free and offlined; free and offlined and broken;
- * assigned and online; assigned and offlining; assigned and offling and broken
- *
  * Following rules applied for page offline:
  * Once a page is broken, it can't be assigned anymore
  * A page will be offlined only if it is free
@@ -711,14 +707,9 @@ int offline_page(unsigned long mfn, int broken, uint32_t *status)
 
     old_info = mark_page_offline(pg, broken);
 
-    if ( page_state_is(pg, free) )
+    if ( page_state_is(pg, offlined) )
     {
-        /* Free pages are reserve directly */
         reserve_heap_page(pg);
-        *status = PG_OFFLINE_OFFLINED;
-    }
-    else if ( page_state_is(pg, offlined) )
-    {
         *status = PG_OFFLINE_OFFLINED;
     }
     else if ( (owner = page_get_owner_and_reference(pg)) )
