@@ -431,7 +431,7 @@ static int __init acpi_parse_madt_lapic_entries(void)
 	 */
 
 	count =
-	    acpi_table_parse_madt(ACPI_MADT_LAPIC_ADDR_OVR,
+	    acpi_table_parse_madt(ACPI_MADT_TYPE_LOCAL_APIC_OVERRIDE,
 				  acpi_parse_lapic_addr_ovr, 0);
 	if (count < 0) {
 		printk(KERN_ERR PREFIX
@@ -442,10 +442,10 @@ static int __init acpi_parse_madt_lapic_entries(void)
 	mp_register_lapic_address(acpi_lapic_addr);
 
 	BUILD_BUG_ON(MAX_APICS != MAX_LOCAL_APIC);
-	count = acpi_table_parse_madt(ACPI_MADT_LAPIC, acpi_parse_lapic,
-				      MAX_APICS);
-	x2count = acpi_table_parse_madt(ACPI_MADT_X2APIC, acpi_parse_x2apic,
-				      MAX_APICS);
+	count = acpi_table_parse_madt(ACPI_MADT_TYPE_LOCAL_APIC, 
+                                      acpi_parse_lapic, MAX_APICS);
+	x2count = acpi_table_parse_madt(ACPI_MADT_TYPE_LOCAL_X2APIC, 
+                                        acpi_parse_x2apic, MAX_APICS);
 	if (!count && !x2count) {
 		printk(KERN_ERR PREFIX "No LAPIC entries present\n");
 		/* TBD: Cleanup to allow fallback to MPS */
@@ -457,9 +457,10 @@ static int __init acpi_parse_madt_lapic_entries(void)
 	}
 
 	count =
-	    acpi_table_parse_madt(ACPI_MADT_LAPIC_NMI, acpi_parse_lapic_nmi, 0);
+	    acpi_table_parse_madt(ACPI_MADT_TYPE_LOCAL_APIC_NMI, 
+                                  acpi_parse_lapic_nmi, 0);
 	x2count =
-	    acpi_table_parse_madt(ACPI_MADT_X2APIC_NMI,
+	    acpi_table_parse_madt(ACPI_MADT_TYPE_LOCAL_X2APIC_NMI,
 				  acpi_parse_x2apic_nmi, 0);
 	if (count < 0 || x2count < 0) {
 		printk(KERN_ERR PREFIX "Error parsing LAPIC NMI entry\n");
@@ -502,7 +503,7 @@ static int __init acpi_parse_madt_ioapic_entries(void)
 	}
 
 	count =
-	    acpi_table_parse_madt(ACPI_MADT_IOAPIC, acpi_parse_ioapic,
+	    acpi_table_parse_madt(ACPI_MADT_TYPE_IO_APIC, acpi_parse_ioapic,
 				  MAX_IO_APICS);
 	if (!count) {
 		printk(KERN_ERR PREFIX "No IOAPIC entries present\n");
@@ -513,8 +514,8 @@ static int __init acpi_parse_madt_ioapic_entries(void)
 	}
 
 	count =
-	    acpi_table_parse_madt(ACPI_MADT_INT_SRC_OVR, acpi_parse_int_src_ovr,
-				  MAX_IRQ_SOURCES);
+	    acpi_table_parse_madt(ACPI_MADT_TYPE_INTERRUPT_OVERRIDE,
+                                  acpi_parse_int_src_ovr, MAX_IRQ_SOURCES);
 	if (count < 0) {
 		printk(KERN_ERR PREFIX
 		       "Error parsing interrupt source overrides entry\n");
@@ -526,8 +527,8 @@ static int __init acpi_parse_madt_ioapic_entries(void)
 	mp_config_acpi_legacy_irqs();
 
 	count =
-	    acpi_table_parse_madt(ACPI_MADT_NMI_SRC, acpi_parse_nmi_src,
-				  MAX_IRQ_SOURCES);
+	    acpi_table_parse_madt(ACPI_MADT_TYPE_NMI_SOURCE, 
+                                  acpi_parse_nmi_src, MAX_IRQ_SOURCES);
 	if (count < 0) {
 		printk(KERN_ERR PREFIX "Error parsing NMI SRC entry\n");
 		/* TBD: Cleanup to allow fallback to MPS */

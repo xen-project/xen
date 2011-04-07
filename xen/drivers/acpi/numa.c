@@ -206,7 +206,7 @@ int __init acpi_numa_init(void)
 {
 	/* SRAT: Static Resource Affinity Table */
 	if (!acpi_table_parse(ACPI_SIG_SRAT, acpi_parse_srat)) {
-		acpi_table_parse_srat(ACPI_SRAT_TYPE_X2APIC_CPU_AFFINITY,
+		acpi_table_parse_srat(ACPI_SRAT_X2APIC_AFFINITY,
 				           acpi_parse_x2apic_affinity, NR_CPUS);
 		acpi_table_parse_srat(ACPI_SRAT_PROCESSOR_AFFINITY,
 					       acpi_parse_processor_affinity,
