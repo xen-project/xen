@@ -546,7 +546,7 @@ static int hpet_load(struct domain *d, hvm_domain_context_t *h)
     spin_lock(&hp->lock);
 
     /* Reload the HPET registers */
-    if ( _hvm_check_entry(h, HVM_SAVE_CODE(HPET), HVM_SAVE_LENGTH(HPET)) )
+    if ( _hvm_check_entry(h, HVM_SAVE_CODE(HPET), HVM_SAVE_LENGTH(HPET), 1) )
     {
         spin_unlock(&hp->lock);
         return -EINVAL;
