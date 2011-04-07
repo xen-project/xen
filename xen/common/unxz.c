@@ -216,7 +216,7 @@ STATIC int INIT unxz(unsigned char *in, unsigned int in_size,
 				b.in_pos = 0;
 
 				in_size = fill(in, XZ_IOBUF_SIZE);
-				if (in_size < 0) {
+				if ((int) in_size < 0) {
 					/*
 					 * This isn't an optimal error code
 					 * but it probably isn't worth making
