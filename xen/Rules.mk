@@ -112,6 +112,9 @@ obj-y += $(obj-bin-y)
 obj-bin-y :=
 endif
 
+# Always build obj-bin files as binary even if they come from C source. 
+$(obj-bin-y): CFLAGS := $(filter-out -flto,$(CFLAGS))
+
 built_in.o: $(obj-y)
 ifeq ($(obj-y),)
 	$(CC) $(CFLAGS) -c -x c /dev/null -o $@
