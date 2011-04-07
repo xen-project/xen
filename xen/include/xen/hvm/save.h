@@ -30,77 +30,39 @@ typedef struct hvm_domain_context {
 } hvm_domain_context_t;
 
 /* Marshalling an entry: check space and fill in the header */
-static inline int _hvm_init_entry(struct hvm_domain_context *h,
-                                  uint16_t tc, uint16_t inst, uint32_t len)
-{
-    struct hvm_save_descriptor *d 
-        = (struct hvm_save_descriptor *)&h->data[h->cur];
-    if ( h->size - h->cur < len + sizeof (*d) )
-    {
-        gdprintk(XENLOG_WARNING,
-                 "HVM save: no room for %"PRIu32" + %u bytes "
-                 "for typecode %"PRIu16"\n",
-                 len, (unsigned) sizeof (*d), tc);
-        return -1;
-    }
-    d->typecode = tc;
-    d->instance = inst;
-    d->length = len;
-    h->cur += sizeof (*d);
-    return 0;
-}
+int _hvm_init_entry(struct hvm_domain_context *h,
+                    uint16_t tc, uint16_t inst, uint32_t len);
 
 /* Marshalling: copy the contents in a type-safe way */
-#define _hvm_write_entry(_x, _h, _src) do {                     \
-    *(HVM_SAVE_TYPE(_x) *)(&(_h)->data[(_h)->cur]) = *(_src);   \
-    (_h)->cur += HVM_SAVE_LENGTH(_x);                           \
-} while (0)
+void _hvm_write_entry(struct hvm_domain_context *h,
+                      void *src, uint32_t src_len);
 
 /* Marshalling: init and copy; evaluates to zero on success */
-#define hvm_save_entry(_x, _inst, _h, _src) ({          \
-    int r;                                              \
-    r = _hvm_init_entry((_h), HVM_SAVE_CODE(_x),        \
-                        (_inst), HVM_SAVE_LENGTH(_x));  \
-    if ( r == 0 )                                       \
-        _hvm_write_entry(_x, (_h), (_src));             \
+#define hvm_save_entry(_x, _inst, _h, _src) ({                  \
+    int r;                                                      \
+    r = _hvm_init_entry((_h), HVM_SAVE_CODE(_x),                \
+                        (_inst), HVM_SAVE_LENGTH(_x));          \
+    if ( r == 0 )                                               \
+        _hvm_write_entry((_h), (_src), HVM_SAVE_LENGTH(_x));    \
     r; })
 
 /* Unmarshalling: test an entry's size and typecode and record the instance */
-static inline int _hvm_check_entry(struct hvm_domain_context *h, 
-                                   uint16_t type, uint32_t len)
-{
-    struct hvm_save_descriptor *d 
-        = (struct hvm_save_descriptor *)&h->data[h->cur];
-    if ( len + sizeof (*d) > h->size - h->cur)
-    {
-        gdprintk(XENLOG_WARNING, 
-                 "HVM restore: not enough data left to read %u bytes "
-                 "for type %u\n", len, type);
-        return -1;
-    }    
-    if ( type != d->typecode || len != d->length )
-    {
-        gdprintk(XENLOG_WARNING, 
-                 "HVM restore mismatch: expected type %u length %u, "
-                 "saw type %u length %u\n", type, len, d->typecode, d->length);
-        return -1;
-    }
-    h->cur += sizeof (*d);
-    return 0;
-}
+int _hvm_check_entry(struct hvm_domain_context *h, 
+                     uint16_t type, uint32_t len);
 
 /* Unmarshalling: copy the contents in a type-safe way */
-#define _hvm_read_entry(_x, _h, _dst) do {                      \
-    *(_dst) = *(HVM_SAVE_TYPE(_x) *) (&(_h)->data[(_h)->cur]);  \
-    (_h)->cur += HVM_SAVE_LENGTH(_x);                           \
-} while (0)
+void _hvm_read_entry(struct hvm_domain_context *h,
+                     void *dest, uint32_t dest_len);
 
-/* Unmarshalling: check, then copy. Evaluates to zero on success. */
-#define hvm_load_entry(_x, _h, _dst) ({                                 \
-    int r;                                                              \
-    r = _hvm_check_entry((_h), HVM_SAVE_CODE(_x), HVM_SAVE_LENGTH(_x)); \
-    if ( r == 0 )                                                       \
-        _hvm_read_entry(_x, (_h), (_dst));                              \
+/*
+ * Unmarshalling: check, then copy. Evaluates to zero on success. This load
+ * function requires the save entry to be the same size as the dest structure.
+ */
+#define hvm_load_entry(_x, _h, _dst) ({                                    \
+    int r;                                                                 \
+    r = _hvm_check_entry((_h), HVM_SAVE_CODE(_x), HVM_SAVE_LENGTH(_x));    \
+    if ( r == 0 )                                                          \
+        _hvm_read_entry((_h), (_dst), HVM_SAVE_LENGTH(_x));                \
     r; })
 
 /* Unmarshalling: what is the instance ID of the next entry? */
