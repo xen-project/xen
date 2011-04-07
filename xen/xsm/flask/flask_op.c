@@ -485,6 +485,9 @@ static int flask_security_sid(char *buf, uint32_t count)
     if ( length < 0 )
         goto out;
 
+    if ( len > count )
+        return -ERANGE; 
+
     memset(buf, 0, count);
     memcpy(buf, context, len);
     length = len;

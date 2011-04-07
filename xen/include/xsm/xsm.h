@@ -427,7 +427,11 @@ static inline int xsm_remove_range (struct domain *d, char *name, unsigned long 
 
 static inline long __do_xsm_op (XEN_GUEST_HANDLE(xsm_op_t) op)
 {
-    return xsm_call(__do_xsm_op(op));
+#ifdef XSM_ENABLE
+    return xsm_ops->__do_xsm_op(op);
+#else
+    return -ENOSYS;
+#endif
 }
 
 #ifdef XSM_ENABLE
