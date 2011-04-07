@@ -231,9 +231,28 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
             /* _PAGE_PSE_PAT not set: remove _PAGE_PAT from flags. */
             flags &= ~_PAGE_PAT;
 
+#define GUEST_L2_GFN_ALIGN (1 << (GUEST_L2_PAGETABLE_SHIFT - \
+                                  GUEST_L1_PAGETABLE_SHIFT))
+        if ( gfn_x(start) & (GUEST_L2_GFN_ALIGN - 1) & ~0x1 )
+        {
+#if GUEST_PAGING_LEVELS == 2
+            /*
+             * Note that _PAGE_INVALID_BITS is zero in this case, yielding a
+             * no-op here.
+             *
+             * Architecturally, the walk should fail if bit 21 is set (others
+             * aren't being checked at least in PSE36 mode), but we'll ignore
+             * this here in order to avoid specifying a non-natural, non-zero
+             * _PAGE_INVALID_BITS value just for that case.
+             */
+#endif
+            rc |= _PAGE_INVALID_BITS;
+        }
+
         /* Increment the pfn by the right number of 4k pages.  
-         * The ~0x1 is to mask out the PAT bit mentioned above. */
-        start = _gfn((gfn_x(start) & ~0x1) + guest_l1_table_offset(va));
+         * Mask out PAT and invalid bits. */
+        start = _gfn((gfn_x(start) & ~(GUEST_L2_GFN_ALIGN - 1)) +
+                     guest_l1_table_offset(va));
         gw->l1e = guest_l1e_from_gfn(start, flags);
         gw->l1mfn = _mfn(INVALID_MFN);
     } 
