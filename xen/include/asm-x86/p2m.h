@@ -530,6 +530,14 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
                         unsigned int order,
                         p2m_query_t q);
 
+/* Scan pod cache when offline/broken page triggered */
+int
+p2m_pod_offline_or_broken_hit(struct page_info *p);
+
+/* Replace pod cache when offline/broken page triggered */
+void
+p2m_pod_offline_or_broken_replace(struct page_info *p);
+
 /* Add a page to a domain's p2m table */
 int guest_physmap_add_entry(struct p2m_domain *p2m, unsigned long gfn,
                             unsigned long mfn, unsigned int page_order, 

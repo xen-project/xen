@@ -678,6 +678,78 @@ p2m_pod_empty_cache(struct domain *d)
     spin_unlock(&d->page_alloc_lock);
 }
 
+int
+p2m_pod_offline_or_broken_hit(struct page_info *p)
+{
+    struct domain *d;
+    struct p2m_domain *p2m;
+    struct page_info *q, *tmp;
+    unsigned long mfn, bmfn;
+
+    if ( !(d = page_get_owner(p)) || !(p2m = p2m_get_hostp2m(d)) )
+        return 0;
+
+    spin_lock(&d->page_alloc_lock);
+    bmfn = mfn_x(page_to_mfn(p));
+    page_list_for_each_safe(q, tmp, &p2m->pod.super)
+    {
+        mfn = mfn_x(page_to_mfn(q));
+        if ( (bmfn >= mfn) && ((bmfn - mfn) < SUPERPAGE_PAGES) )
+        {
+            unsigned long i;
+            page_list_del(q, &p2m->pod.super);
+            for ( i = 0; i < SUPERPAGE_PAGES; i++)
+            {
+                q = mfn_to_page(_mfn(mfn + i));
+                page_list_add_tail(q, &p2m->pod.single);
+            }
+            page_list_del(p, &p2m->pod.single);
+            p2m->pod.count--;
+            goto pod_hit;
+        }
+    }
+
+    page_list_for_each_safe(q, tmp, &p2m->pod.single)
+    {
+        mfn = mfn_x(page_to_mfn(q));
+        if ( mfn == bmfn )
+        {
+            page_list_del(p, &p2m->pod.single);
+            p2m->pod.count--;
+            goto pod_hit;
+        }
+    }
+
+    spin_unlock(&d->page_alloc_lock);
+    return 0;
+
+pod_hit:
+    page_list_add_tail(p, &d->arch.relmem_list);
+    spin_unlock(&d->page_alloc_lock);
+    return 1;
+}
+
+void
+p2m_pod_offline_or_broken_replace(struct page_info *p)
+{
+    struct domain *d;
+    struct p2m_domain *p2m;
+
+    if ( !(d = page_get_owner(p)) || !(p2m = p2m_get_hostp2m(d)) )
+        return;
+
+    free_domheap_page(p);
+
+    p = alloc_domheap_page(d, 0);
+    if ( unlikely(!p) )
+        return;
+
+    p2m_lock(p2m);
+    p2m_pod_cache_add(p2m, p, 0);
+    p2m_unlock(p2m);
+    return;
+}
+
 /* This function is needed for two reasons:
  * + To properly handle clearing of PoD entries
  * + To "steal back" memory being freed for the PoD cache, rather than
