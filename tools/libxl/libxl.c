@@ -1016,12 +1016,7 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
             flexarray_append(back, "params");
             flexarray_append(back, libxl__sprintf(&gc, "%s:%s",
                           libxl__device_disk_string_of_format(disk->format), disk->pdev_path));
-
-            if (libxl__blktap_enabled(&gc) && 
-                 disk->backend != DISK_BACKEND_QDISK)
-                device.backend_kind = DEVICE_TAP;
-            else
-                device.backend_kind = DEVICE_QDISK;
+            device.backend_kind = DEVICE_QDISK;
             break;
         default:
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "unrecognized disk backend type: %d\n", disk->backend);
