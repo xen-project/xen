@@ -30,7 +30,6 @@
 
 static const char *string_of_kinds[] = {
     [DEVICE_VIF] = "vif",
-    [DEVICE_VIF2] = "vif2",
     [DEVICE_VBD] = "vbd",
     [DEVICE_TAP] = "tap",
     [DEVICE_QDISK] = "qdisk",

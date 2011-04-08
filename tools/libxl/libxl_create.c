@@ -43,10 +43,6 @@ void libxl_domain_config_destroy(libxl_domain_config *d_config)
         libxl_device_nic_destroy(&d_config->vifs[i]);
     free(d_config->vifs);
 
-    for (i=0; i<d_config->num_vif2s; i++)
-        libxl_device_net2_destroy(&d_config->vif2s[i]);
-    free(d_config->vif2s);
-
     for (i=0; i<d_config->num_pcidevs; i++)
         libxl_device_pci_destroy(&d_config->pcidevs[i]);
     free(d_config->pcidevs);
@@ -462,17 +458,6 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
             fprintf(stderr, "cannot add nic %d to domain: %d\n", i, ret);
             ret = ERROR_FAIL;
             goto error_out;
-        }
-    }
-    if (!d_config->c_info.hvm) {
-        for (i = 0; i < d_config->num_vif2s; i++) {
-            d_config->vif2s[i].domid = domid;
-            ret = libxl_device_net2_add(ctx, domid, &d_config->vif2s[i]);
-            if (ret) {
-                fprintf(stderr, "cannot add net2 %d to domain: %d\n", i, ret);
-                ret = ERROR_FAIL;
-                goto error_out;
-            }
         }
     }
     if (d_config->c_info.hvm) {

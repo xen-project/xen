@@ -228,21 +228,6 @@ libxl_device_nic = Struct("device_nic", [
     ("nictype", libxl_nic_type),
     ])
 
-libxl_device_net2 = Struct("device_net2", [
-    ("devid", integer),
-    ("front_mac", libxl_mac),
-    ("back_mac", libxl_mac),
-    ("backend_domid", uint32),
-    ("domid", domid),
-    ("trusted", BitField(uint32, 1)),
-    ("back_trusted", BitField(uint32, 1)),
-    ("filter_mac", BitField(uint32, 1)),
-    ("front_filter_mac", BitField(uint32, 1)),
-    ("pdev", uint32),
-    ("max_bypasses", uint32),
-    ("bridge", string),
-    ])
-
 libxl_device_pci = Struct("device_pci", [
     ("func",      uint8),
     ("dev",       uint8),
@@ -316,16 +301,3 @@ libxl_sched_credit = Struct("sched_credit", [
     ("weight", integer),
     ("cap", integer),
     ], destructor_fn=None)
-
-libxl_net2info = Struct("net2info", [
-    ("backend", string),
-    ("backend_id", uint32),
-    ("frontend", string),
-    ("frontend_id", uint32),
-    ("devid", integer),
-    ("state", integer),
-    ("mac", libxl_mac),
-    ("trusted", integer),
-    ("back_mac", libxl_mac),
-    ("filter_mac", integer),
-    ])

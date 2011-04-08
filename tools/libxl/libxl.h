@@ -262,11 +262,10 @@ typedef struct {
     libxl_domain_build_info b_info;
     libxl_device_model_info dm_info;
 
-    int num_disks, num_vifs, num_vif2s, num_pcidevs, num_vfbs, num_vkbs;
+    int num_disks, num_vifs, num_pcidevs, num_vfbs, num_vkbs;
 
     libxl_device_disk *disks;
     libxl_device_nic *vifs;
-    libxl_device_net2 *vif2s;
     libxl_device_pci *pcidevs;
     libxl_device_vfb *vfbs;
     libxl_device_vkb *vkbs;
@@ -534,14 +533,6 @@ int libxl_tmem_set(libxl_ctx *ctx, uint32_t domid, char* name,
 int libxl_tmem_shared_auth(libxl_ctx *ctx, uint32_t domid, char* uuid,
                            int auth);
 int libxl_tmem_freeable(libxl_ctx *ctx);
-
-void libxl_device_net2_init(libxl_device_net2 *net2, int dev_num);
-int libxl_device_net2_add(libxl_ctx *ctx, uint32_t domid,
-                          libxl_device_net2 *net2);
-libxl_net2info *libxl_device_net2_list(libxl_ctx *ctx, uint32_t domid,
-                                       unsigned int *nb);
-int libxl_device_net2_del(libxl_ctx *ctx, libxl_device_net2 *net2,
-                          int wait);
 
 int libxl_get_freecpus(libxl_ctx *ctx, libxl_cpumap *cpumap);
 int libxl_create_cpupool(libxl_ctx *ctx, const char *name, int schedid,
