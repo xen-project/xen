@@ -376,7 +376,6 @@ value stub_xl_disk_add(value info, value domid)
 	INIT_STRUCT();
 
 	device_disk_val(&gc, &c_info, info);
-	c_info.domid = Int_val(domid);
 
 	INIT_CTX();
 	ret = libxl_device_disk_add(ctx, Int_val(domid), &c_info);
@@ -394,10 +393,9 @@ value stub_xl_disk_remove(value info, value domid)
 	INIT_STRUCT();
 
 	device_disk_val(&gc, &c_info, info);
-	c_info.domid = Int_val(domid);
 
 	INIT_CTX();
-	ret = libxl_device_disk_del(ctx, &c_info, 0);
+	ret = libxl_device_disk_del(ctx, Int_val(domid), &c_info, 0);
 	if (ret != 0)
 		failwith_xl("disk_remove", &lg);
 	FREE_CTX();
@@ -412,7 +410,6 @@ value stub_xl_nic_add(value info, value domid)
 	INIT_STRUCT();
 
 	device_nic_val(&gc, &c_info, info);
-	c_info.domid = Int_val(domid);
 
 	INIT_CTX();
 	ret = libxl_device_nic_add(ctx, Int_val(domid), &c_info);
@@ -430,10 +427,9 @@ value stub_xl_nic_remove(value info, value domid)
 	INIT_STRUCT();
 
 	device_nic_val(&gc, &c_info, info);
-	c_info.domid = Int_val(domid);
 
 	INIT_CTX();
-	ret = libxl_device_nic_del(ctx, &c_info, 0);
+	ret = libxl_device_nic_del(ctx, Int_val(domid), &c_info, 0);
 	if (ret != 0)
 		failwith_xl("nic_remove", &lg);
 	FREE_CTX();
@@ -450,7 +446,6 @@ value stub_xl_console_add(value info, value state, value domid)
 
 	device_console_val(&gc, &c_info, info);
 	domain_build_state_val(&gc, &c_state, state);
-	c_info.domid = Int_val(domid);
 	c_info.build_state = &c_state;
 
 	INIT_CTX();
@@ -469,7 +464,6 @@ value stub_xl_vkb_add(value info, value domid)
 	INIT_STRUCT();
 
 	device_vkb_val(&gc, &c_info, info);
-	c_info.domid = Int_val(domid);
 
 	INIT_CTX();
 	ret = libxl_device_vkb_add(ctx, Int_val(domid), &c_info);
@@ -518,7 +512,6 @@ value stub_xl_vfb_add(value info, value domid)
 	INIT_STRUCT();
 
 	device_vfb_val(&gc, &c_info, info);
-	c_info.domid = Int_val(domid);
 
 	INIT_CTX();
 	ret = libxl_device_vfb_add(ctx, Int_val(domid), &c_info);

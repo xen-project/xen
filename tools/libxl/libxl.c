@@ -702,7 +702,6 @@ int libxl_event_get_disk_eject_info(libxl_ctx *ctx, uint32_t domid, libxl_event 
 		disk->backend = DISK_BACKEND_UNKNOWN;
 	} 
 
-    disk->domid = domid;
     disk->pdev_path = strdup("");
     disk->format = DISK_FORMAT_EMPTY;
     /* this value is returned to the user: do not free right away */
@@ -977,7 +976,7 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
     device.backend_devid = devid;
     device.backend_domid = disk->backend_domid;
     device.devid = devid;
-    device.domid = disk->domid;
+    device.domid = domid;
     device.kind = DEVICE_VBD;
 
     switch (disk->backend) {
@@ -1031,7 +1030,7 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
     }
 
     flexarray_append(back, "frontend-id");
-    flexarray_append(back, libxl__sprintf(&gc, "%d", disk->domid));
+    flexarray_append(back, libxl__sprintf(&gc, "%d", domid));
     flexarray_append(back, "online");
     flexarray_append(back, "1");
     flexarray_append(back, "removable");
@@ -1075,7 +1074,7 @@ out:
     return rc;
 }
 
-int libxl_device_disk_del(libxl_ctx *ctx,
+int libxl_device_disk_del(libxl_ctx *ctx, uint32_t domid,
                           libxl_device_disk *disk, int wait)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
@@ -1087,7 +1086,7 @@ int libxl_device_disk_del(libxl_ctx *ctx,
     device.backend_devid    = devid;
     device.backend_kind     =
         (disk->backend == DISK_BACKEND_PHY) ? DEVICE_VBD : DEVICE_TAP;
-    device.domid            = disk->domid;
+    device.domid            = domid;
     device.devid            = devid;
     device.kind             = DEVICE_VBD;
     rc = libxl__device_del(&gc, &device, wait);
@@ -1187,7 +1186,6 @@ int libxl_device_nic_init(libxl_device_nic *nic_info, int devnum)
     memset(nic_info, '\0', sizeof(*nic_info));
 
     nic_info->backend_domid = 0;
-    nic_info->domid = 0;
     nic_info->devid = devnum;
     nic_info->mtu = 1492;
     nic_info->model = strdup("rtl8139");
@@ -1244,11 +1242,11 @@ int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic)
     device.backend_domid = nic->backend_domid;
     device.backend_kind = DEVICE_VIF;
     device.devid = nic->devid;
-    device.domid = nic->domid;
+    device.domid = domid;
     device.kind = DEVICE_VIF;
 
     flexarray_append(back, "frontend-id");
-    flexarray_append(back, libxl__sprintf(&gc, "%d", nic->domid));
+    flexarray_append(back, libxl__sprintf(&gc, "%d", domid));
     flexarray_append(back, "online");
     flexarray_append(back, "1");
     flexarray_append(back, "state");
@@ -1303,7 +1301,7 @@ out:
     return rc;
 }
 
-int libxl_device_nic_del(libxl_ctx *ctx,
+int libxl_device_nic_del(libxl_ctx *ctx, uint32_t domid,
                          libxl_device_nic *nic, int wait)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
@@ -1314,7 +1312,7 @@ int libxl_device_nic_del(libxl_ctx *ctx,
     device.backend_domid    = nic->backend_domid;
     device.backend_kind     = DEVICE_VIF;
     device.devid            = nic->devid;
-    device.domid            = nic->domid;
+    device.domid            = domid;
     device.kind             = DEVICE_VIF;
 
     rc = libxl__device_del(&gc, &device, wait);
@@ -1402,11 +1400,11 @@ int libxl_device_console_add(libxl_ctx *ctx, uint32_t domid, libxl_device_consol
     device.backend_domid = console->backend_domid;
     device.backend_kind = DEVICE_CONSOLE;
     device.devid = console->devid;
-    device.domid = console->domid;
+    device.domid = domid;
     device.kind = DEVICE_CONSOLE;
 
     flexarray_append(back, "frontend-id");
-    flexarray_append(back, libxl__sprintf(&gc, "%d", console->domid));
+    flexarray_append(back, libxl__sprintf(&gc, "%d", domid));
     flexarray_append(back, "online");
     flexarray_append(back, "1");
     flexarray_append(back, "state");
@@ -1486,11 +1484,11 @@ int libxl_device_vkb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb)
     device.backend_domid = vkb->backend_domid;
     device.backend_kind = DEVICE_VKBD;
     device.devid = vkb->devid;
-    device.domid = vkb->domid;
+    device.domid = domid;
     device.kind = DEVICE_VKBD;
 
     flexarray_append(back, "frontend-id");
-    flexarray_append(back, libxl__sprintf(&gc, "%d", vkb->domid));
+    flexarray_append(back, libxl__sprintf(&gc, "%d", domid));
     flexarray_append(back, "online");
     flexarray_append(back, "1");
     flexarray_append(back, "state");
@@ -1548,7 +1546,6 @@ static unsigned int libxl__append_disk_list_of_type(libxl__gc *gc,
         pdisk_end = *disks + *ndisks;
         for (; pdisk < pdisk_end; pdisk++, dir++) {
             pdisk->backend_domid = 0;
-            pdisk->domid = domid;
             physpath_tmp = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(gc, "%s/%s/params", be_path, *dir), &len);
             if (physpath_tmp && strchr(physpath_tmp, ':')) {
                 pdisk->pdev_path = strdup(strchr(physpath_tmp, ':') + 1);
@@ -1647,15 +1644,12 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk)
 
     ret = 0;
 
-    libxl_device_disk_del(ctx, disks + i, 1);
+    libxl_device_disk_del(ctx, domid, disks + i, 1);
     libxl_device_disk_add(ctx, domid, disk);
     stubdomid = libxl_get_stubdom_id(ctx, domid);
     if (stubdomid) {
-        disks[i].domid = stubdomid;
-        libxl_device_disk_del(ctx, disks + i, 1);
-        disk->domid = stubdomid;
+        libxl_device_disk_del(ctx, stubdomid, disks + i, 1);
         libxl_device_disk_add(ctx, stubdomid, disk);
-        disk->domid = domid;
     }
 out:
     for (i = 0; i < num; i++)
@@ -1704,10 +1698,10 @@ int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb)
     device.backend_domid = vfb->backend_domid;
     device.backend_kind = DEVICE_VFB;
     device.devid = vfb->devid;
-    device.domid = vfb->domid;
+    device.domid = domid;
     device.kind = DEVICE_VFB;
 
-    flexarray_append_pair(back, "frontend-id", libxl__sprintf(&gc, "%d", vfb->domid));
+    flexarray_append_pair(back, "frontend-id", libxl__sprintf(&gc, "%d", domid));
     flexarray_append_pair(back, "online", "1");
     flexarray_append_pair(back, "state", libxl__sprintf(&gc, "%d", 1));
     flexarray_append_pair(back, "domain", libxl__domid_to_name(&gc, domid));

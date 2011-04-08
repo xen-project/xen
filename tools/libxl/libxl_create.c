@@ -443,7 +443,6 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     }
 
     for (i = 0; i < d_config->num_disks; i++) {
-        d_config->disks[i].domid = domid;
         ret = libxl_device_disk_add(ctx, domid, &d_config->disks[i]);
         if (ret) {
             fprintf(stderr, "cannot add disk %d to domain: %d\n", i, ret);
@@ -452,7 +451,6 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
         }
     }
     for (i = 0; i < d_config->num_vifs; i++) {
-        d_config->vifs[i].domid = domid;
         ret = libxl_device_nic_add(ctx, domid, &d_config->vifs[i]);
         if (ret) {
             fprintf(stderr, "cannot add nic %d to domain: %d\n", i, ret);
@@ -466,7 +464,6 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
         ret = init_console_info(&console, 0, &state);
         if ( ret )
             goto error_out;
-        console.domid = domid;
         libxl_device_console_add(ctx, domid, &console);
         libxl_device_console_destroy(&console);
 
@@ -485,16 +482,13 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
         libxl_device_console console;
 
         for (i = 0; i < d_config->num_vfbs; i++) {
-            d_config->vfbs[i].domid = domid;
             libxl_device_vfb_add(ctx, domid, &d_config->vfbs[i]);
-            d_config->vkbs[i].domid = domid;
             libxl_device_vkb_add(ctx, domid, &d_config->vkbs[i]);
         }
 
         ret = init_console_info(&console, 0, &state);
         if ( ret )
             goto error_out;
-        console.domid = domid;
 
         need_qemu = libxl__need_xenpv_qemu(gc, 1, &console,
                 d_config->num_vfbs, d_config->vfbs,

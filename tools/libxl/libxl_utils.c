@@ -476,7 +476,6 @@ int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
             ;
         if ((b >= mac_n + 6) && (*a == *b)) {
             nic->backend_domid = nics[i].backend_id;
-            nic->domid = nics[i].frontend_id;
             nic->devid = nics[i].devid;
             memcpy(nic->mac, nics[i].mac, sizeof (nic->mac));
             nic->script = strdup(nics[i].script);
@@ -551,7 +550,6 @@ int libxl_devid_to_device_disk(libxl_ctx *ctx, uint32_t domid,
     if (!val)
         goto out;
     disk->backend_domid = strtoul(val, NULL, 10);
-    disk->domid = domid;
     be_path = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/backend", diskpath));
     disk->pdev_path = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/params", be_path));
     val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/type", be_path));

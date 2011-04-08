@@ -580,22 +580,18 @@ retry_transaction:
             goto retry_transaction;
 
     for (i = 0; i < num_disks; i++) {
-        disks[i].domid = domid;
         ret = libxl_device_disk_add(ctx, domid, &disks[i]);
         if (ret)
             goto out_free;
     }
     for (i = 0; i < num_vifs; i++) {
-        vifs[i].domid = domid;
         ret = libxl_device_nic_add(ctx, domid, &vifs[i]);
         if (ret)
             goto out_free;
     }
-    vfb->domid = domid;
     ret = libxl_device_vfb_add(ctx, domid, vfb);
     if (ret)
         goto out_free;
-    vkb->domid = domid;
     ret = libxl_device_vkb_add(ctx, domid, vkb);
     if (ret)
         goto out_free;
@@ -612,7 +608,6 @@ retry_transaction:
     for (i = 0; i < num_console; i++) {
         console[i].devid = i;
         console[i].consback = LIBXL_CONSBACK_IOEMU;
-        console[i].domid = domid;
         /* STUBDOM_CONSOLE_LOGGING (console 0) is for minios logging
          * STUBDOM_CONSOLE_SAVE (console 1) is for writing the save file
          * STUBDOM_CONSOLE_RESTORE (console 2) is for reading the save file

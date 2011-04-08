@@ -173,7 +173,6 @@ Network is missing""")
 
 libxl_device_vfb = Struct("device_vfb", [
     ("backend_domid", uint32),
-    ("domid",         uint32),
     ("devid",         integer),
     ("vnc",           bool,     False, "vnc enabled or disabled"),
     ("vnclisten",     string,   False, "address:port that should be listened on for the VNC server if vnc is set"),
@@ -189,13 +188,11 @@ libxl_device_vfb = Struct("device_vfb", [
 
 libxl_device_vkb = Struct("device_vkb", [
     ("backend_domid", uint32),
-    ("domid", domid),
     ("devid", integer),
     ])
 
 libxl_device_console = Struct("device_console", [
     ("backend_domid", uint32),
-    ("domid", domid),
     ("devid", integer),
     ("consback", libxl_console_consback),
     ("build_state", Reference(libxl_domain_build_state), True),
@@ -204,7 +201,6 @@ libxl_device_console = Struct("device_console", [
 
 libxl_device_disk = Struct("device_disk", [
     ("backend_domid", uint32),
-    ("domid", domid),
     ("pdev_path", string),
     ("vdev", string),
     ("backend", libxl_disk_backend),
@@ -216,7 +212,6 @@ libxl_device_disk = Struct("device_disk", [
 
 libxl_device_nic = Struct("device_nic", [
     ("backend_domid", uint32),
-    ("domid", domid),
     ("devid", integer),
     ("mtu", integer),
     ("model", string),

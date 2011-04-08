@@ -381,7 +381,7 @@ static void printf_info(int domid,
         printf("\t(device\n");
         printf("\t\t(tap\n");
         printf("\t\t\t(backend_domid %d)\n", d_config->disks[i].backend_domid);
-        printf("\t\t\t(domid %d)\n", d_config->disks[i].domid);
+        printf("\t\t\t(domid %d)\n", domid);
         printf("\t\t\t(physpath %s)\n", d_config->disks[i].pdev_path);
         printf("\t\t\t(phystype %d)\n", d_config->disks[i].backend);
         printf("\t\t\t(virtpath %s)\n", d_config->disks[i].vdev);
@@ -396,7 +396,7 @@ static void printf_info(int domid,
         printf("\t(device\n");
         printf("\t\t(vif\n");
         printf("\t\t\t(backend_domid %d)\n", d_config->vifs[i].backend_domid);
-        printf("\t\t\t(domid %d)\n", d_config->vifs[i].domid);
+        printf("\t\t\t(domid %d)\n", domid);
         printf("\t\t\t(devid %d)\n", d_config->vifs[i].devid);
         printf("\t\t\t(mtu %d)\n", d_config->vifs[i].mtu);
         printf("\t\t\t(model %s)\n", d_config->vifs[i].model);
@@ -426,7 +426,7 @@ static void printf_info(int domid,
         printf("\t(device\n");
         printf("\t\t(vfb\n");
         printf("\t\t\t(backend_domid %d)\n", d_config->vfbs[i].backend_domid);
-        printf("\t\t\t(domid %d)\n", d_config->vfbs[i].domid);
+        printf("\t\t\t(domid %d)\n", domid);
         printf("\t\t\t(devid %d)\n", d_config->vfbs[i].devid);
         printf("\t\t\t(vnc %d)\n", d_config->vfbs[i].vnc);
         printf("\t\t\t(vnclisten %s)\n", d_config->vfbs[i].vnclisten);
@@ -1844,7 +1844,6 @@ static void cd_insert(const char *dom, const char *virtdev, char *phys)
         return;
     }
     disk.backend_domid = 0;
-    disk.domid = domid;
 
     libxl_cdrom_insert(ctx, domid, &disk);
     free(buf);
@@ -4263,7 +4262,6 @@ int main_networkattach(int argc, char **argv)
             return 1;
         }
     }
-    nic.domid = domid;
     if (libxl_device_nic_add(ctx, domid, &nic)) {
         fprintf(stderr, "libxl_device_nic_add failed.\n");
         return 1;
@@ -4358,7 +4356,7 @@ int main_networkdetach(int argc, char **argv)
             return 1;
         }
     }
-    if (libxl_device_nic_del(ctx, &nic, 1)) {
+    if (libxl_device_nic_del(ctx, domid, &nic, 1)) {
         fprintf(stderr, "libxl_device_nic_del failed.\n");
         return 1;
     }
@@ -4433,7 +4431,6 @@ int main_blockattach(int argc, char **argv)
             return 1;
         }
     }
-    disk.domid = fe_domid;
     disk.backend_domid = be_domid;
 
     if (libxl_device_disk_add(ctx, fe_domid, &disk)) {
@@ -4518,7 +4515,7 @@ int main_blockdetach(int argc, char **argv)
         fprintf(stderr, "Error: Device %s not connected.\n", argv[optind+1]);
         return 1;
     }
-    if (libxl_device_disk_del(ctx, &disk, 1)) {
+    if (libxl_device_disk_del(ctx, domid, &disk, 1)) {
         fprintf(stderr, "libxl_device_disk_del failed.\n");
     }
     return 0;

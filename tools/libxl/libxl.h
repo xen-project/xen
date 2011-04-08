@@ -412,7 +412,7 @@ libxl_cpupoolinfo * libxl_list_cpupool(libxl_ctx*, int *nb_pool);
 libxl_vminfo * libxl_list_vm(libxl_ctx *ctx, int *nb_vm);
 
 int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk);
-int libxl_device_disk_del(libxl_ctx *ctx, libxl_device_disk *disk, int wait);
+int libxl_device_disk_del(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk, int wait);
 libxl_device_disk *libxl_device_disk_list(libxl_ctx *ctx, uint32_t domid, int *num);
 int libxl_device_disk_getinfo(libxl_ctx *ctx, uint32_t domid,
                               libxl_device_disk *disk, libxl_diskinfo *diskinfo);
@@ -426,7 +426,7 @@ int libxl_device_disk_local_detach(libxl_ctx *ctx, libxl_device_disk *disk);
 
 int libxl_device_nic_init(libxl_device_nic *nic, int dev_num);
 int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic);
-int libxl_device_nic_del(libxl_ctx *ctx, libxl_device_nic *nic, int wait);
+int libxl_device_nic_del(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic, int wait);
 libxl_nicinfo *libxl_list_nics(libxl_ctx *ctx, uint32_t domid, unsigned int *nb);
 
 int libxl_device_console_add(libxl_ctx *ctx, uint32_t domid, libxl_device_console *console);
