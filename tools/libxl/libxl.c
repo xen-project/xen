@@ -983,6 +983,14 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
     if (disk->backend == DISK_BACKEND_TAP && !libxl__blktap_enabled(&gc))
         disk->backend = DISK_BACKEND_QDISK;
 
+    /*
+     * blktap cannot handle empty disks (aka cdroms). Fall back to
+     * qdisk because qemu-xen creates the disk based on the xenstore
+     * entries.
+     */
+    if (disk->backend == DISK_BACKEND_TAP && disk->format == DISK_FORMAT_EMPTY)
+        disk->backend == DISK_BACKEND_QDISK;
+
     switch (disk->backend) {
         case DISK_BACKEND_PHY: 
             libxl__device_physdisk_major_minor(disk->pdev_path, &major, &minor);
@@ -995,7 +1003,7 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
             device.backend_kind = DEVICE_VBD;
             break;
         case DISK_BACKEND_TAP:
-            if (disk->format != DISK_FORMAT_EMPTY) {
+            {
                 const char *dev = libxl__blktap_devpath(&gc,
                                                disk->pdev_path, disk->format);
                 if (!dev) {
@@ -1003,8 +1011,8 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
                     goto out_free;
                 }
                 flexarray_append(back, "tapdisk-params");
-                flexarray_append(back, libxl__sprintf(&gc, "%s:%s", 
-                    libxl__device_disk_string_of_format(disk->format), 
+                flexarray_append(back, libxl__sprintf(&gc, "%s:%s",
+                    libxl__device_disk_string_of_format(disk->format),
                     disk->pdev_path));
                 flexarray_append(back, "params");
                 flexarray_append(back, libxl__strdup(&gc, dev));
@@ -1013,8 +1021,6 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
                 flexarray_append(back, "physical-device");
                 flexarray_append(back, libxl__sprintf(&gc, "%x:%x", major, minor));
                 device.backend_kind = DEVICE_VBD;
-
-                break;
             }
             break;
         case DISK_BACKEND_QDISK:
