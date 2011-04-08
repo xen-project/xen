@@ -21,6 +21,7 @@ class Cfg(object):
         self.domid = 0
 
         self.host = 'localhost'
+        self.nullremus = False
         self.port = XendOptions.instance().get_xend_relocation_port()
         self.interval = 200
         self.netbuffer = True
@@ -33,6 +34,8 @@ class Cfg(object):
                           help='checkpoint every MS milliseconds')
         parser.add_option('-p', '--port', dest='port', type='int',
                           help='send stream to port PORT', metavar='PORT')
+        parser.add_option('', '--blackhole', dest='nullremus', action='store_true',
+                          help='replicate to /dev/null (no disk checkpoints, only memory & net buffering)')
         parser.add_option('', '--no-net', dest='nonet', action='store_true',
                           help='run without net buffering (benchmark option)')
         parser.add_option('', '--timer', dest='timer', action='store_true',
@@ -49,6 +52,8 @@ class Cfg(object):
             self.interval = opts.interval
         if opts.port:
             self.port = opts.port
+        if opts.nullremus:
+            self.nullremus = True
         if opts.nonet:
             self.netbuffer = False
         if opts.timer:
@@ -107,18 +112,22 @@ def run(cfg):
     bufs = []
 
     # disks must commit before network can be released
-    for disk in dom.disks:
-        try:
-            bufs.append(ReplicatedDisk(disk))
-        except ReplicatedDiskException, e:
-            print e
-            continue
+    if not cfg.nullremus:
+        for disk in dom.disks:
+            try:
+                bufs.append(ReplicatedDisk(disk))
+            except ReplicatedDiskException, e:
+                print e
+                continue
 
     if cfg.netbuffer:
         for vif in dom.vifs:
             bufs.append(BufferedNIC(vif))
 
-    fd = save.MigrationSocket((cfg.host, cfg.port))
+    if cfg.nullremus:
+        fd = save.NullSocket((cfg.host, cfg.port))
+    else:
+        fd = save.MigrationSocket((cfg.host, cfg.port))
 
     def postsuspend():
         'Begin external checkpointing after domain has paused'
