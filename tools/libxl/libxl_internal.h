@@ -97,7 +97,6 @@ struct libxl__ctx {
 typedef enum {
     DEVICE_VIF = 1,
     DEVICE_VBD,
-    DEVICE_TAP,
     DEVICE_QDISK,
     DEVICE_PCI,
     DEVICE_VFB,

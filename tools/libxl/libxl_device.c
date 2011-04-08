@@ -31,7 +31,6 @@
 static const char *string_of_kinds[] = {
     [DEVICE_VIF] = "vif",
     [DEVICE_VBD] = "vbd",
-    [DEVICE_TAP] = "tap",
     [DEVICE_QDISK] = "qdisk",
     [DEVICE_PCI] = "pci",
     [DEVICE_VFB] = "vfb",
@@ -135,7 +134,7 @@ char *libxl__device_disk_string_of_backend(libxl_disk_backend backend)
 {
     switch (backend) {
         case DISK_BACKEND_QDISK: return "qdisk";
-        case DISK_BACKEND_TAP: return "tap";
+        case DISK_BACKEND_TAP: return "phy";
         case DISK_BACKEND_PHY: return "phy";
         default: return NULL;
     }

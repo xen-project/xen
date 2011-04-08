@@ -950,7 +950,6 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
     flexarray_t *front;
     flexarray_t *back;
     char *dev;
-    char *backend_type;
     int devid;
     libxl__device device;
     int major, minor, rc;
@@ -970,7 +969,6 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
         goto out_free;
     }
 
-    backend_type = libxl__device_disk_string_of_backend(disk->backend);
     devid = libxl__device_disk_dev_number(disk->vdev, NULL, NULL);
     if (devid==-1) {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Invalid or unsupported"
@@ -1021,8 +1019,6 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
                 libxl__device_disk_string_of_format(disk->format),
                 disk->pdev_path));
 
-            backend_type = "phy";
-
             /* now create a phy device to export the device to the guest */
             goto do_backend_phy;
 
@@ -1051,7 +1047,7 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
     flexarray_append(back, "dev");
     flexarray_append(back, disk->vdev);
     flexarray_append(back, "type");
-    flexarray_append(back, backend_type);
+    flexarray_append(back, libxl__device_disk_string_of_backend(disk->backend));
     flexarray_append(back, "mode");
     flexarray_append(back, disk->readwrite ? "w" : "r");
 
@@ -1093,14 +1089,30 @@ int libxl_device_disk_del(libxl_ctx *ctx, uint32_t domid,
     devid = libxl__device_disk_dev_number(disk->vdev, NULL, NULL);
     device.backend_domid    = disk->backend_domid;
     device.backend_devid    = devid;
-    device.backend_kind     =
-        (disk->backend == DISK_BACKEND_PHY) ? DEVICE_VBD : DEVICE_TAP;
+
+    switch (disk->backend) {
+        case DISK_BACKEND_PHY:
+            device.backend_kind = DEVICE_VBD;
+            break;
+        case DISK_BACKEND_TAP:
+            device.backend_kind = DEVICE_VBD;
+            break;
+        case DISK_BACKEND_QDISK:
+            device.backend_kind = DEVICE_QDISK;
+            break;
+        default:
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "unrecognized disk backend type: %d\n",
+                       disk->backend);
+            rc = ERROR_INVAL;
+            goto out_free;
+    }
     device.domid            = domid;
     device.devid            = devid;
     device.kind             = DEVICE_VBD;
     rc = libxl__device_del(&gc, &device, wait);
     xs_rm(ctx->xsh, XBT_NULL, libxl__device_backend_path(&gc, &device));
     xs_rm(ctx->xsh, XBT_NULL, libxl__device_frontend_path(&gc, &device));
+out_free:
     libxl__free_all(&gc);
     return rc;
 }
