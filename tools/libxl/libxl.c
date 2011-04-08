@@ -908,8 +908,13 @@ static int validate_virtual_disk(libxl__gc *gc, char *file_name,
     struct stat stat_buf;
     char *delimiter;
 
-    if (disk->format == DISK_FORMAT_EMPTY)
-        return 0;
+    if (disk->format == DISK_FORMAT_EMPTY) {
+        if (disk->is_cdrom)
+            return 0;
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Empty disk %s is not a CDROM device\n",
+                   disk->vdev);
+        return ERROR_INVAL;
+    }
 
     if (disk->format == DISK_FORMAT_RAW) {
         delimiter = strchr(file_name, ':');
