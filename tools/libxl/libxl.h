@@ -463,8 +463,10 @@ void libxl_cpuid_set(libxl_ctx *ctx, uint32_t domid,
  * ASCII string.  The following list is a registry of userdata userids
  * (the registry may be updated by posting a patch to xen-devel):
  *
- *  userid      Data contents
- *   "xl"        domain config file in xl format, Unix line endings
+ *  userid        Data contents
+ *  "xl"          domain config file in xl format, Unix line endings
+ *  "libvirt-xml" domain config file in libvirt XML format.  See
+ *                http://libvirt.org/formatdomain.html
  *
  * libxl does not enforce the registration of userdata userids or the
  * semantics of the data.  For specifications of the data formats
