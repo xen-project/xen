@@ -21,9 +21,9 @@ int libxl__blktap_enabled(libxl__gc *gc)
     return 0;
 }
 
-const char *libxl__blktap_devpath(libxl__gc *gc,
-                                 const char *disk,
-                                 libxl_disk_format format)
+char *libxl__blktap_devpath(libxl__gc *gc,
+                            const char *disk,
+                            libxl_disk_format format)
 {
     return NULL;
 }

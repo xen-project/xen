@@ -325,9 +325,9 @@ _hidden int libxl__blktap_enabled(libxl__gc *gc);
  *    returns device path xenstore wants to have. returns NULL
  *      if no device corresponds to the disk.
  */
-_hidden const char *libxl__blktap_devpath(libxl__gc *gc,
-                                 const char *disk,
-                                 libxl_disk_format format);
+_hidden char *libxl__blktap_devpath(libxl__gc *gc,
+                                    const char *disk,
+                                    libxl_disk_format format);
 
 _hidden char *libxl__uuid2string(libxl__gc *gc, const libxl_uuid uuid);
 

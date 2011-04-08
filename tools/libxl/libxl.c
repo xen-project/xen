@@ -949,6 +949,7 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
     libxl__gc gc = LIBXL_INIT_GC(ctx);
     flexarray_t *front;
     flexarray_t *back;
+    char *dev;
     char *backend_type;
     int devid;
     libxl__device device;
@@ -997,36 +998,39 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
         disk->backend == DISK_BACKEND_QDISK;
 
     switch (disk->backend) {
-        case DISK_BACKEND_PHY: 
-            libxl__device_physdisk_major_minor(disk->pdev_path, &major, &minor);
+        case DISK_BACKEND_PHY:
+            dev = disk->pdev_path;
+
+            libxl__device_physdisk_major_minor(dev, &major, &minor);
             flexarray_append(back, "physical-device");
             flexarray_append(back, libxl__sprintf(&gc, "%x:%x", major, minor));
 
             flexarray_append(back, "params");
-            flexarray_append(back, disk->pdev_path);
+            flexarray_append(back, dev);
 
             device.backend_kind = DEVICE_VBD;
             break;
         case DISK_BACKEND_TAP:
-            {
-                const char *dev = libxl__blktap_devpath(&gc,
-                                               disk->pdev_path, disk->format);
-                if (!dev) {
-                    rc = ERROR_FAIL;
-                    goto out_free;
-                }
-                flexarray_append(back, "tapdisk-params");
-                flexarray_append(back, libxl__sprintf(&gc, "%s:%s",
-                    libxl__device_disk_string_of_format(disk->format),
-                    disk->pdev_path));
-                flexarray_append(back, "params");
-                flexarray_append(back, libxl__strdup(&gc, dev));
-                backend_type = "phy";
-                libxl__device_physdisk_major_minor(dev, &major, &minor);
-                flexarray_append(back, "physical-device");
-                flexarray_append(back, libxl__sprintf(&gc, "%x:%x", major, minor));
-                device.backend_kind = DEVICE_VBD;
+            dev = libxl__blktap_devpath(&gc, disk->pdev_path, disk->format);
+            if (!dev) {
+                rc = ERROR_FAIL;
+                goto out_free;
             }
+            flexarray_append(back, "tapdisk-params");
+            flexarray_append(back, libxl__sprintf(&gc, "%s:%s",
+                libxl__device_disk_string_of_format(disk->format),
+                disk->pdev_path));
+
+            flexarray_append(back, "params");
+            flexarray_append(back, dev);
+
+            backend_type = "phy";
+
+            libxl__device_physdisk_major_minor(dev, &major, &minor);
+            flexarray_append(back, "physical-device");
+            flexarray_append(back, libxl__sprintf(&gc, "%x:%x", major, minor));
+
+            device.backend_kind = DEVICE_VBD;
             break;
         case DISK_BACKEND_QDISK:
             flexarray_append(back, "params");
@@ -1110,7 +1114,7 @@ int libxl_device_disk_del(libxl_ctx *ctx, uint32_t domid,
 char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *disk)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
-    const char *dev = NULL;
+    char *dev = NULL;
     char *ret = NULL;
 
     switch (disk->backend) {
