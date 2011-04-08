@@ -1000,7 +1000,7 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
     switch (disk->backend) {
         case DISK_BACKEND_PHY:
             dev = disk->pdev_path;
-
+    do_backend_phy:
             libxl__device_physdisk_major_minor(dev, &major, &minor);
             flexarray_append(back, "physical-device");
             flexarray_append(back, libxl__sprintf(&gc, "%x:%x", major, minor));
@@ -1021,17 +1021,11 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
                 libxl__device_disk_string_of_format(disk->format),
                 disk->pdev_path));
 
-            flexarray_append(back, "params");
-            flexarray_append(back, dev);
-
             backend_type = "phy";
 
-            libxl__device_physdisk_major_minor(dev, &major, &minor);
-            flexarray_append(back, "physical-device");
-            flexarray_append(back, libxl__sprintf(&gc, "%x:%x", major, minor));
+            /* now create a phy device to export the device to the guest */
+            goto do_backend_phy;
 
-            device.backend_kind = DEVICE_VBD;
-            break;
         case DISK_BACKEND_QDISK:
             flexarray_append(back, "params");
             flexarray_append(back, libxl__sprintf(&gc, "%s:%s",
