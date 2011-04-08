@@ -80,6 +80,9 @@ static PyObject* pycheckpoint_close(PyObject* obj, PyObject* args)
 {
   CheckpointObject* self = (CheckpointObject*)obj;
 
+  if (checkpoint_resume(&self->cps) < 0)
+    fprintf(stderr, "%s\n", checkpoint_error(&self->cps));
+
   checkpoint_close(&self->cps);
 
   Py_XDECREF(self->suspend_cb);
