@@ -25,7 +25,6 @@
 #include <asm/event.h>  /* for local_event_delivery_(en|dis)able */
 #include <asm/paging.h> /* for paging_mode_hap() */
 
-
 /* Nested HVM on/off per domain */
 bool_t
 nestedhvm_enabled(struct domain *d)
@@ -63,7 +62,8 @@ nestedhvm_vcpu_reset(struct vcpu *v)
     nv->nv_flushp2m = 0;
     nv->nv_p2m = NULL;
 
-    nhvm_vcpu_reset(v);
+    if ( hvm_funcs.nhvm_vcpu_reset )
+        hvm_funcs.nhvm_vcpu_reset(v);
 
     /* vcpu is in host mode */
     nestedhvm_vcpu_exit_guestmode(v);
@@ -72,13 +72,11 @@ nestedhvm_vcpu_reset(struct vcpu *v)
 int
 nestedhvm_vcpu_initialise(struct vcpu *v)
 {
-    int rc;
+    int rc = -EOPNOTSUPP;
 
-    if ( (rc = nhvm_vcpu_initialise(v)) )
-    {
-        nhvm_vcpu_destroy(v);
-        return rc;
-    }
+    if ( !hvm_funcs.nhvm_vcpu_initialise ||
+         ((rc = hvm_funcs.nhvm_vcpu_initialise(v)) != 0) )
+         return rc;
 
     nestedhvm_vcpu_reset(v);
     return 0;
@@ -87,8 +85,8 @@ nestedhvm_vcpu_initialise(struct vcpu *v)
 void
 nestedhvm_vcpu_destroy(struct vcpu *v)
 {
-    if ( nestedhvm_enabled(v->domain) )
-        nhvm_vcpu_destroy(v);
+    if ( nestedhvm_enabled(v->domain) && hvm_funcs.nhvm_vcpu_destroy )
+        hvm_funcs.nhvm_vcpu_destroy(v);
 }
 
 static void

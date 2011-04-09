@@ -412,12 +412,6 @@ static inline int hvm_memory_event_int3(unsigned long gla)
  * Nested HVM
  */
 
-/* Initialize vcpu's struct nestedhvm */
-int nhvm_vcpu_initialise(struct vcpu *v);
-/* Destroy and free vcpu's struct nestedhvm */
-void nhvm_vcpu_destroy(struct vcpu *v);
-/* Reset vcpu's state when l1 guest disables nested virtualization */
-int nhvm_vcpu_reset(struct vcpu *v);
 /* Restores l1 guest state */
 int nhvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs);
 /* Fill l1 guest's VMCB/VMCS with data provided by generic exit codes

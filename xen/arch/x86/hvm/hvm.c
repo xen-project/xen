@@ -4020,26 +4020,6 @@ int hvm_memory_event_int3(unsigned long gla)
 }
 #endif /* __x86_64__ */
 
-int nhvm_vcpu_initialise(struct vcpu *v)
-{
-    if (hvm_funcs.nhvm_vcpu_initialise)
-        return hvm_funcs.nhvm_vcpu_initialise(v);
-    return -EOPNOTSUPP;
-}
-
-void nhvm_vcpu_destroy(struct vcpu *v)
-{
-    if ( hvm_funcs.nhvm_vcpu_destroy )
-        hvm_funcs.nhvm_vcpu_destroy(v);
-}
-
-int nhvm_vcpu_reset(struct vcpu *v)
-{
-    if (hvm_funcs.nhvm_vcpu_reset)
-        return hvm_funcs.nhvm_vcpu_reset(v);
-    return -EOPNOTSUPP;
-}
-
 int nhvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)
 {
     if (hvm_funcs.nhvm_vcpu_hostrestore)
