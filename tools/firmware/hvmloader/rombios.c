@@ -330,6 +330,8 @@ struct bios_config rombios_config =  {
 
     .vm86_setup = rombios_init_vm86_tss,
     .e820_setup = rombios_setup_e820,
+
+    .acpi_build_tables = acpi_build_tables,
 };
 
 /*

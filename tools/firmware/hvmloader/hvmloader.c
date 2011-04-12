@@ -20,7 +20,6 @@
  * Place - Suite 330, Boston, MA 02111-1307 USA.
  */
 
-#include "acpi/acpi2_0.h"
 #include "util.h"
 #include "hypercall.h"
 #include "config.h"
@@ -431,8 +430,10 @@ int main(void)
             .value = 1,
         };
 
-        printf("Loading ACPI ...\n");
-        acpi_build_tables(bios->acpi_start);
+        if ( bios->acpi_build_tables ) {
+            printf("Loading ACPI ...\n");
+            bios->acpi_build_tables(bios->acpi_start);
+        }
         hypercall_hvm_op(HVMOP_set_param, &p);
     }
 

@@ -34,6 +34,8 @@ struct bios_config {
 
     void (*vm86_setup)(void);
     void (*e820_setup)(void);
+
+    void (*acpi_build_tables)(unsigned int physical);
 };
 
 extern struct bios_config rombios_config;
