@@ -28,13 +28,12 @@ LOADADDR = 0x100000
 
 CFLAGS += $(CFLAGS_xeninclude)
 
-SRCS  = hvmloader.c mp_tables.c util.c smbios.c 
-SRCS += 32bitbios_support.c smp.c cacheattr.c xenbus.c
-SRCS += e820.c
+OBJS  = hvmloader.o mp_tables.o util.o smbios.o 
+OBJS += 32bitbios_support.o smp.o cacheattr.o xenbus.o
+OBJS += e820.o
 ifeq ($(debug),y)
-SRCS += tests.c
+OBJS += tests.o
 endif
-OBJS  = $(patsubst %.c,%.o,$(SRCS))
 
 CIRRUSVGA_DEBUG ?= n
 
