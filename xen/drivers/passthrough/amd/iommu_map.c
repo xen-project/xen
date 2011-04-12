@@ -327,8 +327,9 @@ void amd_iommu_set_intremap_table(u32 *dte, u64 intremap_ptr, u8 int_valid)
     set_field_in_reg_u32(0xB, entry,
                          IOMMU_DEV_TABLE_INT_TABLE_LENGTH_MASK,
                          IOMMU_DEV_TABLE_INT_TABLE_LENGTH_SHIFT, &entry);
-    /* ignore unmapped interrupts */
-    set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
+
+    /* unmapped interrupt results io page faults*/
+    set_field_in_reg_u32(IOMMU_CONTROL_DISABLED, entry,
                          IOMMU_DEV_TABLE_INT_TABLE_IGN_UNMAPPED_MASK,
                          IOMMU_DEV_TABLE_INT_TABLE_IGN_UNMAPPED_SHIFT, &entry);
     set_field_in_reg_u32(int_valid ? IOMMU_CONTROL_ENABLED :
