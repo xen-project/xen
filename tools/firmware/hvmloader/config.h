@@ -31,6 +31,9 @@ struct bios_config {
 
     uint32_t (*bios_high_setup)(void);
     void (*bios_info_setup)(uint32_t);
+
+    void (*vm86_setup)(void);
+    void (*e820_setup)(void);
 };
 
 extern struct bios_config rombios_config;
@@ -61,9 +64,6 @@ extern unsigned long pci_mem_start, pci_mem_end;
 #define ROMBIOS_SIZE           0x00010000
 #define ROMBIOS_MAXOFFSET      0x0000FFFF
 #define ROMBIOS_END            (ROMBIOS_BEGIN + ROMBIOS_SIZE)
-
-#include "e820.h"
-#include "../rombios/config.h"
 
 #define SCRATCH_PHYSICAL_ADDRESS      0x00010000
 #define HYPERCALL_PHYSICAL_ADDRESS    0x00080000

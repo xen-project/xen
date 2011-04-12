@@ -30,11 +30,37 @@
 #include "util.h"
 #include "hypercall.h"
 
+#include <xen/hvm/params.h>
 #include <xen/hvm/ioreq.h>
 #include <xen/memory.h>
 
 #define ROM_INCLUDE_ROMBIOS
 #include "roms.inc"
+
+/*
+ * Set up an empty TSS area for virtual 8086 mode to use. 
+ * The only important thing is that it musn't have any bits set 
+ * in the interrupt redirection bitmap, so all zeros will do.
+ */
+static void rombios_init_vm86_tss(void)
+{
+    void *tss;
+    struct xen_hvm_param p;
+
+    tss = mem_alloc(128, 128);
+    memset(tss, 0, 128);
+    p.domid = DOMID_SELF;
+    p.index = HVM_PARAM_VM86_TSS;
+    p.value = virt_to_phys(tss);
+    hypercall_hvm_op(HVMOP_set_param, &p);
+    printf("vm86 TSS at %08lx\n", virt_to_phys(tss));
+}
+
+static void rombios_setup_e820(void)
+{
+    *E820_NR = build_e820_table(E820);
+    dump_e820_table(E820, *E820_NR);
+}
 
 static void rombios_setup_bios_info(uint32_t bioshigh)
 {
@@ -301,6 +327,9 @@ struct bios_config rombios_config =  {
 
     .bios_high_setup = rombios_highbios_setup,
     .bios_info_setup = rombios_setup_bios_info,
+
+    .vm86_setup = rombios_init_vm86_tss,
+    .e820_setup = rombios_setup_e820,
 };
 
 /*

@@ -338,24 +338,6 @@ static void cmos_write_memory_size(void)
     cmos_outb(0x35, (uint8_t)( alt_mem >> 8));
 }
 
-/*
- * Set up an empty TSS area for virtual 8086 mode to use. 
- * The only important thing is that it musn't have any bits set 
- * in the interrupt redirection bitmap, so all zeros will do.
- */
-static void init_vm86_tss(void)
-{
-    void *tss;
-    struct xen_hvm_param p;
-
-    tss = mem_alloc(128, 128);
-    memset(tss, 0, 128);
-    p.domid = DOMID_SELF;
-    p.index = HVM_PARAM_VM86_TSS;
-    p.value = virt_to_phys(tss);
-    hypercall_hvm_op(HVMOP_set_param, &p);
-    printf("vm86 TSS at %08lx\n", virt_to_phys(tss));
-}
 
 static const struct bios_config *detect_bios(void)
 {
@@ -454,7 +436,8 @@ int main(void)
         hypercall_hvm_op(HVMOP_set_param, &p);
     }
 
-    init_vm86_tss();
+    if (bios->vm86_setup)
+        bios->vm86_setup();
 
     cmos_write_memory_size();
 
@@ -479,8 +462,8 @@ int main(void)
            bios->bios_address,
            bios->bios_address + bios->image_size - 1);
 
-    *E820_NR = build_e820_table(E820);
-    dump_e820_table(E820, *E820_NR);
+    if (bios->e820_setup)
+        bios->e820_setup();
 
     if (bios->bios_info_setup)
         bios->bios_info_setup(highbios);
