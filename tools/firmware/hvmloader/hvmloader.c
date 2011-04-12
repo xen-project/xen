@@ -599,7 +599,9 @@ int main(void)
     perform_tests();
 
     printf("Writing SMBIOS tables ...\n");
-    smbios_sz = hvm_write_smbios_tables();
+    smbios_sz = hvm_write_smbios_tables(SCRATCH_PHYSICAL_ADDRESS,
+                                        SMBIOS_PHYSICAL_ADDRESS,
+                                        SMBIOS_PHYSICAL_END);
 
     printf("Loading ROMBIOS ...\n");
     rombios_sz = sizeof(rombios);

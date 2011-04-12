@@ -186,7 +186,9 @@ uint32_t highbios_setup(void);
 /* Miscellaneous. */
 void cacheattr_init(void);
 void create_mp_tables(void);
-int hvm_write_smbios_tables(void);
+int hvm_write_smbios_tables(unsigned long scratch,
+			    unsigned long smbios_start,
+			    unsigned long smbios_end);
 void smp_initialise(void);
 
 #include "e820.h"
