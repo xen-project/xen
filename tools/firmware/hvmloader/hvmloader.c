@@ -337,10 +337,30 @@ static void cmos_write_memory_size(void)
     cmos_outb(0x35, (uint8_t)( alt_mem >> 8));
 }
 
+struct bios_info {
+    const char *key;
+    const struct bios_config *bios;
+} bios_configs[] = {
+    { "rombios", &rombios_config, },
+    { NULL, NULL }
+};
 
 static const struct bios_config *detect_bios(void)
 {
-    return &rombios_config;
+    const struct bios_info *b;
+    const char *bios;
+
+    bios = xenstore_read("hvmloader/bios");
+    if ( !bios )
+        bios = "rombios";
+
+    for ( b = &bios_configs[0]; b->key != NULL; b++ )
+        if ( !strcmp(bios, b->key) )
+            return b->bios;
+
+    printf("Unknown BIOS %s, no ROM image found\n", bios);
+    BUG();
+    return NULL;
 }
 
 int main(void)
