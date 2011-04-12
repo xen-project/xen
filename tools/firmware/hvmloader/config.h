@@ -3,6 +3,9 @@
 
 #include <stdint.h>
 
+enum virtual_vga { VGA_none, VGA_std, VGA_cirrus, VGA_pt } virtual_vga;
+extern enum virtual_vga virtual_vga;
+
 struct bios_config {
     const char *name;
 
@@ -21,6 +24,10 @@ struct bios_config {
 
     /* ACPI tables */
     unsigned int acpi_start;
+
+    void (*apic_setup)(void);
+    void (*pci_setup)(void);
+    void (*smp_setup)(void);
 };
 
 extern struct bios_config rombios_config;
