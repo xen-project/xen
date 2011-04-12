@@ -378,10 +378,11 @@ static void pci_setup(void)
  * Scan the list of Option ROMs at @roms for one which supports 
  * PCI (@vendor_id, @device_id) found at slot @devfn. If one is found,
  * copy it to @dest and return its size rounded up to a multiple 2kB. This
- * function will not copy ROMs beyond address OPTIONROM_PHYSICAL_END.
+ * function will not copy ROMs beyond address option_rom_end.
  */
 #define round_option_rom(x) (((x) + 2047) & ~2047)
 static int scan_option_rom(
+    unsigned int option_rom_end,
     uint8_t devfn, uint16_t vendor_id, uint16_t device_id,
     void *roms, uint32_t dest)
 {
@@ -449,7 +450,7 @@ static int scan_option_rom(
         printf(" - Product name: %s\n",
                (char *)rom + pnph->product_name_offset);
 
-    if ( (dest + rom->rom_size * 512 + 1) > OPTIONROM_PHYSICAL_END )
+    if ( (dest + rom->rom_size * 512 + 1) > option_rom_end )
     {
         printf("Option ROM size %x exceeds available space\n",
                rom->rom_size * 512);
@@ -467,7 +468,8 @@ static int scan_option_rom(
  * the corresponding rom data to *copy_rom_dest. Returns the length of the
  * selected rom, or 0 if no NIC found.
  */
-static int scan_etherboot_nic(uint32_t copy_rom_dest)
+static int scan_etherboot_nic(unsigned int option_rom_end,
+                              uint32_t copy_rom_dest)
 {
     uint16_t class, vendor_id, device_id, devfn;
     int rom_size = 0;
@@ -483,6 +485,7 @@ static int scan_etherboot_nic(uint32_t copy_rom_dest)
              (device_id != 0xffff) &&
              (class == 0x0200) )
             rom_size = scan_option_rom(
+                option_rom_end,
                 devfn, vendor_id, device_id, etherboot, copy_rom_dest);
     }
 
@@ -493,7 +496,8 @@ static int scan_etherboot_nic(uint32_t copy_rom_dest)
  * Scan the PCI bus for the devices that have an option ROM, and copy
  * the corresponding rom data to rom_phys_addr.
  */
-static int pci_load_option_roms(uint32_t rom_base_addr)
+static int pci_load_option_roms(unsigned int option_rom_end,
+                                uint32_t rom_base_addr)
 {
     uint32_t option_rom_addr, rom_phys_addr = rom_base_addr;
     uint16_t vendor_id, device_id, devfn, class;
@@ -522,6 +526,7 @@ static int pci_load_option_roms(uint32_t rom_base_addr)
         pci_writel(devfn, PCI_ROM_ADDRESS, option_rom_addr | 0x1);
 
         rom_phys_addr += scan_option_rom(
+            option_rom_end,
             devfn, vendor_id, device_id,
             (void *)(option_rom_addr & ~2047), rom_phys_addr);
 
@@ -640,10 +645,12 @@ int main(void)
     etherboot_phys_addr = VGABIOS_PHYSICAL_ADDRESS + vgabios_sz;
     if ( etherboot_phys_addr < OPTIONROM_PHYSICAL_ADDRESS )
         etherboot_phys_addr = OPTIONROM_PHYSICAL_ADDRESS;
-    etherboot_sz = scan_etherboot_nic(etherboot_phys_addr);
+    etherboot_sz = scan_etherboot_nic(OPTIONROM_PHYSICAL_END,
+                                      etherboot_phys_addr);
 
     option_rom_phys_addr = etherboot_phys_addr + etherboot_sz;
-    option_rom_sz = pci_load_option_roms(option_rom_phys_addr);
+    option_rom_sz = pci_load_option_roms(OPTIONROM_PHYSICAL_END,
+                                         option_rom_phys_addr);
 
     if ( hvm_info->acpi_enabled )
     {
