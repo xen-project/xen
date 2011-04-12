@@ -181,7 +181,7 @@ void xenbus_shutdown(void);
 char *xenstore_read(char *path);
 
 /* Prepare the 32bit BIOS */
-uint32_t highbios_setup(void);
+uint32_t rombios_highbios_setup(void);
 
 /* Miscellaneous. */
 void cacheattr_init(void);

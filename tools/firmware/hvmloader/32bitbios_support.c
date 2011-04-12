@@ -144,7 +144,7 @@ static uint32_t relocate_32bitbios(char *elfarray, uint32_t elfarraysize)
     return (uint32_t)highbiosarea;
 }
 
-uint32_t highbios_setup(void)
+uint32_t rombios_highbios_setup(void)
 {
     return relocate_32bitbios((char *)highbios_array, sizeof(highbios_array));
 }

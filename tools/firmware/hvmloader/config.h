@@ -28,6 +28,9 @@ struct bios_config {
     void (*apic_setup)(void);
     void (*pci_setup)(void);
     void (*smp_setup)(void);
+
+    uint32_t (*bios_high_setup)(void);
+    void (*bios_info_setup)(uint32_t);
 };
 
 extern struct bios_config rombios_config;

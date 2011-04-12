@@ -24,6 +24,7 @@
 
 #include "../rombios/config.h"
 
+#include "acpi/acpi2_0.h"
 #include "apic_regs.h"
 #include "pci_regs.h"
 #include "util.h"
@@ -34,6 +35,23 @@
 
 #define ROM_INCLUDE_ROMBIOS
 #include "roms.inc"
+
+static void rombios_setup_bios_info(uint32_t bioshigh)
+{
+    struct bios_info *bios_info;
+
+    bios_info = (struct bios_info *)BIOS_INFO_PHYSICAL_ADDRESS;
+    memset(bios_info, 0, sizeof(*bios_info));
+    bios_info->com1_present = uart_exists(0x3f8);
+    bios_info->com2_present = uart_exists(0x2f8);
+    bios_info->lpt1_present = lpt_exists(0x378);
+    bios_info->hpet_present = hpet_exists(ACPI_HPET_ADDRESS);
+    bios_info->pci_min = pci_mem_start;
+    bios_info->pci_len = pci_mem_end - pci_mem_start;
+    bios_info->madt_csum_addr = madt_csum_addr;
+    bios_info->madt_lapic0_addr = madt_lapic0_addr;
+    bios_info->bios32_entry = bioshigh;
+}
 
 static void rombios_apic_setup(void)
 {
@@ -280,6 +298,9 @@ struct bios_config rombios_config =  {
     .apic_setup = rombios_apic_setup,
     .pci_setup = rombios_pci_setup,
     .smp_setup = smp_initialise,
+
+    .bios_high_setup = rombios_highbios_setup,
+    .bios_info_setup = rombios_setup_bios_info,
 };
 
 /*

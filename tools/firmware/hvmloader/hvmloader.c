@@ -364,10 +364,10 @@ static const struct bios_config *detect_bios(void)
 
 int main(void)
 {
+    uint32_t highbios = 0;
     const struct bios_config *bios;
     int option_rom_sz = 0, vgabios_sz = 0, etherboot_sz = 0, smbios_sz = 0;
-    uint32_t etherboot_phys_addr, option_rom_phys_addr, bios32_addr;
-    struct bios_info *bios_info;
+    uint32_t etherboot_phys_addr, option_rom_phys_addr;
 
     printf("HVM Loader\n");
 
@@ -400,7 +400,9 @@ int main(void)
     printf("Loading %s ...\n", bios->name);
     memcpy((void *)bios->bios_address, bios->image,
            bios->image_size);
-    bios32_addr = highbios_setup();
+
+    if (bios->bios_high_setup)
+        highbios = bios->bios_high_setup();
 
     if ( (hvm_info->nr_vcpus > 1) || hvm_info->apic_mode )
         create_mp_tables();
@@ -480,17 +482,8 @@ int main(void)
     *E820_NR = build_e820_table(E820);
     dump_e820_table(E820, *E820_NR);
 
-    bios_info = (struct bios_info *)BIOS_INFO_PHYSICAL_ADDRESS;
-    memset(bios_info, 0, sizeof(*bios_info));
-    bios_info->com1_present = uart_exists(0x3f8);
-    bios_info->com2_present = uart_exists(0x2f8);
-    bios_info->lpt1_present = lpt_exists(0x378);
-    bios_info->hpet_present = hpet_exists(ACPI_HPET_ADDRESS);
-    bios_info->pci_min = pci_mem_start;
-    bios_info->pci_len = pci_mem_end - pci_mem_start;
-    bios_info->madt_csum_addr = madt_csum_addr;
-    bios_info->madt_lapic0_addr = madt_lapic0_addr;
-    bios_info->bios32_entry = bios32_addr;
+    if (bios->bios_info_setup)
+        bios->bios_info_setup(highbios);
 
     xenbus_shutdown();
 
