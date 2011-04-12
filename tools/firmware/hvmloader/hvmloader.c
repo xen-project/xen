@@ -585,7 +585,7 @@ static void init_vm86_tss(void)
 int main(void)
 {
     int option_rom_sz = 0, vgabios_sz = 0, etherboot_sz = 0;
-    int rombios_sz, smbios_sz;
+    int smbios_sz;
     uint32_t etherboot_phys_addr, option_rom_phys_addr, bios32_addr;
     struct bios_info *bios_info;
 
@@ -609,10 +609,7 @@ int main(void)
                                         SMBIOS_PHYSICAL_END);
 
     printf("Loading ROMBIOS ...\n");
-    rombios_sz = sizeof(rombios);
-    if ( rombios_sz > 0x10000 )
-        rombios_sz = 0x10000;
-    memcpy((void *)ROMBIOS_PHYSICAL_ADDRESS, rombios, rombios_sz);
+    memcpy((void *)ROMBIOS_PHYSICAL_ADDRESS, rombios, sizeof(rombios));
     bios32_addr = highbios_setup();
 
     if ( (hvm_info->nr_vcpus > 1) || hvm_info->apic_mode )
@@ -686,10 +683,9 @@ int main(void)
         printf(" %05x-%05x: SMBIOS tables\n",
                SMBIOS_PHYSICAL_ADDRESS,
                SMBIOS_PHYSICAL_ADDRESS + smbios_sz - 1);
-    if ( rombios_sz )
-        printf(" %05x-%05x: Main BIOS\n",
-               ROMBIOS_PHYSICAL_ADDRESS,
-               ROMBIOS_PHYSICAL_ADDRESS + rombios_sz - 1);
+    printf(" %05x-%05x: Main BIOS\n",
+           ROMBIOS_PHYSICAL_ADDRESS,
+           ROMBIOS_PHYSICAL_ADDRESS + sizeof(rombios) - 1);
 
     *E820_NR = build_e820_table(E820);
     dump_e820_table(E820, *E820_NR);
