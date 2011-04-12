@@ -1,5 +1,5 @@
-#ifndef __HVMLOADER_E820_H__
-#define __HVMLOADER_E820_H__
+#ifndef __ROMBIOS_E820_H__
+#define __ROMBIOS_E820_H__
 
 /*
  * PC BIOS standard E820 types and structure.
@@ -15,4 +15,4 @@ struct e820entry {
     uint32_t type;
 } __attribute__((packed));
 
-#endif /* __HVMLOADER_E820_H__ */
+#endif /* __ROMBIOS_E820_H__ */

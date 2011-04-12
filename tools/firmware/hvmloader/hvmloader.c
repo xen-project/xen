@@ -27,7 +27,6 @@
 #include "config.h"
 #include "apic_regs.h"
 #include "pci_regs.h"
-#include "e820.h"
 #include "option_rom.h"
 #include <xen/version.h>
 #include <xen/hvm/params.h>
@@ -578,125 +577,6 @@ static void init_vm86_tss(void)
     printf("vm86 TSS at %08lx\n", virt_to_phys(tss));
 }
 
-static void dump_e820_table(void)
-{
-    struct e820entry *e820 = E820;
-    unsigned int nr = *E820_NR;
-    uint64_t last_end = 0, start, end;
-    int i;
-
-    printf("E820 table:\n");
-
-    for ( i = 0; i < nr; i++ )
-    {
-        start = e820[i].addr;
-        end = e820[i].addr + e820[i].size;
-
-        if ( start < last_end )
-            printf(" OVERLAP!!\n");
-        else if ( start > last_end )
-            printf(" HOLE: %08x:%08x - %08x:%08x\n",
-                   (uint32_t)(last_end >> 32), (uint32_t)last_end,
-                   (uint32_t)(start >> 32), (uint32_t)start);
-
-        printf(" [%02d]: %08x:%08x - %08x:%08x: ", i,
-               (uint32_t)(start >> 32), (uint32_t)start,
-               (uint32_t)(end >> 32), (uint32_t)end);
-        switch ( e820[i].type )
-        {
-        case E820_RAM:
-            printf("RAM\n");
-            break;
-        case E820_RESERVED:
-            printf("RESERVED\n");
-            break;
-        case E820_ACPI:
-            printf("ACPI\n");
-            break;
-        case E820_NVS:
-            printf("NVS\n");
-            break;
-        default:
-            printf("UNKNOWN (%08x)\n", e820[i].type);
-            break;
-        }
-
-        last_end = end;
-    }
-}
-
-/* Create an E820 table based on memory parameters provided in hvm_info. */
-static void build_e820_table(void)
-{
-    struct e820entry *e820 = E820;
-    unsigned int nr = 0;
-
-    /* 0x0-0x9E000: Ordinary RAM. */
-    /* (Must be at least 512K to keep Windows happy) */
-    e820[nr].addr = 0x00000;
-    e820[nr].size = 0x9E000;
-    e820[nr].type = E820_RAM;
-    nr++;
-
-    /* 0x9E000-0x9FC00: Reserved for internal use. */
-    e820[nr].addr = 0x9E000;
-    e820[nr].size = 0x01C00;
-    e820[nr].type = E820_RESERVED;
-    nr++;
-
-    /* 0x9FC00-0xA0000: Extended BIOS Data Area (EBDA). */
-    e820[nr].addr = 0x9FC00;
-    e820[nr].size = 0x400;
-    e820[nr].type = E820_RESERVED;
-    nr++;
-
-    /*
-     * Following regions are standard regions of the PC memory map.
-     * They are not covered by e820 regions. OSes will not use as RAM.
-     * 0xA0000-0xC0000: VGA memory-mapped I/O. Not covered by E820.
-     * 0xC0000-0xE0000: 16-bit devices, expansion ROMs (inc. vgabios).
-     * TODO: free pages which turn out to be unused.
-     */
-
-    /*
-     * 0xE0000-0x0F0000: PC-specific area. We place various tables here.
-     * 0xF0000-0x100000: System BIOS.
-     * TODO: free pages which turn out to be unused.
-     */
-    e820[nr].addr = 0xE0000;
-    e820[nr].size = 0x20000;
-    e820[nr].type = E820_RESERVED;
-    nr++;
-
-    /* Low RAM goes here. Reserve space for special pages. */
-    BUG_ON((hvm_info->low_mem_pgend << PAGE_SHIFT) < (2u << 20));
-    e820[nr].addr = 0x100000;
-    e820[nr].size = (hvm_info->low_mem_pgend << PAGE_SHIFT) - e820[nr].addr;
-    e820[nr].type = E820_RAM;
-    nr++;
-
-    /*
-     * Explicitly reserve space for special pages.
-     * This space starts at RESERVED_MEMBASE an extends to cover various
-     * fixed hardware mappings (e.g., LAPIC, IOAPIC, default SVGA framebuffer).
-     */
-    e820[nr].addr = RESERVED_MEMBASE;
-    e820[nr].size = (uint32_t)-e820[nr].addr;
-    e820[nr].type = E820_RESERVED;
-    nr++;
-
-    if ( hvm_info->high_mem_pgend )
-    {
-        e820[nr].addr = ((uint64_t)1 << 32);
-        e820[nr].size =
-            ((uint64_t)hvm_info->high_mem_pgend << PAGE_SHIFT) - e820[nr].addr;
-        e820[nr].type = E820_RAM;
-        nr++;
-    }
-
-    *E820_NR = nr;
-}
-
 int main(void)
 {
     int option_rom_sz = 0, vgabios_sz = 0, etherboot_sz = 0;
@@ -802,8 +682,8 @@ int main(void)
                ROMBIOS_PHYSICAL_ADDRESS,
                ROMBIOS_PHYSICAL_ADDRESS + rombios_sz - 1);
 
-    build_e820_table();
-    dump_e820_table();
+    *E820_NR = build_e820_table(E820);
+    dump_e820_table(E820, *E820_NR);
 
     bios_info = (struct bios_info *)BIOS_INFO_PHYSICAL_ADDRESS;
     memset(bios_info, 0, sizeof(*bios_info));

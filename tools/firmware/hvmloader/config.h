@@ -1,6 +1,8 @@
 #ifndef __HVMLOADER_CONFIG_H__
 #define __HVMLOADER_CONFIG_H__
 
+#include <stdint.h>
+
 #define PAGE_SHIFT 12
 #define PAGE_SIZE  (1ul << PAGE_SHIFT)
 
@@ -28,6 +30,7 @@ extern unsigned long pci_mem_start, pci_mem_end;
 #define ROMBIOS_MAXOFFSET      0x0000FFFF
 #define ROMBIOS_END            (ROMBIOS_BEGIN + ROMBIOS_SIZE)
 
+#include "e820.h"
 #include "../rombios/config.h"
 
 #define VGABIOS_PHYSICAL_ADDRESS      0x000C0000

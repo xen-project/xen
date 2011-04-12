@@ -66,7 +66,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "config.h"
-#include <../hvmloader/e820.h>
+#include "e820.h"
 #include "util.h"
 
 #define DEBUG_PMM 0

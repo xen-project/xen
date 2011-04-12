@@ -20,7 +20,6 @@
 
 #include "util.h"
 #include "config.h"
-#include "e820.h"
 #include "hypercall.h"
 #include <stdint.h>
 #include <xen/xen.h>

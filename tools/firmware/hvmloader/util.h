@@ -189,6 +189,10 @@ void create_mp_tables(void);
 int hvm_write_smbios_tables(void);
 void smp_initialise(void);
 
+#include "e820.h"
+int build_e820_table(struct e820entry *e820);
+void dump_e820_table(struct e820entry *e820, unsigned int nr);
+
 #ifndef NDEBUG
 void perform_tests(void);
 #else

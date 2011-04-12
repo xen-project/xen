@@ -26,7 +26,6 @@
 #include "smbios_types.h"
 #include "util.h"
 #include "hypercall.h"
-#include "e820.h"
 
 static int
 write_smbios_tables(void *start,

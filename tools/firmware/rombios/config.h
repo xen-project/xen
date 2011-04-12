@@ -18,6 +18,9 @@
 #define E820_NR_OFFSET                0x0
 #define E820_OFFSET                   0x8
 
+#define E820_NR ((uint16_t *)(E820_PHYSICAL_ADDRESS + E820_NR_OFFSET))
+#define E820    ((struct e820entry *)(E820_PHYSICAL_ADDRESS + E820_OFFSET))
+
 /* Xen Platform Device */
 #define XEN_PF_IOBASE   0x10
 #define PFFLAG_ROM_LOCK 1 /* Sets whether ROM memory area is RW or RO */
