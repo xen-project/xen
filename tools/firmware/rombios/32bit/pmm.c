@@ -65,7 +65,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include <../hvmloader/config.h>
+#include "config.h"
 #include <../hvmloader/e820.h>
 #include "util.h"
 
