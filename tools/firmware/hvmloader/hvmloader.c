@@ -20,7 +20,6 @@
  * Place - Suite 330, Boston, MA 02111-1307 USA.
  */
 
-#include "roms.h"
 #include "acpi/acpi2_0.h"
 #include "util.h"
 #include "hypercall.h"
@@ -32,6 +31,8 @@
 #include <xen/hvm/params.h>
 #include <xen/hvm/ioreq.h>
 #include <xen/memory.h>
+
+#include "roms.inc"
 
 asm (
     "    .text                       \n"

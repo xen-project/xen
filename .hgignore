@@ -143,7 +143,7 @@
 ^tools/firmware/hvmloader/acpi/dsdt.*\.c$
 ^tools/firmware/hvmloader/acpi/ssdt_.*\.h$
 ^tools/firmware/hvmloader/hvmloader$
-^tools/firmware/hvmloader/roms\.h$
+^tools/firmware/hvmloader/roms\.inc$
 ^tools/firmware/rombios/BIOS-bochs-[^/]*$
 ^tools/firmware/rombios/_rombios[^/]*_\.c$
 ^tools/firmware/rombios/rombios[^/]*\.s$
