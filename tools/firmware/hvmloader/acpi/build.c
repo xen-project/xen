@@ -242,7 +242,9 @@ static int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
     return align16(offset);
 }
 
-static void __acpi_build_tables(uint8_t *buf, int *low_sz, int *high_sz)
+static void __acpi_build_tables(unsigned int physical,
+                                uint8_t *buf,
+                                int *low_sz, int *high_sz)
 {
     struct acpi_20_rsdp *rsdp;
     struct acpi_20_rsdt *rsdt;
@@ -335,11 +337,11 @@ static void __acpi_build_tables(uint8_t *buf, int *low_sz, int *high_sz)
     /*
      * Fill in low-memory data structures: bios_info_table and RSDP.
      */
-
-    buf = (uint8_t *)ACPI_PHYSICAL_ADDRESS;
+    buf = (uint8_t *)physical;
     offset = 0;
 
     rsdp = (struct acpi_20_rsdp *)&buf[offset];
+
     memcpy(rsdp, &Rsdp, sizeof(struct acpi_20_rsdp));
     offset += align16(sizeof(struct acpi_20_rsdp));
     rsdp->rsdt_address = (unsigned long)rsdt;
@@ -354,24 +356,23 @@ static void __acpi_build_tables(uint8_t *buf, int *low_sz, int *high_sz)
     *low_sz = offset;
 }
 
-void acpi_build_tables(void)
+void acpi_build_tables(unsigned int physical)
 {
     int high_sz, low_sz;
     uint8_t *buf;
 
     /* Find out size of high-memory ACPI data area. */
     buf = (uint8_t *)&_end;
-    __acpi_build_tables(buf, &low_sz, &high_sz);
+    __acpi_build_tables(physical, buf, &low_sz, &high_sz);
     memset(buf, 0, high_sz);
 
     /* Allocate data area and set up ACPI tables there. */
     buf = mem_alloc(high_sz, 0);
-    __acpi_build_tables(buf, &low_sz, &high_sz);
+    __acpi_build_tables(physical, buf, &low_sz, &high_sz);
 
-    printf(" - Lo data: %08lx-%08lx\n"
+    printf(" - Lo data: %08x-%08x\n"
            " - Hi data: %08lx-%08lx\n",
-           (unsigned long)ACPI_PHYSICAL_ADDRESS,
-           (unsigned long)ACPI_PHYSICAL_ADDRESS + low_sz - 1,
+           physical, physical + low_sz - 1,
            (unsigned long)buf, (unsigned long)buf + high_sz - 1);
 }
 

@@ -652,7 +652,7 @@ int main(void)
         };
 
         printf("Loading ACPI ...\n");
-        acpi_build_tables();
+        acpi_build_tables(ACPI_PHYSICAL_ADDRESS);
         hypercall_hvm_op(HVMOP_set_param, &p);
     }
 
