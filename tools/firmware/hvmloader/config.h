@@ -33,6 +33,9 @@ extern unsigned long pci_mem_start, pci_mem_end;
 #include "e820.h"
 #include "../rombios/config.h"
 
+#define SCRATCH_PHYSICAL_ADDRESS      0x00010000
+#define HYPERCALL_PHYSICAL_ADDRESS    0x00080000
+
 #define VGABIOS_PHYSICAL_ADDRESS      0x000C0000
 
 #endif /* __HVMLOADER_CONFIG_H__ */
