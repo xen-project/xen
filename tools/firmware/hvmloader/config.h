@@ -36,6 +36,7 @@ struct bios_config {
     void (*e820_setup)(void);
 
     void (*acpi_build_tables)(unsigned int physical);
+    void (*create_mp_tables)(void);
 };
 
 extern struct bios_config rombios_config;
@@ -61,11 +62,6 @@ extern unsigned long pci_mem_start, pci_mem_end;
 /* We reserve 16MB for special BIOS mappings, etc. */
 #define RESERVED_MEMBASE    0xfc000000
 #define RESERVED_MEMSIZE    0x01000000
-
-#define ROMBIOS_BEGIN          0x000F0000
-#define ROMBIOS_SIZE           0x00010000
-#define ROMBIOS_MAXOFFSET      0x0000FFFF
-#define ROMBIOS_END            (ROMBIOS_BEGIN + ROMBIOS_SIZE)
 
 #define SCRATCH_PHYSICAL_ADDRESS      0x00010000
 #define HYPERCALL_PHYSICAL_ADDRESS    0x00080000

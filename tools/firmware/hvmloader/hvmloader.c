@@ -385,8 +385,9 @@ int main(void)
     if (bios->bios_high_setup)
         highbios = bios->bios_high_setup();
 
-    if ( (hvm_info->nr_vcpus > 1) || hvm_info->apic_mode )
-        create_mp_tables();
+    if ( bios->create_mp_tables &&
+         ( (hvm_info->nr_vcpus > 1) || hvm_info->apic_mode ) )
+        bios->create_mp_tables();
 
     switch ( virtual_vga )
     {

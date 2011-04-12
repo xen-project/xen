@@ -37,6 +37,11 @@
 #define ROM_INCLUDE_ROMBIOS
 #include "roms.inc"
 
+#define ROMBIOS_BEGIN          0x000F0000
+#define ROMBIOS_SIZE           0x00010000
+#define ROMBIOS_MAXOFFSET      0x0000FFFF
+#define ROMBIOS_END            (ROMBIOS_BEGIN + ROMBIOS_SIZE)
+
 /*
  * Set up an empty TSS area for virtual 8086 mode to use. 
  * The only important thing is that it musn't have any bits set 
@@ -303,6 +308,57 @@ static void rombios_pci_setup(void)
         pci_writew(devfn, PCI_COMMAND, cmd);
     }
 }
+
+/*
+ * find_mp_table_start - searchs through BIOS memory for '___HVMMP' signature
+ *
+ * The '___HVMMP' signature is created by the ROMBIOS and designates a chunk
+ * of space inside the ROMBIOS that is safe for us to write our MP table info
+ */
+static void *get_mp_table_start(void)
+{
+    char *bios_mem;
+
+    for ( bios_mem = (char *)ROMBIOS_BEGIN;
+          bios_mem != (char *)ROMBIOS_END;
+          bios_mem++ )
+    {
+        if ( strncmp(bios_mem, "___HVMMP", 8) == 0)
+            return bios_mem;
+    }
+
+    return NULL;
+}
+
+/* recalculate the new ROMBIOS checksum after adding MP tables */
+static void reset_bios_checksum(void)
+{
+    uint32_t i;
+    uint8_t checksum;
+
+    checksum = 0;
+    for (i = 0; i < ROMBIOS_MAXOFFSET; ++i)
+        checksum += ((uint8_t *)(ROMBIOS_BEGIN))[i];
+
+    *((uint8_t *)(ROMBIOS_BEGIN + ROMBIOS_MAXOFFSET)) = -checksum;
+}
+
+static void rombios_create_mp_tables(void)
+{
+    /* Find the 'safe' place in ROMBIOS for the MP tables. */
+    void *table = get_mp_table_start();
+
+    if ( table == NULL )
+    {
+        printf("Couldn't find start point for MP tables\n");
+        return;
+    }
+
+    create_mp_tables(table);
+
+    reset_bios_checksum();
+}
+
 //BUILD_BUG_ON(sizeof(rombios) > (0x00100000U - ROMBIOS_PHYSICAL_ADDRESS));
 
 struct bios_config rombios_config =  {
@@ -332,6 +388,7 @@ struct bios_config rombios_config =  {
     .e820_setup = rombios_setup_e820,
 
     .acpi_build_tables = acpi_build_tables,
+    .create_mp_tables = rombios_create_mp_tables,
 };
 
 /*

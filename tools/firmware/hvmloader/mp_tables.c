@@ -259,46 +259,9 @@ static void fill_mpfps(struct mp_floating_pointer_struct *mpfps, uint32_t mpct)
     mpfps->checksum = -checksum;
 }
 
-
-/*
- * find_mp_table_start - searchs through BIOS memory for '___HVMMP' signature
- *
- * The '___HVMMP' signature is created by the ROMBIOS and designates a chunk
- * of space inside the ROMBIOS that is safe for us to write our MP table info
- */
-static void *get_mp_table_start(void)
-{
-    char *bios_mem;
-
-    for ( bios_mem = (char *)ROMBIOS_BEGIN; 
-          bios_mem != (char *)ROMBIOS_END; 
-          bios_mem++ )
-    {
-        if ( strncmp(bios_mem, "___HVMMP", 8) == 0)
-            return bios_mem;
-    }
-
-    return NULL;
-}
-
-
-/* recalculate the new ROMBIOS checksum after adding MP tables */
-static void reset_bios_checksum(void)
-{
-    uint32_t i;
-    uint8_t checksum;
-
-    checksum = 0;
-    for (i = 0; i < ROMBIOS_MAXOFFSET; ++i)
-        checksum += ((uint8_t *)(ROMBIOS_BEGIN))[i];
-
-    *((uint8_t *)(ROMBIOS_BEGIN + ROMBIOS_MAXOFFSET)) = -checksum;
-}
-
 /* create_mp_tables - creates MP tables for the guest based upon config data */
-void create_mp_tables(void)
+void create_mp_tables(void *mp_table_base)
 {
-    void *mp_table_base;
     char *p;
     int vcpu_nr, i, length;
     struct mp_io_intr_entry *mpiie;
@@ -306,14 +269,6 @@ void create_mp_tables(void)
     vcpu_nr = hvm_info->nr_vcpus;
 
     printf("Creating MP tables ...\n");
-
-    /* Find the 'safe' place in ROMBIOS for the MP tables. */
-    mp_table_base = get_mp_table_start();
-    if ( mp_table_base == NULL )
-    {
-        printf("Couldn't find start point for MP tables\n");
-        return;
-    }
 
     p = mp_table_base + sizeof(struct mp_config_table);
 
@@ -363,5 +318,4 @@ void create_mp_tables(void)
                (uint32_t)mp_table_base);
 
     fill_mp_config_table((struct mp_config_table *)mp_table_base, length);
-    reset_bios_checksum();
 }
