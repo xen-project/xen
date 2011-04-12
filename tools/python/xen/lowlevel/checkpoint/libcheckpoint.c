@@ -185,7 +185,7 @@ int checkpoint_start(checkpoint_state* s, int fd,
     hvm = s->domtype > dt_pv;
     if (hvm) {
        flags |= XCFLAGS_HVM;
-       if (!switch_qemu_logdirty(s, 1))
+       if (switch_qemu_logdirty(s, 1))
            return -1;
     }
 
