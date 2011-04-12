@@ -36,6 +36,17 @@ SRCS += tests.c
 endif
 OBJS  = $(patsubst %.c,%.o,$(SRCS))
 
+CIRRUSVGA_DEBUG ?= n
+
+ROMBIOS_ROM   := ../rombios/BIOS-bochs-latest
+
+STDVGA_ROM    := ../vgabios/VGABIOS-lgpl-latest.bin
+ifeq ($(CIRRUSVGA_DEBUG),y)
+CIRRUSVGA_ROM := ../vgabios/VGABIOS-lgpl-latest.cirrus.debug.bin
+else
+CIRRUSVGA_ROM := ../vgabios/VGABIOS-lgpl-latest.cirrus.bin
+endif
+
 .PHONY: all
 all: subdirs-all
 	$(MAKE) hvmloader
@@ -48,12 +59,17 @@ hvmloader: $(OBJS) acpi/acpi.a
 	$(OBJCOPY) hvmloader.tmp hvmloader
 	rm -f hvmloader.tmp
 
-roms.h: ../rombios/BIOS-bochs-latest ../vgabios/VGABIOS-lgpl-latest.bin \
-	../vgabios/VGABIOS-lgpl-latest.cirrus.bin ../etherboot/eb-roms.h
-	sh ./mkhex rombios ../rombios/BIOS-bochs-latest > roms.h
-	sh ./mkhex vgabios_stdvga ../vgabios/VGABIOS-lgpl-latest.bin >> roms.h
-	sh ./mkhex vgabios_cirrusvga \
-		../vgabios/VGABIOS-lgpl-latest.cirrus.bin >> roms.h
+roms.h: $(ROMBIOS_ROM) $(STDVGA_ROM) $(CIRRUSVGA_ROM) ../etherboot/eb-roms.h
+ifneq ($(ROMBIOS_ROM),)
+	sh ./mkhex rombios $(ROMBIOS_ROM) > roms.h
+endif
+ifneq ($(STDVGA_ROM),)
+	sh ./mkhex vgabios_stdvga $(STDVGA_ROM) >> roms.h
+endif
+ifneq ($(CIRRUSVGA_ROM),)
+	sh ./mkhex vgabios_cirrusvga $(CIRRUSVGA_ROM) >> roms.h
+endif
+
 	cat ../etherboot/eb-roms.h >> roms.h
 
 .PHONY: clean
