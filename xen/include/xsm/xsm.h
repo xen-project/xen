@@ -136,11 +136,12 @@ struct xsm_operations {
     int (*getidletime) (void);
     int (*machine_memory_map) (void);
     int (*domain_memory_map) (struct domain *d);
-    int (*mmu_normal_update) (struct domain *d, struct domain *f, 
-                                                                intpte_t fpte);
-    int (*mmu_machphys_update) (struct domain *d, unsigned long mfn);
-    int (*update_va_mapping) (struct domain *d, struct domain *f, 
-                                                            l1_pgentry_t pte);
+    int (*mmu_normal_update) (struct domain *d,
+			      intpte_t fpte, struct page_info *page);
+    int (*mmu_machphys_update) (struct domain *d, struct page_info *page);
+    int (*update_va_mapping) (struct domain *d,
+			      l1_pgentry_t pte,
+			      struct page_info *page);
     int (*add_to_physmap) (struct domain *d1, struct domain *d2);
     int (*sendtrigger) (struct domain *d);
     int (*test_assign_device) (uint32_t machine_bdf);
@@ -571,21 +572,22 @@ static inline int xsm_domain_memory_map(struct domain *d)
     return xsm_call(domain_memory_map(d));
 }
 
-static inline int xsm_mmu_normal_update (struct domain *d, struct domain *f, 
-                                                                intpte_t fpte)
+static inline int xsm_mmu_normal_update (struct domain *d,
+					 intpte_t fpte, struct page_info *page)
 {
-    return xsm_call(mmu_normal_update(d, f, fpte));
+    return xsm_call(mmu_normal_update(d, fpte, page));
 }
 
-static inline int xsm_mmu_machphys_update (struct domain *d, unsigned long mfn)
+static inline int xsm_mmu_machphys_update (struct domain *d, struct page_info *page)
 {
-    return xsm_call(mmu_machphys_update(d, mfn));
+    return xsm_call(mmu_machphys_update(d, page));
 }
 
-static inline int xsm_update_va_mapping(struct domain *d, struct domain *f, 
-                                                            l1_pgentry_t pte)
+static inline int xsm_update_va_mapping(struct domain *d,
+					l1_pgentry_t pte,
+					struct page_info *page)
 {
-    return xsm_call(update_va_mapping(d, f, pte));
+    return xsm_call(update_va_mapping(d, pte, page));
 }
 
 static inline int xsm_add_to_physmap(struct domain *d1, struct domain *d2)

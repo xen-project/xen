@@ -347,26 +347,6 @@ static int get_page_sid(struct page_info *page, u32 *sid)
     return rc;
 }
 
-static int get_mfn_sid(unsigned long mfn, u32 *sid)
-{
-    int rc = 0;
-    struct page_info *page;
-
-    if ( mfn_valid(mfn) )
-    {
-        /*mfn is valid if this is a page that Xen is tracking!*/
-        page = mfn_to_page(mfn);
-        rc = get_page_sid(page, sid);
-    }
-    else
-    {
-        /*Possibly an untracked IO page?*/
-        rc = security_iomem_sid(mfn, sid);
-    }
-
-    return rc;    
-}
-
 static int flask_memory_adjust_reservation(struct domain *d1, struct domain *d2)
 {
     return domain_has_perm(d1, d2, SECCLASS_MMU, MMU__ADJUST);
@@ -1006,12 +986,11 @@ static int flask_domain_memory_map(struct domain *d)
     return domain_has_perm(current->domain, d, SECCLASS_MMU, MMU__MEMORYMAP);
 }
 
-static int flask_mmu_normal_update(struct domain *d, struct domain *f, 
-                                   intpte_t fpte)
+static int flask_mmu_normal_update(struct domain *d, 
+                                   intpte_t fpte, struct page_info *page)
 {
     int rc = 0;
     u32 map_perms = MMU__MAP_READ;
-    unsigned long fmfn;
     struct domain_security_struct *dsec;
     u32 fsid;
 
@@ -1020,42 +999,38 @@ static int flask_mmu_normal_update(struct domain *d, struct domain *f,
     if ( l1e_get_flags(l1e_from_intpte(fpte)) & _PAGE_RW )
         map_perms |= MMU__MAP_WRITE;
 
-    fmfn = gmfn_to_mfn(f, l1e_get_pfn(l1e_from_intpte(fpte)));
-
-    rc = get_mfn_sid(fmfn, &fsid);
+    rc = get_page_sid(page, &fsid);
     if ( rc )
         return rc;
 
     return avc_has_perm(dsec->sid, fsid, SECCLASS_MMU, map_perms, NULL);
 }
 
-static int flask_mmu_machphys_update(struct domain *d, unsigned long mfn)
+static int flask_mmu_machphys_update(struct domain *d, struct page_info *page)
 {
     int rc = 0;
     u32 psid;
     struct domain_security_struct *dsec;
     dsec = d->ssid;
 
-    rc = get_mfn_sid(mfn, &psid);
+    rc = get_page_sid(page, &psid);
     if ( rc )
         return rc;
 
     return avc_has_perm(dsec->sid, psid, SECCLASS_MMU, MMU__UPDATEMP, NULL);
 }
 
-static int flask_update_va_mapping(struct domain *d, struct domain *f, 
-                                   l1_pgentry_t pte)
+static int flask_update_va_mapping(struct domain *d,
+                                   l1_pgentry_t pte, struct page_info *page)
 {
     int rc = 0;
     u32 psid;
     u32 map_perms = MMU__MAP_READ;
-    unsigned long mfn;
     struct domain_security_struct *dsec;
 
     dsec = d->ssid;
 
-    mfn = gmfn_to_mfn(f, l1e_get_pfn(pte));        
-    rc = get_mfn_sid(mfn, &psid);
+    rc = get_page_sid(page, &psid);
     if ( rc )
         return rc;
 
