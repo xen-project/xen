@@ -3,6 +3,28 @@
 
 #include <stdint.h>
 
+struct bios_config {
+    const char *name;
+
+    /* BIOS ROM image bits */
+    void *image;
+    unsigned int image_size;
+
+    /* Physical address to load at */
+    unsigned int bios_address;
+
+    /* SMBIOS */
+    unsigned int smbios_start, smbios_end;
+
+    /* Option ROMs */
+    unsigned int optionrom_start, optionrom_end;
+
+    /* ACPI tables */
+    unsigned int acpi_start;
+};
+
+extern struct bios_config rombios_config;
+
 #define PAGE_SHIFT 12
 #define PAGE_SIZE  (1ul << PAGE_SHIFT)
 
@@ -39,3 +61,13 @@ extern unsigned long pci_mem_start, pci_mem_end;
 #define VGABIOS_PHYSICAL_ADDRESS      0x000C0000
 
 #endif /* __HVMLOADER_CONFIG_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

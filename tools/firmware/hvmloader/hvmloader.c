@@ -32,6 +32,8 @@
 #include <xen/hvm/ioreq.h>
 #include <xen/memory.h>
 
+#define ROM_INCLUDE_VGABIOS
+#define ROM_INCLUDE_ETHERBOOT
 #include "roms.inc"
 
 asm (
@@ -583,10 +585,15 @@ static void init_vm86_tss(void)
     printf("vm86 TSS at %08lx\n", virt_to_phys(tss));
 }
 
+static const struct bios_config *detect_bios(void)
+{
+    return &rombios_config;
+}
+
 int main(void)
 {
-    int option_rom_sz = 0, vgabios_sz = 0, etherboot_sz = 0;
-    int smbios_sz;
+    const struct bios_config *bios;
+    int option_rom_sz = 0, vgabios_sz = 0, etherboot_sz = 0, smbios_sz = 0;
     uint32_t etherboot_phys_addr, option_rom_phys_addr, bios32_addr;
     struct bios_info *bios_info;
 
@@ -594,9 +601,13 @@ int main(void)
 
     init_hypercalls();
 
+    xenbus_setup();
+
+    bios = detect_bios();
+    printf("System requested %s\n", bios->name);
+
     printf("CPU speed is %u MHz\n", get_cpu_mhz());
 
-    xenbus_setup();
     apic_setup();
     pci_setup();
 
@@ -604,13 +615,16 @@ int main(void)
 
     perform_tests();
 
-    printf("Writing SMBIOS tables ...\n");
-    smbios_sz = hvm_write_smbios_tables(SCRATCH_PHYSICAL_ADDRESS,
-                                        SMBIOS_PHYSICAL_ADDRESS,
-                                        SMBIOS_PHYSICAL_END);
+    if (bios->smbios_start) {
+        printf("Writing SMBIOS tables ...\n");
+        smbios_sz = hvm_write_smbios_tables(SCRATCH_PHYSICAL_ADDRESS,
+                                            bios->smbios_start,
+                                            bios->smbios_end);
+    }
 
-    printf("Loading ROMBIOS ...\n");
-    memcpy((void *)ROMBIOS_PHYSICAL_ADDRESS, rombios, sizeof(rombios));
+    printf("Loading %s ...\n", bios->name);
+    memcpy((void *)bios->bios_address, bios->image,
+           bios->image_size);
     bios32_addr = highbios_setup();
 
     if ( (hvm_info->nr_vcpus > 1) || hvm_info->apic_mode )
@@ -641,13 +655,13 @@ int main(void)
     }
 
     etherboot_phys_addr = VGABIOS_PHYSICAL_ADDRESS + vgabios_sz;
-    if ( etherboot_phys_addr < OPTIONROM_PHYSICAL_ADDRESS )
-        etherboot_phys_addr = OPTIONROM_PHYSICAL_ADDRESS;
-    etherboot_sz = scan_etherboot_nic(OPTIONROM_PHYSICAL_END,
+    if ( etherboot_phys_addr < bios->optionrom_start )
+        etherboot_phys_addr = bios->optionrom_start;
+    etherboot_sz = scan_etherboot_nic(bios->optionrom_end,
                                       etherboot_phys_addr);
 
     option_rom_phys_addr = etherboot_phys_addr + etherboot_sz;
-    option_rom_sz = pci_load_option_roms(OPTIONROM_PHYSICAL_END,
+    option_rom_sz = pci_load_option_roms(bios->optionrom_end,
                                          option_rom_phys_addr);
 
     if ( hvm_info->acpi_enabled )
@@ -659,7 +673,7 @@ int main(void)
         };
 
         printf("Loading ACPI ...\n");
-        acpi_build_tables(ACPI_PHYSICAL_ADDRESS);
+        acpi_build_tables(bios->acpi_start);
         hypercall_hvm_op(HVMOP_set_param, &p);
     }
 
@@ -682,11 +696,11 @@ int main(void)
                option_rom_phys_addr + option_rom_sz - 1);
     if ( smbios_sz )
         printf(" %05x-%05x: SMBIOS tables\n",
-               SMBIOS_PHYSICAL_ADDRESS,
-               SMBIOS_PHYSICAL_ADDRESS + smbios_sz - 1);
+               bios->smbios_start,
+               bios->smbios_start + smbios_sz - 1);
     printf(" %05x-%05x: Main BIOS\n",
-           ROMBIOS_PHYSICAL_ADDRESS,
-           ROMBIOS_PHYSICAL_ADDRESS + sizeof(rombios) - 1);
+           bios->bios_address,
+           bios->bios_address + bios->image_size - 1);
 
     *E820_NR = build_e820_table(E820);
     dump_e820_table(E820, *E820_NR);
@@ -705,7 +719,7 @@ int main(void)
 
     xenbus_shutdown();
 
-    printf("Invoking ROMBIOS ...\n");
+    printf("Invoking %s ...\n", bios->name);
     return 0;
 }
 
