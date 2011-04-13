@@ -60,6 +60,15 @@ static inline void svm_vmsave(void *vmcb)
         : : "a" (__pa(vmcb)) : "memory" );
 }
 
+static inline void svm_invlpga(unsigned long vaddr, uint32_t asid)
+{
+    asm volatile (
+        ".byte 0x0f,0x01,0xdf"
+        : /* output */
+        : /* input */
+        "a" (vaddr), "c" (asid));
+}
+
 unsigned long *svm_msrbit(unsigned long *msr_bitmap, uint32_t msr);
 void __update_guest_eip(struct cpu_user_regs *regs, unsigned int inst_len);
 

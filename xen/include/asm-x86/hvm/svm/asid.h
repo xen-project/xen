@@ -34,10 +34,7 @@ static inline void svm_asid_g_invlpg(struct vcpu *v, unsigned long g_vaddr)
 {
 #if 0
     /* Optimization? */
-    asm volatile (".byte 0x0F,0x01,0xDF    \n"
-                  : /* output */
-                  : /* input */
-                  "a" (g_vaddr), "c"(v->arch.hvm_svm.vmcb->guest_asid) );
+    svm_invlpga(g_vaddr, v->arch.hvm_svm.vmcb->guest_asid);
 #endif
 
     /* Safe fallback. Take a new ASID. */
