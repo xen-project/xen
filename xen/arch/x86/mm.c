@@ -100,6 +100,7 @@
 #include <xen/iocap.h>
 #include <xen/guest_access.h>
 #include <xen/pfn.h>
+#include <xen/xmalloc.h>
 #include <asm/paging.h>
 #include <asm/shadow.h>
 #include <asm/page.h>
@@ -4713,11 +4714,12 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
     {
         struct xen_foreign_memory_map fmap;
         struct domain *d;
+        struct e820entry *e820;
 
         if ( copy_from_guest(&fmap, arg, 1) )
             return -EFAULT;
 
-        if ( fmap.map.nr_entries > ARRAY_SIZE(d->arch.pv_domain.e820) )
+        if ( fmap.map.nr_entries > E820MAX )
             return -EINVAL;
 
         rc = rcu_lock_target_domain_by_id(fmap.domid, &d);
@@ -4737,9 +4739,25 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
             return -EPERM;
         }
 
-        rc = copy_from_guest(d->arch.pv_domain.e820, fmap.map.buffer,
-                             fmap.map.nr_entries) ? -EFAULT : 0;
+        e820 = xmalloc_array(e820entry_t, fmap.map.nr_entries);
+        if ( e820 == NULL )
+        {
+            rcu_unlock_domain(d);
+            return -ENOMEM;
+        }
+        
+        if ( copy_from_guest(e820, fmap.map.buffer, fmap.map.nr_entries) )
+        {
+            xfree(e820);
+            rcu_unlock_domain(d);
+            return -EFAULT;
+        }
+
+        spin_lock(&d->arch.pv_domain.e820_lock);
+        xfree(d->arch.pv_domain.e820);
+        d->arch.pv_domain.e820 = e820;
         d->arch.pv_domain.nr_e820 = fmap.map.nr_entries;
+        spin_unlock(&d->arch.pv_domain.e820_lock);
 
         rcu_unlock_domain(d);
         return rc;
@@ -4750,19 +4768,29 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         struct xen_memory_map map;
         struct domain *d = current->domain;
 
-        /* Backwards compatibility. */
-        if ( d->arch.pv_domain.nr_e820 == 0 )
-            return -ENOSYS;
-
         if ( copy_from_guest(&map, arg, 1) )
             return -EFAULT;
+
+        spin_lock(&d->arch.pv_domain.e820_lock);
+
+        /* Backwards compatibility. */
+        if ( (d->arch.pv_domain.nr_e820 == 0) ||
+             (d->arch.pv_domain.e820 == NULL) )
+        {
+            spin_unlock(&d->arch.pv_domain.e820_lock);
+            return -ENOSYS;
+        }
 
         map.nr_entries = min(map.nr_entries, d->arch.pv_domain.nr_e820);
         if ( copy_to_guest(map.buffer, d->arch.pv_domain.e820,
                            map.nr_entries) ||
              copy_to_guest(arg, &map, 1) )
+        {
+            spin_unlock(&d->arch.pv_domain.e820_lock);
             return -EFAULT;
+        }
 
+        spin_unlock(&d->arch.pv_domain.e820_lock);
         return 0;
     }
 

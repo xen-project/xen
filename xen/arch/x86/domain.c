@@ -657,6 +657,8 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
         /* 32-bit PV guest by default only if Xen is not 64-bit. */
         d->arch.is_32bit_pv = d->arch.has_32bit_shinfo =
             (CONFIG_PAGING_LEVELS != 4);
+
+        spin_lock_init(&d->arch.pv_domain.e820_lock);
     }
 
     /* initialize default tsc behavior in case tools don't */
@@ -696,6 +698,8 @@ void arch_domain_destroy(struct domain *d)
 
     if ( is_hvm_domain(d) )
         hvm_domain_destroy(d);
+    else
+        xfree(d->arch.pv_domain.e820);
 
     vmce_destroy_msr(d);
     pci_release_devices(d);
