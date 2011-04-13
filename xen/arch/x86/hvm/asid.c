@@ -48,9 +48,9 @@
 
 /* Per-CPU ASID management. */
 struct hvm_asid_data {
-   u64 core_asid_generation;
-   u32 next_asid;
-   u32 max_asid;
+   uint64_t core_asid_generation;
+   uint32_t next_asid;
+   uint32_t max_asid;
    bool_t disabled;
 };
 
@@ -58,7 +58,7 @@ static DEFINE_PER_CPU(struct hvm_asid_data, hvm_asid_data);
 
 void hvm_asid_init(int nasids)
 {
-    static s8 g_disabled = -1;
+    static int8_t g_disabled = -1;
     struct hvm_asid_data *data = &this_cpu(hvm_asid_data);
 
     data->max_asid = nasids - 1;

@@ -100,8 +100,8 @@ struct hvm_vcpu {
     bool_t              hcall_preempted;
     bool_t              hcall_64bit;
 
-    u64                 asid_generation;
-    u32                 asid;
+    uint64_t            asid_generation;
+    uint32_t            asid;
 
     u32                 msr_tsc_aux;
 
