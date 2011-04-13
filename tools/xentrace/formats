@@ -5,6 +5,7 @@
 0x0001f003  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  cpu_change        0x%(1)08x
 0x0001f004  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  trace_irq    [ vector = %(1)d, count = %(2)d, tot_cycles = 0x%(3)08x, max_cycles = 0x%(4)08x ]
 
+0x00021002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  continue_running    [ dom:vcpu = 0x%(1)08x ]
 0x00021011  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  running_to_runnable [ dom:vcpu = 0x%(1)08x ]
 0x00021021  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  running_to_blocked  [ dom:vcpu = 0x%(1)08x ]
 0x00021031  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  running_to_offline  [ dom:vcpu = 0x%(1)08x ]
@@ -70,6 +71,7 @@
 0x00082018  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  CLTS
 0x00082019  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  LMSW        [ value = 0x%(1)08x ]
 0x00082119  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  LMSW        [ value = 0x%(2)08x%(1)08x ]
+0x0008201a  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  RDTSC       [ value = 0x%(2)08x%(1)08x ]
 0x00082020  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  INTR_WINDOW [ value = 0x%(1)08x ]
 0x00082021  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  NPF         [ gpa = 0x%(2)08x%(1)08x mfn = 0x%(4)08x%(3)08x qual = 0x%(5)04x p2mt = 0x%(6)04x ]
 
