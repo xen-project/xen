@@ -123,6 +123,7 @@
 #define TRC_SHADOW_RESYNC_ONLY                (TRC_SHADOW + 15)
 
 /* trace events per subclass */
+#define TRC_HVM_NESTEDFLAG      (0x400)
 #define TRC_HVM_VMENTRY         (TRC_HVM_ENTRYEXIT + 0x01)
 #define TRC_HVM_VMEXIT          (TRC_HVM_ENTRYEXIT + 0x02)
 #define TRC_HVM_VMEXIT64        (TRC_HVM_ENTRYEXIT + TRC_64_FLAG + 0x02)

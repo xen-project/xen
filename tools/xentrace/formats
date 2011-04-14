@@ -38,6 +38,9 @@
 0x00081001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  VMENTRY
 0x00081002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  VMEXIT      [ exitcode = 0x%(1)08x, rIP  = 0x%(2)08x ]
 0x00081102  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  VMEXIT      [ exitcode = 0x%(1)08x, rIP  = 0x%(3)08x%(2)08x ]
+0x00081401  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  nVMENTRY
+0x00081402  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  nVMEXIT     [ exitcode = 0x%(1)08x, rIP  = 0x%(2)08x ]
+0x00081502  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  nVMEXIT     [ exitcode = 0x%(1)08x, rIP  = 0x%(3)08x%(2)08x ]
 0x00082001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  PF_XEN      [ errorcode = 0x%(2)02x, virt = 0x%(1)08x ]
 0x00082101  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  PF_XEN      [ errorcode = 0x%(3)02x, virt = 0x%(2)08x%(1)08x ]
 0x00082002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  PF_INJECT   [ errorcode = 0x%(1)02x, virt = 0x%(2)08x ]

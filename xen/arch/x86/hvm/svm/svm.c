@@ -1668,6 +1668,17 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     exit_reason = vmcb->exitcode;
 
+    if ( hvm_long_mode_enabled(v) )
+        HVMTRACE_ND(VMEXIT64, vcpu_guestmode ? TRC_HVM_NESTEDFLAG : 0,
+                    1/*cycles*/, 3, exit_reason,
+                    (uint32_t)regs->eip, (uint32_t)((uint64_t)regs->eip >> 32),
+                    0, 0, 0);
+    else
+        HVMTRACE_ND(VMEXIT, vcpu_guestmode ? TRC_HVM_NESTEDFLAG : 0,
+                    1/*cycles*/, 2, exit_reason,
+                    (uint32_t)regs->eip,
+                    0, 0, 0, 0);
+
     if ( vcpu_guestmode ) {
         enum nestedhvm_vmexits nsret;
         struct nestedvcpu *nv = &vcpu_nestedhvm(v);
@@ -1727,15 +1738,6 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
             goto exit_and_crash;
         }
     }
-
-    if ( hvm_long_mode_enabled(v) )
-        HVMTRACE_ND(VMEXIT64, 0, 1/*cycles*/, 3, exit_reason,
-                    (uint32_t)regs->eip, (uint32_t)((uint64_t)regs->eip >> 32),
-                    0, 0, 0);
-    else
-        HVMTRACE_ND(VMEXIT, 0, 1/*cycles*/, 2, exit_reason,
-                    (uint32_t)regs->eip, 
-                    0, 0, 0, 0);
 
     if ( unlikely(exit_reason == VMEXIT_INVALID) )
     {
@@ -2014,7 +2016,10 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 
 asmlinkage void svm_trace_vmentry(void)
 {
-    HVMTRACE_ND(VMENTRY, 0, 1/*cycles*/, 0, 0, 0, 0, 0, 0, 0);
+    struct vcpu *curr = current;
+    HVMTRACE_ND(VMENTRY,
+                nestedhvm_vcpu_in_guestmode(curr) ? TRC_HVM_NESTEDFLAG : 0,
+                1/*cycles*/, 0, 0, 0, 0, 0, 0, 0);
 }
   
 /*
