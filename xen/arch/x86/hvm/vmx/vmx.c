@@ -2251,11 +2251,11 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     exit_reason = __vmread(VM_EXIT_REASON);
 
     if ( hvm_long_mode_enabled(v) )
-        HVMTRACE_ND(VMEXIT64, 1/*cycles*/, 3, exit_reason,
+        HVMTRACE_ND(VMEXIT64, 0, 1/*cycles*/, 3, exit_reason,
                     (uint32_t)regs->eip, (uint32_t)((uint64_t)regs->eip >> 32),
                     0, 0, 0);
     else
-        HVMTRACE_ND(VMEXIT, 1/*cycles*/, 2, exit_reason,
+        HVMTRACE_ND(VMEXIT, 0, 1/*cycles*/, 2, exit_reason,
                     (uint32_t)regs->eip, 
                     0, 0, 0, 0);
 
@@ -2699,7 +2699,7 @@ asmlinkage void vmx_vmenter_helper(void)
         vpid_sync_all();
 
  out:
-    HVMTRACE_ND (VMENTRY, 1/*cycles*/, 0, 0, 0, 0, 0, 0, 0);
+    HVMTRACE_ND(VMENTRY, 0, 1/*cycles*/, 0, 0, 0, 0, 0, 0, 0);
 }
 
 /*

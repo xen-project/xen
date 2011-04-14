@@ -58,38 +58,38 @@
 #define TRC_PAR_LONG(par) (par)
 #endif
 
-#define HVMTRACE_ND(evt, cycles, count, d1, d2, d3, d4, d5, d6)         \
-    do {                                                                \
-        if ( unlikely(tb_init_done) && DO_TRC_HVM_ ## evt )             \
-        {                                                               \
-            struct {                                                    \
-                u32 d[6];                                               \
-            } _d;                                                       \
-            _d.d[0]=(d1);                                               \
-            _d.d[1]=(d2);                                               \
-            _d.d[2]=(d3);                                               \
-            _d.d[3]=(d4);                                               \
-            _d.d[4]=(d5);                                               \
-            _d.d[5]=(d6);                                               \
-            __trace_var(TRC_HVM_ ## evt, cycles,                        \
-                        sizeof(*_d.d) * count, &_d);                    \
-        }                                                               \
+#define HVMTRACE_ND(evt, modifier, cycles, count, d1, d2, d3, d4, d5, d6) \
+    do {                                                                  \
+        if ( unlikely(tb_init_done) && DO_TRC_HVM_ ## evt )               \
+        {                                                                 \
+            struct {                                                      \
+                u32 d[6];                                                 \
+            } _d;                                                         \
+            _d.d[0]=(d1);                                                 \
+            _d.d[1]=(d2);                                                 \
+            _d.d[2]=(d3);                                                 \
+            _d.d[3]=(d4);                                                 \
+            _d.d[4]=(d5);                                                 \
+            _d.d[5]=(d6);                                                 \
+            __trace_var(TRC_HVM_ ## evt | (modifier), cycles,             \
+                        sizeof(*_d.d) * count, &_d);                      \
+        }                                                                 \
     } while(0)
 
 #define HVMTRACE_6D(evt, d1, d2, d3, d4, d5, d6)    \
-                      HVMTRACE_ND(evt, 0, 6, d1, d2, d3,  d4, d5, d6)
+    HVMTRACE_ND(evt, 0, 0, 6, d1, d2, d3, d4, d5, d6)
 #define HVMTRACE_5D(evt, d1, d2, d3, d4, d5)        \
-                      HVMTRACE_ND(evt, 0, 5, d1, d2, d3,  d4, d5, 0)
-#define HVMTRACE_4D(evt, d1, d2, d3, d4)               \
-                      HVMTRACE_ND(evt, 0, 4, d1, d2, d3,  d4, 0, 0)
-#define HVMTRACE_3D(evt, d1, d2, d3)                   \
-                      HVMTRACE_ND(evt, 0, 3, d1, d2, d3,  0, 0, 0)
-#define HVMTRACE_2D(evt, d1, d2)                       \
-                      HVMTRACE_ND(evt, 0, 2, d1, d2,  0,  0, 0, 0)
-#define HVMTRACE_1D(evt, d1)                           \
-                      HVMTRACE_ND(evt, 0, 1, d1,  0,  0,  0, 0, 0)
-#define HVMTRACE_0D(evt)                               \
-                      HVMTRACE_ND(evt, 0, 0, 0,  0,  0,  0, 0, 0)
+    HVMTRACE_ND(evt, 0, 0, 5, d1, d2, d3, d4, d5,  0)
+#define HVMTRACE_4D(evt, d1, d2, d3, d4)            \
+    HVMTRACE_ND(evt, 0, 0, 4, d1, d2, d3, d4,  0,  0)
+#define HVMTRACE_3D(evt, d1, d2, d3)                \
+    HVMTRACE_ND(evt, 0, 0, 3, d1, d2, d3,  0,  0,  0)
+#define HVMTRACE_2D(evt, d1, d2)                    \
+    HVMTRACE_ND(evt, 0, 0, 2, d1, d2,  0,  0,  0,  0)
+#define HVMTRACE_1D(evt, d1)                        \
+    HVMTRACE_ND(evt, 0, 0, 1, d1,  0,  0,  0,  0,  0)
+#define HVMTRACE_0D(evt)                            \
+    HVMTRACE_ND(evt, 0, 0, 0,  0,  0,  0,  0,  0,  0)
 
 
 
