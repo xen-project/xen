@@ -2667,14 +2667,16 @@ asmlinkage void vmx_vmenter_helper(void)
 {
     struct vcpu *curr = current;
     u32 new_asid, old_asid;
+    struct hvm_vcpu_asid *p_asid;
     bool_t need_flush;
 
     if ( !cpu_has_vmx_vpid )
         goto out;
 
-    old_asid = curr->arch.hvm_vcpu.asid;
-    need_flush = hvm_asid_handle_vmenter();
-    new_asid = curr->arch.hvm_vcpu.asid;
+    p_asid = &curr->arch.hvm_vcpu.n1asid;
+    old_asid = p_asid->asid;
+    need_flush = hvm_asid_handle_vmenter(p_asid);
+    new_asid = p_asid->asid;
 
     if ( unlikely(new_asid != old_asid) )
     {

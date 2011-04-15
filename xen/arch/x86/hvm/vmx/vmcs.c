@@ -867,9 +867,6 @@ static int construct_vmcs(struct vcpu *v)
 #endif
     }
 
-    if ( cpu_has_vmx_vpid )
-        __vmwrite(VIRTUAL_PROCESSOR_ID, v->arch.hvm_vcpu.asid);
-
     if ( cpu_has_vmx_pat && paging_mode_hap(d) )
     {
         u64 host_pat, guest_pat;

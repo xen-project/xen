@@ -22,6 +22,7 @@
 #include <xen/perfc.h>
 #include <asm/hvm/svm/asid.h>
 #include <asm/amd.h>
+#include <asm/hvm/nestedhvm.h>
 
 void svm_asid_init(struct cpuinfo_x86 *c)
 {
@@ -42,17 +43,20 @@ asmlinkage void svm_asid_handle_vmrun(void)
 {
     struct vcpu *curr = current;
     struct vmcb_struct *vmcb = curr->arch.hvm_svm.vmcb;
-    bool_t need_flush = hvm_asid_handle_vmenter();
+    struct hvm_vcpu_asid *p_asid =
+        nestedhvm_vcpu_in_guestmode(curr)
+        ? &vcpu_nestedhvm(curr).nv_n2asid : &curr->arch.hvm_vcpu.n1asid;
+    bool_t need_flush = hvm_asid_handle_vmenter(p_asid);
 
     /* ASID 0 indicates that ASIDs are disabled. */
-    if ( curr->arch.hvm_vcpu.asid == 0 )
+    if ( p_asid->asid == 0 )
     {
         vmcb_set_guest_asid(vmcb, 1);
         vmcb->tlb_control = 1;
         return;
     }
 
-    vmcb_set_guest_asid(vmcb, curr->arch.hvm_vcpu.asid);
+    vmcb_set_guest_asid(vmcb, p_asid->asid);
     vmcb->tlb_control = need_flush;
 }
 

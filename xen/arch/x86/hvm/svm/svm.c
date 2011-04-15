@@ -1580,6 +1580,15 @@ static void svm_vmexit_do_invalidate_cache(struct cpu_user_regs *regs)
     __update_guest_eip(regs, inst_len);
 }
 
+static void svm_invlpga_intercept(
+    struct vcpu *v, unsigned long vaddr, uint32_t asid)
+{
+    svm_invlpga(vaddr,
+                (asid == 0)
+                ? v->arch.hvm_vcpu.n1asid.asid
+                : vcpu_nestedhvm(v).nv_n2asid.asid);
+}
+
 static void svm_invlpg_intercept(unsigned long vaddr)
 {
     struct vcpu *curr = current;
@@ -1894,9 +1903,12 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     case VMEXIT_CR0_READ ... VMEXIT_CR15_READ:
     case VMEXIT_CR0_WRITE ... VMEXIT_CR15_WRITE:
     case VMEXIT_INVLPG:
-    case VMEXIT_INVLPGA:
         if ( !handle_mmio() )
             hvm_inject_exception(TRAP_gp_fault, 0, 0);
+        break;
+
+    case VMEXIT_INVLPGA:
+        svm_invlpga_intercept(v, regs->rax, regs->ecx);
         break;
 
     case VMEXIT_VMMCALL:

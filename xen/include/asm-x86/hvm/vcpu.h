@@ -37,6 +37,11 @@ enum hvm_io_state {
     HVMIO_completed
 };
 
+struct hvm_vcpu_asid {
+    uint64_t generation;
+    uint32_t asid;
+};
+
 #define VMCX_EADDR    (~0ULL)
 
 struct nestedvcpu {
@@ -56,6 +61,8 @@ struct nestedvcpu {
 
     bool_t nv_flushp2m; /* True, when p2m table must be flushed */
     struct p2m_domain *nv_p2m; /* used p2m table for this vcpu */
+
+    struct hvm_vcpu_asid nv_n2asid;
 
     bool_t nv_vmentry_pending;
     bool_t nv_vmexit_pending;
@@ -100,8 +107,7 @@ struct hvm_vcpu {
     bool_t              hcall_preempted;
     bool_t              hcall_64bit;
 
-    uint64_t            asid_generation;
-    uint32_t            asid;
+    struct hvm_vcpu_asid n1asid;
 
     u32                 msr_tsc_aux;
 

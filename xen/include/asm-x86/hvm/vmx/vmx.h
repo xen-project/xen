@@ -377,7 +377,7 @@ static inline void vpid_sync_vcpu_gva(struct vcpu *v, unsigned long gva)
         type = INVVPID_ALL_CONTEXT;
 
 execute_invvpid:
-    __invvpid(type, v->arch.hvm_vcpu.asid, (u64)gva);
+    __invvpid(type, v->arch.hvm_vcpu.n1asid.asid, (u64)gva);
 }
 
 static inline void vpid_sync_all(void)

@@ -78,9 +78,15 @@ void hvm_asid_init(int nasids)
     data->next_asid = 1;
 }
 
+void hvm_asid_flush_vcpu_asid(struct hvm_vcpu_asid *asid)
+{
+    asid->generation = 0;
+}
+
 void hvm_asid_flush_vcpu(struct vcpu *v)
 {
-    v->arch.hvm_vcpu.asid_generation = 0;
+    hvm_asid_flush_vcpu_asid(&v->arch.hvm_vcpu.n1asid);
+    hvm_asid_flush_vcpu_asid(&vcpu_nestedhvm(v).nv_n2asid);
 }
 
 void hvm_asid_flush_core(void)
@@ -102,9 +108,8 @@ void hvm_asid_flush_core(void)
     data->disabled = 1;
 }
 
-bool_t hvm_asid_handle_vmenter(void)
+bool_t hvm_asid_handle_vmenter(struct hvm_vcpu_asid *asid)
 {
-    struct vcpu *curr = current;
     struct hvm_asid_data *data = &this_cpu(hvm_asid_data);
 
     /* On erratum #170 systems we must flush the TLB. 
@@ -113,7 +118,7 @@ bool_t hvm_asid_handle_vmenter(void)
         goto disabled;
 
     /* Test if VCPU has valid ASID. */
-    if ( curr->arch.hvm_vcpu.asid_generation == data->core_asid_generation )
+    if ( asid->generation == data->core_asid_generation )
         return 0;
 
     /* If there are no free ASIDs, need to go to a new generation */
@@ -126,17 +131,17 @@ bool_t hvm_asid_handle_vmenter(void)
     }
 
     /* Now guaranteed to be a free ASID. */
-    curr->arch.hvm_vcpu.asid = data->next_asid++;
-    curr->arch.hvm_vcpu.asid_generation = data->core_asid_generation;
+    asid->asid = data->next_asid++;
+    asid->generation = data->core_asid_generation;
 
     /*
      * When we assign ASID 1, flush all TLB entries as we are starting a new
      * generation, and all old ASID allocations are now stale. 
      */
-    return (curr->arch.hvm_vcpu.asid == 1);
+    return (asid->asid == 1);
 
  disabled:
-    curr->arch.hvm_vcpu.asid = 0;
+    asid->asid = 0;
     return 0;
 }
 

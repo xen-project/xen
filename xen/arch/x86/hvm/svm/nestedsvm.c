@@ -261,8 +261,6 @@ int nsvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)
     /* Cleanbits */
     n1vmcb->cleanbits.bytes = 0;
 
-    hvm_asid_flush_vcpu(v);
-
     return 0;
 }
 
@@ -408,9 +406,7 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
     if (rc)
         return rc;
 
-    /* ASID */
-    hvm_asid_flush_vcpu(v);
-    /* n2vmcb->_guest_asid = ns_vmcb->_guest_asid; */
+    /* ASID - Emulation handled in hvm_asid_handle_vmenter() */
 
     /* TLB control */
     n2vmcb->tlb_control = n1vmcb->tlb_control | ns_vmcb->tlb_control;
@@ -605,9 +601,13 @@ nsvm_vcpu_vmentry(struct vcpu *v, struct cpu_user_regs *regs,
     svm->ns_vmcb_guestcr3 = ns_vmcb->_cr3;
     svm->ns_vmcb_hostcr3 = ns_vmcb->_h_cr3;
 
-    nv->nv_flushp2m = (ns_vmcb->tlb_control
-        || (svm->ns_guest_asid != ns_vmcb->_guest_asid));
-    svm->ns_guest_asid = ns_vmcb->_guest_asid;
+    nv->nv_flushp2m = ns_vmcb->tlb_control;
+    if ( svm->ns_guest_asid != ns_vmcb->_guest_asid )
+    {
+        nv->nv_flushp2m = 1;
+        hvm_asid_flush_vcpu_asid(&vcpu_nestedhvm(v).nv_n2asid);
+        svm->ns_guest_asid = ns_vmcb->_guest_asid;
+    }
 
     /* nested paging for the guest */
     svm->ns_hap_enabled = (ns_vmcb->_np_enable) ? 1 : 0;
