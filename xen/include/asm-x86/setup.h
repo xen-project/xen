@@ -4,7 +4,6 @@
 #include <xen/multiboot.h>
 
 extern bool_t early_boot;
-extern s8 xen_cpuidle;
 extern unsigned long xenheap_initial_phys_start;
 
 void init_done(void);

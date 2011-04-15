@@ -41,6 +41,7 @@
 #include <asm/flushtlb.h>
 #include <asm/msr.h>
 #include <asm/mtrr.h>
+#include <asm/time.h>
 #include <mach_apic.h>
 #include <mach_wakecpu.h>
 #include <smpboot_hooks.h>
@@ -124,6 +125,12 @@ static void smp_store_cpu_info(int id)
     ;
 }
 
+/*
+ * TSC's upper 32 bits can't be written in earlier CPUs (before
+ * Prescott), there is no way to resync one AP against BP.
+ */
+bool_t disable_tsc_sync;
+
 static atomic_t tsc_count;
 static uint64_t tsc_value;
 static cpumask_t tsc_sync_cpu_mask;
@@ -131,6 +138,9 @@ static cpumask_t tsc_sync_cpu_mask;
 static void synchronize_tsc_master(unsigned int slave)
 {
     unsigned int i;
+
+    if ( disable_tsc_sync )
+        return;
 
     if ( boot_cpu_has(X86_FEATURE_TSC_RELIABLE) &&
          !cpu_isset(slave, tsc_sync_cpu_mask) )
@@ -152,6 +162,9 @@ static void synchronize_tsc_master(unsigned int slave)
 static void synchronize_tsc_slave(unsigned int slave)
 {
     unsigned int i;
+
+    if ( disable_tsc_sync )
+        return;
 
     if ( boot_cpu_has(X86_FEATURE_TSC_RELIABLE) &&
          !cpu_isset(slave, tsc_sync_cpu_mask) )

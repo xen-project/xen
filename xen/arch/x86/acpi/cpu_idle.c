@@ -1098,3 +1098,7 @@ void cpuidle_disable_deep_cstate(void)
     hpet_disable_legacy_broadcast();
 }
 
+bool_t cpuidle_using_deep_cstate(void)
+{
+    return xen_cpuidle && max_cstate > (local_apic_timer_c2_ok ? 2 : 1);
+}
