@@ -1908,7 +1908,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case VMEXIT_INVLPGA:
-        svm_invlpga_intercept(v, regs->rax, regs->ecx);
+        svm_invlpga_intercept(v, regs->eax, regs->ecx);
         break;
 
     case VMEXIT_VMMCALL:
