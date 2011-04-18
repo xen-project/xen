@@ -63,9 +63,15 @@
  * Further expansions of the type system will only be supported on
  * 64-bit Xen.
  */
+
+/*
+ * AMD IOMMU: When we share p2m table with iommu, bit 52 -bit 58 in pte 
+ * cannot be non-zero, otherwise, hardware generates io page faults when 
+ * device access those pages. Therefore, p2m_ram_rw has to be defined as 0.
+ */
 typedef enum {
-    p2m_invalid = 0,            /* Nothing mapped here */
-    p2m_ram_rw = 1,             /* Normal read/write guest RAM */
+    p2m_ram_rw = 0,             /* Normal read/write guest RAM */
+    p2m_invalid = 1,            /* Nothing mapped here */
     p2m_ram_logdirty = 2,       /* Temporarily read-only for log-dirty */
     p2m_ram_ro = 3,             /* Read-only; writes are silently dropped */
     p2m_mmio_dm = 4,            /* Reads and write go to the device model */
@@ -375,7 +381,13 @@ static inline p2m_type_t p2m_flags_to_type(unsigned long flags)
 {
     /* Type is stored in the "available" bits */
 #ifdef __x86_64__
-    return (flags >> 9) & 0x3fff;
+    /*
+     * AMD IOMMU: When we share p2m table with iommu, bit 9 - bit 11 will be
+     * used for iommu hardware to encode next io page level. Bit 59 - bit 62
+     * are used for iommu flags, We could not use these bits to store p2m types.
+     */
+
+    return (flags >> 12) & 0x7f;
 #else
     return (flags >> 9) & 0x7;
 #endif

@@ -80,7 +80,12 @@ unsigned long p2m_type_to_flags(p2m_type_t t, mfn_t mfn)
 {
     unsigned long flags;
 #ifdef __x86_64__
-    flags = (unsigned long)(t & 0x3fff) << 9;
+    /*
+     * AMD IOMMU: When we share p2m table with iommu, bit 9 - bit 11 will be
+     * used for iommu hardware to encode next io page level. Bit 59 - bit 62
+     * are used for iommu flags, We could not use these bits to store p2m types.
+     */
+    flags = (unsigned long)(t & 0x7f) << 12;
 #else
     flags = (t & 0x7UL) << 9;
 #endif
@@ -1825,6 +1830,9 @@ static mfn_t p2m_gfn_to_mfn_current(struct p2m_domain *p2m,
         if ( ret == 0 ) {
             p2mt = p2m_flags_to_type(l1e_get_flags(l1e));
             ASSERT(l1e_get_pfn(l1e) != INVALID_MFN || !p2m_is_ram(p2mt));
+
+            if ( l1e.l1 == 0 )
+                p2mt = p2m_invalid;
 
             if ( p2m_flags_to_type(l1e_get_flags(l1e))
                  == p2m_populate_on_demand )
