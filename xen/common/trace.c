@@ -104,25 +104,33 @@ static void calc_tinfo_first_offset(void)
  * calculate_tbuf_size - check to make sure that the proposed size will fit
  * in the currently sized struct t_info and allows prod and cons to
  * reach double the value without overflow.
+ * The t_info layout is fixed and cant be changed without breaking xentrace.
  * Initialize t_info_pages based on number of trace pages.
  */
 static int calculate_tbuf_size(unsigned int pages)
 {
-    struct t_buf dummy;
-    typeof(dummy.prod) size;
+    struct t_buf dummy_size;
+    typeof(dummy_size.prod) max_size;
+    struct t_info dummy_pages;
+    typeof(dummy_pages.tbuf_size) max_pages;
     unsigned int t_info_words;
 
     /* force maximum value for an unsigned type */
-    size = -1;
+    max_size = -1;
+    max_pages = -1;
 
     /* max size holds up to n pages */
-    size /= PAGE_SIZE;
-    if ( pages > size )
+    max_size /= PAGE_SIZE;
+
+    if ( max_size < max_pages )
+        max_pages = max_size;
+
+    if ( pages > max_pages )
     {
         printk(XENLOG_INFO "xentrace: requested number of %u pages "
                "reduced to %u\n",
-               pages, (unsigned int)size);
-        pages = size;
+               pages, max_pages);
+        pages = max_pages;
     }
 
     t_info_words = num_online_cpus() * pages * sizeof(uint32_t);
