@@ -995,6 +995,10 @@ struct hvm_function_table * __init start_svm(void)
 
     printk("SVM: Supported advanced features:\n");
 
+    /* DecodeAssists fast paths assume nextrip is valid for fast rIP update. */
+    if ( !cpu_has_svm_nrips )
+        clear_bit(SVM_FEATURE_DECODEASSISTS, &svm_feature_flags);
+
 #define P(p,s) if ( p ) { printk(" - %s\n", s); printed = 1; }
     P(cpu_has_svm_npt, "Nested Page Tables (NPT)");
     P(cpu_has_svm_lbrv, "Last Branch Record (LBR) Virtualisation");
@@ -1142,7 +1146,6 @@ static void svm_vmexit_do_cr_access(
 
     rc = dir ? hvm_mov_to_cr(cr, gp) : hvm_mov_from_cr(cr, gp);
 
-    ASSERT(cpu_has_svm_nrips);
     if ( rc == X86EMUL_OKAY )
         __update_guest_eip(regs, vmcb->nextrip - vmcb->rip);
 }
