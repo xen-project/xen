@@ -35,6 +35,7 @@
 #include <asm/mem_sharing.h>
 #include <xen/event.h>
 #include <asm/hvm/nestedhvm.h>
+#include <asm/hvm/svm/amd-iommu-proto.h>
 
 /* Debugging and auditing of the P2M code? */
 #define P2M_AUDIT     0
@@ -1418,6 +1419,7 @@ p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     unsigned int iommu_pte_flags = (p2mt == p2m_ram_rw) ?
                                    IOMMUF_readable|IOMMUF_writable:
                                    0; 
+    unsigned long old_mfn = 0;
 
     if ( tb_init_done )
     {
@@ -1468,7 +1470,10 @@ p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         entry_content.l1 = l3e_content.l3;
 
         if ( entry_content.l1 != 0 )
+        {
             p2m_add_iommu_flags(&entry_content, 0, iommu_pte_flags);
+            old_mfn = l1e_get_pfn(*p2m_entry);
+        }
 
         p2m->write_p2m_entry(p2m, gfn, p2m_entry, table_mfn, entry_content, 3);
         /* NB: paging_write_p2m_entry() handles tlb flushes properly */
@@ -1510,8 +1515,10 @@ p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
             entry_content = l1e_empty();
 
         if ( entry_content.l1 != 0 )
+        {
             p2m_add_iommu_flags(&entry_content, 0, iommu_pte_flags);
-
+            old_mfn = l1e_get_pfn(*p2m_entry);
+        }
         /* level 1 entry */
         p2m->write_p2m_entry(p2m, gfn, p2m_entry, table_mfn, entry_content, 1);
         /* NB: paging_write_p2m_entry() handles tlb flushes properly */
@@ -1544,7 +1551,10 @@ p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         entry_content.l1 = l2e_content.l2;
 
         if ( entry_content.l1 != 0 )
+        {
             p2m_add_iommu_flags(&entry_content, 0, iommu_pte_flags);
+            old_mfn = l1e_get_pfn(*p2m_entry);
+        }
 
         p2m->write_p2m_entry(p2m, gfn, p2m_entry, table_mfn, entry_content, 2);
         /* NB: paging_write_p2m_entry() handles tlb flushes properly */
@@ -1561,13 +1571,21 @@ p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
 
     if ( iommu_enabled && need_iommu(p2m->domain) )
     {
-        if ( p2mt == p2m_ram_rw )
-            for ( i = 0; i < (1UL << page_order); i++ )
-                iommu_map_page(p2m->domain, gfn+i, mfn_x(mfn)+i,
-                               IOMMUF_readable|IOMMUF_writable);
+        if ( iommu_hap_pt_share )
+        {
+            if ( old_mfn && (old_mfn != mfn_x(mfn)) )
+                amd_iommu_flush_pages(p2m->domain, gfn, page_order);
+        }
         else
-            for ( int i = 0; i < (1UL << page_order); i++ )
-                iommu_unmap_page(p2m->domain, gfn+i);
+        {
+            if ( p2mt == p2m_ram_rw )
+                for ( i = 0; i < (1UL << page_order); i++ )
+                    iommu_map_page(p2m->domain, gfn+i, mfn_x(mfn)+i,
+                                   IOMMUF_readable|IOMMUF_writable);
+            else
+                for ( int i = 0; i < (1UL << page_order); i++ )
+                    iommu_unmap_page(p2m->domain, gfn+i);
+        }
     }
 
     /* Success */

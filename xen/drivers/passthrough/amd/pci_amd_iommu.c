@@ -362,6 +362,9 @@ static void deallocate_iommu_page_tables(struct domain *d)
 {
     struct hvm_iommu *hd  = domain_hvm_iommu(d);
 
+    if ( iommu_hap_pt_share )
+        return;
+
     spin_lock(&hd->mapping_lock);
     if ( hd->root_table )
     {
@@ -375,7 +378,7 @@ static void deallocate_iommu_page_tables(struct domain *d)
 static void amd_iommu_domain_destroy(struct domain *d)
 {
     deallocate_iommu_page_tables(d);
-    invalidate_all_iommu_pages(d);
+    amd_iommu_flush_all_pages(d);
 }
 
 static int amd_iommu_return_device(

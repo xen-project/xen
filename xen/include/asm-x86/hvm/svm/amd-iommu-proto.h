@@ -51,10 +51,17 @@ int amd_iommu_update_ivrs_mapping_acpi(void);
 int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
                        unsigned int flags);
 int amd_iommu_unmap_page(struct domain *d, unsigned long gfn);
+void amd_iommu_flush_pages(struct domain *d, unsigned long gfn,
+                           unsigned int order);
+void amd_iommu_flush_all_pages(struct domain *d);
+
 u64 amd_iommu_get_next_table_from_pte(u32 *entry);
 int amd_iommu_reserve_domain_unity_map(struct domain *domain,
-        u64 phys_addr, unsigned long size, int iw, int ir);
-void invalidate_all_iommu_pages(struct domain *d);
+                                       u64 phys_addr, unsigned long size,
+                                       int iw, int ir);
+
+/* Share p2m table with iommu */
+void amd_iommu_share_p2m(struct domain *d);
 
 /* device table functions */
 int get_dma_requestor_id(u16 bdf);

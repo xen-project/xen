@@ -889,7 +889,7 @@ static void invalidate_all_domain_pages(void)
 {
     struct domain *d;
     for_each_domain( d )
-        invalidate_all_iommu_pages(d);
+        amd_iommu_flush_all_pages(d);
 }
 
 static void invalidate_all_devices(void)

@@ -19,6 +19,7 @@
  */
 
 #include <xen/sched.h>
+#include <asm/p2m.h>
 #include <xen/hvm/iommu.h>
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
@@ -184,19 +185,32 @@ static void clear_iommu_l1e_present(u64 l2e, unsigned long gfn)
     unmap_domain_page(l1_table);
 }
 
-static void set_iommu_l1e_present(u64 l2e, unsigned long gfn,
+static int set_iommu_l1e_present(u64 l2e, unsigned long gfn,
                                  u64 maddr, int iw, int ir)
 {
-    u64 addr_lo, addr_hi;
+    u64 addr_lo, addr_hi, maddr_old;
     u32 entry;
     void *l1_table;
     int offset;
     u32 *l1e;
+    int need_flush = 0;
 
     l1_table = map_domain_page(l2e >> PAGE_SHIFT);
 
     offset = gfn & (~PTE_PER_TABLE_MASK);
     l1e = (u32*)((u8*)l1_table + (offset * IOMMU_PAGE_TABLE_ENTRY_SIZE));
+
+    addr_hi = get_field_from_reg_u32(l1e[1],
+                                     IOMMU_PTE_ADDR_HIGH_MASK,
+                                     IOMMU_PTE_ADDR_HIGH_SHIFT);
+    addr_lo = get_field_from_reg_u32(l1e[0],
+                                     IOMMU_PTE_ADDR_LOW_MASK,
+                                     IOMMU_PTE_ADDR_LOW_SHIFT);
+
+    maddr_old = ((addr_hi << 32) | addr_lo) << PAGE_SHIFT;
+
+    if ( maddr_old && (maddr_old != maddr) )
+        need_flush = 1;
 
     addr_lo = maddr & DMA_32BIT_MASK;
     addr_hi = maddr >> 32;
@@ -226,6 +240,7 @@ static void set_iommu_l1e_present(u64 l2e, unsigned long gfn,
     l1e[0] = entry;
 
     unmap_domain_page(l1_table);
+    return need_flush;
 }
 
 static void amd_iommu_set_page_directory_entry(u32 *pde, 
@@ -551,7 +566,7 @@ static int update_paging_mode(struct domain *d, unsigned long gfn)
         }
 
         /* For safety, invalidate all entries */
-        invalidate_all_iommu_pages(d);
+        amd_iommu_flush_all_pages(d);
     }
     return 0;
 }
@@ -560,9 +575,13 @@ int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
                        unsigned int flags)
 {
     u64 iommu_l2e;
+    int need_flush = 0;
     struct hvm_iommu *hd = domain_hvm_iommu(d);
 
     BUG_ON( !hd->root_table );
+
+    if ( iommu_hap_pt_share && is_hvm_domain(d) )
+        return 0;
 
     spin_lock(&hd->mapping_lock);
 
@@ -587,9 +606,11 @@ int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
         return -EFAULT;
     }
 
-    set_iommu_l1e_present(iommu_l2e, gfn, (u64)mfn << PAGE_SHIFT,
-                          !!(flags & IOMMUF_writable),
-                          !!(flags & IOMMUF_readable));
+    need_flush = set_iommu_l1e_present(iommu_l2e, gfn, (u64)mfn << PAGE_SHIFT,
+                                       !!(flags & IOMMUF_writable),
+                                       !!(flags & IOMMUF_readable));
+    if ( need_flush )
+        amd_iommu_flush_pages(d, gfn, 0);
 
     spin_unlock(&hd->mapping_lock);
     return 0;
@@ -598,11 +619,12 @@ int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
 int amd_iommu_unmap_page(struct domain *d, unsigned long gfn)
 {
     u64 iommu_l2e;
-    unsigned long flags;
-    struct amd_iommu *iommu;
     struct hvm_iommu *hd = domain_hvm_iommu(d);
 
     BUG_ON( !hd->root_table );
+
+    if ( iommu_hap_pt_share && is_hvm_domain(d) )
+        return 0;
 
     spin_lock(&hd->mapping_lock);
 
@@ -632,14 +654,7 @@ int amd_iommu_unmap_page(struct domain *d, unsigned long gfn)
     clear_iommu_l1e_present(iommu_l2e, gfn);
     spin_unlock(&hd->mapping_lock);
 
-    /* send INVALIDATE_IOMMU_PAGES command */
-    for_each_amd_iommu ( iommu )
-    {
-        spin_lock_irqsave(&iommu->lock, flags);
-        invalidate_iommu_pages(iommu, (u64)gfn << PAGE_SHIFT, hd->domain_id, 0);
-        flush_command_buffer(iommu);
-        spin_unlock_irqrestore(&iommu->lock, flags);
-    }
+    amd_iommu_flush_pages(d, gfn, 0);
 
     return 0;
 }
@@ -667,17 +682,59 @@ int amd_iommu_reserve_domain_unity_map(struct domain *domain,
     return 0;
 }
 
-void invalidate_all_iommu_pages(struct domain *d)
+
+/* Flush iommu cache after p2m changes. */
+static void _amd_iommu_flush_pages(struct domain *d,
+                                   uint64_t gaddr, unsigned int order)
 {
     unsigned long flags;
     struct amd_iommu *iommu;
+    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    unsigned int dom_id = hd->domain_id;
 
+    /* send INVALIDATE_IOMMU_PAGES command */
     for_each_amd_iommu ( iommu )
     {
         spin_lock_irqsave(&iommu->lock, flags);
-        invalidate_iommu_pages(iommu, 0x7FFFFFFFFFFFF000ULL,
-                               d->domain_id, 0);
+        invalidate_iommu_pages(iommu, gaddr, dom_id, order);
         flush_command_buffer(iommu);
         spin_unlock_irqrestore(&iommu->lock, flags);
+    }
+}
+
+void amd_iommu_flush_all_pages(struct domain *d)
+{
+    _amd_iommu_flush_pages(d, 0x7FFFFFFFFFFFFULL, 0);
+}
+
+void amd_iommu_flush_pages(struct domain *d,
+                           unsigned long gfn, unsigned int order)
+{
+    _amd_iommu_flush_pages(d, (uint64_t) gfn << PAGE_SHIFT, order);
+}
+
+/* Share p2m table with iommu. */
+void amd_iommu_share_p2m(struct domain *d)
+{
+    struct hvm_iommu *hd  = domain_hvm_iommu(d);
+    struct page_info *p2m_table;
+    mfn_t pgd_mfn;
+
+    ASSERT( is_hvm_domain(d) && d->arch.hvm_domain.hap_enabled );
+
+    pgd_mfn = pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d)));
+    p2m_table = mfn_to_page(mfn_x(pgd_mfn));
+
+    if ( hd->root_table != p2m_table )
+    {
+        free_amd_iommu_pgtable(hd->root_table);
+        hd->root_table = p2m_table;
+
+        /* When sharing p2m with iommu, paging mode = 4 */
+        hd->paging_mode = IOMMU_PAGING_MODE_LEVEL_4;
+        iommu_hap_pt_share = 1;
+
+        AMD_IOMMU_DEBUG("Share p2m table with iommu: p2m table = 0x%lx\n",
+                        mfn_x(pgd_mfn));
     }
 }
