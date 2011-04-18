@@ -133,6 +133,9 @@ struct hvm_function_table {
     int  (*cpu_up)(void);
     void (*cpu_down)(void);
 
+    /* Copy up to 15 bytes from cached instruction bytes at current rIP. */
+    unsigned int (*get_insn_bytes)(struct vcpu *v, uint8_t *buf);
+
     /* Instruction intercepts: non-void return values are X86EMUL codes. */
     void (*cpuid_intercept)(
         unsigned int *eax, unsigned int *ebx,
@@ -340,6 +343,11 @@ static inline void hvm_cpu_down(void)
 {
     if ( hvm_funcs.cpu_down )
         hvm_funcs.cpu_down();
+}
+
+static inline unsigned int hvm_get_insn_bytes(struct vcpu *v, uint8_t *buf)
+{
+    return (hvm_funcs.get_insn_bytes ? hvm_funcs.get_insn_bytes(v, buf) : 0);
 }
 
 enum hvm_task_switch_reason { TSW_jmp, TSW_iret, TSW_call_or_int };

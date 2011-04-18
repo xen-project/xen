@@ -996,6 +996,8 @@ int hvm_emulate_one(
 
     hvmemul_ctxt->insn_buf_eip = regs->eip;
     hvmemul_ctxt->insn_buf_bytes =
+        hvm_get_insn_bytes(curr, hvmemul_ctxt->insn_buf)
+        ? :
         (hvm_virtual_to_linear_addr(
             x86_seg_cs, &hvmemul_ctxt->seg_reg[x86_seg_cs],
             regs->eip, sizeof(hvmemul_ctxt->insn_buf),

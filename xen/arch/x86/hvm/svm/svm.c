@@ -660,6 +660,21 @@ static void svm_set_rdtsc_exiting(struct vcpu *v, bool_t enable)
     vmcb_set_general1_intercepts(vmcb, general1_intercepts);
 }
 
+static unsigned int svm_get_insn_bytes(struct vcpu *v, uint8_t *buf)
+{
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    unsigned int len = v->arch.hvm_svm.cached_insn_len;
+
+    if ( len != 0 )
+    {
+        /* Latch and clear the cached instruction. */
+        memcpy(buf, vmcb->guest_ins, 15);
+        v->arch.hvm_svm.cached_insn_len = 0;
+    }
+
+    return len;
+}
+
 static void svm_init_hypercall_page(struct domain *d, void *hypercall_page)
 {
     char *p;
@@ -1650,6 +1665,7 @@ static struct hvm_function_table __read_mostly svm_function_table = {
     .msr_write_intercept  = svm_msr_write_intercept,
     .invlpg_intercept     = svm_invlpg_intercept,
     .set_rdtsc_exiting    = svm_set_rdtsc_exiting,
+    .get_insn_bytes       = svm_get_insn_bytes,
 
     .nhvm_vcpu_initialise = nsvm_vcpu_initialise,
     .nhvm_vcpu_destroy = nsvm_vcpu_destroy,
@@ -1836,7 +1852,12 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
                     (unsigned long)regs->ecx, (unsigned long)regs->edx,
                     (unsigned long)regs->esi, (unsigned long)regs->edi);
 
-        if ( paging_fault(va, regs) )
+        if ( cpu_has_svm_decode )
+            v->arch.hvm_svm.cached_insn_len = vmcb->guest_ins_len & 0xf;
+        rc = paging_fault(va, regs);
+        v->arch.hvm_svm.cached_insn_len = 0;
+
+        if ( rc )
         {
             if ( trace_will_trace_event(TRC_SHADOW) )
                 break;
@@ -2013,7 +2034,10 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     case VMEXIT_NPF:
         perfc_incra(svmexits, VMEXIT_NPF_PERFC);
         regs->error_code = vmcb->exitinfo1;
+        if ( cpu_has_svm_decode )
+            v->arch.hvm_svm.cached_insn_len = vmcb->guest_ins_len & 0xf;
         svm_do_nested_pgfault(v, regs, vmcb->exitinfo2);
+        v->arch.hvm_svm.cached_insn_len = 0;
         break;
 
     case VMEXIT_IRET: {

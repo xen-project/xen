@@ -501,6 +501,9 @@ struct arch_svm_struct {
     int    launch_core;
     bool_t vmcb_in_sync;    /* VMCB sync'ed with VMSAVE? */
 
+    /* VMCB has a cached instruction from #PF/#NPF Decode Assist? */
+    uint8_t cached_insn_len; /* Zero if no cached instruction. */
+
     /* Upper four bytes are undefined in the VMCB, therefore we can't
      * use the fields in the VMCB. Write a 64bit value and then read a 64bit
      * value is fine unless there's a VMRUN/VMEXIT in between which clears
