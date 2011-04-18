@@ -24,6 +24,7 @@
 #include <stdint.h>
 #include <xen/xen.h>
 #include <xen/memory.h>
+#include <xen/sched.h>
 
 void wrmsr(uint32_t idx, uint64_t v)
 {
@@ -537,19 +538,27 @@ int vprintf(const char *fmt, va_list ap)
     return 0;
 }
 
+static void __attribute__((noreturn)) crash(void)
+{
+    struct sched_shutdown shutdown = { .reason = SHUTDOWN_crash };
+    printf("*** HVMLoader crashed.\n");
+    hypercall_sched_op(SCHEDOP_shutdown, &shutdown);
+    printf("*** Failed to crash. Halting.\n");
+    for ( ; ; )
+        asm volatile ( "hlt" );
+}
+
 void __assert_failed(char *assertion, char *file, int line)
 {
-    printf("HVMLoader assertion '%s' failed at %s:%d\n",
+    printf("*** HVMLoader assertion '%s' failed at %s:%d\n",
            assertion, file, line);
-    for ( ; ; )
-        asm volatile ( "ud2" );
+    crash();
 }
 
 void __bug(char *file, int line)
 {
-    printf("HVMLoader bug at %s:%d\n", file, line);
-    for ( ; ; )
-        asm volatile ( "ud2" );
+    printf("*** HVMLoader bug at %s:%d\n", file, line);
+    crash();
 }
 
 static void validate_hvm_info(struct hvm_info_table *t)

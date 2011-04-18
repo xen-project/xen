@@ -370,6 +370,9 @@ int main(void)
     int option_rom_sz = 0, vgabios_sz = 0, etherboot_sz = 0, smbios_sz = 0;
     uint32_t etherboot_phys_addr, option_rom_phys_addr;
 
+    /* Initialise hypercall stubs with RET, rendering them no-ops. */
+    memset((void *)HYPERCALL_PHYSICAL_ADDRESS, 0xc3 /* RET */, PAGE_SIZE);
+
     printf("HVM Loader\n");
 
     init_hypercalls();
