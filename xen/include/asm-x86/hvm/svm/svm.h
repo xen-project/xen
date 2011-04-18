@@ -90,6 +90,7 @@ extern u32 svm_feature_flags;
 #define cpu_has_svm_svml      cpu_has_svm_feature(SVM_FEATURE_SVML)
 #define cpu_has_svm_nrips     cpu_has_svm_feature(SVM_FEATURE_NRIPS)
 #define cpu_has_svm_cleanbits cpu_has_svm_feature(SVM_FEATURE_VMCBCLEAN)
+#define cpu_has_svm_decode    cpu_has_svm_feature(SVM_FEATURE_DECODEASSISTS)
 #define cpu_has_pause_filter  cpu_has_svm_feature(SVM_FEATURE_PAUSEFILTER)
 
 #define SVM_PAUSEFILTER_INIT    3000
