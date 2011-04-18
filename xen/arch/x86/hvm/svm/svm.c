@@ -1929,7 +1929,12 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case VMEXIT_INVLPG:
-        if ( !handle_mmio() )
+        if ( cpu_has_svm_decode )
+        {
+            svm_invlpg_intercept(vmcb->exitinfo1);
+            __update_guest_eip(regs, vmcb->nextrip - vmcb->rip);
+        }
+        else if ( !handle_mmio() )
             hvm_inject_exception(TRAP_gp_fault, 0, 0);
         break;
 
