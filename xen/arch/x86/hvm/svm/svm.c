@@ -1130,6 +1130,23 @@ static void svm_vmexit_do_cpuid(struct cpu_user_regs *regs)
     __update_guest_eip(regs, inst_len);
 }
 
+static void svm_vmexit_do_cr_access(
+    struct vmcb_struct *vmcb, struct cpu_user_regs *regs)
+{
+    int gp, cr, dir, rc;
+
+    cr = vmcb->exitcode - VMEXIT_CR0_READ;
+    dir = (cr > 15);
+    cr &= 0xf;
+    gp = vmcb->exitinfo1 & 0xf;
+
+    rc = dir ? hvm_mov_to_cr(cr, gp) : hvm_mov_from_cr(cr, gp);
+
+    ASSERT(cpu_has_svm_nrips);
+    if ( rc == X86EMUL_OKAY )
+        __update_guest_eip(regs, vmcb->nextrip - vmcb->rip);
+}
+
 static void svm_dr_access(struct vcpu *v, struct cpu_user_regs *regs)
 {
     HVMTRACE_0D(DR_WRITE);
@@ -1898,11 +1915,19 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
             int dir = (vmcb->exitinfo1 & 1) ? IOREQ_READ : IOREQ_WRITE;
             if ( handle_pio(port, bytes, dir) )
                 __update_guest_eip(regs, vmcb->exitinfo2 - vmcb->rip);
-            break;
         }
-        /* fallthrough to emulation if a string instruction */
+        else if ( !handle_mmio() )
+            hvm_inject_exception(TRAP_gp_fault, 0, 0);
+        break;
+
     case VMEXIT_CR0_READ ... VMEXIT_CR15_READ:
     case VMEXIT_CR0_WRITE ... VMEXIT_CR15_WRITE:
+        if ( cpu_has_svm_decode && (vmcb->exitinfo1 & (1ULL << 63)) )
+            svm_vmexit_do_cr_access(vmcb, regs);
+        else if ( !handle_mmio() ) 
+            hvm_inject_exception(TRAP_gp_fault, 0, 0);
+        break;
+
     case VMEXIT_INVLPG:
         if ( !handle_mmio() )
             hvm_inject_exception(TRAP_gp_fault, 0, 0);
