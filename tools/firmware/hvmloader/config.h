@@ -63,10 +63,11 @@ extern unsigned long pci_mem_start, pci_mem_end;
 #define RESERVED_MEMBASE    0xfc000000
 #define RESERVED_MEMSIZE    0x01000000
 
+/* Memory map. */
 #define SCRATCH_PHYSICAL_ADDRESS      0x00010000
 #define HYPERCALL_PHYSICAL_ADDRESS    0x00080000
-
 #define VGABIOS_PHYSICAL_ADDRESS      0x000C0000
+#define HVMLOADER_PHYSICAL_ADDRESS    0x00100000
 
 #endif /* __HVMLOADER_CONFIG_H__ */
 
