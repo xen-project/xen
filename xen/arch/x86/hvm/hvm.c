@@ -1409,6 +1409,86 @@ static void hvm_set_uc_mode(struct vcpu *v, bool_t is_in_uc_mode)
         return hvm_funcs.set_uc_mode(v);
 }
 
+int hvm_mov_to_cr(unsigned int cr, unsigned int gpr)
+{
+    struct vcpu *curr = current;
+    unsigned long val, *reg;
+
+    if ( (reg = get_x86_gpr(guest_cpu_user_regs(), gpr)) == NULL )
+    {
+        gdprintk(XENLOG_ERR, "invalid gpr: %u\n", gpr);
+        goto exit_and_crash;
+    }
+
+    val = *reg;
+    HVMTRACE_LONG_2D(CR_WRITE, cr, TRC_PAR_LONG(val));
+    HVM_DBG_LOG(DBG_LEVEL_1, "CR%u, value = %lx", cr, val);
+
+    switch ( cr )
+    {
+    case 0:
+        return hvm_set_cr0(val);
+
+    case 3:
+        return hvm_set_cr3(val);
+
+    case 4:
+        return hvm_set_cr4(val);
+
+    case 8:
+        vlapic_set_reg(vcpu_vlapic(curr), APIC_TASKPRI, ((val & 0x0f) << 4));
+        break;
+
+    default:
+        gdprintk(XENLOG_ERR, "invalid cr: %d\n", cr);
+        goto exit_and_crash;
+    }
+
+    return X86EMUL_OKAY;
+
+ exit_and_crash:
+    domain_crash(curr->domain);
+    return X86EMUL_UNHANDLEABLE;
+}
+
+int hvm_mov_from_cr(unsigned int cr, unsigned int gpr)
+{
+    struct vcpu *curr = current;
+    unsigned long val = 0, *reg;
+
+    if ( (reg = get_x86_gpr(guest_cpu_user_regs(), gpr)) == NULL )
+    {
+        gdprintk(XENLOG_ERR, "invalid gpr: %u\n", gpr);
+        goto exit_and_crash;
+    }
+
+    switch ( cr )
+    {
+    case 0:
+    case 2:
+    case 3:
+    case 4:
+        val = curr->arch.hvm_vcpu.guest_cr[cr];
+        break;
+    case 8:
+        val = (vlapic_get_reg(vcpu_vlapic(curr), APIC_TASKPRI) & 0xf0) >> 4;
+        break;
+    default:
+        gdprintk(XENLOG_ERR, "invalid cr: %u\n", cr);
+        goto exit_and_crash;
+    }
+
+    *reg = val;
+    HVMTRACE_LONG_2D(CR_READ, cr, TRC_PAR_LONG(val));
+    HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR%u, value = %lx", cr, val);
+
+    return X86EMUL_OKAY;
+
+ exit_and_crash:
+    domain_crash(curr->domain);
+    return X86EMUL_UNHANDLEABLE;
+}
+
 int hvm_set_cr0(unsigned long value)
 {
     struct vcpu *v = current;

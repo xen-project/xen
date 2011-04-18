@@ -1554,182 +1554,42 @@ static void vmx_invlpg_intercept(unsigned long vaddr)
         vpid_sync_vcpu_gva(curr, vaddr);
 }
 
-#define CASE_SET_REG(REG, reg)      \
-    case VMX_CONTROL_REG_ACCESS_GPR_ ## REG: regs->reg = value; break
-#define CASE_GET_REG(REG, reg)      \
-    case VMX_CONTROL_REG_ACCESS_GPR_ ## REG: value = regs->reg; break
-
-#define CASE_EXTEND_SET_REG         \
-    CASE_EXTEND_REG(S)
-#define CASE_EXTEND_GET_REG         \
-    CASE_EXTEND_REG(G)
-
-#ifdef __i386__
-#define CASE_EXTEND_REG(T)
-#else
-#define CASE_EXTEND_REG(T)          \
-    CASE_ ## T ## ET_REG(R8, r8);   \
-    CASE_ ## T ## ET_REG(R9, r9);   \
-    CASE_ ## T ## ET_REG(R10, r10); \
-    CASE_ ## T ## ET_REG(R11, r11); \
-    CASE_ ## T ## ET_REG(R12, r12); \
-    CASE_ ## T ## ET_REG(R13, r13); \
-    CASE_ ## T ## ET_REG(R14, r14); \
-    CASE_ ## T ## ET_REG(R15, r15)
-#endif
-
-static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
+static int vmx_cr_access(unsigned long exit_qualification)
 {
-    unsigned long value;
-    struct vcpu *v = current;
-    struct vlapic *vlapic = vcpu_vlapic(v);
-    int rc = 0;
-    unsigned long old;
+    struct vcpu *curr = current;
 
-    switch ( gp )
+    switch ( VMX_CONTROL_REG_ACCESS_TYPE(exit_qualification) )
     {
-    CASE_GET_REG(EAX, eax);
-    CASE_GET_REG(ECX, ecx);
-    CASE_GET_REG(EDX, edx);
-    CASE_GET_REG(EBX, ebx);
-    CASE_GET_REG(EBP, ebp);
-    CASE_GET_REG(ESI, esi);
-    CASE_GET_REG(EDI, edi);
-    CASE_GET_REG(ESP, esp);
-    CASE_EXTEND_GET_REG;
-    default:
-        gdprintk(XENLOG_ERR, "invalid gp: %d\n", gp);
-        goto exit_and_crash;
+    case VMX_CONTROL_REG_ACCESS_TYPE_MOV_TO_CR: {
+        unsigned long gp = VMX_CONTROL_REG_ACCESS_GPR(exit_qualification);
+        unsigned long cr = VMX_CONTROL_REG_ACCESS_NUM(exit_qualification);
+        return hvm_mov_to_cr(cr, gp);
     }
-
-    HVMTRACE_LONG_2D(CR_WRITE, cr, TRC_PAR_LONG(value));
-
-    HVM_DBG_LOG(DBG_LEVEL_1, "CR%d, value = %lx", cr, value);
-
-    switch ( cr )
-    {
-    case 0:
-        old = v->arch.hvm_vcpu.guest_cr[0];
-        rc = !hvm_set_cr0(value);
-        if (rc)
-            hvm_memory_event_cr0(value, old);
-        return rc;
-
-    case 3:
-        old = v->arch.hvm_vcpu.guest_cr[3];
-        rc = !hvm_set_cr3(value);
-        if (rc)
-            hvm_memory_event_cr3(value, old);        
-        return rc;
-
-    case 4:
-        old = v->arch.hvm_vcpu.guest_cr[4];
-        rc = !hvm_set_cr4(value);
-        if (rc)
-            hvm_memory_event_cr4(value, old);
-        return rc; 
-
-    case 8:
-        vlapic_set_reg(vlapic, APIC_TASKPRI, ((value & 0x0F) << 4));
-        break;
-
-    default:
-        gdprintk(XENLOG_ERR, "invalid cr: %d\n", cr);
-        goto exit_and_crash;
+    case VMX_CONTROL_REG_ACCESS_TYPE_MOV_FROM_CR: {
+        unsigned long gp = VMX_CONTROL_REG_ACCESS_GPR(exit_qualification);
+        unsigned long cr = VMX_CONTROL_REG_ACCESS_NUM(exit_qualification);
+        return hvm_mov_from_cr(cr, gp);
     }
-
-    return 1;
-
- exit_and_crash:
-    domain_crash(v->domain);
-    return 0;
-}
-
-/*
- * Read from control registers. CR0 and CR4 are read from the shadow.
- */
-static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
-{
-    unsigned long value = 0;
-    struct vcpu *v = current;
-    struct vlapic *vlapic = vcpu_vlapic(v);
-
-    switch ( cr )
-    {
-    case 3:
-        value = (unsigned long)v->arch.hvm_vcpu.guest_cr[3];
-        break;
-    case 8:
-        value = (unsigned long)vlapic_get_reg(vlapic, APIC_TASKPRI);
-        value = (value & 0xF0) >> 4;
-        break;
-    default:
-        gdprintk(XENLOG_ERR, "invalid cr: %d\n", cr);
-        domain_crash(v->domain);
-        break;
-    }
-
-    switch ( gp ) {
-    CASE_SET_REG(EAX, eax);
-    CASE_SET_REG(ECX, ecx);
-    CASE_SET_REG(EDX, edx);
-    CASE_SET_REG(EBX, ebx);
-    CASE_SET_REG(EBP, ebp);
-    CASE_SET_REG(ESI, esi);
-    CASE_SET_REG(EDI, edi);
-    CASE_SET_REG(ESP, esp);
-    CASE_EXTEND_SET_REG;
-    default:
-        printk("invalid gp: %d\n", gp);
-        domain_crash(v->domain);
-        break;
-    }
-
-    HVMTRACE_LONG_2D(CR_READ, cr, TRC_PAR_LONG(value));
-
-    HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR%d, value = %lx", cr, value);
-}
-
-static int vmx_cr_access(unsigned long exit_qualification,
-                         struct cpu_user_regs *regs)
-{
-    unsigned int gp, cr;
-    unsigned long value;
-    struct vcpu *v = current;
-
-    switch ( exit_qualification & VMX_CONTROL_REG_ACCESS_TYPE )
-    {
-    case VMX_CONTROL_REG_ACCESS_TYPE_MOV_TO_CR:
-        gp = exit_qualification & VMX_CONTROL_REG_ACCESS_GPR;
-        cr = exit_qualification & VMX_CONTROL_REG_ACCESS_NUM;
-        return mov_to_cr(gp, cr, regs);
-    case VMX_CONTROL_REG_ACCESS_TYPE_MOV_FROM_CR:
-        gp = exit_qualification & VMX_CONTROL_REG_ACCESS_GPR;
-        cr = exit_qualification & VMX_CONTROL_REG_ACCESS_NUM;
-        mov_from_cr(cr, gp, regs);
-        break;
-    case VMX_CONTROL_REG_ACCESS_TYPE_CLTS: 
-    {
-        unsigned long old = v->arch.hvm_vcpu.guest_cr[0];
-        v->arch.hvm_vcpu.guest_cr[0] &= ~X86_CR0_TS;
-        vmx_update_guest_cr(v, 0);
-
-        hvm_memory_event_cr0(v->arch.hvm_vcpu.guest_cr[0], old);
-
+    case VMX_CONTROL_REG_ACCESS_TYPE_CLTS: {
+        unsigned long old = curr->arch.hvm_vcpu.guest_cr[0];
+        curr->arch.hvm_vcpu.guest_cr[0] &= ~X86_CR0_TS;
+        vmx_update_guest_cr(curr, 0);
+        hvm_memory_event_cr0(curr->arch.hvm_vcpu.guest_cr[0], old);
         HVMTRACE_0D(CLTS);
         break;
     }
-    case VMX_CONTROL_REG_ACCESS_TYPE_LMSW:
-        value = v->arch.hvm_vcpu.guest_cr[0];
+    case VMX_CONTROL_REG_ACCESS_TYPE_LMSW: {
+        unsigned long value = curr->arch.hvm_vcpu.guest_cr[0];
         /* LMSW can: (1) set bits 0-3; (2) clear bits 1-3. */
         value = (value & ~0xe) | ((exit_qualification >> 16) & 0xf);
         HVMTRACE_LONG_1D(LMSW, value);
-        return !hvm_set_cr0(value);
+        return hvm_set_cr0(value);
+    }
     default:
         BUG();
     }
 
-    return 1;
+    return X86EMUL_OKAY;
 }
 
 static const struct lbr_info {
@@ -2534,7 +2394,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     case EXIT_REASON_CR_ACCESS:
     {
         exit_qualification = __vmread(EXIT_QUALIFICATION);
-        if ( vmx_cr_access(exit_qualification, regs) )
+        if ( vmx_cr_access(exit_qualification) == X86EMUL_OKAY )
             update_guest_eip(); /* Safe: MOV Cn, LMSW, CLTS */
         break;
     }
