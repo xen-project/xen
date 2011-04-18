@@ -45,9 +45,6 @@
 #define nr_ioapics              iosapic_get_nr_iosapics()
 #endif
 
-static int sharept = 0;
-boolean_param("sharept", sharept);
-
 int nr_iommus;
 
 static void setup_dom0_devices(struct domain *d);
@@ -1747,7 +1744,7 @@ static bool_t vtd_ept_share(void)
     bool_t share = TRUE;
 
     /* sharept defaults to 0 for now, default to 1 when feature matures */
-    if ( !sharept )
+    if ( !iommu_hap_pt_share )
         share = FALSE;
 
     /*
@@ -2299,6 +2296,7 @@ const struct iommu_ops intel_iommu_ops = {
     .read_msi_from_ire = msi_msg_read_remap_rte,
     .suspend = vtd_suspend,
     .resume = vtd_resume,
+    .share_p2m = iommu_set_pgd,
 };
 
 /*

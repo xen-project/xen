@@ -2061,8 +2061,8 @@ int p2m_alloc_table(struct p2m_domain *p2m)
 
     p2m->phys_table = pagetable_from_mfn(page_to_mfn(p2m_top));
 
-    if ( hap_enabled(d) && (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) )
-        iommu_set_pgd(d);
+    if ( hap_enabled(d) )
+        iommu_share_p2m_table(d);
 
     P2M_PRINTK("populating p2m table\n");
 

@@ -722,6 +722,9 @@ void amd_iommu_share_p2m(struct domain *d)
 
     ASSERT( is_hvm_domain(d) && d->arch.hvm_domain.hap_enabled );
 
+    if ( !iommu_hap_pt_share )
+        return;
+
     pgd_mfn = pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d)));
     p2m_table = mfn_to_page(mfn_x(pgd_mfn));
 
@@ -732,8 +735,6 @@ void amd_iommu_share_p2m(struct domain *d)
 
         /* When sharing p2m with iommu, paging mode = 4 */
         hd->paging_mode = IOMMU_PAGING_MODE_LEVEL_4;
-        iommu_hap_pt_share = 1;
-
         AMD_IOMMU_DEBUG("Share p2m table with iommu: p2m table = 0x%lx\n",
                         mfn_x(pgd_mfn));
     }

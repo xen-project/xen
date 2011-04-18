@@ -82,6 +82,8 @@ static void __init parse_iommu_param(char *s)
             iommu_passthrough = 1;
         else if ( !strcmp(s, "dom0-strict") )
             iommu_dom0_strict = 1;
+        else if ( !strcmp(s, "sharept") )
+            iommu_hap_pt_share = 1;
 
         s = ss + 1;
     } while ( ss );
@@ -417,6 +419,14 @@ void iommu_suspend()
     const struct iommu_ops *ops = iommu_get_ops();
     if ( iommu_enabled )
         ops->suspend();
+}
+
+void iommu_share_p2m_table(struct domain* d)
+{
+    const struct iommu_ops *ops = iommu_get_ops();
+
+    if ( iommu_enabled && is_hvm_domain(d) )
+        ops->share_p2m(d);
 }
 
 /*
