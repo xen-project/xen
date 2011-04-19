@@ -44,8 +44,9 @@ static char **make_bootloader_args(libxl__gc *gc,
 
     flexarray_set(args, nr++, (char *)info->u.pv.bootloader);
 
-    if (info->kernel.path)
-        flexarray_set(args, nr++, libxl__sprintf(gc, "--kernel=%s", info->kernel.path));
+    if (info->u.pv.kernel.path)
+        flexarray_set(args, nr++, libxl__sprintf(gc, "--kernel=%s",
+                                                 info->u.pv.kernel.path));
     if (info->u.pv.ramdisk.path)
         flexarray_set(args, nr++, libxl__sprintf(gc, "--ramdisk=%s", info->u.pv.ramdisk.path));
     if (info->u.pv.cmdline && *info->u.pv.cmdline != '\0')
@@ -277,10 +278,10 @@ static void parse_bootloader_result(libxl__gc *gc,
 {
     while (*o != '\0') {
         if (strncmp("kernel ", o, strlen("kernel ")) == 0) {
-            free(info->kernel.path);
-            info->kernel.path = strdup(o + strlen("kernel "));
-            libxl__file_reference_map(&info->kernel);
-            unlink(info->kernel.path);
+            free(info->u.pv.kernel.path);
+            info->u.pv.kernel.path = strdup(o + strlen("kernel "));
+            libxl__file_reference_map(&info->u.pv.kernel);
+            unlink(info->u.pv.kernel.path);
         } else if (strncmp("ramdisk ", o, strlen("ramdisk ")) == 0) {
             free(info->u.pv.ramdisk.path);
             info->u.pv.ramdisk.path = strdup(o + strlen("ramdisk "));

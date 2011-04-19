@@ -84,8 +84,8 @@ void libxl_init_build_info(libxl_domain_build_info *b_info, libxl_domain_create_
     b_info->shadow_memkb = 0;
     if (c_info->hvm) {
         b_info->video_memkb = 8 * 1024;
-        b_info->kernel.path = strdup("hvmloader");
         b_info->hvm = 1;
+        b_info->u.hvm.hvmloader = NULL;
         b_info->u.hvm.pae = 1;
         b_info->u.hvm.apic = 1;
         b_info->u.hvm.acpi = 1;
@@ -178,7 +178,7 @@ int libxl__domain_build(libxl__gc *gc, libxl_domain_build_info *info, uint32_t d
         vments[i++] = "image/ostype";
         vments[i++] = "linux";
         vments[i++] = "image/kernel";
-        vments[i++] = (char*) info->kernel.path;
+        vments[i++] = (char*) info->u.pv.kernel.path;
         vments[i++] = "start_time";
         vments[i++] = libxl__sprintf(gc, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
         if (info->u.pv.ramdisk.path) {
@@ -228,7 +228,7 @@ static int domain_restore(libxl__gc *gc, libxl_domain_build_info *info,
         vments[i++] = "image/ostype";
         vments[i++] = "linux";
         vments[i++] = "image/kernel";
-        vments[i++] = (char*) info->kernel.path;
+        vments[i++] = (char*) info->u.pv.kernel.path;
         vments[i++] = "start_time";
         vments[i++] = libxl__sprintf(gc, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
         if (info->u.pv.ramdisk.path) {
@@ -252,9 +252,10 @@ static int domain_restore(libxl__gc *gc, libxl_domain_build_info *info,
     }
 
 out:
-    libxl__file_reference_unmap(&info->kernel);
-    if (!info->hvm)
-	    libxl__file_reference_unmap(&info->u.pv.ramdisk);
+    if (!info->hvm) {
+        libxl__file_reference_unmap(&info->u.pv.kernel);
+        libxl__file_reference_unmap(&info->u.pv.ramdisk);
+    }
 
     esave = errno;
 

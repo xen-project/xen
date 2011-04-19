@@ -535,7 +535,8 @@ static int libxl__create_stubdom(libxl__gc *gc,
     b_info.max_vcpus = 1;
     b_info.max_memkb = 32 * 1024;
     b_info.target_memkb = b_info.max_memkb;
-    b_info.kernel.path = libxl__abs_path(gc, "ioemu-stubdom.gz", libxl_xenfirmwaredir_path());
+    b_info.u.pv.kernel.path = libxl__abs_path(gc, "ioemu-stubdom.gz",
+                                              libxl_xenfirmwaredir_path());
     b_info.u.pv.cmdline = libxl__sprintf(gc, " -d %d", info->domid);
     b_info.u.pv.ramdisk.path = "";
     b_info.u.pv.features = "";

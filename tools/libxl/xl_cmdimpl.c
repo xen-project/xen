@@ -337,7 +337,7 @@ static void printf_info(int domid,
     printf("\t(image\n");
     if (c_info->hvm) {
         printf("\t\t(hvm\n");
-        printf("\t\t\t(loader %s)\n", b_info->kernel.path);
+        printf("\t\t\t(loader %s)\n", b_info->u.hvm.hvmloader);
         printf("\t\t\t(video_memkb %d)\n", b_info->video_memkb);
         printf("\t\t\t(shadow_memkb %d)\n", b_info->shadow_memkb);
         printf("\t\t\t(pae %d)\n", b_info->u.hvm.pae);
@@ -370,7 +370,7 @@ static void printf_info(int domid,
         printf("\t\t)\n");
     } else {
         printf("\t\t(linux %d)\n", b_info->hvm);
-        printf("\t\t\t(kernel %s)\n", b_info->kernel.path);
+        printf("\t\t\t(kernel %s)\n", b_info->u.pv.kernel.path);
         printf("\t\t\t(cmdline %s)\n", b_info->u.pv.cmdline);
         printf("\t\t\t(ramdisk %s)\n", b_info->u.pv.ramdisk.path);
         printf("\t\t)\n");
@@ -740,12 +740,16 @@ static void parse_config_data(const char *configfile_filename_report,
     if (!xlu_cfg_get_long (config, "videoram", &l))
         b_info->video_memkb = l * 1024;
 
-    xlu_cfg_replace_string (config, "kernel", &b_info->kernel.path);
-
     if (!xlu_cfg_get_long (config, "gfx_passthru", &l))
         dm_info->gfx_passthru = l;
 
     if (c_info->hvm == 1) {
+        if (!xlu_cfg_get_string (config, "kernel", &buf))
+            fprintf(stderr, "WARNING: ignoring \"kernel\" directive for HVM guest. "
+                    "Use \"hvmloader_override\" instead if you really want a non-default hvmloader\n");
+
+        xlu_cfg_replace_string (config, "hvmloader_override",
+                                &b_info->u.hvm.hvmloader);
         if (!xlu_cfg_get_long (config, "pae", &l))
             b_info->u.hvm.pae = l;
         if (!xlu_cfg_get_long (config, "apic", &l))
@@ -768,6 +772,8 @@ static void parse_config_data(const char *configfile_filename_report,
         char *cmdline = NULL;
         const char *root = NULL, *extra = "";
 
+        xlu_cfg_replace_string (config, "kernel", &b_info->u.pv.kernel.path);
+
         xlu_cfg_get_string (config, "root", &root);
         xlu_cfg_get_string (config, "extra", &extra);
 
@@ -786,7 +792,7 @@ static void parse_config_data(const char *configfile_filename_report,
         xlu_cfg_replace_string (config, "bootloader", &b_info->u.pv.bootloader);
         xlu_cfg_replace_string (config, "bootloader_args", &b_info->u.pv.bootloader_args);
 
-        if (!b_info->u.pv.bootloader && !b_info->kernel.path) {
+        if (!b_info->u.pv.bootloader && !b_info->u.pv.kernel.path) {
             fprintf(stderr, "Neither kernel nor bootloader specified\n");
             exit(1);
         }

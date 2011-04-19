@@ -160,13 +160,17 @@ int libxl__build_pv(libxl__gc *gc, uint32_t domid,
         return ERROR_FAIL;
     }
 
-    if (info->kernel.mapped) {
-        if ( (ret = xc_dom_kernel_mem(dom, info->kernel.data, info->kernel.size)) != 0) {
+    if (info->u.pv.kernel.mapped) {
+        ret = xc_dom_kernel_mem(dom,
+                                info->u.pv.kernel.data,
+                                info->u.pv.kernel.size);
+        if ( ret != 0) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xc_dom_kernel_mem failed");
             goto out;
         }
     } else {
-        if ( (ret = xc_dom_kernel_file(dom, info->kernel.path)) != 0) {
+        ret = xc_dom_kernel_file(dom, info->u.pv.kernel.path);
+        if ( ret != 0) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xc_dom_kernel_file failed");
             goto out;
         }
@@ -264,16 +268,19 @@ static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
     return 0;
 }
 
+static const char *libxl__domain_hvmloader(libxl__gc *gc,
+                                           libxl_domain_build_info *info)
+{
+    return libxl__abs_path(gc,
+                           info->u.hvm.hvmloader ? : "hvmloader",
+                           libxl_xenfirmwaredir_path());
+}
+
 int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
               libxl_domain_build_info *info, libxl_domain_build_state *state)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     int ret, rc = ERROR_INVAL;
-
-    if (info->kernel.mapped) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "libxl__build_hvm kernel cannot be mmapped");
-        goto out;
-    }
 
     rc = ERROR_FAIL;
     ret = xc_hvm_build_target_mem(
@@ -281,8 +288,7 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
         domid,
         (info->max_memkb - info->video_memkb) / 1024,
         (info->target_memkb - info->video_memkb) / 1024,
-        libxl__abs_path(gc, (char *)info->kernel.path,
-                       libxl_xenfirmwaredir_path()));
+        libxl__domain_hvmloader(gc, info));
     if (ret) {
         LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, ret, "hvm building failed");
         goto out;
