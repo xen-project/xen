@@ -37,22 +37,6 @@ type button =
 	| Button_Power
 	| Button_Sleep
 
-module Domain_create_info : sig
-	type t =
-	{
-		hvm : bool;
-		hap : bool;
-		oos : bool;
-		ssidref : int32;
-		name : string;
-		uuid : int array;
-		xsdata : (string * string) list;
-		platformdata : (string * string) list;
-		poolid : int32;
-		poolname : string;
-	}
-end
-
 module Device_vfb : sig
 	type t =
 	{
@@ -175,45 +159,6 @@ module Sched_credit : sig
 
 	external domain_get : domid -> t = "stub_xl_sched_credit_domain_get"
 	external domain_set : domid -> t -> unit = "stub_xl_sched_credit_domain_set"
-end
-
-module Domain_build_info : sig
-	module Hvm : sig
-		type t =
-		{
-			pae : bool;
-			apic : bool;
-			acpi : bool;
-			nx : bool;
-			viridian : bool;
-			timeoffset : string;
-			timer_mode : int;
-			hpet : int;
-			vpt_align : int;
-		}
-	end
-
-	module Pv : sig
-		type t =
-		{
-			slack_memkb : int64;
-			cmdline : string;
-			ramdisk : string;
-			features : string;
-		}
-	end
-
-	type t =
-	{
-		max_vcpus : int;
-		cur_vcpus : int;
-		max_memkb : int64;
-		target_memkb : int64;
-		video_memkb : int64;
-		shadow_memkb : int64;
-		kernel : string;
-		u : [ `HVM of Hvm.t | `PV of Pv.t ];
-	}
 end
 
 module Topologyinfo : sig

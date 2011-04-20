@@ -128,63 +128,6 @@ static int string_string_tuple_array_val (caml_gc *gc, char ***c_val, value v)
 	CAMLreturn(0);
 }
 
-static int domain_create_info_val (caml_gc *gc, libxl_domain_create_info *c_val, value v)
-{
-	CAMLparam1(v);
-	CAMLlocal1(a);
-	uint8_t *uuid = libxl_uuid_bytearray(&c_val->uuid);
-	int i;
-
-	c_val->hvm = Bool_val(Field(v, 0));
-	c_val->hap = Bool_val(Field(v, 1));
-	c_val->oos = Bool_val(Field(v, 2));
-	c_val->ssidref = Int32_val(Field(v, 3));
-	c_val->name = dup_String_val(gc, Field(v, 4));
-	a = Field(v, 5);
-	for (i = 0; i < 16; i++)
-		uuid[i] = Int_val(Field(a, i));
-	string_string_tuple_array_val(gc, &(c_val->xsdata), Field(v, 6));
-	string_string_tuple_array_val(gc, &(c_val->platformdata), Field(v, 7));
-
-	c_val->poolid = Int32_val(Field(v, 8));
-	c_val->poolname = dup_String_val(gc, Field(v, 9));
-
-	CAMLreturn(0);
-}
-
-static int domain_build_info_val (caml_gc *gc, libxl_domain_build_info *c_val, value v)
-{
-	CAMLparam1(v);
-	CAMLlocal1(infopriv);
-
-	c_val->max_vcpus = Int_val(Field(v, 0));
-	c_val->cur_vcpus = Int_val(Field(v, 1));
-	c_val->max_memkb = Int64_val(Field(v, 2));
-	c_val->target_memkb = Int64_val(Field(v, 3));
-	c_val->video_memkb = Int64_val(Field(v, 4));
-	c_val->shadow_memkb = Int64_val(Field(v, 5));
-	c_val->kernel.path = dup_String_val(gc, Field(v, 6));
-	c_val->is_hvm = Tag_val(Field(v, 7)) == 0;
-	infopriv = Field(Field(v, 7), 0);
-	if (c_val->hvm) {
-		c_val->u.hvm.pae = Bool_val(Field(infopriv, 0));
-		c_val->u.hvm.apic = Bool_val(Field(infopriv, 1));
-		c_val->u.hvm.acpi = Bool_val(Field(infopriv, 2));
-		c_val->u.hvm.nx = Bool_val(Field(infopriv, 3));
-		c_val->u.hvm.viridian = Bool_val(Field(infopriv, 4));
-		c_val->u.hvm.timeoffset = dup_String_val(gc, Field(infopriv, 5));
-		c_val->u.hvm.timer_mode = Int_val(Field(infopriv, 6));
-		c_val->u.hvm.hpet = Int_val(Field(infopriv, 7));
-		c_val->u.hvm.vpt_align = Int_val(Field(infopriv, 8));
-	} else {
-		c_val->u.pv.slack_memkb = Int64_val(Field(infopriv, 0));
-		c_val->u.pv.cmdline = dup_String_val(gc, Field(infopriv, 1));
-		c_val->u.pv.ramdisk.path = dup_String_val(gc, Field(infopriv, 2));
-		c_val->u.pv.features = dup_String_val(gc, Field(infopriv, 3));
-	}
-
-	CAMLreturn(0);
-}
 #endif
 
 static int device_disk_val(caml_gc *gc, libxl_device_disk *c_val, value v)
