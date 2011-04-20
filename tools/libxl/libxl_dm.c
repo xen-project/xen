@@ -140,7 +140,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
     if (info->serial) {
         flexarray_vappend(dm_args, "-serial", info->serial, NULL);
     }
-    if (info->type == XENFV) {
+    if (info->type == LIBXL_QEMU_MACHINE_TYPE_FV) {
         int ioemu_vifs = 0;
 
         if (info->videoram) {
@@ -172,7 +172,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
             flexarray_vappend(dm_args, "-vcpu_avail", libxl__sprintf(gc, "0x%x", info->vcpu_avail), NULL);
         }
         for (i = 0; i < num_vifs; i++) {
-            if (vifs[i].nictype == NICTYPE_IOEMU) {
+            if (vifs[i].nictype == LIBXL_NICTYPE_IOEMU) {
                 char *smac = libxl__sprintf(gc, "%02x:%02x:%02x:%02x:%02x:%02x",
                                            vifs[i].mac[0], vifs[i].mac[1], vifs[i].mac[2],
                                            vifs[i].mac[3], vifs[i].mac[4], vifs[i].mac[5]);
@@ -204,10 +204,14 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
     for (i = 0; info->extra && info->extra[i] != NULL; i++)
         flexarray_append(dm_args, info->extra[i]);
     flexarray_append(dm_args, "-M");
-    if (info->type == XENPV)
+    switch (info->type) {
+    case LIBXL_QEMU_MACHINE_TYPE_PV:
         flexarray_append(dm_args, "xenpv");
-    else
+        break;
+    case LIBXL_QEMU_MACHINE_TYPE_FV:
         flexarray_append(dm_args, "xenfv");
+        break;
+    }
     flexarray_append(dm_args, NULL);
     return (char **) flexarray_contents(dm_args);
 }
@@ -215,11 +219,11 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
 static const char *qemu_disk_format_string(libxl_disk_format format)
 {
     switch (format) {
-    case DISK_FORMAT_QCOW: return "qcow";
-    case DISK_FORMAT_QCOW2: return "qcow2";
-    case DISK_FORMAT_VHD: return "vpc";
-    case DISK_FORMAT_RAW: return "raw";
-    case DISK_FORMAT_EMPTY: return NULL;
+    case LIBXL_DISK_FORMAT_QCOW: return "qcow";
+    case LIBXL_DISK_FORMAT_QCOW2: return "qcow2";
+    case LIBXL_DISK_FORMAT_VHD: return "vpc";
+    case LIBXL_DISK_FORMAT_RAW: return "raw";
+    case LIBXL_DISK_FORMAT_EMPTY: return NULL;
     default: return NULL;
     }
 }
@@ -241,7 +245,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     flexarray_vappend(dm_args, dm,
                       "-xen-domid", libxl__sprintf(gc, "%d", info->domid), NULL);
 
-    if (info->type == XENPV) {
+    if (info->type == LIBXL_QEMU_MACHINE_TYPE_PV) {
         flexarray_append(dm_args, "-xen-attach");
     }
 
@@ -279,7 +283,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
         flexarray_append(dm_args, "-sdl");
     }
 
-    if (info->type == XENPV && !info->nographic) {
+    if (info->type == LIBXL_QEMU_MACHINE_TYPE_PV && !info->nographic) {
         flexarray_vappend(dm_args, "-vga", "xenfb", NULL);
     }
 
@@ -292,7 +296,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     if (info->serial) {
         flexarray_vappend(dm_args, "-serial", info->serial, NULL);
     }
-    if (info->type == XENFV) {
+    if (info->type == LIBXL_QEMU_MACHINE_TYPE_FV) {
         int ioemu_vifs = 0;
 
         if (info->stdvga) {
@@ -322,7 +326,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                 flexarray_append(dm_args, libxl__sprintf(gc, "%d", info->vcpus));
         }
         for (i = 0; i < num_vifs; i++) {
-            if (vifs[i].nictype == NICTYPE_IOEMU) {
+            if (vifs[i].nictype == LIBXL_NICTYPE_IOEMU) {
                 char *smac = libxl__sprintf(gc, "%02x:%02x:%02x:%02x:%02x:%02x",
                                            vifs[i].mac[0], vifs[i].mac[1], vifs[i].mac[2],
                                            vifs[i].mac[3], vifs[i].mac[4], vifs[i].mac[5]);
@@ -357,16 +361,20 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     for (i = 0; info->extra && info->extra[i] != NULL; i++)
         flexarray_append(dm_args, info->extra[i]);
     flexarray_append(dm_args, "-M");
-    if (info->type == XENPV)
+    switch (info->type) {
+    case LIBXL_QEMU_MACHINE_TYPE_PV:
         flexarray_append(dm_args, "xenpv");
-    else
+        break;
+    case LIBXL_QEMU_MACHINE_TYPE_FV:
         flexarray_append(dm_args, "xenfv");
+        break;
+    }
 
     /* RAM Size */
     flexarray_append(dm_args, "-m");
     flexarray_append(dm_args, libxl__sprintf(gc, "%d", info->target_ram));
 
-    if (info->type == XENFV) {
+    if (info->type == LIBXL_QEMU_MACHINE_TYPE_FV) {
         for (i; i < num_disks; i++) {
             int disk, part;
             int dev_number =
@@ -381,7 +389,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             }
 
             if (disks[i].is_cdrom) {
-                if (disks[i].format == DISK_FORMAT_EMPTY)
+                if (disks[i].format == LIBXL_DISK_FORMAT_EMPTY)
                     drive = libxl__sprintf
                         (gc, "if=ide,index=%d,media=cdrom", disk);
                 else
@@ -389,7 +397,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                         (gc, "file=%s,if=ide,index=%d,media=cdrom,format=%s",
                          disks[i].pdev_path, disk, format);
             } else {
-                if (disks[i].format == DISK_FORMAT_EMPTY) {
+                if (disks[i].format == LIBXL_DISK_FORMAT_EMPTY) {
                     LIBXL__LOG(ctx, LIBXL__LOG_WARNING, "cannot support"
                                " empty disk format for %s", disks[i].vdev);
                     continue;
@@ -921,7 +929,7 @@ static int libxl__build_xenpv_qemu_args(libxl__gc *gc,
     info->dom_name = libxl_domid_to_name(ctx, domid);
     info->device_model_version = LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
     info->device_model = NULL;
-    info->type = XENPV;
+    info->type = LIBXL_QEMU_MACHINE_TYPE_PV;
     return 0;
 }
 
@@ -953,7 +961,7 @@ int libxl__need_xenpv_qemu(libxl__gc *gc,
         int blktap_enabled = -1;
         for (i = 0; i < nr_disks; i++) {
             switch (disks[i].backend) {
-            case DISK_BACKEND_TAP:
+            case LIBXL_DISK_BACKEND_TAP:
                 if (blktap_enabled == -1)
                     blktap_enabled = libxl__blktap_enabled(gc);
                 if (!blktap_enabled) {
@@ -962,12 +970,12 @@ int libxl__need_xenpv_qemu(libxl__gc *gc,
                 }
                 break;
 
-            case DISK_BACKEND_QDISK:
+            case LIBXL_DISK_BACKEND_QDISK:
                 ret = 1;
                 goto out;
 
-            case DISK_BACKEND_PHY:
-            case DISK_BACKEND_UNKNOWN:
+            case LIBXL_DISK_BACKEND_PHY:
+            case LIBXL_DISK_BACKEND_UNKNOWN:
                 break;
             }
         }

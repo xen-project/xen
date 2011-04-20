@@ -695,15 +695,15 @@ int libxl_event_get_disk_eject_info(libxl_ctx *ctx, uint32_t domid, libxl_event 
             "/local/domain/%d/backend/%" TOSTRING(BACKEND_STRING_SIZE) "[a-z]/%*d/%*d",
             &disk->backend_domid, backend_type);
 	if (!strcmp(backend_type, "tap") || !strcmp(backend_type, "vbd")) {
-		disk->backend = DISK_BACKEND_TAP;
+		disk->backend = LIBXL_DISK_BACKEND_TAP;
 	} else if (!strcmp(backend_type, "qdisk")) {
-		disk->backend = DISK_BACKEND_QDISK;
+		disk->backend = LIBXL_DISK_BACKEND_QDISK;
 	} else {
-		disk->backend = DISK_BACKEND_UNKNOWN;
+		disk->backend = LIBXL_DISK_BACKEND_UNKNOWN;
 	} 
 
     disk->pdev_path = strdup("");
-    disk->format = DISK_FORMAT_EMPTY;
+    disk->format = LIBXL_DISK_FORMAT_EMPTY;
     /* this value is returned to the user: do not free right away */
     disk->vdev = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(&gc, "%s/dev", backend), NULL);
     disk->unpluggable = 1;
@@ -908,7 +908,7 @@ static int validate_virtual_disk(libxl__gc *gc, char *file_name,
     struct stat stat_buf;
     char *delimiter;
 
-    if (disk->format == DISK_FORMAT_EMPTY) {
+    if (disk->format == LIBXL_DISK_FORMAT_EMPTY) {
         if (disk->is_cdrom)
             return 0;
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Empty disk %s is not a CDROM device\n",
@@ -916,11 +916,11 @@ static int validate_virtual_disk(libxl__gc *gc, char *file_name,
         return ERROR_INVAL;
     }
 
-    if (disk->format == DISK_FORMAT_RAW) {
+    if (disk->format == LIBXL_DISK_FORMAT_RAW) {
         delimiter = strchr(file_name, ':');
         if (delimiter) {
             if (!strncmp(file_name, "vhd:", sizeof("vhd:")-1)) {
-                disk->format = DISK_FORMAT_VHD;
+                disk->format = LIBXL_DISK_FORMAT_VHD;
                 file_name = ++delimiter;
             }
         }
@@ -930,7 +930,7 @@ static int validate_virtual_disk(libxl__gc *gc, char *file_name,
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "failed to stat %s", file_name);
         return ERROR_INVAL;
     }
-    if (disk->backend == DISK_BACKEND_PHY) {
+    if (disk->backend == LIBXL_DISK_BACKEND_PHY) {
         if ( !(S_ISBLK(stat_buf.st_mode)) ) {
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Virtual disk %s is not a block device!\n",
                 file_name);
@@ -984,19 +984,20 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
     device.kind = DEVICE_VBD;
 
     /* If blktap is not available then fallback to qdisk */
-    if (disk->backend == DISK_BACKEND_TAP && !libxl__blktap_enabled(&gc))
-        disk->backend = DISK_BACKEND_QDISK;
+    if (disk->backend == LIBXL_DISK_BACKEND_TAP && !libxl__blktap_enabled(&gc))
+        disk->backend = LIBXL_DISK_BACKEND_QDISK;
 
     /*
      * blktap cannot handle empty disks (aka cdroms). Fall back to
      * qdisk because qemu-xen creates the disk based on the xenstore
      * entries.
      */
-    if (disk->backend == DISK_BACKEND_TAP && disk->format == DISK_FORMAT_EMPTY)
-        disk->backend == DISK_BACKEND_QDISK;
+    if (disk->backend == LIBXL_DISK_BACKEND_TAP &&
+        disk->format == LIBXL_DISK_FORMAT_EMPTY)
+        disk->backend == LIBXL_DISK_BACKEND_QDISK;
 
     switch (disk->backend) {
-        case DISK_BACKEND_PHY:
+        case LIBXL_DISK_BACKEND_PHY:
             dev = disk->pdev_path;
     do_backend_phy:
             libxl__device_physdisk_major_minor(dev, &major, &minor);
@@ -1008,7 +1009,7 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
 
             device.backend_kind = DEVICE_VBD;
             break;
-        case DISK_BACKEND_TAP:
+        case LIBXL_DISK_BACKEND_TAP:
             dev = libxl__blktap_devpath(&gc, disk->pdev_path, disk->format);
             if (!dev) {
                 rc = ERROR_FAIL;
@@ -1021,8 +1022,7 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
 
             /* now create a phy device to export the device to the guest */
             goto do_backend_phy;
-
-        case DISK_BACKEND_QDISK:
+        case LIBXL_DISK_BACKEND_QDISK:
             flexarray_append(back, "params");
             flexarray_append(back, libxl__sprintf(&gc, "%s:%s",
                           libxl__device_disk_string_of_format(disk->format), disk->pdev_path));
@@ -1091,13 +1091,13 @@ int libxl_device_disk_del(libxl_ctx *ctx, uint32_t domid,
     device.backend_devid    = devid;
 
     switch (disk->backend) {
-        case DISK_BACKEND_PHY:
+        case LIBXL_DISK_BACKEND_PHY:
             device.backend_kind = DEVICE_VBD;
             break;
-        case DISK_BACKEND_TAP:
+        case LIBXL_DISK_BACKEND_TAP:
             device.backend_kind = DEVICE_VBD;
             break;
-        case DISK_BACKEND_QDISK:
+        case LIBXL_DISK_BACKEND_QDISK:
             device.backend_kind = DEVICE_QDISK;
             break;
         default:
@@ -1124,8 +1124,8 @@ char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *disk)
     char *ret = NULL;
 
     switch (disk->backend) {
-        case DISK_BACKEND_PHY:
-            if (disk->format != DISK_FORMAT_RAW) {
+        case LIBXL_DISK_BACKEND_PHY:
+            if (disk->format != LIBXL_DISK_FORMAT_RAW) {
                 LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "physical block device must"
                     " be raw");
                 break;
@@ -1134,13 +1134,14 @@ char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *disk)
                 disk->pdev_path);
             dev = disk->pdev_path;
             break;
-        case DISK_BACKEND_TAP:
-            if (disk->format == DISK_FORMAT_VHD || disk->format == DISK_FORMAT_RAW)
+        case LIBXL_DISK_BACKEND_TAP:
+            if (disk->format == LIBXL_DISK_FORMAT_VHD ||
+                disk->format == LIBXL_DISK_FORMAT_RAW)
             {
                 if (libxl__blktap_enabled(&gc))
                     dev = libxl__blktap_devpath(&gc, disk->pdev_path, disk->format);
                 else {
-                    if (disk->format != DISK_FORMAT_RAW) {
+                    if (disk->format != LIBXL_DISK_FORMAT_RAW) {
                         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "tapdisk2 is required"
                             " to open a vhd disk");
                         break;
@@ -1152,8 +1153,8 @@ char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *disk)
                     }
                 }
                 break;
-            } else if (disk->format == DISK_FORMAT_QCOW ||
-                       disk->format == DISK_FORMAT_QCOW2) {
+            } else if (disk->format == LIBXL_DISK_FORMAT_QCOW ||
+                       disk->format == LIBXL_DISK_FORMAT_QCOW2) {
                 LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "cannot locally attach a qcow or qcow2 disk image");
                 break;
             } else {
@@ -1161,8 +1162,8 @@ char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *disk)
                     "type: %d", disk->backend);
                 break;
             }
-        case DISK_BACKEND_QDISK:
-            if (disk->format != DISK_FORMAT_RAW) {
+        case LIBXL_DISK_BACKEND_QDISK:
+            if (disk->format != LIBXL_DISK_FORMAT_RAW) {
                 LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "cannot locally attach a qdisk "
                     "image if the format is not raw");
                 break;
@@ -1171,7 +1172,7 @@ char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *disk)
                 disk->pdev_path);
             dev = disk->pdev_path;
             break;
-        case DISK_BACKEND_UNKNOWN:
+        case LIBXL_DISK_BACKEND_UNKNOWN:
         default:
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "unrecognized disk backend "
                 "type: %d", disk->backend);
@@ -1222,7 +1223,7 @@ int libxl_device_nic_init(libxl_device_nic *nic_info, int devnum)
     if ( asprintf(&nic_info->script, "%s/vif-bridge",
                libxl_xen_script_dir_path()) < 0 )
         return ERROR_FAIL;
-    nic_info->nictype = NICTYPE_IOEMU;
+    nic_info->nictype = LIBXL_NICTYPE_IOEMU;
     return 0;
 }
 
@@ -1585,7 +1586,7 @@ static unsigned int libxl__append_disk_list_of_type(libxl__gc *gc,
                 pdisk->readwrite = 0;
             type = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/device-type", libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/%s/frontend", be_path, *dir))));
             pdisk->is_cdrom = !strcmp(type, "cdrom");
-            pdisk->format = DISK_FORMAT_UNKNOWN;
+            pdisk->format = LIBXL_DISK_FORMAT_UNKNOWN;
         }
     }
 
@@ -1650,7 +1651,7 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk)
 
     if (!disk->pdev_path) {
         disk->pdev_path = strdup("");
-        disk->format = DISK_FORMAT_EMPTY;
+        disk->format = LIBXL_DISK_FORMAT_EMPTY;
     }
     disks = libxl_device_disk_list(ctx, domid, &num);
     for (i = 0; i < num; i++) {
@@ -2170,10 +2171,10 @@ int libxl_button_press(libxl_ctx *ctx, uint32_t domid, libxl_button button)
     int rc = -1;
 
     switch (button) {
-    case POWER_BUTTON:
+    case LIBXL_BUTTON_POWER:
         rc = xc_domain_send_trigger(ctx->xch, domid, XEN_DOMCTL_SENDTRIGGER_POWER, 0);
         break;
-    case SLEEP_BUTTON:
+    case LIBXL_BUTTON_SLEEP:
         rc = xc_domain_send_trigger(ctx->xch, domid, XEN_DOMCTL_SENDTRIGGER_SLEEP, 0);
         break;
     default:

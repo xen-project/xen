@@ -224,7 +224,7 @@ static int device_nic_val(caml_gc *gc, libxl_device_nic *c_val, value v)
 	c_val->bridge = dup_String_val(gc, Field(v, 5));
 	c_val->ifname = dup_String_val(gc, Field(v, 6));
 	c_val->script = dup_String_val(gc, Field(v, 7));
-	c_val->nictype = (Int_val(Field(v, 8))) + NICTYPE_IOEMU;
+	c_val->nictype = (Int_val(Field(v, 8))) + LIBXL_NICTYPE_IOEMU;
 
 out:
 	CAMLreturn(ret);
@@ -610,7 +610,7 @@ value stub_xl_button_press(value domid, value button)
 	INIT_STRUCT();
 	
 	INIT_CTX();
-	ret = libxl_button_press(ctx, Int_val(domid), Int_val(button) + POWER_BUTTON);
+	ret = libxl_button_press(ctx, Int_val(domid), Int_val(button) + LIBXL_BUTTON_POWER);
 	if (ret != 0)
 		failwith_xl("button_press", &lg);
 	FREE_CTX();

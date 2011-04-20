@@ -481,12 +481,12 @@ static int parse_disk_config(libxl_device_disk *disk, char *buf2)
                 *p = '\0';
                 if ( !strcmp(tok, "phy") ) {
                     state = DSTATE_PHYSPATH;
-                    disk->format = DISK_FORMAT_RAW;
-                    disk->backend = DISK_BACKEND_PHY;
+                    disk->format = LIBXL_DISK_FORMAT_RAW;
+                    disk->backend = LIBXL_DISK_BACKEND_PHY;
                 }else if ( !strcmp(tok, "file") ) {
                     state = DSTATE_PHYSPATH;
-                    disk->format = DISK_FORMAT_RAW;
-                    disk->backend = DISK_BACKEND_TAP;
+                    disk->format = LIBXL_DISK_FORMAT_RAW;
+                    disk->backend = LIBXL_DISK_BACKEND_TAP;
                 }else if ((!strcmp(tok, "tap")) ||
                           (!strcmp(tok, "tap2"))) {
                     state = DSTATE_TAP;
@@ -497,16 +497,16 @@ static int parse_disk_config(libxl_device_disk *disk, char *buf2)
                 tok = p + 1;
             } else if (*p == ',') {
                 state = DSTATE_VIRTPATH;
-                disk->format = DISK_FORMAT_EMPTY;
-                disk->backend = DISK_BACKEND_TAP;
+                disk->format = LIBXL_DISK_FORMAT_EMPTY;
+                disk->backend = LIBXL_DISK_BACKEND_TAP;
                 disk->pdev_path = strdup("");
                 tok = p + 1;
             }
             break;
         case DSTATE_TAP:
             if (*p == ',') {
-                disk->format = DISK_FORMAT_RAW;
-                disk->backend = DISK_BACKEND_TAP;
+                disk->format = LIBXL_DISK_FORMAT_RAW;
+                disk->backend = LIBXL_DISK_BACKEND_TAP;
                 state = DSTATE_PHYSPATH;
             } else if ( *p == ':' ) {
                 *p = '\0';
@@ -515,17 +515,17 @@ static int parse_disk_config(libxl_device_disk *disk, char *buf2)
                     break;
                 }
                 if (!strcmp(tok, "vhd")) {
-                    disk->format = DISK_FORMAT_VHD;
-                    disk->backend = DISK_BACKEND_TAP;
+                    disk->format = LIBXL_DISK_FORMAT_VHD;
+                    disk->backend = LIBXL_DISK_BACKEND_TAP;
                 }else if ( !strcmp(tok, "qcow") ) {
-                    disk->format = DISK_FORMAT_QCOW;
-                    disk->backend = DISK_BACKEND_QDISK;
+                    disk->format = LIBXL_DISK_FORMAT_QCOW;
+                    disk->backend = LIBXL_DISK_BACKEND_QDISK;
                 }else if ( !strcmp(tok, "qcow2") ) {
-                    disk->format = DISK_FORMAT_QCOW2;
-                    disk->backend = DISK_BACKEND_QDISK;
+                    disk->format = LIBXL_DISK_FORMAT_QCOW2;
+                    disk->backend = LIBXL_DISK_BACKEND_QDISK;
                 }else if (!strcmp(tok, "raw")) {
-                    disk->format = DISK_FORMAT_RAW;
-                    disk->backend = DISK_BACKEND_TAP;
+                    disk->format = LIBXL_DISK_FORMAT_RAW;
+                    disk->backend = LIBXL_DISK_BACKEND_TAP;
                 }
                 else {
                     fprintf(stderr, "Unknown tapdisk type: %s\n", tok);
@@ -874,9 +874,9 @@ static void parse_config_data(const char *configfile_filename_report,
                     nic->bridge = strdup(p2 + 1);
                 } else if (!strcmp(p, "type")) {
                     if (!strcmp(p2 + 1, "ioemu"))
-                        nic->nictype = NICTYPE_IOEMU;
+                        nic->nictype = LIBXL_NICTYPE_IOEMU;
                     else
-                        nic->nictype = NICTYPE_VIF;
+                        nic->nictype = LIBXL_NICTYPE_VIF;
                 } else if (!strcmp(p, "ip")) {
                     free(nic->ip);
                     nic->ip = strdup(p2 + 1);
@@ -1147,7 +1147,9 @@ skip_vfb:
         }
     }
 
-    dm_info->type = c_info->hvm ? XENFV : XENPV;
+    dm_info->type = c_info->hvm ?
+        LIBXL_QEMU_MACHINE_TYPE_FV :
+        LIBXL_QEMU_MACHINE_TYPE_PV;
 
     xlu_cfg_destroy(config);
 }
@@ -3336,9 +3338,9 @@ static void button_press(const char *p, const char *b)
     find_domain(p);
 
     if (!strcmp(b, "power")) {
-        button = POWER_BUTTON;
+        button = LIBXL_BUTTON_POWER;
     } else if (!strcmp(b, "sleep")) {
-        button = SLEEP_BUTTON;
+        button = LIBXL_BUTTON_SLEEP;
     } else {
         fprintf(stderr, "%s is an invalid button identifier\n", b);
         exit(2);
@@ -4250,9 +4252,9 @@ int main_networkattach(int argc, char **argv)
     for (argv += optind+1, argc -= optind+1; argc > 0; ++argv, --argc) {
         if (!strncmp("type=", *argv, 5)) {
             if (!strncmp("vif", (*argv) + 5, 4)) {
-                nic.nictype = NICTYPE_VIF;
+                nic.nictype = LIBXL_NICTYPE_VIF;
             } else if (!strncmp("ioemu", (*argv) + 5, 5)) {
-                nic.nictype = NICTYPE_IOEMU;
+                nic.nictype = LIBXL_NICTYPE_IOEMU;
             } else {
                 fprintf(stderr, "Invalid parameter `type'.\n");
                 return 1;
@@ -4421,22 +4423,22 @@ int main_blockattach(int argc, char **argv)
 
     tok = strtok(argv[optind+1], ":");
     if (!strcmp(tok, "phy")) {
-        disk.backend = DISK_BACKEND_PHY;
+        disk.backend = LIBXL_DISK_BACKEND_PHY;
     } else if (!strcmp(tok, "file")) {
-        disk.backend = DISK_BACKEND_TAP;
+        disk.backend = LIBXL_DISK_BACKEND_TAP;
     } else if (!strcmp(tok, "tap")) {
         tok = strtok(NULL, ":");
         if (!strcmp(tok, "aio")) {
-            disk.backend = DISK_BACKEND_TAP;
+            disk.backend = LIBXL_DISK_BACKEND_TAP;
         } else if (!strcmp(tok, "vhd")) {
-            disk.format = DISK_FORMAT_VHD;
-            disk.backend = DISK_BACKEND_TAP;
+            disk.format = LIBXL_DISK_FORMAT_VHD;
+            disk.backend = LIBXL_DISK_BACKEND_TAP;
         } else if (!strcmp(tok, "qcow")) {
-            disk.format = DISK_FORMAT_QCOW;
-            disk.backend = DISK_BACKEND_QDISK;
+            disk.format = LIBXL_DISK_FORMAT_QCOW;
+            disk.backend = LIBXL_DISK_BACKEND_QDISK;
         } else if (!strcmp(tok, "qcow2")) {
-            disk.format = DISK_FORMAT_QCOW2;
-            disk.backend = DISK_BACKEND_QDISK;
+            disk.format = LIBXL_DISK_FORMAT_QCOW2;
+            disk.backend = LIBXL_DISK_BACKEND_QDISK;
         } else {
             fprintf(stderr, "Error: `%s' is not a valid disk image.\n", tok);
             return 1;

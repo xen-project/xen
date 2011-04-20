@@ -121,11 +121,11 @@ out:
 char *libxl__device_disk_string_of_format(libxl_disk_format format)
 {
     switch (format) {
-        case DISK_FORMAT_QCOW: return "qcow";
-        case DISK_FORMAT_QCOW2: return "qcow2"; 
-        case DISK_FORMAT_VHD: return "vhd"; 
-        case DISK_FORMAT_RAW:
-        case DISK_FORMAT_EMPTY: return "aio"; 
+        case LIBXL_DISK_FORMAT_QCOW: return "qcow";
+        case LIBXL_DISK_FORMAT_QCOW2: return "qcow2"; 
+        case LIBXL_DISK_FORMAT_VHD: return "vhd"; 
+        case LIBXL_DISK_FORMAT_RAW:
+        case LIBXL_DISK_FORMAT_EMPTY: return "aio"; 
         default: return NULL; 
     }
 }
@@ -133,9 +133,9 @@ char *libxl__device_disk_string_of_format(libxl_disk_format format)
 char *libxl__device_disk_string_of_backend(libxl_disk_backend backend)
 {
     switch (backend) {
-        case DISK_BACKEND_QDISK: return "qdisk";
-        case DISK_BACKEND_TAP: return "phy";
-        case DISK_BACKEND_PHY: return "phy";
+        case LIBXL_DISK_BACKEND_QDISK: return "qdisk";
+        case LIBXL_DISK_BACKEND_TAP: return "phy";
+        case LIBXL_DISK_BACKEND_PHY: return "phy";
         default: return NULL;
     }
 }

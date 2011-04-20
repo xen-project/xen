@@ -162,8 +162,8 @@ typedef struct {
 void libxl_cpuarray_destroy(libxl_cpuarray *array);
 
 typedef enum {
-    XENFV = 1,
-    XENPV,
+    LIBXL_QEMU_MACHINE_TYPE_FV = 1,
+    LIBXL_QEMU_MACHINE_TYPE_PV,
 } libxl_qemu_machine_type;
 
 typedef enum libxl_device_model_version {
@@ -184,24 +184,24 @@ typedef enum {
 } libxl_console_consback;
 
 typedef enum {
-    DISK_FORMAT_UNKNOWN = 0,
-    DISK_FORMAT_QCOW,
-    DISK_FORMAT_QCOW2,
-    DISK_FORMAT_VHD,
-    DISK_FORMAT_RAW,
-    DISK_FORMAT_EMPTY,
+    LIBXL_DISK_FORMAT_UNKNOWN = 0,
+    LIBXL_DISK_FORMAT_QCOW,
+    LIBXL_DISK_FORMAT_QCOW2,
+    LIBXL_DISK_FORMAT_VHD,
+    LIBXL_DISK_FORMAT_RAW,
+    LIBXL_DISK_FORMAT_EMPTY,
 } libxl_disk_format;
 
 typedef enum {
-    DISK_BACKEND_UNKNOWN = 0,
-    DISK_BACKEND_PHY,
-    DISK_BACKEND_TAP,
-    DISK_BACKEND_QDISK,
+    LIBXL_DISK_BACKEND_UNKNOWN = 0,
+    LIBXL_DISK_BACKEND_PHY,
+    LIBXL_DISK_BACKEND_TAP,
+    LIBXL_DISK_BACKEND_QDISK,
 } libxl_disk_backend;
 
 typedef enum {
-    NICTYPE_IOEMU = 1,
-    NICTYPE_VIF,
+    LIBXL_NICTYPE_IOEMU = 1,
+    LIBXL_NICTYPE_VIF,
 } libxl_nic_type;
 
 typedef struct {
@@ -495,8 +495,8 @@ int libxl_userdata_retrieve(libxl_ctx *ctx, uint32_t domid,
    */
 
 typedef enum {
-    POWER_BUTTON,
-    SLEEP_BUTTON
+    LIBXL_BUTTON_POWER,
+    LIBXL_BUTTON_SLEEP
 } libxl_button;
 
 int libxl_button_press(libxl_ctx *ctx, uint32_t domid, libxl_button button);

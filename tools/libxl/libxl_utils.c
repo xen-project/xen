@@ -283,9 +283,9 @@ int libxl_string_to_backend(libxl_ctx *ctx, char *s, libxl_disk_backend *backend
     int rc = 0;
 
     if (!strcmp(s, "phy")) {
-        *backend = DISK_BACKEND_PHY;
+        *backend = LIBXL_DISK_BACKEND_PHY;
     } else if (!strcmp(s, "file")) {
-        *backend = DISK_BACKEND_TAP;
+        *backend = LIBXL_DISK_BACKEND_TAP;
     } else if (!strcmp(s, "tap")) {
         p = strchr(s, ':');
         if (!p) {
@@ -294,11 +294,11 @@ int libxl_string_to_backend(libxl_ctx *ctx, char *s, libxl_disk_backend *backend
         }
         p++;
         if (!strcmp(p, "vhd")) {
-            *backend = DISK_BACKEND_TAP;
+            *backend = LIBXL_DISK_BACKEND_TAP;
         } else if (!strcmp(p, "qcow")) {
-            *backend = DISK_BACKEND_QDISK;
+            *backend = LIBXL_DISK_BACKEND_QDISK;
         } else if (!strcmp(p, "qcow2")) {
-            *backend = DISK_BACKEND_QDISK;
+            *backend = LIBXL_DISK_BACKEND_QDISK;
         }
     }
 out:
