@@ -283,7 +283,7 @@ static value Val_topologyinfo(libxl_topologyinfo *c_val)
 	int i;
 
 	topologyinfo = caml_alloc_tuple(c_val->coremap.entries);
-	for (i = 0; i < c_val->coremap.entries; i++) {	
+	for (i = 0; i < c_val->coremap.entries; i++) {
 		v = Val_int(0); /* None */
 		if (c_val->coremap.array[i] != LIBXL_CPUARRAY_INVALID_ENTRY) {
 			topology = caml_alloc_tuple(3);
@@ -398,7 +398,7 @@ value stub_xl_device_vkb_add(value info, value domid)
 	if (ret != 0)
 		failwith_xl("vkb_add", &lg);
 	FREE_CTX();
-	
+
 	CAMLreturn(Val_unit);
 }
 
@@ -413,7 +413,7 @@ value stub_xl_device_vkb_clean_shutdown(value domid)
 	if (ret != 0)
 		failwith_xl("vkb_clean_shutdown", &lg);
 	FREE_CTX();
-	
+
 	CAMLreturn(Val_unit);
 }
 
@@ -428,7 +428,7 @@ value stub_xl_device_vkb_hard_shutdown(value domid)
 	if (ret != 0)
 		failwith_xl("vkb_hard_shutdown", &lg);
 	FREE_CTX();
-	
+
 	CAMLreturn(Val_unit);
 }
 
@@ -446,7 +446,7 @@ value stub_xl_device_vfb_add(value info, value domid)
 	if (ret != 0)
 		failwith_xl("vfb_add", &lg);
 	FREE_CTX();
-	
+
 	CAMLreturn(Val_unit);
 }
 
@@ -461,7 +461,7 @@ value stub_xl_device_vfb_clean_shutdown(value domid)
 	if (ret != 0)
 		failwith_xl("vfb_clean_shutdown", &lg);
 	FREE_CTX();
-	
+
 	CAMLreturn(Val_unit);
 }
 
@@ -476,7 +476,7 @@ value stub_xl_device_vfb_hard_shutdown(value domid)
 	if (ret != 0)
 		failwith_xl("vfb_hard_shutdown", &lg);
 	FREE_CTX();
-	
+
 	CAMLreturn(Val_unit);
 }
 
@@ -494,7 +494,7 @@ value stub_xl_device_pci_add(value info, value domid)
 	if (ret != 0)
 		failwith_xl("pci_add", &lg);
 	FREE_CTX();
-	
+
 	CAMLreturn(Val_unit);
 }
 
@@ -512,7 +512,7 @@ value stub_xl_device_pci_remove(value info, value domid)
 	if (ret != 0)
 		failwith_xl("pci_remove", &lg);
 	FREE_CTX();
-	
+
 	CAMLreturn(Val_unit);
 }
 
@@ -527,7 +527,7 @@ value stub_xl_device_pci_shutdown(value domid)
 	if (ret != 0)
 		failwith_xl("pci_shutdown", &lg);
 	FREE_CTX();
-	
+
 	CAMLreturn(Val_unit);
 }
 
@@ -536,7 +536,7 @@ value stub_xl_button_press(value domid, value button)
 	CAMLparam2(domid, button);
 	int ret;
 	INIT_STRUCT();
-	
+
 	INIT_CTX();
 	ret = libxl_button_press(ctx, Int_val(domid), Int_val(button) + LIBXL_BUTTON_POWER);
 	if (ret != 0)

@@ -64,7 +64,6 @@ module Device_vkb = struct
 		backend_domid : domid;
 		devid : int;
 	}
-	
 	external add : t -> domid -> unit = "stub_xl_device_vkb_add"
 	external clean_shutdown : domid -> unit = "stub_xl_device_vkb_clean_shutdown"
 	external hard_shutdown : domid -> unit = "stub_xl_device_vkb_hard_shutdown"
@@ -77,7 +76,6 @@ module Device_console = struct
 		devid : int;
 		consoletype : console_type;
 	}
-
 	external add : t -> domid -> unit = "stub_xl_device_console_add"
 end
 
@@ -92,7 +90,6 @@ module Device_disk = struct
 		readwrite : bool;
 		is_cdrom : bool;
 	}
-
 	external add : t -> domid -> unit = "stub_xl_device_disk_add"
 	external del : t -> domid -> unit = "stub_xl_device_disk_del"
 end
@@ -125,7 +122,6 @@ module Device_pci = struct
 		msitranslate : bool;
 		power_mgmt : bool;
 	}
-
 	external add : t -> domid -> unit = "stub_xl_device_pci_add"
 	external remove : t -> domid -> unit = "stub_xl_device_pci_remove"
 	external shutdown : domid -> unit = "stub_xl_device_pci_shutdown"
@@ -134,17 +130,17 @@ end
 module Physinfo = struct
 	type t =
 	{
-		threads_per_core: int;
-		cores_per_socket: int;
-		max_cpu_id: int;
-		nr_cpus: int;
-		cpu_khz: int;
-		total_pages: int64;
-		free_pages: int64;
-		scrub_pages: int64;
-		nr_nodes: int;
-		hwcap: int32 array;
-		physcap: int32;
+		threads_per_core : int;
+		cores_per_socket : int;
+		max_cpu_id : int;
+		nr_cpus : int;
+		cpu_khz : int;
+		total_pages : int64;
+		free_pages : int64;
+		scrub_pages : int64;
+		nr_nodes : int;
+		hwcap : int32 array;
+		physcap : int32;
 	}
 	external get : unit -> t = "stub_xl_physinfo"
 
@@ -153,8 +149,8 @@ end
 module Sched_credit = struct
 	type t =
 	{
-		weight: int;
-		cap: int;
+		weight : int;
+		cap : int;
 	}
 	external domain_get : domid -> t = "stub_xl_sched_credit_domain_get"
 	external domain_set : domid -> t -> unit = "stub_xl_sched_credit_domain_set"
@@ -163,11 +159,11 @@ end
 module Topologyinfo = struct
 	type t =
 	{
-		core: int;
-		socket: int;
-		node: int;
+		core : int;
+		socket : int;
+		node : int;
 	}
-	external get: unit -> t = "stub_xl_topologyinfo"
+	external get : unit -> t = "stub_xl_topologyinfo"
 end
 
 external button_press : domid -> button -> unit = "stub_xl_button_press"
