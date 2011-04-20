@@ -211,14 +211,15 @@ module Physinfo : sig
 
 end
 
-type topology = 
-{
-	core: int;
-	socket: int;
-	node: int;
-}
-
-type topologyinfo = topology option array
+module Topologyinfo : sig
+	type t =
+	{
+		core: int;
+		socket: int;
+		node: int;
+	}
+	external get : unit -> t = "stub_xl_topologyinfo"
+end
 
 module Sched_credit : sig
 	type t =
@@ -236,8 +237,6 @@ type button =
 	| Button_Sleep
 
 external button_press : domid -> button -> unit = "stub_xl_button_press"
-
-external topologyinfo: unit -> topologyinfo = "stub_xl_topologyinfo"
 
 external send_trigger : domid -> string -> int -> unit = "stub_xl_send_trigger"
 external send_sysrq : domid -> char -> unit = "stub_xl_send_sysrq"
