@@ -69,6 +69,16 @@ const char *libxl__domain_device_model(libxl__gc *gc,
     return dm;
 }
 
+static char *libxl__domain_bios(libxl__gc *gc,
+                                libxl_device_model_info *info)
+{
+    switch (info->device_model_version) {
+    case 1: return libxl__strdup(gc, "rombios");
+    case 2: return libxl__strdup(gc, "rombios");
+    default:return NULL;
+    }
+}
+
 static char ** libxl__build_device_model_args_old(libxl__gc *gc,
                                                   const char *dm,
                                                   libxl_device_model_info *info,
@@ -753,6 +763,11 @@ int libxl__create_device_model(libxl__gc *gc,
         goto out;
     }
 
+    path = libxl__sprintf(gc, "/local/domain/%d/hvmloader", info->domid);
+    xs_mkdir(ctx->xsh, XBT_NULL, path);
+    libxl__xs_write(gc, XBT_NULL, libxl__sprintf(gc, "%s/bios", path),
+                    libxl__domain_bios(gc, info));
+
     path = libxl__sprintf(gc, "/local/domain/0/device-model/%d", info->domid);
     xs_mkdir(ctx->xsh, XBT_NULL, path);
     libxl__xs_write(gc, XBT_NULL, libxl__sprintf(gc, "%s/disable_pf", path), "%d", !info->xen_platform_pci);
@@ -875,6 +890,7 @@ int libxl__destroy_device_model(libxl__gc *gc, uint32_t domid)
         }
     }
     xs_rm(ctx->xsh, XBT_NULL, libxl__sprintf(gc, "/local/domain/0/device-model/%d", domid));
+    xs_rm(ctx->xsh, XBT_NULL, libxl__sprintf(gc, "/local/domain/%d/hvmloader", domid));
 
 out:
     return ret;
