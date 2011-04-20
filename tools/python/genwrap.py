@@ -42,10 +42,12 @@ def py_decls(ty):
         for f in ty.fields:
             if py_type(f.type) is not None:
                 continue
-            l.append('_hidden PyObject *attrib__%s_get(%s *%s);'%(\
-                fsanitize(f.type.typename), f.type.typename, f.name))
-            l.append('_hidden int attrib__%s_set(PyObject *v, %s *%s);'%(\
-                fsanitize(f.type.typename), f.type.typename, f.name))
+            if ty.marshal_out():
+                l.append('_hidden PyObject *attrib__%s_get(%s *%s);'%(\
+                    fsanitize(f.type.typename), f.type.typename, f.name))
+            if ty.marshal_in():
+                l.append('_hidden int attrib__%s_set(PyObject *v, %s *%s);'%(\
+                    fsanitize(f.type.typename), f.type.typename, f.name))
     return '\n'.join(l) + "\n"
 
 def py_attrib_get(ty, f):
@@ -128,8 +130,15 @@ static PyObject *Py%(rawname)s_new(PyTypeObject *type, PyObject *args, PyObject 
     l.append('static PyGetSetDef Py%s_getset[] = {'%ty.rawname)
     for f in ty.fields:
         l.append('    { .name = "%s", '%f.name)
-        l.append('      .get = (getter)py_%s_%s_get, '%(ty.rawname, f.name))
-        l.append('      .set = (setter)py_%s_%s_set },'%(ty.rawname, f.name))
+        if ty.marshal_out():
+            l.append('      .get = (getter)py_%s_%s_get, '%(ty.rawname, f.name))
+        else:
+            l.append('      .get = (getter)NULL, ')
+        if ty.marshal_in():
+            l.append('      .set = (setter)py_%s_%s_set,'%(ty.rawname, f.name))
+        else:
+            l.append('      .set = (setter)NULL,')
+        l.append('    },')
     l.append('    { .name = NULL }')
     l.append('};')
     struct="""
@@ -289,8 +298,10 @@ _hidden int genwrap__ll_set(PyObject *v, long long *val, long long mask);
         if isinstance(ty, libxltypes.Aggregate):
             f.write('/* Attribute get/set functions for %s */\n'%ty.typename)
             for a in ty.fields:
-                f.write(py_attrib_get(ty,a))
-                f.write(py_attrib_set(ty,a))
+                if ty.marshal_out():
+                    f.write(py_attrib_get(ty,a))
+                if ty.marshal_in():
+                    f.write(py_attrib_set(ty,a))
             f.write(py_object_def(ty))
     f.write(py_initfuncs(types))
     f.close()

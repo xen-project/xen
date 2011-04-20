@@ -3,10 +3,18 @@ import sys
 PASS_BY_VALUE = 1
 PASS_BY_REFERENCE = 2
 
+DIR_NONE = 0
+DIR_IN   = 1
+DIR_OUT  = 2
+DIR_BOTH = 3
+
 class Type(object):
     def __init__(self, typename, **kwargs):
         self.comment = kwargs.setdefault('comment', None)
         self.namespace = kwargs.setdefault('namespace', "libxl_")
+        self.dir = kwargs.setdefault('dir', DIR_BOTH)
+        if self.dir not in [DIR_NONE, DIR_IN, DIR_OUT, DIR_BOTH]:
+            raise ValueError
 
         self.passby = kwargs.setdefault('passby', PASS_BY_VALUE)
         if self.passby not in [PASS_BY_VALUE, PASS_BY_REFERENCE]:
@@ -28,6 +36,11 @@ class Type(object):
             self.destructor_fn = kwargs.setdefault('destructor_fn', None)
 
         self.autogenerate_destructor = kwargs.setdefault('autogenerate_destructor', True)
+
+    def marshal_in(self):
+        return self.dir in [DIR_IN, DIR_BOTH]
+    def marshal_out(self):
+        return self.dir in [DIR_OUT, DIR_BOTH]
 
 class Builtin(Type):
     """Builtin type"""
@@ -214,7 +227,8 @@ def parse(f):
             globs[n] = t
         elif isinstance(t,type(object)) and issubclass(t, Type):
             globs[n] = t
-        elif n in ['PASS_BY_REFERENCE', 'PASS_BY_VALUE']:
+        elif n in ['PASS_BY_REFERENCE', 'PASS_BY_VALUE',
+                   'DIR_NONE', 'DIR_IN', 'DIR_OUT', 'DIR_BOTH']:
             globs[n] = t
 
     try:

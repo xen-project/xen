@@ -348,7 +348,7 @@ libxl_physinfo = Struct("physinfo", [
     ("nr_nodes", uint32),
     ("hw_cap", libxl_hwcap),
     ("phys_cap", uint32),
-    ], destructor_fn=None)
+    ], destructor_fn=None, dir=DIR_OUT)
 
 libxl_topologyinfo = Struct("topologyinfo", [
     ("coremap", libxl_cpuarray,   False, "cpu to core map"),
