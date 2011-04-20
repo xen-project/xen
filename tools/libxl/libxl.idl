@@ -8,7 +8,7 @@ libxl_uuid = Builtin("uuid")
 libxl_mac = Builtin("mac")
 libxl_cpumap = Builtin("cpumap", destructor_fn="libxl_cpumap_destroy", passby=PASS_BY_REFERENCE)
 libxl_cpuarray = Builtin("cpuarray", destructor_fn="libxl_cpuarray_destroy", passby=PASS_BY_REFERENCE)
-libxl_qemu_machine_type = Number("qemu_machine_type", namespace="libxl_")
+libxl_domain_type = Number("domain_type", namespace="libxl_")
 libxl_device_model_version = Number("device_model_version", namespace="libxl_")
 libxl_console_consback = Number("console_consback", namespace="libxl_")
 libxl_console_constype = Number("console_constype", namespace="libxl_")
@@ -145,7 +145,7 @@ libxl_device_model_info = Struct("device_model_info",[
     ("device_model_stubdomain", bool),
     ("device_model",     string, False, "if you set this you must set device_model_version too"),
     ("saved_state",      string),
-    ("type",             libxl_qemu_machine_type),
+    ("type",             libxl_domain_type),
     ("target_ram",       uint32),
     ("videoram",         integer,           False, "size of the videoram in MB"),
     ("stdvga",           bool,              False, "stdvga enabled or disabled"),

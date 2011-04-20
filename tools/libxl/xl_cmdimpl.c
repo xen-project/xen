@@ -1148,8 +1148,8 @@ skip_vfb:
     }
 
     dm_info->type = c_info->hvm ?
-        LIBXL_QEMU_MACHINE_TYPE_FV :
-        LIBXL_QEMU_MACHINE_TYPE_PV;
+        LIBXL_DOMAIN_TYPE_FV :
+        LIBXL_DOMAIN_TYPE_PV;
 
     xlu_cfg_destroy(config);
 }

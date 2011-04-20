@@ -140,7 +140,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
     if (info->serial) {
         flexarray_vappend(dm_args, "-serial", info->serial, NULL);
     }
-    if (info->type == LIBXL_QEMU_MACHINE_TYPE_FV) {
+    if (info->type == LIBXL_DOMAIN_TYPE_FV) {
         int ioemu_vifs = 0;
 
         if (info->videoram) {
@@ -205,10 +205,10 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
         flexarray_append(dm_args, info->extra[i]);
     flexarray_append(dm_args, "-M");
     switch (info->type) {
-    case LIBXL_QEMU_MACHINE_TYPE_PV:
+    case LIBXL_DOMAIN_TYPE_PV:
         flexarray_append(dm_args, "xenpv");
         break;
-    case LIBXL_QEMU_MACHINE_TYPE_FV:
+    case LIBXL_DOMAIN_TYPE_FV:
         flexarray_append(dm_args, "xenfv");
         break;
     }
@@ -245,7 +245,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     flexarray_vappend(dm_args, dm,
                       "-xen-domid", libxl__sprintf(gc, "%d", info->domid), NULL);
 
-    if (info->type == LIBXL_QEMU_MACHINE_TYPE_PV) {
+    if (info->type == LIBXL_DOMAIN_TYPE_PV) {
         flexarray_append(dm_args, "-xen-attach");
     }
 
@@ -283,7 +283,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
         flexarray_append(dm_args, "-sdl");
     }
 
-    if (info->type == LIBXL_QEMU_MACHINE_TYPE_PV && !info->nographic) {
+    if (info->type == LIBXL_DOMAIN_TYPE_PV && !info->nographic) {
         flexarray_vappend(dm_args, "-vga", "xenfb", NULL);
     }
 
@@ -296,7 +296,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     if (info->serial) {
         flexarray_vappend(dm_args, "-serial", info->serial, NULL);
     }
-    if (info->type == LIBXL_QEMU_MACHINE_TYPE_FV) {
+    if (info->type == LIBXL_DOMAIN_TYPE_FV) {
         int ioemu_vifs = 0;
 
         if (info->stdvga) {
@@ -362,10 +362,10 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
         flexarray_append(dm_args, info->extra[i]);
     flexarray_append(dm_args, "-M");
     switch (info->type) {
-    case LIBXL_QEMU_MACHINE_TYPE_PV:
+    case LIBXL_DOMAIN_TYPE_PV:
         flexarray_append(dm_args, "xenpv");
         break;
-    case LIBXL_QEMU_MACHINE_TYPE_FV:
+    case LIBXL_DOMAIN_TYPE_FV:
         flexarray_append(dm_args, "xenfv");
         break;
     }
@@ -374,7 +374,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     flexarray_append(dm_args, "-m");
     flexarray_append(dm_args, libxl__sprintf(gc, "%d", info->target_ram));
 
-    if (info->type == LIBXL_QEMU_MACHINE_TYPE_FV) {
+    if (info->type == LIBXL_DOMAIN_TYPE_FV) {
         for (i; i < num_disks; i++) {
             int disk, part;
             int dev_number =
@@ -929,7 +929,7 @@ static int libxl__build_xenpv_qemu_args(libxl__gc *gc,
     info->dom_name = libxl_domid_to_name(ctx, domid);
     info->device_model_version = LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
     info->device_model = NULL;
-    info->type = LIBXL_QEMU_MACHINE_TYPE_PV;
+    info->type = LIBXL_DOMAIN_TYPE_PV;
     return 0;
 }
 

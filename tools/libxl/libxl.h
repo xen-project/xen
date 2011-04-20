@@ -162,9 +162,9 @@ typedef struct {
 void libxl_cpuarray_destroy(libxl_cpuarray *array);
 
 typedef enum {
-    LIBXL_QEMU_MACHINE_TYPE_FV = 1,
-    LIBXL_QEMU_MACHINE_TYPE_PV,
-} libxl_qemu_machine_type;
+    LIBXL_DOMAIN_TYPE_FV = 1,
+    LIBXL_DOMAIN_TYPE_PV,
+} libxl_domain_type;
 
 typedef enum libxl_device_model_version {
     /* Historical qemu-xen device model (qemu-dm) */
