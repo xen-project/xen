@@ -153,24 +153,6 @@ class KeyedUnion(Aggregate):
             n, kve, ty = f
             self.fields.append(Field(ty, n, keyvar_expr=kve))
 
-class Reference(Type):
-    """A reference to another type"""
-    def __init__(self, ty, **kwargs):
-        self.ref_type = ty
-        
-        # Ugh
-        
-        kwargs.setdefault('destructor_fn', "free")
-        kwargs.setdefault('autogenerate_destructor', False)
-        kwargs.setdefault('passby', PASS_BY_VALUE)
-        
-        kwargs.setdefault('namespace', ty.namespace)
-
-        typename = ty.typename
-        if ty.namespace:
-            typename = typename[len(kwargs['namespace']):]
-        Type.__init__(self, typename + " *", **kwargs)
-
 #
 # Standard Types
 #

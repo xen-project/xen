@@ -64,13 +64,6 @@ libxltype.UInt
  The <N> for a given instance must be passed to the constructor and is
  then available in UInt.width
 
-libxltype.Reference
-
- Instances of this type represent a reference to another type
-
- The referant type must be passed to the constructor and is then
- available in Reference.ref_type
-
 Complex type-Classes
 --------------------
 

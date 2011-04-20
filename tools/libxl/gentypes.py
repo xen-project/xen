@@ -78,13 +78,13 @@ def libxl_C_type_define(ty, indent = ""):
         raise NotImplementedError("%s" % type(ty))
     return s.replace("\n", "\n%s" % indent)
 
-def libxl_C_type_destroy(ty, v, reference, indent = "    ", parent = None):
-    if reference:
+def libxl_C_type_destroy(ty, v, indent = "    ", parent = None):
+    if parent is None:
         deref = v + "->"
     else:
         deref = v + "."
         
-    if ty.passby == libxltypes.PASS_BY_REFERENCE and not reference:
+    if ty.passby == libxltypes.PASS_BY_REFERENCE and parent is not None:
         makeref = "&"
     else:
         makeref = ""
@@ -96,19 +96,15 @@ def libxl_C_type_destroy(ty, v, reference, indent = "    ", parent = None):
         for f in ty.fields:
             keyvar_expr = f.keyvar_expr % (parent + ty.keyvar_name)
             s += "if (" + keyvar_expr + ") {\n"
-            s += libxl_C_type_destroy(f.type, deref + f.name, False, indent + "    ", deref)
+            s += libxl_C_type_destroy(f.type, deref + f.name, indent + "    ", deref)
             s += "}\n"
-    elif isinstance(ty, libxltypes.Reference):
-        s += libxl_C_type_destroy(ty.ref_type, v, True, indent, v)
-        if ty.destructor_fn is not None:
-            s += "%s(%s);\n" % (ty.destructor_fn, makeref + v)
     elif isinstance(ty, libxltypes.Struct) and (parent is None or ty.destructor_fn is None):
         for f in [f for f in ty.fields if not f.const]:
 
             if f.name is None: # Anonynous struct
-                s += libxl_C_type_destroy(f.type, deref, False, "", deref)
+                s += libxl_C_type_destroy(f.type, deref, "", deref)
             else:
-                s += libxl_C_type_destroy(f.type, deref + f.name, False, "", deref)
+                s += libxl_C_type_destroy(f.type, deref + f.name, "", deref)
     else:
         if ty.destructor_fn is not None:
             s += "%s(%s);\n" % (ty.destructor_fn, makeref + v)
@@ -177,7 +173,7 @@ if __name__ == '__main__':
     for ty in [t for t in types if t.destructor_fn is not None and t.autogenerate_destructor]:
         f.write("void %s(%s *p)\n" % (ty.destructor_fn, ty.typename))
         f.write("{\n")
-        f.write(libxl_C_type_destroy(ty, "p", True))
+        f.write(libxl_C_type_destroy(ty, "p"))
         f.write("    memset(p, LIBXL_DTOR_POISON, sizeof(*p));\n")
         f.write("}\n")
         f.write("\n")
