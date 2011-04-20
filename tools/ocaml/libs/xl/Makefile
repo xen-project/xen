@@ -2,6 +2,8 @@ TOPLEVEL=$(CURDIR)/../..
 XEN_ROOT=$(TOPLEVEL)/../..
 include $(TOPLEVEL)/common.make
 
+# ignore unused generated functions
+CFLAGS += -Wno-unused
 CFLAGS += $(CFLAGS_libxenlight)
 
 OBJS = xl
