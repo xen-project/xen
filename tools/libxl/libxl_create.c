@@ -108,7 +108,9 @@ void libxl_init_dm_info(libxl_device_model_info *dm_info,
     libxl_uuid_generate(&dm_info->uuid);
 
     dm_info->dom_name = strdup(c_info->name);
-    dm_info->device_model = strdup("qemu-dm");
+    dm_info->device_model_version = LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
+    dm_info->device_model_stubdomain = false;
+    dm_info->device_model = NULL;
     dm_info->target_ram = libxl__sizekb_to_mb(b_info->target_memkb);
     dm_info->videoram = libxl__sizekb_to_mb(b_info->video_memkb);
     dm_info->apic = b_info->u.hvm.apic;

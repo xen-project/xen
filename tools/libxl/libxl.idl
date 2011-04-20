@@ -9,6 +9,7 @@ libxl_mac = Builtin("mac")
 libxl_cpumap = Builtin("cpumap", destructor_fn="libxl_cpumap_destroy", passby=PASS_BY_REFERENCE)
 libxl_cpuarray = Builtin("cpuarray", destructor_fn="libxl_cpuarray_destroy", passby=PASS_BY_REFERENCE)
 libxl_qemu_machine_type = Number("qemu_machine_type", namespace="libxl_")
+libxl_device_model_version = Number("device_model_version", namespace="libxl_")
 libxl_console_consback = Number("console_consback", namespace="libxl_")
 libxl_console_constype = Number("console_constype", namespace="libxl_")
 libxl_disk_format = Number("disk_format", namespace="libxl_")
@@ -140,7 +141,9 @@ libxl_device_model_info = Struct("device_model_info",[
     ("domid",            integer),
     ("uuid",             libxl_uuid,  False, "this is use only with stubdom, and must be different from the domain uuid"),
     ("dom_name",         string),
-    ("device_model",     string),
+    ("device_model_version", libxl_device_model_version),
+    ("device_model_stubdomain", bool),
+    ("device_model",     string, False, "if you set this you must set device_model_version too"),
     ("saved_state",      string),
     ("type",             libxl_qemu_machine_type),
     ("target_ram",       uint32),

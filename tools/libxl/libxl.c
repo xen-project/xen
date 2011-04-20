@@ -2070,15 +2070,17 @@ out:
 int libxl_domain_need_memory(libxl_ctx *ctx, libxl_domain_build_info *b_info,
         libxl_device_model_info *dm_info, uint32_t *need_memkb)
 {
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
     *need_memkb = b_info->target_memkb;
     if (b_info->hvm) {
         *need_memkb += b_info->shadow_memkb + LIBXL_HVM_EXTRA_MEMORY;
-        if (strstr(dm_info->device_model, "stubdom-dm"))
+        if (dm_info->device_model_stubdomain)
             *need_memkb += 32 * 1024;
     } else
         *need_memkb += b_info->shadow_memkb + LIBXL_PV_EXTRA_MEMORY;
     if (*need_memkb % (2 * 1024))
         *need_memkb += (2 * 1024) - (*need_memkb % (2 * 1024));
+    libxl__free_all(&gc);
     return 0;
 }
 

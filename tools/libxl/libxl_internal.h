@@ -233,6 +233,8 @@ _hidden int libxl__domain_make(libxl__gc *gc, libxl_domain_create_info *info, ui
 _hidden int libxl__domain_build(libxl__gc *gc, libxl_domain_build_info *info, uint32_t domid, /* out */ libxl_domain_build_state *state);
 
 /* for device model creation */
+_hidden const char *libxl__domain_device_model(libxl__gc *gc,
+                                               libxl_device_model_info *info);
 _hidden int libxl__create_device_model(libxl__gc *gc,
                               libxl_device_model_info *info,
                               libxl_device_disk *disk, int num_disks,

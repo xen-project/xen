@@ -350,7 +350,7 @@ static void printf_info(int domid,
         printf("\t\t\t(timer_mode %d)\n", b_info->u.hvm.timer_mode);
         printf("\t\t\t(nestedhvm %d)\n", b_info->u.hvm.nested_hvm);
 
-        printf("\t\t\t(device_model %s)\n", dm_info->device_model);
+        printf("\t\t\t(device_model %s)\n", dm_info->device_model ? : "default");
         printf("\t\t\t(videoram %d)\n", dm_info->videoram);
         printf("\t\t\t(stdvga %d)\n", dm_info->stdvga);
         printf("\t\t\t(vnc %d)\n", dm_info->vnc);
@@ -774,6 +774,8 @@ static void parse_config_data(const char *configfile_filename_report,
 
         xlu_cfg_replace_string (config, "kernel", &b_info->u.pv.kernel.path);
 
+        xlu_cfg_replace_string (config, "kernel", &b_info->u.pv.kernel.path);
+
         xlu_cfg_get_string (config, "root", &root);
         xlu_cfg_get_string (config, "extra", &extra);
 
@@ -1079,7 +1081,32 @@ skip_vfb:
         libxl_init_dm_info(dm_info, c_info, b_info);
 
         /* then process config related to dm */
-        xlu_cfg_replace_string (config, "device_model", &dm_info->device_model);
+        if (!xlu_cfg_get_string (config, "device_model", &buf)) {
+            fprintf(stderr,
+                    "WARNING: ignoring device_model directive.\n"
+                    "WARNING: Use \"device_model_override\" instead if you really want a non-default device_model\n");
+            if (strstr(buf, "stubdom-dm"))
+                fprintf(stderr, "WARNING: Or use \"device_model_stubdomain_override\" if you want to enable stubdomains\n");
+        }
+
+        xlu_cfg_replace_string (config, "device_model_override",
+                                &dm_info->device_model);
+        if (!xlu_cfg_get_string (config, "device_model_version", &buf)) {
+            if (!strcmp(buf, "qemu-xen-traditional")) {
+                dm_info->device_model_version
+                    = LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
+            } else if (!strcmp(buf, "qemu-xen")) {
+                dm_info->device_model_version
+                    = LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN;
+            } else {
+                fprintf(stderr,
+                        "Unknown device_model_version \"%s\" specified\n", buf);
+                exit(1);
+            }
+        } else if (dm_info->device_model)
+            fprintf(stderr, "WARNING: device model override given without specific DM version\n");
+        if (!xlu_cfg_get_long (config, "device_model_stubdomain_override", &l))
+            dm_info->device_model_stubdomain = l;
         if (!xlu_cfg_get_long (config, "stdvga", &l))
             dm_info->stdvga = l;
         if (!xlu_cfg_get_long (config, "vnc", &l))

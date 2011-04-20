@@ -38,7 +38,39 @@ static const char *libxl_tapif_script(libxl__gc *gc)
 #endif
 }
 
+const char *libxl__domain_device_model(libxl__gc *gc,
+                                       libxl_device_model_info *info)
+{
+    libxl_ctx *ctx = libxl__gc_owner(gc);
+    const char *dm;
+
+    if (info->device_model_stubdomain)
+        return NULL;
+
+    if (info->device_model) {
+        dm = libxl__strdup(gc, info->device_model);
+    } else {
+        switch (info->device_model_version) {
+        case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
+            dm = libxl__abs_path(gc, "qemu-dm", libxl_libexec_path());
+            break;
+        case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
+            dm = libxl__strdup(gc, "/usr/bin/qemu");
+            break;
+        default:
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                       "invalid device model version %d\n",
+                       info->device_model_version);
+            dm = NULL;
+            break;
+        }
+    }
+
+    return dm;
+}
+
 static char ** libxl__build_device_model_args_old(libxl__gc *gc,
+                                                  const char *dm,
                                                   libxl_device_model_info *info,
                                                   libxl_device_disk *disks, int num_disks,
                                                   libxl_device_nic *vifs, int num_vifs)
@@ -50,7 +82,8 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
     if (!dm_args)
         return NULL;
 
-    flexarray_vappend(dm_args, "qemu-dm", "-d", libxl__sprintf(gc, "%d", info->domid), NULL);
+    flexarray_vappend(dm_args, dm,
+                      "-d", libxl__sprintf(gc, "%d", info->domid), NULL);
 
     if (info->dom_name)
         flexarray_vappend(dm_args, "-domain-name", info->dom_name, NULL);
@@ -183,6 +216,7 @@ static const char *qemu_disk_format_string(libxl_disk_format format)
 }
 
 static char ** libxl__build_device_model_args_new(libxl__gc *gc,
+                                                  const char *dm,
                                                   libxl_device_model_info *info,
                                                   libxl_device_disk *disks, int num_disks,
                                                   libxl_device_nic *vifs, int num_vifs)
@@ -195,8 +229,8 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     if (!dm_args)
         return NULL;
 
-    flexarray_vappend(dm_args, libxl__strdup(gc, info->device_model),
-                        "-xen-domid", libxl__sprintf(gc, "%d", info->domid), NULL);
+    flexarray_vappend(dm_args, dm,
+                      "-xen-domid", libxl__sprintf(gc, "%d", info->domid), NULL);
 
     if (info->type == XENPV) {
         flexarray_append(dm_args, "-xen-attach");
@@ -385,19 +419,26 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
 }
 
 static char ** libxl__build_device_model_args(libxl__gc *gc,
+                                              const char *dm,
                                               libxl_device_model_info *info,
                                               libxl_device_disk *disks, int num_disks,
                                               libxl_device_nic *vifs, int num_vifs)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
-    int new_qemu;
 
-    new_qemu = libxl_check_device_model_version(ctx, info->device_model);
-
-    if (new_qemu == 1) {
-        return libxl__build_device_model_args_new(gc, info, disks, num_disks, vifs, num_vifs);
-    } else {
-        return libxl__build_device_model_args_old(gc, info, disks, num_disks, vifs, num_vifs);
+    switch (info->device_model_version) {
+    case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
+        return libxl__build_device_model_args_old(gc, dm, info,
+                                                  disks, num_disks,
+                                                  vifs, num_vifs);
+    case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
+        return libxl__build_device_model_args_new(gc, dm, info,
+                                                  disks, num_disks,
+                                                  vifs, num_vifs);
+    default:
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "unknown device model version %d",
+                         info->device_model_version);
+        return NULL;
     }
 }
 
@@ -518,7 +559,13 @@ static int libxl__create_stubdom(libxl__gc *gc,
     xs_transaction_t t;
     libxl__device_model_starting *dm_starting = 0;
 
-    args = libxl__build_device_model_args(gc, info, disks, num_disks,
+    if (info->device_model_version != LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL) {
+        ret = ERROR_INVAL;
+        goto out;
+    }
+
+    args = libxl__build_device_model_args(gc, "stubdom-dm", info,
+                                          disks, num_disks,
                                           vifs, num_vifs);
     if (!args) {
         ret = ERROR_FAIL;
@@ -676,20 +723,30 @@ int libxl__create_device_model(libxl__gc *gc,
     int rc;
     char **args;
     libxl__device_model_starting buf_starting, *p;
-    xs_transaction_t t; 
+    xs_transaction_t t;
     char *vm_path;
     char **pass_stuff;
+    const char *dm;
 
-    if (strstr(info->device_model, "stubdom-dm")) {
+    if (info->device_model_stubdomain) {
         libxl_device_vfb vfb;
         libxl_device_vkb vkb;
 
         libxl__vfb_and_vkb_from_device_model_info(gc, info, &vfb, &vkb);
-        rc = libxl__create_stubdom(gc, info, disks, num_disks, vifs, num_vifs, &vfb, &vkb, starting_r);
+        rc = libxl__create_stubdom(gc, info,
+                                   disks, num_disks,
+                                   vifs, num_vifs,
+                                   &vfb, &vkb, starting_r);
         goto out;
     }
 
-    args = libxl__build_device_model_args(gc, info, disks, num_disks,
+    dm = libxl__domain_device_model(gc, info);
+    if (!dm) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    args = libxl__build_device_model_args(gc, dm, info, disks, num_disks,
                                           vifs, num_vifs);
     if (!args) {
         rc = ERROR_FAIL;
@@ -747,8 +804,8 @@ retry_transaction:
     if (!rc) { /* inner child */
         setsid();
         libxl__exec(null, logfile_w, logfile_w,
-                   libxl__abs_path(gc, info->device_model, libxl_libexec_path()),
-                   args);
+                    libxl__domain_device_model(gc, info),
+                    args);
     }
 
     rc = 0;
@@ -847,7 +904,8 @@ static int libxl__build_xenpv_qemu_args(libxl__gc *gc,
         info->nographic = 1;
     info->domid = domid;
     info->dom_name = libxl_domid_to_name(ctx, domid);
-    info->device_model = libxl__abs_path(gc, "qemu-dm", libxl_libexec_path());
+    info->device_model_version = LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
+    info->device_model = NULL;
     info->type = XENPV;
     return 0;
 }

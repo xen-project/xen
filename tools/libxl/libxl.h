@@ -166,6 +166,13 @@ typedef enum {
     XENPV,
 } libxl_qemu_machine_type;
 
+typedef enum libxl_device_model_version {
+    /* Historical qemu-xen device model (qemu-dm) */
+    LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL = 1,
+    /* Upstream based qemu-xen device model */
+    LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN = 2,
+} libxl_device_model_version;
+
 typedef enum {
     LIBXL_CONSTYPE_SERIAL = 1,
     LIBXL_CONSTYPE_PV,
