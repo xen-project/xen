@@ -18,7 +18,7 @@
 static int cachesize_override __cpuinitdata = -1;
 size_param("cachesize", cachesize_override);
 
-static bool_t __cpuinitdata use_xsave;
+static bool_t __cpuinitdata use_xsave = 1;
 boolean_param("xsave", use_xsave);
 unsigned int __devinitdata opt_cpuid_mask_ecx = ~0u;
 integer_param("cpuid_mask_ecx", opt_cpuid_mask_ecx);
