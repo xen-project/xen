@@ -81,14 +81,6 @@ class Enumeration(Type):
                                                 comment=comment,
                                                 typename=self.rawname))
         
-class BitField(Type):
-    def __init__(self, ty, w, **kwargs):
-        kwargs.setdefault('namespace', None)
-        kwargs.setdefault('destructor_fn', None)
-        Type.__init__(self, ty.typename, **kwargs)
-
-        self.width = w
-
 class Field(object):
     """An element of an Aggregate type"""
     def __init__(self, type, name, **kwargs):

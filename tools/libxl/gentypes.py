@@ -22,9 +22,7 @@ def libxl_C_type_of(ty):
     return ty.typename
 
 def libxl_C_instance_of(ty, instancename):
-    if isinstance(ty, libxltypes.BitField):
-        return libxl_C_type_of(ty) + " " + instancename + ":%d" % ty.width
-    elif isinstance(ty, libxltypes.Aggregate) and ty.typename is None:
+    if isinstance(ty, libxltypes.Aggregate) and ty.typename is None:
         if instancename is None:
             return libxl_C_type_define(ty)
         else:

@@ -89,11 +89,11 @@ libxl_button = Enumeration("button", [
 libxl_dominfo = Struct("dominfo",[
     ("uuid",        libxl_uuid),
     ("domid",       libxl_domid),
-    ("running",     BitField(uint8, 1)),
-    ("blocked",     BitField(uint8, 1)),
-    ("paused",      BitField(uint8, 1)),
-    ("shutdown",    BitField(uint8, 1)),
-    ("dying",       BitField(uint8, 1)),
+    ("running",     bool),
+    ("blocked",     bool),
+    ("paused",      bool),
+    ("shutdown",    bool),
+    ("dying",       bool),
     
     ("shutdown_reason", unsigned, False, 
 """Valid SHUTDOWN_* value from xen/sched.h iff (shutdown||dying).
@@ -326,9 +326,9 @@ libxl_nicinfo = Struct("nicinfo", [
 libxl_vcpuinfo = Struct("vcpuinfo", [
     ("vcpuid", uint32,              False, "vcpu's id"),
     ("cpu", uint32,                 False, "current mapping"),
-    ("online", BitField(uint8, 1),  False, "currently online (not hotplugged)?"),
-    ("blocked", BitField(uint8, 1), False, "blocked waiting for an event?"),
-    ("running", BitField(uint8, 1), False, "currently scheduled on its CPU?"),
+    ("online", bool,                False, "currently online (not hotplugged)?"),
+    ("blocked", bool,               False, "blocked waiting for an event?"),
+    ("running", bool,               False, "currently scheduled on its CPU?"),
     ("vcpu_time", uint64,           False, "total vcpu time ran (ns)"),
     ("cpumap", libxl_cpumap,        False, "current cpu's affinities"),
     ])

@@ -7,7 +7,7 @@ import libxltypes
 (TYPE_BOOL, TYPE_INT, TYPE_UINT, TYPE_STRING) = range(4)
 
 def py_type(ty):
-    if ty == libxltypes.bool or isinstance(ty, libxltypes.BitField) and ty.width == 1:
+    if ty == libxltypes.bool:
         return TYPE_BOOL
     if isinstance(ty, libxltypes.Enumeration):
         return TYPE_UINT

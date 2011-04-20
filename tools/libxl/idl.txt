@@ -64,14 +64,6 @@ libxltype.UInt
  The <N> for a given instance must be passed to the constructor and is
  then available in UInt.width
 
-libxltype.BitField
-
- Instances of this class represent bitfield type classes.
-
- The base type and desired width for a given instance must be passed
- to the contructor. The base type becomes the type of the instance and
- width is contained in BitField.width
-
 libxltype.Reference
 
  Instances of this type represent a reference to another type
