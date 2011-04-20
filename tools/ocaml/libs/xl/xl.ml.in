@@ -17,6 +17,8 @@ exception Error of string
 
 type domid = int
 
+(* @@LIBXL_TYPES@@ *)
+
 type console_type =
 	| CONSOLETYPE_XENCONSOLED
 	| CONSOLETYPE_IOEMU
@@ -37,7 +39,7 @@ type button =
 	| Button_Power
 	| Button_Sleep
 
-module Device_vfb : sig
+module Device_vfb = struct
 	type t =
 	{
 		backend_domid : domid;
@@ -58,7 +60,7 @@ module Device_vfb : sig
 	external hard_shutdown : domid -> unit = "stub_xl_device_vfb_hard_shutdown"
 end
 
-module Device_vkb : sig
+module Device_vkb = struct
 	type t =
 	{
 		backend_domid : domid;
@@ -69,18 +71,17 @@ module Device_vkb : sig
 	external hard_shutdown : domid -> unit = "stub_xl_device_vkb_hard_shutdown"
 end
 
-module Device_console : sig
+module Device_console = struct
 	type t =
 	{
 		backend_domid : domid;
 		devid : int;
 		consoletype : console_type;
 	}
-
 	external add : t -> domid -> unit = "stub_xl_device_console_add"
 end
 
-module Device_disk : sig
+module Device_disk = struct
 	type t =
 	{
 		backend_domid : domid;
@@ -95,7 +96,7 @@ module Device_disk : sig
 	external del : t -> domid -> unit = "stub_xl_device_disk_del"
 end
 
-module Device_nic : sig
+module Device_nic = struct
 	type t =
 	{
 		backend_domid : domid;
@@ -112,7 +113,7 @@ module Device_nic : sig
 	external del : t -> domid -> unit = "stub_xl_device_nic_del"
 end
 
-module Device_pci : sig
+module Device_pci = struct
 	type t =
 	{
 		func : int;
@@ -128,7 +129,7 @@ module Device_pci : sig
 	external shutdown : domid -> unit = "stub_xl_device_pci_shutdown"
 end
 
-module Physinfo : sig
+module Physinfo = struct
 	type t =
 	{
 		threads_per_core : int;
@@ -144,9 +145,10 @@ module Physinfo : sig
 		physcap : int32;
 	}
 	external get : unit -> t = "stub_xl_physinfo"
+
 end
 
-module Sched_credit : sig
+module Sched_credit = struct
 	type t =
 	{
 		weight : int;
@@ -156,7 +158,7 @@ module Sched_credit : sig
 	external domain_set : domid -> t -> unit = "stub_xl_sched_credit_domain_set"
 end
 
-module Topologyinfo : sig
+module Topologyinfo = struct
 	type t =
 	{
 		core : int;
@@ -168,6 +170,9 @@ end
 
 external button_press : domid -> button -> unit = "stub_xl_button_press"
 
+
 external send_trigger : domid -> string -> int -> unit = "stub_xl_send_trigger"
 external send_sysrq : domid -> char -> unit = "stub_xl_send_sysrq"
 external send_debug_keys : domid -> string -> unit = "stub_xl_send_debug_keys"
+
+let _ = Callback.register_exception "xl.error" (Error "register_callback")

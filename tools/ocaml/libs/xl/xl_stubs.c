@@ -26,7 +26,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "libxl.h"
+#include <libxl.h>
 
 struct caml_logger {
 	struct xentoollog_logger logger;
@@ -129,6 +129,8 @@ static int string_string_tuple_array_val (caml_gc *gc, char ***c_val, value v)
 }
 
 #endif
+
+#include "_libxl_types.inc"
 
 static int device_disk_val(caml_gc *gc, libxl_device_disk *c_val, value v)
 {

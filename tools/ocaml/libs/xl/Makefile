@@ -15,7 +15,35 @@ xl_C_OBJS = xl_stubs
 
 OCAML_LIBRARY = xl
 
+GENERATED_FILES += xl.ml xl.mli
+GENERATED_FILES += _libxl_types.ml.in _libxl_types.mli.in
+GENERATED_FILES += _libxl_types.inc
+
 all: $(INTF) $(LIBS)
+
+xl.ml: xl.ml.in _libxl_types.ml.in
+	$(Q)sed -e '1i(*\
+ * AUTO-GENERATED FILE DO NOT EDIT\
+ * Generated from xl.ml.in and _libxl_types.ml.in\
+ *)\
+' \
+	    -e '/^(\* @@LIBXL_TYPES@@ \*)$$/r_libxl_types.ml.in' \
+	  < xl.ml.in > xl.ml
+
+xl.mli: xl.mli.in _libxl_types.mli.in
+	$(Q)sed -e '1i(*\
+ * AUTO-GENERATED FILE DO NOT EDIT\
+ * Generated from xl.mli.in and _libxl_types.mli.in\
+ *)\
+' \
+	    -e '/^(\* @@LIBXL_TYPES@@ \*)$$/r_libxl_types.mli.in' \
+	  < xl.mli.in > xl.mli
+
+_libxl_types.ml.in _libxl_types.mli.in _libxl_types.inc: genwrap.py $(XEN_ROOT)/tools/libxl/libxl.idl \
+                $(XEN_ROOT)/tools/libxl/libxltypes.py
+	PYTHONPATH=$(XEN_ROOT)/tools/libxl $(PYTHON) genwrap.py \
+		$(XEN_ROOT)/tools/libxl/libxl.idl \
+		_libxl_types.mli.in _libxl_types.ml.in _libxl_types.inc
 
 libs: $(LIBS)
 

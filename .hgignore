@@ -295,6 +295,11 @@
 ^tools/ocaml/.*/.*\.cmx?a$
 ^tools/ocaml/.*/META$
 ^tools/ocaml/.*/\.ocamldep\.make$
+^tools/ocaml/libs/xl/_libxl_types\.ml\.in$
+^tools/ocaml/libs/xl/_libxl_types\.mli\.in$
+^tools/ocaml/libs/xl/_libxl_types\.inc$
+^tools/ocaml/libs/xl/xl\.ml$
+^tools/ocaml/libs/xl/xl\.mli$
 ^tools/ocaml/xenstored/oxenstored$
 ^xen/\.banner.*$
 ^xen/BLOG$
