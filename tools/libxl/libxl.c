@@ -1060,11 +1060,6 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
     flexarray_append(front, "device-type");
     flexarray_append(front, disk->is_cdrom ? "cdrom" : "disk");
 
-    if (0 /* protocol != native*/) {
-        flexarray_append(front, "protocol");
-        flexarray_append(front, "x86_32-abi"); /* hardcoded ! */
-    }
-
     libxl__device_generic_add(&gc, &device,
                              libxl__xs_kvs_of_flexarray(&gc, back, back->count),
                              libxl__xs_kvs_of_flexarray(&gc, front, front->count));
@@ -1304,11 +1299,6 @@ int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic)
     flexarray_append(front, libxl__sprintf(&gc, "%02x:%02x:%02x:%02x:%02x:%02x",
                                                   nic->mac[0], nic->mac[1], nic->mac[2],
                                                   nic->mac[3], nic->mac[4], nic->mac[5]));
-    if (0 /* protocol != native*/) {
-        flexarray_append(front, "protocol");
-        flexarray_append(front, "x86_32-abi"); /* hardcoded ! */
-    }
-
     libxl__device_generic_add(&gc, &device,
                              libxl__xs_kvs_of_flexarray(&gc, back, back->count),
                              libxl__xs_kvs_of_flexarray(&gc, front, front->count));
