@@ -184,8 +184,6 @@ uint16 = UInt(16)
 uint32 = UInt(32)
 uint64 = UInt(64)
 
-domid = UInt(32)
-
 string = Builtin("char *", namespace = None, destructor_fn = "free")
 
 class OrderedDict(dict):

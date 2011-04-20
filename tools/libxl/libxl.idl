@@ -3,7 +3,7 @@
 # Builtin libxl types
 #
 
-libxl_ctx = Builtin("ctx")
+libxl_domid = Builtin("domid")
 libxl_uuid = Builtin("uuid")
 libxl_mac = Builtin("mac")
 libxl_cpumap = Builtin("cpumap", destructor_fn="libxl_cpumap_destroy", passby=PASS_BY_REFERENCE)
@@ -88,7 +88,7 @@ libxl_button = Enumeration("button", [
 #
 libxl_dominfo = Struct("dominfo",[
     ("uuid",        libxl_uuid),
-    ("domid",       domid),
+    ("domid",       libxl_domid),
     ("running",     BitField(uint8, 1)),
     ("blocked",     BitField(uint8, 1)),
     ("paused",      BitField(uint8, 1)),
@@ -116,7 +116,7 @@ libxl_cpupoolinfo = Struct("cpupoolinfo", [
 
 libxl_vminfo = Struct("vminfo", [
     ("uuid", libxl_uuid),
-    ("domid", domid),
+    ("domid", libxl_domid),
     ], destructor_fn=None)
 
 libxl_version_info = Struct("version_info", [
@@ -198,7 +198,7 @@ libxl_domain_build_state = Struct("domain_build_state",[
     ], destructor_fn=None)
 
 libxl_device_model_info = Struct("device_model_info",[
-    ("domid",            integer),
+    ("domid",            libxl_domid),
     ("uuid",             libxl_uuid,  False, "this is use only with stubdom, and must be different from the domain uuid"),
     ("dom_name",         string),
     ("device_model_version", libxl_device_model_version),
@@ -236,7 +236,7 @@ libxl_device_model_info = Struct("device_model_info",[
 Network is missing""")
 
 libxl_device_vfb = Struct("device_vfb", [
-    ("backend_domid", uint32),
+    ("backend_domid", libxl_domid),
     ("devid",         integer),
     ("vnc",           bool,     False, "vnc enabled or disabled"),
     ("vnclisten",     string,   False, "address:port that should be listened on for the VNC server if vnc is set"),
@@ -251,12 +251,12 @@ libxl_device_vfb = Struct("device_vfb", [
     ])
 
 libxl_device_vkb = Struct("device_vkb", [
-    ("backend_domid", uint32),
+    ("backend_domid", libxl_domid),
     ("devid", integer),
     ])
 
 libxl_device_console = Struct("device_console", [
-    ("backend_domid", uint32),
+    ("backend_domid", libxl_domid),
     ("devid", integer),
     ("consback", libxl_console_backend),
     ("build_state", Reference(libxl_domain_build_state), True),
@@ -264,7 +264,7 @@ libxl_device_console = Struct("device_console", [
     ])
 
 libxl_device_disk = Struct("device_disk", [
-    ("backend_domid", uint32),
+    ("backend_domid", libxl_domid),
     ("pdev_path", string),
     ("vdev", string),
     ("backend", libxl_disk_backend),
@@ -275,7 +275,7 @@ libxl_device_disk = Struct("device_disk", [
     ])
 
 libxl_device_nic = Struct("device_nic", [
-    ("backend_domid", uint32),
+    ("backend_domid", libxl_domid),
     ("devid", integer),
     ("mtu", integer),
     ("model", string),

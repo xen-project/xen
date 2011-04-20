@@ -155,6 +155,7 @@ int genwrap__ll_set(PyObject *v, long long *val, long long mask)
     *val = tmp;
     return 0;
 }
+
 static int fixed_bytearray_set(PyObject *v, uint8_t *ptr, size_t len)
 {
     char *tmp;
@@ -275,6 +276,11 @@ int attrib__libxl_uuid_set(PyObject *v, libxl_uuid *pptr)
     return fixed_bytearray_set(v, libxl_uuid_bytearray(pptr), 16);
 }
 
+int attrib__libxl_domid_set(PyObject *v, libxl_domid *domid) {
+    *domid = PyInt_AsLong(v);
+    return 0;
+}
+
 int attrib__struct_in_addr_set(PyObject *v, struct in_addr *pptr)
 {
     PyErr_SetString(PyExc_NotImplementedError, "Setting in_addr");
@@ -360,6 +366,10 @@ PyObject *attrib__libxl_string_list_get(libxl_string_list *pptr)
 PyObject *attrib__libxl_uuid_get(libxl_uuid *pptr)
 {
     return fixed_bytearray_get(libxl_uuid_bytearray(pptr), 16);
+}
+
+PyObject *attrib__libxl_domid_get(libxl_domid *domid) {
+    return PyInt_FromLong(*domid);
 }
 
 PyObject *attrib__struct_in_addr_get(struct in_addr *pptr)

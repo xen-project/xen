@@ -183,6 +183,8 @@ void libxl_cpuid_destroy(libxl_cpuid_policy_list *cpuid_list);
 
 #define LIBXL_PCI_FUNC_ALL (~0U)
 
+typedef uint32_t libxl_domid;
+
 #include "_libxl_types.h"
 
 typedef struct libxl__ctx libxl_ctx;
