@@ -592,7 +592,7 @@ int libxl_get_wait_fd(libxl_ctx *ctx, int *fd)
 int libxl_wait_for_domain_death(libxl_ctx *ctx, uint32_t domid, libxl_waiter *waiter)
 {
     waiter->path = strdup("@releaseDomain");
-    if (asprintf(&(waiter->token), "%d", LIBXL_EVENT_DOMAIN_DEATH) < 0)
+    if (asprintf(&(waiter->token), "%d", LIBXL_EVENT_TYPE_DOMAIN_DEATH) < 0)
         return -1;
     if (!xs_watch(ctx->xsh, waiter->path, waiter->token))
         return -1;
@@ -614,7 +614,7 @@ int libxl_wait_for_disk_ejects(libxl_ctx *ctx, uint32_t guest_domid, libxl_devic
                      libxl__device_disk_dev_number(disks[i].vdev,
                                                    NULL, NULL)) < 0)
             goto out;
-        if (asprintf(&(waiter[i].token), "%d", LIBXL_EVENT_DISK_EJECT) < 0)
+        if (asprintf(&(waiter[i].token), "%d", LIBXL_EVENT_TYPE_DISK_EJECT) < 0)
             goto out;
         xs_watch(ctx->xsh, waiter[i].path, waiter[i].token);
     }
@@ -782,7 +782,7 @@ out:
     return 0;
 }
 
-int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num, libxl_console_constype type)
+int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num, libxl_console_type type)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
     char *p = libxl__sprintf(&gc, "%s/xenconsole", libxl_private_bindir_path());
@@ -791,10 +791,10 @@ int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num, libxl_conso
     char *cons_type_s;
 
     switch (type) {
-    case LIBXL_CONSTYPE_PV:
+    case LIBXL_CONSOLE_TYPE_PV:
         cons_type_s = "pv";
         break;
-    case LIBXL_CONSTYPE_SERIAL:
+    case LIBXL_CONSOLE_TYPE_SERIAL:
         cons_type_s = "serial";
         break;
     default:
@@ -815,12 +815,12 @@ int libxl_primary_console_exec(libxl_ctx *ctx, uint32_t domid_vm)
     int rc;
     if (stubdomid)
         rc = libxl_console_exec(ctx, stubdomid,
-                                STUBDOM_CONSOLE_SERIAL, LIBXL_CONSTYPE_PV);
+                                STUBDOM_CONSOLE_SERIAL, LIBXL_CONSOLE_TYPE_PV);
     else {
         if (libxl__domain_is_hvm(&gc, domid_vm))
-            rc = libxl_console_exec(ctx, domid_vm, 0, LIBXL_CONSTYPE_SERIAL);
+            rc = libxl_console_exec(ctx, domid_vm, 0, LIBXL_CONSOLE_TYPE_SERIAL);
         else
-            rc = libxl_console_exec(ctx, domid_vm, 0, LIBXL_CONSTYPE_PV);
+            rc = libxl_console_exec(ctx, domid_vm, 0, LIBXL_CONSOLE_TYPE_PV);
     }
     libxl__free_all(&gc);
     return rc;
@@ -1223,7 +1223,7 @@ int libxl_device_nic_init(libxl_device_nic *nic_info, int devnum)
     if ( asprintf(&nic_info->script, "%s/vif-bridge",
                libxl_xen_script_dir_path()) < 0 )
         return ERROR_FAIL;
-    nic_info->nictype = LIBXL_NICTYPE_IOEMU;
+    nic_info->nictype = LIBXL_NIC_TYPE_IOEMU;
     return 0;
 }
 
@@ -1441,7 +1441,7 @@ int libxl_device_console_add(libxl_ctx *ctx, uint32_t domid, libxl_device_consol
     flexarray_append(front, "limit");
     flexarray_append(front, libxl__sprintf(&gc, "%d", LIBXL_XENCONSOLE_LIMIT));
     flexarray_append(front, "type");
-    if (console->consback == LIBXL_CONSBACK_XENCONSOLED)
+    if (console->consback == LIBXL_CONSOLE_BACKEND_XENCONSOLED)
         flexarray_append(front, "xenconsoled");
     else
         flexarray_append(front, "ioemu");

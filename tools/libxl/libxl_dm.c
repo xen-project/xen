@@ -172,7 +172,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
             flexarray_vappend(dm_args, "-vcpu_avail", libxl__sprintf(gc, "0x%x", info->vcpu_avail), NULL);
         }
         for (i = 0; i < num_vifs; i++) {
-            if (vifs[i].nictype == LIBXL_NICTYPE_IOEMU) {
+            if (vifs[i].nictype == LIBXL_NIC_TYPE_IOEMU) {
                 char *smac = libxl__sprintf(gc, "%02x:%02x:%02x:%02x:%02x:%02x",
                                            vifs[i].mac[0], vifs[i].mac[1], vifs[i].mac[2],
                                            vifs[i].mac[3], vifs[i].mac[4], vifs[i].mac[5]);
@@ -326,7 +326,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                 flexarray_append(dm_args, libxl__sprintf(gc, "%d", info->vcpus));
         }
         for (i = 0; i < num_vifs; i++) {
-            if (vifs[i].nictype == LIBXL_NICTYPE_IOEMU) {
+            if (vifs[i].nictype == LIBXL_NIC_TYPE_IOEMU) {
                 char *smac = libxl__sprintf(gc, "%02x:%02x:%02x:%02x:%02x:%02x",
                                            vifs[i].mac[0], vifs[i].mac[1], vifs[i].mac[2],
                                            vifs[i].mac[3], vifs[i].mac[4], vifs[i].mac[5]);
@@ -672,7 +672,7 @@ retry_transaction:
 
     for (i = 0; i < num_console; i++) {
         console[i].devid = i;
-        console[i].consback = LIBXL_CONSBACK_IOEMU;
+        console[i].consback = LIBXL_CONSOLE_BACKEND_IOEMU;
         /* STUBDOM_CONSOLE_LOGGING (console 0) is for minios logging
          * STUBDOM_CONSOLE_SAVE (console 1) is for writing the save file
          * STUBDOM_CONSOLE_RESTORE (console 2) is for reading the save file
@@ -946,7 +946,7 @@ int libxl__need_xenpv_qemu(libxl__gc *gc,
     }
 
     for (i = 0; i < nr_consoles; i++) {
-        if (consoles[i].consback == LIBXL_CONSBACK_IOEMU) {
+        if (consoles[i].consback == LIBXL_CONSOLE_BACKEND_IOEMU) {
             ret = 1;
             goto out;
         }

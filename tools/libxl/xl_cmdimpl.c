@@ -101,15 +101,15 @@ struct save_file_header {
 
 
 static const char *action_on_shutdown_names[] = {
-    [LIBXL_ACTION_DESTROY] = "destroy",
+    [LIBXL_ACTION_ON_SHUTDOWN_DESTROY] = "destroy",
 
-    [LIBXL_ACTION_RESTART] = "restart",
-    [LIBXL_ACTION_RESTART_RENAME] = "rename-restart",
+    [LIBXL_ACTION_ON_SHUTDOWN_RESTART] = "restart",
+    [LIBXL_ACTION_ON_SHUTDOWN_RESTART_RENAME] = "rename-restart",
 
-    [LIBXL_ACTION_PRESERVE] = "preserve",
+    [LIBXL_ACTION_ON_SHUTDOWN_PRESERVE] = "preserve",
 
-    [LIBXL_ACTION_COREDUMP_DESTROY] = "coredump-destroy",
-    [LIBXL_ACTION_COREDUMP_RESTART] = "coredump-restart",
+    [LIBXL_ACTION_ON_SHUTDOWN_COREDUMP_DESTROY] = "coredump-destroy",
+    [LIBXL_ACTION_ON_SHUTDOWN_COREDUMP_RESTART] = "coredump-restart",
 };
 
 /* Optional data, in order:
@@ -874,9 +874,9 @@ static void parse_config_data(const char *configfile_filename_report,
                     nic->bridge = strdup(p2 + 1);
                 } else if (!strcmp(p, "type")) {
                     if (!strcmp(p2 + 1, "ioemu"))
-                        nic->nictype = LIBXL_NICTYPE_IOEMU;
+                        nic->nictype = LIBXL_NIC_TYPE_IOEMU;
                     else
-                        nic->nictype = LIBXL_NICTYPE_VIF;
+                        nic->nictype = LIBXL_NIC_TYPE_VIF;
                 } else if (!strcmp(p, "ip")) {
                     free(nic->ip);
                     nic->ip = strdup(p2 + 1);
@@ -1178,12 +1178,12 @@ static int handle_domain_death(libxl_ctx *ctx, uint32_t domid, libxl_event *even
         break;
     default:
         LOG("Unknown shutdown reason code %d. Destroying domain.", info->shutdown_reason);
-        action = LIBXL_ACTION_DESTROY;
+        action = LIBXL_ACTION_ON_SHUTDOWN_DESTROY;
     }
 
     LOG("Action for shutdown reason code %d is %s", info->shutdown_reason, action_on_shutdown_names[action]);
 
-    if (action == LIBXL_ACTION_COREDUMP_DESTROY || action == LIBXL_ACTION_COREDUMP_RESTART) {
+    if (action == LIBXL_ACTION_ON_SHUTDOWN_COREDUMP_DESTROY || action == LIBXL_ACTION_ON_SHUTDOWN_COREDUMP_RESTART) {
         char *corefile;
         int rc;
 
@@ -1196,30 +1196,30 @@ static int handle_domain_death(libxl_ctx *ctx, uint32_t domid, libxl_event *even
         }
         /* No point crying over spilled milk, continue on failure. */
 
-        if (action == LIBXL_ACTION_COREDUMP_DESTROY)
-            action = LIBXL_ACTION_DESTROY;
+        if (action == LIBXL_ACTION_ON_SHUTDOWN_COREDUMP_DESTROY)
+            action = LIBXL_ACTION_ON_SHUTDOWN_DESTROY;
         else
-            action = LIBXL_ACTION_RESTART;
+            action = LIBXL_ACTION_ON_SHUTDOWN_RESTART;
     }
 
     switch (action) {
-    case LIBXL_ACTION_PRESERVE:
+    case LIBXL_ACTION_ON_SHUTDOWN_PRESERVE:
         break;
 
-    case LIBXL_ACTION_RESTART_RENAME:
+    case LIBXL_ACTION_ON_SHUTDOWN_RESTART_RENAME:
         restart = 2;
         break;
 
-    case LIBXL_ACTION_RESTART:
+    case LIBXL_ACTION_ON_SHUTDOWN_RESTART:
         restart = 1;
         /* fall-through */
-    case LIBXL_ACTION_DESTROY:
+    case LIBXL_ACTION_ON_SHUTDOWN_DESTROY:
         LOG("Domain %d needs to be cleaned up: destroying the domain", domid);
         libxl_domain_destroy(ctx, domid, 0);
         break;
 
-    case LIBXL_ACTION_COREDUMP_DESTROY:
-    case LIBXL_ACTION_COREDUMP_RESTART:
+    case LIBXL_ACTION_ON_SHUTDOWN_COREDUMP_DESTROY:
+    case LIBXL_ACTION_ON_SHUTDOWN_COREDUMP_RESTART:
         /* Already handled these above. */
         abort();
     }
@@ -1617,7 +1617,7 @@ start:
             continue;
         libxl_get_event(ctx, &event);
         switch (event.type) {
-            case LIBXL_EVENT_DOMAIN_DEATH:
+            case LIBXL_EVENT_TYPE_DOMAIN_DEATH:
                 ret = libxl_event_get_domain_death_info(ctx, domid, &event, &info);
 
                 if (ret < 0) {
@@ -1675,7 +1675,7 @@ start:
                     goto out;
                 }
                 break;
-            case LIBXL_EVENT_DISK_EJECT:
+            case LIBXL_EVENT_TYPE_DISK_EJECT:
                 if (libxl_event_get_disk_eject_info(ctx, domid, &event, &disk)) {
                     libxl_cdrom_insert(ctx, domid, &disk);
                     libxl_device_disk_destroy(&disk);
@@ -1943,7 +1943,7 @@ int main_cd_insert(int argc, char **argv)
 int main_console(int argc, char **argv)
 {
     int opt = 0, num = 0;
-    libxl_console_constype type = 0;
+    libxl_console_type type = 0;
 
     while ((opt = getopt(argc, argv, "hn:t:")) != -1) {
         switch (opt) {
@@ -1952,9 +1952,9 @@ int main_console(int argc, char **argv)
             return 0;
         case 't':
             if (!strcmp(optarg, "pv"))
-                type = LIBXL_CONSTYPE_PV;
+                type = LIBXL_CONSOLE_TYPE_PV;
             else if (!strcmp(optarg, "serial"))
-                type = LIBXL_CONSTYPE_SERIAL;
+                type = LIBXL_CONSOLE_TYPE_SERIAL;
             else {
                 fprintf(stderr, "console type supported are: pv, serial\n");
                 return 2;
@@ -2249,7 +2249,7 @@ static void shutdown_domain(const char *p, int wait)
 
             libxl_get_event(ctx, &event);
 
-            if (event.type == LIBXL_EVENT_DOMAIN_DEATH) {
+            if (event.type == LIBXL_EVENT_TYPE_DOMAIN_DEATH) {
                 if (libxl_event_get_domain_death_info(ctx, domid, &event, &info) < 0)
                     continue;
 
@@ -4252,9 +4252,9 @@ int main_networkattach(int argc, char **argv)
     for (argv += optind+1, argc -= optind+1; argc > 0; ++argv, --argc) {
         if (!strncmp("type=", *argv, 5)) {
             if (!strncmp("vif", (*argv) + 5, 4)) {
-                nic.nictype = LIBXL_NICTYPE_VIF;
+                nic.nictype = LIBXL_NIC_TYPE_VIF;
             } else if (!strncmp("ioemu", (*argv) + 5, 5)) {
-                nic.nictype = LIBXL_NICTYPE_IOEMU;
+                nic.nictype = LIBXL_NIC_TYPE_IOEMU;
             } else {
                 fprintf(stderr, "Invalid parameter `type'.\n");
                 return 1;

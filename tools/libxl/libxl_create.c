@@ -137,7 +137,7 @@ static int init_console_info(libxl_device_console *console, int dev_num, libxl_d
 {
     memset(console, 0x00, sizeof(libxl_device_console));
     console->devid = dev_num;
-    console->consback = LIBXL_CONSBACK_XENCONSOLED;
+    console->consback = LIBXL_CONSOLE_BACKEND_XENCONSOLED;
     console->output = strdup("pty");
     if ( NULL == console->output )
         return ERROR_NOMEM;
@@ -498,7 +498,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
                 d_config->num_disks, &d_config->disks[0]);
 
         if (need_qemu)
-             console.consback = LIBXL_CONSBACK_IOEMU;
+             console.consback = LIBXL_CONSOLE_BACKEND_IOEMU;
 
         libxl_device_console_add(ctx, domid, &console);
         libxl_device_console_destroy(&console);

@@ -10,8 +10,8 @@ libxl_cpumap = Builtin("cpumap", destructor_fn="libxl_cpumap_destroy", passby=PA
 libxl_cpuarray = Builtin("cpuarray", destructor_fn="libxl_cpuarray_destroy", passby=PASS_BY_REFERENCE)
 libxl_domain_type = Number("domain_type", namespace="libxl_")
 libxl_device_model_version = Number("device_model_version", namespace="libxl_")
-libxl_console_consback = Number("console_consback", namespace="libxl_")
-libxl_console_constype = Number("console_constype", namespace="libxl_")
+libxl_console_backend = Number("console_backend", namespace="libxl_")
+libxl_console_type = Number("console_type", namespace="libxl_")
 libxl_disk_format = Number("disk_format", namespace="libxl_")
 libxl_disk_backend = Number("disk_backend", namespace="libxl_")
 libxl_nic_type = Number("nic_type", namespace="libxl_")
@@ -198,7 +198,7 @@ libxl_device_vkb = Struct("device_vkb", [
 libxl_device_console = Struct("device_console", [
     ("backend_domid", uint32),
     ("devid", integer),
-    ("consback", libxl_console_consback),
+    ("consback", libxl_console_backend),
     ("build_state", Reference(libxl_domain_build_state), True),
     ("output", string),
     ])

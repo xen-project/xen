@@ -174,14 +174,14 @@ typedef enum libxl_device_model_version {
 } libxl_device_model_version;
 
 typedef enum {
-    LIBXL_CONSTYPE_SERIAL = 1,
-    LIBXL_CONSTYPE_PV,
-} libxl_console_constype;
+    LIBXL_CONSOLE_TYPE_SERIAL = 1,
+    LIBXL_CONSOLE_TYPE_PV,
+} libxl_console_type;
 
 typedef enum {
-    LIBXL_CONSBACK_XENCONSOLED,
-    LIBXL_CONSBACK_IOEMU,
-} libxl_console_consback;
+    LIBXL_CONSOLE_BACKEND_XENCONSOLED,
+    LIBXL_CONSOLE_BACKEND_IOEMU,
+} libxl_console_backend;
 
 typedef enum {
     LIBXL_DISK_FORMAT_UNKNOWN = 0,
@@ -200,8 +200,8 @@ typedef enum {
 } libxl_disk_backend;
 
 typedef enum {
-    LIBXL_NICTYPE_IOEMU = 1,
-    LIBXL_NICTYPE_VIF,
+    LIBXL_NIC_TYPE_IOEMU = 1,
+    LIBXL_NIC_TYPE_VIF,
 } libxl_nic_type;
 
 typedef struct {
@@ -253,15 +253,15 @@ enum {
 #define LIBXL_VERSION 0
 
 typedef enum libxl_action_on_shutdown {
-    LIBXL_ACTION_DESTROY,
+    LIBXL_ACTION_ON_SHUTDOWN_DESTROY,
 
-    LIBXL_ACTION_RESTART,
-    LIBXL_ACTION_RESTART_RENAME,
+    LIBXL_ACTION_ON_SHUTDOWN_RESTART,
+    LIBXL_ACTION_ON_SHUTDOWN_RESTART_RENAME,
 
-    LIBXL_ACTION_PRESERVE,
+    LIBXL_ACTION_ON_SHUTDOWN_PRESERVE,
 
-    LIBXL_ACTION_COREDUMP_DESTROY,
-    LIBXL_ACTION_COREDUMP_RESTART,
+    LIBXL_ACTION_ON_SHUTDOWN_COREDUMP_DESTROY,
+    LIBXL_ACTION_ON_SHUTDOWN_COREDUMP_RESTART,
 } libxl_action_on_shutdown;
 
 typedef struct {
@@ -328,8 +328,8 @@ int libxl_run_bootloader(libxl_ctx *ctx,
 /* events handling */
 
 typedef enum {
-    LIBXL_EVENT_DOMAIN_DEATH,
-    LIBXL_EVENT_DISK_EJECT,
+    LIBXL_EVENT_TYPE_DOMAIN_DEATH,
+    LIBXL_EVENT_TYPE_DISK_EJECT,
 } libxl_event_type;
 
 typedef struct {
@@ -402,7 +402,7 @@ int libxl_wait_for_free_memory(libxl_ctx *ctx, uint32_t domid, uint32_t memory_k
 int libxl_wait_for_memory_target(libxl_ctx *ctx, uint32_t domid, int wait_secs);
 
 int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass);
-int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num, libxl_console_constype type);
+int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num, libxl_console_type type);
 /* libxl_primary_console_exec finds the domid and console number
  * corresponding to the primary console of the given vm, then calls
  * libxl_console_exec with the right arguments (domid might be different

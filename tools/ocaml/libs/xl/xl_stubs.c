@@ -224,7 +224,7 @@ static int device_nic_val(caml_gc *gc, libxl_device_nic *c_val, value v)
 	c_val->bridge = dup_String_val(gc, Field(v, 5));
 	c_val->ifname = dup_String_val(gc, Field(v, 6));
 	c_val->script = dup_String_val(gc, Field(v, 7));
-	c_val->nictype = (Int_val(Field(v, 8))) + LIBXL_NICTYPE_IOEMU;
+	c_val->nictype = (Int_val(Field(v, 8))) + LIBXL_NIC_TYPE_IOEMU;
 
 out:
 	CAMLreturn(ret);
@@ -236,7 +236,7 @@ static int device_console_val(caml_gc *gc, libxl_device_console *c_val, value v)
 
 	c_val->backend_domid = Int_val(Field(v, 0));
 	c_val->devid = Int_val(Field(v, 1));
-	c_val->consback = (Int_val(Field(v, 2))) + LIBXL_CONSBACK_XENCONSOLED;
+	c_val->consback = (Int_val(Field(v, 2))) + LIBXL_CONSOLE_BACKEND_XENCONSOLED;
 
 	CAMLreturn(0);
 }
