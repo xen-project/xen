@@ -162,9 +162,6 @@ bool = Builtin("bool", namespace = None)
 size_t = Number("size_t", namespace = None)
 
 integer = Number("int", namespace = None, signed = True)
-unsigned_integer = Number("unsigned int", namespace = None)
-unsigned = Number("unsigned int", namespace = None)
-unsigned_long = Number("unsigned long", namespace = None)
 
 uint8 = UInt(8)
 uint16 = UInt(16)

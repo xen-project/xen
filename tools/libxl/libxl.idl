@@ -95,7 +95,7 @@ libxl_dominfo = Struct("dominfo",[
     ("shutdown",    bool),
     ("dying",       bool),
     
-    ("shutdown_reason", unsigned, False, 
+    ("shutdown_reason", uint8, False, 
 """Valid SHUTDOWN_* value from xen/sched.h iff (shutdown||dying).
 
 Otherwise set to a value guaranteed not to clash with any valid
@@ -129,8 +129,8 @@ libxl_version_info = Struct("version_info", [
     ("compile_date",      string),
     ("capabilities",      string),
     ("changeset",         string),
-    ("virt_start",        unsigned_long),
-    ("pagesize",          unsigned_long),
+    ("virt_start",        uint64),
+    ("pagesize",          integer),
     ("commandline",       string),
     ])
                                              
@@ -157,7 +157,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
     ("shadow_memkb",    uint32),
     ("disable_migrate", bool),
     ("cpuid",           libxl_cpuid_policy_list),
-    ("hvm",             integer),
+    ("hvm",             bool),
     ("u", KeyedUnion(None, "hvm",
                 [("hvm", "%s", Struct(None,
                                        [("hvmloader", string),
@@ -220,7 +220,7 @@ libxl_device_model_info = Struct("device_model_info",[
     ("apic",             bool,              False, "apic enabled or disabled"),
     ("vcpus",            integer,           False, "max number of vcpus"),
     ("vcpu_avail",       integer,           False, "vcpus actually available"),
-    ("xen_platform_pci", integer,           False, "enable/disable the xen platform pci device"),
+    ("xen_platform_pci", bool,              False, "enable/disable the xen platform pci device"),
     ("extra",            libxl_string_list, False, "extra parameters pass directly to qemu, NULL terminated"),
     ],
     comment=
@@ -283,9 +283,9 @@ libxl_device_pci = Struct("device_pci", [
     ("func",      uint8),
     ("dev",       uint8),
     ("bus",       uint8),
-    ("domain", unsigned_integer),
-    ("vdevfn", unsigned_integer),
-    ("vfunc_mask", unsigned_integer),
+    ("domain",    integer),
+    ("vdevfn",    uint32),
+    ("vfunc_mask", uint32),
     ("msitranslate", bool),
     ("power_mgmt", bool),
     ])

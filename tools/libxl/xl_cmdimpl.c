@@ -3699,8 +3699,8 @@ static void output_xeninfo(void)
     printf("xen_extra              : %s\n", info->xen_version_extra);
     printf("xen_caps               : %s\n", info->capabilities);
     printf("xen_scheduler          : %s\n", libxl_schedid_to_name(ctx, sched_id));
-    printf("xen_pagesize           : %lu\n", info->pagesize);
-    printf("platform_params        : virt_start=0x%lx\n", info->virt_start);
+    printf("xen_pagesize           : %u\n", info->pagesize);
+    printf("platform_params        : virt_start=0x%"PRIx64"\n", info->virt_start);
     printf("xen_changeset          : %s\n", info->changeset);
     printf("xen_commandline        : %s\n", info->commandline);
     printf("cc_compiler            : %s\n", info->compiler);

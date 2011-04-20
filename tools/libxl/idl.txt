@@ -143,10 +143,7 @@ Several standard types a predefined. They are
 void			(void pointer type)
 bool
 size_t
-integer			(C int type)
-unsigned_integer	(C unsigned int type) 
-unsigned		(C unsigned int type) 
-unsigned_long		(C unsigned long type)
+integer			24 bit signed integer.
 
 uint{8,16,32,64}	uint{8,16,32,64}_t
 
