@@ -569,7 +569,7 @@ static int libxl__create_stubdom(libxl__gc *gc,
     libxl_device_console *console;
     libxl_domain_create_info c_info;
     libxl_domain_build_info b_info;
-    libxl_domain_build_state state;
+    libxl__domain_build_state state;
     uint32_t domid;
     char **args;
     struct xs_permissions perm[2];
@@ -684,7 +684,6 @@ retry_transaction:
                 name = libxl__sprintf(gc, "qemu-dm-%s", libxl_domid_to_name(ctx, info->domid));
                 libxl_create_logfile(ctx, name, &filename);
                 console[i].output = libxl__sprintf(gc, "file:%s", filename);
-                console[i].build_state = &state;
                 free(filename);
                 break;
             case STUBDOM_CONSOLE_SAVE:
@@ -698,7 +697,8 @@ retry_transaction:
                 console[i].output = "pty";
                 break;
         }
-        ret = libxl_device_console_add(ctx, domid, &console[i]);
+        ret = libxl__device_console_add(gc, domid, &console[i],
+                                    i == STUBDOM_CONSOLE_LOGGING ? &state : NULL);
         if (ret)
             goto out_free;
     }

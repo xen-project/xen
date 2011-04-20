@@ -294,18 +294,6 @@ static int sched_credit_val(caml_gc *gc, libxl_sched_credit *c_val, value v)
 	CAMLreturn(0);
 }
 
-static int domain_build_state_val(caml_gc *gc, libxl_domain_build_state *c_val, value v)
-{
-	CAMLparam1(v);
-
-	c_val->store_port = Int_val(Field(v, 0));
-	c_val->store_mfn = Int64_val(Field(v, 1));
-	c_val->console_port = Int_val(Field(v, 2));
-	c_val->console_mfn = Int64_val(Field(v, 3));
-	
-	CAMLreturn(0);
-}
-
 static value Val_sched_credit(libxl_sched_credit *c_val)
 {
 	CAMLparam0();
@@ -436,17 +424,14 @@ value stub_xl_device_nic_del(value info, value domid)
 	CAMLreturn(Val_unit);
 }
 
-value stub_xl_device_console_add(value info, value state, value domid)
+value stub_xl_device_console_add(value info, value domid)
 {
-	CAMLparam3(info, state, domid);
+	CAMLparam2(info, domid);
 	libxl_device_console c_info;
-	libxl_domain_build_state c_state;
 	int ret;
 	INIT_STRUCT();
 
 	device_console_val(&gc, &c_info, info);
-	domain_build_state_val(&gc, &c_state, state);
-	c_info.build_state = &c_state;
 
 	INIT_CTX();
 	ret = libxl_device_console_add(ctx, Int_val(domid), &c_info);

@@ -232,12 +232,6 @@ int attrib__libxl_cpuarray_set(PyObject *v, libxl_cpuarray *pptr)
     return -1;
 }
 
-int attrib__libxl_domain_build_state_ptr_set(PyObject *v, libxl_domain_build_state **pptr)
-{
-    PyErr_SetString(PyExc_NotImplementedError, "Setting domain_build_state_ptr");
-    return -1;
-}
-
 int attrib__libxl_file_reference_set(PyObject *v, libxl_file_reference *pptr)
 {
     return genwrap__string_set(v, &pptr->path);
@@ -327,12 +321,6 @@ PyObject *attrib__libxl_cpuarray_get(libxl_cpuarray *pptr)
         }
     }
     return list;
-}
-
-PyObject *attrib__libxl_domain_build_state_ptr_get(libxl_domain_build_state **pptr)
-{
-    PyErr_SetString(PyExc_NotImplementedError, "Getting domain_build_state_ptr");
-    return NULL;
 }
 
 PyObject *attrib__libxl_file_reference_get(libxl_file_reference *pptr)

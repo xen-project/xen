@@ -169,23 +169,33 @@ _hidden char **libxl__xs_directory(libxl__gc *gc, xs_transaction_t t,
 _hidden int libxl__domain_is_hvm(libxl__gc *gc, uint32_t domid);
 _hidden int libxl__domain_shutdown_reason(libxl__gc *gc, uint32_t domid);
 
+typedef struct {
+    uint32_t store_port;
+    unsigned long store_mfn;
+
+    uint32_t console_port;
+    unsigned long console_mfn;
+} libxl__domain_build_state;
+
 _hidden int libxl__build_pre(libxl__gc *gc, uint32_t domid,
-              libxl_domain_build_info *info, libxl_domain_build_state *state);
+              libxl_domain_build_info *info, libxl__domain_build_state *state);
 _hidden int libxl__build_post(libxl__gc *gc, uint32_t domid,
-               libxl_domain_build_info *info, libxl_domain_build_state *state,
+               libxl_domain_build_info *info, libxl__domain_build_state *state,
                char **vms_ents, char **local_ents);
 
 _hidden int libxl__build_pv(libxl__gc *gc, uint32_t domid,
-             libxl_domain_build_info *info, libxl_domain_build_state *state);
+             libxl_domain_build_info *info, libxl__domain_build_state *state);
 _hidden int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
-              libxl_domain_build_info *info, libxl_domain_build_state *state);
+              libxl_domain_build_info *info, libxl__domain_build_state *state);
 
 _hidden int libxl__domain_rename(libxl__gc *gc, uint32_t domid,
                                  const char *old_name, const char *new_name,
                                  xs_transaction_t trans);
 
 _hidden int libxl__domain_restore_common(libxl__gc *gc, uint32_t domid,
-                   libxl_domain_build_info *info, libxl_domain_build_state *state, int fd);
+                                         libxl_domain_build_info *info,
+                                         libxl__domain_build_state *state,
+                                         int fd);
 _hidden int libxl__domain_suspend_common(libxl__gc *gc, uint32_t domid, int fd, int hvm, int live, int debug);
 _hidden int libxl__domain_save_device_model(libxl__gc *gc, uint32_t domid, int fd);
 _hidden void libxl__userdata_destroyall(libxl__gc *gc, uint32_t domid);
@@ -197,6 +207,10 @@ _hidden char *libxl__device_disk_string_of_format(libxl_disk_format format);
 _hidden int libxl__device_physdisk_major_minor(const char *physpath, int *major, int *minor);
 _hidden int libxl__device_disk_dev_number(char *virtpath,
                                           int *pdisk, int *ppartition);
+
+_hidden int libxl__device_console_add(libxl__gc *gc, uint32_t domid,
+                                      libxl_device_console *console,
+                                      libxl__domain_build_state *state);
 
 _hidden int libxl__device_generic_add(libxl__gc *gc, libxl__device *device,
                              char **bents, char **fents);
@@ -230,7 +244,9 @@ typedef struct {
 
 /* from xl_create */
 _hidden int libxl__domain_make(libxl__gc *gc, libxl_domain_create_info *info, uint32_t *domid);
-_hidden int libxl__domain_build(libxl__gc *gc, libxl_domain_build_info *info, uint32_t domid, /* out */ libxl_domain_build_state *state);
+_hidden int libxl__domain_build(libxl__gc *gc, libxl_domain_build_info *info,
+                                uint32_t domid,
+                                libxl__domain_build_state *state);
 
 /* for device model creation */
 _hidden const char *libxl__domain_device_model(libxl__gc *gc,

@@ -1389,13 +1389,19 @@ err:
 }
 
 /******************************************************************************/
-int libxl_device_console_add(libxl_ctx *ctx, uint32_t domid, libxl_device_console *console)
+int libxl__device_console_add(libxl__gc *gc, uint32_t domid,
+                              libxl_device_console *console,
+                              libxl__domain_build_state *state)
 {
-    libxl__gc gc = LIBXL_INIT_GC(ctx);
     flexarray_t *front;
     flexarray_t *back;
     libxl__device device;
     int rc;
+
+    if (console->devid && state) {
+        rc = ERROR_INVAL;
+        goto out;
+    }
 
     front = flexarray_make(16, 1);
     if (!front) {
@@ -1416,20 +1422,20 @@ int libxl_device_console_add(libxl_ctx *ctx, uint32_t domid, libxl_device_consol
     device.kind = DEVICE_CONSOLE;
 
     flexarray_append(back, "frontend-id");
-    flexarray_append(back, libxl__sprintf(&gc, "%d", domid));
+    flexarray_append(back, libxl__sprintf(gc, "%d", domid));
     flexarray_append(back, "online");
     flexarray_append(back, "1");
     flexarray_append(back, "state");
-    flexarray_append(back, libxl__sprintf(&gc, "%d", 1));
+    flexarray_append(back, libxl__sprintf(gc, "%d", 1));
     flexarray_append(back, "domain");
-    flexarray_append(back, libxl__domid_to_name(&gc, domid));
+    flexarray_append(back, libxl__domid_to_name(gc, domid));
     flexarray_append(back, "protocol");
     flexarray_append(back, LIBXL_XENCONSOLE_PROTOCOL);
 
     flexarray_append(front, "backend-id");
-    flexarray_append(front, libxl__sprintf(&gc, "%d", console->backend_domid));
+    flexarray_append(front, libxl__sprintf(gc, "%d", console->backend_domid));
     flexarray_append(front, "limit");
-    flexarray_append(front, libxl__sprintf(&gc, "%d", LIBXL_XENCONSOLE_LIMIT));
+    flexarray_append(front, libxl__sprintf(gc, "%d", LIBXL_XENCONSOLE_LIMIT));
     flexarray_append(front, "type");
     if (console->consback == LIBXL_CONSOLE_BACKEND_XENCONSOLED)
         flexarray_append(front, "xenconsoled");
@@ -1438,30 +1444,37 @@ int libxl_device_console_add(libxl_ctx *ctx, uint32_t domid, libxl_device_consol
     flexarray_append(front, "output");
     flexarray_append(front, console->output);
 
-    if (device.devid == 0) {
-        if (console->build_state == NULL) {
-            rc = ERROR_INVAL;
-            goto out_free;
-        }
+    if (state) {
         flexarray_append(front, "port");
-        flexarray_append(front, libxl__sprintf(&gc, "%"PRIu32, console->build_state->console_port));
+        flexarray_append(front, libxl__sprintf(gc, "%"PRIu32, state->console_port));
         flexarray_append(front, "ring-ref");
-        flexarray_append(front, libxl__sprintf(&gc, "%lu", console->build_state->console_mfn));
+        flexarray_append(front, libxl__sprintf(gc, "%lu", state->console_mfn));
     } else {
         flexarray_append(front, "state");
-        flexarray_append(front, libxl__sprintf(&gc, "%d", 1));
+        flexarray_append(front, libxl__sprintf(gc, "%d", 1));
         flexarray_append(front, "protocol");
         flexarray_append(front, LIBXL_XENCONSOLE_PROTOCOL);
     }
 
-    libxl__device_generic_add(&gc, &device,
-                             libxl__xs_kvs_of_flexarray(&gc, back, back->count),
-                             libxl__xs_kvs_of_flexarray(&gc, front, front->count));
+    libxl__device_generic_add(gc, &device,
+                             libxl__xs_kvs_of_flexarray(gc, back, back->count),
+                             libxl__xs_kvs_of_flexarray(gc, front, front->count));
     rc = 0;
 out_free:
     flexarray_free(back);
     flexarray_free(front);
 out:
+    return rc;
+}
+
+int libxl_device_console_add(libxl_ctx *ctx, uint32_t domid,
+                              libxl_device_console *console)
+{
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    int rc = ERROR_INVAL;
+
+    rc = libxl__device_console_add(&gc, domid, console, NULL);
+
     libxl__free_all(&gc);
     return rc;
 }

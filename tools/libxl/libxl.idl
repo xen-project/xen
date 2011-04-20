@@ -190,13 +190,6 @@ by libxl_domain_build/restore. If either of these are never called
 then the user is responsible for calling
 libxl_file_reference_unmap.""")
 
-libxl_domain_build_state = Struct("domain_build_state",[
-    ("store_port",   uint32),
-    ("store_mfn",    unsigned_long),
-    ("console_port", uint32),
-    ("console_mfn",  unsigned_long),
-    ], destructor_fn=None)
-
 libxl_device_model_info = Struct("device_model_info",[
     ("domid",            libxl_domid),
     ("uuid",             libxl_uuid,  False, "this is use only with stubdom, and must be different from the domain uuid"),
@@ -259,7 +252,6 @@ libxl_device_console = Struct("device_console", [
     ("backend_domid", libxl_domid),
     ("devid", integer),
     ("consback", libxl_console_backend),
-    ("build_state", Reference(libxl_domain_build_state), True),
     ("output", string),
     ])
 

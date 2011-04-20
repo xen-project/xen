@@ -67,7 +67,7 @@ int libxl__domain_shutdown_reason(libxl__gc *gc, uint32_t domid)
 }
 
 int libxl__build_pre(libxl__gc *gc, uint32_t domid,
-              libxl_domain_build_info *info, libxl_domain_build_state *state)
+              libxl_domain_build_info *info, libxl__domain_build_state *state)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     xc_domain_max_vcpus(ctx->xch, domid, info->max_vcpus);
@@ -91,8 +91,9 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
 }
 
 int libxl__build_post(libxl__gc *gc, uint32_t domid,
-               libxl_domain_build_info *info, libxl_domain_build_state *state,
-               char **vms_ents, char **local_ents)
+                      libxl_domain_build_info *info,
+                      libxl__domain_build_state *state,
+                      char **vms_ents, char **local_ents)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     char *dom_path, *vm_path;
@@ -145,7 +146,7 @@ retry_transaction:
 }
 
 int libxl__build_pv(libxl__gc *gc, uint32_t domid,
-             libxl_domain_build_info *info, libxl_domain_build_state *state)
+             libxl_domain_build_info *info, libxl__domain_build_state *state)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     struct xc_dom_image *dom;
@@ -277,7 +278,7 @@ static const char *libxl__domain_hvmloader(libxl__gc *gc,
 }
 
 int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
-              libxl_domain_build_info *info, libxl_domain_build_state *state)
+              libxl_domain_build_info *info, libxl__domain_build_state *state)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     int ret, rc = ERROR_INVAL;
@@ -305,8 +306,9 @@ out:
 }
 
 int libxl__domain_restore_common(libxl__gc *gc, uint32_t domid,
-                   libxl_domain_build_info *info, libxl_domain_build_state *state,
-                   int fd)
+                                 libxl_domain_build_info *info,
+                                 libxl__domain_build_state *state,
+                                 int fd)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     /* read signature */

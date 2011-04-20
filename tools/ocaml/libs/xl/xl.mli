@@ -70,16 +70,6 @@ module Domain_build_info : sig
 	}
 end
 
-module Domain_build_state : sig
-	type t =
-	{
-		store_port : int;
-		store_mfn : int64;
-		console_port : int;
-		console_mfn : int64;
-	}
-end
-
 type domid = int
 
 type disk_phystype =
@@ -139,7 +129,7 @@ module Device_console : sig
 		consoletype : console_type;
 	}
 
-	external add : t -> Domain_build_state.t -> domid -> unit = "stub_xl_device_console_add"
+	external add : t -> domid -> unit = "stub_xl_device_console_add"
 end
 
 module Device_vkb : sig

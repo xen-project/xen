@@ -133,7 +133,7 @@ void libxl_init_dm_info(libxl_device_model_info *dm_info,
     dm_info->xen_platform_pci = 1;
 }
 
-static int init_console_info(libxl_device_console *console, int dev_num, libxl_domain_build_state *state)
+static int init_console_info(libxl_device_console *console, int dev_num)
 {
     memset(console, 0x00, sizeof(libxl_device_console));
     console->devid = dev_num;
@@ -141,12 +141,11 @@ static int init_console_info(libxl_device_console *console, int dev_num, libxl_d
     console->output = strdup("pty");
     if ( NULL == console->output )
         return ERROR_NOMEM;
-    if (state)
-        console->build_state = state;
     return 0;
 }
 
-int libxl__domain_build(libxl__gc *gc, libxl_domain_build_info *info, uint32_t domid, libxl_domain_build_state *state)
+int libxl__domain_build(libxl__gc *gc, libxl_domain_build_info *info,
+                        uint32_t domid, libxl__domain_build_state *state)
 {
     char **vments = NULL, **localents = NULL;
     struct timeval start_time;
@@ -198,7 +197,8 @@ out:
 }
 
 static int domain_restore(libxl__gc *gc, libxl_domain_build_info *info,
-                          uint32_t domid, int fd, libxl_domain_build_state *state,
+                          uint32_t domid, int fd,
+                          libxl__domain_build_state *state,
                           libxl_device_model_info *dm_info)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
@@ -403,7 +403,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     libxl_ctx *ctx = libxl__gc_owner(gc);
     libxl__device_model_starting *dm_starting = 0;
     libxl_device_model_info *dm_info = &d_config->dm_info;
-    libxl_domain_build_state state;
+    libxl__domain_build_state state;
     uint32_t domid;
     int i, ret;
 
@@ -464,10 +464,10 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     if (d_config->c_info.hvm) {
         libxl_device_console console;
 
-        ret = init_console_info(&console, 0, &state);
+        ret = init_console_info(&console, 0);
         if ( ret )
             goto error_out;
-        libxl_device_console_add(ctx, domid, &console);
+        libxl__device_console_add(gc, domid, &console, &state);
         libxl_device_console_destroy(&console);
 
         dm_info->domid = domid;
@@ -489,7 +489,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
             libxl_device_vkb_add(ctx, domid, &d_config->vkbs[i]);
         }
 
-        ret = init_console_info(&console, 0, &state);
+        ret = init_console_info(&console, 0);
         if ( ret )
             goto error_out;
 
@@ -500,7 +500,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
         if (need_qemu)
              console.consback = LIBXL_CONSOLE_BACKEND_IOEMU;
 
-        libxl_device_console_add(ctx, domid, &console);
+        libxl__device_console_add(gc, domid, &console, &state);
         libxl_device_console_destroy(&console);
 
         if (need_qemu)
