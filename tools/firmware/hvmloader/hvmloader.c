@@ -341,7 +341,12 @@ struct bios_info {
     const char *key;
     const struct bios_config *bios;
 } bios_configs[] = {
+#ifdef ENABLE_ROMBIOS
     { "rombios", &rombios_config, },
+#endif
+#ifdef ENABLE_SEABIOS
+    { "seabios", &seabios_config, },
+#endif
     { NULL, NULL }
 };
 

@@ -65,7 +65,6 @@ const char *libxl__domain_device_model(libxl__gc *gc,
             break;
         }
     }
-
     return dm;
 }
 
@@ -74,7 +73,7 @@ static char *libxl__domain_bios(libxl__gc *gc,
 {
     switch (info->device_model_version) {
     case 1: return libxl__strdup(gc, "rombios");
-    case 2: return libxl__strdup(gc, "rombios");
+    case 2: return libxl__strdup(gc, "seabios");
     default:return NULL;
     }
 }

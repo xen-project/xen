@@ -184,6 +184,18 @@ QEMU_TAG := xen-4.1.0-rc6
 # Fri Feb 11 17:54:51 2011 +0000
 # qemu-xen: fix segfault with empty cdroms
 
+# Short answer -- do not enable this unless you know what you are
+# doing and are prepared for some pain.
+
+# SeaBIOS integration is a work in progress. Before enabling this
+# option you must clone git://git.qemu.org/seabios.git/, possibly add
+# some development patches and then build it yourself before pointing
+# this variable to it (using an absolute path).
+#
+# Note that using SeaBIOS requires the use the upstream qemu as the
+# device model.
+SEABIOS_DIR ?= 
+
 # Optional components
 XENSTAT_XENTOP     ?= y
 VTPM_TOOLS         ?= n
