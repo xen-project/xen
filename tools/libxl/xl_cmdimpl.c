@@ -451,6 +451,8 @@ static int parse_action_on_shutdown(const char *buf, libxl_action_on_shutdown *a
     for (i = 0; i < sizeof(action_on_shutdown_names) / sizeof(action_on_shutdown_names[0]); i++) {
         n = action_on_shutdown_names[i];
 
+        if (!n) continue;
+
         if (strcmp(buf, n) == 0) {
             *a = i;
             return 1;

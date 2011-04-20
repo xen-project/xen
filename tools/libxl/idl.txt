@@ -82,6 +82,30 @@ libxltype.Reference
 Complex type-Classes
 --------------------
 
+libxltype.Enumeration
+
+  A class representing an enumeration (named integer values).
+
+  The values are available in the list Enumeration.values. Each
+  element in the list is of type libxltype.EnumerationValue.
+
+  Each EnumerationValue has the following properties:
+
+    EnumerationValue.enum	Reference to containing Enumeration
+    EnumerationValue.name       The C name of this value, including
+                                    the namespace and typename of the
+                                    containing Enumeration (e.g.
+                                    "LIBXL_FOOENUM_VALUE")
+    EnumerationValue.rawname    The C name of this value, excluding
+                                    the namespace but including the
+                                    typename of the containing
+                                    Enumeration (e.g. "FOOENUM_VALUE")
+    EnumerationValue.valuename	The name of this value, excluding the
+				    name of the containing Enumeration
+				    and any namespace (e.g. "VALUE")
+    EnumerationValue.value	The integer value associated with this name.
+    EnumerationValue.comment	A free text comment which describes the member.
+
 libxltype.Aggregate
 
  Base class for type-Classes which contain a number of other types

@@ -8,13 +8,6 @@ libxl_uuid = Builtin("uuid")
 libxl_mac = Builtin("mac")
 libxl_cpumap = Builtin("cpumap", destructor_fn="libxl_cpumap_destroy", passby=PASS_BY_REFERENCE)
 libxl_cpuarray = Builtin("cpuarray", destructor_fn="libxl_cpuarray_destroy", passby=PASS_BY_REFERENCE)
-libxl_domain_type = Number("domain_type", namespace="libxl_")
-libxl_device_model_version = Number("device_model_version", namespace="libxl_")
-libxl_console_backend = Number("console_backend", namespace="libxl_")
-libxl_console_type = Number("console_type", namespace="libxl_")
-libxl_disk_format = Number("disk_format", namespace="libxl_")
-libxl_disk_backend = Number("disk_backend", namespace="libxl_")
-libxl_nic_type = Number("nic_type", namespace="libxl_")
 libxl_cpuid_policy_list = Builtin("cpuid_policy_list", destructor_fn="libxl_cpuid_destroy", passby=PASS_BY_REFERENCE)
 
 libxl_string_list = Builtin("string_list", destructor_fn="libxl_string_list_destroy", passby=PASS_BY_REFERENCE)
@@ -22,6 +15,73 @@ libxl_key_value_list = Builtin("key_value_list", destructor_fn="libxl_key_value_
 libxl_file_reference = Builtin("file_reference", destructor_fn="libxl_file_reference_destroy", passby=PASS_BY_REFERENCE)
 
 libxl_hwcap = Builtin("hwcap")
+
+#
+# Constants / Enumerations
+#
+
+libxl_domain_type = Enumeration("domain_type", [
+    (1, "FV"),
+    (2, "PV"),
+    ])
+
+libxl_device_model_version = Enumeration("device_model_version", [
+    (1, "QEMU_XEN_TRADITIONAL", "Historical qemu-xen device model (qemu-dm)"),
+    (2, "QEMU_XEN", "Upstream based qemu-xen device model"),
+    ])
+
+libxl_console_type = Enumeration("console_type", [
+    (1, "SERIAL"),
+    (2, "PV"),
+    ])
+
+libxl_console_backend = Enumeration("console_backend", [
+    (1, "XENCONSOLED"),
+    (2, "IOEMU"),
+    ])
+
+libxl_disk_format = Enumeration("disk_format", [
+    (0, "UNKNOWN"),
+    (1, "QCOW"),
+    (2, "QCOW2"),
+    (3, "VHD"),
+    (4, "RAW"),
+    (5, "EMPTY"),
+    ])
+
+libxl_disk_backend = Enumeration("disk_backend", [
+    (0, "UNKNOWN"),
+    (1, "PHY"),
+    (2, "TAP"),
+    (3, "QDISK"),
+    ])
+
+libxl_nic_type = Enumeration("nic_type", [
+    (1, "IOEMU"),
+    (2, "VIF"),
+    ])
+
+libxl_action_on_shutdown = Enumeration("action_on_shutdown", [
+    (1, "DESTROY"),
+
+    (2, "RESTART"),
+    (3, "RESTART_RENAME"),
+
+    (4, "PRESERVE"),
+
+    (5, "COREDUMP_DESTROY"),
+    (6, "COREDUMP_RESTART"),
+    ])
+
+libxl_event_type = Enumeration("event_type", [
+    (1, "DOMAIN_DEATH"),
+    (2, "DISK_EJECT"),
+    ])
+
+libxl_button = Enumeration("button", [
+    (1, "POWER"),
+    (2, "SLEEP"),
+    ])
 
 #
 # Complex libxl types

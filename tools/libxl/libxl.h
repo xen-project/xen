@@ -161,49 +161,6 @@ typedef struct {
 #define LIBXL_CPUARRAY_INVALID_ENTRY  ~0
 void libxl_cpuarray_destroy(libxl_cpuarray *array);
 
-typedef enum {
-    LIBXL_DOMAIN_TYPE_FV = 1,
-    LIBXL_DOMAIN_TYPE_PV,
-} libxl_domain_type;
-
-typedef enum libxl_device_model_version {
-    /* Historical qemu-xen device model (qemu-dm) */
-    LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL = 1,
-    /* Upstream based qemu-xen device model */
-    LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN = 2,
-} libxl_device_model_version;
-
-typedef enum {
-    LIBXL_CONSOLE_TYPE_SERIAL = 1,
-    LIBXL_CONSOLE_TYPE_PV,
-} libxl_console_type;
-
-typedef enum {
-    LIBXL_CONSOLE_BACKEND_XENCONSOLED,
-    LIBXL_CONSOLE_BACKEND_IOEMU,
-} libxl_console_backend;
-
-typedef enum {
-    LIBXL_DISK_FORMAT_UNKNOWN = 0,
-    LIBXL_DISK_FORMAT_QCOW,
-    LIBXL_DISK_FORMAT_QCOW2,
-    LIBXL_DISK_FORMAT_VHD,
-    LIBXL_DISK_FORMAT_RAW,
-    LIBXL_DISK_FORMAT_EMPTY,
-} libxl_disk_format;
-
-typedef enum {
-    LIBXL_DISK_BACKEND_UNKNOWN = 0,
-    LIBXL_DISK_BACKEND_PHY,
-    LIBXL_DISK_BACKEND_TAP,
-    LIBXL_DISK_BACKEND_QDISK,
-} libxl_disk_backend;
-
-typedef enum {
-    LIBXL_NIC_TYPE_IOEMU = 1,
-    LIBXL_NIC_TYPE_VIF,
-} libxl_nic_type;
-
 typedef struct {
     /*
      * Path is always set if the file reference is valid. However if
@@ -251,18 +208,6 @@ enum {
 };
 
 #define LIBXL_VERSION 0
-
-typedef enum libxl_action_on_shutdown {
-    LIBXL_ACTION_ON_SHUTDOWN_DESTROY,
-
-    LIBXL_ACTION_ON_SHUTDOWN_RESTART,
-    LIBXL_ACTION_ON_SHUTDOWN_RESTART_RENAME,
-
-    LIBXL_ACTION_ON_SHUTDOWN_PRESERVE,
-
-    LIBXL_ACTION_ON_SHUTDOWN_COREDUMP_DESTROY,
-    LIBXL_ACTION_ON_SHUTDOWN_COREDUMP_RESTART,
-} libxl_action_on_shutdown;
 
 typedef struct {
     libxl_domain_create_info c_info;
@@ -326,11 +271,6 @@ int libxl_run_bootloader(libxl_ctx *ctx,
   /* 0 means ERROR_ENOMEM, which we have logged */
 
 /* events handling */
-
-typedef enum {
-    LIBXL_EVENT_TYPE_DOMAIN_DEATH,
-    LIBXL_EVENT_TYPE_DISK_EJECT,
-} libxl_event_type;
 
 typedef struct {
     /* event type */
@@ -493,11 +433,6 @@ int libxl_userdata_retrieve(libxl_ctx *ctx, uint32_t domid,
    * data_r and datalen_r may be 0.
    * On error return, *data_r and *datalen_r are undefined.
    */
-
-typedef enum {
-    LIBXL_BUTTON_POWER,
-    LIBXL_BUTTON_SLEEP
-} libxl_button;
 
 int libxl_button_press(libxl_ctx *ctx, uint32_t domid, libxl_button button);
 

@@ -52,6 +52,35 @@ class UInt(Number):
 
         self.width = w
 
+class EnumerationValue(object):
+    def __init__(self, enum, value, name, **kwargs):
+        self.enum = enum
+
+        self.valuename = str.upper(name)
+        self.rawname = str.upper(enum.rawname) + "_" + self.valuename
+        self.name = str.upper(enum.namespace) + self.rawname
+        self.value = value
+        self.comment = kwargs.setdefault("comment", None)
+        
+class Enumeration(Type):
+    def __init__(self, typename, values, **kwargs):
+        kwargs.setdefault('destructor_fn', None)
+        Type.__init__(self, typename, **kwargs)
+
+        self.values = []
+        for v in values:
+            # (value, name[, comment=None])
+            if len(v) == 2:
+                (num,name) = v
+                comment = None
+            elif len(v) == 3:
+                num,name,comment = v
+            else:
+                raise ""
+            self.values.append(EnumerationValue(self, num, name,
+                                                comment=comment,
+                                                typename=self.rawname))
+        
 class BitField(Type):
     def __init__(self, ty, w, **kwargs):
         kwargs.setdefault('namespace', None)

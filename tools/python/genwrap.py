@@ -9,6 +9,8 @@ import libxltypes
 def py_type(ty):
     if ty == libxltypes.bool or isinstance(ty, libxltypes.BitField) and ty.width == 1:
         return TYPE_BOOL
+    if isinstance(ty, libxltypes.Enumeration):
+        return TYPE_UINT
     if isinstance(ty, libxltypes.Number):
         if ty.signed:
             return TYPE_INT
@@ -34,15 +36,16 @@ def fsanitize(name):
 
 def py_decls(ty):
     l = []
-    l.append('_hidden Py_%s *Py%s_New(void);\n'%(ty.rawname, ty.rawname))
-    l.append('_hidden int Py%s_Check(PyObject *self);\n'%ty.rawname)
-    for f in ty.fields:
-        if py_type(f.type) is not None:
-            continue
-        l.append('_hidden PyObject *attrib__%s_get(%s *%s);'%(\
-                 fsanitize(f.type.typename), f.type.typename, f.name))
-        l.append('_hidden int attrib__%s_set(PyObject *v, %s *%s);'%(\
-                 fsanitize(f.type.typename), f.type.typename, f.name))
+    if isinstance(ty, libxltypes.Aggregate):
+        l.append('_hidden Py_%s *Py%s_New(void);\n'%(ty.rawname, ty.rawname))
+        l.append('_hidden int Py%s_Check(PyObject *self);\n'%ty.rawname)
+        for f in ty.fields:
+            if py_type(f.type) is not None:
+                continue
+            l.append('_hidden PyObject *attrib__%s_get(%s *%s);'%(\
+                fsanitize(f.type.typename), f.type.typename, f.name))
+            l.append('_hidden int attrib__%s_set(PyObject *v, %s *%s);'%(\
+                fsanitize(f.type.typename), f.type.typename, f.name))
     return '\n'.join(l) + "\n"
 
 def py_attrib_get(ty, f):
@@ -189,16 +192,23 @@ def py_initfuncs(types):
     l.append('void genwrap__init(PyObject *m)')
     l.append('{')
     for ty in types:
-        l.append('    if (PyType_Ready(&Py%s_Type) >= 0) {'%ty.rawname)
-        l.append('        Py_INCREF(&Py%s_Type);'%ty.rawname)
-        l.append('        PyModule_AddObject(m, "%s", (PyObject *)&Py%s_Type);'%(ty.rawname, ty.rawname))
-        l.append('    }')
+        if isinstance(ty, libxltypes.Enumeration):
+            for v in ty.values:
+                l.append('    PyModule_AddIntConstant(m, "%s", %s);' % (v.rawname, v.name))
+        elif isinstance(ty, libxltypes.Aggregate):
+            l.append('    if (PyType_Ready(&Py%s_Type) >= 0) {'%ty.rawname)
+            l.append('        Py_INCREF(&Py%s_Type);'%ty.rawname)
+            l.append('        PyModule_AddObject(m, "%s", (PyObject *)&Py%s_Type);'%(ty.rawname, ty.rawname))
+            l.append('    }')
+        else:
+            raise NotImplementedError("unknown type %s (%s)" % (ty.typename, type(ty)))        
+
     l.append('}')
     return '\n'.join(l) + "\n\n"
 
 def tree_frob(types):
     ret = types[:]
-    for ty in ret:
+    for ty in [ty for ty in ret if isinstance(ty, libxltypes.Aggregate)]:
         ty.fields = filter(lambda f:f.name is not None and f.type.typename is not None, ty.fields)
     return ret
 
@@ -249,8 +259,8 @@ _hidden PyObject *genwrap__ll_get(long long val);
 _hidden int genwrap__ll_set(PyObject *v, long long *val, long long mask);
 
 """ % " ".join(sys.argv))
-    for ty in types:
-        f.write('/* Internal APU for %s wrapper */\n'%ty.typename)
+    for ty in [ty for ty in types if isinstance(ty, libxltypes.Aggregate)]:
+        f.write('/* Internal API for %s wrapper */\n'%ty.typename)
         f.write(py_wrapstruct(ty))
         f.write(py_decls(ty))
         f.write('\n')
@@ -276,10 +286,11 @@ _hidden int genwrap__ll_set(PyObject *v, long long *val, long long mask);
 
 """ % tuple((' '.join(sys.argv),) + (os.path.split(decls)[-1:]),))
     for ty in types:
-        f.write('/* Attribute get/set functions for %s */\n'%ty.typename)
-        for a in ty.fields:
-            f.write(py_attrib_get(ty,a))
-            f.write(py_attrib_set(ty,a))
-        f.write(py_object_def(ty))
+        if isinstance(ty, libxltypes.Aggregate):
+            f.write('/* Attribute get/set functions for %s */\n'%ty.typename)
+            for a in ty.fields:
+                f.write(py_attrib_get(ty,a))
+                f.write(py_attrib_set(ty,a))
+            f.write(py_object_def(ty))
     f.write(py_initfuncs(types))
     f.close()

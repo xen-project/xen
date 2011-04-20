@@ -34,7 +34,28 @@ def libxl_C_instance_of(ty, instancename):
 
 def libxl_C_type_define(ty, indent = ""):
     s = ""
-    if isinstance(ty, libxltypes.Aggregate):
+
+    if isinstance(ty, libxltypes.Enumeration):
+        if ty.comment is not None:
+            s += format_comment(0, ty.comment)
+        
+        if ty.typename is None:
+            s += "enum {\n"
+        else:
+            s += "typedef enum %s {\n" % ty.typename
+
+        for v in ty.values:
+            if v.comment is not None:
+                s += format_comment(4, v.comment)
+            x = "%s = %d" % (v.name, v.value)
+            x = x.replace("\n", "\n    ")
+            s += "    " + x + ",\n"
+        if ty.typename is None:
+            s += "}"
+        else:
+            s += "} %s" % ty.typename
+
+    elif isinstance(ty, libxltypes.Aggregate):
         if ty.comment is not None:
             s += format_comment(0, ty.comment)
 
