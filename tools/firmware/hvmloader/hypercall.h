@@ -39,7 +39,8 @@
  * NB. Hypercall address needs to be relative to a linkage symbol for
  * some version of ld to relocate the relative calls properly.
  */
-#define hypercall_pa "_start - " STR(HYPERCALL_PHYSICAL_ADDRESS)
+#define hypercall_pa "_start - " STR(HVMLOADER_PHYSICAL_ADDRESS) \
+                           " + " STR(HYPERCALL_PHYSICAL_ADDRESS)
 
 #define _hypercall0(type, name)						\
 ({									\

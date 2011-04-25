@@ -41,6 +41,7 @@ extern unsigned long pci_mem_start, pci_mem_end;
 #define SMBIOS_PHYSICAL_ADDRESS       0x000EB000
 #define SMBIOS_MAXIMUM_SIZE           0x00005000
 #define ROMBIOS_PHYSICAL_ADDRESS      0x000F0000
+#define HVMLOADER_PHYSICAL_ADDRESS    0x00100000
 
 /* Offsets from E820_PHYSICAL_ADDRESS. */
 #define E820_NR_OFFSET                0x0
