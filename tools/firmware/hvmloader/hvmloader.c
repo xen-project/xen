@@ -704,6 +704,9 @@ int main(void)
     uint32_t etherboot_phys_addr, option_rom_phys_addr, bios32_addr;
     struct bios_info *bios_info;
 
+    /* Initialise hypercall stubs with RET, rendering them no-ops. */
+    memset((void *)HYPERCALL_PHYSICAL_ADDRESS, 0xc3 /* RET */, PAGE_SIZE);
+
     printf("HVM Loader\n");
 
     init_hypercalls();
