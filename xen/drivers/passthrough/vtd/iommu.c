@@ -1737,28 +1737,6 @@ static int vtd_ept_page_compatible(struct iommu *iommu)
     return 1;
 }
 
-static bool_t vtd_ept_share(void)
-{
-    struct acpi_drhd_unit *drhd;
-    struct iommu *iommu;
-    bool_t share = TRUE;
-
-    /* sharept defaults to 0 for now, default to 1 when feature matures */
-    if ( !iommu_hap_pt_share )
-        share = FALSE;
-
-    /*
-     * Determine whether EPT and VT-d page tables can be shared or not.
-     */
-    for_each_drhd_unit ( drhd )
-    {
-        iommu = drhd->iommu;
-        if ( !vtd_ept_page_compatible(drhd->iommu) )
-            share = FALSE;
-    }
-    return share;
-}
-
 /*
  * set VT-d page table directory to EPT table if allowed
  */
@@ -1769,17 +1747,11 @@ void iommu_set_pgd(struct domain *d)
 
     ASSERT( is_hvm_domain(d) && d->arch.hvm_domain.hap_enabled );
 
-    iommu_hap_pt_share = vtd_ept_share();
     if ( !iommu_hap_pt_share )
-        goto out;
+        return;
 
     pgd_mfn = pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d)));
     hd->pgd_maddr = pagetable_get_paddr(pagetable_from_mfn(pgd_mfn));
-
-out:
-    dprintk(XENLOG_INFO VTDPREFIX,
-            "VT-d page table %s with EPT table\n",
-            iommu_hap_pt_share ? "shares" : "not sharing");
 }
 
 static int domain_rmrr_mapped(struct domain *d,
@@ -2080,6 +2052,9 @@ int __init intel_vtd_setup(void)
         if ( iommu_intremap && !ecap_intr_remap(iommu->ecap) )
             iommu_intremap = 0;
 
+        if ( !vtd_ept_page_compatible(iommu) )
+            iommu_hap_pt_share = FALSE;
+
         ret = iommu_set_interrupt(iommu);
         if ( ret < 0 )
         {
@@ -2101,6 +2076,7 @@ int __init intel_vtd_setup(void)
     P(iommu_passthrough, "Dom0 DMA Passthrough");
     P(iommu_qinval, "Queued Invalidation");
     P(iommu_intremap, "Interrupt Remapping");
+    P(iommu_hap_pt_share, "Shared EPT tables");
 #undef P
 
     scan_pci_devices();
