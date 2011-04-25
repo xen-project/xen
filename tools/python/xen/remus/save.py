@@ -158,9 +158,13 @@ class Saver(object):
             self.checkpointer.open(self.vm.domid)
             self.checkpointer.start(self.fd, self.suspendcb, self.resumecb,
                                     self.checkpointcb, self.interval)
-            self.checkpointer.close()
         except xen.lowlevel.checkpoint.error, e:
             raise CheckpointError(e)
+        finally:
+            try: #errors in checkpoint close are not critical atm.
+                self.checkpointer.close()
+            except:
+                pass
 
     def _resume(self):
         """low-overhead version of XendDomainInfo.resumeDomain"""
