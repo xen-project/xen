@@ -405,8 +405,9 @@ static void xc_cpuid_pv_policy(
     const unsigned int *input, unsigned int *regs)
 {
     DECLARE_DOMCTL;
-    int guest_64bit, xsave_supported, xen_64bit = hypervisor_is_64bit(xch);
+    int guest_64bit, xen_64bit = hypervisor_is_64bit(xch);
     char brand[13];
+    uint64_t xfeature_mask;
 
     xc_cpuid_brand_get(brand);
 
@@ -421,7 +422,7 @@ static void xc_cpuid_pv_policy(
     domctl.cmd = XEN_DOMCTL_getvcpuextstate;
     domctl.domain = domid;
     do_domctl(xch, &domctl);
-    xsave_supported = (domctl.u.vcpuextstate.xfeature_mask != 0);
+    xfeature_mask = domctl.u.vcpuextstate.xfeature_mask;
 
     if ( (input[0] & 0x7fffffff) == 1 )
     {
@@ -452,7 +453,7 @@ static void xc_cpuid_pv_policy(
         clear_bit(X86_FEATURE_TM2, regs[2]);
         if ( !guest_64bit )
             clear_bit(X86_FEATURE_CX16, regs[2]);
-        if ( !xsave_supported )
+        if ( xfeature_mask == 0 )
         {
             clear_bit(X86_FEATURE_XSAVE, regs[2]);
             clear_bit(X86_FEATURE_AVX, regs[2]);
@@ -462,6 +463,11 @@ static void xc_cpuid_pv_policy(
         clear_bit(X86_FEATURE_DCA, regs[2]);
         set_bit(X86_FEATURE_HYPERVISOR, regs[2]);
         break;
+
+    case 0x0000000d:
+        xc_cpuid_config_xsave(xch, domid, xfeature_mask, input, regs);
+        break;
+
     case 0x80000001:
         if ( !guest_64bit )
         {
@@ -486,9 +492,9 @@ static void xc_cpuid_pv_policy(
         clear_bit(X86_FEATURE_NODEID_MSR, regs[2]);
         clear_bit(X86_FEATURE_TOPOEXT, regs[2]);
         break;
+
     case 5: /* MONITOR/MWAIT */
     case 0xa: /* Architectural Performance Monitor Features */
-    case 0xd: /* XSAVE */
     case 0x8000000a: /* SVM revision and features */
     case 0x8000001b: /* Instruction Based Sampling */
     case 0x8000001c: /* Light Weight Profiling */
