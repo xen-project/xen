@@ -27,6 +27,8 @@ void calibrate_tsc_ap(void);
 
 typedef u64 cycles_t;
 
+extern bool_t disable_tsc_sync;
+
 static inline cycles_t get_cycles(void)
 {
     cycles_t c;

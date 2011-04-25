@@ -83,7 +83,10 @@ struct cpuidle_governor
     void (*reflect)         (struct acpi_processor_power *dev);
 };
 
+extern s8 xen_cpuidle;
 extern struct cpuidle_governor *cpuidle_current_governor;
+
+bool_t cpuidle_using_deep_cstate(void);
 void cpuidle_disable_deep_cstate(void);
 
 #define CPUIDLE_DRIVER_STATE_START  1

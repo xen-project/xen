@@ -21,6 +21,7 @@
 #include <xen/smp.h>
 #include <xen/irq.h>
 #include <xen/softirq.h>
+#include <xen/cpuidle.h>
 #include <xen/keyhandler.h>
 #include <xen/guest_access.h>
 #include <asm/io.h>
@@ -175,7 +176,6 @@ static inline struct time_scale scale_reciprocal(struct time_scale scale)
  * cpu_mask that denotes the CPUs that needs timer interrupt coming in as
  * IPIs in place of local APIC timers
  */
-extern int xen_cpuidle;
 static cpumask_t pit_broadcast_mask;
 
 static void smp_send_timer_broadcast_ipi(void)
@@ -723,6 +723,8 @@ void cstate_restore_tsc(void)
         stime_delta = 0;
 
     new_tsc = t->local_tsc_stamp + scale_delta(stime_delta, &sys_to_tsc);
+
+    ASSERT(boot_cpu_has(X86_FEATURE_TSC_RELIABLE));
 
     write_tsc(new_tsc);
 }
@@ -1416,6 +1418,66 @@ void init_percpu_time(void)
     }
 }
 
+/*
+ * On certain older Intel CPUs writing the TSC MSR clears the upper 32 bits. 
+ * Obviously we must not use write_tsc() on such CPUs.
+ *
+ * Additionally, AMD specifies that being able to write the TSC MSR is not an 
+ * architectural feature (but, other than their manual says, also cannot be 
+ * determined from CPUID bits).
+ */
+static void __init tsc_check_writability(void)
+{
+    const char *what = NULL;
+    uint64_t tsc;
+
+    /*
+     * If all CPUs are reported as synchronised and in sync, we never write
+     * the TSCs (except unavoidably, when a CPU is physically hot-plugged).
+     * Hence testing for writability is pointless and even harmful.
+     */
+    if ( boot_cpu_has(X86_FEATURE_TSC_RELIABLE) )
+        return;
+
+    rdtscll(tsc);
+    if ( wrmsr_safe(MSR_IA32_TSC, 0, 0) == 0 )
+    {
+        uint64_t tmp, tmp2;
+        rdtscll(tmp2);
+        write_tsc(tsc | (1ULL << 32));
+        rdtscll(tmp);
+        if ( ABS((s64)tmp - (s64)tmp2) < (1LL << 31) )
+            what = "only partially";
+    }
+    else
+    {
+        what = "not";
+    }
+
+    /* Nothing to do if the TSC is fully writable. */
+    if ( !what )
+    {
+        /*
+         * Paranoia - write back original TSC value. However, APs get synced
+         * with BSP as they are brought up, so this doesn't much matter.
+         */
+        write_tsc(tsc);
+        return;
+    }
+
+    printk(XENLOG_WARNING "TSC %s writable\n", what);
+
+    /* time_calibration_tsc_rendezvous() must not be used */
+    setup_clear_cpu_cap(X86_FEATURE_CONSTANT_TSC);
+
+    /* cstate_restore_tsc() must not be used (or do nothing) */
+    if ( !boot_cpu_has(X86_FEATURE_NONSTOP_TSC) )
+        cpuidle_disable_deep_cstate();
+
+    /* synchronize_tsc_slave() must do nothing */
+    disable_tsc_sync = 1;
+}
+
 /* Late init function (after all CPUs are booted). */
 int __init init_xen_time(void)
 {
@@ -1431,6 +1493,8 @@ int __init init_xen_time(void)
         if ( tsc_max_warp )
             setup_clear_cpu_cap(X86_FEATURE_TSC_RELIABLE);
     }
+
+    tsc_check_writability();
 
     /* If we have constant-rate TSCs then scale factor can be shared. */
     if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC) )
@@ -1486,7 +1550,7 @@ static int disable_pit_irq(void)
      * XXX dom0 may rely on RTC interrupt delivery, so only enable
      * hpet_broadcast if FSB mode available or if force_hpet_broadcast.
      */
-    if ( xen_cpuidle && !boot_cpu_has(X86_FEATURE_ARAT) )
+    if ( cpuidle_using_deep_cstate() && !boot_cpu_has(X86_FEATURE_ARAT) )
     {
         hpet_broadcast_init();
         if ( !hpet_broadcast_is_available() )
