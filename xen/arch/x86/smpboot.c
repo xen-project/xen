@@ -172,12 +172,6 @@ valid_k7:
  * then we print a warning if not, and always resync.
  */
 
-/*
- * TSC's upper 32 bits can't be written in earlier CPUs (before
- * Prescott), there is no way to resync one AP against BP.
- */
-bool_t disable_tsc_sync;
-
 static atomic_t tsc_start_flag = ATOMIC_INIT(0);
 static atomic_t tsc_count_start = ATOMIC_INIT(0);
 static atomic_t tsc_count_stop = ATOMIC_INIT(0);
@@ -193,9 +187,6 @@ static void __init synchronize_tsc_bp (void)
 	long long delta;
 	unsigned int one_usec;
 	int buggy = 0;
-
-	if ( disable_tsc_sync )
-		return;
 
 	if (boot_cpu_has(X86_FEATURE_TSC_RELIABLE)) {
 		printk("TSC is reliable, synchronization unnecessary\n");
@@ -293,9 +284,6 @@ static void __init synchronize_tsc_bp (void)
 static void __init synchronize_tsc_ap (void)
 {
 	int i;
-
-	if ( disable_tsc_sync )
-		return;
 
 	if (boot_cpu_has(X86_FEATURE_TSC_RELIABLE))
 		return;

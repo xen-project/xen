@@ -1473,9 +1473,6 @@ static void __init tsc_check_writability(void)
     /* cstate_restore_tsc() must not be used (or do nothing) */
     if ( !boot_cpu_has(X86_FEATURE_NONSTOP_TSC) )
         cpuidle_disable_deep_cstate();
-
-    /* synchronize_tsc_slave() must do nothing */
-    disable_tsc_sync = 1;
 }
 
 /* Late init function (after all CPUs are booted). */
