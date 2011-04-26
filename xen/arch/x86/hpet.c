@@ -624,6 +624,9 @@ void hpet_disable_legacy_broadcast(void)
     u32 cfg;
     unsigned long flags;
 
+    if ( !legacy_hpet_event.shift )
+        return;
+
     spin_lock_irqsave(&legacy_hpet_event.lock, flags);
 
     legacy_hpet_event.flags |= HPET_EVT_DISABLE;
