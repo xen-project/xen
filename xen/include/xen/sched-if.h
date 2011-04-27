@@ -170,6 +170,8 @@ struct scheduler {
                                       bool_t tasklet_work_scheduled);
 
     int          (*pick_cpu)       (const struct scheduler *, struct vcpu *);
+    void         (*migrate)        (const struct scheduler *, struct vcpu *,
+                                    unsigned int);
     int          (*adjust)         (const struct scheduler *, struct domain *,
                                     struct xen_domctl_scheduler_op *);
     int          (*adjust_global)  (const struct scheduler *,

@@ -1352,30 +1352,27 @@ out:
 static int
 csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
 {
-    struct csched_vcpu * const svc = CSCHED_VCPU(vc);
     int new_cpu;
 
-    /* The scheduler interface doesn't have an explicit mechanism to
-     * involve the choosable scheduler in the migrate process, so we
-     * infer that a change may happen by the call to cpu_pick, and
-     * remove it from the old runqueue while the lock for the old
-     * runqueue is held.  It can't be actively waiting to run.  It
-     * will be added to the new runqueue when it next wakes.
-     *
-     * If we want to be able to call pick() separately, we need to add
-     * a mechansim to remove a vcpu from an old processor / runqueue
-     * before releasing the lock. */
-    BUG_ON(__vcpu_on_runq(svc));
-
     new_cpu = choose_cpu(ops, vc);
-    /* If we're suggesting moving to a different runqueue, remove it
-     * from the old runqueue while we have the lock.  It will be added
-     * to the new one when it wakes. */
-    if ( svc->rqd != NULL
-         && RQD(ops, new_cpu) != svc->rqd )
-        runq_deassign(ops, vc);
 
     return new_cpu;
+}
+
+static void
+csched_vcpu_migrate(
+    const struct scheduler *ops, struct vcpu *vc, unsigned int new_cpu)
+{
+    struct csched_vcpu * const svc = CSCHED_VCPU(vc);
+    struct csched_runqueue_data *trqd;
+
+    /* Check if new_cpu is valid */
+    BUG_ON(!cpu_isset(new_cpu, CSCHED_PRIV(ops)->initialized));
+
+    trqd = RQD(ops, new_cpu);
+
+    if ( trqd != svc->rqd )
+        migrate(ops, svc, trqd, NOW());
 }
 
 static int
@@ -2121,6 +2118,7 @@ const struct scheduler sched_credit2_def = {
     .adjust         = csched_dom_cntl,
 
     .pick_cpu       = csched_cpu_pick,
+    .migrate        = csched_vcpu_migrate,
     .do_schedule    = csched_schedule,
     .context_saved  = csched_context_saved,
 

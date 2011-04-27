@@ -489,7 +489,11 @@ static void vcpu_migrate(struct vcpu *v)
      * Switch to new CPU, then unlock new and old CPU.  This is safe because
      * the lock pointer cant' change while the current lock is held.
      */
-    v->processor = new_cpu;
+    if ( VCPU2OP(v)->migrate )
+        SCHED_OP(VCPU2OP(v), migrate, v, new_cpu);
+    else
+        v->processor = new_cpu;
+
 
     if ( old_lock != new_lock )
         spin_unlock(new_lock);
