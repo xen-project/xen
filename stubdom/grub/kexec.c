@@ -48,6 +48,7 @@ extern void _boot(void);
 
 static unsigned long *pages;
 static unsigned long *pages_mfns;
+static xen_pfn_t *pages_moved2pfns;
 static unsigned long allocated;
 
 int pin_table(xc_interface *xc_handle, unsigned int type, unsigned long mfn,
@@ -80,6 +81,7 @@ int kexec_allocate(struct xc_dom_image *dom, xen_vaddr_t up_to)
 
     pages = realloc(pages, new_allocated * sizeof(*pages));
     pages_mfns = realloc(pages_mfns, new_allocated * sizeof(*pages_mfns));
+    pages_moved2pfns = realloc(pages_moved2pfns, new_allocated * sizeof(*pages_moved2pfns));
     for (i = allocated; i < new_allocated; i++) {
         /* Exchange old page of PFN i with a newly allocated page.  */
         xen_pfn_t old_mfn = dom->p2m_host[i];
@@ -90,6 +92,18 @@ int kexec_allocate(struct xc_dom_image *dom, xen_vaddr_t up_to)
         memset((void*) pages[i], 0, PAGE_SIZE);
         new_pfn = PHYS_PFN(to_phys(pages[i]));
         pages_mfns[i] = new_mfn = pfn_to_mfn(new_pfn);
+
+	/*
+	 * If PFN of newly allocated page (new_pfn) is less then currently
+	 * requested PFN (i) then look for relevant PFN/MFN pair. In this
+	 * situation dom->p2m_host[new_pfn] no longer contains proper MFN
+	 * because original page with new_pfn was moved earlier
+	 * to different location.
+	 */
+	for (; new_pfn < i; new_pfn = pages_moved2pfns[new_pfn]);
+
+	/* Store destination PFN of currently requested page. */
+	pages_moved2pfns[i] = new_pfn;
 
         /* Put old page at new PFN */
         dom->p2m_host[new_pfn] = old_mfn;
