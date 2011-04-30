@@ -36,15 +36,6 @@
  * Clobbered: Argument registers (e.g., 2-arg hypercall clobbers %ebx,%ecx)
  */
 
-#if __XEN_INTERFACE_VERSION__ < 0x00030203
-/*
- * Legacy hypercall interface:
- * As above, except the entry sequence to the hypervisor is:
- *  mov $hypercall-number*32,%eax ; int $0x82
- */
-#define TRAP_INSTR "int $0x82"
-#endif
-
 /*
  * These flat segments are in the Xen-private section of every GDT. Since these
  * are also present in the initial GDT, many OSes will be able to avoid
