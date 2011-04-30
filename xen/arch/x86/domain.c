@@ -1784,7 +1784,7 @@ unsigned long hypercall_create_continuation(
 
         /* Ensure the hypercall trap instruction is re-executed. */
         if ( !is_hvm_vcpu(current) )
-            regs->eip -= 2;  /* re-execute 'syscall' / 'int 0x82' */
+            regs->eip -= 2;  /* re-execute 'syscall' / 'int $xx' */
         else
             current->arch.hvm_vcpu.hcall_preempted = 1;
 

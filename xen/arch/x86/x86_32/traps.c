@@ -597,7 +597,7 @@ static void hypercall_page_initialise_ring1_kernel(void *hypercall_page)
         p = (char *)(hypercall_page + (i * 32));
         *(u8  *)(p+ 0) = 0xb8;    /* mov  $<i>,%eax */
         *(u32 *)(p+ 1) = i;
-        *(u16 *)(p+ 5) = 0x82cd;  /* int  $0x82 */
+        *(u16 *)(p+ 5) = (HYPERCALL_VECTOR << 8) | 0xcd; /* int  $xx */
         *(u8  *)(p+ 7) = 0xc3;    /* ret */
     }
 
@@ -610,7 +610,7 @@ static void hypercall_page_initialise_ring1_kernel(void *hypercall_page)
     *(u8  *)(p+ 0) = 0x50;    /* push %eax */
     *(u8  *)(p+ 1) = 0xb8;    /* mov  $__HYPERVISOR_iret,%eax */
     *(u32 *)(p+ 2) = __HYPERVISOR_iret;
-    *(u16 *)(p+ 6) = 0x82cd;  /* int  $0x82 */
+    *(u16 *)(p+ 6) = (HYPERCALL_VECTOR << 8) | 0xcd; /* int  $xx */
 }
 
 void hypercall_page_initialise(struct domain *d, void *hypercall_page)
