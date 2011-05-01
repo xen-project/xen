@@ -42,7 +42,7 @@
 static char __initdata opt_clocksource[10];
 string_param("clocksource", opt_clocksource);
 
-unsigned long cpu_khz;  /* CPU clock frequency in kHz. */
+unsigned long __read_mostly cpu_khz;  /* CPU clock frequency in kHz. */
 DEFINE_SPINLOCK(rtc_lock);
 unsigned long pit0_ticks;
 static u32 wc_sec, wc_nsec; /* UTC time at last 'time update'. */
@@ -81,7 +81,7 @@ static struct timer calibration_timer;
 static DEFINE_SPINLOCK(pit_lock);
 static u16 pit_stamp16;
 static u32 pit_stamp32;
-static int using_pit;
+static bool_t __read_mostly using_pit;
 
 /*
  * 32-bit division of integer dividend and integer divisor yielding
@@ -407,7 +407,7 @@ bool_t __initdata use_cyclone;
 #define CYCLONE_TIMER_FREQ  100000000
 
 /* Cyclone MPMC0 register. */
-static volatile u32 *cyclone_timer;
+static volatile u32 *__read_mostly cyclone_timer;
 
 static u64 read_cyclone_count(void)
 {
@@ -458,7 +458,7 @@ static struct platform_timesource __initdata plt_cyclone =
  * PLATFORM TIMER 4: ACPI PM TIMER
  */
 
-u32 pmtmr_ioport;
+u32 __read_mostly pmtmr_ioport;
 
 /* ACPI PM timer ticks at 3.579545 MHz. */
 #define ACPI_PM_FREQUENCY 3579545
@@ -486,8 +486,9 @@ static struct platform_timesource __initdata plt_pmtimer =
     .init = init_pmtimer
 };
 
-static struct time_scale pmt_scale;
-static struct time_scale pmt_scale_r;
+static struct time_scale __read_mostly pmt_scale;
+static struct time_scale __read_mostly pmt_scale_r;
+
 static __init int init_pmtmr_scale(void)
 {
     set_time_scale(&pmt_scale, ACPI_PM_FREQUENCY);
@@ -510,10 +511,14 @@ uint64_t ns_to_acpi_pm_tick(uint64_t ns)
  * GENERIC PLATFORM TIMER INFRASTRUCTURE
  */
 
-static struct platform_timesource plt_src; /* details of chosen timesource  */
-static u64 plt_mask;             /* hardware-width mask                     */
-static u64 plt_overflow_period;  /* ns between calls to plt_overflow()      */
-static struct time_scale plt_scale; /* scale: platform counter -> nanosecs  */
+/* details of chosen timesource */
+static struct platform_timesource __read_mostly plt_src;
+/* hardware-width mask */
+static u64 __read_mostly plt_mask;
+ /* ns between calls to plt_overflow() */
+static u64 __read_mostly plt_overflow_period;
+/* scale: platform counter -> nanosecs */
+static struct time_scale __read_mostly plt_scale;
 
 /* Protected by platform_timer_lock. */
 static DEFINE_SPINLOCK(platform_timer_lock);
@@ -1228,7 +1233,7 @@ static void tsc_check_slave(void *unused)
     local_irq_enable();
 }
 
-void tsc_check_reliability(void)
+static void tsc_check_reliability(void)
 {
     unsigned int cpu = smp_processor_id();
     static DEFINE_SPINLOCK(lock);
@@ -1377,12 +1382,6 @@ void init_percpu_time(void)
 
     t->stime_master_stamp = now;
     t->stime_local_stamp  = now;
-
-    if ( smp_processor_id() == 0 )
-    {
-        init_timer(&calibration_timer, time_calibration, NULL, 0);
-        set_timer(&calibration_timer, NOW() + EPOCH);
-    }
 }
 
 /*
@@ -1483,6 +1482,9 @@ int __init init_xen_time(void)
 
     init_percpu_time();
 
+    init_timer(&calibration_timer, time_calibration, NULL, 0);
+    set_timer(&calibration_timer, NOW() + EPOCH);
+
     return 0;
 }
 
@@ -1567,7 +1569,7 @@ void pit_broadcast_exit(void)
 
 int pit_broadcast_is_available(void)
 {
-    return xen_cpuidle;
+    return cpuidle_using_deep_cstate();
 }
 
 void send_timer_event(struct vcpu *v)
@@ -1618,6 +1620,8 @@ int time_resume(void)
         BUG();
 
     init_percpu_time();
+
+    set_timer(&calibration_timer, NOW() + EPOCH);
 
     do_settime(get_cmos_time() + cmos_utc_offset, 0, NOW());
 
