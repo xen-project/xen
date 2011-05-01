@@ -23,7 +23,7 @@ extern void smp_prepare_cpus(unsigned int max_cpus);
 /*
  * Final polishing of CPUs
  */
-extern void smp_cpus_done(unsigned int max_cpus);
+extern void smp_cpus_done(void);
 
 /*
  * Call a function on all other processors

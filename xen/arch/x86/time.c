@@ -1445,7 +1445,7 @@ static void __init tsc_check_writability(void)
     disable_tsc_sync = 1;
 }
 
-/* Late init function (after all CPUs are booted). */
+/* Late init function (after interrupts are enabled). */
 int __init init_xen_time(void)
 {
     if ( boot_cpu_has(X86_FEATURE_TSC_RELIABLE) )

@@ -615,7 +615,7 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
     local_irq_disable();
 
     printk("Brought up %ld CPUs\n", (long)num_online_cpus());
-    smp_cpus_done(max_cpus);
+    smp_cpus_done();
 #endif
 
     iommu_setup();    /* setup iommu if available */

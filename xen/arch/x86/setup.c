@@ -1226,9 +1226,8 @@ void __init __start_xen(unsigned long mbi_p)
 
     /*
      * Initialise higher-level timer functions. We do this fairly late
-     * (post-SMP) because the time bases and scale factors need to be updated 
-     * regularly, and SMP initialisation can cause a long delay with 
-     * interrupts not yet enabled.
+     * (after interrupts got enabled) because the time bases and scale
+     * factors need to be updated regularly.
      */
     init_xen_time();
 
@@ -1254,7 +1253,7 @@ void __init __start_xen(unsigned long mbi_p)
     }
 
     printk("Brought up %ld CPUs\n", (long)num_online_cpus());
-    smp_cpus_done(max_cpus);
+    smp_cpus_done();
 
     do_initcalls();
 

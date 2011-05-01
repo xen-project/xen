@@ -770,7 +770,7 @@ void __cpu_die(unsigned int cpu)
 #endif /* CONFIG_HOTPLUG_CPU */
 
 void
-smp_cpus_done (unsigned int dummy)
+smp_cpus_done(void)
 {
 	int cpu;
 	unsigned long bogosum = 0;

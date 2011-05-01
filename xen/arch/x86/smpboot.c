@@ -966,7 +966,7 @@ int __cpu_up(unsigned int cpu)
 }
 
 
-void __init smp_cpus_done(unsigned int max_cpus)
+void __init smp_cpus_done(void)
 {
     /*
      * Don't taint if we are running SMP kernel on a single non-MP
