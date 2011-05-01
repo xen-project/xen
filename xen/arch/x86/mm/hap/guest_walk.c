@@ -32,7 +32,9 @@
 #define _hap_p2m_ga_to_gfn(levels) hap_p2m_ga_to_gfn_##levels##_levels
 #define hap_p2m_ga_to_gfn(levels) _hap_p2m_ga_to_gfn(levels)
 
-#if GUEST_PAGING_LEVELS <= CONFIG_PAGING_LEVELS
+#if GUEST_PAGING_LEVELS > CONFIG_PAGING_LEVELS
+#error GUEST_PAGING_LEVELS must not exceed CONFIG_PAGING_LEVELS
+#endif
 
 #include <asm/guest_pt.h>
 #include <asm/p2m.h>
@@ -118,28 +120,6 @@ unsigned long hap_p2m_ga_to_gfn(GUEST_PAGING_LEVELS)(
 
     return INVALID_GFN;
 }
-
-#else
-
-unsigned long hap_gva_to_gfn(GUEST_PAGING_LEVELS)(
-    struct vcpu *v, struct p2m_domain *p2m, unsigned long gva, uint32_t *pfec)
-{
-    gdprintk(XENLOG_ERR,
-             "Guest paging level is greater than host paging level!\n");
-    domain_crash(v->domain);
-    return INVALID_GFN;
-}
-
-unsigned long hap_p2m_ga_to_gfn(GUEST_PAGING_LEVELS)(
-    struct vcpu *v, struct p2m_domain *p2m, unsigned long cr3,
-    paddr_t ga, uint32_t *pfec)
-{
-    gdprintk(XENLOG_ERR,
-             "Guest paging level is greater than host paging level!\n");
-    domain_crash(v->domain);
-    return INVALID_GFN;
-}
-#endif
 
 
 /*
