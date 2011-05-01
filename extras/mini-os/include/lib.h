@@ -16,9 +16,8 @@
  * $Id: h-insert.h,v 1.4 2002/11/08 16:03:55 rn Exp $
  ****************************************************************************
  *
- *-
- * Copyright (c) 1991, 1993
- *      The Regents of the University of California.  All rights reserved.
+ * Copyright (c) 1992, 1993
+ *	The Regents of the University of California.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,10 +27,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by the University of
- *      California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -48,8 +43,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *      @(#)stdarg.h    8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/i386/include/stdarg.h,v 1.10 1999/08/28 00:44:26 peter Exp $
  */
 
 #ifndef _LIB_H_
@@ -64,42 +57,48 @@
 #ifdef HAVE_LIBC
 #include <stdio.h>
 #else
-/* printing */
-#define _p(_x) ((void *)(unsigned long)(_x))
-int vsnprintf(char *buf, size_t size, const char *fmt, va_list args);
-int vscnprintf(char *buf, size_t size, const char *fmt, va_list args);
-int snprintf(char * buf, size_t size, const char *fmt, ...);
-int scnprintf(char * buf, size_t size, const char *fmt, ...);
-int vsprintf(char *buf, const char *fmt, va_list args);
-int sprintf(char * buf, const char *fmt, ...);
-int vsscanf(const char * buf, const char * fmt, va_list args);
-int sscanf(const char * buf, const char * fmt, ...);
+#include <lib-gpl.h>
 #endif
-
-long simple_strtol(const char *cp,char **endp,unsigned int base);
-unsigned long simple_strtoul(const char *cp,char **endp,unsigned int base);
-long long simple_strtoll(const char *cp,char **endp,unsigned int base);
-unsigned long long simple_strtoull(const char *cp,char **endp,unsigned int base);
 
 #ifdef HAVE_LIBC
 #include <string.h>
 #else
 /* string and memory manipulation */
-int    memcmp(const void *cs, const void *ct, size_t count);
-void  *memcpy(void *dest, const void *src, size_t count);
-int    strncmp(const char *cs, const char *ct, size_t count);
-int    strcmp(const char *cs, const char *ct);
-char  *strcpy(char *dest, const char *src);
-char  *strncpy(char *dest, const char *src, size_t count);
-void  *memset(void *s,int c, size_t count);
-size_t strnlen(const char *s, size_t count);
-size_t strlen(const char *s);
-char  *strchr(const char *s, int c);
-char  *strrchr(const char *s, int c);
-char  *strstr(const char *s1, const char *s2);
-char * strcat(char * dest, const char * src);
-char  *strdup(const char *s);
+
+/*
+ * From:
+ *	@(#)libkern.h	8.1 (Berkeley) 6/10/93
+ * $FreeBSD$
+ */
+int	 memcmp(const void *b1, const void *b2, size_t len);
+
+char	*strcat(char * __restrict, const char * __restrict);
+int	 strcmp(const char *, const char *);
+char	*strcpy(char * __restrict, const char * __restrict);
+
+char	*strdup(const char *__restrict);
+
+size_t	 strlen(const char *);
+
+int	 strncmp(const char *, const char *, size_t);
+char	*strncpy(char * __restrict, const char * __restrict, size_t);
+
+char	*strstr(const char *, const char *);
+
+void *memset(void *, int, size_t);
+
+char *strchr(const char *p, int ch);
+char *strrchr(const char *p, int ch);
+
+/* From:
+ *	@(#)systm.h	8.7 (Berkeley) 3/29/95
+ * $FreeBSD$
+ */
+void	*memcpy(void *to, const void *from, size_t len);
+
+size_t strnlen(const char *, size_t);
 #endif
+
 #include <mini-os/console.h>
 
 #define RAND_MIX 2654435769U
@@ -109,11 +108,6 @@ int rand(void);
 #include <mini-os/xenbus.h>
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
-
-struct kvec {
-    void *iov_base;
-    size_t iov_len;
-};
 
 #define ASSERT(x)                                              \
 do {                                                           \
