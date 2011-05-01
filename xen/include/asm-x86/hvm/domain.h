@@ -59,6 +59,9 @@ struct hvm_domain {
     /* VCPU which is current target for 8259 interrupts. */
     struct vcpu           *i8259_target;
 
+    /* emulated irq to pirq */
+    struct radix_tree_root emuirq_pirq;
+
     /* hvm_print_line() logging. */
 #define HVM_PBUF_SIZE 80
     char                  *pbuf;
