@@ -13,10 +13,6 @@
  * Description:  Library functions for 64bit arith and other
  *               from freebsd, files in sys/libkern/ (qdivrem.c, etc)
  *
- ****************************************************************************
- * $Id: c-insert.c,v 1.7 2002/11/08 16:04:34 rn Exp $
- ****************************************************************************
- *-
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -32,10 +28,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -52,7 +44,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/libkern/divdi3.c,v 1.6 1999/08/28 00:46:31 peter Exp $
 */
 
 #include <mini-os/types.h>
@@ -63,49 +54,62 @@
 	 * assembler functions. */
 #if !defined(__ia64__)
 
+/* XXX RN: Yuck hardcoded endianess :) */
+#define _QUAD_HIGHWORD 1
+#define _QUAD_LOWWORD 0
+
+/*
+ * From
+ *	@(#)quad.h	8.1 (Berkeley) 6/4/93
+ */
+
 /*
  * Depending on the desired operation, we view a `long long' (aka quad_t) in
  * one or more of the following formats.
  */
 union uu {
-        int64_t           q;              /* as a (signed) quad */
-        int64_t          uq;             /* as an unsigned quad */
-        int32_t        sl[2];          /* as two signed ints */
-        uint32_t       ul[2];          /* as two unsigned ints */
+	quad_t	q;		/* as a (signed) quad */
+	quad_t	uq;		/* as an unsigned quad */
+	int32_t	sl[2];		/* as two signed longs */
+	uint32_t	ul[2];		/* as two unsigned longs */
 };
-/* XXX RN: Yuck hardcoded endianess :) */
-#define _QUAD_HIGHWORD 1
-#define _QUAD_LOWWORD 0
+
 /*
  * Define high and low longwords.
  */
-#define H               _QUAD_HIGHWORD
-#define L               _QUAD_LOWWORD
+#define	H		_QUAD_HIGHWORD
+#define	L		_QUAD_LOWWORD
 
 /*
- * Total number of bits in a quad_t and in the pieces that make it up.
+ * Total number of bits in an quad_t and in the pieces that make it up.
  * These are used for shifting, and also below for halfword extraction
  * and assembly.
  */
 #ifndef HAVE_LIBC
 #define CHAR_BIT        8               /* number of bits in a char */
 #endif
-#define QUAD_BITS       (sizeof(int64_t) * CHAR_BIT)
-#define LONG_BITS       (sizeof(int32_t) * CHAR_BIT)
-#define HALF_BITS       (sizeof(int32_t) * CHAR_BIT / 2)
+#define	QUAD_BITS	(sizeof(quad_t) * CHAR_BIT)
+#define	LONG_BITS	(sizeof(int32_t) * CHAR_BIT)
+#define	HALF_BITS	(sizeof(int32_t) * CHAR_BIT / 2)
 
 /*
- * Extract high and low shortwords from intword, and move low shortword of
- * intword to upper half of int32_t, i.e., produce the upper intword of
- * ((quad_t)(x) << (number_of_bits_in_int/2)).  (`x' must actually be uint32_t.)
+ * Extract high and low shortwords from longword, and move low shortword of
+ * longword to upper half of int32_t, i.e., produce the upper longword of
+ * ((quad_t)(x) << (number_of_bits_in_long/2)).  (`x' must actually be uint32_t.)
  *
- * These are used in the multiply code, to split a intword into upper
+ * These are used in the multiply code, to split a longword into upper
  * and lower halves, and to reassemble a product as a quad_t, shifted left
  * (sizeof(int32_t)*CHAR_BIT/2).
  */
-#define HHALF(x)        ((x) >> HALF_BITS)
-#define LHALF(x)        ((x) & ((1UL << HALF_BITS) - 1))
-#define LHUP(x)         ((x) << HALF_BITS)
+#define	HHALF(x)	((x) >> HALF_BITS)
+#define	LHALF(x)	((x) & ((1UL << HALF_BITS) - 1))
+#define	LHUP(x)		((x) << HALF_BITS)
+
+
+/*
+ * From
+ * qdivrem.c
+ */
 
 /*
  * Multiprecision divide.  This algorithm is from Knuth vol. 2 (2nd ed),
@@ -118,7 +122,6 @@ union uu {
 
 /* select a type for digits in base B: */
 typedef uint16_t digit;
-
 
 /*
  * Shift p[0]..p[len] left `sh' bits, ignoring any bits that
@@ -143,8 +146,8 @@ shl(register digit *p, register int len, register int sh)
  * divisor are 4 `digits' in this base (they are shorter if they have
  * leading zeros).
  */
-uint64_t
-__qdivrem(uint64_t uq, uint64_t vq, uint64_t *arq)
+u_quad_t
+__qdivrem(u_quad_t uq, u_quad_t vq, u_quad_t *arq)
 {
 	union uu tmp;
 	digit *u, *v, *q;
@@ -339,38 +342,51 @@ __qdivrem(uint64_t uq, uint64_t vq, uint64_t *arq)
 	return (tmp.q);
 }
 
+/*
+ * From
+ * divdi3.c
+ */
 
 /*
  * Divide two signed quads.
  * ??? if -1/2 should produce -1 on this machine, this code is wrong
  */
-int64_t
-__divdi3(int64_t a, int64_t b)
+quad_t
+__divdi3(quad_t a, quad_t b)
 {
-	uint64_t ua, ub, uq;
+	u_quad_t ua, ub, uq;
 	int neg;
 
 	if (a < 0)
-		ua = -(uint64_t)a, neg = 1;
+		ua = -(u_quad_t)a, neg = 1;
 	else
 		ua = a, neg = 0;
 	if (b < 0)
-		ub = -(uint64_t)b, neg ^= 1;
+		ub = -(u_quad_t)b, neg ^= 1;
 	else
 		ub = b;
-	uq = __qdivrem(ua, ub, (uint64_t *)0);
+	uq = __qdivrem(ua, ub, (u_quad_t *)0);
 	return (neg ? -uq : uq);
 }
 
 /*
+ * From
+ * udivdi3.c
+ */
+
+/*
  * Divide two unsigned quads.
  */
-uint64_t
-__udivdi3(uint64_t a, uint64_t b)
+u_quad_t
+__udivdi3(u_quad_t a, u_quad_t b)
 {
-        return (__qdivrem(a, b, (uint64_t *)0));
+	return (__qdivrem(a, b, (u_quad_t *)0));
 }
 
+/*
+ * From
+ * umoddi3.c
+ */
 
 /*
  * Return remainder after dividing two unsigned quads.
@@ -378,11 +394,16 @@ __udivdi3(uint64_t a, uint64_t b)
 u_quad_t
 __umoddi3(u_quad_t a, u_quad_t b)
 {
-        u_quad_t r;
+	u_quad_t r;
 
-        (void)__qdivrem(a, b, &r);
-        return (r);
+	(void)__qdivrem(a, b, &r);
+	return (r);
 }
+
+/*
+ * From
+ * moddi3.c
+ */
 
 /*
  * Return remainder after dividing two signed quads.
