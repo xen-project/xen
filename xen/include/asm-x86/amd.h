@@ -134,6 +134,10 @@
     AMD_OSVW_ERRATUM(3, AMD_MODEL_RANGE(0x10, 0x2, 0x1, 0xff, 0xf),	\
 		        AMD_MODEL_RANGE(0x12, 0x0, 0x0, 0x1, 0x0))
 
+#define AMD_ERRATUM_400                                                 \
+    AMD_OSVW_ERRATUM(1, AMD_MODEL_RANGE(0xf, 0x41, 0x2, 0xff, 0xf),     \
+                        AMD_MODEL_RANGE(0x10, 0x2, 0x1, 0xff, 0xf))
+
 struct cpuinfo_x86;
 int cpu_has_amd_erratum(const struct cpuinfo_x86 *, int, ...);
 

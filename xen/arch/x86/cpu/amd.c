@@ -474,6 +474,10 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 	}
 #endif
 
+	/* As a rule processors have APIC timer running in deep C states */
+	if (c->x86 >= 0xf && !cpu_has_amd_erratum(c, AMD_ERRATUM_400))
+		set_bit(X86_FEATURE_ARAT, c->x86_capability);
+
 	/* Prevent TSC drift in non single-processor, single-core platforms. */
 	if ((smp_processor_id() == 1) && c1_ramping_may_cause_clock_drift(c))
 		disable_c1_ramping();
