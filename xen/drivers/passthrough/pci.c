@@ -236,12 +236,28 @@ out:
     return ret;
 }
 
+static int pci_clean_dpci_irq(struct domain *d, unsigned int pirq,
+                              struct hvm_pirq_dpci *pirq_dpci, void *arg)
+{
+    struct dev_intx_gsi_link *digl, *tmp;
+
+    pirq_guest_unbind(d, pirq, dpci_pirq(pirq_dpci));
+
+    if ( pt_irq_need_timer(pirq_dpci->flags) )
+        kill_timer(&pirq_dpci->timer);
+
+    list_for_each_entry_safe ( digl, tmp, &pirq_dpci->digl_list, list )
+    {
+        list_del(&digl->list);
+        xfree(digl);
+    }
+
+    return 0;
+}
+
 static void pci_clean_dpci_irqs(struct domain *d)
 {
     struct hvm_irq_dpci *hvm_irq_dpci = NULL;
-    uint32_t i;
-    struct list_head *digl_list, *tmp;
-    struct dev_intx_gsi_link *digl;
 
     if ( !iommu_enabled )
         return;
@@ -255,24 +271,7 @@ static void pci_clean_dpci_irqs(struct domain *d)
     {
         tasklet_kill(&hvm_irq_dpci->dirq_tasklet);
 
-        for ( i = find_first_bit(hvm_irq_dpci->mapping, d->nr_pirqs);
-              i < d->nr_pirqs;
-              i = find_next_bit(hvm_irq_dpci->mapping, d->nr_pirqs, i + 1) )
-        {
-            pirq_guest_unbind(d, i);
-
-            if ( pt_irq_need_timer(hvm_irq_dpci->mirq[i].flags) )
-                kill_timer(&hvm_irq_dpci->hvm_timer[i]);
-
-            list_for_each_safe ( digl_list, tmp,
-                                 &hvm_irq_dpci->mirq[i].digl_list )
-            {
-                digl = list_entry(digl_list,
-                                  struct dev_intx_gsi_link, list);
-                list_del(&digl->list);
-                xfree(digl);
-            }
-        }
+        pt_pirq_iterate(d, pci_clean_dpci_irq, NULL);
 
         d->arch.hvm_domain.irq.dpci = NULL;
         free_hvm_irq_dpci(hvm_irq_dpci);

@@ -11,6 +11,7 @@
 #include <xen/list.h>
 #include <xen/cpumask.h>
 #include <xen/mm.h>
+#include <xen/hvm/irq.h>
 #include <asm/fpswa.h>
 #include <xen/rangeset.h>
 
@@ -315,6 +316,23 @@ struct arch_vcpu {
     int last_processor;
     cpumask_t cache_coherent_map;
 };
+
+struct arch_pirq {
+    struct hvm_pirq_dpci dpci;
+};
+
+#define pirq_dpci(pirq) ((pirq) ? &(pirq)->arch.dpci : NULL)
+#define dpci_pirq(dpci) container_of(dpci, struct pirq, arch.dpci)
+
+#define alloc_pirq_struct(d) ({ \
+    struct pirq *pirq = xmalloc(struct pirq); \
+    if ( pirq ) \
+    { \
+        memset(pirq, 0, sizeof(*pirq)); \
+        pt_pirq_init(d, &pirq->arch.dpci); \
+    } \
+    pirq; \
+})
 
 #include <asm/uaccess.h> /* for KERNEL_DS */
 #include <asm/pgtable.h>

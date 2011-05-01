@@ -290,13 +290,7 @@ struct domain *domain_create(
         if ( d->nr_pirqs > nr_irqs )
             d->nr_pirqs = nr_irqs;
 
-        d->pirq_to_evtchn = xmalloc_array(u16, d->nr_pirqs);
-        d->pirq_mask = xmalloc_array(
-            unsigned long, BITS_TO_LONGS(d->nr_pirqs));
-        if ( (d->pirq_to_evtchn == NULL) || (d->pirq_mask == NULL) )
-            goto fail;
-        memset(d->pirq_to_evtchn, 0, d->nr_pirqs * sizeof(*d->pirq_to_evtchn));
-        bitmap_zero(d->pirq_mask, d->nr_pirqs);
+        INIT_RADIX_TREE(&d->pirq_tree, 0);
 
         if ( evtchn_init(d) != 0 )
             goto fail;
@@ -346,6 +340,7 @@ struct domain *domain_create(
     {
         evtchn_destroy(d);
         evtchn_destroy_final(d);
+        radix_tree_destroy(&d->pirq_tree, free_pirq_struct, NULL);
     }
     if ( init_status & INIT_rangeset )
         rangeset_domain_destroy(d);
@@ -353,8 +348,6 @@ struct domain *domain_create(
         watchdog_domain_destroy(d);
     if ( init_status & INIT_xsm )
         xsm_free_security_domain(d);
-    xfree(d->pirq_mask);
-    xfree(d->pirq_to_evtchn);
     free_cpumask_var(d->domain_dirty_cpumask);
     free_domain_struct(d);
     return NULL;
@@ -680,8 +673,7 @@ static void complete_domain_destroy(struct rcu_head *head)
 
     evtchn_destroy_final(d);
 
-    xfree(d->pirq_mask);
-    xfree(d->pirq_to_evtchn);
+    radix_tree_destroy(&d->pirq_tree, free_pirq_struct, NULL);
 
     xsm_free_security_domain(d);
     free_cpumask_var(d->domain_dirty_cpumask);
@@ -961,6 +953,20 @@ long vm_assist(struct domain *p, unsigned int cmd, unsigned int type)
     }
 
     return -ENOSYS;
+}
+
+struct pirq *pirq_get_info(struct domain *d, int pirq)
+{
+    struct pirq *info = pirq_info(d, pirq);
+
+    if ( !info && (info = alloc_pirq_struct(d)) != NULL &&
+         radix_tree_insert(&d->pirq_tree, pirq, info, NULL, NULL) )
+    {
+         free_pirq_struct(info);
+         info = NULL;
+    }
+
+    return info;
 }
 
 struct migrate_info {

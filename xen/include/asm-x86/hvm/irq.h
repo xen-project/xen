@@ -111,4 +111,6 @@ struct hvm_intack hvm_vcpu_ack_pending_irq(struct vcpu *v,
  */
 #define SUPPORT_MSI_REMAPPING 1
 
+void msixtbl_pt_cleanup(struct domain *d);
+
 #endif /* __ASM_X86_HVM_IRQ_H__ */

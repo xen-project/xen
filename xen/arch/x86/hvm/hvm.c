@@ -252,32 +252,36 @@ void hvm_migrate_timers(struct vcpu *v)
     pt_migrate(v);
 }
 
-void hvm_migrate_pirqs(struct vcpu *v)
+static int hvm_migrate_pirq(struct domain *d, unsigned int pirq,
+                            struct hvm_pirq_dpci *pirq_dpci, void *arg)
 {
-    int pirq, irq;
-    struct irq_desc *desc;
-    struct domain *d = v->domain;
-    struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
-    
-    if ( !iommu_enabled || (hvm_irq_dpci == NULL) )
-       return;
+    struct vcpu *v = arg;
 
-    spin_lock(&d->event_lock);
-    for ( pirq = find_first_bit(hvm_irq_dpci->mapping, d->nr_pirqs);
-          pirq < d->nr_pirqs;
-          pirq = find_next_bit(hvm_irq_dpci->mapping, d->nr_pirqs, pirq + 1) )
+    if ( (pirq_dpci->flags & HVM_IRQ_DPCI_MACH_MSI) &&
+         (pirq_dpci->gmsi.dest_vcpu_id == v->vcpu_id) )
     {
-        if ( !(hvm_irq_dpci->mirq[pirq].flags & HVM_IRQ_DPCI_MACH_MSI) ||
-               (hvm_irq_dpci->mirq[pirq].gmsi.dest_vcpu_id != v->vcpu_id) )
-            continue;
-        desc = domain_spin_lock_irq_desc(v->domain, pirq, NULL);
-        if (!desc)
-            continue;
-        irq = desc - irq_desc;
-        ASSERT(MSI_IRQ(irq));
+        struct irq_desc *desc =
+            pirq_spin_lock_irq_desc(d, dpci_pirq(pirq_dpci), NULL);
+
+        if ( !desc )
+            return 0;
+        ASSERT(MSI_IRQ(desc - irq_desc));
         irq_set_affinity(desc, cpumask_of(v->processor));
         spin_unlock_irq(&desc->lock);
     }
+
+    return 0;
+}
+
+void hvm_migrate_pirqs(struct vcpu *v)
+{
+    struct domain *d = v->domain;
+
+    if ( !iommu_enabled || !d->arch.hvm_domain.irq.dpci )
+       return;
+
+    spin_lock(&d->event_lock);
+    pt_pirq_iterate(d, hvm_migrate_pirq, v);
     spin_unlock(&d->event_lock);
 }
 
@@ -500,8 +504,6 @@ int hvm_domain_initialise(struct domain *d)
     xfree(d->arch.hvm_domain.pbuf);
     return rc;
 }
-
-extern void msixtbl_pt_cleanup(struct domain *d);
 
 void hvm_domain_relinquish_resources(struct domain *d)
 {

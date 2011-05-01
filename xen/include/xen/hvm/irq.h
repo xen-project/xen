@@ -25,7 +25,7 @@
 #include <xen/types.h>
 #include <xen/spinlock.h>
 #include <xen/tasklet.h>
-#include <asm/irq.h>
+#include <xen/timer.h>
 #include <public/hvm/save.h>
 
 struct dev_intx_gsi_link {
@@ -38,11 +38,15 @@ struct dev_intx_gsi_link {
 
 #define _HVM_IRQ_DPCI_MACH_PCI_SHIFT            0
 #define _HVM_IRQ_DPCI_MACH_MSI_SHIFT            1
+#define _HVM_IRQ_DPCI_MAPPED_SHIFT              2
+#define _HVM_IRQ_DPCI_EOI_LATCH_SHIFT           3
 #define _HVM_IRQ_DPCI_GUEST_PCI_SHIFT           4
 #define _HVM_IRQ_DPCI_GUEST_MSI_SHIFT           5
 #define _HVM_IRQ_DPCI_TRANSLATE_SHIFT          15
 #define HVM_IRQ_DPCI_MACH_PCI        (1 << _HVM_IRQ_DPCI_MACH_PCI_SHIFT)
 #define HVM_IRQ_DPCI_MACH_MSI        (1 << _HVM_IRQ_DPCI_MACH_MSI_SHIFT)
+#define HVM_IRQ_DPCI_MAPPED          (1 << _HVM_IRQ_DPCI_MAPPED_SHIFT)
+#define HVM_IRQ_DPCI_EOI_LATCH       (1 << _HVM_IRQ_DPCI_EOI_LATCH_SHIFT)
 #define HVM_IRQ_DPCI_GUEST_PCI       (1 << _HVM_IRQ_DPCI_GUEST_PCI_SHIFT)
 #define HVM_IRQ_DPCI_GUEST_MSI       (1 << _HVM_IRQ_DPCI_GUEST_MSI_SHIFT)
 #define HVM_IRQ_DPCI_TRANSLATE       (1 << _HVM_IRQ_DPCI_TRANSLATE_SHIFT)
@@ -63,14 +67,6 @@ struct hvm_gmsi_info {
     int dest_vcpu_id; /* -1 :multi-dest, non-negative: dest_vcpu_id */
 };
 
-struct hvm_mirq_dpci_mapping {
-    uint32_t flags;
-    int pending;
-    struct list_head digl_list;
-    struct domain *dom;
-    struct hvm_gmsi_info gmsi;
-};
-
 struct hvm_girq_dpci_mapping {
     struct list_head list;
     uint8_t device;
@@ -88,19 +84,32 @@ struct hvm_girq_dpci_mapping {
 
 /* Protected by domain's event_lock */
 struct hvm_irq_dpci {
-    /* Machine IRQ to guest device/intx mapping. */
-    unsigned long *mapping;
-    struct hvm_mirq_dpci_mapping *mirq;
-    unsigned long *dirq_mask;
     /* Guest IRQ to guest device/intx mapping. */
     struct list_head girq[NR_HVM_IRQS];
     /* Record of mapped ISA IRQs */
     DECLARE_BITMAP(isairq_map, NR_ISAIRQS);
     /* Record of mapped Links */
     uint8_t link_cnt[NR_LINK];
-    struct timer *hvm_timer;
     struct tasklet dirq_tasklet;
 };
+
+/* Machine IRQ to guest device/intx mapping. */
+struct hvm_pirq_dpci {
+    uint32_t flags;
+    bool_t masked;
+    uint16_t pending;
+    struct list_head digl_list;
+    struct domain *dom;
+    struct hvm_gmsi_info gmsi;
+    struct timer timer;
+};
+
+void pt_pirq_init(struct domain *, struct hvm_pirq_dpci *);
+bool_t pt_pirq_cleanup_check(struct hvm_pirq_dpci *);
+int pt_pirq_iterate(struct domain *d,
+                    int (*cb)(struct domain *, unsigned int pirq,
+                              struct hvm_pirq_dpci *, void *arg),
+                    void *arg);
 
 /* Modify state of a PCI INTx wire. */
 void hvm_pci_intx_assert(
@@ -119,5 +128,7 @@ void hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq);
 void hvm_maybe_deassert_evtchn_irq(void);
 void hvm_assert_evtchn_irq(struct vcpu *v);
 void hvm_set_callback_via(struct domain *d, uint64_t via);
+
+int vmsi_deliver(struct domain *, const struct hvm_pirq_dpci *);
 
 #endif /* __XEN_HVM_IRQ_H__ */

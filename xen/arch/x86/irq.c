@@ -814,7 +814,7 @@ static void irq_guest_eoi_timer_fn(void *data)
         {
             struct domain *d = action->guest[i];
             unsigned int pirq = domain_irq_to_pirq(d, irq);
-            if ( test_and_clear_bit(pirq, d->pirq_mask) )
+            if ( test_and_clear_bool(pirq_info(d, pirq)->masked) )
                 action->in_flight--;
         }
     }
@@ -874,11 +874,12 @@ static void __do_IRQ_guest(int irq)
 
     for ( i = 0; i < action->nr_guests; i++ )
     {
-        unsigned int pirq;
+        struct pirq *pirq;
+
         d = action->guest[i];
-        pirq = domain_irq_to_pirq(d, irq);
+        pirq = pirq_info(d, domain_irq_to_pirq(d, irq));
         if ( (action->ack_type != ACKTYPE_NONE) &&
-             !test_and_set_bit(pirq, d->pirq_mask) )
+             !test_and_set_bool(pirq->masked) )
             action->in_flight++;
         if ( hvm_do_IRQ_dpci(d, pirq) )
         {
@@ -950,6 +951,34 @@ struct irq_desc *domain_spin_lock_irq_desc(
     return desc;
 }
 
+/*
+ * Same with struct pirq already looked up, and d->event_lock already
+ * held (thus the PIRQ <-> IRQ mapping can't change under our feet).
+ */
+struct irq_desc *pirq_spin_lock_irq_desc(
+    struct domain *d, const struct pirq *pirq, unsigned long *pflags)
+{
+    int irq = pirq->arch.irq;
+    struct irq_desc *desc;
+    unsigned long flags;
+
+    ASSERT(spin_is_locked(&d->event_lock));
+
+    if ( irq <= 0 )
+        return NULL;
+
+    desc = irq_to_desc(irq);
+    spin_lock_irqsave(&desc->lock, flags);
+
+    if ( pflags )
+        *pflags = flags;
+
+    ASSERT(pirq == pirq_info(d, domain_irq_to_pirq(d, irq)));
+    ASSERT(irq == pirq->arch.irq);
+
+    return desc;
+}
+
 static int set_domain_irq_pirq(struct domain *d, int irq, int pirq)
 {
     int err = radix_tree_insert(&d->arch.irq_pirq, irq, (void *)(long)pirq,
@@ -957,20 +986,31 @@ static int set_domain_irq_pirq(struct domain *d, int irq, int pirq)
 
     switch ( err )
     {
+        struct pirq *info;
+
     case -EEXIST:
         *radix_tree_lookup_slot(&d->arch.irq_pirq, irq) = (void *)(long)pirq;
         /* fall through */
     case 0:
-        d->arch.pirq_irq[pirq] = irq;
-        return 0;
+        info = pirq_get_info(d, pirq);
+        if ( info )
+        {
+            info->arch.irq = irq;
+            return 0;
+        }
+        radix_tree_delete(&d->arch.irq_pirq, irq, NULL);
+        err = -ENOMEM;
+        break;
     }
 
     return err;
 }
 
-static void clear_domain_irq_pirq(struct domain *d, int irq, int pirq)
+static void clear_domain_irq_pirq(struct domain *d, int irq, int pirq,
+                                  struct pirq *info)
 {
-    d->arch.pirq_irq[pirq] = 0;
+    info->arch.irq = 0;
+    pirq_cleanup_check(info, d, pirq);
     radix_tree_delete(&d->arch.irq_pirq, irq, NULL);
 }
 
@@ -1000,6 +1040,48 @@ void cleanup_domain_irq_mapping(struct domain *d)
     if ( is_hvm_domain(d) )
         radix_tree_destroy(&d->arch.hvm_domain.emuirq_pirq,
                            irq_slot_free, NULL);
+}
+
+struct pirq *alloc_pirq_struct(struct domain *d)
+{
+    size_t sz = is_hvm_domain(d) ? sizeof(struct pirq) :
+                                   offsetof(struct pirq, arch.hvm);
+    struct pirq *pirq = xmalloc_bytes(sz);
+
+    if ( pirq )
+    {
+        memset(pirq, 0, sz);
+        if ( is_hvm_domain(d) )
+        {
+            pirq->arch.hvm.emuirq = IRQ_UNBOUND;
+            pt_pirq_init(d, &pirq->arch.hvm.dpci);
+        }
+    }
+
+    return pirq;
+}
+
+void (pirq_cleanup_check)(struct pirq *info, struct domain *d, int pirq)
+{
+    /*
+     * Check whether all fields have their default values, and delete
+     * the entry from the tree if so.
+     *
+     * NB: Common parts were already checked.
+     */
+    if ( info->arch.irq )
+        return;
+
+    if ( is_hvm_domain(d) )
+    {
+        if ( info->arch.hvm.emuirq != IRQ_UNBOUND )
+            return;
+        if ( !pt_pirq_cleanup_check(&info->arch.hvm.dpci) )
+            return;
+    }
+
+    if ( radix_tree_delete(&d->pirq_tree, pirq, NULL) != info )
+        BUG();
 }
 
 /* Flush all ready EOIs from the top of this CPU's pending-EOI stack. */
@@ -1062,17 +1144,21 @@ static void set_eoi_ready(void *data)
     flush_ready_eoi();
 }
 
-static void __pirq_guest_eoi(struct domain *d, int pirq)
+void pirq_guest_eoi(struct domain *d, struct pirq *pirq)
 {
-    struct irq_desc         *desc;
+    struct irq_desc *desc;
+
+    ASSERT(local_irq_is_enabled());
+    desc = pirq_spin_lock_irq_desc(d, pirq, NULL);
+    if ( desc )
+        desc_guest_eoi(d, desc, pirq);
+}
+
+void desc_guest_eoi(struct domain *d, struct irq_desc *desc, struct pirq *pirq)
+{
     irq_guest_action_t *action;
     cpumask_t           cpu_eoi_map;
     int                 irq;
-
-    ASSERT(local_irq_is_enabled());
-    desc = domain_spin_lock_irq_desc(d, pirq, NULL);
-    if ( desc == NULL )
-        return;
 
     if ( !(desc->status & IRQ_GUEST) )
     {
@@ -1085,12 +1171,12 @@ static void __pirq_guest_eoi(struct domain *d, int pirq)
 
     if ( action->ack_type == ACKTYPE_NONE )
     {
-        ASSERT(!test_bit(pirq, d->pirq_mask));
+        ASSERT(!pirq->masked);
         stop_timer(&action->eoi_timer);
         _irq_guest_eoi(desc);
     }
 
-    if ( unlikely(!test_and_clear_bit(pirq, d->pirq_mask)) ||
+    if ( unlikely(!test_and_clear_bool(pirq->masked)) ||
          unlikely(--action->in_flight != 0) )
     {
         spin_unlock_irq(&desc->lock);
@@ -1125,27 +1211,23 @@ static void __pirq_guest_eoi(struct domain *d, int pirq)
         on_selected_cpus(&cpu_eoi_map, set_eoi_ready, desc, 0);
 }
 
-int pirq_guest_eoi(struct domain *d, int irq)
-{
-    if ( (irq < 0) || (irq >= d->nr_pirqs) )
-        return -EINVAL;
-
-    __pirq_guest_eoi(d, irq);
-
-    return 0;
-}
-
 int pirq_guest_unmask(struct domain *d)
 {
-    unsigned int irq, nr = d->nr_pirqs;
+    unsigned int pirq = 0, n, i;
+    unsigned long indexes[16];
+    struct pirq *pirqs[ARRAY_SIZE(indexes)];
 
-    for ( irq = find_first_bit(d->pirq_mask, nr);
-          irq < nr;
-          irq = find_next_bit(d->pirq_mask, nr, irq+1) )
-    {
-        if ( !test_bit(d->pirq_to_evtchn[irq], &shared_info(d, evtchn_mask)) )
-            __pirq_guest_eoi(d, irq);
-    }
+    do {
+        n = radix_tree_gang_lookup(&d->pirq_tree, (void **)pirqs, pirq,
+                                   ARRAY_SIZE(pirqs), indexes);
+        for ( i = 0; i < n; ++i )
+        {
+            pirq = indexes[i];
+            if ( pirqs[i]->masked &&
+                 !test_bit(pirqs[i]->evtchn, &shared_info(d, evtchn_mask)) )
+                pirq_guest_eoi(d, pirqs[i]);
+        }
+    } while ( ++pirq < d->nr_pirqs && n == ARRAY_SIZE(pirqs) );
 
     return 0;
 }
@@ -1215,7 +1297,7 @@ int pirq_shared(struct domain *d, int pirq)
     return shared;
 }
 
-int pirq_guest_bind(struct vcpu *v, int pirq, int will_share)
+int pirq_guest_bind(struct vcpu *v, int pirq, struct pirq *info, int will_share)
 {
     unsigned int        irq;
     struct irq_desc         *desc;
@@ -1227,7 +1309,7 @@ int pirq_guest_bind(struct vcpu *v, int pirq, int will_share)
     BUG_ON(!local_irq_is_enabled());
 
  retry:
-    desc = domain_spin_lock_irq_desc(v->domain, pirq, NULL);
+    desc = pirq_spin_lock_irq_desc(v->domain, info, NULL);
     if ( desc == NULL )
     {
         rc = -EINVAL;
@@ -1328,7 +1410,7 @@ int pirq_guest_bind(struct vcpu *v, int pirq, int will_share)
 }
 
 static irq_guest_action_t *__pirq_guest_unbind(
-    struct domain *d, int pirq, struct irq_desc *desc)
+    struct domain *d, int pirq, struct pirq *info, struct irq_desc *desc)
 {
     unsigned int        irq;
     irq_guest_action_t *action;
@@ -1357,13 +1439,13 @@ static irq_guest_action_t *__pirq_guest_unbind(
     switch ( action->ack_type )
     {
     case ACKTYPE_UNMASK:
-        if ( test_and_clear_bit(pirq, d->pirq_mask) &&
+        if ( test_and_clear_bool(info->masked) &&
              (--action->in_flight == 0) )
             desc->handler->end(irq);
         break;
     case ACKTYPE_EOI:
         /* NB. If #guests == 0 then we clear the eoi_map later on. */
-        if ( test_and_clear_bit(pirq, d->pirq_mask) &&
+        if ( test_and_clear_bool(info->masked) &&
              (--action->in_flight == 0) &&
              (action->nr_guests != 0) )
         {
@@ -1381,9 +1463,9 @@ static irq_guest_action_t *__pirq_guest_unbind(
 
     /*
      * The guest cannot re-bind to this IRQ until this function returns. So,
-     * when we have flushed this IRQ from pirq_mask, it should remain flushed.
+     * when we have flushed this IRQ from ->masked, it should remain flushed.
      */
-    BUG_ON(test_bit(pirq, d->pirq_mask));
+    BUG_ON(info->masked);
 
     if ( action->nr_guests != 0 )
         return NULL;
@@ -1421,7 +1503,7 @@ static irq_guest_action_t *__pirq_guest_unbind(
     return action;
 }
 
-void pirq_guest_unbind(struct domain *d, int pirq)
+void pirq_guest_unbind(struct domain *d, int pirq, struct pirq *info)
 {
     irq_guest_action_t *oldaction = NULL;
     struct irq_desc *desc;
@@ -1430,19 +1512,19 @@ void pirq_guest_unbind(struct domain *d, int pirq)
     WARN_ON(!spin_is_locked(&d->event_lock));
 
     BUG_ON(!local_irq_is_enabled());
-    desc = domain_spin_lock_irq_desc(d, pirq, NULL);
+    desc = pirq_spin_lock_irq_desc(d, info, NULL);
 
     if ( desc == NULL )
     {
-        irq = -domain_pirq_to_irq(d, pirq);
+        irq = -info->arch.irq;
         BUG_ON(irq <= 0);
         desc = irq_to_desc(irq);
         spin_lock_irq(&desc->lock);
-        clear_domain_irq_pirq(d, irq, pirq);
+        clear_domain_irq_pirq(d, irq, pirq, info);
     }
     else
     {
-        oldaction = __pirq_guest_unbind(d, pirq, desc);
+        oldaction = __pirq_guest_unbind(d, pirq, info, desc);
     }
 
     spin_unlock_irq(&desc->lock);
@@ -1454,7 +1536,7 @@ void pirq_guest_unbind(struct domain *d, int pirq)
     }
 }
 
-static int pirq_guest_force_unbind(struct domain *d, int irq)
+static int pirq_guest_force_unbind(struct domain *d, int irq, struct pirq *info)
 {
     struct irq_desc *desc;
     irq_guest_action_t *action, *oldaction = NULL;
@@ -1463,7 +1545,7 @@ static int pirq_guest_force_unbind(struct domain *d, int irq)
     WARN_ON(!spin_is_locked(&d->event_lock));
 
     BUG_ON(!local_irq_is_enabled());
-    desc = domain_spin_lock_irq_desc(d, irq, NULL);
+    desc = pirq_spin_lock_irq_desc(d, info, NULL);
     BUG_ON(desc == NULL);
 
     if ( !(desc->status & IRQ_GUEST) )
@@ -1483,7 +1565,7 @@ static int pirq_guest_force_unbind(struct domain *d, int irq)
         goto out;
 
     bound = 1;
-    oldaction = __pirq_guest_unbind(d, irq, desc);
+    oldaction = __pirq_guest_unbind(d, irq, info, desc);
 
  out:
     spin_unlock_irq(&desc->lock);
@@ -1497,6 +1579,13 @@ static int pirq_guest_force_unbind(struct domain *d, int irq)
     return bound;
 }
 
+static inline bool_t is_free_pirq(const struct domain *d,
+                                  const struct pirq *pirq)
+{
+    return !pirq || (!pirq->arch.irq && (!is_hvm_domain(d) ||
+        pirq->arch.hvm.emuirq == IRQ_UNBOUND));
+}
+
 int get_free_pirq(struct domain *d, int type, int index)
 {
     int i;
@@ -1506,29 +1595,17 @@ int get_free_pirq(struct domain *d, int type, int index)
     if ( type == MAP_PIRQ_TYPE_GSI )
     {
         for ( i = 16; i < nr_irqs_gsi; i++ )
-            if ( !d->arch.pirq_irq[i] )
-            {
-                if ( !is_hvm_domain(d) ||
-                        d->arch.pirq_emuirq[i] == IRQ_UNBOUND )
-                    break;
-            }
-        if ( i == nr_irqs_gsi )
-            return -ENOSPC;
+            if ( is_free_pirq(d, pirq_info(d, i)) )
+                return i;
     }
     else
     {
         for ( i = d->nr_pirqs - 1; i >= nr_irqs_gsi; i-- )
-            if ( !d->arch.pirq_irq[i] )
-            {
-                if ( !is_hvm_domain(d) ||
-                        d->arch.pirq_emuirq[i] == IRQ_UNBOUND )
-                    break;
-            }
-        if ( i < nr_irqs_gsi )
-            return -ENOSPC;
+            if ( is_free_pirq(d, pirq_info(d, i)) )
+                return i;
     }
 
-    return i;
+    return -ENOSPC;
 }
 
 int map_domain_pirq(
@@ -1627,6 +1704,7 @@ int unmap_domain_pirq(struct domain *d, int pirq)
     struct irq_desc *desc;
     int irq, ret = 0;
     bool_t forced_unbind;
+    struct pirq *info;
     struct msi_desc *msi_desc = NULL;
 
     if ( (pirq < 0) || (pirq >= d->nr_pirqs) )
@@ -1635,8 +1713,8 @@ int unmap_domain_pirq(struct domain *d, int pirq)
     ASSERT(spin_is_locked(&pcidevs_lock));
     ASSERT(spin_is_locked(&d->event_lock));
 
-    irq = domain_pirq_to_irq(d, pirq);
-    if ( irq <= 0 )
+    info = pirq_info(d, pirq);
+    if ( !info || (irq = info->arch.irq) <= 0 )
     {
         dprintk(XENLOG_G_ERR, "dom%d: pirq %d not mapped\n",
                 d->domain_id, pirq);
@@ -1644,7 +1722,7 @@ int unmap_domain_pirq(struct domain *d, int pirq)
         goto done;
     }
 
-    forced_unbind = pirq_guest_force_unbind(d, pirq);
+    forced_unbind = pirq_guest_force_unbind(d, pirq, info);
     if ( forced_unbind )
         dprintk(XENLOG_G_WARNING, "dom%d: forcing unbind of pirq %d\n",
                 d->domain_id, pirq);
@@ -1659,10 +1737,10 @@ int unmap_domain_pirq(struct domain *d, int pirq)
     BUG_ON(irq != domain_pirq_to_irq(d, pirq));
 
     if ( !forced_unbind )
-        clear_domain_irq_pirq(d, irq, pirq);
+        clear_domain_irq_pirq(d, irq, pirq, info);
     else
     {
-        d->arch.pirq_irq[pirq] = -irq;
+        info->arch.irq = -irq;
         *radix_tree_lookup_slot(&d->arch.irq_pirq, irq) = (void *)(long)-pirq;
     }
 
@@ -1690,7 +1768,7 @@ void free_domain_pirqs(struct domain *d)
     spin_lock(&d->event_lock);
 
     for ( i = 0; i < d->nr_pirqs; i++ )
-        if ( d->arch.pirq_irq[i] > 0 )
+        if ( domain_pirq_to_irq(d, i) > 0 )
             unmap_domain_pirq(d, i);
 
     spin_unlock(&d->event_lock);
@@ -1706,6 +1784,7 @@ static void dump_irqs(unsigned char key)
     struct irq_cfg *cfg;
     irq_guest_action_t *action;
     struct domain *d;
+    const struct pirq *info;
     unsigned long flags;
 
     printk("Guest interrupt information:\n");
@@ -1740,20 +1819,18 @@ static void dump_irqs(unsigned char key)
             {
                 d = action->guest[i];
                 pirq = domain_irq_to_pirq(d, irq);
+                info = pirq_info(d, pirq);
                 printk("%u:%3d(%c%c%c%c)",
                        d->domain_id, pirq,
-                       (test_bit(d->pirq_to_evtchn[pirq],
+                       (test_bit(info->evtchn,
                                  &shared_info(d, evtchn_pending)) ?
                         'P' : '-'),
-                       (test_bit(d->pirq_to_evtchn[pirq] /
-                                 BITS_PER_EVTCHN_WORD(d),
+                       (test_bit(info->evtchn / BITS_PER_EVTCHN_WORD(d),
                                  &vcpu_info(d->vcpu[0], evtchn_pending_sel)) ?
                         'S' : '-'),
-                       (test_bit(d->pirq_to_evtchn[pirq],
-                                 &shared_info(d, evtchn_mask)) ?
+                       (test_bit(info->evtchn, &shared_info(d, evtchn_mask)) ?
                         'M' : '-'),
-                       (test_bit(pirq, d->pirq_mask) ?
-                        'M' : '-'));
+                       (info->masked ? 'M' : '-'));
                 if ( i != action->nr_guests )
                     printk(",");
             }
@@ -1860,6 +1937,7 @@ void fixup_irqs(void)
 int map_domain_emuirq_pirq(struct domain *d, int pirq, int emuirq)
 {
     int old_emuirq = IRQ_UNBOUND, old_pirq = IRQ_UNBOUND;
+    struct pirq *info;
 
     ASSERT(spin_is_locked(&d->event_lock));
 
@@ -1886,6 +1964,10 @@ int map_domain_emuirq_pirq(struct domain *d, int pirq, int emuirq)
         return 0;
     }
 
+    info = pirq_get_info(d, pirq);
+    if ( !info )
+        return -ENOMEM;
+
     /* do not store emuirq mappings for pt devices */
     if ( emuirq != IRQ_PT )
     {
@@ -1901,10 +1983,11 @@ int map_domain_emuirq_pirq(struct domain *d, int pirq, int emuirq)
                 (void *)((long)pirq + 1);
             break;
         default:
+            pirq_cleanup_check(info, d, pirq);
             return err;
         }
     }
-    d->arch.pirq_emuirq[pirq] = emuirq;
+    info->arch.hvm.emuirq = emuirq;
 
     return 0;
 }
@@ -1912,6 +1995,7 @@ int map_domain_emuirq_pirq(struct domain *d, int pirq, int emuirq)
 int unmap_domain_pirq_emuirq(struct domain *d, int pirq)
 {
     int emuirq, ret = 0;
+    struct pirq *info;
 
     if ( !is_hvm_domain(d) )
         return -EINVAL;
@@ -1930,7 +2014,12 @@ int unmap_domain_pirq_emuirq(struct domain *d, int pirq)
         goto done;
     }
 
-    d->arch.pirq_emuirq[pirq] = IRQ_UNBOUND;
+    info = pirq_info(d, pirq);
+    if ( info )
+    {
+        info->arch.hvm.emuirq = IRQ_UNBOUND;
+        pirq_cleanup_check(info, d, pirq);
+    }
     if ( emuirq != IRQ_PT )
         radix_tree_delete(&d->arch.hvm_domain.emuirq_pirq, emuirq, NULL);
 
@@ -1938,16 +2027,9 @@ int unmap_domain_pirq_emuirq(struct domain *d, int pirq)
     return ret;
 }
 
-int hvm_domain_use_pirq(struct domain *d, int pirq)
+bool_t hvm_domain_use_pirq(const struct domain *d, const struct pirq *pirq)
 {
-    int emuirq;
-    
-    if ( !is_hvm_domain(d) )
-        return 0;
-
-    emuirq = domain_pirq_to_emuirq(d, pirq);
-    if ( emuirq != IRQ_UNBOUND && d->pirq_to_evtchn[pirq] != 0 )
-        return 1;
-    else
-        return 0;
+    return is_hvm_domain(d) &&
+           pirq->arch.hvm.emuirq != IRQ_UNBOUND &&
+           pirq->evtchn != 0;
 }

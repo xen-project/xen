@@ -225,7 +225,8 @@ EXPORT_SYMBOL(radix_tree_lookup);
 
 static unsigned int
 __lookup(struct radix_tree_root *root, void **results, unsigned long index,
-         unsigned int max_items, unsigned long *next_index)
+         unsigned int max_items, unsigned long *indexes,
+         unsigned long *next_index)
 {
     unsigned int nr_found = 0;
     unsigned int shift, height;
@@ -235,8 +236,11 @@ __lookup(struct radix_tree_root *root, void **results, unsigned long index,
     height = root->height;
     if (index > radix_tree_maxindex(height))
         if (height == 0) {
-            if (root->rnode && index == 0)
+            if (root->rnode && index == 0) {
+                if (indexes)
+                    indexes[nr_found] = index;
                 results[nr_found++] = root->rnode;
+            }
             goto out;
         }
 
@@ -265,6 +269,8 @@ __lookup(struct radix_tree_root *root, void **results, unsigned long index,
     for (i = index & RADIX_TREE_MAP_MASK; i < RADIX_TREE_MAP_SIZE; i++) {
         index++;
         if (slot->slots[i]) {
+            if (indexes)
+                indexes[nr_found] = index - 1;
             results[nr_found++] = slot->slots[i];
             if (nr_found == max_items)
                 goto out;
@@ -281,6 +287,7 @@ __lookup(struct radix_tree_root *root, void **results, unsigned long index,
  * @results: where the results of the lookup are placed
  * @first_index: start the lookup from this key
  * @max_items: place up to this many items at *results
+ * @indexes: (optional) array to store indexes of items.
  *
  * Performs an index-ascending scan of the tree for present items.  Places
  * them at *@results and returns the number of items which were placed at
@@ -290,7 +297,8 @@ __lookup(struct radix_tree_root *root, void **results, unsigned long index,
  */
 unsigned int
 radix_tree_gang_lookup(struct radix_tree_root *root, void **results,
-                       unsigned long first_index, unsigned int max_items)
+                       unsigned long first_index, unsigned int max_items,
+                       unsigned long *indexes)
 {
     const unsigned long max_index = radix_tree_maxindex(root->height);
     unsigned long cur_index = first_index;
@@ -303,7 +311,7 @@ radix_tree_gang_lookup(struct radix_tree_root *root, void **results,
         if (cur_index > max_index)
             break;
         nr_found = __lookup(root, results + ret, cur_index,
-                            max_items - ret, &next_index);
+                            max_items - ret, indexes + ret, &next_index);
         ret += nr_found;
         if (next_index == 0)
             break;

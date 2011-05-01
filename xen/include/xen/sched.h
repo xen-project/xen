@@ -21,6 +21,7 @@
 #include <xen/irq.h>
 #include <xen/mm.h>
 #include <xen/tasklet.h>
+#include <xen/radix-tree.h>
 #include <public/mem_event.h>
 #include <xen/cpumask.h>
 #include <xen/nodemask.h>
@@ -234,13 +235,11 @@ struct domain
     struct grant_table *grant_table;
 
     /*
-     * Interrupt to event-channel mappings. Updates should be protected by the 
-     * domain's event-channel spinlock. Read accesses can also synchronise on 
-     * the lock, but races don't usually matter.
+     * Interrupt to event-channel mappings and other per-guest-pirq data.
+     * Protected by the domain's event-channel spinlock.
      */
     unsigned int     nr_pirqs;
-    u16             *pirq_to_evtchn;
-    unsigned long   *pirq_mask;
+    struct radix_tree_root pirq_tree;
 
     /* I/O capabilities (access to IRQs and memory-mapped I/O). */
     struct rangeset *iomem_caps;

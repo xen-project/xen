@@ -286,9 +286,6 @@ struct arch_domain
 
     /* NB. protected by d->event_lock and by irq_desc[irq].lock */
     struct radix_tree_root irq_pirq;
-    int *pirq_irq;
-    /* pirq to emulated irq */
-    int *pirq_emuirq;
 
     /* Maximum physical-address bitwidth supported by this guest. */
     unsigned int physaddr_bitsize;

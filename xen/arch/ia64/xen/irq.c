@@ -363,15 +363,17 @@ void __do_IRQ_guest(int irq)
     irq_desc_t         *desc = &irq_desc[irq];
     irq_guest_action_t *action = (irq_guest_action_t *)desc->action;
     struct domain      *d;
+    struct pirq        *pirq;
     int                 i, already_pending = 0;
 
     for ( i = 0; i < action->nr_guests; i++ )
     {
         d = action->guest[i];
+        pirq = pirq_info(d, irq);
         if ( (action->ack_type != ACKTYPE_NONE) &&
-             !test_and_set_bit(irq, &d->pirq_mask) )
+             !test_and_set_bool(pirq->masked) )
             action->in_flight++;
-		if ( hvm_do_IRQ_dpci(d, irq) )
+		if ( hvm_do_IRQ_dpci(d, pirq) )
 		{
 			if ( action->ack_type == ACKTYPE_NONE )
 			{
@@ -379,7 +381,7 @@ void __do_IRQ_guest(int irq)
 				desc->status |= IRQ_INPROGRESS; /* cleared during hvm eoi */
 			}
 		}
-		else if ( send_guest_pirq(d, irq) &&
+		else if ( send_guest_pirq(d, pirq) &&
 				(action->ack_type == ACKTYPE_NONE) )
 		{
 			already_pending++;
@@ -423,13 +425,10 @@ static int pirq_acktype(int irq)
     return ACKTYPE_NONE;
 }
 
-int pirq_guest_eoi(struct domain *d, int irq)
+int pirq_guest_eoi(struct domain *d, struct pirq *pirq)
 {
     irq_desc_t *desc;
     irq_guest_action_t *action;
-
-    if ( (irq < 0) || (irq >= NR_IRQS) )
-        return -EINVAL;
 
     desc = &irq_desc[irq];
     spin_lock_irq(&desc->lock);
@@ -437,12 +436,12 @@ int pirq_guest_eoi(struct domain *d, int irq)
 
     if ( action->ack_type == ACKTYPE_NONE )
     {
-        ASSERT(!test_bit(irq, d->pirq_mask));
+        ASSERT(!pirq->masked);
         stop_timer(&irq_guest_eoi_timer[irq]);
         _irq_guest_eoi(desc);
     }
 
-    if ( test_and_clear_bit(irq, &d->pirq_mask) && (--action->in_flight == 0) )
+    if ( test_and_clear_bool(pirq->masked) && (--action->in_flight == 0) )
     {
         ASSERT(action->ack_type == ACKTYPE_UNMASK);
         desc->handler->end(irq);
@@ -455,22 +454,27 @@ int pirq_guest_eoi(struct domain *d, int irq)
 
 int pirq_guest_unmask(struct domain *d)
 {
-    int            irq;
+    unsigned int pirq = 0, n, i;
+    unsigned long indexes[16];
+    struct pirq *pirqs[ARRAY_SIZE(indexes)];
     shared_info_t *s = d->shared_info;
 
-    for ( irq = find_first_bit(d->pirq_mask, NR_IRQS);
-          irq < NR_IRQS;
-          irq = find_next_bit(d->pirq_mask, NR_IRQS, irq+1) )
-    {
-        if ( !test_bit(d->pirq_to_evtchn[irq], &s->evtchn_mask[0]) )
-            pirq_guest_eoi(d, irq);
-
-    }
+    do {
+        n = radix_tree_gang_lookup(&d->pirq_tree, (void **)pirqs, pirq,
+                                   ARRAY_SIZE(pirqs), indexes);
+        for ( i = 0; i < n; ++i )
+        {
+            pirq = indexes[i];
+            if ( pirqs[i]->masked &&
+                 !test_bit(pirqs[i]->evtchn, &s->evtchn_mask[0]) )
+            pirq_guest_eoi(d, pirqs[i]);
+        }
+    } while ( ++pirq < d->nr_pirqs && n == ARRAY_SIZE(pirqs) );
 
     return 0;
 }
 
-int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
+int pirq_guest_bind(struct vcpu *v, int irq, struct pirq *pirq, int will_share)
 {
     irq_desc_t         *desc = &irq_desc[irq];
     irq_guest_action_t *action;
@@ -554,7 +558,7 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
     return rc;
 }
 
-void pirq_guest_unbind(struct domain *d, int irq)
+void pirq_guest_unbind(struct domain *d, int irq, struct pirq *pirq)
 {
     irq_desc_t         *desc = &irq_desc[irq];
     irq_guest_action_t *action;
@@ -572,7 +576,7 @@ void pirq_guest_unbind(struct domain *d, int irq)
     action->nr_guests--;
 
     if ( action->ack_type == ACKTYPE_UNMASK )
-        if ( test_and_clear_bit(irq, &d->pirq_mask) &&
+        if ( test_and_clear_bool(pirq->masked) &&
              (--action->in_flight == 0) )
             desc->handler->end(irq);
 

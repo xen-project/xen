@@ -72,6 +72,7 @@ void *radix_tree_delete(struct radix_tree_root *root, unsigned long index,
                         void(*node_free)(struct radix_tree_node *));
 unsigned int
 radix_tree_gang_lookup(struct radix_tree_root *root, void **results,
-                       unsigned long first_index, unsigned int max_items);
+                       unsigned long first_index, unsigned int max_items,
+                       unsigned long *indexes);
 
 #endif /* _XEN_RADIX_TREE_H */
