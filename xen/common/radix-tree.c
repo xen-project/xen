@@ -26,6 +26,7 @@
  * o tagging code removed
  * o radix_tree_insert has func parameter for dynamic data struct allocation
  * o radix_tree_destroy added (including recursive helper function)
+ * o __init functions must be called explicitly
  * o other include files adapted to Xen
  */
 
@@ -34,7 +35,6 @@
 #include <xen/lib.h>
 #include <xen/types.h>
 #include <xen/errno.h>
-#include <xen/xmalloc.h>
 #include <xen/radix-tree.h>
 #include <asm/cache.h>
 
@@ -47,18 +47,6 @@ static unsigned long height_to_maxindex[RADIX_TREE_MAX_PATH + 1] __read_mostly;
 static inline unsigned long radix_tree_maxindex(unsigned int height)
 {
     return height_to_maxindex[height];
-}
-
-static struct radix_tree_node *_node_alloc(void *unused)
-{
-    struct radix_tree_node *node = xmalloc(struct radix_tree_node);
-
-    return node ? memset(node, 0, sizeof(*node)) : node;
-}
-
-static void _node_free(struct radix_tree_node *node)
-{
-    xfree(node);
 }
 
 /*
@@ -111,9 +99,6 @@ int radix_tree_insert(struct radix_tree_root *root, unsigned long index,
     unsigned int height, shift;
     int offset;
     int error;
-
-    if (!node_alloc)
-        node_alloc = _node_alloc;
 
     /* Make sure the tree is high enough.  */
     if (index > radix_tree_maxindex(root->height)) {
@@ -225,8 +210,7 @@ EXPORT_SYMBOL(radix_tree_lookup);
 
 static unsigned int
 __lookup(struct radix_tree_root *root, void **results, unsigned long index,
-         unsigned int max_items, unsigned long *indexes,
-         unsigned long *next_index)
+         unsigned int max_items, unsigned long *next_index)
 {
     unsigned int nr_found = 0;
     unsigned int shift, height;
@@ -236,11 +220,8 @@ __lookup(struct radix_tree_root *root, void **results, unsigned long index,
     height = root->height;
     if (index > radix_tree_maxindex(height))
         if (height == 0) {
-            if (root->rnode && index == 0) {
-                if (indexes)
-                    indexes[nr_found] = index;
+            if (root->rnode && index == 0)
                 results[nr_found++] = root->rnode;
-            }
             goto out;
         }
 
@@ -269,8 +250,6 @@ __lookup(struct radix_tree_root *root, void **results, unsigned long index,
     for (i = index & RADIX_TREE_MAP_MASK; i < RADIX_TREE_MAP_SIZE; i++) {
         index++;
         if (slot->slots[i]) {
-            if (indexes)
-                indexes[nr_found] = index - 1;
             results[nr_found++] = slot->slots[i];
             if (nr_found == max_items)
                 goto out;
@@ -287,7 +266,6 @@ __lookup(struct radix_tree_root *root, void **results, unsigned long index,
  * @results: where the results of the lookup are placed
  * @first_index: start the lookup from this key
  * @max_items: place up to this many items at *results
- * @indexes: (optional) array to store indexes of items.
  *
  * Performs an index-ascending scan of the tree for present items.  Places
  * them at *@results and returns the number of items which were placed at
@@ -297,8 +275,7 @@ __lookup(struct radix_tree_root *root, void **results, unsigned long index,
  */
 unsigned int
 radix_tree_gang_lookup(struct radix_tree_root *root, void **results,
-                       unsigned long first_index, unsigned int max_items,
-                       unsigned long *indexes)
+                       unsigned long first_index, unsigned int max_items)
 {
     const unsigned long max_index = radix_tree_maxindex(root->height);
     unsigned long cur_index = first_index;
@@ -311,7 +288,7 @@ radix_tree_gang_lookup(struct radix_tree_root *root, void **results,
         if (cur_index > max_index)
             break;
         nr_found = __lookup(root, results + ret, cur_index,
-                            max_items - ret, indexes + ret, &next_index);
+                            max_items - ret, &next_index);
         ret += nr_found;
         if (next_index == 0)
             break;
@@ -358,9 +335,6 @@ void *radix_tree_delete(struct radix_tree_root *root, unsigned long index,
     struct radix_tree_node *slot = NULL;
     unsigned int height, shift;
     int offset;
-
-    if (!node_free)
-        node_free = _node_free;
 
     height = root->height;
     if (index > radix_tree_maxindex(height))
@@ -446,8 +420,6 @@ void radix_tree_destroy(struct radix_tree_root *root,
     if (root->height == 0)
         slot_free(root->rnode);
     else {
-        if (!node_free)
-            node_free = _node_free;
         radix_tree_node_destroy(root->rnode, root->height,
                                 slot_free, node_free);
         node_free(root->rnode);
@@ -468,14 +440,10 @@ static unsigned long __init __maxindex(unsigned int height)
     return index;
 }
 
-static int __init radix_tree_init(void)
+void __init radix_tree_init(void)
 {
     unsigned int i;
 
     for (i = 0; i < ARRAY_SIZE(height_to_maxindex); i++)
         height_to_maxindex[i] = __maxindex(i);
-
-    return 0;
 }
-/* pre-SMP just so it runs before 'normal' initcalls */
-presmp_initcall(radix_tree_init);

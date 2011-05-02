@@ -135,41 +135,13 @@ extern void no_action(int cpl, void *dev_id, struct cpu_user_regs *regs);
 
 struct domain;
 struct vcpu;
-
-struct pirq {
-    u16 evtchn;
-    bool_t masked;
-    struct arch_pirq arch;
-};
-
-#define pirq_info(d, p) ((struct pirq *)radix_tree_lookup(&(d)->pirq_tree, p))
-
-/* Use this instead of pirq_info() if the structure may need allocating. */
-extern struct pirq *pirq_get_info(struct domain *, int pirq);
-
-#define pirq_field(d, p, f) ({ \
-    const struct pirq *__pi = pirq_info(d, p); \
-    __pi ? __pi->f : 0; \
-})
-#define pirq_to_evtchn(d, pirq) pirq_field(d, pirq, evtchn)
-#define pirq_masked(d, pirq) pirq_field(d, pirq, masked)
-
-void pirq_cleanup_check(struct pirq *, struct domain *, int);
-
-#define pirq_cleanup_check(info, d, pirq) \
-    ((info)->evtchn ? pirq_cleanup_check(info, d, pirq) : (void)0)
-
-extern void pirq_guest_eoi(struct domain *, struct pirq *);
-extern void desc_guest_eoi(struct domain *, struct irq_desc *, struct pirq *);
+extern int pirq_guest_eoi(struct domain *d, int irq);
 extern int pirq_guest_unmask(struct domain *d);
-extern int pirq_guest_bind(struct vcpu *, int pirq, struct pirq *,
-    int will_share);
-extern void pirq_guest_unbind(struct domain *d, int pirq, struct pirq *);
+extern int pirq_guest_bind(struct vcpu *v, int irq, int will_share);
+extern void pirq_guest_unbind(struct domain *d, int irq);
 extern void pirq_set_affinity(struct domain *d, int irq, const cpumask_t *);
 extern irq_desc_t *domain_spin_lock_irq_desc(
     struct domain *d, int irq, unsigned long *pflags);
-extern irq_desc_t *pirq_spin_lock_irq_desc(
-    struct domain *, const struct pirq *, unsigned long *pflags);
 
 static inline void set_native_irq_info(unsigned int irq, const cpumask_t *mask)
 {

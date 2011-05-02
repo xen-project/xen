@@ -3,7 +3,6 @@
 
 #include <xen/config.h>
 #include <xen/mm.h>
-#include <xen/radix-tree.h>
 #include <asm/hvm/vcpu.h>
 #include <asm/hvm/domain.h>
 #include <asm/e820.h>
@@ -285,7 +284,11 @@ struct arch_domain
     const char *nested_p2m_function;
 
     /* NB. protected by d->event_lock and by irq_desc[irq].lock */
-    struct radix_tree_root irq_pirq;
+    int *irq_pirq;
+    int *pirq_irq;
+    /* pirq to emulated irq and vice versa */
+    int *emuirq_pirq;
+    int *pirq_emuirq;
 
     /* Maximum physical-address bitwidth supported by this guest. */
     unsigned int physaddr_bitsize;

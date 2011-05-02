@@ -608,8 +608,34 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
         share_xen_page_with_guest(
             virt_to_page(d->shared_info), d, XENSHARE_writable);
 
-        if ( (rc = init_domain_irq_mapping(d)) != 0 )
+        d->arch.pirq_irq = xmalloc_array(int, d->nr_pirqs);
+        if ( !d->arch.pirq_irq )
             goto fail;
+        memset(d->arch.pirq_irq, 0,
+               d->nr_pirqs * sizeof(*d->arch.pirq_irq));
+
+        d->arch.irq_pirq = xmalloc_array(int, nr_irqs);
+        if ( !d->arch.irq_pirq )
+            goto fail;
+        memset(d->arch.irq_pirq, 0,
+               nr_irqs * sizeof(*d->arch.irq_pirq));
+
+        for ( i = 1; platform_legacy_irq(i); ++i )
+            if ( !IO_APIC_IRQ(i) )
+                d->arch.irq_pirq[i] = d->arch.pirq_irq[i] = i;
+
+        if ( is_hvm_domain(d) )
+        {
+            d->arch.pirq_emuirq = xmalloc_array(int, d->nr_pirqs);
+            d->arch.emuirq_pirq = xmalloc_array(int, nr_irqs);
+            if ( !d->arch.pirq_emuirq || !d->arch.emuirq_pirq )
+                goto fail;
+            for (i = 0; i < d->nr_pirqs; i++)
+                d->arch.pirq_emuirq[i] = IRQ_UNBOUND;
+            for (i = 0; i < nr_irqs; i++)
+                d->arch.emuirq_pirq[i] = IRQ_UNBOUND;
+        }
+
 
         if ( (rc = iommu_domain_init(d)) != 0 )
             goto fail;
@@ -644,7 +670,10 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
  fail:
     d->is_dying = DOMDYING_dead;
     vmce_destroy_msr(d);
-    cleanup_domain_irq_mapping(d);
+    xfree(d->arch.pirq_irq);
+    xfree(d->arch.irq_pirq);
+    xfree(d->arch.pirq_emuirq);
+    xfree(d->arch.emuirq_pirq);
     free_xenheap_page(d->shared_info);
     if ( paging_initialised )
         paging_final_teardown(d);
@@ -696,7 +725,10 @@ void arch_domain_destroy(struct domain *d)
 #endif
 
     free_xenheap_page(d->shared_info);
-    cleanup_domain_irq_mapping(d);
+    xfree(d->arch.pirq_irq);
+    xfree(d->arch.irq_pirq);
+    xfree(d->arch.pirq_emuirq);
+    xfree(d->arch.emuirq_pirq);
 }
 
 unsigned long pv_guest_cr4_fixup(const struct vcpu *v, unsigned long guest_cr4)

@@ -33,7 +33,7 @@ static void assert_irq(struct domain *d, unsigned ioapic_gsi, unsigned pic_irq)
     int pirq = domain_emuirq_to_pirq(d, ioapic_gsi);
     if ( pirq != IRQ_UNBOUND )
     {
-        send_guest_pirq(d, pirq_info(d, pirq));
+        send_guest_pirq(d, pirq);
         return;
     }
     vioapic_irq_positive_edge(d, ioapic_gsi);

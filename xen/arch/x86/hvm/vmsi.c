@@ -65,10 +65,11 @@ static void vmsi_inj_irq(
     }
 }
 
-int vmsi_deliver(struct domain *d, const struct hvm_pirq_dpci *pirq_dpci)
+int vmsi_deliver(struct domain *d, int pirq)
 {
-    uint32_t flags = pirq_dpci->gmsi.gflags;
-    int vector = pirq_dpci->gmsi.gvec;
+    struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
+    uint32_t flags = hvm_irq_dpci->mirq[pirq].gmsi.gflags;
+    int vector = hvm_irq_dpci->mirq[pirq].gmsi.gvec;
     uint8_t dest = (uint8_t)flags;
     uint8_t dest_mode = !!(flags & VMSI_DM_MASK);
     uint8_t delivery_mode = (flags & VMSI_DELIV_MASK) >> GLFAGS_SHIFT_DELIV_MODE;
@@ -81,7 +82,11 @@ int vmsi_deliver(struct domain *d, const struct hvm_pirq_dpci *pirq_dpci)
                 "vector=%x trig_mode=%x\n",
                 dest, dest_mode, delivery_mode, vector, trig_mode);
 
-    ASSERT(pirq_dpci->flags & HVM_IRQ_DPCI_GUEST_MSI);
+    if ( !( hvm_irq_dpci->mirq[pirq].flags & HVM_IRQ_DPCI_GUEST_MSI ) )
+    {
+        gdprintk(XENLOG_WARNING, "pirq %x not msi \n", pirq);
+        return 0;
+    }
 
     switch ( delivery_mode )
     {
@@ -344,7 +349,7 @@ static void del_msixtbl_entry(struct msixtbl_entry *entry)
     call_rcu(&entry->rcu, free_msixtbl_entry);
 }
 
-int msixtbl_pt_register(struct domain *d, struct pirq *pirq, uint64_t gtable)
+int msixtbl_pt_register(struct domain *d, int pirq, uint64_t gtable)
 {
     struct irq_desc *irq_desc;
     struct msi_desc *msi_desc;
@@ -353,7 +358,6 @@ int msixtbl_pt_register(struct domain *d, struct pirq *pirq, uint64_t gtable)
     int r = -EINVAL;
 
     ASSERT(spin_is_locked(&pcidevs_lock));
-    ASSERT(spin_is_locked(&d->event_lock));
 
     /*
      * xmalloc() with irq_disabled causes the failure of check_lock() 
@@ -363,7 +367,7 @@ int msixtbl_pt_register(struct domain *d, struct pirq *pirq, uint64_t gtable)
     if ( !new_entry )
         return -ENOMEM;
 
-    irq_desc = pirq_spin_lock_irq_desc(d, pirq, NULL);
+    irq_desc = domain_spin_lock_irq_desc(d, pirq, NULL);
     if ( !irq_desc )
     {
         xfree(new_entry);
@@ -400,7 +404,7 @@ out:
     return r;
 }
 
-void msixtbl_pt_unregister(struct domain *d, struct pirq *pirq)
+void msixtbl_pt_unregister(struct domain *d, int pirq)
 {
     struct irq_desc *irq_desc;
     struct msi_desc *msi_desc;
@@ -408,9 +412,8 @@ void msixtbl_pt_unregister(struct domain *d, struct pirq *pirq)
     struct msixtbl_entry *entry;
 
     ASSERT(spin_is_locked(&pcidevs_lock));
-    ASSERT(spin_is_locked(&d->event_lock));
 
-    irq_desc = pirq_spin_lock_irq_desc(d, pirq, NULL);
+    irq_desc = domain_spin_lock_irq_desc(d, pirq, NULL);
     if ( !irq_desc )
         return;
 
@@ -444,7 +447,7 @@ found:
     spin_unlock_irq(&irq_desc->lock);
 }
 
-void msixtbl_pt_cleanup(struct domain *d)
+void msixtbl_pt_cleanup(struct domain *d, int pirq)
 {
     struct msixtbl_entry *entry, *temp;
     unsigned long flags;

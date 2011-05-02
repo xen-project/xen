@@ -2925,6 +2925,7 @@ static int __init init_tmem(void)
     if ( !tmh_enabled() )
         return 0;
 
+    radix_tree_init();
     if ( tmh_dedup_enabled() )
         for (i = 0; i < 256; i++ )
         {

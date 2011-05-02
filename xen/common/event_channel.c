@@ -325,7 +325,6 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
     struct evtchn *chn;
     struct domain *d = current->domain;
     struct vcpu   *v = d->vcpu[0];
-    struct pirq   *info;
     int            port, pirq = bind->pirq;
     long           rc;
 
@@ -337,7 +336,7 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
 
     spin_lock(&d->event_lock);
 
-    if ( pirq_to_evtchn(d, pirq) != 0 )
+    if ( d->pirq_to_evtchn[pirq] != 0 )
         ERROR_EXIT(-EEXIST);
 
     if ( (port = get_free_port(d)) < 0 )
@@ -345,18 +344,14 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
 
     chn = evtchn_from_port(d, port);
 
-    info = pirq_get_info(d, pirq);
-    if ( !info )
-        ERROR_EXIT(-ENOMEM);
-    info->evtchn = port;
+    d->pirq_to_evtchn[pirq] = port;
     rc = (!is_hvm_domain(d)
-          ? pirq_guest_bind(v, pirq, info,
-                            !!(bind->flags & BIND_PIRQ__WILL_SHARE))
+          ? pirq_guest_bind(
+              v, pirq, !!(bind->flags & BIND_PIRQ__WILL_SHARE))
           : 0);
     if ( rc != 0 )
     {
-        info->evtchn = 0;
-        pirq_cleanup_check(info, d, pirq);
+        d->pirq_to_evtchn[pirq] = 0;
         goto out;
     }
 
@@ -409,18 +404,12 @@ static long __evtchn_close(struct domain *d1, int port1)
     case ECS_UNBOUND:
         break;
 
-    case ECS_PIRQ: {
-        struct pirq *pirq = pirq_info(d1, chn1->u.pirq.irq);
-
-        if ( !pirq )
-            break;
+    case ECS_PIRQ:
         if ( !is_hvm_domain(d1) )
-            pirq_guest_unbind(d1, chn1->u.pirq.irq, pirq);
-        pirq->evtchn = 0;
-        pirq_cleanup_check(pirq, d1, chn1->u.pirq.irq);
+            pirq_guest_unbind(d1, chn1->u.pirq.irq);
+        d1->pirq_to_evtchn[chn1->u.pirq.irq] = 0;
         unlink_pirq_port(chn1, d1->vcpu[chn1->notify_vcpu_id]);
         break;
-    }
 
     case ECS_VIRQ:
         for_each_vcpu ( d1, v )
@@ -670,9 +659,9 @@ void send_guest_global_virq(struct domain *d, int virq)
     spin_unlock_irqrestore(&v->virq_lock, flags);
 }
 
-int send_guest_pirq(struct domain *d, const struct pirq *pirq)
+int send_guest_pirq(struct domain *d, int pirq)
 {
-    int port;
+    int port = d->pirq_to_evtchn[pirq];
     struct evtchn *chn;
 
     /*
@@ -681,7 +670,7 @@ int send_guest_pirq(struct domain *d, const struct pirq *pirq)
      * HVM guests: Port is legitimately zero when the guest disables the
      *     emulated interrupt/evtchn.
      */
-    if ( pirq == NULL || (port = pirq->evtchn) == 0 )
+    if ( port == 0 )
     {
         BUG_ON(!is_hvm_domain(d));
         return 0;
@@ -823,10 +812,13 @@ int evtchn_unmask(unsigned int port)
     struct domain *d = current->domain;
     struct vcpu   *v;
 
-    ASSERT(spin_is_locked(&d->event_lock));
+    spin_lock(&d->event_lock);
 
     if ( unlikely(!port_is_valid(d, port)) )
+    {
+        spin_unlock(&d->event_lock);
         return -EINVAL;
+    }
 
     v = d->vcpu[evtchn_from_port(d, port)->notify_vcpu_id];
 
@@ -841,6 +833,8 @@ int evtchn_unmask(unsigned int port)
     {
         vcpu_mark_events_pending(v);
     }
+
+    spin_unlock(&d->event_lock);
 
     return 0;
 }
@@ -966,9 +960,7 @@ long do_event_channel_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         struct evtchn_unmask unmask;
         if ( copy_from_guest(&unmask, arg, 1) != 0 )
             return -EFAULT;
-        spin_lock(&current->domain->event_lock);
         rc = evtchn_unmask(unmask.port);
-        spin_unlock(&current->domain->event_lock);
         break;
     }
 

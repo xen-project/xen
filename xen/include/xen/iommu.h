@@ -88,9 +88,7 @@ int iommu_unmap_page(struct domain *d, unsigned long gfn);
 void iommu_pte_flush(struct domain *d, u64 gfn, u64 *pte, int order, int present);
 void iommu_set_pgd(struct domain *d);
 void iommu_domain_teardown(struct domain *d);
-
-struct pirq;
-int hvm_do_IRQ_dpci(struct domain *, struct pirq *);
+int hvm_do_IRQ_dpci(struct domain *d, unsigned int irq);
 int dpci_ioport_intercept(ioreq_t *p);
 int pt_irq_create_bind_vtd(struct domain *d,
                            xen_domctl_bind_pt_irq_t *pt_irq_bind);

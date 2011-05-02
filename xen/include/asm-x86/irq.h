@@ -7,7 +7,6 @@
 #include <asm/atomic.h>
 #include <xen/cpumask.h>
 #include <xen/smp.h>
-#include <xen/hvm/irq.h>
 #include <irq_vectors.h>
 #include <asm/percpu.h>
 
@@ -106,20 +105,6 @@ extern unsigned int io_apic_irqs;
 
 DECLARE_PER_CPU(unsigned int, irq_count);
 
-struct pirq;
-struct arch_pirq {
-    int irq;
-    union {
-        struct hvm_pirq {
-            int emuirq;
-            struct hvm_pirq_dpci dpci;
-        } hvm;
-    };
-};
-
-#define pirq_dpci(pirq) ((pirq) ? &(pirq)->arch.hvm.dpci : NULL)
-#define dpci_pirq(pd) container_of(pd, struct pirq, arch.hvm.dpci)
-
 int pirq_shared(struct domain *d , int irq);
 
 int map_domain_pirq(struct domain *d, int pirq, int irq, int type,
@@ -129,7 +114,7 @@ int get_free_pirq(struct domain *d, int type, int index);
 void free_domain_pirqs(struct domain *d);
 int map_domain_emuirq_pirq(struct domain *d, int pirq, int irq);
 int unmap_domain_pirq_emuirq(struct domain *d, int pirq);
-bool_t hvm_domain_use_pirq(const struct domain *, const struct pirq *);
+int hvm_domain_use_pirq(struct domain *d, int irq);
 
 int  init_irq_data(void);
 
@@ -158,17 +143,11 @@ int bind_irq_vector(int irq, int vector, cpumask_t domain);
 
 void irq_set_affinity(struct irq_desc *, const cpumask_t *mask);
 
-int init_domain_irq_mapping(struct domain *);
-void cleanup_domain_irq_mapping(struct domain *);
-
-#define domain_pirq_to_irq(d, pirq) pirq_field(d, pirq, arch.irq)
-#define domain_irq_to_pirq(d, irq) \
-    ((long)radix_tree_lookup(&(d)->arch.irq_pirq, irq))
+#define domain_pirq_to_irq(d, pirq) ((d)->arch.pirq_irq[pirq])
+#define domain_irq_to_pirq(d, irq) ((d)->arch.irq_pirq[irq])
 #define PIRQ_ALLOCATED -1
-#define domain_pirq_to_emuirq(d, pirq) pirq_field(d, pirq, arch.hvm.emuirq)
-#define domain_emuirq_to_pirq(d, emuirq) \
-    (((long)radix_tree_lookup(&(d)->arch.hvm_domain.emuirq_pirq, emuirq) ?: \
-     IRQ_UNBOUND + 1) - 1)
+#define domain_pirq_to_emuirq(d, pirq) ((d)->arch.pirq_emuirq[pirq])
+#define domain_emuirq_to_pirq(d, emuirq) ((d)->arch.emuirq_pirq[emuirq])
 #define IRQ_UNBOUND -1
 #define IRQ_PT -2
 

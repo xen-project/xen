@@ -65,11 +65,8 @@ static long __do_pirq_guest_eoi(struct domain *d, int pirq)
 {
 	if ( pirq < 0 || pirq >= NR_IRQS )
 		return -EINVAL;
-	if ( d->arch.pirq_eoi_map ) {
-		spin_lock(&d->event_lock);
-		evtchn_unmask(pirq_to_evtchn(d, pirq));
-		spin_unlock(&d->event_lock);
-	}
+	if ( d->arch.pirq_eoi_map )
+		evtchn_unmask(d->pirq_to_evtchn[pirq]);
 	return pirq_guest_eoi(d, pirq);
 }
 
