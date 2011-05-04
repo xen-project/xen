@@ -3676,6 +3676,37 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
+    case HVMOP_get_mem_type:
+    {
+        struct xen_hvm_get_mem_type a;
+        struct domain *d;
+        p2m_type_t t;
+
+        if ( copy_from_guest(&a, arg, 1) )
+            return -EFAULT;
+
+        rc = rcu_lock_target_domain_by_id(a.domid, &d);
+        if ( rc != 0 )
+            return rc;
+
+        rc = -EINVAL;
+        if ( is_hvm_domain(d) )
+        {
+            gfn_to_mfn_unshare(p2m_get_hostp2m(d), a.pfn, &t, 0);
+            if ( p2m_is_mmio(t) )
+                a.mem_type =  HVMMEM_mmio_dm;
+            else if ( p2m_is_readonly(t) )
+                a.mem_type =  HVMMEM_ram_ro;
+            else if ( p2m_is_ram(t) )
+                a.mem_type =  HVMMEM_ram_rw;
+            else
+                a.mem_type =  HVMMEM_mmio_dm;
+            rc = copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
+        }
+        rcu_unlock_domain(d);
+        break;
+    }
+
     case HVMOP_set_mem_type:
     {
         struct xen_hvm_set_mem_type a;
