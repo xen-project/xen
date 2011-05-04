@@ -1772,6 +1772,31 @@ static int64_t parse_mem_size_kb(const char *mem)
     return kbytes;
 }
 
+static int def_getopt(int argc, char * const argv[], const char *optstring,
+                      const char* helpstr, int reqargs)
+{
+    int opt;
+
+    opterr = 0;
+    while ((opt = getopt(argc, argv, optstring)) == '?') {
+        if (optopt == 'h') {
+            help(helpstr);
+            return 0;
+        }
+        fprintf(stderr, "option `%c' not supported.\n", optopt);
+    }
+    if (opt != -1)
+        return opt;
+
+    if (argc - optind <= reqargs - 1) {
+        fprintf(stderr, "'xl %s' requires at least %d argument%s.\n\n",
+                helpstr, reqargs, reqargs > 1 ? "s" : "");
+        help(helpstr);
+        return 2;
+    }
+    return -1;
+}
+
 static int set_memory_max(const char *p, const char *mem)
 {
     int64_t memorykb;
@@ -1796,20 +1821,8 @@ int main_memmax(int argc, char **argv)
     char *p = NULL, *mem;
     int rc;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("mem-max");
-            exit(0);
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
-    if (optind >= argc - 1) {
-        help("mem-max");
-        return 2;
-    }
+    if ((opt = def_getopt(argc, argv, "", "mem-max", 2)) != -1)
+        return opt;
 
     p = argv[optind];
     mem = argv[optind + 1];
@@ -1843,20 +1856,8 @@ int main_memset(int argc, char **argv)
     int opt = 0;
     const char *p = NULL, *mem;
 
-    while ((opt = getopt(argc, argv, "h:")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("mem-set");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
-    if (optind >= argc - 1) {
-        help("mem-set");
-        return 2;
-    }
+    if ((opt = def_getopt(argc, argv, "", "mem-set", 2)) != -1)
+        return opt;
 
     p = argv[optind];
     mem = argv[optind + 1];
@@ -1891,20 +1892,8 @@ int main_cd_eject(int argc, char **argv)
     int opt = 0;
     const char *p = NULL, *virtdev;
 
-    while ((opt = getopt(argc, argv, "hn:")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("cd-eject");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
-    if (optind >= argc - 1) {
-        help("cd-eject");
-        return 2;
-    }
+    if ((opt = def_getopt(argc, argv, "", "cd-eject", 2)) != -1)
+        return opt;
 
     p = argv[optind];
     virtdev = argv[optind + 1];
@@ -1919,20 +1908,8 @@ int main_cd_insert(int argc, char **argv)
     const char *p = NULL, *virtdev;
     char *file = NULL; /* modified by cd_insert tokenising it */
 
-    while ((opt = getopt(argc, argv, "hn:")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("cd-insert");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
-    if (optind >= argc - 2) {
-        help("cd-insert");
-        return 2;
-    }
+    if ((opt = def_getopt(argc, argv, "", "cd-insert", 3)) != -1)
+        return opt;
 
     p = argv[optind];
     virtdev = argv[optind + 1];
@@ -1947,11 +1924,10 @@ int main_console(int argc, char **argv)
     int opt = 0, num = 0;
     libxl_console_type type = 0;
 
-    while ((opt = getopt(argc, argv, "hn:t:")) != -1) {
+    while ((opt = def_getopt(argc, argv, "n:t:", "console", 1)) != -1) {
         switch (opt) {
-        case 'h':
-            help("console");
-            return 0;
+        case 0: case 2:
+            return opt;
         case 't':
             if (!strcmp(optarg, "pv"))
                 type = LIBXL_CONSOLE_TYPE_PV;
@@ -1965,14 +1941,7 @@ int main_console(int argc, char **argv)
         case 'n':
             num = atoi(optarg);
             break;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
         }
-    }
-    if (optind >= argc) {
-        help("console");
-        return 2;
     }
 
     find_domain(argv[optind]);
@@ -2048,16 +2017,8 @@ int main_pcilist_assignable(int argc, char **argv)
 {
     int opt;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("pci-list-assignable-devices");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
+    if ((opt = def_getopt(argc, argv, "", "pci-list-assignable-devices", 0)) != -1)
+        return opt;
 
     pcilist_assignable();
     return 0;
@@ -2087,20 +2048,8 @@ int main_pcilist(int argc, char **argv)
     int opt;
     const char *domname = NULL;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("pci-list");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
-    if (optind >= argc) {
-        help("pci-list");
-        return 2;
-    }
+    if ((opt = def_getopt(argc, argv, "", "pci-list", 1)) != -1)
+        return opt;
 
     domname = argv[optind];
 
@@ -2129,22 +2078,14 @@ int main_pcidetach(int argc, char **argv)
     int force = 0;
     const char *domname = NULL, *bdf = NULL;
 
-    while ((opt = getopt(argc, argv, "hf")) != -1) {
+    while ((opt = def_getopt(argc, argv, "f", "pci-detach", 2)) != -1) {
         switch (opt) {
-        case 'h':
-            help("pci-detach");
-            return 0;
+        case 0: case 2:
+            return opt;
         case 'f':
             force = 1;
             break;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
         }
-    }
-    if (optind >= argc - 1) {
-        help("pci-detach");
-        return 2;
     }
 
     domname = argv[optind];
@@ -2173,20 +2114,8 @@ int main_pciattach(int argc, char **argv)
     int opt;
     const char *domname = NULL, *bdf = NULL, *vs = NULL;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("pci-attach");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
-    if (optind >= argc - 1) {
-        help("pci-attach");
-        return 2;
-    }
+    if ((opt = def_getopt(argc, argv, "", "pci-attach", 2)) != -1)
+        return opt;
 
     domname = argv[optind];
     bdf = argv[optind + 1];
@@ -2828,8 +2757,10 @@ int main_restore(int argc, char **argv)
     int paused = 0, debug = 0, daemonize = 1, console_autoconnect = 0;
     int opt, rc;
 
-    while ((opt = getopt(argc, argv, "chpde")) != -1) {
+    while ((opt = def_getopt(argc, argv, "cpde", "restore", 1)) != -1) {
         switch (opt) {
+        case 0: case 2:
+            return opt;
         case 'c':
             console_autoconnect = 1;
             break;
@@ -2841,12 +2772,6 @@ int main_restore(int argc, char **argv)
             break;
         case 'e':
             daemonize = 0;
-            break;
-        case 'h':
-            help("restore");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -2882,20 +2807,15 @@ int main_migrate_receive(int argc, char **argv)
     int debug = 0, daemonize = 1;
     int opt;
 
-    while ((opt = getopt(argc, argv, "hed")) != -1) {
+    while ((opt = def_getopt(argc, argv, "ed", "migrate-receive", 0)) != -1) {
         switch (opt) {
-        case 'h':
-            help("migrate-receive");
-            return 2;
-            break;
+        case 0: case 2:
+            return opt;
         case 'e':
             daemonize = 0;
             break;
         case 'd':
             debug = 1;
-            break;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -2915,21 +2835,17 @@ int main_save(int argc, char **argv)
     int checkpoint = 0;
     int opt;
 
-    while ((opt = getopt(argc, argv, "hc")) != -1) {
+    while ((opt = def_getopt(argc, argv, "c", "save", 1)) != -1) {
         switch (opt) {
+        case 0: case 2:
+            return opt;
         case 'c':
             checkpoint = 1;
-            break;
-        case 'h':
-            help("save");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
 
-    if (argc-optind < 1 || argc-optind > 3) {
+    if (argc-optind > 3) {
         help("save");
         return 2;
     }
@@ -2950,11 +2866,10 @@ int main_migrate(int argc, char **argv)
     char *host;
     int opt, daemonize = 1, debug = 0;
 
-    while ((opt = getopt(argc, argv, "hC:s:ed")) != -1) {
+    while ((opt = def_getopt(argc, argv, "C:s:ed", "migrate", 2)) != -1) {
         switch (opt) {
-        case 'h':
-            help("migrate");
-            return 0;
+        case 0: case 2:
+            return opt;
         case 'C':
             config_filename = optarg;
             break;
@@ -2967,15 +2882,7 @@ int main_migrate(int argc, char **argv)
         case 'd':
             debug = 1;
             break;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
         }
-    }
-
-    if (argc-optind < 2 || argc-optind > 2) {
-        help("migrate");
-        return 2;
     }
 
     p = argv[optind];
@@ -2998,20 +2905,10 @@ int main_migrate(int argc, char **argv)
 int main_dump_core(int argc, char **argv)
 {
     int opt;
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("dump-core");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
-    if ( argc-optind < 2 ) {
-        help("dump-core");
-        return 2;
-    }
+
+    if ((opt = def_getopt(argc, argv, "", "dump-core", 2)) != -1)
+        return opt;
+
     core_dump_domain(argv[optind], argv[optind + 1]);
     return 0;
 }
@@ -3019,80 +2916,35 @@ int main_dump_core(int argc, char **argv)
 int main_pause(int argc, char **argv)
 {
     int opt;
-    const char *p;
-    
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("pause");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
-    if (optind >= argc) {
-        help("pause");
-        return 2;
-    }
+    if ((opt = def_getopt(argc, argv, "", "pause", 1)) != -1)
+        return opt;
 
-    p = argv[optind];
+    pause_domain(argv[optind]);
 
-    pause_domain(p);
     return 0;
 }
 
 int main_unpause(int argc, char **argv)
 {
     int opt;
-    const char *p;
-    
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("unpause");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
-    if (optind >= argc) {
-        help("unpause");
-        return 2;
-    }
+    if ((opt = def_getopt(argc, argv, "", "unpause", 1)) != -1)
+        return opt;
 
-    p = argv[optind];
+    unpause_domain(argv[optind]);
 
-    unpause_domain(p);
     return 0;
 }
 
 int main_destroy(int argc, char **argv)
 {
     int opt;
-    const char *p;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("destroy");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
-    if (optind >= argc) {
-        help("destroy");
-        return 2;
-    }
+    if ((opt = def_getopt(argc, argv, "", "destroy", 1)) != -1)
+        return opt;
 
-    p = argv[optind];
-
-    destroy_domain(p);
+    destroy_domain(argv[optind]);
     return 0;
 }
 
@@ -3100,57 +2952,32 @@ int main_shutdown(int argc, char **argv)
 {
     int opt;
     int wait = 0;
-    const char *p;
 
-    while ((opt = getopt(argc, argv, "hw")) != -1) {
+    while ((opt = def_getopt(argc, argv, "w", "shutdown", 1)) != -1) {
         switch (opt) {
-        case 'h':
-            help("shutdown");
-            return 0;
+        case 0: case 2:
+            return opt;
         case 'w':
             wait = 1;
             break;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
         }
     }
-    if (optind >= argc) {
-        help("shutdown");
-        return 2;
-    }
 
-    p = argv[optind];
-
-    shutdown_domain(p, wait);
+    shutdown_domain(argv[optind], wait);
     return 0;
 }
 
 int main_reboot(int argc, char **argv)
 {
     int opt;
-    const char *p;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("reboot");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
-    if (optind >= argc) {
-        help("reboot");
-        return 2;
-    }
+    if ((opt = def_getopt(argc, argv, "", "reboot", 1)) != -1)
+        return opt;
 
-    p = argv[optind];
-
-    reboot_domain(p);
+    reboot_domain(argv[optind]);
     return 0;
 }
+
 int main_list(int argc, char **argv)
 {
     int opt, verbose = 0;
@@ -3228,16 +3055,8 @@ int main_list_vm(int argc, char **argv)
 {
     int opt;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("list-vm");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
+    if ((opt = def_getopt(argc, argv, "", "list-vm", 0)) != -1)
+        return opt;
 
     list_vm();
     return 0;
@@ -3354,28 +3173,12 @@ static void button_press(const char *p, const char *b)
 int main_button_press(int argc, char **argv)
 {
     int opt;
-    const char *p;
-    const char *b;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("button-press");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
-    if (optind >= argc - 1) {
-        help("button-press");
-        return 2;
-    }
+    if ((opt = def_getopt(argc, argv, "", "button-press", 2)) != -1)
+        return opt;
 
-    p = argv[optind];
-    b = argv[optind + 1];
+    button_press(argv[optind], argv[optind + 1]);
 
-    button_press(p, b);
     return 0;
 }
 
@@ -3518,16 +3321,8 @@ int main_vcpulist(int argc, char **argv)
 {
     int opt;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("vcpu-list");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
+    if ((opt = def_getopt(argc, argv, "", "cpu-list", 0)) != -1)
+        return opt;
 
     vcpulist(argc - optind, argv + optind);
     return 0;
@@ -3609,21 +3404,8 @@ int main_vcpupin(int argc, char **argv)
 {
     int opt;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("vcpu-pin");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
-
-    if (optind != argc - 3) {
-        help("vcpu-pin");
-        return 2;
-    }
+    if ((opt = def_getopt(argc, argv, "", "vcpu-pin", 3)) != -1)
+        return opt;
 
     vcpupin(argv[optind], argv[optind+1] , argv[optind+2]);
     return 0;
@@ -3660,21 +3442,9 @@ int main_vcpuset(int argc, char **argv)
 {
     int opt;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-        help("vcpu-set");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
+    if ((opt = def_getopt(argc, argv, "", "vcpu-set", 2)) != -1)
+        return opt;
 
-    if (optind >= argc - 1) {
-        help("vcpu-set");
-        return 2;
-    }
     vcpuset(argv[optind], argv[optind+1]);
     return 0;
 }
@@ -3885,8 +3655,10 @@ int main_sched_credit(int argc, char **argv)
     int weight = 256, cap = 0, opt_w = 0, opt_c = 0;
     int opt, rc;
 
-    while ((opt = getopt(argc, argv, "hd:w:c:")) != -1) {
+    while ((opt = def_getopt(argc, argv, "d:w:c:", "sched-credit", 0)) != -1) {
         switch (opt) {
+        case 0: case 2:
+            return opt;
         case 'd':
             dom = optarg;
             break;
@@ -3897,12 +3669,6 @@ int main_sched_credit(int argc, char **argv)
         case 'c':
             cap = strtol(optarg, NULL, 10);
             opt_c = 1;
-            break;
-        case 'h':
-            help("sched-credit");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -3955,23 +3721,10 @@ int main_domid(int argc, char **argv)
     int opt;
     const char *domname = NULL;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("domid");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
+    if ((opt = def_getopt(argc, argv, "", "domid", 1)) != -1)
+        return opt;
 
     domname = argv[optind];
-    if (!domname) {
-        fprintf(stderr, "Must specify a domain name.\n\n");
-        help("domid");
-        return 1;
-    }
 
     if (libxl_name_to_domid(ctx, domname, &domid)) {
         fprintf(stderr, "Can't get domid of domain name '%s', maybe this domain does not exist.\n", domname);
@@ -3989,22 +3742,9 @@ int main_domname(int argc, char **argv)
     char *domname = NULL;
     char *endptr = NULL;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("domname");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
+    if ((opt = def_getopt(argc, argv, "", "domname", 1)) != -1)
+        return opt;
 
-    if (!argv[optind]) {
-        fprintf(stderr, "Must specify a domain id.\n\n");
-        help("domname");
-        return 1;
-    }
     domid = strtol(argv[optind], &endptr, 10);
     if (domid == 0 && !strcmp(endptr, argv[optind])) {
         /*no digits at all*/
@@ -4030,23 +3770,10 @@ int main_rename(int argc, char **argv)
     const char *dom;
     const char *new_name;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("rename");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
+    if ((opt = def_getopt(argc, argv, "", "rename", 2)) != -1)
+        return opt;
 
     dom = argv[optind++];
-    if (!dom || !argv[optind]) {
-        fprintf(stderr, "'xl rename' requires 2 arguments.\n\n");
-        help("rename");
-        return 1;
-    }
 
     find_domain(dom);
     new_name = argv[optind];
@@ -4067,23 +3794,10 @@ int main_trigger(int argc, char **argv)
     const char *dom = NULL;
     int vcpuid = 0;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("trigger");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
+    if ((opt = def_getopt(argc, argv, "", "trigger", 2)) != -1)
+        return opt;
 
     dom = argv[optind++];
-    if (!dom || !argv[optind]) {
-        fprintf(stderr, "'xl trigger' requires between 2 and 3 arguments.\n\n");
-        help("trigger");
-        return 1;
-    }
 
     find_domain(dom);
 
@@ -4108,23 +3822,10 @@ int main_sysrq(int argc, char **argv)
     const char *sysrq = NULL;
     const char *dom = NULL;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("sysrq");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
+    if ((opt = def_getopt(argc, argv, "", "sysrq", 2)) != -1)
+        return opt;
 
     dom = argv[optind++];
-    if (!dom || !argv[optind]) {
-        fprintf(stderr, "'xl sysrq' requires 2 arguments.\n\n");
-        help("sysrq");
-        return 1;
-    }
 
     find_domain(dom);
 
@@ -4146,20 +3847,8 @@ int main_debug_keys(int argc, char **argv)
     int opt;
     char *keys;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("debug-keys");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
-    if (optind >= argc) {
-        help("debug-keys");
-        return 2;
-    }
+    if ((opt = def_getopt(argc, argv, "", "debug-keys", 1)) != -1)
+        return opt;
 
     keys = argv[optind];
 
@@ -4178,16 +3867,12 @@ int main_dmesg(int argc, char **argv)
     char *line;
     int opt, ret = 1;
 
-    while ((opt = getopt(argc, argv, "hc")) != -1) {
+    while ((opt = def_getopt(argc, argv, "c", "dmesg", 0)) != -1) {
         switch (opt) {
+        case 0: case 2:
+            return opt;
         case 'c':
             clear = 1;
-            break;
-        case 'h':
-            help("dmesg");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -4208,16 +3893,8 @@ int main_top(int argc, char **argv)
 {
     int opt;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("top");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
+    if ((opt = def_getopt(argc, argv, "", "top", 0)) != -1)
+        return opt;
 
     return system("xentop");
 }
@@ -4231,17 +3908,10 @@ int main_networkattach(int argc, char **argv)
     int i;
     unsigned int val;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("network-attach");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
-    if ((argc-optind < 2) || (argc-optind > 11)) {
+    if ((opt = def_getopt(argc, argv, "", "network-attach", 1)) != -1)
+        return opt;
+
+    if (argc-optind > 11) {
         help("network-attach");
         return 0;
     }
@@ -4313,20 +3983,8 @@ int main_networklist(int argc, char **argv)
     libxl_nicinfo *nics;
     unsigned int nb, i;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-            case 'h':
-                help("network-list");
-                return 0;
-            default:
-                fprintf(stderr, "option `%c' not supported.\n", optopt);
-                break;
-        }
-    }
-    if (argc-optind < 1) {
-        help("network-list");
-        return 1;
-    }
+    if ((opt = def_getopt(argc, argv, "", "network-list", 0)) != -1)
+        return opt;
 
     /*      Idx  BE   MAC   Hdl  Sta  evch txr/rxr  BE-path */
     printf("%-3s %-2s %-17s %-6s %-5s %-6s %5s/%-5s %-30s\n",
@@ -4362,20 +4020,8 @@ int main_networkdetach(int argc, char **argv)
     int opt;
     libxl_device_nic nic;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("network-detach");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
-    if (argc-optind != 2) {
-        help("network-detach");
-        return 0;
-    }
+    if ((opt = def_getopt(argc, argv, "", "network-detach", 2)) != -1)
+        return opt;
 
     if (domain_qualifier_to_domid(argv[optind], &domid, 0) < 0) {
         fprintf(stderr, "%s is an invalid domain identifier\n", argv[optind]);
@@ -4408,19 +4054,11 @@ int main_blockattach(int argc, char **argv)
     uint32_t fe_domid, be_domid = 0;
     libxl_device_disk disk = { 0 };
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("block-attach");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
-    if ((argc-optind < 3) || (argc-optind > 5)) {
+    if ((opt = def_getopt(argc, argv, "", "block-attach", 2)) != -1)
+        return opt;
+    if (argc-optind > 5) {
         help("block-attach");
-        return 0;
+        return 2;
     }
 
     tok = strtok(argv[optind+1], ":");
@@ -4483,20 +4121,8 @@ int main_blocklist(int argc, char **argv)
     libxl_device_disk *disks;
     libxl_diskinfo diskinfo;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("block-list");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
-    if (argc-optind < 1) {
-        help("block-list");
-        return 0;
-    }
+    if ((opt = def_getopt(argc, argv, "", "block-list", 1)) != -1)
+        return opt;
 
     printf("%-5s %-3s %-6s %-5s %-6s %-8s %-30s\n",
            "Vdev", "BE", "handle", "state", "evt-ch", "ring-ref", "BE-path");
@@ -4529,20 +4155,8 @@ int main_blockdetach(int argc, char **argv)
     int opt;
     libxl_device_disk disk;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("block-detach");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
-    if (argc-optind != 2) {
-        help("block-detach");
-        return 0;
-    }
+    if ((opt = def_getopt(argc, argv, "", "block-detach", 2)) != -1)
+        return opt;
 
     if (domain_qualifier_to_domid(argv[optind], &domid, 0) < 0) {
         fprintf(stderr, "%s is an invalid domain identifier\n", argv[optind]);
@@ -4724,16 +4338,12 @@ int main_uptime(int argc, char **argv)
     int nb_doms = 0;
     int opt;
 
-    while ((opt = getopt(argc, argv, "hs")) != -1) {
+    while ((opt = def_getopt(argc, argv, "s", "uptime", 1)) != -1) {
         switch (opt) {
+        case 0: case 2:
+            return opt;
         case 's':
             short_mode = 1;
-            break;
-        case 'h':
-            help("uptime");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -4756,19 +4366,15 @@ int main_tmem_list(int argc, char **argv)
     int all = 0;
     int opt;
 
-    while ((opt = getopt(argc, argv, "alh")) != -1) {
+    while ((opt = def_getopt(argc, argv, "al", "tmem-list", 0)) != -1) {
         switch (opt) {
+        case 0: case 2:
+            return opt;
         case 'l':
             use_long = 1;
             break;
         case 'a':
             all = 1;
-            break;
-        case 'h':
-            help("tmem-list");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -4800,16 +4406,12 @@ int main_tmem_freeze(int argc, char **argv)
     int all = 0;
     int opt;
 
-    while ((opt = getopt(argc, argv, "ah")) != -1) {
+    while ((opt = def_getopt(argc, argv, "a", "tmem-freeze", 0)) != -1) {
         switch (opt) {
+        case 0: case 2:
+            return opt;
         case 'a':
             all = 1;
-            break;
-        case 'h':
-            help("tmem-freeze");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -4836,16 +4438,12 @@ int main_tmem_destroy(int argc, char **argv)
     int all = 0;
     int opt;
 
-    while ((opt = getopt(argc, argv, "ah")) != -1) {
+    while ((opt = def_getopt(argc, argv, "a", "tmem-destroy", 0)) != -1) {
         switch (opt) {
+        case 0: case 2:
+            return opt;
         case 'a':
             all = 1;
-            break;
-        case 'h':
-            help("tmem-destroy");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -4872,16 +4470,12 @@ int main_tmem_thaw(int argc, char **argv)
     int all = 0;
     int opt;
 
-    while ((opt = getopt(argc, argv, "ah")) != -1) {
+    while ((opt = def_getopt(argc, argv, "a", "tmem-thaw", 0)) != -1) {
         switch (opt) {
+        case 0: case 2:
+            return opt;
         case 'a':
             all = 1;
-            break;
-        case 'h':
-            help("tmem-thaw");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -4910,8 +4504,10 @@ int main_tmem_set(int argc, char **argv)
     int all = 0;
     int opt;
 
-    while ((opt = getopt(argc, argv, "aw:c:p:h")) != -1) {
+    while ((opt = def_getopt(argc, argv, "aw:c:p:", "tmem-set", 0)) != -1) {
         switch (opt) {
+        case 0: case 2:
+            return opt;
         case 'a':
             all = 1;
             break;
@@ -4926,12 +4522,6 @@ int main_tmem_set(int argc, char **argv)
         case 'p':
             compress = strtol(optarg, NULL, 10);
             opt_p = 1;
-            break;
-        case 'h':
-            help("tmem-set");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -4974,8 +4564,10 @@ int main_tmem_shared_auth(int argc, char **argv)
     int all = 0;
     int opt;
 
-    while ((opt = getopt(argc, argv, "au:A:h")) != -1) {
+    while ((opt = def_getopt(argc, argv, "au:A:", "tmem-shared-auth", 0)) != -1) {
         switch (opt) {
+        case 0: case 2:
+            return opt;
         case 'a':
             all = 1;
             break;
@@ -4984,12 +4576,6 @@ int main_tmem_shared_auth(int argc, char **argv)
             break;
         case 'A':
             autharg = optarg;
-            break;
-        case 'h':
-            help("tmem-shared-auth");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -5028,16 +4614,8 @@ int main_tmem_freeable(int argc, char **argv)
     int opt;
     int mb;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("tmem-freeable");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
+    if ((opt = def_getopt(argc, argv, "", "tmem-freeable", 0)) != -1)
+        return opt;
 
     mb = libxl_tmem_freeable(ctx);
     if (mb == -1)
@@ -5355,23 +4933,10 @@ int main_cpupooldestroy(int argc, char **argv)
     const char *pool;
     uint32_t poolid;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("cpupool-destroy");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
+    if ((opt = def_getopt(argc, argv, "", "cpupool-destroy", 1)) != -1)
+        return opt;
 
     pool = argv[optind];
-    if (!pool) {
-        fprintf(stderr, "no cpupool specified\n");
-        help("cpupool-destroy");
-        return -ERROR_FAIL;
-    }
 
     if (cpupool_qualifier_to_cpupoolid(pool, &poolid, NULL) ||
         !libxl_cpupoolid_to_name(ctx, poolid)) {
@@ -5389,23 +4954,10 @@ int main_cpupoolrename(int argc, char **argv)
     const char *new_name;
     uint32_t poolid;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("cpupool-rename");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
+    if ((opt = def_getopt(argc, argv, "", "cpupool-rename", 2)) != -1)
+        return opt;
 
     pool = argv[optind++];
-    if (!pool || !argv[optind]) {
-        fprintf(stderr, "'xl cpupool-rename' requires 2 arguments.\n\n");
-        help("cpupool-rename");
-        return 1;
-    }
 
     if (cpupool_qualifier_to_cpupoolid(pool, &poolid, NULL) ||
         !libxl_cpupoolid_to_name(ctx, poolid)) {
@@ -5432,29 +4984,10 @@ int main_cpupoolcpuadd(int argc, char **argv)
     int node;
     int n;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("cpupool-cpu-add");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
+    if ((opt = def_getopt(argc, argv, "", "cpupool-cpu-add", 2)) != -1)
+        return opt;
 
     pool = argv[optind++];
-    if (!pool) {
-        fprintf(stderr, "no cpupool specified\n");
-        help("cpupool-cpu-add");
-        return -ERROR_FAIL;
-    }
-
-    if (!argv[optind]) {
-        fprintf(stderr, "no cpu specified\n");
-        help("cpupool-cpu-add");
-        return -ERROR_FAIL;
-    }
     node = -1;
     cpu = -1;
     if (strncmp(argv[optind], "node:", 5) == 0) {
@@ -5495,29 +5028,10 @@ int main_cpupoolcpuremove(int argc, char **argv)
     int node;
     int n;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("cpupool-cpu-remove");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
+    if ((opt = def_getopt(argc, argv, "", "cpupool-cpu-remove", 2)) != -1)
+        return opt;
 
     pool = argv[optind++];
-    if (!pool) {
-        fprintf(stderr, "no cpupool specified\n");
-        help("cpupool-cpu-remove");
-        return -ERROR_FAIL;
-    }
-
-    if (!argv[optind]) {
-        fprintf(stderr, "no cpu specified\n");
-        help("cpupool-cpu-remove");
-        return -ERROR_FAIL;
-    }
     node = -1;
     cpu = -1;
     if (strncmp(argv[optind], "node:", 5) == 0) {
@@ -5557,30 +5071,11 @@ int main_cpupoolmigrate(int argc, char **argv)
     const char *dom;
     uint32_t domid;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("cpupool-migrate");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
+    if ((opt = def_getopt(argc, argv, "", "cpupool-migrate", 2)) != -1)
+        return opt;
 
     dom = argv[optind++];
-    if (!dom) {
-       fprintf(stderr, "no domain specified\n");
-        help("cpupool-migrate");
-        return -ERROR_FAIL;
-    }
-
-    pool = argv[optind++];
-    if (!pool) {
-        fprintf(stderr, "no cpupool specified\n");
-        help("cpupool-migrate");
-        return -ERROR_FAIL;
-    }
+    pool = argv[optind];
 
     if (domain_qualifier_to_domid(dom, &domid, NULL) ||
         !libxl_domid_to_name(ctx, domid)) {
@@ -5615,16 +5110,8 @@ int main_cpupoolnumasplit(int argc, char **argv)
     libxl_topologyinfo topology;
     libxl_dominfo info;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
-        switch (opt) {
-        case 'h':
-            help("cpupool-numa-split");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
-        }
-    }
+    if ((opt = def_getopt(argc, argv, "", "cpupool-numa-split", 0)) != -1)
+        return opt;
     ret = 0;
 
     poolinfo = libxl_list_cpupool(ctx, &n_pools);
