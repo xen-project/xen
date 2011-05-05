@@ -579,8 +579,9 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
             goto out;
     }
 
-
-    if ( ept_entry->sa_p2mt != p2m_invalid )
+    /* Need to check for all-zeroes because typecode 0 is p2m_ram and an
+     * entirely empty entry shouldn't have RAM type. */
+    if ( ept_entry->epte != 0 && ept_entry->sa_p2mt != p2m_invalid )
     {
         *t = ept_entry->sa_p2mt;
         *a = ept_entry->access;

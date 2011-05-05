@@ -381,12 +381,12 @@ static inline p2m_type_t p2m_flags_to_type(unsigned long flags)
 {
     /* Type is stored in the "available" bits */
 #ifdef __x86_64__
-    /*
-     * AMD IOMMU: When we share p2m table with iommu, bit 9 - bit 11 will be
-     * used for iommu hardware to encode next io page level. Bit 59 - bit 62
-     * are used for iommu flags, We could not use these bits to store p2m types.
-     */
-
+    /* For AMD IOMMUs we need to use type 0 for plain RAM, but we need
+     * to make sure that an entirely empty PTE doesn't have RAM type */
+    if ( flags == 0 ) 
+        return p2m_invalid;
+    /* AMD IOMMUs use bits 9-11 to encode next io page level and bits
+     * 59-62 for iommu flags so we can't use them to store p2m type info. */
     return (flags >> 12) & 0x7f;
 #else
     return (flags >> 9) & 0x7;

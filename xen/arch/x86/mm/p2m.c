@@ -1883,9 +1883,6 @@ static mfn_t p2m_gfn_to_mfn_current(struct p2m_domain *p2m,
             p2mt = p2m_flags_to_type(l1e_get_flags(l1e));
             ASSERT(l1e_get_pfn(l1e) != INVALID_MFN || !p2m_is_ram(p2mt));
 
-            if ( l1e.l1 == 0 )
-                p2mt = p2m_invalid;
-
             if ( p2m_flags_to_type(l1e_get_flags(l1e))
                  == p2m_populate_on_demand )
             {
