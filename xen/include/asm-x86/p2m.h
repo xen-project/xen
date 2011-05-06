@@ -638,6 +638,34 @@ static inline void p2m_mem_access_check(unsigned long gpa, bool_t gla_valid,
 struct page_info *p2m_alloc_ptp(struct p2m_domain *p2m, unsigned long type);
 void p2m_free_ptp(struct p2m_domain *p2m, struct page_info *pg);
 
+#if CONFIG_PAGING_LEVELS == 3
+static inline int p2m_gfn_check_limit(
+    struct domain *d, unsigned long gfn, unsigned int order)
+{
+    /*
+     * 32bit AMD nested paging does not support over 4GB guest due to 
+     * hardware translation limit. This limitation is checked by comparing
+     * gfn with 0xfffffUL.
+     */
+    if ( !hap_enabled(d) || ((gfn + (1ul << order)) <= 0x100000UL) ||
+         (boot_cpu_data.x86_vendor != X86_VENDOR_AMD) )
+        return 0;
+
+    if ( !test_and_set_bool(d->arch.hvm_domain.svm.npt_4gb_warning) )
+        dprintk(XENLOG_WARNING, "Dom%d failed to populate memory beyond"
+                " 4GB: specify 'hap=0' domain config option.\n",
+                d->domain_id);
+
+    return -EINVAL;
+}
+#else
+#define p2m_gfn_check_limit(d, g, o) 0
+#endif
+
+/* Directly set a p2m entry: only for use by p2m code */
+int set_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn, 
+                  unsigned int page_order, p2m_type_t p2mt, p2m_access_t p2ma);
+
 #endif /* _XEN_P2M_H */
 
 /*

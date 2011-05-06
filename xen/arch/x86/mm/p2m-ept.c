@@ -820,9 +820,8 @@ static void ept_change_entry_type_global(struct p2m_domain *p2m,
     ept_sync_domain(d);
 }
 
-void ept_p2m_init(struct domain *d)
+void ept_p2m_init(struct p2m_domain *p2m)
 {
-    struct p2m_domain *p2m = p2m_get_hostp2m(d);
     p2m->set_entry = ept_set_entry;
     p2m->get_entry = ept_get_entry;
     p2m->get_entry_current = ept_get_entry_current;
