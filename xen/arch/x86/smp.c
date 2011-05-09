@@ -280,8 +280,6 @@ static struct call_data_struct {
     void (*func) (void *info);
     void *info;
     int wait;
-    atomic_t started;
-    atomic_t finished;
     cpumask_t selected;
 } call_data;
 
@@ -316,8 +314,6 @@ void on_selected_cpus(
     call_data.func = func;
     call_data.info = info;
     call_data.wait = wait;
-    atomic_set(&call_data.started, 0);
-    atomic_set(&call_data.finished, 0);
 
     send_IPI_mask(&call_data.selected, CALL_FUNCTION_VECTOR);
 
@@ -328,8 +324,7 @@ void on_selected_cpus(
         local_irq_enable();
     }
 
-    while ( atomic_read(wait ? &call_data.finished : &call_data.started)
-            != nr_cpus )
+    while ( !cpus_empty(call_data.selected) )
         cpu_relax();
 
  out:
@@ -397,8 +392,9 @@ static void __smp_call_function_interrupt(void)
 {
     void (*func)(void *info) = call_data.func;
     void *info = call_data.info;
+    unsigned int cpu = smp_processor_id();
 
-    if ( !cpu_isset(smp_processor_id(), call_data.selected) )
+    if ( !cpu_isset(cpu, call_data.selected) )
         return;
 
     irq_enter();
@@ -407,12 +403,12 @@ static void __smp_call_function_interrupt(void)
     {
         (*func)(info);
         mb();
-        atomic_inc(&call_data.finished);
+        cpu_clear(cpu, call_data.selected);
     }
     else
     {
         mb();
-        atomic_inc(&call_data.started);
+        cpu_clear(cpu, call_data.selected);
         (*func)(info);
     }
 
