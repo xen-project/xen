@@ -218,7 +218,7 @@ static enum mce_result mce_action(struct cpu_user_regs *regs,
         for ( i = 0; i < handler_num; i++ ) {
             if (handlers[i].owned_error(binfo.mib->mc_status))
             {
-                handlers[i].recovery_handler(binfo.bank, &binfo, &mca_res);
+                handlers[i].recovery_handler(&binfo, &mca_res);
 
                 if (mca_res.result & MCA_OWNER)
                     binfo.mib->mc_domid = mca_res.owner;
@@ -600,7 +600,7 @@ struct mcinfo_recovery *mci_add_pageoff_action(int bank, struct mc_info *mi,
     return rec;
 }
 
-static void intel_memerr_dhandler(int bnum,
+static void intel_memerr_dhandler(
              struct mca_binfo *binfo,
              struct mca_handle_result *result)
 {
@@ -634,7 +634,7 @@ static void intel_memerr_dhandler(int bnum,
         return;
     }
 
-    mci_add_pageoff_action(bnum, binfo->mi, mfn, status);
+    mci_add_pageoff_action(binfo->bank, binfo->mi, mfn, status);
 
     /* This is free page */
     if (status & PG_OFFLINE_OFFLINED)
@@ -710,7 +710,7 @@ static int default_check(uint64_t status)
     return 1;
 }
 
-static void intel_default_dhandler(int bnum,
+static void intel_default_dhandler(
              struct mca_binfo *binfo,
              struct mca_handle_result *result)
 {
@@ -720,7 +720,7 @@ static void intel_default_dhandler(int bnum,
     type = intel_check_mce_type(status);
 
     if (type == intel_mce_fatal || type == intel_mce_ucr_srar)
-        result->result = MCA_RESET;
+        result->result = MCA_NEED_RESET;
     else if (type == intel_mce_ucr_srao)
         result->result = MCA_NO_ACTION;
 }
@@ -730,7 +730,7 @@ static const struct mca_error_handler intel_mce_dhandlers[] = {
     {default_check, intel_default_dhandler}
 };
 
-static void intel_default_uhandler(int bnum,
+static void intel_default_uhandler(
              struct mca_binfo *binfo,
              struct mca_handle_result *result)
 {
@@ -744,7 +744,7 @@ static void intel_default_uhandler(int bnum,
     /* Panic if no handler for SRAR error */
     case intel_mce_ucr_srar:
     case intel_mce_fatal:
-        result->result = MCA_RESET;
+        result->result = MCA_NEED_RESET;
         break;
     default:
         result->result = MCA_NO_ACTION;

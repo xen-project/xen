@@ -174,7 +174,7 @@ struct mca_error_handler
      * for the particular mca error later.
     */
     int (*owned_error)(uint64_t status);
-    void (*recovery_handler)(int bank, struct mca_binfo *binfo,
+    void (*recovery_handler)(struct mca_binfo *binfo,
                     struct mca_handle_result *result);
 };
 
