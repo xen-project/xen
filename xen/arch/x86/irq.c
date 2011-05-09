@@ -950,6 +950,65 @@ struct irq_desc *domain_spin_lock_irq_desc(
     return desc;
 }
 
+static int prepare_domain_irq_pirq(struct domain *d, int irq, int pirq)
+{
+    int err = radix_tree_insert(&d->arch.irq_pirq, irq,
+                                radix_tree_int_to_ptr(0));
+    return (err != -EEXIST) ? err : 0;
+}
+
+static void set_domain_irq_pirq(struct domain *d, int irq, int pirq)
+{
+    radix_tree_replace_slot(
+        radix_tree_lookup_slot(&d->arch.irq_pirq, irq),
+        radix_tree_int_to_ptr(pirq));
+    d->arch.pirq_irq[pirq] = irq;
+}
+
+static void clear_domain_irq_pirq(struct domain *d, int irq, int pirq)
+{
+    d->arch.pirq_irq[pirq] = 0;
+    radix_tree_replace_slot(
+        radix_tree_lookup_slot(&d->arch.irq_pirq, irq),
+        radix_tree_int_to_ptr(0));
+}
+
+static void cleanup_domain_irq_pirq(struct domain *d, int irq, int pirq)
+{
+    radix_tree_delete(&d->arch.irq_pirq, irq);
+}
+
+int init_domain_irq_mapping(struct domain *d)
+{
+    unsigned int i;
+    int err = 0;
+
+    radix_tree_init(&d->arch.irq_pirq);
+    if ( is_hvm_domain(d) )
+        radix_tree_init(&d->arch.hvm_domain.emuirq_pirq);
+
+    for ( i = 1; platform_legacy_irq(i); ++i )
+    {
+        if ( IO_APIC_IRQ(i) )
+            continue;
+        err = prepare_domain_irq_pirq(d, i, i);
+        if ( err )
+            break;
+        set_domain_irq_pirq(d, i, i);
+    }
+
+    if ( err )
+        cleanup_domain_irq_mapping(d);
+    return err;
+}
+
+void cleanup_domain_irq_mapping(struct domain *d)
+{
+    radix_tree_destroy(&d->arch.irq_pirq, NULL);
+    if ( is_hvm_domain(d) )
+        radix_tree_destroy(&d->arch.hvm_domain.emuirq_pirq, NULL);
+}
+
 /* Flush all ready EOIs from the top of this CPU's pending-EOI stack. */
 static void flush_ready_eoi(void)
 {
@@ -1373,7 +1432,7 @@ void pirq_guest_unbind(struct domain *d, int pirq)
 {
     irq_guest_action_t *oldaction = NULL;
     struct irq_desc *desc;
-    int irq;
+    int irq = 0;
 
     WARN_ON(!spin_is_locked(&d->event_lock));
 
@@ -1386,7 +1445,7 @@ void pirq_guest_unbind(struct domain *d, int pirq)
         BUG_ON(irq <= 0);
         desc = irq_to_desc(irq);
         spin_lock_irq(&desc->lock);
-        d->arch.pirq_irq[pirq] = d->arch.irq_pirq[irq] = 0;
+        clear_domain_irq_pirq(d, irq, pirq);
     }
     else
     {
@@ -1400,6 +1459,8 @@ void pirq_guest_unbind(struct domain *d, int pirq)
         kill_timer(&oldaction->eoi_timer);
         xfree(oldaction);
     }
+    else if ( irq > 0 )
+        cleanup_domain_irq_pirq(d, irq, pirq);
 }
 
 static int pirq_guest_force_unbind(struct domain *d, int irq)
@@ -1523,6 +1584,10 @@ int map_domain_pirq(
         return ret;
     }
 
+    ret = prepare_domain_irq_pirq(d, irq, pirq);
+    if ( ret )
+        return ret;
+
     desc = irq_to_desc(irq);
 
     if ( type == MAP_PIRQ_TYPE_MSI )
@@ -1544,19 +1609,20 @@ int map_domain_pirq(
             dprintk(XENLOG_G_ERR, "dom%d: irq %d in use\n",
               d->domain_id, irq);
         desc->handler = &pci_msi_type;
-        d->arch.pirq_irq[pirq] = irq;
-        d->arch.irq_pirq[irq] = pirq;
+        set_domain_irq_pirq(d, irq, pirq);
         setup_msi_irq(pdev, msi_desc, irq);
         spin_unlock_irqrestore(&desc->lock, flags);
-    } else
+    }
+    else
     {
         spin_lock_irqsave(&desc->lock, flags);
-        d->arch.pirq_irq[pirq] = irq;
-        d->arch.irq_pirq[irq] = pirq;
+        set_domain_irq_pirq(d, irq, pirq);
         spin_unlock_irqrestore(&desc->lock, flags);
     }
 
  done:
+    if ( ret )
+        cleanup_domain_irq_pirq(d, irq, pirq);
     return ret;
 }
 
@@ -1599,19 +1665,21 @@ int unmap_domain_pirq(struct domain *d, int pirq)
     BUG_ON(irq != domain_pirq_to_irq(d, pirq));
 
     if ( !forced_unbind )
-    {
-        d->arch.pirq_irq[pirq] = 0;
-        d->arch.irq_pirq[irq] = 0;
-    }
+        clear_domain_irq_pirq(d, irq, pirq);
     else
     {
         d->arch.pirq_irq[pirq] = -irq;
-        d->arch.irq_pirq[irq] = -pirq;
+        radix_tree_replace_slot(
+            radix_tree_lookup_slot(&d->arch.irq_pirq, irq),
+            radix_tree_int_to_ptr(-pirq));
     }
 
     spin_unlock_irqrestore(&desc->lock, flags);
     if (msi_desc)
         msi_free_irq(msi_desc);
+
+    if ( !forced_unbind )
+        cleanup_domain_irq_pirq(d, irq, pirq);
 
     ret = irq_deny_access(d, pirq);
     if ( ret )
@@ -1829,10 +1897,27 @@ int map_domain_emuirq_pirq(struct domain *d, int pirq, int emuirq)
         return 0;
     }
 
-    d->arch.pirq_emuirq[pirq] = emuirq;
     /* do not store emuirq mappings for pt devices */
     if ( emuirq != IRQ_PT )
-        d->arch.emuirq_pirq[emuirq] = pirq;
+    {
+        int err = radix_tree_insert(&d->arch.hvm_domain.emuirq_pirq, emuirq,
+                                    radix_tree_int_to_ptr(pirq));
+
+        switch ( err )
+        {
+        case 0:
+            break;
+        case -EEXIST:
+            radix_tree_replace_slot(
+                radix_tree_lookup_slot(
+                    &d->arch.hvm_domain.emuirq_pirq, emuirq),
+                radix_tree_int_to_ptr(pirq));
+            break;
+        default:
+            return err;
+        }
+    }
+    d->arch.pirq_emuirq[pirq] = emuirq;
 
     return 0;
 }
@@ -1860,7 +1945,7 @@ int unmap_domain_pirq_emuirq(struct domain *d, int pirq)
 
     d->arch.pirq_emuirq[pirq] = IRQ_UNBOUND;
     if ( emuirq != IRQ_PT )
-        d->arch.emuirq_pirq[emuirq] = IRQ_UNBOUND;
+        radix_tree_delete(&d->arch.hvm_domain.emuirq_pirq, emuirq);
 
  done:
     return ret;
