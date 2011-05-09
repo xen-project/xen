@@ -58,7 +58,8 @@
 #include <asm/hvm/trace.h>
 #include <asm/hap.h>
 #include <asm/apic.h>
-#include <asm/debugger.h>       
+#include <asm/debugger.h>
+#include <asm/xstate.h>
 
 u32 svm_feature_flags;
 
@@ -695,6 +696,50 @@ static void svm_init_hypercall_page(struct domain *d, void *hypercall_page)
     *(u16 *)(hypercall_page + (__HYPERVISOR_iret * 32)) = 0x0b0f; /* ud2 */
 }
 
+static inline void svm_lwp_save(struct vcpu *v)
+{
+    /* Don't mess up with other guests. Disable LWP for next VCPU. */
+    if ( v->arch.hvm_svm.guest_lwp_cfg )
+    {
+        wrmsrl(MSR_AMD64_LWP_CFG, 0x0);
+        wrmsrl(MSR_AMD64_LWP_CBADDR, 0x0);
+    }
+}
+
+static inline void svm_lwp_load(struct vcpu *v)
+{
+    /* Only LWP_CFG is reloaded. LWP_CBADDR will be reloaded via xrstor. */
+   if ( v->arch.hvm_svm.guest_lwp_cfg ) 
+       wrmsrl(MSR_AMD64_LWP_CFG, v->arch.hvm_svm.guest_lwp_cfg);
+}
+
+/* Update LWP_CFG MSR (0xc0000105). Return -1 if error; otherwise returns 0. */
+static int svm_update_lwp_cfg(struct vcpu *v, uint64_t msr_content)
+{
+    unsigned int eax, ebx, ecx, edx;
+    uint32_t msr_low;
+    
+    if ( xsave_enabled(v) && cpu_has_lwp )
+    {
+        hvm_cpuid(0x8000001c, &eax, &ebx, &ecx, &edx);
+        msr_low = (uint32_t)msr_content;
+        
+        /* generate #GP if guest tries to turn on unsupported features. */
+        if ( msr_low & ~edx)
+            return -1;
+        
+        wrmsrl(MSR_AMD64_LWP_CFG, msr_content);
+        /* CPU might automatically correct reserved bits. So read it back. */
+        rdmsrl(MSR_AMD64_LWP_CFG, msr_content);
+        v->arch.hvm_svm.guest_lwp_cfg = msr_content;
+
+        /* track nonalzy state if LWP_CFG is non-zero. */
+        v->arch.nonlazy_xstate_used = !!(msr_content);
+    }
+
+    return 0;
+}
+
 static void svm_ctxt_switch_from(struct vcpu *v)
 {
     int cpu = smp_processor_id();
@@ -703,6 +748,7 @@ static void svm_ctxt_switch_from(struct vcpu *v)
 
     svm_save_dr(v);
     vpmu_save(v);
+    svm_lwp_save(v);
 
     svm_sync_vmcb(v);
     svm_vmload(per_cpu(root_vmcb, cpu));
@@ -746,6 +792,7 @@ static void svm_ctxt_switch_to(struct vcpu *v)
     svm_vmload(vmcb);
     vmcb->cleanbits.bytes = 0;
     vpmu_load(v);
+    svm_lwp_load(v);
 
     if ( cpu_has_rdtscp )
         wrmsrl(MSR_TSC_AUX, hvm_msr_tsc_aux(v));
@@ -1120,6 +1167,24 @@ static void svm_cpuid_intercept(
         if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
             __clear_bit(X86_FEATURE_APIC & 31, edx);
         break;
+    case 0x8000001c: 
+    {
+        /* LWP capability CPUID */
+        uint64_t lwp_cfg = v->arch.hvm_svm.guest_lwp_cfg;
+
+        if ( cpu_has_lwp )
+        {
+            if ( !(v->arch.xcr0 & XSTATE_LWP) )
+           {
+                *eax = 0x0;
+                break;
+            }
+
+            /* turn on available bit and other features specified in lwp_cfg */
+            *eax = (*edx & lwp_cfg) | 0x00000001;
+        }
+        break;
+    }
     default:
         break;
     }
@@ -1225,6 +1290,10 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 
     case MSR_IA32_LASTINTTOIP:
         *msr_content = vmcb_get_lastinttoip(vmcb);
+        break;
+
+    case MSR_AMD64_LWP_CFG:
+        *msr_content = v->arch.hvm_svm.guest_lwp_cfg;
         break;
 
     case MSR_K7_PERFCTR0:
@@ -1335,6 +1404,11 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 
     case MSR_IA32_LASTINTTOIP:
         vmcb_set_lastinttoip(vmcb, msr_content);
+        break;
+
+    case MSR_AMD64_LWP_CFG:
+        if ( svm_update_lwp_cfg(v, msr_content) < 0 )
+            goto gpf;
         break;
 
     case MSR_K7_PERFCTR0:

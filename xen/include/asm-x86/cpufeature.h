@@ -208,6 +208,8 @@
 
 #define cpu_has_xsave           boot_cpu_has(X86_FEATURE_XSAVE)
 
+#define cpu_has_lwp             boot_cpu_has(X86_FEATURE_LWP)
+
 #define cpu_has_arch_perfmon    boot_cpu_has(X86_FEATURE_ARCH_PERFMON)
 
 #define cpu_has_rdtscp          boot_cpu_has(X86_FEATURE_RDTSCP)

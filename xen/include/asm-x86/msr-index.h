@@ -266,6 +266,10 @@
 #define MSR_AMD_PATCHLEVEL		0x0000008b
 #define MSR_AMD_PATCHLOADER		0xc0010020
 
+/* AMD Lightweight Profiling MSRs */
+#define MSR_AMD64_LWP_CFG		0xc0000105
+#define MSR_AMD64_LWP_CBADDR		0xc0000106
+
 /* AMD OS Visible Workaround MSRs */
 #define MSR_AMD_OSVW_ID_LENGTH          0xc0010140
 #define MSR_AMD_OSVW_STATUS             0xc0010141
