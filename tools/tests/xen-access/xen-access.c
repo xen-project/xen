@@ -482,9 +482,6 @@ int main(int argc, char *argv[])
 
     if ( argc == 3 && argv[0][0] == '-' )
     {
-        argv++;
-        argc--;
-
         if ( !strcmp(argv[0], "-m") )
             required = 1;
         else
@@ -492,6 +489,8 @@ int main(int argc, char *argv[])
             usage(progname);
             return -1;
         }
+        argv++;
+        argc--;
     }
 
     if ( argc != 2 )
@@ -650,8 +649,6 @@ int main(int argc, char *argv[])
 
     if ( rc == 0 )
         rc = rc1;
-
-    xc_interface_close(xch);
 
     DPRINTF("xenaccess exit code %d\n", rc);
     return rc;
