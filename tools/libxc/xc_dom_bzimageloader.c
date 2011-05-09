@@ -68,8 +68,29 @@ static int xc_try_bzip2_decode(
     for ( ; ; )
     {
         ret = BZ2_bzDecompress(&stream);
-        if ( (stream.avail_out == 0) || (ret != BZ_OK) )
+        if ( ret == BZ_STREAM_END )
         {
+            xc_dom_printf("BZIP2: Saw data stream end\n");
+            retval = 0;
+            break;
+        }
+        if ( ret != BZ_OK )
+        {
+            xc_dom_printf("BZIP2: error %d", ret);
+            free(out_buf);
+            goto bzip2_cleanup;
+        }
+
+        if ( stream.avail_out == 0 )
+        {
+            /* Protect against output buffer overflow */
+            if ( outsize > INT_MAX / 2 )
+            {
+                xc_dom_printf("BZIP2: output buffer overflow\n");
+                free(out_buf);
+                goto bzip2_cleanup;
+            }
+
             tmp_buf = realloc(out_buf, outsize * 2);
             if ( tmp_buf == NULL )
             {
@@ -83,16 +104,18 @@ static int xc_try_bzip2_decode(
             stream.avail_out = (outsize * 2) - outsize;
             outsize *= 2;
         }
-
-        if ( ret != BZ_OK )
+        else if ( stream.avail_in == 0 )
         {
-            if ( ret == BZ_STREAM_END )
-            {
-                xc_dom_printf("BZIP2: Saw data stream end\n");
-                retval = 0;
-                break;
-            }
-            xc_dom_printf("BZIP2: error\n");
+            /*
+             * If there is output buffer available then this indicates
+             * that BZ2_bzDecompress would like more input data to be
+             * provided.  However our complete input buffer is in
+             * memory and provided upfront so if avail_in is zero this
+             * actually indicates a truncated input.
+             */
+            xc_dom_printf("BZIP2: not enough input\n");
+            free(out_buf);
+            goto bzip2_cleanup;
         }
     }
 
@@ -187,31 +210,14 @@ static int xc_try_lzma_decode(
     for ( ; ; )
     {
         ret = lzma_code(&stream, action);
-        if ( (stream.avail_out == 0) || (ret != LZMA_OK) )
+        if ( ret == LZMA_STREAM_END )
         {
-            tmp_buf = realloc(out_buf, outsize * 2);
-            if ( tmp_buf == NULL )
-            {
-                xc_dom_printf("LZMA: Failed to realloc memory\n");
-                free(out_buf);
-                goto lzma_cleanup;
-            }
-            out_buf = tmp_buf;
-
-            stream.next_out = out_buf + outsize;
-            stream.avail_out = (outsize * 2) - outsize;
-            outsize *= 2;
+            xc_dom_printf("LZMA: Saw data stream end\n");
+            retval = 0;
+            break;
         }
-
         if ( ret != LZMA_OK )
         {
-            if ( ret == LZMA_STREAM_END )
-            {
-                xc_dom_printf("LZMA: Saw data stream end\n");
-                retval = 0;
-                break;
-            }
-
             switch ( ret )
             {
             case LZMA_MEM_ERROR:
@@ -245,7 +251,32 @@ static int xc_try_lzma_decode(
             }
             xc_dom_printf("%s: LZMA decompression error %s\n",
                           __FUNCTION__, msg);
-            break;
+            free(out_buf);
+            goto lzma_cleanup;
+        }
+
+        if ( stream.avail_out == 0 )
+        {
+            /* Protect against output buffer overflow */
+            if ( outsize > INT_MAX / 2 )
+            {
+                xc_dom_printf("LZMA: output buffer overflow\n");
+                free(out_buf);
+                goto lzma_cleanup;
+            }
+
+            tmp_buf = realloc(out_buf, outsize * 2);
+            if ( tmp_buf == NULL )
+            {
+                xc_dom_printf("LZMA: Failed to realloc memory");
+                free(out_buf);
+                goto lzma_cleanup;
+            }
+            out_buf = tmp_buf;
+
+            stream.next_out = out_buf + outsize;
+            stream.avail_out = (outsize * 2) - outsize;
+            outsize *= 2;
         }
     }
 
@@ -314,18 +345,18 @@ struct setup_header {
 
 extern struct xc_dom_loader elf_loader;
 
-static unsigned int payload_offset(struct setup_header *hdr)
+static int check_magic(struct xc_dom_image *dom, const void *magic, size_t len)
 {
-    unsigned int off;
+    if (len > dom->kernel_size)
+        return 0;
 
-    off = (hdr->setup_sects + 1) * 512;
-    off += hdr->payload_offset;
-    return off;
+    return (memcmp(dom->kernel_blob, magic, len) == 0);
 }
 
 static int xc_dom_probe_bzimage_kernel(struct xc_dom_image *dom)
 {
     struct setup_header *hdr;
+    uint64_t payload_offset, payload_length;
     int ret;
 
     if ( dom->kernel_blob == NULL )
@@ -358,10 +389,30 @@ static int xc_dom_probe_bzimage_kernel(struct xc_dom_image *dom)
         return -EINVAL;
     }
 
-    dom->kernel_blob = dom->kernel_blob + payload_offset(hdr);
-    dom->kernel_size = hdr->payload_length;
 
-    if ( memcmp(dom->kernel_blob, "\037\213", 2) == 0 )
+    /* upcast to 64 bits to avoid overflow */
+    /* setup_sects is u8 and so cannot overflow */
+    payload_offset = (hdr->setup_sects + 1) * 512;
+    payload_offset += hdr->payload_offset;
+    payload_length = hdr->payload_length;
+
+    if ( payload_offset >= dom->kernel_size )
+    {
+        xc_dom_panic(XC_INVALID_KERNEL, "%s: payload offset overflow",
+                     __FUNCTION__);
+        return -EINVAL;
+    }
+    if ( (payload_offset + payload_length) > dom->kernel_size )
+    {
+        xc_dom_panic(XC_INVALID_KERNEL, "%s: payload length overflow",
+                     __FUNCTION__);
+        return -EINVAL;
+    }
+
+    dom->kernel_blob = dom->kernel_blob + payload_offset;
+    dom->kernel_size = payload_length;
+
+    if ( check_magic(dom, "\037\213", 2) )
     {
         ret = xc_dom_try_gunzip(dom, &dom->kernel_blob, &dom->kernel_size);
         if ( ret == -1 )
@@ -372,7 +423,7 @@ static int xc_dom_probe_bzimage_kernel(struct xc_dom_image *dom)
             return -EINVAL;
         }
     }
-    else if ( memcmp(dom->kernel_blob, "\102\132\150", 3) == 0 )
+    else if ( check_magic(dom, "\102\132\150", 3) )
     {
         ret = xc_try_bzip2_decode(dom, &dom->kernel_blob, &dom->kernel_size);
         if ( ret < 0 )
@@ -383,7 +434,7 @@ static int xc_dom_probe_bzimage_kernel(struct xc_dom_image *dom)
             return -EINVAL;
         }
     }
-    else if ( memcmp(dom->kernel_blob, "\135\000", 2) == 0 )
+    else if ( check_magic(dom, "\135\000", 2) )
     {
         ret = xc_try_lzma_decode(dom, &dom->kernel_blob, &dom->kernel_size);
         if ( ret < 0 )
