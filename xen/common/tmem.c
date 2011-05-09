@@ -772,15 +772,12 @@ static NOINLINE void pgp_destroy(void *v)
     pgp_free(pgp,0);
 }
 
-FORWARD static rtn_t *rtn_alloc(void *arg);
-FORWARD static void rtn_free(rtn_t *rtn);
-
 static int pgp_add_to_obj(obj_t *obj, uint32_t index, pgp_t *pgp)
 {
     int ret;
 
     ASSERT_SPINLOCK(&obj->obj_spinlock);
-    ret = radix_tree_insert(&obj->tree_root, index, pgp, rtn_alloc, obj);
+    ret = radix_tree_insert(&obj->tree_root, index, pgp);
     if ( !ret )
         obj->pgp_count++;
     return ret;
@@ -795,7 +792,7 @@ static NOINLINE pgp_t *pgp_delete_from_obj(obj_t *obj, uint32_t index)
     ASSERT_SENTINEL(obj,OBJ);
     ASSERT(obj->pool != NULL);
     ASSERT_SENTINEL(obj->pool,POOL);
-    pgp = radix_tree_delete(&obj->tree_root, index, rtn_free);
+    pgp = radix_tree_delete(&obj->tree_root, index);
     if ( pgp != NULL )
         obj->pgp_count--;
     ASSERT(obj->pgp_count >= 0);
@@ -828,15 +825,12 @@ static NOINLINE rtn_t *rtn_alloc(void *arg)
 }
 
 /* called only indirectly from radix_tree_delete/destroy */
-static void rtn_free(rtn_t *rtn)
+static void rtn_free(rtn_t *rtn, void *arg)
 {
     pool_t *pool;
     objnode_t *objnode;
-    int i;
 
     ASSERT(rtn != NULL);
-    for (i = 0; i < RADIX_TREE_MAP_SIZE; i++)
-        ASSERT(rtn->slots[i] == NULL);
     objnode = container_of(rtn,objnode_t,rtn);
     ASSERT_SENTINEL(objnode,OBJNODE);
     INVERT_SENTINEL(objnode,OBJNODE);
@@ -943,7 +937,7 @@ static NOINLINE void obj_free(obj_t *obj, int no_rebalance)
     ASSERT(pool->client != NULL);
     ASSERT_WRITELOCK(&pool->pool_rwlock);
     if ( obj->tree_root.rnode != NULL ) /* may be a "stump" with no leaves */
-        radix_tree_destroy(&obj->tree_root, pgp_destroy, rtn_free);
+        radix_tree_destroy(&obj->tree_root, pgp_destroy);
     ASSERT((long)obj->objnode_count == 0);
     ASSERT(obj->tree_root.rnode == NULL);
     pool->obj_count--;
@@ -1003,7 +997,8 @@ static NOINLINE obj_t * obj_new(pool_t *pool, OID *oidp)
     if (pool->obj_count > pool->obj_count_max)
         pool->obj_count_max = pool->obj_count;
     atomic_inc_and_max(global_obj_count);
-    INIT_RADIX_TREE(&obj->tree_root,0);
+    radix_tree_init(&obj->tree_root);
+    radix_tree_set_alloc_callbacks(&obj->tree_root, rtn_alloc, rtn_free, obj);
     spin_lock_init(&obj->obj_spinlock);
     obj->pool = pool;
     obj->oid = *oidp;
@@ -1022,7 +1017,7 @@ static NOINLINE obj_t * obj_new(pool_t *pool, OID *oidp)
 static NOINLINE void obj_destroy(obj_t *obj, int no_rebalance)
 {
     ASSERT_WRITELOCK(&obj->pool->pool_rwlock);
-    radix_tree_destroy(&obj->tree_root, pgp_destroy, rtn_free);
+    radix_tree_destroy(&obj->tree_root, pgp_destroy);
     obj_free(obj,no_rebalance);
 }
 
@@ -2925,7 +2920,6 @@ static int __init init_tmem(void)
     if ( !tmh_enabled() )
         return 0;
 
-    radix_tree_init();
     if ( tmh_dedup_enabled() )
         for (i = 0; i < 256; i++ )
         {

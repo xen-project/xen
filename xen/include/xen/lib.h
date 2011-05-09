@@ -48,7 +48,8 @@ do {                                                            \
 #define SWAP(_a, _b) \
    do { typeof(_a) _t = (_a); (_a) = (_b); (_b) = _t; } while ( 0 )
 
-#define DIV_ROUND(x, y) (((x) + (y) / 2) / (y))
+#define DIV_ROUND(n, d) (((n) + (d) / 2) / (d))
+#define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]) + __must_be_array(x))
 

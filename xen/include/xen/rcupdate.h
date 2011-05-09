@@ -38,6 +38,8 @@
 #include <xen/cpumask.h>
 #include <xen/preempt.h>
 
+#define __rcu
+
 /**
  * struct rcu_head - callback structure for use with RCU
  * @next: next update requests in a list
