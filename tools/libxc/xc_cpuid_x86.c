@@ -31,7 +31,7 @@
 
 #define DEF_MAX_BASE 0x0000000du
 #define DEF_MAX_INTELEXT  0x80000008u
-#define DEF_MAX_AMDEXT    0x8000000au
+#define DEF_MAX_AMDEXT    0x8000001cu
 
 static int hypervisor_is_64bit(xc_interface *xch)
 {
@@ -111,7 +111,8 @@ static void amd_xc_cpuid_policy(
                     bitmaskof(X86_FEATURE_3DNOWPREFETCH) |
                     bitmaskof(X86_FEATURE_XOP) |
                     bitmaskof(X86_FEATURE_FMA4) |
-                    bitmaskof(X86_FEATURE_TBM));
+                    bitmaskof(X86_FEATURE_TBM) |
+                    bitmaskof(X86_FEATURE_LWP));
         regs[3] &= (0x0183f3ff | /* features shared with 0x00000001:EDX */
                     (is_pae ? bitmaskof(X86_FEATURE_NX) : 0) |
                     (is_64bit ? bitmaskof(X86_FEATURE_LM) : 0) |
@@ -385,6 +386,7 @@ static void xc_cpuid_hvm_policy(
     case 0x80000005: /* AMD L1 cache/TLB info (dumped by Intel policy) */
     case 0x80000006: /* AMD L2/3 cache/TLB info ; Intel L2 cache features */
     case 0x8000000a: /* AMD SVM feature bits */
+    case 0x8000001c: /* AMD lightweight profiling */
         break;
 
     default:
