@@ -101,6 +101,7 @@ void vpmu_initialise(struct vcpu *v)
         switch ( family )
         {
         case 0x10:
+        case 0x15:
             vpmu->arch_vpmu_ops = &amd_vpmu_ops;
             break;
         default:

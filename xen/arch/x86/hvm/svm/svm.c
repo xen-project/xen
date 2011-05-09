@@ -1235,6 +1235,18 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     case MSR_K7_EVNTSEL1:
     case MSR_K7_EVNTSEL2:
     case MSR_K7_EVNTSEL3:
+    case MSR_AMD_FAM15H_PERFCTR0:
+    case MSR_AMD_FAM15H_PERFCTR1:
+    case MSR_AMD_FAM15H_PERFCTR2:
+    case MSR_AMD_FAM15H_PERFCTR3:
+    case MSR_AMD_FAM15H_PERFCTR4:
+    case MSR_AMD_FAM15H_PERFCTR5:
+    case MSR_AMD_FAM15H_EVNTSEL0:
+    case MSR_AMD_FAM15H_EVNTSEL1:
+    case MSR_AMD_FAM15H_EVNTSEL2:
+    case MSR_AMD_FAM15H_EVNTSEL3:
+    case MSR_AMD_FAM15H_EVNTSEL4:
+    case MSR_AMD_FAM15H_EVNTSEL5:
         vpmu_do_rdmsr(msr, msr_content);
         break;
 
@@ -1333,6 +1345,18 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
     case MSR_K7_EVNTSEL1:
     case MSR_K7_EVNTSEL2:
     case MSR_K7_EVNTSEL3:
+    case MSR_AMD_FAM15H_PERFCTR0:
+    case MSR_AMD_FAM15H_PERFCTR1:
+    case MSR_AMD_FAM15H_PERFCTR2:
+    case MSR_AMD_FAM15H_PERFCTR3:
+    case MSR_AMD_FAM15H_PERFCTR4:
+    case MSR_AMD_FAM15H_PERFCTR5:
+    case MSR_AMD_FAM15H_EVNTSEL0:
+    case MSR_AMD_FAM15H_EVNTSEL1:
+    case MSR_AMD_FAM15H_EVNTSEL2:
+    case MSR_AMD_FAM15H_EVNTSEL3:
+    case MSR_AMD_FAM15H_EVNTSEL4:
+    case MSR_AMD_FAM15H_EVNTSEL5:
         vpmu_do_wrmsr(msr, msr_content);
         break;
 

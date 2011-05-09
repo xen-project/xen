@@ -36,7 +36,9 @@
 #include <public/hvm/save.h>
 #include <asm/hvm/vpmu.h>
 
-#define NUM_COUNTERS 4
+#define F10H_NUM_COUNTERS 4
+#define F15H_NUM_COUNTERS 6
+#define MAX_NUM_COUNTERS F15H_NUM_COUNTERS
 
 #define MSR_F10H_EVNTSEL_GO_SHIFT   40
 #define MSR_F10H_EVNTSEL_EN_SHIFT   22
@@ -46,6 +48,11 @@
 #define is_pmu_enabled(msr) ((msr) & (1ULL << MSR_F10H_EVNTSEL_EN_SHIFT))
 #define set_guest_mode(msr) (msr |= (1ULL << MSR_F10H_EVNTSEL_GO_SHIFT))
 #define is_overflowed(msr) (!((msr) & (1ULL << (MSR_F10H_COUNTER_LENGTH-1))))
+
+static int __read_mostly num_counters = 0;
+static u32 __read_mostly *counters = NULL;
+static u32 __read_mostly *ctrls = NULL;
+static bool_t __read_mostly k7_counters_mirrored = 0;
 
 /* PMU Counter MSRs. */
 u32 AMD_F10H_COUNTERS[] = {
@@ -63,10 +70,28 @@ u32 AMD_F10H_CTRLS[] = {
     MSR_K7_EVNTSEL3
 };
 
+u32 AMD_F15H_COUNTERS[] = {
+    MSR_AMD_FAM15H_PERFCTR0,
+    MSR_AMD_FAM15H_PERFCTR1,
+    MSR_AMD_FAM15H_PERFCTR2,
+    MSR_AMD_FAM15H_PERFCTR3,
+    MSR_AMD_FAM15H_PERFCTR4,
+    MSR_AMD_FAM15H_PERFCTR5
+};
+
+u32 AMD_F15H_CTRLS[] = {
+    MSR_AMD_FAM15H_EVNTSEL0,
+    MSR_AMD_FAM15H_EVNTSEL1,
+    MSR_AMD_FAM15H_EVNTSEL2,
+    MSR_AMD_FAM15H_EVNTSEL3,
+    MSR_AMD_FAM15H_EVNTSEL4,
+    MSR_AMD_FAM15H_EVNTSEL5
+};
+
 /* storage for context switching */
 struct amd_vpmu_context {
-    u64 counters[NUM_COUNTERS];
-    u64 ctrls[NUM_COUNTERS];
+    u64 counters[MAX_NUM_COUNTERS];
+    u64 ctrls[MAX_NUM_COUNTERS];
     u32 hw_lapic_lvtpc;
 };
 
@@ -78,10 +103,45 @@ static inline int get_pmu_reg_type(u32 addr)
     if ( (addr >= MSR_K7_PERFCTR0) && (addr <= MSR_K7_PERFCTR3) )
         return MSR_TYPE_COUNTER;
 
+    if ( (addr >= MSR_AMD_FAM15H_EVNTSEL0) &&
+         (addr <= MSR_AMD_FAM15H_PERFCTR5 ) )
+    {
+        if (addr & 1)
+            return MSR_TYPE_COUNTER;
+        else
+            return MSR_TYPE_CTRL;
+    }
+
     /* unsupported registers */
     return -1;
 }
 
+static inline u32 get_fam15h_addr(u32 addr)
+{
+    switch ( addr )
+    {
+    case MSR_K7_PERFCTR0:
+        return MSR_AMD_FAM15H_PERFCTR0;
+    case MSR_K7_PERFCTR1:
+        return MSR_AMD_FAM15H_PERFCTR1;
+    case MSR_K7_PERFCTR2:
+        return MSR_AMD_FAM15H_PERFCTR2;
+    case MSR_K7_PERFCTR3:
+        return MSR_AMD_FAM15H_PERFCTR3;
+    case MSR_K7_EVNTSEL0:
+        return MSR_AMD_FAM15H_EVNTSEL0;
+    case MSR_K7_EVNTSEL1:
+        return MSR_AMD_FAM15H_EVNTSEL1;
+    case MSR_K7_EVNTSEL2:
+        return MSR_AMD_FAM15H_EVNTSEL2;
+    case MSR_K7_EVNTSEL3:
+        return MSR_AMD_FAM15H_EVNTSEL3;
+    default:
+        break;
+    }
+
+    return addr;
+}
 
 static int amd_vpmu_do_interrupt(struct cpu_user_regs *regs)
 {
@@ -110,12 +170,12 @@ static inline void context_restore(struct vcpu *v)
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     struct amd_vpmu_context *ctxt = vpmu->context;
 
-    for ( i = 0; i < NUM_COUNTERS; i++ )
-        wrmsrl(AMD_F10H_CTRLS[i], ctxt->ctrls[i]);
+    for ( i = 0; i < num_counters; i++ )
+        wrmsrl(ctrls[i], ctxt->ctrls[i]);
 
-    for ( i = 0; i < NUM_COUNTERS; i++ )
+    for ( i = 0; i < num_counters; i++ )
     {
-        wrmsrl(AMD_F10H_COUNTERS[i], ctxt->counters[i]);
+        wrmsrl(counters[i], ctxt->counters[i]);
 
         /* Force an interrupt to allow guest reset the counter,
         if the value is positive */
@@ -147,11 +207,11 @@ static inline void context_save(struct vcpu *v)
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     struct amd_vpmu_context *ctxt = vpmu->context;
 
-    for ( i = 0; i < NUM_COUNTERS; i++ )
-        rdmsrl(AMD_F10H_COUNTERS[i], ctxt->counters[i]);
+    for ( i = 0; i < num_counters; i++ )
+        rdmsrl(counters[i], ctxt->counters[i]);
 
-    for ( i = 0; i < NUM_COUNTERS; i++ )
-        rdmsrl(AMD_F10H_CTRLS[i], ctxt->ctrls[i]);
+    for ( i = 0; i < num_counters; i++ )
+        rdmsrl(ctrls[i], ctxt->ctrls[i]);
 }
 
 static void amd_vpmu_save(struct vcpu *v)
@@ -175,12 +235,18 @@ static void context_update(unsigned int msr, u64 msr_content)
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     struct amd_vpmu_context *ctxt = vpmu->context;
 
-    for ( i = 0; i < NUM_COUNTERS; i++ )
-        if ( msr == AMD_F10H_COUNTERS[i] )
+    if ( k7_counters_mirrored &&
+        ((msr >= MSR_K7_EVNTSEL0) && (msr <= MSR_K7_PERFCTR3)) )
+    {
+        msr = get_fam15h_addr(msr);
+    }
+
+    for ( i = 0; i < num_counters; i++ )
+        if ( msr == counters[i] )
             ctxt->counters[i] = msr_content;
 
-    for ( i = 0; i < NUM_COUNTERS; i++ )
-        if ( msr == AMD_F10H_CTRLS[i] )
+    for ( i = 0; i < num_counters; i++ )
+        if ( msr == ctrls[i] )
             ctxt->ctrls[i] = msr_content;
 
     ctxt->hw_lapic_lvtpc = apic_read(APIC_LVTPC);
@@ -235,9 +301,30 @@ static void amd_vpmu_initialise(struct vcpu *v)
 {
     struct amd_vpmu_context *ctxt = NULL;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
+    __u8 family = current_cpu_data.x86;
 
     if ( vpmu->flags & VPMU_CONTEXT_ALLOCATED )
         return;
+
+    if ( counters == NULL )
+    {
+         switch ( family )
+	 {
+	 case 0x15:
+	     num_counters = F15H_NUM_COUNTERS;
+	     counters = AMD_F15H_COUNTERS;
+	     ctrls = AMD_F15H_CTRLS;
+	     k7_counters_mirrored = 1;
+	     break;
+	 case 0x10:
+	 default:
+	     num_counters = F10H_NUM_COUNTERS;
+	     counters = AMD_F10H_COUNTERS;
+	     ctrls = AMD_F10H_CTRLS;
+	     k7_counters_mirrored = 0;
+	     break;
+	 }
+    }
 
     ctxt = xmalloc_bytes(sizeof(struct amd_vpmu_context));
 
