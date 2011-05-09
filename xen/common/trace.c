@@ -483,7 +483,7 @@ static inline void __insert_record(struct t_buf *buf,
                                    const void *extra_data)
 {
     struct t_rec *rec;
-    unsigned char *dst;
+    uint32_t *dst;
     unsigned int extra_word = extra / sizeof(u32);
     unsigned int local_rec_size = calc_rec_size(cycles, extra);
     uint32_t next;
@@ -508,13 +508,13 @@ static inline void __insert_record(struct t_buf *buf,
 
     rec->event = event;
     rec->extra_u32 = extra_word;
-    dst = (unsigned char *)rec->u.nocycles.extra_u32;
+    dst = rec->u.nocycles.extra_u32;
     if ( (rec->cycles_included = cycles) != 0 )
     {
         u64 tsc = (u64)get_cycles();
         rec->u.cycles.cycles_lo = (uint32_t)tsc;
         rec->u.cycles.cycles_hi = (uint32_t)(tsc >> 32);
-        dst = (unsigned char *)rec->u.cycles.extra_u32;
+        dst = rec->u.cycles.extra_u32;
     } 
 
     if ( extra_data && extra )
