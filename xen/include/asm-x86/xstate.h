@@ -27,6 +27,10 @@
 #define XSTATE_FP_SSE  (XSTATE_FP | XSTATE_SSE)
 #define XCNTXT_MASK    (XSTATE_FP | XSTATE_SSE | XSTATE_YMM | XSTATE_LWP)
 
+#define XSTATE_ALL     (~0)
+#define XSTATE_NONLAZY (XSTATE_LWP)
+#define XSTATE_LAZY    (XSTATE_ALL & ~XSTATE_NONLAZY)
+
 #ifdef CONFIG_X86_64
 #define REX_PREFIX     "0x48, "
 #else
@@ -56,8 +60,8 @@ struct xsave_struct
 /* extended state operations */
 void set_xcr0(u64 xfeatures);
 uint64_t get_xcr0(void);
-void xsave(struct vcpu *v);
-void xrstor(struct vcpu *v);
+void xsave(struct vcpu *v, uint64_t mask);
+void xrstor(struct vcpu *v, uint64_t mask);
 bool_t xsave_enabled(const struct vcpu *v);
 
 /* extended state init and cleanup functions */

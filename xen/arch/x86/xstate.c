@@ -51,32 +51,37 @@ inline uint64_t get_xcr0(void)
     return this_cpu(xcr0);
 }
 
-void xsave(struct vcpu *v)
+void xsave(struct vcpu *v, uint64_t mask)
 {
     struct xsave_struct *ptr = v->arch.xsave_area;
+    uint32_t hmask = mask >> 32;
+    uint32_t lmask = mask;
 
     if ( cpu_has_xsaveopt )
         asm volatile (
             ".byte " REX_PREFIX "0x0f,0xae,0x37"
             :
-            : "a" (-1), "d" (-1), "D"(ptr)
+            : "a" (lmask), "d" (hmask), "D"(ptr)
             : "memory" );
     else
         asm volatile (
             ".byte " REX_PREFIX "0x0f,0xae,0x27"
             :
-            : "a" (-1), "d" (-1), "D"(ptr)
+            : "a" (lmask), "d" (hmask), "D"(ptr)
             : "memory" );
 }
 
-void xrstor(struct vcpu *v)
+void xrstor(struct vcpu *v, uint64_t mask)
 {
+    uint32_t hmask = mask >> 32;
+    uint32_t lmask = mask;
+
     struct xsave_struct *ptr = v->arch.xsave_area;
 
     asm volatile (
         ".byte " REX_PREFIX "0x0f,0xae,0x2f"
         :
-        : "m" (*ptr), "a" (-1), "d" (-1), "D"(ptr) );
+        : "m" (*ptr), "a" (lmask), "d" (hmask), "D"(ptr) );
 }
 
 bool_t xsave_enabled(const struct vcpu *v)

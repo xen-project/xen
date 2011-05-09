@@ -35,14 +35,14 @@ static void fpu_init(void)
 /*     FPU Restore Functions   */
 /*******************************/
 /* Restore x87 extended state */
-static inline void fpu_xrstor(struct vcpu *v)
+static inline void fpu_xrstor(struct vcpu *v, uint64_t mask)
 {
     /*
      * XCR0 normally represents what guest OS set. In case of Xen itself, 
      * we set all supported feature mask before doing save/restore.
      */
     set_xcr0(v->arch.xcr0_accum);
-    xrstor(v);
+    xrstor(v, mask);
     set_xcr0(v->arch.xcr0);
 }
 
@@ -98,13 +98,13 @@ static inline void fpu_frstor(struct vcpu *v)
 /*      FPU Save Functions     */
 /*******************************/
 /* Save x87 extended state */
-static inline void fpu_xsave(struct vcpu *v)
+static inline void fpu_xsave(struct vcpu *v, uint64_t mask)
 {
     /* XCR0 normally represents what guest OS set. In case of Xen itself,
      * we set all accumulated feature mask before doing save/restore.
      */
     set_xcr0(v->arch.xcr0_accum);
-    xsave(v);
+    xsave(v, mask);
     set_xcr0(v->arch.xcr0);    
 }
 
@@ -174,7 +174,7 @@ void vcpu_restore_fpu(struct vcpu *v)
         return;
 
     if ( xsave_enabled(v) )
-        fpu_xrstor(v);
+        fpu_xrstor(v, XSTATE_ALL);
     else if ( v->fpu_initialised )
     {
         if ( cpu_has_fxsr )
@@ -204,7 +204,7 @@ void vcpu_save_fpu(struct vcpu *v)
     clts();
 
     if ( xsave_enabled(v) )
-        fpu_xsave(v);
+        fpu_xsave(v, XSTATE_ALL);
     else if ( cpu_has_fxsr )
         fpu_fxsave(v);
     else
