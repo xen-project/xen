@@ -296,7 +296,7 @@ int cpufreq_governor_dbs(struct cpufreq_policy *policy, unsigned int event)
     return 0;
 }
 
-static void __init cpufreq_dbs_handle_option(const char *name, const char *val)
+static bool_t __init cpufreq_dbs_handle_option(const char *name, const char *val)
 {
     if ( !strcmp(name, "rate") && val )
     {
@@ -334,6 +334,9 @@ static void __init cpufreq_dbs_handle_option(const char *name, const char *val)
         }
         dbs_tuners_ins.powersave_bias = tmp;
     }
+    else
+        return 0;
+    return 1;
 }
 
 struct cpufreq_governor cpufreq_gov_dbs = {

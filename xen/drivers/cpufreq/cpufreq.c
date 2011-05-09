@@ -47,7 +47,8 @@
 #include <acpi/acpi.h>
 #include <acpi/cpufreq/cpufreq.h>
 
-static unsigned int usr_max_freq, usr_min_freq;
+static unsigned int __read_mostly usr_min_freq;
+static unsigned int __read_mostly usr_max_freq;
 static void cpufreq_cmdline_common_para(struct cpufreq_policy *new_policy);
 
 struct cpufreq_dom {
@@ -55,10 +56,10 @@ struct cpufreq_dom {
     cpumask_t		map;
     struct list_head	node;
 };
-static LIST_HEAD(cpufreq_dom_list_head);
+static LIST_HEAD_READ_MOSTLY(cpufreq_dom_list_head);
 
-struct cpufreq_governor *cpufreq_opt_governor;
-LIST_HEAD(cpufreq_governor_list);
+struct cpufreq_governor *__read_mostly cpufreq_opt_governor;
+LIST_HEAD_READ_MOSTLY(cpufreq_governor_list);
 
 bool_t __read_mostly cpufreq_verbose;
 
@@ -525,6 +526,7 @@ void __init cpufreq_cmdline_parse(char *str)
 {
     static struct cpufreq_governor *__initdata cpufreq_governors[] =
     {
+        CPUFREQ_DEFAULT_GOVERNOR,
         &cpufreq_gov_userspace,
         &cpufreq_gov_dbs,
         &cpufreq_gov_performance,
@@ -558,8 +560,10 @@ void __init cpufreq_cmdline_parse(char *str)
         }
 
         if (str && !cpufreq_handle_common_option(str, val) &&
-            cpufreq_governors[gov_index]->handle_option)
-            cpufreq_governors[gov_index]->handle_option(str, val);
+            (!cpufreq_governors[gov_index]->handle_option ||
+             !cpufreq_governors[gov_index]->handle_option(str, val)))
+            printk(XENLOG_WARNING "cpufreq/%s: option '%s' not recognized\n",
+                   cpufreq_governors[gov_index]->name, str);
 
         str = end;
     } while (str);
