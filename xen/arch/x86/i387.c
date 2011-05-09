@@ -66,78 +66,6 @@ static void init_fpu(void)
         load_mxcsr(0x1f80);
 }
 
-void save_init_fpu(struct vcpu *v)
-{
-    unsigned long cr0;
-    char *fpu_ctxt;
-
-    if ( !v->fpu_dirtied )
-        return;
-
-    ASSERT(!is_idle_vcpu(v));
-
-    cr0 = read_cr0();
-    fpu_ctxt = v->arch.fpu_ctxt;
-
-    /* This can happen, if a paravirtualised guest OS has set its CR0.TS. */
-    if ( cr0 & X86_CR0_TS )
-        clts();
-
-    if ( xsave_enabled(v) )
-    {
-        /* XCR0 normally represents what guest OS set. In case of Xen itself,
-         * we set all accumulated feature mask before doing save/restore.
-         */
-        set_xcr0(v->arch.xcr0_accum);
-        xsave(v);
-        set_xcr0(v->arch.xcr0);
-    }
-    else if ( cpu_has_fxsr )
-    {
-#ifdef __i386__
-        asm volatile (
-            "fxsave %0"
-            : "=m" (*fpu_ctxt) );
-#else /* __x86_64__ */
-        /*
-         * The only way to force fxsaveq on a wide range of gas versions. On 
-         * older versions the rex64 prefix works only if we force an
-         * addressing mode that doesn't require extended registers.
-         */
-        asm volatile (
-            REX64_PREFIX "fxsave (%1)"
-            : "=m" (*fpu_ctxt) : "cdaSDb" (fpu_ctxt) );
-#endif
-
-        /* Clear exception flags if FSW.ES is set. */
-        if ( unlikely(fpu_ctxt[2] & 0x80) )
-            asm volatile ("fnclex");
-
-        /*
-         * AMD CPUs don't save/restore FDP/FIP/FOP unless an exception
-         * is pending. Clear the x87 state here by setting it to fixed
-         * values. The hypervisor data segment can be sometimes 0 and
-         * sometimes new user value. Both should be ok. Use the FPU saved
-         * data block as a safe address because it should be in L1.
-         */
-        if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
-        {
-            asm volatile (
-                "emms\n\t"  /* clear stack tags */
-                "fildl %0"  /* load to clear state */
-                : : "m" (*fpu_ctxt) );
-        }
-    }
-    else
-    {
-        /* FWAIT is required to make FNSAVE synchronous. */
-        asm volatile ( "fnsave %0 ; fwait" : "=m" (*fpu_ctxt) );
-    }
-
-    v->fpu_dirtied = 0;
-    write_cr0(cr0|X86_CR0_TS);
-}
-
 static void restore_fpu(struct vcpu *v)
 {
     const char *fpu_ctxt = v->arch.fpu_ctxt;
@@ -185,8 +113,96 @@ static void restore_fpu(struct vcpu *v)
 }
 
 /*******************************/
+/*      FPU Save Functions     */
+/*******************************/
+/* Save x87 extended state */
+static inline void fpu_xsave(struct vcpu *v)
+{
+    /* XCR0 normally represents what guest OS set. In case of Xen itself,
+     * we set all accumulated feature mask before doing save/restore.
+     */
+    set_xcr0(v->arch.xcr0_accum);
+    xsave(v);
+    set_xcr0(v->arch.xcr0);    
+}
+
+/* Save x87 FPU, MMX, SSE and SSE2 state */
+static inline void fpu_fxsave(struct vcpu *v)
+{
+    char *fpu_ctxt = v->arch.fpu_ctxt;
+
+#ifdef __i386__
+    asm volatile (
+        "fxsave %0"
+        : "=m" (*fpu_ctxt) );
+#else /* __x86_64__ */
+    /*
+     * The only way to force fxsaveq on a wide range of gas versions. On 
+     * older versions the rex64 prefix works only if we force an
+     * addressing mode that doesn't require extended registers.
+     */
+    asm volatile (
+        REX64_PREFIX "fxsave (%1)"
+        : "=m" (*fpu_ctxt) : "cdaSDb" (fpu_ctxt) );
+#endif
+    
+    /* Clear exception flags if FSW.ES is set. */
+    if ( unlikely(fpu_ctxt[2] & 0x80) )
+        asm volatile ("fnclex");
+    
+    /*
+     * AMD CPUs don't save/restore FDP/FIP/FOP unless an exception
+     * is pending. Clear the x87 state here by setting it to fixed
+     * values. The hypervisor data segment can be sometimes 0 and
+     * sometimes new user value. Both should be ok. Use the FPU saved
+     * data block as a safe address because it should be in L1.
+     */
+    if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
+    {
+        asm volatile (
+            "emms\n\t"  /* clear stack tags */
+            "fildl %0"  /* load to clear state */
+            : : "m" (*fpu_ctxt) );
+    }
+}
+
+/* Save x87 FPU state */
+static inline void fpu_fsave(struct vcpu *v)
+{
+    char *fpu_ctxt = v->arch.fpu_ctxt;
+
+    /* FWAIT is required to make FNSAVE synchronous. */
+    asm volatile ( "fnsave %0 ; fwait" : "=m" (*fpu_ctxt) );
+}
+
+/*******************************/
 /*       VCPU FPU Functions    */
 /*******************************/
+/* 
+ * On each context switch, save the necessary FPU info of VCPU being switch 
+ * out. It dispatches saving operation based on CPU's capability.
+ */
+void vcpu_save_fpu(struct vcpu *v)
+{
+    if ( !v->fpu_dirtied )
+        return;
+
+    ASSERT(!is_idle_vcpu(v));
+
+    /* This can happen, if a paravirtualised guest OS has set its CR0.TS. */
+    clts();
+
+    if ( xsave_enabled(v) )
+        fpu_xsave(v);
+    else if ( cpu_has_fxsr )
+        fpu_fxsave(v);
+    else
+        fpu_fsave(v);
+
+    v->fpu_dirtied = 0;
+    stts();
+}
+
 /* Initialize FPU's context save area */
 int vcpu_init_fpu(struct vcpu *v)
 {

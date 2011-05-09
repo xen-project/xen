@@ -1548,7 +1548,7 @@ static void __context_switch(void)
     if ( !is_idle_vcpu(p) )
     {
         memcpy(&p->arch.user_regs, stack_regs, CTXT_SWITCH_STACK_BYTES);
-        save_init_fpu(p);
+        vcpu_save_fpu(p);
         p->arch.ctxt_switch_from(p);
     }
 

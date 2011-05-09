@@ -24,7 +24,7 @@ static uint16_t saved_segs[4];
 
 void save_rest_processor_state(void)
 {
-    save_init_fpu(current);
+    vcpu_save_fpu(current);
 
 #if defined(CONFIG_X86_64)
     asm volatile (
