@@ -246,7 +246,8 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, struct mca_banks *bankma
     uint64_t gstatus, status;
     struct mcinfo_global *mig = NULL; /* on stack */
     mctelem_cookie_t mctc = NULL;
-    uint32_t uc = 0, pcc = 0, recover, need_clear = 1, mc_flags = 0;
+    bool_t uc = 0, pcc = 0, recover = 1, need_clear = 1;
+    uint32_t mc_flags = 0;
     struct mc_info *mci = NULL;
     mctelem_class_t which = MC_URGENT; /* XXXgcc */
     int errcnt = 0;
@@ -280,7 +281,7 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, struct mca_banks *bankma
      */
     recover = (mc_recoverable_scan)? 1: 0;
 
-    for (i = 0; i < 32 && i < nr_mce_banks; i++) {
+    for (i = 0; i < nr_mce_banks; i++) {
         struct mcinfo_bank *mib;  /* on stack */
 
         /* Skip bank if corresponding bit in bankmask is clear */
@@ -324,13 +325,13 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, struct mca_banks *bankma
             }
         }
 
-        /* form a mask of which banks have logged uncorrected errors */
-        if ((status & MCi_STATUS_UC) != 0)
-            uc |= (1 << i);
+        /* flag for uncorrected errors */
+        if (!uc && ((status & MCi_STATUS_UC) != 0))
+            uc = 1;
 
-        /* likewise for those with processor context corrupt */
-        if ((status & MCi_STATUS_PCC) != 0)
-            pcc |= (1 << i);
+        /* flag processor context corrupt */
+        if (!pcc && ((status & MCi_STATUS_PCC) != 0))
+            pcc = 1;
 
         if (recover && uc)
             /* uc = 1, recover = 1, we need not panic.

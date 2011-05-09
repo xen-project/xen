@@ -119,10 +119,9 @@ struct mca_summary {
 	uint32_t	errcnt;	/* number of banks with valid errors */
 	int		ripv;	/* meaningful on #MC */
 	int		eipv;	/* meaningful on #MC */
-	uint32_t	uc;	/* bitmask of banks with UC */
-	uint32_t	pcc;	/* bitmask of banks with PCC */
-	/* bitmask of banks with software error recovery ability*/
-	uint32_t	recoverable; 
+	bool_t		uc;	/* UC flag */
+	bool_t		pcc;	/* PCC flag */
+	bool_t		recoverable; /* software error recoverable flag */
 };
 
 DECLARE_PER_CPU(struct mca_banks *, poll_bankmask);
