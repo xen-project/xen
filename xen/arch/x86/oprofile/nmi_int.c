@@ -30,7 +30,7 @@
 struct op_counter_config counter_config[OP_MAX_COUNTER];
 struct op_ibs_config ibs_config;
 
-static struct op_x86_model_spec const *__read_mostly model;
+struct op_x86_model_spec const *__read_mostly model;
 static struct op_msrs cpu_msrs[NR_CPUS];
 static unsigned long saved_lvtpc[NR_CPUS];
 
@@ -446,7 +446,7 @@ static int __init nmi_init(void)
                                 cpu_type = "x86-64/family14h";
                                 break;
                         case 0x15:
-                                model = &op_athlon_spec;
+                                model = &op_amd_fam15h_spec;
                                 cpu_type = "x86-64/family15h";
                                 break;
 			}

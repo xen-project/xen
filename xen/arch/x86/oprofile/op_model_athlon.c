@@ -24,8 +24,13 @@
 #include "op_x86_model.h"
 #include "op_counter.h"
 
-#define NUM_COUNTERS 4
-#define NUM_CONTROLS 4
+#define K7_NUM_COUNTERS 4
+#define K7_NUM_CONTROLS 4
+
+#define FAM15H_NUM_COUNTERS 6
+#define FAM15H_NUM_CONTROLS 6
+
+#define MAX_COUNTERS FAM15H_NUM_COUNTERS
 
 #define CTR_READ(msr_content,msrs,c) do {rdmsrl(msrs->counters[(c)].addr, (msr_content));} while (0)
 #define CTR_WRITE(l,msrs,c) do {wrmsr(msrs->counters[(c)].addr, -(unsigned int)(l), -1);} while (0)
@@ -44,9 +49,10 @@
 #define CTRL_SET_HOST_ONLY(val, h) (val |= ((h & 0x1ULL) << 41))
 #define CTRL_SET_GUEST_ONLY(val, h) (val |= ((h & 0x1ULL) << 40))
 
-static unsigned long reset_value[NUM_COUNTERS];
+static unsigned long reset_value[MAX_COUNTERS];
 
 extern char svm_stgi_label[];
+extern struct op_x86_model_spec const *__read_mostly model;
 
 #ifdef CONFIG_X86_64
 u32 ibs_caps = 0;
@@ -175,26 +181,44 @@ static void athlon_fill_in_addresses(struct op_msrs * const msrs)
 	msrs->controls[3].addr = MSR_K7_EVNTSEL3;
 }
 
- 
+static void fam15h_fill_in_addresses(struct op_msrs * const msrs)
+{
+	msrs->counters[0].addr = MSR_AMD_FAM15H_PERFCTR0;
+	msrs->counters[1].addr = MSR_AMD_FAM15H_PERFCTR1;
+	msrs->counters[2].addr = MSR_AMD_FAM15H_PERFCTR2;
+	msrs->counters[3].addr = MSR_AMD_FAM15H_PERFCTR3;
+	msrs->counters[4].addr = MSR_AMD_FAM15H_PERFCTR4;
+	msrs->counters[5].addr = MSR_AMD_FAM15H_PERFCTR5;
+
+	msrs->controls[0].addr = MSR_AMD_FAM15H_EVNTSEL0;
+	msrs->controls[1].addr = MSR_AMD_FAM15H_EVNTSEL1;
+	msrs->controls[2].addr = MSR_AMD_FAM15H_EVNTSEL2;
+	msrs->controls[3].addr = MSR_AMD_FAM15H_EVNTSEL3;
+	msrs->controls[4].addr = MSR_AMD_FAM15H_EVNTSEL4;
+	msrs->controls[5].addr = MSR_AMD_FAM15H_EVNTSEL5;
+}
+
 static void athlon_setup_ctrs(struct op_msrs const * const msrs)
 {
 	uint64_t msr_content;
 	int i;
+	unsigned int const nr_ctrs = model->num_counters;
+	unsigned int const nr_ctrls = model->num_controls;
  
 	/* clear all counters */
-	for (i = 0 ; i < NUM_CONTROLS; ++i) {
+	for (i = 0 ; i < nr_ctrls; ++i) {
 		CTRL_READ(msr_content, msrs, i);
 		CTRL_CLEAR(msr_content);
 		CTRL_WRITE(msr_content, msrs, i);
 	}
 	
 	/* avoid a false detection of ctr overflows in NMI handler */
-	for (i = 0; i < NUM_COUNTERS; ++i) {
+	for (i = 0; i < nr_ctrs; ++i) {
 		CTR_WRITE(1, msrs, i);
 	}
 
 	/* enable active counters */
-	for (i = 0; i < NUM_COUNTERS; ++i) {
+	for (i = 0; i < nr_ctrs; ++i) {
 		if (counter_config[i].enabled) {
 			reset_value[i] = counter_config[i].count;
 
@@ -300,6 +324,7 @@ static int athlon_check_ctrs(unsigned int const cpu,
 	int mode = 0;
 	struct vcpu *v = current;
 	struct cpu_user_regs *guest_regs = guest_cpu_user_regs();
+	unsigned int const nr_ctrs = model->num_counters;
 
 	if (!guest_mode(regs) &&
 	    (regs->eip == (unsigned long)svm_stgi_label)) {
@@ -312,7 +337,7 @@ static int athlon_check_ctrs(unsigned int const cpu,
 		mode = xenoprofile_get_mode(v, regs);
 	}
 
-	for (i = 0 ; i < NUM_COUNTERS; ++i) {
+	for (i = 0 ; i < nr_ctrs; ++i) {
 		CTR_READ(msr_content, msrs, i);
 		if (CTR_OVERFLOWED(msr_content)) {
 			xenoprof_log_event(current, regs, eip, mode, i);
@@ -373,7 +398,8 @@ static void athlon_start(struct op_msrs const * const msrs)
 {
 	uint64_t msr_content;
 	int i;
-	for (i = 0 ; i < NUM_COUNTERS ; ++i) {
+	unsigned int const nr_ctrs = model->num_counters;
+	for (i = 0 ; i < nr_ctrs ; ++i) {
 		if (reset_value[i]) {
 			CTRL_READ(msr_content, msrs, i);
 			CTRL_SET_ACTIVE(msr_content);
@@ -401,10 +427,11 @@ static void athlon_stop(struct op_msrs const * const msrs)
 {
 	uint64_t msr_content;
 	int i;
+	unsigned int const nr_ctrs = model->num_counters;
 
 	/* Subtle: stop on all counters to avoid race with
 	 * setting our pm callback */
-	for (i = 0 ; i < NUM_COUNTERS ; ++i) {
+	for (i = 0 ; i < nr_ctrs ; ++i) {
 		CTRL_READ(msr_content, msrs, i);
 		CTRL_SET_INACTIVE(msr_content);
 		CTRL_WRITE(msr_content, msrs, i);
@@ -512,9 +539,19 @@ void __init ibs_init(void)
 #endif /* CONFIG_X86_64 */
 
 struct op_x86_model_spec const op_athlon_spec = {
-	.num_counters = NUM_COUNTERS,
-	.num_controls = NUM_CONTROLS,
+	.num_counters = K7_NUM_COUNTERS,
+	.num_controls = K7_NUM_CONTROLS,
 	.fill_in_addresses = &athlon_fill_in_addresses,
+	.setup_ctrs = &athlon_setup_ctrs,
+	.check_ctrs = &athlon_check_ctrs,
+	.start = &athlon_start,
+	.stop = &athlon_stop
+};
+
+struct op_x86_model_spec const op_amd_fam15h_spec = {
+	.num_counters = FAM15H_NUM_COUNTERS,
+	.num_controls = FAM15H_NUM_CONTROLS,
+	.fill_in_addresses = &fam15h_fill_in_addresses,
 	.setup_ctrs = &athlon_setup_ctrs,
 	.check_ctrs = &athlon_check_ctrs,
 	.start = &athlon_start,
