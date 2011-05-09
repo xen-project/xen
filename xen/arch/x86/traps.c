@@ -58,6 +58,7 @@
 #include <asm/flushtlb.h>
 #include <asm/uaccess.h>
 #include <asm/i387.h>
+#include <asm/xstate.h>
 #include <asm/debugger.h>
 #include <asm/msr.h>
 #include <asm/shared.h>

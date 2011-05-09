@@ -33,7 +33,7 @@
 #include <asm/mem_event.h>
 #include <public/mem_event.h>
 #include <asm/mem_sharing.h>
-#include <asm/i387.h>
+#include <asm/xstate.h>
 
 #ifdef XEN_KDB_CONFIG
 #include "../kdb/include/kdbdefs.h"

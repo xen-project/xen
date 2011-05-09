@@ -42,6 +42,7 @@
 #include <asm/processor.h>
 #include <asm/desc.h>
 #include <asm/i387.h>
+#include <asm/xstate.h>
 #include <asm/mpspec.h>
 #include <asm/ldt.h>
 #include <asm/hypercall.h>
@@ -419,7 +420,7 @@ int vcpu_initialise(struct vcpu *v)
 
     v->arch.perdomain_ptes = perdomain_ptes(d, v);
 
-    if ( (rc = xsave_alloc_save_area(v)) != 0 )
+    if ( (rc = xstate_alloc_save_area(v)) != 0 )
         return rc;
     if ( v->arch.xsave_area )
         v->arch.fpu_ctxt = &v->arch.xsave_area->fpu_sse;
@@ -485,7 +486,7 @@ int vcpu_initialise(struct vcpu *v)
     if ( rc )
     {
         if ( v->arch.xsave_area )
-            xsave_free_save_area(v);
+            xstate_free_save_area(v);
         else
             xfree(v->arch.fpu_ctxt);
         if ( !is_hvm_domain(d) && standalone_trap_ctxt(v) )
@@ -501,7 +502,7 @@ void vcpu_destroy(struct vcpu *v)
         release_compat_l4(v);
 
     if ( v->arch.xsave_area )
-        xsave_free_save_area(v);
+        xstate_free_save_area(v);
     else
         xfree(v->arch.fpu_ctxt);
 

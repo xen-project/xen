@@ -5,7 +5,7 @@
 #include <xen/smp.h>
 #include <asm/current.h>
 #include <asm/processor.h>
-#include <asm/i387.h>
+#include <asm/xstate.h>
 #include <asm/msr.h>
 #include <asm/io.h>
 #include <asm/mpspec.h>
@@ -354,7 +354,7 @@ void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 		clear_bit(X86_FEATURE_XSAVE, boot_cpu_data.x86_capability);
 
 	if ( cpu_has_xsave )
-		xsave_init();
+		xstate_init();
 
 	/*
 	 * The vendor-specific functions might have changed features.  Now

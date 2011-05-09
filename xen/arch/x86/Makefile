@@ -56,6 +56,7 @@ obj-y += machine_kexec.o
 obj-y += crash.o
 obj-y += tboot.o
 obj-y += hpet.o
+obj-y += xstate.o
 
 obj-$(crash_debug) += gdbstub.o
 

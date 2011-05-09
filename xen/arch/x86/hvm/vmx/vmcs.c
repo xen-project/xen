@@ -26,6 +26,7 @@
 #include <asm/cpufeature.h>
 #include <asm/processor.h>
 #include <asm/msr.h>
+#include <asm/xstate.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/support.h>
