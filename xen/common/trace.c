@@ -54,7 +54,7 @@ static unsigned int t_info_pages;
 static DEFINE_PER_CPU_READ_MOSTLY(struct t_buf *, t_bufs);
 static DEFINE_PER_CPU_READ_MOSTLY(unsigned char *, t_data);
 static DEFINE_PER_CPU_READ_MOSTLY(spinlock_t, t_lock);
-static u32 data_size;
+static u32 data_size __read_mostly;
 
 /* High water mark for trace buffers; */
 /* Send virtual interrupt when buffer level reaches this point */
