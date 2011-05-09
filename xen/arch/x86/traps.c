@@ -3198,7 +3198,7 @@ asmlinkage void do_device_not_available(struct cpu_user_regs *regs)
 
     BUG_ON(!guest_mode(regs));
 
-    vcpu_restore_fpu(curr);
+    vcpu_restore_fpu_lazy(curr);
 
     if ( curr->arch.pv_vcpu.ctrlreg[0] & X86_CR0_TS )
     {

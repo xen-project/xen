@@ -348,7 +348,7 @@ static void svm_fpu_enter(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    vcpu_restore_fpu(v);
+    vcpu_restore_fpu_lazy(v);
     vmcb_set_exception_intercepts(
         vmcb, vmcb_get_exception_intercepts(vmcb) & ~(1U << TRAP_no_device));
 }

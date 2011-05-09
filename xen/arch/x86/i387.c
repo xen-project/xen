@@ -98,13 +98,13 @@ static inline void fpu_frstor(struct vcpu *v)
 /*      FPU Save Functions     */
 /*******************************/
 /* Save x87 extended state */
-static inline void fpu_xsave(struct vcpu *v, uint64_t mask)
+static inline void fpu_xsave(struct vcpu *v)
 {
     /* XCR0 normally represents what guest OS set. In case of Xen itself,
      * we set all accumulated feature mask before doing save/restore.
      */
     set_xcr0(v->arch.xcr0_accum);
-    xsave(v, mask);
+    xsave(v, v->arch.nonlazy_xstate_used ? XSTATE_ALL : XSTATE_LAZY);
     set_xcr0(v->arch.xcr0);    
 }
 
@@ -160,10 +160,25 @@ static inline void fpu_fsave(struct vcpu *v)
 /*******************************/
 /*       VCPU FPU Functions    */
 /*******************************/
+/* Restore FPU state whenever VCPU is schduled in. */
+void vcpu_restore_fpu_eager(struct vcpu *v)
+{
+    ASSERT(!is_idle_vcpu(v));
+    
+    /* save the nonlazy extended state which is not tracked by CR0.TS bit */
+    if ( v->arch.nonlazy_xstate_used )
+    {
+        /* Avoid recursion */
+        clts();        
+        fpu_xrstor(v, XSTATE_NONLAZY);
+        stts();
+    }
+}
+
 /* 
  * Restore FPU state when #NM is triggered.
  */
-void vcpu_restore_fpu(struct vcpu *v)
+void vcpu_restore_fpu_lazy(struct vcpu *v)
 {
     ASSERT(!is_idle_vcpu(v));
 
@@ -174,7 +189,7 @@ void vcpu_restore_fpu(struct vcpu *v)
         return;
 
     if ( xsave_enabled(v) )
-        fpu_xrstor(v, XSTATE_ALL);
+        fpu_xrstor(v, XSTATE_LAZY);
     else if ( v->fpu_initialised )
     {
         if ( cpu_has_fxsr )
@@ -204,7 +219,7 @@ void vcpu_save_fpu(struct vcpu *v)
     clts();
 
     if ( xsave_enabled(v) )
-        fpu_xsave(v, XSTATE_ALL);
+        fpu_xsave(v);
     else if ( cpu_has_fxsr )
         fpu_fxsave(v);
     else
