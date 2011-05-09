@@ -27,6 +27,17 @@ boolean_param("mce_fb", mce_force_broadcast);
 
 static int __read_mostly nr_intel_ext_msrs;
 
+/* Intel SDM define bit15~bit0 of IA32_MCi_STATUS as the MC error code */
+#define INTEL_MCCOD_MASK 0xFFFF
+
+/*
+ * Currently Intel SDM define 2 kinds of srao errors:
+ * 1). Memory scrubbing error, error code = 0xC0 ~ 0xCF
+ * 2). L3 explicit writeback error, error code = 0x17A
+ */
+#define INTEL_SRAO_MEM_SCRUB 0xC0 ... 0xCF
+#define INTEL_SRAO_L3_EWB    0x17A
+
 /* Thermal Hanlding */
 #ifdef CONFIG_X86_MCE_THERMAL
 static void unexpected_thermal_interrupt(struct cpu_user_regs *regs)
@@ -571,11 +582,6 @@ static enum intel_mce_type intel_check_mce_type(uint64_t status)
     return intel_mce_fatal;
 }
 
-static int is_async_memerr(uint64_t status)
-{
-    return (status & 0xFFFF) == 0x17A || (status & 0xFFF0) == 0xC0;
-}
-
 struct mcinfo_recovery *mci_add_pageoff_action(int bank, struct mc_info *mi,
                               uint64_t mfn, uint32_t status)
 {
@@ -705,12 +711,38 @@ vmce_failed:
     }
 }
 
-static int default_check(uint64_t status)
+static int intel_srao_check(uint64_t status)
+{
+    return ( intel_check_mce_type(status) == intel_mce_ucr_srao );
+}
+
+static void intel_srao_dhandler(
+             struct mca_binfo *binfo,
+             struct mca_handle_result *result)
+{
+    uint64_t status = binfo->mib->mc_status;
+
+    /* For unknown srao error code, no action required */
+    if ( status & MCi_STATUS_VAL )
+    {
+        switch ( status & INTEL_MCCOD_MASK )
+        {
+        case INTEL_SRAO_MEM_SCRUB:
+        case INTEL_SRAO_L3_EWB:
+            intel_memerr_dhandler(binfo, result);
+            break;
+        default:
+            break;
+        }
+    }
+}
+
+static int intel_default_check(uint64_t status)
 {
     return 1;
 }
 
-static void intel_default_dhandler(
+static void intel_default_mce_dhandler(
              struct mca_binfo *binfo,
              struct mca_handle_result *result)
 {
@@ -726,11 +758,11 @@ static void intel_default_dhandler(
 }
 
 static const struct mca_error_handler intel_mce_dhandlers[] = {
-    {is_async_memerr, intel_memerr_dhandler},
-    {default_check, intel_default_dhandler}
+    {intel_srao_check, intel_srao_dhandler},
+    {intel_default_check, intel_default_mce_dhandler}
 };
 
-static void intel_default_uhandler(
+static void intel_default_mce_uhandler(
              struct mca_binfo *binfo,
              struct mca_handle_result *result)
 {
@@ -753,7 +785,7 @@ static void intel_default_uhandler(
 }
 
 static const struct mca_error_handler intel_mce_uhandlers[] = {
-    {default_check, intel_default_uhandler}
+    {intel_default_check, intel_default_mce_uhandler}
 };
 
 static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
