@@ -17,56 +17,37 @@
 #include <asm/xstate.h>
 #include <asm/asm_defns.h>
 
-static void load_mxcsr(unsigned long val)
+#define MXCSR_DEFAULT 0x1f80
+static void fpu_init(void)
 {
-    val &= 0xffbf;
-    asm volatile ( "ldmxcsr %0" : : "m" (val) );
-}
-
-static void init_fpu(void);
-static void restore_fpu(struct vcpu *v);
-
-void setup_fpu(struct vcpu *v)
-{
-    ASSERT(!is_idle_vcpu(v));
-
-    /* Avoid recursion. */
-    clts();
-
-    if ( v->fpu_dirtied )
-        return;
-
-    if ( xsave_enabled(v) )
-    {
-        /*
-         * XCR0 normally represents what guest OS set. In case of Xen itself, 
-         * we set all supported feature mask before doing save/restore.
-         */
-        set_xcr0(v->arch.xcr0_accum);
-        xrstor(v);
-        set_xcr0(v->arch.xcr0);
-    }
-    else if ( v->fpu_initialised )
-    {
-        restore_fpu(v);
-    }
-    else
-    {
-        init_fpu();
-    }
-
-    v->fpu_initialised = 1;
-    v->fpu_dirtied = 1;
-}
-
-static void init_fpu(void)
-{
+    unsigned long val;
+    
     asm volatile ( "fninit" );
     if ( cpu_has_xmm )
-        load_mxcsr(0x1f80);
+    {
+        /* load default value into MXCSR control/status register */
+        val = MXCSR_DEFAULT;
+        asm volatile ( "ldmxcsr %0" : : "m" (val) );
+    }
 }
 
-static void restore_fpu(struct vcpu *v)
+/*******************************/
+/*     FPU Restore Functions   */
+/*******************************/
+/* Restore x87 extended state */
+static inline void fpu_xrstor(struct vcpu *v)
+{
+    /*
+     * XCR0 normally represents what guest OS set. In case of Xen itself, 
+     * we set all supported feature mask before doing save/restore.
+     */
+    set_xcr0(v->arch.xcr0_accum);
+    xrstor(v);
+    set_xcr0(v->arch.xcr0);
+}
+
+/* Restor x87 FPU, MMX, SSE and SSE2 state */
+static inline void fpu_fxrstor(struct vcpu *v)
 {
     const char *fpu_ctxt = v->arch.fpu_ctxt;
 
@@ -75,41 +56,42 @@ static void restore_fpu(struct vcpu *v)
      * possibility, which may occur if the block was passed to us by control
      * tools, by silently clearing the block.
      */
-    if ( cpu_has_fxsr )
-    {
-        asm volatile (
+    asm volatile (
 #ifdef __i386__
-            "1: fxrstor %0            \n"
+        "1: fxrstor %0            \n"
 #else /* __x86_64__ */
-            /* See above for why the operands/constraints are this way. */
-            "1: " REX64_PREFIX "fxrstor (%2)\n"
+        /* See above for why the operands/constraints are this way. */
+        "1: " REX64_PREFIX "fxrstor (%2)\n"
 #endif
-            ".section .fixup,\"ax\"   \n"
-            "2: push %%"__OP"ax       \n"
-            "   push %%"__OP"cx       \n"
-            "   push %%"__OP"di       \n"
-            "   lea  %0,%%"__OP"di    \n"
-            "   mov  %1,%%ecx         \n"
-            "   xor  %%eax,%%eax      \n"
-            "   rep ; stosl           \n"
-            "   pop  %%"__OP"di       \n"
-            "   pop  %%"__OP"cx       \n"
-            "   pop  %%"__OP"ax       \n"
-            "   jmp  1b               \n"
-            ".previous                \n"
-            _ASM_EXTABLE(1b, 2b)
-            : 
-            : "m" (*fpu_ctxt),
-              "i" (sizeof(v->arch.xsave_area->fpu_sse)/4)
+        ".section .fixup,\"ax\"   \n"
+        "2: push %%"__OP"ax       \n"
+        "   push %%"__OP"cx       \n"
+        "   push %%"__OP"di       \n"
+        "   lea  %0,%%"__OP"di    \n"
+        "   mov  %1,%%ecx         \n"
+        "   xor  %%eax,%%eax      \n"
+        "   rep ; stosl           \n"
+        "   pop  %%"__OP"di       \n"
+        "   pop  %%"__OP"cx       \n"
+        "   pop  %%"__OP"ax       \n"
+        "   jmp  1b               \n"
+        ".previous                \n"
+        _ASM_EXTABLE(1b, 2b)
+        : 
+        : "m" (*fpu_ctxt),
+          "i" (sizeof(v->arch.xsave_area->fpu_sse)/4)
 #ifdef __x86_64__
-             ,"cdaSDb" (fpu_ctxt)
+          ,"cdaSDb" (fpu_ctxt)
 #endif
-            );
-    }
-    else
-    {
-        asm volatile ( "frstor %0" : : "m" (*fpu_ctxt) );
-    }
+        );
+}
+
+/* Restore x87 extended state */
+static inline void fpu_frstor(struct vcpu *v)
+{
+    const char *fpu_ctxt = v->arch.fpu_ctxt;
+
+    asm volatile ( "frstor %0" : : "m" (*fpu_ctxt) );
 }
 
 /*******************************/
@@ -178,6 +160,35 @@ static inline void fpu_fsave(struct vcpu *v)
 /*******************************/
 /*       VCPU FPU Functions    */
 /*******************************/
+/* 
+ * Restore FPU state when #NM is triggered.
+ */
+void vcpu_restore_fpu(struct vcpu *v)
+{
+    ASSERT(!is_idle_vcpu(v));
+
+    /* Avoid recursion. */
+    clts();
+
+    if ( v->fpu_dirtied )
+        return;
+
+    if ( xsave_enabled(v) )
+        fpu_xrstor(v);
+    else if ( v->fpu_initialised )
+    {
+        if ( cpu_has_fxsr )
+            fpu_fxrstor(v);
+        else
+            fpu_frstor(v);
+    }
+    else
+        fpu_init();
+
+    v->fpu_initialised = 1;
+    v->fpu_dirtied = 1;
+}
+
 /* 
  * On each context switch, save the necessary FPU info of VCPU being switch 
  * out. It dispatches saving operation based on CPU's capability.

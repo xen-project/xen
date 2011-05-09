@@ -14,7 +14,7 @@
 #include <xen/types.h>
 #include <xen/percpu.h>
 
-void setup_fpu(struct vcpu *v);
+void vcpu_restore_fpu(struct vcpu *v);
 void vcpu_save_fpu(struct vcpu *v);
 
 int vcpu_init_fpu(struct vcpu *v);

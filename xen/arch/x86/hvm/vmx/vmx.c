@@ -612,7 +612,7 @@ static int vmx_load_vmcs_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
 
 static void vmx_fpu_enter(struct vcpu *v)
 {
-    setup_fpu(v);
+    vcpu_restore_fpu(v);
     v->arch.hvm_vmx.exception_bitmap &= ~(1u << TRAP_no_device);
     vmx_update_exception_bitmap(v);
     v->arch.hvm_vmx.host_cr0 &= ~X86_CR0_TS;
