@@ -55,7 +55,6 @@ static DEFINE_PER_CPU_READ_MOSTLY(struct t_buf *, t_bufs);
 static DEFINE_PER_CPU_READ_MOSTLY(unsigned char *, t_data);
 static DEFINE_PER_CPU_READ_MOSTLY(spinlock_t, t_lock);
 static u32 data_size;
-static u32 t_info_first_offset __read_mostly;
 
 /* High water mark for trace buffers; */
 /* Send virtual interrupt when buffer level reaches this point */
@@ -94,10 +93,10 @@ static struct notifier_block cpu_nfb = {
     .notifier_call = cpu_callback
 };
 
-static void calc_tinfo_first_offset(void)
+static uint32_t calc_tinfo_first_offset(void)
 {
     int offset_in_bytes = offsetof(struct t_info, mfn_offset[NR_CPUS]);
-    t_info_first_offset = fit_to_type(uint32_t, offset_in_bytes);
+    return fit_to_type(uint32_t, offset_in_bytes);
 }
 
 /**
@@ -107,7 +106,7 @@ static void calc_tinfo_first_offset(void)
  * The t_info layout is fixed and cant be changed without breaking xentrace.
  * Initialize t_info_pages based on number of trace pages.
  */
-static int calculate_tbuf_size(unsigned int pages)
+static int calculate_tbuf_size(unsigned int pages, uint32_t t_info_first_offset)
 {
     struct t_buf dummy_size;
     typeof(dummy_size.prod) max_size;
@@ -156,6 +155,7 @@ static int alloc_trace_bufs(unsigned int pages)
     int i, cpu, order;
     /* Start after a fixed-size array of NR_CPUS */
     uint32_t *t_info_mfn_list;
+    uint32_t t_info_first_offset;
     int offset;
 
     if ( t_info )
@@ -165,9 +165,9 @@ static int alloc_trace_bufs(unsigned int pages)
         return -EINVAL;
 
     /* Calculate offset in u32 of first mfn */
-    calc_tinfo_first_offset();
+    t_info_first_offset = calc_tinfo_first_offset();
 
-    pages = calculate_tbuf_size(pages);
+    pages = calculate_tbuf_size(pages, t_info_first_offset);
     order = get_order_from_pages(pages);
 
     t_info = alloc_xenheap_pages(get_order_from_pages(t_info_pages), 0);
