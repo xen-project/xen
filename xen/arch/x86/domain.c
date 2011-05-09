@@ -420,20 +420,8 @@ int vcpu_initialise(struct vcpu *v)
 
     v->arch.perdomain_ptes = perdomain_ptes(d, v);
 
-    if ( (rc = xstate_alloc_save_area(v)) != 0 )
+    if ( (rc = vcpu_init_fpu(v)) != 0 )
         return rc;
-    if ( v->arch.xsave_area )
-        v->arch.fpu_ctxt = &v->arch.xsave_area->fpu_sse;
-    else if ( !is_idle_domain(d) )
-    {
-        v->arch.fpu_ctxt = _xmalloc(sizeof(v->arch.xsave_area->fpu_sse), 16);
-        if ( !v->arch.fpu_ctxt )
-        {
-            rc = -ENOMEM;
-            goto done;
-        }
-        memset(v->arch.fpu_ctxt, 0, sizeof(v->arch.xsave_area->fpu_sse));
-    }
 
     if ( is_hvm_domain(d) )
     {
@@ -485,10 +473,8 @@ int vcpu_initialise(struct vcpu *v)
  done:
     if ( rc )
     {
-        if ( v->arch.xsave_area )
-            xstate_free_save_area(v);
-        else
-            xfree(v->arch.fpu_ctxt);
+        vcpu_destroy_fpu(v);
+
         if ( !is_hvm_domain(d) && standalone_trap_ctxt(v) )
             free_xenheap_page(v->arch.pv_vcpu.trap_ctxt);
     }
@@ -501,10 +487,7 @@ void vcpu_destroy(struct vcpu *v)
     if ( is_pv_32on64_vcpu(v) )
         release_compat_l4(v);
 
-    if ( v->arch.xsave_area )
-        xstate_free_save_area(v);
-    else
-        xfree(v->arch.fpu_ctxt);
+    vcpu_destroy_fpu(v);
 
     if ( is_hvm_vcpu(v) )
         hvm_vcpu_destroy(v);

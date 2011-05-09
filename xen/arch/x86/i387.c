@@ -184,6 +184,47 @@ static void restore_fpu(struct vcpu *v)
     }
 }
 
+/*******************************/
+/*       VCPU FPU Functions    */
+/*******************************/
+/* Initialize FPU's context save area */
+int vcpu_init_fpu(struct vcpu *v)
+{
+    int rc = 0;
+    
+    /* Idle domain doesn't have FPU state allocated */
+    if ( is_idle_vcpu(v) )
+        goto done;
+
+    if ( (rc = xstate_alloc_save_area(v)) != 0 )
+        return rc;
+
+    if ( v->arch.xsave_area )
+        v->arch.fpu_ctxt = &v->arch.xsave_area->fpu_sse;
+    else
+    {
+        v->arch.fpu_ctxt = _xmalloc(sizeof(v->arch.xsave_area->fpu_sse), 16);
+        if ( !v->arch.fpu_ctxt )
+        {
+            rc = -ENOMEM;
+            goto done;
+        }
+        memset(v->arch.fpu_ctxt, 0, sizeof(v->arch.xsave_area->fpu_sse));
+    }
+
+done:
+    return rc;
+}
+
+/* Free FPU's context save area */
+void vcpu_destroy_fpu(struct vcpu *v)
+{
+    if ( v->arch.xsave_area )
+        xstate_free_save_area(v);
+    else
+        xfree(v->arch.fpu_ctxt);
+}
+
 /*
  * Local variables:
  * mode: C

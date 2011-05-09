@@ -17,4 +17,6 @@
 void setup_fpu(struct vcpu *v);
 void save_init_fpu(struct vcpu *v);
 
+int vcpu_init_fpu(struct vcpu *v);
+void vcpu_destroy_fpu(struct vcpu *v);
 #endif /* __ASM_I386_I387_H */
