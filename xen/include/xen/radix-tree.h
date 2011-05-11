@@ -181,8 +181,9 @@ static inline void radix_tree_replace_slot(void **pslot, void *item)
  */
 static inline void *radix_tree_int_to_ptr(int val)
 {
-    ASSERT((val <= (LONG_MAX >> 2)) && (val >= (LONG_MIN >> 2)));
-    return (void *)(((long)val << 2) | 0x2ul);
+    long _ptr = ((long)val << 2) | 0x2l;
+    ASSERT((_ptr >> 2) == val);
+    return (void *)_ptr;
 }
 
 static inline int radix_tree_ptr_to_int(void *ptr)
