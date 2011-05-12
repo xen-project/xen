@@ -27,6 +27,15 @@ ENTRY(compat_hypercall)
         pushq $0
         movl  $TRAP_syscall,4(%rsp)
         SAVE_ALL
+
+        cmpb  $0,untrusted_msi(%rip)
+        je    1f
+        movl  $0x82,%edi
+        call  check_for_unexpected_msi
+        RESTORE_ALL
+        SAVE_ALL
+1:
+
         GET_CURRENT(%rbx)
 
         cmpl  $NR_hypercalls,%eax

@@ -42,6 +42,9 @@
 #define nr_ioapics              iosapic_get_nr_iosapics()
 #endif
 
+/* Possible unfiltered LAPIC/MSI messages from untrusted sources? */
+bool_t __read_mostly untrusted_msi;
+
 int nr_iommus;
 static bool_t rwbf_quirk;
 
@@ -1565,6 +1568,14 @@ static int reassign_device_ownership(
 
     if (!pdev)
         return -ENODEV;
+
+    /*
+     * Devices assigned to untrusted domains (here assumed to be any domU)
+     * can attempt to send arbitrary LAPIC/MSI messages. We are unprotected
+     * by the root complex unless interrupt remapping is enabled.
+     */
+    if ( (target != dom0) && !iommu_intremap )
+        untrusted_msi = 1;
 
     ret = domain_context_unmap(source, bus, devfn);
     if ( ret )
