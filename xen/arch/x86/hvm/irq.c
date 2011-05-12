@@ -31,7 +31,7 @@
 static void assert_irq(struct domain *d, unsigned ioapic_gsi, unsigned pic_irq)
 {
     int pirq = domain_emuirq_to_pirq(d, ioapic_gsi);
-    if ( pirq != IRQ_UNBOUND )
+    if ( hvm_domain_use_pirq(d, pirq) )
     {
         send_guest_pirq(d, pirq);
         return;
@@ -43,7 +43,8 @@ static void assert_irq(struct domain *d, unsigned ioapic_gsi, unsigned pic_irq)
 /* Must be called with hvm_domain->irq_lock hold */
 static void deassert_irq(struct domain *d, unsigned isa_irq)
 {
-    if ( domain_emuirq_to_pirq(d, isa_irq) != IRQ_UNBOUND )
+    int pirq = domain_emuirq_to_pirq(d, isa_irq);
+    if ( !hvm_domain_use_pirq(d, pirq) )
         vpic_irq_negative_edge(d, isa_irq);
 }
 
