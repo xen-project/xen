@@ -135,6 +135,21 @@ void mcabanks_free(struct mca_banks *banks)
         xfree(banks->bank_map);
     xfree(banks);
 }
+
+static void mcabank_clear(int banknum)
+{
+    uint64_t status;
+
+    status = mca_rdmsr(MSR_IA32_MCx_STATUS(banknum));
+
+    if (status & MCi_STATUS_ADDRV)
+        mca_wrmsr(MSR_IA32_MCx_ADDR(banknum), 0x0ULL);
+    if (status & MCi_STATUS_MISCV)
+        mca_wrmsr(MSR_IA32_MCx_MISC(banknum), 0x0ULL);
+
+    mca_wrmsr(MSR_IA32_MCx_STATUS(banknum), 0x0ULL);
+}
+
 /* Judging whether to Clear Machine Check error bank callback handler
  * According to Intel latest MCA OS Recovery Writer's Guide, 
  * whether the error MCA bank needs to be cleared is decided by the mca_source
@@ -345,8 +360,8 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, struct mca_banks *bankma
 
         /* By default, need_clear = 1 */
         if (who != MCA_MCE_SCAN && need_clear)
-            /* Clear status */
-            mca_wrmsr(MSR_IA32_MCx_STATUS(i), 0x0ULL);
+            /* Clear bank */
+            mcabank_clear(i);
         else if ( who == MCA_MCE_SCAN && need_clear)
             mcabanks_set(i, clear_bank);
 
@@ -601,15 +616,11 @@ void mcheck_cmn_handler(struct cpu_user_regs *regs, long error_code,
 void mcheck_mca_clearbanks(struct mca_banks *bankmask)
 {
     int i;
-    uint64_t status;
 
-    for (i = 0; i < 32 && i < nr_mce_banks; i++) {
+    for (i = 0; i < nr_mce_banks; i++) {
         if (!mcabanks_test(i, bankmask))
             continue;
-        status = mca_rdmsr(MSR_IA32_MCx_STATUS(i));
-        if (!(status & MCi_STATUS_VAL))
-            continue;
-        mca_wrmsr(MSR_IA32_MCx_STATUS(i), 0x0ULL);
+        mcabank_clear(i);
     }
 }
 

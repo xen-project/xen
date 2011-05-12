@@ -903,17 +903,25 @@ static int intel_need_clearbank_scan(enum mca_source who, u64 status)
         else return 0;
     }
     else if ( who == MCA_MCE_SCAN) {
+        if ( !ser_support )
+            return 0;
+        /* 
+         * For fatal error, it shouldn't be cleared so that sticky bank
+         * have chance to be handled after reboot by polling
+         */
+        if ( (status & MCi_STATUS_UC) && (status & MCi_STATUS_PCC) )
+            return 0;
         /* Spurious need clear bank */
-        if ( ser_support && !(status & MCi_STATUS_OVER)
+        else if ( !(status & MCi_STATUS_OVER)
                     && (status & MCi_STATUS_UC) && !(status & MCi_STATUS_EN))
             return 1;
         /* SRAR OVER=0 clear bank. OVER = 1 have caused reset */
-        else if ( ser_support && (status & MCi_STATUS_UC)
+        else if ( (status & MCi_STATUS_UC)
                     && (status & MCi_STATUS_S) && (status & MCi_STATUS_AR )
-                    && (status & MCi_STATUS_OVER) )
+                    && !(status & MCi_STATUS_OVER) )
             return 1;
         /* SRAO need clear bank */
-        else if ( ser_support && !(status & MCi_STATUS_AR) 
+        else if ( !(status & MCi_STATUS_AR) 
                     && (status & MCi_STATUS_S) && (status & MCi_STATUS_UC))
             return 1; 
         else
