@@ -1955,7 +1955,7 @@ int hvm_domain_use_pirq(struct domain *d, int pirq)
 {
     int emuirq;
     
-    if ( !is_hvm_domain(d) )
+    if ( !is_hvm_domain(d) || pirq < 0 )
         return 0;
 
     emuirq = domain_pirq_to_emuirq(d, pirq);
