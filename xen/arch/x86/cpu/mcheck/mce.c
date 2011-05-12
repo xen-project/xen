@@ -151,7 +151,6 @@ static struct mcinfo_bank *mca_init_bank(enum mca_source who,
                                          struct mc_info *mi, int bank)
 {
     struct mcinfo_bank *mib;
-    uint64_t addr=0, misc = 0;
 
     if (!mi)
         return NULL;
@@ -170,22 +169,23 @@ static struct mcinfo_bank *mca_init_bank(enum mca_source who,
     mib->common.size = sizeof (struct mcinfo_bank);
     mib->mc_bank = bank;
 
-    addr = misc = 0;
     if (mib->mc_status & MCi_STATUS_MISCV)
         mib->mc_misc = mca_rdmsr(MSR_IA32_MCx_MISC(bank));
 
     if (mib->mc_status & MCi_STATUS_ADDRV)
-    {
         mib->mc_addr = mca_rdmsr(MSR_IA32_MCx_ADDR(bank));
 
-        if (mfn_valid(paddr_to_pfn(mib->mc_addr))) {
-            struct domain *d;
+    if ((mib->mc_status & MCi_STATUS_MISCV) &&
+        (mib->mc_status & MCi_STATUS_ADDRV) &&
+        ((mib->mc_misc & MCi_MISC_ADDRMOD_MASK) == MCi_MISC_PHYSMOD) && 
+        (who == MCA_POLLER || who == MCA_CMCI_HANDLER) &&
+        (mfn_valid(paddr_to_pfn(mib->mc_addr))))
+    {
+        struct domain *d;
 
-            d = maddr_get_owner(mib->mc_addr);
-            if (d != NULL && (who == MCA_POLLER ||
-                              who == MCA_CMCI_HANDLER))
-                mib->mc_domid = d->domain_id;
-        }
+        d = maddr_get_owner(mib->mc_addr);
+        if (d)
+            mib->mc_domid = d->domain_id;
     }
 
     if (who == MCA_CMCI_HANDLER) {
