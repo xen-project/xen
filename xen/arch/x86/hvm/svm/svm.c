@@ -2061,7 +2061,10 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case VMEXIT_INVLPGA:
+        if ( (inst_len = __get_instruction_length(v, INSTR_INVLPGA)) == 0 )
+            break;
         svm_invlpga_intercept(v, regs->eax, regs->ecx);
+        __update_guest_eip(regs, inst_len);
         break;
 
     case VMEXIT_VMMCALL:

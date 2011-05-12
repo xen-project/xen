@@ -107,6 +107,7 @@ MAKE_INSTR(VMLOAD, 3, 0x0f, 0x01, 0xda);
 MAKE_INSTR(VMSAVE, 3, 0x0f, 0x01, 0xdb);
 MAKE_INSTR(STGI,   3, 0x0f, 0x01, 0xdc);
 MAKE_INSTR(CLGI,   3, 0x0f, 0x01, 0xdd);
+MAKE_INSTR(INVLPGA,3, 0x0f, 0x01, 0xdf);
 
 static const u8 *opc_bytes[INSTR_MAX_COUNT] = 
 {
@@ -126,6 +127,7 @@ static const u8 *opc_bytes[INSTR_MAX_COUNT] =
     [INSTR_VMSAVE] = OPCODE_VMSAVE,
     [INSTR_STGI]   = OPCODE_STGI,
     [INSTR_CLGI]   = OPCODE_CLGI,
+    [INSTR_INVLPGA] = OPCODE_INVLPGA,
 };
 
 static int fetch(struct vcpu *v, u8 *buf, unsigned long addr, int len)
