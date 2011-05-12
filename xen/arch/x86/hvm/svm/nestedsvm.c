@@ -494,6 +494,7 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
         /* host nested paging + guest shadow paging. */
         n2vmcb->_np_enable = 1;
         /* Keep h_cr3 as it is. */
+        n2vmcb->_h_cr3 = n1vmcb->_h_cr3;
         /* When l1 guest does shadow paging
          * we assume it intercepts page faults.
          */

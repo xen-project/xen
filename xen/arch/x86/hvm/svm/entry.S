@@ -65,12 +65,16 @@ ENTRY(svm_asm_do_resume)
         testl $~0,(r(dx),r(ax),1)
         jnz  .Lsvm_process_softirqs
 
+        testb $0, VCPU_nsvm_hap_enabled(r(bx))
+        jz  .Lsvm_asid_handle
+        
         mov  VCPU_nhvm_p2m(r(bx)),r(ax)
         test r(ax),r(ax)
         sete %al
         andb VCPU_nhvm_guestmode(r(bx)),%al
         jnz  .Lsvm_nsvm_no_p2m
 
+.Lsvm_asid_handle:
         call svm_asid_handle_vmrun
 
         cmpb $0,addr_of(tb_init_done)

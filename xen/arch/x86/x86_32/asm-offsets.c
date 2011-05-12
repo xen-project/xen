@@ -95,6 +95,7 @@ void __dummy__(void)
 
     OFFSET(VCPU_nhvm_guestmode, struct vcpu, arch.hvm_vcpu.nvcpu.nv_guestmode);
     OFFSET(VCPU_nhvm_p2m, struct vcpu, arch.hvm_vcpu.nvcpu.nv_p2m);
+    OFFSET(VCPU_nsvm_hap_enabled, struct vcpu, arch.hvm_vcpu.nvcpu.u.nsvm.ns_hap_enabled);
     BLANK();
 
     OFFSET(VMCB_rax, struct vmcb_struct, rax);
