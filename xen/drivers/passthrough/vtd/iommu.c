@@ -1971,6 +1971,8 @@ static int init_vtd_hw(void)
                     "ioapic_to_iommu: ioapic 0x%x (id: 0x%x) is NULL! "
                     "Will not try to enable Interrupt Remapping.\n",
                     apic, IO_APIC_ID(apic));
+                if ( force_iommu )
+                    panic("intremap remapping failed to enable with iommu=required/force in grub\n");
                 break;
             }
         }
@@ -1984,6 +1986,9 @@ static int init_vtd_hw(void)
             {
                 dprintk(XENLOG_WARNING VTDPREFIX,
                         "Interrupt Remapping not enabled\n");
+
+                if ( force_iommu && platform_supports_intremap() )
+                    panic("intremap remapping failed to enable with iommu=required/force in grub\n");
                 break;
             }
         }
