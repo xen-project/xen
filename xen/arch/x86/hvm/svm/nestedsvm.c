@@ -1365,6 +1365,7 @@ nestedsvm_vcpu_interrupt(struct vcpu *v, const struct hvm_intack intack)
     switch (intack.source) {
     case hvm_intsrc_pic:
     case hvm_intsrc_lapic:
+    case hvm_intsrc_vector:
         exitcode = VMEXIT_INTR;
         exitinfo2 = intack.vector;
         break;
