@@ -317,6 +317,8 @@ static void amd_vpmu_initialise(struct vcpu *v)
 	     k7_counters_mirrored = 1;
 	     break;
 	 case 0x10:
+	 case 0x12:
+	 case 0x14:
 	 default:
 	     num_counters = F10H_NUM_COUNTERS;
 	     counters = AMD_F10H_COUNTERS;
