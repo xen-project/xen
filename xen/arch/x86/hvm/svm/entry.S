@@ -66,20 +66,20 @@ ENTRY(svm_asm_do_resume)
         jnz  .Lsvm_process_softirqs
 
         testb $0, VCPU_nsvm_hap_enabled(r(bx))
-        jz  .Lsvm_asid_handle
-        
+UNLIKELY_START(nz, nsvm_hap)
         mov  VCPU_nhvm_p2m(r(bx)),r(ax)
         test r(ax),r(ax)
         sete %al
         andb VCPU_nhvm_guestmode(r(bx)),%al
         jnz  .Lsvm_nsvm_no_p2m
+UNLIKELY_END(nsvm_hap)
 
-.Lsvm_asid_handle:
         call svm_asid_handle_vmrun
 
         cmpb $0,addr_of(tb_init_done)
-        jnz  .Lsvm_trace
-.Lsvm_trace_done:
+UNLIKELY_START(nz, svm_trace)
+        call svm_trace_vmentry
+UNLIKELY_END(svm_trace)
 
         mov  VCPU_svm_vmcb(r(bx)),r(cx)
         mov  UREGS_rax(r(sp)),r(ax)
@@ -180,10 +180,6 @@ svm_stgi_label:
         STGI
         call do_softirq
         jmp  svm_asm_do_resume
-
-.Lsvm_trace:
-        call svm_trace_vmentry
-        jmp  .Lsvm_trace_done
 
 .Lsvm_nsvm_no_p2m:
         /* Someone shot down our nested p2m table; go round again

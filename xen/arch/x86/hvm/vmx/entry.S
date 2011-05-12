@@ -132,12 +132,12 @@ vmx_asm_do_vmentry:
         testb $0xff,VCPU_vmx_emulate(r(bx))
         jnz .Lvmx_goto_emulator
         testb $0xff,VCPU_vmx_realmode(r(bx))
-        jz .Lvmx_not_realmode
+UNLIKELY_START(nz, realmode)
         cmpw $0,VCPU_vm86_seg_mask(r(bx))
         jnz .Lvmx_goto_emulator
         call_with_regs(vmx_enter_realmode) 
+UNLIKELY_END(realmode)
 
-.Lvmx_not_realmode:
         call vmx_vmenter_helper
         mov  VCPU_hvm_guest_cr2(r(bx)),r(ax)
         mov  r(ax),%cr2
