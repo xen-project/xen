@@ -656,17 +656,21 @@ nsvm_vcpu_vmrun(struct vcpu *v, struct cpu_user_regs *regs)
 
     /* save host state */
     ret = nsvm_vcpu_vmentry(v, regs, inst_len);
+
+    /* Switch vcpu to guest mode. In the error case
+     * this ensures the host mode is restored correctly
+     * and l1 guest keeps alive. */
+    nestedhvm_vcpu_enter_guestmode(v);
+
     if (ret) {
         gdprintk(XENLOG_ERR,
             "nsvm_vcpu_vmentry failed, injecting #UD\n");
         hvm_inject_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE, 0);
+        /* Must happen after hvm_inject_exception or it doesn't work right. */
         nv->nv_vmswitch_in_progress = 0;
         return 1;
     }
 
-    /* Switch vcpu to guest mode
-     */
-    nestedhvm_vcpu_enter_guestmode(v);
     nv->nv_vmswitch_in_progress = 0;
     return 0;
 }
@@ -1329,7 +1333,7 @@ asmlinkage void nsvm_vcpu_switch(struct cpu_user_regs *regs)
         int ret;
         ASSERT(!nv->nv_vmexit_pending);
         ret = nsvm_vcpu_vmrun(v, regs);
-        if (ret < 0)
+        if (ret)
             goto vmexit;
 
         ASSERT(nestedhvm_vcpu_in_guestmode(v));
