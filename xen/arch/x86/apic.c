@@ -560,12 +560,9 @@ void __devinit setup_local_APIC(void)
     init_apic_ldr();
 
     /*
-     * Set Task Priority to 'accept all'. We never change this
-     * later on.
+     * Set Task Priority to reject any interrupts below FIRST_DYNAMIC_VECTOR.
      */
-    value = apic_read(APIC_TASKPRI);
-    value &= ~APIC_TPRI_MASK;
-    apic_write_around(APIC_TASKPRI, value);
+    apic_write_around(APIC_TASKPRI, (FIRST_DYNAMIC_VECTOR & 0xF0) - 0x10);
 
     /*
      * After a crash, we no longer service the interrupts and a pending
@@ -1438,4 +1435,10 @@ int __init APIC_init_uniprocessor (void)
     setup_boot_APIC_clock();
 
     return 0;
+}
+
+void check_for_unexpected_msi(unsigned int vector)
+{
+    unsigned long v = apic_read(APIC_ISR + ((vector & ~0x1f) >> 1));
+    BUG_ON(v & (1 << (vector & 0x1f)));
 }

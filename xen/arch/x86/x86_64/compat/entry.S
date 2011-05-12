@@ -10,12 +10,22 @@
 #include <asm/page.h>
 #include <asm/desc.h>
 #include <public/xen.h>
+#include <irq_vectors.h>
 
         ALIGN
 ENTRY(compat_hypercall)
         pushq $0
         movl  $TRAP_syscall,4(%rsp)
         SAVE_ALL
+
+        cmpb  $0,untrusted_msi(%rip)
+UNLIKELY_START(ne, msi_check)
+        movl  $HYPERCALL_VECTOR,%edi
+        call  check_for_unexpected_msi
+        RESTORE_ALL
+        SAVE_ALL
+UNLIKELY_END(msi_check)
+
         GET_CURRENT(%rbx)
 
         cmpl  $NR_hypercalls,%eax
