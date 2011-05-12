@@ -146,6 +146,20 @@ compat_vcpu_op(
 extern int
 compat_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg);
 
+extern int
+compat_xen_version(
+    int cmd,
+    XEN_GUEST_HANDLE(void) arg);
+
+extern int
+compat_sched_op(
+    int cmd,
+    XEN_GUEST_HANDLE(void) arg);
+
+extern int
+compat_set_timer_op(
+    s_time_t timeout);
+
 #endif
 
 #endif /* __XEN_HYPERCALL_H__ */
