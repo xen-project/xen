@@ -1,6 +1,6 @@
 #!/bin/sh
 
-if [ "$1" == "" ]
+if [ "$1" = "" ]
 then
   arch=""
 else
