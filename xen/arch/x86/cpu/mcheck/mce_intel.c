@@ -355,7 +355,7 @@ static int mce_urgent_action(struct cpu_user_regs *regs,
     gstatus = mca_rdmsr(MSR_IA32_MCG_STATUS);
     /* Xen is not pre-emptible */
     if ( !(gstatus & MCG_STATUS_RIPV) && !guest_mode(regs))
-        return 0;
+        return -1;
 
     return mce_action(regs, mctc) == MCER_RESET ? -1 : 0;
 }

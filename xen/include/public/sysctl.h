@@ -410,7 +410,7 @@ struct xen_sysctl_page_offline_op {
 
 #define PG_OFFLINE_MISC_MASK    (0xFFUL << 4)
 
-/* only valid when PG_OFFLINE_FAILED */
+/* valid when PG_OFFLINE_FAILED or PG_OFFLINE_PENDING */
 #define PG_OFFLINE_XENPAGE   (0x1UL << 8)
 #define PG_OFFLINE_DOM0PAGE  (0x1UL << 9)
 #define PG_OFFLINE_ANONYMOUS (0x1UL << 10)
