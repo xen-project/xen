@@ -56,6 +56,9 @@ struct nestedsvm {
     /* Shadow io permission map */
     unsigned long *ns_iomap;
 
+    uint64_t ns_cr0; /* Cached guest_cr[0] of l1 guest while l2 guest runs.
+                      * Needed to handle FPU context switching */
+
     /* Cache guest cr3/host cr3 the guest sets up for the l2 guest.
      * Used by Shadow-on-Shadow and Nested-on-Nested.
      * ns_vmcb_guestcr3: in l2 guest physical address space and points to

@@ -165,6 +165,45 @@ int nsvm_vcpu_reset(struct vcpu *v)
     return 0;
 }
 
+static uint64_t nestedsvm_fpu_vmentry(uint64_t n1cr0,
+    struct vmcb_struct *vvmcb,
+    struct vmcb_struct *n1vmcb, struct vmcb_struct *n2vmcb)
+{
+    uint64_t vcr0;
+
+    vcr0 = vvmcb->_cr0;
+    if ( !(n1cr0 & X86_CR0_TS) && (n1vmcb->_cr0 & X86_CR0_TS) ) {
+        /* svm_fpu_leave() run while l1 guest was running.
+         * Sync FPU state with l2 guest.
+         */
+        vcr0 |= X86_CR0_TS;
+        n2vmcb->_exception_intercepts |= (1U << TRAP_no_device);
+    } else if ( !(vcr0 & X86_CR0_TS) && (n2vmcb->_cr0 & X86_CR0_TS) ) {
+        /* svm_fpu_enter() run while l1 guest was running.
+         * Sync FPU state with l2 guest. */
+        vcr0 &= ~X86_CR0_TS;
+        n2vmcb->_exception_intercepts &= ~(1U << TRAP_no_device);
+    }
+
+    return vcr0;
+}
+
+static void nestedsvm_fpu_vmexit(struct vmcb_struct *n1vmcb,
+    struct vmcb_struct *n2vmcb, uint64_t n1cr0, uint64_t guest_cr0)
+{
+    if ( !(guest_cr0 & X86_CR0_TS) && (n2vmcb->_cr0 & X86_CR0_TS) ) {
+        /* svm_fpu_leave() run while l2 guest was running.
+         * Sync FPU state with l1 guest. */
+        n1vmcb->_cr0 |= X86_CR0_TS;
+        n1vmcb->_exception_intercepts |= (1U << TRAP_no_device);
+    } else if ( !(n1cr0 & X86_CR0_TS) && (n1vmcb->_cr0 & X86_CR0_TS) ) {
+        /* svm_fpu_enter() run while l2 guest was running.
+         * Sync FPU state with l1 guest. */
+        n1vmcb->_cr0 &= ~X86_CR0_TS;
+        n1vmcb->_exception_intercepts &= ~(1U << TRAP_no_device);
+    }
+}
+
 static int nsvm_vcpu_hostsave(struct vcpu *v, unsigned int inst_len)
 {
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
@@ -176,6 +215,13 @@ static int nsvm_vcpu_hostsave(struct vcpu *v, unsigned int inst_len)
 
     n1vmcb->rip += inst_len;
 
+    /* Save shadowed values. This ensures that the l1 guest
+     * cannot override them to break out. */
+    n1vmcb->_efer = v->arch.hvm_vcpu.guest_efer;
+    n1vmcb->_cr0 = v->arch.hvm_vcpu.guest_cr[0];
+    n1vmcb->_cr2 = v->arch.hvm_vcpu.guest_cr[2];
+    n1vmcb->_cr4 = v->arch.hvm_vcpu.guest_cr[4];
+
     /* Remember the host interrupt flag */
     svm->ns_hostflags.fields.rflagsif =
         (n1vmcb->rflags & X86_EFLAGS_IF) ? 1 : 0;
@@ -186,6 +232,7 @@ static int nsvm_vcpu_hostsave(struct vcpu *v, unsigned int inst_len)
 int nsvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)
 {
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
+    struct nestedsvm *svm = &vcpu_nestedsvm(v);
     struct vmcb_struct *n1vmcb, *n2vmcb;
     int rc;
 
@@ -215,11 +262,14 @@ int nsvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)
         gdprintk(XENLOG_ERR, "hvm_set_cr4 failed, rc: %u\n", rc);
 
     /* CR0 */
+    nestedsvm_fpu_vmexit(n1vmcb, n2vmcb,
+        svm->ns_cr0, v->arch.hvm_vcpu.guest_cr[0]);
     v->arch.hvm_vcpu.guest_cr[0] = n1vmcb->_cr0 | X86_CR0_PE;
     n1vmcb->rflags &= ~X86_EFLAGS_VM;
     rc = hvm_set_cr0(n1vmcb->_cr0 | X86_CR0_PE);
     if (rc != X86EMUL_OKAY)
         gdprintk(XENLOG_ERR, "hvm_set_cr0 failed, rc: %u\n", rc);
+    svm->ns_cr0 = v->arch.hvm_vcpu.guest_cr[0];
 
     /* CR2 */
     v->arch.hvm_vcpu.guest_cr[2] = n1vmcb->_cr2;
@@ -336,6 +386,7 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
     struct vmcb_struct *ns_vmcb, *n1vmcb, *n2vmcb;
     bool_t vcleanbits_valid;
     int rc;
+    uint64_t cr0;
 
     ns_vmcb = nv->nv_vvmcx;
     n1vmcb = nv->nv_n1vmcx;
@@ -470,8 +521,10 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
         gdprintk(XENLOG_ERR, "hvm_set_cr4 failed, rc: %u\n", rc);
 
     /* CR0 */
+    svm->ns_cr0 = v->arch.hvm_vcpu.guest_cr[0];
+    cr0 = nestedsvm_fpu_vmentry(svm->ns_cr0, ns_vmcb, n1vmcb, n2vmcb);
     v->arch.hvm_vcpu.guest_cr[0] = ns_vmcb->_cr0;
-    rc = hvm_set_cr0(ns_vmcb->_cr0);
+    rc = hvm_set_cr0(cr0);
     if (rc != X86EMUL_OKAY)
         gdprintk(XENLOG_ERR, "hvm_set_cr0 failed, rc: %u\n", rc);
 
