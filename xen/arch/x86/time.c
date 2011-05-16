@@ -724,8 +724,6 @@ void cstate_restore_tsc(void)
 
     new_tsc = t->local_tsc_stamp + scale_delta(stime_delta, &sys_to_tsc);
 
-    ASSERT(boot_cpu_has(X86_FEATURE_TSC_RELIABLE));
-
     write_tsc(new_tsc);
 }
 

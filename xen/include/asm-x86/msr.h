@@ -82,7 +82,13 @@ static inline void wrmsrl(unsigned int msr, __u64 val)
 } while(0)
 #endif
 
-#define write_tsc(val) wrmsrl(MSR_IA32_TSC, val)
+#define __write_tsc(val) wrmsrl(MSR_IA32_TSC, val)
+#define write_tsc(val) ({                                       \
+    /* Reliable TSCs are in lockstep across all CPUs. We should \
+     * never write to them. */                                  \
+    ASSERT(!boot_cpu_has(X86_FEATURE_TSC_RELIABLE));            \
+    __write_tsc(val);                                           \
+})
 
 #define write_rdtscp_aux(val) wrmsr(MSR_TSC_AUX, (val), 0)
 
