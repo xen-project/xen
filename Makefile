@@ -118,6 +118,11 @@ world:
 	$(MAKE) kdelete
 	$(MAKE) dist
 
+# Package a build in a .deb file
+.PHONY: deb
+deb: dist
+	fakeroot sh ./tools/misc/mkdeb $(XEN_ROOT) $$($(MAKE) -C xen xenversion | grep -v :)
+
 # clean doesn't do a kclean
 .PHONY: clean
 clean::

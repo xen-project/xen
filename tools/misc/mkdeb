@@ -1,0 +1,56 @@
+#!/bin/sh
+#
+# mkdeb: package the dist/install output of a Xen build in a .deb 
+#
+# Takes 2 arguments, the path to the dist directory and the version
+
+set -e
+
+if test -z "$1" -o -z "$2" ; then 
+  echo "usage: $0 path-to-XEN_ROOT xen-version"
+  exit 1
+fi 
+
+cd $1
+version=$2
+if test "$XEN_TARGET_ARCH" = "x86_32"; then
+  arch=i386
+else
+  arch=amd64
+fi
+
+# Prepare the directory to package
+cd dist
+rm -rf deb
+cp -a install deb
+
+# Debian doesn't use /usr/lib64 for 64-bit libraries
+if test -d deb/usr/lib64 ; then 
+  cp -a deb/usr/lib64/* deb/usr/lib/
+  rm -rf deb/usr/lib64
+fi
+
+# Fill in the debian boilerplate
+mkdir -p deb/DEBIAN
+cat >deb/DEBIAN/control <<EOF
+Package: xen-upstream-$version
+Source: xen-upstream
+Version: $version
+Architecture: $arch
+Maintainer: Unmaintained snapshot
+Section: admin
+Priority: optional
+Installed-Size: $(du -ks deb | cut -f1)
+Description: Xen hypervisor and tools, version $version
+ This package contains the Xen hypervisor and associated tools, built
+ from a source tree.  It is not a fully packaged and supported Xen, just
+ the output of a xen "make dist" wrapped in a .deb to make it easy to
+ uninstall.
+EOF
+
+# Package it up
+chown -R root:root deb
+dpkg --build deb $xen-upstream-$version.deb
+
+# Tidy up after ourselves
+rm -rf deb

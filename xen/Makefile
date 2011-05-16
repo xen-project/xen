@@ -129,6 +129,10 @@ define set_exuberant_flags
 	    --extra=+f --c-kinds=+px") || true` 
 endef
 
+.PHONY: xenversion
+xenversion:
+	@echo $(XEN_FULLVERSION)
+
 .PHONY: _TAGS
 _TAGS: 
 	set -e; rm -f TAGS; \
