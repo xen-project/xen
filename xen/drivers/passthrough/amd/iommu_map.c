@@ -317,7 +317,8 @@ void amd_iommu_set_root_page_table(
     dte[0] = entry;
 }
 
-void amd_iommu_set_intremap_table(u32 *dte, u64 intremap_ptr, u8 int_valid)
+void __init amd_iommu_set_intremap_table(
+    u32 *dte, u64 intremap_ptr, u8 int_valid)
 {
     u64 addr_hi, addr_lo;
     u32 entry;
@@ -354,7 +355,7 @@ void amd_iommu_set_intremap_table(u32 *dte, u64 intremap_ptr, u8 int_valid)
     dte[4] = entry;
 }
 
-void amd_iommu_add_dev_table_entry(
+void __init amd_iommu_add_dev_table_entry(
     u32 *dte, u8 sys_mgt, u8 dev_ex, u8 lint1_pass, u8 lint0_pass, 
     u8 nmi_pass, u8 ext_int_pass, u8 init_pass)
 {
