@@ -210,7 +210,8 @@ static int alloc_remap_entry(struct iommu *iommu)
     if ( iremap_entries )
         unmap_vtd_domain_page(iremap_entries);
 
-    ir_ctrl->iremap_num++;
+    if ( i < IREMAP_ENTRY_NR ) 
+        ir_ctrl->iremap_num++;
     return i;
 }
 
@@ -246,6 +247,8 @@ static int remap_entry_to_ioapic_rte(
         dprintk(XENLOG_ERR VTDPREFIX,
                 "%s: index (%d) get an empty entry!\n",
                 __func__, index);
+        unmap_vtd_domain_page(iremap_entries);
+        spin_unlock_irqrestore(&ir_ctrl->iremap_lock, flags);
         return -EFAULT;
     }
 
@@ -281,7 +284,8 @@ static int ioapic_rte_to_remap_entry(struct iommu *iommu,
     if ( index < 0 )
     {
         index = alloc_remap_entry(iommu);
-        apic_pin_2_ir_idx[apic][ioapic_pin] = index;
+        if ( index < IREMAP_ENTRY_NR )
+            apic_pin_2_ir_idx[apic][ioapic_pin] = index;
     }
 
     if ( index > IREMAP_ENTRY_NR - 1 )
@@ -546,6 +550,8 @@ static int remap_entry_to_msi_msg(
         dprintk(XENLOG_ERR VTDPREFIX,
                 "%s: index (%d) get an empty entry!\n",
                 __func__, index);
+        unmap_vtd_domain_page(iremap_entries);
+        spin_unlock_irqrestore(&ir_ctrl->iremap_lock, flags);
         return -EFAULT;
     }
 
