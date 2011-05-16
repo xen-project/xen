@@ -7,6 +7,9 @@
 #ifndef __XEN_CONFIG_H__
 #define __XEN_CONFIG_H__
 
+#ifndef __ASSEMBLY__
+#include <xen/compiler.h>
+#endif
 #include <asm/config.h>
 
 #define EXPORT_SYMBOL(var)
@@ -74,8 +77,6 @@ int current_domain_id(void);
 #define gdprintk(_l, _f, _a...)                             \
     printk(XENLOG_GUEST _l "%s:%d:d%d " _f, __FILE__,       \
            __LINE__, current_domain_id() , ## _a )
-
-#include <xen/compiler.h>
 
 #endif /* !__ASSEMBLY__ */
 
