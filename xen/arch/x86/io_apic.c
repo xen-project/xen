@@ -159,6 +159,52 @@ nomem:
     return 0;
 }
 
+union entry_union {
+    struct { u32 w1, w2; };
+    struct IO_APIC_route_entry entry;
+};
+
+static struct IO_APIC_route_entry __ioapic_read_entry(int apic, int pin, int raw)
+{
+    unsigned int (*read)(unsigned int, unsigned int)
+        = raw ? __io_apic_read : io_apic_read;
+    union entry_union eu;
+    eu.w1 = (*read)(apic, 0x10 + 2 * pin);
+    eu.w2 = (*read)(apic, 0x11 + 2 * pin);
+    return eu.entry;
+}
+
+static struct IO_APIC_route_entry ioapic_read_entry(int apic, int pin, int raw)
+{
+    struct IO_APIC_route_entry entry;
+    unsigned long flags;
+
+    spin_lock_irqsave(&ioapic_lock, flags);
+    entry = __ioapic_read_entry(apic, pin, raw);
+    spin_unlock_irqrestore(&ioapic_lock, flags);
+    return entry;
+}
+
+static void
+__ioapic_write_entry(int apic, int pin, int raw, struct IO_APIC_route_entry e)
+{
+    void (*write)(unsigned int, unsigned int, unsigned int)
+        = raw ? __io_apic_write : io_apic_write;
+    union entry_union eu = {{0, 0}};
+
+    eu.entry = e;
+    (*write)(apic, 0x11 + 2*pin, eu.w2);
+    (*write)(apic, 0x10 + 2*pin, eu.w1);
+}
+
+static void ioapic_write_entry(int apic, int pin, int raw, struct IO_APIC_route_entry e)
+{
+    unsigned long flags;
+    spin_lock_irqsave(&ioapic_lock, flags);
+    __ioapic_write_entry(apic, pin, raw, e);
+    spin_unlock_irqrestore(&ioapic_lock, flags);
+}
+
 /*
  * Saves all the IO-APIC RTE's
  */
@@ -173,12 +219,8 @@ int save_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries)
         if (!ioapic_entries[apic])
             return -ENOMEM;
 
-        for (pin = 0; pin < nr_ioapic_registers[apic]; pin++) {
-            *(((int *)&ioapic_entries[apic][pin])+0) =
-                __io_apic_read(apic, 0x10+pin*2);
-            *(((int *)&ioapic_entries[apic][pin])+1) =
-                __io_apic_read(apic, 0x11+pin*2);
-        }
+        for (pin = 0; pin < nr_ioapic_registers[apic]; pin++)
+	    ioapic_entries[apic][pin] = __ioapic_read_entry(apic, pin, 1);
     }
 
     return 0;
@@ -200,16 +242,12 @@ void mask_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries)
 
         for (pin = 0; pin < nr_ioapic_registers[apic]; pin++) {
             struct IO_APIC_route_entry entry;
-            unsigned long flags;
 
             entry = ioapic_entries[apic][pin];
             if (!entry.mask) {
                 entry.mask = 1;
 
-                spin_lock_irqsave(&ioapic_lock, flags);
-                __io_apic_write(apic, 0x11+2*pin, *(((int *)&entry)+1));
-                __io_apic_write(apic, 0x10+2*pin, *(((int *)&entry)+0));
-                spin_unlock_irqrestore(&ioapic_lock, flags);
+                ioapic_write_entry(apic, pin, 1, entry);
             }
         }
     }
@@ -221,8 +259,6 @@ void mask_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries)
 int restore_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries)
 {
     int apic, pin;
-    unsigned long flags;
-    struct IO_APIC_route_entry entry;
 
     if (!ioapic_entries)
         return -ENOMEM;
@@ -232,11 +268,7 @@ int restore_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries)
             return -ENOMEM;
 
         for (pin = 0; pin < nr_ioapic_registers[apic]; pin++)
-            entry = ioapic_entries[apic][pin];
-            spin_lock_irqsave(&ioapic_lock, flags);
-            __io_apic_write(apic, 0x11+2*pin, *(((int *)&entry)+1));
-            __io_apic_write(apic, 0x10+2*pin, *(((int *)&entry)+0));
-            spin_unlock_irqrestore(&ioapic_lock, flags);
+	    ioapic_write_entry(apic, pin, 1, ioapic_entries[apic][pin]);
     }
 
     return 0;
@@ -341,18 +373,10 @@ static void eoi_IO_APIC_irq(unsigned int irq)
 #define clear_IO_APIC_pin_raw(a,p) __clear_IO_APIC_pin(a,p,1)
 static void __clear_IO_APIC_pin(unsigned int apic, unsigned int pin, int raw)
 {
-    unsigned int (*read)(unsigned int, unsigned int)
-        = raw ? __io_apic_read : io_apic_read;
-    void (*write)(unsigned int, unsigned int, unsigned int)
-        = raw ? __io_apic_write : io_apic_write;
     struct IO_APIC_route_entry entry;
-    unsigned long flags;
-    
+
     /* Check delivery_mode to be sure we're not clearing an SMI pin */
-    spin_lock_irqsave(&ioapic_lock, flags);
-    *(((int*)&entry) + 0) = (*read)(apic, 0x10 + 2 * pin);
-    *(((int*)&entry) + 1) = (*read)(apic, 0x11 + 2 * pin);
-    spin_unlock_irqrestore(&ioapic_lock, flags);
+    entry = ioapic_read_entry(apic, pin, raw);
     if (entry.delivery_mode == dest_SMI)
         return;
 
@@ -361,10 +385,7 @@ static void __clear_IO_APIC_pin(unsigned int apic, unsigned int pin, int raw)
      */
     memset(&entry, 0, sizeof(entry));
     entry.mask = 1;
-    spin_lock_irqsave(&ioapic_lock, flags);
-    (*write)(apic, 0x10 + 2 * pin, *(((int *)&entry) + 0));
-    (*write)(apic, 0x11 + 2 * pin, *(((int *)&entry) + 1));
-    spin_unlock_irqrestore(&ioapic_lock, flags);
+    ioapic_write_entry(apic, pin, raw, entry);
 }
 
 static void clear_IO_APIC (void)
@@ -994,11 +1015,10 @@ static void __init setup_IO_APIC_irqs(void)
             SET_DEST(entry.dest.dest32, entry.dest.logical.logical_dest,
                 cpu_mask_to_apicid(cfg->domain));
             spin_lock_irqsave(&ioapic_lock, flags);
-            io_apic_write(apic, 0x11+2*pin, *(((int *)&entry)+1));
-            io_apic_write(apic, 0x10+2*pin, *(((int *)&entry)+0));
+            __ioapic_write_entry(apic, pin, 0, entry);
             set_native_irq_info(irq, TARGET_CPUS);
             spin_unlock_irqrestore(&ioapic_lock, flags);
-	}
+        }
     }
 
     if (!first_notcon)
@@ -1011,7 +1031,6 @@ static void __init setup_IO_APIC_irqs(void)
 static void __init setup_ExtINT_IRQ0_pin(unsigned int apic, unsigned int pin, int vector)
 {
     struct IO_APIC_route_entry entry;
-    unsigned long flags;
 
     memset(&entry,0,sizeof(entry));
 
@@ -1042,10 +1061,7 @@ static void __init setup_ExtINT_IRQ0_pin(unsigned int apic, unsigned int pin, in
     /*
      * Add it to the IO-APIC irq-routing table:
      */
-    spin_lock_irqsave(&ioapic_lock, flags);
-    io_apic_write(apic, 0x11+2*pin, *(((int *)&entry)+1));
-    io_apic_write(apic, 0x10+2*pin, *(((int *)&entry)+0));
-    spin_unlock_irqrestore(&ioapic_lock, flags);
+    ioapic_write_entry(apic, pin, 0, entry);
 
     enable_8259A_irq(0);
 }
@@ -1152,10 +1168,7 @@ static void /*__init*/ __print_IO_APIC(void)
 	for (i = 0; i <= reg_01.bits.entries; i++) {
             struct IO_APIC_route_entry entry;
 
-            spin_lock_irqsave(&ioapic_lock, flags);
-            *(((int *)&entry)+0) = io_apic_read(apic, 0x10+i*2);
-            *(((int *)&entry)+1) = io_apic_read(apic, 0x11+i*2);
-            spin_unlock_irqrestore(&ioapic_lock, flags);
+            entry = ioapic_read_entry(apic, i, 0);
 
             printk(KERN_DEBUG " %02x %03X %02X  ",
                    i,
@@ -1216,7 +1229,6 @@ static void __init enable_IO_APIC(void)
 {
     int i8259_apic, i8259_pin;
     int i, apic;
-    unsigned long flags;
 
     /* Initialise dynamic irq_2_pin free list. */
     irq_2_pin = xmalloc_array(struct irq_pin_list, PIN_MAP_SIZE);
@@ -1231,12 +1243,7 @@ static void __init enable_IO_APIC(void)
         int pin;
         /* See if any of the pins is in ExtINT mode */
         for (pin = 0; pin < nr_ioapic_registers[apic]; pin++) {
-            struct IO_APIC_route_entry entry;
-            spin_lock_irqsave(&ioapic_lock, flags);
-            *(((int *)&entry) + 0) = io_apic_read(apic, 0x10 + 2 * pin);
-            *(((int *)&entry) + 1) = io_apic_read(apic, 0x11 + 2 * pin);
-            spin_unlock_irqrestore(&ioapic_lock, flags);
-
+            struct IO_APIC_route_entry entry = ioapic_read_entry(apic, pin, 0);
 
             /* If the interrupt line is enabled and in ExtInt mode
              * I have found the pin where the i8259 is connected.
@@ -1292,7 +1299,6 @@ void disable_IO_APIC(void)
      */
     if (ioapic_i8259.pin != -1) {
         struct IO_APIC_route_entry entry;
-        unsigned long flags;
 
         memset(&entry, 0, sizeof(entry));
         entry.mask            = 0; /* Enabled */
@@ -1309,12 +1315,7 @@ void disable_IO_APIC(void)
         /*
          * Add it to the IO-APIC irq-routing table:
          */
-        spin_lock_irqsave(&ioapic_lock, flags);
-        io_apic_write(ioapic_i8259.apic, 0x11+2*ioapic_i8259.pin,
-                      *(((int *)&entry)+1));
-        io_apic_write(ioapic_i8259.apic, 0x10+2*ioapic_i8259.pin,
-                      *(((int *)&entry)+0));
-        spin_unlock_irqrestore(&ioapic_lock, flags);
+        ioapic_write_entry(ioapic_i8259.apic, ioapic_i8259.pin, 0, entry);
     }
     disconnect_bsp_APIC(ioapic_i8259.pin != -1);
 }
@@ -1851,17 +1852,13 @@ static inline void unlock_ExtINT_logic(void)
     int apic, pin, i;
     struct IO_APIC_route_entry entry0, entry1;
     unsigned char save_control, save_freq_select;
-    unsigned long flags;
 
     pin = find_isa_irq_pin(8, mp_INT);
     apic = find_isa_irq_apic(8, mp_INT);
     if (pin == -1)
         return;
 
-    spin_lock_irqsave(&ioapic_lock, flags);
-    *(((int *)&entry0) + 1) = io_apic_read(apic, 0x11 + 2 * pin);
-    *(((int *)&entry0) + 0) = io_apic_read(apic, 0x10 + 2 * pin);
-    spin_unlock_irqrestore(&ioapic_lock, flags);
+    entry0 = ioapic_read_entry(apic, pin, 0);
     clear_IO_APIC_pin(apic, pin);
 
     memset(&entry1, 0, sizeof(entry1));
@@ -1875,10 +1872,7 @@ static inline void unlock_ExtINT_logic(void)
     entry1.trigger = 0;
     entry1.vector = 0;
 
-    spin_lock_irqsave(&ioapic_lock, flags);
-    io_apic_write(apic, 0x11 + 2 * pin, *(((int *)&entry1) + 1));
-    io_apic_write(apic, 0x10 + 2 * pin, *(((int *)&entry1) + 0));
-    spin_unlock_irqrestore(&ioapic_lock, flags);
+    ioapic_write_entry(apic, pin, 0, entry1);
 
     save_control = CMOS_READ(RTC_CONTROL);
     save_freq_select = CMOS_READ(RTC_FREQ_SELECT);
@@ -1897,10 +1891,7 @@ static inline void unlock_ExtINT_logic(void)
     CMOS_WRITE(save_freq_select, RTC_FREQ_SELECT);
     clear_IO_APIC_pin(apic, pin);
 
-    spin_lock_irqsave(&ioapic_lock, flags);
-    io_apic_write(apic, 0x11 + 2 * pin, *(((int *)&entry0) + 1));
-    io_apic_write(apic, 0x10 + 2 * pin, *(((int *)&entry0) + 0));
-    spin_unlock_irqrestore(&ioapic_lock, flags);
+    ioapic_write_entry(apic, pin, 0, entry0);
 }
 
 int timer_uses_ioapic_pin_0;
@@ -2280,8 +2271,7 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
         disable_8259A_irq(irq);
 
     spin_lock_irqsave(&ioapic_lock, flags);
-    io_apic_write(ioapic, 0x11+2*pin, *(((int *)&entry)+1));
-    io_apic_write(ioapic, 0x10+2*pin, *(((int *)&entry)+0));
+    __ioapic_write_entry(ioapic, pin, 0, entry);
     set_native_irq_info(irq, TARGET_CPUS);
     spin_unlock_irqrestore(&ioapic_lock, flags);
 
