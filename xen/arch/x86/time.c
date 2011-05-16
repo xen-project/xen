@@ -686,8 +686,6 @@ void cstate_restore_tsc(void)
     if ( boot_cpu_has(X86_FEATURE_NONSTOP_TSC) )
         return;
 
-    ASSERT(boot_cpu_has(X86_FEATURE_TSC_RELIABLE));
-
     write_tsc(stime2tsc(read_platform_stime()));
 }
 

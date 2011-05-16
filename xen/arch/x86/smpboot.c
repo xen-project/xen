@@ -175,7 +175,12 @@ static void synchronize_tsc_slave(unsigned int slave)
         while ( atomic_read(&tsc_count) != ((i<<1)-1) )
             cpu_relax();
         rmb();
-        write_tsc(tsc_value);
+        /*
+         * If a CPU has been physically hotplugged, we may as well write
+         * to its TSC in spite of X86_FEATURE_TSC_RELIABLE. The platform does
+         * not sync up a new CPU's TSC for us.
+         */
+        __write_tsc(tsc_value);
         atomic_inc(&tsc_count);
     }
 }
