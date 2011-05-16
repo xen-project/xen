@@ -172,23 +172,14 @@ static const struct mca_error_handler *__read_mostly mce_uhandlers;
 static unsigned int __read_mostly mce_dhandler_num;
 static unsigned int __read_mostly mce_uhandler_num;
 
-enum mce_result
-{
-    MCER_NOERROR,
-    MCER_RECOVERED,
-    /* Not recoverd, but can continue */
-    MCER_CONTINUE,
-    MCER_RESET,
-};
-
 /* Maybe called in MCE context, no lock, no printk */
 static enum mce_result mce_action(struct cpu_user_regs *regs,
                       mctelem_cookie_t mctc)
 {
     struct mc_info *local_mi;
-    enum mce_result ret = MCER_NOERROR;
+    enum mce_result bank_result = MCER_NOERROR;
+    enum mce_result worst_result = MCER_NOERROR;
     struct mcinfo_common *mic = NULL;
-    struct mca_handle_result mca_res;
     struct mca_binfo binfo;
     const struct mca_error_handler *handlers = mce_dhandlers;
     unsigned int i, handler_num = mce_dhandler_num;
@@ -217,7 +208,7 @@ static enum mce_result mce_action(struct cpu_user_regs *regs,
     /* Processing bank information */
     x86_mcinfo_lookup(mic, local_mi, MC_TYPE_BANK);
 
-    for ( ; ret != MCER_RESET && mic && mic->size;
+    for ( ; bank_result != MCER_RESET && mic && mic->size;
           mic = x86_mcinfo_next(mic) )
     {
         if (mic->type != MC_TYPE_BANK) {
@@ -225,34 +216,20 @@ static enum mce_result mce_action(struct cpu_user_regs *regs,
         }
         binfo.mib = (struct mcinfo_bank*)mic;
         binfo.bank = binfo.mib->mc_bank;
-        memset(&mca_res, 0x0f, sizeof(mca_res));
+        bank_result = MCER_NOERROR;
         for ( i = 0; i < handler_num; i++ ) {
             if (handlers[i].owned_error(binfo.mib->mc_status))
             {
-                handlers[i].recovery_handler(&binfo, &mca_res);
-
-                if (mca_res.result & MCA_OWNER)
-                    binfo.mib->mc_domid = mca_res.owner;
-
-                if (mca_res.result == MCA_NEED_RESET)
-                    ret = MCER_RESET;
-                else if (mca_res.result == MCA_RECOVERED)
-                {
-                    if (ret < MCER_RECOVERED)
-                        ret = MCER_RECOVERED;
-                }
-                else if (mca_res.result == MCA_NO_ACTION)
-                {
-                    if (ret < MCER_CONTINUE)
-                        ret = MCER_CONTINUE;
-                }
+                handlers[i].recovery_handler(&binfo, &bank_result);
+                if (worst_result < bank_result)
+                    worst_result = bank_result;
                 break;
             }
         }
         ASSERT(i != handler_num);
     }
 
-    return ret;
+    return worst_result;
 }
 
 /*
@@ -608,7 +585,7 @@ struct mcinfo_recovery *mci_add_pageoff_action(int bank, struct mc_info *mi,
 
 static void intel_memerr_dhandler(
              struct mca_binfo *binfo,
-             struct mca_handle_result *result)
+             enum mce_result *result)
 {
     struct mcinfo_bank *bank = binfo->mib;
     struct mcinfo_global *global = binfo->mig;
@@ -618,7 +595,6 @@ static void intel_memerr_dhandler(
     uint64_t mc_status, mc_misc;
 
     mce_printk(MCE_VERBOSE, "MCE: Enter UCR recovery action\n");
-    result->result = MCA_NEED_RESET;
 
     mc_status = bank->mc_status;
     mc_misc = bank->mc_misc;
@@ -626,7 +602,6 @@ static void intel_memerr_dhandler(
         !(mc_status & MCi_STATUS_MISCV) ||
         ((mc_misc & MCi_MISC_ADDRMOD_MASK) != MCi_MISC_PHYSMOD) )
     {
-        result->result |= MCA_NO_ACTION;
         dprintk(XENLOG_WARNING,
             "No physical address provided for memory error\n");
         return;
@@ -644,23 +619,19 @@ static void intel_memerr_dhandler(
 
     /* This is free page */
     if (status & PG_OFFLINE_OFFLINED)
-        result->result = MCA_RECOVERED;
+        *result = MCER_RECOVERED;
     else if (status & PG_OFFLINE_PENDING) {
         /* This page has owner */
         if (status & PG_OFFLINE_OWNED) {
-            result->result |= MCA_OWNER;
-            result->owner = status >> PG_OFFLINE_OWNER_SHIFT;
+            bank->mc_domid = status >> PG_OFFLINE_OWNER_SHIFT;
             mce_printk(MCE_QUIET, "MCE: This error page is ownded"
-              " by DOM %d\n", result->owner);
-            /* Fill vMCE# injection and vMCE# MSR virtualization "
-             * "related data */
-            bank->mc_domid = result->owner;
+              " by DOM %d\n", bank->mc_domid);
             /* XXX: Cannot handle shared pages yet 
              * (this should identify all domains and gfn mapping to
              *  the mfn in question) */
-            BUG_ON( result->owner == DOMID_COW );
-            if ( result->owner != DOMID_XEN ) {
-                d = get_domain_by_id(result->owner);
+            BUG_ON( bank->mc_domid == DOMID_COW );
+            if ( bank->mc_domid != DOMID_XEN ) {
+                d = get_domain_by_id(bank->mc_domid);
                 ASSERT(d);
                 gfn = get_gpfn_from_mfn((bank->mc_addr) >> PAGE_SHIFT);
 
@@ -683,7 +654,7 @@ static void intel_memerr_dhandler(
                       global->mc_gstatus) == -1 )
                 {
                     mce_printk(MCE_QUIET, "Fill vMCE# data for DOM%d "
-                      "failed\n", result->owner);
+                      "failed\n", bank->mc_domid);
                     goto vmce_failed;
                 }
 
@@ -699,7 +670,7 @@ static void intel_memerr_dhandler(
                  * For xen, it has contained the error and finished
                  * its own recovery job.
                  */
-                result->result = MCA_RECOVERED;
+                *result = MCER_RECOVERED;
                 put_domain(d);
 
                 return;
@@ -718,11 +689,13 @@ static int intel_srao_check(uint64_t status)
 
 static void intel_srao_dhandler(
              struct mca_binfo *binfo,
-             struct mca_handle_result *result)
+             enum mce_result *result)
 {
     uint64_t status = binfo->mib->mc_status;
 
     /* For unknown srao error code, no action required */
+    *result = MCER_CONTINUE;
+
     if ( status & MCi_STATUS_VAL )
     {
         switch ( status & INTEL_MCCOD_MASK )
@@ -744,7 +717,7 @@ static int intel_default_check(uint64_t status)
 
 static void intel_default_mce_dhandler(
              struct mca_binfo *binfo,
-             struct mca_handle_result *result)
+             enum mce_result *result)
 {
     uint64_t status = binfo->mib->mc_status;
     enum intel_mce_type type;
@@ -752,9 +725,9 @@ static void intel_default_mce_dhandler(
     type = intel_check_mce_type(status);
 
     if (type == intel_mce_fatal || type == intel_mce_ucr_srar)
-        result->result = MCA_NEED_RESET;
-    else if (type == intel_mce_ucr_srao)
-        result->result = MCA_NO_ACTION;
+        *result = MCER_RESET;
+    else
+        *result = MCER_CONTINUE;
 }
 
 static const struct mca_error_handler intel_mce_dhandlers[] = {
@@ -764,7 +737,7 @@ static const struct mca_error_handler intel_mce_dhandlers[] = {
 
 static void intel_default_mce_uhandler(
              struct mca_binfo *binfo,
-             struct mca_handle_result *result)
+             enum mce_result *result)
 {
     uint64_t status = binfo->mib->mc_status;
     enum intel_mce_type type;
@@ -776,10 +749,10 @@ static void intel_default_mce_uhandler(
     /* Panic if no handler for SRAR error */
     case intel_mce_ucr_srar:
     case intel_mce_fatal:
-        result->result = MCA_NEED_RESET;
+        *result = MCER_RESET;
         break;
     default:
-        result->result = MCA_NO_ACTION;
+        *result = MCER_CONTINUE;
         break;
     }
 }

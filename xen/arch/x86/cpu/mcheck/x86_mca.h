@@ -124,36 +124,6 @@ struct mca_banks *mcabanks_alloc(void);
 void mcabanks_free(struct mca_banks *banks);
 extern struct mca_banks *mca_allbanks;
 
-/* Below interfaces are defined for MCA internal processing:
- * a. pre_handler will be called early in MCA ISR context, mainly for early
- *    need_reset detection for avoiding log missing. Also, it is used to judge
- *    impacted DOMAIN if possible.
- * b. mca_error_handler is actually a (error_action_index,
- *    recovery_hanlder pointer) pair. The defined recovery_handler
- *    performs the actual recovery operations such as page_offline, cpu_offline
- *    in softIRQ context when the per_bank MCA error matching the corresponding
- *    mca_code index. If pre_handler can't judge the impacted domain,
- *    recovery_handler must figure it out.
-*/
-
-/* MCA error has been recovered successfully by the recovery action*/
-#define MCA_RECOVERED (0x1 << 0)
-/* MCA error impact the specified DOMAIN in owner field below */
-#define MCA_OWNER (0x1 << 1)
-/* MCA error can't be recovered and need reset */
-#define MCA_NEED_RESET (0x1 << 2)
-/* MCA error did not have any action yet */
-#define MCA_NO_ACTION (0x1 << 3)
-
-struct mca_handle_result
-{
-    uint32_t result;
-    /* Used one result & MCA_OWNER */
-    domid_t owner;
-    /* Used by mca_error_handler, result & MCA_RECOVRED */
-    struct recovery_action *action;
-};
-
 /*Keep bank so that we can get staus even if mib is NULL */
 struct mca_binfo {
     int bank;
@@ -163,8 +133,14 @@ struct mca_binfo {
     struct cpu_user_regs *regs;
 };
 
-extern void (*mca_prehandler)( struct cpu_user_regs *regs,
-                        struct mca_handle_result *result);
+enum mce_result
+{
+    MCER_NOERROR,
+    MCER_RECOVERED,
+    /* Not recoverd, but can continue */
+    MCER_CONTINUE,
+    MCER_RESET,
+};
 
 struct mca_error_handler
 {
@@ -175,7 +151,7 @@ struct mca_error_handler
     */
     int (*owned_error)(uint64_t status);
     void (*recovery_handler)(struct mca_binfo *binfo,
-                    struct mca_handle_result *result);
+                    enum mce_result *result);
 };
 
 /* Global variables */
