@@ -366,7 +366,7 @@ static void printf_info(int domid,
         printf("\t\t\t(boot %s)\n", dm_info->boot);
         printf("\t\t\t(usb %d)\n", dm_info->usb);
         printf("\t\t\t(usbdevice %s)\n", dm_info->usbdevice);
-        printf("\t\t\t(apic %d)\n", dm_info->apic);
+        printf("\t\t\t(acpi %d)\n", dm_info->acpi);
         printf("\t\t)\n");
     } else {
         printf("\t\t(linux %d)\n", b_info->hvm);

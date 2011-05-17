@@ -113,7 +113,7 @@ void libxl_init_dm_info(libxl_device_model_info *dm_info,
     dm_info->device_model = NULL;
     dm_info->target_ram = libxl__sizekb_to_mb(b_info->target_memkb);
     dm_info->videoram = libxl__sizekb_to_mb(b_info->video_memkb);
-    dm_info->apic = b_info->u.hvm.apic;
+    dm_info->acpi = b_info->u.hvm.acpi;
     dm_info->vcpus = b_info->max_vcpus;
     dm_info->vcpu_avail = b_info->cur_vcpus;
 

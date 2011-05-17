@@ -217,7 +217,7 @@ libxl_device_model_info = Struct("device_model_info",[
     ("usb",              bool,              False, "usb support enabled or disabled"),
     ("usbdevice",        string,            False, "enable usb mouse: tablet for absolute mouse, mouse for PS/2 protocol relative mouse"),
     ("soundhw",          string,            False, "enable sound hardware"),
-    ("apic",             bool,              False, "apic enabled or disabled"),
+    ("acpi",             bool,              False, "acpi enabled or disabled"),
     ("vcpus",            integer,           False, "max number of vcpus"),
     ("vcpu_avail",       integer,           False, "vcpus actually available"),
     ("xen_platform_pci", bool,              False, "enable/disable the xen platform pci device"),

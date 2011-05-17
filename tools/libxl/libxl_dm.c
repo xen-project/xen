@@ -162,7 +162,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
         if (info->soundhw) {
             flexarray_vappend(dm_args, "-soundhw", info->soundhw, NULL);
         }
-        if (info->apic) {
+        if (info->acpi) {
             flexarray_append(dm_args, "-acpi");
         }
         if (info->vcpus > 1) {
@@ -315,7 +315,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
         if (info->soundhw) {
             flexarray_vappend(dm_args, "-soundhw", info->soundhw, NULL);
         }
-        if (!info->apic) {
+        if (!info->acpi) {
             flexarray_append(dm_args, "-no-acpi");
         }
         if (info->vcpus > 1) {
