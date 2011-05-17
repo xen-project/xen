@@ -1268,6 +1268,7 @@ static int preserve_domain(libxl_ctx *ctx, uint32_t domid, libxl_event *event,
 struct domain_create {
     int debug;
     int daemonize;
+    int monitor; /* handle guest reboots etc */
     int paused;
     int dryrun;
     int quiet;
@@ -1347,6 +1348,7 @@ static int create_domain(struct domain_create *dom_info)
 
     int debug = dom_info->debug;
     int daemonize = dom_info->daemonize;
+    int monitor = dom_info->monitor;
     int paused = dom_info->paused;
     const char *config_file = dom_info->config_file;
     const char *extra_config = dom_info->extra_config;
@@ -1354,7 +1356,7 @@ static int create_domain(struct domain_create *dom_info)
     int migrate_fd = dom_info->migrate_fd;
 
     int fd, i;
-    int need_daemon = 1;
+    int need_daemon = daemonize;
     int ret, rc;
     libxl_waiter *w1 = NULL, *w2 = NULL;
     void *config_data = 0;
@@ -1537,7 +1539,7 @@ start:
         libxl_domain_unpause(ctx, domid);
 
     ret = domid; /* caller gets success in parent */
-    if (!daemonize)
+    if (!daemonize && !monitor)
         goto out;
 
     if (need_daemon) {
@@ -2651,7 +2653,7 @@ static void core_dump_domain(const char *domain_spec, const char *filename)
     if (rc) { fprintf(stderr,"core dump failed (rc=%d)\n",rc);exit(-1); }
 }
 
-static void migrate_receive(int debug, int daemonize)
+static void migrate_receive(int debug, int daemonize, int monitor)
 {
     int rc, rc2;
     char rc_buf;
@@ -2672,6 +2674,7 @@ static void migrate_receive(int debug, int daemonize)
     memset(&dom_info, 0, sizeof(dom_info));
     dom_info.debug = debug;
     dom_info.daemonize = daemonize;
+    dom_info.monitor = monitor;
     dom_info.paused = 1;
     dom_info.restore_file = "incoming migration stream";
     dom_info.migrate_fd = 0; /* stdin */
@@ -2754,10 +2757,11 @@ int main_restore(int argc, char **argv)
     const char *checkpoint_file = NULL;
     const char *config_file = NULL;
     struct domain_create dom_info;
-    int paused = 0, debug = 0, daemonize = 1, console_autoconnect = 0;
+    int paused = 0, debug = 0, daemonize = 1, monitor = 1,
+        console_autoconnect = 0;
     int opt, rc;
 
-    while ((opt = def_getopt(argc, argv, "cpde", "restore", 1)) != -1) {
+    while ((opt = def_getopt(argc, argv, "Fcpde", "restore", 1)) != -1) {
         switch (opt) {
         case 0: case 2:
             return opt;
@@ -2770,8 +2774,12 @@ int main_restore(int argc, char **argv)
         case 'd':
             debug = 1;
             break;
+        case 'F':
+            daemonize = 0;
+            break;
         case 'e':
             daemonize = 0;
+            monitor = 0;
             break;
         }
     }
@@ -2789,6 +2797,7 @@ int main_restore(int argc, char **argv)
     memset(&dom_info, 0, sizeof(dom_info));
     dom_info.debug = debug;
     dom_info.daemonize = daemonize;
+    dom_info.monitor = monitor;
     dom_info.paused = paused;
     dom_info.config_file = config_file;
     dom_info.restore_file = checkpoint_file;
@@ -2804,15 +2813,19 @@ int main_restore(int argc, char **argv)
 
 int main_migrate_receive(int argc, char **argv)
 {
-    int debug = 0, daemonize = 1;
+    int debug = 0, daemonize = 1, monitor = 1;
     int opt;
 
-    while ((opt = def_getopt(argc, argv, "ed", "migrate-receive", 0)) != -1) {
+    while ((opt = def_getopt(argc, argv, "Fed", "migrate-receive", 0)) != -1) {
         switch (opt) {
         case 0: case 2:
             return opt;
+        case 'F':
+            daemonize = 0;
+            break;
         case 'e':
             daemonize = 0;
+            monitor = 0;
             break;
         case 'd':
             debug = 1;
@@ -2824,7 +2837,7 @@ int main_migrate_receive(int argc, char **argv)
         help("migrate-receive");
         return 2;
     }
-    migrate_receive(debug, daemonize);
+    migrate_receive(debug, daemonize, monitor);
     return 0;
 }
 
@@ -2864,9 +2877,9 @@ int main_migrate(int argc, char **argv)
     const char *ssh_command = "ssh";
     char *rune = NULL;
     char *host;
-    int opt, daemonize = 1, debug = 0;
+    int opt, daemonize = 1, monitor = 1, debug = 0;
 
-    while ((opt = def_getopt(argc, argv, "C:s:ed", "migrate", 2)) != -1) {
+    while ((opt = def_getopt(argc, argv, "FC:s:ed", "migrate", 2)) != -1) {
         switch (opt) {
         case 0: case 2:
             return opt;
@@ -2876,8 +2889,12 @@ int main_migrate(int argc, char **argv)
         case 's':
             ssh_command = optarg;
             break;
+        case 'F':
+            daemonize = 0;
+            break;
         case 'e':
             daemonize = 0;
+            monitor = 0;
             break;
         case 'd':
             debug = 1;
@@ -3069,7 +3086,7 @@ int main_create(int argc, char **argv)
     char extra_config[1024];
     struct domain_create dom_info;
     int paused = 0, debug = 0, daemonize = 1, console_autoconnect = 0,
-        dryrun = 0, quiet = 0;
+        dryrun = 0, quiet = 0, monitor = 1;
     int opt, rc;
     int option_index = 0;
     static struct option long_options[] = {
@@ -3086,7 +3103,7 @@ int main_create(int argc, char **argv)
     }
 
     while (1) {
-        opt = getopt_long(argc, argv, "hnqf:pcde", long_options, &option_index);
+        opt = getopt_long(argc, argv, "Fhnqf:pcde", long_options, &option_index);
         if (opt == -1)
             break;
 
@@ -3103,8 +3120,12 @@ int main_create(int argc, char **argv)
         case 'd':
             debug = 1;
             break;
+        case 'F':
+            daemonize = 0;
+            break;
         case 'e':
             daemonize = 0;
+            monitor = 0;
             break;
         case 'h':
             help("create");
@@ -3137,6 +3158,7 @@ int main_create(int argc, char **argv)
     memset(&dom_info, 0, sizeof(dom_info));
     dom_info.debug = debug;
     dom_info.daemonize = daemonize;
+    dom_info.monitor = monitor;
     dom_info.paused = paused;
     dom_info.dryrun = dryrun;
     dom_info.quiet = quiet;
