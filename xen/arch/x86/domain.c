@@ -843,6 +843,15 @@ int arch_set_info_guest(
         goto out;
     }
 
+    init_int80_direct_trap(v);
+
+    /* IOPL privileges are virtualised. */
+    v->arch.pv_vcpu.iopl = (v->arch.user_regs.eflags >> 12) & 3;
+    v->arch.user_regs.eflags &= ~X86_EFLAGS_IOPL;
+
+    /* Ensure real hardware interrupts are enabled. */
+    v->arch.user_regs.eflags |= X86_EFLAGS_IF;
+
     if ( !v->is_initialised )
     {
         v->arch.pv_vcpu.ldt_base = c(ldt_base);
@@ -850,11 +859,27 @@ int arch_set_info_guest(
     }
     else
     {
-        bool_t fail = v->arch.pv_vcpu.ctrlreg[3] != c(ctrlreg[3]);
+        unsigned long pfn = pagetable_get_pfn(v->arch.guest_table);
+        bool_t fail;
 
+        if ( !compat )
+        {
+            fail = xen_pfn_to_cr3(pfn) != c.nat->ctrlreg[3];
 #ifdef CONFIG_X86_64
-        fail |= v->arch.pv_vcpu.ctrlreg[1] != c(ctrlreg[1]);
+            if ( pagetable_is_null(v->arch.guest_table_user) )
+                fail |= c.nat->ctrlreg[1] || !(flags & VGCF_in_kernel);
+            else
+            {
+                pfn = pagetable_get_pfn(v->arch.guest_table_user);
+                fail |= xen_pfn_to_cr3(pfn) != c.nat->ctrlreg[1];
+            }
+        } else {
+            l4_pgentry_t *l4tab = __va(pfn_to_paddr(pfn));
+
+            pfn = l4e_get_pfn(*l4tab);
+            fail = compat_pfn_to_cr3(pfn) != c.cmp->ctrlreg[3];
 #endif
+        }
 
         for ( i = 0; i < ARRAY_SIZE(v->arch.pv_vcpu.gdt_frames); ++i )
             fail |= v->arch.pv_vcpu.gdt_frames[i] != c(gdt_frames[i]);
@@ -893,15 +918,6 @@ int arch_set_info_guest(
     /* Only CR0.TS is modifiable by guest or admin. */
     v->arch.pv_vcpu.ctrlreg[0] &= X86_CR0_TS;
     v->arch.pv_vcpu.ctrlreg[0] |= read_cr0() & ~X86_CR0_TS;
-
-    init_int80_direct_trap(v);
-
-    /* IOPL privileges are virtualised. */
-    v->arch.pv_vcpu.iopl = (v->arch.user_regs.eflags >> 12) & 3;
-    v->arch.user_regs.eflags &= ~X86_EFLAGS_IOPL;
-
-    /* Ensure real hardware interrupts are enabled. */
-    v->arch.user_regs.eflags |= X86_EFLAGS_IF;
 
     cr4 = v->arch.pv_vcpu.ctrlreg[4];
     v->arch.pv_vcpu.ctrlreg[4] = cr4 ? pv_guest_cr4_fixup(v, cr4) :
