@@ -390,7 +390,7 @@ static int xc_tmem_restore_new_pool(
 
 int xc_tmem_restore(xc_interface *xch, int dom, int io_fd)
 {
-    uint32_t save_max_pools, save_version;
+    uint32_t save_version;
     uint32_t this_max_pools, this_version;
     uint32_t pool_id;
     uint32_t minusone;
@@ -400,7 +400,6 @@ int xc_tmem_restore(xc_interface *xch, int dom, int io_fd)
     save_version = xc_tmem_control(xch,0,TMEMC_SAVE_GET_VERSION,dom,0,0,0,NULL);
     if ( save_version == -1 )
         return -1; /* domain doesn't exist */
-    save_max_pools = xc_tmem_control(xch,0,TMEMC_SAVE_GET_MAXPOOLS,0,0,0,0,NULL);
     if ( read_exact(io_fd, &this_version, sizeof(this_version)) )
         return -1;
     if ( read_exact(io_fd, &this_max_pools, sizeof(this_max_pools)) )
