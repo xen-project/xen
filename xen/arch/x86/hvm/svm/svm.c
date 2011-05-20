@@ -451,7 +451,14 @@ static void svm_update_guest_cr(struct vcpu *v, unsigned int cr)
         break;
     case 3:
         vmcb_set_cr3(vmcb, v->arch.hvm_vcpu.hw_cr[3]);
-        hvm_asid_flush_vcpu(v);
+        if ( !nestedhvm_enabled(v->domain) )
+            hvm_asid_flush_vcpu(v);
+        else if ( nestedhvm_vmswitch_in_progress(v) )
+            ; /* We toggle between n1asid/n2asid -> no flush required. */
+        else
+            hvm_asid_flush_vcpu_asid(
+                nestedhvm_vcpu_in_guestmode(v)
+                ? &vcpu_nestedhvm(v).nv_n2asid : &v->arch.hvm_vcpu.n1asid);
         break;
     case 4:
         value = HVM_CR4_HOST_MASK;
