@@ -189,13 +189,11 @@ static int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
         table_ptrs[nr_tables++] = (unsigned long)madt;
     }
 
-    /* HPET. */
-    if ( hpet_exists(ACPI_HPET_ADDRESS) )
-    {
-        hpet = (struct acpi_20_hpet *)&buf[offset];
-        offset += construct_hpet(hpet);
-        table_ptrs[nr_tables++] = (unsigned long)hpet;
-    }
+    /* HPET. Always included in DSDT, so always include it here too. */
+    /* (And it's unconditionally required by Windows SVVP tests.) */
+    hpet = (struct acpi_20_hpet *)&buf[offset];
+    offset += construct_hpet(hpet);
+    table_ptrs[nr_tables++] = (unsigned long)hpet;
 
     if ( battery_port_exists() ) 
     {
