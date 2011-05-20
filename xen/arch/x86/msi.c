@@ -745,17 +745,8 @@ static int __pci_enable_msi(struct msi_info *msi, struct msi_desc **desc)
 static void __pci_disable_msi(struct msi_desc *entry)
 {
     struct pci_dev *dev;
-    int pos;
-    u16 control;
-    u8 bus, slot, func;
 
     dev = entry->dev;
-    bus = dev->bus;
-    slot = PCI_SLOT(dev->devfn);
-    func = PCI_FUNC(dev->devfn);
-
-    pos = pci_find_cap_offset(bus, slot, func, PCI_CAP_ID_MSI);
-    control = pci_conf_read16(bus, slot, func, msi_control_reg(pos));
     msi_set_enable(dev, 0);
 
     BUG_ON(list_empty(&dev->msi_list));

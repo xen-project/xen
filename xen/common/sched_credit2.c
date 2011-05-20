@@ -1880,7 +1880,7 @@ static void deactivate_runqueue(struct csched_private *prv, int rqi)
 
 static void init_pcpu(const struct scheduler *ops, int cpu)
 {
-    int rqi, old_rqi, flags;
+    int rqi, flags;
     struct csched_private *prv = CSCHED_PRIV(ops);
     struct csched_runqueue_data *rqd;
     spinlock_t *old_lock;
@@ -1893,8 +1893,6 @@ static void init_pcpu(const struct scheduler *ops, int cpu)
         spin_unlock_irqrestore(&prv->lock, flags);
         return;
     }
-
-    old_rqi = prv->runq_map[cpu];
 
     /* Figure out which runqueue to put it in */
     rqi = 0;

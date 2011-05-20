@@ -437,7 +437,7 @@ void destroy_m2p_mapping(struct mem_hotadd_info *info)
 static int setup_compat_m2p_table(struct mem_hotadd_info *info)
 {
     unsigned long i, va, smap, emap, rwva, epfn = info->epfn;
-    unsigned int n, memflags;
+    unsigned int n;
     l3_pgentry_t *l3_ro_mpt = NULL;
     l2_pgentry_t *l2_ro_mpt = NULL;
     struct page_info *l1_pg;
@@ -488,8 +488,6 @@ static int setup_compat_m2p_table(struct mem_hotadd_info *info)
                 break;
         if ( n == CNT )
             continue;
-
-        memflags = MEMF_node(phys_to_nid(i << PAGE_SHIFT));
 
         l1_pg = mfn_to_page(alloc_hotadd_mfn(info));
         err = map_pages_to_xen(rwva, page_to_mfn(l1_pg),

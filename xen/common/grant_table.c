@@ -765,7 +765,6 @@ __gnttab_unmap_common(
     struct domain   *ld, *rd;
     struct active_grant_entry *act;
     s16              rc = 0;
-    u32              old_pin;
 
     ld = current->domain;
 
@@ -811,7 +810,6 @@ __gnttab_unmap_common(
     spin_lock(&rd->grant_table->lock);
 
     act = &active_entry(rd->grant_table, op->map->ref);
-    old_pin = act->pin;
 
     if ( op->frame == 0 )
     {

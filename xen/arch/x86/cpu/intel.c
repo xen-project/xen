@@ -33,8 +33,6 @@ struct movsl_mask movsl_mask __read_mostly;
  */
 static void __devinit set_cpuidmask(const struct cpuinfo_x86 *c)
 {
-	const char *extra = "";
-
 	if (!~(opt_cpuid_mask_ecx & opt_cpuid_mask_edx &
 	       opt_cpuid_mask_ext_ecx & opt_cpuid_mask_ext_edx))
 		return;
@@ -51,7 +49,6 @@ static void __devinit set_cpuidmask(const struct cpuinfo_x86 *c)
 		      opt_cpuid_mask_edx);
 		if (!~(opt_cpuid_mask_ext_ecx & opt_cpuid_mask_ext_edx))
 			return;
-		extra = "extended ";
 		break;
 /* 
  * CPU supports this feature if the processor signature meets the following:

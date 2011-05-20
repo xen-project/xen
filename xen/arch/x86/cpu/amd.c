@@ -329,7 +329,6 @@ static void check_syscfg_dram_mod_en(void)
 static void __devinit init_amd(struct cpuinfo_x86 *c)
 {
 	u32 l, h;
-	int r;
 
 #ifdef CONFIG_SMP
 	unsigned long long value;
@@ -374,8 +373,6 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 		}
 	}
 #endif
-
-	r = get_model_name(c);
 
 	switch(c->x86)
 	{

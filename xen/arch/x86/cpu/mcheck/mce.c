@@ -162,19 +162,19 @@ void mce_need_clearbank_register(mce_need_clearbank_t cbfunc)
     mc_need_clearbank_scan = cbfunc;
 }
 
-static struct mcinfo_bank *mca_init_bank(enum mca_source who,
+static void mca_init_bank(enum mca_source who,
                                          struct mc_info *mi, int bank)
 {
     struct mcinfo_bank *mib;
 
     if (!mi)
-        return NULL;
+        return;
 
     mib = x86_mcinfo_reserve(mi, sizeof(struct mcinfo_bank));
     if (!mib)
     {
         mi->flags |= MCINFO_FLAGS_UNCOMPLETE;
-        return NULL;
+        return;
     }
 
     memset(mib, 0, sizeof (struct mcinfo_bank));
@@ -207,8 +207,6 @@ static struct mcinfo_bank *mca_init_bank(enum mca_source who,
         mib->mc_ctrl2 = mca_rdmsr(MSR_IA32_MC0_CTL2 + bank);
         rdtscll(mib->mc_tsc);
     }
-
-    return mib;
 }
 
 static int mca_init_global(uint32_t flags, struct mcinfo_global *mig)
@@ -297,8 +295,6 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, struct mca_banks *bankma
     recover = (mc_recoverable_scan)? 1: 0;
 
     for (i = 0; i < nr_mce_banks; i++) {
-        struct mcinfo_bank *mib;  /* on stack */
-
         /* Skip bank if corresponding bit in bankmask is clear */
         if (!mcabanks_test(i, bankmask))
             continue;
@@ -353,7 +349,7 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, struct mca_banks *bankma
              */
             recover = mc_recoverable_scan(status);
 
-        mib = mca_init_bank(who, mci, i);
+        mca_init_bank(who, mci, i);
 
         if (mc_callback_bank_extended)
             mc_callback_bank_extended(mci, i, status);
@@ -1226,12 +1222,9 @@ static void x86_mc_msrinject(void *data)
 {
     struct xen_mc_msrinject *mci = data;
     struct mcinfo_msr *msr;
-    struct cpuinfo_x86 *c;
     uint64_t hwcr = 0;
     int intpose;
     int i;
-
-    c = &cpu_data[smp_processor_id()];
 
     if (mci->mcinj_flags & _MC_MSRINJ_F_REQ_HWCR_WREN)
         hwcr = x86_mc_hwcr_wren();

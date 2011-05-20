@@ -164,7 +164,6 @@ static int apply_microcode(int cpu)
 static int get_next_ucode_from_buffer_amd(void *mc, const void *buf,
                                          size_t size, unsigned long *offset)
 {
-    struct microcode_header_amd *mc_header;
     size_t total_size;
     const uint8_t *bufp = buf;
     unsigned long off;
@@ -181,8 +180,6 @@ static int get_next_ucode_from_buffer_amd(void *mc, const void *buf,
                "Wrong microcode payload type field\n");
         return -EINVAL;
     }
-
-    mc_header = (struct microcode_header_amd *)(&bufp[off+8]);
 
     total_size = (unsigned long) (bufp[off+4] + (bufp[off+5] << 8));
 

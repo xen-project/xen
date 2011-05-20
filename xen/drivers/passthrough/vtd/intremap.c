@@ -367,7 +367,6 @@ unsigned int io_apic_read_remap_rte(
     unsigned int ioapic_pin = (reg - 0x10) / 2;
     int index;
     struct IO_xAPIC_route_entry old_rte = { 0 };
-    struct IO_APIC_route_remap_entry *remap_rte;
     int rte_upper = (reg & 1) ? 1 : 0;
     struct iommu *iommu = ioapic_to_iommu(IO_APIC_ID(apic));
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
@@ -388,8 +387,6 @@ unsigned int io_apic_read_remap_rte(
     *(((u32 *)&old_rte) + 0) = *(IO_APIC_BASE(apic)+4);
     *IO_APIC_BASE(apic) = reg + 1;
     *(((u32 *)&old_rte) + 1) = *(IO_APIC_BASE(apic)+4);
-
-    remap_rte = (struct IO_APIC_route_remap_entry *) &old_rte;
 
     if ( remap_entry_to_ioapic_rte(iommu, index, &old_rte) )
     {
@@ -850,10 +847,7 @@ int iommu_enable_x2apic_IR(void)
 
     for_each_drhd_unit ( drhd )
     {
-        struct qi_ctrl *qi_ctrl = NULL;
-
         iommu = drhd->iommu;
-        qi_ctrl = iommu_qi_ctrl(iommu);
 
         /* Clear previous faults */
         clear_fault_bits(iommu);

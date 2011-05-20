@@ -376,10 +376,8 @@ int mem_sharing_debug_gfn(struct domain *d, unsigned long gfn)
 {
     p2m_type_t p2mt;
     mfn_t mfn;
-    struct page_info *page;
 
     mfn = gfn_to_mfn(p2m_get_hostp2m(d), gfn, &p2mt);
-    page = mfn_to_page(mfn);
 
     printk("Debug for domain=%d, gfn=%lx, ", 
             d->domain_id, 
