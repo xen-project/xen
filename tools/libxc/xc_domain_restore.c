@@ -1087,7 +1087,6 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     int vcpuextstate = 0;
     uint32_t vcpuextstate_size = 0;
     unsigned long mfn, pfn;
-    unsigned int prev_pc;
     int nraces = 0;
 
     /* The new domain's shared-info frame number. */
@@ -1255,7 +1254,6 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
      * Now simply read each saved frame into its new machine frame.
      * We uncanonicalise page tables as we go.
      */
-    prev_pc = 0;
 
     n = m = 0;
  loadpages:
