@@ -273,8 +273,6 @@ static void acpi_processor_ffh_cstate_enter(struct acpi_processor_cx *cx)
 
 static void acpi_idle_do_entry(struct acpi_processor_cx *cx)
 {
-    int unused;
-
     switch ( cx->entry_method )
     {
     case ACPI_CSTATE_EM_FFH:
@@ -287,7 +285,7 @@ static void acpi_idle_do_entry(struct acpi_processor_cx *cx)
         /* Dummy wait op - must do something useless after P_LVL2 read
            because chipsets cannot guarantee that STPCLK# signal
            gets asserted in time to freeze execution properly. */
-        unused = inl(pmtmr_ioport);
+        inl(pmtmr_ioport);
         return;
     case ACPI_CSTATE_EM_HALT:
         safe_halt();
