@@ -454,7 +454,7 @@ static void svm_update_guest_cr(struct vcpu *v, unsigned int cr)
         if ( !nestedhvm_enabled(v->domain) )
             hvm_asid_flush_vcpu(v);
         else if ( nestedhvm_vmswitch_in_progress(v) )
-            ; /* We toggle between n1asid/n2asid -> no flush required. */
+            ; /* CR3 switches during VMRUN/VMEXIT do not flush the TLB. */
         else
             hvm_asid_flush_vcpu_asid(
                 nestedhvm_vcpu_in_guestmode(v)
