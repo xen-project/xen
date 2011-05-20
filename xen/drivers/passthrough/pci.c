@@ -173,11 +173,11 @@ out:
 
 int pci_remove_device(u8 bus, u8 devfn)
 {
-    struct pci_dev *pdev;
+    struct pci_dev *pdev, *tmp;
     int ret = -ENODEV;
 
     spin_lock(&pcidevs_lock);
-    list_for_each_entry ( pdev, &alldevs_list, alldevs_list )
+    list_for_each_entry_safe ( pdev, tmp, &alldevs_list, alldevs_list )
         if ( pdev->bus == bus && pdev->devfn == devfn )
         {
             ret = iommu_remove_device(pdev);
