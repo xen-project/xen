@@ -411,7 +411,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
 
     ret = libxl__domain_make(gc, &d_config->c_info, &domid);
     if (ret) {
-        fprintf(stderr, "cannot make domain: %d\n", ret);
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "cannot make domain: %d", ret);
         ret = ERROR_FAIL;
         goto error_out;
     }
@@ -424,7 +424,8 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     if ( restore_fd < 0 ) {
         ret = libxl_run_bootloader(ctx, &d_config->b_info, d_config->num_disks > 0 ? &d_config->disks[0] : NULL, domid);
         if (ret) {
-            fprintf(stderr, "failed to run bootloader: %d\n", ret);
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                       "failed to run bootloader: %d", ret);
             goto error_out;
         }
     }
@@ -440,7 +441,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     }
 
     if (ret) {
-        fprintf(stderr, "cannot (re-)build domain: %d\n", ret);
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "cannot (re-)build domain: %d", ret);
         ret = ERROR_FAIL;
         goto error_out;
     }
@@ -448,7 +449,8 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     for (i = 0; i < d_config->num_disks; i++) {
         ret = libxl_device_disk_add(ctx, domid, &d_config->disks[i]);
         if (ret) {
-            fprintf(stderr, "cannot add disk %d to domain: %d\n", i, ret);
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                       "cannot add disk %d to domain: %d", i, ret);
             ret = ERROR_FAIL;
             goto error_out;
         }
@@ -456,7 +458,8 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     for (i = 0; i < d_config->num_vifs; i++) {
         ret = libxl_device_nic_add(ctx, domid, &d_config->vifs[i]);
         if (ret) {
-            fprintf(stderr, "cannot add nic %d to domain: %d\n", i, ret);
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                       "cannot add nic %d to domain: %d", i, ret);
             ret = ERROR_FAIL;
             goto error_out;
         }
@@ -476,8 +479,8 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
                                         d_config->vifs, d_config->num_vifs,
                                         &dm_starting);
         if (ret < 0) {
-            fprintf(stderr,"xl: fatal error: %s:%d, rc=%d: libxl__create_device_model\n",
-                    __FILE__,__LINE__, ret);
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                       "failed to create device model: %d", ret);
             goto error_out;
         }
     } else {
@@ -510,8 +513,8 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     if (dm_starting) {
         ret = libxl__confirm_device_model_startup(gc, dm_starting);
         if (ret < 0) {
-            fprintf(stderr,"xl: fatal error: %s:%d, rc=%d: libxl__confirm_device_model_startup\n",
-                    __FILE__,__LINE__, ret);
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                       "device model did not start: %d", ret);
             goto error_out;
         }
     }
