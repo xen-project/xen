@@ -66,8 +66,12 @@ install-xen:
 	$(MAKE) -C xen install
 
 .PHONY: install-tools
-install-tools: tools/ioemu-dir
+install-tools:
 	$(MAKE) -C tools install
+
+ifeq ($(CONFIG_IOEMU),y)
+install-tools: tools/ioemu-dir
+endif
 
 .PHONY: install-kernels
 install-kernels:
