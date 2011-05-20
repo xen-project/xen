@@ -345,6 +345,7 @@ static void xc_cpuid_pv_policy(
         clear_bit(X86_FEATURE_NODEID_MSR, regs[2]);
         clear_bit(X86_FEATURE_TOPOEXT, regs[2]);
         break;
+    case 0xd: /* XSAVE */
     case 5: /* MONITOR/MWAIT */
     case 0xa: /* Architectural Performance Monitor Features */
     case 0x8000000a: /* SVM revision and features */
