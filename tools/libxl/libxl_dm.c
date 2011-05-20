@@ -773,7 +773,7 @@ int libxl__create_device_model(libxl__gc *gc,
     path = libxl__sprintf(gc, "/local/domain/%d/hvmloader", info->domid);
     xs_mkdir(ctx->xsh, XBT_NULL, path);
     libxl__xs_write(gc, XBT_NULL, libxl__sprintf(gc, "%s/bios", path),
-                    libxl__domain_bios(gc, info));
+                    "%s", libxl__domain_bios(gc, info));
 
     path = libxl__sprintf(gc, "/local/domain/0/device-model/%d", info->domid);
     xs_mkdir(ctx->xsh, XBT_NULL, path);
