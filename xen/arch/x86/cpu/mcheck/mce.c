@@ -940,10 +940,11 @@ void x86_mcinfo_dump(struct mc_info *mi)
         printk(XENLOG_WARNING
                "CPU%d: Machine Check Exception: %16"PRIx64"\n",
                mc_global->mc_coreid, mc_global->mc_gstatus);
-    } else {
-        printk(XENLOG_WARNING "MCE: The hardware reports a non "
-               "fatal, correctable incident occurred on "
-               "CPU %d.\n",
+    } else if (mc_global->mc_flags & MC_FLAG_CMCI) {
+        printk(XENLOG_WARNING "CMCI occurred on CPU %d.\n", 
+               mc_global->mc_coreid);
+    } else if (mc_global->mc_flags & MC_FLAG_POLLED) {
+        printk(XENLOG_WARNING "POLLED occurred on CPU %d.\n",
                mc_global->mc_coreid);
     }
 
