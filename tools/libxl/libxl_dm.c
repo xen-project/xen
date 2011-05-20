@@ -97,7 +97,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
     if (info->dom_name)
         flexarray_vappend(dm_args, "-domain-name", info->dom_name, NULL);
 
-    if (info->vnc || info->vncdisplay || info->vnclisten || info->vncunused) {
+    if (info->vnc) {
         char *vncarg;
         if (info->vncdisplay) {
             if (info->vnclisten && strchr(info->vnclisten, ':') == NULL) {
@@ -252,7 +252,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     if (info->dom_name) {
         flexarray_vappend(dm_args, "-name", info->dom_name, NULL);
     }
-    if (info->vnc || info->vncdisplay || info->vnclisten || info->vncunused) {
+    if (info->vnc) {
         int display = 0;
         const char *listen = "127.0.0.1";
 
