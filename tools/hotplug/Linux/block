@@ -280,8 +280,8 @@ mount it read-write in a guest domain."
           fi
 
           shared_list=$(losetup -a |
-                sed -n -e "s@^\([^:]\+\)\(:[[:blank:]]\[${dev}\]:${inode}[[:blank:]](${file})\)@\1@p" )
-          for dev in "$shared_list"
+                sed -n -e "s@^\([^:]\+\)\(:[[:blank:]]\[${dev}\]:${inode}[[:blank:]](.*)\)@\1@p" )
+          for dev in $shared_list
           do
             if [ -n "$dev" ]
             then
