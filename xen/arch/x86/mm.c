@@ -101,6 +101,7 @@
 #include <xen/guest_access.h>
 #include <xen/pfn.h>
 #include <xen/xmalloc.h>
+#include <xen/grant_table.h>
 #include <asm/paging.h>
 #include <asm/shadow.h>
 #include <asm/page.h>

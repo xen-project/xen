@@ -23,17 +23,11 @@
  */
 
 #include <xen/config.h>
+#include <xen/xenoprof.h>
+#include <xen/hvm/save.h>
 #include <xen/sched.h>
-#include <asm/system.h>
-#include <asm/regs.h>
-#include <asm/types.h>
 #include <asm/apic.h>
-#include <asm/msr.h>
-#include <asm/msr-index.h>
-#include <asm/hvm/support.h>
 #include <asm/hvm/vlapic.h>
-#include <public/sched.h>
-#include <public/hvm/save.h>
 #include <asm/hvm/vpmu.h>
 
 #define F10H_NUM_COUNTERS 4

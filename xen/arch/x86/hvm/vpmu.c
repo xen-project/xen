@@ -21,14 +21,13 @@
 
 #include <xen/config.h>
 #include <xen/sched.h>
+#include <xen/xenoprof.h>
 #include <asm/regs.h>
 #include <asm/types.h>
 #include <asm/msr.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/vmx/vmx.h>
 #include <asm/hvm/vmx/vmcs.h>
-#include <public/sched.h>
-#include <public/hvm/save.h>
 #include <asm/hvm/vpmu.h>
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/svm/vmcb.h>

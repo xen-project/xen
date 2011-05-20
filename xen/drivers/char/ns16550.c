@@ -13,6 +13,8 @@
 #include <xen/init.h>
 #include <xen/irq.h>
 #include <xen/sched.h>
+#include <xen/pci.h>
+#include <xen/timer.h>
 #include <xen/serial.h>
 #include <xen/iocap.h>
 #include <asm/io.h>

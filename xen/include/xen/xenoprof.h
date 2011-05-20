@@ -11,6 +11,7 @@
 #define __XEN_XENOPROF_H__
 
 #include <xen/config.h>
+#include <xen/inttypes.h>
 #include <public/xenoprof.h>
 #include <asm/xenoprof.h>
 

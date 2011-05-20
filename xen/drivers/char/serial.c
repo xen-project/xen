@@ -9,11 +9,9 @@
 #include <xen/config.h>
 #include <xen/delay.h>
 #include <xen/init.h>
-#include <xen/irq.h>
-#include <xen/keyhandler.h> 
-#include <xen/sched.h>
 #include <xen/mm.h>
 #include <xen/serial.h>
+#include <xen/cache.h>
 
 /* Never drop characters, even if the async transmit buffer fills. */
 /* #define SERIAL_NEVER_DROP_CHARS 1 */

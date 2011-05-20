@@ -7,8 +7,7 @@
 #ifndef __CONSOLE_H__
 #define __CONSOLE_H__
 
-#include <xen/spinlock.h>
-#include <xen/guest_access.h>
+#include <xen/inttypes.h>
 #include <public/xen.h>
 
 struct xen_sysctl_readconsole;

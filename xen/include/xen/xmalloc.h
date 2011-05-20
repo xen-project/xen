@@ -2,6 +2,9 @@
 #ifndef __XMALLOC_H__
 #define __XMALLOC_H__
 
+#include <xen/types.h>
+#include <xen/cache.h>
+
 /*
  * Xen malloc/free-style interface.
  */

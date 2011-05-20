@@ -20,13 +20,9 @@
 #define __ASM_X86_HVM_SVM_ASID_H__
 
 #include <xen/config.h>
-#include <asm/types.h>
-#include <asm/hvm/hvm.h>
+#include <xen/types.h>
 #include <asm/hvm/asid.h>
-#include <asm/hvm/support.h>
-#include <asm/hvm/svm/svm.h>
-#include <asm/hvm/svm/vmcb.h>
-#include <asm/percpu.h>
+#include <asm/processor.h>
 
 void svm_asid_init(struct cpuinfo_x86 *c);
 

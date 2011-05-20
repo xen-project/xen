@@ -42,6 +42,8 @@ enum instruction_index {
     INSTR_MAX_COUNT /* Must be last - Number of instructions supported */
 };
 
+struct vcpu;
+
 int __get_instruction_length_from_list(
     struct vcpu *v, enum instruction_index *list, unsigned int list_count);
 

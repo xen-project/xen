@@ -6,18 +6,10 @@
  * - Magnus Damm <magnus@valinux.co.jp>
  */
 
-#include <xen/lib.h>
-#include <asm/irq.h>
-#include <asm/page.h>
-#include <asm/flushtlb.h>
-#include <xen/smp.h>
-#include <xen/nmi.h>
 #include <xen/types.h>
-#include <xen/console.h>
 #include <xen/kexec.h>
-#include <xen/domain_page.h>
+#include <xen/guest_access.h>
 #include <asm/fixmap.h>
-#include <asm/hvm/hvm.h>
 #include <asm/hpet.h>
 
 typedef void (*relocate_new_kernel_t)(

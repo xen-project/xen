@@ -10,6 +10,7 @@
 #define _XEN_VGA_H
 
 #include <xen/config.h>
+#include <public/xen.h>
 
 #ifdef CONFIG_VGA
 extern struct xen_vga_console_info vga_console_info;

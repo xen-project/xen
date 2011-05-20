@@ -10,6 +10,7 @@
 
 #include <xen/types.h>
 #include <xen/list.h>
+#include <xen/percpu.h>
 
 struct tasklet
 {

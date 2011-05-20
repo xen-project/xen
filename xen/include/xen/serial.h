@@ -9,6 +9,8 @@
 #ifndef __XEN_SERIAL_H__
 #define __XEN_SERIAL_H__
 
+#include <xen/spinlock.h>
+
 struct cpu_user_regs;
 
 /* Register a character-receive hook on the specified COM port. */

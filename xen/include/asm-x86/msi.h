@@ -2,6 +2,8 @@
 #define __ASM_MSI_H
 
 #include <xen/cpumask.h>
+#include <xen/pci.h>
+
 /*
  * Constants for Intel APIC based MSI messages.
  */

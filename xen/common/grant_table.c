@@ -31,6 +31,7 @@
 #include <xen/mm.h>
 #include <xen/event.h>
 #include <xen/trace.h>
+#include <xen/grant_table.h>
 #include <xen/guest_access.h>
 #include <xen/domain_page.h>
 #include <xen/iommu.h>

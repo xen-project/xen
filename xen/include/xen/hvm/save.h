@@ -18,9 +18,9 @@
 #ifndef __XEN_HVM_SAVE_H__
 #define __XEN_HVM_SAVE_H__
 
+#include <xen/types.h>
 #include <public/xen.h>
 #include <public/hvm/save.h>
-#include <asm/types.h>
 
 /* Marshalling and unmarshalling uses a buffer with size and cursor. */
 typedef struct hvm_domain_context {

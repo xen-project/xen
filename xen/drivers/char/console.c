@@ -10,31 +10,20 @@
  *     Ported to Xen - Steven Rostedt - Red Hat
  */
 
-#include <xen/stdarg.h>
-#include <xen/config.h>
 #include <xen/version.h>
-#include <xen/init.h>
 #include <xen/lib.h>
-#include <xen/errno.h>
 #include <xen/event.h>
-#include <xen/spinlock.h>
 #include <xen/console.h>
 #include <xen/serial.h>
 #include <xen/softirq.h>
-#include <xen/tasklet.h>
 #include <xen/keyhandler.h>
-#include <xen/mm.h>
 #include <xen/delay.h>
 #include <xen/guest_access.h>
 #include <xen/shutdown.h>
 #include <xen/vga.h>
 #include <xen/kexec.h>
-#include <asm/current.h>
 #include <asm/debugger.h>
-#include <asm/io.h>
 #include <asm/div64.h>
-#include <xsm/xsm.h>
-#include <public/sysctl.h>
 #include <xen/hypercall.h> /* for do_console_io */
 
 /* console: comma-separated list of console outputs. */

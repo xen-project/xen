@@ -21,10 +21,10 @@
 #ifndef __ASM_X86_HVM_SUPPORT_H__
 #define __ASM_X86_HVM_SUPPORT_H__
 
+#include <xen/types.h>
+#include <public/hvm/ioreq.h>
 #include <xen/sched.h>
 #include <xen/hvm/save.h>
-#include <asm/types.h>
-#include <asm/regs.h>
 #include <asm/processor.h>
 
 static inline ioreq_t *get_ioreq(struct vcpu *v)

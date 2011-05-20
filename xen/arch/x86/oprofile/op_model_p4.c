@@ -13,7 +13,7 @@
 #include <asm/io.h>
 #include <asm/apic.h>
 #include <asm/processor.h>
-#include <xen/sched.h>
+#include <xen/xenoprof.h>
 #include <asm/regs.h>
 #include <asm/current.h>
 

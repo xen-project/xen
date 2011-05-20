@@ -12,6 +12,7 @@
 #include <xen/shutdown.h>
 #include <xen/nmi.h>
 #include <xen/cpu.h>
+#include <xen/guest_access.h>
 #include <asm/current.h>
 #include <asm/flushtlb.h>
 #include <asm/traps.h>

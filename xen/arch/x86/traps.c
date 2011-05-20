@@ -33,6 +33,7 @@
 #include <xen/mm.h>
 #include <xen/console.h>
 #include <xen/shutdown.h>
+#include <xen/guest_access.h>
 #include <asm/regs.h>
 #include <xen/delay.h>
 #include <xen/event.h>

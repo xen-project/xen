@@ -20,8 +20,9 @@
 #ifndef __ASM_X86_HVM_SVM_VMCB_H__
 #define __ASM_X86_HVM_SVM_VMCB_H__
 
-#include <asm/config.h>
-#include <asm/hvm/hvm.h>
+#include <xen/config.h>
+#include <xen/types.h>
+#include <asm/hvm/emulate.h>
 
 
 /* general 1 intercepts */

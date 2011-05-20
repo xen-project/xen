@@ -26,6 +26,7 @@
 #include <xen/softirq.h>
 #include <xen/hypercall.h>
 #include <xen/domain_page.h>
+#include <xen/xenoprof.h>
 #include <asm/current.h>
 #include <asm/io.h>
 #include <asm/paging.h>
@@ -38,6 +39,7 @@
 #include <asm/types.h>
 #include <asm/debugreg.h>
 #include <asm/msr.h>
+#include <asm/i387.h>
 #include <asm/spinlock.h>
 #include <asm/hvm/emulate.h>
 #include <asm/hvm/hvm.h>

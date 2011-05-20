@@ -7,10 +7,10 @@
 #include <xen/config.h>
 #include <xen/init.h>
 #include <xen/lib.h>
-#include <xen/mm.h>
-#include <xen/errno.h>
-#include <xen/console.h>
+#include <xen/xmalloc.h>
+#include <xen/kernel.h>
 #include <xen/vga.h>
+#include <asm/page.h>
 #include "font.h"
 
 #define vlfb_info    vga_console_info.u.vesa_lfb

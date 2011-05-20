@@ -21,13 +21,8 @@
 #ifndef __ASM_X86_HVM_SVM_H__
 #define __ASM_X86_HVM_SVM_H__
 
-#include <xen/sched.h>
-#include <asm/types.h>
-#include <asm/regs.h>
-#include <asm/processor.h>
-#include <asm/hvm/svm/vmcb.h>
-#include <asm/i387.h>
-#include <asm/hvm/vpmu.h>
+#include <xen/types.h>
+#include <xen/bitmap.h>
 
 #define SVM_REG_EAX (0) 
 #define SVM_REG_ECX (1) 

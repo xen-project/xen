@@ -20,16 +20,17 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <xen/types.h>
+#include <xen/domain_page.h>
+#include <xen/spinlock.h>
+#include <xen/mm.h>
+#include <xen/grant_table.h>
+#include <xen/sched.h>
 #include <asm/page.h>
 #include <asm/string.h>
 #include <asm/p2m.h>
 #include <asm/mem_event.h>
 #include <asm/atomic.h>
-#include <xen/domain_page.h>
-#include <xen/types.h>
-#include <xen/spinlock.h>
-#include <xen/mm.h>
-#include <xen/sched.h>
 
 /* Auditing of memory sharing code? */
 #define MEM_SHARING_AUDIT  0

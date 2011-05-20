@@ -13,12 +13,12 @@
 #define _ASM_FIXMAP_H
 
 #include <xen/config.h>
-#include <asm/apicdef.h>
-#include <asm/acpi.h>
-#include <asm/page.h>
 #include <xen/pfn.h>
 #include <xen/kexec.h>
 #include <xen/iommu.h>
+#include <asm/apicdef.h>
+#include <asm/acpi.h>
+#include <asm/page.h>
 #include <asm/amd-iommu.h>
 #include <asm/msi.h>
 #include <acpi/apei.h>

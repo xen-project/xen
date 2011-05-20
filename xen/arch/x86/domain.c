@@ -34,6 +34,7 @@
 #include <xen/paging.h>
 #include <xen/cpu.h>
 #include <xen/wait.h>
+#include <xen/guest_access.h>
 #include <public/sysctl.h>
 #include <asm/regs.h>
 #include <asm/mc146818rtc.h>

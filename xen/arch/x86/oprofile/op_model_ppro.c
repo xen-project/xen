@@ -11,11 +11,12 @@
  */
 
 #include <xen/types.h>
+#include <xen/xenoprof.h>
+#include <xen/sched.h>
 #include <asm/msr.h>
 #include <asm/io.h>
 #include <asm/apic.h>
 #include <asm/processor.h>
-#include <xen/sched.h>
 #include <asm/regs.h>
 #include <asm/current.h>
 #include <asm/hvm/vpmu.h>

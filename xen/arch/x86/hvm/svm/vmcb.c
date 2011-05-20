@@ -20,24 +20,17 @@
 
 #include <xen/config.h>
 #include <xen/init.h>
-#include <xen/mm.h>
 #include <xen/lib.h>
-#include <xen/errno.h>
-#include <asm/cpufeature.h>
-#include <asm/processor.h>
-#include <asm/msr.h>
+#include <xen/keyhandler.h>
+#include <xen/mm.h>
+#include <xen/rcupdate.h>
+#include <xen/sched.h>
+#include <asm/hvm/svm/vmcb.h>
+#include <asm/msr-index.h>
 #include <asm/p2m.h>
-#include <asm/hvm/hvm.h>
-#include <asm/hvm/io.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/svm/svm.h>
-#include <asm/hvm/svm/intr.h>
-#include <asm/hvm/svm/asid.h>
 #include <asm/hvm/svm/svmdebug.h>
-#include <xen/event.h>
-#include <xen/kernel.h>
-#include <xen/domain_page.h>
-#include <xen/keyhandler.h>
 
 extern int svm_dbg_on;
 

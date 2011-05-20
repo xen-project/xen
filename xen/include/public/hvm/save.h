@@ -67,6 +67,7 @@ struct hvm_save_descriptor {
     struct __HVM_SAVE_TYPE_##_x { _type t; char c[_code]; char cpt[2];}; \
     struct __HVM_SAVE_TYPE_COMPAT_##_x { _ctype t; }                   
 
+# include <xen/lib.h> /* BUG() */
 # define DECLARE_HVM_SAVE_TYPE(_x, _code, _type)                         \
     static inline int __HVM_SAVE_FIX_COMPAT_##_x(void *h) { BUG(); return -1; } \
     struct __HVM_SAVE_TYPE_##_x { _type t; char c[_code]; char cpt[1];}; \

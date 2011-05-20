@@ -21,6 +21,7 @@
 
 #include <xen/config.h>
 #include <xen/sched.h>
+#include <xen/xenoprof.h>
 #include <asm/system.h>
 #include <asm/regs.h>
 #include <asm/types.h>

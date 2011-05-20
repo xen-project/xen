@@ -8,8 +8,6 @@
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
-#include <xen/errno.h>
-#include <xen/console.h>
 #include <xen/vga.h>
 #include <asm/io.h>
 

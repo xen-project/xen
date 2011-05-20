@@ -13,6 +13,7 @@
 #include <xen/guest_access.h>
 #include <xen/sched.h>
 #include <xen/event.h>
+#include <xen/xenoprof.h>
 #include <public/xenoprof.h>
 #include <xen/paging.h>
 #include <xsm/xsm.h>
