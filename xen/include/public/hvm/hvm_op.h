@@ -76,6 +76,12 @@ DEFINE_XEN_GUEST_HANDLE(xen_hvm_set_pci_link_route_t);
 /* Flushes all VCPU TLBs: @arg must be NULL. */
 #define HVMOP_flush_tlbs          5
 
+typedef enum {
+    HVMMEM_ram_rw,             /* Normal read/write guest RAM */
+    HVMMEM_ram_ro,             /* Read-only; writes are discarded */
+    HVMMEM_mmio_dm,            /* Reads and write go to the device model */
+} hvmmem_type_t;
+
 /* Following tools-only interfaces may change in future. */
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
 
@@ -109,11 +115,6 @@ typedef struct xen_hvm_modified_memory xen_hvm_modified_memory_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_modified_memory_t);
 
 #define HVMOP_set_mem_type    8
-typedef enum {
-    HVMMEM_ram_rw,             /* Normal read/write guest RAM */
-    HVMMEM_ram_ro,             /* Read-only; writes are discarded */
-    HVMMEM_mmio_dm,            /* Reads and write go to the device model */
-} hvmmem_type_t;
 /* Notify that a region of memory is to be treated in a specific way. */
 struct xen_hvm_set_mem_type {
     /* Domain to be updated. */
@@ -224,5 +225,19 @@ typedef struct xen_hvm_inject_trap xen_hvm_inject_trap_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_inject_trap_t);
 
 #endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */
+
+#define HVMOP_get_mem_type    15
+/* Return hvmmem_type_t for the specified pfn. */
+struct xen_hvm_get_mem_type {
+    /* Domain to be queried. */
+    domid_t domid;
+    /* OUT variable. */
+    uint16_t mem_type;
+    uint16_t pad[2]; /* align next field on 8-byte boundary */
+    /* IN variable. */
+    uint64_t pfn;
+};
+typedef struct xen_hvm_get_mem_type xen_hvm_get_mem_type_t;
+DEFINE_XEN_GUEST_HANDLE(xen_hvm_get_mem_type_t);
 
 #endif /* __XEN_PUBLIC_HVM_HVM_OP_H__ */
