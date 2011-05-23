@@ -158,7 +158,10 @@ int pci_add_device(u8 bus, u8 devfn)
         pdev->domain = dom0;
         ret = iommu_add_device(pdev);
         if ( ret )
+        {
+            pdev->domain = NULL;
             goto out;
+        }
 
         list_add(&pdev->domain_list, &dom0->arch.pdev_list);
         pci_enable_acs(pdev);
@@ -222,7 +225,10 @@ int pci_add_device_ext(u8 bus, u8 devfn, struct pci_dev_info *info)
         pdev->domain = dom0;
         ret = iommu_add_device(pdev);
         if ( ret )
+        {
+            pdev->domain = NULL;
             goto out;
+        }
 
         list_add(&pdev->domain_list, &dom0->arch.pdev_list);
         pci_enable_acs(pdev);
