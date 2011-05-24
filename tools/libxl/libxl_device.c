@@ -445,6 +445,8 @@ int libxl__wait_for_device_model(libxl__gc *gc,
         if ( starting ) {
             rc = libxl__spawn_check(gc, starting->for_spawn);
             if ( rc ) {
+                LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                           "Device Model died during startup");
                 rc = -1;
                 goto err_died;
             }
@@ -487,10 +489,10 @@ again:
             }
         }
     }
+    LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Device Model not ready");
 err_died:
     xs_unwatch(xsh, path, path);
     xs_daemon_close(xsh);
-    LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Device Model not ready");
 err:
     return -1;
 }
