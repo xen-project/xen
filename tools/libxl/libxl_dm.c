@@ -762,7 +762,12 @@ int libxl__create_device_model(libxl__gc *gc,
         rc = ERROR_FAIL;
         goto out;
     }
-
+    if (access(dm, X_OK) < 0) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                         "device model %s is not executable", dm);
+        rc = ERROR_FAIL;
+        goto out;
+    }
     args = libxl__build_device_model_args(gc, dm, info, disks, num_disks,
                                           vifs, num_vifs);
     if (!args) {
