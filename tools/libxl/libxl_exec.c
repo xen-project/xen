@@ -36,20 +36,72 @@ static int call_waitpid(pid_t (*waitpid_cb)(pid_t, int *, int), pid_t pid, int *
     return (waitpid_cb) ? waitpid_cb(pid, status, options) : waitpid(pid, status, options);
 }
 
+static void check_open_fds(const char *what)
+{
+    const char *env_debug;
+    int debug;
+    int i, flags, badness = 0;
+    char path[PATH_MAX];
+    char link[PATH_MAX+1];
+
+    env_debug = getenv("_LIBXL_DEBUG_EXEC_FDS");
+    if (!env_debug) return;
+
+    debug = strtol(env_debug, (char **) NULL, 10);atoi(env_debug);
+    if (debug <= 0) return;
+
+    for (i = 4; i < 256; i++) {
+#ifdef __linux__
+        size_t len;
+#endif
+        flags = fcntl(i, F_GETFD);
+        if ( flags == -1 ) {
+            if ( errno != EBADF )
+                fprintf(stderr, "libxl: execing %s: fd %d flags returned %s (%d)\n",
+                        what, i, strerror(errno), errno);
+            continue;
+        }
+
+        if ( flags & FD_CLOEXEC )
+            continue;
+
+        badness++;
+
+#ifdef __linux__
+        snprintf(path, PATH_MAX, "/proc/%d/fd/%d", getpid(), i);
+        len = readlink(path, link, PATH_MAX);
+        if (len > 0) {
+            link[len] = '\0';
+            fprintf(stderr, "libxl: execing %s: fd %d is open to %s with flags %#x\n",
+                    what, i, link, flags);
+        } else
+#endif
+            fprintf(stderr, "libxl: execing %s: fd %d is open with flags %#x\n",
+                    what, i, flags);
+    }
+    if (debug < 2) return;
+    if (badness) abort();
+}
+
 void libxl__exec(int stdinfd, int stdoutfd, int stderrfd, const char *arg0,
                 char **args)
      /* call this in the child */
 {
-    int i;
-
     if (stdinfd != -1)
         dup2(stdinfd, STDIN_FILENO);
     if (stdoutfd != -1)
         dup2(stdoutfd, STDOUT_FILENO);
     if (stderrfd != -1)
         dup2(stderrfd, STDERR_FILENO);
-    for (i = 4; i < 256; i++)
-        close(i);
+
+    if (stdinfd != -1)
+        close(stdinfd);
+    if (stdoutfd != -1 && stdoutfd != stdinfd)
+        close(stdoutfd);
+    if (stderrfd != -1 && stderrfd != stdinfd && stderrfd != stdoutfd)
+        close(stderrfd);
+
+    check_open_fds(arg0);
 
     signal(SIGPIPE, SIG_DFL);
     /* in case our caller set it to IGN.  subprocesses are entitled
@@ -148,6 +200,7 @@ int libxl__spawn_spawn(libxl__gc *gc,
     }
 
     /* we are now the intermediate process */
+    if (for_spawn) close(pipes[0]);
 
     child = fork();
     if (child == -1)

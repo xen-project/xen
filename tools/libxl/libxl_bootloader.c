@@ -115,6 +115,7 @@ static int open_xenconsoled_pty(int *master, int *slave, char *slave_path, size_
 #endif
 
     fcntl(*master, F_SETFL, O_NDELAY);
+    fcntl(*master, F_SETFD, FD_CLOEXEC);
 
     return 0;
 }
@@ -393,6 +394,9 @@ int libxl_run_bootloader(libxl_ctx *ctx,
     }
 
     while (1) {
+        if (waitpid(pid, &blrc, WNOHANG) == pid)
+            goto out_close;
+
         fifo_fd = open(fifo, O_RDONLY);
         if (fifo_fd > -1)
             break;
