@@ -375,7 +375,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     flexarray_append(dm_args, libxl__sprintf(gc, "%d", info->target_ram));
 
     if (info->type == LIBXL_DOMAIN_TYPE_FV) {
-        for (i; i < num_disks; i++) {
+        for (i = 0; i < num_disks; i++) {
             int disk, part;
             int dev_number =
                 libxl__device_disk_dev_number(disks[i].vdev, &disk, &part);
