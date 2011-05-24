@@ -88,7 +88,9 @@ static int loadelfimage(
     struct elf_binary *elf, uint32_t dom, unsigned long *parray)
 {
     privcmd_mmap_entry_t *entries = NULL;
-    size_t pages = (elf->pend - elf->pstart + PAGE_SIZE - 1) >> PAGE_SHIFT;
+    unsigned long pfn_start = elf->pstart >> PAGE_SHIFT;
+    unsigned long pfn_end = (elf->pend + PAGE_SIZE - 1) >> PAGE_SHIFT;
+    size_t pages = pfn_end - pfn_start;
     int i, rc = -1;
 
     /* Map address space for initial elf image. */
@@ -104,6 +106,8 @@ static int loadelfimage(
         entries, pages);
     if ( elf->dest == NULL )
         goto err;
+
+    elf->dest += elf->pstart & (PAGE_SIZE - 1);
 
     /* Load the initial elf image. */
     elf_load_binary(elf);
@@ -169,12 +173,6 @@ static int setup_guest(xc_interface *xch,
     if ( xc_version(xch, XENVER_capabilities, &caps) != 0 )
     {
         PERROR("Could not get Xen capabilities");
-        goto error_out;
-    }
-
-    if ( (elf.pstart & (PAGE_SIZE - 1)) != 0 )
-    {
-        PERROR("Guest OS must load to a page boundary.");
         goto error_out;
     }
 
