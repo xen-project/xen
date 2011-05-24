@@ -830,9 +830,7 @@ retry_transaction:
         goto out_close;
     if (!rc) { /* inner child */
         setsid();
-        libxl__exec(null, logfile_w, logfile_w,
-                    libxl__domain_device_model(gc, info),
-                    args);
+        libxl__exec(null, logfile_w, logfile_w, dm, args);
     }
 
     rc = 0;
