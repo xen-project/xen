@@ -59,6 +59,7 @@ struct outbuf {
     void* buf;
     size_t size;
     size_t pos;
+    int write_count;
 };
 
 #define OUTBUF_SIZE (16384 * 1024)
@@ -152,19 +153,19 @@ static uint64_t tv_delta(struct timeval *new, struct timeval *old)
 }
 
 static int noncached_write(xc_interface *xch,
+                           struct outbuf* ob,
                            int fd, void *buffer, int len) 
 {
-    static int write_count = 0;
     int rc = (write_exact(fd, buffer, len) == 0) ? len : -1;
 
-    write_count += len;
-    if ( write_count >= (MAX_PAGECACHE_USAGE * PAGE_SIZE) )
+    ob->write_count += len;
+    if ( ob->write_count >= (MAX_PAGECACHE_USAGE * PAGE_SIZE) )
     {
         /* Time to discard cache - dont care if this fails */
         int saved_errno = errno;
         discard_file_cache(xch, fd, 0 /* no flush */);
         errno = saved_errno;
-        write_count = 0;
+        ob->write_count = 0;
     }
 
     return rc;
@@ -260,7 +261,7 @@ static inline int write_uncached(xc_interface *xch,
     if ( dobuf )
         return outbuf_hardwrite(xch, ob, fd, buf, len) ? -1 : len;
     else
-        return noncached_write(xch, fd, buf, len);
+        return noncached_write(xch, ob, fd, buf, len);
 }
 
 static int print_stats(xc_interface *xch, uint32_t domid, int pages_sent,
