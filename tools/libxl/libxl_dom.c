@@ -273,9 +273,28 @@ static const char *libxl__domain_firmware(libxl__gc *gc,
                                           libxl_domain_build_info *info,
                                           libxl_device_model_info *dm_info)
 {
-    return libxl__abs_path(gc,
-                           info->u.hvm.firmware ? : "hvmloader",
-                           libxl_xenfirmwaredir_path());
+    libxl_ctx *ctx = libxl__gc_owner(gc);
+    const char *firmware;
+
+    if (info->u.hvm.firmware)
+        firmware = info->u.hvm.firmware;
+    else {
+        switch (dm_info->device_model_version)
+        {
+        case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
+            firmware = "hvmloader";
+            break;
+        case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
+            firmware = "hvmloader";
+            break;
+        default:
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "invalid device model version %d",
+                       dm_info->device_model_version);
+            return NULL;
+            break;
+        }
+    }
+    return libxl__abs_path(gc, firmware, libxl_xenfirmwaredir_path());
 }
 
 int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
