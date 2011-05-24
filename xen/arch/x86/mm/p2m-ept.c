@@ -736,7 +736,7 @@ void ept_change_entry_emt_with_range(struct domain *d,
         uint64_t trunk = 0;
 
         e = ept_get_entry_content(p2m, gfn, &level);
-        if ( !p2m_has_emt(e.sa_p2mt) )
+        if ( !is_epte_present(&e) || !p2m_has_emt(e.sa_p2mt) )
             continue;
 
         order = 0;
