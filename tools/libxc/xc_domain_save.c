@@ -861,7 +861,7 @@ static xen_pfn_t *map_and_save_p2m_table(xc_interface *xch,
  out:
     
     if ( !success && p2m )
-        munmap(p2m, P2M_FLL_ENTRIES * PAGE_SIZE);
+        munmap(p2m, P2M_FL_ENTRIES * PAGE_SIZE);
 
     if ( live_p2m_frame_list_list )
         munmap(live_p2m_frame_list_list, PAGE_SIZE);
@@ -1955,7 +1955,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
         munmap(live_shinfo, PAGE_SIZE);
 
     if ( ctx->live_p2m )
-        munmap(ctx->live_p2m, P2M_FLL_ENTRIES * PAGE_SIZE);
+        munmap(ctx->live_p2m, P2M_FL_ENTRIES * PAGE_SIZE);
 
     if ( ctx->live_m2p )
         munmap(ctx->live_m2p, M2P_SIZE(ctx->max_mfn));
