@@ -252,8 +252,8 @@ static inline int write_buffer(xc_interface *xch,
         return write_exact(fd, buf, len);
 }
 
-/* like write_buffer for ratewrite, which returns number of bytes written */
-static inline int ratewrite_buffer(xc_interface *xch,
+/* like write_buffer for noncached, which returns number of bytes written */
+static inline int write_uncached(xc_interface *xch,
                                    int dobuf, struct outbuf* ob, int fd,
                                    int live, void* buf, size_t len)
 {
@@ -1066,7 +1066,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
   copypages:
 #define wrexact(fd, buf, len) write_buffer(xch, last_iter, &ob, (fd), (buf), (len))
-#define ratewrite(fd, live, buf, len) ratewrite_buffer(xch, last_iter, &ob, (fd), (live), (buf), (len))
+#define ratewrite(fd, live, buf, len) write_uncached(xch, last_iter, &ob, (fd), (live), (buf), (len))
 
     /* Now write out each data page, canonicalising page tables as we go... */
     for ( ; ; )
