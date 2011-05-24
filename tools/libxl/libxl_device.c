@@ -408,6 +408,7 @@ out:
 
 int libxl__wait_for_device_model(libxl__gc *gc,
                                  uint32_t domid, char *state,
+                                 libxl__device_model_starting *starting,
                                  int (*check_callback)(libxl__gc *gc,
                                                        uint32_t domid,
                                                        const char *state,
@@ -437,7 +438,17 @@ int libxl__wait_for_device_model(libxl__gc *gc,
     tv.tv_sec = LIBXL_DEVICE_MODEL_START_TIMEOUT;
     tv.tv_usec = 0;
     nfds = xs_fileno(xsh) + 1;
+    if (starting && starting->for_spawn->fd > xs_fileno(xsh))
+        nfds = starting->for_spawn->fd + 1;
+
     while (rc > 0 || (!rc && tv.tv_sec > 0)) {
+        if ( starting ) {
+            rc = libxl__spawn_check(gc, starting->for_spawn);
+            if ( rc ) {
+                rc = -1;
+                goto err_died;
+            }
+        }
         p = xs_read(xsh, XBT_NULL, path, &len);
         if ( NULL == p )
             goto again;
@@ -459,15 +470,24 @@ again:
         free(p);
         FD_ZERO(&rfds);
         FD_SET(xs_fileno(xsh), &rfds);
+        if (starting)
+            FD_SET(starting->for_spawn->fd, &rfds);
         rc = select(nfds, &rfds, NULL, NULL, &tv);
         if (rc > 0) {
-            l = xs_read_watch(xsh, &num);
-            if (l != NULL)
-                free(l);
-            else
-                goto again;
+            if (FD_ISSET(xs_fileno(xsh), &rfds)) {
+                l = xs_read_watch(xsh, &num);
+                if (l != NULL)
+                    free(l);
+                else
+                    goto again;
+            }
+            if (starting && FD_ISSET(starting->for_spawn->fd, &rfds)) {
+                unsigned char dummy;
+                read(starting->for_spawn->fd, &dummy, sizeof(dummy));
+            }
         }
     }
+err_died:
     xs_unwatch(xsh, path, path);
     xs_daemon_close(xsh);
     LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Device Model not ready");

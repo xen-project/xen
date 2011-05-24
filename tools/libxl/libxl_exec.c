@@ -26,6 +26,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <signal.h> /* for SIGKILL */
+#include <fcntl.h>
 
 #include "libxl.h"
 #include "libxl_internal.h"
@@ -91,6 +92,22 @@ void libxl_report_child_exitstatus(libxl_ctx *ctx,
     }
 }
 
+static int libxl__set_fd_flag(libxl__gc *gc, int fd, int flag)
+{
+    int flags;
+
+    flags = fcntl(fd, F_GETFL);
+    if (flags == -1)
+        return ERROR_FAIL;
+
+    flags |= flag;
+
+    if (fcntl(fd, F_SETFL, flags) == -1)
+        return ERROR_FAIL;
+
+    return 0;
+}
+
 int libxl__spawn_spawn(libxl__gc *gc,
                       libxl__spawn_starting *for_spawn,
                       const char *what,
@@ -100,22 +117,33 @@ int libxl__spawn_spawn(libxl__gc *gc,
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     pid_t child, got;
-    int status;
+    int status, rc;
     pid_t intermediate;
+    int pipes[2];
+    unsigned char dummy = 0;
 
     if (for_spawn) {
         for_spawn->what = strdup(what);
         if (!for_spawn->what) return ERROR_NOMEM;
+
+        if (libxl_pipe(ctx, pipes) < 0)
+            goto err_parent;
+        if (libxl__set_fd_flag(gc, pipes[0], O_NONBLOCK) < 0 ||
+            libxl__set_fd_flag(gc, pipes[1], O_NONBLOCK) < 0)
+            goto err_parent_pipes;
     }
 
     intermediate = libxl_fork(ctx);
-    if (intermediate ==-1) {
-        if (for_spawn) free(for_spawn->what);
-        return ERROR_FAIL;
-    }
+    if (intermediate ==-1)
+        goto err_parent_pipes;
+
     if (intermediate) {
         /* parent */
-        if (for_spawn) for_spawn->intermediate = intermediate;
+        if (for_spawn) {
+            for_spawn->intermediate = intermediate;
+            for_spawn->fd = pipes[0];
+            close(pipes[1]);
+        }
         return 1;
     }
 
@@ -124,8 +152,10 @@ int libxl__spawn_spawn(libxl__gc *gc,
     child = fork();
     if (child == -1)
         exit(255);
-    if (!child)
+    if (!child) {
+        if (for_spawn) close(pipes[1]);
         return 0; /* caller runs child code */
+    }
 
     intermediate_hook(hook_data, child);
 
@@ -134,9 +164,23 @@ int libxl__spawn_spawn(libxl__gc *gc,
     got = call_waitpid(ctx->waitpid_instead, child, &status, 0);
     assert(got == child);
 
-    _exit(WIFEXITED(status) ? WEXITSTATUS(status) :
+    rc = (WIFEXITED(status) ? WEXITSTATUS(status) :
           WIFSIGNALED(status) && WTERMSIG(status) < 127
           ? WTERMSIG(status)+128 : -1);
+    if (for_spawn)
+        write(pipes[1], &dummy, sizeof(dummy));
+    _exit(rc);
+
+ err_parent_pipes:
+    if (for_spawn) {
+        close(pipes[0]);
+        close(pipes[1]);
+    }
+
+ err_parent:
+    if (for_spawn) free(for_spawn->what);
+
+    return ERROR_FAIL;
 }
 
 static void report_spawn_intermediate_status(libxl__gc *gc,

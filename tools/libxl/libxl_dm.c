@@ -855,14 +855,12 @@ static int detach_device_model(libxl__gc *gc,
     return rc;
 }
 
-
 int libxl__confirm_device_model_startup(libxl__gc *gc,
                                        libxl__device_model_starting *starting)
 {
-    int problem = libxl__wait_for_device_model(gc, starting->domid, "running", NULL, NULL);
     int detach;
-    if ( !problem )
-        problem = libxl__spawn_check(gc, starting->for_spawn);
+    int problem = libxl__wait_for_device_model(gc, starting->domid, "running",
+                                               starting, NULL, NULL);
     detach = detach_device_model(gc, starting);
     return problem ? problem : detach;
 }

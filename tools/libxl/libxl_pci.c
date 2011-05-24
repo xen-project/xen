@@ -612,7 +612,8 @@ static int do_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, i
 
     hvm = libxl__domain_is_hvm(gc, domid);
     if (hvm) {
-        if (libxl__wait_for_device_model(gc, domid, "running", NULL, NULL) < 0) {
+        if (libxl__wait_for_device_model(gc, domid, "running",
+                                         NULL, NULL, NULL) < 0) {
             return ERROR_FAIL;
         }
         path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/state", domid);
@@ -626,7 +627,8 @@ static int do_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, i
                            pcidev->bus, pcidev->dev, pcidev->func);
         path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/command", domid);
         xs_write(ctx->xsh, XBT_NULL, path, "pci-ins", strlen("pci-ins"));
-        rc = libxl__wait_for_device_model(gc, domid, NULL, pci_ins_check, state);
+        rc = libxl__wait_for_device_model(gc, domid, NULL, NULL,
+                                          pci_ins_check, state);
         path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/parameter", domid);
         vdevfn = libxl__xs_read(gc, XBT_NULL, path);
         path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/state", domid);
@@ -843,7 +845,8 @@ static int do_pci_remove(libxl__gc *gc, uint32_t domid,
 
     hvm = libxl__domain_is_hvm(gc, domid);
     if (hvm) {
-        if (libxl__wait_for_device_model(gc, domid, "running", NULL, NULL) < 0) {
+        if (libxl__wait_for_device_model(gc, domid, "running",
+                                         NULL, NULL, NULL) < 0) {
             return ERROR_FAIL;
         }
         path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/state", domid);
@@ -857,7 +860,8 @@ static int do_pci_remove(libxl__gc *gc, uint32_t domid,
          * device-model for function 0 */
         if ( !force && (pcidev->vdevfn & 0x7) == 0 ) {
             xs_write(ctx->xsh, XBT_NULL, path, "pci-rem", strlen("pci-rem"));
-            if (libxl__wait_for_device_model(gc, domid, "pci-removed", NULL, NULL) < 0) {
+            if (libxl__wait_for_device_model(gc, domid, "pci-removed",
+                                             NULL, NULL, NULL) < 0) {
                 LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Device Model didn't respond in time");
                 /* This depends on guest operating system acknowledging the
                  * SCI, if it doesn't respond in time then we may wish to 

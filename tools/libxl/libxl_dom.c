@@ -543,7 +543,7 @@ int libxl__domain_save_device_model(libxl__gc *gc, uint32_t domid, int fd)
 
     LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Saving device model state to %s", filename);
     libxl__xs_write(gc, XBT_NULL, libxl__sprintf(gc, "/local/domain/0/device-model/%d/command", domid), "save");
-    libxl__wait_for_device_model(gc, domid, "paused", NULL, NULL);
+    libxl__wait_for_device_model(gc, domid, "paused", NULL, NULL, NULL);
 
     if (stat(filename, &st) < 0)
     {
