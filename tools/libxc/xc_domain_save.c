@@ -275,10 +275,6 @@ static int print_stats(xc_interface *xch, uint32_t domid, int pages_sent,
     static struct time_stats last;
     struct time_stats now;
 
-    long long wall_delta;
-    long long d0_cpu_delta;
-    long long d1_cpu_delta;
-
     gettimeofday(&now.wall, NULL);
 
     now.d0_cpu = xc_domain_get_cpu_usage(xch, 0, /* FIXME */ 0)/1000;
@@ -287,14 +283,19 @@ static int print_stats(xc_interface *xch, uint32_t domid, int pages_sent,
     if ( (now.d0_cpu == -1) || (now.d1_cpu == -1) )
         DPRINTF("ARRHHH!!\n");
 
-    wall_delta = tv_delta(&now.wall,&last.wall)/1000;
-    if ( wall_delta == 0 )
-        wall_delta = 1;
-
-    d0_cpu_delta = (now.d0_cpu - last.d0_cpu)/1000;
-    d1_cpu_delta = (now.d1_cpu - last.d1_cpu)/1000;
-
     if ( print )
+    {
+        long long wall_delta;
+        long long d0_cpu_delta;
+        long long d1_cpu_delta;
+
+        wall_delta = tv_delta(&now.wall,&last.wall)/1000;
+        if ( wall_delta == 0 )
+            wall_delta = 1;
+
+        d0_cpu_delta = (now.d0_cpu - last.d0_cpu)/1000;
+        d1_cpu_delta = (now.d1_cpu - last.d1_cpu)/1000;
+
         DPRINTF("delta %lldms, dom0 %d%%, target %d%%, sent %dMb/s, "
                 "dirtied %dMb/s %" PRId32 " pages\n",
                 wall_delta,
@@ -303,6 +304,7 @@ static int print_stats(xc_interface *xch, uint32_t domid, int pages_sent,
                 (int)((pages_sent*PAGE_SIZE)/(wall_delta*(1000/8))),
                 (int)((stats->dirty_count*PAGE_SIZE)/(wall_delta*(1000/8))),
                 stats->dirty_count);
+    }
 
     last = now;
 
