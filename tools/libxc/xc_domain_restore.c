@@ -1133,22 +1133,18 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
 
     int orig_io_fd_flags;
 
-    static struct restore_ctx _ctx = {
-        .live_p2m = NULL,
-        .p2m = NULL,
-    };
-    static struct restore_ctx *ctx = &_ctx;
+    struct restore_ctx _ctx;
+    struct restore_ctx *ctx = &_ctx;
     struct domain_info_context *dinfo = &ctx->dinfo;
 
     pagebuf_init(&pagebuf);
     memset(&tailbuf, 0, sizeof(tailbuf));
     tailbuf.ishvm = hvm;
 
-    /* For info only */
-    ctx->nr_pfns = 0;
-
     if ( superpages )
         return 1;
+
+    memset(ctx, 0, sizeof(*ctx));
 
     ctxt = xc_hypercall_buffer_alloc(xch, ctxt, sizeof(*ctxt));
 

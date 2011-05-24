@@ -958,11 +958,8 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
     unsigned long mfn;
 
     struct outbuf ob;
-    static struct save_ctx _ctx = {
-        .live_p2m = NULL,
-        .live_m2p = NULL,
-    };
-    static struct save_ctx *ctx = &_ctx;
+    struct save_ctx _ctx;
+    struct save_ctx *ctx = &_ctx;
     struct domain_info_context *dinfo = &ctx->dinfo;
 
     int completed = 0;
@@ -975,6 +972,8 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
     }
 
     outbuf_init(xch, &ob, OUTBUF_SIZE);
+
+    memset(ctx, 0, sizeof(*ctx));
 
     /* If no explicit control parameters given, use defaults */
     max_iters  = max_iters  ? : DEF_MAX_ITERS;
