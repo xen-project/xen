@@ -252,98 +252,6 @@ static inline int write_buffer(xc_interface *xch,
         return write_exact(fd, buf, len);
 }
 
-#ifdef ADAPTIVE_SAVE
-
-/*
-** We control the rate at which we transmit (or save) to minimize impact
-** on running domains (including the target if we're doing live migrate).
-*/
-
-#define MAX_MBIT_RATE    500      /* maximum transmit rate for migrate */
-#define START_MBIT_RATE  100      /* initial transmit rate for migrate */
-
-/* Scaling factor to convert between a rate (in Mb/s) and time (in usecs) */
-#define RATE_TO_BTU      781250
-
-/* Amount in bytes we allow ourselves to send in a burst */
-#define BURST_BUDGET (100*1024)
-
-/* We keep track of the current and previous transmission rate */
-static int mbit_rate, ombit_rate = 0;
-
-/* Have we reached the maximum transmission rate? */
-#define RATE_IS_MAX() (mbit_rate == MAX_MBIT_RATE)
-
-static inline void initialize_mbit_rate()
-{
-    mbit_rate = START_MBIT_RATE;
-}
-
-static int ratewrite(xc_interface *xch, int io_fd, int live, void *buf, int n)
-{
-    static int budget = 0;
-    static int burst_time_us = -1;
-    static struct timeval last_put = { 0 };
-    struct timeval now;
-    struct timespec delay;
-    long long delta;
-
-    if ( START_MBIT_RATE == 0 )
-        return noncached_write(io_fd, live, buf, n);
-
-    budget -= n;
-    if ( budget < 0 )
-    {
-        if ( mbit_rate != ombit_rate )
-        {
-            burst_time_us = RATE_TO_BTU / mbit_rate;
-            ombit_rate = mbit_rate;
-            DPRINTF("rate limit: %d mbit/s burst budget %d slot time %d\n",
-                    mbit_rate, BURST_BUDGET, burst_time_us);
-        }
-        if ( last_put.tv_sec == 0 )
-        {
-            budget += BURST_BUDGET;
-            gettimeofday(&last_put, NULL);
-        }
-        else
-        {
-            while ( budget < 0 )
-            {
-                gettimeofday(&now, NULL);
-                delta = tv_delta(&now, &last_put);
-                while ( delta > burst_time_us )
-                {
-                    budget += BURST_BUDGET;
-                    last_put.tv_usec += burst_time_us;
-                    if ( last_put.tv_usec > 1000000 )
-                    {
-                        last_put.tv_usec -= 1000000;
-                        last_put.tv_sec++;
-                    }
-                    delta -= burst_time_us;
-                }
-                if ( budget > 0 )
-                    break;
-                delay.tv_sec = 0;
-                delay.tv_nsec = 1000 * (burst_time_us - delta);
-                while ( delay.tv_nsec > 0 )
-                    if ( nanosleep(&delay, &delay) == 0 )
-                        break;
-            }
-        }
-    }
-    return noncached_write(io_fd, live, buf, n);
-}
-
-#else /* ! ADAPTIVE SAVE */
-
-#define RATE_IS_MAX() (0)
-#define ratewrite(xch, _io_fd, _live, _buf, _n) noncached_write((xch), (_io_fd), (_live), (_buf), (_n))
-#define initialize_mbit_rate()
-
-#endif
-
 /* like write_buffer for ratewrite, which returns number of bytes written */
 static inline int ratewrite_buffer(xc_interface *xch,
                                    int dobuf, struct outbuf* ob, int fd,
@@ -352,7 +260,7 @@ static inline int ratewrite_buffer(xc_interface *xch,
     if ( dobuf )
         return outbuf_hardwrite(xch, ob, fd, buf, len) ? -1 : len;
     else
-        return ratewrite(xch, fd, live, buf, len);
+        return noncached_write(xch, fd, live, buf, len);
 }
 
 static int print_stats(xc_interface *xch, uint32_t domid, int pages_sent,
@@ -391,16 +299,6 @@ static int print_stats(xc_interface *xch, uint32_t domid, int pages_sent,
                 (int)((pages_sent*PAGE_SIZE)/(wall_delta*(1000/8))),
                 (int)((stats->dirty_count*PAGE_SIZE)/(wall_delta*(1000/8))),
                 stats->dirty_count);
-
-#ifdef ADAPTIVE_SAVE
-    if ( ((stats->dirty_count*PAGE_SIZE)/(wall_delta*(1000/8))) > mbit_rate )
-    {
-        mbit_rate = (int)((stats->dirty_count*PAGE_SIZE)/(wall_delta*(1000/8)))
-            + 50;
-        if ( mbit_rate > MAX_MBIT_RATE )
-            mbit_rate = MAX_MBIT_RATE;
-    }
-#endif
 
     d0_cpu_last = d0_cpu_now;
     d1_cpu_last = d1_cpu_now;
@@ -979,8 +877,6 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
     max_iters  = max_iters  ? : DEF_MAX_ITERS;
     max_factor = max_factor ? : DEF_MAX_FACTOR;
 
-    initialize_mbit_rate();
-
     if ( !get_platform_info(xch, dom,
                             &ctx->max_mfn, &ctx->hvirt_start, &ctx->pt_levels, &dinfo->guest_width) )
     {
@@ -1170,9 +1066,6 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
   copypages:
 #define wrexact(fd, buf, len) write_buffer(xch, last_iter, &ob, (fd), (buf), (len))
-#ifdef ratewrite
-#undef ratewrite
-#endif
 #define ratewrite(fd, live, buf, len) ratewrite_buffer(xch, last_iter, &ob, (fd), (live), (buf), (len))
 
     /* Now write out each data page, canonicalising page tables as we go... */
@@ -1509,8 +1402,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
         if ( live )
         {
-            if ( ((sent_this_iter > sent_last_iter) && RATE_IS_MAX()) ||
-                 (iter >= max_iters) ||
+            if ( (iter >= max_iters) ||
                  (sent_this_iter+skip_this_iter < 50) ||
                  (total_sent > dinfo->p2m_size*max_factor) )
             {
