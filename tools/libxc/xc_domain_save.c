@@ -270,9 +270,9 @@ struct time_stats {
 };
 
 static int print_stats(xc_interface *xch, uint32_t domid, int pages_sent,
+                       struct time_stats *last,
                        xc_shadow_op_stats_t *stats, int print)
 {
-    static struct time_stats last;
     struct time_stats now;
 
     gettimeofday(&now.wall, NULL);
@@ -289,12 +289,12 @@ static int print_stats(xc_interface *xch, uint32_t domid, int pages_sent,
         long long d0_cpu_delta;
         long long d1_cpu_delta;
 
-        wall_delta = tv_delta(&now.wall,&last.wall)/1000;
+        wall_delta = tv_delta(&now.wall,&last->wall)/1000;
         if ( wall_delta == 0 )
             wall_delta = 1;
 
-        d0_cpu_delta = (now.d0_cpu - last.d0_cpu)/1000;
-        d1_cpu_delta = (now.d1_cpu - last.d1_cpu)/1000;
+        d0_cpu_delta = (now.d0_cpu - last->d0_cpu)/1000;
+        d1_cpu_delta = (now.d1_cpu - last->d1_cpu)/1000;
 
         DPRINTF("delta %lldms, dom0 %d%%, target %d%%, sent %dMb/s, "
                 "dirtied %dMb/s %" PRId32 " pages\n",
@@ -306,7 +306,7 @@ static int print_stats(xc_interface *xch, uint32_t domid, int pages_sent,
                 stats->dirty_count);
     }
 
-    last = now;
+    *last = now;
 
     return 0;
 }
@@ -843,7 +843,8 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
     DECLARE_HYPERCALL_BUFFER(unsigned long, to_send);
     unsigned long *to_fix = NULL;
 
-    xc_shadow_op_stats_t stats;
+    struct time_stats time_stats;
+    xc_shadow_op_stats_t shadow_stats;
 
     unsigned long needed_to_fix = 0;
     unsigned long total_sent    = 0;
@@ -1053,7 +1054,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
         DPRINTF("Had %d unexplained entries in p2m table\n", err);
     }
 
-    print_stats(xch, dom, 0, &stats, 0);
+    print_stats(xch, dom, 0, &time_stats, &shadow_stats, 0);
 
     tmem_saved = xc_tmem_save(xch, dom, io_fd, live, XC_SAVE_ID_TMEM);
     if ( tmem_saved == -1 )
@@ -1377,7 +1378,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
         if ( last_iter )
         {
-            print_stats( xch, dom, sent_this_iter, &stats, 1);
+            print_stats( xch, dom, sent_this_iter, &time_stats, &shadow_stats, 1);
 
             DPRINTF("Total pages sent= %ld (%.2fx)\n",
                     total_sent, ((float)total_sent)/dinfo->p2m_size );
@@ -1439,7 +1440,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
             if ( xc_shadow_control(xch, dom,
                                    XEN_DOMCTL_SHADOW_OP_CLEAN, HYPERCALL_BUFFER(to_send),
-                                   dinfo->p2m_size, NULL, 0, &stats) != dinfo->p2m_size )
+                                   dinfo->p2m_size, NULL, 0, &shadow_stats) != dinfo->p2m_size )
             {
                 PERROR("Error flushing shadow PT");
                 goto out;
@@ -1447,7 +1448,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
             sent_last_iter = sent_this_iter;
 
-            print_stats(xch, dom, sent_this_iter, &stats, 1);
+            print_stats(xch, dom, sent_this_iter, &time_stats, &shadow_stats, 1);
 
         }
     } /* end of infinite for loop */
@@ -1810,7 +1811,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
         callbacks->checkpoint(callbacks->data) > 0)
     {
         /* reset stats timer */
-        print_stats(xch, dom, 0, &stats, 0);
+        print_stats(xch, dom, 0, &time_stats, &shadow_stats, 0);
 
         rc = 1;
         /* last_iter = 1; */
@@ -1821,11 +1822,11 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
             goto out;
         }
         DPRINTF("SUSPEND shinfo %08lx\n", info.shared_info_frame);
-        print_stats(xch, dom, 0, &stats, 1);
+        print_stats(xch, dom, 0, &time_stats, &shadow_stats, 1);
 
         if ( xc_shadow_control(xch, dom,
                                XEN_DOMCTL_SHADOW_OP_CLEAN, HYPERCALL_BUFFER(to_send),
-                               dinfo->p2m_size, NULL, 0, &stats) != dinfo->p2m_size )
+                               dinfo->p2m_size, NULL, 0, &shadow_stats) != dinfo->p2m_size )
         {
             PERROR("Error flushing shadow PT");
         }
