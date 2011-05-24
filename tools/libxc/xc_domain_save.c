@@ -152,7 +152,7 @@ static uint64_t tv_delta(struct timeval *new, struct timeval *old)
 }
 
 static int noncached_write(xc_interface *xch,
-                           int fd, int live, void *buffer, int len) 
+                           int fd, void *buffer, int len) 
 {
     static int write_count = 0;
     int rc = (write_exact(fd, buffer, len) == 0) ? len : -1;
@@ -255,12 +255,12 @@ static inline int write_buffer(xc_interface *xch,
 /* like write_buffer for noncached, which returns number of bytes written */
 static inline int write_uncached(xc_interface *xch,
                                    int dobuf, struct outbuf* ob, int fd,
-                                   int live, void* buf, size_t len)
+                                   void* buf, size_t len)
 {
     if ( dobuf )
         return outbuf_hardwrite(xch, ob, fd, buf, len) ? -1 : len;
     else
-        return noncached_write(xch, fd, live, buf, len);
+        return noncached_write(xch, fd, buf, len);
 }
 
 static int print_stats(xc_interface *xch, uint32_t domid, int pages_sent,
@@ -1066,7 +1066,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
   copypages:
 #define wrexact(fd, buf, len) write_buffer(xch, last_iter, &ob, (fd), (buf), (len))
-#define ratewrite(fd, live, buf, len) write_uncached(xch, last_iter, &ob, (fd), (live), (buf), (len))
+#define wruncached(fd, live, buf, len) write_uncached(xch, last_iter, &ob, (fd), (buf), (len))
 
     /* Now write out each data page, canonicalising page tables as we go... */
     for ( ; ; )
@@ -1300,7 +1300,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
                        run of pages we may have previously acumulated */
                     if ( run )
                     {
-                        if ( ratewrite(io_fd, live, 
+                        if ( wruncached(io_fd, live,
                                        (char*)region_base+(PAGE_SIZE*(j-run)), 
                                        PAGE_SIZE*run) != PAGE_SIZE*run )
                         {
@@ -1332,7 +1332,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
                         goto out;
                     }
 
-                    if ( ratewrite(io_fd, live, page, PAGE_SIZE) != PAGE_SIZE )
+                    if ( wruncached(io_fd, live, page, PAGE_SIZE) != PAGE_SIZE )
                     {
                         PERROR("Error when writing to state file (4b)"
                               " (errno %d)", errno);
@@ -1349,7 +1349,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
             if ( run )
             {
                 /* write out the last accumulated run of pages */
-                if ( ratewrite(io_fd, live, 
+                if ( wruncached(io_fd, live,
                                (char*)region_base+(PAGE_SIZE*(j-run)), 
                                PAGE_SIZE*run) != PAGE_SIZE*run )
                 {
