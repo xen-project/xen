@@ -159,6 +159,9 @@ static int setup_guest(xc_interface *xch,
     memset(&elf, 0, sizeof(elf));
     if ( elf_init(&elf, image, image_size) != 0 )
         goto error_out;
+
+    xc_elf_set_logfile(xch, &elf, 1);
+
     elf_parse_binary(&elf);
     v_start = 0;
     v_end = (unsigned long long)memsize << 20;
