@@ -309,7 +309,7 @@ _hidden void libxl__exec(int stdinfd, int stdoutfd, int stderrfd,
 _hidden void libxl__log_child_exitstatus(libxl__gc *gc,
                                 const char *what, pid_t pid, int status);
 
-_hidden char *libxl__abs_path(libxl__gc *gc, char *s, const char *path);
+_hidden char *libxl__abs_path(libxl__gc *gc, const char *s, const char *path);
 
 #define LIBXL__LOG_DEBUG   XTL_DEBUG
 #define LIBXL__LOG_INFO    XTL_INFO

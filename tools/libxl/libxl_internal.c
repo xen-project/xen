@@ -184,10 +184,10 @@ void libxl__log(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
     va_end(ap);
 }
 
-char *libxl__abs_path(libxl__gc *gc, char *s, const char *path)
+char *libxl__abs_path(libxl__gc *gc, const char *s, const char *path)
 {
     if (!s || s[0] == '/')
-        return s;
+        return libxl__strdup(gc, s);
     return libxl__sprintf(gc, "%s/%s", path, s);
 }
 
