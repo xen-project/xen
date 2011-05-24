@@ -269,11 +269,11 @@ static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
     return 0;
 }
 
-static const char *libxl__domain_hvmloader(libxl__gc *gc,
+static const char *libxl__domain_firmware(libxl__gc *gc,
                                            libxl_domain_build_info *info)
 {
     return libxl__abs_path(gc,
-                           info->u.hvm.hvmloader ? : "hvmloader",
+                           info->u.hvm.firmware ? : "hvmloader",
                            libxl_xenfirmwaredir_path());
 }
 
@@ -289,7 +289,7 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
         domid,
         (info->max_memkb - info->video_memkb) / 1024,
         (info->target_memkb - info->video_memkb) / 1024,
-        libxl__domain_hvmloader(gc, info));
+        libxl__domain_firmware(gc, info));
     if (ret) {
         LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, ret, "hvm building failed");
         goto out;

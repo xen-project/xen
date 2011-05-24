@@ -85,7 +85,7 @@ void libxl_init_build_info(libxl_domain_build_info *b_info, libxl_domain_create_
     if (c_info->hvm) {
         b_info->video_memkb = 8 * 1024;
         b_info->hvm = 1;
-        b_info->u.hvm.hvmloader = NULL;
+        b_info->u.hvm.firmware = NULL;
         b_info->u.hvm.pae = 1;
         b_info->u.hvm.apic = 1;
         b_info->u.hvm.acpi = 1;

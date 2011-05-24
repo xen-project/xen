@@ -160,7 +160,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
     ("hvm",             bool),
     ("u", KeyedUnion(None, "hvm",
                 [("hvm", "%s", Struct(None,
-                                       [("hvmloader", string),
+                                       [("firmware", string),
                                         ("pae", bool),
                                         ("apic", bool),
                                         ("acpi", bool),

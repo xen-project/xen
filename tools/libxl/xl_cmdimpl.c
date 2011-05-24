@@ -337,7 +337,7 @@ static void printf_info(int domid,
     printf("\t(image\n");
     if (c_info->hvm) {
         printf("\t\t(hvm\n");
-        printf("\t\t\t(loader %s)\n", b_info->u.hvm.hvmloader);
+        printf("\t\t\t(firmware %s)\n", b_info->u.hvm.firmware);
         printf("\t\t\t(video_memkb %d)\n", b_info->video_memkb);
         printf("\t\t\t(shadow_memkb %d)\n", b_info->shadow_memkb);
         printf("\t\t\t(pae %d)\n", b_info->u.hvm.pae);
@@ -748,10 +748,10 @@ static void parse_config_data(const char *configfile_filename_report,
     if (c_info->hvm == 1) {
         if (!xlu_cfg_get_string (config, "kernel", &buf))
             fprintf(stderr, "WARNING: ignoring \"kernel\" directive for HVM guest. "
-                    "Use \"hvmloader_override\" instead if you really want a non-default hvmloader\n");
+                    "Use \"firmware_override\" instead if you really want a non-default firmware\n");
 
-        xlu_cfg_replace_string (config, "hvmloader_override",
-                                &b_info->u.hvm.hvmloader);
+        xlu_cfg_replace_string (config, "firmware_override",
+                                &b_info->u.hvm.firmware);
         if (!xlu_cfg_get_long (config, "pae", &l))
             b_info->u.hvm.pae = l;
         if (!xlu_cfg_get_long (config, "apic", &l))
