@@ -825,7 +825,8 @@ retry_transaction:
         }
     }
 
-    rc = libxl__spawn_spawn(gc, p, "device model", dm_xenstore_record_pid);
+    rc = libxl__spawn_spawn(gc, p->for_spawn, "device model",
+                            dm_xenstore_record_pid, p);
     if (rc < 0)
         goto out_close;
     if (!rc) { /* inner child */

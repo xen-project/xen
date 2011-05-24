@@ -92,16 +92,16 @@ void libxl_report_child_exitstatus(libxl_ctx *ctx,
 }
 
 int libxl__spawn_spawn(libxl__gc *gc,
-                      libxl__device_model_starting *starting,
+                      libxl__spawn_starting *for_spawn,
                       const char *what,
                       void (*intermediate_hook)(void *for_spawn,
-                                                pid_t innerchild))
+                                                pid_t innerchild),
+                      void *hook_data)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     pid_t child, got;
     int status;
     pid_t intermediate;
-    libxl__spawn_starting *for_spawn = starting->for_spawn;
 
     if (for_spawn) {
         for_spawn->what = strdup(what);
@@ -127,7 +127,7 @@ int libxl__spawn_spawn(libxl__gc *gc,
     if (!child)
         return 0; /* caller runs child code */
 
-    intermediate_hook(starting, child);
+    intermediate_hook(hook_data, child);
 
     if (!for_spawn) _exit(0); /* just detach then */
 
