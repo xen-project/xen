@@ -264,32 +264,35 @@ static inline int write_uncached(xc_interface *xch,
         return noncached_write(xch, ob, fd, buf, len);
 }
 
+struct time_stats {
+    struct timeval wall;
+    long long d0_cpu, d1_cpu;
+};
+
 static int print_stats(xc_interface *xch, uint32_t domid, int pages_sent,
                        xc_shadow_op_stats_t *stats, int print)
 {
-    static struct timeval wall_last;
-    static long long      d0_cpu_last;
-    static long long      d1_cpu_last;
+    static struct time_stats last;
+    struct time_stats now;
 
-    struct timeval        wall_now;
-    long long             wall_delta;
-    long long             d0_cpu_now, d0_cpu_delta;
-    long long             d1_cpu_now, d1_cpu_delta;
+    long long wall_delta;
+    long long d0_cpu_delta;
+    long long d1_cpu_delta;
 
-    gettimeofday(&wall_now, NULL);
+    gettimeofday(&now.wall, NULL);
 
-    d0_cpu_now = xc_domain_get_cpu_usage(xch, 0, /* FIXME */ 0)/1000;
-    d1_cpu_now = xc_domain_get_cpu_usage(xch, domid, /* FIXME */ 0)/1000;
+    now.d0_cpu = xc_domain_get_cpu_usage(xch, 0, /* FIXME */ 0)/1000;
+    now.d1_cpu = xc_domain_get_cpu_usage(xch, domid, /* FIXME */ 0)/1000;
 
-    if ( (d0_cpu_now == -1) || (d1_cpu_now == -1) )
+    if ( (now.d0_cpu == -1) || (now.d1_cpu == -1) )
         DPRINTF("ARRHHH!!\n");
 
-    wall_delta = tv_delta(&wall_now,&wall_last)/1000;
+    wall_delta = tv_delta(&now.wall,&last.wall)/1000;
     if ( wall_delta == 0 )
         wall_delta = 1;
 
-    d0_cpu_delta = (d0_cpu_now - d0_cpu_last)/1000;
-    d1_cpu_delta = (d1_cpu_now - d1_cpu_last)/1000;
+    d0_cpu_delta = (now.d0_cpu - last.d0_cpu)/1000;
+    d1_cpu_delta = (now.d1_cpu - last.d1_cpu)/1000;
 
     if ( print )
         DPRINTF("delta %lldms, dom0 %d%%, target %d%%, sent %dMb/s, "
@@ -301,9 +304,7 @@ static int print_stats(xc_interface *xch, uint32_t domid, int pages_sent,
                 (int)((stats->dirty_count*PAGE_SIZE)/(wall_delta*(1000/8))),
                 stats->dirty_count);
 
-    d0_cpu_last = d0_cpu_now;
-    d1_cpu_last = d1_cpu_now;
-    wall_last   = wall_now;
+    last = now;
 
     return 0;
 }
