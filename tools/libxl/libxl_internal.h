@@ -153,7 +153,7 @@ _hidden char **libxl__xs_kvs_of_flexarray(libxl__gc *gc, flexarray_t *array, int
 _hidden int libxl__xs_writev(libxl__gc *gc, xs_transaction_t t,
                     char *dir, char **kvs);
 _hidden int libxl__xs_write(libxl__gc *gc, xs_transaction_t t,
-                   char *path, char *fmt, ...) PRINTF_ATTRIBUTE(4, 5);
+                   char *path, const char *fmt, ...) PRINTF_ATTRIBUTE(4, 5);
    /* Each fn returns 0 on success.
     * On error: returns -1, sets errno (no logging) */
 
