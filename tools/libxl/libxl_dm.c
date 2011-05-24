@@ -611,7 +611,7 @@ static int libxl__create_stubdom(libxl__gc *gc,
     ret = libxl__domain_make(gc, &c_info, &domid);
     if (ret)
         goto out_free;
-    ret = libxl__domain_build(gc, &b_info, domid, &state);
+    ret = libxl__domain_build(gc, &b_info, info, domid, &state);
     if (ret)
         goto out_free;
 

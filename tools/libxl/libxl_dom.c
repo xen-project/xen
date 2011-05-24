@@ -270,7 +270,8 @@ static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
 }
 
 static const char *libxl__domain_firmware(libxl__gc *gc,
-                                           libxl_domain_build_info *info)
+                                          libxl_domain_build_info *info,
+                                          libxl_device_model_info *dm_info)
 {
     return libxl__abs_path(gc,
                            info->u.hvm.firmware ? : "hvmloader",
@@ -278,7 +279,9 @@ static const char *libxl__domain_firmware(libxl__gc *gc,
 }
 
 int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
-              libxl_domain_build_info *info, libxl__domain_build_state *state)
+              libxl_domain_build_info *info,
+              libxl_device_model_info *dm_info,
+              libxl__domain_build_state *state)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     int ret, rc = ERROR_INVAL;
@@ -289,7 +292,7 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
         domid,
         (info->max_memkb - info->video_memkb) / 1024,
         (info->target_memkb - info->video_memkb) / 1024,
-        libxl__domain_firmware(gc, info));
+        libxl__domain_firmware(gc, info, dm_info));
     if (ret) {
         LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, ret, "hvm building failed");
         goto out;

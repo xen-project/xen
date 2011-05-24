@@ -186,7 +186,9 @@ _hidden int libxl__build_post(libxl__gc *gc, uint32_t domid,
 _hidden int libxl__build_pv(libxl__gc *gc, uint32_t domid,
              libxl_domain_build_info *info, libxl__domain_build_state *state);
 _hidden int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
-              libxl_domain_build_info *info, libxl__domain_build_state *state);
+              libxl_domain_build_info *info,
+              libxl_device_model_info *dm_info,
+              libxl__domain_build_state *state);
 
 _hidden int libxl__domain_rename(libxl__gc *gc, uint32_t domid,
                                  const char *old_name, const char *new_name,
@@ -245,7 +247,9 @@ typedef struct {
 
 /* from xl_create */
 _hidden int libxl__domain_make(libxl__gc *gc, libxl_domain_create_info *info, uint32_t *domid);
-_hidden int libxl__domain_build(libxl__gc *gc, libxl_domain_build_info *info,
+_hidden int libxl__domain_build(libxl__gc *gc,
+                                libxl_domain_build_info *info,
+                                libxl_device_model_info *dm_info,
                                 uint32_t domid,
                                 libxl__domain_build_state *state);
 

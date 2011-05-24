@@ -144,8 +144,11 @@ static int init_console_info(libxl_device_console *console, int dev_num)
     return 0;
 }
 
-int libxl__domain_build(libxl__gc *gc, libxl_domain_build_info *info,
-                        uint32_t domid, libxl__domain_build_state *state)
+int libxl__domain_build(libxl__gc *gc,
+                        libxl_domain_build_info *info,
+                        libxl_device_model_info *dm_info,
+                        uint32_t domid,
+                        libxl__domain_build_state *state)
 {
     char **vments = NULL, **localents = NULL;
     struct timeval start_time;
@@ -158,7 +161,7 @@ int libxl__domain_build(libxl__gc *gc, libxl_domain_build_info *info,
     gettimeofday(&start_time, NULL);
 
     if (info->hvm) {
-        ret = libxl__build_hvm(gc, domid, info, state);
+        ret = libxl__build_hvm(gc, domid, info, dm_info, state);
         if (ret)
             goto out;
 
@@ -437,7 +440,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
             free(dm_info->saved_state);
             dm_info->saved_state = NULL;
         }
-        ret = libxl__domain_build(gc, &d_config->b_info, domid, &state);
+        ret = libxl__domain_build(gc, &d_config->b_info, dm_info, domid, &state);
     }
 
     if (ret) {
