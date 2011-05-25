@@ -1,0 +1,18 @@
+#============================================================================
+# ${XEN_SCRIPT_DIR}/vif-post.d/00-vif-local.hook
+#
+# Script for performing local configuration of a vif.
+# This script will be sourced by, e.g., vif-bridge after the hotplugging
+# system calls vif-bridge. The script is here and not simply executed as
+# a udev rule because this allows simple access to several environment
+# variables set by the calling vif-* script.
+#
+# Environment vars:
+# command     (add|remove|online|offline)
+# dev         vif interface name (required).
+# main_ip     IP address of Dom0
+# ip          list of IP networks for the vif, space-separated
+# XENBUS_PATH path to this device's details in the XenStore (required).
+#============================================================================
+
+# Place local modifications here.

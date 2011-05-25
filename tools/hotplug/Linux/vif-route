@@ -49,6 +49,8 @@ fi
 
 handle_iptable
 
+call_hooks vif post
+
 log debug "Successful vif-route ${command} for ${dev}."
 if [ "${command}" = "online" ]
 then

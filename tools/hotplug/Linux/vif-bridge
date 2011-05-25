@@ -105,6 +105,8 @@ if [ "$type_if" = vif ]; then
     handle_iptable
 fi
 
+call_hooks vif post
+
 log debug "Successful vif-bridge $command for $dev, bridge $bridge."
 if [ "$type_if" = vif -a "$command" = "online" ]
 then

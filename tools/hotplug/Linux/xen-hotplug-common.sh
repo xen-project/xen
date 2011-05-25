@@ -99,4 +99,15 @@ xenstore_write() {
   _xenstore_write "$@" || fatal "Writing $@ to xenstore failed."
 }
 
+##
+# call_hooks <devtype> <hook>
+#
+# Execute each hook in the <hook> directory.
+#
+call_hooks() {
+  for f in /etc/xen/scripts/${1}-${2}.d/*.hook; do
+    [ -x "$f" ] && . "$f"
+  done
+}
+
 log debug "$@" "XENBUS_PATH=$XENBUS_PATH"

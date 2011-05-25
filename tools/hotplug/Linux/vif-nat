@@ -185,6 +185,8 @@ esac
 
 handle_iptable
 
+call_hooks vif post
+
 log debug "Successful vif-nat $command for ${dev}."
 if [ "$command" = "online" ]
 then
