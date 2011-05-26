@@ -48,6 +48,11 @@ struct restore_ctx {
 
 #define HEARTBEAT_MS 1000
 
+#define SUPERPAGE_PFN_SHIFT  9
+#define SUPERPAGE_NR_PFNS    (1UL << SUPERPAGE_PFN_SHIFT)
+
+#define SUPER_PAGE_START(pfn)    (((pfn) & (SUPERPAGE_NR_PFNS-1)) == 0 )
+
 #ifndef __MINIOS__
 static ssize_t rdexact(xc_interface *xch, struct restore_ctx *ctx,
                        int fd, void* buf, size_t size)
@@ -882,9 +887,11 @@ static int pagebuf_get(xc_interface *xch, struct restore_ctx *ctx,
 static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
                        xen_pfn_t* region_mfn, unsigned long* pfn_type, int pae_extended_cr3,
                        unsigned int hvm, struct xc_mmu* mmu,
-                       pagebuf_t* pagebuf, int curbatch)
+                       pagebuf_t* pagebuf, int curbatch, int superpages)
 {
     int i, j, curpage, nr_mfns;
+    int k, scount;
+    unsigned long superpage_start=INVALID_P2M_ENTRY;
     /* used by debug verify code */
     unsigned long buf[PAGE_SIZE/sizeof(unsigned long)];
     /* Our mapping of the current region (batch) */
@@ -902,8 +909,8 @@ static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
     if (j > MAX_BATCH_SIZE)
         j = MAX_BATCH_SIZE;
 
-    /* First pass for this batch: work out how much memory to alloc */
-    nr_mfns = 0; 
+    /* First pass for this batch: work out how much memory to alloc, and detect superpages */
+    nr_mfns = scount = 0;
     for ( i = 0; i < j; i++ )
     {
         unsigned long pfn, pagetype;
@@ -914,19 +921,103 @@ static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
              (ctx->p2m[pfn] == INVALID_P2M_ENTRY) )
         {
             /* Have a live PFN which hasn't had an MFN allocated */
+
+            /* Logic if we're in the middle of detecting a candidate superpage */
+            if ( superpage_start != INVALID_P2M_ENTRY )
+            {
+                /* Is this the next expected continuation? */
+                if ( pfn == superpage_start + scount )
+                {
+                    if ( !superpages )
+                    {
+                        ERROR("Unexpexted codepath with no superpages");
+                        return -1;
+                    }
+
+                    scount++;
+
+                    /* If we've found a whole superpage, allocate it and update p2m */
+                    if ( scount  == SUPERPAGE_NR_PFNS )
+                    {
+                        unsigned long supermfn;
+
+
+                        supermfn=superpage_start;
+                        if ( xc_domain_populate_physmap_exact(xch, dom, 1,
+                                         SUPERPAGE_PFN_SHIFT, 0, &supermfn) != 0 )
+                        {
+                            DPRINTF("No 2M page available for pfn 0x%lx, fall back to 4K page.\n",
+                                    superpage_start);
+                            /* If we're falling back from a failed allocation, subtract one
+                             * from count, since the last page == pfn, which will behandled
+                             * anyway. */
+                            scount--;
+                            goto fallback;
+                        }
+
+                        DPRINTF("Mapping superpage (%d) pfn %lx, mfn %lx\n", scount, superpage_start, supermfn);
+                        for (k=0; k<scount; k++)
+                        {
+                            /* We just allocated a new mfn above; update p2m */
+                            ctx->p2m[superpage_start+k] = supermfn+k;
+                            ctx->nr_pfns++;
+                            /* region_map[] will be set below */
+                        }
+                        superpage_start=INVALID_P2M_ENTRY;
+                        scount=0;
+                    }
+                    continue;
+                }
+                
+            fallback:
+                DPRINTF("Falling back %d pages pfn %lx\n", scount, superpage_start);
+                for (k=0; k<scount; k++)
+                {
+                    ctx->p2m_batch[nr_mfns++] = superpage_start+k; 
+                    ctx->p2m[superpage_start+k]--;
+                }
+                superpage_start = INVALID_P2M_ENTRY;
+                scount=0;
+            }
+
+            /* Are we ready to start a new superpage candidate? */
+            if ( superpages && SUPER_PAGE_START(pfn) )
+            {
+                superpage_start=pfn;
+                scount++;
+                continue;
+            }
+            
+            /* Add the current pfn to pfn_batch */
             ctx->p2m_batch[nr_mfns++] = pfn; 
             ctx->p2m[pfn]--;
         }
-    } 
+    }
+
+    /* Clean up any partial superpage candidates */
+    if ( superpage_start != INVALID_P2M_ENTRY )
+    {
+        DPRINTF("Falling back %d pages pfn %lx\n", scount, superpage_start);
+        for (k=0; k<scount; k++)
+        {
+            ctx->p2m_batch[nr_mfns++] = superpage_start+k; 
+            ctx->p2m[superpage_start+k]--;
+        }
+        superpage_start = INVALID_P2M_ENTRY;
+    }
 
     /* Now allocate a bunch of mfns for this batch */
-    if ( nr_mfns &&
-         (xc_domain_populate_physmap_exact(xch, dom, nr_mfns, 0,
-                                            0, ctx->p2m_batch) != 0) )
-    { 
-        ERROR("Failed to allocate memory for batch.!\n"); 
-        errno = ENOMEM;
-        return -1;
+    if ( nr_mfns )
+    {
+        DPRINTF("Mapping order 0,  %d; first pfn %lx\n", nr_mfns, ctx->p2m_batch[0]);
+    
+        if(xc_domain_populate_physmap_exact(xch, dom, nr_mfns, 0,
+                                            0, ctx->p2m_batch) != 0) 
+        { 
+            ERROR("Failed to allocate memory for batch.!\n"); 
+            errno = ENOMEM;
+            return -1;
+        }
     }
 
     /* Second pass for this batch: update p2m[] and region_mfn[] */
@@ -977,7 +1068,8 @@ static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
 
         if (pfn_err[i])
         {
-            ERROR("unexpected PFN mapping failure");
+            ERROR("unexpected PFN mapping failure pfn %lx map_mfn %lx p2m_mfn %lx",
+                  pfn, region_mfn[i], ctx->p2m[pfn]);
             goto err_mapped;
         }
 
@@ -1141,9 +1233,6 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     memset(&tailbuf, 0, sizeof(tailbuf));
     tailbuf.ishvm = hvm;
 
-    if ( superpages )
-        return 1;
-
     memset(ctx, 0, sizeof(*ctx));
 
     ctxt = xc_hypercall_buffer_alloc(xch, ctxt, sizeof(*ctxt));
@@ -1292,7 +1381,8 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
             int brc;
 
             brc = apply_batch(xch, dom, ctx, region_mfn, pfn_type,
-                              pae_extended_cr3, hvm, mmu, &pagebuf, curbatch);
+                              pae_extended_cr3, hvm, mmu, &pagebuf, curbatch,
+                              superpages);
             if ( brc < 0 )
                 goto out;
 
