@@ -571,7 +571,7 @@ xfs_dir (fsi_file_t *ffi, char *dirname)
 			continue;
 		}
 
-		if (!*dirname || isspace (*dirname)) {
+		if (!*dirname || isspace ((uint8_t)*dirname)) {
 			if ((di_mode & IFMT) != IFREG) {
 				errnum = ERR_BAD_FILETYPE;
 				return 0;
@@ -588,7 +588,8 @@ xfs_dir (fsi_file_t *ffi, char *dirname)
 
 		for (; *dirname == '/'; dirname++);
 
-		for (rest = dirname; (ch = *rest) && !isspace (ch) && ch != '/'; rest++);
+		for (rest = dirname; (ch = *rest)
+                   && !isspace ((uint8_t)ch) && ch != '/'; rest++);
 		*rest = 0;
 
 		name = first_dentry (ffi, &new_ino);
