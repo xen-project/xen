@@ -112,17 +112,32 @@ static int calculate_tbuf_size(unsigned int pages, uint32_t t_info_first_offset)
     typeof(dummy_size.prod) max_size;
     struct t_info dummy_pages;
     typeof(dummy_pages.tbuf_size) max_pages;
+    typeof(dummy_pages.mfn_offset[0]) max_mfn_offset;
+    unsigned int max_cpus = num_online_cpus();
     unsigned int t_info_words;
 
     /* force maximum value for an unsigned type */
     max_size = -1;
     max_pages = -1;
+    max_mfn_offset = -1;
 
     /* max size holds up to n pages */
     max_size /= PAGE_SIZE;
 
     if ( max_size < max_pages )
         max_pages = max_size;
+
+    /*
+     * max mfn_offset holds up to n pages per cpu
+     * The array of mfns for the highest cpu can start at the maximum value
+     * mfn_offset can hold. So reduce the number of cpus and also the mfn_offset.
+     */
+    max_mfn_offset -= t_info_first_offset - 1;
+    max_cpus--;
+    if ( max_cpus )
+        max_mfn_offset /= max_cpus;
+    if ( max_mfn_offset < max_pages )
+        max_pages = max_mfn_offset;
 
     if ( pages > max_pages )
     {
