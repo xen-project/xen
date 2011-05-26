@@ -1132,21 +1132,98 @@ static int e820_sanitize(libxl_ctx *ctx, struct e820entry src[],
                ram_end >> 12, delta_kb, start_kb ,start >> 12,
                (uint64_t)balloon_kb);
 
+
+    /* This whole code below is to guard against if the Intel IGD is passed into
+     * the guest. If we don't pass in IGD, this whole code can be ignored.
+     *
+     * The reason for this code is that Intel boxes fill their E820 with
+     * E820_RAM amongst E820_RESERVED and we can't just ditch those E820_RAM.
+     * That is b/c any "gaps" in the E820 is considered PCI I/O space by
+     * Linux and it would be utilized by the Intel IGD as I/O space while
+     * in reality it was an RAM region.
+     *
+     * What this means is that we have to walk the E820 and for any region
+     * that is RAM and below 4GB and above ram_end, needs to change its type
+     * to E820_UNUSED. We also need to move some of the E820_RAM regions if
+     * the overlap with ram_end. */
+    for (i = 0; i < nr; i++) {
+	uint64_t end = src[i].addr + src[i].size;
+
+	/* We don't care about E820_UNUSABLE, but we need to
+         * change the type to zero b/c the loop after this
+         * sticks E820_UNUSABLE on the guest's E820 but ignores
+         * the ones with type zero. */
+        if ((src[i].type == E820_UNUSABLE) ||
+	    /* Any region that is within the "RAM region" can
+             * be safely ditched. */
+            (end < ram_end)) {
+                src[i].type = 0;
+                continue;
+        }
+
+        /* Look only at RAM regions. */
+	if (src[i].type != E820_RAM)
+            continue;
+
+        /* We only care about RAM regions below 4GB. */
+        if (src[i].addr >= (1ULL<<32))
+            continue;
+
+	/* E820_RAM overlaps with our RAM region. Move it */
+	if (src[i].addr < ram_end) {
+            uint64_t delta;
+
+            src[i].type = E820_UNUSABLE;
+            delta = ram_end - src[i].addr;
+            /* The end < ram_end should weed this out */
+            if (src[i].size - delta < 0)
+                src[i].type = 0;
+            else {
+                src[i].size -= delta;
+                src[i].addr = ram_end;
+            }
+            if (src[i].addr + src[i].size != end) {
+                /* We messed up somewhere */
+                src[i].type = 0;
+                LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Computed E820 wrongly. Continuing on.");
+            }
+        }
+        /* Lastly, convert the RAM to UNSUABLE. Look in the Linux kernel
+           at git commit 2f14ddc3a7146ea4cd5a3d1ecd993f85f2e4f948
+            "xen/setup: Inhibit resource API from using System RAM E820
+           gaps as PCI mem gaps" for full explanation. */
+        if (end > ram_end)
+            src[i].type = E820_UNUSABLE;
+    }
+
     /* Check if there is a region between ram_end and start. */
     if (start > ram_end) {
+        int add_unusable = 1;
+        for (i = 0; i < nr && add_unusable; i++) {
+            if (src[i].type != E820_UNUSABLE)
+                continue;
+            if (ram_end != src[i].addr)
+                continue;
+            if (start != src[i].addr + src[i].size) {
+                /* there is one, adjust it */
+                src[i].size = start - src[i].addr;
+            }
+            add_unusable = 0;
+        }
         /* .. and if not present, add it in. This is to guard against
-          the Linux guest assuming that the gap between the end of
-          RAM region and the start of the E820_[ACPI,NVS,RESERVED]
-          is PCI I/O space. Which it certainly is _not_. */
-        e820[idx].type = E820_UNUSABLE;
-        e820[idx].addr = ram_end;
-        e820[idx].size = start - ram_end;
-        idx++;
+           the Linux guest assuming that the gap between the end of
+           RAM region and the start of the E820_[ACPI,NVS,RESERVED]
+           is PCI I/O space. Which it certainly is _not_. */
+        if (add_unusable) {
+            e820[idx].type = E820_UNUSABLE;
+            e820[idx].addr = ram_end;
+            e820[idx].size = start - ram_end;
+            idx++;
+        }
     }
     /* Almost done: copy them over, ignoring the undesireable ones */
     for (i = 0; i < nr; i++) {
         if ((src[i].type == E820_RAM) ||
-	    (src[i].type == E820_UNUSABLE) ||
 	    (src[i].type == 0))
 	    continue;
 
