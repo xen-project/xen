@@ -52,7 +52,6 @@ static struct t_info *t_info;
 static unsigned int t_info_pages;
 
 static DEFINE_PER_CPU_READ_MOSTLY(struct t_buf *, t_bufs);
-static DEFINE_PER_CPU_READ_MOSTLY(unsigned char *, t_data);
 static DEFINE_PER_CPU_READ_MOSTLY(spinlock_t, t_lock);
 static u32 data_size __read_mostly;
 
@@ -208,7 +207,6 @@ static int alloc_trace_bufs(unsigned int pages)
 
         per_cpu(t_bufs, cpu) = buf = rawbuf;
         buf->cons = buf->prod = 0;
-        per_cpu(t_data, cpu) = (unsigned char *)(buf + 1);
     }
 
     offset = t_info_first_offset;
@@ -472,10 +470,16 @@ static inline u32 calc_bytes_avail(const struct t_buf *buf)
     return data_size - calc_unconsumed_bytes(buf);
 }
 
-static inline struct t_rec *next_record(const struct t_buf *buf,
-                                        uint32_t *next)
+static unsigned char *next_record(const struct t_buf *buf, uint32_t *next,
+                                 unsigned char **next_page,
+                                 uint32_t *offset_in_page)
 {
     u32 x = buf->prod, cons = buf->cons;
+    uint16_t per_cpu_mfn_offset;
+    uint32_t per_cpu_mfn_nr;
+    uint32_t *mfn_list;
+    uint32_t mfn;
+    unsigned char *this_page;
 
     barrier(); /* must read buf->prod and buf->cons only once */
     *next = x;
@@ -487,7 +491,27 @@ static inline struct t_rec *next_record(const struct t_buf *buf,
 
     ASSERT(x < data_size);
 
-    return (struct t_rec *)&this_cpu(t_data)[x];
+    /* add leading header to get total offset of next record */
+    x += sizeof(struct t_buf);
+    *offset_in_page = x & ~PAGE_MASK;
+
+    /* offset into array of mfns */
+    per_cpu_mfn_nr = x >> PAGE_SHIFT;
+    per_cpu_mfn_offset = t_info->mfn_offset[smp_processor_id()];
+    mfn_list = (uint32_t *)t_info;
+    mfn = mfn_list[per_cpu_mfn_offset + per_cpu_mfn_nr];
+    this_page = mfn_to_virt(mfn);
+    if (per_cpu_mfn_nr + 1 >= opt_tbuf_size)
+    {
+        /* reached end of buffer? */
+        *next_page = NULL;
+    }
+    else
+    {
+        mfn = mfn_list[per_cpu_mfn_offset + per_cpu_mfn_nr + 1];
+        *next_page = mfn_to_virt(mfn);
+    }
+    return this_page;
 }
 
 static inline void __insert_record(struct t_buf *buf,
@@ -497,28 +521,37 @@ static inline void __insert_record(struct t_buf *buf,
                                    unsigned int rec_size,
                                    const void *extra_data)
 {
-    struct t_rec *rec;
+    struct t_rec split_rec, *rec;
     uint32_t *dst;
+    unsigned char *this_page, *next_page;
     unsigned int extra_word = extra / sizeof(u32);
     unsigned int local_rec_size = calc_rec_size(cycles, extra);
     uint32_t next;
+    uint32_t offset;
+    uint32_t remaining;
 
     BUG_ON(local_rec_size != rec_size);
     BUG_ON(extra & 3);
 
-    rec = next_record(buf, &next);
-    if ( !rec )
+    this_page = next_record(buf, &next, &next_page, &offset);
+    if ( !this_page )
         return;
-    /* Double-check once more that we have enough space.
-     * Don't bugcheck here, in case the userland tool is doing
-     * something stupid. */
-    if ( (unsigned char *)rec + rec_size > this_cpu(t_data) + data_size )
+
+    remaining = PAGE_SIZE - offset;
+
+    if ( unlikely(rec_size > remaining) )
     {
-        if ( printk_ratelimit() )
+        if ( next_page == NULL )
+        {
+            /* access beyond end of buffer */
             printk(XENLOG_WARNING
-                   "%s: size=%08x prod=%08x cons=%08x rec=%u\n",
-                   __func__, data_size, next, buf->cons, rec_size);
-        return;
+                   "%s: size=%08x prod=%08x cons=%08x rec=%u remaining=%u\n",
+                   __func__, data_size, next, buf->cons, rec_size, remaining);
+            return;
+        }
+        rec = &split_rec;
+    } else {
+        rec = (struct t_rec*)(this_page + offset);
     }
 
     rec->event = event;
@@ -534,6 +567,12 @@ static inline void __insert_record(struct t_buf *buf,
 
     if ( extra_data && extra )
         memcpy(dst, extra_data, extra);
+
+    if ( unlikely(rec_size > remaining) )
+    {
+        memcpy(this_page + offset, rec, remaining);
+        memcpy(next_page, (char *)rec + remaining, rec_size - remaining);
+    }
 
     wmb();
 
