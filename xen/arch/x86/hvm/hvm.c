@@ -3285,10 +3285,10 @@ static int hvmop_set_pci_link_route(
     return rc;
 }
 
-static int hvmop_inj_msi(
-    XEN_GUEST_HANDLE(xen_hvm_inj_msi_t) uop)
+static int hvmop_inject_msi(
+    XEN_GUEST_HANDLE(xen_hvm_inject_msi_t) uop)
 {
-    struct xen_hvm_inj_msi op;
+    struct xen_hvm_inject_msi op;
     struct domain *d;
     int rc;
 
@@ -3303,12 +3303,11 @@ static int hvmop_inj_msi(
     if ( !is_hvm_domain(d) )
         goto out;
 
-    rc = xsm_hvm_inj_msi(d);
+    rc = xsm_hvm_inject_msi(d);
     if ( rc )
         goto out;
 
-    rc = 0;
-    hvm_inj_msi(d, op.addr, op.data);
+    hvm_inject_msi(d, op.addr, op.data);
 
  out:
     rcu_unlock_domain(d);
@@ -3593,9 +3592,9 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             guest_handle_cast(arg, xen_hvm_set_isa_irq_level_t));
         break;
 
-    case HVMOP_inj_msi:
-        rc = hvmop_inj_msi(
-            guest_handle_cast(arg, xen_hvm_inj_msi_t));
+    case HVMOP_inject_msi:
+        rc = hvmop_inject_msi(
+            guest_handle_cast(arg, xen_hvm_inject_msi_t));
         break;
 
     case HVMOP_set_pci_link_route:

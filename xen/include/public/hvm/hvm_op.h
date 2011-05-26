@@ -244,8 +244,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_hvm_get_mem_type_t);
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
 
 /* MSI injection for emulated devices */
-#define HVMOP_inj_msi         16
-struct xen_hvm_inj_msi {
+#define HVMOP_inject_msi         16
+struct xen_hvm_inject_msi {
     /* Domain to be injected */
     domid_t   domid;
     /* Data -- lower 32 bits */
@@ -253,8 +253,8 @@ struct xen_hvm_inj_msi {
     /* Address (0xfeexxxxx) */
     uint64_t  addr;
 };
-typedef struct xen_hvm_inj_msi xen_hvm_inj_msi_t;
-DEFINE_XEN_GUEST_HANDLE(xen_hvm_inj_msi_t);
+typedef struct xen_hvm_inject_msi xen_hvm_inject_msi_t;
+DEFINE_XEN_GUEST_HANDLE(xen_hvm_inject_msi_t);
 
 #endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */
 

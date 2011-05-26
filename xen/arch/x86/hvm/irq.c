@@ -260,7 +260,7 @@ void hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq)
             d->domain_id, link, old_isa_irq, isa_irq);
 }
 
-void hvm_inj_msi(struct domain *d, uint64_t addr, uint32_t data)
+void hvm_inject_msi(struct domain *d, uint64_t addr, uint32_t data)
 {
     uint32_t tmp = (uint32_t) addr;
     uint8_t  dest = (tmp & MSI_ADDR_DEST_ID_MASK) >> MSI_ADDR_DEST_ID_SHIFT;

@@ -123,7 +123,7 @@ struct xsm_operations {
     int (*hvm_set_pci_intx_level) (struct domain *d);
     int (*hvm_set_isa_irq_level) (struct domain *d);
     int (*hvm_set_pci_link_route) (struct domain *d);
-    int (*hvm_inj_msi) (struct domain *d);
+    int (*hvm_inject_msi) (struct domain *d);
     int (*apic) (struct domain *d, int cmd);
     int (*assign_vector) (struct domain *d, uint32_t pirq);
     int (*xen_settime) (void);
@@ -508,9 +508,9 @@ static inline int xsm_hvm_set_pci_link_route (struct domain *d)
     return xsm_call(hvm_set_pci_link_route(d));
 }
 
-static inline int xsm_hvm_inj_msi (struct domain *d)
+static inline int xsm_hvm_inject_msi (struct domain *d)
 {
-    return xsm_call(hvm_inj_msi(d));
+    return xsm_call(hvm_inject_msi(d));
 }
 
 static inline int xsm_apic (struct domain *d, int cmd)
