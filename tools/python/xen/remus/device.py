@@ -2,7 +2,7 @@
 #
 # Coordinates with devices at suspend, resume, and commit hooks
 
-import os, re
+import os, re, fcntl
 
 import netlink, qdisc, util
 
@@ -30,22 +30,51 @@ class ReplicatedDisk(CheckpointedDevice):
     is paused between epochs.
     """
     FIFODIR = '/var/run/tap'
+    SEND_CHECKPOINT = 20
+    WAIT_CHECKPOINT_ACK = 30
 
     def __init__(self, disk):
         # look up disk, make sure it is tap:buffer, and set up socket
         # to request commits.
         self.ctlfd = None
+        self.msgfd = None
+        self.is_drbd = False
+        self.ackwait = False
 
-        if not disk.uname.startswith('tap:remus:') and not disk.uname.startswith('tap:tapdisk:remus:'):
+        if disk.uname.startswith('tap:remus:') or disk.uname.startswith('tap:tapdisk:remus:'):
+            fifo = re.match("tap:.*(remus.*)\|", disk.uname).group(1).replace(':', '_')
+            absfifo = os.path.join(self.FIFODIR, fifo)
+            absmsgfifo = absfifo + '.msg'
+
+            self.installed = False
+            self.ctlfd = open(absfifo, 'w+b')
+            self.msgfd = open(absmsgfifo, 'r+b')
+        elif disk.uname.startswith('drbd:'):
+            #get the drbd device associated with this resource
+            drbdres = re.match("drbd:(.*)", disk.uname).group(1)
+            drbddev = util.runcmd("drbdadm sh-dev %s" % drbdres).rstrip()
+
+            #check for remus supported drbd installation
+            rconf = util.runcmd("drbdsetup %s show" % drbddev)
+            if rconf.find('protocol D;') == -1:
+                raise ReplicatedDiskException('Remus support for DRBD disks requires the '
+                                              'resources to operate in protocol D. Please make '
+                                              'sure that you have installed the remus supported DRBD '
+                                              'version from git://aramis.nss.cs.ubc.ca/drbd-8.3-remus '
+                                              'and enabled protocol D in the resource config')
+
+            #check if resource is in connected state
+            cstate = util.runcmd("drbdadm cstate %s" % drbdres).rstrip()
+            if cstate != 'Connected':
+                raise ReplicatedDiskException('DRBD resource %s is not in connected state!'
+                                              % drbdres)
+
+            #open a handle to the resource so that we could issue chkpt ioctls
+            self.ctlfd = open(drbddev, 'r')
+            self.is_drbd = True
+        else:
             raise ReplicatedDiskException('Disk is not replicated: %s' %
                                         str(disk))
-        fifo = re.match("tap:.*(remus.*)\|", disk.uname).group(1).replace(':', '_')
-        absfifo = os.path.join(self.FIFODIR, fifo)
-        absmsgfifo = absfifo + '.msg'
-
-        self.installed = False
-        self.ctlfd = open(absfifo, 'w+b')
-        self.msgfd = open(absmsgfifo, 'r+b')
 
     def __del__(self):
         self.uninstall()
@@ -56,12 +85,24 @@ class ReplicatedDisk(CheckpointedDevice):
             self.ctlfd = None
 
     def postsuspend(self):
-        os.write(self.ctlfd.fileno(), 'flush')
+        if not self.is_drbd:
+            os.write(self.ctlfd.fileno(), 'flush')
+        elif not self.ackwait:
+            if (fcntl.ioctl(self.ctlfd.fileno(), self.SEND_CHECKPOINT, 0) > 0):
+                self.ackwait = False
+            else:
+                self.ackwait = True
+
+    def preresume(self):
+        if self.is_drbd and self.ackwait:
+            fcntl.ioctl(self.ctlfd.fileno(), self.WAIT_CHECKPOINT_ACK, 0)
+            self.ackwait = False
 
     def commit(self):
-        msg = os.read(self.msgfd.fileno(), 4)
-        if msg != 'done':
-            print 'Unknown message: %s' % msg
+        if not self.is_drbd:
+            msg = os.read(self.msgfd.fileno(), 4)
+            if msg != 'done':
+                print 'Unknown message: %s' % msg
 
 ### Network
 
