@@ -966,6 +966,17 @@ int xc_domain_set_memmap_limit(xc_interface *xch,
                                uint32_t domid,
                                unsigned long map_limitkb);
 
+#if defined(__i386__) || defined(__x86_64__)
+#include "xc_e820.h"
+int xc_domain_set_memory_map(xc_interface *xch,
+                               uint32_t domid,
+                               struct e820entry entries[],
+                               uint32_t nr_entries);
+
+int xc_get_machine_memory_map(xc_interface *xch,
+                              struct e820entry entries[],
+                              uint32_t max_entries);
+#endif
 int xc_domain_set_time_offset(xc_interface *xch,
                               uint32_t domid,
                               int32_t time_offset_seconds);

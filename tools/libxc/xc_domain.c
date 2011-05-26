@@ -478,37 +478,64 @@ int xc_domain_pin_memory_cacheattr(xc_interface *xch,
 }
 
 #if defined(__i386__) || defined(__x86_64__)
-#include "xc_e820.h"
-int xc_domain_set_memmap_limit(xc_interface *xch,
+int xc_domain_set_memory_map(xc_interface *xch,
                                uint32_t domid,
-                               unsigned long map_limitkb)
+                               struct e820entry entries[],
+                               uint32_t nr_entries)
 {
     int rc;
     struct xen_foreign_memory_map fmap = {
         .domid = domid,
-        .map = { .nr_entries = 1 }
+        .map = { .nr_entries = nr_entries }
     };
-    DECLARE_HYPERCALL_BUFFER(struct e820entry, e820);
+    DECLARE_HYPERCALL_BOUNCE(entries, nr_entries * sizeof(struct e820entry),
+                             XC_HYPERCALL_BUFFER_BOUNCE_IN);
 
-    e820 = xc_hypercall_buffer_alloc(xch, e820, sizeof(*e820));
-
-    if ( e820 == NULL )
-    {
-        PERROR("Could not allocate memory for xc_domain_set_memmap_limit hypercall");
+    if ( !entries || xc_hypercall_bounce_pre(xch, entries) )
         return -1;
-    }
 
-    e820->addr = 0;
-    e820->size = (uint64_t)map_limitkb << 10;
-    e820->type = E820_RAM;
-
-    set_xen_guest_handle(fmap.map.buffer, e820);
+    set_xen_guest_handle(fmap.map.buffer, entries);
 
     rc = do_memory_op(xch, XENMEM_set_memory_map, &fmap, sizeof(fmap));
 
-    xc_hypercall_buffer_free(xch, e820);
+    xc_hypercall_bounce_post(xch, entries);
 
     return rc;
+}
+int xc_get_machine_memory_map(xc_interface *xch,
+                              struct e820entry entries[],
+                              uint32_t max_entries)
+{
+    int rc;
+    struct xen_memory_map memmap = {
+        .nr_entries = max_entries
+    };
+    DECLARE_HYPERCALL_BOUNCE(entries, sizeof(struct e820entry) * max_entries,
+                             XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+
+    if ( !entries || xc_hypercall_bounce_pre(xch, entries) || max_entries <= 1)
+        return -1;
+
+
+    set_xen_guest_handle(memmap.buffer, entries);
+
+    rc = do_memory_op(xch, XENMEM_machine_memory_map, &memmap, sizeof(memmap));
+
+    xc_hypercall_bounce_post(xch, entries);
+
+    return rc ? rc : memmap.nr_entries;
+}
+int xc_domain_set_memmap_limit(xc_interface *xch,
+                               uint32_t domid,
+                               unsigned long map_limitkb)
+{
+    struct e820entry e820;
+
+    e820.addr = 0;
+    e820.size = (uint64_t)map_limitkb << 10;
+    e820.type = E820_RAM;
+
+    return xc_domain_set_memory_map(xch, domid, &e820, 1);
 }
 #else
 int xc_domain_set_memmap_limit(xc_interface *xch,
