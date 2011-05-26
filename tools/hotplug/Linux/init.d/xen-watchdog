@@ -10,8 +10,8 @@
 # Should-Start:      $syslog $remote_fs
 # Required-Stop:     xend
 # Should-Stop:       $syslog $remote_fs
-# Default-Start:     3 4 5
-# Default-Stop:      0 1 2 6
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
 # Short-Description: Start/stop xen-watchdog
 # Description:       Run domain watchdog daemon.
 ### END INIT INFO
