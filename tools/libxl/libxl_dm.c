@@ -282,6 +282,43 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     if (info->sdl) {
         flexarray_append(dm_args, "-sdl");
     }
+    if (info->spice) {
+        char *spiceoptions = NULL;
+        if (!info->spiceport && !info->spicetls_port) {
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                "at least one of the spiceport or tls_port must be provided");
+            return NULL;
+        }
+
+        if (!info->spicedisable_ticketing) {
+            if (!info->spicepasswd) {
+                LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                    "spice ticketing is enabled but missing password");
+                return NULL;
+            }
+            else if (!info->spicepasswd[0]) {
+                LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                    "spice password can't be empty");
+                return NULL;
+            }
+        }
+        spiceoptions = libxl__sprintf(gc, "port=%d,tls-port=%d",
+                       info->spiceport, info->spicetls_port);
+        if (info->spicehost)
+            spiceoptions = libxl__sprintf(gc,
+                    "%s,addr=%s", spiceoptions, info->spicehost);
+        if (info->spicedisable_ticketing)
+            spiceoptions = libxl__sprintf(gc, "%s,disable-ticketing",
+                                               spiceoptions);
+        else
+            spiceoptions = libxl__sprintf(gc,
+                    "%s,password=%s", spiceoptions, info->spicepasswd);
+        spiceoptions = libxl__sprintf(gc, "%s,agent-mouse=%s", spiceoptions,
+                                      info->spiceagent_mouse ? "on" : "off");
+
+        flexarray_append(dm_args, "-spice");
+        flexarray_append(dm_args, spiceoptions);
+    }
 
     if (info->type == LIBXL_DOMAIN_TYPE_PV && !info->nographic) {
         flexarray_vappend(dm_args, "-vga", "xenfb", NULL);

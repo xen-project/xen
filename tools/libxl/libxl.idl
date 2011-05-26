@@ -210,6 +210,22 @@ libxl_device_model_info = Struct("device_model_info",[
     ("keymap",           string,            False, "set keyboard layout, default is en-us keyboard"),
     ("sdl",              bool,              False, "sdl enabled or disabled"),
     ("opengl",           bool,              False, "opengl enabled or disabled (if enabled requires sdl enabled)"),
+    ("spice",            bool,              False,
+    "spice enabled or disabled"),
+    ("spiceport",        integer,           False, 
+    "the port that should be listened on for the spice server"),
+    ("spicetls_port",    integer,           False, """the tls port
+that should be listened on for the spice server, 
+at least one of the port or tls port must be given"""),
+    ("spicehost",        string,            False, """the interface
+that should be listened on if given otherwise any interface"""),
+    ("spicedisable_ticketing", bool,        False, 
+    "enable client connection with no password"),
+    ("spicepasswd",      string,            False, """set ticket password
+witch must be used by a client for connection.
+The password never expires"""),
+    ("spiceagent_mouse", bool,              False, 
+    "Whether spice agent is used for client mouse mode(default is on)"),
     ("nographic",        bool,              False, "no graphics, use serial port"),
     ("gfx_passthru",     bool,              False, "graphics passthrough enabled or disabled"),
     ("serial",           string,            False, "serial port re-direct to pty deivce"),
