@@ -380,6 +380,7 @@ static void printf_info(int domid,
         printf("\t\t\t(kernel %s)\n", b_info->u.pv.kernel.path);
         printf("\t\t\t(cmdline %s)\n", b_info->u.pv.cmdline);
         printf("\t\t\t(ramdisk %s)\n", b_info->u.pv.ramdisk.path);
+        printf("\t\t\t(e820_host %d)\n", b_info->u.pv.e820_host);
         printf("\t\t)\n");
     }
     printf("\t)\n");
@@ -1001,6 +1002,8 @@ skip_vfb:
             if (!libxl_device_pci_parse_bdf(ctx, pcidev, buf))
                 d_config->num_pcidevs++;
         }
+        if (d_config->num_pcidevs && !c_info->hvm)
+            b_info->u.pv.e820_host = true;
     }
 
     switch (xlu_cfg_get_list(config, "cpuid", &cpuids, 0, 1)) {

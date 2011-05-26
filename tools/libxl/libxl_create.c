@@ -525,6 +525,14 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     for (i = 0; i < d_config->num_pcidevs; i++)
         libxl__device_pci_add(gc, domid, &d_config->pcidevs[i], 1);
 
+    if (!d_config->c_info.hvm && d_config->b_info.u.pv.e820_host) {
+        int rc;
+        rc = libxl__e820_alloc(ctx, domid, d_config);
+        if (rc)
+            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                      "Failed while collecting E820 with: %d (errno:%d)\n",
+                      rc, errno);
+    }
     if ( cb && (d_config->c_info.hvm || d_config->b_info.u.pv.bootloader )) {
         if ( (*cb)(ctx, domid, priv) )
             goto error_out;

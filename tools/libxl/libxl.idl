@@ -180,6 +180,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                         ("cmdline", string),
                                         ("ramdisk", libxl_file_reference),
                                         ("features", string, True),
+                                        ("e820_host", bool, False, "Use host's E820 for PCI passthrough."),
                                         ])),
                  ])),
     ],

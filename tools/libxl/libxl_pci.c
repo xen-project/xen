@@ -1051,3 +1051,167 @@ int libxl_device_pci_shutdown(libxl_ctx *ctx, uint32_t domid)
     free(pcidevs);
     return 0;
 }
+
+static const char *e820_names(int type)
+{
+    switch (type) {
+        case E820_RAM: return "RAM";
+        case E820_RESERVED: return "Reserved";
+        case E820_ACPI: return "ACPI";
+        case E820_NVS: return "ACPI NVS";
+        case E820_UNUSABLE: return "Unusable";
+        default: break;
+    }
+    return "Unknown";
+}
+
+static int e820_sanitize(libxl_ctx *ctx, struct e820entry src[],
+                         uint32_t *nr_entries,
+                         unsigned long map_limitkb,
+                         unsigned long balloon_kb)
+{
+    uint64_t delta_kb = 0, start = 0, start_kb = 0, last = 0, ram_end;
+    uint32_t i, idx = 0, nr;
+    struct e820entry e820[E820MAX];
+
+    if (!src || !map_limitkb || !balloon_kb || !nr_entries)
+        return ERROR_INVAL;
+
+    nr = *nr_entries;
+    if (!nr)
+        return ERROR_INVAL;
+
+    if (nr > E820MAX)
+        return ERROR_NOMEM;
+
+    /* Weed out anything under 1MB */
+    for (i = 0; i < nr; i++) {
+        if (src[i].addr > 0x100000)
+            continue;
+
+        src[i].type = 0;
+        src[i].size = 0;
+        src[i].addr = -1ULL;
+    }
+
+    /* Find the lowest and highest entry in E820, skipping over
+     * undesired entries. */
+    start = -1ULL;
+    last = 0;
+    for (i = 0; i < nr; i++) {
+        if ((src[i].type == E820_RAM) ||
+            (src[i].type == E820_UNUSABLE) ||
+            (src[i].type == 0))
+		continue;
+
+        start = src[i].addr < start ? src[i].addr : start;
+        last = src[i].addr + src[i].size > last ?
+               src[i].addr + src[i].size > last : last;
+    }
+    if (start > 1024)
+        start_kb = start >> 10;
+
+    /* Add the memory RAM region for the guest */
+    e820[idx].addr = 0;
+    e820[idx].size = (uint64_t)map_limitkb << 10;
+    e820[idx].type = E820_RAM;
+
+    /* .. and trim if neccessary */
+    if (start_kb && map_limitkb > start_kb) {
+        delta_kb = map_limitkb - start_kb;
+        if (delta_kb)
+            e820[idx].size -= (uint64_t)(delta_kb << 10);
+    }
+    /* Note: We don't touch balloon_kb here. Will add it at the end. */
+    ram_end = e820[idx].addr + e820[idx].size;
+    idx ++;
+
+    LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Memory: %"PRIu64"kB End of RAM: " \
+               "0x%"PRIx64" (PFN) Delta: %"PRIu64"kB, PCI start: %"PRIu64"kB " \
+               "(0x%"PRIx64" PFN), Balloon %"PRIu64"kB\n", (uint64_t)map_limitkb,
+               ram_end >> 12, delta_kb, start_kb ,start >> 12,
+               (uint64_t)balloon_kb);
+
+    /* Check if there is a region between ram_end and start. */
+    if (start > ram_end) {
+        /* .. and if not present, add it in. This is to guard against
+          the Linux guest assuming that the gap between the end of
+          RAM region and the start of the E820_[ACPI,NVS,RESERVED]
+          is PCI I/O space. Which it certainly is _not_. */
+        e820[idx].type = E820_UNUSABLE;
+        e820[idx].addr = ram_end;
+        e820[idx].size = start - ram_end;
+        idx++;
+    }
+    /* Almost done: copy them over, ignoring the undesireable ones */
+    for (i = 0; i < nr; i++) {
+        if ((src[i].type == E820_RAM) ||
+	    (src[i].type == E820_UNUSABLE) ||
+	    (src[i].type == 0))
+	    continue;
+
+        e820[idx].type = src[i].type;
+        e820[idx].addr = src[i].addr;
+        e820[idx].size = src[i].size;
+        idx++;
+    }
+    /* At this point we have the mapped RAM + E820 entries from src. */
+    if (balloon_kb) {
+        /* and if we truncated the RAM region, then add it to the end. */
+        e820[idx].type = E820_RAM;
+        e820[idx].addr = (uint64_t)(1ULL << 32) > last ?
+                         (uint64_t)(1ULL << 32) : last;
+        /* also add the balloon memory to the end. */
+        e820[idx].size = (uint64_t)(delta_kb << 10) +
+                         (uint64_t)(balloon_kb << 10);
+        idx++;
+
+    }
+    nr = idx;
+
+    for (i = 0; i < nr; i++) {
+      LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, ":\t[%"PRIx64" -> %"PRIx64"] %s",
+                 e820[i].addr >> 12, (e820[i].addr + e820[i].size) >> 12,
+                 e820_names(e820[i].type));
+    }
+
+    /* Done: copy the sanitized version. */
+    *nr_entries = nr;
+    memcpy(src, e820, nr * sizeof(struct e820entry));
+    return 0;
+}
+
+int libxl__e820_alloc(libxl_ctx *ctx, uint32_t domid, libxl_domain_config *d_config)
+{
+    int rc;
+    uint32_t nr;
+    struct e820entry map[E820MAX];
+    libxl_domain_build_info *b_info;
+
+    if (d_config == NULL || d_config->c_info.hvm)
+        return ERROR_INVAL;
+
+    b_info = &d_config->b_info;
+    if (!b_info->u.pv.e820_host)
+        return ERROR_INVAL;
+
+    rc = xc_get_machine_memory_map(ctx->xch, map, E820MAX);
+    if (rc < 0) {
+        errno = rc;
+        return ERROR_FAIL;
+    }
+    nr = rc;
+    rc = e820_sanitize(ctx, map, &nr, b_info->target_memkb,
+                       (b_info->max_memkb - b_info->target_memkb) +
+                       b_info->u.pv.slack_memkb);
+    if (rc)
+        return ERROR_FAIL;
+
+    rc = xc_domain_set_memory_map(ctx->xch, domid, map, nr);
+
+    if (rc < 0) {
+        errno  = rc;
+        return ERROR_FAIL;
+    }
+    return 0;
+}
