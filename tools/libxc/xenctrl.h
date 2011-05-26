@@ -1398,6 +1398,8 @@ int xc_hvm_set_isa_irq_level(
 int xc_hvm_set_pci_link_route(
     xc_interface *xch, domid_t dom, uint8_t link, uint8_t isa_irq);
 
+int xc_hvm_inject_msi(
+    xc_interface *xch, domid_t dom, uint64_t addr, uint32_t data);
 
 /*
  * Track dirty bit changes in the VRAM area

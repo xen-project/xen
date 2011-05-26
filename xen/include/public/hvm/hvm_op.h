@@ -240,4 +240,22 @@ struct xen_hvm_get_mem_type {
 typedef struct xen_hvm_get_mem_type xen_hvm_get_mem_type_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_get_mem_type_t);
 
+/* Following tools-only interfaces may change in future. */
+#if defined(__XEN__) || defined(__XEN_TOOLS__)
+
+/* MSI injection for emulated devices */
+#define HVMOP_inject_msi         16
+struct xen_hvm_inject_msi {
+    /* Domain to be injected */
+    domid_t   domid;
+    /* Data -- lower 32 bits */
+    uint32_t  data;
+    /* Address (0xfeexxxxx) */
+    uint64_t  addr;
+};
+typedef struct xen_hvm_inject_msi xen_hvm_inject_msi_t;
+DEFINE_XEN_GUEST_HANDLE(xen_hvm_inject_msi_t);
+
+#endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */
+
 #endif /* __XEN_PUBLIC_HVM_HVM_OP_H__ */

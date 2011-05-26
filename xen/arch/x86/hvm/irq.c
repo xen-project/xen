@@ -26,6 +26,7 @@
 #include <xen/irq.h>
 #include <asm/hvm/domain.h>
 #include <asm/hvm/support.h>
+#include <asm/msi.h>
 
 /* Must be called with hvm_domain->irq_lock hold */
 static void assert_irq(struct domain *d, unsigned ioapic_gsi, unsigned pic_irq)
@@ -257,6 +258,20 @@ void hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq)
 
     dprintk(XENLOG_G_INFO, "Dom%u PCI link %u changed %u -> %u\n",
             d->domain_id, link, old_isa_irq, isa_irq);
+}
+
+void hvm_inject_msi(struct domain *d, uint64_t addr, uint32_t data)
+{
+    uint32_t tmp = (uint32_t) addr;
+    uint8_t  dest = (tmp & MSI_ADDR_DEST_ID_MASK) >> MSI_ADDR_DEST_ID_SHIFT;
+    uint8_t  dest_mode = !!(tmp & MSI_ADDR_DESTMODE_MASK);
+    uint8_t  delivery_mode = (data & MSI_DATA_DELIVERY_MODE_MASK)
+        >> MSI_DATA_DELIVERY_MODE_SHIFT;
+    uint8_t trig_mode = (data & MSI_DATA_TRIGGER_MASK)
+        >> MSI_DATA_TRIGGER_SHIFT;
+    uint8_t vector = data & MSI_DATA_VECTOR_MASK;
+
+    vmsi_deliver(d, vector, dest, dest_mode, delivery_mode, trig_mode);
 }
 
 void hvm_set_callback_via(struct domain *d, uint64_t via)

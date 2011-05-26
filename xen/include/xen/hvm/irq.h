@@ -116,6 +116,8 @@ void hvm_isa_irq_deassert(
 
 void hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq);
 
+void hvm_inject_msi(struct domain *d, uint64_t addr, uint32_t data);
+
 void hvm_maybe_deassert_evtchn_irq(void);
 void hvm_assert_evtchn_irq(struct vcpu *v);
 void hvm_set_callback_via(struct domain *d, uint64_t via);
