@@ -454,10 +454,9 @@ void hvm_dpci_msi_eoi(struct domain *d, int vector)
 
 static int hvm_pci_msi_assert(struct domain *d, int pirq)
 {
-    if ( hvm_domain_use_pirq(d, pirq) )
-        return send_guest_pirq(d, pirq);
-    else
-        return vmsi_deliver(d, pirq);
+    return (hvm_domain_use_pirq(d, pirq)
+            ? send_guest_pirq(d, pirq)
+            : vmsi_deliver_pirq(d, pirq));
 }
 #endif
 

@@ -199,7 +199,11 @@ void hvm_init_guest_time(struct domain *d);
 void hvm_set_guest_time(struct vcpu *v, u64 guest_time);
 u64 hvm_get_guest_time(struct vcpu *v);
 
-int vmsi_deliver(struct domain *d, int pirq);
+int vmsi_deliver(
+    struct domain *d, int vector,
+    uint8_t dest, uint8_t dest_mode,
+    uint8_t delivery_mode, uint8_t trig_mode);
+int vmsi_deliver_pirq(struct domain *d, int pirq);
 int hvm_girq_dest_2_vcpu_id(struct domain *d, uint8_t dest, uint8_t dest_mode);
 
 #define hvm_paging_enabled(v) \

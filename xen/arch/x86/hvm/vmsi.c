@@ -65,28 +65,13 @@ static void vmsi_inj_irq(
     }
 }
 
-int vmsi_deliver(struct domain *d, int pirq)
+int vmsi_deliver(
+    struct domain *d, int vector,
+    uint8_t dest, uint8_t dest_mode,
+    uint8_t delivery_mode, uint8_t trig_mode)
 {
-    struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
-    uint32_t flags = hvm_irq_dpci->mirq[pirq].gmsi.gflags;
-    int vector = hvm_irq_dpci->mirq[pirq].gmsi.gvec;
-    uint8_t dest = (uint8_t)flags;
-    uint8_t dest_mode = !!(flags & VMSI_DM_MASK);
-    uint8_t delivery_mode = (flags & VMSI_DELIV_MASK) >> GFLAGS_SHIFT_DELIV_MODE;
-    uint8_t trig_mode = (flags & VMSI_TRIG_MODE) >> GFLAGS_SHIFT_TRG_MODE;
     struct vlapic *target;
     struct vcpu *v;
-
-    HVM_DBG_LOG(DBG_LEVEL_IOAPIC,
-                "msi: dest=%x dest_mode=%x delivery_mode=%x "
-                "vector=%x trig_mode=%x\n",
-                dest, dest_mode, delivery_mode, vector, trig_mode);
-
-    if ( !( hvm_irq_dpci->mirq[pirq].flags & HVM_IRQ_DPCI_GUEST_MSI ) )
-    {
-        gdprintk(XENLOG_WARNING, "pirq %x not msi \n", pirq);
-        return 0;
-    }
 
     switch ( delivery_mode )
     {
@@ -122,6 +107,32 @@ int vmsi_deliver(struct domain *d, int pirq)
                  delivery_mode);
         break;
     }
+    return 1;
+}
+
+int vmsi_deliver_pirq(struct domain *d, int pirq)
+{
+    struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
+    uint32_t flags = hvm_irq_dpci->mirq[pirq].gmsi.gflags;
+    int vector = hvm_irq_dpci->mirq[pirq].gmsi.gvec;
+    uint8_t dest = (uint8_t)flags;
+    uint8_t dest_mode = !!(flags & VMSI_DM_MASK);
+    uint8_t delivery_mode = (flags & VMSI_DELIV_MASK)
+        >> GFLAGS_SHIFT_DELIV_MODE;
+    uint8_t trig_mode = (flags&VMSI_TRIG_MODE) >> GFLAGS_SHIFT_TRG_MODE;
+
+    HVM_DBG_LOG(DBG_LEVEL_IOAPIC,
+                "msi: dest=%x dest_mode=%x delivery_mode=%x "
+                "vector=%x trig_mode=%x\n",
+                dest, dest_mode, delivery_mode, vector, trig_mode);
+
+    if ( !(hvm_irq_dpci->mirq[pirq].flags & HVM_IRQ_DPCI_GUEST_MSI) )
+    {
+        gdprintk(XENLOG_WARNING, "pirq %x not msi \n", pirq);
+        return 0;
+    }
+
+    vmsi_deliver(d, vector, dest, dest_mode, delivery_mode, trig_mode);
     return 1;
 }
 
