@@ -986,6 +986,16 @@ skip_vfb:
     if (!xlu_cfg_get_long (config, "pci_power_mgmt", &l))
         pci_power_mgmt = l;
 
+    /* To be reworked (automatically enabled) once the auto ballooning
+     * after guest starts is done (with PCI devices passed in). */
+    if (!xlu_cfg_get_long (config, "e820_host", &l)) {
+        if (c_info->hvm)
+          fprintf(stderr, "Can't do e820_host in HVM mode!");
+        else {
+          if (l)
+            b_info->u.pv.e820_host = true;
+        }
+    }
     if (!xlu_cfg_get_list (config, "pci", &pcis, 0, 0)) {
         int i;
         d_config->num_pcidevs = 0;
