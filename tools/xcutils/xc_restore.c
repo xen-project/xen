@@ -43,7 +43,7 @@ main(int argc, char **argv)
     if ( argc == 9 )
 	    superpages = atoi(argv[8]);
     else
-	    superpages = 0;
+	    superpages = !!hvm;
 
     ret = xc_domain_restore(xch, io_fd, domid, store_evtchn, &store_mfn,
                             console_evtchn, &console_mfn, hvm, pae, superpages);
