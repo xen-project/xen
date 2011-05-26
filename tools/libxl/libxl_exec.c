@@ -41,8 +41,6 @@ static void check_open_fds(const char *what)
     const char *env_debug;
     int debug;
     int i, flags, badness = 0;
-    char path[PATH_MAX];
-    char link[PATH_MAX+1];
 
     env_debug = getenv("_LIBXL_DEBUG_EXEC_FDS");
     if (!env_debug) return;
@@ -53,6 +51,8 @@ static void check_open_fds(const char *what)
     for (i = 4; i < 256; i++) {
 #ifdef __linux__
         size_t len;
+        char path[PATH_MAX];
+        char link[PATH_MAX+1];
 #endif
         flags = fcntl(i, F_GETFD);
         if ( flags == -1 ) {
