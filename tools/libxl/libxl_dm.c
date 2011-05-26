@@ -373,12 +373,16 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                 } else {
                     ifname = vifs[i].ifname;
                 }
-                flexarray_append(dm_args, "-net");
-                flexarray_append(dm_args, libxl__sprintf(gc, "nic,vlan=%d,macaddr=%s,model=%s",
-                            vifs[i].devid, smac, vifs[i].model));
-                flexarray_append(dm_args, "-net");
-                flexarray_append(dm_args, libxl__sprintf(gc, "tap,vlan=%d,ifname=%s,script=%s",
-                            vifs[i].devid, ifname, libxl_tapif_script(gc)));
+                flexarray_append(dm_args, "-device");
+                flexarray_append(dm_args,
+                   libxl__sprintf(gc, "%s,id=nic%d,netdev=net%d,mac=%s",
+                                                vifs[i].model, vifs[i].devid,
+                                                vifs[i].devid, smac));
+                flexarray_append(dm_args, "-netdev");
+                flexarray_append(dm_args,
+                   libxl__sprintf(gc, "type=tap,id=net%d,ifname=%s,script=%s",
+                                                vifs[i].devid, ifname,
+                                                libxl_tapif_script(gc)));
                 ioemu_vifs++;
             }
         }
