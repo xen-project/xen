@@ -311,6 +311,7 @@ int deassign_device(struct domain *d, u8 bus, u8 devfn)
 int __init iommu_setup(void)
 {
     int rc = -ENODEV;
+    bool_t force_intremap = force_iommu && iommu_intremap;
 
     if ( iommu_dom0_strict )
         iommu_passthrough = 0;
@@ -321,8 +322,10 @@ int __init iommu_setup(void)
         iommu_enabled = (rc == 0);
     }
 
-    if ( force_iommu && !iommu_enabled )
-        panic("IOMMU setup failed, crash Xen for security purpose!\n");
+    if ( (force_iommu && !iommu_enabled) ||
+         (force_intremap && !iommu_intremap) )
+        panic("Couldn't enable %s and iommu=required/force\n",
+              !iommu_enabled ? "IOMMU" : "Interrupt Remapping");
 
     if ( !iommu_enabled )
     {
