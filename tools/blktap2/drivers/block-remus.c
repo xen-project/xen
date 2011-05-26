@@ -103,12 +103,24 @@ struct ramdisk {
 	size_t sector_size;
 	struct hashtable* h;
 	/* when a ramdisk is flushed, h is given a new empty hash for writes
-	 * while the old ramdisk (prev) is drained asynchronously. To avoid
-	 * a race where a read request points to a sector in prev which has
-	 * not yet been flushed, check prev on a miss in h */
+	 * while the old ramdisk (prev) is drained asynchronously.
+	 */
 	struct hashtable* prev;
 	/* count of outstanding requests to the base driver */
 	size_t inflight;
+	/* prev holds the requests to be flushed, while inprogress holds
+	 * requests being flushed. When requests complete, they are removed
+	 * from inprogress.
+	 * Whenever a new flush is merged with ongoing flush (i.e, prev),
+	 * we have to make sure that none of the new requests overlap with
+	 * ones in "inprogress". If it does, keep it back in prev and dont issue
+	 * IO until the current one finishes. If we allow this IO to proceed,
+	 * we might end up with two "overlapping" requests in the disk's queue and
+	 * the disk may not offer any guarantee on which one is written first.
+	 * IOW, make sure we dont create a write-after-write time ordering constraint.
+	 * 
+	 */
+	struct hashtable* inprogress;
 };
 
 /* the ramdisk intercepts the original callback for reads and writes.
@@ -217,6 +229,8 @@ static inline int ring_isfull(struct req_ring* ring)
 {
 	return ring_next(ring, ring->tail) == ring->head;
 }
+/* Prototype declarations */
+static int ramdisk_flush(td_driver_t *driver, struct tdremus_state* s);
 
 /* functions to create and sumbit treq's */
 
@@ -225,7 +239,8 @@ replicated_write_callback(td_request_t treq, int err)
 {
 	struct tdremus_state *s = (struct tdremus_state *) treq.cb_data;
 	td_vbd_request_t *vreq;
-
+	int i;
+	uint64_t start;
 	vreq = (td_vbd_request_t *) treq.private;
 
 	/* the write failed for now, lets panic. this is very bad */
@@ -240,6 +255,13 @@ replicated_write_callback(td_request_t treq, int err)
 	free(vreq);
 
 	s->ramdisk.inflight--;
+	start = treq.sec;
+	for (i = 0; i < treq.secs; i++) {
+		hashtable_remove(s->ramdisk.inprogress, &start);
+		start++;
+	}
+	free(treq.buf);
+
 	if (!s->ramdisk.inflight && !s->ramdisk.prev) {
 		/* TODO: the ramdisk has been flushed */
 	}
@@ -281,9 +303,6 @@ create_write_request(struct tdremus_state *state, td_sector_t sec, int secs, cha
 }
 
 
-/* ramdisk methods */
-static int ramdisk_flush(td_driver_t *driver, struct tdremus_state *s);
-
 /* http://www.concentric.net/~Ttwang/tech/inthash.htm */
 static unsigned int uint64_hash(void* k)
 {
@@ -318,9 +337,10 @@ static int ramdisk_read(struct ramdisk* ramdisk, uint64_t sector,
 
 	for (i = 0; i < nb_sectors; i++) {
 		key = sector + i;
-		if (!(v = hashtable_search(ramdisk->h, &key))) {
-			/* check whether it is queued in a previous flush request */
-			if (!(ramdisk->prev && (v = hashtable_search(ramdisk->prev, &key))))
+		/* check whether it is queued in a previous flush request */
+		if (!(ramdisk->prev && (v = hashtable_search(ramdisk->prev, &key)))) {
+			/* check whether it is an ongoing flush */
+			if (!(ramdisk->inprogress && (v = hashtable_search(ramdisk->inprogress, &key))))
 				return -1;
 		}
 		memcpy(buf + i * ramdisk->sector_size, v, ramdisk->sector_size);
@@ -377,40 +397,6 @@ static inline int ramdisk_write(struct ramdisk* ramdisk, uint64_t sector,
 	return 0;
 }
 
-static int ramdisk_write_cb(td_driver_t *driver, int res, uint64_t sector,
-			    int nb_sectors, int id, void* private)
-{
-	struct ramdisk_write_cbdata *cbdata = (struct ramdisk_write_cbdata*)private;
-	struct tdremus_state *s = cbdata->state;
-	int rc;
-
-	/*
-	  RPRINTF("ramdisk write callback: rc %d, %d sectors @ %" PRIu64 "\n", res, nb_sectors,
-	  sector);
-	*/
-
-	free(cbdata->buf);
-	free(cbdata);
-
-	s->ramdisk.inflight--;
-	if (!s->ramdisk.inflight && !s->ramdisk.prev) {
-		/* when this reaches 0 and prev is empty, the disk is flushed. */
-		/*
-		  RPRINTF("ramdisk flush complete\n");
-		*/
-	}
-
-	if (s->ramdisk.prev) {
-		/* resubmit as much as possible in the remaining disk */
-		/*
-		  RPRINTF("calling ramdisk_flush from write callback\n");
-		*/
-		return ramdisk_flush(driver, s);
-	}
-
-	return 0;
-}
-
 static int uint64_compare(const void* k1, const void* k2)
 {
 	uint64_t u1 = *(uint64_t*)k1;
@@ -447,31 +433,69 @@ static int ramdisk_get_sectors(struct hashtable* h, uint64_t** psectors)
 	return count;
 }
 
-static char* merge_requests(struct ramdisk* ramdisk, uint64_t start,
-			    size_t count)
+/*
+  return -1 for OOM
+  return -2 for merge lookup failure
+  return -3 for WAW race
+  return 0 on success.
+*/
+static int merge_requests(struct ramdisk* ramdisk, uint64_t start,
+			size_t count, char **mergedbuf)
 {
 	char* buf;
 	char* sector;
 	int i;
+	uint64_t *key;
+	int rc = 0;
 
 	if (!(buf = valloc(count * ramdisk->sector_size))) {
 		DPRINTF("merge_request: allocation failed\n");
-		return NULL;
+		return -1;
 	}
 
 	for (i = 0; i < count; i++) {
 		if (!(sector = hashtable_search(ramdisk->prev, &start))) {
 			DPRINTF("merge_request: lookup failed on %"PRIu64"\n", start);
-			return NULL;
+			free(buf);
+			rc = -2;
+			goto fail;
 		}
 
+		/* Check inprogress requests to avoid waw non-determinism */
+		if (hashtable_search(ramdisk->inprogress, &start)) {
+			DPRINTF("merge_request: WAR RACE on %"PRIu64"\n", start);
+			free(buf);
+			rc = -3;
+			goto fail;
+		}
+		/* Insert req into inprogress (brief period of duplication of hash entries until
+		 * they are removed from prev. Read tracking would not be reading wrong entries)
+		 */
+		if (!(key = malloc(sizeof(*key)))) {
+			DPRINTF("%s: error allocating key\n", __FUNCTION__);
+			free(buf);			
+			rc = -1;
+			goto fail;
+		}
+		*key = start;
+		if (!hashtable_insert(ramdisk->inprogress, key, NULL)) {
+			DPRINTF("%s failed to insert sector %" PRIu64 " into inprogress hash\n", 
+				__FUNCTION__, start);
+			free(key);
+			free(buf);
+			rc = -1;
+			goto fail;
+		}
 		memcpy(buf + i * ramdisk->sector_size, sector, ramdisk->sector_size);
-		free(sector);
-
 		start++;
 	}
 
-	return buf;
+	*mergedbuf = buf;
+	return 0;
+fail:
+	for (start--; i >0; i--, start--)
+		hashtable_remove(ramdisk->inprogress, &start);
+	return rc;
 }
 
 /* The underlying driver may not handle having the whole ramdisk queued at
@@ -490,6 +514,12 @@ static int ramdisk_flush(td_driver_t *driver, struct tdremus_state* s)
 	if ((count = ramdisk_get_sectors(s->ramdisk.prev, &sectors)) <= 0)
 		return count;
 
+	/* Create the inprogress table if empty */
+	if (!s->ramdisk.inprogress)
+		s->ramdisk.inprogress = create_hashtable(RAMDISK_HASHSIZE,
+							uint64_hash,
+							rd_hash_equal);
+	
 	/*
 	  RPRINTF("ramdisk: flushing %d sectors\n", count);
 	*/
@@ -503,8 +533,12 @@ static int ramdisk_flush(td_driver_t *driver, struct tdremus_state* s)
 			i++;
 		batchlen = sectors[i-1] - base + 1;
 
-		if (!(buf = merge_requests(&s->ramdisk, base, batchlen))) {
-			RPRINTF("ramdisk_flush: merge_requests failed\n");
+		j = merge_requests(&s->ramdisk, base, batchlen, &buf);
+			
+		if (j) {
+			RPRINTF("ramdisk_flush: merge_requests failed:%s\n",
+				j == -1? "OOM": (j==-2? "missing sector" : "WAW race"));
+			if (j == -3) continue;
 			free(sectors);
 			return -1;
 		}
@@ -518,6 +552,8 @@ static int ramdisk_flush(td_driver_t *driver, struct tdremus_state* s)
 		s->ramdisk.inflight++;
 
 		for (j = 0; j < batchlen; j++) {
+			buf = hashtable_search(s->ramdisk.prev, &base);
+			free(buf);
 			hashtable_remove(s->ramdisk.prev, &base);
 			base++;
 		}
@@ -864,6 +900,18 @@ static int client_flush(td_driver_t *driver)
 	return 0;
 }
 
+static int server_flush(td_driver_t *driver)
+{
+	struct tdremus_state *s = (struct tdremus_state *)driver->data;
+	/* 
+	 * Nothing to flush in beginning.
+	 */
+	if (!s->ramdisk.prev)
+		return 0;
+	/* Try to flush any remaining requests */
+	return ramdisk_flush(driver, s);	
+}
+
 static int primary_start(td_driver_t *driver)
 {
 	struct tdremus_state *s = (struct tdremus_state *)driver->data;
@@ -1103,18 +1151,18 @@ static inline int server_writes_inflight(td_driver_t *driver)
 void backup_queue_read(td_driver_t *driver, td_request_t treq)
 {
 	struct tdremus_state *s = (struct tdremus_state *)driver->data;
-
+	int i;
 	if(!remus_image)
 		remus_image = treq.image;
-
-#if 0
-	/* due to prefetching, we must return EBUSY on server reads. This
-	 * maintains a consistent disk image */
-	td_complete_request(treq, -EBUSY);
-#else
-	/* what exactly is the race that requires the response above? */
-	td_forward_request(treq);
-#endif
+	
+	/* check if this read is queued in any currently ongoing flush */
+	if (ramdisk_read(&s->ramdisk, treq.sec, treq.secs, treq.buf)) {
+		/* TODO: Add to pending read hash */
+		td_forward_request(treq);
+	} else {
+		/* complete the request */
+		td_complete_request(treq, 0);
+	}
 }
 
 /* see above */
@@ -1142,6 +1190,7 @@ static int backup_start(td_driver_t *driver)
 
 	tapdisk_remus.td_queue_read = backup_queue_read;
 	tapdisk_remus.td_queue_write = backup_queue_write;
+	s->queue_flush = server_flush;
 	/* TODO set flush function */
 	return 0;
 }
@@ -1257,8 +1306,13 @@ void unprotected_queue_read(td_driver_t *driver, td_request_t treq)
 
 	/* wait for previous ramdisk to flush  before servicing reads */
 	if (server_writes_inflight(driver)) {
-		/* for now lets just return EBUSY. if this becomes an issue we can
-		 * do something smarter */
+		/* for now lets just return EBUSY.
+		 * if there are any left-over requests in prev,
+		 * kick em again.
+		 */
+		if(!s->ramdisk.inflight) /* nothing in inprogress */
+			ramdisk_flush(driver, s);
+
 		td_complete_request(treq, -EBUSY);
 	}
 	else {
@@ -1275,10 +1329,13 @@ void unprotected_queue_write(td_driver_t *driver, td_request_t treq)
 	/* wait for previous ramdisk to flush */
 	if (server_writes_inflight(driver)) {
 		RPRINTF("queue_write: waiting for queue to drain");
+		if(!s->ramdisk.inflight) /* nothing in inprogress. Kick prev */
+			ramdisk_flush(driver, s);
 		td_complete_request(treq, -EBUSY);
 	}
 	else {
 		// RPRINTF("servicing write request on backup\n");
+		/* NOTE: DRBD style bitmap tracking could go here */
 		td_forward_request(treq);
 	}
 }
@@ -1632,7 +1689,9 @@ static int tdremus_close(td_driver_t *driver)
 	struct tdremus_state *s = (struct tdremus_state *)driver->data;
 
 	RPRINTF("closing\n");
-
+	if (s->ramdisk.inprogress)
+		hashtable_destroy(s->ramdisk.inprogress, 0);
+	
 	if (s->driver_data) {
 		free(s->driver_data);
 		s->driver_data = NULL;
