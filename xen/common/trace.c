@@ -166,7 +166,7 @@ static int calculate_tbuf_size(unsigned int pages, uint16_t t_info_first_offset)
  */
 static int alloc_trace_bufs(unsigned int pages)
 {
-    int i, cpu, order;
+    int i, cpu;
     /* Start after a fixed-size array of NR_CPUS */
     uint32_t *t_info_mfn_list;
     uint16_t t_info_first_offset;
@@ -182,34 +182,11 @@ static int alloc_trace_bufs(unsigned int pages)
     t_info_first_offset = calc_tinfo_first_offset();
 
     pages = calculate_tbuf_size(pages, t_info_first_offset);
-    order = get_order_from_pages(pages);
 
     t_info = alloc_xenheap_pages(get_order_from_pages(t_info_pages), 0);
     if ( t_info == NULL )
-        goto out_dealloc;
+        goto out_dealloc_t_info;
 
-    /*
-     * First, allocate buffers for all of the cpus.  If any
-     * fails, deallocate what you have so far and exit. 
-     */
-    for_each_online_cpu(cpu)
-    {
-        void *rawbuf;
-        struct t_buf *buf;
-
-        if ( (rawbuf = alloc_xenheap_pages(
-                order, MEMF_bits(32 + PAGE_SHIFT))) == NULL )
-        {
-            printk(XENLOG_INFO "xentrace: memory allocation failed "
-                   "on cpu %d\n", cpu);
-            goto out_dealloc;
-        }
-
-        per_cpu(t_bufs, cpu) = buf = rawbuf;
-        buf->cons = buf->prod = 0;
-    }
-
-    offset = t_info_first_offset;
     t_info_mfn_list = (uint32_t *)t_info;
 
     for(i = 0; i < t_info_pages; i++)
@@ -219,27 +196,53 @@ static int alloc_trace_bufs(unsigned int pages)
     t_info->tbuf_size = pages;
 
     /*
-     * Now share the pages so xentrace can map them, and write them in
-     * the global t_info structure.
+     * Allocate buffers for all of the cpus.
+     * If any fails, deallocate what you have so far and exit.
      */
     for_each_online_cpu(cpu)
     {
-        void *rawbuf = per_cpu(t_bufs, cpu);
-        struct page_info *p = virt_to_page(rawbuf);
-        uint32_t mfn = virt_to_mfn(rawbuf);
+        offset = t_info_first_offset + (cpu * pages);
+        t_info->mfn_offset[cpu] = offset;
 
         for ( i = 0; i < pages; i++ )
         {
-            share_xen_page_with_privileged_guests(p + i, XENSHARE_writable);
-
-            t_info_mfn_list[offset + i]=mfn + i;
+            void *p = alloc_xenheap_pages(0, MEMF_bits(32 + PAGE_SHIFT));
+            if ( !p )
+            {
+                printk(XENLOG_INFO "xentrace: memory allocation failed "
+                       "on cpu %d after %d pages\n", cpu, i);
+                t_info_mfn_list[offset + i] = 0;
+                goto out_dealloc;
+            }
+            t_info_mfn_list[offset + i] = virt_to_mfn(p);
         }
-        t_info->mfn_offset[cpu]=offset;
-        printk(XENLOG_INFO "xentrace: p%d mfn %"PRIx32" offset %d\n",
-               cpu, mfn, offset);
-        offset+=i;
+    }
+
+    /*
+     * Initialize buffers for all of the cpus.
+     */
+    for_each_online_cpu(cpu)
+    {
+        struct t_buf *buf;
+        struct page_info *pg;
 
         spin_lock_init(&per_cpu(t_lock, cpu));
+
+        offset = t_info->mfn_offset[cpu];
+
+        /* Initialize the buffer metadata */
+        per_cpu(t_bufs, cpu) = buf = mfn_to_virt(t_info_mfn_list[offset]);
+        buf->cons = buf->prod = 0;
+
+        printk(XENLOG_INFO "xentrace: p%d mfn %x offset %u\n",
+                   cpu, t_info_mfn_list[offset], offset);
+
+        /* Now share the trace pages */
+        for ( i = 0; i < pages; i++ )
+        {
+            pg = mfn_to_page(t_info_mfn_list[offset + i]);
+            share_xen_page_with_privileged_guests(pg, XENSHARE_writable);
+        }
     }
 
     data_size  = (pages * PAGE_SIZE - sizeof(struct t_buf));
@@ -255,14 +258,19 @@ static int alloc_trace_bufs(unsigned int pages)
 out_dealloc:
     for_each_online_cpu(cpu)
     {
-        void *rawbuf = per_cpu(t_bufs, cpu);
-        per_cpu(t_bufs, cpu) = NULL;
-        if ( rawbuf )
+        offset = t_info->mfn_offset[cpu];
+        if ( !offset )
+            continue;
+        for ( i = 0; i < pages; i++ )
         {
-            ASSERT(!(virt_to_page(rawbuf)->count_info & PGC_allocated));
-            free_xenheap_pages(rawbuf, order);
+            uint32_t mfn = t_info_mfn_list[offset + i];
+            if ( !mfn )
+                break;
+            ASSERT(!(mfn_to_page(mfn)->count_info & PGC_allocated));
+            free_xenheap_pages(mfn_to_virt(mfn), 0);
         }
     }
+out_dealloc_t_info:
     free_xenheap_pages(t_info, get_order_from_pages(t_info_pages));
     t_info = NULL;
     printk(XENLOG_WARNING "xentrace: allocation failed! Tracing disabled.\n");
