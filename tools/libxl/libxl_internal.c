@@ -168,7 +168,7 @@ void libxl__logv(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
  x:
     xtl_log(ctx->lg, msglevel, errnoval, "libxl",
             "%s%s%s%s" "%s",
-            fileline, func&&file?":":"", func?func:"", func||file?" ":"",
+            fileline, func&&file?":":"", func?func:"", func||file?": ":"",
             base);
     if (base != enomem) free(base);
     errno = esave;
