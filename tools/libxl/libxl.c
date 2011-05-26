@@ -1795,6 +1795,13 @@ int libxl_domain_setmaxmem(libxl_ctx *ctx, uint32_t domid, uint32_t max_memkb)
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "memory_static_max must be greater than or or equal to memory_dynamic_max\n");
         goto out;
     }
+    rc = xc_domain_setmaxmem(ctx->xch, domid, max_memkb + LIBXL_MAXMEM_CONSTANT);
+    if (rc != 0) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                "xc_domain_setmaxmem domid=%d memkb=%d failed "
+                "rc=%d\n", domid, max_memkb + LIBXL_MAXMEM_CONSTANT, rc);
+        goto out;
+    }
 
     rc = 0;
 out:
