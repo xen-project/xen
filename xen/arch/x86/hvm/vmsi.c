@@ -72,8 +72,8 @@ int vmsi_deliver(struct domain *d, int pirq)
     int vector = hvm_irq_dpci->mirq[pirq].gmsi.gvec;
     uint8_t dest = (uint8_t)flags;
     uint8_t dest_mode = !!(flags & VMSI_DM_MASK);
-    uint8_t delivery_mode = (flags & VMSI_DELIV_MASK) >> GLFAGS_SHIFT_DELIV_MODE;
-    uint8_t trig_mode = (flags & VMSI_TRIG_MODE) >> GLFAGS_SHIFT_TRG_MODE;
+    uint8_t delivery_mode = (flags & VMSI_DELIV_MASK) >> GFLAGS_SHIFT_DELIV_MODE;
+    uint8_t trig_mode = (flags & VMSI_TRIG_MODE) >> GFLAGS_SHIFT_TRG_MODE;
     struct vlapic *target;
     struct vcpu *v;
 
