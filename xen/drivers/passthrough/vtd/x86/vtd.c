@@ -25,6 +25,7 @@
 #include <xen/iommu.h>
 #include <xen/numa.h>
 #include <asm/fixmap.h>
+#include <asm/setup.h>
 #include "../iommu.h"
 #include "../dmar.h"
 #include "../vtd.h"
@@ -113,7 +114,6 @@ void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
 void __init iommu_set_dom0_mapping(struct domain *d)
 {
     unsigned long i, j, tmp, top;
-    extern int xen_in_range(unsigned long mfn);
 
     BUG_ON(d->domain_id != 0);
 

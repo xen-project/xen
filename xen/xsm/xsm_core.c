@@ -21,9 +21,6 @@
 
 #define XSM_FRAMEWORK_VERSION    "1.0.0"
 
-extern struct xsm_operations dummy_xsm_ops;
-extern void xsm_fixup_ops(struct xsm_operations *ops);
-
 struct xsm_operations *xsm_ops;
 
 static inline int verify(struct xsm_operations *ops)

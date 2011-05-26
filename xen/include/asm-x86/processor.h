@@ -580,6 +580,7 @@ DECLARE_TRAP_HANDLER(machine_check);
 DECLARE_TRAP_HANDLER(alignment_check);
 DECLARE_TRAP_HANDLER(spurious_interrupt_bug);
 #undef DECLARE_TRAP_HANDLER
+extern asmlinkage int hypercall(void);
 
 int cpuid_hypervisor_leaves( uint32_t idx, uint32_t sub_idx,
           uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx);

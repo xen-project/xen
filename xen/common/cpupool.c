@@ -582,8 +582,6 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
     return ret;
 }
 
-void schedule_dump(struct cpupool *c);
-
 void dump_runq(unsigned char key)
 {
     unsigned long    flags;

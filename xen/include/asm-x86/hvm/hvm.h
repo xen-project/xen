@@ -174,6 +174,10 @@ struct hvm_function_table {
 extern struct hvm_function_table hvm_funcs;
 extern bool_t hvm_enabled;
 extern bool_t cpu_has_lmsl;
+extern s8 hvm_port80_allowed;
+
+extern struct hvm_function_table *start_svm(void);
+extern struct hvm_function_table *start_vmx(void);
 
 int hvm_domain_initialise(struct domain *d);
 void hvm_domain_relinquish_resources(struct domain *d);
@@ -195,6 +199,7 @@ void hvm_init_guest_time(struct domain *d);
 void hvm_set_guest_time(struct vcpu *v, u64 guest_time);
 u64 hvm_get_guest_time(struct vcpu *v);
 
+int vmsi_deliver(struct domain *d, int pirq);
 int hvm_girq_dest_2_vcpu_id(struct domain *d, uint8_t dest, uint8_t dest_mode);
 
 #define hvm_paging_enabled(v) \

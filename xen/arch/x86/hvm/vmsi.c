@@ -447,7 +447,7 @@ found:
     spin_unlock_irq(&irq_desc->lock);
 }
 
-void msixtbl_pt_cleanup(struct domain *d, int pirq)
+void msixtbl_pt_cleanup(struct domain *d)
 {
     struct msixtbl_entry *entry, *temp;
     unsigned long flags;

@@ -34,22 +34,14 @@
 #include <public/mem_event.h>
 #include <asm/mem_sharing.h>
 #include <asm/xstate.h>
-
-#ifdef XEN_KDB_CONFIG
-#include "../kdb/include/kdbdefs.h"
-#include "../kdb/include/kdbproto.h"
-#else
-typedef unsigned long kdbva_t;
-typedef unsigned char kdbbyt_t;
-extern int dbg_rw_mem(kdbva_t, kdbbyt_t *, int, domid_t, int, uint64_t);
-#endif
+#include <asm/debugger.h>
 
 static int gdbsx_guest_mem_io(
     domid_t domid, struct xen_domctl_gdbsx_memio *iop)
 {   
     ulong l_uva = (ulong)iop->uva;
     iop->remain = dbg_rw_mem(
-        (kdbva_t)iop->gva, (kdbbyt_t *)l_uva, iop->len, domid,
+        (dbgva_t)iop->gva, (dbgbyte_t *)l_uva, iop->len, domid,
         iop->gwr, iop->pgd3val);
     return (iop->remain ? -EFAULT : 0);
 }
@@ -732,8 +724,6 @@ long arch_do_domctl(
 
         case XEN_DOMCTL_SENDTRIGGER_SLEEP:
         {
-            extern void hvm_acpi_sleep_button(struct domain *d);
-
             ret = -EINVAL;
             if ( is_hvm_domain(d) ) 
             {

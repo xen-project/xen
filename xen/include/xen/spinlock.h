@@ -98,6 +98,10 @@ void _lock_profile_deregister_struct(int32_t, struct lock_profile_qhead *);
 #define lock_profile_deregister_struct(type, ptr)                             \
     _lock_profile_deregister_struct(type, &((ptr)->profile_head))
 
+extern int spinlock_profile_control(xen_sysctl_lockprof_op_t *pc);
+extern void spinlock_profile_printall(unsigned char key);
+extern void spinlock_profile_reset(unsigned char key);
+
 #else
 
 struct lock_profile { };

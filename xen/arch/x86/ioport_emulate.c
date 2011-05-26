@@ -9,10 +9,6 @@
 #include <xen/sched.h>
 #include <xen/dmi.h>
 
-/* Function pointer used to handle platform specific I/O port emulation. */
-extern void (*ioemul_handle_quirk)(
-    u8 opcode, char *io_emul_stub, struct cpu_user_regs *regs);
-
 static void ioemul_handle_proliant_quirk(
     u8 opcode, char *io_emul_stub, struct cpu_user_regs *regs)
 {

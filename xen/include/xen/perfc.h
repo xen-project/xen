@@ -95,6 +95,10 @@ DECLARE_PER_CPU(perfc_t[NUM_PERFCOUNTERS], perfcounters);
 
 struct xen_sysctl_perfc_op;
 int perfc_control(struct xen_sysctl_perfc_op *);
+
+extern void perfc_printall(unsigned char key);
+extern void perfc_reset(unsigned char key);
+
     
 #else /* PERF_COUNTERS */
 

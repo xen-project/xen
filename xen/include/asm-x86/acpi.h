@@ -150,6 +150,7 @@ void acpi_mmcfg_init(void);
 extern uint32_t system_reset_counter;
 
 void hvm_acpi_power_button(struct domain *d);
+void hvm_acpi_sleep_button(struct domain *d);
 
 /* suspend/resume */
 void save_rest_processor_state(void);

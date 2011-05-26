@@ -95,4 +95,6 @@ extern void cpuidle_wakeup_mwait(cpumask_t *mask);
 
 #define CPUIDLE_DRIVER_STATE_START  1
 
+extern void menu_get_trace_data(u32 *expected, u32 *pred);
+
 #endif /* _XEN_CPUIDLE_H */

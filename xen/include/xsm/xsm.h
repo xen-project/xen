@@ -636,4 +636,7 @@ static inline int xsm_vcpuextstate(struct domain *d, uint32_t cmd)
 }
 #endif /* CONFIG_X86 */
 
+extern struct xsm_operations dummy_xsm_ops;
+extern void xsm_fixup_ops(struct xsm_operations *ops);
+
 #endif /* __XSM_H */

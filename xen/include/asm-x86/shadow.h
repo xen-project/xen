@@ -115,6 +115,9 @@ static inline void shadow_remove_all_shadows(struct vcpu *v, mfn_t gmfn)
     sh_remove_shadows(v, gmfn, 0 /* Be thorough */, 1 /* Must succeed */);
 }
 
+/* Discard _all_ mappings from the domain's shadows. */
+void shadow_blow_tables_per_domain(struct domain *d);
+
 #endif /* _XEN_SHADOW_H */
 
 /*

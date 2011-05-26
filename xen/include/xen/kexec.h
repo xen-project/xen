@@ -34,6 +34,12 @@ void kexec_crash_save_cpu(void);
 crash_xen_info_t *kexec_crash_save_info(void);
 void machine_crash_shutdown(void);
 int machine_kexec_get(xen_kexec_range_t *range);
+int machine_kexec_get_xen(xen_kexec_range_t *range);
+
+void compat_machine_kexec(unsigned long rnk,
+                          unsigned long indirection_page,
+                          unsigned long *page_list,
+                          unsigned long start_address);
 
 /* vmcoreinfo stuff */
 #define VMCOREINFO_BYTES           (4096)

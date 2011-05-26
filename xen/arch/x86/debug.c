@@ -22,6 +22,7 @@
 #include <xen/mm.h>
 #include <xen/domain_page.h>
 #include <xen/guest_access.h>
+#include <asm/debugger.h>
 #include <asm/p2m.h>
 
 /* 
@@ -30,8 +31,8 @@
  */
 
 #ifdef XEN_KDB_CONFIG
-extern volatile int kdbdbg;
-extern void kdbp(const char *fmt, ...);
+#include "../kdb/include/kdbdefs.h"
+#include "../kdb/include/kdbproto.h"
 #define DBGP(...) {(kdbdbg) ? kdbp(__VA_ARGS__):0;}
 #define DBGP1(...) {(kdbdbg>1) ? kdbp(__VA_ARGS__):0;}
 #define DBGP2(...) {(kdbdbg>2) ? kdbp(__VA_ARGS__):0;}
@@ -39,10 +40,6 @@ extern void kdbp(const char *fmt, ...);
 #define DBGP1(...) {0;}
 #define DBGP2(...) {0;}
 #endif
-
-typedef unsigned long dbgva_t;
-typedef unsigned char dbgbyte_t;
-
 
 /* Returns: mfn for the given (hvm guest) vaddr */
 static unsigned long 

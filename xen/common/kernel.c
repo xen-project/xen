@@ -18,6 +18,7 @@
 #include <public/version.h>
 #ifdef CONFIG_X86
 #include <asm/shared.h>
+#include <asm/setup.h>
 #endif
 
 #ifndef COMPAT
@@ -237,7 +238,6 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE(void) arg)
     case XENVER_capabilities:
     {
         xen_capabilities_info_t info;
-        extern void arch_get_xen_caps(xen_capabilities_info_t *info);
 
         memset(info, 0, sizeof(info));
         arch_get_xen_caps(&info);

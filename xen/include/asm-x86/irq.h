@@ -116,6 +116,9 @@ int map_domain_emuirq_pirq(struct domain *d, int pirq, int irq);
 int unmap_domain_pirq_emuirq(struct domain *d, int pirq);
 int hvm_domain_use_pirq(struct domain *d, int irq);
 
+/* A cpu has been removed from cpu_online_mask.  Re-set irq affinities. */
+void fixup_irqs(void);
+
 int  init_irq_data(void);
 
 void clear_irq_vector(int irq);

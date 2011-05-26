@@ -1708,8 +1708,6 @@ void free_domain_pirqs(struct domain *d)
     spin_unlock(&pcidevs_lock);
 }
 
-extern void dump_ioapic_irq_info(void);
-
 static void dump_irqs(unsigned char key)
 {
     int i, irq, pirq;

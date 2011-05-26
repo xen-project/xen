@@ -22,14 +22,12 @@
 #include <xen/guest_access.h>
 #include <xen/bitmap.h>
 #include <xen/paging.h>
+#include <xen/hypercall.h>
 #include <asm/current.h>
 #include <public/domctl.h>
 #include <xsm/xsm.h>
 
 static DEFINE_SPINLOCK(domctl_lock);
-
-extern long arch_do_domctl(
-    struct xen_domctl *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl);
 
 int cpumask_to_xenctl_cpumap(
     struct xenctl_cpumap *xenctl_cpumap, cpumask_t *cpumask)

@@ -21,8 +21,6 @@
 
 #include <public/callback.h>
 
-extern asmlinkage int hypercall(void);
-
 static void print_xen_info(void)
 {
     char taint_str[TAINT_STRING_MAX_LEN];

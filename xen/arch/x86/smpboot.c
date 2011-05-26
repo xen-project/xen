@@ -213,7 +213,6 @@ void smp_callin(void)
 
     if ( (rc = hvm_cpu_up()) != 0 )
     {
-        extern void (*dead_idle) (void);
         printk("CPU%d: Failed to initialise HVM. Not coming online.\n", cpu);
         cpu_error = rc;
         clear_local_APIC();
@@ -840,7 +839,6 @@ remove_siblinginfo(int cpu)
 
 void __cpu_disable(void)
 {
-    extern void fixup_irqs(void);
     int cpu = smp_processor_id();
 
     set_cpu_state(CPU_STATE_DYING);

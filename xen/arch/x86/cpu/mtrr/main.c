@@ -580,9 +580,6 @@ mtrr_del(int reg, unsigned long base, unsigned long size)
  * These should be called implicitly, but we can't yet until all the initcall
  * stuff is done...
  */
-extern void amd_init_mtrr(void);
-extern void cyrix_init_mtrr(void);
-
 static void __init init_ifs(void)
 {
 #ifndef CONFIG_X86_64

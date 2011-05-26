@@ -108,10 +108,6 @@ static struct notifier_block cpu_nfb = {
 
 static int __init hvm_enable(void)
 {
-    extern struct hvm_function_table *start_svm(void);
-    extern struct hvm_function_table *start_vmx(void);
-    extern int hvm_port80_allowed;
-
     struct hvm_function_table *fns = NULL;
 
     switch ( boot_cpu_data.x86_vendor )
@@ -501,8 +497,6 @@ int hvm_domain_initialise(struct domain *d)
     xfree(d->arch.hvm_domain.pbuf);
     return rc;
 }
-
-extern void msixtbl_pt_cleanup(struct domain *d);
 
 void hvm_domain_relinquish_resources(struct domain *d)
 {
@@ -1376,8 +1370,6 @@ int hvm_set_efer(uint64_t value)
 
     return X86EMUL_OKAY;
 }
-
-extern void shadow_blow_tables_per_domain(struct domain *d);
 
 /* Exit UC mode only if all VCPUs agree on MTRR/PAT and are not in no_fill. */
 static bool_t domain_exit_uc_mode(struct vcpu *v)

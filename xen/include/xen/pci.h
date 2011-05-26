@@ -119,6 +119,7 @@ int pci_find_ext_capability(int seg, int bus, int devfn, int cap);
 
 int msixtbl_pt_register(struct domain *d, int pirq, uint64_t gtable);
 void msixtbl_pt_unregister(struct domain *d, int pirq);
+void msixtbl_pt_cleanup(struct domain *d);
 void pci_enable_acs(struct pci_dev *pdev);
 
 #endif /* __XEN_PCI_H__ */

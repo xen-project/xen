@@ -65,14 +65,6 @@ boolean_param("hap_2mb", opt_hap_2mb);
 #undef page_to_mfn
 #define page_to_mfn(_pg) _mfn(__page_to_mfn(_pg))
 
-#if P2M_AUDIT
-extern void audit_p2m(struct p2m_domain *p2m, int strict_m2p);
-#else
-# define audit_p2m(_p2m, _m2p) do { (void)(_p2m),(_m2p); } while (0)
-#endif /* P2M_AUDIT */
-
-/* XXX declare functions moved to p2m-pt.c */
-extern void p2m_pt_init(struct p2m_domain *p2m);
 
 /* Init the datastructures for later use by the p2m code */
 static void p2m_initialise(struct domain *d, struct p2m_domain *p2m)

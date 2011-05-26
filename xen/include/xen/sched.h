@@ -534,6 +534,9 @@ void continue_running(
     struct vcpu *same);
 
 void startup_cpu_idle_loop(void);
+extern void (*pm_idle) (void);
+extern void (*dead_idle) (void);
+
 
 /*
  * Creates a continuation to resume the current hypercall. The caller should
@@ -653,6 +656,9 @@ void cpupool_put(struct cpupool *pool);
 int cpupool_add_domain(struct domain *d, int poolid);
 void cpupool_rm_domain(struct domain *d);
 int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op);
+void schedule_dump(struct cpupool *c);
+extern void dump_runq(unsigned char key);
+
 #define num_cpupool_cpus(c) (cpus_weight((c)->cpu_valid))
 
 #endif /* __SCHED_H__ */

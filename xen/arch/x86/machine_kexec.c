@@ -21,9 +21,6 @@ typedef void (*relocate_new_kernel_t)(
 #endif
                 unsigned int preserve_context);
 
-extern int machine_kexec_get_xen(xen_kexec_range_t *range);
-
-
 int machine_kexec_load(int type, int slot, xen_kexec_image_t *image)
 {
     unsigned long prev_ma = 0;
@@ -101,10 +98,6 @@ void machine_kexec(xen_kexec_image_t *image)
 #ifdef CONFIG_COMPAT
     if ( is_pv_32on64_domain(dom0) )
     {
-        extern void compat_machine_kexec(unsigned long rnk,
-                                         unsigned long indirection_page,
-                                         unsigned long *page_list,
-                                         unsigned long start_address);
         compat_machine_kexec(image->page_list[1],
                              image->indirection_page,
                              image->page_list,

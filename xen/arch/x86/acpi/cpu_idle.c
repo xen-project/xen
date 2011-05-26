@@ -72,10 +72,6 @@ static uint64_t (*ticks_elapsed)(uint64_t t1, uint64_t t2);
 static uint64_t (*tick_to_ns)(uint64_t ticks);
 static uint64_t (*ns_to_tick)(uint64_t ticks);
 
-extern void (*pm_idle) (void);
-extern void (*dead_idle) (void);
-extern void menu_get_trace_data(u32 *expected, u32 *pred);
-
 static void (*pm_idle_save) (void) __read_mostly;
 unsigned int max_cstate __read_mostly = ACPI_PROCESSOR_MAX_POWER - 1;
 integer_param("max_cstate", max_cstate);

@@ -20,6 +20,7 @@
 #include <xen/guest_access.h>
 #include <xen/acpi.h>
 #include <xen/cpu.h>
+#include <xen/pmstat.h>
 #include <asm/current.h>
 #include <public/platform.h>
 #include <acpi/cpufreq/processor_perf.h>
@@ -46,9 +47,6 @@ extern spinlock_t xenpf_lock;
 #endif
 
 static DEFINE_PER_CPU(uint64_t, freq);
-
-extern int set_px_pminfo(uint32_t cpu, struct xen_processor_performance *perf);
-extern long set_cx_pminfo(uint32_t cpu, struct xen_processor_power *power);
 
 static long cpu_frequency_change_helper(void *data)
 {

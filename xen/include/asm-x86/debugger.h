@@ -77,4 +77,9 @@ static inline int debugger_trap_entry(
     return 0;
 }
 
+typedef unsigned long dbgva_t;
+typedef unsigned char dbgbyte_t;
+extern int dbg_rw_mem(dbgva_t addr, dbgbyte_t *buf, int len,
+                      domid_t domid, int toaddr, uint64_t pgd3);
+
 #endif /* __X86_DEBUGGER_H__ */

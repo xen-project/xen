@@ -9,6 +9,7 @@
 #include <xen/guest_access.h>
 #include <xen/iocap.h>
 #include <asm/current.h>
+#include <asm/io_apic.h>
 #include <asm/msi.h>
 #include <asm/hypercall.h>
 #include <public/xen.h>
@@ -19,13 +20,6 @@
 #ifndef COMPAT
 typedef long ret_t;
 #endif
-
-int
-ioapic_guest_read(
-    unsigned long physbase, unsigned int reg, u32 *pval);
-int
-ioapic_guest_write(
-    unsigned long physbase, unsigned int reg, u32 pval);
 
 static int physdev_hvm_map_pirq(
     struct domain *d, struct physdev_map_pirq *map)

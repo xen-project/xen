@@ -27,12 +27,6 @@
 #include <xsm/xsm.h>
 #include <xen/pmstat.h>
 
-extern long arch_do_sysctl(
-    struct xen_sysctl *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl);
-#ifdef LOCK_PROFILE
-extern int spinlock_profile_control(xen_sysctl_lockprof_op_t *pc);
-#endif
-
 long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 {
     long ret = 0;

@@ -33,18 +33,6 @@
 #include <asm/hvm/nestedhvm.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
  
-/* Printouts */
-#define P2M_PRINTK(_f, _a...)                                \
-    debugtrace_printk("p2m: %s(): " _f, __func__, ##_a)
-#define P2M_ERROR(_f, _a...)                                 \
-    printk("pg error: %s(): " _f, __func__, ##_a)
-#if P2M_DEBUGGING
-#define P2M_DEBUG(_f, _a...)                                 \
-    debugtrace_printk("p2mdebug: %s(): " _f, __func__, ##_a)
-#else
-#define P2M_DEBUG(_f, _a...) do { (void)(_f); } while(0)
-#endif
-
 
 /* Override macros from asm/page.h to make them work with mfn_t */
 #undef mfn_to_page
@@ -53,12 +41,6 @@
 #define mfn_valid(_mfn) __mfn_valid(mfn_x(_mfn))
 #undef page_to_mfn
 #define page_to_mfn(_pg) _mfn(__page_to_mfn(_pg))
-
-#if P2M_AUDIT
-extern void audit_p2m(struct p2m_domain *p2m, int strict_m2p);
-#else
-# define audit_p2m(_p2m, _m2p) do { (void)(_p2m),(_m2p); } while (0)
-#endif /* P2M_AUDIT */
 
 #define SUPERPAGE_PAGES (1UL << 9)
 #define superpage_aligned(_x)  (((_x)&(SUPERPAGE_PAGES-1))==0)

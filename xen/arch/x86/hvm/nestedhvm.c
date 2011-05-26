@@ -200,7 +200,6 @@ unsigned long *
 nestedhvm_vcpu_iomap_get(bool_t port_80, bool_t port_ed)
 {
     int i;
-    extern int hvm_port80_allowed;
 
     if (!hvm_port80_allowed)
         port_80 = 1;

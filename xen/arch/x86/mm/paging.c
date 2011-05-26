@@ -875,8 +875,6 @@ const struct paging_mode *paging_get_mode(struct vcpu *v)
     return paging_get_nestedmode(v);
 }
 
-extern const struct paging_mode *hap_paging_get_mode(struct vcpu *);
-
 void paging_update_nestedmode(struct vcpu *v)
 {
     ASSERT(nestedhvm_enabled(v->domain));

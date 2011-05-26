@@ -11,6 +11,7 @@
 #include <xen/lib.h>
 #include <xen/mm.h>
 #include <xen/guest_access.h>
+#include <xen/hypercall.h>
 #include <public/sysctl.h>
 #include <xen/sched.h>
 #include <xen/event.h>
@@ -55,8 +56,6 @@ long cpu_down_helper(void *data)
     }
     return ret;
 }
-
-extern int __node_distance(int a, int b);
 
 long arch_do_sysctl(
     struct xen_sysctl *sysctl, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)

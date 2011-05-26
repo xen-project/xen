@@ -69,6 +69,7 @@
 #include <asm/hypercall.h>
 #include <asm/mce.h>
 #include <asm/apic.h>
+#include <asm/hpet.h>
 #include <public/arch-x86/cpuid.h>
 
 /*
@@ -1633,8 +1634,6 @@ static uint32_t guest_io_read(
 
     return data;
 }
-
-extern void (*pv_rtc_handler)(unsigned int port, uint8_t value);
 
 static void guest_io_write(
     unsigned int port, unsigned int bytes, uint32_t data,

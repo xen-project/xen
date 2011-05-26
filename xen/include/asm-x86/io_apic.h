@@ -198,6 +198,8 @@ extern void init_ioapic_mappings(void);
 extern void ioapic_suspend(void);
 extern void ioapic_resume(void);
 
+extern void dump_ioapic_irq_info(void);
+
 extern struct IO_APIC_route_entry **alloc_ioapic_entries(void);
 extern void free_ioapic_entries(struct IO_APIC_route_entry **ioapic_entries);
 extern int save_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries);
@@ -214,5 +216,8 @@ extern int assign_irq_vector(int irq);
 extern int free_irq_vector(int vector);
 
 unsigned highest_gsi(void);
+
+int ioapic_guest_read( unsigned long physbase, unsigned int reg, u32 *pval);
+int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 pval);
 
 #endif

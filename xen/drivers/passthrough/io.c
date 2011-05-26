@@ -452,7 +452,6 @@ void hvm_dpci_msi_eoi(struct domain *d, int vector)
     spin_unlock(&d->event_lock);
 }
 
-extern int vmsi_deliver(struct domain *d, int pirq);
 static int hvm_pci_msi_assert(struct domain *d, int pirq)
 {
     if ( hvm_domain_use_pirq(d, pirq) )

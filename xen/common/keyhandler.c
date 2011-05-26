@@ -14,6 +14,7 @@
 #include <xen/rangeset.h>
 #include <xen/compat.h>
 #include <xen/ctype.h>
+#include <xen/perfc.h>
 #include <asm/debugger.h>
 #include <asm/div64.h>
 
@@ -403,7 +404,6 @@ static struct keyhandler read_clocks_keyhandler = {
     .desc = "display multi-cpu clock info"
 };
 
-extern void dump_runq(unsigned char key);
 static struct keyhandler dump_runq_keyhandler = {
     .diagnostic = 1,
     .u.fn = dump_runq,
@@ -411,13 +411,11 @@ static struct keyhandler dump_runq_keyhandler = {
 };
 
 #ifdef PERF_COUNTERS
-extern void perfc_printall(unsigned char key);
 static struct keyhandler perfc_printall_keyhandler = {
     .diagnostic = 1,
     .u.fn = perfc_printall,
     .desc = "print performance counters"
 };
-extern void perfc_reset(unsigned char key);
 static struct keyhandler perfc_reset_keyhandler = {
     .u.fn = perfc_reset,
     .desc = "reset performance counters"
@@ -425,13 +423,11 @@ static struct keyhandler perfc_reset_keyhandler = {
 #endif
 
 #ifdef LOCK_PROFILE
-extern void spinlock_profile_printall(unsigned char key);
 static struct keyhandler spinlock_printall_keyhandler = {
     .diagnostic = 1,
     .u.fn = spinlock_profile_printall,
     .desc = "print lock profile info"
 };
-extern void spinlock_profile_reset(unsigned char key);
 static struct keyhandler spinlock_reset_keyhandler = {
     .u.fn = spinlock_profile_reset,
     .desc = "reset lock profile info"

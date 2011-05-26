@@ -28,21 +28,13 @@
 #include <xen/types.h>
 #include <xen/xmalloc.h>
 #include <xen/guest_access.h>
+#include <xen/pmstat.h>
 #include <compat/platform.h>
 
 CHECK_processor_csd;
 
 DEFINE_XEN_GUEST_HANDLE(compat_processor_csd_t);
 DEFINE_XEN_GUEST_HANDLE(compat_processor_cx_t);
-
-#define xlat_page_start ((unsigned long)COMPAT_ARG_XLAT_VIRT_BASE)
-#define xlat_page_size  COMPAT_ARG_XLAT_SIZE
-#define xlat_page_left_size(xlat_page_current) \
-    (xlat_page_start + xlat_page_size - xlat_page_current)
-
-#define xlat_malloc_init(xlat_page_current)    do { \
-    xlat_page_current = xlat_page_start; \
-} while (0)
 
 void *xlat_malloc(unsigned long *xlat_page_current, size_t size)
 {
@@ -60,8 +52,6 @@ void *xlat_malloc(unsigned long *xlat_page_current, size_t size)
     return ret;
 }
 
-#define xlat_malloc_array(_p, _t, _c) ((_t *) xlat_malloc(&_p, sizeof(_t) * _c))
-
 static int copy_from_compat_state(xen_processor_cx_t *xen_state,
                                   compat_processor_cx_t *state)
 {
@@ -77,8 +67,6 @@ static int copy_from_compat_state(xen_processor_cx_t *xen_state,
 
     return 0;
 }
-
-extern long set_cx_pminfo(uint32_t cpu, struct xen_processor_power *power);
 
 long compat_set_cx_pminfo(uint32_t cpu, struct compat_processor_power *power)
 {

@@ -666,6 +666,31 @@ static inline int p2m_gfn_check_limit(
 int set_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn, 
                   unsigned int page_order, p2m_type_t p2mt, p2m_access_t p2ma);
 
+/* Set up function pointers for PT implementation: only for use by p2m code */
+extern void p2m_pt_init(struct p2m_domain *p2m);
+
+/* Debugging and auditing of the P2M code? */
+#define P2M_AUDIT     0
+#define P2M_DEBUGGING 0
+
+#if P2M_AUDIT
+extern void audit_p2m(struct p2m_domain *p2m, int strict_m2p);
+#else
+# define audit_p2m(_p2m, _m2p) do { (void)(_p2m),(_m2p); } while (0)
+#endif /* P2M_AUDIT */
+
+/* Printouts */
+#define P2M_PRINTK(_f, _a...)                                \
+    debugtrace_printk("p2m: %s(): " _f, __func__, ##_a)
+#define P2M_ERROR(_f, _a...)                                 \
+    printk("pg error: %s(): " _f, __func__, ##_a)
+#if P2M_DEBUGGING
+#define P2M_DEBUG(_f, _a...)                                 \
+    debugtrace_printk("p2mdebug: %s(): " _f, __func__, ##_a)
+#else
+#define P2M_DEBUG(_f, _a...) do { (void)(_f); } while(0)
+#endif
+
 #endif /* _XEN_P2M_H */
 
 /*

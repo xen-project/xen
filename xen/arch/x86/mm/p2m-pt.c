@@ -38,23 +38,6 @@
 #include <asm/hvm/nestedhvm.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
 
-/* Debugging and auditing of the P2M code? */
-#define P2M_AUDIT     0
-#define P2M_DEBUGGING 0
-
-/* Printouts */
-#define P2M_PRINTK(_f, _a...)                                \
-    debugtrace_printk("p2m: %s(): " _f, __func__, ##_a)
-#define P2M_ERROR(_f, _a...)                                 \
-    printk("pg error: %s(): " _f, __func__, ##_a)
-#if P2M_DEBUGGING
-#define P2M_DEBUG(_f, _a...)                                 \
-    debugtrace_printk("p2mdebug: %s(): " _f, __func__, ##_a)
-#else
-#define P2M_DEBUG(_f, _a...) do { (void)(_f); } while(0)
-#endif
-
-
 /* Override macros from asm/page.h to make them work with mfn_t */
 #undef mfn_to_page
 #define mfn_to_page(_m) __mfn_to_page(mfn_x(_m))
@@ -113,11 +96,6 @@ unsigned long p2m_type_to_flags(p2m_type_t t, mfn_t mfn)
     }
 }
 
-#if P2M_AUDIT
-void audit_p2m(struct p2m_domain *p2m, int strict_m2p);
-#else
-# define audit_p2m(_p2m, _m2p) do { (void)(_p2m),(_m2p); } while (0)
-#endif /* P2M_AUDIT */
 
 // Find the next level's P2M entry, checking for out-of-range gfn's...
 // Returns NULL on error.

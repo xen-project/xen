@@ -25,22 +25,10 @@
 #include <xen/types.h>
 #include <xen/xmalloc.h>
 #include <xen/guest_access.h>
+#include <xen/pmstat.h>
 #include <compat/platform.h>
 
 DEFINE_XEN_GUEST_HANDLE(compat_processor_px_t);
-
-#define xlat_page_start ((unsigned long)COMPAT_ARG_XLAT_VIRT_BASE)
-
-#define xlat_malloc_init(xlat_page_current)    do { \
-    xlat_page_current = xlat_page_start; \
-} while (0)
-
-extern void *xlat_malloc(unsigned long *xlat_page_current, size_t size);
-
-#define xlat_malloc_array(_p, _t, _c) ((_t *) xlat_malloc(&_p, sizeof(_t) * _c))
-
-extern int 
-set_px_pminfo(uint32_t cpu, struct xen_processor_performance *perf);
 
 int 
 compat_set_px_pminfo(uint32_t cpu, struct compat_processor_performance *perf)
