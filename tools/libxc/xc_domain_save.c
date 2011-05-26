@@ -83,6 +83,11 @@ struct outbuf {
      ((mfn_to_pfn(_mfn) < (dinfo->p2m_size)) &&   \
       (pfn_to_mfn(mfn_to_pfn(_mfn)) == (_mfn))))
 
+#define SUPERPAGE_PFN_SHIFT  9
+#define SUPERPAGE_NR_PFNS    (1UL << SUPERPAGE_PFN_SHIFT)
+
+#define SUPER_PAGE_START(pfn)    (((pfn) & (SUPERPAGE_NR_PFNS-1)) == 0 )
+
 /*
 ** During (live) save/migrate, we maintain a number of bitmaps to track
 ** which pages we have to send, to fixup, and to skip.
@@ -808,6 +813,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
     int rc = 1, frc, i, j, last_iter = 0, iter = 0;
     int live  = (flags & XCFLAGS_LIVE);
     int debug = (flags & XCFLAGS_DEBUG);
+    int superpages = !!hvm;
     int race = 0, sent_last_iter, skip_this_iter = 0;
     unsigned int sent_this_iter = 0;
     int tmem_saved = 0;
@@ -1158,6 +1164,12 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
                            (test_bit(n, to_send) && last_iter) ||
                            (test_bit(n, to_fix)  && last_iter)) )
                         continue;
+
+                    /* First time through, try to keep superpages in the same batch */
+                    if ( superpages && iter == 1
+                         && SUPER_PAGE_START(n)
+                         && batch + SUPERPAGE_NR_PFNS > MAX_BATCH_SIZE )
+                        break;
 
                     /*
                     ** we get here if:
