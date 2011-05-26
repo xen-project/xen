@@ -839,7 +839,8 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
 
     countpages = count;
     for (i = oldcount; i < buf->nr_pages; ++i)
-        if ((buf->pfn_types[i] & XEN_DOMCTL_PFINFO_LTAB_MASK) == XEN_DOMCTL_PFINFO_XTAB)
+        if ((buf->pfn_types[i] & XEN_DOMCTL_PFINFO_LTAB_MASK) == XEN_DOMCTL_PFINFO_XTAB
+            ||(buf->pfn_types[i] & XEN_DOMCTL_PFINFO_LTAB_MASK) == XEN_DOMCTL_PFINFO_XALLOC)
             --countpages;
 
     if (!countpages)
@@ -917,6 +918,7 @@ static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
         pfn      = pagebuf->pfn_types[i + curbatch] & ~XEN_DOMCTL_PFINFO_LTAB_MASK;
         pagetype = pagebuf->pfn_types[i + curbatch] &  XEN_DOMCTL_PFINFO_LTAB_MASK;
 
+        /* For allocation purposes, treat XEN_DOMCTL_PFINFO_XALLOC as a normal page */
         if ( (pagetype != XEN_DOMCTL_PFINFO_XTAB) && 
              (ctx->p2m[pfn] == INVALID_P2M_ENTRY) )
         {
@@ -1028,21 +1030,21 @@ static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
         pfn      = pagebuf->pfn_types[i + curbatch] & ~XEN_DOMCTL_PFINFO_LTAB_MASK;
         pagetype = pagebuf->pfn_types[i + curbatch] &  XEN_DOMCTL_PFINFO_LTAB_MASK;
 
-        if ( pagetype == XEN_DOMCTL_PFINFO_XTAB )
-            region_mfn[i] = ~0UL; /* map will fail but we don't care */
-        else 
+        if ( pagetype != XEN_DOMCTL_PFINFO_XTAB
+             && ctx->p2m[pfn] == (INVALID_P2M_ENTRY-1) )
         {
-            if ( ctx->p2m[pfn] == (INVALID_P2M_ENTRY-1) )
-            {
-                /* We just allocated a new mfn above; update p2m */
-                ctx->p2m[pfn] = ctx->p2m_batch[nr_mfns++]; 
-                ctx->nr_pfns++; 
-            }
-
-            /* setup region_mfn[] for batch map.
-             * For HVM guests, this interface takes PFNs, not MFNs */
-            region_mfn[i] = hvm ? pfn : ctx->p2m[pfn]; 
+            /* We just allocated a new mfn above; update p2m */
+            ctx->p2m[pfn] = ctx->p2m_batch[nr_mfns++]; 
+            ctx->nr_pfns++; 
         }
+
+        /* setup region_mfn[] for batch map, if necessary.
+         * For HVM guests, this interface takes PFNs, not MFNs */
+        if ( pagetype == XEN_DOMCTL_PFINFO_XTAB
+             || pagetype == XEN_DOMCTL_PFINFO_XALLOC )
+            region_mfn[i] = ~0UL; /* map will fail but we don't care */
+        else
+            region_mfn[i] = hvm ? pfn : ctx->p2m[pfn]; 
     }
 
     /* Map relevant mfns */
@@ -1062,8 +1064,9 @@ static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
         pfn      = pagebuf->pfn_types[i + curbatch] & ~XEN_DOMCTL_PFINFO_LTAB_MASK;
         pagetype = pagebuf->pfn_types[i + curbatch] &  XEN_DOMCTL_PFINFO_LTAB_MASK;
 
-        if ( pagetype == XEN_DOMCTL_PFINFO_XTAB )
-            /* a bogus/unmapped page: skip it */
+        if ( pagetype == XEN_DOMCTL_PFINFO_XTAB 
+             || pagetype == XEN_DOMCTL_PFINFO_XALLOC)
+            /* a bogus/unmapped/allocate-only page: skip it */
             continue;
 
         if (pfn_err[i])

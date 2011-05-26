@@ -1155,13 +1155,15 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
                 }
                 else
                 {
-                    if ( !last_iter &&
+                    int dont_skip = (last_iter || (superpages && iter==1));
+
+                    if ( !dont_skip &&
                          test_bit(n, to_send) &&
                          test_bit(n, to_skip) )
                         skip_this_iter++; /* stats keeping */
 
                     if ( !((test_bit(n, to_send) && !test_bit(n, to_skip)) ||
-                           (test_bit(n, to_send) && last_iter) ||
+                           (test_bit(n, to_send) && dont_skip) ||
                            (test_bit(n, to_fix)  && last_iter)) )
                         continue;
 
@@ -1174,7 +1176,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
                     /*
                     ** we get here if:
                     **  1. page is marked to_send & hasn't already been re-dirtied
-                    **  2. (ignore to_skip in last iteration)
+                    **  2. (ignore to_skip in first and last iterations)
                     **  3. add in pages that still need fixup (net bufs)
                     */
 
@@ -1198,7 +1200,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
                         set_bit(n, to_fix);
                         continue;
                     }
-
+                    
                     if ( last_iter &&
                          test_bit(n, to_fix) &&
                          !test_bit(n, to_send) )
@@ -1243,6 +1245,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
                 {
                     if ( pfn_type[j] == XEN_DOMCTL_PFINFO_XTAB )
                         continue;
+
                     DPRINTF("map fail: page %i mfn %08lx err %d\n",
                             j, gmfn, pfn_err[j]);
                     pfn_type[j] = XEN_DOMCTL_PFINFO_XTAB;
@@ -1254,6 +1257,9 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
                     DPRINTF("type fail: page %i mfn %08lx\n", j, gmfn);
                     continue;
                 }
+
+                if ( superpages && iter==1 && test_bit(gmfn, to_skip))
+                    pfn_type[j] = XEN_DOMCTL_PFINFO_XALLOC;
 
                 /* canonicalise mfn->pfn */
                 pfn_type[j] |= pfn_batch[j];
@@ -1329,8 +1335,9 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
                     }
                 }
 
-                /* skip pages that aren't present */
-                if ( pagetype == XEN_DOMCTL_PFINFO_XTAB )
+                /* skip pages that aren't present or are alloc-only */
+                if ( pagetype == XEN_DOMCTL_PFINFO_XTAB
+                    || pagetype == XEN_DOMCTL_PFINFO_XALLOC )
                     continue;
 
                 pagetype &= XEN_DOMCTL_PFINFO_LTABTYPE_MASK;

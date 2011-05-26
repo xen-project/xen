@@ -133,6 +133,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_getmemlist_t);
 #define XEN_DOMCTL_PFINFO_LTABTYPE_MASK (0x7U<<28)
 #define XEN_DOMCTL_PFINFO_LPINTAB (0x1U<<31)
 #define XEN_DOMCTL_PFINFO_XTAB    (0xfU<<28) /* invalid page */
+#define XEN_DOMCTL_PFINFO_XALLOC  (0xeU<<28) /* allocate-only page */
 #define XEN_DOMCTL_PFINFO_PAGEDTAB (0x8U<<28)
 #define XEN_DOMCTL_PFINFO_LTAB_MASK (0xfU<<28)
 
