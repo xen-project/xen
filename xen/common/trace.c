@@ -106,7 +106,7 @@ static uint32_t calc_tinfo_first_offset(void)
  * The t_info layout is fixed and cant be changed without breaking xentrace.
  * Initialize t_info_pages based on number of trace pages.
  */
-static int calculate_tbuf_size(unsigned int pages, uint32_t t_info_first_offset)
+static int calculate_tbuf_size(unsigned int pages, uint16_t t_info_first_offset)
 {
     struct t_buf dummy_size;
     typeof(dummy_size.prod) max_size;
@@ -170,8 +170,8 @@ static int alloc_trace_bufs(unsigned int pages)
     int i, cpu, order;
     /* Start after a fixed-size array of NR_CPUS */
     uint32_t *t_info_mfn_list;
-    uint32_t t_info_first_offset;
-    int offset;
+    uint16_t t_info_first_offset;
+    uint16_t offset;
 
     if ( t_info )
         return -EBUSY;
@@ -179,7 +179,7 @@ static int alloc_trace_bufs(unsigned int pages)
     if ( pages == 0 )
         return -EINVAL;
 
-    /* Calculate offset in u32 of first mfn */
+    /* Calculate offset in units of u32 of first mfn */
     t_info_first_offset = calc_tinfo_first_offset();
 
     pages = calculate_tbuf_size(pages, t_info_first_offset);
