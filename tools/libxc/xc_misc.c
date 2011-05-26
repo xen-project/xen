@@ -417,6 +417,35 @@ int xc_hvm_set_pci_link_route(
     return rc;
 }
 
+int xc_hvm_inject_msi(
+    xc_interface *xch, domid_t dom, uint64_t addr, uint32_t data)
+{
+    DECLARE_HYPERCALL;
+    DECLARE_HYPERCALL_BUFFER(struct xen_hvm_inj_msi, arg);
+    int rc;
+
+    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
+    if ( arg == NULL )
+    {
+        PERROR("Could not allocate memory for xc_hvm_inj_msi hypercall");
+        return -1;
+    }
+
+    hypercall.op     = __HYPERVISOR_hvm_op;
+    hypercall.arg[0] = HVMOP_inj_msi;
+    hypercall.arg[1] = HYPERCALL_BUFFER_AS_ARG(arg);
+
+    arg->domid = dom;
+    arg->addr  = addr;
+    arg->data  = data;
+
+    rc = do_xen_hypercall(xch, &hypercall);
+
+    xc_hypercall_buffer_free(xch, arg);
+
+    return rc;
+}
+
 int xc_hvm_track_dirty_vram(
     xc_interface *xch, domid_t dom,
     uint64_t first_pfn, uint64_t nr,
