@@ -654,7 +654,7 @@ a653sched_adjust_global(const struct scheduler *ops,
  * callback functions.
  * The symbol must be visible to the rest of Xen at link time.
  */
-struct scheduler sched_arinc653_def = {
+const struct scheduler sched_arinc653_def = {
     .name           = "ARINC 653 Scheduler",
     .opt_name       = "arinc653",
     .sched_id       = XEN_SCHEDULER_ARINC653,

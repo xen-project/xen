@@ -339,7 +339,6 @@ static int force_cpu_type(const char *str)
 }
 custom_param("cpu_type", force_cpu_type);
 
-extern int ppro_has_global_ctrl;
 static int __init ppro_init(char ** cpu_type)
 {
 	__u8 cpu_model = current_cpu_data.x86_model;

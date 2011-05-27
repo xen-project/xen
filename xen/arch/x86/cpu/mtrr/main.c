@@ -63,12 +63,6 @@ const struct mtrr_ops *__read_mostly mtrr_if = NULL;
 static void set_mtrr(unsigned int reg, unsigned long base,
 		     unsigned long size, mtrr_type type);
 
-#ifndef CONFIG_X86_64
-extern int arr3_protected;
-#else
-#define arr3_protected 0
-#endif
-
 static const char *const mtrr_strings[MTRR_NUM_TYPES] =
 {
     "uncachable",               /* 0 */

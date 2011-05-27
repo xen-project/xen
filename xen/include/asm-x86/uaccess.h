@@ -269,6 +269,10 @@ struct exception_table_entry
 {
 	s32 addr, cont;
 };
+extern struct exception_table_entry __start___ex_table[];
+extern struct exception_table_entry __stop___ex_table[];
+extern struct exception_table_entry __start___pre_ex_table[];
+extern struct exception_table_entry __stop___pre_ex_table[];
 
 extern unsigned long search_exception_table(unsigned long);
 extern void sort_exception_tables(void);

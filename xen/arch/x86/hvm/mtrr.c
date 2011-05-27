@@ -28,8 +28,6 @@
 #include <asm/hvm/support.h>
 #include <asm/hvm/cacheattr.h>
 
-extern struct mtrr_state mtrr_state;
-
 static uint32_t size_or_mask;
 
 /* Get page attribute fields (PAn) from PAT MSR. */

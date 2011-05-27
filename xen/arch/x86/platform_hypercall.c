@@ -30,9 +30,6 @@
 #include "cpu/mtrr/mtrr.h"
 #include <xsm/xsm.h>
 
-extern uint16_t boot_edid_caps;
-extern uint8_t boot_edid_info[];
-
 #ifndef COMPAT
 typedef long ret_t;
 DEFINE_SPINLOCK(xenpf_lock);

@@ -86,3 +86,8 @@ void mtrr_wrmsr(unsigned int msr, uint64_t msr_content);
 extern int amd_init_mtrr(void);
 extern int cyrix_init_mtrr(void);
 
+#ifndef CONFIG_X86_64
+extern int arr3_protected;
+#else
+#define arr3_protected 0
+#endif

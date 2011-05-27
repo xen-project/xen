@@ -32,13 +32,6 @@
 #include <xen/event.h>
 #include <xen/iommu.h>
 
-extern const struct hvm_mmio_handler hpet_mmio_handler;
-extern const struct hvm_mmio_handler vlapic_mmio_handler;
-extern const struct hvm_mmio_handler vioapic_mmio_handler;
-extern const struct hvm_mmio_handler msixtbl_mmio_handler;
-
-#define HVM_MMIO_HANDLER_NR 4
-
 static const struct hvm_mmio_handler *const
 hvm_mmio_handlers[HVM_MMIO_HANDLER_NR] =
 {

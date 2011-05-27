@@ -57,6 +57,9 @@ extern int firstbank;
 int intel_mce_rdmsr(uint32_t msr, uint64_t *val);
 int intel_mce_wrmsr(uint32_t msr, uint64_t val);
 
+struct mcinfo_extended *intel_get_extended_msrs(
+    struct mcinfo_global *mig, struct mc_info *mi);
+
 int mce_available(struct cpuinfo_x86 *c);
 int mce_firstbank(struct cpuinfo_x86 *c);
 /* Helper functions used for collecting error telemetry */

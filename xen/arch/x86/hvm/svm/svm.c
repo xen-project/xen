@@ -1656,8 +1656,6 @@ static void svm_vmexit_ud_intercept(struct cpu_user_regs *regs)
     }
 }
 
-extern unsigned int nr_mce_banks; /* from mce.h */
-
 static int svm_is_erratum_383(struct cpu_user_regs *regs)
 {
     uint64_t msr_content;

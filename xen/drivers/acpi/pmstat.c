@@ -45,8 +45,6 @@
 
 DEFINE_PER_CPU_READ_MOSTLY(struct pm_px *, cpufreq_statistic_data);
 
-extern struct list_head cpufreq_governor_list;
-
 /*
  * Get PM statistic info
  */

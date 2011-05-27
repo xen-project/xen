@@ -245,7 +245,6 @@ static void tboot_gen_domain_integrity(const uint8_t key[TB_KEY_SIZE],
  */
 static int mfn_in_guarded_stack(unsigned long mfn)
 {
-    extern void *stack_base[NR_CPUS];
     void *p;
     int i;
 

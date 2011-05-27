@@ -108,6 +108,8 @@ extern unsigned int trampoline_xen_phys_start;
 extern unsigned char trampoline_cpu_started;
 extern char wakeup_start[];
 extern unsigned int video_mode, video_flags;
+extern unsigned short boot_edid_caps;
+extern unsigned char boot_edid_info[128];
 #endif
 
 #if defined(__x86_64__)

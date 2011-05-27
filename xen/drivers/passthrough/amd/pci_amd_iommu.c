@@ -25,9 +25,6 @@
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
 
-extern unsigned short ivrs_bdf_entries;
-extern struct ivrs_mappings *ivrs_mappings;
-
 struct amd_iommu *find_iommu_for_device(int bdf)
 {
     BUG_ON ( bdf >= ivrs_bdf_entries );

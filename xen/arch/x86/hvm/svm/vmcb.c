@@ -32,8 +32,6 @@
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/svm/svmdebug.h>
 
-extern int svm_dbg_on;
-
 struct vmcb_struct *alloc_vmcb(void) 
 {
     struct vmcb_struct *vmcb;

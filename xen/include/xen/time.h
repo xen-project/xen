@@ -15,6 +15,7 @@ extern int init_xen_time(void);
 extern void cstate_restore_tsc(void);
 
 extern unsigned long cpu_khz;
+extern unsigned long pit0_ticks;
 
 struct domain;
 struct vcpu;

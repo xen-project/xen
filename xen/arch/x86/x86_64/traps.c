@@ -24,10 +24,6 @@
 #include <asm/hvm/support.h>
 #include <public/callback.h>
 
-asmlinkage void syscall_enter(void);
-asmlinkage void sysenter_entry(void);
-asmlinkage void compat_hypercall(void);
-asmlinkage void int80_direct_trap(void);
 
 static void print_xen_info(void)
 {

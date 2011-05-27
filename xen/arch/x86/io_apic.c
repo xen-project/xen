@@ -1440,7 +1440,6 @@ static void __init setup_ioapic_ids_from_mpc(void)
  */
 static int __init timer_irq_works(void)
 {
-    extern unsigned long pit0_ticks;
     unsigned long t1, flags;
 
     t1 = pit0_ticks;

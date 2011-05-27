@@ -3248,8 +3248,6 @@ asmlinkage void do_debug(struct cpu_user_regs *regs)
         if ( regs->eflags & X86_EFLAGS_TF )
         {
 #ifdef __x86_64__
-            void sysenter_entry(void);
-            void sysenter_eflags_saved(void);
             /* In SYSENTER entry path we can't zap TF until EFLAGS is saved. */
             if ( (regs->rip >= (unsigned long)sysenter_entry) &&
                  (regs->rip <= (unsigned long)sysenter_eflags_saved) )

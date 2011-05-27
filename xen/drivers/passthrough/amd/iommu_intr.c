@@ -28,8 +28,6 @@
 #define INTREMAP_ENTRIES (1 << INTREMAP_LENGTH)
 
 int ioapic_bdf[MAX_IO_APICS];
-extern struct ivrs_mappings *ivrs_mappings;
-extern unsigned short ivrs_bdf_entries;
 void *shared_intremap_table;
 static DEFINE_SPINLOCK(shared_intremap_lock);
 

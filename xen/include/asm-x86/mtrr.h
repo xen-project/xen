@@ -52,6 +52,7 @@ struct mtrr_state {
 	/* ranges in var MSRs are overlapped or not:0(no overlapped) */
 	bool_t    overlapped;
 };
+extern struct mtrr_state mtrr_state;
 
 extern void mtrr_save_fixed_ranges(void *);
 extern void mtrr_save_state(void);

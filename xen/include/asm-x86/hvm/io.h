@@ -65,6 +65,13 @@ struct hvm_mmio_handler {
     hvm_mmio_write_t write_handler;
 };
 
+extern const struct hvm_mmio_handler hpet_mmio_handler;
+extern const struct hvm_mmio_handler vlapic_mmio_handler;
+extern const struct hvm_mmio_handler vioapic_mmio_handler;
+extern const struct hvm_mmio_handler msixtbl_mmio_handler;
+
+#define HVM_MMIO_HANDLER_NR 4
+
 int hvm_io_intercept(ioreq_t *p, int type);
 void register_io_handler(
     struct domain *d, unsigned long addr, unsigned long size,

@@ -52,7 +52,6 @@
 static unsigned long reset_value[MAX_COUNTERS];
 
 extern char svm_stgi_label[];
-extern struct op_x86_model_spec const *__read_mostly model;
 
 #ifdef CONFIG_X86_64
 u32 ibs_caps = 0;

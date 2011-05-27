@@ -99,4 +99,8 @@ struct ivrs_mappings {
     u8 dte_ext_int_pass;
     u8 dte_init_pass;
 };
+
+extern unsigned short ivrs_bdf_entries;
+extern struct ivrs_mappings *ivrs_mappings;
+
 #endif /* _ASM_X86_64_AMD_IOMMU_H */

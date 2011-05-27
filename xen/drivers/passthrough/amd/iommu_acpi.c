@@ -25,12 +25,6 @@
 #include <asm/hvm/svm/amd-iommu-proto.h>
 #include <asm/hvm/svm/amd-iommu-acpi.h>
 
-extern unsigned long amd_iommu_page_entries;
-extern unsigned short ivrs_bdf_entries;
-extern struct ivrs_mappings *ivrs_mappings;
-extern int ioapic_bdf[MAX_IO_APICS];
-extern void *shared_intremap_table;
-
 static unsigned short __initdata last_bdf;
 
 static void __init add_ivrs_mapping_entry(

@@ -45,10 +45,6 @@
 #include <asm/setup.h>
 #include <xen/cpu.h>
 
-extern u16 boot_edid_caps;
-extern u8 boot_edid_info[128];
-extern struct boot_video_info boot_vid_info;
-
 /* opt_nosmp: If true, secondary processors are ignored. */
 static bool_t __initdata opt_nosmp;
 boolean_param("nosmp", opt_nosmp);
@@ -438,6 +434,7 @@ struct boot_video_info {
     u16 vesapm_off;         /* 0x26 */
     u16 vesa_attrib;        /* 0x28 */
 };
+extern struct boot_video_info boot_vid_info;
 
 static void __init parse_video_info(void)
 {
@@ -806,7 +803,6 @@ void __init __start_xen(unsigned long mbi_p)
             end = 0;
         if ( end > s )
         {
-            extern l2_pgentry_t l2_xenmap[];
             l4_pgentry_t *pl4e;
             l3_pgentry_t *pl3e;
             l2_pgentry_t *pl2e;

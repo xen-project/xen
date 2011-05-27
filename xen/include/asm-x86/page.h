@@ -303,6 +303,8 @@ extern l2_pgentry_t  *compat_idle_pg_table_l2;
 extern unsigned int   m2p_compat_vstart;
 #endif
 extern l2_pgentry_t l2_identmap[4*L2_PAGETABLE_ENTRIES];
+extern l1_pgentry_t l1_identmap[L1_PAGETABLE_ENTRIES];
+extern l2_pgentry_t l2_xenmap[];
 void paging_init(void);
 void setup_idle_pagetable(void);
 #endif /* !defined(__ASSEMBLY__) */

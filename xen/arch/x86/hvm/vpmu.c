@@ -78,9 +78,6 @@ void vpmu_load(struct vcpu *v)
         vpmu->arch_vpmu_ops->arch_vpmu_load(v);
 }
 
-extern struct arch_vpmu_ops core2_vpmu_ops;
-extern struct arch_vpmu_ops amd_vpmu_ops;
-
 void vpmu_initialise(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);

@@ -63,4 +63,6 @@ static inline void on_each_cpu(
 
 int alloc_cpu_id(void);
 
+extern void *stack_base[NR_CPUS];
+
 #endif /* __XEN_SMP_H__ */

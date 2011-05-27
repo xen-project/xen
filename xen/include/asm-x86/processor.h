@@ -580,6 +580,13 @@ DECLARE_TRAP_HANDLER(machine_check);
 DECLARE_TRAP_HANDLER(alignment_check);
 DECLARE_TRAP_HANDLER(spurious_interrupt_bug);
 #undef DECLARE_TRAP_HANDLER
+
+asmlinkage void syscall_enter(void);
+asmlinkage void sysenter_entry(void);
+asmlinkage void sysenter_eflags_saved(void);
+asmlinkage void compat_hypercall(void);
+asmlinkage void int80_direct_trap(void);
+
 extern asmlinkage int hypercall(void);
 
 int cpuid_hypervisor_leaves( uint32_t idx, uint32_t sub_idx,

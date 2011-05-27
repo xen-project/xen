@@ -30,4 +30,7 @@ extern int vmce_init_msr(struct domain *d);
 extern void vmce_destroy_msr(struct domain *d);
 extern int vmce_wrmsr(uint32_t msr, uint64_t val);
 extern int vmce_rdmsr(uint32_t msr, uint64_t *val);
+
+extern unsigned int nr_mce_banks;
+
 #endif
