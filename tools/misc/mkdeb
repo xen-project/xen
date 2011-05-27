@@ -50,7 +50,7 @@ EOF
 
 # Package it up
 chown -R root:root deb
-dpkg --build deb $xen-upstream-$version.deb
+dpkg --build deb xen-upstream-$version.deb
 
 # Tidy up after ourselves
 rm -rf deb
