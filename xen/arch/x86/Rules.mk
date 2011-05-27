@@ -27,6 +27,7 @@ CFLAGS += -I$(BASEDIR)/include/asm-x86/mach-default
 CFLAGS += -msoft-float
 
 $(call cc-options-add,CFLAGS,CC,$(EMBEDDED_EXTRA_CFLAGS))
+$(call cc-option-add,CFLAGS,CC,-Wnested-externs)
 
 ifeq ($(supervisor_mode_kernel),y)
 CFLAGS += -DCONFIG_X86_SUPERVISOR_MODE_KERNEL=1
