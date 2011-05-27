@@ -16,7 +16,6 @@
  * - scnprintf and vscnprintf
  */
 
-#include <xen/stdarg.h>
 #include <xen/ctype.h>
 #include <xen/lib.h>
 #include <asm/div64.h>
