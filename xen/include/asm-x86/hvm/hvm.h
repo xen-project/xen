@@ -414,6 +414,10 @@ void hvm_memory_event_cr3(unsigned long value, unsigned long old);
 void hvm_memory_event_cr4(unsigned long value, unsigned long old);
 /* Called for current VCPU on int3: returns -1 if no listener */
 int hvm_memory_event_int3(unsigned long gla);
+
+/* Called for current VCPU on single step: returns -1 if no listener */
+int hvm_memory_event_single_step(unsigned long gla);
+
 #else
 static inline void hvm_memory_event_cr0(unsigned long value, unsigned long old)
 { }
@@ -422,6 +426,8 @@ static inline void hvm_memory_event_cr3(unsigned long value, unsigned long old)
 static inline void hvm_memory_event_cr4(unsigned long value, unsigned long old)
 { }
 static inline int hvm_memory_event_int3(unsigned long gla)
+{ return 0; }
+static inline int hvm_memory_event_single_step(unsigned long gla)
 { return 0; }
 #endif
 

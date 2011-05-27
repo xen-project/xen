@@ -3510,7 +3510,8 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                     rc = -EPERM;
                 break;
             case HVM_PARAM_MEMORY_EVENT_INT3:
-                if ( d == current->domain ) 
+            case HVM_PARAM_MEMORY_EVENT_SINGLE_STEP:
+                if ( d == current->domain )
                 {
                     rc = -EPERM;
                     break;
@@ -3543,6 +3544,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                 switch( a.index )
                 {
                 case HVM_PARAM_MEMORY_EVENT_INT3:
+                case HVM_PARAM_MEMORY_EVENT_SINGLE_STEP:
                 {
                     domain_pause(d);
                     domain_unpause(d); /* Causes guest to latch new status */
@@ -4066,11 +4068,21 @@ int hvm_debug_op(struct vcpu *v, int32_t op)
             rc = -ENOSYS;
             if ( !cpu_has_monitor_trap_flag )
                 break;
-            rc = 0;
-            vcpu_pause(v);
+
+            rc = mem_event_check_ring(v->domain);
+            /* rc ==0 p2m_mem_access_check() has already paused the vcpu */
+            if ( rc < 0 )
+                vcpu_pause(v);
+
             v->arch.hvm_vcpu.single_step =
                 (op == XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_ON);
-            vcpu_unpause(v); /* guest will latch new state */
+
+            /* rc ==0 p2m_mem_access_resume() will unpause the vcpu */
+            if ( rc < 0 )
+            {
+                vcpu_unpause(v); /* guest will latch new state */
+                rc = 0;
+            }
             break;
         default:
             rc = -ENOSYS;
@@ -4158,6 +4170,18 @@ int hvm_memory_event_int3(unsigned long gla)
                                     .params[HVM_PARAM_MEMORY_EVENT_INT3],
                                   MEM_EVENT_REASON_INT3,
                                   gfn, 0, 1, gla);
+}
+
+int hvm_memory_event_single_step(unsigned long gla)
+{
+    uint32_t pfec = PFEC_page_present;
+    unsigned long gfn;
+    gfn = paging_gva_to_gfn(current, gla, &pfec);
+
+    return hvm_memory_event_traps(current->domain->arch.hvm_domain
+            .params[HVM_PARAM_MEMORY_EVENT_SINGLE_STEP],
+            MEM_EVENT_REASON_SINGLESTEP,
+            gfn, 0, 1, gla);
 }
 #endif /* __x86_64__ */
 

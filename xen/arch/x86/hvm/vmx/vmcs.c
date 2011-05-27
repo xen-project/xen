@@ -1081,8 +1081,9 @@ void vmx_do_resume(struct vcpu *v)
         hvm_asid_flush_vcpu(v);
     }
 
-    debug_state = v->domain->debugger_attached 
-                  || v->domain->arch.hvm_domain.params[HVM_PARAM_MEMORY_EVENT_INT3];
+    debug_state = v->domain->debugger_attached
+                  || v->domain->arch.hvm_domain.params[HVM_PARAM_MEMORY_EVENT_INT3]
+                  || v->domain->arch.hvm_domain.params[HVM_PARAM_MEMORY_EVENT_SINGLE_STEP];
 
     if ( unlikely(v->arch.hvm_vcpu.debug_state_latch != debug_state) )
     {

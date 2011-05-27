@@ -126,10 +126,11 @@
 
 /* Enable blocking memory events, async or sync (pause vcpu until response) 
  * onchangeonly indicates messages only on a change of value */
-#define HVM_PARAM_MEMORY_EVENT_CR0   20
-#define HVM_PARAM_MEMORY_EVENT_CR3   21
-#define HVM_PARAM_MEMORY_EVENT_CR4   22
-#define HVM_PARAM_MEMORY_EVENT_INT3  23
+#define HVM_PARAM_MEMORY_EVENT_CR0          20
+#define HVM_PARAM_MEMORY_EVENT_CR3          21
+#define HVM_PARAM_MEMORY_EVENT_CR4          22
+#define HVM_PARAM_MEMORY_EVENT_INT3         23
+#define HVM_PARAM_MEMORY_EVENT_SINGLE_STEP  25
 
 #define HVMPME_MODE_MASK       (3 << 0)
 #define HVMPME_mode_disabled   0
@@ -140,6 +141,6 @@
 /* Boolean: Enable nestedhvm (hvm only) */
 #define HVM_PARAM_NESTEDHVM    24
 
-#define HVM_NR_PARAMS          25
+#define HVM_NR_PARAMS          26
 
 #endif /* __XEN_PUBLIC_HVM_PARAMS_H__ */
