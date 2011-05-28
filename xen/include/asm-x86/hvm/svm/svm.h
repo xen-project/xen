@@ -87,7 +87,15 @@ extern u32 svm_feature_flags;
 #define cpu_has_svm_cleanbits cpu_has_svm_feature(SVM_FEATURE_VMCBCLEAN)
 #define cpu_has_svm_decode    cpu_has_svm_feature(SVM_FEATURE_DECODEASSISTS)
 #define cpu_has_pause_filter  cpu_has_svm_feature(SVM_FEATURE_PAUSEFILTER)
+#define cpu_has_tsc_ratio     cpu_has_svm_feature(SVM_FEATURE_TSCRATEMSR)
 
 #define SVM_PAUSEFILTER_INIT    3000
+
+/* TSC rate */
+#define DEFAULT_TSC_RATIO       0x0000000100000000ULL
+#define TSC_RATIO_RSVD_BITS     0xffffff0000000000ULL
+#define TSC_RATIO(g_khz, h_khz) ( (((u64)(g_khz)<<32)/(u64)(h_khz)) & \
+                                  ~TSC_RATIO_RSVD_BITS )
+#define vcpu_tsc_ratio(v)       TSC_RATIO((v)->domain->arch.tsc_khz, cpu_khz)
 
 #endif /* __ASM_X86_HVM_SVM_H__ */

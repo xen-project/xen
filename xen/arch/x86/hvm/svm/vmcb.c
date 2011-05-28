@@ -128,7 +128,9 @@ static int construct_vmcb(struct vcpu *v)
 
     /* TSC. */
     vmcb->_tsc_offset = 0;
-    if ( v->domain->arch.vtsc )
+
+    /* Don't need to intercept RDTSC if CPU supports TSC rate scaling */
+    if ( v->domain->arch.vtsc && !cpu_has_tsc_ratio )
     {
         vmcb->_general1_intercepts |= GENERAL1_INTERCEPT_RDTSC;
         vmcb->_general2_intercepts |= GENERAL2_INTERCEPT_RDTSCP;
