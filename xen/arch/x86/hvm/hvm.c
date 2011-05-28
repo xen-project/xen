@@ -4068,21 +4068,11 @@ int hvm_debug_op(struct vcpu *v, int32_t op)
             rc = -ENOSYS;
             if ( !cpu_has_monitor_trap_flag )
                 break;
-
-            rc = mem_event_check_ring(v->domain);
-            /* rc ==0 p2m_mem_access_check() has already paused the vcpu */
-            if ( rc < 0 )
-                vcpu_pause(v);
-
+            rc = 0;
+            vcpu_pause(v);
             v->arch.hvm_vcpu.single_step =
                 (op == XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_ON);
-
-            /* rc ==0 p2m_mem_access_resume() will unpause the vcpu */
-            if ( rc < 0 )
-            {
-                vcpu_unpause(v); /* guest will latch new state */
-                rc = 0;
-            }
+            vcpu_unpause(v); /* guest will latch new state */
             break;
         default:
             rc = -ENOSYS;
