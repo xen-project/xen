@@ -448,7 +448,6 @@ xc_domain_dumpcore_via_callback(int xc_handle,
 
     int auto_translated_physmap;
     xen_pfn_t *p2m = NULL;
-    unsigned long p2m_size = 0;
     struct xen_dumpcore_p2m *p2m_array = NULL;
 
     uint64_t *pfn_array = NULL;
@@ -549,7 +548,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
         }
 
         sts = xc_core_arch_map_p2m(xc_handle, dinfo->guest_width, &info, live_shinfo,
-                                   &p2m, &p2m_size);
+                                   &p2m, &dinfo->p2m_size);
         if ( sts != 0 )
             goto out;
     }
