@@ -1908,6 +1908,7 @@ static int init_vtd_hw(void)
             iommu = drhd->iommu;
             if ( enable_intremap(iommu, 0) != 0 )
             {
+                iommu_intremap = 0;
                 dprintk(XENLOG_WARNING VTDPREFIX,
                         "Failed to enable Interrupt Remapping!\n");
                 break;
