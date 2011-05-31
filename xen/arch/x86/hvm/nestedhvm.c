@@ -153,16 +153,16 @@ nestedhvm_is_n2(struct vcpu *v)
  * iomap[2]      set        set
  */
 
-/* same format and size as hvm_io_bitmap */
-#define IOBITMAP_SIZE		3*PAGE_SIZE/BYTES_PER_LONG
-/* same format as hvm_io_bitmap */
-#define IOBITMAP_VMX_SIZE	2*PAGE_SIZE/BYTES_PER_LONG
-
 static unsigned long *shadow_io_bitmap[3];
 
 void
 nestedhvm_setup(void)
 {
+    /* Same format and size as hvm_io_bitmap (Intel needs only 2 pages). */
+    unsigned int sz = (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL)
+        ? 2*PAGE_SIZE : 3*PAGE_SIZE;
+    unsigned int i;
+
     /* shadow_io_bitmaps can't be declared static because
      *   they must fulfill hw requirements (page aligned section)
      *   and doing so triggers the ASSERT(va >= XEN_VIRT_START)
@@ -173,23 +173,10 @@ nestedhvm_setup(void)
      * it is valid to use _xmalloc()
      */
 
-    /* shadow I/O permission bitmaps */
-    if (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) {
-        /* Same format as hvm_io_bitmap */
-        shadow_io_bitmap[0] = _xmalloc(IOBITMAP_VMX_SIZE, PAGE_SIZE);
-        shadow_io_bitmap[1] = _xmalloc(IOBITMAP_VMX_SIZE, PAGE_SIZE);
-        shadow_io_bitmap[2] = _xmalloc(IOBITMAP_VMX_SIZE, PAGE_SIZE);
-        memset(shadow_io_bitmap[0], ~0U, IOBITMAP_VMX_SIZE);
-        memset(shadow_io_bitmap[1], ~0U, IOBITMAP_VMX_SIZE);
-        memset(shadow_io_bitmap[2], ~0U, IOBITMAP_VMX_SIZE);
-    } else {
-        /* Same size and format as hvm_io_bitmap */
-        shadow_io_bitmap[0] = _xmalloc(IOBITMAP_SIZE, PAGE_SIZE);
-        shadow_io_bitmap[1] = _xmalloc(IOBITMAP_SIZE, PAGE_SIZE);
-        shadow_io_bitmap[2] = _xmalloc(IOBITMAP_SIZE, PAGE_SIZE);
-        memset(shadow_io_bitmap[0], ~0U, IOBITMAP_SIZE);
-        memset(shadow_io_bitmap[1], ~0U, IOBITMAP_SIZE);
-        memset(shadow_io_bitmap[2], ~0U, IOBITMAP_SIZE);
+    for ( i = 0; i < ARRAY_SIZE(shadow_io_bitmap); i++ )
+    {
+        shadow_io_bitmap[i] = _xmalloc(sz, PAGE_SIZE);
+        memset(shadow_io_bitmap[i], ~0U, sz);
     }
 
     __clear_bit(0x80, shadow_io_bitmap[0]);
