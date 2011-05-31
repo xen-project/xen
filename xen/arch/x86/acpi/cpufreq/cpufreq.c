@@ -695,15 +695,11 @@ __initcall(cpufreq_driver_init);
 
 int cpufreq_cpu_init(unsigned int cpuid)
 {
-    static int cpu_count=0;
     int ret;
 
-    cpu_count++; 
-
     /* Currently we only handle Intel and AMD processor */
-    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
-        ret = cpufreq_add_cpu(cpuid);
-    else if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
+    if ( (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL ) ||
+         (boot_cpu_data.x86_vendor == X86_VENDOR_AMD ) )
         ret = cpufreq_add_cpu(cpuid);
     else
         ret = -EFAULT;
