@@ -1195,6 +1195,8 @@ static int __spurious_page_fault(
     if ( ((l3e_get_flags(l3e) & required_flags) != required_flags) ||
          (l3e_get_flags(l3e) & disallowed_flags) )
         return 0;
+    if ( l3e_get_flags(l3e) & _PAGE_PSE )
+        return 1;
 #endif
 #endif
 
