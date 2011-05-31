@@ -460,7 +460,7 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
     /* ASID - Emulation handled in hvm_asid_handle_vmenter() */
 
     /* TLB control */
-    n2vmcb->tlb_control = n1vmcb->tlb_control | ns_vmcb->tlb_control;
+    n2vmcb->tlb_control = ns_vmcb->tlb_control;
 
     /* Virtual Interrupts */
     if (!vcleanbit_set(tpr)) {
@@ -655,7 +655,9 @@ nsvm_vcpu_vmentry(struct vcpu *v, struct cpu_user_regs *regs,
     svm->ns_vmcb_guestcr3 = ns_vmcb->_cr3;
     svm->ns_vmcb_hostcr3 = ns_vmcb->_h_cr3;
 
-    nv->nv_flushp2m = ns_vmcb->tlb_control;
+    /* Convert explicitely to boolean. Deals with l1 guests
+     * that use flush-by-asid w/o checking the cpuid bits */
+    nv->nv_flushp2m = !!ns_vmcb->tlb_control;
     if ( svm->ns_guest_asid != ns_vmcb->_guest_asid )
     {
         nv->nv_flushp2m = 1;
