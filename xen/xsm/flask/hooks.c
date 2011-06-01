@@ -18,6 +18,7 @@
 #include <xen/cpumask.h>
 #include <xen/errno.h>
 #include <xen/guest_access.h>
+#include <xen/xenoprof.h>
 #include <public/xen.h>
 #include <public/physdev.h>
 #include <public/platform.h>
