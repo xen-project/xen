@@ -31,6 +31,10 @@ int mem_paging_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
     int rc;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
+    /* Only HAP is supported */
+    if ( !hap_enabled(d) )
+         return -ENODEV;
+
     switch( mec->op )
     {
     case XEN_DOMCTL_MEM_EVENT_OP_PAGING_NOMINATE:

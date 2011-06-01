@@ -737,6 +737,10 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
 {
     int rc;
 
+    /* Only HAP is supported */
+    if ( !hap_enabled(d) )
+         return -ENODEV;
+
     switch(mec->op)
     {
         case XEN_DOMCTL_MEM_SHARING_OP_CONTROL:
