@@ -50,8 +50,6 @@ struct bios_config seabios_config = {
 
     .bios_info_setup = NULL,
 
-    .smp_setup = NULL,
-
     .vm86_setup = NULL,
     .e820_setup = NULL,
 

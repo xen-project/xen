@@ -151,8 +151,6 @@ struct bios_config rombios_config =  {
 
     .acpi_start = ACPI_PHYSICAL_ADDRESS,
 
-    .smp_setup = smp_initialise,
-
     .bios_high_setup = rombios_highbios_setup,
     .bios_info_setup = rombios_setup_bios_info,
 

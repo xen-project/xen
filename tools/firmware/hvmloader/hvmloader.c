@@ -403,8 +403,7 @@ int main(void)
     apic_setup();
     pci_setup();
 
-    if (bios->smp_setup)
-        bios->smp_setup();
+    smp_initialise();
 
     perform_tests();
 

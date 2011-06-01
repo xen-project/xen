@@ -26,8 +26,6 @@ struct bios_config {
     /* ACPI tables */
     unsigned int acpi_start;
 
-    void (*smp_setup)(void);
-
     uint32_t (*bios_high_setup)(void);
     void (*bios_info_setup)(uint32_t);
 
