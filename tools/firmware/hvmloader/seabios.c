@@ -38,9 +38,6 @@ struct bios_config seabios_config = {
 
     .bios_address = SEABIOS_PHYSICAL_ADDRESS,
 
-    .smbios_start = 0,
-    .smbios_end = 0,
-
     .load_roms = 0,
 
     .optionrom_start = 0,
@@ -53,6 +50,7 @@ struct bios_config seabios_config = {
 
     .acpi_build_tables = NULL,
     .create_mp_tables = NULL,
+    .create_smbios_tables = NULL,
 };
 
 /*

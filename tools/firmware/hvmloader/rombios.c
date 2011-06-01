@@ -136,6 +136,13 @@ static void rombios_create_mp_tables(void)
     reset_bios_checksum();
 }
 
+static void rombios_create_smbios_tables(void)
+{
+    hvm_write_smbios_tables(SCRATCH_PHYSICAL_ADDRESS,
+                            SMBIOS_PHYSICAL_ADDRESS,
+                            SMBIOS_PHYSICAL_END);
+}
+
 //BUILD_BUG_ON(sizeof(rombios) > (0x00100000U - ROMBIOS_PHYSICAL_ADDRESS));
 
 struct bios_config rombios_config =  {
@@ -145,9 +152,6 @@ struct bios_config rombios_config =  {
     .image_size = sizeof(rombios),
 
     .bios_address = ROMBIOS_PHYSICAL_ADDRESS,
-
-    .smbios_start = SMBIOS_PHYSICAL_ADDRESS,
-    .smbios_end = SMBIOS_PHYSICAL_END,
 
     .load_roms = 1,
 
@@ -162,6 +166,7 @@ struct bios_config rombios_config =  {
 
     .acpi_build_tables = rombios_acpi_build_tables,
     .create_mp_tables = rombios_create_mp_tables,
+    .create_smbios_tables = rombios_create_smbios_tables,
 };
 
 /*

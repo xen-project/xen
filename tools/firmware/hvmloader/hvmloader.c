@@ -383,7 +383,7 @@ int main(void)
 {
     uint32_t highbios = 0;
     const struct bios_config *bios;
-    int option_rom_sz = 0, vgabios_sz = 0, etherboot_sz = 0, smbios_sz = 0;
+    int option_rom_sz = 0, vgabios_sz = 0, etherboot_sz = 0;
     uint32_t etherboot_phys_addr = 0, option_rom_phys_addr = 0;
 
     /* Initialise hypercall stubs with RET, rendering them no-ops. */
@@ -407,11 +407,9 @@ int main(void)
 
     perform_tests();
 
-    if (bios->smbios_start) {
+    if (bios->create_smbios_tables) {
         printf("Writing SMBIOS tables ...\n");
-        smbios_sz = hvm_write_smbios_tables(SCRATCH_PHYSICAL_ADDRESS,
-                                            bios->smbios_start,
-                                            bios->smbios_end);
+        bios->create_smbios_tables();
     }
 
     printf("Loading %s ...\n", bios->name);
@@ -495,10 +493,6 @@ int main(void)
         printf(" %05x-%05x: PCI Option ROMs\n",
                option_rom_phys_addr,
                option_rom_phys_addr + option_rom_sz - 1);
-    if ( smbios_sz )
-        printf(" %05x-%05x: SMBIOS tables\n",
-               bios->smbios_start,
-               bios->smbios_start + smbios_sz - 1);
     printf(" %05x-%05x: Main BIOS\n",
            bios->bios_address,
            bios->bios_address + bios->image_size - 1);

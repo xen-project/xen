@@ -16,9 +16,6 @@ struct bios_config {
     /* Physical address to load at */
     unsigned int bios_address;
 
-    /* SMBIOS */
-    unsigned int smbios_start, smbios_end;
-
     /* ROMS */
     int load_roms;
     unsigned int optionrom_start, optionrom_end;
@@ -31,6 +28,7 @@ struct bios_config {
 
     void (*acpi_build_tables)(void);
     void (*create_mp_tables)(void);
+    void (*create_smbios_tables)(void);
 };
 
 extern struct bios_config rombios_config;
