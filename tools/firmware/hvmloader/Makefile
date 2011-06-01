@@ -30,7 +30,7 @@ CFLAGS += $(CFLAGS_xeninclude)
 
 OBJS  = hvmloader.o mp_tables.o util.o smbios.o 
 OBJS += 32bitbios_support.o smp.o cacheattr.o xenbus.o
-OBJS += e820.o
+OBJS += e820.o pci.o
 ifeq ($(debug),y)
 OBJS += tests.o
 endif

@@ -180,6 +180,9 @@ void xenbus_shutdown(void);
  * static buffer, so only valid until the next xenstore/xenbus operation. */
 char *xenstore_read(char *path);
 
+/* Setup PCI bus */
+void pci_setup(void);
+
 /* Prepare the 32bit BIOS */
 uint32_t rombios_highbios_setup(void);
 

@@ -28,11 +28,6 @@
 #define ROM_INCLUDE_SEABIOS
 #include "roms.inc"
 
-static void seabios_pci_setup(void)
-{
-    virtual_vga = VGA_cirrus;
-}
-
 //BUILD_BUG_ON(sizeof(seabios) > (0x00100000U - SEABIOS_PHYSICAL_ADDRESS));
 
 struct bios_config seabios_config = {
@@ -56,7 +51,6 @@ struct bios_config seabios_config = {
     .bios_info_setup = NULL,
 
     .apic_setup = NULL,
-    .pci_setup = seabios_pci_setup,
     .smp_setup = NULL,
 
     .vm86_setup = NULL,

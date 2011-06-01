@@ -109,11 +109,6 @@ asm (
     "    .text                       \n"
     );
 
-unsigned long pci_mem_start = PCI_MEM_START;
-unsigned long pci_mem_end = PCI_MEM_END;
-
-enum virtual_vga virtual_vga = VGA_none;
-
 static void init_hypercalls(void)
 {
     uint32_t eax, ebx, ecx, edx;
@@ -391,8 +386,7 @@ int main(void)
 
     if (bios->apic_setup)
         bios->apic_setup();
-    if (bios->pci_setup)
-        bios->pci_setup();
+    pci_setup();
 
     if (bios->smp_setup)
         bios->smp_setup();
