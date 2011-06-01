@@ -383,7 +383,6 @@ static const struct bios_config *detect_bios(void)
 
 int main(void)
 {
-    uint32_t highbios = 0;
     const struct bios_config *bios;
     int option_rom_sz = 0, vgabios_sz = 0, etherboot_sz = 0;
     uint32_t etherboot_phys_addr = 0, option_rom_phys_addr = 0;
@@ -409,6 +408,9 @@ int main(void)
 
     perform_tests();
 
+    if (bios->bios_info_setup)
+        bios->bios_info_setup();
+
     if (bios->create_smbios_tables) {
         printf("Writing SMBIOS tables ...\n");
         bios->create_smbios_tables();
@@ -418,8 +420,8 @@ int main(void)
     memcpy((void *)bios->bios_address, bios->image,
            bios->image_size);
 
-    if (bios->bios_high_setup)
-        highbios = bios->bios_high_setup();
+    if (bios->bios_relocate)
+        bios->bios_relocate();
 
     if ( bios->create_mp_tables &&
          ( (hvm_info->nr_vcpus > 1) || hvm_info->apic_mode ) )
@@ -505,8 +507,8 @@ int main(void)
     if (bios->e820_setup)
         bios->e820_setup();
 
-    if (bios->bios_info_setup)
-        bios->bios_info_setup(highbios);
+    if (bios->bios_info_finish)
+        bios->bios_info_finish();
 
     xenbus_shutdown();
 

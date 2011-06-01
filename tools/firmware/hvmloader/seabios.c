@@ -44,6 +44,9 @@ struct bios_config seabios_config = {
     .optionrom_end = 0,
 
     .bios_info_setup = NULL,
+    .bios_info_finish = NULL,
+
+    .bios_relocate = NULL,
 
     .vm86_setup = NULL,
     .e820_setup = NULL,

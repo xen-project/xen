@@ -20,8 +20,10 @@ struct bios_config {
     int load_roms;
     unsigned int optionrom_start, optionrom_end;
 
-    uint32_t (*bios_high_setup)(void);
-    void (*bios_info_setup)(uint32_t);
+    void (*bios_info_setup)(void);
+    void (*bios_info_finish)(void);
+
+    void (*bios_relocate)(void);
 
     void (*vm86_setup)(void);
     void (*e820_setup)(void);
