@@ -23,16 +23,13 @@ struct bios_config {
     int load_roms;
     unsigned int optionrom_start, optionrom_end;
 
-    /* ACPI tables */
-    unsigned int acpi_start;
-
     uint32_t (*bios_high_setup)(void);
     void (*bios_info_setup)(uint32_t);
 
     void (*vm86_setup)(void);
     void (*e820_setup)(void);
 
-    void (*acpi_build_tables)(unsigned int physical);
+    void (*acpi_build_tables)(void);
     void (*create_mp_tables)(void);
 };
 

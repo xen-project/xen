@@ -115,6 +115,11 @@ static void reset_bios_checksum(void)
     *((uint8_t *)(ROMBIOS_BEGIN + ROMBIOS_MAXOFFSET)) = -checksum;
 }
 
+static void rombios_acpi_build_tables(void)
+{
+    acpi_build_tables(ACPI_PHYSICAL_ADDRESS);
+}
+
 static void rombios_create_mp_tables(void)
 {
     /* Find the 'safe' place in ROMBIOS for the MP tables. */
@@ -149,15 +154,13 @@ struct bios_config rombios_config =  {
     .optionrom_start = OPTIONROM_PHYSICAL_ADDRESS,
     .optionrom_end = OPTIONROM_PHYSICAL_END,
 
-    .acpi_start = ACPI_PHYSICAL_ADDRESS,
-
     .bios_high_setup = rombios_highbios_setup,
     .bios_info_setup = rombios_setup_bios_info,
 
     .vm86_setup = rombios_init_vm86_tss,
     .e820_setup = rombios_setup_e820,
 
-    .acpi_build_tables = acpi_build_tables,
+    .acpi_build_tables = rombios_acpi_build_tables,
     .create_mp_tables = rombios_create_mp_tables,
 };
 

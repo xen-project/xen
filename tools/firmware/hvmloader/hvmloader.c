@@ -472,7 +472,7 @@ int main(void)
 
         if ( bios->acpi_build_tables ) {
             printf("Loading ACPI ...\n");
-            bios->acpi_build_tables(bios->acpi_start);
+            bios->acpi_build_tables();
         }
         hypercall_hvm_op(HVMOP_set_param, &p);
     }

@@ -46,8 +46,6 @@ struct bios_config seabios_config = {
     .optionrom_start = 0,
     .optionrom_end = 0,
 
-    .acpi_start = 0,
-
     .bios_info_setup = NULL,
 
     .vm86_setup = NULL,
