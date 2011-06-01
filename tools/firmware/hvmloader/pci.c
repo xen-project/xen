@@ -48,7 +48,7 @@ void pci_setup(void)
     /* Create a list of device BARs in descending order of size. */
     struct bars {
         uint32_t devfn, bar_reg, bar_sz;
-    } *bars = (struct bars *)SCRATCH_PHYSICAL_ADDRESS;
+    } *bars = (struct bars *)scratch_start;
     unsigned int i, nr_bars = 0;
 
     /* Program PCI-ISA bridge with appropriate link routes. */

@@ -138,7 +138,7 @@ static void rombios_create_mp_tables(void)
 
 static void rombios_create_smbios_tables(void)
 {
-    hvm_write_smbios_tables(SCRATCH_PHYSICAL_ADDRESS,
+    hvm_write_smbios_tables(scratch_start,
                             SMBIOS_PHYSICAL_ADDRESS,
                             SMBIOS_PHYSICAL_END);
 }

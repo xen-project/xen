@@ -168,6 +168,9 @@ int vprintf(const char *fmt, va_list ap);
 void *mem_alloc(uint32_t size, uint32_t align);
 #define virt_to_phys(v) ((unsigned long)(v))
 
+/* Allocate memory in a scratch region */
+void *scratch_alloc(uint32_t size, uint32_t align);
+
 /* Connect our xenbus client to the backend.  
  * Call once, before any other xenbus actions. */
 void xenbus_setup(void);

@@ -362,6 +362,24 @@ void *mem_alloc(uint32_t size, uint32_t align)
     return (void *)(unsigned long)s;
 }
 
+void *scratch_alloc(uint32_t size, uint32_t align)
+{
+    uint32_t s, e;
+
+    /* Align to at least one kilobyte. */
+    if ( align < 1024 )
+        align = 1024;
+
+    s = (scratch_start + align - 1) & ~(align - 1);
+    e = s + size - 1;
+
+    BUG_ON(e < s);
+
+    scratch_start = e;
+
+    return (void *)(unsigned long)s;
+}
+
 uint32_t ioapic_read(uint32_t reg)
 {
     *(volatile uint32_t *)(IOAPIC_BASE_ADDRESS + 0x00) = reg;

@@ -110,6 +110,8 @@ asm (
     "    .text                       \n"
     );
 
+unsigned long scratch_start = SCRATCH_PHYSICAL_ADDRESS;
+
 static void init_hypercalls(void)
 {
     uint32_t eax, ebx, ecx, edx;
@@ -481,6 +483,9 @@ int main(void)
     cmos_write_memory_size();
 
     printf("BIOS map:\n");
+    if ( SCRATCH_PHYSICAL_ADDRESS != scratch_start )
+        printf(" %05x-%05lx: Scratch space\n",
+               SCRATCH_PHYSICAL_ADDRESS, scratch_start);
     if ( vgabios_sz )
         printf(" %05x-%05x: VGA BIOS\n",
                VGABIOS_PHYSICAL_ADDRESS,
