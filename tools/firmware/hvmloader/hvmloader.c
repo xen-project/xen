@@ -25,6 +25,7 @@
 #include "config.h"
 #include "pci_regs.h"
 #include "option_rom.h"
+#include "apic_regs.h"
 #include <xen/version.h>
 #include <xen/hvm/params.h>
 
@@ -332,6 +333,21 @@ static void cmos_write_memory_size(void)
     cmos_outb(0x35, (uint8_t)( alt_mem >> 8));
 }
 
+static void apic_setup(void)
+{
+    /* Set the IOAPIC ID to the static value used in the MP/ACPI tables. */
+    ioapic_write(0x00, IOAPIC_ID);
+
+    /* NMIs are delivered direct to the BSP. */
+    lapic_write(APIC_SPIV, APIC_SPIV_APIC_ENABLED | 0xFF);
+    lapic_write(APIC_LVT0, (APIC_MODE_EXTINT << 8) | APIC_LVT_MASKED);
+    lapic_write(APIC_LVT1, APIC_MODE_NMI << 8);
+
+    /* 8259A ExtInts are delivered through IOAPIC pin 0 (Virtual Wire Mode). */
+    ioapic_write(0x10, APIC_DM_EXTINT);
+    ioapic_write(0x11, SET_APIC_ID(LAPIC_ID(0)));
+}
+
 struct bios_info {
     const char *key;
     const struct bios_config *bios;
@@ -384,8 +400,7 @@ int main(void)
 
     printf("CPU speed is %u MHz\n", get_cpu_mhz());
 
-    if (bios->apic_setup)
-        bios->apic_setup();
+    apic_setup();
     pci_setup();
 
     if (bios->smp_setup)

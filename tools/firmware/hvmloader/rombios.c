@@ -25,7 +25,6 @@
 #include "../rombios/config.h"
 
 #include "acpi/acpi2_0.h"
-#include "apic_regs.h"
 #include "pci_regs.h"
 #include "util.h"
 #include "hypercall.h"
@@ -80,21 +79,6 @@ static void rombios_setup_bios_info(uint32_t bioshigh)
     bios_info->madt_csum_addr = madt_csum_addr;
     bios_info->madt_lapic0_addr = madt_lapic0_addr;
     bios_info->bios32_entry = bioshigh;
-}
-
-static void rombios_apic_setup(void)
-{
-    /* Set the IOAPIC ID to the static value used in the MP/ACPI tables. */
-    ioapic_write(0x00, IOAPIC_ID);
-
-    /* NMIs are delivered direct to the BSP. */
-    lapic_write(APIC_SPIV, APIC_SPIV_APIC_ENABLED | 0xFF);
-    lapic_write(APIC_LVT0, (APIC_MODE_EXTINT << 8) | APIC_LVT_MASKED);
-    lapic_write(APIC_LVT1, APIC_MODE_NMI << 8);
-
-    /* 8259A ExtInts are delivered through IOAPIC pin 0 (Virtual Wire Mode). */
-    ioapic_write(0x10, APIC_DM_EXTINT);
-    ioapic_write(0x11, SET_APIC_ID(LAPIC_ID(0)));
 }
 
 /*
@@ -167,7 +151,6 @@ struct bios_config rombios_config =  {
 
     .acpi_start = ACPI_PHYSICAL_ADDRESS,
 
-    .apic_setup = rombios_apic_setup,
     .smp_setup = smp_initialise,
 
     .bios_high_setup = rombios_highbios_setup,
