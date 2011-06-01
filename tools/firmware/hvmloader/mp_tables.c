@@ -266,11 +266,26 @@ unsigned long create_mp_tables(void *_mpfps)
     int vcpu_nr, i, length;
     void *base;
     struct mp_io_intr_entry *mpiie;
-    struct mp_floating_pointer_struct *mpfps = _mpfps;
+    struct mp_floating_pointer_struct *mpfps;
 
     vcpu_nr = hvm_info->nr_vcpus;
 
     printf("Creating MP tables ...\n");
+
+    if (!_mpfps) {
+        int sz;
+
+        sz  = sizeof(struct mp_floating_pointer_struct);
+        sz += sizeof(struct mp_config_table);
+        sz += sizeof(struct mp_proc_entry) * vcpu_nr;
+        sz += sizeof(struct mp_bus_entry);
+        sz += sizeof(struct mp_ioapic_entry);
+        sz += sizeof(struct mp_io_intr_entry) * 16;
+
+        base = mem_alloc(sz, 0);
+    }
+
+    mpfps = _mpfps;
 
     base = &mpfps[1];
 
