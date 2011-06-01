@@ -25,8 +25,97 @@
 
 #include "util.h"
 
+#include "smbios_types.h"
+#include "acpi/acpi2_0.h"
+
 #define ROM_INCLUDE_SEABIOS
 #include "roms.inc"
+
+struct seabios_info {
+    char signature[14]; /* XenHVMSeaBIOS\0 */
+    uint8_t length;     /* Length of this struct */
+    uint8_t checksum;   /* Set such that the sum over bytes 0..length == 0 */
+    /*
+     * Physical address of an array of tables_nr elements.
+     *
+     * Each element is a 32 bit value contianing the physical address
+     * of a BIOS table.
+     */
+    uint32_t tables;
+    uint32_t tables_nr;
+    /*
+     * Physical address of the e820 table, contains e820_nr entries.
+     */
+    uint32_t e820;
+    uint32_t e820_nr;
+} __attribute__ ((packed));
+
+#define MAX_TABLES 4
+
+static void seabios_setup_bios_info(void)
+{
+    struct seabios_info *info = (void *)BIOS_INFO_PHYSICAL_ADDRESS;
+
+    memset(info, 0, sizeof(*info));
+
+    memcpy(info->signature, "XenHVMSeaBIOS", sizeof(info->signature));
+    info->length = sizeof(*info);
+
+    info->tables = (uint32_t)scratch_alloc(MAX_TABLES*sizeof(uint32_t), 0);
+}
+
+static void seabios_finish_bios_info(void)
+{
+    struct seabios_info *info = (void *)BIOS_INFO_PHYSICAL_ADDRESS;
+    uint32_t i;
+    uint8_t checksum;
+
+    checksum = 0;
+    for (i = 0; i < info->length; ++i)
+        checksum += ((uint8_t *)(info))[i];
+
+    info->checksum = -checksum;
+}
+
+static void add_table(uint32_t t)
+{
+    struct seabios_info *info = (void *)BIOS_INFO_PHYSICAL_ADDRESS;
+    uint32_t *ts = (uint32_t *)info->tables;
+
+    ASSERT(info->tables_nr < MAX_TABLES);
+
+    ts[info->tables_nr] = t;
+    info->tables_nr++;
+}
+
+static void seabios_acpi_build_tables(void)
+{
+    uint32_t rsdp = (uint32_t)scratch_alloc(sizeof(struct acpi_20_rsdp), 0);
+    acpi_build_tables(rsdp);
+    add_table(rsdp);
+}
+
+static void seabios_create_mp_tables(void)
+{
+    add_table(create_mp_tables(NULL));
+}
+
+static void seabios_create_smbios_tables(void)
+{
+    uint32_t ep = (uint32_t)scratch_alloc(sizeof(struct smbios_entry_point), 0);
+    uint32_t t = (uint32_t)mem_alloc(32*1024, 0);
+    hvm_write_smbios_tables(ep, t, 32*1024);
+    add_table(ep);
+}
+
+static void seabios_setup_e820(void)
+{
+    struct seabios_info *info = (void *)BIOS_INFO_PHYSICAL_ADDRESS;
+    struct e820entry *e820 = scratch_alloc(sizeof(struct e820entry)*16, 0);
+    info->e820 = (uint32_t)e820;
+    info->e820_nr = build_e820_table(e820);
+    dump_e820_table(e820, info->e820_nr);
+}
 
 //BUILD_BUG_ON(sizeof(seabios) > (0x00100000U - SEABIOS_PHYSICAL_ADDRESS));
 
@@ -43,17 +132,17 @@ struct bios_config seabios_config = {
     .optionrom_start = 0,
     .optionrom_end = 0,
 
-    .bios_info_setup = NULL,
-    .bios_info_finish = NULL,
+    .bios_info_setup = seabios_setup_bios_info,
+    .bios_info_finish = seabios_finish_bios_info,
 
     .bios_relocate = NULL,
 
     .vm86_setup = NULL,
-    .e820_setup = NULL,
+    .e820_setup = seabios_setup_e820,
 
-    .acpi_build_tables = NULL,
-    .create_mp_tables = NULL,
-    .create_smbios_tables = NULL,
+    .acpi_build_tables = seabios_acpi_build_tables,
+    .create_mp_tables = seabios_create_mp_tables,
+    .create_smbios_tables = seabios_create_smbios_tables,
 };
 
 /*
