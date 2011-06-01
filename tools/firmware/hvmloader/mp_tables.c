@@ -260,17 +260,21 @@ static void fill_mpfps(struct mp_floating_pointer_struct *mpfps, uint32_t mpct)
 }
 
 /* create_mp_tables - creates MP tables for the guest based upon config data */
-void create_mp_tables(void *mp_table_base)
+unsigned long create_mp_tables(void *_mpfps)
 {
     char *p;
     int vcpu_nr, i, length;
+    void *base;
     struct mp_io_intr_entry *mpiie;
+    struct mp_floating_pointer_struct *mpfps = _mpfps;
 
     vcpu_nr = hvm_info->nr_vcpus;
 
     printf("Creating MP tables ...\n");
 
-    p = mp_table_base + sizeof(struct mp_config_table);
+    base = &mpfps[1];
+
+    p = base + sizeof(struct mp_config_table);
 
     for ( i = 0; i < vcpu_nr; i++ )
     {
@@ -308,14 +312,11 @@ void create_mp_tables(void *mp_table_base)
         p += sizeof(*mpiie);
     }
 
-    length = p - (char *)mp_table_base;
+    length = p - (char *)base;
 
-    /* find the next 16-byte boundary to place the mp floating pointer */
-    while ( (unsigned long)p & 0xF )
-        p++;
+    fill_mp_config_table((struct mp_config_table *)base, length);
 
-    fill_mpfps((struct mp_floating_pointer_struct *)p, 
-               (uint32_t)mp_table_base);
+    fill_mpfps(mpfps, (uint32_t)base);
 
-    fill_mp_config_table((struct mp_config_table *)mp_table_base, length);
+    return (unsigned long)mpfps;
 }
