@@ -102,6 +102,7 @@ static void rombios_apic_setup(void)
 static void rombios_pci_setup(void)
 {
     uint32_t base, devfn, bar_reg, bar_data, bar_sz, cmd, mmio_total = 0;
+    uint32_t vga_devfn = 256;
     uint16_t class, vendor_id, device_id;
     unsigned int bar, pin, link, isa_irq;
 
@@ -146,12 +147,22 @@ static void rombios_pci_setup(void)
         {
         case 0x0300:
             /* If emulated VGA is found, preserve it as primary VGA. */
+            if ( virtual_vga == VGA_none )
             if ( (vendor_id == 0x1234) && (device_id == 0x1111) )
+            {
+                vga_devfn = devfn;
                 virtual_vga = VGA_std;
+            }
             else if ( (vendor_id == 0x1013) && (device_id == 0xb8) )
+            {
+                vga_devfn = devfn;
                 virtual_vga = VGA_cirrus;
+            }
             else if ( virtual_vga == VGA_none )
+            {
+                vga_devfn = devfn;
                 virtual_vga = VGA_pt;
+            }
             break;
         case 0x0680:
             /* PIIX4 ACPI PM. Special device with special PCI config space. */
@@ -306,6 +317,18 @@ static void rombios_pci_setup(void)
         else
             cmd |= PCI_COMMAND_IO;
         pci_writew(devfn, PCI_COMMAND, cmd);
+    }
+
+    if ( vga_devfn != 256 )
+    {
+        /*
+         * VGA registers live in I/O space so ensure that primary VGA
+         * has IO enabled, even if there is no I/O BAR on that
+         * particular device.
+         */
+        cmd = pci_readw(vga_devfn, PCI_COMMAND);
+        cmd |= PCI_COMMAND_IO;
+        pci_writew(vga_devfn, PCI_COMMAND, cmd);
     }
 }
 
