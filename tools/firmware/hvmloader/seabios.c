@@ -46,8 +46,10 @@ struct bios_config seabios_config = {
     .smbios_start = 0,
     .smbios_end = 0,
 
-    .optionrom_start = OPTIONROM_PHYSICAL_ADDRESS,
-    .optionrom_end = OPTIONROM_PHYSICAL_END,
+    .load_roms = 0,
+
+    .optionrom_start = 0,
+    .optionrom_end = 0,
 
     .acpi_start = 0,
 

@@ -19,7 +19,8 @@ struct bios_config {
     /* SMBIOS */
     unsigned int smbios_start, smbios_end;
 
-    /* Option ROMs */
+    /* ROMS */
+    int load_roms;
     unsigned int optionrom_start, optionrom_end;
 
     /* ACPI tables */

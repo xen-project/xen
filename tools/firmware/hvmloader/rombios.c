@@ -372,6 +372,8 @@ struct bios_config rombios_config =  {
     .smbios_start = SMBIOS_PHYSICAL_ADDRESS,
     .smbios_end = SMBIOS_PHYSICAL_END,
 
+    .load_roms = 1,
+
     .optionrom_start = OPTIONROM_PHYSICAL_ADDRESS,
     .optionrom_end = OPTIONROM_PHYSICAL_END,
 
