@@ -103,8 +103,7 @@ static void seabios_create_mp_tables(void)
 static void seabios_create_smbios_tables(void)
 {
     uint32_t ep = (uint32_t)scratch_alloc(sizeof(struct smbios_entry_point), 0);
-    uint32_t t = (uint32_t)mem_alloc(32*1024, 0);
-    hvm_write_smbios_tables(ep, t, 32*1024);
+    hvm_write_smbios_tables(ep, 0UL, 0UL);
     add_table(ep);
 }
 

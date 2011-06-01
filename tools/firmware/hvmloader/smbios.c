@@ -28,10 +28,11 @@
 #include "hypercall.h"
 
 static int
-write_smbios_tables(void *ep, void *start, unsigned long phys,
+write_smbios_tables(void *ep, void *start,
                     uint32_t vcpus, uint64_t memsize,
                     uint8_t uuid[16], char *xen_version,
-                    uint32_t xen_major_version, uint32_t xen_minor_version);
+                    uint32_t xen_major_version, uint32_t xen_minor_version,
+                    unsigned *nr_structs, unsigned *max_struct_size);
 
 static void
 get_cpu_manufacturer(char *buf, int len);
@@ -85,12 +86,13 @@ get_cpu_manufacturer(char *buf, int len)
 }
 
 static int
-write_smbios_tables(void *ep, void *start, unsigned long phys,
+write_smbios_tables(void *ep, void *start,
                     uint32_t vcpus, uint64_t memsize,
                     uint8_t uuid[16], char *xen_version,
-                    uint32_t xen_major_version, uint32_t xen_minor_version)
+                    uint32_t xen_major_version, uint32_t xen_minor_version,
+                    unsigned *nr_structs, unsigned *max_struct_size)
 {
-    unsigned cpu_num, nr_structs = 0, max_struct_size = 0;
+    unsigned cpu_num;
     char *p, *q;
     char cpu_manufacturer[15];
     int i, nr_mem_devs;
@@ -101,9 +103,9 @@ write_smbios_tables(void *ep, void *start, unsigned long phys,
 
 #define do_struct(fn) do {                      \
     q = (fn);                                   \
-    nr_structs++;                               \
-    if ( (q - p) > max_struct_size )            \
-        max_struct_size = q - p;                \
+    (*nr_structs)++;                            \
+    if ( (q - p) > *max_struct_size )           \
+        *max_struct_size = q - p;               \
     p = q;                                      \
 } while (0)
 
@@ -133,10 +135,6 @@ write_smbios_tables(void *ep, void *start, unsigned long phys,
 
 #undef do_struct
 
-    smbios_entry_point_init(ep, max_struct_size,
-                            (p - (char *)start), phys,
-                            nr_structs);
-
     return ((char *)p - (char *)start);
 }
 
@@ -159,7 +157,7 @@ get_memsize(void)
     return (sz + (1ul << 20) - 1) >> 20;
 }
 
-int
+void
 hvm_write_smbios_tables(unsigned long ep, unsigned long smbios_start, unsigned long smbios_end)
 {
     xen_domain_handle_t uuid;
@@ -173,6 +171,7 @@ hvm_write_smbios_tables(unsigned long ep, unsigned long smbios_start, unsigned l
     unsigned len = 0; /* length of string already composed */
     char tmp[16]; /* holds result of itoa() */
     unsigned tmp_len; /* length of next string to add */
+    unsigned nr_structs = 0, max_struct_size = 0;
 
     hypercall_xen_version(XENVER_guest_handle, uuid);
     BUILD_BUG_ON(sizeof(xen_domain_handle_t) != 16);
@@ -220,21 +219,26 @@ hvm_write_smbios_tables(unsigned long ep, unsigned long smbios_start, unsigned l
     xen_version_str[sizeof(xen_version_str)-1] = '\0';
 
     /* scratch_start is a safe large memory area for scratch. */
-    len = write_smbios_tables((void *)ep, (void *)scratch_start, smbios_start,
+    len = write_smbios_tables((void *)ep, (void *)scratch_start,
                               hvm_info->nr_vcpus, get_memsize(),
                               uuid, xen_version_str,
-                              xen_major_version, xen_minor_version);
-    if ( smbios_start + len > smbios_end )
+                              xen_major_version, xen_minor_version,
+                              &nr_structs, &max_struct_size);
+    if ( smbios_start && smbios_start + len > smbios_end )
         goto error_out;
-    /* Okay, not too large: copy out of scratch to final location. */
+
+    if ( !smbios_start )
+        smbios_start = (unsigned long)mem_alloc(len, 0);
+
     memcpy((void *)smbios_start, (void *)scratch_start, len);
 
-    return len;
+    smbios_entry_point_init((void *)ep, max_struct_size, len, smbios_start, nr_structs);
+
+    return;
 
  error_out:
     printf("Could not write SMBIOS tables, error in hvmloader.c:"
            "hvm_write_smbios_tables()\n");
-    return 0;
 }
 
 
