@@ -423,9 +423,12 @@ int main(void)
     if (bios->bios_relocate)
         bios->bios_relocate();
 
-    if ( bios->create_mp_tables &&
-         ( (hvm_info->nr_vcpus > 1) || hvm_info->apic_mode ) )
-        bios->create_mp_tables();
+    if ( (hvm_info->nr_vcpus > 1) || hvm_info->apic_mode ) {
+        if ( bios->create_mp_tables )
+            bios->create_mp_tables();
+        if ( bios->create_pir_tables )
+            bios->create_pir_tables();
+    }
 
     if ( bios->load_roms )
     {

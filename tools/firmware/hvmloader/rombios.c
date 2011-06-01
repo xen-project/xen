@@ -187,6 +187,7 @@ struct bios_config rombios_config =  {
     .acpi_build_tables = rombios_acpi_build_tables,
     .create_mp_tables = rombios_create_mp_tables,
     .create_smbios_tables = rombios_create_smbios_tables,
+    .create_pir_tables = NULL, /* embedded in ROMBIOS */
 };
 
 /*

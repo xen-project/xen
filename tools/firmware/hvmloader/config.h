@@ -31,6 +31,7 @@ struct bios_config {
     void (*acpi_build_tables)(void);
     void (*create_mp_tables)(void);
     void (*create_smbios_tables)(void);
+    void (*create_pir_tables)(void);
 };
 
 extern struct bios_config rombios_config;

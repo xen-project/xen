@@ -107,6 +107,11 @@ static void seabios_create_smbios_tables(void)
     add_table(ep);
 }
 
+static void seabios_create_pir_tables(void)
+{
+    add_table(create_pir_tables());
+}
+
 static void seabios_setup_e820(void)
 {
     struct seabios_info *info = (void *)BIOS_INFO_PHYSICAL_ADDRESS;
@@ -142,6 +147,7 @@ struct bios_config seabios_config = {
     .acpi_build_tables = seabios_acpi_build_tables,
     .create_mp_tables = seabios_create_mp_tables,
     .create_smbios_tables = seabios_create_smbios_tables,
+    .create_pir_tables = seabios_create_pir_tables,
 };
 
 /*
