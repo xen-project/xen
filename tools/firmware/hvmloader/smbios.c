@@ -28,7 +28,7 @@
 #include "hypercall.h"
 
 static int
-write_smbios_tables(void *start, unsigned long phys,
+write_smbios_tables(void *ep, void *start, unsigned long phys,
                     uint32_t vcpus, uint64_t memsize,
                     uint8_t uuid[16], char *xen_version,
                     uint32_t xen_major_version, uint32_t xen_minor_version);
@@ -85,7 +85,7 @@ get_cpu_manufacturer(char *buf, int len)
 }
 
 static int
-write_smbios_tables(void *start, unsigned long phys,
+write_smbios_tables(void *ep, void *start, unsigned long phys,
                     uint32_t vcpus, uint64_t memsize,
                     uint8_t uuid[16], char *xen_version,
                     uint32_t xen_major_version, uint32_t xen_minor_version)
@@ -97,7 +97,7 @@ write_smbios_tables(void *start, unsigned long phys,
 
     get_cpu_manufacturer(cpu_manufacturer, 15);
 
-    p = (char *)start + sizeof(struct smbios_entry_point);
+    p = (char *)start;
 
 #define do_struct(fn) do {                      \
     q = (fn);                                   \
@@ -133,11 +133,9 @@ write_smbios_tables(void *start, unsigned long phys,
 
 #undef do_struct
 
-    smbios_entry_point_init(
-        start, max_struct_size,
-        (p - (char *)start) - sizeof(struct smbios_entry_point),
-        phys + sizeof(struct smbios_entry_point),
-        nr_structs);
+    smbios_entry_point_init(ep, max_struct_size,
+                            (p - (char *)start), phys,
+                            nr_structs);
 
     return ((char *)p - (char *)start);
 }
@@ -162,7 +160,7 @@ get_memsize(void)
 }
 
 int
-hvm_write_smbios_tables(unsigned long scratch, unsigned long smbios_start, unsigned long smbios_end)
+hvm_write_smbios_tables(unsigned long ep, unsigned long smbios_start, unsigned long smbios_end)
 {
     xen_domain_handle_t uuid;
     uint16_t xen_major_version, xen_minor_version;
@@ -221,15 +219,15 @@ hvm_write_smbios_tables(unsigned long scratch, unsigned long smbios_start, unsig
 
     xen_version_str[sizeof(xen_version_str)-1] = '\0';
 
-    /* SCRATCH_PHYSICAL_ADDRESS is a safe large memory area for scratch. */
-    len = write_smbios_tables((void *)scratch, smbios_start,
+    /* scratch_start is a safe large memory area for scratch. */
+    len = write_smbios_tables((void *)ep, (void *)scratch_start, smbios_start,
                               hvm_info->nr_vcpus, get_memsize(),
                               uuid, xen_version_str,
                               xen_major_version, xen_minor_version);
     if ( smbios_start + len > smbios_end )
         goto error_out;
     /* Okay, not too large: copy out of scratch to final location. */
-    memcpy((void *)smbios_start, (void *)scratch, len);
+    memcpy((void *)smbios_start, (void *)scratch_start, len);
 
     return len;
 

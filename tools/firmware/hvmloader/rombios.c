@@ -24,6 +24,7 @@
 
 #include "../rombios/config.h"
 
+#include "smbios_types.h"
 #include "acpi/acpi2_0.h"
 #include "pci_regs.h"
 #include "util.h"
@@ -155,8 +156,8 @@ static void rombios_create_mp_tables(void)
 
 static void rombios_create_smbios_tables(void)
 {
-    hvm_write_smbios_tables(scratch_start,
-                            SMBIOS_PHYSICAL_ADDRESS,
+    hvm_write_smbios_tables(SMBIOS_PHYSICAL_ADDRESS,
+                            SMBIOS_PHYSICAL_ADDRESS + sizeof(struct smbios_entry_point),
                             SMBIOS_PHYSICAL_END);
 }
 
