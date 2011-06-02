@@ -4810,11 +4810,8 @@ static mfn_t emulate_gva_to_mfn(struct vcpu *v,
     }
 
     /* Translate the GFN to an MFN */
-    /* PoD: query only if paging lock is held (to avoid deadlock) */
-    if ( paging_locked_by_me(v->domain) )
-        mfn = gfn_to_mfn_query(v->domain, _gfn(gfn), &p2mt);
-    else
-        mfn = gfn_to_mfn(v->domain, _gfn(gfn), &p2mt);
+    ASSERT(!paging_locked_by_me(v->domain));
+    mfn = gfn_to_mfn_guest(v->domain, _gfn(gfn), &p2mt);
         
     if ( p2m_is_readonly(p2mt) )
         return _mfn(READONLY_GFN);
