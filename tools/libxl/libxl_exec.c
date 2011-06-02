@@ -220,8 +220,10 @@ int libxl__spawn_spawn(libxl__gc *gc,
     rc = (WIFEXITED(status) ? WEXITSTATUS(status) :
           WIFSIGNALED(status) && WTERMSIG(status) < 127
           ? WTERMSIG(status)+128 : -1);
-    if (for_spawn)
-        write(pipes[1], &dummy, sizeof(dummy));
+    if (for_spawn) {
+        if (write(pipes[1], &dummy, sizeof(dummy)) != 1)
+            perror("libxl__spawn_spawn: unable to signal child exit to parent");
+    }
     _exit(rc);
 
  err_parent_pipes:
