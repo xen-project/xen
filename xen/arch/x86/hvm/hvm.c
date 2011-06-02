@@ -1212,7 +1212,7 @@ int hvm_hap_nested_page_fault(unsigned long gpa,
     }
 
     p2m = p2m_get_hostp2m(v->domain);
-    mfn = gfn_to_mfn_type_current(p2m, gfn, &p2mt, &p2ma, p2m_guest);
+    mfn = gfn_to_mfn_type_p2m(p2m, gfn, &p2mt, &p2ma, p2m_guest);
 
     /* Check access permissions first, then handle faults */
     if ( access_valid && (mfn_x(mfn) != INVALID_MFN) )

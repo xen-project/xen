@@ -218,11 +218,6 @@ struct p2m_domain {
                                        p2m_type_t *p2mt,
                                        p2m_access_t *p2ma,
                                        p2m_query_t q);
-    mfn_t              (*get_entry_current)(struct p2m_domain *p2m,
-                                            unsigned long gfn,
-                                            p2m_type_t *p2mt,
-                                            p2m_access_t *p2ma,
-                                            p2m_query_t q);
     void               (*change_entry_type_global)(struct p2m_domain *p2m,
                                                    p2m_type_t ot,
                                                    p2m_type_t nt);
@@ -362,45 +357,14 @@ struct p2m_domain *p2m_get_p2m(struct vcpu *v);
         spin_unlock(&(_domain)->arch.nested_p2m_lock);                 \
     } while (0)
 
-/* Read the current domain's p2m table.  Do not populate PoD pages. */
-static inline mfn_t gfn_to_mfn_type_current(struct p2m_domain *p2m,
-                                            unsigned long gfn, p2m_type_t *t,
-                                            p2m_access_t *a,
-                                            p2m_query_t q)
-{
-    return p2m->get_entry_current(p2m, gfn, t, a, q);
-}
 
 /* Read P2M table, mapping pages as we go.
  * Do not populate PoD pages. */
 static inline mfn_t
 gfn_to_mfn_type_p2m(struct p2m_domain *p2m, unsigned long gfn,
-                              p2m_type_t *t, p2m_query_t q)
+                    p2m_type_t *t, p2m_access_t *a, p2m_query_t q)
 {
-    p2m_access_t a = 0;
-    return p2m->get_entry(p2m, gfn, t, &a, q);
-}
-
-
-/* General conversion function from gfn to mfn */
-static inline mfn_t _gfn_to_mfn_type(struct p2m_domain *p2m,
-                                     unsigned long gfn, p2m_type_t *t,
-                                     p2m_query_t q)
-{
-    mfn_t mfn;
-    p2m_access_t a;
-
-    if ( !p2m || !paging_mode_translate(p2m->domain) )
-    {
-        /* Not necessarily true, but for non-translated guests, we claim
-         * it's the most generic kind of memory */
-        *t = p2m_ram_rw;
-        mfn = _mfn(gfn);
-    }
-    else if ( likely(current->domain == p2m->domain) )
-        mfn = gfn_to_mfn_type_current(p2m, gfn, t, &a, q);
-    else
-        mfn = gfn_to_mfn_type_p2m(p2m, gfn, t, q);
+    mfn_t mfn = p2m->get_entry(p2m, gfn, t, a, q);
 
 #ifdef __x86_64__
     if (unlikely((p2m_is_broken(*t))))
@@ -413,6 +377,25 @@ static inline mfn_t _gfn_to_mfn_type(struct p2m_domain *p2m,
 #endif
 
     return mfn;
+}
+
+
+/* General conversion function from gfn to mfn */
+static inline mfn_t _gfn_to_mfn_type(struct p2m_domain *p2m,
+                                     unsigned long gfn, p2m_type_t *t,
+                                     p2m_query_t q)
+{
+    p2m_access_t a;
+
+    if ( !p2m || !paging_mode_translate(p2m->domain) )
+    {
+        /* Not necessarily true, but for non-translated guests, we claim
+         * it's the most generic kind of memory */
+        *t = p2m_ram_rw;
+        return _mfn(gfn);
+    }
+    
+    return gfn_to_mfn_type_p2m(p2m, gfn, t, &a, q);
 }
 
 #define gfn_to_mfn(p2m, g, t) _gfn_to_mfn_type((p2m), (g), (t), p2m_alloc)

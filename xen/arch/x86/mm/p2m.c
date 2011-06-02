@@ -101,7 +101,6 @@ p2m_init_nestedp2m(struct domain *d)
         if (p2m == NULL)
             return -ENOMEM;
         p2m_initialise(d, p2m);
-        p2m->get_entry_current = p2m->get_entry;
         p2m->write_p2m_entry = nestedp2m_write_p2m_entry;
     }
 
@@ -956,7 +955,6 @@ p2m_flush_locked(struct p2m_domain *p2m)
 
     p2m_teardown(p2m);
     p2m_initialise(p2m->domain, p2m);
-    p2m->get_entry_current = p2m->get_entry;
     p2m->write_p2m_entry = nestedp2m_write_p2m_entry;
     return p2m_alloc_table(p2m);
 }

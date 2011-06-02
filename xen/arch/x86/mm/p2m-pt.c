@@ -503,6 +503,180 @@ static int p2m_pod_check_and_populate(struct p2m_domain *p2m, unsigned long gfn,
     return r;
 }
 
+/* Read the current domain's p2m table (through the linear mapping). */
+static mfn_t p2m_gfn_to_mfn_current(struct p2m_domain *p2m, 
+                                    unsigned long gfn, p2m_type_t *t, 
+                                    p2m_access_t *a, p2m_query_t q)
+{
+    mfn_t mfn = _mfn(INVALID_MFN);
+    p2m_type_t p2mt = p2m_mmio_dm;
+    paddr_t addr = ((paddr_t)gfn) << PAGE_SHIFT;
+    /* XXX This is for compatibility with the old model, where anything not 
+     * XXX marked as RAM was considered to be emulated MMIO space.
+     * XXX Once we start explicitly registering MMIO regions in the p2m 
+     * XXX we will return p2m_invalid for unmapped gfns */
+
+    l1_pgentry_t l1e = l1e_empty(), *p2m_entry;
+    l2_pgentry_t l2e = l2e_empty();
+    int ret;
+#if CONFIG_PAGING_LEVELS >= 4
+    l3_pgentry_t l3e = l3e_empty();
+#endif
+
+    ASSERT(gfn < (RO_MPT_VIRT_END - RO_MPT_VIRT_START) 
+           / sizeof(l1_pgentry_t));
+
+#if CONFIG_PAGING_LEVELS >= 4
+    /*
+     * Read & process L3
+     */
+    p2m_entry = (l1_pgentry_t *)
+        &__linear_l2_table[l2_linear_offset(RO_MPT_VIRT_START)
+                           + l3_linear_offset(addr)];
+pod_retry_l3:
+    ret = __copy_from_user(&l3e, p2m_entry, sizeof(l3e));
+
+    if ( ret != 0 || !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
+    {
+        if ( (l3e_get_flags(l3e) & _PAGE_PSE) &&
+             (p2m_flags_to_type(l3e_get_flags(l3e)) == p2m_populate_on_demand) )
+        {
+            /* The read has succeeded, so we know that mapping exists */
+            if ( q != p2m_query )
+            {
+                if ( !p2m_pod_demand_populate(p2m, gfn, 18, q) )
+                    goto pod_retry_l3;
+                p2mt = p2m_invalid;
+                printk("%s: Allocate 1GB failed!\n", __func__);
+                goto out;
+            }
+            else
+            {
+                p2mt = p2m_populate_on_demand;
+                goto out;
+            }
+        }
+        goto pod_retry_l2;
+    }
+
+    if ( l3e_get_flags(l3e) & _PAGE_PSE )
+    {
+        p2mt = p2m_flags_to_type(l3e_get_flags(l3e));
+        ASSERT(l3e_get_pfn(l3e) != INVALID_MFN || !p2m_is_ram(p2mt));
+        if (p2m_is_valid(p2mt) )
+            mfn = _mfn(l3e_get_pfn(l3e) + 
+                       l2_table_offset(addr) * L1_PAGETABLE_ENTRIES + 
+                       l1_table_offset(addr));
+        else
+            p2mt = p2m_mmio_dm;
+            
+        goto out;
+    }
+#endif
+    /*
+     * Read & process L2
+     */
+    p2m_entry = &__linear_l1_table[l1_linear_offset(RO_MPT_VIRT_START)
+                                   + l2_linear_offset(addr)];
+
+pod_retry_l2:
+    ret = __copy_from_user(&l2e,
+                           p2m_entry,
+                           sizeof(l2e));
+    if ( ret != 0
+         || !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
+    {
+        if( (l2e_get_flags(l2e) & _PAGE_PSE)
+            && ( p2m_flags_to_type(l2e_get_flags(l2e))
+                 == p2m_populate_on_demand ) )
+        {
+            /* The read has succeeded, so we know that the mapping
+             * exits at this point.  */
+            if ( q != p2m_query )
+            {
+                if ( !p2m_pod_check_and_populate(p2m, gfn,
+                                                 p2m_entry, 9, q) )
+                    goto pod_retry_l2;
+
+                /* Allocate failed. */
+                p2mt = p2m_invalid;
+                printk("%s: Allocate failed!\n", __func__);
+                goto out;
+            }
+            else
+            {
+                p2mt = p2m_populate_on_demand;
+                goto out;
+            }
+        }
+
+        goto pod_retry_l1;
+    }
+        
+    if (l2e_get_flags(l2e) & _PAGE_PSE)
+    {
+        p2mt = p2m_flags_to_type(l2e_get_flags(l2e));
+        ASSERT(l2e_get_pfn(l2e) != INVALID_MFN || !p2m_is_ram(p2mt));
+
+        if ( p2m_is_valid(p2mt) )
+            mfn = _mfn(l2e_get_pfn(l2e) + l1_table_offset(addr));
+        else
+            p2mt = p2m_mmio_dm;
+
+        goto out;
+    }
+
+    /*
+     * Read and process L1
+     */
+
+    /* Need to __copy_from_user because the p2m is sparse and this
+     * part might not exist */
+pod_retry_l1:
+    p2m_entry = &phys_to_machine_mapping[gfn];
+
+    ret = __copy_from_user(&l1e,
+                           p2m_entry,
+                           sizeof(l1e));
+            
+    if ( ret == 0 ) {
+        p2mt = p2m_flags_to_type(l1e_get_flags(l1e));
+        ASSERT(l1e_get_pfn(l1e) != INVALID_MFN || !p2m_is_ram(p2mt));
+
+        if ( p2m_flags_to_type(l1e_get_flags(l1e))
+             == p2m_populate_on_demand )
+        {
+            /* The read has succeeded, so we know that the mapping
+             * exits at this point.  */
+            if ( q != p2m_query )
+            {
+                if ( !p2m_pod_check_and_populate(p2m, gfn,
+                                                 (l1_pgentry_t *)p2m_entry, 0, q) )
+                    goto pod_retry_l1;
+
+                /* Allocate failed. */
+                p2mt = p2m_invalid;
+                goto out;
+            }
+            else
+            {
+                p2mt = p2m_populate_on_demand;
+                goto out;
+            }
+        }
+
+        if ( p2m_is_valid(p2mt) || p2m_is_grant(p2mt) )
+            mfn = _mfn(l1e_get_pfn(l1e));
+        else 
+            /* XXX see above */
+            p2mt = p2m_mmio_dm;
+    }
+    
+out:
+    *t = p2mt;
+    return mfn;
+}
+
 
 static mfn_t
 p2m_gfn_to_mfn(struct p2m_domain *p2m, unsigned long gfn, p2m_type_t *t, p2m_access_t *a,
@@ -528,6 +702,10 @@ p2m_gfn_to_mfn(struct p2m_domain *p2m, unsigned long gfn, p2m_type_t *t, p2m_acc
     if ( gfn > p2m->max_mapped_pfn )
         /* This pfn is higher than the highest the p2m map currently holds */
         return _mfn(INVALID_MFN);
+
+    /* Use the fast path with the linear mapping if we can */
+    if ( p2m == p2m_get_hostp2m(current->domain) )
+        return p2m_gfn_to_mfn_current(p2m, gfn, t, a, q);
 
 #if CONFIG_PAGING_LEVELS >= 4
     {
@@ -644,185 +822,6 @@ pod_retry_l1:
 
     ASSERT(mfn_valid(mfn) || !p2m_is_ram(*t));
     return (p2m_is_valid(*t) || p2m_is_grant(*t)) ? mfn : _mfn(INVALID_MFN);
-}
-
-/* Read the current domain's p2m table (through the linear mapping). */
-static mfn_t p2m_gfn_to_mfn_current(struct p2m_domain *p2m,
-                                    unsigned long gfn, p2m_type_t *t, p2m_access_t *a,
-                                    p2m_query_t q)
-{
-    mfn_t mfn = _mfn(INVALID_MFN);
-    p2m_type_t p2mt = p2m_mmio_dm;
-    paddr_t addr = ((paddr_t)gfn) << PAGE_SHIFT;
-    /* XXX This is for compatibility with the old model, where anything not 
-     * XXX marked as RAM was considered to be emulated MMIO space.
-     * XXX Once we start explicitly registering MMIO regions in the p2m 
-     * XXX we will return p2m_invalid for unmapped gfns */
-
-    /* Not currently implemented except for EPT */
-    *a = p2m_access_rwx;
-
-    if ( gfn <= p2m->max_mapped_pfn )
-    {
-        l1_pgentry_t l1e = l1e_empty(), *p2m_entry;
-        l2_pgentry_t l2e = l2e_empty();
-        int ret;
-#if CONFIG_PAGING_LEVELS >= 4
-        l3_pgentry_t l3e = l3e_empty();
-#endif
-
-        ASSERT(gfn < (RO_MPT_VIRT_END - RO_MPT_VIRT_START) 
-               / sizeof(l1_pgentry_t));
-
-#if CONFIG_PAGING_LEVELS >= 4
-        /*
-         * Read & process L3
-         */
-        p2m_entry = (l1_pgentry_t *)
-            &__linear_l2_table[l2_linear_offset(RO_MPT_VIRT_START)
-                               + l3_linear_offset(addr)];
-    pod_retry_l3:
-        ret = __copy_from_user(&l3e, p2m_entry, sizeof(l3e));
-
-        if ( ret != 0 || !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
-        {
-            if ( (l3e_get_flags(l3e) & _PAGE_PSE) &&
-                 (p2m_flags_to_type(l3e_get_flags(l3e)) == p2m_populate_on_demand) )
-            {
-                /* The read has succeeded, so we know that mapping exists */
-                if ( q != p2m_query )
-                {
-                    if ( !p2m_pod_demand_populate(p2m, gfn, 18, q) )
-                        goto pod_retry_l3;
-                    p2mt = p2m_invalid;
-                    printk("%s: Allocate 1GB failed!\n", __func__);
-                    goto out;
-                }
-                else
-                {
-                    p2mt = p2m_populate_on_demand;
-                    goto out;
-                }
-            }
-            goto pod_retry_l2;
-        }
-
-        if ( l3e_get_flags(l3e) & _PAGE_PSE )
-        {
-            p2mt = p2m_flags_to_type(l3e_get_flags(l3e));
-            ASSERT(l3e_get_pfn(l3e) != INVALID_MFN || !p2m_is_ram(p2mt));
-            if (p2m_is_valid(p2mt) )
-                mfn = _mfn(l3e_get_pfn(l3e) + 
-                           l2_table_offset(addr) * L1_PAGETABLE_ENTRIES + 
-                           l1_table_offset(addr));
-            else
-                p2mt = p2m_mmio_dm;
-            
-            goto out;
-        }
-#endif
-        /*
-         * Read & process L2
-         */
-        p2m_entry = &__linear_l1_table[l1_linear_offset(RO_MPT_VIRT_START)
-                                       + l2_linear_offset(addr)];
-
-    pod_retry_l2:
-        ret = __copy_from_user(&l2e,
-                               p2m_entry,
-                               sizeof(l2e));
-        if ( ret != 0
-             || !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
-        {
-            if( (l2e_get_flags(l2e) & _PAGE_PSE)
-                && ( p2m_flags_to_type(l2e_get_flags(l2e))
-                     == p2m_populate_on_demand ) )
-            {
-                /* The read has succeeded, so we know that the mapping
-                 * exits at this point.  */
-                if ( q != p2m_query )
-                {
-                    if ( !p2m_pod_check_and_populate(p2m, gfn,
-                                                     p2m_entry, 9, q) )
-                        goto pod_retry_l2;
-
-                    /* Allocate failed. */
-                    p2mt = p2m_invalid;
-                    printk("%s: Allocate failed!\n", __func__);
-                    goto out;
-                }
-                else
-                {
-                    p2mt = p2m_populate_on_demand;
-                    goto out;
-                }
-            }
-
-            goto pod_retry_l1;
-        }
-        
-        if (l2e_get_flags(l2e) & _PAGE_PSE)
-        {
-            p2mt = p2m_flags_to_type(l2e_get_flags(l2e));
-            ASSERT(l2e_get_pfn(l2e) != INVALID_MFN || !p2m_is_ram(p2mt));
-
-            if ( p2m_is_valid(p2mt) )
-                mfn = _mfn(l2e_get_pfn(l2e) + l1_table_offset(addr));
-            else
-                p2mt = p2m_mmio_dm;
-
-            goto out;
-        }
-
-        /*
-         * Read and process L1
-         */
-
-        /* Need to __copy_from_user because the p2m is sparse and this
-         * part might not exist */
-    pod_retry_l1:
-        p2m_entry = &phys_to_machine_mapping[gfn];
-
-        ret = __copy_from_user(&l1e,
-                               p2m_entry,
-                               sizeof(l1e));
-            
-        if ( ret == 0 ) {
-            p2mt = p2m_flags_to_type(l1e_get_flags(l1e));
-            ASSERT(l1e_get_pfn(l1e) != INVALID_MFN || !p2m_is_ram(p2mt));
-
-            if ( p2m_flags_to_type(l1e_get_flags(l1e))
-                 == p2m_populate_on_demand )
-            {
-                /* The read has succeeded, so we know that the mapping
-                 * exits at this point.  */
-                if ( q != p2m_query )
-                {
-                    if ( !p2m_pod_check_and_populate(p2m, gfn,
-                                                     (l1_pgentry_t *)p2m_entry, 0, q) )
-                        goto pod_retry_l1;
-
-                    /* Allocate failed. */
-                    p2mt = p2m_invalid;
-                    goto out;
-                }
-                else
-                {
-                    p2mt = p2m_populate_on_demand;
-                    goto out;
-                }
-            }
-
-            if ( p2m_is_valid(p2mt) || p2m_is_grant(p2mt) )
-                mfn = _mfn(l1e_get_pfn(l1e));
-            else 
-                /* XXX see above */
-                p2mt = p2m_mmio_dm;
-        }
-    }
-out:
-    *t = p2mt;
-    return mfn;
 }
 
 /* Walk the whole p2m table, changing any entries of the old type
@@ -968,7 +967,6 @@ void p2m_pt_init(struct p2m_domain *p2m)
 {
     p2m->set_entry = p2m_set_entry;
     p2m->get_entry = p2m_gfn_to_mfn;
-    p2m->get_entry_current = p2m_gfn_to_mfn_current;
     p2m->change_entry_type_global = p2m_change_type_global;
     p2m->write_p2m_entry = paging_write_p2m_entry;
 }

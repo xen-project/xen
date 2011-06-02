@@ -692,13 +692,6 @@ out:
     return;
 }
 
-static mfn_t ept_get_entry_current(struct p2m_domain *p2m,
-                                   unsigned long gfn, p2m_type_t *t, p2m_access_t *a,
-                                   p2m_query_t q)
-{
-    return ept_get_entry(p2m, gfn, t, a, q);
-}
-
 /*
  * To test if the new emt type is the same with old,
  * return 1 to not to reset ept entry.
@@ -824,7 +817,6 @@ void ept_p2m_init(struct p2m_domain *p2m)
 {
     p2m->set_entry = ept_set_entry;
     p2m->get_entry = ept_get_entry;
-    p2m->get_entry_current = ept_get_entry_current;
     p2m->change_entry_type_global = ept_change_entry_type_global;
 }
 
