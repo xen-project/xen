@@ -143,17 +143,15 @@ nestedhap_walk_L0_p2m(struct p2m_domain *p2m, paddr_t L1_gpa, paddr_t *L0_gpa)
  * L1_gpa. The result value tells what to do next.
  */
 static int
-nestedhap_walk_L1_p2m(struct vcpu *v, struct p2m_domain *p2m,
-    paddr_t L2_gpa, paddr_t *L1_gpa)
+nestedhap_walk_L1_p2m(struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa)
 {
     uint32_t pfec;
     unsigned long nested_cr3, gfn;
-    const struct paging_mode *mode = paging_get_hostmode(v);
     
     nested_cr3 = nhvm_vcpu_hostcr3(v);
 
-    /* walk the guest table */
-    gfn = paging_p2m_ga_to_gfn(v, p2m, mode, nested_cr3, L2_gpa, &pfec);
+    /* Walk the guest-supplied NPT table, just as if it were a pagetable */
+    gfn = paging_ga_to_gfn_cr3(v, nested_cr3, L2_gpa, &pfec);
 
     if ( gfn == INVALID_GFN ) 
         return NESTEDHVM_PAGEFAULT_INJECT;
@@ -178,10 +176,8 @@ nestedhvm_hap_nested_page_fault(struct vcpu *v, paddr_t L2_gpa)
     p2m = p2m_get_hostp2m(d); /* L0 p2m */
     nested_p2m = p2m_get_nestedp2m(v, nhvm_vcpu_hostcr3(v));
 
-    /* walk the L1 P2M table, note we have to pass p2m
-     * and not nested_p2m here or we fail the walk forever,
-     * otherwise. */
-    rv = nestedhap_walk_L1_p2m(v, p2m, L2_gpa, &L1_gpa);
+    /* walk the L1 P2M table */
+    rv = nestedhap_walk_L1_p2m(v, L2_gpa, &L1_gpa);
 
     /* let caller to handle these two cases */
     switch (rv) {

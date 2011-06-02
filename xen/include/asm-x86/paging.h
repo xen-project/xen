@@ -265,26 +265,19 @@ unsigned long paging_gva_to_gfn(struct vcpu *v,
                                 unsigned long va,
                                 uint32_t *pfec);
 
-/* Translates a guest virtual address to guest physical address
- * where the specified cr3 is translated to host physical address
- * using the specified p2m table.
- * This allows to do page walks in the guest or even in the nested guest.
- * It returns the guest's gfn or the nested guest's gfn.
+/* Translate a guest address using a particular CR3 value.  This is used
+ * to by nested HAP code, to walk the guest-supplied NPT tables as if
+ * they were pagetables.
  * Use 'paddr_t' for the guest address so it won't overflow when
  * guest or nested guest is in 32bit PAE mode.
  */
-static inline unsigned long paging_p2m_ga_to_gfn(struct vcpu *v,
-                                                 struct p2m_domain *p2m,
-                                                 const struct paging_mode *mode,
+static inline unsigned long paging_ga_to_gfn_cr3(struct vcpu *v,
                                                  unsigned long cr3,
                                                  paddr_t ga,
                                                  uint32_t *pfec)
 {
-    if ( is_hvm_domain(v->domain) && paging_mode_hap(v->domain) )
-        return mode->p2m_ga_to_gfn(v, p2m, cr3, ga, pfec);
-
-    /* shadow paging */
-    return paging_gva_to_gfn(v, ga, pfec);
+    struct p2m_domain *p2m = v->domain->arch.p2m;
+    return paging_get_hostmode(v)->p2m_ga_to_gfn(v, p2m, cr3, ga, pfec);
 }
 
 /* Update all the things that are derived from the guest's CR3.
