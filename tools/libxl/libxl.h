@@ -499,6 +499,14 @@ static inline int libxl_domid_valid_guest(uint32_t domid)
     return domid > 0 && domid < DOMID_FIRST_RESERVED;
 }
 
+int libxl_flask_context_to_sid(libxl_ctx *ctx, char *buf, size_t len,
+                               uint32_t *ssidref);
+int libxl_flask_sid_to_context(libxl_ctx *ctx, uint32_t ssidref, char **buf, 
+                               size_t *len);
+int libxl_flask_getenforce(libxl_ctx *ctx);
+int libxl_flask_setenforce(libxl_ctx *ctx, int mode);
+int libxl_flask_loadpolicy(libxl_ctx *ctx, void *policy, uint32_t size);
+
 /* common paths */
 const char *libxl_sbindir_path(void);
 const char *libxl_bindir_path(void);

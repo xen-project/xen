@@ -342,6 +342,7 @@ static void xcinfo2xlinfo(const xc_domaininfo_t *xcinfo,
 {
     memcpy(&(xlinfo->uuid), xcinfo->handle, sizeof(xen_domain_handle_t));
     xlinfo->domid = xcinfo->domain;
+    xlinfo->ssidref = xcinfo->ssidref;
 
     xlinfo->dying    = !!(xcinfo->flags&XEN_DOMINF_dying);
     xlinfo->shutdown = !!(xcinfo->flags&XEN_DOMINF_shutdown);
