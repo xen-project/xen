@@ -813,6 +813,13 @@ static void pv_cpuid(struct cpu_user_regs *regs)
            __clear_bit(X86_FEATURE_X2APIC % 32, &c);
         __set_bit(X86_FEATURE_HYPERVISOR % 32, &c);
         break;
+    case 7:
+        if ( regs->ecx == 0 )
+            b &= cpufeat_mask(X86_FEATURE_FSGSBASE);
+        else
+            b = 0;
+        a = c = d = 0;
+        break;
     case 0x80000001:
         /* Modify Feature Information. */
         if ( is_pv_32bit_vcpu(current) )

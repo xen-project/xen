@@ -466,6 +466,14 @@ static void xc_cpuid_pv_policy(
         set_bit(X86_FEATURE_HYPERVISOR, regs[2]);
         break;
 
+    case 7:
+        if ( input[1] == 0 )
+            regs[1] &= bitmaskof(X86_FEATURE_FSGSBASE);
+        else
+            regs[1] = 0;
+        regs[0] = regs[2] = regs[3] = 0;
+        break;
+
     case 0x0000000d:
         xc_cpuid_config_xsave(xch, domid, xfeature_mask, input, regs);
         break;
@@ -612,7 +620,7 @@ int xc_cpuid_apply_policy(xc_interface *xch, domid_t domid)
             input[0] = 0x80000000u;
 
         input[1] = XEN_CPUID_INPUT_UNUSED;
-        if ( (input[0] == 4) || (input[0] == 0xd) )
+        if ( (input[0] == 4) || (input[0] == 7) || (input[0] == 0xd) )
             input[1] = 0;
 
         if ( (input[0] & 0x80000000u) && (input[0] > ext_max) )

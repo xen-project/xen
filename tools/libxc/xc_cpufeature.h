@@ -141,4 +141,7 @@
 #define X86_FEATURE_TBM         (6*32+21) /* trailing bit manipulations */
 #define X86_FEATURE_TOPOEXT     (6*32+22) /* topology extensions CPUID leafs */
 
+/* Intel-defined CPU features, CPUID level 0x00000007:0 (ebx), word 9 */
+#define X86_FEATURE_FSGSBASE	(7*32+ 0) /* {RD,WR}{FS,GS}BASE instructions */
+
 #endif /* __LIBXC_CPUFEATURE_H */
