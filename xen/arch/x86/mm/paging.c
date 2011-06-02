@@ -156,9 +156,15 @@ void paging_free_log_dirty_bitmap(struct domain *d)
 {
     mfn_t *l4, *l3, *l2;
     int i4, i3, i2;
+    struct page_list_head to_free;    
+    struct page_info *pg, *tmp;
 
     if ( !mfn_valid(d->arch.paging.log_dirty.top) )
         return;
+
+    INIT_PAGE_LIST_HEAD(&to_free);
+
+    log_dirty_lock(d);
 
     l4 = map_domain_page(mfn_x(d->arch.paging.log_dirty.top));
 
@@ -178,22 +184,28 @@ void paging_free_log_dirty_bitmap(struct domain *d)
 
             for ( i2 = 0; i2 < LOGDIRTY_NODE_ENTRIES; i2++ )
                 if ( mfn_valid(l2[i2]) )
-                    paging_free_log_dirty_page(d, l2[i2]);
+                    page_list_add_tail(mfn_to_page(l2[i2]), &to_free);
 
             unmap_domain_page(l2);
-            paging_free_log_dirty_page(d, l3[i3]);
+            page_list_add_tail(mfn_to_page(l3[i3]), &to_free);
         }
 
         unmap_domain_page(l3);
-        paging_free_log_dirty_page(d, l4[i4]);
+        page_list_add_tail(mfn_to_page(l4[i4]), &to_free);
     }
 
     unmap_domain_page(l4);
-    paging_free_log_dirty_page(d, d->arch.paging.log_dirty.top);
+    page_list_add_tail(mfn_to_page(d->arch.paging.log_dirty.top), &to_free);
 
     d->arch.paging.log_dirty.top = _mfn(INVALID_MFN);
     ASSERT(d->arch.paging.log_dirty.allocs == 0);
     d->arch.paging.log_dirty.failed_allocs = 0;
+
+    log_dirty_unlock(d);
+    
+    /* Return the memory now that we're not holding the log-dirty lock */
+    page_list_for_each_safe(pg, tmp, &to_free)
+        paging_free_log_dirty_page(d, page_to_mfn(pg));
 }
 
 int paging_log_dirty_enable(struct domain *d)
@@ -217,10 +229,8 @@ int paging_log_dirty_disable(struct domain *d)
     domain_pause(d);
     /* Safe because the domain is paused. */
     ret = d->arch.paging.log_dirty.disable_log_dirty(d);
-    log_dirty_lock(d);
     if ( !paging_mode_log_dirty(d) )
         paging_free_log_dirty_bitmap(d);
-    log_dirty_unlock(d);
     domain_unpause(d);
 
     return ret;
@@ -672,10 +682,9 @@ void paging_log_dirty_init(struct domain *d,
 /* This function fress log dirty bitmap resources. */
 static void paging_log_dirty_teardown(struct domain*d)
 {
-    log_dirty_lock(d);
     paging_free_log_dirty_bitmap(d);
-    log_dirty_unlock(d);
 }
+
 /************************************************/
 /*           CODE FOR PAGING SUPPORT            */
 /************************************************/
