@@ -2380,7 +2380,6 @@ unsigned long copy_from_user_hvm(void *to, const void *from, unsigned len)
     return rc ? len : 0; /* fake a copy_from_user() return code */
 }
 
-#define bitmaskof(idx)  (1U << ((idx) & 31))
 void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                                    unsigned int *ecx, unsigned int *edx)
 {
@@ -2407,7 +2406,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         /* Fix up OSXSAVE. */
         if ( xsave_enabled(v) )
             *ecx |= (v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_OSXSAVE) ?
-                     bitmaskof(X86_FEATURE_OSXSAVE) : 0;
+                     cpufeat_mask(X86_FEATURE_OSXSAVE) : 0;
         break;
     case 0xb:
         /* Fix the x2APIC identifier. */
@@ -2438,7 +2437,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
            tsc_mode == TSC_MODE_DEFAULT and host_tsc_is_safe() returns 1 */
         if ( v->domain->arch.tsc_mode != TSC_MODE_DEFAULT ||
              !host_tsc_is_safe() )
-            *edx &= ~bitmaskof(X86_FEATURE_RDTSCP);
+            *edx &= ~cpufeat_mask(X86_FEATURE_RDTSCP);
         break;
     }
 }
@@ -2467,7 +2466,7 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     fixed_range_base = (uint64_t *)v->arch.hvm_vcpu.mtrr.fixed_ranges;
 
     hvm_cpuid(1, &cpuid[0], &cpuid[1], &cpuid[2], &cpuid[3]);
-    mtrr = !!(cpuid[3] & bitmaskof(X86_FEATURE_MTRR));
+    mtrr = !!(cpuid[3] & cpufeat_mask(X86_FEATURE_MTRR));
 
     switch ( msr )
     {
@@ -2579,7 +2578,7 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
                (uint32_t)msr_content, (uint32_t)(msr_content >> 32));
 
     hvm_cpuid(1, &cpuid[0], &cpuid[1], &cpuid[2], &cpuid[3]);
-    mtrr = !!(cpuid[3] & bitmaskof(X86_FEATURE_MTRR));
+    mtrr = !!(cpuid[3] & cpufeat_mask(X86_FEATURE_MTRR));
 
     switch ( msr )
     {

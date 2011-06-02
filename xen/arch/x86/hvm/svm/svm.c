@@ -1190,7 +1190,6 @@ static void svm_fpu_dirty_intercept(void)
         vmcb_set_cr0(vmcb, vmcb_get_cr0(vmcb) & ~X86_CR0_TS);
 }
 
-#define bitmaskof(idx)  (1U << ((idx) & 31))
 static void svm_cpuid_intercept(
     unsigned int *eax, unsigned int *ebx,
     unsigned int *ecx, unsigned int *edx)
