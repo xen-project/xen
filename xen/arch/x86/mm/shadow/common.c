@@ -1612,7 +1612,7 @@ shadow_alloc_p2m_page(struct domain *d)
     struct page_info *pg;
 
     /* This is called both from the p2m code (which never holds the 
-     * paging lock) and the log-dirty code (which sometimes does). */
+     * paging lock) and the log-dirty code (which always does). */
     paging_lock_recursive(d);
 
     if ( d->arch.paging.shadow.total_pages 
@@ -1654,7 +1654,7 @@ shadow_free_p2m_page(struct domain *d, struct page_info *pg)
     page_set_owner(pg, NULL); 
 
     /* This is called both from the p2m code (which never holds the 
-     * paging lock) and the log-dirty code (which sometimes does). */
+     * paging lock) and the log-dirty code (which always does). */
     paging_lock_recursive(d);
 
     shadow_free(d, page_to_mfn(pg));

@@ -279,7 +279,7 @@ static struct page_info *hap_alloc_p2m_page(struct domain *d)
     struct page_info *pg;
 
     /* This is called both from the p2m code (which never holds the 
-     * paging lock) and the log-dirty code (which sometimes does). */
+     * paging lock) and the log-dirty code (which always does). */
     paging_lock_recursive(d);
     pg = hap_alloc(d);
 
@@ -318,7 +318,7 @@ static struct page_info *hap_alloc_p2m_page(struct domain *d)
 static void hap_free_p2m_page(struct domain *d, struct page_info *pg)
 {
     /* This is called both from the p2m code (which never holds the 
-     * paging lock) and the log-dirty code (which sometimes does). */
+     * paging lock) and the log-dirty code (which always does). */
     paging_lock_recursive(d);
 
     ASSERT(page_get_owner(pg) == d);
