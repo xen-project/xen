@@ -1979,7 +1979,7 @@ static shadow_l1e_t * shadow_get_and_create_l1e(struct vcpu *v,
     /* All pages walked are now pagetables. Safe to resync pages
        in case level 4 or 3 shadows were set. */
     if ( resync )
-        shadow_resync_all(v, 0);
+        shadow_resync_all(v);
 #endif
 
     /* Now follow it down a level.  Guaranteed to succeed. */
@@ -2273,7 +2273,7 @@ static int validate_gl4e(struct vcpu *v, void *new_ge, mfn_t sl4mfn, void *se)
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC )
         if ( mfn_valid(sl3mfn) )
-            shadow_resync_all(v, 0);
+            shadow_resync_all(v);
 #endif
     }
     l4e_propagate_from_guest(v, new_gl4e, sl3mfn, &new_sl4e, ft_prefetch);
@@ -2330,7 +2330,7 @@ static int validate_gl3e(struct vcpu *v, void *new_ge, mfn_t sl3mfn, void *se)
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC )
         if ( mfn_valid(sl2mfn) )
-            shadow_resync_all(v, 0);
+            shadow_resync_all(v);
 #endif
     }
     l3e_propagate_from_guest(v, new_gl3e, sl2mfn, &new_sl3e, ft_prefetch);
@@ -4172,14 +4172,14 @@ sh_update_cr3(struct vcpu *v, int do_locking)
         return;
     }
 
+    if ( do_locking ) shadow_lock(v->domain);
+
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
     /* Need to resync all the shadow entries on a TLB flush.  Resync
      * current vcpus OOS pages before switching to the new shadow
      * tables so that the VA hint is still valid.  */
-    shadow_resync_current_vcpu(v, do_locking);
+    shadow_resync_current_vcpu(v);
 #endif
-
-    if ( do_locking ) shadow_lock(v->domain);
 
     ASSERT(shadow_locked_by_me(v->domain));
     ASSERT(v->arch.paging.mode);
@@ -4406,17 +4406,16 @@ sh_update_cr3(struct vcpu *v, int do_locking)
     v->arch.paging.last_write_emul_ok = 0;
 #endif
 
-    /* Release the lock, if we took it (otherwise it's the caller's problem) */
-    if ( do_locking ) shadow_unlock(v->domain);
-
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
     /* Need to resync all the shadow entries on a TLB flush. We only
      * update the shadows, leaving the pages out of sync. Also, we try
      * to skip synchronization of shadows not mapped in the new
      * tables. */
-    shadow_sync_other_vcpus(v, do_locking);
+    shadow_sync_other_vcpus(v);
 #endif
 
+    /* Release the lock, if we took it (otherwise it's the caller's problem) */
+    if ( do_locking ) shadow_unlock(v->domain);
 }
 
 

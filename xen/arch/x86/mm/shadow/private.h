@@ -388,36 +388,24 @@ int sh_remove_write_access_from_sl1p(struct vcpu *v, mfn_t gmfn,
 /* Pull all out-of-sync shadows back into sync.  If skip != 0, we try
  * to avoid resyncing where we think we can get away with it. */
 
-void sh_resync_all(struct vcpu *v, int skip, int this, int others, int do_locking);
+void sh_resync_all(struct vcpu *v, int skip, int this, int others);
 
 static inline void
-shadow_resync_all(struct vcpu *v, int do_locking)
+shadow_resync_all(struct vcpu *v)
 {
-    sh_resync_all(v,
-                  0 /* skip */,
-                  1 /* this */,
-                  1 /* others */,
-                  do_locking);
+    sh_resync_all(v, 0 /* skip */, 1 /* this */, 1 /* others */);
 }
 
 static inline void
-shadow_resync_current_vcpu(struct vcpu *v, int do_locking)
+shadow_resync_current_vcpu(struct vcpu *v)
 {
-    sh_resync_all(v,
-                  0 /* skip */,
-                  1 /* this */, 
-                  0 /* others */,
-                  do_locking);
+    sh_resync_all(v, 0 /* skip */, 1 /* this */, 0 /* others */);
 }
 
 static inline void
-shadow_sync_other_vcpus(struct vcpu *v, int do_locking)
+shadow_sync_other_vcpus(struct vcpu *v)
 {
-    sh_resync_all(v,
-                  1 /* skip */, 
-                  0 /* this */,
-                  1 /* others */,
-                  do_locking);
+    sh_resync_all(v, 1 /* skip */, 0 /* this */, 1 /* others */);
 }
 
 void oos_audit_hash_is_present(struct domain *d, mfn_t gmfn);

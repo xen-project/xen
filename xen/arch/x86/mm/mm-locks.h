@@ -37,42 +37,44 @@ static inline void mm_lock_init(mm_lock_t *l)
     l->unlock_level = 0;
 }
 
-static inline void _mm_lock(mm_lock_t *l, const char *func, int level)
+static inline int mm_locked_by_me(mm_lock_t *l) 
 {
-    if ( unlikely(l->locker == current->processor) )
-        panic("mm lock held by %s\n", l->locker_function);
+    return (l->lock.recurse_cpu == current->processor);
+}
+
+static inline void _mm_lock(mm_lock_t *l, const char *func, int level, int rec)
+{
     /* If you see this crash, the numbers printed are lines in this file 
      * where the offending locks are declared. */
-    if ( unlikely(this_cpu(mm_lock_level) >= level) )
-        panic("mm locking order violation: %i >= %i\n", 
+    if ( unlikely(this_cpu(mm_lock_level) > level) )
+        panic("mm locking order violation: %i > %i\n", 
               this_cpu(mm_lock_level), level);
-    spin_lock(&l->lock);
-    ASSERT(l->locker == -1);
-    l->locker = current->processor;
-    l->locker_function = func;
-    l->unlock_level = this_cpu(mm_lock_level);
+    spin_lock_recursive(&l->lock);
+    if ( l->lock.recurse_cnt == 1 )
+    {
+        l->locker_function = func;
+        l->unlock_level = this_cpu(mm_lock_level);
+    }
+    else if ( (unlikely(!rec)) )
+        panic("mm lock already held by %s\n", l->locker_function);
     this_cpu(mm_lock_level) = level;
 }
 /* This wrapper uses the line number to express the locking order below */
-#define declare_mm_lock(name)                                             \
-  static inline void mm_lock_##name(mm_lock_t *l, const char *func)       \
-  { _mm_lock(l, func, __LINE__); }
-/* This one captures the name of the calling function */
-#define mm_lock(name, l) mm_lock_##name(l, __func__)
+#define declare_mm_lock(name)                                                 \
+    static inline void mm_lock_##name(mm_lock_t *l, const char *func, int rec)\
+    { _mm_lock(l, func, __LINE__, rec); }
+/* These capture the name of the calling function */
+#define mm_lock(name, l) mm_lock_##name(l, __func__, 0)
+#define mm_lock_recursive(name, l) mm_lock_##name(l, __func__, 1)
 
 static inline void mm_unlock(mm_lock_t *l)
 {
-    ASSERT(l->locker == current->processor);
-    l->locker = -1;
-    l->locker_function = "nobody";
-    this_cpu(mm_lock_level) = l->unlock_level;
-    l->unlock_level = -1;
-    spin_unlock(&l->lock);
-}
-
-static inline int mm_locked_by_me(mm_lock_t *l) 
-{
-    return (current->processor == l->locker);
+    if ( l->lock.recurse_cnt == 1 )
+    {
+        l->locker_function = "nobody";
+        this_cpu(mm_lock_level) = l->unlock_level;
+    }
+    spin_unlock_recursive(&l->lock);
 }
 
 /************************************************************************
@@ -107,9 +109,10 @@ declare_mm_lock(nestedp2m)
  * be safe against concurrent reads, which do *not* require the lock. */
 
 declare_mm_lock(p2m)
-#define p2m_lock(p)         mm_lock(p2m, &(p)->lock)
-#define p2m_unlock(p)       mm_unlock(&(p)->lock)
-#define p2m_locked_by_me(p) mm_locked_by_me(&(p)->lock)
+#define p2m_lock(p)           mm_lock(p2m, &(p)->lock)
+#define p2m_lock_recursive(p) mm_lock_recursive(p2m, &(p)->lock)
+#define p2m_unlock(p)         mm_unlock(&(p)->lock)
+#define p2m_locked_by_me(p)   mm_locked_by_me(&(p)->lock)
 
 /* Shadow lock (per-domain)
  *
@@ -126,6 +129,8 @@ declare_mm_lock(p2m)
 
 declare_mm_lock(shadow)
 #define shadow_lock(d)         mm_lock(shadow, &(d)->arch.paging.shadow.lock)
+#define shadow_lock_recursive(d) \
+                     mm_lock_recursive(shadow, &(d)->arch.paging.shadow.lock)
 #define shadow_unlock(d)       mm_unlock(&(d)->arch.paging.shadow.lock)
 #define shadow_locked_by_me(d) mm_locked_by_me(&(d)->arch.paging.shadow.lock)
 
@@ -136,6 +141,8 @@ declare_mm_lock(shadow)
 
 declare_mm_lock(hap)
 #define hap_lock(d)         mm_lock(hap, &(d)->arch.paging.hap.lock)
+#define hap_lock_recursive(d) \
+                  mm_lock_recursive(hap, &(d)->arch.paging.hap.lock)
 #define hap_unlock(d)       mm_unlock(&(d)->arch.paging.hap.lock)
 #define hap_locked_by_me(d) mm_locked_by_me(&(d)->arch.paging.hap.lock)
 

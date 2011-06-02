@@ -277,13 +277,10 @@ static void hap_free(struct domain *d, mfn_t mfn)
 static struct page_info *hap_alloc_p2m_page(struct domain *d)
 {
     struct page_info *pg;
-    int do_locking;
 
     /* This is called both from the p2m code (which never holds the 
      * hap lock) and the log-dirty code (which sometimes does). */
-    do_locking = !hap_locked_by_me(d);
-    if ( do_locking )
-        hap_lock(d);
+    hap_lock_recursive(d);
     pg = hap_alloc(d);
 
 #if CONFIG_PAGING_LEVELS == 3
@@ -314,20 +311,15 @@ static struct page_info *hap_alloc_p2m_page(struct domain *d)
         pg->count_info |= 1;
     }
 
-    if ( do_locking )
-        hap_unlock(d);
+    hap_unlock(d);
     return pg;
 }
 
 static void hap_free_p2m_page(struct domain *d, struct page_info *pg)
 {
-    int do_locking;
-
     /* This is called both from the p2m code (which never holds the 
      * hap lock) and the log-dirty code (which sometimes does). */
-    do_locking = !hap_locked_by_me(d);
-    if ( do_locking )
-        hap_lock(d);
+    hap_lock_recursive(d);
 
     ASSERT(page_get_owner(pg) == d);
     /* Should have just the one ref we gave it in alloc_p2m_page() */
@@ -345,8 +337,7 @@ static void hap_free_p2m_page(struct domain *d, struct page_info *pg)
     hap_free(d, page_to_mfn(pg));
     ASSERT(d->arch.paging.hap.p2m_pages >= 0);
 
-    if ( do_locking )
-        hap_unlock(d);
+    hap_unlock(d);
 }
 
 /* Return the size of the pool, rounded up to the nearest MB */
