@@ -161,6 +161,36 @@ int set_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     return rc;
 }
 
+struct page_info *p2m_alloc_ptp(struct p2m_domain *p2m, unsigned long type)
+{
+    struct page_info *pg;
+
+    ASSERT(p2m);
+    ASSERT(p2m->domain);
+    ASSERT(p2m->domain->arch.paging.alloc_page);
+    pg = p2m->domain->arch.paging.alloc_page(p2m->domain);
+    if (pg == NULL)
+        return NULL;
+
+    page_list_add_tail(pg, &p2m->pages);
+    pg->u.inuse.type_info = type | 1 | PGT_validated;
+
+    return pg;
+}
+
+void p2m_free_ptp(struct p2m_domain *p2m, struct page_info *pg)
+{
+    ASSERT(pg);
+    ASSERT(p2m);
+    ASSERT(p2m->domain);
+    ASSERT(p2m->domain->arch.paging.free_page);
+
+    page_list_del(pg, &p2m->pages);
+    p2m->domain->arch.paging.free_page(p2m->domain, pg);
+
+    return;
+}
+
 // Allocate a new p2m table for a domain.
 //
 // The structure of the p2m table is that of a pagetable for xen (i.e. it is

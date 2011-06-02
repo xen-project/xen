@@ -164,7 +164,7 @@ static int ept_set_middle_entry(struct p2m_domain *p2m, ept_entry_t *ept_entry)
 }
 
 /* free ept sub tree behind an entry */
-void ept_free_entry(struct p2m_domain *p2m, ept_entry_t *ept_entry, int level)
+static void ept_free_entry(struct p2m_domain *p2m, ept_entry_t *ept_entry, int level)
 {
     /* End if the entry is a leaf entry. */
     if ( level == 0 || !is_epte_present(ept_entry) ||

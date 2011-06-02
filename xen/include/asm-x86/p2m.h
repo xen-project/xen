@@ -499,20 +499,10 @@ static inline unsigned long mfn_to_gfn(struct domain *d, mfn_t mfn)
 /* Init the datastructures for later use by the p2m code */
 int p2m_init(struct domain *d);
 
-/* PTE flags for various types of p2m entry */
-unsigned long p2m_type_to_flags(p2m_type_t t, mfn_t mfn);
-
 /* Allocate a new p2m table for a domain. 
  *
  * Returns 0 for success or -errno. */
 int p2m_alloc_table(struct p2m_domain *p2m);
-
-/* Find the next level's P2M entry, checking for out-of-range gfn's...
- * Returns NULL on error.
- */
-l1_pgentry_t *
-p2m_find_entry(void *table, unsigned long *gfn_remainder,
-               unsigned long gfn, uint32_t shift, uint32_t max);
 
 /* Return all the p2m resources to Xen. */
 void p2m_teardown(struct p2m_domain *p2m);
@@ -584,7 +574,6 @@ static inline void guest_physmap_remove_page(struct domain *d,
 }
 
 /* Change types across all p2m entries in a domain */
-void p2m_change_type_global(struct p2m_domain *p2m, p2m_type_t ot, p2m_type_t nt);
 void p2m_change_entry_type_global(struct p2m_domain *p2m, p2m_type_t ot, p2m_type_t nt);
 
 /* Compare-exchange the type of a single p2m entry */

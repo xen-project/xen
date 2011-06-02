@@ -54,7 +54,7 @@
 #define SUPERPAGE_PAGES (1UL << 9)
 #define superpage_aligned(_x)  (((_x)&(SUPERPAGE_PAGES-1))==0)
 
-unsigned long p2m_type_to_flags(p2m_type_t t, mfn_t mfn)
+static unsigned long p2m_type_to_flags(p2m_type_t t, mfn_t mfn)
 {
     unsigned long flags;
 #ifdef __x86_64__
@@ -100,7 +100,7 @@ unsigned long p2m_type_to_flags(p2m_type_t t, mfn_t mfn)
 // Find the next level's P2M entry, checking for out-of-range gfn's...
 // Returns NULL on error.
 //
-l1_pgentry_t *
+static l1_pgentry_t *
 p2m_find_entry(void *table, unsigned long *gfn_remainder,
                    unsigned long gfn, uint32_t shift, uint32_t max)
 {
@@ -118,40 +118,8 @@ p2m_find_entry(void *table, unsigned long *gfn_remainder,
     return (l1_pgentry_t *)table + index;
 }
 
-struct page_info *
-p2m_alloc_ptp(struct p2m_domain *p2m, unsigned long type)
-{
-    struct page_info *pg;
-
-    ASSERT(p2m);
-    ASSERT(p2m->domain);
-    ASSERT(p2m->domain->arch.paging.alloc_page);
-    pg = p2m->domain->arch.paging.alloc_page(p2m->domain);
-    if (pg == NULL)
-        return NULL;
-
-    page_list_add_tail(pg, &p2m->pages);
-    pg->u.inuse.type_info = type | 1 | PGT_validated;
-
-    return pg;
-}
-
-void
-p2m_free_ptp(struct p2m_domain *p2m, struct page_info *pg)
-{
-    ASSERT(pg);
-    ASSERT(p2m);
-    ASSERT(p2m->domain);
-    ASSERT(p2m->domain->arch.paging.free_page);
-
-    page_list_del(pg, &p2m->pages);
-    p2m->domain->arch.paging.free_page(p2m->domain, pg);
-
-    return;
-}
-
 /* Free intermediate tables from a p2m sub-tree */
-void
+static void
 p2m_free_entry(struct p2m_domain *p2m, l1_pgentry_t *p2m_entry, int page_order)
 {
     /* End if the entry is a leaf entry. */
@@ -864,7 +832,8 @@ out:
 /* Walk the whole p2m table, changing any entries of the old type
  * to the new type.  This is used in hardware-assisted paging to 
  * quickly enable or diable log-dirty tracking */
-void p2m_change_type_global(struct p2m_domain *p2m, p2m_type_t ot, p2m_type_t nt)
+static void p2m_change_type_global(struct p2m_domain *p2m,
+                                   p2m_type_t ot, p2m_type_t nt)
 {
     unsigned long mfn, gfn, flags;
     l1_pgentry_t l1e_content;
