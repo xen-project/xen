@@ -32,6 +32,8 @@
 #include <xen/keyhandler.h>
 #include <xen/softirq.h>
 
+#include "mm-locks.h"
+
 #define atomic_read_ept_entry(__pepte)                              \
     ( (ept_entry_t) { .epte = atomic_read64(&(__pepte)->epte) } )
 #define atomic_write_ept_entry(__pepte, __epte)                     \

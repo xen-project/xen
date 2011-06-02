@@ -3136,7 +3136,7 @@ static int sh_page_fault(struct vcpu *v,
     if ( unlikely(shadow_locked_by_me(d)) )
     {
         SHADOW_ERROR("Recursive shadow fault: lock was taken by %s\n",
-                     d->arch.paging.shadow.locker_function);
+                     d->arch.paging.shadow.lock.locker_function);
         return 0;
     }
 

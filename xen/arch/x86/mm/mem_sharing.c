@@ -32,6 +32,8 @@
 #include <asm/mem_event.h>
 #include <asm/atomic.h>
 
+#include "mm-locks.h"
+
 /* Auditing of memory sharing code? */
 #define MEM_SHARING_AUDIT  0
 
@@ -74,13 +76,7 @@ typedef struct gfn_info
     struct list_head list;
 } gfn_info_t;
 
-typedef struct shr_lock
-{
-    spinlock_t  lock;            /* mem sharing lock */
-    int         locker;          /* processor which holds the lock */
-    const char *locker_function; /* func that took it */
-} shr_lock_t;
-static shr_lock_t shr_lock;
+static mm_lock_t shr_lock;
 
 /* Returns true if list has only one entry. O(1) complexity. */
 static inline int list_has_one_entry(struct list_head *head)
@@ -93,43 +89,11 @@ static inline struct gfn_info* gfn_get_info(struct list_head *list)
     return list_entry(list->next, struct gfn_info, list);
 }
 
-#define shr_lock_init(_i)                      \
-    do {                                       \
-        spin_lock_init(&shr_lock.lock);        \
-        shr_lock.locker = -1;                  \
-        shr_lock.locker_function = "nobody";   \
-    } while (0)
-
-#define shr_locked_by_me(_i)                   \
-    (current->processor == shr_lock.locker)
-
-#define shr_lock(_i)                                           \
-    do {                                                       \
-        if ( unlikely(shr_lock.locker == current->processor) ) \
-        {                                                      \
-            printk("Error: shr lock held by %s\n",             \
-                   shr_lock.locker_function);                  \
-            BUG();                                             \
-        }                                                      \
-        spin_lock(&shr_lock.lock);                             \
-        ASSERT(shr_lock.locker == -1);                         \
-        shr_lock.locker = current->processor;                  \
-        shr_lock.locker_function = __func__;                   \
-    } while (0)
-
-#define shr_unlock(_i)                                    \
-    do {                                                  \
-        ASSERT(shr_lock.locker == current->processor);    \
-        shr_lock.locker = -1;                             \
-        shr_lock.locker_function = "nobody";              \
-        spin_unlock(&shr_lock.lock);                      \
-    } while (0)
-
 static void __init mem_sharing_hash_init(void)
 {
     int i;
 
-    shr_lock_init();
+    mm_lock_init(&shr_lock);
     for(i=0; i<SHR_HASH_LENGTH; i++)
         shr_hash[i] = NULL;
 }

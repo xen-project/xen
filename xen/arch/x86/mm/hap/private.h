@@ -20,6 +20,8 @@
 #ifndef __HAP_PRIVATE_H__
 #define __HAP_PRIVATE_H__
 
+#include "../mm-locks.h"
+
 /********************************************/
 /*          GUEST TRANSLATION FUNCS         */
 /********************************************/

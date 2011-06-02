@@ -91,9 +91,8 @@ void hypercall_page_initialise(struct domain *d, void *);
 /*          shadow paging extension             */
 /************************************************/
 struct shadow_domain {
-    spinlock_t        lock;  /* shadow domain lock */
-    int               locker; /* processor which holds the lock */
-    const char       *locker_function; /* Func that took it */
+    mm_lock_t         lock;  /* shadow domain lock */
+
     unsigned int      opt_flags;    /* runtime tunable optimizations on/off */
     struct page_list_head pinned_shadows;
 
@@ -159,9 +158,7 @@ struct shadow_vcpu {
 /*            hardware assisted paging          */
 /************************************************/
 struct hap_domain {
-    spinlock_t        lock;
-    int               locker;
-    const char       *locker_function;
+    mm_lock_t         lock;
 
     struct page_list_head freelist;
     unsigned int      total_pages;  /* number of pages allocated */
@@ -174,9 +171,7 @@ struct hap_domain {
 /************************************************/
 struct log_dirty_domain {
     /* log-dirty lock */
-    spinlock_t     lock;
-    int            locker; /* processor that holds the lock */
-    const char    *locker_function; /* func that took it */
+    mm_lock_t     lock;
 
     /* log-dirty radix tree to record dirty pages */
     mfn_t          top;
@@ -280,9 +275,7 @@ struct arch_domain
 
     /* nestedhvm: translate l2 guest physical to host physical */
     struct p2m_domain *nested_p2m[MAX_NESTEDP2M];
-    spinlock_t nested_p2m_lock;
-    int nested_p2m_locker;
-    const char *nested_p2m_function;
+    mm_lock_t nested_p2m_lock;
 
     /* NB. protected by d->event_lock and by irq_desc[irq].lock */
     struct radix_tree_root irq_pirq;

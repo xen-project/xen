@@ -4,6 +4,7 @@
 
 #include <xen/config.h>
 #include <xen/list.h>
+#include <xen/spinlock.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
@@ -596,5 +597,13 @@ unsigned int domain_clamp_alloc_bitsize(struct domain *d, unsigned int bits);
 unsigned long domain_get_maximum_gpfn(struct domain *d);
 
 extern struct domain *dom_xen, *dom_io, *dom_cow;	/* for vmcoreinfo */
+
+/* Definition of an mm lock: spinlock with extra fields for debugging */
+typedef struct mm_lock {
+    spinlock_t         lock; 
+    int                unlock_level;
+    int                locker;          /* processor which holds the lock */
+    const char        *locker_function; /* func that took it */
+} mm_lock_t;
 
 #endif /* __ASM_X86_MM_H__ */

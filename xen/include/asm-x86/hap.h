@@ -47,41 +47,6 @@ hap_unmap_domain_page(void *p)
 }
 
 /************************************************/
-/*           locking for hap code               */
-/************************************************/
-#define hap_lock_init(_d)                                   \
-    do {                                                    \
-        spin_lock_init(&(_d)->arch.paging.hap.lock);        \
-        (_d)->arch.paging.hap.locker = -1;                  \
-        (_d)->arch.paging.hap.locker_function = "nobody";   \
-    } while (0)
-
-#define hap_locked_by_me(_d)                     \
-    (current->processor == (_d)->arch.paging.hap.locker)
-
-#define hap_lock(_d)                                                       \
-    do {                                                                   \
-        if ( unlikely((_d)->arch.paging.hap.locker == current->processor) )\
-        {                                                                  \
-            printk("Error: hap lock held by %s\n",                         \
-                   (_d)->arch.paging.hap.locker_function);                 \
-            BUG();                                                         \
-        }                                                                  \
-        spin_lock(&(_d)->arch.paging.hap.lock);                            \
-        ASSERT((_d)->arch.paging.hap.locker == -1);                        \
-        (_d)->arch.paging.hap.locker = current->processor;                 \
-        (_d)->arch.paging.hap.locker_function = __func__;                  \
-    } while (0)
-
-#define hap_unlock(_d)                                              \
-    do {                                                            \
-        ASSERT((_d)->arch.paging.hap.locker == current->processor); \
-        (_d)->arch.paging.hap.locker = -1;                          \
-        (_d)->arch.paging.hap.locker_function = "nobody";           \
-        spin_unlock(&(_d)->arch.paging.hap.lock);                   \
-    } while (0)
-
-/************************************************/
 /*        hap domain level functions            */
 /************************************************/
 void  hap_domain_init(struct domain *d);

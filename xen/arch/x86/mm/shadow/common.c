@@ -45,7 +45,7 @@ DEFINE_PER_CPU(uint32_t,trace_shadow_path_flags);
  * Called for every domain from arch_domain_create() */
 void shadow_domain_init(struct domain *d, unsigned int domcr_flags)
 {
-    shadow_lock_init(d);
+    mm_lock_init(&d->arch.paging.shadow.lock);
     INIT_PAGE_LIST_HEAD(&d->arch.paging.shadow.freelist);
     INIT_PAGE_LIST_HEAD(&d->arch.paging.shadow.pinned_shadows);
 

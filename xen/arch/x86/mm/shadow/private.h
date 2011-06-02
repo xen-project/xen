@@ -31,6 +31,7 @@
 #include <asm/x86_emulate.h>
 #include <asm/hvm/support.h>
 
+#include "../mm-locks.h"
 
 /******************************************************************************
  * Levels of self-test and paranoia
@@ -127,57 +128,6 @@ enum {
     TRCE_SFLAG_OOS_FIXUP_ADD,
     TRCE_SFLAG_OOS_FIXUP_EVICT,
 };
-
-/******************************************************************************
- * The shadow lock.
- *
- * This lock is per-domain.  It is intended to allow us to make atomic
- * updates to the software TLB that the shadow tables provide.
- * 
- * Specifically, it protects:
- *   - all changes to shadow page table pages
- *   - the shadow hash table
- *   - the shadow page allocator 
- *   - all changes to guest page table pages
- *   - all changes to the page_info->tlbflush_timestamp
- *   - the page_info->count fields on shadow pages
- *   - the shadow dirty bit array and count
- */
-#ifndef CONFIG_SMP
-#error shadow.h currently requires CONFIG_SMP
-#endif
-
-#define shadow_lock_init(_d)                                   \
-    do {                                                       \
-        spin_lock_init(&(_d)->arch.paging.shadow.lock);        \
-        (_d)->arch.paging.shadow.locker = -1;                  \
-        (_d)->arch.paging.shadow.locker_function = "nobody";   \
-    } while (0)
-
-#define shadow_locked_by_me(_d)                     \
-    (current->processor == (_d)->arch.paging.shadow.locker)
-
-#define shadow_lock(_d)                                                       \
-    do {                                                                      \
-        if ( unlikely((_d)->arch.paging.shadow.locker == current->processor) )\
-        {                                                                     \
-            printk("Error: shadow lock held by %s\n",                         \
-                   (_d)->arch.paging.shadow.locker_function);                 \
-            BUG();                                                            \
-        }                                                                     \
-        spin_lock(&(_d)->arch.paging.shadow.lock);                            \
-        ASSERT((_d)->arch.paging.shadow.locker == -1);                        \
-        (_d)->arch.paging.shadow.locker = current->processor;                 \
-        (_d)->arch.paging.shadow.locker_function = __func__;                  \
-    } while (0)
-
-#define shadow_unlock(_d)                                              \
-    do {                                                               \
-        ASSERT((_d)->arch.paging.shadow.locker == current->processor); \
-        (_d)->arch.paging.shadow.locker = -1;                          \
-        (_d)->arch.paging.shadow.locker_function = "nobody";           \
-        spin_unlock(&(_d)->arch.paging.shadow.lock);                   \
-    } while (0)
 
 
 /* Size (in bytes) of a guest PTE */

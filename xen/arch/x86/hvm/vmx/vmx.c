@@ -1215,7 +1215,6 @@ void ept_sync_domain(struct domain *d)
         return;
 
     ASSERT(local_irq_is_enabled());
-    ASSERT(p2m_locked_by_me(p2m_get_hostp2m(d)));
 
     /*
      * Flush active cpus synchronously. Flush others the next time this domain

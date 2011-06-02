@@ -572,7 +572,7 @@ static void hap_destroy_monitor_table(struct vcpu* v, mfn_t mmfn)
 /************************************************/
 void hap_domain_init(struct domain *d)
 {
-    hap_lock_init(d);
+    mm_lock_init(&d->arch.paging.hap.lock);
     INIT_PAGE_LIST_HEAD(&d->arch.paging.hap.freelist);
 }
 

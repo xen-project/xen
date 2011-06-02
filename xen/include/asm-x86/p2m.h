@@ -189,9 +189,7 @@ typedef enum {
 /* Per-p2m-table state */
 struct p2m_domain {
     /* Lock that protects updates to the p2m */
-    spinlock_t         lock;
-    int                locker;   /* processor which holds the lock */
-    const char        *locker_function; /* Func that took it */
+    mm_lock_t          lock;
 
     /* Shadow translated domain: p2m mapping */
     pagetable_t        phys_table;
@@ -283,80 +281,6 @@ struct p2m_domain *p2m_get_p2m(struct vcpu *v);
 #define p2m_is_nestedp2m(p2m)   ((p2m) != p2m_get_hostp2m((p2m->domain)))
 
 #define p2m_get_pagetable(p2m)  ((p2m)->phys_table)
-
-
-/*
- * The P2M lock.  This protects all updates to the p2m table.
- * Updates are expected to be safe against concurrent reads,
- * which do *not* require the lock.
- *
- * Locking discipline: always acquire this lock before the shadow or HAP one
- */
-
-#define p2m_lock_init(_p2m)                     \
-    do {                                        \
-        spin_lock_init(&(_p2m)->lock);          \
-        (_p2m)->locker = -1;                    \
-        (_p2m)->locker_function = "nobody";     \
-    } while (0)
-
-#define p2m_lock(_p2m)                                          \
-    do {                                                        \
-        if ( unlikely((_p2m)->locker == current->processor) )   \
-        {                                                       \
-            printk("Error: p2m lock held by %s\n",              \
-                   (_p2m)->locker_function);                    \
-            BUG();                                              \
-        }                                                       \
-        spin_lock(&(_p2m)->lock);                               \
-        ASSERT((_p2m)->locker == -1);                           \
-        (_p2m)->locker = current->processor;                    \
-        (_p2m)->locker_function = __func__;                     \
-    } while (0)
-
-#define p2m_unlock(_p2m)                                \
-    do {                                                \
-        ASSERT((_p2m)->locker == current->processor);   \
-        (_p2m)->locker = -1;                            \
-        (_p2m)->locker_function = "nobody";             \
-        spin_unlock(&(_p2m)->lock);                     \
-    } while (0)
-
-#define p2m_locked_by_me(_p2m)                            \
-    (current->processor == (_p2m)->locker)
-
-
-#define nestedp2m_lock_init(_domain)                                  \
-    do {                                                              \
-        spin_lock_init(&(_domain)->arch.nested_p2m_lock);             \
-        (_domain)->arch.nested_p2m_locker = -1;                       \
-        (_domain)->arch.nested_p2m_function = "nobody";               \
-    } while (0)
-
-#define nestedp2m_locked_by_me(_domain)                \
-    (current->processor == (_domain)->arch.nested_p2m_locker)
-
-#define nestedp2m_lock(_domain)                                       \
-    do {                                                              \
-        if ( nestedp2m_locked_by_me(_domain) )                        \
-        {                                                             \
-            printk("Error: p2m lock held by %s\n",                    \
-                   (_domain)->arch.nested_p2m_function);              \
-            BUG();                                                    \
-        }                                                             \
-        spin_lock(&(_domain)->arch.nested_p2m_lock);                  \
-        ASSERT((_domain)->arch.nested_p2m_locker == -1);              \
-        (_domain)->arch.nested_p2m_locker = current->processor;       \
-        (_domain)->arch.nested_p2m_function = __func__;               \
-    } while (0)
-
-#define nestedp2m_unlock(_domain)                                      \
-    do {                                                               \
-        ASSERT(nestedp2m_locked_by_me(_domain));                       \
-        (_domain)->arch.nested_p2m_locker = -1;                        \
-        (_domain)->arch.nested_p2m_function = "nobody";                \
-        spin_unlock(&(_domain)->arch.nested_p2m_lock);                 \
-    } while (0)
 
 
 /* Read a particular P2M table, mapping pages as we go.  Most callers

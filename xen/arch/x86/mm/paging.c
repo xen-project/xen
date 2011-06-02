@@ -30,6 +30,8 @@
 #include <xen/numa.h>
 #include <xsm/xsm.h>
 
+#include "mm-locks.h"
+
 /* Printouts */
 #define PAGING_PRINTK(_f, _a...)                                     \
     debugtrace_printk("pg: %s(): " _f, __func__, ##_a)
@@ -41,9 +43,9 @@
             debugtrace_printk("pgdebug: %s(): " _f, __func__, ##_a); \
     } while (0)
 
-/************************************************/
-/*              LOG DIRTY SUPPORT               */
-/************************************************/
+/* Per-CPU variable for enforcing the lock ordering */
+DEFINE_PER_CPU(int, mm_lock_level);
+
 /* Override macros from asm/page.h to make them work with mfn_t */
 #undef mfn_to_page
 #define mfn_to_page(_m) __mfn_to_page(mfn_x(_m))
@@ -52,49 +54,9 @@
 #undef page_to_mfn
 #define page_to_mfn(_pg) _mfn(__page_to_mfn(_pg))
 
-/* The log-dirty lock.  This protects the log-dirty bitmap from
- * concurrent accesses (and teardowns, etc).
- *
- * Locking discipline: always acquire shadow or HAP lock before this one.
- *
- * Because mark_dirty is called from a lot of places, the log-dirty lock
- * may be acquired with the shadow or HAP locks already held.  When the
- * log-dirty code makes callbacks into HAP or shadow code to reset
- * various traps that will trigger the mark_dirty calls, it must *not*
- * have the log-dirty lock held, or it risks deadlock.  Because the only
- * purpose of those calls is to make sure that *guest* actions will
- * cause mark_dirty to be called (hypervisor actions explictly call it
- * anyway), it is safe to release the log-dirty lock before the callback
- * as long as the domain is paused for the entire operation. */
-
-#define log_dirty_lock_init(_d)                                   \
-    do {                                                          \
-        spin_lock_init(&(_d)->arch.paging.log_dirty.lock);        \
-        (_d)->arch.paging.log_dirty.locker = -1;                  \
-        (_d)->arch.paging.log_dirty.locker_function = "nobody";   \
-    } while (0)
-
-#define log_dirty_lock(_d)                                                   \
-    do {                                                                     \
-        if (unlikely((_d)->arch.paging.log_dirty.locker==current->processor))\
-        {                                                                    \
-            printk("Error: paging log dirty lock held by %s\n",              \
-                   (_d)->arch.paging.log_dirty.locker_function);             \
-            BUG();                                                           \
-        }                                                                    \
-        spin_lock(&(_d)->arch.paging.log_dirty.lock);                        \
-        ASSERT((_d)->arch.paging.log_dirty.locker == -1);                    \
-        (_d)->arch.paging.log_dirty.locker = current->processor;             \
-        (_d)->arch.paging.log_dirty.locker_function = __func__;              \
-    } while (0)
-
-#define log_dirty_unlock(_d)                                              \
-    do {                                                                  \
-        ASSERT((_d)->arch.paging.log_dirty.locker == current->processor); \
-        (_d)->arch.paging.log_dirty.locker = -1;                          \
-        (_d)->arch.paging.log_dirty.locker_function = "nobody";           \
-        spin_unlock(&(_d)->arch.paging.log_dirty.lock);                   \
-    } while (0)
+/************************************************/
+/*              LOG DIRTY SUPPORT               */
+/************************************************/
 
 static mfn_t paging_new_log_dirty_page(struct domain *d)
 {
@@ -671,7 +633,7 @@ void paging_log_dirty_init(struct domain *d,
                            void   (*clean_dirty_bitmap)(struct domain *d))
 {
     /* We initialize log dirty lock first */
-    log_dirty_lock_init(d);
+    mm_lock_init(&d->arch.paging.log_dirty.lock);
 
     d->arch.paging.log_dirty.enable_log_dirty = enable_log_dirty;
     d->arch.paging.log_dirty.disable_log_dirty = disable_log_dirty;

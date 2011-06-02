@@ -32,7 +32,8 @@
 #include <xen/event.h>
 #include <asm/hvm/nestedhvm.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
- 
+
+#include "mm-locks.h"
 
 /* Override macros from asm/page.h to make them work with mfn_t */
 #undef mfn_to_page
@@ -375,7 +376,7 @@ p2m_pod_empty_cache(struct domain *d)
 
     /* After this barrier no new PoD activities can happen. */
     BUG_ON(!d->is_dying);
-    spin_barrier(&p2m->lock);
+    spin_barrier(&p2m->lock.lock);
 
     spin_lock(&d->page_alloc_lock);
 

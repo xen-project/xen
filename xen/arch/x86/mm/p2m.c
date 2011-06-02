@@ -37,6 +37,8 @@
 #include <asm/hvm/nestedhvm.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
 
+#include "mm-locks.h"
+
 /* turn on/off 1GB host page table support for hap, default on */
 static bool_t __read_mostly opt_hap_1gb = 1;
 boolean_param("hap_1gb", opt_hap_1gb);
@@ -70,7 +72,7 @@ boolean_param("hap_2mb", opt_hap_2mb);
 static void p2m_initialise(struct domain *d, struct p2m_domain *p2m)
 {
     memset(p2m, 0, sizeof(*p2m));
-    p2m_lock_init(p2m);
+    mm_lock_init(&p2m->lock);
     INIT_PAGE_LIST_HEAD(&p2m->pages);
     INIT_PAGE_LIST_HEAD(&p2m->pod.super);
     INIT_PAGE_LIST_HEAD(&p2m->pod.single);
@@ -95,7 +97,7 @@ p2m_init_nestedp2m(struct domain *d)
     uint8_t i;
     struct p2m_domain *p2m;
 
-    nestedp2m_lock_init(d);
+    mm_lock_init(&d->arch.nested_p2m_lock);
     for (i = 0; i < MAX_NESTEDP2M; i++) {
         d->arch.nested_p2m[i] = p2m = xmalloc(struct p2m_domain);
         if (p2m == NULL)
