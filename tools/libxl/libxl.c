@@ -970,6 +970,13 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
         goto out_free;
     }
 
+    if (disk->script) {
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "External block scripts"
+                   " not yet supported, sorry");
+        rc = ERROR_INVAL;
+        goto out_free;
+    }
+
     devid = libxl__device_disk_dev_number(disk->vdev, NULL, NULL);
     if (devid==-1) {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Invalid or unsupported"

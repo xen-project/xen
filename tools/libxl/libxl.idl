@@ -279,6 +279,7 @@ libxl_device_disk = Struct("device_disk", [
     ("vdev", string),
     ("backend", libxl_disk_backend),
     ("format", libxl_disk_format),
+    ("script", string),
     ("unpluggable", integer),
     ("readwrite", integer),
     ("is_cdrom", integer),
