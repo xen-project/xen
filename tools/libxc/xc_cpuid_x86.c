@@ -25,9 +25,9 @@
 #include "xc_cpufeature.h"
 #include <xen/hvm/params.h>
 
-#define bitmaskof(idx)      (1u << ((idx) & 31))
-#define clear_bit(idx, dst) ((dst) &= ~(1u << ((idx) & 31)))
-#define set_bit(idx, dst)   ((dst) |= (1u << ((idx) & 31)))
+#define bitmaskof(idx)      (1u << (idx))
+#define clear_bit(idx, dst) ((dst) &= ~(1u << (idx)))
+#define set_bit(idx, dst)   ((dst) |= (1u << (idx)))
 
 #define DEF_MAX_BASE 0x0000000du
 #define DEF_MAX_INTELEXT  0x80000008u
