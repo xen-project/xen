@@ -140,6 +140,8 @@ int set_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     unsigned int order;
     int rc = 1;
 
+    ASSERT(p2m_locked_by_me(p2m));
+
     while ( todo )
     {
         if ( hap_enabled(d) )

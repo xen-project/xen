@@ -103,9 +103,12 @@ nestedhap_fix_p2m(struct p2m_domain *p2m, paddr_t L2_gpa, paddr_t L0_gpa,
     ASSERT(p2m);
     ASSERT(p2m->set_entry);
 
-    rv = p2m->set_entry(p2m, L2_gpa >> PAGE_SHIFT,
+    p2m_lock(p2m);
+    rv = set_p2m_entry(p2m, L2_gpa >> PAGE_SHIFT,
                          page_to_mfn(maddr_to_page(L0_gpa)),
                          0 /*4K*/, p2mt, p2ma);
+    p2m_unlock(p2m);
+
     if (rv == 0) {
         gdprintk(XENLOG_ERR,
 		"failed to set entry for 0x%"PRIx64" -> 0x%"PRIx64"\n",
