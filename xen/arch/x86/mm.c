@@ -4653,7 +4653,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
             p2m_type_t p2mt;
 
             xatp.idx = mfn_x(gfn_to_mfn_unshare(p2m_get_hostp2m(d),
-                                                xatp.idx, &p2mt, 0));
+                                                xatp.idx, &p2mt));
             /* If the page is still shared, exit early */
             if ( p2m_is_shared(p2mt) )
             {

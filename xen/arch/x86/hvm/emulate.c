@@ -63,7 +63,7 @@ static int hvmemul_do_io(
     int rc;
 
     /* Check for paged out page */
-    ram_mfn = gfn_to_mfn_unshare(p2m, ram_gfn, &p2mt, 0);
+    ram_mfn = gfn_to_mfn_unshare(p2m, ram_gfn, &p2mt);
     if ( p2m_is_paging(p2mt) )
     {
         p2m_mem_paging_populate(p2m, ram_gfn);

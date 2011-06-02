@@ -112,9 +112,10 @@ typedef enum {
 } p2m_access_t;
 
 typedef enum {
-    p2m_query = 0,              /* Do not populate a PoD entries      */
-    p2m_alloc = 1,              /* Automatically populate PoD entries */
-    p2m_guest = 2,              /* Guest demand-fault; implies alloc  */
+    p2m_query,              /* Do not populate a PoD entries      */
+    p2m_alloc,              /* Automatically populate PoD entries */
+    p2m_unshare,            /* Break c-o-w sharing; implies alloc */
+    p2m_guest,              /* Guest demand-fault; implies alloc  */
 } p2m_query_t;
 
 /* We use bitmaps and maks to handle groups of types */
@@ -367,6 +368,14 @@ gfn_to_mfn_type_p2m(struct p2m_domain *p2m, unsigned long gfn,
     mfn_t mfn = p2m->get_entry(p2m, gfn, t, a, q);
 
 #ifdef __x86_64__
+    if ( q == p2m_unshare && p2m_is_shared(*t) )
+    {
+        mem_sharing_unshare_page(p2m, gfn, 0);
+        mfn = p2m->get_entry(p2m, gfn, t, a, q);
+    }
+#endif
+
+#ifdef __x86_64__
     if (unlikely((p2m_is_broken(*t))))
     {
         /* Return invalid_mfn to avoid caller's access */
@@ -401,32 +410,7 @@ static inline mfn_t _gfn_to_mfn_type(struct p2m_domain *p2m,
 #define gfn_to_mfn(p2m, g, t) _gfn_to_mfn_type((p2m), (g), (t), p2m_alloc)
 #define gfn_to_mfn_query(p2m, g, t) _gfn_to_mfn_type((p2m), (g), (t), p2m_query)
 #define gfn_to_mfn_guest(p2m, g, t) _gfn_to_mfn_type((p2m), (g), (t), p2m_guest)
-
-static inline mfn_t gfn_to_mfn_unshare(struct p2m_domain *p2m,
-                                       unsigned long gfn,
-                                       p2m_type_t *p2mt,
-                                       int must_succeed)
-{
-    mfn_t mfn;
-
-    mfn = gfn_to_mfn(p2m, gfn, p2mt);
-#ifdef __x86_64__
-    if ( p2m_is_shared(*p2mt) )
-    {
-        if ( mem_sharing_unshare_page(p2m, gfn,
-                                      must_succeed 
-                                      ? MEM_SHARING_MUST_SUCCEED : 0) )
-        {
-            BUG_ON(must_succeed);
-            return mfn;
-        }
-        mfn = gfn_to_mfn(p2m, gfn, p2mt);
-    }
-#endif
-
-    return mfn;
-}
-
+#define gfn_to_mfn_unshare(p, g, t) _gfn_to_mfn_type((p), (g), (t), p2m_unshare)
 
 /* Compatibility function exporting the old untyped interface */
 static inline unsigned long gmfn_to_mfn(struct domain *d, unsigned long gpfn)

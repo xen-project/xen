@@ -34,7 +34,6 @@ int mem_sharing_nominate_page(struct p2m_domain *p2m,
                               unsigned long gfn,
                               int expected_refcnt,
                               shr_handle_t *phandle);
-#define MEM_SHARING_MUST_SUCCEED      (1<<0)
 #define MEM_SHARING_DESTROY_GFN       (1<<1)
 int mem_sharing_unshare_page(struct p2m_domain *p2m, 
                              unsigned long gfn, 

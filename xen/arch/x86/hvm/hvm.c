@@ -352,7 +352,7 @@ static int hvm_set_ioreq_page(
     unsigned long mfn;
     void *va;
 
-    mfn = mfn_x(gfn_to_mfn_unshare(p2m, gmfn, &p2mt, 0));
+    mfn = mfn_x(gfn_to_mfn_unshare(p2m, gmfn, &p2mt));
     if ( !p2m_is_ram(p2mt) )
         return -EINVAL;
     if ( p2m_is_paging(p2mt) )
@@ -1767,7 +1767,7 @@ static void *__hvm_map_guest_frame(unsigned long gfn, bool_t writable)
     struct p2m_domain *p2m = p2m_get_hostp2m(current->domain);
 
     mfn = mfn_x(writable
-                ? gfn_to_mfn_unshare(p2m, gfn, &p2mt, 0)
+                ? gfn_to_mfn_unshare(p2m, gfn, &p2mt)
                 : gfn_to_mfn(p2m, gfn, &p2mt));
     if ( (p2m_is_shared(p2mt) && writable) || !p2m_is_ram(p2mt) )
         return NULL;
@@ -2229,7 +2229,7 @@ static enum hvm_copy_result __hvm_copy(
             gfn = addr >> PAGE_SHIFT;
         }
 
-        mfn = mfn_x(gfn_to_mfn_unshare(p2m, gfn, &p2mt, 0));
+        mfn = mfn_x(gfn_to_mfn_unshare(p2m, gfn, &p2mt));
 
         if ( p2m_is_paging(p2mt) )
         {
@@ -3724,7 +3724,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         rc = -EINVAL;
         if ( is_hvm_domain(d) )
         {
-            gfn_to_mfn_unshare(p2m_get_hostp2m(d), a.pfn, &t, 0);
+            gfn_to_mfn_unshare(p2m_get_hostp2m(d), a.pfn, &t);
             if ( p2m_is_mmio(t) )
                 a.mem_type =  HVMMEM_mmio_dm;
             else if ( p2m_is_readonly(t) )
@@ -3779,7 +3779,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             p2m_type_t t;
             p2m_type_t nt;
             mfn_t mfn;
-            mfn = gfn_to_mfn_unshare(p2m, pfn, &t, 0);
+            mfn = gfn_to_mfn_unshare(p2m, pfn, &t);
             if ( p2m_is_paging(t) )
             {
                 p2m_mem_paging_populate(p2m, pfn);
@@ -3877,7 +3877,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             mfn_t mfn;
             int success;
 
-            mfn = gfn_to_mfn_unshare(p2m, pfn, &t, 0);
+            mfn = gfn_to_mfn_unshare(p2m, pfn, &t);
 
             p2m_lock(p2m);
             success = p2m->set_entry(p2m, pfn, mfn, 0, t, memaccess[a.hvmmem_access]);

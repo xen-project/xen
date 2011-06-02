@@ -294,8 +294,7 @@ static void mem_sharing_audit(void)
 
 
 static struct page_info* mem_sharing_alloc_page(struct domain *d, 
-                                                unsigned long gfn,
-                                                int must_succeed)
+                                                unsigned long gfn)
 {
     struct page_info* page;
     struct vcpu *v = current;
@@ -307,21 +306,20 @@ static struct page_info* mem_sharing_alloc_page(struct domain *d,
     memset(&req, 0, sizeof(req));
     req.type = MEM_EVENT_TYPE_SHARED;
 
-    if(must_succeed) 
+    if ( v->domain != d )
     {
-        /* We do not support 'must_succeed' any more. External operations such
-         * as grant table mappings may fail with OOM condition! 
-         */
-        BUG();
+        /* XXX This path needs some attention.  For now, just fail foreign 
+         * XXX requests to unshare if there's no memory.  This replaces 
+         * XXX old code that BUG()ed here; the callers now BUG()
+         * XXX elewhere. */
+        gdprintk(XENLOG_ERR, 
+                 "Failed alloc on unshare path for foreign (%d) lookup\n",
+                 d->domain_id);
+        return page;
     }
-    else
-    {
-        /* All foreign attempts to unshare pages should be handled through
-         * 'must_succeed' case. */
-        ASSERT(v->domain->domain_id == d->domain_id);
-        vcpu_pause_nosync(v);
-        req.flags |= MEM_EVENT_FLAG_VCPU_PAUSED;
-    }
+
+    vcpu_pause_nosync(v);
+    req.flags |= MEM_EVENT_FLAG_VCPU_PAUSED;
 
     /* XXX: Need to reserve a request, not just check the ring! */
     if(mem_event_check_ring(d)) return page;
@@ -692,8 +690,7 @@ gfn_found:
     if(ret == 0) goto private_page_found;
         
     old_page = page;
-    page = mem_sharing_alloc_page(d, gfn, flags & MEM_SHARING_MUST_SUCCEED);
-    BUG_ON(!page && (flags & MEM_SHARING_MUST_SUCCEED));
+    page = mem_sharing_alloc_page(d, gfn);
     if(!page) 
     {
         /* We've failed to obtain memory for private page. Need to re-add the

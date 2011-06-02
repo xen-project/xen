@@ -363,7 +363,7 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
                 p2m_type_t p2mt;
 
                 /* Shared pages cannot be exchanged */
-                mfn = mfn_x(gfn_to_mfn_unshare(p2m_get_hostp2m(d), gmfn + k, &p2mt, 0));
+                mfn = mfn_x(gfn_to_mfn_unshare(p2m_get_hostp2m(d), gmfn + k, &p2mt));
                 if ( p2m_is_shared(p2mt) )
                 {
                     rc = -ENOMEM;

@@ -93,7 +93,7 @@ static inline void *map_domain_gfn(struct p2m_domain *p2m,
                                    uint32_t *rc) 
 {
     /* Translate the gfn, unsharing if shared */
-    *mfn = gfn_to_mfn_unshare(p2m, gfn_x(gfn), p2mt, 0);
+    *mfn = gfn_to_mfn_unshare(p2m, gfn_x(gfn), p2mt);
     if ( p2m_is_paging(*p2mt) )
     {
         p2m_mem_paging_populate(p2m, gfn_x(gfn));

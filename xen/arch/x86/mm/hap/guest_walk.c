@@ -57,7 +57,7 @@ unsigned long hap_p2m_ga_to_gfn(GUEST_PAGING_LEVELS)(
     walk_t gw;
 
     /* Get the top-level table's MFN */
-    top_mfn = gfn_to_mfn_unshare(p2m, cr3 >> PAGE_SHIFT, &p2mt, 0);
+    top_mfn = gfn_to_mfn_unshare(p2m, cr3 >> PAGE_SHIFT, &p2mt);
     if ( p2m_is_paging(p2mt) )
     {
         p2m_mem_paging_populate(p2m, cr3 >> PAGE_SHIFT);
@@ -89,7 +89,7 @@ unsigned long hap_p2m_ga_to_gfn(GUEST_PAGING_LEVELS)(
     if ( missing == 0 )
     {
         gfn_t gfn = guest_l1e_get_gfn(gw.l1e);
-        gfn_to_mfn_unshare(p2m, gfn_x(gfn), &p2mt, 0);
+        gfn_to_mfn_unshare(p2m, gfn_x(gfn), &p2mt);
         if ( p2m_is_paging(p2mt) )
         {
             p2m_mem_paging_populate(p2m, gfn_x(gfn));
