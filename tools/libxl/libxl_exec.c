@@ -45,7 +45,7 @@ static void check_open_fds(const char *what)
     env_debug = getenv("_LIBXL_DEBUG_EXEC_FDS");
     if (!env_debug) return;
 
-    debug = strtol(env_debug, (char **) NULL, 10);atoi(env_debug);
+    debug = strtol(env_debug, (char **) NULL, 10);
     if (debug <= 0) return;
 
     for (i = 4; i < 256; i++) {
