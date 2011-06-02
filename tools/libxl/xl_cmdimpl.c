@@ -393,7 +393,7 @@ static void printf_info(int domid,
         printf("\t\t\t(physpath %s)\n", d_config->disks[i].pdev_path);
         printf("\t\t\t(phystype %d)\n", d_config->disks[i].backend);
         printf("\t\t\t(virtpath %s)\n", d_config->disks[i].vdev);
-        printf("\t\t\t(unpluggable %d)\n", d_config->disks[i].unpluggable);
+        printf("\t\t\t(unpluggable %d)\n", d_config->disks[i].removable);
         printf("\t\t\t(readwrite %d)\n", d_config->disks[i].readwrite);
         printf("\t\t\t(is_cdrom %d)\n", d_config->disks[i].is_cdrom);
         printf("\t\t)\n");
@@ -591,7 +591,7 @@ static int parse_disk_config(libxl_device_disk *disk, char *buf2)
                 *p = '\0';
                 if ( !strcmp(tok, "cdrom") ) {
                     disk->is_cdrom = 1;
-                    disk->unpluggable = 1;
+                    disk->removable = 1;
                 }else{
                     fprintf(stderr, "Unknown virtual disk type: %s\n", tok);
                     return 0;
@@ -4181,7 +4181,7 @@ int main_blockattach(int argc, char **argv)
         return 1;
     }
     disk.vdev = argv[optind+2];
-    disk.unpluggable = 1;
+    disk.removable = 1;
     disk.readwrite = ((argc-optind <= 3) || (argv[optind+3][0] == 'w'));
 
     if (domain_qualifier_to_domid(argv[optind], &fe_domid, 0) < 0) {

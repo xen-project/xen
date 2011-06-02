@@ -707,7 +707,7 @@ int libxl_event_get_disk_eject_info(libxl_ctx *ctx, uint32_t domid, libxl_event 
     disk->format = LIBXL_DISK_FORMAT_EMPTY;
     /* this value is returned to the user: do not free right away */
     disk->vdev = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(&gc, "%s/dev", backend), NULL);
-    disk->unpluggable = 1;
+    disk->removable = 1;
     disk->readwrite = 0;
     disk->is_cdrom = 1;
 
@@ -1047,7 +1047,7 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
     flexarray_append(back, "online");
     flexarray_append(back, "1");
     flexarray_append(back, "removable");
-    flexarray_append(back, libxl__sprintf(&gc, "%d", (disk->unpluggable) ? 1 : 0));
+    flexarray_append(back, libxl__sprintf(&gc, "%d", (disk->removable) ? 1 : 0));
     flexarray_append(back, "bootable");
     flexarray_append(back, libxl__sprintf(&gc, "%d", 1));
     flexarray_append(back, "state");
@@ -1590,7 +1590,7 @@ static unsigned int libxl__append_disk_list_of_type(libxl__gc *gc,
                 libxl__sprintf(gc, "%s/%s/type", be_path, *dir)), 
                 &(pdisk->backend));
             pdisk->vdev = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(gc, "%s/%s/dev", be_path, *dir), &len);
-            pdisk->unpluggable = atoi(libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/%s/removable", be_path, *dir)));
+            pdisk->removable = atoi(libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/%s/removable", be_path, *dir)));
             if (!strcmp(libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/%s/mode", be_path, *dir)), "w"))
                 pdisk->readwrite = 1;
             else

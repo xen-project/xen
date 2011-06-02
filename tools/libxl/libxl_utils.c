@@ -556,7 +556,7 @@ int libxl_devid_to_device_disk(libxl_ctx *ctx, uint32_t domid,
     libxl_string_to_backend(ctx, val, &(disk->backend));
     disk->vdev = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/dev", be_path));
     val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/removable", be_path));
-    disk->unpluggable = !strcmp(val, "1");
+    disk->removable = !strcmp(val, "1");
     val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/mode", be_path));
     disk->readwrite = !!strcmp(val, "w");
     val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/device-type", diskpath));
