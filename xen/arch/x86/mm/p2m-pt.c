@@ -51,9 +51,6 @@
 #define P2M_BASE_FLAGS \
         (_PAGE_PRESENT | _PAGE_USER | _PAGE_DIRTY | _PAGE_ACCESSED)
 
-#define SUPERPAGE_PAGES (1UL << 9)
-#define superpage_aligned(_x)  (((_x)&(SUPERPAGE_PAGES-1))==0)
-
 static unsigned long p2m_type_to_flags(p2m_type_t t, mfn_t mfn)
 {
     unsigned long flags;
@@ -67,32 +64,31 @@ static unsigned long p2m_type_to_flags(p2m_type_t t, mfn_t mfn)
 #else
     flags = (t & 0x7UL) << 9;
 #endif
-#ifndef HAVE_GRANT_MAP_P2M
-    BUG_ON(p2m_is_grant(t));
+
+#ifndef __x86_64__
+    /* 32-bit builds don't support a lot of the p2m types */
+    BUG_ON(t > p2m_populate_on_demand);
 #endif
+
     switch(t)
     {
     case p2m_invalid:
+    case p2m_mmio_dm:
+    case p2m_populate_on_demand:
     default:
         return flags;
+    case p2m_ram_ro:
+    case p2m_grant_map_ro:
+    case p2m_ram_logdirty:
+    case p2m_ram_shared:
+        return flags | P2M_BASE_FLAGS;
     case p2m_ram_rw:
     case p2m_grant_map_rw:
         return flags | P2M_BASE_FLAGS | _PAGE_RW;
-    case p2m_ram_logdirty:
-        return flags | P2M_BASE_FLAGS;
-    case p2m_ram_ro:
-    case p2m_grant_map_ro:
-        return flags | P2M_BASE_FLAGS;
-    case p2m_ram_shared:
-        return flags | P2M_BASE_FLAGS;
-    case p2m_mmio_dm:
-        return flags;
     case p2m_mmio_direct:
         if ( !rangeset_contains_singleton(mmio_ro_ranges, mfn_x(mfn)) )
             flags |= _PAGE_RW;
         return flags | P2M_BASE_FLAGS | _PAGE_PCD;
-    case p2m_populate_on_demand:
-        return flags;
     }
 }
 

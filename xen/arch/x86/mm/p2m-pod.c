@@ -42,7 +42,6 @@
 #undef page_to_mfn
 #define page_to_mfn(_pg) _mfn(__page_to_mfn(_pg))
 
-#define SUPERPAGE_PAGES (1UL << 9)
 #define superpage_aligned(_x)  (((_x)&(SUPERPAGE_PAGES-1))==0)
 
 /*
@@ -688,8 +687,7 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
     }
 
     /* Try to remove the page, restoring old mapping if it fails. */
-    set_p2m_entry(p2m, gfn,
-                  _mfn(POPULATE_ON_DEMAND_MFN), 9,
+    set_p2m_entry(p2m, gfn, _mfn(0), 9,
                   p2m_populate_on_demand, p2m->default_access);
 
     /* Make none of the MFNs are used elsewhere... for example, mapped
@@ -801,8 +799,7 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
         }
 
         /* Try to remove the page, restoring old mapping if it fails. */
-        set_p2m_entry(p2m, gfns[i],
-                      _mfn(POPULATE_ON_DEMAND_MFN), 0,
+        set_p2m_entry(p2m, gfns[i], _mfn(0), 0,
                       p2m_populate_on_demand, p2m->default_access);
 
         /* See if the page was successfully unmapped.  (Allow one refcount
@@ -966,7 +963,7 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
          * set_p2m_entry() should automatically shatter the 1GB page into 
          * 512 2MB pages. The rest of 511 calls are unnecessary.
          */
-        set_p2m_entry(p2m, gfn_aligned, _mfn(POPULATE_ON_DEMAND_MFN), 9,
+        set_p2m_entry(p2m, gfn_aligned, _mfn(0), 9,
                       p2m_populate_on_demand, p2m->default_access);
         audit_p2m(p2m, 1);
         p2m_unlock(p2m);
@@ -1054,7 +1051,7 @@ remap_and_retry:
     /* Remap this 2-meg region in singleton chunks */
     gfn_aligned = (gfn>>order)<<order;
     for(i=0; i<(1<<order); i++)
-        set_p2m_entry(p2m, gfn_aligned+i, _mfn(POPULATE_ON_DEMAND_MFN), 0,
+        set_p2m_entry(p2m, gfn_aligned+i, _mfn(0), 0,
                       p2m_populate_on_demand, p2m->default_access);
     if ( tb_init_done )
     {
@@ -1114,7 +1111,7 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
     }
 
     /* Now, actually do the two-way mapping */
-    if ( !set_p2m_entry(p2m, gfn, _mfn(POPULATE_ON_DEMAND_MFN), order,
+    if ( !set_p2m_entry(p2m, gfn, _mfn(0), order,
                         p2m_populate_on_demand, p2m->default_access) )
         rc = -EINVAL;
     else

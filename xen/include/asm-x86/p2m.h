@@ -47,10 +47,6 @@
  */
 #define phys_to_machine_mapping ((l1_pgentry_t *)RO_MPT_VIRT_START)
 
-#ifdef __x86_64__
-#define HAVE_GRANT_MAP_P2M
-#endif
-
 /*
  * The upper levels of the p2m pagetable always contain full rights; all 
  * variation in the access control bits is made in the level-1 PTEs.
@@ -78,20 +74,16 @@ typedef enum {
     p2m_mmio_direct = 5,        /* Read/write mapping of genuine MMIO area */
     p2m_populate_on_demand = 6, /* Place-holder for empty memory */
 
-    /* Note that these can only be used if HAVE_GRANT_MAP_P2M is
-       defined.  They get defined anyway so as to avoid lots of
-       #ifdef's everywhere else. */
-    p2m_grant_map_rw = 7,       /* Read/write grant mapping */
-    p2m_grant_map_ro = 8,       /* Read-only grant mapping */
-
-    /* Likewise, although these are defined in all builds, they can only
+    /* Although these are defined in all builds, they can only
      * be used in 64-bit builds */
+    p2m_grant_map_rw = 7,         /* Read/write grant mapping */
+    p2m_grant_map_ro = 8,         /* Read-only grant mapping */
     p2m_ram_paging_out = 9,       /* Memory that is being paged out */
     p2m_ram_paged = 10,           /* Memory that has been paged out */
     p2m_ram_paging_in = 11,       /* Memory that is being paged in */
     p2m_ram_paging_in_start = 12, /* Memory that is being paged in */
     p2m_ram_shared = 13,          /* Shared or sharable memory */
-    p2m_ram_broken  =14,          /* Broken page, access cause domain crash */
+    p2m_ram_broken = 14,          /* Broken page, access cause domain crash */
 } p2m_type_t;
 
 /*
@@ -170,6 +162,9 @@ typedef enum {
  * reinit the type correctly after fault */
 #define P2M_SHARABLE_TYPES (p2m_to_mask(p2m_ram_rw))
 #define P2M_SHARED_TYPES   (p2m_to_mask(p2m_ram_shared))
+
+/* Broken type: the frame backing this pfn has failed in hardware
+ * and must not be touched. */
 #define P2M_BROKEN_TYPES (p2m_to_mask(p2m_ram_broken))
 
 /* Useful predicates */
@@ -190,12 +185,7 @@ typedef enum {
 #define p2m_is_shared(_t)   (p2m_to_mask(_t) & P2M_SHARED_TYPES)
 #define p2m_is_broken(_t)   (p2m_to_mask(_t) & P2M_BROKEN_TYPES)
 
-/* Populate-on-demand */
-#define POPULATE_ON_DEMAND_MFN  (1<<9)
-#define POD_PAGE_ORDER 9
-
-#define PAGING_MFN  INVALID_MFN
-
+/* Per-p2m-table state */
 struct p2m_domain {
     /* Lock that protects updates to the p2m */
     spinlock_t         lock;
@@ -298,10 +288,6 @@ struct p2m_domain *p2m_get_p2m(struct vcpu *v);
 
 #define p2m_get_pagetable(p2m)  ((p2m)->phys_table)
 
-/* Flushes specified p2m table */
-void p2m_flush(struct vcpu *v, struct p2m_domain *p2m);
-/* Flushes all nested p2m tables */
-void p2m_flush_nestedp2m(struct domain *d);
 
 /*
  * The P2M lock.  This protects all updates to the p2m table.
@@ -375,23 +361,6 @@ void p2m_flush_nestedp2m(struct domain *d);
         (_domain)->arch.nested_p2m_function = "nobody";                \
         spin_unlock(&(_domain)->arch.nested_p2m_lock);                 \
     } while (0)
-
-/* Extract the type from the PTE flags that store it */
-static inline p2m_type_t p2m_flags_to_type(unsigned long flags)
-{
-    /* Type is stored in the "available" bits */
-#ifdef __x86_64__
-    /* For AMD IOMMUs we need to use type 0 for plain RAM, but we need
-     * to make sure that an entirely empty PTE doesn't have RAM type */
-    if ( flags == 0 ) 
-        return p2m_invalid;
-    /* AMD IOMMUs use bits 9-11 to encode next io page level and bits
-     * 59-62 for iommu flags so we can't use them to store p2m type info. */
-    return (flags >> 12) & 0x7f;
-#else
-    return (flags >> 9) & 0x7;
-#endif
-}
 
 /* Read the current domain's p2m table.  Do not populate PoD pages. */
 static inline mfn_t gfn_to_mfn_type_current(struct p2m_domain *p2m,
@@ -508,6 +477,52 @@ int p2m_alloc_table(struct p2m_domain *p2m);
 void p2m_teardown(struct p2m_domain *p2m);
 void p2m_final_teardown(struct domain *d);
 
+/* Add a page to a domain's p2m table */
+int guest_physmap_add_entry(struct p2m_domain *p2m, unsigned long gfn,
+                            unsigned long mfn, unsigned int page_order, 
+                            p2m_type_t t);
+
+/* Remove a page from a domain's p2m table */
+void guest_physmap_remove_entry(struct p2m_domain *p2m, unsigned long gfn,
+                            unsigned long mfn, unsigned int page_order);
+
+/* Set a p2m range as populate-on-demand */
+int guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
+                                          unsigned int order);
+
+/* Untyped version for RAM only, for compatibility */
+static inline int guest_physmap_add_page(struct domain *d,
+                                         unsigned long gfn,
+                                         unsigned long mfn,
+                                         unsigned int page_order)
+{
+    return guest_physmap_add_entry(d->arch.p2m, gfn, mfn, page_order, p2m_ram_rw);
+}
+
+/* Remove a page from a domain's p2m table */
+static inline void guest_physmap_remove_page(struct domain *d,
+                               unsigned long gfn,
+                               unsigned long mfn, unsigned int page_order)
+{
+    guest_physmap_remove_entry(d->arch.p2m, gfn, mfn, page_order);
+}
+
+/* Change types across all p2m entries in a domain */
+void p2m_change_entry_type_global(struct p2m_domain *p2m, p2m_type_t ot, p2m_type_t nt);
+
+/* Compare-exchange the type of a single p2m entry */
+p2m_type_t p2m_change_type(struct p2m_domain *p2m, unsigned long gfn,
+                           p2m_type_t ot, p2m_type_t nt);
+
+/* Set mmio addresses in the p2m table (for pass-through) */
+int set_mmio_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn);
+int clear_mmio_p2m_entry(struct p2m_domain *p2m, unsigned long gfn);
+
+
+/* 
+ * Populate-on-demand
+ */
+
 /* Dump PoD information about the domain */
 void p2m_pod_dump_data(struct p2m_domain *p2m);
 
@@ -540,52 +555,9 @@ p2m_pod_offline_or_broken_hit(struct page_info *p);
 void
 p2m_pod_offline_or_broken_replace(struct page_info *p);
 
-/* Add a page to a domain's p2m table */
-int guest_physmap_add_entry(struct p2m_domain *p2m, unsigned long gfn,
-                            unsigned long mfn, unsigned int page_order, 
-                            p2m_type_t t);
-
-/* Remove a page from a domain's p2m table */
-void guest_physmap_remove_entry(struct p2m_domain *p2m, unsigned long gfn,
-                            unsigned long mfn, unsigned int page_order);
-
-/* Set a p2m range as populate-on-demand */
-int guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
-                                          unsigned int order);
-
-/* Untyped version for RAM only, for compatibility 
- *
- * Return 0 for success
+/*
+ * Paging to disk and page-sharing
  */
-static inline int guest_physmap_add_page(struct domain *d,
-                                         unsigned long gfn,
-                                         unsigned long mfn,
-                                         unsigned int page_order)
-{
-    return guest_physmap_add_entry(d->arch.p2m, gfn, mfn, page_order, p2m_ram_rw);
-}
-
-/* Remove a page from a domain's p2m table */
-static inline void guest_physmap_remove_page(struct domain *d,
-                               unsigned long gfn,
-                               unsigned long mfn, unsigned int page_order)
-{
-    guest_physmap_remove_entry(d->arch.p2m, gfn, mfn, page_order);
-}
-
-/* Change types across all p2m entries in a domain */
-void p2m_change_entry_type_global(struct p2m_domain *p2m, p2m_type_t ot, p2m_type_t nt);
-
-/* Compare-exchange the type of a single p2m entry */
-p2m_type_t p2m_change_type(struct p2m_domain *p2m, unsigned long gfn,
-                           p2m_type_t ot, p2m_type_t nt);
-
-/* Set mmio addresses in the p2m table (for pass-through) */
-int set_mmio_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn);
-int clear_mmio_p2m_entry(struct p2m_domain *p2m, unsigned long gfn);
-
-void nestedp2m_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
-    l1_pgentry_t *p, mfn_t table_mfn, l1_pgentry_t new, unsigned int level);
 
 #ifdef __x86_64__
 /* Modify p2m table for shared gfn */
@@ -679,6 +651,40 @@ extern void audit_p2m(struct p2m_domain *p2m, int strict_m2p);
 #else
 #define P2M_DEBUG(_f, _a...) do { (void)(_f); } while(0)
 #endif
+
+
+/*
+ * Functions specific to the p2m-pt implementation
+ */
+
+/* Extract the type from the PTE flags that store it */
+static inline p2m_type_t p2m_flags_to_type(unsigned long flags)
+{
+    /* Type is stored in the "available" bits */
+#ifdef __x86_64__
+    /* For AMD IOMMUs we need to use type 0 for plain RAM, but we need
+     * to make sure that an entirely empty PTE doesn't have RAM type */
+    if ( flags == 0 ) 
+        return p2m_invalid;
+    /* AMD IOMMUs use bits 9-11 to encode next io page level and bits
+     * 59-62 for iommu flags so we can't use them to store p2m type info. */
+    return (flags >> 12) & 0x7f;
+#else
+    return (flags >> 9) & 0x7;
+#endif
+}
+
+/*
+ * Nested p2m: shadow p2m tables used for nexted HVM virtualization 
+ */
+
+/* Flushes specified p2m table */
+void p2m_flush(struct vcpu *v, struct p2m_domain *p2m);
+/* Flushes all nested p2m tables */
+void p2m_flush_nestedp2m(struct domain *d);
+
+void nestedp2m_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
+    l1_pgentry_t *p, mfn_t table_mfn, l1_pgentry_t new, unsigned int level);
 
 #endif /* _XEN_P2M_H */
 

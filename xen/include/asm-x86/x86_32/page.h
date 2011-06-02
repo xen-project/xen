@@ -15,6 +15,7 @@
 #define L3_PAGETABLE_ENTRIES    4
 #define ROOT_PAGETABLE_ENTRIES  L3_PAGETABLE_ENTRIES
 #define SUPERPAGE_ORDER         PAGETABLE_ORDER
+#define SUPERPAGE_PAGES         (1<<SUPERPAGE_ORDER)
 
 /*
  * Architecturally, physical addresses may be up to 52 bits. However, the

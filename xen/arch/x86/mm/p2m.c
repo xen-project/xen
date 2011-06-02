@@ -243,31 +243,30 @@ int p2m_alloc_table(struct p2m_domain *p2m)
                         p2m_invalid, p2m->default_access) )
         goto error;
 
-    if (p2m_is_nestedp2m(p2m))
-        goto nesteddone;
-
-    /* Copy all existing mappings from the page list and m2p */
-    spin_lock(&p2m->domain->page_alloc_lock);
-    page_list_for_each(page, &p2m->domain->page_list)
+    if ( !p2m_is_nestedp2m(p2m) )
     {
-        mfn = page_to_mfn(page);
-        gfn = get_gpfn_from_mfn(mfn_x(mfn));
-        /* Pages should not be shared that early */
-        ASSERT(gfn != SHARED_M2P_ENTRY);
-        page_count++;
-        if (
+        /* Copy all existing mappings from the page list and m2p */
+        spin_lock(&p2m->domain->page_alloc_lock);
+        page_list_for_each(page, &p2m->domain->page_list)
+        {
+            mfn = page_to_mfn(page);
+            gfn = get_gpfn_from_mfn(mfn_x(mfn));
+            /* Pages should not be shared that early */
+            ASSERT(gfn != SHARED_M2P_ENTRY);
+            page_count++;
+            if (
 #ifdef __x86_64__
-            (gfn != 0x5555555555555555L)
+                (gfn != 0x5555555555555555L)
 #else
-            (gfn != 0x55555555L)
+                (gfn != 0x55555555L)
 #endif
-             && gfn != INVALID_M2P_ENTRY
-            && !set_p2m_entry(p2m, gfn, mfn, 0, p2m_ram_rw, p2m->default_access) )
-            goto error_unlock;
+                && gfn != INVALID_M2P_ENTRY
+                && !set_p2m_entry(p2m, gfn, mfn, 0, p2m_ram_rw, p2m->default_access) )
+                goto error_unlock;
+        }
+        spin_unlock(&p2m->domain->page_alloc_lock);
     }
-    spin_unlock(&p2m->domain->page_alloc_lock);
 
- nesteddone:
     P2M_PRINTK("p2m table initialised (%u pages)\n", page_count);
     p2m_unlock(p2m);
     return 0;
@@ -693,7 +692,8 @@ int p2m_mem_paging_evict(struct p2m_domain *p2m, unsigned long gfn)
 
     /* Remove mapping from p2m table */
     p2m_lock(p2m);
-    set_p2m_entry(p2m, gfn, _mfn(PAGING_MFN), 0, p2m_ram_paged, p2m->default_access);
+    set_p2m_entry(p2m, gfn, _mfn(INVALID_MFN), 0, 
+                  p2m_ram_paged, p2m->default_access);
     audit_p2m(p2m, 1);
     p2m_unlock(p2m);
 
@@ -743,7 +743,8 @@ void p2m_mem_paging_populate(struct p2m_domain *p2m, unsigned long gfn)
     if ( p2mt == p2m_ram_paged )
     {
         p2m_lock(p2m);
-        set_p2m_entry(p2m, gfn, _mfn(PAGING_MFN), 0, p2m_ram_paging_in_start, p2m->default_access);
+        set_p2m_entry(p2m, gfn, _mfn(INVALID_MFN), 0, 
+                      p2m_ram_paging_in_start, p2m->default_access);
         audit_p2m(p2m, 1);
         p2m_unlock(p2m);
     }
