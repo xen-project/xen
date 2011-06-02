@@ -479,7 +479,23 @@ static yyconst flex_int32_t yy_rule_can_match_eol[17] =
 #define YY_RESTORE_YY_MORE_OFFSET
 #line 1 "libxlu_cfg_l.l"
 /* -*- fundamental -*- */
-#line 4 "libxlu_cfg_l.l"
+/*
+ * libxlu_cfg_l.l - xl configuration file parsing: lexer
+ *
+ * Copyright (C) 2010      Citrix Ltd.
+ * Author Ian Jackson <ian.jackson@eu.citrix.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation; version 2.1 only. with the special
+ * exception on linking described in file LICENSE.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ */
+#line 20 "libxlu_cfg_l.l"
 #include "libxlu_cfg_i.h"
 
 #define ctx ((CfgParseContext*)yyextra)
@@ -498,7 +514,7 @@ int xlu__cfg_yyget_column(yyscan_t yyscanner);
 void xlu__cfg_yyset_column(int  column_no, yyscan_t yyscanner);
 
 
-#line 502 "libxlu_cfg_l.c"
+#line 518 "libxlu_cfg_l.c"
 
 #define INITIAL 0
 #define lexerr 1
@@ -743,10 +759,10 @@ YY_DECL
 	register int yy_act;
     struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
 
-#line 37 "libxlu_cfg_l.l"
+#line 53 "libxlu_cfg_l.l"
 
 
-#line 750 "libxlu_cfg_l.c"
+#line 766 "libxlu_cfg_l.c"
 
     yylval = yylval_param;
 
@@ -849,7 +865,7 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 39 "libxlu_cfg_l.l"
+#line 55 "libxlu_cfg_l.l"
 {
                           yylval->string= xlu__cfgl_strdup(ctx,yytext);
                           GOT(IDENT);
@@ -857,7 +873,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 43 "libxlu_cfg_l.l"
+#line 59 "libxlu_cfg_l.l"
 {
                           yylval->string= xlu__cfgl_strdup(ctx,yytext);
                           GOT(NUMBER);
@@ -865,43 +881,43 @@ YY_RULE_SETUP
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 48 "libxlu_cfg_l.l"
+#line 64 "libxlu_cfg_l.l"
 
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 50 "libxlu_cfg_l.l"
+#line 66 "libxlu_cfg_l.l"
 { GOT(','); }
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 51 "libxlu_cfg_l.l"
+#line 67 "libxlu_cfg_l.l"
 { GOT('['); }
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 52 "libxlu_cfg_l.l"
+#line 68 "libxlu_cfg_l.l"
 { GOT(']'); }
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 53 "libxlu_cfg_l.l"
+#line 69 "libxlu_cfg_l.l"
 { GOT('='); }
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 54 "libxlu_cfg_l.l"
+#line 70 "libxlu_cfg_l.l"
 { GOT(';'); }
 	YY_BREAK
 case 9:
 /* rule 9 can match eol */
 YY_RULE_SETUP
-#line 56 "libxlu_cfg_l.l"
+#line 72 "libxlu_cfg_l.l"
 { yylloc->first_line= yylineno-1; return NEWLINE; }
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 58 "libxlu_cfg_l.l"
+#line 74 "libxlu_cfg_l.l"
 {
                           yylval->string= xlu__cfgl_dequote(ctx,yytext);
                           GOT(STRING);
@@ -909,7 +925,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 62 "libxlu_cfg_l.l"
+#line 78 "libxlu_cfg_l.l"
 {
                           yylval->string= xlu__cfgl_dequote(ctx,yytext);
                           GOT(STRING);
@@ -917,7 +933,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 67 "libxlu_cfg_l.l"
+#line 83 "libxlu_cfg_l.l"
 {
                           ctx->likely_python= 1;
                           BEGIN(lexerr);
@@ -926,7 +942,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 73 "libxlu_cfg_l.l"
+#line 89 "libxlu_cfg_l.l"
 {
                           BEGIN(lexerr);
                           yymore();
@@ -934,7 +950,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 78 "libxlu_cfg_l.l"
+#line 94 "libxlu_cfg_l.l"
 {
                           xlu__cfgl_lexicalerror(ctx,"lexical error");
                           BEGIN(0);
@@ -943,7 +959,7 @@ YY_RULE_SETUP
 case 15:
 /* rule 15 can match eol */
 YY_RULE_SETUP
-#line 83 "libxlu_cfg_l.l"
+#line 99 "libxlu_cfg_l.l"
 {
                           xlu__cfgl_lexicalerror(ctx,"lexical error");
                           BEGIN(0);
@@ -952,10 +968,10 @@ YY_RULE_SETUP
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 88 "libxlu_cfg_l.l"
+#line 104 "libxlu_cfg_l.l"
 YY_FATAL_ERROR( "flex scanner jammed" );
 	YY_BREAK
-#line 959 "libxlu_cfg_l.c"
+#line 975 "libxlu_cfg_l.c"
 case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(lexerr):
 	yyterminate();
@@ -2105,4 +2121,4 @@ void xlu__cfg_yyfree (void * ptr , yyscan_t yyscanner)
 
 #define YYTABLES_NAME "yytables"
 
-#line 88 "libxlu_cfg_l.l"
+#line 104 "libxlu_cfg_l.l"
