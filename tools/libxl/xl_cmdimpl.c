@@ -1516,10 +1516,6 @@ static int create_domain(struct domain_create *dom_info)
 
     parse_config_data(config_file, config_data, config_len, &d_config, &d_config.dm_info);
 
-    ret = 0;
-    if (dom_info->dryrun)
-        goto out;
-
     if (migrate_fd >= 0) {
         if (d_config.c_info.name) {
             /* when we receive a domain we get its name from the config
@@ -1538,8 +1534,12 @@ static int create_domain(struct domain_create *dom_info)
         }
     }
 
-    if (debug)
+    if (debug || dom_info->dryrun)
         printf_info(-1, &d_config, &d_config.dm_info);
+
+    ret = 0;
+    if (dom_info->dryrun)
+        goto out;
 
 start:
     domid = -1;
