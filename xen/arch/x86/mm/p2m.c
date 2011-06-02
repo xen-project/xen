@@ -566,7 +566,7 @@ set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
     if ( 0 == rc )
         gdprintk(XENLOG_ERR,
             "set_mmio_p2m_entry: set_p2m_entry failed! mfn=%08lx\n",
-            mfn_x(gfn_to_mfn(d, gfn, &ot)));
+            mfn_x(gfn_to_mfn_query(d, gfn, &ot)));
     return rc;
 }
 
@@ -623,8 +623,8 @@ set_shared_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
     p2m_unlock(p2m);
     if ( 0 == rc )
         gdprintk(XENLOG_ERR,
-            "set_mmio_p2m_entry: set_p2m_entry failed! mfn=%08lx\n",
-            gmfn_to_mfn(p2m->domain, gfn));
+            "set_shared_p2m_entry: set_p2m_entry failed! mfn=%08lx\n",
+            mfn_x(gfn_to_mfn_query(d, gfn, &ot)));
     return rc;
 }
 
