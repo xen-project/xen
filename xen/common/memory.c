@@ -162,11 +162,11 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
     unsigned long mfn;
 
 #ifdef CONFIG_X86
-    mfn = mfn_x(gfn_to_mfn(p2m_get_hostp2m(d), gmfn, &p2mt)); 
+    mfn = mfn_x(gfn_to_mfn(d, gmfn, &p2mt)); 
     if ( unlikely(p2m_is_paging(p2mt)) )
     {
         guest_physmap_remove_page(d, gmfn, mfn, 0);
-        p2m_mem_paging_drop_page(p2m_get_hostp2m(d), gmfn);
+        p2m_mem_paging_drop_page(d, gmfn);
         return 1;
     }
 #else
@@ -363,7 +363,7 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
                 p2m_type_t p2mt;
 
                 /* Shared pages cannot be exchanged */
-                mfn = mfn_x(gfn_to_mfn_unshare(p2m_get_hostp2m(d), gmfn + k, &p2mt));
+                mfn = mfn_x(gfn_to_mfn_unshare(d, gmfn + k, &p2mt));
                 if ( p2m_is_shared(p2mt) )
                 {
                     rc = -ENOMEM;

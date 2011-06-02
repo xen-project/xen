@@ -28,9 +28,6 @@
 int mem_paging_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
                       XEN_GUEST_HANDLE(void) u_domctl)
 {
-    int rc;
-    struct p2m_domain *p2m = p2m_get_hostp2m(d);
-
     /* Only HAP is supported */
     if ( !hap_enabled(d) )
          return -ENODEV;
@@ -40,37 +37,35 @@ int mem_paging_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
     case XEN_DOMCTL_MEM_EVENT_OP_PAGING_NOMINATE:
     {
         unsigned long gfn = mec->gfn;
-        rc = p2m_mem_paging_nominate(p2m, gfn);
+        return p2m_mem_paging_nominate(d, gfn);
     }
     break;
 
     case XEN_DOMCTL_MEM_EVENT_OP_PAGING_EVICT:
     {
         unsigned long gfn = mec->gfn;
-        rc = p2m_mem_paging_evict(p2m, gfn);
+        return p2m_mem_paging_evict(d, gfn);
     }
     break;
 
     case XEN_DOMCTL_MEM_EVENT_OP_PAGING_PREP:
     {
         unsigned long gfn = mec->gfn;
-        rc = p2m_mem_paging_prep(p2m, gfn);
+        return p2m_mem_paging_prep(d, gfn);
     }
     break;
 
     case XEN_DOMCTL_MEM_EVENT_OP_PAGING_RESUME:
     {
-        p2m_mem_paging_resume(p2m);
-        rc = 0;
+        p2m_mem_paging_resume(d);
+        return 0;
     }
     break;
 
     default:
-        rc = -ENOSYS;
+        return -ENOSYS;
         break;
     }
-
-    return rc;
 }
 
 

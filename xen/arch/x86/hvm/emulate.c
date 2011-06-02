@@ -55,7 +55,6 @@ static int hvmemul_do_io(
     paddr_t value = ram_gpa;
     int value_is_ptr = (p_data == NULL);
     struct vcpu *curr = current;
-    struct p2m_domain *p2m = p2m_get_hostp2m(curr->domain);
     ioreq_t *p = get_ioreq(curr);
     unsigned long ram_gfn = paddr_to_pfn(ram_gpa);
     p2m_type_t p2mt;
@@ -63,10 +62,10 @@ static int hvmemul_do_io(
     int rc;
 
     /* Check for paged out page */
-    ram_mfn = gfn_to_mfn_unshare(p2m, ram_gfn, &p2mt);
+    ram_mfn = gfn_to_mfn_unshare(curr->domain, ram_gfn, &p2mt);
     if ( p2m_is_paging(p2mt) )
     {
-        p2m_mem_paging_populate(p2m, ram_gfn);
+        p2m_mem_paging_populate(curr->domain, ram_gfn);
         return X86EMUL_RETRY;
     }
     if ( p2m_is_shared(p2mt) )
@@ -640,7 +639,6 @@ static int hvmemul_rep_movs(
     unsigned long saddr, daddr, bytes;
     paddr_t sgpa, dgpa;
     uint32_t pfec = PFEC_page_present;
-    struct p2m_domain *p2m = p2m_get_hostp2m(current->domain);
     p2m_type_t p2mt;
     int rc, df = !!(ctxt->regs->eflags & X86_EFLAGS_DF);
     char *buf;
@@ -671,12 +669,12 @@ static int hvmemul_rep_movs(
     if ( rc != X86EMUL_OKAY )
         return rc;
 
-    (void)gfn_to_mfn(p2m, sgpa >> PAGE_SHIFT, &p2mt);
+    (void)gfn_to_mfn(current->domain, sgpa >> PAGE_SHIFT, &p2mt);
     if ( !p2m_is_ram(p2mt) && !p2m_is_grant(p2mt) )
         return hvmemul_do_mmio(
             sgpa, reps, bytes_per_rep, dgpa, IOREQ_READ, df, NULL);
 
-    (void)gfn_to_mfn(p2m, dgpa >> PAGE_SHIFT, &p2mt);
+    (void)gfn_to_mfn(current->domain, dgpa >> PAGE_SHIFT, &p2mt);
     if ( !p2m_is_ram(p2mt) && !p2m_is_grant(p2mt) )
         return hvmemul_do_mmio(
             dgpa, reps, bytes_per_rep, sgpa, IOREQ_WRITE, df, NULL);

@@ -1808,8 +1808,7 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
     if ( l1e_get_flags(nl1e) & _PAGE_PRESENT )
     {
         /* Translate foreign guest addresses. */
-        mfn = mfn_x(gfn_to_mfn(p2m_get_hostp2m(pg_dom),
-            l1e_get_pfn(nl1e), &p2mt));
+        mfn = mfn_x(gfn_to_mfn(pg_dom, l1e_get_pfn(nl1e), &p2mt));
         if ( !p2m_is_ram(p2mt) || unlikely(mfn == INVALID_MFN) )
             return -EINVAL;
         ASSERT((mfn & ~(PADDR_MASK >> PAGE_SHIFT)) == 0);
@@ -3482,13 +3481,13 @@ int do_mmu_update(
 
             req.ptr -= cmd;
             gmfn = req.ptr >> PAGE_SHIFT;
-            mfn = mfn_x(gfn_to_mfn(p2m_get_hostp2m(pt_owner), gmfn, &p2mt));
+            mfn = mfn_x(gfn_to_mfn(pt_owner, gmfn, &p2mt));
             if ( !p2m_is_valid(p2mt) )
               mfn = INVALID_MFN;
 
             if ( p2m_is_paged(p2mt) )
             {
-                p2m_mem_paging_populate(p2m_get_hostp2m(pg_owner), gmfn);
+                p2m_mem_paging_populate(pg_owner, gmfn);
 
                 rc = -ENOENT;
                 break;
@@ -3520,13 +3519,11 @@ int do_mmu_update(
                 {
                     l1_pgentry_t l1e = l1e_from_intpte(req.val);
                     p2m_type_t l1e_p2mt;
-                    gfn_to_mfn(p2m_get_hostp2m(pg_owner),
-                        l1e_get_pfn(l1e), &l1e_p2mt);
+                    gfn_to_mfn(pg_owner, l1e_get_pfn(l1e), &l1e_p2mt);
 
                     if ( p2m_is_paged(l1e_p2mt) )
                     {
-                        p2m_mem_paging_populate(p2m_get_hostp2m(pg_owner),
-                            l1e_get_pfn(l1e));
+                        p2m_mem_paging_populate(pg_owner, l1e_get_pfn(l1e));
                         rc = -ENOENT;
                         break;
                     }
@@ -3544,7 +3541,7 @@ int do_mmu_update(
                         /* Unshare the page for RW foreign mappings */
                         if ( l1e_get_flags(l1e) & _PAGE_RW )
                         {
-                            rc = mem_sharing_unshare_page(p2m_get_hostp2m(pg_owner), 
+                            rc = mem_sharing_unshare_page(pg_owner, 
                                                           l1e_get_pfn(l1e), 
                                                           0);
                             if ( rc )
@@ -3562,12 +3559,11 @@ int do_mmu_update(
                 {
                     l2_pgentry_t l2e = l2e_from_intpte(req.val);
                     p2m_type_t l2e_p2mt;
-                    gfn_to_mfn(p2m_get_hostp2m(pg_owner), l2e_get_pfn(l2e), &l2e_p2mt);
+                    gfn_to_mfn(pg_owner, l2e_get_pfn(l2e), &l2e_p2mt);
 
                     if ( p2m_is_paged(l2e_p2mt) )
                     {
-                        p2m_mem_paging_populate(p2m_get_hostp2m(pg_owner),
-                            l2e_get_pfn(l2e));
+                        p2m_mem_paging_populate(pg_owner, l2e_get_pfn(l2e));
                         rc = -ENOENT;
                         break;
                     }
@@ -3591,12 +3587,11 @@ int do_mmu_update(
                 {
                     l3_pgentry_t l3e = l3e_from_intpte(req.val);
                     p2m_type_t l3e_p2mt;
-                    gfn_to_mfn(p2m_get_hostp2m(pg_owner), l3e_get_pfn(l3e), &l3e_p2mt);
+                    gfn_to_mfn(pg_owner, l3e_get_pfn(l3e), &l3e_p2mt);
 
                     if ( p2m_is_paged(l3e_p2mt) )
                     {
-                        p2m_mem_paging_populate(p2m_get_hostp2m(pg_owner),
-                            l3e_get_pfn(l3e));
+                        p2m_mem_paging_populate(pg_owner, l3e_get_pfn(l3e));
                         rc = -ENOENT;
                         break;
                     }
@@ -3620,13 +3615,11 @@ int do_mmu_update(
                 {
                     l4_pgentry_t l4e = l4e_from_intpte(req.val);
                     p2m_type_t l4e_p2mt;
-                    gfn_to_mfn(p2m_get_hostp2m(pg_owner),
-                        l4e_get_pfn(l4e), &l4e_p2mt);
+                    gfn_to_mfn(pg_owner, l4e_get_pfn(l4e), &l4e_p2mt);
 
                     if ( p2m_is_paged(l4e_p2mt) )
                     {
-                        p2m_mem_paging_populate(p2m_get_hostp2m(pg_owner),
-                            l4e_get_pfn(l4e));
+                        p2m_mem_paging_populate(pg_owner, l4e_get_pfn(l4e));
                         rc = -ENOENT;
                         break;
                     }
@@ -4003,7 +3996,7 @@ static int create_grant_p2m_mapping(uint64_t addr, unsigned long frame,
         p2mt = p2m_grant_map_ro;
     else
         p2mt = p2m_grant_map_rw;
-    rc = guest_physmap_add_entry(p2m_get_hostp2m(current->domain),
+    rc = guest_physmap_add_entry(current->domain,
                                  addr >> PAGE_SHIFT, frame, 0, p2mt);
     if ( rc )
         return GNTST_general_error;
@@ -4053,7 +4046,7 @@ static int replace_grant_p2m_mapping(
     if ( new_addr != 0 || (flags & GNTMAP_contains_pte) )
         return GNTST_general_error;
 
-    old_mfn = gfn_to_mfn(p2m_get_hostp2m(d), gfn, &type);
+    old_mfn = gfn_to_mfn(d, gfn, &type);
     if ( !p2m_is_grant(type) || mfn_x(old_mfn) != frame )
     {
         gdprintk(XENLOG_WARNING,
@@ -4652,8 +4645,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         {
             p2m_type_t p2mt;
 
-            xatp.idx = mfn_x(gfn_to_mfn_unshare(p2m_get_hostp2m(d),
-                                                xatp.idx, &p2mt));
+            xatp.idx = mfn_x(gfn_to_mfn_unshare(d, xatp.idx, &p2mt));
             /* If the page is still shared, exit early */
             if ( p2m_is_shared(p2mt) )
             {

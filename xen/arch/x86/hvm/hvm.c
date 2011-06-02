@@ -347,17 +347,16 @@ static int hvm_set_ioreq_page(
     struct domain *d, struct hvm_ioreq_page *iorp, unsigned long gmfn)
 {
     struct page_info *page;
-    struct p2m_domain *p2m = p2m_get_hostp2m(d);
     p2m_type_t p2mt;
     unsigned long mfn;
     void *va;
 
-    mfn = mfn_x(gfn_to_mfn_unshare(p2m, gmfn, &p2mt));
+    mfn = mfn_x(gfn_to_mfn_unshare(d, gmfn, &p2mt));
     if ( !p2m_is_ram(p2mt) )
         return -EINVAL;
     if ( p2m_is_paging(p2mt) )
     {
-        p2m_mem_paging_populate(p2m, gmfn);
+        p2m_mem_paging_populate(d, gmfn);
         return -ENOENT;
     }
     if ( p2m_is_shared(p2mt) )
@@ -1181,7 +1180,7 @@ int hvm_hap_nested_page_fault(unsigned long gpa,
     p2m_access_t p2ma;
     mfn_t mfn;
     struct vcpu *v = current;
-    struct p2m_domain *p2m = NULL;
+    struct p2m_domain *p2m;
 
     /* On Nested Virtualization, walk the guest page table.
      * If this succeeds, all is fine.
@@ -1270,12 +1269,13 @@ int hvm_hap_nested_page_fault(unsigned long gpa,
 #ifdef __x86_64__
     /* Check if the page has been paged out */
     if ( p2m_is_paged(p2mt) || (p2mt == p2m_ram_paging_out) )
-        p2m_mem_paging_populate(p2m, gfn);
+        p2m_mem_paging_populate(v->domain, gfn);
 
     /* Mem sharing: unshare the page and try again */
     if ( p2mt == p2m_ram_shared )
     {
-        mem_sharing_unshare_page(p2m, gfn, 0);
+        ASSERT(!p2m_is_nestedp2m(p2m));
+        mem_sharing_unshare_page(p2m->domain, gfn, 0);
         return 1;
     }
 #endif
@@ -1289,7 +1289,7 @@ int hvm_hap_nested_page_fault(unsigned long gpa,
          * page.
          */
         paging_mark_dirty(v->domain, mfn_x(mfn));
-        p2m_change_type(p2m, gfn, p2m_ram_logdirty, p2m_ram_rw);
+        p2m_change_type(v->domain, gfn, p2m_ram_logdirty, p2m_ram_rw);
         return 1;
     }
 
@@ -1486,7 +1486,6 @@ int hvm_set_cr0(unsigned long value)
 {
     struct vcpu *v = current;
     p2m_type_t p2mt;
-    struct p2m_domain *p2m = p2m_get_hostp2m(v->domain);
     unsigned long gfn, mfn, old_value = v->arch.hvm_vcpu.guest_cr[0];
 
     HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx", value);
@@ -1526,7 +1525,7 @@ int hvm_set_cr0(unsigned long value)
         {
             /* The guest CR3 must be pointing to the guest physical. */
             gfn = v->arch.hvm_vcpu.guest_cr[3]>>PAGE_SHIFT;
-            mfn = mfn_x(gfn_to_mfn(p2m, gfn, &p2mt));
+            mfn = mfn_x(gfn_to_mfn(v->domain, gfn, &p2mt));
             if ( !p2m_is_ram(p2mt) || !mfn_valid(mfn) ||
                  !get_page(mfn_to_page(mfn), v->domain))
             {
@@ -1617,8 +1616,7 @@ int hvm_set_cr3(unsigned long value)
     {
         /* Shadow-mode CR3 change. Check PDBR and update refcounts. */
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 value = %lx", value);
-        mfn = mfn_x(gfn_to_mfn(p2m_get_hostp2m(v->domain),
-            value >> PAGE_SHIFT, &p2mt));
+        mfn = mfn_x(gfn_to_mfn(v->domain, value >> PAGE_SHIFT, &p2mt));
         if ( !p2m_is_ram(p2mt) || !mfn_valid(mfn) ||
              !get_page(mfn_to_page(mfn), v->domain) )
               goto bad_cr3;
@@ -1764,23 +1762,23 @@ static void *__hvm_map_guest_frame(unsigned long gfn, bool_t writable)
 {
     unsigned long mfn;
     p2m_type_t p2mt;
-    struct p2m_domain *p2m = p2m_get_hostp2m(current->domain);
+    struct domain *d = current->domain;
 
     mfn = mfn_x(writable
-                ? gfn_to_mfn_unshare(p2m, gfn, &p2mt)
-                : gfn_to_mfn(p2m, gfn, &p2mt));
+                ? gfn_to_mfn_unshare(d, gfn, &p2mt)
+                : gfn_to_mfn(d, gfn, &p2mt));
     if ( (p2m_is_shared(p2mt) && writable) || !p2m_is_ram(p2mt) )
         return NULL;
     if ( p2m_is_paging(p2mt) )
     {
-        p2m_mem_paging_populate(p2m, gfn);
+        p2m_mem_paging_populate(d, gfn);
         return NULL;
     }
 
     ASSERT(mfn_valid(mfn));
 
     if ( writable )
-        paging_mark_dirty(current->domain, mfn);
+        paging_mark_dirty(d, mfn);
 
     return map_domain_page(mfn);
 }
@@ -2182,7 +2180,6 @@ static enum hvm_copy_result __hvm_copy(
     void *buf, paddr_t addr, int size, unsigned int flags, uint32_t pfec)
 {
     struct vcpu *curr = current;
-    struct p2m_domain *p2m;
     unsigned long gfn, mfn;
     p2m_type_t p2mt;
     char *p;
@@ -2203,8 +2200,6 @@ static enum hvm_copy_result __hvm_copy(
     if ( in_atomic() )
         return HVMCOPY_unhandleable;
 #endif
-
-    p2m = p2m_get_hostp2m(curr->domain);
 
     while ( todo > 0 )
     {
@@ -2229,11 +2224,11 @@ static enum hvm_copy_result __hvm_copy(
             gfn = addr >> PAGE_SHIFT;
         }
 
-        mfn = mfn_x(gfn_to_mfn_unshare(p2m, gfn, &p2mt));
+        mfn = mfn_x(gfn_to_mfn_unshare(curr->domain, gfn, &p2mt));
 
         if ( p2m_is_paging(p2mt) )
         {
-            p2m_mem_paging_populate(p2m, gfn);
+            p2m_mem_paging_populate(curr->domain, gfn);
             return HVMCOPY_gfn_paged_out;
         }
         if ( p2m_is_shared(p2mt) )
@@ -3650,7 +3645,6 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
     {
         struct xen_hvm_modified_memory a;
         struct domain *d;
-        struct p2m_domain *p2m;
         unsigned long pfn;
 
         if ( copy_from_guest(&a, arg, 1) )
@@ -3678,14 +3672,13 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         if ( !paging_mode_log_dirty(d) )
             goto param_fail3;
 
-        p2m = p2m_get_hostp2m(d);
         for ( pfn = a.first_pfn; pfn < a.first_pfn + a.nr; pfn++ )
         {
             p2m_type_t t;
-            mfn_t mfn = gfn_to_mfn(p2m, pfn, &t);
+            mfn_t mfn = gfn_to_mfn(d, pfn, &t);
             if ( p2m_is_paging(t) )
             {
-                p2m_mem_paging_populate(p2m, pfn);
+                p2m_mem_paging_populate(d, pfn);
 
                 rc = -EINVAL;
                 goto param_fail3;
@@ -3724,7 +3717,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         rc = -EINVAL;
         if ( is_hvm_domain(d) )
         {
-            gfn_to_mfn_unshare(p2m_get_hostp2m(d), a.pfn, &t);
+            gfn_to_mfn_unshare(d, a.pfn, &t);
             if ( p2m_is_mmio(t) )
                 a.mem_type =  HVMMEM_mmio_dm;
             else if ( p2m_is_readonly(t) )
@@ -3743,7 +3736,6 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
     {
         struct xen_hvm_set_mem_type a;
         struct domain *d;
-        struct p2m_domain *p2m;
         unsigned long pfn;
         
         /* Interface types to internal p2m types */
@@ -3773,17 +3765,15 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         if ( a.hvmmem_type >= ARRAY_SIZE(memtype) )
             goto param_fail4;
 
-        p2m = p2m_get_hostp2m(d);
         for ( pfn = a.first_pfn; pfn < a.first_pfn + a.nr; pfn++ )
         {
             p2m_type_t t;
             p2m_type_t nt;
             mfn_t mfn;
-            mfn = gfn_to_mfn_unshare(p2m, pfn, &t);
+            mfn = gfn_to_mfn_unshare(d, pfn, &t);
             if ( p2m_is_paging(t) )
             {
-                p2m_mem_paging_populate(p2m, pfn);
-
+                p2m_mem_paging_populate(d, pfn);
                 rc = -EINVAL;
                 goto param_fail4;
             }
@@ -3801,7 +3791,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             }
             else
             {
-                nt = p2m_change_type(p2m, pfn, t, memtype[a.hvmmem_type]);
+                nt = p2m_change_type(d, pfn, t, memtype[a.hvmmem_type]);
                 if ( nt != t )
                 {
                     gdprintk(XENLOG_WARNING,
@@ -3877,7 +3867,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             mfn_t mfn;
             int success;
 
-            mfn = gfn_to_mfn_unshare(p2m, pfn, &t);
+            mfn = gfn_to_mfn_unshare(d, pfn, &t);
 
             p2m_lock(p2m);
             success = p2m->set_entry(p2m, pfn, mfn, 0, t, memaccess[a.hvmmem_access]);

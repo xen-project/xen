@@ -252,7 +252,6 @@ static void mem_sharing_audit(void)
             list_for_each(le, &e->gfns)
             {
                 struct domain *d;
-                struct p2m_domain *p2m;
                 p2m_type_t t;
                 mfn_t mfn;
 
@@ -264,8 +263,7 @@ static void mem_sharing_audit(void)
                             g->domain, g->gfn, mfn_x(e->mfn));
                     continue;
                 }
-                p2m = p2m_get_hostp2m(d);
-                mfn = gfn_to_mfn(p2m, g->gfn, &t); 
+                mfn = gfn_to_mfn(d, g->gfn, &t); 
                 if(mfn_x(mfn) != mfn_x(e->mfn))
                     MEM_SHARING_DEBUG("Incorrect P2M for d=%d, PFN=%lx."
                                       "Expecting MFN=%ld, got %ld\n",
@@ -376,7 +374,7 @@ int mem_sharing_debug_gfn(struct domain *d, unsigned long gfn)
     p2m_type_t p2mt;
     mfn_t mfn;
 
-    mfn = gfn_to_mfn(p2m_get_hostp2m(d), gfn, &p2mt);
+    mfn = gfn_to_mfn(d, gfn, &p2mt);
 
     printk("Debug for domain=%d, gfn=%lx, ", 
             d->domain_id, 
@@ -485,7 +483,7 @@ int mem_sharing_debug_gref(struct domain *d, grant_ref_t ref)
     return mem_sharing_debug_gfn(d, gfn); 
 }
 
-int mem_sharing_nominate_page(struct p2m_domain *p2m, 
+int mem_sharing_nominate_page(struct domain *d,
                               unsigned long gfn,
                               int expected_refcnt,
                               shr_handle_t *phandle)
@@ -497,12 +495,11 @@ int mem_sharing_nominate_page(struct p2m_domain *p2m,
     shr_handle_t handle;
     shr_hash_entry_t *hash_entry;
     struct gfn_info *gfn_info;
-    struct domain *d = p2m->domain;
 
     *phandle = 0UL;
 
     shr_lock(); 
-    mfn = gfn_to_mfn(p2m, gfn, &p2mt);
+    mfn = gfn_to_mfn(d, gfn, &p2mt);
 
     /* Check if mfn is valid */
     ret = -EINVAL;
@@ -540,7 +537,7 @@ int mem_sharing_nominate_page(struct p2m_domain *p2m,
     }
 
     /* Change the p2m type */
-    if(p2m_change_type(p2m, gfn, p2mt, p2m_ram_shared) != p2mt) 
+    if(p2m_change_type(d, gfn, p2mt, p2m_ram_shared) != p2mt) 
     {
         /* This is unlikely, as the type must have changed since we've checked
          * it a few lines above.
@@ -602,7 +599,7 @@ int mem_sharing_share_pages(shr_handle_t sh, shr_handle_t ch)
         list_del(&gfn->list);
         d = get_domain_by_id(gfn->domain);
         BUG_ON(!d);
-        BUG_ON(set_shared_p2m_entry(p2m_get_hostp2m(d), gfn->gfn, se->mfn) == 0);
+        BUG_ON(set_shared_p2m_entry(d, gfn->gfn, se->mfn) == 0);
         put_domain(d);
         list_add(&gfn->list, &se->gfns);
         put_page_and_type(cpage);
@@ -621,7 +618,7 @@ err_out:
     return ret;
 }
 
-int mem_sharing_unshare_page(struct p2m_domain *p2m,
+int mem_sharing_unshare_page(struct domain *d,
                              unsigned long gfn, 
                              uint16_t flags)
 {
@@ -634,13 +631,12 @@ int mem_sharing_unshare_page(struct p2m_domain *p2m,
     struct gfn_info *gfn_info = NULL;
     shr_handle_t handle;
     struct list_head *le;
-    struct domain *d = p2m->domain;
 
     mem_sharing_audit();
     /* Remove the gfn_info from the list */
     shr_lock();
     
-    mfn = gfn_to_mfn(p2m, gfn, &p2mt);
+    mfn = gfn_to_mfn(d, gfn, &p2mt);
     
     /* Has someone already unshared it? */
     if (!p2m_is_shared(p2mt)) {
@@ -706,7 +702,7 @@ gfn_found:
     unmap_domain_page(s);
     unmap_domain_page(t);
 
-    BUG_ON(set_shared_p2m_entry(p2m, gfn, page_to_mfn(page)) == 0);
+    BUG_ON(set_shared_p2m_entry(d, gfn, page_to_mfn(page)) == 0);
     put_page_and_type(old_page);
 
 private_page_found:    
@@ -717,7 +713,7 @@ private_page_found:
     else
         atomic_dec(&nr_saved_mfns);
 
-    if(p2m_change_type(p2m, gfn, p2m_ram_shared, p2m_ram_rw) != 
+    if(p2m_change_type(d, gfn, p2m_ram_shared, p2m_ram_rw) != 
                                                 p2m_ram_shared) 
     {
         printk("Could not change p2m type.\n");
@@ -754,7 +750,7 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
             shr_handle_t handle;
             if(!mem_sharing_enabled(d))
                 return -EINVAL;
-            rc = mem_sharing_nominate_page(p2m_get_hostp2m(d), gfn, 0, &handle);
+            rc = mem_sharing_nominate_page(d, gfn, 0, &handle);
             mec->u.nominate.handle = handle;
             mem_sharing_audit();
         }
@@ -770,8 +766,7 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
                 return -EINVAL;
             if(mem_sharing_gref_to_gfn(d, gref, &gfn) < 0)
                 return -EINVAL;
-            rc = mem_sharing_nominate_page(p2m_get_hostp2m(d),
-                gfn, 3, &handle);
+            rc = mem_sharing_nominate_page(d, gfn, 3, &handle);
             mec->u.nominate.handle = handle;
             mem_sharing_audit();
         }

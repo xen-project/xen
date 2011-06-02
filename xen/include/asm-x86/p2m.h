@@ -359,8 +359,10 @@ struct p2m_domain *p2m_get_p2m(struct vcpu *v);
     } while (0)
 
 
-/* Read P2M table, mapping pages as we go.
- * Do not populate PoD pages. */
+/* Read a particular P2M table, mapping pages as we go.  Most callers
+ * should _not_ call this directly; use the other gfn_to_mfn_* functions
+ * below unless you know you want to walk a p2m that isn't a domain's
+ * main one. */
 static inline mfn_t
 gfn_to_mfn_type_p2m(struct p2m_domain *p2m, unsigned long gfn,
                     p2m_type_t *t, p2m_access_t *a, p2m_query_t q)
@@ -370,7 +372,8 @@ gfn_to_mfn_type_p2m(struct p2m_domain *p2m, unsigned long gfn,
 #ifdef __x86_64__
     if ( q == p2m_unshare && p2m_is_shared(*t) )
     {
-        mem_sharing_unshare_page(p2m, gfn, 0);
+        ASSERT(!p2m_is_nestedp2m(p2m));
+        mem_sharing_unshare_page(p2m->domain, gfn, 0);
         mfn = p2m->get_entry(p2m, gfn, t, a, q);
     }
 #endif
@@ -390,10 +393,11 @@ gfn_to_mfn_type_p2m(struct p2m_domain *p2m, unsigned long gfn,
 
 
 /* General conversion function from gfn to mfn */
-static inline mfn_t _gfn_to_mfn_type(struct p2m_domain *p2m,
-                                     unsigned long gfn, p2m_type_t *t,
-                                     p2m_query_t q)
+static inline mfn_t gfn_to_mfn_type(struct domain *d,
+                                    unsigned long gfn, p2m_type_t *t,
+                                    p2m_query_t q)
 {
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
     p2m_access_t a;
 
     if ( !p2m || !paging_mode_translate(p2m->domain) )
@@ -407,17 +411,17 @@ static inline mfn_t _gfn_to_mfn_type(struct p2m_domain *p2m,
     return gfn_to_mfn_type_p2m(p2m, gfn, t, &a, q);
 }
 
-#define gfn_to_mfn(p2m, g, t) _gfn_to_mfn_type((p2m), (g), (t), p2m_alloc)
-#define gfn_to_mfn_query(p2m, g, t) _gfn_to_mfn_type((p2m), (g), (t), p2m_query)
-#define gfn_to_mfn_guest(p2m, g, t) _gfn_to_mfn_type((p2m), (g), (t), p2m_guest)
-#define gfn_to_mfn_unshare(p, g, t) _gfn_to_mfn_type((p), (g), (t), p2m_unshare)
+#define gfn_to_mfn(d, g, t)         gfn_to_mfn_type((d), (g), (t), p2m_alloc)
+#define gfn_to_mfn_query(d, g, t)   gfn_to_mfn_type((d), (g), (t), p2m_query)
+#define gfn_to_mfn_guest(d, g, t)   gfn_to_mfn_type((d), (g), (t), p2m_guest)
+#define gfn_to_mfn_unshare(d, g, t) gfn_to_mfn_type((d), (g), (t), p2m_unshare)
 
 /* Compatibility function exporting the old untyped interface */
 static inline unsigned long gmfn_to_mfn(struct domain *d, unsigned long gpfn)
 {
     mfn_t mfn;
     p2m_type_t t;
-    mfn = gfn_to_mfn(d->arch.p2m, gpfn, &t);
+    mfn = gfn_to_mfn(d, gpfn, &t);
     if ( p2m_is_valid(t) )
         return mfn_x(mfn);
     return INVALID_MFN;
@@ -445,17 +449,9 @@ void p2m_teardown(struct p2m_domain *p2m);
 void p2m_final_teardown(struct domain *d);
 
 /* Add a page to a domain's p2m table */
-int guest_physmap_add_entry(struct p2m_domain *p2m, unsigned long gfn,
+int guest_physmap_add_entry(struct domain *d, unsigned long gfn,
                             unsigned long mfn, unsigned int page_order, 
                             p2m_type_t t);
-
-/* Remove a page from a domain's p2m table */
-void guest_physmap_remove_entry(struct p2m_domain *p2m, unsigned long gfn,
-                            unsigned long mfn, unsigned int page_order);
-
-/* Set a p2m range as populate-on-demand */
-int guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
-                                          unsigned int order);
 
 /* Untyped version for RAM only, for compatibility */
 static inline int guest_physmap_add_page(struct domain *d,
@@ -463,27 +459,29 @@ static inline int guest_physmap_add_page(struct domain *d,
                                          unsigned long mfn,
                                          unsigned int page_order)
 {
-    return guest_physmap_add_entry(d->arch.p2m, gfn, mfn, page_order, p2m_ram_rw);
+    return guest_physmap_add_entry(d, gfn, mfn, page_order, p2m_ram_rw);
 }
 
 /* Remove a page from a domain's p2m table */
-static inline void guest_physmap_remove_page(struct domain *d,
+void guest_physmap_remove_page(struct domain *d,
                                unsigned long gfn,
-                               unsigned long mfn, unsigned int page_order)
-{
-    guest_physmap_remove_entry(d->arch.p2m, gfn, mfn, page_order);
-}
+                               unsigned long mfn, unsigned int page_order);
+
+/* Set a p2m range as populate-on-demand */
+int guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
+                                          unsigned int order);
 
 /* Change types across all p2m entries in a domain */
-void p2m_change_entry_type_global(struct p2m_domain *p2m, p2m_type_t ot, p2m_type_t nt);
+void p2m_change_entry_type_global(struct domain *d, 
+                                  p2m_type_t ot, p2m_type_t nt);
 
 /* Compare-exchange the type of a single p2m entry */
-p2m_type_t p2m_change_type(struct p2m_domain *p2m, unsigned long gfn,
+p2m_type_t p2m_change_type(struct domain *d, unsigned long gfn,
                            p2m_type_t ot, p2m_type_t nt);
 
 /* Set mmio addresses in the p2m table (for pass-through) */
-int set_mmio_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn);
-int clear_mmio_p2m_entry(struct p2m_domain *p2m, unsigned long gfn);
+int set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn);
+int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn);
 
 
 /* 
@@ -491,7 +489,7 @@ int clear_mmio_p2m_entry(struct p2m_domain *p2m, unsigned long gfn);
  */
 
 /* Dump PoD information about the domain */
-void p2m_pod_dump_data(struct p2m_domain *p2m);
+void p2m_pod_dump_data(struct domain *d);
 
 /* Move all pages from the populate-on-demand cache to the domain page_list
  * (usually in preparation for domain destruction) */
@@ -508,12 +506,6 @@ p2m_pod_decrease_reservation(struct domain *d,
                              xen_pfn_t gpfn,
                              unsigned int order);
 
-/* Called by p2m code when demand-populating a PoD page */
-int
-p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
-                        unsigned int order,
-                        p2m_query_t q);
-
 /* Scan pod cache when offline/broken page triggered */
 int
 p2m_pod_offline_or_broken_hit(struct page_info *p);
@@ -522,30 +514,31 @@ p2m_pod_offline_or_broken_hit(struct page_info *p);
 void
 p2m_pod_offline_or_broken_replace(struct page_info *p);
 
+
 /*
  * Paging to disk and page-sharing
  */
 
 #ifdef __x86_64__
 /* Modify p2m table for shared gfn */
-int set_shared_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn);
+int set_shared_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn);
 
 /* Check if a nominated gfn is valid to be paged out */
-int p2m_mem_paging_nominate(struct p2m_domain *p2m, unsigned long gfn);
+int p2m_mem_paging_nominate(struct domain *d, unsigned long gfn);
 /* Evict a frame */
-int p2m_mem_paging_evict(struct p2m_domain *p2m, unsigned long gfn);
+int p2m_mem_paging_evict(struct domain *d, unsigned long gfn);
 /* Tell xenpaging to drop a paged out frame */
-void p2m_mem_paging_drop_page(struct p2m_domain *p2m, unsigned long gfn);
+void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn);
 /* Start populating a paged out frame */
-void p2m_mem_paging_populate(struct p2m_domain *p2m, unsigned long gfn);
+void p2m_mem_paging_populate(struct domain *d, unsigned long gfn);
 /* Prepare the p2m for paging a frame in */
-int p2m_mem_paging_prep(struct p2m_domain *p2m, unsigned long gfn);
+int p2m_mem_paging_prep(struct domain *d, unsigned long gfn);
 /* Resume normal operation (in case a domain was paused) */
-void p2m_mem_paging_resume(struct p2m_domain *p2m);
+void p2m_mem_paging_resume(struct domain *d);
 #else
-static inline void p2m_mem_paging_drop_page(struct p2m_domain *p2m, unsigned long gfn)
+static inline void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn)
 { }
-static inline void p2m_mem_paging_populate(struct p2m_domain *p2m, unsigned long gfn)
+static inline void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
 { }
 #endif
 
@@ -562,6 +555,10 @@ static inline void p2m_mem_access_check(unsigned long gpa, bool_t gla_valid,
                                         bool_t access_w, bool_t access_x)
 { }
 #endif
+
+/* 
+ * Internal functions, only called by other p2m code
+ */
 
 struct page_info *p2m_alloc_ptp(struct p2m_domain *p2m, unsigned long type);
 void p2m_free_ptp(struct p2m_domain *p2m, struct page_info *pg);
@@ -619,6 +616,11 @@ extern void audit_p2m(struct p2m_domain *p2m, int strict_m2p);
 #define P2M_DEBUG(_f, _a...) do { (void)(_f); } while(0)
 #endif
 
+/* Called by p2m code when demand-populating a PoD page */
+int
+p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
+                        unsigned int order,
+                        p2m_query_t q);
 
 /*
  * Functions specific to the p2m-pt implementation
@@ -642,7 +644,7 @@ static inline p2m_type_t p2m_flags_to_type(unsigned long flags)
 }
 
 /*
- * Nested p2m: shadow p2m tables used for nexted HVM virtualization 
+ * Nested p2m: shadow p2m tables used for nested HVM virtualization 
  */
 
 /* Flushes specified p2m table */

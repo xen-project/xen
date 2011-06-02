@@ -110,7 +110,7 @@ static unsigned inline int max_nr_maptrack_frames(void)
 #define gfn_to_mfn_private(_d, _gfn) ({                     \
     p2m_type_t __p2mt;                                      \
     unsigned long __x;                                      \
-    __x = mfn_x(gfn_to_mfn_unshare(p2m_get_hostp2m(_d), _gfn, &__p2mt));  \
+    __x = mfn_x(gfn_to_mfn_unshare((_d), (_gfn), &__p2mt)); \
     BUG_ON(p2m_is_shared(__p2mt)); /* XXX fixme */          \
     if ( !p2m_is_valid(__p2mt) )                            \
         __x = INVALID_MFN;                                  \
@@ -146,16 +146,14 @@ static int __get_paged_frame(unsigned long gfn, unsigned long *frame, int readon
 {
     int rc = GNTST_okay;
 #if defined(P2M_PAGED_TYPES) || defined(P2M_SHARED_TYPES)
-    struct p2m_domain *p2m;
     p2m_type_t p2mt;
     mfn_t mfn;
 
-    p2m = p2m_get_hostp2m(rd);
     if ( readonly )
-        mfn = gfn_to_mfn(p2m, gfn, &p2mt);
+        mfn = gfn_to_mfn(rd, gfn, &p2mt);
     else
     {
-        mfn = gfn_to_mfn_unshare(p2m, gfn, &p2mt);
+        mfn = gfn_to_mfn_unshare(rd, gfn, &p2mt);
         BUG_ON(p2m_is_shared(p2mt));
         /* XXX Here, and above in gfn_to_mfn_private, need to handle
          * XXX failure to unshare. */
@@ -165,7 +163,7 @@ static int __get_paged_frame(unsigned long gfn, unsigned long *frame, int readon
         *frame = mfn_x(mfn);
         if ( p2m_is_paging(p2mt) )
         {
-            p2m_mem_paging_populate(p2m, gfn);
+            p2m_mem_paging_populate(rd, gfn);
             rc = GNTST_eagain;
         }
     } else {

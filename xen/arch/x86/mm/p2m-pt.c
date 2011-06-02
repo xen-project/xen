@@ -677,10 +677,9 @@ out:
     return mfn;
 }
 
-
 static mfn_t
-p2m_gfn_to_mfn(struct p2m_domain *p2m, unsigned long gfn, p2m_type_t *t, p2m_access_t *a,
-               p2m_query_t q)
+p2m_gfn_to_mfn(struct p2m_domain *p2m, unsigned long gfn, 
+               p2m_type_t *t, p2m_access_t *a, p2m_query_t q)
 {
     mfn_t mfn;
     paddr_t addr = ((paddr_t)gfn) << PAGE_SHIFT;
@@ -697,8 +696,6 @@ p2m_gfn_to_mfn(struct p2m_domain *p2m, unsigned long gfn, p2m_type_t *t, p2m_acc
     /* Not implemented except with EPT */
     *a = p2m_access_rwx; 
 
-    mfn = pagetable_get_mfn(p2m_get_pagetable(p2m));
-
     if ( gfn > p2m->max_mapped_pfn )
         /* This pfn is higher than the highest the p2m map currently holds */
         return _mfn(INVALID_MFN);
@@ -706,6 +703,8 @@ p2m_gfn_to_mfn(struct p2m_domain *p2m, unsigned long gfn, p2m_type_t *t, p2m_acc
     /* Use the fast path with the linear mapping if we can */
     if ( p2m == p2m_get_hostp2m(current->domain) )
         return p2m_gfn_to_mfn_current(p2m, gfn, t, a, q);
+
+    mfn = pagetable_get_mfn(p2m_get_pagetable(p2m));
 
 #if CONFIG_PAGING_LEVELS >= 4
     {
@@ -1059,7 +1058,7 @@ void audit_p2m(struct p2m_domain *p2m, int strict_m2p)
 
         if ( test_linear && (gfn <= p2m->max_mapped_pfn) )
         {
-            lp2mfn = mfn_x(gfn_to_mfn_query(p2m, gfn, &type));
+            lp2mfn = mfn_x(gfn_to_mfn_type_p2m(p2m, gfn, &type, p2m_query));
             if ( lp2mfn != mfn_x(p2mfn) )
             {
                 P2M_PRINTK("linear mismatch gfn %#lx -> mfn %#lx "

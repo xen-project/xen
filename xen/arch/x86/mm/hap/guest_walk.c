@@ -54,13 +54,16 @@ unsigned long hap_p2m_ga_to_gfn(GUEST_PAGING_LEVELS)(
     mfn_t top_mfn;
     void *top_map;
     p2m_type_t p2mt;
+    p2m_access_t p2ma;
     walk_t gw;
 
     /* Get the top-level table's MFN */
-    top_mfn = gfn_to_mfn_unshare(p2m, cr3 >> PAGE_SHIFT, &p2mt);
+    top_mfn = gfn_to_mfn_type_p2m(p2m, cr3 >> PAGE_SHIFT, 
+                                  &p2mt, &p2ma, p2m_unshare);
     if ( p2m_is_paging(p2mt) )
     {
-        p2m_mem_paging_populate(p2m, cr3 >> PAGE_SHIFT);
+        ASSERT(!p2m_is_nestedp2m(p2m));
+        p2m_mem_paging_populate(p2m->domain, cr3 >> PAGE_SHIFT);
 
         pfec[0] = PFEC_page_paged;
         return INVALID_GFN;
@@ -89,10 +92,11 @@ unsigned long hap_p2m_ga_to_gfn(GUEST_PAGING_LEVELS)(
     if ( missing == 0 )
     {
         gfn_t gfn = guest_l1e_get_gfn(gw.l1e);
-        gfn_to_mfn_unshare(p2m, gfn_x(gfn), &p2mt);
+        gfn_to_mfn_type_p2m(p2m, gfn_x(gfn), &p2mt, &p2ma, p2m_unshare);
         if ( p2m_is_paging(p2mt) )
         {
-            p2m_mem_paging_populate(p2m, gfn_x(gfn));
+            ASSERT(!p2m_is_nestedp2m(p2m));
+            p2m_mem_paging_populate(p2m->domain, gfn_x(gfn));
 
             pfec[0] = PFEC_page_paged;
             return INVALID_GFN;

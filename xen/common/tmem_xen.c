@@ -109,7 +109,7 @@ static inline void *cli_get_page(tmem_cli_mfn_t cmfn, unsigned long *pcli_mfn,
     struct page_info *page;
     int ret;
 
-    cli_mfn = mfn_x(gfn_to_mfn(p2m_get_hostp2m(current->domain), cmfn, &t));
+    cli_mfn = mfn_x(gfn_to_mfn(current->domain, cmfn, &t));
     if ( t != p2m_ram_rw || !mfn_valid(cli_mfn) )
             return NULL;
     page = mfn_to_page(cli_mfn);

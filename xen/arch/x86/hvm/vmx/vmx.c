@@ -476,8 +476,7 @@ static int vmx_restore_cr0_cr3(
     {
         if ( cr0 & X86_CR0_PG )
         {
-            mfn = mfn_x(gfn_to_mfn(p2m_get_hostp2m(v->domain),
-                cr3 >> PAGE_SHIFT, &p2mt));
+            mfn = mfn_x(gfn_to_mfn(v->domain, cr3 >> PAGE_SHIFT, &p2mt));
             if ( !p2m_is_ram(p2mt) || !get_page(mfn_to_page(mfn), v->domain) )
             {
                 gdprintk(XENLOG_ERR, "Invalid CR3 value=0x%lx\n", cr3);
@@ -993,8 +992,7 @@ static void vmx_load_pdptrs(struct vcpu *v)
     if ( cr3 & 0x1fUL )
         goto crash;
 
-    mfn = mfn_x(gfn_to_mfn(p2m_get_hostp2m(v->domain),
-        cr3 >> PAGE_SHIFT, &p2mt));
+    mfn = mfn_x(gfn_to_mfn(v->domain, cr3 >> PAGE_SHIFT, &p2mt));
     if ( !p2m_is_ram(p2mt) )
         goto crash;
 
@@ -1752,8 +1750,7 @@ static int vmx_alloc_vlapic_mapping(struct domain *d)
     if ( apic_va == NULL )
         return -ENOMEM;
     share_xen_page_with_guest(virt_to_page(apic_va), d, XENSHARE_writable);
-    set_mmio_p2m_entry(
-        p2m_get_hostp2m(d), paddr_to_pfn(APIC_DEFAULT_PHYS_BASE),
+    set_mmio_p2m_entry(d, paddr_to_pfn(APIC_DEFAULT_PHYS_BASE),
         _mfn(virt_to_mfn(apic_va)));
     d->arch.hvm_domain.vmx.apic_access_mfn = virt_to_mfn(apic_va);
 
@@ -1959,7 +1956,7 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
     unsigned long gla, gfn = gpa >> PAGE_SHIFT;
     mfn_t mfn;
     p2m_type_t p2mt;
-    struct p2m_domain *p2m = p2m_get_hostp2m(current->domain);
+    struct domain *d = current->domain;
 
     if ( tb_init_done )
     {
@@ -1972,7 +1969,7 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
 
         _d.gpa = gpa;
         _d.qualification = qualification;
-        _d.mfn = mfn_x(gfn_to_mfn_query(p2m, gfn, &_d.p2mt));
+        _d.mfn = mfn_x(gfn_to_mfn_query(d, gfn, &_d.p2mt));
         
         __trace_var(TRC_HVM_NPF, 0, sizeof(_d), &_d);
     }
@@ -1988,7 +1985,7 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
         return;
 
     /* Everything else is an error. */
-    mfn = gfn_to_mfn_guest(p2m, gfn, &p2mt);
+    mfn = gfn_to_mfn_guest(d, gfn, &p2mt);
     gdprintk(XENLOG_ERR, "EPT violation %#lx (%c%c%c/%c%c%c), "
              "gpa %#"PRIpaddr", mfn %#lx, type %i.\n", 
              qualification, 
@@ -2000,7 +1997,7 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
              (qualification & EPT_EFFECTIVE_EXEC) ? 'x' : '-',
              gpa, mfn_x(mfn), p2mt);
 
-    ept_walk_table(current->domain, gfn);
+    ept_walk_table(d, gfn);
 
     if ( qualification & EPT_GLA_VALID )
     {
@@ -2008,7 +2005,7 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
         gdprintk(XENLOG_ERR, " --- GLA %#lx\n", gla);
     }
 
-    domain_crash(current->domain);
+    domain_crash(d);
 }
 
 static void vmx_failed_vmentry(unsigned int exit_reason,

@@ -577,7 +577,6 @@ int is_vmce_ready(struct mcinfo_bank *bank, struct domain *d)
 int unmmap_broken_page(struct domain *d, mfn_t mfn, unsigned long gfn)
 {
     mfn_t r_mfn;
-    struct p2m_domain *p2m;
     p2m_type_t pt;
 
     /* Always trust dom0's MCE handler will prevent future access */
@@ -590,18 +589,11 @@ int unmmap_broken_page(struct domain *d, mfn_t mfn, unsigned long gfn)
     if ( !is_hvm_domain(d) || !paging_mode_hap(d) )
         return -ENOSYS;
 
-    p2m = p2m_get_hostp2m(d);
-    ASSERT(p2m);
-
-    /* This only happen for PoD memory, which should be handled seperetely */
-    if (gfn > p2m->max_mapped_pfn)
-        return -EINVAL;
-
-    r_mfn = gfn_to_mfn_query(p2m, gfn, &pt);
+    r_mfn = gfn_to_mfn_query(d, gfn, &pt);
     if ( p2m_to_mask(pt) & P2M_UNMAP_TYPES)
     {
         ASSERT(mfn_x(r_mfn) == mfn_x(mfn));
-        p2m_change_type(p2m, gfn, pt, p2m_ram_broken);
+        p2m_change_type(d, gfn, pt, p2m_ram_broken);
         return 0;
     }
 

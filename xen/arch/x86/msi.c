@@ -663,7 +663,7 @@ static int msix_capability_init(struct pci_dev *dev,
             WARN();
 
         if ( dev->domain )
-            p2m_change_entry_type_global(p2m_get_hostp2m(dev->domain),
+            p2m_change_entry_type_global(dev->domain,
                                          p2m_mmio_direct, p2m_mmio_direct);
         if ( !dev->domain || !paging_mode_translate(dev->domain) )
         {

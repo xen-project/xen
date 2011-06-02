@@ -193,9 +193,9 @@ static inline shadow_l4e_t shadow_l4e_from_mfn(mfn_t mfn, u32 flags)
 
  /* Override gfn_to_mfn to work with gfn_t */
 #undef gfn_to_mfn_query
-#define gfn_to_mfn_query(d, g, t) _gfn_to_mfn_type((d), gfn_x(g), (t), p2m_query)
+#define gfn_to_mfn_query(d, g, t) gfn_to_mfn_type((d), gfn_x(g), (t), p2m_query)
 #undef gfn_to_mfn_guest
-#define gfn_to_mfn_guest(d, g, t) _gfn_to_mfn_type((d), gfn_x(g), (t), p2m_guest)
+#define gfn_to_mfn_guest(d, g, t) gfn_to_mfn_type((d), gfn_x(g), (t), p2m_guest)
 
 /* The shadow types needed for the various levels. */
 

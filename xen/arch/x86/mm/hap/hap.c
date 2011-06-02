@@ -71,7 +71,7 @@ static int hap_enable_vram_tracking(struct domain *d)
 
     /* set l1e entries of P2M table to be read-only. */
     for (i = dirty_vram->begin_pfn; i < dirty_vram->end_pfn; i++)
-        p2m_change_type(p2m_get_hostp2m(d), i, p2m_ram_rw, p2m_ram_logdirty);
+        p2m_change_type(d, i, p2m_ram_rw, p2m_ram_logdirty);
 
     flush_tlb_mask(d->domain_dirty_cpumask);
     return 0;
@@ -91,7 +91,7 @@ static int hap_disable_vram_tracking(struct domain *d)
 
     /* set l1e entries of P2M table with normal mode */
     for (i = dirty_vram->begin_pfn; i < dirty_vram->end_pfn; i++)
-        p2m_change_type(p2m_get_hostp2m(d), i, p2m_ram_logdirty, p2m_ram_rw);
+        p2m_change_type(d, i, p2m_ram_logdirty, p2m_ram_rw);
 
     flush_tlb_mask(d->domain_dirty_cpumask);
     return 0;
@@ -107,7 +107,7 @@ static void hap_clean_vram_tracking(struct domain *d)
 
     /* set l1e entries of P2M table to be read-only. */
     for (i = dirty_vram->begin_pfn; i < dirty_vram->end_pfn; i++)
-        p2m_change_type(p2m_get_hostp2m(d), i, p2m_ram_rw, p2m_ram_logdirty);
+        p2m_change_type(d, i, p2m_ram_rw, p2m_ram_logdirty);
 
     flush_tlb_mask(d->domain_dirty_cpumask);
 }
@@ -201,8 +201,7 @@ static int hap_enable_log_dirty(struct domain *d)
     hap_unlock(d);
 
     /* set l1e entries of P2M table to be read-only. */
-    p2m_change_entry_type_global(p2m_get_hostp2m(d),
-        p2m_ram_rw, p2m_ram_logdirty);
+    p2m_change_entry_type_global(d, p2m_ram_rw, p2m_ram_logdirty);
     flush_tlb_mask(d->domain_dirty_cpumask);
     return 0;
 }
@@ -214,16 +213,14 @@ static int hap_disable_log_dirty(struct domain *d)
     hap_unlock(d);
 
     /* set l1e entries of P2M table with normal mode */
-    p2m_change_entry_type_global(p2m_get_hostp2m(d),
-        p2m_ram_logdirty, p2m_ram_rw);
+    p2m_change_entry_type_global(d, p2m_ram_logdirty, p2m_ram_rw);
     return 0;
 }
 
 static void hap_clean_dirty_bitmap(struct domain *d)
 {
     /* set l1e entries of P2M table to be read-only. */
-    p2m_change_entry_type_global(p2m_get_hostp2m(d),
-        p2m_ram_rw, p2m_ram_logdirty);
+    p2m_change_entry_type_global(d, p2m_ram_rw, p2m_ram_logdirty);
     flush_tlb_mask(d->domain_dirty_cpumask);
 }
 

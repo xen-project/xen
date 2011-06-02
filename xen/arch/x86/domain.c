@@ -164,9 +164,7 @@ void dump_pageframe_info(struct domain *d)
     }
 
     if ( is_hvm_domain(d) )
-    {
-        p2m_pod_dump_data(p2m_get_hostp2m(d));
-    }
+        p2m_pod_dump_data(d);
 
     spin_lock(&d->page_alloc_lock);
     page_list_for_each ( page, &d->xenpage_list )

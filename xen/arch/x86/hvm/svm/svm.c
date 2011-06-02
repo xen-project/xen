@@ -244,7 +244,7 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     {
         if ( c->cr0 & X86_CR0_PG )
         {
-            mfn = mfn_x(gfn_to_mfn(p2m, c->cr3 >> PAGE_SHIFT, &p2mt));
+            mfn = mfn_x(gfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT, &p2mt));
             if ( !p2m_is_ram(p2mt) || !get_page(mfn_to_page(mfn), v->domain) )
             {
                 gdprintk(XENLOG_ERR, "Invalid CR3 value=0x%"PRIx64"\n",
@@ -1127,6 +1127,7 @@ static void svm_do_nested_pgfault(struct vcpu *v,
     unsigned long gfn = gpa >> PAGE_SHIFT;
     mfn_t mfn;
     p2m_type_t p2mt;
+    p2m_access_t p2ma;
     struct p2m_domain *p2m = NULL;
 
     ret = hvm_hap_nested_page_fault(gpa, 0, ~0ul, 0, 0, 0, 0);
@@ -1143,7 +1144,7 @@ static void svm_do_nested_pgfault(struct vcpu *v,
         p2m = p2m_get_p2m(v);
         _d.gpa = gpa;
         _d.qualification = 0;
-        _d.mfn = mfn_x(gfn_to_mfn_query(p2m, gfn, &_d.p2mt));
+        _d.mfn = mfn_x(gfn_to_mfn_type_p2m(p2m, gfn, &_d.p2mt, &p2ma, p2m_query));
         
         __trace_var(TRC_HVM_NPF, 0, sizeof(_d), &_d);
     }
@@ -1163,7 +1164,7 @@ static void svm_do_nested_pgfault(struct vcpu *v,
     if ( p2m == NULL )
         p2m = p2m_get_p2m(v);
     /* Everything else is an error. */
-    mfn = gfn_to_mfn_guest(p2m, gfn, &p2mt);
+    mfn = gfn_to_mfn_type_p2m(p2m, gfn, &p2mt, &p2ma, p2m_guest);
     gdprintk(XENLOG_ERR,
          "SVM violation gpa %#"PRIpaddr", mfn %#lx, type %i\n",
          gpa, mfn_x(mfn), p2mt);
