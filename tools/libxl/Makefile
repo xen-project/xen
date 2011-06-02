@@ -69,7 +69,7 @@ $(eval $(genpath-target))
 
 _libxl_paths.h: genpath
 	sed -e "s/\([^=]*\)=\(.*\)/#define \1 \2/g" $@.tmp >$@.2.tmp
-	if ! cmp $@.2.tmp $@; then mv -f $@.2.tmp $@; fi
+	if ! cmp -s $@.2.tmp $@; then mv -f $@.2.tmp $@; fi
 
 libxl_paths.c: _libxl_paths.h
 
