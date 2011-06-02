@@ -915,6 +915,101 @@ void p2m_mem_access_resume(struct p2m_domain *p2m)
      * was available */
     mem_event_unpause_vcpus(d);
 }
+
+
+/* Set access type for a region of pfns.
+ * If start_pfn == -1ul, sets the default access type */
+int p2m_set_mem_access(struct domain *d, unsigned long start_pfn, 
+                       uint32_t nr, hvmmem_access_t access) 
+{
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+    unsigned long pfn;
+    p2m_access_t a;
+    p2m_type_t t;
+    mfn_t mfn;
+    int rc = 0;
+
+    /* N.B. _not_ static: initializer depends on p2m->default_access */
+    p2m_access_t memaccess[] = {
+        p2m_access_n,
+        p2m_access_r,
+        p2m_access_w,
+        p2m_access_rw,
+        p2m_access_x,
+        p2m_access_rx,
+        p2m_access_wx,
+        p2m_access_rwx,
+        p2m_access_rx2rw,
+        p2m->default_access,
+    };
+
+    if ( access >= HVMMEM_access_default || access < 0 )
+        return -EINVAL;
+
+    a = memaccess[access];
+
+    /* If request to set default access */
+    if ( start_pfn == ~0ull ) 
+    {
+        p2m->default_access = a;
+        return 0;
+    }
+
+    p2m_lock(p2m);
+    for ( pfn = start_pfn; pfn < start_pfn + nr; pfn++ )
+    {
+        mfn = gfn_to_mfn_query(d, pfn, &t);
+        if ( p2m->set_entry(p2m, pfn, mfn, 0, t, a) == 0 )
+        {
+            rc = -ENOMEM;
+            break;
+        }
+    }
+    p2m_unlock(p2m);
+    return rc;
+}
+
+/* Get access type for a pfn
+ * If pfn == -1ul, gets the default access type */
+int p2m_get_mem_access(struct domain *d, unsigned long pfn, 
+                       hvmmem_access_t *access)
+{
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+    p2m_type_t t;
+    p2m_access_t a;
+    mfn_t mfn;
+
+    static const hvmmem_access_t memaccess[] = {
+        HVMMEM_access_n,
+        HVMMEM_access_r,
+        HVMMEM_access_w,
+        HVMMEM_access_rw,
+        HVMMEM_access_x,
+        HVMMEM_access_rx,
+        HVMMEM_access_wx,
+        HVMMEM_access_rwx,
+        HVMMEM_access_rx2rw
+    };
+
+    /* If request to get default access */
+    if ( pfn == ~0ull ) 
+    {
+        *access = memaccess[p2m->default_access];
+        return 0;
+    }
+
+    mfn = p2m->get_entry(p2m, pfn, &t, &a, p2m_query);
+    if ( mfn_x(mfn) == INVALID_MFN )
+        return -ESRCH;
+    
+    if ( a >= ARRAY_SIZE(memaccess) || a < 0 )
+        return -ERANGE;
+
+    *access =  memaccess[a];
+    return 0;
+}
+
+
 #endif /* __x86_64__ */
 
 static struct p2m_domain *

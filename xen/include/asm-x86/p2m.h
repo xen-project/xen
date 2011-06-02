@@ -553,6 +553,17 @@ void p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long gla
                           bool_t access_r, bool_t access_w, bool_t access_x);
 /* Resumes the running of the VCPU, restarting the last instruction */
 void p2m_mem_access_resume(struct p2m_domain *p2m);
+
+/* Set access type for a region of pfns.
+ * If start_pfn == -1ul, sets the default access type */
+int p2m_set_mem_access(struct domain *d, unsigned long start_pfn, 
+                       uint32_t nr, hvmmem_access_t access);
+
+/* Get access type for a pfn
+ * If pfn == -1ul, gets the default access type */
+int p2m_get_mem_access(struct domain *d, unsigned long pfn, 
+                       hvmmem_access_t *access);
+
 #else
 static inline void p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, 
                                         unsigned long gla, bool_t access_r, 

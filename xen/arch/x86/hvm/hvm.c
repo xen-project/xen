@@ -3814,21 +3814,6 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
     {
         struct xen_hvm_set_mem_access a;
         struct domain *d;
-        struct p2m_domain *p2m;
-        unsigned long pfn;
-        
-        p2m_access_t memaccess[] = {
-            p2m_access_n,
-            p2m_access_r,
-            p2m_access_w,
-            p2m_access_rw,
-            p2m_access_x,
-            p2m_access_rx,
-            p2m_access_wx,
-            p2m_access_rwx,
-            p2m_access_rx2rw,
-            0,  /* HVMMEM_access_default -- will get set below */
-        };
 
         if ( copy_from_guest(&a, arg, 1) )
             return -EFAULT;
@@ -3841,42 +3826,13 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         if ( !is_hvm_domain(d) )
             goto param_fail5;
 
-        p2m = p2m_get_hostp2m(d);
-        memaccess[HVMMEM_access_default] = p2m->default_access;
-
-        /* If request to set default access */
-        if ( a.first_pfn == ~0ull ) 
-        {
-            rc = 0;
-            p2m->default_access = memaccess[a.hvmmem_access];
-            goto param_fail5;
-        }
-
         rc = -EINVAL;
         if ( (a.first_pfn > domain_get_maximum_gpfn(d)) ||
              ((a.first_pfn + a.nr - 1) < a.first_pfn) ||
              ((a.first_pfn + a.nr - 1) > domain_get_maximum_gpfn(d)) )
             goto param_fail5;
             
-        if ( a.hvmmem_access >= ARRAY_SIZE(memaccess) )
-            goto param_fail5;
-
-        for ( pfn = a.first_pfn; pfn < a.first_pfn + a.nr; pfn++ )
-        {
-            p2m_type_t t;
-            mfn_t mfn;
-            int success;
-
-            mfn = gfn_to_mfn_unshare(d, pfn, &t);
-
-            p2m_lock(p2m);
-            success = p2m->set_entry(p2m, pfn, mfn, 0, t, memaccess[a.hvmmem_access]);
-            p2m_unlock(p2m);
-            if ( !success )
-                goto param_fail5;
-        }
-
-        rc = 0;
+        rc = p2m_set_mem_access(d, a.first_pfn, a.nr, a.hvmmem_access);
 
     param_fail5:
         rcu_unlock_domain(d);
@@ -3887,23 +3843,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
     {
         struct xen_hvm_get_mem_access a;
         struct domain *d;
-        struct p2m_domain *p2m;
-        p2m_type_t t;
-        p2m_access_t ac;
-        mfn_t mfn;
-
-        /* Interface access to internal p2m accesses */
-        hvmmem_access_t memaccess[] = {
-            HVMMEM_access_n,
-            HVMMEM_access_r,
-            HVMMEM_access_w,
-            HVMMEM_access_rw,
-            HVMMEM_access_x,
-            HVMMEM_access_rx,
-            HVMMEM_access_wx,
-            HVMMEM_access_rwx,
-            HVMMEM_access_rx2rw
-        };
+        hvmmem_access_t access;
 
         if ( copy_from_guest(&a, arg, 1) )
             return -EFAULT;
@@ -3916,30 +3856,15 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         if ( !is_hvm_domain(d) )
             goto param_fail6;
 
-        p2m = p2m_get_hostp2m(d);
-        
-        if ( a.pfn == ~0ull ) 
-        {
-            a.hvmmem_access = memaccess[p2m->default_access];
-        }
-        else {
-            rc = -EINVAL;
-            if ( (a.pfn > domain_get_maximum_gpfn(d)) )
-                goto param_fail6;
+        rc = -EINVAL;
+        if ( (a.pfn > domain_get_maximum_gpfn(d)) && a.pfn != ~0ull )
+            goto param_fail6;
 
-            rc = -ESRCH;
-            mfn = p2m->get_entry(p2m, a.pfn, &t, &ac, p2m_query);
+        rc = p2m_get_mem_access(d, a.pfn, &access);
+        if ( rc != 0 )
+            goto param_fail6;
 
-            if ( mfn_x(mfn) == INVALID_MFN )
-                goto param_fail6;
-            
-            rc = -ERANGE;
-            if ( ac >= ARRAY_SIZE(memaccess) )
-                goto param_fail6;
-        
-            a.hvmmem_access = memaccess[ac];
-        }
-
+        a.hvmmem_access = access;
         rc = copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
 
     param_fail6:
