@@ -82,14 +82,14 @@ nestedp2m_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
     struct domain *d = p2m->domain;
     uint32_t old_flags;
 
-    hap_lock(d);
+    paging_lock(d);
 
     old_flags = l1e_get_flags(*p);
     safe_write_pte(p, new);
     if (old_flags & _PAGE_PRESENT)
         nestedhvm_vmcx_flushtlb(p2m);
     
-    hap_unlock(d);
+    paging_unlock(d);
 }
 
 /********************************************/

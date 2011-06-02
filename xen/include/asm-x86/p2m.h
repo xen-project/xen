@@ -337,8 +337,8 @@ static inline mfn_t gfn_to_mfn_type(struct domain *d,
 
 /* Syntactic sugar: most callers will use one of these. 
  * N.B. gfn_to_mfn_query() is the _only_ one guaranteed not to take the
- * p2m lock; none of the others can be called with the p2m, hap or
- * shadow lock held. */
+ * p2m lock; none of the others can be called with the p2m or paging
+ * lock held. */
 #define gfn_to_mfn(d, g, t)         gfn_to_mfn_type((d), (g), (t), p2m_alloc)
 #define gfn_to_mfn_query(d, g, t)   gfn_to_mfn_type((d), (g), (t), p2m_query)
 #define gfn_to_mfn_guest(d, g, t)   gfn_to_mfn_type((d), (g), (t), p2m_guest)

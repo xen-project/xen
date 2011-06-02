@@ -292,7 +292,7 @@ static inline shadow_l4e_t shadow_l4e_from_mfn(mfn_t mfn, u32 flags)
  * MMIO emulation, and faults where the guest PTE is not present.  We
  * record these as shadow l1 entries that have reserved bits set in
  * them, so we can spot them immediately in the fault handler and handle
- * them without needing to hold the shadow lock or walk the guest
+ * them without needing to hold the paging lock or walk the guest
  * pagetables.
  *
  * This is only feasible for PAE and 64bit Xen: 32-bit non-PAE PTEs don't

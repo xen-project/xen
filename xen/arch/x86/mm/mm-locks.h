@@ -114,55 +114,26 @@ declare_mm_lock(p2m)
 #define p2m_unlock(p)         mm_unlock(&(p)->lock)
 #define p2m_locked_by_me(p)   mm_locked_by_me(&(p)->lock)
 
-/* Shadow lock (per-domain)
+/* Paging lock (per-domain)
  *
- * This lock is intended to allow us to make atomic updates to the
- * software TLB that the shadow pagetables provide.
- *
- * Specifically, it protects:
+ * For shadow pagetables, this lock protects
  *   - all changes to shadow page table pages
  *   - the shadow hash table
  *   - the shadow page allocator 
  *   - all changes to guest page table pages
  *   - all changes to the page_info->tlbflush_timestamp
- *   - the page_info->count fields on shadow pages */
-
-declare_mm_lock(shadow)
-#define shadow_lock(d)         mm_lock(shadow, &(d)->arch.paging.shadow.lock)
-#define shadow_lock_recursive(d) \
-                     mm_lock_recursive(shadow, &(d)->arch.paging.shadow.lock)
-#define shadow_unlock(d)       mm_unlock(&(d)->arch.paging.shadow.lock)
-#define shadow_locked_by_me(d) mm_locked_by_me(&(d)->arch.paging.shadow.lock)
-
-/* HAP lock (per-domain)
+ *   - the page_info->count fields on shadow pages 
  * 
- * Equivalent of the shadow lock for HAP.  Protects updates to the
- * NPT and EPT tables, and the HAP page allocator. */
-
-declare_mm_lock(hap)
-#define hap_lock(d)         mm_lock(hap, &(d)->arch.paging.hap.lock)
-#define hap_lock_recursive(d) \
-                  mm_lock_recursive(hap, &(d)->arch.paging.hap.lock)
-#define hap_unlock(d)       mm_unlock(&(d)->arch.paging.hap.lock)
-#define hap_locked_by_me(d) mm_locked_by_me(&(d)->arch.paging.hap.lock)
-
-/* Log-dirty lock (per-domain) 
+ * For HAP, it protects the NPT/EPT tables and mode changes. 
  * 
- * Protects the log-dirty bitmap from concurrent accesses (and teardowns, etc).
- *
- * Because mark_dirty is called from a lot of places, the log-dirty lock
- * may be acquired with the shadow or HAP locks already held.  When the
- * log-dirty code makes callbacks into HAP or shadow code to reset
- * various traps that will trigger the mark_dirty calls, it must *not*
- * have the log-dirty lock held, or it risks deadlock.  Because the only
- * purpose of those calls is to make sure that *guest* actions will
- * cause mark_dirty to be called (hypervisor actions explictly call it
- * anyway), it is safe to release the log-dirty lock before the callback
- * as long as the domain is paused for the entire operation. */
+ * It also protects the log-dirty bitmap from concurrent accesses (and
+ * teardowns, etc). */
 
-declare_mm_lock(log_dirty)
-#define log_dirty_lock(d) mm_lock(log_dirty, &(d)->arch.paging.log_dirty.lock)
-#define log_dirty_unlock(d) mm_unlock(&(d)->arch.paging.log_dirty.lock)
-
+declare_mm_lock(paging)
+#define paging_lock(d)         mm_lock(paging, &(d)->arch.paging.lock)
+#define paging_lock_recursive(d) \
+                    mm_lock_recursive(paging, &(d)->arch.paging.lock)
+#define paging_unlock(d)       mm_unlock(&(d)->arch.paging.lock)
+#define paging_locked_by_me(d) mm_locked_by_me(&(d)->arch.paging.lock)
 
 #endif /* _MM_LOCKS_H */

@@ -533,7 +533,7 @@ static inline int sh_get_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
         return 0;
     }
     
-    /* Guarded by the shadow lock, so no need for atomic update */
+    /* Guarded by the paging lock, so no need for atomic update */
     sp->u.sh.count = nx;
 
     /* We remember the first shadow entry that points to each shadow. */
@@ -573,7 +573,7 @@ static inline void sh_put_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
         BUG();
     }
 
-    /* Guarded by the shadow lock, so no need for atomic update */
+    /* Guarded by the paging lock, so no need for atomic update */
     sp->u.sh.count = nx;
 
     if ( unlikely(nx == 0) ) 

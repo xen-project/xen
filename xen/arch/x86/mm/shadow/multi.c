@@ -203,7 +203,7 @@ shadow_check_gwalk(struct vcpu *v, unsigned long va, walk_t *gw, int version)
 #endif
     int mismatch = 0;
 
-    ASSERT(shadow_locked_by_me(d));
+    ASSERT(paging_locked_by_me(d));
 
     if ( version == atomic_read(&d->arch.paging.shadow.gtable_dirty_version) )
          return 1;
@@ -781,7 +781,7 @@ l1e_propagate_from_guest(struct vcpu *v,
 static inline void safe_write_entry(void *dst, void *src) 
 /* Copy one PTE safely when processors might be running on the
  * destination pagetable.   This does *not* give safety against
- * concurrent writes (that's what the shadow lock is for), just 
+ * concurrent writes (that's what the paging lock is for), just 
  * stops the hardware picking up partially written entries. */
 {
     volatile unsigned long *d = dst;
@@ -3133,17 +3133,17 @@ static int sh_page_fault(struct vcpu *v,
      * do is let Xen's normal fault handlers try to fix it.  In any case, 
      * a diagnostic trace of the fault will be more useful than 
      * a BUG() when we try to take the lock again. */
-    if ( unlikely(shadow_locked_by_me(d)) )
+    if ( unlikely(paging_locked_by_me(d)) )
     {
         SHADOW_ERROR("Recursive shadow fault: lock was taken by %s\n",
-                     d->arch.paging.shadow.lock.locker_function);
+                     d->arch.paging.lock.locker_function);
         return 0;
     }
 
  rewalk:
 
     /* The walk is done in a lock-free style, with some sanity check
-     * postponed after grabbing shadow lock later. Those delayed checks
+     * postponed after grabbing paging lock later. Those delayed checks
      * will make sure no inconsistent mapping being translated into
      * shadow page table. */ 
     version = atomic_read(&d->arch.paging.shadow.gtable_dirty_version);
@@ -3201,7 +3201,7 @@ static int sh_page_fault(struct vcpu *v,
                 regs->error_code | PFEC_page_present);
 #endif /* (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB) */
 
-    shadow_lock(d);
+    paging_lock(d);
 
     TRACE_CLEAR_PATH_FLAGS;
 
@@ -3235,7 +3235,7 @@ static int sh_page_fault(struct vcpu *v,
     /* Second bit set: Resynced a page. Re-walk needed. */
     if ( rc & GW_RMWR_REWALK )
     {
-        shadow_unlock(d);
+        paging_unlock(d);
         goto rewalk;
     }
 #endif /* OOS */
@@ -3243,7 +3243,7 @@ static int sh_page_fault(struct vcpu *v,
     if ( !shadow_check_gwalk(v, va, &gw, version) )
     {
         perfc_incr(shadow_inconsistent_gwalk);
-        shadow_unlock(d);
+        paging_unlock(d);
         goto rewalk;
     }
 
@@ -3269,7 +3269,7 @@ static int sh_page_fault(struct vcpu *v,
 #else
         ASSERT(d->is_shutting_down);
 #endif
-        shadow_unlock(d);
+        paging_unlock(d);
         trace_shadow_gen(TRC_SHADOW_DOMF_DYING, va);
         return 0;
     }
@@ -3286,7 +3286,7 @@ static int sh_page_fault(struct vcpu *v,
          * sh_remove_shadows() in a previous sh_resync() call has
          * failed. We cannot safely continue since some page is still
          * OOS but not in the hash table anymore. */
-        shadow_unlock(d);
+        paging_unlock(d);
         return 0;
     }
 
@@ -3295,7 +3295,7 @@ static int sh_page_fault(struct vcpu *v,
     if ( shadow_check_gl1e(v, &gw)  )
     {
         perfc_incr(shadow_inconsistent_gwalk);
-        shadow_unlock(d);
+        paging_unlock(d);
         goto rewalk;
     }
 #endif /* OOS */
@@ -3388,7 +3388,7 @@ static int sh_page_fault(struct vcpu *v,
     sh_audit_gw(v, &gw);
     SHADOW_PRINTK("fixed\n");
     shadow_audit_tables(v);
-    shadow_unlock(d);
+    paging_unlock(d);
     return EXCRET_fault_fixed;
 
  emulate:
@@ -3456,7 +3456,7 @@ static int sh_page_fault(struct vcpu *v,
      */
     sh_audit_gw(v, &gw);
     shadow_audit_tables(v);
-    shadow_unlock(d);
+    paging_unlock(d);
 
     this_cpu(trace_emulate_write_val) = 0;
 
@@ -3594,7 +3594,7 @@ static int sh_page_fault(struct vcpu *v,
     SHADOW_PRINTK("mmio %#"PRIpaddr"\n", gpa);
     shadow_audit_tables(v);
     reset_early_unshadow(v);
-    shadow_unlock(d);
+    paging_unlock(d);
     trace_shadow_gen(TRC_SHADOW_MMIO, va);
     return (handle_mmio_with_translation(va, gpa >> PAGE_SHIFT)
             ? EXCRET_fault_fixed : 0);
@@ -3604,7 +3604,7 @@ static int sh_page_fault(struct vcpu *v,
     SHADOW_PRINTK("not a shadow fault\n");
     shadow_audit_tables(v);
     reset_early_unshadow(v);
-    shadow_unlock(d);
+    paging_unlock(d);
 
 propagate:
     trace_not_shadow_fault(gw.l1e, va);
@@ -3644,7 +3644,7 @@ sh_invlpg(struct vcpu *v, unsigned long va)
                & _PAGE_PRESENT) )
             return 0;
         /* This must still be a copy-from-user because we don't have the
-         * shadow lock, and the higher-level shadows might disappear
+         * paging lock, and the higher-level shadows might disappear
          * under our feet. */
         if ( __copy_from_user(&sl3e, (sh_linear_l3_table(v) 
                                       + shadow_l3_linear_offset(va)),
@@ -3700,11 +3700,11 @@ sh_invlpg(struct vcpu *v, unsigned long va)
              && page_is_out_of_sync(pg) )
         {
             /* The test above may give false positives, since we don't
-             * hold the shadow lock yet.  Check again with the lock held. */
-            shadow_lock(v->domain);
+             * hold the paging lock yet.  Check again with the lock held. */
+            paging_lock(v->domain);
 
             /* This must still be a copy-from-user because we didn't
-             * have the shadow lock last time we checked, and the
+             * have the paging lock last time we checked, and the
              * higher-level shadows might have disappeared under our
              * feet. */
             if ( __copy_from_user(&sl2e, 
@@ -3713,13 +3713,13 @@ sh_invlpg(struct vcpu *v, unsigned long va)
                                   sizeof (sl2e)) != 0 )
             {
                 perfc_incr(shadow_invlpg_fault);
-                shadow_unlock(v->domain);
+                paging_unlock(v->domain);
                 return 0;
             }
 
             if ( !(shadow_l2e_get_flags(sl2e) & _PAGE_PRESENT) )
             {
-                shadow_unlock(v->domain);
+                paging_unlock(v->domain);
                 return 0;
             }
 
@@ -3736,7 +3736,7 @@ sh_invlpg(struct vcpu *v, unsigned long va)
                 (void) shadow_set_l1e(v, sl1, shadow_l1e_empty(),
                                       p2m_invalid, sl1mfn);
             }
-            shadow_unlock(v->domain);
+            paging_unlock(v->domain);
             /* Need the invlpg, to pick up the disappeareance of the sl1e */
             return 1;
         }
@@ -4153,7 +4153,7 @@ sh_update_cr3(struct vcpu *v, int do_locking)
  * this function will call hvm_update_guest_cr(v, 3) to tell them where the 
  * shadow tables are.
  * If do_locking != 0, assume we are being called from outside the 
- * shadow code, and must take and release the shadow lock; otherwise 
+ * shadow code, and must take and release the paging lock; otherwise 
  * that is the caller's responsibility.
  */
 {
@@ -4172,7 +4172,7 @@ sh_update_cr3(struct vcpu *v, int do_locking)
         return;
     }
 
-    if ( do_locking ) shadow_lock(v->domain);
+    if ( do_locking ) paging_lock(v->domain);
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
     /* Need to resync all the shadow entries on a TLB flush.  Resync
@@ -4181,7 +4181,7 @@ sh_update_cr3(struct vcpu *v, int do_locking)
     shadow_resync_current_vcpu(v);
 #endif
 
-    ASSERT(shadow_locked_by_me(v->domain));
+    ASSERT(paging_locked_by_me(v->domain));
     ASSERT(v->arch.paging.mode);
 
     ////
@@ -4415,7 +4415,7 @@ sh_update_cr3(struct vcpu *v, int do_locking)
 #endif
 
     /* Release the lock, if we took it (otherwise it's the caller's problem) */
-    if ( do_locking ) shadow_unlock(v->domain);
+    if ( do_locking ) paging_unlock(v->domain);
 }
 
 
@@ -4695,7 +4695,7 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
     guest_l3e_t *gl3e = NULL;
     paddr_t gl2a = 0;
 
-    shadow_lock(v->domain);
+    paging_lock(v->domain);
 
     gcr3 = (v->arch.hvm_vcpu.guest_cr[3]);
     /* fast path: the pagetable belongs to the current context */
@@ -4747,7 +4747,7 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
 out:
     if ( !fast_path )
         unmap_domain_page(gl3pa);
-    shadow_unlock(v->domain);
+    paging_unlock(v->domain);
 }
 #else
 static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
@@ -4755,7 +4755,7 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
     mfn_t smfn, gmfn;
     p2m_type_t p2mt;
 
-    shadow_lock(v->domain);
+    paging_lock(v->domain);
 
     gmfn = gfn_to_mfn_query(v->domain, _gfn(gpa >> PAGE_SHIFT), &p2mt);
 #if GUEST_PAGING_LEVELS == 2
@@ -4778,7 +4778,7 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
 
     v->arch.paging.shadow.pagetable_dying = 1;
 
-    shadow_unlock(v->domain);
+    paging_unlock(v->domain);
 }
 #endif
 
@@ -4810,8 +4810,8 @@ static mfn_t emulate_gva_to_mfn(struct vcpu *v,
     }
 
     /* Translate the GFN to an MFN */
-    /* PoD: query only if shadow lock is held (to avoid deadlock) */
-    if ( shadow_locked_by_me(v->domain) )
+    /* PoD: query only if paging lock is held (to avoid deadlock) */
+    if ( paging_locked_by_me(v->domain) )
         mfn = gfn_to_mfn_query(v->domain, _gfn(gfn), &p2mt);
     else
         mfn = gfn_to_mfn(v->domain, _gfn(gfn), &p2mt);
@@ -5000,7 +5000,7 @@ sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
     if ( emulate_map_dest_failed(addr) )
         return (long)addr;
 
-    shadow_lock(v->domain);
+    paging_lock(v->domain);
     memcpy(addr, src, bytes);
 
     if ( tb_init_done )
@@ -5021,7 +5021,7 @@ sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
 
     emulate_unmap_dest(v, addr, bytes, sh_ctxt);
     shadow_audit_tables(v);
-    shadow_unlock(v->domain);
+    paging_unlock(v->domain);
     return X86EMUL_OKAY;
 }
 
@@ -5042,7 +5042,7 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
     if ( emulate_map_dest_failed(addr) )
         return (long)addr;
 
-    shadow_lock(v->domain);
+    paging_lock(v->domain);
     switch ( bytes )
     {
     case 1: prev = cmpxchg(((u8 *)addr), old, new);  break;
@@ -5063,7 +5063,7 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
 
     emulate_unmap_dest(v, addr, bytes, sh_ctxt);
     shadow_audit_tables(v);
-    shadow_unlock(v->domain);
+    paging_unlock(v->domain);
     return rv;
 }
 
@@ -5089,7 +5089,7 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
     old = (((u64) old_hi) << 32) | (u64) old_lo;
     new = (((u64) new_hi) << 32) | (u64) new_lo;
 
-    shadow_lock(v->domain);
+    paging_lock(v->domain);
     prev = cmpxchg(((u64 *)addr), old, new);
 
     if ( prev != old )
@@ -5097,7 +5097,7 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
 
     emulate_unmap_dest(v, addr, 8, sh_ctxt);
     shadow_audit_tables(v);
-    shadow_unlock(v->domain);
+    paging_unlock(v->domain);
     return rv;
 }
 #endif
