@@ -85,6 +85,7 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version, xentoollog_logger * lg)
 
 int libxl_ctx_free(libxl_ctx *ctx)
 {
+    if (!ctx) return 0;
     if (ctx->xch) xc_interface_close(ctx->xch);
     libxl_version_info_destroy(&ctx->version_info);
     if (ctx->xsh) xs_daemon_close(ctx->xsh); 

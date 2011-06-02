@@ -232,7 +232,7 @@ typedef struct {
 
 /* context functions */
 int libxl_ctx_alloc(libxl_ctx **pctx, int version, xentoollog_logger *lg);
-int libxl_ctx_free(libxl_ctx *ctx);
+int libxl_ctx_free(libxl_ctx *ctx /* 0 is OK */);
 int libxl_ctx_postfork(libxl_ctx *ctx);
 
 /* domain related functions */
