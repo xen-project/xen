@@ -48,7 +48,7 @@ static unsigned int pcidev_encode_bdf(libxl_device_pci *pcidev)
     value = 0;
     value |= (pcidev->bus & 0xff) << 16;
     value |= (pcidev->dev & 0x1f) << (8+3);
-    value |= (pcidev->func & 0x3) << (8+0);
+    value |= (pcidev->func & 0x7) << (8+0);
 
     return value;
 }
