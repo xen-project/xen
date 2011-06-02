@@ -296,12 +296,10 @@ void p2m_teardown(struct p2m_domain *p2m)
     if (p2m == NULL)
         return;
 
-    p2m_lock(p2m);
-
 #ifdef __x86_64__
     for ( gfn=0; gfn < p2m->max_mapped_pfn; gfn++ )
     {
-        mfn = p2m->get_entry(p2m, gfn, &t, &a, p2m_query);
+        mfn = gfn_to_mfn_type_p2m(p2m, gfn, &t, &a, p2m_query);
         if ( mfn_valid(mfn) && (t == p2m_ram_shared) )
         {
             ASSERT(!p2m_is_nestedp2m(p2m));
@@ -310,6 +308,8 @@ void p2m_teardown(struct p2m_domain *p2m)
 
     }
 #endif
+
+    p2m_lock(p2m);
 
     p2m->phys_table = pagetable_null();
 

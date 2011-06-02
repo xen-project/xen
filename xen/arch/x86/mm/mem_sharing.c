@@ -225,7 +225,7 @@ static void mem_sharing_audit(void)
     int bucket;
     struct page_info *pg;
 
-    shr_lock();
+    ASSERT(shr_locked_by_me());
 
     for(bucket=0; bucket < SHR_HASH_LENGTH; bucket++)
     {
@@ -285,8 +285,6 @@ static void mem_sharing_audit(void)
             e = e->next;
         }
     }
-
-    shr_unlock();
 }
 #endif
 
@@ -632,10 +630,10 @@ int mem_sharing_unshare_page(struct domain *d,
     shr_handle_t handle;
     struct list_head *le;
 
-    mem_sharing_audit();
-    /* Remove the gfn_info from the list */
     shr_lock();
+    mem_sharing_audit();
     
+    /* Remove the gfn_info from the list */
     mfn = gfn_to_mfn(d, gfn, &p2mt);
     
     /* Has someone already unshared it? */
@@ -739,7 +737,6 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
         case XEN_DOMCTL_MEM_SHARING_OP_CONTROL:
         {
             d->arch.hvm_domain.mem_sharing_enabled = mec->u.enable;
-            mem_sharing_audit();
             rc = 0;
         }
         break;
@@ -752,7 +749,6 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
                 return -EINVAL;
             rc = mem_sharing_nominate_page(d, gfn, 0, &handle);
             mec->u.nominate.handle = handle;
-            mem_sharing_audit();
         }
         break;
 
@@ -768,7 +764,6 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
                 return -EINVAL;
             rc = mem_sharing_nominate_page(d, gfn, 3, &handle);
             mec->u.nominate.handle = handle;
-            mem_sharing_audit();
         }
         break;
 
@@ -777,7 +772,6 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
             shr_handle_t sh = mec->u.share.source_handle;
             shr_handle_t ch = mec->u.share.client_handle;
             rc = mem_sharing_share_pages(sh, ch); 
-            mem_sharing_audit();
         }
         break;
 
@@ -785,7 +779,6 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
         {
             if(!mem_sharing_enabled(d))
                 return -EINVAL;
-            mem_sharing_audit();
             rc = mem_sharing_sharing_resume(d);
         }
         break;
@@ -794,7 +787,6 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
         {
             unsigned long gfn = mec->u.debug.u.gfn;
             rc = mem_sharing_debug_gfn(d, gfn);
-            mem_sharing_audit();
         }
         break;
 
@@ -802,7 +794,6 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
         {
             unsigned long mfn = mec->u.debug.u.mfn;
             rc = mem_sharing_debug_mfn(mfn);
-            mem_sharing_audit();
         }
         break;
 
@@ -810,7 +801,6 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
         {
             grant_ref_t gref = mec->u.debug.u.gref;
             rc = mem_sharing_debug_gref(d, gref);
-            mem_sharing_audit();
         }
         break;
 
@@ -818,6 +808,10 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
             rc = -ENOSYS;
             break;
     }
+
+    shr_lock();
+    mem_sharing_audit();
+    shr_unlock();
 
     return rc;
 }
