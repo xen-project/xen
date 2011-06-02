@@ -45,4 +45,8 @@ typedef struct {
     void *scanner;
 } CfgParseContext;
 
+
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+
 #endif /*LIBXLU_INTERNAL_H*/

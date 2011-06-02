@@ -38,8 +38,6 @@
 
 #define PAGE_TO_MEMKB(pages) ((pages) * 4)
 #define BACKEND_STRING_SIZE 5
-#define STRINGIFY(x) #x
-#define TOSTRING(x) STRINGIFY(x)
 
 int libxl_ctx_alloc(libxl_ctx **pctx, int version, xentoollog_logger * lg)
 {
