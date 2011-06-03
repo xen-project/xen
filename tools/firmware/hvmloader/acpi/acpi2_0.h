@@ -98,11 +98,6 @@ struct acpi_20_rsdp {
 };
 
 /*
- * The maximum number of entrys in RSDT or XSDT.
- */
-#define ACPI_MAX_NUM_TABLES 5
-
-/*
  * Root System Description Table (RSDT).
  */
 struct acpi_20_rsdt {
