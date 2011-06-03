@@ -178,7 +178,7 @@ endif
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG := xen-4.0.2-rc4
+QEMU_TAG := xen-4.0.2-rc5
 #QEMU_TAG ?= 6d5b7ee3acfe8cc10681d2583a38398f7470ec2a
 # Wed Jan 5 23:42:03 2011 +0000
 # Change tap device mac address to prevent change of bridge's mac
