@@ -817,6 +817,7 @@ static void pv_cpuid(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_NODEID_MSR % 32, &c);
         __clear_bit(X86_FEATURE_TOPOEXT % 32, &c);
         break;
+    case 7:
     case 0xd: /* XSAVE */
     case 5: /* MONITOR/MWAIT */
     case 0xa: /* Architectural Performance Monitor Features */
