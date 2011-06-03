@@ -106,7 +106,7 @@ xenstore_write() {
 #
 call_hooks() {
   for f in /etc/xen/scripts/${1}-${2}.d/*.hook; do
-    [ -x "$f" ] && . "$f"
+    if [ -x "$f" ]; then . "$f"; fi
   done
 }
 
