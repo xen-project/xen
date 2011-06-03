@@ -57,6 +57,10 @@ integer_param("maxcpus", max_cpus);
 static bool_t __initdata opt_watchdog;
 boolean_param("watchdog", opt_watchdog);
 
+/* smep: Enable/disable Supervisor Mode Execution Protection (default on). */
+static bool_t __initdata disable_smep;
+invbool_param("smep", disable_smep);
+
 /* **** Linux config option: propagated to domain0. */
 /* "acpi=off":    Sisables both ACPI table parsing and interpreter. */
 /* "acpi=force":  Override the disable blacklist.                   */
@@ -1200,10 +1204,16 @@ void __init __start_xen(unsigned long mbi_p)
     arch_init_memory();
 
     identify_cpu(&boot_cpu_data);
+
     if ( cpu_has_fxsr )
         set_in_cr4(X86_CR4_OSFXSR);
     if ( cpu_has_xmm )
         set_in_cr4(X86_CR4_OSXMMEXCPT);
+
+    if ( disable_smep )
+        setup_clear_cpu_cap(X86_FEATURE_SMEP);
+    if ( cpu_has_smep )
+        set_in_cr4(X86_CR4_SMEP);
 
     local_irq_enable();
 

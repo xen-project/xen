@@ -141,8 +141,9 @@
 #define X86_FEATURE_TBM         (6*32+21) /* trailing bit manipulations */
 #define X86_FEATURE_TOPOEXT     (6*32+22) /* topology extensions CPUID leafs */
 
-/* Intel-defined CPU features, CPUID level 0x00000007:0 (ebx), word 9 */
+/* Intel-defined CPU features, CPUID level 0x00000007:0 (ebx), word 7 */
 #define X86_FEATURE_FSGSBASE	(7*32+ 0) /* {RD,WR}{FS,GS}BASE instructions */
+#define X86_FEATURE_SMEP	(7*32+ 7) /* Supervisor Mode Execution Protection */
 
 #define cpu_has(c, bit)		test_bit(bit, (c)->x86_capability)
 #define boot_cpu_has(bit)	test_bit(bit, boot_cpu_data.x86_capability)
@@ -201,6 +202,8 @@
 #define cpu_has_efer		1
 #define cpu_has_fsgsbase	boot_cpu_has(X86_FEATURE_FSGSBASE)
 #endif
+
+#define cpu_has_smep            boot_cpu_has(X86_FEATURE_SMEP)
 
 #define cpu_has_ffxsr           ((boot_cpu_data.x86_vendor == X86_VENDOR_AMD) \
                                  && boot_cpu_has(X86_FEATURE_FFXSR))
