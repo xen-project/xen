@@ -17,7 +17,7 @@
 #ifndef __LIBXC_CPUFEATURE_H
 #define __LIBXC_CPUFEATURE_H
 
-/* Intel-defined CPU features, CPUID level 0x00000001 (edx), word 0 */
+/* Intel-defined CPU features, CPUID level 0x00000001 (edx) */
 #define X86_FEATURE_FPU          0 /* Onboard FPU */
 #define X86_FEATURE_VME          1 /* Virtual Mode Extensions */
 #define X86_FEATURE_DE           2 /* Debugging Extensions */
@@ -49,7 +49,7 @@
 #define X86_FEATURE_IA64        30 /* IA-64 processor */
 #define X86_FEATURE_PBE         31 /* Pending Break Enable */
 
-/* AMD-defined CPU features, CPUID level 0x80000001, word 1 */
+/* AMD-defined CPU features, CPUID level 0x80000001 */
 /* Don't duplicate feature flags which are redundant with Intel! */
 #define X86_FEATURE_SYSCALL     11 /* SYSCALL/SYSRET */
 #define X86_FEATURE_MP          19 /* MP Capable. */
@@ -62,7 +62,7 @@
 #define X86_FEATURE_3DNOWEXT    30 /* AMD 3DNow! extensions */
 #define X86_FEATURE_3DNOW       31 /* 3DNow! */
 
-/* Intel-defined CPU features, CPUID level 0x00000001 (ecx), word 4 */
+/* Intel-defined CPU features, CPUID level 0x00000001 (ecx) */
 #define X86_FEATURE_XMM3         0 /* Streaming SIMD Extensions-3 */
 #define X86_FEATURE_PCLMULQDQ    1 /* Carry-less multiplication */
 #define X86_FEATURE_DTES64       2 /* 64-bit Debug Store */
@@ -89,7 +89,7 @@
 #define X86_FEATURE_F16C        29 /* Half-precision convert instruction */
 #define X86_FEATURE_HYPERVISOR  31 /* Running under some hypervisor */
 
-/* VIA/Cyrix/Centaur-defined CPU features, CPUID level 0xC0000001, word 5 */
+/* VIA/Cyrix/Centaur-defined CPU features, CPUID level 0xC0000001 */
 #define X86_FEATURE_XSTORE       2 /* on-CPU RNG present (xstore insn) */
 #define X86_FEATURE_XSTORE_EN    3 /* on-CPU RNG enabled */
 #define X86_FEATURE_XCRYPT       6 /* on-CPU crypto (xcrypt insn) */
@@ -101,7 +101,7 @@
 #define X86_FEATURE_PMM         12 /* PadLock Montgomery Multiplier */
 #define X86_FEATURE_PMM_EN      13 /* PMM enabled */
 
-/* More extended AMD flags: CPUID level 0x80000001, ecx, word 6 */
+/* More extended AMD flags: CPUID level 0x80000001, ecx */
 #define X86_FEATURE_LAHF_LM      0 /* LAHF/SAHF in long mode */
 #define X86_FEATURE_CMP_LEGACY   1 /* If yes HyperThreading not valid */
 #define X86_FEATURE_SVM          2 /* Secure virtual machine */
@@ -122,7 +122,7 @@
 #define X86_FEATURE_TBM         21 /* trailing bit manipulations */
 #define X86_FEATURE_TOPOEXT     22 /* topology extensions CPUID leafs */
 
-/* Intel-defined CPU features, CPUID level 0x00000007:0 (ebx), word 9 */
+/* Intel-defined CPU features, CPUID level 0x00000007:0 (ebx) */
 #define X86_FEATURE_FSGSBASE     0 /* {RD,WR}{FS,GS}BASE instructions */
 
 #endif /* __LIBXC_CPUFEATURE_H */
