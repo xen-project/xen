@@ -378,7 +378,6 @@ struct acpi_20_madt_intsrcovr {
 #pragma pack ()
 
 void acpi_build_tables(unsigned int physical);
-extern uint32_t madt_csum_addr, madt_lapic0_addr;
 
 #endif /* _ACPI_2_0_H_ */
 

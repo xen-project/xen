@@ -62,6 +62,7 @@ extern unsigned long pci_mem_start, pci_mem_end;
 /* Memory map. */
 #define SCRATCH_PHYSICAL_ADDRESS      0x00010000
 #define HYPERCALL_PHYSICAL_ADDRESS    0x00080000
+#define ACPI_INFO_PHYSICAL_ADDRESS    0x0009F000
 #define VGABIOS_PHYSICAL_ADDRESS      0x000C0000
 #define HVMLOADER_PHYSICAL_ADDRESS    0x00100000
 

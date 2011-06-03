@@ -25,14 +25,26 @@
 #define align16(sz)        (((sz) + 15) & ~15)
 #define fixed_strcpy(d, s) strncpy((d), (s), sizeof(d))
 
-/* MADT parameters for filling in bios_info structure for DSDT. */
-uint32_t madt_csum_addr, madt_lapic0_addr;
-
 extern struct acpi_20_rsdp Rsdp;
 extern struct acpi_20_rsdt Rsdt;
 extern struct acpi_20_xsdt Xsdt;
 extern struct acpi_20_fadt Fadt;
 extern struct acpi_20_facs Facs;
+
+/*
+ * Located at ACPI_INFO_PHYSICAL_ADDRESS.
+ *
+ * This must match the Field("BIOS"....) definition in the DSDT.
+ */
+struct acpi_info {
+    uint8_t  com1_present:1;    /* 0[0] - System has COM1? */
+    uint8_t  com2_present:1;    /* 0[1] - System has COM2? */
+    uint8_t  lpt1_present:1;    /* 0[2] - System has LPT1? */
+    uint8_t  hpet_present:1;    /* 0[3] - System has HPET? */
+    uint32_t pci_min, pci_len;  /* 4, 8 - PCI I/O hole boundaries */
+    uint32_t madt_csum_addr;    /* 12   - Address of MADT checksum */
+    uint32_t madt_lapic0_addr;  /* 16   - Address of first MADT LAPIC struct */
+};
 
 /*
  * Alternative DSDTs we get linked against. A cover-all DSDT for up to the
@@ -68,7 +80,7 @@ static uint8_t battery_port_exists(void)
     return (inb(0x88) == 0x1F);
 }
 
-static struct acpi_20_madt *construct_madt(void)
+static struct acpi_20_madt *construct_madt(struct acpi_info *info)
 {
     struct acpi_20_madt           *madt;
     struct acpi_20_madt_intsrcovr *intsrcovr;
@@ -132,7 +144,7 @@ static struct acpi_20_madt *construct_madt(void)
     io_apic->ioapic_addr = IOAPIC_BASE_ADDRESS;
 
     lapic = (struct acpi_20_madt_lapic *)(io_apic + 1);
-    madt_lapic0_addr = (uint32_t)lapic;
+    info->madt_lapic0_addr = (uint32_t)lapic;
     for ( i = 0; i < nr_processor_objects; i++ )
     {
         memset(lapic, 0, sizeof(*lapic));
@@ -150,7 +162,7 @@ static struct acpi_20_madt *construct_madt(void)
     madt->header.length = (unsigned char *)lapic - (unsigned char *)madt;
     set_checksum(madt, offsetof(struct acpi_header, checksum),
                  madt->header.length);
-    madt_csum_addr = (uint32_t)&madt->header.checksum;
+    info->madt_csum_addr = (uint32_t)&madt->header.checksum;
 
     return madt;
 }
@@ -179,7 +191,8 @@ static struct acpi_20_hpet *construct_hpet(void)
     return hpet;
 }
 
-static int construct_secondary_tables(unsigned long *table_ptrs)
+static int construct_secondary_tables(unsigned long *table_ptrs,
+                                      struct acpi_info *info)
 {
     int nr_tables = 0;
     struct acpi_20_madt *madt;
@@ -193,7 +206,7 @@ static int construct_secondary_tables(unsigned long *table_ptrs)
     /* MADT. */
     if ( (hvm_info->nr_vcpus > 1) || hvm_info->apic_mode )
     {
-        madt = construct_madt();
+        madt = construct_madt(info);
         if (!madt) return -1;
         table_ptrs[nr_tables++] = (unsigned long)madt;
     }
@@ -253,6 +266,7 @@ static int construct_secondary_tables(unsigned long *table_ptrs)
 
 void acpi_build_tables(unsigned int physical)
 {
+    struct acpi_info *acpi_info = (struct acpi_info *)ACPI_INFO_PHYSICAL_ADDRESS;
     struct acpi_20_rsdp *rsdp;
     struct acpi_20_rsdt *rsdt;
     struct acpi_20_xsdt *xsdt;
@@ -316,7 +330,7 @@ void acpi_build_tables(unsigned int physical)
                  offsetof(struct acpi_header, checksum),
                  sizeof(struct acpi_20_fadt));
 
-    nr_secondaries = construct_secondary_tables(secondary_tables);
+    nr_secondaries = construct_secondary_tables(secondary_tables, acpi_info);
     if ( nr_secondaries < 0 )
         goto oom;
 
@@ -347,7 +361,7 @@ void acpi_build_tables(unsigned int physical)
                  rsdt->header.length);
 
     /*
-     * Fill in low-memory data structures: bios_info_table and RSDP.
+     * Fill in low-memory data structures: acpi_info and RSDP.
      */
     rsdp = (struct acpi_20_rsdp *)physical;
 
@@ -360,6 +374,14 @@ void acpi_build_tables(unsigned int physical)
     set_checksum(rsdp,
                  offsetof(struct acpi_20_rsdp, extended_checksum),
                  sizeof(struct acpi_20_rsdp));
+
+    memset(acpi_info, 0, sizeof(*acpi_info));
+    acpi_info->com1_present = uart_exists(0x3f8);
+    acpi_info->com2_present = uart_exists(0x2f8);
+    acpi_info->lpt1_present = lpt_exists(0x378);
+    acpi_info->hpet_present = hpet_exists(ACPI_HPET_ADDRESS);
+    acpi_info->pci_min = pci_mem_start;
+    acpi_info->pci_len = pci_mem_end - pci_mem_start;
 
     return;
 

@@ -67,36 +67,21 @@ static void rombios_setup_e820(void)
 
 static void rombios_setup_bios_info(void)
 {
-    struct bios_info *bios_info;
+    struct rombios_info *info;
 
-    bios_info = (struct bios_info *)BIOS_INFO_PHYSICAL_ADDRESS;
-    memset(bios_info, 0, sizeof(*bios_info));
-    bios_info->com1_present = uart_exists(0x3f8);
-    bios_info->com2_present = uart_exists(0x2f8);
-    bios_info->lpt1_present = lpt_exists(0x378);
-    bios_info->hpet_present = hpet_exists(ACPI_HPET_ADDRESS);
-    bios_info->madt_csum_addr = madt_csum_addr;
-    bios_info->madt_lapic0_addr = madt_lapic0_addr;
+    info = (struct rombios_info *)BIOS_INFO_PHYSICAL_ADDRESS;
+    memset(info, 0, sizeof(*info));
 }
 
 static void rombios_relocate(void)
 {
     uint32_t bioshigh;
-    struct bios_info *bios_info;
+    struct rombios_info *info;
 
     bioshigh = rombios_highbios_setup();
 
-    bios_info = (struct bios_info *)BIOS_INFO_PHYSICAL_ADDRESS;
-    bios_info->bios32_entry = bioshigh;
-}
-
-static void rombios_finish_bios_info(void)
-{
-    struct bios_info *bios_info;
-
-    bios_info = (struct bios_info *)BIOS_INFO_PHYSICAL_ADDRESS;
-    bios_info->pci_min = pci_mem_start;
-    bios_info->pci_len = pci_mem_end - pci_mem_start;
+    info = (struct rombios_info *)BIOS_INFO_PHYSICAL_ADDRESS;
+    info->bios32_entry = bioshigh;
 }
 
 /*
@@ -177,7 +162,7 @@ struct bios_config rombios_config =  {
     .optionrom_end = OPTIONROM_PHYSICAL_END,
 
     .bios_info_setup = rombios_setup_bios_info,
-    .bios_info_finish = rombios_finish_bios_info,
+    .bios_info_finish = NULL,
 
     .bios_relocate = rombios_relocate,
 
