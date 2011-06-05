@@ -412,14 +412,16 @@ static PyObject *pyxl_domid_to_name(XlObject *self, PyObject *args)
 {
     char *domname;
     int domid;
-    PyObject *ret;
+    PyObject *ret = Py_None;
 
     if ( !PyArg_ParseTuple(args, "i", &domid) )
         return NULL;
 
     domname = libxl_domid_to_name(&self->ctx, domid);
-    ret = PyString_FromString(domname);
-    free(domname);
+    if (domname) {
+        ret = PyString_FromString(domname);
+        free(domname);
+    }
 
     return ret;
 }
