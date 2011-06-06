@@ -134,7 +134,7 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
     guest_l4e_t *l4p;
 #endif
     uint32_t gflags, mflags, iflags, rc = 0;
-    int pse;
+    int pse, smep;
 
     perfc_incr(guest_walk);
     memset(gw, 0, sizeof(*gw));
@@ -146,6 +146,15 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
      * are missing/unwanted. */
     mflags = mandatory_flags(v, pfec);
     iflags = (_PAGE_NX_BIT | _PAGE_INVALID_BITS);
+
+    /* SMEP: kernel-mode instruction fetches from user-mode mappings
+     * should fault.  Unlike NX or invalid bits, we're looking for _all_
+     * entries in the walk to have _PAGE_USER set, so we need to do the
+     * whole walk as if it were a user-mode one and then invert the answer. */
+    smep = (is_hvm_vcpu(v) && hvm_smep_enabled(v) 
+            && (pfec & PFEC_insn_fetch) && !(pfec & PFEC_user_mode) );
+    if ( smep )
+        mflags |= _PAGE_USER;
 
 #if GUEST_PAGING_LEVELS >= 3 /* PAE or 64... */
 #if GUEST_PAGING_LEVELS >= 4 /* 64-bit only... */
@@ -272,6 +281,10 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
         gflags = guest_l1e_get_flags(gw->l1e) ^ iflags;
         rc |= ((gflags & mflags) ^ mflags);
     }
+
+    /* Now re-invert the user-mode requirement for SMEP. */
+    if ( smep ) 
+        rc ^= _PAGE_USER;
 
     /* Go back and set accessed and dirty bits only if the walk was a
      * success.  Although the PRMs say higher-level _PAGE_ACCESSED bits

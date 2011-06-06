@@ -212,6 +212,8 @@ int hvm_girq_dest_2_vcpu_id(struct domain *d, uint8_t dest, uint8_t dest_mode);
     (!!((v)->arch.hvm_vcpu.guest_cr[0] & X86_CR0_WP))
 #define hvm_pae_enabled(v) \
     (hvm_paging_enabled(v) && ((v)->arch.hvm_vcpu.guest_cr[4] & X86_CR4_PAE))
+#define hvm_smep_enabled(v) \
+    (hvm_paging_enabled(v) && ((v)->arch.hvm_vcpu.guest_cr[4] & X86_CR4_SMEP))
 #define hvm_nx_enabled(v) \
     (!!((v)->arch.hvm_vcpu.guest_efer & EFER_NX))
 
@@ -321,6 +323,7 @@ static inline int hvm_do_pmu_interrupt(struct cpu_user_regs *regs)
         X86_CR4_DE  | X86_CR4_PSE | X86_CR4_PAE |       \
         X86_CR4_MCE | X86_CR4_PGE | X86_CR4_PCE |       \
         X86_CR4_OSFXSR | X86_CR4_OSXMMEXCPT |           \
+        (cpu_has_smep ? X86_CR4_SMEP : 0) |             \
         (xsave_enabled(_v) ? X86_CR4_OSXSAVE : 0))))
 
 /* These exceptions must always be intercepted. */

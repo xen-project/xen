@@ -352,6 +352,14 @@ static void xc_cpuid_hvm_policy(
             clear_bit(X86_FEATURE_PAE, regs[3]);
         break;
 
+    case 0x00000007: /* Intel-defined CPU features */
+        if ( input[1] == 0 ) {
+            regs[1] &= bitmaskof(X86_FEATURE_SMEP);
+        } else
+            regs[1] = 0;
+        regs[0] = regs[2] = regs[3] = 0;
+        break;
+
     case 0x0000000d:
         xc_cpuid_config_xsave(xch, domid, xfeature_mask, input, regs);
         break;

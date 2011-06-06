@@ -1661,8 +1661,9 @@ int hvm_set_cr4(unsigned long value)
     v->arch.hvm_vcpu.guest_cr[4] = value;
     hvm_update_guest_cr(v, 4);
 
-    /* Modifying CR4.{PSE,PAE,PGE} invalidates all TLB entries, inc. Global. */
-    if ( (old_cr ^ value) & (X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE) ) {
+    /* Modifying CR4.{PSE,PAE,PGE,SMEP} invalidates all TLB entries. */
+    if ( (old_cr ^ value) & (X86_CR4_PSE | X86_CR4_PGE |
+                             X86_CR4_PAE | X86_CR4_SMEP) ) {
         if ( !nestedhvm_vmswitch_in_progress(v) && nestedhvm_vcpu_in_guestmode(v) )
             paging_update_nestedmode(v);
         else
@@ -2307,7 +2308,7 @@ enum hvm_copy_result hvm_copy_from_guest_virt(
 enum hvm_copy_result hvm_fetch_from_guest_virt(
     void *buf, unsigned long vaddr, int size, uint32_t pfec)
 {
-    if ( hvm_nx_enabled(current) )
+    if ( hvm_nx_enabled(current) || hvm_smep_enabled(current) )
         pfec |= PFEC_insn_fetch;
     return __hvm_copy(buf, vaddr, size,
                       HVMCOPY_from_guest | HVMCOPY_fault | HVMCOPY_virt,
@@ -2333,7 +2334,7 @@ enum hvm_copy_result hvm_copy_from_guest_virt_nofault(
 enum hvm_copy_result hvm_fetch_from_guest_virt_nofault(
     void *buf, unsigned long vaddr, int size, uint32_t pfec)
 {
-    if ( hvm_nx_enabled(current) )
+    if ( hvm_nx_enabled(current) || hvm_smep_enabled(current) )
         pfec |= PFEC_insn_fetch;
     return __hvm_copy(buf, vaddr, size,
                       HVMCOPY_from_guest | HVMCOPY_no_fault | HVMCOPY_virt,
@@ -2402,6 +2403,10 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         if ( xsave_enabled(v) )
             *ecx |= (v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_OSXSAVE) ?
                      cpufeat_mask(X86_FEATURE_OSXSAVE) : 0;
+        break;
+    case 0x7:
+        if ( (count == 0) && !cpu_has_smep )
+            *ebx &= ~cpufeat_mask(X86_FEATURE_SMEP);
         break;
     case 0xb:
         /* Fix the x2APIC identifier. */
