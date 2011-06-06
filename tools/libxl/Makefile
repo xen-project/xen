@@ -35,7 +35,7 @@ LIBXL_OBJS-$(CONFIG_IA64) += libxl_nocpuid.o
 LIBXL_OBJS = flexarray.o libxl.o libxl_create.o libxl_dm.o libxl_pci.o \
 			libxl_dom.o libxl_exec.o libxl_xshelp.o libxl_device.o \
 			libxl_internal.o libxl_utils.o libxl_uuid.o $(LIBXL_OBJS-y)
-LIBXL_OBJS += _libxl_types.o
+LIBXL_OBJS += _libxl_types.o libxl_flask.o
 
 $(LIBXL_OBJS): CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) $(CFLAGS_libxenstore) $(CFLAGS_libblktapctl)
 
@@ -69,7 +69,7 @@ $(eval $(genpath-target))
 
 _libxl_paths.h: genpath
 	sed -e "s/\([^=]*\)=\(.*\)/#define \1 \2/g" $@.tmp >$@.2.tmp
-	if ! cmp $@.2.tmp $@; then mv -f $@.2.tmp $@; fi
+	if ! cmp -s $@.2.tmp $@; then mv -f $@.2.tmp $@; fi
 
 libxl_paths.c: _libxl_paths.h
 

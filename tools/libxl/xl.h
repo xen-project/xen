@@ -87,6 +87,9 @@ int main_cpupoolcpuadd(int argc, char **argv);
 int main_cpupoolcpuremove(int argc, char **argv);
 int main_cpupoolmigrate(int argc, char **argv);
 int main_cpupoolnumasplit(int argc, char **argv);
+int main_getenforce(int argc, char **argv);
+int main_setenforce(int argc, char **argv);
+int main_loadpolicy(int argc, char **argv);
 
 void help(const char *command);
 

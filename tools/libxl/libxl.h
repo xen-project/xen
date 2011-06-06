@@ -232,7 +232,7 @@ typedef struct {
 
 /* context functions */
 int libxl_ctx_alloc(libxl_ctx **pctx, int version, xentoollog_logger *lg);
-int libxl_ctx_free(libxl_ctx *ctx);
+int libxl_ctx_free(libxl_ctx *ctx /* 0 is OK */);
 int libxl_ctx_postfork(libxl_ctx *ctx);
 
 /* domain related functions */
@@ -498,6 +498,14 @@ static inline int libxl_domid_valid_guest(uint32_t domid)
      * does not check whether the domain actually exists */
     return domid > 0 && domid < DOMID_FIRST_RESERVED;
 }
+
+int libxl_flask_context_to_sid(libxl_ctx *ctx, char *buf, size_t len,
+                               uint32_t *ssidref);
+int libxl_flask_sid_to_context(libxl_ctx *ctx, uint32_t ssidref, char **buf, 
+                               size_t *len);
+int libxl_flask_getenforce(libxl_ctx *ctx);
+int libxl_flask_setenforce(libxl_ctx *ctx, int mode);
+int libxl_flask_loadpolicy(libxl_ctx *ctx, void *policy, uint32_t size);
 
 /* common paths */
 const char *libxl_sbindir_path(void);

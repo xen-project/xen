@@ -312,9 +312,9 @@ void *mem_alloc(uint32_t size, uint32_t align)
     xen_pfn_t mfn;
     uint32_t s, e;
 
-    /* Align to at least one kilobyte. */
-    if ( align < 1024 )
-        align = 1024;
+    /* Align to at least 16 bytes. */
+    if ( align < 16 )
+        align = 16;
 
     s = (reserve + align) & ~(align - 1);
     e = s + size - 1;
@@ -366,9 +366,9 @@ void *scratch_alloc(uint32_t size, uint32_t align)
 {
     uint32_t s, e;
 
-    /* Align to at least one kilobyte. */
-    if ( align < 1024 )
-        align = 1024;
+    /* Align to at least 16 bytes. */
+    if ( align < 16 )
+        align = 16;
 
     s = (scratch_start + align - 1) & ~(align - 1);
     e = s + size - 1;

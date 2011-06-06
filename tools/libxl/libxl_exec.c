@@ -45,7 +45,7 @@ static void check_open_fds(const char *what)
     env_debug = getenv("_LIBXL_DEBUG_EXEC_FDS");
     if (!env_debug) return;
 
-    debug = strtol(env_debug, (char **) NULL, 10);atoi(env_debug);
+    debug = strtol(env_debug, (char **) NULL, 10);
     if (debug <= 0) return;
 
     for (i = 4; i < 256; i++) {
@@ -220,8 +220,10 @@ int libxl__spawn_spawn(libxl__gc *gc,
     rc = (WIFEXITED(status) ? WEXITSTATUS(status) :
           WIFSIGNALED(status) && WTERMSIG(status) < 127
           ? WTERMSIG(status)+128 : -1);
-    if (for_spawn)
-        write(pipes[1], &dummy, sizeof(dummy));
+    if (for_spawn) {
+        if (write(pipes[1], &dummy, sizeof(dummy)) != 1)
+            perror("libxl__spawn_spawn: unable to signal child exit to parent");
+    }
     _exit(rc);
 
  err_parent_pipes:

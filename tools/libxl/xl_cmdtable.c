@@ -36,7 +36,8 @@ struct cmd_spec cmd_table[] = {
       "List information about all/some domains",
       "[options] [Domain]\n",
       "-l, --long              Output all VM details\n"
-      "-v, --verbose           Prints out UUIDs",
+      "-v, --verbose           Prints out UUIDs and security context\n"
+      "-Z, --context           Prints out security context"
     },
     { "destroy",
       &main_destroy,
@@ -363,6 +364,21 @@ struct cmd_spec cmd_table[] = {
       &main_cpupoolnumasplit,
       "Splits up the machine into one CPU pool per NUMA node",
       "",
+    },
+    { "getenforce",
+      &main_getenforce,
+      "Returns the current enforcing mode of the Flask Xen security module",
+      "",
+    },
+    { "setenforce",
+      &main_setenforce,
+      "Sets the current enforcing mode of the Flask Xen security module",
+      "<1|0|Enforcing|Permissive>",
+    },
+    { "loadpolicy",
+      &main_loadpolicy,
+      "Loads a new policy int the Flask Xen security module",
+      "<policy file>",
     },
 };
 

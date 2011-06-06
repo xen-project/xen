@@ -813,6 +813,13 @@ static void pv_cpuid(struct cpu_user_regs *regs)
            __clear_bit(X86_FEATURE_X2APIC % 32, &c);
         __set_bit(X86_FEATURE_HYPERVISOR % 32, &c);
         break;
+    case 7:
+        if ( regs->ecx == 0 )
+            b &= cpufeat_mask(X86_FEATURE_FSGSBASE);
+        else
+            b = 0;
+        a = c = d = 0;
+        break;
     case 0x80000001:
         /* Modify Feature Information. */
         if ( is_pv_32bit_vcpu(current) )
@@ -1132,7 +1139,13 @@ static int handle_gdt_ldt_mapping_fault(
     (((va) >= HYPERVISOR_VIRT_START))
 #endif
 
-static int __spurious_page_fault(
+enum pf_type {
+    real_fault,
+    smep_fault,
+    spurious_fault
+};
+
+static enum pf_type __page_fault_type(
     unsigned long addr, unsigned int error_code)
 {
     unsigned long mfn, cr3 = read_cr3();
@@ -1144,7 +1157,7 @@ static int __spurious_page_fault(
 #endif
     l2_pgentry_t l2e, *l2t;
     l1_pgentry_t l1e, *l1t;
-    unsigned int required_flags, disallowed_flags;
+    unsigned int required_flags, disallowed_flags, page_user;
 
     /*
      * We do not take spurious page faults in IRQ handlers as we do not
@@ -1152,11 +1165,11 @@ static int __spurious_page_fault(
      * map_domain_page() is not IRQ-safe.
      */
     if ( in_irq() )
-        return 0;
+        return real_fault;
 
     /* Reserved bit violations are never spurious faults. */
     if ( error_code & PFEC_reserved_bit )
-        return 0;
+        return real_fault;
 
     required_flags  = _PAGE_PRESENT;
     if ( error_code & PFEC_write_access )
@@ -1168,6 +1181,8 @@ static int __spurious_page_fault(
     if ( error_code & PFEC_insn_fetch )
         disallowed_flags |= _PAGE_NX_BIT;
 
+    page_user = _PAGE_USER;
+
     mfn = cr3 >> PAGE_SHIFT;
 
 #if CONFIG_PAGING_LEVELS >= 4
@@ -1177,7 +1192,8 @@ static int __spurious_page_fault(
     unmap_domain_page(l4t);
     if ( ((l4e_get_flags(l4e) & required_flags) != required_flags) ||
          (l4e_get_flags(l4e) & disallowed_flags) )
-        return 0;
+        return real_fault;
+    page_user &= l4e_get_flags(l4e);
 #endif
 
 #if CONFIG_PAGING_LEVELS >= 3
@@ -1190,13 +1206,14 @@ static int __spurious_page_fault(
     unmap_domain_page(l3t);
 #if CONFIG_PAGING_LEVELS == 3
     if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
-        return 0;
+        return real_fault;
 #else
     if ( ((l3e_get_flags(l3e) & required_flags) != required_flags) ||
          (l3e_get_flags(l3e) & disallowed_flags) )
-        return 0;
+        return real_fault;
+    page_user &= l3e_get_flags(l3e);
     if ( l3e_get_flags(l3e) & _PAGE_PSE )
-        return 1;
+        goto leaf;
 #endif
 #endif
 
@@ -1206,9 +1223,10 @@ static int __spurious_page_fault(
     unmap_domain_page(l2t);
     if ( ((l2e_get_flags(l2e) & required_flags) != required_flags) ||
          (l2e_get_flags(l2e) & disallowed_flags) )
-        return 0;
+        return real_fault;
+    page_user &= l2e_get_flags(l2e);
     if ( l2e_get_flags(l2e) & _PAGE_PSE )
-        return 1;
+        goto leaf;
 
     l1t = map_domain_page(mfn);
     l1e = l1e_read_atomic(&l1t[l1_table_offset(addr)]);
@@ -1216,26 +1234,36 @@ static int __spurious_page_fault(
     unmap_domain_page(l1t);
     if ( ((l1e_get_flags(l1e) & required_flags) != required_flags) ||
          (l1e_get_flags(l1e) & disallowed_flags) )
-        return 0;
+        return real_fault;
+    page_user &= l1e_get_flags(l1e);
 
-    return 1;
+leaf:
+    /*
+     * Supervisor Mode Execution Protection (SMEP):
+     * Disallow supervisor execution from user-accessible mappings
+     */
+    if ( (read_cr4() & X86_CR4_SMEP) && page_user &&
+         ((error_code & (PFEC_insn_fetch|PFEC_user_mode)) == PFEC_insn_fetch) )
+        return smep_fault;
+
+    return spurious_fault;
 }
 
-static int spurious_page_fault(
+static enum pf_type spurious_page_fault(
     unsigned long addr, unsigned int error_code)
 {
     unsigned long flags;
-    int           is_spurious;
+    enum pf_type pf_type;
 
     /*
      * Disabling interrupts prevents TLB flushing, and hence prevents
      * page tables from becoming invalid under our feet during the walk.
      */
     local_irq_save(flags);
-    is_spurious = __spurious_page_fault(addr, error_code);
+    pf_type = __page_fault_type(addr, error_code);
     local_irq_restore(flags);
 
-    return is_spurious;
+    return pf_type;
 }
 
 static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
@@ -1310,6 +1338,7 @@ asmlinkage void do_page_fault(struct cpu_user_regs *regs)
 {
     unsigned long addr, fixup;
     unsigned int error_code;
+    enum pf_type pf_type;
 
     addr = read_cr2();
 
@@ -1325,7 +1354,9 @@ asmlinkage void do_page_fault(struct cpu_user_regs *regs)
 
     if ( unlikely(!guest_mode(regs)) )
     {
-        if ( spurious_page_fault(addr, error_code) )
+        pf_type = spurious_page_fault(addr, error_code);
+        BUG_ON(pf_type == smep_fault);
+        if ( pf_type != real_fault )
             return;
 
         if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
@@ -1347,9 +1378,17 @@ asmlinkage void do_page_fault(struct cpu_user_regs *regs)
               error_code, _p(addr));
     }
 
-    if ( unlikely(current->domain->arch.suppress_spurious_page_faults
-                  && spurious_page_fault(addr, error_code)) )
-        return;
+    if ( unlikely(current->domain->arch.suppress_spurious_page_faults) )
+    {
+        pf_type = spurious_page_fault(addr, error_code);
+        if ( pf_type == smep_fault )
+        {
+            gdprintk(XENLOG_ERR, "Fatal SMEP fault\n");
+            domain_crash(current->domain);
+        }
+        if ( pf_type != real_fault )
+            return;
+    }
 
     propagate_page_fault(addr, regs->error_code);
 }

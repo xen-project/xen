@@ -56,7 +56,7 @@
 
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 typedef union YYSTYPE
-#line 9 "libxlu_cfg_y.y"
+#line 25 "libxlu_cfg_y.y"
 {
   char *string;
   XLU_ConfigSetting *setting;

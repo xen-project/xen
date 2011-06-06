@@ -393,7 +393,7 @@ static void printf_info(int domid,
         printf("\t\t\t(physpath %s)\n", d_config->disks[i].pdev_path);
         printf("\t\t\t(phystype %d)\n", d_config->disks[i].backend);
         printf("\t\t\t(virtpath %s)\n", d_config->disks[i].vdev);
-        printf("\t\t\t(unpluggable %d)\n", d_config->disks[i].unpluggable);
+        printf("\t\t\t(unpluggable %d)\n", d_config->disks[i].removable);
         printf("\t\t\t(readwrite %d)\n", d_config->disks[i].readwrite);
         printf("\t\t\t(is_cdrom %d)\n", d_config->disks[i].is_cdrom);
         printf("\t\t)\n");
@@ -591,7 +591,7 @@ static int parse_disk_config(libxl_device_disk *disk, char *buf2)
                 *p = '\0';
                 if ( !strcmp(tok, "cdrom") ) {
                     disk->is_cdrom = 1;
-                    disk->unpluggable = 1;
+                    disk->removable = 1;
                 }else{
                     fprintf(stderr, "Unknown virtual disk type: %s\n", tok);
                     return 0;
@@ -651,6 +651,19 @@ static void parse_config_data(const char *configfile_filename_report,
     }
 
     libxl_init_create_info(c_info);
+
+    if (!xlu_cfg_get_string (config, "seclabel", &buf)) {
+        e = libxl_flask_context_to_sid(ctx, (char *)buf, strlen(buf),
+                                    &c_info->ssidref);
+        if (e) {
+            if (errno == ENOSYS) {
+                fprintf(stderr, "XSM Disabled: seclabel not supported\n");    
+            } else {
+                fprintf(stderr, "Invalid seclabel: %s\n", buf);
+                exit(1);
+            }
+        }
+    }
 
     c_info->hvm = 0;
     if (!xlu_cfg_get_string (config, "builder", &buf) &&
@@ -1503,10 +1516,6 @@ static int create_domain(struct domain_create *dom_info)
 
     parse_config_data(config_file, config_data, config_len, &d_config, &d_config.dm_info);
 
-    ret = 0;
-    if (dom_info->dryrun)
-        goto out;
-
     if (migrate_fd >= 0) {
         if (d_config.c_info.name) {
             /* when we receive a domain we get its name from the config
@@ -1525,8 +1534,12 @@ static int create_domain(struct domain_create *dom_info)
         }
     }
 
-    if (debug)
+    if (debug || dom_info->dryrun)
         printf_info(-1, &d_config, &d_config.dm_info);
+
+    ret = 0;
+    if (dom_info->dryrun)
+        goto out;
 
 start:
     domid = -1;
@@ -2264,13 +2277,14 @@ static void list_domains_details(const libxl_dominfo *info, int nb_domain)
     }
 }
 
-static void list_domains(int verbose, const libxl_dominfo *info, int nb_domain)
+static void list_domains(int verbose, int context, const libxl_dominfo *info, int nb_domain)
 {
     int i;
     static const char shutdown_reason_letters[]= "-rscw";
 
     printf("Name                                        ID   Mem VCPUs\tState\tTime(s)");
-    if (verbose) printf("   UUID                            Reason-Code");
+    if (verbose) printf("   UUID                            Reason-Code\tSecurity Label");
+    if (context && !verbose) printf("   Security Label");
     printf("\n");
     for (i = 0; i < nb_domain; i++) {
         char *domname;
@@ -2294,9 +2308,22 @@ static void list_domains(int verbose, const libxl_dominfo *info, int nb_domain)
         free(domname);
         if (verbose) {
             printf(" " LIBXL_UUID_FMT, LIBXL_UUID_BYTES(info[i].uuid));
-	    if (info[i].shutdown) printf(" %8x", shutdown_reason);
-	    else printf(" %8s", "-");
-	}
+            if (info[i].shutdown) printf(" %8x", shutdown_reason);
+            else printf(" %8s", "-");
+        }
+        if (verbose || context) {
+            int rc;
+            size_t size;
+            char *buf;
+            rc = libxl_flask_sid_to_context(ctx, info[i].ssidref, &buf, 
+                                            &size); 
+            if (rc < 0)
+                printf("  -");
+            else {
+                printf("  %s", buf);
+                free(buf);
+            }
+        }
         putchar('\n');
     }
 }
@@ -3032,12 +3059,14 @@ int main_reboot(int argc, char **argv)
 int main_list(int argc, char **argv)
 {
     int opt, verbose = 0;
+    int context = 0;
     int details = 0;
     int option_index = 0;
     static struct option long_options[] = {
         {"long", 0, 0, 'l'},
         {"help", 0, 0, 'h'},
         {"verbose", 0, 0, 'v'},
+        {"context", 0, 0, 'Z'},
         {0, 0, 0, 0}
     };
 
@@ -3046,7 +3075,7 @@ int main_list(int argc, char **argv)
     int nb_domain, rc;
 
     while (1) {
-        opt = getopt_long(argc, argv, "lvh", long_options, &option_index);
+        opt = getopt_long(argc, argv, "lvhZ", long_options, &option_index);
         if (opt == -1)
             break;
 
@@ -3059,6 +3088,9 @@ int main_list(int argc, char **argv)
             return 0;
         case 'v':
             verbose = 1;
+            break;
+        case 'Z':
+            context = 1;
             break;
         default:
             fprintf(stderr, "option `%c' not supported.\n", optopt);
@@ -3095,7 +3127,7 @@ int main_list(int argc, char **argv)
     if (details)
         list_domains_details(info, nb_domain);
     else
-        list_domains(verbose, info, nb_domain);
+        list_domains(verbose, context, info, nb_domain);
 
     free(info_free);
 
@@ -4149,7 +4181,7 @@ int main_blockattach(int argc, char **argv)
         return 1;
     }
     disk.vdev = argv[optind+2];
-    disk.unpluggable = 1;
+    disk.removable = 1;
     disk.readwrite = ((argc-optind <= 3) || (argv[optind+3][0] == 'w'));
 
     if (domain_qualifier_to_domid(argv[optind], &fe_domid, 0) < 0) {
@@ -5277,6 +5309,125 @@ int main_cpupoolnumasplit(int argc, char **argv)
 out:
     libxl_topologyinfo_destroy(&topology);
     libxl_cpumap_destroy(&cpumap);
+
+    return ret;
+}
+
+int main_getenforce(int argc, char **argv)
+{
+    int ret;
+
+    ret = libxl_flask_getenforce(ctx);
+
+    if (ret < 0) {
+        if (errno == ENOSYS)
+            printf("Flask XSM Disabled\n");
+        else
+            fprintf(stderr, "Failed to get enforcing mode\n");
+    }
+    else if (ret == 1)
+        printf("Enforcing\n");
+    else if (ret == 0)
+        printf("Permissive\n");
+
+    return ret; 
+}
+
+int main_setenforce(int argc, char **argv)
+{
+    int ret, mode = -1;
+    const char *p = NULL;
+
+    if (optind >= argc) {
+        help("setenforce");
+        return 2;
+    }
+
+    p = argv[optind];
+
+    if (!strcmp(p, "0"))
+        mode = 0;
+    else if (!strcmp(p, "1"))
+        mode = 1;
+    else if (!strcasecmp(p, "permissive"))
+        mode = 0;
+    else if (!strcasecmp(p, "enforcing"))
+        mode = 1;
+    else {
+        help("setenforce");
+        return 2;
+    }
+   
+    ret = libxl_flask_setenforce(ctx, mode);
+
+    if (ret) {
+        if (errno == ENOSYS) {
+            fprintf(stderr, "Flask XSM disabled\n");
+        } 
+        else 
+            fprintf(stderr, "error occured while setting enforcing mode (%i)\n", ret);
+    }
+
+    return ret;
+}
+
+int main_loadpolicy(int argc, char **argv)
+{
+    const char *polFName;
+    int polFd = 0;
+    void *polMemCp = NULL;
+    struct stat info;
+    int ret;
+
+    if (optind >= argc) {
+        help("loadpolicy");
+        return 2;
+    }
+
+    polFName = argv[optind];
+    polFd = open(polFName, O_RDONLY);
+    if ( polFd < 0 ) {
+        fprintf(stderr, "Error occurred opening policy file '%s': %s\n",
+                polFName, strerror(errno));
+        ret = -1;
+        goto done;
+    }
+    
+    ret = stat(polFName, &info);
+    if ( ret < 0 ) {
+        fprintf(stderr, "Error occurred retrieving information about"
+                "policy file '%s': %s\n", polFName, strerror(errno));
+        goto done;
+    }
+
+    polMemCp = malloc(info.st_size);
+     
+    ret = read(polFd, polMemCp, info.st_size);
+    if ( ret < 0 ) {
+        fprintf(stderr, "Unable to read new Flask policy file: %s\n",
+                strerror(errno));
+        goto done;
+    }
+
+    ret = libxl_flask_loadpolicy(ctx, polMemCp, info.st_size);
+
+    if (ret < 0) {
+        if (errno == ENOSYS) {
+            fprintf(stderr, "Flask XSM disabled\n");
+        } else {
+            errno = -ret;
+            fprintf(stderr, "Unable to load new Flask policy: %s\n",
+                    strerror(errno));
+            ret = -1;
+        }
+    } else {
+        printf("Successfully loaded policy.\n");
+    }
+
+done:
+    free(polMemCp);
+    if ( polFd > 0 )
+        close(polFd);
 
     return ret;
 }

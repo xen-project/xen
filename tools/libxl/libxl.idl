@@ -89,6 +89,7 @@ libxl_button = Enumeration("button", [
 libxl_dominfo = Struct("dominfo",[
     ("uuid",        libxl_uuid),
     ("domid",       libxl_domid),
+    ("ssidref",      uint32),
     ("running",     bool),
     ("blocked",     bool),
     ("paused",      bool),
@@ -138,7 +139,7 @@ libxl_domain_create_info = Struct("domain_create_info",[
     ("hvm",          bool),
     ("hap",          bool),
     ("oos",          bool),
-    ("ssidref",      integer),
+    ("ssidref",      uint32),
     ("name",         string),
     ("uuid",         libxl_uuid),
     ("xsdata",       libxl_key_value_list),
@@ -278,7 +279,8 @@ libxl_device_disk = Struct("device_disk", [
     ("vdev", string),
     ("backend", libxl_disk_backend),
     ("format", libxl_disk_format),
-    ("unpluggable", integer),
+    ("script", string),
+    ("removable", integer),
     ("readwrite", integer),
     ("is_cdrom", integer),
     ])

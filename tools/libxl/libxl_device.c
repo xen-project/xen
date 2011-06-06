@@ -485,7 +485,9 @@ again:
             }
             if (starting && FD_ISSET(starting->for_spawn->fd, &rfds)) {
                 unsigned char dummy;
-                read(starting->for_spawn->fd, &dummy, sizeof(dummy));
+                if (read(starting->for_spawn->fd, &dummy, sizeof(dummy)) != 1)
+                    LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_DEBUG,
+                                     "failed to read spawn status pipe");
             }
         }
     }

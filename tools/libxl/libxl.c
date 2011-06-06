@@ -38,8 +38,6 @@
 
 #define PAGE_TO_MEMKB(pages) ((pages) * 4)
 #define BACKEND_STRING_SIZE 5
-#define STRINGIFY(x) #x
-#define TOSTRING(x) STRINGIFY(x)
 
 int libxl_ctx_alloc(libxl_ctx **pctx, int version, xentoollog_logger * lg)
 {
@@ -87,6 +85,7 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version, xentoollog_logger * lg)
 
 int libxl_ctx_free(libxl_ctx *ctx)
 {
+    if (!ctx) return 0;
     if (ctx->xch) xc_interface_close(ctx->xch);
     libxl_version_info_destroy(&ctx->version_info);
     if (ctx->xsh) xs_daemon_close(ctx->xsh); 
@@ -342,6 +341,7 @@ static void xcinfo2xlinfo(const xc_domaininfo_t *xcinfo,
 {
     memcpy(&(xlinfo->uuid), xcinfo->handle, sizeof(xen_domain_handle_t));
     xlinfo->domid = xcinfo->domain;
+    xlinfo->ssidref = xcinfo->ssidref;
 
     xlinfo->dying    = !!(xcinfo->flags&XEN_DOMINF_dying);
     xlinfo->shutdown = !!(xcinfo->flags&XEN_DOMINF_shutdown);
@@ -707,7 +707,7 @@ int libxl_event_get_disk_eject_info(libxl_ctx *ctx, uint32_t domid, libxl_event 
     disk->format = LIBXL_DISK_FORMAT_EMPTY;
     /* this value is returned to the user: do not free right away */
     disk->vdev = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(&gc, "%s/dev", backend), NULL);
-    disk->unpluggable = 1;
+    disk->removable = 1;
     disk->readwrite = 0;
     disk->is_cdrom = 1;
 
@@ -970,6 +970,13 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
         goto out_free;
     }
 
+    if (disk->script) {
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "External block scripts"
+                   " not yet supported, sorry");
+        rc = ERROR_INVAL;
+        goto out_free;
+    }
+
     devid = libxl__device_disk_dev_number(disk->vdev, NULL, NULL);
     if (devid==-1) {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Invalid or unsupported"
@@ -1040,7 +1047,7 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
     flexarray_append(back, "online");
     flexarray_append(back, "1");
     flexarray_append(back, "removable");
-    flexarray_append(back, libxl__sprintf(&gc, "%d", (disk->unpluggable) ? 1 : 0));
+    flexarray_append(back, libxl__sprintf(&gc, "%d", (disk->removable) ? 1 : 0));
     flexarray_append(back, "bootable");
     flexarray_append(back, libxl__sprintf(&gc, "%d", 1));
     flexarray_append(back, "state");
@@ -1583,7 +1590,7 @@ static unsigned int libxl__append_disk_list_of_type(libxl__gc *gc,
                 libxl__sprintf(gc, "%s/%s/type", be_path, *dir)), 
                 &(pdisk->backend));
             pdisk->vdev = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(gc, "%s/%s/dev", be_path, *dir), &len);
-            pdisk->unpluggable = atoi(libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/%s/removable", be_path, *dir)));
+            pdisk->removable = atoi(libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/%s/removable", be_path, *dir)));
             if (!strcmp(libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/%s/mode", be_path, *dir)), "w"))
                 pdisk->readwrite = 1;
             else

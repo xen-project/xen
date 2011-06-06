@@ -90,7 +90,7 @@
 
 
 /* Copy the first part of user declarations.  */
-#line 3 "libxlu_cfg_y.y"
+#line 19 "libxlu_cfg_y.y"
 
 #define YYLEX_PARAM ctx->scanner
 #include "libxlu_cfg_i.h"
@@ -117,7 +117,7 @@
 
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 typedef union YYSTYPE
-#line 9 "libxlu_cfg_y.y"
+#line 25 "libxlu_cfg_y.y"
 {
   char *string;
   XLU_ConfigSetting *setting;
@@ -439,9 +439,9 @@ static const yytype_int8 yyrhs[] =
 /* YYRLINE[YYN] -- source line where rule number YYN was defined.  */
 static const yytype_uint8 yyrline[] =
 {
-       0,    31,    31,    32,    34,    34,    36,    37,    39,    40,
-      42,    43,    45,    46,    48,    49,    50,    52,    53,    55,
-      57
+       0,    47,    47,    48,    50,    50,    52,    53,    55,    56,
+      58,    59,    61,    62,    64,    65,    66,    68,    69,    71,
+      73
 };
 #endif
 
@@ -1062,37 +1062,37 @@ yydestruct (yymsg, yytype, yyvaluep, yylocationp, ctx)
   switch (yytype)
     {
       case 3: /* "IDENT" */
-#line 24 "libxlu_cfg_y.y"
+#line 40 "libxlu_cfg_y.y"
 	{ free((yyvaluep->string)); };
 #line 1068 "libxlu_cfg_y.c"
 	break;
       case 4: /* "STRING" */
-#line 24 "libxlu_cfg_y.y"
+#line 40 "libxlu_cfg_y.y"
 	{ free((yyvaluep->string)); };
 #line 1073 "libxlu_cfg_y.c"
 	break;
       case 5: /* "NUMBER" */
-#line 24 "libxlu_cfg_y.y"
+#line 40 "libxlu_cfg_y.y"
 	{ free((yyvaluep->string)); };
 #line 1078 "libxlu_cfg_y.c"
 	break;
       case 17: /* "value" */
-#line 27 "libxlu_cfg_y.y"
+#line 43 "libxlu_cfg_y.y"
 	{ xlu__cfg_set_free((yyvaluep->setting)); };
 #line 1083 "libxlu_cfg_y.c"
 	break;
       case 18: /* "atom" */
-#line 24 "libxlu_cfg_y.y"
+#line 40 "libxlu_cfg_y.y"
 	{ free((yyvaluep->string)); };
 #line 1088 "libxlu_cfg_y.c"
 	break;
       case 19: /* "valuelist" */
-#line 27 "libxlu_cfg_y.y"
+#line 43 "libxlu_cfg_y.y"
 	{ xlu__cfg_set_free((yyvaluep->setting)); };
 #line 1093 "libxlu_cfg_y.c"
 	break;
       case 20: /* "values" */
-#line 27 "libxlu_cfg_y.y"
+#line 43 "libxlu_cfg_y.y"
 	{ xlu__cfg_set_free((yyvaluep->setting)); };
 #line 1098 "libxlu_cfg_y.c"
 	break;
@@ -1417,52 +1417,52 @@ yyreduce:
   switch (yyn)
     {
         case 4:
-#line 34 "libxlu_cfg_y.y"
+#line 50 "libxlu_cfg_y.y"
     { xlu__cfg_set_store(ctx,(yyvsp[(1) - (3)].string),(yyvsp[(3) - (3)].setting),(yylsp[(3) - (3)]).first_line); ;}
     break;
 
   case 10:
-#line 42 "libxlu_cfg_y.y"
+#line 58 "libxlu_cfg_y.y"
     { (yyval.setting)= xlu__cfg_set_mk(ctx,1,(yyvsp[(1) - (1)].string)); ;}
     break;
 
   case 11:
-#line 43 "libxlu_cfg_y.y"
+#line 59 "libxlu_cfg_y.y"
     { (yyval.setting)= (yyvsp[(3) - (4)].setting); ;}
     break;
 
   case 12:
-#line 45 "libxlu_cfg_y.y"
+#line 61 "libxlu_cfg_y.y"
     { (yyval.string)= (yyvsp[(1) - (1)].string); ;}
     break;
 
   case 13:
-#line 46 "libxlu_cfg_y.y"
+#line 62 "libxlu_cfg_y.y"
     { (yyval.string)= (yyvsp[(1) - (1)].string); ;}
     break;
 
   case 14:
-#line 48 "libxlu_cfg_y.y"
+#line 64 "libxlu_cfg_y.y"
     { (yyval.setting)= xlu__cfg_set_mk(ctx,0,0); ;}
     break;
 
   case 15:
-#line 49 "libxlu_cfg_y.y"
+#line 65 "libxlu_cfg_y.y"
     { (yyval.setting)= (yyvsp[(1) - (1)].setting); ;}
     break;
 
   case 16:
-#line 50 "libxlu_cfg_y.y"
+#line 66 "libxlu_cfg_y.y"
     { (yyval.setting)= (yyvsp[(1) - (3)].setting); ;}
     break;
 
   case 17:
-#line 52 "libxlu_cfg_y.y"
+#line 68 "libxlu_cfg_y.y"
     { (yyval.setting)= xlu__cfg_set_mk(ctx,2,(yyvsp[(1) - (2)].string)); ;}
     break;
 
   case 18:
-#line 53 "libxlu_cfg_y.y"
+#line 69 "libxlu_cfg_y.y"
     { xlu__cfg_set_add(ctx,(yyvsp[(1) - (5)].setting),(yyvsp[(4) - (5)].string)); (yyval.setting)= (yyvsp[(1) - (5)].setting); ;}
     break;
 

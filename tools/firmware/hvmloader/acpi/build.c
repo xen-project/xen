@@ -25,14 +25,26 @@
 #define align16(sz)        (((sz) + 15) & ~15)
 #define fixed_strcpy(d, s) strncpy((d), (s), sizeof(d))
 
-/* MADT parameters for filling in bios_info structure for DSDT. */
-uint32_t madt_csum_addr, madt_lapic0_addr;
-
 extern struct acpi_20_rsdp Rsdp;
 extern struct acpi_20_rsdt Rsdt;
 extern struct acpi_20_xsdt Xsdt;
 extern struct acpi_20_fadt Fadt;
 extern struct acpi_20_facs Facs;
+
+/*
+ * Located at ACPI_INFO_PHYSICAL_ADDRESS.
+ *
+ * This must match the Field("BIOS"....) definition in the DSDT.
+ */
+struct acpi_info {
+    uint8_t  com1_present:1;    /* 0[0] - System has COM1? */
+    uint8_t  com2_present:1;    /* 0[1] - System has COM2? */
+    uint8_t  lpt1_present:1;    /* 0[2] - System has LPT1? */
+    uint8_t  hpet_present:1;    /* 0[3] - System has HPET? */
+    uint32_t pci_min, pci_len;  /* 4, 8 - PCI I/O hole boundaries */
+    uint32_t madt_csum_addr;    /* 12   - Address of MADT checksum */
+    uint32_t madt_lapic0_addr;  /* 16   - Address of first MADT LAPIC struct */
+};
 
 /*
  * Alternative DSDTs we get linked against. A cover-all DSDT for up to the
@@ -68,12 +80,21 @@ static uint8_t battery_port_exists(void)
     return (inb(0x88) == 0x1F);
 }
 
-static int construct_madt(struct acpi_20_madt *madt)
+static struct acpi_20_madt *construct_madt(struct acpi_info *info)
 {
+    struct acpi_20_madt           *madt;
     struct acpi_20_madt_intsrcovr *intsrcovr;
     struct acpi_20_madt_ioapic    *io_apic;
     struct acpi_20_madt_lapic     *lapic;
-    int i, offset = 0;
+    int i, sz;
+
+    sz  = sizeof(struct acpi_20_madt);
+    sz += sizeof(struct acpi_20_madt_intsrcovr) * 16;
+    sz += sizeof(struct acpi_20_madt_ioapic);
+    sz += sizeof(struct acpi_20_madt_lapic) * nr_processor_objects;
+
+    madt = mem_alloc(sz, 16);
+    if (!madt) return NULL;
 
     memset(madt, 0, sizeof(*madt));
     madt->header.signature    = ACPI_2_0_MADT_SIGNATURE;
@@ -85,7 +106,6 @@ static int construct_madt(struct acpi_20_madt *madt)
     madt->header.creator_revision = ACPI_CREATOR_REVISION;
     madt->lapic_addr = LAPIC_BASE_ADDRESS;
     madt->flags      = ACPI_PCAT_COMPAT;
-    offset += sizeof(*madt);
 
     intsrcovr = (struct acpi_20_madt_intsrcovr *)(madt + 1);
     for ( i = 0; i < 16; i++ )
@@ -113,7 +133,6 @@ static int construct_madt(struct acpi_20_madt *madt)
             continue;
         }
 
-        offset += sizeof(*intsrcovr);
         intsrcovr++;
     }
 
@@ -123,10 +142,9 @@ static int construct_madt(struct acpi_20_madt *madt)
     io_apic->length      = sizeof(*io_apic);
     io_apic->ioapic_id   = IOAPIC_ID;
     io_apic->ioapic_addr = IOAPIC_BASE_ADDRESS;
-    offset += sizeof(*io_apic);
 
     lapic = (struct acpi_20_madt_lapic *)(io_apic + 1);
-    madt_lapic0_addr = (uint32_t)lapic;
+    info->madt_lapic0_addr = (uint32_t)lapic;
     for ( i = 0; i < nr_processor_objects; i++ )
     {
         memset(lapic, 0, sizeof(*lapic));
@@ -138,20 +156,23 @@ static int construct_madt(struct acpi_20_madt *madt)
         lapic->flags = ((i < hvm_info->nr_vcpus) &&
                         test_bit(i, hvm_info->vcpu_online)
                         ? ACPI_LOCAL_APIC_ENABLED : 0);
-        offset += sizeof(*lapic);
         lapic++;
     }
 
-    madt->header.length = offset;
-    set_checksum(madt, offsetof(struct acpi_header, checksum), offset);
-    madt_csum_addr = (uint32_t)&madt->header.checksum;
+    madt->header.length = (unsigned char *)lapic - (unsigned char *)madt;
+    set_checksum(madt, offsetof(struct acpi_header, checksum),
+                 madt->header.length);
+    info->madt_csum_addr = (uint32_t)&madt->header.checksum;
 
-    return align16(offset);
+    return madt;
 }
 
-static int construct_hpet(struct acpi_20_hpet *hpet)
+static struct acpi_20_hpet *construct_hpet(void)
 {
-    int offset;
+    struct acpi_20_hpet *hpet;
+
+    hpet = mem_alloc(sizeof(*hpet), 16);
+    if (!hpet) return NULL;
 
     memset(hpet, 0, sizeof(*hpet));
     hpet->header.signature    = ACPI_2_0_HPET_SIGNATURE;
@@ -163,20 +184,21 @@ static int construct_hpet(struct acpi_20_hpet *hpet)
     hpet->header.creator_revision = ACPI_CREATOR_REVISION;
     hpet->timer_block_id      = 0x8086a201;
     hpet->addr.address        = ACPI_HPET_ADDRESS;
-    offset = sizeof(*hpet);
 
-    hpet->header.length = offset;
-    set_checksum(hpet, offsetof(struct acpi_header, checksum), offset);
-
-    return offset;
+    hpet->header.length = sizeof(*hpet);
+    set_checksum(hpet, offsetof(struct acpi_header, checksum),
+                 hpet->header.length = sizeof(*hpet));
+    return hpet;
 }
 
-static int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
+static int construct_secondary_tables(unsigned long *table_ptrs,
+                                      struct acpi_info *info)
 {
-    int offset = 0, nr_tables = 0;
+    int nr_tables = 0;
     struct acpi_20_madt *madt;
     struct acpi_20_hpet *hpet;
     struct acpi_20_tcpa *tcpa;
+    unsigned char *ssdt;
     static const uint16_t tis_signature[] = {0x0001, 0x0001, 0x0001};
     uint16_t *tis_hdr;
     void *lasa;
@@ -184,22 +206,23 @@ static int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
     /* MADT. */
     if ( (hvm_info->nr_vcpus > 1) || hvm_info->apic_mode )
     {
-        madt = (struct acpi_20_madt *)&buf[offset];
-        offset += construct_madt(madt);
+        madt = construct_madt(info);
+        if (!madt) return -1;
         table_ptrs[nr_tables++] = (unsigned long)madt;
     }
 
     /* HPET. Always included in DSDT, so always include it here too. */
     /* (And it's unconditionally required by Windows SVVP tests.) */
-    hpet = (struct acpi_20_hpet *)&buf[offset];
-    offset += construct_hpet(hpet);
+    hpet = construct_hpet();
+    if (!hpet) return -1;
     table_ptrs[nr_tables++] = (unsigned long)hpet;
 
-    if ( battery_port_exists() ) 
+    if ( battery_port_exists() )
     {
-        table_ptrs[nr_tables++] = (unsigned long)&buf[offset];
-        memcpy(&buf[offset], ssdt_pm, sizeof(ssdt_pm));
-        offset += align16(sizeof(ssdt_pm));
+        ssdt = mem_alloc(sizeof(ssdt_pm), 16);
+        if (!ssdt) return -1;
+        memcpy(ssdt, ssdt_pm, sizeof(ssdt_pm));
+        table_ptrs[nr_tables++] = (unsigned long)ssdt;
     }
 
     /* TPM TCPA and SSDT. */
@@ -208,13 +231,14 @@ static int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
          (tis_hdr[1] == tis_signature[1]) &&
          (tis_hdr[2] == tis_signature[2]) )
     {
-        memcpy(&buf[offset], ssdt_tpm, sizeof(ssdt_tpm));
-        table_ptrs[nr_tables++] = (unsigned long)&buf[offset];
-        offset += align16(sizeof(ssdt_tpm));
+        ssdt = mem_alloc(sizeof(ssdt_tpm), 16);
+        if (!ssdt) return -1;
+        memcpy(ssdt, ssdt_tpm, sizeof(ssdt_tpm));
+        table_ptrs[nr_tables++] = (unsigned long)ssdt;
 
-        tcpa = (struct acpi_20_tcpa *)&buf[offset];
+        tcpa = mem_alloc(sizeof(struct acpi_20_tcpa), 16);
+        if (!tcpa) return -1;
         memset(tcpa, 0, sizeof(*tcpa));
-        offset += align16(sizeof(*tcpa));
         table_ptrs[nr_tables++] = (unsigned long)tcpa;
 
         tcpa->header.signature = ACPI_2_0_TCPA_SIGNATURE;
@@ -225,7 +249,7 @@ static int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
         tcpa->header.oem_revision = ACPI_OEM_REVISION;
         tcpa->header.creator_id   = ACPI_CREATOR_ID;
         tcpa->header.creator_revision = ACPI_CREATOR_REVISION;
-        if ( (lasa = mem_alloc(ACPI_2_0_TCPA_LAML_SIZE, 0)) != NULL )
+        if ( (lasa = mem_alloc(ACPI_2_0_TCPA_LAML_SIZE, 16)) != NULL )
         {
             tcpa->lasa = virt_to_phys(lasa);
             tcpa->laml = ACPI_2_0_TCPA_LAML_SIZE;
@@ -237,13 +261,12 @@ static int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
     }
 
     table_ptrs[nr_tables] = 0;
-    return align16(offset);
+    return nr_tables;
 }
 
-static void __acpi_build_tables(unsigned int physical,
-                                uint8_t *buf,
-                                int *low_sz, int *high_sz)
+void acpi_build_tables(unsigned int physical)
 {
+    struct acpi_info *acpi_info = (struct acpi_info *)ACPI_INFO_PHYSICAL_ADDRESS;
     struct acpi_20_rsdp *rsdp;
     struct acpi_20_rsdt *rsdt;
     struct acpi_20_xsdt *xsdt;
@@ -252,27 +275,28 @@ static void __acpi_build_tables(unsigned int physical,
     struct acpi_20_facs *facs;
     unsigned char       *dsdt;
     unsigned long        secondary_tables[16];
-    int                  offset = 0, i;
+    int                  nr_secondaries, i;
 
     /*
      * Fill in high-memory data structures, starting at @buf.
      */
 
-    facs = (struct acpi_20_facs *)&buf[offset];
+    facs = mem_alloc(sizeof(struct acpi_20_facs), 16);
+    if (!facs) goto oom;
     memcpy(facs, &Facs, sizeof(struct acpi_20_facs));
-    offset += align16(sizeof(struct acpi_20_facs));
 
-    dsdt = (unsigned char *)&buf[offset];
     if ( hvm_info->nr_vcpus <= 15 )
     {
+        dsdt = mem_alloc(dsdt_15cpu_len, 16);
+        if (!dsdt) goto oom;
         memcpy(dsdt, &dsdt_15cpu, dsdt_15cpu_len);
-        offset += align16(dsdt_15cpu_len);
         nr_processor_objects = 15;
     }
     else
     {
+        dsdt = mem_alloc(dsdt_anycpu_len, 16);
+        if (!dsdt) goto oom;
         memcpy(dsdt, &dsdt_anycpu, dsdt_anycpu_len);
-        offset += align16(dsdt_anycpu_len);
         nr_processor_objects = HVM_MAX_VCPUS;
     }
 
@@ -284,9 +308,9 @@ static void __acpi_build_tables(unsigned int physical,
      * compatible revision 1 FADT that is linked with the RSDT. Refer to:
      *     http://www.acpi.info/presentations/S01USMOBS169_OS%20new.ppt
      */
-    fadt_10 = (struct acpi_10_fadt *)&buf[offset];
+    fadt_10 = mem_alloc(sizeof(struct acpi_10_fadt), 16);
+    if (!fadt_10) goto oom;
     memcpy(fadt_10, &Fadt, sizeof(struct acpi_10_fadt));
-    offset += align16(sizeof(struct acpi_10_fadt));
     fadt_10->header.length = sizeof(struct acpi_10_fadt);
     fadt_10->header.revision = ACPI_1_0_FADT_REVISION;
     fadt_10->dsdt          = (unsigned long)dsdt;
@@ -295,9 +319,9 @@ static void __acpi_build_tables(unsigned int physical,
                  offsetof(struct acpi_header, checksum),
                  sizeof(struct acpi_10_fadt));
 
-    fadt = (struct acpi_20_fadt *)&buf[offset];
+    fadt = mem_alloc(sizeof(struct acpi_20_fadt), 16);
+    if (!fadt) goto oom;
     memcpy(fadt, &Fadt, sizeof(struct acpi_20_fadt));
-    offset += align16(sizeof(struct acpi_20_fadt));
     fadt->dsdt   = (unsigned long)dsdt;
     fadt->x_dsdt = (unsigned long)dsdt;
     fadt->firmware_ctrl   = (unsigned long)facs;
@@ -306,42 +330,42 @@ static void __acpi_build_tables(unsigned int physical,
                  offsetof(struct acpi_header, checksum),
                  sizeof(struct acpi_20_fadt));
 
-    offset += construct_secondary_tables(&buf[offset], secondary_tables);
+    nr_secondaries = construct_secondary_tables(secondary_tables, acpi_info);
+    if ( nr_secondaries < 0 )
+        goto oom;
 
-    xsdt = (struct acpi_20_xsdt *)&buf[offset];
+    xsdt = mem_alloc(sizeof(struct acpi_20_xsdt)+
+                     sizeof(uint64_t)*nr_secondaries,
+                     16);
+    if (!xsdt) goto oom;
     memcpy(xsdt, &Xsdt, sizeof(struct acpi_header));
     xsdt->entry[0] = (unsigned long)fadt;
     for ( i = 0; secondary_tables[i]; i++ )
         xsdt->entry[i+1] = secondary_tables[i];
     xsdt->header.length = sizeof(struct acpi_header) + (i+1)*sizeof(uint64_t);
-    offset += align16(xsdt->header.length);
     set_checksum(xsdt,
                  offsetof(struct acpi_header, checksum),
                  xsdt->header.length);
 
-    rsdt = (struct acpi_20_rsdt *)&buf[offset];
+    rsdt = mem_alloc(sizeof(struct acpi_20_rsdt)+
+                     sizeof(uint32_t)*nr_secondaries,
+                     16);
+    if (!rsdt) goto oom;
     memcpy(rsdt, &Rsdt, sizeof(struct acpi_header));
     rsdt->entry[0] = (unsigned long)fadt_10;
     for ( i = 0; secondary_tables[i]; i++ )
         rsdt->entry[i+1] = secondary_tables[i];
     rsdt->header.length = sizeof(struct acpi_header) + (i+1)*sizeof(uint32_t);
-    offset += align16(rsdt->header.length);
     set_checksum(rsdt,
                  offsetof(struct acpi_header, checksum),
                  rsdt->header.length);
 
-    *high_sz = offset;
-
     /*
-     * Fill in low-memory data structures: bios_info_table and RSDP.
+     * Fill in low-memory data structures: acpi_info and RSDP.
      */
-    buf = (uint8_t *)physical;
-    offset = 0;
-
-    rsdp = (struct acpi_20_rsdp *)&buf[offset];
+    rsdp = (struct acpi_20_rsdp *)physical;
 
     memcpy(rsdp, &Rsdp, sizeof(struct acpi_20_rsdp));
-    offset += align16(sizeof(struct acpi_20_rsdp));
     rsdp->rsdt_address = (unsigned long)rsdt;
     rsdp->xsdt_address = (unsigned long)xsdt;
     set_checksum(rsdp,
@@ -351,27 +375,19 @@ static void __acpi_build_tables(unsigned int physical,
                  offsetof(struct acpi_20_rsdp, extended_checksum),
                  sizeof(struct acpi_20_rsdp));
 
-    *low_sz = offset;
-}
+    memset(acpi_info, 0, sizeof(*acpi_info));
+    acpi_info->com1_present = uart_exists(0x3f8);
+    acpi_info->com2_present = uart_exists(0x2f8);
+    acpi_info->lpt1_present = lpt_exists(0x378);
+    acpi_info->hpet_present = hpet_exists(ACPI_HPET_ADDRESS);
+    acpi_info->pci_min = pci_mem_start;
+    acpi_info->pci_len = pci_mem_end - pci_mem_start;
 
-void acpi_build_tables(unsigned int physical)
-{
-    int high_sz, low_sz;
-    uint8_t *buf;
+    return;
 
-    /* Find out size of high-memory ACPI data area. */
-    buf = (uint8_t *)&_end;
-    __acpi_build_tables(physical, buf, &low_sz, &high_sz);
-    memset(buf, 0, high_sz);
+oom:
+    printf("unable to build ACPI tables: out of memory\n");
 
-    /* Allocate data area and set up ACPI tables there. */
-    buf = mem_alloc(high_sz, 0);
-    __acpi_build_tables(physical, buf, &low_sz, &high_sz);
-
-    printf(" - Lo data: %08x-%08x\n"
-           " - Hi data: %08lx-%08lx\n",
-           physical, physical + low_sz - 1,
-           (unsigned long)buf, (unsigned long)buf + high_sz - 1);
 }
 
 /*

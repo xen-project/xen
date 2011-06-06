@@ -370,4 +370,8 @@ _hidden int libxl__file_reference_map(libxl_file_reference *f);
 _hidden int libxl__file_reference_unmap(libxl_file_reference *f);
 
 _hidden int libxl__e820_alloc(libxl_ctx *ctx, uint32_t domid, libxl_domain_config *d_config);
+
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+
 #endif

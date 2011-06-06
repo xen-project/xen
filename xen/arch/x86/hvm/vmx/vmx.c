@@ -1484,7 +1484,6 @@ static void vmx_fpu_dirty_intercept(void)
     }
 }
 
-#define bitmaskof(idx)  (1U << ((idx) & 31))
 static void vmx_cpuid_intercept(
     unsigned int *eax, unsigned int *ebx,
     unsigned int *ecx, unsigned int *edx)
@@ -1501,9 +1500,9 @@ static void vmx_cpuid_intercept(
             /* SYSCALL is visible iff running in long mode. */
             hvm_get_segment_register(v, x86_seg_cs, &cs);
             if ( cs.attr.fields.l )
-                *edx |= bitmaskof(X86_FEATURE_SYSCALL);
+                *edx |= cpufeat_mask(X86_FEATURE_SYSCALL);
             else
-                *edx &= ~(bitmaskof(X86_FEATURE_SYSCALL));
+                *edx &= ~(cpufeat_mask(X86_FEATURE_SYSCALL));
 
             break;
     }
