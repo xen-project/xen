@@ -493,6 +493,13 @@ static inline void p2m_mem_access_check(unsigned long gpa, bool_t gla_valid,
                                         unsigned long gla, bool_t access_r, 
                                         bool_t access_w, bool_t access_x)
 { }
+static inline int p2m_set_mem_access(struct domain *d, 
+                                     unsigned long start_pfn, 
+                                     uint32_t nr, hvmmem_access_t access)
+{ return -EINVAL; }
+static inline int p2m_get_mem_access(struct domain *d, unsigned long pfn, 
+                                     hvmmem_access_t *access)
+{ return -EINVAL; }
 #endif
 
 /* 
