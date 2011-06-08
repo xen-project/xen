@@ -200,7 +200,9 @@ unsigned long create_pir_tables(void);
 void smp_initialise(void);
 
 #include "e820.h"
-int build_e820_table(struct e820entry *e820);
+int build_e820_table(struct e820entry *e820,
+		     unsigned int lowmem_reserved_base,
+		     unsigned int bios_image_base);
 void dump_e820_table(struct e820entry *e820, unsigned int nr);
 
 #ifndef NDEBUG

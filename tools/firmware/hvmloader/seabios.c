@@ -117,7 +117,9 @@ static void seabios_setup_e820(void)
     struct seabios_info *info = (void *)BIOS_INFO_PHYSICAL_ADDRESS;
     struct e820entry *e820 = scratch_alloc(sizeof(struct e820entry)*16, 0);
     info->e820 = (uint32_t)e820;
-    info->e820_nr = build_e820_table(e820);
+
+    /* SeaBIOS reserves memory in e820 as necessary so no low reservation. */
+    info->e820_nr = build_e820_table(e820, 0, 0x100000-sizeof(seabios));
     dump_e820_table(e820, info->e820_nr);
 }
 

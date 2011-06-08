@@ -66,6 +66,9 @@ extern unsigned long pci_mem_start, pci_mem_end;
 #define VGABIOS_PHYSICAL_ADDRESS      0x000C0000
 #define HVMLOADER_PHYSICAL_ADDRESS    0x00100000
 
+#define ACPI_INFO_SIZE                     0xC00
+#define ACPI_INFO_PHYSICAL_END (ACPI_INFO_PHYSICAL_ADDRESS + ACPI_INFO_SIZE)
+
 extern unsigned long scratch_start;
 
 #endif /* __HVMLOADER_CONFIG_H__ */

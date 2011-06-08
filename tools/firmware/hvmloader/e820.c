@@ -69,28 +69,67 @@ void dump_e820_table(struct e820entry *e820, unsigned int nr)
 }
 
 /* Create an E820 table based on memory parameters provided in hvm_info. */
-int build_e820_table(struct e820entry *e820)
+int build_e820_table(struct e820entry *e820,
+                     unsigned int lowmem_reserved_base,
+                     unsigned int bios_image_base)
 {
     unsigned int nr = 0;
 
-    /* 0x0-0x9E000: Ordinary RAM. */
-    /* (Must be at least 512K to keep Windows happy) */
-    e820[nr].addr = 0x00000;
-    e820[nr].size = 0x9E000;
-    e820[nr].type = E820_RAM;
-    nr++;
+    if ( !lowmem_reserved_base )
+            lowmem_reserved_base = 0xA0000;
 
-    /* 0x9E000-0x9FC00: Reserved for internal use. */
-    e820[nr].addr = 0x9E000;
-    e820[nr].size = 0x01C00;
-    e820[nr].type = E820_RESERVED;
-    nr++;
+    /* Lowmem must be at least 512K to keep Windows happy) */
+    ASSERT ( lowmem_reserved_base > 512<<10 );
 
-    /* 0x9FC00-0xA0000: Extended BIOS Data Area (EBDA). */
-    e820[nr].addr = 0x9FC00;
-    e820[nr].size = 0x400;
-    e820[nr].type = E820_RESERVED;
-    nr++;
+    /*
+     * Lowmem reservation must either cover the ACPI info region
+     * entirely or not at all. Sitting half way through suggests
+     * something funny is going on.
+     */
+    ASSERT ( lowmem_reserved_base < ACPI_INFO_PHYSICAL_ADDRESS ||
+             lowmem_reserved_base > ACPI_INFO_PHYSICAL_END );
+
+    ASSERT ( bios_image_base < 0x100000 );
+
+    if ( lowmem_reserved_base < ACPI_INFO_PHYSICAL_ADDRESS ) {
+        /*
+         * 0x0-lowmem_reserved_base: Ordinary RAM.
+         */
+        e820[nr].addr = 0x00000;
+        e820[nr].size = lowmem_reserved_base;
+        e820[nr].type = E820_RAM;
+        nr++;
+    }
+    else
+    {
+        /* 0x0-ACPI_INFO: Ordinary RAM. */
+        e820[nr].addr = 0x00000;
+        e820[nr].size = ACPI_INFO_PHYSICAL_ADDRESS;
+        e820[nr].type = E820_RAM;
+        nr++;
+
+        /* ACPI INFO: Reserved. */
+        e820[nr].addr = ACPI_INFO_PHYSICAL_ADDRESS;
+        e820[nr].size = ACPI_INFO_SIZE;
+        e820[nr].type = E820_RESERVED;
+        nr++;
+
+        /* ACPI_INFO-lowmem_reserved_base: Ordinary RAM. */
+        e820[nr].addr = ACPI_INFO_PHYSICAL_END;
+        e820[nr].size = lowmem_reserved_base - ACPI_INFO_PHYSICAL_END;
+        e820[nr].type = E820_RAM;
+        nr++;
+    }
+
+    /* lowmem_reserved_base-0xa00000: reserved by BIOS implementation. */
+    if ( lowmem_reserved_base < 0xA0000 )
+    {
+            /* Reserved for internal use. */
+            e820[nr].addr = lowmem_reserved_base;
+            e820[nr].size = 0xA0000-lowmem_reserved_base;
+            e820[nr].type = E820_RESERVED;
+            nr++;
+    }
 
     /*
      * Following regions are standard regions of the PC memory map.
@@ -101,12 +140,10 @@ int build_e820_table(struct e820entry *e820)
      */
 
     /*
-     * 0xE0000-0x0F0000: PC-specific area. We place various tables here.
-     * 0xF0000-0x100000: System BIOS.
-     * TODO: free pages which turn out to be unused.
+     * BIOS region.
      */
-    e820[nr].addr = 0xE0000;
-    e820[nr].size = 0x20000;
+    e820[nr].addr = bios_image_base;
+    e820[nr].size = 0x100000-bios_image_base;
     e820[nr].type = E820_RESERVED;
     nr++;
 
