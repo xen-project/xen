@@ -111,3 +111,13 @@ void cacheattr_init(void)
 
     wrmsr(MSR_MTRRdefType, mtrr_def);
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

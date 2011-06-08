@@ -264,3 +264,13 @@ void pci_setup(void)
         pci_writew(vga_devfn, PCI_COMMAND, cmd);
     }
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

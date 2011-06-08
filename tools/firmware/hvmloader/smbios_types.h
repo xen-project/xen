@@ -186,3 +186,13 @@ struct smbios_type_127 {
 } __attribute__ ((packed));
 
 #endif /* SMBIOS_TYPES_H */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

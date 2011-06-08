@@ -148,3 +148,13 @@ uint32_t rombios_highbios_setup(void)
 {
     return relocate_32bitbios((char *)highbios_array, sizeof(highbios_array));
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

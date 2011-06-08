@@ -106,3 +106,13 @@
 #define PCI_MAX_LAT		0x3f	/* 8 bits */
 
 #endif /* __HVMLOADER_PCI_REGS_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

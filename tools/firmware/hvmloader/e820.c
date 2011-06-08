@@ -176,3 +176,12 @@ int build_e820_table(struct e820entry *e820,
     return nr;
 }
 
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
