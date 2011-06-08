@@ -1056,6 +1056,10 @@ nsvm_vmcb_prepare4vmexit(struct vcpu *v)
     /* NextRIP */
     ns_vmcb->nextrip = n2vmcb->nextrip;
 
+    /* Decode Assist */
+    ns_vmcb->guest_ins_len = n2vmcb->guest_ins_len;
+    memcpy(ns_vmcb->guest_ins, n2vmcb->guest_ins, sizeof(ns_vmcb->guest_ins));
+
     /*
      * VMCB Save State Area
      */

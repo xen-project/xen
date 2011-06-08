@@ -153,7 +153,8 @@ static void amd_xc_cpuid_policy(
          * available in hw and which are implemented
          */
         regs[3] &= (SVM_FEATURE_NPT | SVM_FEATURE_LBRV | \
-            SVM_FEATURE_NRIPS | SVM_FEATURE_PAUSEFILTER);
+            SVM_FEATURE_NRIPS | SVM_FEATURE_PAUSEFILTER | \
+            SVM_FEATURE_DECODEASSISTS);
 
         /* Pass 2: Always enable SVM features which are emulated */
         regs[3] |= SVM_FEATURE_VMCBCLEAN;
