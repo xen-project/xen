@@ -670,6 +670,30 @@ void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr)
     }
 }
 
+/*
+ * Switch VMCS between layer 1 & 2 guest
+ */
+void vmx_vmcs_switch(struct vmcs_struct *from, struct vmcs_struct *to)
+{
+    struct arch_vmx_struct *vmx = &current->arch.hvm_vmx;
+    spin_lock(&vmx->vmcs_lock);
+
+    __vmpclear(virt_to_maddr(from));
+    __vmptrld(virt_to_maddr(to));
+
+    vmx->vmcs = to;
+    vmx->launched = 0;
+    this_cpu(current_vmcs) = to;
+
+    if ( vmx->hostenv_migrated )
+    {
+        vmx->hostenv_migrated = 0;
+        vmx_set_host_env(current);
+    }
+
+    spin_unlock(&vmx->vmcs_lock);
+}
+
 static int construct_vmcs(struct vcpu *v)
 {
     struct domain *d = v->domain;
@@ -1079,6 +1103,13 @@ void vmx_do_resume(struct vcpu *v)
         hvm_migrate_timers(v);
         hvm_migrate_pirqs(v);
         vmx_set_host_env(v);
+        /*
+         * Both n1 VMCS and n2 VMCS need to update the host environment after 
+         * VCPU migration. The environment of current VMCS is updated in place,
+         * but the action of another VMCS is deferred till it is switched in.
+         */
+        v->arch.hvm_vmx.hostenv_migrated = 1;
+
         hvm_asid_flush_vcpu(v);
     }
 

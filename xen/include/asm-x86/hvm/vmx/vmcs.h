@@ -123,6 +123,7 @@ struct arch_vmx_struct {
     struct segment_register vm86_saved_seg[x86_seg_tr + 1];
     /* Remember EFLAGS while in virtual 8086 mode */
     uint32_t             vm86_saved_eflags;
+    int                  hostenv_migrated;
 };
 
 int vmx_create_vmcs(struct vcpu *v);
@@ -392,6 +393,7 @@ int vmx_read_guest_msr(u32 msr, u64 *val);
 int vmx_write_guest_msr(u32 msr, u64 val);
 int vmx_add_guest_msr(u32 msr);
 int vmx_add_host_load_msr(u32 msr);
+void vmx_vmcs_switch(struct vmcs_struct *from, struct vmcs_struct *to);
 
 #endif /* ASM_X86_HVM_VMX_VMCS_H__ */
 
