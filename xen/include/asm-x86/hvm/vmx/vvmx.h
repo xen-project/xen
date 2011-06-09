@@ -161,5 +161,10 @@ int nvmx_handle_vmwrite(struct cpu_user_regs *regs);
 int nvmx_handle_vmresume(struct cpu_user_regs *regs);
 int nvmx_handle_vmlaunch(struct cpu_user_regs *regs);
 
+void nvmx_update_exec_control(struct vcpu *v, u32 value);
+void nvmx_update_secondary_exec_control(struct vcpu *v,
+                                        unsigned long value);
+void nvmx_update_exception_bitmap(struct vcpu *v, unsigned long value);
+
 #endif /* __ASM_X86_HVM_VVMX_H__ */
 

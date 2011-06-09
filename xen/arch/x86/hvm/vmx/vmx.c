@@ -54,6 +54,7 @@
 #include <asm/xenoprof.h>
 #include <asm/debugger.h>
 #include <asm/apic.h>
+#include <asm/hvm/nestedhvm.h>
 
 enum handler_return { HNDL_done, HNDL_unhandled, HNDL_exception_raised };
 
@@ -361,18 +362,28 @@ long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
 
 void vmx_update_cpu_exec_control(struct vcpu *v)
 {
-    __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vmx.exec_control);
+    if ( nestedhvm_vcpu_in_guestmode(v) )
+        nvmx_update_exec_control(v, v->arch.hvm_vmx.exec_control);
+    else
+        __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vmx.exec_control);
 }
 
 static void vmx_update_secondary_exec_control(struct vcpu *v)
 {
-    __vmwrite(SECONDARY_VM_EXEC_CONTROL,
-              v->arch.hvm_vmx.secondary_exec_control);
+    if ( nestedhvm_vcpu_in_guestmode(v) )
+        nvmx_update_secondary_exec_control(v,
+            v->arch.hvm_vmx.secondary_exec_control);
+    else
+        __vmwrite(SECONDARY_VM_EXEC_CONTROL,
+                  v->arch.hvm_vmx.secondary_exec_control);
 }
 
 void vmx_update_exception_bitmap(struct vcpu *v)
 {
-    __vmwrite(EXCEPTION_BITMAP, v->arch.hvm_vmx.exception_bitmap);
+    if ( nestedhvm_vcpu_in_guestmode(v) )
+        nvmx_update_exception_bitmap(v, v->arch.hvm_vmx.exception_bitmap);
+    else
+        __vmwrite(EXCEPTION_BITMAP, v->arch.hvm_vmx.exception_bitmap);
 }
 
 static int vmx_guest_x86_mode(struct vcpu *v)

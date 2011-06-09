@@ -25,6 +25,7 @@
 #include <asm/p2m.h>
 #include <asm/hvm/vmx/vmx.h>
 #include <asm/hvm/vmx/vvmx.h>
+#include <asm/hvm/nestedhvm.h>
 
 static void nvmx_purge_vvmcs(struct vcpu *v);
 
@@ -390,6 +391,91 @@ static void vmreturn(struct cpu_user_regs *regs, enum vmx_ops_result ops_res)
     }
 
     regs->eflags = eflags;
+}
+
+/*
+ * Nested VMX uses "strict" condition to exit from 
+ * L2 guest if either L1 VMM or L0 VMM expect to exit.
+ */
+static inline u32 __shadow_control(struct vcpu *v,
+                                 unsigned int field,
+                                 u32 host_value)
+{
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+
+    return (u32) __get_vvmcs(nvcpu->nv_vvmcx, field) | host_value;
+}
+
+static void set_shadow_control(struct vcpu *v,
+                               unsigned int field,
+                               u32 host_value)
+{
+    __vmwrite(field, __shadow_control(v, field, host_value));
+}
+
+unsigned long *_shadow_io_bitmap(struct vcpu *v)
+{
+    struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
+    int port80, portED;
+    u8 *bitmap;
+
+    bitmap = nvmx->iobitmap[0];
+    port80 = bitmap[0x80 >> 3] & (1 << (0x80 & 0x7)) ? 1 : 0;
+    portED = bitmap[0xed >> 3] & (1 << (0xed & 0x7)) ? 1 : 0;
+
+    return nestedhvm_vcpu_iomap_get(port80, portED);
+}
+
+void nvmx_update_exec_control(struct vcpu *v, u32 host_cntrl)
+{
+    u32 pio_cntrl = (CPU_BASED_ACTIVATE_IO_BITMAP
+                     | CPU_BASED_UNCOND_IO_EXITING);
+    unsigned long *bitmap; 
+    u32 shadow_cntrl;
+ 
+    shadow_cntrl = __n2_exec_control(v);
+    pio_cntrl &= shadow_cntrl;
+    /* Enforce the removed features */
+    shadow_cntrl &= ~(CPU_BASED_TPR_SHADOW
+                      | CPU_BASED_ACTIVATE_MSR_BITMAP
+                      | CPU_BASED_ACTIVATE_SECONDARY_CONTROLS
+                      | CPU_BASED_ACTIVATE_IO_BITMAP
+                      | CPU_BASED_UNCOND_IO_EXITING);
+    shadow_cntrl |= host_cntrl;
+    if ( pio_cntrl == CPU_BASED_UNCOND_IO_EXITING ) {
+        /* L1 VMM intercepts all I/O instructions */
+        shadow_cntrl |= CPU_BASED_UNCOND_IO_EXITING;
+        shadow_cntrl &= ~CPU_BASED_ACTIVATE_IO_BITMAP;
+    }
+    else {
+        /* Use IO_BITMAP in shadow */
+        if ( pio_cntrl == 0 ) {
+            /* 
+             * L1 VMM doesn't intercept IO instruction.
+             * Use host configuration and reset IO_BITMAP
+             */
+            bitmap = hvm_io_bitmap;
+        }
+        else {
+            /* use IO bitmap */
+            bitmap = _shadow_io_bitmap(v);
+        }
+        __vmwrite(IO_BITMAP_A, virt_to_maddr(bitmap));
+        __vmwrite(IO_BITMAP_B, virt_to_maddr(bitmap) + PAGE_SIZE);
+    }
+
+    __vmwrite(CPU_BASED_VM_EXEC_CONTROL, shadow_cntrl);
+}
+
+void nvmx_update_secondary_exec_control(struct vcpu *v,
+                                            unsigned long value)
+{
+    set_shadow_control(v, SECONDARY_VM_EXEC_CONTROL, value);
+}
+
+void nvmx_update_exception_bitmap(struct vcpu *v, unsigned long value)
+{
+    set_shadow_control(v, EXCEPTION_BITMAP, value);
 }
 
 static void __clear_current_vvmcs(struct vcpu *v)
