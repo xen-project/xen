@@ -473,6 +473,41 @@ void nvmx_update_secondary_exec_control(struct vcpu *v,
     set_shadow_control(v, SECONDARY_VM_EXEC_CONTROL, value);
 }
 
+static void nvmx_update_pin_control(struct vcpu *v, unsigned long host_cntrl)
+{
+    u32 shadow_cntrl;
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+
+    shadow_cntrl = __get_vvmcs(nvcpu->nv_vvmcx, PIN_BASED_VM_EXEC_CONTROL);
+    shadow_cntrl &= ~PIN_BASED_PREEMPT_TIMER;
+    shadow_cntrl |= host_cntrl;
+    __vmwrite(PIN_BASED_VM_EXEC_CONTROL, shadow_cntrl);
+}
+
+static void nvmx_update_exit_control(struct vcpu *v, unsigned long host_cntrl)
+{
+    u32 shadow_cntrl;
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+
+    shadow_cntrl = __get_vvmcs(nvcpu->nv_vvmcx, VM_EXIT_CONTROLS);
+    shadow_cntrl &= ~(VM_EXIT_SAVE_DEBUG_CNTRLS 
+                      | VM_EXIT_SAVE_GUEST_PAT
+                      | VM_EXIT_SAVE_GUEST_EFER
+                      | VM_EXIT_SAVE_PREEMPT_TIMER);
+    shadow_cntrl |= host_cntrl;
+    __vmwrite(VM_EXIT_CONTROLS, shadow_cntrl);
+}
+
+static void nvmx_update_entry_control(struct vcpu *v)
+{
+    u32 shadow_cntrl;
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+
+    shadow_cntrl = __get_vvmcs(nvcpu->nv_vvmcx, VM_ENTRY_CONTROLS);
+    shadow_cntrl &= ~(VM_ENTRY_LOAD_GUEST_PAT | VM_ENTRY_LOAD_GUEST_EFER);
+    __vmwrite(VM_ENTRY_CONTROLS, shadow_cntrl);
+}
+
 void nvmx_update_exception_bitmap(struct vcpu *v, unsigned long value)
 {
     set_shadow_control(v, EXCEPTION_BITMAP, value);
@@ -522,6 +557,348 @@ static void nvmx_purge_vvmcs(struct vcpu *v)
             nvmx->iobitmap[i] = NULL;
         }
     }
+}
+
+/*
+ * Context synchronized between shadow and virtual VMCS.
+ */
+static unsigned long vmcs_gstate_field[] = {
+    /* 16 BITS */
+    GUEST_ES_SELECTOR,
+    GUEST_CS_SELECTOR,
+    GUEST_SS_SELECTOR,
+    GUEST_DS_SELECTOR,
+    GUEST_FS_SELECTOR,
+    GUEST_GS_SELECTOR,
+    GUEST_LDTR_SELECTOR,
+    GUEST_TR_SELECTOR,
+    /* 64 BITS */
+    VMCS_LINK_POINTER,
+    GUEST_IA32_DEBUGCTL,
+#ifndef CONFIG_X86_64
+    VMCS_LINK_POINTER_HIGH,
+    GUEST_IA32_DEBUGCTL_HIGH,
+#endif
+    /* 32 BITS */
+    GUEST_ES_LIMIT,
+    GUEST_CS_LIMIT,
+    GUEST_SS_LIMIT,
+    GUEST_DS_LIMIT,
+    GUEST_FS_LIMIT,
+    GUEST_GS_LIMIT,
+    GUEST_LDTR_LIMIT,
+    GUEST_TR_LIMIT,
+    GUEST_GDTR_LIMIT,
+    GUEST_IDTR_LIMIT,
+    GUEST_ES_AR_BYTES,
+    GUEST_CS_AR_BYTES,
+    GUEST_SS_AR_BYTES,
+    GUEST_DS_AR_BYTES,
+    GUEST_FS_AR_BYTES,
+    GUEST_GS_AR_BYTES,
+    GUEST_LDTR_AR_BYTES,
+    GUEST_TR_AR_BYTES,
+    GUEST_INTERRUPTIBILITY_INFO,
+    GUEST_ACTIVITY_STATE,
+    GUEST_SYSENTER_CS,
+    /* natural */
+    GUEST_ES_BASE,
+    GUEST_CS_BASE,
+    GUEST_SS_BASE,
+    GUEST_DS_BASE,
+    GUEST_FS_BASE,
+    GUEST_GS_BASE,
+    GUEST_LDTR_BASE,
+    GUEST_TR_BASE,
+    GUEST_GDTR_BASE,
+    GUEST_IDTR_BASE,
+    GUEST_DR7,
+    /*
+     * Following guest states are in local cache (cpu_user_regs)
+     GUEST_RSP,
+     GUEST_RIP,
+     */
+    GUEST_RFLAGS,
+    GUEST_PENDING_DBG_EXCEPTIONS,
+    GUEST_SYSENTER_ESP,
+    GUEST_SYSENTER_EIP,
+};
+
+/*
+ * Context: shadow -> virtual VMCS
+ */
+static unsigned long vmcs_ro_field[] = {
+    GUEST_PHYSICAL_ADDRESS,
+    VM_INSTRUCTION_ERROR,
+    VM_EXIT_REASON,
+    VM_EXIT_INTR_INFO,
+    VM_EXIT_INTR_ERROR_CODE,
+    IDT_VECTORING_INFO,
+    IDT_VECTORING_ERROR_CODE,
+    VM_EXIT_INSTRUCTION_LEN,
+    VMX_INSTRUCTION_INFO,
+    EXIT_QUALIFICATION,
+    GUEST_LINEAR_ADDRESS
+};
+
+static struct vmcs_host_to_guest {
+    unsigned long host_field;
+    unsigned long guest_field;
+} vmcs_h2g_field[] = {
+    {HOST_ES_SELECTOR, GUEST_ES_SELECTOR},
+    {HOST_CS_SELECTOR, GUEST_CS_SELECTOR},
+    {HOST_SS_SELECTOR, GUEST_SS_SELECTOR},
+    {HOST_DS_SELECTOR, GUEST_DS_SELECTOR},
+    {HOST_FS_SELECTOR, GUEST_FS_SELECTOR},
+    {HOST_GS_SELECTOR, GUEST_GS_SELECTOR},
+    {HOST_TR_SELECTOR, GUEST_TR_SELECTOR},
+    {HOST_SYSENTER_CS, GUEST_SYSENTER_CS},
+    {HOST_FS_BASE, GUEST_FS_BASE},
+    {HOST_GS_BASE, GUEST_GS_BASE},
+    {HOST_TR_BASE, GUEST_TR_BASE},
+    {HOST_GDTR_BASE, GUEST_GDTR_BASE},
+    {HOST_IDTR_BASE, GUEST_IDTR_BASE},
+    {HOST_SYSENTER_ESP, GUEST_SYSENTER_ESP},
+    {HOST_SYSENTER_EIP, GUEST_SYSENTER_EIP},
+};
+
+static void vvmcs_to_shadow(void *vvmcs, unsigned int field)
+{
+    u64 value;
+
+    value = __get_vvmcs(vvmcs, field);
+    __vmwrite(field, value);
+}
+
+static void shadow_to_vvmcs(void *vvmcs, unsigned int field)
+{
+    u64 value;
+    int rc;
+
+    value = __vmread_safe(field, &rc);
+    if ( !rc )
+        __set_vvmcs(vvmcs, field, value);
+}
+
+static void load_shadow_control(struct vcpu *v)
+{
+    /*
+     * Set shadow controls:  PIN_BASED, CPU_BASED, EXIT, ENTRY
+     * and EXCEPTION
+     * Enforce the removed features
+     */
+    nvmx_update_pin_control(v, vmx_pin_based_exec_control);
+    vmx_update_cpu_exec_control(v);
+    nvmx_update_exit_control(v, vmx_vmexit_control);
+    nvmx_update_entry_control(v);
+    vmx_update_exception_bitmap(v);
+}
+
+static void load_shadow_guest_state(struct vcpu *v)
+{
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    void *vvmcs = nvcpu->nv_vvmcx;
+    int i;
+
+    /* vvmcs.gstate to shadow vmcs.gstate */
+    for ( i = 0; i < ARRAY_SIZE(vmcs_gstate_field); i++ )
+        vvmcs_to_shadow(vvmcs, vmcs_gstate_field[i]);
+
+    hvm_set_cr0(__get_vvmcs(vvmcs, GUEST_CR0));
+    hvm_set_cr4(__get_vvmcs(vvmcs, GUEST_CR4));
+    hvm_set_cr3(__get_vvmcs(vvmcs, GUEST_CR3));
+
+    vvmcs_to_shadow(vvmcs, VM_ENTRY_INTR_INFO);
+    vvmcs_to_shadow(vvmcs, VM_ENTRY_EXCEPTION_ERROR_CODE);
+    vvmcs_to_shadow(vvmcs, VM_ENTRY_INSTRUCTION_LEN);
+
+    vvmcs_to_shadow(vvmcs, CR0_READ_SHADOW);
+    vvmcs_to_shadow(vvmcs, CR4_READ_SHADOW);
+    vvmcs_to_shadow(vvmcs, CR0_GUEST_HOST_MASK);
+    vvmcs_to_shadow(vvmcs, CR4_GUEST_HOST_MASK);
+
+    /* TODO: PDPTRs for nested ept */
+    /* TODO: CR3 target control */
+}
+
+static void virtual_vmentry(struct cpu_user_regs *regs)
+{
+    struct vcpu *v = current;
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    void *vvmcs = nvcpu->nv_vvmcx;
+#ifdef __x86_64__
+    unsigned long lm_l1, lm_l2;
+#endif
+
+    vmx_vmcs_switch(v->arch.hvm_vmx.vmcs, nvcpu->nv_n2vmcx);
+
+    nestedhvm_vcpu_enter_guestmode(v);
+    nvcpu->nv_vmentry_pending = 0;
+    nvcpu->nv_vmswitch_in_progress = 1;
+
+#ifdef __x86_64__
+    /*
+     * EFER handling:
+     * hvm_set_efer won't work if CR0.PG = 1, so we change the value
+     * directly to make hvm_long_mode_enabled(v) work in L2.
+     * An additional update_paging_modes is also needed if
+     * there is 32/64 switch. v->arch.hvm_vcpu.guest_efer doesn't
+     * need to be saved, since its value on vmexit is determined by
+     * L1 exit_controls
+     */
+    lm_l1 = !!hvm_long_mode_enabled(v);
+    lm_l2 = !!(__get_vvmcs(vvmcs, VM_ENTRY_CONTROLS) &
+                           VM_ENTRY_IA32E_MODE);
+
+    if ( lm_l2 )
+        v->arch.hvm_vcpu.guest_efer |= EFER_LMA | EFER_LME;
+    else
+        v->arch.hvm_vcpu.guest_efer &= ~(EFER_LMA | EFER_LME);
+#endif
+
+    load_shadow_control(v);
+    load_shadow_guest_state(v);
+
+#ifdef __x86_64__
+    if ( lm_l1 != lm_l2 )
+        paging_update_paging_modes(v);
+#endif
+
+    regs->eip = __get_vvmcs(vvmcs, GUEST_RIP);
+    regs->esp = __get_vvmcs(vvmcs, GUEST_RSP);
+    regs->eflags = __get_vvmcs(vvmcs, GUEST_RFLAGS);
+
+    /* TODO: EPT_POINTER */
+}
+
+static void sync_vvmcs_guest_state(struct vcpu *v, struct cpu_user_regs *regs)
+{
+    int i;
+    unsigned long mask;
+    unsigned long cr;
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    void *vvmcs = nvcpu->nv_vvmcx;
+
+    /* copy shadow vmcs.gstate back to vvmcs.gstate */
+    for ( i = 0; i < ARRAY_SIZE(vmcs_gstate_field); i++ )
+        shadow_to_vvmcs(vvmcs, vmcs_gstate_field[i]);
+    /* RIP, RSP are in user regs */
+    __set_vvmcs(vvmcs, GUEST_RIP, regs->eip);
+    __set_vvmcs(vvmcs, GUEST_RSP, regs->esp);
+
+    /* SDM 20.6.6: L2 guest execution may change GUEST CR0/CR4 */
+    mask = __get_vvmcs(vvmcs, CR0_GUEST_HOST_MASK);
+    if ( ~mask )
+    {
+        cr = __get_vvmcs(vvmcs, GUEST_CR0);
+        cr = (cr & mask) | (__vmread(GUEST_CR0) & ~mask);
+        __set_vvmcs(vvmcs, GUEST_CR0, cr);
+    }
+
+    mask = __get_vvmcs(vvmcs, CR4_GUEST_HOST_MASK);
+    if ( ~mask )
+    {
+        cr = __get_vvmcs(vvmcs, GUEST_CR4);
+        cr = (cr & mask) | (__vmread(GUEST_CR4) & ~mask);
+        __set_vvmcs(vvmcs, GUEST_CR4, cr);
+    }
+
+    /* CR3 sync if exec doesn't want cr3 load exiting: i.e. nested EPT */
+    if ( !(__n2_exec_control(v) & CPU_BASED_CR3_LOAD_EXITING) )
+        shadow_to_vvmcs(vvmcs, GUEST_CR3);
+}
+
+static void sync_vvmcs_ro(struct vcpu *v)
+{
+    int i;
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+
+    for ( i = 0; i < ARRAY_SIZE(vmcs_ro_field); i++ )
+        shadow_to_vvmcs(nvcpu->nv_vvmcx, vmcs_ro_field[i]);
+}
+
+static void load_vvmcs_host_state(struct vcpu *v)
+{
+    int i;
+    u64 r;
+    void *vvmcs = vcpu_nestedhvm(v).nv_vvmcx;
+
+    for ( i = 0; i < ARRAY_SIZE(vmcs_h2g_field); i++ )
+    {
+        r = __get_vvmcs(vvmcs, vmcs_h2g_field[i].host_field);
+        __vmwrite(vmcs_h2g_field[i].guest_field, r);
+    }
+
+    hvm_set_cr0(__get_vvmcs(vvmcs, HOST_CR0));
+    hvm_set_cr4(__get_vvmcs(vvmcs, HOST_CR4));
+    hvm_set_cr3(__get_vvmcs(vvmcs, HOST_CR3));
+
+    __set_vvmcs(vvmcs, VM_ENTRY_INTR_INFO, 0);
+}
+
+static void virtual_vmexit(struct cpu_user_regs *regs)
+{
+    struct vcpu *v = current;
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+#ifdef __x86_64__
+    unsigned long lm_l1, lm_l2;
+#endif
+
+    sync_vvmcs_ro(v);
+    sync_vvmcs_guest_state(v, regs);
+
+    vmx_vmcs_switch(v->arch.hvm_vmx.vmcs, nvcpu->nv_n1vmcx);
+
+    nestedhvm_vcpu_exit_guestmode(v);
+    nvcpu->nv_vmexit_pending = 0;
+
+#ifdef __x86_64__
+    lm_l2 = !!hvm_long_mode_enabled(v);
+    lm_l1 = !!(__get_vvmcs(nvcpu->nv_vvmcx, VM_EXIT_CONTROLS) &
+                           VM_EXIT_IA32E_MODE);
+
+    if ( lm_l1 )
+        v->arch.hvm_vcpu.guest_efer |= EFER_LMA | EFER_LME;
+    else
+        v->arch.hvm_vcpu.guest_efer &= ~(EFER_LMA | EFER_LME);
+#endif
+
+    vmx_update_cpu_exec_control(v);
+    vmx_update_exception_bitmap(v);
+
+    load_vvmcs_host_state(v);
+
+#ifdef __x86_64__
+    if ( lm_l1 != lm_l2 )
+        paging_update_paging_modes(v);
+#endif
+
+    regs->eip = __get_vvmcs(nvcpu->nv_vvmcx, HOST_RIP);
+    regs->esp = __get_vvmcs(nvcpu->nv_vvmcx, HOST_RSP);
+    regs->eflags = __vmread(GUEST_RFLAGS);
+
+    vmreturn(regs, VMSUCCEED);
+}
+
+asmlinkage void nvmx_switch_guest(void)
+{
+    struct vcpu *v = current;
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    struct cpu_user_regs *regs = guest_cpu_user_regs();
+
+    /*
+     * a softirq may interrupt us between a virtual vmentry is
+     * just handled and the true vmentry. If during this window,
+     * a L1 virtual interrupt causes another virtual vmexit, we
+     * cannot let that happen or VM_ENTRY_INTR_INFO will be lost.
+     */
+    if ( unlikely(nvcpu->nv_vmswitch_in_progress) )
+        return;
+
+    if ( nestedhvm_vcpu_in_guestmode(v) && nvcpu->nv_vmexit_pending )
+        virtual_vmexit(regs);
+    else if ( !nestedhvm_vcpu_in_guestmode(v) && nvcpu->nv_vmentry_pending )
+        virtual_vmentry(regs);
 }
 
 /*

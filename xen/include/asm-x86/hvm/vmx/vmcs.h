@@ -160,6 +160,7 @@ extern u32 vmx_cpu_based_exec_control;
 #define PIN_BASED_PREEMPT_TIMER         0x00000040
 extern u32 vmx_pin_based_exec_control;
 
+#define VM_EXIT_SAVE_DEBUG_CNTRLS       0x00000004
 #define VM_EXIT_IA32E_MODE              0x00000200
 #define VM_EXIT_ACK_INTR_ON_EXIT        0x00008000
 #define VM_EXIT_SAVE_GUEST_PAT          0x00040000

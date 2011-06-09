@@ -165,6 +165,7 @@ void nvmx_update_exec_control(struct vcpu *v, u32 value);
 void nvmx_update_secondary_exec_control(struct vcpu *v,
                                         unsigned long value);
 void nvmx_update_exception_bitmap(struct vcpu *v, unsigned long value);
+asmlinkage void nvmx_switch_guest(void);
 
 #endif /* __ASM_X86_HVM_VVMX_H__ */
 

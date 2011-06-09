@@ -119,6 +119,7 @@ vmx_asm_vmexit_handler:
 .globl vmx_asm_do_vmentry
 vmx_asm_do_vmentry:
         call vmx_intr_assist
+        call nvmx_switch_guest
 
         get_current(bx)
         cli
