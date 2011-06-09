@@ -352,6 +352,25 @@ static void vmreturn(struct cpu_user_regs *regs, enum vmx_ops_result ops_res)
     regs->eflags = eflags;
 }
 
+static void __map_io_bitmap(struct vcpu *v, u64 vmcs_reg)
+{
+    struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
+    unsigned long gpa;
+    int index;
+
+    index = vmcs_reg == IO_BITMAP_A ? 0 : 1;
+    if (nvmx->iobitmap[index])
+        hvm_unmap_guest_frame (nvmx->iobitmap[index]);
+    gpa = __get_vvmcs(vcpu_nestedhvm(v).nv_vvmcx, vmcs_reg);
+    nvmx->iobitmap[index] = hvm_map_guest_frame_ro (gpa >> PAGE_SHIFT);
+}
+
+static inline void map_io_bitmap_all(struct vcpu *v)
+{
+   __map_io_bitmap (v, IO_BITMAP_A);
+   __map_io_bitmap (v, IO_BITMAP_B);
+}
+
 /*
  * VMX instructions handling
  */
@@ -360,6 +379,7 @@ int nvmx_handle_vmxon(struct cpu_user_regs *regs)
 {
     struct vcpu *v=current;
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     struct vmx_inst_decoded decode;
     unsigned long gpa = 0;
     int rc;
@@ -368,7 +388,22 @@ int nvmx_handle_vmxon(struct cpu_user_regs *regs)
     if ( rc != X86EMUL_OKAY )
         return rc;
 
+    if ( nvmx->vmxon_region_pa )
+        gdprintk(XENLOG_WARNING, 
+                 "vmxon again: orig %"PRIpaddr" new %lx\n",
+                 nvmx->vmxon_region_pa, gpa);
+
     nvmx->vmxon_region_pa = gpa;
+
+    /*
+     * `fork' the host vmcs to shadow_vmcs
+     * vmcs_lock is not needed since we are on current
+     */
+    nvcpu->nv_n1vmcx = v->arch.hvm_vmx.vmcs;
+    __vmpclear(virt_to_maddr(v->arch.hvm_vmx.vmcs));
+    memcpy(nvcpu->nv_n2vmcx, v->arch.hvm_vmx.vmcs, PAGE_SIZE);
+    __vmptrld(virt_to_maddr(v->arch.hvm_vmx.vmcs));
+    v->arch.hvm_vmx.launched = 0;
     vmreturn(regs, VMSUCCEED);
 
     return X86EMUL_OKAY;
@@ -387,6 +422,37 @@ int nvmx_handle_vmxoff(struct cpu_user_regs *regs)
     nvmx->vmxon_region_pa = 0;
 
     vmreturn(regs, VMSUCCEED);
+    return X86EMUL_OKAY;
+}
+
+int nvmx_handle_vmptrld(struct cpu_user_regs *regs)
+{
+    struct vcpu *v = current;
+    struct vmx_inst_decoded decode;
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    unsigned long gpa = 0;
+    int rc;
+
+    rc = decode_vmx_inst(regs, &decode, &gpa, 0);
+    if ( rc != X86EMUL_OKAY )
+        return rc;
+
+    if ( gpa == vcpu_2_nvmx(v).vmxon_region_pa || gpa & 0xfff )
+    {
+        vmreturn(regs, VMFAIL_INVALID);
+        goto out;
+    }
+
+    if ( nvcpu->nv_vvmcxaddr == VMCX_EADDR )
+    {
+        nvcpu->nv_vvmcx = hvm_map_guest_frame_rw (gpa >> PAGE_SHIFT);
+        nvcpu->nv_vvmcxaddr = gpa;
+        map_io_bitmap_all (v);
+    }
+
+    vmreturn(regs, VMSUCCEED);
+
+out:
     return X86EMUL_OKAY;
 }
 

@@ -152,5 +152,8 @@ enum vvmcs_encoding_type {
 u64 __get_vvmcs(void *vvmcs, u32 vmcs_encoding);
 void __set_vvmcs(void *vvmcs, u32 vmcs_encoding, u64 val);
 
+void nvmx_destroy_vmcs(struct vcpu *v);
+int nvmx_handle_vmptrld(struct cpu_user_regs *regs);
+
 #endif /* __ASM_X86_HVM_VVMX_H__ */
 
