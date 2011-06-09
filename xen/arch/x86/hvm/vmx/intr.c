@@ -35,6 +35,7 @@
 #include <asm/hvm/vmx/vmcs.h>
 #include <asm/hvm/vpic.h>
 #include <asm/hvm/vlapic.h>
+#include <asm/hvm/nestedhvm.h>
 #include <public/hvm/ioreq.h>
 #include <asm/hvm/trace.h>
 
@@ -109,6 +110,96 @@ static void enable_intr_window(struct vcpu *v, struct hvm_intack intack)
     }
 }
 
+/*
+ * Injecting interrupts for nested virtualization
+ *
+ *  When injecting virtual interrupts (originated from L0), there are
+ *  two major possibilities, within L1 context and within L2 context
+ *   1. L1 context (in_nesting == 0)
+ *     Everything is the same as without nested, check RFLAGS.IF to
+ *     see if the injection can be done, using VMCS to inject the
+ *     interrupt
+ *
+ *   2. L2 context (in_nesting == 1)
+ *     Causes a virtual VMExit, RFLAGS.IF is ignored, whether to ack
+ *     irq according to intr_ack_on_exit, shouldn't block normally,
+ *     except for:
+ *    a. context transition
+ *     interrupt needs to be blocked at virtual VMEntry time
+ *    b. L2 idtv reinjection
+ *     if L2 idtv is handled within L0 (e.g. L0 shadow page fault),
+ *     it needs to be reinjected without exiting to L1, interrupt
+ *     injection should be blocked as well at this point.
+ *
+ *  Unfortunately, interrupt blocking in L2 won't work with simple
+ *  intr_window_open (which depends on L2's IF). To solve this,
+ *  the following algorithm can be used:
+ *   v->arch.hvm_vmx.exec_control.VIRTUAL_INTR_PENDING now denotes
+ *   only L0 control, physical control may be different from it.
+ *       - if in L1, it behaves normally, intr window is written
+ *         to physical control as it is
+ *       - if in L2, replace it to MTF (or NMI window) if possible
+ *       - if MTF/NMI window is not used, intr window can still be
+ *         used but may have negative impact on interrupt performance.
+ */
+
+enum hvm_intblk nvmx_intr_blocked(struct vcpu *v)
+{
+    int r = hvm_intblk_none;
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+
+    if ( nestedhvm_vcpu_in_guestmode(v) )
+    {
+        if ( nvcpu->nv_vmexit_pending ||
+             nvcpu->nv_vmswitch_in_progress ||
+             (__vmread(VM_ENTRY_INTR_INFO) & INTR_INFO_VALID_MASK) )
+            r = hvm_intblk_rflags_ie;
+    }
+    else if ( nvcpu->nv_vmentry_pending )
+        r = hvm_intblk_rflags_ie;
+
+    return r;
+}
+
+static int nvmx_intr_intercept(struct vcpu *v, struct hvm_intack intack)
+{
+    u32 exit_ctrl;
+
+    if ( nvmx_intr_blocked(v) != hvm_intblk_none )
+    {
+        enable_intr_window(v, intack);
+        return 1;
+    }
+
+    if ( nestedhvm_vcpu_in_guestmode(v) )
+    {
+        if ( intack.source == hvm_intsrc_pic ||
+                 intack.source == hvm_intsrc_lapic )
+        {
+            vmx_inject_extint(intack.vector);
+
+            exit_ctrl = __get_vvmcs(vcpu_nestedhvm(v).nv_vvmcx,
+                            VM_EXIT_CONTROLS);
+            if ( exit_ctrl & VM_EXIT_ACK_INTR_ON_EXIT )
+            {
+                /* for now, duplicate the ack path in vmx_intr_assist */
+                hvm_vcpu_ack_pending_irq(v, intack);
+                pt_intr_post(v, intack);
+
+                intack = hvm_vcpu_has_pending_irq(v);
+                if ( unlikely(intack.source != hvm_intsrc_none) )
+                    enable_intr_window(v, intack);
+            }
+            else
+                enable_intr_window(v, intack);
+
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 asmlinkage void vmx_intr_assist(void)
 {
     struct hvm_intack intack;
@@ -130,6 +221,9 @@ asmlinkage void vmx_intr_assist(void)
     do {
         intack = hvm_vcpu_has_pending_irq(v);
         if ( likely(intack.source == hvm_intsrc_none) )
+            goto out;
+
+        if ( unlikely(nvmx_intr_intercept(v, intack)) )
             goto out;
 
         intblk = hvm_interrupt_blocked(v, intack);

@@ -393,6 +393,27 @@ static void vmreturn(struct cpu_user_regs *regs, enum vmx_ops_result ops_res)
     regs->eflags = eflags;
 }
 
+int nvmx_intercepts_exception(struct vcpu *v, unsigned int trap,
+                               int error_code)
+{
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    u32 exception_bitmap, pfec_match=0, pfec_mask=0;
+    int r;
+
+    ASSERT ( trap < 32 );
+
+    exception_bitmap = __get_vvmcs(nvcpu->nv_vvmcx, EXCEPTION_BITMAP);
+    r = exception_bitmap & (1 << trap) ? 1: 0;
+
+    if ( trap == TRAP_page_fault ) {
+        pfec_match = __get_vvmcs(nvcpu->nv_vvmcx, PAGE_FAULT_ERROR_CODE_MATCH);
+        pfec_mask  = __get_vvmcs(nvcpu->nv_vvmcx, PAGE_FAULT_ERROR_CODE_MASK);
+        if ( (error_code & pfec_mask) != pfec_match )
+            r = !r;
+    }
+    return r;
+}
+
 /*
  * Nested VMX uses "strict" condition to exit from 
  * L2 guest if either L1 VMM or L0 VMM expect to exit.
@@ -464,6 +485,7 @@ void nvmx_update_exec_control(struct vcpu *v, u32 host_cntrl)
         __vmwrite(IO_BITMAP_B, virt_to_maddr(bitmap) + PAGE_SIZE);
     }
 
+    /* TODO: change L0 intr window to MTF or NMI window */
     __vmwrite(CPU_BASED_VM_EXEC_CONTROL, shadow_cntrl);
 }
 
@@ -836,6 +858,42 @@ static void load_vvmcs_host_state(struct vcpu *v)
     __set_vvmcs(vvmcs, VM_ENTRY_INTR_INFO, 0);
 }
 
+static void sync_exception_state(struct vcpu *v)
+{
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
+
+    if ( !(nvmx->intr.intr_info & INTR_INFO_VALID_MASK) )
+        return;
+
+    switch ( (nvmx->intr.intr_info & INTR_INFO_INTR_TYPE_MASK) >> 8 )
+    {
+    case X86_EVENTTYPE_EXT_INTR:
+        /* rename exit_reason to EXTERNAL_INTERRUPT */
+        __set_vvmcs(nvcpu->nv_vvmcx, VM_EXIT_REASON,
+                    EXIT_REASON_EXTERNAL_INTERRUPT);
+        __set_vvmcs(nvcpu->nv_vvmcx, EXIT_QUALIFICATION, 0);
+        __set_vvmcs(nvcpu->nv_vvmcx, VM_EXIT_INTR_INFO,
+                    nvmx->intr.intr_info);
+        break;
+
+    case X86_EVENTTYPE_HW_EXCEPTION:
+    case X86_EVENTTYPE_SW_INTERRUPT:
+    case X86_EVENTTYPE_SW_EXCEPTION:
+        /* throw to L1 */
+        __set_vvmcs(nvcpu->nv_vvmcx, VM_EXIT_INTR_INFO,
+                    nvmx->intr.intr_info);
+        __set_vvmcs(nvcpu->nv_vvmcx, VM_EXIT_INTR_ERROR_CODE,
+                    nvmx->intr.error_code);
+        break;
+    case X86_EVENTTYPE_NMI:
+    default:
+        gdprintk(XENLOG_ERR, "Exception state %lx not handled\n",
+               nvmx->intr.intr_info); 
+        break;
+    }
+}
+
 static void virtual_vmexit(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
@@ -846,6 +904,7 @@ static void virtual_vmexit(struct cpu_user_regs *regs)
 
     sync_vvmcs_ro(v);
     sync_vvmcs_guest_state(v, regs);
+    sync_exception_state(v);
 
     vmx_vmcs_switch(v->arch.hvm_vmx.vmcs, nvcpu->nv_n1vmcx);
 
@@ -1156,5 +1215,40 @@ int nvmx_handle_vmwrite(struct cpu_user_regs *regs)
 
     vmreturn(regs, VMSUCCEED);
     return X86EMUL_OKAY;
+}
+
+void nvmx_idtv_handling(void)
+{
+    struct vcpu *v = current;
+    struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    unsigned int idtv_info = __vmread(IDT_VECTORING_INFO);
+
+    if ( likely(!(idtv_info & INTR_INFO_VALID_MASK)) )
+        return;
+
+    /*
+     * If L0 can solve the fault that causes idt vectoring, it should
+     * be reinjected, otherwise, pass to L1.
+     */
+    if ( (__vmread(VM_EXIT_REASON) != EXIT_REASON_EPT_VIOLATION &&
+          !(nvmx->intr.intr_info & INTR_INFO_VALID_MASK)) ||
+         (__vmread(VM_EXIT_REASON) == EXIT_REASON_EPT_VIOLATION &&
+          !nvcpu->nv_vmexit_pending) )
+    {
+        __vmwrite(VM_ENTRY_INTR_INFO, idtv_info & ~INTR_INFO_RESVD_BITS_MASK);
+        if ( idtv_info & INTR_INFO_DELIVER_CODE_MASK )
+           __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE,
+                        __vmread(IDT_VECTORING_ERROR_CODE));
+        /*
+         * SDM 23.2.4, if L1 tries to inject a software interrupt
+         * and the delivery fails, VM_EXIT_INSTRUCTION_LEN receives
+         * the value of previous VM_ENTRY_INSTRUCTION_LEN.
+         *
+         * This means EXIT_INSTRUCTION_LEN is always valid here, for
+         * software interrupts both injected by L1, and generated in L2.
+         */
+        __vmwrite(VM_ENTRY_INSTRUCTION_LEN, __vmread(VM_EXIT_INSTRUCTION_LEN));
+   }
 }
 

@@ -93,6 +93,9 @@ int nvmx_vcpu_reset(struct vcpu *v);
 uint64_t nvmx_vcpu_guestcr3(struct vcpu *v);
 uint64_t nvmx_vcpu_hostcr3(struct vcpu *v);
 uint32_t nvmx_vcpu_asid(struct vcpu *v);
+enum hvm_intblk nvmx_intr_blocked(struct vcpu *v);
+int nvmx_intercepts_exception(struct vcpu *v, 
+                              unsigned int trap, int error_code);
 
 int nvmx_handle_vmxon(struct cpu_user_regs *regs);
 int nvmx_handle_vmxoff(struct cpu_user_regs *regs);
@@ -166,6 +169,7 @@ void nvmx_update_secondary_exec_control(struct vcpu *v,
                                         unsigned long value);
 void nvmx_update_exception_bitmap(struct vcpu *v, unsigned long value);
 asmlinkage void nvmx_switch_guest(void);
+void nvmx_idtv_handling(void);
 
 #endif /* __ASM_X86_HVM_VVMX_H__ */
 

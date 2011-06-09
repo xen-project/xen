@@ -1240,6 +1240,31 @@ void ept_sync_domain(struct domain *d)
                      __ept_sync_domain, d, 1);
 }
 
+void nvmx_enqueue_n2_exceptions(struct vcpu *v, 
+            unsigned long intr_fields, int error_code)
+{
+    struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
+
+    if ( !(nvmx->intr.intr_info & INTR_INFO_VALID_MASK) ) {
+        /* enqueue the exception till the VMCS switch back to L1 */
+        nvmx->intr.intr_info = intr_fields;
+        nvmx->intr.error_code = error_code;
+        vcpu_nestedhvm(v).nv_vmexit_pending = 1;
+        return;
+    }
+    else
+        gdprintk(XENLOG_ERR, "Double Fault on Nested Guest: exception %lx %x"
+                 "on %lx %x\n", intr_fields, error_code,
+                 nvmx->intr.intr_info, nvmx->intr.error_code);
+}
+
+static int nvmx_vmexit_exceptions(struct vcpu *v, unsigned int trapnr,
+                      int errcode, unsigned long cr2)
+{
+    nvmx_enqueue_n2_exceptions(v, trapnr, errcode);
+    return NESTEDHVM_VMEXIT_DONE;
+}
+
 static void __vmx_inject_exception(int trap, int type, int error_code)
 {
     unsigned long intr_fields;
@@ -1269,10 +1294,15 @@ static void __vmx_inject_exception(int trap, int type, int error_code)
 
 void vmx_inject_hw_exception(int trap, int error_code)
 {
-    unsigned long intr_info = __vmread(VM_ENTRY_INTR_INFO);
+    unsigned long intr_info;
     struct vcpu *curr = current;
 
     int type = X86_EVENTTYPE_HW_EXCEPTION;
+
+    if ( nestedhvm_vcpu_in_guestmode(curr) )
+        intr_info = vcpu_2_nvmx(curr).intr.intr_info;
+    else
+        intr_info = __vmread(VM_ENTRY_INTR_INFO);
 
     switch ( trap )
     {
@@ -1305,7 +1335,16 @@ void vmx_inject_hw_exception(int trap, int error_code)
             error_code = 0;
     }
 
-    __vmx_inject_exception(trap, type, error_code);
+    if ( nestedhvm_vcpu_in_guestmode(curr) &&
+         nvmx_intercepts_exception(curr, trap, error_code) )
+    {
+        nvmx_enqueue_n2_exceptions (curr, 
+            INTR_INFO_VALID_MASK | (type<<8) | trap,
+            error_code); 
+        return;
+    }
+    else
+        __vmx_inject_exception(trap, type, error_code);
 
     if ( trap == TRAP_page_fault )
         HVMTRACE_LONG_2D(PF_INJECT, error_code,
@@ -1316,12 +1355,38 @@ void vmx_inject_hw_exception(int trap, int error_code)
 
 void vmx_inject_extint(int trap)
 {
+    struct vcpu *v = current;
+    u32    pin_based_cntrl;
+
+    if ( nestedhvm_vcpu_in_guestmode(v) ) {
+        pin_based_cntrl = __get_vvmcs(vcpu_nestedhvm(v).nv_vvmcx, 
+                                     PIN_BASED_VM_EXEC_CONTROL);
+        if ( pin_based_cntrl && PIN_BASED_EXT_INTR_MASK ) {
+            nvmx_enqueue_n2_exceptions (v, 
+               INTR_INFO_VALID_MASK | (X86_EVENTTYPE_EXT_INTR<<8) | trap,
+               HVM_DELIVER_NO_ERROR_CODE);
+            return;
+        }
+    }
     __vmx_inject_exception(trap, X86_EVENTTYPE_EXT_INTR,
                            HVM_DELIVER_NO_ERROR_CODE);
 }
 
 void vmx_inject_nmi(void)
 {
+    struct vcpu *v = current;
+    u32    pin_based_cntrl;
+
+    if ( nestedhvm_vcpu_in_guestmode(v) ) {
+        pin_based_cntrl = __get_vvmcs(vcpu_nestedhvm(v).nv_vvmcx, 
+                                     PIN_BASED_VM_EXEC_CONTROL);
+        if ( pin_based_cntrl && PIN_BASED_NMI_EXITING ) {
+            nvmx_enqueue_n2_exceptions (v, 
+               INTR_INFO_VALID_MASK | (X86_EVENTTYPE_NMI<<8) | TRAP_nmi,
+               HVM_DELIVER_NO_ERROR_CODE);
+            return;
+        }
+    }
     __vmx_inject_exception(2, X86_EVENTTYPE_NMI,
                            HVM_DELIVER_NO_ERROR_CODE);
 }
@@ -1421,7 +1486,10 @@ static struct hvm_function_table __read_mostly vmx_function_table = {
     .nhvm_vcpu_reset      = nvmx_vcpu_reset,
     .nhvm_vcpu_guestcr3   = nvmx_vcpu_guestcr3,
     .nhvm_vcpu_hostcr3    = nvmx_vcpu_hostcr3,
-    .nhvm_vcpu_asid       = nvmx_vcpu_asid
+    .nhvm_vcpu_asid       = nvmx_vcpu_asid,
+    .nhvm_vmcx_guest_intercepts_trap = nvmx_intercepts_exception,
+    .nhvm_vcpu_vmexit_trap = nvmx_vmexit_exceptions,
+    .nhvm_intr_blocked    = nvmx_intr_blocked
 };
 
 struct hvm_function_table * __init start_vmx(void)
@@ -2232,7 +2300,8 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     hvm_maybe_deassert_evtchn_irq();
 
     idtv_info = __vmread(IDT_VECTORING_INFO);
-    if ( exit_reason != EXIT_REASON_TASK_SWITCH )
+    if ( !nestedhvm_vcpu_in_guestmode(v) && 
+         exit_reason != EXIT_REASON_TASK_SWITCH )
         vmx_idtv_reinject(idtv_info);
 
     switch ( exit_reason )
@@ -2584,6 +2653,9 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         domain_crash(v->domain);
         break;
     }
+
+    if ( nestedhvm_vcpu_in_guestmode(v) )
+        nvmx_idtv_handling();
 }
 
 asmlinkage void vmx_vmenter_helper(void)
