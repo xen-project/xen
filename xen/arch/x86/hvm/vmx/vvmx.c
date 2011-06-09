@@ -288,13 +288,19 @@ static int vmx_inst_check_privilege(struct cpu_user_regs *regs, int vmxop_check)
     if ( (regs->eflags & X86_EFLAGS_VM) ||
          (hvm_long_mode_enabled(v) && cs.attr.fields.l == 0) )
         goto invalid_op;
-    /* TODO: check vmx operation mode */
+    else if ( nestedhvm_vcpu_in_guestmode(v) )
+        goto vmexit;
 
     if ( (cs.sel & 3) > 0 )
         goto gp_fault;
 
     return X86EMUL_OKAY;
 
+vmexit:
+    gdprintk(XENLOG_ERR, "vmx_inst_check_privilege: vmexit\n");
+    vcpu_nestedhvm(v).nv_vmexit_pending = 1;
+    return X86EMUL_EXCEPTION;
+    
 invalid_op:
     gdprintk(XENLOG_ERR, "vmx_inst_check_privilege: invalid_op\n");
     hvm_inject_exception(TRAP_invalid_op, 0, 0);
@@ -581,6 +587,18 @@ static void nvmx_purge_vvmcs(struct vcpu *v)
     }
 }
 
+u64 nvmx_get_tsc_offset(struct vcpu *v)
+{
+    u64 offset = 0;
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+
+    if ( __get_vvmcs(nvcpu->nv_vvmcx, CPU_BASED_VM_EXEC_CONTROL) &
+         CPU_BASED_USE_TSC_OFFSETING )
+        offset = __get_vvmcs(nvcpu->nv_vvmcx, TSC_OFFSET);
+
+    return offset;
+}
+
 /*
  * Context synchronized between shadow and virtual VMCS.
  */
@@ -730,6 +748,8 @@ static void load_shadow_guest_state(struct vcpu *v)
     hvm_set_cr4(__get_vvmcs(vvmcs, GUEST_CR4));
     hvm_set_cr3(__get_vvmcs(vvmcs, GUEST_CR3));
 
+    hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
+
     vvmcs_to_shadow(vvmcs, VM_ENTRY_INTR_INFO);
     vvmcs_to_shadow(vvmcs, VM_ENTRY_EXCEPTION_ERROR_CODE);
     vvmcs_to_shadow(vvmcs, VM_ENTRY_INSTRUCTION_LEN);
@@ -854,6 +874,8 @@ static void load_vvmcs_host_state(struct vcpu *v)
     hvm_set_cr0(__get_vvmcs(vvmcs, HOST_CR0));
     hvm_set_cr4(__get_vvmcs(vvmcs, HOST_CR4));
     hvm_set_cr3(__get_vvmcs(vvmcs, HOST_CR3));
+
+    hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
 
     __set_vvmcs(vvmcs, VM_ENTRY_INTR_INFO, 0);
 }
@@ -1250,5 +1272,197 @@ void nvmx_idtv_handling(void)
          */
         __vmwrite(VM_ENTRY_INSTRUCTION_LEN, __vmread(VM_EXIT_INSTRUCTION_LEN));
    }
+}
+
+/*
+ * L2 VMExit handling
+ *    return 1: Done or skip the normal layer 0 hypervisor process.
+ *              Typically it requires layer 1 hypervisor processing
+ *              or it may be already processed here.
+ *           0: Require the normal layer 0 process.
+ */
+int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
+                               unsigned int exit_reason)
+{
+    struct vcpu *v = current;
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
+    u32 ctrl;
+    u16 port;
+    u8 *bitmap;
+
+    nvcpu->nv_vmexit_pending = 0;
+    nvmx->intr.intr_info = 0;
+    nvmx->intr.error_code = 0;
+
+    switch (exit_reason) {
+    case EXIT_REASON_EXCEPTION_NMI:
+    {
+        u32 intr_info = __vmread(VM_EXIT_INTR_INFO);
+        u32 valid_mask = (X86_EVENTTYPE_HW_EXCEPTION << 8) |
+                         INTR_INFO_VALID_MASK;
+        u64 exec_bitmap;
+        int vector = intr_info & INTR_INFO_VECTOR_MASK;
+
+        /*
+         * decided by L0 and L1 exception bitmap, if the vetor is set by
+         * both, L0 has priority on #PF, L1 has priority on others
+         */
+        if ( vector == TRAP_page_fault )
+        {
+            if ( paging_mode_hap(v->domain) )
+                nvcpu->nv_vmexit_pending = 1;
+        }
+        else if ( (intr_info & valid_mask) == valid_mask )
+        {
+            exec_bitmap =__get_vvmcs(nvcpu->nv_vvmcx, EXCEPTION_BITMAP);
+
+            if ( exec_bitmap & (1 << vector) )
+                nvcpu->nv_vmexit_pending = 1;
+        }
+        break;
+    }
+    case EXIT_REASON_WBINVD:
+    case EXIT_REASON_EPT_VIOLATION:
+    case EXIT_REASON_EPT_MISCONFIG:
+    case EXIT_REASON_EXTERNAL_INTERRUPT:
+        /* pass to L0 handler */
+        break;
+    case VMX_EXIT_REASONS_FAILED_VMENTRY:
+    case EXIT_REASON_TRIPLE_FAULT:
+    case EXIT_REASON_TASK_SWITCH:
+    case EXIT_REASON_CPUID:
+    case EXIT_REASON_MSR_READ:
+    case EXIT_REASON_MSR_WRITE:
+    case EXIT_REASON_VMCALL:
+    case EXIT_REASON_VMCLEAR:
+    case EXIT_REASON_VMLAUNCH:
+    case EXIT_REASON_VMPTRLD:
+    case EXIT_REASON_VMPTRST:
+    case EXIT_REASON_VMREAD:
+    case EXIT_REASON_VMRESUME:
+    case EXIT_REASON_VMWRITE:
+    case EXIT_REASON_VMXOFF:
+    case EXIT_REASON_VMXON:
+    case EXIT_REASON_INVEPT:
+        /* inject to L1 */
+        nvcpu->nv_vmexit_pending = 1;
+        break;
+    case EXIT_REASON_IO_INSTRUCTION:
+        ctrl = __n2_exec_control(v);
+        if ( ctrl & CPU_BASED_ACTIVATE_IO_BITMAP )
+        {
+            port = __vmread(EXIT_QUALIFICATION) >> 16;
+            bitmap = nvmx->iobitmap[port >> 15];
+            if ( bitmap[(port & 0x7fff) >> 4] & (1 << (port & 0x7)) )
+                nvcpu->nv_vmexit_pending = 1;
+            if ( !nvcpu->nv_vmexit_pending )
+               gdprintk(XENLOG_WARNING, "L0 PIO %x.\n", port);
+        }
+        else if ( ctrl & CPU_BASED_UNCOND_IO_EXITING )
+            nvcpu->nv_vmexit_pending = 1;
+        break;
+
+    case EXIT_REASON_PENDING_VIRT_INTR:
+        ctrl = __n2_exec_control(v);
+        if ( ctrl & CPU_BASED_VIRTUAL_INTR_PENDING )
+            nvcpu->nv_vmexit_pending = 1;
+        break;
+    case EXIT_REASON_PENDING_VIRT_NMI:
+        ctrl = __n2_exec_control(v);
+        if ( ctrl & CPU_BASED_VIRTUAL_NMI_PENDING )
+            nvcpu->nv_vmexit_pending = 1;
+        break;
+    /* L1 has priority handling several other types of exits */
+    case EXIT_REASON_HLT:
+        ctrl = __n2_exec_control(v);
+        if ( ctrl & CPU_BASED_HLT_EXITING )
+            nvcpu->nv_vmexit_pending = 1;
+        break;
+    case EXIT_REASON_RDTSC:
+        ctrl = __n2_exec_control(v);
+        if ( ctrl & CPU_BASED_RDTSC_EXITING )
+            nvcpu->nv_vmexit_pending = 1;
+        else
+        {
+            uint64_t tsc;
+
+            /*
+             * special handler is needed if L1 doesn't intercept rdtsc,
+             * avoiding changing guest_tsc and messing up timekeeping in L1
+             */
+            tsc = hvm_get_guest_tsc(v);
+            tsc += __get_vvmcs(nvcpu->nv_vvmcx, TSC_OFFSET);
+            regs->eax = (uint32_t)tsc;
+            regs->edx = (uint32_t)(tsc >> 32);
+
+            return 1;
+        }
+        break;
+    case EXIT_REASON_RDPMC:
+        ctrl = __n2_exec_control(v);
+        if ( ctrl & CPU_BASED_RDPMC_EXITING )
+            nvcpu->nv_vmexit_pending = 1;
+        break;
+    case EXIT_REASON_MWAIT_INSTRUCTION:
+        ctrl = __n2_exec_control(v);
+        if ( ctrl & CPU_BASED_MWAIT_EXITING )
+            nvcpu->nv_vmexit_pending = 1;
+        break;
+    case EXIT_REASON_PAUSE_INSTRUCTION:
+        ctrl = __n2_exec_control(v);
+        if ( ctrl & CPU_BASED_PAUSE_EXITING )
+            nvcpu->nv_vmexit_pending = 1;
+        break;
+    case EXIT_REASON_MONITOR_INSTRUCTION:
+        ctrl = __n2_exec_control(v);
+        if ( ctrl & CPU_BASED_MONITOR_EXITING )
+            nvcpu->nv_vmexit_pending = 1;
+        break;
+    case EXIT_REASON_DR_ACCESS:
+        ctrl = __n2_exec_control(v);
+        if ( ctrl & CPU_BASED_MOV_DR_EXITING )
+            nvcpu->nv_vmexit_pending = 1;
+        break;
+    case EXIT_REASON_INVLPG:
+        ctrl = __n2_exec_control(v);
+        if ( ctrl & CPU_BASED_INVLPG_EXITING )
+            nvcpu->nv_vmexit_pending = 1;
+        break;
+    case EXIT_REASON_CR_ACCESS:
+    {
+        u64 exit_qualification = __vmread(EXIT_QUALIFICATION);
+        int cr = exit_qualification & 15;
+        int write = (exit_qualification >> 4) & 3;
+        u32 mask = 0;
+
+        /* also according to guest exec_control */
+        ctrl = __n2_exec_control(v);
+
+        if ( cr == 3 )
+        {
+            mask = write? CPU_BASED_CR3_STORE_EXITING:
+                          CPU_BASED_CR3_LOAD_EXITING;
+            if ( ctrl & mask )
+                nvcpu->nv_vmexit_pending = 1;
+        }
+        else if ( cr == 8 )
+        {
+            mask = write? CPU_BASED_CR8_STORE_EXITING:
+                          CPU_BASED_CR8_LOAD_EXITING;
+            if ( ctrl & mask )
+                nvcpu->nv_vmexit_pending = 1;
+        }
+        else  /* CR0, CR4, CLTS, LMSW */
+            nvcpu->nv_vmexit_pending = 1;
+
+        break;
+    }
+    default:
+        gdprintk(XENLOG_WARNING, "Unknown nested vmexit reason %x.\n",
+                 exit_reason);
+    }
+
+    return ( nvcpu->nv_vmexit_pending == 1 );
 }
 

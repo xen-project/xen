@@ -170,6 +170,9 @@ void nvmx_update_secondary_exec_control(struct vcpu *v,
 void nvmx_update_exception_bitmap(struct vcpu *v, unsigned long value);
 asmlinkage void nvmx_switch_guest(void);
 void nvmx_idtv_handling(void);
+u64 nvmx_get_tsc_offset(struct vcpu *v);
+int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
+                          unsigned int exit_reason);
 
 #endif /* __ASM_X86_HVM_VVMX_H__ */
 

@@ -942,6 +942,10 @@ static void vmx_set_segment_register(struct vcpu *v, enum x86_segment seg,
 static void vmx_set_tsc_offset(struct vcpu *v, u64 offset)
 {
     vmx_vmcs_enter(v);
+
+    if ( nestedhvm_vcpu_in_guestmode(v) )
+        offset += nvmx_get_tsc_offset(v);
+
     __vmwrite(TSC_OFFSET, offset);
 #if defined (__i386__)
     __vmwrite(TSC_OFFSET_HIGH, offset >> 32);
@@ -2253,6 +2257,11 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
      * any pending vmresume has really happened
      */
     vcpu_nestedhvm(v).nv_vmswitch_in_progress = 0;
+    if ( nestedhvm_vcpu_in_guestmode(v) )
+    {
+        if ( nvmx_n2_vmexit_handler(regs, exit_reason) )
+            goto out;
+    }
 
     if ( unlikely(exit_reason & VMX_EXIT_REASONS_FAILED_VMENTRY) )
         return vmx_failed_vmentry(exit_reason, regs);
@@ -2654,6 +2663,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
     }
 
+out:
     if ( nestedhvm_vcpu_in_guestmode(v) )
         nvmx_idtv_handling();
 }
