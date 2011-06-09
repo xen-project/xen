@@ -24,6 +24,7 @@
 #include <asm/hvm/io.h>
 #include <asm/hvm/vlapic.h>
 #include <asm/hvm/vmx/vmcs.h>
+#include <asm/hvm/vmx/vvmx.h>
 #include <asm/hvm/svm/vmcb.h>
 #include <asm/hvm/svm/nestedsvm.h>
 #include <asm/mtrr.h>
@@ -57,6 +58,7 @@ struct nestedvcpu {
     /* SVM/VMX arch specific */
     union {
         struct nestedsvm nsvm;
+        struct nestedvmx nvmx;
     } u;
 
     bool_t nv_flushp2m; /* True, when p2m table must be flushed */
