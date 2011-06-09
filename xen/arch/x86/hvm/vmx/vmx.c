@@ -1404,7 +1404,13 @@ static struct hvm_function_table __read_mostly vmx_function_table = {
     .invlpg_intercept     = vmx_invlpg_intercept,
     .set_uc_mode          = vmx_set_uc_mode,
     .set_info_guest       = vmx_set_info_guest,
-    .set_rdtsc_exiting    = vmx_set_rdtsc_exiting
+    .set_rdtsc_exiting    = vmx_set_rdtsc_exiting,
+    .nhvm_vcpu_initialise = nvmx_vcpu_initialise,
+    .nhvm_vcpu_destroy    = nvmx_vcpu_destroy,
+    .nhvm_vcpu_reset      = nvmx_vcpu_reset,
+    .nhvm_vcpu_guestcr3   = nvmx_vcpu_guestcr3,
+    .nhvm_vcpu_hostcr3    = nvmx_vcpu_hostcr3,
+    .nhvm_vcpu_asid       = nvmx_vcpu_asid
 };
 
 struct hvm_function_table * __init start_vmx(void)

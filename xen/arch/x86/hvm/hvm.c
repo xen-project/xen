@@ -3526,7 +3526,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                 /* Remove the check below once we have
                  * shadow-on-shadow.
                  */
-                if ( !paging_mode_hap(d) && a.value )
+                if ( cpu_has_svm && !paging_mode_hap(d) && a.value )
                     rc = -EINVAL;
                 /* Set up NHVM state for any vcpus that are already up */
                 if ( !d->arch.hvm_domain.params[HVM_PARAM_NESTEDHVM] )

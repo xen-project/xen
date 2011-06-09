@@ -34,5 +34,13 @@ struct nestedvmx {
 };
 
 #define vcpu_2_nvmx(v)	(vcpu_nestedhvm(v).u.nvmx)
+
+int nvmx_vcpu_initialise(struct vcpu *v);
+void nvmx_vcpu_destroy(struct vcpu *v);
+int nvmx_vcpu_reset(struct vcpu *v);
+uint64_t nvmx_vcpu_guestcr3(struct vcpu *v);
+uint64_t nvmx_vcpu_hostcr3(struct vcpu *v);
+uint32_t nvmx_vcpu_asid(struct vcpu *v);
+
 #endif /* __ASM_X86_HVM_VVMX_H__ */
 
