@@ -261,6 +261,13 @@ static void reg_write(struct cpu_user_regs *regs,
     }
 }
 
+static inline u32 __n2_exec_control(struct vcpu *v)
+{
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+
+    return __get_vvmcs(nvcpu->nv_vvmcx, CPU_BASED_VM_EXEC_CONTROL);
+}
+
 static int vmx_inst_check_privilege(struct cpu_user_regs *regs, int vmxop_check)
 {
     struct vcpu *v = current;
@@ -484,6 +491,62 @@ int nvmx_handle_vmxoff(struct cpu_user_regs *regs)
 
     vmreturn(regs, VMSUCCEED);
     return X86EMUL_OKAY;
+}
+
+int nvmx_vmresume(struct vcpu *v, struct cpu_user_regs *regs)
+{
+    struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    int rc;
+
+    rc = vmx_inst_check_privilege(regs, 0);
+    if ( rc != X86EMUL_OKAY )
+        return rc;
+
+    /* check VMCS is valid and IO BITMAP is set */
+    if ( (nvcpu->nv_vvmcxaddr != VMCX_EADDR) &&
+            ((nvmx->iobitmap[0] && nvmx->iobitmap[1]) ||
+            !(__n2_exec_control(v) & CPU_BASED_ACTIVATE_IO_BITMAP) ) )
+        nvcpu->nv_vmentry_pending = 1;
+    else
+        vmreturn(regs, VMFAIL_INVALID);
+
+    return X86EMUL_OKAY;
+}
+
+int nvmx_handle_vmresume(struct cpu_user_regs *regs)
+{
+    int launched;
+    struct vcpu *v = current;
+
+    launched = __get_vvmcs(vcpu_nestedhvm(v).nv_vvmcx,
+                           NVMX_LAUNCH_STATE);
+    if ( !launched ) {
+       vmreturn (regs, VMFAIL_VALID);
+       return X86EMUL_EXCEPTION;
+    }
+    return nvmx_vmresume(v,regs);
+}
+
+int nvmx_handle_vmlaunch(struct cpu_user_regs *regs)
+{
+    int launched;
+    int rc;
+    struct vcpu *v = current;
+
+    launched = __get_vvmcs(vcpu_nestedhvm(v).nv_vvmcx,
+                           NVMX_LAUNCH_STATE);
+    if ( launched ) {
+       vmreturn (regs, VMFAIL_VALID);
+       rc = X86EMUL_EXCEPTION;
+    }
+    else {
+        rc = nvmx_vmresume(v,regs);
+        if ( rc == X86EMUL_OKAY )
+            __set_vvmcs(vcpu_nestedhvm(v).nv_vvmcx,
+                        NVMX_LAUNCH_STATE, 1);
+    }
+    return rc;
 }
 
 int nvmx_handle_vmptrld(struct cpu_user_regs *regs)

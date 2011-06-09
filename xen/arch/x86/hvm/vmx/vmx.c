@@ -2170,6 +2170,11 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     /* Now enable interrupts so it's safe to take locks. */
     local_irq_enable();
 
+    /* XXX: This looks ugly, but we need a mechanism to ensure
+     * any pending vmresume has really happened
+     */
+    vcpu_nestedhvm(v).nv_vmswitch_in_progress = 0;
+
     if ( unlikely(exit_reason & VMX_EXIT_REASONS_FAILED_VMENTRY) )
         return vmx_failed_vmentry(exit_reason, regs);
 
@@ -2464,10 +2469,18 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
             update_guest_eip();
         break;
 
+    case EXIT_REASON_VMLAUNCH:
+        if ( nvmx_handle_vmlaunch(regs) == X86EMUL_OKAY )
+            update_guest_eip();
+        break;
+
+    case EXIT_REASON_VMRESUME:
+        if ( nvmx_handle_vmresume(regs) == X86EMUL_OKAY )
+            update_guest_eip();
+        break;
+
     case EXIT_REASON_MWAIT_INSTRUCTION:
     case EXIT_REASON_MONITOR_INSTRUCTION:
-    case EXIT_REASON_VMLAUNCH:
-    case EXIT_REASON_VMRESUME:
     case EXIT_REASON_GETSEC:
     case EXIT_REASON_INVEPT:
     case EXIT_REASON_INVVPID:
