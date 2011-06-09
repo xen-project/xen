@@ -381,6 +381,8 @@ enum vmcs_field {
     HOST_SYSENTER_EIP               = 0x00006c12,
     HOST_RSP                        = 0x00006c14,
     HOST_RIP                        = 0x00006c16,
+    /* A virtual VMCS field used for nestedvmx only */
+    NVMX_LAUNCH_STATE               = 0x00006c20,
 };
 
 #define VMCS_VPID_WIDTH 16

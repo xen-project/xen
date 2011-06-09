@@ -26,6 +26,8 @@
 #include <asm/hvm/vmx/vmx.h>
 #include <asm/hvm/vmx/vvmx.h>
 
+static void nvmx_purge_vvmcs(struct vcpu *v);
+
 int nvmx_vcpu_initialise(struct vcpu *v)
 {
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
@@ -53,6 +55,7 @@ void nvmx_vcpu_destroy(struct vcpu *v)
 {
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
 
+    nvmx_purge_vvmcs(v);
     if ( nvcpu->nv_n2vmcx ) {
         __vmpclear(virt_to_maddr(nvcpu->nv_n2vmcx));
         free_xenheap_page(nvcpu->nv_n2vmcx);
@@ -352,6 +355,14 @@ static void vmreturn(struct cpu_user_regs *regs, enum vmx_ops_result ops_res)
     regs->eflags = eflags;
 }
 
+static void __clear_current_vvmcs(struct vcpu *v)
+{
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    
+    if ( nvcpu->nv_n2vmcx )
+        __vmpclear(virt_to_maddr(nvcpu->nv_n2vmcx));
+}
+
 static void __map_io_bitmap(struct vcpu *v, u64 vmcs_reg)
 {
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
@@ -369,6 +380,25 @@ static inline void map_io_bitmap_all(struct vcpu *v)
 {
    __map_io_bitmap (v, IO_BITMAP_A);
    __map_io_bitmap (v, IO_BITMAP_B);
+}
+
+static void nvmx_purge_vvmcs(struct vcpu *v)
+{
+    struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    int i;
+
+    __clear_current_vvmcs(v);
+    if ( nvcpu->nv_vvmcxaddr != VMCX_EADDR )
+        hvm_unmap_guest_frame (nvcpu->nv_vvmcx);
+    nvcpu->nv_vvmcx == NULL;
+    nvcpu->nv_vvmcxaddr = VMCX_EADDR;
+    for (i=0; i<2; i++) {
+        if ( nvmx->iobitmap[i] ) {
+            hvm_unmap_guest_frame (nvmx->iobitmap[i]);
+            nvmx->iobitmap[i] = NULL;
+        }
+    }
 }
 
 /*
@@ -419,6 +449,7 @@ int nvmx_handle_vmxoff(struct cpu_user_regs *regs)
     if ( rc != X86EMUL_OKAY )
         return rc;
 
+    nvmx_purge_vvmcs(v);
     nvmx->vmxon_region_pa = 0;
 
     vmreturn(regs, VMSUCCEED);
@@ -442,6 +473,9 @@ int nvmx_handle_vmptrld(struct cpu_user_regs *regs)
         vmreturn(regs, VMFAIL_INVALID);
         goto out;
     }
+
+    if ( nvcpu->nv_vvmcxaddr != gpa )
+        nvmx_purge_vvmcs(v);
 
     if ( nvcpu->nv_vvmcxaddr == VMCX_EADDR )
     {
@@ -475,6 +509,42 @@ int nvmx_handle_vmptrst(struct cpu_user_regs *regs)
         return X86EMUL_EXCEPTION;
 
     vmreturn(regs, VMSUCCEED);
+    return X86EMUL_OKAY;
+}
+
+int nvmx_handle_vmclear(struct cpu_user_regs *regs)
+{
+    struct vcpu *v = current;
+    struct vmx_inst_decoded decode;
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    unsigned long gpa = 0;
+    int rc;
+
+    rc = decode_vmx_inst(regs, &decode, &gpa, 0);
+    if ( rc != X86EMUL_OKAY )
+        return rc;
+
+    if ( gpa & 0xfff )
+    {
+        vmreturn(regs, VMFAIL_INVALID);
+        goto out;
+    }
+
+    if ( gpa != nvcpu->nv_vvmcxaddr && nvcpu->nv_vvmcxaddr != VMCX_EADDR )
+    {
+        gdprintk(XENLOG_WARNING, 
+                 "vmclear gpa %lx not the same as current vmcs %"PRIpaddr"\n",
+                 gpa, nvcpu->nv_vvmcxaddr);
+        vmreturn(regs, VMSUCCEED);
+        goto out;
+    }
+    if ( nvcpu->nv_vvmcxaddr != VMCX_EADDR )
+        __set_vvmcs(nvcpu->nv_vvmcx, NVMX_LAUNCH_STATE, 0);
+    nvmx_purge_vvmcs(v);
+
+    vmreturn(regs, VMSUCCEED);
+
+out:
     return X86EMUL_OKAY;
 }
 
