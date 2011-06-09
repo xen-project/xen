@@ -164,7 +164,8 @@ struct hvm_function_table {
     uint64_t (*nhvm_vcpu_guestcr3)(struct vcpu *v);
     uint64_t (*nhvm_vcpu_hostcr3)(struct vcpu *v);
     uint32_t (*nhvm_vcpu_asid)(struct vcpu *v);
-    int (*nhvm_vmcx_guest_intercepts_trap)(struct vcpu *v, unsigned int trapnr);
+    int (*nhvm_vmcx_guest_intercepts_trap)(struct vcpu *v, 
+                               unsigned int trapnr, int errcode);
 
     bool_t (*nhvm_vmcx_hap_enabled)(struct vcpu *v);
 
@@ -461,7 +462,8 @@ uint64_t nhvm_vcpu_hostcr3(struct vcpu *v);
 uint32_t nhvm_vcpu_asid(struct vcpu *v);
 
 /* returns true, when l1 guest intercepts the specified trap */
-int nhvm_vmcx_guest_intercepts_trap(struct vcpu *v, unsigned int trapnr);
+int nhvm_vmcx_guest_intercepts_trap(struct vcpu *v, 
+                                    unsigned int trapnr, int errcode);
 
 /* returns true when l1 guest wants to use hap to run l2 guest */
 bool_t nhvm_vmcx_hap_enabled(struct vcpu *v);

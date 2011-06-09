@@ -1145,7 +1145,7 @@ void hvm_inject_exception(unsigned int trapnr, int errcode, unsigned long cr2)
         return;
     }
 
-    if ( nhvm_vmcx_guest_intercepts_trap(v, trapnr) )
+    if ( nhvm_vmcx_guest_intercepts_trap(v, trapnr, errcode) )
     {
         enum nestedhvm_vmexits nsret;
 
@@ -4137,10 +4137,10 @@ uint32_t nhvm_vcpu_asid(struct vcpu *v)
     return -EOPNOTSUPP;
 }
 
-int nhvm_vmcx_guest_intercepts_trap(struct vcpu *v, unsigned int trap)
+int nhvm_vmcx_guest_intercepts_trap(struct vcpu *v, unsigned int trap, int errcode)
 {
     if (hvm_funcs.nhvm_vmcx_guest_intercepts_trap)
-        return hvm_funcs.nhvm_vmcx_guest_intercepts_trap(v, trap);
+        return hvm_funcs.nhvm_vmcx_guest_intercepts_trap(v, trap, errcode);
     return -EOPNOTSUPP;
 }
 

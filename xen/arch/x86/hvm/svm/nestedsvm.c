@@ -955,7 +955,7 @@ nsvm_vmcb_guest_intercepts_exitcode(struct vcpu *v,
 }
 
 int
-nsvm_vmcb_guest_intercepts_trap(struct vcpu *v, unsigned int trapnr)
+nsvm_vmcb_guest_intercepts_trap(struct vcpu *v, unsigned int trapnr, int errcode)
 {
     return nsvm_vmcb_guest_intercepts_exitcode(v,
         guest_cpu_user_regs(), VMEXIT_EXCEPTION_DE + trapnr);

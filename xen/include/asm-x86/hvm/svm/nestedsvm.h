@@ -117,7 +117,8 @@ uint64_t nsvm_vcpu_hostcr3(struct vcpu *v);
 uint32_t nsvm_vcpu_asid(struct vcpu *v);
 int nsvm_vmcb_guest_intercepts_exitcode(struct vcpu *v,
     struct cpu_user_regs *regs, uint64_t exitcode);
-int nsvm_vmcb_guest_intercepts_trap(struct vcpu *v, unsigned int trapnr);
+int nsvm_vmcb_guest_intercepts_trap(struct vcpu *v, unsigned int trapnr,
+                                    int errcode);
 bool_t nsvm_vmcb_hap_enabled(struct vcpu *v);
 enum hvm_intblk nsvm_intr_blocked(struct vcpu *v);
 
