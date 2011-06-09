@@ -35,6 +35,58 @@ struct nestedvmx {
 
 #define vcpu_2_nvmx(v)	(vcpu_nestedhvm(v).u.nvmx)
 
+/*
+ * Encode of VMX instructions base on Table 24-11 & 24-12 of SDM 3B
+ */
+
+enum vmx_regs_enc {
+    VMX_REG_RAX,
+    VMX_REG_RCX,
+    VMX_REG_RDX,
+    VMX_REG_RBX,
+    VMX_REG_RSP,
+    VMX_REG_RBP,
+    VMX_REG_RSI,
+    VMX_REG_RDI,
+#ifdef CONFIG_X86_64
+    VMX_REG_R8,
+    VMX_REG_R9,
+    VMX_REG_R10,
+    VMX_REG_R11,
+    VMX_REG_R12,
+    VMX_REG_R13,
+    VMX_REG_R14,
+    VMX_REG_R15,
+#endif
+};
+
+enum vmx_sregs_enc {
+    VMX_SREG_ES,
+    VMX_SREG_CS,
+    VMX_SREG_SS,
+    VMX_SREG_DS,
+    VMX_SREG_FS,
+    VMX_SREG_GS,
+};
+
+union vmx_inst_info {
+    struct {
+        unsigned int scaling           :2; /* bit 0-1 */
+        unsigned int __rsvd0           :1; /* bit 2 */
+        unsigned int reg1              :4; /* bit 3-6 */
+        unsigned int addr_size         :3; /* bit 7-9 */
+        unsigned int memreg            :1; /* bit 10 */
+        unsigned int __rsvd1           :4; /* bit 11-14 */
+        unsigned int segment           :3; /* bit 15-17 */
+        unsigned int index_reg         :4; /* bit 18-21 */
+        unsigned int index_reg_invalid :1; /* bit 22 */
+        unsigned int base_reg          :4; /* bit 23-26 */
+        unsigned int base_reg_invalid  :1; /* bit 27 */
+        unsigned int reg2              :4; /* bit 28-31 */
+    } fields;
+    u32 word;
+};
+
 int nvmx_vcpu_initialise(struct vcpu *v);
 void nvmx_vcpu_destroy(struct vcpu *v);
 int nvmx_vcpu_reset(struct vcpu *v);
@@ -42,5 +94,7 @@ uint64_t nvmx_vcpu_guestcr3(struct vcpu *v);
 uint64_t nvmx_vcpu_hostcr3(struct vcpu *v);
 uint32_t nvmx_vcpu_asid(struct vcpu *v);
 
+int nvmx_handle_vmxon(struct cpu_user_regs *regs);
+int nvmx_handle_vmxoff(struct cpu_user_regs *regs);
 #endif /* __ASM_X86_HVM_VVMX_H__ */
 
