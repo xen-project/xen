@@ -2454,12 +2454,16 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
             update_guest_eip();
         break;
 
+    case EXIT_REASON_VMWRITE:
+        if ( nvmx_handle_vmwrite(regs) == X86EMUL_OKAY )
+            update_guest_eip();
+        break;
+
     case EXIT_REASON_MWAIT_INSTRUCTION:
     case EXIT_REASON_MONITOR_INSTRUCTION:
     case EXIT_REASON_VMLAUNCH:
     case EXIT_REASON_VMREAD:
     case EXIT_REASON_VMRESUME:
-    case EXIT_REASON_VMWRITE:
     case EXIT_REASON_GETSEC:
     case EXIT_REASON_INVEPT:
     case EXIT_REASON_INVVPID:

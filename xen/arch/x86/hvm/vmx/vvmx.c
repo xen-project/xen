@@ -548,3 +548,28 @@ out:
     return X86EMUL_OKAY;
 }
 
+int nvmx_handle_vmwrite(struct cpu_user_regs *regs)
+{
+    struct vcpu *v = current;
+    struct vmx_inst_decoded decode;
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    unsigned long operand; 
+    u64 vmcs_encoding;
+
+    if ( decode_vmx_inst(regs, &decode, &operand, 0)
+             != X86EMUL_OKAY )
+        return X86EMUL_EXCEPTION;
+
+    vmcs_encoding = reg_read(regs, decode.reg2);
+    __set_vvmcs(nvcpu->nv_vvmcx, vmcs_encoding, operand);
+
+    if ( vmcs_encoding == IO_BITMAP_A || vmcs_encoding == IO_BITMAP_A_HIGH )
+        __map_io_bitmap (v, IO_BITMAP_A);
+    else if ( vmcs_encoding == IO_BITMAP_B || 
+              vmcs_encoding == IO_BITMAP_B_HIGH )
+        __map_io_bitmap (v, IO_BITMAP_B);
+
+    vmreturn(regs, VMSUCCEED);
+    return X86EMUL_OKAY;
+}
+
