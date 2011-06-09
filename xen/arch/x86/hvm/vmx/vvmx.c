@@ -119,6 +119,8 @@ enum vmx_ops_result {
     VMFAIL_INVALID,
 };
 
+#define CASE_SET_REG(REG, reg)      \
+    case VMX_REG_ ## REG: regs->reg = value; break
 #define CASE_GET_REG(REG, reg)      \
     case VMX_REG_ ## REG: value = regs->reg; break
 
@@ -229,6 +231,34 @@ static unsigned long reg_read(struct cpu_user_regs *regs,
     }
 
     return value;
+}
+
+static void reg_write(struct cpu_user_regs *regs,
+                      enum vmx_regs_enc index,
+                      unsigned long value)
+{
+    switch ( index ) {
+    CASE_SET_REG(RAX, eax);
+    CASE_SET_REG(RCX, ecx);
+    CASE_SET_REG(RDX, edx);
+    CASE_SET_REG(RBX, ebx);
+    CASE_SET_REG(RBP, ebp);
+    CASE_SET_REG(RSI, esi);
+    CASE_SET_REG(RDI, edi);
+    CASE_SET_REG(RSP, esp);
+#ifdef CONFIG_X86_64
+    CASE_SET_REG(R8, r8);
+    CASE_SET_REG(R9, r9);
+    CASE_SET_REG(R10, r10);
+    CASE_SET_REG(R11, r11);
+    CASE_SET_REG(R12, r12);
+    CASE_SET_REG(R13, r13);
+    CASE_SET_REG(R14, r14);
+    CASE_SET_REG(R15, r15);
+#endif
+    default:
+        break;
+    }
 }
 
 static int vmx_inst_check_privilege(struct cpu_user_regs *regs, int vmxop_check)
@@ -545,6 +575,35 @@ int nvmx_handle_vmclear(struct cpu_user_regs *regs)
     vmreturn(regs, VMSUCCEED);
 
 out:
+    return X86EMUL_OKAY;
+}
+
+int nvmx_handle_vmread(struct cpu_user_regs *regs)
+{
+    struct vcpu *v = current;
+    struct vmx_inst_decoded decode;
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    u64 value = 0;
+    int rc;
+
+    rc = decode_vmx_inst(regs, &decode, NULL, 0);
+    if ( rc != X86EMUL_OKAY )
+        return rc;
+
+    value = __get_vvmcs(nvcpu->nv_vvmcx, reg_read(regs, decode.reg2));
+
+    switch ( decode.type ) {
+    case VMX_INST_MEMREG_TYPE_MEMORY:
+        rc = hvm_copy_to_guest_virt(decode.mem, &value, decode.len, 0);
+        if ( rc != HVMCOPY_okay )
+            return X86EMUL_EXCEPTION;
+        break;
+    case VMX_INST_MEMREG_TYPE_REG:
+        reg_write(regs, decode.reg1, value);
+        break;
+    }
+
+    vmreturn(regs, VMSUCCEED);
     return X86EMUL_OKAY;
 }
 
