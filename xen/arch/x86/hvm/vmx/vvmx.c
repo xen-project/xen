@@ -810,6 +810,9 @@ static void virtual_vmentry(struct cpu_user_regs *regs)
     regs->esp = __get_vvmcs(vvmcs, GUEST_RSP);
     regs->eflags = __get_vvmcs(vvmcs, GUEST_RFLAGS);
 
+    /* updating host cr0 to sync TS bit */
+    __vmwrite(HOST_CR0, v->arch.hvm_vmx.host_cr0);
+
     /* TODO: EPT_POINTER */
 }
 
@@ -957,6 +960,9 @@ static void virtual_vmexit(struct cpu_user_regs *regs)
     regs->eip = __get_vvmcs(nvcpu->nv_vvmcx, HOST_RIP);
     regs->esp = __get_vvmcs(nvcpu->nv_vvmcx, HOST_RSP);
     regs->eflags = __vmread(GUEST_RFLAGS);
+
+    /* updating host cr0 to sync TS bit */
+    __vmwrite(HOST_CR0, v->arch.hvm_vmx.host_cr0);
 
     vmreturn(regs, VMSUCCEED);
 }
@@ -1306,11 +1312,16 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
 
         /*
          * decided by L0 and L1 exception bitmap, if the vetor is set by
-         * both, L0 has priority on #PF, L1 has priority on others
+         * both, L0 has priority on #PF and #NM, L1 has priority on others
          */
         if ( vector == TRAP_page_fault )
         {
             if ( paging_mode_hap(v->domain) )
+                nvcpu->nv_vmexit_pending = 1;
+        }
+        else if ( vector == TRAP_no_device )
+        {
+            if ( v->fpu_dirtied )
                 nvcpu->nv_vmexit_pending = 1;
         }
         else if ( (intr_info & valid_mask) == valid_mask )
