@@ -2093,6 +2093,33 @@ static int vmx_handle_eoi_write(void)
     return 0;
 }
 
+static void vmx_idtv_reinject(unsigned long idtv_info)
+{
+
+    /* Event delivery caused this intercept? Queue for redelivery. */
+    if ( unlikely(idtv_info & INTR_INFO_VALID_MASK) )
+    {
+        if ( hvm_event_needs_reinjection((idtv_info>>8)&7, idtv_info&0xff) )
+        {
+            /* See SDM 3B 25.7.1.1 and .2 for info about masking resvd bits. */
+            __vmwrite(VM_ENTRY_INTR_INFO,
+                      idtv_info & ~INTR_INFO_RESVD_BITS_MASK);
+            if ( idtv_info & INTR_INFO_DELIVER_CODE_MASK )
+                __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE,
+                          __vmread(IDT_VECTORING_ERROR_CODE));
+        }
+
+        /*
+         * Clear NMI-blocking interruptibility info if an NMI delivery faulted.
+         * Re-delivery will re-set it (see SDM 3B 25.7.1.2).
+         */
+        if ( (idtv_info & INTR_INFO_INTR_TYPE_MASK) == (X86_EVENTTYPE_NMI<<8) )
+            __vmwrite(GUEST_INTERRUPTIBILITY_INFO,
+                      __vmread(GUEST_INTERRUPTIBILITY_INFO) &
+                      ~VMX_INTR_SHADOW_NMI);
+    }
+}
+
 asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 {
     unsigned int exit_reason, idtv_info, intr_info = 0, vector = 0;
@@ -2182,30 +2209,9 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     hvm_maybe_deassert_evtchn_irq();
 
-    /* Event delivery caused this intercept? Queue for redelivery. */
     idtv_info = __vmread(IDT_VECTORING_INFO);
-    if ( unlikely(idtv_info & INTR_INFO_VALID_MASK) &&
-         (exit_reason != EXIT_REASON_TASK_SWITCH) )
-    {
-        if ( hvm_event_needs_reinjection((idtv_info>>8)&7, idtv_info&0xff) )
-        {
-            /* See SDM 3B 25.7.1.1 and .2 for info about masking resvd bits. */
-            __vmwrite(VM_ENTRY_INTR_INFO,
-                      idtv_info & ~INTR_INFO_RESVD_BITS_MASK);
-            if ( idtv_info & INTR_INFO_DELIVER_CODE_MASK )
-                __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE,
-                          __vmread(IDT_VECTORING_ERROR_CODE));
-        }
-
-        /*
-         * Clear NMI-blocking interruptibility info if an NMI delivery faulted.
-         * Re-delivery will re-set it (see SDM 3B 25.7.1.2).
-         */
-        if ( (idtv_info & INTR_INFO_INTR_TYPE_MASK) == (X86_EVENTTYPE_NMI<<8) )
-            __vmwrite(GUEST_INTERRUPTIBILITY_INFO,
-                      __vmread(GUEST_INTERRUPTIBILITY_INFO) &
-                      ~VMX_INTR_SHADOW_NMI);
-    }
+    if ( exit_reason != EXIT_REASON_TASK_SWITCH )
+        vmx_idtv_reinject(idtv_info);
 
     switch ( exit_reason )
     {
