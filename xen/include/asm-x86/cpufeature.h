@@ -222,6 +222,8 @@
 
 #define cpu_has_svm		boot_cpu_has(X86_FEATURE_SVM)
 
+#define cpu_has_vmx		boot_cpu_has(X86_FEATURE_VMXE)
+
 #endif /* __ASM_I386_CPUFEATURE_H */
 
 /* 
