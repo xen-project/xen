@@ -119,6 +119,84 @@ enum vmx_ops_result {
 #define CASE_GET_REG(REG, reg)      \
     case VMX_REG_ ## REG: value = regs->reg; break
 
+static int vvmcs_offset(u32 width, u32 type, u32 index)
+{
+    int offset;
+
+    offset = (index & 0x1f) | type << 5 | width << 7;
+
+    if ( offset == 0 )    /* vpid */
+        offset = 0x3f;
+
+    return offset;
+}
+
+u64 __get_vvmcs(void *vvmcs, u32 vmcs_encoding)
+{
+    union vmcs_encoding enc;
+    u64 *content = (u64 *) vvmcs;
+    int offset;
+    u64 res;
+
+    enc.word = vmcs_encoding;
+    offset = vvmcs_offset(enc.width, enc.type, enc.index);
+    res = content[offset];
+
+    switch ( enc.width ) {
+    case VVMCS_WIDTH_16:
+        res &= 0xffff;
+        break;
+   case VVMCS_WIDTH_64:
+        if ( enc.access_type )
+            res >>= 32;
+        break;
+    case VVMCS_WIDTH_32:
+        res &= 0xffffffff;
+        break;
+    case VVMCS_WIDTH_NATURAL:
+    default:
+        break;
+    }
+
+    return res;
+}
+
+void __set_vvmcs(void *vvmcs, u32 vmcs_encoding, u64 val)
+{
+    union vmcs_encoding enc;
+    u64 *content = (u64 *) vvmcs;
+    int offset;
+    u64 res;
+
+    enc.word = vmcs_encoding;
+    offset = vvmcs_offset(enc.width, enc.type, enc.index);
+    res = content[offset];
+
+    switch ( enc.width ) {
+    case VVMCS_WIDTH_16:
+        res = val & 0xffff;
+        break;
+    case VVMCS_WIDTH_64:
+        if ( enc.access_type )
+        {
+            res &= 0xffffffff;
+            res |= val << 32;
+        }
+        else
+            res = val;
+        break;
+    case VVMCS_WIDTH_32:
+        res = val & 0xffffffff;
+        break;
+    case VVMCS_WIDTH_NATURAL:
+    default:
+        res = val;
+        break;
+    }
+
+    content[offset] = res;
+}
+
 static unsigned long reg_read(struct cpu_user_regs *regs,
                               enum vmx_regs_enc index)
 {

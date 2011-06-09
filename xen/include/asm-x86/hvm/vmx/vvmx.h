@@ -96,5 +96,61 @@ uint32_t nvmx_vcpu_asid(struct vcpu *v);
 
 int nvmx_handle_vmxon(struct cpu_user_regs *regs);
 int nvmx_handle_vmxoff(struct cpu_user_regs *regs);
+/*
+ * Virtual VMCS layout
+ *
+ * Since physical VMCS layout is unknown, a custom layout is used
+ * for virtual VMCS seen by guest. It occupies a 4k page, and the
+ * field is offset by an 9-bit offset into u64[], The offset is as
+ * follow, which means every <width, type> pair has a max of 32
+ * fields available.
+ *
+ *             9       7      5               0
+ *             --------------------------------
+ *     offset: | width | type |     index     |
+ *             --------------------------------
+ *
+ * Also, since the lower range <width=0, type={0,1}> has only one
+ * field: VPID, it is moved to a higher offset (63), and leaves the
+ * lower range to non-indexed field like VMCS revision.
+ *
+ */
+
+#define VVMCS_REVISION 0x40000001u
+
+struct vvmcs_header {
+    u32 revision;
+    u32 abort;
+};
+
+union vmcs_encoding {
+    struct {
+        u32 access_type : 1;
+        u32 index : 9;
+        u32 type : 2;
+        u32 rsv1 : 1;
+        u32 width : 2;
+        u32 rsv2 : 17;
+    };
+    u32 word;
+};
+
+enum vvmcs_encoding_width {
+    VVMCS_WIDTH_16 = 0,
+    VVMCS_WIDTH_64,
+    VVMCS_WIDTH_32,
+    VVMCS_WIDTH_NATURAL,
+};
+
+enum vvmcs_encoding_type {
+    VVMCS_TYPE_CONTROL = 0,
+    VVMCS_TYPE_RO,
+    VVMCS_TYPE_GSTATE,
+    VVMCS_TYPE_HSTATE,
+};
+
+u64 __get_vvmcs(void *vvmcs, u32 vmcs_encoding);
+void __set_vvmcs(void *vvmcs, u32 vmcs_encoding, u64 val);
+
 #endif /* __ASM_X86_HVM_VVMX_H__ */
 
