@@ -456,3 +456,25 @@ out:
     return X86EMUL_OKAY;
 }
 
+int nvmx_handle_vmptrst(struct cpu_user_regs *regs)
+{
+    struct vcpu *v = current;
+    struct vmx_inst_decoded decode;
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    unsigned long gpa = 0;
+    int rc;
+
+    rc = decode_vmx_inst(regs, &decode, &gpa, 0);
+    if ( rc != X86EMUL_OKAY )
+        return rc;
+
+    gpa = nvcpu->nv_vvmcxaddr;
+
+    rc = hvm_copy_to_guest_virt(decode.mem, &gpa, decode.len, 0);
+    if ( rc != HVMCOPY_okay )
+        return X86EMUL_EXCEPTION;
+
+    vmreturn(regs, VMSUCCEED);
+    return X86EMUL_OKAY;
+}
+
