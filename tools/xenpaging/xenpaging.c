@@ -581,9 +581,6 @@ int main(int argc, char *argv[])
     domain_id = atoi(argv[1]);
     num_pages = atoi(argv[2]);
 
-    /* Seed random-number generator */
-    srand(time(NULL));
-
     /* Initialise domain paging */
     paging = xenpaging_init(domain_id);
     if ( paging == NULL )
