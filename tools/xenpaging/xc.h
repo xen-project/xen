@@ -30,13 +30,6 @@
 #include <xen/mem_event.h>
 
 
-#if 1
-#define ASSERT(_p) \
-    if ( !(_p) ) { DPRINTF("Assertion '%s' failed, line %d, file %s", #_p , \
-    __LINE__, __FILE__); *(int*)0=0; }
-#else
-#define ASSERT(_p) ((void)0)
-#endif
 
 
 

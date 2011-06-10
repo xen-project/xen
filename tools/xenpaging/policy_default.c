@@ -78,7 +78,6 @@ int policy_choose_victim(xenpaging_t *paging, xenpaging_victim_t *victim)
 {
     xc_interface *xch = paging->xc_handle;
     unsigned long wrap = current_gfn;
-    ASSERT(victim != NULL);
 
     do
     {
