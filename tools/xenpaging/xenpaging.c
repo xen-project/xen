@@ -342,7 +342,7 @@ static int xenpaging_teardown(xenpaging_t *paging)
     return -1;
 }
 
-static int get_request(mem_event_t *mem_event, mem_event_request_t *req)
+static void get_request(mem_event_t *mem_event, mem_event_request_t *req)
 {
     mem_event_back_ring_t *back_ring;
     RING_IDX req_cons;
@@ -357,11 +357,9 @@ static int get_request(mem_event_t *mem_event, mem_event_request_t *req)
     /* Update ring */
     back_ring->req_cons = req_cons;
     back_ring->sring->req_event = req_cons + 1;
-
-    return 0;
 }
 
-static int put_response(mem_event_t *mem_event, mem_event_response_t *rsp)
+static void put_response(mem_event_t *mem_event, mem_event_response_t *rsp)
 {
     mem_event_back_ring_t *back_ring;
     RING_IDX rsp_prod;
@@ -376,8 +374,6 @@ static int put_response(mem_event_t *mem_event, mem_event_response_t *rsp)
     /* Update ring */
     back_ring->rsp_prod_pvt = rsp_prod;
     RING_PUSH_RESPONSES(back_ring);
-
-    return 0;
 }
 
 static int xenpaging_evict_page(xenpaging_t *paging,
@@ -437,9 +433,7 @@ static int xenpaging_resume_page(xenpaging_t *paging, mem_event_response_t *rsp,
     int ret;
 
     /* Put the page info on the ring */
-    ret = put_response(&paging->mem_event, rsp);
-    if ( ret != 0 )
-        goto out;
+    put_response(&paging->mem_event, rsp);
 
     /* Notify policy of page being paged in */
     if ( notify_policy )
@@ -649,12 +643,7 @@ int main(int argc, char *argv[])
 
         while ( RING_HAS_UNCONSUMED_REQUESTS(&paging->mem_event.back_ring) )
         {
-            rc = get_request(&paging->mem_event, &req);
-            if ( rc != 0 )
-            {
-                ERROR("Error getting request");
-                goto out;
-            }
+            get_request(&paging->mem_event, &req);
 
             /* Check if the page has already been paged in */
             if ( test_and_clear_bit(req.gfn, paging->bitmap) )
