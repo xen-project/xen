@@ -887,7 +887,9 @@ int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm)
     dprintk(XENLOG_DEBUG, "cpu_add apic_id %x acpi_id %x pxm %x\n",
             apic_id, acpi_id, pxm);
 
-    if ( acpi_id > MAX_MADT_ENTRIES || apic_id > MAX_APICS || pxm > 256 )
+    if ( (acpi_id >= MAX_MADT_ENTRIES) ||
+         (apic_id >= MAX_APICS) ||
+         (pxm >= 256) )
         return -EINVAL;
 
     if ( !cpu_hotplug_begin() )
