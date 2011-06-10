@@ -128,7 +128,7 @@ static void *init_page(void)
     return NULL;
 }
 
-static xenpaging_t *xenpaging_init(domid_t domain_id)
+static xenpaging_t *xenpaging_init(domid_t domain_id, int num_pages)
 {
     xenpaging_t *paging;
     xc_interface *xch;
@@ -255,6 +255,13 @@ static xenpaging_t *xenpaging_init(domid_t domain_id)
         goto err;
     }
     DPRINTF("max_pages = %"PRIx64"\n", paging->domain_info->max_pages);
+
+    if ( num_pages < 0 || num_pages > paging->domain_info->max_pages )
+    {
+        num_pages = paging->domain_info->max_pages;
+        DPRINTF("setting num_pages to %d\n", num_pages);
+    }
+    paging->num_pages = num_pages;
 
     /* Initialise policy */
     rc = policy_init(paging);
@@ -552,7 +559,6 @@ static int evict_victim(xenpaging_t *paging,
 int main(int argc, char *argv[])
 {
     struct sigaction act;
-    int num_pages;
     xenpaging_t *paging;
     xenpaging_victim_t *victims;
     mem_event_request_t req;
@@ -572,10 +578,8 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    num_pages = atoi(argv[2]);
-
     /* Initialise domain paging */
-    paging = xenpaging_init(atoi(argv[1]));
+    paging = xenpaging_init(atoi(argv[1]), atoi(argv[2]));
     if ( paging == NULL )
     {
         fprintf(stderr, "Error initialising paging");
@@ -583,7 +587,7 @@ int main(int argc, char *argv[])
     }
     xch = paging->xc_handle;
 
-    DPRINTF("starting %s %u %d\n", argv[0], paging->mem_event.domain_id, num_pages);
+    DPRINTF("starting %s %u %d\n", argv[0], paging->mem_event.domain_id, paging->num_pages);
 
     /* Open file */
     sprintf(filename, "page_cache_%u", paging->mem_event.domain_id);
@@ -594,12 +598,7 @@ int main(int argc, char *argv[])
         return 2;
     }
 
-    if ( num_pages < 0 || num_pages > paging->domain_info->max_pages )
-    {
-        num_pages = paging->domain_info->max_pages;
-        DPRINTF("setting num_pages to %d\n", num_pages);
-    }
-    victims = calloc(num_pages, sizeof(xenpaging_victim_t));
+    victims = calloc(paging->num_pages, sizeof(xenpaging_victim_t));
 
     /* ensure that if we get a signal, we'll do cleanup, then exit */
     act.sa_handler = close_handler;
@@ -611,8 +610,7 @@ int main(int argc, char *argv[])
     sigaction(SIGALRM, &act, NULL);
 
     /* Evict pages */
-    memset(victims, 0, sizeof(xenpaging_victim_t) * num_pages);
-    for ( i = 0; i < num_pages; i++ )
+    for ( i = 0; i < paging->num_pages; i++ )
     {
         rc = evict_victim(paging, &victims[i], fd, i);
         if ( rc == -ENOSPC )
@@ -648,13 +646,13 @@ int main(int argc, char *argv[])
             if ( test_and_clear_bit(req.gfn, paging->bitmap) )
             {
                 /* Find where in the paging file to read from */
-                for ( i = 0; i < num_pages; i++ )
+                for ( i = 0; i < paging->num_pages; i++ )
                 {
                     if ( victims[i].gfn == req.gfn )
                         break;
                 }
     
-                if ( i >= num_pages )
+                if ( i >= paging->num_pages )
                 {
                     DPRINTF("Couldn't find page %"PRIx64"\n", req.gfn);
                     goto out;
