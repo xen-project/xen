@@ -31,11 +31,8 @@
 #include <xc_private.h>
 #include <xs.h>
 
-#include <xen/mem_event.h>
-
 #include "xc_bitops.h"
 #include "file_ops.h"
-
 #include "policy.h"
 #include "xenpaging.h"
 
