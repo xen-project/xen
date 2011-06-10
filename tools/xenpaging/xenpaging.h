@@ -25,7 +25,6 @@
 #define __XEN_PAGING2_H__
 
 
-#include "spinlock.h"
 #include "xc.h"
 #include <xc_private.h>
 

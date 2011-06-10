@@ -25,7 +25,6 @@
 #define __XEN_MEM_EVENT_H__
 
 
-#include "spinlock.h"
 #include "xc.h"
 #include <xc_private.h>
 
@@ -33,9 +32,6 @@
 #include <xen/mem_event.h>
 
 
-#define mem_event_ring_lock_init(_m)  spin_lock_init(&(_m)->ring_lock)
-#define mem_event_ring_lock(_m)       spin_lock(&(_m)->ring_lock)
-#define mem_event_ring_unlock(_m)     spin_unlock(&(_m)->ring_lock)
 
 
 typedef struct mem_event {
@@ -45,7 +41,6 @@ typedef struct mem_event {
     mem_event_back_ring_t back_ring;
     mem_event_shared_page_t *shared_page;
     void *ring_page;
-    spinlock_t ring_lock;
 } mem_event_t;
 
 

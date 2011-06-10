@@ -32,7 +32,6 @@
 #include <xen/mem_event.h>
 
 #include "bitops.h"
-#include "spinlock.h"
 #include "file_ops.h"
 #include "xc.h"
 
@@ -127,9 +126,6 @@ static xenpaging_t *xenpaging_init(domid_t domain_id)
     BACK_RING_INIT(&paging->mem_event.back_ring,
                    (mem_event_sring_t *)paging->mem_event.ring_page,
                    PAGE_SIZE);
-
-    /* Initialise lock */
-    mem_event_ring_lock_init(&paging->mem_event);
     
     /* Initialise Xen */
     rc = xc_mem_event_enable(xch, paging->mem_event.domain_id,
@@ -302,8 +298,6 @@ static int get_request(mem_event_t *mem_event, mem_event_request_t *req)
     mem_event_back_ring_t *back_ring;
     RING_IDX req_cons;
 
-    mem_event_ring_lock(mem_event);
-
     back_ring = &mem_event->back_ring;
     req_cons = back_ring->req_cons;
 
@@ -315,8 +309,6 @@ static int get_request(mem_event_t *mem_event, mem_event_request_t *req)
     back_ring->req_cons = req_cons;
     back_ring->sring->req_event = req_cons + 1;
 
-    mem_event_ring_unlock(mem_event);
-
     return 0;
 }
 
@@ -324,8 +316,6 @@ static int put_response(mem_event_t *mem_event, mem_event_response_t *rsp)
 {
     mem_event_back_ring_t *back_ring;
     RING_IDX rsp_prod;
-
-    mem_event_ring_lock(mem_event);
 
     back_ring = &mem_event->back_ring;
     rsp_prod = back_ring->rsp_prod_pvt;
@@ -337,8 +327,6 @@ static int put_response(mem_event_t *mem_event, mem_event_response_t *rsp)
     /* Update ring */
     back_ring->rsp_prod_pvt = rsp_prod;
     RING_PUSH_RESPONSES(back_ring);
-
-    mem_event_ring_unlock(mem_event);
 
     return 0;
 }
