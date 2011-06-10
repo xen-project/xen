@@ -31,24 +31,6 @@
 
 
 
-int xc_mem_paging_flush_ioemu_cache(domid_t domain_id)
-{
-    struct xs_handle *xsh = NULL;
-    char path[80];
-    int rc;
-
-    sprintf(path, "/local/domain/0/device-model/%u/command", domain_id);
-
-    xsh = xs_daemon_open();
-    if ( xsh == NULL )
-        return -EIO;
-
-    rc = xs_write(xsh, XBT_NULL, path, "flush-cache", strlen("flush-cache")); 
-
-    xs_daemon_close(xsh);
-
-    return rc ? 0 : -1;
-}
 
 int xc_wait_for_event_or_timeout(xc_interface *xch, xc_evtchn *xce, unsigned long ms)
 {

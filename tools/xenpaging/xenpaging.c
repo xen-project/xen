@@ -48,6 +48,20 @@ static void close_handler(int sig)
         unlink(filename);
 }
 
+static int xenpaging_mem_paging_flush_ioemu_cache(xenpaging_t *paging)
+{
+    struct xs_handle *xsh = paging->xs_handle;
+    domid_t domain_id = paging->mem_event.domain_id;
+    char path[80];
+    bool rc;
+
+    sprintf(path, "/local/domain/0/device-model/%u/command", domain_id);
+
+    rc = xs_write(xsh, XBT_NULL, path, "flush-cache", strlen("flush-cache")); 
+
+    return rc == true ? 0 : -1;
+}
+
 static void *init_page(void)
 {
     void *buffer;
@@ -484,7 +498,7 @@ static int evict_victim(xenpaging_t *paging,
         else
         {
             if ( j++ % 1000 == 0 )
-                if ( xc_mem_paging_flush_ioemu_cache(paging->mem_event.domain_id) )
+                if ( xenpaging_mem_paging_flush_ioemu_cache(paging) )
                     ERROR("Error flushing ioemu cache");
         }
     }
