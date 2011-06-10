@@ -442,8 +442,9 @@ static int xenpaging_resume_page(xenpaging_t *paging, mem_event_response_t *rsp,
     /* Tell Xen page is ready */
     ret = xc_mem_paging_resume(paging->xc_handle, paging->mem_event.domain_id,
                                rsp->gfn);
-    ret = xc_evtchn_notify(paging->mem_event.xce_handle,
-                           paging->mem_event.port);
+    if ( ret == 0 ) 
+        ret = xc_evtchn_notify(paging->mem_event.xce_handle,
+                               paging->mem_event.port);
 
  out:
     return ret;
