@@ -552,7 +552,6 @@ static int evict_victim(xenpaging_t *paging,
 int main(int argc, char *argv[])
 {
     struct sigaction act;
-    domid_t domain_id;
     int num_pages;
     xenpaging_t *paging;
     xenpaging_victim_t *victims;
@@ -573,11 +572,10 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    domain_id = atoi(argv[1]);
     num_pages = atoi(argv[2]);
 
     /* Initialise domain paging */
-    paging = xenpaging_init(domain_id);
+    paging = xenpaging_init(atoi(argv[1]));
     if ( paging == NULL )
     {
         fprintf(stderr, "Error initialising paging");
@@ -585,10 +583,10 @@ int main(int argc, char *argv[])
     }
     xch = paging->xc_handle;
 
-    DPRINTF("starting %s %u %d\n", argv[0], domain_id, num_pages);
+    DPRINTF("starting %s %u %d\n", argv[0], paging->mem_event.domain_id, num_pages);
 
     /* Open file */
-    sprintf(filename, "page_cache_%d", domain_id);
+    sprintf(filename, "page_cache_%u", paging->mem_event.domain_id);
     fd = open(filename, open_flags, open_mode);
     if ( fd < 0 )
     {
