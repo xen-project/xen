@@ -458,27 +458,24 @@ static int xenpaging_resume_page(xenpaging_t *paging, mem_event_response_t *rsp,
 }
 
 static int xenpaging_populate_page(xenpaging_t *paging,
-    uint64_t *gfn, int fd, int i)
+    xen_pfn_t gfn, int fd, int i)
 {
     xc_interface *xch = paging->xc_handle;
-    unsigned long _gfn;
     void *page;
     int ret;
     unsigned char oom = 0;
 
-    _gfn = *gfn;
-    DPRINTF("populate_page < gfn %lx pageslot %d\n", _gfn, i);
+    DPRINTF("populate_page < gfn %"PRI_xen_pfn" pageslot %d\n", gfn, i);
     do
     {
         /* Tell Xen to allocate a page for the domain */
-        ret = xc_mem_paging_prep(xch, paging->mem_event.domain_id,
-                                 _gfn);
+        ret = xc_mem_paging_prep(xch, paging->mem_event.domain_id, gfn);
         if ( ret != 0 )
         {
             if ( errno == ENOMEM )
             {
                 if ( oom++ == 0 )
-                    DPRINTF("ENOMEM while preparing gfn %lx\n", _gfn);
+                    DPRINTF("ENOMEM while preparing gfn %"PRI_xen_pfn"\n", gfn);
                 sleep(1);
                 continue;
             }
@@ -491,8 +488,7 @@ static int xenpaging_populate_page(xenpaging_t *paging,
     /* Map page */
     ret = -EFAULT;
     page = xc_map_foreign_pages(xch, paging->mem_event.domain_id,
-                                PROT_READ | PROT_WRITE, &_gfn, 1);
-    *gfn = _gfn;
+                                PROT_READ | PROT_WRITE, &gfn, 1);
     if ( page == NULL )
     {
         ERROR("Error mapping page: page is null");
@@ -667,7 +663,7 @@ int main(int argc, char *argv[])
                 else
                 {
                     /* Populate the page */
-                    rc = xenpaging_populate_page(paging, &req.gfn, fd, i);
+                    rc = xenpaging_populate_page(paging, req.gfn, fd, i);
                     if ( rc != 0 )
                     {
                         ERROR("Error populating page");
