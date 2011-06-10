@@ -690,19 +690,19 @@ int main(int argc, char *argv[])
                         ERROR("Error populating page");
                         goto out;
                     }
+                }
 
-                    /* Prepare the response */
-                    rsp.gfn = req.gfn;
-                    rsp.p2mt = req.p2mt;
-                    rsp.vcpu_id = req.vcpu_id;
-                    rsp.flags = req.flags;
+                /* Prepare the response */
+                rsp.gfn = req.gfn;
+                rsp.p2mt = req.p2mt;
+                rsp.vcpu_id = req.vcpu_id;
+                rsp.flags = req.flags;
 
-                    rc = xenpaging_resume_page(paging, &rsp, 1);
-                    if ( rc != 0 )
-                    {
-                        ERROR("Error resuming page");
-                        goto out;
-                    }
+                rc = xenpaging_resume_page(paging, &rsp, 1);
+                if ( rc != 0 )
+                {
+                    ERROR("Error resuming page");
+                    goto out;
                 }
 
                 /* Evict a new page to replace the one we just paged in */
