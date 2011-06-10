@@ -39,6 +39,7 @@
 #include "policy.h"
 #include "xenpaging.h"
 
+static char watch_token[16];
 static char filename[80];
 static int interrupted;
 
@@ -75,13 +76,19 @@ static int xenpaging_wait_for_event_or_timeout(xenpaging_t *paging)
 {
     xc_interface *xch = paging->xc_handle;
     xc_evtchn *xce = paging->mem_event.xce_handle;
-    struct pollfd fd[1];
+    char **vec;
+    unsigned int num;
+    struct pollfd fd[2];
     int port;
     int rc;
 
+    /* Wait for event channel and xenstore */
     fd[0].fd = xc_evtchn_fd(xce);
     fd[0].events = POLLIN | POLLERR;
-    rc = poll(fd, 1, 100);
+    fd[1].fd = xs_fileno(paging->xs_handle);
+    fd[1].events = POLLIN | POLLERR;
+
+    rc = poll(fd, 2, 100);
     if ( rc < 0 )
     {
         if (errno == EINTR)
@@ -89,6 +96,27 @@ static int xenpaging_wait_for_event_or_timeout(xenpaging_t *paging)
 
         ERROR("Poll exited with an error");
         return -errno;
+    }
+
+    /* First check for guest shutdown */
+    if ( rc && fd[1].revents & POLLIN )
+    {
+        DPRINTF("Got event from xenstore\n");
+        vec = xs_read_watch(paging->xs_handle, &num);
+        if ( vec )
+        {
+            if ( strcmp(vec[XS_WATCH_TOKEN], watch_token) == 0 )
+            {
+                /* If our guest disappeared, set interrupt flag and fall through */
+                if ( xs_is_domain_introduced(paging->xs_handle, paging->mem_event.domain_id) == false )
+                {
+                    xs_unwatch(paging->xs_handle, "@releaseDomain", watch_token);
+                    interrupted = SIGQUIT;
+                    rc = 0;
+                }
+            }
+            free(vec);
+        }
     }
 
     if ( rc && fd[0].revents & POLLIN )
@@ -162,6 +190,14 @@ static xenpaging_t *xenpaging_init(domid_t domain_id, int num_pages)
     if ( paging->xs_handle == NULL )
     {
         ERROR("Error initialising xenstore connection");
+        goto err;
+    }
+
+    /* write domain ID to watch so we can ignore other domain shutdowns */
+    snprintf(watch_token, sizeof(watch_token), "%u", domain_id);
+    if ( xs_watch(paging->xs_handle, "@releaseDomain", watch_token) == false )
+    {
+        ERROR("Could not bind to shutdown watch\n");
         goto err;
     }
 
