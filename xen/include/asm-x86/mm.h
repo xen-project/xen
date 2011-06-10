@@ -470,7 +470,7 @@ TYPE_SAFE(unsigned long,mfn);
 
 #ifdef CONFIG_COMPAT
 #define compat_machine_to_phys_mapping ((unsigned int *)RDWR_COMPAT_MPT_VIRT_START)
-#define set_gpfn_from_mfn(mfn, pfn) ({                         \
+#define _set_gpfn_from_mfn(mfn, pfn) ({                        \
     struct domain *d = page_get_owner(__mfn_to_page(mfn));     \
     unsigned long entry = (d && (d == dom_cow)) ?              \
         SHARED_M2P_ENTRY : (pfn);                              \
@@ -479,7 +479,7 @@ TYPE_SAFE(unsigned long,mfn);
      machine_to_phys_mapping[(mfn)] = (entry));                \
     })
 #else
-#define set_gpfn_from_mfn(mfn, pfn) ({                         \
+#define _set_gpfn_from_mfn(mfn, pfn) ({                        \
     struct domain *d = page_get_owner(__mfn_to_page(mfn));     \
     if(d && (d == dom_cow))                                    \
         machine_to_phys_mapping[(mfn)] = SHARED_M2P_ENTRY;     \
@@ -487,6 +487,17 @@ TYPE_SAFE(unsigned long,mfn);
         machine_to_phys_mapping[(mfn)] = (pfn);                \
     })
 #endif
+
+/*
+ * Disable some users of set_gpfn_from_mfn() (e.g., free_heap_pages()) until
+ * the machine_to_phys_mapping is actually set up.
+ */
+extern bool_t machine_to_phys_mapping_valid;
+#define set_gpfn_from_mfn(mfn, pfn) do {        \
+    if ( machine_to_phys_mapping_valid )        \
+        _set_gpfn_from_mfn(mfn, pfn);           \
+} while (0)
+
 #define get_gpfn_from_mfn(mfn)      (machine_to_phys_mapping[(mfn)])
 
 #define mfn_to_gmfn(_d, mfn)                            \

@@ -47,6 +47,8 @@ unsigned int __read_mostly pfn_pdx_hole_shift = 0;
 
 unsigned int __read_mostly m2p_compat_vstart = __HYPERVISOR_COMPAT_VIRT_START;
 
+bool_t __read_mostly machine_to_phys_mapping_valid = 0;
+
 /* Top-level master (and idle-domain) page directory. */
 l4_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
     idle_pg_table[L4_PAGETABLE_ENTRIES];
@@ -799,6 +801,8 @@ void __init paging_init(void)
     }
 #undef CNT
 #undef MFN
+
+    machine_to_phys_mapping_valid = 1;
 
     /* Set up linear page table mapping. */
     l4e_write(&idle_pg_table[l4_table_offset(LINEAR_PT_VIRT_START)],
