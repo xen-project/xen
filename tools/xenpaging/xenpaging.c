@@ -35,7 +35,6 @@
 
 #include "xc_bitops.h"
 #include "file_ops.h"
-#include "xc.h"
 
 #include "policy.h"
 #include "xenpaging.h"

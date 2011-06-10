@@ -25,7 +25,6 @@
 #define __XEN_PAGING2_H__
 
 
-#include "xc.h"
 #include <xc_private.h>
 
 #include <xen/event_channel.h>
