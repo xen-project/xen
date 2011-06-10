@@ -148,6 +148,11 @@ static int vmx_init_vmcs_config(void)
         MSR_IA32_VMX_PINBASED_CTLS, &mismatch);
 
     min = (CPU_BASED_HLT_EXITING |
+           CPU_BASED_VIRTUAL_INTR_PENDING |
+#ifdef __x86_64__
+           CPU_BASED_CR8_LOAD_EXITING |
+           CPU_BASED_CR8_STORE_EXITING |
+#endif
            CPU_BASED_INVLPG_EXITING |
            CPU_BASED_CR3_LOAD_EXITING |
            CPU_BASED_CR3_STORE_EXITING |
@@ -166,13 +171,9 @@ static int vmx_init_vmcs_config(void)
         MSR_IA32_VMX_PROCBASED_CTLS, &mismatch);
     _vmx_cpu_based_exec_control &= ~CPU_BASED_RDTSC_EXITING;
 #ifdef __x86_64__
-    if ( !(_vmx_cpu_based_exec_control & CPU_BASED_TPR_SHADOW) )
-    {
-        min |= CPU_BASED_CR8_LOAD_EXITING | CPU_BASED_CR8_STORE_EXITING;
-        _vmx_cpu_based_exec_control = adjust_vmx_controls(
-            "CPU-Based Exec Control", min, opt,
-            MSR_IA32_VMX_PROCBASED_CTLS, &mismatch);
-    }
+    if ( _vmx_cpu_based_exec_control & CPU_BASED_TPR_SHADOW )
+        _vmx_cpu_based_exec_control &=
+            ~(CPU_BASED_CR8_LOAD_EXITING | CPU_BASED_CR8_STORE_EXITING);
 #endif
 
     if ( _vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_SECONDARY_CONTROLS )
