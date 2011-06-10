@@ -41,11 +41,20 @@
 
 static char filename[80];
 static int interrupted;
+
+static void unlink_pagefile(void)
+{
+    if ( filename[0] )
+    {
+        unlink(filename);
+        filename[0] = '\0';
+    }
+}
+
 static void close_handler(int sig)
 {
     interrupted = sig;
-    if ( filename[0] )
-        unlink(filename);
+    unlink_pagefile();
 }
 
 static int xenpaging_mem_paging_flush_ioemu_cache(xenpaging_t *paging)
@@ -716,6 +725,7 @@ int main(int argc, char *argv[])
 
  out:
     close(fd);
+    unlink_pagefile();
     free(victims);
 
     /* Tear down domain paging */
