@@ -53,6 +53,9 @@ typedef struct xenpaging_victim {
 } xenpaging_victim_t;
 
 
+extern void create_page_in_thread(domid_t domain_id, xc_interface *xch);
+extern void page_in_trigger(unsigned long gfn);
+
 #endif // __XEN_PAGING_H__
 
 

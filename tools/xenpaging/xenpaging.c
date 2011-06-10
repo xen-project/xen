@@ -650,6 +650,9 @@ int main(int argc, char *argv[])
     sigaction(SIGINT,  &act, NULL);
     sigaction(SIGALRM, &act, NULL);
 
+    /* listen for page-in events to stop pager */
+    create_page_in_thread(paging->mem_event.domain_id, xch);
+
     /* Evict pages */
     for ( i = 0; i < paging->num_pages; i++ )
     {
@@ -665,7 +668,7 @@ int main(int argc, char *argv[])
     DPRINTF("%d pages evicted. Done.\n", i);
 
     /* Swap pages in and out */
-    while ( !interrupted )
+    while ( 1 )
     {
         /* Wait for Xen to signal that a page needs paged in */
         rc = xenpaging_wait_for_event_or_timeout(paging);
@@ -728,8 +731,12 @@ int main(int argc, char *argv[])
                     goto out;
                 }
 
-                /* Evict a new page to replace the one we just paged in */
-                evict_victim(paging, &victims[i], fd, i);
+                /* Evict a new page to replace the one we just paged in,
+                 * or clear this pagefile slot on exit */
+                if ( interrupted )
+                    victims[i].gfn = INVALID_MFN;
+                else
+                    evict_victim(paging, &victims[i], fd, i);
             }
             else
             {
@@ -755,6 +762,28 @@ int main(int argc, char *argv[])
                     }
                 }
             }
+        }
+
+        /* Write all pages back into the guest */
+        if ( interrupted == SIGTERM || interrupted == SIGINT )
+        {
+            for ( i = 0; i < paging->domain_info->max_pages; i++ )
+            {
+                if ( test_bit(i, paging->bitmap) )
+                {
+                    page_in_trigger(i);
+                    break;
+                }
+            }
+            /* If no more pages to process, exit loop */
+            if ( i == paging->domain_info->max_pages )
+                break;
+        }
+        else
+        {
+            /* Exit on any other signal */
+            if ( interrupted )
+                break;
         }
     }
     DPRINTF("xenpaging got signal %d\n", interrupted);

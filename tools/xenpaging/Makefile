@@ -8,6 +8,7 @@ POLICY    = default
 
 SRC      :=
 SRCS     += file_ops.c xenpaging.c policy_$(POLICY).c
+SRCS     += pagein.c
 
 CFLAGS   += -Werror
 CFLAGS   += -Wno-unused
