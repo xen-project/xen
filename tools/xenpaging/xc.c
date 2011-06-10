@@ -31,20 +31,6 @@
 #include "xc.h"
 
 
-int alloc_bitmap(unsigned long **bitmap, unsigned long bitmap_size)
-{
-    if ( *bitmap == NULL )
-    {
-        *bitmap = calloc(bitmap_size / BITS_PER_LONG, sizeof(unsigned long));
-
-        if ( *bitmap == NULL )
-            return -ENOMEM;
-    }
-
-    memset(*bitmap, 0, bitmap_size / 8);
-
-    return 0;
-}
 
 int xc_mem_paging_flush_ioemu_cache(domid_t domain_id)
 {

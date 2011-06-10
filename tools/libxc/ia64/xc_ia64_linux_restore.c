@@ -218,14 +218,12 @@ xc_ia64_recv_vcpumap(xc_interface *xch,
               max_virt_cpus, info->max_vcpu_id);
         return -1;
     }
-    vcpumap_size = (max_virt_cpus + 1 + sizeof(vcpumap[0]) - 1) /
-        sizeof(vcpumap[0]);
-    vcpumap = malloc(vcpumap_size);
-    if (vcpumap == NULL) {
+    vcpumap_size = bitmap_size(max_virt_cpus);
+    rc = bitmap_alloc(&vcpumap, max_virt_cpus);
+    if (rc < 0) {
         ERROR("memory alloc for vcpumap");
-        return -1;
+        return rc;
     }
-    memset(vcpumap, 0, vcpumap_size);
     if (read_exact(io_fd, vcpumap, vcpumap_size)) {
         ERROR("read vcpumap");
         free(vcpumap);
@@ -353,7 +351,7 @@ xc_ia64_pv_recv_context_ver_three(xc_interface *xch, int io_fd, uint32_t dom,
 
     /* vcpu context */
     for (i = 0; i <= info.max_vcpu_id; i++) {
-        if (!__test_bit(i, vcpumap))
+        if (!test_bit(i, vcpumap))
             continue;
 
         rc = xc_ia64_pv_recv_vcpu_context(xch, io_fd, dom, i);
@@ -454,7 +452,7 @@ xc_ia64_hvm_recv_context(xc_interface *xch, int io_fd, uint32_t dom,
         /* A copy of the CPU context of the guest. */
         vcpu_guest_context_any_t ctxt_any;
 
-        if (!__test_bit(i, vcpumap))
+        if (!test_bit(i, vcpumap))
             continue;
 
         if (xc_ia64_recv_vcpu_context(xch, io_fd, dom, i, &ctxt_any))

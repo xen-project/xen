@@ -39,7 +39,6 @@
 #endif
 
 
-#define BITS_PER_LONG 64
 
 
 typedef struct xc_platform_info {
@@ -50,7 +49,6 @@ typedef struct xc_platform_info {
 } xc_platform_info_t;
 
 
-int alloc_bitmap(unsigned long **bitmap, unsigned long bitmap_size);
 
 int xc_mem_paging_flush_ioemu_cache(domid_t domain_id);
 int xc_wait_for_event(xc_interface *xch, xc_evtchn *xce);

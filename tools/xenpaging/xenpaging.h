@@ -40,7 +40,6 @@ typedef struct xenpaging {
     xc_platform_info_t *platform_info;
     xc_domaininfo_t    *domain_info;
 
-    unsigned long  bitmap_size;
     unsigned long *bitmap;
 
     mem_event_t mem_event;

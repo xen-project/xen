@@ -21,8 +21,7 @@
  */
 
 
-#include "bitops.h"
-#include "xc.h"
+#include "xc_bitops.h"
 #include "policy.h"
 
 
@@ -35,26 +34,23 @@ static unsigned int mru_size;
 static unsigned long *bitmap;
 static unsigned long *unconsumed;
 static unsigned long current_gfn;
-static unsigned long bitmap_size;
 static unsigned long max_pages;
 
 
 int policy_init(xenpaging_t *paging)
 {
     int i;
-    int rc;
+    int rc = -ENOMEM;
 
     /* Allocate bitmap for pages not to page out */
-    rc = alloc_bitmap(&bitmap, paging->bitmap_size);
-    if ( rc != 0 )
+    bitmap = bitmap_alloc(paging->domain_info->max_pages);
+    if ( !bitmap )
         goto out;
     /* Allocate bitmap to track unusable pages */
-    rc = alloc_bitmap(&unconsumed, paging->bitmap_size);
-    if ( rc != 0 )
+    unconsumed = bitmap_alloc(paging->domain_info->max_pages);
+    if ( !unconsumed )
         goto out;
 
-    /* record bitmap_size */
-    bitmap_size = paging->bitmap_size;
     max_pages = paging->domain_info->max_pages;
 
     /* Initialise MRU list of paged in pages */
@@ -65,10 +61,7 @@ int policy_init(xenpaging_t *paging)
 
     mru = malloc(sizeof(*mru) * mru_size);
     if ( mru == NULL )
-    {
-        rc = -ENOMEM;
         goto out;
-    }
 
     for ( i = 0; i < mru_size; i++ )
         mru[i] = INVALID_MFN;
@@ -76,6 +69,7 @@ int policy_init(xenpaging_t *paging)
     /* Don't page out page 0 */
     set_bit(0, bitmap);
 
+    rc = 0;
  out:
     return rc;
 }

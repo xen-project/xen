@@ -47,6 +47,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
+#include "xc_bitops.h"
 #include "log.h"
 #include "tapdisk.h"
 #include "tapdisk-server.h"
@@ -89,31 +90,6 @@ static void ctl_request(event_id_t, char, void *);
 
 /* large flat bitmaps don't scale particularly well either in size or scan
  * time, but they'll do for now */
-#define BITS_PER_LONG (sizeof(unsigned long) * 8)
-#define BITS_TO_LONGS(bits) (((bits)+BITS_PER_LONG-1)/BITS_PER_LONG)
-
-#define BITMAP_ENTRY(_nr, _bmap) ((unsigned long*)(_bmap))[(_nr)/BITS_PER_LONG]
-#define BITMAP_SHIFT(_nr) ((_nr) % BITS_PER_LONG)
-
-static inline int test_bit(int nr, void* bmap)
-{
-  return (BITMAP_ENTRY(nr, bmap) >> BITMAP_SHIFT(nr)) & 1;
-}
-
-static inline void clear_bit(int nr, void* bmap)
-{
-  BITMAP_ENTRY(nr, bmap) &= ~(1UL << BITMAP_SHIFT(nr));
-}
-
-static inline void set_bit(int nr, void* bmap)
-{
-  BITMAP_ENTRY(nr, bmap) |= (1UL << BITMAP_SHIFT(nr));
-}
-
-static inline int bitmap_size(uint64_t sz)
-{
-  return sz >> 3;
-}
 
 static int writelog_create(struct tdlog_state *s)
 {
@@ -123,7 +99,8 @@ static int writelog_create(struct tdlog_state *s)
 
   BDPRINTF("allocating %"PRIu64" bytes for dirty bitmap", bmsize);
 
-  if (!(s->writelog = calloc(bmsize, 1))) {
+  s->writelog = bitmap_alloc(s->size);
+  if (!s->writelog) {
     BWPRINTF("could not allocate dirty bitmap of size %"PRIu64, bmsize);
     return -1;
   }

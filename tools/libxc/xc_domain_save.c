@@ -27,6 +27,7 @@
 #include <sys/time.h>
 
 #include "xc_private.h"
+#include "xc_bitops.h"
 #include "xc_dom.h"
 #include "xg_private.h"
 #include "xg_save_restore.h"
@@ -87,57 +88,6 @@ struct outbuf {
 #define SUPERPAGE_NR_PFNS    (1UL << SUPERPAGE_PFN_SHIFT)
 
 #define SUPER_PAGE_START(pfn)    (((pfn) & (SUPERPAGE_NR_PFNS-1)) == 0 )
-
-/*
-** During (live) save/migrate, we maintain a number of bitmaps to track
-** which pages we have to send, to fixup, and to skip.
-*/
-
-#define BITS_PER_LONG (sizeof(unsigned long) * 8)
-#define BITS_TO_LONGS(bits) (((bits)+BITS_PER_LONG-1)/BITS_PER_LONG)
-#define BITMAP_SIZE   (BITS_TO_LONGS(dinfo->p2m_size) * sizeof(unsigned long))
-
-#define BITMAP_ENTRY(_nr,_bmap) \
-   ((volatile unsigned long *)(_bmap))[(_nr)/BITS_PER_LONG]
-
-#define BITMAP_SHIFT(_nr) ((_nr) % BITS_PER_LONG)
-
-#define ORDER_LONG (sizeof(unsigned long) == 4 ? 5 : 6)
-
-static inline int test_bit (int nr, volatile void * addr)
-{
-    return (BITMAP_ENTRY(nr, addr) >> BITMAP_SHIFT(nr)) & 1;
-}
-
-static inline void clear_bit (int nr, volatile void * addr)
-{
-    BITMAP_ENTRY(nr, addr) &= ~(1UL << BITMAP_SHIFT(nr));
-}
-
-static inline void set_bit ( int nr, volatile void * addr)
-{
-    BITMAP_ENTRY(nr, addr) |= (1UL << BITMAP_SHIFT(nr));
-}
-
-/* Returns the hamming weight (i.e. the number of bits set) in a N-bit word */
-static inline unsigned int hweight32(unsigned int w)
-{
-    unsigned int res = (w & 0x55555555) + ((w >> 1) & 0x55555555);
-    res = (res & 0x33333333) + ((res >> 2) & 0x33333333);
-    res = (res & 0x0F0F0F0F) + ((res >> 4) & 0x0F0F0F0F);
-    res = (res & 0x00FF00FF) + ((res >> 8) & 0x00FF00FF);
-    return (res & 0x0000FFFF) + ((res >> 16) & 0x0000FFFF);
-}
-
-static inline int count_bits ( int nr, volatile void *addr)
-{
-    int i, count = 0;
-    volatile unsigned long *p = (volatile unsigned long *)addr;
-    /* We know that the array is padded to unsigned long. */
-    for ( i = 0; i < (nr / (sizeof(unsigned long)*8)); i++, p++ )
-        count += hweight32(*p);
-    return count;
-}
 
 static uint64_t tv_to_us(struct timeval *new)
 {
@@ -974,9 +924,9 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
     sent_last_iter = dinfo->p2m_size;
 
     /* Setup to_send / to_fix and to_skip bitmaps */
-    to_send = xc_hypercall_buffer_alloc_pages(xch, to_send, NRPAGES(BITMAP_SIZE));
-    to_skip = xc_hypercall_buffer_alloc_pages(xch, to_skip, NRPAGES(BITMAP_SIZE));
-    to_fix  = calloc(1, BITMAP_SIZE);
+    to_send = xc_hypercall_buffer_alloc_pages(xch, to_send, NRPAGES(bitmap_size(dinfo->p2m_size)));
+    to_skip = xc_hypercall_buffer_alloc_pages(xch, to_skip, NRPAGES(bitmap_size(dinfo->p2m_size)));
+    to_fix  = calloc(1, bitmap_size(dinfo->p2m_size));
 
     if ( !to_send || !to_fix || !to_skip )
     {
@@ -984,7 +934,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
         goto out;
     }
 
-    memset(to_send, 0xff, BITMAP_SIZE);
+    memset(to_send, 0xff, bitmap_size(dinfo->p2m_size));
 
     if ( hvm )
     {
@@ -1407,7 +1357,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
         if ( last_iter && debug )
         {
             int id = XC_SAVE_ID_ENABLE_VERIFY_MODE;
-            memset(to_send, 0xff, BITMAP_SIZE);
+            memset(to_send, 0xff, bitmap_size(dinfo->p2m_size));
             debug = 0;
             DPRINTF("Entering debug resend-all mode\n");
 
@@ -1875,8 +1825,8 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
     if ( ctx->live_m2p )
         munmap(ctx->live_m2p, M2P_SIZE(ctx->max_mfn));
 
-    xc_hypercall_buffer_free_pages(xch, to_send, NRPAGES(BITMAP_SIZE));
-    xc_hypercall_buffer_free_pages(xch, to_skip, NRPAGES(BITMAP_SIZE));
+    xc_hypercall_buffer_free_pages(xch, to_send, NRPAGES(bitmap_size(dinfo->p2m_size)));
+    xc_hypercall_buffer_free_pages(xch, to_skip, NRPAGES(bitmap_size(dinfo->p2m_size)));
 
     free(pfn_type);
     free(pfn_batch);

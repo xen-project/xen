@@ -31,7 +31,7 @@
 
 #include <xen/mem_event.h>
 
-#include "bitops.h"
+#include "xc_bitops.h"
 #include "file_ops.h"
 #include "xc.h"
 
@@ -200,11 +200,8 @@ static xenpaging_t *xenpaging_init(domid_t domain_id)
     }
 
     /* Allocate bitmap for tracking pages that have been paged out */
-    paging->bitmap_size = (paging->domain_info->max_pages + BITS_PER_LONG) &
-                          ~(BITS_PER_LONG - 1);
-
-    rc = alloc_bitmap(&paging->bitmap, paging->bitmap_size);
-    if ( rc != 0 )
+    paging->bitmap = bitmap_alloc(paging->domain_info->max_pages);
+    if ( !paging->bitmap )
     {
         ERROR("Error allocating bitmap");
         goto err;

@@ -33,26 +33,6 @@
 
 #define XC_IA64_SR_FORMAT_VER_CURRENT   XC_IA64_SR_FORMAT_VER_THREE
 
-/*
-** During (live) save/migrate, we maintain a number of bitmaps to track
-** which pages we have to send, and to skip.
-*/
-#define BITS_PER_LONG (sizeof(unsigned long) * 8)
-
-#define BITMAP_ENTRY(_nr,_bmap) \
-   ((unsigned long *)(_bmap))[(_nr)/BITS_PER_LONG]
-
-#define BITMAP_SHIFT(_nr) ((_nr) % BITS_PER_LONG)
-
-static inline int __test_bit(int nr, void * addr)
-{
-    return (BITMAP_ENTRY(nr, addr) >> BITMAP_SHIFT(nr)) & 1;
-}
-
-static inline void __set_bit(int nr, void * addr)
-{
-    BITMAP_ENTRY(nr, addr) |= (1UL << BITMAP_SHIFT(nr));
-}
 
 #endif /* XC_IA64_SAVE_RESTORE_H */
 

@@ -32,6 +32,7 @@
 #include <sys/time.h>
 
 #include "xg_private.h"
+#include "xc_bitops.h"
 #include "xc_ia64.h"
 #include "xc_ia64_save_restore.h"
 #include "xc_efi.h"
@@ -51,20 +52,6 @@
 ** During (live) save/migrate, we maintain a number of bitmaps to track
 ** which pages we have to send, and to skip.
 */
-static inline int test_bit(int nr, volatile void * addr)
-{
-    return (BITMAP_ENTRY(nr, addr) >> BITMAP_SHIFT(nr)) & 1;
-}
-
-static inline void clear_bit(int nr, volatile void * addr)
-{
-    BITMAP_ENTRY(nr, addr) &= ~(1UL << BITMAP_SHIFT(nr));
-}
-
-static inline void set_bit(int nr, volatile void * addr)
-{
-    BITMAP_ENTRY(nr, addr) |= (1UL << BITMAP_SHIFT(nr));
-}
 
 static int
 suspend_and_state(int (*suspend)(void*), void* data,
@@ -207,19 +194,17 @@ xc_ia64_send_vcpumap(xc_interface *xch, int io_fd, uint32_t dom,
     unsigned long vcpumap_size;
     uint64_t *vcpumap = NULL;
 
-    vcpumap_size = (max_virt_cpus + 1 + sizeof(vcpumap[0]) - 1) /
-        sizeof(vcpumap[0]);
-    vcpumap = malloc(vcpumap_size);
-    if (vcpumap == NULL) {
+    vcpumap_size = bitmap_size(max_virt_cpus);
+    rc = bitmap_alloc(&vcpumap, max_virt_cpus);
+    if (rc < 0) {
         ERROR("memory alloc for vcpumap");
         goto out;
     }
-    memset(vcpumap, 0, vcpumap_size);
 
     for (i = 0; i <= info->max_vcpu_id; i++) {
         xc_vcpuinfo_t vinfo;
         if ((xc_vcpu_getinfo(xch, dom, i, &vinfo) == 0) && vinfo.online)
-            __set_bit(i, vcpumap);
+            set_bit(i, vcpumap);
     }
 
     if (write_exact(io_fd, &max_virt_cpus, sizeof(max_virt_cpus))) {
@@ -265,7 +250,7 @@ xc_ia64_pv_send_context(xc_interface *xch, int io_fd, uint32_t dom,
 
         char *mem;
 
-        if (!__test_bit(i, vcpumap))
+        if (!test_bit(i, vcpumap))
             continue;
 
         if (xc_ia64_send_vcpu_context(xch, io_fd, dom, i, &ctxt_any))
@@ -332,7 +317,7 @@ xc_ia64_hvm_send_context(xc_interface *xch, int io_fd, uint32_t dom,
         /* A copy of the CPU context of the guest. */
         vcpu_guest_context_any_t ctxt_any;
 
-        if (!__test_bit(i, vcpumap))
+        if (!test_bit(i, vcpumap))
             continue;
 
         if (xc_ia64_send_vcpu_context(xch, io_fd, dom, i, &ctxt_any))
