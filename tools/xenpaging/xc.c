@@ -26,7 +26,6 @@
 #include <stdarg.h>
 #include <sys/poll.h>
 #include <xc_private.h>
-#include <xg_save_restore.h>
 #include <xs.h>
 #include "xc.h"
 
@@ -97,15 +96,6 @@ int xc_wait_for_event(xc_interface *xch, xc_evtchn *xce)
     return xc_wait_for_event_or_timeout(xch, xce, -1);
 }
 
-int xc_get_platform_info(xc_interface *xc_handle, domid_t domain_id,
-                         xc_platform_info_t *platform_info)
-{
-    return get_platform_info(xc_handle, domain_id,
-                             &platform_info->max_mfn,
-                             &platform_info->hvirt_start,
-                             &platform_info->pt_levels,
-                             &platform_info->guest_width);
-}
 
 
 /*

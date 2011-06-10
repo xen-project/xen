@@ -34,12 +34,6 @@
 
 
 
-typedef struct xc_platform_info {
-    unsigned long max_mfn;
-    unsigned long hvirt_start;
-    unsigned int  pt_levels;
-    unsigned int  guest_width;
-} xc_platform_info_t;
 
 
 
@@ -47,8 +41,6 @@ int xc_mem_paging_flush_ioemu_cache(domid_t domain_id);
 int xc_wait_for_event(xc_interface *xch, xc_evtchn *xce);
 int xc_wait_for_event_or_timeout(xc_interface *xch, xc_evtchn *xce, unsigned long ms);
 
-int xc_get_platform_info(xc_interface *xc_handle, domid_t domain_id,
-                         xc_platform_info_t *platform_info);
 
 
 #endif // __XC_H__

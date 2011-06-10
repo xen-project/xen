@@ -176,22 +176,6 @@ static xenpaging_t *xenpaging_init(domid_t domain_id)
 
     paging->mem_event.port = rc;
 
-    /* Get platform info */
-    paging->platform_info = malloc(sizeof(xc_platform_info_t));
-    if ( paging->platform_info == NULL )
-    {
-        ERROR("Error allocating memory for platform info");
-        goto err;
-    }
-
-    rc = xc_get_platform_info(xch, paging->mem_event.domain_id,
-                              paging->platform_info);
-    if ( rc != 1 )
-    {
-        ERROR("Error getting platform info");
-        goto err;
-    }
-
     /* Get domaininfo */
     paging->domain_info = malloc(sizeof(xc_domaininfo_t));
     if ( paging->domain_info == NULL )
@@ -246,7 +230,6 @@ static xenpaging_t *xenpaging_init(domid_t domain_id)
         }
 
         free(paging->bitmap);
-        free(paging->platform_info);
         free(paging->domain_info);
         free(paging);
     }
