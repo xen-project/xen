@@ -27,6 +27,7 @@
 #include <time.h>
 #include <signal.h>
 #include <unistd.h>
+#include <poll.h>
 #include <xc_private.h>
 #include <xs.h>
 
@@ -60,6 +61,47 @@ static int xenpaging_mem_paging_flush_ioemu_cache(xenpaging_t *paging)
     rc = xs_write(xsh, XBT_NULL, path, "flush-cache", strlen("flush-cache")); 
 
     return rc == true ? 0 : -1;
+}
+
+static int xenpaging_wait_for_event_or_timeout(xenpaging_t *paging)
+{
+    xc_interface *xch = paging->xc_handle;
+    xc_evtchn *xce = paging->mem_event.xce_handle;
+    struct pollfd fd[1];
+    int port;
+    int rc;
+
+    fd[0].fd = xc_evtchn_fd(xce);
+    fd[0].events = POLLIN | POLLERR;
+    rc = poll(fd, 1, 100);
+    if ( rc < 0 )
+    {
+        if (errno == EINTR)
+            return 0;
+
+        ERROR("Poll exited with an error");
+        return -errno;
+    }
+
+    if ( rc && fd[0].revents & POLLIN )
+    {
+        DPRINTF("Got event from evtchn\n");
+        port = xc_evtchn_pending(xce);
+        if ( port == -1 )
+        {
+            ERROR("Failed to read port from event channel");
+            rc = -1;
+            goto err;
+        }
+
+        rc = xc_evtchn_unmask(xce, port);
+        if ( rc < 0 )
+        {
+            ERROR("Failed to unmask event channel port");
+        }
+    }
+err:
+    return rc;
 }
 
 static void *init_page(void)
@@ -598,13 +640,13 @@ int main(int argc, char *argv[])
     while ( !interrupted )
     {
         /* Wait for Xen to signal that a page needs paged in */
-        rc = xc_wait_for_event_or_timeout(xch, paging->mem_event.xce_handle, 100);
-        if ( rc < -1 )
+        rc = xenpaging_wait_for_event_or_timeout(paging);
+        if ( rc < 0 )
         {
             ERROR("Error getting event");
             goto out;
         }
-        else if ( rc != -1 )
+        else if ( rc != 0 )
         {
             DPRINTF("Got event from Xen\n");
         }

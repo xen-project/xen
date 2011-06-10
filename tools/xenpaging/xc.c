@@ -32,46 +32,6 @@
 
 
 
-int xc_wait_for_event_or_timeout(xc_interface *xch, xc_evtchn *xce, unsigned long ms)
-{
-    struct pollfd fd = { .fd = xc_evtchn_fd(xce), .events = POLLIN | POLLERR };
-    int port;
-    int rc;
-    
-    rc = poll(&fd, 1, ms);
-    if ( rc == -1 )
-    {
-        if (errno == EINTR)
-            return 0;
-
-        ERROR("Poll exited with an error");
-        goto err;
-    }
-    
-    if ( rc == 1 )
-    {
-        port = xc_evtchn_pending(xce);
-        if ( port == -1 )
-        {
-            ERROR("Failed to read port from event channel");
-            goto err;
-        }
-        
-        rc = xc_evtchn_unmask(xce, port);
-        if ( rc != 0 )
-        {
-            ERROR("Failed to unmask event channel port");
-            goto err;
-        }
-    }
-    else
-        port = -1;
-    
-    return port;
-
- err:
-    return -errno;
-}
 
 
 

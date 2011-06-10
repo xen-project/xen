@@ -37,7 +37,6 @@
 
 
 
-int xc_wait_for_event_or_timeout(xc_interface *xch, xc_evtchn *xce, unsigned long ms);
 
 
 
