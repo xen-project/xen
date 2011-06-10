@@ -91,10 +91,6 @@ int xc_wait_for_event_or_timeout(xc_interface *xch, xc_evtchn *xce, unsigned lon
     return -errno;
 }
 
-int xc_wait_for_event(xc_interface *xch, xc_evtchn *xce)
-{
-    return xc_wait_for_event_or_timeout(xch, xce, -1);
-}
 
 
 
