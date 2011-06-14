@@ -126,5 +126,6 @@
 /* Intel-defined CPU features, CPUID level 0x00000007:0 (ebx) */
 #define X86_FEATURE_FSGSBASE     0 /* {RD,WR}{FS,GS}BASE instructions */
 #define X86_FEATURE_SMEP         7 /* Supervisor Mode Execution Protection */
+#define X86_FEATURE_ERMS         9 /* Enhanced REP MOVSB/STOSB */
 
 #endif /* __LIBXC_CPUFEATURE_H */

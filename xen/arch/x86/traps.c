@@ -815,7 +815,8 @@ static void pv_cpuid(struct cpu_user_regs *regs)
         break;
     case 7:
         if ( regs->ecx == 0 )
-            b &= cpufeat_mask(X86_FEATURE_FSGSBASE);
+            b &= (cpufeat_mask(X86_FEATURE_FSGSBASE) |
+                  cpufeat_mask(X86_FEATURE_ERMS));
         else
             b = 0;
         a = c = d = 0;
