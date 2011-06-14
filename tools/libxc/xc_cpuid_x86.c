@@ -314,6 +314,7 @@ static void xc_cpuid_hvm_policy(
                     bitmaskof(X86_FEATURE_POPCNT) |
                     bitmaskof(X86_FEATURE_AES) |
                     bitmaskof(X86_FEATURE_F16C) |
+                    bitmaskof(X86_FEATURE_RDRAND) |
                     ((xfeature_mask != 0) ?
                      (bitmaskof(X86_FEATURE_AVX) |
                       bitmaskof(X86_FEATURE_XSAVE)) : 0));

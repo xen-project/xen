@@ -87,6 +87,7 @@
 #define X86_FEATURE_XSAVE       26 /* XSAVE/XRSTOR/XSETBV/XGETBV */
 #define X86_FEATURE_AVX         28 /* Advanced Vector Extensions */
 #define X86_FEATURE_F16C        29 /* Half-precision convert instruction */
+#define X86_FEATURE_RDRAND      30 /* Digital Random Number Generator */
 #define X86_FEATURE_HYPERVISOR  31 /* Running under some hypervisor */
 
 /* VIA/Cyrix/Centaur-defined CPU features, CPUID level 0xC0000001 */
