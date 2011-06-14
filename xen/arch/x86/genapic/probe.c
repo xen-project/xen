@@ -60,6 +60,8 @@ void __init generic_apic_probe(void)
 { 
 	int i, changed;
 
+	record_boot_APIC_mode();
+
 	check_x2apic_preenabled();
 	cmdline_apic = changed = (genapic != NULL);
 

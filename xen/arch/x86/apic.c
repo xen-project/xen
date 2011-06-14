@@ -74,6 +74,12 @@ u8 __read_mostly apic_verbosity;
 static bool_t __initdata opt_x2apic = 1;
 boolean_param("x2apic", opt_x2apic);
 
+/*
+ * Bootstrap processor local APIC boot mode - so we can undo our changes
+ * to the APIC state.
+ */
+static enum apic_mode apic_boot_mode = APIC_MODE_INVALID;
+
 bool_t __read_mostly x2apic_enabled = 0;
 bool_t __read_mostly directed_eoi_enabled = 0;
 
@@ -1437,6 +1443,62 @@ int __init APIC_init_uniprocessor (void)
 
     return 0;
 }
+
+static const char * __init apic_mode_to_str(const enum apic_mode mode)
+{
+    switch ( mode )
+    {
+        case APIC_MODE_INVALID:
+            return "invalid";
+        case APIC_MODE_DISABLED:
+            return "disabled";
+        case APIC_MODE_XAPIC:
+            return "xapic";
+        case APIC_MODE_X2APIC:
+            return "x2apic";
+        default:
+            return "unrecognised";
+    }
+}
+
+/* Needs to be called during startup.  It records the state the BIOS
+ * leaves the local APIC so we can undo upon kexec.
+ */
+void __init record_boot_APIC_mode(void)
+{
+    /* Sanity check - we should only ever run once, but could possibly
+     * be called several times */
+    if ( APIC_MODE_INVALID != apic_boot_mode )
+        return;
+
+    apic_boot_mode = current_local_apic_mode();
+
+    apic_printk(APIC_DEBUG, "APIC boot state is '%s'\n",
+                apic_mode_to_str(apic_boot_mode));
+}
+
+/* Look at the bits in MSR_IA32_APICBASE and work out which
+ * APIC mode we are in */
+enum apic_mode current_local_apic_mode(void)
+{
+    u64 msr_contents;
+
+    rdmsrl(MSR_IA32_APICBASE, msr_contents);
+
+    /* Reading EXTD bit from the MSR is only valid if CPUID
+     * says so, else reserved */
+    if ( cpu_has(&current_cpu_data, X86_FEATURE_X2APIC)
+         && (msr_contents & MSR_IA32_APICBASE_EXTD) )
+        return APIC_MODE_X2APIC;
+
+    /* EN bit should always be valid as long as we can read the MSR
+     */
+    if ( msr_contents & MSR_IA32_APICBASE_ENABLE )
+        return APIC_MODE_XAPIC;
+
+    return APIC_MODE_DISABLED;
+}
+
 
 void check_for_unexpected_msi(unsigned int vector)
 {

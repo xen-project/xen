@@ -21,6 +21,14 @@
 #define IO_APIC_REDIR_DEST_LOGICAL	0x00800
 #define IO_APIC_REDIR_DEST_PHYSICAL	0x00000
 
+/* Possible APIC states */
+enum apic_mode {
+    APIC_MODE_INVALID,  /* Not set yet */
+    APIC_MODE_DISABLED, /* If uniprocessor, or MP in uniprocessor mode */
+    APIC_MODE_XAPIC,    /* xAPIC mode - default upon chipset reset */
+    APIC_MODE_X2APIC    /* x2APIC mode - common for large MP machines */
+};
+
 extern u8 apic_verbosity;
 extern bool_t x2apic_enabled;
 extern bool_t directed_eoi_enabled;
@@ -203,6 +211,8 @@ extern void disable_APIC_timer(void);
 extern void enable_APIC_timer(void);
 extern int lapic_suspend(void);
 extern int lapic_resume(void);
+extern void record_boot_APIC_mode(void);
+extern enum apic_mode current_local_apic_mode(void);
 
 extern int check_nmi_watchdog (void);
 
