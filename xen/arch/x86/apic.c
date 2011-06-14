@@ -340,7 +340,8 @@ void disable_local_APIC(void)
     if (enabled_via_apicbase) {
         uint64_t msr_content;
         rdmsrl(MSR_IA32_APICBASE, msr_content);
-        wrmsrl(MSR_IA32_APICBASE, msr_content & ~MSR_IA32_APICBASE_ENABLE);
+        wrmsrl(MSR_IA32_APICBASE, msr_content &
+               ~(MSR_IA32_APICBASE_ENABLE|MSR_IA32_APICBASE_EXTD));
     }
 }
 
