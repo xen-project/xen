@@ -673,7 +673,8 @@ static void acpi_processor_power_init_bm_check(struct acpi_processor_flags *flag
     flags->bm_check = 0;
     if ( num_online_cpus() == 1 )
         flags->bm_check = 1;
-    else if ( c->x86_vendor == X86_VENDOR_INTEL )
+    else if ( (c->x86_vendor == X86_VENDOR_INTEL) ||
+              ((c->x86_vendor == X86_VENDOR_AMD) && (c->x86 == 0x15)) )
     {
         /*
          * Today all MP CPUs that support C3 share cache.
