@@ -79,8 +79,6 @@ static void nmi_shootdown_cpus(void)
 
     __stop_this_cpu();
     disable_IO_APIC();
-
-    local_irq_enable();
 }
 
 void machine_crash_shutdown(void)
