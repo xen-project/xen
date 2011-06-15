@@ -88,6 +88,11 @@ void machine_kexec(xen_kexec_image_t *image)
     if ( hpet_broadcast_is_available() )
         hpet_disable_legacy_broadcast();
 
+    /* We are about to permenantly jump out of the Xen context into the kexec
+     * purgatory code.  We really dont want to be still servicing interupts.
+     */
+    local_irq_disable();
+
     /*
      * compat_machine_kexec() returns to idle pagetables, which requires us
      * to be running on a static GDT mapping (idle pagetables have no GDT

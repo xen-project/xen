@@ -27,6 +27,7 @@
 #include <asm/hvm/support.h>
 #include <asm/apic.h>
 #include <asm/io_apic.h>
+#include <xen/iommu.h>
 
 static atomic_t waiting_for_crash_ipi;
 static unsigned int crashing_cpu;
@@ -82,6 +83,12 @@ static void nmi_shootdown_cpus(void)
     iommu_crash_shutdown();
 
     __stop_this_cpu();
+
+    /* This is a bit of a hack due to the problems with the x2apic_enabled
+     * variable, but we can't do any better without a significant refactoring
+     * of the APIC code */
+    x2apic_enabled = (current_local_apic_mode() == APIC_MODE_X2APIC);
+
     disable_IO_APIC();
 }
 

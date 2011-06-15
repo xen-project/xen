@@ -12,6 +12,8 @@ typedef struct xen_kexec_reserve {
 
 extern xen_kexec_reserve_t kexec_crash_area;
 
+extern bool_t kexecing;
+
 void set_kexec_crash_area_size(u64 system_ram);
 
 /* We have space for 4 images to support atomic update

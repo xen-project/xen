@@ -37,6 +37,7 @@
 #include <asm/asm_defns.h> /* for BUILD_SMP_INTERRUPT */
 #include <mach_apic.h>
 #include <io_ports.h>
+#include <xen/kexec.h>
 
 static bool_t tdt_enabled __read_mostly;
 static bool_t tdt_enable __initdata = 1;
@@ -349,6 +350,33 @@ void disable_local_APIC(void)
         wrmsrl(MSR_IA32_APICBASE, msr_content &
                ~(MSR_IA32_APICBASE_ENABLE|MSR_IA32_APICBASE_EXTD));
     }
+
+    if ( kexecing )
+    {
+        uint64_t msr_content;
+        rdmsrl(MSR_IA32_APICBASE, msr_content);
+        msr_content &= ~(MSR_IA32_APICBASE_ENABLE|MSR_IA32_APICBASE_EXTD);
+        wrmsrl(MSR_IA32_APICBASE, msr_content);
+
+        switch ( apic_boot_mode )
+        {
+        case APIC_MODE_DISABLED:
+            break; /* Nothing to do - we did this above */
+        case APIC_MODE_XAPIC:
+            msr_content |= MSR_IA32_APICBASE_ENABLE;
+            wrmsrl(MSR_IA32_APICBASE, msr_content);
+            break;
+        case APIC_MODE_X2APIC:
+            msr_content |= (MSR_IA32_APICBASE_ENABLE|MSR_IA32_APICBASE_EXTD);
+            wrmsrl(MSR_IA32_APICBASE, msr_content);
+            break;
+        default:
+            printk("Default case when reverting #%d lapic to boot state\n",
+                   smp_processor_id());
+            break;
+        }
+    }
+
 }
 
 /*
