@@ -133,6 +133,7 @@ struct iommu_ops {
     void (*suspend)(void);
     void (*resume)(void);
     void (*share_p2m)(struct domain *d);
+    void (*crash_shutdown)(void);
 };
 
 void iommu_update_ire_from_apic(unsigned int apic, unsigned int reg, unsigned int value);
@@ -142,6 +143,7 @@ unsigned int iommu_read_apic_from_ire(unsigned int apic, unsigned int reg);
 
 void iommu_suspend(void);
 void iommu_resume(void);
+void iommu_crash_shutdown(void);
 
 void iommu_set_dom0_mapping(struct domain *d);
 void iommu_share_p2m_table(struct domain *d);

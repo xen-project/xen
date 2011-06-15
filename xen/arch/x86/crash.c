@@ -77,6 +77,10 @@ static void nmi_shootdown_cpus(void)
         msecs--;
     }
 
+    /* Crash shutdown any IOMMU functionality as the crashdump kernel is not
+     * happy when booting if interrupt/dma remapping is still enabled */
+    iommu_crash_shutdown();
+
     __stop_this_cpu();
     disable_IO_APIC();
 }

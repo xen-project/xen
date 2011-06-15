@@ -102,6 +102,7 @@ extern void *shared_intremap_table;
 /* power management support */
 void amd_iommu_resume(void);
 void amd_iommu_suspend(void);
+void amd_iommu_crash_shutdown(void);
 
 static inline u32 get_field_from_reg_u32(u32 reg_value, u32 mask, u32 shift)
 {

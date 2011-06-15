@@ -432,6 +432,14 @@ void iommu_share_p2m_table(struct domain* d)
         ops->share_p2m(d);
 }
 
+void iommu_crash_shutdown(void)
+{
+    const struct iommu_ops *ops = iommu_get_ops();
+    if ( iommu_enabled )
+        ops->crash_shutdown();
+    iommu_enabled = 0;
+}
+
 /*
  * Local variables:
  * mode: C
