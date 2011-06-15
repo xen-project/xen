@@ -239,7 +239,9 @@ int handle_pio(uint16_t port, int size, int dir)
         curr->arch.hvm_vcpu.io_state = HVMIO_handle_pio_awaiting_completion;
         break;
     default:
-        BUG();
+        gdprintk(XENLOG_ERR, "Weird HVM ioemulation status %d.\n", rc);
+        domain_crash(curr->domain);
+        break;
     }
 
     return 1;
