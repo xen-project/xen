@@ -753,7 +753,8 @@ int lapic_suspend(void)
     apic_pm_state.apic_dfr = apic_read(APIC_DFR);
     apic_pm_state.apic_spiv = apic_read(APIC_SPIV);
     apic_pm_state.apic_lvtt = apic_read(APIC_LVTT);
-    apic_pm_state.apic_lvtpc = apic_read(APIC_LVTPC);
+    if (maxlvt >= 4)
+        apic_pm_state.apic_lvtpc = apic_read(APIC_LVTPC);
 
     if (maxlvt >= 6) {
         apic_pm_state.apic_lvtcmci = apic_read(APIC_CMCI);
@@ -764,7 +765,8 @@ int lapic_suspend(void)
     apic_pm_state.apic_lvterr = apic_read(APIC_LVTERR);
     apic_pm_state.apic_tmict = apic_read(APIC_TMICT);
     apic_pm_state.apic_tdcr = apic_read(APIC_TDCR);
-    apic_pm_state.apic_thmr = apic_read(APIC_LVTTHMR);
+    if (maxlvt >= 5)
+        apic_pm_state.apic_thmr = apic_read(APIC_LVTTHMR);
 
     local_irq_save(flags);
     disable_local_APIC();
@@ -800,6 +802,7 @@ int lapic_resume(void)
     else
         resume_x2apic();
 
+    maxlvt = get_maxlvt();
     apic_write(APIC_LVTERR, ERROR_APIC_VECTOR | APIC_LVT_MASKED);
     apic_write(APIC_ID, apic_pm_state.apic_id);
     apic_write(APIC_DFR, apic_pm_state.apic_dfr);
@@ -808,14 +811,15 @@ int lapic_resume(void)
     apic_write(APIC_SPIV, apic_pm_state.apic_spiv);
     apic_write(APIC_LVT0, apic_pm_state.apic_lvt0);
     apic_write(APIC_LVT1, apic_pm_state.apic_lvt1);
-    apic_write(APIC_LVTTHMR, apic_pm_state.apic_thmr);
+    if (maxlvt >= 5)
+        apic_write(APIC_LVTTHMR, apic_pm_state.apic_thmr);
 
-    maxlvt = get_maxlvt();
     if (maxlvt >= 6) {
         apic_write(APIC_CMCI, apic_pm_state.apic_lvtcmci);
     }
 
-    apic_write(APIC_LVTPC, apic_pm_state.apic_lvtpc);
+    if (maxlvt >= 4)
+        apic_write(APIC_LVTPC, apic_pm_state.apic_lvtpc);
     apic_write(APIC_LVTT, apic_pm_state.apic_lvtt);
     apic_write(APIC_TDCR, apic_pm_state.apic_tdcr);
     apic_write(APIC_TMICT, apic_pm_state.apic_tmict);
