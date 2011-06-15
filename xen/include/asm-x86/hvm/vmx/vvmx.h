@@ -163,6 +163,10 @@ int nvmx_handle_vmread(struct cpu_user_regs *regs);
 int nvmx_handle_vmwrite(struct cpu_user_regs *regs);
 int nvmx_handle_vmresume(struct cpu_user_regs *regs);
 int nvmx_handle_vmlaunch(struct cpu_user_regs *regs);
+int nvmx_msr_read_intercept(unsigned int msr,
+                                u64 *msr_content);
+int nvmx_msr_write_intercept(unsigned int msr,
+                                 u64 msr_content);
 
 void nvmx_update_exec_control(struct vcpu *v, u32 value);
 void nvmx_update_secondary_exec_control(struct vcpu *v,

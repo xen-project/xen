@@ -1774,8 +1774,11 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         *msr_content |= (u64)__vmread(GUEST_IA32_DEBUGCTL_HIGH) << 32;
 #endif
         break;
-    case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_PROCBASED_CTLS2:
-        goto gp_fault;
+    case IA32_FEATURE_CONTROL_MSR:
+    case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_TRUE_ENTRY_CTLS:
+        if ( !nvmx_msr_read_intercept(msr, msr_content) )
+            goto gp_fault;
+        break;
     case MSR_IA32_MISC_ENABLE:
         rdmsrl(MSR_IA32_MISC_ENABLE, *msr_content);
         /* Debug Trace Store is not supported. */
@@ -1935,8 +1938,11 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 
         break;
     }
-    case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_PROCBASED_CTLS2:
-        goto gp_fault;
+    case IA32_FEATURE_CONTROL_MSR:
+    case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_TRUE_ENTRY_CTLS:
+        if ( !nvmx_msr_write_intercept(msr, msr_content) )
+            goto gp_fault;
+        break;
     default:
         if ( vpmu_do_wrmsr(msr, msr_content) )
             return X86EMUL_OKAY;

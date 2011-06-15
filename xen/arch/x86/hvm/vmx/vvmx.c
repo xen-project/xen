@@ -22,6 +22,7 @@
 
 #include <xen/config.h>
 #include <asm/types.h>
+#include <asm/mtrr.h>
 #include <asm/p2m.h>
 #include <asm/hvm/vmx/vmx.h>
 #include <asm/hvm/vmx/vvmx.h>
@@ -1243,6 +1244,113 @@ int nvmx_handle_vmwrite(struct cpu_user_regs *regs)
 
     vmreturn(regs, VMSUCCEED);
     return X86EMUL_OKAY;
+}
+
+/*
+ * Capability reporting
+ */
+int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
+{
+    u64 data = 0, tmp;
+    int r = 1;
+
+    if ( !nestedhvm_enabled(current->domain) )
+        return 0;
+
+    /*
+     * Remove unsupport features from n1 guest capability MSR
+     */
+    switch (msr) {
+    case MSR_IA32_VMX_BASIC:
+        data = VVMCS_REVISION | ((u64)PAGE_SIZE) << 32 | 
+               ((u64)MTRR_TYPE_WRBACK) << 50 | (1ULL << 55);
+        break;
+    case MSR_IA32_VMX_PINBASED_CTLS:
+        /* 1-seetings */
+        data = PIN_BASED_EXT_INTR_MASK | PIN_BASED_NMI_EXITING;
+        data <<= 32;
+	/* 0-settings */
+        data |= 0;
+        break;
+    case MSR_IA32_VMX_PROCBASED_CTLS:
+        /* 1-seetings */
+        data = (CPU_BASED_HLT_EXITING |
+               CPU_BASED_VIRTUAL_INTR_PENDING |
+               CPU_BASED_CR8_LOAD_EXITING |
+               CPU_BASED_CR8_STORE_EXITING |
+               CPU_BASED_INVLPG_EXITING |
+               CPU_BASED_CR3_LOAD_EXITING |
+               CPU_BASED_CR3_STORE_EXITING |
+               CPU_BASED_MONITOR_EXITING |
+               CPU_BASED_MWAIT_EXITING |
+               CPU_BASED_MOV_DR_EXITING |
+               CPU_BASED_ACTIVATE_IO_BITMAP |
+               CPU_BASED_USE_TSC_OFFSETING |
+               CPU_BASED_UNCOND_IO_EXITING |
+               CPU_BASED_RDTSC_EXITING);
+        /* bit 1, 4-6,8,13-16,26 must be 1 (refer G4 of SDM) */
+        tmp = ( (1<<26) | (0xf << 13) | 0x100 | (0x7 << 4) | 0x2);
+        /* 0-settings */
+        data = ((data | tmp) << 32) | (tmp);
+        break;
+    case MSR_IA32_VMX_EXIT_CTLS:
+        /* 1-seetings */
+        /* bit 0-8, 10,11,13,14,16,17 must be 1 (refer G4 of SDM) */
+        tmp = 0x36dff;
+        data = VM_EXIT_ACK_INTR_ON_EXIT;
+#ifdef __x86_64__
+        data |= VM_EXIT_IA32E_MODE;
+#endif
+	/* 0-settings */
+        data = ((data | tmp) << 32) | tmp;
+        break;
+    case MSR_IA32_VMX_ENTRY_CTLS:
+        /* bit 0-8, and 12 must be 1 (refer G5 of SDM) */
+        data = 0x11ff;
+        data |= VM_ENTRY_IA32E_MODE;
+        data = (data << 32) | data;
+        break;
+
+    case IA32_FEATURE_CONTROL_MSR:
+        data = IA32_FEATURE_CONTROL_MSR_LOCK | 
+               IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON_OUTSIDE_SMX;
+        break;
+    case MSR_IA32_VMX_VMCS_ENUM:
+        /* The max index of VVMCS encoding is 0x1f. */
+        data = 0x1f << 1;
+        break;
+    case MSR_IA32_VMX_CR0_FIXED0:
+        /* PG, PE bits must be 1 in VMX operation */
+        data = X86_CR0_PE | X86_CR0_PG;
+        break;
+    case MSR_IA32_VMX_CR0_FIXED1:
+        /* allow 0-settings for all bits */
+        data = 0xffffffff;
+        break;
+    case MSR_IA32_VMX_CR4_FIXED0:
+        /* VMXE bit must be 1 in VMX operation */
+        data = X86_CR4_VMXE;
+        break;
+    case MSR_IA32_VMX_CR4_FIXED1:
+        /* allow 0-settings except SMXE */
+        data = 0x267ff & ~X86_CR4_SMXE;
+        break;
+    case MSR_IA32_VMX_MISC:
+        gdprintk(XENLOG_WARNING, "VMX MSR %x not fully supported yet.\n", msr);
+        break;
+    default:
+        r = 0;
+        break;
+    }
+
+    *msr_content = data;
+    return r;
+}
+
+int nvmx_msr_write_intercept(unsigned int msr, u64 msr_content)
+{
+    /* silently ignore for now */
+    return 1;
 }
 
 void nvmx_idtv_handling(void)
