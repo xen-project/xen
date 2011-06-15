@@ -2936,8 +2936,8 @@ x86_emulate(
             dst.reg = (unsigned long *)&_regs.eax;
             emulate_fpu_insn_memdst("fnstsw", dst.val);
             break;
+        case 0xe8 ... 0xef: /* fucomip %stN */
         case 0xf0 ... 0xf7: /* fcomip %stN */
-        case 0xf8 ... 0xff: /* fucomip %stN */
             emulate_fpu_insn_stub(0xdf, modrm);
             break;
         default:
