@@ -96,7 +96,7 @@ static inline unsigned long __virt_to_maddr(unsigned long va)
 
 static inline void *__maddr_to_virt(unsigned long ma)
 {
-    ASSERT(ma < DIRECTMAP_VIRT_END - DIRECTMAP_VIRT_START);
+    ASSERT(pfn_to_pdx(ma >> PAGE_SHIFT) < (DIRECTMAP_SIZE >> PAGE_SHIFT));
     return (void *)(DIRECTMAP_VIRT_START +
                     ((ma & ma_va_bottom_mask) |
                      ((ma & ma_top_mask) >> pfn_pdx_hole_shift)));
