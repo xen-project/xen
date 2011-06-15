@@ -291,7 +291,17 @@ static inline mfn_t
 gfn_to_mfn_type_p2m(struct p2m_domain *p2m, unsigned long gfn,
                     p2m_type_t *t, p2m_access_t *a, p2m_query_t q)
 {
-    mfn_t mfn = p2m->get_entry(p2m, gfn, t, a, q);
+    mfn_t mfn;
+
+    if ( !p2m || !paging_mode_translate(p2m->domain) )
+    {
+        /* Not necessarily true, but for non-translated guests, we claim
+         * it's the most generic kind of memory */
+        *t = p2m_ram_rw;
+        return _mfn(gfn);
+    }
+
+    mfn = p2m->get_entry(p2m, gfn, t, a, q);
 
 #ifdef __x86_64__
     if ( q == p2m_unshare && p2m_is_shared(*t) )
@@ -321,18 +331,8 @@ static inline mfn_t gfn_to_mfn_type(struct domain *d,
                                     unsigned long gfn, p2m_type_t *t,
                                     p2m_query_t q)
 {
-    struct p2m_domain *p2m = p2m_get_hostp2m(d);
     p2m_access_t a;
-
-    if ( !p2m || !paging_mode_translate(p2m->domain) )
-    {
-        /* Not necessarily true, but for non-translated guests, we claim
-         * it's the most generic kind of memory */
-        *t = p2m_ram_rw;
-        return _mfn(gfn);
-    }
-    
-    return gfn_to_mfn_type_p2m(p2m, gfn, t, &a, q);
+    return gfn_to_mfn_type_p2m(p2m_get_hostp2m(d), gfn, t, &a, q);
 }
 
 /* Syntactic sugar: most callers will use one of these. 
