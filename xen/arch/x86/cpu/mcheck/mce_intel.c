@@ -83,6 +83,29 @@ fastcall void smp_thermal_interrupt(struct cpu_user_regs *regs)
     set_irq_regs(old_regs);
 }
 
+/* Thermal monitoring depends on APIC, ACPI and clock modulation */
+static int intel_thermal_supported(struct cpuinfo_x86 *c)
+{
+    if (!cpu_has_apic)
+        return 0;
+    if (!cpu_has(c, X86_FEATURE_ACPI) || !cpu_has(c, X86_FEATURE_ACC))
+        return 0;
+    return 1;
+}
+
+static u32 __read_mostly lvtthmr_init;
+
+static void __init mcheck_intel_therm_init(void)
+{
+    /*
+     * This function is only called on boot CPU. Save the init thermal
+     * LVT value on BSP and use that value to restore APs' thermal LVT
+     * entry BIOS programmed later
+     */
+    if (intel_thermal_supported(&boot_cpu_data))
+        lvtthmr_init = apic_read(APIC_LVTTHMR);
+}
+
 /* P4/Xeon Thermal regulation detect and init */
 static void intel_init_thermal(struct cpuinfo_x86 *c)
 {
@@ -91,12 +114,7 @@ static void intel_init_thermal(struct cpuinfo_x86 *c)
     int tm2 = 0;
     unsigned int cpu = smp_processor_id();
 
-    /* Thermal monitoring */
-    if (!cpu_has(c, X86_FEATURE_ACPI))
-        return; /* -ENODEV */
-
-    /* Clock modulation */
-    if (!cpu_has(c, X86_FEATURE_ACC))
+    if (!intel_thermal_supported(c))
         return; /* -ENODEV */
 
     /* first check if its enabled already, in which case there might
@@ -104,9 +122,25 @@ static void intel_init_thermal(struct cpuinfo_x86 *c)
      * since it might be delivered via SMI already -zwanem.
      */
     rdmsrl(MSR_IA32_MISC_ENABLE, msr_content);
-    val = apic_read(APIC_LVTTHMR);
-    if ((msr_content & (1ULL<<3)) && (val & APIC_DM_SMI)) {
-        printk(KERN_DEBUG "CPU%d: Thermal monitoring handled by SMI\n",cpu);
+    val = lvtthmr_init;
+    /*
+     * The initial value of thermal LVT entries on all APs always reads
+     * 0x10000 because APs are woken up by BSP issuing INIT-SIPI-SIPI
+     * sequence to them and LVT registers are reset to 0s except for
+     * the mask bits which are set to 1s when APs receive INIT IPI.
+     * If BIOS takes over the thermal interrupt and sets its interrupt
+     * delivery mode to SMI (not fixed), it restores the value that the
+     * BIOS has programmed on AP based on BSP's info we saved (since BIOS
+     * is required to set the same value for all threads/cores).
+     */
+    if ((val & APIC_MODE_MASK) != APIC_DM_FIXED
+        || (val & APIC_VECTOR_MASK) > 0xf)
+        apic_write(APIC_LVTTHMR, val);
+
+    if ((msr_content & (1ULL<<3))
+        && (val & APIC_MODE_MASK) == APIC_DM_SMI) {
+        if (c == &boot_cpu_data)
+            printk(KERN_DEBUG "Thermal monitoring handled by SMI\n");
         return; /* -EBUSY */
     }
 
@@ -115,8 +149,9 @@ static void intel_init_thermal(struct cpuinfo_x86 *c)
 
     /* check whether a vector already exists, temporarily masked? */
     if (val & APIC_VECTOR_MASK) {
-        printk(KERN_DEBUG "CPU%d: Thermal LVT vector (%#x) already installed\n",
-                 cpu, (val & APIC_VECTOR_MASK));
+        if (c == &boot_cpu_data)
+            printk(KERN_DEBUG "Thermal LVT vector (%#x) already installed\n",
+                   val & APIC_VECTOR_MASK);
         return; /* -EBUSY */
     }
 
@@ -134,7 +169,7 @@ static void intel_init_thermal(struct cpuinfo_x86 *c)
     rdmsrl(MSR_IA32_MISC_ENABLE, msr_content);
     wrmsrl(MSR_IA32_MISC_ENABLE, msr_content | (1ULL<<3));
 
-    apic_write_around(APIC_LVTTHMR, apic_read(APIC_LVTTHMR) & ~APIC_LVT_MASKED);
+    apic_write_around(APIC_LVTTHMR, val & ~APIC_LVT_MASKED);
     if (opt_cpu_info)
         printk(KERN_INFO "CPU%u: Thermal monitoring enabled (%s)\n",
                 cpu, tm2 ? "TM2" : "TM1");
@@ -1318,6 +1353,7 @@ enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c, bool_t bsp)
         if ( cpu_mcabank_alloc(0) )
             BUG();
         register_cpu_notifier(&cpu_nfb);
+        mcheck_intel_therm_init();
     }
 
     intel_init_mca(c);
