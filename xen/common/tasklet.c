@@ -1,8 +1,10 @@
 /******************************************************************************
  * tasklet.c
  * 
- * Tasklets are dynamically-allocatable tasks run in VCPU context
- * (specifically, the idle VCPU's context) on at most one CPU at a time.
+ * Tasklets are dynamically-allocatable tasks run in either VCPU context
+ * (specifically, the idle VCPU's context) or in softirq context, on at most
+ * one CPU at a time. Softirq versus VCPU context execution is specified
+ * during per-tasklet initialisation.
  * 
  * Copyright (c) 2010, Citrix Systems, Inc.
  * Copyright (c) 1992, Linus Torvalds
@@ -24,6 +26,7 @@ static bool_t tasklets_initialised;
 DEFINE_PER_CPU(unsigned long, tasklet_work_to_do);
 
 static DEFINE_PER_CPU(struct list_head, tasklet_list);
+static DEFINE_PER_CPU(struct list_head, softirq_tasklet_list);
 
 /* Protects all lists and tasklet structures. */
 static DEFINE_SPINLOCK(tasklet_lock);
@@ -31,11 +34,22 @@ static DEFINE_SPINLOCK(tasklet_lock);
 static void tasklet_enqueue(struct tasklet *t)
 {
     unsigned int cpu = t->scheduled_on;
-    unsigned long *work_to_do = &per_cpu(tasklet_work_to_do, cpu);
 
-    list_add_tail(&t->list, &per_cpu(tasklet_list, cpu));
-    if ( !test_and_set_bit(_TASKLET_enqueued, work_to_do) )
-        cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
+    if ( t->is_softirq )
+    {
+        struct list_head *list = &per_cpu(softirq_tasklet_list, cpu);
+        bool_t was_empty = list_empty(list);
+        list_add_tail(&t->list, list);
+        if ( was_empty )
+            cpu_raise_softirq(cpu, TASKLET_SOFTIRQ);
+    }
+    else
+    {
+        unsigned long *work_to_do = &per_cpu(tasklet_work_to_do, cpu);
+        list_add_tail(&t->list, &per_cpu(tasklet_list, cpu));
+        if ( !test_and_set_bit(_TASKLET_enqueued, work_to_do) )
+            cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
+    }
 }
 
 void tasklet_schedule_on_cpu(struct tasklet *t, unsigned int cpu)
@@ -62,24 +76,12 @@ void tasklet_schedule(struct tasklet *t)
     tasklet_schedule_on_cpu(t, smp_processor_id());
 }
 
-void do_tasklet(void)
+static void do_tasklet_work(unsigned int cpu, struct list_head *list)
 {
-    unsigned int cpu = smp_processor_id();
-    unsigned long *work_to_do = &per_cpu(tasklet_work_to_do, cpu);
-    struct list_head *list = &per_cpu(tasklet_list, cpu);
     struct tasklet *t;
 
-    /*
-     * Work must be enqueued *and* scheduled. Otherwise there is no work to
-     * do, and/or scheduler needs to run to update idle vcpu priority.
-     */
-    if ( likely(*work_to_do != (TASKLET_enqueued|TASKLET_scheduled)) )
-        return;
-
-    spin_lock_irq(&tasklet_lock);
-
     if ( unlikely(list_empty(list) || cpu_is_offline(cpu)) )
-        goto out;
+        return;
 
     t = list_entry(list->next, struct tasklet, list);
     list_del_init(&t->list);
@@ -100,13 +102,47 @@ void do_tasklet(void)
         BUG_ON(t->is_dead || !list_empty(&t->list));
         tasklet_enqueue(t);
     }
+}
 
- out:
+/* VCPU context work */
+void do_tasklet(void)
+{
+    unsigned int cpu = smp_processor_id();
+    unsigned long *work_to_do = &per_cpu(tasklet_work_to_do, cpu);
+    struct list_head *list = &per_cpu(tasklet_list, cpu);
+
+    /*
+     * Work must be enqueued *and* scheduled. Otherwise there is no work to
+     * do, and/or scheduler needs to run to update idle vcpu priority.
+     */
+    if ( likely(*work_to_do != (TASKLET_enqueued|TASKLET_scheduled)) )
+        return;
+
+    spin_lock_irq(&tasklet_lock);
+
+    do_tasklet_work(cpu, list);
+
     if ( list_empty(list) )
     {
         clear_bit(_TASKLET_enqueued, work_to_do);        
         raise_softirq(SCHEDULE_SOFTIRQ);
     }
+
+    spin_unlock_irq(&tasklet_lock);
+}
+
+/* Softirq context work */
+static void tasklet_softirq_action(void)
+{
+    unsigned int cpu = smp_processor_id();
+    struct list_head *list = &per_cpu(softirq_tasklet_list, cpu);
+
+    spin_lock_irq(&tasklet_lock);
+
+    do_tasklet_work(cpu, list);
+
+    if ( !list_empty(list) && !cpu_is_offline(cpu) )
+        raise_softirq(TASKLET_SOFTIRQ);
 
     spin_unlock_irq(&tasklet_lock);
 }
@@ -136,9 +172,8 @@ void tasklet_kill(struct tasklet *t)
     spin_unlock_irqrestore(&tasklet_lock, flags);
 }
 
-static void migrate_tasklets_from_cpu(unsigned int cpu)
+static void migrate_tasklets_from_cpu(unsigned int cpu, struct list_head *list)
 {
-    struct list_head *list = &per_cpu(tasklet_list, cpu);
     unsigned long flags;
     struct tasklet *t;
 
@@ -166,6 +201,13 @@ void tasklet_init(
     t->data = data;
 }
 
+void softirq_tasklet_init(
+    struct tasklet *t, void (*func)(unsigned long), unsigned long data)
+{
+    tasklet_init(t, func, data);
+    t->is_softirq = 1;
+}
+
 static int cpu_callback(
     struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
@@ -175,10 +217,12 @@ static int cpu_callback(
     {
     case CPU_UP_PREPARE:
         INIT_LIST_HEAD(&per_cpu(tasklet_list, cpu));
+        INIT_LIST_HEAD(&per_cpu(softirq_tasklet_list, cpu));
         break;
     case CPU_UP_CANCELED:
     case CPU_DEAD:
-        migrate_tasklets_from_cpu(cpu);
+        migrate_tasklets_from_cpu(cpu, &per_cpu(tasklet_list, cpu));
+        migrate_tasklets_from_cpu(cpu, &per_cpu(softirq_tasklet_list, cpu));
         break;
     default:
         break;
@@ -197,6 +241,7 @@ void __init tasklet_subsys_init(void)
     void *hcpu = (void *)(long)smp_processor_id();
     cpu_callback(&cpu_nfb, CPU_UP_PREPARE, hcpu);
     register_cpu_notifier(&cpu_nfb);
+    open_softirq(TASKLET_SOFTIRQ, tasklet_softirq_action);
     tasklets_initialised = 1;
 }
 
