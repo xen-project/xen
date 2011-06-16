@@ -316,7 +316,8 @@ static void notify_dom0_con_ring(unsigned long unused)
 {
     send_guest_global_virq(dom0, VIRQ_CON_RING);
 }
-static DECLARE_TASKLET(notify_dom0_con_ring_tasklet, notify_dom0_con_ring, 0);
+static DECLARE_SOFTIRQ_TASKLET(notify_dom0_con_ring_tasklet,
+                               notify_dom0_con_ring, 0);
 
 static long guest_console_write(XEN_GUEST_HANDLE(char) buffer, int count)
 {

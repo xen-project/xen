@@ -641,7 +641,8 @@ static void trace_notify_dom0(unsigned long unused)
 {
     send_guest_global_virq(dom0, VIRQ_TBUF);
 }
-static DECLARE_TASKLET(trace_notify_dom0_tasklet, trace_notify_dom0, 0);
+static DECLARE_SOFTIRQ_TASKLET(trace_notify_dom0_tasklet,
+                               trace_notify_dom0, 0);
 
 /**
  * trace - Enters a trace tuple into the trace buffer for the current CPU.

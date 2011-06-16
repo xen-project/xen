@@ -127,8 +127,9 @@ int pt_irq_create_bind_vtd(
             return -ENOMEM;
         }
         memset(hvm_irq_dpci, 0, sizeof(*hvm_irq_dpci));
-        tasklet_init(&hvm_irq_dpci->dirq_tasklet,
-                     hvm_dirq_assist, (unsigned long)d);
+        softirq_tasklet_init(
+            &hvm_irq_dpci->dirq_tasklet,
+            hvm_dirq_assist, (unsigned long)d);
         hvm_irq_dpci->mirq = xmalloc_array(struct hvm_mirq_dpci_mapping,
                                            d->nr_pirqs);
         hvm_irq_dpci->dirq_mask = xmalloc_array(unsigned long,
