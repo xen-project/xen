@@ -53,15 +53,7 @@
 #define MSR_PSTATE_CUR_LIMIT    0xc0010061 /* pstate current limit MSR */
 #define MSR_HWCR_CPBDIS_MASK    0x02000000ULL
 
-struct powernow_cpufreq_data {
-    struct processor_performance *acpi_data;
-    struct cpufreq_frequency_table *freq_table;
-    unsigned int max_freq;
-    unsigned int resume;
-    unsigned int cpu_feature;
-};
-
-static struct powernow_cpufreq_data *drv_data[NR_CPUS];
+#define ARCH_CPU_FLAG_RESUME	1
 
 static struct cpufreq_driver powernow_cpufreq_driver;
 
@@ -92,7 +84,7 @@ static void transition_pstate(void *drvcmd)
 static int powernow_cpufreq_target(struct cpufreq_policy *policy,
                                unsigned int target_freq, unsigned int relation)
 {
-    struct powernow_cpufreq_data *data = drv_data[policy->cpu];
+    struct acpi_cpufreq_data *data = cpufreq_drv_data[policy->cpu];
     struct processor_performance *perf;
     struct cpufreq_freqs freqs;
     cpumask_t online_policy_cpus;
@@ -119,8 +111,8 @@ static int powernow_cpufreq_target(struct cpufreq_policy *policy,
 
     next_perf_state = data->freq_table[next_state].index;
     if (perf->state == next_perf_state) {
-        if (unlikely(data->resume)) 
-            data->resume = 0;
+        if (unlikely(data->arch_cpu_flags & ARCH_CPU_FLAG_RESUME)) 
+            data->arch_cpu_flags &= ~ARCH_CPU_FLAG_RESUME;
         else
             return 0;
     }
@@ -149,10 +141,10 @@ static int powernow_cpufreq_target(struct cpufreq_policy *policy,
 
 static int powernow_cpufreq_verify(struct cpufreq_policy *policy)
 {
-    struct powernow_cpufreq_data *data;
+    struct acpi_cpufreq_data *data;
     struct processor_performance *perf;
 
-    if (!policy || !(data = drv_data[policy->cpu]) ||
+    if (!policy || !(data = cpufreq_drv_data[policy->cpu]) ||
         !processor_pminfo[policy->cpu])
         return -EINVAL;
 
@@ -190,19 +182,19 @@ static int powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
     unsigned int i;
     unsigned int valid_states = 0;
     unsigned int cpu = policy->cpu;
-    struct powernow_cpufreq_data *data;
+    struct acpi_cpufreq_data *data;
     unsigned int result = 0;
     struct processor_performance *perf;
     u32 max_hw_pstate;
     uint64_t msr_content;
     struct cpuinfo_x86 *c = &cpu_data[policy->cpu];
 
-    data = xmalloc(struct powernow_cpufreq_data);
+    data = xmalloc(struct acpi_cpufreq_data);
     if (!data)
         return -ENOMEM;
-    memset(data, 0, sizeof(struct powernow_cpufreq_data));
+    memset(data, 0, sizeof(struct acpi_cpufreq_data));
 
-    drv_data[cpu] = data;
+    cpufreq_drv_data[cpu] = data;
 
     data->acpi_data = &processor_pminfo[cpu]->perf;
 
@@ -252,7 +244,6 @@ static int powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
 
     policy->governor = cpufreq_opt_governor ? : CPUFREQ_DEFAULT_GOVERNOR;
 
-    data->max_freq = perf->states[0].core_frequency * 1000;
     /* table init */
     for (i = 0; i < perf->state_count && i <= max_hw_pstate; i++) {
         if (i > 0 && perf->states[i].core_frequency >=
@@ -278,7 +269,7 @@ static int powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
      * the first call to ->target() should result in us actually
      * writing something to the appropriate registers.
      */
-    data->resume = 1;
+    data->arch_cpu_flags |= ARCH_CPU_FLAG_RESUME;
 
     policy->cur = data->freq_table[i].frequency;
     return result;
@@ -287,17 +278,17 @@ err_freqfree:
     xfree(data->freq_table);
 err_unreg:
     xfree(data);
-    drv_data[cpu] = NULL;
+    cpufreq_drv_data[cpu] = NULL;
 
     return result;
 }
 
 static int powernow_cpufreq_cpu_exit(struct cpufreq_policy *policy)
 {
-    struct powernow_cpufreq_data *data = drv_data[policy->cpu];
+    struct acpi_cpufreq_data *data = cpufreq_drv_data[policy->cpu];
 
     if (data) {
-        drv_data[policy->cpu] = NULL;
+        cpufreq_drv_data[policy->cpu] = NULL;
         xfree(data->freq_table);
         xfree(data);
     }

@@ -29,8 +29,10 @@ struct cpufreq_governor;
 struct acpi_cpufreq_data {
     struct processor_performance *acpi_data;
     struct cpufreq_frequency_table *freq_table;
-    unsigned int cpu_feature;
+    unsigned int arch_cpu_flags;
 };
+
+extern struct acpi_cpufreq_data *cpufreq_drv_data[NR_CPUS];
 
 struct cpufreq_cpuinfo {
     unsigned int        max_freq;

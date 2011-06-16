@@ -54,7 +54,7 @@ enum {
 #define INTEL_MSR_RANGE         (0xffffull)
 #define CPUID_6_ECX_APERFMPERF_CAPABILITY       (0x1)
 
-static struct acpi_cpufreq_data *drv_data[NR_CPUS];
+struct acpi_cpufreq_data *cpufreq_drv_data[NR_CPUS];
 
 static struct cpufreq_driver acpi_cpufreq_driver;
 
@@ -103,7 +103,7 @@ static unsigned extract_msr(u32 msr, struct acpi_cpufreq_data *data)
 
 static unsigned extract_freq(u32 val, struct acpi_cpufreq_data *data)
 {
-    switch (data->cpu_feature) {
+    switch (data->arch_cpu_flags) {
     case SYSTEM_INTEL_MSR_CAPABLE:
         return extract_msr(val, data);
     case SYSTEM_IO_CAPABLE:
@@ -213,17 +213,17 @@ static u32 get_cur_val(const cpumask_t *mask)
         return 0;
 
     policy = per_cpu(cpufreq_cpu_policy, cpu);
-    if (!policy || !drv_data[policy->cpu])
+    if (!policy || !cpufreq_drv_data[policy->cpu])
         return 0;    
 
-    switch (drv_data[policy->cpu]->cpu_feature) {
+    switch (cpufreq_drv_data[policy->cpu]->arch_cpu_flags) {
     case SYSTEM_INTEL_MSR_CAPABLE:
         cmd.type = SYSTEM_INTEL_MSR_CAPABLE;
         cmd.addr.msr.reg = MSR_IA32_PERF_STATUS;
         break;
     case SYSTEM_IO_CAPABLE:
         cmd.type = SYSTEM_IO_CAPABLE;
-        perf = drv_data[policy->cpu]->acpi_data;
+        perf = cpufreq_drv_data[policy->cpu]->acpi_data;
         cmd.addr.io.port = perf->control_register.address;
         cmd.addr.io.bit_width = perf->control_register.bit_width;
         break;
@@ -372,7 +372,7 @@ static unsigned int get_cur_freq_on_cpu(unsigned int cpu)
     if (!policy)
         return 0;
 
-    data = drv_data[policy->cpu];
+    data = cpufreq_drv_data[policy->cpu];
     if (unlikely(data == NULL ||
         data->acpi_data == NULL || data->freq_table == NULL))
         return 0;
@@ -419,7 +419,7 @@ static unsigned int check_freqs(const cpumask_t *mask, unsigned int freq,
 static int acpi_cpufreq_target(struct cpufreq_policy *policy,
                                unsigned int target_freq, unsigned int relation)
 {
-    struct acpi_cpufreq_data *data = drv_data[policy->cpu];
+    struct acpi_cpufreq_data *data = cpufreq_drv_data[policy->cpu];
     struct processor_performance *perf;
     struct cpufreq_freqs freqs;
     cpumask_t online_policy_cpus;
@@ -456,7 +456,7 @@ static int acpi_cpufreq_target(struct cpufreq_policy *policy,
             return 0;
     }
 
-    switch (data->cpu_feature) {
+    switch (data->arch_cpu_flags) {
     case SYSTEM_INTEL_MSR_CAPABLE:
         cmd.type = SYSTEM_INTEL_MSR_CAPABLE;
         cmd.addr.msr.reg = MSR_IA32_PERF_CTL;
@@ -501,7 +501,7 @@ static int acpi_cpufreq_verify(struct cpufreq_policy *policy)
     struct acpi_cpufreq_data *data;
     struct processor_performance *perf;
 
-    if (!policy || !(data = drv_data[policy->cpu]) ||
+    if (!policy || !(data = cpufreq_drv_data[policy->cpu]) ||
         !processor_pminfo[policy->cpu])
         return -EINVAL;
 
@@ -557,7 +557,7 @@ acpi_cpufreq_cpu_init(struct cpufreq_policy *policy)
         return -ENOMEM;
     memset(data, 0, sizeof(struct acpi_cpufreq_data));
 
-    drv_data[cpu] = data;
+    cpufreq_drv_data[cpu] = data;
 
     data->acpi_data = &processor_pminfo[cpu]->perf;
 
@@ -569,7 +569,7 @@ acpi_cpufreq_cpu_init(struct cpufreq_policy *policy)
         if (cpufreq_verbose)
             printk("xen_pminfo: @acpi_cpufreq_cpu_init,"
                    "SYSTEM IO addr space\n");
-        data->cpu_feature = SYSTEM_IO_CAPABLE;
+        data->arch_cpu_flags = SYSTEM_IO_CAPABLE;
         break;
     case ACPI_ADR_SPACE_FIXED_HARDWARE:
         if (cpufreq_verbose)
@@ -579,7 +579,7 @@ acpi_cpufreq_cpu_init(struct cpufreq_policy *policy)
             result = -ENODEV;
             goto err_unreg;
         }
-        data->cpu_feature = SYSTEM_INTEL_MSR_CAPABLE;
+        data->arch_cpu_flags = SYSTEM_INTEL_MSR_CAPABLE;
         break;
     default:
         result = -ENODEV;
@@ -652,17 +652,17 @@ err_freqfree:
     xfree(data->freq_table);
 err_unreg:
     xfree(data);
-    drv_data[cpu] = NULL;
+    cpufreq_drv_data[cpu] = NULL;
 
     return result;
 }
 
 static int acpi_cpufreq_cpu_exit(struct cpufreq_policy *policy)
 {
-    struct acpi_cpufreq_data *data = drv_data[policy->cpu];
+    struct acpi_cpufreq_data *data = cpufreq_drv_data[policy->cpu];
 
     if (data) {
-        drv_data[policy->cpu] = NULL;
+        cpufreq_drv_data[policy->cpu] = NULL;
         xfree(data->freq_table);
         xfree(data);
     }
