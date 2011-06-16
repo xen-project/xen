@@ -1951,14 +1951,8 @@ int unmap_domain_pirq_emuirq(struct domain *d, int pirq)
 
 int hvm_domain_use_pirq(struct domain *d, int pirq)
 {
-    int emuirq;
-    
     if ( !is_hvm_domain(d) || pirq < 0 )
         return 0;
 
-    emuirq = domain_pirq_to_emuirq(d, pirq);
-    if ( emuirq != IRQ_UNBOUND && d->pirq_to_evtchn[pirq] != 0 )
-        return 1;
-    else
-        return 0;
+    return (domain_pirq_to_emuirq(d, pirq) != IRQ_UNBOUND);
 }
