@@ -35,6 +35,7 @@ static struct xenctx {
     int frame_ptrs;
     int stack_trace;
     int disp_all;
+    int all_vcpus;
     int self_paused;
     xc_dominfo_t dominfo;
 } xenctx;
@@ -899,6 +900,19 @@ static void dump_ctx(int vcpu)
 #endif
 }
 
+static void dump_all_vcpus(void)
+{
+    xc_vcpuinfo_t vinfo;
+    int vcpu;
+    for (vcpu = 0; vcpu <= xenctx.dominfo.max_vcpu_id; vcpu++)
+    {
+        if ( xc_vcpu_getinfo(xenctx.xc_handle, xenctx.domid, vcpu, &vinfo) )
+            continue;
+        if ( vinfo.online )
+            dump_ctx(vcpu);
+    }
+}
+
 static void usage(void)
 {
     printf("usage:\n\n");
@@ -920,13 +934,14 @@ static void usage(void)
 #else
     printf("  -a --all          display more registers\n");
 #endif
+    printf("  -C --all-vcpus    print info for all vcpus\n");
 }
 
 int main(int argc, char **argv)
 {
     int ch;
     int ret;
-    static const char *sopts = "fs:hak:S"
+    static const char *sopts = "fs:hak:SC"
 #ifdef __ia64__
         "r:"
 #endif
@@ -940,6 +955,7 @@ int main(int argc, char **argv)
         {"regs", 1, NULL, 'r'},
 #endif
         {"all", 0, NULL, 'a'},
+        {"all-vcpus", 0, NULL, 'C'},
         {"help", 0, NULL, 'h'},
         {0, 0, 0, 0}
     };
@@ -995,6 +1011,9 @@ int main(int argc, char **argv)
             xenctx.disp_all = 1;
             break;
 #endif
+        case 'C':
+            xenctx.all_vcpus = 1;
+            break;
         case 'k':
             kernel_start = strtoull(optarg, NULL, 0);
             break;
@@ -1047,7 +1066,10 @@ int main(int argc, char **argv)
         xenctx.self_paused = 1;
     }
 
-    dump_ctx(vcpu);
+    if (xenctx.all_vcpus)
+        dump_all_vcpus();
+    else
+        dump_ctx(vcpu);
 
     if (xenctx.self_paused) {
         ret = xc_domain_unpause(xenctx.xc_handle, xenctx.domid);
