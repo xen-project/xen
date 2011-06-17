@@ -924,7 +924,7 @@ static void usage(void)
     printf("                    frame pointers.\n");
     printf("  -s SYMTAB, --symbol-table=SYMTAB\n");
     printf("                    read symbol table from SYMTAB.\n");
-    printf("  --stack-trace     print a complete stack trace.\n");
+    printf("  -S --stack-trace  print a complete stack trace.\n");
     printf("  -k, --kernel-start\n");
     printf("                    set user/kernel split. (default 0xc0000000)\n");
 #ifdef __ia64__
@@ -938,7 +938,7 @@ static void usage(void)
 int main(int argc, char **argv)
 {
     int ch;
-    static const char *sopts = "fs:hak:"
+    static const char *sopts = "fs:hak:S"
 #ifdef __ia64__
         "r:"
 #endif
