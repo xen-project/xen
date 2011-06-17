@@ -35,6 +35,7 @@ static struct xenctx {
     int frame_ptrs;
     int stack_trace;
     int disp_all;
+    int self_paused;
     xc_dominfo_t dominfo;
 } xenctx;
 
@@ -699,7 +700,7 @@ static void *map_page(vcpu_guest_context_any_t *ctx, int vcpu, guest_word_t virt
 
     if (mapped == NULL) {
         fprintf(stderr, "failed to map page.\n");
-        exit(-1);
+        return NULL;
     }
 
  out:
@@ -722,7 +723,7 @@ static void print_stack_word(guest_word_t word, int width)
         printf(FMT_64B_WORD, word);
 }
 
-static void print_code(vcpu_guest_context_any_t *ctx, int vcpu)
+static int print_code(vcpu_guest_context_any_t *ctx, int vcpu)
 {
     guest_word_t instr;
     int i;
@@ -732,6 +733,8 @@ static void print_code(vcpu_guest_context_any_t *ctx, int vcpu)
     instr -= 21;
     for(i=0; i<32; i++) {
         unsigned char *c = map_page(ctx, vcpu, instr+i);
+        if (!c)
+            return -1;
         if (instr+i == instr_pointer(ctx))
             printf("<%02x> ", *c);
         else
@@ -740,9 +743,10 @@ static void print_code(vcpu_guest_context_any_t *ctx, int vcpu)
     printf("\n");
 
     printf("\n");
+    return 0;
 }
 
-static void print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
+static int print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
 {
     guest_word_t stack = stack_pointer(ctx);
     guest_word_t stack_limit;
@@ -758,6 +762,8 @@ static void print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
     for (i=1; i<5 && stack < stack_limit; i++) {
         while(stack < stack_limit && stack < stack_pointer(ctx) + i*32) {
             p = map_page(ctx, vcpu, stack);
+            if (!p)
+                return -1;
             word = read_stack_word(p, width);
             printf(" ");
             print_stack_word(word, width);
@@ -784,6 +790,8 @@ static void print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
             if (xenctx.stack_trace) {
                 while (stack < frame) {
                     p = map_page(ctx, vcpu, stack);
+                    if (!p)
+                        return -1;
                     printf("|   ");
                     print_stack_word(read_stack_word(p, width), width);
                     printf("   \n");
@@ -794,6 +802,8 @@ static void print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
             }
 
             p = map_page(ctx, vcpu, stack);
+            if (!p)
+                return -1;
             frame = read_stack_word(p, width);
             if (xenctx.stack_trace) {
                 printf("|-- ");
@@ -804,6 +814,8 @@ static void print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
 
             if (frame) {
                 p = map_page(ctx, vcpu, stack);
+                if (!p)
+                    return -1;
                 word = read_stack_word(p, width);
                 printf("%c [<", xenctx.stack_trace ? '|' : ' ');
                 print_stack_word(word, width);
@@ -817,6 +829,8 @@ static void print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
         stack = stack_pointer(ctx);
         while(stack < stack_limit) {
             p = map_page(ctx, vcpu, stack);
+            if (!p)
+                return -1;
             word = read_stack_word(p, width);
             if (is_kernel_text(word)) {
                 printf("  [<");
@@ -832,34 +846,17 @@ static void print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
             stack += width;
         }
     }
+    return 0;
 }
 #endif
 
 static void dump_ctx(int vcpu)
 {
-    int ret;
     vcpu_guest_context_any_t ctx;
 
-    xenctx.xc_handle = xc_interface_open(0,0,0); /* for accessing control interface */
-
-    ret = xc_domain_getinfo(xenctx.xc_handle, xenctx.domid, 1, &xenctx.dominfo);
-    if (ret < 0) {
-        perror("xc_domain_getinfo");
-        exit(-1);
-    }
-    
-    ret = xc_domain_pause(xenctx.xc_handle, xenctx.domid);
-    if (ret < 0) {
-        perror("xc_domain_pause");
-        exit(-1);
-    }
-
-    ret = xc_vcpu_getcontext(xenctx.xc_handle, xenctx.domid, vcpu, &ctx);
-    if (ret < 0) {
-        if (!xenctx.dominfo.paused)
-            xc_domain_unpause(xenctx.xc_handle, xenctx.domid);
+    if (xc_vcpu_getcontext(xenctx.xc_handle, xenctx.domid, vcpu, &ctx) < 0) {
         perror("xc_vcpu_getcontext");
-        exit(-1);
+        return;
     }
 
 #if defined(__i386__) || defined(__x86_64__)
@@ -871,14 +868,14 @@ static void dump_ctx(int vcpu)
                     xenctx.xc_handle, xenctx.domid, HVM_SAVE_CODE(CPU),
                     vcpu, &cpuctx, sizeof cpuctx) != 0) {
                 perror("xc_domain_hvm_getcontext_partial");
-                exit(-1);
+                return;
             }
             guest_word_size = (cpuctx.msr_efer & 0x400) ? 8 : 4;
             guest_protected_mode = (cpuctx.cr0 & CR0_PE);
             /* HVM guest context records are always host-sized */
             if (xc_version(xenctx.xc_handle, XENVER_capabilities, &xen_caps) != 0) {
                 perror("xc_version");
-                exit(-1);
+                return;
             }
             ctxt_word_size = (strstr(xen_caps, "xen-3.0-x86_64")) ? 8 : 4;
         } else {
@@ -894,24 +891,12 @@ static void dump_ctx(int vcpu)
 
     print_ctx(&ctx);
 #ifndef NO_TRANSLATION
-    print_code(&ctx, vcpu);
+    if (print_code(&ctx, vcpu))
+        return;
     if (is_kernel_text(instr_pointer(&ctx)))
-        print_stack(&ctx, vcpu, guest_word_size);
+        if (print_stack(&ctx, vcpu, guest_word_size))
+            return;
 #endif
-
-    if (!xenctx.dominfo.paused) {
-        ret = xc_domain_unpause(xenctx.xc_handle, xenctx.domid);
-        if (ret < 0) {
-            perror("xc_domain_unpause");
-            exit(-1);
-        }
-    }
-
-    ret = xc_interface_close(xenctx.xc_handle);
-    if (ret < 0) {
-        perror("xc_interface_close");
-        exit(-1);
-    }
 }
 
 static void usage(void)
@@ -940,6 +925,7 @@ static void usage(void)
 int main(int argc, char **argv)
 {
     int ch;
+    int ret;
     static const char *sopts = "fs:hak:S"
 #ifdef __ia64__
         "r:"
@@ -1040,7 +1026,42 @@ int main(int argc, char **argv)
     if (symbol_table)
         read_symbol_table(symbol_table);
 
+    xenctx.xc_handle = xc_interface_open(0,0,0); /* for accessing control interface */
+    if (xenctx.xc_handle < 0) {
+        perror("xc_interface_open");
+        exit(-1);
+    }
+
+    ret = xc_domain_getinfo(xenctx.xc_handle, xenctx.domid, 1, &xenctx.dominfo);
+    if (ret < 0) {
+        perror("xc_domain_getinfo");
+        exit(-1);
+    }
+
+    if (!xenctx.dominfo.paused) {
+        ret = xc_domain_pause(xenctx.xc_handle, xenctx.domid);
+        if (ret < 0) {
+            perror("xc_domain_pause");
+            exit(-1);
+        }
+        xenctx.self_paused = 1;
+    }
+
     dump_ctx(vcpu);
+
+    if (xenctx.self_paused) {
+        ret = xc_domain_unpause(xenctx.xc_handle, xenctx.domid);
+        if (ret < 0) {
+            perror("xc_domain_unpause");
+            exit(-1);
+        }
+    }
+
+    ret = xc_interface_close(xenctx.xc_handle);
+    if (ret < 0) {
+        perror("xc_interface_close");
+        exit(-1);
+    }
 
     return 0;
 }
