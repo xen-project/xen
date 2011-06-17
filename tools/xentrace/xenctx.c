@@ -29,11 +29,14 @@
 #include <xen/foreign/x86_64.h>
 #include <xen/hvm/save.h>
 
-xc_interface *xc_handle = 0;
-int domid = 0;
-int frame_ptrs = 0;
-int stack_trace = 0;
-int disp_all = 0;
+static struct xenctx {
+    xc_interface *xc_handle;
+    int domid;
+    int frame_ptrs;
+    int stack_trace;
+    int disp_all;
+    xc_dominfo_t dominfo;
+} xenctx;
 
 #if defined (__i386__) || defined (__x86_64__)
 typedef unsigned long long guest_word_t;
@@ -300,7 +303,7 @@ static void print_ctx_32(vcpu_guest_context_x86_32_t *ctx)
     printf(" fs:     %04x\t", regs->fs);
     printf(" gs:     %04x\n", regs->gs);
 
-    if (disp_all) {
+    if (xenctx.disp_all) {
         print_special(ctx->ctrlreg, "cr", 0x1d, 4);
         print_special(ctx->debugreg, "dr", 0xcf, 4);
     }
@@ -329,7 +332,7 @@ static void print_ctx_32on64(vcpu_guest_context_x86_64_t *ctx)
     printf(" fs:     %04x\t", regs->fs);
     printf(" gs:     %04x\n", regs->gs);
 
-    if (disp_all) {
+    if (xenctx.disp_all) {
         print_special(ctx->ctrlreg, "cr", 0x1d, 4);
         print_special(ctx->debugreg, "dr", 0xcf, 4);
     }
@@ -373,7 +376,7 @@ static void print_ctx_64(vcpu_guest_context_x86_64_t *ctx)
     printf(" gs: %04x @ %016"PRIx64"/%016"PRIx64"\n", regs->gs,
            ctx->gs_base_kernel, ctx->gs_base_user);
 
-    if (disp_all) {
+    if (xenctx.disp_all) {
         print_special(ctx->ctrlreg, "cr", 0x1d, 8);
         print_special(ctx->debugreg, "dr", 0xcf, 8);
     }
@@ -681,7 +684,7 @@ static void *map_page(vcpu_guest_context_any_t *ctx, int vcpu, guest_word_t virt
     static unsigned long previous_mfn = 0;
     static void *mapped = NULL;
 
-    unsigned long mfn = xc_translate_foreign_address(xc_handle, domid, vcpu, virt);
+    unsigned long mfn = xc_translate_foreign_address(xenctx.xc_handle, xenctx.domid, vcpu, virt);
     unsigned long offset = virt & ~XC_PAGE_MASK;
 
     if (mapped && mfn == previous_mfn)
@@ -692,7 +695,7 @@ static void *map_page(vcpu_guest_context_any_t *ctx, int vcpu, guest_word_t virt
 
     previous_mfn = mfn;
 
-    mapped = xc_map_foreign_range(xc_handle, domid, XC_PAGE_SIZE, PROT_READ, mfn);
+    mapped = xc_map_foreign_range(xenctx.xc_handle, xenctx.domid, XC_PAGE_SIZE, PROT_READ, mfn);
 
     if (mapped == NULL) {
         fprintf(stderr, "failed to map page.\n");
@@ -764,21 +767,21 @@ static void print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
     }
     printf("\n");
 
-    if(stack_trace)
+    if(xenctx.stack_trace)
         printf("Stack Trace:\n");
     else
         printf("Call Trace:\n");
-    printf("%c [<", stack_trace ? '*' : ' ');
+    printf("%c [<", xenctx.stack_trace ? '*' : ' ');
     print_stack_word(instr_pointer(ctx), width);
     printf(">] ");
 
     print_symbol(instr_pointer(ctx));
     printf(" <--\n");
-    if (frame_ptrs) {
+    if (xenctx.frame_ptrs) {
         stack = stack_pointer(ctx);
         frame = frame_pointer(ctx);
         while(frame && stack < stack_limit) {
-            if (stack_trace) {
+            if (xenctx.stack_trace) {
                 while (stack < frame) {
                     p = map_page(ctx, vcpu, stack);
                     printf("|   ");
@@ -792,7 +795,7 @@ static void print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
 
             p = map_page(ctx, vcpu, stack);
             frame = read_stack_word(p, width);
-            if (stack_trace) {
+            if (xenctx.stack_trace) {
                 printf("|-- ");
                 print_stack_word(read_stack_word(p, width), width);
                 printf("\n");
@@ -802,7 +805,7 @@ static void print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
             if (frame) {
                 p = map_page(ctx, vcpu, stack);
                 word = read_stack_word(p, width);
-                printf("%c [<", stack_trace ? '|' : ' ');
+                printf("%c [<", xenctx.stack_trace ? '|' : ' ');
                 print_stack_word(word, width);
                 printf(">] ");
                 print_symbol(word);
@@ -821,7 +824,7 @@ static void print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
                 printf(">] ");
                 print_symbol(word);
                 printf("\n");
-            } else if (stack_trace) {
+            } else if (xenctx.stack_trace) {
                 printf("    ");
                 print_stack_word(word, width);
                 printf("\n");
@@ -836,37 +839,36 @@ static void dump_ctx(int vcpu)
 {
     int ret;
     vcpu_guest_context_any_t ctx;
-    xc_dominfo_t dominfo;
 
-    xc_handle = xc_interface_open(0,0,0); /* for accessing control interface */
+    xenctx.xc_handle = xc_interface_open(0,0,0); /* for accessing control interface */
 
-    ret = xc_domain_getinfo(xc_handle, domid, 1, &dominfo);
+    ret = xc_domain_getinfo(xenctx.xc_handle, xenctx.domid, 1, &xenctx.dominfo);
     if (ret < 0) {
         perror("xc_domain_getinfo");
         exit(-1);
     }
     
-    ret = xc_domain_pause(xc_handle, domid);
+    ret = xc_domain_pause(xenctx.xc_handle, xenctx.domid);
     if (ret < 0) {
         perror("xc_domain_pause");
         exit(-1);
     }
 
-    ret = xc_vcpu_getcontext(xc_handle, domid, vcpu, &ctx);
+    ret = xc_vcpu_getcontext(xenctx.xc_handle, xenctx.domid, vcpu, &ctx);
     if (ret < 0) {
-        if (!dominfo.paused)
-            xc_domain_unpause(xc_handle, domid);
+        if (!xenctx.dominfo.paused)
+            xc_domain_unpause(xenctx.xc_handle, xenctx.domid);
         perror("xc_vcpu_getcontext");
         exit(-1);
     }
 
 #if defined(__i386__) || defined(__x86_64__)
     {
-        if (dominfo.hvm) {
+        if (xenctx.dominfo.hvm) {
             struct hvm_hw_cpu cpuctx;
             xen_capabilities_info_t xen_caps = "";
             if (xc_domain_hvm_getcontext_partial(
-                    xc_handle, domid, HVM_SAVE_CODE(CPU), 
+                    xenctx.xc_handle, xenctx.domid, HVM_SAVE_CODE(CPU),
                     vcpu, &cpuctx, sizeof cpuctx) != 0) {
                 perror("xc_domain_hvm_getcontext_partial");
                 exit(-1);
@@ -874,7 +876,7 @@ static void dump_ctx(int vcpu)
             guest_word_size = (cpuctx.msr_efer & 0x400) ? 8 : 4;
             guest_protected_mode = (cpuctx.cr0 & CR0_PE);
             /* HVM guest context records are always host-sized */
-            if (xc_version(xc_handle, XENVER_capabilities, &xen_caps) != 0) {
+            if (xc_version(xenctx.xc_handle, XENVER_capabilities, &xen_caps) != 0) {
                 perror("xc_version");
                 exit(-1);
             }
@@ -882,9 +884,9 @@ static void dump_ctx(int vcpu)
         } else {
             struct xen_domctl domctl;
             memset(&domctl, 0, sizeof domctl);
-            domctl.domain = domid;
+            domctl.domain = xenctx.domid;
             domctl.cmd = XEN_DOMCTL_get_address_size;
-            if (xc_domctl(xc_handle, &domctl) == 0)
+            if (xc_domctl(xenctx.xc_handle, &domctl) == 0)
                 ctxt_word_size = guest_word_size = domctl.u.address_size.size / 8;
         }
     }
@@ -897,15 +899,15 @@ static void dump_ctx(int vcpu)
         print_stack(&ctx, vcpu, guest_word_size);
 #endif
 
-    if (!dominfo.paused) {
-        ret = xc_domain_unpause(xc_handle, domid);
+    if (!xenctx.dominfo.paused) {
+        ret = xc_domain_unpause(xenctx.xc_handle, xenctx.domid);
         if (ret < 0) {
             perror("xc_domain_unpause");
             exit(-1);
         }
     }
 
-    ret = xc_interface_close(xc_handle);
+    ret = xc_interface_close(xenctx.xc_handle);
     if (ret < 0) {
         perror("xc_interface_close");
         exit(-1);
@@ -962,13 +964,13 @@ int main(int argc, char **argv)
     while ((ch = getopt_long(argc, argv, sopts, lopts, NULL)) != -1) {
         switch(ch) {
         case 'f':
-            frame_ptrs = 1;
+            xenctx.frame_ptrs = 1;
             break;
         case 's':
             symbol_table = optarg;
             break;
         case 'S':
-            stack_trace = 1;
+            xenctx.stack_trace = 1;
             break;
 #ifdef __ia64__
         case 'r':
@@ -1004,7 +1006,7 @@ int main(int argc, char **argv)
             break;
 #else
         case 'a':
-            disp_all = 1;
+            xenctx.disp_all = 1;
             break;
 #endif
         case 'k':
@@ -1026,8 +1028,8 @@ int main(int argc, char **argv)
         exit(-1);
     }
 
-    domid = atoi(argv[0]);
-    if (domid==0) {
+    xenctx.domid = atoi(argv[0]);
+    if (xenctx.domid==0) {
             fprintf(stderr, "cannot trace dom0\n");
             exit(-1);
     }
