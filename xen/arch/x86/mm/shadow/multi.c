@@ -4918,11 +4918,14 @@ static void emulate_unmap_dest(struct vcpu *v,
     ASSERT(mfn_valid(sh_ctxt->mfn1));
 
     /* If we are writing lots of PTE-aligned zeros, might want to unshadow */
-    if ( likely(bytes >= 4)
-         && (*(u32 *)addr == 0)
-         && ((unsigned long) addr & ((sizeof (guest_intpte_t)) - 1)) == 0 )
-        check_for_early_unshadow(v, sh_ctxt->mfn1);
-    else
+    if ( likely(bytes >= 4) && (*(u32 *)addr == 0) )
+    {
+        if ( ((unsigned long) addr & ((sizeof (guest_intpte_t)) - 1)) == 0 )
+            check_for_early_unshadow(v, sh_ctxt->mfn1);
+        /* Don't reset the heuristic if we're writing zeros at non-aligned 
+         * addresses, otherwise it doesn't catch REP MOVSD on PAE guests */
+    }
+    else 
         reset_early_unshadow(v);
 
     /* We can avoid re-verifying the page contents after the write if:
