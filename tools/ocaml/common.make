@@ -9,7 +9,7 @@ OCAMLLEX ?= ocamllex
 OCAMLYACC ?= ocamlyacc
 
 CFLAGS += -fPIC -Werror
-CFLAGS-$(CONFIG_Linux) += -I/usr/lib64/ocaml -I/usr/lib/ocaml
+CFLAGS-$(CONFIG_Linux) += -I$(shell ocamlc -where)
 CFLAGS-$(CONFIG_NetBSD) += -I/usr/pkg/lib/ocaml -fPIC
 
 OCAMLOPTFLAG_G := $(shell $(OCAMLOPT) -h 2>&1 | sed -n 's/^  *\(-g\) .*/\1/p')
