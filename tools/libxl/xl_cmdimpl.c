@@ -299,7 +299,7 @@ static void printf_info(int domid,
     libxl_domain_build_info *b_info = &d_config->b_info;
 
     printf("(domain\n\t(domid %d)\n", domid);
-    printf("\t(domain_create_info)\n");
+    printf("\t(create_info)\n");
     printf("\t(hvm %d)\n", c_info->hvm);
     printf("\t(hap %d)\n", c_info->hap);
     printf("\t(oos %d)\n", c_info->oos);
@@ -326,7 +326,7 @@ static void printf_info(int domid,
         printf("\t(platformdata (null))\n");
 
 
-    printf("\t(domain_build_info)\n");
+    printf("\t(build_info)\n");
     printf("\t(max_vcpus %d)\n", b_info->max_vcpus);
     printf("\t(tsc_mode %d)\n", b_info->tsc_mode);
     printf("\t(max_memkb %d)\n", b_info->max_memkb);
@@ -394,7 +394,7 @@ static void printf_info(int domid,
         printf("\t(device\n");
         printf("\t\t(tap\n");
         printf("\t\t\t(backend_domid %d)\n", d_config->disks[i].backend_domid);
-        printf("\t\t\t(domid %d)\n", domid);
+        printf("\t\t\t(frontend_domid %d)\n", domid);
         printf("\t\t\t(physpath %s)\n", d_config->disks[i].pdev_path);
         printf("\t\t\t(phystype %d)\n", d_config->disks[i].backend);
         printf("\t\t\t(virtpath %s)\n", d_config->disks[i].vdev);
@@ -409,7 +409,7 @@ static void printf_info(int domid,
         printf("\t(device\n");
         printf("\t\t(vif\n");
         printf("\t\t\t(backend_domid %d)\n", d_config->vifs[i].backend_domid);
-        printf("\t\t\t(domid %d)\n", domid);
+        printf("\t\t\t(frontend_domid %d)\n", domid);
         printf("\t\t\t(devid %d)\n", d_config->vifs[i].devid);
         printf("\t\t\t(mtu %d)\n", d_config->vifs[i].mtu);
         printf("\t\t\t(model %s)\n", d_config->vifs[i].model);
@@ -439,7 +439,7 @@ static void printf_info(int domid,
         printf("\t(device\n");
         printf("\t\t(vfb\n");
         printf("\t\t\t(backend_domid %d)\n", d_config->vfbs[i].backend_domid);
-        printf("\t\t\t(domid %d)\n", domid);
+        printf("\t\t\t(frontend_domid %d)\n", domid);
         printf("\t\t\t(devid %d)\n", d_config->vfbs[i].devid);
         printf("\t\t\t(vnc %d)\n", d_config->vfbs[i].vnc);
         printf("\t\t\t(vnclisten %s)\n", d_config->vfbs[i].vnclisten);
