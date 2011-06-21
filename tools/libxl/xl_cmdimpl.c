@@ -199,9 +199,14 @@ static int acquire_lock(void)
     fl.l_whence = SEEK_SET;
     fl.l_start = 0;
     fl.l_len = 0;
-    fd_lock = open(lockfile, O_WRONLY|O_CREAT|O_CLOEXEC, S_IWUSR);
+    fd_lock = open(lockfile, O_WRONLY|O_CREAT, S_IWUSR);
     if (fd_lock < 0) {
         fprintf(stderr, "cannot open the lockfile %s errno=%d\n", lockfile, errno);
+        return ERROR_FAIL;
+    }
+    if (fcntl(fd_lock, F_SETFD, FD_CLOEXEC) < 0) {
+        close(fd_lock);
+        fprintf(stderr, "cannot set cloexec to lockfile %s errno=%d\n", lockfile, errno);
         return ERROR_FAIL;
     }
 get_lock:
