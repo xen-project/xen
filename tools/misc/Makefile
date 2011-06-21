@@ -21,7 +21,7 @@ INSTALL_BIN-y := xencons
 INSTALL_BIN-$(CONFIG_X86) += xen-detect
 INSTALL_BIN := $(INSTALL_BIN-y)
 
-INSTALL_SBIN-y := xm xen-bugtool xen-python-path xend xenperf xsview xenpm xen-tmem-list-parse gtraceview gtracestat xenlockprof xenwatchdogd
+INSTALL_SBIN-y := xm xen-bugtool xen-python-path xend xenperf xsview xenpm xen-tmem-list-parse gtraceview gtracestat xenlockprof xenwatchdogd xen-ringwatch
 INSTALL_SBIN-$(CONFIG_X86) += xen-hvmctx xen-hvmcrash
 INSTALL_SBIN-$(CONFIG_MIGRATE) += xen-hptool
 INSTALL_SBIN := $(INSTALL_SBIN-y)
