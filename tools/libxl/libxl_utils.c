@@ -639,3 +639,17 @@ int libxl_get_max_cpus(libxl_ctx *ctx)
 {
     return xc_get_max_cpus(ctx->xch);
 }
+
+int libxl__enum_from_string(const libxl_enum_string_table *t,
+                            const char *s, int *e)
+{
+    if (!t) return ERROR_INVAL;
+
+    for( ; t->s; t++) {
+        if (!strcasecmp(t->s, s)) {
+                *e = t->v;
+                return 0;
+        }
+    }
+    return ERROR_FAIL;
+}

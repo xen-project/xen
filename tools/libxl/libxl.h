@@ -185,6 +185,17 @@ void libxl_cpuid_destroy(libxl_cpuid_policy_list *cpuid_list);
 
 typedef uint32_t libxl_domid;
 
+/*
+ * Formatting Enumerations.
+ *
+ * Each enumeration type libxl_E declares an associated lookup table
+ * libxl_E_string_table and a lookup function libxl_E_from_string.
+ */
+typedef struct {
+    const char *s;
+    int v;
+} libxl_enum_string_table;
+
 #include "_libxl_types.h"
 
 typedef struct libxl__ctx libxl_ctx;

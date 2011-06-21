@@ -187,6 +187,7 @@
 ^tools/libxl/_.*\.c$
 ^tools/libxl/libxlu_cfg_y\.output$
 ^tools/libxl/xl$
+^tools/libxl/testenum$
 ^tools/libaio/src/.*\.ol$
 ^tools/libaio/src/.*\.os$
 ^tools/misc/cpuperf/cpuperf-perfcntr$

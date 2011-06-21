@@ -113,6 +113,43 @@ def libxl_C_type_destroy(ty, v, indent = "    ", parent = None):
         s = indent + s
     return s.replace("\n", "\n%s" % indent).rstrip(indent)
 
+def libxl_C_enum_to_string(ty, e, indent = "    "):
+    s = ""
+    s += "switch(%s) {\n" % e
+    for v in ty.values:
+        s += "    case %s:\n" % (v.name)
+        s += "        return \"%s\";\n" % (v.valuename.lower())
+    s += "    default:\n "
+    s += "        return NULL;\n"
+    s += "}\n"
+
+    if s != "":
+        s = indent + s
+    return s.replace("\n", "\n%s" % indent).rstrip(indent)
+
+def libxl_C_enum_strings(ty, indent=""):
+    s = ""
+    s += "libxl_enum_string_table %s_string_table[] = {\n" % (ty.typename)
+    for v in ty.values:
+        s += "    { .s = \"%s\", .v = %s },\n" % (v.valuename.lower(), v.name)
+    s += "    { NULL, -1 },\n"
+    s += "};\n"
+    s += "\n"
+    
+    if s != "":
+        s = indent + s
+    return s.replace("\n", "\n%s" % indent).rstrip(indent)
+
+def libxl_C_enum_from_string(ty, str, e, indent = "    "):
+    s = ""
+    s += "return libxl__enum_from_string(%s_string_table,\n" % ty.typename
+    s += "                               %s, (int *)%s);\n" % (str, e)
+    
+    if s != "":
+        s = indent + s
+    return s.replace("\n", "\n%s" % indent).rstrip(indent)
+    
+
 if __name__ == '__main__':
     if len(sys.argv) < 4:
         print >>sys.stderr, "Usage: gentypes.py <idl> <header> <implementation>"
@@ -142,6 +179,10 @@ if __name__ == '__main__':
         f.write(libxl_C_type_define(ty) + ";\n")
         if ty.destructor_fn is not None:
             f.write("void %s(%s *p);\n" % (ty.destructor_fn, ty.typename))
+        if isinstance(ty, libxltypes.Enumeration):
+            f.write("const char *%s_to_string(%s e);\n" % (ty.typename, ty.typename))
+            f.write("int %s_from_string(const char *s, %s *e);\n" % (ty.typename, ty.typename))
+            f.write("extern libxl_enum_string_table %s_string_table[];\n" % (ty.typename))
         f.write("\n")
 
     f.write("""#endif /* __LIBXL_TYPES_H */\n""")
@@ -165,6 +206,7 @@ if __name__ == '__main__':
 #include <string.h>
 
 #include "libxl.h"
+#include "libxl_internal.h"
 
 #define LIBXL_DTOR_POISON 0xa5
 
@@ -177,4 +219,21 @@ if __name__ == '__main__':
         f.write("    memset(p, LIBXL_DTOR_POISON, sizeof(*p));\n")
         f.write("}\n")
         f.write("\n")
+
+    for ty in [t for t in types if isinstance(t,libxltypes.Enumeration)]:
+        f.write("const char *%s_to_string(%s e)\n" % (ty.typename, ty.typename))
+        f.write("{\n")
+        f.write(libxl_C_enum_to_string(ty, "e"))
+        f.write("}\n")
+        f.write("\n")
+
+        f.write(libxl_C_enum_strings(ty))               
+
+        f.write("int %s_from_string(const char *s, %s *e)\n" % (ty.typename, ty.typename))
+        f.write("{\n")
+        f.write(libxl_C_enum_from_string(ty, "s", "e"))               
+        f.write("}\n")
+        f.write("\n")
+
+
     f.close()

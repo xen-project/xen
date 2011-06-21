@@ -325,6 +325,8 @@ _hidden char *libxl__abs_path(libxl__gc *gc, const char *s, const char *path);
 _hidden char *libxl__domid_to_name(libxl__gc *gc, uint32_t domid);
 _hidden char *libxl__cpupoolid_to_name(libxl__gc *gc, uint32_t poolid);
 
+_hidden int libxl__enum_from_string(const libxl_enum_string_table *t,
+                                    const char *s, int *e);
 
   /* holds the CPUID response for a single CPUID leaf
    * input contains the value of the EAX and ECX register,

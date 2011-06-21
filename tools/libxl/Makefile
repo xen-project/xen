@@ -44,11 +44,16 @@ AUTOSRCS= libxlu_cfg_y.c libxlu_cfg_l.c
 LIBXLU_OBJS = libxlu_cfg_y.o libxlu_cfg_l.o libxlu_cfg.o
 $(LIBXLU_OBJS): CFLAGS += $(CFLAGS_libxenctrl) # For xentoollog.h
 
-CLIENTS = xl
+CLIENTS = xl testenum
 
 XL_OBJS = xl.o xl_cmdimpl.o xl_cmdtable.o
 $(XL_OBJS): CFLAGS += $(CFLAGS_libxenctrl) # For xentoollog.h
 $(XL_OBJS): CFLAGS += $(CFLAGS_libxenlight)
+
+testenum.o: CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenlight)
+testenum.c: libxl.idl gentest.py
+	$(PYTHON) gentest.py libxl.idl testenum.c.new
+	mv testenum.c.new testenum.c
 
 .PHONY: all
 all: $(CLIENTS) libxenlight.so libxenlight.a libxlutil.so libxlutil.a \
@@ -106,8 +111,11 @@ libxlutil.so.$(XLUMAJOR).$(XLUMINOR): $(LIBXLU_OBJS)
 libxlutil.a: $(LIBXLU_OBJS)
 	$(AR) rcs libxlutil.a $^
 
-$(CLIENTS): $(XL_OBJS) libxlutil.so libxenlight.so
+xl: $(XL_OBJS) libxlutil.so libxenlight.so
 	$(CC) $(LDFLAGS) -o $@ $(XL_OBJS) libxlutil.so $(LDLIBS_libxenlight) $(LDLIBS_libxenctrl)
+
+testenum: testenum.o libxlutil.so libxenlight.so
+	$(CC) $(LDFLAGS) -o $@ testenum.o libxlutil.so $(LDLIBS_libxenlight) $(LDLIBS_libxenctrl)
 
 .PHONY: install
 install: all
