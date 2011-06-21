@@ -1026,8 +1026,7 @@ int libxl_device_pci_list_assigned(libxl_ctx *ctx, libxl_device_pci **list, uint
             } while ((p = strtok_r(NULL, ",=", &saveptr)) != NULL);
         }
     }
-    if ( *num )
-        *list = pcidevs;
+    *list = pcidevs;
     libxl__free_all(&gc);
     return 0;
 }
