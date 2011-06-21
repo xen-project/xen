@@ -103,7 +103,7 @@ XENDOMAINS_RESTORE=true
 XENDOMAINS_AUTO=/etc/xen/auto
 
 ## Type: boolean
-## Default: false
+## Default: true
 # 
 # If this variable is set to "true", only the domains started via config 
 # files in XENDOMAINS_AUTO will be treated according to XENDOMAINS_SYSRQ,
@@ -111,7 +111,7 @@ XENDOMAINS_AUTO=/etc/xen/auto
 # all running domains will be. 
 # Note that the name matching is somewhat fuzzy.
 # 
-XENDOMAINS_AUTO_ONLY=false
+XENDOMAINS_AUTO_ONLY=true
 
 ## Type: integer
 ## Default: 300
