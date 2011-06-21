@@ -221,7 +221,8 @@ static void libxl_create_pci_backend_device(libxl__gc *gc, flexarray_t *back, in
     flexarray_append_pair(back, libxl__sprintf(gc, "state-%d", num), libxl__sprintf(gc, "%d", 1));
 }
 
-static int libxl__create_pci_backend(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, int num)
+int libxl__create_pci_backend(libxl__gc *gc, uint32_t domid,
+                              libxl_device_pci *pcidev, int num)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     flexarray_t *front = NULL;
@@ -707,7 +708,10 @@ out:
         }
     }
 
-    rc = libxl__device_pci_add_xenstore(gc, domid, pcidev, starting);
+    if (!starting)
+        rc = libxl__device_pci_add_xenstore(gc, domid, pcidev, starting);
+    else
+        rc = 0;
     return rc;
 }
 
