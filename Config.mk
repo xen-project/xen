@@ -190,10 +190,9 @@ endif
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG := xen-4.1.0-rc6
-#QEMU_TAG ?= e073e69457b4d99b6da0b6536296e3498f7f6599
-# Fri Feb 11 17:54:51 2011 +0000
-# qemu-xen: fix segfault with empty cdroms
+QEMU_TAG ?= e3073b9dbf3217f619a4537197067231111d400e
+# Tue Jun 21 18:05:10 2011 +0100
+# mapcache: remember the last page address rather then the last address_index
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
