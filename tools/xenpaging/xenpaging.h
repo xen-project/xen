@@ -36,6 +36,7 @@
 
 typedef struct xenpaging {
     xc_interface *xc_handle;
+    struct xs_handle *xs_handle;
 
     xc_platform_info_t *platform_info;
     xc_domaininfo_t    *domain_info;

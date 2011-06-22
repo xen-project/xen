@@ -28,6 +28,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <xc_private.h>
+#include <xs.h>
 
 #include <xen/mem_event.h>
 
@@ -91,6 +92,14 @@ static xenpaging_t *xenpaging_init(domid_t domain_id)
     /* Allocate memory */
     paging = malloc(sizeof(xenpaging_t));
     memset(paging, 0, sizeof(xenpaging_t));
+
+    /* Open connection to xenstore */
+    paging->xs_handle = xs_open(0);
+    if ( paging->xs_handle == NULL )
+    {
+        ERROR("Error initialising xenstore connection");
+        goto err;
+    }
 
     p = getenv("XENPAGING_POLICY_MRU_SIZE");
     if ( p && *p )
@@ -221,6 +230,8 @@ static xenpaging_t *xenpaging_init(domid_t domain_id)
  err:
     if ( paging )
     {
+        if ( paging->xs_handle )
+            xs_close(paging->xs_handle);
         xc_interface_close(xch);
         if ( paging->mem_event.shared_page )
         {
@@ -277,6 +288,9 @@ static int xenpaging_teardown(xenpaging_t *paging)
     }
     paging->mem_event.xce_handle = NULL;
     
+    /* Close connection to xenstore */
+    xs_close(paging->xs_handle);
+
     /* Close connection to Xen */
     rc = xc_interface_close(xch);
     if ( rc != 0 )
