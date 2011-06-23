@@ -971,9 +971,10 @@ int hvm_vcpu_initialise(struct vcpu *v)
     if ( rc != 0 )
         goto fail4;
 
-    tasklet_init(&v->arch.hvm_vcpu.assert_evtchn_irq_tasklet,
-                 (void(*)(unsigned long))hvm_assert_evtchn_irq,
-                 (unsigned long)v);
+    softirq_tasklet_init(
+        &v->arch.hvm_vcpu.assert_evtchn_irq_tasklet,
+        (void(*)(unsigned long))hvm_assert_evtchn_irq,
+        (unsigned long)v);
 
     v->arch.guest_context.user_regs.eflags = 2;
 
