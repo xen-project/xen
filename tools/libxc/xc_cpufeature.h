@@ -143,5 +143,6 @@
 
 /* Intel-defined CPU features, CPUID level 0x00000007:0 (ebx), word 9 */
 #define X86_FEATURE_FSGSBASE	(7*32+ 0) /* {RD,WR}{FS,GS}BASE instructions */
+#define X86_FEATURE_SMEP        (7*32+ 7) /* Supervisor Mode Execution Protection */
 
 #endif /* __LIBXC_CPUFEATURE_H */
