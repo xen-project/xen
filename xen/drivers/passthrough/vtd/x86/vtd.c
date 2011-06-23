@@ -23,6 +23,7 @@
 #include <xen/domain_page.h>
 #include <asm/paging.h>
 #include <xen/iommu.h>
+#include <xen/irq.h>
 #include <xen/numa.h>
 #include <asm/fixmap.h>
 #include <asm/setup.h>

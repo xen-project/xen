@@ -21,6 +21,7 @@
 #include <xen/list.h>
 #include <xen/prefetch.h>
 #include <xen/iommu.h>
+#include <xen/irq.h>
 #include <asm/hvm/iommu.h>
 #include <asm/hvm/irq.h>
 #include <xen/delay.h>

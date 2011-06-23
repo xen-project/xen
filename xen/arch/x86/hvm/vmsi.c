@@ -32,6 +32,7 @@
 #include <xen/lib.h>
 #include <xen/errno.h>
 #include <xen/sched.h>
+#include <xen/irq.h>
 #include <public/hvm/ioreq.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/vpic.h>

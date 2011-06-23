@@ -30,6 +30,7 @@
 #include <xen/wait.h>
 #include <xen/grant_table.h>
 #include <xen/xenoprof.h>
+#include <xen/irq.h>
 #include <acpi/cpufreq/cpufreq.h>
 #include <asm/debugger.h>
 #include <public/sched.h>

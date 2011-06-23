@@ -20,6 +20,7 @@
 
 #include <xen/event.h>
 #include <xen/iommu.h>
+#include <xen/irq.h>
 #include <asm/hvm/irq.h>
 #include <asm/hvm/iommu.h>
 #include <asm/hvm/support.h>

@@ -22,6 +22,7 @@
 #include <xen/config.h>
 #include <xen/init.h>
 #include <xen/radix-tree.h>
+#include <xen/errno.h>
 
 struct radix_tree_path {
 	struct radix_tree_node *node;
