@@ -1422,6 +1422,7 @@ asmlinkage void __init do_early_page_fault(struct cpu_user_regs *regs)
         unsigned long *stk = (unsigned long *)regs;
         printk("Early fatal page fault at %04x:%p (cr2=%p, ec=%04x)\n", 
                regs->cs, _p(regs->eip), _p(cr2), regs->error_code);
+        show_page_walk(cr2);
         printk("Stack dump: ");
         while ( ((long)stk & ((PAGE_SIZE - 1) & ~(BYTES_PER_LONG - 1))) != 0 )
             printk("%p ", _p(*stk++));

@@ -153,6 +153,8 @@ unsigned long __read_mostly pdx_group_valid[BITS_TO_LONGS(
     (FRAMETABLE_SIZE / sizeof(*frame_table) + PDX_GROUP_COUNT - 1)
     / PDX_GROUP_COUNT)] = { [0] = 1 };
 
+bool_t __read_mostly machine_to_phys_mapping_valid = 0;
+
 #define PAGE_CACHE_ATTRS (_PAGE_PAT|_PAGE_PCD|_PAGE_PWT)
 
 bool_t __read_mostly opt_allow_superpage;

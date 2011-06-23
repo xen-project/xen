@@ -37,8 +37,6 @@ l2_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
 unsigned int __read_mostly PAGE_HYPERVISOR         = __PAGE_HYPERVISOR;
 unsigned int __read_mostly PAGE_HYPERVISOR_NOCACHE = __PAGE_HYPERVISOR_NOCACHE;
 
-bool_t __read_mostly machine_to_phys_mapping_valid = 0;
-
 static unsigned long __read_mostly mpt_size;
 
 void *alloc_xen_pagetable(void)
