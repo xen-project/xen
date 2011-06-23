@@ -155,13 +155,13 @@ void hvm_isa_irq_deassert(struct domain *d, unsigned int isa_irq)
     /* dummy */
 }
 
-int msixtbl_pt_register(struct domain *d, int pirq, uint64_t gtable)
+int msixtbl_pt_register(struct domain *d, struct pirq *pirq, uint64_t gtable)
 {
     /* dummy */
     return -ENOSYS;
 }
 
-void msixtbl_pt_unregister(struct domain *d, int pirq)
+void msixtbl_pt_unregister(struct domain *d, struct pirq *pirq)
 {
     /* dummy */
 }

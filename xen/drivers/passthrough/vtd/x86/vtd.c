@@ -70,12 +70,32 @@ void *__init map_to_nocache_virt(int nr_iommus, u64 maddr)
     return (void *)fix_to_virt(FIX_IOMMU_REGS_BASE_0 + nr_iommus);
 }
 
-void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
+static int _hvm_dpci_isairq_eoi(struct domain *d,
+                                struct hvm_pirq_dpci *pirq_dpci, void *arg)
 {
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
-    struct hvm_irq_dpci *dpci = NULL;
+    unsigned int isairq = (long)arg;
     struct dev_intx_gsi_link *digl, *tmp;
-    int i;
+
+    list_for_each_entry_safe ( digl, tmp, &pirq_dpci->digl_list, list )
+    {
+        if ( hvm_irq->pci_link.route[digl->link] == isairq )
+        {
+            hvm_pci_intx_deassert(d, digl->device, digl->intx);
+            if ( --pirq_dpci->pending == 0 )
+            {
+                stop_timer(&pirq_dpci->timer);
+                pirq_guest_eoi(d, dpci_pirq(pirq_dpci));
+            }
+        }
+    }
+
+    return 0;
+}
+
+void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
+{
+    struct hvm_irq_dpci *dpci = NULL;
 
     ASSERT(isairq < NR_ISAIRQS);
     if ( !iommu_enabled)
@@ -85,29 +105,10 @@ void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
 
     dpci = domain_get_irq_dpci(d);
 
-    if ( !dpci || !test_bit(isairq, dpci->isairq_map) )
+    if ( dpci && test_bit(isairq, dpci->isairq_map) )
     {
-        spin_unlock(&d->event_lock);
-        return;
-    }
-    /* Multiple mirq may be mapped to one isa irq */
-    for ( i = find_first_bit(dpci->mapping, d->nr_pirqs);
-          i < d->nr_pirqs;
-          i = find_next_bit(dpci->mapping, d->nr_pirqs, i + 1) )
-    {
-        list_for_each_entry_safe ( digl, tmp,
-            &dpci->mirq[i].digl_list, list )
-        {
-            if ( hvm_irq->pci_link.route[digl->link] == isairq )
-            {
-                hvm_pci_intx_deassert(d, digl->device, digl->intx);
-                if ( --dpci->mirq[i].pending == 0 )
-                {
-                    stop_timer(&dpci->hvm_timer[i]);
-                    pirq_guest_eoi(d, i);
-                }
-            }
-        }
+        /* Multiple mirq may be mapped to one isa irq */
+        pt_pirq_iterate(d, _hvm_dpci_isairq_eoi, (void *)(long)isairq);
     }
     spin_unlock(&d->event_lock);
 }
