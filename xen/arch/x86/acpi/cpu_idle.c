@@ -42,6 +42,7 @@
 #include <xen/cpuidle.h>
 #include <xen/trace.h>
 #include <xen/sched-if.h>
+#include <xen/irq.h>
 #include <asm/cache.h>
 #include <asm/io.h>
 #include <asm/hpet.h>

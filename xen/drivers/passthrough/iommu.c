@@ -48,7 +48,7 @@ bool_t __read_mostly iommu_snoop = 1;
 bool_t __read_mostly iommu_qinval = 1;
 bool_t __read_mostly iommu_intremap = 1;
 bool_t __read_mostly iommu_hap_pt_share;
-bool_t __read_mostly amd_iommu_debug;
+bool_t __read_mostly iommu_debug;
 bool_t __read_mostly amd_iommu_perdev_intremap;
 
 static void __init parse_iommu_param(char *s)
@@ -74,8 +74,8 @@ static void __init parse_iommu_param(char *s)
             iommu_qinval = 0;
         else if ( !strcmp(s, "no-intremap") )
             iommu_intremap = 0;
-        else if ( !strcmp(s, "amd-iommu-debug") )
-            amd_iommu_debug = 1;
+        else if ( !strcmp(s, "debug") )
+            iommu_debug = 1;
         else if ( !strcmp(s, "amd-iommu-perdev-intremap") )
             amd_iommu_perdev_intremap = 1;
         else if ( !strcmp(s, "dom0-passthrough") )

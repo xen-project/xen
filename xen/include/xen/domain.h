@@ -38,6 +38,12 @@ struct vcpu_guest_context *alloc_vcpu_guest_context(void);
 void free_vcpu_guest_context(struct vcpu_guest_context *);
 #endif
 
+/* Allocate/free a PIRQ structure. */
+#ifndef alloc_pirq_struct
+struct pirq *alloc_pirq_struct(struct domain *);
+#endif
+void free_pirq_struct(void *);
+
 /*
  * Initialise/destroy arch-specific details of a VCPU.
  *  - vcpu_initialise() is called after the basic generic fields of the

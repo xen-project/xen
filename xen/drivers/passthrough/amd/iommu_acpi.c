@@ -817,7 +817,7 @@ static int __init parse_ivrs_table(struct acpi_table_header *_table)
 
     BUG_ON(!table);
 
-    if ( amd_iommu_debug )
+    if ( iommu_debug )
         dump_acpi_table_header(table);
 
     /* parse IVRS blocks */

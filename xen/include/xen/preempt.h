@@ -10,9 +10,8 @@
 #define __XEN_PREEMPT_H__
 
 #include <xen/config.h>
+#include <xen/types.h>
 #include <xen/percpu.h>
-#include <xen/irq.h>    /* in_irq() */
-#include <asm/system.h> /* local_irq_is_enabled() */
 
 DECLARE_PER_CPU(unsigned int, __preempt_count);
 
@@ -28,6 +27,6 @@ DECLARE_PER_CPU(unsigned int, __preempt_count);
     preempt_count()--;                          \
 } while (0)
 
-#define in_atomic() (preempt_count() || in_irq() || !local_irq_is_enabled())
+bool_t in_atomic(void);
 
 #endif /* __XEN_PREEMPT_H__ */

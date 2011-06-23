@@ -21,6 +21,7 @@
 #include <xen/acpi.h>
 #include <xen/cpu.h>
 #include <xen/pmstat.h>
+#include <xen/irq.h>
 #include <asm/current.h>
 #include <public/platform.h>
 #include <acpi/cpufreq/processor_perf.h>

@@ -204,7 +204,8 @@ int vmsi_deliver(
     struct domain *d, int vector,
     uint8_t dest, uint8_t dest_mode,
     uint8_t delivery_mode, uint8_t trig_mode);
-int vmsi_deliver_pirq(struct domain *d, int pirq);
+struct hvm_pirq_dpci;
+int vmsi_deliver_pirq(struct domain *d, const struct hvm_pirq_dpci *);
 int hvm_girq_dest_2_vcpu_id(struct domain *d, uint8_t dest, uint8_t dest_mode);
 
 #define hvm_paging_enabled(v) \

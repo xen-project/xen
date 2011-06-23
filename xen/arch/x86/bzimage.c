@@ -5,6 +5,7 @@
 #include <xen/string.h>
 #include <xen/types.h>
 #include <xen/decompress.h>
+#include <xen/libelf.h>
 #include <asm/bzimage.h>
 
 #define HEAPORDER 3
@@ -200,25 +201,36 @@ static __init int bzimage_check(struct setup_header *hdr, unsigned long len)
     return 1;
 }
 
-int __init bzimage_headroom(char *image_start, unsigned long image_length)
+static unsigned long __initdata orig_image_len;
+
+unsigned long __init bzimage_headroom(char *image_start,
+                                      unsigned long image_length)
 {
     struct setup_header *hdr = (struct setup_header *)image_start;
-    char *img;
-    int err, headroom;
+    int err;
+    unsigned long headroom;
 
     err = bzimage_check(hdr, image_length);
-    if (err < 1)
+    if ( err < 0 )
         return 0;
 
-    img = image_start + (hdr->setup_sects+1) * 512;
-    img += hdr->payload_offset;
+    if ( err > 0 )
+    {
+        image_start += (hdr->setup_sects + 1) * 512 + hdr->payload_offset;
+        image_length = hdr->payload_length;
+    }
 
-    headroom = output_length(img, hdr->payload_length);
-    if (gzip_check(img, hdr->payload_length)) {
+    if ( elf_is_elfbinary(image_start) )
+        return 0;
+
+    orig_image_len = image_length;
+    headroom = output_length(image_start, image_length);
+    if (gzip_check(image_start, image_length))
+    {
         headroom += headroom >> 12; /* Add 8 bytes for every 32K input block */
         headroom += (32768 + 18); /* Add 32K + 18 bytes of extra headroom */
     } else
-        headroom += hdr->payload_length;
+        headroom += image_length;
     headroom = (headroom + 4095) & ~4095;
 
     return headroom;
@@ -230,18 +242,24 @@ int __init bzimage_parse(char *image_base, char **image_start, unsigned long *im
     int err = bzimage_check(hdr, *image_len);
     unsigned long output_len;
 
-    if (err < 1)
+    if ( err < 0 )
         return err;
+
+    if ( err > 0 )
+    {
+        *image_start += (hdr->setup_sects + 1) * 512 + hdr->payload_offset;
+        *image_len = hdr->payload_length;
+    }
+
+    if ( elf_is_elfbinary(*image_start) )
+        return 0;
 
     BUG_ON(!(image_base < *image_start));
 
-    *image_start += (hdr->setup_sects+1) * 512;
-    *image_start += hdr->payload_offset;
-    *image_len = hdr->payload_length;
-    output_len = output_length(*image_start, *image_len);
+    output_len = output_length(*image_start, orig_image_len);
 
-    if ( (err = perform_gunzip(image_base, *image_start, *image_len)) > 0 )
-        err = decompress(*image_start, *image_len, image_base);
+    if ( (err = perform_gunzip(image_base, *image_start, orig_image_len)) > 0 )
+        err = decompress(*image_start, orig_image_len, image_base);
 
     if ( !err )
     {

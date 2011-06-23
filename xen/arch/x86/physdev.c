@@ -252,20 +252,28 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
     {
     case PHYSDEVOP_eoi: {
         struct physdev_eoi eoi;
+        struct pirq *pirq;
+
         ret = -EFAULT;
         if ( copy_from_guest(&eoi, arg, 1) != 0 )
             break;
         ret = -EINVAL;
         if ( eoi.irq >= v->domain->nr_pirqs )
             break;
+        spin_lock(&v->domain->event_lock);
+        pirq = pirq_info(v->domain, eoi.irq);
+        if ( !pirq ) {
+            spin_unlock(&v->domain->event_lock);
+            break;
+        }
         if ( !is_hvm_domain(v->domain) &&
              v->domain->arch.pv_domain.pirq_eoi_map )
-            evtchn_unmask(v->domain->pirq_to_evtchn[eoi.irq]);
+            evtchn_unmask(pirq->evtchn);
         if ( !is_hvm_domain(v->domain) ||
-             domain_pirq_to_emuirq(v->domain, eoi.irq) == IRQ_PT )
-            ret = pirq_guest_eoi(v->domain, eoi.irq);
-        else
-            ret = 0;
+             pirq->arch.hvm.emuirq == IRQ_PT )
+            pirq_guest_eoi(v->domain, pirq);
+        spin_unlock(&v->domain->event_lock);
+        ret = 0;
         break;
     }
 
@@ -558,11 +566,23 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             break;
 
         spin_lock(&d->event_lock);
-        out.pirq = get_free_pirq(d, out.type, 0);
-        d->arch.pirq_irq[out.pirq] = PIRQ_ALLOCATED;
+        ret = get_free_pirq(d, out.type, 0);
+        if ( ret >= 0 )
+        {
+            struct pirq *info = pirq_get_info(d, ret);
+
+            if ( info )
+                info->arch.irq = PIRQ_ALLOCATED;
+            else
+                ret = -ENOMEM;
+        }
         spin_unlock(&d->event_lock);
 
-        ret = copy_to_guest(arg, &out, 1) ? -EFAULT : 0;
+        if ( ret >= 0 )
+        {
+            out.pirq = ret;
+            ret = copy_to_guest(arg, &out, 1) ? -EFAULT : 0;
+        }
 
         rcu_unlock_domain(d);
         break;

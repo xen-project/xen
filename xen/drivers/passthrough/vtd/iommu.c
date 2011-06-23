@@ -818,7 +818,7 @@ static int iommu_page_fault_do_one(struct iommu *iommu, int type,
 
     if ( fault_type == DMA_REMAP )
     {
-        dprintk(XENLOG_WARNING VTDPREFIX,
+        INTEL_IOMMU_DEBUG(
                 "DMAR:[%s] Request device [%02x:%02x.%d] "
                 "fault addr %"PRIx64", iommu reg = %p\n"
                 "DMAR:[fault reason %02xh] %s\n",
@@ -827,12 +827,13 @@ static int iommu_page_fault_do_one(struct iommu *iommu, int type,
                 PCI_FUNC(source_id & 0xFF), addr, iommu->reg,
                 fault_reason, reason);
 #ifndef __i386__ /* map_domain_page() cannot be used in this context */
-        print_vtd_entries(iommu, (source_id >> 8),
+	if (iommu_debug)
+            print_vtd_entries(iommu, (source_id >> 8),
                           (source_id & 0xff), (addr >> PAGE_SHIFT));
 #endif
     }
     else
-        dprintk(XENLOG_WARNING VTDPREFIX,
+        INTEL_IOMMU_DEBUG(
                 "INTR-REMAP: Request device [%02x:%02x.%d] "
                 "fault index %"PRIx64", iommu reg = %p\n"
                 "INTR-REMAP:[fault reason %02xh] %s\n",
@@ -846,26 +847,19 @@ static int iommu_page_fault_do_one(struct iommu *iommu, int type,
 static void iommu_fault_status(u32 fault_status)
 {
     if ( fault_status & DMA_FSTS_PFO )
-        dprintk(XENLOG_ERR VTDPREFIX,
-            "iommu_fault_status: Fault Overflow\n");
+        INTEL_IOMMU_DEBUG("iommu_fault_status: Fault Overflow\n");
     if ( fault_status & DMA_FSTS_PPF )
-        dprintk(XENLOG_ERR VTDPREFIX,
-            "iommu_fault_status: Primary Pending Fault\n");
+        INTEL_IOMMU_DEBUG("iommu_fault_status: Primary Pending Fault\n");
     if ( fault_status & DMA_FSTS_AFO )
-        dprintk(XENLOG_ERR VTDPREFIX,
-            "iommu_fault_status: Advanced Fault Overflow\n");
+        INTEL_IOMMU_DEBUG("iommu_fault_status: Advanced Fault Overflow\n");
     if ( fault_status & DMA_FSTS_APF )
-        dprintk(XENLOG_ERR VTDPREFIX,
-            "iommu_fault_status: Advanced Pending Fault\n");
+        INTEL_IOMMU_DEBUG("iommu_fault_status: Advanced Pending Fault\n");
     if ( fault_status & DMA_FSTS_IQE )
-        dprintk(XENLOG_ERR VTDPREFIX,
-            "iommu_fault_status: Invalidation Queue Error\n");
+        INTEL_IOMMU_DEBUG("iommu_fault_status: Invalidation Queue Error\n");
     if ( fault_status & DMA_FSTS_ICE )
-        dprintk(XENLOG_ERR VTDPREFIX,
-            "iommu_fault_status: Invalidation Completion Error\n");
+        INTEL_IOMMU_DEBUG("iommu_fault_status: Invalidation Completion Error\n");
     if ( fault_status & DMA_FSTS_ITE )
-        dprintk(XENLOG_ERR VTDPREFIX,
-            "iommu_fault_status: Invalidation Time-out Error\n");
+        INTEL_IOMMU_DEBUG("iommu_fault_status: Invalidation Time-out Error\n");
 }
 
 #define PRIMARY_FAULT_REG_LEN (16)

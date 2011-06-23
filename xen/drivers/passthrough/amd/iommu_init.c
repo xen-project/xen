@@ -22,6 +22,7 @@
 #include <xen/errno.h>
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
+#include <xen/irq.h>
 #include <asm/amd-iommu.h>
 #include <asm/msi.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>

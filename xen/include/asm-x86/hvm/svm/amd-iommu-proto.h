@@ -35,7 +35,7 @@
 #define AMD_IOMMU_DEBUG(fmt, args...) \
     do  \
     {   \
-        if ( amd_iommu_debug )  \
+        if ( iommu_debug )  \
             printk(XENLOG_INFO "AMD-Vi: " fmt, ## args);    \
     } while(0)
 

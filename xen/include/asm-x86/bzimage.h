@@ -4,7 +4,7 @@
 #include <xen/config.h>
 #include <xen/init.h>
 
-int bzimage_headroom(char *image_start, unsigned long image_length);
+unsigned long bzimage_headroom(char *image_start, unsigned long image_length);
 
 int bzimage_parse(char *image_base, char **image_start,
                   unsigned long *image_len);
