@@ -422,6 +422,14 @@ void iommu_suspend()
         ops->suspend();
 }
 
+void iommu_crash_shutdown(void)
+{
+    const struct iommu_ops *ops = iommu_get_ops();
+    if ( iommu_enabled )
+        ops->crash_shutdown();
+    iommu_enabled = 0;
+}
+
 /*
  * Local variables:
  * mode: C

@@ -2238,6 +2238,25 @@ static void vtd_suspend(void)
     }
 }
 
+static void vtd_crash_shutdown(void)
+{
+    struct acpi_drhd_unit *drhd;
+    struct iommu *iommu;
+
+    if ( !iommu_enabled )
+        return;
+
+    iommu_flush_all();
+
+    for_each_drhd_unit ( drhd )
+    {
+        iommu = drhd->iommu;
+        iommu_disable_translation(iommu);
+        disable_intremap(drhd->iommu);
+        disable_qinval(drhd->iommu);
+    }
+}
+
 static void vtd_resume(void)
 {
     struct acpi_drhd_unit *drhd;
@@ -2288,6 +2307,7 @@ const struct iommu_ops intel_iommu_ops = {
     .read_msi_from_ire = msi_msg_read_remap_rte,
     .suspend = vtd_suspend,
     .resume = vtd_resume,
+    .crash_shutdown = vtd_crash_shutdown,
 };
 
 /*

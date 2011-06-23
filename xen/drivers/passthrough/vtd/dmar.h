@@ -23,6 +23,7 @@
 
 #include <xen/list.h>
 #include <xen/iommu.h>
+#include <xen/kexec.h>
 
 extern u8 dmar_host_address_width;
 
@@ -102,9 +103,13 @@ do {                                                \
         sts = op(iommu->reg, offset);               \
         if ( cond )                                 \
             break;                                  \
-        if ( NOW() > start_time + DMAR_OPERATION_TIMEOUT )      \
-            panic("%s:%d:%s: DMAR hardware is malfunctional\n", \
-                  __FILE__, __LINE__, __func__);                \
+        if ( NOW() > start_time + DMAR_OPERATION_TIMEOUT ) {    \
+            if ( !kexecing )                                    \
+                panic("%s:%d:%s: DMAR hardware is malfunctional\n",\
+                      __FILE__, __LINE__, __func__);            \
+            else                                                \
+                break;                                          \
+        }                                                       \
         cpu_relax();                                            \
     }                                                           \
 } while (0)

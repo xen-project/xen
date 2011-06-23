@@ -467,7 +467,7 @@ struct qinval_entry {
 
 #define IEC_GLOBAL_INVL         0
 #define IEC_INDEX_INVL          1
-#define IRTA_REG_EIME_SHIFT     11
+#define IRTA_EIME               (((u64)1) << 11)
 
 /* 2^(IRTA_REG_TABLE_SIZE + 1) = IREMAP_ENTRY_NR */
 #define IRTA_REG_TABLE_SIZE     ( IREMAP_PAGE_ORDER + 7 )

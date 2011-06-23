@@ -29,6 +29,8 @@
 #include <compat/kexec.h>
 #endif
 
+bool_t kexecing = FALSE;
+
 static DEFINE_PER_CPU_READ_MOSTLY(void *, crash_notes);
 
 static Elf_Note *xen_crash_note;
@@ -220,6 +222,8 @@ void kexec_crash(void)
     if ( !test_bit(KEXEC_IMAGE_CRASH_BASE + pos, &kexec_flags) )
         return;
 
+    kexecing = TRUE;
+
     kexec_common_shutdown();
     kexec_crash_save_cpu();
     machine_crash_shutdown();
@@ -231,6 +235,8 @@ void kexec_crash(void)
 static long kexec_reboot(void *_image)
 {
     xen_kexec_image_t *image = _image;
+
+    kexecing = TRUE;
 
     kexec_common_shutdown();
     machine_reboot_kexec(image);

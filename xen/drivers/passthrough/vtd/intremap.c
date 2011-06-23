@@ -772,8 +772,7 @@ int enable_intremap(struct iommu *iommu, int eim)
 
 #ifdef CONFIG_X86
     /* set extended interrupt mode bit */
-    ir_ctrl->iremap_maddr |=
-            eim ? (1 << IRTA_REG_EIME_SHIFT) : 0;
+    ir_ctrl->iremap_maddr |= eim ? IRTA_EIME : 0;
 #endif
     spin_lock_irqsave(&iommu->register_lock, flags);
 
@@ -808,6 +807,7 @@ int enable_intremap(struct iommu *iommu, int eim)
 void disable_intremap(struct iommu *iommu)
 {
     u32 sts;
+    u64 irta;
     unsigned long flags;
 
     if ( !ecap_intr_remap(iommu->ecap) )
@@ -822,6 +822,26 @@ void disable_intremap(struct iommu *iommu)
 
     IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
                   !(sts & DMA_GSTS_IRES), sts);
+
+    /* If we are disabling Interrupt Remapping, make sure we dont stay in
+     * Extended Interrupt Mode, as this is unaffected by the Interrupt 
+     * Remapping flag in each DMAR Global Control Register.
+     * Specifically, local apics in xapic mode do not like interrupts delivered
+     * in x2apic mode.  Any code turning interrupt remapping back on will set
+     * EIME back correctly.
+     */
+    if ( !ecap_eim(iommu->ecap) )
+        goto out;
+
+    /* Can't read the register unless we ecaps says we can */
+    irta = dmar_readl(iommu->reg, DMAR_IRTA_REG);
+    if ( !(irta & IRTA_EIME) )
+        goto out;
+
+    dmar_writel(iommu->reg, DMAR_IRTA_REG, irta & ~IRTA_EIME);
+    IOMMU_WAIT_OP(iommu, DMAR_IRTA_REG, dmar_readl,
+                  !(irta & IRTA_EIME), irta);
+
 out:
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
