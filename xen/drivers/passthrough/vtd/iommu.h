@@ -512,4 +512,11 @@ struct intel_iommu {
     struct acpi_drhd_unit *drhd;
 };
 
+#define INTEL_IOMMU_DEBUG(fmt, args...) \
+    do  \
+    {   \
+        if ( iommu_debug )  \
+            dprintk(XENLOG_WARNING VTDPREFIX, fmt, ## args);    \
+    } while(0)
+
 #endif
