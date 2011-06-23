@@ -10,10 +10,30 @@
 #include <asm/system.h>
 #include <xen/dmi.h>
 
-#define bt_ioremap(b,l)  ((u8 *)__acpi_map_table(b,l))
+#define bt_ioremap(b,l)  ((void *)__acpi_map_table(b,l))
 #define bt_iounmap(b,l)  ((void)0)
 #define memcpy_fromio    memcpy
 #define alloc_bootmem(l) xmalloc_bytes(l)
+
+struct dmi_eps {
+	char anchor[5];			/* "_DMI_" */
+	u8 checksum;
+	u16 size;
+	u32 address;
+	u16 num_structures;
+	u8 revision;
+} __attribute__((packed));
+
+struct smbios_eps {
+	char anchor[4];			/* "_SM_" */
+	u8 checksum;
+	u8 length;
+	u8 major, minor;
+	u16 max_size;
+	u8 revision;
+	u8 _rsrvd_[5];
+	struct dmi_eps dmi;
+} __attribute__((packed));
 
 struct dmi_header
 {
@@ -90,62 +110,70 @@ static int __init dmi_table(u32 base, int len, int num, void (*decode)(struct dm
 }
 
 
-inline static int __init dmi_checksum(u8 *buf)
+static inline bool_t __init dmi_checksum(const void __iomem *buf,
+					 unsigned int len)
 {
-	u8 sum=0;
-	int a;
+	u8 sum = 0;
+	const u8 *p = buf;
+	unsigned int a;
 	
-	for(a=0; a<15; a++)
-		sum+=buf[a];
-	return (sum==0);
+	for (a = 0; a < len; a++)
+		sum += p[a];
+	return sum == 0;
 }
 
 int __init dmi_get_table(u32 *base, u32 *len)
 {
-	u8 buf[15];
+	struct dmi_eps eps;
 	char __iomem *p, *q;
 
 	p = maddr_to_virt(0xF0000);
 	for (q = p; q < p + 0x10000; q += 16) {
-		memcpy_fromio(buf, q, 15);
-		if (memcmp(buf, "_DMI_", 5)==0 && dmi_checksum(buf)) {
-			*base=buf[11]<<24|buf[10]<<16|buf[9]<<8|buf[8];
-			*len=buf[7]<<8|buf[6];
+		memcpy_fromio(&eps, q, 15);
+		if (memcmp(eps.anchor, "_DMI_", 5) == 0 &&
+		    dmi_checksum(&eps, sizeof(eps))) {
+			*base = eps.address;
+			*len = eps.size;
 			return 0;
 		}
 	}
 	return -1;
 }
 
+static int __init _dmi_iterate(const struct dmi_eps *dmi,
+			       const struct smbios_eps __iomem *smbios,
+			       void (*decode)(struct dmi_header *))
+{
+	u16 num = dmi->num_structures;
+	u16 len = dmi->size;
+	u32 base = dmi->address;
+
+	/*
+	 * DMI version 0.0 means that the real version is taken from
+	 * the SMBIOS version, which we may not know at this point.
+	 */
+	if (dmi->revision)
+		printk(KERN_INFO "DMI %d.%d present.\n",
+		       dmi->revision >> 4,  dmi->revision & 0x0f);
+	else if (!smbios)
+		printk(KERN_INFO "DMI present.\n");
+	dmi_printk((KERN_INFO "%d structures occupying %d bytes.\n",
+		    num, len));
+	dmi_printk((KERN_INFO "DMI table at 0x%08X.\n", base));
+	return dmi_table(base, len, num, decode);
+}
+
 static int __init dmi_iterate(void (*decode)(struct dmi_header *))
 {
-	u8 buf[15];
+	struct dmi_eps eps;
 	char __iomem *p, *q;
 
 	p = maddr_to_virt(0xF0000);
 	for (q = p; q < p + 0x10000; q += 16) {
-		memcpy_fromio(buf, q, 15);
-		if (memcmp(buf, "_DMI_", 5)==0 && dmi_checksum(buf)) {
-			u16 num=buf[13]<<8|buf[12];
-			u16 len=buf[7]<<8|buf[6];
-			u32 base=buf[11]<<24|buf[10]<<16|buf[9]<<8|buf[8];
-
-			/*
-			 * DMI version 0.0 means that the real version is taken from
-			 * the SMBIOS version, which we don't know at this point.
-			 */
-			if(buf[14]!=0)
-				printk(KERN_INFO "DMI %d.%d present.\n",
-					buf[14]>>4, buf[14]&0x0F);
-			else
-				printk(KERN_INFO "DMI present.\n");
-			dmi_printk((KERN_INFO "%d structures occupying %d bytes.\n",
-				num, len));
-			dmi_printk((KERN_INFO "DMI table at 0x%08X.\n",
-				base));
-			if(dmi_table(base,len, num, decode)==0)
-				return 0;
-		}
+		memcpy_fromio(&eps, q, sizeof(eps));
+		if (memcmp(eps.anchor, "_DMI_", 5) == 0 &&
+		    dmi_checksum(&eps, sizeof(eps)))
+			return _dmi_iterate(&eps, NULL, decode);
 	}
 	return -1;
 }
