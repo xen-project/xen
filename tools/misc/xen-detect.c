@@ -33,43 +33,46 @@
 #include <unistd.h>
 #include <getopt.h>
 
-static void cpuid(uint32_t idx,
-                  uint32_t *eax,
-                  uint32_t *ebx,
-                  uint32_t *ecx,
-                  uint32_t *edx,
-                  int pv_context)
+static void cpuid(uint32_t idx, uint32_t *regs, int pv_context)
 {
     asm volatile (
-        "test %1,%1 ; jz 1f ; ud2a ; .ascii \"xen\" ; 1: cpuid"
-        : "=a" (*eax), "=b" (*ebx), "=c" (*ecx), "=d" (*edx)
-        : "0" (idx), "1" (pv_context) );
+#ifdef __i386__
+#define R(x) "%%e"#x"x"
+#else
+#define R(x) "%%r"#x"x"
+#endif
+        "push "R(a)"; push "R(b)"; push "R(c)"; push "R(d)"\n\t"
+        "test %1,%1 ; jz 1f ; ud2a ; .ascii \"xen\" ; 1: cpuid\n\t"
+        "mov %%eax,(%2); mov %%ebx,4(%2)\n\t"
+        "mov %%ecx,8(%2); mov %%edx,12(%2)\n\t"
+        "pop "R(d)"; pop "R(c)"; pop "R(b)"; pop "R(a)"\n\t"
+        : : "a" (idx), "c" (pv_context), "S" (regs) : "memory" );
 }
 
 static int check_for_xen(int pv_context)
 {
-    uint32_t eax, ebx, ecx, edx;
+    uint32_t regs[4];
     char signature[13];
     uint32_t base;
 
     for ( base = 0x40000000; base < 0x40010000; base += 0x100 )
     {
-        cpuid(base, &eax, &ebx, &ecx, &edx, pv_context);
+        cpuid(base, regs, pv_context);
 
-        *(uint32_t *)(signature + 0) = ebx;
-        *(uint32_t *)(signature + 4) = ecx;
-        *(uint32_t *)(signature + 8) = edx;
+        *(uint32_t *)(signature + 0) = regs[1];
+        *(uint32_t *)(signature + 4) = regs[2];
+        *(uint32_t *)(signature + 8) = regs[3];
         signature[12] = '\0';
 
-        if ( !strcmp("XenVMMXenVMM", signature) && (eax >= (base + 2)) )
+        if ( !strcmp("XenVMMXenVMM", signature) && (regs[0] >= (base + 2)) )
             goto found;
     }
 
     return 0;
 
  found:
-    cpuid(base + 1, &eax, &ebx, &ecx, &edx, pv_context);
-    return eax;
+    cpuid(base + 1, regs, pv_context);
+    return regs[0];
 }
 
 static jmp_buf sigill_jmp;
