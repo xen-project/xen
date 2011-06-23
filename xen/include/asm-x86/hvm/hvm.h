@@ -294,6 +294,7 @@ static inline int hvm_do_pmu_interrupt(struct cpu_user_regs *regs)
         X86_CR4_MCE | X86_CR4_PGE | X86_CR4_PCE |       \
         X86_CR4_OSFXSR | X86_CR4_OSXMMEXCPT |           \
         (cpu_has_smep ? X86_CR4_SMEP : 0) |             \
+        (cpu_has_fsgsbase ? X86_CR4_FSGSBASE : 0) |     \
         (xsave_enabled(_v) ? X86_CR4_OSXSAVE : 0))))
 
 /* These exceptions must always be intercepted. */

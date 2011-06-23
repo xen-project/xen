@@ -106,6 +106,7 @@
 #define X86_FEATURE_XSAVE	(4*32+26) /* XSAVE/XRSTOR/XSETBV/XGETBV */
 #define X86_FEATURE_AVX		(4*32+28) /* Advanced Vector Extensions */
 #define X86_FEATURE_F16C	(4*32+29) /* Half-precision convert instruction */
+#define X86_FEATURE_RDRAND      (4*32+30) /* Digital Random Number Generator */
 #define X86_FEATURE_HYPERVISOR	(4*32+31) /* Running under some hypervisor */
 
 /* VIA/Cyrix/Centaur-defined CPU features, CPUID level 0xC0000001, word 5 */
@@ -144,5 +145,6 @@
 /* Intel-defined CPU features, CPUID level 0x00000007:0 (ebx), word 9 */
 #define X86_FEATURE_FSGSBASE	(7*32+ 0) /* {RD,WR}{FS,GS}BASE instructions */
 #define X86_FEATURE_SMEP        (7*32+ 7) /* Supervisor Mode Execution Protection */
+#define X86_FEATURE_ERMS        (7*32+ 9) /* Enhanced REP MOVSB/STOSB */
 
 #endif /* __LIBXC_CPUFEATURE_H */
