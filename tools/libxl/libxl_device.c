@@ -273,6 +273,8 @@ retry_transaction:
     if (!force) {
         xs_watch(ctx->xsh, state_path, be_path);
         rc = 1;
+    } else {
+        xs_rm(ctx->xsh, XBT_NULL, be_path);
     }
 out:
     return rc;
@@ -312,10 +314,8 @@ int libxl__devices_destroy(libxl__gc *gc, uint32_t domid, int force)
     char *path, *be_path, *fe_path;
     unsigned int num1, num2;
     char **l1 = NULL, **l2 = NULL;
-    int i, j, n = 0, n_watches = 0;
-    flexarray_t *toremove;
+    int i, j, n_watches = 0;
 
-    toremove = flexarray_make(16, 1);
     path = libxl__sprintf(gc, "/local/domain/%d/device", domid);
     l1 = libxl__xs_directory(gc, XBT_NULL, path, &num1);
     if (!l1) {
@@ -339,7 +339,6 @@ int libxl__devices_destroy(libxl__gc *gc, uint32_t domid, int force)
             if (be_path != NULL) {
                 if (libxl__device_destroy(gc, be_path, force) > 0)
                     n_watches++;
-                flexarray_set(toremove, n++, libxl__dirname(gc, be_path));
             } else {
                 xs_rm(ctx->xsh, XBT_NULL, path);
             }
@@ -352,7 +351,6 @@ int libxl__devices_destroy(libxl__gc *gc, uint32_t domid, int force)
     if (be_path && strcmp(be_path, "")) {
         if (libxl__device_destroy(gc, be_path, force) > 0)
             n_watches++;
-        flexarray_set(toremove, n++, libxl__dirname(gc, be_path));
     }
 
     if (!force) {
@@ -372,17 +370,13 @@ int libxl__devices_destroy(libxl__gc *gc, uint32_t domid, int force)
             }
         }
     }
-    for (i = 0; i < n; i++) {
-        flexarray_get(toremove, i, (void**) &path);
-        xs_rm(ctx->xsh, XBT_NULL, path);
-    }
 out:
-    flexarray_free(toremove);
     return 0;
 }
 
 int libxl__device_del(libxl__gc *gc, libxl__device *dev, int wait)
 {
+    libxl_ctx *ctx = libxl__gc_owner(gc);
     char *backend_path;
     int rc;
 
@@ -401,6 +395,7 @@ int libxl__device_del(libxl__gc *gc, libxl__device *dev, int wait)
         (void)wait_for_dev_destroy(gc, &tv);
     }
 
+    xs_rm(ctx->xsh, XBT_NULL, libxl__device_frontend_path(gc, dev));
     rc = 0;
 
 out:

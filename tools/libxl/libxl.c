@@ -1113,8 +1113,6 @@ int libxl_device_disk_del(libxl_ctx *ctx, uint32_t domid,
     device.devid            = devid;
     device.kind             = DEVICE_VBD;
     rc = libxl__device_del(&gc, &device, wait);
-    xs_rm(ctx->xsh, XBT_NULL, libxl__device_backend_path(&gc, &device));
-    xs_rm(ctx->xsh, XBT_NULL, libxl__device_frontend_path(&gc, &device));
 out_free:
     libxl__free_all(&gc);
     return rc;
