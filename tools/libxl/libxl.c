@@ -1571,6 +1571,7 @@ static unsigned int libxl__append_disk_list_of_type(libxl__gc *gc,
                              libxl__xs_get_dompath(gc, 0), type, domid);
     dir = libxl__xs_directory(gc, XBT_NULL, be_path, &n);
     if (dir) {
+        char *removable;
         *disks = realloc(*disks, sizeof (libxl_device_disk) * (*ndisks + n));
         pdisk = *disks + *ndisks;
         *ndisks += n;
@@ -1588,7 +1589,12 @@ static unsigned int libxl__append_disk_list_of_type(libxl__gc *gc,
                 libxl__sprintf(gc, "%s/%s/type", be_path, *dir)), 
                 &(pdisk->backend));
             pdisk->vdev = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(gc, "%s/%s/dev", be_path, *dir), &len);
-            pdisk->removable = atoi(libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/%s/removable", be_path, *dir)));
+            removable = libxl__xs_read(gc, XBT_NULL, libxl__sprintf
+                                       (gc, "%s/%s/removable", be_path, *dir));
+            if (removable)
+                pdisk->removable = atoi(removable);
+            else
+                pdisk->removable = 0;
             if (!strcmp(libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/%s/mode", be_path, *dir)), "w"))
                 pdisk->readwrite = 1;
             else
