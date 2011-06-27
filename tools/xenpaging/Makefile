@@ -2,7 +2,7 @@ XEN_ROOT=$(CURDIR)/../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenstore)
-LDLIBS += $(LDLIBS_libxenctrl) $(LDLIBS_libxenstore)
+LDLIBS += $(LDLIBS_libxenctrl) $(LDLIBS_libxenstore) -pthread
 
 POLICY    = default
 
