@@ -1281,6 +1281,24 @@ static int handle_domain_death(libxl_ctx *ctx, uint32_t domid, libxl_event *even
     return restart;
 }
 
+/* for now used only by main_networkattach, but can be reused elsewhere */
+static int match_option_size(const char *prefix, size_t len,
+        char *arg, char **argopt)
+{
+    int rc = strncmp(prefix, arg, len);
+    if (!rc) *argopt = arg+len;
+    return !rc;
+}
+#define MATCH_OPTION(prefix, arg, oparg) \
+    match_option_size((prefix "="), sizeof((prefix)), (arg), &(oparg))
+
+static void replace_string(char **str, const char *val)
+{
+    free(*str);
+    *str = strdup(val);
+}
+
+
 static int preserve_domain(libxl_ctx *ctx, uint32_t domid, libxl_event *event,
                            libxl_domain_config *d_config, libxl_dominfo *info)
 {
@@ -3996,7 +4014,7 @@ int main_networkattach(int argc, char **argv)
 {
     int opt;
     libxl_device_nic nic;
-    char *endptr;
+    char *endptr, *oparg;
     const char *tok;
     int i;
     unsigned int val;
@@ -4015,17 +4033,17 @@ int main_networkattach(int argc, char **argv)
     }
     libxl_device_nic_init(&nic, -1);
     for (argv += optind+1, argc -= optind+1; argc > 0; ++argv, --argc) {
-        if (!strncmp("type=", *argv, 5)) {
-            if (!strncmp("vif", (*argv) + 5, 4)) {
+        if (MATCH_OPTION("type", *argv, oparg)) {
+            if (!strcmp("vif", oparg)) {
                 nic.nictype = LIBXL_NIC_TYPE_VIF;
-            } else if (!strncmp("ioemu", (*argv) + 5, 5)) {
+            } else if (!strcmp("ioemu", oparg)) {
                 nic.nictype = LIBXL_NIC_TYPE_IOEMU;
             } else {
                 fprintf(stderr, "Invalid parameter `type'.\n");
                 return 1;
             }
-        } else if (!strncmp("mac=", *argv, 4)) {
-            tok = strtok((*argv) + 4, ":");
+        } else if (MATCH_OPTION("mac", *argv, oparg)) {
+            tok = strtok(oparg, ":");
             for (i = 0; tok && i < 6; tok = strtok(NULL, ":"), ++i) {
                 val = strtoul(tok, &endptr, 16);
                 if ((tok == endptr) || (val > 255)) {
@@ -4034,29 +4052,24 @@ int main_networkattach(int argc, char **argv)
                 }
                 nic.mac[i] = val;
             }
-        } else if (!strncmp("bridge=", *argv, 7)) {
-            free(nic.bridge);
-            nic.bridge = strdup((*argv) + 7);
-        } else if (!strncmp("ip=", *argv, 3)) {
-            free(nic.ip);
-            nic.ip = strdup((*argv) + 3);
-        } else if (!strncmp("script=", *argv, 6)) {
-            free(nic.script);
-            nic.script = strdup((*argv) + 6);
-        } else if (!strncmp("backend=", *argv, 8)) {
-            if(libxl_name_to_domid(ctx, ((*argv) + 8), &val)) {
+        } else if (MATCH_OPTION("bridge", *argv, oparg)) {
+            replace_string(&nic.bridge, oparg);
+        } else if (MATCH_OPTION("ip", *argv, oparg)) {
+            replace_string(&nic.ip, oparg);
+        } else if (MATCH_OPTION("script", *argv, oparg)) {
+            replace_string(&nic.script, oparg);
+        } else if (MATCH_OPTION("backend", *argv, oparg)) {
+            if(libxl_name_to_domid(ctx, oparg, &val)) {
                 fprintf(stderr, "Specified backend domain does not exist, defaulting to Dom0\n");
                 val = 0;
             }
             nic.backend_domid = val;
-        } else if (!strncmp("vifname=", *argv, 8)) {
-            free(nic.ifname);
-            nic.ifname = strdup((*argv) + 8);
-        } else if (!strncmp("model=", *argv, 6)) {
-            free(nic.model);
-            nic.model = strdup((*argv) + 6);
-        } else if (!strncmp("rate=", *argv, 5)) {
-        } else if (!strncmp("accel=", *argv, 6)) {
+        } else if (MATCH_OPTION("vifname", *argv, oparg)) {
+            replace_string(&nic.ifname, oparg);
+        } else if (MATCH_OPTION("model", *argv, oparg)) {
+            replace_string(&nic.model, oparg);
+        } else if (MATCH_OPTION("rate", *argv, oparg)) {
+        } else if (MATCH_OPTION("accel", *argv, oparg)) {
         } else {
             fprintf(stderr, "unrecognized argument `%s'\n", *argv);
             return 1;
