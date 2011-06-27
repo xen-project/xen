@@ -530,18 +530,18 @@ int libxl_devid_to_device_disk(libxl_ctx *ctx, uint32_t domid,
                                const char *devid, libxl_device_disk *disk)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
-    char *endptr, *val;
+    char *val;
     char *dompath, *diskpath, *be_path;
     unsigned int devid_n;
     int rc = ERROR_INVAL;
 
-    devid_n = strtoul(devid, &endptr, 10);
-    if (devid == endptr) {
+    devid_n = libxl__device_disk_dev_number(devid, NULL, NULL);
+    if (devid_n < 0) {
         goto out;
     }
     rc = ERROR_FAIL;
     dompath = libxl__xs_get_dompath(&gc, domid);
-    diskpath = libxl__sprintf(&gc, "%s/device/vbd/%s", dompath, devid);
+    diskpath = libxl__sprintf(&gc, "%s/device/vbd/%d", dompath, devid_n);
     if (!diskpath) {
         goto out;
     }

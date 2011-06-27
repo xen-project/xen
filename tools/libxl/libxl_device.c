@@ -198,7 +198,8 @@ static int device_virtdisk_matches(const char *virtpath, const char *devtype,
     return 1;
 }
 
-int libxl__device_disk_dev_number(char *virtpath, int *pdisk, int *ppartition)
+int libxl__device_disk_dev_number(const char *virtpath, int *pdisk,
+                                  int *ppartition)
 {
     int disk, partition;
     char *ep;

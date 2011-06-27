@@ -207,7 +207,7 @@ _hidden char *libxl__device_disk_string_of_backend(libxl_disk_backend backend);
 _hidden char *libxl__device_disk_string_of_format(libxl_disk_format format);
 
 _hidden int libxl__device_physdisk_major_minor(const char *physpath, int *major, int *minor);
-_hidden int libxl__device_disk_dev_number(char *virtpath,
+_hidden int libxl__device_disk_dev_number(const char *virtpath,
                                           int *pdisk, int *ppartition);
 
 _hidden int libxl__device_console_add(libxl__gc *gc, uint32_t domid,
