@@ -133,6 +133,7 @@ define buildmakevars2file-closure
 	echo "XEN_CONFIG_DIR=\"$(XEN_CONFIG_DIR)\"" >> $(1).tmp;           \
 	echo "XEN_SCRIPT_DIR=\"$(XEN_SCRIPT_DIR)\"" >> $(1).tmp;           \
 	echo "XEN_LOCK_DIR=\"$(XEN_LOCK_DIR)\"" >> $(1).tmp;               \
+	echo "XEN_RUN_DIR=\"$(XEN_RUN_DIR)\"" >> $(1).tmp;                 \
 	if ! cmp $(1).tmp $(1); then mv -f $(1).tmp $(1); fi
 endef
 

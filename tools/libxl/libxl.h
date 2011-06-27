@@ -529,6 +529,7 @@ const char *libxl_xenfirmwaredir_path(void);
 const char *libxl_xen_config_dir_path(void);
 const char *libxl_xen_script_dir_path(void);
 const char *libxl_lock_dir_path(void);
+const char *libxl_run_dir_path(void);
 
 #endif /* LIBXL_H */
 

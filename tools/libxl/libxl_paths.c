@@ -64,3 +64,8 @@ const char *libxl_lock_dir_path(void)
 {
     return XEN_LOCK_DIR;
 }
+
+const char *libxl_run_dir_path(void)
+{
+    return XEN_RUN_DIR;
+}

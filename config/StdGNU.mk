@@ -52,9 +52,11 @@ PRIVATE_BINDIR = $(PRIVATE_PREFIX)/bin
 ifeq ($(PREFIX),/usr)
 CONFIG_DIR = /etc
 XEN_LOCK_DIR = /var/lock
+XEN_RUN_DIR = /var/run/xen
 else
 CONFIG_DIR = $(PREFIX)/etc
 XEN_LOCK_DIR = $(PREFIX)/var/lock
+XEN_RUN_DIR = $(PREFIX)/var/run/xen
 endif
 
 SYSCONFIG_DIR = $(CONFIG_DIR)/$(CONFIG_LEAF_DIR)
