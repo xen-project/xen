@@ -551,10 +551,12 @@ int libxl_devid_to_device_disk(libxl_ctx *ctx, uint32_t domid,
         goto out;
     disk->backend_domid = strtoul(val, NULL, 10);
     be_path = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/backend", diskpath));
-    disk->pdev_path = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/params", be_path));
+    disk->pdev_path = xs_read(ctx->xsh, XBT_NULL,
+                              libxl__sprintf(&gc, "%s/params", be_path), NULL);
     val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/type", be_path));
     libxl_string_to_backend(ctx, val, &(disk->backend));
-    disk->vdev = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/dev", be_path));
+    disk->vdev = xs_read(ctx->xsh, XBT_NULL,
+                         libxl__sprintf(&gc, "%s/dev", be_path), NULL);
     val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/removable", be_path));
     disk->removable = !strcmp(val, "1");
     val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/mode", be_path));
