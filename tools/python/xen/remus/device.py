@@ -169,15 +169,25 @@ class IFBBuffer(Netbuf):
         self.vif = vif
         # voodoo from http://www.linuxfoundation.org/collaborate/workgroups/networking/ifb#Typical_Usage
         util.runcmd('ip link set %s up' % self.devname)
-        util.runcmd('tc qdisc add dev %s ingress' % vif.dev)
+        try:
+            util.runcmd('tc qdisc add dev %s ingress' % vif.dev)
+        except util.PipeException, e:
+            # check if error indicates that ingress qdisc
+            # already exists on the vif. If so, ignore it.
+            ignoreme = 'RTNETLINK answers: File exists'
+            if ignoreme in str(e):
+                pass
+            else:
+                raise e
         util.runcmd('tc filter add dev %s parent ffff: proto ip pref 10 '
                     'u32 match u32 0 0 action mirred egress redirect '
                     'dev %s' % (vif.dev, self.devname))
 
     def uninstall(self):
-        util.runcmd('tc filter del dev %s parent ffff: proto ip pref 10 u32' \
-                        % self.vif.dev)
-        util.runcmd('tc qdisc del dev %s ingress' % self.vif.dev)
+        try:
+            util.runcmd('tc qdisc del dev %s ingress' % self.vif.dev)
+        except util.PipeException, e:
+            pass
         util.runcmd('ip link set %s down' % self.devname)
 
 class IMQBuffer(Netbuf):
@@ -373,9 +383,15 @@ class BufferedNIC(CheckpointedDevice):
 
     def uninstall(self):
         if self.installed:
-            req = qdisc.delrequest(self.bufdevno, self.handle)
-            self.rth.talk(req.pack())
+            try:
+                req = qdisc.delrequest(self.bufdevno, self.handle)
+                self.rth.talk(req.pack())
+            except IOError, e:
+                pass
             self.installed = False
 
-        self.bufdev.uninstall()
-        self.pool.put(self.bufdev)
+            try:
+                self.bufdev.uninstall()
+            except util.PipeException, e:
+                pass
+            self.pool.put(self.bufdev)
