@@ -991,6 +991,21 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
     device.domid = domid;
     device.kind = DEVICE_VBD;
 
+
+    /*
+     * Fixing the incoming backend type to try to decide on which
+     * backend to use.  Unfortunately at the moment this code is
+     * utterly broken, but it more or less works.
+     */
+
+    /*
+     * Backend type UNKNOWN should mean "caller does not want to specify",
+     * not "break pointlessely".  (Callers should not be required to
+     * specify the backend if they don't want to.)
+     */
+    if (disk->backend == LIBXL_DISK_BACKEND_UNKNOWN)
+        disk->backend = LIBXL_DISK_BACKEND_TAP;
+
     /* If blktap is not available then fallback to qdisk */
     if (disk->backend == LIBXL_DISK_BACKEND_TAP && !libxl__blktap_enabled(&gc))
         disk->backend = LIBXL_DISK_BACKEND_QDISK;
@@ -1124,6 +1139,20 @@ char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *disk)
     char *dev = NULL;
     char *ret = NULL;
 
+    /*
+     * Fixing the incoming backend type to try to decide on which
+     * backend to use.  Unfortunately at the moment this code is
+     * utterly broken, but it more or less works.
+     */
+
+    /*
+     * Backend type UNKNOWN should mean "caller does not want to specify",
+     * not "break pointlessely".  (Callers should not be required to
+     * specify the backend if they don't want to.)
+     */
+    if (disk->backend == LIBXL_DISK_BACKEND_UNKNOWN)
+        disk->backend = LIBXL_DISK_BACKEND_TAP;
+
     switch (disk->backend) {
         case LIBXL_DISK_BACKEND_PHY:
             if (disk->format != LIBXL_DISK_FORMAT_RAW) {
@@ -1173,7 +1202,6 @@ char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *disk)
                 disk->pdev_path);
             dev = disk->pdev_path;
             break;
-        case LIBXL_DISK_BACKEND_UNKNOWN:
         default:
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "unrecognized disk backend "
                 "type: %d", disk->backend);
