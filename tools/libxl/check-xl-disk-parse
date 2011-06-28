@@ -1,0 +1,82 @@
+#!/bin/bash
+
+set -e
+
+fprefix=tmp.check-xl-disk-parse
+
+expected () {
+    cat >$fprefix.expected
+}
+
+failures=0
+
+one () {
+    expected_rc=$1; shift
+    printf "test case %s...\n" "$*"
+    set +e
+    LD_LIBRARY_PATH=.:../libxc:../xenstore \
+        ./xl -N block-attach 0 "$@" </dev/null >$fprefix.actual 2>/dev/null
+    actual_rc=$?
+    diff -u $fprefix.expected $fprefix.actual
+    diff_rc=$?
+    set -e
+    if [ $actual_rc != $expected_rc ] || [ $diff_rc != 0 ]; then
+        echo >&2 "test case \`$*' failed ($actual_rc $diff_rc)"
+        failures=$(( $failures + 1 ))
+    fi
+}
+
+complete () {
+    if [ "$failures" = 0 ]; then
+        echo all ok.; exit 0
+    else
+        echo "$failures tests failed."; exit 1
+    fi
+}
+
+e=255
+
+
+#---------- test data ----------
+#
+# culled from docs/misc/xl-disk-configuration.txt
+
+expected </dev/null
+one $e foo
+
+expected <<END
+disk.backend_domid = 0
+disk.pdev_path =     /dev/vg/guest-volume
+disk.vdev =          hda
+disk.backend =       0
+disk.format =        4
+disk.script =        (null)
+disk.removable =     0
+disk.readwrite =     1
+disk.is_cdrom =      0
+END
+one 0 /dev/vg/guest-volume,,hda
+one 0 /dev/vg/guest-volume,raw,hda,rw
+one 0 "format=raw, vdev=hda, access=rw, target=/dev/vg/guest-volume"
+one 0  format=raw  vdev=hda  access=rw  target=/dev/vg/guest-volume
+one 0 raw:/dev/vg/guest-volume,hda,w
+
+expected <<END
+disk.backend_domid = 0
+disk.pdev_path =     /root/image.iso
+disk.vdev =          hdc
+disk.backend =       0
+disk.format =        4
+disk.script =        (null)
+disk.removable =     1
+disk.readwrite =     0
+disk.is_cdrom =      1
+END
+one 0 /root/image.iso,,hdc,cdrom
+one 0 /root/image.iso,,hdc,,cdrom
+one 0 /root/image.iso,raw,hdc,devtype=cdrom
+one 0 "format=raw, vdev=hdc, access=ro, devtype=cdrom, target=/root/image.iso"
+one 0  format=raw  vdev=hdc  access=ro  devtype=cdrom  target=/root/image.iso
+one 0 raw:/root/image.iso,hdc:cdrom,ro
+
+complete
