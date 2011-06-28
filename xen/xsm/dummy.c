@@ -463,6 +463,11 @@ static int dummy_ext_vcpucontext (struct domain *d, uint32_t cmd)
     return 0;
 }
 
+static int dummy_vcpuextstate (struct domain *d, uint32_t cmd)
+{
+    return 0;
+}
+
 #endif
 
 struct xsm_operations dummy_xsm_ops;
@@ -578,5 +583,6 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, bind_pt_irq);
     set_to_dummy_if_null(ops, pin_mem_cacheattr);
     set_to_dummy_if_null(ops, ext_vcpucontext);
+    set_to_dummy_if_null(ops, vcpuextstate);
 #endif
 }
