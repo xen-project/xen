@@ -564,7 +564,7 @@ static int flask_set_target(struct domain *d, struct domain *e)
 
 static int flask_tbufcontrol(void)
 {
-    return domain_has_xen(current->domain, SECCLASS_XEN);
+    return domain_has_xen(current->domain, XEN__TBUFCONTROL);
 }
 
 static int flask_readconsole(uint32_t clear)
