@@ -482,148 +482,31 @@ static int parse_action_on_shutdown(const char *buf, libxl_action_on_shutdown *a
 #define DSTATE_RW        5
 #define DSTATE_TERMINAL  6
 
-static int parse_disk_config(libxl_device_disk *disk, char *buf2)
+static void parse_disk_config_multistring(XLU_Config **config,
+                                          int nspecs, const char *const *specs,
+                                          libxl_device_disk *disk)
 {
-    int state = DSTATE_INITIAL;
-    char *p, *end, *tok;
+    int e;
 
     memset(disk, 0, sizeof(*disk));
 
-    for(tok = p = buf2, end = buf2 + strlen(buf2) + 1; p < end; p++) {
-        switch(state){
-        case DSTATE_INITIAL:
-            if ( *p == ':' ) {
-                *p = '\0';
-                if ( !strcmp(tok, "phy") ) {
-                    state = DSTATE_PHYSPATH;
-                    disk->format = LIBXL_DISK_FORMAT_RAW;
-                    disk->backend = LIBXL_DISK_BACKEND_PHY;
-                }else if ( !strcmp(tok, "file") ) {
-                    state = DSTATE_PHYSPATH;
-                    disk->format = LIBXL_DISK_FORMAT_RAW;
-                    disk->backend = LIBXL_DISK_BACKEND_TAP;
-                }else if ((!strcmp(tok, "tap")) ||
-                          (!strcmp(tok, "tap2"))) {
-                    state = DSTATE_TAP;
-                }else{
-                    fprintf(stderr, "Unknown disk type: %s\n", tok);
-                    return 0;
-                }
-                tok = p + 1;
-            } else if (*p == ',') {
-                state = DSTATE_VIRTPATH;
-                disk->format = LIBXL_DISK_FORMAT_EMPTY;
-                disk->backend = LIBXL_DISK_BACKEND_TAP;
-                disk->pdev_path = strdup("");
-                tok = p + 1;
-            }
-            break;
-        case DSTATE_TAP:
-            if (*p == ',') {
-                disk->format = LIBXL_DISK_FORMAT_RAW;
-                disk->backend = LIBXL_DISK_BACKEND_TAP;
-                state = DSTATE_PHYSPATH;
-            } else if ( *p == ':' ) {
-                *p = '\0';
-                if (!strcmp(tok, "aio")) {
-                    tok = p + 1;
-                    break;
-                }
-                if (!strcmp(tok, "vhd")) {
-                    disk->format = LIBXL_DISK_FORMAT_VHD;
-                    disk->backend = LIBXL_DISK_BACKEND_TAP;
-                }else if ( !strcmp(tok, "qcow") ) {
-                    disk->format = LIBXL_DISK_FORMAT_QCOW;
-                    disk->backend = LIBXL_DISK_BACKEND_QDISK;
-                }else if ( !strcmp(tok, "qcow2") ) {
-                    disk->format = LIBXL_DISK_FORMAT_QCOW2;
-                    disk->backend = LIBXL_DISK_BACKEND_QDISK;
-                }else if (!strcmp(tok, "raw")) {
-                    disk->format = LIBXL_DISK_FORMAT_RAW;
-                    disk->backend = LIBXL_DISK_BACKEND_TAP;
-                }
-                else {
-                    fprintf(stderr, "Unknown tapdisk type: %s\n", tok);
-                    return 0;
-                }
-
-                tok = p + 1;
-                state = DSTATE_PHYSPATH;
-                break;
-            } else {
-                break;
-            }
-        case DSTATE_PHYSPATH:
-            if ( *p == ',' ) {
-                int ioemu_len;
-
-                *p = '\0';
-                disk->pdev_path = (*tok) ? strdup(tok) : NULL;
-                tok = p + 1;
-
-                /* hack for ioemu disk spec */
-                ioemu_len = strlen("ioemu:");
-                state = DSTATE_VIRTPATH;
-                if ( tok + ioemu_len < end &&
-                    !strncmp(tok, "ioemu:", ioemu_len)) {
-                    tok += ioemu_len;
-                    p += ioemu_len;
-                }
-            }
-            break;
-        case DSTATE_VIRTPATH:
-            if ( *p == ',' || *p == ':' || *p == '\0' ) {
-                switch(*p) {
-                case ':':
-                    state = DSTATE_VIRTTYPE;
-                    break;
-                case ',':
-                    state = DSTATE_RW;
-                    break;
-                case '\0':
-                    state = DSTATE_TERMINAL;
-                    break;
-                }
-                if ( tok == p )
-                    goto out;
-                *p = '\0';
-                disk->vdev = (*tok) ? strdup(tok) : NULL;
-                tok = p + 1;
-            }
-            break;
-        case DSTATE_VIRTTYPE:
-            if ( *p == ',' || *p == '\0' ) {
-                *p = '\0';
-                if ( !strcmp(tok, "cdrom") ) {
-                    disk->is_cdrom = 1;
-                    disk->removable = 1;
-                }else{
-                    fprintf(stderr, "Unknown virtual disk type: %s\n", tok);
-                    return 0;
-                }
-                tok = p + 1;
-                state = (*p == ',') ? DSTATE_RW : DSTATE_TERMINAL;
-            }
-            break;
-        case DSTATE_RW:
-            if ( *p == '\0' ) {
-                disk->readwrite = (tok[0] == 'w');
-                tok = p + 1;
-                state = DSTATE_TERMINAL;
-            }
-            break;
-        case DSTATE_TERMINAL:
-            goto out;
-        }
+    if (!*config) {
+	*config = xlu_cfg_init(stderr, "command line");
+	if (!*config) { perror("xlu_cfg_init"); exit(-1); }
     }
 
-out:
-    if ( tok != p || state != DSTATE_TERMINAL ) {
-        fprintf(stderr, "parse error in disk config near '%s'\n", tok);
-        return 0;
+    e = xlu_disk_parse(*config, nspecs, specs, disk);
+    if (e == EINVAL) exit(-1);
+    if (e) {
+	fprintf(stderr,"xlu_disk_parse failed: %s\n",strerror(errno));
+	exit(-1);
     }
+}
 
-    return 1;
+static void parse_disk_config(XLU_Config **config, const char *spec,
+                              libxl_device_disk *disk)
+{
+    parse_disk_config_multistring(config, 1, &spec, disk);
 }
 
 static void parse_config_data(const char *configfile_filename_report,
@@ -840,9 +723,7 @@ static void parse_config_data(const char *configfile_filename_report,
 
             d_config->disks = (libxl_device_disk *) realloc(d_config->disks, sizeof (libxl_device_disk) * (d_config->num_disks + 1));
             disk = d_config->disks + d_config->num_disks;
-            if ( !parse_disk_config(disk, buf2) ) {
-                exit(1);
-            }
+            parse_disk_config(&config, buf2, disk);
 
             free(buf2);
             d_config->num_disks++;
@@ -1942,6 +1823,7 @@ static void cd_insert(const char *dom, const char *virtdev, char *phys)
 {
     libxl_device_disk disk; /* we don't free disk's contents */
     char *buf = NULL;
+    XLU_Config *config = 0;
 
     find_domain(dom);
 
@@ -1949,10 +1831,9 @@ static void cd_insert(const char *dom, const char *virtdev, char *phys)
         fprintf(stderr, "out of memory\n");
         return;
     }
-    if (!parse_disk_config(&disk, buf)) {
-        fprintf(stderr, "format error\n");
-        return;
-    }
+
+    parse_disk_config(&config, buf, &disk);
+
     disk.backend_domid = 0;
 
     libxl_cdrom_insert(ctx, domid, &disk);
