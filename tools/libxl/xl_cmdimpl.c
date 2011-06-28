@@ -3057,7 +3057,7 @@ int main_create(int argc, char **argv)
     char extra_config[1024];
     struct domain_create dom_info;
     int paused = 0, debug = 0, daemonize = 1, console_autoconnect = 0,
-        dryrun = 0, quiet = 0, monitor = 1;
+        quiet = 0, monitor = 1;
     int opt, rc;
     int option_index = 0;
     static struct option long_options[] = {
@@ -3102,7 +3102,7 @@ int main_create(int argc, char **argv)
             help("create");
             return 0;
         case 'n':
-            dryrun = 1;
+            dryrun_only = 1;
             break;
         case 'q':
             quiet = 1;
@@ -3131,7 +3131,7 @@ int main_create(int argc, char **argv)
     dom_info.daemonize = daemonize;
     dom_info.monitor = monitor;
     dom_info.paused = paused;
-    dom_info.dryrun = dryrun;
+    dom_info.dryrun = dryrun_only;
     dom_info.quiet = quiet;
     dom_info.config_file = filename;
     dom_info.extra_config = extra_config;
@@ -4582,7 +4582,6 @@ int main_cpupoolcreate(int argc, char **argv)
     const char *filename = NULL;
     const char *p;
     char extra_config[1024];
-    int dryrun = 0;
     int opt;
     int option_index = 0;
     static struct option long_options[] = {
@@ -4621,7 +4620,7 @@ int main_cpupoolcreate(int argc, char **argv)
             help("cpupool-create");
             return 0;
         case 'n':
-            dryrun = 1;
+            dryrun_only = 1;
             break;
         default:
             fprintf(stderr, "option `%c' not supported.\n", optopt);
@@ -4773,7 +4772,7 @@ int main_cpupoolcreate(int argc, char **argv)
     printf("scheduler:      %s\n", sched);
     printf("number of cpus: %d\n", n_cpus);
 
-    if (dryrun)
+    if (dryrun_only)
         return 0;
 
     poolid = 0;

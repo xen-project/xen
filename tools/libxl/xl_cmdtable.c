@@ -19,7 +19,7 @@
 
 struct cmd_spec cmd_table[] = {
     { "create",
-      &main_create, 0,
+      &main_create, 1,
       "Create a domain from config file <filename>",
       "<ConfigFile> [options] [vars]",
       "-h                      Print this help.\n"
@@ -27,7 +27,8 @@ struct cmd_spec cmd_table[] = {
       "-c                      Connect to the console after the domain is created.\n"
       "-f=FILE, --defconfig=FILE\n                     Use the given configuration file.\n"
       "-q, --quiet             Quiet.\n"
-      "-n, --dryrun            Dry run - prints the resulting configuration.\n"
+      "-n, --dryrun            Dry run - prints the resulting configuration\n"
+      "                         (deprecated in favour of global -N option).\n"
       "-d                      Enable debug messages.\n"
       "-e                      Do not wait in the background for the death of the domain."
     },
@@ -322,12 +323,13 @@ struct cmd_spec cmd_table[] = {
       "",
     },
     { "cpupool-create",
-      &main_cpupoolcreate, 0,
+      &main_cpupoolcreate, 1,
       "Create a CPU pool based an ConfigFile",
       "[options] <ConfigFile> [vars]",
       "-h, --help                   Print this help.\n"
       "-f=FILE, --defconfig=FILE    Use the given configuration file.\n"
-      "-n, --dryrun                 Dry run - prints the resulting configuration."
+      "-n, --dryrun                 Dry run - prints the resulting configuration.\n"
+      "                              (deprecated in favour of global -N option)."
     },
     { "cpupool-list",
       &main_cpupoollist, 0,
