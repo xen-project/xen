@@ -7,6 +7,7 @@
 #include <xen/serial.h>
 #include <xen/softirq.h>
 #include <xen/acpi.h>
+#include <xen/efi.h>
 #include <xen/console.h>
 #include <xen/serial.h>
 #include <xen/trace.h>
@@ -444,6 +445,10 @@ static void __init parse_video_info(void)
 {
     struct boot_video_info *bvi = &bootsym(boot_vid_info);
 
+    /* The EFI loader fills vga_console_info directly. */
+    if ( efi_enabled )
+        return;
+
     if ( (bvi->orig_video_isVGA == 1) && (bvi->orig_video_mode == 3) )
     {
         vga_console_info.video_type = XEN_VGATYPE_TEXT_MODE_3;
@@ -615,6 +620,7 @@ void __init __start_xen(unsigned long mbi_p)
                vga_console_info.u.text_mode_3.font_height);
         break;
     case XEN_VGATYPE_VESA_LFB:
+    case XEN_VGATYPE_EFI_LFB:
         printk(" VGA is graphics mode %dx%d, %d bpp\n",
                vga_console_info.u.vesa_lfb.width,
                vga_console_info.u.vesa_lfb.height,
@@ -660,7 +666,24 @@ void __init __start_xen(unsigned long mbi_p)
     if ( ((unsigned long)cpu0_stack & (STACK_SIZE-1)) != 0 )
         EARLY_FAIL("Misaligned CPU0 stack.\n");
 
-    if ( e820_raw_nr != 0 )
+    if ( efi_enabled )
+    {
+        set_pdx_range(xen_phys_start >> PAGE_SHIFT,
+                      (xen_phys_start + BOOTSTRAP_MAP_BASE) >> PAGE_SHIFT);
+
+        /* Clean up boot loader identity mappings. */
+        destroy_xen_mappings(xen_phys_start,
+                             xen_phys_start + BOOTSTRAP_MAP_BASE);
+
+#ifdef CONFIG_X86_64
+        /* Make boot page tables match non-EFI boot. */
+        l3_bootmap[l3_table_offset(BOOTSTRAP_MAP_BASE)] =
+            l3e_from_paddr(__pa(l2_bootmap), __PAGE_HYPERVISOR);
+#endif
+
+        memmap_type = loader;
+    }
+    else if ( e820_raw_nr != 0 )
     {
         memmap_type = "Xen-e820";
     }
@@ -758,7 +781,7 @@ void __init __start_xen(unsigned long mbi_p)
      * we can relocate the dom0 kernel and other multiboot modules. Also, on
      * x86/64, we relocate Xen to higher memory.
      */
-    for ( i = 0; i < mbi->mods_count; i++ )
+    for ( i = 0; !efi_enabled && i < mbi->mods_count; i++ )
     {
         if ( mod[i].mod_start & (PAGE_SIZE - 1) )
             EARLY_FAIL("Bootloader didn't honor module alignment request.\n");
@@ -946,7 +969,8 @@ void __init __start_xen(unsigned long mbi_p)
 #else
     if ( !xen_phys_start )
         EARLY_FAIL("Not enough memory to relocate Xen.\n");
-    reserve_e820_ram(&boot_e820, __pa(&_start), __pa(&_end));
+    reserve_e820_ram(&boot_e820, efi_enabled ? mbi->mem_upper : __pa(&_start),
+                     __pa(&_end));
 #endif
 
     /* Late kexec reservation (dynamic start address). */

@@ -101,6 +101,7 @@
 #include <xen/guest_access.h>
 #include <xen/pfn.h>
 #include <xen/xmalloc.h>
+#include <xen/efi.h>
 #include <xen/grant_table.h>
 #include <asm/paging.h>
 #include <asm/shadow.h>
@@ -381,6 +382,8 @@ void __init arch_init_memory(void)
     }
 
     subarch_init_memory();
+
+    efi_init_memory();
 
     mem_sharing_init();
 }

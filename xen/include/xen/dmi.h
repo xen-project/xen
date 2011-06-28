@@ -35,6 +35,7 @@ struct dmi_system_id {
 extern int dmi_check_system(struct dmi_system_id *list);
 extern void dmi_scan_machine(void);
 extern int dmi_get_table(u32 *base, u32 *len);
+extern void dmi_efi_get_table(void *);
 extern void dmi_end_boot(void);
 
 #endif	/* __DMI_H__ */

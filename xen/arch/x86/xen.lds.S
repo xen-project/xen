@@ -8,15 +8,34 @@
 #undef ENTRY
 #undef ALIGN
 
+#ifdef EFI
+
+#define FORMAT "pei-x86-64"
+#undef __XEN_VIRT_START
+#define __XEN_VIRT_START __image_base__
+
+ENTRY(efi_start)
+
+#else /* !EFI */
+
 #ifdef __x86_64__
-OUTPUT_FORMAT("elf64-x86-64", "elf64-x86-64", "elf64-x86-64")
-OUTPUT_ARCH(i386:x86-64)
+#define FORMAT "elf64-x86-64"
 #else
-OUTPUT_FORMAT("elf32-i386", "elf32-i386", "elf32-i386")
-OUTPUT_ARCH(i386)
+#define FORMAT "elf32-i386"
 #endif
 
 ENTRY(start)
+
+#endif /* EFI */
+
+OUTPUT_FORMAT(FORMAT, FORMAT, FORMAT)
+
+#ifdef __x86_64__
+OUTPUT_ARCH(i386:x86-64)
+#else
+OUTPUT_ARCH(i386)
+#endif
+
 PHDRS
 {
   text PT_LOAD ;
@@ -122,12 +141,29 @@ SECTIONS
   } :text
   _end = . ;
 
+#ifdef EFI
+  . = ALIGN(4);
+  .reloc : {
+    *(.reloc)
+  } :text
+  /* Trick the linker into setting the image size to exactly 16Mb. */
+  . = ALIGN(__section_alignment__);
+  .pad : {
+    . = ALIGN(0x1000000);
+  } :text
+#else
+  efi = .;
+#endif
+
   /* Sections to be discarded */
   /DISCARD/ : {
        *(.exit.text)
        *(.exit.data)
        *(.exitcall.exit)
        *(.eh_frame)
+#ifdef EFI
+       *(.comment)
+#endif
   }
 
   /* Stabs debugging sections.  */

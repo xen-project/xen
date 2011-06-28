@@ -9,6 +9,7 @@
 #include <asm/io.h>
 #include <asm/system.h>
 #include <xen/dmi.h>
+#include <xen/efi.h>
 
 #define bt_ioremap(b,l)  ((void *)__acpi_map_table(b,l))
 #define bt_iounmap(b,l)  ((void)0)
@@ -122,10 +123,38 @@ static inline bool_t __init dmi_checksum(const void __iomem *buf,
 	return sum == 0;
 }
 
+static u32 __initdata efi_dmi_address;
+static u32 __initdata efi_dmi_size;
+
+/*
+ * Important: This function gets called while still in EFI
+ * (pseudo-)physical mode.
+ */
+void __init dmi_efi_get_table(void *smbios)
+{
+	struct smbios_eps *eps = smbios;
+
+	if (memcmp(eps->anchor, "_SM_", 4) &&
+	    dmi_checksum(eps, eps->length) &&
+	    memcmp(eps->dmi.anchor, "_DMI_", 5) == 0 &&
+	    dmi_checksum(&eps->dmi, sizeof(eps->dmi))) {
+		efi_dmi_address = eps->dmi.address;
+		efi_dmi_size = eps->dmi.size;
+	}
+}
+
 int __init dmi_get_table(u32 *base, u32 *len)
 {
 	struct dmi_eps eps;
 	char __iomem *p, *q;
+
+	if (efi_enabled) {
+		if (!efi_dmi_size)
+			return -1;
+		*base = efi_dmi_address;
+		*len = efi_dmi_size;
+		return 0;
+	}
 
 	p = maddr_to_virt(0xF0000);
 	for (q = p; q < p + 0x10000; q += 16) {
@@ -176,6 +205,39 @@ static int __init dmi_iterate(void (*decode)(struct dmi_header *))
 			return _dmi_iterate(&eps, NULL, decode);
 	}
 	return -1;
+}
+
+static int __init dmi_efi_iterate(void (*decode)(struct dmi_header *))
+{
+	struct smbios_eps eps;
+	const struct smbios_eps __iomem *p;
+	int ret = -1;
+
+	if (efi.smbios == EFI_INVALID_TABLE_ADDR)
+		return -1;
+
+	p = bt_ioremap(efi.smbios, sizeof(eps));
+	if (!p)
+		return -1;
+	memcpy_fromio(&eps, p, sizeof(eps));
+	bt_iounmap(p, sizeof(eps));
+
+	if (memcmp(eps.anchor, "_SM_", 4))
+		return -1;
+
+	p = bt_ioremap(efi.smbios, eps.length);
+	if (!p)
+		return -1;
+	if (dmi_checksum(p, eps.length) &&
+	    memcmp(eps.dmi.anchor, "_DMI_", 5) == 0 &&
+	    dmi_checksum(&eps.dmi, sizeof(eps.dmi))) {
+		printk(KERN_INFO "SMBIOS %d.%d present.\n",
+		       eps.major, eps.minor);
+		ret = _dmi_iterate(&eps.dmi, p, decode);
+	}
+	bt_iounmap(p, eps.length);
+
+	return ret;
 }
 
 static char *__initdata dmi_ident[DMI_STRING_MAX];
@@ -418,8 +480,8 @@ static void __init dmi_decode(struct dmi_header *dm)
 
 void __init dmi_scan_machine(void)
 {
-	int err = dmi_iterate(dmi_decode);
-	if(err == 0)
+	if ((!efi_enabled ? dmi_iterate(dmi_decode) :
+	                    dmi_efi_iterate(dmi_decode)) == 0)
  		dmi_check_system(dmi_blacklist);
 	else
 		printk(KERN_INFO "DMI not present.\n");

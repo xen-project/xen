@@ -19,6 +19,7 @@
 #include <xen/iocap.h>
 #include <xen/guest_access.h>
 #include <xen/acpi.h>
+#include <xen/efi.h>
 #include <xen/cpu.h>
 #include <xen/pmstat.h>
 #include <xen/irq.h>
@@ -288,6 +289,14 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
                                      u.vbeddc_info.edid_transfer_time) ||
                  copy_to_compat(op->u.firmware_info.u.vbeddc_info.edid,
                                 bootsym(boot_edid_info), 128) )
+                ret = -EFAULT;
+            break;
+        case XEN_FW_EFI_INFO:
+            ret = efi_get_info(op->u.firmware_info.index,
+                               &op->u.firmware_info.u.efi_info);
+            if ( ret == 0 &&
+                 copy_field_to_guest(u_xenpf_op, op,
+                                     u.firmware_info.u.efi_info) )
                 ret = -EFAULT;
             break;
         default:

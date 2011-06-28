@@ -36,9 +36,7 @@
 #include <acpi/platform/aclinux.h>
 #include <xen/spinlock.h>
 #include <xen/domain_page.h>
-#ifdef __ia64__
-#include <linux/efi.h>
-#endif
+#include <xen/efi.h>
 
 #define _COMPONENT		ACPI_OS_SERVICES
 ACPI_MODULE_NAME("osl")
@@ -66,7 +64,6 @@ void __init acpi_os_vprintf(const char *fmt, va_list args)
 
 acpi_physical_address __init acpi_os_get_root_pointer(void)
 {
-#ifdef __ia64__
 	if (efi_enabled) {
 		if (efi.acpi20 != EFI_INVALID_TABLE_ADDR)
 			return efi.acpi20;
@@ -77,9 +74,7 @@ acpi_physical_address __init acpi_os_get_root_pointer(void)
 			       "System description tables not found\n");
 			return 0;
 		}
-	} else
-#endif
-	{
+	} else {
 		acpi_physical_address pa = 0;
 
 		acpi_find_root_pointer(&pa);

@@ -34,7 +34,7 @@
 /* Cast a compat handle to the specified type of handle. */
 #define compat_handle_cast(chnd, type) ({                            \
     type *_x = (__typeof__(**(chnd)._) *)(full_ptr_t)(chnd).c;       \
-    (XEN_GUEST_HANDLE(type)) { _x };                                 \
+    (COMPAT_HANDLE(type)) { (full_ptr_t)_x };                        \
 })
 
 #define guest_from_compat_handle(ghnd, chnd)                         \

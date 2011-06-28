@@ -12,6 +12,8 @@ export XEN_DOMAIN	?= $(shell ([ -x /bin/dnsdomainname ] && /bin/dnsdomainname) |
 export BASEDIR := $(CURDIR)
 export XEN_ROOT := $(BASEDIR)/..
 
+EFI_MOUNTPOINT ?= /boot/efi
+
 .PHONY: default
 default: build
 
@@ -33,6 +35,13 @@ _install: $(TARGET).gz
 	ln -f -s $(notdir $(TARGET))-$(XEN_FULLVERSION).gz $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_VERSION).gz
 	ln -f -s $(notdir $(TARGET))-$(XEN_FULLVERSION).gz $(DESTDIR)/boot/$(notdir $(TARGET)).gz
 	$(INSTALL_DATA) $(TARGET)-syms $(DESTDIR)/boot/$(notdir $(TARGET))-syms-$(XEN_FULLVERSION)
+	if [ -r $(TARGET).efi -a -n "$(EFI_MOUNTPOINT)" ]; then \
+		if [ -n '$(EFI_VENDOR)' ]; then \
+			$(INSTALL_DATA) $(TARGET).efi $(DESTDIR)$(EFI_MOUNTPOINT)/efi/$(EFI_VENDOR)/$(notdir $(TARGET))-$(XEN_FULLVERSION).efi; \
+		elif [ "$(DESTDIR)" = "$(patsubst $(shell cd $(XEN_ROOT) && pwd)/%,%,$(DESTDIR))" ]; then \
+			echo 'EFI installation not done (EFI_VENDOR not set)' >&2; \
+		fi; \
+	fi
 
 .PHONY: _debug
 _debug:

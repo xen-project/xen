@@ -118,6 +118,11 @@ DEFINE_XEN_GUEST_HANDLE(xenpf_platform_quirk_t);
 #define XEN_FW_DISK_INFO          1 /* from int 13 AH=08/41/48 */
 #define XEN_FW_DISK_MBR_SIGNATURE 2 /* from MBR offset 0x1b8 */
 #define XEN_FW_VBEDDC_INFO        3 /* from int 10 AX=4f15 */
+#define XEN_FW_EFI_INFO           4 /* from EFI */
+#define  XEN_FW_EFI_VERSION        0
+#define  XEN_FW_EFI_CONFIG_TABLE   1
+#define  XEN_FW_EFI_VENDOR         2
+#define  XEN_FW_EFI_MEM_INFO       3
 struct xenpf_firmware_info {
     /* IN variables. */
     uint32_t type;
@@ -148,6 +153,24 @@ struct xenpf_firmware_info {
             /* must refer to 128-byte buffer */
             XEN_GUEST_HANDLE(uint8) edid;
         } vbeddc_info; /* XEN_FW_VBEDDC_INFO */
+        union xenpf_efi_info {
+            uint32_t version;
+            struct {
+                uint64_t addr;                /* EFI_CONFIGURATION_TABLE */
+                uint32_t nent;
+            } cfg;
+            struct {
+                uint32_t revision;
+                uint32_t bufsz;               /* input, in bytes */
+                XEN_GUEST_HANDLE(void) name;  /* UCS-2/UTF-16 string */
+            } vendor;
+            struct {
+                uint64_t addr;
+                uint64_t size;
+                uint64_t attr;
+                uint32_t type;
+            } mem;
+        } efi_info; /* XEN_FW_EFI_INFO */
     } u;
 };
 typedef struct xenpf_firmware_info xenpf_firmware_info_t;

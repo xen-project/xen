@@ -830,7 +830,8 @@ void __init zap_low_mappings(void)
 
     /* Replace with mapping of the boot trampoline only. */
     map_pages_to_xen(BOOT_TRAMPOLINE, BOOT_TRAMPOLINE >> PAGE_SHIFT,
-                     0x10, __PAGE_HYPERVISOR);
+                     PFN_UP(trampoline_end - trampoline_start),
+                     __PAGE_HYPERVISOR);
 }
 
 void *compat_arg_xlat_virt_base(void)

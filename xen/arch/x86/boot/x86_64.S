@@ -84,11 +84,13 @@ multiboot_ptr:
         .long   0
 
         .word   0
+        .globl  gdt_descr
 gdt_descr:
         .word   LAST_RESERVED_GDT_BYTE
         .quad   boot_cpu_gdt_table - FIRST_RESERVED_GDT_BYTE
 
         .word   0,0,0
+        .globl  idt_descr
 idt_descr:
         .word   256*16-1
         .quad   idt_table

@@ -87,6 +87,7 @@ void __init vga_init(void)
         vga_puts = vga_text_puts;
         break;
     case XEN_VGATYPE_VESA_LFB:
+    case XEN_VGATYPE_EFI_LFB:
         vesa_early_init();
         break;
     default:
@@ -113,6 +114,7 @@ void __init vga_endboot(void)
             memset(video, 0, columns * lines * 2);
         break;
     case XEN_VGATYPE_VESA_LFB:
+    case XEN_VGATYPE_EFI_LFB:
         vesa_endboot(vgacon_keep);
         break;
     default:

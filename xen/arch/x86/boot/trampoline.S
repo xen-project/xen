@@ -38,6 +38,7 @@ trampoline_gdt:
         .long   0x0000ffff | ((BOOT_TRAMPOLINE & 0x00ffff) << 16)
         .long   0x00009200 | ((BOOT_TRAMPOLINE & 0xff0000) >> 16)
 
+        .globl cpuid_ext_features
 cpuid_ext_features:
         .long   0
 
