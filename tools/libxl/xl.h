@@ -20,6 +20,7 @@
 struct cmd_spec {
     char *cmd_name;
     int (*cmd_impl)(int argc, char **argv);
+    int can_dryrun;
     char *cmd_desc;
     char *cmd_usage;
     char *cmd_option;
@@ -103,6 +104,7 @@ extern xentoollog_logger_stdiostream *logger;
 
 /* global options */
 extern int autoballoon;
+extern int dryrun_only;
 extern char *lockfile;
 extern char *default_vifscript;
 

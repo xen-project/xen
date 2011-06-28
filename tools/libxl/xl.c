@@ -34,6 +34,7 @@
 #include "xl.h"
 
 xentoollog_logger_stdiostream *logger;
+int dryrun_only;
 int autoballoon = 1;
 char *lockfile;
 char *default_vifscript = NULL;
@@ -90,10 +91,13 @@ int main(int argc, char **argv)
     void *config_data = 0;
     int config_len = 0;
 
-    while ((opt = getopt(argc, argv, "+v")) >= 0) {
+    while ((opt = getopt(argc, argv, "+vN")) >= 0) {
         switch (opt) {
         case 'v':
             if (minmsglevel > 0) minmsglevel--;
+            break;
+        case 'N':
+            dryrun_only = 1;
             break;
         default:
             fprintf(stderr, "unknown global option\n");
@@ -138,9 +142,14 @@ int main(int argc, char **argv)
     optind = 1;
 
     cspec = cmdtable_lookup(cmd);
-    if (cspec)
+    if (cspec) {
+        if (dryrun_only && !cspec->can_dryrun) {
+            fprintf(stderr, "command does not implement -N (dryrun) option\n");
+            ret = 1;
+            goto xit;
+        }
         ret = cspec->cmd_impl(argc, argv);
-    else if (!strcmp(cmd, "help")) {
+    } else if (!strcmp(cmd, "help")) {
         help(argv[1]);
         ret = 0;
     } else {
@@ -148,8 +157,8 @@ int main(int argc, char **argv)
         ret = 1;
     }
 
+ xit:
     libxl_ctx_free(ctx);
     xtl_logger_destroy((xentoollog_logger*)logger);
-
     return ret;
 }
