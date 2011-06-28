@@ -175,9 +175,10 @@ struct cpuinfo_x86 {
     __u32 x86_max_cores; /* cpuid returned max cores value */
     __u32 booted_cores;  /* number of cores as seen by OS */
     __u32 x86_num_siblings; /* cpuid logical cpus per chip value */
+    __u32 apicid;
     int   phys_proc_id; /* package ID of each logical CPU */
     int   cpu_core_id; /* core ID of each logical CPU*/
-    __u32 apicid;
+    int   compute_unit_id; /* AMD compute unit ID of each logical CPU */
     unsigned short x86_clflush_size;
 } __cacheline_aligned;
 

@@ -318,6 +318,7 @@ void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 	c->x86_clflush_size = 0;
 	c->phys_proc_id = BAD_APICID;
 	c->cpu_core_id = BAD_APICID;
+	c->compute_unit_id = BAD_APICID;
 	memset(&c->x86_capability, 0, sizeof c->x86_capability);
 
 	generic_identify(c);

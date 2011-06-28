@@ -326,6 +326,49 @@ static void check_syscfg_dram_mod_en(void)
 	wrmsrl(MSR_K8_SYSCFG, syscfg);
 }
 
+static void __devinit amd_get_topology(struct cpuinfo_x86 *c)
+{
+#ifdef CONFIG_X86_HT
+        int cpu;
+        unsigned bits;
+
+        if (c->x86_max_cores <= 1)
+                return;
+        /*
+         * On a AMD multi core setup the lower bits of the APIC id
+         * distingush the cores.
+         */
+        cpu = smp_processor_id();
+        bits = (cpuid_ecx(0x80000008) >> 12) & 0xf;
+
+        if (bits == 0) {
+                while ((1 << bits) < c->x86_max_cores)
+                        bits++;
+        }
+
+        /* Low order bits define the core id */
+        c->cpu_core_id = c->phys_proc_id & ((1<<bits)-1);
+        /* Convert local APIC ID into the socket ID */
+        c->phys_proc_id >>= bits;
+        /* Collect compute unit ID if available */
+        if (cpu_has(c, X86_FEATURE_TOPOEXT)) {
+                u32 eax, ebx, ecx, edx;
+
+                cpuid(0x8000001e, &eax, &ebx, &ecx, &edx);
+                c->compute_unit_id = ebx & 0xFF;
+                c->x86_num_siblings = ((ebx >> 8) & 0x3) + 1;
+        }
+        
+        if (opt_cpu_info)
+                printk("CPU %d(%d) -> Processor %d, %s %d\n",
+                       cpu, c->x86_max_cores, c->phys_proc_id,
+                       cpu_has(c, X86_FEATURE_TOPOEXT) ? "Compute Unit" : 
+                                                         "Core",
+                       cpu_has(c, X86_FEATURE_TOPOEXT) ? c->compute_unit_id :
+                                                         c->cpu_core_id);
+#endif
+}
+
 static void __devinit init_amd(struct cpuinfo_x86 *c)
 {
 	u32 l, h;
@@ -433,26 +476,7 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 		}
 	}
 
-#ifdef CONFIG_X86_HT
-	/*
-	 * On a AMD multi core setup the lower bits of the APIC id
-	 * distingush the cores.
-	 */
-	if (c->x86_max_cores > 1) {
-		int cpu = smp_processor_id();
-		unsigned bits = (cpuid_ecx(0x80000008) >> 12) & 0xf;
-
-		if (bits == 0) {
-			while ((1 << bits) < c->x86_max_cores)
-				bits++;
-		}
-		c->cpu_core_id = c->phys_proc_id & ((1<<bits)-1);
-		c->phys_proc_id >>= bits;
-		if (opt_cpu_info)
-			printk("CPU %d(%d) -> Core %d\n",
-			       cpu, c->x86_max_cores, c->cpu_core_id);
-	}
-#endif
+        amd_get_topology(c);
 
 	/* Pointless to use MWAIT on Family10 as it does not deep sleep. */
 	if (c->x86 >= 0x10 && !force_mwait)

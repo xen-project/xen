@@ -230,6 +230,14 @@ static int booting_cpu;
 /* CPUs for which sibling maps can be computed. */
 static cpumask_t cpu_sibling_setup_map;
 
+static void link_thread_siblings(int cpu1, int cpu2)
+{
+    cpu_set(cpu1, per_cpu(cpu_sibling_map, cpu2));
+    cpu_set(cpu2, per_cpu(cpu_sibling_map, cpu1));
+    cpu_set(cpu1, per_cpu(cpu_core_map, cpu2));
+    cpu_set(cpu2, per_cpu(cpu_core_map, cpu1));
+}
+
 static void set_cpu_sibling_map(int cpu)
 {
     int i;
@@ -241,13 +249,13 @@ static void set_cpu_sibling_map(int cpu)
     {
         for_each_cpu_mask ( i, cpu_sibling_setup_map )
         {
-            if ( (c[cpu].phys_proc_id == c[i].phys_proc_id) &&
-                 (c[cpu].cpu_core_id == c[i].cpu_core_id) )
-            {
-                cpu_set(i, per_cpu(cpu_sibling_map, cpu));
-                cpu_set(cpu, per_cpu(cpu_sibling_map, i));
-                cpu_set(i, per_cpu(cpu_core_map, cpu));
-                cpu_set(cpu, per_cpu(cpu_core_map, i));
+            if ( cpu_has(c, X86_FEATURE_TOPOEXT) ) {
+                if ( (c[cpu].phys_proc_id == c[i].phys_proc_id) &&
+                     (c[cpu].compute_unit_id == c[i].compute_unit_id) )
+                    link_thread_siblings(cpu, i);
+            } else if ( (c[cpu].phys_proc_id == c[i].phys_proc_id) &&
+                        (c[cpu].cpu_core_id == c[i].cpu_core_id) ) {
+                link_thread_siblings(cpu, i);
             }
         }
     }
@@ -828,6 +836,7 @@ remove_siblinginfo(int cpu)
     cpus_clear(per_cpu(cpu_core_map, cpu));
     c[cpu].phys_proc_id = BAD_APICID;
     c[cpu].cpu_core_id = BAD_APICID;
+    c[cpu].compute_unit_id = BAD_APICID;
     cpu_clear(cpu, cpu_sibling_setup_map);
 }
 
