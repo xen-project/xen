@@ -5,6 +5,8 @@
 #include <efi/efidevp.h>
 #include <efi/efiapi.h>
 #include <xen/efi.h>
+#include <xen/spinlock.h>
+#include <asm/page.h>
 
 extern unsigned int efi_num_ct;
 extern EFI_CONFIGURATION_TABLE *efi_ct;
@@ -16,3 +18,8 @@ extern EFI_RUNTIME_SERVICES *efi_rs;
 
 extern UINTN efi_memmap_size, efi_mdesc_size;
 extern void *efi_memmap;
+
+extern l4_pgentry_t *efi_l4_pgtable;
+
+unsigned long efi_rs_enter(void);
+void efi_rs_leave(unsigned long);

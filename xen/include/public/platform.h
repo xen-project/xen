@@ -114,6 +114,77 @@ struct xenpf_platform_quirk {
 typedef struct xenpf_platform_quirk xenpf_platform_quirk_t;
 DEFINE_XEN_GUEST_HANDLE(xenpf_platform_quirk_t);
 
+#define XENPF_efi_runtime_call    49
+#define XEN_EFI_get_time                      1
+#define XEN_EFI_set_time                      2
+#define XEN_EFI_get_wakeup_time               3
+#define XEN_EFI_set_wakeup_time               4
+#define XEN_EFI_get_next_high_monotonic_count 5
+#define XEN_EFI_get_variable                  6
+#define XEN_EFI_set_variable                  7
+#define XEN_EFI_get_next_variable_name        8
+struct xenpf_efi_runtime_call {
+    uint32_t function;
+    /*
+     * This field is generally used for per sub-function flags (defined
+     * below), except for the XEN_EFI_get_next_high_monotonic_count case,
+     * where it holds the single returned value.
+     */
+    uint32_t misc;
+    unsigned long status;
+    union {
+#define XEN_EFI_GET_TIME_SET_CLEARS_NS 0x00000001
+        struct {
+            struct xenpf_efi_time {
+                uint16_t year;
+                uint8_t month;
+                uint8_t day;
+                uint8_t hour;
+                uint8_t min;
+                uint8_t sec;
+                uint32_t ns;
+                int16_t tz;
+                uint8_t daylight;
+            } time;
+            uint32_t resolution;
+            uint32_t accuracy;
+        } get_time;
+
+        struct xenpf_efi_time set_time;
+
+#define XEN_EFI_GET_WAKEUP_TIME_ENABLED 0x00000001
+#define XEN_EFI_GET_WAKEUP_TIME_PENDING 0x00000002
+        struct xenpf_efi_time get_wakeup_time;
+
+#define XEN_EFI_SET_WAKEUP_TIME_ENABLE      0x00000001
+#define XEN_EFI_SET_WAKEUP_TIME_ENABLE_ONLY 0x00000002
+        struct xenpf_efi_time set_wakeup_time;
+
+#define XEN_EFI_VARIABLE_NON_VOLATILE       0x00000001
+#define XEN_EFI_VARIABLE_BOOTSERVICE_ACCESS 0x00000002
+#define XEN_EFI_VARIABLE_RUNTIME_ACCESS     0x00000004
+        struct {
+            XEN_GUEST_HANDLE(void) name;  /* UCS-2/UTF-16 string */
+            unsigned long size;
+            XEN_GUEST_HANDLE(void) data;
+            struct xenpf_efi_guid {
+                uint32_t data1;
+                uint16_t data2;
+                uint16_t data3;
+                uint8_t data4[8];
+            } vendor_guid;
+        } get_variable, set_variable;
+
+        struct {
+            unsigned long size;
+            XEN_GUEST_HANDLE(void) name;  /* UCS-2/UTF-16 string */
+            struct xenpf_efi_guid vendor_guid;
+        } get_next_variable_name;
+    } u;
+};
+typedef struct xenpf_efi_runtime_call xenpf_efi_runtime_call_t;
+DEFINE_XEN_GUEST_HANDLE(xenpf_efi_runtime_call_t);
+
 #define XENPF_firmware_info       50
 #define XEN_FW_DISK_INFO          1 /* from int 13 AH=08/41/48 */
 #define XEN_FW_DISK_MBR_SIGNATURE 2 /* from MBR offset 0x1b8 */
@@ -388,6 +459,7 @@ struct xen_platform_op {
         struct xenpf_read_memtype      read_memtype;
         struct xenpf_microcode_update  microcode;
         struct xenpf_platform_quirk    platform_quirk;
+        struct xenpf_efi_runtime_call  efi_runtime_call;
         struct xenpf_firmware_info     firmware_info;
         struct xenpf_enter_acpi_sleep  enter_acpi_sleep;
         struct xenpf_change_freq       change_freq;

@@ -16,6 +16,7 @@
 #include <xen/stringify.h>
 #include <xen/vga.h>
 #include <asm/e820.h>
+#include <asm/mm.h>
 #include <asm/msr.h>
 #include <asm/processor.h>
 
@@ -1149,6 +1150,53 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     for( ; ; ); /* not reached */
 }
 
+static __init void copy_mapping(unsigned long mfn, unsigned long end,
+                                bool_t (*is_valid)(unsigned long smfn,
+                                                   unsigned long emfn))
+{
+    unsigned long next;
+
+    for ( ; mfn < end; mfn = next )
+    {
+        l4_pgentry_t l4e = efi_l4_pgtable[l4_table_offset(mfn << PAGE_SHIFT)];
+        l3_pgentry_t *l3src, *l3dst;
+        unsigned long va = (unsigned long)mfn_to_virt(mfn);
+
+        next = mfn + (1UL << (L3_PAGETABLE_SHIFT - PAGE_SHIFT));
+        if ( !is_valid(mfn, min(next, end)) )
+            continue;
+        if ( !(l4e_get_flags(l4e) & _PAGE_PRESENT) )
+        {
+            l3dst = alloc_xen_pagetable();
+            BUG_ON(!l3dst);
+            clear_page(l3dst);
+            efi_l4_pgtable[l4_table_offset(mfn << PAGE_SHIFT)] =
+                l4e_from_paddr(virt_to_maddr(l3dst), __PAGE_HYPERVISOR);
+        }
+        else
+            l3dst = l4e_to_l3e(l4e);
+        l3src = l4e_to_l3e(idle_pg_table[l4_table_offset(va)]);
+        l3dst[l3_table_offset(mfn << PAGE_SHIFT)] = l3src[l3_table_offset(va)];
+    }
+}
+
+static bool_t __init ram_range_valid(unsigned long smfn, unsigned long emfn)
+{
+    unsigned long sz = pfn_to_pdx(emfn - 1) / PDX_GROUP_COUNT + 1;
+
+    return !(smfn & pfn_hole_mask) &&
+           find_next_bit(pdx_group_valid, sz,
+                         pfn_to_pdx(smfn) / PDX_GROUP_COUNT) < sz;
+}
+
+static bool_t __init rt_range_valid(unsigned long smfn, unsigned long emfn)
+{
+    return 1;
+}
+
+#define INVALID_VIRTUAL_ADDRESS (0xBAAADUL << \
+                                 (EFI_PAGE_SHIFT + BITS_PER_LONG - 32))
+
 void __init efi_init_memory(void)
 {
     unsigned int i;
@@ -1169,10 +1217,10 @@ void __init efi_init_memory(void)
         if ( !(desc->Attribute & EFI_MEMORY_RUNTIME) )
             continue;
 
+        desc->VirtualStart = INVALID_VIRTUAL_ADDRESS;
+
         smfn = PFN_DOWN(desc->PhysicalStart);
         emfn = PFN_UP(desc->PhysicalStart + len);
-
-        desc->VirtualStart = 0xBAAADUL << (EFI_PAGE_SHIFT + BITS_PER_LONG - 32);
 
         if ( desc->Attribute & EFI_MEMORY_WB )
             /* nothing */;
@@ -1217,5 +1265,34 @@ void __init efi_init_memory(void)
 #if 0 /* Incompatible with kexec. */
     efi_rs->SetVirtualAddressMap(efi_memmap_size, efi_mdesc_size,
                                  mdesc_ver, efi_memmap);
+#else
+    /* Set up 1:1 page tables to do runtime calls in "physical" mode. */
+    efi_l4_pgtable = alloc_xen_pagetable();
+    BUG_ON(!efi_l4_pgtable);
+    clear_page(efi_l4_pgtable);
+
+    copy_mapping(0, max_page, ram_range_valid);
+
+    /* Insert non-RAM runtime mappings. */
+    for ( i = 0; i < efi_memmap_size; i += efi_mdesc_size )
+    {
+        const EFI_MEMORY_DESCRIPTOR *desc = efi_memmap + i;
+
+        if ( desc->Attribute & EFI_MEMORY_RUNTIME )
+        {
+            if ( desc->VirtualStart != INVALID_VIRTUAL_ADDRESS )
+                copy_mapping(PFN_DOWN(desc->PhysicalStart),
+                             PFN_UP(desc->PhysicalStart +
+                                    (desc->NumberOfPages << EFI_PAGE_SHIFT)),
+                             rt_range_valid);
+            else
+                /* XXX */;
+        }
+    }
+
+    /* Insert Xen mappings. */
+    for ( i = l4_table_offset(HYPERVISOR_VIRT_START);
+          i < l4_table_offset(HYPERVISOR_VIRT_END); ++i )
+        efi_l4_pgtable[i] = idle_pg_table[i];
 #endif
 }

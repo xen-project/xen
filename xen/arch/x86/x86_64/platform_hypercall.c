@@ -12,6 +12,7 @@ DEFINE_XEN_GUEST_HANDLE(compat_platform_op_t);
 #define do_platform_op(x)   compat_platform_op(_##x)
 
 #define efi_get_info        efi_compat_get_info
+#define efi_runtime_call(x) efi_compat_runtime_call(x)
 
 #define xen_processor_px    compat_processor_px
 #define xen_processor_px_t  compat_processor_px_t

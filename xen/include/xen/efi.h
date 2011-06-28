@@ -29,10 +29,18 @@ extern struct efi efi;
 union xenpf_efi_info;
 union compat_pf_efi_info;
 
+struct xenpf_efi_runtime_call;
+struct compat_pf_efi_runtime_call;
+
 void efi_init_memory(void);
+unsigned long efi_get_time(void);
+void efi_halt_system(void);
+void efi_reset_system(bool_t warm);
 #ifndef COMPAT
 int efi_get_info(uint32_t idx, union xenpf_efi_info *);
+int efi_runtime_call(struct xenpf_efi_runtime_call *);
 #endif
 int efi_compat_get_info(uint32_t idx, union compat_pf_efi_info *);
+int efi_compat_runtime_call(struct compat_pf_efi_runtime_call *);
 
 #endif /* __XEN_EFI_H__ */

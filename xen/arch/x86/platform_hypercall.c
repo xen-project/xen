@@ -305,6 +305,17 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
         }
         break;
 
+    case XENPF_efi_runtime_call:
+        ret = xsm_efi_runtime_call();
+        if ( ret )
+            break;
+
+        ret = efi_runtime_call(&op->u.efi_runtime_call);
+        if ( ret == 0 &&
+             copy_field_to_guest(u_xenpf_op, op, u.efi_runtime_call) )
+            ret = -EFAULT;
+        break;
+
     case XENPF_enter_acpi_sleep:
         ret = xsm_acpi_sleep();
         if ( ret )

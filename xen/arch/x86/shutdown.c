@@ -15,6 +15,7 @@
 #include <xen/console.h>
 #include <xen/shutdown.h>
 #include <xen/acpi.h>
+#include <xen/efi.h>
 #include <asm/msr.h>
 #include <asm/regs.h>
 #include <asm/mc146818rtc.h>
@@ -95,6 +96,7 @@ void machine_halt(void)
     watchdog_disable();
     console_start_sync();
     local_irq_enable();
+    efi_halt_system();
     smp_call_function(__machine_halt, NULL, 0);
     __machine_halt(NULL);
 }
@@ -336,6 +338,8 @@ void machine_restart(unsigned int delay_millisecs)
 
     if ( tboot_in_measured_env() )
         tboot_shutdown(TB_SHUTDOWN_REBOOT);
+
+    efi_reset_system(reboot_mode != 0);
 
     /* Rebooting needs to touch the page at absolute address 0. */
     *((unsigned short *)__va(0x472)) = reboot_mode;

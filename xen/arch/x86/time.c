@@ -21,6 +21,7 @@
 #include <xen/smp.h>
 #include <xen/irq.h>
 #include <xen/softirq.h>
+#include <xen/efi.h>
 #include <xen/cpuidle.h>
 #include <xen/symbols.h>
 #include <xen/keyhandler.h>
@@ -758,6 +759,13 @@ static unsigned long get_cmos_time(void)
 {
     unsigned long res, flags;
     int i;
+
+    if ( efi_enabled )
+    {
+        res = efi_get_time();
+        if ( res )
+            return res;
+    }
 
     spin_lock_irqsave(&rtc_lock, flags);
 
