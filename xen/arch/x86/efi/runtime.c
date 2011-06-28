@@ -29,6 +29,7 @@ void *__read_mostly efi_memmap;
 struct efi __read_mostly efi = {
 	.acpi   = EFI_INVALID_TABLE_ADDR,
 	.acpi20 = EFI_INVALID_TABLE_ADDR,
+	.mps    = EFI_INVALID_TABLE_ADDR,
 	.smbios = EFI_INVALID_TABLE_ADDR,
 };
 

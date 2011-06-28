@@ -17,6 +17,7 @@ extern const bool_t efi_enabled;
 
 /* Add fields here only if they need to be referenced from non-EFI code. */
 struct efi {
+    unsigned long mps;          /* MPS table */
     unsigned long acpi;         /* ACPI table (IA64 ext 0.71) */
     unsigned long acpi20;       /* ACPI table (ACPI 2.0) */
     unsigned long smbios;       /* SM BIOS table */

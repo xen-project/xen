@@ -897,12 +897,15 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     {
         static EFI_GUID __initdata acpi2_guid = ACPI_20_TABLE_GUID;
         static EFI_GUID __initdata acpi_guid = ACPI_TABLE_GUID;
+        static EFI_GUID __initdata mps_guid = MPS_TABLE_GUID;
         static EFI_GUID __initdata smbios_guid = SMBIOS_TABLE_GUID;
 
         if ( match_guid(&acpi2_guid, &efi_ct[i].VendorGuid) )
 	       efi.acpi20 = (long)efi_ct[i].VendorTable;
         if ( match_guid(&acpi_guid, &efi_ct[i].VendorGuid) )
 	       efi.acpi = (long)efi_ct[i].VendorTable;
+        if ( match_guid(&mps_guid, &efi_ct[i].VendorGuid) )
+	       efi.mps = (long)efi_ct[i].VendorTable;
         if ( match_guid(&smbios_guid, &efi_ct[i].VendorGuid) )
 	       efi.smbios = (long)efi_ct[i].VendorTable;
     }

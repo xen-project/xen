@@ -19,6 +19,7 @@
 #include <xen/init.h>
 #include <xen/acpi.h>
 #include <xen/delay.h>
+#include <xen/efi.h>
 #include <xen/sched.h>
 
 #include <asm/bitops.h>
@@ -514,6 +515,14 @@ static inline void __init construct_default_ISA_mptable(int mpc_default_type)
 	}
 }
 
+#define FIX_EFI_MPF FIX_KEXEC_BASE_0
+
+static __init void efi_unmap_mpf(void)
+{
+	if (efi_enabled)
+		__set_fixmap(FIX_EFI_MPF, 0, 0);
+}
+
 static struct intel_mp_floating *__initdata mpf_found;
 
 /*
@@ -528,6 +537,7 @@ void __init get_smp_config (void)
 	 * processors, where MPS only supports physical.
 	 */
 	if (acpi_lapic && acpi_ioapic) {
+		efi_unmap_mpf();
 		printk(KERN_INFO "Using ACPI (MADT) for SMP configuration information\n");
 		return;
 	}
@@ -558,6 +568,7 @@ void __init get_smp_config (void)
 		 * override the defaults.
 		 */
 		if (!smp_read_mpc((void *)(unsigned long)mpf->mpf_physptr)) {
+			efi_unmap_mpf();
 			smp_found_config = 0;
 			printk(KERN_ERR "BIOS bug, MP table errors detected!...\n");
 			printk(KERN_ERR "... disabling SMP support. (tell your hw vendor)\n");
@@ -583,6 +594,8 @@ void __init get_smp_config (void)
 
 	} else
 		BUG();
+
+	efi_unmap_mpf();
 
 	printk(KERN_INFO "Processors: %d\n", num_processors);
 	/*
@@ -638,9 +651,36 @@ static int __init smp_scan_config (unsigned long base, unsigned long length)
 	return 0;
 }
 
+static void __init efi_check_config(void)
+{
+	struct intel_mp_floating *mpf;
+
+	if (efi.mps == EFI_INVALID_TABLE_ADDR)
+		return;
+
+	__set_fixmap(FIX_EFI_MPF, PFN_DOWN(efi.mps), __PAGE_HYPERVISOR);
+	mpf = (void *)fix_to_virt(FIX_EFI_MPF) + ((long)efi.mps & (PAGE_SIZE-1));
+
+	if (memcmp(mpf->mpf_signature, "_MP_", 4) == 0 &&
+	    mpf->mpf_length == 1 &&
+	    mpf_checksum((void *)mpf, 16) &&
+	    (mpf->mpf_specification == 1 || mpf->mpf_specification == 4)) {
+		smp_found_config = 1;
+		printk(KERN_INFO "SMP MP-table at %08"PRIx64"\n", efi.mps);
+		mpf_found = mpf;
+	}
+	else
+		efi_unmap_mpf();
+}
+
 void __init find_smp_config (void)
 {
 	unsigned int address;
+
+	if (efi_enabled) {
+		efi_check_config();
+		return;
+	}
 
 	/*
 	 * FIXME: Linux assumes you have 640K of base ram..
