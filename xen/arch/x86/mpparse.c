@@ -666,7 +666,7 @@ static void __init efi_check_config(void)
 	    mpf_checksum((void *)mpf, 16) &&
 	    (mpf->mpf_specification == 1 || mpf->mpf_specification == 4)) {
 		smp_found_config = 1;
-		printk(KERN_INFO "SMP MP-table at %08"PRIx64"\n", efi.mps);
+		printk(KERN_INFO "SMP MP-table at %08lx\n", efi.mps);
 		mpf_found = mpf;
 	}
 	else
