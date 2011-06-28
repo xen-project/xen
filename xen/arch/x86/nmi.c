@@ -95,6 +95,11 @@ int nmi_active;
     (P4_CCCR_OVF_PMI0|P4_CCCR_THRESHOLD(15)|P4_CCCR_COMPLEMENT| \
      P4_CCCR_COMPARE|P4_CCCR_REQUIRED|P4_CCCR_ESCR_SELECT(4)|P4_CCCR_ENABLE)
 
+static void __init wait_for_nmis(void *p)
+{
+    mdelay((10*1000)/nmi_hz); /* wait 10 ticks */
+}
+
 int __init check_nmi_watchdog (void)
 {
     static unsigned int __initdata prev_nmi_count[NR_CPUS];
@@ -108,7 +113,12 @@ int __init check_nmi_watchdog (void)
     for_each_online_cpu ( cpu )
         prev_nmi_count[cpu] = nmi_count(cpu);
     local_irq_enable();
-    mdelay((10*1000)/nmi_hz); /* wait 10 ticks */
+
+    /* Wait for 10 ticks.  Busy-wait on all CPUs: the LAPIC counter that
+     * the NMI watchdog uses only runs while the core's not halted */
+    if ( nmi_watchdog == NMI_LOCAL_APIC )
+        smp_call_function(wait_for_nmis, NULL, 0);
+    wait_for_nmis(NULL);
 
     for_each_online_cpu ( cpu )
     {
