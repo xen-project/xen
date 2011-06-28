@@ -58,4 +58,27 @@ const char *xlu_cfg_get_listitem(const XLU_ConfigList*, int entry);
   /* xlu_cfg_get_listitem cannot fail, except that if entry is
    * out of range it returns 0 (not setting errno) */
 
+
+/*
+ * Disk specification parsing.
+ */
+
+int xlu_disk_parse(XLU_Config *cfg, int nspecs, const char *const *specs,
+		   libxl_device_disk *disk);
+  /* disk must have been initialised.
+   *
+   * On error, returns errno value.  Bad strings cause EINVAL and
+   * print a message to cfg's report (that's all cfg is used for).
+   *
+   * Normally one would pass nspecs==1 and only specs[0].  But it is
+   * permitted to pass more strings in which case each is parsed as a
+   * string containing a collection of parameters (but they all refer
+   * to of the configuration for a single disk).
+   *
+   * nspecs==0 is permitted but since it does not specify some mandatory
+   * properties, it produces a run-time configuration error if the
+   * resulting disk struct is used with libxl.
+   */
+
+
 #endif /* LIBXLUTIL_H */
