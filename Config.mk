@@ -191,9 +191,9 @@ endif
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= e3073b9dbf3217f619a4537197067231111d400e
-# Tue Jun 21 18:05:10 2011 +0100
-# mapcache: remember the last page address rather then the last address_index
+QEMU_TAG ?= cd776ee9408ff127f934a707c1a339ee600bc127
+# Tue Jun 28 13:50:53 2011 +0100
+# qemu-char.c: fix incorrect CONFIG_STUBDOM handling
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
