@@ -100,6 +100,14 @@ static void setformat(DiskParseContext *dpc, const char *str) {
     else xlu__disk_err(dpc,str,"unknown value for format");
 }
  
+/* Sets ->backend from the string.  IDL should provide something for this. */
+static void setbackendtype(DiskParseContext *dpc, const char *str) {
+    if (     !strcmp(str,"phy"))   DSET(dpc,backend,BACKEND,str,PHY);
+    else if (!strcmp(str,"tap"))   DSET(dpc,backend,BACKEND,str,TAP);
+    else if (!strcmp(str,"qdisk")) DSET(dpc,backend,BACKEND,str,QDISK);
+    else xlu__disk_err(dpc,str,"unknown value for backendtype");
+}
+ 
 #define DEPRECATE(usewhatinstead) /* not currently reported */
 
 %}
@@ -131,6 +139,7 @@ devtype=disk,?	{ DPC->disk->is_cdrom = 0; }
 devtype=[^,]*,?	{ xlu__disk_err(DPC,yytext,"unknown value for type"); }
 
 access=[^,]*,?	{ STRIP(','); setaccess(DPC, FROMEQUALS); }
+backendtype=[^,]*? { STRIP(','); setbackendtype(DPC,yytext); }
 
 vdev=[^,]*,?	{ STRIP(','); SAVESTRING("vdev", vdev, FROMEQUALS); }
 script=[^,]*,?	{ STRIP(','); SAVESTRING("script", script, FROMEQUALS); }
