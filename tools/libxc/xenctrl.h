@@ -967,7 +967,22 @@ int xc_domain_set_memmap_limit(xc_interface *xch,
                                unsigned long map_limitkb);
 
 #if defined(__i386__) || defined(__x86_64__)
-#include "xc_e820.h"
+/*
+ * PC BIOS standard E820 types and structure.
+ */
+#define E820_RAM          1
+#define E820_RESERVED     2
+#define E820_ACPI         3
+#define E820_NVS          4
+#define E820_UNUSABLE     5
+
+#define E820MAX           (128)
+
+struct e820entry {
+    uint64_t addr;
+    uint64_t size;
+    uint32_t type;
+} __attribute__((packed));
 int xc_domain_set_memory_map(xc_interface *xch,
                                uint32_t domid,
                                struct e820entry entries[],

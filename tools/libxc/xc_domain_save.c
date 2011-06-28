@@ -33,7 +33,6 @@
 #include "xg_save_restore.h"
 
 #include <xen/hvm/params.h>
-#include "xc_e820.h"
 
 /*
 ** Default values for important tuning parameters. Can override by passing

@@ -20,7 +20,7 @@
 
 #include "xg_private.h"
 #include "xc_core.h"
-#include "xc_e820.h"
+#include <xen/hvm/e820.h>
 
 #define GET_FIELD(_p, _f) ((dinfo->guest_width==8) ? ((_p)->x64._f) : ((_p)->x32._f))
 
