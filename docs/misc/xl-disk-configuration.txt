@@ -1,57 +1,98 @@
+                     ---------------------
+                     XL DISK CONFIGURATION
+                     ---------------------
+
+This document specifies the xl config file format disk configuration
+option.  It has the following form:
+
+    disk = [ '<diskspec>', '<diskspec>', ... ]
+
+where each diskspec is in this form:
+    
+   [<key>=<value>|<flag>,]*,
+     [<target>, [<format>, [<vdev>, [<access>]]]],
+     [<key>=<value>|<flag>,]*
+     [target=<target>]
 
 
-                         ----------------------------
-                         xl Disk Configuration Option
-                         ----------------------------
+For example, these strings are equivalent:
 
-This document provides a brief description of xl disk configuration
-option, different attributes that can be passed through it and the
-format in which they need to be specified.
+  /dev/vg/guest-volume,,hda
+  /dev/vg/guest-volume,raw,hda,rw
+  format=raw, vdev=hda, access=rw, target=/dev/vg/guest-volume
+  raw:/dev/vg/guest-volume,hda,w   (deprecated, see below)
 
-At a higher level, xl disk configuration option takes the following
-format:
+As are these:
 
-    disk = [ '[format:][path],vdev[:type],attrib',
-             '[format:][path],vdev[:type],attrib', ... ]
+  /root/image.iso,,hdc,cdrom
+  /root/image.iso,,hdc,,cdrom
+  /root/image.iso,raw,hdc,devtype=cdrom
+  format=raw, vdev=hdc, access=ro, devtype=cdrom, target=/root/image.iso
+  raw:/root/image.iso,hdc:cdrom,ro   (deprecated, see below)
 
-Not all attributes are required (the attributes enclosed within square
-brackets above are optional) and some are deprecated.  Following is a
-brief description of each of the attribute along with information on
-whether or not they are mandatory.
+These might be specified in the domain config file like this:
 
-
-------------------
-Attribute Details
-------------------
+  disk = [ '/dev/vg/guest-volume,,hda', '/root/image.iso,,hdc,cdrom' ]
 
 
-format:
+More formally, the string is a series of comma-separated keyword/value
+pairs, flags and positional parameters.  Parameters which are not bare
+keywords and which do not contain "=" symbols are assigned to the
+so-far-unspecified positional parameters, in the order below.  The
+positional parameters may also be specified explicitly by name.
+
+Each parameter may be specified at most once, either as a positional
+parameter or a named parameter.  Default values apply if the parameter
+is not specified, or if it is specified with an empty value (whether
+positionally or explicitly).
+
+Whitespace may appear before each parameter and will be ignored.
+
+
+=====================
+POSITIONAL PARAMETERS
+=====================
+
+target
+------
+
+Description:           Block device or image file path.  When this is
+                       used as a path, /dev will be prepended
+                       if the path doesn't start with a '/'.
+Supported values:      N/A
+Deprecated values:     N/A
+Default value:         None.  While a path is provided in most cases
+                       there is an exception: for a cdrom device, lack
+                       of this attribute would imply an empty cdrom
+                       drive.
+
+Special syntax:
+
+   When this parameter is specified by name, ie with the "target="
+   syntax in the configuration file, it consumes the whole rest of the
+   <diskspec>.  Therefore in that case it must come last.  This is
+   permissible even if an empty value for the target was already
+   specifed as a positional parameter.  This is the only way to
+   specify a target string containing metacharacters such as commas
+   and (in some cases) colons, which would otherwise be
+   misinterpreted.
+
+   Future parameter and flag names will start with an ascii letter and
+   contain only ascii alphanumerics, hyphens and underscores, and will
+   not be legal as vdevs.  Targets which might match that syntax
+   should not be specified as positional parameters.
+
+
+format
 ------
 
 Description:           Specifies the format of image file.
 Supported values:      raw, qcow, qcow2, vhd
 Deprecated values:     None
-Mandatory:             No.  When not specified raw format is assumed.
-                       For a physical block device the format must be
-                       raw and need not be explicitly specified.  For
-                       an image file the format could be one of the
-                       supported values and when not specified assumed
-                       to be raw.
-path:
-----
+Default value:         raw
 
-Description:           Block  device or image file path.  For a
-                       physical block device a /dev  will be prepended
-                       when not specified and when the path doesn't
-                       start  with a '/'.
-Supported values:      N/A
-Deprecated values:     N/A
-Mandatory:             No.  While a path is provided in most cases
-                       there is an exception.  For a cdrom device, lack
-                       of this attribute would imply an empty cdrom
-                       drive.
 
-vdev:
+vdev
 ----
 
 Description:           Virtual device as seen by the guest (also
@@ -60,95 +101,105 @@ Description:           Virtual device as seen by the guest (also
 Supported values:      hd[x], xvd[x], sd[x] etc.  Please refer to the
                        above specification for further details.
 Deprecated values:     None
-Mandatory:             Yes
+Default Value:         None, this parameter is mandatory.
 
-type:
-----
+
+access
+-------
+
+Description:           Specified access control information.  Whether
+                       or not the block device is provided to the
+                       guest in read-only or read-write mode depends
+                       on this attribute.
+Supported values:      ro, r   (specifies read-only)
+                       rw, w   (specifies read/write)
+Deprecated values:     None
+Default value:         rw
+                       unless devtype=cdrom, in which case r
+
+
+
+==========================
+OTHER PARAMETERS AND FLAGS
+==========================
+
+
+devtype=<devtype>
+-----------------
 
 Description:           Qualifies virtual device type.
 Supported values:      cdrom
 Deprecated values:     None
 Mandatory:             No
 
-attrib:
-------
 
-Description:           Specified access control information.  Whether
-                       or not the block device is provided to the
-                       guest in read-only or read-write mode depends
-                       on this attribute.
-Supported values:      'r', 'w'
-Deprecated values:     None
-Mandatory:             Yes
+cdrom
+-----
+
+Convenience alias for "devtype=cdrom".
 
 
---------------
-Example usages
---------------
-
-disk = [ 'vhd:/path/to/dev,hda,w', '/path/to/iso,hdc:cdrom,r' ]
-disk = [ 'path/to/phy/dev,hda,w', '/dev/cdrom,hdc:cdrom,r' ]
-disk = [ 'qcow:/path/to/file,hda,w' ]
-disk = [ 'qcow2:/path/to/file,hda,w', 'raw:/path/to/dev,hdc:cdrom,r' ]
-
-
--------------------------
-Miscellaneous Information
--------------------------
-
----------------------
-Deprecated Attributes
----------------------
-
-Deprecated values are acceptable and will work the way they did
-earlier except with a warning message printed to the xl log or screen.
-However it's usage is supported purely for backward compatibility
-purpose and not recommended. Also, support for these deprecated
-attributes are likely to be dropped in future versions of xl.
-
-The block-dev-type and access-type deprecated attributes described
-below are prepended to the format attribute.  Example - tap:aio:qcow
-Further details on the deprecated attributes are below:
-
-block-dev-type:
---------------
-
-Description:           Specifies the block device type.
-Supported values:      phy,file, tap, tap2
-
-access-type:
------------
-
-Description:           Backend implementation option to choose from
-                       while accessing block device.
-                       Example: tap:aio:vhd:/path/to/file
-Supported values:      'aio', 'tapdisk', 'ioemu'
-
----------------------
-Impementation Details
----------------------
-
-Backend Details:
+script=<script>
 ---------------
 
-For 'phy' block device type, blkback is always used as the backend.
-When the running dom0 instance does not support blkback, block device
-access will fail.  For block device type 'file' with format raw or
-when no format specfied, tapdisk2 is used when present otherwise qemu
-fallback option is used.  For 'file', 'tap' or 'tap2' block device
-type with format 'vhd', only tapdisk2 is used as qemu does not support
-vhd format.  Absence of tapdisk2 support in this case will result in
-failure.  When it comes to image format and how that affects the
-backend choice, for qcow/qcow2 qemu backend is used as tapdisk2 does
-not work with these formats. For raw format image file, tapdisk2 is
-used and when not available qemu backend is used as fallback.  For vhd
-format, as mentioned earlier tapdisk2 is used and tapdisk2
-unavailability will result in failure as qemu fallback option does not
-support vhd file format.
+Specifies that <target> is not a normal host path, but rather
+information to be interpreted by /etc/xen/scripts/block-<script>.
 
 
 
+==================================
+DEPRECATED PARAMETERS AND PREFIXES
+==================================
+
+Deprecated values are acceptable and are intended work compatibly with
+xend and xl from xen 4.1.  In future they may print a warning.
+Support for deprecated parameters and syntaxes are likely to be
+dropped in future versions of xl.
+
+There is also support for a deprecated old syntax for <diskspec>:
+
+  [<format>:][<target>],<vdev>[:<devtype>],<access>   (deprecated)
+
+This syntax also supports deprecated prefixes, described below.  These
+are found prepended to the format parameter - eg "tap:aio:qcow:".
 
 
+<format>:
+---------
+
+Description:           Specifies the format (deprecated)
+Supported values:      raw:  qcow2:  vhd:
+
+In xend and old versions of libxl it was necessary to specify the
+format with a prefix.  For compatibility, these three prefixes are
+recognised as specifying the corresponding format.  They are
+equivalent to "format=<format>" or the specification of <format>
+(without a colon) as a positional parameter.
 
 
+<script>:
+---------
+
+Description:           Specifies the script (deprecated)
+Supported values:      iscsi:  nbd:  enbd:  drbd:
+
+In xend and old versions of libxl it was necessary to specify the
+"script" (see above) with a prefix.  For compatibility, these four
+prefixes are recognised as specifying the corresponding script.  They
+are equivalent to "script=<script>".
+
+
+<deprecated-prefix>:
+--------------------
+
+Description;          Deprecated prefix, ignored
+Supported values:     tapdisk:  tap2:  aio:  ioemu:  file:  phy:
+
+Various prefixes were required by xend and older versions of libxl to
+make the block devices work.  In some cases these options would
+override the backend type, but in other cases they would be ignored in
+favour of "making it work"; in yet other cases it would be necessary
+to specify several of these, for example:
+  "tap:aio:/some/path..."
+
+All of these prefixes are now stripped and ignored.
