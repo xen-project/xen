@@ -4037,62 +4037,26 @@ int main_networkdetach(int argc, char **argv)
 int main_blockattach(int argc, char **argv)
 {
     int opt;
-    const char *tok;
     uint32_t fe_domid, be_domid = 0;
     libxl_device_disk disk = { 0 };
+    XLU_Config *config = 0;
 
     if ((opt = def_getopt(argc, argv, "", "block-attach", 2)) != -1)
         return opt;
-    if (argc-optind > 5) {
+    if ((argc-optind < 2)) {
         help("block-attach");
         return 2;
     }
-
-    tok = strtok(argv[optind+1], ":");
-    if (!strcmp(tok, "phy")) {
-        disk.backend = LIBXL_DISK_BACKEND_PHY;
-    } else if (!strcmp(tok, "file")) {
-        disk.backend = LIBXL_DISK_BACKEND_TAP;
-    } else if (!strcmp(tok, "tap")) {
-        tok = strtok(NULL, ":");
-        if (!strcmp(tok, "aio")) {
-            disk.backend = LIBXL_DISK_BACKEND_TAP;
-        } else if (!strcmp(tok, "vhd")) {
-            disk.format = LIBXL_DISK_FORMAT_VHD;
-            disk.backend = LIBXL_DISK_BACKEND_TAP;
-        } else if (!strcmp(tok, "qcow")) {
-            disk.format = LIBXL_DISK_FORMAT_QCOW;
-            disk.backend = LIBXL_DISK_BACKEND_QDISK;
-        } else if (!strcmp(tok, "qcow2")) {
-            disk.format = LIBXL_DISK_FORMAT_QCOW2;
-            disk.backend = LIBXL_DISK_BACKEND_QDISK;
-        } else {
-            fprintf(stderr, "Error: `%s' is not a valid disk image.\n", tok);
-            return 1;
-        }
-    } else {
-        fprintf(stderr, "Error: `%s' is not a valid block device.\n", tok);
-        return 1;
-    }
-    disk.pdev_path = strtok(NULL, "\0");
-    if (!disk.pdev_path) {
-        fprintf(stderr, "Error: missing path to disk image.\n");
-        return 1;
-    }
-    disk.vdev = argv[optind+2];
-    disk.removable = 1;
-    disk.readwrite = ((argc-optind <= 3) || (argv[optind+3][0] == 'w'));
 
     if (domain_qualifier_to_domid(argv[optind], &fe_domid, 0) < 0) {
         fprintf(stderr, "%s is an invalid domain identifier\n", argv[optind]);
         return 1;
     }
-    if (argc-optind == 5) {
-        if (domain_qualifier_to_domid(argv[optind+4], &be_domid, 0) < 0) {
-            fprintf(stderr, "%s is an invalid domain identifier\n", argv[optind+4]);
-            return 1;
-        }
-    }
+    optind++;
+
+    parse_disk_config_multistring
+        (&config, argc-optind, (const char* const*)argv + optind, &disk);
+
     disk.backend_domid = be_domid;
 
     if (libxl_device_disk_add(ctx, fe_domid, &disk)) {

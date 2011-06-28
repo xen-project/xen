@@ -257,7 +257,7 @@ struct cmd_spec cmd_table[] = {
     { "block-attach",
       &main_blockattach,
       "Create a new virtual block device",
-      "<Domain> <BackDev> <FrontDev> [<Mode>] [BackDomain]",
+      "<Domain> <disk-spec-component(s)>...",
     },
     { "block-list",
       &main_blocklist,
