@@ -1046,9 +1046,9 @@ void x86_mc_get_cpu_info(unsigned cpu, uint32_t *chipid, uint16_t *coreid,
         if (nthreads != NULL)
             *nthreads = 1;
     } else {
-        *chipid = phys_proc_id[cpu];
+        *chipid = c->phys_proc_id;
         if (c->x86_max_cores > 1)
-            *coreid = cpu_core_id[cpu];
+            *coreid = c->cpu_core_id;
         else
             *coreid = 0;
         *threadid = c->apicid & ((1 << (c->x86_num_siblings - 1)) - 1);

@@ -49,12 +49,6 @@
 
 #define setup_trampoline()    (bootsym_phys(trampoline_realmode_entry))
 
-/* Package ID of each logical CPU */
-int phys_proc_id[NR_CPUS] __read_mostly = {[0 ... NR_CPUS-1] = BAD_APICID};
-
-/* Core ID of each logical CPU */
-int cpu_core_id[NR_CPUS] __read_mostly = {[0 ... NR_CPUS-1] = BAD_APICID};
-
 /* representing HT siblings of each logical CPU */
 DEFINE_PER_CPU_READ_MOSTLY(cpumask_t, cpu_sibling_map);
 /* representing HT and core siblings of each logical CPU */
@@ -247,8 +241,8 @@ static void set_cpu_sibling_map(int cpu)
     {
         for_each_cpu_mask ( i, cpu_sibling_setup_map )
         {
-            if ( (phys_proc_id[cpu] == phys_proc_id[i]) &&
-                 (cpu_core_id[cpu] == cpu_core_id[i]) )
+            if ( (c[cpu].phys_proc_id == c[i].phys_proc_id) &&
+                 (c[cpu].cpu_core_id == c[i].cpu_core_id) )
             {
                 cpu_set(i, per_cpu(cpu_sibling_map, cpu));
                 cpu_set(cpu, per_cpu(cpu_sibling_map, i));
@@ -271,7 +265,7 @@ static void set_cpu_sibling_map(int cpu)
 
     for_each_cpu_mask ( i, cpu_sibling_setup_map )
     {
-        if ( phys_proc_id[cpu] == phys_proc_id[i] )
+        if ( c[cpu].phys_proc_id == c[i].phys_proc_id )
         {
             cpu_set(i, per_cpu(cpu_core_map, cpu));
             cpu_set(cpu, per_cpu(cpu_core_map, i));
@@ -832,8 +826,8 @@ remove_siblinginfo(int cpu)
         cpu_clear(cpu, per_cpu(cpu_sibling_map, sibling));
     cpus_clear(per_cpu(cpu_sibling_map, cpu));
     cpus_clear(per_cpu(cpu_core_map, cpu));
-    phys_proc_id[cpu] = BAD_APICID;
-    cpu_core_id[cpu] = BAD_APICID;
+    c[cpu].phys_proc_id = BAD_APICID;
+    c[cpu].cpu_core_id = BAD_APICID;
     cpu_clear(cpu, cpu_sibling_setup_map);
 }
 

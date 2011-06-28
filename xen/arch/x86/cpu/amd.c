@@ -446,11 +446,11 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 			while ((1 << bits) < c->x86_max_cores)
 				bits++;
 		}
-		cpu_core_id[cpu] = phys_proc_id[cpu] & ((1<<bits)-1);
-		phys_proc_id[cpu] >>= bits;
+		c->cpu_core_id = c->phys_proc_id & ((1<<bits)-1);
+		c->phys_proc_id >>= bits;
 		if (opt_cpu_info)
 			printk("CPU %d(%d) -> Core %d\n",
-			       cpu, c->x86_max_cores, cpu_core_id[cpu]);
+			       cpu, c->x86_max_cores, c->cpu_core_id);
 	}
 #endif
 

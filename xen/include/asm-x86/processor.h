@@ -175,6 +175,8 @@ struct cpuinfo_x86 {
     __u32 x86_max_cores; /* cpuid returned max cores value */
     __u32 booted_cores;  /* number of cores as seen by OS */
     __u32 x86_num_siblings; /* cpuid logical cpus per chip value */
+    int   phys_proc_id; /* package ID of each logical CPU */
+    int   cpu_core_id; /* core ID of each logical CPU*/
     __u32 apicid;
     unsigned short x86_clflush_size;
 } __cacheline_aligned;
@@ -194,8 +196,6 @@ extern struct cpuinfo_x86 cpu_data[];
 #endif
 
 extern u64 host_pat;
-extern int phys_proc_id[NR_CPUS];
-extern int cpu_core_id[NR_CPUS];
 extern bool_t opt_cpu_info;
 
 /* Maximum width of physical addresses supported by the hardware */
@@ -215,8 +215,8 @@ extern void detect_ht(struct cpuinfo_x86 *c);
 static always_inline void detect_ht(struct cpuinfo_x86 *c) {}
 #endif
 
-#define cpu_to_core(_cpu)   (cpu_core_id[_cpu])
-#define cpu_to_socket(_cpu) (phys_proc_id[_cpu])
+#define cpu_to_core(_cpu)   (cpu_data[_cpu].cpu_core_id)
+#define cpu_to_socket(_cpu) (cpu_data[_cpu].phys_proc_id)
 
 /*
  * Generic CPUID function
