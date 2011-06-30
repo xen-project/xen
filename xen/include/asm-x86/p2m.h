@@ -209,6 +209,12 @@ struct p2m_domain {
 #define CR3_EADDR     (~0ULL)
     uint64_t           cr3;
 
+    /* Host p2m: when this flag is set, don't flush all the nested-p2m 
+     * tables on every host-p2m change.  The setter of this flag 
+     * is responsible for performing the full flush before releasing the
+     * host p2m's lock. */
+    int                defer_nested_flush;
+
     /* Pages used to construct the p2m */
     struct page_list_head pages;
 
@@ -407,6 +413,11 @@ int guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
 /* Change types across all p2m entries in a domain */
 void p2m_change_entry_type_global(struct domain *d, 
                                   p2m_type_t ot, p2m_type_t nt);
+
+/* Change types across a range of p2m entries (start ... end-1) */
+void p2m_change_type_range(struct domain *d, 
+                           unsigned long start, unsigned long end,
+                           p2m_type_t ot, p2m_type_t nt);
 
 /* Compare-exchange the type of a single p2m entry */
 p2m_type_t p2m_change_type(struct domain *d, unsigned long gfn,

@@ -537,6 +537,37 @@ p2m_type_t p2m_change_type(struct domain *d, unsigned long gfn,
     return pt;
 }
 
+/* Modify the p2m type of a range of gfns from ot to nt.
+ * Resets the access permissions. */
+void p2m_change_type_range(struct domain *d, 
+                           unsigned long start, unsigned long end,
+                           p2m_type_t ot, p2m_type_t nt)
+{
+    p2m_type_t pt;
+    unsigned long gfn;
+    mfn_t mfn;
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+
+    BUG_ON(p2m_is_grant(ot) || p2m_is_grant(nt));
+
+    p2m_lock(p2m);
+    p2m->defer_nested_flush = 1;
+
+    for ( gfn = start; gfn < end; gfn++ )
+    {
+        mfn = gfn_to_mfn_query(d, gfn, &pt);
+        if ( pt == ot )
+            set_p2m_entry(p2m, gfn, mfn, 0, nt, p2m->default_access);
+    }
+
+    p2m->defer_nested_flush = 0;
+    if ( nestedhvm_enabled(d) )
+        p2m_flush_nestedp2m(d);
+    p2m_unlock(p2m);
+}
+
+
+
 int
 set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
 {

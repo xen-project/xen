@@ -58,7 +58,6 @@
 
 static int hap_enable_vram_tracking(struct domain *d)
 {
-    int i;
     struct sh_dirty_vram *dirty_vram = d->arch.hvm_domain.dirty_vram;
 
     if ( !dirty_vram )
@@ -70,8 +69,8 @@ static int hap_enable_vram_tracking(struct domain *d)
     paging_unlock(d);
 
     /* set l1e entries of P2M table to be read-only. */
-    for (i = dirty_vram->begin_pfn; i < dirty_vram->end_pfn; i++)
-        p2m_change_type(d, i, p2m_ram_rw, p2m_ram_logdirty);
+    p2m_change_type_range(d, dirty_vram->begin_pfn, dirty_vram->end_pfn, 
+                          p2m_ram_rw, p2m_ram_logdirty);
 
     flush_tlb_mask(d->domain_dirty_cpumask);
     return 0;
@@ -79,7 +78,6 @@ static int hap_enable_vram_tracking(struct domain *d)
 
 static int hap_disable_vram_tracking(struct domain *d)
 {
-    int i;
     struct sh_dirty_vram *dirty_vram = d->arch.hvm_domain.dirty_vram;
 
     if ( !dirty_vram )
@@ -90,8 +88,8 @@ static int hap_disable_vram_tracking(struct domain *d)
     paging_unlock(d);
 
     /* set l1e entries of P2M table with normal mode */
-    for (i = dirty_vram->begin_pfn; i < dirty_vram->end_pfn; i++)
-        p2m_change_type(d, i, p2m_ram_logdirty, p2m_ram_rw);
+    p2m_change_type_range(d, dirty_vram->begin_pfn, dirty_vram->end_pfn, 
+                          p2m_ram_logdirty, p2m_ram_rw);
 
     flush_tlb_mask(d->domain_dirty_cpumask);
     return 0;
@@ -99,15 +97,14 @@ static int hap_disable_vram_tracking(struct domain *d)
 
 static void hap_clean_vram_tracking(struct domain *d)
 {
-    int i;
     struct sh_dirty_vram *dirty_vram = d->arch.hvm_domain.dirty_vram;
 
     if ( !dirty_vram )
         return;
 
     /* set l1e entries of P2M table to be read-only. */
-    for (i = dirty_vram->begin_pfn; i < dirty_vram->end_pfn; i++)
-        p2m_change_type(d, i, p2m_ram_rw, p2m_ram_logdirty);
+    p2m_change_type_range(d, dirty_vram->begin_pfn, dirty_vram->end_pfn, 
+                          p2m_ram_rw, p2m_ram_logdirty);
 
     flush_tlb_mask(d->domain_dirty_cpumask);
 }
@@ -863,7 +860,8 @@ hap_write_p2m_entry(struct vcpu *v, unsigned long gfn, l1_pgentry_t *p,
     paging_lock(d);
     old_flags = l1e_get_flags(*p);
 
-    if ( nestedhvm_enabled(d) && (old_flags & _PAGE_PRESENT) ) {
+    if ( nestedhvm_enabled(d) && (old_flags & _PAGE_PRESENT) 
+         && !p2m_get_hostp2m(d)->defer_nested_flush ) {
         /* We are replacing a valid entry so we need to flush nested p2ms,
          * unless the only change is an increase in access rights. */
         mfn_t omfn = _mfn(l1e_get_pfn(*p));
