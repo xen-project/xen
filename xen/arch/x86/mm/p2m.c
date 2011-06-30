@@ -1122,8 +1122,8 @@ p2m_get_nestedp2m(struct vcpu *v, uint64_t cr3)
     struct p2m_domain *p2m;
     int i;
 
-    if (cr3 == 0 || cr3 == CR3_EADDR)
-        cr3 = v->arch.hvm_vcpu.guest_cr[3];
+    /* Mask out low bits; this avoids collisions with CR3_EADDR */
+    cr3 &= ~(0xfffull);
 
     if (nv->nv_flushp2m && nv->nv_p2m) {
         nv->nv_p2m = NULL;
