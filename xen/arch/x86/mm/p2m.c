@@ -1131,11 +1131,9 @@ p2m_get_nestedp2m(struct vcpu *v, uint64_t cr3)
 
     d = v->domain;
     nestedp2m_lock(d);
-    for (i = 0; i < MAX_NESTEDP2M; i++) {
-        p2m = d->arch.nested_p2m[i];
-        if ((p2m->cr3 != cr3 && p2m->cr3 != CR3_EADDR) || (p2m != nv->nv_p2m))
-            continue;
-
+    p2m = nv->nv_p2m;
+    if ( p2m && (p2m->cr3 == cr3 || p2m->cr3 == CR3_EADDR) )
+    {
         nv->nv_flushp2m = 0;
         p2m_getlru_nestedp2m(d, p2m);
         nv->nv_p2m = p2m;
