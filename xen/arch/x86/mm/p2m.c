@@ -1102,9 +1102,7 @@ p2m_flush_table(struct p2m_domain *p2m)
 void
 p2m_flush(struct vcpu *v, struct p2m_domain *p2m)
 {
-    struct domain *d = p2m->domain;
-
-    ASSERT(v->domain == d);
+    ASSERT(v->domain == p2m->domain);
     vcpu_nestedhvm(v).nv_p2m = NULL;
     p2m_flush_table(p2m);
     hvm_asid_flush_vcpu(v);
