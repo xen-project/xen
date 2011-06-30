@@ -201,8 +201,13 @@ struct p2m_domain {
     cpumask_t          p2m_dirty_cpumask;
 
     struct domain     *domain;   /* back pointer to domain */
+
+    /* Nested p2ms only: nested-CR3 value that this p2m shadows. 
+     * This can be cleared to CR3_EADDR under the per-p2m lock but
+     * needs both the per-p2m lock and the per-domain nestedp2m lock
+     * to set it to any other value. */
 #define CR3_EADDR     (~0ULL)
-    uint64_t           cr3;      /* to identify this p2m for re-use */
+    uint64_t           cr3;
 
     /* Pages used to construct the p2m */
     struct page_list_head pages;

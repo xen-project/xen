@@ -96,17 +96,23 @@ nestedp2m_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
 /*          NESTED VIRT FUNCTIONS           */
 /********************************************/
 static void
-nestedhap_fix_p2m(struct p2m_domain *p2m, paddr_t L2_gpa, paddr_t L0_gpa,
-    p2m_type_t p2mt, p2m_access_t p2ma)
+nestedhap_fix_p2m(struct vcpu *v, struct p2m_domain *p2m, 
+                  paddr_t L2_gpa, paddr_t L0_gpa,
+                  p2m_type_t p2mt, p2m_access_t p2ma)
 {
-    int rv;
+    int rv = 1;
     ASSERT(p2m);
     ASSERT(p2m->set_entry);
 
     p2m_lock(p2m);
-    rv = set_p2m_entry(p2m, L2_gpa >> PAGE_SHIFT,
-                         page_to_mfn(maddr_to_page(L0_gpa)),
-                         0 /*4K*/, p2mt, p2ma);
+
+    /* If this p2m table has been flushed or recycled under our feet, 
+     * leave it alone.  We'll pick up the right one as we try to 
+     * vmenter the guest. */
+    if ( p2m->cr3 == nhvm_vcpu_hostcr3(v) )
+         rv = set_p2m_entry(p2m, L2_gpa >> PAGE_SHIFT,
+                            page_to_mfn(maddr_to_page(L0_gpa)),
+                            0 /*4K*/, p2mt, p2ma);
     p2m_unlock(p2m);
 
     if (rv == 0) {
@@ -211,12 +217,10 @@ nestedhvm_hap_nested_page_fault(struct vcpu *v, paddr_t L2_gpa)
         break;
     }
 
-    nestedp2m_lock(d);
     /* fix p2m_get_pagetable(nested_p2m) */
-    nestedhap_fix_p2m(nested_p2m, L2_gpa, L0_gpa,
+    nestedhap_fix_p2m(v, nested_p2m, L2_gpa, L0_gpa,
         p2m_ram_rw,
         p2m_access_rwx /* FIXME: Should use same permission as l1 guest */);
-    nestedp2m_unlock(d);
 
     return NESTEDHVM_PAGEFAULT_DONE;
 }

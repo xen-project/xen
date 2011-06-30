@@ -1052,7 +1052,7 @@ p2m_getlru_nestedp2m(struct domain *d, struct p2m_domain *p2m)
 
 /* Reset this p2m table to be empty */
 static void
-p2m_flush_locked(struct p2m_domain *p2m)
+p2m_flush_table(struct p2m_domain *p2m)
 {
     struct page_info *top, *pg;
     struct domain *d = p2m->domain;
@@ -1094,21 +1094,16 @@ p2m_flush(struct vcpu *v, struct p2m_domain *p2m)
 
     ASSERT(v->domain == d);
     vcpu_nestedhvm(v).nv_p2m = NULL;
-    nestedp2m_lock(d);
-    p2m_flush_locked(p2m);
+    p2m_flush_table(p2m);
     hvm_asid_flush_vcpu(v);
-    nestedp2m_unlock(d);
 }
 
 void
 p2m_flush_nestedp2m(struct domain *d)
 {
     int i;
-
-    nestedp2m_lock(d);
     for ( i = 0; i < MAX_NESTEDP2M; i++ )
-        p2m_flush_locked(d->arch.nested_p2m[i]);
-    nestedp2m_unlock(d);
+        p2m_flush_table(d->arch.nested_p2m[i]);
 }
 
 struct p2m_domain *
@@ -1131,29 +1126,37 @@ p2m_get_nestedp2m(struct vcpu *v, uint64_t cr3)
     d = v->domain;
     nestedp2m_lock(d);
     p2m = nv->nv_p2m;
-    if ( p2m && (p2m->cr3 == cr3 || p2m->cr3 == CR3_EADDR) )
+    if ( p2m ) 
     {
-        nv->nv_flushp2m = 0;
-        p2m_getlru_nestedp2m(d, p2m);
-        nv->nv_p2m = p2m;
-        if (p2m->cr3 == CR3_EADDR)
-            hvm_asid_flush_vcpu(v);
-        p2m->cr3 = cr3;
-        cpu_set(v->processor, p2m->p2m_dirty_cpumask);
-        nestedp2m_unlock(d);
-        return p2m;
+        p2m_lock(p2m);
+        if ( p2m->cr3 == cr3 || p2m->cr3 == CR3_EADDR )
+        {
+            nv->nv_flushp2m = 0;
+            p2m_getlru_nestedp2m(d, p2m);
+            nv->nv_p2m = p2m;
+            if (p2m->cr3 == CR3_EADDR)
+                hvm_asid_flush_vcpu(v);
+            p2m->cr3 = cr3;
+            cpu_set(v->processor, p2m->p2m_dirty_cpumask);
+            p2m_unlock(p2m);
+            nestedp2m_unlock(d);
+            return p2m;
+        }
+        p2m_unlock(p2m);
     }
 
     /* All p2m's are or were in use. Take the least recent used one,
      * flush it and reuse. */
     p2m = p2m_getlru_nestedp2m(d, NULL);
-    p2m_flush_locked(p2m);
+    p2m_flush_table(p2m);
+    p2m_lock(p2m);
     nv->nv_p2m = p2m;
     p2m->cr3 = cr3;
     nv->nv_flushp2m = 0;
     hvm_asid_flush_vcpu(v);
-    nestedhvm_vmcx_flushtlb(nv->nv_p2m);
+    nestedhvm_vmcx_flushtlb(p2m);
     cpu_set(v->processor, p2m->p2m_dirty_cpumask);
+    p2m_unlock(p2m);
     nestedp2m_unlock(d);
 
     return p2m;

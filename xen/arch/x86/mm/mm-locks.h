@@ -96,8 +96,11 @@ declare_mm_lock(shr)
 
 /* Nested P2M lock (per-domain)
  *
- * A per-domain lock that protects some of the nested p2m datastructures.
- * TODO: find out exactly what needs to be covered by this lock */
+ * A per-domain lock that protects the mapping from nested-CR3 to 
+ * nested-p2m.  In particular it covers:
+ * - the array of nested-p2m tables, and all LRU activity therein; and
+ * - setting the "cr3" field of any p2m table to a non-CR3_EADDR value. 
+ *   (i.e. assigning a p2m table to be the shadow of that cr3 */
 
 declare_mm_lock(nestedp2m)
 #define nestedp2m_lock(d)   mm_lock(nestedp2m, &(d)->arch.nested_p2m_lock)
