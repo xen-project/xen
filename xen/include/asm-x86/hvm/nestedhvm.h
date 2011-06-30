@@ -61,7 +61,6 @@ unsigned long *nestedhvm_vcpu_iomap_get(bool_t ioport_80, bool_t ioport_ed);
     (!!vcpu_nestedhvm((v)).nv_vmswitch_in_progress)
 
 void nestedhvm_vmcx_flushtlb(struct p2m_domain *p2m);
-void nestedhvm_vmcx_flushtlbdomain(struct domain *d);
 
 bool_t nestedhvm_is_n2(struct vcpu *v);
 

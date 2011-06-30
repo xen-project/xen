@@ -119,12 +119,6 @@ nestedhvm_vmcx_flushtlb(struct p2m_domain *p2m)
     cpus_clear(p2m->p2m_dirty_cpumask);
 }
 
-void
-nestedhvm_vmcx_flushtlbdomain(struct domain *d)
-{
-    on_selected_cpus(d->domain_dirty_cpumask, nestedhvm_flushtlb_ipi, d, 1);
-}
-
 bool_t
 nestedhvm_is_n2(struct vcpu *v)
 {
