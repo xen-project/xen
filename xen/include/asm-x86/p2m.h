@@ -209,6 +209,12 @@ struct p2m_domain {
 #define CR3_EADDR     (~0ULL)
     uint64_t           cr3;
 
+    /* Nested p2ms: linked list of n2pms allocated to this domain. 
+     * The host p2m hasolds the head of the list and the np2ms are 
+     * threaded on in LRU order. */
+    struct list_head np2m_list; 
+
+
     /* Host p2m: when this flag is set, don't flush all the nested-p2m 
      * tables on every host-p2m change.  The setter of this flag 
      * is responsible for performing the full flush before releasing the

@@ -73,6 +73,7 @@ static void p2m_initialise(struct domain *d, struct p2m_domain *p2m)
 {
     memset(p2m, 0, sizeof(*p2m));
     mm_lock_init(&p2m->lock);
+    INIT_LIST_HEAD(&p2m->np2m_list);
     INIT_PAGE_LIST_HEAD(&p2m->pages);
     INIT_PAGE_LIST_HEAD(&p2m->pod.super);
     INIT_PAGE_LIST_HEAD(&p2m->pod.single);
@@ -104,6 +105,7 @@ p2m_init_nestedp2m(struct domain *d)
             return -ENOMEM;
         p2m_initialise(d, p2m);
         p2m->write_p2m_entry = nestedp2m_write_p2m_entry;
+        list_add(&p2m->np2m_list, &p2m_get_hostp2m(d)->np2m_list);
     }
 
     return 0;
@@ -1048,37 +1050,16 @@ int p2m_get_mem_access(struct domain *d, unsigned long pfn,
 static struct p2m_domain *
 p2m_getlru_nestedp2m(struct domain *d, struct p2m_domain *p2m)
 {
-    int i, lru_index = -1;
-    struct p2m_domain *lrup2m, *tmp;
+    struct list_head *lru_list = &p2m_get_hostp2m(d)->np2m_list;
+    
+    ASSERT(!list_empty(lru_list));
 
-    if (p2m == NULL) {
-        lru_index = MAX_NESTEDP2M - 1;
-        lrup2m = d->arch.nested_p2m[lru_index];
-    } else {
-        lrup2m = p2m;
-        for (i = 0; i < MAX_NESTEDP2M; i++) {
-            if (d->arch.nested_p2m[i] == p2m) {
-                lru_index = i;
-                break;
-            }
-        }
-    }
+    if ( p2m == NULL )
+        p2m = list_entry(lru_list->prev, struct p2m_domain, np2m_list);
 
-    ASSERT(lru_index >= 0);
-    if (lru_index == 0) {
-        return lrup2m;
-    }
+    list_move(&p2m->np2m_list, lru_list);
 
-    /* move the other's down the array "list" */
-    for (i = lru_index - 1; i >= 0; i--) {
-        tmp = d->arch.nested_p2m[i];
-        d->arch.nested_p2m[i+1] = tmp;        
-    }
-
-    /* make the entry the first one */
-    d->arch.nested_p2m[0] = lrup2m;
-
-    return lrup2m;
+    return p2m;
 }
 
 /* Reset this p2m table to be empty */
