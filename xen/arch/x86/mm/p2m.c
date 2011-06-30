@@ -1120,7 +1120,6 @@ p2m_get_nestedp2m(struct vcpu *v, uint64_t cr3)
     volatile struct nestedvcpu *nv = &vcpu_nestedhvm(v);
     struct domain *d;
     struct p2m_domain *p2m;
-    int i;
 
     /* Mask out low bits; this avoids collisions with CR3_EADDR */
     cr3 &= ~(0xfffull);
@@ -1146,12 +1145,9 @@ p2m_get_nestedp2m(struct vcpu *v, uint64_t cr3)
     }
 
     /* All p2m's are or were in use. Take the least recent used one,
-     * flush it and reuse.
-     */
-    for (i = 0; i < MAX_NESTEDP2M; i++) {
-        p2m = p2m_getlru_nestedp2m(d, NULL);
-        p2m_flush_locked(p2m);
-    }
+     * flush it and reuse. */
+    p2m = p2m_getlru_nestedp2m(d, NULL);
+    p2m_flush_locked(p2m);
     nv->nv_p2m = p2m;
     p2m->cr3 = cr3;
     nv->nv_flushp2m = 0;
