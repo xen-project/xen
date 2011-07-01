@@ -166,7 +166,12 @@ void __init pci_mmcfg_arch_free(void)
 
     for (i = 0; i < pci_mmcfg_config_num; ++i) {
         if (pci_mmcfg_virt[i].virt) {
-            iounmap(pci_mmcfg_virt[i].virt);
+            unsigned long size;
+            const struct acpi_mcfg_allocation *cfg = pci_mmcfg_virt[i].cfg;
+
+            size = (cfg->end_bus_number - cfg->start_bus_number + 1) << 20;
+            destroy_xen_mappings((unsigned long)pci_mmcfg_virt[i].virt,
+                                 (unsigned long)pci_mmcfg_virt[i].virt + size);
             pci_mmcfg_virt[i].virt = NULL;
             pci_mmcfg_virt[i].cfg = NULL;
         }
