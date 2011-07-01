@@ -74,6 +74,15 @@ void unlock_vector_lock(void)
     spin_unlock(&vector_lock);
 }
 
+static void trace_irq_mask(u32 event, int irq, int vector, cpumask_t *mask)
+{
+    struct {
+        int irq, vec;
+        cpumask_t mask;
+    } d = { irq, vector, *mask };
+    trace_var(event, 1, sizeof(d), (unsigned char *)&d);
+}
+
 static int __init __bind_irq_vector(int irq, int vector, cpumask_t cpu_mask)
 {
     cpumask_t online_mask;
@@ -90,6 +99,7 @@ static int __init __bind_irq_vector(int irq, int vector, cpumask_t cpu_mask)
         return 0;
     if (cfg->vector != IRQ_VECTOR_UNASSIGNED) 
         return -EBUSY;
+    trace_irq_mask(TRC_HW_IRQ_BIND_VECTOR, irq, vector, &online_mask);
     for_each_cpu_mask(cpu, online_mask)
         per_cpu(vector_irq, cpu)[vector] = irq;
     cfg->vector = vector;
@@ -181,6 +191,8 @@ static void __clear_irq_vector(int irq)
     vector = cfg->vector;
     cpus_and(tmp_mask, cfg->cpu_mask, cpu_online_map);
 
+    trace_irq_mask(TRC_HW_IRQ_CLEAR_VECTOR, irq, vector, &tmp_mask);
+
     for_each_cpu_mask(cpu, tmp_mask)
         per_cpu(vector_irq, cpu)[vector] = -1;
 
@@ -195,6 +207,8 @@ static void __clear_irq_vector(int irq)
                                 vector++) {
             if (per_cpu(vector_irq, cpu)[vector] != irq)
                 continue;
+            TRACE_3D(TRC_HW_IRQ_MOVE_FINISH,
+                     irq, vector, cpu);
             per_cpu(vector_irq, cpu)[vector] = -1;
              break;
         }
@@ -394,6 +408,7 @@ next:
             cfg->move_in_progress = 1;
             cpus_copy(cfg->old_cpu_mask, cfg->cpu_mask);
         }
+        trace_irq_mask(TRC_HW_IRQ_ASSIGN_VECTOR, irq, vector, &tmp_mask);
         for_each_cpu_mask(new_cpu, tmp_mask)
             per_cpu(vector_irq, new_cpu)[vector] = irq;
         cfg->vector = vector;
@@ -539,6 +554,7 @@ asmlinkage void do_IRQ(struct cpu_user_regs *regs)
         printk("%s: %d.%d No irq handler for vector (irq %d)\n",
                 __func__, smp_processor_id(), vector, irq);
         set_irq_regs(old_regs);
+        TRACE_1D(TRC_HW_IRQ_UNMAPPED_VECTOR, vector);
         return;
     }
 
@@ -579,7 +595,7 @@ asmlinkage void do_IRQ(struct cpu_user_regs *regs)
 
         tsc_in = tb_init_done ? get_cycles() : 0;
         __do_IRQ_guest(irq);
-        TRACE_3D(TRC_TRACE_IRQ, irq, tsc_in, get_cycles());
+        TRACE_3D(TRC_HW_IRQ_HANDLED, irq, tsc_in, get_cycles());
         goto out_no_end;
     }
 
@@ -602,7 +618,7 @@ asmlinkage void do_IRQ(struct cpu_user_regs *regs)
         spin_unlock_irq(&desc->lock);
         tsc_in = tb_init_done ? get_cycles() : 0;
         action->handler(irq, action->dev_id, regs);
-        TRACE_3D(TRC_TRACE_IRQ, irq, tsc_in, get_cycles());
+        TRACE_3D(TRC_HW_IRQ_HANDLED, irq, tsc_in, get_cycles());
         spin_lock_irq(&desc->lock);
     }
 

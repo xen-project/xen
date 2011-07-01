@@ -37,6 +37,7 @@
 #include <mach_apic.h>
 #include <io_ports.h>
 #include <public/physdev.h>
+#include <xen/trace.h>
 
 /* Where if anywhere is the i8259 connect in external int mode */
 static struct { int pin, apic; } ioapic_i8259 = { -1, -1 };
@@ -439,8 +440,14 @@ fastcall void smp_irq_move_cleanup_interrupt(struct cpu_user_regs *regs)
          */
         if (irr  & (1 << (vector % 32))) {
             genapic->send_IPI_self(IRQ_MOVE_CLEANUP_VECTOR);
+            TRACE_3D(TRC_HW_IRQ_MOVE_CLEANUP_DELAY,
+                     irq, vector, smp_processor_id());
             goto unlock;
         }
+
+        TRACE_3D(TRC_HW_IRQ_MOVE_CLEANUP,
+                 irq, vector, smp_processor_id());
+
         __get_cpu_var(vector_irq)[vector] = -1;
         cfg->move_cleanup_count--;
 unlock:
