@@ -85,7 +85,7 @@ static int _hvm_dpci_isairq_eoi(struct domain *d,
             if ( --pirq_dpci->pending == 0 )
             {
                 stop_timer(&pirq_dpci->timer);
-                pirq_guest_eoi(d, dpci_pirq(pirq_dpci));
+                pirq_guest_eoi(dpci_pirq(pirq_dpci));
             }
         }
     }

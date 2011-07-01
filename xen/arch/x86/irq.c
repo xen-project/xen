@@ -1158,17 +1158,17 @@ static void set_eoi_ready(void *data)
     flush_ready_eoi();
 }
 
-void pirq_guest_eoi(struct domain *d, struct pirq *pirq)
+void pirq_guest_eoi(struct pirq *pirq)
 {
     struct irq_desc *desc;
 
     ASSERT(local_irq_is_enabled());
     desc = pirq_spin_lock_irq_desc(pirq, NULL);
     if ( desc )
-        desc_guest_eoi(d, desc, pirq);
+        desc_guest_eoi(desc, pirq);
 }
 
-void desc_guest_eoi(struct domain *d, struct irq_desc *desc, struct pirq *pirq)
+void desc_guest_eoi(struct irq_desc *desc, struct pirq *pirq)
 {
     irq_guest_action_t *action;
     cpumask_t           cpu_eoi_map;
@@ -1238,7 +1238,7 @@ int pirq_guest_unmask(struct domain *d)
             pirq = pirqs[i]->pirq;
             if ( pirqs[i]->masked &&
                  !test_bit(pirqs[i]->evtchn, &shared_info(d, evtchn_mask)) )
-                pirq_guest_eoi(d, pirqs[i]);
+                pirq_guest_eoi(pirqs[i]);
         }
     } while ( ++pirq < d->nr_pirqs && n == ARRAY_SIZE(pirqs) );
 

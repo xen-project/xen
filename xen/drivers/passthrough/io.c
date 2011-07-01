@@ -44,7 +44,7 @@ static int pt_irq_guest_eoi(struct domain *d, struct hvm_pirq_dpci *pirq_dpci,
     {
         pirq_dpci->masked = 0;
         pirq_dpci->pending = 0;
-        pirq_guest_eoi(d, dpci_pirq(pirq_dpci));
+        pirq_guest_eoi(dpci_pirq(pirq_dpci));
     }
 
     return 0;
@@ -182,7 +182,7 @@ int pt_irq_create_bind_vtd(
             if ( pirq_dpci->gmsi.gvec != pt_irq_bind->u.msi.gvec ||
                  pirq_dpci->gmsi.gflags != pt_irq_bind->u.msi.gflags) {
                 /* Directly clear pending EOIs before enabling new MSI info. */
-                pirq_guest_eoi(d, info);
+                pirq_guest_eoi(info);
 
                 pirq_dpci->gmsi.gvec = pt_irq_bind->u.msi.gvec;
                 pirq_dpci->gmsi.gflags = pt_irq_bind->u.msi.gflags;
@@ -422,7 +422,7 @@ int hvm_do_IRQ_dpci(struct domain *d, struct pirq *pirq)
 
 #ifdef SUPPORT_MSI_REMAPPING
 /* called with d->event_lock held */
-static void __msi_pirq_eoi(struct domain *d, struct hvm_pirq_dpci *pirq_dpci)
+static void __msi_pirq_eoi(struct hvm_pirq_dpci *pirq_dpci)
 {
     irq_desc_t *desc;
 
@@ -437,7 +437,7 @@ static void __msi_pirq_eoi(struct domain *d, struct hvm_pirq_dpci *pirq_dpci)
             return;
 
          desc->status &= ~IRQ_INPROGRESS;
-         desc_guest_eoi(d, desc, pirq);
+         desc_guest_eoi(desc, pirq);
     }
 }
 
@@ -455,7 +455,7 @@ static int _hvm_dpci_msi_eoi(struct domain *d,
         if ( vlapic_match_dest(vcpu_vlapic(current), NULL, 0, dest,
                                dest_mode) )
         {
-            __msi_pirq_eoi(d, pirq_dpci);
+            __msi_pirq_eoi(pirq_dpci);
             return 1;
         }
     }
@@ -515,7 +515,7 @@ static int _hvm_dirq_assist(struct domain *d, struct hvm_pirq_dpci *pirq_dpci,
             if ( pirq_dpci->flags & HVM_IRQ_DPCI_TRANSLATE )
             {
                 /* for translated MSI to INTx interrupt, eoi as early as possible */
-                __msi_pirq_eoi(d, pirq_dpci);
+                __msi_pirq_eoi(pirq_dpci);
             }
 #endif
         }
@@ -570,7 +570,7 @@ static void __hvm_dpci_eoi(struct domain *d,
         return;
 
     stop_timer(&pirq_dpci->timer);
-    pirq_guest_eoi(d, pirq);
+    pirq_guest_eoi(pirq);
 }
 
 void hvm_dpci_eoi(struct domain *d, unsigned int guest_gsi,

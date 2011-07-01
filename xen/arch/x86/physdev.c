@@ -271,7 +271,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             evtchn_unmask(pirq->evtchn);
         if ( !is_hvm_domain(v->domain) ||
              pirq->arch.hvm.emuirq == IRQ_PT )
-            pirq_guest_eoi(v->domain, pirq);
+            pirq_guest_eoi(pirq);
         spin_unlock(&v->domain->event_lock);
         ret = 0;
         break;

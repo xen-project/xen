@@ -162,8 +162,8 @@ void pirq_cleanup_check(struct pirq *, struct domain *);
 #define pirq_cleanup_check(pirq, d) \
     ((pirq)->evtchn ? pirq_cleanup_check(pirq, d) : (void)0)
 
-extern void pirq_guest_eoi(struct domain *, struct pirq *);
-extern void desc_guest_eoi(struct domain *, struct irq_desc *, struct pirq *);
+extern void pirq_guest_eoi(struct pirq *);
+extern void desc_guest_eoi(struct irq_desc *, struct pirq *);
 extern int pirq_guest_unmask(struct domain *d);
 extern int pirq_guest_bind(struct vcpu *, struct pirq *, int will_share);
 extern void pirq_guest_unbind(struct domain *d, struct pirq *);

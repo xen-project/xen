@@ -425,7 +425,7 @@ static int pirq_acktype(int irq)
     return ACKTYPE_NONE;
 }
 
-int pirq_guest_eoi(struct domain *d, struct pirq *pirq)
+int pirq_guest_eoi(struct pirq *pirq)
 {
     irq_desc_t *desc;
     irq_guest_action_t *action;
@@ -466,7 +466,7 @@ int pirq_guest_unmask(struct domain *d)
             pirq = pirqs[i]->pirq;
             if ( pirqs[i]->masked &&
                  !test_bit(pirqs[i]->evtchn, &s->evtchn_mask[0]) )
-            pirq_guest_eoi(d, pirqs[i]);
+            pirq_guest_eoi(pirqs[i]);
         }
     } while ( ++pirq < d->nr_pirqs && n == ARRAY_SIZE(pirqs) );
 
