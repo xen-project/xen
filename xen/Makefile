@@ -35,11 +35,16 @@ _install: $(TARGET).gz
 	ln -f -s $(notdir $(TARGET))-$(XEN_FULLVERSION).gz $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_VERSION).gz
 	ln -f -s $(notdir $(TARGET))-$(XEN_FULLVERSION).gz $(DESTDIR)/boot/$(notdir $(TARGET)).gz
 	$(INSTALL_DATA) $(TARGET)-syms $(DESTDIR)/boot/$(notdir $(TARGET))-syms-$(XEN_FULLVERSION)
-	if [ -r $(TARGET).efi -a -n "$(EFI_MOUNTPOINT)" ]; then \
-		if [ -n '$(EFI_VENDOR)' ]; then \
+	if [ -r $(TARGET).efi ]; then \
+		[ -d $(DESTDIR)$(LIBDIR)/efi ] || $(INSTALL_DIR) $(DESTDIR)$(LIBDIR)/efi; \
+		$(INSTALL_DATA) $(TARGET).efi $(DESTDIR)$(LIBDIR)/efi/$(notdir $(TARGET))-$(XEN_FULLVERSION).efi; \
+		ln -sf $(notdir $(TARGET))-$(XEN_FULLVERSION).efi $(DESTDIR)$(LIBDIR)/efi/$(notdir $(TARGET))-$(XEN_VERSION).$(XEN_SUBVERSION).efi; \
+		ln -sf $(notdir $(TARGET))-$(XEN_FULLVERSION).efi $(DESTDIR)$(LIBDIR)/efi/$(notdir $(TARGET))-$(XEN_VERSION).efi; \
+		ln -sf $(notdir $(TARGET))-$(XEN_FULLVERSION).efi $(DESTDIR)$(LIBDIR)/efi/$(notdir $(TARGET)).efi; \
+		if [ -n '$(EFI_MOUNTPOINT)' -a -n '$(EFI_VENDOR)' ]; then \
 			$(INSTALL_DATA) $(TARGET).efi $(DESTDIR)$(EFI_MOUNTPOINT)/efi/$(EFI_VENDOR)/$(notdir $(TARGET))-$(XEN_FULLVERSION).efi; \
 		elif [ "$(DESTDIR)" = "$(patsubst $(shell cd $(XEN_ROOT) && pwd)/%,%,$(DESTDIR))" ]; then \
-			echo 'EFI installation not done (EFI_VENDOR not set)' >&2; \
+			echo 'EFI installation only partially done (EFI_VENDOR not set)' >&2; \
 		fi; \
 	fi
 
