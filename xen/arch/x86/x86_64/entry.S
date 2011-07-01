@@ -461,9 +461,11 @@ ENTRY(ret_from_intr)
         jz    test_all_events
         jmp   compat_test_all_events
 
-        ALIGN
+ENTRY(page_fault)
+        movl  $TRAP_page_fault,4(%rsp)
 /* No special register assumptions. */
-ENTRY(handle_exception)
+	.globl handle_exception
+handle_exception:
         SAVE_ALL
 handle_exception_saved:
         testb $X86_EFLAGS_IF>>8,UREGS_eflags+1(%rsp)
@@ -583,10 +585,6 @@ ENTRY(general_protection)
 
 ENTRY(alignment_check)
         movl  $TRAP_alignment_check,4(%rsp)
-        jmp   handle_exception
-
-ENTRY(page_fault)
-        movl  $TRAP_page_fault,4(%rsp)
         jmp   handle_exception
 
 ENTRY(spurious_interrupt_bug)

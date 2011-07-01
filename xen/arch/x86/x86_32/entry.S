@@ -426,9 +426,8 @@ ENTRY(ret_from_intr)
         jnz   test_all_events
         jmp   restore_all_xen
 
-ENTRY(divide_error)
-        pushl $TRAP_divide_error<<16
-        ALIGN
+ENTRY(page_fault)
+        movw  $TRAP_page_fault,2(%esp)
 handle_exception:
         FIXUP_RING0_GUEST_STACK
         SAVE_ALL(1f,2f)
@@ -501,6 +500,10 @@ ENTRY(device_not_available)
         pushl $TRAP_no_device<<16
         jmp   handle_exception
 
+ENTRY(divide_error)
+        pushl $TRAP_divide_error<<16
+        jmp   handle_exception
+
 ENTRY(debug)
         pushl $TRAP_debug<<16
         jmp   handle_exception
@@ -543,10 +546,6 @@ ENTRY(general_protection)
 
 ENTRY(alignment_check)
         movw  $TRAP_alignment_check,2(%esp)
-        jmp   handle_exception
-
-ENTRY(page_fault)
-        movw  $TRAP_page_fault,2(%esp)
         jmp   handle_exception
 
 ENTRY(spurious_interrupt_bug)
