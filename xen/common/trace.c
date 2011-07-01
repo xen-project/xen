@@ -45,7 +45,9 @@ CHECK_t_buf;
 
 /* opt_tbuf_size: trace buffer size (in pages) for each cpu */
 static unsigned int opt_tbuf_size;
+static unsigned int opt_tevt_mask;
 integer_param("tbuf_size", opt_tbuf_size);
+integer_param("tevt_mask", opt_tevt_mask);
 
 /* Pointers to the meta-data objects for all system trace buffers */
 static struct t_info *t_info;
@@ -338,11 +340,21 @@ void __init init_trace_bufs(void)
 {
     register_cpu_notifier(&cpu_nfb);
 
-    if ( opt_tbuf_size && alloc_trace_bufs(opt_tbuf_size) )
+    if ( opt_tbuf_size )
     {
-        printk(XENLOG_INFO "xentrace: allocation size %d failed, disabling\n",
-               opt_tbuf_size);
-        opt_tbuf_size = 0;
+        if ( alloc_trace_bufs(opt_tbuf_size) )
+        {
+            printk("xentrace: allocation size %d failed, disabling\n",
+                   opt_tbuf_size);
+            opt_tbuf_size = 0;
+        }
+        else if ( opt_tevt_mask )
+        {
+            printk("xentrace: Starting tracing, enabling mask %x\n",
+                   opt_tevt_mask);
+            tb_event_mask = opt_tevt_mask;
+            tb_init_done=1;
+        }
     }
 }
 
