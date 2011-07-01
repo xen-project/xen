@@ -968,29 +968,30 @@ struct irq_desc *domain_spin_lock_irq_desc(
 }
 
 /*
- * Same with struct pirq already looked up, and d->event_lock already
- * held (thus the PIRQ <-> IRQ mapping can't change under our feet).
+ * Same with struct pirq already looked up.
  */
 struct irq_desc *pirq_spin_lock_irq_desc(
     struct domain *d, const struct pirq *pirq, unsigned long *pflags)
 {
-    int irq = pirq->arch.irq;
     struct irq_desc *desc;
     unsigned long flags;
 
-    ASSERT(spin_is_locked(&d->event_lock));
+    for ( ; ; )
+    {
+        int irq = pirq->arch.irq;
 
-    if ( irq <= 0 )
-        return NULL;
+        if ( irq <= 0 )
+            return NULL;
 
-    desc = irq_to_desc(irq);
-    spin_lock_irqsave(&desc->lock, flags);
+        desc = irq_to_desc(irq);
+        spin_lock_irqsave(&desc->lock, flags);
+        if ( irq == pirq->arch.irq )
+            break;
+        spin_unlock_irqrestore(&desc->lock, flags);
+    }
 
     if ( pflags )
         *pflags = flags;
-
-    ASSERT(pirq == pirq_info(d, domain_irq_to_pirq(d, irq)));
-    ASSERT(irq == pirq->arch.irq);
 
     return desc;
 }
