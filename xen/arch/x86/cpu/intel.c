@@ -25,6 +25,30 @@
 struct movsl_mask movsl_mask __read_mostly;
 #endif
 
+static unsigned int probe_intel_cpuid_faulting(void)
+{
+	uint32_t x;
+	return !rdmsr_safe(MSR_INTEL_PLATFORM_INFO, x) && (x & (1u<<31));
+}
+
+static DEFINE_PER_CPU(bool_t, cpuid_faulting_enabled);
+void set_cpuid_faulting(bool_t enable)
+{
+	uint32_t hi, lo;
+
+	if (!cpu_has_cpuid_faulting ||
+	    this_cpu(cpuid_faulting_enabled) == enable )
+		return;
+
+	rdmsr(MSR_INTEL_MISC_FEATURES_ENABLES, lo, hi);
+	lo &= ~1;
+	if (enable)
+		lo |= 1;
+	wrmsr(MSR_INTEL_MISC_FEATURES_ENABLES, lo, hi);
+
+	this_cpu(cpuid_faulting_enabled) = enable;
+}
+
 /*
  * opt_cpuid_mask_ecx/edx: cpuid.1[ecx, edx] feature mask.
  * For example, E8400[Intel Core 2 Duo Processor series] ecx = 0x0008E3FD,
@@ -194,7 +218,19 @@ static void __devinit init_intel(struct cpuinfo_x86 *c)
 		detect_ht(c);
 	}
 
-	set_cpuidmask(c);
+	if (smp_processor_id() == 0) {
+		if (probe_intel_cpuid_faulting())
+			set_bit(X86_FEATURE_CPUID_FAULTING, c->x86_capability);
+	} else if (boot_cpu_has(X86_FEATURE_CPUID_FAULTING)) {
+		BUG_ON(!probe_intel_cpuid_faulting());
+		set_bit(X86_FEATURE_CPUID_FAULTING, c->x86_capability);
+	}
+
+	if (!cpu_has_cpuid_faulting)
+		set_cpuidmask(c);
+
+	BUG_ON(cpu_has(c, X86_FEATURE_CPUID_FAULTING) !=
+	       boot_cpu_has(X86_FEATURE_CPUID_FAULTING));
 
 	/* Work around errata */
 	Intel_errata_workarounds(c);

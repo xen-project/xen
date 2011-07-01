@@ -79,6 +79,7 @@
 #define X86_FEATURE_ARCH_PERFMON (3*32+11) /* Intel Architectural PerfMon */
 #define X86_FEATURE_TSC_RELIABLE (3*32+12) /* TSC is known to be reliable */
 #define X86_FEATURE_XTOPOLOGY    (3*32+13) /* cpu topology enum extensions */
+#define X86_FEATURE_CPUID_FAULTING (3*32+14) /* cpuid faulting */
 
 /* Intel-defined CPU features, CPUID level 0x00000001 (ecx), word 4 */
 #define X86_FEATURE_XMM3	(4*32+ 0) /* Streaming SIMD Extensions-3 */
@@ -223,6 +224,8 @@
 #define cpu_has_svm		boot_cpu_has(X86_FEATURE_SVM)
 
 #define cpu_has_vmx		boot_cpu_has(X86_FEATURE_VMXE)
+
+#define cpu_has_cpuid_faulting	boot_cpu_has(X86_FEATURE_CPUID_FAULTING)
 
 #endif /* __ASM_I386_CPUFEATURE_H */
 

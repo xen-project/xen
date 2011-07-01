@@ -196,6 +196,8 @@ extern struct cpuinfo_x86 cpu_data[];
 #define current_cpu_data boot_cpu_data
 #endif
 
+extern void set_cpuid_faulting(bool_t enable);
+
 extern u64 host_pat;
 extern bool_t opt_cpu_info;
 

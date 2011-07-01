@@ -2115,11 +2115,13 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
  twobyte_opcode:
     /*
-     * All 2 and 3 byte opcodes, except RDTSC (0x31) and RDTSCP (0x1,0xF9)
-     * are executable only from guest kernel mode (virtual ring 0).
+     * All 2 and 3 byte opcodes, except RDTSC (0x31), RDTSCP (0x1,0xF9),
+     * and CPUID (0xa2), are executable only from guest kernel mode 
+     * (virtual ring 0).
      */
     opcode = insn_fetch(u8, code_base, eip, code_limit);
-    if ( !guest_kernel_mode(v, regs) && (opcode != 0x1) && (opcode != 0x31) )
+    if ( !guest_kernel_mode(v, regs) && 
+        (opcode != 0x1) && (opcode != 0x31) && (opcode != 0xa2) )
         goto fail;
 
     if ( lock && (opcode & ~3) != 0x20 )
@@ -2552,6 +2554,10 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             regs->edx = (uint32_t)(msr_content >> 32);
             break;
         }
+        break;
+
+    case 0xa2: /* CPUID */
+        pv_cpuid(regs);
         break;
 
     default:

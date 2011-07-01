@@ -1658,6 +1658,9 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
             load_LDT(next);
             load_segments(next);
         }
+
+        set_cpuid_faulting(!is_hvm_vcpu(next) &&
+                           (next->domain->domain_id != 0));
     }
 
     context_saved(prev);
