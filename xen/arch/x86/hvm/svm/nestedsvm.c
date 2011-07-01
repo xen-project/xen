@@ -28,6 +28,10 @@
 #include <asm/event.h> /* for local_event_delivery_(en|dis)able */
 #include <asm/p2m.h> /* p2m_get_pagetable, p2m_get_nestedp2m */
 
+
+#define NSVM_ERROR_VVMCB        1
+#define NSVM_ERROR_VMENTRY      2
+ 
 static void
 nestedsvm_vcpu_clgi(struct vcpu *v)
 {
@@ -616,13 +620,13 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
     rc = svm_vmcb_isvalid(__func__, ns_vmcb, 1);
     if (rc) {
         gdprintk(XENLOG_ERR, "virtual vmcb invalid\n");
-        return rc;
+        return NSVM_ERROR_VVMCB;
     }
 
     rc = svm_vmcb_isvalid(__func__, n2vmcb, 1);
     if (rc) {
         gdprintk(XENLOG_ERR, "n2vmcb invalid\n");
-        return rc;
+        return NSVM_ERROR_VMENTRY;
     }
 
     /* Switch guest registers to l2 guest */
@@ -718,7 +722,15 @@ nsvm_vcpu_vmrun(struct vcpu *v, struct cpu_user_regs *regs)
      * and l1 guest keeps alive. */
     nestedhvm_vcpu_enter_guestmode(v);
 
-    if (ret) {
+    switch (ret) {
+    case 0:
+        break;
+    case NSVM_ERROR_VVMCB:
+        gdprintk(XENLOG_ERR, "inject VMEXIT(INVALID)\n");
+        svm->ns_vmexit.exitcode = VMEXIT_INVALID;
+        return -1;
+    case NSVM_ERROR_VMENTRY:
+    default:
         gdprintk(XENLOG_ERR,
             "nsvm_vcpu_vmentry failed, injecting #UD\n");
         hvm_inject_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE, 0);
