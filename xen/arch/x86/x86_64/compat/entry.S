@@ -12,7 +12,6 @@
 #include <public/xen.h>
 #include <irq_vectors.h>
 
-        ALIGN
 ENTRY(compat_hypercall)
         pushq $0
         movl  $TRAP_syscall,4(%rsp)

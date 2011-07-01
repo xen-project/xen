@@ -138,7 +138,6 @@ restore_all_xen:
         addl $4,%esp
         iret
 
-        ALIGN
 ENTRY(hypercall)
         subl $4,%esp
         FIXUP_RING0_GUEST_STACK
@@ -417,7 +416,6 @@ domain_crash_synchronous:
         call  printk
         jmp   __domain_crash_synchronous
 
-        ALIGN
 ENTRY(ret_from_intr)
         GET_CURRENT(%ebx)
         movl  UREGS_eflags(%esp),%eax

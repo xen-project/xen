@@ -110,7 +110,6 @@ restore_all_xen:
  * the stack, starting with %rip, and an appropriate %ss must be saved into
  * the space left by the trampoline.
  */
-        ALIGN
 ENTRY(syscall_enter)
         sti
         movl  $FLAT_KERNEL_SS,24(%rsp)
@@ -450,7 +449,6 @@ ENTRY(domain_crash_synchronous)
         call  printk
         jmp  __domain_crash_synchronous
 
-        ALIGN
 /* No special register assumptions. */
 ENTRY(ret_from_intr)
         GET_CURRENT(%rbx)
