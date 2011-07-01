@@ -432,7 +432,7 @@ static void __msi_pirq_eoi(struct domain *d, struct hvm_pirq_dpci *pirq_dpci)
         struct pirq *pirq = dpci_pirq(pirq_dpci);
 
          BUG_ON(!local_irq_is_enabled());
-         desc = pirq_spin_lock_irq_desc(d, pirq, NULL);
+         desc = pirq_spin_lock_irq_desc(pirq, NULL);
          if ( !desc )
             return;
 

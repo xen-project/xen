@@ -375,7 +375,7 @@ int msixtbl_pt_register(struct domain *d, struct pirq *pirq, uint64_t gtable)
     if ( !new_entry )
         return -ENOMEM;
 
-    irq_desc = pirq_spin_lock_irq_desc(d, pirq, NULL);
+    irq_desc = pirq_spin_lock_irq_desc(pirq, NULL);
     if ( !irq_desc )
     {
         xfree(new_entry);
@@ -422,7 +422,7 @@ void msixtbl_pt_unregister(struct domain *d, struct pirq *pirq)
     ASSERT(spin_is_locked(&pcidevs_lock));
     ASSERT(spin_is_locked(&d->event_lock));
 
-    irq_desc = pirq_spin_lock_irq_desc(d, pirq, NULL);
+    irq_desc = pirq_spin_lock_irq_desc(pirq, NULL);
     if ( !irq_desc )
         return;
 

@@ -171,7 +171,7 @@ extern void pirq_set_affinity(struct domain *d, int irq, const cpumask_t *);
 extern irq_desc_t *domain_spin_lock_irq_desc(
     struct domain *d, int irq, unsigned long *pflags);
 extern irq_desc_t *pirq_spin_lock_irq_desc(
-    struct domain *, const struct pirq *, unsigned long *pflags);
+    const struct pirq *, unsigned long *pflags);
 
 static inline void set_native_irq_info(unsigned int irq, const cpumask_t *mask)
 {

@@ -258,7 +258,7 @@ static int hvm_migrate_pirq(struct domain *d, struct hvm_pirq_dpci *pirq_dpci,
          (pirq_dpci->gmsi.dest_vcpu_id == v->vcpu_id) )
     {
         struct irq_desc *desc =
-            pirq_spin_lock_irq_desc(d, dpci_pirq(pirq_dpci), NULL);
+            pirq_spin_lock_irq_desc(dpci_pirq(pirq_dpci), NULL);
 
         if ( !desc )
             return 0;

@@ -946,32 +946,16 @@ static void __do_IRQ_guest(int irq)
 struct irq_desc *domain_spin_lock_irq_desc(
     struct domain *d, int pirq, unsigned long *pflags)
 {
-    int irq;
-    unsigned long flags;
-    struct irq_desc *desc;
+    const struct pirq *info = pirq_info(d, pirq);
 
-    for ( ; ; )
-    {
-        irq = domain_pirq_to_irq(d, pirq);
-        if ( irq <= 0 )
-            return NULL;
-        desc = irq_to_desc(irq);
-        spin_lock_irqsave(&desc->lock, flags);
-        if ( irq == domain_pirq_to_irq(d, pirq) )
-            break;
-        spin_unlock_irqrestore(&desc->lock, flags);
-    }
-
-    if ( pflags != NULL )
-        *pflags = flags;
-    return desc;
+    return info ? pirq_spin_lock_irq_desc(info, pflags) : NULL;
 }
 
 /*
  * Same with struct pirq already looked up.
  */
 struct irq_desc *pirq_spin_lock_irq_desc(
-    struct domain *d, const struct pirq *pirq, unsigned long *pflags)
+    const struct pirq *pirq, unsigned long *pflags)
 {
     struct irq_desc *desc;
     unsigned long flags;
@@ -1179,7 +1163,7 @@ void pirq_guest_eoi(struct domain *d, struct pirq *pirq)
     struct irq_desc *desc;
 
     ASSERT(local_irq_is_enabled());
-    desc = pirq_spin_lock_irq_desc(d, pirq, NULL);
+    desc = pirq_spin_lock_irq_desc(pirq, NULL);
     if ( desc )
         desc_guest_eoi(d, desc, pirq);
 }
@@ -1338,7 +1322,7 @@ int pirq_guest_bind(struct vcpu *v, struct pirq *pirq, int will_share)
     BUG_ON(!local_irq_is_enabled());
 
  retry:
-    desc = pirq_spin_lock_irq_desc(v->domain, pirq, NULL);
+    desc = pirq_spin_lock_irq_desc(pirq, NULL);
     if ( desc == NULL )
     {
         rc = -EINVAL;
@@ -1541,7 +1525,7 @@ void pirq_guest_unbind(struct domain *d, struct pirq *pirq)
     WARN_ON(!spin_is_locked(&d->event_lock));
 
     BUG_ON(!local_irq_is_enabled());
-    desc = pirq_spin_lock_irq_desc(d, pirq, NULL);
+    desc = pirq_spin_lock_irq_desc(pirq, NULL);
 
     if ( desc == NULL )
     {
@@ -1576,7 +1560,7 @@ static int pirq_guest_force_unbind(struct domain *d, struct pirq *pirq)
     WARN_ON(!spin_is_locked(&d->event_lock));
 
     BUG_ON(!local_irq_is_enabled());
-    desc = pirq_spin_lock_irq_desc(d, pirq, NULL);
+    desc = pirq_spin_lock_irq_desc(pirq, NULL);
     BUG_ON(desc == NULL);
 
     if ( !(desc->status & IRQ_GUEST) )
