@@ -44,6 +44,17 @@ unsigned long efi_rs_enter(void)
     /* prevent fixup_page_fault() from doing anything */
     irq_enter();
 
+    if ( !is_hvm_vcpu(current) && !is_idle_vcpu(current) )
+    {
+        struct desc_ptr gdt_desc = {
+            .limit = LAST_RESERVED_GDT_BYTE,
+            .base  = (unsigned long)(per_cpu(gdt_table, smp_processor_id()) -
+                                     FIRST_RESERVED_GDT_ENTRY)
+        };
+
+        asm volatile ( "lgdt %0" : : "m" (gdt_desc) );
+    }
+
     write_cr3(virt_to_maddr(efi_l4_pgtable));
 
     return cr3;
@@ -52,6 +63,15 @@ unsigned long efi_rs_enter(void)
 void efi_rs_leave(unsigned long cr3)
 {
     write_cr3(cr3);
+    if ( !is_hvm_vcpu(current) && !is_idle_vcpu(current) )
+    {
+        struct desc_ptr gdt_desc = {
+            .limit = LAST_RESERVED_GDT_BYTE,
+            .base  = GDT_VIRT_START(current)
+        };
+
+        asm volatile ( "lgdt %0" : : "m" (gdt_desc) );
+    }
     irq_exit();
     spin_unlock(&efi_rs_lock);
 }
