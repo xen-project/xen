@@ -229,9 +229,6 @@ static void __devinit init_intel(struct cpuinfo_x86 *c)
 	if (!cpu_has_cpuid_faulting)
 		set_cpuidmask(c);
 
-	BUG_ON(cpu_has(c, X86_FEATURE_CPUID_FAULTING) !=
-	       boot_cpu_has(X86_FEATURE_CPUID_FAULTING));
-
 	/* Work around errata */
 	Intel_errata_workarounds(c);
 
