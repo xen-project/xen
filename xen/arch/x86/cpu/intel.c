@@ -27,7 +27,7 @@ struct movsl_mask movsl_mask __read_mostly;
 
 static unsigned int probe_intel_cpuid_faulting(void)
 {
-	uint32_t x;
+	uint64_t x;
 	return !rdmsr_safe(MSR_INTEL_PLATFORM_INFO, x) && (x & (1u<<31));
 }
 
