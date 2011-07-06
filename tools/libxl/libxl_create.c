@@ -424,6 +424,12 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
             goto error_out;
     }
 
+
+    for (i = 0; i < d_config->num_disks; i++) {
+        ret = libxl__device_disk_set_backend(gc, &d_config->disks[i]);
+        if (ret) goto error_out;
+    }
+
     if ( restore_fd < 0 ) {
         ret = libxl_run_bootloader(ctx, &d_config->b_info, d_config->num_disks > 0 ? &d_config->disks[0] : NULL, domid);
         if (ret) {

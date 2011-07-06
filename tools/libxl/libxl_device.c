@@ -118,6 +118,122 @@ out:
     return rc;
 }
 
+typedef struct {
+    libxl__gc *gc;
+    libxl_device_disk *disk;
+    struct stat stab;
+} disk_try_backend_args;
+
+static int disk_try_backend(disk_try_backend_args *a,
+                            libxl_disk_backend backend) {
+    /* returns 0 (ie, DISK_BACKEND_UNKNOWN) on failure, or
+     * backend on success */
+    libxl_ctx *ctx = libxl__gc_owner(a->gc);
+    switch (backend) {
+
+    case LIBXL_DISK_BACKEND_PHY:
+        if (!(a->disk->format == LIBXL_DISK_FORMAT_RAW ||
+              a->disk->format == LIBXL_DISK_FORMAT_EMPTY)) {
+            LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Disk vdev=%s, backend phy"
+                       " unsuitable due to format %s",
+                       a->disk->vdev,
+                       libxl_disk_format_to_string(a->disk->format));
+            return 0;
+        }
+        if (a->disk->format != LIBXL_DISK_FORMAT_EMPTY &&
+            !S_ISBLK(a->stab.st_mode)) {
+            LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Disk vdev=%s, backend phy"
+                       " unsuitable as phys path not a block device",
+                       a->disk->vdev);
+            return ERROR_INVAL;
+        }
+
+        return backend;
+
+    case LIBXL_DISK_BACKEND_TAP:
+        if (!libxl__blktap_enabled(a->gc)) {
+            LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Disk vdev=%s, backend tap"
+                       " unsuitable because blktap not available",
+                       a->disk->vdev);
+            return 0;
+        }
+        if (a->disk->format == LIBXL_DISK_FORMAT_EMPTY ||
+            (S_ISREG(a->stab.st_mode) && !a->stab.st_size)) {
+            LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Disk vdev=%s, backend tap"
+                       " unsuitable because empty devices not supported",
+                       a->disk->vdev);
+            return 0;
+        }
+        return backend;
+
+    case LIBXL_DISK_BACKEND_QDISK:
+        return backend;
+
+    default:
+        LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Disk vdev=%s, backend "
+                   " %d unknown", a->disk->vdev, backend);
+        return 0;
+        
+    }
+}            
+
+int libxl__device_disk_set_backend(libxl__gc *gc, libxl_device_disk *disk) {
+    libxl_ctx *ctx = libxl__gc_owner(gc);
+    libxl_disk_backend ok;
+    disk_try_backend_args a;
+
+    a.gc = gc;
+    a.disk = disk;
+
+    LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Disk vdev=%s spec.backend=%s",
+               disk->vdev,
+               libxl_disk_backend_to_string(disk->backend));
+
+    if (disk->format == LIBXL_DISK_FORMAT_EMPTY) {
+        if (!disk->is_cdrom) {
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Disk vdev=%s is empty"
+                       " but not cdrom",
+                       disk->vdev);
+            return ERROR_INVAL;
+        }
+        memset(&a.stab, 0, sizeof(a.stab));
+    } else {
+        if (stat(disk->pdev_path, &a.stab)) {
+            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Disk vdev=%s "
+                             "failed to stat: %s",
+                             disk->vdev, disk->pdev_path);
+            return ERROR_INVAL;
+        }
+        if (!S_ISBLK(a.stab.st_mode) &
+            !S_ISREG(a.stab.st_mode)) {
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Disk vdev=%s "
+                             "phys path is not a block dev or file: %s",
+                             disk->vdev, disk->pdev_path);
+            return ERROR_INVAL;
+        }
+    }
+
+    if (disk->backend != LIBXL_DISK_BACKEND_UNKNOWN) {
+        ok= disk_try_backend(&a, disk->backend);
+    } else {
+        ok=
+            disk_try_backend(&a, LIBXL_DISK_BACKEND_PHY) ?:
+            disk_try_backend(&a, LIBXL_DISK_BACKEND_TAP) ?:
+            disk_try_backend(&a, LIBXL_DISK_BACKEND_QDISK);
+        if (ok)
+            LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Disk vdev=%s, using backend %s",
+                       disk->vdev,
+                       libxl_disk_backend_to_string(ok));
+    }
+    if (!ok) {
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "no suitable backend for disk %s",
+                   disk->vdev);
+        return ERROR_INVAL;
+    }
+    disk->backend = ok;
+    return 0;
+}
+
 char *libxl__device_disk_string_of_format(libxl_disk_format format)
 {
     switch (format) {
