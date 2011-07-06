@@ -52,7 +52,7 @@ $(XL_OBJS): CFLAGS += $(CFLAGS_libxenctrl) # For xentoollog.h
 $(XL_OBJS): CFLAGS += $(CFLAGS_libxenlight)
 
 testenum.o: CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenlight)
-testenum.c: libxl.idl gentest.py
+testenum.c: libxl.idl gentest.py libxl.h
 	$(PYTHON) gentest.py libxl.idl testenum.c.new
 	mv testenum.c.new testenum.c
 
