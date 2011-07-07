@@ -145,7 +145,7 @@ static int disk_try_backend(disk_try_backend_args *a,
             LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Disk vdev=%s, backend phy"
                        " unsuitable as phys path not a block device",
                        a->disk->vdev);
-            return ERROR_INVAL;
+            return 0;
         }
 
         return backend;
