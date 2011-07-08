@@ -2164,14 +2164,6 @@ int __init construct_dom0(struct domain *d,
 		return -1;
 	}
 
-	if (test_bit(XENFEAT_unprivileged, parms.f_required) ||
-	    (test_bit(XENFEAT_unprivileged, parms.f_supported) &&
-	     !test_bit(XENFEAT_privileged, parms.f_supported)))
-	{
-		printk("Kernel does not support Dom0 operation\n");
-		return -1;
-	}
-
 	p_start = parms.virt_base;
 	pkern_start = parms.virt_kstart;
 	pkern_end = parms.virt_kend;
