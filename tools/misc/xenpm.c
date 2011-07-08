@@ -115,6 +115,9 @@ static int get_cxstat_by_cpuid(xc_interface *xc_handle, int cpuid, struct xc_cx_
     if ( !cxstat )
         return -EINVAL;
 
+    if ( !max_cx_num )
+        return -ENODEV;
+
     cxstat->triggers = malloc(max_cx_num * sizeof(uint64_t));
     if ( !cxstat->triggers )
         return -ENOMEM;
@@ -147,7 +150,7 @@ static int show_max_cstate(xc_interface *xc_handle)
     if ( (ret = xc_get_cpuidle_max_cstate(xc_handle, &value)) )
         return ret;
 
-    printf("Max C-state: C%d\n\n", value);
+    printf("Max possible C-state: C%d\n\n", value);
     return 0;
 }
 
@@ -158,7 +161,11 @@ static int show_cxstat_by_cpuid(xc_interface *xc_handle, int cpuid)
 
     ret = get_cxstat_by_cpuid(xc_handle, cpuid, &cxstatinfo);
     if ( ret )
+    {
+        if ( ret == -ENODEV )
+            printf("Either xen cpuidle is disabled or no valid information is registered!\n");
         return ret;
+    }
 
     print_cxstat(cpuid, &cxstatinfo);
 
@@ -1191,7 +1198,7 @@ int main(int argc, char *argv[])
 
     if ( nr_matches > 1 )
     {
-        fprintf(stderr, "Ambigious options: ");
+        fprintf(stderr, "Ambiguous options: ");
         for ( i = 0; i < nr_matches; i++ )
             fprintf(stderr, " %s", main_options[matches_main_options[i]].name);
         fprintf(stderr, "\n");
