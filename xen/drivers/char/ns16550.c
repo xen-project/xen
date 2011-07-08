@@ -328,6 +328,12 @@ static void __init ns16550_init_postirq(struct serial_port *port)
     ns16550_setup_postirq(uart);
 }
 
+static void ns16550_suspend(struct serial_port *port)
+{
+    struct ns16550 *uart = port->uart;
+    stop_timer(&uart->timer);
+}
+
 static void ns16550_resume(struct serial_port *port)
 {
     ns16550_setup_preirq(port->uart);
@@ -355,6 +361,7 @@ static struct uart_driver __read_mostly ns16550_driver = {
     .init_preirq  = ns16550_init_preirq,
     .init_postirq = ns16550_init_postirq,
     .endboot      = ns16550_endboot,
+    .suspend      = ns16550_suspend,
     .resume       = ns16550_resume,
     .tx_empty     = ns16550_tx_empty,
     .putc         = ns16550_putc,
