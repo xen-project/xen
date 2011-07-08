@@ -64,13 +64,14 @@ int elf_xen_parse_features(const char *features,
         {
             if ( !elf_xen_feature_names[i] )
                 continue;
-            if ( (required != NULL) && (feature[0] == '!') )
+            if ( feature[0] == '!' )
             {
                 /* required */
                 if ( !strcmp(feature + 1, elf_xen_feature_names[i]) )
                 {
                     elf_xen_feature_set(i, supported);
-                    elf_xen_feature_set(i, required);
+                    if ( required )
+                        elf_xen_feature_set(i, required);
                     break;
                 }
             }
