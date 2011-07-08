@@ -462,6 +462,25 @@ int __init scan_pci_devices(void)
     return 0;
 }
 
+/* Disconnect all PCI devices from the PCI buses. From the PCI spec:
+ *   "When a 0 is written to [the COMMAND] register, the device is
+ *    logically disconnected from the PCI bus for all accesses except
+ *    configuration accesses. All devices are required to support
+ *    this base level of functionality."
+ */
+void disconnect_pci_devices(void)
+{
+    struct pci_dev *pdev;
+
+    spin_lock(&pcidevs_lock);
+
+    list_for_each_entry ( pdev, &alldevs_list, alldevs_list )
+        pci_conf_write16(pdev->bus, PCI_SLOT(pdev->devfn),
+                         PCI_FUNC(pdev->devfn), PCI_COMMAND, 0);
+
+    spin_unlock(&pcidevs_lock);
+}
+
 #ifdef SUPPORT_MSI_REMAPPING
 static void dump_pci_devices(unsigned char ch)
 {

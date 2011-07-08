@@ -92,6 +92,8 @@ int pci_add_device_ext(u8 bus, u8 devfn, struct pci_dev_info *info);
 struct pci_dev *pci_get_pdev(int bus, int devfn);
 struct pci_dev *pci_get_pdev_by_domain(struct domain *d, int bus, int devfn);
 
+void disconnect_pci_devices(void);
+
 uint8_t pci_conf_read8(
     unsigned int bus, unsigned int dev, unsigned int func, unsigned int reg);
 uint16_t pci_conf_read16(
