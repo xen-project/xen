@@ -124,8 +124,13 @@ svm_vmcb_isvalid(const char *from, struct vmcb_struct *vmcb,
         PRINTF("CR3: MBZ bits are set (0x%"PRIx64")\n", vmcb->_cr3);
     }
 
-    if ((vmcb->_cr4 >> 11U) != 0) {
-        PRINTF("CR4: bits [63:11] are not zero (0x%"PRIx64")\n",
+    if ((vmcb->_cr4 >> 19U) != 0) {
+        PRINTF("CR4: bits [63:19] are not zero (0x%"PRIx64")\n",
+                vmcb->_cr4);
+    }
+
+    if (((vmcb->_cr4 >> 11U) & 0x7fU) != 0) {
+        PRINTF("CR4: bits [17:11] are not zero (0x%"PRIx64")\n",
                 vmcb->_cr4);
     }
 
