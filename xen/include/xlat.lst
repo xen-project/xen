@@ -59,6 +59,16 @@
 !	memory_map			memory.h
 !	memory_reservation		memory.h
 !	pod_target			memory.h
+?	physdev_eoi			physdev.h
+?	physdev_get_free_pirq		physdev.h
+?	physdev_irq			physdev.h
+?	physdev_irq_status_query	physdev.h
+?	physdev_manage_pci		physdev.h
+?	physdev_manage_pci_ext		physdev.h
+?	physdev_unmap_pirq		physdev.h
+?	physdev_restore_msi		physdev.h
+?	physdev_set_iopl		physdev.h
+?	physdev_setup_gsi		physdev.h
 !	sched_poll			sched.h
 ?	sched_remote_shutdown		sched.h
 ?	sched_shutdown			sched.h

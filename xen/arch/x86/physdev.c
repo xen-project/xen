@@ -17,17 +17,20 @@
 #include <xsm/xsm.h>
 #include <asm/p2m.h>
 
+int physdev_map_pirq(domid_t, int type, int *index, int *pirq_p,
+                     struct msi_info *);
+int physdev_unmap_pirq(domid_t, int pirq);
+
 #ifndef COMPAT
 typedef long ret_t;
-#endif
 
 static int physdev_hvm_map_pirq(
-    struct domain *d, struct physdev_map_pirq *map)
+    struct domain *d, int type, int *index, int *pirq)
 {
-    int pirq, ret = 0;
+    int ret = 0;
 
     spin_lock(&d->event_lock);
-    switch ( map->type )
+    switch ( type )
     {
     case MAP_PIRQ_TYPE_GSI: {
         struct hvm_irq_dpci *hvm_irq_dpci;
@@ -40,33 +43,31 @@ static int physdev_hvm_map_pirq(
         if ( hvm_irq_dpci )
         {
             list_for_each_entry ( girq,
-                                  &hvm_irq_dpci->girq[map->index],
+                                  &hvm_irq_dpci->girq[*index],
                                   list )
                 machine_gsi = girq->machine_gsi;
         }
         /* found one, this mean we are dealing with a pt device */
         if ( machine_gsi )
         {
-            map->index = domain_pirq_to_irq(d, machine_gsi);
-            pirq = machine_gsi;
-            ret = (pirq > 0) ? 0 : pirq;
+            *index = domain_pirq_to_irq(d, machine_gsi);
+            *pirq = machine_gsi;
+            ret = (*pirq > 0) ? 0 : *pirq;
         }
         /* we didn't find any, this means we are dealing
          * with an emulated device */
         else
         {
-            pirq = map->pirq;
-            if ( pirq < 0 )
-                pirq = get_free_pirq(d, map->type, map->index);
-            ret = map_domain_emuirq_pirq(d, pirq, map->index);
+            if ( *pirq < 0 )
+                *pirq = get_free_pirq(d, type, *index);
+            ret = map_domain_emuirq_pirq(d, *pirq, *index);
         }
-        map->pirq = pirq;
         break;
     }
 
     default:
         ret = -EINVAL;
-        dprintk(XENLOG_G_WARNING, "map type %d not supported yet\n", map->type);
+        dprintk(XENLOG_G_WARNING, "map type %d not supported yet\n", type);
         break;
     }
 
@@ -74,20 +75,20 @@ static int physdev_hvm_map_pirq(
     return ret;
 }
 
-static int physdev_map_pirq(struct physdev_map_pirq *map)
+int physdev_map_pirq(domid_t domid, int type, int *index, int *pirq_p,
+                     struct msi_info *msi)
 {
     struct domain *d;
     int pirq, irq, ret = 0;
-    struct msi_info _msi;
     void *map_data = NULL;
 
-    ret = rcu_lock_target_domain_by_id(map->domid, &d);
+    ret = rcu_lock_target_domain_by_id(domid, &d);
     if ( ret )
         return ret;
 
-    if ( map->domid == DOMID_SELF && is_hvm_domain(d) )
+    if ( domid == DOMID_SELF && is_hvm_domain(d) )
     {
-        ret = physdev_hvm_map_pirq(d, map);
+        ret = physdev_hvm_map_pirq(d, type, index, pirq_p);
         goto free_domain;
     }
 
@@ -98,22 +99,22 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
     }
 
     /* Verify or get irq. */
-    switch ( map->type )
+    switch ( type )
     {
     case MAP_PIRQ_TYPE_GSI:
-        if ( map->index < 0 || map->index >= nr_irqs_gsi )
+        if ( *index < 0 || *index >= nr_irqs_gsi )
         {
             dprintk(XENLOG_G_ERR, "dom%d: map invalid irq %d\n",
-                    d->domain_id, map->index);
+                    d->domain_id, *index);
             ret = -EINVAL;
             goto free_domain;
         }
 
-        irq = domain_pirq_to_irq(current->domain, map->index);
+        irq = domain_pirq_to_irq(current->domain, *index);
         if ( irq <= 0 )
         {
             if ( IS_PRIV(current->domain) )
-                irq = map->index;
+                irq = *index;
             else {
                 dprintk(XENLOG_G_ERR, "dom%d: map pirq with incorrect irq!\n",
                         d->domain_id);
@@ -124,7 +125,7 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
         break;
 
     case MAP_PIRQ_TYPE_MSI:
-        irq = map->index;
+        irq = *index;
         if ( irq == -1 )
             irq = create_irq();
 
@@ -136,17 +137,13 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
             goto free_domain;
         }
 
-        _msi.bus = map->bus;
-        _msi.devfn = map->devfn;
-        _msi.entry_nr = map->entry_nr;
-        _msi.table_base = map->table_base;
-        _msi.irq = irq;
-        map_data = &_msi;
+        msi->irq = irq;
+        map_data = msi;
         break;
 
     default:
         dprintk(XENLOG_G_ERR, "dom%d: wrong map_pirq type %x\n",
-                d->domain_id, map->type);
+                d->domain_id, type);
         ret = -EINVAL;
         goto free_domain;
     }
@@ -155,13 +152,12 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
     /* Verify or get pirq. */
     spin_lock(&d->event_lock);
     pirq = domain_irq_to_pirq(d, irq);
-    if ( map->pirq < 0 )
+    if ( *pirq_p < 0 )
     {
         if ( pirq )
         {
             dprintk(XENLOG_G_ERR, "dom%d: %d:%d already mapped to %d\n",
-                    d->domain_id, map->index, map->pirq,
-                    pirq);
+                    d->domain_id, *index, *pirq_p, pirq);
             if ( pirq < 0 )
             {
                 ret = -EBUSY;
@@ -170,7 +166,7 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
         }
         else
         {
-            pirq = get_free_pirq(d, map->type, map->index);
+            pirq = get_free_pirq(d, type, *index);
             if ( pirq < 0 )
             {
                 dprintk(XENLOG_G_ERR, "dom%d: no free pirq\n", d->domain_id);
@@ -181,20 +177,20 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
     }
     else
     {
-        if ( pirq && pirq != map->pirq )
+        if ( pirq && pirq != *pirq_p )
         {
             dprintk(XENLOG_G_ERR, "dom%d: pirq %d conflicts with irq %d\n",
-                    d->domain_id, map->index, map->pirq);
+                    d->domain_id, *index, *pirq_p);
             ret = -EEXIST;
             goto done;
         }
         else
-            pirq = map->pirq;
+            pirq = *pirq_p;
     }
 
-    ret = map_domain_pirq(d, pirq, irq, map->type, map_data);
+    ret = map_domain_pirq(d, pirq, irq, type, map_data);
     if ( ret == 0 )
-        map->pirq = pirq;
+        *pirq_p = pirq;
 
     if ( !ret && is_hvm_domain(d) )
         map_domain_emuirq_pirq(d, pirq, IRQ_PT);
@@ -202,28 +198,28 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
  done:
     spin_unlock(&d->event_lock);
     spin_unlock(&pcidevs_lock);
-    if ( (ret != 0) && (map->type == MAP_PIRQ_TYPE_MSI) && (map->index == -1) )
+    if ( (ret != 0) && (type == MAP_PIRQ_TYPE_MSI) && (*index == -1) )
         destroy_irq(irq);
  free_domain:
     rcu_unlock_domain(d);
     return ret;
 }
 
-static int physdev_unmap_pirq(struct physdev_unmap_pirq *unmap)
+int physdev_unmap_pirq(domid_t domid, int pirq)
 {
     struct domain *d;
     int ret;
 
-    ret = rcu_lock_target_domain_by_id(unmap->domid, &d);
+    ret = rcu_lock_target_domain_by_id(domid, &d);
     if ( ret )
         return ret;
 
     if ( is_hvm_domain(d) )
     {
         spin_lock(&d->event_lock);
-        ret = unmap_domain_pirq_emuirq(d, unmap->pirq);
+        ret = unmap_domain_pirq_emuirq(d, pirq);
         spin_unlock(&d->event_lock);
-        if ( unmap->domid == DOMID_SELF || ret )
+        if ( domid == DOMID_SELF || ret )
             goto free_domain;
     }
 
@@ -233,7 +229,7 @@ static int physdev_unmap_pirq(struct physdev_unmap_pirq *unmap)
 
     spin_lock(&pcidevs_lock);
     spin_lock(&d->event_lock);
-    ret = unmap_domain_pirq(d, unmap->pirq);
+    ret = unmap_domain_pirq(d, pirq);
     spin_unlock(&d->event_lock);
     spin_unlock(&pcidevs_lock);
 
@@ -241,6 +237,7 @@ static int physdev_unmap_pirq(struct physdev_unmap_pirq *unmap)
     rcu_unlock_domain(d);
     return ret;
 }
+#endif /* COMPAT */
 
 ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 {
@@ -352,13 +349,19 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
     }
 
     case PHYSDEVOP_map_pirq: {
-        struct physdev_map_pirq map;
+        physdev_map_pirq_t map;
+        struct msi_info msi;
 
         ret = -EFAULT;
         if ( copy_from_guest(&map, arg, 1) != 0 )
             break;
 
-        ret = physdev_map_pirq(&map);
+        msi.bus = map.bus;
+        msi.devfn = map.devfn;
+        msi.entry_nr = map.entry_nr;
+        msi.table_base = map.table_base;
+        ret = physdev_map_pirq(map.domid, map.type, &map.index, &map.pirq,
+                               &msi);
 
         if ( copy_to_guest(arg, &map, 1) != 0 )
             ret = -EFAULT;
@@ -372,7 +375,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         if ( copy_from_guest(&unmap, arg, 1) != 0 )
             break;
 
-        ret = physdev_unmap_pirq(&unmap);
+        ret = physdev_unmap_pirq(unmap.domid, unmap.pirq);
         break;
     }
 

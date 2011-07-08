@@ -15,8 +15,9 @@
 #define physdev_apic               compat_physdev_apic
 #define physdev_apic_t             physdev_apic_compat_t
 
-#define physdev_eoi                compat_physdev_eoi
-#define physdev_eoi_t              physdev_eoi_compat_t
+#define xen_physdev_eoi physdev_eoi
+CHECK_physdev_eoi;
+#undef xen_physdev_eoi
 
 #define physdev_pirq_eoi_gmfn      compat_physdev_pirq_eoi_gmfn
 #define physdev_pirq_eoi_gmfn_t    physdev_pirq_eoi_gmfn_compat_t
@@ -24,35 +25,43 @@
 #define physdev_set_iobitmap       compat_physdev_set_iobitmap
 #define physdev_set_iobitmap_t     physdev_set_iobitmap_compat_t
 
-#define physdev_set_iopl           compat_physdev_set_iopl
-#define physdev_set_iopl_t         physdev_set_iopl_compat_t
+#define xen_physdev_set_iopl physdev_set_iopl
+CHECK_physdev_set_iopl;
+#undef xen_physdev_set_iopl
 
-#define physdev_irq                compat_physdev_irq
-#define physdev_irq_t              physdev_irq_compat_t
+#define xen_physdev_irq physdev_irq
+CHECK_physdev_irq;
+#undef xen_physdev_irq
 
-#define physdev_irq_status_query   compat_physdev_irq_status_query
-#define physdev_irq_status_query_t physdev_irq_status_query_compat_t
+#define xen_physdev_irq_status_query physdev_irq_status_query
+CHECK_physdev_irq_status_query;
+#undef xen_physdev_irq_status_query
 
-#define physdev_map_pirq           compat_physdev_map_pirq
 #define physdev_map_pirq_t         physdev_map_pirq_compat_t
 
-#define physdev_unmap_pirq         compat_physdev_unmap_pirq
-#define physdev_unmap_pirq_t       physdev_unmap_pirq_compat_t
+#define xen_physdev_unmap_pirq physdev_unmap_pirq
+CHECK_physdev_unmap_pirq;
+#undef xen_physdev_unmap_pirq
 
-#define physdev_manage_pci         compat_physdev_manage_pci
-#define physdev_manage_pci_t       physdev_manage_pci_compat_t
+#define xen_physdev_manage_pci physdev_manage_pci
+CHECK_physdev_manage_pci;
+#undef xen_physdev_manage_pci
 
-#define physdev_manage_pci_ext     compat_physdev_manage_pci_ext
-#define physdev_manage_pci_ext_t   physdev_manage_pci_ext_compat_t
+#define xen_physdev_manage_pci_ext physdev_manage_pci_ext
+CHECK_physdev_manage_pci_ext;
+#undef xen_physdev_manage_pci_ext
 
-#define physdev_restore_msi        compat_physdev_restore_msi
-#define physdev_restore_msi_t      physdev_restore_msi_compat_t
+#define xen_physdev_restore_msi physdev_restore_msi
+CHECK_physdev_restore_msi;
+#undef xen_physdev_restore_msi
 
-#define physdev_setup_gsi          compat_physdev_setup_gsi
-#define physdev_setup_gsi_t        physdev_setup_gsi_compat_t
+#define xen_physdev_setup_gsi physdev_setup_gsi
+CHECK_physdev_setup_gsi;
+#undef xen_physdev_setup_gsi
 
-#define physdev_get_free_pirq      compat_physdev_get_free_pirq
-#define physdev_get_free_pirq_t    physdev_get_free_pirq_compat_t
+#define xen_physdev_get_free_pirq physdev_get_free_pirq
+CHECK_physdev_get_free_pirq;
+#undef xen_physdev_get_free_pirq
 
 #define COMPAT
 #undef guest_handle_okay
