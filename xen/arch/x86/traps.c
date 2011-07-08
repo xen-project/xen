@@ -704,15 +704,23 @@ int cpuid_hypervisor_leaves( uint32_t idx, uint32_t sub_idx,
     struct domain *d = current->domain;
     /* Optionally shift out of the way of Viridian architectural leaves. */
     uint32_t base = is_viridian_domain(d) ? 0x40000100 : 0x40000000;
+    uint32_t limit;
 
     idx -= base;
-    if ( idx > 3 ) 
+
+    /*
+     * Some Solaris PV drivers fail if max > base + 2. Help them out by
+     * hiding the PVRDTSCP leaf if PVRDTSCP is disabled.
+     */
+    limit = (d->arch.tsc_mode < TSC_MODE_PVRDTSCP) ? 2 : 3;
+
+    if ( idx > limit ) 
         return 0;
 
     switch ( idx )
     {
     case 0:
-        *eax = base + 3; /* Largest leaf */
+        *eax = base + limit; /* Largest leaf */
         *ebx = XEN_CPUID_SIGNATURE_EBX;
         *ecx = XEN_CPUID_SIGNATURE_ECX;
         *edx = XEN_CPUID_SIGNATURE_EDX;
