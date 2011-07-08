@@ -6,10 +6,10 @@
 # description: Run domain watchdog daemon
 ### BEGIN INIT INFO
 # Provides:          xen-watchdog
-# Required-Start:    xend
-# Should-Start:      $syslog $remote_fs
-# Required-Stop:     xend
-# Should-Stop:       $syslog $remote_fs
+# Required-Start:    $syslog $remote_fs
+# Should-Start:      xend
+# Required-Stop:     $syslog $remote_fs
+# Should-Stop:       xend
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
 # Short-Description: Start/stop xen-watchdog
