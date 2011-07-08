@@ -284,7 +284,7 @@ static inline int test_cyrix_52div(void)
 	return (unsigned char) (test >> 8) == 0x02;
 }
 
-static struct cpu_dev cyrix_cpu_dev __initdata = {
+static struct cpu_dev cyrix_cpu_dev __cpuinitdata = {
 	.c_vendor	= "Cyrix",
 	.c_ident 	= { "CyrixInstead" },
 	.c_init		= init_cyrix,
@@ -299,7 +299,7 @@ int __init cyrix_init_cpu(void)
 
 //early_arch_initcall(cyrix_init_cpu);
 
-static struct cpu_dev nsc_cpu_dev __initdata = {
+static struct cpu_dev nsc_cpu_dev __cpuinitdata = {
 	.c_vendor	= "NSC",
 	.c_ident 	= { "Geode by NSC" },
 	.c_init		= init_cyrix,
