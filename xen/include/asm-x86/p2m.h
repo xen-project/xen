@@ -597,12 +597,11 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
 /* Extract the type from the PTE flags that store it */
 static inline p2m_type_t p2m_flags_to_type(unsigned long flags)
 {
-    /* Type is stored in the "available" bits */
-#ifdef __x86_64__
     /* For AMD IOMMUs we need to use type 0 for plain RAM, but we need
      * to make sure that an entirely empty PTE doesn't have RAM type */
     if ( flags == 0 ) 
         return p2m_invalid;
+#ifdef __x86_64__
     /* AMD IOMMUs use bits 9-11 to encode next io page level and bits
      * 59-62 for iommu flags so we can't use them to store p2m type info. */
     return (flags >> 12) & 0x7f;
