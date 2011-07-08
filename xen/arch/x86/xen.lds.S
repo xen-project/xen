@@ -163,6 +163,7 @@ SECTIONS
        *(.eh_frame)
 #ifdef EFI
        *(.comment)
+       *(.comment.*)
 #endif
   }
 
