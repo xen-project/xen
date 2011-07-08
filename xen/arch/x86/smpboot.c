@@ -45,7 +45,6 @@
 #include <mach_apic.h>
 #include <mach_wakecpu.h>
 #include <smpboot_hooks.h>
-#include <acpi/cpufreq/processor_perf.h>
 
 #define setup_trampoline()    (bootsym_phys(trampoline_realmode_entry))
 

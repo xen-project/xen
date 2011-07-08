@@ -53,6 +53,8 @@
 #include <public/sysctl.h>
 #include <acpi/cpufreq/cpufreq.h>
 #include <asm/apic.h>
+#include <xen/notifier.h>
+#include <xen/cpu.h>
 
 /*#define DEBUG_PM_CX*/
 
@@ -592,23 +594,51 @@ default_halt:
         halt();
 }
 
-static int init_cx_pminfo(struct acpi_processor_power *acpi_power)
+static int cpuidle_init_cpu(int cpu)
 {
-    int i;
+    struct acpi_processor_power *acpi_power;
 
-    memset(acpi_power, 0, sizeof(*acpi_power));
+    acpi_power = processor_powers[cpu];
+    if ( !acpi_power )
+    {
+        int i;
+        acpi_power = xmalloc(struct acpi_processor_power);
+        if ( !acpi_power )
+            return -ENOMEM;
+        memset(acpi_power, 0, sizeof(*acpi_power));
 
-    for ( i = 0; i < ACPI_PROCESSOR_MAX_POWER; i++ )
-        acpi_power->states[i].idx = i;
+        for ( i = 0; i < ACPI_PROCESSOR_MAX_POWER; i++ )
+            acpi_power->states[i].idx = i;
+     
+        acpi_power->states[ACPI_STATE_C1].type = ACPI_STATE_C1;
+        acpi_power->states[ACPI_STATE_C1].entry_method = ACPI_CSTATE_EM_HALT;
+     
+        acpi_power->states[ACPI_STATE_C0].valid = 1;
+        acpi_power->states[ACPI_STATE_C1].valid = 1;
+     
+        acpi_power->count = 2;
+        acpi_power->safe_state = &acpi_power->states[ACPI_STATE_C1];
+        acpi_power->cpu = cpu;
+        processor_powers[cpu] = acpi_power;
+    }
 
-    acpi_power->states[ACPI_STATE_C1].type = ACPI_STATE_C1;
-    acpi_power->states[ACPI_STATE_C1].entry_method = ACPI_CSTATE_EM_HALT;
-
-    acpi_power->states[ACPI_STATE_C0].valid = 1;
-    acpi_power->states[ACPI_STATE_C1].valid = 1;
-
-    acpi_power->count = 2;
-    acpi_power->safe_state = &acpi_power->states[ACPI_STATE_C1];
+    if ( cpu == 0 )
+    {
+        if ( boot_cpu_has(X86_FEATURE_NONSTOP_TSC) )
+        {
+            get_tick = get_stime_tick;
+            ticks_elapsed = stime_ticks_elapsed;
+            tick_to_ns = stime_tick_to_ns;
+            ns_to_tick = ns_to_stime_tick;
+        }
+        else
+        {
+            get_tick = get_acpi_pm_tick;
+            ticks_elapsed = acpi_pm_ticks_elapsed;
+            tick_to_ns = acpi_pm_tick_to_ns;
+            ns_to_tick = ns_to_acpi_pm_tick;
+        }
+    }
 
     return 0;
 }
@@ -938,7 +968,7 @@ long set_cx_pminfo(uint32_t cpu, struct xen_processor_power *power)
     XEN_GUEST_HANDLE(xen_processor_cx_t) states;
     xen_processor_cx_t xen_cx;
     struct acpi_processor_power *acpi_power;
-    int cpu_id, i;
+    int cpu_id, i, ret;
 
     if ( unlikely(!guest_handle_okay(power->states, power->count)) )
         return -EFAULT;
@@ -950,46 +980,19 @@ long set_cx_pminfo(uint32_t cpu, struct xen_processor_power *power)
     if ( cpu_id == -1 )
     {
         printk(XENLOG_ERR "no cpu_id for acpi_id %d\n", cpu);
-        return -EFAULT;
+        return -EINVAL;
     }
 
-    if ( cpu_id == 0 )
-    {
-        if ( boot_cpu_has(X86_FEATURE_NONSTOP_TSC) )
-        {
-            get_tick = get_stime_tick;
-            ticks_elapsed = stime_ticks_elapsed;
-            tick_to_ns = stime_tick_to_ns;
-            ns_to_tick = ns_to_stime_tick;
-        }
-        else
-        {
-            get_tick = get_acpi_pm_tick;
-            ticks_elapsed = acpi_pm_ticks_elapsed;
-            tick_to_ns = acpi_pm_tick_to_ns;
-            ns_to_tick = ns_to_acpi_pm_tick;
-        }
-    }
-        
+    ret = cpuidle_init_cpu(cpu_id);
+    if ( ret < 0 )
+        return ret;
+
     acpi_power = processor_powers[cpu_id];
-    if ( !acpi_power )
-    {
-        acpi_power = xmalloc(struct acpi_processor_power);
-        if ( !acpi_power )
-            return -ENOMEM;
-        memset(acpi_power, 0, sizeof(*acpi_power));
-        processor_powers[cpu_id] = acpi_power;
-    }
-
-    init_cx_pminfo(acpi_power);
-
-    acpi_power->cpu = cpu_id;
     acpi_power->flags.bm_check = power->flags.bm_check;
     acpi_power->flags.bm_control = power->flags.bm_control;
     acpi_power->flags.has_cst = power->flags.has_cst;
 
     states = power->states;
-
     for ( i = 0; i < power->count; i++ )
     {
         if ( unlikely(copy_from_guest_offset(&xen_cx, states, i, 1)) )
@@ -1004,19 +1007,17 @@ long set_cx_pminfo(uint32_t cpu, struct xen_processor_power *power)
 
     /* FIXME: C-state dependency is not supported by far */
 
-    /*print_acpi_power(cpu_id, acpi_power);*/
-
-    if ( cpu_id == 0 && pm_idle_save == NULL )
-    {
-        pm_idle_save = pm_idle;
-        pm_idle = acpi_processor_idle;
-    }
-
     if ( cpu_id == 0 )
     {
+        if ( pm_idle_save == NULL )
+        {
+            pm_idle_save = pm_idle;
+            pm_idle = acpi_processor_idle;
+        }
+
         dead_idle = acpi_dead_idle;
     }
-        
+ 
     return 0;
 }
 
@@ -1027,7 +1028,7 @@ uint32_t pmstat_get_cx_nr(uint32_t cpuid)
 
 int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
 {
-    const struct acpi_processor_power *power = processor_powers[cpuid];
+    struct acpi_processor_power *power = processor_powers[cpuid];
     uint64_t usage, res, idle_usage = 0, idle_res = 0;
     int i;
     struct hw_residencies hw_res = {0};
@@ -1043,6 +1044,30 @@ int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
     stat->last = power->last_state ? power->last_state->idx : 0;
     stat->nr = power->count;
     stat->idle_time = get_cpu_idle_time(cpuid);
+
+    /* mimic the stat when detail info hasn't been registered by dom0 */
+    if ( pm_idle_save == NULL )
+    {
+        /* C1 */
+        usage = 1;
+        res = stat->idle_time;
+        if ( copy_to_guest_offset(stat->triggers, 1, &usage, 1) ||
+             copy_to_guest_offset(stat->residencies, 1, &res, 1) )
+            return -EFAULT;
+
+        /* C0 */
+        res = NOW() - res;
+        if ( copy_to_guest_offset(stat->triggers, 0, &usage, 1) ||
+             copy_to_guest_offset(stat->residencies, 0, &res, 1) )
+            return -EFAULT;
+
+        stat->pc3 = 0;
+        stat->pc6 = 0;
+        stat->pc7 = 0;
+        stat->cc3 = 0;
+        stat->cc6 = 0;
+        return 0;
+    }
 
     for ( i = power->count - 1; i >= 0; i-- )
     {
@@ -1098,3 +1123,36 @@ bool_t cpuidle_using_deep_cstate(void)
 {
     return xen_cpuidle && max_cstate > (local_apic_timer_c2_ok ? 2 : 1);
 }
+
+static int cpu_callback(
+    struct notifier_block *nfb, unsigned long action, void *hcpu)
+{
+    unsigned int cpu = (unsigned long)hcpu;
+
+    /* Only hook on CPU_ONLINE because a dead cpu may utilize the info to
+     * to enter deep C-state */
+    switch ( action )
+    {
+    case CPU_ONLINE:
+        (void)cpuidle_init_cpu(cpu);
+        break;
+    default:
+        break;
+    }
+
+    return NOTIFY_DONE;
+}
+
+static struct notifier_block cpu_nfb = {
+    .notifier_call = cpu_callback
+};
+
+static int __init cpuidle_presmp_init(void)
+{
+    void *cpu = (void *)(long)smp_processor_id();
+    cpu_callback(&cpu_nfb, CPU_ONLINE, cpu);
+    register_cpu_notifier(&cpu_nfb);
+    return 0;
+}
+presmp_initcall(cpuidle_presmp_init);
+
