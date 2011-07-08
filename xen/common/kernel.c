@@ -278,7 +278,8 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE(void) arg)
         switch ( fi.submap_idx )
         {
         case 0:
-            fi.submap = 0;
+            fi.submap = 1U << (IS_PRIV(current->domain) ?
+                               XENFEAT_privileged : XENFEAT_unprivileged);
             if ( VM_ASSIST(d, VMASST_TYPE_pae_extended_cr3) )
                 fi.submap |= (1U << XENFEAT_pae_pgdir_above_4gb);
             if ( paging_mode_translate(current->domain) )

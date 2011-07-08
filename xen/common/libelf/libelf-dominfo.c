@@ -26,7 +26,9 @@ static const char *const elf_xen_feature_names[] = {
     [XENFEAT_writable_descriptor_tables] = "writable_descriptor_tables",
     [XENFEAT_auto_translated_physmap] = "auto_translated_physmap",
     [XENFEAT_supervisor_mode_kernel] = "supervisor_mode_kernel",
-    [XENFEAT_pae_pgdir_above_4gb] = "pae_pgdir_above_4gb"
+    [XENFEAT_pae_pgdir_above_4gb] = "pae_pgdir_above_4gb",
+    [XENFEAT_privileged] = "privileged",
+    [XENFEAT_unprivileged] = "unprivileged"
 };
 static const int elf_xen_features =
 sizeof(elf_xen_feature_names) / sizeof(elf_xen_feature_names[0]);

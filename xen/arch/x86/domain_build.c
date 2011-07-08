@@ -415,6 +415,14 @@ int __init construct_dom0(
         return -EINVAL;
     }
 
+    if ( test_bit(XENFEAT_unprivileged, parms.f_required) ||
+         (test_bit(XENFEAT_unprivileged, parms.f_supported) &&
+          !test_bit(XENFEAT_privileged, parms.f_supported)) )
+    {
+        printk("Kernel does not support Dom0 operation\n");
+        return -EINVAL;
+    }
+
 #if defined(__x86_64__)
     if ( compat32 )
     {
