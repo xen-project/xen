@@ -1089,9 +1089,7 @@ char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *disk)
                 break;
             case LIBXL_DISK_FORMAT_QCOW:
             case LIBXL_DISK_FORMAT_QCOW2:
-                LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "cannot locally attach"
-                           " a qcow or qcow2 disk image");
-                break;
+                abort(); /* prevented by libxl__device_disk_set_backend */
             default:
                 LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
                            "unrecognized disk format: %d", disk->format);
