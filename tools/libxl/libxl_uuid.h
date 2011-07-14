@@ -16,6 +16,7 @@
 #define __LIBXL_UUID_H__
 
 #define LIBXL_UUID_FMT "%02hhx%02hhx%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx"
+#define LIBXL_UUID_FMTLEN ((2*16)+4) /* 16 hex bytes plus 4 hypens */
 #define LIBXL__UUID_BYTES(uuid) uuid[0], uuid[1], uuid[2], uuid[3], \
                                 uuid[4], uuid[5], uuid[6], uuid[7], \
                                 uuid[8], uuid[9], uuid[10], uuid[11], \

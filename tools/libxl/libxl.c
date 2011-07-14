@@ -1215,9 +1215,8 @@ int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic)
                                           nic->script));
     }
     flexarray_append(back, "mac");
-    flexarray_append(back, libxl__sprintf(&gc, "%02x:%02x:%02x:%02x:%02x:%02x",
-                                                 nic->mac[0], nic->mac[1], nic->mac[2],
-                                                 nic->mac[3], nic->mac[4], nic->mac[5]));
+    flexarray_append(back,libxl__sprintf(&gc,
+                                    LIBXL_MAC_FMT, LIBXL_MAC_BYTES(nic->mac)));
     if (nic->ip) {
         flexarray_append(back, "ip");
         flexarray_append(back, libxl__strdup(&gc, nic->ip));
@@ -1235,9 +1234,8 @@ int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic)
     flexarray_append(front, "handle");
     flexarray_append(front, libxl__sprintf(&gc, "%d", nic->devid));
     flexarray_append(front, "mac");
-    flexarray_append(front, libxl__sprintf(&gc, "%02x:%02x:%02x:%02x:%02x:%02x",
-                                                  nic->mac[0], nic->mac[1], nic->mac[2],
-                                                  nic->mac[3], nic->mac[4], nic->mac[5]));
+    flexarray_append(front, libxl__sprintf(&gc,
+                                    LIBXL_MAC_FMT, LIBXL_MAC_BYTES(nic->mac)));
     libxl__device_generic_add(&gc, &device,
                              libxl__xs_kvs_of_flexarray(&gc, back, back->count),
                              libxl__xs_kvs_of_flexarray(&gc, front, front->count));

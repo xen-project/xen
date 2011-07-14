@@ -3989,9 +3989,7 @@ int main_networklist(int argc, char **argv)
             /* Idx BE */
             printf("%-3d %-2d ", nics[i].devid, nics[i].backend_id);
             /* MAC */
-            printf("%02x:%02x:%02x:%02x:%02x:%02x ",
-                   nics[i].mac[0], nics[i].mac[1], nics[i].mac[2],
-                   nics[i].mac[3], nics[i].mac[4], nics[i].mac[5]);
+            printf(LIBXL_MAC_FMT, LIBXL_MAC_BYTES(nics[i].mac));
             /* Hdl  Sta  evch txr/rxr  BE-path */
             printf("%6d %5d %6d %5d/%-11d %-30s\n",
                    nics[i].devid, nics[i].state, nics[i].evtch,

@@ -173,9 +173,8 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
         }
         for (i = 0; i < num_vifs; i++) {
             if (vifs[i].nictype == LIBXL_NIC_TYPE_IOEMU) {
-                char *smac = libxl__sprintf(gc, "%02x:%02x:%02x:%02x:%02x:%02x",
-                                           vifs[i].mac[0], vifs[i].mac[1], vifs[i].mac[2],
-                                           vifs[i].mac[3], vifs[i].mac[4], vifs[i].mac[5]);
+                char *smac = libxl__sprintf(gc,
+                                   LIBXL_MAC_FMT, LIBXL_MAC_BYTES(vifs[i].mac));
                 char *ifname;
                 if (!vifs[i].ifname)
                     ifname = libxl__sprintf(gc, "tap%d.%d", info->domid, vifs[i].devid);
@@ -364,9 +363,8 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
         }
         for (i = 0; i < num_vifs; i++) {
             if (vifs[i].nictype == LIBXL_NIC_TYPE_IOEMU) {
-                char *smac = libxl__sprintf(gc, "%02x:%02x:%02x:%02x:%02x:%02x",
-                                           vifs[i].mac[0], vifs[i].mac[1], vifs[i].mac[2],
-                                           vifs[i].mac[3], vifs[i].mac[4], vifs[i].mac[5]);
+                char *smac = libxl__sprintf(gc,
+                                LIBXL_MAC_FMT, LIBXL_MAC_BYTES(vifs[i].mac));
                 char *ifname;
                 if (!vifs[i].ifname) {
                     ifname = libxl__sprintf(gc, "tap%d.%d", info->domid, vifs[i].devid);

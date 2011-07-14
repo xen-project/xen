@@ -139,6 +139,9 @@
 #include <libxl_uuid.h>
 
 typedef uint8_t libxl_mac[6];
+#define LIBXL_MAC_FMT "%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx"
+#define LIBXL_MAC_FMTLEN ((2*6)+5) /* 6 hex bytes plus 5 colons */
+#define LIBXL_MAC_BYTES(mac) mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]
 
 typedef char **libxl_string_list;
 void libxl_string_list_destroy(libxl_string_list *sl);
