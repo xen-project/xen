@@ -4,8 +4,8 @@
 #
 
 libxl_domid = Builtin("domid")
-libxl_uuid = Builtin("uuid")
-libxl_mac = Builtin("mac")
+libxl_uuid = Builtin("uuid", passby=PASS_BY_REFERENCE)
+libxl_mac = Builtin("mac", passby=PASS_BY_REFERENCE)
 libxl_cpumap = Builtin("cpumap", destructor_fn="libxl_cpumap_destroy", passby=PASS_BY_REFERENCE)
 libxl_cpuarray = Builtin("cpuarray", destructor_fn="libxl_cpuarray_destroy", passby=PASS_BY_REFERENCE)
 libxl_cpuid_policy_list = Builtin("cpuid_policy_list", destructor_fn="libxl_cpuid_destroy", passby=PASS_BY_REFERENCE)

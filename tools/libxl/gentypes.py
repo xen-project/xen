@@ -178,10 +178,10 @@ if __name__ == '__main__':
     for ty in types:
         f.write(libxl_C_type_define(ty) + ";\n")
         if ty.destructor_fn is not None:
-            f.write("void %s(%s *p);\n" % (ty.destructor_fn, ty.typename))
+            f.write("void %s(%s);\n" % (ty.destructor_fn, ty.make_arg("p")))
         if isinstance(ty, libxltypes.Enumeration):
-            f.write("const char *%s_to_string(%s e);\n" % (ty.typename, ty.typename))
-            f.write("int %s_from_string(const char *s, %s *e);\n" % (ty.typename, ty.typename))
+            f.write("const char *%s_to_string(%s);\n" % (ty.typename, ty.make_arg("p")))
+            f.write("int %s_from_string(const char *s, %s);\n" % (ty.typename, ty.make_arg("e", passby=libxltypes.PASS_BY_REFERENCE)))
             f.write("extern libxl_enum_string_table %s_string_table[];\n" % (ty.typename))
         f.write("\n")
 
@@ -213,7 +213,7 @@ if __name__ == '__main__':
 """ % " ".join(sys.argv))
 
     for ty in [t for t in types if t.destructor_fn is not None and t.autogenerate_destructor]:
-        f.write("void %s(%s *p)\n" % (ty.destructor_fn, ty.typename))
+        f.write("void %s(%s)\n" % (ty.destructor_fn, ty.make_arg("p")))
         f.write("{\n")
         f.write(libxl_C_type_destroy(ty, "p"))
         f.write("    memset(p, LIBXL_DTOR_POISON, sizeof(*p));\n")

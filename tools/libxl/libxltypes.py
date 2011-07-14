@@ -42,6 +42,14 @@ class Type(object):
     def marshal_out(self):
         return self.dir in [DIR_OUT, DIR_BOTH]
 
+    def make_arg(self, n, passby=None):
+        if passby is None: passby = self.passby
+        
+        if passby == PASS_BY_REFERENCE:
+            return "%s *%s" % (self.typename, n)
+        else:
+            return "%s %s" % (self.typename, n)
+        
 class Builtin(Type):
     """Builtin type"""
     def __init__(self, typename, **kwargs):
