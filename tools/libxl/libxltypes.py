@@ -50,6 +50,21 @@ class Type(object):
         else:
             return "%s %s" % (self.typename, n)
         
+    def pass_arg(self, n, isref=None, passby=None):
+        if passby is None: passby = self.passby
+        if isref is None: isref = self.passby == PASS_BY_REFERENCE
+
+        if passby == PASS_BY_REFERENCE:
+            if isref:
+                return "%s" % (n)
+            else:
+                return "&%s" % (n)
+        else:
+            if isref:
+                return "*%s" % (n)
+            else:
+                return "%s" % (n)
+
 class Builtin(Type):
     """Builtin type"""
     def __init__(self, typename, **kwargs):
