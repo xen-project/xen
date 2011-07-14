@@ -49,7 +49,7 @@ static struct ns16550 {
     unsigned int ps_bdf[3]; /* pci serial port BDF */
     bool_t pb_bdf_enable;   /* if =1, pb-bdf effective, port behind bridge */
     bool_t ps_bdf_enable;   /* if =1, ps_bdf effective, port on pci card */
-    int bar0, cr;
+    int bar, cr, bar_idx;
 } ns16550_com[2] = { { 0 } };
 
 /* Register offsets */
@@ -337,9 +337,10 @@ static void ns16550_suspend(struct serial_port *port)
 
     stop_timer(&uart->timer);
 
-    if (uart->bar0) {
-       uart->bar0 = pci_conf_read32(uart->pb_bdf[0], uart->pb_bdf[1], uart->pb_bdf[2],
-                                    PCI_BASE_ADDRESS_0);
+    if (uart->bar) {
+       uart->bar = pci_conf_read32(uart->pb_bdf[0], uart->pb_bdf[1], uart->pb_bdf[2],
+                                   PCI_BASE_ADDRESS_0 +
+                                   (sizeof(uint32_t) * uart->bar_idx));
        uart->cr = pci_conf_read32(uart->pb_bdf[0], uart->pb_bdf[1], uart->pb_bdf[2],
                                     PCI_COMMAND);
     }
@@ -352,9 +353,10 @@ static void ns16550_resume(struct serial_port *port)
     ns16550_setup_preirq(port->uart);
     ns16550_setup_postirq(port->uart);
 
-    if (uart->bar0) {
+    if (uart->bar) {
        pci_conf_write32(uart->pb_bdf[0], uart->pb_bdf[1], uart->pb_bdf[2],
-                        PCI_BASE_ADDRESS_0, uart->bar0);
+                        PCI_BASE_ADDRESS_0 + sizeof(uint32_t) * uart->bar_idx,
+                        uart->bar);
        pci_conf_write32(uart->pb_bdf[0], uart->pb_bdf[1], uart->pb_bdf[2],
                         PCI_COMMAND, uart->cr);
     }
@@ -461,37 +463,40 @@ static int __init check_existence(struct ns16550 *uart)
 }
 
 static int
-magic_uart_config (struct ns16550 *uart,int skip_amt)
+pci_uart_config (struct ns16550 *uart, int skip_amt, int bar_idx)
 {
   uint16_t class;
-  uint32_t bar0, len;
+  uint32_t bar, len;
   int b, d, f;
 
 /*Skanky hack - start at bus 1 to avoid AMT, a plug in card cannot be on bus 1 */
 
-  if (skip_amt) b=1;
-	else b=0;
+  if (skip_amt)
+    b=1;
+  else
+    b=0;
 
   for (; b < 0x100; ++b)
-    {
+  {
     for (d = 0; d < 0x20; ++d)
-        {
+    {
           for (f = 0; f < 0x8; ++f)
-            {
-
+          {
               class = pci_conf_read16 (b, d, f, PCI_CLASS_DEVICE);
               if (class != 0x700)
                 continue;;
 
-              bar0 = pci_conf_read32 (b, d, f, PCI_BASE_ADDRESS_0);
+              bar = pci_conf_read32 (b, d, f, PCI_BASE_ADDRESS_0 +
+                                     (sizeof(uint32_t) * bar_idx));
 
               /* Not IO */
-              if (!(bar0 & 1))
+              if (!(bar & 1))
                 continue;
 
               pci_conf_write32 (b, d, f, PCI_BASE_ADDRESS_0, 0xffffffff);
               len = pci_conf_read32 (b, d, f, PCI_BASE_ADDRESS_0);
-              pci_conf_write32 (b, d, f, PCI_BASE_ADDRESS_0, bar0);
+              pci_conf_write32 (b, d, f, PCI_BASE_ADDRESS_0 +
+                                (sizeof(uint32_t) * bar_idx), bar);
 
               /* Not 8 bytes */
               if ((len & 0xffff) != 0xfff9)
@@ -500,8 +505,9 @@ magic_uart_config (struct ns16550 *uart,int skip_amt)
               uart->pb_bdf[0] = b;
               uart->pb_bdf[1] = d;
               uart->pb_bdf[2] = f;
-              uart->bar0 = bar0;
-              uart->io_base = bar0 & 0xfffe;
+              uart->bar = bar;
+              uart->bar_idx = bar_idx;
+              uart->io_base = bar & 0xfffe;
               uart->irq = 0;
 
               return 0;
@@ -570,15 +576,14 @@ static void __init ns16550_parse_port_config(
     if ( *conf == ',' )
     {
         conf++;
-        
-        if ( strncmp(conf,"magic",5) == 0 ) {
-	    if (magic_uart_config(uart,1)) 
-		return;
-	    conf+=5;
-        } else if ( strncmp(conf,"amt",3) == 0 ) {
-	    if (magic_uart_config(uart,0)) 
-		return;
-	    conf+=3;
+        if ( strncmp(conf, "pci", 5) == 0 ) {
+	        if (pci_uart_config(uart, 1/* skip AMT */, uart - ns16550_com))
+		        return;
+	        conf += 3;
+        } else if ( strncmp(conf, "amt", 3) == 0 ) {
+	        if (pci_uart_config(uart, 0, uart - ns16550_com))
+		        return;
+	         conf += 3;
         } else {
             uart->io_base = simple_strtoul(conf, &conf, 0);
         }
