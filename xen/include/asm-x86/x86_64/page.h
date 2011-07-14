@@ -35,6 +35,8 @@
 #include <xen/config.h>
 #include <asm/types.h>
 
+extern unsigned long xen_virt_end;
+
 extern unsigned long max_pdx;
 extern unsigned long pfn_pdx_bottom_mask, ma_va_bottom_mask;
 extern unsigned int pfn_pdx_hole_shift;

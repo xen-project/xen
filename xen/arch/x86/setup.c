@@ -94,6 +94,8 @@ unsigned long __read_mostly xen_phys_start;
 /* Limits of Xen heap, used to initialise the allocator. */
 unsigned long __initdata xenheap_initial_phys_start;
 unsigned long __read_mostly xenheap_phys_end;
+#else
+unsigned long __read_mostly xen_virt_end;
 #endif
 
 DEFINE_PER_CPU(struct tss_struct, init_tss);
@@ -1094,6 +1096,9 @@ void __init __start_xen(unsigned long mbi_p)
     map_pages_to_xen((unsigned long)__va(kexec_crash_area.start),
                      kexec_crash_area.start >> PAGE_SHIFT,
                      PFN_UP(kexec_crash_area.size), PAGE_HYPERVISOR);
+    xen_virt_end = ((unsigned long)_end + (1UL << L2_PAGETABLE_SHIFT) - 1) &
+                   ~((1UL << L2_PAGETABLE_SHIFT) - 1);
+    destroy_xen_mappings(xen_virt_end, XEN_VIRT_START + BOOTSTRAP_MAP_BASE);
 #endif
 
     memguard_init();
