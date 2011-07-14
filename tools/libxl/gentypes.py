@@ -17,10 +17,7 @@ def format_comment(level, comment):
     s += "%s */" % indent
     s += "\n"
     return s
-
-def libxl_C_type_of(ty):
-    return ty.typename
-
+    
 def libxl_C_instance_of(ty, instancename):
     if isinstance(ty, libxltypes.Aggregate) and ty.typename is None:
         if instancename is None:
@@ -28,7 +25,7 @@ def libxl_C_instance_of(ty, instancename):
         else:
             return libxl_C_type_define(ty) + " " + instancename
     else:
-        return libxl_C_type_of(ty) + " " + instancename
+        return ty.typename + " " + instancename
 
 def libxl_C_type_define(ty, indent = ""):
     s = ""
