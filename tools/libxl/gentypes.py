@@ -76,27 +76,21 @@ def libxl_C_type_define(ty, indent = ""):
     return s.replace("\n", "\n%s" % indent)
 
 def libxl_C_type_destroy(ty, v, indent = "    ", parent = None):
-    if parent is None:
-        deref = v + "->"
-    else:
-        deref = v + "."
         
     s = ""
     if isinstance(ty, libxltypes.KeyedUnion):
         if parent is None:
             raise Exception("KeyedUnion type must have a parent")
         for f in ty.fields:
+            (nparent,fexpr) = ty.member(v, f, parent is None)
             keyvar_expr = f.keyvar_expr % (parent + ty.keyvar_name)
             s += "if (" + keyvar_expr + ") {\n"
-            s += libxl_C_type_destroy(f.type, deref + f.name, indent + "    ", deref)
+            s += libxl_C_type_destroy(f.type, fexpr, indent + "    ", nparent)
             s += "}\n"
     elif isinstance(ty, libxltypes.Struct) and (parent is None or ty.destructor_fn is None):
         for f in [f for f in ty.fields if not f.const]:
-
-            if f.name is None: # Anonymous struct
-                s += libxl_C_type_destroy(f.type, deref, "", deref)
-            else:
-                s += libxl_C_type_destroy(f.type, deref + f.name, "", deref)
+            (nparent,fexpr) = ty.member(v, f, parent is None)
+            s += libxl_C_type_destroy(f.type, fexpr, "", nparent)
     else:
         if ty.destructor_fn is not None:
             s += "%s(%s);\n" % (ty.destructor_fn, ty.pass_arg(v, parent is None))

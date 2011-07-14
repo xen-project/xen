@@ -147,6 +147,24 @@ class Aggregate(Type):
                 n,t,const,comment = f
             self.fields.append(Field(t,n,const=const,comment=comment))
 
+    # Returns a tuple (stem, field-expr)
+    #
+    # field-expr is a C expression for a field "f" within the struct
+    # "v".
+    #
+    # stem is the stem common to both "f" and any other sibbling field
+    # within the "v".
+    def member(self, v, f, isref):
+        if isref:
+            deref = v + "->"
+        else:
+            deref = v + "."
+        
+        if f.name is None: # Anonymous
+            return (deref, deref)
+        else:
+            return (deref, deref + f.name)
+
 class Struct(Aggregate):
     def __init__(self, name, fields, **kwargs):
         kwargs.setdefault('passby', PASS_BY_REFERENCE)
