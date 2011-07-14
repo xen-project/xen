@@ -17,6 +17,8 @@
 #include <xen/timer.h>
 #include <xen/serial.h>
 #include <xen/iocap.h>
+#include <xen/pci.h>
+#include <xen/pci_regs.h>
 #include <asm/io.h>
 
 /*
@@ -440,6 +442,64 @@ static int __init check_existence(struct ns16550 *uart)
     return (status == 0x90);
 }
 
+static int
+magic_uart_config (struct ns16550 *uart,int skip_amt)
+{
+  uint16_t class;
+  uint32_t bar0, len;
+  int b, d, f;
+
+/*Skanky hack - start at bus 1 to avoid AMT, a plug in card cannot be on bus 1 */
+
+  if (skip_amt) b=1;
+	else b=0;
+
+  for (; b < 0x100; ++b)
+    {
+    for (d = 0; d < 0x20; ++d)
+        {
+          for (f = 0; f < 0x8; ++f)
+            {
+
+              class = pci_conf_read16 (b, d, f, PCI_CLASS_DEVICE);
+              if (class != 0x700)
+                continue;;
+
+              bar0 = pci_conf_read32 (b, d, f, PCI_BASE_ADDRESS_0);
+
+              /* Not IO */
+              if (!(bar0 & 1))
+                continue;
+
+              pci_conf_write32 (b, d, f, PCI_BASE_ADDRESS_0, 0xffffffff);
+              len = pci_conf_read32 (b, d, f, PCI_BASE_ADDRESS_0);
+              pci_conf_write32 (b, d, f, PCI_BASE_ADDRESS_0, bar0);
+
+              /* Not 8 bytes */
+              if ((len & 0xffff) != 0xfff9)
+                continue;
+
+              uart->io_base = bar0 & 0xfffe;
+              uart->irq = 0;
+
+              return 0;
+
+            }
+
+        }
+    }
+
+  if (!skip_amt)
+	return -1;
+
+  uart->io_base = 0x3f8;
+  uart->irq = 0;
+  uart->clock_hz  = UART_CLOCK_HZ;
+
+  return 0;
+}
+
+
 #define PARSE_ERR(_f, _a...)                 \
     do {                                     \
         printk( "ERROR: " _f "\n" , ## _a ); \
@@ -488,7 +548,18 @@ static void __init ns16550_parse_port_config(
     if ( *conf == ',' )
     {
         conf++;
-        uart->io_base = simple_strtoul(conf, &conf, 0);
+        
+        if ( strncmp(conf,"magic",5) == 0 ) {
+	    if (magic_uart_config(uart,1)) 
+		return;
+	    conf+=5;
+        } else if ( strncmp(conf,"amt",3) == 0 ) {
+	    if (magic_uart_config(uart,0)) 
+		return;
+	    conf+=3;
+        } else {
+            uart->io_base = simple_strtoul(conf, &conf, 0);
+        }
 
         if ( *conf == ',' )
         {
