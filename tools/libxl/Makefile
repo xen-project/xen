@@ -45,16 +45,16 @@ LIBXLU_OBJS = libxlu_cfg_y.o libxlu_cfg_l.o libxlu_cfg.o \
 	libxlu_disk_l.o libxlu_disk.o
 $(LIBXLU_OBJS): CFLAGS += $(CFLAGS_libxenctrl) # For xentoollog.h
 
-CLIENTS = xl testenum
+CLIENTS = xl testidl
 
 XL_OBJS = xl.o xl_cmdimpl.o xl_cmdtable.o
 $(XL_OBJS): CFLAGS += $(CFLAGS_libxenctrl) # For xentoollog.h
 $(XL_OBJS): CFLAGS += $(CFLAGS_libxenlight)
 
-testenum.o: CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenlight)
-testenum.c: libxl.idl gentest.py libxl.h
-	$(PYTHON) gentest.py libxl.idl testenum.c.new
-	mv testenum.c.new testenum.c
+testidl.o: CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenlight)
+testidl.c: libxl.idl gentest.py libxl.h
+	$(PYTHON) gentest.py libxl.idl testidl.c.new
+	mv testidl.c.new testidl.c
 
 .PHONY: all
 all: $(CLIENTS) libxenlight.so libxenlight.a libxlutil.so libxlutil.a \
@@ -116,8 +116,8 @@ libxlutil.a: $(LIBXLU_OBJS)
 xl: $(XL_OBJS) libxlutil.so libxenlight.so
 	$(CC) $(LDFLAGS) -o $@ $(XL_OBJS) libxlutil.so $(LDLIBS_libxenlight) $(LDLIBS_libxenctrl)
 
-testenum: testenum.o libxlutil.so libxenlight.so
-	$(CC) $(LDFLAGS) -o $@ testenum.o libxlutil.so $(LDLIBS_libxenlight) $(LDLIBS_libxenctrl)
+testidl: testidl.o libxlutil.so libxenlight.so
+	$(CC) $(LDFLAGS) -o $@ testidl.o libxlutil.so $(LDLIBS_libxenlight) $(LDLIBS_libxenctrl)
 
 .PHONY: install
 install: all
