@@ -134,11 +134,7 @@ static int disk_try_backend(disk_try_backend_args *a,
     case LIBXL_DISK_BACKEND_PHY:
         if (!(a->disk->format == LIBXL_DISK_FORMAT_RAW ||
               a->disk->format == LIBXL_DISK_FORMAT_EMPTY)) {
-            LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Disk vdev=%s, backend phy"
-                       " unsuitable due to format %s",
-                       a->disk->vdev,
-                       libxl_disk_format_to_string(a->disk->format));
-            return 0;
+            goto bad_format;
         }
         if (a->disk->format != LIBXL_DISK_FORMAT_EMPTY &&
             !S_ISBLK(a->stab.st_mode)) {
@@ -157,12 +153,9 @@ static int disk_try_backend(disk_try_backend_args *a,
                        a->disk->vdev);
             return 0;
         }
-        if (a->disk->format == LIBXL_DISK_FORMAT_EMPTY ||
-            (S_ISREG(a->stab.st_mode) && !a->stab.st_size)) {
-            LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Disk vdev=%s, backend tap"
-                       " unsuitable because empty devices not supported",
-                       a->disk->vdev);
-            return 0;
+        if (!(a->disk->format == LIBXL_DISK_FORMAT_RAW ||
+              a->disk->format == LIBXL_DISK_FORMAT_VHD)) {
+            goto bad_format;
         }
         return backend;
 
@@ -175,6 +168,15 @@ static int disk_try_backend(disk_try_backend_args *a,
         return 0;
         
     }
+    abort(); /* notreached */
+
+ bad_format:
+    LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Disk vdev=%s, backend %s"
+               " unsuitable due to format %s",
+               a->disk->vdev,
+               libxl_disk_backend_to_string(backend),
+               libxl_disk_format_to_string(a->disk->format));
+    return 0;
 }            
 
 int libxl__device_disk_set_backend(libxl__gc *gc, libxl_device_disk *disk) {
