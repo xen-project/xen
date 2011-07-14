@@ -137,14 +137,14 @@ def libxl_C_enum_from_string(ty, str, e, indent = "    "):
     
 
 if __name__ == '__main__':
-    if len(sys.argv) < 4:
+    if len(sys.argv) != 4:
         print >>sys.stderr, "Usage: gentypes.py <idl> <header> <implementation>"
         sys.exit(1)
 
-    idl = sys.argv[1]
+    (_, idl, header, impl) = sys.argv
+
     (_,types) = libxltypes.parse(idl)
                     
-    header = sys.argv[2]
     print "outputting libxl type definitions to %s" % header
 
     f = open(header, "w")
@@ -174,7 +174,6 @@ if __name__ == '__main__':
     f.write("""#endif /* __LIBXL_TYPES_H */\n""")
     f.close()
     
-    impl = sys.argv[3]
     print "outputting libxl type implementations to %s" % impl
 
     f = open(impl, "w")
