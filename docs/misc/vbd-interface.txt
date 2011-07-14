@@ -50,7 +50,7 @@ Configuration file syntax
 The config file syntaxes are, for example
 
        d0 d0p0  xvda     Xen virtual disk 0 partition 0 (whole disk)
-       d1p2     xvda2    Xen virtual disk 1 partition 2
+       d1p2     xvdb2    Xen virtual disk 1 partition 2
        d536p37  xvdtq37  Xen virtual disk 536 partition 37
        sdb3              SCSI disk 1 partition 3
        hdc2              IDE disk 2 partition 2
