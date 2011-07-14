@@ -75,7 +75,8 @@ $(eval $(genpath-target))
 
 _libxl_paths.h: genpath
 	sed -e "s/\([^=]*\)=\(.*\)/#define \1 \2/g" $@.tmp >$@.2.tmp
-	if ! cmp -s $@.2.tmp $@; then mv -f $@.2.tmp $@; fi
+	rm -f $@.tmp
+	$(call move-if-changed,$@.2.tmp,$@)
 
 libxl_paths.c: _libxl_paths.h
 
@@ -85,8 +86,8 @@ $(LIBXL_OBJS) $(LIBXLU_OBJS) $(XL_OBJS): libxl.h
 
 _libxl_%.h _libxl_%.c: libxl.idl gen%.py libxl%.py
 	$(PYTHON) gen$*.py libxl.idl __libxl_$*.h __libxl_$*.c
-	mv __libxl_$*.h _libxl_$*.h
-	mv __libxl_$*.c _libxl_$*.c
+	$(call move-if-changed,__libxl_$*.h,_libxl_$*.h)
+	$(call move-if-changed,__libxl_$*.c,_libxl_$*.c)
 
 libxenlight.so: libxenlight.so.$(MAJOR)
 	ln -sf $< $@

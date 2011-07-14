@@ -118,6 +118,16 @@ define buildmakevars2shellvars
     export XEN_ROOT="$(XEN_ROOT)"
 endef
 
+#
+# Compare $(1) and $(2) and replace $(2) with $(1) if they differ
+#
+# Typically $(1) is a newly generated file and $(2) is the target file
+# being regenerated. This prevents changing the timestamp of $(2) only
+# due to being auto regenereated with the same contents.
+define move-if-changed
+	if ! cmp -s $(1) $(2); then mv -f $(1) $(2); else rm -f $(1); fi
+endef
+
 buildmakevars2file = $(eval $(call buildmakevars2file-closure,$(1)))
 define buildmakevars2file-closure
     .PHONY: genpath
@@ -134,7 +144,7 @@ define buildmakevars2file-closure
 	echo "XEN_SCRIPT_DIR=\"$(XEN_SCRIPT_DIR)\"" >> $(1).tmp;           \
 	echo "XEN_LOCK_DIR=\"$(XEN_LOCK_DIR)\"" >> $(1).tmp;               \
 	echo "XEN_RUN_DIR=\"$(XEN_RUN_DIR)\"" >> $(1).tmp;                 \
-	if ! cmp $(1).tmp $(1); then mv -f $(1).tmp $(1); fi
+	$(call move-if-changed,$(1).tmp,$(1))
 endef
 
 ifeq ($(debug),y)
