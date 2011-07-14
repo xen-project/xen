@@ -422,7 +422,6 @@ retry_transaction2:
 
 static int get_all_assigned_devices(libxl__gc *gc, libxl_device_pci **list, int *num)
 {
-    libxl_device_pci *pcidevs = NULL;
     char **domlist;
     unsigned int nd = 0, i;
 
@@ -439,8 +438,7 @@ static int get_all_assigned_devices(libxl__gc *gc, libxl_device_pci **list, int 
             int ndev = atoi(num_devs), j;
             char *devpath, *bdf;
 
-            pcidevs = libxl__calloc(gc, sizeof(*pcidevs), ndev);
-            for(j = (pcidevs) ? 0 : ndev; j < ndev; j++) {
+            for(j = 0; j < ndev; j++) {
                 devpath = libxl__sprintf(gc, "/local/domain/0/backend/pci/%s/0/dev-%u",
                                         domlist[i], j);
                 bdf = libxl__xs_read(gc, XBT_NULL, devpath);
@@ -449,19 +447,16 @@ static int get_all_assigned_devices(libxl__gc *gc, libxl_device_pci **list, int 
                     if ( sscanf(bdf, PCI_BDF, &dom, &bus, &dev, &func) != 4 )
                         continue;
 
-                    pcidev_init(pcidevs + *num, dom, bus, dev, func, 0);
+                    *list = realloc(*list, sizeof(libxl_device_pci) * ((*num) + 1));
+                    if (*list == NULL)
+                        return ERROR_NOMEM;
+                    pcidev_init(*list + *num, dom, bus, dev, func, 0);
                     (*num)++;
                 }
             }
         }
     }
-
-    if ( 0 == *num ) {
-        free(pcidevs);
-        pcidevs = NULL;
-    }else{
-        *list = pcidevs;
-    }
+    libxl__ptr_add(gc, *list);
 
     return 0;
 }
