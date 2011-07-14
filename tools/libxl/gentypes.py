@@ -101,7 +101,7 @@ def libxl_C_type_destroy(ty, v, indent = "    ", parent = None):
     elif isinstance(ty, libxltypes.Struct) and (parent is None or ty.destructor_fn is None):
         for f in [f for f in ty.fields if not f.const]:
 
-            if f.name is None: # Anonynous struct
+            if f.name is None: # Anonymous struct
                 s += libxl_C_type_destroy(f.type, deref, "", deref)
             else:
                 s += libxl_C_type_destroy(f.type, deref + f.name, "", deref)
