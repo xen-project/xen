@@ -2154,8 +2154,8 @@ editing \path{grub.conf}.
   is bad, you would place `badpage=0x12345' on Xen's command line.
 \item [ serial\_tx\_buffer=$<$size$>$ ] Size of serial transmit
   buffers. Default is 16kB.
-\item [ com1=$<$baud$>$,DPS,$<$io\_base$>$,$<$irq$>$
-  com2=$<$baud$>$,DPS,$<$io\_base$>$,$<$irq$>$ ] \mbox{}\\
+\item [ com1=$<$baud$>$,DPS,($<$io\_base$>$$|$pci$|$amt),$<$irq$>$
+  com2=$<$baud$>$,DPS,($<$io\_base$>$$|$pci$|$amt),$<$irq$>$] \mbox{}\\
   Xen supports up to two 16550-compatible serial ports.  For example:
   `com1=9600, 8n1, 0x408, 5' maps COM1 to a 9600-baud port, 8 data
   bits, no parity, 1 stop bit, I/O port base 0x408, IRQ 5.  If some
@@ -2163,6 +2163,10 @@ editing \path{grub.conf}.
   only a prefix of the full configuration string need be specified. If
   the baud rate is pre-configured (e.g., by the bootloader) then you
   can specify `auto' in place of a numeric baud rate.
+  For PCI serial devices, such as Intel AMT you can use the {\bf amt}
+  option to automatically find the I/O base. For PCI serial devices,
+  such as NetMos, you can use {\bf pci} to probe for the I/O base.
+  Both options will set the IRQ to zero - meaning they will poll the device.
 \item [ console=$<$specifier list$>$ ] Specify the destination for Xen
   console I/O.  This is a comma-separated list of, for example:
   \begin{description}
