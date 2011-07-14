@@ -49,6 +49,7 @@ static struct ns16550 {
     unsigned int ps_bdf[3]; /* pci serial port BDF */
     bool_t pb_bdf_enable;   /* if =1, pb-bdf effective, port behind bridge */
     bool_t ps_bdf_enable;   /* if =1, ps_bdf effective, port on pci card */
+    int bar0, cr;
 } ns16550_com[2] = { { 0 } };
 
 /* Register offsets */
@@ -333,13 +334,30 @@ static void __init ns16550_init_postirq(struct serial_port *port)
 static void ns16550_suspend(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
+
     stop_timer(&uart->timer);
+
+    if (uart->bar0) {
+       uart->bar0 = pci_conf_read32(uart->pb_bdf[0], uart->pb_bdf[1], uart->pb_bdf[2],
+                                    PCI_BASE_ADDRESS_0);
+       uart->cr = pci_conf_read32(uart->pb_bdf[0], uart->pb_bdf[1], uart->pb_bdf[2],
+                                    PCI_COMMAND);
+    }
 }
 
 static void ns16550_resume(struct serial_port *port)
 {
+    struct ns16550 *uart = port->uart;
+
     ns16550_setup_preirq(port->uart);
     ns16550_setup_postirq(port->uart);
+
+    if (uart->bar0) {
+       pci_conf_write32(uart->pb_bdf[0], uart->pb_bdf[1], uart->pb_bdf[2],
+                        PCI_BASE_ADDRESS_0, uart->bar0);
+       pci_conf_write32(uart->pb_bdf[0], uart->pb_bdf[1], uart->pb_bdf[2],
+                        PCI_COMMAND, uart->cr);
+    }
 }
 
 #ifdef CONFIG_X86
@@ -479,6 +497,10 @@ magic_uart_config (struct ns16550 *uart,int skip_amt)
               if ((len & 0xffff) != 0xfff9)
                 continue;
 
+              uart->pb_bdf[0] = b;
+              uart->pb_bdf[1] = d;
+              uart->pb_bdf[2] = f;
+              uart->bar0 = bar0;
               uart->io_base = bar0 & 0xfffe;
               uart->irq = 0;
 
