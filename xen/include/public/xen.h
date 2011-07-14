@@ -93,6 +93,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 #define __HYPERVISOR_domctl               36
 #define __HYPERVISOR_kexec_op             37
 #define __HYPERVISOR_tmem_op              38
+#define __HYPERVISOR_xc_reserved_op       39 /* reserved for XenClient */
 
 /* Architecture-specific hypercall definitions. */
 #define __HYPERVISOR_arch_0               48
@@ -147,6 +148,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 #define VIRQ_CON_RING   8  /* G. (DOM0) Bytes received on console            */
 #define VIRQ_PCPU_STATE 9  /* G. (DOM0) PCPU state changed                   */
 #define VIRQ_MEM_EVENT  10 /* G. (DOM0) A memory event has occured           */
+#define VIRQ_XC_RESERVED 11 /* G. Reserved for XenClient                     */
 
 /* Architecture-specific VIRQ definitions. */
 #define VIRQ_ARCH_0    16
