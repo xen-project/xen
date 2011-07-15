@@ -152,7 +152,7 @@ main(int argc, char * const argv[])
 	char *sstate;
 	char *p;
 	char buf[80];
-	int type = DEVTYPE_UNKNOWN;
+	int type;
 	int ch;
 	int debug_fd;
 	FILE *pidfile_f;
@@ -239,6 +239,7 @@ main(int argc, char * const argv[])
 
 	for (;;) {
 		vec = xs_read_watch(xs, &num);
+		dodebug("read from xen watch: %s", *vec);
 		if (!vec) {
 			dolog(LOG_ERR, "xs_read_watch: NULL\n");
 			continue;
@@ -272,6 +273,7 @@ main(int argc, char * const argv[])
 		if (s != NULL && state != 6 /* XenbusStateClosed */)
 			goto next2;
 
+		type = DEVTYPE_UNKNOWN;
 		if (strncmp(vec[XS_WATCH_PATH],
 		    DOMAIN_PATH "/backend/vif",
 		    strlen(DOMAIN_PATH "/backend/vif")) == 0)
