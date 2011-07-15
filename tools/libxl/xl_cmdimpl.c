@@ -1104,6 +1104,7 @@ static int handle_domain_death(libxl_ctx *ctx, uint32_t domid, libxl_event *even
         action = d_config->on_reboot;
         break;
     case SHUTDOWN_suspend:
+        LOG("Domain has suspended.");
         return 0;
     case SHUTDOWN_crash:
         action = d_config->on_crash;
