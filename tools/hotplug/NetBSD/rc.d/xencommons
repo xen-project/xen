@@ -23,6 +23,9 @@ required_files="/kern/xen/privcmd"
 XENSTORED_PIDFILE="/var/run/xenstored.pid"
 XENCONSOLED_PIDFILE="/var/run/xenconsoled.pid"
 XENBACKENDD_PIDFILE="/var/run/xenbackendd.pid"
+#XENBACKENDD_DEBUG=1
+#XENCONSOLED_TRACE="/var/log/xen/xenconsole-trace.log"
+#XENSTORED_TRACE="/var/log/xen/xenstore-trace.log"
 
 xen_precmd()
 {
@@ -33,14 +36,30 @@ xen_precmd()
 
 xen_startcmd()
 {
-	printf "Starting xenservices: xenstored, xenconsoled, xenbackendd.\n"
-	XENSTORED_ARGS=" --pid-file ${XENSTORED_PIDFILE}"
-	if [ -n "${XENSTORED_TRACE}" ]; then
-		XENSTORED_ARGS="${XENSTORED_ARGS} -T /var/log/xen/xenstored-trace.log"
-	fi
+	local time=0
+	local timeout=30
 
-	${SBINDIR}/xenstored ${XENSTORED_ARGS}
-	sleep 5
+	xenstored_pid=$(check_pidfile ${XENSTORED_PIDFILE} ${SBINDIR}/xenstored)
+	if test -z "$xenstored_pid"; then
+		printf "Cleaning xenstore database.\n"
+		if [ -z "${XENSTORED_ROOTDIR}" ]; then
+			XENSTORED_ROOTDIR="/var/lib/xenstored"
+		fi
+		rm -f ${XENSTORED_ROOTDIR}/tdb* >/dev/null 2>&1
+		printf "Starting xenservices: xenstored, xenconsoled, xenbackendd."
+		XENSTORED_ARGS=" --pid-file ${XENSTORED_PIDFILE}"
+		if [ -n "${XENSTORED_TRACE}" ]; then
+			XENSTORED_ARGS="${XENSTORED_ARGS} -T /var/log/xen/xenstored-trace.log"
+		fi
+		${SBINDIR}/xenstored ${XENSTORED_ARGS}
+		while [ $time -lt $timeout ] && ! `${BINDIR}/xenstore-read -s / >/dev/null 2>&1` ; do
+			printf "."
+			time=$(($time+1))
+			sleep 1
+		done
+	else
+		printf "Starting xenservices: xenconsoled, xenbackendd."
+	fi
 
 	XENCONSOLED_ARGS=""
 	if [ -n "${XENCONSOLED_TRACE}" ]; then
@@ -55,24 +74,26 @@ xen_startcmd()
 	fi
 
 	${SBINDIR}/xenbackendd ${XENBACKENDD_ARGS}
+
+	printf "\n"
+
+	printf "Setting domain 0 name.\n"
+	${BINDIR}/xenstore-write "/local/domain/0/name" "Domain-0"
 }
 
 xen_stop()
 {
 	pids=""
-	printf "Stopping xencommons"
+	printf "Stopping xencommons.\n"
+	printf "WARNING: Not stopping xenstored, as it cannot be restarted.\n"
 
 	rc_pid=$(check_pidfile ${XENBACKENDD_PIDFILE} ${SBINDIR}/xenbackendd)
 	pids="$pids $rc_pid"
 	rc_pid=$(check_pidfile ${XENCONSOLED_PIDFILE} ${SBINDIR}/xenconsoled)
 	pids="$pids $rc_pid"
-	rc_pid=$(check_pidfile ${XENSTORED_PIDFILE} ${SBINDIR}/xenstored)
-	pids="$pids $rc_pid"
 
 	kill -${sig_stop:-TERM} $pids
 	wait_for_pids $pids
-
-	printf ".\n"
 }
 
 xen_status()
