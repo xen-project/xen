@@ -385,14 +385,14 @@ class Grub:
                            # fallbacks
                            ["/efi/boot/elilo.conf", "/elilo.conf",])
         else:
-            cfg_list = map(lambda x: (x,grub.GrubConf.GrubConfigFile),
-                           ["/boot/grub/menu.lst", "/boot/grub/grub.conf",
-                            "/grub/menu.lst", "/grub/grub.conf"]) + \
-                       map(lambda x: (x,grub.GrubConf.Grub2ConfigFile),
+            cfg_list = map(lambda x: (x,grub.GrubConf.Grub2ConfigFile),
                            ["/boot/grub/grub.cfg", "/grub/grub.cfg"]) + \
                        map(lambda x: (x,grub.ExtLinuxConf.ExtLinuxConfigFile),
                            ["/boot/isolinux/isolinux.cfg",
-                            "/boot/extlinux.conf"])
+                            "/boot/extlinux.conf"]) + \
+                       map(lambda x: (x,grub.GrubConf.GrubConfigFile),
+                           ["/boot/grub/menu.lst", "/boot/grub/grub.conf",
+                            "/grub/menu.lst", "/grub/grub.conf"])
 
         if not fs:
             # set the config file and parse it
