@@ -36,6 +36,11 @@ struct nestedsvm {
      */
     uint64_t ns_ovvmcb_pa;
 
+    /* virtual tscratio holding the value l1 guest writes to the
+     * MSR_AMD64_TSC_RATIO MSR.
+     */
+    uint64_t ns_tscratio;
+
     /* Cached real intercepts of the l2 guest */
     uint32_t ns_cr_intercepts;
     uint32_t ns_dr_intercepts;

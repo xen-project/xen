@@ -147,6 +147,8 @@ int nsvm_vcpu_reset(struct vcpu *v)
     svm->ns_msr_hsavepa = VMCX_EADDR;
     svm->ns_ovvmcb_pa = VMCX_EADDR;
 
+    svm->ns_tscratio = DEFAULT_TSC_RATIO;
+
     svm->ns_cr_intercepts = 0;
     svm->ns_dr_intercepts = 0;
     svm->ns_exception_intercepts = 0;
@@ -1185,6 +1187,9 @@ int nsvm_rdmsr(struct vcpu *v, unsigned int msr, uint64_t *msr_content)
     case MSR_K8_VM_HSAVE_PA:
         *msr_content = svm->ns_msr_hsavepa;
         break;
+    case MSR_AMD64_TSC_RATIO:
+        *msr_content = svm->ns_tscratio;
+        break;
     default:
         ret = 0;
         break;
@@ -1210,6 +1215,16 @@ int nsvm_wrmsr(struct vcpu *v, unsigned int msr, uint64_t msr_content)
             break;
         }
         svm->ns_msr_hsavepa = msr_content;
+        break;
+    case MSR_AMD64_TSC_RATIO:
+        if ((msr_content & ~TSC_RATIO_RSVD_BITS) != msr_content) {
+            gdprintk(XENLOG_ERR,
+                "reserved bits set in MSR_AMD64_TSC_RATIO 0x%"PRIx64"\n",
+                msr_content);
+            ret = -1; /* inject #GP */
+            break;
+        }
+        svm->ns_tscratio = msr_content;
         break;
     default:
         ret = 0;

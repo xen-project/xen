@@ -635,28 +635,37 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
         svm_vmload(vmcb);
 }
 
+static uint64_t svm_get_tsc_offset(uint64_t host_tsc, uint64_t guest_tsc,
+    uint64_t ratio)
+{
+    uint64_t offset;
+
+    if (ratio == DEFAULT_TSC_RATIO)
+        return guest_tsc - host_tsc;
+
+    /* calculate hi,lo parts in 64bits to prevent overflow */
+    offset = (((host_tsc >> 32U) * (ratio >> 32U)) << 32U) +
+          (host_tsc & 0xffffffffULL) * (ratio & 0xffffffffULL);
+    return guest_tsc - offset;
+}
+
 static void svm_set_tsc_offset(struct vcpu *v, u64 offset)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     struct vmcb_struct *n1vmcb, *n2vmcb;
     uint64_t n2_tsc_offset = 0;
     struct domain *d = v->domain;
+    uint64_t host_tsc, guest_tsc;
+
+    guest_tsc = hvm_get_guest_tsc(v);
+
+    /* Re-adjust the offset value when TSC_RATIO is available */
+    if ( cpu_has_tsc_ratio && d->arch.vtsc ) {
+        rdtscll(host_tsc);
+        offset = svm_get_tsc_offset(host_tsc, guest_tsc, vcpu_tsc_ratio(v));
+    }
 
     if ( !nestedhvm_enabled(d) ) {
-        /* Re-adjust the offset value when TSC_RATIO is available */
-        if ( cpu_has_tsc_ratio && d->arch.vtsc )
-        {
-            uint64_t host_tsc, guest_tsc;
-
-            rdtscll(host_tsc);
-            guest_tsc = hvm_get_guest_tsc(v);
-            
-            /* calculate hi,lo parts in 64bits to prevent overflow */
-            offset = (((host_tsc >> 32) * d->arch.tsc_khz / cpu_khz) << 32) +
-                     (host_tsc & 0xffffffffULL) * d->arch.tsc_khz / cpu_khz;
-            offset = guest_tsc - offset;
-        }
-
         vmcb_set_tsc_offset(vmcb, offset);
         return;
     }
@@ -665,8 +674,14 @@ static void svm_set_tsc_offset(struct vcpu *v, u64 offset)
     n2vmcb = vcpu_nestedhvm(v).nv_n2vmcx;
 
     if ( nestedhvm_vcpu_in_guestmode(v) ) {
+        struct nestedsvm *svm = &vcpu_nestedsvm(v);
+
         n2_tsc_offset = vmcb_get_tsc_offset(n2vmcb) -
             vmcb_get_tsc_offset(n1vmcb);
+        if ( svm->ns_tscratio != DEFAULT_TSC_RATIO ) {
+            n2_tsc_offset = svm_get_tsc_offset(guest_tsc,
+                guest_tsc + n2_tsc_offset, svm->ns_tscratio);
+        }
         vmcb_set_tsc_offset(n1vmcb, offset);
     }
 
@@ -1107,6 +1122,7 @@ struct hvm_function_table * __init start_svm(void)
     P(cpu_has_svm_cleanbits, "VMCB Clean Bits");
     P(cpu_has_svm_decode, "DecodeAssists");
     P(cpu_has_pause_filter, "Pause-Intercept Filter");
+    P(cpu_has_tsc_ratio, "TSC Rate MSR");
 #undef P
 
     if ( !printed )

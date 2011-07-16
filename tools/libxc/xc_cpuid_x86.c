@@ -157,7 +157,7 @@ static void amd_xc_cpuid_policy(
             SVM_FEATURE_DECODEASSISTS);
 
         /* Pass 2: Always enable SVM features which are emulated */
-        regs[3] |= SVM_FEATURE_VMCBCLEAN;
+        regs[3] |= SVM_FEATURE_VMCBCLEAN | SVM_FEATURE_TSCRATEMSR;
         break;
     }
 
