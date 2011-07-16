@@ -16,6 +16,7 @@ oprofile.h		-> linux/include/linux/oprofile.h
 pci.h			-> linux/include/linux/pci.h
 kobject.h		-> linux/include/linux/kobject.h
 device.h		-> linux/include/linux/device.h
+completion.h		-> linux/include/linux/completion.h
 
 # The files below are from Linux-2.6.21
 cpu.h			-> linux/include/linux/cpu.h

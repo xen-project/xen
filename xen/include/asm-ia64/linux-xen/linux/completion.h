@@ -12,7 +12,9 @@
 
 struct completion {
 	unsigned int done;
+#ifndef XEN
 	wait_queue_head_t wait;
+#endif
 };
 
 #define COMPLETION_INITIALIZER(work) \
@@ -39,7 +41,9 @@ struct completion {
 static inline void init_completion(struct completion *x)
 {
 	x->done = 0;
+#ifndef XEN
 	init_waitqueue_head(&x->wait);
+#endif
 }
 
 extern void FASTCALL(wait_for_completion(struct completion *));

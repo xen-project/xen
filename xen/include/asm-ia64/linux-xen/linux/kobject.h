@@ -58,7 +58,9 @@ struct kobject {
 	struct kset		* kset;
 	struct kobj_type	* ktype;
 	struct dentry		* dentry;
+#ifndef XEN
 	wait_queue_head_t	poll;
+#endif
 };
 
 extern int kobject_set_name(struct kobject *, const char *, ...)
