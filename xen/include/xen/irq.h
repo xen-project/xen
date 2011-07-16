@@ -20,13 +20,13 @@ struct irqaction {
 /*
  * IRQ line status.
  */
-#define IRQ_INPROGRESS	1	/* IRQ handler active - do not enter! */
-#define IRQ_DISABLED	2	/* IRQ disabled - do not enter! */
-#define IRQ_PENDING	4	/* IRQ pending - replay on enable */
-#define IRQ_REPLAY	8	/* IRQ has been replayed but not acked yet */
-#define IRQ_GUEST       16      /* IRQ is handled by guest OS(es) */
-#define IRQ_MOVE_PENDING      64  /* IRQ is migrating to another CPUs */
-#define IRQ_PER_CPU     256     /* IRQ is per CPU */
+#define IRQ_INPROGRESS    (1u<<0) /* IRQ handler active - do not enter! */
+#define IRQ_DISABLED      (1u<<1) /* IRQ disabled - do not enter! */
+#define IRQ_PENDING       (1u<<2) /* IRQ pending - replay on enable */
+#define IRQ_REPLAY        (1u<<3) /* IRQ has been replayed but not acked yet */
+#define IRQ_GUEST         (1u<<4) /* IRQ is handled by guest OS(es) */
+#define IRQ_MOVE_PENDING  (1u<<5) /* IRQ is migrating to another CPUs */
+#define IRQ_PER_CPU       (1u<<6) /* IRQ is per CPU */
 
 /* Special IRQ numbers. */
 #define AUTO_ASSIGN_IRQ         (-1)
