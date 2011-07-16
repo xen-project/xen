@@ -777,7 +777,7 @@ static void pv_cpuid(struct cpu_user_regs *regs)
         : "=a" (a), "=b" (b), "=c" (c), "=d" (d)
         : "0" (a), "1" (b), "2" (c), "3" (d) );
 
-    if ( (regs->eax & 0x7fffffff) == 1 )
+    if ( (regs->eax & 0x7fffffff) == 0x00000001 )
     {
         /* Modify Feature Information. */
         __clear_bit(X86_FEATURE_VME, &d);
@@ -787,9 +787,10 @@ static void pv_cpuid(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_PGE, &d);
         __clear_bit(X86_FEATURE_PSE36, &d);
     }
+
     switch ( (uint32_t)regs->eax )
     {
-    case 1:
+    case 0x00000001:
         /* Modify Feature Information. */
         if ( !cpu_has_sep )
             __clear_bit(X86_FEATURE_SEP, &d);
@@ -821,7 +822,8 @@ static void pv_cpuid(struct cpu_user_regs *regs)
            __clear_bit(X86_FEATURE_X2APIC % 32, &c);
         __set_bit(X86_FEATURE_HYPERVISOR % 32, &c);
         break;
-    case 7:
+
+    case 0x00000007:
         if ( regs->ecx == 0 )
             b &= (cpufeat_mask(X86_FEATURE_FSGSBASE) |
                   cpufeat_mask(X86_FEATURE_ERMS));
@@ -829,6 +831,12 @@ static void pv_cpuid(struct cpu_user_regs *regs)
             b = 0;
         a = c = d = 0;
         break;
+
+    case 0x0000000d: /* XSAVE */
+        if ( !xsave_enabled(current) )
+            goto unsupported;
+        break;
+
     case 0x80000001:
         /* Modify Feature Information. */
         if ( is_pv_32bit_vcpu(current) )
@@ -855,19 +863,18 @@ static void pv_cpuid(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_NODEID_MSR % 32, &c);
         __clear_bit(X86_FEATURE_TOPOEXT % 32, &c);
         break;
-    case 0xd: /* XSAVE */
-        if ( xsave_enabled(current) )
-            break;
-        /* fall through */
-    case 5: /* MONITOR/MWAIT */
-    case 0xa: /* Architectural Performance Monitor Features */
+
+    case 0x00000005: /* MONITOR/MWAIT */
+    case 0x0000000a: /* Architectural Performance Monitor Features */
     case 0x0000000b: /* Extended Topology Enumeration */
     case 0x8000000a: /* SVM revision and features */
     case 0x8000001b: /* Instruction Based Sampling */
     case 0x8000001c: /* Light Weight Profiling */
     case 0x8000001e: /* Extended topology reporting */
+    unsupported:
         a = b = c = d = 0;
         break;
+
     default:
         (void)cpuid_hypervisor_leaves(regs->eax, 0, &a, &b, &c, &d);
         break;

@@ -438,7 +438,7 @@ static void xc_cpuid_pv_policy(
     do_domctl(xch, &domctl);
     xfeature_mask = domctl.u.vcpuextstate.xfeature_mask;
 
-    if ( (input[0] & 0x7fffffff) == 1 )
+    if ( (input[0] & 0x7fffffff) == 0x00000001 )
     {
         clear_bit(X86_FEATURE_VME, regs[3]);
         clear_bit(X86_FEATURE_PSE, regs[3]);
@@ -451,7 +451,7 @@ static void xc_cpuid_pv_policy(
 
     switch ( input[0] )
     {
-    case 1:
+    case 0x00000001:
         if ( !xen_64bit || strstr(brand, "AMD") )
             clear_bit(X86_FEATURE_SEP, regs[3]);
         clear_bit(X86_FEATURE_DS, regs[3]);
@@ -478,7 +478,7 @@ static void xc_cpuid_pv_policy(
         set_bit(X86_FEATURE_HYPERVISOR, regs[2]);
         break;
 
-    case 7:
+    case 0x00000007:
         if ( input[1] == 0 )
             regs[1] &= (bitmaskof(X86_FEATURE_FSGSBASE) |
                         bitmaskof(X86_FEATURE_ERMS));
@@ -516,8 +516,8 @@ static void xc_cpuid_pv_policy(
         clear_bit(X86_FEATURE_TOPOEXT, regs[2]);
         break;
 
-    case 5: /* MONITOR/MWAIT */
-    case 0xa: /* Architectural Performance Monitor Features */
+    case 0x00000005: /* MONITOR/MWAIT */
+    case 0x0000000a: /* Architectural Performance Monitor Features */
     case 0x0000000b: /* Extended Topology Enumeration */
     case 0x8000000a: /* SVM revision and features */
     case 0x8000001b: /* Instruction Based Sampling */
