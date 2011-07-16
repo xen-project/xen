@@ -77,10 +77,14 @@ void unlock_vector_lock(void)
 static void trace_irq_mask(u32 event, int irq, int vector, cpumask_t *mask)
 {
     struct {
-        int irq, vec;
-        cpumask_t mask;
-    } d = { irq, vector, *mask };
-    trace_var(event, 1, sizeof(d), (unsigned char *)&d);
+        unsigned int irq:16, vec:16;
+        unsigned int mask[6];
+    } d;
+    d.irq = irq;
+    d.vec = vector;
+    memset(d.mask, 0, sizeof(d.mask));
+    memcpy(d.mask, mask, min(sizeof(d.mask), sizeof(cpumask_t)));
+    trace_var(event, 1, sizeof(d), &d);
 }
 
 static int __init __bind_irq_vector(int irq, int vector, cpumask_t cpu_mask)
