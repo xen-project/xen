@@ -1132,10 +1132,6 @@ int xc_lockprof_query(xc_interface *xch,
  * should be unmapped with munmap and should follow the same rules as mmap
  * regarding page alignment.  Returns NULL on failure.
  *
- * In Linux, the ring queue for the control channel is accessible by mapping
- * the shared_info_frame (from xc_domain_getinfo()) + 2048.  The structure
- * stored there is of type control_if_t.
- *
  * @parm xch a handle on an open hypervisor interface
  * @parm dom the domain to map memory from
  * @parm size the amount of memory to map (in multiples of page size)
