@@ -25,7 +25,6 @@ struct irqaction {
 #define IRQ_PENDING	4	/* IRQ pending - replay on enable */
 #define IRQ_REPLAY	8	/* IRQ has been replayed but not acked yet */
 #define IRQ_GUEST       16      /* IRQ is handled by guest OS(es) */
-#define IRQ_GUEST_EOI_PENDING 32 /* IRQ was disabled, pending a guest EOI */
 #define IRQ_MOVE_PENDING      64  /* IRQ is migrating to another CPUs */
 #define IRQ_PER_CPU     256     /* IRQ is per CPU */
 

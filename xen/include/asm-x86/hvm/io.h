@@ -139,6 +139,5 @@ struct hvm_hw_stdvga {
 void stdvga_init(struct domain *d);
 void stdvga_deinit(struct domain *d);
 
-extern void hvm_dpci_msi_eoi(struct domain *d, int vector);
 #endif /* __ASM_X86_HVM_IO_H__ */
 

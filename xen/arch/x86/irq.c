@@ -790,22 +790,6 @@ static inline void clear_pirq_eoi(struct domain *d, unsigned int irq)
         clear_bit(irq, d->arch.pv_domain.pirq_eoi_map);
 }
 
-static void _irq_guest_eoi(struct irq_desc *desc)
-{
-    irq_guest_action_t *action = (irq_guest_action_t *)desc->action;
-    unsigned int i, irq = desc - irq_desc;
-
-    if ( !(desc->status & IRQ_GUEST_EOI_PENDING) )
-        return;
-
-    for ( i = 0; i < action->nr_guests; ++i )
-        clear_pirq_eoi(action->guest[i],
-                       domain_irq_to_pirq(action->guest[i], irq));
-
-    desc->status &= ~(IRQ_INPROGRESS|IRQ_GUEST_EOI_PENDING);
-    desc->handler->enable(irq);
-}
-
 static void set_eoi_ready(void *data);
 
 static void irq_guest_eoi_timer_fn(void *data)
@@ -849,9 +833,6 @@ static void irq_guest_eoi_timer_fn(void *data)
         on_selected_cpus(&cpu_eoi_map, set_eoi_ready, desc, 0);
         spin_lock_irq(&desc->lock);
         break;
-    case ACKTYPE_NONE:
-        _irq_guest_eoi(desc);
-        break;
     }
 
  out:
@@ -863,7 +844,7 @@ static void __do_IRQ_guest(int irq)
     struct irq_desc         *desc = irq_to_desc(irq);
     irq_guest_action_t *action = (irq_guest_action_t *)desc->action;
     struct domain      *d;
-    int                 i, sp, already_pending = 0;
+    int                 i, sp;
     struct pending_eoi *peoi = this_cpu(pending_eoi);
     int vector = get_irq_regs()->entry_vector;
 
@@ -897,45 +878,16 @@ static void __do_IRQ_guest(int irq)
         if ( (action->ack_type != ACKTYPE_NONE) &&
              !test_and_set_bool(pirq->masked) )
             action->in_flight++;
-        if ( hvm_do_IRQ_dpci(d, pirq) )
-        {
-            if ( action->ack_type == ACKTYPE_NONE )
-            {
-                already_pending += !!(desc->status & IRQ_INPROGRESS);
-                desc->status |= IRQ_INPROGRESS; /* cleared during hvm eoi */
-            }
-        }
-        else if ( send_guest_pirq(d, pirq) &&
-                  (action->ack_type == ACKTYPE_NONE) )
-        {
-            already_pending++;
-        }
+        if ( !hvm_do_IRQ_dpci(d, pirq) )
+            send_guest_pirq(d, pirq);
     }
 
-    stop_timer(&action->eoi_timer);
-
-    if ( (action->ack_type == ACKTYPE_NONE) &&
-         (already_pending == action->nr_guests) )
+    if ( action->ack_type != ACKTYPE_NONE )
     {
-        desc->handler->disable(irq);
-        desc->status |= IRQ_GUEST_EOI_PENDING;
-        for ( i = 0; i < already_pending; ++i )
-        {
-            d = action->guest[i];
-            set_pirq_eoi(d, domain_irq_to_pirq(d, irq));
-            /*
-             * Could check here whether the guest unmasked the event by now
-             * (or perhaps just re-issue the send_guest_pirq()), and if it
-             * can now accept the event,
-             * - clear all the pirq_eoi bits we already set,
-             * - re-enable the vector, and
-             * - skip the timer setup below.
-             */
-        }
+        stop_timer(&action->eoi_timer);
+        migrate_timer(&action->eoi_timer, smp_processor_id());
+        set_timer(&action->eoi_timer, NOW() + MILLISECS(1));
     }
-
-    migrate_timer(&action->eoi_timer, smp_processor_id());
-    set_timer(&action->eoi_timer, NOW() + MILLISECS(1));
 }
 
 /*
@@ -1182,13 +1134,6 @@ void desc_guest_eoi(struct irq_desc *desc, struct pirq *pirq)
 
     action = (irq_guest_action_t *)desc->action;
     irq = desc - irq_desc;
-
-    if ( action->ack_type == ACKTYPE_NONE )
-    {
-        ASSERT(!pirq->masked);
-        stop_timer(&action->eoi_timer);
-        _irq_guest_eoi(desc);
-    }
 
     if ( unlikely(!test_and_clear_bool(pirq->masked)) ||
          unlikely(--action->in_flight != 0) )
@@ -1468,10 +1413,6 @@ static irq_guest_action_t *__pirq_guest_unbind(
             spin_lock_irq(&desc->lock);
         }
         break;
-    case ACKTYPE_NONE:
-        stop_timer(&action->eoi_timer);
-        _irq_guest_eoi(desc);
-        break;
     }
 
     /*
@@ -1509,7 +1450,7 @@ static irq_guest_action_t *__pirq_guest_unbind(
     BUG_ON(!cpus_empty(action->cpu_eoi_map));
 
     desc->action = NULL;
-    desc->status &= ~(IRQ_GUEST|IRQ_GUEST_EOI_PENDING|IRQ_INPROGRESS);
+    desc->status &= ~(IRQ_GUEST|IRQ_INPROGRESS);
     desc->handler->shutdown(irq);
 
     /* Caller frees the old guest descriptor block. */

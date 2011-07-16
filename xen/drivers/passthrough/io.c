@@ -421,58 +421,6 @@ int hvm_do_IRQ_dpci(struct domain *d, struct pirq *pirq)
 }
 
 #ifdef SUPPORT_MSI_REMAPPING
-/* called with d->event_lock held */
-static void __msi_pirq_eoi(struct hvm_pirq_dpci *pirq_dpci)
-{
-    irq_desc_t *desc;
-
-    if ( (pirq_dpci->flags & HVM_IRQ_DPCI_MAPPED) &&
-         (pirq_dpci->flags & HVM_IRQ_DPCI_MACH_MSI) )
-    {
-        struct pirq *pirq = dpci_pirq(pirq_dpci);
-
-         BUG_ON(!local_irq_is_enabled());
-         desc = pirq_spin_lock_irq_desc(pirq, NULL);
-         if ( !desc )
-            return;
-
-         desc->status &= ~IRQ_INPROGRESS;
-         desc_guest_eoi(desc, pirq);
-    }
-}
-
-static int _hvm_dpci_msi_eoi(struct domain *d,
-                             struct hvm_pirq_dpci *pirq_dpci, void *arg)
-{
-    int vector = (long)arg;
-
-    if ( (pirq_dpci->flags & HVM_IRQ_DPCI_MACH_MSI) &&
-         (pirq_dpci->gmsi.gvec == vector) )
-    {
-        int dest = pirq_dpci->gmsi.gflags & VMSI_DEST_ID_MASK;
-        int dest_mode = !!(pirq_dpci->gmsi.gflags & VMSI_DM_MASK);
-
-        if ( vlapic_match_dest(vcpu_vlapic(current), NULL, 0, dest,
-                               dest_mode) )
-        {
-            __msi_pirq_eoi(pirq_dpci);
-            return 1;
-        }
-    }
-
-    return 0;
-}
-
-void hvm_dpci_msi_eoi(struct domain *d, int vector)
-{
-    if ( !iommu_enabled || !d->arch.hvm_domain.irq.dpci )
-       return;
-
-    spin_lock(&d->event_lock);
-    pt_pirq_iterate(d, _hvm_dpci_msi_eoi, (void *)(long)vector);
-    spin_unlock(&d->event_lock);
-}
-
 static int hvm_pci_msi_assert(struct domain *d,
                               struct hvm_pirq_dpci *pirq_dpci)
 {
@@ -510,14 +458,6 @@ static int _hvm_dirq_assist(struct domain *d, struct hvm_pirq_dpci *pirq_dpci,
             else
                 hvm_pci_intx_assert(d, device, intx);
             pirq_dpci->pending++;
-
-#ifdef SUPPORT_MSI_REMAPPING
-            if ( pirq_dpci->flags & HVM_IRQ_DPCI_TRANSLATE )
-            {
-                /* for translated MSI to INTx interrupt, eoi as early as possible */
-                __msi_pirq_eoi(pirq_dpci);
-            }
-#endif
         }
 
         /*
