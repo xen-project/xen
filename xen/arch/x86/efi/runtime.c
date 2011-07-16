@@ -3,6 +3,7 @@
 #include <xen/errno.h>
 #include <xen/guest_access.h>
 #include <xen/time.h>
+#include <xen/irq.h>
 
 DEFINE_XEN_GUEST_HANDLE(CHAR16);
 
