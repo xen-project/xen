@@ -3926,8 +3926,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
 
         /* Cycles will be taken at the vmexit and vmenter */
         trace_var(tr.event | TRC_GUEST, 0 /*!cycles*/,
-                  tr.extra_bytes,
-                  (unsigned char *)tr.extra);
+                  tr.extra_bytes, tr.extra);
         break;
     }
 
