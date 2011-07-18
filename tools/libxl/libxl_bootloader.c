@@ -323,7 +323,7 @@ int libxl_run_bootloader(libxl_ctx *ctx,
 
     struct stat st_buf;
 
-    if (info->hvm || !info->u.pv.bootloader)
+    if (info->type != LIBXL_DOMAIN_TYPE_PV || !info->u.pv.bootloader)
         goto out;
 
     rc = ERROR_INVAL;

@@ -84,7 +84,7 @@ void libxl_init_build_info(libxl_domain_build_info *b_info, libxl_domain_create_
     b_info->shadow_memkb = 0;
     if (c_info->hvm) {
         b_info->video_memkb = 8 * 1024;
-        b_info->hvm = 1;
+        b_info->type = LIBXL_DOMAIN_TYPE_HVM;
         b_info->u.hvm.firmware = NULL;
         b_info->u.hvm.pae = 1;
         b_info->u.hvm.apic = 1;
@@ -96,6 +96,7 @@ void libxl_init_build_info(libxl_domain_build_info *b_info, libxl_domain_create_
         b_info->u.hvm.timer_mode = 1;
         b_info->u.hvm.nested_hvm = 0;
     } else {
+        b_info->type = LIBXL_DOMAIN_TYPE_PV;
         b_info->u.pv.slack_memkb = 8 * 1024;
     }
 }
@@ -160,7 +161,8 @@ int libxl__domain_build(libxl__gc *gc,
 
     gettimeofday(&start_time, NULL);
 
-    if (info->hvm) {
+    switch (info->type) {
+    case LIBXL_DOMAIN_TYPE_HVM:
         ret = libxl__build_hvm(gc, domid, info, dm_info, state);
         if (ret)
             goto out;
@@ -172,7 +174,8 @@ int libxl__domain_build(libxl__gc *gc,
         vments[3] = "hvm";
         vments[4] = "start_time";
         vments[5] = libxl__sprintf(gc, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
-    } else {
+        break;
+    case LIBXL_DOMAIN_TYPE_PV:
         ret = libxl__build_pv(gc, domid, info, state);
         if (ret)
             goto out;
@@ -193,6 +196,10 @@ int libxl__domain_build(libxl__gc *gc,
             vments[i++] = "image/cmdline";
             vments[i++] = (char*) info->u.pv.cmdline;
         }
+        break;
+    default:
+        ret = ERROR_INVAL;
+        goto out;
     }
     ret = libxl__build_post(gc, domid, info, state, vments, localents);
 out:
@@ -219,7 +226,8 @@ static int domain_restore(libxl__gc *gc, libxl_domain_build_info *info,
 
     gettimeofday(&start_time, NULL);
 
-    if (info->hvm) {
+    switch (info->type) {
+    case LIBXL_DOMAIN_TYPE_HVM:
         vments = libxl__calloc(gc, 7, sizeof(char *));
         vments[0] = "rtc/timeoffset";
         vments[1] = (info->u.hvm.timeoffset) ? info->u.hvm.timeoffset : "";
@@ -227,7 +235,8 @@ static int domain_restore(libxl__gc *gc, libxl_domain_build_info *info,
         vments[3] = "hvm";
         vments[4] = "start_time";
         vments[5] = libxl__sprintf(gc, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
-    } else {
+        break;
+    case LIBXL_DOMAIN_TYPE_PV:
         vments = libxl__calloc(gc, 11, sizeof(char *));
         i = 0;
         vments[i++] = "image/ostype";
@@ -244,20 +253,24 @@ static int domain_restore(libxl__gc *gc, libxl_domain_build_info *info,
             vments[i++] = "image/cmdline";
             vments[i++] = (char*) info->u.pv.cmdline;
         }
+        break;
+    default:
+        ret = ERROR_INVAL;
+        goto out;
     }
     ret = libxl__build_post(gc, domid, info, state, vments, localents);
     if (ret)
         goto out;
 
     dm_info->saved_state = NULL;
-    if (info->hvm) {
+    if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
         ret = asprintf(&dm_info->saved_state,
                        XC_DEVICE_MODEL_RESTORE_FILE".%d", domid);
         ret = (ret < 0) ? ERROR_FAIL : 0;
     }
 
 out:
-    if (!info->hvm) {
+    if (info->type == LIBXL_DOMAIN_TYPE_PV) {
         libxl__file_reference_unmap(&info->u.pv.kernel);
         libxl__file_reference_unmap(&info->u.pv.ramdisk);
     }

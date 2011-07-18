@@ -75,14 +75,14 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
     libxl_ctx *ctx = libxl__gc_owner(gc);
     xc_domain_max_vcpus(ctx->xch, domid, info->max_vcpus);
     xc_domain_setmaxmem(ctx->xch, domid, info->target_memkb + LIBXL_MAXMEM_CONSTANT);
-    if (!info->hvm)
+    if (info->type == LIBXL_DOMAIN_TYPE_PV)
         xc_domain_set_memmap_limit(ctx->xch, domid,
                 (info->max_memkb + info->u.pv.slack_memkb));
     xc_domain_set_tsc_info(ctx->xch, domid, info->tsc_mode, 0, 0, 0);
     if ( info->disable_migrate )
         xc_domain_disable_migrate(ctx->xch, domid);
 
-    if (info->hvm) {
+    if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
         unsigned long shadow;
         shadow = (info->shadow_memkb + 1023) / 1024;
         xc_shadow_control(ctx->xch, domid, XEN_DOMCTL_SHADOW_OP_SET_ALLOCATION, NULL, 0, &shadow, 0, NULL);
@@ -340,10 +340,25 @@ int libxl__domain_restore_common(libxl__gc *gc, uint32_t domid,
     libxl_ctx *ctx = libxl__gc_owner(gc);
     /* read signature */
     int rc;
+    int hvm, pae, superpages;
+    switch (info->type) {
+    case LIBXL_DOMAIN_TYPE_HVM:
+        hvm = 1;
+        superpages = 1;
+        pae = info->u.hvm.pae;
+        break;
+    case LIBXL_DOMAIN_TYPE_PV:
+        hvm = 0;
+        superpages = 0;
+        pae = 1;
+        break;
+    default:
+        return ERROR_INVAL;
+    }
     rc = xc_domain_restore(ctx->xch, fd, domid,
-                             state->store_port, &state->store_mfn,
-                             state->console_port, &state->console_mfn,
-                             info->hvm, info->u.hvm.pae, !!info->hvm);
+                           state->store_port, &state->store_mfn,
+                           state->console_port, &state->console_mfn,
+                           hvm, pae, superpages);
     if ( rc ) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "restoring domain");
         return ERROR_FAIL;

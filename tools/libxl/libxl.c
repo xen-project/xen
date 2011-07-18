@@ -2036,17 +2036,27 @@ int libxl_domain_need_memory(libxl_ctx *ctx, libxl_domain_build_info *b_info,
         libxl_device_model_info *dm_info, uint32_t *need_memkb)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
+    int rc = ERROR_INVAL;
     *need_memkb = b_info->target_memkb;
-    if (b_info->hvm) {
+    switch (b_info->type) {
+    case LIBXL_DOMAIN_TYPE_HVM:
         *need_memkb += b_info->shadow_memkb + LIBXL_HVM_EXTRA_MEMORY;
         if (dm_info->device_model_stubdomain)
             *need_memkb += 32 * 1024;
-    } else
+        break;
+    case LIBXL_DOMAIN_TYPE_PV:
         *need_memkb += b_info->shadow_memkb + LIBXL_PV_EXTRA_MEMORY;
+        break;
+    default:
+        goto out;
+    }
     if (*need_memkb % (2 * 1024))
         *need_memkb += (2 * 1024) - (*need_memkb % (2 * 1024));
+    rc = 0;
+out:
     libxl__free_all(&gc);
-    return 0;
+    return rc;
+
 }
 
 int libxl_get_free_memory(libxl_ctx *ctx, uint32_t *memkb)
