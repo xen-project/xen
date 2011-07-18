@@ -81,12 +81,13 @@ def libxl_C_type_destroy(ty, v, indent = "    ", parent = None):
     if isinstance(ty, libxltypes.KeyedUnion):
         if parent is None:
             raise Exception("KeyedUnion type must have a parent")
+        s += "switch (%s) {\n" % (parent + ty.keyvar_name)        
         for f in ty.fields:
             (nparent,fexpr) = ty.member(v, f, parent is None)
-            keyvar_expr = f.keyvar_expr % (parent + ty.keyvar_name)
-            s += "if (" + keyvar_expr + ") {\n"
+            s += "case %s:\n" % f.enumname
             s += libxl_C_type_destroy(f.type, fexpr, indent + "    ", nparent)
-            s += "}\n"
+            s += "    break;\n"
+        s += "}\n"
     elif isinstance(ty, libxltypes.Struct) and (parent is None or ty.destructor_fn is None):
         for f in [f for f in ty.fields if not f.const]:
             (nparent,fexpr) = ty.member(v, f, parent is None)

@@ -116,6 +116,11 @@ class Enumeration(Type):
             self.values.append(EnumerationValue(self, num, name,
                                                 comment=comment,
                                                 typename=self.rawname))
+    def lookup(self, name):
+        for v in self.values:
+            if v.valuename == str.upper(name):
+                return v
+        return ValueError
         
 class Field(object):
     """An element of an Aggregate type"""
@@ -124,7 +129,7 @@ class Field(object):
         self.name = name
         self.const = kwargs.setdefault('const', False)
         self.comment = kwargs.setdefault('comment', None)
-        self.keyvar_expr = kwargs.setdefault('keyvar_expr', None)
+        self.enumname = kwargs.setdefault('enumname', None)
 
 class Aggregate(Type):
     """A type containing a collection of other types"""
@@ -181,18 +186,21 @@ class Union(Aggregate):
 
 class KeyedUnion(Aggregate):
     """A union which is keyed of another variable in the parent structure"""
-    def __init__(self, name, keyvar_name, fields, **kwargs):
+    def __init__(self, name, keyvar_type, keyvar_name, fields, **kwargs):
         Aggregate.__init__(self, "union", name, [], **kwargs)
 
+        if not isinstance(keyvar_type, Enumeration):
+            raise ValueError
+        
         self.keyvar_name = keyvar_name
+        self.keyvar_type = keyvar_type
 
         for f in fields:
-            # (name, keyvar_expr, type)
-
-            # keyvar_expr must contain exactly one %s which will be replaced with the keyvar_name
-
-            n, kve, ty = f
-            self.fields.append(Field(ty, n, keyvar_expr=kve))
+            # (name, enum, type)
+            e, ty = f
+            ev = keyvar_type.lookup(e)
+            en = ev.name
+            self.fields.append(Field(ty, e, enumname=en))
 
 #
 # Standard Types

@@ -127,13 +127,9 @@ libxltype.KeyedUnion
  upon another member in the containing type.
 
  The KeyedUnion.keyvar_name must contain the name of the member of the
- containing type which determines the valid member of the union
-
- The fields in a KeyedUnion have an extra Field.keyvar_expr
- property. This must be a string containing a single "%s" format
- specifier such that when "%s" is substited by an instance of
- KeyedUnion.keyvar_name it becomes a C expression which evaluates to
- True IFF this field currently contains valid data.
+ containing type which determines the valid member of the union. The
+ member referenced by KeyedUnion.keyvar_name has type
+ KeyedUnion.keyvar_type which must be an instance of the Enumeration type.
 
 Standard Types
 --------------
