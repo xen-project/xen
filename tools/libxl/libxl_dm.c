@@ -140,7 +140,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
     if (info->serial) {
         flexarray_vappend(dm_args, "-serial", info->serial, NULL);
     }
-    if (info->type == LIBXL_DOMAIN_TYPE_FV) {
+    if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
         int ioemu_vifs = 0;
 
         if (info->videoram) {
@@ -207,7 +207,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
     case LIBXL_DOMAIN_TYPE_PV:
         flexarray_append(dm_args, "xenpv");
         break;
-    case LIBXL_DOMAIN_TYPE_FV:
+    case LIBXL_DOMAIN_TYPE_HVM:
         flexarray_append(dm_args, "xenfv");
         break;
     }
@@ -332,7 +332,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     if (info->serial) {
         flexarray_vappend(dm_args, "-serial", info->serial, NULL);
     }
-    if (info->type == LIBXL_DOMAIN_TYPE_FV) {
+    if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
         int ioemu_vifs = 0;
 
         if (info->stdvga) {
@@ -404,7 +404,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     case LIBXL_DOMAIN_TYPE_PV:
         flexarray_append(dm_args, "xenpv");
         break;
-    case LIBXL_DOMAIN_TYPE_FV:
+    case LIBXL_DOMAIN_TYPE_HVM:
         flexarray_append(dm_args, "xenfv");
         break;
     }
@@ -413,7 +413,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     flexarray_append(dm_args, "-m");
     flexarray_append(dm_args, libxl__sprintf(gc, "%d", info->target_ram));
 
-    if (info->type == LIBXL_DOMAIN_TYPE_FV) {
+    if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
         for (i = 0; i < num_disks; i++) {
             int disk, part;
             int dev_number =

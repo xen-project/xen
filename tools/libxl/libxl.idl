@@ -21,7 +21,7 @@ libxl_hwcap = Builtin("hwcap")
 #
 
 libxl_domain_type = Enumeration("domain_type", [
-    (1, "FV"),
+    (1, "HVM"),
     (2, "PV"),
     ])
 
