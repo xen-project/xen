@@ -513,14 +513,26 @@ static int libxl__domain_suspend_common_callback(void *data)
 }
 
 int libxl__domain_suspend_common(libxl__gc *gc, uint32_t domid, int fd,
-		int hvm, int live, int debug)
+                                 libxl_domain_type type,
+                                 int live, int debug)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     int flags;
     int port;
     struct save_callbacks callbacks;
     struct suspendinfo si;
-    int rc = ERROR_FAIL;
+    int hvm, rc = ERROR_FAIL;
+
+    switch (type) {
+    case LIBXL_DOMAIN_TYPE_HVM:
+        hvm = 1;
+        break;
+    case LIBXL_DOMAIN_TYPE_PV:
+        hvm = 0;
+        break;
+    default:
+        return ERROR_INVAL;
+    }
 
     flags = (live) ? XCFLAGS_LIVE : 0
           | (debug) ? XCFLAGS_DEBUG : 0

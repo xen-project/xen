@@ -199,7 +199,9 @@ _hidden int libxl__domain_restore_common(libxl__gc *gc, uint32_t domid,
                                          libxl_domain_build_info *info,
                                          libxl__domain_build_state *state,
                                          int fd);
-_hidden int libxl__domain_suspend_common(libxl__gc *gc, uint32_t domid, int fd, int hvm, int live, int debug);
+_hidden int libxl__domain_suspend_common(libxl__gc *gc, uint32_t domid, int fd,
+                                         libxl_domain_type type,
+                                         int live, int debug);
 _hidden int libxl__domain_save_device_model(libxl__gc *gc, uint32_t domid, int fd);
 _hidden void libxl__userdata_destroyall(libxl__gc *gc, uint32_t domid);
 
