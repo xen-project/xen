@@ -35,7 +35,7 @@
 #include "libxl.h"
 #include "libxl_internal.h"
 
-int libxl__domain_is_hvm(libxl__gc *gc, uint32_t domid)
+libxl_domain_type libxl__domain_type(libxl__gc *gc, uint32_t domid)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     xc_domaininfo_t info;
@@ -46,7 +46,10 @@ int libxl__domain_is_hvm(libxl__gc *gc, uint32_t domid)
         return -1;
     if (info.domain != domid)
         return -1;
-    return !!(info.flags & XEN_DOMINF_hvm_guest);
+    if (info.flags & XEN_DOMINF_hvm_guest)
+        return LIBXL_DOMAIN_TYPE_HVM;
+    else
+        return LIBXL_DOMAIN_TYPE_PV;
 }
 
 int libxl__domain_shutdown_reason(libxl__gc *gc, uint32_t domid)

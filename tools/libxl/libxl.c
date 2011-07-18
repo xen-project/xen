@@ -240,7 +240,7 @@ int libxl_domain_resume(libxl_ctx *ctx, uint32_t domid)
     libxl__gc gc = LIBXL_INIT_GC(ctx);
     int rc = 0;
 
-    if (libxl__domain_is_hvm(&gc, domid)) {
+    if (LIBXL__DOMAIN_IS_TYPE(&gc,  domid, HVM)) {
         LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Called domain_resume on "
                 "non-cooperative hvm domain %u", domid);
         rc = ERROR_NI;
@@ -474,7 +474,7 @@ int libxl_domain_suspend(libxl_ctx *ctx, libxl_domain_suspend_info *info,
                          uint32_t domid, int fd)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
-    int hvm = libxl__domain_is_hvm(&gc, domid);
+    int hvm = LIBXL__DOMAIN_IS_TYPE(&gc,  domid, HVM);
     int live = info != NULL && info->flags & XL_SUSPEND_LIVE;
     int debug = info != NULL && info->flags & XL_SUSPEND_DEBUG;
     int rc = 0;
@@ -517,7 +517,7 @@ int libxl_domain_unpause(libxl_ctx *ctx, uint32_t domid)
     char *state;
     int ret, rc = 0;
 
-    if (libxl__domain_is_hvm(&gc, domid)) {
+    if (LIBXL__DOMAIN_IS_TYPE(&gc,  domid, HVM)) {
         path = libxl__sprintf(&gc, "/local/domain/0/device-model/%d/state", domid);
         state = libxl__xs_read(&gc, XBT_NULL, path);
         if (state != NULL && !strcmp(state, "paused")) {
@@ -560,7 +560,7 @@ int libxl_domain_shutdown(libxl_ctx *ctx, uint32_t domid, int req)
         return ERROR_FAIL;
     }
 
-    if (libxl__domain_is_hvm(&gc, domid)) {
+    if (LIBXL__DOMAIN_IS_TYPE(&gc,  domid, HVM)) {
         unsigned long pvdriver = 0;
         int ret;
         ret = xc_get_hvm_param(ctx->xch, domid, HVM_PARAM_CALLBACK_IRQ, &pvdriver);
@@ -722,6 +722,7 @@ int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid, int force)
     libxl_dominfo dominfo;
     char *dom_path;
     char *vm_path;
+    char *pid;
     int rc, dm_present;
 
     rc = libxl_domain_info(ctx, &dominfo, domid);
@@ -734,12 +735,16 @@ int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid, int force)
         return rc;
     }
 
-    if (libxl__domain_is_hvm(&gc, domid)) {
+    switch (libxl__domain_type(&gc, domid)) {
+    case LIBXL_DOMAIN_TYPE_HVM:
         dm_present = 1;
-    } else {
-        char *pid;
+        break;
+    case LIBXL_DOMAIN_TYPE_PV:
         pid = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "/local/domain/%d/image/device-model-pid", domid));
         dm_present = (pid != NULL);
+        break;
+    default:
+        abort();
     }
 
     dom_path = libxl__xs_get_dompath(&gc, domid);
@@ -818,10 +823,16 @@ int libxl_primary_console_exec(libxl_ctx *ctx, uint32_t domid_vm)
         rc = libxl_console_exec(ctx, stubdomid,
                                 STUBDOM_CONSOLE_SERIAL, LIBXL_CONSOLE_TYPE_PV);
     else {
-        if (libxl__domain_is_hvm(&gc, domid_vm))
+        switch (libxl__domain_type(&gc, domid_vm)) {
+        case LIBXL_DOMAIN_TYPE_HVM:
             rc = libxl_console_exec(ctx, domid_vm, 0, LIBXL_CONSOLE_TYPE_SERIAL);
-        else
+            break;
+        case LIBXL_DOMAIN_TYPE_PV:
             rc = libxl_console_exec(ctx, domid_vm, 0, LIBXL_CONSOLE_TYPE_PV);
+            break;
+        default:
+            abort();
+        }
     }
     libxl__free_all(&gc);
     return rc;

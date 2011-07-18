@@ -166,9 +166,10 @@ _hidden char **libxl__xs_directory(libxl__gc *gc, xs_transaction_t t,
    /* On error: returns NULL, sets errno (no logging) */
 
 /* from xl_dom */
-_hidden int libxl__domain_is_hvm(libxl__gc *gc, uint32_t domid);
+_hidden libxl_domain_type libxl__domain_type(libxl__gc *gc, uint32_t domid);
 _hidden int libxl__domain_shutdown_reason(libxl__gc *gc, uint32_t domid);
-
+#define LIBXL__DOMAIN_IS_TYPE(gc, domid, type) \
+    libxl__domain_type((gc), (domid)) == LIBXL_DOMAIN_TYPE_##type
 typedef struct {
     uint32_t store_port;
     unsigned long store_mfn;
