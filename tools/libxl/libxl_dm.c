@@ -629,7 +629,7 @@ static int libxl__create_stubdom(libxl__gc *gc,
     }
 
     memset(&c_info, 0x00, sizeof(libxl_domain_create_info));
-    c_info.hvm = 0;
+    c_info.type = LIBXL_DOMAIN_TYPE_PV;
     c_info.name = libxl__sprintf(gc, "%s-dm", libxl__domid_to_name(gc, info->domid));
 
     libxl_uuid_copy(&c_info.uuid, &info->uuid);

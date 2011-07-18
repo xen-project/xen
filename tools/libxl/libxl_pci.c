@@ -1275,7 +1275,7 @@ int libxl__e820_alloc(libxl_ctx *ctx, uint32_t domid, libxl_domain_config *d_con
     struct e820entry map[E820MAX];
     libxl_domain_build_info *b_info;
 
-    if (d_config == NULL || d_config->c_info.hvm)
+    if (d_config == NULL || d_config->c_info.type == LIBXL_DOMAIN_TYPE_HVM)
         return ERROR_INVAL;
 
     b_info = &d_config->b_info;

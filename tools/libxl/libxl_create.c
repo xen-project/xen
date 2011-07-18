@@ -60,19 +60,22 @@ void libxl_domain_config_destroy(libxl_domain_config *d_config)
     libxl_device_model_info_destroy(&d_config->dm_info);
 }
 
-void libxl_init_create_info(libxl_domain_create_info *c_info)
+int libxl_init_create_info(libxl_ctx *ctx, libxl_domain_create_info *c_info)
 {
     memset(c_info, '\0', sizeof(*c_info));
     c_info->xsdata = NULL;
     c_info->platformdata = NULL;
     c_info->hap = 1;
-    c_info->hvm = 1;
+    c_info->type = LIBXL_DOMAIN_TYPE_HVM;
     c_info->oos = 1;
     c_info->ssidref = 0;
     c_info->poolid = 0;
+    return 0;
 }
 
-void libxl_init_build_info(libxl_domain_build_info *b_info, libxl_domain_create_info *c_info)
+int libxl_init_build_info(libxl_ctx *ctx,
+                          libxl_domain_build_info *b_info,
+                          libxl_domain_create_info *c_info)
 {
     memset(b_info, '\0', sizeof(*b_info));
     b_info->max_vcpus = 1;
@@ -82,9 +85,10 @@ void libxl_init_build_info(libxl_domain_build_info *b_info, libxl_domain_create_
     b_info->disable_migrate = 0;
     b_info->cpuid = NULL;
     b_info->shadow_memkb = 0;
-    if (c_info->hvm) {
+    b_info->type = c_info->type;
+    switch (b_info->type) {
+    case LIBXL_DOMAIN_TYPE_HVM:
         b_info->video_memkb = 8 * 1024;
-        b_info->type = LIBXL_DOMAIN_TYPE_HVM;
         b_info->u.hvm.firmware = NULL;
         b_info->u.hvm.pae = 1;
         b_info->u.hvm.apic = 1;
@@ -95,14 +99,23 @@ void libxl_init_build_info(libxl_domain_build_info *b_info, libxl_domain_create_
         b_info->u.hvm.vpt_align = 1;
         b_info->u.hvm.timer_mode = 1;
         b_info->u.hvm.nested_hvm = 0;
-    } else {
-        b_info->type = LIBXL_DOMAIN_TYPE_PV;
+        break;
+    case LIBXL_DOMAIN_TYPE_PV:
         b_info->u.pv.slack_memkb = 8 * 1024;
+        break;
+    default:
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                   "invalid domain type %s in create info",
+                   libxl_domain_type_to_string(b_info->type));
+        return ERROR_INVAL;
     }
+    return 0;
 }
 
-void libxl_init_dm_info(libxl_device_model_info *dm_info,
-        libxl_domain_create_info *c_info, libxl_domain_build_info *b_info)
+int libxl_init_dm_info(libxl_ctx *ctx,
+                       libxl_device_model_info *dm_info,
+                       libxl_domain_create_info *c_info,
+                       libxl_domain_build_info *b_info)
 {
     memset(dm_info, '\0', sizeof(*dm_info));
 
@@ -132,6 +145,7 @@ void libxl_init_dm_info(libxl_device_model_info *dm_info,
     dm_info->usb = 0;
     dm_info->usbdevice = NULL;
     dm_info->xen_platform_pci = 1;
+    return 0;
 }
 
 static int init_console_info(libxl_device_console *console, int dev_num)
@@ -316,9 +330,12 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_create_info *info,
         goto out;
     }
 
-    flags = info->hvm ? XEN_DOMCTL_CDF_hvm_guest : 0;
-    flags |= info->hap ? XEN_DOMCTL_CDF_hap : 0;
-    flags |= info->oos ? 0 : XEN_DOMCTL_CDF_oos_off;
+    flags = 0;
+    if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
+        flags |= XEN_DOMCTL_CDF_hvm_guest;
+        flags |= info->hap ? XEN_DOMCTL_CDF_hap : 0;
+        flags |= info->oos ? 0 : XEN_DOMCTL_CDF_oos_off;
+    }
     *domid = -1;
 
     /* Ultimately, handle is an array of 16 uint8_t, same as uuid */
@@ -432,7 +449,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
         goto error_out;
     }
 
-    if ( !d_config->c_info.hvm && cb ) {
+    if ( d_config->c_info.type == LIBXL_DOMAIN_TYPE_PV && cb ) {
         if ( (*cb)(ctx, domid, priv) )
             goto error_out;
     }
@@ -486,7 +503,9 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
             goto error_out;
         }
     }
-    if (d_config->c_info.hvm) {
+    switch (d_config->c_info.type) {
+    case LIBXL_DOMAIN_TYPE_HVM:
+    {
         libxl_device_console console;
 
         ret = init_console_info(&console, 0);
@@ -505,7 +524,10 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
                        "failed to create device model: %d", ret);
             goto error_out;
         }
-    } else {
+        break;
+    }
+    case LIBXL_DOMAIN_TYPE_PV:
+    {
         int need_qemu = 0;
         libxl_device_console console;
 
@@ -530,6 +552,11 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
 
         if (need_qemu)
             libxl__create_xenpv_qemu(gc, domid, d_config->vfbs, &dm_starting);
+        break;
+    }
+    default:
+        ret = ERROR_INVAL;
+        goto error_out;
     }
 
     if (dm_starting) {
@@ -552,7 +579,8 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
         goto error_out;
     }
 
-    if (!d_config->c_info.hvm && d_config->b_info.u.pv.e820_host) {
+    if (d_config->c_info.type == LIBXL_DOMAIN_TYPE_PV &&
+        d_config->b_info.u.pv.e820_host) {
         int rc;
         rc = libxl__e820_alloc(ctx, domid, d_config);
         if (rc)
@@ -560,7 +588,9 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
                       "Failed while collecting E820 with: %d (errno:%d)\n",
                       rc, errno);
     }
-    if ( cb && (d_config->c_info.hvm || d_config->b_info.u.pv.bootloader )) {
+    if ( cb && (d_config->c_info.type == LIBXL_DOMAIN_TYPE_HVM ||
+                (d_config->c_info.type == LIBXL_DOMAIN_TYPE_PV &&
+                 d_config->b_info.u.pv.bootloader ))) {
         if ( (*cb)(ctx, domid, priv) )
             goto error_out;
     }

@@ -250,9 +250,14 @@ int libxl_ctx_free(libxl_ctx *ctx /* 0 is OK */);
 int libxl_ctx_postfork(libxl_ctx *ctx);
 
 /* domain related functions */
-void libxl_init_create_info(libxl_domain_create_info *c_info);
-void libxl_init_build_info(libxl_domain_build_info *b_info, libxl_domain_create_info *c_info);
-void libxl_init_dm_info(libxl_device_model_info *dm_info, libxl_domain_create_info *c_info, libxl_domain_build_info *b_info);
+int libxl_init_create_info(libxl_ctx *ctx, libxl_domain_create_info *c_info);
+int libxl_init_build_info(libxl_ctx *ctx,
+                          libxl_domain_build_info *b_info,
+                          libxl_domain_create_info *c_info);
+int libxl_init_dm_info(libxl_ctx *ctx,
+                       libxl_device_model_info *dm_info,
+                       libxl_domain_create_info *c_info,
+                       libxl_domain_build_info *b_info);
 typedef int (*libxl_console_ready)(libxl_ctx *ctx, uint32_t domid, void *priv);
 int libxl_domain_create_new(libxl_ctx *ctx, libxl_domain_config *d_config, libxl_console_ready cb, void *priv, uint32_t *domid);
 int libxl_domain_create_restore(libxl_ctx *ctx, libxl_domain_config *d_config, libxl_console_ready cb, void *priv, uint32_t *domid, int restore_fd);

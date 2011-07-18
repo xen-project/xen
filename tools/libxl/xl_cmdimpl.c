@@ -300,7 +300,7 @@ static void printf_info(int domid,
 
     printf("(domain\n\t(domid %d)\n", domid);
     printf("\t(create_info)\n");
-    printf("\t(hvm %d)\n", c_info->hvm);
+    printf("\t(hvm %d)\n", c_info->type == LIBXL_DOMAIN_TYPE_HVM);
     printf("\t(hap %d)\n", c_info->hap);
     printf("\t(oos %d)\n", c_info->oos);
     printf("\t(ssidref %d)\n", c_info->ssidref);
@@ -333,14 +333,15 @@ static void printf_info(int domid,
     printf("\t(target_memkb %d)\n", b_info->target_memkb);
     printf("\t(nomigrate %d)\n", b_info->disable_migrate);
 
-    if (!c_info->hvm && b_info->u.pv.bootloader) {
+    if (c_info->type == LIBXL_DOMAIN_TYPE_PV && b_info->u.pv.bootloader) {
         printf("\t(bootloader %s)\n", b_info->u.pv.bootloader);
         if (b_info->u.pv.bootloader_args)
             printf("\t(bootloader_args %s)\n", b_info->u.pv.bootloader_args);
     }
 
     printf("\t(image\n");
-    if (c_info->hvm) {
+    switch (c_info->type) {
+    case LIBXL_DOMAIN_TYPE_HVM:
         printf("\t\t(hvm\n");
         printf("\t\t\t(firmware %s)\n", b_info->u.hvm.firmware);
         printf("\t\t\t(video_memkb %d)\n", b_info->video_memkb);
@@ -380,13 +381,18 @@ static void printf_info(int domid,
                     dm_info->spicedisable_ticketing);
         printf("\t\t\t(spiceagent_mouse %d)\n", dm_info->spiceagent_mouse);
         printf("\t\t)\n");
-    } else {
+        break;
+    case LIBXL_DOMAIN_TYPE_PV:
         printf("\t\t(linux %d)\n", 0);
         printf("\t\t\t(kernel %s)\n", b_info->u.pv.kernel.path);
         printf("\t\t\t(cmdline %s)\n", b_info->u.pv.cmdline);
         printf("\t\t\t(ramdisk %s)\n", b_info->u.pv.ramdisk.path);
         printf("\t\t\t(e820_host %d)\n", b_info->u.pv.e820_host);
         printf("\t\t)\n");
+        break;
+    default:
+        fprintf(stderr, "Unknown domain type %d\n", c_info->type);
+        exit(1);
     }
     printf("\t)\n");
 
@@ -453,7 +459,7 @@ static void printf_info(int domid,
         printf("\t\t)\n");
         printf("\t)\n");
     }
-       printf(")\n");
+    printf(")\n");
 }
 
 static int parse_action_on_shutdown(const char *buf, libxl_action_on_shutdown *a)
@@ -538,7 +544,8 @@ static void parse_config_data(const char *configfile_filename_report,
         exit(1);
     }
 
-    libxl_init_create_info(c_info);
+    if (libxl_init_create_info(ctx, c_info))
+        exit(1);
 
     if (!xlu_cfg_get_string (config, "seclabel", &buf)) {
         e = libxl_flask_context_to_sid(ctx, (char *)buf, strlen(buf),
@@ -553,10 +560,10 @@ static void parse_config_data(const char *configfile_filename_report,
         }
     }
 
-    c_info->hvm = 0;
+    c_info->type = LIBXL_DOMAIN_TYPE_PV;
     if (!xlu_cfg_get_string (config, "builder", &buf) &&
         !strncmp(buf, "hvm", strlen(buf)))
-        c_info->hvm = 1;
+        c_info->type = LIBXL_DOMAIN_TYPE_HVM;
 
     if (!xlu_cfg_get_long (config, "hap", &l))
         c_info->hap = l;
@@ -586,7 +593,8 @@ static void parse_config_data(const char *configfile_filename_report,
         exit(1);
     }
 
-    libxl_init_build_info(b_info, c_info);
+    if (libxl_init_build_info(ctx, b_info, c_info))
+        exit(1);
 
     /* the following is the actual config parsing with overriding values in the structures */
     if (!xlu_cfg_get_long (config, "vcpus", &l)) {
@@ -654,7 +662,8 @@ static void parse_config_data(const char *configfile_filename_report,
     if (!xlu_cfg_get_long (config, "gfx_passthru", &l))
         dm_info->gfx_passthru = l;
 
-    if (c_info->hvm == 1) {
+    switch(c_info->type) {
+    case LIBXL_DOMAIN_TYPE_HVM:
         if (!xlu_cfg_get_string (config, "kernel", &buf))
             fprintf(stderr, "WARNING: ignoring \"kernel\" directive for HVM guest. "
                     "Use \"firmware_override\" instead if you really want a non-default firmware\n");
@@ -679,7 +688,9 @@ static void parse_config_data(const char *configfile_filename_report,
             b_info->u.hvm.timer_mode = l;
         if (!xlu_cfg_get_long (config, "nestedhvm", &l))
             b_info->u.hvm.nested_hvm = l;
-    } else {
+        break;
+    case LIBXL_DOMAIN_TYPE_PV:
+    {
         char *cmdline = NULL;
         const char *root = NULL, *extra = "";
 
@@ -712,6 +723,10 @@ static void parse_config_data(const char *configfile_filename_report,
 
         b_info->u.pv.cmdline = cmdline;
         xlu_cfg_replace_string (config, "ramdisk", &b_info->u.pv.ramdisk.path);
+        break;
+    }
+    default:
+        abort();
     }
 
     if (!xlu_cfg_get_list (config, "disk", &vbds, 0, 0)) {
@@ -888,11 +903,16 @@ skip_vfb:
     /* To be reworked (automatically enabled) once the auto ballooning
      * after guest starts is done (with PCI devices passed in). */
     if (!xlu_cfg_get_long (config, "e820_host", &l)) {
-        if (c_info->hvm)
-          fprintf(stderr, "Can't do e820_host in HVM mode!");
-        else {
-          if (l)
-            b_info->u.pv.e820_host = true;
+        switch (c_info->type) {
+        case LIBXL_DOMAIN_TYPE_HVM:
+            fprintf(stderr, "Can't do e820_host in HVM mode!");
+            break;
+        case LIBXL_DOMAIN_TYPE_PV:
+            if (l)
+                b_info->u.pv.e820_host = true;
+            break;
+        default:
+            abort();
         }
     }
     if (!xlu_cfg_get_list (config, "pci", &pcis, 0, 0)) {
@@ -911,7 +931,7 @@ skip_vfb:
             if (!libxl_device_pci_parse_bdf(ctx, pcidev, buf))
                 d_config->num_pcidevs++;
         }
-        if (d_config->num_pcidevs && !c_info->hvm)
+        if (d_config->num_pcidevs && c_info->type == LIBXL_DOMAIN_TYPE_PV)
             b_info->u.pv.e820_host = true;
     }
 
@@ -994,12 +1014,13 @@ skip_vfb:
         break;
     }
 
-    if (c_info->hvm == 1) {
+    if (c_info->type == LIBXL_DOMAIN_TYPE_HVM) {
         XLU_ConfigList *dmargs;
         int nr_dmargs = 0;
 
         /* init dm from c and b */
-        libxl_init_dm_info(dm_info, c_info, b_info);
+        if (libxl_init_dm_info(ctx, dm_info, c_info, b_info))
+            exit(1);
 
         /* then process config related to dm */
         if (!xlu_cfg_get_string (config, "device_model", &buf)) {
@@ -1082,9 +1103,7 @@ skip_vfb:
         }
     }
 
-    dm_info->type = c_info->hvm ?
-        LIBXL_DOMAIN_TYPE_HVM :
-        LIBXL_DOMAIN_TYPE_PV;
+    dm_info->type = c_info->type;
 
     xlu_cfg_destroy(config);
 }
