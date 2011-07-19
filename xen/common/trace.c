@@ -657,13 +657,13 @@ static DECLARE_SOFTIRQ_TASKLET(trace_notify_dom0_tasklet,
                                trace_notify_dom0, 0);
 
 /**
- * trace - Enters a trace tuple into the trace buffer for the current CPU.
+ * __trace_var - Enters a trace tuple into the trace buffer for the current CPU.
  * @event: the event type being logged
- * @d1...d5: the data items for the event being logged
+ * @cycles: include tsc timestamp into trace record
+ * @extra: size of additional trace data in bytes
+ * @extra_data: pointer to additional trace data
  *
- * Logs a trace record into the appropriate buffer.  Returns nonzero on
- * failure, otherwise 0.  Failure occurs only if the trace buffers are not yet
- * initialised.
+ * Logs a trace record into the appropriate buffer.
  */
 void __trace_var(u32 event, bool_t cycles, unsigned int extra,
                  const void *extra_data)
