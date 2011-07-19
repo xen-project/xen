@@ -529,6 +529,13 @@ static void parse_config_data(const char *configfile_filename_report,
     int pci_msitranslate = 1;
     int e;
 
+    XLU_ConfigList *dmargs;
+    int nr_dmargs = 0;
+    XLU_ConfigList *dmargs_hvm;
+    int nr_dmargs_hvm = 0;
+    XLU_ConfigList *dmargs_pv;
+    int nr_dmargs_pv = 0;
+
     libxl_domain_create_info *c_info = &d_config->c_info;
     libxl_domain_build_info *b_info = &d_config->b_info;
 
@@ -552,7 +559,7 @@ static void parse_config_data(const char *configfile_filename_report,
                                     &c_info->ssidref);
         if (e) {
             if (errno == ENOSYS) {
-                fprintf(stderr, "XSM Disabled: seclabel not supported\n");    
+                fprintf(stderr, "XSM Disabled: seclabel not supported\n");
             } else {
                 fprintf(stderr, "Invalid seclabel: %s\n", buf);
                 exit(1);
@@ -1014,41 +1021,72 @@ skip_vfb:
         break;
     }
 
-    if (c_info->type == LIBXL_DOMAIN_TYPE_HVM) {
-        XLU_ConfigList *dmargs;
-        int nr_dmargs = 0;
-
-        /* init dm from c and b */
-        if (libxl_init_dm_info(ctx, dm_info, c_info, b_info))
-            exit(1);
-
-        /* then process config related to dm */
-        if (!xlu_cfg_get_string (config, "device_model", &buf)) {
-            fprintf(stderr,
-                    "WARNING: ignoring device_model directive.\n"
-                    "WARNING: Use \"device_model_override\" instead if you really want a non-default device_model\n");
-            if (strstr(buf, "stubdom-dm"))
-                fprintf(stderr, "WARNING: Or use \"device_model_stubdomain_override\" if you want to enable stubdomains\n");
+    /* init dm from c and b */
+    if (libxl_init_dm_info(ctx, dm_info, c_info, b_info))
+        exit(1);
+    /* parse device model arguments, this works for pv, hvm and stubdom */
+    if (!xlu_cfg_get_string (config, "device_model", &buf)) {
+        fprintf(stderr,
+                "WARNING: ignoring device_model directive.\n"
+                "WARNING: Use \"device_model_override\" instead if you"
+                " really want a non-default device_model\n");
+        if (strstr(buf, "stubdom-dm")) {
+            if (c_info->type == LIBXL_DOMAIN_TYPE_HVM)
+                fprintf(stderr, "WARNING: Or use"
+                        " \"device_model_stubdomain_override\" if you "
+                        " want to enable stubdomains\n");
+            else
+                fprintf(stderr, "WARNING: ignoring"
+                        " \"device_model_stubdomain_override\" directive"
+                        " for pv guest\n");
         }
+    }
 
-        xlu_cfg_replace_string (config, "device_model_override",
-                                &dm_info->device_model);
-        if (!xlu_cfg_get_string (config, "device_model_version", &buf)) {
-            if (!strcmp(buf, "qemu-xen-traditional")) {
-                dm_info->device_model_version
-                    = LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
-            } else if (!strcmp(buf, "qemu-xen")) {
-                dm_info->device_model_version
-                    = LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN;
-            } else {
-                fprintf(stderr,
-                        "Unknown device_model_version \"%s\" specified\n", buf);
-                exit(1);
-            }
-        } else if (dm_info->device_model)
-            fprintf(stderr, "WARNING: device model override given without specific DM version\n");
-        if (!xlu_cfg_get_long (config, "device_model_stubdomain_override", &l))
-            dm_info->device_model_stubdomain = l;
+
+    xlu_cfg_replace_string (config, "device_model_override",
+                            &dm_info->device_model);
+    if (!xlu_cfg_get_string (config, "device_model_version", &buf)) {
+        if (!strcmp(buf, "qemu-xen-traditional")) {
+            dm_info->device_model_version
+                = LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
+        } else if (!strcmp(buf, "qemu-xen")) {
+            dm_info->device_model_version
+                = LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN;
+        } else {
+            fprintf(stderr,
+                    "Unknown device_model_version \"%s\" specified\n", buf);
+            exit(1);
+        }
+    } else if (dm_info->device_model)
+        fprintf(stderr, "WARNING: device model override given without specific DM version\n");
+    if (!xlu_cfg_get_long (config, "device_model_stubdomain_override", &l))
+        dm_info->device_model_stubdomain = l;
+
+#define parse_extra_args(type)                                          \
+    if (!xlu_cfg_get_list(config, "device_model_args"#type,             \
+                          &dmargs##type, &nr_dmargs##type, 0))          \
+    {                                                                   \
+        int i;                                                          \
+        dm_info->extra##type =                                          \
+            xmalloc(sizeof(char*)*(nr_dmargs##type + 1));               \
+        dm_info->extra##type[nr_dmargs##type] = NULL;                   \
+        for (i=0; i<nr_dmargs##type; i++) {                             \
+            const char *a = xlu_cfg_get_listitem(dmargs##type, i);      \
+            dm_info->extra##type[i] = a ? strdup(a) : NULL;             \
+        }                                                               \
+    }                                                                   \
+    /* parse extra args for qemu, common to both pv, hvm */
+    parse_extra_args();
+
+    /* parse extra args dedicated to pv */
+    parse_extra_args(_pv);
+
+    /* parse extra args dedicated to hvm */
+    parse_extra_args(_hvm);
+
+#undef parse_extra_args
+
+    if (c_info->type == LIBXL_DOMAIN_TYPE_HVM) {
         if (!xlu_cfg_get_long (config, "stdvga", &l))
             dm_info->stdvga = l;
         if (!xlu_cfg_get_long (config, "vnc", &l))
@@ -1090,17 +1128,6 @@ skip_vfb:
         xlu_cfg_replace_string (config, "soundhw", &dm_info->soundhw);
         if (!xlu_cfg_get_long (config, "xen_platform_pci", &l))
             dm_info->xen_platform_pci = l;
-
-        if (!xlu_cfg_get_list(config, "device_model_args", &dmargs, &nr_dmargs, 0))
-        {
-            int i;
-            dm_info->extra = xmalloc(sizeof(char *) * (nr_dmargs + 1));
-            dm_info->extra[nr_dmargs] = NULL;
-            for (i=0; i<nr_dmargs; i++) {
-                const char *a = xlu_cfg_get_listitem(dmargs, i);
-                dm_info->extra[i] = a ? strdup(a) : NULL;
-            }
-        }
     }
 
     dm_info->type = c_info->type;

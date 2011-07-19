@@ -238,6 +238,8 @@ The password never expires"""),
     ("vcpu_avail",       integer,           False, "vcpus actually available"),
     ("xen_platform_pci", bool,              False, "enable/disable the xen platform pci device"),
     ("extra",            libxl_string_list, False, "extra parameters pass directly to qemu, NULL terminated"),
+    ("extra_pv",         libxl_string_list, False, "extra parameters pass directly to qemu for PV guest, NULL terminated"),
+    ("extra_hvm",        libxl_string_list, False, "extra parameters pass directly to qemu for HVM guest, NULL terminated"),
     ],
     comment=
 """Device Model information.
