@@ -69,6 +69,7 @@
 #include <asm/hypercall.h>
 #include <asm/mce.h>
 #include <asm/apic.h>
+#include <asm/mc146818rtc.h>
 #include <asm/hpet.h>
 #include <public/arch-x86/cpuid.h>
 
@@ -1640,6 +1641,10 @@ static int admin_io_okay(
     if ( (port == 0xcf8) && (bytes == 4) )
         return 0;
 
+    /* We also never permit direct access to the RTC/CMOS registers. */
+    if ( ((port & ~1) == RTC_PORT(0)) )
+        return 0;
+
     return ioports_access_permitted(v->domain, port, port + bytes - 1);
 }
 
@@ -1668,6 +1673,21 @@ static uint32_t guest_io_read(
         if ( (port == 0x42) || (port == 0x43) || (port == 0x61) )
         {
             sub_data = pv_pit_handler(port, 0, 0);
+        }
+        else if ( (port == RTC_PORT(0)) )
+        {
+            sub_data = v->domain->arch.cmos_idx;
+        }
+        else if ( (port == RTC_PORT(1)) &&
+                  ioports_access_permitted(v->domain, RTC_PORT(0),
+                                           RTC_PORT(1)) )
+        {
+            unsigned long flags;
+
+            spin_lock_irqsave(&rtc_lock, flags);
+            outb(v->domain->arch.cmos_idx & 0x7f, RTC_PORT(0));
+            sub_data = inb(RTC_PORT(1));
+            spin_unlock_irqrestore(&rtc_lock, flags);
         }
         else if ( (port == 0xcf8) && (bytes == 4) )
         {
@@ -1702,8 +1722,6 @@ static void guest_io_write(
     {
         switch ( bytes ) {
         case 1:
-            if ( ((port == 0x70) || (port == 0x71)) && pv_rtc_handler )
-                pv_rtc_handler(port, (uint8_t)data);
             outb((uint8_t)data, port);
             if ( pv_post_outb_hook )
                 pv_post_outb_hook(port, (uint8_t)data);
@@ -1725,6 +1743,23 @@ static void guest_io_write(
         if ( (port == 0x42) || (port == 0x43) || (port == 0x61) )
         {
             pv_pit_handler(port, (uint8_t)data, 1);
+        }
+        else if ( (port == RTC_PORT(0)) )
+        {
+            v->domain->arch.cmos_idx = data;
+        }
+        else if ( (port == RTC_PORT(1)) &&
+                  ioports_access_permitted(v->domain, RTC_PORT(0),
+                                           RTC_PORT(1)) )
+        {
+            unsigned long flags;
+
+            if ( pv_rtc_handler )
+                pv_rtc_handler(v->domain->arch.cmos_idx & 0x7f, data);
+            spin_lock_irqsave(&rtc_lock, flags);
+            outb(v->domain->arch.cmos_idx & 0x7f, RTC_PORT(0));
+            outb(data, RTC_PORT(1));
+            spin_unlock_irqrestore(&rtc_lock, flags);
         }
         else if ( (port == 0xcf8) && (bytes == 4) )
         {
@@ -2091,10 +2126,6 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             goto fail;
         if ( admin_io_okay(port, op_bytes, v, regs) )
         {
-            if ( (op_bytes == 1) &&
-                 ((port == 0x71) || (port == 0x70)) &&
-                 pv_rtc_handler )
-                pv_rtc_handler(port, regs->eax);
             io_emul(regs);            
             if ( (op_bytes == 1) && pv_post_outb_hook )
                 pv_post_outb_hook(port, regs->eax);

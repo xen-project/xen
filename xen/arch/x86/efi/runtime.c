@@ -2,8 +2,9 @@
 #include <xen/cache.h>
 #include <xen/errno.h>
 #include <xen/guest_access.h>
-#include <xen/time.h>
 #include <xen/irq.h>
+#include <xen/time.h>
+#include <asm/mc146818rtc.h>
 
 DEFINE_XEN_GUEST_HANDLE(CHAR16);
 
@@ -81,9 +82,11 @@ unsigned long efi_get_time(void)
 {
     EFI_TIME time;
     EFI_STATUS status;
-    unsigned long cr3 = efi_rs_enter();
+    unsigned long cr3 = efi_rs_enter(), flags;
 
+    spin_lock_irqsave(&rtc_lock, flags);
     status = efi_rs->GetTime(&time, NULL);
+    spin_unlock_irqrestore(&rtc_lock, flags);
     efi_rs_leave(cr3);
 
     if ( EFI_ERROR(status) )
@@ -224,7 +227,7 @@ static inline EFI_GUID *cast_guid(struct xenpf_efi_guid *guid)
 
 int efi_runtime_call(struct xenpf_efi_runtime_call *op)
 {
-    unsigned long cr3;
+    unsigned long cr3, flags;
     EFI_STATUS status = EFI_NOT_STARTED;
     int rc = 0;
 
@@ -238,7 +241,9 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
             return -EINVAL;
 
         cr3 = efi_rs_enter();
+        spin_lock_irqsave(&rtc_lock, flags);
         status = efi_rs->GetTime(cast_time(&op->u.get_time.time), &caps);
+        spin_unlock_irqrestore(&rtc_lock, flags);
         efi_rs_leave(cr3);
 
         if ( !EFI_ERROR(status) )
@@ -256,7 +261,9 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
             return -EINVAL;
 
         cr3 = efi_rs_enter();
+        spin_lock_irqsave(&rtc_lock, flags);
         status = efi_rs->SetTime(cast_time(&op->u.set_time));
+        spin_unlock_irqrestore(&rtc_lock, flags);
         efi_rs_leave(cr3);
         break;
 
@@ -268,8 +275,10 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
             return -EINVAL;
 
         cr3 = efi_rs_enter();
+        spin_lock_irqsave(&rtc_lock, flags);
         status = efi_rs->GetWakeupTime(&enabled, &pending,
                                        cast_time(&op->u.get_wakeup_time));
+        spin_unlock_irqrestore(&rtc_lock, flags);
         efi_rs_leave(cr3);
 
         if ( !EFI_ERROR(status) )
@@ -288,12 +297,14 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
             return -EINVAL;
 
         cr3 = efi_rs_enter();
+        spin_lock_irqsave(&rtc_lock, flags);
         status = efi_rs->SetWakeupTime(!!(op->misc &
                                           XEN_EFI_SET_WAKEUP_TIME_ENABLE),
                                        (op->misc &
                                         XEN_EFI_SET_WAKEUP_TIME_ENABLE_ONLY) ?
                                        NULL :
                                        cast_time(&op->u.set_wakeup_time));
+        spin_unlock_irqrestore(&rtc_lock, flags);
         efi_rs_leave(cr3);
 
         op->misc = 0;

@@ -502,18 +502,10 @@ static void hpet_detach_channel(unsigned int cpu,
 
 #include <asm/mc146818rtc.h>
 
-void (*__read_mostly pv_rtc_handler)(unsigned int port, uint8_t value);
+void (*__read_mostly pv_rtc_handler)(uint8_t index, uint8_t value);
 
-static void handle_rtc_once(unsigned int port, uint8_t value)
+static void handle_rtc_once(uint8_t index, uint8_t value)
 {
-    static int index;
-
-    if ( port == 0x70 )
-    {
-        index = value;
-        return;
-    }
-
     if ( index != RTC_REG_B )
         return;
     
