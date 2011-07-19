@@ -132,18 +132,12 @@ buildmakevars2file = $(eval $(call buildmakevars2file-closure,$(1)))
 define buildmakevars2file-closure
     .PHONY: genpath
     genpath:
-	rm -f $(1).tmp;                                                    \
-	echo "SBINDIR=\"$(SBINDIR)\"" >> $(1).tmp;                         \
-	echo "BINDIR=\"$(BINDIR)\"" >> $(1).tmp;                           \
-	echo "LIBEXEC=\"$(LIBEXEC)\"" >> $(1).tmp;                         \
-	echo "LIBDIR=\"$(LIBDIR)\"" >> $(1).tmp;                           \
-	echo "SHAREDIR=\"$(SHAREDIR)\"" >> $(1).tmp;                       \
-	echo "PRIVATE_BINDIR=\"$(PRIVATE_BINDIR)\"" >> $(1).tmp;           \
-	echo "XENFIRMWAREDIR=\"$(XENFIRMWAREDIR)\"" >> $(1).tmp;           \
-	echo "XEN_CONFIG_DIR=\"$(XEN_CONFIG_DIR)\"" >> $(1).tmp;           \
-	echo "XEN_SCRIPT_DIR=\"$(XEN_SCRIPT_DIR)\"" >> $(1).tmp;           \
-	echo "XEN_LOCK_DIR=\"$(XEN_LOCK_DIR)\"" >> $(1).tmp;               \
-	echo "XEN_RUN_DIR=\"$(XEN_RUN_DIR)\"" >> $(1).tmp;                 \
+	rm -f $(1).tmp;                                                     \
+	$(foreach var,                                                      \
+	          SBINDIR BINDIR LIBEXEC LIBDIR SHAREDIR PRIVATE_BINDIR     \
+	          XENFIRMWAREDIR XEN_CONFIG_DIR XEN_SCRIPT_DIR XEN_LOCK_DIR \
+	          XEN_RUN_DIR,                                              \
+	          echo "$(var)=\"$(DESTDIR)$($(var))\"" >>$(1).tmp;)        \
 	$(call move-if-changed,$(1).tmp,$(1))
 endef
 
