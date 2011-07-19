@@ -400,6 +400,8 @@ void vlapic_EOI_set(struct vlapic *vlapic)
 
     if ( vlapic_test_and_clear_vector(vector, &vlapic->regs->data[APIC_TMR]) )
         vioapic_update_EOI(vlapic_domain(vlapic), vector);
+
+    hvm_dpci_msi_eoi(current->domain, vector);
 }
 
 int vlapic_ipi(
