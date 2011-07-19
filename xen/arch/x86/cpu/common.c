@@ -20,10 +20,15 @@ size_param("cachesize", cachesize_override);
 
 static bool_t __cpuinitdata use_xsave = 1;
 boolean_param("xsave", use_xsave);
+
 unsigned int __devinitdata opt_cpuid_mask_ecx = ~0u;
 integer_param("cpuid_mask_ecx", opt_cpuid_mask_ecx);
 unsigned int __devinitdata opt_cpuid_mask_edx = ~0u;
 integer_param("cpuid_mask_edx", opt_cpuid_mask_edx);
+
+unsigned int __devinitdata opt_cpuid_mask_xsave_eax = ~0u;
+integer_param("cpuid_mask_xsave_eax", opt_cpuid_mask_xsave_eax);
+
 unsigned int __devinitdata opt_cpuid_mask_ext_ecx = ~0u;
 integer_param("cpuid_mask_ext_ecx", opt_cpuid_mask_ext_ecx);
 unsigned int __devinitdata opt_cpuid_mask_ext_edx = ~0u;

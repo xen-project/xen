@@ -57,6 +57,9 @@ void set_cpuid_faulting(bool_t enable)
  */
 static void __devinit set_cpuidmask(const struct cpuinfo_x86 *c)
 {
+	u32 eax, edx;
+	const char *extra = "";
+
 	if (!~(opt_cpuid_mask_ecx & opt_cpuid_mask_edx &
 	       opt_cpuid_mask_ext_ecx & opt_cpuid_mask_ext_edx))
 		return;
@@ -71,7 +74,11 @@ static void __devinit set_cpuidmask(const struct cpuinfo_x86 *c)
 		wrmsr(MSR_INTEL_CPUID_FEATURE_MASK,
 		      opt_cpuid_mask_ecx,
 		      opt_cpuid_mask_edx);
-		if (!~(opt_cpuid_mask_ext_ecx & opt_cpuid_mask_ext_edx))
+		if (~(opt_cpuid_mask_ext_ecx & opt_cpuid_mask_ext_edx))
+			extra = "extended ";
+		else if (~opt_cpuid_mask_xsave_eax)
+			extra = "xsave ";
+		else
 			return;
 		break;
 /* 
@@ -92,11 +99,25 @@ static void __devinit set_cpuidmask(const struct cpuinfo_x86 *c)
 		wrmsr(MSR_INTEL_CPUID80000001_FEATURE_MASK,
 		      opt_cpuid_mask_ext_ecx,
 		      opt_cpuid_mask_ext_edx);
+		if (!~opt_cpuid_mask_xsave_eax)
+			return;
+		extra = "xsave ";
+		break;
+	case 0x2a:
+		wrmsr(MSR_INTEL_CPUID1_FEATURE_MASK_V2,
+		      opt_cpuid_mask_ecx,
+		      opt_cpuid_mask_edx);
+		rdmsr(MSR_INTEL_CPUIDD_01_FEATURE_MASK, eax, edx);
+		wrmsr(MSR_INTEL_CPUIDD_01_FEATURE_MASK,
+		      opt_cpuid_mask_xsave_eax, edx);
+		wrmsr(MSR_INTEL_CPUID80000001_FEATURE_MASK_V2,
+		      opt_cpuid_mask_ext_ecx,
+		      opt_cpuid_mask_ext_edx);
 		return;
 	}
 
-	printk(XENLOG_ERR "Cannot set CPU feature mask on CPU#%d\n",
-	       smp_processor_id());
+	printk(XENLOG_ERR "Cannot set CPU %sfeature mask on CPU#%d\n",
+	       extra, smp_processor_id());
 }
 
 void __devinit early_intel_workaround(struct cpuinfo_x86 *c)
