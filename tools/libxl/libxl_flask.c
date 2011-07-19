@@ -22,23 +22,23 @@ int libxl_flask_context_to_sid(libxl_ctx *ctx, char *buf, size_t len,
     int rc;
 
     rc = xc_flask_context_to_sid(ctx->xch, buf, len, ssidref);
-   
+
     return rc;
 }
 
-int libxl_flask_sid_to_context(libxl_ctx *ctx, uint32_t ssidref, 
+int libxl_flask_sid_to_context(libxl_ctx *ctx, uint32_t ssidref,
                                char **buf, size_t *len)
 {
     int rc;
     char tmp[XC_PAGE_SIZE];
 
     rc = xc_flask_sid_to_context(ctx->xch, ssidref, tmp, sizeof(tmp));
-                                    
+
     if (!rc) {
         *len = strlen(tmp);
-        *buf = strdup(tmp); 
+        *buf = strdup(tmp);
     }
-     
+
     return rc;
 }
 
@@ -48,7 +48,7 @@ int libxl_flask_getenforce(libxl_ctx *ctx)
 
     rc = xc_flask_getenforce(ctx->xch);
 
-    return rc; 
+    return rc;
 }
 
 int libxl_flask_setenforce(libxl_ctx *ctx, int mode)

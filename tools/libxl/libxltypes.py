@@ -44,12 +44,12 @@ class Type(object):
 
     def make_arg(self, n, passby=None):
         if passby is None: passby = self.passby
-        
+
         if passby == PASS_BY_REFERENCE:
             return "%s *%s" % (self.typename, n)
         else:
             return "%s %s" % (self.typename, n)
-        
+
     def pass_arg(self, n, isref=None, passby=None):
         if passby is None: passby = self.passby
         if isref is None: isref = self.passby == PASS_BY_REFERENCE
@@ -97,7 +97,7 @@ class EnumerationValue(object):
         self.name = str.upper(enum.namespace) + self.rawname
         self.value = value
         self.comment = kwargs.setdefault("comment", None)
-        
+
 class Enumeration(Type):
     def __init__(self, typename, values, **kwargs):
         kwargs.setdefault('destructor_fn', None)
@@ -121,7 +121,7 @@ class Enumeration(Type):
             if v.valuename == str.upper(name):
                 return v
         return ValueError
-        
+
 class Field(object):
     """An element of an Aggregate type"""
     def __init__(self, type, name, **kwargs):
@@ -164,7 +164,7 @@ class Aggregate(Type):
             deref = v + "->"
         else:
             deref = v + "."
-        
+
         if f.name is None: # Anonymous
             return (deref, deref)
         else:
@@ -191,7 +191,7 @@ class KeyedUnion(Aggregate):
 
         if not isinstance(keyvar_type, Enumeration):
             raise ValueError
-        
+
         self.keyvar_name = keyvar_name
         self.keyvar_type = keyvar_type
 

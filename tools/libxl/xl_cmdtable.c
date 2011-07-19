@@ -54,7 +54,7 @@ struct cmd_spec cmd_table[] = {
       &main_reboot, 0,
       "Issue a reboot signal to a domain",
       "<Domain>",
-    }, 
+    },
     { "pci-attach",
       &main_pciattach, 0,
       "Insert a new pass-through pci device",
@@ -393,7 +393,7 @@ struct cmd_spec *cmdtable_lookup(const char *s)
     size_t len;
     int i, count = 0;
 
-    if (!s) 
+    if (!s)
         return NULL;
     len = strlen(s);
     for (i = 0; i < cmdtable_len; i++) {

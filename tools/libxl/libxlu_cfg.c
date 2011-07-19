@@ -45,7 +45,7 @@ static int ctx_prep(CfgParseContext *ctx, XLU_Config *cfg) {
     ctx->lexerrlineno= -1;
     ctx->likely_python= 0;
     ctx->scanner= 0;
-    
+
     e= xlu__cfg_yylex_init_extra(ctx, &ctx->scanner);
     if (e) {
         fprintf(cfg->report,"%s: unable to create scanner: %s\n",
@@ -191,7 +191,7 @@ int xlu_cfg_get_string(const XLU_Config *cfg, const char *n,
     *value_r= set->values[0];
     return 0;
 }
- 
+
 int xlu_cfg_replace_string(const XLU_Config *cfg, const char *n,
                            char **value_r) {
     XLU_ConfigSetting *set;
@@ -231,7 +231,7 @@ int xlu_cfg_get_long(const XLU_Config *cfg, const char *n,
     *value_r= l;
     return 0;
 }
-        
+
 
 int xlu_cfg_get_list(const XLU_Config *cfg, const char *n,
                      XLU_ConfigList **list_r, int *entries_r, int dont_warn) {
@@ -269,7 +269,7 @@ XLU_ConfigSetting *xlu__cfg_set_mk(CfgParseContext *ctx,
 
     set->name= 0; /* tbd */
     set->avalues= alloc;
-    
+
     if (!alloc) {
         set->nvalues= 0;
         set->values= 0;
@@ -295,11 +295,11 @@ void xlu__cfg_set_add(CfgParseContext *ctx, XLU_ConfigSetting *set,
     if (ctx->err) return;
 
     assert(atom);
-    
+
     if (set->nvalues >= set->avalues) {
         int new_avalues;
         char **new_values;
-        
+
         if (set->avalues > INT_MAX / 100) { ctx->err= ERANGE; return; }
         new_avalues= set->avalues * 4;
         new_values= realloc(set->values,
@@ -324,7 +324,7 @@ void xlu__cfg_set_store(CfgParseContext *ctx, char *name,
 
 char *xlu__cfgl_strdup(CfgParseContext *ctx, const char *src) {
     char *result;
-    
+
     if (ctx->err) return 0;
     result= strdup(src);
     if (!result) ctx->err= errno;
@@ -380,7 +380,7 @@ char *xlu__cfgl_dequote(CfgParseContext *ctx, const char *src) {
                     goto x;                                                  \
                 }                                                            \
                 p += (ep - numbuf);                                          \
- }while(0) 
+ }while(0)
 
                 p++;
                 NUMERIC_CHAR(2,2,16,"hex");

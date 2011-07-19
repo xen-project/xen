@@ -64,7 +64,7 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version, xentoollog_logger * lg)
 
     ctx->xch = xc_interface_open(lg,lg,0);
     if (!ctx->xch) {
-        LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, errno, 
+        LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, errno,
                         "cannot open libxc handle");
         return ERROR_FAIL;
     }
@@ -73,7 +73,7 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version, xentoollog_logger * lg)
     if (!ctx->xsh)
         ctx->xsh = xs_domain_open();
     if (!ctx->xsh) {
-        LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, errno, 
+        LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, errno,
                         "cannot connect to xenstore");
         xc_interface_close(ctx->xch);
         return ERROR_FAIL;
@@ -88,7 +88,7 @@ int libxl_ctx_free(libxl_ctx *ctx)
     if (!ctx) return 0;
     if (ctx->xch) xc_interface_close(ctx->xch);
     libxl_version_info_destroy(&ctx->version_info);
-    if (ctx->xsh) xs_daemon_close(ctx->xsh); 
+    if (ctx->xsh) xs_daemon_close(ctx->xsh);
     return 0;
 }
 
@@ -247,15 +247,15 @@ int libxl_domain_resume(libxl_ctx *ctx, uint32_t domid)
         goto out;
     }
     if (xc_domain_resume(ctx->xch, domid, 0)) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, 
-                        "xc_domain_resume failed for domain %u", 
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                        "xc_domain_resume failed for domain %u",
                         domid);
         rc = ERROR_FAIL;
         goto out;
     }
     if (!xs_resume_domain(ctx->xsh, domid)) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, 
-                        "xs_resume_domain failed for domain %u", 
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                        "xs_resume_domain failed for domain %u",
                         domid);
         rc = ERROR_FAIL;
     }
@@ -701,7 +701,7 @@ int libxl_event_get_disk_eject_info(libxl_ctx *ctx, uint32_t domid, libxl_event 
 		disk->backend = LIBXL_DISK_BACKEND_QDISK;
 	} else {
 		disk->backend = LIBXL_DISK_BACKEND_UNKNOWN;
-	} 
+	}
 
     disk->pdev_path = strdup("");
     disk->format = LIBXL_DISK_FORMAT_EMPTY;
@@ -897,7 +897,7 @@ int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass)
         if ( lseek(autopass_fd, SEEK_SET, 0) ) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
                              "rewind %s (autopass) failed", tmpname);
-            goto x_fail; 
+            goto x_fail;
         }
 
         args[2] = "-autopass";
@@ -1527,8 +1527,8 @@ static unsigned int libxl__append_disk_list_of_type(libxl__gc *gc,
             } else {
                 pdisk->pdev_path = physpath_tmp;
             }
-            libxl_string_to_backend(ctx, libxl__xs_read(gc, XBT_NULL, 
-                libxl__sprintf(gc, "%s/%s/type", be_path, *dir)), 
+            libxl_string_to_backend(ctx, libxl__xs_read(gc, XBT_NULL,
+                libxl__sprintf(gc, "%s/%s/type", be_path, *dir)),
                 &(pdisk->backend));
             pdisk->vdev = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(gc, "%s/%s/dev", be_path, *dir), &len);
             removable = libxl__xs_read(gc, XBT_NULL, libxl__sprintf

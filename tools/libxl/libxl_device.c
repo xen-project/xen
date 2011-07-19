@@ -166,7 +166,7 @@ static int disk_try_backend(disk_try_backend_args *a,
         LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Disk vdev=%s, backend "
                    " %d unknown", a->disk->vdev, backend);
         return 0;
-        
+
     }
     abort(); /* notreached */
 
@@ -177,7 +177,7 @@ static int disk_try_backend(disk_try_backend_args *a,
                libxl_disk_backend_to_string(backend),
                libxl_disk_format_to_string(a->disk->format));
     return 0;
-}            
+}
 
 int libxl__device_disk_set_backend(libxl__gc *gc, libxl_device_disk *disk) {
     libxl_ctx *ctx = libxl__gc_owner(gc);
@@ -240,11 +240,11 @@ char *libxl__device_disk_string_of_format(libxl_disk_format format)
 {
     switch (format) {
         case LIBXL_DISK_FORMAT_QCOW: return "qcow";
-        case LIBXL_DISK_FORMAT_QCOW2: return "qcow2"; 
-        case LIBXL_DISK_FORMAT_VHD: return "vhd"; 
+        case LIBXL_DISK_FORMAT_QCOW2: return "qcow2";
+        case LIBXL_DISK_FORMAT_VHD: return "vhd";
         case LIBXL_DISK_FORMAT_RAW:
-        case LIBXL_DISK_FORMAT_EMPTY: return "aio"; 
-        default: return NULL; 
+        case LIBXL_DISK_FORMAT_EMPTY: return "aio";
+        default: return NULL;
     }
 }
 
@@ -474,7 +474,7 @@ int libxl__devices_destroy(libxl__gc *gc, uint32_t domid, int force)
     if (!force) {
         /* Linux-ism. Most implementations leave the timeout
          * untouched after select. Linux, however, will chip
-         * away the elapsed time from it, which is what we 
+         * away the elapsed time from it, which is what we
          * need to enforce a single time span waiting for
          * device destruction. */
         struct timeval tv;

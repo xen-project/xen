@@ -99,7 +99,7 @@ static void setformat(DiskParseContext *dpc, const char *str) {
     else if (!strcmp(str,"vhd"))    DSET(dpc,format,FORMAT,str,VHD);
     else xlu__disk_err(dpc,str,"unknown value for format");
 }
- 
+
 /* Sets ->backend from the string.  IDL should provide something for this. */
 static void setbackendtype(DiskParseContext *dpc, const char *str) {
     if (     !strcmp(str,"phy"))   DSET(dpc,backend,BACKEND,str,PHY);
@@ -107,7 +107,7 @@ static void setbackendtype(DiskParseContext *dpc, const char *str) {
     else if (!strcmp(str,"qdisk")) DSET(dpc,backend,BACKEND,str,QDISK);
     else xlu__disk_err(dpc,str,"unknown value for backendtype");
 }
- 
+
 #define DEPRECATE(usewhatinstead) /* not currently reported */
 
 %}

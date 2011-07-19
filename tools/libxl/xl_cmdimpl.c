@@ -586,7 +586,7 @@ static void parse_config_data(const char *configfile_filename_report,
     }else{
         libxl_uuid_generate(&c_info->uuid);
     }
- 
+
     if (!xlu_cfg_get_long(config, "oos", &l))
         c_info->oos = l;
 
@@ -1472,7 +1472,7 @@ static int create_domain(struct domain_create *dom_info)
             /* when we receive a domain we get its name from the config
              * file; and we receive it to a temporary name */
             assert(!common_domname);
-            
+
             common_domname = d_config.c_info.name;
             d_config.c_info.name = 0; /* steals allocation from config */
 
@@ -1655,7 +1655,7 @@ start:
 
                         /* Some settings only make sense on first boot. */
                         paused = 0;
-                        if (common_domname 
+                        if (common_domname
                             && strcmp(d_config.c_info.name, common_domname)) {
                             d_config.c_info.name = strdup(common_domname);
                         }
@@ -2267,8 +2267,8 @@ static void list_domains(int verbose, int context, const libxl_dominfo *info, in
             int rc;
             size_t size;
             char *buf;
-            rc = libxl_flask_sid_to_context(ctx, info[i].ssidref, &buf, 
-                                            &size); 
+            rc = libxl_flask_sid_to_context(ctx, info[i].ssidref, &buf,
+                                            &size);
             if (rc < 0)
                 printf("  -");
             else {
@@ -3657,7 +3657,7 @@ static int sched_credit_domain_get(
     rc = libxl_sched_credit_domain_get(ctx, domid, scinfo);
     if (rc)
         fprintf(stderr, "libxl_sched_credit_domain_get failed.\n");
-    
+
     return rc;
 }
 
@@ -5254,7 +5254,7 @@ int main_getenforce(int argc, char **argv)
     else if (ret == 0)
         printf("Permissive\n");
 
-    return ret; 
+    return ret;
 }
 
 int main_setenforce(int argc, char **argv)
@@ -5281,14 +5281,14 @@ int main_setenforce(int argc, char **argv)
         help("setenforce");
         return 2;
     }
-   
+
     ret = libxl_flask_setenforce(ctx, mode);
 
     if (ret) {
         if (errno == ENOSYS) {
             fprintf(stderr, "Flask XSM disabled\n");
-        } 
-        else 
+        }
+        else
             fprintf(stderr, "error occured while setting enforcing mode (%i)\n", ret);
     }
 
@@ -5316,7 +5316,7 @@ int main_loadpolicy(int argc, char **argv)
         ret = -1;
         goto done;
     }
-    
+
     ret = stat(polFName, &info);
     if ( ret < 0 ) {
         fprintf(stderr, "Error occurred retrieving information about"
@@ -5325,7 +5325,7 @@ int main_loadpolicy(int argc, char **argv)
     }
 
     polMemCp = malloc(info.st_size);
-     
+
     ret = read(polFd, polMemCp, info.st_size);
     if ( ret < 0 ) {
         fprintf(stderr, "Unable to read new Flask policy file: %s\n",

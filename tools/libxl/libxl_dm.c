@@ -120,7 +120,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
             vncarg = libxl__sprintf(gc, "%s,password", vncarg);
         flexarray_append(dm_args, "-vnc");
         flexarray_append(dm_args, vncarg);
-        
+
         if (info->vncunused) {
             flexarray_append(dm_args, "-vncunused");
         }
@@ -274,11 +274,11 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
         }
 
         if (strchr(listen, ':') != NULL)
-            flexarray_append(dm_args, 
+            flexarray_append(dm_args,
                     libxl__sprintf(gc, "%s%s", listen,
                         info->vncunused ? ",to=99" : ""));
         else
-            flexarray_append(dm_args, 
+            flexarray_append(dm_args,
                     libxl__sprintf(gc, "%s:%d%s", listen, display,
                         info->vncunused ? ",to=99" : ""));
     }

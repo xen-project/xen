@@ -95,8 +95,8 @@ libxl_dominfo = Struct("dominfo",[
     ("paused",      bool),
     ("shutdown",    bool),
     ("dying",       bool),
-    
-    ("shutdown_reason", uint8, False, 
+
+    ("shutdown_reason", uint8, False,
 """Valid SHUTDOWN_* value from xen/sched.h iff (shutdown||dying).
 
 Otherwise set to a value guaranteed not to clash with any valid
@@ -134,7 +134,7 @@ libxl_version_info = Struct("version_info", [
     ("pagesize",          integer),
     ("commandline",       string),
     ])
-                                             
+
 libxl_domain_create_info = Struct("domain_create_info",[
     ("type",         libxl_domain_type),
     ("hap",          bool),
@@ -212,19 +212,19 @@ libxl_device_model_info = Struct("device_model_info",[
     ("opengl",           bool,              False, "opengl enabled or disabled (if enabled requires sdl enabled)"),
     ("spice",            bool,              False,
     "spice enabled or disabled"),
-    ("spiceport",        integer,           False, 
+    ("spiceport",        integer,           False,
     "the port that should be listened on for the spice server"),
     ("spicetls_port",    integer,           False, """the tls port
-that should be listened on for the spice server, 
+that should be listened on for the spice server,
 at least one of the port or tls port must be given"""),
     ("spicehost",        string,            False, """the interface
 that should be listened on if given otherwise any interface"""),
-    ("spicedisable_ticketing", bool,        False, 
+    ("spicedisable_ticketing", bool,        False,
     "enable client connection with no password"),
     ("spicepasswd",      string,            False, """set ticket password
 witch must be used by a client for connection.
 The password never expires"""),
-    ("spiceagent_mouse", bool,              False, 
+    ("spiceagent_mouse", bool,              False,
     "Whether spice agent is used for client mouse mode(default is on)"),
     ("nographic",        bool,              False, "no graphics, use serial port"),
     ("gfx_passthru",     bool,              False, "graphics passthrough enabled or disabled"),

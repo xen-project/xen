@@ -45,7 +45,7 @@
 %%
 
 file: /* empty */
- |     file setting           
+ |     file setting
 
 setting: IDENT '=' value      { xlu__cfg_set_store(ctx,$1,$3,@3.first_line); }
                      endstmt

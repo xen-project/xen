@@ -370,7 +370,7 @@ int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num, libxl_conso
  * if the guest is using stubdoms).
  * This function can be called after creating the device model, in
  * case of HVM guests, and before libxl_run_bootloader in case of PV
- * guests using pygrub. */ 
+ * guests using pygrub. */
 int libxl_primary_console_exec(libxl_ctx *ctx, uint32_t domid_vm);
 
 int libxl_domain_info(libxl_ctx*, libxl_dominfo *info_r,
@@ -520,7 +520,7 @@ static inline int libxl_domid_valid_guest(uint32_t domid)
 
 int libxl_flask_context_to_sid(libxl_ctx *ctx, char *buf, size_t len,
                                uint32_t *ssidref);
-int libxl_flask_sid_to_context(libxl_ctx *ctx, uint32_t ssidref, char **buf, 
+int libxl_flask_sid_to_context(libxl_ctx *ctx, uint32_t ssidref, char **buf,
                                size_t *len);
 int libxl_flask_getenforce(libxl_ctx *ctx);
 int libxl_flask_setenforce(libxl_ctx *ctx, int mode);

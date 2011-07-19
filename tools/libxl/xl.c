@@ -80,7 +80,7 @@ static void parse_global_config(const char *configfile,
 
     xlu_cfg_destroy(config);
 }
- 
+
 int main(int argc, char **argv)
 {
     int opt = 0;

@@ -535,7 +535,7 @@ int libxl_device_pci_list_assignable(libxl_ctx *ctx, libxl_device_pci **list, in
     return 0;
 }
 
-/* 
+/*
  * This function checks that all functions of a device are bound to pciback
  * driver. It also initialises a bit-mask of which function numbers are present
  * on that device.
@@ -598,7 +598,7 @@ static int pci_ins_check(libxl__gc *gc, uint32_t domid, const char *state, void 
 
     return 1;
 }
- 
+
 static int do_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, int starting)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
@@ -870,7 +870,7 @@ static int do_pci_remove(libxl__gc *gc, uint32_t domid,
                                              NULL, NULL, NULL) < 0) {
                 LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Device Model didn't respond in time");
                 /* This depends on guest operating system acknowledging the
-                 * SCI, if it doesn't respond in time then we may wish to 
+                 * SCI, if it doesn't respond in time then we may wish to
                  * force the removal.
                  */
                 return ERROR_FAIL;

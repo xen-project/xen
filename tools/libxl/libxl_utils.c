@@ -313,7 +313,7 @@ int libxl_read_file_contents(libxl_ctx *ctx, const char *filename,
     int e;
     struct stat stab;
     ssize_t rs;
-    
+
     f = fopen(filename, "r");
     if (!f) {
         if (errno == ENOENT) return ENOENT;

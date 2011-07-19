@@ -19,7 +19,7 @@ static int dpc_prep(DiskParseContext *dpc, const char *spec) {
     int e;
 
     dpc->spec = spec;
-    
+
     e = xlu__disk_yylex_init_extra(dpc, &dpc->scanner);
     if (e) goto fail;
 
