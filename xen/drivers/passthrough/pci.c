@@ -143,15 +143,28 @@ void pci_enable_acs(struct pci_dev *pdev)
     pci_conf_write16(bus, dev, func, pos + PCI_ACS_CTRL, ctrl);
 }
 
-int pci_add_device(u8 bus, u8 devfn)
+int pci_add_device(u8 bus, u8 devfn, const struct pci_dev_info *info)
 {
     struct pci_dev *pdev;
+    const char *pdev_type;
     int ret = -ENOMEM;
+
+    if (!info)
+        pdev_type = "device";
+    else if (info->is_extfn)
+        pdev_type = "extended function";
+    else if (info->is_virtfn)
+        pdev_type = "virtual function";
+    else
+        return -EINVAL;
 
     spin_lock(&pcidevs_lock);
     pdev = alloc_pdev(bus, devfn);
     if ( !pdev )
         goto out;
+
+    if ( info )
+        pdev->info = *info;
 
     ret = 0;
     if ( !pdev->domain )
@@ -170,8 +183,8 @@ int pci_add_device(u8 bus, u8 devfn)
 
 out:
     spin_unlock(&pcidevs_lock);
-    printk(XENLOG_DEBUG "PCI add device %02x:%02x.%x\n", bus,
-           PCI_SLOT(devfn), PCI_FUNC(devfn));
+    printk(XENLOG_DEBUG "PCI add %s %02x:%02x.%x\n", pdev_type,
+           bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
     return ret;
 }
 
@@ -195,51 +208,6 @@ int pci_remove_device(u8 bus, u8 devfn)
         }
 
     spin_unlock(&pcidevs_lock);
-    return ret;
-}
-
-int pci_add_device_ext(u8 bus, u8 devfn, struct pci_dev_info *info)
-{
-    int ret;
-    char *pdev_type;
-    struct pci_dev *pdev;
-
-    if (info->is_extfn)
-        pdev_type = "Extended Function";
-    else if (info->is_virtfn)
-        pdev_type = "Virtual Function";
-    else
-        return -EINVAL;
-
-
-    ret = -ENOMEM;
-    spin_lock(&pcidevs_lock);
-    pdev = alloc_pdev(bus, devfn);
-    if ( !pdev )
-        goto out;
-
-    pdev->info = *info;
-
-    ret = 0;
-    if ( !pdev->domain )
-    {
-        pdev->domain = dom0;
-        ret = iommu_add_device(pdev);
-        if ( ret )
-        {
-            pdev->domain = NULL;
-            goto out;
-        }
-
-        list_add(&pdev->domain_list, &dom0->arch.pdev_list);
-        pci_enable_acs(pdev);
-    }
-
-out:
-    spin_unlock(&pcidevs_lock);
-    printk(XENLOG_DEBUG "PCI add %s %02x:%02x.%x\n", pdev_type,
-           bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
-
     return ret;
 }
 
