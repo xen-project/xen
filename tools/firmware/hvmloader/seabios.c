@@ -126,7 +126,7 @@ static void seabios_setup_e820(void)
 //BUILD_BUG_ON(sizeof(seabios) > (0x00100000U - SEABIOS_PHYSICAL_ADDRESS));
 
 struct bios_config seabios_config = {
-	.name = "SeaBIOS",
+    .name = "SeaBIOS",
 
     .image = seabios,
     .image_size = sizeof(seabios),
