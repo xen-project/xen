@@ -35,84 +35,85 @@
 #include <xen/xen.h>
 #include "config.h"
 
-/*
- * NB. Hypercall address needs to be relative to a linkage symbol for
- * some version of ld to relocate the relative calls properly.
- */
-#define hypercall_pa "_start - " STR(HVMLOADER_PHYSICAL_ADDRESS) \
-                           " + " STR(HYPERCALL_PHYSICAL_ADDRESS)
+#define hcall_addr(name)                                                \
+    ((unsigned long)HYPERCALL_PHYSICAL_ADDRESS + __HYPERVISOR_##name * 32)
 
-#define _hypercall0(type, name)                                 \
-({                                                              \
-    long __res;                                                 \
-    asm volatile (                                              \
-        "call "hypercall_pa" + " STR(__HYPERVISOR_##name * 32)  \
-        : "=a" (__res)                                          \
-        :                                                       \
-        : "memory" );                                           \
-    (type)__res;                                                \
+#define _hypercall0(type, name)                 \
+({                                              \
+    long __res;                                 \
+    asm volatile (                              \
+        "call *%%eax"                           \
+        : "=a" (__res)                          \
+        : "0" (hcall_addr(name))                \
+        : "memory" );                           \
+    (type)__res;                                \
 })
 
-#define _hypercall1(type, name, a1)                             \
-({                                                              \
-    long __res, __ign1;                                         \
-    asm volatile (                                              \
-        "call "hypercall_pa" + " STR(__HYPERVISOR_##name * 32)  \
-        : "=a" (__res), "=b" (__ign1)                           \
-        : "1" ((long)(a1))                                      \
-        : "memory" );                                           \
-    (type)__res;                                                \
+#define _hypercall1(type, name, a1)             \
+({                                              \
+    long __res, __ign1;                         \
+    asm volatile (                              \
+        "call *%%eax"                           \
+        : "=a" (__res), "=b" (__ign1)           \
+        : "0" (hcall_addr(name)),               \
+          "1" ((long)(a1))                      \
+        : "memory" );                           \
+    (type)__res;                                \
 })
 
-#define _hypercall2(type, name, a1, a2)                         \
-({                                                              \
-    long __res, __ign1, __ign2;                                 \
-    asm volatile (                                              \
-        "call "hypercall_pa" + " STR(__HYPERVISOR_##name * 32)  \
-        : "=a" (__res), "=b" (__ign1), "=c" (__ign2)            \
-        : "1" ((long)(a1)), "2" ((long)(a2))                    \
-        : "memory" );                                           \
-    (type)__res;                                                \
+#define _hypercall2(type, name, a1, a2)                 \
+({                                                      \
+    long __res, __ign1, __ign2;                         \
+    asm volatile (                                      \
+        "call *%%eax"                                   \
+        : "=a" (__res), "=b" (__ign1), "=c" (__ign2)    \
+        : "0" (hcall_addr(name)),                       \
+          "1" ((long)(a1)), "2" ((long)(a2))            \
+        : "memory" );                                   \
+    (type)__res;                                        \
 })
 
-#define _hypercall3(type, name, a1, a2, a3)                     \
-({                                                              \
-    long __res, __ign1, __ign2, __ign3;                         \
-    asm volatile (                                              \
-        "call "hypercall_pa" + " STR(__HYPERVISOR_##name * 32)  \
-        : "=a" (__res), "=b" (__ign1), "=c" (__ign2),           \
-          "=d" (__ign3)                                         \
-        : "1" ((long)(a1)), "2" ((long)(a2)),                   \
-          "3" ((long)(a3))                                      \
-        : "memory" );                                           \
-    (type)__res;                                                \
+#define _hypercall3(type, name, a1, a2, a3)             \
+({                                                      \
+    long __res, __ign1, __ign2, __ign3;                 \
+    asm volatile (                                      \
+        "call *%%eax"                                   \
+        : "=a" (__res), "=b" (__ign1), "=c" (__ign2),   \
+          "=d" (__ign3)                                 \
+        : "0" (hcall_addr(name)),                       \
+          "1" ((long)(a1)), "2" ((long)(a2)),           \
+          "3" ((long)(a3))                              \
+        : "memory" );                                   \
+    (type)__res;                                        \
 })
 
-#define _hypercall4(type, name, a1, a2, a3, a4)                 \
-({                                                              \
-    long __res, __ign1, __ign2, __ign3, __ign4;                 \
-    asm volatile (                                              \
-        "call "hypercall_pa" + " STR(__HYPERVISOR_##name * 32)  \
-        : "=a" (__res), "=b" (__ign1), "=c" (__ign2),           \
-          "=d" (__ign3), "=S" (__ign4)                          \
-        : "1" ((long)(a1)), "2" ((long)(a2)),                   \
-          "3" ((long)(a3)), "4" ((long)(a4))                    \
-        : "memory" );                                           \
-    (type)__res;                                                \
+#define _hypercall4(type, name, a1, a2, a3, a4)         \
+({                                                      \
+    long __res, __ign1, __ign2, __ign3, __ign4;         \
+    asm volatile (                                      \
+        "call *%%eax"                                   \
+        : "=a" (__res), "=b" (__ign1), "=c" (__ign2),   \
+          "=d" (__ign3), "=S" (__ign4)                  \
+        : "0" (hcall_addr(name)),                       \
+          "1" ((long)(a1)), "2" ((long)(a2)),           \
+          "3" ((long)(a3)), "4" ((long)(a4))            \
+        : "memory" );                                   \
+    (type)__res;                                        \
 })
 
-#define _hypercall5(type, name, a1, a2, a3, a4, a5)             \
-({                                                              \
-    long __res, __ign1, __ign2, __ign3, __ign4, __ign5;         \
-    asm volatile (                                              \
-        "call "hypercall_pa" + " STR(__HYPERVISOR_##name * 32)  \
-        : "=a" (__res), "=b" (__ign1), "=c" (__ign2),           \
-          "=d" (__ign3), "=S" (__ign4), "=D" (__ign5)           \
-        : "1" ((long)(a1)), "2" ((long)(a2)),                   \
-          "3" ((long)(a3)), "4" ((long)(a4)),                   \
-          "5" ((long)(a5))                                      \
-        : "memory" );                                           \
-    (type)__res;                                                \
+#define _hypercall5(type, name, a1, a2, a3, a4, a5)     \
+({                                                      \
+    long __res, __ign1, __ign2, __ign3, __ign4, __ign5; \
+    asm volatile (                                      \
+        "call *%%eax"                                   \
+        : "=a" (__res), "=b" (__ign1), "=c" (__ign2),   \
+          "=d" (__ign3), "=S" (__ign4), "=D" (__ign5)   \
+        : "0" (hcall_addr(name)),                       \
+          "1" ((long)(a1)), "2" ((long)(a2)),           \
+          "3" ((long)(a3)), "4" ((long)(a4)),           \
+          "5" ((long)(a5))                              \
+        : "memory" );                                   \
+    (type)__res;                                        \
 })
 
 static inline int
