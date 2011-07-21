@@ -31,25 +31,10 @@ struct amd_iommu *find_iommu_for_device(int bdf)
     return ivrs_mappings[bdf].iommu;
 }
 
-/*
- * Some devices will use alias id and original device id to index interrupt
- * table and I/O page table respectively. Such devices will have
- * both alias entry and select entry in IVRS structure.
- *
- * Return original device id, if device has valid interrupt remapping
- * table setup for both select entry and alias entry.
- */
-int get_dma_requestor_id(u16 bdf)
+int get_requestor_id(u16 bdf)
 {
-    int req_id;
-
     BUG_ON ( bdf >= ivrs_bdf_entries );
-    req_id = ivrs_mappings[bdf].dte_requestor_id;
-    if ( (ivrs_mappings[bdf].intremap_table != NULL) &&
-         (ivrs_mappings[req_id].intremap_table != NULL) )
-        req_id = bdf;
-
-    return req_id;
+    return ivrs_mappings[bdf].dte_requestor_id;
 }
 
 static int is_translation_valid(u32 *entry)
@@ -91,7 +76,7 @@ static void amd_iommu_setup_domain_device(
         valid = 0;
 
     /* get device-table entry */
-    req_id = get_dma_requestor_id(bdf);
+    req_id = get_requestor_id(bdf);
     dte = iommu->dev_table.buffer + (req_id * IOMMU_DEV_TABLE_ENTRY_SIZE);
 
     spin_lock_irqsave(&iommu->lock, flags);
@@ -252,7 +237,7 @@ static void amd_iommu_disable_domain_device(
     int req_id;
 
     BUG_ON ( iommu->dev_table.buffer == NULL );
-    req_id = get_dma_requestor_id(bdf);
+    req_id = get_requestor_id(bdf);
     dte = iommu->dev_table.buffer + (req_id * IOMMU_DEV_TABLE_ENTRY_SIZE);
 
     spin_lock_irqsave(&iommu->lock, flags);
@@ -314,7 +299,7 @@ static int reassign_device( struct domain *source, struct domain *target,
 static int amd_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
 {
     int bdf = (bus << 8) | devfn;
-    int req_id = get_dma_requestor_id(bdf);
+    int req_id = get_requestor_id(bdf);
 
     if ( ivrs_mappings[req_id].unity_map_enable )
     {
@@ -433,7 +418,7 @@ static int amd_iommu_group_id(u8 bus, u8 devfn)
     int rt;
     int bdf = (bus << 8) | devfn;
     rt = ( bdf < ivrs_bdf_entries ) ?
-        get_dma_requestor_id(bdf) :
+        get_requestor_id(bdf) :
         bdf;
     return rt;
 }

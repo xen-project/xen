@@ -65,7 +65,7 @@ int amd_iommu_reserve_domain_unity_map(struct domain *domain,
 void amd_iommu_share_p2m(struct domain *d);
 
 /* device table functions */
-int get_dma_requestor_id(u16 bdf);
+int get_requestor_id(u16 bdf);
 void amd_iommu_add_dev_table_entry(
     u32 *dte, u8 sys_mgt, u8 dev_ex, u8 lint1_pass, u8 lint0_pass, 
     u8 nmi_pass, u8 ext_int_pass, u8 init_pass);
@@ -97,7 +97,6 @@ unsigned int amd_iommu_read_ioapic_from_ire(
     unsigned int apic, unsigned int reg);
 
 extern int ioapic_bdf[MAX_IO_APICS];
-extern void *shared_intremap_table;
 
 /* power management support */
 void amd_iommu_resume(void);

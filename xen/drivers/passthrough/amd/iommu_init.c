@@ -760,8 +760,7 @@ static int __init init_ivrs_mapping(void)
         ivrs_mappings[bdf].dte_ext_int_pass = IOMMU_CONTROL_DISABLED;
         ivrs_mappings[bdf].dte_init_pass = IOMMU_CONTROL_DISABLED;
 
-        if ( amd_iommu_perdev_intremap )
-            spin_lock_init(&ivrs_mappings[bdf].intremap_lock);
+        spin_lock_init(&ivrs_mappings[bdf].intremap_lock);
     }
     return 0;
 }
