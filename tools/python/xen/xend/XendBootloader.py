@@ -44,7 +44,7 @@ def bootloader(blexec, disk, dom, quiet = False, blargs = '', kernel = '',
         raise VmError(msg)
 
     if os.uname()[0] == "NetBSD" and disk.startswith('/dev/'):
-       disk = disk.replace("/dev/", "/dev/r")
+       disk = "/r".join(disk.rsplit("/",1))
 
     mkdir.parents("/var/run/xend/boot/", stat.S_IRWXU)
 
