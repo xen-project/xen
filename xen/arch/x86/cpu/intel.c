@@ -61,7 +61,8 @@ static void __devinit set_cpuidmask(const struct cpuinfo_x86 *c)
 	const char *extra = "";
 
 	if (!~(opt_cpuid_mask_ecx & opt_cpuid_mask_edx &
-	       opt_cpuid_mask_ext_ecx & opt_cpuid_mask_ext_edx))
+	       opt_cpuid_mask_ext_ecx & opt_cpuid_mask_ext_edx &
+               opt_cpuid_mask_xsave_eax))
 		return;
 
 	/* Only family 6 supports this feature  */
