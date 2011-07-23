@@ -283,6 +283,7 @@ static int mce_delayed_action(mctelem_cookie_t mctc)
     {
     case MCER_RESET:
         dprintk(XENLOG_ERR, "MCE delayed action failed\n");
+        is_mc_panic = 1;
         x86_mcinfo_dump(mctelem_dataptr(mctc));
         panic("MCE: Software recovery failed for the UCR\n");
         break;

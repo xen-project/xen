@@ -210,4 +210,6 @@ struct mce {
     __u64 mcgcap;   /* MCGCAP MSR: machine check capabilities of CPU */
 };
 
+extern int apei_write_mce(struct mce *m);
+
 #endif /* _MCE_H */

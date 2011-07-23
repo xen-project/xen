@@ -919,6 +919,28 @@ void *x86_mcinfo_add(struct mc_info *mi, void *mcinfo)
     return buf;
 }
 
+static void x86_mcinfo_apei_save(
+    struct mcinfo_global *mc_global, struct mcinfo_bank *mc_bank)
+{
+    struct mce m;
+
+    memset(&m, 0, sizeof(struct mce));
+
+    m.cpu = mc_global->mc_coreid;
+    m.cpuvendor = boot_cpu_data.x86_vendor;
+    m.cpuid = cpuid_eax(1);
+    m.socketid = mc_global->mc_socketid;
+    m.apicid = mc_global->mc_apicid;
+
+    m.mcgstatus = mc_global->mc_gstatus;
+    m.status = mc_bank->mc_status;
+    m.misc = mc_bank->mc_misc;
+    m.addr = mc_bank->mc_addr;
+    m.bank = mc_bank->mc_bank;
+
+    apei_write_mce(&m);
+}
+
 /* Dump machine check information in a format,
  * mcelog can parse. This is used only when
  * Dom0 does not take the notification. */
@@ -962,8 +984,11 @@ void x86_mcinfo_dump(struct mc_info *mi)
             printk("[%16"PRIx64"]", mc_bank->mc_misc);
         if (mc_bank->mc_status & MCi_STATUS_ADDRV)
             printk(" at %16"PRIx64, mc_bank->mc_addr);
-
         printk("\n");
+
+        if (is_mc_panic)
+            x86_mcinfo_apei_save(mc_global, mc_bank);
+
     next:
         mic = x86_mcinfo_next(mic); /* next entry */
         if ((mic == NULL) || (mic->size == 0))
