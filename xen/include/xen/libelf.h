@@ -179,6 +179,8 @@ const elf_sym *elf_sym_by_index(struct elf_binary *elf, int index);
 const char *elf_note_name(struct elf_binary *elf, const elf_note * note);
 const void *elf_note_desc(struct elf_binary *elf, const elf_note * note);
 uint64_t elf_note_numeric(struct elf_binary *elf, const elf_note * note);
+uint64_t elf_note_numeric_array(struct elf_binary *, const elf_note *,
+                                unsigned int unitsz, unsigned int idx);
 const elf_note *elf_note_next(struct elf_binary *elf, const elf_note * note);
 
 int elf_is_elfbinary(const void *image);

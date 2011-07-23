@@ -415,6 +415,13 @@ int __init construct_dom0(
         return -EINVAL;
     }
 
+    if ( parms.elf_notes[XEN_ELFNOTE_FEATURES].type != XEN_ENT_NONE &&
+         !test_bit(XENFEAT_dom0, parms.f_supported) )
+    {
+        printk("Kernel does not support Dom0 operation\n");
+        return -EINVAL;
+    }
+
 #if defined(__x86_64__)
     if ( compat32 )
     {

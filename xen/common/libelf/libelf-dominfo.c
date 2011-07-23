@@ -26,7 +26,8 @@ static const char *const elf_xen_feature_names[] = {
     [XENFEAT_writable_descriptor_tables] = "writable_descriptor_tables",
     [XENFEAT_auto_translated_physmap] = "auto_translated_physmap",
     [XENFEAT_supervisor_mode_kernel] = "supervisor_mode_kernel",
-    [XENFEAT_pae_pgdir_above_4gb] = "pae_pgdir_above_4gb"
+    [XENFEAT_pae_pgdir_above_4gb] = "pae_pgdir_above_4gb",
+    [XENFEAT_dom0] = "dom0"
 };
 static const int elf_xen_features =
 sizeof(elf_xen_feature_names) / sizeof(elf_xen_feature_names[0]);
@@ -83,7 +84,7 @@ int elf_xen_parse_features(const char *features,
                 }
             }
         }
-        if ( i == elf_xen_features )
+        if ( i == elf_xen_features && required && feature[0] == '!' )
             return -1;
     }
 
@@ -114,6 +115,7 @@ int elf_xen_parse_note(struct elf_binary *elf,
         [XEN_ELFNOTE_LOADER] = { "LOADER", 1},
         [XEN_ELFNOTE_PAE_MODE] = { "PAE_MODE", 1},
         [XEN_ELFNOTE_FEATURES] = { "FEATURES", 1},
+        [XEN_ELFNOTE_SUPPORTED_FEATURES] = { "SUPPORTED_FEATURES", 0},
         [XEN_ELFNOTE_BSD_SYMTAB] = { "BSD_SYMTAB", 1},
         [XEN_ELFNOTE_SUSPEND_CANCEL] = { "SUSPEND_CANCEL", 0 },
         [XEN_ELFNOTE_MOD_START_PFN] = { "MOD_START_PFN", 0 },
@@ -122,6 +124,7 @@ int elf_xen_parse_note(struct elf_binary *elf,
 
     const char *str = NULL;
     uint64_t val = 0;
+    unsigned int i;
     int type = elf_uval(elf, note, type);
 
     if ( (type >= sizeof(note_desc) / sizeof(note_desc[0])) ||
@@ -198,6 +201,12 @@ int elf_xen_parse_note(struct elf_binary *elf,
         if ( elf_xen_parse_features(str, parms->f_supported,
                                     parms->f_required) )
             return -1;
+        break;
+
+    case XEN_ELFNOTE_SUPPORTED_FEATURES:
+        for ( i = 0; i < XENFEAT_NR_SUBMAPS; ++i )
+            parms->f_supported[i] |= elf_note_numeric_array(
+                elf, note, sizeof(*parms->f_supported), i);
         break;
 
     }

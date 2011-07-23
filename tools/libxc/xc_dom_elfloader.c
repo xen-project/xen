@@ -286,6 +286,13 @@ static int xc_dom_parse_elf_kernel(struct xc_dom_image *dom)
     if ( (rc = elf_xen_parse(elf, &dom->parms)) != 0 )
         return rc;
 
+    if ( elf_xen_feature_get(XENFEAT_dom0, dom->parms.f_required) )
+    {
+        xc_dom_panic(dom->xch, XC_INVALID_KERNEL, "%s: Kernel does not"
+                     " support unprivileged (DomU) operation", __FUNCTION__);
+        return -EINVAL;
+    }
+
     /* find kernel segment */
     dom->kernel_seg.vstart = dom->parms.virt_kstart;
     dom->kernel_seg.vend   = dom->parms.virt_kend;

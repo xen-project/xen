@@ -227,6 +227,27 @@ uint64_t elf_note_numeric(struct elf_binary *elf, const elf_note * note)
         return 0;
     }
 }
+
+uint64_t elf_note_numeric_array(struct elf_binary *elf, const elf_note *note,
+                                unsigned int unitsz, unsigned int idx)
+{
+    const void *desc = elf_note_desc(elf, note);
+    int descsz = elf_uval(elf, note, descsz);
+
+    if ( descsz % unitsz || idx >= descsz / unitsz )
+        return 0;
+    switch (unitsz)
+    {
+    case 1:
+    case 2:
+    case 4:
+    case 8:
+        return elf_access_unsigned(elf, desc, idx * unitsz, unitsz);
+    default:
+        return 0;
+    }
+}
+
 const elf_note *elf_note_next(struct elf_binary *elf, const elf_note * note)
 {
     int namesz = (elf_uval(elf, note, namesz) + 3) & ~3;

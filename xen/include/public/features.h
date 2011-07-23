@@ -75,7 +75,10 @@
 #define XENFEAT_hvm_safe_pvclock           9
 
 /* x86: pirq can be used by HVM guests */
-#define XENFEAT_hvm_pirqs           10
+#define XENFEAT_hvm_pirqs                 10
+
+/* operation as Dom0 is supported */
+#define XENFEAT_dom0                      11
 
 #define XENFEAT_NR_SUBMAPS 1
 

@@ -287,6 +287,8 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE(void) arg)
                     (1U << XENFEAT_auto_translated_physmap);
             if ( supervisor_mode_kernel )
                 fi.submap |= 1U << XENFEAT_supervisor_mode_kernel;
+            if ( current->domain == dom0 )
+                fi.submap |= 1U << XENFEAT_dom0;
 #ifdef CONFIG_X86
             if ( !is_hvm_vcpu(current) )
                 fi.submap |= (1U << XENFEAT_mmu_pt_update_preserve_ad) |

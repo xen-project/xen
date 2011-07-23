@@ -2164,6 +2164,13 @@ int __init construct_dom0(struct domain *d,
 		return -1;
 	}
 
+	if (parms.elf_notes[XEN_ELFNOTE_FEATURES].type != XEN_ENT_NONE &&
+	    !test_bit(XENFEAT_dom0, parms.f_supported))
+	{
+		printk("Kernel does not support Dom0 operation\n");
+		return -1;
+	}
+
 	p_start = parms.virt_base;
 	pkern_start = parms.virt_kstart;
 	pkern_end = parms.virt_kend;
