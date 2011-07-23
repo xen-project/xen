@@ -462,6 +462,7 @@ def find_sysfs_mnt():
     return None
 
 def get_all_pci_names():
+    if not sys.platform.startswith('linux'): return []
     sysfs_mnt = find_sysfs_mnt()
     if sysfs_mnt is None:
         return None
