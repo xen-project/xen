@@ -331,6 +331,19 @@ static inline void __add_to_runqueue_sort(struct vcpu *v)
 }
 
 
+static void sedf_insert_vcpu(const struct scheduler *ops, struct vcpu *v)
+{
+    if ( !is_idle_vcpu(v) )
+    {
+        extraq_check(v);
+    }
+    else
+    {
+        EDOM_INFO(v)->deadl_abs = 0;
+        EDOM_INFO(v)->status &= ~SEDF_ASLEEP;
+    }
+}
+
 static void *sedf_alloc_vdata(const struct scheduler *ops, struct vcpu *v, void *dd)
 {
     struct sedf_vcpu_info *inf;
@@ -365,16 +378,6 @@ static void *sedf_alloc_vdata(const struct scheduler *ops, struct vcpu *v, void 
     INIT_LIST_HEAD(&(inf->list));
     INIT_LIST_HEAD(&(inf->extralist[EXTRA_PEN_Q]));
     INIT_LIST_HEAD(&(inf->extralist[EXTRA_UTIL_Q]));
- 
-    if ( !is_idle_vcpu(v) )
-    {
-        extraq_check(v);
-    }
-    else
-    {
-        inf->deadl_abs = 0;
-        inf->status &= ~SEDF_ASLEEP;
-    }
 
     return inf;
 }
@@ -1497,6 +1500,8 @@ const struct scheduler sched_sedf_def = {
     
     .init_domain    = sedf_init_domain,
     .destroy_domain = sedf_destroy_domain,
+
+    .insert_vcpu    = sedf_insert_vcpu,
 
     .alloc_vdata    = sedf_alloc_vdata,
     .free_vdata     = sedf_free_vdata,
