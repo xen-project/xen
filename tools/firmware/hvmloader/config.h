@@ -55,9 +55,8 @@ extern struct bios_config seabios_config;
 #define PCI_MEM_END         0xfc000000
 extern unsigned long pci_mem_start, pci_mem_end;
 
-/* We reserve 16MB for special BIOS mappings, etc. */
+/* Reserved for special BIOS mappings, etc. */
 #define RESERVED_MEMBASE    0xfc000000
-#define RESERVED_MEMSIZE    0x01000000
 
 /* Memory map. */
 #define SCRATCH_PHYSICAL_ADDRESS      0x00010000
