@@ -303,29 +303,14 @@ uuid_to_string(char *dest, uint8_t *uuid)
     *p = '\0';
 }
 
-void *mem_alloc(uint32_t size, uint32_t align)
+void mem_hole_populate_ram(xen_pfn_t mfn, uint32_t nr_mfns)
 {
-    static uint32_t reserve = RESERVED_MEMBASE - 1;
     static int over_allocated;
     struct xen_add_to_physmap xatp;
     struct xen_memory_reservation xmr;
-    xen_pfn_t mfn;
-    uint32_t s, e;
 
-    /* Align to at least 16 bytes. */
-    if ( align < 16 )
-        align = 16;
-
-    s = (reserve + align) & ~(align - 1);
-    e = s + size - 1;
-
-    BUG_ON((e < s) || (e >> PAGE_SHIFT) >= hvm_info->reserved_mem_pgstart);
-
-    while ( (reserve >> PAGE_SHIFT) != (e >> PAGE_SHIFT) )
+    for ( ; nr_mfns-- != 0; mfn++ )
     {
-        reserve += PAGE_SIZE;
-        mfn = reserve >> PAGE_SHIFT;
-
         /* Try to allocate a brand new page in the reserved area. */
         if ( !over_allocated )
         {
@@ -355,6 +340,35 @@ void *mem_alloc(uint32_t size, uint32_t align)
         xatp.gpfn  = mfn;
         if ( hypercall_memory_op(XENMEM_add_to_physmap, &xatp) != 0 )
             BUG();
+    }
+}
+
+static uint32_t reserve = RESERVED_MEMBASE - 1;
+
+xen_pfn_t mem_hole_alloc(uint32_t nr_mfns)
+{
+    hvm_info->reserved_mem_pgstart -= nr_mfns;
+    BUG_ON(hvm_info->reserved_mem_pgstart <= (reserve >> PAGE_SHIFT));
+    return hvm_info->reserved_mem_pgstart;
+}
+
+void *mem_alloc(uint32_t size, uint32_t align)
+{
+    uint32_t s, e;
+
+    /* Align to at least 16 bytes. */
+    if ( align < 16 )
+        align = 16;
+
+    s = (reserve + align) & ~(align - 1);
+    e = s + size - 1;
+
+    BUG_ON((e < s) || (e >> PAGE_SHIFT) >= hvm_info->reserved_mem_pgstart);
+
+    while ( (reserve >> PAGE_SHIFT) != (e >> PAGE_SHIFT) )
+    {
+        reserve += PAGE_SIZE;
+        mem_hole_populate_ram(reserve >> PAGE_SHIFT, 1);
     }
 
     reserve = e;
@@ -635,7 +649,7 @@ struct shared_info *get_shared_info(void)
     xatp.domid = DOMID_SELF;
     xatp.space = XENMAPSPACE_shared_info;
     xatp.idx   = 0;
-    xatp.gpfn  = 0xfffffu;
+    xatp.gpfn  = mem_hole_alloc(1);
     shared_info = (struct shared_info *)(xatp.gpfn << PAGE_SHIFT);
     if ( hypercall_memory_op(XENMEM_add_to_physmap, &xatp) != 0 )
         BUG();

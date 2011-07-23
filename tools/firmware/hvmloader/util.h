@@ -3,6 +3,7 @@
 
 #include <stdarg.h>
 #include <stdint.h>
+#include <xen/xen.h>
 #include <xen/hvm/hvm_info_table.h>
 
 #define __STR(...) #__VA_ARGS__
@@ -163,6 +164,12 @@ void uuid_to_string(char *dest, uint8_t *uuid);
 /* Debug output */
 int printf(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 int vprintf(const char *fmt, va_list ap);
+
+/* Populate specified memory hole with RAM. */
+void mem_hole_populate_ram(xen_pfn_t mfn, uint32_t nr_mfns);
+
+/* Allocate a memory hole below 4GB. */
+xen_pfn_t mem_hole_alloc(uint32_t nr_mfns);
 
 /* Allocate memory in a reserved region below 4GB. */
 void *mem_alloc(uint32_t size, uint32_t align);
