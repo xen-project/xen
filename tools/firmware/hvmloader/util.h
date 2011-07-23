@@ -81,7 +81,7 @@ void pci_write(uint32_t devfn, uint32_t reg, uint32_t len, uint32_t val);
 #define pci_writel(devfn, reg, val) (pci_write(devfn, reg, 4, (uint32_t)val))
 
 /* Get a pointer to the shared-info page */
-struct shared_info *get_shared_info(void);
+struct shared_info *get_shared_info(void) __attribute__ ((const));
 
 /* Get CPU speed in MHz. */
 uint16_t get_cpu_mhz(void);
@@ -138,7 +138,7 @@ static inline void cpu_relax(void)
 })
 
 /* HVM-builder info. */
-struct hvm_info_table *get_hvm_info_table(void);
+struct hvm_info_table *get_hvm_info_table(void) __attribute__ ((const));
 #define hvm_info (get_hvm_info_table())
 
 /* String and memory functions */
