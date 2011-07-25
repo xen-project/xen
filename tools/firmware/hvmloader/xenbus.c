@@ -83,7 +83,7 @@ static void ring_wait(void)
 }
 
 /* Helper functions: copy data in and out of the ring */
-static void ring_write(char *data, uint32_t len)
+static void ring_write(const char *data, uint32_t len)
 {
     uint32_t part;
 
@@ -140,8 +140,8 @@ static void ring_read(char *data, uint32_t len)
  * Returns 0 for success, or an errno for error.
  * The answer is returned in a static buffer which is only
  * valid until the next call of xenbus_send(). */
-static int xenbus_send(uint32_t type, uint32_t len, char *data,
-                       uint32_t *reply_len, char **reply_data)
+static int xenbus_send(uint32_t type, uint32_t len, const char *data,
+                       uint32_t *reply_len, const char **reply_data)
 {
     struct xsd_sockmsg hdr;
     evtchn_send_t send;
@@ -190,15 +190,22 @@ static int xenbus_send(uint32_t type, uint32_t len, char *data,
 
 /* Read a xenstore key.  Returns a nul-terminated string (even if the XS
  * data wasn't nul-terminated) or NULL.  The returned string is in a
- * static buffer, so only valid until the next xenstore/xenbus operation. */
-char *xenstore_read(char *path)
+ * static buffer, so only valid until the next xenstore/xenbus operation.
+ * If @default_resp is specified, it is returned in preference to a NULL or
+ * empty string received from xenstore.
+ */
+const char *xenstore_read(const char *path, const char *default_resp)
 {
     uint32_t len = 0;
-    char *answer = NULL;
+    const char *answer = NULL;
 
     /* Include the nul in the request */
     if ( xenbus_send(XS_READ, strlen(path) + 1, path, &len, &answer) )
-        return NULL;
+        answer = NULL;
+
+    if ( (default_resp != NULL) && ((answer == NULL) || (*answer == '\0')) )
+        answer = default_resp;
+
     /* We know xenbus_send() nul-terminates its answer, so just pass it on. */
     return answer;
 }

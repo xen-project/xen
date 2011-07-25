@@ -315,15 +315,11 @@ smbios_type_0_init(void *start, const char *xen_version,
     p->embedded_controller_minor = 0xff;
 
     start += sizeof(struct smbios_type_0);
-    if ( ((s = xenstore_read("bios-strings/bios-vendor")) == NULL)
-         || (*s == '\0') )
-        s = "Xen";
+    s = xenstore_read("bios-strings/bios-vendor", "Xen");
     strcpy((char *)start, s);
     start += strlen(s) + 1;
 
-    if ( ((s = xenstore_read("bios-strings/bios-version")) == NULL)
-         || (*s == '\0') )
-        s = xen_version;
+    s = xenstore_read("bios-strings/bios-version", xen_version);
     strcpy((char *)start, s);
     start += strlen(s) + 1;
 
@@ -362,28 +358,20 @@ smbios_type_1_init(void *start, const char *xen_version,
 
     start += sizeof(struct smbios_type_1);
     
-    if ( ((s = xenstore_read("bios-strings/system-manufacturer")) == NULL)
-         || (*s == '\0') )
-        s = "Xen";
+    s = xenstore_read("bios-strings/system-manufacturer", "Xen");
     strcpy((char *)start, s);
     start += strlen(s) + 1;
 
-    if ( ((s = xenstore_read("bios-strings/system-product-name")) == NULL)
-         || (*s == '\0') )
-        s = "HVM domU";
+    s = xenstore_read("bios-strings/system-product-name", "HVM domU");
     strcpy((char *)start, s);
     start += strlen(s) + 1;
 
-    if ( ((s = xenstore_read("bios-strings/system-version")) == NULL)
-         || (*s == '\0') )
-        s = xen_version;
+    s = xenstore_read("bios-strings/system-version", xen_version);
     strcpy((char *)start, s);
     start += strlen(s) + 1;
 
     uuid_to_string(uuid_str, uuid); 
-    if ( ((s = xenstore_read("bios-strings/system-serial-number")) == NULL)
-         || (*s == '\0') )
-        s = uuid_str;
+    s = xenstore_read("bios-strings/system-serial-number", uuid_str);
     strcpy((char *)start, s);
     start += strlen(s) + 1;
 
@@ -494,7 +482,7 @@ smbios_type_11_init(void *start)
     {
         path[(sizeof path) - 3] = '0' + ((i < 10) ? i : i / 10);
         path[(sizeof path) - 2] = (i < 10) ? '\0' : '0' + (i % 10);
-        if ( ((s = xenstore_read(path)) == NULL) || (*s == '\0') )
+        if ( ((s = xenstore_read(path, NULL)) == NULL) || (*s == '\0') )
             break;
         strcpy((char *)start, s);
         start += strlen(s) + 1;

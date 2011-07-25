@@ -368,9 +368,7 @@ static const struct bios_config *detect_bios(void)
     const struct bios_info *b;
     const char *bios;
 
-    bios = xenstore_read("hvmloader/bios");
-    if ( !bios )
-        bios = "rombios";
+    bios = xenstore_read("hvmloader/bios", "rombios");
 
     for ( b = &bios_configs[0]; b->key != NULL; b++ )
         if ( !strcmp(bios, b->key) )

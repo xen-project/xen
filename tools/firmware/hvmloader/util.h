@@ -187,8 +187,11 @@ void xenbus_shutdown(void);
 
 /* Read a xenstore key.  Returns a nul-terminated string (even if the XS
  * data wasn't nul-terminated) or NULL.  The returned string is in a
- * static buffer, so only valid until the next xenstore/xenbus operation. */
-char *xenstore_read(char *path);
+ * static buffer, so only valid until the next xenstore/xenbus operation.
+ * If @default_resp is specified, it is returned in preference to a NULL or
+ * empty string received from xenstore.
+ */
+const char *xenstore_read(const char *path, const char *default_resp);
 
 /* Setup PCI bus */
 void pci_setup(void);
