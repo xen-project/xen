@@ -416,12 +416,13 @@ int main(void)
         bios->create_smbios_tables();
     }
 
-    printf("Loading %s ...\n", bios->name);
-    memcpy((void *)bios->bios_address, bios->image,
-           bios->image_size);
-
-    if (bios->bios_relocate)
-        bios->bios_relocate();
+    if (bios->bios_load) {
+        bios->bios_load(bios);
+    } else {
+        printf("Loading %s ...\n", bios->name);
+        memcpy((void *)bios->bios_address, bios->image,
+               bios->image_size);
+    }
 
     if ( (hvm_info->nr_vcpus > 1) || hvm_info->apic_mode ) {
         if ( bios->create_mp_tables )

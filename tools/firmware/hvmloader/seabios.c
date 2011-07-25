@@ -138,10 +138,10 @@ struct bios_config seabios_config = {
     .optionrom_start = 0,
     .optionrom_end = 0,
 
+    .bios_load = NULL,
+
     .bios_info_setup = seabios_setup_bios_info,
     .bios_info_finish = seabios_finish_bios_info,
-
-    .bios_relocate = NULL,
 
     .vm86_setup = NULL,
     .e820_setup = seabios_setup_e820,

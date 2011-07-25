@@ -81,10 +81,14 @@ static void rombios_setup_bios_info(void)
     memset(info, 0, sizeof(*info));
 }
 
-static void rombios_relocate(void)
+static void rombios_load(const struct bios_config *config)
 {
     uint32_t bioshigh;
     struct rombios_info *info;
+
+    printf("Loading %s ...\n", config->name);
+    memcpy((void *)config->bios_address, config->image,
+           config->image_size);
 
     bioshigh = rombios_highbios_setup();
 
@@ -169,10 +173,10 @@ struct bios_config rombios_config =  {
     .optionrom_start = OPTIONROM_PHYSICAL_ADDRESS,
     .optionrom_end = OPTIONROM_PHYSICAL_END,
 
+    .bios_load = rombios_load,
+
     .bios_info_setup = rombios_setup_bios_info,
     .bios_info_finish = NULL,
-
-    .bios_relocate = rombios_relocate,
 
     .vm86_setup = rombios_init_vm86_tss,
     .e820_setup = rombios_setup_e820,
