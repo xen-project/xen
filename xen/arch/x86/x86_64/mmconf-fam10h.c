@@ -9,6 +9,7 @@
 #include <xen/init.h>
 #include <xen/dmi.h>
 #include <asm/amd.h>
+#include <asm/e820.h>
 #include <asm/msr.h>
 #include <asm/processor.h>
 
@@ -131,7 +132,8 @@ static void __init get_fam10h_pci_mmconf_base(void)
 	return;
 
 out:
-	fam10h_pci_mmconf_base = start;
+	if (e820_add_range(&e820, start, start + SIZE, E820_RESERVED))
+		fam10h_pci_mmconf_base = start;
 }
 
 void __cpuinit fam10h_check_enable_mmcfg(void)

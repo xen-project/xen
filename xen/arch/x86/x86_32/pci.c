@@ -60,8 +60,3 @@ int pci_find_ext_capability(int seg, int bus, int devfn, int cap)
 {
     return 0;
 }
-
-void acpi_mmcfg_init(void)
-{
-    return;
-}

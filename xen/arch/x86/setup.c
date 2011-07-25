@@ -1248,6 +1248,8 @@ void __init __start_xen(unsigned long mbi_p)
 
 #ifdef CONFIG_X86_64
     vesa_mtrr_init();
+
+    acpi_mmcfg_init();
 #endif
 
     if ( opt_nosmp )

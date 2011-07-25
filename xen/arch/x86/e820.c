@@ -563,6 +563,55 @@ static void __init machine_specific_memory_setup(
         clip_to_limit(top_of_ram, "MTRRs do not cover all of memory.");
 }
 
+/* This function relies on the passed in e820->map[] being sorted. */
+int __init e820_add_range(
+    struct e820map *e820, uint64_t s, uint64_t e, uint32_t type)
+{
+    unsigned int i;
+
+    for ( i = 0; i < e820->nr_map; ++i )
+    {
+        uint64_t rs = e820->map[i].addr;
+        uint64_t re = rs + e820->map[i].size;
+
+        if ( rs == e && e820->map[i].type == type )
+        {
+            e820->map[i].addr = s;
+            return 1;
+        }
+
+        if ( re == s && e820->map[i].type == type &&
+             (i + 1 == e820->nr_map || e820->map[i + 1].addr >= e) )
+        {
+            e820->map[i].size += e - s;
+            return 1;
+        }
+
+        if ( rs >= e )
+            break;
+
+        if ( re > s )
+            return 0;
+    }
+
+    if ( e820->nr_map >= ARRAY_SIZE(e820->map) )
+    {
+        printk(XENLOG_WARNING "E820: overflow while adding region"
+               " %"PRIx64"-%"PRIx64"\n", s, e);
+        return 0;
+    }
+
+    memmove(e820->map + i + 1, e820->map + i,
+            (e820->nr_map - i) * sizeof(*e820->map));
+
+    e820->nr_map++;
+    e820->map[i].addr = s;
+    e820->map[i].size = e - s;
+    e820->map[i].type = type;
+
+    return 1;
+}
+
 int __init e820_change_range_type(
     struct e820map *e820, uint64_t s, uint64_t e,
     uint32_t orig_type, uint32_t new_type)
