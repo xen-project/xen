@@ -408,23 +408,24 @@ int main(void)
 
     perform_tests();
 
-    if (bios->bios_info_setup)
+    if ( bios->bios_info_setup )
         bios->bios_info_setup();
 
-    if (bios->create_smbios_tables) {
+    if ( bios->create_smbios_tables )
+    {
         printf("Writing SMBIOS tables ...\n");
         bios->create_smbios_tables();
     }
 
-    if (bios->bios_load) {
+    printf("Loading %s ...\n", bios->name);
+    if ( bios->bios_load )
         bios->bios_load(bios);
-    } else {
-        printf("Loading %s ...\n", bios->name);
+    else
         memcpy((void *)bios->bios_address, bios->image,
                bios->image_size);
-    }
 
-    if ( (hvm_info->nr_vcpus > 1) || hvm_info->apic_mode ) {
+    if ( (hvm_info->nr_vcpus > 1) || hvm_info->apic_mode )
+    {
         if ( bios->create_mp_tables )
             bios->create_mp_tables();
         if ( bios->create_pir_tables )
@@ -476,14 +477,16 @@ int main(void)
             .value = 1,
         };
 
-        if ( bios->acpi_build_tables ) {
+        if ( bios->acpi_build_tables )
+        {
             printf("Loading ACPI ...\n");
             bios->acpi_build_tables();
         }
+
         hypercall_hvm_op(HVMOP_set_param, &p);
     }
 
-    if (bios->vm86_setup)
+    if ( bios->vm86_setup )
         bios->vm86_setup();
 
     cmos_write_memory_size();
@@ -508,10 +511,10 @@ int main(void)
            bios->bios_address,
            bios->bios_address + bios->image_size - 1);
 
-    if (bios->e820_setup)
+    if ( bios->e820_setup )
         bios->e820_setup();
 
-    if (bios->bios_info_finish)
+    if ( bios->bios_info_finish )
         bios->bios_info_finish();
 
     xenbus_shutdown();

@@ -199,9 +199,8 @@ uint32_t rombios_highbios_setup(void);
 /* Miscellaneous. */
 void cacheattr_init(void);
 unsigned long create_mp_tables(void *table);
-void hvm_write_smbios_tables(unsigned long ep,
-                             unsigned long smbios_start,
-                             unsigned long smbios_end);
+void hvm_write_smbios_tables(
+    unsigned long ep, unsigned long smbios_start, unsigned long smbios_end);
 unsigned long create_pir_tables(void);
 
 void smp_initialise(void);

@@ -91,7 +91,8 @@ int build_e820_table(struct e820entry *e820,
 
     ASSERT ( bios_image_base < 0x100000 );
 
-    if ( lowmem_reserved_base < ACPI_INFO_PHYSICAL_ADDRESS ) {
+    if ( lowmem_reserved_base < ACPI_INFO_PHYSICAL_ADDRESS )
+    {
         /*
          * 0x0-lowmem_reserved_base: Ordinary RAM.
          */

@@ -86,7 +86,6 @@ static void rombios_load(const struct bios_config *config)
     uint32_t bioshigh;
     struct rombios_info *info;
 
-    printf("Loading %s ...\n", config->name);
     memcpy((void *)config->bios_address, config->image,
            config->image_size);
 
@@ -110,7 +109,7 @@ static void *get_mp_table_start(void)
           bios_mem != (char *)ROMBIOS_END;
           bios_mem++ )
     {
-        if ( strncmp(bios_mem, "___HVMMP", 8) == 0)
+        if ( strncmp(bios_mem, "___HVMMP", 8) == 0 )
             return bios_mem;
     }
 
@@ -124,7 +123,7 @@ static void reset_bios_checksum(void)
     uint8_t checksum;
 
     checksum = 0;
-    for (i = 0; i < ROMBIOS_MAXOFFSET; ++i)
+    for ( i = 0; i < ROMBIOS_MAXOFFSET; i++ )
         checksum += ((uint8_t *)(ROMBIOS_BEGIN))[i];
 
     *((uint8_t *)(ROMBIOS_BEGIN + ROMBIOS_MAXOFFSET)) = -checksum;
@@ -153,9 +152,10 @@ static void rombios_create_mp_tables(void)
 
 static void rombios_create_smbios_tables(void)
 {
-    hvm_write_smbios_tables(SMBIOS_PHYSICAL_ADDRESS,
-                            SMBIOS_PHYSICAL_ADDRESS + sizeof(struct smbios_entry_point),
-                            SMBIOS_PHYSICAL_END);
+    hvm_write_smbios_tables(
+        SMBIOS_PHYSICAL_ADDRESS,
+        SMBIOS_PHYSICAL_ADDRESS + sizeof(struct smbios_entry_point),
+        SMBIOS_PHYSICAL_END);
 }
 
 //BUILD_BUG_ON(sizeof(rombios) > (0x00100000U - ROMBIOS_PHYSICAL_ADDRESS));

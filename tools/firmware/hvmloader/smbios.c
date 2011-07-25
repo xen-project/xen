@@ -77,9 +77,9 @@ get_cpu_manufacturer(char *buf, int len)
     cpuid(0, &eax, (uint32_t *)&id[0], (uint32_t *)&id[8],
           (uint32_t *)&id[4]);
 
-    if (memcmp(id, "GenuineIntel", 12) == 0)
+    if ( memcmp(id, "GenuineIntel", 12) == 0 )
         strncpy(buf, "Intel", len);
-    else if (memcmp(id, "AuthenticAMD", 12) == 0)
+    else if ( memcmp(id, "AuthenticAMD", 12) == 0 )
         strncpy(buf, "AMD", len);
     else
         strncpy(buf, "unknown", len);
@@ -158,7 +158,8 @@ get_memsize(void)
 }
 
 void
-hvm_write_smbios_tables(unsigned long ep, unsigned long smbios_start, unsigned long smbios_end)
+hvm_write_smbios_tables(
+    unsigned long ep, unsigned long smbios_start, unsigned long smbios_end)
 {
     xen_domain_handle_t uuid;
     uint16_t xen_major_version, xen_minor_version;
@@ -232,7 +233,8 @@ hvm_write_smbios_tables(unsigned long ep, unsigned long smbios_start, unsigned l
 
     memcpy((void *)smbios_start, (void *)scratch_start, len);
 
-    smbios_entry_point_init((void *)ep, max_struct_size, len, smbios_start, nr_structs);
+    smbios_entry_point_init(
+        (void *)ep, max_struct_size, len, smbios_start, nr_structs);
 
     return;
 
@@ -313,12 +315,14 @@ smbios_type_0_init(void *start, const char *xen_version,
     p->embedded_controller_minor = 0xff;
 
     start += sizeof(struct smbios_type_0);
-    if ((s = xenstore_read("bios-strings/bios-vendor")) == NULL || *s == '\0')
+    if ( ((s = xenstore_read("bios-strings/bios-vendor")) == NULL)
+         || (*s == '\0') )
         s = "Xen";
     strcpy((char *)start, s);
     start += strlen(s) + 1;
 
-    if ((s = xenstore_read("bios-strings/bios-version")) == NULL || *s == '\0')
+    if ( ((s = xenstore_read("bios-strings/bios-version")) == NULL)
+         || (*s == '\0') )
         s = xen_version;
     strcpy((char *)start, s);
     start += strlen(s) + 1;
@@ -358,27 +362,27 @@ smbios_type_1_init(void *start, const char *xen_version,
 
     start += sizeof(struct smbios_type_1);
     
-    if ((s = xenstore_read("bios-strings/system-manufacturer")) == NULL  
-        || *s == '\0')
+    if ( ((s = xenstore_read("bios-strings/system-manufacturer")) == NULL)
+         || (*s == '\0') )
         s = "Xen";
     strcpy((char *)start, s);
     start += strlen(s) + 1;
 
-    if ((s = xenstore_read("bios-strings/system-product-name")) == NULL
-         || *s == '\0')
+    if ( ((s = xenstore_read("bios-strings/system-product-name")) == NULL)
+         || (*s == '\0') )
         s = "HVM domU";
     strcpy((char *)start, s);
     start += strlen(s) + 1;
 
-    if ((s = xenstore_read("bios-strings/system-version")) == NULL
-        || *s == '\0')
+    if ( ((s = xenstore_read("bios-strings/system-version")) == NULL)
+         || (*s == '\0') )
         s = xen_version;
     strcpy((char *)start, s);
     start += strlen(s) + 1;
 
     uuid_to_string(uuid_str, uuid); 
-    if ((s = xenstore_read("bios-strings/system-serial-number")) == NULL
-        || *s == '\0')
+    if ( ((s = xenstore_read("bios-strings/system-serial-number")) == NULL)
+         || (*s == '\0') )
         s = uuid_str;
     strcpy((char *)start, s);
     start += strlen(s) + 1;
@@ -486,10 +490,11 @@ smbios_type_11_init(void *start)
     start += sizeof(struct smbios_type_11);
 
     /* Pull out as many oem-* strings we find in xenstore */
-    for (i = 1; i < 100; i++) {
+    for ( i = 1; i < 100; i++ )
+    {
         path[(sizeof path) - 3] = '0' + ((i < 10) ? i : i / 10);
         path[(sizeof path) - 2] = (i < 10) ? '\0' : '0' + (i % 10);
-        if ((s = xenstore_read(path)) == NULL || *s == '\0')
+        if ( ((s = xenstore_read(path)) == NULL) || (*s == '\0') )
             break;
         strcpy((char *)start, s);
         start += strlen(s) + 1;
@@ -497,7 +502,8 @@ smbios_type_11_init(void *start)
     }
     
     /* Make sure there's at least one type-11 string */
-    if (p->count == 0) {
+    if ( p->count == 0 )
+    {
         strcpy((char *)start, "Xen");
         start += strlen("Xen") + 1;
         p->count++;

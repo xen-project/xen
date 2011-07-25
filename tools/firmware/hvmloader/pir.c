@@ -23,7 +23,8 @@
  */
 unsigned long create_pir_tables(void)
 {
-    int length = sizeof(struct pir_table) + sizeof(struct pir_slot)*NR_PIR_SLOTS;
+    int length = sizeof(struct pir_table)
+        + sizeof(struct pir_slot) * NR_PIR_SLOTS;
     struct pir_table *pir = scratch_alloc(length, 0);
     int i, checksum;
 
@@ -57,10 +58,8 @@ unsigned long create_pir_tables(void)
     }
 
     checksum = 0;
-    for ( i = 0; i < length; i++)
-    {
+    for ( i = 0; i < length; i++ )
         checksum += ((int8_t *)pir)[i];
-    }
     pir->checksum = -checksum;
 
     return (unsigned long)pir;

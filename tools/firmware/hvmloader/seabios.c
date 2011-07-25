@@ -71,7 +71,7 @@ static void seabios_finish_bios_info(void)
     uint8_t checksum;
 
     checksum = 0;
-    for (i = 0; i < info->length; ++i)
+    for ( i = 0; i < info->length; i++ )
         checksum += ((uint8_t *)(info))[i];
 
     info->checksum = -checksum;

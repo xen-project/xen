@@ -211,7 +211,8 @@ static void fill_mp_proc_entry(struct mp_proc_entry *mppe, int vcpu_id)
 
 
 /* fills in an MP bus entry of type 'type' and bus ID 'bus_id' */
-static void fill_mp_bus_entry(struct mp_bus_entry *mpbe, int bus_id, const char *type)
+static void fill_mp_bus_entry(
+    struct mp_bus_entry *mpbe, int bus_id, const char *type)
 {
     int i;
 
@@ -272,7 +273,8 @@ unsigned long create_mp_tables(void *_mpfps)
 
     printf("Creating MP tables ...\n");
 
-    if (!_mpfps) {
+    if ( _mpfps == NULL )
+    {
         int sz;
 
         sz  = sizeof(struct mp_floating_pointer_struct);
@@ -282,7 +284,7 @@ unsigned long create_mp_tables(void *_mpfps)
         sz += sizeof(struct mp_ioapic_entry);
         sz += sizeof(struct mp_io_intr_entry) * 16;
 
-        base = mem_alloc(sz, 0);
+        _mpfps = mem_alloc(sz, 0);
     }
 
     mpfps = _mpfps;
