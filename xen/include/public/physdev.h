@@ -255,6 +255,19 @@ struct physdev_get_free_pirq {
 typedef struct physdev_get_free_pirq physdev_get_free_pirq_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_get_free_pirq_t);
 
+#define XEN_PCI_MMCFG_RESERVED         0x1
+
+#define PHYSDEVOP_pci_mmcfg_reserved    24
+struct physdev_pci_mmcfg_reserved {
+    uint64_t address;
+    uint16_t segment;
+    uint8_t start_bus;
+    uint8_t end_bus;
+    uint32_t flags;
+};
+typedef struct physdev_pci_mmcfg_reserved physdev_pci_mmcfg_reserved_t;
+DEFINE_XEN_GUEST_HANDLE(physdev_pci_mmcfg_reserved_t);
+
 /*
  * Notify that some PIRQ-bound event channels have been unmasked.
  * ** This command is obsolete since interface version 0x00030202 and is **

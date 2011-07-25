@@ -85,5 +85,9 @@ extern struct acpi_mcfg_allocation *pci_mmcfg_config;
 
 /* function prototypes */
 int acpi_parse_mcfg(struct acpi_table_header *header);
+int pci_mmcfg_reserved(uint64_t address, unsigned int segment,
+                       unsigned int start_bus, unsigned int end_bus,
+                       unsigned int flags);
 int pci_mmcfg_arch_init(void);
-void pci_mmcfg_arch_free(void);
+int pci_mmcfg_arch_enable(unsigned int);
+void pci_mmcfg_arch_disable(unsigned int);

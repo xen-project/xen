@@ -63,6 +63,10 @@ CHECK_physdev_setup_gsi;
 CHECK_physdev_get_free_pirq;
 #undef xen_physdev_get_free_pirq
 
+#define xen_physdev_pci_mmcfg_reserved physdev_pci_mmcfg_reserved
+CHECK_physdev_pci_mmcfg_reserved;
+#undef xen_physdev_pci_mmcfg_reserved
+
 #define COMPAT
 #undef guest_handle_okay
 #define guest_handle_okay          compat_handle_okay

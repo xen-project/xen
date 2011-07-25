@@ -112,7 +112,8 @@ int pci_mmcfg_write(unsigned int seg, unsigned int bus,
     return 0;
 }
 
-static void __iomem * __init mcfg_ioremap(struct acpi_mcfg_allocation *cfg)
+static void __iomem *mcfg_ioremap(const struct acpi_mcfg_allocation *cfg,
+                                  unsigned int prot)
 {
     unsigned long virt, size;
 
@@ -126,19 +127,55 @@ static void __iomem * __init mcfg_ioremap(struct acpi_mcfg_allocation *cfg)
     if (map_pages_to_xen(virt,
                          (cfg->address >> PAGE_SHIFT) +
                          (cfg->start_bus_number << (20 - PAGE_SHIFT)),
-                         size >> PAGE_SHIFT, PAGE_HYPERVISOR_NOCACHE))
+                         size >> PAGE_SHIFT, prot))
         return NULL;
 
     return (void __iomem *) virt;
+}
+
+int pci_mmcfg_arch_enable(unsigned int idx)
+{
+    const typeof(pci_mmcfg_config[0]) *cfg = pci_mmcfg_virt[idx].cfg;
+
+    if (pci_mmcfg_virt[idx].virt)
+        return 0;
+    pci_mmcfg_virt[idx].virt = mcfg_ioremap(cfg, PAGE_HYPERVISOR_NOCACHE);
+    if (!pci_mmcfg_virt[idx].virt) {
+        printk(KERN_ERR "PCI: Cannot map MCFG aperture for segment %04x\n",
+               cfg->pci_segment);
+        return -ENOMEM;
+    }
+    printk(KERN_INFO "PCI: Using MCFG for segment %04x bus %02x-%02x\n",
+           cfg->pci_segment, cfg->start_bus_number, cfg->end_bus_number);
+    return 0;
+}
+
+void pci_mmcfg_arch_disable(unsigned int idx)
+{
+    const typeof(pci_mmcfg_config[0]) *cfg = pci_mmcfg_virt[idx].cfg;
+
+    pci_mmcfg_virt[idx].virt = NULL;
+    /*
+     * Don't use destroy_xen_mappings() here, or make sure that at least
+     * the necessary L4 entries get populated (so that they get properly
+     * propagated to guest domains' page tables).
+     */
+    mcfg_ioremap(cfg, 0);
+    printk(KERN_WARNING "PCI: Not using MCFG for segment %04x bus %02x-%02x\n",
+           cfg->pci_segment, cfg->start_bus_number, cfg->end_bus_number);
 }
 
 int __init pci_mmcfg_arch_init(void)
 {
     int i;
 
+    if (pci_mmcfg_virt)
+        return 0;
+
     pci_mmcfg_virt = xmalloc_array(struct mmcfg_virt, pci_mmcfg_config_num);
     if (pci_mmcfg_virt == NULL) {
         printk(KERN_ERR "PCI: Can not allocate memory for mmconfig structures\n");
+        pci_mmcfg_config_num = 0;
         return 0;
     }
     memset(pci_mmcfg_virt, 0, sizeof(*pci_mmcfg_virt) * pci_mmcfg_config_num);
@@ -149,39 +186,5 @@ int __init pci_mmcfg_arch_init(void)
             ++mmcfg_pci_segment_shift;
     }
     mmcfg_pci_segment_shift += 20;
-    for (i = 0; i < pci_mmcfg_config_num; ++i) {
-        pci_mmcfg_virt[i].virt = mcfg_ioremap(&pci_mmcfg_config[i]);
-        if (!pci_mmcfg_virt[i].virt) {
-            printk(KERN_ERR "PCI: Cannot map mmconfig aperture for "
-                    "segment %d\n",
-                pci_mmcfg_config[i].pci_segment);
-            pci_mmcfg_arch_free();
-            return 0;
-        }
-    }
     return 1;
-}
-
-void __init pci_mmcfg_arch_free(void)
-{
-    int i;
-
-    if (pci_mmcfg_virt == NULL)
-        return;
-
-    for (i = 0; i < pci_mmcfg_config_num; ++i) {
-        if (pci_mmcfg_virt[i].virt) {
-            unsigned long size;
-            const struct acpi_mcfg_allocation *cfg = pci_mmcfg_virt[i].cfg;
-
-            size = (cfg->end_bus_number - cfg->start_bus_number + 1) << 20;
-            destroy_xen_mappings((unsigned long)pci_mmcfg_virt[i].virt,
-                                 (unsigned long)pci_mmcfg_virt[i].virt + size);
-            pci_mmcfg_virt[i].virt = NULL;
-            pci_mmcfg_virt[i].cfg = NULL;
-        }
-    }
-
-    xfree(pci_mmcfg_virt);
-    pci_mmcfg_virt = NULL;
 }

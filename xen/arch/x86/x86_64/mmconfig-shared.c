@@ -22,10 +22,10 @@
 #include <asm/e820.h>
 #include <asm/msr.h>
 #include <asm/msr-index.h>
+#include <public/physdev.h>
 
 #include "mmconfig.h"
 
-static int __initdata known_bridge;
 unsigned int pci_probe = PCI_PROBE_CONF1 | PCI_PROBE_MMCONF;
 
 static void __init parse_mmcfg(char *s)
@@ -316,26 +316,21 @@ static int __init pci_mmcfg_check_hostbridge(void)
     return name != NULL;
 }
 
-typedef int (*check_reserved_t)(u64 start, u64 end, unsigned type);
-
 static int __init is_mmconf_reserved(
-    check_reserved_t is_reserved,
     u64 addr, u64 size, int i,
-    typeof(pci_mmcfg_config[0]) *cfg, int with_e820)
+    typeof(pci_mmcfg_config[0]) *cfg)
 {
     u64 old_size = size;
     int valid = 0;
 
-    while (!is_reserved(addr, addr + size - 1, E820_RESERVED)) {
+    while (!e820_all_mapped(addr, addr + size - 1, E820_RESERVED)) {
         size >>= 1;
         if (size < (16UL<<20))
             break;
     }
 
     if (size >= (16UL<<20) || size == old_size) {
-        printk(KERN_NOTICE
-               "PCI: MCFG area at %lx reserved in %s\n",
-                addr, with_e820?"E820":"ACPI motherboard resources");
+        printk(KERN_NOTICE "PCI: MCFG area at %lx reserved in E820\n", addr);
         valid = 1;
 
         if (old_size != size) {
@@ -352,15 +347,16 @@ static int __init is_mmconf_reserved(
     return valid;
 }
 
-static void __init pci_mmcfg_reject_broken(void)
+static bool_t __init pci_mmcfg_reject_broken(void)
 {
     typeof(pci_mmcfg_config[0]) *cfg;
     int i;
+    bool_t valid = 1;
 
     if ((pci_mmcfg_config_num == 0) ||
         (pci_mmcfg_config == NULL) ||
         (pci_mmcfg_config[0].address == 0))
-        return;
+        return 0;
 
     cfg = &pci_mmcfg_config[0];
 
@@ -374,27 +370,25 @@ static void __init pci_mmcfg_reject_broken(void)
         size = cfg->end_bus_number + 1 - cfg->start_bus_number;
         size <<= 20;
         printk(KERN_NOTICE "PCI: MCFG configuration %d: base %lx "
-               "segment %hu buses %u - %u\n",
+               "segment %04x buses %02x - %02x\n",
                i, (unsigned long)cfg->address, cfg->pci_segment,
                (unsigned int)cfg->start_bus_number,
                (unsigned int)cfg->end_bus_number);
 
-        if (!is_mmconf_reserved(e820_all_mapped, addr, size, i, cfg, 1))
-            goto reject;
+        if (!is_mmconf_reserved(addr, size, i, cfg) ||
+            pci_mmcfg_arch_enable(i)) {
+            pci_mmcfg_arch_disable(i);
+            valid = 0;
+        }
     }
 
-    return;
-
-reject:
-    printk(KERN_INFO "PCI: Not using MMCONFIG.\n");
-    pci_mmcfg_arch_free();
-    xfree(pci_mmcfg_config);
-    pci_mmcfg_config = NULL;
-    pci_mmcfg_config_num = 0;
+    return valid;
 }
 
 void __init acpi_mmcfg_init(void)
 {
+    bool_t valid = 1;
+
     /* MMCONFIG disabled */
     if ((pci_probe & PCI_PROBE_MMCONF) == 0)
         return;
@@ -403,16 +397,17 @@ void __init acpi_mmcfg_init(void)
     if (!(pci_probe & PCI_PROBE_MASK & ~PCI_PROBE_MMCONF))
         return;
 
-    /* for late to exit */
-    if (known_bridge)
-        return;
+    if (pci_mmcfg_check_hostbridge()) {
+        unsigned int i;
 
-    if (pci_mmcfg_check_hostbridge())
-        known_bridge = 1;
-
-    if (!known_bridge) {
+        pci_mmcfg_arch_init();
+        for (i = 0; i < pci_mmcfg_config_num; ++i)
+            if (pci_mmcfg_arch_enable(i))
+                valid = 0;
+    } else {
         acpi_table_parse(ACPI_SIG_MCFG, acpi_parse_mcfg);
-        pci_mmcfg_reject_broken();
+        pci_mmcfg_arch_init();
+        valid = pci_mmcfg_reject_broken();
     }
 
     if ((pci_mmcfg_config_num == 0) ||
@@ -420,9 +415,41 @@ void __init acpi_mmcfg_init(void)
         (pci_mmcfg_config[0].address == 0))
         return;
 
-    if (pci_mmcfg_arch_init()) {
+    if (valid)
         pci_probe = (pci_probe & ~PCI_PROBE_MASK) | PCI_PROBE_MMCONF;
+}
+
+int pci_mmcfg_reserved(uint64_t address, unsigned int segment,
+                       unsigned int start_bus, unsigned int end_bus,
+                       unsigned int flags)
+{
+    unsigned int i;
+
+    if (flags & ~XEN_PCI_MMCFG_RESERVED)
+        return -EINVAL;
+
+    for (i = 0; i < pci_mmcfg_config_num; ++i) {
+        const typeof(pci_mmcfg_config[0]) *cfg = &pci_mmcfg_config[i];
+
+        if (cfg->pci_segment == segment &&
+            cfg->start_bus_number == start_bus &&
+            cfg->end_bus_number == end_bus) {
+            if (cfg->address != address) {
+                printk(KERN_WARNING
+                       "Base address presented for segment %04x bus %02x-%02x"
+                       " (%08" PRIx64 ") does not match previously obtained"
+                       " one (%08" PRIx64 ")\n",
+                       segment, start_bus, end_bus, address, cfg->address);
+                return -EIO;
+            }
+            if (flags & XEN_PCI_MMCFG_RESERVED)
+                return pci_mmcfg_arch_enable(i);
+            pci_mmcfg_arch_disable(i);
+            return 0;
+        }
     }
+
+    return -ENODEV;
 }
 
 /**
