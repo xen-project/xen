@@ -1162,6 +1162,7 @@ int nvmx_handle_vmclear(struct cpu_user_regs *regs)
     struct vmx_inst_decoded decode;
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     unsigned long gpa = 0;
+    void *vvmcs;
     int rc;
 
     rc = decode_vmx_inst(regs, &decode, &gpa, 0);
@@ -1171,24 +1172,24 @@ int nvmx_handle_vmclear(struct cpu_user_regs *regs)
     if ( gpa & 0xfff )
     {
         vmreturn(regs, VMFAIL_INVALID);
-        goto out;
+        return X86EMUL_OKAY;
     }
-
-    if ( gpa != nvcpu->nv_vvmcxaddr && nvcpu->nv_vvmcxaddr != VMCX_EADDR )
+    
+    if ( gpa == nvcpu->nv_vvmcxaddr ) 
     {
-        gdprintk(XENLOG_WARNING, 
-                 "vmclear gpa %lx not the same as current vmcs %"PRIpaddr"\n",
-                 gpa, nvcpu->nv_vvmcxaddr);
-        vmreturn(regs, VMSUCCEED);
-        goto out;
-    }
-    if ( nvcpu->nv_vvmcxaddr != VMCX_EADDR )
         __set_vvmcs(nvcpu->nv_vvmcx, NVMX_LAUNCH_STATE, 0);
-    nvmx_purge_vvmcs(v);
+        nvmx_purge_vvmcs(v);
+    }
+    else 
+    {
+        /* Even if this VMCS isn't the current one, we must clear it. */
+        vvmcs = hvm_map_guest_frame_rw(gpa >> PAGE_SHIFT);
+        if ( vvmcs ) 
+            __set_vvmcs(vvmcs, NVMX_LAUNCH_STATE, 0);
+        hvm_unmap_guest_frame(vvmcs);
+    }
 
     vmreturn(regs, VMSUCCEED);
-
-out:
     return X86EMUL_OKAY;
 }
 
