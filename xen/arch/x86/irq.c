@@ -32,6 +32,7 @@ unsigned int __read_mostly nr_irqs_gsi = 16;
 unsigned int __read_mostly nr_irqs;
 integer_param("nr_irqs", nr_irqs);
 
+/* This default may be changed by the AMD IOMMU code */
 bool_t __read_mostly opt_irq_perdev_vector_map = 0;
 boolean_param("irq-perdev-vector-map", opt_irq_perdev_vector_map);
 

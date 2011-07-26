@@ -25,6 +25,9 @@
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
 
+extern bool_t __read_mostly opt_irq_perdev_vector_map;
+extern bool_t __read_mostly iommu_amd_perdev_vector_map;
+
 struct amd_iommu *find_iommu_for_device(int bdf)
 {
     BUG_ON ( bdf >= ivrs_bdf_entries );
@@ -146,6 +149,18 @@ int __init amd_iov_detect(void)
     {
         printk("AMD-Vi: Error initialization\n");
         return -ENODEV;
+    }
+
+    /* Enable use of per-device vector map unless otherwise
+     * specified */
+    if ( iommu_amd_perdev_vector_map )
+    {
+        printk("AMD-Vi: Enabling per-device vector maps\n");
+        opt_irq_perdev_vector_map=1;
+    }
+    else
+    {
+        printk("AMD-Vi: WARNING - not enabling per-device vector maps\n");
     }
 
     return scan_pci_devices();
