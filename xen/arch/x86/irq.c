@@ -108,6 +108,8 @@ static int __init __bind_irq_vector(int irq, int vector, cpumask_t cpu_mask)
         per_cpu(vector_irq, cpu)[vector] = irq;
     cfg->vector = vector;
     cfg->cpu_mask = online_mask;
+    if ( cfg->used_vectors )
+        set_bit(vector, cfg->used_vectors);
     irq_status[irq] = IRQ_USED;
     if (IO_APIC_IRQ(irq))
         irq_vector[irq] = vector;
@@ -172,6 +174,7 @@ static void dynamic_irq_cleanup(unsigned int irq)
     desc->depth   = 1;
     desc->msi_desc = NULL;
     desc->handler = &no_irq_type;
+    desc->chip_data->used_vectors=NULL;
     cpus_setall(desc->affinity);
     spin_unlock_irqrestore(&desc->lock, flags);
 
@@ -199,6 +202,9 @@ static void __clear_irq_vector(int irq)
 
     for_each_cpu_mask(cpu, tmp_mask)
         per_cpu(vector_irq, cpu)[vector] = -1;
+
+    if ( cfg->used_vectors )
+        clear_bit(vector, cfg->used_vectors);
 
     cfg->vector = IRQ_VECTOR_UNASSIGNED;
     cpus_clear(cfg->cpu_mask);
@@ -277,6 +283,7 @@ static void __init init_one_irq_cfg(struct irq_cfg *cfg)
     cfg->vector = IRQ_VECTOR_UNASSIGNED;
     cpus_clear(cfg->cpu_mask);
     cpus_clear(cfg->old_cpu_mask);
+    cfg->used_vectors = NULL;
 }
 
 int __init init_irq_data(void)
@@ -402,6 +409,10 @@ next:
         if (test_bit(vector, used_vectors))
             goto next;
 
+        if (cfg->used_vectors
+            && test_bit(vector, cfg->used_vectors) )
+            goto next;
+
         for_each_cpu_mask(new_cpu, tmp_mask)
             if (per_cpu(vector_irq, new_cpu)[vector] != -1)
                 goto next;
@@ -417,6 +428,11 @@ next:
             per_cpu(vector_irq, new_cpu)[vector] = irq;
         cfg->vector = vector;
         cpus_copy(cfg->cpu_mask, tmp_mask);
+        if ( cfg->used_vectors )
+        {
+            ASSERT(!test_bit(vector, cfg->used_vectors));
+            set_bit(vector, cfg->used_vectors);
+        }
 
         irq_status[irq] = IRQ_USED;
             if (IO_APIC_IRQ(irq))

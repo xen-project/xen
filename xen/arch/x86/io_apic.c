@@ -449,6 +449,11 @@ fastcall void smp_irq_move_cleanup_interrupt(struct cpu_user_regs *regs)
                  irq, vector, smp_processor_id());
 
         __get_cpu_var(vector_irq)[vector] = -1;
+        if ( cfg->used_vectors )
+        {
+            ASSERT(test_bit(vector, cfg->used_vectors));
+            clear_bit(vector, cfg->used_vectors);
+        }
         cfg->move_cleanup_count--;
 unlock:
         spin_unlock(&desc->lock);

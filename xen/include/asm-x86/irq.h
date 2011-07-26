@@ -24,11 +24,16 @@
 #define irq_to_desc(irq)    (&irq_desc[irq])
 #define irq_cfg(irq)        (&irq_cfg[irq])
 
+typedef struct {
+    DECLARE_BITMAP(_bits,NR_VECTORS);
+} vmask_t;
+
 struct irq_cfg {
         int  vector;
         cpumask_t cpu_mask;
         cpumask_t old_cpu_mask;
         unsigned move_cleanup_count;
+        vmask_t *used_vectors;
         u8 move_in_progress : 1;
 };
 
