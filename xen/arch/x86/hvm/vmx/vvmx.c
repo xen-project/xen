@@ -1070,11 +1070,17 @@ int nvmx_handle_vmresume(struct cpu_user_regs *regs)
     int launched;
     struct vcpu *v = current;
 
+    if ( vcpu_nestedhvm(v).nv_vvmcxaddr == VMCX_EADDR )
+    {
+        vmreturn (regs, VMFAIL_INVALID);
+        return X86EMUL_OKAY;        
+    }
+
     launched = __get_vvmcs(vcpu_nestedhvm(v).nv_vvmcx,
                            NVMX_LAUNCH_STATE);
     if ( !launched ) {
        vmreturn (regs, VMFAIL_VALID);
-       return X86EMUL_EXCEPTION;
+       return X86EMUL_OKAY;
     }
     return nvmx_vmresume(v,regs);
 }
@@ -1085,11 +1091,17 @@ int nvmx_handle_vmlaunch(struct cpu_user_regs *regs)
     int rc;
     struct vcpu *v = current;
 
+    if ( vcpu_nestedhvm(v).nv_vvmcxaddr == VMCX_EADDR )
+    {
+        vmreturn (regs, VMFAIL_INVALID);
+        return X86EMUL_OKAY;        
+    }
+
     launched = __get_vvmcs(vcpu_nestedhvm(v).nv_vvmcx,
                            NVMX_LAUNCH_STATE);
     if ( launched ) {
        vmreturn (regs, VMFAIL_VALID);
-       rc = X86EMUL_EXCEPTION;
+       return X86EMUL_OKAY;
     }
     else {
         rc = nvmx_vmresume(v,regs);
