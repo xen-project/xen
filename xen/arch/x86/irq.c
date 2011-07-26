@@ -32,6 +32,9 @@ unsigned int __read_mostly nr_irqs_gsi = 16;
 unsigned int __read_mostly nr_irqs;
 integer_param("nr_irqs", nr_irqs);
 
+bool_t __read_mostly opt_irq_perdev_vector_map = 0;
+boolean_param("irq-perdev-vector-map", opt_irq_perdev_vector_map);
+
 u8 __read_mostly *irq_vector;
 struct irq_desc __read_mostly *irq_desc = NULL;
 
@@ -1654,6 +1657,9 @@ int map_domain_pirq(
             dprintk(XENLOG_G_ERR, "dom%d: irq %d in use\n",
               d->domain_id, irq);
         desc->handler = &pci_msi_type;
+        if ( opt_irq_perdev_vector_map
+             && !desc->chip_data->used_vectors )
+            desc->chip_data->used_vectors = &pdev->info.used_vectors;
         set_domain_irq_pirq(d, irq, info);
         setup_msi_irq(pdev, msi_desc, irq);
         spin_unlock_irqrestore(&desc->lock, flags);
