@@ -1480,6 +1480,7 @@ int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm)
 	if ( (acpi_id >= MAX_MADT_ENTRIES) ||
 	     (apic_id >= MAX_APICS) ||
 	     (pxm >= 256) )
+		return -EINVAL;
 
 	/* Detect if the cpu has been added before */
 	if ( x86_acpiid_to_apicid[acpi_id] != 0xff)
