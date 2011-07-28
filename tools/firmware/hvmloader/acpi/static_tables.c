@@ -18,7 +18,6 @@
 
 #include "acpi2_0.h"
 #include "../config.h"
-#include <xen/hvm/ioreq.h>
 
 /*
  * Firmware ACPI Control Structure (FACS).

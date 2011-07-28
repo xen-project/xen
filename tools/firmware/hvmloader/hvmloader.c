@@ -26,6 +26,7 @@
 #include "pci_regs.h"
 #include "option_rom.h"
 #include "apic_regs.h"
+#include "acpi/acpi2_0.h"
 #include <xen/version.h>
 #include <xen/hvm/params.h>
 
@@ -379,6 +380,25 @@ static const struct bios_config *detect_bios(void)
     return NULL;
 }
 
+static void acpi_enable_sci(void)
+{
+    uint8_t pm1a_cnt_val;
+
+#define PIIX4_SMI_CMD_IOPORT 0xb2
+#define PIIX4_ACPI_ENABLE    0xf1
+
+    /*
+     * PIIX4 emulation in QEMU has SCI_EN=0 by default. We have no legacy
+     * SMM implementation, so give ACPI control to the OSPM immediately.
+     */
+    pm1a_cnt_val = inb(ACPI_PM1A_CNT_BLK_ADDRESS_V1);
+    if ( !(pm1a_cnt_val & ACPI_PM1C_SCI_EN) )
+        outb(PIIX4_SMI_CMD_IOPORT, PIIX4_ACPI_ENABLE);
+
+    pm1a_cnt_val = inb(ACPI_PM1A_CNT_BLK_ADDRESS_V1);
+    BUG_ON(!(pm1a_cnt_val & ACPI_PM1C_SCI_EN));
+}
+
 int main(void)
 {
     const struct bios_config *bios;
@@ -480,6 +500,8 @@ int main(void)
             printf("Loading ACPI ...\n");
             bios->acpi_build_tables();
         }
+
+        acpi_enable_sci();
 
         hypercall_hvm_op(HVMOP_set_param, &p);
     }

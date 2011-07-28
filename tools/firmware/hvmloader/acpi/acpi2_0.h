@@ -20,6 +20,7 @@
 
 #include <stdint.h>
 #include <xen/xen.h>
+#include <xen/hvm/ioreq.h>
 
 #define ASCII32(a,b,c,d)         \
     (((a) <<  0) | ((b) <<  8) | ((c) << 16) | ((d) << 24))
@@ -251,6 +252,9 @@ struct acpi_20_fadt {
 #define ACPI_HEADLESS       (1 << 12)
 #define ACPI_CPU_SW_SLP     (1 << 13)
 #define ACPI_USE_PLATFORM_CLOCK (1 << 15)
+
+/* PM1 Control Register Bits */
+#define ACPI_PM1C_SCI_EN    (1 << 0)
 
 /*
  * Firmware ACPI Control Structure (FACS).
