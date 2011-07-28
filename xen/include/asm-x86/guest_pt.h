@@ -177,6 +177,11 @@ static inline guest_l4e_t guest_l4e_from_gfn(gfn_t gfn, u32 flags)
 
 #endif /* GUEST_PAGING_LEVELS != 2 */
 
+/* Mask of the GFNs covered by an L2 or L3 superpage */
+#define GUEST_L2_GFN_MASK (GUEST_L1_PAGETABLE_ENTRIES - 1)
+#define GUEST_L3_GFN_MASK \
+    ((GUEST_L2_PAGETABLE_ENTRIES * GUEST_L1_PAGETABLE_ENTRIES) - 1)
+
 
 /* Which pagetable features are supported on this vcpu? */
 
@@ -191,6 +196,12 @@ guest_supports_superpages(struct vcpu *v)
             : (GUEST_PAGING_LEVELS != 2 
                || !hvm_paging_enabled(v)
                || (v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_PSE)));
+}
+
+static inline int
+guest_supports_1G_superpages(struct vcpu *v)
+{
+    return (GUEST_PAGING_LEVELS >= 4 && hvm_pse1gb_supported(v->domain));
 }
 
 static inline int

@@ -219,10 +219,15 @@ int hvm_girq_dest_2_vcpu_id(struct domain *d, uint8_t dest, uint8_t dest_mode);
 #define hvm_nx_enabled(v) \
     (!!((v)->arch.hvm_vcpu.guest_efer & EFER_NX))
 
+/* Can we use superpages in the HAP p2m table? */
 #define hvm_hap_has_1gb(d) \
     (hvm_funcs.hap_capabilities & HVM_HAP_SUPERPAGE_1GB)
 #define hvm_hap_has_2mb(d) \
     (hvm_funcs.hap_capabilities & HVM_HAP_SUPERPAGE_2MB)
+
+/* Can the guest use 1GB superpages in its own pagetables? */
+#define hvm_pse1gb_supported(d) \
+    (cpu_has_page1gb && paging_mode_hap(d))
 
 #ifdef __x86_64__
 #define hvm_long_mode_enabled(v) \

@@ -2385,6 +2385,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                                    unsigned int *ecx, unsigned int *edx)
 {
     struct vcpu *v = current;
+    struct domain *d = v->domain;
     unsigned int count = *ecx;
 
     if ( cpuid_viridian_leaves(input, eax, ebx, ecx, edx) )
@@ -2393,7 +2394,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
     if ( cpuid_hypervisor_leaves(input, count, eax, ebx, ecx, edx) )
         return;
 
-    domain_cpuid(v->domain, input, *ecx, eax, ebx, ecx, edx);
+    domain_cpuid(d, input, *ecx, eax, ebx, ecx, edx);
 
     switch ( input )
     {
@@ -2429,7 +2430,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
             {
                 if ( !(v->arch.xcr0 & (1ULL << sub_leaf)) )
                     continue;
-                domain_cpuid(v->domain, input, sub_leaf, &_eax, &_ebx, &_ecx, 
+                domain_cpuid(d, input, sub_leaf, &_eax, &_ebx, &_ecx, 
                              &_edx);
                 if ( (_eax + _ebx) > *ebx )
                     *ebx = _eax + _ebx;
@@ -2440,9 +2441,12 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
     case 0x80000001:
         /* We expose RDTSCP feature to guest only when
            tsc_mode == TSC_MODE_DEFAULT and host_tsc_is_safe() returns 1 */
-        if ( v->domain->arch.tsc_mode != TSC_MODE_DEFAULT ||
+        if ( d->arch.tsc_mode != TSC_MODE_DEFAULT ||
              !host_tsc_is_safe() )
             *edx &= ~cpufeat_mask(X86_FEATURE_RDTSCP);
+        /* Hide 1GB-superpage feature if we can't emulate it. */
+        if (!hvm_pse1gb_supported(d))
+            *edx &= ~cpufeat_mask(X86_FEATURE_PAGE1GB);
         break;
     }
 }

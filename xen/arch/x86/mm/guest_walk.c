@@ -134,7 +134,8 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
     guest_l4e_t *l4p;
 #endif
     uint32_t gflags, mflags, iflags, rc = 0;
-    int pse, smep;
+    int smep;
+    bool_t pse1G = 0, pse2M = 0;
 
     perfc_incr(guest_walk);
     memset(gw, 0, sizeof(*gw));
@@ -181,6 +182,37 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
     rc |= ((gflags & mflags) ^ mflags);
     if ( rc & _PAGE_PRESENT )
         goto out;
+    
+    pse1G = (gflags & _PAGE_PSE) && guest_supports_1G_superpages(v); 
+
+    if ( pse1G )
+    {
+        /* Generate a fake l1 table entry so callers don't all 
+         * have to understand superpages. */
+        gfn_t start = guest_l3e_get_gfn(gw->l3e);
+        /* Grant full access in the l1e, since all the guest entry's
+         * access controls are enforced in the l3e. */
+        int flags = (_PAGE_PRESENT|_PAGE_USER|_PAGE_RW|
+                     _PAGE_ACCESSED|_PAGE_DIRTY);
+        /* Import cache-control bits. Note that _PAGE_PAT is actually
+         * _PAGE_PSE, and it is always set. We will clear it in case
+         * _PAGE_PSE_PAT (bit 12, i.e. first bit of gfn) is clear. */
+        flags |= (guest_l3e_get_flags(gw->l3e)
+                  & (_PAGE_PAT|_PAGE_PWT|_PAGE_PCD));
+        if ( !(gfn_x(start) & 1) )
+            /* _PAGE_PSE_PAT not set: remove _PAGE_PAT from flags. */
+            flags &= ~_PAGE_PAT;
+
+        if ( gfn_x(start) & GUEST_L3_GFN_MASK & ~0x1 )
+            rc |= _PAGE_INVALID_BITS;
+
+        /* Increment the pfn by the right number of 4k pages. */
+        start = _gfn((gfn_x(start) & ~GUEST_L3_GFN_MASK) +
+                     ((va >> PAGE_SHIFT) & GUEST_L3_GFN_MASK));
+        gw->l1e = guest_l1e_from_gfn(start, flags);
+        gw->l2mfn = gw->l1mfn = _mfn(INVALID_MFN);
+        goto set_ad;
+    }
 
 #else /* PAE only... */
 
@@ -219,10 +251,9 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
     if ( rc & _PAGE_PRESENT )
         goto out;
 
-    pse = (guest_supports_superpages(v) && 
-           (guest_l2e_get_flags(gw->l2e) & _PAGE_PSE)); 
+    pse2M = (gflags & _PAGE_PSE) && guest_supports_superpages(v); 
 
-    if ( pse )
+    if ( pse2M )
     {
         /* Special case: this guest VA is in a PSE superpage, so there's
          * no guest l1e.  We make one up so that the propagation code
@@ -242,9 +273,7 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
             /* _PAGE_PSE_PAT not set: remove _PAGE_PAT from flags. */
             flags &= ~_PAGE_PAT;
 
-#define GUEST_L2_GFN_ALIGN (1 << (GUEST_L2_PAGETABLE_SHIFT - \
-                                  GUEST_L1_PAGETABLE_SHIFT))
-        if ( gfn_x(start) & (GUEST_L2_GFN_ALIGN - 1) & ~0x1 )
+        if ( gfn_x(start) & GUEST_L2_GFN_MASK & ~0x1 )
         {
 #if GUEST_PAGING_LEVELS == 2
             /*
@@ -262,7 +291,7 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
 
         /* Increment the pfn by the right number of 4k pages.  
          * Mask out PAT and invalid bits. */
-        start = _gfn((gfn_x(start) & ~(GUEST_L2_GFN_ALIGN - 1)) +
+        start = _gfn((gfn_x(start) & ~GUEST_L2_GFN_MASK) +
                      guest_l1_table_offset(va));
         gw->l1e = guest_l1e_from_gfn(start, flags);
         gw->l1mfn = _mfn(INVALID_MFN);
@@ -282,6 +311,9 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
         rc |= ((gflags & mflags) ^ mflags);
     }
 
+#if GUEST_PAGING_LEVELS >= 4 /* 64-bit only... */
+set_ad:
+#endif
     /* Now re-invert the user-mode requirement for SMEP. */
     if ( smep ) 
         rc ^= _PAGE_USER;
@@ -295,17 +327,21 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
 #if GUEST_PAGING_LEVELS == 4 /* 64-bit only... */
         if ( set_ad_bits(l4p + guest_l4_table_offset(va), &gw->l4e, 0) )
             paging_mark_dirty(d, mfn_x(gw->l4mfn));
-        if ( set_ad_bits(l3p + guest_l3_table_offset(va), &gw->l3e, 0) )
+        if ( set_ad_bits(l3p + guest_l3_table_offset(va), &gw->l3e,
+                         (pse1G && (pfec & PFEC_write_access))) )
             paging_mark_dirty(d, mfn_x(gw->l3mfn));
 #endif
-        if ( set_ad_bits(l2p + guest_l2_table_offset(va), &gw->l2e,
-                         (pse && (pfec & PFEC_write_access))) )
-            paging_mark_dirty(d, mfn_x(gw->l2mfn));            
-        if ( !pse ) 
+        if ( !pse1G ) 
         {
-            if ( set_ad_bits(l1p + guest_l1_table_offset(va), &gw->l1e, 
-                             (pfec & PFEC_write_access)) )
-                paging_mark_dirty(d, mfn_x(gw->l1mfn));
+            if ( set_ad_bits(l2p + guest_l2_table_offset(va), &gw->l2e,
+                             (pse2M && (pfec & PFEC_write_access))) )
+                paging_mark_dirty(d, mfn_x(gw->l2mfn));            
+            if ( !pse2M ) 
+            {
+                if ( set_ad_bits(l1p + guest_l1_table_offset(va), &gw->l1e, 
+                                 (pfec & PFEC_write_access)) )
+                    paging_mark_dirty(d, mfn_x(gw->l1mfn));
+            }
         }
     }
 
