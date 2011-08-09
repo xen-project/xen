@@ -715,13 +715,7 @@ int erst_clear(u64 record_id)
 
 static int __init erst_check_table(struct acpi_table_erst *erst_tab)
 {
-	/*
-	 * Some old BIOSes include the ACPI standard header in the ERST header
-	 * length; new BIOSes do not. Our check allows for both methods.
-	 */
-	if ((erst_tab->header_length !=
-	    (sizeof(struct acpi_table_erst) - sizeof(erst_tab->header)))
-	    && (erst_tab->header_length != sizeof(struct acpi_table_erst)))
+	if (erst_tab->header_length != sizeof(struct acpi_table_erst))
 		return -EINVAL;
 	if (erst_tab->header.length < sizeof(struct acpi_table_erst))
 		return -EINVAL;
