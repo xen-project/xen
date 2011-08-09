@@ -315,7 +315,7 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 {
 	struct domain *domain;
 	char *vec[3];
-	unsigned int domid, target;
+	unsigned int domid;
 	unsigned long mfn;
 	evtchn_port_t port;
 	int rc;
@@ -326,7 +326,7 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 		return;
 	}
 
-	if (!conn->can_write) {
+	if (conn->id != 0 || !conn->can_write) {
 		send_error(conn, EACCES);
 		return;
 	}
@@ -340,26 +340,19 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 		send_error(conn, EINVAL);
 		return;
 	}
-	/* Allow guest to reset all watches */
-	if (domid != DOMID_SELF && conn->id != 0) {
-		send_error(conn, EACCES);
-		return;
-	}
 
-	target = domid == DOMID_SELF ? conn->id : domid;
-
-	domain = find_domain_by_domid(target);
+	domain = find_domain_by_domid(domid);
 
 	if (domain == NULL) {
 		interface = xc_map_foreign_range(
-			*xc_handle, target,
+			*xc_handle, domid,
 			getpagesize(), PROT_READ|PROT_WRITE, mfn);
 		if (!interface) {
 			send_error(conn, errno);
 			return;
 		}
 		/* Hang domain off "in" until we're finished. */
-		domain = new_domain(in, target, port);
+		domain = new_domain(in, domid, port);
 		if (!domain) {
 			munmap(interface, getpagesize());
 			send_error(conn, errno);
@@ -372,11 +365,11 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 		talloc_steal(domain->conn, domain);
 
 		fire_watches(NULL, "@introduceDomain", false);
-	} else if ((domain->mfn == mfn) && ((domain->conn != conn) || domid == DOMID_SELF)) {
+	} else if ((domain->mfn == mfn) && (domain->conn != conn)) {
 		/* Use XS_INTRODUCE for recreating the xenbus event-channel. */
 		if (domain->port)
 			xc_evtchn_unbind(xce_handle, domain->port);
-		rc = xc_evtchn_bind_interdomain(xce_handle, target, port);
+		rc = xc_evtchn_bind_interdomain(xce_handle, domid, port);
 		domain->port = (rc == -1) ? 0 : rc;
 		domain->remote_port = port;
 	} else {
