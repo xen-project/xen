@@ -25,7 +25,6 @@ struct bios_config {
     void (*bios_info_setup)(void);
     void (*bios_info_finish)(void);
 
-    void (*vm86_setup)(void);
     void (*e820_setup)(void);
 
     void (*acpi_build_tables)(void);

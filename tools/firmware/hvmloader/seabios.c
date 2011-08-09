@@ -143,7 +143,6 @@ struct bios_config seabios_config = {
     .bios_info_setup = seabios_setup_bios_info,
     .bios_info_finish = seabios_finish_bios_info,
 
-    .vm86_setup = NULL,
     .e820_setup = seabios_setup_e820,
 
     .acpi_build_tables = seabios_acpi_build_tables,

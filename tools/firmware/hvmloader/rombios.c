@@ -40,25 +40,6 @@
 #define ROMBIOS_MAXOFFSET      0x0000FFFF
 #define ROMBIOS_END            (ROMBIOS_BEGIN + ROMBIOS_SIZE)
 
-/*
- * Set up an empty TSS area for virtual 8086 mode to use. 
- * The only important thing is that it musn't have any bits set 
- * in the interrupt redirection bitmap, so all zeros will do.
- */
-static void rombios_init_vm86_tss(void)
-{
-    void *tss;
-    struct xen_hvm_param p;
-
-    tss = mem_alloc(128, 128);
-    memset(tss, 0, 128);
-    p.domid = DOMID_SELF;
-    p.index = HVM_PARAM_VM86_TSS;
-    p.value = virt_to_phys(tss);
-    hypercall_hvm_op(HVMOP_set_param, &p);
-    printf("vm86 TSS at %08lx\n", virt_to_phys(tss));
-}
-
 static void rombios_setup_e820(void)
 {
     /*
@@ -178,7 +159,6 @@ struct bios_config rombios_config =  {
     .bios_info_setup = rombios_setup_bios_info,
     .bios_info_finish = NULL,
 
-    .vm86_setup = rombios_init_vm86_tss,
     .e820_setup = rombios_setup_e820,
 
     .acpi_build_tables = rombios_acpi_build_tables,
