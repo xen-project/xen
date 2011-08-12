@@ -461,7 +461,7 @@ static hw_irq_controller iommu_msi_type = {
 
 static void parse_event_log_entry(u32 entry[])
 {
-    u16 domain_id, device_id;
+    u16 domain_id, device_id, bdf, cword;
     u32 code;
     u64 *addr;
     char * event_str[] = {"ILLEGAL_DEV_TABLE_ENTRY",
@@ -496,6 +496,18 @@ static void parse_event_log_entry(u32 entry[])
                "%s: domain = %d, device id = 0x%04x, "
                "fault address = 0x%"PRIx64"\n",
                event_str[code-1], domain_id, device_id, *addr);
+
+        /* Tell the device to stop DMAing; we can't rely on the guest to
+         * control it for us. */
+        for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )
+            if ( get_requestor_id(bdf) == device_id ) 
+            {
+                cword = pci_conf_read16(PCI_BUS(bdf), PCI_SLOT(bdf), 
+                                PCI_FUNC(bdf), PCI_COMMAND);
+                pci_conf_write16(PCI_BUS(bdf), PCI_SLOT(bdf), 
+                                 PCI_FUNC(bdf), PCI_COMMAND, 
+                                 cword & ~PCI_COMMAND_MASTER);
+            }
     }
     else
     {
