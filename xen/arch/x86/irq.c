@@ -216,6 +216,7 @@ static void __clear_irq_vector(int irq)
 
     if (likely(!cfg->move_in_progress))
         return;
+    cpus_and(tmp_mask, cfg->old_cpu_mask, cpu_online_map);
     for_each_cpu_mask(cpu, tmp_mask) {
         for (vector = FIRST_DYNAMIC_VECTOR; vector <= LAST_DYNAMIC_VECTOR;
                                 vector++) {
