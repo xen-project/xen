@@ -499,6 +499,12 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 	if (c->x86 > 0xf && !cpu_has_amd_erratum(c, AMD_ERRATUM_400))
 		set_bit(X86_FEATURE_ARAT, c->x86_capability);
 
+	if (cpuid_edx(0x80000007) & (1 << 10)) {
+		rdmsr(MSR_K7_HWCR, l, h);
+		l |= (1 << 27); /* Enable read-only APERF/MPERF bit */
+		wrmsr(MSR_K7_HWCR, l, h);
+	}
+
 	/* Prevent TSC drift in non single-processor, single-core platforms. */
 	if ((smp_processor_id() == 1) && c1_ramping_may_cause_clock_drift(c))
 		disable_c1_ramping();
