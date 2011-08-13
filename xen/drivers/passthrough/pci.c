@@ -146,6 +146,7 @@ void pci_enable_acs(struct pci_dev *pdev)
 int pci_add_device(u8 bus, u8 devfn, const struct pci_dev_info *info)
 {
     struct pci_dev *pdev;
+    unsigned int slot = PCI_SLOT(devfn), func = PCI_FUNC(devfn);
     const char *pdev_type;
     int ret = -ENOMEM;
 
@@ -154,7 +155,14 @@ int pci_add_device(u8 bus, u8 devfn, const struct pci_dev_info *info)
     else if (info->is_extfn)
         pdev_type = "extended function";
     else if (info->is_virtfn)
+    {
+        spin_lock(&pcidevs_lock);
+        pdev = pci_get_pdev(info->physfn.bus, info->physfn.devfn);
+        spin_unlock(&pcidevs_lock);
+        if ( !pdev )
+            pci_add_device(info->physfn.bus, info->physfn.devfn, NULL);
         pdev_type = "virtual function";
+    }
     else
         return -EINVAL;
 
@@ -165,6 +173,70 @@ int pci_add_device(u8 bus, u8 devfn, const struct pci_dev_info *info)
 
     if ( info )
         pdev->info = *info;
+    else if ( !pdev->vf_rlen[0] )
+    {
+        unsigned int pos = pci_find_ext_capability(0, bus, devfn,
+                                                   PCI_EXT_CAP_ID_SRIOV);
+        u16 ctrl = pci_conf_read16(bus, slot, func, pos + PCI_SRIOV_CTRL);
+
+        if ( !pos )
+            /* Nothing */;
+        else if ( !(ctrl & (PCI_SRIOV_CTRL_VFE | PCI_SRIOV_CTRL_MSE)) )
+        {
+            unsigned int i;
+
+            BUILD_BUG_ON(ARRAY_SIZE(pdev->vf_rlen) != PCI_SRIOV_NUM_BARS);
+            for ( i = 0; i < PCI_SRIOV_NUM_BARS; ++i )
+            {
+                unsigned int idx = pos + PCI_SRIOV_BAR + i * 4;
+                u32 bar = pci_conf_read32(bus, slot, func, idx);
+                u32 hi = 0;
+
+                if ( (bar & PCI_BASE_ADDRESS_SPACE) ==
+                     PCI_BASE_ADDRESS_SPACE_IO )
+                {
+                    printk(XENLOG_WARNING "SR-IOV device %02x:%02x.%x with vf"
+                                          " BAR%u in IO space\n",
+                           bus, slot, func, i);
+                    continue;
+                }
+                pci_conf_write32(bus, slot, func, idx, ~0);
+                if ( (bar & PCI_BASE_ADDRESS_MEM_TYPE_MASK) ==
+                     PCI_BASE_ADDRESS_MEM_TYPE_64 )
+                {
+                    if ( i >= PCI_SRIOV_NUM_BARS )
+                    {
+                        printk(XENLOG_WARNING "SR-IOV device %02x:%02x.%x with"
+                                              " 64-bit vf BAR in last slot\n",
+                               bus, slot, func);
+                        break;
+                    }
+                    hi = pci_conf_read32(bus, slot, func, idx + 4);
+                    pci_conf_write32(bus, slot, func, idx + 4, ~0);
+                }
+                pdev->vf_rlen[i] = pci_conf_read32(bus, slot, func, idx) &
+                                   PCI_BASE_ADDRESS_MEM_MASK;
+                if ( (bar & PCI_BASE_ADDRESS_MEM_TYPE_MASK) ==
+                     PCI_BASE_ADDRESS_MEM_TYPE_64 )
+                {
+                    pdev->vf_rlen[i] |= (u64)pci_conf_read32(bus, slot, func,
+                                                             idx + 4) << 32;
+                    pci_conf_write32(bus, slot, func, idx + 4, hi);
+                }
+                else if ( pdev->vf_rlen[i] )
+                    pdev->vf_rlen[i] |= (u64)~0 << 32;
+                pci_conf_write32(bus, slot, func, idx, bar);
+                pdev->vf_rlen[i] = -pdev->vf_rlen[i];
+                if ( (bar & PCI_BASE_ADDRESS_MEM_TYPE_MASK) ==
+                     PCI_BASE_ADDRESS_MEM_TYPE_64 )
+                    ++i;
+            }
+        }
+        else
+            printk(XENLOG_WARNING "SR-IOV device %02x:%02x.%x has its virtual"
+                                  " functions already enabled (%04x)\n",
+                   bus, slot, func, ctrl);
+    }
 
     ret = 0;
     if ( !pdev->domain )
@@ -184,7 +256,7 @@ int pci_add_device(u8 bus, u8 devfn, const struct pci_dev_info *info)
 out:
     spin_unlock(&pcidevs_lock);
     printk(XENLOG_DEBUG "PCI add %s %02x:%02x.%x\n", pdev_type,
-           bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+           bus, slot, func);
     return ret;
 }
 

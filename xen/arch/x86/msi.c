@@ -522,12 +522,48 @@ static int msi_capability_init(struct pci_dev *dev,
     return 0;
 }
 
-static u64 read_pci_mem_bar(u8 bus, u8 slot, u8 func, u8 bir)
+static u64 read_pci_mem_bar(u8 bus, u8 slot, u8 func, u8 bir, int vf)
 {
     u8 limit;
-    u32 addr;
+    u32 addr, base = PCI_BASE_ADDRESS_0, disp = 0;
 
-    switch ( pci_conf_read8(bus, slot, func, PCI_HEADER_TYPE) & 0x7f )
+    if ( vf >= 0 )
+    {
+        struct pci_dev *pdev = pci_get_pdev(bus, PCI_DEVFN(slot, func));
+        unsigned int pos = pci_find_ext_capability(0, bus,
+                                                   PCI_DEVFN(slot, func),
+                                                   PCI_EXT_CAP_ID_SRIOV);
+        u16 ctrl = pci_conf_read16(bus, slot, func, pos + PCI_SRIOV_CTRL);
+        u16 num_vf = pci_conf_read16(bus, slot, func, pos + PCI_SRIOV_NUM_VF);
+        u16 offset = pci_conf_read16(bus, slot, func,
+                                     pos + PCI_SRIOV_VF_OFFSET);
+        u16 stride = pci_conf_read16(bus, slot, func,
+                                     pos + PCI_SRIOV_VF_STRIDE);
+
+        if ( !pdev || !pos ||
+             !(ctrl & PCI_SRIOV_CTRL_VFE) ||
+             !(ctrl & PCI_SRIOV_CTRL_MSE) ||
+             !num_vf || !offset || (num_vf > 1 && !stride) ||
+             bir >= PCI_SRIOV_NUM_BARS ||
+             !pdev->vf_rlen[bir] )
+            return 0;
+        base = pos + PCI_SRIOV_BAR;
+        vf -= PCI_BDF(bus, slot, func) + offset;
+        if ( vf < 0 || (vf && vf % stride) )
+            return 0;
+        if ( stride )
+        {
+            if ( vf % stride )
+                return 0;
+            vf /= stride;
+        }
+        if ( vf >= num_vf )
+            return 0;
+        BUILD_BUG_ON(ARRAY_SIZE(pdev->vf_rlen) != PCI_SRIOV_NUM_BARS);
+        disp = vf * pdev->vf_rlen[bir];
+        limit = PCI_SRIOV_NUM_BARS;
+    }
+    else switch ( pci_conf_read8(bus, slot, func, PCI_HEADER_TYPE) & 0x7f )
     {
     case PCI_HEADER_TYPE_NORMAL:
         limit = 6;
@@ -544,7 +580,7 @@ static u64 read_pci_mem_bar(u8 bus, u8 slot, u8 func, u8 bir)
 
     if ( bir >= limit )
         return 0;
-    addr = pci_conf_read32(bus, slot, func, PCI_BASE_ADDRESS_0 + bir * 4);
+    addr = pci_conf_read32(bus, slot, func, base + bir * 4);
     if ( (addr & PCI_BASE_ADDRESS_SPACE) == PCI_BASE_ADDRESS_SPACE_IO )
         return 0;
     if ( (addr & PCI_BASE_ADDRESS_MEM_TYPE_MASK) == PCI_BASE_ADDRESS_MEM_TYPE_64 )
@@ -552,11 +588,10 @@ static u64 read_pci_mem_bar(u8 bus, u8 slot, u8 func, u8 bir)
         addr &= PCI_BASE_ADDRESS_MEM_MASK;
         if ( ++bir >= limit )
             return 0;
-        return addr |
-               ((u64)pci_conf_read32(bus, slot, func,
-                                     PCI_BASE_ADDRESS_0 + bir * 4) << 32);
+        return addr + disp +
+               ((u64)pci_conf_read32(bus, slot, func, base + bir * 4) << 32);
     }
-    return addr & PCI_BASE_ADDRESS_MEM_MASK;
+    return (addr & PCI_BASE_ADDRESS_MEM_MASK) + disp;
 }
 
 /**
@@ -629,11 +664,29 @@ static int msix_capability_init(struct pci_dev *dev,
 
     if ( !dev->msix_nr_entries )
     {
+        u8 pbus, pslot, pfunc;
+        int vf;
         u64 pba_paddr;
         u32 pba_offset;
 
+        if ( !dev->info.is_virtfn )
+        {
+            pbus = bus;
+            pslot = slot;
+            pfunc = func;
+            vf = -1;
+        }
+        else
+        {
+            pbus = dev->info.physfn.bus;
+            pslot = PCI_SLOT(dev->info.physfn.devfn);
+            pfunc = PCI_FUNC(dev->info.physfn.devfn);
+            vf = PCI_BDF2(dev->bus, dev->devfn);
+        }
+
         ASSERT(!dev->msix_used_entries);
-        WARN_ON(msi->table_base != read_pci_mem_bar(bus, slot, func, bir));
+        WARN_ON(msi->table_base !=
+                read_pci_mem_bar(pbus, pslot, pfunc, bir, vf));
 
         dev->msix_nr_entries = nr_entries;
         dev->msix_table.first = PFN_DOWN(table_paddr);
@@ -645,7 +698,7 @@ static int msix_capability_init(struct pci_dev *dev,
         pba_offset = pci_conf_read32(bus, slot, func,
                                      msix_pba_offset_reg(pos));
         bir = (u8)(pba_offset & PCI_MSIX_BIRMASK);
-        pba_paddr = read_pci_mem_bar(bus, slot, func, bir);
+        pba_paddr = read_pci_mem_bar(pbus, pslot, pfunc, bir, vf);
         WARN_ON(!pba_paddr);
         pba_paddr += pba_offset & ~PCI_MSIX_BIRMASK;
 

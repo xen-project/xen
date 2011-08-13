@@ -59,6 +59,7 @@ struct pci_dev {
     const u8 bus;
     const u8 devfn;
     struct pci_dev_info info;
+    u64 vf_rlen[6];
 };
 
 #define for_each_pdev(domain, pdev) \
