@@ -418,13 +418,14 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
         if ( iommu_verbose )
             dprintk(VTDPREFIX, "  flags: INCLUDE_ALL\n");
         /* Only allow one INCLUDE_ALL */
-        if ( include_all )
+        if ( drhd->segment == 0 && include_all )
         {
             dprintk(XENLOG_WARNING VTDPREFIX,
                     "Only one INCLUDE_ALL device scope is allowed\n");
             ret = -EINVAL;
         }
-        include_all = 1;
+        if ( drhd->segment == 0 )
+            include_all = 1;
     }
 
     if ( ret )
@@ -624,13 +625,14 @@ acpi_parse_one_atsr(struct acpi_dmar_entry_header *header)
         if ( iommu_verbose )
             dprintk(VTDPREFIX, "  flags: ALL_PORTS\n");
         /* Only allow one ALL_PORTS */
-        if ( all_ports )
+        if ( atsr->segment == 0 && all_ports )
         {
             dprintk(XENLOG_WARNING VTDPREFIX,
                     "Only one ALL_PORTS device scope is allowed\n");
             ret = -EINVAL;
         }
-        all_ports = 1;
+        if ( atsr->segment == 0 )
+            all_ports = 1;
     }
 
     if ( ret )
