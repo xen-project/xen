@@ -34,6 +34,22 @@
 #ifdef __ia64__
 #define nr_ioapics              iosapic_get_nr_iosapics()
 #define nr_ioapic_registers(i)  iosapic_get_nr_pins(i)
+#define __io_apic_read(apic, reg) \
+    (*IO_APIC_BASE(apic) = reg, *(IO_APIC_BASE(apic)+4))
+#define __io_apic_write(apic, reg, val) \
+    (*IO_APIC_BASE(apic) = reg, *(IO_APIC_BASE(apic)+4) = (val))
+#define __ioapic_read_entry(apic, pin, raw) ({ \
+    struct IO_xAPIC_route_entry _e_; \
+    ASSERT(raw); \
+    ((u32 *)&_e_)[0] = __io_apic_read(apic, 0x10 + 2 * (pin)); \
+    ((u32 *)&_e_)[1] = __io_apic_read(apic, 0x11 + 2 * (pin)); \
+    _e_; \
+})
+#define __ioapic_write_entry(apic, pin, raw, ent) ({ \
+    ASSERT(raw); \
+    __io_apic_write(apic, 0x10 + 2 * (pin), ((u32 *)&_e_)[0]); \
+    __io_apic_write(apic, 0x11 + 2 * (pin), ((u32 *)&_e_)[1]); \
+})
 #else
 #include <asm/apic.h>
 #include <asm/io_apic.h>
@@ -374,25 +390,12 @@ unsigned int io_apic_read_remap_rte(
     if ( !iommu || !ir_ctrl || ir_ctrl->iremap_maddr == 0 ||
         (ir_ctrl->iremap_num == 0) ||
         ( (index = apic_pin_2_ir_idx[apic][ioapic_pin]) < 0 ) )
-    {
-        *IO_APIC_BASE(apic) = reg;
-        return *(IO_APIC_BASE(apic)+4);
-    }
+        return __io_apic_read(apic, reg);
 
-    if ( rte_upper )
-        reg--;
-
-    /* read lower and upper 32-bits of rte entry */
-    *IO_APIC_BASE(apic) = reg;
-    *(((u32 *)&old_rte) + 0) = *(IO_APIC_BASE(apic)+4);
-    *IO_APIC_BASE(apic) = reg + 1;
-    *(((u32 *)&old_rte) + 1) = *(IO_APIC_BASE(apic)+4);
+    old_rte = __ioapic_read_entry(apic, ioapic_pin, TRUE);
 
     if ( remap_entry_to_ioapic_rte(iommu, index, &old_rte) )
-    {
-        *IO_APIC_BASE(apic) = rte_upper ? (reg + 1) : reg;
-        return *(IO_APIC_BASE(apic)+4);
-    }
+        return __io_apic_read(apic, reg);
 
     if ( rte_upper )
         return (*(((u32 *)&old_rte) + 1));
@@ -413,49 +416,31 @@ void io_apic_write_remap_rte(
 
     if ( !iommu || !ir_ctrl || ir_ctrl->iremap_maddr == 0 )
     {
-        *IO_APIC_BASE(apic) = reg;
-        *(IO_APIC_BASE(apic)+4) = value;
+        __io_apic_write(apic, reg, value);
         return;
     }
 
-    if ( rte_upper )
-        reg--;
-
-    /* read both lower and upper 32-bits of rte entry */
-    *IO_APIC_BASE(apic) = reg;
-    *(((u32 *)&old_rte) + 0) = *(IO_APIC_BASE(apic)+4);
-    *IO_APIC_BASE(apic) = reg + 1;
-    *(((u32 *)&old_rte) + 1) = *(IO_APIC_BASE(apic)+4);
+    old_rte = __ioapic_read_entry(apic, ioapic_pin, TRUE);
 
     remap_rte = (struct IO_APIC_route_remap_entry *) &old_rte;
 
     /* mask the interrupt while we change the intremap table */
     saved_mask = remap_rte->mask;
     remap_rte->mask = 1;
-    *IO_APIC_BASE(apic) = reg;
-    *(IO_APIC_BASE(apic)+4) = *(((int *)&old_rte)+0);
+    __io_apic_write(apic, reg & ~1, *(u32 *)&old_rte);
     remap_rte->mask = saved_mask;
 
     if ( ioapic_rte_to_remap_entry(iommu, apic, ioapic_pin,
                                    &old_rte, rte_upper, value) )
     {
-        *IO_APIC_BASE(apic) = rte_upper ? (reg + 1) : reg;
-        *(IO_APIC_BASE(apic)+4) = value;
+        __io_apic_write(apic, reg, value);
 
         /* Recover the original value of 'mask' bit */
         if ( rte_upper )
-        {
-            *IO_APIC_BASE(apic) = reg;
-            *(IO_APIC_BASE(apic)+4) = *(((u32 *)&old_rte)+0);
-        }
-        return;
+            __io_apic_write(apic, reg & ~1, *(u32 *)&old_rte);
     }
-
-    /* write new entry to ioapic */
-    *IO_APIC_BASE(apic) = reg + 1;
-    *(IO_APIC_BASE(apic)+4) = *(((u32 *)&old_rte)+1);
-    *IO_APIC_BASE(apic) = reg;
-    *(IO_APIC_BASE(apic)+4) = *(((u32 *)&old_rte)+0);
+    else
+        __ioapic_write_entry(apic, ioapic_pin, TRUE, old_rte);
 }
 
 #if defined(__i386__) || defined(__x86_64__)

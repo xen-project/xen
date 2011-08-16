@@ -162,7 +162,8 @@ union entry_union {
     struct IO_APIC_route_entry entry;
 };
 
-static struct IO_APIC_route_entry __ioapic_read_entry(int apic, int pin, int raw)
+struct IO_APIC_route_entry __ioapic_read_entry(
+    unsigned int apic, unsigned int pin, bool_t raw)
 {
     unsigned int (*read)(unsigned int, unsigned int)
         = raw ? __io_apic_read : io_apic_read;
@@ -172,7 +173,8 @@ static struct IO_APIC_route_entry __ioapic_read_entry(int apic, int pin, int raw
     return eu.entry;
 }
 
-static struct IO_APIC_route_entry ioapic_read_entry(int apic, int pin, int raw)
+static struct IO_APIC_route_entry ioapic_read_entry(
+    unsigned int apic, unsigned int pin, bool_t raw)
 {
     struct IO_APIC_route_entry entry;
     unsigned long flags;
@@ -183,8 +185,9 @@ static struct IO_APIC_route_entry ioapic_read_entry(int apic, int pin, int raw)
     return entry;
 }
 
-static void
-__ioapic_write_entry(int apic, int pin, int raw, struct IO_APIC_route_entry e)
+void __ioapic_write_entry(
+    unsigned int apic, unsigned int pin, bool_t raw,
+    struct IO_APIC_route_entry e)
 {
     void (*write)(unsigned int, unsigned int, unsigned int)
         = raw ? __io_apic_write : io_apic_write;
@@ -195,7 +198,9 @@ __ioapic_write_entry(int apic, int pin, int raw, struct IO_APIC_route_entry e)
     (*write)(apic, 0x10 + 2*pin, eu.w1);
 }
 
-static void ioapic_write_entry(int apic, int pin, int raw, struct IO_APIC_route_entry e)
+static void ioapic_write_entry(
+    unsigned int apic, unsigned int pin, bool_t raw,
+    struct IO_APIC_route_entry e)
 {
     unsigned long flags;
     spin_lock_irqsave(&ioapic_lock, flags);

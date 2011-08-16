@@ -261,9 +261,8 @@ static void dump_iommu_info(unsigned char key)
     /* Dump the I/O xAPIC redirection table(s). */
     if ( iommu_enabled )
     {
-        int apic, reg;
+        int apic;
         union IO_APIC_reg_01 reg_01;
-        struct IO_APIC_route_entry rte = { 0 };
         struct IO_APIC_route_remap_entry *remap;
         struct ir_ctrl *ir_ctrl;
 
@@ -277,19 +276,14 @@ static void dump_iommu_info(unsigned char key)
 
             printk( "\nRedirection table of IOAPIC %x:\n", apic);
 
-            reg = 1; /* IO xAPIC Version Register. */
-            *IO_APIC_BASE(apic) = reg;
-            reg_01.raw = *(IO_APIC_BASE(apic)+4);
+            /* IO xAPIC Version Register. */
+            reg_01.raw = __io_apic_read(apic, 1);
 
             printk("  #entry IDX FMT MASK TRIG IRR POL STAT DELI  VECTOR\n");
             for ( i = 0; i <= reg_01.bits.entries; i++ )
             {
-                reg = 0x10 + i*2;
-                *IO_APIC_BASE(apic) = reg;
-                *(((u32 *)&rte) + 0) = *(IO_APIC_BASE(apic)+4);
-
-                *IO_APIC_BASE(apic) = reg + 1;
-                *(((u32 *)&rte) + 1) = *(IO_APIC_BASE(apic)+4);
+                struct IO_APIC_route_entry rte =
+                    __ioapic_read_entry(apic, i, TRUE);
 
                 remap = (struct IO_APIC_route_remap_entry *) &rte;
                 if ( !remap->format )

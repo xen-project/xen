@@ -374,13 +374,6 @@ void amd_iommu_msi_msg_update_ire(
     update_intremap_entry_from_msi_msg(iommu, pdev, msi_desc, msg);
 }
 
-unsigned int amd_iommu_read_ioapic_from_ire(
-    unsigned int apic, unsigned int reg)
-{
-    *IO_APIC_BASE(apic) = reg;
-    return *(IO_APIC_BASE(apic)+4);
-}
-
 void amd_iommu_read_msi_from_ire(
     struct msi_desc *msi_desc, struct msi_msg *msg)
 {
