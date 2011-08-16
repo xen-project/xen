@@ -249,9 +249,6 @@ static void pci_clean_dpci_irqs(struct domain *d)
     if ( !iommu_enabled )
         return;
 
-    if ( !need_iommu(d) )
-        return;
-
     spin_lock(&d->event_lock);
     hvm_irq_dpci = domain_get_irq_dpci(d);
     if ( hvm_irq_dpci != NULL )
