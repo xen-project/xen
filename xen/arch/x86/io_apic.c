@@ -372,14 +372,12 @@ static void eoi_IO_APIC_irq(unsigned int irq)
     spin_unlock_irqrestore(&ioapic_lock, flags);
 }
 
-#define clear_IO_APIC_pin(a,p)     __clear_IO_APIC_pin(a,p,0)
-#define clear_IO_APIC_pin_raw(a,p) __clear_IO_APIC_pin(a,p,1)
-static void __clear_IO_APIC_pin(unsigned int apic, unsigned int pin, int raw)
+static void clear_IO_APIC_pin(unsigned int apic, unsigned int pin)
 {
     struct IO_APIC_route_entry entry;
 
     /* Check delivery_mode to be sure we're not clearing an SMI pin */
-    entry = ioapic_read_entry(apic, pin, raw);
+    entry = __ioapic_read_entry(apic, pin, FALSE);
     if (entry.delivery_mode == dest_SMI)
         return;
 
@@ -388,7 +386,7 @@ static void __clear_IO_APIC_pin(unsigned int apic, unsigned int pin, int raw)
      */
     memset(&entry, 0, sizeof(entry));
     entry.mask = 1;
-    ioapic_write_entry(apic, pin, raw, entry);
+    __ioapic_write_entry(apic, pin, TRUE, entry);
 }
 
 static void clear_IO_APIC (void)
@@ -396,10 +394,8 @@ static void clear_IO_APIC (void)
     int apic, pin;
 
     for (apic = 0; apic < nr_ioapics; apic++) {
-        for (pin = 0; pin < nr_ioapic_registers[apic]; pin++) {
+        for (pin = 0; pin < nr_ioapic_registers[apic]; pin++)
             clear_IO_APIC_pin(apic, pin);
-            clear_IO_APIC_pin_raw(apic, pin);
-        }
     }
 }
 
