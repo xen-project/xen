@@ -520,6 +520,76 @@ fail:		d++;
 	return count;
 }
 
+/**
+ *	dmi_get_date - parse a DMI date
+ *	@field:	data index (see enum dmi_field)
+ *	@yearp: optional out parameter for the year
+ *	@monthp: optional out parameter for the month
+ *	@dayp: optional out parameter for the day
+ *
+ *	The date field is assumed to be in the form resembling
+ *	[mm[/dd]]/yy[yy] and the result is stored in the out
+ *	parameters any or all of which can be omitted.
+ *
+ *	If the field doesn't exist, all out parameters are set to zero
+ *	and false is returned.  Otherwise, true is returned with any
+ *	invalid part of date set to zero.
+ *
+ *	On return, year, month and day are guaranteed to be in the
+ *	range of [0,9999], [0,12] and [0,31] respectively.
+ */
+bool_t __init dmi_get_date(int field, int *yearp, int *monthp, int *dayp)
+{
+	int year = 0, month = 0, day = 0;
+	bool_t exists;
+	const char *s, *e, *y;
+
+	s = field < DMI_STRING_MAX ? dmi_ident[field] : NULL;
+	exists = !!s;
+	if (!exists)
+		goto out;
+
+	/*
+	 * Determine year first.  We assume the date string resembles
+	 * mm/dd/yy[yy] but the original code extracted only the year
+	 * from the end.  Keep the behavior in the spirit of no
+	 * surprises.
+	 */
+	y = strrchr(s, '/');
+	if (!y)
+		goto out;
+
+	y++;
+	year = simple_strtoul(y, &e, 10);
+	if (y != e && year < 100) {	/* 2-digit year */
+		year += 1900;
+		if (year < 1996)	/* no dates < spec 1.0 */
+			year += 100;
+	}
+	if (year > 9999)		/* year should fit in %04d */
+		year = 0;
+
+	/* parse the mm and dd */
+	month = simple_strtoul(s, &e, 10);
+	if (s == e || *e != '/' || !month || month > 12) {
+		month = 0;
+		goto out;
+	}
+
+	s = e + 1;
+	day = simple_strtoul(s, &e, 10);
+	if (s == y || s == e || *e != '/' || day > 31)
+		day = 0;
+out:
+	if (yearp)
+		*yearp = year;
+	if (monthp)
+		*monthp = month;
+	if (dayp)
+		*dayp = day;
+	return exists;
+}
+
 void __init dmi_end_boot(void)
 {
     unsigned int i;

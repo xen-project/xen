@@ -48,6 +48,30 @@
 struct acpi_mcfg_allocation *pci_mmcfg_config;
 int pci_mmcfg_config_num;
 
+static int __init acpi_mcfg_check_entry(struct acpi_table_mcfg *mcfg,
+                                        struct acpi_mcfg_allocation *cfg)
+{
+    int year;
+
+    if (cfg->address < 0xFFFFFFFF)
+        return 0;
+
+    if (!strcmp(mcfg->header.oem_id, "SGI") ||
+        !strcmp(mcfg->header.oem_id, "SGI2"))
+        return 0;
+
+    if (mcfg->header.revision >= 1 &&
+        dmi_get_date(DMI_BIOS_DATE, &year, NULL, NULL) &&
+        year >= 2010)
+            return 0;
+
+    printk(KERN_ERR "MCFG region for %04x:%02x-%02x at %#"PRIx64
+                    " (above 4GB) ignored\n",
+           cfg->pci_segment, cfg->start_bus_number, cfg->end_bus_number,
+           cfg->address);
+    return -EINVAL;
+}
+
 int __init acpi_parse_mcfg(struct acpi_table_header *header)
 {
     struct acpi_table_mcfg *mcfg;
@@ -82,9 +106,7 @@ int __init acpi_parse_mcfg(struct acpi_table_header *header)
            pci_mmcfg_config_num * sizeof(*pci_mmcfg_config));
 
     for (i = 0; i < pci_mmcfg_config_num; ++i) {
-        if (pci_mmcfg_config[i].address > 0xFFFFFFFF) {
-            printk(KERN_ERR PREFIX
-                   "MMCONFIG not in low 4GB of memory\n");
+        if (acpi_mcfg_check_entry(mcfg, &pci_mmcfg_config[i])) {
             xfree(pci_mmcfg_config);
             pci_mmcfg_config_num = 0;
             return -ENODEV;
