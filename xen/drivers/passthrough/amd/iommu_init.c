@@ -500,7 +500,7 @@ static void parse_event_log_entry(u32 entry[])
         /* Tell the device to stop DMAing; we can't rely on the guest to
          * control it for us. */
         for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )
-            if ( get_requestor_id(bdf) == device_id ) 
+            if ( get_dma_requestor_id(bdf) == device_id ) 
             {
                 cword = pci_conf_read16(PCI_BUS(bdf), PCI_SLOT(bdf), 
                                 PCI_FUNC(bdf), PCI_COMMAND);
@@ -772,7 +772,8 @@ static int __init init_ivrs_mapping(void)
         ivrs_mappings[bdf].dte_ext_int_pass = IOMMU_CONTROL_DISABLED;
         ivrs_mappings[bdf].dte_init_pass = IOMMU_CONTROL_DISABLED;
 
-        spin_lock_init(&ivrs_mappings[bdf].intremap_lock);
+        if ( amd_iommu_perdev_intremap )
+            spin_lock_init(&ivrs_mappings[bdf].intremap_lock);
     }
     return 0;
 }

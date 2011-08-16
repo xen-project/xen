@@ -719,7 +719,7 @@ static int update_paging_mode(struct domain *d, unsigned long gfn)
         for_each_pdev( d, pdev )
         {
             bdf = (pdev->bus << 8) | pdev->devfn;
-            req_id = get_requestor_id(bdf);
+            req_id = get_dma_requestor_id(bdf);
             iommu = find_iommu_for_device(bdf);
             if ( !iommu )
             {
