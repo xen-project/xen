@@ -57,6 +57,7 @@ struct pci_dev {
     const u8 bus;
     const u8 devfn;
     struct pci_dev_info info;
+    u64 vf_rlen[6];
 };
 
 #define for_each_pdev(domain, pdev) \
@@ -86,9 +87,8 @@ struct pci_dev *pci_lock_pdev(int bus, int devfn);
 struct pci_dev *pci_lock_domain_pdev(struct domain *d, int bus, int devfn);
 
 void pci_release_devices(struct domain *d);
-int pci_add_device(u8 bus, u8 devfn);
+int pci_add_device(u8 bus, u8 devfn, const struct pci_dev_info *);
 int pci_remove_device(u8 bus, u8 devfn);
-int pci_add_device_ext(u8 bus, u8 devfn, struct pci_dev_info *info);
 struct pci_dev *pci_get_pdev(int bus, int devfn);
 struct pci_dev *pci_get_pdev_by_domain(struct domain *d, int bus, int devfn);
 
