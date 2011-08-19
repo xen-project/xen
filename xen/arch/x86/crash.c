@@ -29,6 +29,7 @@
 #include <asm/io_apic.h>
 #include <xen/iommu.h>
 #include <xen/pci.h>
+#include <asm/hpet.h>
 
 static atomic_t waiting_for_crash_ipi;
 static unsigned int crashing_cpu;
@@ -60,6 +61,9 @@ static void nmi_shootdown_cpus(void)
     unsigned long msecs;
 
     local_irq_disable();
+
+    if ( hpet_broadcast_is_available() )
+        hpet_disable_legacy_broadcast();
 
     crashing_cpu = smp_processor_id();
     local_irq_count(crashing_cpu) = 0;

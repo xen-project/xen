@@ -85,9 +85,6 @@ void machine_kexec(xen_kexec_image_t *image)
         .limit = LAST_RESERVED_GDT_BYTE
     };
 
-    if ( hpet_broadcast_is_available() )
-        hpet_disable_legacy_broadcast();
-
     /* We are about to permenantly jump out of the Xen context into the kexec
      * purgatory code.  We really dont want to be still servicing interupts.
      */
