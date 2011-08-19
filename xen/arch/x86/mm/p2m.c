@@ -1164,7 +1164,6 @@ p2m_get_nestedp2m(struct vcpu *v, uint64_t cr3)
     p2m->cr3 = cr3;
     nv->nv_flushp2m = 0;
     hvm_asid_flush_vcpu(v);
-    nestedhvm_vmcx_flushtlb(p2m);
     cpu_set(v->processor, p2m->p2m_dirty_cpumask);
     p2m_unlock(p2m);
     nestedp2m_unlock(d);
