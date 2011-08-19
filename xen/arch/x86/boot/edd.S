@@ -16,20 +16,12 @@
  * Updated and ported for Xen by Keir Fraser <keir@xensource.com> June 2007
  */
 
+#include <asm/edd.h>
+
         .code16
 
 /* Offset of disc signature in the MBR. */
 #define EDD_MBR_SIG_OFFSET      0x1B8
-
-/* Maximum number of EDD information structures at boot_edd_info. */
-#define EDD_INFO_MAX            6
-
-/* Maximum number of MBR signatures at boot_mbr_signature. */
-#define EDD_MBR_SIG_MAX         16
-
-/* Size of components of EDD information structure. */
-#define EDDEXTSIZE              8
-#define EDDPARMSIZE             74
 
 get_edd:
         cmpb    $2, bootsym(opt_edd)            # edd=off ?

@@ -16,6 +16,7 @@
 #include <xen/stringify.h>
 #include <xen/vga.h>
 #include <asm/e820.h>
+#include <asm/edd.h>
 #include <asm/mm.h>
 #include <asm/msr.h>
 #include <asm/processor.h>
@@ -539,6 +540,18 @@ static void __init split_value(char *s)
     *s = 0;
 }
 
+static void __init edd_put_string(u8 *dst, size_t n, const char *src)
+{
+    while ( n-- && *src )
+       *dst++ = *src++;
+    if ( *src )
+       PrintErrMesg(L"Internal error populating EDD info",
+                    EFI_BUFFER_TOO_SMALL);
+    while ( n-- )
+       *dst++ = ' ';
+}
+#define edd_put_string(d, s) edd_put_string(d, ARRAY_SIZE(d), s)
+
 static int __init set_color(u32 mask, int bpp, u8 *pos, u8 *sz)
 {
    if ( bpp < 0 )
@@ -607,6 +620,8 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 {
     static EFI_GUID __initdata loaded_image_guid = LOADED_IMAGE_PROTOCOL;
     static EFI_GUID __initdata gop_guid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
+    static EFI_GUID __initdata bio_guid = BLOCK_IO_PROTOCOL;
+    static EFI_GUID __initdata devp_guid = DEVICE_PATH_PROTOCOL;
     EFI_LOADED_IMAGE *loaded_image;
     EFI_STATUS status;
     unsigned int i, argc;
@@ -887,7 +902,148 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 
     place_string(&mbi.mem_upper, NULL);
 
-    /* XXX Collect EDD info. */
+    /* Collect EDD info. */
+    BUILD_BUG_ON(offsetof(struct edd_info, edd_device_params) != EDDEXTSIZE);
+    BUILD_BUG_ON(sizeof(struct edd_device_params) != EDDPARMSIZE);
+    size = 0;
+    status = efi_bs->LocateHandle(ByProtocol, &bio_guid, NULL, &size, NULL);
+    if ( status == EFI_BUFFER_TOO_SMALL )
+        status = efi_bs->AllocatePool(EfiLoaderData, size, (void **)&handles);
+    if ( !EFI_ERROR(status) )
+        status = efi_bs->LocateHandle(ByProtocol, &bio_guid, NULL, &size,
+                                      handles);
+    if ( EFI_ERROR(status) )
+        size = 0;
+    for ( i = 0; i < size / sizeof(*handles); ++i )
+    {
+        EFI_BLOCK_IO *bio;
+        EFI_DEV_PATH_PTR devp;
+        struct edd_info *info = boot_edd_info + boot_edd_info_nr;
+        struct edd_device_params *params = &info->edd_device_params;
+        enum { root, acpi, pci, ctrlr } state = root;
+
+        status = efi_bs->HandleProtocol(handles[i], &bio_guid, (void **)&bio);
+        if ( EFI_ERROR(status) ||
+             bio->Media->RemovableMedia ||
+             bio->Media->LogicalPartition )
+            continue;
+        if ( boot_edd_info_nr < EDD_INFO_MAX )
+        {
+            info->device = 0x80 + boot_edd_info_nr; /* fake */
+            info->version = 0x11;
+            params->length = offsetof(struct edd_device_params, dpte_ptr);
+            params->number_of_sectors = bio->Media->LastBlock + 1;
+            params->bytes_per_sector = bio->Media->BlockSize;
+            params->dpte_ptr = ~0;
+        }
+        ++boot_edd_info_nr;
+        status = efi_bs->HandleProtocol(handles[i], &devp_guid,
+                                        (void **)&devp);
+        if ( EFI_ERROR(status) )
+            continue;
+        for ( ; !IsDevicePathEnd(devp.DevPath);
+              devp.DevPath = NextDevicePathNode(devp.DevPath) )
+        {
+            switch ( DevicePathType(devp.DevPath) )
+            {
+                const u8 *p;
+
+            case ACPI_DEVICE_PATH:
+                if ( state != root || boot_edd_info_nr > EDD_INFO_MAX )
+                    break;
+                switch ( DevicePathSubType(devp.DevPath) )
+                {
+                case ACPI_DP:
+                    if ( devp.Acpi->HID != EISA_PNP_ID(0xA03) &&
+                         devp.Acpi->HID != EISA_PNP_ID(0xA08) )
+                        break;
+                    params->interface_path.pci.bus = devp.Acpi->UID;
+                    state = acpi;
+                    break;
+                case EXPANDED_ACPI_DP:
+                    /* XXX */
+                    break;
+                }
+                break;
+            case HARDWARE_DEVICE_PATH:
+                if ( state != acpi ||
+                     DevicePathSubType(devp.DevPath) != HW_PCI_DP ||
+                     boot_edd_info_nr > EDD_INFO_MAX )
+                    break;
+                state = pci;
+                edd_put_string(params->host_bus_type, "PCI");
+                params->interface_path.pci.slot = devp.Pci->Device;
+                params->interface_path.pci.function = devp.Pci->Function;
+                break;
+            case MESSAGING_DEVICE_PATH:
+                if ( state != pci || boot_edd_info_nr > EDD_INFO_MAX )
+                    break;
+                state = ctrlr;
+                switch ( DevicePathSubType(devp.DevPath) )
+                {
+                case MSG_ATAPI_DP:
+                    edd_put_string(params->interface_type, "ATAPI");
+                    params->interface_path.pci.channel =
+                        devp.Atapi->PrimarySecondary;
+                    params->device_path.atapi.device = devp.Atapi->SlaveMaster;
+                    params->device_path.atapi.lun = devp.Atapi->Lun;
+                    break;
+                case MSG_SCSI_DP:
+                    edd_put_string(params->interface_type, "SCSI");
+                    params->device_path.scsi.id = devp.Scsi->Pun;
+                    params->device_path.scsi.lun = devp.Scsi->Lun;
+                    break;
+                case MSG_FIBRECHANNEL_DP:
+                    edd_put_string(params->interface_type, "FIBRE");
+                    params->device_path.fibre.wwid = devp.FibreChannel->WWN;
+                    params->device_path.fibre.lun = devp.FibreChannel->Lun;
+                    break;
+                case MSG_1394_DP:
+                    edd_put_string(params->interface_type, "1394");
+                    params->device_path.i1394.eui = devp.F1394->Guid;
+                    break;
+                case MSG_USB_DP:
+                case MSG_USB_CLASS_DP:
+                    edd_put_string(params->interface_type, "USB");
+                    break;
+                case MSG_I2O_DP:
+                    edd_put_string(params->interface_type, "I2O");
+                    params->device_path.i2o.identity_tag = devp.I2O->Tid;
+                    break;
+                default:
+                    continue;
+                }
+                info->version = 0x30;
+                params->length = sizeof(struct edd_device_params);
+                params->key = 0xbedd;
+                params->device_path_info_length =
+                    sizeof(struct edd_device_params) -
+                    offsetof(struct edd_device_params, key);
+                for ( p = (const u8 *)&params->key; p < &params->checksum; ++p )
+                    params->checksum -= *p;
+                break;
+            case MEDIA_DEVICE_PATH:
+                if ( DevicePathSubType(devp.DevPath) == MEDIA_HARDDRIVE_DP &&
+                     devp.HardDrive->MBRType == MBR_TYPE_PCAT &&
+                     boot_mbr_signature_nr < EDD_MBR_SIG_MAX )
+                {
+                    struct mbr_signature *sig = boot_mbr_signature +
+                                                boot_mbr_signature_nr;
+
+                    sig->device = 0x80 + boot_edd_info_nr; /* fake */
+                    memcpy(&sig->signature, devp.HardDrive->Signature,
+                           sizeof(sig->signature));
+                    ++boot_mbr_signature_nr;
+                }
+                break;
+            }
+        }
+    }
+    if ( handles )
+        efi_bs->FreePool(handles);
+    if ( boot_edd_info_nr > EDD_INFO_MAX )
+        boot_edd_info_nr = EDD_INFO_MAX;
+
     /* XXX Collect EDID info. */
 
     if ( cpuid_eax(0x80000000) > 0x80000000 )
