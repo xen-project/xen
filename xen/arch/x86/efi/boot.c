@@ -599,6 +599,9 @@ static void __init relocate_image(unsigned long delta)
     }
 }
 
+extern const s32 __trampoline_rel_start[], __trampoline_rel_stop[];
+extern const s32 __trampoline_seg_start[], __trampoline_seg_stop[];
+
 void EFIAPI __init __attribute__((__noreturn__))
 efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 {
@@ -614,9 +617,10 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *mode_info;
     EFI_FILE_HANDLE dir_handle;
     union string section = { NULL }, name;
+    const s32 *trampoline_ptr;
     struct e820entry *e;
     u64 efer;
-    bool_t base_video = 0, trampoline_okay = 0;
+    bool_t base_video = 0;
 
     efi_ih = ImageHandle;
     efi_bs = SystemTable->BootServices;
@@ -914,15 +918,27 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
         dmi_efi_get_table((void *)(long)efi.smbios);
 
     /* Allocate space for trampoline (in first Mb). */
-    cfg.addr = BOOT_TRAMPOLINE;
+    cfg.addr = 0x100000;
     cfg.size = trampoline_end - trampoline_start;
-    status = efi_bs->AllocatePages(AllocateAddress, EfiLoaderData,
+    status = efi_bs->AllocatePages(AllocateMaxAddress, EfiLoaderData,
                                    PFN_UP(cfg.size), &cfg.addr);
     if ( EFI_ERROR(status) )
     {
         cfg.addr = 0;
-        PrintErr(L"Note: Trampoline area is in use\r\n");
+        blexit(L"No memory for trampoline\r\n");
     }
+    trampoline_phys = cfg.addr;
+    /* Apply relocations to trampoline. */
+    for ( trampoline_ptr = __trampoline_rel_start;
+          trampoline_ptr < __trampoline_rel_stop;
+          ++trampoline_ptr )
+        *(u32 *)(*trampoline_ptr + (long)trampoline_ptr) +=
+            trampoline_phys;
+    for ( trampoline_ptr = __trampoline_seg_start;
+          trampoline_ptr < __trampoline_seg_stop;
+          ++trampoline_ptr )
+        *(u16 *)(*trampoline_ptr + (long)trampoline_ptr) =
+            trampoline_phys >> 4;
 
     /* Initialise L2 identity-map and xen page table entries (16MB). */
     for ( i = 0; i < 8; ++i )
@@ -1096,13 +1112,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
             e->type = type;
             ++e820nr;
         }
-        if ( type == E820_RAM && e->addr <= BOOT_TRAMPOLINE &&
-             e->addr + e->size >= BOOT_TRAMPOLINE + cfg.size )
-            trampoline_okay = 1;
     }
-
-    if ( !trampoline_okay )
-        blexit(L"Trampoline area unavailable\r\n");
 
     status = efi_bs->ExitBootServices(ImageHandle, map_key);
     if ( EFI_ERROR(status) )
@@ -1117,7 +1127,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     efi_fw_vendor = (void *)efi_fw_vendor + DIRECTMAP_VIRT_START;
 
     relocate_image(__XEN_VIRT_START - xen_phys_start);
-    memcpy((void *)(long)BOOT_TRAMPOLINE, trampoline_start, cfg.size);
+    memcpy((void *)trampoline_phys, trampoline_start, cfg.size);
 
     /* Set system registers and transfer control. */
     asm volatile("pushq $0\n\tpopfq");

@@ -42,15 +42,13 @@ ENTRY(wakeup_start)
 
         # boot trampoline is under 1M, and shift its start into
         # %fs to reference symbols in that area
-        movl    $BOOT_TRAMPOLINE, %eax
-        shrl    $4, %eax
-        movl    %eax, %fs
+        mov     wakesym(trampoline_seg), %fs
         lidt    %fs:bootsym(idt_48)
         lgdt    %fs:bootsym(gdt_48)
 
         movw    $1, %ax
         lmsw    %ax             # Turn on CR0.PE 
-        ljmpl   $BOOT_CS32, $bootsym_phys(wakeup_32)
+        ljmpl   $BOOT_CS32, $bootsym_rel(wakeup_32, 6)
 
 /* This code uses an extended set of video mode numbers. These include:
  * Aliases for standard modes
@@ -103,6 +101,10 @@ real_magic:     .long 0x12345678
          .globl video_mode, video_flags
 video_mode:     .long 0
 video_flags:    .long 0
+trampoline_seg: .word BOOT_TRAMPOLINE >> 4
+        .pushsection .trampoline_seg, "a"
+        .long   trampoline_seg - .
+        .popsection
 
         .code32
 
@@ -114,11 +116,11 @@ wakeup_32:
         mov     $BOOT_DS, %eax
         mov     %eax, %ds
         mov     %eax, %ss
-        mov     $bootsym_phys(early_stack), %esp
+        mov     $bootsym_rel(early_stack, 4, %esp)
 
         # check saved magic again
         mov     $sym_phys(saved_magic), %eax
-        add     bootsym_phys(trampoline_xen_phys_start), %eax
+        add     bootsym_rel(trampoline_xen_phys_start, 4, %eax)
         mov     (%eax), %eax
         cmp     $0x9abcdef0, %eax
         jne     bogus_saved_magic
@@ -131,12 +133,12 @@ wakeup_32:
 
         /* Load pagetable base register */
         mov     $sym_phys(idle_pg_table),%eax
-        add     bootsym_phys(trampoline_xen_phys_start),%eax
+        add     bootsym_rel(trampoline_xen_phys_start,4,%eax)
         mov     %eax,%cr3
 
         /* Will cpuid feature change after resume? */
         /* Set up EFER (Extended Feature Enable Register). */
-        mov     bootsym_phys(cpuid_ext_features),%edi
+        mov     bootsym_rel(cpuid_ext_features,4,%edi)
         test    $0x20100800,%edi /* SYSCALL/SYSRET, No Execute, Long Mode? */
         jz      .Lskip_eferw
         movl    $MSR_EFER,%ecx
@@ -162,7 +164,7 @@ wakeup_32:
 #if defined(__x86_64__)
 
         /* Now in compatibility mode. Long-jump to 64-bit mode */
-        ljmp    $BOOT_CS64, $bootsym_phys(wakeup_64)
+        ljmp    $BOOT_CS64, $bootsym_rel(wakeup_64,6)
 
         .code64
 wakeup_64:

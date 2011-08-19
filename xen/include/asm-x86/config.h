@@ -95,13 +95,13 @@
 /* Primary stack is restricted to 8kB by guard pages. */
 #define PRIMARY_STACK_SIZE 8192
 
-#define BOOT_TRAMPOLINE 0x7c000
+#ifndef __ASSEMBLY__
+extern unsigned long trampoline_phys;
 #define bootsym_phys(sym)                                 \
-    (((unsigned long)&(sym)-(unsigned long)&trampoline_start)+BOOT_TRAMPOLINE)
+    (((unsigned long)&(sym)-(unsigned long)&trampoline_start)+trampoline_phys)
 #define bootsym(sym)                                      \
     (*RELOC_HIDE((typeof(&(sym)))__va(__pa(&(sym))),      \
-                 BOOT_TRAMPOLINE-__pa(trampoline_start)))
-#ifndef __ASSEMBLY__
+                 trampoline_phys-__pa(trampoline_start)))
 extern char trampoline_start[], trampoline_end[];
 extern char trampoline_realmode_entry[];
 extern unsigned int trampoline_xen_phys_start;

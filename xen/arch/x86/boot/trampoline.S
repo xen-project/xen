@@ -4,6 +4,13 @@
 #undef bootsym
 #define bootsym(s) ((s)-trampoline_start)
 
+#define bootsym_rel(sym, off, opnd...)     \
+        bootsym(sym),##opnd;               \
+111:;                                      \
+        .pushsection .trampoline_rel, "a"; \
+        .long 111b - (off) - .;            \
+        .popsection
+
         .globl trampoline_realmode_entry
 trampoline_realmode_entry:
         mov     %cs,%ax
@@ -17,11 +24,11 @@ trampoline_realmode_entry:
         xor     %ax, %ax
         inc     %ax
         lmsw    %ax                       # CR0.PE = 1 (enter protected mode)
-        ljmpl   $BOOT_CS32,$bootsym_phys(trampoline_protmode_entry)
+        ljmpl   $BOOT_CS32,$bootsym_rel(trampoline_protmode_entry,6)
 
 idt_48: .word   0, 0, 0 # base = limit = 0
 gdt_48: .word   6*8-1
-        .long   bootsym_phys(trampoline_gdt)
+        .long   bootsym_rel(trampoline_gdt,4)
 trampoline_gdt:
         /* 0x0000: unused */
         .quad   0x0000000000000000
@@ -32,11 +39,16 @@ trampoline_gdt:
         /* 0x0018: ring 0 data */
         .quad   0x00cf92000000ffff
         /* 0x0020: real-mode code @ BOOT_TRAMPOLINE */
-        .long   0x0000ffff | ((BOOT_TRAMPOLINE & 0x00ffff) << 16)
-        .long   0x00009a00 | ((BOOT_TRAMPOLINE & 0xff0000) >> 16)
+        .long   0x0000ffff
+        .long   0x00009a00
         /* 0x0028: real-mode data @ BOOT_TRAMPOLINE */
-        .long   0x0000ffff | ((BOOT_TRAMPOLINE & 0x00ffff) << 16)
-        .long   0x00009200 | ((BOOT_TRAMPOLINE & 0xff0000) >> 16)
+        .long   0x0000ffff
+        .long   0x00009200
+
+        .pushsection .trampoline_rel, "a"
+        .long   trampoline_gdt + BOOT_PSEUDORM_CS + 2 - .
+        .long   trampoline_gdt + BOOT_PSEUDORM_DS + 2 - .
+        .popsection
 
         .globl cpuid_ext_features
 cpuid_ext_features:
@@ -66,11 +78,11 @@ trampoline_protmode_entry:
 
         /* Load pagetable base register. */
         mov     $sym_phys(idle_pg_table),%eax
-        add     bootsym_phys(trampoline_xen_phys_start),%eax
+        add     bootsym_rel(trampoline_xen_phys_start,4,%eax)
         mov     %eax,%cr3
 
         /* Set up EFER (Extended Feature Enable Register). */
-        mov     bootsym_phys(cpuid_ext_features),%edi
+        mov     bootsym_rel(cpuid_ext_features,4,%edi)
         test    $0x20100800,%edi /* SYSCALL/SYSRET, No Execute, Long Mode? */
         jz      .Lskip_efer
         movl    $MSR_EFER,%ecx
@@ -93,7 +105,7 @@ trampoline_protmode_entry:
 #if defined(__x86_64__)
 
         /* Now in compatibility mode. Long-jump into 64-bit mode. */
-        ljmp    $BOOT_CS64,$bootsym_phys(start64)
+        ljmp    $BOOT_CS64,$bootsym_rel(start64,6)
 
         .code64
 start64:

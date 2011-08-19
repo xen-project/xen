@@ -48,6 +48,8 @@
 
 #define setup_trampoline()    (bootsym_phys(trampoline_realmode_entry))
 
+unsigned long __read_mostly trampoline_phys;
+
 /* representing HT siblings of each logical CPU */
 DEFINE_PER_CPU_READ_MOSTLY(cpumask_t, cpu_sibling_map);
 /* representing HT and core siblings of each logical CPU */

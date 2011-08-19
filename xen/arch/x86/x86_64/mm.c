@@ -829,7 +829,7 @@ void __init zap_low_mappings(void)
     flush_local(FLUSH_TLB_GLOBAL);
 
     /* Replace with mapping of the boot trampoline only. */
-    map_pages_to_xen(BOOT_TRAMPOLINE, BOOT_TRAMPOLINE >> PAGE_SHIFT,
+    map_pages_to_xen(trampoline_phys, trampoline_phys >> PAGE_SHIFT,
                      PFN_UP(trampoline_end - trampoline_start),
                      __PAGE_HYPERVISOR);
 }

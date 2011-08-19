@@ -166,8 +166,9 @@ void __init zap_low_mappings(l2_pgentry_t *dom0_l2)
     flush_all(FLUSH_TLB_GLOBAL);
 
     /* Replace with mapping of the boot trampoline only. */
-    map_pages_to_xen(BOOT_TRAMPOLINE, BOOT_TRAMPOLINE >> PAGE_SHIFT,
-                     0x10, __PAGE_HYPERVISOR);
+    map_pages_to_xen(trampoline_phys, trampoline_phys >> PAGE_SHIFT,
+                     PFN_UP(trampoline_end - trampoline_start),
+                     __PAGE_HYPERVISOR);
 }
 
 void __init subarch_init_memory(void)

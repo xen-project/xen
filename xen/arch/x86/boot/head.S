@@ -9,7 +9,7 @@
         .text
         .code32
 
-#undef bootsym_phys
+#define BOOT_TRAMPOLINE   0x7c000
 #define sym_phys(sym)     ((sym) - __XEN_VIRT_START)
 #define bootsym_phys(sym) ((sym) - trampoline_start + BOOT_TRAMPOLINE)
 
@@ -188,6 +188,17 @@ __start:
         mov     %edi,sym_phys(idle_pg_table_l2)
         mov     %edi,sym_phys(idle_pg_table_l2) + (__PAGE_OFFSET>>18)
 #endif
+
+        /* Apply relocations to bootstrap trampoline. */
+        mov     $BOOT_TRAMPOLINE,%edx
+        mov     $sym_phys(__trampoline_rel_start),%edi
+        mov     %edx,sym_phys(trampoline_phys)
+1:
+        mov     (%edi),%eax
+        add     %edx,(%edi,%eax)
+        add     $4,%edi
+        cmp     $sym_phys(__trampoline_rel_stop),%edi
+        jb      1b
 
         /* Copy bootstrap trampoline to low memory, below 1MB. */
         mov     $sym_phys(trampoline_start),%esi

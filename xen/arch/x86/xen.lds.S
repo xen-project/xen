@@ -103,6 +103,13 @@ SECTIONS
        *(.init.data)
        *(.init.data.rel)
        *(.init.data.rel.*)
+       . = ALIGN(4);
+       __trampoline_rel_start = .;
+       *(.trampoline_rel)
+       __trampoline_rel_stop = .;
+       __trampoline_seg_start = .;
+       *(.trampoline_seg)
+       __trampoline_seg_stop = .;
   } :text
   . = ALIGN(32);
   .init.setup : {
