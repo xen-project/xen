@@ -30,7 +30,6 @@ SECTIONS
 
   .ctors : {
         __CTOR_LIST__ = .;
-        LONG((__CTOR_END__ - __CTOR_LIST__) / 4 - 2)
         *(.ctors)
 	CONSTRUCTORS
         LONG(0)
@@ -39,7 +38,6 @@ SECTIONS
 
   .dtors : {
         __DTOR_LIST__ = .;
-        LONG((__DTOR_END__ - __DTOR_LIST__) / 4 - 2)
         *(.dtors)
         LONG(0)
         __DTOR_END__ = .;

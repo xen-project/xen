@@ -30,7 +30,6 @@ SECTIONS
 
   .ctors : {
         __CTOR_LIST__ = .;
-        QUAD((__CTOR_END__ - __CTOR_LIST__) / 8 - 2)
         *(.ctors)
 	CONSTRUCTORS
         QUAD(0)
@@ -39,7 +38,6 @@ SECTIONS
 
   .dtors : {
         __DTOR_LIST__ = .;
-        QUAD((__DTOR_END__ - __DTOR_LIST__) / 8 - 2)
         *(.dtors)
         QUAD(0)
         __DTOR_END__ = .;
