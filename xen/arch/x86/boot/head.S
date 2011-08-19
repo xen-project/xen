@@ -202,17 +202,19 @@ __start:
 
         /* Copy bootstrap trampoline to low memory, below 1MB. */
         mov     $sym_phys(trampoline_start),%esi
-        mov     $bootsym_phys(trampoline_start),%edi
+        mov     %edx,%edi
         mov     $trampoline_end - trampoline_start,%ecx
         rep     movsb
 
-        mov     $bootsym_phys(early_stack),%esp
+        lea     early_stack-trampoline_start(%edx),%esp
         call    cmdline_parse_early
 
         /* Jump into the relocated trampoline. */
         jmp     $BOOT_CS32,$bootsym_phys(trampoline_boot_cpu_entry)
 
 #include "cmdline.S"
+
+#undef bootsym_phys
 
 reloc:
 #include "reloc.S"

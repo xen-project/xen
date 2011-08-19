@@ -132,7 +132,7 @@ high_start:
 
         .code32
 trampoline_boot_cpu_entry:
-        cmpb    $0,bootsym_phys(skip_realmode)
+        cmpb    $0,bootsym_rel(skip_realmode,5)
         jnz     .Lskip_realmode
 
         /* Load pseudo-real-mode segments. */
@@ -152,7 +152,7 @@ trampoline_boot_cpu_entry:
 
         /* Load proper real-mode values into %cs, %ds, %es and %ss. */
         ljmp    $(BOOT_TRAMPOLINE>>4),$bootsym(1f)
-1:      mov     $(BOOT_TRAMPOLINE>>4),%ax
+1:      mov     %cs,%ax
         mov     %ax,%ds
         mov     %ax,%es
         mov     %ax,%ss
@@ -195,7 +195,7 @@ trampoline_boot_cpu_entry:
         lmsw    %ax                       # CR0.PE = 1 (enter protected mode)
 
         /* Load proper protected-mode values into all segment registers. */
-        ljmpl   $BOOT_CS32,$bootsym_phys(1f)
+        ljmpl   $BOOT_CS32,$bootsym_rel(1f,6)
         .code32
 1:      mov     $BOOT_DS,%eax
         mov     %eax,%ds
