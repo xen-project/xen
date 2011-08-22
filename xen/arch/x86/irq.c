@@ -113,7 +113,10 @@ static int __init __bind_irq_vector(int irq, int vector, cpumask_t cpu_mask)
     cfg->vector = vector;
     cfg->cpu_mask = online_mask;
     if ( cfg->used_vectors )
+    {
+        ASSERT(!test_bit(vector, cfg->used_vectors));
         set_bit(vector, cfg->used_vectors);
+    }
     irq_status[irq] = IRQ_USED;
     if (IO_APIC_IRQ(irq))
         irq_vector[irq] = vector;
@@ -207,15 +210,13 @@ static void __clear_irq_vector(int irq)
     for_each_cpu_mask(cpu, tmp_mask)
         per_cpu(vector_irq, cpu)[vector] = -1;
 
-    if ( cfg->used_vectors )
-        clear_bit(vector, cfg->used_vectors);
-
     cfg->vector = IRQ_VECTOR_UNASSIGNED;
     cpus_clear(cfg->cpu_mask);
     init_one_irq_status(irq);
 
     if (likely(!cfg->move_in_progress))
         return;
+
     cpus_and(tmp_mask, cfg->old_cpu_mask, cpu_online_map);
     for_each_cpu_mask(cpu, tmp_mask) {
         for (vector = FIRST_DYNAMIC_VECTOR; vector <= LAST_DYNAMIC_VECTOR;
@@ -228,6 +229,12 @@ static void __clear_irq_vector(int irq)
              break;
         }
      }
+
+    if ( cfg->used_vectors )
+    {
+        ASSERT(test_bit(vector, cfg->used_vectors));
+        clear_bit(vector, cfg->used_vectors);
+    }
 
     cfg->move_in_progress = 0;
 }
