@@ -245,6 +245,7 @@ int p2m_alloc_table(struct p2m_domain *p2m)
     P2M_PRINTK("populating p2m table\n");
 
     /* Initialise physmap tables for slot zero. Other code assumes this. */
+    p2m->defer_nested_flush = 1;
     if ( !set_p2m_entry(p2m, 0, _mfn(INVALID_MFN), 0,
                         p2m_invalid, p2m->default_access) )
         goto error;
@@ -272,6 +273,7 @@ int p2m_alloc_table(struct p2m_domain *p2m)
         }
         spin_unlock(&p2m->domain->page_alloc_lock);
     }
+    p2m->defer_nested_flush = 0;
 
     P2M_PRINTK("p2m table initialised (%u pages)\n", page_count);
     p2m_unlock(p2m);
