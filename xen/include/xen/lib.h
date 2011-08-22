@@ -37,7 +37,7 @@ do {                                                            \
 #define ASSERT(p) \
     do { if ( unlikely(!(p)) ) assert_failed(#p); } while (0)
 #else
-#define ASSERT(p) ((void)0)
+#define ASSERT(p) do { if ( 0 && (p) ); } while (0)
 #endif
 
 #define ABS(_x) ({                              \
