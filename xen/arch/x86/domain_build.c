@@ -254,6 +254,8 @@ static unsigned long __init compute_dom0_nr_pages(
     }
 #endif
 
+    d->max_pages = min(max_pages, avail);
+
     return nr_pages;
 }
 
