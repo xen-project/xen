@@ -796,7 +796,10 @@ int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
     if ( !need_flush )
         goto out;
 
-    amd_iommu_flush_pages(d, gfn, 0);
+    /* 4K mapping for PV guests never changes, 
+     * no need to flush if we trust non-present bits */
+    if ( is_hvm_domain(d) )
+        amd_iommu_flush_pages(d, gfn, 0);
 
     for ( merge_level = IOMMU_PAGING_MODE_LEVEL_2;
           merge_level <= hd->paging_mode; merge_level++ )
