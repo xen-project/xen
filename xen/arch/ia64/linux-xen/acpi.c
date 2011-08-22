@@ -221,10 +221,13 @@ static u16 ia64_acpiid_to_sapicid[ MAX_LOCAL_SAPIC ] =
 		{[0 ... MAX_LOCAL_SAPIC - 1] = 0xffff };
 
 /* acpi id to cpu id */
-int get_cpu_id(u8 acpi_id)
+int get_cpu_id(u32 acpi_id)
 {
 	int i;
 	u16 apic_id;
+
+	if ( acpi_id >= MAX_LOCAL_SAPIC )
+		return -EINVAL;
 
 	apic_id = ia64_acpiid_to_sapicid[acpi_id];
 	if ( apic_id == 0xffff )

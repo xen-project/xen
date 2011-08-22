@@ -6,7 +6,7 @@
 
 #define XEN_PX_INIT 0x80000000
 
-int get_cpu_id(u8);
+int get_cpu_id(u32);
 int powernow_cpufreq_init(void);
 unsigned int powernow_register_driver(void);
 unsigned int get_measured_perf(unsigned int cpu, unsigned int flag);

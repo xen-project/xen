@@ -895,10 +895,13 @@ static void set_cx(
         acpi_power->safe_state = cx;
 }
 
-int get_cpu_id(u8 acpi_id)
+int get_cpu_id(u32 acpi_id)
 {
     int i;
     u32 apic_id;
+
+    if ( acpi_id >= MAX_MADT_ENTRIES )
+        return -1;
 
     apic_id = x86_acpiid_to_apicid[acpi_id];
     if ( apic_id == BAD_APICID )
@@ -976,7 +979,7 @@ long set_cx_pminfo(uint32_t cpu, struct xen_processor_power *power)
     print_cx_pminfo(cpu, power);
 
     /* map from acpi_id to cpu_id */
-    cpu_id = get_cpu_id((u8)cpu);
+    cpu_id = get_cpu_id(cpu);
     if ( cpu_id == -1 )
     {
         printk(XENLOG_ERR "no cpu_id for acpi_id %d\n", cpu);
