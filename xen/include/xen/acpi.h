@@ -322,6 +322,8 @@ static inline int acpi_boot_table_init(void)
 
 #endif 	/*!CONFIG_ACPI_BOOT*/
 
+int get_cpu_id(u32 acpi_id);
+
 unsigned int acpi_register_gsi (u32 gsi, int edge_level, int active_high_low);
 int acpi_gsi_to_irq (u32 gsi, unsigned int *irq);
 
@@ -357,6 +359,9 @@ static inline void acpi_set_cstate_limit(unsigned int new_limit)
 static inline unsigned int acpi_get_cstate_limit(void) { return 0; }
 static inline void acpi_set_cstate_limit(unsigned int new_limit) { return; }
 #endif
+
+int acpi_set_pdc_bits(u32 acpi_id, XEN_GUEST_HANDLE(uint32));
+int arch_acpi_set_pdc_bits(u32 acpi_id, u32 *, u32 mask);
 
 #ifdef CONFIG_ACPI_NUMA
 int acpi_get_pxm(acpi_handle handle);

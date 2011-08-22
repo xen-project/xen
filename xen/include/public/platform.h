@@ -304,6 +304,7 @@ DEFINE_XEN_GUEST_HANDLE(xenpf_getidletime_t);
 #define XEN_PM_CX   0
 #define XEN_PM_PX   1
 #define XEN_PM_TX   2
+#define XEN_PM_PDC  3
 
 /* Px sub info type */
 #define XEN_PX_PCT   1
@@ -401,6 +402,7 @@ struct xenpf_set_processor_pminfo {
     union {
         struct xen_processor_power          power;/* Cx: _CST/_CSD */
         struct xen_processor_performance    perf; /* Px: _PPC/_PCT/_PSS/_PSD */
+        XEN_GUEST_HANDLE(uint32)            pdc;  /* _PDC */
     } u;
 };
 typedef struct xenpf_set_processor_pminfo xenpf_set_processor_pminfo_t;

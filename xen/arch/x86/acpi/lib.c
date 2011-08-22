@@ -81,3 +81,47 @@ unsigned int acpi_get_processor_id(unsigned int cpu)
 
 	return INVALID_ACPIID;
 }
+
+static void get_mwait_ecx(void *info)
+{
+	*(u32 *)info = cpuid_ecx(CPUID_MWAIT_LEAF);
+}
+
+int arch_acpi_set_pdc_bits(u32 acpi_id, u32 *pdc, u32 mask)
+{
+	unsigned int cpu = get_cpu_id(acpi_id);
+	struct cpuinfo_x86 *c;
+	u32 ecx;
+
+	if (!(acpi_id + 1))
+		c = &boot_cpu_data;
+	else if (cpu >= NR_CPUS || !cpu_online(cpu))
+		return -EINVAL;
+	else
+		c = cpu_data + cpu;
+
+	pdc[2] |= ACPI_PDC_C_CAPABILITY_SMP & mask;
+
+	if (cpu_has(c, X86_FEATURE_EST))
+		pdc[2] |= ACPI_PDC_EST_CAPABILITY_SWSMP & mask;
+
+	if (cpu_has(c, X86_FEATURE_ACPI))
+		pdc[2] |= ACPI_PDC_T_FFH & mask;
+
+	/*
+	 * If mwait/monitor or its break-on-interrupt extension are
+	 * unsupported, Cx_FFH will be disabled.
+	 */
+	if (!cpu_has(c, X86_FEATURE_MWAIT) ||
+	    c->cpuid_level < CPUID_MWAIT_LEAF)
+		ecx = 0;
+	else if (c == &boot_cpu_data || cpu == smp_processor_id())
+		ecx = cpuid_ecx(CPUID_MWAIT_LEAF);
+	else
+		on_selected_cpus(cpumask_of(cpu), get_mwait_ecx, &ecx, 1);
+	if (!(ecx & CPUID5_ECX_EXTENSIONS_SUPPORTED) ||
+	    !(ecx & CPUID5_ECX_INTERRUPT_BREAK))
+		pdc[2] &= ~(ACPI_PDC_C_C1_FFH | ACPI_PDC_C_C2C3_FFH);
+
+	return 0;
+}

@@ -241,6 +241,13 @@ int get_cpu_id(u32 acpi_id)
 
 	return -1;
 }
+
+int arch_acpi_set_pdc_bits(u32 acpi_id, u32 *pdc, u32 mask)
+{
+	pdc[2] |= ACPI_PDC_EST_CAPABILITY_SMP & mask;
+	return 0;
+}
+
 #endif
 
 static int __init

@@ -415,6 +415,15 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
             ret = -EINVAL;
             break;
 
+        case XEN_PM_PDC:
+        {
+            XEN_GUEST_HANDLE(uint32) pdc;
+
+            guest_from_compat_handle(pdc, op->u.set_pminfo.u.pdc);
+            ret = acpi_set_pdc_bits(op->u.set_pminfo.id, pdc);
+        }
+        break;
+
         default:
             ret = -EINVAL;
             break;

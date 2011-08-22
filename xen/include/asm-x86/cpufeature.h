@@ -152,6 +152,10 @@
 #define boot_cpu_has(bit)	test_bit(bit, boot_cpu_data.x86_capability)
 #define cpufeat_mask(idx)       (1u << ((idx) & 31))
 
+#define CPUID_MWAIT_LEAF                5
+#define CPUID5_ECX_EXTENSIONS_SUPPORTED 0x1
+#define CPUID5_ECX_INTERRUPT_BREAK      0x2
+
 #ifdef __i386__
 #define cpu_has_vme		boot_cpu_has(X86_FEATURE_VME)
 #define cpu_has_de		boot_cpu_has(X86_FEATURE_DE)

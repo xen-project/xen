@@ -643,12 +643,6 @@ static int cpuidle_init_cpu(int cpu)
     return 0;
 }
 
-#define CPUID_MWAIT_LEAF (5)
-#define CPUID5_ECX_EXTENSIONS_SUPPORTED (0x1)
-#define CPUID5_ECX_INTERRUPT_BREAK      (0x2)
-
-#define MWAIT_ECX_INTERRUPT_BREAK       (0x1)
-
 #define MWAIT_SUBSTATE_MASK (0xf)
 #define MWAIT_SUBSTATE_SIZE (4)
 

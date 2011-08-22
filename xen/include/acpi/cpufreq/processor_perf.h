@@ -3,10 +3,10 @@
 
 #include <public/platform.h>
 #include <public/sysctl.h>
+#include <xen/acpi.h>
 
 #define XEN_PX_INIT 0x80000000
 
-int get_cpu_id(u32);
 int powernow_cpufreq_init(void);
 unsigned int powernow_register_driver(void);
 unsigned int get_measured_perf(unsigned int cpu, unsigned int flag);
