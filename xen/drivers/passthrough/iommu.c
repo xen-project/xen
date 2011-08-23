@@ -180,7 +180,7 @@ int assign_device(struct domain *d, u8 bus, u8 devfn)
     if ( has_arch_pdevs(d) && !need_iommu(d) )
     {
         d->need_iommu = 1;
-        if ( !iommu_hap_pt_share )
+        if ( !iommu_use_hap_pt(d) )
             rc = iommu_populate_page_table(d);
         goto done;
     }

@@ -21,6 +21,7 @@
 #include <xen/sched.h>
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
+#include <xen/paging.h>
 #include <asm/hvm/iommu.h>
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
@@ -388,7 +389,7 @@ static void deallocate_iommu_page_tables(struct domain *d)
 {
     struct hvm_iommu *hd  = domain_hvm_iommu(d);
 
-    if ( iommu_hap_pt_share )
+    if ( iommu_use_hap_pt(d) )
         return;
 
     spin_lock(&hd->mapping_lock);

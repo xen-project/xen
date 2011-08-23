@@ -1613,7 +1613,7 @@ void iommu_domain_teardown(struct domain *d)
     if ( list_empty(&acpi_drhd_units) )
         return;
 
-    if ( iommu_hap_pt_share )
+    if ( iommu_use_hap_pt(d) )
         return;
 
     spin_lock(&hd->mapping_lock);
@@ -1635,7 +1635,7 @@ static int intel_iommu_map_page(
     int iommu_domid;
 
     /* Do nothing if VT-d shares EPT page table */
-    if ( iommu_hap_pt_share )
+    if ( iommu_use_hap_pt(d) )
         return 0;
 
     /* do nothing if dom0 and iommu supports pass thru */
@@ -1760,7 +1760,7 @@ void iommu_set_pgd(struct domain *d)
 
     ASSERT( is_hvm_domain(d) && d->arch.hvm_domain.hap_enabled );
 
-    if ( !iommu_hap_pt_share )
+    if ( !iommu_use_hap_pt(d) )
         return;
 
     pgd_mfn = pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d)));

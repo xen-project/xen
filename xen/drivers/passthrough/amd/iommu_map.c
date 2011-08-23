@@ -758,7 +758,7 @@ int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
 
     BUG_ON( !hd->root_table );
 
-    if ( iommu_hap_pt_share && is_hvm_domain(d) )
+    if ( iommu_use_hap_pt(d) )
         return 0;
 
     memset(pt_mfn, 0, sizeof(pt_mfn));
@@ -835,7 +835,7 @@ int amd_iommu_unmap_page(struct domain *d, unsigned long gfn)
 
     BUG_ON( !hd->root_table );
 
-    if ( iommu_hap_pt_share && is_hvm_domain(d) )
+    if ( iommu_use_hap_pt(d) )
         return 0;
 
     memset(pt_mfn, 0, sizeof(pt_mfn));
@@ -935,7 +935,7 @@ void amd_iommu_share_p2m(struct domain *d)
 
     ASSERT( is_hvm_domain(d) && d->arch.hvm_domain.hap_enabled );
 
-    if ( !iommu_hap_pt_share )
+    if ( !iommu_use_hap_pt(d) )
         return;
 
     pgd_mfn = pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d)));
