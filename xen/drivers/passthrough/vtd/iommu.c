@@ -1739,15 +1739,15 @@ void iommu_pte_flush(struct domain *d, u64 gfn, u64 *pte,
 
 static int vtd_ept_page_compatible(struct iommu *iommu)
 {
-    u64 cap = iommu->cap;
+    u64 ept_cap, vtd_cap = iommu->cap;
 
-    if ( ept_has_2mb(cpu_has_vmx_ept_2mb) != cap_sps_2mb(cap) )
+    /* EPT is not initialised yet, so we must check the capability in
+     * the MSR explicitly rather than use cpu_has_vmx_ept_*() */
+    if ( rdmsr_safe(MSR_IA32_VMX_EPT_VPID_CAP, ept_cap) != 0 ) 
         return 0;
 
-    if ( ept_has_1gb(cpu_has_vmx_ept_1gb) != cap_sps_1gb(cap) )
-        return 0;
-
-    return 1;
+    return ( ept_has_2mb(ept_cap) == cap_sps_2mb(vtd_cap) 
+             && ept_has_1gb(ept_cap) == cap_sps_1gb(vtd_cap) );
 }
 
 /*
