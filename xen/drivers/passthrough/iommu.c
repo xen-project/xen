@@ -47,7 +47,7 @@ bool_t __read_mostly iommu_passthrough;
 bool_t __read_mostly iommu_snoop = 1;
 bool_t __read_mostly iommu_qinval = 1;
 bool_t __read_mostly iommu_intremap = 1;
-bool_t __read_mostly iommu_hap_pt_share;
+bool_t __read_mostly iommu_hap_pt_share = 1;
 bool_t __read_mostly iommu_debug;
 bool_t __read_mostly iommu_amd_perdev_vector_map = 1;
 bool_t __read_mostly amd_iommu_perdev_intremap;
