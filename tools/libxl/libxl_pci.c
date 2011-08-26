@@ -696,6 +696,7 @@ static int do_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, i
             }
         }
         fclose(f);
+        break;
     }
     default:
         abort();
