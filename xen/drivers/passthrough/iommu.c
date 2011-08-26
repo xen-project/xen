@@ -82,6 +82,8 @@ static void __init parse_iommu_param(char *s)
             iommu_passthrough = 1;
         else if ( !strcmp(s, "dom0-strict") )
             iommu_dom0_strict = 1;
+        else if ( !strcmp(s, "sharept") )
+            iommu_hap_pt_share = 1;
 
         s = ss + 1;
     } while ( ss );
