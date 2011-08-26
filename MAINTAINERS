@@ -108,7 +108,7 @@ F:	xen/arch/x86/debug.c
 F:	tools/debugger/gdbsx/
 
 KDD DEBUGGER
-M:	Tim Deegan <Tim.Deegan@citrix.com>
+M:	Tim Deegan <tim@xen.org>
 S:	Supported
 F:	tools/debugger/kdd/
 
@@ -213,7 +213,7 @@ F:	xen/arch/x86/*
 F:	xen/include/asm-x86/*
 
 X86 MEMORY MANAGEMENT
-M:	Tim Deegan <tim.deegan@citrix.com>
+M:	Tim Deegan <tim@xen.org>
 S:	Supported
 F:	xen/arch/x86/mm/
 
