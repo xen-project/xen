@@ -112,11 +112,11 @@ p2m_pod_cache_add(struct p2m_domain *p2m,
     /* Then add the first one to the appropriate populate-on-demand list */
     switch(order)
     {
-    case 9:
+    case PAGE_ORDER_2M:
         page_list_add_tail(page, &p2m->pod.super); /* lock: page_alloc */
         p2m->pod.count += 1 << order;
         break;
-    case 0:
+    case PAGE_ORDER_4K:
         page_list_add_tail(page, &p2m->pod.single); /* lock: page_alloc */
         p2m->pod.count += 1;
         break;
@@ -143,11 +143,11 @@ static struct page_info * p2m_pod_cache_get(struct p2m_domain *p2m,
     struct page_info *p = NULL;
     int i;
 
-    if ( order == 9 && page_list_empty(&p2m->pod.super) )
+    if ( order == PAGE_ORDER_2M && page_list_empty(&p2m->pod.super) )
     {
         return NULL;
     }
-    else if ( order == 0 && page_list_empty(&p2m->pod.single) )
+    else if ( order == PAGE_ORDER_4K && page_list_empty(&p2m->pod.single) )
     {
         unsigned long mfn;
         struct page_info *q;
@@ -168,12 +168,12 @@ static struct page_info * p2m_pod_cache_get(struct p2m_domain *p2m,
 
     switch ( order )
     {
-    case 9:
+    case PAGE_ORDER_2M:
         BUG_ON( page_list_empty(&p2m->pod.super) );
         p = page_list_remove_head(&p2m->pod.super);
         p2m->pod.count -= 1 << order; /* Lock: page_alloc */
         break;
-    case 0:
+    case PAGE_ORDER_4K:
         BUG_ON( page_list_empty(&p2m->pod.single) );
         p = page_list_remove_head(&p2m->pod.single);
         p2m->pod.count -= 1;
@@ -206,17 +206,17 @@ p2m_pod_set_cache_target(struct p2m_domain *p2m, unsigned long pod_target, int p
         int order;
 
         if ( (pod_target - p2m->pod.count) >= SUPERPAGE_PAGES )
-            order = 9;
+            order = PAGE_ORDER_2M;
         else
-            order = 0;
+            order = PAGE_ORDER_4K;
     retry:
-        page = alloc_domheap_pages(d, order, 0);
+        page = alloc_domheap_pages(d, order, PAGE_ORDER_4K);
         if ( unlikely(page == NULL) )
         {
-            if ( order == 9 )
+            if ( order == PAGE_ORDER_2M )
             {
                 /* If we can't allocate a superpage, try singleton pages */
-                order = 0;
+                order = PAGE_ORDER_4K;
                 goto retry;
             }   
             
@@ -249,9 +249,9 @@ p2m_pod_set_cache_target(struct p2m_domain *p2m, unsigned long pod_target, int p
 
         if ( (p2m->pod.count - pod_target) > SUPERPAGE_PAGES
              && !page_list_empty(&p2m->pod.super) )
-            order = 9;
+            order = PAGE_ORDER_2M;
         else
-            order = 0;
+            order = PAGE_ORDER_4K;
 
         page = p2m_pod_cache_get(p2m, order);
 
@@ -468,12 +468,12 @@ p2m_pod_offline_or_broken_replace(struct page_info *p)
 
     free_domheap_page(p);
 
-    p = alloc_domheap_page(d, 0);
+    p = alloc_domheap_page(d, PAGE_ORDER_4K);
     if ( unlikely(!p) )
         return;
 
     p2m_lock(p2m);
-    p2m_pod_cache_add(p2m, p, 0);
+    p2m_pod_cache_add(p2m, p, PAGE_ORDER_4K);
     p2m_unlock(p2m);
     return;
 }
@@ -688,7 +688,7 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
     }
 
     /* Try to remove the page, restoring old mapping if it fails. */
-    set_p2m_entry(p2m, gfn, _mfn(0), 9,
+    set_p2m_entry(p2m, gfn, _mfn(0), PAGE_ORDER_2M,
                   p2m_populate_on_demand, p2m->default_access);
 
     /* Make none of the MFNs are used elsewhere... for example, mapped
@@ -739,7 +739,7 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
 
     /* Finally!  We've passed all the checks, and can add the mfn superpage
      * back on the PoD cache, and account for the new p2m PoD entries */
-    p2m_pod_cache_add(p2m, mfn_to_page(mfn0), 9);
+    p2m_pod_cache_add(p2m, mfn_to_page(mfn0), PAGE_ORDER_2M);
     p2m->pod.entry_count += SUPERPAGE_PAGES;
 
 out_reset:
@@ -800,7 +800,7 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
         }
 
         /* Try to remove the page, restoring old mapping if it fails. */
-        set_p2m_entry(p2m, gfns[i], _mfn(0), 0,
+        set_p2m_entry(p2m, gfns[i], _mfn(0), PAGE_ORDER_4K,
                       p2m_populate_on_demand, p2m->default_access);
 
         /* See if the page was successfully unmapped.  (Allow one refcount
@@ -810,7 +810,8 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
             unmap_domain_page(map[i]);
             map[i] = NULL;
 
-            set_p2m_entry(p2m, gfns[i], mfns[i], 0, types[i], p2m->default_access);
+            set_p2m_entry(p2m, gfns[i], mfns[i], PAGE_ORDER_4K,
+                types[i], p2m->default_access);
 
             continue;
         }
@@ -832,7 +833,8 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
          * check timing.  */
         if ( j < PAGE_SIZE/sizeof(*map[i]) )
         {
-            set_p2m_entry(p2m, gfns[i], mfns[i], 0, types[i], p2m->default_access);
+            set_p2m_entry(p2m, gfns[i], mfns[i], PAGE_ORDER_4K,
+                types[i], p2m->default_access);
         }
         else
         {
@@ -852,7 +854,7 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
             }
 
             /* Add to cache, and account for the new p2m PoD entry */
-            p2m_pod_cache_add(p2m, mfn_to_page(mfns[i]), 0);
+            p2m_pod_cache_add(p2m, mfn_to_page(mfns[i]), PAGE_ORDER_4K);
             p2m->pod.entry_count++;
         }
     }
@@ -867,7 +869,7 @@ p2m_pod_emergency_sweep_super(struct p2m_domain *p2m)
 
     if ( p2m->pod.reclaim_super == 0 )
     {
-        p2m->pod.reclaim_super = (p2m->pod.max_guest>>9)<<9;
+        p2m->pod.reclaim_super = (p2m->pod.max_guest>>PAGE_ORDER_2M)<<PAGE_ORDER_2M;
         p2m->pod.reclaim_super -= SUPERPAGE_PAGES;
     }
     
@@ -956,7 +958,7 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
 
     /* Because PoD does not have cache list for 1GB pages, it has to remap
      * 1GB region to 2MB chunks for a retry. */
-    if ( order == 18 )
+    if ( order == PAGE_ORDER_1G )
     {
         gfn_aligned = (gfn >> order) << order;
         /* Note that we are supposed to call set_p2m_entry() 512 times to 
@@ -964,7 +966,7 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
          * set_p2m_entry() should automatically shatter the 1GB page into 
          * 512 2MB pages. The rest of 511 calls are unnecessary.
          */
-        set_p2m_entry(p2m, gfn_aligned, _mfn(0), 9,
+        set_p2m_entry(p2m, gfn_aligned, _mfn(0), PAGE_ORDER_2M,
                       p2m_populate_on_demand, p2m->default_access);
         audit_p2m(p2m, 1);
         p2m_unlock(p2m);
@@ -979,12 +981,12 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
     {
 
         /* If we're low, start a sweep */
-        if ( order == 9 && page_list_empty(&p2m->pod.super) )
+        if ( order == PAGE_ORDER_2M && page_list_empty(&p2m->pod.super) )
             p2m_pod_emergency_sweep_super(p2m);
 
         if ( page_list_empty(&p2m->pod.single) &&
-             ( ( order == 0 )
-               || (order == 9 && page_list_empty(&p2m->pod.super) ) ) )
+             ( ( order == PAGE_ORDER_4K )
+               || (order == PAGE_ORDER_2M && page_list_empty(&p2m->pod.super) ) ) )
             p2m_pod_emergency_sweep(p2m);
     }
 
@@ -1046,13 +1048,13 @@ out_of_memory:
 out_fail:
     return -1;
 remap_and_retry:
-    BUG_ON(order != 9);
+    BUG_ON(order != PAGE_ORDER_2M);
     spin_unlock(&d->page_alloc_lock);
 
     /* Remap this 2-meg region in singleton chunks */
     gfn_aligned = (gfn>>order)<<order;
     for(i=0; i<(1<<order); i++)
-        set_p2m_entry(p2m, gfn_aligned+i, _mfn(0), 0,
+        set_p2m_entry(p2m, gfn_aligned+i, _mfn(0), PAGE_ORDER_4K,
                       p2m_populate_on_demand, p2m->default_access);
     if ( tb_init_done )
     {

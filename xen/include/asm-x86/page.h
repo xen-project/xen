@@ -13,6 +13,10 @@
 #define PAGE_MASK           (~(PAGE_SIZE-1))
 #define PAGE_FLAG_MASK      (~0)
 
+#define PAGE_ORDER_4K       0
+#define PAGE_ORDER_2M       9
+#define PAGE_ORDER_1G       18
+
 #ifndef __ASSEMBLY__
 # include <asm/types.h>
 # include <xen/lib.h>

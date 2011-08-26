@@ -121,12 +121,12 @@ static void
 p2m_free_entry(struct p2m_domain *p2m, l1_pgentry_t *p2m_entry, int page_order)
 {
     /* End if the entry is a leaf entry. */
-    if ( page_order == 0
+    if ( page_order == PAGE_ORDER_4K 
          || !(l1e_get_flags(*p2m_entry) & _PAGE_PRESENT)
          || (l1e_get_flags(*p2m_entry) & _PAGE_PSE) )
         return;
 
-    if ( page_order > 9 )
+    if ( page_order > PAGE_ORDER_2M )
     {
         l1_pgentry_t *l3_table = map_domain_page(l1e_get_pfn(*p2m_entry));
         for ( int i = 0; i < L3_PAGETABLE_ENTRIES; i++ )
@@ -323,7 +323,7 @@ p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     /*
      * Try to allocate 1GB page table if this feature is supported.
      */
-    if ( page_order == 18 )
+    if ( page_order == PAGE_ORDER_1G )
     {
         l1_pgentry_t old_entry = l1e_empty();
         p2m_entry = p2m_find_entry(table, &gfn_remainder, gfn,
@@ -373,7 +373,7 @@ p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
                               PGT_l2_page_table) )
         goto out;
 
-    if ( page_order == 0 )
+    if ( page_order == PAGE_ORDER_4K )
     {
         if ( !p2m_next_level(p2m, &table_mfn, &table, &gfn_remainder, gfn,
                              L2_PAGETABLE_SHIFT - PAGE_SHIFT,
@@ -399,7 +399,7 @@ p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         p2m->write_p2m_entry(p2m, gfn, p2m_entry, table_mfn, entry_content, 1);
         /* NB: paging_write_p2m_entry() handles tlb flushes properly */
     }
-    else if ( page_order == 9 )
+    else if ( page_order == PAGE_ORDER_2M )
     {
         l1_pgentry_t old_entry = l1e_empty();
         p2m_entry = p2m_find_entry(table, &gfn_remainder, gfn,
@@ -541,7 +541,7 @@ pod_retry_l3:
             /* The read has succeeded, so we know that mapping exists */
             if ( q != p2m_query )
             {
-                if ( !p2m_pod_demand_populate(p2m, gfn, 18, q) )
+                if ( !p2m_pod_demand_populate(p2m, gfn, PAGE_ORDER_1G, q) )
                     goto pod_retry_l3;
                 p2mt = p2m_invalid;
                 printk("%s: Allocate 1GB failed!\n", __func__);
@@ -735,7 +735,7 @@ pod_retry_l3:
             {
                 if ( q != p2m_query )
                 {
-                    if ( !p2m_pod_demand_populate(p2m, gfn, 18, q) )
+                    if ( !p2m_pod_demand_populate(p2m, gfn, PAGE_ORDER_1G, q) )
                         goto pod_retry_l3;
                 }
                 else
@@ -771,7 +771,7 @@ pod_retry_l2:
         {
             if ( q != p2m_query ) {
                 if ( !p2m_pod_check_and_populate(p2m, gfn,
-                                                 (l1_pgentry_t *)l2e, 9, q) )
+                                                 (l1_pgentry_t *)l2e, PAGE_ORDER_2M, q) )
                     goto pod_retry_l2;
             } else
                 *t = p2m_populate_on_demand;
@@ -803,7 +803,7 @@ pod_retry_l1:
         {
             if ( q != p2m_query ) {
                 if ( !p2m_pod_check_and_populate(p2m, gfn,
-                                                 (l1_pgentry_t *)l1e, 0, q) )
+                                                 (l1_pgentry_t *)l1e, PAGE_ORDER_4K, q) )
                     goto pod_retry_l1;
             } else
                 *t = p2m_populate_on_demand;
