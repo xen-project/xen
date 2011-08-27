@@ -1,5 +1,7 @@
 # -*- mode: Makefile; -*-
 
+-include $(XEN_ROOT)/.config
+
 # A debug build of Xen and tools?
 debug ?= y
 
@@ -223,5 +225,3 @@ CONFIG_LOMOUNT     ?= n
 ifeq ($(OCAML_TOOLS),y)
 OCAML_TOOLS := $(shell ocamlopt -v > /dev/null 2>&1 && echo "y" || echo "n")
 endif
-
--include $(XEN_ROOT)/.config
