@@ -1670,7 +1670,7 @@ int map_domain_pirq(
              && !desc->chip_data->used_vectors )
             desc->chip_data->used_vectors = &pdev->info.used_vectors;
         set_domain_irq_pirq(d, irq, info);
-        setup_msi_irq(pdev, msi_desc, irq);
+        setup_msi_irq(msi_desc, irq);
         spin_unlock_irqrestore(&desc->lock, flags);
     }
     else
