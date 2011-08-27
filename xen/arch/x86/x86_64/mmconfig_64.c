@@ -113,12 +113,11 @@ int pci_mmcfg_write(unsigned int seg, unsigned int bus,
 }
 
 static void __iomem *mcfg_ioremap(const struct acpi_mcfg_allocation *cfg,
-                                  unsigned int prot)
+                                  unsigned long idx, unsigned int prot)
 {
     unsigned long virt, size;
 
-    virt = PCI_MCFG_VIRT_START +
-           ((unsigned long)cfg->pci_segment << mmcfg_pci_segment_shift) +
+    virt = PCI_MCFG_VIRT_START + (idx << mmcfg_pci_segment_shift) +
            (cfg->start_bus_number << 20);
     size = (cfg->end_bus_number - cfg->start_bus_number + 1) << 20;
     if (virt + size < virt || virt + size > PCI_MCFG_VIRT_END)
@@ -139,7 +138,7 @@ int pci_mmcfg_arch_enable(unsigned int idx)
 
     if (pci_mmcfg_virt[idx].virt)
         return 0;
-    pci_mmcfg_virt[idx].virt = mcfg_ioremap(cfg, PAGE_HYPERVISOR_NOCACHE);
+    pci_mmcfg_virt[idx].virt = mcfg_ioremap(cfg, idx, PAGE_HYPERVISOR_NOCACHE);
     if (!pci_mmcfg_virt[idx].virt) {
         printk(KERN_ERR "PCI: Cannot map MCFG aperture for segment %04x\n",
                cfg->pci_segment);
@@ -160,7 +159,7 @@ void pci_mmcfg_arch_disable(unsigned int idx)
      * the necessary L4 entries get populated (so that they get properly
      * propagated to guest domains' page tables).
      */
-    mcfg_ioremap(cfg, 0);
+    mcfg_ioremap(cfg, idx, 0);
     printk(KERN_WARNING "PCI: Not using MCFG for segment %04x bus %02x-%02x\n",
            cfg->pci_segment, cfg->start_bus_number, cfg->end_bus_number);
 }
