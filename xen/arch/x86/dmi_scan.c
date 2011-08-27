@@ -10,6 +10,8 @@
 #include <asm/system.h>
 #include <xen/dmi.h>
 #include <xen/efi.h>
+#include <xen/pci.h>
+#include <xen/pci_regs.h>
 
 #define bt_ioremap(b,l)  ((void *)__acpi_map_table(b,l))
 #define bt_iounmap(b,l)  ((void)0)
@@ -278,6 +280,28 @@ static __init int broken_toshiba_keyboard(struct dmi_blacklist *d)
 	return 0;
 }
 
+static int __init ich10_bios_quirk(struct dmi_system_id *d)
+{
+    u32 port, smictl;
+
+    if ( pci_conf_read16(0, 0x1f, 0, PCI_VENDOR_ID) != 0x8086 )
+        return 0;
+
+    switch ( pci_conf_read16(0, 0x1f, 0, PCI_DEVICE_ID) ) {
+    case 0x3a14:
+    case 0x3a16:
+    case 0x3a18:
+    case 0x3a1a:
+        port = (pci_conf_read16(0, 0x1f, 0, 0x40) & 0xff80) + 0x30;
+        smictl = inl(port);
+        /* turn off LEGACY_USB{,2}_EN if enabled */
+        if ( smictl & 0x20008 )
+            outl(smictl & ~0x20008, port);
+        break;
+    }
+
+    return 0;
+}
 
 #ifdef CONFIG_ACPI_SLEEP
 static __init int reset_videomode_after_s3(struct dmi_blacklist *d)
@@ -341,6 +365,18 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			NO_MATCH, NO_MATCH, NO_MATCH
 			} },
 #endif
+
+	{ ich10_bios_quirk, "Intel board & BIOS",
+		/*
+		 * BIOS leaves legacy USB emulation enabled while
+		 * SMM can't properly handle it.
+		 */
+		{
+			MATCH(DMI_BOARD_VENDOR, "Intel Corp"),
+			MATCH(DMI_BIOS_VENDOR, "Intel Corp"),
+			NO_MATCH, NO_MATCH
+		}
+	},
 
 #ifdef	CONFIG_ACPI_BOOT
 	/*
