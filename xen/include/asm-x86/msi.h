@@ -81,7 +81,7 @@ extern void set_msi_affinity(unsigned int vector, cpumask_t mask);
 extern int pci_enable_msi(struct msi_info *msi, struct msi_desc **desc);
 extern void pci_disable_msi(struct msi_desc *desc);
 extern void pci_cleanup_msi(struct pci_dev *pdev);
-extern int setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc, int irq);
+extern int setup_msi_irq(struct msi_desc *desc, int irq);
 extern void teardown_msi_irq(int irq);
 extern int msi_free_vector(struct msi_desc *entry);
 extern int pci_restore_msi_state(struct pci_dev *pdev);
@@ -221,6 +221,5 @@ struct msg_address {
 	__u32 	hi_address;
 } __attribute__ ((packed));
 
-void msi_compose_msg(struct pci_dev *pdev, int irq,
-                            struct msi_msg *msg);
+void msi_compose_msg(int irq, struct msi_msg *);
 #endif /* __ASM_MSI_H */

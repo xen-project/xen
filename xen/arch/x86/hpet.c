@@ -342,7 +342,7 @@ static void __hpet_setup_msi_irq(unsigned int irq)
 {
     struct msi_msg msg;
 
-    msi_compose_msg(NULL, irq, &msg);
+    msi_compose_msg(irq, &msg);
     hpet_msi_write(irq, &msg);
 }
 

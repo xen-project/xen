@@ -120,8 +120,7 @@ static void msix_put_fixmap(struct pci_dev *dev, int idx)
 /*
  * MSI message composition
  */
-void msi_compose_msg(struct pci_dev *pdev, int irq,
-                            struct msi_msg *msg)
+void msi_compose_msg(int irq, struct msi_msg *msg)
 {
     unsigned dest;
     cpumask_t domain;
@@ -414,11 +413,11 @@ static struct msi_desc* alloc_msi_entry(void)
     return entry;
 }
 
-int setup_msi_irq(struct pci_dev *dev, struct msi_desc *msidesc, int irq)
+int setup_msi_irq(struct msi_desc *msidesc, int irq)
 {
     struct msi_msg msg;
 
-    msi_compose_msg(dev, irq, &msg);
+    msi_compose_msg(irq, &msg);
     set_irq_msi(msidesc);
     write_msi_msg(irq_desc[irq].msi_desc, &msg);
 
