@@ -161,11 +161,12 @@ class Saver(object):
 
         self.checkpointer = xen.lowlevel.checkpoint.checkpointer()
         try:
-            self.checkpointer.open(self.vm.domid)
-            self.checkpointer.start(self.fd, self.suspendcb, self.resumecb,
-                                    self.checkpointcb, self.interval)
-        except xen.lowlevel.checkpoint.error, e:
-            raise CheckpointError(e)
+            try:
+                self.checkpointer.open(self.vm.domid)
+                self.checkpointer.start(self.fd, self.suspendcb, self.resumecb,
+                                        self.checkpointcb, self.interval)
+            except xen.lowlevel.checkpoint.error, e:
+                raise CheckpointError(e)
         finally:
             try: #errors in checkpoint close are not critical atm.
                 self.checkpointer.close()
