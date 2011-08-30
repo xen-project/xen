@@ -65,8 +65,10 @@ def runcmd(args, cwd=None):
         proc.wait()
         if proc.returncode:
             print ' '.join(args)
-            print stderr.strip()
-            raise PipeException('%s failed' % args[0], proc.returncode)
+            errmsg = stderr.strip()
+            print errmsg
+            raise PipeException('%s failed (errmsg: %s)' % (args[0], errmsg),
+                                proc.returncode)
         return stdout
     except (OSError, IOError), inst:
         raise PipeException('could not run %s' % args[0], inst.errno)
