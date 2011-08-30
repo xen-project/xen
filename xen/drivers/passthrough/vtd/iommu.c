@@ -1622,7 +1622,7 @@ void iommu_domain_teardown(struct domain *d)
     if ( list_empty(&acpi_drhd_units) )
         return;
 
-    if ( iommu_hap_pt_share )
+    if ( iommu_use_hap_pt(d) )
         return;
 
     spin_lock(&hd->mapping_lock);
@@ -1644,7 +1644,7 @@ static int intel_iommu_map_page(
     int iommu_domid;
 
     /* Do nothing if VT-d shares EPT page table */
-    if ( iommu_hap_pt_share )
+    if ( iommu_use_hap_pt(d) )
         return 0;
 
     /* do nothing if dom0 and iommu supports pass thru */
@@ -1748,15 +1748,15 @@ void iommu_pte_flush(struct domain *d, u64 gfn, u64 *pte,
 
 static int vtd_ept_page_compatible(struct iommu *iommu)
 {
-    u64 cap = iommu->cap;
+    u64 ept_cap, vtd_cap = iommu->cap;
 
-    if ( ept_has_2mb(cpu_has_vmx_ept_2mb) != cap_sps_2mb(cap) )
+    /* EPT is not initialised yet, so we must check the capability in
+     * the MSR explicitly rather than use cpu_has_vmx_ept_*() */
+    if ( rdmsr_safe(MSR_IA32_VMX_EPT_VPID_CAP, ept_cap) != 0 ) 
         return 0;
 
-    if ( ept_has_1gb(cpu_has_vmx_ept_1gb) != cap_sps_1gb(cap) )
-        return 0;
-
-    return 1;
+    return ( ept_has_2mb(ept_cap) == cap_sps_2mb(vtd_cap) 
+             && ept_has_1gb(ept_cap) == cap_sps_1gb(vtd_cap) );
 }
 
 /*
@@ -1769,7 +1769,7 @@ void iommu_set_pgd(struct domain *d)
 
     ASSERT( is_hvm_domain(d) && d->arch.hvm_domain.hap_enabled );
 
-    if ( !iommu_hap_pt_share )
+    if ( !iommu_use_hap_pt(d) )
         return;
 
     pgd_mfn = pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d)));
