@@ -95,6 +95,12 @@ class MigrationSocket(_proxy):
         self.sock = sock
         super(MigrationSocket, self).__init__(fd)
 
+class NullSocket(_proxy):
+    def __init__(self, address):
+        filedesc = os.open('/dev/null', 0666)
+        fd = os.fdopen(filedesc, 'w+')
+        super(NullSocket, self).__init__(fd)
+
 class Keepalive(object):
     "Call a keepalive method at intervals"
     def __init__(self, method, interval=0.1):
