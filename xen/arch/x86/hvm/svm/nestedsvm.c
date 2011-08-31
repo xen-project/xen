@@ -493,8 +493,7 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
     n2vmcb->lbr_control.bytes =
         n1vmcb->lbr_control.bytes | ns_vmcb->lbr_control.bytes;
 
-    /* NextRIP */
-    n2vmcb->nextrip = ns_vmcb->nextrip;
+    /* NextRIP - only evaluated on #VMEXIT. */
 
     /*
      * VMCB Save State Area
