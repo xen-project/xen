@@ -366,6 +366,9 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
 
     bind->port = port;
 
+    if ( is_hvm_domain(d) && domain_pirq_to_irq(d, pirq) > 0 )
+        map_domain_emuirq_pirq(d, pirq, IRQ_PT);
+
  out:
     spin_unlock(&d->event_lock);
 
@@ -419,6 +422,8 @@ static long __evtchn_close(struct domain *d1, int port1)
         pirq->evtchn = 0;
         pirq_cleanup_check(pirq, d1);
         unlink_pirq_port(chn1, d1->vcpu[chn1->notify_vcpu_id]);
+        if ( is_hvm_domain(d1) && domain_pirq_to_irq(d1, pirq->pirq) > 0 )
+            unmap_domain_pirq_emuirq(d1, pirq->pirq);
         break;
     }
 

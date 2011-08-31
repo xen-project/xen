@@ -2027,6 +2027,5 @@ int unmap_domain_pirq_emuirq(struct domain *d, int pirq)
 bool_t hvm_domain_use_pirq(const struct domain *d, const struct pirq *pirq)
 {
     return is_hvm_domain(d) && pirq &&
-           pirq->arch.hvm.emuirq != IRQ_UNBOUND &&
-           pirq->evtchn != 0;
+           pirq->arch.hvm.emuirq != IRQ_UNBOUND; 
 }
