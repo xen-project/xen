@@ -58,7 +58,8 @@ static void check_pmc_quirk(void)
     is_pmc_quirk = 0;
     if ( family == 6 )
     {
-        if ( cpu_model == 46 || cpu_model == 26 )
+        if ( cpu_model == 47 || cpu_model == 46 || cpu_model == 42 ||
+             cpu_model == 26 )
             is_pmc_quirk = 1;
     }
 }
