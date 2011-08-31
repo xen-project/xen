@@ -971,7 +971,7 @@ static unsigned int dma_msi_startup(unsigned int irq)
     return 0;
 }
 
-static void dma_msi_end(unsigned int irq)
+static void dma_msi_end(unsigned int irq, u8 vector)
 {
     dma_msi_unmask(irq);
     ack_APIC_irq();

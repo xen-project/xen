@@ -93,7 +93,7 @@ static unsigned int startup_8259A_irq(unsigned int irq)
     return 0; /* never anything pending */
 }
 
-static void end_8259A_irq(unsigned int irq)
+static void end_8259A_irq(unsigned int irq, u8 vector)
 {
     if (!(irq_desc[irq].status & (IRQ_DISABLED|IRQ_INPROGRESS)))
         enable_8259A_irq(irq);

@@ -44,7 +44,7 @@ struct hw_interrupt_type {
     void (*enable)(unsigned int irq);
     void (*disable)(unsigned int irq);
     void (*ack)(unsigned int irq);
-    void (*end)(unsigned int irq);
+    void (*end)(unsigned int irq, u8 vector);
     void (*set_affinity)(unsigned int irq, cpumask_t mask);
 };
 

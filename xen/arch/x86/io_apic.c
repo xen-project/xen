@@ -1691,7 +1691,7 @@ static void mask_and_ack_level_ioapic_irq (unsigned int irq)
     }
 }
 
-static void end_level_ioapic_irq (unsigned int irq)
+static void end_level_ioapic_irq (unsigned int irq, u8 vector)
 {
     unsigned long v;
     int i;
@@ -1740,6 +1740,14 @@ static void end_level_ioapic_irq (unsigned int irq)
  */
     i = IO_APIC_VECTOR(irq);
 
+    /* Manually EOI the old vector if we are moving to the new */
+    if ( vector && i != vector )
+    {
+        int ioapic;
+        for (ioapic = 0; ioapic < nr_ioapics; ioapic++)
+            io_apic_eoi(ioapic, i);
+    }
+
     v = apic_read(APIC_TMR + ((i & ~0x1f) >> 1));
 
     ack_APIC_irq();
@@ -1763,7 +1771,10 @@ static void disable_edge_ioapic_irq(unsigned int irq)
 {
 }
 
-#define end_edge_ioapic_irq disable_edge_ioapic_irq
+static void end_edge_ioapic_irq(unsigned int irq, u8 vector)
+{
+}
+
 
 /*
  * Level and edge triggered IO-APIC interrupts need different handling,
@@ -1812,7 +1823,7 @@ static void ack_msi_irq(unsigned int irq)
         ack_APIC_irq(); /* ACKTYPE_NONE */
 }
 
-static void end_msi_irq(unsigned int irq)
+static void end_msi_irq(unsigned int irq, u8 vector)
 {
     if ( !msi_maskable_irq(irq_desc[irq].msi_desc) )
         ack_APIC_irq(); /* ACKTYPE_EOI */

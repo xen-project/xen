@@ -441,7 +441,7 @@ static unsigned int iommu_msi_startup(unsigned int irq)
     return 0;
 }
 
-static void iommu_msi_end(unsigned int irq)
+static void iommu_msi_end(unsigned int irq, u8 vector)
 {
     iommu_msi_unmask(irq);
     ack_APIC_irq();
