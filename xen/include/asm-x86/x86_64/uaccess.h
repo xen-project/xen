@@ -34,7 +34,7 @@ extern void *xlat_malloc(unsigned long *xlat_page_current, size_t size);
  * non-canonical address (and thus fault) before ever reaching VIRT_START.
  */
 #define __addr_ok(addr) \
-    (((unsigned long)(addr) < (1UL<<48)) || \
+    (((unsigned long)(addr) < (1UL<<47)) || \
      ((unsigned long)(addr) >= HYPERVISOR_VIRT_END))
 
 #define access_ok(addr, size) \
