@@ -29,7 +29,7 @@
 #include <asm/msi.h>
 
 /* Must be called with hvm_domain->irq_lock hold */
-static void assert_irq(struct domain *d, unsigned ioapic_gsi, unsigned pic_irq)
+static void assert_gsi(struct domain *d, unsigned ioapic_gsi)
 {
     struct pirq *pirq =
         pirq_info(d, domain_emuirq_to_pirq(d, ioapic_gsi));
@@ -40,6 +40,11 @@ static void assert_irq(struct domain *d, unsigned ioapic_gsi, unsigned pic_irq)
         return;
     }
     vioapic_irq_positive_edge(d, ioapic_gsi);
+}
+
+static void assert_irq(struct domain *d, unsigned ioapic_gsi, unsigned pic_irq)
+{
+    assert_gsi(d, ioapic_gsi);
     vpic_irq_positive_edge(d, pic_irq);
 }
 
@@ -66,7 +71,7 @@ static void __hvm_pci_intx_assert(
 
     gsi = hvm_pci_intx_gsi(device, intx);
     if ( hvm_irq->gsi_assert_count[gsi]++ == 0 )
-        vioapic_irq_positive_edge(d, gsi);
+        assert_gsi(d, gsi);
 
     link    = hvm_pci_intx_link(device, intx);
     isa_irq = hvm_irq->pci_link.route[link];
