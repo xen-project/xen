@@ -202,9 +202,6 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
     if ( ret == 0 )
         map->pirq = pirq;
 
-    if ( !ret && is_hvm_domain(d) )
-        map_domain_emuirq_pirq(d, pirq, IRQ_PT);
-
  done:
     spin_unlock(&d->event_lock);
     spin_unlock(&pcidevs_lock);
@@ -267,7 +264,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         if ( v->domain->arch.pirq_eoi_map )
             evtchn_unmask(v->domain->pirq_to_evtchn[eoi.irq]);
         if ( !is_hvm_domain(v->domain) ||
-             domain_pirq_to_emuirq(v->domain, eoi.irq) == IRQ_PT )
+             domain_pirq_to_irq(v->domain, eoi.irq) > 0 )
             ret = pirq_guest_eoi(v->domain, eoi.irq);
         else
             ret = 0;
@@ -326,7 +323,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             break;
         irq_status_query.flags = 0;
         if ( is_hvm_domain(v->domain) &&
-             domain_pirq_to_emuirq(v->domain, irq) != IRQ_PT )
+             domain_pirq_to_irq(v->domain, irq) <= 0 )
         {
             ret = copy_to_guest(arg, &irq_status_query, 1) ? -EFAULT : 0;
             break;
