@@ -1587,13 +1587,19 @@ int get_free_pirq(struct domain *d, int type, int index)
     {
         for ( i = 16; i < nr_irqs_gsi; i++ )
             if ( is_free_pirq(d, pirq_info(d, i)) )
+            {
+                pirq_get_info(d, i);
                 return i;
+            }
     }
     else
     {
         for ( i = d->nr_pirqs - 1; i >= nr_irqs_gsi; i-- )
             if ( is_free_pirq(d, pirq_info(d, i)) )
+            {
+                pirq_get_info(d, i);
                 return i;
+            }
     }
 
     return -ENOSPC;
