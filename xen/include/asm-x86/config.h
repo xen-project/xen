@@ -50,7 +50,7 @@
 #ifdef MAX_PHYS_CPUS
 #define NR_CPUS MAX_PHYS_CPUS
 #else
-#define NR_CPUS 128
+#define NR_CPUS 256
 #endif
 
 #ifdef __i386__
