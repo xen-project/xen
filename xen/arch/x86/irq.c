@@ -309,6 +309,7 @@ static void __do_IRQ_guest(int vector);
 void no_action(int cpl, void *dev_id, struct cpu_user_regs *regs) { }
 
 static void enable_none(unsigned int vector) { }
+static void end_none(unsigned int irq, u8 vector) { }
 static unsigned int startup_none(unsigned int vector) { return 0; }
 static void disable_none(unsigned int vector) { }
 static void ack_none(unsigned int irq)
@@ -317,7 +318,6 @@ static void ack_none(unsigned int irq)
 }
 
 #define shutdown_none   disable_none
-#define end_none        enable_none
 
 hw_irq_controller no_irq_type = {
     "none",
@@ -345,6 +345,7 @@ int __assign_irq_vector(int irq, struct irq_cfg *cfg, const cpumask_t *mask)
     static int current_vector = FIRST_DYNAMIC_VECTOR, current_offset = 0;
     unsigned int old_vector;
     int cpu, err;
+    unsigned long flags;
     cpumask_t tmp_mask;
 
     old_vector = irq_to_vector(irq);
@@ -391,6 +392,7 @@ next:
         /* Found one! */
         current_vector = vector;
         current_offset = offset;
+        local_irq_save(flags);
         if (old_vector) {
             cfg->move_in_progress = 1;
             cpus_copy(cfg->old_cpu_mask, cfg->cpu_mask);
@@ -404,6 +406,7 @@ next:
             if (IO_APIC_IRQ(irq))
                     irq_vector[irq] = vector;
         err = 0;
+        local_irq_restore(flags);
         break;
     }
     return err;
@@ -610,7 +613,7 @@ asmlinkage void do_IRQ(struct cpu_user_regs *regs)
     desc->status &= ~IRQ_INPROGRESS;
 
  out:
-    desc->handler->end(irq);
+    desc->handler->end(irq, regs->entry_vector);
  out_no_end:
     spin_unlock(&desc->lock);
     irq_exit();
@@ -826,7 +829,7 @@ static void irq_guest_eoi_timer_fn(void *data)
     switch ( action->ack_type )
     {
     case ACKTYPE_UNMASK:
-        desc->handler->end(irq);
+        desc->handler->end(irq, 0);
         break;
     case ACKTYPE_EOI:
         cpu_eoi_map = action->cpu_eoi_map;
@@ -857,7 +860,7 @@ static void __do_IRQ_guest(int irq)
         /* An interrupt may slip through while freeing an ACKTYPE_EOI irq. */
         ASSERT(action->ack_type == ACKTYPE_EOI);
         ASSERT(desc->status & IRQ_DISABLED);
-        desc->handler->end(irq);
+        desc->handler->end(irq, vector);
         return;
     }
 
@@ -968,7 +971,7 @@ static void flush_ready_eoi(void)
         ASSERT(irq > 0);
         desc = irq_to_desc(irq);
         spin_lock(&desc->lock);
-        desc->handler->end(irq);
+        desc->handler->end(irq, peoi[sp].vector);
         spin_unlock(&desc->lock);
     }
 
@@ -1049,7 +1052,7 @@ static void __pirq_guest_eoi(struct domain *d, int pirq)
     if ( action->ack_type == ACKTYPE_UNMASK )
     {
         ASSERT(cpus_empty(action->cpu_eoi_map));
-        desc->handler->end(irq);
+        desc->handler->end(irq, 0);
         spin_unlock_irq(&desc->lock);
         return;
     }
@@ -1309,7 +1312,7 @@ static irq_guest_action_t *__pirq_guest_unbind(
     case ACKTYPE_UNMASK:
         if ( test_and_clear_bit(pirq, d->pirq_mask) &&
              (--action->in_flight == 0) )
-            desc->handler->end(irq);
+            desc->handler->end(irq, 0);
         break;
     case ACKTYPE_EOI:
         /* NB. If #guests == 0 then we clear the eoi_map later on. */

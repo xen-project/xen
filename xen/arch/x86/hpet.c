@@ -325,7 +325,7 @@ static void hpet_msi_ack(unsigned int irq)
     ack_APIC_irq();
 }
 
-static void hpet_msi_end(unsigned int irq)
+static void hpet_msi_end(unsigned int irq, u8 vector)
 {
 }
 
