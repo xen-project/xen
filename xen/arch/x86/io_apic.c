@@ -441,6 +441,7 @@ fastcall void smp_irq_move_cleanup_interrupt(struct cpu_user_regs *regs)
     struct cpu_user_regs *old_regs = set_irq_regs(regs);
 
     ack_APIC_irq();
+    this_cpu(irq_count)++;
     irq_enter();
 
     me = smp_processor_id();

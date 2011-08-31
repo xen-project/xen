@@ -1332,6 +1332,7 @@ fastcall void smp_apic_timer_interrupt(struct cpu_user_regs * regs)
     struct cpu_user_regs *old_regs = set_irq_regs(regs);
     ack_APIC_irq();
     perfc_incr(apic_timer);
+    this_cpu(irq_count)++;
     raise_softirq(TIMER_SOFTIRQ);
     set_irq_regs(old_regs);
 }
@@ -1353,6 +1354,7 @@ fastcall void smp_spurious_interrupt(struct cpu_user_regs *regs)
     unsigned long v;
     struct cpu_user_regs *old_regs = set_irq_regs(regs);
 
+    this_cpu(irq_count)++;
     irq_enter();
 
     /*
@@ -1388,6 +1390,7 @@ fastcall void smp_error_interrupt(struct cpu_user_regs *regs)
     unsigned long v, v1;
     struct cpu_user_regs *old_regs = set_irq_regs(regs);
 
+    this_cpu(irq_count)++;
     irq_enter();
     /* First tickle the hardware, only then report what went on. -- REW */
     v = apic_read(APIC_ESR);
@@ -1419,6 +1422,7 @@ fastcall void smp_pmu_apic_interrupt(struct cpu_user_regs *regs)
 {
     struct cpu_user_regs *old_regs = set_irq_regs(regs);
     ack_APIC_irq();
+    this_cpu(irq_count)++;
     hvm_do_pmu_interrupt(regs);
     set_irq_regs(old_regs);
 }

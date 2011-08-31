@@ -221,6 +221,7 @@ fastcall void smp_invalidate_interrupt(void)
 {
     ack_APIC_irq();
     perfc_incr(ipis);
+    this_cpu(irq_count)++;
     irq_enter();
     if ( !__sync_local_execstate() ||
          (flush_flags & (FLUSH_TLB_GLOBAL | FLUSH_CACHE)) )
@@ -385,6 +386,7 @@ fastcall void smp_event_check_interrupt(struct cpu_user_regs *regs)
     struct cpu_user_regs *old_regs = set_irq_regs(regs);
     ack_APIC_irq();
     perfc_incr(ipis);
+    this_cpu(irq_count)++;
     set_irq_regs(old_regs);
 }
 
@@ -421,6 +423,7 @@ fastcall void smp_call_function_interrupt(struct cpu_user_regs *regs)
 
     ack_APIC_irq();
     perfc_incr(ipis);
+    this_cpu(irq_count)++;
     __smp_call_function_interrupt();
     set_irq_regs(old_regs);
 }

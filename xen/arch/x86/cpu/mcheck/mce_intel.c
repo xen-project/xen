@@ -77,6 +77,7 @@ static void (*__read_mostly vendor_thermal_interrupt)(struct cpu_user_regs *regs
 fastcall void smp_thermal_interrupt(struct cpu_user_regs *regs)
 {
     struct cpu_user_regs *old_regs = set_irq_regs(regs);
+    this_cpu(irq_count)++;
     irq_enter();
     vendor_thermal_interrupt(regs);
     irq_exit();
@@ -1147,6 +1148,7 @@ fastcall void smp_cmci_interrupt(struct cpu_user_regs *regs)
     struct cpu_user_regs *old_regs = set_irq_regs(regs);
 
     ack_APIC_irq();
+    this_cpu(irq_count)++;
     irq_enter();
 
     mctc = mcheck_mca_logout(
