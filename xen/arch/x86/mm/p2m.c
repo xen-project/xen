@@ -881,7 +881,7 @@ void p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long gla
 
     if ( access_w && p2ma == p2m_access_rx2rw ) 
     {
-        p2m->set_entry(p2m, gfn, mfn, 0, p2mt, p2m_access_rw);
+        p2m->set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2mt, p2m_access_rw);
         p2m_unlock(p2m);
         return;
     }
@@ -904,7 +904,7 @@ void p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long gla
         {
             /* A listener is not required, so clear the access restrictions */
             p2m_lock(p2m);
-            p2m->set_entry(p2m, gfn, mfn, 0, p2mt, p2m_access_rwx);
+            p2m->set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2mt, p2m_access_rwx);
             p2m_unlock(p2m);
         }
 
@@ -996,7 +996,7 @@ int p2m_set_mem_access(struct domain *d, unsigned long start_pfn,
     for ( pfn = start_pfn; pfn < start_pfn + nr; pfn++ )
     {
         mfn = gfn_to_mfn_query(d, pfn, &t);
-        if ( p2m->set_entry(p2m, pfn, mfn, 0, t, a) == 0 )
+        if ( p2m->set_entry(p2m, pfn, mfn, PAGE_ORDER_4K, t, a) == 0 )
         {
             rc = -ENOMEM;
             break;
