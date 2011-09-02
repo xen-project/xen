@@ -43,7 +43,7 @@ static struct ns16550 {
     /* UART with no IRQ line: periodically-polled I/O. */
     struct timer timer;
     unsigned int timeout_ms;
-    bool_t probing, intr_works;
+    bool_t intr_works;
     /* PCI card parameters. */
     unsigned int pb_bdf[3]; /* pci bridge BDF */
     unsigned int ps_bdf[3]; /* pci serial port BDF */
@@ -138,12 +138,7 @@ static void ns16550_interrupt(
     struct serial_port *port = dev_id;
     struct ns16550 *uart = port->uart;
 
-    if ( !uart->intr_works )
-    {
-        uart->probing = 0;
-        uart->intr_works = 1;
-        stop_timer(&uart->timer);
-    }
+    uart->intr_works = 1;
 
     while ( !(ns_read_reg(uart, IIR) & IIR_NOINT) )
     {
@@ -155,29 +150,25 @@ static void ns16550_interrupt(
     }
 }
 
-/* Safe: ns16550_poll() runs in softirq context so not reentrant on a given CPU. */
+/* Safe: ns16550_poll() runs as softirq so not reentrant on a given CPU. */
 static DEFINE_PER_CPU(struct serial_port *, poll_port);
 
 static void __ns16550_poll(struct cpu_user_regs *regs)
 {
     struct serial_port *port = this_cpu(poll_port);
     struct ns16550 *uart = port->uart;
+    char lsr;
 
     if ( uart->intr_works )
         return; /* Interrupts work - no more polling */
 
-    if ( uart->probing )
+    while ( (lsr = ns_read_reg(uart, LSR)) & (LSR_DR|LSR_THRE) )
     {
-        uart->probing = 0;
-        if ( (ns_read_reg(uart, LSR) & 0xff) == 0xff )
-            return; /* All bits set - probably no UART present */
+        if ( lsr & LSR_THRE )
+            serial_tx_interrupt(port, regs);
+        if ( lsr & LSR_DR )
+            serial_rx_interrupt(port, regs);
     }
-
-    while ( ns_read_reg(uart, LSR) & LSR_DR )
-        serial_rx_interrupt(port, regs);
-
-    if ( ns_read_reg(uart, LSR) & LSR_THRE )
-        serial_tx_interrupt(port, regs);
 
     set_timer(&uart->timer, NOW() + MILLISECS(uart->timeout_ms));
 }
@@ -234,6 +225,8 @@ static void ns16550_setup_preirq(struct ns16550 *uart)
 {
     unsigned char lcr;
     unsigned int  divisor;
+
+    uart->intr_works = 0;
 
     pci_serial_early_init(uart);
 
@@ -292,11 +285,6 @@ static void ns16550_setup_postirq(struct ns16550 *uart)
 
         /* Enable receive and transmit interrupts. */
         ns_write_reg(uart, IER, IER_ERDAI | IER_ETHREI);
-
-        /* Do a timed write to make sure we are getting interrupts. */
-        uart->probing = 1;
-        uart->intr_works = 0;
-        ns_write_reg(uart, THR, 0xff);
     }
 
     if ( uart->irq >= 0 )
