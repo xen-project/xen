@@ -167,18 +167,35 @@ int __init amd_iov_detect(void)
         return -ENODEV;
     }
 
-    /* Enable use of per-device vector map unless otherwise
-     * specified */
-    if ( iommu_amd_perdev_vector_map )
+    /*
+     * AMD IOMMUs don't distinguish between vectors destined for
+     * different cpus when doing interrupt remapping.  This means
+     * that interrupts going through the same intremap table
+     * can't share the same vector.
+     *
+     * If irq_vector_map isn't specified, choose a sensible default:
+     * - If we're using per-device interemap tables, per-device
+     *   vector non-sharing maps
+     * - If we're using a global interemap table, global vector
+     *   non-sharing map
+     */
+    if ( opt_irq_vector_map == OPT_IRQ_VECTOR_MAP_DEFAULT )
     {
-        printk("AMD-Vi: Enabling per-device vector maps\n");
-        opt_irq_perdev_vector_map=1;
+        if ( amd_iommu_perdev_intremap )
+        {
+            printk("AMD-Vi: Enabling per-device vector maps\n");
+            opt_irq_vector_map = OPT_IRQ_VECTOR_MAP_PERDEV;
+        }
+        else
+        {
+            printk("AMD-Vi: Enabling global vector map\n");
+            opt_irq_vector_map = OPT_IRQ_VECTOR_MAP_GLOBAL;
+        }
     }
     else
     {
-        printk("AMD-Vi: WARNING - not enabling per-device vector maps\n");
+        printk("AMD-Vi: Not overriding irq_vector_map setting\n");
     }
-
     return scan_pci_devices();
 }
 

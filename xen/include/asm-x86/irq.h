@@ -46,6 +46,13 @@ extern u8 *irq_vector;
 
 extern bool_t opt_noirqbalance;
 
+#define OPT_IRQ_VECTOR_MAP_DEFAULT 0 /* Do the default thing  */
+#define OPT_IRQ_VECTOR_MAP_NONE    1 /* None */ 
+#define OPT_IRQ_VECTOR_MAP_GLOBAL  2 /* One global vector map (no vector sharing) */ 
+#define OPT_IRQ_VECTOR_MAP_PERDEV  3 /* Per-device vetor map (no vector sharing w/in a device) */
+
+extern int opt_irq_vector_map;
+
 /*
  * Per-cpu current frame pointer - the location of the last exception frame on
  * the stack
