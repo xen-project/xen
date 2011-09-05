@@ -34,7 +34,12 @@ struct irq_cfg {
         unsigned move_cleanup_count;
         vmask_t *used_vectors;
         u8 move_in_progress : 1;
+        u8 used: 1;
 };
+
+/* For use with irq_cfg.used */
+#define IRQ_UNUSED      (0)
+#define IRQ_USED        (1)
 
 extern struct irq_cfg *irq_cfg;
 

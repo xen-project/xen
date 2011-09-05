@@ -43,11 +43,6 @@ vmask_t global_used_vector_map;
 u8 __read_mostly *irq_vector;
 struct irq_desc __read_mostly *irq_desc = NULL;
 
-int __read_mostly *irq_status = NULL;
-#define IRQ_UNUSED      (0)
-#define IRQ_USED        (1)
-#define IRQ_RSVD        (2)
-
 #define IRQ_VECTOR_UNASSIGNED (0)
 
 static DECLARE_BITMAP(used_vectors, NR_VECTORS);
@@ -141,7 +136,7 @@ static int __init __bind_irq_vector(int irq, int vector, cpumask_t cpu_mask)
         ASSERT(!test_bit(vector, cfg->used_vectors));
         set_bit(vector, cfg->used_vectors);
     }
-    irq_status[irq] = IRQ_USED;
+    cfg->used = IRQ_USED;
     if (IO_APIC_IRQ(irq))
         irq_vector[irq] = vector;
     return 0;
@@ -163,7 +158,7 @@ static inline int find_unassigned_irq(void)
     int irq;
 
     for (irq = nr_irqs_gsi; irq < nr_irqs; irq++)
-        if (irq_status[irq] == IRQ_UNUSED)
+        if (irq_cfg[irq].used == IRQ_UNUSED)
             return irq;
     return -ENOSPC;
 }
@@ -215,8 +210,6 @@ static void dynamic_irq_cleanup(unsigned int irq)
         xfree(action);
 }
 
-static void init_one_irq_status(int irq);
-
 static void __clear_irq_vector(int irq)
 {
     int cpu, vector;
@@ -235,7 +228,7 @@ static void __clear_irq_vector(int irq)
 
     cfg->vector = IRQ_VECTOR_UNASSIGNED;
     cpus_clear(cfg->cpu_mask);
-    init_one_irq_status(irq);
+    cfg->used = IRQ_UNUSED;
 
     if (likely(!cfg->move_in_progress))
         return;
@@ -307,17 +300,13 @@ static void __init init_one_irq_desc(struct irq_desc *desc)
     INIT_LIST_HEAD(&desc->rl_link);
 }
 
-static void init_one_irq_status(int irq)
-{
-    irq_status[irq] = IRQ_UNUSED;
-}
-
 static void __init init_one_irq_cfg(struct irq_cfg *cfg)
 {
     cfg->vector = IRQ_VECTOR_UNASSIGNED;
     cpus_clear(cfg->cpu_mask);
     cpus_clear(cfg->old_cpu_mask);
     cfg->used_vectors = NULL;
+    cfg->used = IRQ_UNUSED;
 }
 
 int __init init_irq_data(void)
@@ -331,15 +320,13 @@ int __init init_irq_data(void)
 
     irq_desc = xmalloc_array(struct irq_desc, nr_irqs);
     irq_cfg = xmalloc_array(struct irq_cfg, nr_irqs);
-    irq_status = xmalloc_array(int, nr_irqs);
     irq_vector = xmalloc_array(u8, nr_irqs_gsi);
     
-    if ( !irq_desc || !irq_cfg || !irq_status ||! irq_vector )
+    if ( !irq_desc || !irq_cfg ||! irq_vector )
         return -ENOMEM;
 
     memset(irq_desc, 0,  nr_irqs * sizeof(*irq_desc));
     memset(irq_cfg, 0,  nr_irqs * sizeof(*irq_cfg));
-    memset(irq_status, 0,  nr_irqs * sizeof(*irq_status));
     memset(irq_vector, 0, nr_irqs_gsi * sizeof(*irq_vector));
     
     for (irq = 0; irq < nr_irqs; irq++) {
@@ -349,7 +336,6 @@ int __init init_irq_data(void)
         desc->chip_data = cfg;
         init_one_irq_desc(desc);
         init_one_irq_cfg(cfg);
-        init_one_irq_status(irq);
     }
 
     /* Never allocate the hypercall vector or Linux/BSD fast-trap vector. */
@@ -459,7 +445,7 @@ int __assign_irq_vector(int irq, struct irq_cfg *cfg, const cpumask_t *mask)
     /* This is the only place normal IRQs are ever marked
      * as "in use".  If they're not in use yet, check to see
      * if we need to assign a global vector mask. */
-    if ( irq_status[irq] == IRQ_USED )
+    if ( cfg->used == IRQ_USED )
     {
         irq_used_vectors = cfg->used_vectors;
     }
@@ -512,7 +498,7 @@ next:
         cfg->vector = vector;
         cpus_copy(cfg->cpu_mask, tmp_mask);
 
-        irq_status[irq] = IRQ_USED;
+        cfg->used = IRQ_USED;
         ASSERT((cfg->used_vectors == NULL)
                || (cfg->used_vectors == irq_used_vectors));
         cfg->used_vectors = irq_used_vectors;
