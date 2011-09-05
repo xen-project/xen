@@ -178,10 +178,7 @@ int mem_event_check_ring(struct domain *d)
     }
 
     if ( (curr->domain->domain_id == d->domain_id) && ring_full )
-    {
-        set_bit(_VPF_mem_event, &curr->pause_flags);
-        vcpu_sleep_nosync(curr);
-    }
+        mem_event_mark_and_pause(curr);
 
     mem_event_ring_unlock(d);
 
