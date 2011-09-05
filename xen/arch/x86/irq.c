@@ -43,8 +43,6 @@ vmask_t global_used_vector_map;
 u8 __read_mostly *irq_vector;
 struct irq_desc __read_mostly *irq_desc = NULL;
 
-#define IRQ_VECTOR_UNASSIGNED (0)
-
 static DECLARE_BITMAP(used_vectors, NR_VECTORS);
 
 struct irq_cfg __read_mostly *irq_cfg = NULL;
@@ -235,15 +233,9 @@ static void __clear_irq_vector(int irq)
 
     cpus_and(tmp_mask, cfg->old_cpu_mask, cpu_online_map);
     for_each_cpu_mask(cpu, tmp_mask) {
-        for (vector = FIRST_DYNAMIC_VECTOR; vector <= LAST_DYNAMIC_VECTOR;
-                                vector++) {
-            if (per_cpu(vector_irq, cpu)[vector] != irq)
-                continue;
-            TRACE_3D(TRC_HW_IRQ_MOVE_FINISH,
-                     irq, vector, cpu);
-            per_cpu(vector_irq, cpu)[vector] = -1;
-             break;
-        }
+        ASSERT( per_cpu(vector_irq, cpu)[cfg->old_vector] == irq );
+        TRACE_3D(TRC_HW_IRQ_MOVE_FINISH, irq, vector, cpu);
+        per_cpu(vector_irq, cpu)[cfg->old_vector] = -1;
      }
 
     if ( cfg->used_vectors )
@@ -253,6 +245,8 @@ static void __clear_irq_vector(int irq)
     }
 
     cfg->move_in_progress = 0;
+    cfg->old_vector = IRQ_VECTOR_UNASSIGNED;
+    cpus_clear(cfg->old_cpu_mask);
 }
 
 void clear_irq_vector(int irq)
@@ -303,6 +297,7 @@ static void __init init_one_irq_desc(struct irq_desc *desc)
 static void __init init_one_irq_cfg(struct irq_cfg *cfg)
 {
     cfg->vector = IRQ_VECTOR_UNASSIGNED;
+    cfg->old_vector = IRQ_VECTOR_UNASSIGNED;
     cpus_clear(cfg->cpu_mask);
     cpus_clear(cfg->old_cpu_mask);
     cfg->used_vectors = NULL;
@@ -491,6 +486,7 @@ next:
         if (old_vector) {
             cfg->move_in_progress = 1;
             cpus_copy(cfg->old_cpu_mask, cfg->cpu_mask);
+            cfg->old_vector = cfg->vector;
         }
         trace_irq_mask(TRC_HW_IRQ_ASSIGN_VECTOR, irq, vector, &tmp_mask);
         for_each_cpu_mask(new_cpu, tmp_mask)

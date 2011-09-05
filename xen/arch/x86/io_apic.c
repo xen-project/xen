@@ -488,11 +488,16 @@ fastcall void smp_irq_move_cleanup_interrupt(struct cpu_user_regs *regs)
         __get_cpu_var(vector_irq)[vector] = -1;
         cfg->move_cleanup_count--;
 
-        if ( cfg->move_cleanup_count == 0 
-             &&  cfg->used_vectors )
+        if ( cfg->move_cleanup_count == 0 )
         {
-            ASSERT(test_bit(vector, cfg->used_vectors));
-            clear_bit(vector, cfg->used_vectors);
+            cfg->old_vector = IRQ_VECTOR_UNASSIGNED;
+            cpus_clear(cfg->old_cpu_mask);
+
+            if ( cfg->used_vectors )
+            {
+                ASSERT(test_bit(vector, cfg->used_vectors));
+                clear_bit(vector, cfg->used_vectors);
+            }
         }
 unlock:
         spin_unlock(&desc->lock);

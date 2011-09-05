@@ -28,7 +28,8 @@ typedef struct {
 } vmask_t;
 
 struct irq_cfg {
-        int  vector;
+        s16 vector;                  /* vector itself is only 8 bits, */
+        s16 old_vector;              /* but we use -1 for unassigned  */
         cpumask_t cpu_mask;
         cpumask_t old_cpu_mask;
         unsigned move_cleanup_count;
@@ -40,6 +41,8 @@ struct irq_cfg {
 /* For use with irq_cfg.used */
 #define IRQ_UNUSED      (0)
 #define IRQ_USED        (1)
+
+#define IRQ_VECTOR_UNASSIGNED (-1)
 
 extern struct irq_cfg *irq_cfg;
 
