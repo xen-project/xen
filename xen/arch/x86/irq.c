@@ -202,7 +202,6 @@ static void dynamic_irq_cleanup(unsigned int irq)
     desc->handler->shutdown(irq);
     action = desc->action;
     desc->action  = NULL;
-    desc->depth   = 1;
     desc->msi_desc = NULL;
     desc->handler = &no_irq_type;
     desc->chip_data->used_vectors=NULL;
@@ -302,7 +301,6 @@ static void __init init_one_irq_desc(struct irq_desc *desc)
     desc->status  = IRQ_DISABLED;
     desc->handler = &no_irq_type;
     desc->action  = NULL;
-    desc->depth   = 1;
     desc->msi_desc = NULL;
     spin_lock_init(&desc->lock);
     cpus_setall(desc->affinity);
@@ -817,7 +815,6 @@ void __init release_irq(unsigned int irq)
     spin_lock_irqsave(&desc->lock,flags);
     action = desc->action;
     desc->action  = NULL;
-    desc->depth   = 1;
     desc->status |= IRQ_DISABLED;
     desc->handler->shutdown(irq);
     spin_unlock_irqrestore(&desc->lock,flags);
@@ -845,7 +842,6 @@ int __init setup_irq(unsigned int irq, struct irqaction *new)
     }
 
     desc->action  = new;
-    desc->depth   = 0;
     desc->status &= ~IRQ_DISABLED;
     desc->handler->startup(irq);
 
@@ -1424,7 +1420,6 @@ int pirq_guest_bind(struct vcpu *v, struct pirq *pirq, int will_share)
         cpus_clear(action->cpu_eoi_map);
         init_timer(&action->eoi_timer, irq_guest_eoi_timer_fn, desc, 0);
 
-        desc->depth = 0;
         desc->status |= IRQ_GUEST;
         desc->status &= ~IRQ_DISABLED;
         desc->handler->startup(irq);
@@ -1540,7 +1535,6 @@ static irq_guest_action_t *__pirq_guest_unbind(
     BUG_ON(action->in_flight != 0);
 
     /* Disabling IRQ before releasing the desc_lock avoids an IRQ storm. */
-    desc->depth   = 1;
     desc->status |= IRQ_DISABLED;
     desc->handler->disable(irq);
 

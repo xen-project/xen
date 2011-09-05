@@ -72,7 +72,6 @@ typedef struct irq_desc {
     hw_irq_controller *handler;
     struct msi_desc   *msi_desc;
     struct irqaction *action;	/* IRQ action list */
-    unsigned int depth;		/* nested irq disables */
     struct irq_cfg *chip_data;
     int irq;
     spinlock_t lock;

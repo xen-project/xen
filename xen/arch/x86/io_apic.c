@@ -1967,7 +1967,6 @@ static void __init check_timer(void)
     if ((ret = bind_irq_vector(0, vector, mask_all)))
         printk(KERN_ERR"..IRQ0 is not set correctly with ioapic!!!, err:%d\n", ret);
     
-    irq_desc[0].depth  = 0;
     irq_desc[0].status &= ~IRQ_DISABLED;
 
     /*

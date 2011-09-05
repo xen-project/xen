@@ -19,7 +19,6 @@
 #define MSI_IRQ(irq)       ((irq) >= nr_irqs_gsi && (irq) < nr_irqs)
 
 #define LEGACY_VECTOR(irq)          ((irq) + FIRST_LEGACY_VECTOR)
-#define LEGACY_IRQ_FROM_VECTOR(vec) ((vec) - FIRST_LEGACY_VECTOR)
 
 #define irq_to_desc(irq)    (&irq_desc[irq])
 #define irq_cfg(irq)        (&irq_cfg[irq])
