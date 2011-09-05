@@ -183,6 +183,7 @@ struct mem_event_domain
 {
     /* ring lock */
     spinlock_t ring_lock;
+    unsigned int req_producers;
     /* shared page */
     mem_event_shared_page_t *shared_page;
     /* shared ring page */

@@ -281,7 +281,6 @@ static struct page_info* mem_sharing_alloc_page(struct domain *d,
     vcpu_pause_nosync(v);
     req.flags |= MEM_EVENT_FLAG_VCPU_PAUSED;
 
-    /* XXX: Need to reserve a request, not just check the ring! */
     if(mem_event_check_ring(d)) return page;
 
     req.gfn = gfn;

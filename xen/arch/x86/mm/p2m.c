@@ -803,6 +803,7 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
     else if ( p2mt != p2m_ram_paging_out && p2mt != p2m_ram_paged )
     {
         /* gfn is already on its way back and vcpu is not paused */
+        mem_event_put_req_producers(d);
         return;
     }
 

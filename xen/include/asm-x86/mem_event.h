@@ -27,6 +27,7 @@
 /* Pauses VCPU while marking pause flag for mem event */
 void mem_event_mark_and_pause(struct vcpu *v);
 int mem_event_check_ring(struct domain *d);
+void mem_event_put_req_producers(struct domain *d);
 void mem_event_put_request(struct domain *d, mem_event_request_t *req);
 void mem_event_get_response(struct domain *d, mem_event_response_t *rsp);
 void mem_event_unpause_vcpus(struct domain *d);

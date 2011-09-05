@@ -37,8 +37,6 @@
 #define mem_event_ring_lock(_d)       spin_lock(&(_d)->mem_event.ring_lock)
 #define mem_event_ring_unlock(_d)     spin_unlock(&(_d)->mem_event.ring_lock)
 
-#define MEM_EVENT_RING_THRESHOLD 4
-
 static int mem_event_enable(struct domain *d, mfn_t ring_mfn, mfn_t shared_mfn)
 {
     int rc;
@@ -109,6 +107,7 @@ void mem_event_put_request(struct domain *d, mem_event_request_t *req)
     req_prod++;
 
     /* Update ring */
+    d->mem_event.req_producers--;
     front_ring->req_prod_pvt = req_prod;
     RING_PUSH_REQUESTS(front_ring);
 
@@ -153,11 +152,18 @@ void mem_event_mark_and_pause(struct vcpu *v)
     vcpu_sleep_nosync(v);
 }
 
+void mem_event_put_req_producers(struct domain *d)
+{
+    mem_event_ring_lock(d);
+    d->mem_event.req_producers--;
+    mem_event_ring_unlock(d);
+}
+
 int mem_event_check_ring(struct domain *d)
 {
     struct vcpu *curr = current;
     int free_requests;
-    int ring_full;
+    int ring_full = 1;
 
     if ( !d->mem_event.ring_page )
         return -1;
@@ -165,12 +171,11 @@ int mem_event_check_ring(struct domain *d)
     mem_event_ring_lock(d);
 
     free_requests = RING_FREE_REQUESTS(&d->mem_event.front_ring);
-    if ( unlikely(free_requests < 2) )
+    if ( d->mem_event.req_producers < free_requests )
     {
-        gdprintk(XENLOG_INFO, "free request slots: %d\n", free_requests);
-        WARN_ON(free_requests == 0);
+        d->mem_event.req_producers++;
+        ring_full = 0;
     }
-    ring_full = free_requests < MEM_EVENT_RING_THRESHOLD ? 1 : 0;
 
     if ( (curr->domain->domain_id == d->domain_id) && ring_full )
     {
