@@ -113,6 +113,27 @@ static int context_set_domain_id(struct context_entry *context,
     return 0;
 }
 
+static int context_get_domain_id(struct context_entry *context,
+                                 struct iommu *iommu)
+{
+    unsigned long dom_index, nr_dom;
+    int domid = -1;
+
+    if (iommu && context)
+    {
+        nr_dom = cap_ndoms(iommu->cap);
+
+        dom_index = context_domain_id(*context);
+
+        if ( dom_index < nr_dom && iommu->domid_map)
+            domid = iommu->domid_map[dom_index];
+        else
+            dprintk(XENLOG_DEBUG VTDPREFIX, "%s: dom_index %lu exceeds nr_dom %lu or iommu has no domid_map\n",
+                    __func__, dom_index, nr_dom);
+    }
+    return domid;
+}
+
 static struct intel_iommu *__init alloc_intel_iommu(void)
 {
     struct intel_iommu *intel;
@@ -1237,7 +1258,6 @@ int domain_context_mapping_one(
     struct hvm_iommu *hd = domain_hvm_iommu(domain);
     struct context_entry *context, *context_entries;
     u64 maddr, pgd_maddr;
-    struct pci_dev *pdev = NULL;
     int agaw;
 
     ASSERT(spin_is_locked(&pcidevs_lock));
@@ -1249,12 +1269,45 @@ int domain_context_mapping_one(
     if ( context_present(*context) )
     {
         int res = 0;
+        struct pci_dev *pdev = NULL;
 
+        /* First try to get domain ownership from device structure.  If that's
+         * not available, try to read it from the context itself. */
         pdev = pci_get_pdev(bus, devfn);
-        if (!pdev)
-            res = -ENODEV;
-        else if (pdev->domain != domain)
-            res = -EINVAL;
+        if ( pdev )
+        {
+            if ( pdev->domain != domain )
+            {
+                dprintk(XENLOG_INFO VTDPREFIX, "d%d: bdf = %x:%x.%x owned by d%d!",
+                        domain->domain_id, 
+                        bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+                        (pdev->domain)
+                        ? pdev->domain->domain_id : -1);
+                res = -EINVAL;
+            }
+        }
+        else
+        {
+            int cdomain;
+            cdomain = context_get_domain_id(context, iommu);
+            
+            if ( cdomain < 0 )
+            {
+                dprintk(VTDPREFIX, "d%d: bdf = %x:%x.%x mapped, but can't find owner!\n",
+                        domain->domain_id, 
+                        bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+                res = -EINVAL;
+            }
+            else if ( cdomain != domain->domain_id )
+            {
+                dprintk(XENLOG_INFO VTDPREFIX, "d%d: bdf = %x:%x.%x already mapped to d%d!",
+                        domain->domain_id, 
+                        bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+                        cdomain);
+                res = -EINVAL;
+            }
+        }
+
         unmap_vtd_domain_page(context_entries);
         spin_unlock(&iommu->lock);
         return res;
