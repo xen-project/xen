@@ -363,9 +363,8 @@ static inline int bscnl_emit(char *buf, int buflen, int rbot, int rtop, int len)
  * the range.  Output format is compatible with the format
  * accepted as input by bitmap_parselist().
  *
- * The return value is the number of characters which would be
- * generated for the given input, excluding the trailing '\0', as
- * per ISO C99.
+ * The return value is the number of characters which were output,
+ * excluding the trailing '\0'.
  */
 int bitmap_scnlistprintf(char *buf, unsigned int buflen,
 	const unsigned long *maskp, int nmaskbits)
@@ -383,6 +382,8 @@ int bitmap_scnlistprintf(char *buf, unsigned int buflen,
 			rbot = cur;
 		}
 	}
+	if (!len && buflen)
+		*buf = 0;
 	return len;
 }
 EXPORT_SYMBOL(bitmap_scnlistprintf);
