@@ -332,8 +332,6 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
 
     table = map_domain_page(ept_get_asr(d));
 
-    ASSERT(table != NULL);
-
     for ( i = ept_get_wl(d); i > target; i-- )
     {
         ret = ept_next_level(p2m, 0, &table, &gfn_remainder, i);
