@@ -518,9 +518,8 @@ static void send_cleanup_vector(struct irq_cfg *cfg)
     cfg->move_in_progress = 0;
 }
 
-void irq_complete_move(struct irq_desc **descp)
+void irq_complete_move(struct irq_desc *desc)
 {
-    struct irq_desc *desc = *descp;
     struct irq_cfg *cfg = desc->chip_data;
     unsigned vector, me;
 
@@ -1569,7 +1568,7 @@ static void ack_edge_ioapic_irq(unsigned int irq)
 {
     struct irq_desc *desc = irq_to_desc(irq);
     
-    irq_complete_move(&desc);
+    irq_complete_move(desc);
     move_native_irq(irq);
 
     if ((desc->status & (IRQ_PENDING | IRQ_DISABLED))
@@ -1648,7 +1647,7 @@ static void mask_and_ack_level_ioapic_irq (unsigned int irq)
     int i;
     struct irq_desc *desc = irq_to_desc(irq);
 
-    irq_complete_move(&desc);
+    irq_complete_move(desc);
 
     if ( ioapic_ack_new )
         return;
@@ -1821,7 +1820,7 @@ static void ack_msi_irq(unsigned int irq)
 {
     struct irq_desc *desc = irq_to_desc(irq);
 
-    irq_complete_move(&desc);
+    irq_complete_move(desc);
     move_native_irq(irq);
 
     if ( msi_maskable_irq(desc->msi_desc) )

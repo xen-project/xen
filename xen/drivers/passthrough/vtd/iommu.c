@@ -978,7 +978,7 @@ static void dma_msi_mask(unsigned int irq)
     struct iommu *iommu = irq_to_iommu[irq];
     struct irq_desc *desc = irq_to_desc(irq);
 
-    irq_complete_move(&desc);
+    irq_complete_move(desc);
 
     /* mask it */
     spin_lock_irqsave(&iommu->register_lock, flags);

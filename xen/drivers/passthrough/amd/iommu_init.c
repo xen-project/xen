@@ -424,7 +424,7 @@ static void iommu_msi_mask(unsigned int irq)
     struct amd_iommu *iommu = irq_to_iommu[irq];
     struct irq_desc *desc = irq_to_desc(irq);
 
-    irq_complete_move(&desc);
+    irq_complete_move(desc);
 
     /* FIXME: do not support mask bits at the moment */
     if ( iommu->maskbit )

@@ -162,7 +162,7 @@ int create_irq(void);
 void destroy_irq(unsigned int irq);
 
 struct irq_desc;
-extern void irq_complete_move(struct irq_desc **descp);
+extern void irq_complete_move(struct irq_desc *);
 
 extern struct irq_desc *irq_desc;
 
