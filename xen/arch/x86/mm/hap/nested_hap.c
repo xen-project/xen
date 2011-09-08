@@ -99,7 +99,7 @@ nestedp2m_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
 static void
 nestedhap_fix_p2m(struct vcpu *v, struct p2m_domain *p2m, 
                   paddr_t L2_gpa, paddr_t L0_gpa,
-                  p2m_type_t p2mt, p2m_access_t p2ma)
+                  unsigned int page_order, p2m_type_t p2mt, p2m_access_t p2ma)
 {
     int rv = 1;
     ASSERT(p2m);
@@ -111,9 +111,20 @@ nestedhap_fix_p2m(struct vcpu *v, struct p2m_domain *p2m,
      * leave it alone.  We'll pick up the right one as we try to 
      * vmenter the guest. */
     if ( p2m->cr3 == nhvm_vcpu_hostcr3(v) )
-         rv = set_p2m_entry(p2m, L2_gpa >> PAGE_SHIFT,
-                            page_to_mfn(maddr_to_page(L0_gpa)),
-                            0 /*4K*/, p2mt, p2ma);
+    {
+        unsigned long gfn, mask;
+        mfn_t mfn;
+
+        /* If this is a superpage mapping, round down both addresses
+         * to the start of the superpage. */
+        mask = ~((1UL << page_order) - 1);
+
+        gfn = (L2_gpa >> PAGE_SHIFT) & mask;
+        mfn = _mfn((L0_gpa >> PAGE_SHIFT) & mask);
+
+        rv = set_p2m_entry(p2m, gfn, mfn, page_order, p2mt, p2ma);
+    }
+
     p2m_unlock(p2m);
 
     if (rv == 0) {
@@ -129,7 +140,8 @@ nestedhap_fix_p2m(struct vcpu *v, struct p2m_domain *p2m,
  * value tells the upper level what to do.
  */
 static int
-nestedhap_walk_L0_p2m(struct p2m_domain *p2m, paddr_t L1_gpa, paddr_t *L0_gpa)
+nestedhap_walk_L0_p2m(struct p2m_domain *p2m, paddr_t L1_gpa, paddr_t *L0_gpa,
+                      unsigned int *page_order)
 {
     mfn_t mfn;
     p2m_type_t p2mt;
@@ -137,7 +149,7 @@ nestedhap_walk_L0_p2m(struct p2m_domain *p2m, paddr_t L1_gpa, paddr_t *L0_gpa)
 
     /* walk L0 P2M table */
     mfn = gfn_to_mfn_type_p2m(p2m, L1_gpa >> PAGE_SHIFT, &p2mt, &p2ma, 
-                              p2m_query, NULL);
+                              p2m_query, page_order);
 
     if ( p2m_is_paging(p2mt) || p2m_is_shared(p2mt) || !p2m_is_ram(p2mt) )
         return NESTEDHVM_PAGEFAULT_ERROR;
@@ -154,7 +166,8 @@ nestedhap_walk_L0_p2m(struct p2m_domain *p2m, paddr_t L1_gpa, paddr_t *L0_gpa)
  * L1_gpa. The result value tells what to do next.
  */
 static int
-nestedhap_walk_L1_p2m(struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa)
+nestedhap_walk_L1_p2m(struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa,
+                      unsigned int *page_order)
 {
     uint32_t pfec;
     unsigned long nested_cr3, gfn;
@@ -162,7 +175,7 @@ nestedhap_walk_L1_p2m(struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa)
     nested_cr3 = nhvm_vcpu_hostcr3(v);
 
     /* Walk the guest-supplied NPT table, just as if it were a pagetable */
-    gfn = paging_ga_to_gfn_cr3(v, nested_cr3, L2_gpa, &pfec, NULL);
+    gfn = paging_ga_to_gfn_cr3(v, nested_cr3, L2_gpa, &pfec, page_order);
 
     if ( gfn == INVALID_GFN ) 
         return NESTEDHVM_PAGEFAULT_INJECT;
@@ -183,12 +196,13 @@ nestedhvm_hap_nested_page_fault(struct vcpu *v, paddr_t L2_gpa)
     paddr_t L1_gpa, L0_gpa;
     struct domain *d = v->domain;
     struct p2m_domain *p2m, *nested_p2m;
+    unsigned int page_order_21, page_order_10, page_order_20;
 
     p2m = p2m_get_hostp2m(d); /* L0 p2m */
     nested_p2m = p2m_get_nestedp2m(v, nhvm_vcpu_hostcr3(v));
 
     /* walk the L1 P2M table */
-    rv = nestedhap_walk_L1_p2m(v, L2_gpa, &L1_gpa);
+    rv = nestedhap_walk_L1_p2m(v, L2_gpa, &L1_gpa, &page_order_21);
 
     /* let caller to handle these two cases */
     switch (rv) {
@@ -204,7 +218,7 @@ nestedhvm_hap_nested_page_fault(struct vcpu *v, paddr_t L2_gpa)
     }
 
     /* ==> we have to walk L0 P2M */
-    rv = nestedhap_walk_L0_p2m(p2m, L1_gpa, &L0_gpa);
+    rv = nestedhap_walk_L0_p2m(p2m, L1_gpa, &L0_gpa, &page_order_10);
 
     /* let upper level caller to handle these two cases */
     switch (rv) {
@@ -219,8 +233,10 @@ nestedhvm_hap_nested_page_fault(struct vcpu *v, paddr_t L2_gpa)
         break;
     }
 
+    page_order_20 = min(page_order_21, page_order_10);
+
     /* fix p2m_get_pagetable(nested_p2m) */
-    nestedhap_fix_p2m(v, nested_p2m, L2_gpa, L0_gpa,
+    nestedhap_fix_p2m(v, nested_p2m, L2_gpa, L0_gpa, page_order_20,
         p2m_ram_rw,
         p2m_access_rwx /* FIXME: Should use same permission as l1 guest */);
 
