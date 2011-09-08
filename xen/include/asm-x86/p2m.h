@@ -233,7 +233,8 @@ struct p2m_domain {
                                        unsigned long gfn,
                                        p2m_type_t *p2mt,
                                        p2m_access_t *p2ma,
-                                       p2m_query_t q);
+                                       p2m_query_t q,
+                                       unsigned int *page_order);
     void               (*change_entry_type_global)(struct p2m_domain *p2m,
                                                    p2m_type_t ot,
                                                    p2m_type_t nt);
@@ -303,10 +304,14 @@ struct p2m_domain *p2m_get_p2m(struct vcpu *v);
 /* Read a particular P2M table, mapping pages as we go.  Most callers
  * should _not_ call this directly; use the other gfn_to_mfn_* functions
  * below unless you know you want to walk a p2m that isn't a domain's
- * main one. */
+ * main one.
+ * If the lookup succeeds, the return value is != INVALID_MFN and 
+ * *page_order is filled in with the order of the superpage (if any) that
+ * the entry was found in.  */
 static inline mfn_t
 gfn_to_mfn_type_p2m(struct p2m_domain *p2m, unsigned long gfn,
-                    p2m_type_t *t, p2m_access_t *a, p2m_query_t q)
+                    p2m_type_t *t, p2m_access_t *a, p2m_query_t q,
+                    unsigned int *page_order)
 {
     mfn_t mfn;
 
@@ -318,14 +323,14 @@ gfn_to_mfn_type_p2m(struct p2m_domain *p2m, unsigned long gfn,
         return _mfn(gfn);
     }
 
-    mfn = p2m->get_entry(p2m, gfn, t, a, q);
+    mfn = p2m->get_entry(p2m, gfn, t, a, q, page_order);
 
 #ifdef __x86_64__
     if ( q == p2m_unshare && p2m_is_shared(*t) )
     {
         ASSERT(!p2m_is_nestedp2m(p2m));
         mem_sharing_unshare_page(p2m->domain, gfn, 0);
-        mfn = p2m->get_entry(p2m, gfn, t, a, q);
+        mfn = p2m->get_entry(p2m, gfn, t, a, q, page_order);
     }
 #endif
 
@@ -349,7 +354,7 @@ static inline mfn_t gfn_to_mfn_type(struct domain *d,
                                     p2m_query_t q)
 {
     p2m_access_t a;
-    return gfn_to_mfn_type_p2m(p2m_get_hostp2m(d), gfn, t, &a, q);
+    return gfn_to_mfn_type_p2m(p2m_get_hostp2m(d), gfn, t, &a, q, NULL);
 }
 
 /* Syntactic sugar: most callers will use one of these. 

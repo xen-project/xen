@@ -503,7 +503,8 @@ static int p2m_pod_check_and_populate(struct p2m_domain *p2m, unsigned long gfn,
 /* Read the current domain's p2m table (through the linear mapping). */
 static mfn_t p2m_gfn_to_mfn_current(struct p2m_domain *p2m, 
                                     unsigned long gfn, p2m_type_t *t, 
-                                    p2m_access_t *a, p2m_query_t q)
+                                    p2m_access_t *a, p2m_query_t q,
+                                    unsigned int *page_order)
 {
     mfn_t mfn = _mfn(INVALID_MFN);
     p2m_type_t p2mt = p2m_mmio_dm;
@@ -567,6 +568,8 @@ pod_retry_l3:
         else
             p2mt = p2m_mmio_dm;
             
+        if ( page_order )
+            *page_order = PAGE_ORDER_1G;
         goto out;
     }
 #endif
@@ -620,6 +623,8 @@ pod_retry_l2:
         else
             p2mt = p2m_mmio_dm;
 
+        if ( page_order )
+            *page_order = PAGE_ORDER_2M;
         goto out;
     }
 
@@ -669,6 +674,8 @@ pod_retry_l1:
             p2mt = p2m_mmio_dm;
     }
     
+    if ( page_order )
+        *page_order = PAGE_ORDER_4K;
 out:
     *t = p2mt;
     return mfn;
@@ -676,7 +683,8 @@ out:
 
 static mfn_t
 p2m_gfn_to_mfn(struct p2m_domain *p2m, unsigned long gfn, 
-               p2m_type_t *t, p2m_access_t *a, p2m_query_t q)
+               p2m_type_t *t, p2m_access_t *a, p2m_query_t q,
+               unsigned int *page_order)
 {
     mfn_t mfn;
     paddr_t addr = ((paddr_t)gfn) << PAGE_SHIFT;
@@ -699,7 +707,7 @@ p2m_gfn_to_mfn(struct p2m_domain *p2m, unsigned long gfn,
 
     /* Use the fast path with the linear mapping if we can */
     if ( p2m == p2m_get_hostp2m(current->domain) )
-        return p2m_gfn_to_mfn_current(p2m, gfn, t, a, q);
+        return p2m_gfn_to_mfn_current(p2m, gfn, t, a, q, page_order);
 
     mfn = pagetable_get_mfn(p2m_get_pagetable(p2m));
 
@@ -753,6 +761,8 @@ pod_retry_l3:
             unmap_domain_page(l3e);
 
             ASSERT(mfn_valid(mfn) || !p2m_is_ram(*t));
+            if ( page_order )
+                *page_order = PAGE_ORDER_1G;
             return (p2m_is_valid(*t)) ? mfn : _mfn(INVALID_MFN);
         }
 
@@ -787,6 +797,8 @@ pod_retry_l2:
         unmap_domain_page(l2e);
         
         ASSERT(mfn_valid(mfn) || !p2m_is_ram(*t));
+        if ( page_order )
+            *page_order = PAGE_ORDER_2M;
         return (p2m_is_valid(*t)) ? mfn : _mfn(INVALID_MFN);
     }
 
@@ -817,6 +829,8 @@ pod_retry_l1:
     unmap_domain_page(l1e);
 
     ASSERT(mfn_valid(mfn) || !p2m_is_ram(*t));
+    if ( page_order )
+        *page_order = PAGE_ORDER_4K;
     return (p2m_is_valid(*t) || p2m_is_grant(*t)) ? mfn : _mfn(INVALID_MFN);
 }
 

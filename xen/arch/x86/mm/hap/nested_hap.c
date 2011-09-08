@@ -136,7 +136,8 @@ nestedhap_walk_L0_p2m(struct p2m_domain *p2m, paddr_t L1_gpa, paddr_t *L0_gpa)
     p2m_access_t p2ma;
 
     /* walk L0 P2M table */
-    mfn = gfn_to_mfn_type_p2m(p2m, L1_gpa >> PAGE_SHIFT, &p2mt, &p2ma, p2m_query);
+    mfn = gfn_to_mfn_type_p2m(p2m, L1_gpa >> PAGE_SHIFT, &p2mt, &p2ma, 
+                              p2m_query, NULL);
 
     if ( p2m_is_paging(p2mt) || p2m_is_shared(p2mt) || !p2m_is_ram(p2mt) )
         return NESTEDHVM_PAGEFAULT_ERROR;

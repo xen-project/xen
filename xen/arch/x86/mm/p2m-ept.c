@@ -507,7 +507,7 @@ out:
 /* Read ept p2m entries */
 static mfn_t ept_get_entry(struct p2m_domain *p2m,
                            unsigned long gfn, p2m_type_t *t, p2m_access_t* a,
-                           p2m_query_t q)
+                           p2m_query_t q, unsigned int *page_order)
 {
     struct domain *d = p2m->domain;
     ept_entry_t *table = map_domain_page(ept_get_asr(d));
@@ -594,6 +594,9 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
                  ((1 << (i * EPT_TABLE_ORDER)) - 1));
             mfn = _mfn(split_mfn);
         }
+
+        if ( page_order )
+            *page_order = i * EPT_TABLE_ORDER;
     }
 
 out:

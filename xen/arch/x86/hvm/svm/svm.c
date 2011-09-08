@@ -1160,7 +1160,7 @@ static void svm_do_nested_pgfault(struct vcpu *v,
         p2m = p2m_get_p2m(v);
         _d.gpa = gpa;
         _d.qualification = 0;
-        _d.mfn = mfn_x(gfn_to_mfn_type_p2m(p2m, gfn, &_d.p2mt, &p2ma, p2m_query));
+        _d.mfn = mfn_x(gfn_to_mfn_type_p2m(p2m, gfn, &_d.p2mt, &p2ma, p2m_query, NULL));
         
         __trace_var(TRC_HVM_NPF, 0, sizeof(_d), &_d);
     }
@@ -1180,7 +1180,7 @@ static void svm_do_nested_pgfault(struct vcpu *v,
     if ( p2m == NULL )
         p2m = p2m_get_p2m(v);
     /* Everything else is an error. */
-    mfn = gfn_to_mfn_type_p2m(p2m, gfn, &p2mt, &p2ma, p2m_guest);
+    mfn = gfn_to_mfn_type_p2m(p2m, gfn, &p2mt, &p2ma, p2m_guest, NULL);
     gdprintk(XENLOG_ERR,
          "SVM violation gpa %#"PRIpaddr", mfn %#lx, type %i\n",
          gpa, mfn_x(mfn), p2mt);

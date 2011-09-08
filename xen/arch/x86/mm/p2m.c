@@ -307,7 +307,7 @@ void p2m_teardown(struct p2m_domain *p2m)
 #ifdef __x86_64__
     for ( gfn=0; gfn < p2m->max_mapped_pfn; gfn++ )
     {
-        mfn = gfn_to_mfn_type_p2m(p2m, gfn, &t, &a, p2m_query);
+        mfn = gfn_to_mfn_type_p2m(p2m, gfn, &t, &a, p2m_query, NULL);
         if ( mfn_valid(mfn) && (t == p2m_ram_shared) )
         {
             ASSERT(!p2m_is_nestedp2m(p2m));
@@ -372,7 +372,7 @@ p2m_remove_page(struct p2m_domain *p2m, unsigned long gfn, unsigned long mfn,
     {
         for ( i = 0; i < (1UL << page_order); i++ )
         {
-            mfn_return = p2m->get_entry(p2m, gfn + i, &t, &a, p2m_query);
+            mfn_return = p2m->get_entry(p2m, gfn + i, &t, &a, p2m_query, NULL);
             if ( !p2m_is_grant(t) )
                 set_gpfn_from_mfn(mfn+i, INVALID_M2P_ENTRY);
             ASSERT( !p2m_is_valid(t) || mfn + i == mfn_x(mfn_return) );
@@ -878,7 +878,7 @@ void p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long gla
     
     /* First, handle rx2rw conversion automatically */
     p2m_lock(p2m);
-    mfn = p2m->get_entry(p2m, gfn, &p2mt, &p2ma, p2m_query);
+    mfn = p2m->get_entry(p2m, gfn, &p2mt, &p2ma, p2m_query, NULL);
 
     if ( access_w && p2ma == p2m_access_rx2rw ) 
     {
@@ -1036,7 +1036,7 @@ int p2m_get_mem_access(struct domain *d, unsigned long pfn,
         return 0;
     }
 
-    mfn = p2m->get_entry(p2m, pfn, &t, &a, p2m_query);
+    mfn = p2m->get_entry(p2m, pfn, &t, &a, p2m_query, NULL);
     if ( mfn_x(mfn) == INVALID_MFN )
         return -ESRCH;
     
