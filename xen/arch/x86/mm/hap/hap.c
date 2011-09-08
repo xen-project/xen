@@ -897,8 +897,10 @@ static unsigned long hap_gva_to_gfn_real_mode(
 
 static unsigned long hap_p2m_ga_to_gfn_real_mode(
     struct vcpu *v, struct p2m_domain *p2m, unsigned long cr3,
-    paddr_t ga, uint32_t *pfec)
+    paddr_t ga, uint32_t *pfec, unsigned int *page_order)
 {
+    if ( page_order )
+        *page_order = PAGE_ORDER_4K;
     return (ga >> PAGE_SHIFT);
 }
 

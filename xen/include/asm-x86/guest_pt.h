@@ -272,6 +272,24 @@ guest_walk_to_gpa(walk_t *gw)
     return guest_l1e_get_paddr(gw->l1e) + (gw->va & ~PAGE_MASK);
 }
 
+/* Given a walk_t from a successful walk, return the page-order of the 
+ * page or superpage that the virtual address is in. */
+static inline unsigned int 
+guest_walk_to_page_order(walk_t *gw)
+{
+    /* This is only valid for successful walks - otherwise the 
+     * PSE bits might be invalid. */
+    ASSERT(guest_l1e_get_flags(gw->l1e) & _PAGE_PRESENT);
+#if GUEST_PAGING_LEVELS >= 3
+    if ( guest_l3e_get_flags(gw->l3e) & _PAGE_PSE )
+        return GUEST_L3_PAGETABLE_SHIFT - PAGE_SHIFT;
+#endif
+    if ( guest_l2e_get_flags(gw->l2e) & _PAGE_PSE )
+        return GUEST_L2_PAGETABLE_SHIFT - PAGE_SHIFT;
+    return GUEST_L1_PAGETABLE_SHIFT - PAGE_SHIFT;
+}
+
+
 /* Walk the guest pagetables, after the manner of a hardware walker. 
  *
  * Inputs: a vcpu, a virtual address, a walk_t to fill, a 

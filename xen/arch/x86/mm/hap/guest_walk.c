@@ -43,12 +43,12 @@ unsigned long hap_gva_to_gfn(GUEST_PAGING_LEVELS)(
     struct vcpu *v, struct p2m_domain *p2m, unsigned long gva, uint32_t *pfec)
 {
     unsigned long cr3 = v->arch.hvm_vcpu.guest_cr[3];
-    return hap_p2m_ga_to_gfn(GUEST_PAGING_LEVELS)(v, p2m, cr3, gva, pfec);
+    return hap_p2m_ga_to_gfn(GUEST_PAGING_LEVELS)(v, p2m, cr3, gva, pfec, NULL);
 }
 
 unsigned long hap_p2m_ga_to_gfn(GUEST_PAGING_LEVELS)(
     struct vcpu *v, struct p2m_domain *p2m, unsigned long cr3,
-    paddr_t ga, uint32_t *pfec)
+    paddr_t ga, uint32_t *pfec, unsigned int *page_order)
 {
     uint32_t missing;
     mfn_t top_mfn;
@@ -106,6 +106,9 @@ unsigned long hap_p2m_ga_to_gfn(GUEST_PAGING_LEVELS)(
             pfec[0] = PFEC_page_shared;
             return INVALID_GFN;
         }
+
+        if ( page_order )
+            *page_order = guest_walk_to_page_order(&gw);
 
         return gfn_x(gfn);
     }

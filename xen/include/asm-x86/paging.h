@@ -115,7 +115,8 @@ struct paging_mode {
     unsigned long (*p2m_ga_to_gfn         )(struct vcpu *v,
                                             struct p2m_domain *p2m,
                                             unsigned long cr3,
-                                            paddr_t ga, uint32_t *pfec);
+                                            paddr_t ga, uint32_t *pfec,
+                                            unsigned int *page_order);
     void          (*update_cr3            )(struct vcpu *v, int do_locking);
     void          (*update_paging_modes   )(struct vcpu *v);
     void          (*write_p2m_entry       )(struct vcpu *v, unsigned long gfn,
@@ -270,15 +271,18 @@ unsigned long paging_gva_to_gfn(struct vcpu *v,
  * to by nested HAP code, to walk the guest-supplied NPT tables as if
  * they were pagetables.
  * Use 'paddr_t' for the guest address so it won't overflow when
- * guest or nested guest is in 32bit PAE mode.
- */
+ * l1 or l2 guest is in 32bit PAE mode.
+ * If the GFN returned is not INVALID_GFN, *page_order gives
+ * the size of the superpage (if any) it was found in. */
 static inline unsigned long paging_ga_to_gfn_cr3(struct vcpu *v,
                                                  unsigned long cr3,
                                                  paddr_t ga,
-                                                 uint32_t *pfec)
+                                                 uint32_t *pfec,
+                                                 unsigned int *page_order)
 {
     struct p2m_domain *p2m = v->domain->arch.p2m;
-    return paging_get_hostmode(v)->p2m_ga_to_gfn(v, p2m, cr3, ga, pfec);
+    return paging_get_hostmode(v)->p2m_ga_to_gfn(v, p2m, cr3, ga, pfec,
+        page_order);
 }
 
 /* Update all the things that are derived from the guest's CR3.
