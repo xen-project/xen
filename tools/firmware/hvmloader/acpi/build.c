@@ -277,6 +277,8 @@ void acpi_build_tables(unsigned int physical)
     unsigned long        secondary_tables[16];
     int                  nr_secondaries, i;
 
+    memset(acpi_info, 0, sizeof(*acpi_info));
+
     /*
      * Fill in high-memory data structures, starting at @buf.
      */
@@ -375,7 +377,6 @@ void acpi_build_tables(unsigned int physical)
                  offsetof(struct acpi_20_rsdp, extended_checksum),
                  sizeof(struct acpi_20_rsdp));
 
-    memset(acpi_info, 0, sizeof(*acpi_info));
     acpi_info->com1_present = uart_exists(0x3f8);
     acpi_info->com2_present = uart_exists(0x2f8);
     acpi_info->lpt1_present = lpt_exists(0x378);
