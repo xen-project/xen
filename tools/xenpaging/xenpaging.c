@@ -648,7 +648,7 @@ int main(int argc, char *argv[])
     sigaction(SIGALRM, &act, NULL);
 
     /* listen for page-in events to stop pager */
-    create_page_in_thread(paging->mem_event.domain_id, xch);
+    create_page_in_thread(paging);
 
     /* Evict pages */
     for ( i = 0; i < paging->num_pages; i++ )
@@ -764,16 +764,24 @@ int main(int argc, char *argv[])
         /* Write all pages back into the guest */
         if ( interrupted == SIGTERM || interrupted == SIGINT )
         {
+            int num = 0;
             for ( i = 0; i < paging->domain_info->max_pages; i++ )
             {
                 if ( test_bit(i, paging->bitmap) )
                 {
-                    page_in_trigger(i);
-                    break;
+                    paging->pagein_queue[num] = i;
+                    num++;
+                    if ( num == XENPAGING_PAGEIN_QUEUE_SIZE )
+                        break;
                 }
             }
-            /* If no more pages to process, exit loop */
-            if ( i == paging->domain_info->max_pages )
+            /*
+             * One more round if there are still pages to process.
+             * If no more pages to process, exit loop.
+             */
+            if ( num )
+                page_in_trigger();
+            else if ( i == paging->domain_info->max_pages )
                 break;
         }
         else

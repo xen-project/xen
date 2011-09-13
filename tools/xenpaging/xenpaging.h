@@ -29,6 +29,8 @@
 #include <xen/event_channel.h>
 #include <xen/mem_event.h>
 
+#define XENPAGING_PAGEIN_QUEUE_SIZE 64
+
 typedef struct mem_event {
     domid_t domain_id;
     xc_evtchn *xce_handle;
@@ -49,6 +51,7 @@ typedef struct xenpaging {
     mem_event_t mem_event;
     int num_pages;
     int policy_mru_size;
+    unsigned long pagein_queue[XENPAGING_PAGEIN_QUEUE_SIZE];
 } xenpaging_t;
 
 
@@ -58,8 +61,8 @@ typedef struct xenpaging_victim {
 } xenpaging_victim_t;
 
 
-extern void create_page_in_thread(domid_t domain_id, xc_interface *xch);
-extern void page_in_trigger(unsigned long gfn);
+extern void create_page_in_thread(xenpaging_t *paging);
+extern void page_in_trigger(void);
 
 #endif // __XEN_PAGING_H__
 
