@@ -1463,24 +1463,18 @@ int get_free_pirq(struct domain *d, int type, int index)
             {
                 if ( !is_hvm_domain(d) ||
                         d->arch.pirq_emuirq[i] == IRQ_UNBOUND )
-                    break;
+                    return i;
             }
-        if ( i == nr_irqs_gsi )
-            return -ENOSPC;
     }
-    else
-    {
-        for ( i = d->nr_pirqs - 1; i >= nr_irqs_gsi; i-- )
-            if ( !d->arch.pirq_irq[i] )
-            {
-                if ( !is_hvm_domain(d) ||
-                        d->arch.pirq_emuirq[i] == IRQ_UNBOUND )
-                    break;
-            }
-        if ( i < nr_irqs_gsi )
-            return -ENOSPC;
-    }
-
+    for ( i = d->nr_pirqs - 1; i >= nr_irqs_gsi; i-- )
+        if ( !d->arch.pirq_irq[i] )
+        {
+            if ( !is_hvm_domain(d) ||
+                    d->arch.pirq_emuirq[i] == IRQ_UNBOUND )
+                break;
+        }
+    if ( i < nr_irqs_gsi )
+        return -ENOSPC;
     return i;
 }
 
