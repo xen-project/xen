@@ -68,6 +68,13 @@ int __read_mostly nr_ioapics;
 #define MAX_PLUS_SHARED_IRQS nr_irqs_gsi
 #define PIN_MAP_SIZE (MAX_PLUS_SHARED_IRQS + nr_irqs_gsi)
 
+
+#define ioapic_has_eoi_reg(apic) (mp_ioapics[(apic)].mpc_apicver >= 0x20)
+
+#define io_apic_eoi_vector(apic, vector) io_apic_eoi((apic), (vector), -1)
+#define io_apic_eoi_pin(apic, pin) io_apic_eoi((apic), -1, (pin))
+
+
 /*
  * This is performance-critical, we want to do it O(1)
  *
@@ -205,6 +212,105 @@ static void ioapic_write_entry(
     unsigned long flags;
     spin_lock_irqsave(&ioapic_lock, flags);
     __ioapic_write_entry(apic, pin, raw, e);
+    spin_unlock_irqrestore(&ioapic_lock, flags);
+}
+
+/* EOI an IO-APIC entry.  One of vector or pin may be -1, indicating that
+ * it should be worked out using the other.  This function expect that the
+ * ioapic_lock is taken, and interrupts are disabled (or there is a good reason
+ * not to), and that if both pin and vector are passed, that they refer to the
+ * same redirection entry in the IO-APIC. */
+static void __io_apic_eoi(unsigned int apic, unsigned int vector, unsigned int pin)
+{
+    /* Ensure some useful information is passed in */
+    BUG_ON( (vector == -1 && pin == -1) );
+    
+    /* Prefer the use of the EOI register if available */
+    if ( ioapic_has_eoi_reg(apic) )
+    {
+        /* If vector is unknown, read it from the IO-APIC */
+        if ( vector == -1 )
+            vector = __ioapic_read_entry(apic, pin, TRUE).vector;
+
+        *(IO_APIC_BASE(apic)+16) = vector;
+    }
+    else
+    {
+        /* Else fake an EOI by switching to edge triggered mode
+         * and back */
+        struct IO_APIC_route_entry entry;
+        bool_t need_to_unmask = 0;
+
+        /* If pin is unknown, search for it */
+        if ( pin == -1 )
+        {
+            unsigned int p;
+            for ( p = 0; p < nr_ioapic_registers[apic]; ++p )
+            {
+                entry = __ioapic_read_entry(apic, p, TRUE);
+                if ( entry.vector == vector )
+                {
+                    pin = p;
+                    /* break; */
+
+                    /* Here should be a break out of the loop, but at the 
+                     * Xen code doesn't actually prevent multiple IO-APIC
+                     * entries being assigned the same vector, so EOI all
+                     * pins which have the correct vector.
+                     *
+                     * Remove the following code when the above assertion
+                     * is fulfilled. */
+                    __io_apic_eoi(apic, vector, p);
+                }
+            }
+            
+            /* If search fails, nothing to do */
+
+            /* if ( pin == -1 ) */
+
+            /* Because the loop wasn't broken out of (see comment above),
+             * all relevant pins have been EOI, so we can always return.
+             * 
+             * Re-instate the if statement above when the Xen logic has been
+             * fixed.*/
+
+            return;
+        }
+
+        entry = __ioapic_read_entry(apic, pin, TRUE);
+
+        if ( ! entry.mask )
+        {
+            /* If entry is not currently masked, mask it and make
+             * a note to unmask it later */
+            entry.mask = 1;
+            __ioapic_write_entry(apic, pin, TRUE, entry);
+            need_to_unmask = 1;
+        }
+
+        /* Flip the trigger mode to edge and back */
+        entry.trigger = 0;
+        __ioapic_write_entry(apic, pin, TRUE, entry);
+        entry.trigger = 1;
+        __ioapic_write_entry(apic, pin, TRUE, entry);
+
+        if ( need_to_unmask )
+        {
+            /* Unmask if neccesary */
+            entry.mask = 0;
+            __ioapic_write_entry(apic, pin, TRUE, entry);
+        }
+    }
+}
+
+/* EOI an IO-APIC entry.  One of vector or pin may be -1, indicating that
+ * it should be worked out using the other.  This function disables interrupts
+ * and takes the ioapic_lock */
+static void io_apic_eoi(unsigned int apic, unsigned int vector, unsigned int pin)
+{
+    unsigned int flags;
+    spin_lock_irqsave(&ioapic_lock, flags);
+    __io_apic_eoi(apic, vector, pin);
     spin_unlock_irqrestore(&ioapic_lock, flags);
 }
 
@@ -357,7 +463,7 @@ static void __eoi_IO_APIC_irq(unsigned int irq)
         pin = entry->pin;
         if (pin == -1)
             break;
-        io_apic_eoi(entry->apic, vector);
+        __io_apic_eoi(entry->apic, vector, pin);
         if (!entry->next)
             break;
         entry = irq_2_pin + entry->next;
@@ -397,18 +503,7 @@ static void clear_IO_APIC_pin(unsigned int apic, unsigned int pin)
             entry.trigger = 1;
             __ioapic_write_entry(apic, pin, TRUE, entry);
         }
-        if (mp_ioapics[apic].mpc_apicver >= 0x20)
-            io_apic_eoi(apic, entry.vector);
-        else {
-            /*
-             * Mechanism by which we clear remoteIRR in this case is by
-             * changing the trigger mode to edge and back to level.
-             */
-            entry.trigger = 0;
-            __ioapic_write_entry(apic, pin, TRUE, entry);
-            entry.trigger = 1;
-            __ioapic_write_entry(apic, pin, TRUE, entry);
-        }
+        __io_apic_eoi(apic, entry.vector, pin);
     }
 
     /*
@@ -1749,7 +1844,7 @@ static void end_level_ioapic_irq (unsigned int irq, u8 vector)
     {
         int ioapic;
         for (ioapic = 0; ioapic < nr_ioapics; ioapic++)
-            io_apic_eoi(ioapic, i);
+            io_apic_eoi_vector(ioapic, i);
     }
 
     v = apic_read(APIC_TMR + ((i & ~0x1f) >> 1));
@@ -2621,3 +2716,4 @@ void __init init_ioapic_mappings(void)
     printk(XENLOG_INFO "IRQ limits: %u GSI, %u MSI/MSI-X\n",
            nr_irqs_gsi, nr_irqs - nr_irqs_gsi);
 }
+
