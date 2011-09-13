@@ -30,7 +30,7 @@ set -e
 cd $DIR
 # is this qemu-xen-traditional?
 if test -f $ROOT/xen-setup; then
-	$ROOT/xen-setup $IOEMU_CONFIGURE_CROSS
+	QEMU_ROOT=$ROOT $ROOT/xen-setup $IOEMU_CONFIGURE_CROSS
 # is this qemu-xen?
 elif test -f $ROOT/configure; then
 	cd $ROOT
