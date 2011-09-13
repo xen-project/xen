@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 TREE=$1
 TAG=$2
