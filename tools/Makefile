@@ -31,6 +31,7 @@ SUBDIRS-$(LIBXENAPI_BINDINGS) += libxen
 # do not recurse in to a dir we are about to delete
 ifneq "$(MAKECMDGOALS)" "distclean"
 SUBDIRS-$(CONFIG_IOEMU) += qemu-xen-traditional-dir
+SUBDIRS-$(CONFIG_IOEMU) += qemu-xen-dir
 endif
 
 SUBDIRS-y += xenpmd
@@ -71,6 +72,7 @@ clean: subdirs-clean
 .PHONY: distclean
 distclean: subdirs-distclean
 	rm -rf qemu-xen-traditional-dir qemu-xen-traditional-dir-remote
+	rm -rf qemu-xen-dir qemu-xen-dir-remote
 
 ifneq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
 IOEMU_CONFIGURE_CROSS ?= --cpu=$(XEN_TARGET_ARCH) \
@@ -80,6 +82,9 @@ endif
 
 qemu-xen-traditional-dir-find:
 	$(XEN_ROOT)/scripts/git-checkout.sh $(CONFIG_QEMU) $(QEMU_TAG) qemu-xen-traditional-dir
+	
+qemu-xen-dir-find:
+	$(XEN_ROOT)/scripts/git-checkout.sh $(QEMU_UPSTREAM_URL) $(QEMU_UPSTREAM_TAG) qemu-xen-dir
 	
 .PHONY: qemu-xen-traditional-dir-force-update
 qemu-xen-traditional-dir-force-update:
@@ -96,6 +101,14 @@ subdir-clean-qemu-xen-traditional-dir:
 	set -e; if test -d qemu-xen-traditional-dir/.; then \
 		$(buildmakevars2shellvars); \
 		$(MAKE) -C qemu-xen-traditional-dir clean; \
+	fi
+
+subdir-all-qemu-xen-dir subdir-install-qemu-xen-dir: qemu-xen-dir-find
+
+subdir-clean-qemu-xen-dir:
+	set -e; if test -d qemu-xen-dir/.; then \
+		$(buildmakevars2shellvars); \
+		$(MAKE) -C qemu-xen-dir clean; \
 	fi
 
 subdir-clean-debugger/gdbsx subdir-distclean-debugger/gdbsx: .phony

@@ -192,6 +192,10 @@ else
 QEMU_REMOTE=git://xenbits.xensource.com/qemu-xen-unstable.git
 endif
 
+# Only available through the git protocol at the moment
+QEMU_UPSTREAM_URL ?= git://xenbits.xen.org/people/sstabellini/qemu-dm.git
+QEMU_UPSTREAM_TAG ?= origin/xen-stable-0.15
+
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
