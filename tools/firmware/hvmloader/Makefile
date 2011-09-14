@@ -44,7 +44,6 @@ CFLAGS += -DENABLE_ROMBIOS
 ROMBIOS_ROM := $(ROMBIOS_DIR)/BIOS-bochs-latest
 endif
 
-SEABIOS_DIR := ../seabios-dir
 ifneq ($(SEABIOS_DIR),)
 OBJS += seabios.o
 CFLAGS += -DENABLE_SEABIOS

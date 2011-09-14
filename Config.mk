@@ -192,12 +192,6 @@ else
 QEMU_REMOTE=git://xenbits.xensource.com/qemu-xen-unstable.git
 endif
 
-# Only available through the git protocol at the moment
-QEMU_UPSTREAM_URL ?= git://xenbits.xen.org/people/sstabellini/qemu-dm.git
-QEMU_UPSTREAM_TAG ?= origin/xen-stable-0.15
-SEABIOS_UPSTREAM_URL=git://git.qemu.org/seabios.git
-SEABIOS_UPSTREAM_TAG ?= 7fc039e9c262b4199fab497f3e12f4e425c37560
-
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
@@ -209,6 +203,15 @@ QEMU_TAG ?= cd776ee9408ff127f934a707c1a339ee600bc127
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
+
+# SeaBIOS integration is a work in progress. Before enabling this
+# option you must clone git://git.qemu.org/seabios.git/, possibly add
+# some development patches and then build it yourself before pointing
+# this variable to it (using an absolute path).
+#
+# Note that using SeaBIOS requires the use the upstream qemu as the
+# device model.
+SEABIOS_DIR ?= 
 
 # Optional components
 XENSTAT_XENTOP     ?= y
