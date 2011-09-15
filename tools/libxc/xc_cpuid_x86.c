@@ -392,6 +392,7 @@ static void xc_cpuid_hvm_policy(
 
     case 0x00000002: /* Intel cache info (dumped by AMD policy) */
     case 0x00000004: /* Intel cache info (dumped by AMD policy) */
+    case 0x0000000a: /* Architectural Performance Monitor Features */
     case 0x80000002: /* Processor name string */
     case 0x80000003: /* ... continued         */
     case 0x80000004: /* ... continued         */
