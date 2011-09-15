@@ -537,6 +537,15 @@ void do_is_domain_introduced(struct connection *conn, const char *domid_str)
 	send_reply(conn, XS_IS_DOMAIN_INTRODUCED, result ? "T" : "F", 2);
 }
 
+/* Allow guest to reset all watches */
+void do_reset_watches(struct connection *conn)
+{
+	conn_delete_all_watches(conn);
+	conn_delete_all_transactions(conn);
+
+	send_ack(conn, XS_RESET_WATCHES);
+}
+
 static int close_xc_handle(void *_handle)
 {
 	xc_interface_close(*(xc_interface**)_handle);

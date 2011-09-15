@@ -120,6 +120,7 @@ static char *sockmsg_string(enum xsd_sockmsg_type type)
 	case XS_IS_DOMAIN_INTRODUCED: return "XS_IS_DOMAIN_INTRODUCED";
 	case XS_RESUME: return "RESUME";
 	case XS_SET_TARGET: return "SET_TARGET";
+	case XS_RESET_WATCHES: return "RESET_WATCHES";
 	default:
 		return "**UNKNOWN**";
 	}
@@ -1240,6 +1241,10 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 
 	case XS_SET_TARGET:
 		do_set_target(conn, in);
+		break;
+
+	case XS_RESET_WATCHES:
+		do_reset_watches(conn);
 		break;
 
 	default:

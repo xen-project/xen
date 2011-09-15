@@ -217,6 +217,9 @@ WATCH_EVENT					<epath>|<token>|
 
 UNWATCH			<wpath>|<token>|?
 
+RESET_WATCHES		|
+	Reset all watches and transactions of the caller.
+
 ---------- Transactions ----------
 
 TRANSACTION_START	|			<transid>|

@@ -40,6 +40,9 @@ void do_set_target(struct connection *conn, struct buffered_data *in);
 /* domid */
 void do_get_domain_path(struct connection *conn, const char *domid_str);
 
+/* Allow guest to reset all watches */
+void do_reset_watches(struct connection *conn);
+
 void domain_init(void);
 
 /* Returns the implicit path of a connection (only domains have this) */
