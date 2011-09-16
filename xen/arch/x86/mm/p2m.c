@@ -755,7 +755,7 @@ void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn)
     mem_event_request_t req;
 
     /* Check that there's space on the ring for this request */
-    if ( mem_event_check_ring(d) == 0)
+    if ( mem_event_check_ring(d, &d->mem_event) == 0)
     {
         /* Send release notification to pager */
         memset(&req, 0, sizeof(req));
@@ -763,7 +763,7 @@ void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn)
         req.gfn = gfn;
         req.vcpu_id = v->vcpu_id;
 
-        mem_event_put_request(d, &req);
+        mem_event_put_request(d, &d->mem_event, &req);
     }
 }
 
@@ -775,7 +775,7 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
     /* Check that there's space on the ring for this request */
-    if ( mem_event_check_ring(d) )
+    if ( mem_event_check_ring(d, &d->mem_event) )
         return;
 
     memset(&req, 0, sizeof(req));
@@ -803,7 +803,7 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
     else if ( p2mt != p2m_ram_paging_out && p2mt != p2m_ram_paged )
     {
         /* gfn is already on its way back and vcpu is not paused */
-        mem_event_put_req_producers(d);
+        mem_event_put_req_producers(&d->mem_event);
         return;
     }
 
@@ -812,7 +812,7 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
     req.p2mt = p2mt;
     req.vcpu_id = v->vcpu_id;
 
-    mem_event_put_request(d, &req);
+    mem_event_put_request(d, &d->mem_event, &req);
 }
 
 int p2m_mem_paging_prep(struct domain *d, unsigned long gfn)
@@ -842,7 +842,7 @@ void p2m_mem_paging_resume(struct domain *d)
     mfn_t mfn;
 
     /* Pull the response off the ring */
-    mem_event_get_response(d, &rsp);
+    mem_event_get_response(&d->mem_event, &rsp);
 
     /* Fix p2m entry if the page was not dropped */
     if ( !(rsp.flags & MEM_EVENT_FLAG_DROP_PAGE) )
@@ -889,7 +889,7 @@ void p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long gla
     p2m_unlock(p2m);
 
     /* Otherwise, check if there is a memory event listener, and send the message along */
-    res = mem_event_check_ring(d);
+    res = mem_event_check_ring(d, &d->mem_event);
     if ( res < 0 ) 
     {
         /* No listener */
@@ -933,7 +933,7 @@ void p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long gla
     
     req.vcpu_id = v->vcpu_id;
 
-    mem_event_put_request(d, &req);   
+    mem_event_put_request(d, &d->mem_event, &req);
 
     /* VCPU paused, mem event request sent */
 }
@@ -943,7 +943,7 @@ void p2m_mem_access_resume(struct p2m_domain *p2m)
     struct domain *d = p2m->domain;
     mem_event_response_t rsp;
 
-    mem_event_get_response(d, &rsp);
+    mem_event_get_response(&d->mem_event, &rsp);
 
     /* Unpause domain */
     if ( rsp.flags & MEM_EVENT_FLAG_VCPU_PAUSED )

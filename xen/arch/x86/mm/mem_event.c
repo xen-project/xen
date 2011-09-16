@@ -33,21 +33,21 @@
 #define xen_rmb()  rmb()
 #define xen_wmb()  wmb()
 
-#define mem_event_ring_lock_init(_d)  spin_lock_init(&(_d)->mem_event.ring_lock)
-#define mem_event_ring_lock(_d)       spin_lock(&(_d)->mem_event.ring_lock)
-#define mem_event_ring_unlock(_d)     spin_unlock(&(_d)->mem_event.ring_lock)
+#define mem_event_ring_lock_init(_med)  spin_lock_init(&(_med)->ring_lock)
+#define mem_event_ring_lock(_med)       spin_lock(&(_med)->ring_lock)
+#define mem_event_ring_unlock(_med)     spin_unlock(&(_med)->ring_lock)
 
-static int mem_event_enable(struct domain *d, mfn_t ring_mfn, mfn_t shared_mfn)
+static int mem_event_enable(struct domain *d, struct mem_event_domain *med, mfn_t ring_mfn, mfn_t shared_mfn)
 {
     int rc;
 
     /* Map ring and shared pages */
-    d->mem_event.ring_page = map_domain_page(mfn_x(ring_mfn));
-    if ( d->mem_event.ring_page == NULL )
+    med->ring_page = map_domain_page(mfn_x(ring_mfn));
+    if ( med->ring_page == NULL )
         goto err;
 
-    d->mem_event.shared_page = map_domain_page(mfn_x(shared_mfn));
-    if ( d->mem_event.shared_page == NULL )
+    med->shared_page = map_domain_page(mfn_x(shared_mfn));
+    if ( med->shared_page == NULL )
         goto err_ring;
 
     /* Allocate event channel */
@@ -56,15 +56,15 @@ static int mem_event_enable(struct domain *d, mfn_t ring_mfn, mfn_t shared_mfn)
     if ( rc < 0 )
         goto err_shared;
 
-    ((mem_event_shared_page_t *)d->mem_event.shared_page)->port = rc;
-    d->mem_event.xen_port = rc;
+    ((mem_event_shared_page_t *)med->shared_page)->port = rc;
+    med->xen_port = rc;
 
     /* Prepare ring buffer */
-    FRONT_RING_INIT(&d->mem_event.front_ring,
-                    (mem_event_sring_t *)d->mem_event.ring_page,
+    FRONT_RING_INIT(&med->front_ring,
+                    (mem_event_sring_t *)med->ring_page,
                     PAGE_SIZE);
 
-    mem_event_ring_lock_init(d);
+    mem_event_ring_lock_init(med);
 
     /* Wake any VCPUs paused for memory events */
     mem_event_unpause_vcpus(d);
@@ -72,34 +72,34 @@ static int mem_event_enable(struct domain *d, mfn_t ring_mfn, mfn_t shared_mfn)
     return 0;
 
  err_shared:
-    unmap_domain_page(d->mem_event.shared_page);
-    d->mem_event.shared_page = NULL;
+    unmap_domain_page(med->shared_page);
+    med->shared_page = NULL;
  err_ring:
-    unmap_domain_page(d->mem_event.ring_page);
-    d->mem_event.ring_page = NULL;
+    unmap_domain_page(med->ring_page);
+    med->ring_page = NULL;
  err:
     return 1;
 }
 
-static int mem_event_disable(struct domain *d)
+static int mem_event_disable(struct mem_event_domain *med)
 {
-    unmap_domain_page(d->mem_event.ring_page);
-    d->mem_event.ring_page = NULL;
+    unmap_domain_page(med->ring_page);
+    med->ring_page = NULL;
 
-    unmap_domain_page(d->mem_event.shared_page);
-    d->mem_event.shared_page = NULL;
+    unmap_domain_page(med->shared_page);
+    med->shared_page = NULL;
 
     return 0;
 }
 
-void mem_event_put_request(struct domain *d, mem_event_request_t *req)
+void mem_event_put_request(struct domain *d, struct mem_event_domain *med, mem_event_request_t *req)
 {
     mem_event_front_ring_t *front_ring;
     RING_IDX req_prod;
 
-    mem_event_ring_lock(d);
+    mem_event_ring_lock(med);
 
-    front_ring = &d->mem_event.front_ring;
+    front_ring = &med->front_ring;
     req_prod = front_ring->req_prod_pvt;
 
     /* Copy request */
@@ -107,23 +107,23 @@ void mem_event_put_request(struct domain *d, mem_event_request_t *req)
     req_prod++;
 
     /* Update ring */
-    d->mem_event.req_producers--;
+    med->req_producers--;
     front_ring->req_prod_pvt = req_prod;
     RING_PUSH_REQUESTS(front_ring);
 
-    mem_event_ring_unlock(d);
+    mem_event_ring_unlock(med);
 
-    notify_via_xen_event_channel(d, d->mem_event.xen_port);
+    notify_via_xen_event_channel(d, med->xen_port);
 }
 
-void mem_event_get_response(struct domain *d, mem_event_response_t *rsp)
+void mem_event_get_response(struct mem_event_domain *med, mem_event_response_t *rsp)
 {
     mem_event_front_ring_t *front_ring;
     RING_IDX rsp_cons;
 
-    mem_event_ring_lock(d);
+    mem_event_ring_lock(med);
 
-    front_ring = &d->mem_event.front_ring;
+    front_ring = &med->front_ring;
     rsp_cons = front_ring->rsp_cons;
 
     /* Copy response */
@@ -134,7 +134,7 @@ void mem_event_get_response(struct domain *d, mem_event_response_t *rsp)
     front_ring->rsp_cons = rsp_cons;
     front_ring->sring->rsp_event = rsp_cons + 1;
 
-    mem_event_ring_unlock(d);
+    mem_event_ring_unlock(med);
 }
 
 void mem_event_unpause_vcpus(struct domain *d)
@@ -152,35 +152,35 @@ void mem_event_mark_and_pause(struct vcpu *v)
     vcpu_sleep_nosync(v);
 }
 
-void mem_event_put_req_producers(struct domain *d)
+void mem_event_put_req_producers(struct mem_event_domain *med)
 {
-    mem_event_ring_lock(d);
-    d->mem_event.req_producers--;
-    mem_event_ring_unlock(d);
+    mem_event_ring_lock(med);
+    med->req_producers--;
+    mem_event_ring_unlock(med);
 }
 
-int mem_event_check_ring(struct domain *d)
+int mem_event_check_ring(struct domain *d, struct mem_event_domain *med)
 {
     struct vcpu *curr = current;
     int free_requests;
     int ring_full = 1;
 
-    if ( !d->mem_event.ring_page )
+    if ( !med->ring_page )
         return -1;
 
-    mem_event_ring_lock(d);
+    mem_event_ring_lock(med);
 
-    free_requests = RING_FREE_REQUESTS(&d->mem_event.front_ring);
-    if ( d->mem_event.req_producers < free_requests )
+    free_requests = RING_FREE_REQUESTS(&med->front_ring);
+    if ( med->req_producers < free_requests )
     {
-        d->mem_event.req_producers++;
+        med->req_producers++;
         ring_full = 0;
     }
 
-    if ( (curr->domain->domain_id == d->domain_id) && ring_full )
+    if ( ring_full && (curr->domain == d) )
         mem_event_mark_and_pause(curr);
 
-    mem_event_ring_unlock(d);
+    mem_event_ring_unlock(med);
 
     return ring_full;
 }
@@ -230,6 +230,7 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
         {
             struct domain *dom_mem_event = current->domain;
             struct vcpu *v = current;
+            struct mem_event_domain *med = &d->mem_event;
             unsigned long ring_addr = mec->ring_addr;
             unsigned long shared_addr = mec->shared_addr;
             l1_pgentry_t l1e;
@@ -242,7 +243,7 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
              * the cache is in an undefined state and so is the guest
              */
             rc = -EBUSY;
-            if ( d->mem_event.ring_page )
+            if ( med->ring_page )
                 break;
 
             /* Currently only EPT is supported */
@@ -270,7 +271,7 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
                 break;
 
             rc = -EINVAL;
-            if ( mem_event_enable(d, ring_mfn, shared_mfn) != 0 )
+            if ( mem_event_enable(d, med, ring_mfn, shared_mfn) != 0 )
                 break;
 
             rc = 0;
@@ -279,7 +280,7 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
 
         case XEN_DOMCTL_MEM_EVENT_OP_DISABLE:
         {
-            rc = mem_event_disable(d);
+            rc = mem_event_disable(&d->mem_event);
         }
         break;
 
