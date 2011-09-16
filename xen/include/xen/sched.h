@@ -317,8 +317,12 @@ struct domain
     /* Non-migratable and non-restoreable? */
     bool_t disable_migrate;
 
+    /* Memory sharing support */
+    struct mem_event_domain mem_share;
     /* Memory paging support */
-    struct mem_event_domain mem_event;
+    struct mem_event_domain mem_paging;
+    /* Memory access support */
+    struct mem_event_domain mem_access;
 
     /* Currently computed from union of all vcpu cpu-affinity masks. */
     nodemask_t node_affinity;

@@ -42,18 +42,3 @@ int xc_mem_event_control(xc_interface *xch, domid_t domain_id, unsigned int op,
     return do_domctl(xch, &domctl);
 }
 
-int xc_mem_event_enable(xc_interface *xch, domid_t domain_id,
-                        void *shared_page, void *ring_page)
-{
-    return xc_mem_event_control(xch, domain_id,
-                                XEN_DOMCTL_MEM_EVENT_OP_ENABLE, 0,
-                                shared_page, ring_page, INVALID_MFN);
-}
-
-int xc_mem_event_disable(xc_interface *xch, domid_t domain_id)
-{
-    return xc_mem_event_control(xch, domain_id,
-                                XEN_DOMCTL_MEM_EVENT_OP_DISABLE, 0,
-                                NULL, NULL, INVALID_MFN);
-}
-

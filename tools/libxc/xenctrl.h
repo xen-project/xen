@@ -1758,16 +1758,19 @@ int xc_mem_event_control(xc_interface *xch, domid_t domain_id, unsigned int op,
                          unsigned int mode, void *shared_page,
                           void *ring_page, unsigned long gfn);
 
-int xc_mem_event_enable(xc_interface *xch, domid_t domain_id,
+int xc_mem_paging_enable(xc_interface *xch, domid_t domain_id,
                         void *shared_page, void *ring_page);
-int xc_mem_event_disable(xc_interface *xch, domid_t domain_id);
-
+int xc_mem_paging_disable(xc_interface *xch, domid_t domain_id);
 int xc_mem_paging_nominate(xc_interface *xch, domid_t domain_id,
                            unsigned long gfn);
 int xc_mem_paging_evict(xc_interface *xch, domid_t domain_id, unsigned long gfn);
 int xc_mem_paging_prep(xc_interface *xch, domid_t domain_id, unsigned long gfn);
 int xc_mem_paging_resume(xc_interface *xch, domid_t domain_id,
                          unsigned long gfn);
+
+int xc_mem_access_enable(xc_interface *xch, domid_t domain_id,
+                        void *shared_page, void *ring_page);
+int xc_mem_access_disable(xc_interface *xch, domid_t domain_id);
 int xc_mem_access_resume(xc_interface *xch, domid_t domain_id,
                          unsigned long gfn);
 

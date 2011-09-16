@@ -4025,7 +4025,7 @@ static int hvm_memory_event_traps(long p, uint32_t reason,
     if ( (p & HVMPME_onchangeonly) && (value == old) )
         return 1;
     
-    rc = mem_event_check_ring(d, &d->mem_event);
+    rc = mem_event_check_ring(d, &d->mem_access);
     if ( rc )
         return rc;
     
@@ -4048,7 +4048,7 @@ static int hvm_memory_event_traps(long p, uint32_t reason,
         req.gla_valid = 1;
     }
     
-    mem_event_put_request(d, &d->mem_event, &req);
+    mem_event_put_request(d, &d->mem_access, &req);
     
     return 1;
 }

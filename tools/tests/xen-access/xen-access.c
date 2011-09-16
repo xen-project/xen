@@ -241,7 +241,7 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
     mem_event_ring_lock_init(&xenaccess->mem_event);
 
     /* Initialise Xen */
-    rc = xc_mem_event_enable(xenaccess->xc_handle, xenaccess->mem_event.domain_id,
+    rc = xc_mem_access_enable(xenaccess->xc_handle, xenaccess->mem_event.domain_id,
                              xenaccess->mem_event.shared_page,
                              xenaccess->mem_event.ring_page);
     if ( rc != 0 )
@@ -351,7 +351,7 @@ int xenaccess_teardown(xc_interface *xch, xenaccess_t *xenaccess)
         return 0;
 
     /* Tear down domain xenaccess in Xen */
-    rc = xc_mem_event_disable(xenaccess->xc_handle, xenaccess->mem_event.domain_id);
+    rc = xc_mem_access_disable(xenaccess->xc_handle, xenaccess->mem_event.domain_id);
     if ( rc != 0 )
     {
         ERROR("Error tearing down domain xenaccess in xen");

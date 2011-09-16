@@ -281,12 +281,12 @@ static struct page_info* mem_sharing_alloc_page(struct domain *d,
     vcpu_pause_nosync(v);
     req.flags |= MEM_EVENT_FLAG_VCPU_PAUSED;
 
-    if(mem_event_check_ring(d, &d->mem_event)) return page;
+    if(mem_event_check_ring(d, &d->mem_share)) return page;
 
     req.gfn = gfn;
     req.p2mt = p2m_ram_shared;
     req.vcpu_id = v->vcpu_id;
-    mem_event_put_request(d, &d->mem_event, &req);
+    mem_event_put_request(d, &d->mem_share, &req);
 
     return page;
 }
@@ -301,7 +301,7 @@ int mem_sharing_sharing_resume(struct domain *d)
     mem_event_response_t rsp;
 
     /* Get request off the ring */
-    mem_event_get_response(&d->mem_event, &rsp);
+    mem_event_get_response(&d->mem_share, &rsp);
 
     /* Unpause domain/vcpu */
     if( rsp.flags & MEM_EVENT_FLAG_VCPU_PAUSED )
@@ -697,14 +697,14 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
 
     switch(mec->op)
     {
-        case XEN_DOMCTL_MEM_SHARING_OP_CONTROL:
+        case XEN_DOMCTL_MEM_EVENT_OP_SHARING_CONTROL:
         {
             d->arch.hvm_domain.mem_sharing_enabled = mec->u.enable;
             rc = 0;
         }
         break;
 
-        case XEN_DOMCTL_MEM_SHARING_OP_NOMINATE_GFN:
+        case XEN_DOMCTL_MEM_EVENT_OP_SHARING_NOMINATE_GFN:
         {
             unsigned long gfn = mec->u.nominate.u.gfn;
             shr_handle_t handle;
@@ -715,7 +715,7 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
         }
         break;
 
-        case XEN_DOMCTL_MEM_SHARING_OP_NOMINATE_GREF:
+        case XEN_DOMCTL_MEM_EVENT_OP_SHARING_NOMINATE_GREF:
         {
             grant_ref_t gref = mec->u.nominate.u.grant_ref;
             unsigned long gfn;
@@ -730,7 +730,7 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
         }
         break;
 
-        case XEN_DOMCTL_MEM_SHARING_OP_SHARE:
+        case XEN_DOMCTL_MEM_EVENT_OP_SHARING_SHARE:
         {
             shr_handle_t sh = mec->u.share.source_handle;
             shr_handle_t ch = mec->u.share.client_handle;
@@ -738,7 +738,7 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
         }
         break;
 
-        case XEN_DOMCTL_MEM_SHARING_OP_RESUME:
+        case XEN_DOMCTL_MEM_EVENT_OP_SHARING_RESUME:
         {
             if(!mem_sharing_enabled(d))
                 return -EINVAL;
@@ -746,21 +746,21 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
         }
         break;
 
-        case XEN_DOMCTL_MEM_SHARING_OP_DEBUG_GFN:
+        case XEN_DOMCTL_MEM_EVENT_OP_SHARING_DEBUG_GFN:
         {
             unsigned long gfn = mec->u.debug.u.gfn;
             rc = mem_sharing_debug_gfn(d, gfn);
         }
         break;
 
-        case XEN_DOMCTL_MEM_SHARING_OP_DEBUG_MFN:
+        case XEN_DOMCTL_MEM_EVENT_OP_SHARING_DEBUG_MFN:
         {
             unsigned long mfn = mec->u.debug.u.mfn;
             rc = mem_sharing_debug_mfn(mfn);
         }
         break;
 
-        case XEN_DOMCTL_MEM_SHARING_OP_DEBUG_GREF:
+        case XEN_DOMCTL_MEM_EVENT_OP_SHARING_DEBUG_GREF:
         {
             grant_ref_t gref = mec->u.debug.u.gref;
             rc = mem_sharing_debug_gref(d, gref);

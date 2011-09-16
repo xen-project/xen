@@ -708,20 +708,18 @@ struct xen_domctl_gdbsx_domstatus {
 
 /* XEN_DOMCTL_mem_event_op */
 
-/* Add and remove memory handlers */
-#define XEN_DOMCTL_MEM_EVENT_OP_ENABLE     0
-#define XEN_DOMCTL_MEM_EVENT_OP_DISABLE    1
-
 /*
+* Domain memory paging
  * Page memory in and out. 
  */
 #define XEN_DOMCTL_MEM_EVENT_OP_PAGING            1
 
-/* Domain memory paging */
-#define XEN_DOMCTL_MEM_EVENT_OP_PAGING_NOMINATE   0
-#define XEN_DOMCTL_MEM_EVENT_OP_PAGING_EVICT      1
-#define XEN_DOMCTL_MEM_EVENT_OP_PAGING_PREP       2
-#define XEN_DOMCTL_MEM_EVENT_OP_PAGING_RESUME     3
+#define XEN_DOMCTL_MEM_EVENT_OP_PAGING_ENABLE     0
+#define XEN_DOMCTL_MEM_EVENT_OP_PAGING_DISABLE    1
+#define XEN_DOMCTL_MEM_EVENT_OP_PAGING_NOMINATE   2
+#define XEN_DOMCTL_MEM_EVENT_OP_PAGING_EVICT      3
+#define XEN_DOMCTL_MEM_EVENT_OP_PAGING_PREP       4
+#define XEN_DOMCTL_MEM_EVENT_OP_PAGING_RESUME     5
 
 /*
  * Access permissions.
@@ -734,11 +732,14 @@ struct xen_domctl_gdbsx_domstatus {
  * ACCESS_RESUME mode for the following domctl.
  */
 #define XEN_DOMCTL_MEM_EVENT_OP_ACCESS            2
-#define XEN_DOMCTL_MEM_EVENT_OP_ACCESS_RESUME     0 
+
+#define XEN_DOMCTL_MEM_EVENT_OP_ACCESS_ENABLE     0
+#define XEN_DOMCTL_MEM_EVENT_OP_ACCESS_DISABLE    1
+#define XEN_DOMCTL_MEM_EVENT_OP_ACCESS_RESUME     2
 
 struct xen_domctl_mem_event_op {
-    uint32_t       op;           /* XEN_DOMCTL_MEM_EVENT_OP_* */
-    uint32_t       mode;         /* XEN_DOMCTL_MEM_EVENT_ENABLE_* */
+    uint32_t       op;           /* XEN_DOMCTL_MEM_EVENT_OP_*_* */
+    uint32_t       mode;         /* XEN_DOMCTL_MEM_EVENT_OP_* */
 
     /* OP_ENABLE */
     uint64_aligned_t shared_addr;  /* IN:  Virtual address of shared page */
@@ -755,14 +756,16 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_mem_event_op_t);
  */
 /* XEN_DOMCTL_mem_sharing_op */
 
-#define XEN_DOMCTL_MEM_SHARING_OP_CONTROL        0
-#define XEN_DOMCTL_MEM_SHARING_OP_NOMINATE_GFN   1
-#define XEN_DOMCTL_MEM_SHARING_OP_NOMINATE_GREF  2
-#define XEN_DOMCTL_MEM_SHARING_OP_SHARE          3
-#define XEN_DOMCTL_MEM_SHARING_OP_RESUME         4
-#define XEN_DOMCTL_MEM_SHARING_OP_DEBUG_GFN      5
-#define XEN_DOMCTL_MEM_SHARING_OP_DEBUG_MFN      6
-#define XEN_DOMCTL_MEM_SHARING_OP_DEBUG_GREF     7
+#define XEN_DOMCTL_MEM_EVENT_OP_SHARING                3
+
+#define XEN_DOMCTL_MEM_EVENT_OP_SHARING_CONTROL        0
+#define XEN_DOMCTL_MEM_EVENT_OP_SHARING_NOMINATE_GFN   1
+#define XEN_DOMCTL_MEM_EVENT_OP_SHARING_NOMINATE_GREF  2
+#define XEN_DOMCTL_MEM_EVENT_OP_SHARING_SHARE          3
+#define XEN_DOMCTL_MEM_EVENT_OP_SHARING_RESUME         4
+#define XEN_DOMCTL_MEM_EVENT_OP_SHARING_DEBUG_GFN      5
+#define XEN_DOMCTL_MEM_EVENT_OP_SHARING_DEBUG_MFN      6
+#define XEN_DOMCTL_MEM_EVENT_OP_SHARING_DEBUG_GREF     7
 
 #define XEN_DOMCTL_MEM_SHARING_S_HANDLE_INVALID  (-10)
 #define XEN_DOMCTL_MEM_SHARING_C_HANDLE_INVALID  (-9)

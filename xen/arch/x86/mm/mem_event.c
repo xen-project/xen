@@ -37,24 +37,52 @@
 #define mem_event_ring_lock(_med)       spin_lock(&(_med)->ring_lock)
 #define mem_event_ring_unlock(_med)     spin_unlock(&(_med)->ring_lock)
 
-static int mem_event_enable(struct domain *d, struct mem_event_domain *med, mfn_t ring_mfn, mfn_t shared_mfn)
+static int mem_event_enable(struct domain *d,
+                            xen_domctl_mem_event_op_t *mec,
+                            struct mem_event_domain *med)
 {
     int rc;
+    struct domain *dom_mem_event = current->domain;
+    struct vcpu *v = current;
+    unsigned long ring_addr = mec->ring_addr;
+    unsigned long shared_addr = mec->shared_addr;
+    l1_pgentry_t l1e;
+    unsigned long gfn;
+    p2m_type_t p2mt;
+    mfn_t ring_mfn;
+    mfn_t shared_mfn;
+
+    /* Only one helper at a time. If the helper crashed,
+     * the ring is in an undefined state and so is the guest.
+     */
+    if ( med->ring_page )
+        return -EBUSY;
+
+    /* Get MFN of ring page */
+    guest_get_eff_l1e(v, ring_addr, &l1e);
+    gfn = l1e_get_pfn(l1e);
+    ring_mfn = gfn_to_mfn(dom_mem_event, gfn, &p2mt);
+
+    if ( unlikely(!mfn_valid(mfn_x(ring_mfn))) )
+        return -EINVAL;
+
+    /* Get MFN of shared page */
+    guest_get_eff_l1e(v, shared_addr, &l1e);
+    gfn = l1e_get_pfn(l1e);
+    shared_mfn = gfn_to_mfn(dom_mem_event, gfn, &p2mt);
+
+    if ( unlikely(!mfn_valid(mfn_x(shared_mfn))) )
+        return -EINVAL;
 
     /* Map ring and shared pages */
     med->ring_page = map_domain_page(mfn_x(ring_mfn));
-    if ( med->ring_page == NULL )
-        goto err;
-
     med->shared_page = map_domain_page(mfn_x(shared_mfn));
-    if ( med->shared_page == NULL )
-        goto err_ring;
 
     /* Allocate event channel */
     rc = alloc_unbound_xen_event_channel(d->vcpu[0],
                                          current->domain->domain_id);
     if ( rc < 0 )
-        goto err_shared;
+        goto err;
 
     ((mem_event_shared_page_t *)med->shared_page)->port = rc;
     med->xen_port = rc;
@@ -71,14 +99,14 @@ static int mem_event_enable(struct domain *d, struct mem_event_domain *med, mfn_
 
     return 0;
 
- err_shared:
+ err:
     unmap_domain_page(med->shared_page);
     med->shared_page = NULL;
- err_ring:
+
     unmap_domain_page(med->ring_page);
     med->ring_page = NULL;
- err:
-    return 1;
+
+    return rc;
 }
 
 static int mem_event_disable(struct mem_event_domain *med)
@@ -220,86 +248,79 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
 
     rc = -ENOSYS;
 
-    switch ( mec-> mode ) 
+    switch ( mec->mode )
     {
-    case 0:
+    case XEN_DOMCTL_MEM_EVENT_OP_PAGING:
     {
+        struct mem_event_domain *med = &d->mem_paging;
+        rc = -ENODEV;
+        /* Only HAP is supported */
+        if ( !hap_enabled(d) )
+            break;
+
+        /* Currently only EPT is supported */
+        if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
+            break;
+
         switch( mec->op )
         {
-        case XEN_DOMCTL_MEM_EVENT_OP_ENABLE:
+        case XEN_DOMCTL_MEM_EVENT_OP_PAGING_ENABLE:
         {
-            struct domain *dom_mem_event = current->domain;
-            struct vcpu *v = current;
-            struct mem_event_domain *med = &d->mem_event;
-            unsigned long ring_addr = mec->ring_addr;
-            unsigned long shared_addr = mec->shared_addr;
-            l1_pgentry_t l1e;
-            unsigned long gfn;
-            p2m_type_t p2mt;
-            mfn_t ring_mfn;
-            mfn_t shared_mfn;
-
-            /* Only one xenpaging at a time. If xenpaging crashed,
-             * the cache is in an undefined state and so is the guest
-             */
-            rc = -EBUSY;
-            if ( med->ring_page )
-                break;
-
-            /* Currently only EPT is supported */
-            rc = -ENODEV;
-            if ( !(hap_enabled(d) &&
-                  (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL)) )
-                break;
-
-            /* Get MFN of ring page */
-            guest_get_eff_l1e(v, ring_addr, &l1e);
-            gfn = l1e_get_pfn(l1e);
-            ring_mfn = gfn_to_mfn(dom_mem_event, gfn, &p2mt);
-
-            rc = -EINVAL;
-            if ( unlikely(!mfn_valid(mfn_x(ring_mfn))) )
-                break;
-
-            /* Get MFN of shared page */
-            guest_get_eff_l1e(v, shared_addr, &l1e);
-            gfn = l1e_get_pfn(l1e);
-            shared_mfn = gfn_to_mfn(dom_mem_event, gfn, &p2mt);
-
-            rc = -EINVAL;
-            if ( unlikely(!mfn_valid(mfn_x(shared_mfn))) )
-                break;
-
-            rc = -EINVAL;
-            if ( mem_event_enable(d, med, ring_mfn, shared_mfn) != 0 )
-                break;
-
-            rc = 0;
+            rc = mem_event_enable(d, mec, med);
         }
         break;
 
-        case XEN_DOMCTL_MEM_EVENT_OP_DISABLE:
+        case XEN_DOMCTL_MEM_EVENT_OP_PAGING_DISABLE:
         {
-            rc = mem_event_disable(&d->mem_event);
+            rc = mem_event_disable(med);
         }
         break;
 
         default:
-            rc = -ENOSYS;
-            break;
+        {
+            if ( med->ring_page )
+                rc = mem_paging_domctl(d, mec, u_domctl);
         }
         break;
+        }
     }
-    case XEN_DOMCTL_MEM_EVENT_OP_PAGING:
-    {
-        rc = mem_paging_domctl(d, mec, u_domctl);
-        break;
-    }
+    break;
+
     case XEN_DOMCTL_MEM_EVENT_OP_ACCESS: 
     {
-        rc = mem_access_domctl(d, mec, u_domctl);
+        struct mem_event_domain *med = &d->mem_access;
+        rc = -ENODEV;
+        /* Only HAP is supported */
+        if ( !hap_enabled(d) )
+            break;
+
+        /* Currently only EPT is supported */
+        if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
+            break;
+
+        switch( mec->op )
+        {
+        case XEN_DOMCTL_MEM_EVENT_OP_ACCESS_ENABLE:
+        {
+            rc = mem_event_enable(d, mec, med);
+        }
         break;
+
+        case XEN_DOMCTL_MEM_EVENT_OP_ACCESS_DISABLE:
+        {
+            rc = mem_event_disable(&d->mem_access);
+        }
+        break;
+
+        default:
+        {
+            if ( med->ring_page )
+                rc = mem_access_domctl(d, mec, u_domctl);
+        }
+        break;
+        }
     }
+    break;
     }
 
     return rc;

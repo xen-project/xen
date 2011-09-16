@@ -234,7 +234,7 @@ static xenpaging_t *xenpaging_init(domid_t domain_id, int num_pages)
                    PAGE_SIZE);
     
     /* Initialise Xen */
-    rc = xc_mem_event_enable(xch, paging->mem_event.domain_id,
+    rc = xc_mem_paging_enable(xch, paging->mem_event.domain_id,
                              paging->mem_event.shared_page,
                              paging->mem_event.ring_page);
     if ( rc != 0 )
@@ -353,7 +353,7 @@ static int xenpaging_teardown(xenpaging_t *paging)
     xch = paging->xc_handle;
     paging->xc_handle = NULL;
     /* Tear down domain paging in Xen */
-    rc = xc_mem_event_disable(xch, paging->mem_event.domain_id);
+    rc = xc_mem_paging_disable(xch, paging->mem_event.domain_id);
     if ( rc != 0 )
     {
         ERROR("Error tearing down domain paging in xen");
