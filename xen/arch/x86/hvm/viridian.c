@@ -96,9 +96,43 @@ int cpuid_viridian_leaves(unsigned int leaf, unsigned int *eax,
     return 1;
 }
 
-static void enable_hypercall_page(void)
+void dump_guest_os_id(struct domain *d)
 {
-    struct domain *d = current->domain;
+    gdprintk(XENLOG_INFO, "GUEST_OS_ID:\n");
+    gdprintk(XENLOG_INFO, "\tvendor: %x\n",
+            d->arch.hvm_domain.viridian.guest_os_id.fields.vendor);
+    gdprintk(XENLOG_INFO, "\tos: %x\n",
+            d->arch.hvm_domain.viridian.guest_os_id.fields.os);
+    gdprintk(XENLOG_INFO, "\tmajor: %x\n",
+            d->arch.hvm_domain.viridian.guest_os_id.fields.major);
+    gdprintk(XENLOG_INFO, "\tminor: %x\n",
+            d->arch.hvm_domain.viridian.guest_os_id.fields.minor);
+    gdprintk(XENLOG_INFO, "\tsp: %x\n",
+            d->arch.hvm_domain.viridian.guest_os_id.fields.service_pack);
+    gdprintk(XENLOG_INFO, "\tbuild: %x\n",
+            d->arch.hvm_domain.viridian.guest_os_id.fields.build_number);
+}
+
+void dump_hypercall(struct domain *d)
+{
+    gdprintk(XENLOG_INFO, "HYPERCALL:\n");
+    gdprintk(XENLOG_INFO, "\tenabled: %x\n",
+            d->arch.hvm_domain.viridian.hypercall_gpa.fields.enabled);
+    gdprintk(XENLOG_INFO, "\tpfn: %lx\n",
+            (unsigned long)d->arch.hvm_domain.viridian.hypercall_gpa.fields.pfn);
+}
+
+void dump_apic_assist(struct vcpu *v)
+{
+    gdprintk(XENLOG_INFO, "APIC_ASSIST[%d]:\n", v->vcpu_id);
+    gdprintk(XENLOG_INFO, "\tenabled: %x\n",
+            v->arch.hvm_vcpu.viridian.apic_assist.fields.enabled);
+    gdprintk(XENLOG_INFO, "\tpfn: %lx\n",
+            (unsigned long)v->arch.hvm_vcpu.viridian.apic_assist.fields.pfn);
+}
+
+static void enable_hypercall_page(struct domain *d)
+{
     unsigned long gmfn = d->arch.hvm_domain.viridian.hypercall_gpa.fields.pfn;
     unsigned long mfn = gmfn_to_mfn(d, gmfn);
     uint8_t *p;
@@ -130,9 +164,43 @@ static void enable_hypercall_page(void)
     put_page_and_type(mfn_to_page(mfn));
 }
 
+void initialize_apic_assist(struct vcpu *v)
+{
+    struct domain *d = v->domain;
+    unsigned long gmfn = v->arch.hvm_vcpu.viridian.apic_assist.fields.pfn;
+    unsigned long mfn = gmfn_to_mfn(d, gmfn);
+    uint8_t *p;
+
+    /*
+     * We don't support the APIC assist page, and that fact is reflected in
+     * our CPUID flags. However, Newer versions of Windows have a bug which
+     * means that they don't recognise that, and tries to use the page
+     * anyway. We therefore have to fake up just enough to keep windows happy.
+     *
+     * See http://msdn.microsoft.com/en-us/library/ff538657%28VS.85%29.aspx for
+     * details of how Windows uses the page.
+     */
+
+    if ( !mfn_valid(mfn) ||
+         !get_page_and_type(mfn_to_page(mfn), d, PGT_writable_page) )
+    {
+        gdprintk(XENLOG_WARNING, "Bad GMFN %lx (MFN %lx)\n", gmfn, mfn);
+        return;
+    }
+
+    p = map_domain_page(mfn);
+
+    *(u32 *)p = 0;
+
+    unmap_domain_page(p);
+
+    put_page_and_type(mfn_to_page(mfn));
+}
+
 int wrmsr_viridian_regs(uint32_t idx, uint64_t val)
 {
-    struct domain *d = current->domain;
+    struct vcpu *v = current;
+    struct domain *d = v->domain;
 
     if ( !is_viridian_domain(d) )
         return 0;
@@ -142,44 +210,29 @@ int wrmsr_viridian_regs(uint32_t idx, uint64_t val)
     case VIRIDIAN_MSR_GUEST_OS_ID:
         perfc_incr(mshv_wrmsr_osid);
         d->arch.hvm_domain.viridian.guest_os_id.raw = val;
-        gdprintk(XENLOG_INFO, "Guest os:\n");
-        gdprintk(XENLOG_INFO, "\tvendor: %x\n",
-               d->arch.hvm_domain.viridian.guest_os_id.fields.vendor);
-        gdprintk(XENLOG_INFO, "\tos: %x\n",
-               d->arch.hvm_domain.viridian.guest_os_id.fields.os);
-        gdprintk(XENLOG_INFO, "\tmajor: %x\n",
-               d->arch.hvm_domain.viridian.guest_os_id.fields.major);
-        gdprintk(XENLOG_INFO, "\tminor: %x\n",
-               d->arch.hvm_domain.viridian.guest_os_id.fields.minor);
-        gdprintk(XENLOG_INFO, "\tsp: %x\n",
-               d->arch.hvm_domain.viridian.guest_os_id.fields.service_pack);
-        gdprintk(XENLOG_INFO, "\tbuild: %x\n",
-               d->arch.hvm_domain.viridian.guest_os_id.fields.build_number);
+        dump_guest_os_id(d);
         break;
 
     case VIRIDIAN_MSR_HYPERCALL:
         perfc_incr(mshv_wrmsr_hc_page);
-        gdprintk(XENLOG_INFO, "Set hypercall page %"PRIx64".\n", val);
-        if ( d->arch.hvm_domain.viridian.guest_os_id.raw == 0 )
-            break;
         d->arch.hvm_domain.viridian.hypercall_gpa.raw = val;
+        dump_hypercall(d);
         if ( d->arch.hvm_domain.viridian.hypercall_gpa.fields.enabled )
-            enable_hypercall_page();
+            enable_hypercall_page(d);
         break;
 
     case VIRIDIAN_MSR_VP_INDEX:
         perfc_incr(mshv_wrmsr_vp_index);
-        gdprintk(XENLOG_INFO, "Set VP index %"PRIu64".\n", val);
         break;
 
     case VIRIDIAN_MSR_EOI:
         perfc_incr(mshv_wrmsr_eoi);
-        vlapic_EOI_set(vcpu_vlapic(current));
+        vlapic_EOI_set(vcpu_vlapic(v));
         break;
 
     case VIRIDIAN_MSR_ICR: {
         u32 eax = (u32)val, edx = (u32)(val >> 32);
-        struct vlapic *vlapic = vcpu_vlapic(current);
+        struct vlapic *vlapic = vcpu_vlapic(v);
         perfc_incr(mshv_wrmsr_icr);
         eax &= ~(1 << 12);
         edx &= 0xff000000;
@@ -191,31 +244,15 @@ int wrmsr_viridian_regs(uint32_t idx, uint64_t val)
 
     case VIRIDIAN_MSR_TPR:
         perfc_incr(mshv_wrmsr_tpr);
-        vlapic_set_reg(vcpu_vlapic(current), APIC_TASKPRI, (uint8_t)val);
+        vlapic_set_reg(vcpu_vlapic(v), APIC_TASKPRI, (uint8_t)val);
         break;
 
     case VIRIDIAN_MSR_APIC_ASSIST:
-        /*
-         * We don't support the APIC assist page, and that fact is reflected in
-         * our CPUID flags. However, Windows 7 build 7000 has a bug which means
-         * that it doesn't recognise that, and tries to use the page anyway. We
-         * therefore have to fake up just enough to keep win7 happy.
-         * Fortunately, that's really easy: just setting the first four bytes
-         * in the page to zero effectively disables the page again, so that's
-         * what we do. Semantically, the first four bytes are supposed to be a
-         * flag saying whether the guest really needs to issue an EOI. Setting
-         * that flag to zero means that it must always issue one, which is what
-         * we want. Once a page has been repurposed as an APIC assist page the
-         * guest isn't allowed to set anything in it, so the flag remains zero
-         * and all is fine. The guest is allowed to clear flags in the page,
-         * but that doesn't cause us any problems.
-         */
-        if ( val & 1 ) /* APIC assist page enabled? */
-        {
-            uint32_t word = 0;
-            paddr_t page_start = val & ~1ul;
-            (void)hvm_copy_to_guest_phys(page_start, &word, sizeof(word));
-        }
+        perfc_incr(mshv_wrmsr_apic_msr);
+        v->arch.hvm_vcpu.viridian.apic_assist.raw = val;
+        dump_apic_assist(v);
+        if (v->arch.hvm_vcpu.viridian.apic_assist.fields.enabled)
+            initialize_apic_assist(v);
         break;
 
     default:
@@ -228,20 +265,21 @@ int wrmsr_viridian_regs(uint32_t idx, uint64_t val)
 int rdmsr_viridian_regs(uint32_t idx, uint64_t *val)
 {
     struct vcpu *v = current;
+    struct domain *d = v->domain;
     
-    if ( !is_viridian_domain(v->domain) )
+    if ( !is_viridian_domain(d) )
         return 0;
 
     switch ( idx )
     {
     case VIRIDIAN_MSR_GUEST_OS_ID:
         perfc_incr(mshv_rdmsr_osid);
-        *val = v->domain->arch.hvm_domain.viridian.guest_os_id.raw;
+        *val = d->arch.hvm_domain.viridian.guest_os_id.raw;
         break;
 
     case VIRIDIAN_MSR_HYPERCALL:
         perfc_incr(mshv_rdmsr_hc_page);
-        *val = v->domain->arch.hvm_domain.viridian.hypercall_gpa.raw;
+        *val = d->arch.hvm_domain.viridian.hypercall_gpa.raw;
         break;
 
     case VIRIDIAN_MSR_VP_INDEX:
@@ -258,6 +296,11 @@ int rdmsr_viridian_regs(uint32_t idx, uint64_t *val)
     case VIRIDIAN_MSR_TPR:
         perfc_incr(mshv_rdmsr_tpr);
         *val = vlapic_get_reg(vcpu_vlapic(v), APIC_TASKPRI);
+        break;
+
+    case VIRIDIAN_MSR_APIC_ASSIST:
+        perfc_incr(mshv_rdmsr_apic_msr);
+        *val = v->arch.hvm_vcpu.viridian.apic_assist.raw;
         break;
 
     default:

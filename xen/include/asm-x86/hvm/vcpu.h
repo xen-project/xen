@@ -23,6 +23,7 @@
 #include <xen/tasklet.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/vlapic.h>
+#include <asm/hvm/viridian.h>
 #include <asm/hvm/vmx/vmcs.h>
 #include <asm/hvm/vmx/vvmx.h>
 #include <asm/hvm/svm/vmcb.h>
@@ -163,6 +164,8 @@ struct hvm_vcpu {
     int           inject_trap;       /* -1 for nothing to inject */
     int           inject_error_code;
     unsigned long inject_cr2;
+
+    struct viridian_vcpu viridian;
 };
 
 #endif /* __ASM_X86_HVM_VCPU_H__ */

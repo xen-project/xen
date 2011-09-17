@@ -9,6 +9,21 @@
 #ifndef __ASM_X86_HVM_VIRIDIAN_H__
 #define __ASM_X86_HVM_VIRIDIAN_H__
 
+union viridian_apic_assist
+{   uint64_t raw;
+    struct
+    {
+        uint64_t enabled:1;
+        uint64_t reserved_preserved:11;
+        uint64_t pfn:48;
+    } fields;
+};
+
+struct viridian_vcpu
+{
+    union viridian_apic_assist apic_assist;
+};
+
 union viridian_guest_os_id
 {
     uint64_t raw;
