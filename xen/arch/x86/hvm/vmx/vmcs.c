@@ -71,6 +71,7 @@ bool_t cpu_has_vmx_ins_outs_instr_info __read_mostly;
 static DEFINE_PER_CPU_READ_MOSTLY(struct vmcs_struct *, vmxon_region);
 static DEFINE_PER_CPU(struct vmcs_struct *, current_vmcs);
 static DEFINE_PER_CPU(struct list_head, active_vmcs_list);
+static DEFINE_PER_CPU(bool_t, vmxon);
 
 static u32 vmcs_revision_id __read_mostly;
 
@@ -519,6 +520,7 @@ int vmx_cpu_up(void)
         printk("CPU%d: unexpected VMXON failure\n", cpu);
         return -EINVAL;
     case 0: /* success */
+        this_cpu(vmxon) = 1;
         break;
     default:
         BUG();
@@ -540,6 +542,9 @@ void vmx_cpu_down(void)
     struct list_head *active_vmcs_list = &this_cpu(active_vmcs_list);
     unsigned long flags;
 
+    if ( !this_cpu(vmxon) )
+        return;
+
     local_irq_save(flags);
 
     while ( !list_empty(active_vmcs_list) )
@@ -547,6 +552,7 @@ void vmx_cpu_down(void)
                                     struct vcpu, arch.hvm_vmx.active_list));
 
     BUG_ON(!(read_cr4() & X86_CR4_VMXE));
+    this_cpu(vmxon) = 0;
     __vmxoff();
 
     local_irq_restore(flags);
