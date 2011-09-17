@@ -1292,7 +1292,10 @@ void __init __start_xen(unsigned long mbi_p)
     printk("Brought up %ld CPUs\n", (long)num_online_cpus());
     smp_cpus_done();
 
+    verify_tsc_reliability();
+
     do_initcalls();
+
 
     if ( opt_watchdog ) 
         watchdog_setup();

@@ -1450,8 +1450,8 @@ static void __init tsc_check_writability(void)
     disable_tsc_sync = 1;
 }
 
-/* Late init function (after interrupts are enabled). */
-int __init init_xen_time(void)
+/* Late init function, after all cpus have booted */
+void __init verify_tsc_reliability(void)
 {
     if ( boot_cpu_has(X86_FEATURE_TSC_RELIABLE) )
     {
@@ -1463,9 +1463,17 @@ int __init init_xen_time(void)
          */
         tsc_check_reliability();
         if ( tsc_max_warp )
+        {
+            printk("%s: TSC warp detected, disabling TSC_RELIABLE\n",
+                   __func__);
             setup_clear_cpu_cap(X86_FEATURE_TSC_RELIABLE);
+        }
     }
+}
 
+/* Late init function (after interrupts are enabled). */
+int __init init_xen_time(void)
+{
     tsc_check_writability();
 
     /* If we have constant-rate TSCs then scale factor can be shared. */

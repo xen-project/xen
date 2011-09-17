@@ -11,6 +11,7 @@
 #include <xen/types.h>
 #include <public/xen.h>
 
+extern void verify_tsc_reliability(void);
 extern int init_xen_time(void);
 extern void cstate_restore_tsc(void);
 
