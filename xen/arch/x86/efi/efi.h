@@ -3,6 +3,7 @@
 #include <efi/efierr.h>
 #include <efi/eficon.h>
 #include <efi/efidevp.h>
+#include <efi/eficapsule.h>
 #include <efi/efiapi.h>
 #include <xen/efi.h>
 #include <xen/spinlock.h>

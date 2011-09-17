@@ -246,6 +246,15 @@ EFI_STATUS
     IN VOID                         *Data
     );
 
+typedef
+EFI_STATUS
+(EFIAPI *EFI_QUERY_VARIABLE_INFO) (
+    IN UINT32                       Attributes,
+    OUT UINT64                      *MaximumVariableStorageSize,
+    OUT UINT64                      *RemainingVariableStorageSize,
+    OUT UINT64                      *MaximumVariableSize
+    );
+
 
 //
 // EFI Time
@@ -412,6 +421,147 @@ EFI_STATUS
     IN CHAR16                   *WatchdogData OPTIONAL
     );
 
+typedef
+EFI_STATUS
+(EFIAPI *EFI_CONNECT_CONTROLLER) (
+    IN EFI_HANDLE               ControllerHandle,
+    IN EFI_HANDLE               *DriverImageHandle OPTIONAL,
+    IN EFI_DEVICE_PATH          *RemainingDevicePath OPTIONAL,
+    IN BOOLEAN                  Recursive
+    );
+
+typedef
+EFI_STATUS
+(EFIAPI *EFI_DISCONNECT_CONTROLLER) (
+    IN EFI_HANDLE               ControllerHandle,
+    IN EFI_HANDLE               DriverImageHandle OPTIONAL,
+    IN EFI_HANDLE               ChildHandle OPTIONAL
+    );
+
+#define EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL  0x00000001
+#define EFI_OPEN_PROTOCOL_GET_PROTOCOL        0x00000002
+#define EFI_OPEN_PROTOCOL_TEST_PROTOCOL       0x00000004
+#define EFI_OPEN_PROTOCOL_BY_CHILD_CONTROLLER 0x00000008
+#define EFI_OPEN_PROTOCOL_BY_DRIVER           0x00000010
+#define EFI_OPEN_PROTOCOL_EXCLUSIVE           0x00000020
+
+typedef
+EFI_STATUS
+(EFIAPI *EFI_OPEN_PROTOCOL) (
+    IN EFI_HANDLE               Handle,
+    IN EFI_GUID                 *Protocol,
+    OUT VOID                    **Interface OPTIONAL,
+    IN EFI_HANDLE               AgentHandle,
+    IN EFI_HANDLE               ControllerHandle,
+    IN UINT32                   Attributes
+    );
+
+typedef
+EFI_STATUS
+(EFIAPI *EFI_CLOSE_PROTOCOL) (
+    IN EFI_HANDLE               Handle,
+    IN EFI_GUID                 *Protocol,
+    IN EFI_HANDLE               AgentHandle,
+    IN EFI_HANDLE               ControllerHandle
+    );
+
+typedef struct {
+    EFI_HANDLE                  AgentHandle;
+    EFI_HANDLE                  ControllerHandle;
+    UINT32                      Attributes;
+    UINT32                      OpenCount;
+} EFI_OPEN_PROTOCOL_INFORMATION_ENTRY;
+
+typedef
+EFI_STATUS
+(EFIAPI *EFI_OPEN_PROTOCOL_INFORMATION) (
+    IN EFI_HANDLE               Handle,
+    IN EFI_GUID                 *Protocol,
+    OUT EFI_OPEN_PROTOCOL_INFORMATION_ENTRY **EntryBuffer,
+    OUT UINTN                   *EntryCount
+    );
+
+typedef
+EFI_STATUS
+(EFIAPI *EFI_PROTOCOLS_PER_HANDLE) (
+    IN EFI_HANDLE               Handle,
+    OUT EFI_GUID                ***ProtocolBuffer,
+    OUT UINTN                   *ProtocolBufferCount
+    );
+
+typedef enum {
+    AllHandles,
+    ByRegisterNotify,
+    ByProtocol
+} EFI_LOCATE_SEARCH_TYPE;
+
+typedef
+EFI_STATUS
+(EFIAPI *EFI_LOCATE_HANDLE_BUFFER) (
+    IN EFI_LOCATE_SEARCH_TYPE   SearchType,
+    IN EFI_GUID                 *Protocol OPTIONAL,
+    IN VOID                     *SearchKey OPTIONAL,
+    IN OUT UINTN                *NoHandles,
+    OUT EFI_HANDLE              **Buffer
+    );
+
+typedef
+EFI_STATUS
+(EFIAPI *EFI_LOCATE_PROTOCOL) (
+    IN EFI_GUID                 *Protocol,
+    IN VOID                     *Registration OPTIONAL,
+    OUT VOID                    **Interface
+    );
+
+typedef
+EFI_STATUS
+(EFIAPI *EFI_INSTALL_MULTIPLE_PROTOCOL_INTERFACES) (
+    IN OUT EFI_HANDLE           *Handle,
+    ...
+    );
+
+typedef
+EFI_STATUS
+(EFIAPI *EFI_UNINSTALL_MULTIPLE_PROTOCOL_INTERFACES) (
+    IN OUT EFI_HANDLE           Handle,
+    ...
+    );
+
+typedef
+EFI_STATUS
+(EFIAPI *EFI_CALCULATE_CRC32) (
+    IN VOID                     *Data,
+    IN UINTN                    DataSize,
+    OUT UINT32                  *Crc32
+    );
+
+typedef
+VOID
+(EFIAPI *EFI_COPY_MEM) (
+    IN VOID                     *Destination,
+    IN VOID                     *Source,
+    IN UINTN                    Length
+    );
+
+typedef
+VOID
+(EFIAPI *EFI_SET_MEM) (
+    IN VOID                     *Buffer,
+    IN UINTN                    Size,
+    IN UINT8                    Value
+    );
+
+
+typedef
+EFI_STATUS
+(EFIAPI *EFI_CREATE_EVENT_EX) (
+    IN UINT32                   Type,
+    IN EFI_TPL                  NotifyTpl,
+    IN EFI_EVENT_NOTIFY         NotifyFunction OPTIONAL,
+    IN const VOID               *NotifyContext OPTIONAL,
+    IN const EFI_GUID           EventGroup OPTIONAL,
+    OUT EFI_EVENT               *Event
+    );
 
 typedef enum {
     EfiResetCold,
@@ -439,6 +589,24 @@ EFI_STATUS
 (EFIAPI *EFI_GET_NEXT_HIGH_MONO_COUNT) (
     OUT UINT32                  *HighCount
     );
+
+typedef
+EFI_STATUS
+(EFIAPI *EFI_UPDATE_CAPSULE) (
+    IN EFI_CAPSULE_HEADER       **CapsuleHeaderArray,
+    IN UINTN                    CapsuleCount,
+    IN EFI_PHYSICAL_ADDRESS     ScatterGatherList OPTIONAL
+    );
+
+
+typedef
+EFI_STATUS
+(EFIAPI *EFI_QUERY_CAPSULE_CAPABILITIES) (
+    IN  EFI_CAPSULE_HEADER      **CapsuleHeaderArray,
+    IN  UINTN                   CapsuleCount,
+    OUT UINT64                  *MaxiumCapsuleSize,
+    OUT EFI_RESET_TYPE          *ResetType
+);
 
 //
 // Protocol handler functions
@@ -490,12 +658,6 @@ EFI_STATUS
     IN EFI_EVENT                Event,
     OUT VOID                    **Registration
     );
-
-typedef enum {
-    AllHandles,
-    ByRegisterNotify,
-    ByProtocol
-} EFI_LOCATE_SEARCH_TYPE;
 
 typedef
 EFI_STATUS
@@ -578,6 +740,14 @@ typedef struct  {
     EFI_GET_NEXT_HIGH_MONO_COUNT    GetNextHighMonotonicCount;
     EFI_RESET_SYSTEM                ResetSystem;
 
+    //
+    // New Boot Service added by UEFI 2.0
+    //
+
+    EFI_UPDATE_CAPSULE             UpdateCapsule;
+    EFI_QUERY_CAPSULE_CAPABILITIES QueryCapsuleCapabilities;
+    EFI_QUERY_VARIABLE_INFO        QueryVariableInfo;
+
 } EFI_RUNTIME_SERVICES;
 
 
@@ -652,6 +822,40 @@ typedef struct _EFI_BOOT_SERVICES {
     EFI_STALL                       Stall;
     EFI_SET_WATCHDOG_TIMER          SetWatchdogTimer;
 
+    //
+    // DriverSupport Services
+    //
+
+    EFI_CONNECT_CONTROLLER          ConnectController;
+    EFI_DISCONNECT_CONTROLLER       DisconnectController;
+
+    //
+    // Open and Close Protocol Services
+    //
+    EFI_OPEN_PROTOCOL               OpenProtocol;
+    EFI_CLOSE_PROTOCOL              CloseProtocol;
+    EFI_OPEN_PROTOCOL_INFORMATION   OpenProtocolInformation;
+
+    //
+    // Library Services
+    //
+    EFI_PROTOCOLS_PER_HANDLE        ProtocolsPerHandle;
+    EFI_LOCATE_HANDLE_BUFFER        LocateHandleBuffer;
+    EFI_LOCATE_PROTOCOL             LocateProtocol;
+    EFI_INSTALL_MULTIPLE_PROTOCOL_INTERFACES InstallMultipleProtocolInterfaces;
+    EFI_UNINSTALL_MULTIPLE_PROTOCOL_INTERFACES UninstallMultipleProtocolInterfaces;
+
+    //
+    // 32-bit CRC Services
+    //
+    EFI_CALCULATE_CRC32             CalculateCrc32;
+
+    //
+    // Misc Services
+    //
+    EFI_COPY_MEM                    CopyMem;
+    EFI_SET_MEM                     SetMem;
+    EFI_CREATE_EVENT_EX             CreateEventEx;
 } EFI_BOOT_SERVICES;
 
 
