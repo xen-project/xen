@@ -1107,7 +1107,7 @@ static void schedule(void)
 {
     struct vcpu          *prev = current, *next = NULL;
     s_time_t              now = NOW();
-    struct scheduler     *sched = this_cpu(scheduler);
+    struct scheduler     *sched;
     unsigned long        *tasklet_work = &this_cpu(tasklet_work_to_do);
     bool_t                tasklet_work_scheduled = 0;
     struct schedule_data *sd;
@@ -1141,6 +1141,7 @@ static void schedule(void)
     stop_timer(&sd->s_timer);
     
     /* get policy-specific decision on scheduling... */
+    sched = this_cpu(scheduler);
     next_slice = sched->do_schedule(sched, now, tasklet_work_scheduled);
 
     next = next_slice.task;
