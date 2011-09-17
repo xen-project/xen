@@ -2426,7 +2426,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         {
             /* reset EBX to default value first */
             *ebx = XSTATE_AREA_MIN_SIZE; 
-            for ( sub_leaf = 2; sub_leaf < 64; sub_leaf++ )
+            for ( sub_leaf = 2; sub_leaf < 63; sub_leaf++ )
             {
                 if ( !(v->arch.xcr0 & (1ULL << sub_leaf)) )
                     continue;
