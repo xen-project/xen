@@ -192,6 +192,7 @@ static void dynamic_irq_cleanup(unsigned int irq)
 
     spin_lock_irqsave(&desc->lock, flags);
     desc->status  |= IRQ_DISABLED;
+    desc->status  &= ~IRQ_GUEST;
     desc->handler->shutdown(irq);
     action = desc->action;
     desc->action  = NULL;
@@ -1465,8 +1466,6 @@ static irq_guest_action_t *__pirq_guest_unbind(
     cpumask_t           cpu_eoi_map;
     int                 i;
 
-    BUG_ON(!(desc->status & IRQ_GUEST));
-
     action = (irq_guest_action_t *)desc->action;
     irq = desc - irq_desc;
 
@@ -1476,6 +1475,8 @@ static irq_guest_action_t *__pirq_guest_unbind(
                 d->domain_id, pirq->pirq);
         return NULL;
     }
+
+    BUG_ON(!(desc->status & IRQ_GUEST));
 
     for ( i = 0; (i < action->nr_guests) && (action->guest[i] != d); i++ )
         continue;
