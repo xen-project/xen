@@ -79,6 +79,7 @@ ACPI & POWER MANAGEMENT
 M:	Winston Wang <winston.l.wang@intel.com>
 M:	Gang Wei <gang.wei@intel.com>
 M:	Mark Langsdorf <mark.langsdorf@amd.com>
+M:	Jan Beulich <jbeulich@suse.com>
 S:	Supported
 F:	xen/arch/x86/acpi/
 F:	xen/drivers/acpi/
@@ -101,6 +102,14 @@ M:	Juergen Gross <juergen.gross@ts.fujitsu.com>
 S:	Supported
 F:	xen/common/cpupool.c
 
+EFI
+M:     Jan Beulich <jbeulich@suse.com>
+S:     Supported
+F:     xen/arch/x86/efi/
+F:     xen/include/efi/
+F:     xen/include/asm-x86/efi*.h
+F:     xen/include/asm-x86/x86_*/efi*.h
+
 GDBSX DEBUGGER
 M:	Mukesh Rathor <mukesh.rathor@oracle.com>
 S:	Supported
@@ -113,8 +122,8 @@ S:	Supported
 F:	tools/debugger/kdd/
 
 IA64 ARCHITECTURE
-M:	Supported
 M:	KUWAMURA Shin'ya <kuwa@jp.fujitsu.com>
+S:	Supported
 L:	xen-ia64-devel@lists.xensource.com
 F:	xen/arch/ia64/*
 F:	xen/include/asm-ia64/*
@@ -206,11 +215,12 @@ T:	hg http://xenbits.xen.org/linux-2.6.18-xen.hg
 F:	drivers/xen/usb*/
 
 X86 ARCHITECTURE
-M:	Supported
 M:	Keir Fraser <keir@xen.org>
+M:	Jan Beulich <jbeulich@suse.com>
+S:	Supported
 L:	xen-devel@lists.xensource.com
-F:	xen/arch/x86/*
-F:	xen/include/asm-x86/*
+F:	xen/arch/x86/
+F:	xen/include/asm-x86/
 
 X86 MEMORY MANAGEMENT
 M:	Tim Deegan <tim@xen.org>
