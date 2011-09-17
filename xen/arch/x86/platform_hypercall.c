@@ -306,7 +306,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
         break;
 
     case XENPF_efi_runtime_call:
-        ret = xsm_efi_runtime_call();
+        ret = xsm_efi_call();
         if ( ret )
             break;
 

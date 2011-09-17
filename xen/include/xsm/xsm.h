@@ -132,7 +132,7 @@ struct xsm_operations {
     int (*physinfo) (void);
     int (*platform_quirk) (uint32_t);
     int (*firmware_info) (void);
-    int (*efi_runtime_call) (void);
+    int (*efi_call) (void);
     int (*acpi_sleep) (void);
     int (*change_freq) (void);
     int (*getidletime) (void);
@@ -554,9 +554,9 @@ static inline int xsm_firmware_info (void)
     return xsm_call(firmware_info());
 }
 
-static inline int xsm_efi_runtime_call (void)
+static inline int xsm_efi_call (void)
 {
-    return xsm_call(efi_runtime_call());
+    return xsm_call(efi_call());
 }
 
 static inline int xsm_acpi_sleep (void)
