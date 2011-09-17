@@ -658,7 +658,7 @@ unsigned int set_desc_affinity(struct irq_desc *desc, const cpumask_t *mask)
 }
 
 static void
-set_ioapic_affinity_irq_desc(struct irq_desc *desc, const cpumask_t *mask)
+set_ioapic_affinity_irq(struct irq_desc *desc, const cpumask_t *mask)
 {
     unsigned long flags;
     unsigned int dest;
@@ -694,16 +694,6 @@ set_ioapic_affinity_irq_desc(struct irq_desc *desc, const cpumask_t *mask)
     }
     spin_unlock_irqrestore(&ioapic_lock, flags);
 
-}
-
-static void
-set_ioapic_affinity_irq(unsigned int irq, const struct cpumask *mask)
-{
-    struct irq_desc *desc;
-
-    desc = irq_to_desc(irq);
-
-    set_ioapic_affinity_irq_desc(desc, mask);
 }
 #endif /* CONFIG_SMP */
 
@@ -802,7 +792,7 @@ void /*__init*/ setup_ioapic_dest(void)
             irq = pin_2_irq(irq_entry, ioapic, pin);
             cfg = irq_cfg(irq);
             BUG_ON(cpus_empty(cfg->cpu_mask));
-            set_ioapic_affinity_irq(irq, &cfg->cpu_mask);
+            set_ioapic_affinity_irq(irq_to_desc(irq), &cfg->cpu_mask);
         }
 
     }
@@ -1780,7 +1770,7 @@ static void mask_and_ack_level_ioapic_irq (unsigned int irq)
 
     if ((irq_desc[irq].status & IRQ_MOVE_PENDING) &&
        !io_apic_level_ack_pending(irq))
-        move_masked_irq(irq);
+        move_masked_irq(desc);
 
     if ( !(v & (1 << (i & 0x1f))) ) {
         spin_lock(&ioapic_lock);
@@ -1799,7 +1789,9 @@ static void end_level_ioapic_irq (unsigned int irq, u8 vector)
     {
         if ( directed_eoi_enabled )
         {
-            if ( !(irq_desc[irq].status & (IRQ_DISABLED|IRQ_MOVE_PENDING)) )
+            struct irq_desc *desc = irq_to_desc(irq);
+
+            if ( !(desc->status & (IRQ_DISABLED|IRQ_MOVE_PENDING)) )
             {
                 eoi_IO_APIC_irq(irq);
                 return;
@@ -1807,9 +1799,9 @@ static void end_level_ioapic_irq (unsigned int irq, u8 vector)
 
             mask_IO_APIC_irq(irq);
             eoi_IO_APIC_irq(irq);
-            if ( (irq_desc[irq].status & IRQ_MOVE_PENDING) &&
+            if ( (desc->status & IRQ_MOVE_PENDING) &&
                  !io_apic_level_ack_pending(irq) )
-                move_masked_irq(irq);
+                move_masked_irq(desc);
         }
 
         if ( !(irq_desc[irq].status & IRQ_DISABLED) )

@@ -266,11 +266,10 @@ static void write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
     }
 }
 
-void set_msi_affinity(unsigned int irq, const cpumask_t *mask)
+void set_msi_affinity(struct irq_desc *desc, const cpumask_t *mask)
 {
     struct msi_msg msg;
     unsigned int dest;
-    struct irq_desc *desc = irq_to_desc(irq);
     struct msi_desc *msi_desc = desc->msi_desc;
     struct irq_cfg *cfg = desc->chip_data;
 

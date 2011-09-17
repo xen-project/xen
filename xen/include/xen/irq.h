@@ -33,6 +33,8 @@ struct irqaction {
 #define NEVER_ASSIGN_IRQ        (-2)
 #define FREE_TO_ASSIGN_IRQ      (-3)
 
+struct irq_desc;
+
 /*
  * Interrupt controller descriptor. This is all we need
  * to describe about the low-level hardware. 
@@ -45,7 +47,7 @@ struct hw_interrupt_type {
     void (*disable)(unsigned int irq);
     void (*ack)(unsigned int irq);
     void (*end)(unsigned int irq, u8 vector);
-    void (*set_affinity)(unsigned int irq, const cpumask_t *);
+    void (*set_affinity)(struct irq_desc *, const cpumask_t *);
 };
 
 typedef const struct hw_interrupt_type hw_irq_controller;

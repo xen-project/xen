@@ -172,7 +172,7 @@ void unlock_vector_lock(void);
 void __setup_vector_irq(int cpu);
 
 void move_native_irq(int irq);
-void move_masked_irq(int irq);
+void move_masked_irq(struct irq_desc *);
 
 int __assign_irq_vector(int irq, struct irq_cfg *, const cpumask_t *);
 

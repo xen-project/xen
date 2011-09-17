@@ -998,14 +998,12 @@ static void dma_msi_end(unsigned int irq, u8 vector)
     ack_APIC_irq();
 }
 
-static void dma_msi_set_affinity(unsigned int irq, const cpumask_t *mask)
+static void dma_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
 {
     struct msi_msg msg;
     unsigned int dest;
     unsigned long flags;
-
-    struct iommu *iommu = irq_to_iommu[irq];
-    struct irq_desc *desc = irq_to_desc(irq);
+    struct iommu *iommu = desc->action->dev_id;
     struct irq_cfg *cfg = desc->chip_data;
 
 #ifdef CONFIG_X86
@@ -1984,7 +1982,7 @@ static int init_vtd_hw(void)
         iommu = drhd->iommu;
 
         cfg = irq_cfg(iommu->irq);
-        dma_msi_set_affinity(iommu->irq, &cfg->cpu_mask);
+        dma_msi_set_affinity(irq_to_desc(iommu->irq), &cfg->cpu_mask);
 
         clear_fault_bits(iommu);
 

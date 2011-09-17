@@ -558,10 +558,8 @@ void __setup_vector_irq(int cpu)
     }
 }
 
-void move_masked_irq(int irq)
+void move_masked_irq(struct irq_desc *desc)
 {
-    struct irq_desc *desc = irq_to_desc(irq);
-
     if (likely(!(desc->status & IRQ_MOVE_PENDING)))
         return;
     
@@ -583,7 +581,7 @@ void move_masked_irq(int irq)
      * For correct operation this depends on the caller masking the irqs.
      */
     if (likely(cpus_intersects(desc->pending_mask, cpu_online_map)))
-        desc->handler->set_affinity(irq, &desc->pending_mask);
+        desc->handler->set_affinity(desc, &desc->pending_mask);
 
     cpus_clear(desc->pending_mask);
 }
@@ -599,7 +597,7 @@ void move_native_irq(int irq)
         return;
 
     desc->handler->disable(irq);
-    move_masked_irq(irq);
+    move_masked_irq(desc);
     desc->handler->enable(irq);
 }
 
@@ -1410,7 +1408,7 @@ int pirq_guest_bind(struct vcpu *v, struct pirq *pirq, int will_share)
         /* Attempt to bind the interrupt target to the correct CPU. */
         cpu_set(v->processor, cpumask);
         if ( !opt_noirqbalance && (desc->handler->set_affinity != NULL) )
-            desc->handler->set_affinity(irq, &cpumask);
+            desc->handler->set_affinity(desc, &cpumask);
     }
     else if ( !will_share || !action->shareable )
     {
@@ -1964,7 +1962,7 @@ void fixup_irqs(void)
             desc->handler->disable(irq);
 
         if ( desc->handler->set_affinity )
-            desc->handler->set_affinity(irq, &affinity);
+            desc->handler->set_affinity(desc, &affinity);
         else if ( !(warned++) )
             set_affinity = 0;
 

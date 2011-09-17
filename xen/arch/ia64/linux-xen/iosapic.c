@@ -352,18 +352,18 @@ unmask_irq (unsigned int irq)
 
 
 static void
-iosapic_set_affinity (unsigned int irq, const cpumask_t *mask)
+iosapic_set_affinity (struct irq_desc *desc, const cpumask_t *mask)
 {
 #ifdef CONFIG_SMP
 	unsigned long flags;
 	u32 high32, low32;
 	int dest, rte_index;
 	char __iomem *addr;
-	int redir = (irq & IA64_IRQ_REDIRECTED) ? 1 : 0;
+	int redir = (desc->irq & IA64_IRQ_REDIRECTED) ? 1 : 0;
+	unsigned int irq = desc->irq & ~IA64_IRQ_REDIRECTED;
 	ia64_vector vec;
 	struct iosapic_rte_info *rte;
 
-	irq &= (~IA64_IRQ_REDIRECTED);
 	vec = irq_to_vector(irq);
 
 	if (cpumask_empty(mask))
