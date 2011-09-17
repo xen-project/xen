@@ -59,8 +59,9 @@
 #endif
 
 struct msi_info {
-    int bus;
-    int devfn;
+    u16 seg;
+    u8 bus;
+    u8 devfn;
     int irq;
     int entry_nr;
     uint64_t table_base;

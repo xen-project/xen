@@ -282,7 +282,7 @@ int deassign_device(struct domain *d, u8 bus, u8 devfn)
         return -EINVAL;
 
     ASSERT(spin_is_locked(&pcidevs_lock));
-    pdev = pci_get_pdev(bus, devfn);
+    pdev = pci_get_pdev(0, bus, devfn);
     if ( !pdev )
         return -ENODEV;
 

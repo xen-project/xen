@@ -280,7 +280,7 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
          * just get any passthrough device in the domainr - assume user
          * assigns only devices from same node to a given guest.
          */
-        pdev = pci_get_pdev_by_domain(domain, -1, -1);
+        pdev = pci_get_pdev_by_domain(domain, -1, -1, -1);
         drhd = acpi_find_matched_drhd_unit(pdev);
         if ( !alloc || ((hd->pgd_maddr = alloc_pgtable_maddr(drhd, 1)) == 0) )
             goto out;
@@ -297,7 +297,7 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
             if ( !alloc )
                 break;
 
-            pdev = pci_get_pdev_by_domain(domain, -1, -1);
+            pdev = pci_get_pdev_by_domain(domain, -1, -1, -1);
             drhd = acpi_find_matched_drhd_unit(pdev);
             maddr = alloc_pgtable_maddr(drhd, 1);
             if ( !maddr )
@@ -1273,7 +1273,7 @@ int domain_context_mapping_one(
 
         /* First try to get domain ownership from device structure.  If that's
          * not available, try to read it from the context itself. */
-        pdev = pci_get_pdev(bus, devfn);
+        pdev = pci_get_pdev(0, bus, devfn);
         if ( pdev )
         {
             if ( pdev->domain != domain )
@@ -1396,7 +1396,7 @@ static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
     int ret = 0;
     u32 type;
     u8 secbus;
-    struct pci_dev *pdev = pci_get_pdev(bus, devfn);
+    struct pci_dev *pdev = pci_get_pdev(0, bus, devfn);
 
     drhd = acpi_find_matched_drhd_unit(pdev);
     if ( !drhd )
@@ -1521,7 +1521,7 @@ static int domain_context_unmap(struct domain *domain, u8 bus, u8 devfn)
     int ret = 0;
     u32 type;
     u8 tmp_bus, tmp_devfn, secbus;
-    struct pci_dev *pdev = pci_get_pdev(bus, devfn);
+    struct pci_dev *pdev = pci_get_pdev(0, bus, devfn);
     int found = 0;
 
     BUG_ON(!pdev);
@@ -1632,7 +1632,7 @@ static int reassign_device_ownership(
     int ret;
 
     ASSERT(spin_is_locked(&pcidevs_lock));
-    pdev = pci_get_pdev_by_domain(source, bus, devfn);
+    pdev = pci_get_pdev_by_domain(source, 0, bus, devfn);
 
     if (!pdev)
         return -ENODEV;
@@ -1941,7 +1941,7 @@ static void __init setup_dom0_devices(struct domain *d)
     {
         for ( devfn = 0; devfn < 256; devfn++ )
         {
-            pdev = pci_get_pdev(bus, devfn);
+            pdev = pci_get_pdev(0, bus, devfn);
             if ( !pdev )
                 continue;
 
@@ -2175,7 +2175,7 @@ int device_assigned(u8 bus, u8 devfn)
     struct pci_dev *pdev;
 
     spin_lock(&pcidevs_lock);
-    pdev = pci_get_pdev_by_domain(dom0, bus, devfn);
+    pdev = pci_get_pdev_by_domain(dom0, 0, bus, devfn);
     if (!pdev)
     {
         spin_unlock(&pcidevs_lock);
@@ -2197,7 +2197,7 @@ static int intel_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
         return -ENODEV;
 
     ASSERT(spin_is_locked(&pcidevs_lock));
-    pdev = pci_get_pdev(bus, devfn);
+    pdev = pci_get_pdev(0, bus, devfn);
     if (!pdev)
         return -ENODEV;
 

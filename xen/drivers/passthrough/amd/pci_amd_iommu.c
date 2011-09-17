@@ -131,7 +131,7 @@ static void __init amd_iommu_setup_dom0_devices(struct domain *d)
     {
         for ( devfn = 0; devfn < 256; devfn++ )
         {
-            pdev = pci_get_pdev(bus, devfn);
+            pdev = pci_get_pdev(0, bus, devfn);
             if ( !pdev )
                 continue;
 
@@ -313,7 +313,7 @@ static int reassign_device( struct domain *source, struct domain *target,
     struct hvm_iommu *t = domain_hvm_iommu(target);
 
     ASSERT(spin_is_locked(&pcidevs_lock));
-    pdev = pci_get_pdev_by_domain(source, bus, devfn);
+    pdev = pci_get_pdev_by_domain(source, 0, bus, devfn);
     if ( !pdev )
         return -ENODEV;
 

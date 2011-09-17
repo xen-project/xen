@@ -37,6 +37,7 @@ static LIST_HEAD(ats_dev_drhd_units);
 
 struct pci_ats_dev {
     struct list_head list;
+    u16 seg;
     u8 bus;
     u8 devfn;
     u16 ats_queue_depth;    /* ATS device invalidation queue depth */
@@ -91,7 +92,7 @@ int ats_device(int seg, int bus, int devfn)
     if ( !ats_enabled || !iommu_qinval )
         return 0;
 
-    pdev = pci_get_pdev(bus, devfn);
+    pdev = pci_get_pdev(seg, bus, devfn);
     if ( !pdev )
         return 0;
 
@@ -130,8 +131,9 @@ int enable_ats_device(int seg, int bus, int devfn)
     BUG_ON(!pos);
 
     if ( iommu_verbose )
-        dprintk(XENLOG_INFO VTDPREFIX, "%x:%x.%x: ATS capability found\n",
-                bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        dprintk(XENLOG_INFO VTDPREFIX,
+                "%04x:%02x:%02x.%u: ATS capability found\n",
+                seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
 
     /* BUGBUG: add back seg when multi-seg platform support is enabled */
     value = pci_conf_read16(bus, PCI_SLOT(devfn),
@@ -140,7 +142,7 @@ int enable_ats_device(int seg, int bus, int devfn)
     {
         list_for_each_entry ( pdev, &ats_devices, list )
         {
-            if ( pdev->bus == bus && pdev->devfn == devfn )
+            if ( pdev->seg == seg && pdev->bus == bus && pdev->devfn == devfn )
             {
                 pos = 0;
                 break;
@@ -161,6 +163,7 @@ int enable_ats_device(int seg, int bus, int devfn)
 
     if ( pos )
     {
+        pdev->seg = seg;
         pdev->bus = bus;
         pdev->devfn = devfn;
         value = pci_conf_read16(bus, PCI_SLOT(devfn),
@@ -170,8 +173,10 @@ int enable_ats_device(int seg, int bus, int devfn)
     }
 
     if ( iommu_verbose )
-        dprintk(XENLOG_INFO VTDPREFIX, "%x:%x.%x: ATS %s enabled\n",
-                bus, PCI_SLOT(devfn), PCI_FUNC(devfn), pos ? "is" : "was");
+        dprintk(XENLOG_INFO VTDPREFIX,
+                "%04x:%02x:%02x.%u: ATS %s enabled\n",
+                seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+                pos ? "is" : "was");
 
     return pos;
 }
@@ -194,7 +199,7 @@ void disable_ats_device(int seg, int bus, int devfn)
 
     list_for_each_entry ( pdev, &ats_devices, list )
     {
-        if ( pdev->bus == bus && pdev->devfn == devfn )
+        if ( pdev->seg == seg && pdev->bus == bus && pdev->devfn == devfn )
         {
             list_del(&pdev->list);
             xfree(pdev);
@@ -203,8 +208,9 @@ void disable_ats_device(int seg, int bus, int devfn)
     }
 
     if ( iommu_verbose )
-        dprintk(XENLOG_INFO VTDPREFIX, "%x:%x.%x: ATS is disabled\n",
-                bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        dprintk(XENLOG_INFO VTDPREFIX,
+                "%04x:%02x:%02x.%u: ATS is disabled\n",
+                seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
 }
 
 

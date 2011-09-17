@@ -67,6 +67,14 @@ CHECK_physdev_get_free_pirq;
 CHECK_physdev_pci_mmcfg_reserved;
 #undef xen_physdev_pci_mmcfg_reserved
 
+#define xen_physdev_pci_device_add physdev_pci_device_add
+CHECK_physdev_pci_device_add
+#undef xen_physdev_pci_device_add
+
+#define xen_physdev_pci_device physdev_pci_device
+CHECK_physdev_pci_device
+#undef xen_physdev_pci_device
+
 #define COMPAT
 #undef guest_handle_okay
 #define guest_handle_okay          compat_handle_okay

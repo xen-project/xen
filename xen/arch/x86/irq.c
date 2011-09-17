@@ -1716,7 +1716,7 @@ int map_domain_pirq(
         if ( !cpu_has_apic )
             goto done;
 
-        pdev = pci_get_pdev(msi->bus, msi->devfn);
+        pdev = pci_get_pdev(msi->seg, msi->bus, msi->devfn);
         ret = pci_enable_msi(msi, &msi_desc);
         if ( ret )
             goto done;

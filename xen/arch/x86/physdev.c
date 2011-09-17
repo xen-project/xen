@@ -357,6 +357,15 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         if ( copy_from_guest(&map, arg, 1) != 0 )
             break;
 
+        if ( map.type == MAP_PIRQ_TYPE_MSI_SEG )
+        {
+            map.type = MAP_PIRQ_TYPE_MSI;
+            msi.seg = map.bus >> 16;
+        }
+        else
+        {
+            msi.seg = 0;
+        }
         msi.bus = map.bus;
         msi.devfn = map.devfn;
         msi.entry_nr = map.entry_nr;
@@ -480,7 +489,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         if ( copy_from_guest(&manage_pci, arg, 1) != 0 )
             break;
 
-        ret = pci_add_device(manage_pci.bus, manage_pci.devfn, NULL);
+        ret = pci_add_device(0, manage_pci.bus, manage_pci.devfn, NULL);
         break;
     }
 
@@ -493,7 +502,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         if ( copy_from_guest(&manage_pci, arg, 1) != 0 )
             break;
 
-        ret = pci_remove_device(manage_pci.bus, manage_pci.devfn);
+        ret = pci_remove_device(0, manage_pci.bus, manage_pci.devfn);
         break;
     }
 
@@ -517,9 +526,49 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         pdev_info.is_virtfn = manage_pci_ext.is_virtfn;
         pdev_info.physfn.bus = manage_pci_ext.physfn.bus;
         pdev_info.physfn.devfn = manage_pci_ext.physfn.devfn;
-        ret = pci_add_device(manage_pci_ext.bus,
+        ret = pci_add_device(0, manage_pci_ext.bus,
                              manage_pci_ext.devfn,
                              &pdev_info);
+        break;
+    }
+
+    case PHYSDEVOP_pci_device_add: {
+        struct physdev_pci_device_add add;
+        struct pci_dev_info pdev_info;
+
+        ret = -EPERM;
+        if ( !IS_PRIV(current->domain) )
+            break;
+
+        ret = -EFAULT;
+        if ( copy_from_guest(&add, arg, 1) != 0 )
+            break;
+
+        pdev_info.is_extfn = !!(add.flags & XEN_PCI_DEV_EXTFN);
+        if ( add.flags & XEN_PCI_DEV_VIRTFN )
+        {
+            pdev_info.is_virtfn = 1;
+            pdev_info.physfn.bus = add.physfn.bus;
+            pdev_info.physfn.devfn = add.physfn.devfn;
+        }
+        else
+            pdev_info.is_virtfn = 0;
+        ret = pci_add_device(add.seg, add.bus, add.devfn, &pdev_info);
+        break;
+    }
+
+    case PHYSDEVOP_pci_device_remove: {
+        struct physdev_pci_device dev;
+
+        ret = -EPERM;
+        if ( !IS_PRIV(v->domain) )
+            break;
+
+        ret = -EFAULT;
+        if ( copy_from_guest(&dev, arg, 1) != 0 )
+            break;
+
+        ret = pci_remove_device(dev.seg, dev.bus, dev.devfn);
         break;
     }
 
@@ -554,11 +603,31 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             break;
 
         spin_lock(&pcidevs_lock);
-        pdev = pci_get_pdev(restore_msi.bus, restore_msi.devfn);
+        pdev = pci_get_pdev(0, restore_msi.bus, restore_msi.devfn);
         ret = pdev ? pci_restore_msi_state(pdev) : -ENODEV;
         spin_unlock(&pcidevs_lock);
         break;
     }
+
+    case PHYSDEVOP_restore_msi_ext: {
+        struct physdev_pci_device dev;
+        struct pci_dev *pdev;
+
+        ret = -EPERM;
+        if ( !IS_PRIV(v->domain) )
+            break;
+
+        ret = -EFAULT;
+        if ( copy_from_guest(&dev, arg, 1) != 0 )
+            break;
+
+        spin_lock(&pcidevs_lock);
+        pdev = pci_get_pdev(dev.seg, dev.bus, dev.devfn);
+        ret = pdev ? pci_restore_msi_state(pdev) : -ENODEV;
+        spin_unlock(&pcidevs_lock);
+        break;
+    }
+
     case PHYSDEVOP_setup_gsi: {
         struct physdev_setup_gsi setup_gsi;
 

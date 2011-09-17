@@ -528,7 +528,7 @@ static u64 read_pci_mem_bar(u8 bus, u8 slot, u8 func, u8 bir, int vf)
 
     if ( vf >= 0 )
     {
-        struct pci_dev *pdev = pci_get_pdev(bus, PCI_DEVFN(slot, func));
+        struct pci_dev *pdev = pci_get_pdev(0, bus, PCI_DEVFN(slot, func));
         unsigned int pos = pci_find_ext_capability(0, bus,
                                                    PCI_DEVFN(slot, func),
                                                    PCI_EXT_CAP_ID_SRIOV);
@@ -767,7 +767,7 @@ static int __pci_enable_msi(struct msi_info *msi, struct msi_desc **desc)
     struct msi_desc *old_desc;
 
     ASSERT(spin_is_locked(&pcidevs_lock));
-    pdev = pci_get_pdev(msi->bus, msi->devfn);
+    pdev = pci_get_pdev(msi->seg, msi->bus, msi->devfn);
     if ( !pdev )
         return -ENODEV;
 
@@ -775,7 +775,8 @@ static int __pci_enable_msi(struct msi_info *msi, struct msi_desc **desc)
     if ( old_desc )
     {
         dprintk(XENLOG_WARNING, "irq %d has already mapped to MSI on "
-                "device %02x:%02x.%01x.\n", msi->irq, msi->bus,
+                "device %04x:%02x:%02x.%01x\n",
+                msi->irq, msi->seg, msi->bus,
                 PCI_SLOT(msi->devfn), PCI_FUNC(msi->devfn));
         *desc = old_desc;
         return 0;
@@ -785,7 +786,7 @@ static int __pci_enable_msi(struct msi_info *msi, struct msi_desc **desc)
     if ( old_desc )
     {
         dprintk(XENLOG_WARNING, "MSI-X is already in use on "
-                "device %02x:%02x.%01x\n", msi->bus,
+                "device %04x:%02x:%02x.%01x\n", msi->seg, msi->bus,
                 PCI_SLOT(msi->devfn), PCI_FUNC(msi->devfn));
         pci_disable_msi(old_desc);
     }
@@ -830,7 +831,7 @@ static int __pci_enable_msix(struct msi_info *msi, struct msi_desc **desc)
     struct msi_desc *old_desc;
 
     ASSERT(spin_is_locked(&pcidevs_lock));
-    pdev = pci_get_pdev(msi->bus, msi->devfn);
+    pdev = pci_get_pdev(msi->seg, msi->bus, msi->devfn);
     if ( !pdev )
         return -ENODEV;
 
@@ -844,7 +845,8 @@ static int __pci_enable_msix(struct msi_info *msi, struct msi_desc **desc)
     if ( old_desc )
     {
         dprintk(XENLOG_WARNING, "irq %d has already mapped to MSIX on "
-                "device %02x:%02x.%01x.\n", msi->irq, msi->bus,
+                "device %04x:%02x:%02x.%01x\n",
+                msi->irq, msi->seg, msi->bus,
                 PCI_SLOT(msi->devfn), PCI_FUNC(msi->devfn));
         *desc = old_desc;
         return 0;
@@ -854,7 +856,7 @@ static int __pci_enable_msix(struct msi_info *msi, struct msi_desc **desc)
     if ( old_desc )
     {
         dprintk(XENLOG_WARNING, "MSI is already in use on "
-                "device %02x:%02x.%01x\n", msi->bus,
+                "device %04x:%02x:%02x.%01x\n", msi->seg, msi->bus,
                 PCI_SLOT(msi->devfn), PCI_FUNC(msi->devfn));
         pci_disable_msi(old_desc);
 
@@ -962,8 +964,10 @@ int pci_restore_msi_state(struct pci_dev *pdev)
 
         if (desc->msi_desc != entry)
         {
-            dprintk(XENLOG_ERR, "Restore MSI for dev %x:%x not set before?\n",
-                                pdev->bus, pdev->devfn);
+            dprintk(XENLOG_ERR,
+                    "Restore MSI for dev %04x:%02x:%02x:%x not set before?\n",
+                    pdev->seg, pdev->bus, PCI_SLOT(pdev->devfn),
+                    PCI_FUNC(pdev->devfn));
             spin_unlock_irqrestore(&desc->lock, flags);
             return -EINVAL;
         }

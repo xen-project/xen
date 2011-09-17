@@ -142,6 +142,7 @@ DEFINE_XEN_GUEST_HANDLE(physdev_irq_t);
 #define MAP_PIRQ_TYPE_MSI               0x0
 #define MAP_PIRQ_TYPE_GSI               0x1
 #define MAP_PIRQ_TYPE_UNKNOWN           0x2
+#define MAP_PIRQ_TYPE_MSI_SEG           0x3
 
 #define PHYSDEVOP_map_pirq               13
 struct physdev_map_pirq {
@@ -152,7 +153,7 @@ struct physdev_map_pirq {
     int index;
     /* IN or OUT */
     int pirq;
-    /* IN */
+    /* IN - high 16 bits hold segment for MAP_PIRQ_TYPE_MSI_SEG */
     int bus;
     /* IN */
     int devfn;
@@ -267,6 +268,41 @@ struct physdev_pci_mmcfg_reserved {
 };
 typedef struct physdev_pci_mmcfg_reserved physdev_pci_mmcfg_reserved_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_pci_mmcfg_reserved_t);
+
+#define XEN_PCI_DEV_EXTFN              0x1
+#define XEN_PCI_DEV_VIRTFN             0x2
+#define XEN_PCI_DEV_PXM                0x4
+
+#define PHYSDEVOP_pci_device_add        25
+struct physdev_pci_device_add {
+    /* IN */
+    uint16_t seg;
+    uint8_t bus;
+    uint8_t devfn;
+    uint32_t flags;
+    struct {
+        uint8_t bus;
+        uint8_t devfn;
+    } physfn;
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
+    uint32_t optarr[];
+#elif defined(__GNUC__)
+    uint32_t optarr[0];
+#endif
+};
+typedef struct physdev_pci_device_add physdev_pci_device_add_t;
+DEFINE_XEN_GUEST_HANDLE(physdev_pci_device_add_t);
+
+#define PHYSDEVOP_pci_device_remove     26
+#define PHYSDEVOP_restore_msi_ext       27
+struct physdev_pci_device {
+    /* IN */
+    uint16_t seg;
+    uint8_t bus;
+    uint8_t devfn;
+};
+typedef struct physdev_pci_device physdev_pci_device_t;
+DEFINE_XEN_GUEST_HANDLE(physdev_pci_device_t);
 
 /*
  * Notify that some PIRQ-bound event channels have been unmasked.

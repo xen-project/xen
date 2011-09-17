@@ -65,6 +65,8 @@
 ?	physdev_irq_status_query	physdev.h
 ?	physdev_manage_pci		physdev.h
 ?	physdev_manage_pci_ext		physdev.h
+?	physdev_pci_device		physdev.h
+?	physdev_pci_device_add		physdev.h
 ?	physdev_pci_mmcfg_reserved	physdev.h
 ?	physdev_unmap_pirq		physdev.h
 ?	physdev_restore_msi		physdev.h
