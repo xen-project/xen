@@ -119,6 +119,7 @@ int tboot_in_measured_env(void);
 int tboot_protect_mem_regions(void);
 int tboot_parse_dmar_table(acpi_table_handler dmar_handler);
 int tboot_s3_resume(void);
+void tboot_s3_error(int error);
 
 #endif /* __TBOOT_H__ */
 

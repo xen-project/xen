@@ -481,33 +481,48 @@ int __init tboot_parse_dmar_table(acpi_table_handler dmar_handler)
     return rc;
 }
 
+static vmac_t orig_mac, resume_mac;
+
 int tboot_s3_resume(void)
 {
-    vmac_t mac;
-
     if ( !tboot_in_measured_env() )
         return 0;
 
     /* need to do these in reverse order of shutdown */
-    tboot_gen_xenheap_integrity(g_tboot_shared->s3_key, &mac);
-    printk("MAC for xenheap before S3 is: 0x%08"PRIx64"\n", xenheap_mac);
-    printk("MAC for xenheap after S3 is: 0x%08"PRIx64"\n", mac);
-    if ( mac != xenheap_mac )
+    tboot_gen_xenheap_integrity(g_tboot_shared->s3_key, &resume_mac);
+    orig_mac = xenheap_mac;
+    if ( resume_mac != xenheap_mac )
         return -1;
 
-    tboot_gen_frametable_integrity(g_tboot_shared->s3_key, &mac);
-    printk("MAC for frametable before S3 is: 0x%08"PRIx64"\n", frametable_mac);
-    printk("MAC for frametable after S3 is: 0x%08"PRIx64"\n", mac);
-    if ( mac != frametable_mac )
+    tboot_gen_frametable_integrity(g_tboot_shared->s3_key, &resume_mac);
+    orig_mac = frametable_mac;
+    if ( resume_mac != frametable_mac )
         return -2;
 
-    tboot_gen_domain_integrity(g_tboot_shared->s3_key, &mac);
-    printk("MAC for domains before S3 is: 0x%08"PRIx64"\n", domain_mac);
-    printk("MAC for domains after S3 is: 0x%08"PRIx64"\n", mac);
-    if ( mac != domain_mac )
+    tboot_gen_domain_integrity(g_tboot_shared->s3_key, &resume_mac);
+    orig_mac = domain_mac;
+    if ( resume_mac != domain_mac )
         return -3;
 
     return 0;
+}
+
+void tboot_s3_error(int error)
+{
+    const char *what = "???";
+
+    BUG_ON(!error || !tboot_in_measured_env());
+
+    switch ( error )
+    {
+    case -1: what = "Xen heap"; break;
+    case -2: what = "frame table"; break;
+    case -3: what = "domains"; break;
+    }
+
+    printk("MAC for %s before S3 is: 0x%08"PRIx64"\n", what, orig_mac);
+    printk("MAC for %s after S3 is: 0x%08"PRIx64"\n", what, resume_mac);
+    panic("Memory integrity was lost on resume (%d)\n", error);
 }
 
 /*

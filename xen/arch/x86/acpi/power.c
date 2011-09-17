@@ -193,7 +193,7 @@ static int enter_state(u32 state)
     printk(XENLOG_INFO "Finishing wakeup from ACPI S%d state.\n", state);
 
     if ( (state == ACPI_STATE_S3) && error )
-        panic("Memory integrity was lost on resume (%d)\n", error);
+        tboot_s3_error(error);
 
  done:
     spin_debug_enable();
