@@ -382,7 +382,7 @@ int msixtbl_pt_register(struct domain *d, struct pirq *pirq, uint64_t gtable)
         return r;
     }
 
-    if ( irq_desc->handler != &pci_msi_type )
+    if ( !irq_desc->msi_desc )
         goto out;
 
     msi_desc = irq_desc->msi_desc;
@@ -426,7 +426,7 @@ void msixtbl_pt_unregister(struct domain *d, struct pirq *pirq)
     if ( !irq_desc )
         return;
 
-    if ( irq_desc->handler != &pci_msi_type )
+    if ( !irq_desc->msi_desc )
         goto out;
 
     msi_desc = irq_desc->msi_desc;

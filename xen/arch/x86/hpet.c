@@ -312,7 +312,7 @@ static void __hpet_setup_msi_irq(struct irq_desc *desc)
 {
     struct msi_msg msg;
 
-    msi_compose_msg(desc->irq, &msg);
+    msi_compose_msg(desc, &msg);
     hpet_msi_write(desc->action->dev_id, &msg);
 }
 

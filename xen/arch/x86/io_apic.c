@@ -1882,44 +1882,6 @@ static hw_irq_controller ioapic_level_type = {
     .set_affinity 	= set_ioapic_affinity_irq,
 };
 
-static unsigned int startup_msi_irq(struct irq_desc *desc)
-{
-    unmask_msi_irq(desc);
-    return 0;
-}
-
-static void ack_msi_irq(struct irq_desc *desc)
-{
-    irq_complete_move(desc);
-    move_native_irq(desc);
-
-    if ( msi_maskable_irq(desc->msi_desc) )
-        ack_APIC_irq(); /* ACKTYPE_NONE */
-}
-
-static void end_msi_irq(struct irq_desc *desc, u8 vector)
-{
-    if ( !msi_maskable_irq(desc->msi_desc) )
-        ack_APIC_irq(); /* ACKTYPE_EOI */
-}
-
-#define shutdown_msi_irq mask_msi_irq
-
-/*
- * IRQ Chip for MSI PCI/PCI-X/PCI-Express Devices,
- * which implement the MSI or MSI-X Capability Structure.
- */
-hw_irq_controller pci_msi_type = {
-    .typename   = "PCI-MSI",
-    .startup    = startup_msi_irq,
-    .shutdown   = shutdown_msi_irq,
-    .enable	    = unmask_msi_irq,
-    .disable    = mask_msi_irq,
-    .ack        = ack_msi_irq,
-    .end        = end_msi_irq,
-    .set_affinity   = set_msi_affinity,
-};
-
 static inline void init_IO_APIC_traps(void)
 {
     int irq;

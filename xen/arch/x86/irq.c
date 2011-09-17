@@ -1304,7 +1304,7 @@ static int pirq_acktype(struct domain *d, int pirq)
      * MSIs are treated as edge-triggered interrupts, except
      * when there is no proper way to mask them.
      */
-    if ( desc->handler == &pci_msi_type )
+    if ( desc->msi_desc )
         return msi_maskable_irq(desc->msi_desc) ? ACKTYPE_NONE : ACKTYPE_EOI;
 
     /*
@@ -1723,7 +1723,7 @@ int map_domain_pirq(
         if ( desc->handler != &no_irq_type )
             dprintk(XENLOG_G_ERR, "dom%d: irq %d in use\n",
                     d->domain_id, irq);
-        desc->handler = &pci_msi_type;
+        setup_msi_handler(desc, msi_desc);
 
         if ( opt_irq_vector_map == OPT_IRQ_VECTOR_MAP_PERDEV
              && !desc->chip_data->used_vectors )
@@ -1739,7 +1739,7 @@ int map_domain_pirq(
         }
 
         set_domain_irq_pirq(d, irq, info);
-        setup_msi_irq(msi_desc, irq);
+        setup_msi_irq(desc);
         spin_unlock_irqrestore(&desc->lock, flags);
     }
     else
@@ -1807,6 +1807,12 @@ int unmap_domain_pirq(struct domain *d, int pirq)
             radix_tree_int_to_ptr(-pirq));
     }
 
+    if ( msi_desc )
+    {
+        desc->handler = &no_irq_type;
+        desc->msi_desc = NULL;
+    }
+
     spin_unlock_irqrestore(&desc->lock, flags);
     if (msi_desc)
         msi_free_irq(msi_desc);
@@ -1818,9 +1824,6 @@ int unmap_domain_pirq(struct domain *d, int pirq)
     if ( ret )
         dprintk(XENLOG_G_ERR, "dom%d: could not deny access to irq %d\n",
                 d->domain_id, pirq);
-
-    if ( desc->handler == &pci_msi_type )
-        desc->handler = &no_irq_type;
 
  done:
     return ret;

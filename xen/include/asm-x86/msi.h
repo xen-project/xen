@@ -74,15 +74,14 @@ struct msi_msg {
 	u32	dest32;		/* used when Interrupt Remapping with EIM is enabled */
 };
 
+struct irq_desc;
 struct msi_desc;
 /* Helper functions */
-extern void mask_msi_irq(struct irq_desc *);
-extern void unmask_msi_irq(struct irq_desc *);
-extern void set_msi_affinity(struct irq_desc *, const cpumask_t *);
 extern int pci_enable_msi(struct msi_info *msi, struct msi_desc **desc);
 extern void pci_disable_msi(struct msi_desc *desc);
 extern void pci_cleanup_msi(struct pci_dev *pdev);
-extern int setup_msi_irq(struct msi_desc *desc, int irq);
+extern void setup_msi_handler(struct irq_desc *, struct msi_desc *);
+extern void setup_msi_irq(struct irq_desc *);
 extern void teardown_msi_irq(int irq);
 extern int msi_free_vector(struct msi_desc *entry);
 extern int pci_restore_msi_state(struct pci_dev *pdev);
@@ -90,14 +89,14 @@ extern int pci_restore_msi_state(struct pci_dev *pdev);
 extern unsigned int pci_msix_get_table_len(struct pci_dev *pdev);
 
 struct msi_desc {
-	struct {
+	struct msi_attrib {
 		__u8	type	: 5; 	/* {0: unused, 5h:MSI, 11h:MSI-X} */
 		__u8	maskbit	: 1; 	/* mask-pending bit supported ?   */
 		__u8	masked	: 1;
 		__u8	is_64	: 1;	/* Address size: 0=32bit 1=64bit  */
 		__u8	pos;	 	/* Location of the msi capability */
 		__u16	entry_nr;    	/* specific enabled entry 	  */
-	}msi_attrib;
+	} msi_attrib;
 
 	struct list_head list;
 
@@ -122,8 +121,6 @@ int msi_free_irq(struct msi_desc *entry);
  * MSI-X device function.
  */
 #define NR_HP_RESERVED_VECTORS 	20
-
-extern const struct hw_interrupt_type pci_msi_type;
 
 #define PCI_MSIX_ENTRY_SIZE			16
 #define  PCI_MSIX_ENTRY_LOWER_ADDR_OFFSET	0
@@ -222,5 +219,6 @@ struct msg_address {
 	__u32 	hi_address;
 } __attribute__ ((packed));
 
-void msi_compose_msg(int irq, struct msi_msg *);
+void msi_compose_msg(struct irq_desc *, struct msi_msg *);
+
 #endif /* __ASM_MSI_H */

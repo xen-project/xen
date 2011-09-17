@@ -120,11 +120,11 @@ static void msix_put_fixmap(struct pci_dev *dev, int idx)
 /*
  * MSI message composition
  */
-void msi_compose_msg(int irq, struct msi_msg *msg)
+void msi_compose_msg(struct irq_desc *desc, struct msi_msg *msg)
 {
     unsigned dest;
     cpumask_t domain;
-    struct irq_cfg *cfg = irq_cfg(irq);
+    struct irq_cfg *cfg = desc->chip_data;
     int vector = cfg->vector;
     domain = cfg->cpu_mask;
 
@@ -205,19 +205,6 @@ static void read_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
         iommu_read_msi_from_ire(entry, msg);
 }
 
-static int set_irq_msi(struct msi_desc *entry)
-{
-    if ( entry->irq >= nr_irqs )
-    {
-        dprintk(XENLOG_ERR, "Trying to install msi data for irq %d\n",
-                entry->irq);
-        return -EINVAL;
-    }
-
-    irq_desc[entry->irq].msi_desc = entry;
-    return 0;
-}
-
 static void write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
 {
     entry->msg = *msg;
@@ -266,7 +253,7 @@ static void write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
     }
 }
 
-void set_msi_affinity(struct irq_desc *desc, const cpumask_t *mask)
+static void set_msi_affinity(struct irq_desc *desc, const cpumask_t *mask)
 {
     struct msi_msg msg;
     unsigned int dest;
@@ -387,15 +374,64 @@ static int msi_get_mask_bit(const struct msi_desc *entry)
     return -1;
 }
 
-void mask_msi_irq(struct irq_desc *desc)
+static void mask_msi_irq(struct irq_desc *desc)
 {
     msi_set_mask_bit(desc, 1);
 }
 
-void unmask_msi_irq(struct irq_desc *desc)
+static void unmask_msi_irq(struct irq_desc *desc)
 {
     msi_set_mask_bit(desc, 0);
 }
+
+static unsigned int startup_msi_irq(struct irq_desc *desc)
+{
+    unmask_msi_irq(desc);
+    return 0;
+}
+
+static void ack_nonmaskable_msi_irq(struct irq_desc *desc)
+{
+    irq_complete_move(desc);
+    move_native_irq(desc);
+}
+
+static void ack_maskable_msi_irq(struct irq_desc *desc)
+{
+    ack_nonmaskable_msi_irq(desc);
+    ack_APIC_irq(); /* ACKTYPE_NONE */
+}
+
+static void end_nonmaskable_msi_irq(struct irq_desc *desc, u8 vector)
+{
+    ack_APIC_irq(); /* ACKTYPE_EOI */
+}
+
+/*
+ * IRQ chip for MSI PCI/PCI-X/PCI-Express devices,
+ * which implement the MSI or MSI-X capability structure.
+ */
+static hw_irq_controller pci_msi_maskable = {
+    .typename     = "PCI-MSI/-X",
+    .startup      = startup_msi_irq,
+    .shutdown     = mask_msi_irq,
+    .enable       = unmask_msi_irq,
+    .disable      = mask_msi_irq,
+    .ack          = ack_maskable_msi_irq,
+    .set_affinity = set_msi_affinity
+};
+
+/* As above, but without having masking capability. */
+static hw_irq_controller pci_msi_nonmaskable = {
+    .typename     = "PCI-MSI",
+    .startup      = irq_startup_none,
+    .shutdown     = irq_shutdown_none,
+    .enable       = irq_enable_none,
+    .disable      = irq_disable_none,
+    .ack          = ack_nonmaskable_msi_irq,
+    .end          = end_nonmaskable_msi_irq,
+    .set_affinity = set_msi_affinity
+};
 
 static struct msi_desc* alloc_msi_entry(void)
 {
@@ -412,15 +448,19 @@ static struct msi_desc* alloc_msi_entry(void)
     return entry;
 }
 
-int setup_msi_irq(struct msi_desc *msidesc, int irq)
+void setup_msi_handler(struct irq_desc *desc, struct msi_desc *msidesc)
+{
+    desc->msi_desc = msidesc;
+    desc->handler = msi_maskable_irq(msidesc) ? &pci_msi_maskable
+                                              : &pci_msi_nonmaskable;
+}
+
+void setup_msi_irq(struct irq_desc *desc)
 {
     struct msi_msg msg;
 
-    msi_compose_msg(irq, &msg);
-    set_irq_msi(msidesc);
-    write_msi_msg(irq_desc[irq].msi_desc, &msg);
-
-    return 0;
+    msi_compose_msg(desc, &msg);
+    write_msi_msg(desc->msi_desc, &msg);
 }
 
 int msi_free_irq(struct msi_desc *entry)
@@ -1022,19 +1062,20 @@ static void dump_msi(unsigned char key)
     {
         struct irq_desc *desc = irq_to_desc(irq);
         const struct msi_desc *entry;
-        u32 addr, data;
+        u32 addr, data, dest32;
+        int mask;
+        struct msi_attrib attr;
         unsigned long flags;
         char type;
 
         spin_lock_irqsave(&desc->lock, flags);
 
         entry = desc->msi_desc;
-        type = desc->handler == &pci_msi_type && entry;
-
-        spin_unlock_irqrestore(&desc->lock, flags);
-
-        if ( !type )
+        if ( !entry )
+        {
+            spin_unlock_irqrestore(&desc->lock, flags);
             continue;
+        }
 
         switch ( entry->msi_attrib.type )
         {
@@ -1045,6 +1086,11 @@ static void dump_msi(unsigned char key)
 
         data = entry->msg.data;
         addr = entry->msg.address_lo;
+        dest32 = entry->msg.dest32;
+        attr = entry->msi_attrib;
+        mask = msi_get_mask_bit(entry);
+
+        spin_unlock_irqrestore(&desc->lock, flags);
 
         printk(" MSI%c %4u vec=%02x%7s%6s%3sassert%5s%7s"
                " dest=%08x mask=%d/%d/%d\n",
@@ -1055,9 +1101,7 @@ static void dump_msi(unsigned char key)
                data & MSI_DATA_LEVEL_ASSERT ? "" : "de",
                addr & MSI_ADDR_DESTMODE_LOGIC ? "log" : "phys",
                addr & MSI_ADDR_REDIRECTION_LOWPRI ? "lowest" : "cpu",
-               entry->msg.dest32,
-               entry->msi_attrib.maskbit, entry->msi_attrib.masked,
-               msi_get_mask_bit(entry));
+               dest32, attr.maskbit, attr.masked, mask);
     }
 }
 
