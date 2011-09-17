@@ -27,6 +27,8 @@ typedef struct {
     DECLARE_BITMAP(_bits,NR_VECTORS);
 } vmask_t;
 
+struct irq_desc;
+
 struct irq_cfg {
         s16 vector;                  /* vector itself is only 8 bits, */
         s16 old_vector;              /* but we use -1 for unassigned  */
@@ -107,8 +109,8 @@ fastcall void smp_irq_move_cleanup_interrupt(struct cpu_user_regs *regs);
 
 asmlinkage void do_IRQ(struct cpu_user_regs *regs);
 
-void disable_8259A_irq(unsigned int irq);
-void enable_8259A_irq(unsigned int irq);
+void disable_8259A_irq(struct irq_desc *);
+void enable_8259A_irq(struct irq_desc *);
 int i8259A_irq_pending(unsigned int irq);
 void mask_8259A(void);
 void unmask_8259A(void);
@@ -161,7 +163,6 @@ int irq_to_vector(int irq);
 int create_irq(void);
 void destroy_irq(unsigned int irq);
 
-struct irq_desc;
 extern void irq_complete_move(struct irq_desc *);
 
 extern struct irq_desc *irq_desc;
@@ -171,7 +172,7 @@ void unlock_vector_lock(void);
 
 void __setup_vector_irq(int cpu);
 
-void move_native_irq(int irq);
+void move_native_irq(struct irq_desc *);
 void move_masked_irq(struct irq_desc *);
 
 int __assign_irq_vector(int irq, struct irq_cfg *, const cpumask_t *);

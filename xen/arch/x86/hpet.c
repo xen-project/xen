@@ -49,9 +49,6 @@ static unsigned int __read_mostly num_hpets_used;
 
 DEFINE_PER_CPU(struct hpet_event_channel *, cpu_bc_channel);
 
-static unsigned int *__read_mostly irq_channel;
-#define irq_to_channel(irq)   irq_channel[irq]
-
 unsigned long __read_mostly hpet_address;
 
 /*
@@ -232,26 +229,20 @@ static void hpet_interrupt_handler(int irq, void *data,
     ch->event_handler(ch);
 }
 
-static void hpet_msi_unmask(unsigned int irq)
+static void hpet_msi_unmask(struct irq_desc *desc)
 {
     u32 cfg;
-    unsigned int ch_idx = irq_to_channel(irq);
-    struct hpet_event_channel *ch = hpet_events + ch_idx;
-
-    BUG_ON(ch_idx >= num_hpets_used);
+    struct hpet_event_channel *ch = desc->action->dev_id;
 
     cfg = hpet_read32(HPET_Tn_CFG(ch->idx));
     cfg |= HPET_TN_FSB;
     hpet_write32(cfg, HPET_Tn_CFG(ch->idx));
 }
 
-static void hpet_msi_mask(unsigned int irq)
+static void hpet_msi_mask(struct irq_desc *desc)
 {
     u32 cfg;
-    unsigned int ch_idx = irq_to_channel(irq);
-    struct hpet_event_channel *ch = hpet_events + ch_idx;
-
-    BUG_ON(ch_idx >= num_hpets_used);
+    struct hpet_event_channel *ch = desc->action->dev_id;
 
     cfg = hpet_read32(HPET_Tn_CFG(ch->idx));
     cfg &= ~HPET_TN_FSB;
@@ -271,28 +262,19 @@ static void hpet_msi_read(struct hpet_event_channel *ch, struct msi_msg *msg)
     msg->address_hi = 0;
 }
 
-static unsigned int hpet_msi_startup(unsigned int irq)
+static unsigned int hpet_msi_startup(struct irq_desc *desc)
 {
-    hpet_msi_unmask(irq);
+    hpet_msi_unmask(desc);
     return 0;
 }
 
-static void hpet_msi_shutdown(unsigned int irq)
-{
-    hpet_msi_mask(irq);
-}
+#define hpet_msi_shutdown hpet_msi_mask
 
-static void hpet_msi_ack(unsigned int irq)
+static void hpet_msi_ack(struct irq_desc *desc)
 {
-    struct irq_desc *desc = irq_to_desc(irq);
-
     irq_complete_move(desc);
-    move_native_irq(irq);
+    move_native_irq(desc);
     ack_APIC_irq();
-}
-
-static void hpet_msi_end(unsigned int irq, u8 vector)
-{
 }
 
 static void hpet_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
@@ -323,7 +305,6 @@ static hw_irq_controller hpet_msi_type = {
     .enable	    = hpet_msi_unmask,
     .disable    = hpet_msi_mask,
     .ack        = hpet_msi_ack,
-    .end        = hpet_msi_end,
     .set_affinity   = hpet_msi_set_affinity,
 };
 
@@ -335,14 +316,13 @@ static void __hpet_setup_msi_irq(struct irq_desc *desc)
     hpet_msi_write(desc->action->dev_id, &msg);
 }
 
-static int __init hpet_setup_msi_irq(unsigned int irq)
+static int __init hpet_setup_msi_irq(unsigned int irq, struct hpet_event_channel *ch)
 {
     int ret;
     irq_desc_t *desc = irq_to_desc(irq);
 
     desc->handler = &hpet_msi_type;
-    ret = request_irq(irq, hpet_interrupt_handler,
-                      0, "HPET", hpet_events + irq_channel[irq]);
+    ret = request_irq(irq, hpet_interrupt_handler, 0, "HPET", ch);
     if ( ret < 0 )
         return ret;
 
@@ -358,12 +338,9 @@ static int __init hpet_assign_irq(unsigned int idx)
     if ( (irq = create_irq()) < 0 )
         return irq;
 
-    irq_channel[irq] = idx;
-
-    if ( hpet_setup_msi_irq(irq) )
+    if ( hpet_setup_msi_irq(irq, hpet_events + idx) )
     {
         destroy_irq(irq);
-        irq_channel[irq] = -1;
         return -EINVAL;
     }
 
@@ -511,11 +488,6 @@ void __init hpet_broadcast_init(void)
     if ( hpet_rate == 0 )
         return;
 
-    irq_channel = xmalloc_array(unsigned int, nr_irqs);
-    BUG_ON(irq_channel == NULL);
-    for ( i = 0; i < nr_irqs; i++ )
-        irq_channel[i] = -1;
-
     cfg = hpet_read32(HPET_CFG);
 
     hpet_fsb_cap_lookup();
@@ -527,9 +499,6 @@ void __init hpet_broadcast_init(void)
     }
     else
     {
-        xfree(irq_channel);
-        irq_channel = NULL;
-
         hpet_id = hpet_read32(HPET_ID);
         if ( !(hpet_id & HPET_ID_LEGSUP) )
             return;

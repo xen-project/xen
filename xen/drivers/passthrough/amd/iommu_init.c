@@ -29,7 +29,6 @@
 #include <asm-x86/fixmap.h>
 #include <mach_apic.h>
 
-static struct amd_iommu **__read_mostly irq_to_iommu;
 static int __initdata nr_amd_iommus;
 
 unsigned short ivrs_bdf_entries;
@@ -403,10 +402,10 @@ static void amd_iommu_msi_enable(struct amd_iommu *iommu, int flag)
         iommu->msi_cap + PCI_MSI_FLAGS, control);
 }
 
-static void iommu_msi_unmask(unsigned int irq)
+static void iommu_msi_unmask(struct irq_desc *desc)
 {
     unsigned long flags;
-    struct amd_iommu *iommu = irq_to_iommu[irq];
+    struct amd_iommu *iommu = desc->action->dev_id;
 
     /* FIXME: do not support mask bits at the moment */
     if ( iommu->maskbit )
@@ -417,11 +416,10 @@ static void iommu_msi_unmask(unsigned int irq)
     spin_unlock_irqrestore(&iommu->lock, flags);
 }
 
-static void iommu_msi_mask(unsigned int irq)
+static void iommu_msi_mask(struct irq_desc *desc)
 {
     unsigned long flags;
-    struct amd_iommu *iommu = irq_to_iommu[irq];
-    struct irq_desc *desc = irq_to_desc(irq);
+    struct amd_iommu *iommu = desc->action->dev_id;
 
     irq_complete_move(desc);
 
@@ -434,15 +432,15 @@ static void iommu_msi_mask(unsigned int irq)
     spin_unlock_irqrestore(&iommu->lock, flags);
 }
 
-static unsigned int iommu_msi_startup(unsigned int irq)
+static unsigned int iommu_msi_startup(struct irq_desc *desc)
 {
-    iommu_msi_unmask(irq);
+    iommu_msi_unmask(desc);
     return 0;
 }
 
-static void iommu_msi_end(unsigned int irq, u8 vector)
+static void iommu_msi_end(struct irq_desc *desc, u8 vector)
 {
-    iommu_msi_unmask(irq);
+    iommu_msi_unmask(desc);
     ack_APIC_irq();
 }
 
@@ -557,13 +555,11 @@ static int __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
     }
     
     irq_desc[irq].handler = &iommu_msi_type;
-    irq_to_iommu[irq] = iommu;
     ret = request_irq(irq, amd_iommu_page_fault, 0,
                              "amd_iommu", iommu);
     if ( ret )
     {
         irq_desc[irq].handler = &no_irq_type;
-        irq_to_iommu[irq] = NULL;
         destroy_irq(irq);
         AMD_IOMMU_DEBUG("can't request irq\n");
         return 0;
@@ -728,13 +724,6 @@ static void __init amd_iommu_init_cleanup(void)
         ivrs_mappings = NULL;
     }
 
-    /* free irq_to_iommu[] */
-    if ( irq_to_iommu )
-    {
-        xfree(irq_to_iommu);
-        irq_to_iommu = NULL;
-    }
-
     iommu_enabled = 0;
     iommu_passthrough = 0;
     iommu_intremap = 0;
@@ -837,11 +826,6 @@ int __init amd_iommu_init(void)
     struct amd_iommu *iommu;
 
     BUG_ON( !iommu_found() );
-
-    irq_to_iommu = xmalloc_array(struct amd_iommu *, nr_irqs);
-    if ( irq_to_iommu == NULL )
-        goto error_out;
-    memset(irq_to_iommu, 0, nr_irqs * sizeof(struct iommu*));
 
     ivrs_bdf_entries = amd_iommu_get_ivrs_dev_entries();
 

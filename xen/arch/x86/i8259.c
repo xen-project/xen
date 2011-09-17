@@ -85,18 +85,18 @@ BUILD_16_IRQS(0xc) BUILD_16_IRQS(0xd) BUILD_16_IRQS(0xe) BUILD_16_IRQS(0xf)
 
 static DEFINE_SPINLOCK(i8259A_lock);
 
-static void mask_and_ack_8259A_irq(unsigned int irq);
+static void mask_and_ack_8259A_irq(struct irq_desc *);
 
-static unsigned int startup_8259A_irq(unsigned int irq)
+static unsigned int startup_8259A_irq(struct irq_desc *desc)
 {
-    enable_8259A_irq(irq);
+    enable_8259A_irq(desc);
     return 0; /* never anything pending */
 }
 
-static void end_8259A_irq(unsigned int irq, u8 vector)
+static void end_8259A_irq(struct irq_desc *desc, u8 vector)
 {
-    if (!(irq_desc[irq].status & (IRQ_DISABLED|IRQ_INPROGRESS)))
-        enable_8259A_irq(irq);
+    if (!(desc->status & (IRQ_DISABLED|IRQ_INPROGRESS)))
+        enable_8259A_irq(desc);
 }
 
 static struct hw_interrupt_type __read_mostly i8259A_irq_type = {
@@ -133,28 +133,28 @@ static unsigned int cached_irq_mask = 0xffff;
  */
 unsigned int __read_mostly io_apic_irqs;
 
-void disable_8259A_irq(unsigned int irq)
+void disable_8259A_irq(struct irq_desc *desc)
 {
-    unsigned int mask = 1 << irq;
+    unsigned int mask = 1 << desc->irq;
     unsigned long flags;
 
     spin_lock_irqsave(&i8259A_lock, flags);
     cached_irq_mask |= mask;
-    if (irq & 8)
+    if (desc->irq & 8)
         outb(cached_A1,0xA1);
     else
         outb(cached_21,0x21);
     spin_unlock_irqrestore(&i8259A_lock, flags);
 }
 
-void enable_8259A_irq(unsigned int irq)
+void enable_8259A_irq(struct irq_desc *desc)
 {
-    unsigned int mask = ~(1 << irq);
+    unsigned int mask = ~(1 << desc->irq);
     unsigned long flags;
 
     spin_lock_irqsave(&i8259A_lock, flags);
     cached_irq_mask &= mask;
-    if (irq & 8)
+    if (desc->irq & 8)
         outb(cached_A1,0xA1);
     else
         outb(cached_21,0x21);
@@ -226,9 +226,9 @@ static inline int i8259A_irq_real(unsigned int irq)
  * first, _then_ send the EOI, and the order of EOI
  * to the two 8259s is important!
  */
-static void mask_and_ack_8259A_irq(unsigned int irq)
+static void mask_and_ack_8259A_irq(struct irq_desc *desc)
 {
-    unsigned int irqmask = 1 << irq;
+    unsigned int irqmask = 1 << desc->irq;
     unsigned long flags;
 
     spin_lock_irqsave(&i8259A_lock, flags);
@@ -252,15 +252,15 @@ static void mask_and_ack_8259A_irq(unsigned int irq)
     cached_irq_mask |= irqmask;
 
  handle_real_irq:
-    if (irq & 8) {
+    if (desc->irq & 8) {
         inb(0xA1);              /* DUMMY - (do we need this?) */
         outb(cached_A1,0xA1);
-        outb(0x60+(irq&7),0xA0);/* 'Specific EOI' to slave */
+        outb(0x60 + (desc->irq & 7), 0xA0);/* 'Specific EOI' to slave */
         outb(0x62,0x20);        /* 'Specific EOI' to master-IRQ2 */
     } else {
         inb(0x21);              /* DUMMY - (do we need this?) */
         outb(cached_21,0x21);
-        outb(0x60+irq,0x20);    /* 'Specific EOI' to master */
+        outb(0x60 + desc->irq, 0x20);/* 'Specific EOI' to master */
     }
     spin_unlock_irqrestore(&i8259A_lock, flags);
     return;
@@ -269,7 +269,7 @@ static void mask_and_ack_8259A_irq(unsigned int irq)
     /*
      * this is the slow path - should happen rarely.
      */
-    if (i8259A_irq_real(irq))
+    if (i8259A_irq_real(desc->irq))
         /*
          * oops, the IRQ _is_ in service according to the
          * 8259A - not spurious, go handle it.
@@ -283,7 +283,7 @@ static void mask_and_ack_8259A_irq(unsigned int irq)
          * lets ACK and report it. [once per IRQ]
          */
         if (!(spurious_irq_mask & irqmask)) {
-            printk("spurious 8259A interrupt: IRQ%d.\n", irq);
+            printk("spurious 8259A interrupt: IRQ%d.\n", desc->irq);
             spurious_irq_mask |= irqmask;
         }
         /*

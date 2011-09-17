@@ -193,7 +193,7 @@ static void dynamic_irq_cleanup(unsigned int irq)
     spin_lock_irqsave(&desc->lock, flags);
     desc->status  |= IRQ_DISABLED;
     desc->status  &= ~IRQ_GUEST;
-    desc->handler->shutdown(irq);
+    desc->handler->shutdown(desc);
     action = desc->action;
     desc->action  = NULL;
     desc->msi_desc = NULL;
@@ -348,25 +348,20 @@ static void __do_IRQ_guest(int vector);
 
 void no_action(int cpl, void *dev_id, struct cpu_user_regs *regs) { }
 
-static void enable_none(unsigned int vector) { }
-static void end_none(unsigned int irq, u8 vector) { }
-static unsigned int startup_none(unsigned int vector) { return 0; }
-static void disable_none(unsigned int vector) { }
-static void ack_none(unsigned int irq)
+void irq_actor_none(struct irq_desc *desc) { }
+unsigned int irq_startup_none(struct irq_desc *desc) { return 0; }
+static void ack_none(struct irq_desc *desc)
 {
-    ack_bad_irq(irq);
+    ack_bad_irq(desc->irq);
 }
-
-#define shutdown_none   disable_none
 
 hw_irq_controller no_irq_type = {
     "none",
-    startup_none,
-    shutdown_none,
-    enable_none,
-    disable_none,
+    irq_startup_none,
+    irq_shutdown_none,
+    irq_enable_none,
+    irq_disable_none,
     ack_none,
-    end_none
 };
 
 static vmask_t *irq_get_used_vector_mask(int irq)
@@ -586,19 +581,17 @@ void move_masked_irq(struct irq_desc *desc)
     cpus_clear(desc->pending_mask);
 }
 
-void move_native_irq(int irq)
+void move_native_irq(struct irq_desc *desc)
 {
-    struct irq_desc *desc = irq_to_desc(irq);
-
     if (likely(!(desc->status & IRQ_MOVE_PENDING)))
         return;
 
     if (unlikely(desc->status & IRQ_DISABLED))
         return;
 
-    desc->handler->disable(irq);
+    desc->handler->disable(desc);
     move_masked_irq(desc);
-    desc->handler->enable(irq);
+    desc->handler->enable(desc);
 }
 
 /* For re-setting irq interrupt affinity for specific irq */
@@ -655,7 +648,7 @@ asmlinkage void do_IRQ(struct cpu_user_regs *regs)
     desc = irq_to_desc(irq);
 
     spin_lock(&desc->lock);
-    desc->handler->ack(irq);
+    desc->handler->ack(desc);
 
     if ( likely(desc->status & IRQ_GUEST) )
     {
@@ -665,7 +658,7 @@ asmlinkage void do_IRQ(struct cpu_user_regs *regs)
             s_time_t now = NOW();
             if ( now < (desc->rl_quantum_start + MILLISECS(10)) )
             {
-                desc->handler->disable(irq);
+                desc->handler->disable(desc);
                 /*
                  * If handler->disable doesn't actually mask the interrupt, a 
                  * disabled irq still can fire. This check also avoids possible 
@@ -717,7 +710,8 @@ asmlinkage void do_IRQ(struct cpu_user_regs *regs)
     desc->status &= ~IRQ_INPROGRESS;
 
  out:
-    desc->handler->end(irq, regs->entry_vector);
+    if ( desc->handler->end )
+        desc->handler->end(desc, regs->entry_vector);
  out_no_end:
     spin_unlock(&desc->lock);
     irq_exit();
@@ -734,7 +728,7 @@ static void irq_ratelimit_timer_fn(void *data)
     list_for_each_entry_safe ( desc, tmp, &irq_ratelimit_list, rl_link )
     {
         spin_lock(&desc->lock);
-        desc->handler->enable(desc->irq);
+        desc->handler->enable(desc);
         list_del(&desc->rl_link);
         INIT_LIST_HEAD(&desc->rl_link);
         spin_unlock(&desc->lock);
@@ -797,7 +791,7 @@ void __init release_irq(unsigned int irq)
     action = desc->action;
     desc->action  = NULL;
     desc->status |= IRQ_DISABLED;
-    desc->handler->shutdown(irq);
+    desc->handler->shutdown(desc);
     spin_unlock_irqrestore(&desc->lock,flags);
 
     /* Wait to make sure it's not being used on another CPU */
@@ -824,7 +818,7 @@ int __init setup_irq(unsigned int irq, struct irqaction *new)
 
     desc->action  = new;
     desc->status &= ~IRQ_DISABLED;
-    desc->handler->startup(irq);
+    desc->handler->startup(desc);
 
     spin_unlock_irqrestore(&desc->lock,flags);
 
@@ -915,7 +909,8 @@ static void irq_guest_eoi_timer_fn(void *data)
     switch ( action->ack_type )
     {
     case ACKTYPE_UNMASK:
-        desc->handler->end(irq, 0);
+        if ( desc->handler->end )
+            desc->handler->end(desc, 0);
         break;
     case ACKTYPE_EOI:
         cpu_eoi_map = action->cpu_eoi_map;
@@ -943,7 +938,8 @@ static void __do_IRQ_guest(int irq)
         /* An interrupt may slip through while freeing an ACKTYPE_EOI irq. */
         ASSERT(action->ack_type == ACKTYPE_EOI);
         ASSERT(desc->status & IRQ_DISABLED);
-        desc->handler->end(irq, vector);
+        if ( desc->handler->end )
+            desc->handler->end(desc, vector);
         return;
     }
 
@@ -1157,7 +1153,8 @@ static void flush_ready_eoi(void)
         ASSERT(irq > 0);
         desc = irq_to_desc(irq);
         spin_lock(&desc->lock);
-        desc->handler->end(irq, peoi[sp].vector);
+        if ( desc->handler->end )
+            desc->handler->end(desc, peoi[sp].vector);
         spin_unlock(&desc->lock);
     }
 
@@ -1235,7 +1232,8 @@ void desc_guest_eoi(struct irq_desc *desc, struct pirq *pirq)
     if ( action->ack_type == ACKTYPE_UNMASK )
     {
         ASSERT(cpus_empty(action->cpu_eoi_map));
-        desc->handler->end(irq, 0);
+        if ( desc->handler->end )
+            desc->handler->end(desc, 0);
         spin_unlock_irq(&desc->lock);
         return;
     }
@@ -1403,7 +1401,7 @@ int pirq_guest_bind(struct vcpu *v, struct pirq *pirq, int will_share)
 
         desc->status |= IRQ_GUEST;
         desc->status &= ~IRQ_DISABLED;
-        desc->handler->startup(irq);
+        desc->handler->startup(desc);
 
         /* Attempt to bind the interrupt target to the correct CPU. */
         cpu_set(v->processor, cpumask);
@@ -1487,8 +1485,9 @@ static irq_guest_action_t *__pirq_guest_unbind(
     {
     case ACKTYPE_UNMASK:
         if ( test_and_clear_bool(pirq->masked) &&
-             (--action->in_flight == 0) )
-            desc->handler->end(irq, 0);
+             (--action->in_flight == 0) &&
+             desc->handler->end )
+                desc->handler->end(desc, 0);
         break;
     case ACKTYPE_EOI:
         /* NB. If #guests == 0 then we clear the eoi_map later on. */
@@ -1517,7 +1516,7 @@ static irq_guest_action_t *__pirq_guest_unbind(
 
     /* Disabling IRQ before releasing the desc_lock avoids an IRQ storm. */
     desc->status |= IRQ_DISABLED;
-    desc->handler->disable(irq);
+    desc->handler->disable(desc);
 
     /*
      * Mark any remaining pending EOIs as ready to flush.
@@ -1539,7 +1538,7 @@ static irq_guest_action_t *__pirq_guest_unbind(
 
     desc->action = NULL;
     desc->status &= ~(IRQ_GUEST|IRQ_INPROGRESS);
-    desc->handler->shutdown(irq);
+    desc->handler->shutdown(desc);
 
     /* Caller frees the old guest descriptor block. */
     return action;
@@ -1959,7 +1958,7 @@ void fixup_irqs(void)
         }
 
         if ( desc->handler->disable )
-            desc->handler->disable(irq);
+            desc->handler->disable(desc);
 
         if ( desc->handler->set_affinity )
             desc->handler->set_affinity(desc, &affinity);
@@ -1967,7 +1966,7 @@ void fixup_irqs(void)
             set_affinity = 0;
 
         if ( desc->handler->enable )
-            desc->handler->enable(irq);
+            desc->handler->enable(desc);
 
         spin_unlock(&desc->lock);
 

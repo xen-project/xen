@@ -41,12 +41,12 @@ struct irq_desc;
  */
 struct hw_interrupt_type {
     const char *typename;
-    unsigned int (*startup)(unsigned int irq);
-    void (*shutdown)(unsigned int irq);
-    void (*enable)(unsigned int irq);
-    void (*disable)(unsigned int irq);
-    void (*ack)(unsigned int irq);
-    void (*end)(unsigned int irq, u8 vector);
+    unsigned int (*startup)(struct irq_desc *);
+    void (*shutdown)(struct irq_desc *);
+    void (*enable)(struct irq_desc *);
+    void (*disable)(struct irq_desc *);
+    void (*ack)(struct irq_desc *);
+    void (*end)(struct irq_desc *, u8 vector);
     void (*set_affinity)(struct irq_desc *, const cpumask_t *);
 };
 
@@ -133,6 +133,11 @@ extern int request_irq(unsigned int irq,
 
 extern hw_irq_controller no_irq_type;
 extern void no_action(int cpl, void *dev_id, struct cpu_user_regs *regs);
+extern unsigned int irq_startup_none(struct irq_desc *);
+extern void irq_actor_none(struct irq_desc *);
+#define irq_shutdown_none irq_actor_none
+#define irq_disable_none irq_actor_none
+#define irq_enable_none irq_actor_none
 
 struct domain;
 struct vcpu;

@@ -336,11 +336,11 @@ int msi_maskable_irq(const struct msi_desc *entry)
            || entry->msi_attrib.maskbit;
 }
 
-static void msi_set_mask_bit(unsigned int irq, int flag)
+static void msi_set_mask_bit(struct irq_desc *desc, int flag)
 {
-    struct msi_desc *entry = irq_desc[irq].msi_desc;
+    struct msi_desc *entry = desc->msi_desc;
 
-    ASSERT(spin_is_locked(&irq_desc[irq].lock));
+    ASSERT(spin_is_locked(&desc->lock));
     BUG_ON(!entry || !entry->dev);
     switch (entry->msi_attrib.type) {
     case PCI_CAP_ID_MSI:
@@ -387,14 +387,14 @@ static int msi_get_mask_bit(const struct msi_desc *entry)
     return -1;
 }
 
-void mask_msi_irq(unsigned int irq)
+void mask_msi_irq(struct irq_desc *desc)
 {
-    msi_set_mask_bit(irq, 1);
+    msi_set_mask_bit(desc, 1);
 }
 
-void unmask_msi_irq(unsigned int irq)
+void unmask_msi_irq(struct irq_desc *desc)
 {
-    msi_set_mask_bit(irq, 0);
+    msi_set_mask_bit(desc, 0);
 }
 
 static struct msi_desc* alloc_msi_entry(void)
@@ -978,7 +978,7 @@ int pci_restore_msi_state(struct pci_dev *pdev)
 
         write_msi_msg(entry, &entry->msg);
 
-        msi_set_mask_bit(irq, entry->msi_attrib.masked);
+        msi_set_mask_bit(desc, entry->msi_attrib.masked);
 
         if ( entry->msi_attrib.type == PCI_CAP_ID_MSI )
             msi_set_enable(pdev, 1);

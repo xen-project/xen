@@ -276,7 +276,7 @@ set_rte (unsigned int gsi, unsigned int vector, unsigned int dest, int mask)
 }
 
 static void
-nop (unsigned int vector)
+nop (struct irq_desc *desc)
 {
 	/* do nothing... */
 }
@@ -300,13 +300,13 @@ kexec_disable_iosapic(void)
 }
 
 static void
-mask_irq (unsigned int irq)
+mask_irq (struct irq_desc *desc)
 {
 	unsigned long flags;
 	char __iomem *addr;
 	u32 low32;
 	int rte_index;
-	ia64_vector vec = irq_to_vector(irq);
+	ia64_vector vec = irq_to_vector(desc->irq);
 	struct iosapic_rte_info *rte;
 
 	if (list_empty(&iosapic_intr_info[vec].rtes))
@@ -326,13 +326,13 @@ mask_irq (unsigned int irq)
 }
 
 static void
-unmask_irq (unsigned int irq)
+unmask_irq (struct irq_desc *desc)
 {
 	unsigned long flags;
 	char __iomem *addr;
 	u32 low32;
 	int rte_index;
-	ia64_vector vec = irq_to_vector(irq);
+	ia64_vector vec = irq_to_vector(desc->irq);
 	struct iosapic_rte_info *rte;
 
 	if (list_empty(&iosapic_intr_info[vec].rtes))
@@ -408,19 +408,19 @@ iosapic_set_affinity (struct irq_desc *desc, const cpumask_t *mask)
  */
 
 static unsigned int
-iosapic_startup_level_irq (unsigned int irq)
+iosapic_startup_level_irq (struct irq_desc *desc)
 {
-	unmask_irq(irq);
+	unmask_irq(desc);
 	return 0;
 }
 
 static void
-iosapic_end_level_irq (unsigned int irq)
+iosapic_end_level_irq (struct irq_desc *desc)
 {
-	ia64_vector vec = irq_to_vector(irq);
+	ia64_vector vec = irq_to_vector(desc->irq);
 	struct iosapic_rte_info *rte;
 
-	move_irq(irq);
+	move_irq(desc->irq);
 	list_for_each_entry(rte, &iosapic_intr_info[vec].rtes, rte_list)
 		iosapic_eoi(rte->addr, vec);
 }

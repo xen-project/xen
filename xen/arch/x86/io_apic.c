@@ -436,21 +436,21 @@ static void __level_IO_APIC_irq (unsigned int irq)
     __modify_IO_APIC_irq(irq, 0x00008000, 0);
 }
 
-static void mask_IO_APIC_irq (unsigned int irq)
+static void mask_IO_APIC_irq(struct irq_desc *desc)
 {
     unsigned long flags;
 
     spin_lock_irqsave(&ioapic_lock, flags);
-    __mask_IO_APIC_irq(irq);
+    __mask_IO_APIC_irq(desc->irq);
     spin_unlock_irqrestore(&ioapic_lock, flags);
 }
 
-static void unmask_IO_APIC_irq (unsigned int irq)
+static void unmask_IO_APIC_irq(struct irq_desc *desc)
 {
     unsigned long flags;
 
     spin_lock_irqsave(&ioapic_lock, flags);
-    __unmask_IO_APIC_irq(irq);
+    __unmask_IO_APIC_irq(desc->irq);
     spin_unlock_irqrestore(&ioapic_lock, flags);
 }
 
@@ -1145,7 +1145,7 @@ static void __init setup_IO_APIC_irqs(void)
                 ioapic_register_intr(irq, IOAPIC_AUTO);
 
                 if (!apic && platform_legacy_irq(irq))
-                    disable_8259A_irq(irq);
+                    disable_8259A_irq(irq_to_desc(irq));
             }
             cfg = irq_cfg(irq);
             SET_DEST(entry.dest.dest32, entry.dest.logical.logical_dest,
@@ -1170,7 +1170,7 @@ static void __init setup_ExtINT_IRQ0_pin(unsigned int apic, unsigned int pin, in
 
     memset(&entry,0,sizeof(entry));
 
-    disable_8259A_irq(0);
+    disable_8259A_irq(irq_to_desc(0));
 
     /* mask LVT0 */
     apic_write_around(APIC_LVT0, APIC_LVT_MASKED | APIC_DM_EXTINT);
@@ -1199,7 +1199,7 @@ static void __init setup_ExtINT_IRQ0_pin(unsigned int apic, unsigned int pin, in
      */
     ioapic_write_entry(apic, pin, 0, entry);
 
-    enable_8259A_irq(0);
+    enable_8259A_irq(irq_to_desc(0));
 }
 
 static inline void UNEXPECTED_IO_APIC(void)
@@ -1627,18 +1627,18 @@ static int __init timer_irq_works(void)
  * This is not complete - we should be able to fake
  * an edge even if it isn't on the 8259A...
  */
-static unsigned int startup_edge_ioapic_irq(unsigned int irq)
+static unsigned int startup_edge_ioapic_irq(struct irq_desc *desc)
 {
     int was_pending = 0;
     unsigned long flags;
 
     spin_lock_irqsave(&ioapic_lock, flags);
-    if (platform_legacy_irq(irq)) {
-        disable_8259A_irq(irq);
-        if (i8259A_irq_pending(irq))
+    if (platform_legacy_irq(desc->irq)) {
+        disable_8259A_irq(desc);
+        if (i8259A_irq_pending(desc->irq))
             was_pending = 1;
     }
-    __unmask_IO_APIC_irq(irq);
+    __unmask_IO_APIC_irq(desc->irq);
     spin_unlock_irqrestore(&ioapic_lock, flags);
 
     return was_pending;
@@ -1649,16 +1649,14 @@ static unsigned int startup_edge_ioapic_irq(unsigned int irq)
  * interrupt for real. This prevents IRQ storms from unhandled
  * devices.
  */
-static void ack_edge_ioapic_irq(unsigned int irq)
+static void ack_edge_ioapic_irq(struct irq_desc *desc)
 {
-    struct irq_desc *desc = irq_to_desc(irq);
-    
     irq_complete_move(desc);
-    move_native_irq(irq);
+    move_native_irq(desc);
 
     if ((desc->status & (IRQ_PENDING | IRQ_DISABLED))
         == (IRQ_PENDING | IRQ_DISABLED))
-        mask_IO_APIC_irq(irq);
+        mask_IO_APIC_irq(desc);
     ack_APIC_irq();
 }
 
@@ -1676,9 +1674,9 @@ static void ack_edge_ioapic_irq(unsigned int irq)
  * generic IRQ layer and by the fact that an unacked local
  * APIC does not accept IRQs.
  */
-static unsigned int startup_level_ioapic_irq (unsigned int irq)
+static unsigned int startup_level_ioapic_irq(struct irq_desc *desc)
 {
-    unmask_IO_APIC_irq(irq);
+    unmask_IO_APIC_irq(desc);
 
     return 0; /* don't check for pending */
 }
@@ -1726,11 +1724,10 @@ static bool_t io_apic_level_ack_pending(unsigned int irq)
     return 0;
 }
 
-static void mask_and_ack_level_ioapic_irq (unsigned int irq)
+static void mask_and_ack_level_ioapic_irq(struct irq_desc *desc)
 {
     unsigned long v;
     int i;
-    struct irq_desc *desc = irq_to_desc(irq);
 
     irq_complete_move(desc);
 
@@ -1738,7 +1735,7 @@ static void mask_and_ack_level_ioapic_irq (unsigned int irq)
         return;
 
     if ( !directed_eoi_enabled )
-        mask_IO_APIC_irq(irq);
+        mask_IO_APIC_irq(desc);
 
 /*
  * It appears there is an erratum which affects at least version 0x11
@@ -1759,7 +1756,7 @@ static void mask_and_ack_level_ioapic_irq (unsigned int irq)
  * operation to prevent an edge-triggered interrupt escaping meanwhile.
  * The idea is from Manfred Spraul.  --macro
  */
-    i = IO_APIC_VECTOR(irq);
+    i = IO_APIC_VECTOR(desc->irq);
 
     v = apic_read(APIC_TMR + ((i & ~0x1f) >> 1));
 
@@ -1768,19 +1765,19 @@ static void mask_and_ack_level_ioapic_irq (unsigned int irq)
     if ( directed_eoi_enabled )
         return;
 
-    if ((irq_desc[irq].status & IRQ_MOVE_PENDING) &&
-       !io_apic_level_ack_pending(irq))
+    if ((desc->status & IRQ_MOVE_PENDING) &&
+       !io_apic_level_ack_pending(desc->irq))
         move_masked_irq(desc);
 
     if ( !(v & (1 << (i & 0x1f))) ) {
         spin_lock(&ioapic_lock);
-        __edge_IO_APIC_irq(irq);
-        __level_IO_APIC_irq(irq);
+        __edge_IO_APIC_irq(desc->irq);
+        __level_IO_APIC_irq(desc->irq);
         spin_unlock(&ioapic_lock);
     }
 }
 
-static void end_level_ioapic_irq (unsigned int irq, u8 vector)
+static void end_level_ioapic_irq(struct irq_desc *desc, u8 vector)
 {
     unsigned long v;
     int i;
@@ -1789,23 +1786,21 @@ static void end_level_ioapic_irq (unsigned int irq, u8 vector)
     {
         if ( directed_eoi_enabled )
         {
-            struct irq_desc *desc = irq_to_desc(irq);
-
             if ( !(desc->status & (IRQ_DISABLED|IRQ_MOVE_PENDING)) )
             {
-                eoi_IO_APIC_irq(irq);
+                eoi_IO_APIC_irq(desc->irq);
                 return;
             }
 
-            mask_IO_APIC_irq(irq);
-            eoi_IO_APIC_irq(irq);
+            mask_IO_APIC_irq(desc);
+            eoi_IO_APIC_irq(desc->irq);
             if ( (desc->status & IRQ_MOVE_PENDING) &&
-                 !io_apic_level_ack_pending(irq) )
+                 !io_apic_level_ack_pending(desc->irq) )
                 move_masked_irq(desc);
         }
 
-        if ( !(irq_desc[irq].status & IRQ_DISABLED) )
-            unmask_IO_APIC_irq(irq);
+        if ( !(desc->status & IRQ_DISABLED) )
+            unmask_IO_APIC_irq(desc);
 
         return;
     }
@@ -1829,7 +1824,7 @@ static void end_level_ioapic_irq (unsigned int irq, u8 vector)
  * operation to prevent an edge-triggered interrupt escaping meanwhile.
  * The idea is from Manfred Spraul.  --macro
  */
-    i = IO_APIC_VECTOR(irq);
+    i = IO_APIC_VECTOR(desc->irq);
 
     /* Manually EOI the old vector if we are moving to the new */
     if ( vector && i != vector )
@@ -1843,29 +1838,20 @@ static void end_level_ioapic_irq (unsigned int irq, u8 vector)
 
     ack_APIC_irq();
 
-    if ((irq_desc[irq].status & IRQ_MOVE_PENDING) &&
-            !io_apic_level_ack_pending(irq))
-        move_native_irq(irq);
+    if ( (desc->status & IRQ_MOVE_PENDING) &&
+         !io_apic_level_ack_pending(desc->irq) )
+        move_native_irq(desc);
 
     if (!(v & (1 << (i & 0x1f)))) {
         spin_lock(&ioapic_lock);
-        __mask_IO_APIC_irq(irq);
-        __edge_IO_APIC_irq(irq);
-        __level_IO_APIC_irq(irq);
-        if ( !(irq_desc[irq].status & IRQ_DISABLED) )
-            __unmask_IO_APIC_irq(irq);
+        __mask_IO_APIC_irq(desc->irq);
+        __edge_IO_APIC_irq(desc->irq);
+        __level_IO_APIC_irq(desc->irq);
+        if ( !(desc->status & IRQ_DISABLED) )
+            __unmask_IO_APIC_irq(desc->irq);
         spin_unlock(&ioapic_lock);
     }
 }
-
-static void disable_edge_ioapic_irq(unsigned int irq)
-{
-}
-
-static void end_edge_ioapic_irq(unsigned int irq, u8 vector)
-{
-}
-
 
 /*
  * Level and edge triggered IO-APIC interrupts need different handling,
@@ -1878,11 +1864,10 @@ static void end_edge_ioapic_irq(unsigned int irq, u8 vector)
 static hw_irq_controller ioapic_edge_type = {
     .typename 	= "IO-APIC-edge",
     .startup 	= startup_edge_ioapic_irq,
-    .shutdown 	= disable_edge_ioapic_irq,
+    .shutdown 	= irq_shutdown_none,
     .enable 	= unmask_IO_APIC_irq,
-    .disable 	= disable_edge_ioapic_irq,
+    .disable 	= irq_disable_none,
     .ack 		= ack_edge_ioapic_irq,
-    .end 		= end_edge_ioapic_irq,
     .set_affinity 	= set_ioapic_affinity_irq,
 };
 
@@ -1897,26 +1882,24 @@ static hw_irq_controller ioapic_level_type = {
     .set_affinity 	= set_ioapic_affinity_irq,
 };
 
-static unsigned int startup_msi_irq(unsigned int irq)
+static unsigned int startup_msi_irq(struct irq_desc *desc)
 {
-    unmask_msi_irq(irq);
+    unmask_msi_irq(desc);
     return 0;
 }
 
-static void ack_msi_irq(unsigned int irq)
+static void ack_msi_irq(struct irq_desc *desc)
 {
-    struct irq_desc *desc = irq_to_desc(irq);
-
     irq_complete_move(desc);
-    move_native_irq(irq);
+    move_native_irq(desc);
 
     if ( msi_maskable_irq(desc->msi_desc) )
         ack_APIC_irq(); /* ACKTYPE_NONE */
 }
 
-static void end_msi_irq(unsigned int irq, u8 vector)
+static void end_msi_irq(struct irq_desc *desc, u8 vector)
 {
-    if ( !msi_maskable_irq(irq_desc[irq].msi_desc) )
+    if ( !msi_maskable_irq(desc->msi_desc) )
         ack_APIC_irq(); /* ACKTYPE_EOI */
 }
 
@@ -1946,7 +1929,7 @@ static inline void init_IO_APIC_traps(void)
             make_8259A_irq(irq);
 }
 
-static void enable_lapic_irq(unsigned int irq)
+static void enable_lapic_irq(struct irq_desc *desc)
 {
     unsigned long v;
 
@@ -1954,7 +1937,7 @@ static void enable_lapic_irq(unsigned int irq)
     apic_write_around(APIC_LVT0, v & ~APIC_LVT_MASKED);
 }
 
-static void disable_lapic_irq(unsigned int irq)
+static void disable_lapic_irq(struct irq_desc *desc)
 {
     unsigned long v;
 
@@ -1962,12 +1945,10 @@ static void disable_lapic_irq(unsigned int irq)
     apic_write_around(APIC_LVT0, v | APIC_LVT_MASKED);
 }
 
-static void ack_lapic_irq(unsigned int irq)
+static void ack_lapic_irq(struct irq_desc *desc)
 {
     ack_APIC_irq();
 }
-
-#define end_lapic_irq end_edge_ioapic_irq
 
 static hw_irq_controller lapic_irq_type = {
     .typename 	= "local-APIC-edge",
@@ -1976,7 +1957,6 @@ static hw_irq_controller lapic_irq_type = {
     .enable 	= enable_lapic_irq,
     .disable 	= disable_lapic_irq,
     .ack 		= ack_lapic_irq,
-    .end 		= end_lapic_irq,
 };
 
 /*
@@ -2051,7 +2031,7 @@ static void __init check_timer(void)
     /*
      * get/set the timer IRQ vector:
      */
-    disable_8259A_irq(0);
+    disable_8259A_irq(irq_to_desc(0));
     vector = FIRST_HIPRIORITY_VECTOR;
     clear_irq_vector(0);
 
@@ -2071,7 +2051,7 @@ static void __init check_timer(void)
     init_8259A(1);
     /* XEN: Ripped out the legacy missed-tick logic, so below is not needed. */
     /*timer_ack = 1;*/
-    /*enable_8259A_irq(0);*/
+    /*enable_8259A_irq(irq_to_desc(0));*/
 
     pin1  = find_isa_irq_pin(0, mp_INT);
     apic1 = find_isa_irq_apic(0, mp_INT);
@@ -2085,7 +2065,7 @@ static void __init check_timer(void)
         /*
          * Ok, does IRQ0 through the IOAPIC work?
          */
-        unmask_IO_APIC_irq(0);
+        unmask_IO_APIC_irq(irq_to_desc(0));
         if (timer_irq_works()) {
             local_irq_restore(flags);
             return;
@@ -2125,10 +2105,10 @@ static void __init check_timer(void)
 
     printk(KERN_INFO "...trying to set up timer as Virtual Wire IRQ...");
 
-    disable_8259A_irq(0);
+    disable_8259A_irq(irq_to_desc(0));
     irq_desc[0].handler = &lapic_irq_type;
     apic_write_around(APIC_LVT0, APIC_DM_FIXED | vector);	/* Fixed mode */
-    enable_8259A_irq(0);
+    enable_8259A_irq(irq_to_desc(0));
 
     if (timer_irq_works()) {
         local_irq_restore(flags);
@@ -2401,7 +2381,7 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
     ioapic_register_intr(irq, edge_level);
 
     if (!ioapic && platform_legacy_irq(irq))
-        disable_8259A_irq(irq);
+        disable_8259A_irq(desc);
 
     spin_lock_irqsave(&ioapic_lock, flags);
     __ioapic_write_entry(ioapic, pin, 0, entry);
@@ -2410,7 +2390,7 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
 
     spin_lock(&desc->lock);
     if (!(desc->status & (IRQ_DISABLED | IRQ_GUEST)))
-        desc->handler->startup(irq);
+        desc->handler->startup(desc);
     spin_unlock_irqrestore(&desc->lock, flags);
 
     return 0;

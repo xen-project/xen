@@ -829,7 +829,6 @@ static const char *iommu_get_fault_reason(u8 fault_reason, int *fault_type)
     }
 }
 
-static struct iommu **irq_to_iommu;
 static int iommu_page_fault_do_one(struct iommu *iommu, int type,
                                    u8 fault_reason, u16 source_id, u64 addr)
 {
@@ -961,9 +960,9 @@ clear_overflow:
     }
 }
 
-static void dma_msi_unmask(unsigned int irq)
+static void dma_msi_unmask(struct irq_desc *desc)
 {
-    struct iommu *iommu = irq_to_iommu[irq];
+    struct iommu *iommu = desc->action->dev_id;
     unsigned long flags;
 
     /* unmask it */
@@ -972,11 +971,10 @@ static void dma_msi_unmask(unsigned int irq)
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
 
-static void dma_msi_mask(unsigned int irq)
+static void dma_msi_mask(struct irq_desc *desc)
 {
     unsigned long flags;
-    struct iommu *iommu = irq_to_iommu[irq];
-    struct irq_desc *desc = irq_to_desc(irq);
+    struct iommu *iommu = desc->action->dev_id;
 
     irq_complete_move(desc);
 
@@ -986,15 +984,15 @@ static void dma_msi_mask(unsigned int irq)
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
 
-static unsigned int dma_msi_startup(unsigned int irq)
+static unsigned int dma_msi_startup(struct irq_desc *desc)
 {
-    dma_msi_unmask(irq);
+    dma_msi_unmask(desc);
     return 0;
 }
 
-static void dma_msi_end(unsigned int irq, u8 vector)
+static void dma_msi_end(struct irq_desc *desc, u8 vector)
 {
-    dma_msi_unmask(irq);
+    dma_msi_unmask(desc);
     ack_APIC_irq();
 }
 
@@ -1071,7 +1069,6 @@ static int __init iommu_set_interrupt(struct iommu *iommu)
     }
 
     irq_desc[irq].handler = &dma_msi_type;
-    irq_to_iommu[irq] = iommu;
 #ifdef CONFIG_X86
     ret = request_irq(irq, iommu_page_fault, 0, "dmar", iommu);
 #else
@@ -1080,7 +1077,6 @@ static int __init iommu_set_interrupt(struct iommu *iommu)
     if ( ret )
     {
         irq_desc[irq].handler = &no_irq_type;
-        irq_to_iommu[irq] = NULL;
         destroy_irq(irq);
         dprintk(XENLOG_ERR VTDPREFIX, "IOMMU: can't request irq\n");
         return ret;
@@ -2090,13 +2086,6 @@ int __init intel_vtd_setup(void)
         return -ENODEV;
 
     platform_quirks_init();
-
-    irq_to_iommu = xmalloc_array(struct iommu*, nr_irqs);
-    BUG_ON(!irq_to_iommu);
-    memset(irq_to_iommu, 0, nr_irqs * sizeof(struct iommu*));
-
-    if(!irq_to_iommu)
-        return -ENOMEM;
 
     /* We enable the following features only if they are supported by all VT-d
      * engines: Snoop Control, DMA passthrough, Queued Invalidation and
