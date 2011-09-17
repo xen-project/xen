@@ -130,6 +130,14 @@ int efi_get_info(uint32_t idx, union xenpf_efi_info *info)
     case XEN_FW_EFI_VERSION:
         info->version = efi_version;
         break;
+    case XEN_FW_EFI_RT_VERSION:
+    {
+        unsigned long cr3 = efi_rs_enter();
+
+        info->version = efi_rs->Hdr.Revision;
+        efi_rs_leave(cr3);
+        break;
+    }
     case XEN_FW_EFI_CONFIG_TABLE:
         info->cfg.addr = __pa(efi_ct);
         info->cfg.nent = efi_num_ct;
@@ -418,7 +426,12 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
         name.raw = xmalloc_bytes(size);
         if ( !name.raw )
             return -ENOMEM;
-        copy_from_guest(name.raw, op->u.get_next_variable_name.name, size);
+        if ( copy_from_guest(name.raw, op->u.get_next_variable_name.name,
+                             size) )
+        {
+            xfree(name.raw);
+            return -EFAULT;
+        }
 
         cr3 = efi_rs_enter();
         status = efi_rs->GetNextVariableName(
@@ -435,6 +448,31 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
     }
     break;
 
+    case XEN_EFI_query_variable_info:
+        cr3 = efi_rs_enter();
+        if ( (efi_rs->Hdr.Revision >> 16) < 2 )
+        {
+            efi_rs_leave(cr3);
+            return -EOPNOTSUPP;
+        }
+        status = efi_rs->QueryVariableInfo(
+            op->u.query_variable_info.attr,
+            &op->u.query_variable_info.max_store_size,
+            &op->u.query_variable_info.remain_store_size,
+            &op->u.query_variable_info.max_size);
+        efi_rs_leave(cr3);
+        break;
+
+    case XEN_EFI_query_capsule_capabilities:
+    case XEN_EFI_update_capsule:
+        cr3 = efi_rs_enter();
+        if ( (efi_rs->Hdr.Revision >> 16) < 2 )
+        {
+            efi_rs_leave(cr3);
+            return -EOPNOTSUPP;
+        }
+        efi_rs_leave(cr3);
+        /* XXX fall through for now */
     default:
         return -ENOSYS;
     }
