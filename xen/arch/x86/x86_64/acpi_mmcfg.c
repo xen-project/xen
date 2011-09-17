@@ -111,6 +111,7 @@ int __init acpi_parse_mcfg(struct acpi_table_header *header)
             pci_mmcfg_config_num = 0;
             return -ENODEV;
         }
+        pci_add_segment(pci_mmcfg_config[i].pci_segment);
     }
 
     return 0;

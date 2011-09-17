@@ -26,29 +26,93 @@
 #include <asm/hvm/irq.h>
 #include <xen/delay.h>
 #include <xen/keyhandler.h>
+#include <xen/radix-tree.h>
 #include <xen/tasklet.h>
 #ifdef CONFIG_X86
 #include <asm/msi.h>
 #endif
 
-LIST_HEAD(alldevs_list);
-spinlock_t pcidevs_lock = SPIN_LOCK_UNLOCKED;
-
+struct pci_seg {
+    struct list_head alldevs_list;
+    u16 nr;
+    /* bus2bridge_lock protects bus2bridge array */
+    spinlock_t bus2bridge_lock;
 #define MAX_BUSES 256
-static struct {
-    u8 map;
-    u8 bus;
-    u8 devfn;
-} bus2bridge[MAX_BUSES];
+    struct {
+        u8 map;
+        u8 bus;
+        u8 devfn;
+    } bus2bridge[MAX_BUSES];
+};
 
-/* bus2bridge_lock protects bus2bridge array */
-static DEFINE_SPINLOCK(bus2bridge_lock);
+spinlock_t pcidevs_lock = SPIN_LOCK_UNLOCKED;
+static struct radix_tree_root pci_segments;
 
-static struct pci_dev *alloc_pdev(u8 bus, u8 devfn)
+static inline struct pci_seg *get_pseg(u16 seg)
+{
+    return radix_tree_lookup(&pci_segments, seg);
+}
+
+static struct pci_seg *alloc_pseg(u16 seg)
+{
+    struct pci_seg *pseg = get_pseg(seg);
+
+    if ( pseg )
+        return pseg;
+
+    pseg = xmalloc(struct pci_seg);
+    if ( !pseg )
+        return NULL;
+
+    pseg->nr = seg;
+    INIT_LIST_HEAD(&pseg->alldevs_list);
+    spin_lock_init(&pseg->bus2bridge_lock);
+    memset(pseg->bus2bridge, 0, sizeof(pseg->bus2bridge));
+
+    if ( radix_tree_insert(&pci_segments, seg, pseg) )
+    {
+        xfree(pseg);
+        pseg = NULL;
+    }
+
+    return pseg;
+}
+
+static int pci_segments_iterate(
+    int (*handler)(struct pci_seg *, void *), void *arg)
+{
+    u16 seg = 0;
+    int rc = 0;
+
+    do {
+        struct pci_seg *pseg;
+
+        if ( !radix_tree_gang_lookup(&pci_segments, (void **)&pseg, seg, 1) )
+            break;
+        rc = handler(pseg, arg);
+        seg = pseg->nr + 1;
+    } while (!rc && seg);
+
+    return rc;
+}
+
+void __init pt_pci_init(void)
+{
+    radix_tree_init(&pci_segments);
+    if ( !alloc_pseg(0) )
+        panic("Could not initialize PCI segment 0\n");
+}
+
+int __init pci_add_segment(u16 seg)
+{
+    return alloc_pseg(seg) ? 0 : -ENOMEM;
+}
+
+static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
 {
     struct pci_dev *pdev;
 
-    list_for_each_entry ( pdev, &alldevs_list, alldevs_list )
+    list_for_each_entry ( pdev, &pseg->alldevs_list, alldevs_list )
         if ( pdev->bus == bus && pdev->devfn == devfn )
             return pdev;
 
@@ -61,7 +125,7 @@ static struct pci_dev *alloc_pdev(u8 bus, u8 devfn)
     *((u8*) &pdev->devfn) = devfn;
     pdev->domain = NULL;
     INIT_LIST_HEAD(&pdev->msi_list);
-    list_add(&pdev->alldevs_list, &alldevs_list);
+    list_add(&pdev->alldevs_list, &pseg->alldevs_list);
     spin_lock_init(&pdev->msix_table_lock);
 
     return pdev;
@@ -75,11 +139,15 @@ static void free_pdev(struct pci_dev *pdev)
 
 struct pci_dev *pci_get_pdev(int bus, int devfn)
 {
+    struct pci_seg *pseg = get_pseg(0);
     struct pci_dev *pdev = NULL;
 
     ASSERT(spin_is_locked(&pcidevs_lock));
 
-    list_for_each_entry ( pdev, &alldevs_list, alldevs_list )
+    if ( !pseg )
+        return NULL;
+
+    list_for_each_entry ( pdev, &pseg->alldevs_list, alldevs_list )
         if ( (pdev->bus == bus || bus == -1) &&
              (pdev->devfn == devfn || devfn == -1) )
         {
@@ -91,9 +159,13 @@ struct pci_dev *pci_get_pdev(int bus, int devfn)
 
 struct pci_dev *pci_get_pdev_by_domain(struct domain *d, int bus, int devfn)
 {
+    struct pci_seg *pseg = get_pseg(0);
     struct pci_dev *pdev = NULL;
 
-    list_for_each_entry ( pdev, &alldevs_list, alldevs_list )
+    if ( !pseg )
+        return NULL;
+
+    list_for_each_entry ( pdev, &pseg->alldevs_list, alldevs_list )
          if ( (pdev->bus == bus || bus == -1) &&
               (pdev->devfn == devfn || devfn == -1) &&
               (pdev->domain == d) )
@@ -145,6 +217,7 @@ void pci_enable_acs(struct pci_dev *pdev)
 
 int pci_add_device(u8 bus, u8 devfn, const struct pci_dev_info *info)
 {
+    struct pci_seg *pseg;
     struct pci_dev *pdev;
     unsigned int slot = PCI_SLOT(devfn), func = PCI_FUNC(devfn);
     const char *pdev_type;
@@ -167,7 +240,10 @@ int pci_add_device(u8 bus, u8 devfn, const struct pci_dev_info *info)
         return -EINVAL;
 
     spin_lock(&pcidevs_lock);
-    pdev = alloc_pdev(bus, devfn);
+    pseg = alloc_pseg(0);
+    if ( !pseg )
+        goto out;
+    pdev = alloc_pdev(pseg, bus, devfn);
     if ( !pdev )
         goto out;
 
@@ -262,11 +338,15 @@ out:
 
 int pci_remove_device(u8 bus, u8 devfn)
 {
+    struct pci_seg *pseg = get_pseg(0);
     struct pci_dev *pdev;
     int ret = -ENODEV;
 
+    if ( !pseg )
+        return -ENODEV;
+
     spin_lock(&pcidevs_lock);
-    list_for_each_entry ( pdev, &alldevs_list, alldevs_list )
+    list_for_each_entry ( pdev, &pseg->alldevs_list, alldevs_list )
         if ( pdev->bus == bus && pdev->devfn == devfn )
         {
             ret = iommu_remove_device(pdev);
@@ -384,22 +464,26 @@ int pdev_type(u8 bus, u8 devfn)
  */
 int find_upstream_bridge(u8 *bus, u8 *devfn, u8 *secbus)
 {
+    struct pci_seg *pseg = get_pseg(0);
     int ret = 0;
     int cnt = 0;
 
     if ( *bus == 0 )
         return 0;
 
-    if ( !bus2bridge[*bus].map )
+    if ( !pseg )
+        return -1;
+
+    if ( !pseg->bus2bridge[*bus].map )
         return 0;
 
     ret = 1;
-    spin_lock(&bus2bridge_lock);
-    while ( bus2bridge[*bus].map )
+    spin_lock(&pseg->bus2bridge_lock);
+    while ( pseg->bus2bridge[*bus].map )
     {
         *secbus = *bus;
-        *devfn = bus2bridge[*bus].devfn;
-        *bus = bus2bridge[*bus].bus;
+        *devfn = pseg->bus2bridge[*bus].devfn;
+        *bus = pseg->bus2bridge[*bus].bus;
         if ( cnt++ >= MAX_BUSES )
         {
             ret = -1;
@@ -408,7 +492,7 @@ int find_upstream_bridge(u8 *bus, u8 *devfn, u8 *secbus)
     }
 
 out:
-    spin_unlock(&bus2bridge_lock);
+    spin_unlock(&pseg->bus2bridge_lock);
     return ret;
 }
 
@@ -431,14 +515,13 @@ int __init pci_device_detect(u8 bus, u8 dev, u8 func)
  * scan pci devices to add all existed PCI devices to alldevs_list,
  * and setup pci hierarchy in array bus2bridge.
  */
-int __init scan_pci_devices(void)
+static int __init _scan_pci_devices(struct pci_seg *pseg, void *arg)
 {
     struct pci_dev *pdev;
     int bus, dev, func;
     u8 sec_bus, sub_bus;
     int type;
 
-    spin_lock(&pcidevs_lock);
     for ( bus = 0; bus < 256; bus++ )
     {
         for ( dev = 0; dev < 32; dev++ )
@@ -448,11 +531,10 @@ int __init scan_pci_devices(void)
                 if ( pci_device_detect(bus, dev, func) == 0 )
                     continue;
 
-                pdev = alloc_pdev(bus, PCI_DEVFN(dev, func));
+                pdev = alloc_pdev(pseg, bus, PCI_DEVFN(dev, func));
                 if ( !pdev )
                 {
                     printk("%s: alloc_pdev failed.\n", __func__);
-                    spin_unlock(&pcidevs_lock);
                     return -ENOMEM;
                 }
 
@@ -470,14 +552,15 @@ int __init scan_pci_devices(void)
                         sub_bus = pci_conf_read8(bus, dev, func,
                                                  PCI_SUBORDINATE_BUS);
 
-                        spin_lock(&bus2bridge_lock);
+                        spin_lock(&pseg->bus2bridge_lock);
                         for ( sub_bus &= 0xff; sec_bus <= sub_bus; sec_bus++ )
                         {
-                            bus2bridge[sec_bus].map = 1;
-                            bus2bridge[sec_bus].bus =  bus;
-                            bus2bridge[sec_bus].devfn =  PCI_DEVFN(dev, func);
+                            pseg->bus2bridge[sec_bus].map = 1;
+                            pseg->bus2bridge[sec_bus].bus = bus;
+                            pseg->bus2bridge[sec_bus].devfn =
+                                PCI_DEVFN(dev, func);
                         }
-                        spin_unlock(&bus2bridge_lock);
+                        spin_unlock(&pseg->bus2bridge_lock);
                         break;
 
                     case DEV_TYPE_PCIe_ENDPOINT:
@@ -487,7 +570,6 @@ int __init scan_pci_devices(void)
                     default:
                         printk("%s: unknown type: bdf = %x:%x.%x\n",
                                __func__, bus, dev, func);
-                        spin_unlock(&pcidevs_lock);
                         return -EINVAL;
                 }
 
@@ -498,8 +580,18 @@ int __init scan_pci_devices(void)
         }
     }
 
-    spin_unlock(&pcidevs_lock);
     return 0;
+}
+
+int __init scan_pci_devices(void)
+{
+    int ret;
+
+    spin_lock(&pcidevs_lock);
+    ret = pci_segments_iterate(_scan_pci_devices, NULL);
+    spin_unlock(&pcidevs_lock);
+
+    return ret;
 }
 
 /* Disconnect all PCI devices from the PCI buses. From the PCI spec:
@@ -508,29 +600,33 @@ int __init scan_pci_devices(void)
  *    configuration accesses. All devices are required to support
  *    this base level of functionality."
  */
-void disconnect_pci_devices(void)
+static int _disconnect_pci_devices(struct pci_seg *pseg, void *arg)
 {
     struct pci_dev *pdev;
 
-    spin_lock(&pcidevs_lock);
-
-    list_for_each_entry ( pdev, &alldevs_list, alldevs_list )
+    list_for_each_entry ( pdev, &pseg->alldevs_list, alldevs_list )
         pci_conf_write16(pdev->bus, PCI_SLOT(pdev->devfn),
                          PCI_FUNC(pdev->devfn), PCI_COMMAND, 0);
 
+    return 0;
+}
+
+void disconnect_pci_devices(void)
+{
+    spin_lock(&pcidevs_lock);
+    pci_segments_iterate(_disconnect_pci_devices, NULL);
     spin_unlock(&pcidevs_lock);
 }
 
 #ifdef SUPPORT_MSI_REMAPPING
-static void dump_pci_devices(unsigned char ch)
+static int _dump_pci_devices(struct pci_seg *pseg, void *arg)
 {
     struct pci_dev *pdev;
     struct msi_desc *msi;
 
-    printk("==== PCI devices ====\n");
-    spin_lock(&pcidevs_lock);
+    printk("==== segment %04x ====\n", pseg->nr);
 
-    list_for_each_entry ( pdev, &alldevs_list, alldevs_list )
+    list_for_each_entry ( pdev, &pseg->alldevs_list, alldevs_list )
     {
         printk("%02x:%02x.%x - dom %-3d - MSIs < ",
                pdev->bus, PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn),
@@ -540,6 +636,14 @@ static void dump_pci_devices(unsigned char ch)
         printk(">\n");
     }
 
+    return 0;
+}
+
+static void dump_pci_devices(unsigned char ch)
+{
+    printk("==== PCI devices ====\n");
+    spin_lock(&pcidevs_lock);
+    pci_segments_iterate(_dump_pci_devices, NULL);
     spin_unlock(&pcidevs_lock);
 }
 

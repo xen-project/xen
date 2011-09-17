@@ -171,6 +171,7 @@ static const char __init *pci_mmcfg_amd_fam10h(void)
         pci_mmcfg_config[i].pci_segment = i;
         pci_mmcfg_config[i].start_bus_number = 0;
         pci_mmcfg_config[i].end_bus_number = (1 << busnbits) - 1;
+        pci_add_segment(i);
     }
 
     return "AMD Family 10h NB";

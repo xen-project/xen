@@ -92,6 +92,8 @@ void iommu_pte_flush(struct domain *d, u64 gfn, u64 *pte, int order, int present
 void iommu_set_pgd(struct domain *d);
 void iommu_domain_teardown(struct domain *d);
 
+void pt_pci_init(void);
+
 struct pirq;
 int hvm_do_IRQ_dpci(struct domain *, struct pirq *);
 int dpci_ioport_intercept(ioreq_t *p);

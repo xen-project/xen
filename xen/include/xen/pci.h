@@ -89,6 +89,7 @@ struct pci_dev *pci_lock_pdev(int bus, int devfn);
 struct pci_dev *pci_lock_domain_pdev(struct domain *d, int bus, int devfn);
 
 void pci_release_devices(struct domain *d);
+int pci_add_segment(u16 seg);
 int pci_add_device(u8 bus, u8 devfn, const struct pci_dev_info *);
 int pci_remove_device(u8 bus, u8 devfn);
 struct pci_dev *pci_get_pdev(int bus, int devfn);
