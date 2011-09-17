@@ -68,15 +68,16 @@ void open_softirq(int nr, softirq_handler handler)
     softirq_handlers[nr] = handler;
 }
 
-void cpumask_raise_softirq(cpumask_t mask, unsigned int nr)
+void cpumask_raise_softirq(const cpumask_t *mask, unsigned int nr)
 {
     int cpu;
+    cpumask_t send_mask = CPU_MASK_NONE;
 
-    for_each_cpu_mask(cpu, mask)
-        if ( test_and_set_bit(nr, &softirq_pending(cpu)) )
-            cpu_clear(cpu, mask);
+    for_each_cpu_mask(cpu, *mask)
+        if ( !test_and_set_bit(nr, &softirq_pending(cpu)) )
+            cpu_set(cpu, send_mask);
 
-    smp_send_event_check_mask(&mask);
+    smp_send_event_check_mask(&send_mask);
 }
 
 void cpu_raise_softirq(unsigned int cpu, unsigned int nr)

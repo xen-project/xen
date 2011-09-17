@@ -998,7 +998,7 @@ static void dma_msi_end(unsigned int irq, u8 vector)
     ack_APIC_irq();
 }
 
-static void dma_msi_set_affinity(unsigned int irq, cpumask_t mask)
+static void dma_msi_set_affinity(unsigned int irq, const cpumask_t *mask)
 {
     struct msi_msg msg;
     unsigned int dest;
@@ -1009,7 +1009,7 @@ static void dma_msi_set_affinity(unsigned int irq, cpumask_t mask)
     struct irq_cfg *cfg = desc->chip_data;
 
 #ifdef CONFIG_X86
-    dest = set_desc_affinity(desc, &mask);
+    dest = set_desc_affinity(desc, mask);
     if (dest == BAD_APICID){
         dprintk(XENLOG_ERR VTDPREFIX, "Set iommu interrupt affinity error!\n");
         return;
@@ -1984,7 +1984,7 @@ static int init_vtd_hw(void)
         iommu = drhd->iommu;
 
         cfg = irq_cfg(iommu->irq);
-        dma_msi_set_affinity(iommu->irq, cfg->cpu_mask);
+        dma_msi_set_affinity(iommu->irq, &cfg->cpu_mask);
 
         clear_fault_bits(iommu);
 

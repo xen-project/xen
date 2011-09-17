@@ -352,7 +352,7 @@ unmask_irq (unsigned int irq)
 
 
 static void
-iosapic_set_affinity (unsigned int irq, cpumask_t mask)
+iosapic_set_affinity (unsigned int irq, const cpumask_t *mask)
 {
 #ifdef CONFIG_SMP
 	unsigned long flags;
@@ -366,10 +366,10 @@ iosapic_set_affinity (unsigned int irq, cpumask_t mask)
 	irq &= (~IA64_IRQ_REDIRECTED);
 	vec = irq_to_vector(irq);
 
-	if (cpus_empty(mask))
+	if (cpumask_empty(mask))
 		return;
 
-	dest = cpu_physical_id(first_cpu(mask));
+	dest = cpu_physical_id(cpumask_first(mask));
 
 	if (list_empty(&iosapic_intr_info[vec].rtes))
 		return;			/* not an IOSAPIC interrupt */

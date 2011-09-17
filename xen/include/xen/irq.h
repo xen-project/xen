@@ -45,7 +45,7 @@ struct hw_interrupt_type {
     void (*disable)(unsigned int irq);
     void (*ack)(unsigned int irq);
     void (*end)(unsigned int irq, u8 vector);
-    void (*set_affinity)(unsigned int irq, cpumask_t mask);
+    void (*set_affinity)(unsigned int irq, const cpumask_t *);
 };
 
 typedef const struct hw_interrupt_type hw_irq_controller;
@@ -174,11 +174,6 @@ extern irq_desc_t *pirq_spin_lock_irq_desc(
 static inline void set_native_irq_info(unsigned int irq, const cpumask_t *mask)
 {
     irq_desc[irq].affinity = *mask;
-}
-
-static inline void set_irq_info(int irq, cpumask_t mask)
-{
-    set_native_irq_info(irq, &mask);
 }
 
 unsigned int set_desc_affinity(struct irq_desc *, const cpumask_t *);

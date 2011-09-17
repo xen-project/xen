@@ -78,7 +78,7 @@ struct msi_desc;
 /* Helper functions */
 extern void mask_msi_irq(unsigned int irq);
 extern void unmask_msi_irq(unsigned int irq);
-extern void set_msi_affinity(unsigned int vector, cpumask_t mask);
+extern void set_msi_affinity(unsigned int vector, const cpumask_t *);
 extern int pci_enable_msi(struct msi_info *msi, struct msi_desc **desc);
 extern void pci_disable_msi(struct msi_desc *desc);
 extern void pci_cleanup_msi(struct pci_dev *pdev);

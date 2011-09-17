@@ -344,7 +344,7 @@ static void amd_iommu_reset_event_log(struct amd_iommu *iommu)
     set_iommu_event_log_control(iommu, IOMMU_CONTROL_ENABLED);
 }
 
-static void iommu_msi_set_affinity(unsigned int irq, cpumask_t mask)
+static void iommu_msi_set_affinity(unsigned int irq, const cpumask_t *mask)
 {
     struct msi_msg msg;
     unsigned int dest;
@@ -355,7 +355,7 @@ static void iommu_msi_set_affinity(unsigned int irq, cpumask_t mask)
     u8 dev = PCI_SLOT(iommu->bdf & 0xff);
     u8 func = PCI_FUNC(iommu->bdf & 0xff);
 
-    dest = set_desc_affinity(desc, &mask);
+    dest = set_desc_affinity(desc, mask);
 
     if ( dest == BAD_APICID )
     {
@@ -591,7 +591,7 @@ static void enable_iommu(struct amd_iommu *iommu)
     register_iommu_event_log_in_mmio_space(iommu);
     register_iommu_exclusion_range(iommu);
 
-    iommu_msi_set_affinity(iommu->irq, cpu_online_map);
+    iommu_msi_set_affinity(iommu->irq, &cpu_online_map);
     amd_iommu_msi_enable(iommu, IOMMU_CONTROL_ENABLED);
 
     set_iommu_command_buffer_control(iommu, IOMMU_CONTROL_ENABLED);

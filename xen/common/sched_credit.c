@@ -310,7 +310,7 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
 
     /* Send scheduler interrupts to designated CPUs */
     if ( !cpus_empty(mask) )
-        cpumask_raise_softirq(mask, SCHEDULE_SOFTIRQ);
+        cpumask_raise_softirq(&mask, SCHEDULE_SOFTIRQ);
 }
 
 static void

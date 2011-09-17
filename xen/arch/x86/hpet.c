@@ -154,16 +154,16 @@ static int reprogram_hpet_evt_channel(
     return ret;
 }
 
-static void evt_do_broadcast(cpumask_t mask)
+static void evt_do_broadcast(cpumask_t *mask)
 {
     unsigned int cpu = smp_processor_id();
 
-    if ( cpu_test_and_clear(cpu, mask) )
+    if ( cpumask_test_and_clear_cpu(cpu, mask) )
         raise_softirq(TIMER_SOFTIRQ);
 
-    cpuidle_wakeup_mwait(&mask);
+    cpuidle_wakeup_mwait(mask);
 
-    if ( !cpus_empty(mask) )
+    if ( !cpumask_empty(mask) )
        cpumask_raise_softirq(mask, TIMER_SOFTIRQ);
 }
 
@@ -202,7 +202,7 @@ again:
     }
 
     /* wakeup the cpus which have an expired event. */
-    evt_do_broadcast(mask);
+    evt_do_broadcast(&mask);
 
     if ( next_event != STIME_MAX )
     {
@@ -305,14 +305,14 @@ static void hpet_msi_end(unsigned int irq, u8 vector)
 {
 }
 
-static void hpet_msi_set_affinity(unsigned int irq, cpumask_t mask)
+static void hpet_msi_set_affinity(unsigned int irq, const cpumask_t *mask)
 {
     struct msi_msg msg;
     unsigned int dest;
     struct irq_desc * desc = irq_to_desc(irq);
     struct irq_cfg *cfg= desc->chip_data;
 
-    dest = set_desc_affinity(desc, &mask);
+    dest = set_desc_affinity(desc, mask);
     if (dest == BAD_APICID)
         return;
 
@@ -471,9 +471,7 @@ static void hpet_attach_channel(unsigned int cpu,
     if ( ch->cpu != cpu )
         return;
 
-    /* set irq affinity */
-    irq_desc[ch->irq].handler->
-        set_affinity(ch->irq, cpumask_of_cpu(ch->cpu));
+    hpet_msi_set_affinity(ch->irq, cpumask_of(ch->cpu));
 }
 
 static void hpet_detach_channel(unsigned int cpu,
@@ -495,9 +493,7 @@ static void hpet_detach_channel(unsigned int cpu,
     }
 
     ch->cpu = first_cpu(ch->cpumask);
-    /* set irq affinity */
-    irq_desc[ch->irq].handler->
-        set_affinity(ch->irq, cpumask_of_cpu(ch->cpu));
+    hpet_msi_set_affinity(ch->irq, cpumask_of(ch->cpu));
 }
 
 #include <asm/mc146818rtc.h>

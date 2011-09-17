@@ -176,7 +176,7 @@ void move_masked_irq(int irq);
 
 int __assign_irq_vector(int irq, struct irq_cfg *, const cpumask_t *);
 
-int bind_irq_vector(int irq, int vector, cpumask_t domain);
+int bind_irq_vector(int irq, int vector, const cpumask_t *);
 
 void irq_set_affinity(struct irq_desc *, const cpumask_t *mask);
 

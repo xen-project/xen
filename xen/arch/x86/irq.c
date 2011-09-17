@@ -108,7 +108,7 @@ static void trace_irq_mask(u32 event, int irq, int vector, cpumask_t *mask)
     trace_var(event, 1, sizeof(d), &d);
 }
 
-static int __init __bind_irq_vector(int irq, int vector, cpumask_t cpu_mask)
+static int __init __bind_irq_vector(int irq, int vector, const cpumask_t *cpu_mask)
 {
     cpumask_t online_mask;
     int cpu;
@@ -117,7 +117,7 @@ static int __init __bind_irq_vector(int irq, int vector, cpumask_t cpu_mask)
     BUG_ON((unsigned)irq >= nr_irqs);
     BUG_ON((unsigned)vector >= NR_VECTORS);
 
-    cpus_and(online_mask, cpu_mask, cpu_online_map);
+    cpus_and(online_mask, *cpu_mask, cpu_online_map);
     if (cpus_empty(online_mask))
         return -EINVAL;
     if ((cfg->vector == vector) && cpus_equal(cfg->cpu_mask, online_mask))
@@ -140,7 +140,7 @@ static int __init __bind_irq_vector(int irq, int vector, cpumask_t cpu_mask)
     return 0;
 }
 
-int __init bind_irq_vector(int irq, int vector, cpumask_t cpu_mask)
+int __init bind_irq_vector(int irq, int vector, const cpumask_t *cpu_mask)
 {
     unsigned long flags;
     int ret;
@@ -583,7 +583,7 @@ void move_masked_irq(int irq)
      * For correct operation this depends on the caller masking the irqs.
      */
     if (likely(cpus_intersects(desc->pending_mask, cpu_online_map)))
-        desc->handler->set_affinity(irq, desc->pending_mask);
+        desc->handler->set_affinity(irq, &desc->pending_mask);
 
     cpus_clear(desc->pending_mask);
 }
@@ -1410,7 +1410,7 @@ int pirq_guest_bind(struct vcpu *v, struct pirq *pirq, int will_share)
         /* Attempt to bind the interrupt target to the correct CPU. */
         cpu_set(v->processor, cpumask);
         if ( !opt_noirqbalance && (desc->handler->set_affinity != NULL) )
-            desc->handler->set_affinity(irq, cpumask);
+            desc->handler->set_affinity(irq, &cpumask);
     }
     else if ( !will_share || !action->shareable )
     {
@@ -1964,7 +1964,7 @@ void fixup_irqs(void)
             desc->handler->disable(irq);
 
         if ( desc->handler->set_affinity )
-            desc->handler->set_affinity(irq, affinity);
+            desc->handler->set_affinity(irq, &affinity);
         else if ( !(warned++) )
             set_affinity = 0;
 

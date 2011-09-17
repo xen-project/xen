@@ -697,13 +697,13 @@ set_ioapic_affinity_irq_desc(struct irq_desc *desc, const cpumask_t *mask)
 }
 
 static void
-set_ioapic_affinity_irq(unsigned int irq, const struct cpumask mask)
+set_ioapic_affinity_irq(unsigned int irq, const struct cpumask *mask)
 {
     struct irq_desc *desc;
 
     desc = irq_to_desc(irq);
 
-    set_ioapic_affinity_irq_desc(desc, &mask);
+    set_ioapic_affinity_irq_desc(desc, mask);
 }
 #endif /* CONFIG_SMP */
 
@@ -802,7 +802,7 @@ void /*__init*/ setup_ioapic_dest(void)
             irq = pin_2_irq(irq_entry, ioapic, pin);
             cfg = irq_cfg(irq);
             BUG_ON(cpus_empty(cfg->cpu_mask));
-            set_ioapic_affinity_irq(irq, cfg->cpu_mask);
+            set_ioapic_affinity_irq(irq, &cfg->cpu_mask);
         }
 
     }
@@ -2063,7 +2063,7 @@ static void __init check_timer(void)
     vector = FIRST_HIPRIORITY_VECTOR;
     clear_irq_vector(0);
 
-    if ((ret = bind_irq_vector(0, vector, mask_all)))
+    if ((ret = bind_irq_vector(0, vector, &mask_all)))
         printk(KERN_ERR"..IRQ0 is not set correctly with ioapic!!!, err:%d\n", ret);
     
     irq_desc[0].status &= ~IRQ_DISABLED;

@@ -195,7 +195,7 @@ static void smp_send_timer_broadcast_ipi(void)
 
     if ( !cpus_empty(mask) )
     {
-        cpumask_raise_softirq(mask, TIMER_SOFTIRQ);
+        cpumask_raise_softirq(&mask, TIMER_SOFTIRQ);
     }
 }
 

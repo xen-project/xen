@@ -1312,7 +1312,7 @@ ia64_mca_cmc_int_handler(int cmc_irq, void *arg, struct pt_regs *ptregs)
 #ifndef XEN	/* XXX FIXME */
 			schedule_work(&cmc_disable_work);
 #else
-			cpumask_raise_softirq(cpu_online_map,
+			cpumask_raise_softirq(&cpu_online_map,
 			                      CMC_DISABLE_SOFTIRQ);
 #endif
 
@@ -1383,7 +1383,7 @@ ia64_mca_cmc_int_caller(int cmc_irq, void *arg, struct pt_regs *ptregs)
 #ifndef XEN	/* XXX FIXME */
 			schedule_work(&cmc_enable_work);
 #else
-			cpumask_raise_softirq(cpu_online_map,
+			cpumask_raise_softirq(&cpu_online_map,
 			                      CMC_ENABLE_SOFTIRQ);
 #endif
 			cmc_polling_enabled = 0;
@@ -1904,7 +1904,7 @@ ia64_mca_late_init(void)
 #ifndef XEN	/* XXX FIXME */
 	schedule_work(&cmc_enable_work);
 #else
-	cpumask_raise_softirq(cpu_online_map, CMC_ENABLE_SOFTIRQ);
+	cpumask_raise_softirq(&cpu_online_map, CMC_ENABLE_SOFTIRQ);
 #endif
 
 	IA64_MCA_DEBUG("%s: CMCI/P setup and enabled.\n", __FUNCTION__);

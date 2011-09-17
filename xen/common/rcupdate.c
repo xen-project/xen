@@ -117,7 +117,7 @@ static void force_quiescent_state(struct rcu_data *rdp,
          */
         cpumask = rcp->cpumask;
         cpu_clear(rdp->cpu, cpumask);
-        cpumask_raise_softirq(cpumask, SCHEDULE_SOFTIRQ);
+        cpumask_raise_softirq(&cpumask, SCHEDULE_SOFTIRQ);
     }
 }
 
