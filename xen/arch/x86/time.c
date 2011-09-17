@@ -1451,7 +1451,7 @@ static void __init tsc_check_writability(void)
 }
 
 /* Late init function, after all cpus have booted */
-void __init verify_tsc_reliability(void)
+static int __init verify_tsc_reliability(void)
 {
     if ( boot_cpu_has(X86_FEATURE_TSC_RELIABLE) )
     {
@@ -1469,7 +1469,10 @@ void __init verify_tsc_reliability(void)
             setup_clear_cpu_cap(X86_FEATURE_TSC_RELIABLE);
         }
     }
+
+    return 0;
 }
+__initcall(verify_tsc_reliability);
 
 /* Late init function (after interrupts are enabled). */
 int __init init_xen_time(void)
