@@ -11,11 +11,11 @@ build: lomount
 
 .PHONY: install
 install install-recurse: build
-	$(INSTALL_PROG) $(BIN) $(SCRIPTS) $(DESTDIR)$(BINDIR)
+	$(INSTALL_PROG) lomount $(SCRIPTS) $(DESTDIR)$(BINDIR)
 
 .PHONY: clean
 clean:
-	$(RM) *.a *.so *.o *.rpm $(BIN)
+	$(RM) *.o lomount
 
 lomount: lomount.o
 	$(CC) $(CFLAGS) -o $@ $< 
