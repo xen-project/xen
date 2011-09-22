@@ -455,15 +455,15 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_sendtrigger_t);
 /* XEN_DOMCTL_test_assign_device */
 /* XEN_DOMCTL_deassign_device */
 struct xen_domctl_assign_device {
-    uint32_t  machine_bdf;   /* machine PCI ID of assigned device */
+    uint32_t  machine_sbdf;   /* machine PCI ID of assigned device */
 };
 typedef struct xen_domctl_assign_device xen_domctl_assign_device_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_assign_device_t);
 
-/* Retrieve sibling devices infomation of machine_bdf */
+/* Retrieve sibling devices infomation of machine_sbdf */
 /* XEN_DOMCTL_get_device_group */
 struct xen_domctl_get_device_group {
-    uint32_t  machine_bdf;      /* IN */
+    uint32_t  machine_sbdf;     /* IN */
     uint32_t  max_sdevs;        /* IN */
     uint32_t  num_sdevs;        /* OUT */
     XEN_GUEST_HANDLE_64(uint32)  sdev_array;   /* OUT */

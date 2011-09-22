@@ -19,6 +19,7 @@
 #include <xen/paging.h>
 #include <xen/guest_access.h>
 #include <xen/softirq.h>
+#include <xsm/xsm.h>
 
 static void parse_iommu_param(char *s);
 static int iommu_populate_page_table(struct domain *d);
@@ -165,7 +166,22 @@ int iommu_remove_device(struct pci_dev *pdev)
     return hd->platform_ops->remove_device(pdev);
 }
 
-int assign_device(struct domain *d, u8 bus, u8 devfn)
+/*
+ * If the device isn't owned by dom0, it means it already
+ * has been assigned to other domain, or it doesn't exist.
+ */
+static int device_assigned(u16 seg, u8 bus, u8 devfn)
+{
+    struct pci_dev *pdev;
+
+    spin_lock(&pcidevs_lock);
+    pdev = pci_get_pdev_by_domain(dom0, seg, bus, devfn);
+    spin_unlock(&pcidevs_lock);
+
+    return pdev ? 0 : -1;
+}
+
+static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
     int rc = 0;
@@ -174,7 +190,7 @@ int assign_device(struct domain *d, u8 bus, u8 devfn)
         return 0;
 
     spin_lock(&pcidevs_lock);
-    if ( (rc = hd->platform_ops->assign_device(d, bus, devfn)) )
+    if ( (rc = hd->platform_ops->assign_device(d, seg, bus, devfn)) )
         goto done;
 
     if ( has_arch_pdevs(d) && !need_iommu(d) )
@@ -272,7 +288,7 @@ int iommu_unmap_page(struct domain *d, unsigned long gfn)
 }
 
 /* caller should hold the pcidevs_lock */
-int deassign_device(struct domain *d, u8 bus, u8 devfn)
+int deassign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
     struct pci_dev *pdev = NULL;
@@ -282,7 +298,7 @@ int deassign_device(struct domain *d, u8 bus, u8 devfn)
         return -EINVAL;
 
     ASSERT(spin_is_locked(&pcidevs_lock));
-    pdev = pci_get_pdev(0, bus, devfn);
+    pdev = pci_get_pdev(seg, bus, devfn);
     if ( !pdev )
         return -ENODEV;
 
@@ -293,12 +309,12 @@ int deassign_device(struct domain *d, u8 bus, u8 devfn)
         return -EINVAL;
     }
 
-    ret = hd->platform_ops->reassign_device(d, dom0, bus, devfn);
+    ret = hd->platform_ops->reassign_device(d, dom0, seg, bus, devfn);
     if ( ret )
     {
         dprintk(XENLOG_ERR VTDPREFIX,
-                "d%d: Deassign device (%x:%x.%x) failed!\n",
-                d->domain_id, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+                "d%d: Deassign device (%04x:%02x:%02x.%u) failed!\n",
+                d->domain_id, seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         return ret;
     }
 
@@ -347,7 +363,8 @@ int __init iommu_setup(void)
     return rc;
 }
 
-int iommu_get_device_group(struct domain *d, u8 bus, u8 devfn, 
+static int iommu_get_device_group(
+    struct domain *d, u16 seg, u8 bus, u8 devfn,
     XEN_GUEST_HANDLE_64(uint32) buf, int max_sdevs)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
@@ -360,15 +377,16 @@ int iommu_get_device_group(struct domain *d, u8 bus, u8 devfn,
     if ( !iommu_enabled || !ops || !ops->get_device_group_id )
         return 0;
 
-    group_id = ops->get_device_group_id(bus, devfn);
+    group_id = ops->get_device_group_id(seg, bus, devfn);
 
     spin_lock(&pcidevs_lock);
     for_each_pdev( d, pdev )
     {
-        if ( (pdev->bus == bus) && (pdev->devfn == devfn) )
+        if ( (pdev->seg != seg) ||
+             ((pdev->bus == bus) && (pdev->devfn == devfn)) )
             continue;
 
-        sdev_id = ops->get_device_group_id(pdev->bus, pdev->devfn);
+        sdev_id = ops->get_device_group_id(seg, pdev->bus, pdev->devfn);
         if ( (sdev_id == group_id) && (i < max_sdevs) )
         {
             bdf = 0;
@@ -441,6 +459,154 @@ void iommu_crash_shutdown(void)
     if ( iommu_enabled )
         ops->crash_shutdown();
     iommu_enabled = 0;
+}
+
+int iommu_do_domctl(
+    struct xen_domctl *domctl,
+    XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
+{
+    struct domain *d;
+    u16 seg;
+    u8 bus, devfn;
+    int ret = 0;
+
+    if ( !iommu_enabled )
+        return -ENOSYS;
+
+    switch ( domctl->cmd )
+    {
+    case XEN_DOMCTL_get_device_group:
+    {
+        u32 max_sdevs;
+        XEN_GUEST_HANDLE_64(uint32) sdevs;
+
+        ret = -EINVAL;
+        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
+            break;
+
+        seg = domctl->u.get_device_group.machine_sbdf >> 16;
+        bus = (domctl->u.get_device_group.machine_sbdf >> 8) & 0xff;
+        devfn = domctl->u.get_device_group.machine_sbdf & 0xff;
+        max_sdevs = domctl->u.get_device_group.max_sdevs;
+        sdevs = domctl->u.get_device_group.sdev_array;
+
+        ret = iommu_get_device_group(d, seg, bus, devfn, sdevs, max_sdevs);
+        if ( ret < 0 )
+        {
+            dprintk(XENLOG_ERR, "iommu_get_device_group() failed!\n");
+            ret = -EFAULT;
+            domctl->u.get_device_group.num_sdevs = 0;
+        }
+        else
+        {
+            domctl->u.get_device_group.num_sdevs = ret;
+            ret = 0;
+        }
+        if ( copy_to_guest(u_domctl, domctl, 1) )
+            ret = -EFAULT;
+        rcu_unlock_domain(d);
+    }
+    break;
+
+    case XEN_DOMCTL_test_assign_device:
+        ret = xsm_test_assign_device(domctl->u.assign_device.machine_sbdf);
+        if ( ret )
+            break;
+
+        seg = domctl->u.get_device_group.machine_sbdf >> 16;
+        bus = (domctl->u.assign_device.machine_sbdf >> 8) & 0xff;
+        devfn = domctl->u.assign_device.machine_sbdf & 0xff;
+
+        if ( device_assigned(seg, bus, devfn) )
+        {
+            gdprintk(XENLOG_ERR, "XEN_DOMCTL_test_assign_device: "
+                     "%04x:%02x:%02x.%u already assigned, or non-existent\n",
+                     seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+            ret = -EINVAL;
+        }
+        break;
+
+    case XEN_DOMCTL_assign_device:
+        if ( unlikely((d = get_domain_by_id(domctl->domain)) == NULL) )
+        {
+            gdprintk(XENLOG_ERR,
+                "XEN_DOMCTL_assign_device: get_domain_by_id() failed\n");
+            ret = -EINVAL;
+            break;
+        }
+
+        ret = xsm_assign_device(d, domctl->u.assign_device.machine_sbdf);
+        if ( ret )
+            goto assign_device_out;
+
+        seg = domctl->u.get_device_group.machine_sbdf >> 16;
+        bus = (domctl->u.assign_device.machine_sbdf >> 8) & 0xff;
+        devfn = domctl->u.assign_device.machine_sbdf & 0xff;
+
+#ifdef __ia64__ /* XXX Is this really needed? */
+        if ( device_assigned(seg, bus, devfn) )
+        {
+            gdprintk(XENLOG_ERR, "XEN_DOMCTL_assign_device: "
+                     "%x:%x.%x already assigned, or non-existent\n",
+                     bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+            ret = -EINVAL;
+            goto assign_device_out;
+        }
+#endif
+
+        ret = assign_device(d, seg, bus, devfn);
+        if ( ret )
+            gdprintk(XENLOG_ERR, "XEN_DOMCTL_assign_device: "
+                     "assign device (%04x:%02x:%02x.%u) failed\n",
+                     seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+
+    assign_device_out:
+        put_domain(d);
+        break;
+
+    case XEN_DOMCTL_deassign_device:
+        if ( unlikely((d = get_domain_by_id(domctl->domain)) == NULL) )
+        {
+            gdprintk(XENLOG_ERR,
+                "XEN_DOMCTL_deassign_device: get_domain_by_id() failed\n");
+            ret = -EINVAL;
+            break;
+        }
+
+        ret = xsm_assign_device(d, domctl->u.assign_device.machine_sbdf);
+        if ( ret )
+            goto deassign_device_out;
+
+        seg = domctl->u.get_device_group.machine_sbdf >> 16;
+        bus = (domctl->u.assign_device.machine_sbdf >> 8) & 0xff;
+        devfn = domctl->u.assign_device.machine_sbdf & 0xff;
+
+#ifdef __ia64__ /* XXX Is this really needed? */
+        if ( !device_assigned(seg, bus, devfn) )
+        {
+            ret = -EINVAL;
+            goto deassign_device_out;
+        }
+#endif
+
+        spin_lock(&pcidevs_lock);
+        ret = deassign_device(d, seg, bus, devfn);
+        spin_unlock(&pcidevs_lock);
+        if ( ret )
+            gdprintk(XENLOG_ERR, "XEN_DOMCTL_deassign_device: "
+                     "deassign device (%04x:%02x:%02x.%u) failed\n",
+                     seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+
+    deassign_device_out:
+        put_domain(d);
+        break;
+
+    default:
+        ret = -ENOSYS;
+        break;
+    }
+
+    return ret;
 }
 
 /*

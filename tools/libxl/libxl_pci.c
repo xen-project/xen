@@ -45,10 +45,10 @@ static unsigned int pcidev_encode_bdf(libxl_device_pci *pcidev)
 {
     unsigned int value;
 
-    value = 0;
-    value |= (pcidev->bus & 0xff) << 16;
-    value |= (pcidev->dev & 0x1f) << (8+3);
-    value |= (pcidev->func & 0x7) << (8+0);
+    value = pcidev->domain << 16;
+    value |= (pcidev->bus & 0xff) << 8;
+    value |= (pcidev->dev & 0x1f) << 3;
+    value |= (pcidev->func & 0x7);
 
     return value;
 }

@@ -1132,13 +1132,13 @@ int xc_domain_setdebugging(xc_interface *xch,
 int xc_assign_device(
     xc_interface *xch,
     uint32_t domid,
-    uint32_t machine_bdf)
+    uint32_t machine_sbdf)
 {
     DECLARE_DOMCTL;
 
     domctl.cmd = XEN_DOMCTL_assign_device;
     domctl.domain = domid;
-    domctl.u.assign_device.machine_bdf = machine_bdf;
+    domctl.u.assign_device.machine_sbdf = machine_sbdf;
 
     return do_domctl(xch, &domctl);
 }
@@ -1146,7 +1146,7 @@ int xc_assign_device(
 int xc_get_device_group(
     xc_interface *xch,
     uint32_t domid,
-    uint32_t machine_bdf,
+    uint32_t machine_sbdf,
     uint32_t max_sdevs,
     uint32_t *num_sdevs,
     uint32_t *sdev_array)
@@ -1164,7 +1164,7 @@ int xc_get_device_group(
     domctl.cmd = XEN_DOMCTL_get_device_group;
     domctl.domain = (domid_t)domid;
 
-    domctl.u.get_device_group.machine_bdf = machine_bdf;
+    domctl.u.get_device_group.machine_sbdf = machine_sbdf;
     domctl.u.get_device_group.max_sdevs = max_sdevs;
 
     set_xen_guest_handle(domctl.u.get_device_group.sdev_array, sdev_array);
@@ -1181,13 +1181,13 @@ int xc_get_device_group(
 int xc_test_assign_device(
     xc_interface *xch,
     uint32_t domid,
-    uint32_t machine_bdf)
+    uint32_t machine_sbdf)
 {
     DECLARE_DOMCTL;
 
     domctl.cmd = XEN_DOMCTL_test_assign_device;
     domctl.domain = domid;
-    domctl.u.assign_device.machine_bdf = machine_bdf;
+    domctl.u.assign_device.machine_sbdf = machine_sbdf;
 
     return do_domctl(xch, &domctl);
 }
@@ -1195,13 +1195,13 @@ int xc_test_assign_device(
 int xc_deassign_device(
     xc_interface *xch,
     uint32_t domid,
-    uint32_t machine_bdf)
+    uint32_t machine_sbdf)
 {
     DECLARE_DOMCTL;
 
     domctl.cmd = XEN_DOMCTL_deassign_device;
     domctl.domain = domid;
-    domctl.u.assign_device.machine_bdf = machine_bdf;
+    domctl.u.assign_device.machine_sbdf = machine_sbdf;
  
     return do_domctl(xch, &domctl);
 }

@@ -305,7 +305,7 @@ static void amd_iommu_disable_domain_device(
 }
 
 static int reassign_device( struct domain *source, struct domain *target,
-                            u8 bus, u8 devfn)
+                            u16 seg, u8 bus, u8 devfn)
 {
     struct pci_dev *pdev;
     struct amd_iommu *iommu;
@@ -313,7 +313,7 @@ static int reassign_device( struct domain *source, struct domain *target,
     struct hvm_iommu *t = domain_hvm_iommu(target);
 
     ASSERT(spin_is_locked(&pcidevs_lock));
-    pdev = pci_get_pdev_by_domain(source, 0, bus, devfn);
+    pdev = pci_get_pdev_by_domain(source, seg, bus, devfn);
     if ( !pdev )
         return -ENODEV;
 
@@ -346,7 +346,7 @@ static int reassign_device( struct domain *source, struct domain *target,
     return 0;
 }
 
-static int amd_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
+static int amd_iommu_assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
 {
     int bdf = (bus << 8) | devfn;
     int req_id = get_dma_requestor_id(bdf);
@@ -361,7 +361,7 @@ static int amd_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
             ivrs_mappings[req_id].read_permission);
     }
 
-    return reassign_device(dom0, d, bus, devfn);
+    return reassign_device(dom0, d, seg, bus, devfn);
 }
 
 static void deallocate_next_page_table(struct page_info* pg, int level)
@@ -426,9 +426,9 @@ static void amd_iommu_domain_destroy(struct domain *d)
 }
 
 static int amd_iommu_return_device(
-    struct domain *s, struct domain *t, u8 bus, u8 devfn)
+    struct domain *s, struct domain *t, u16 seg, u8 bus, u8 devfn)
 {
-    return reassign_device(s, t, bus, devfn);
+    return reassign_device(s, t, seg, bus, devfn);
 }
 
 static int amd_iommu_add_device(struct pci_dev *pdev)
@@ -475,7 +475,7 @@ static int amd_iommu_remove_device(struct pci_dev *pdev)
     return 0;
 }
 
-static int amd_iommu_group_id(u8 bus, u8 devfn)
+static int amd_iommu_group_id(u16 seg, u8 bus, u8 devfn)
 {
     int rt;
     int bdf = (bus << 8) | devfn;

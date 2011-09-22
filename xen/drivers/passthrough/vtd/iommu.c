@@ -1620,13 +1620,13 @@ out:
 static int reassign_device_ownership(
     struct domain *source,
     struct domain *target,
-    u8 bus, u8 devfn)
+    u16 seg, u8 bus, u8 devfn)
 {
     struct pci_dev *pdev;
     int ret;
 
     ASSERT(spin_is_locked(&pcidevs_lock));
-    pdev = pci_get_pdev_by_domain(source, 0, bus, devfn);
+    pdev = pci_get_pdev_by_domain(source, seg, bus, devfn);
 
     if (!pdev)
         return -ENODEV;
@@ -2153,27 +2153,8 @@ int __init intel_vtd_setup(void)
     return ret;
 }
 
-/*
- * If the device isn't owned by dom0, it means it already
- * has been assigned to other domain, or it's not exist.
- */
-int device_assigned(u8 bus, u8 devfn)
-{
-    struct pci_dev *pdev;
-
-    spin_lock(&pcidevs_lock);
-    pdev = pci_get_pdev_by_domain(dom0, 0, bus, devfn);
-    if (!pdev)
-    {
-        spin_unlock(&pcidevs_lock);
-        return -1;
-    }
-
-    spin_unlock(&pcidevs_lock);
-    return 0;
-}
-
-static int intel_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
+static int intel_iommu_assign_device(
+    struct domain *d, u16 seg, u8 bus, u8 devfn)
 {
     struct acpi_rmrr_unit *rmrr;
     int ret = 0, i;
@@ -2184,7 +2165,7 @@ static int intel_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
         return -ENODEV;
 
     ASSERT(spin_is_locked(&pcidevs_lock));
-    pdev = pci_get_pdev(0, bus, devfn);
+    pdev = pci_get_pdev(seg, bus, devfn);
     if (!pdev)
         return -ENODEV;
 
@@ -2195,7 +2176,7 @@ static int intel_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
        return -EBUSY;
     }
 
-    ret = reassign_device_ownership(dom0, d, bus, devfn);
+    ret = reassign_device_ownership(dom0, d, seg, bus, devfn);
     if ( ret )
         goto done;
 
@@ -2227,7 +2208,7 @@ done:
     return ret;
 }
 
-static int intel_iommu_group_id(u8 bus, u8 devfn)
+static int intel_iommu_group_id(u16 seg, u8 bus, u8 devfn)
 {
     u8 secbus;
     if ( find_upstream_bridge(&bus, &devfn, &secbus) < 0 )

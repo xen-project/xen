@@ -609,7 +609,7 @@ static PyObject *pyxc_test_assign_device(XcObject *self,
 {
     uint32_t dom;
     char *pci_str;
-    int32_t bdf = 0;
+    int32_t sbdf = 0;
     int seg, bus, dev, func;
 
     static char *kwd_list[] = { "domid", "pci", NULL };
@@ -619,20 +619,21 @@ static PyObject *pyxc_test_assign_device(XcObject *self,
 
     while ( next_bdf(&pci_str, &seg, &bus, &dev, &func) )
     {
-        bdf |= (bus & 0xff) << 16;
-        bdf |= (dev & 0x1f) << 11;
-        bdf |= (func & 0x7) << 8;
+        sbdf = seg << 16;
+        sbdf |= (bus & 0xff) << 8;
+        sbdf |= (dev & 0x1f) << 3;
+        sbdf |= (func & 0x7);
 
-        if ( xc_test_assign_device(self->xc_handle, dom, bdf) != 0 )
+        if ( xc_test_assign_device(self->xc_handle, dom, sbdf) != 0 )
         {
             if (errno == ENOSYS)
-                bdf = -1;
+                sbdf = -1;
             break;
         }
-        bdf = 0;
+        sbdf = 0;
     }
 
-    return Py_BuildValue("i", bdf);
+    return Py_BuildValue("i", sbdf);
 }
 
 static PyObject *pyxc_assign_device(XcObject *self,
@@ -641,7 +642,7 @@ static PyObject *pyxc_assign_device(XcObject *self,
 {
     uint32_t dom;
     char *pci_str;
-    int32_t bdf = 0;
+    int32_t sbdf = 0;
     int seg, bus, dev, func;
 
     static char *kwd_list[] = { "domid", "pci", NULL };
@@ -651,20 +652,21 @@ static PyObject *pyxc_assign_device(XcObject *self,
 
     while ( next_bdf(&pci_str, &seg, &bus, &dev, &func) )
     {
-        bdf |= (bus & 0xff) << 16;
-        bdf |= (dev & 0x1f) << 11;
-        bdf |= (func & 0x7) << 8;
+        sbdf = seg << 16;
+        sbdf |= (bus & 0xff) << 8;
+        sbdf |= (dev & 0x1f) << 3;
+        sbdf |= (func & 0x7);
 
-        if ( xc_assign_device(self->xc_handle, dom, bdf) != 0 )
+        if ( xc_assign_device(self->xc_handle, dom, sbdf) != 0 )
         {
             if (errno == ENOSYS)
-                bdf = -1;
+                sbdf = -1;
             break;
         }
-        bdf = 0;
+        sbdf = 0;
     }
 
-    return Py_BuildValue("i", bdf);
+    return Py_BuildValue("i", sbdf);
 }
 
 static PyObject *pyxc_deassign_device(XcObject *self,
@@ -673,7 +675,7 @@ static PyObject *pyxc_deassign_device(XcObject *self,
 {
     uint32_t dom;
     char *pci_str;
-    int32_t bdf = 0;
+    int32_t sbdf = 0;
     int seg, bus, dev, func;
 
     static char *kwd_list[] = { "domid", "pci", NULL };
@@ -683,26 +685,27 @@ static PyObject *pyxc_deassign_device(XcObject *self,
 
     while ( next_bdf(&pci_str, &seg, &bus, &dev, &func) )
     {
-        bdf |= (bus & 0xff) << 16;
-        bdf |= (dev & 0x1f) << 11;
-        bdf |= (func & 0x7) << 8;
+        sbdf = seg << 16;
+        sbdf |= (bus & 0xff) << 8;
+        sbdf |= (dev & 0x1f) << 3;
+        sbdf |= (func & 0x7);
 
-        if ( xc_deassign_device(self->xc_handle, dom, bdf) != 0 )
+        if ( xc_deassign_device(self->xc_handle, dom, sbdf) != 0 )
         {
             if (errno == ENOSYS)
-                bdf = -1;
+                sbdf = -1;
             break;
         }
-        bdf = 0;
+        sbdf = 0;
     }
 
-    return Py_BuildValue("i", bdf);
+    return Py_BuildValue("i", sbdf);
 }
 
 static PyObject *pyxc_get_device_group(XcObject *self,
                                          PyObject *args)
 {
-    uint32_t bdf = 0;
+    uint32_t sbdf;
     uint32_t max_sdevs, num_sdevs;
     int domid, seg, bus, dev, func, rc, i;
     PyObject *Pystr;
@@ -720,12 +723,13 @@ static PyObject *pyxc_get_device_group(XcObject *self,
     if (sdev_array == NULL)
         return PyErr_NoMemory();
 
-    bdf |= (bus & 0xff) << 16;
-    bdf |= (dev & 0x1f) << 11;
-    bdf |= (func & 0x7) << 8;
+    sbdf = seg << 16;
+    sbdf |= (bus & 0xff) << 8;
+    sbdf |= (dev & 0x1f) << 3;
+    sbdf |= (func & 0x7);
 
     rc = xc_get_device_group(self->xc_handle,
-        domid, bdf, max_sdevs, &num_sdevs, sdev_array);
+        domid, sbdf, max_sdevs, &num_sdevs, sdev_array);
 
     if ( rc < 0 )
     {

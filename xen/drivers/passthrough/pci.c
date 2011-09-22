@@ -441,11 +441,12 @@ void pci_release_devices(struct domain *d)
     while ( (pdev = pci_get_pdev_by_domain(d, -1, -1, -1)) )
     {
         pci_cleanup_msi(pdev);
-        bus = pdev->bus; devfn = pdev->devfn;
-        if ( deassign_device(d, bus, devfn) )
-            printk("domain %d: deassign device (%02x:%02x.%x) failed!\n",
-                   d->domain_id, pdev->bus, PCI_SLOT(pdev->devfn),
-                   PCI_FUNC(pdev->devfn));
+        bus = pdev->bus;
+        devfn = pdev->devfn;
+        if ( deassign_device(d, pdev->seg, bus, devfn) )
+            printk("domain %d: deassign device (%04x:%02x:%02x.%u) failed!\n",
+                   d->domain_id, pdev->seg, bus,
+                   PCI_SLOT(devfn), PCI_FUNC(devfn));
     }
     spin_unlock(&pcidevs_lock);
 }
