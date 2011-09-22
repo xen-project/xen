@@ -589,7 +589,6 @@ static void dma_pte_clear_one(struct domain *domain, u64 addr)
     u64 pg_maddr;
     int flush_dev_iotlb;
     int iommu_domid;
-    struct list_head *rmrr_list, *tmp;
     struct mapped_rmrr *mrmrr;
 
     spin_lock(&hd->mapping_lock);
@@ -636,10 +635,9 @@ static void dma_pte_clear_one(struct domain *domain, u64 addr)
     /* if the cleared address is between mapped RMRR region,
      * remove the mapped RMRR
      */
-    spin_lock(&pcidevs_lock);
-    list_for_each_safe ( rmrr_list, tmp, &hd->mapped_rmrrs )
+    spin_lock(&hd->mapping_lock);
+    list_for_each_entry ( mrmrr, &hd->mapped_rmrrs, list )
     {
-        mrmrr = list_entry(rmrr_list, struct mapped_rmrr, list);
         if ( addr >= mrmrr->base && addr <= mrmrr->end )
         {
             list_del(&mrmrr->list);
@@ -647,7 +645,7 @@ static void dma_pte_clear_one(struct domain *domain, u64 addr)
             break;
         }
     }
-    spin_unlock(&pcidevs_lock);
+    spin_unlock(&hd->mapping_lock);
 }
 
 static void iommu_free_pagetable(u64 pt_maddr, int level)
@@ -1824,22 +1822,6 @@ void iommu_set_pgd(struct domain *d)
     hd->pgd_maddr = pagetable_get_paddr(pagetable_from_mfn(pgd_mfn));
 }
 
-static int domain_rmrr_mapped(struct domain *d,
-                              struct acpi_rmrr_unit *rmrr)
-{
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
-    struct mapped_rmrr *mrmrr;
-
-    list_for_each_entry( mrmrr, &hd->mapped_rmrrs, list )
-    {
-        if ( mrmrr->base == rmrr->base_address &&
-             mrmrr->end == rmrr->end_address )
-            return 1;
-    }
-
-    return 0;
-}
-
 static int rmrr_identity_mapping(struct domain *d,
                                  struct acpi_rmrr_unit *rmrr)
 {
@@ -1851,8 +1833,16 @@ static int rmrr_identity_mapping(struct domain *d,
     ASSERT(spin_is_locked(&pcidevs_lock));
     ASSERT(rmrr->base_address < rmrr->end_address);
 
-    if ( domain_rmrr_mapped(d, rmrr) )
-        return 0;
+    /*
+     * No need to acquire hd->mapping_lock, as the only theoretical race is
+     * with the insertion below (impossible due to holding pcidevs_lock).
+     */
+    list_for_each_entry( mrmrr, &hd->mapped_rmrrs, list )
+    {
+        if ( mrmrr->base == rmrr->base_address &&
+             mrmrr->end == rmrr->end_address )
+            return 0;
+    }
 
     base = rmrr->base_address & PAGE_MASK_4K;
     base_pfn = base >> PAGE_SHIFT_4K;
@@ -1872,7 +1862,9 @@ static int rmrr_identity_mapping(struct domain *d,
         return -ENOMEM;
     mrmrr->base = rmrr->base_address;
     mrmrr->end = rmrr->end_address;
+    spin_lock(&hd->mapping_lock);
     list_add_tail(&mrmrr->list, &hd->mapped_rmrrs);
+    spin_unlock(&hd->mapping_lock);
 
     return 0;
 }
