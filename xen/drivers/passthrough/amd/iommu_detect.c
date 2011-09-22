@@ -27,8 +27,8 @@
 #include <asm/hvm/svm/amd-iommu-proto.h>
 #include <asm/hvm/svm/amd-iommu-acpi.h>
 
-static int __init get_iommu_msi_capabilities(u8 bus, u8 dev, u8 func,
-            struct amd_iommu *iommu)
+static int __init get_iommu_msi_capabilities(
+    u16 seg, u8 bus, u8 dev, u8 func, struct amd_iommu *iommu)
 {
     int cap_ptr, cap_id;
     u32 cap_header;
@@ -66,8 +66,8 @@ static int __init get_iommu_msi_capabilities(u8 bus, u8 dev, u8 func,
     return 0;
 }
 
-static int __init get_iommu_capabilities(u8 bus, u8 dev, u8 func, u8 cap_ptr,
-                                  struct amd_iommu *iommu)
+static int __init get_iommu_capabilities(
+    u16 seg, u8 bus, u8 dev, u8 func, u8 cap_ptr, struct amd_iommu *iommu)
 {
     u32 cap_header, cap_range, misc_info;
 
@@ -121,6 +121,11 @@ int __init amd_iommu_detect_one_acpi(void *ivhd)
 
     spin_lock_init(&iommu->lock);
 
+    iommu->seg = ivhd_block->pci_segment;
+    if (alloc_ivrs_mappings(ivhd_block->pci_segment)) {
+        xfree(iommu);
+        return -ENOMEM;
+    }
     iommu->bdf = ivhd_block->header.dev_id;
     iommu->cap_offset = ivhd_block->cap_offset;
     iommu->mmio_base_phys = ivhd_block->mmio_base;
@@ -147,8 +152,9 @@ int __init amd_iommu_detect_one_acpi(void *ivhd)
     bus = iommu->bdf >> 8;
     dev = PCI_SLOT(iommu->bdf & 0xFF);
     func = PCI_FUNC(iommu->bdf & 0xFF);
-    get_iommu_capabilities(bus, dev, func, iommu->cap_offset, iommu);
-    get_iommu_msi_capabilities(bus, dev, func, iommu);
+    get_iommu_capabilities(iommu->seg, bus, dev, func,
+                           iommu->cap_offset, iommu);
+    get_iommu_msi_capabilities(iommu->seg, bus, dev, func, iommu);
 
     list_add_tail(&iommu->list, &amd_iommu_head);
 

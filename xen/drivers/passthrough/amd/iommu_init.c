@@ -32,7 +32,7 @@
 static int __initdata nr_amd_iommus;
 
 unsigned short ivrs_bdf_entries;
-struct ivrs_mappings *ivrs_mappings;
+static struct radix_tree_root ivrs_maps;
 struct list_head amd_iommu_head;
 struct table_struct device_table;
 
@@ -692,7 +692,6 @@ error_out:
 static void __init amd_iommu_init_cleanup(void)
 {
     struct amd_iommu *iommu, *next;
-    int bdf;
 
     /* free amd iommu list */
     list_for_each_entry_safe ( iommu, next, &amd_iommu_head, list )
@@ -708,40 +707,84 @@ static void __init amd_iommu_init_cleanup(void)
     }
 
     /* free interrupt remapping table */
-    for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )
-    {
-        if ( ivrs_mappings[bdf].intremap_table )
-            amd_iommu_free_intremap_table(bdf);
-    }
+    iterate_ivrs_entries(amd_iommu_free_intremap_table);
 
     /* free device table */
     deallocate_iommu_table_struct(&device_table);
 
     /* free ivrs_mappings[] */
-    if ( ivrs_mappings )
-    {
-        xfree(ivrs_mappings);
-        ivrs_mappings = NULL;
-    }
+    radix_tree_destroy(&ivrs_maps, xfree);
 
     iommu_enabled = 0;
     iommu_passthrough = 0;
     iommu_intremap = 0;
 }
 
-static int __init init_ivrs_mapping(void)
+/*
+ * We allocate an extra array element to store the segment number
+ * (and in the future perhaps other global information).
+ */
+#define IVRS_MAPPINGS_SEG(m) m[ivrs_bdf_entries].dte_requestor_id
+
+struct ivrs_mappings *get_ivrs_mappings(u16 seg)
 {
+    return radix_tree_lookup(&ivrs_maps, seg);
+}
+
+int iterate_ivrs_mappings(int (*handler)(u16 seg, struct ivrs_mappings *))
+{
+    u16 seg = 0;
+    int rc = 0;
+
+    do {
+        struct ivrs_mappings *map;
+
+        if ( !radix_tree_gang_lookup(&ivrs_maps, (void **)&map, seg, 1) )
+            break;
+        seg = IVRS_MAPPINGS_SEG(map);
+        rc = handler(seg, map);
+    } while ( !rc && ++seg );
+
+    return rc;
+}
+
+int iterate_ivrs_entries(int (*handler)(u16 seg, struct ivrs_mappings *))
+{
+    u16 seg = 0;
+    int rc = 0;
+
+    do {
+        struct ivrs_mappings *map;
+        int bdf;
+
+        if ( !radix_tree_gang_lookup(&ivrs_maps, (void **)&map, seg, 1) )
+            break;
+        seg = IVRS_MAPPINGS_SEG(map);
+        for ( bdf = 0; !rc && bdf < ivrs_bdf_entries; ++bdf )
+            rc = handler(seg, map + bdf);
+    } while ( !rc && ++seg );
+
+    return rc;
+}
+
+int __init alloc_ivrs_mappings(u16 seg)
+{
+    struct ivrs_mappings *ivrs_mappings;
     int bdf;
 
     BUG_ON( !ivrs_bdf_entries );
 
-    ivrs_mappings = xmalloc_array( struct ivrs_mappings, ivrs_bdf_entries);
+    if ( get_ivrs_mappings(seg) )
+        return 0;
+
+    ivrs_mappings = xmalloc_array(struct ivrs_mappings, ivrs_bdf_entries + 1);
     if ( ivrs_mappings == NULL )
     {
         AMD_IOMMU_DEBUG("Error allocating IVRS Mappings table\n");
         return -ENOMEM;
     }
     memset(ivrs_mappings, 0, ivrs_bdf_entries * sizeof(struct ivrs_mappings));
+    IVRS_MAPPINGS_SEG(ivrs_mappings) = seg;
 
     /* assign default values for device entries */
     for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )
@@ -763,10 +806,14 @@ static int __init init_ivrs_mapping(void)
         if ( amd_iommu_perdev_intremap )
             spin_lock_init(&ivrs_mappings[bdf].intremap_lock);
     }
+
+    radix_tree_insert(&ivrs_maps, seg, ivrs_mappings);
+
     return 0;
 }
 
-static int __init amd_iommu_setup_device_table(void)
+static int __init amd_iommu_setup_device_table(
+    u16 seg, struct ivrs_mappings *ivrs_mappings)
 {
     int bdf;
     void *intr_tb, *dte;
@@ -832,7 +879,8 @@ int __init amd_iommu_init(void)
     if ( !ivrs_bdf_entries )
         goto error_out;
 
-    if ( init_ivrs_mapping() != 0 )
+    radix_tree_init(&ivrs_maps);
+    if ( alloc_ivrs_mappings(0) != 0 )
         goto error_out;
 
     if ( amd_iommu_update_ivrs_mapping_acpi() != 0 )
@@ -843,7 +891,7 @@ int __init amd_iommu_init(void)
         goto error_out;
 
     /* allocate and initialize a global device table shared by all iommus */
-    if ( amd_iommu_setup_device_table() != 0 )
+    if ( iterate_ivrs_mappings(amd_iommu_setup_device_table) != 0 )
         goto error_out;
 
     /* per iommu initialization  */
@@ -888,7 +936,8 @@ static void invalidate_all_domain_pages(void)
         amd_iommu_flush_all_pages(d);
 }
 
-static void invalidate_all_devices(void)
+static int _invalidate_all_devices(
+    u16 seg, struct ivrs_mappings *ivrs_mappings)
 {
     int bdf, req_id;
     unsigned long flags;
@@ -896,7 +945,7 @@ static void invalidate_all_devices(void)
 
     for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )
     {
-        iommu = find_iommu_for_device(bdf);
+        iommu = find_iommu_for_device(seg, bdf);
         req_id = ivrs_mappings[bdf].dte_requestor_id;
         if ( iommu )
         {
@@ -907,6 +956,13 @@ static void invalidate_all_devices(void)
             spin_unlock_irqrestore(&iommu->lock, flags);
         }
     }
+
+    return 0;
+}
+
+static void invalidate_all_devices(void)
+{
+    iterate_ivrs_mappings(_invalidate_all_devices);
 }
 
 void amd_iommu_suspend(void)

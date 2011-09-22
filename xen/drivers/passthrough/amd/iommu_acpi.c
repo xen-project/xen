@@ -30,6 +30,7 @@ static unsigned short __initdata last_bdf;
 static void __init add_ivrs_mapping_entry(
     u16 bdf, u16 alias_id, u8 flags, struct amd_iommu *iommu)
 {
+    struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(iommu->seg);
     u8 sys_mgt, lint1_pass, lint0_pass, nmi_pass, ext_int_pass, init_pass;
     ASSERT( ivrs_mappings != NULL );
 
@@ -118,9 +119,10 @@ static void __init reserve_iommu_exclusion_range_all(
 }
 
 static void __init reserve_unity_map_for_device(
-    u16 bdf, unsigned long base,
+    u16 seg, u16 bdf, unsigned long base,
     unsigned long length, u8 iw, u8 ir)
 {
+    struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(seg);
     unsigned long old_top, new_top;
 
     /* need to extend unity-mapped range? */
@@ -147,6 +149,7 @@ static void __init reserve_unity_map_for_device(
 static int __init register_exclusion_range_for_all_devices(
     unsigned long base, unsigned long limit, u8 iw, u8 ir)
 {
+    int seg = 0; /* XXX */
     unsigned long range_top, iommu_top, length;
     struct amd_iommu *iommu;
     u16 bdf;
@@ -163,7 +166,7 @@ static int __init register_exclusion_range_for_all_devices(
         /* reserve r/w unity-mapped page entries for devices */
         /* note: these entries are part of the exclusion range */
         for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )
-            reserve_unity_map_for_device(bdf, base, length, iw, ir);
+            reserve_unity_map_for_device(seg, bdf, base, length, iw, ir);
         /* push 'base' just outside of virtual address space */
         base = iommu_top;
     }
@@ -180,11 +183,13 @@ static int __init register_exclusion_range_for_all_devices(
 static int __init register_exclusion_range_for_device(
     u16 bdf, unsigned long base, unsigned long limit, u8 iw, u8 ir)
 {
+    int seg = 0; /* XXX */
+    struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(seg);
     unsigned long range_top, iommu_top, length;
     struct amd_iommu *iommu;
     u16 req;
 
-    iommu = find_iommu_for_device(bdf);
+    iommu = find_iommu_for_device(seg, bdf);
     if ( !iommu )
     {
         AMD_IOMMU_DEBUG("IVMD Error: No IOMMU for Dev_Id 0x%x!\n", bdf);
@@ -202,8 +207,8 @@ static int __init register_exclusion_range_for_device(
         length = range_top - base;
         /* reserve unity-mapped page entries for device */
         /* note: these entries are part of the exclusion range */
-        reserve_unity_map_for_device(bdf, base, length, iw, ir);
-        reserve_unity_map_for_device(req, base, length, iw, ir);
+        reserve_unity_map_for_device(seg, bdf, base, length, iw, ir);
+        reserve_unity_map_for_device(seg, req, base, length, iw, ir);
 
         /* push 'base' just outside of virtual address space */
         base = iommu_top;
@@ -240,11 +245,13 @@ static int __init register_exclusion_range_for_iommu_devices(
         /* note: these entries are part of the exclusion range */
         for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )
         {
-            if ( iommu == find_iommu_for_device(bdf) )
+            if ( iommu == find_iommu_for_device(iommu->seg, bdf) )
             {
-                reserve_unity_map_for_device(bdf, base, length, iw, ir);
-                req = ivrs_mappings[bdf].dte_requestor_id;
-                reserve_unity_map_for_device(req, base, length, iw, ir);
+                reserve_unity_map_for_device(iommu->seg, bdf, base, length,
+                                             iw, ir);
+                req = get_ivrs_mappings(iommu->seg)[bdf].dte_requestor_id;
+                reserve_unity_map_for_device(iommu->seg, req, base, length,
+                                             iw, ir);
             }
         }
 
@@ -627,7 +634,7 @@ static u16 __init parse_ivhd_device_extended_range(
 }
 
 static u16 __init parse_ivhd_device_special(
-    union acpi_ivhd_device *ivhd_device,
+    union acpi_ivhd_device *ivhd_device, u16 seg,
     u16 header_length, u16 block_length, struct amd_iommu *iommu)
 {
     u16 dev_length, bdf;
@@ -648,7 +655,8 @@ static u16 __init parse_ivhd_device_special(
 
     add_ivrs_mapping_entry(bdf, bdf, ivhd_device->header.flags, iommu);
     /* set device id of ioapic */
-    ioapic_bdf[ivhd_device->special.handle] = bdf;
+    ioapic_sbdf[ivhd_device->special.handle].bdf = bdf;
+    ioapic_sbdf[ivhd_device->special.handle].seg = seg;
     return dev_length;
 }
 
@@ -729,7 +737,7 @@ static int __init parse_ivhd_block(struct acpi_ivhd_block_header *ivhd_block)
             break;
         case AMD_IOMMU_ACPI_IVHD_DEV_SPECIAL:
             dev_length = parse_ivhd_device_special(
-                ivhd_device,
+                ivhd_device, ivhd_block->pci_segment,
                 ivhd_block->header.length, block_length, iommu);
             break;
         default:

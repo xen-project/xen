@@ -27,21 +27,21 @@
 #define INTREMAP_LENGTH 0xB
 #define INTREMAP_ENTRIES (1 << INTREMAP_LENGTH)
 
-int ioapic_bdf[MAX_IO_APICS];
+struct ioapic_sbdf ioapic_sbdf[MAX_IO_APICS];
 void *shared_intremap_table;
 static DEFINE_SPINLOCK(shared_intremap_lock);
 
-static spinlock_t* get_intremap_lock(int req_id)
+static spinlock_t* get_intremap_lock(int seg, int req_id)
 {
     return (amd_iommu_perdev_intremap ?
-           &ivrs_mappings[req_id].intremap_lock:
+           &get_ivrs_mappings(seg)[req_id].intremap_lock:
            &shared_intremap_lock);
 }
 
-static int get_intremap_requestor_id(int bdf)
+static int get_intremap_requestor_id(int seg, int bdf)
 {
     ASSERT( bdf < ivrs_bdf_entries );
-    return ivrs_mappings[bdf].dte_requestor_id;
+    return get_ivrs_mappings(seg)[bdf].dte_requestor_id;
 }
 
 static int get_intremap_offset(u8 vector, u8 dm)
@@ -53,20 +53,20 @@ static int get_intremap_offset(u8 vector, u8 dm)
     return offset;
 }
 
-static u8 *get_intremap_entry(int bdf, int offset)
+static u8 *get_intremap_entry(int seg, int bdf, int offset)
 {
     u8 *table;
 
-    table = (u8*)ivrs_mappings[bdf].intremap_table;
+    table = (u8*)get_ivrs_mappings(seg)[bdf].intremap_table;
     ASSERT( (table != NULL) && (offset < INTREMAP_ENTRIES) );
 
     return (u8*) (table + offset);
 }
 
-static void free_intremap_entry(int bdf, int offset)
+static void free_intremap_entry(int seg, int bdf, int offset)
 {
     u32* entry;
-    entry = (u32*)get_intremap_entry(bdf, offset);
+    entry = (u32*)get_intremap_entry(seg, bdf, offset);
     memset(entry, 0, sizeof(u32));
 }
 
@@ -125,8 +125,8 @@ static void update_intremap_entry_from_ioapic(
     spinlock_t *lock;
     int offset;
 
-    req_id = get_intremap_requestor_id(bdf);
-    lock = get_intremap_lock(req_id);
+    req_id = get_intremap_requestor_id(iommu->seg, bdf);
+    lock = get_intremap_lock(iommu->seg, req_id);
 
     delivery_mode = rte->delivery_mode;
     vector = rte->vector;
@@ -136,7 +136,7 @@ static void update_intremap_entry_from_ioapic(
     spin_lock_irqsave(lock, flags);
 
     offset = get_intremap_offset(vector, delivery_mode);
-    entry = (u32*)get_intremap_entry(req_id, offset);
+    entry = (u32*)get_intremap_entry(iommu->seg, req_id, offset);
     update_intremap_entry(entry, vector, delivery_mode, dest_mode, dest);
 
     spin_unlock_irqrestore(lock, flags);
@@ -157,7 +157,7 @@ int __init amd_iommu_setup_ioapic_remapping(void)
     u32* entry;
     int apic, pin;
     u8 delivery_mode, dest, vector, dest_mode;
-    u16 bdf, req_id;
+    u16 seg, bdf, req_id;
     struct amd_iommu *iommu;
     spinlock_t *lock;
     int offset;
@@ -174,17 +174,18 @@ int __init amd_iommu_setup_ioapic_remapping(void)
                 continue;
 
             /* get device id of ioapic devices */
-            bdf = ioapic_bdf[IO_APIC_ID(apic)];
-            iommu = find_iommu_for_device(bdf);
+            bdf = ioapic_sbdf[IO_APIC_ID(apic)].bdf;
+            seg = ioapic_sbdf[IO_APIC_ID(apic)].seg;
+            iommu = find_iommu_for_device(seg, bdf);
             if ( !iommu )
             {
                 AMD_IOMMU_DEBUG("Fail to find iommu for ioapic "
-                                "device id = 0x%x\n", bdf);
+                                "device id = %04x:%04x\n", seg, bdf);
                 continue;
             }
 
-            req_id = get_intremap_requestor_id(bdf);
-            lock = get_intremap_lock(req_id);
+            req_id = get_intremap_requestor_id(iommu->seg, bdf);
+            lock = get_intremap_lock(iommu->seg, req_id);
 
             delivery_mode = rte.delivery_mode;
             vector = rte.vector;
@@ -193,7 +194,7 @@ int __init amd_iommu_setup_ioapic_remapping(void)
 
             spin_lock_irqsave(lock, flags);
             offset = get_intremap_offset(vector, delivery_mode);
-            entry = (u32*)get_intremap_entry(req_id, offset);
+            entry = (u32*)get_intremap_entry(iommu->seg, req_id, offset);
             update_intremap_entry(entry, vector,
                                   delivery_mode, dest_mode, dest);
             spin_unlock_irqrestore(lock, flags);
@@ -216,7 +217,7 @@ void amd_iommu_ioapic_update_ire(
     struct IO_APIC_route_entry old_rte = { 0 };
     struct IO_APIC_route_entry new_rte = { 0 };
     unsigned int rte_lo = (reg & 1) ? reg - 1 : reg;
-    int saved_mask, bdf;
+    int saved_mask, seg, bdf;
     struct amd_iommu *iommu;
 
     if ( !iommu_intremap )
@@ -226,12 +227,13 @@ void amd_iommu_ioapic_update_ire(
     }
 
     /* get device id of ioapic devices */
-    bdf = ioapic_bdf[IO_APIC_ID(apic)];
-    iommu = find_iommu_for_device(bdf);
+    bdf = ioapic_sbdf[IO_APIC_ID(apic)].bdf;
+    seg = ioapic_sbdf[IO_APIC_ID(apic)].seg;
+    iommu = find_iommu_for_device(seg, bdf);
     if ( !iommu )
     {
-        AMD_IOMMU_DEBUG("Fail to find iommu for ioapic device id = 0x%x\n",
-                        bdf);
+        AMD_IOMMU_DEBUG("Fail to find iommu for ioapic device id ="
+                        " %04x:%04x\n", seg, bdf);
         __io_apic_write(apic, reg, value);
         return;
     }
@@ -289,28 +291,28 @@ static void update_intremap_entry_from_msi_msg(
     int offset;
 
     bdf = (pdev->bus << 8) | pdev->devfn;
-    req_id = get_dma_requestor_id(bdf);
-    alias_id = get_intremap_requestor_id(bdf);
+    req_id = get_dma_requestor_id(pdev->seg, bdf);
+    alias_id = get_intremap_requestor_id(pdev->seg, bdf);
 
     if ( msg == NULL )
     {
-        lock = get_intremap_lock(req_id);
+        lock = get_intremap_lock(iommu->seg, req_id);
         spin_lock_irqsave(lock, flags);
-        free_intremap_entry(req_id, msi_desc->remap_index);
+        free_intremap_entry(iommu->seg, req_id, msi_desc->remap_index);
         spin_unlock_irqrestore(lock, flags);
 
         if ( ( req_id != alias_id ) &&
-            ivrs_mappings[alias_id].intremap_table != NULL )
+             get_ivrs_mappings(pdev->seg)[alias_id].intremap_table != NULL )
         {
-            lock = get_intremap_lock(alias_id);
+            lock = get_intremap_lock(iommu->seg, alias_id);
             spin_lock_irqsave(lock, flags);
-            free_intremap_entry(alias_id, msi_desc->remap_index);
+            free_intremap_entry(iommu->seg, alias_id, msi_desc->remap_index);
             spin_unlock_irqrestore(lock, flags);
         }
         goto done;
     }
 
-    lock = get_intremap_lock(req_id);
+    lock = get_intremap_lock(iommu->seg, req_id);
 
     spin_lock_irqsave(lock, flags);
     dest_mode = (msg->address_lo >> MSI_ADDR_DESTMODE_SHIFT) & 0x1;
@@ -320,7 +322,7 @@ static void update_intremap_entry_from_msi_msg(
     offset = get_intremap_offset(vector, delivery_mode);
     msi_desc->remap_index = offset;
 
-    entry = (u32*)get_intremap_entry(req_id, offset);
+    entry = (u32*)get_intremap_entry(iommu->seg, req_id, offset);
     update_intremap_entry(entry, vector, delivery_mode, dest_mode, dest);
     spin_unlock_irqrestore(lock, flags);
 
@@ -331,12 +333,12 @@ static void update_intremap_entry_from_msi_msg(
      * devices.
      */
 
-    lock = get_intremap_lock(alias_id);
+    lock = get_intremap_lock(iommu->seg, alias_id);
     if ( ( req_id != alias_id ) &&
-        ivrs_mappings[alias_id].intremap_table != NULL )
+         get_ivrs_mappings(pdev->seg)[alias_id].intremap_table != NULL )
     {
         spin_lock_irqsave(lock, flags);
-        entry = (u32*)get_intremap_entry(alias_id, offset);
+        entry = (u32*)get_intremap_entry(iommu->seg, alias_id, offset);
         update_intremap_entry(entry, vector, delivery_mode, dest_mode, dest);
         spin_unlock_irqrestore(lock, flags);
     }
@@ -362,7 +364,7 @@ void amd_iommu_msi_msg_update_ire(
     if ( !iommu_intremap )
         return;
 
-    iommu = find_iommu_for_device((pdev->bus << 8) | pdev->devfn);
+    iommu = find_iommu_for_device(pdev->seg, (pdev->bus << 8) | pdev->devfn);
 
     if ( !iommu )
     {
@@ -379,15 +381,18 @@ void amd_iommu_read_msi_from_ire(
 {
 }
 
-void __init amd_iommu_free_intremap_table(int bdf)
+int __init amd_iommu_free_intremap_table(
+    u16 seg, struct ivrs_mappings *ivrs_mapping)
 {
-    void *tb = ivrs_mappings[bdf].intremap_table;
+    void *tb = ivrs_mapping->intremap_table;
 
     if ( tb )
     {
         __free_amd_iommu_tables(tb, INTREMAP_TABLE_ORDER);
-        ivrs_mappings[bdf].intremap_table = NULL;
+        ivrs_mapping->intremap_table = NULL;
     }
+
+    return 0;
 }
 
 void* __init amd_iommu_alloc_intremap_table(void)

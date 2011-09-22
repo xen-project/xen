@@ -65,7 +65,7 @@ int amd_iommu_reserve_domain_unity_map(struct domain *domain,
 void amd_iommu_share_p2m(struct domain *d);
 
 /* device table functions */
-int get_dma_requestor_id(u16 bdf);
+int get_dma_requestor_id(u16 seg, u16 bdf);
 void amd_iommu_add_dev_table_entry(
     u32 *dte, u8 sys_mgt, u8 dev_ex, u8 lint1_pass, u8 lint0_pass, 
     u8 nmi_pass, u8 ext_int_pass, u8 init_pass);
@@ -80,12 +80,12 @@ int send_iommu_command(struct amd_iommu *iommu, u32 cmd[]);
 void flush_command_buffer(struct amd_iommu *iommu);
 
 /* find iommu for bdf */
-struct amd_iommu *find_iommu_for_device(int bdf);
+struct amd_iommu *find_iommu_for_device(int seg, int bdf);
 
 /* interrupt remapping */
 int amd_iommu_setup_ioapic_remapping(void);
 void *amd_iommu_alloc_intremap_table(void);
-void amd_iommu_free_intremap_table(int bdf);
+int amd_iommu_free_intremap_table(u16 seg, struct ivrs_mappings *);
 void invalidate_interrupt_table(struct amd_iommu *iommu, u16 device_id);
 void amd_iommu_ioapic_update_ire(
     unsigned int apic, unsigned int reg, unsigned int value);
@@ -94,7 +94,9 @@ void amd_iommu_msi_msg_update_ire(
 void amd_iommu_read_msi_from_ire(
     struct msi_desc *msi_desc, struct msi_msg *msg);
 
-extern int ioapic_bdf[MAX_IO_APICS];
+extern struct ioapic_sbdf {
+    u16 bdf, seg;
+} ioapic_sbdf[MAX_IO_APICS];
 extern void *shared_intremap_table;
 
 /* power management support */
