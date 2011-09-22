@@ -457,11 +457,11 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
             d = PCI_SLOT(dmaru->scope.devices[i]);
             f = PCI_FUNC(dmaru->scope.devices[i]);
 
-            if ( pci_device_detect(b, d, f) == 0 )
+            if ( pci_device_detect(drhd->segment, b, d, f) == 0 )
             {
                 dprintk(XENLOG_WARNING VTDPREFIX,
-                    "  Non-existent device (%x:%x.%x) is reported "
-                    "in this DRHD's scope!\n", b, d, f);
+                        " Non-existent device (%04x:%02x:%02x.%u) is reported"
+                        " in this DRHD's scope!\n", drhd->segment, b, d, f);
                 invalid_cnt++;
             }
         }
@@ -556,12 +556,13 @@ acpi_parse_one_rmrr(struct acpi_dmar_entry_header *header)
             d = PCI_SLOT(rmrru->scope.devices[i]);
             f = PCI_FUNC(rmrru->scope.devices[i]);
 
-            if ( pci_device_detect(b, d, f) == 0 )
+            if ( pci_device_detect(rmrr->segment, b, d, f) == 0 )
             {
                 dprintk(XENLOG_WARNING VTDPREFIX,
-                    "  Non-existent device (%x:%x.%x) is reported "
-                    "in RMRR (%"PRIx64", %"PRIx64")'s scope!\n",
-                    b, d, f, rmrru->base_address, rmrru->end_address);
+                        " Non-existent device (%04x:%02x:%02x.%u) is reported"
+                        " in RMRR (%"PRIx64", %"PRIx64")'s scope!\n",
+                        rmrr->segment, b, d, f,
+                        rmrru->base_address, rmrru->end_address);
                 ignore = 1;
             }
             else

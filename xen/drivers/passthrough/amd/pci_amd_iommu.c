@@ -123,35 +123,17 @@ static void amd_iommu_setup_domain_device(
     spin_unlock_irqrestore(&iommu->lock, flags);
 }
 
-static void __init amd_iommu_setup_dom0_devices(struct domain *d)
+static void __init amd_iommu_setup_dom0_device(struct pci_dev *pdev)
 {
-    struct amd_iommu *iommu;
-    struct pci_dev *pdev;
-    int bus, devfn, bdf;
+    int bdf = (pdev->bus << 8) | pdev->devfn;
+    struct amd_iommu *iommu = find_iommu_for_device(pdev->seg, bdf);
 
-    spin_lock(&pcidevs_lock);
-    for ( bus = 0; bus < 256; bus++ )
-    {
-        for ( devfn = 0; devfn < 256; devfn++ )
-        {
-            pdev = pci_get_pdev(0, bus, devfn);
-            if ( !pdev )
-                continue;
-
-            pdev->domain = d;
-            list_add(&pdev->domain_list, &d->arch.pdev_list);
-
-            bdf = (bus << 8) | devfn;
-            iommu = find_iommu_for_device(pdev->seg, bdf);
-
-            if ( likely(iommu != NULL) )
-                amd_iommu_setup_domain_device(d, iommu, bdf);
-            else
-                AMD_IOMMU_DEBUG("No iommu for device %02x:%02x.%x\n",
-                                bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
-        }
-    }
-    spin_unlock(&pcidevs_lock);
+    if ( likely(iommu != NULL) )
+        amd_iommu_setup_domain_device(pdev->domain, iommu, bdf);
+    else
+        AMD_IOMMU_DEBUG("No iommu for device %04x:%02x:%02x.%u\n",
+                        pdev->seg, pdev->bus,
+                        PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
 }
 
 int __init amd_iov_detect(void)
@@ -279,7 +261,7 @@ static void __init amd_iommu_dom0_init(struct domain *d)
         }
     }
 
-    amd_iommu_setup_dom0_devices(d);
+    setup_dom0_pci_devices(d, amd_iommu_setup_dom0_device);
 }
 
 static void amd_iommu_disable_domain_device(

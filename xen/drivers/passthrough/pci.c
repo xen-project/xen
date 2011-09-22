@@ -202,9 +202,7 @@ struct pci_dev *pci_get_pdev_by_domain(
 void pci_enable_acs(struct pci_dev *pdev)
 {
     int pos;
-    u16 cap;
-    u16 ctrl;
-
+    u16 cap, ctrl, seg = pdev->seg;
     u8 bus = pdev->bus;
     u8 dev = PCI_SLOT(pdev->devfn);
     u8 func = PCI_FUNC(pdev->devfn);
@@ -212,7 +210,7 @@ void pci_enable_acs(struct pci_dev *pdev)
     if ( !iommu_enabled )
         return;
 
-    pos = pci_find_ext_capability(0, bus, pdev->devfn, PCI_EXT_CAP_ID_ACS);
+    pos = pci_find_ext_capability(seg, bus, pdev->devfn, PCI_EXT_CAP_ID_ACS);
     if (!pos)
         return;
 
@@ -453,7 +451,7 @@ void pci_release_devices(struct domain *d)
 
 #define PCI_CLASS_BRIDGE_PCI     0x0604
 
-int pdev_type(u8 bus, u8 devfn)
+int pdev_type(u16 seg, u8 bus, u8 devfn)
 {
     u16 class_device;
     u16 status, creg;
@@ -488,9 +486,9 @@ int pdev_type(u8 bus, u8 devfn)
  * return 1: find PCIe-to-PCI/PCIX bridge or PCI legacy bridge
  * return -1: fail
  */
-int find_upstream_bridge(u8 *bus, u8 *devfn, u8 *secbus)
+int find_upstream_bridge(u16 seg, u8 *bus, u8 *devfn, u8 *secbus)
 {
-    struct pci_seg *pseg = get_pseg(0);
+    struct pci_seg *pseg = get_pseg(seg);
     int ret = 0;
     int cnt = 0;
 
@@ -525,7 +523,7 @@ out:
 /*
  * detect pci device, return 0 if it exists, or return 0
  */
-int __init pci_device_detect(u8 bus, u8 dev, u8 func)
+int __init pci_device_detect(u16 seg, u8 bus, u8 dev, u8 func)
 {
     u32 vendor;
 
@@ -554,7 +552,7 @@ static int __init _scan_pci_devices(struct pci_seg *pseg, void *arg)
         {
             for ( func = 0; func < 8; func++ )
             {
-                if ( pci_device_detect(bus, dev, func) == 0 )
+                if ( pci_device_detect(pseg->nr, bus, dev, func) == 0 )
                     continue;
 
                 pdev = alloc_pdev(pseg, bus, PCI_DEVFN(dev, func));
@@ -565,7 +563,7 @@ static int __init _scan_pci_devices(struct pci_seg *pseg, void *arg)
                 }
 
                 /* build bus2bridge */
-                type = pdev_type(bus, PCI_DEVFN(dev, func));
+                type = pdev_type(pseg->nr, bus, PCI_DEVFN(dev, func));
                 switch ( type )
                 {
                     case DEV_TYPE_PCIe_BRIDGE:
@@ -594,8 +592,8 @@ static int __init _scan_pci_devices(struct pci_seg *pseg, void *arg)
                         break;
 
                     default:
-                        printk("%s: unknown type: bdf = %x:%x.%x\n",
-                               __func__, bus, dev, func);
+                        printk("%s: unknown type: %04x:%02x:%02x.%u\n",
+                               __func__, pseg->nr, bus, dev, func);
                         return -EINVAL;
                 }
 
@@ -618,6 +616,44 @@ int __init scan_pci_devices(void)
     spin_unlock(&pcidevs_lock);
 
     return ret;
+}
+
+struct setup_dom0 {
+    struct domain *d;
+    void (*handler)(struct pci_dev *);
+};
+
+static int __init _setup_dom0_pci_devices(struct pci_seg *pseg, void *arg)
+{
+    struct setup_dom0 *ctxt = arg;
+    int bus, devfn;
+
+    for ( bus = 0; bus < 256; bus++ )
+    {
+        for ( devfn = 0; devfn < 256; devfn++ )
+        {
+            struct pci_dev *pdev = pci_get_pdev(pseg->nr, bus, devfn);
+
+            if ( !pdev )
+                continue;
+
+            pdev->domain = ctxt->d;
+            list_add(&pdev->domain_list, &ctxt->d->arch.pdev_list);
+            ctxt->handler(pdev);
+        }
+    }
+
+    return 0;
+}
+
+void __init setup_dom0_pci_devices(
+    struct domain *d, void (*handler)(struct pci_dev *))
+{
+    struct setup_dom0 ctxt = { .d = d, .handler = handler };
+
+    spin_lock(&pcidevs_lock);
+    pci_segments_iterate(_setup_dom0_pci_devices, &ctxt);
+    spin_unlock(&pcidevs_lock);
 }
 
 /* Disconnect all PCI devices from the PCI buses. From the PCI spec:
@@ -654,8 +690,9 @@ static int _dump_pci_devices(struct pci_seg *pseg, void *arg)
 
     list_for_each_entry ( pdev, &pseg->alldevs_list, alldevs_list )
     {
-        printk("%02x:%02x.%x - dom %-3d - MSIs < ",
-               pdev->bus, PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn),
+        printk("%04x:%02x:%02x.%u - dom %-3d - MSIs < ",
+               pseg->nr, pdev->bus,
+               PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn),
                pdev->domain ? pdev->domain->domain_id : -1);
         list_for_each_entry ( msi, &pdev->msi_list, list )
                printk("%d ", msi->irq);

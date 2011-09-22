@@ -50,7 +50,7 @@ bool_t __read_mostly untrusted_msi;
 
 int nr_iommus;
 
-static void setup_dom0_devices(struct domain *d);
+static void setup_dom0_device(struct pci_dev *);
 static void setup_dom0_rmrr(struct domain *d);
 
 static int domain_iommu_domid(struct domain *d,
@@ -1234,7 +1234,7 @@ static void __init intel_iommu_dom0_init(struct domain *d)
         iommu_set_dom0_mapping(d);
     }
 
-    setup_dom0_devices(d);
+    setup_dom0_pci_devices(d, setup_dom0_device);
     setup_dom0_rmrr(d);
 
     iommu_flush_all();
@@ -1402,7 +1402,7 @@ static int domain_context_mapping(
 
     ASSERT(spin_is_locked(&pcidevs_lock));
 
-    type = pdev_type(bus, devfn);
+    type = pdev_type(seg, bus, devfn);
     switch ( type )
     {
     case DEV_TYPE_PCIe_BRIDGE:
@@ -1431,7 +1431,7 @@ static int domain_context_mapping(
         if ( ret )
             break;
 
-        if ( find_upstream_bridge(&bus, &devfn, &secbus) < 1 )
+        if ( find_upstream_bridge(seg, &bus, &devfn, &secbus) < 1 )
             break;
 
         ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn);
@@ -1441,7 +1441,7 @@ static int domain_context_mapping(
          * requester-id. It may originate from devfn=0 on the secondary bus
          * behind the bridge. Map that id as well if we didn't already.
          */
-        if ( !ret && pdev_type(bus, devfn) == DEV_TYPE_PCIe2PCI_BRIDGE &&
+        if ( !ret && pdev_type(seg, bus, devfn) == DEV_TYPE_PCIe2PCI_BRIDGE &&
              (secbus != pdev->bus || pdev->devfn != 0) )
             ret = domain_context_mapping_one(domain, drhd->iommu, secbus, 0);
 
@@ -1533,7 +1533,7 @@ static int domain_context_unmap(
         return -ENODEV;
     iommu = drhd->iommu;
 
-    type = pdev_type(bus, devfn);
+    type = pdev_type(seg, bus, devfn);
     switch ( type )
     {
     case DEV_TYPE_PCIe_BRIDGE:
@@ -1562,11 +1562,11 @@ static int domain_context_unmap(
 
         tmp_bus = bus;
         tmp_devfn = devfn;
-        if ( find_upstream_bridge(&tmp_bus, &tmp_devfn, &secbus) < 1 )
+        if ( find_upstream_bridge(seg, &tmp_bus, &tmp_devfn, &secbus) < 1 )
             break;
 
         /* PCIe to PCI/PCIx bridge */
-        if ( pdev_type(tmp_bus, tmp_devfn) == DEV_TYPE_PCIe2PCI_BRIDGE )
+        if ( pdev_type(seg, tmp_bus, tmp_devfn) == DEV_TYPE_PCIe2PCI_BRIDGE )
         {
             ret = domain_context_unmap_one(domain, iommu, tmp_bus, tmp_devfn);
             if ( ret )
@@ -1939,28 +1939,11 @@ static int intel_iommu_remove_device(struct pci_dev *pdev)
                                 pdev->devfn);
 }
 
-static void __init setup_dom0_devices(struct domain *d)
+static void __init setup_dom0_device(struct pci_dev *pdev)
 {
-    struct pci_dev *pdev;
-    int bus, devfn;
-
-    spin_lock(&pcidevs_lock);
-    for ( bus = 0; bus < 256; bus++ )
-    {
-        for ( devfn = 0; devfn < 256; devfn++ )
-        {
-            pdev = pci_get_pdev(0, bus, devfn);
-            if ( !pdev )
-                continue;
-
-            pdev->domain = d;
-            list_add(&pdev->domain_list, &d->arch.pdev_list);
-            domain_context_mapping(d, pdev->seg, pdev->bus, pdev->devfn);
-            pci_enable_acs(pdev);
-            pci_vtd_quirk(pdev);
-        }
-    }
-    spin_unlock(&pcidevs_lock);
+    domain_context_mapping(pdev->domain, pdev->seg, pdev->bus, pdev->devfn);
+    pci_enable_acs(pdev);
+    pci_vtd_quirk(pdev);
 }
 
 void clear_fault_bits(struct iommu *iommu)
@@ -2227,7 +2210,7 @@ done:
 static int intel_iommu_group_id(u16 seg, u8 bus, u8 devfn)
 {
     u8 secbus;
-    if ( find_upstream_bridge(&bus, &devfn, &secbus) < 0 )
+    if ( find_upstream_bridge(seg, &bus, &devfn, &secbus) < 0 )
         return -1;
     else
         return PCI_BDF2(bus, devfn);

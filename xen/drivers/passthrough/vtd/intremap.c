@@ -448,15 +448,17 @@ void io_apic_write_remap_rte(
 static void set_msi_source_id(struct pci_dev *pdev, struct iremap_entry *ire)
 {
     int type;
+    u16 seg;
     u8 bus, devfn, secbus;
     int ret;
 
     if ( !pdev || !ire )
         return;
 
+    seg = pdev->seg;
     bus = pdev->bus;
     devfn = pdev->devfn;
-    type = pdev_type(bus, devfn);
+    type = pdev_type(seg, bus, devfn);
     switch ( type )
     {
     case DEV_TYPE_PCIe_BRIDGE:
@@ -469,7 +471,7 @@ static void set_msi_source_id(struct pci_dev *pdev, struct iremap_entry *ire)
         break;
 
     case DEV_TYPE_PCI:
-        ret = find_upstream_bridge(&bus, &devfn, &secbus);
+        ret = find_upstream_bridge(seg, &bus, &devfn, &secbus);
         if ( ret == 0 ) /* integrated PCI device */
         {
             set_ire_sid(ire, SVT_VERIFY_SID_SQ, SQ_ALL_16,
@@ -477,19 +479,20 @@ static void set_msi_source_id(struct pci_dev *pdev, struct iremap_entry *ire)
         }
         else if ( ret == 1 ) /* find upstream bridge */
         {
-            if ( pdev_type(bus, devfn) == DEV_TYPE_PCIe2PCI_BRIDGE )
+            if ( pdev_type(seg, bus, devfn) == DEV_TYPE_PCIe2PCI_BRIDGE )
                 set_ire_sid(ire, SVT_VERIFY_BUS, SQ_ALL_16,
                             (bus << 8) | pdev->bus);
-            else if ( pdev_type(bus, devfn) == DEV_TYPE_LEGACY_PCI_BRIDGE )
+            else if ( pdev_type(seg, bus, devfn) == DEV_TYPE_LEGACY_PCI_BRIDGE )
                 set_ire_sid(ire, SVT_VERIFY_BUS, SQ_ALL_16,
                             PCI_BDF2(bus, devfn));
         }
         break;
 
     default:
-        dprintk(XENLOG_WARNING VTDPREFIX, "d%d: unknown(%u): bdf = %x:%x.%x\n",
+        dprintk(XENLOG_WARNING VTDPREFIX,
+                "d%d: unknown(%u): %04x:%02x:%02x.%u\n",
                 pdev->domain->domain_id, type,
-                bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+                seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         break;
    }
 }

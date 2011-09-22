@@ -82,13 +82,15 @@ enum {
     DEV_TYPE_PCI,
 };
 
-int pci_device_detect(u8 bus, u8 dev, u8 func);
+int pci_device_detect(u16 seg, u8 bus, u8 dev, u8 func);
 int scan_pci_devices(void);
-int pdev_type(u8 bus, u8 devfn);
-int find_upstream_bridge(u8 *bus, u8 *devfn, u8 *secbus);
-struct pci_dev *pci_lock_pdev(int bus, int devfn);
-struct pci_dev *pci_lock_domain_pdev(struct domain *d, int bus, int devfn);
+int pdev_type(u16 seg, u8 bus, u8 devfn);
+int find_upstream_bridge(u16 seg, u8 *bus, u8 *devfn, u8 *secbus);
+struct pci_dev *pci_lock_pdev(int seg, int bus, int devfn);
+struct pci_dev *pci_lock_domain_pdev(
+    struct domain *, int seg, int bus, int devfn);
 
+void setup_dom0_pci_devices(struct domain *, void (*)(struct pci_dev *));
 void pci_release_devices(struct domain *d);
 int pci_add_segment(u16 seg);
 int pci_add_device(u16 seg, u8 bus, u8 devfn, const struct pci_dev_info *);
