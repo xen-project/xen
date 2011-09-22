@@ -268,7 +268,7 @@ static void set_iommu_event_log_control(struct amd_iommu *iommu,
     writel(entry, iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
 }
 
-static void parse_event_log_entry(u32 entry[]);
+static void parse_event_log_entry(struct amd_iommu *, u32 entry[]);
 
 static int amd_iommu_read_event_log(struct amd_iommu *iommu)
 {
@@ -289,7 +289,7 @@ static int amd_iommu_read_event_log(struct amd_iommu *iommu)
                            (iommu->event_log_head *
                            IOMMU_EVENT_LOG_ENTRY_SIZE));
 
-        parse_event_log_entry(event_log);
+        parse_event_log_entry(iommu, event_log);
 
         if ( ++iommu->event_log_head == iommu->event_log.entries )
             iommu->event_log_head = 0;
@@ -349,6 +349,7 @@ static void iommu_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
     unsigned int dest;
     struct amd_iommu *iommu = desc->action->dev_id;
     struct irq_cfg *cfg = desc->chip_data;
+    u16 seg = iommu->seg;
     u8 bus = (iommu->bdf >> 8) & 0xff;
     u8 dev = PCI_SLOT(iommu->bdf & 0xff);
     u8 func = PCI_FUNC(iommu->bdf & 0xff);
@@ -377,11 +378,11 @@ static void iommu_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
                     MSI_ADDR_REDIRECTION_LOWPRI;
     msg.address_lo |= MSI_ADDR_DEST_ID(dest & 0xff);
 
-    pci_conf_write32(bus, dev, func,
+    pci_conf_write32(seg, bus, dev, func,
         iommu->msi_cap + PCI_MSI_DATA_64, msg.data);
-    pci_conf_write32(bus, dev, func,
+    pci_conf_write32(seg, bus, dev, func,
         iommu->msi_cap + PCI_MSI_ADDRESS_LO, msg.address_lo);
-    pci_conf_write32(bus, dev, func,
+    pci_conf_write32(seg, bus, dev, func,
         iommu->msi_cap + PCI_MSI_ADDRESS_HI, msg.address_hi);
     
 }
@@ -393,12 +394,12 @@ static void amd_iommu_msi_enable(struct amd_iommu *iommu, int flag)
     int dev = PCI_SLOT(iommu->bdf & 0xff);
     int func = PCI_FUNC(iommu->bdf & 0xff);
 
-    control = pci_conf_read16(bus, dev, func,
+    control = pci_conf_read16(iommu->seg, bus, dev, func,
         iommu->msi_cap + PCI_MSI_FLAGS);
     control &= ~(1);
     if ( flag )
         control |= flag;
-    pci_conf_write16(bus, dev, func,
+    pci_conf_write16(iommu->seg, bus, dev, func,
         iommu->msi_cap + PCI_MSI_FLAGS, control);
 }
 
@@ -456,7 +457,7 @@ static hw_irq_controller iommu_msi_type = {
     .set_affinity = iommu_msi_set_affinity,
 };
 
-static void parse_event_log_entry(u32 entry[])
+static void parse_event_log_entry(struct amd_iommu *iommu, u32 entry[])
 {
     u16 domain_id, device_id, bdf, cword;
     u32 code;
@@ -497,11 +498,12 @@ static void parse_event_log_entry(u32 entry[])
         /* Tell the device to stop DMAing; we can't rely on the guest to
          * control it for us. */
         for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )
-            if ( get_dma_requestor_id(bdf) == device_id ) 
+            if ( get_dma_requestor_id(iommu->seg, bdf) == device_id )
             {
-                cword = pci_conf_read16(PCI_BUS(bdf), PCI_SLOT(bdf), 
-                                PCI_FUNC(bdf), PCI_COMMAND);
-                pci_conf_write16(PCI_BUS(bdf), PCI_SLOT(bdf), 
+                cword = pci_conf_read16(iommu->seg, PCI_BUS(bdf),
+                                        PCI_SLOT(bdf), PCI_FUNC(bdf),
+                                        PCI_COMMAND);
+                pci_conf_write16(iommu->seg, PCI_BUS(bdf), PCI_SLOT(bdf),
                                  PCI_FUNC(bdf), PCI_COMMAND, 
                                  cword & ~PCI_COMMAND_MASTER);
             }

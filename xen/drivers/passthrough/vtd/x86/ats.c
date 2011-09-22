@@ -135,8 +135,7 @@ int enable_ats_device(int seg, int bus, int devfn)
                 "%04x:%02x:%02x.%u: ATS capability found\n",
                 seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
 
-    /* BUGBUG: add back seg when multi-seg platform support is enabled */
-    value = pci_conf_read16(bus, PCI_SLOT(devfn),
+    value = pci_conf_read16(seg, bus, PCI_SLOT(devfn),
                             PCI_FUNC(devfn), pos + ATS_REG_CTL);
     if ( value & ATS_ENABLE )
     {
@@ -157,7 +156,7 @@ int enable_ats_device(int seg, int bus, int devfn)
     if ( !(value & ATS_ENABLE) )
     {
         value |= ATS_ENABLE;
-        pci_conf_write16(bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+        pci_conf_write16(seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
                          pos + ATS_REG_CTL, value);
     }
 
@@ -166,7 +165,7 @@ int enable_ats_device(int seg, int bus, int devfn)
         pdev->seg = seg;
         pdev->bus = bus;
         pdev->devfn = devfn;
-        value = pci_conf_read16(bus, PCI_SLOT(devfn),
+        value = pci_conf_read16(seg, bus, PCI_SLOT(devfn),
                                 PCI_FUNC(devfn), pos + ATS_REG_CAP);
         pdev->ats_queue_depth = value & ATS_QUEUE_DEPTH_MASK;
         list_add(&pdev->list, &ats_devices);
@@ -190,11 +189,10 @@ void disable_ats_device(int seg, int bus, int devfn)
     pos = pci_find_ext_capability(seg, bus, devfn, PCI_EXT_CAP_ID_ATS);
     BUG_ON(!pos);
 
-    /* BUGBUG: add back seg when multi-seg platform support is enabled */
-    value = pci_conf_read16(bus, PCI_SLOT(devfn),
+    value = pci_conf_read16(seg, bus, PCI_SLOT(devfn),
                             PCI_FUNC(devfn), pos + ATS_REG_CTL);
     value &= ~ATS_ENABLE;
-    pci_conf_write16(bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+    pci_conf_write16(seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
                      pos + ATS_REG_CTL, value);
 
     list_for_each_entry ( pdev, &ats_devices, list )

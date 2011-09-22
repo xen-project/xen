@@ -307,17 +307,18 @@ static int __init acpi_parse_dev_scope(
 
         while ( --depth > 0 )
         {
-            bus = pci_conf_read8(bus, path->dev, path->fn, PCI_SECONDARY_BUS);
+            bus = pci_conf_read8(seg, bus, path->dev, path->fn,
+                                 PCI_SECONDARY_BUS);
             path++;
         }
 
         switch ( acpi_scope->dev_type )
         {
         case ACPI_DEV_P2PBRIDGE:
-            sec_bus = pci_conf_read8(
-                bus, path->dev, path->fn, PCI_SECONDARY_BUS);
-            sub_bus = pci_conf_read8(
-                bus, path->dev, path->fn, PCI_SUBORDINATE_BUS);
+            sec_bus = pci_conf_read8(seg, bus, path->dev, path->fn,
+                                     PCI_SECONDARY_BUS);
+            sub_bus = pci_conf_read8(seg, bus, path->dev, path->fn,
+                                     PCI_SUBORDINATE_BUS);
             if ( iommu_verbose )
                 dprintk(VTDPREFIX,
                         " bridge: %04x:%02x:%02x.%u start=%x sec=%x sub=%x\n",

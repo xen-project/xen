@@ -35,14 +35,14 @@ static int __init get_iommu_msi_capabilities(
     u16 control;
     int count = 0;
 
-    cap_ptr = pci_conf_read8(bus, dev, func,
+    cap_ptr = pci_conf_read8(seg, bus, dev, func,
             PCI_CAPABILITY_LIST);
 
     while ( cap_ptr >= PCI_MIN_CAP_OFFSET &&
         count < PCI_MAX_CAP_BLOCKS )
     {
         cap_ptr &= PCI_CAP_PTR_MASK;
-        cap_header = pci_conf_read32(bus, dev, func, cap_ptr);
+        cap_header = pci_conf_read32(seg, bus, dev, func, cap_ptr);
         cap_id = get_field_from_reg_u32(cap_header,
                 PCI_CAP_ID_MASK, PCI_CAP_ID_SHIFT);
 
@@ -60,7 +60,7 @@ static int __init get_iommu_msi_capabilities(
         return -ENODEV;
 
     AMD_IOMMU_DEBUG("Found MSI capability block \n");
-    control = pci_conf_read16(bus, dev, func,
+    control = pci_conf_read16(seg, bus, dev, func,
             iommu->msi_cap + PCI_MSI_FLAGS);
     iommu->maskbit = control & PCI_MSI_FLAGS_MASKBIT;
     return 0;
@@ -71,18 +71,18 @@ static int __init get_iommu_capabilities(
 {
     u32 cap_header, cap_range, misc_info;
 
-    cap_header = pci_conf_read32(bus, dev, func, cap_ptr);
+    cap_header = pci_conf_read32(seg, bus, dev, func, cap_ptr);
     iommu->revision = get_field_from_reg_u32(
         cap_header, PCI_CAP_REV_MASK, PCI_CAP_REV_SHIFT);
     iommu->pte_not_present_cached = get_field_from_reg_u32(
         cap_header, PCI_CAP_NP_CACHE_MASK, PCI_CAP_NP_CACHE_SHIFT);
 
-    cap_range = pci_conf_read32(bus, dev, func,
+    cap_range = pci_conf_read32(seg, bus, dev, func,
                                 cap_ptr + PCI_CAP_RANGE_OFFSET);
     iommu->unit_id = get_field_from_reg_u32(
         cap_range, PCI_CAP_UNIT_ID_MASK, PCI_CAP_UNIT_ID_SHIFT);
 
-    misc_info = pci_conf_read32(bus, dev, func,
+    misc_info = pci_conf_read32(seg, bus, dev, func,
                                 cap_ptr + PCI_MISC_INFO_OFFSET);
     iommu->msi_number = get_field_from_reg_u32(
         misc_info, PCI_CAP_MSI_NUMBER_MASK, PCI_CAP_MSI_NUMBER_SHIFT);

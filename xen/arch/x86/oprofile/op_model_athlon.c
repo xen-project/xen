@@ -470,7 +470,7 @@ static int __init init_ibs_nmi(void)
 	for (bus = 0; bus < 256; bus++) {
 		for (dev = 0; dev < 32; dev++) {
 			for (func = 0; func < 8; func++) {
-				id = pci_conf_read32(bus, dev, func, PCI_VENDOR_ID);
+				id = pci_conf_read32(0, bus, dev, func, PCI_VENDOR_ID);
 
 				vendor_id = id & 0xffff;
 				dev_id = (id >> 16) & 0xffff;
@@ -478,10 +478,10 @@ static int __init init_ibs_nmi(void)
 				if ((vendor_id == PCI_VENDOR_ID_AMD) &&
 					(dev_id == PCI_DEVICE_ID_AMD_10H_NB_MISC)) {
 
-					pci_conf_write32(bus, dev, func, IBSCTL,
+					pci_conf_write32(0, bus, dev, func, IBSCTL,
 						IBSCTL_LVTOFFSETVAL | APIC_EILVT_LVTOFF_IBS);
 
-					value = pci_conf_read32(bus, dev, func, IBSCTL);
+					value = pci_conf_read32(0, bus, dev, func, IBSCTL);
 
 					if (value != (IBSCTL_LVTOFFSETVAL |
 						APIC_EILVT_LVTOFF_IBS)) {

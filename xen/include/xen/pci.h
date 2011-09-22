@@ -102,28 +102,31 @@ struct pci_dev *pci_get_pdev_by_domain(
 void disconnect_pci_devices(void);
 
 uint8_t pci_conf_read8(
-    unsigned int bus, unsigned int dev, unsigned int func, unsigned int reg);
+    unsigned int seg, unsigned int bus, unsigned int dev, unsigned int func,
+    unsigned int reg);
 uint16_t pci_conf_read16(
-    unsigned int bus, unsigned int dev, unsigned int func, unsigned int reg);
+    unsigned int seg, unsigned int bus, unsigned int dev, unsigned int func,
+    unsigned int reg);
 uint32_t pci_conf_read32(
-    unsigned int bus, unsigned int dev, unsigned int func, unsigned int reg);
+    unsigned int seg, unsigned int bus, unsigned int dev, unsigned int func,
+    unsigned int reg);
 void pci_conf_write8(
-    unsigned int bus, unsigned int dev, unsigned int func, unsigned int reg,
-    uint8_t data);
+    unsigned int seg, unsigned int bus, unsigned int dev, unsigned int func,
+    unsigned int reg, uint8_t data);
 void pci_conf_write16(
-    unsigned int bus, unsigned int dev, unsigned int func, unsigned int reg,
-    uint16_t data);
+    unsigned int seg, unsigned int bus, unsigned int dev, unsigned int func,
+    unsigned int reg, uint16_t data);
 void pci_conf_write32(
-    unsigned int bus, unsigned int dev, unsigned int func, unsigned int reg,
-    uint32_t data);
+    unsigned int seg, unsigned int bus, unsigned int dev, unsigned int func,
+    unsigned int reg, uint32_t data);
 uint32_t pci_conf_read(uint32_t cf8, uint8_t offset, uint8_t bytes);
 void pci_conf_write(uint32_t cf8, uint8_t offset, uint8_t bytes, uint32_t data);
 int pci_mmcfg_read(unsigned int seg, unsigned int bus,
                    unsigned int devfn, int reg, int len, u32 *value);
 int pci_mmcfg_write(unsigned int seg, unsigned int bus,
                     unsigned int devfn, int reg, int len, u32 value);
-int pci_find_cap_offset(u8 bus, u8 dev, u8 func, u8 cap);
-int pci_find_next_cap(u8 bus, unsigned int devfn, u8 pos, int cap);
+int pci_find_cap_offset(u16 seg, u8 bus, u8 dev, u8 func, u8 cap);
+int pci_find_next_cap(u16 seg, u8 bus, unsigned int devfn, u8 pos, int cap);
 int pci_find_ext_capability(int seg, int bus, int devfn, int cap);
 
 struct pirq;

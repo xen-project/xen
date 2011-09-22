@@ -212,12 +212,12 @@ static void pci_serial_early_init(struct ns16550 *uart)
         return;
     
     if ( uart->pb_bdf_enable )
-        pci_conf_write16(uart->pb_bdf[0], uart->pb_bdf[1], uart->pb_bdf[2],
+        pci_conf_write16(0, uart->pb_bdf[0], uart->pb_bdf[1], uart->pb_bdf[2],
             0x1c, (uart->io_base & 0xF000) | ((uart->io_base & 0xF000) >> 8));
 
-    pci_conf_write32(uart->ps_bdf[0], uart->ps_bdf[1], uart->ps_bdf[2],
+    pci_conf_write32(0, uart->ps_bdf[0], uart->ps_bdf[1], uart->ps_bdf[2],
         0x10, uart->io_base | 0x1);
-    pci_conf_write16(uart->ps_bdf[0], uart->ps_bdf[1], uart->ps_bdf[2],
+    pci_conf_write16(0, uart->ps_bdf[0], uart->ps_bdf[1], uart->ps_bdf[2],
         0x4, 0x1);
 }
 
@@ -329,10 +329,10 @@ static void ns16550_suspend(struct serial_port *port)
     if ( uart->bar )
     {
        uart->bar = pci_conf_read32(
-           uart->pb_bdf[0], uart->pb_bdf[1], uart->pb_bdf[2],
+           0, uart->pb_bdf[0], uart->pb_bdf[1], uart->pb_bdf[2],
            PCI_BASE_ADDRESS_0 + uart->bar_idx*4);
        uart->cr = pci_conf_read32(
-           uart->pb_bdf[0], uart->pb_bdf[1], uart->pb_bdf[2],
+           0, uart->pb_bdf[0], uart->pb_bdf[1], uart->pb_bdf[2],
            PCI_COMMAND);
     }
 }
@@ -346,9 +346,9 @@ static void ns16550_resume(struct serial_port *port)
 
     if ( uart->bar )
     {
-       pci_conf_write32(uart->pb_bdf[0], uart->pb_bdf[1], uart->pb_bdf[2],
+       pci_conf_write32(0, uart->pb_bdf[0], uart->pb_bdf[1], uart->pb_bdf[2],
                         PCI_BASE_ADDRESS_0 + uart->bar_idx*4, uart->bar);
-       pci_conf_write32(uart->pb_bdf[0], uart->pb_bdf[1], uart->pb_bdf[2],
+       pci_conf_write32(0, uart->pb_bdf[0], uart->pb_bdf[1], uart->pb_bdf[2],
                         PCI_COMMAND, uart->cr);
     }
 }
@@ -467,19 +467,20 @@ pci_uart_config (struct ns16550 *uart, int skip_amt, int bar_idx)
         {
             for ( f = 0; f < 0x8; f++ )
             {
-                class = pci_conf_read16(b, d, f, PCI_CLASS_DEVICE);
+                class = pci_conf_read16(0, b, d, f, PCI_CLASS_DEVICE);
                 if ( class != 0x700 )
                     continue;
 
-                bar = pci_conf_read32(b, d, f, PCI_BASE_ADDRESS_0 + bar_idx*4);
+                bar = pci_conf_read32(0, b, d, f,
+                                      PCI_BASE_ADDRESS_0 + bar_idx*4);
 
                 /* Not IO */
                 if ( !(bar & 1) )
                     continue;
 
-                pci_conf_write32(b, d, f, PCI_BASE_ADDRESS_0, ~0u);
-                len = pci_conf_read32(b, d, f, PCI_BASE_ADDRESS_0);
-                pci_conf_write32(b, d, f, PCI_BASE_ADDRESS_0 + bar_idx*4, bar);
+                pci_conf_write32(0, b, d, f, PCI_BASE_ADDRESS_0, ~0u);
+                len = pci_conf_read32(0, b, d, f, PCI_BASE_ADDRESS_0);
+                pci_conf_write32(0, b, d, f, PCI_BASE_ADDRESS_0 + bar_idx*4, bar);
 
                 /* Not 8 bytes */
                 if ( (len & 0xffff) != 0xfff9 )

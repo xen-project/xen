@@ -940,11 +940,12 @@ static void iommu_page_fault(int irq, void *dev_id,
 
         /* Tell the device to stop DMAing; we can't rely on the guest to
          * control it for us. */
-        cword = pci_conf_read16(PCI_BUS(source_id), PCI_SLOT(source_id), 
+        cword = pci_conf_read16(iommu->intel->drhd->segment,
+                                PCI_BUS(source_id), PCI_SLOT(source_id),
                                 PCI_FUNC(source_id), PCI_COMMAND);
-        pci_conf_write16(PCI_BUS(source_id), PCI_SLOT(source_id), 
-                         PCI_FUNC(source_id), PCI_COMMAND, 
-                         cword & ~PCI_COMMAND_MASTER);
+        pci_conf_write16(iommu->intel->drhd->segment, PCI_BUS(source_id),
+                         PCI_SLOT(source_id), PCI_FUNC(source_id),
+                         PCI_COMMAND, cword & ~PCI_COMMAND_MASTER);
 
         fault_index++;
         if ( fault_index > cap_num_fault_regs(iommu->cap) )

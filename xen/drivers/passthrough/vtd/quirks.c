@@ -70,7 +70,7 @@ int is_igd_vt_enabled_quirk(void)
         return 1;
 
     /* integrated graphics on Intel platforms is located at 0:2.0 */
-    ggc = pci_conf_read16(0, IGD_DEV, 0, GGC);
+    ggc = pci_conf_read16(0, 0, IGD_DEV, 0, GGC);
     return ( ggc & GGC_MEMORY_VT_ENABLED ? 1 : 0 );
 }
 
@@ -84,12 +84,12 @@ static void __init cantiga_b3_errata_init(void)
     u16 vid;
     u8 did_hi, rid;
 
-    vid = pci_conf_read16(0, IGD_DEV, 0, 0);
+    vid = pci_conf_read16(0, 0, IGD_DEV, 0, 0);
     if ( vid != 0x8086 )
         return;
 
-    did_hi = pci_conf_read8(0, IGD_DEV, 0, 3);
-    rid = pci_conf_read8(0, IGD_DEV, 0, 8);
+    did_hi = pci_conf_read8(0, 0, IGD_DEV, 0, 3);
+    rid = pci_conf_read8(0, 0, IGD_DEV, 0, 8);
 
     if ( (did_hi == 0x2A) && (rid == 0x7) )
         is_cantiga_b3 = 1;
@@ -125,8 +125,8 @@ static void __init map_igd_reg(void)
         return;
 
     /* get IGD mmio address in PCI BAR */
-    igd_mmio = ((u64)pci_conf_read32(0, IGD_DEV, 0, 0x14) << 32) +
-                     pci_conf_read32(0, IGD_DEV, 0, 0x10);
+    igd_mmio = ((u64)pci_conf_read32(0, 0, IGD_DEV, 0, 0x14) << 32) +
+                     pci_conf_read32(0, 0, IGD_DEV, 0, 0x10);
 
     /* offset of IGD regster we want to access is in 0x2000 range */
     igd_reg = (igd_mmio & IGD_BAR_MASK) + 0x2000;
@@ -251,8 +251,8 @@ void vtd_ops_postamble_quirk(struct iommu* iommu)
 /* initialize platform identification flags */
 void __init platform_quirks_init(void)
 {
-    ioh_id = pci_conf_read32(0, IOH_DEV, 0, 0);
-    igd_id = pci_conf_read32(0, IGD_DEV, 0, 0);
+    ioh_id = pci_conf_read32(0, 0, IOH_DEV, 0, 0);
+    igd_id = pci_conf_read32(0, 0, IGD_DEV, 0, 0);
 
     /* Mobile 4 Series Chipset neglects to set RWBF capability. */
     if ( ioh_id == 0x2a408086 )
@@ -302,15 +302,15 @@ void me_wifi_quirk(struct domain *domain, u8 bus, u8 devfn, int map)
 {
     u32 id;
 
-    id = pci_conf_read32(0, 0, 0, 0);
+    id = pci_conf_read32(0, 0, 0, 0, 0);
     if ( IS_CTG(id) )
     {
         /* quit if ME does not exist */
-        if ( pci_conf_read32(0, 3, 0, 0) == 0xffffffff )
+        if ( pci_conf_read32(0, 0, 3, 0, 0) == 0xffffffff )
             return;
 
         /* if device is WLAN device, map ME phantom device 0:3.7 */
-        id = pci_conf_read32(bus, PCI_SLOT(devfn), PCI_FUNC(devfn), 0);
+        id = pci_conf_read32(0, bus, PCI_SLOT(devfn), PCI_FUNC(devfn), 0);
         switch (id)
         {
             case 0x42328086:
@@ -330,11 +330,11 @@ void me_wifi_quirk(struct domain *domain, u8 bus, u8 devfn, int map)
     else if ( IS_ILK(id) || IS_CPT(id) )
     {
         /* quit if ME does not exist */
-        if ( pci_conf_read32(0, 22, 0, 0) == 0xffffffff )
+        if ( pci_conf_read32(0, 0, 22, 0, 0) == 0xffffffff )
             return;
 
         /* if device is WLAN device, map ME phantom device 0:22.7 */
-        id = pci_conf_read32(bus, PCI_SLOT(devfn), PCI_FUNC(devfn), 0);
+        id = pci_conf_read32(0, bus, PCI_SLOT(devfn), PCI_FUNC(devfn), 0);
         switch (id)
         {
             case 0x00878086:        /* Kilmer Peak */
@@ -364,16 +364,17 @@ void me_wifi_quirk(struct domain *domain, u8 bus, u8 devfn, int map)
 void __init pci_vtd_quirk(struct pci_dev *pdev)
 {
 #ifdef CONFIG_X86_64
+    int seg = pdev->seg;
     int bus = pdev->bus;
     int dev = PCI_SLOT(pdev->devfn);
     int func = PCI_FUNC(pdev->devfn);
     int id, val;
 
-    id = pci_conf_read32(bus, dev, func, 0);
+    id = pci_conf_read32(seg, bus, dev, func, 0);
     if ( id == 0x342e8086 || id == 0x3c288086 )
     {
-        val = pci_conf_read32(bus, dev, func, 0x1AC);
-        pci_conf_write32(bus, dev, func, 0x1AC, val | (1 << 31));
+        val = pci_conf_read32(seg, bus, dev, func, 0x1AC);
+        pci_conf_write32(seg, bus, dev, func, 0x1AC, val | (1 << 31));
     }
 #endif
 }

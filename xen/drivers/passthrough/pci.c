@@ -214,8 +214,8 @@ void pci_enable_acs(struct pci_dev *pdev)
     if (!pos)
         return;
 
-    cap = pci_conf_read16(bus, dev, func, pos + PCI_ACS_CAP);
-    ctrl = pci_conf_read16(bus, dev, func, pos + PCI_ACS_CTRL);
+    cap = pci_conf_read16(seg, bus, dev, func, pos + PCI_ACS_CAP);
+    ctrl = pci_conf_read16(seg, bus, dev, func, pos + PCI_ACS_CTRL);
 
     /* Source Validation */
     ctrl |= (cap & PCI_ACS_SV);
@@ -229,7 +229,7 @@ void pci_enable_acs(struct pci_dev *pdev)
     /* Upstream Forwarding */
     ctrl |= (cap & PCI_ACS_UF);
 
-    pci_conf_write16(bus, dev, func, pos + PCI_ACS_CTRL, ctrl);
+    pci_conf_write16(seg, bus, dev, func, pos + PCI_ACS_CTRL, ctrl);
 }
 
 int pci_add_device(u16 seg, u8 bus, u8 devfn, const struct pci_dev_info *info)
@@ -273,7 +273,7 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn, const struct pci_dev_info *info)
     {
         unsigned int pos = pci_find_ext_capability(seg, bus, devfn,
                                                    PCI_EXT_CAP_ID_SRIOV);
-        u16 ctrl = pci_conf_read16(bus, slot, func, pos + PCI_SRIOV_CTRL);
+        u16 ctrl = pci_conf_read16(seg, bus, slot, func, pos + PCI_SRIOV_CTRL);
 
         if ( !pos )
             /* Nothing */;
@@ -285,7 +285,7 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn, const struct pci_dev_info *info)
             for ( i = 0; i < PCI_SRIOV_NUM_BARS; ++i )
             {
                 unsigned int idx = pos + PCI_SRIOV_BAR + i * 4;
-                u32 bar = pci_conf_read32(bus, slot, func, idx);
+                u32 bar = pci_conf_read32(seg, bus, slot, func, idx);
                 u32 hi = 0;
 
                 if ( (bar & PCI_BASE_ADDRESS_SPACE) ==
@@ -297,7 +297,7 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn, const struct pci_dev_info *info)
                            seg, bus, slot, func, i);
                     continue;
                 }
-                pci_conf_write32(bus, slot, func, idx, ~0);
+                pci_conf_write32(seg, bus, slot, func, idx, ~0);
                 if ( (bar & PCI_BASE_ADDRESS_MEM_TYPE_MASK) ==
                      PCI_BASE_ADDRESS_MEM_TYPE_64 )
                 {
@@ -309,21 +309,22 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn, const struct pci_dev_info *info)
                                seg, bus, slot, func);
                         break;
                     }
-                    hi = pci_conf_read32(bus, slot, func, idx + 4);
-                    pci_conf_write32(bus, slot, func, idx + 4, ~0);
+                    hi = pci_conf_read32(seg, bus, slot, func, idx + 4);
+                    pci_conf_write32(seg, bus, slot, func, idx + 4, ~0);
                 }
-                pdev->vf_rlen[i] = pci_conf_read32(bus, slot, func, idx) &
+                pdev->vf_rlen[i] = pci_conf_read32(seg, bus, slot, func, idx) &
                                    PCI_BASE_ADDRESS_MEM_MASK;
                 if ( (bar & PCI_BASE_ADDRESS_MEM_TYPE_MASK) ==
                      PCI_BASE_ADDRESS_MEM_TYPE_64 )
                 {
-                    pdev->vf_rlen[i] |= (u64)pci_conf_read32(bus, slot, func,
+                    pdev->vf_rlen[i] |= (u64)pci_conf_read32(seg, bus,
+                                                             slot, func,
                                                              idx + 4) << 32;
-                    pci_conf_write32(bus, slot, func, idx + 4, hi);
+                    pci_conf_write32(seg, bus, slot, func, idx + 4, hi);
                 }
                 else if ( pdev->vf_rlen[i] )
                     pdev->vf_rlen[i] |= (u64)~0 << 32;
-                pci_conf_write32(bus, slot, func, idx, bar);
+                pci_conf_write32(seg, bus, slot, func, idx, bar);
                 pdev->vf_rlen[i] = -pdev->vf_rlen[i];
                 if ( (bar & PCI_BASE_ADDRESS_MEM_TYPE_MASK) ==
                      PCI_BASE_ADDRESS_MEM_TYPE_64 )
@@ -458,23 +459,24 @@ int pdev_type(u16 seg, u8 bus, u8 devfn)
     int pos;
     u8 d = PCI_SLOT(devfn), f = PCI_FUNC(devfn);
 
-    class_device = pci_conf_read16(bus, d, f, PCI_CLASS_DEVICE);
+    class_device = pci_conf_read16(seg, bus, d, f, PCI_CLASS_DEVICE);
     if ( class_device == PCI_CLASS_BRIDGE_PCI )
     {
-        pos = pci_find_next_cap(bus, devfn,
+        pos = pci_find_next_cap(seg, bus, devfn,
                                 PCI_CAPABILITY_LIST, PCI_CAP_ID_EXP);
         if ( !pos )
             return DEV_TYPE_LEGACY_PCI_BRIDGE;
-        creg = pci_conf_read16(bus, d, f, pos + PCI_EXP_FLAGS);
+        creg = pci_conf_read16(seg, bus, d, f, pos + PCI_EXP_FLAGS);
         return ((creg & PCI_EXP_FLAGS_TYPE) >> 4) == PCI_EXP_TYPE_PCI_BRIDGE ?
             DEV_TYPE_PCIe2PCI_BRIDGE : DEV_TYPE_PCIe_BRIDGE;
     }
 
-    status = pci_conf_read16(bus, d, f, PCI_STATUS);
+    status = pci_conf_read16(seg, bus, d, f, PCI_STATUS);
     if ( !(status & PCI_STATUS_CAP_LIST) )
         return DEV_TYPE_PCI;
 
-    if ( pci_find_next_cap(bus, devfn, PCI_CAPABILITY_LIST, PCI_CAP_ID_EXP) )
+    if ( pci_find_next_cap(seg, bus, devfn, PCI_CAPABILITY_LIST,
+                           PCI_CAP_ID_EXP) )
         return DEV_TYPE_PCIe_ENDPOINT;
 
     return DEV_TYPE_PCI;
@@ -527,7 +529,7 @@ int __init pci_device_detect(u16 seg, u8 bus, u8 dev, u8 func)
 {
     u32 vendor;
 
-    vendor = pci_conf_read32(bus, dev, func, PCI_VENDOR_ID);
+    vendor = pci_conf_read32(seg, bus, dev, func, PCI_VENDOR_ID);
     /* some broken boards return 0 or ~0 if a slot is empty: */
     if ( (vendor == 0xffffffff) || (vendor == 0x00000000) ||
          (vendor == 0x0000ffff) || (vendor == 0xffff0000) )
@@ -571,9 +573,9 @@ static int __init _scan_pci_devices(struct pci_seg *pseg, void *arg)
 
                     case DEV_TYPE_PCIe2PCI_BRIDGE:
                     case DEV_TYPE_LEGACY_PCI_BRIDGE:
-                        sec_bus = pci_conf_read8(bus, dev, func,
+                        sec_bus = pci_conf_read8(pseg->nr, bus, dev, func,
                                                  PCI_SECONDARY_BUS);
-                        sub_bus = pci_conf_read8(bus, dev, func,
+                        sub_bus = pci_conf_read8(pseg->nr, bus, dev, func,
                                                  PCI_SUBORDINATE_BUS);
 
                         spin_lock(&pseg->bus2bridge_lock);
@@ -597,7 +599,7 @@ static int __init _scan_pci_devices(struct pci_seg *pseg, void *arg)
                         return -EINVAL;
                 }
 
-                if ( !func && !(pci_conf_read8(bus, dev, func,
+                if ( !func && !(pci_conf_read8(pseg->nr, bus, dev, func,
                                                PCI_HEADER_TYPE) & 0x80) )
                     break;
             }
@@ -667,7 +669,7 @@ static int _disconnect_pci_devices(struct pci_seg *pseg, void *arg)
     struct pci_dev *pdev;
 
     list_for_each_entry ( pdev, &pseg->alldevs_list, alldevs_list )
-        pci_conf_write16(pdev->bus, PCI_SLOT(pdev->devfn),
+        pci_conf_write16(pseg->nr, pdev->bus, PCI_SLOT(pdev->devfn),
                          PCI_FUNC(pdev->devfn), PCI_COMMAND, 0);
 
     return 0;
