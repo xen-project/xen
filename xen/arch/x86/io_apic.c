@@ -27,8 +27,6 @@
 #include <xen/delay.h>
 #include <xen/sched.h>
 #include <xen/acpi.h>
-#include <xen/pci.h>
-#include <xen/pci_regs.h>
 #include <xen/keyhandler.h>
 #include <asm/mc146818rtc.h>
 #include <asm/smp.h>
@@ -2491,12 +2489,10 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
 
         add_pin_to_irq(irq, apic, pin);
     }
-    spin_lock(&pcidevs_lock);
     spin_lock(&dom0->event_lock);
     ret = map_domain_pirq(dom0, pirq, irq,
             MAP_PIRQ_TYPE_GSI, NULL);
     spin_unlock(&dom0->event_lock);
-    spin_unlock(&pcidevs_lock);
     if ( ret < 0 )
         return ret;
 

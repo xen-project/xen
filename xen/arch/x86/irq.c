@@ -1662,10 +1662,7 @@ int map_domain_pirq(
     struct pirq *info;
     struct irq_desc *desc;
     unsigned long flags;
-    struct msi_desc *msi_desc;
-    struct pci_dev *pdev = NULL;
 
-    ASSERT(spin_is_locked(&pcidevs_lock));
     ASSERT(spin_is_locked(&d->event_lock));
 
     if ( !IS_PRIV(current->domain) &&
@@ -1708,6 +1705,10 @@ int map_domain_pirq(
     if ( type == MAP_PIRQ_TYPE_MSI )
     {
         struct msi_info *msi = (struct msi_info *)data;
+        struct msi_desc *msi_desc;
+        struct pci_dev *pdev;
+
+        ASSERT(spin_is_locked(&pcidevs_lock));
 
         ret = -ENODEV;
         if ( !cpu_has_apic )
