@@ -520,7 +520,7 @@ acpi_parse_one_rmrr(struct acpi_dmar_entry_header *header)
      * inform the user
      */
     if ( (!page_is_ram_type(paddr_to_pfn(base_addr), RAM_TYPE_RESERVED)) ||
-         (!page_is_ram_type(paddr_to_pfn(end_addr) - 1, RAM_TYPE_RESERVED)) )
+         (!page_is_ram_type(paddr_to_pfn(end_addr), RAM_TYPE_RESERVED)) )
     {
         dprintk(XENLOG_WARNING VTDPREFIX,
                 "  RMRR address range not in reserved memory "
