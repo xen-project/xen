@@ -188,6 +188,9 @@ struct acpi_drhd_unit * acpi_find_matched_drhd_unit(struct pci_dev *pdev)
 
     list_for_each_entry ( drhd, &acpi_drhd_units, list )
     {
+        if ( drhd->segment != pdev->seg )
+            continue;
+
         for (i = 0; i < drhd->scope.devices_cnt; i++)
             if ( drhd->scope.devices[i] == PCI_BDF2(bus, devfn) )
                 return drhd;
@@ -201,13 +204,16 @@ struct acpi_drhd_unit * acpi_find_matched_drhd_unit(struct pci_dev *pdev)
     return include_all;
 }
 
-struct acpi_atsr_unit * acpi_find_matched_atsr_unit(u8 bus, u8 devfn)
+struct acpi_atsr_unit * acpi_find_matched_atsr_unit(u16 seg, u8 bus, u8 devfn)
 {
     struct acpi_atsr_unit *atsr;
     struct acpi_atsr_unit *all_ports = NULL;
 
     list_for_each_entry ( atsr, &acpi_atsr_units, list )
     {
+        if ( atsr->segment != seg )
+            continue;
+
         if ( test_bit(bus, atsr->scope.buses) )
             return atsr;
 
@@ -269,8 +275,8 @@ static int scope_device_count(void *start, void *end)
 }
 
 
-static int __init acpi_parse_dev_scope(void *start, void *end,
-                                       void *acpi_entry, int type)
+static int __init acpi_parse_dev_scope(
+    void *start, void *end, void *acpi_entry, int type, u16 seg)
 {
     struct dmar_scope *scope = acpi_entry;
     struct acpi_ioapic_unit *acpi_ioapic_unit;
@@ -314,8 +320,8 @@ static int __init acpi_parse_dev_scope(void *start, void *end,
                 bus, path->dev, path->fn, PCI_SUBORDINATE_BUS);
             if ( iommu_verbose )
                 dprintk(VTDPREFIX,
-                        "  bridge: %x:%x.%x  start = %x sec = %x  sub = %x\n",
-                        bus, path->dev, path->fn,
+                        " bridge: %04x:%02x:%02x.%u start=%x sec=%x sub=%x\n",
+                        seg, bus, path->dev, path->fn,
                         acpi_scope->start_bus, sec_bus, sub_bus);
 
             dmar_scope_add_buses(scope, sec_bus, sub_bus);
@@ -323,20 +329,21 @@ static int __init acpi_parse_dev_scope(void *start, void *end,
 
         case ACPI_DEV_MSI_HPET:
             if ( iommu_verbose )
-                dprintk(VTDPREFIX, "  MSI HPET: %x:%x.%x\n",
-                        bus, path->dev, path->fn);
+                dprintk(VTDPREFIX, " MSI HPET: %04x:%02x:%02x.%u\n",
+                        seg, bus, path->dev, path->fn);
             break;
 
         case ACPI_DEV_ENDPOINT:
             if ( iommu_verbose )
-                dprintk(VTDPREFIX, "  endpoint: %x:%x.%x\n",
-                        bus, path->dev, path->fn);
+                dprintk(VTDPREFIX, " endpoint: %04x:%02x:%02x.%u\n",
+                        seg, bus, path->dev, path->fn);
 
             if ( type == DMAR_TYPE )
             {
                 struct acpi_drhd_unit *drhd = acpi_entry;
 
-                if ( (bus == 0) && (path->dev == 2) && (path->fn == 0) )
+                if ( (seg == 0) && (bus == 0) && (path->dev == 2) &&
+                     (path->fn == 0) )
                     igd_drhd_address = drhd->address;
             }
 
@@ -344,8 +351,8 @@ static int __init acpi_parse_dev_scope(void *start, void *end,
 
         case ACPI_DEV_IOAPIC:
             if ( iommu_verbose )
-                dprintk(VTDPREFIX, "  IOAPIC: %x:%x.%x\n",
-                        bus, path->dev, path->fn);
+                dprintk(VTDPREFIX, " IOAPIC: %04x:%02x:%02x.%u\n",
+                        seg, bus, path->dev, path->fn);
 
             if ( type == DMAR_TYPE )
             {
@@ -398,6 +405,7 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
     memset(dmaru, 0, sizeof(struct acpi_drhd_unit));
 
     dmaru->address = drhd->address;
+    dmaru->segment = drhd->segment;
     dmaru->include_all = drhd->flags & 1; /* BIT0: INCLUDE_ALL */
     INIT_LIST_HEAD(&dmaru->ioapic_list);
     if ( iommu_verbose )
@@ -411,7 +419,7 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
     dev_scope_start = (void *)(drhd + 1);
     dev_scope_end = ((void *)drhd) + header->length;
     ret = acpi_parse_dev_scope(dev_scope_start, dev_scope_end,
-                               dmaru, DMAR_TYPE);
+                               dmaru, DMAR_TYPE, drhd->segment);
 
     if ( dmaru->include_all )
     {
@@ -528,11 +536,12 @@ acpi_parse_one_rmrr(struct acpi_dmar_entry_header *header)
 
     rmrru->base_address = base_addr;
     rmrru->end_address = end_addr;
+    rmrru->segment = rmrr->segment;
 
     dev_scope_start = (void *)(rmrr + 1);
     dev_scope_end   = ((void *)rmrr) + header->length;
     ret = acpi_parse_dev_scope(dev_scope_start, dev_scope_end,
-                               rmrru, RMRR_TYPE);
+                               rmrru, RMRR_TYPE, rmrr->segment);
 
     if ( ret || (rmrru->scope.devices_cnt == 0) )
         xfree(rmrru);
@@ -609,6 +618,7 @@ acpi_parse_one_atsr(struct acpi_dmar_entry_header *header)
         return -ENOMEM;
     memset(atsru, 0, sizeof(struct acpi_atsr_unit));
 
+    atsru->segment = atsr->segment;
     atsru->all_ports = atsr->flags & 1; /* BIT0: ALL_PORTS */
     if ( iommu_verbose )
         dprintk(VTDPREFIX,
@@ -618,7 +628,7 @@ acpi_parse_one_atsr(struct acpi_dmar_entry_header *header)
         dev_scope_start = (void *)(atsr + 1);
         dev_scope_end   = ((void *)atsr) + header->length;
         ret = acpi_parse_dev_scope(dev_scope_start, dev_scope_end,
-                                   atsru, ATSR_TYPE);
+                                   atsru, ATSR_TYPE, atsr->segment);
     }
     else
     {

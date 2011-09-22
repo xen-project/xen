@@ -32,7 +32,7 @@
 #include <asm/io_apic.h>
 #endif
 
-int is_usb_device(u8 bus, u8 devfn)
+int is_usb_device(u16 seg, u8 bus, u8 devfn)
 {
     u16 class = pci_conf_read16(bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
                                 PCI_CLASS_DEVICE);
@@ -106,8 +106,9 @@ void print_vtd_entries(struct iommu *iommu, int bus, int devfn, u64 gmfn)
     u64 *l, val;
     u32 l_index, level;
 
-    printk("print_vtd_entries: iommu = %p bdf = %x:%x.%x gmfn = %"PRIx64"\n",
-           iommu, bus, PCI_SLOT(devfn), PCI_FUNC(devfn), gmfn);
+    printk("print_vtd_entries: iommu %p dev %04x:%02x:%02x.%u gmfn %"PRIx64"\n",
+           iommu, iommu->intel->drhd->segment, bus,
+           PCI_SLOT(devfn), PCI_FUNC(devfn), gmfn);
 
     if ( iommu->root_maddr == 0 )
     {

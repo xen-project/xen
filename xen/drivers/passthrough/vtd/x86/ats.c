@@ -104,7 +104,7 @@ int ats_device(int seg, int bus, int devfn)
          !ecap_dev_iotlb(drhd->iommu->ecap) )
         return 0;
 
-    if ( !acpi_find_matched_atsr_unit(bus, devfn) )
+    if ( !acpi_find_matched_atsr_unit(seg, bus, devfn) )
         return 0;
 
     ats_drhd = find_ats_dev_drhd(drhd->iommu);

@@ -834,16 +834,17 @@ static int iommu_page_fault_do_one(struct iommu *iommu, int type,
 {
     const char *reason;
     int fault_type;
+    u16 seg = iommu->intel->drhd->segment;
     reason = iommu_get_fault_reason(fault_reason, &fault_type);
 
     if ( fault_type == DMA_REMAP )
     {
         INTEL_IOMMU_DEBUG(
-                "DMAR:[%s] Request device [%02x:%02x.%d] "
+                "DMAR:[%s] Request device [%04x:%02x:%02x.%u] "
                 "fault addr %"PRIx64", iommu reg = %p\n"
                 "DMAR:[fault reason %02xh] %s\n",
                 (type ? "DMA Read" : "DMA Write"),
-                (source_id >> 8), PCI_SLOT(source_id & 0xFF),
+                seg, (source_id >> 8), PCI_SLOT(source_id & 0xFF),
                 PCI_FUNC(source_id & 0xFF), addr, iommu->reg,
                 fault_reason, reason);
 #ifndef __i386__ /* map_domain_page() cannot be used in this context */
@@ -854,10 +855,10 @@ static int iommu_page_fault_do_one(struct iommu *iommu, int type,
     }
     else
         INTEL_IOMMU_DEBUG(
-                "INTR-REMAP: Request device [%02x:%02x.%d] "
+                "INTR-REMAP: Request device [%04x:%02x:%02x.%u] "
                 "fault index %"PRIx64", iommu reg = %p\n"
                 "INTR-REMAP:[fault reason %02xh] %s\n",
-                (source_id >> 8), PCI_SLOT(source_id & 0xFF),
+                seg, (source_id >> 8), PCI_SLOT(source_id & 0xFF),
                 PCI_FUNC(source_id & 0xFF), addr >> 48, iommu->reg,
                 fault_reason, reason);
     return 0;
@@ -1252,6 +1253,7 @@ int domain_context_mapping_one(
     struct hvm_iommu *hd = domain_hvm_iommu(domain);
     struct context_entry *context, *context_entries;
     u64 maddr, pgd_maddr;
+    u16 seg = iommu->intel->drhd->segment;
     int agaw;
 
     ASSERT(spin_is_locked(&pcidevs_lock));
@@ -1267,7 +1269,7 @@ int domain_context_mapping_one(
 
         /* First try to get domain ownership from device structure.  If that's
          * not available, try to read it from the context itself. */
-        pdev = pci_get_pdev(0, bus, devfn);
+        pdev = pci_get_pdev(seg, bus, devfn);
         if ( pdev )
         {
             if ( pdev->domain != domain )
@@ -1379,18 +1381,20 @@ int domain_context_mapping_one(
 
     unmap_vtd_domain_page(context_entries);
 
-    me_wifi_quirk(domain, bus, devfn, MAP_ME_PHANTOM_FUNC);
+    if ( !seg )
+        me_wifi_quirk(domain, bus, devfn, MAP_ME_PHANTOM_FUNC);
 
     return 0;
 }
 
-static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
+static int domain_context_mapping(
+    struct domain *domain, u16 seg, u8 bus, u8 devfn)
 {
     struct acpi_drhd_unit *drhd;
     int ret = 0;
     u32 type;
     u8 secbus;
-    struct pci_dev *pdev = pci_get_pdev(0, bus, devfn);
+    struct pci_dev *pdev = pci_get_pdev(seg, bus, devfn);
 
     drhd = acpi_find_matched_drhd_unit(pdev);
     if ( !drhd )
@@ -1408,18 +1412,20 @@ static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
 
     case DEV_TYPE_PCIe_ENDPOINT:
         if ( iommu_verbose )
-            dprintk(VTDPREFIX, "d%d:PCIe: map bdf = %x:%x.%x\n",
-                    domain->domain_id, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+            dprintk(VTDPREFIX, "d%d:PCIe: map %04x:%02x:%02x.%u\n",
+                    domain->domain_id, seg, bus,
+                    PCI_SLOT(devfn), PCI_FUNC(devfn));
         ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn);
-        if ( !ret && ats_device(0, bus, devfn) )
-            enable_ats_device(0, bus, devfn);
+        if ( !ret && ats_device(seg, bus, devfn) )
+            enable_ats_device(seg, bus, devfn);
 
         break;
 
     case DEV_TYPE_PCI:
         if ( iommu_verbose )
-            dprintk(VTDPREFIX, "d%d:PCI: map bdf = %x:%x.%x\n",
-                    domain->domain_id, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+            dprintk(VTDPREFIX, "d%d:PCI: map %04x:%02x:%02x.%u\n",
+                    domain->domain_id, seg, bus,
+                    PCI_SLOT(devfn), PCI_FUNC(devfn));
 
         ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn);
         if ( ret )
@@ -1442,9 +1448,9 @@ static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
         break;
 
     default:
-        dprintk(XENLOG_ERR VTDPREFIX, "d%d:unknown(%u): bdf = %x:%x.%x\n",
+        dprintk(XENLOG_ERR VTDPREFIX, "d%d:unknown(%u): %04x:%02x:%02x.%u\n",
                 domain->domain_id, type,
-                bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+                seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         ret = -EINVAL;
         break;
     }
@@ -1503,19 +1509,21 @@ int domain_context_unmap_one(
     spin_unlock(&iommu->lock);
     unmap_vtd_domain_page(context_entries);
 
-    me_wifi_quirk(domain, bus, devfn, UNMAP_ME_PHANTOM_FUNC);
+    if ( !iommu->intel->drhd->segment )
+        me_wifi_quirk(domain, bus, devfn, UNMAP_ME_PHANTOM_FUNC);
 
     return 0;
 }
 
-static int domain_context_unmap(struct domain *domain, u8 bus, u8 devfn)
+static int domain_context_unmap(
+    struct domain *domain, u16 seg, u8 bus, u8 devfn)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
     int ret = 0;
     u32 type;
     u8 tmp_bus, tmp_devfn, secbus;
-    struct pci_dev *pdev = pci_get_pdev(0, bus, devfn);
+    struct pci_dev *pdev = pci_get_pdev(seg, bus, devfn);
     int found = 0;
 
     BUG_ON(!pdev);
@@ -1535,18 +1543,19 @@ static int domain_context_unmap(struct domain *domain, u8 bus, u8 devfn)
 
     case DEV_TYPE_PCIe_ENDPOINT:
         if ( iommu_verbose )
-            dprintk(VTDPREFIX, "d%d:PCIe: unmap bdf = %x:%x.%x\n",
-                    domain->domain_id, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+            dprintk(VTDPREFIX, "d%d:PCIe: unmap %04x:%02x:%02x.%u\n",
+                    domain->domain_id, seg, bus,
+                    PCI_SLOT(devfn), PCI_FUNC(devfn));
         ret = domain_context_unmap_one(domain, iommu, bus, devfn);
-        if ( !ret && ats_device(0, bus, devfn) )
-            disable_ats_device(0, bus, devfn);
+        if ( !ret && ats_device(seg, bus, devfn) )
+            disable_ats_device(seg, bus, devfn);
 
         break;
 
     case DEV_TYPE_PCI:
         if ( iommu_verbose )
-            dprintk(VTDPREFIX, "d%d:PCI: unmap bdf = %x:%x.%x\n",
-                    domain->domain_id, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+            dprintk(VTDPREFIX, "d%d:PCI: unmap %04x:%02x:%02x.%u\n",
+                    domain->domain_id, seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         ret = domain_context_unmap_one(domain, iommu, bus, devfn);
         if ( ret )
             break;
@@ -1571,9 +1580,9 @@ static int domain_context_unmap(struct domain *domain, u8 bus, u8 devfn)
         break;
 
     default:
-        dprintk(XENLOG_ERR VTDPREFIX, "d%d:unknown(%u): bdf = %x:%x.%x\n",
+        dprintk(XENLOG_ERR VTDPREFIX, "d%d:unknown(%u): %04x:%02x:%02x.%u\n",
                 domain->domain_id, type,
-                bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+                seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         ret = -EINVAL;
         goto out;
     }
@@ -1584,7 +1593,7 @@ static int domain_context_unmap(struct domain *domain, u8 bus, u8 devfn)
      */
     for_each_pdev ( domain, pdev )
     {
-        if ( pdev->bus == bus && pdev->devfn == devfn )
+        if ( pdev->seg == seg && pdev->bus == bus && pdev->devfn == devfn )
             continue;
 
         drhd = acpi_find_matched_drhd_unit(pdev);
@@ -1639,11 +1648,11 @@ static int reassign_device_ownership(
     if ( (target != dom0) && !iommu_intremap )
         untrusted_msi = 1;
 
-    ret = domain_context_unmap(source, bus, devfn);
+    ret = domain_context_unmap(source, seg, bus, devfn);
     if ( ret )
         return ret;
 
-    ret = domain_context_mapping(target, bus, devfn);
+    ret = domain_context_mapping(target, seg, bus, devfn);
     if ( ret )
         return ret;
 
@@ -1878,7 +1887,8 @@ static int intel_iommu_add_device(struct pci_dev *pdev)
     if ( !pdev->domain )
         return -EINVAL;
 
-    ret = domain_context_mapping(pdev->domain, pdev->bus, pdev->devfn);
+    ret = domain_context_mapping(pdev->domain, pdev->seg, pdev->bus,
+                                 pdev->devfn);
     if ( ret )
     {
         dprintk(XENLOG_ERR VTDPREFIX, "d%d: context mapping failed\n",
@@ -1888,7 +1898,9 @@ static int intel_iommu_add_device(struct pci_dev *pdev)
 
     for_each_rmrr_device ( rmrr, bdf, i )
     {
-        if ( PCI_BUS(bdf) == pdev->bus && PCI_DEVFN2(bdf) == pdev->devfn )
+        if ( rmrr->segment == pdev->seg &&
+             PCI_BUS(bdf) == pdev->bus &&
+             PCI_DEVFN2(bdf) == pdev->devfn )
         {
             ret = rmrr_identity_mapping(pdev->domain, rmrr);
             if ( ret )
@@ -1916,13 +1928,15 @@ static int intel_iommu_remove_device(struct pci_dev *pdev)
     {
         for_each_rmrr_device ( rmrr, bdf, i )
         {
-            if ( PCI_BUS(bdf) == pdev->bus &&
+            if ( rmrr->segment == pdev->seg &&
+                 PCI_BUS(bdf) == pdev->bus &&
                  PCI_DEVFN2(bdf) == pdev->devfn )
                 return 0;
         }
     }
 
-    return domain_context_unmap(pdev->domain, pdev->bus, pdev->devfn);
+    return domain_context_unmap(pdev->domain, pdev->seg, pdev->bus,
+                                pdev->devfn);
 }
 
 static void __init setup_dom0_devices(struct domain *d)
@@ -1941,7 +1955,7 @@ static void __init setup_dom0_devices(struct domain *d)
 
             pdev->domain = d;
             list_add(&pdev->domain_list, &d->arch.pdev_list);
-            domain_context_mapping(d, pdev->bus, pdev->devfn);
+            domain_context_mapping(d, pdev->seg, pdev->bus, pdev->devfn);
             pci_enable_acs(pdev);
             pci_vtd_quirk(pdev);
         }
@@ -2183,7 +2197,7 @@ static int intel_iommu_assign_device(
     /* FIXME: Because USB RMRR conflicts with guest bios region,
      * ignore USB RMRR temporarily.
      */
-    if ( is_usb_device(bus, devfn) )
+    if ( is_usb_device(seg, bus, devfn) )
     {
         ret = 0;
         goto done;
@@ -2192,7 +2206,9 @@ static int intel_iommu_assign_device(
     /* Setup rmrr identity mapping */
     for_each_rmrr_device( rmrr, bdf, i )
     {
-        if ( PCI_BUS(bdf) == bus && PCI_DEVFN2(bdf) == devfn )
+        if ( rmrr->segment == seg &&
+             PCI_BUS(bdf) == bus &&
+             PCI_DEVFN2(bdf) == devfn )
         {
             ret = rmrr_identity_mapping(d, rmrr);
             if ( ret )

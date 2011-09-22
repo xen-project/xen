@@ -49,6 +49,7 @@ struct acpi_drhd_unit {
     struct dmar_scope scope;            /* must be first member of struct */
     struct list_head list;
     u64    address;                     /* register base address of the unit */
+    u16    segment;
     u8     include_all:1;
     struct iommu *iommu;
     struct list_head ioapic_list;
@@ -59,12 +60,14 @@ struct acpi_rmrr_unit {
     struct list_head list;
     u64    base_address;
     u64    end_address;
+    u16    segment;
     u8     allow_all:1;
 };
 
 struct acpi_atsr_unit {
     struct dmar_scope scope;            /* must be first member of struct */
     struct list_head list;
+    u16    segment;
     u8     all_ports:1;
 };
 
@@ -84,7 +87,7 @@ struct acpi_rhsa_unit {
                  idx < rmrr->scope.devices_cnt; idx++)
 
 struct acpi_drhd_unit * acpi_find_matched_drhd_unit(struct pci_dev *pdev);
-struct acpi_atsr_unit * acpi_find_matched_atsr_unit(u8 bus, u8 devfn);
+struct acpi_atsr_unit * acpi_find_matched_atsr_unit(u16 seg, u8 bus, u8 devfn);
 
 #define DMAR_TYPE 1
 #define RMRR_TYPE 2
@@ -114,7 +117,7 @@ void *map_to_nocache_virt(int nr_iommus, u64 maddr);
 
 int vtd_hw_check(void);
 void disable_pmr(struct iommu *iommu);
-int is_usb_device(u8 bus, u8 devfn);
+int is_usb_device(u16 seg, u8 bus, u8 devfn);
 int is_igd_drhd(struct acpi_drhd_unit *drhd);
 
 #endif /* _DMAR_H_ */
