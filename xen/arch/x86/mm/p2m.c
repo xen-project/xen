@@ -746,6 +746,9 @@ int p2m_mem_paging_evict(struct domain *d, unsigned long gfn)
     /* Put the page back so it gets freed */
     put_page(page);
 
+    /* Track number of paged gfns */
+    atomic_inc(&d->paged_pages);
+
     return 0;
 }
 
@@ -830,6 +833,8 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn)
     set_p2m_entry(p2m, gfn, page_to_mfn(page), 0, p2m_ram_paging_in, p2m->default_access);
     audit_p2m(p2m, 1);
     p2m_unlock(p2m);
+
+    atomic_dec(&d->paged_pages);
 
     return 0;
 }

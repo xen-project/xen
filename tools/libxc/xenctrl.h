@@ -351,6 +351,7 @@ typedef struct xc_dominfo {
     unsigned int  shutdown_reason; /* only meaningful if shutdown==1 */
     unsigned long nr_pages; /* current number, not maximum */
     unsigned long nr_shared_pages;
+    unsigned long nr_paged_pages;
     unsigned long shared_info_frame;
     uint64_t      cpu_time;
     unsigned long max_memkb;

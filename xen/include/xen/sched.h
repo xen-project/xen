@@ -208,6 +208,7 @@ struct domain
     unsigned int     tot_pages;       /* number of pages currently possesed */
     unsigned int     max_pages;       /* maximum value for tot_pages        */
     atomic_t         shr_pages;       /* number of shared pages             */
+    atomic_t         paged_pages;     /* number of paged-out pages          */
     unsigned int     xenheap_pages;   /* # pages allocated from Xen heap    */
 
     unsigned int     max_vcpus;

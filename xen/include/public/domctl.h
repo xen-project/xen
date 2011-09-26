@@ -35,7 +35,7 @@
 #include "xen.h"
 #include "grant_table.h"
 
-#define XEN_DOMCTL_INTERFACE_VERSION 0x00000007
+#define XEN_DOMCTL_INTERFACE_VERSION 0x00000008
 
 /*
  * NB. xen_domctl.domain is an IN/OUT parameter for this operation.
@@ -95,6 +95,7 @@ struct xen_domctl_getdomaininfo {
     uint64_aligned_t tot_pages;
     uint64_aligned_t max_pages;
     uint64_aligned_t shr_pages;
+    uint64_aligned_t paged_pages;
     uint64_aligned_t shared_info_frame; /* GMFN of shared_info struct */
     uint64_aligned_t cpu_time;
     uint32_t nr_online_vcpus;    /* Number of VCPUs currently online. */
