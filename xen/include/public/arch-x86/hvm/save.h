@@ -547,18 +547,6 @@ struct hvm_hw_mtrr {
 DECLARE_HVM_SAVE_TYPE(MTRR, 14, struct hvm_hw_mtrr);
 
 /*
- * Viridian hypervisor context.
- */
-
-struct hvm_viridian_context {
-    uint64_t hypercall_gpa;
-    uint64_t guest_os_id;
-};
-
-DECLARE_HVM_SAVE_TYPE(VIRIDIAN, 15, struct hvm_viridian_context);
-
-
-/*
  * The save area of XSAVE/XRSTOR.
  */
 
@@ -580,9 +568,26 @@ struct hvm_hw_cpu_xsave {
 
 #define CPU_XSAVE_CODE  16
 
+/*
+ * Viridian hypervisor context.
+ */
+
+struct hvm_viridian_domain_context {
+    uint64_t hypercall_gpa;
+    uint64_t guest_os_id;
+};
+
+DECLARE_HVM_SAVE_TYPE(VIRIDIAN_DOMAIN, 15, struct hvm_viridian_domain_context);
+
+struct hvm_viridian_vcpu_context {
+    uint64_t apic_assist;
+};
+
+DECLARE_HVM_SAVE_TYPE(VIRIDIAN_VCPU, 17, struct hvm_viridian_vcpu_context);
+
 /* 
  * Largest type-code in use
  */
-#define HVM_SAVE_CODE_MAX 16
+#define HVM_SAVE_CODE_MAX 17
 
 #endif /* __XEN_PUBLIC_HVM_SAVE_X86_H__ */

@@ -366,13 +366,21 @@ static void dump_mtrr(void)
                (unsigned long long) p.msr_mtrr_fixed[i]);
 }
 
-static void dump_viridian(void)
+static void dump_viridian_domain(void)
 {
-    HVM_SAVE_TYPE(VIRIDIAN) p;
+    HVM_SAVE_TYPE(VIRIDIAN_DOMAIN) p;
     READ(p);
-    printf("    VIRIDIAN: hypercall gpa 0x%llx, guest ID 0x%llx\n",
+    printf("    VIRIDIAN_DOMAIN: hypercall gpa 0x%llx, guest_os_id 0x%llx\n",
            (unsigned long long) p.hypercall_gpa,
            (unsigned long long) p.guest_os_id);           
+}
+
+static void dump_viridian_vcpu(void)
+{
+    HVM_SAVE_TYPE(VIRIDIAN_VCPU) p;
+    READ(p);
+    printf("    VIRIDIAN_VCPU: apic_assist 0x%llx\n",
+           (unsigned long long) p.apic_assist);           
 }
 
 int main(int argc, char **argv)
@@ -439,7 +447,8 @@ int main(int argc, char **argv)
         case HVM_SAVE_CODE(HPET): dump_hpet(); break;
         case HVM_SAVE_CODE(PMTIMER): dump_pmtimer(); break;
         case HVM_SAVE_CODE(MTRR): dump_mtrr(); break;
-        case HVM_SAVE_CODE(VIRIDIAN): dump_viridian(); break;
+        case HVM_SAVE_CODE(VIRIDIAN_DOMAIN): dump_viridian_domain(); break;
+        case HVM_SAVE_CODE(VIRIDIAN_VCPU): dump_viridian_vcpu(); break;
         case HVM_SAVE_CODE(END): break;
         default:
             printf(" ** Don't understand type %u: skipping\n",

@@ -172,10 +172,10 @@ void initialize_apic_assist(struct vcpu *v)
     uint8_t *p;
 
     /*
-     * We don't support the APIC assist page, and that fact is reflected in
-     * our CPUID flags. However, Newer versions of Windows have a bug which
-     * means that they don't recognise that, and tries to use the page
-     * anyway. We therefore have to fake up just enough to keep windows happy.
+     * We don't yet make use of the APIC assist page but by setting
+     * the CPUID3A_MSR_APIC_ACCESS bit in CPUID leaf 40000003 we are duty
+     * bound to support the MSR. We therefore do just enough to keep windows
+     * happy.
      *
      * See http://msdn.microsoft.com/en-us/library/ff538657%28VS.85%29.aspx for
      * details of how Windows uses the page.
@@ -387,9 +387,9 @@ out:
     return HVM_HCALL_completed;
 }
 
-static int viridian_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
+static int viridian_save_domain_ctxt(struct domain *d, hvm_domain_context_t *h)
 {
-    struct hvm_viridian_context ctxt;
+    struct hvm_viridian_domain_context ctxt;
 
     if ( !is_viridian_domain(d) )
         return 0;
@@ -397,14 +397,14 @@ static int viridian_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     ctxt.hypercall_gpa = d->arch.hvm_domain.viridian.hypercall_gpa.raw;
     ctxt.guest_os_id   = d->arch.hvm_domain.viridian.guest_os_id.raw;
 
-    return (hvm_save_entry(VIRIDIAN, 0, h, &ctxt) != 0);
+    return (hvm_save_entry(VIRIDIAN_DOMAIN, 0, h, &ctxt) != 0);
 }
 
-static int viridian_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
+static int viridian_load_domain_ctxt(struct domain *d, hvm_domain_context_t *h)
 {
-    struct hvm_viridian_context ctxt;
+    struct hvm_viridian_domain_context ctxt;
 
-    if ( hvm_load_entry(VIRIDIAN, h, &ctxt) != 0 )
+    if ( hvm_load_entry(VIRIDIAN_DOMAIN, h, &ctxt) != 0 )
         return -EINVAL;
 
     d->arch.hvm_domain.viridian.hypercall_gpa.raw = ctxt.hypercall_gpa;
@@ -413,5 +413,48 @@ static int viridian_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     return 0;
 }
 
-HVM_REGISTER_SAVE_RESTORE(VIRIDIAN, viridian_save_cpu_ctxt,
-                          viridian_load_cpu_ctxt, 1, HVMSR_PER_DOM);
+HVM_REGISTER_SAVE_RESTORE(VIRIDIAN_DOMAIN, viridian_save_domain_ctxt,
+                          viridian_load_domain_ctxt, 1, HVMSR_PER_DOM);
+
+static int viridian_save_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
+{
+    struct vcpu *v;
+
+    if ( !is_viridian_domain(d) )
+        return 0;
+
+    for_each_vcpu( d, v ) {
+        struct hvm_viridian_vcpu_context ctxt;
+
+        ctxt.apic_assist = v->arch.hvm_vcpu.viridian.apic_assist.raw;
+
+        if ( hvm_save_entry(VIRIDIAN_VCPU, v->vcpu_id, h, &ctxt) != 0 )
+            return 1;
+    }
+
+    return 0;
+}
+
+static int viridian_load_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
+{
+    int vcpuid;
+    struct vcpu *v;
+    struct hvm_viridian_vcpu_context ctxt;
+
+    vcpuid = hvm_load_instance(h);
+    if ( vcpuid >= d->max_vcpus || (v = d->vcpu[vcpuid]) == NULL )
+    {
+        gdprintk(XENLOG_ERR, "HVM restore: domain has no vcpu %u\n", vcpuid);
+        return -EINVAL;
+    }
+
+    if ( hvm_load_entry(VIRIDIAN_VCPU, h, &ctxt) != 0 )
+        return -EINVAL;
+
+    v->arch.hvm_vcpu.viridian.apic_assist.raw = ctxt.apic_assist;
+
+    return 0;
+}
+
+HVM_REGISTER_SAVE_RESTORE(VIRIDIAN_VCPU, viridian_save_vcpu_ctxt,
+                          viridian_load_vcpu_ctxt, 1, HVMSR_PER_VCPU);
