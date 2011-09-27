@@ -103,7 +103,6 @@ struct ivrs_mappings {
 
 extern unsigned short ivrs_bdf_entries;
 
-int alloc_ivrs_mappings(u16 seg);
 struct ivrs_mappings *get_ivrs_mappings(u16 seg);
 int iterate_ivrs_mappings(int (*)(u16 seg, struct ivrs_mappings *));
 int iterate_ivrs_entries(int (*)(u16 seg, struct ivrs_mappings *));

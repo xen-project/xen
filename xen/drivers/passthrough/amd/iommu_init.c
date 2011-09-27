@@ -769,7 +769,7 @@ int iterate_ivrs_entries(int (*handler)(u16 seg, struct ivrs_mappings *))
     return rc;
 }
 
-int __init alloc_ivrs_mappings(u16 seg)
+static int __init alloc_ivrs_mappings(u16 seg)
 {
     struct ivrs_mappings *ivrs_mappings;
     int bdf;
@@ -882,8 +882,9 @@ int __init amd_iommu_init(void)
         goto error_out;
 
     radix_tree_init(&ivrs_maps);
-    if ( alloc_ivrs_mappings(0) != 0 )
-        goto error_out;
+    for_each_amd_iommu ( iommu )
+        if ( alloc_ivrs_mappings(iommu->seg) != 0 )
+            goto error_out;
 
     if ( amd_iommu_update_ivrs_mapping_acpi() != 0 )
         goto error_out;

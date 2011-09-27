@@ -122,10 +122,6 @@ int __init amd_iommu_detect_one_acpi(void *ivhd)
     spin_lock_init(&iommu->lock);
 
     iommu->seg = ivhd_block->pci_segment;
-    if (alloc_ivrs_mappings(ivhd_block->pci_segment)) {
-        xfree(iommu);
-        return -ENOMEM;
-    }
     iommu->bdf = ivhd_block->header.dev_id;
     iommu->cap_offset = ivhd_block->cap_offset;
     iommu->mmio_base_phys = ivhd_block->mmio_base;
