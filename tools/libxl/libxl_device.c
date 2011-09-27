@@ -522,7 +522,7 @@ out:
 
 int libxl__wait_for_device_model(libxl__gc *gc,
                                  uint32_t domid, char *state,
-                                 libxl__device_model_starting *starting,
+                                 libxl__spawn_starting *spawning,
                                  int (*check_callback)(libxl__gc *gc,
                                                        uint32_t domid,
                                                        const char *state,
@@ -552,12 +552,12 @@ int libxl__wait_for_device_model(libxl__gc *gc,
     tv.tv_sec = LIBXL_DEVICE_MODEL_START_TIMEOUT;
     tv.tv_usec = 0;
     nfds = xs_fileno(xsh) + 1;
-    if (starting && starting->for_spawn->fd > xs_fileno(xsh))
-        nfds = starting->for_spawn->fd + 1;
+    if (spawning && spawning->fd > xs_fileno(xsh))
+        nfds = spawning->fd + 1;
 
     while (rc > 0 || (!rc && tv.tv_sec > 0)) {
-        if ( starting ) {
-            rc = libxl__spawn_check(gc, starting->for_spawn);
+        if ( spawning ) {
+            rc = libxl__spawn_check(gc, spawning);
             if ( rc ) {
                 LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
                            "Device Model died during startup");
@@ -586,8 +586,8 @@ again:
         free(p);
         FD_ZERO(&rfds);
         FD_SET(xs_fileno(xsh), &rfds);
-        if (starting)
-            FD_SET(starting->for_spawn->fd, &rfds);
+        if (spawning)
+            FD_SET(spawning->fd, &rfds);
         rc = select(nfds, &rfds, NULL, NULL, &tv);
         if (rc > 0) {
             if (FD_ISSET(xs_fileno(xsh), &rfds)) {
@@ -597,9 +597,9 @@ again:
                 else
                     goto again;
             }
-            if (starting && FD_ISSET(starting->for_spawn->fd, &rfds)) {
+            if (spawning && FD_ISSET(spawning->fd, &rfds)) {
                 unsigned char dummy;
-                if (read(starting->for_spawn->fd, &dummy, sizeof(dummy)) != 1)
+                if (read(spawning->fd, &dummy, sizeof(dummy)) != 1)
                     LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_DEBUG,
                                      "failed to read spawn status pipe");
             }

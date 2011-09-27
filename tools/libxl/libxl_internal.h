@@ -283,7 +283,7 @@ _hidden int libxl__confirm_device_model_startup(libxl__gc *gc,
 _hidden int libxl__detach_device_model(libxl__gc *gc, libxl__device_model_starting *starting);
 _hidden int libxl__wait_for_device_model(libxl__gc *gc,
                                 uint32_t domid, char *state,
-                                libxl__device_model_starting *starting,
+                                libxl__spawn_starting *spawning,
                                 int (*check_callback)(libxl__gc *gc,
                                                       uint32_t domid,
                                                       const char *state,

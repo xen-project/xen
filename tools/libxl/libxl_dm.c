@@ -920,7 +920,7 @@ int libxl__confirm_device_model_startup(libxl__gc *gc,
 {
     int detach;
     int problem = libxl__wait_for_device_model(gc, starting->domid, "running",
-                                               starting, NULL, NULL);
+                                               starting->for_spawn, NULL, NULL);
     detach = detach_device_model(gc, starting);
     return problem ? problem : detach;
 }
