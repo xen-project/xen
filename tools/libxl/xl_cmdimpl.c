@@ -2856,8 +2856,8 @@ int main_migrate_receive(int argc, char **argv)
 
 int main_save(int argc, char **argv)
 {
-    const char *filename = NULL, *p = NULL;
-    const char *config_filename;
+    const char *filename, *p;
+    const char *config_filename = NULL;
     int checkpoint = 0;
     int opt;
 
@@ -2871,14 +2871,16 @@ int main_save(int argc, char **argv)
         }
     }
 
-    if (argc-optind > 3) {
+    if (argc-optind < 2 || argc-optind > 3) {
         help("save");
         return 2;
     }
 
     p = argv[optind];
     filename = argv[optind + 1];
-    config_filename = argv[optind + 2];
+    if ( argc - optind >= 3 )
+        config_filename = argv[optind + 2];
+
     save_domain(p, filename, checkpoint, config_filename);
     return 0;
 }
