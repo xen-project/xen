@@ -469,7 +469,6 @@ static int get_all_assigned_devices(libxl__gc *gc, libxl_device_pci **list, int 
     }
 
     if ( 0 == *num ) {
-        free(pcidevs);
         pcidevs = NULL;
     }else{
         *list = pcidevs;
