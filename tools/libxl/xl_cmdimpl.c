@@ -1516,6 +1516,11 @@ start:
         ret = libxl_domain_create_restore(ctx, &d_config,
                                             cb, &child_console_pid,
                                             &domid, restore_fd);
+        /*
+         * On subsequent reboot etc we should create the domain, not
+         * restore/migrate-receive it again.
+         */
+        restore_file = NULL;
     }else{
         ret = libxl_domain_create_new(ctx, &d_config,
                                         cb, &child_console_pid, &domid);
