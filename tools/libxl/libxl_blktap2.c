@@ -18,6 +18,8 @@
 
 #include "tap-ctl.h"
 
+#include <string.h>
+
 int libxl__blktap_enabled(libxl__gc *gc)
 {
     const char *msg;
@@ -30,12 +32,13 @@ char *libxl__blktap_devpath(libxl__gc *gc,
 {
     const char *type;
     char *params, *devname = NULL;
-    int minor, err;
+    tap_list_t tap;
+    int err;
 
     type = libxl__device_disk_string_of_format(format);
-    minor = tap_ctl_find_minor(type, disk);
-    if (minor >= 0) {
-        devname = libxl__sprintf(gc, "/dev/xen/blktap-2/tapdev%d", minor);
+    err = tap_ctl_find(type, disk, &tap);
+    if (err == 0) {
+        devname = libxl__sprintf(gc, "/dev/xen/blktap-2/tapdev%d", tap.minor);
         if (devname)
             return devname;
     }
@@ -48,4 +51,29 @@ char *libxl__blktap_devpath(libxl__gc *gc,
     }
 
     return NULL;
+}
+
+
+void libxl__device_destroy_tapdisk(libxl__gc *gc, char *be_path)
+{
+    char *path, *params, *type, *disk;
+    int err;
+    tap_list_t tap;
+
+    path = libxl__sprintf(gc, "%s/tapdisk-params", be_path);
+    if (!path) return;
+
+    params = libxl__xs_read(gc, XBT_NULL, path);
+    if (!params) return;
+
+    type = params;
+    disk = strchr(params, ':');
+    if (!disk) return;
+
+    *disk++ = '\0';
+
+    err = tap_ctl_find(type, disk, &tap);
+    if (err < 0) return;
+
+    tap_ctl_destroy(tap.id, tap.minor);
 }

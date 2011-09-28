@@ -376,6 +376,7 @@ int libxl__device_destroy(libxl__gc *gc, char *be_path, int force)
     if (!state)
         goto out;
     if (atoi(state) != 4) {
+        libxl__device_destroy_tapdisk(gc, be_path);
         xs_rm(ctx->xsh, XBT_NULL, be_path);
         goto out;
     }
@@ -398,6 +399,7 @@ retry_transaction:
     } else {
         xs_rm(ctx->xsh, XBT_NULL, be_path);
     }
+    libxl__device_destroy_tapdisk(gc, be_path);
 out:
     return rc;
 }

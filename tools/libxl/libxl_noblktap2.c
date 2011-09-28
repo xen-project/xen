@@ -27,3 +27,7 @@ char *libxl__blktap_devpath(libxl__gc *gc,
 {
     return NULL;
 }
+
+void libxl__device_destroy_tapdisk(libxl__gc *gc, char *be_path)
+{
+}

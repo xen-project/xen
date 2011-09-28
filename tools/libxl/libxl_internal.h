@@ -363,6 +363,12 @@ _hidden char *libxl__blktap_devpath(libxl__gc *gc,
                                     const char *disk,
                                     libxl_disk_format format);
 
+/* libxl__device_destroy_tapdisk:
+ *   Destroys any tapdisk process associated with the backend represented
+ *   by be_path.
+ */
+_hidden void libxl__device_destroy_tapdisk(libxl__gc *gc, char *be_path);
+
 _hidden char *libxl__uuid2string(libxl__gc *gc, const libxl_uuid uuid);
 
 struct libxl__xen_console_reader {
