@@ -1296,7 +1296,7 @@ libxl_nicinfo *libxl_list_nics(libxl_ctx *ctx, uint32_t domid, unsigned int *nb)
                            libxl__sprintf(&gc, "%s/device/vif", dompath), &nb_nics);
     if (!l)
         goto err;
-    nics = res = calloc(nb_nics, sizeof (libxl_device_nic));
+    nics = res = calloc(nb_nics, sizeof (libxl_nicinfo));
     if (!res)
         goto err;
     for (*nb = nb_nics; nb_nics > 0; --nb_nics, ++l, ++nics) {
