@@ -449,7 +449,7 @@ libxl_vminfo * libxl_list_vm(libxl_ctx *ctx, int *nb_vm)
     xc_domaininfo_t info[1024];
     int size = 1024;
 
-    ptr = calloc(size, sizeof(libxl_dominfo));
+    ptr = calloc(size, sizeof(libxl_vminfo));
     if (!ptr)
         return NULL;
 

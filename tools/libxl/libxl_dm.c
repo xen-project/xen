@@ -774,7 +774,7 @@ retry_transaction:
     libxl_domain_unpause(ctx, domid);
 
     if (starting_r) {
-        *starting_r = calloc(sizeof(libxl__device_model_starting), 1);
+        *starting_r = calloc(1, sizeof(libxl__device_model_starting));
         (*starting_r)->domid = info->domid;
         (*starting_r)->dom_path = libxl__xs_get_dompath(gc, info->domid);
         (*starting_r)->for_spawn = NULL;
@@ -851,11 +851,11 @@ int libxl__create_device_model(libxl__gc *gc,
 
     if (starting_r) {
         rc = ERROR_NOMEM;
-        *starting_r = calloc(sizeof(libxl__device_model_starting), 1);
+        *starting_r = calloc(1, sizeof(libxl__device_model_starting));
         if (!*starting_r)
             goto out_close;
         p = *starting_r;
-        p->for_spawn = calloc(sizeof(libxl__spawn_starting), 1);
+        p->for_spawn = calloc(1, sizeof(libxl__spawn_starting));
     } else {
         p = &buf_starting;
         p->for_spawn = NULL;
