@@ -341,8 +341,12 @@ int libxl__device_disk_dev_number(const char *virtpath, int *pdisk,
 
     errno = 0;
     ul = strtoul(virtpath, &ep, 0);
-    if (!errno && !*ep && ul <= INT_MAX)
+    if (!errno && !*ep && ul <= INT_MAX) {
+        /* FIXME: should parse ul to determine these. */
+        if (pdisk || ppartition)
+            return -1;
         return ul;
+    }
 
     if (device_virtdisk_matches(virtpath, "hd",
                                 &disk, 3,
