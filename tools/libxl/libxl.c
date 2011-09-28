@@ -785,7 +785,7 @@ int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid, int force)
     rc = 0;
 out:
     libxl__free_all(&gc);
-    return 0;
+    return rc;
 }
 
 int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num, libxl_console_type type)
