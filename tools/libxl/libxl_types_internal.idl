@@ -1,0 +1,9 @@
+namespace("libxl__")
+
+libxl__qmp_message_type  = Enumeration("qmp_message_type", [
+    (1, "QMP"),
+    (2, "return"),
+    (3, "error"),
+    (4, "event"),
+    (5, "invalid"),
+    ])

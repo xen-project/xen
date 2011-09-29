@@ -35,7 +35,7 @@ LIBXL_OBJS-$(CONFIG_IA64) += libxl_nocpuid.o
 LIBXL_OBJS = flexarray.o libxl.o libxl_create.o libxl_dm.o libxl_pci.o \
 			libxl_dom.o libxl_exec.o libxl_xshelp.o libxl_device.o \
 			libxl_internal.o libxl_utils.o libxl_uuid.o $(LIBXL_OBJS-y)
-LIBXL_OBJS += _libxl_types.o libxl_flask.o
+LIBXL_OBJS += _libxl_types.o libxl_flask.o _libxl_types_internal.o
 
 $(LIBXL_OBJS): CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) $(CFLAGS_libxenstore) $(CFLAGS_libblktapctl)
 
@@ -81,8 +81,10 @@ _libxl_paths.h: genpath
 libxl_paths.c: _libxl_paths.h
 
 libxl.h: _libxl_types.h
+libxl_internal.h: _libxl_types_internal.h
 
 $(LIBXL_OBJS) $(LIBXLU_OBJS) $(XL_OBJS): libxl.h
+$(LIBXL_OBJS): libxl_internal.h
 
 _libxl_type%.h _libxl_type%.c: libxl_type%.idl gentypes.py libxltypes.py
 	$(PYTHON) gentypes.py libxl_type$*.idl __libxl_type$*.h __libxl_type$*.c

@@ -150,8 +150,9 @@ if __name__ == '__main__':
 
     f = open(header, "w")
 
-    f.write("""#ifndef __LIBXL_TYPES_H
-#define __LIBXL_TYPES_H
+    header_define = header.upper().replace('.','_')
+    f.write("""#ifndef %s
+#define %s
 
 /*
  * DO NOT EDIT.
@@ -160,7 +161,7 @@ if __name__ == '__main__':
  * "%s"
  */
 
-""" % " ".join(sys.argv))
+""" % (header_define, header_define, " ".join(sys.argv)))
 
     for ty in types:
         f.write(libxl_C_type_define(ty) + ";\n")
@@ -172,7 +173,7 @@ if __name__ == '__main__':
             f.write("extern libxl_enum_string_table %s_string_table[];\n" % (ty.typename))
         f.write("\n")
 
-    f.write("""#endif /* __LIBXL_TYPES_H */\n""")
+    f.write("""#endif /* %s */\n""" % (header_define))
     f.close()
 
     print "outputting libxl type implementations to %s" % impl

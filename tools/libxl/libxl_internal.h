@@ -35,6 +35,7 @@
 
 #include "flexarray.h"
 #include "libxl_utils.h"
+#include "_libxl_types_internal.h"
 
 #define LIBXL_DESTROY_TIMEOUT 10
 #define LIBXL_DEVICE_MODEL_START_TIMEOUT 10
