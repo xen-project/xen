@@ -242,3 +242,16 @@ int libxl__file_reference_unmap(libxl_file_reference *f)
 
 	return ERROR_FAIL;
 }
+
+int libxl__fd_set_cloexec(int fd)
+{
+    int flags = 0;
+
+    if ((flags = fcntl(fd, F_GETFD)) == -1) {
+        flags = 0;
+    }
+    if ((flags & FD_CLOEXEC)) {
+        return 0;
+    }
+    return fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
+}
