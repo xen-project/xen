@@ -10,10 +10,10 @@ genpath-target = $(call buildmakevars2file,$(XENPATH))
 $(eval $(genpath-target))
 
 .PHONY: build
-build: genpath genwrap.py $(XEN_ROOT)/tools/libxl/libxl.idl \
+build: genpath genwrap.py $(XEN_ROOT)/tools/libxl/libxl_types.idl \
 		$(XEN_ROOT)/tools/libxl/libxltypes.py
 	PYTHONPATH=$(XEN_ROOT)/tools/libxl $(PYTHON) genwrap.py \
-		$(XEN_ROOT)/tools/libxl/libxl.idl \
+		$(XEN_ROOT)/tools/libxl/libxl_types.idl \
 		xen/lowlevel/xl/_pyxl_types.h \
 		xen/lowlevel/xl/_pyxl_types.c
 	CC="$(CC)" CFLAGS="$(CFLAGS)" $(PYTHON) setup.py build

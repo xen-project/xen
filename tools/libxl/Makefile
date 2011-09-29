@@ -52,8 +52,8 @@ $(XL_OBJS): CFLAGS += $(CFLAGS_libxenctrl) # For xentoollog.h
 $(XL_OBJS): CFLAGS += $(CFLAGS_libxenlight)
 
 testidl.o: CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenlight)
-testidl.c: libxl.idl gentest.py libxl.h
-	$(PYTHON) gentest.py libxl.idl testidl.c.new
+testidl.c: libxl_types.idl gentest.py libxl.h
+	$(PYTHON) gentest.py libxl_types.idl testidl.c.new
 	mv testidl.c.new testidl.c
 
 .PHONY: all
@@ -84,10 +84,10 @@ libxl.h: _libxl_types.h
 
 $(LIBXL_OBJS) $(LIBXLU_OBJS) $(XL_OBJS): libxl.h
 
-_libxl_%.h _libxl_%.c: libxl.idl gen%.py libxl%.py
-	$(PYTHON) gen$*.py libxl.idl __libxl_$*.h __libxl_$*.c
-	$(call move-if-changed,__libxl_$*.h,_libxl_$*.h)
-	$(call move-if-changed,__libxl_$*.c,_libxl_$*.c)
+_libxl_type%.h _libxl_type%.c: libxl_type%.idl gentypes.py libxltypes.py
+	$(PYTHON) gentypes.py libxl_type$*.idl __libxl_type$*.h __libxl_type$*.c
+	$(call move-if-changed,__libxl_type$*.h,_libxl_type$*.h)
+	$(call move-if-changed,__libxl_type$*.c,_libxl_type$*.c)
 
 libxenlight.so: libxenlight.so.$(MAJOR)
 	ln -sf $< $@

@@ -45,10 +45,10 @@ xl.mli: xl.mli.in _libxl_types.mli.in
 	  < xl.mli.in > xl.mli.tmp
 	$(Q)mv xl.mli.tmp xl.mli
 
-_libxl_types.ml.in _libxl_types.mli.in _libxl_types.inc: genwrap.py $(XEN_ROOT)/tools/libxl/libxl.idl \
+_libxl_types.ml.in _libxl_types.mli.in _libxl_types.inc: genwrap.py $(XEN_ROOT)/tools/libxl/libxl_types.idl \
                 $(XEN_ROOT)/tools/libxl/libxltypes.py
 	PYTHONPATH=$(XEN_ROOT)/tools/libxl $(PYTHON) genwrap.py \
-		$(XEN_ROOT)/tools/libxl/libxl.idl \
+		$(XEN_ROOT)/tools/libxl/libxl_types.idl \
 		_libxl_types.mli.in _libxl_types.ml.in _libxl_types.inc
 
 libs: $(LIBS)
