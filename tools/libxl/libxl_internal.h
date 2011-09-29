@@ -394,4 +394,104 @@ _hidden int libxl__e820_alloc(libxl_ctx *ctx, uint32_t domid, libxl_domain_confi
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 
+/* from libxl_json */
+#include <yajl/yajl_gen.h>
+
+_hidden yajl_gen_status libxl__yajl_gen_asciiz(yajl_gen hand, const char *str);
+
+typedef enum {
+    JSON_ERROR,
+    JSON_NULL,
+    JSON_TRUE,
+    JSON_FALSE,
+    JSON_INTEGER,
+    JSON_DOUBLE,
+    JSON_STRING,
+    JSON_MAP,
+    JSON_ARRAY,
+    JSON_ANY
+} libxl__json_node_type;
+
+typedef struct libxl__json_object {
+    libxl__json_node_type type;
+    union {
+        long i;
+        double d;
+        char *string;
+        /* List of libxl__json_object */
+        flexarray_t *array;
+        /* List of libxl__json_map_node */
+        flexarray_t *map;
+    } u;
+    struct libxl__json_object *parent;
+} libxl__json_object;
+
+typedef struct {
+    char *map_key;
+    libxl__json_object *obj;
+} libxl__json_map_node;
+
+typedef struct libxl__yajl_ctx libxl__yajl_ctx;
+
+static inline bool libxl__json_object_is_string(const libxl__json_object *o)
+{
+    return o != NULL && o->type == JSON_STRING;
+}
+static inline bool libxl__json_object_is_integer(const libxl__json_object *o)
+{
+    return o != NULL && o->type == JSON_INTEGER;
+}
+static inline bool libxl__json_object_is_map(const libxl__json_object *o)
+{
+    return o != NULL && o->type == JSON_MAP;
+}
+static inline bool libxl__json_object_is_array(const libxl__json_object *o)
+{
+    return o != NULL && o->type == JSON_ARRAY;
+}
+
+static inline
+const char *libxl__json_object_get_string(const libxl__json_object *o)
+{
+    if (libxl__json_object_is_string(o))
+        return o->u.string;
+    else
+        return NULL;
+}
+static inline
+flexarray_t *libxl__json_object_get_map(const libxl__json_object *o)
+{
+    if (libxl__json_object_is_map(o))
+        return o->u.map;
+    else
+        return NULL;
+}
+static inline
+flexarray_t *libxl__json_object_get_array(const libxl__json_object *o)
+{
+    if (libxl__json_object_is_array(o))
+        return o->u.array;
+    else
+        return NULL;
+}
+static inline long libxl__json_object_get_integer(const libxl__json_object *o)
+{
+    if (libxl__json_object_is_integer(o))
+        return o->u.i;
+    else
+        return -1;
+}
+
+_hidden libxl__json_object *libxl__json_array_get(const libxl__json_object *o,
+                                                  int i);
+_hidden
+libxl__json_map_node *libxl__json_map_node_get(const libxl__json_object *o,
+                                               int i);
+_hidden const libxl__json_object *libxl__json_map_get(const char *key,
+                                          const libxl__json_object *o,
+                                          libxl__json_node_type expected_type);
+_hidden void libxl__json_object_free(libxl__gc *gc, libxl__json_object *obj);
+
+_hidden libxl__json_object *libxl__json_parse(libxl__gc *gc, const char *s);
+
 #endif
