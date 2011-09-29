@@ -2866,7 +2866,7 @@ int main_save(int argc, char **argv)
     int checkpoint = 0;
     int opt;
 
-    while ((opt = def_getopt(argc, argv, "c", "save", 1)) != -1) {
+    while ((opt = def_getopt(argc, argv, "c", "save", 2)) != -1) {
         switch (opt) {
         case 0: case 2:
             return opt;
@@ -2876,7 +2876,7 @@ int main_save(int argc, char **argv)
         }
     }
 
-    if (argc-optind < 2 || argc-optind > 3) {
+    if (argc-optind > 3) {
         help("save");
         return 2;
     }
@@ -4025,7 +4025,7 @@ int main_networklist(int argc, char **argv)
     libxl_nicinfo *nics;
     unsigned int nb, i;
 
-    if ((opt = def_getopt(argc, argv, "", "network-list", 0)) != -1)
+    if ((opt = def_getopt(argc, argv, "", "network-list", 1)) != -1)
         return opt;
 
     /*      Idx  BE   MAC   Hdl  Sta  evch txr/rxr  BE-path */
@@ -4096,10 +4096,6 @@ int main_blockattach(int argc, char **argv)
 
     if ((opt = def_getopt(argc, argv, "", "block-attach", 2)) != -1)
         return opt;
-    if ((argc-optind < 2)) {
-        help("block-attach");
-        return 2;
-    }
 
     if (domain_qualifier_to_domid(argv[optind], &fe_domid, 0) < 0) {
         fprintf(stderr, "%s is an invalid domain identifier\n", argv[optind]);
