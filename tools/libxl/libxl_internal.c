@@ -102,6 +102,30 @@ void *libxl__calloc(libxl__gc *gc, size_t nmemb, size_t size)
     return ptr;
 }
 
+void *libxl__realloc(libxl__gc *gc, void *ptr, size_t new_size)
+{
+    void *new_ptr = realloc(ptr, new_size);
+    int i = 0;
+
+    if (new_ptr == NULL && new_size != 0) {
+        return NULL;
+    }
+
+    if (ptr == NULL) {
+        libxl__ptr_add(gc, new_ptr);
+    } else if (new_ptr != ptr) {
+        for (i = 0; i < gc->alloc_maxsize; i++) {
+            if (gc->alloc_ptrs[i] == ptr) {
+                gc->alloc_ptrs[i] = new_ptr;
+                break;
+            }
+        }
+    }
+
+
+    return new_ptr;
+}
+
 char *libxl__sprintf(libxl__gc *gc, const char *fmt, ...)
 {
     char *s;

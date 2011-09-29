@@ -145,6 +145,7 @@ _hidden int libxl__ptr_add(libxl__gc *gc, void *ptr);
 _hidden void libxl__free_all(libxl__gc *gc);
 _hidden void *libxl__zalloc(libxl__gc *gc, int bytes);
 _hidden void *libxl__calloc(libxl__gc *gc, size_t nmemb, size_t size);
+_hidden void *libxl__realloc(libxl__gc *gc, void *ptr, size_t new_size);
 _hidden char *libxl__sprintf(libxl__gc *gc, const char *fmt, ...) PRINTF_ATTRIBUTE(2, 3);
 _hidden char *libxl__strdup(libxl__gc *gc, const char *c);
 _hidden char *libxl__dirname(libxl__gc *gc, const char *s);
