@@ -159,6 +159,16 @@ char *libxl__strdup(libxl__gc *gc, const char *c)
     return s;
 }
 
+char *libxl__strndup(libxl__gc *gc, const char *c, size_t n)
+{
+    char *s = strndup(c, n);
+
+    if (s)
+        libxl__ptr_add(gc, s);
+
+    return s;
+}
+
 char *libxl__dirname(libxl__gc *gc, const char *s)
 {
     char *c;

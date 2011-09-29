@@ -148,6 +148,7 @@ _hidden void *libxl__calloc(libxl__gc *gc, size_t nmemb, size_t size);
 _hidden void *libxl__realloc(libxl__gc *gc, void *ptr, size_t new_size);
 _hidden char *libxl__sprintf(libxl__gc *gc, const char *fmt, ...) PRINTF_ATTRIBUTE(2, 3);
 _hidden char *libxl__strdup(libxl__gc *gc, const char *c);
+_hidden char *libxl__strndup(libxl__gc *gc, const char *c, size_t n);
 _hidden char *libxl__dirname(libxl__gc *gc, const char *s);
 
 _hidden char **libxl__xs_kvs_of_flexarray(libxl__gc *gc, flexarray_t *array, int length);
