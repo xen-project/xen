@@ -394,6 +394,25 @@ _hidden int libxl__e820_alloc(libxl_ctx *ctx, uint32_t domid, libxl_domain_confi
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 
+/* from libxl_qmp */
+typedef struct libxl__qmp_handler libxl__qmp_handler;
+
+/* Initialise and connect to the QMP socket.
+ *   Return an handler or NULL if there is an error
+ */
+_hidden libxl__qmp_handler *libxl__qmp_initialize(libxl_ctx *ctx,
+                                                  uint32_t domid);
+/* ask to QEMU the serial port information and store it in xenstore. */
+_hidden int libxl__qmp_query_serial(libxl__qmp_handler *qmp);
+/* close and free the QMP handler */
+_hidden void libxl__qmp_close(libxl__qmp_handler *qmp);
+/* remove the socket file, if the file has already been removed,
+ * nothing happen */
+_hidden void libxl__qmp_cleanup(libxl__gc *gc, uint32_t domid);
+
+/* this helper calls qmp_initialize, query_serial and qmp_close */
+_hidden int libxl__qmp_initializations(libxl_ctx *ctx, uint32_t domid);
+
 /* from libxl_json */
 #include <yajl/yajl_gen.h>
 

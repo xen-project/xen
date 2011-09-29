@@ -248,6 +248,16 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     flexarray_vappend(dm_args, dm,
                       "-xen-domid", libxl__sprintf(gc, "%d", info->domid), NULL);
 
+    flexarray_append(dm_args, "-chardev");
+    flexarray_append(dm_args,
+                     libxl__sprintf(gc, "socket,id=libxl-cmd,"
+                                    "path=%s/qmp-libxl-%d,server,nowait",
+                                    libxl_run_dir_path(),
+                                    info->domid));
+
+    flexarray_append(dm_args, "-mon");
+    flexarray_append(dm_args, "chardev=libxl-cmd,mode=control");
+
     if (info->type == LIBXL_DOMAIN_TYPE_PV) {
         flexarray_append(dm_args, "-xen-attach");
     }

@@ -763,6 +763,8 @@ int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid, int force)
     if (dm_present) {
         if (libxl__destroy_device_model(&gc, domid) < 0)
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "libxl__destroy_device_model failed for %d", domid);
+
+        libxl__qmp_cleanup(&gc, domid);
     }
     if (libxl__devices_destroy(&gc, domid, force) < 0)
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "libxl_destroy_devices failed for %d", domid);
