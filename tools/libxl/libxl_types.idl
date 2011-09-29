@@ -3,6 +3,8 @@
 # Builtin libxl types
 #
 
+namespace("libxl_")
+
 libxl_domid = Builtin("domid")
 libxl_uuid = Builtin("uuid", passby=PASS_BY_REFERENCE)
 libxl_mac = Builtin("mac", passby=PASS_BY_REFERENCE)

@@ -8,10 +8,23 @@ DIR_IN   = 1
 DIR_OUT  = 2
 DIR_BOTH = 3
 
+_default_namespace = ""
+def namespace(s):
+    if type(s) != str:
+        raise TypeError, "Require a string for the default namespace."
+    global _default_namespace
+    _default_namespace = s
+
+def _get_default_namespace():
+    global _default_namespace
+    return _default_namespace
+
+
 class Type(object):
     def __init__(self, typename, **kwargs):
         self.comment = kwargs.setdefault('comment', None)
-        self.namespace = kwargs.setdefault('namespace', "libxl_")
+        self.namespace = kwargs.setdefault('namespace',
+                _get_default_namespace())
         self.dir = kwargs.setdefault('dir', DIR_BOTH)
         if self.dir not in [DIR_NONE, DIR_IN, DIR_OUT, DIR_BOTH]:
             raise ValueError
@@ -256,7 +269,8 @@ def parse(f):
         elif isinstance(t,type(object)) and issubclass(t, Type):
             globs[n] = t
         elif n in ['PASS_BY_REFERENCE', 'PASS_BY_VALUE',
-                   'DIR_NONE', 'DIR_IN', 'DIR_OUT', 'DIR_BOTH']:
+                   'DIR_NONE', 'DIR_IN', 'DIR_OUT', 'DIR_BOTH',
+                   'namespace']:
             globs[n] = t
 
     try:
