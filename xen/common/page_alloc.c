@@ -38,6 +38,7 @@
 #include <xen/tmem.h>
 #include <xen/tmem_xen.h>
 #include <public/sysctl.h>
+#include <public/sched.h>
 #include <asm/page.h>
 #include <asm/numa.h>
 #include <asm/flushtlb.h>
@@ -706,6 +707,19 @@ int offline_page(unsigned long mfn, int broken, uint32_t *status)
     {
         *status = PG_OFFLINE_FAILED | PG_OFFLINE_NOT_CONV_RAM;
         return -EINVAL;
+    }
+
+    /*
+     * NB. When broken page belong to guest, usually hypervisor will
+     * notify the guest to handle the broken page. However, hypervisor
+     * need to prevent malicious guest access the broken page again.
+     * Under such case, hypervisor shutdown guest, preventing recursive mce.
+     */
+    if ( (pg->count_info & PGC_broken) && (owner = page_get_owner(pg)) )
+    {
+        *status = PG_OFFLINE_AGAIN;
+        domain_shutdown(owner, SHUTDOWN_crash);
+        return 0;
     }
 
     spin_lock(&heap_lock);

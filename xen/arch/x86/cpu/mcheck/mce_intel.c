@@ -657,6 +657,8 @@ static void intel_memerr_dhandler(
     /* This is free page */
     if (status & PG_OFFLINE_OFFLINED)
         *result = MCER_RECOVERED;
+    else if (status & PG_OFFLINE_AGAIN)
+        *result = MCER_CONTINUE;
     else if (status & PG_OFFLINE_PENDING) {
         /* This page has owner */
         if (status & PG_OFFLINE_OWNED) {

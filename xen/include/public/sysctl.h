@@ -399,6 +399,7 @@ struct xen_sysctl_page_offline_op {
 #define PG_OFFLINE_OFFLINED  (0x1UL << 1)
 #define PG_OFFLINE_PENDING   (0x1UL << 2)
 #define PG_OFFLINE_FAILED    (0x1UL << 3)
+#define PG_OFFLINE_AGAIN     (0x1UL << 4)
 
 #define PG_ONLINE_FAILED     PG_OFFLINE_FAILED
 #define PG_ONLINE_ONLINED    PG_OFFLINE_OFFLINED
