@@ -165,7 +165,7 @@ int __init amd_iommu_setup_ioapic_remapping(void)
     /* Read ioapic entries and update interrupt remapping table accordingly */
     for ( apic = 0; apic < nr_ioapics; apic++ )
     {
-        for ( pin = 0; pin < nr_ioapic_registers[apic]; pin++ )
+        for ( pin = 0; pin < nr_ioapic_entries[apic]; pin++ )
         {
             *(((int *)&rte) + 1) = io_apic_read(apic, 0x11 + 2 * pin);
             *(((int *)&rte) + 0) = io_apic_read(apic, 0x10 + 2 * pin);

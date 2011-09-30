@@ -56,7 +56,7 @@ s8 __read_mostly sis_apic_bug = -1;
 /*
  * # of IRQ routing registers
  */
-int __read_mostly nr_ioapic_registers[MAX_IO_APICS];
+int __read_mostly nr_ioapic_entries[MAX_IO_APICS];
 int __read_mostly nr_ioapics;
 
 /*
@@ -147,7 +147,7 @@ struct IO_APIC_route_entry **alloc_ioapic_entries(void)
     for (apic = 0; apic < nr_ioapics; apic++) {
         ioapic_entries[apic] =
             xmalloc_array(struct IO_APIC_route_entry,
-                          nr_ioapic_registers[apic]);
+                          nr_ioapic_entries[apic]);
         if (!ioapic_entries[apic])
             goto nomem;
     }
@@ -243,7 +243,7 @@ static void __io_apic_eoi(unsigned int apic, unsigned int vector, unsigned int p
         if ( pin == -1 )
         {
             unsigned int p;
-            for ( p = 0; p < nr_ioapic_registers[apic]; ++p )
+            for ( p = 0; p < nr_ioapic_entries[apic]; ++p )
             {
                 entry = __ioapic_read_entry(apic, p, TRUE);
                 if ( entry.vector == vector )
@@ -326,7 +326,7 @@ int save_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries)
         if (!ioapic_entries[apic])
             return -ENOMEM;
 
-        for (pin = 0; pin < nr_ioapic_registers[apic]; pin++)
+        for (pin = 0; pin < nr_ioapic_entries[apic]; pin++)
 	    ioapic_entries[apic][pin] = __ioapic_read_entry(apic, pin, 1);
     }
 
@@ -347,7 +347,7 @@ void mask_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries)
         if (!ioapic_entries[apic])
             break;
 
-        for (pin = 0; pin < nr_ioapic_registers[apic]; pin++) {
+        for (pin = 0; pin < nr_ioapic_entries[apic]; pin++) {
             struct IO_APIC_route_entry entry;
 
             entry = ioapic_entries[apic][pin];
@@ -374,7 +374,7 @@ int restore_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries)
         if (!ioapic_entries[apic])
             return -ENOMEM;
 
-        for (pin = 0; pin < nr_ioapic_registers[apic]; pin++)
+        for (pin = 0; pin < nr_ioapic_entries[apic]; pin++)
 	    ioapic_write_entry(apic, pin, 1, ioapic_entries[apic][pin]);
     }
 
@@ -522,7 +522,7 @@ static void clear_IO_APIC (void)
     int apic, pin;
 
     for (apic = 0; apic < nr_ioapics; apic++) {
-        for (pin = 0; pin < nr_ioapic_registers[apic]; pin++)
+        for (pin = 0; pin < nr_ioapic_entries[apic]; pin++)
             clear_IO_APIC_pin(apic, pin);
     }
 }
@@ -783,7 +783,7 @@ void /*__init*/ setup_ioapic_dest(void)
         return;
 
     for (ioapic = 0; ioapic < nr_ioapics; ioapic++) {
-        for (pin = 0; pin < nr_ioapic_registers[ioapic]; pin++) {
+        for (pin = 0; pin < nr_ioapic_entries[ioapic]; pin++) {
             irq_entry = find_irq_entry(ioapic, pin, mp_INT);
             if (irq_entry == -1)
                 continue;
@@ -1029,7 +1029,7 @@ static int pin_2_irq(int idx, int apic, int pin)
          */
         i = irq = 0;
         while (i < apic)
-            irq += nr_ioapic_registers[i++];
+            irq += nr_ioapic_entries[i++];
         irq += pin;
         break;
     }
@@ -1049,7 +1049,7 @@ static inline int IO_APIC_irq_trigger(int irq)
     int apic, idx, pin;
 
     for (apic = 0; apic < nr_ioapics; apic++) {
-        for (pin = 0; pin < nr_ioapic_registers[apic]; pin++) {
+        for (pin = 0; pin < nr_ioapic_entries[apic]; pin++) {
             idx = find_irq_entry(apic,pin,mp_INT);
             if ((idx != -1) && (irq == pin_2_irq(idx,apic,pin)))
                 return irq_trigger(idx);
@@ -1090,7 +1090,7 @@ static void __init setup_IO_APIC_irqs(void)
     apic_printk(APIC_VERBOSE, KERN_DEBUG "init IO_APIC IRQs\n");
 
     for (apic = 0; apic < nr_ioapics; apic++) {
-        for (pin = 0; pin < nr_ioapic_registers[apic]; pin++) {
+        for (pin = 0; pin < nr_ioapic_entries[apic]; pin++) {
 
             /*
              * add it to the IO-APIC irq-routing table:
@@ -1216,7 +1216,7 @@ static void /*__init*/ __print_IO_APIC(void)
     printk(KERN_DEBUG "number of MP IRQ sources: %d.\n", mp_irq_entries);
     for (i = 0; i < nr_ioapics; i++)
         printk(KERN_DEBUG "number of IO-APIC #%d registers: %d.\n",
-               mp_ioapics[i].mpc_apicid, nr_ioapic_registers[i]);
+               mp_ioapics[i].mpc_apicid, nr_ioapic_entries[i]);
 
     /*
      * We are a bit conservative about what we expect.  We have to
@@ -1376,7 +1376,7 @@ static void __init enable_IO_APIC(void)
     for(apic = 0; apic < nr_ioapics; apic++) {
         int pin;
         /* See if any of the pins is in ExtINT mode */
-        for (pin = 0; pin < nr_ioapic_registers[apic]; pin++) {
+        for (pin = 0; pin < nr_ioapic_entries[apic]; pin++) {
             struct IO_APIC_route_entry entry = ioapic_read_entry(apic, pin, 0);
 
             /* If the interrupt line is enabled and in ExtInt mode
@@ -2114,7 +2114,7 @@ static void __init ioapic_pm_state_alloc(void)
     int i, nr_entry = 0;
 
     for (i = 0; i < nr_ioapics; i++)
-        nr_entry += nr_ioapic_registers[i];
+        nr_entry += nr_ioapic_entries[i];
 
     ioapic_pm_state = _xmalloc(sizeof(struct IO_APIC_route_entry)*nr_entry,
                                sizeof(struct IO_APIC_route_entry));
@@ -2156,7 +2156,7 @@ void ioapic_suspend(void)
 
     spin_lock_irqsave(&ioapic_lock, flags);
     for (apic = 0; apic < nr_ioapics; apic++) {
-        for (i = 0; i < nr_ioapic_registers[apic]; i ++, entry ++ ) {
+        for (i = 0; i < nr_ioapic_entries[apic]; i ++, entry ++ ) {
             *(((int *)entry) + 1) = __io_apic_read(apic, 0x11 + 2 * i);
             *(((int *)entry) + 0) = __io_apic_read(apic, 0x10 + 2 * i);
         }
@@ -2178,7 +2178,7 @@ void ioapic_resume(void)
             reg_00.bits.ID = mp_ioapics[apic].mpc_apicid;
             __io_apic_write(apic, 0, reg_00.raw);
         }
-        for (i = 0; i < nr_ioapic_registers[apic]; i++, entry++) {
+        for (i = 0; i < nr_ioapic_entries[apic]; i++, entry++) {
             __io_apic_write(apic, 0x11+2*i, *(((int *)entry)+1));
             __io_apic_write(apic, 0x10+2*i, *(((int *)entry)+0));
         }
@@ -2605,8 +2605,8 @@ void __init init_ioapic_mappings(void)
         {
             /* The number of IO-APIC IRQ registers (== #pins): */
             reg_01.raw = io_apic_read(i, 1);
-            nr_ioapic_registers[i] = reg_01.bits.entries + 1;
-            nr_irqs_gsi += nr_ioapic_registers[i];
+            nr_ioapic_entries[i] = reg_01.bits.entries + 1;
+            nr_irqs_gsi += nr_ioapic_entries[i];
         }
     }
 

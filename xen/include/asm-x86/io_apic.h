@@ -77,7 +77,7 @@ union IO_APIC_reg_03 {
  * # of IO-APICs and # of IRQ routing registers
  */
 extern int nr_ioapics;
-extern int nr_ioapic_registers[MAX_IO_APICS];
+extern int nr_ioapic_entries[MAX_IO_APICS];
 
 enum ioapic_irq_destination_types {
 	dest_Fixed = 0,

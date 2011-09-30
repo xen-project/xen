@@ -33,7 +33,7 @@
 
 #ifdef __ia64__
 #define nr_ioapics              iosapic_get_nr_iosapics()
-#define nr_ioapic_registers(i)  iosapic_get_nr_pins(i)
+#define nr_ioapic_entries(i)  iosapic_get_nr_pins(i)
 #define __io_apic_read(apic, reg) \
     (*IO_APIC_BASE(apic) = reg, *(IO_APIC_BASE(apic)+4))
 #define __io_apic_write(apic, reg, val) \
@@ -53,7 +53,7 @@
 #else
 #include <asm/apic.h>
 #include <asm/io_apic.h>
-#define nr_ioapic_registers(i)  nr_ioapic_registers[i]
+#define nr_ioapic_entries(i)  nr_ioapic_entries[i]
 #endif
 
 /*
@@ -91,7 +91,7 @@ static int init_apic_pin_2_ir_idx(void)
 
     nr_pins = 0;
     for ( i = 0; i < nr_ioapics; i++ )
-        nr_pins += nr_ioapic_registers(i);
+        nr_pins += nr_ioapic_entries(i);
 
     _apic_pin_2_ir_idx = xmalloc_array(int, nr_pins);
     apic_pin_2_ir_idx = xmalloc_array(int *, nr_ioapics);
@@ -109,7 +109,7 @@ static int init_apic_pin_2_ir_idx(void)
     for ( i = 0; i < nr_ioapics; i++ )
     {
         apic_pin_2_ir_idx[i] = &_apic_pin_2_ir_idx[nr_pins];
-        nr_pins += nr_ioapic_registers(i);
+        nr_pins += nr_ioapic_entries(i);
     }
 
     return 0;
