@@ -271,6 +271,15 @@ _hidden int libxl__device_destroy(libxl__gc *gc, libxl__device *dev);
 _hidden int libxl__devices_destroy(libxl__gc *gc, uint32_t domid, int force);
 _hidden int libxl__wait_for_backend(libxl__gc *gc, char *be_path, char *state);
 
+/*
+ * libxl__try_phy_backend - Check if there's support for the passed
+ * type of file using the PHY backend
+ * st_mode: mode_t of the file, as returned by stat function
+ *
+ * Returns 0 on success, and < 0 on error.
+ */
+_hidden int libxl__try_phy_backend(mode_t st_mode);
+
 /* from libxl_pci */
 
 _hidden int libxl__device_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, int starting);

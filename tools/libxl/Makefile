@@ -33,6 +33,15 @@ endif
 LIBXL_OBJS-$(CONFIG_X86) += libxl_cpuid.o
 LIBXL_OBJS-$(CONFIG_IA64) += libxl_nocpuid.o
 
+ifeq ($(CONFIG_NetBSD),y)
+LIBXL_OBJS-y += libxl_netbsd.o
+else ifeq ($(CONFIG_Linux),y)
+LIBXL_OBJS-y += libxl_linux.o
+else
+$(error Your Operating System is not supported by libxenlight, \
+please check libxl_linux.c and libxl_netbsd.c to see how to get it ported)
+endif
+
 LIBXL_LIBS += -lyajl
 
 LIBXL_OBJS = flexarray.o libxl.o libxl_create.o libxl_dm.o libxl_pci.o \

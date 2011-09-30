@@ -137,15 +137,14 @@ static int disk_try_backend(disk_try_backend_args *a,
               a->disk->format == LIBXL_DISK_FORMAT_EMPTY)) {
             goto bad_format;
         }
-        if (a->disk->format != LIBXL_DISK_FORMAT_EMPTY &&
-            !S_ISBLK(a->stab.st_mode)) {
-            LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Disk vdev=%s, backend phy"
-                       " unsuitable as phys path not a block device",
-                       a->disk->vdev);
-            return 0;
-        }
 
-        return backend;
+        if (libxl__try_phy_backend(a->stab.st_mode))
+            return backend;
+
+        LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Disk vdev=%s, backend phy"
+                   " unsuitable as phys path not a block device",
+                   a->disk->vdev);
+        return 0;
 
     case LIBXL_DISK_BACKEND_TAP:
         if (!libxl__blktap_enabled(a->gc)) {
