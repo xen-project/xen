@@ -211,33 +211,23 @@ static void dynamic_irq_cleanup(unsigned int irq)
 
 static void __clear_irq_vector(int irq)
 {
-    int cpu, vector;
+    int cpu, vector, old_vector;
     cpumask_t tmp_mask;
     struct irq_cfg *cfg = irq_cfg(irq);
 
     BUG_ON(!cfg->vector);
 
+    /* Always clear cfg->vector */
     vector = cfg->vector;
     cpus_and(tmp_mask, cfg->cpu_mask, cpu_online_map);
 
-    trace_irq_mask(TRC_HW_IRQ_CLEAR_VECTOR, irq, vector, &tmp_mask);
-
-    for_each_cpu_mask(cpu, tmp_mask)
+    for_each_cpu_mask(cpu, tmp_mask) {
+        ASSERT( per_cpu(vector_irq, cpu)[vector] == irq );
         per_cpu(vector_irq, cpu)[vector] = -1;
+    }
 
     cfg->vector = IRQ_VECTOR_UNASSIGNED;
     cpus_clear(cfg->cpu_mask);
-    cfg->used = IRQ_UNUSED;
-
-    if (likely(!cfg->move_in_progress))
-        return;
-
-    cpus_and(tmp_mask, cfg->old_cpu_mask, cpu_online_map);
-    for_each_cpu_mask(cpu, tmp_mask) {
-        ASSERT( per_cpu(vector_irq, cpu)[cfg->old_vector] == irq );
-        TRACE_3D(TRC_HW_IRQ_MOVE_FINISH, irq, vector, cpu);
-        per_cpu(vector_irq, cpu)[cfg->old_vector] = -1;
-     }
 
     if ( cfg->used_vectors )
     {
@@ -245,9 +235,33 @@ static void __clear_irq_vector(int irq)
         clear_bit(vector, cfg->used_vectors);
     }
 
-    cfg->move_in_progress = 0;
+    cfg->used = IRQ_UNUSED;
+
+    trace_irq_mask(TRC_HW_IRQ_CLEAR_VECTOR, irq, vector, &tmp_mask);
+
+    if (likely(!cfg->move_in_progress))
+        return;
+
+    /* If we were in motion, also clear cfg->old_vector */
+    old_vector = cfg->old_vector;
+    cpus_and(tmp_mask, cfg->old_cpu_mask, cpu_online_map);
+
+    for_each_cpu_mask(cpu, tmp_mask) {
+        ASSERT( per_cpu(vector_irq, cpu)[old_vector] == irq );
+        TRACE_3D(TRC_HW_IRQ_MOVE_FINISH, irq, old_vector, cpu);
+        per_cpu(vector_irq, cpu)[old_vector] = -1;
+     }
+
     cfg->old_vector = IRQ_VECTOR_UNASSIGNED;
     cpus_clear(cfg->old_cpu_mask);
+
+    if ( cfg->used_vectors )
+    {
+        ASSERT(test_bit(old_vector, cfg->used_vectors));
+        clear_bit(old_vector, cfg->used_vectors);
+    }
+
+    cfg->move_in_progress = 0;
 }
 
 void clear_irq_vector(int irq)
