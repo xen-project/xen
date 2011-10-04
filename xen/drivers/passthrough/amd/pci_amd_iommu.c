@@ -26,9 +26,6 @@
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
 
-extern bool_t __read_mostly opt_irq_perdev_vector_map;
-extern bool_t __read_mostly iommu_amd_perdev_vector_map;
-
 struct amd_iommu *find_iommu_for_device(int seg, int bdf)
 {
     struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(seg);
