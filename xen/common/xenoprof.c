@@ -193,17 +193,14 @@ static int alloc_xenoprof_struct(
     unsigned max_max_samples;
     int i;
 
-    d->xenoprof = xmalloc(struct xenoprof);
-
+    d->xenoprof = xzalloc(struct xenoprof);
     if ( d->xenoprof == NULL )
     {
         printk("alloc_xenoprof_struct(): memory allocation failed\n");
         return -ENOMEM;
     }
 
-    memset(d->xenoprof, 0, sizeof(*d->xenoprof));
-
-    d->xenoprof->vcpu = xmalloc_array(struct xenoprof_vcpu, d->max_vcpus);
+    d->xenoprof->vcpu = xzalloc_array(struct xenoprof_vcpu, d->max_vcpus);
     if ( d->xenoprof->vcpu == NULL )
     {
         xfree(d->xenoprof);
@@ -211,8 +208,6 @@ static int alloc_xenoprof_struct(
         printk("alloc_xenoprof_struct(): vcpu array allocation failed\n");
         return -ENOMEM;
     }
-
-    memset(d->xenoprof->vcpu, 0, d->max_vcpus * sizeof(*d->xenoprof->vcpu));
 
     nvcpu = 0;
     for_each_vcpu ( d, v )

@@ -41,11 +41,10 @@ int init_waitqueue_vcpu(struct vcpu *v)
 {
     struct waitqueue_vcpu *wqv;
 
-    wqv = xmalloc(struct waitqueue_vcpu);
+    wqv = xzalloc(struct waitqueue_vcpu);
     if ( wqv == NULL )
         return -ENOMEM;
 
-    memset(wqv, 0, sizeof(*wqv));
     INIT_LIST_HEAD(&wqv->list);
     wqv->vcpu = v;
 

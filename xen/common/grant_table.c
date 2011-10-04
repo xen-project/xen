@@ -2400,19 +2400,17 @@ grant_table_create(
     struct grant_table *t;
     int                 i;
 
-    if ( (t = xmalloc(struct grant_table)) == NULL )
+    if ( (t = xzalloc(struct grant_table)) == NULL )
         goto no_mem_0;
 
     /* Simple stuff. */
-    memset(t, 0, sizeof(*t));
     spin_lock_init(&t->lock);
     t->nr_grant_frames = INITIAL_NR_GRANT_FRAMES;
 
     /* Active grant table. */
-    if ( (t->active = xmalloc_array(struct active_grant_entry *,
+    if ( (t->active = xzalloc_array(struct active_grant_entry *,
                                     max_nr_active_grant_frames())) == NULL )
         goto no_mem_1;
-    memset(t->active, 0, max_nr_active_grant_frames() * sizeof(t->active[0]));
     for ( i = 0;
           i < num_act_frames_from_sha_frames(INITIAL_NR_GRANT_FRAMES); i++ )
     {
@@ -2422,10 +2420,9 @@ grant_table_create(
     }
 
     /* Tracking of mapped foreign frames table */
-    if ( (t->maptrack = xmalloc_array(struct grant_mapping *,
+    if ( (t->maptrack = xzalloc_array(struct grant_mapping *,
                                       max_nr_maptrack_frames())) == NULL )
         goto no_mem_2;
-    memset(t->maptrack, 0, max_nr_maptrack_frames() * sizeof(t->maptrack[0]));
     if ( (t->maptrack[0] = alloc_xenheap_page()) == NULL )
         goto no_mem_3;
     clear_page(t->maptrack[0]);
@@ -2434,9 +2431,8 @@ grant_table_create(
         t->maptrack[0][i].ref = i+1;
 
     /* Shared grant table. */
-    if ( (t->shared_raw = xmalloc_array(void *, max_nr_grant_frames)) == NULL )
+    if ( (t->shared_raw = xzalloc_array(void *, max_nr_grant_frames)) == NULL )
         goto no_mem_3;
-    memset(t->shared_raw, 0, max_nr_grant_frames * sizeof(t->shared_raw[0]));
     for ( i = 0; i < INITIAL_NR_GRANT_FRAMES; i++ )
     {
         if ( (t->shared_raw[i] = alloc_xenheap_page()) == NULL )
@@ -2448,12 +2444,10 @@ grant_table_create(
         gnttab_create_shared_page(d, t, i);
 
     /* Status pages for grant table - for version 2 */
-    t->status = xmalloc_array(grant_status_t *,
+    t->status = xzalloc_array(grant_status_t *,
                               grant_to_status_frames(max_nr_grant_frames));
     if ( t->status == NULL )
         goto no_mem_4;
-    memset(t->status, 0,
-           grant_to_status_frames(max_nr_grant_frames) * sizeof(t->status[0]));
     t->nr_status_frames = 0;
 
     /* Okay, install the structure. */

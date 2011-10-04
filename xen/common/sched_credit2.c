@@ -732,10 +732,9 @@ csched_alloc_vdata(const struct scheduler *ops, struct vcpu *vc, void *dd)
     struct csched_vcpu *svc;
 
     /* Allocate per-VCPU info */
-    svc = xmalloc(struct csched_vcpu);
+    svc = xzalloc(struct csched_vcpu);
     if ( svc == NULL )
         return NULL;
-    memset(svc, 0, sizeof(*svc));
 
     INIT_LIST_HEAD(&svc->rqd_elem);
     INIT_LIST_HEAD(&svc->sdom_elem);
@@ -1437,10 +1436,9 @@ csched_alloc_domdata(const struct scheduler *ops, struct domain *dom)
     struct csched_dom *sdom;
     int flags;
 
-    sdom = xmalloc(struct csched_dom);
+    sdom = xzalloc(struct csched_dom);
     if ( sdom == NULL )
         return NULL;
-    memset(sdom, 0, sizeof(*sdom));
 
     /* Initialize credit and weight */
     INIT_LIST_HEAD(&sdom->vcpu);
@@ -2065,10 +2063,9 @@ csched_init(struct scheduler *ops)
      * set up basic structures, and a callback when the CPU info is
      * available. */
 
-    prv = xmalloc(struct csched_private);
+    prv = xzalloc(struct csched_private);
     if ( prv == NULL )
         return -ENOMEM;
-    memset(prv, 0, sizeof(*prv));
     ops->sched_data = prv;
     spin_lock_init(&prv->lock);
     INIT_LIST_HEAD(&prv->sdom);

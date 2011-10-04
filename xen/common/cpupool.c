@@ -39,7 +39,7 @@ DEFINE_PER_CPU(struct cpupool *, cpupool);
 
 static struct cpupool *alloc_cpupool_struct(void)
 {
-    return xmalloc(struct cpupool);
+    return xzalloc(struct cpupool);
 }
 
 static void free_cpupool_struct(struct cpupool *c)
@@ -118,7 +118,6 @@ static struct cpupool *cpupool_create(
     *perr = -ENOMEM;
     if ( (c = alloc_cpupool_struct()) == NULL )
         return NULL;
-    memset(c, 0, sizeof(*c));
 
     /* One reference for caller, one reference for cpupool_destroy(). */
     atomic_set(&c->refcnt, 2);

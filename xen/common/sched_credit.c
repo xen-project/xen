@@ -351,10 +351,9 @@ csched_alloc_pdata(const struct scheduler *ops, int cpu)
     unsigned long flags;
 
     /* Allocate per-PCPU info */
-    spc = xmalloc(struct csched_pcpu);
+    spc = xzalloc(struct csched_pcpu);
     if ( spc == NULL )
         return NULL;
-    memset(spc, 0, sizeof(*spc));
 
     spin_lock_irqsave(&prv->lock, flags);
 
@@ -649,10 +648,9 @@ csched_alloc_vdata(const struct scheduler *ops, struct vcpu *vc, void *dd)
     struct csched_vcpu *svc;
 
     /* Allocate per-VCPU info */
-    svc = xmalloc(struct csched_vcpu);
+    svc = xzalloc(struct csched_vcpu);
     if ( svc == NULL )
         return NULL;
-    memset(svc, 0, sizeof(*svc));
 
     INIT_LIST_HEAD(&svc->runq_elem);
     INIT_LIST_HEAD(&svc->active_vcpu_elem);
@@ -837,10 +835,9 @@ csched_alloc_domdata(const struct scheduler *ops, struct domain *dom)
 {
     struct csched_dom *sdom;
 
-    sdom = xmalloc(struct csched_dom);
+    sdom = xzalloc(struct csched_dom);
     if ( sdom == NULL )
         return NULL;
-    memset(sdom, 0, sizeof(*sdom));
 
     /* Initialize credit and weight */
     INIT_LIST_HEAD(&sdom->active_vcpu);
@@ -1513,11 +1510,10 @@ csched_init(struct scheduler *ops)
 {
     struct csched_private *prv;
 
-    prv = xmalloc(struct csched_private);
+    prv = xzalloc(struct csched_private);
     if ( prv == NULL )
         return -ENOMEM;
 
-    memset(prv, 0, sizeof(*prv));
     ops->sched_data = prv;
     spin_lock_init(&prv->lock);
     INIT_LIST_HEAD(&prv->active_sdom);

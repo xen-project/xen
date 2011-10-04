@@ -100,10 +100,9 @@ static int get_free_port(struct domain *d)
     if ( port == MAX_EVTCHNS(d) )
         return -ENOSPC;
 
-    chn = xmalloc_array(struct evtchn, EVTCHNS_PER_BUCKET);
+    chn = xzalloc_array(struct evtchn, EVTCHNS_PER_BUCKET);
     if ( unlikely(chn == NULL) )
         return -ENOMEM;
-    memset(chn, 0, EVTCHNS_PER_BUCKET * sizeof(*chn));
     bucket_from_port(d, port) = chn;
 
     for ( i = 0; i < EVTCHNS_PER_BUCKET; i++ )

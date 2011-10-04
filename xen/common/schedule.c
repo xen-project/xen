@@ -233,14 +233,13 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
     if ( domdata == NULL )
         return -ENOMEM;
 
-    vcpu_priv = xmalloc_array(void *, d->max_vcpus);
+    vcpu_priv = xzalloc_array(void *, d->max_vcpus);
     if ( vcpu_priv == NULL )
     {
         SCHED_OP(c->sched, free_domdata, domdata);
         return -ENOMEM;
     }
 
-    memset(vcpu_priv, 0, d->max_vcpus * sizeof(void *));
     for_each_vcpu ( d, v )
     {
         vcpu_priv[v->vcpu_id] = SCHED_OP(c->sched, alloc_vdata, v, domdata);

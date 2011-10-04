@@ -155,11 +155,9 @@ static unsigned int default_vcpu0_location(cpumask_t *online)
 
     /* Do an initial CPU placement. Pick the least-populated CPU. */
     nr_cpus = last_cpu(cpu_online_map) + 1;
-    cnt = xmalloc_array(unsigned int, nr_cpus);
+    cnt = xzalloc_array(unsigned int, nr_cpus);
     if ( cnt )
     {
-        memset(cnt, 0, nr_cpus * sizeof(*cnt));
-
         rcu_read_lock(&domlist_read_lock);
         for_each_domain ( d )
             for_each_vcpu ( d, v )
@@ -511,9 +509,8 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             BUG_ON(d->vcpu != NULL);
             BUG_ON(d->max_vcpus != 0);
 
-            if ( (vcpus = xmalloc_array(struct vcpu *, max)) == NULL )
+            if ( (vcpus = xzalloc_array(struct vcpu *, max)) == NULL )
                 goto maxvcpu_out;
-            memset(vcpus, 0, max * sizeof(*vcpus));
 
             /* Install vcpu array /then/ update max_vcpus. */
             d->vcpu = vcpus;

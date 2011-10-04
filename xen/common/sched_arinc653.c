@@ -341,11 +341,10 @@ a653sched_init(struct scheduler *ops)
 {
     a653sched_priv_t *prv;
 
-    prv = xmalloc(a653sched_priv_t);
+    prv = xzalloc(a653sched_priv_t);
     if ( prv == NULL )
         return -ENOMEM;
 
-    memset(prv, 0, sizeof(*prv));
     ops->sched_data = prv;
 
     prv->schedule[0].dom_handle[0] = '\0';

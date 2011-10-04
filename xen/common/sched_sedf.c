@@ -348,11 +348,10 @@ static void *sedf_alloc_vdata(const struct scheduler *ops, struct vcpu *v, void 
 {
     struct sedf_vcpu_info *inf;
 
-    inf = xmalloc(struct sedf_vcpu_info);
+    inf = xzalloc(struct sedf_vcpu_info);
     if ( inf == NULL )
         return NULL;
 
-    memset(inf, 0, sizeof(struct sedf_vcpu_info));
     inf->vcpu = v;
 
     /* Every VCPU gets an equal share of extratime by default. */
@@ -387,9 +386,8 @@ sedf_alloc_pdata(const struct scheduler *ops, int cpu)
 {
     struct sedf_cpu_info *spc;
 
-    spc = xmalloc(struct sedf_cpu_info);
+    spc = xzalloc(struct sedf_cpu_info);
     BUG_ON(spc == NULL);
-    memset(spc, 0, sizeof(*spc));
     INIT_LIST_HEAD(&spc->waitq);
     INIT_LIST_HEAD(&spc->runnableq);
     INIT_LIST_HEAD(&spc->extraq[EXTRA_PEN_Q]);
@@ -415,15 +413,7 @@ static void sedf_free_vdata(const struct scheduler *ops, void *priv)
 static void *
 sedf_alloc_domdata(const struct scheduler *ops, struct domain *d)
 {
-    void *mem;
-
-    mem = xmalloc(struct sedf_dom_info);
-    if ( mem == NULL )
-        return NULL;
-
-    memset(mem, 0, sizeof(struct sedf_dom_info));
-
-    return mem;
+    return xzalloc(struct sedf_dom_info);
 }
 
 static int sedf_init_domain(const struct scheduler *ops, struct domain *d)
@@ -1333,8 +1323,8 @@ static int sedf_adjust_weights(struct cpupool *c, struct xen_domctl_scheduler_op
     struct vcpu *p;
     struct domain      *d;
     unsigned int        cpu, nr_cpus = last_cpu(cpu_online_map) + 1;
-    int                *sumw = xmalloc_array(int, nr_cpus);
-    s_time_t           *sumt = xmalloc_array(s_time_t, nr_cpus);
+    int                *sumw = xzalloc_array(int, nr_cpus);
+    s_time_t           *sumt = xzalloc_array(s_time_t, nr_cpus);
 
     if ( !sumw || !sumt )
     {
@@ -1342,8 +1332,6 @@ static int sedf_adjust_weights(struct cpupool *c, struct xen_domctl_scheduler_op
         xfree(sumw);
         return -ENOMEM;
     }
-    memset(sumw, 0, nr_cpus * sizeof(*sumw));
-    memset(sumt, 0, nr_cpus * sizeof(*sumt));
 
     /* Sum across all weights. */
     rcu_read_lock(&domlist_read_lock);
