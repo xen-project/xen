@@ -362,14 +362,13 @@ static struct bank_entry* alloc_bank_entry(void)
 {
     struct bank_entry *entry;
 
-    entry = xmalloc(struct bank_entry);
+    entry = xzalloc(struct bank_entry);
     if ( entry == NULL )
     {
         printk(KERN_ERR "MCE: malloc bank_entry failed\n");
         return NULL;
     }
 
-    memset(entry, 0x0, sizeof(entry));
     INIT_LIST_HEAD(&entry->list);
     return entry;
 }

@@ -328,17 +328,13 @@ int __init init_irq_data(void)
     for (vector = 0; vector < NR_VECTORS; ++vector)
         this_cpu(vector_irq)[vector] = -1;
 
-    irq_desc = xmalloc_array(struct irq_desc, nr_irqs);
-    irq_cfg = xmalloc_array(struct irq_cfg, nr_irqs);
-    irq_vector = xmalloc_array(u8, nr_irqs_gsi);
+    irq_desc = xzalloc_array(struct irq_desc, nr_irqs);
+    irq_cfg = xzalloc_array(struct irq_cfg, nr_irqs);
+    irq_vector = xzalloc_array(u8, nr_irqs_gsi);
     
     if ( !irq_desc || !irq_cfg ||! irq_vector )
         return -ENOMEM;
 
-    memset(irq_desc, 0,  nr_irqs * sizeof(*irq_desc));
-    memset(irq_cfg, 0,  nr_irqs * sizeof(*irq_cfg));
-    memset(irq_vector, 0, nr_irqs_gsi * sizeof(*irq_vector));
-    
     for (irq = 0; irq < nr_irqs; irq++) {
         desc = irq_to_desc(irq);
         cfg = irq_cfg(irq);
@@ -1112,11 +1108,10 @@ struct pirq *alloc_pirq_struct(struct domain *d)
 {
     size_t sz = is_hvm_domain(d) ? sizeof(struct pirq) :
                                    offsetof(struct pirq, arch.hvm);
-    struct pirq *pirq = xmalloc_bytes(sz);
+    struct pirq *pirq = xzalloc_bytes(sz);
 
     if ( pirq )
     {
-        memset(pirq, 0, sz);
         if ( is_hvm_domain(d) )
         {
             pirq->arch.hvm.emuirq = IRQ_UNBOUND;

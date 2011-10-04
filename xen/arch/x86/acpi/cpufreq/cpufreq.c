@@ -552,10 +552,9 @@ acpi_cpufreq_cpu_init(struct cpufreq_policy *policy)
     struct cpuinfo_x86 *c = &cpu_data[policy->cpu];
     struct processor_performance *perf;
 
-    data = xmalloc(struct acpi_cpufreq_data);
+    data = xzalloc(struct acpi_cpufreq_data);
     if (!data)
         return -ENOMEM;
-    memset(data, 0, sizeof(struct acpi_cpufreq_data));
 
     cpufreq_drv_data[cpu] = data;
 

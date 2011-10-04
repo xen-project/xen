@@ -1365,8 +1365,7 @@ static void __init enable_IO_APIC(void)
     int i, apic;
 
     /* Initialise dynamic irq_2_pin free list. */
-    irq_2_pin = xmalloc_array(struct irq_pin_list, PIN_MAP_SIZE);
-    memset(irq_2_pin, 0, PIN_MAP_SIZE * sizeof(*irq_2_pin));
+    irq_2_pin = xzalloc_array(struct irq_pin_list, PIN_MAP_SIZE);
         
     for (i = 0; i < PIN_MAP_SIZE; i++)
         irq_2_pin[i].pin = -1;

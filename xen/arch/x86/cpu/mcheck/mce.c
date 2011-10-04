@@ -113,7 +113,7 @@ struct mca_banks *mcabanks_alloc(void)
     if (!mb)
         return NULL;
 
-    mb->bank_map = xmalloc_array(unsigned long,
+    mb->bank_map = xzalloc_array(unsigned long,
                                  BITS_TO_LONGS(nr_mce_banks));
     if (!mb->bank_map)
     {
@@ -122,7 +122,6 @@ struct mca_banks *mcabanks_alloc(void)
     }
 
     mb->num = nr_mce_banks;
-    memset(mb->bank_map, 0, sizeof(long) * BITS_TO_LONGS(nr_mce_banks));
 
     return mb;
 }

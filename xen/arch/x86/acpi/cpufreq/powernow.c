@@ -189,10 +189,9 @@ static int powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
     uint64_t msr_content;
     struct cpuinfo_x86 *c = &cpu_data[policy->cpu];
 
-    data = xmalloc(struct acpi_cpufreq_data);
+    data = xzalloc(struct acpi_cpufreq_data);
     if (!data)
         return -ENOMEM;
-    memset(data, 0, sizeof(struct acpi_cpufreq_data));
 
     cpufreq_drv_data[cpu] = data;
 

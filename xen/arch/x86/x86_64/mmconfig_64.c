@@ -171,13 +171,12 @@ int __init pci_mmcfg_arch_init(void)
     if (pci_mmcfg_virt)
         return 0;
 
-    pci_mmcfg_virt = xmalloc_array(struct mmcfg_virt, pci_mmcfg_config_num);
+    pci_mmcfg_virt = xzalloc_array(struct mmcfg_virt, pci_mmcfg_config_num);
     if (pci_mmcfg_virt == NULL) {
         printk(KERN_ERR "PCI: Can not allocate memory for mmconfig structures\n");
         pci_mmcfg_config_num = 0;
         return 0;
     }
-    memset(pci_mmcfg_virt, 0, sizeof(*pci_mmcfg_virt) * pci_mmcfg_config_num);
 
     for (i = 0; i < pci_mmcfg_config_num; ++i) {
         pci_mmcfg_virt[i].cfg = &pci_mmcfg_config[i];

@@ -105,11 +105,10 @@ int xstate_alloc_save_area(struct vcpu *v)
     BUG_ON(xsave_cntxt_size < XSTATE_AREA_MIN_SIZE);
 
     /* XSAVE/XRSTOR requires the save area be 64-byte-boundary aligned. */
-    save_area = _xmalloc(xsave_cntxt_size, 64);
+    save_area = _xzalloc(xsave_cntxt_size, 64);
     if ( save_area == NULL )
         return -ENOMEM;
 
-    memset(save_area, 0, xsave_cntxt_size);
     ((u32 *)save_area)[6] = 0x1f80;  /* MXCSR */
     *(uint64_t *)(save_area + 512) = XSTATE_FP_SSE;  /* XSETBV */
 

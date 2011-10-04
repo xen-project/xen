@@ -57,10 +57,9 @@ static const char __init *pci_mmcfg_e7520(void)
         pci_mmcfg_config_num = 0;
     else {
         pci_mmcfg_config_num = 1;
-        pci_mmcfg_config = xmalloc(struct acpi_mcfg_allocation);
+        pci_mmcfg_config = xzalloc(struct acpi_mcfg_allocation);
         if (!pci_mmcfg_config)
             return NULL;
-        memset(pci_mmcfg_config, 0, sizeof(pci_mmcfg_config[0]));
         pci_mmcfg_config[0].address = win << 16;
         pci_mmcfg_config[0].pci_segment = 0;
         pci_mmcfg_config[0].start_bus_number = 0;
@@ -111,10 +110,9 @@ static const char __init *pci_mmcfg_intel_945(void)
         pci_mmcfg_config_num = 0;
 
     if (pci_mmcfg_config_num) {
-        pci_mmcfg_config = xmalloc(struct acpi_mcfg_allocation);
+        pci_mmcfg_config = xzalloc(struct acpi_mcfg_allocation);
         if (!pci_mmcfg_config)
             return NULL;
-        memset(pci_mmcfg_config, 0, sizeof(pci_mmcfg_config[0]));
         pci_mmcfg_config[0].address = pciexbar & mask;
         pci_mmcfg_config[0].pci_segment = 0;
         pci_mmcfg_config[0].start_bus_number = 0;

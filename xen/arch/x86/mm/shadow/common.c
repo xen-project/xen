@@ -1922,10 +1922,8 @@ static int shadow_hash_alloc(struct domain *d)
     ASSERT(paging_locked_by_me(d));
     ASSERT(!d->arch.paging.shadow.hash_table);
 
-    table = xmalloc_array(struct page_info *, SHADOW_HASH_BUCKETS);
+    table = xzalloc_array(struct page_info *, SHADOW_HASH_BUCKETS);
     if ( !table ) return 1;
-    memset(table, 0, 
-           SHADOW_HASH_BUCKETS * sizeof (struct page_info *));
     d->arch.paging.shadow.hash_table = table;
     return 0;
 }
@@ -2816,7 +2814,7 @@ static void sh_update_paging_modes(struct vcpu *v)
     /* Make sure this vcpu has a virtual TLB array allocated */
     if ( unlikely(!v->arch.paging.vtlb) )
     {
-        v->arch.paging.vtlb = xmalloc_array(struct shadow_vtlb, VTLB_ENTRIES);
+        v->arch.paging.vtlb = xzalloc_array(struct shadow_vtlb, VTLB_ENTRIES);
         if ( unlikely(!v->arch.paging.vtlb) )
         {
             SHADOW_ERROR("Could not allocate vTLB space for dom %u vcpu %u\n",
@@ -2824,8 +2822,6 @@ static void sh_update_paging_modes(struct vcpu *v)
             domain_crash(v->domain);
             return;
         }
-        memset(v->arch.paging.vtlb, 0, 
-               VTLB_ENTRIES * sizeof (struct shadow_vtlb));
         spin_lock_init(&v->arch.paging.vtlb_lock);
     }
 #endif /* (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB) */
@@ -3656,9 +3652,8 @@ int shadow_track_dirty_vram(struct domain *d,
             goto out_dirty_vram;
         memset(dirty_vram->sl1ma, ~0, sizeof(paddr_t) * nr);
 
-        if ( (dirty_vram->dirty_bitmap = xmalloc_array(uint8_t, dirty_size)) == NULL )
+        if ( (dirty_vram->dirty_bitmap = xzalloc_array(uint8_t, dirty_size)) == NULL )
             goto out_sl1ma;
-        memset(dirty_vram->dirty_bitmap, 0, dirty_size);
 
         dirty_vram->last_dirty = NOW();
 

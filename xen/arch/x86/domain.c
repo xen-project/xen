@@ -563,11 +563,10 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 
     if ( !is_idle_domain(d) )
     {
-        d->arch.cpuids = xmalloc_array(cpuid_input_t, MAX_CPUID_INPUT);
+        d->arch.cpuids = xzalloc_array(cpuid_input_t, MAX_CPUID_INPUT);
         rc = -ENOMEM;
         if ( d->arch.cpuids == NULL )
             goto fail;
-        memset(d->arch.cpuids, 0, MAX_CPUID_INPUT * sizeof(*d->arch.cpuids));
         for ( i = 0; i < MAX_CPUID_INPUT; i++ )
         {
             d->arch.cpuids[i].input[0] = XEN_CPUID_INPUT_UNUSED;

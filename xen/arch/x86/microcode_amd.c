@@ -231,7 +231,6 @@ static int install_equiv_cpu_table(const void *buf, uint32_t size,
         return -ENOMEM;
     }
 
-    memset(equiv_cpu_table, 0, size);
     memcpy(equiv_cpu_table, (const void *)&buf_pos[3], size);
 
     *offset = size + 12;	/* add header length */

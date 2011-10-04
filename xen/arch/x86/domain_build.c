@@ -92,10 +92,9 @@ struct vcpu *__init alloc_dom0_vcpu0(void)
     if ( opt_dom0_max_vcpus > MAX_VIRT_CPUS )
         opt_dom0_max_vcpus = MAX_VIRT_CPUS;
 
-    dom0->vcpu = xmalloc_array(struct vcpu *, opt_dom0_max_vcpus);
+    dom0->vcpu = xzalloc_array(struct vcpu *, opt_dom0_max_vcpus);
     if ( !dom0->vcpu )
         return NULL;
-    memset(dom0->vcpu, 0, opt_dom0_max_vcpus * sizeof(*dom0->vcpu));
     dom0->max_vcpus = opt_dom0_max_vcpus;
 
     return alloc_vcpu(dom0, 0, 0);

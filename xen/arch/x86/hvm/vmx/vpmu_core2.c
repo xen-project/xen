@@ -328,19 +328,15 @@ static int core2_vpmu_alloc_resource(struct vcpu *v)
     vmx_write_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL,
                  core2_calc_intial_glb_ctrl_msr());
 
-    pmu_enable = xmalloc_bytes(sizeof(struct core2_pmu_enable) +
-                 (core2_get_pmc_count()-1)*sizeof(char));
+    pmu_enable = xzalloc_bytes(sizeof(struct core2_pmu_enable) +
+                               core2_get_pmc_count() - 1);
     if ( !pmu_enable )
         goto out1;
-    memset(pmu_enable, 0, sizeof(struct core2_pmu_enable) +
-                 (core2_get_pmc_count()-1)*sizeof(char));
 
-    core2_vpmu_cxt = xmalloc_bytes(sizeof(struct core2_vpmu_context) +
+    core2_vpmu_cxt = xzalloc_bytes(sizeof(struct core2_vpmu_context) +
                     (core2_get_pmc_count()-1)*sizeof(struct arch_msr_pair));
     if ( !core2_vpmu_cxt )
         goto out2;
-    memset(core2_vpmu_cxt, 0, sizeof(struct core2_vpmu_context) +
-                    (core2_get_pmc_count()-1)*sizeof(struct arch_msr_pair));
     core2_vpmu_cxt->pmu_enable = pmu_enable;
     vpmu->context = (void *)core2_vpmu_cxt;
 

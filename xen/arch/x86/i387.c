@@ -245,13 +245,12 @@ int vcpu_init_fpu(struct vcpu *v)
         v->arch.fpu_ctxt = &v->arch.xsave_area->fpu_sse;
     else
     {
-        v->arch.fpu_ctxt = _xmalloc(sizeof(v->arch.xsave_area->fpu_sse), 16);
+        v->arch.fpu_ctxt = _xzalloc(sizeof(v->arch.xsave_area->fpu_sse), 16);
         if ( !v->arch.fpu_ctxt )
         {
             rc = -ENOMEM;
             goto done;
         }
-        memset(v->arch.fpu_ctxt, 0, sizeof(v->arch.xsave_area->fpu_sse));
     }
 
 done:

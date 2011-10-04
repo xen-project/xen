@@ -602,10 +602,9 @@ static int cpuidle_init_cpu(int cpu)
     if ( !acpi_power )
     {
         int i;
-        acpi_power = xmalloc(struct acpi_processor_power);
+        acpi_power = xzalloc(struct acpi_processor_power);
         if ( !acpi_power )
             return -ENOMEM;
-        memset(acpi_power, 0, sizeof(*acpi_power));
 
         for ( i = 0; i < ACPI_PROCESSOR_MAX_POWER; i++ )
             acpi_power->states[i].idx = i;

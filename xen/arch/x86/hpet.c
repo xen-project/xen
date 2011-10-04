@@ -365,10 +365,9 @@ static void __init hpet_fsb_cap_lookup(void)
     num_chs = ((id & HPET_ID_NUMBER) >> HPET_ID_NUMBER_SHIFT);
     num_chs++; /* Value read out starts from 0 */
 
-    hpet_events = xmalloc_array(struct hpet_event_channel, num_chs);
+    hpet_events = xzalloc_array(struct hpet_event_channel, num_chs);
     if ( !hpet_events )
         return;
-    memset(hpet_events, 0, num_chs * sizeof(*hpet_events));
 
     for ( i = 0; i < num_chs; i++ )
     {
@@ -504,10 +503,9 @@ void __init hpet_broadcast_init(void)
             return;
 
         if ( !hpet_events )
-            hpet_events = xmalloc(struct hpet_event_channel);
+            hpet_events = xzalloc(struct hpet_event_channel);
         if ( !hpet_events )
             return;
-        memset(hpet_events, 0, sizeof(*hpet_events));
         hpet_events->irq = -1;
 
         /* Start HPET legacy interrupts */

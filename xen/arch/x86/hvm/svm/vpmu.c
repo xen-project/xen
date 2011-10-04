@@ -323,8 +323,7 @@ static void amd_vpmu_initialise(struct vcpu *v)
 	 }
     }
 
-    ctxt = xmalloc_bytes(sizeof(struct amd_vpmu_context));
-
+    ctxt = xzalloc_bytes(sizeof(struct amd_vpmu_context));
     if ( !ctxt )
     {
         gdprintk(XENLOG_WARNING, "Insufficient memory for PMU, "
@@ -333,7 +332,6 @@ static void amd_vpmu_initialise(struct vcpu *v)
         return;
     }
 
-    memset(ctxt, 0, sizeof(struct amd_vpmu_context));
     vpmu->context = (void *)ctxt;
     vpmu->flags |= VPMU_CONTEXT_ALLOCATED;
 }

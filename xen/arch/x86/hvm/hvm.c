@@ -444,17 +444,13 @@ int hvm_domain_initialise(struct domain *d)
     INIT_LIST_HEAD(&d->arch.hvm_domain.msixtbl_list);
     spin_lock_init(&d->arch.hvm_domain.msixtbl_list_lock);
 
-    d->arch.hvm_domain.pbuf = xmalloc_array(char, HVM_PBUF_SIZE);
-    d->arch.hvm_domain.params = xmalloc_array(uint64_t, HVM_NR_PARAMS);
+    d->arch.hvm_domain.pbuf = xzalloc_array(char, HVM_PBUF_SIZE);
+    d->arch.hvm_domain.params = xzalloc_array(uint64_t, HVM_NR_PARAMS);
     d->arch.hvm_domain.io_handler = xmalloc(struct hvm_io_handler);
     rc = -ENOMEM;
     if ( !d->arch.hvm_domain.pbuf || !d->arch.hvm_domain.params ||
          !d->arch.hvm_domain.io_handler )
         goto fail0;
-    memset(d->arch.hvm_domain.pbuf, 0,
-           HVM_PBUF_SIZE * sizeof(*d->arch.hvm_domain.pbuf));
-    memset(d->arch.hvm_domain.params, 0,
-           HVM_NR_PARAMS * sizeof(*d->arch.hvm_domain.params));
     d->arch.hvm_domain.io_handler->num_slot = 0;
 
     hvm_init_guest_time(d);

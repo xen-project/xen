@@ -202,10 +202,9 @@ int hvm_vcpu_cacheattr_init(struct vcpu *v)
 
     memset(m, 0, sizeof(*m));
 
-    m->var_ranges = xmalloc_array(struct mtrr_var_range, MTRR_VCNT);
+    m->var_ranges = xzalloc_array(struct mtrr_var_range, MTRR_VCNT);
     if ( m->var_ranges == NULL )
         return -ENOMEM;
-    memset(m->var_ranges, 0, MTRR_VCNT * sizeof(struct mtrr_var_range));
 
     m->mtrr_cap = (1u << 10) | (1u << 8) | MTRR_VCNT;
 
@@ -608,11 +607,9 @@ int32_t hvm_set_mem_pinned_cacheattr(
          !is_hvm_domain(d) )
         return -EINVAL;
 
-    range = xmalloc(struct hvm_mem_pinned_cacheattr_range);
+    range = xzalloc(struct hvm_mem_pinned_cacheattr_range);
     if ( range == NULL )
         return -ENOMEM;
-
-    memset(range, 0, sizeof(*range));
 
     range->start = gfn_start;
     range->end = gfn_end;

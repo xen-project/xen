@@ -226,10 +226,9 @@ static int ppro_allocate_msr(struct vcpu *v)
 	struct vpmu_struct *vpmu = vcpu_vpmu(v);
 	struct arch_msr_pair *msr_content;
 
-	msr_content = xmalloc_bytes( sizeof(struct arch_msr_pair) * num_counters );
+	msr_content = xzalloc_array(struct arch_msr_pair, num_counters);
 	if ( !msr_content )
 		goto out;
-	memset(msr_content, 0, sizeof(struct arch_msr_pair) * num_counters);
 	vpmu->context = (void *)msr_content;
 	vpmu->flags = 0;
 	vpmu->flags |= PASSIVE_DOMAIN_ALLOCATED;
