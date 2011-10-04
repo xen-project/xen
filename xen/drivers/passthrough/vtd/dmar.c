@@ -291,10 +291,9 @@ static int __init acpi_parse_dev_scope(
     scope->devices_cnt = cnt;
     if ( cnt > 0 )
     {
-        scope->devices = xmalloc_array(u16, cnt);
+        scope->devices = xzalloc_array(u16, cnt);
         if ( !scope->devices )
             return -ENOMEM;
-        memset(scope->devices, 0, sizeof(u16) * cnt);
     }
 
     while ( start < end )
@@ -400,10 +399,9 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
     if ( (ret = acpi_dmar_check_length(header, sizeof(*drhd))) != 0 )
         return ret;
 
-    dmaru = xmalloc(struct acpi_drhd_unit);
+    dmaru = xzalloc(struct acpi_drhd_unit);
     if ( !dmaru )
         return -ENOMEM;
-    memset(dmaru, 0, sizeof(struct acpi_drhd_unit));
 
     dmaru->address = drhd->address;
     dmaru->segment = drhd->segment;
@@ -530,10 +528,9 @@ acpi_parse_one_rmrr(struct acpi_dmar_entry_header *header)
     }
 #endif
 
-    rmrru = xmalloc(struct acpi_rmrr_unit);
+    rmrru = xzalloc(struct acpi_rmrr_unit);
     if ( !rmrru )
         return -ENOMEM;
-    memset(rmrru, 0, sizeof(struct acpi_rmrr_unit));
 
     rmrru->base_address = base_addr;
     rmrru->end_address = end_addr;
@@ -615,10 +612,9 @@ acpi_parse_one_atsr(struct acpi_dmar_entry_header *header)
     if ( (ret = acpi_dmar_check_length(header, sizeof(*atsr))) != 0 )
         return ret;
 
-    atsru = xmalloc(struct acpi_atsr_unit);
+    atsru = xzalloc(struct acpi_atsr_unit);
     if ( !atsru )
         return -ENOMEM;
-    memset(atsru, 0, sizeof(struct acpi_atsr_unit));
 
     atsru->segment = atsr->segment;
     atsru->all_ports = atsr->flags & 1; /* BIT0: ALL_PORTS */
@@ -664,10 +660,9 @@ acpi_parse_one_rhsa(struct acpi_dmar_entry_header *header)
     if ( (ret = acpi_dmar_check_length(header, sizeof(*rhsa))) != 0 )
         return ret;
 
-    rhsau = xmalloc(struct acpi_rhsa_unit);
+    rhsau = xzalloc(struct acpi_rhsa_unit);
     if ( !rhsau )
         return -ENOMEM;
-    memset(rhsau, 0, sizeof(struct acpi_rhsa_unit));
 
     rhsau->address = rhsa->address;
     rhsau->proximity_domain = rhsa->proximity_domain;

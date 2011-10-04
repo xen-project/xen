@@ -779,13 +779,12 @@ static int __init alloc_ivrs_mappings(u16 seg)
     if ( get_ivrs_mappings(seg) )
         return 0;
 
-    ivrs_mappings = xmalloc_array(struct ivrs_mappings, ivrs_bdf_entries + 1);
+    ivrs_mappings = xzalloc_array(struct ivrs_mappings, ivrs_bdf_entries + 1);
     if ( ivrs_mappings == NULL )
     {
         AMD_IOMMU_DEBUG("Error allocating IVRS Mappings table\n");
         return -ENOMEM;
     }
-    memset(ivrs_mappings, 0, ivrs_bdf_entries * sizeof(struct ivrs_mappings));
     IVRS_MAPPINGS_SEG(ivrs_mappings) = seg;
 
     /* assign default values for device entries */

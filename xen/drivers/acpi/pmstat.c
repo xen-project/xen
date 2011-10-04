@@ -221,9 +221,8 @@ static int get_cpufreq_para(struct xen_sysctl_pm_op *op)
         return -EAGAIN;
     }
 
-    if ( !(affected_cpus = xmalloc_array(uint32_t, op->u.get_para.cpu_num)) )
+    if ( !(affected_cpus = xzalloc_array(uint32_t, op->u.get_para.cpu_num)) )
         return -ENOMEM;
-    memset(affected_cpus, 0, op->u.get_para.cpu_num * sizeof(uint32_t));
     for_each_cpu_mask(cpu, policy->cpus)
         affected_cpus[j++] = cpu;
     ret = copy_to_guest(op->u.get_para.affected_cpus,
@@ -233,10 +232,8 @@ static int get_cpufreq_para(struct xen_sysctl_pm_op *op)
         return ret;
 
     if ( !(scaling_available_frequencies =
-        xmalloc_array(uint32_t, op->u.get_para.freq_num)) )
+           xzalloc_array(uint32_t, op->u.get_para.freq_num)) )
         return -ENOMEM;
-    memset(scaling_available_frequencies, 0,
-           op->u.get_para.freq_num * sizeof(uint32_t));
     for ( i = 0; i < op->u.get_para.freq_num; i++ )
         scaling_available_frequencies[i] =
                         pmpt->perf.states[i].core_frequency * 1000;
@@ -247,10 +244,8 @@ static int get_cpufreq_para(struct xen_sysctl_pm_op *op)
         return ret;
 
     if ( !(scaling_available_governors =
-        xmalloc_array(char, gov_num * CPUFREQ_NAME_LEN)) )
+           xzalloc_array(char, gov_num * CPUFREQ_NAME_LEN)) )
         return -ENOMEM;
-    memset(scaling_available_governors, 0,
-                gov_num * CPUFREQ_NAME_LEN * sizeof(char));
     if ( (ret = read_scaling_available_governors(scaling_available_governors,
                 gov_num * CPUFREQ_NAME_LEN * sizeof(char))) )
     {

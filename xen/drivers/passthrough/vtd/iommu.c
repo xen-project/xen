@@ -138,10 +138,9 @@ static struct intel_iommu *__init alloc_intel_iommu(void)
 {
     struct intel_iommu *intel;
 
-    intel = xmalloc(struct intel_iommu);
+    intel = xzalloc(struct intel_iommu);
     if ( intel == NULL )
         return NULL;
-    memset(intel, 0, sizeof(struct intel_iommu));
 
     spin_lock_init(&intel->qi_ctrl.qinval_lock);
     spin_lock_init(&intel->ir_ctrl.iremap_lock);
@@ -1098,10 +1097,9 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
         return -ENOMEM;
     }
 
-    iommu = xmalloc(struct iommu);
+    iommu = xzalloc(struct iommu);
     if ( iommu == NULL )
         return -ENOMEM;
-    memset(iommu, 0, sizeof(struct iommu));
 
     iommu->irq = -1; /* No irq assigned yet. */
 
@@ -1157,10 +1155,9 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
 
     /* allocate domain id bitmap */
     nr_dom = cap_ndoms(iommu->cap);
-    iommu->domid_bitmap = xmalloc_array(unsigned long, BITS_TO_LONGS(nr_dom));
+    iommu->domid_bitmap = xzalloc_array(unsigned long, BITS_TO_LONGS(nr_dom));
     if ( !iommu->domid_bitmap )
         return -ENOMEM ;
-    memset(iommu->domid_bitmap, 0, nr_dom / 8);
 
     /*
      * if Caching mode is set, then invalid translations are tagged with
@@ -1169,10 +1166,9 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
     if ( cap_caching_mode(iommu->cap) )
         set_bit(0, iommu->domid_bitmap);
 
-    iommu->domid_map = xmalloc_array(u16, nr_dom);
+    iommu->domid_map = xzalloc_array(u16, nr_dom);
     if ( !iommu->domid_map )
         return -ENOMEM ;
-    memset(iommu->domid_map, 0, nr_dom * sizeof(*iommu->domid_map));
 
     spin_lock_init(&iommu->lock);
     spin_lock_init(&iommu->register_lock);

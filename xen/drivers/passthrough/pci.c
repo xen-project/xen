@@ -60,14 +60,13 @@ static struct pci_seg *alloc_pseg(u16 seg)
     if ( pseg )
         return pseg;
 
-    pseg = xmalloc(struct pci_seg);
+    pseg = xzalloc(struct pci_seg);
     if ( !pseg )
         return NULL;
 
     pseg->nr = seg;
     INIT_LIST_HEAD(&pseg->alldevs_list);
     spin_lock_init(&pseg->bus2bridge_lock);
-    memset(pseg->bus2bridge, 0, sizeof(pseg->bus2bridge));
 
     if ( radix_tree_insert(&pci_segments, seg, pseg) )
     {
@@ -116,10 +115,9 @@ static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
         if ( pdev->bus == bus && pdev->devfn == devfn )
             return pdev;
 
-    pdev = xmalloc(struct pci_dev);
+    pdev = xzalloc(struct pci_dev);
     if ( !pdev )
         return NULL;
-    memset(pdev, 0, sizeof(struct pci_dev));
 
     *(u16*) &pdev->seg = pseg->nr;
     *((u8*) &pdev->bus) = bus;

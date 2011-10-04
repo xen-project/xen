@@ -93,11 +93,11 @@ void __init vesa_init(void)
     if ( !lbuf )
         goto fail;
 
-    text_buf = xmalloc_bytes(text_columns * text_rows);
+    text_buf = xzalloc_bytes(text_columns * text_rows);
     if ( !text_buf )
         goto fail;
 
-    line_len = xmalloc_array(unsigned int, text_columns);
+    line_len = xzalloc_array(unsigned int, text_columns);
     if ( !line_len )
         goto fail;
 
@@ -108,8 +108,6 @@ void __init vesa_init(void)
         goto fail;
 
     lfb = memset((void *)IOREMAP_VIRT_START, 0, vram_remap);
-    memset(text_buf, 0, text_columns * text_rows);
-    memset(line_len, 0, text_columns * sizeof(*line_len));
 
     vga_puts = vesa_redraw_puts;
 

@@ -148,11 +148,10 @@ int cpufreq_add_cpu(unsigned int cpu)
     }
 
     if (!domexist) {
-        cpufreq_dom = xmalloc(struct cpufreq_dom);
+        cpufreq_dom = xzalloc(struct cpufreq_dom);
         if (!cpufreq_dom)
             return -ENOMEM;
 
-        memset(cpufreq_dom, 0, sizeof(struct cpufreq_dom));
         cpufreq_dom->dom = dom;
         list_add(&cpufreq_dom->node, &cpufreq_dom_list_head);
     } else {
@@ -176,11 +175,10 @@ int cpufreq_add_cpu(unsigned int cpu)
     }
 
     if (!domexist || hw_all) {
-        policy = xmalloc(struct cpufreq_policy);
+        policy = xzalloc(struct cpufreq_policy);
         if (!policy)
             ret = -ENOMEM;
 
-        memset(policy, 0, sizeof(struct cpufreq_policy));
         policy->cpu = cpu;
         per_cpu(cpufreq_cpu_policy, cpu) = policy;
 
@@ -374,13 +372,12 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *dom0_px_in
     pmpt = processor_pminfo[cpuid];
     if ( !pmpt )
     {
-        pmpt = xmalloc(struct processor_pminfo);
+        pmpt = xzalloc(struct processor_pminfo);
         if ( !pmpt )
         {
             ret = -ENOMEM;
             goto out;
         }
-        memset(pmpt, 0, sizeof(*pmpt));
         processor_pminfo[cpuid] = pmpt;
     }
     pxpt = &pmpt->perf;

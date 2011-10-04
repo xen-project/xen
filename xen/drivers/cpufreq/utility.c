@@ -110,31 +110,27 @@ int cpufreq_statistic_init(unsigned int cpuid)
 
     count = pmpt->perf.state_count;
 
-    pxpt = xmalloc(struct pm_px);
+    pxpt = xzalloc(struct pm_px);
     if ( !pxpt ) {
         spin_unlock(cpufreq_statistic_lock);
         return -ENOMEM;
     }
-    memset(pxpt, 0, sizeof(*pxpt));
     per_cpu(cpufreq_statistic_data, cpuid) = pxpt;
 
-    pxpt->u.trans_pt = xmalloc_array(uint64_t, count * count);
+    pxpt->u.trans_pt = xzalloc_array(uint64_t, count * count);
     if (!pxpt->u.trans_pt) {
         xfree(pxpt);
         spin_unlock(cpufreq_statistic_lock);
         return -ENOMEM;
     }
 
-    pxpt->u.pt = xmalloc_array(struct pm_px_val, count);
+    pxpt->u.pt = xzalloc_array(struct pm_px_val, count);
     if (!pxpt->u.pt) {
         xfree(pxpt->u.trans_pt);
         xfree(pxpt);
         spin_unlock(cpufreq_statistic_lock);
         return -ENOMEM;
     }
-
-    memset(pxpt->u.trans_pt, 0, count * count * (sizeof(uint64_t)));
-    memset(pxpt->u.pt, 0, count * (sizeof(struct pm_px_val)));
 
     pxpt->u.total = pmpt->perf.state_count;
     pxpt->u.usable = pmpt->perf.state_count - pmpt->perf.platform_limit;

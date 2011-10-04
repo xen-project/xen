@@ -111,13 +111,12 @@ int __init amd_iommu_detect_one_acpi(void *ivhd)
         return -ENODEV;
     }
 
-    iommu = (struct amd_iommu *) xmalloc(struct amd_iommu);
+    iommu = xzalloc(struct amd_iommu);
     if ( !iommu )
     {
         AMD_IOMMU_DEBUG("Error allocating amd_iommu\n");
         return -ENOMEM;
     }
-    memset(iommu, 0, sizeof(struct amd_iommu));
 
     spin_lock_init(&iommu->lock);
 
