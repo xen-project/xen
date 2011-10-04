@@ -585,6 +585,13 @@ void *_xmalloc(unsigned long size, unsigned long align)
     return p;
 }
 
+void *_xzalloc(unsigned long size, unsigned long align)
+{
+    void *p = _xmalloc(size, align);
+
+    return p ? memset(p, 0, size) : p;
+}
+
 void xfree(void *p)
 {
     struct bhdr *b;

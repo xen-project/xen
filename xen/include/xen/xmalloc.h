@@ -11,19 +11,25 @@
 
 /* Allocate space for typed object. */
 #define xmalloc(_type) ((_type *)_xmalloc(sizeof(_type), __alignof__(_type)))
+#define xzalloc(_type) ((_type *)_xzalloc(sizeof(_type), __alignof__(_type)))
 
 /* Allocate space for array of typed objects. */
 #define xmalloc_array(_type, _num) \
     ((_type *)_xmalloc_array(sizeof(_type), __alignof__(_type), _num))
+#define xzalloc_array(_type, _num) \
+    ((_type *)_xzalloc_array(sizeof(_type), __alignof__(_type), _num))
 
 /* Allocate untyped storage. */
-#define xmalloc_bytes(_bytes) (_xmalloc(_bytes, SMP_CACHE_BYTES))
+#define xmalloc_bytes(_bytes) _xmalloc(_bytes, SMP_CACHE_BYTES)
+#define xzalloc_bytes(_bytes) _xzalloc(_bytes, SMP_CACHE_BYTES)
 
 /* Free any of the above. */
 extern void xfree(void *);
 
 /* Underlying functions */
 extern void *_xmalloc(unsigned long size, unsigned long align);
+extern void *_xzalloc(unsigned long size, unsigned long align);
+
 static inline void *_xmalloc_array(
     unsigned long size, unsigned long align, unsigned long num)
 {
@@ -31,6 +37,15 @@ static inline void *_xmalloc_array(
 	if (size && num > UINT_MAX / size)
 		return NULL;
  	return _xmalloc(size * num, align);
+}
+
+static inline void *_xzalloc_array(
+    unsigned long size, unsigned long align, unsigned long num)
+{
+    /* Check for overflow. */
+    if (size && num > UINT_MAX / size)
+        return NULL;
+    return _xzalloc(size * num, align);
 }
 
 /*
