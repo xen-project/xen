@@ -18,6 +18,7 @@
  */
 
 #include "xc_private.h"
+#include <errno.h>
 
 int xc_gnttab_op(xc_interface *xch, int cmd, void * op, int op_size, int count)
 {
@@ -150,8 +151,8 @@ void *xc_gnttab_map_grant_ref(xc_gnttab *xcg,
                               uint32_t ref,
                               int prot)
 {
-	return xcg->ops->u.gnttab.map_grant_ref(xcg, xcg->ops_handle,
-						domid, ref, prot);
+	return xcg->ops->u.gnttab.grant_map(xcg, xcg->ops_handle, 1, 0, prot,
+	                                    &domid, &ref, -1, -1);
 }
 
 void *xc_gnttab_map_grant_refs(xc_gnttab *xcg,
@@ -160,8 +161,8 @@ void *xc_gnttab_map_grant_refs(xc_gnttab *xcg,
                                uint32_t *refs,
                                int prot)
 {
-	return xcg->ops->u.gnttab.map_grant_refs(xcg, xcg->ops_handle,
-						 count, domids, refs, prot);
+	return xcg->ops->u.gnttab.grant_map(xcg, xcg->ops_handle, count, 0,
+	                                    prot, domids, refs, -1, -1);
 }
 
 void *xc_gnttab_map_domain_grant_refs(xc_gnttab *xcg,
@@ -170,9 +171,22 @@ void *xc_gnttab_map_domain_grant_refs(xc_gnttab *xcg,
                                       uint32_t *refs,
                                       int prot)
 {
-	return xcg->ops->u.gnttab.map_domain_grant_refs(xcg, xcg->ops_handle,
-							count, domid, refs, prot);
+	return xcg->ops->u.gnttab.grant_map(xcg, xcg->ops_handle, count,
+	                                    XC_GRANT_MAP_SINGLE_DOMAIN,
+	                                    prot, &domid, refs, -1, -1);
 }
+
+void *xc_gnttab_map_grant_ref_notify(xc_gnttab *xcg,
+                                     uint32_t domid,
+                                     uint32_t ref,
+                                     int prot,
+                                     uint32_t notify_offset,
+                                     evtchn_port_t notify_port)
+{
+	return xcg->ops->u.gnttab.grant_map(xcg, xcg->ops_handle, 1, 0, prot,
+	                              &domid, &ref, notify_offset, notify_port);
+}
+
 
 int xc_gnttab_munmap(xc_gnttab *xcg,
                      void *start_address,

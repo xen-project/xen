@@ -509,55 +509,20 @@ static int linux_gnttab_close(xc_gnttab *xcg, xc_osdep_handle h)
     return close(fd);
 }
 
-static void *linux_gnttab_map_grant_ref(xc_gnttab *xch, xc_osdep_handle h,
-                                        uint32_t domid, uint32_t ref, int prot)
-{
-    int fd = (int)h;
-    struct ioctl_gntdev_map_grant_ref map;
-    void *addr;
-
-    map.count = 1;
-    map.refs[0].domid = domid;
-    map.refs[0].ref = ref;
-
-    if ( ioctl(fd, IOCTL_GNTDEV_MAP_GRANT_REF, &map) ) {
-        PERROR("xc_gnttab_map_grant_ref: ioctl MAP_GRANT_REF failed");
-        return NULL;
-    }
-
-mmap_again:    
-    addr = mmap(NULL, XC_PAGE_SIZE, prot, MAP_SHARED, fd, map.index);
-    if ( addr == MAP_FAILED )
-    {
-        int saved_errno = errno;
-        struct ioctl_gntdev_unmap_grant_ref unmap_grant;
-
-        if(saved_errno == EAGAIN)
-        {
-            usleep(1000);
-            goto mmap_again;
-        }
-         /* Unmap the driver slots used to store the grant information. */
-        PERROR("xc_gnttab_map_grant_ref: mmap failed");
-        unmap_grant.index = map.index;
-        unmap_grant.count = 1;
-        ioctl(fd, IOCTL_GNTDEV_UNMAP_GRANT_REF, &unmap_grant);
-        errno = saved_errno;
-        return NULL;
-    }
-
-    return addr;
-}
-
-static void *do_gnttab_map_grant_refs(xc_gnttab *xch, xc_osdep_handle h,
-                                      uint32_t count,
-                                      uint32_t *domids, int domids_stride,
-                                      uint32_t *refs, int prot)
+static void *linux_gnttab_grant_map(xc_gnttab *xch, xc_osdep_handle h,
+                                    uint32_t count, int flags, int prot,
+                                    uint32_t *domids, uint32_t *refs,
+                                    uint32_t notify_offset,
+                                    evtchn_port_t notify_port)
 {
     int fd = (int)h;
     struct ioctl_gntdev_map_grant_ref *map;
     void *addr = NULL;
+    int domids_stride = 1;
     int i;
+
+    if (flags & XC_GRANT_MAP_SINGLE_DOMAIN)
+        domids_stride = 0;
 
     map = malloc(sizeof(*map) +
                  (count - 1) * sizeof(struct ioctl_gntdev_map_grant_ref));
@@ -573,13 +538,52 @@ static void *do_gnttab_map_grant_refs(xc_gnttab *xch, xc_osdep_handle h,
     map->count = count;
 
     if ( ioctl(fd, IOCTL_GNTDEV_MAP_GRANT_REF, map) ) {
-        PERROR("xc_gnttab_map_grant_refs: ioctl MAP_GRANT_REF failed");
+        PERROR("linux_gnttab_grant_map: ioctl MAP_GRANT_REF failed");
         goto out;
     }
 
+ retry:
     addr = mmap(NULL, XC_PAGE_SIZE * count, prot, MAP_SHARED, fd,
                 map->index);
-    if ( addr == MAP_FAILED )
+
+    if (addr == MAP_FAILED && errno == EAGAIN)
+    {
+        /*
+         * The grant hypercall can return EAGAIN if the granted page is
+         * swapped out. Since the paging daemon may be in the same domain, the
+         * hypercall cannot block without causing a deadlock.
+         *
+         * Because there are no notificaitons when the page is swapped in, wait
+         * a bit before retrying, and hope that the page will arrive eventually.
+         */
+        usleep(1000);
+        goto retry;
+    }
+
+    if (addr != MAP_FAILED)
+    {
+        int rv = 0;
+        struct ioctl_gntdev_unmap_notify notify;
+        notify.index = map->index;
+        notify.action = 0;
+        if (notify_offset >= 0 && notify_offset < XC_PAGE_SIZE * count) {
+            notify.index += notify_offset;
+            notify.action |= UNMAP_NOTIFY_CLEAR_BYTE;
+        }
+        if (notify_port != -1) {
+            notify.event_channel_port = notify_port;
+            notify.action |= UNMAP_NOTIFY_SEND_EVENT;
+        }
+        if (notify.action)
+            rv = ioctl(fd, IOCTL_GNTDEV_SET_UNMAP_NOTIFY, &notify);
+        if (rv) {
+            PERROR("linux_gnttab_grant_map: ioctl SET_UNMAP_NOTIFY failed");
+            munmap(addr, count * XC_PAGE_SIZE);
+            addr = MAP_FAILED;
+        }
+    }
+
+    if (addr == MAP_FAILED)
     {
         int saved_errno = errno;
         struct ioctl_gntdev_unmap_grant_ref unmap_grant;
@@ -599,19 +603,7 @@ static void *do_gnttab_map_grant_refs(xc_gnttab *xch, xc_osdep_handle h,
     return addr;
 }
 
-static void *linux_gnttab_map_grant_refs(xc_gnttab *xcg, xc_osdep_handle h,
-                                         uint32_t count, uint32_t *domids,
-                                         uint32_t *refs, int prot)
-{
-    return do_gnttab_map_grant_refs(xcg, h, count, domids, 1, refs, prot);
-}
 
-static void *linux_gnttab_map_domain_grant_refs(xc_gnttab *xcg, xc_osdep_handle h,
-                                                uint32_t count,
-                                                uint32_t domid, uint32_t *refs, int prot)
-{
-    return do_gnttab_map_grant_refs(xcg, h, count, &domid, 0, refs, prot);
-}
 
 static int linux_gnttab_munmap(xc_gnttab *xcg, xc_osdep_handle h,
                                void *start_address, uint32_t count)
@@ -659,9 +651,7 @@ static struct xc_osdep_ops linux_gnttab_ops = {
     .close = &linux_gnttab_close,
 
     .u.gnttab = {
-        .map_grant_ref = &linux_gnttab_map_grant_ref,
-        .map_grant_refs = &linux_gnttab_map_grant_refs,
-        .map_domain_grant_refs = &linux_gnttab_map_domain_grant_refs,
+        .grant_map = &linux_gnttab_grant_map,
         .munmap = &linux_gnttab_munmap,
     },
 };

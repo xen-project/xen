@@ -458,45 +458,23 @@ void minios_gnttab_close_fd(int fd)
     files[fd].type = FTYPE_NONE;
 }
 
-static void *minios_gnttab_map_grant_ref(xc_gnttab *xcg, xc_osdep_handle h,
-                                         uint32_t domid,
-                                         uint32_t ref,
-                                         int prot)
+static void *minios_gnttab_grant_map(xc_gnttab *xcg, xc_osdep_handle h,
+                                     uint32_t count, int flags, int prot,
+                                     uint32_t *domids, uint32_t *refs,
+                                     uint32_t notify_offset,
+                                     evtchn_port_t notify_port)
 {
     int fd = (int)h;
+    int stride = 1;
+    if (flags & XC_GRANT_MAP_SINGLE_DOMAIN)
+        stride = 0;
+    if (notify_offset != -1 || notify_port != -1) {
+        errno = ENOSYS;
+        return NULL;
+    }
     return gntmap_map_grant_refs(&files[fd].gntmap,
-                                 1,
-                                 &domid, 0,
-                                 &ref,
-                                 prot & PROT_WRITE);
-}
-
-static void *minios_gnttab_map_grant_refs(xc_gnttab *xcg, xc_osdep_handle h,
-                                          uint32_t count,
-                                          uint32_t *domids,
-                                          uint32_t *refs,
-                                          int prot)
-{
-    int fd = (int)h;
-    return gntmap_map_grant_refs(&files[fd].gntmap,
-                                 count,
-                                 domids, 1,
-                                 refs,
-                                 prot & PROT_WRITE);
-}
-
-static void *minios_gnttab_map_domain_grant_refs(xc_gnttab *xcg, xc_osdep_handle h,
-                                                 uint32_t count,
-                                                 uint32_t domid,
-                                                 uint32_t *refs,
-                                                 int prot)
-{
-    int fd = (int)h;
-    return gntmap_map_grant_refs(&files[fd].gntmap,
-                                 count,
-                                 &domid, 0,
-                                 refs,
-                                 prot & PROT_WRITE);
+                                 count, domids, stride,
+                                 refs, prot & PROT_WRITE);
 }
 
 static int minios_gnttab_munmap(xc_gnttab *xcg, xc_osdep_handle h,
@@ -534,9 +512,7 @@ static struct xc_osdep_ops minios_gnttab_ops = {
     .close = &minios_gnttab_close,
 
     .u.gnttab = {
-        .map_grant_ref = &minios_gnttab_map_grant_ref,
-        .map_grant_refs = &minios_gnttab_map_grant_refs,
-        .map_domain_grant_refs = &minios_gnttab_map_domain_grant_refs,
+        .grant_map = &minios_gnttab_grant_map,
         .munmap = &minios_gnttab_munmap,
         .set_max_grants = &minios_gnttab_set_max_grants,
     },

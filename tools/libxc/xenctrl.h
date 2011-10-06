@@ -1349,6 +1349,29 @@ void *xc_gnttab_map_domain_grant_refs(xc_gnttab *xcg,
                                       uint32_t *refs,
                                       int prot);
 
+/**
+ * Memory maps a grant reference from one domain to a local address range.
+ * Mappings should be unmapped with xc_gnttab_munmap. If notify_offset or
+ * notify_port are not -1, this version will attempt to set up an unmap
+ * notification at the given offset and event channel. When the page is
+ * unmapped, the byte at the given offset will be zeroed and a wakeup will be
+ * sent to the given event channel.  Logs errors.
+ *
+ * @parm xcg a handle on an open grant table interface
+ * @parm domid the domain to map memory from
+ * @parm ref the grant reference ID to map
+ * @parm prot same flag as in mmap()
+ * @parm notify_offset The byte offset in the page to use for unmap
+ *                     notification; -1 for none.
+ * @parm notify_port The event channel port to use for unmap notify, or -1
+ */
+void *xc_gnttab_map_grant_ref_notify(xc_gnttab *xcg,
+                                     uint32_t domid,
+                                     uint32_t ref,
+                                     int prot,
+                                     uint32_t notify_offset,
+                                     evtchn_port_t notify_port);
+
 /*
  * Unmaps the @count pages starting at @start_address, which were mapped by a
  * call to xc_gnttab_map_grant_ref or xc_gnttab_map_grant_refs. Never logs.
