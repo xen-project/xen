@@ -197,9 +197,9 @@ endif
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= cd776ee9408ff127f934a707c1a339ee600bc127
-# Tue Jun 28 13:50:53 2011 +0100
-# qemu-char.c: fix incorrect CONFIG_STUBDOM handling
+QEMU_TAG ?= 25378e0a76b282127e9ab8933a4defbc91db3862
+# Thu Oct 6 18:38:08 2011 +0100
+# remove blktap when building for NetBSD
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
