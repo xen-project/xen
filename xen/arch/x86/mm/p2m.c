@@ -792,8 +792,6 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
     req.type = MEM_EVENT_TYPE_PAGING;
 
     /* Fix p2m mapping */
-    /* XXX: It seems inefficient to have this here, as it's only needed
-     *      in one case (ept guest accessing paging out page) */
     p2m_lock(p2m);
     p2m->get_entry(p2m, gfn, &p2mt, &a, p2m_query, NULL);
     if ( p2mt == p2m_ram_paged )
