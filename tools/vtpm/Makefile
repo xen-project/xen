@@ -1,4 +1,4 @@
-XEN_ROOT = ../..
+XEN_ROOT = $(CURDIR)/../..
 
 # Base definitions and rules
 include $(XEN_ROOT)/tools/vtpm/Rules.mk

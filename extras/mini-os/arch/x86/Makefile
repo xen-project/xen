@@ -3,7 +3,7 @@
 # It's is used for x86_32, x86_32y and x86_64
 #
 
-XEN_ROOT = ../../../..
+XEN_ROOT = $(CURDIR)/../../../..
 include $(XEN_ROOT)/Config.mk
 include ../../Config.mk
 

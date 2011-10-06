@@ -1,4 +1,4 @@
-XEN_ROOT = ../..
+XEN_ROOT = $(CURDIR)/../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 # hvmloader is a 32-bit protected mode binary.

@@ -4,7 +4,7 @@
 # Makefile and a arch.mk.
 #
 
-export XEN_ROOT = ../..
+export XEN_ROOT = $(CURDIR)/../..
 include $(XEN_ROOT)/Config.mk
 OBJ_DIR ?= $(CURDIR)
 

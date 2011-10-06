@@ -1,4 +1,4 @@
-XEN_ROOT = ..
+XEN_ROOT = $(CURDIR)/..
 MINI_OS = $(XEN_ROOT)/extras/mini-os
 
 export XEN_OS=MiniOS
@@ -64,7 +64,7 @@ $(call cc-options-add,TARGET_CFLAGS,CC,$(EMBEDDED_EXTRA_CFLAGS))
 GCC_INSTALL = $(shell LANG=C gcc -print-search-dirs | sed -n -e 's/install: \(.*\)/\1/p')
 TARGET_CPPFLAGS += -U __linux__ -U __FreeBSD__ -U __sun__
 TARGET_CPPFLAGS += -nostdinc
-TARGET_CPPFLAGS += -isystem $(CURDIR)/$(MINI_OS)/include/posix
+TARGET_CPPFLAGS += -isystem $(MINI_OS)/include/posix
 TARGET_CPPFLAGS += -isystem $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/include
 TARGET_CPPFLAGS += -isystem $(GCC_INSTALL)include
 TARGET_CPPFLAGS += -isystem $(CURDIR)/lwip-$(XEN_TARGET_ARCH)/src/include
@@ -224,7 +224,7 @@ $(XEN_ROOT)/tools/ioemu-dir:
 ioemu/linkfarm.stamp: $(XEN_ROOT)/tools/ioemu-dir
 	mkdir -p ioemu
 	set -e;									\
-	$(absolutify_xen_root);							\
+	$(buildmakevars2shellvars);						\
 	cd ioemu;								\
 	src="$$XEN_ROOT/tools/ioemu-dir"; export src;				\
 	(cd $$src && find * -type d -print) | xargs mkdir -p;			\
@@ -244,24 +244,24 @@ endif
 
 mk-headers-$(XEN_TARGET_ARCH): ioemu/linkfarm.stamp
 	mkdir -p include/xen && \
-          ln -sf $(addprefix ../../,$(wildcard $(XEN_ROOT)/xen/include/public/*.h)) include/xen && \
-          ln -sf $(addprefix ../../$(XEN_ROOT)/xen/include/public/,arch-ia64 arch-x86 hvm io xsm) include/xen && \
-          ( [ -h include/xen/sys ] || ln -sf ../../$(XEN_ROOT)/tools/include/xen-sys/MiniOS include/xen/sys ) && \
-          ( [ -h include/xen/libelf ] || ln -sf ../../$(XEN_ROOT)/tools/include/xen/libelf include/xen/libelf ) && \
+          ln -sf $(wildcard $(XEN_ROOT)/xen/include/public/*.h) include/xen && \
+          ln -sf $(addprefix $(XEN_ROOT)/xen/include/public/,arch-ia64 arch-x86 hvm io xsm) include/xen && \
+          ( [ -h include/xen/sys ] || ln -sf $(XEN_ROOT)/tools/include/xen-sys/MiniOS include/xen/sys ) && \
+          ( [ -h include/xen/libelf ] || ln -sf $(XEN_ROOT)/tools/include/xen/libelf include/xen/libelf ) && \
 	  mkdir -p include/xen-foreign && \
-	  ln -sf $(addprefix ../../,$(wildcard $(XEN_ROOT)/tools/include/xen-foreign/*)) include/xen-foreign/ && \
+	  ln -sf $(wildcard $(XEN_ROOT)/tools/include/xen-foreign/*) include/xen-foreign/ && \
 	  $(CROSS_MAKE) -C include/xen-foreign/ && \
 	  ( [ -h include/xen/foreign ] || ln -sf ../xen-foreign include/xen/foreign )
 	mkdir -p libxc-$(XEN_TARGET_ARCH)
 	[ -h libxc-$(XEN_TARGET_ARCH)/Makefile ] || ( cd libxc-$(XEN_TARGET_ARCH) && \
-	  ln -sf ../$(XEN_ROOT)/tools/libxc/*.h . && \
-	  ln -sf ../$(XEN_ROOT)/tools/libxc/*.c . && \
-	  ln -sf ../$(XEN_ROOT)/tools/libxc/Makefile . )
+	  ln -sf $(XEN_ROOT)/tools/libxc/*.h . && \
+	  ln -sf $(XEN_ROOT)/tools/libxc/*.c . && \
+	  ln -sf $(XEN_ROOT)/tools/libxc/Makefile . )
 	mkdir -p libxc-$(XEN_TARGET_ARCH)/$(XEN_TARGET_ARCH)
 	[ -h libxc-$(XEN_TARGET_ARCH)/$(XEN_TARGET_ARCH) ] || ( cd libxc-$(XEN_TARGET_ARCH)/$(XEN_TARGET_ARCH) && \
-	  ln -sf ../$(XEN_ROOT)/tools/libxc/$(XEN_TARGET_ARCH)/*.c . && \
-	  ln -sf ../$(XEN_ROOT)/tools/libxc/$(XEN_TARGET_ARCH)/*.h . && \
-	  ln -sf ../$(XEN_ROOT)/tools/libxc/$(XEN_TARGET_ARCH)/Makefile . )
+	  ln -sf $(XEN_ROOT)/tools/libxc/$(XEN_TARGET_ARCH)/*.c . && \
+	  ln -sf $(XEN_ROOT)/tools/libxc/$(XEN_TARGET_ARCH)/*.h . && \
+	  ln -sf $(XEN_ROOT)/tools/libxc/$(XEN_TARGET_ARCH)/Makefile . )
 	$(CROSS_MAKE) -C $(MINI_OS) links
 	touch mk-headers-$(XEN_TARGET_ARCH)
 
@@ -290,8 +290,7 @@ libxc-$(XEN_TARGET_ARCH)/libxenctrl.a: cross-zlib
 .PHONY: ioemu
 ioemu: cross-zlib cross-libpci libxc
 	[ -f ioemu/config-host.mak ] || \
-	  ( $(absolutify_xen_root); \
-	    $(buildmakevars2shellvars); \
+	  ( $(buildmakevars2shellvars); \
 	    cd ioemu ; \
 	    LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) \
 	    TARGET_CPPFLAGS="$(TARGET_CPPFLAGS)" \

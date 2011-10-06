@@ -38,15 +38,15 @@ EXTRA_INC = $(ARCH_INC)
 # This must be before include minios.mk!
 include $(MINI-OS_ROOT)/$(TARGET_ARCH_DIR)/arch.mk
 
-extra_incl := $(foreach dir,$(EXTRA_INC),-isystem $(CURDIR)/$(MINI-OS_ROOT)/include/$(dir))
+extra_incl := $(foreach dir,$(EXTRA_INC),-isystem $(MINI-OS_ROOT)/include/$(dir))
 
-DEF_CPPFLAGS += -isystem $(CURDIR)/$(MINI-OS_ROOT)/include
+DEF_CPPFLAGS += -isystem $(MINI-OS_ROOT)/include
 DEF_CPPFLAGS += -D__MINIOS__
 
 ifeq ($(libc),y)
 DEF_CPPFLAGS += -DHAVE_LIBC
-DEF_CPPFLAGS += -isystem $(CURDIR)/$(MINI-OS_ROOT)/include/posix
-DEF_CPPFLAGS += -isystem $(CURDIR)/$(XEN_ROOT)/tools/xenstore
+DEF_CPPFLAGS += -isystem $(MINI-OS_ROOT)/include/posix
+DEF_CPPFLAGS += -isystem $(XEN_ROOT)/tools/xenstore
 endif
 
 ifneq ($(LWIPDIR),)

@@ -15,7 +15,7 @@
 # Place - Suite 330, Boston, MA 02111-1307 USA.
 #
 
-XEN_ROOT = ../../../..
+XEN_ROOT = $(CURDIR)/../../../..
 include $(XEN_ROOT)/tools/firmware/Rules.mk
 
 C_SRC = build.c dsdt_anycpu.c dsdt_15cpu.c static_tables.c

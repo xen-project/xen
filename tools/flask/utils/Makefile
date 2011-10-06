@@ -1,4 +1,4 @@
-XEN_ROOT=../../..
+XEN_ROOT=$(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 XEN_LIBXC          = $(XEN_ROOT)/tools/libxc
 

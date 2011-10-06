@@ -1,4 +1,4 @@
-XEN_ROOT = ../..
+XEN_ROOT = $(CURDIR)/../..
 
 include $(XEN_ROOT)/Config.mk
 vpath %.c ../grub-upstream

@@ -1,4 +1,4 @@
-XEN_ROOT = ../..
+XEN_ROOT = $(CURDIR)/../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 SUBDIRS-y = common ufs reiserfs iso9660 fat zfs
