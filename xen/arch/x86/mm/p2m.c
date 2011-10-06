@@ -628,7 +628,7 @@ clear_mmio_p2m_entry(struct domain *d, unsigned long gfn)
         return 0;
     }
     p2m_lock(p2m);
-    rc = set_p2m_entry(p2m, gfn, _mfn(INVALID_MFN), 0, 0, p2m->default_access);
+    rc = set_p2m_entry(p2m, gfn, _mfn(INVALID_MFN), 0, p2m_invalid, p2m->default_access);
     audit_p2m(p2m, 1);
     p2m_unlock(p2m);
 
