@@ -169,7 +169,7 @@ main(int argc, char * const argv[])
 			log_file = optarg;
 			break;
 		case 'p':
-			pidfile = pidfile;
+			pidfile = optarg;
 		case 's':
 			vbd_script = optarg;
 			break;
