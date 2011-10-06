@@ -416,7 +416,10 @@ _hidden int libxl__fd_set_cloexec(int fd);
 
 _hidden int libxl__e820_alloc(libxl_ctx *ctx, uint32_t domid, libxl_domain_config *d_config);
 
+/* parse the string @s as a sequence of 6 colon separated bytes in to @mac */
 _hidden int libxl__parse_mac(const char *s, libxl_mac mac);
+/* compare mac address @a and @b. 0 if the same, -ve if a<b and +ve if a>b */
+_hidden int libxl__compare_macs(libxl_mac *a, libxl_mac *b);
 
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)

@@ -294,6 +294,18 @@ _hidden int libxl__parse_mac(const char *s, libxl_mac mac)
     return 0;
 }
 
+_hidden int libxl__compare_macs(libxl_mac *a, libxl_mac *b)
+{
+    int i;
+
+    for (i = 0; i<6; i++) {
+        if ((*a)[i] != (*b)[i])
+            return (*a)[i] - (*b)[i];
+    }
+
+    return 0;
+}
+
 int libxl__fd_set_cloexec(int fd)
 {
     int flags = 0;

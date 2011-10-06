@@ -453,9 +453,7 @@ int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
 {
     libxl_nicinfo *nics;
     unsigned int nb, rc, i;
-    int found;
     libxl_mac mac_n;
-    uint8_t *a, *b;
 
     rc = libxl__parse_mac(mac, mac_n);
     if (rc)
@@ -466,17 +464,15 @@ int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
         return ERROR_FAIL;
 
     memset(nic, 0, sizeof (libxl_device_nic));
-    found = 0;
+
+    rc = ERROR_INVAL;
     for (i = 0; i < nb; ++i) {
-        for (i = 0, a = nics[i].mac, b = mac_n;
-             (b < mac_n + 6) && (*a == *b); ++a, ++b)
-            ;
-        if ((b >= mac_n + 6) && (*a == *b)) {
+        if (!libxl__compare_macs(&mac_n, &nics[i].mac)) {
             nic->backend_domid = nics[i].backend_id;
             nic->devid = nics[i].devid;
             memcpy(nic->mac, nics[i].mac, sizeof (nic->mac));
             nic->script = strdup(nics[i].script);
-            found = 1;
+            rc = 0;
             break;
         }
     }
@@ -484,7 +480,7 @@ int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
     for (i=0; i<nb; i++)
         libxl_nicinfo_destroy(&nics[i]);
     free(nics);
-    return found;
+    return rc;
 }
 
 int libxl_devid_to_device_nic(libxl_ctx *ctx, uint32_t domid,
