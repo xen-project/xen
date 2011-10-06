@@ -139,7 +139,7 @@ devtype=disk,?	{ DPC->disk->is_cdrom = 0; }
 devtype=[^,]*,?	{ xlu__disk_err(DPC,yytext,"unknown value for type"); }
 
 access=[^,]*,?	{ STRIP(','); setaccess(DPC, FROMEQUALS); }
-backendtype=[^,]*? { STRIP(','); setbackendtype(DPC,yytext); }
+backendtype=[^,]*? { STRIP(','); setbackendtype(DPC,FROMEQUALS); }
 
 vdev=[^,]*,?	{ STRIP(','); SAVESTRING("vdev", vdev, FROMEQUALS); }
 script=[^,]*,?	{ STRIP(','); SAVESTRING("script", script, FROMEQUALS); }

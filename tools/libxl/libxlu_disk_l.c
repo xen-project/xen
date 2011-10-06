@@ -1261,7 +1261,7 @@ case 8:
 /* rule 8 can match eol */
 YY_RULE_SETUP
 #line 142 "libxlu_disk_l.l"
-{ STRIP(','); setbackendtype(DPC,yytext); }
+{ STRIP(','); setbackendtype(DPC,FROMEQUALS); }
 	YY_BREAK
 case 9:
 /* rule 9 can match eol */
