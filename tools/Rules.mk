@@ -14,6 +14,7 @@ XEN_XENLIGHT       = $(XEN_ROOT)/tools/libxl
 XEN_XENSTORE       = $(XEN_ROOT)/tools/xenstore
 XEN_LIBXENSTAT     = $(XEN_ROOT)/tools/xenstat/libxenstat/src
 XEN_BLKTAP2        = $(XEN_ROOT)/tools/blktap2
+XEN_LIBVCHAN       = $(XEN_ROOT)/tools/libvchan
 
 CFLAGS_xeninclude = -I$(XEN_INCLUDE)
 
@@ -32,6 +33,10 @@ SHLIB_libxenstore  = -Wl,-rpath-link=$(XEN_XENSTORE)
 CFLAGS_libxenstat  = -I$(XEN_LIBXENSTAT)
 LDLIBS_libxenstat  = $(SHLIB_libxenctrl) $(SHLIB_libxenstore) $(XEN_LIBXENSTAT)/libxenstat.so
 SHLIB_libxenstat  = -Wl,-rpath-link=$(XEN_LIBXENSTAT)
+
+CFLAGS_libxenvchan = -I$(XEN_LIBVCHAN)
+LDLIBS_libxenvchan = $(SHLIB_libxenctrl) $(SHLIB_libxenstore) -L$(XEN_LIBVCHAN) -lxenvchan
+SHLIB_libxenvchan  = -Wl,-rpath-link=$(XEN_LIBVCHAN)
 
 ifeq ($(CONFIG_Linux),y)
 LIBXL_BLKTAP = y
