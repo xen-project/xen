@@ -277,6 +277,23 @@ int libxl__file_reference_unmap(libxl_file_reference *f)
 	return ERROR_FAIL;
 }
 
+_hidden int libxl__parse_mac(const char *s, libxl_mac mac)
+{
+    const char *tok;
+    char *endptr;
+    int i;
+
+    for (i = 0, tok = s; *tok && (i < 6); ++i, tok += 3) {
+        mac[i] = strtol(tok, &endptr, 16);
+        if (endptr != (tok + 2) || (*endptr != '\0' && *endptr != ':') )
+            return ERROR_INVAL;
+    }
+    if ( i != 6 )
+        return ERROR_INVAL;
+
+    return 0;
+}
+
 int libxl__fd_set_cloexec(int fd)
 {
     int flags = 0;

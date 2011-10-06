@@ -452,22 +452,19 @@ int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
                             const char *mac, libxl_device_nic *nic)
 {
     libxl_nicinfo *nics;
-    unsigned int nb, i;
+    unsigned int nb, rc, i;
     int found;
-    uint8_t mac_n[6];
+    libxl_mac mac_n;
     uint8_t *a, *b;
-    const char *tok;
-    char *endptr;
+
+    rc = libxl__parse_mac(mac, mac_n);
+    if (rc)
+	    return rc;
 
     nics = libxl_list_nics(ctx, domid, &nb);
     if (!nics)
         return ERROR_FAIL;
 
-    for (i = 0, tok = mac; *tok && (i < 6); ++i, tok += 3) {
-        mac_n[i] = strtol(tok, &endptr, 16);
-        if (endptr != (tok + 2))
-            return ERROR_INVAL;
-    }
     memset(nic, 0, sizeof (libxl_device_nic));
     found = 0;
     for (i = 0; i < nb; ++i) {
@@ -494,9 +491,8 @@ int libxl_devid_to_device_nic(libxl_ctx *ctx, uint32_t domid,
                               const char *devid, libxl_device_nic *nic)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
-    char *tok, *val;
+    char *val;
     char *dompath, *nic_path_fe, *nic_path_be;
-    unsigned int i;
     int rc = ERROR_FAIL;
 
     memset(nic, 0, sizeof (libxl_device_nic));
@@ -515,10 +511,10 @@ int libxl_devid_to_device_nic(libxl_ctx *ctx, uint32_t domid,
     nic->devid = strtoul(devid, NULL, 10);
 
     val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/mac", nic_path_fe));
-    for (i = 0, tok = strtok(val, ":"); tok && (i < 6);
-         ++i, tok = strtok(NULL, ":")) {
-        nic->mac[i] = strtoul(tok, NULL, 16);
-    }
+    rc = libxl__parse_mac(val, nic->mac);
+    if (rc)
+	    goto out;
+
     nic->script = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(&gc, "%s/script", nic_path_be), NULL);
     rc = 0;
 out:
