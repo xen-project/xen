@@ -1728,9 +1728,12 @@ void help(const char *command)
     if (!command || !strcmp(command, "help")) {
         printf("Usage xl [-vN] <subcommand> [args]\n\n");
         printf("xl full list of subcommands:\n\n");
-        for (i = 0; i < cmdtable_len; i++)
-            printf(" %-20s%s\n",
-                   cmd_table[i].cmd_name, cmd_table[i].cmd_desc);
+        for (i = 0; i < cmdtable_len; i++) {
+            printf(" %-19s ", cmd_table[i].cmd_name);
+            if (strlen(cmd_table[i].cmd_name) > 19)
+                printf("\n %-19s ", "");
+            printf("%s\n", cmd_table[i].cmd_desc);
+        }
     } else {
         cmd = cmdtable_lookup(command);
         if (cmd) {
