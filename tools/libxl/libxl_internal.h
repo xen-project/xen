@@ -140,15 +140,40 @@ static inline libxl_ctx *libxl__gc_owner(libxl__gc *gc)
     return gc->owner;
 }
 
-/* memory allocation tracking/helpers */
+/*
+ * Memory allocation tracking/helpers
+ *
+ * See comment "libxl memory management" in libxl.h for a description
+ * of the framework which these calls belong to.
+ *
+ * These functions deal with memory allocations of type (a) and (d) in
+ * that description.
+ *
+ * All pointers returned by these functions are registered for garbage
+ * collection on exit from the outermost libxl callframe.
+ */
+/* register @ptr in @gc for free on exit from outermost libxl callframe. */
 _hidden int libxl__ptr_add(libxl__gc *gc, void *ptr);
+/* if this is the outermost libxl callframe then free all pointers in @gc */
 _hidden void libxl__free_all(libxl__gc *gc);
+/* allocate and zero @bytes. (similar to a gc'd malloc(3)+memzero()) */
 _hidden void *libxl__zalloc(libxl__gc *gc, int bytes);
+/* allocate and zero memory for an array of @nmemb members of @size each.
+ * (similar to a gc'd calloc(3)). */
 _hidden void *libxl__calloc(libxl__gc *gc, size_t nmemb, size_t size);
+/* change the size of the memory block pointed to by @ptr to @new_size bytes.
+ * unlike other allocation functions here any additional space between the
+ * oldsize and @new_size is not initialised (similar to a gc'd realloc(3)). */
 _hidden void *libxl__realloc(libxl__gc *gc, void *ptr, size_t new_size);
+/* print @fmt into an allocated string large enoughto contain the result.
+ * (similar to gc'd asprintf(3)). */
 _hidden char *libxl__sprintf(libxl__gc *gc, const char *fmt, ...) PRINTF_ATTRIBUTE(2, 3);
+/* duplicate the string @c (similar to a gc'd strdup(3)). */
 _hidden char *libxl__strdup(libxl__gc *gc, const char *c);
+/* duplicate at most @n bytes of string @c (similar to a gc'd strndup(3)). */
 _hidden char *libxl__strndup(libxl__gc *gc, const char *c, size_t n);
+/* strip the last path component from @s and return as a newly allocated
+ * string. (similar to a gc'd dirname(3)). */
 _hidden char *libxl__dirname(libxl__gc *gc, const char *s);
 
 _hidden char **libxl__xs_kvs_of_flexarray(libxl__gc *gc, flexarray_t *array, int length);
