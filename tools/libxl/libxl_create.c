@@ -588,12 +588,14 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     for (i = 0; i < d_config->num_pcidevs; i++)
         libxl__device_pci_add(gc, domid, &d_config->pcidevs[i], 1);
 
-    ret = libxl__create_pci_backend(gc, domid, d_config->pcidevs,
-                                    d_config->num_pcidevs);
-    if (ret < 0) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                   "libxl_create_pci_backend failed: %d", ret);
-        goto error_out;
+    if (d_config->num_pcidevs > 0) {
+        ret = libxl__create_pci_backend(gc, domid, d_config->pcidevs,
+            d_config->num_pcidevs);
+        if (ret < 0) {
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                "libxl_create_pci_backend failed: %d", ret);
+            goto error_out;
+        }
     }
 
     if (d_config->c_info.type == LIBXL_DOMAIN_TYPE_PV &&
