@@ -203,6 +203,33 @@ int xc_gnttab_set_max_grants(xc_gnttab *xcg, uint32_t count)
 	return xcg->ops->u.gnttab.set_max_grants(xcg, xcg->ops_handle, count);
 }
 
+void *xc_gntshr_share_pages(xc_gntshr *xcg, uint32_t domid,
+                            int count, uint32_t *refs, int writable)
+{
+	return xcg->ops->u.gntshr.share_pages(xcg, xcg->ops_handle, domid,
+	                                      count, refs, writable, -1, -1);
+}
+
+void *xc_gntshr_share_page_notify(xc_gntshr *xcg, uint32_t domid,
+                                  uint32_t *ref, int writable,
+                                  uint32_t notify_offset,
+                                  evtchn_port_t notify_port)
+{
+	return xcg->ops->u.gntshr.share_pages(xcg, xcg->ops_handle,
+			domid, 1, ref, writable, notify_offset, notify_port);
+}
+
+/*
+ * Unmaps the @count pages starting at @start_address, which were mapped by a
+ * call to xc_gntshr_share_*. Never logs.
+ */
+int xc_gntshr_munmap(xc_gntshr *xcg, void *start_address, uint32_t count)
+{
+	return xcg->ops->u.gntshr.munmap(xcg, xcg->ops_handle,
+					 start_address, count);
+}
+
+
 /*
  * Local variables:
  * mode: C

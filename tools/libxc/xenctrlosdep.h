@@ -54,6 +54,7 @@ enum xc_osdep_type {
     XC_OSDEP_PRIVCMD,
     XC_OSDEP_EVTCHN,
     XC_OSDEP_GNTTAB,
+    XC_OSDEP_GNTSHR,
 };
 
 /* Opaque handle internal to the backend */
@@ -116,6 +117,15 @@ struct xc_osdep_ops
                           uint32_t count);
             int (*set_max_grants)(xc_gnttab *xcg, xc_osdep_handle h, uint32_t count);
         } gnttab;
+        struct {
+            void *(*share_pages)(xc_gntshr *xcg, xc_osdep_handle h,
+                                 uint32_t domid, int count,
+                                 uint32_t *refs, int writable,
+                                 uint32_t notify_offset,
+                                 evtchn_port_t notify_port);
+            int (*munmap)(xc_gntshr *xcg, xc_osdep_handle h,
+                          void *start_address, uint32_t count);
+        } gntshr;
     } u;
 };
 typedef struct xc_osdep_ops xc_osdep_ops;

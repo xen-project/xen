@@ -258,6 +258,19 @@ int xc_gnttab_close(xc_gnttab *xcg)
     return xc_interface_close_common(xcg);
 }
 
+xc_gntshr *xc_gntshr_open(xentoollog_logger *logger,
+                             unsigned open_flags)
+{
+    return xc_interface_open_common(logger, NULL, open_flags,
+                                    XC_OSDEP_GNTSHR);
+}
+
+int xc_gntshr_close(xc_gntshr *xcg)
+{
+    return xc_interface_close_common(xcg);
+}
+
+
 static pthread_key_t errbuf_pkey;
 static pthread_once_t errbuf_pkey_once = PTHREAD_ONCE_INIT;
 

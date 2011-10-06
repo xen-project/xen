@@ -34,6 +34,7 @@
 #include <xen/memory.h>
 #include <xen/sys/evtchn.h>
 #include <xen/sys/gntdev.h>
+#include <xen/sys/gntalloc.h>
 
 #include "xenctrl.h"
 #include "xenctrlosdep.h"
@@ -656,6 +657,105 @@ static struct xc_osdep_ops linux_gnttab_ops = {
     },
 };
 
+static xc_osdep_handle linux_gntshr_open(xc_gntshr *xcg)
+{
+    int fd = open(DEVXEN "gntalloc", O_RDWR);
+
+    if ( fd == -1 )
+        return XC_OSDEP_OPEN_ERROR;
+
+    return (xc_osdep_handle)fd;
+}
+
+static int linux_gntshr_close(xc_gntshr *xcg, xc_osdep_handle h)
+{
+    int fd = (int)h;
+    return close(fd);
+}
+
+static void *linux_gntshr_share_pages(xc_gntshr *xch, xc_osdep_handle h,
+                                      uint32_t domid, int count,
+                                      uint32_t *refs, int writable,
+                                      uint32_t notify_offset,
+                                      evtchn_port_t notify_port)
+{
+    struct ioctl_gntalloc_alloc_gref *gref_info = NULL;
+    struct ioctl_gntalloc_unmap_notify notify;
+    struct ioctl_gntalloc_dealloc_gref gref_drop;
+    int fd = (int)h;
+    int err;
+    void *area = NULL;
+    gref_info = malloc(sizeof(*gref_info) + count * sizeof(uint32_t));
+    if (!gref_info)
+        return NULL;
+    gref_info->domid = domid;
+    gref_info->flags = writable ? GNTALLOC_FLAG_WRITABLE : 0;
+    gref_info->count = count;
+
+    err = ioctl(fd, IOCTL_GNTALLOC_ALLOC_GREF, gref_info);
+    if (err) {
+        PERROR("linux_gntshr_share_pages: ioctl failed");
+        goto out;
+    }
+
+    area = mmap(NULL, count * XC_PAGE_SIZE, PROT_READ | PROT_WRITE,
+        MAP_SHARED, fd, gref_info->index);
+
+    if (area == MAP_FAILED) {
+        area = NULL;
+        PERROR("linux_gntshr_share_pages: mmap failed");
+        goto out_remove_fdmap;
+    }
+
+    notify.index = gref_info->index;
+    notify.action = 0;
+    if (notify_offset >= 0) {
+        notify.index += notify_offset;
+        notify.action |= UNMAP_NOTIFY_CLEAR_BYTE;
+    }
+    if (notify_port >= 0) {
+        notify.event_channel_port = notify_port;
+        notify.action |= UNMAP_NOTIFY_SEND_EVENT;
+    }
+    if (notify.action)
+        err = ioctl(fd, IOCTL_GNTALLOC_SET_UNMAP_NOTIFY, &notify);
+    if (err) {
+        PERROR("linux_gntshr_share_page_notify: ioctl SET_UNMAP_NOTIFY failed");
+		munmap(area, count * XC_PAGE_SIZE);
+		area = NULL;
+	}
+
+    memcpy(refs, gref_info->gref_ids, count * sizeof(uint32_t));
+
+ out_remove_fdmap:
+    /* Removing the mapping from the file descriptor does not cause the pages to
+     * be deallocated until the mapping is removed.
+     */
+    gref_drop.index = gref_info->index;
+    gref_drop.count = count;
+    ioctl(fd, IOCTL_GNTALLOC_DEALLOC_GREF, &gref_drop);
+ out:
+    free(gref_info);
+    return area;
+}
+
+static int linux_gntshr_munmap(xc_gntshr *xcg, xc_osdep_handle h,
+                               void *start_address, uint32_t count)
+{
+    return munmap(start_address, count);
+}
+
+static struct xc_osdep_ops linux_gntshr_ops = {
+    .open = &linux_gntshr_open,
+    .close = &linux_gntshr_close,
+
+    .u.gntshr = {
+        .share_pages = &linux_gntshr_share_pages,
+        .munmap = &linux_gntshr_munmap,
+    },
+};
+
+
 static struct xc_osdep_ops *linux_osdep_init(xc_interface *xch, enum xc_osdep_type type)
 {
     switch ( type )
@@ -666,6 +766,8 @@ static struct xc_osdep_ops *linux_osdep_init(xc_interface *xch, enum xc_osdep_ty
         return &linux_evtchn_ops;
     case XC_OSDEP_GNTTAB:
         return &linux_gnttab_ops;
+    case XC_OSDEP_GNTSHR:
+        return &linux_gntshr_ops;
     default:
         return NULL;
     }

@@ -115,6 +115,7 @@
 typedef struct xc_interface_core xc_interface;
 typedef struct xc_interface_core xc_evtchn;
 typedef struct xc_interface_core xc_gnttab;
+typedef struct xc_interface_core xc_gntshr;
 typedef enum xc_error_code xc_error_code;
 
 
@@ -1402,6 +1403,53 @@ int xc_gnttab_get_version(xc_interface *xch, int domid); /* Never logs */
 grant_entry_v1_t *xc_gnttab_map_table_v1(xc_interface *xch, int domid, int *gnt_num);
 grant_entry_v2_t *xc_gnttab_map_table_v2(xc_interface *xch, int domid, int *gnt_num);
 /* Sometimes these don't set errno [fixme], and sometimes they don't log. */
+
+/*
+ * Return an fd onto the grant sharing driver.  Logs errors.
+ */
+xc_gntshr *xc_gntshr_open(xentoollog_logger *logger,
+			  unsigned open_flags);
+
+/*
+ * Close a handle previously allocated with xc_gntshr_open().
+ * Never logs errors.
+ */
+int xc_gntshr_close(xc_gntshr *xcg);
+
+/*
+ * Creates and shares pages with another domain.
+ * 
+ * @parm xcg a handle to an open grant sharing instance
+ * @parm domid the domain to share memory with
+ * @parm count the number of pages to share
+ * @parm refs the grant references of the pages (output)
+ * @parm writable true if the other domain can write to the pages
+ * @return local mapping of the pages
+ */
+void *xc_gntshr_share_pages(xc_gntshr *xcg, uint32_t domid,
+                            int count, uint32_t *refs, int writable);
+
+/*
+ * Creates and shares a page with another domain, with unmap notification.
+ * 
+ * @parm xcg a handle to an open grant sharing instance
+ * @parm domid the domain to share memory with
+ * @parm refs the grant reference of the pages (output)
+ * @parm writable true if the other domain can write to the page
+ * @parm notify_offset The byte offset in the page to use for unmap
+ *                     notification; -1 for none.
+ * @parm notify_port The event channel port to use for unmap notify, or -1
+ * @return local mapping of the page
+ */
+void *xc_gntshr_share_page_notify(xc_gntshr *xcg, uint32_t domid,
+                                  uint32_t *ref, int writable,
+                                  uint32_t notify_offset,
+                                  evtchn_port_t notify_port);
+/*
+ * Unmaps the @count pages starting at @start_address, which were mapped by a
+ * call to xc_gntshr_share_*. Never logs.
+ */
+int xc_gntshr_munmap(xc_gntshr *xcg, void *start_address, uint32_t count);
 
 int xc_physdev_map_pirq(xc_interface *xch,
                         int domid,
