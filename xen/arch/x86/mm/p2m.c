@@ -671,10 +671,11 @@ int p2m_mem_paging_nominate(struct domain *d, unsigned long gfn)
     struct page_info *page;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     p2m_type_t p2mt;
+    p2m_access_t a;
     mfn_t mfn;
     int ret;
 
-    mfn = gfn_to_mfn(p2m->domain, gfn, &p2mt);
+    mfn = p2m->get_entry(p2m, gfn, &p2mt, &a, p2m_query, NULL);
 
     /* Check if mfn is valid */
     ret = -EINVAL;
@@ -701,7 +702,7 @@ int p2m_mem_paging_nominate(struct domain *d, unsigned long gfn)
 
     /* Fix p2m entry */
     p2m_lock(p2m);
-    set_p2m_entry(p2m, gfn, mfn, 0, p2m_ram_paging_out, p2m->default_access);
+    set_p2m_entry(p2m, gfn, mfn, 0, p2m_ram_paging_out, a);
     audit_p2m(p2m, 1);
     p2m_unlock(p2m);
 
@@ -715,11 +716,12 @@ int p2m_mem_paging_evict(struct domain *d, unsigned long gfn)
 {
     struct page_info *page;
     p2m_type_t p2mt;
+    p2m_access_t a;
     mfn_t mfn;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
     /* Get mfn */
-    mfn = gfn_to_mfn(d, gfn, &p2mt);
+    mfn = p2m->get_entry(p2m, gfn, &p2mt, &a, p2m_query, NULL);
     if ( unlikely(!mfn_valid(mfn)) )
         return -EINVAL;
 
@@ -738,8 +740,7 @@ int p2m_mem_paging_evict(struct domain *d, unsigned long gfn)
 
     /* Remove mapping from p2m table */
     p2m_lock(p2m);
-    set_p2m_entry(p2m, gfn, _mfn(INVALID_MFN), 0, 
-                  p2m_ram_paged, p2m->default_access);
+    set_p2m_entry(p2m, gfn, _mfn(INVALID_MFN), 0, p2m_ram_paged, a);
     audit_p2m(p2m, 1);
     p2m_unlock(p2m);
 
@@ -775,6 +776,7 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
     struct vcpu *v = current;
     mem_event_request_t req;
     p2m_type_t p2mt;
+    p2m_access_t a;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
     /* Check that there's space on the ring for this request */
@@ -787,12 +789,12 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
     /* Fix p2m mapping */
     /* XXX: It seems inefficient to have this here, as it's only needed
      *      in one case (ept guest accessing paging out page) */
-    gfn_to_mfn(d, gfn, &p2mt);
+    p2m->get_entry(p2m, gfn, &p2mt, &a, p2m_query, NULL);
     if ( p2mt == p2m_ram_paged )
     {
         p2m_lock(p2m);
         set_p2m_entry(p2m, gfn, _mfn(INVALID_MFN), 0, 
-                      p2m_ram_paging_in_start, p2m->default_access);
+                      p2m_ram_paging_in_start, a);
         audit_p2m(p2m, 1);
         p2m_unlock(p2m);
     }
@@ -821,8 +823,11 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
 int p2m_mem_paging_prep(struct domain *d, unsigned long gfn)
 {
     struct page_info *page;
+    p2m_type_t p2mt;
+    p2m_access_t a;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
+    p2m->get_entry(p2m, gfn, &p2mt, &a, p2m_query, NULL);
     /* Get a free page */
     page = alloc_domheap_page(p2m->domain, 0);
     if ( unlikely(page == NULL) )
@@ -830,7 +835,7 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn)
 
     /* Fix p2m mapping */
     p2m_lock(p2m);
-    set_p2m_entry(p2m, gfn, page_to_mfn(page), 0, p2m_ram_paging_in, p2m->default_access);
+    set_p2m_entry(p2m, gfn, page_to_mfn(page), 0, p2m_ram_paging_in, a);
     audit_p2m(p2m, 1);
     p2m_unlock(p2m);
 
@@ -844,6 +849,7 @@ void p2m_mem_paging_resume(struct domain *d)
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     mem_event_response_t rsp;
     p2m_type_t p2mt;
+    p2m_access_t a;
     mfn_t mfn;
 
     /* Pull the response off the ring */
@@ -852,9 +858,9 @@ void p2m_mem_paging_resume(struct domain *d)
     /* Fix p2m entry if the page was not dropped */
     if ( !(rsp.flags & MEM_EVENT_FLAG_DROP_PAGE) )
     {
-        mfn = gfn_to_mfn(d, rsp.gfn, &p2mt);
+        mfn = p2m->get_entry(p2m, rsp.gfn, &p2mt, &a, p2m_query, NULL);
         p2m_lock(p2m);
-        set_p2m_entry(p2m, rsp.gfn, mfn, 0, p2m_ram_rw, p2m->default_access);
+        set_p2m_entry(p2m, rsp.gfn, mfn, 0, p2m_ram_rw, a);
         set_gpfn_from_mfn(mfn_x(mfn), rsp.gfn);
         audit_p2m(p2m, 1);
         p2m_unlock(p2m);
