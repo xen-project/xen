@@ -10,7 +10,6 @@ lock_profile  ?= n
 crash_debug   ?= n
 frame_pointer ?= n
 
-XEN_ROOT=$(BASEDIR)/..
 include $(XEN_ROOT)/Config.mk
 
 # Hardcoded configuration implications and dependencies.

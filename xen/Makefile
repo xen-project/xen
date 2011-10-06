@@ -10,6 +10,7 @@ export XEN_WHOAMI	?= $(USER)
 export XEN_DOMAIN	?= $(shell ([ -x /bin/dnsdomainname ] && /bin/dnsdomainname) || ([ -x /bin/domainname ] && /bin/domainname || echo [unknown]))
 
 export BASEDIR := $(CURDIR)
+export XEN_ROOT := $(BASEDIR)/..
 
 .PHONY: default
 default: build
