@@ -4112,17 +4112,9 @@ int main_blockattach(int argc, char **argv)
     disk.backend_domid = be_domid;
 
     if (dryrun_only) {
-        /* fixme: this should be generated from the idl */
-        /* fixme: enums (backend, format) should be converted to strings */
-        printf("disk.backend_domid = %"PRIx32"\n", disk.backend_domid);
-        printf("disk.pdev_path =     %s\n",        disk.pdev_path);
-        printf("disk.vdev =          %s\n",        disk.vdev);
-        printf("disk.backend =       %d\n",        disk.backend);
-        printf("disk.format =        %d\n",        disk.format);
-        printf("disk.script =        %s\n",        disk.script);
-        printf("disk.removable =     %d\n",        disk.removable);
-        printf("disk.readwrite =     %d\n",        disk.readwrite);
-        printf("disk.is_cdrom =      %d\n",        disk.is_cdrom);
+        char *json = libxl_device_disk_to_json(ctx, &disk);
+        printf("disk: %s\n", json);
+        free(json);
         if (ferror(stdout) || fflush(stdout)) { perror("stdout"); exit(-1); }
         return 0;
     }
