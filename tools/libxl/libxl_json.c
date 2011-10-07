@@ -18,6 +18,7 @@
 #include <yajl/yajl_parse.h>
 #include <yajl/yajl_gen.h>
 
+#include <libxl.h>
 #include "libxl_internal.h"
 
 /* #define DEBUG_ANSWER */
@@ -71,6 +72,216 @@ yajl_gen_status libxl__yajl_gen_asciiz(yajl_gen hand, const char *str)
     return yajl_gen_string(hand, (const unsigned char *)str, strlen(str));
 }
 
+yajl_gen_status libxl__yajl_gen_enum(yajl_gen hand, const char *str)
+{
+    if (str)
+        return libxl__yajl_gen_asciiz(hand, str);
+    else
+        return yajl_gen_null(hand);
+}
+
+/*
+ * YAJL generators for builtin libxl types.
+ */
+yajl_gen_status libxl_uuid_gen_json(yajl_gen hand,
+                                    libxl_uuid *uuid)
+{
+    char buf[LIBXL_UUID_FMTLEN+1];
+    snprintf(buf, sizeof(buf), LIBXL_UUID_FMT, LIBXL_UUID_BYTES((*uuid)));
+    return yajl_gen_string(hand, (const unsigned char *)buf, LIBXL_UUID_FMTLEN);
+}
+
+yajl_gen_status libxl_cpumap_gen_json(yajl_gen hand,
+                                      libxl_cpumap *cpumap)
+{
+    yajl_gen_status s;
+    int i;
+
+    s = yajl_gen_array_open(hand);
+    if (s != yajl_gen_status_ok) goto out;
+
+    libxl_for_each_cpu(i, *cpumap) {
+        if (libxl_cpumap_test(cpumap, i)) {
+            s = yajl_gen_integer(hand, i);
+            if (s != yajl_gen_status_ok) goto out;
+        }
+    }
+    s = yajl_gen_array_close(hand);
+out:
+    return s;
+}
+
+yajl_gen_status libxl_key_value_list_gen_json(yajl_gen hand,
+                                              libxl_key_value_list *pkvl)
+{
+    libxl_key_value_list kvl = *pkvl;
+    yajl_gen_status s;
+    int i;
+
+    s = yajl_gen_map_open(hand);
+    if (s != yajl_gen_status_ok) goto out;
+
+    if (!kvl) goto empty;
+
+    for (i = 0; kvl[i] != NULL; i += 2) {
+        s = libxl__yajl_gen_asciiz(hand, kvl[i]);
+        if (s != yajl_gen_status_ok) goto out;
+        if (kvl[i + 1])
+            s = libxl__yajl_gen_asciiz(hand, kvl[i+1]);
+        else
+            s = yajl_gen_null(hand);
+        if (s != yajl_gen_status_ok) goto out;
+    }
+empty:
+    s = yajl_gen_map_close(hand);
+out:
+    return s;
+}
+
+yajl_gen_status libxl_cpuid_policy_list_gen_json(yajl_gen hand,
+                                libxl_cpuid_policy_list *pcpuid)
+{
+    libxl_cpuid_policy_list cpuid = *pcpuid;
+    yajl_gen_status s;
+    const char *input_names[2] = { "leaf", "subleaf" };
+    const char *policy_names[4] = { "eax", "ebx", "ecx", "edx" };
+    int i, j;
+
+    /*
+     * Aiming for:
+     * [
+     *     { 'leaf':    'val-eax',
+     *       'subleaf': 'val-ecx',
+     *       'eax':     'filter',
+     *       'ebx':     'filter',
+     *       'ecx':     'filter',
+     *       'edx':     'filter' },
+     *     { 'leaf':    'val-eax', ..., 'eax': 'filter', ... },
+     *     ... etc ...
+     * ]
+     */
+
+    s = yajl_gen_array_open(hand);
+    if (s != yajl_gen_status_ok) goto out;
+
+    if (cpuid == NULL) goto empty;
+
+    for (i = 0; cpuid[i].input[0] != XEN_CPUID_INPUT_UNUSED; i++) {
+        s = yajl_gen_map_open(hand);
+        if (s != yajl_gen_status_ok) goto out;
+
+        for (j = 0; j < 2; j++) {
+            if (cpuid[i].input[j] != XEN_CPUID_INPUT_UNUSED) {
+                s = libxl__yajl_gen_asciiz(hand, input_names[j]);
+                if (s != yajl_gen_status_ok) goto out;
+                s = yajl_gen_integer(hand, cpuid[i].input[j]);
+                if (s != yajl_gen_status_ok) goto out;
+            }
+        }
+
+        for (j = 0; j < 4; j++) {
+            if (cpuid[i].policy[j] != NULL) {
+                s = libxl__yajl_gen_asciiz(hand, policy_names[j]);
+                if (s != yajl_gen_status_ok) goto out;
+                s = yajl_gen_string(hand,
+                               (const unsigned char *)cpuid[i].policy[j], 32);
+                if (s != yajl_gen_status_ok) goto out;
+            }
+        }
+        s = yajl_gen_map_close(hand);
+        if (s != yajl_gen_status_ok) goto out;
+    }
+
+empty:
+    s = yajl_gen_array_close(hand);
+out:
+    return s;
+}
+
+yajl_gen_status libxl_string_list_gen_json(yajl_gen hand, libxl_string_list *pl)
+{
+    libxl_string_list l = *pl;
+    yajl_gen_status s;
+    int i;
+
+    s = yajl_gen_array_open(hand);
+    if (s != yajl_gen_status_ok) goto out;
+
+    if (!l) goto empty;
+
+    for (i = 0; l[i] != NULL; i++) {
+        s = libxl__yajl_gen_asciiz(hand, l[i]);
+        if (s != yajl_gen_status_ok) goto out;
+    }
+empty:
+    s = yajl_gen_array_close(hand);
+out:
+    return s;
+}
+
+yajl_gen_status libxl_mac_gen_json(yajl_gen hand, libxl_mac *mac)
+{
+    char buf[LIBXL_MAC_FMTLEN+1];
+    snprintf(buf, sizeof(buf), LIBXL_MAC_FMT, LIBXL_MAC_BYTES((*mac)));
+    return yajl_gen_string(hand, (const unsigned char *)buf, LIBXL_MAC_FMTLEN);
+}
+
+yajl_gen_status libxl_hwcap_gen_json(yajl_gen hand,
+                                     libxl_hwcap *p)
+{
+    yajl_gen_status s;
+    int i;
+
+    s = yajl_gen_array_open(hand);
+    if (s != yajl_gen_status_ok) goto out;
+
+    for(i=0; i<4; i++) {
+        s = yajl_gen_integer(hand, (*p)[i]);
+        if (s != yajl_gen_status_ok) goto out;
+    }
+    s = yajl_gen_array_close(hand);
+out:
+    return s;
+}
+
+yajl_gen_status libxl_cpuarray_gen_json(yajl_gen hand,
+                                        libxl_cpuarray *cpuarray)
+{
+    yajl_gen_status s;
+    int i;
+
+    s = yajl_gen_array_open(hand);
+    if (s != yajl_gen_status_ok) goto out;
+
+    for(i=0; i<cpuarray->entries; i++) {
+        if (cpuarray->array[i] == LIBXL_CPUARRAY_INVALID_ENTRY)
+            s = yajl_gen_null(hand);
+        else
+            s = yajl_gen_integer(hand, cpuarray->array[i]);
+        if (s != yajl_gen_status_ok) goto out;
+    }
+    s = yajl_gen_array_close(hand);
+out:
+    return s;
+}
+
+yajl_gen_status libxl_file_reference_gen_json(yajl_gen hand,
+                                              libxl_file_reference *p)
+{
+    if (p->path)
+        return libxl__yajl_gen_asciiz(hand, p->path);
+    else
+        return yajl_gen_null(hand);
+}
+
+yajl_gen_status libxl__string_gen_json(yajl_gen hand,
+                                       const char *p)
+{
+    if (p)
+        return libxl__yajl_gen_asciiz(hand, p);
+    else
+        return yajl_gen_null(hand);
+}
 
 /*
  * libxl__json_object helper functions
@@ -557,6 +768,71 @@ libxl__json_object *libxl__json_parse(libxl__gc *gc, const char *s)
         yajl_ctx_free(&yajl_ctx);
         return NULL;
     }
+}
+
+static const char *yajl_gen_status_to_string(yajl_gen_status s)
+{
+        switch (s) {
+        case yajl_gen_status_ok: abort();
+        case yajl_gen_keys_must_be_strings:
+            return "keys must be strings";
+        case yajl_max_depth_exceeded:
+            return "max depth exceeded";
+        case yajl_gen_in_error_state:
+            return "in error state";
+        case yajl_gen_generation_complete:
+            return "generation complete";
+        case yajl_gen_invalid_number:
+            return "invalid number";
+        case yajl_gen_no_buf:
+            return "no buffer";
+#if 0 /* This is in the docs but not implemented in the version I am running. */
+        case yajl_gen_invalid_string:
+            return "invalid string";
+#endif
+        default:
+            return "unknown error";
+        }
+}
+
+char *libxl__object_to_json(libxl_ctx *ctx, const char *type,
+                            libxl__gen_json_callback gen, void *p)
+{
+    yajl_gen_config conf = { 1, "    " };
+    const unsigned char *buf;
+    char *ret = NULL;
+    unsigned int len = 0;
+    yajl_gen_status s;
+    yajl_gen hand;
+
+    hand = yajl_gen_alloc(&conf, NULL);
+    if (!hand)
+        return NULL;
+
+    s = gen(hand, p);
+    if (s != yajl_gen_status_ok)
+        goto out;
+
+    s = yajl_gen_get_buf(hand, &buf, &len);
+    if (s != yajl_gen_status_ok)
+        goto out;
+    ret = strdup((const char *)buf);
+
+out:
+    yajl_gen_free(hand);
+
+    if (s != yajl_gen_status_ok) {
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                   "unable to convert %s to JSON representation. "
+                   "YAJL error code %d: %s", type,
+                   s, yajl_gen_status_to_string(s));
+    } else if (!ret) {
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                   "unable to allocate space for to JSON representation of %s",
+                   type);
+    }
+
+    return ret;
 }
 
 /*

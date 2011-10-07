@@ -50,6 +50,13 @@ class Type(object):
 
         self.autogenerate_destructor = kwargs.setdefault('autogenerate_destructor', True)
 
+        if self.typename is not None:
+            self.json_fn = kwargs.setdefault('json_fn', self.typename + "_gen_json")
+        else:
+            self.json_fn = kwargs.setdefault('json_fn', None)
+
+        self.autogenerate_json = kwargs.setdefault('autogenerate_json', True)
+
     def marshal_in(self):
         return self.dir in [DIR_IN, DIR_BOTH]
     def marshal_out(self):
@@ -83,6 +90,7 @@ class Builtin(Type):
     def __init__(self, typename, **kwargs):
         kwargs.setdefault('destructor_fn', None)
         kwargs.setdefault('autogenerate_destructor', False)
+        kwargs.setdefault('autogenerate_json', False)
         Type.__init__(self, typename, **kwargs)
 
 class Number(Builtin):
@@ -90,6 +98,7 @@ class Number(Builtin):
         kwargs.setdefault('namespace', None)
         kwargs.setdefault('destructor_fn', None)
         kwargs.setdefault('signed', False)
+        kwargs.setdefault('json_fn', "yajl_gen_integer")
         self.signed = kwargs['signed']
         Builtin.__init__(self, ctype, **kwargs)
 
@@ -163,6 +172,8 @@ class Aggregate(Type):
                 comment = None
             else:
                 n,t,const,comment = f
+            if n is None:
+                raise ValueError
             self.fields.append(Field(t,n,const=const,comment=comment))
 
     # Returns a tuple (stem, field-expr)
@@ -220,7 +231,10 @@ class KeyedUnion(Aggregate):
 #
 
 void = Builtin("void *", namespace = None)
-bool = Builtin("bool", namespace = None)
+bool = Builtin("bool", namespace = None,
+               json_fn = "yajl_gen_bool",
+               autogenerate_json = False)
+
 size_t = Number("size_t", namespace = None)
 
 integer = Number("int", namespace = None, signed = True)
@@ -230,7 +244,9 @@ uint16 = UInt(16)
 uint32 = UInt(32)
 uint64 = UInt(64)
 
-string = Builtin("char *", namespace = None, destructor_fn = "free")
+string = Builtin("char *", namespace = None, destructor_fn = "free",
+                 json_fn = "libxl__string_gen_json",
+                 autogenerate_json = False)
 
 class OrderedDict(dict):
     """A dictionary which remembers insertion order.

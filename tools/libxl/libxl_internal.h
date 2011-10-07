@@ -35,7 +35,9 @@
 
 #include "flexarray.h"
 #include "libxl_utils.h"
+
 #include "_libxl_types_internal.h"
+#include "libxl_json.h"
 
 #define LIBXL_DESTROY_TIMEOUT 10
 #define LIBXL_DEVICE_MODEL_START_TIMEOUT 10
@@ -362,6 +364,14 @@ _hidden char *libxl__cpupoolid_to_name(libxl__gc *gc, uint32_t poolid);
 _hidden int libxl__enum_from_string(const libxl_enum_string_table *t,
                                     const char *s, int *e);
 
+_hidden yajl_gen_status libxl__yajl_gen_asciiz(yajl_gen hand, const char *str);
+
+_hidden yajl_gen_status libxl__string_gen_json(yajl_gen hand, const char *p);
+
+typedef yajl_gen_status (*libxl__gen_json_callback)(yajl_gen hand, void *);
+_hidden char *libxl__object_to_json(libxl_ctx *ctx, const char *type,
+                                    libxl__gen_json_callback gen, void *p);
+
   /* holds the CPUID response for a single CPUID leaf
    * input contains the value of the EAX and ECX register,
    * and each policy string contains a filter to apply to
@@ -447,6 +457,7 @@ _hidden int libxl__qmp_initializations(libxl_ctx *ctx, uint32_t domid);
 #include <yajl/yajl_gen.h>
 
 _hidden yajl_gen_status libxl__yajl_gen_asciiz(yajl_gen hand, const char *str);
+_hidden yajl_gen_status libxl__yajl_gen_enum(yajl_gen hand, const char *str);
 
 typedef enum {
     JSON_ERROR,

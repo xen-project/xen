@@ -199,9 +199,9 @@ typedef struct {
     int v;
 } libxl_enum_string_table;
 
-#include "_libxl_types.h"
-
 typedef struct libxl__ctx libxl_ctx;
+
+#include "_libxl_types.h"
 
 const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx);
 

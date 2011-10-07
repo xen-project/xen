@@ -84,14 +84,17 @@ _libxl_paths.h: genpath
 libxl_paths.c: _libxl_paths.h
 
 libxl.h: _libxl_types.h
+libxl_json.h: _libxl_types_json.h
 libxl_internal.h: _libxl_types_internal.h
+libxl_internal_json.h: _libxl_types_internal_json.h
 
 $(LIBXL_OBJS) $(LIBXLU_OBJS) $(XL_OBJS): libxl.h
 $(LIBXL_OBJS): libxl_internal.h
 
-_libxl_type%.h _libxl_type%.c: libxl_type%.idl gentypes.py libxltypes.py
-	$(PYTHON) gentypes.py libxl_type$*.idl __libxl_type$*.h __libxl_type$*.c
+_libxl_type%.h _libxl_type%_json.h _libxl_type%.c: libxl_type%.idl gentypes.py libxltypes.py
+	$(PYTHON) gentypes.py libxl_type$*.idl __libxl_type$*.h __libxl_type$*_json.h __libxl_type$*.c
 	$(call move-if-changed,__libxl_type$*.h,_libxl_type$*.h)
+	$(call move-if-changed,__libxl_type$*_json.h,_libxl_type$*_json.h)
 	$(call move-if-changed,__libxl_type$*.c,_libxl_type$*.c)
 
 libxenlight.so: libxenlight.so.$(MAJOR)
@@ -140,7 +143,7 @@ install: all
 	ln -sf libxlutil.so.$(XLUMAJOR).$(XLUMINOR) $(DESTDIR)$(LIBDIR)/libxlutil.so.$(XLUMAJOR)
 	ln -sf libxlutil.so.$(XLUMAJOR) $(DESTDIR)$(LIBDIR)/libxlutil.so
 	$(INSTALL_DATA) libxlutil.a $(DESTDIR)$(LIBDIR)
-	$(INSTALL_DATA) libxl.h _libxl_types.h libxl_utils.h libxl_uuid.h $(DESTDIR)$(INCLUDEDIR)
+	$(INSTALL_DATA) libxl.h libxl_json.h _libxl_types.h _libxl_types_json.h libxl_utils.h libxl_uuid.h $(DESTDIR)$(INCLUDEDIR)
 	$(INSTALL_DATA) bash-completion $(DESTDIR)$(BASH_COMPLETION_DIR)/xl.sh
 
 .PHONY: clean
