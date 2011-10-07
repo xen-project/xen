@@ -1,5 +1,9 @@
 # -*- mode: Makefile; -*-
 
+ifeq ($(filter /%,$(XEN_ROOT)),)
+$(error XEN_ROOT must be absolute)
+endif
+
 -include $(XEN_ROOT)/.config
 
 # A debug build of Xen and tools?
