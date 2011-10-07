@@ -495,8 +495,11 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 	}
 #endif
 
-	/* As a rule processors have APIC timer running in deep C states */
-	if (c->x86 > 0xf && !cpu_has_amd_erratum(c, AMD_ERRATUM_400))
+	/*
+	 * Family 0x12 and above processors have APIC timer
+	 * running in deep C states.
+	 */
+	if (c->x86 > 0x11)
 		set_bit(X86_FEATURE_ARAT, c->x86_capability);
 
 	if (cpuid_edx(0x80000007) & (1 << 10)) {
