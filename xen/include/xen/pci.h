@@ -82,6 +82,7 @@ enum {
     DEV_TYPE_PCI,
 };
 
+bool_t pci_known_segment(u16 seg);
 int pci_device_detect(u16 seg, u8 bus, u8 dev, u8 func);
 int scan_pci_devices(void);
 int pdev_type(u16 seg, u8 bus, u8 devfn);

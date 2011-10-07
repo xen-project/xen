@@ -53,6 +53,11 @@ static inline struct pci_seg *get_pseg(u16 seg)
     return radix_tree_lookup(&pci_segments, seg);
 }
 
+bool_t pci_known_segment(u16 seg)
+{
+    return get_pseg(seg) != NULL;
+}
+
 static struct pci_seg *alloc_pseg(u16 seg)
 {
     struct pci_seg *pseg = get_pseg(seg);

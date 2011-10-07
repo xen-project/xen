@@ -442,10 +442,14 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
     else
     {
         u8 b, d, f;
-        int i, invalid_cnt = 0;
+        unsigned int i = 0, invalid_cnt = 0;
         void *p;
 
-        for ( i = 0, p = dev_scope_start; i < dmaru->scope.devices_cnt;
+        /* Skip checking if segment is not accessible yet. */
+        if ( !pci_known_segment(drhd->segment) )
+            i = UINT_MAX;
+
+        for ( p = dev_scope_start; i < dmaru->scope.devices_cnt;
               i++, p += ((struct acpi_dev_scope *)p)->length )
         {
             if ( ((struct acpi_dev_scope *)p)->dev_type == ACPI_DEV_IOAPIC ||
@@ -546,7 +550,12 @@ acpi_parse_one_rmrr(struct acpi_dmar_entry_header *header)
     else
     {
         u8 b, d, f;
-        int i, ignore = 0;
+        bool_t ignore = 0;
+        unsigned int i = 0;
+
+        /* Skip checking if segment is not accessible yet. */
+        if ( !pci_known_segment(rmrr->segment) )
+            i = UINT_MAX;
 
         for ( i = 0; i < rmrru->scope.devices_cnt; i++ )
         {
