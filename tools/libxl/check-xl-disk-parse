@@ -2,6 +2,13 @@
 
 set -e
 
+if [ -x ./xl ] ; then
+    export LD_LIBRARY_PATH=.:../libxc:../xenstore:../blktap2/control
+    XL=./xl
+else
+    XL=xl
+fi
+
 fprefix=tmp.check-xl-disk-parse
 
 expected () {
@@ -14,8 +21,7 @@ one () {
     expected_rc=$1; shift
     printf "test case %s...\n" "$*"
     set +e
-    LD_LIBRARY_PATH=.:../libxc:../xenstore \
-        ./xl -N block-attach 0 "$@" </dev/null >$fprefix.actual 2>/dev/null
+    ${XL} -N block-attach 0 "$@" </dev/null >$fprefix.actual 2>/dev/null
     actual_rc=$?
     diff -u $fprefix.expected $fprefix.actual
     diff_rc=$?
