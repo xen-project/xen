@@ -557,7 +557,7 @@ acpi_parse_one_rmrr(struct acpi_dmar_entry_header *header)
         if ( !pci_known_segment(rmrr->segment) )
             i = UINT_MAX;
 
-        for ( i = 0; i < rmrru->scope.devices_cnt; i++ )
+        for ( ; i < rmrru->scope.devices_cnt; i++ )
         {
             b = PCI_BUS(rmrru->scope.devices[i]);
             d = PCI_SLOT(rmrru->scope.devices[i]);
