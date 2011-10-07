@@ -91,4 +91,20 @@ one 0 "format=raw, vdev=hdc, access=ro, devtype=cdrom, target=/root/image.iso"
 one 0  format=raw  vdev=hdc  access=ro  devtype=cdrom  target=/root/image.iso
 one 0 raw:/root/image.iso,hdc:cdrom,ro
 
+expected <<EOF
+disk: {
+    "backend_domid": 0,
+    "pdev_path": "/dev/vg/guest-volume",
+    "vdev": "xvdb",
+    "backend": "phy",
+    "format": "raw",
+    "script": null,
+    "removable": 0,
+    "readwrite": 1,
+    "is_cdrom": 0
+}
+
+EOF
+one 0 backendtype=phy,vdev=xvdb,access=w,target=/dev/vg/guest-volume
+
 complete
