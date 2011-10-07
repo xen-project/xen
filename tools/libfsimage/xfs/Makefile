@@ -1,4 +1,4 @@
-XEN_ROOT = ../../..
+XEN_ROOT = $(CURDIR)/../../..
 
 LIB_SRCS-y = fsys_xfs.c
 
