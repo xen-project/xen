@@ -1,0 +1,6 @@
+#!/bin/sh
+# CHECK-BUILD CHECK-INSTALL
+
+. ./funcs.sh
+
+has_lib libyajl.so.1 || fail "can't find libyajl.so.1 version 1"
