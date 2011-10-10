@@ -17,21 +17,122 @@
 open Stdext
 open Printf
 
-let error fmt = Logs.error "general" fmt
-let info fmt = Logs.info "general" fmt
-let debug fmt = Logs.debug "general" fmt
 
-let access_log_file = ref "/var/log/xenstored-access.log"
-let access_log_nb_files = ref 20
-let access_log_nb_lines = ref 13215
-let activate_access_log = ref true
+(* Logger common *)
 
-(* maximal size of the lines in xenstore-acces.log file *)
-let line_size = 180
+type logger =
+		{ stop: unit -> unit;
+		  restart: unit -> unit;
+		  rotate: unit -> unit;
+		  write: 'a. ('a, unit, string, unit) format4 -> 'a }
 
-let log_read_ops = ref false
-let log_transaction_ops = ref false
-let log_special_ops = ref false
+let truncate_line nb_chars line = 
+	if String.length line > nb_chars - 1 then
+		let len = max (nb_chars - 1) 2 in
+		let dst_line = String.create len in
+		String.blit line 0 dst_line 0 (len - 2);
+		dst_line.[len-2] <- '.'; 
+		dst_line.[len-1] <- '.';
+		dst_line
+	else line
+
+let log_rotate ref_ch log_file log_nb_files =
+	let file n = sprintf "%s.%i" log_file n in
+	let log_files =
+		let rec aux accu n =
+			if n >= log_nb_files then accu
+			else
+				if n = 1 && Sys.file_exists log_file
+				then aux [log_file,1] 2
+				else
+					let file = file (n-1) in
+					if Sys.file_exists file then
+						aux ((file, n) :: accu) (n+1)
+					else accu in
+		aux [] 1 in
+	List.iter (fun (f, n) -> Unix.rename f (file n)) log_files;
+	close_out !ref_ch;
+	ref_ch := open_out log_file
+
+let make_logger log_file log_nb_files log_nb_lines log_nb_chars post_rotate =
+	let channel = ref (open_out_gen [Open_append; Open_creat] 0o644 log_file) in
+	let counter = ref 0 in
+	let stop() =
+		try flush !channel; close_out !channel
+		with _ -> () in
+	let restart() =
+		stop();
+		channel := open_out_gen [Open_append; Open_creat] 0o644 log_file in
+	let rotate() =
+		log_rotate channel log_file log_nb_files;
+		(post_rotate (): unit);
+		counter := 0 in
+	let output s =
+		let s = if log_nb_chars > 0 then truncate_line log_nb_chars s else s in
+		let s = s ^ "\n" in
+		output_string !channel s;
+		flush !channel;
+		incr counter;
+		if !counter > log_nb_lines then rotate() in
+	{ stop=stop; restart=restart; rotate=rotate; write = fun fmt -> Printf.ksprintf output fmt }
+
+
+(* Xenstored logger *) 
+
+exception Unknown_level of string
+
+type level = Debug | Info | Warn | Error | Null
+
+let int_of_level = function
+	| Debug -> 0 | Info -> 1 | Warn -> 2
+	| Error -> 3 | Null -> max_int
+
+let string_of_level = function
+	| Debug -> "debug" | Info -> "info" | Warn -> "warn"
+	| Error -> "error" | Null -> "null"
+
+let level_of_string = function
+	| "debug" -> Debug | "info"  -> Info | "warn"  -> Warn
+	| "error" -> Error | "null"  -> Null | s  -> raise (Unknown_level s)
+
+let string_of_date () =
+	let time = Unix.gettimeofday () in
+	let tm = Unix.gmtime time in
+	let msec = time -. (floor time) in
+	sprintf "%d%.2d%.2dT%.2d:%.2d:%.2d.%.3dZ"
+		(1900 + tm.Unix.tm_year) (tm.Unix.tm_mon + 1) tm.Unix.tm_mday
+		tm.Unix.tm_hour tm.Unix.tm_min tm.Unix.tm_sec
+		(int_of_float (1000.0 *. msec))
+
+let xenstored_log_file = ref "/var/log/xenstored.log"
+let xenstored_log_level = ref Null
+let xenstored_log_nb_files = ref 10
+let xenstored_log_nb_lines = ref 13215
+let xenstored_log_nb_chars = ref (-1)
+let xenstored_logger = ref (None: logger option)
+
+let init_xenstored_log () =
+	if !xenstored_log_level <> Null && !xenstored_log_nb_files > 0 then
+		let logger =
+			make_logger 
+				!xenstored_log_file !xenstored_log_nb_files !xenstored_log_nb_lines
+				!xenstored_log_nb_chars ignore in
+		xenstored_logger := Some logger
+
+let xenstored_logging level key (fmt: (_,_,_,_) format4) =
+	match !xenstored_logger with
+	| Some logger when int_of_level level >= int_of_level !xenstored_log_level ->
+			let date = string_of_date() in
+			let level = string_of_level level in
+			logger.write ("[%s|%5s|%s] " ^^ fmt) date level key
+	| _ -> Printf.ksprintf ignore fmt
+
+let debug key = xenstored_logging Debug key
+let info key = xenstored_logging Info key
+let warn key = xenstored_logging Warn key
+let error key = xenstored_logging Error key
+
+(* Access logger *)
 
 type access_type =
 	| Coalesce
@@ -41,38 +142,10 @@ type access_type =
 	| Endconn
 	| XbOp of Xenbus.Xb.Op.operation
 
-type access =
-	{
-		fd: out_channel ref;
-		counter: int ref;
-		write: tid:int -> con:string -> ?data:string -> access_type -> unit;
-	}
-
-let string_of_date () =
-	let time = Unix.gettimeofday () in
-	let tm = Unix.localtime time in
-	let msec = time -. (floor time) in
-	sprintf "%d%.2d%.2d %.2d:%.2d:%.2d.%.3d" (1900 + tm.Unix.tm_year)
-		(tm.Unix.tm_mon + 1)
-		tm.Unix.tm_mday
-		tm.Unix.tm_hour
-		tm.Unix.tm_min
-		tm.Unix.tm_sec
-		(int_of_float (1000.0 *. msec))
-
-let fill_with_space n s =
-	if String.length s < n
-	then 
-		let r = String.make n ' ' in
-		String.blit s 0  r 0 (String.length s);
-		r
-	else 
-		s
-
 let string_of_tid ~con tid =
 	if tid = 0
-	then fill_with_space 12 (sprintf "%s" con)
-	else fill_with_space 12 (sprintf "%s.%i" con tid)
+	then sprintf "%-12s" con
+	else sprintf "%-12s" (sprintf "%s.%i" con tid)
 
 let string_of_access_type = function
 	| Coalesce                -> "coalesce "
@@ -109,41 +182,9 @@ let string_of_access_type = function
 
 	| Xenbus.Xb.Op.Error             -> "error    "
 	| Xenbus.Xb.Op.Watchevent        -> "w event  "
-
+	(*
 	| x                       -> Xenbus.Xb.Op.to_string x
-
-let file_exists file =
-	try
-		Unix.close (Unix.openfile file [Unix.O_RDONLY] 0o644);
-		true
-	with _ ->
-		false
-
-let log_rotate fd =
-	let file n = sprintf "%s.%i" !access_log_file n in
-	let log_files =
-		let rec aux accu n =
-			if n >= !access_log_nb_files
-			then accu
-			else if n = 1 && file_exists !access_log_file
-			then aux [!access_log_file,1] 2
-			else
-				let file = file (n-1) in
-				if file_exists file
-				then aux ((file,n) :: accu) (n+1)
-				else accu
-		in
-		aux [] 1
-	in
-	let rec rename = function
-		| (f,n) :: t when n < !access_log_nb_files -> 
-			Unix.rename f (file n);
-			rename t
-		| _ -> ()
-	in
-	rename log_files;
-	close_out !fd;
-	fd := open_out !access_log_file
+	*)
 
 let sanitize_data data =
 	let data = String.copy data in
@@ -154,86 +195,68 @@ let sanitize_data data =
 	done;
 	String.escaped data
 
-let make save_to_disk =
-	let fd = ref (open_out_gen [Open_append; Open_creat] 0o644 !access_log_file) in
-	let counter = ref 0 in
-	{
-		fd = fd;
-		counter = counter;
-		write = 
-			if not !activate_access_log || !access_log_nb_files = 0
-			then begin fun ~tid ~con ?data _ -> () end
-			else fun ~tid ~con ?(data="") access_type ->
-				let s = Printf.sprintf "[%s] %s %s %s\n" (string_of_date()) (string_of_tid ~con tid) 
-					(string_of_access_type access_type) (sanitize_data data) in
-				let s =
-					if String.length s > line_size
-					then begin
-						let s = String.sub s 0 line_size in
-						s.[line_size-3] <- '.'; 
-						s.[line_size-2] <- '.';
-						s.[line_size-1] <- '\n';
-						s
-					end else
-						s
-				in
-				incr counter;
-				output_string !fd s;
-				flush !fd;
-				if !counter > !access_log_nb_lines 
-				then begin 
-					log_rotate fd;
-					save_to_disk ();
-					counter := 0;
-				end
-	}
+let activate_access_log = ref true
+let access_log_file = ref "/var/log/xenstored-access.log"
+let access_log_nb_files = ref 20
+let access_log_nb_lines = ref 13215
+let access_log_nb_chars = ref 180
+let access_log_read_ops = ref false
+let access_log_transaction_ops = ref false
+let access_log_special_ops = ref false
+let access_logger = ref None
 
-let access : (access option) ref = ref None
-let init aal save_to_disk =
-	activate_access_log := aal;
-	access := Some (make save_to_disk)
-
-let write_access_log ~con ~tid ?data access_type = 
+let init_access_log post_rotate =
+	if !access_log_nb_files > 0 then
+		let logger =
+			make_logger
+				!access_log_file !access_log_nb_files !access_log_nb_lines
+				!access_log_nb_chars post_rotate in
+		access_logger := Some logger
+ 
+let access_logging ~con ~tid ?(data="") access_type =
         try
-	  maybe (fun a -> a.write access_type ~con ~tid ?data) !access
+		maybe
+			(fun logger ->
+				let date = string_of_date() in
+				let tid = string_of_tid ~con tid in
+				let access_type = string_of_access_type access_type in
+				let data = sanitize_data data in
+				logger.write "[%s] %s %s %s" date tid access_type data)
+			!access_logger
 	with _ -> ()
 
-let new_connection = write_access_log Newconn
-let end_connection = write_access_log Endconn
+let new_connection = access_logging Newconn
+let end_connection = access_logging Endconn
 let read_coalesce ~tid ~con data =
-	if !log_read_ops
-	then write_access_log Coalesce ~tid ~con ~data:("read "^data)
-let write_coalesce data = write_access_log Coalesce ~data:("write "^data)
-let conflict = write_access_log Conflict
-let commit = write_access_log Commit
+	if !access_log_read_ops
+	then access_logging Coalesce ~tid ~con ~data:("read "^data)
+let write_coalesce data = access_logging Coalesce ~data:("write "^data)
+let conflict = access_logging Conflict
+let commit = access_logging Commit
 
 let xb_op ~tid ~con ~ty data =
-	let print =
-	match ty with
-		| Xenbus.Xb.Op.Read | Xenbus.Xb.Op.Directory | Xenbus.Xb.Op.Getperms -> !log_read_ops
+	let print = match ty with
+		| Xenbus.Xb.Op.Read | Xenbus.Xb.Op.Directory | Xenbus.Xb.Op.Getperms -> !access_log_read_ops
 		| Xenbus.Xb.Op.Transaction_start | Xenbus.Xb.Op.Transaction_end ->
 			false (* transactions are managed below *)
 		| Xenbus.Xb.Op.Introduce | Xenbus.Xb.Op.Release | Xenbus.Xb.Op.Getdomainpath | Xenbus.Xb.Op.Isintroduced | Xenbus.Xb.Op.Resume ->
-			!log_special_ops
-		| _ -> true
-	in
-		if print 
-		then write_access_log ~tid ~con ~data (XbOp ty)
+			!access_log_special_ops
+		| _ -> true in
+	if print then access_logging ~tid ~con ~data (XbOp ty)
 
 let start_transaction ~tid ~con = 
-	if !log_transaction_ops && tid <> 0
-	then write_access_log ~tid ~con (XbOp Xenbus.Xb.Op.Transaction_start)
+	if !access_log_transaction_ops && tid <> 0
+	then access_logging ~tid ~con (XbOp Xenbus.Xb.Op.Transaction_start)
 
 let end_transaction ~tid ~con = 
-	if !log_transaction_ops && tid <> 0
-	then write_access_log ~tid ~con (XbOp Xenbus.Xb.Op.Transaction_end)
+	if !access_log_transaction_ops && tid <> 0
+	then access_logging ~tid ~con (XbOp Xenbus.Xb.Op.Transaction_end)
 
 let xb_answer ~tid ~con ~ty data =
 	let print = match ty with
-		| Xenbus.Xb.Op.Error when data="ENOENT " -> !log_read_ops
-		| Xenbus.Xb.Op.Error -> !log_special_ops
+		| Xenbus.Xb.Op.Error when String.startswith "ENOENT " data -> !access_log_read_ops
+		| Xenbus.Xb.Op.Error -> true
 		| Xenbus.Xb.Op.Watchevent -> true
 		| _ -> false
 	in
-		if print
-		then write_access_log ~tid ~con ~data (XbOp ty)
+	if print then access_logging ~tid ~con ~data (XbOp ty)

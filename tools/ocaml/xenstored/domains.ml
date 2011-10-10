@@ -14,6 +14,8 @@
  * GNU Lesser General Public License for more details.
  *)
 
+let debug fmt = Logging.debug "domains" fmt
+
 type domains = {
 	eventchn: Event.t;
 	table: (Xenctrl.domid, Domain.t) Hashtbl.t;
@@ -35,7 +37,7 @@ let cleanup xc doms =
 		try
 			let info = Xenctrl.domain_getinfo xc id in
 			if info.Xenctrl.shutdown || info.Xenctrl.dying then (
-				Logs.debug "general" "Domain %u died (dying=%b, shutdown %b -- code %d)"
+				debug "Domain %u died (dying=%b, shutdown %b -- code %d)"
 				                    id info.Xenctrl.dying info.Xenctrl.shutdown info.Xenctrl.shutdown_code;
 				if info.Xenctrl.dying then
 					dead_dom := id :: !dead_dom
@@ -43,7 +45,7 @@ let cleanup xc doms =
 					notify := true;
 			)
 		with Xenctrl.Error _ ->
-			Logs.debug "general" "Domain %u died -- no domain info" id;
+			debug "Domain %u died -- no domain info" id;
 			dead_dom := id :: !dead_dom;
 		) doms.table;
 	List.iter (fun id ->

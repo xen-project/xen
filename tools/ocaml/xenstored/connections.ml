@@ -15,7 +15,7 @@
  * GNU Lesser General Public License for more details.
  *)
 
-let debug fmt = Logs.debug "general" fmt
+let debug fmt = Logging.debug "connections" fmt
 
 type t = {
 	mutable anonymous: Connection.t list;
@@ -165,3 +165,8 @@ let stats cons =
 	);
 	(List.length cons.anonymous, !nb_ops_anon, !nb_watchs_anon,
 	 Hashtbl.length cons.domains, !nb_ops_dom, !nb_watchs_dom)
+
+let debug cons =
+	let anonymous = List.map Connection.debug cons.anonymous in
+	let domains = Hashtbl.fold (fun _ con accu -> Connection.debug con :: accu) cons.domains [] in
+	String.concat "" (domains @ anonymous)

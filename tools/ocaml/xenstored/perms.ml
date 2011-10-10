@@ -15,6 +15,8 @@
  * GNU Lesser General Public License for more details.
  *)
 
+let info fmt = Logging.info "perms" fmt
+
 open Stdext
 
 let activate = ref true
@@ -145,16 +147,16 @@ let check (connection:Connection.t) request (node:Node.t) =
 		in
 		match perm, request with
 		| NONE, _ ->
-			Logs.info "io" "Permission denied: Domain %d has no permission" domainid;
+			info "Permission denied: Domain %d has no permission" domainid;
 			false
 		| RDWR, _ -> true
 		| READ, READ -> true
 		| WRITE, WRITE -> true
 		| READ, _ ->
-			Logs.info "io" "Permission denied: Domain %d has read only access" domainid;
+			info "Permission denied: Domain %d has read only access" domainid;
 			false
 		| WRITE, _ ->
-			Logs.info "io" "Permission denied: Domain %d has write only access" domainid;
+			info "Permission denied: Domain %d has write only access" domainid;
 			false
 	in
 	if !activate

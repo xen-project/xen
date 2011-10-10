@@ -83,7 +83,7 @@ let check_perm node connection request =
 let check_owner node connection =
 	if not (Perms.check_owner connection node.perms)
 	then begin
-		Logs.info "io" "Permission denied: Domain %d not owner" (get_owner node);
+		Logging.info "store|node" "Permission denied: Domain %d not owner" (get_owner node);
 		raise Define.Permission_denied;
 	end
 

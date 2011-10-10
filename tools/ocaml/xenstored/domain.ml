@@ -16,7 +16,7 @@
 
 open Printf
 
-let debug fmt = Logs.debug "general" fmt
+let debug fmt = Logging.debug "domain" fmt
 
 type t =
 {

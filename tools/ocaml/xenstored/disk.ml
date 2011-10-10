@@ -17,7 +17,7 @@
 let enable = ref false
 let xs_daemon_database = "/var/run/xenstored/db"
 
-let error = Logs.error "general"
+let error fmt = Logging.error "disk" fmt
 
 (* unescape utils *)
 exception Bad_escape

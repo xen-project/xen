@@ -232,3 +232,8 @@ let dump con chan =
 			Printf.fprintf chan "watch,%d,%s,%s\n" domid (Utils.hexify path) (Utils.hexify token)
 			) (list_watches con);
 	| None -> ()
+
+let debug con =
+	let domid = get_domstr con in
+	let watches = List.map (fun (path, token) -> Printf.sprintf "watch %s: %s %s\n" domid path token) (list_watches con) in
+	String.concat "" watches

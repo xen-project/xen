@@ -18,7 +18,7 @@ exception Limit_reached
 exception Data_too_big
 exception Transaction_opened
 
-let warn fmt = Logs.warn "general" fmt
+let warn fmt = Logging.warn "quota" fmt
 let activate = ref true
 let maxent = ref (10000)
 let maxsize = ref (4096)

@@ -18,7 +18,10 @@
 open Printf
 open Parse_arg
 open Stdext
-open Logging
+
+let error fmt = Logging.error "xenstored" fmt
+let debug fmt = Logging.debug "xenstored" fmt
+let info fmt = Logging.info "xenstored" fmt
 
 (*------------ event klass processors --------------*)
 let process_connection_fds store cons domains rset wset =
@@ -64,7 +67,8 @@ let sigusr1_handler store =
 		()
 
 let sighup_handler _ =
-	try Logs.reopen (); info "Log re-opened" with _ -> ()
+	maybe (fun logger -> logger.Logging.restart()) !Logging.xenstored_logger;
+	maybe (fun logger -> logger.Logging.restart()) !Logging.access_logger
 
 let config_filename cf =
 	match cf.config_file with
@@ -75,26 +79,6 @@ let default_pidfile = "/var/run/xenstored.pid"
 
 let parse_config filename =
 	let pidfile = ref default_pidfile in
-	let set_log s =
-		let ls = String.split ~limit:3 ';' s in
-		let level, key, logger = match ls with
-		| [ level; key; logger ] -> level, key, logger
-		| _ -> failwith "format mismatch: expecting 3 arguments" in
-
-		let loglevel = match level with
-		| "debug" -> Log.Debug
-		| "info"  -> Log.Info
-		| "warn"  -> Log.Warn
-		| "error" -> Log.Error
-		| s       -> failwith (sprintf "Unknown log level: %s" s) in
-
-		(* if key is empty, append to the default logger *)
-		let append =
-			if key = "" then
-				Logs.append_default
-			else
-				Logs.append key in
-		append loglevel logger in
 	let options = [
 		("merge-activate", Config.Set_bool Transaction.do_coalesce);
 		("perms-activate", Config.Set_bool Perms.activate);
@@ -104,14 +88,20 @@ let parse_config filename =
 		("quota-maxentity", Config.Set_int Quota.maxent);
 		("quota-maxsize", Config.Set_int Quota.maxsize);
 		("test-eagain", Config.Set_bool Transaction.test_eagain);
-		("log", Config.String set_log);
 		("persistant", Config.Set_bool Disk.enable);
+		("xenstored-log-file", Config.Set_string Logging.xenstored_log_file);
+		("xenstored-log-level", Config.String
+			(fun s -> Logging.xenstored_log_level := Logging.level_of_string s));
+		("xenstored-log-nb-files", Config.Set_int Logging.xenstored_log_nb_files);
+		("xenstored-log-nb-lines", Config.Set_int Logging.xenstored_log_nb_lines);
+		("xenstored-log-nb-chars", Config.Set_int Logging.xenstored_log_nb_chars);
 		("access-log-file", Config.Set_string Logging.access_log_file);
 		("access-log-nb-files", Config.Set_int Logging.access_log_nb_files);
 		("access-log-nb-lines", Config.Set_int Logging.access_log_nb_lines);
-		("access-log-read-ops", Config.Set_bool Logging.log_read_ops);
-		("access-log-transactions-ops", Config.Set_bool Logging.log_transaction_ops);
-		("access-log-special-ops", Config.Set_bool Logging.log_special_ops);
+		("access-log-nb-chars", Config.Set_int Logging.access_log_nb_chars);
+		("access-log-read-ops", Config.Set_bool Logging.access_log_read_ops);
+		("access-log-transactions-ops", Config.Set_bool Logging.access_log_transaction_ops);
+		("access-log-special-ops", Config.Set_bool Logging.access_log_special_ops);
 		("allow-debug", Config.Set_bool Process.allow_debug);
 		("pid-file", Config.Set_string pidfile); ] in
 	begin try Config.read filename options (fun _ _ -> raise Not_found)
@@ -223,9 +213,6 @@ let to_file store cons file =
 end
 
 let _ =
-	printf "Xen Storage Daemon, version %d.%d\n%!"
-	       Define.xenstored_major Define.xenstored_minor;
-
 	let cf = do_argv in
 	let pidfile =
 		if Sys.file_exists (config_filename cf) then
@@ -249,12 +236,12 @@ let _ =
 		in
 	
 	if cf.daemonize then
-		Unixext.daemonize ();
+		Unixext.daemonize ()
+	else
+		printf "Xen Storage Daemon, version %d.%d\n%!" 
+			Define.xenstored_major Define.xenstored_minor;
 
 	(try Unixext.pidfile_write pidfile with _ -> ());
-
-	info "Xen Storage Daemon, version %d.%d"
-	     Define.xenstored_major Define.xenstored_minor;
 
 	(* for compatilibity with old xenstored *)
 	begin match cf.pidfile with
@@ -293,7 +280,14 @@ let _ =
 	Sys.set_signal Sys.sigusr1 (Sys.Signal_handle (fun i -> sigusr1_handler store));
 	Sys.set_signal Sys.sigpipe Sys.Signal_ignore;
 
-	Logging.init cf.activate_access_log (fun () -> DB.to_file store cons "/var/run/xenstored/db");
+	Logging.init_xenstored_log();
+	if cf.activate_access_log then begin
+		let post_rotate () = DB.to_file store cons "/var/run/xenstored/db" in
+		Logging.init_access_log post_rotate
+	end;
+
+	info "Xen Storage Daemon, version %d.%d"
+	     Define.xenstored_major Define.xenstored_minor;
 
 	let spec_fds =
 		(match rw_sock with None -> [] | Some x -> [ x ]) @
