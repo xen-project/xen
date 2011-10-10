@@ -52,6 +52,7 @@ type physinfo = {
   free_pages       : nativeint;
   scrub_pages      : nativeint;
   capabilities     : physinfo_cap_flag list;
+  max_nr_cpus      : int; (** compile-time max possible number of nr_cpus *)
 }
 type version = { major : int; minor : int; extra : string; }
 type compile_info = {

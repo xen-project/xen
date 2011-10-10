@@ -534,6 +534,7 @@ CAMLprim value stub_xc_readconsolering(value xch)
 
 	if (retval)
 		failwith_xc(_H(xch));
+
 	ring[size] = '\0';
 	CAMLreturn(caml_copy_string(ring));
 }
@@ -573,7 +574,7 @@ CAMLprim value stub_xc_physinfo(value xch)
 		}
 	}
 
-	physinfo = caml_alloc_tuple(9);
+	physinfo = caml_alloc_tuple(10);
 	Store_field(physinfo, 0, Val_int(c_physinfo.threads_per_core));
 	Store_field(physinfo, 1, Val_int(c_physinfo.cores_per_socket));
 	Store_field(physinfo, 2, Val_int(c_physinfo.nr_cpus));
@@ -583,6 +584,7 @@ CAMLprim value stub_xc_physinfo(value xch)
 	Store_field(physinfo, 6, caml_copy_nativeint(c_physinfo.free_pages));
 	Store_field(physinfo, 7, caml_copy_nativeint(c_physinfo.scrub_pages));
 	Store_field(physinfo, 8, cap_list);
+	Store_field(physinfo, 9, Val_int(c_physinfo.max_cpu_id + 1));
 
 	CAMLreturn(physinfo);
 }
