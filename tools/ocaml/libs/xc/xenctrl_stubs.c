@@ -430,7 +430,7 @@ CAMLprim value stub_xc_vcpu_setaffinity(value xch, value domid,
 
 	for (i=0; i<len; i++) {
 		if (Bool_val(Field(cpumap, i)))
-			c_cpumap[i/8] |= i << (i&7);
+			c_cpumap[i/8] |= 1 << (i&7);
 	}
 	retval = xc_vcpu_setaffinity(_H(xch), _D(domid),
 	                             Int_val(vcpu), c_cpumap);
@@ -466,7 +466,7 @@ CAMLprim value stub_xc_vcpu_getaffinity(value xch, value domid,
 	ret = caml_alloc(len, 0);
 
 	for (i=0; i<len; i++) {
-		if (c_cpumap[i%8] & 1 << (i&7))
+		if (c_cpumap[i/8] & 1 << (i&7))
 			Store_field(ret, i, Val_true);
 		else
 			Store_field(ret, i, Val_false);
@@ -523,7 +523,7 @@ static char ring[RING_SIZE];
 
 CAMLprim value stub_xc_readconsolering(value xch)
 {
-	unsigned int size = RING_SIZE;
+	unsigned int size = RING_SIZE - 1;
 	char *ring_ptr = ring;
 
 	CAMLparam1(xch);
