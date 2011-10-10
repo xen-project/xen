@@ -20,10 +20,10 @@ let debug fmt = Logs.debug "general" fmt
 
 type t =
 {
-	id: Xc.domid;
+	id: Xenctrl.domid;
 	mfn: nativeint;
 	remote_port: int;
-	interface: Mmap.mmap_interface;
+	interface: Xenmmap.mmap_interface;
 	eventchn: Event.t;
 	mutable port: int;
 }
@@ -47,7 +47,7 @@ let bind_interdomain dom =
 let close dom =
 	debug "domain %d unbound port %d" dom.id dom.port;
 	Event.unbind dom.eventchn dom.port;
-	Mmap.unmap dom.interface;
+	Xenmmap.unmap dom.interface;
 	()
 
 let make id mfn remote_port interface eventchn = {

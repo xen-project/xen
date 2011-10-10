@@ -214,7 +214,7 @@ external cpuid_check: handle -> (int64 * (int64 option)) -> string option array 
        = "stub_xc_cpuid_check"
 
 external map_foreign_range: handle -> domid -> int
-                         -> nativeint -> Mmap.mmap_interface
+                         -> nativeint -> Xenmmap.mmap_interface
        = "stub_map_foreign_range"
 
 external domain_get_pfn_list: handle -> domid -> nativeint -> nativeint array
@@ -306,12 +306,12 @@ let coredump xch domid fd =
 	if Array.length pfns <> Nativeint.to_int nrpages then
 		failwith "could not get the page frame list";
 
-	let page_size = Mmap.getpagesize () in
+	let page_size = Xenmmap.getpagesize () in
 	for i = 0 to Nativeint.to_int nrpages - 1
 	do
 		let page = map_foreign_range xch domid page_size pfns.(i) in
-		let data = Mmap.read page 0 page_size in
-		Mmap.unmap page;
+		let data = Xenmmap.read page 0 page_size in
+		Xenmmap.unmap page;
 		dump data
 	done
 

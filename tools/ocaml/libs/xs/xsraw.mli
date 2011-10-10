@@ -16,8 +16,8 @@
 exception Partial_not_empty
 exception Unexpected_packet of string
 exception Invalid_path of string
-val unexpected_packet : Xb.Op.operation -> Xb.Op.operation -> 'a
-type con = { xb : Xb.t; watchevents : (string * string) Queue.t; }
+val unexpected_packet : Xenbus.Xb.Op.operation -> Xenbus.Xb.Op.operation -> 'a
+type con = { xb : Xenbus.Xb.t; watchevents : (string * string) Queue.t; }
 val close : con -> unit
 val open_fd : Unix.file_descr -> con
 val split_string : ?limit:int -> char -> string -> string list
@@ -26,14 +26,14 @@ type perms = int * perm * (int * perm) list
 val string_of_perms : int * perm * (int * perm) list -> string
 val perms_of_string : string -> int * perm * (int * perm) list
 val pkt_send : con -> unit
-val pkt_recv : con -> Xb.Packet.t
-val pkt_recv_timeout : con -> float -> bool * Xb.Packet.t option
+val pkt_recv : con -> Xenbus.Xb.Packet.t
+val pkt_recv_timeout : con -> float -> bool * Xenbus.Xb.Packet.t option
 val queue_watchevent : con -> string -> unit
 val has_watchevents : con -> bool
 val get_watchevent : con -> string * string
 val read_watchevent : con -> string * string
-val sync_recv : Xb.Op.operation -> con -> string
-val sync : (Xb.t -> 'a) -> con -> string
+val sync_recv : Xenbus.Xb.Op.operation -> con -> string
+val sync : (Xenbus.Xb.t -> 'a) -> con -> string
 val ack : string -> unit
 val validate_path : string -> unit
 val validate_watch_path : string -> unit

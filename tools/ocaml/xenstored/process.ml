@@ -54,10 +54,10 @@ let split_one_path data con =
 let process_watch ops cons =
 	let do_op_watch op cons =
 		let recurse = match (fst op) with
-		| Xb.Op.Write    -> false
-		| Xb.Op.Mkdir    -> false
-		| Xb.Op.Rm       -> true
-		| Xb.Op.Setperms -> false
+		| Xenbus.Xb.Op.Write    -> false
+		| Xenbus.Xb.Op.Mkdir    -> false
+		| Xenbus.Xb.Op.Rm       -> true
+		| Xenbus.Xb.Op.Setperms -> false
 		| _              -> raise (Failure "huh ?") in
 		Connections.fire_watches cons (snd op) recurse in
 	List.iter (fun op -> do_op_watch op cons) ops
@@ -83,7 +83,7 @@ let do_debug con t domains cons data =
 	then None
 	else try match split None '\000' data with
 	| "print" :: msg :: _ ->
-		Logging.xb_op ~tid:0 ~ty:Xb.Op.Debug ~con:"=======>" msg;
+		Logging.xb_op ~tid:0 ~ty:Xenbus.Xb.Op.Debug ~con:"=======>" msg;
 		None
 	| "quota" :: domid :: _ ->
 		let domid = int_of_string domid in
@@ -120,7 +120,7 @@ let do_watch con t rid domains cons data =
 		| _                   -> raise Invalid_Cmd_Args
 		in
 	let watch = Connections.add_watch cons con node token in
-	Connection.send_ack con (Transaction.get_id t) rid Xb.Op.Watch;
+	Connection.send_ack con (Transaction.get_id t) rid Xenbus.Xb.Op.Watch;
 	Connection.fire_single_watch watch
 
 let do_unwatch con t domains cons data =
@@ -165,7 +165,7 @@ let do_introduce con t domains cons data =
 		if Domains.exist domains domid then
 			Domains.find domains domid
 		else try
-			let ndom = Xc.with_intf (fun xc ->
+			let ndom = Xenctrl.with_intf (fun xc ->
 				Domains.create xc domains domid mfn port) in
 			Connections.add_domain cons ndom;
 			Connections.fire_spec_watches cons "@introduceDomain";
@@ -299,25 +299,25 @@ let reply_none fct ty con t rid doms cons data =
 
 let function_of_type ty =
 	match ty with
-	| Xb.Op.Debug             -> reply_data_or_ack do_debug
-	| Xb.Op.Directory         -> reply_data do_directory
-	| Xb.Op.Read              -> reply_data do_read
-	| Xb.Op.Getperms          -> reply_data do_getperms
-	| Xb.Op.Watch             -> reply_none do_watch
-	| Xb.Op.Unwatch           -> reply_ack do_unwatch
-	| Xb.Op.Transaction_start -> reply_data do_transaction_start
-	| Xb.Op.Transaction_end   -> reply_ack do_transaction_end
-	| Xb.Op.Introduce         -> reply_ack do_introduce
-	| Xb.Op.Release           -> reply_ack do_release
-	| Xb.Op.Getdomainpath     -> reply_data do_getdomainpath
-	| Xb.Op.Write             -> reply_ack do_write
-	| Xb.Op.Mkdir             -> reply_ack do_mkdir
-	| Xb.Op.Rm                -> reply_ack do_rm
-	| Xb.Op.Setperms          -> reply_ack do_setperms
-	| Xb.Op.Isintroduced      -> reply_data do_isintroduced
-	| Xb.Op.Resume            -> reply_ack do_resume
-	| Xb.Op.Set_target        -> reply_ack do_set_target
-	| Xb.Op.Restrict          -> reply_ack do_restrict
+	| Xenbus.Xb.Op.Debug             -> reply_data_or_ack do_debug
+	| Xenbus.Xb.Op.Directory         -> reply_data do_directory
+	| Xenbus.Xb.Op.Read              -> reply_data do_read
+	| Xenbus.Xb.Op.Getperms          -> reply_data do_getperms
+	| Xenbus.Xb.Op.Watch             -> reply_none do_watch
+	| Xenbus.Xb.Op.Unwatch           -> reply_ack do_unwatch
+	| Xenbus.Xb.Op.Transaction_start -> reply_data do_transaction_start
+	| Xenbus.Xb.Op.Transaction_end   -> reply_ack do_transaction_end
+	| Xenbus.Xb.Op.Introduce         -> reply_ack do_introduce
+	| Xenbus.Xb.Op.Release           -> reply_ack do_release
+	| Xenbus.Xb.Op.Getdomainpath     -> reply_data do_getdomainpath
+	| Xenbus.Xb.Op.Write             -> reply_ack do_write
+	| Xenbus.Xb.Op.Mkdir             -> reply_ack do_mkdir
+	| Xenbus.Xb.Op.Rm                -> reply_ack do_rm
+	| Xenbus.Xb.Op.Setperms          -> reply_ack do_setperms
+	| Xenbus.Xb.Op.Isintroduced      -> reply_data do_isintroduced
+	| Xenbus.Xb.Op.Resume            -> reply_ack do_resume
+	| Xenbus.Xb.Op.Set_target        -> reply_ack do_set_target
+	| Xenbus.Xb.Op.Restrict          -> reply_ack do_restrict
 	| _                       -> reply_ack do_error
 
 let input_handle_error ~cons ~doms ~fct ~ty ~con ~t ~rid ~data =
@@ -370,11 +370,11 @@ let write_answer_log ~ty ~tid ~con ~data =
 let do_input store cons doms con =
 	if Connection.do_input con then (
 		let packet = Connection.pop_in con in
-		let tid, rid, ty, data = Xb.Packet.unpack packet in
+		let tid, rid, ty, data = Xenbus.Xb.Packet.unpack packet in
 		(* As we don't log IO, do not call an unnecessary sanitize_data 
 		   Logs.info "io" "[%s] -> [%d] %s \"%s\""
 		         (Connection.get_domstr con) tid
-		         (Xb.Op.to_string ty) (sanitize_data data); *)
+		         (Xenbus.Xb.Op.to_string ty) (sanitize_data data); *)
 		process_packet ~store ~cons ~doms ~con ~tid ~rid ~ty ~data;
 		write_access_log ~ty ~tid ~con ~data;
 		Connection.incr_ops con;
@@ -384,11 +384,11 @@ let do_output store cons doms con =
 	if Connection.has_output con then (
 		if Connection.has_new_output con then (
 			let packet = Connection.peek_output con in
-			let tid, rid, ty, data = Xb.Packet.unpack packet in
+			let tid, rid, ty, data = Xenbus.Xb.Packet.unpack packet in
 			(* As we don't log IO, do not call an unnecessary sanitize_data 
 			   Logs.info "io" "[%s] <- %s \"%s\""
 			         (Connection.get_domstr con)
-			         (Xb.Op.to_string ty) (sanitize_data data);*)
+			         (Xenbus.Xb.Op.to_string ty) (sanitize_data data);*)
 			write_answer_log ~ty ~tid ~con ~data;
 		);
 		ignore (Connection.do_output con)

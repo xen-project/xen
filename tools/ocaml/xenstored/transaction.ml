@@ -74,7 +74,7 @@ type ty = No | Full of (int * Store.Node.t * Store.t)
 type t = {
 	ty: ty;
 	store: Store.t;
-	mutable ops: (Xb.Op.operation * Store.Path.t) list;
+	mutable ops: (Xenbus.Xb.Op.operation * Store.Path.t) list;
 	mutable read_lowpath: Store.Path.t option;
 	mutable write_lowpath: Store.Path.t option;
 }
@@ -105,23 +105,23 @@ let write t perm path value =
 	if path_exists
 	then set_write_lowpath t path
 	else set_write_lowpath t (Store.Path.get_parent path);
-	add_wop t Xb.Op.Write path
+	add_wop t Xenbus.Xb.Op.Write path
 
 let mkdir ?(with_watch=true) t perm path =
 	Store.mkdir t.store perm path;
 	set_write_lowpath t path;
 	if with_watch then
-		add_wop t Xb.Op.Mkdir path
+		add_wop t Xenbus.Xb.Op.Mkdir path
 
 let setperms t perm path perms =
 	Store.setperms t.store perm path perms;
 	set_write_lowpath t path;
-	add_wop t Xb.Op.Setperms path
+	add_wop t Xenbus.Xb.Op.Setperms path
 
 let rm t perm path =
 	Store.rm t.store perm path;
 	set_write_lowpath t (Store.Path.get_parent path);
-	add_wop t Xb.Op.Rm path
+	add_wop t Xenbus.Xb.Op.Rm path
 
 let ls t perm path =	
 	let r = Store.ls t.store perm path in

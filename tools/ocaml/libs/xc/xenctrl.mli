@@ -132,7 +132,7 @@ external domain_memory_increase_reservation :
   handle -> domid -> int64 -> unit
   = "stub_xc_domain_memory_increase_reservation"
 external map_foreign_range :
-  handle -> domid -> int -> nativeint -> Mmap.mmap_interface
+  handle -> domid -> int -> nativeint -> Xenmmap.mmap_interface
   = "stub_map_foreign_range"
 external domain_get_pfn_list :
   handle -> domid -> nativeint -> nativeint array

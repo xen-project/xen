@@ -1,5 +1,5 @@
 version = "@VERSION@"
 description = "Eventchn interface extension"
 requires = "unix"
-archive(byte) = "eventchn.cma"
-archive(native) = "eventchn.cmxa"
+archive(byte) = "xeneventchn.cma"
+archive(native) = "xeneventchn.cmxa"

@@ -16,7 +16,7 @@
 
 type domains = {
 	eventchn: Event.t;
-	table: (Xc.domid, Domain.t) Hashtbl.t;
+	table: (Xenctrl.domid, Domain.t) Hashtbl.t;
 }
 
 let init eventchn =
@@ -33,16 +33,16 @@ let cleanup xc doms =
 
 	Hashtbl.iter (fun id _ -> if id <> 0 then
 		try
-			let info = Xc.domain_getinfo xc id in
-			if info.Xc.shutdown || info.Xc.dying then (
+			let info = Xenctrl.domain_getinfo xc id in
+			if info.Xenctrl.shutdown || info.Xenctrl.dying then (
 				Logs.debug "general" "Domain %u died (dying=%b, shutdown %b -- code %d)"
-				                    id info.Xc.dying info.Xc.shutdown info.Xc.shutdown_code;
-				if info.Xc.dying then
+				                    id info.Xenctrl.dying info.Xenctrl.shutdown info.Xenctrl.shutdown_code;
+				if info.Xenctrl.dying then
 					dead_dom := id :: !dead_dom
 				else
 					notify := true;
 			)
-		with Xc.Error _ ->
+		with Xenctrl.Error _ ->
 			Logs.debug "general" "Domain %u died -- no domain info" id;
 			dead_dom := id :: !dead_dom;
 		) doms.table;
@@ -57,7 +57,7 @@ let resume doms domid =
 	()
 
 let create xc doms domid mfn port =
-	let interface = Xc.map_foreign_range xc domid (Mmap.getpagesize()) mfn in
+	let interface = Xenctrl.map_foreign_range xc domid (Xenmmap.getpagesize()) mfn in
 	let dom = Domain.make domid mfn port interface doms.eventchn in
 	Hashtbl.add doms.table domid dom;
 	Domain.bind_interdomain dom;
@@ -66,13 +66,13 @@ let create xc doms domid mfn port =
 let create0 fake doms =
 	let port, interface =
 		if fake then (
-			0, Xc.with_intf (fun xc -> Xc.map_foreign_range xc 0 (Mmap.getpagesize()) 0n)
+			0, Xenctrl.with_intf (fun xc -> Xenctrl.map_foreign_range xc 0 (Xenmmap.getpagesize()) 0n)
 		) else (
 			let port = Utils.read_file_single_integer Define.xenstored_proc_port
 			and fd = Unix.openfile Define.xenstored_proc_kva
 					       [ Unix.O_RDWR ] 0o600 in
-			let interface = Mmap.mmap fd Mmap.RDWR Mmap.SHARED
-						  (Mmap.getpagesize()) 0 in
+			let interface = Xenmmap.mmap fd Xenmmap.RDWR Xenmmap.SHARED
+						  (Xenmmap.getpagesize()) 0 in
 			Unix.close fd;
 			port, interface
 		)

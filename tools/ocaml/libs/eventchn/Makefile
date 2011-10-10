@@ -4,11 +4,11 @@ include $(TOPLEVEL)/common.make
 
 CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_xeninclude)
 
-OBJS = eventchn
+OBJS = xeneventchn
 INTF = $(foreach obj, $(OBJS),$(obj).cmi)
-LIBS = eventchn.cma eventchn.cmxa
+LIBS = xeneventchn.cma xeneventchn.cmxa
 
-LIBS_evtchn = $(LDLIBS_libxenctrl)
+LIBS_xeneventchn = $(LDLIBS_libxenctrl)
 
 all: $(INTF) $(LIBS) $(PROGRAMS)
 
@@ -16,20 +16,20 @@ bins: $(PROGRAMS)
 
 libs: $(LIBS)
 
-eventchn_OBJS = $(OBJS)
-eventchn_C_OBJS = eventchn_stubs
+xeneventchn_OBJS = $(OBJS)
+xeneventchn_C_OBJS = xeneventchn_stubs
 
-OCAML_LIBRARY = eventchn
+OCAML_LIBRARY = xeneventchn
 
 .PHONY: install
 install: $(LIBS) META
 	mkdir -p $(OCAMLDESTDIR)
-	ocamlfind remove -destdir $(OCAMLDESTDIR) eventchn
-	ocamlfind install -destdir $(OCAMLDESTDIR) -ldconf ignore eventchn META $(INTF) $(LIBS) *.a *.so *.cmx
+	ocamlfind remove -destdir $(OCAMLDESTDIR) xeneventchn
+	ocamlfind install -destdir $(OCAMLDESTDIR) -ldconf ignore xeneventchn META $(INTF) $(LIBS) *.a *.so *.cmx
 
 .PHONY: uninstall
 uninstall:
-	ocamlfind remove -destdir $(OCAMLDESTDIR) eventchn
+	ocamlfind remove -destdir $(OCAMLDESTDIR) xeneventchn
 
 include $(TOPLEVEL)/Makefile.rules
 

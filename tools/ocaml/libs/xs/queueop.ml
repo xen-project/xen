@@ -13,6 +13,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Lesser General Public License for more details.
  *)
+open Xenbus
 
 let data_concat ls = (String.concat "\000" ls) ^ "\000"
 let queue_path ty (tid: int) (path: string) con =

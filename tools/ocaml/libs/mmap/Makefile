@@ -2,9 +2,9 @@ TOPLEVEL=$(CURDIR)/../..
 XEN_ROOT=$(TOPLEVEL)/../..
 include $(TOPLEVEL)/common.make
 
-OBJS = mmap
+OBJS = xenmmap
 INTF = $(foreach obj, $(OBJS),$(obj).cmi)
-LIBS = mmap.cma mmap.cmxa
+LIBS = xenmmap.cma xenmmap.cmxa
 
 all: $(INTF) $(LIBS) $(PROGRAMS)
 
@@ -12,19 +12,19 @@ bins: $(PROGRAMS)
 
 libs: $(LIBS)
 
-mmap_OBJS = $(OBJS)
-mmap_C_OBJS = mmap_stubs
-OCAML_LIBRARY = mmap
+xenmmap_OBJS = $(OBJS)
+xenmmap_C_OBJS = xenmmap_stubs
+OCAML_LIBRARY = xenmmap
 
 .PHONY: install
 install: $(LIBS) META
 	mkdir -p $(OCAMLDESTDIR)
-	ocamlfind remove -destdir $(OCAMLDESTDIR) mmap
-	ocamlfind install -destdir $(OCAMLDESTDIR) -ldconf ignore mmap META $(INTF) $(LIBS) *.a *.so *.cmx
+	ocamlfind remove -destdir $(OCAMLDESTDIR) xenmmap
+	ocamlfind install -destdir $(OCAMLDESTDIR) -ldconf ignore xenmmap META $(INTF) $(LIBS) *.a *.so *.cmx
 
 .PHONY: uninstall
 uninstall:
-	ocamlfind remove -destdir $(OCAMLDESTDIR) mmap
+	ocamlfind remove -destdir $(OCAMLDESTDIR) xenmmap
 
 include $(TOPLEVEL)/Makefile.rules
 

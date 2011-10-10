@@ -14,5 +14,5 @@
  * GNU Lesser General Public License for more details.
  *)
 
-external read: Mmap.mmap_interface -> string -> int -> int = "ml_interface_read"
-external write: Mmap.mmap_interface -> string -> int -> int = "ml_interface_write"
+external read: Xenmmap.mmap_interface -> string -> int -> int = "ml_interface_read"
+external write: Xenmmap.mmap_interface -> string -> int -> int = "ml_interface_write"

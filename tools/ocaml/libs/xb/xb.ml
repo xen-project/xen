@@ -24,7 +24,7 @@ exception Invalid
 
 type backend_mmap =
 {
-	mmap: Mmap.mmap_interface;     (* mmaped interface = xs_ring *)
+	mmap: Xenmmap.mmap_interface;     (* mmaped interface = xs_ring *)
 	eventchn_notify: unit -> unit; (* function to notify through eventchn *)
 	mutable work_again: bool;
 }
@@ -34,7 +34,7 @@ type backend_fd =
 	fd: Unix.file_descr;
 }
 
-type backend = Fd of backend_fd | Mmap of backend_mmap
+type backend = Fd of backend_fd | Xenmmap of backend_mmap
 
 type partial_buf = HaveHdr of Partial.pkt | NoHdr of int * string
 
@@ -68,7 +68,7 @@ let read_mmap back con s len =
 let read con s len =
 	match con.backend with
 	| Fd backfd     -> read_fd backfd con s len
-	| Mmap backmmap -> read_mmap backmmap con s len
+	| Xenmmap backmmap -> read_mmap backmmap con s len
 
 let write_fd back con s len =
 	Unix.write back.fd s 0 len
@@ -82,7 +82,7 @@ let write_mmap back con s len =
 let write con s len =
 	match con.backend with
 	| Fd backfd     -> write_fd backfd con s len
-	| Mmap backmmap -> write_mmap backmmap con s len
+	| Xenmmap backmmap -> write_mmap backmmap con s len
 
 let output con =
 	(* get the output string from a string_of(packet) or partial_out *)
@@ -145,7 +145,7 @@ let newcon backend = {
 let open_fd fd = newcon (Fd { fd = fd; })
 
 let open_mmap mmap notifyfct =
-	newcon (Mmap {
+	newcon (Xenmmap {
 		mmap = mmap;
 		eventchn_notify = notifyfct;
 		work_again = false; })
@@ -153,12 +153,12 @@ let open_mmap mmap notifyfct =
 let close con =
 	match con.backend with
 	| Fd backend   -> Unix.close backend.fd
-	| Mmap backend -> Mmap.unmap backend.mmap
+	| Xenmmap backend -> Xenmmap.unmap backend.mmap
 
 let is_fd con =
 	match con.backend with
 	| Fd _   -> true
-	| Mmap _ -> false
+	| Xenmmap _ -> false
 
 let is_mmap con = not (is_fd con)
 
@@ -176,14 +176,14 @@ let get_in_packet con = Queue.pop con.pkt_in
 let has_more_input con =
 	match con.backend with
 	| Fd _         -> false
-	| Mmap backend -> backend.work_again
+	| Xenmmap backend -> backend.work_again
 
 let is_selectable con =
 	match con.backend with
 	| Fd _   -> true
-	| Mmap _ -> false
+	| Xenmmap _ -> false
 
 let get_fd con =
 	match con.backend with
 	| Fd backend -> backend.fd
-	| Mmap _     -> raise (Failure "get_fd")
+	| Xenmmap _     -> raise (Failure "get_fd")

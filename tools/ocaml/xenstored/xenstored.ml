@@ -35,7 +35,7 @@ let process_connection_fds store cons domains rset wset =
 			if err <> Unix.ECONNRESET then
 			error "closing socket connection: read error: %s"
 			      (Unix.error_message err)
-		| Xb.End_of_file ->
+		| Xenbus.Xb.End_of_file ->
 			Connections.del_anonymous cons c;
 			debug "closing socket connection"
 		in
@@ -170,7 +170,7 @@ let from_channel_f chan domain_f watch_f store_f =
 let from_channel store cons doms chan =
 	(* don't let the permission get on our way, full perm ! *)
 	let op = Store.get_ops store Perms.Connection.full_rights in
-	let xc = Xc.interface_open () in
+	let xc = Xenctrl.interface_open () in
 
 	let domain_f domid mfn port =
 		let ndom =
@@ -190,7 +190,7 @@ let from_channel store cons doms chan =
 		op.Store.setperms path perms
 		in
 	finally (fun () -> from_channel_f chan domain_f watch_f store_f)
-	        (fun () -> Xc.interface_close xc)
+	        (fun () -> Xenctrl.interface_close xc)
 
 let from_file store cons doms file =
 	let channel = open_in file in
@@ -282,7 +282,7 @@ let _ =
 			Store.mkdir store (Perms.Connection.create 0) localpath;
 
 		if cf.domain_init then (
-			let usingxiu = Xc.is_fake () in
+			let usingxiu = Xenctrl.is_fake () in
 			Connections.add_domain cons (Domains.create0 usingxiu domains);
 			Event.bind_dom_exc_virq eventchn
 		);
@@ -301,7 +301,7 @@ let _ =
 		(if cf.domain_init then [ Event.fd eventchn ] else [])
 		in
 
-	let xc = Xc.interface_open () in
+	let xc = Xenctrl.interface_open () in
 
 	let process_special_fds rset =
 		let accept_connection can_write fd =

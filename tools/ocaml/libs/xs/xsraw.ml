@@ -14,6 +14,8 @@
  * GNU Lesser General Public License for more details.
  *)
 
+open Xenbus
+
 exception Partial_not_empty
 exception Unexpected_packet of string
 
@@ -27,7 +29,7 @@ let unexpected_packet expected received =
 	raise (Unexpected_packet s)
 
 type con = {
-	xb: Xb.t;
+	xb: Xenbus.Xb.t;
 	watchevents: (string * string) Queue.t;
 }
 

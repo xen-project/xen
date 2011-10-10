@@ -69,7 +69,7 @@ let get_watchevent xsh = Xsraw.get_watchevent xsh.con
 let read_watchevent xsh = Xsraw.read_watchevent xsh.con
 
 let make fd = get_operations (Xsraw.open_fd fd)
-let get_fd xsh = Xb.get_fd xsh.con.Xsraw.xb
+let get_fd xsh = Xenbus.Xb.get_fd xsh.con.Xsraw.xb
 
 exception Timeout
 

@@ -5,16 +5,16 @@ include $(TOPLEVEL)/common.make
 CFLAGS += -I../mmap $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest)
 OCAMLINCLUDE += -I ../mmap -I ../uuid
 
-OBJS = xc
-INTF = xc.cmi
-LIBS = xc.cma xc.cmxa
+OBJS = xenctrl
+INTF = xenctrl.cmi
+LIBS = xenctrl.cma xenctrl.cmxa
 
-LIBS_xc = $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest)
+LIBS_xenctrl = $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest)
 
-xc_OBJS = $(OBJS)
-xc_C_OBJS = xc_stubs
+xenctrl_OBJS = $(OBJS)
+xenctrl_C_OBJS = xenctrl_stubs
 
-OCAML_LIBRARY = xc
+OCAML_LIBRARY = xenctrl
 
 all: $(INTF) $(LIBS)
 
@@ -23,11 +23,11 @@ libs: $(LIBS)
 .PHONY: install
 install: $(LIBS) META
 	mkdir -p $(OCAMLDESTDIR)
-	ocamlfind remove -destdir $(OCAMLDESTDIR) xc
-	ocamlfind install -destdir $(OCAMLDESTDIR) -ldconf ignore xc META $(INTF) $(LIBS) *.a *.so *.cmx
+	ocamlfind remove -destdir $(OCAMLDESTDIR) xenctrl
+	ocamlfind install -destdir $(OCAMLDESTDIR) -ldconf ignore xenctrl META $(INTF) $(LIBS) *.a *.so *.cmx
 
 .PHONY: uninstall
 uninstall:
-	ocamlfind remove -destdir $(OCAMLDESTDIR) xc
+	ocamlfind remove -destdir $(OCAMLDESTDIR) xenctrl
 
 include $(TOPLEVEL)/Makefile.rules

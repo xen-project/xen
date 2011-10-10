@@ -26,12 +26,12 @@ type t = {
 let create () = { anonymous = []; domains = Hashtbl.create 8; watches = Trie.create () }
 
 let add_anonymous cons fd can_write =
-	let xbcon = Xb.open_fd fd in
+	let xbcon = Xenbus.Xb.open_fd fd in
 	let con = Connection.create xbcon None in
 	cons.anonymous <- con :: cons.anonymous
 
 let add_domain cons dom =
-	let xbcon = Xb.open_mmap (Domain.get_interface dom) (fun () -> Domain.notify dom) in
+	let xbcon = Xenbus.Xb.open_mmap (Domain.get_interface dom) (fun () -> Domain.notify dom) in
 	let con = Connection.create xbcon (Some dom) in
 	Hashtbl.add cons.domains (Domain.get_id dom) con
 

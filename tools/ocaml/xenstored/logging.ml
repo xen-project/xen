@@ -39,7 +39,7 @@ type access_type =
 	| Commit
 	| Newconn
 	| Endconn
-	| XbOp of Xb.Op.operation
+	| XbOp of Xenbus.Xb.Op.operation
 
 type access =
 	{
@@ -82,35 +82,35 @@ let string_of_access_type = function
 	| Endconn                 -> "endconn  "
 
 	| XbOp op -> match op with
-	| Xb.Op.Debug             -> "debug    "
+	| Xenbus.Xb.Op.Debug             -> "debug    "
 
-	| Xb.Op.Directory         -> "directory"
-	| Xb.Op.Read              -> "read     "
-	| Xb.Op.Getperms          -> "getperms "
+	| Xenbus.Xb.Op.Directory         -> "directory"
+	| Xenbus.Xb.Op.Read              -> "read     "
+	| Xenbus.Xb.Op.Getperms          -> "getperms "
 
-	| Xb.Op.Watch             -> "watch    "
-	| Xb.Op.Unwatch           -> "unwatch  "
+	| Xenbus.Xb.Op.Watch             -> "watch    "
+	| Xenbus.Xb.Op.Unwatch           -> "unwatch  "
 
-	| Xb.Op.Transaction_start -> "t start  "
-	| Xb.Op.Transaction_end   -> "t end    "
+	| Xenbus.Xb.Op.Transaction_start -> "t start  "
+	| Xenbus.Xb.Op.Transaction_end   -> "t end    "
 
-	| Xb.Op.Introduce         -> "introduce"
-	| Xb.Op.Release           -> "release  "
-	| Xb.Op.Getdomainpath     -> "getdomain"
-	| Xb.Op.Isintroduced      -> "is introduced"
-	| Xb.Op.Resume            -> "resume   "
+	| Xenbus.Xb.Op.Introduce         -> "introduce"
+	| Xenbus.Xb.Op.Release           -> "release  "
+	| Xenbus.Xb.Op.Getdomainpath     -> "getdomain"
+	| Xenbus.Xb.Op.Isintroduced      -> "is introduced"
+	| Xenbus.Xb.Op.Resume            -> "resume   "
  
-	| Xb.Op.Write             -> "write    "
-	| Xb.Op.Mkdir             -> "mkdir    "
-	| Xb.Op.Rm                -> "rm       "
-	| Xb.Op.Setperms          -> "setperms "
-	| Xb.Op.Restrict          -> "restrict "
-	| Xb.Op.Set_target        -> "settarget"
+	| Xenbus.Xb.Op.Write             -> "write    "
+	| Xenbus.Xb.Op.Mkdir             -> "mkdir    "
+	| Xenbus.Xb.Op.Rm                -> "rm       "
+	| Xenbus.Xb.Op.Setperms          -> "setperms "
+	| Xenbus.Xb.Op.Restrict          -> "restrict "
+	| Xenbus.Xb.Op.Set_target        -> "settarget"
 
-	| Xb.Op.Error             -> "error    "
-	| Xb.Op.Watchevent        -> "w event  "
+	| Xenbus.Xb.Op.Error             -> "error    "
+	| Xenbus.Xb.Op.Watchevent        -> "w event  "
 
-	| x                       -> Xb.Op.to_string x
+	| x                       -> Xenbus.Xb.Op.to_string x
 
 let file_exists file =
 	try
@@ -210,10 +210,10 @@ let commit = write_access_log Commit
 let xb_op ~tid ~con ~ty data =
 	let print =
 	match ty with
-		| Xb.Op.Read | Xb.Op.Directory | Xb.Op.Getperms -> !log_read_ops
-		| Xb.Op.Transaction_start | Xb.Op.Transaction_end ->
+		| Xenbus.Xb.Op.Read | Xenbus.Xb.Op.Directory | Xenbus.Xb.Op.Getperms -> !log_read_ops
+		| Xenbus.Xb.Op.Transaction_start | Xenbus.Xb.Op.Transaction_end ->
 			false (* transactions are managed below *)
-		| Xb.Op.Introduce | Xb.Op.Release | Xb.Op.Getdomainpath | Xb.Op.Isintroduced | Xb.Op.Resume ->
+		| Xenbus.Xb.Op.Introduce | Xenbus.Xb.Op.Release | Xenbus.Xb.Op.Getdomainpath | Xenbus.Xb.Op.Isintroduced | Xenbus.Xb.Op.Resume ->
 			!log_special_ops
 		| _ -> true
 	in
@@ -222,17 +222,17 @@ let xb_op ~tid ~con ~ty data =
 
 let start_transaction ~tid ~con = 
 	if !log_transaction_ops && tid <> 0
-	then write_access_log ~tid ~con (XbOp Xb.Op.Transaction_start)
+	then write_access_log ~tid ~con (XbOp Xenbus.Xb.Op.Transaction_start)
 
 let end_transaction ~tid ~con = 
 	if !log_transaction_ops && tid <> 0
-	then write_access_log ~tid ~con (XbOp Xb.Op.Transaction_end)
+	then write_access_log ~tid ~con (XbOp Xenbus.Xb.Op.Transaction_end)
 
 let xb_answer ~tid ~con ~ty data =
 	let print = match ty with
-		| Xb.Op.Error when data="ENOENT " -> !log_read_ops
-		| Xb.Op.Error -> !log_special_ops
-		| Xb.Op.Watchevent -> true
+		| Xenbus.Xb.Op.Error when data="ENOENT " -> !log_read_ops
+		| Xenbus.Xb.Op.Error -> !log_special_ops
+		| Xenbus.Xb.Op.Watchevent -> true
 		| _ -> false
 	in
 		if print

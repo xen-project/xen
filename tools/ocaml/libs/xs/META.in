@@ -1,5 +1,5 @@
 version = "@VERSION@"
 description = "XenStore Interface"
-requires = "unix,xb"
-archive(byte) = "xs.cma"
-archive(native) = "xs.cmxa"
+requires = "unix,xenbus"
+archive(byte) = "xenstore.cma"
+archive(native) = "xenstore.cmxa"

@@ -16,15 +16,15 @@
 
 (**************** high level binding ****************)
 type t = {
-	handle: Eventchn.handle;
+	handle: Xeneventchn.handle;
 	mutable virq_port: int;
 }
 
-let init () = { handle = Eventchn.init (); virq_port = -1; }
-let fd eventchn = Eventchn.fd eventchn.handle
-let bind_dom_exc_virq eventchn = eventchn.virq_port <- Eventchn.bind_dom_exc_virq eventchn.handle
-let bind_interdomain eventchn domid port = Eventchn.bind_interdomain eventchn.handle domid port
-let unbind eventchn port = Eventchn.unbind eventchn.handle port
-let notify eventchn port = Eventchn.notify eventchn.handle port
-let pending eventchn = Eventchn.pending eventchn.handle
-let unmask eventchn port = Eventchn.unmask eventchn.handle port
+let init () = { handle = Xeneventchn.init (); virq_port = -1; }
+let fd eventchn = Xeneventchn.fd eventchn.handle
+let bind_dom_exc_virq eventchn = eventchn.virq_port <- Xeneventchn.bind_dom_exc_virq eventchn.handle
+let bind_interdomain eventchn domid port = Xeneventchn.bind_interdomain eventchn.handle domid port
+let unbind eventchn port = Xeneventchn.unbind eventchn.handle port
+let notify eventchn port = Xeneventchn.notify eventchn.handle port
+let pending eventchn = Xeneventchn.pending eventchn.handle
+let unmask eventchn port = Xeneventchn.unmask eventchn.handle port

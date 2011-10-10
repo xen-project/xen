@@ -1,5 +1,5 @@
 version = "@VERSION@"
 description = "Xen Control Interface"
-requires = "mmap,uuid"
-archive(byte) = "xc.cma"
-archive(native) = "xc.cmxa"
+requires = "xenmmap,uuid"
+archive(byte) = "xenctrl.cma"
+archive(native) = "xenctrl.cmxa"
