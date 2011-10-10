@@ -2,7 +2,7 @@ XEN_ROOT = $(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 SUBDIRS= \
-	uuid mmap \
+	mmap \
 	log xc eventchn \
 	xb xs xl
 

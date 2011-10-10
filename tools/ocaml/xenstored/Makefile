@@ -5,7 +5,6 @@ include $(OCAML_TOPLEVEL)/common.make
 OCAMLINCLUDE += \
 	-I $(OCAML_TOPLEVEL)/libs/log \
 	-I $(OCAML_TOPLEVEL)/libs/xb \
-	-I $(OCAML_TOPLEVEL)/libs/uuid \
 	-I $(OCAML_TOPLEVEL)/libs/mmap \
 	-I $(OCAML_TOPLEVEL)/libs/xc \
 	-I $(OCAML_TOPLEVEL)/libs/eventchn
@@ -34,7 +33,6 @@ OBJS = define \
 INTF = symbol.cmi trie.cmi
 XENSTOREDLIBS = \
 	unix.cmxa \
-	$(OCAML_TOPLEVEL)/libs/uuid/uuid.cmxa \
 	-ccopt -L -ccopt $(OCAML_TOPLEVEL)/libs/mmap $(OCAML_TOPLEVEL)/libs/mmap/xenmmap.cmxa \
 	-ccopt -L -ccopt $(OCAML_TOPLEVEL)/libs/log $(OCAML_TOPLEVEL)/libs/log/log.cmxa \
 	-ccopt -L -ccopt $(OCAML_TOPLEVEL)/libs/eventchn $(OCAML_TOPLEVEL)/libs/eventchn/xeneventchn.cmxa \

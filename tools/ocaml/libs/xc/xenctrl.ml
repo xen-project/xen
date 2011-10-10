@@ -118,14 +118,23 @@ let with_intf f =
 external _domain_create: handle -> int32 -> domain_create_flag list -> int array -> domid
        = "stub_xc_domain_create"
 
+let int_array_of_uuid_string s =
+	try
+		Scanf.sscanf s
+			"%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x"
+			(fun a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 ->
+				[| a0; a1; a2; a3; a4; a5; a6; a7;
+				   a8; a9; a10; a11; a12; a13; a14; a15 |])
+	with _ -> invalid_arg ("Xc.int_array_of_uuid_string: " ^ s)
+
 let domain_create handle n flags uuid =
-	_domain_create handle n flags (Uuid.int_array_of_uuid uuid)
+	_domain_create handle n flags (int_array_of_uuid_string uuid)
 
 external _domain_sethandle: handle -> domid -> int array -> unit
                           = "stub_xc_domain_sethandle"
 
 let domain_sethandle handle n uuid =
-	_domain_sethandle handle n (Uuid.int_array_of_uuid uuid)
+	_domain_sethandle handle n (int_array_of_uuid_string uuid)
 
 external domain_max_vcpus: handle -> domid -> int -> unit
        = "stub_xc_domain_max_vcpus"

@@ -1,4 +1,0 @@
-version = "@VERSION@"
-description = "Uuid - universal identifer"
-archive(byte) = "uuid.cma"
-archive(native) = "uuid.cmxa"
