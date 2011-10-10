@@ -132,11 +132,67 @@ static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
     list_add(&pdev->alldevs_list, &pseg->alldevs_list);
     spin_lock_init(&pdev->msix_table_lock);
 
+    /* update bus2bridge */
+    switch ( pdev_type(pseg->nr, bus, devfn) )
+    {
+        u8 sec_bus, sub_bus;
+
+        case DEV_TYPE_PCIe_BRIDGE:
+            break;
+
+        case DEV_TYPE_PCIe2PCI_BRIDGE:
+        case DEV_TYPE_LEGACY_PCI_BRIDGE:
+            sec_bus = pci_conf_read8(pseg->nr, bus, PCI_SLOT(devfn),
+                                     PCI_FUNC(devfn), PCI_SECONDARY_BUS);
+            sub_bus = pci_conf_read8(pseg->nr, bus, PCI_SLOT(devfn),
+                                     PCI_FUNC(devfn), PCI_SUBORDINATE_BUS);
+
+            spin_lock(&pseg->bus2bridge_lock);
+            for ( ; sec_bus <= sub_bus; sec_bus++ )
+            {
+                pseg->bus2bridge[sec_bus].map = 1;
+                pseg->bus2bridge[sec_bus].bus = bus;
+                pseg->bus2bridge[sec_bus].devfn = devfn;
+            }
+            spin_unlock(&pseg->bus2bridge_lock);
+            break;
+
+        case DEV_TYPE_PCIe_ENDPOINT:
+        case DEV_TYPE_PCI:
+            break;
+
+        default:
+            printk(XENLOG_WARNING "%s: unknown type: %04x:%02x:%02x.%u\n",
+                   __func__, pseg->nr, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+            break;
+    }
+
     return pdev;
 }
 
-static void free_pdev(struct pci_dev *pdev)
+static void free_pdev(struct pci_seg *pseg, struct pci_dev *pdev)
 {
+    /* update bus2bridge */
+    switch ( pdev_type(pseg->nr, pdev->bus, pdev->devfn) )
+    {
+        u8 dev, func, sec_bus, sub_bus;
+
+        case DEV_TYPE_PCIe2PCI_BRIDGE:
+        case DEV_TYPE_LEGACY_PCI_BRIDGE:
+            dev = PCI_SLOT(pdev->devfn);
+            func = PCI_FUNC(pdev->devfn);
+            sec_bus = pci_conf_read8(pseg->nr, pdev->bus, dev, func,
+                                     PCI_SECONDARY_BUS);
+            sub_bus = pci_conf_read8(pseg->nr, pdev->bus, dev, func,
+                                     PCI_SUBORDINATE_BUS);
+
+            spin_lock(&pseg->bus2bridge_lock);
+            for ( ; sec_bus <= sub_bus; sec_bus++ )
+                pseg->bus2bridge[sec_bus] = pseg->bus2bridge[pdev->bus];
+            spin_unlock(&pseg->bus2bridge_lock);
+            break;
+    }
+
     list_del(&pdev->alldevs_list);
     xfree(pdev);
 }
@@ -380,7 +436,7 @@ int pci_remove_device(u16 seg, u8 bus, u8 devfn)
             if ( pdev->domain )
                 list_del(&pdev->domain_list);
             pci_cleanup_msi(pdev);
-            free_pdev(pdev);
+            free_pdev(pseg, pdev);
             printk(XENLOG_DEBUG "PCI remove device %04x:%02x:%02x.%u\n",
                    seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
             break;
@@ -548,8 +604,6 @@ static int __init _scan_pci_devices(struct pci_seg *pseg, void *arg)
 {
     struct pci_dev *pdev;
     int bus, dev, func;
-    u8 sec_bus, sub_bus;
-    int type;
 
     for ( bus = 0; bus < 256; bus++ )
     {
@@ -565,41 +619,6 @@ static int __init _scan_pci_devices(struct pci_seg *pseg, void *arg)
                 {
                     printk("%s: alloc_pdev failed.\n", __func__);
                     return -ENOMEM;
-                }
-
-                /* build bus2bridge */
-                type = pdev_type(pseg->nr, bus, PCI_DEVFN(dev, func));
-                switch ( type )
-                {
-                    case DEV_TYPE_PCIe_BRIDGE:
-                        break;
-
-                    case DEV_TYPE_PCIe2PCI_BRIDGE:
-                    case DEV_TYPE_LEGACY_PCI_BRIDGE:
-                        sec_bus = pci_conf_read8(pseg->nr, bus, dev, func,
-                                                 PCI_SECONDARY_BUS);
-                        sub_bus = pci_conf_read8(pseg->nr, bus, dev, func,
-                                                 PCI_SUBORDINATE_BUS);
-
-                        spin_lock(&pseg->bus2bridge_lock);
-                        for ( sub_bus &= 0xff; sec_bus <= sub_bus; sec_bus++ )
-                        {
-                            pseg->bus2bridge[sec_bus].map = 1;
-                            pseg->bus2bridge[sec_bus].bus = bus;
-                            pseg->bus2bridge[sec_bus].devfn =
-                                PCI_DEVFN(dev, func);
-                        }
-                        spin_unlock(&pseg->bus2bridge_lock);
-                        break;
-
-                    case DEV_TYPE_PCIe_ENDPOINT:
-                    case DEV_TYPE_PCI:
-                        break;
-
-                    default:
-                        printk("%s: unknown type: %04x:%02x:%02x.%u\n",
-                               __func__, pseg->nr, bus, dev, func);
-                        return -EINVAL;
                 }
 
                 if ( !func && !(pci_conf_read8(pseg->nr, bus, dev, func,
