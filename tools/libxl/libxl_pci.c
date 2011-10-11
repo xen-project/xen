@@ -1113,7 +1113,7 @@ static int e820_sanitize(libxl_ctx *ctx, struct e820entry src[],
         if ((src[i].type == E820_RAM) ||
             (src[i].type == E820_UNUSABLE) ||
             (src[i].type == 0))
-                continue;
+            continue;
 
         start = src[i].addr < start ? src[i].addr : start;
         last = src[i].addr + src[i].size > last ?

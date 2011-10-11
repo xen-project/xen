@@ -457,7 +457,7 @@ int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
 
     rc = libxl__parse_mac(mac, mac_n);
     if (rc)
-            return rc;
+        return rc;
 
     nics = libxl_list_nics(ctx, domid, &nb);
     if (!nics)
@@ -509,7 +509,7 @@ int libxl_devid_to_device_nic(libxl_ctx *ctx, uint32_t domid,
     val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/mac", nic_path_fe));
     rc = libxl__parse_mac(val, nic->mac);
     if (rc)
-            goto out;
+        goto out;
 
     nic->script = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(&gc, "%s/script", nic_path_be), NULL);
     rc = 0;

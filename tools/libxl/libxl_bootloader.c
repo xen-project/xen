@@ -81,14 +81,14 @@ static int open_xenconsoled_pty(int *master, int *slave, char *slave_path, size_
 
     ret = openpty(master, slave, NULL, NULL, NULL);
     if (ret < 0)
-            return -1;
+        return -1;
 
     ret = ttyname_r(*slave, slave_path, slave_path_len);
     if (ret == -1) {
-            close(*master);
-            close(*slave);
-            *master = *slave = -1;
-            return -1;
+        close(*master);
+        close(*slave);
+        *master = *slave = -1;
+        return -1;
     }
 
     /*
