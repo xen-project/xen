@@ -64,7 +64,7 @@ const char *xlu_cfg_get_listitem(const XLU_ConfigList*, int entry);
  */
 
 int xlu_disk_parse(XLU_Config *cfg, int nspecs, const char *const *specs,
-		   libxl_device_disk *disk);
+                   libxl_device_disk *disk);
   /* disk must have been initialised.
    *
    * On error, returns errno value.  Bad strings cause EINVAL and

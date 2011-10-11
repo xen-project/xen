@@ -228,53 +228,53 @@ char *libxl__abs_path(libxl__gc *gc, const char *s, const char *path)
 
 int libxl__file_reference_map(libxl_file_reference *f)
 {
-	struct stat st_buf;
-	int ret, fd;
-	void *data;
+        struct stat st_buf;
+        int ret, fd;
+        void *data;
 
-	if (f->mapped)
-		return 0;
+        if (f->mapped)
+                return 0;
 
-	fd = open(f->path, O_RDONLY);
-	if (f < 0)
-		return ERROR_FAIL;
+        fd = open(f->path, O_RDONLY);
+        if (f < 0)
+                return ERROR_FAIL;
 
-	ret = fstat(fd, &st_buf);
-	if (ret < 0)
-		goto out;
+        ret = fstat(fd, &st_buf);
+        if (ret < 0)
+                goto out;
 
-	ret = -1;
-	data = mmap(NULL, st_buf.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-	if (data == NULL)
-		goto out;
+        ret = -1;
+        data = mmap(NULL, st_buf.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+        if (data == NULL)
+                goto out;
 
-	f->mapped = 1;
-	f->data = data;
-	f->size = st_buf.st_size;
+        f->mapped = 1;
+        f->data = data;
+        f->size = st_buf.st_size;
 
-	ret = 0;
+        ret = 0;
 out:
-	close(fd);
+        close(fd);
 
-	return ret == 0 ? 0 : ERROR_FAIL;
+        return ret == 0 ? 0 : ERROR_FAIL;
 }
 
 int libxl__file_reference_unmap(libxl_file_reference *f)
 {
-	int ret;
+        int ret;
 
-	if (!f->mapped)
-		return 0;
+        if (!f->mapped)
+                return 0;
 
-	ret = munmap(f->data, f->size);
-	if (ret == 0) {
-		f->mapped = 0;
-		f->data = NULL;
-		f->size = 0;
-		return 0;
-	}
+        ret = munmap(f->data, f->size);
+        if (ret == 0) {
+                f->mapped = 0;
+                f->data = NULL;
+                f->size = 0;
+                return 0;
+        }
 
-	return ERROR_FAIL;
+        return ERROR_FAIL;
 }
 
 _hidden int libxl__parse_mac(const char *s, libxl_mac mac)

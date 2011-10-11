@@ -420,7 +420,7 @@ int libxl_cpuid_parse_config_xend(libxl_cpuid_policy_list *cpuid,
                                   const char* str);
 void libxl_cpuid_apply_policy(libxl_ctx *ctx, uint32_t domid);
 void libxl_cpuid_set(libxl_ctx *ctx, uint32_t domid,
-		     libxl_cpuid_policy_list cpuid);
+                     libxl_cpuid_policy_list cpuid);
 
 /*
  * Functions for allowing users of libxl to store private data

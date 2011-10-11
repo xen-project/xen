@@ -696,13 +696,13 @@ int libxl_event_get_disk_eject_info(libxl_ctx *ctx, uint32_t domid, libxl_event 
     sscanf(backend,
             "/local/domain/%d/backend/%" TOSTRING(BACKEND_STRING_SIZE) "[a-z]/%*d/%*d",
             &disk->backend_domid, backend_type);
-	if (!strcmp(backend_type, "tap") || !strcmp(backend_type, "vbd")) {
-		disk->backend = LIBXL_DISK_BACKEND_TAP;
-	} else if (!strcmp(backend_type, "qdisk")) {
-		disk->backend = LIBXL_DISK_BACKEND_QDISK;
-	} else {
-		disk->backend = LIBXL_DISK_BACKEND_UNKNOWN;
-	}
+        if (!strcmp(backend_type, "tap") || !strcmp(backend_type, "vbd")) {
+                disk->backend = LIBXL_DISK_BACKEND_TAP;
+        } else if (!strcmp(backend_type, "qdisk")) {
+                disk->backend = LIBXL_DISK_BACKEND_QDISK;
+        } else {
+                disk->backend = LIBXL_DISK_BACKEND_UNKNOWN;
+        }
 
     disk->pdev_path = strdup("");
     disk->format = LIBXL_DISK_FORMAT_EMPTY;

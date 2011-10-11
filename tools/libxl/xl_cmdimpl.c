@@ -497,15 +497,15 @@ static void parse_disk_config_multistring(XLU_Config **config,
     memset(disk, 0, sizeof(*disk));
 
     if (!*config) {
-	*config = xlu_cfg_init(stderr, "command line");
-	if (!*config) { perror("xlu_cfg_init"); exit(-1); }
+        *config = xlu_cfg_init(stderr, "command line");
+        if (!*config) { perror("xlu_cfg_init"); exit(-1); }
     }
 
     e = xlu_disk_parse(*config, nspecs, specs, disk);
     if (e == EINVAL) exit(-1);
     if (e) {
-	fprintf(stderr,"xlu_disk_parse failed: %s\n",strerror(errno));
-	exit(-1);
+        fprintf(stderr,"xlu_disk_parse failed: %s\n",strerror(errno));
+        exit(-1);
     }
 }
 

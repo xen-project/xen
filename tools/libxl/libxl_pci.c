@@ -1113,7 +1113,7 @@ static int e820_sanitize(libxl_ctx *ctx, struct e820entry src[],
         if ((src[i].type == E820_RAM) ||
             (src[i].type == E820_UNUSABLE) ||
             (src[i].type == 0))
-		continue;
+                continue;
 
         start = src[i].addr < start ? src[i].addr : start;
         last = src[i].addr + src[i].size > last ?
@@ -1158,14 +1158,14 @@ static int e820_sanitize(libxl_ctx *ctx, struct e820entry src[],
      * to E820_UNUSED. We also need to move some of the E820_RAM regions if
      * the overlap with ram_end. */
     for (i = 0; i < nr; i++) {
-	uint64_t end = src[i].addr + src[i].size;
+        uint64_t end = src[i].addr + src[i].size;
 
-	/* We don't care about E820_UNUSABLE, but we need to
+        /* We don't care about E820_UNUSABLE, but we need to
          * change the type to zero b/c the loop after this
          * sticks E820_UNUSABLE on the guest's E820 but ignores
          * the ones with type zero. */
         if ((src[i].type == E820_UNUSABLE) ||
-	    /* Any region that is within the "RAM region" can
+            /* Any region that is within the "RAM region" can
              * be safely ditched. */
             (end < ram_end)) {
                 src[i].type = 0;
@@ -1173,15 +1173,15 @@ static int e820_sanitize(libxl_ctx *ctx, struct e820entry src[],
         }
 
         /* Look only at RAM regions. */
-	if (src[i].type != E820_RAM)
+        if (src[i].type != E820_RAM)
             continue;
 
         /* We only care about RAM regions below 4GB. */
         if (src[i].addr >= (1ULL<<32))
             continue;
 
-	/* E820_RAM overlaps with our RAM region. Move it */
-	if (src[i].addr < ram_end) {
+        /* E820_RAM overlaps with our RAM region. Move it */
+        if (src[i].addr < ram_end) {
             uint64_t delta;
 
             src[i].type = E820_UNUSABLE;
@@ -1235,8 +1235,8 @@ static int e820_sanitize(libxl_ctx *ctx, struct e820entry src[],
     /* Almost done: copy them over, ignoring the undesireable ones */
     for (i = 0; i < nr; i++) {
         if ((src[i].type == E820_RAM) ||
-	    (src[i].type == 0))
-	    continue;
+            (src[i].type == 0))
+            continue;
 
         e820[idx].type = src[i].type;
         e820[idx].addr = src[i].addr;
