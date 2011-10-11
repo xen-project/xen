@@ -455,9 +455,6 @@ static int xenpaging_evict_page(xenpaging_t *paging,
         goto out;
     }
 
-    /* Clear page */
-    memset(page, 0, PAGE_SIZE);
-
     munmap(page, PAGE_SIZE);
 
     /* Tell Xen to evict page */

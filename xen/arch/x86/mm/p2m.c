@@ -748,6 +748,9 @@ int p2m_mem_paging_evict(struct domain *d, unsigned long gfn)
     set_p2m_entry(p2m, gfn, _mfn(INVALID_MFN), 0, p2m_ram_paged, a);
     audit_p2m(p2m, 1);
 
+    /* Clear content before returning the page to Xen */
+    scrub_one_page(page);
+
     /* Put the page back so it gets freed */
     put_page(page);
 
