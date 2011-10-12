@@ -541,3 +541,10 @@ const char *libxl_run_dir_path(void);
 
 #endif /* LIBXL_H */
 
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

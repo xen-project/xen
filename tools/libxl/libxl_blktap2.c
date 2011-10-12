@@ -77,3 +77,11 @@ void libxl__device_destroy_tapdisk(libxl__gc *gc, char *be_path)
 
     tap_ctl_destroy(tap.id, tap.minor);
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

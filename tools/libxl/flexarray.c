@@ -107,3 +107,11 @@ void **flexarray_contents(flexarray_t *array)
     free(array);
     return data;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

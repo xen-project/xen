@@ -594,3 +594,11 @@ int libxl__qmp_initializations(libxl_ctx *ctx, uint32_t domid)
     libxl__qmp_close(qmp);
     return ret;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

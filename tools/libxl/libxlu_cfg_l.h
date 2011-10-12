@@ -355,3 +355,11 @@ extern int xlu__cfg_yylex \
 #line 356 "libxlu_cfg_l.h"
 #undef xlu__cfg_yyIN_HEADER
 #endif /* xlu__cfg_yyHEADER_H */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

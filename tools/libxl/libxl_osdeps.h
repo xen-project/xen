@@ -39,3 +39,11 @@ int vasprintf(char **buffer, const char *fmt, va_list ap);
 #endif /*NEED_OWN_ASPRINTF*/
 
 #endif
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

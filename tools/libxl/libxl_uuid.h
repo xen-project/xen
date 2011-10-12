@@ -62,3 +62,11 @@ int libxl_uuid_compare(libxl_uuid *uuid1, libxl_uuid *uuid2);
 uint8_t *libxl_uuid_bytearray(libxl_uuid *uuid);
 
 #endif /* __LIBXL_UUID_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

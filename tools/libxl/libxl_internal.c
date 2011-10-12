@@ -318,3 +318,11 @@ int libxl__fd_set_cloexec(int fd)
     }
     return fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

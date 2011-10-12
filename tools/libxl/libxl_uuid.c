@@ -103,3 +103,11 @@ uint8_t *libxl_uuid_bytearray(libxl_uuid *uuid)
 #error "Please update libxl_uuid.c for your OS"
 
 #endif
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

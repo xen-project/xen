@@ -109,3 +109,11 @@ extern char *lockfile;
 extern char *default_vifscript;
 
 #endif /* XL_H */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

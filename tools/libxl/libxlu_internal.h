@@ -50,3 +50,11 @@ typedef struct {
 #define TOSTRING(x) STRINGIFY(x)
 
 #endif /*LIBXLU_INTERNAL_H*/
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

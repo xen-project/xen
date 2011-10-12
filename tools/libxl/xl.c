@@ -162,3 +162,11 @@ int main(int argc, char **argv)
     xtl_logger_destroy((xentoollog_logger*)logger);
     return ret;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

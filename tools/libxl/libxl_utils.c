@@ -647,3 +647,11 @@ int libxl__enum_from_string(const libxl_enum_string_table *t,
     }
     return ERROR_FAIL;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

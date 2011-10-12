@@ -35,3 +35,11 @@ _hidden int flexarray_get(flexarray_t *array, int index, void **ptr);
 _hidden void **flexarray_contents(flexarray_t *array);
 
 #endif
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

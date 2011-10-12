@@ -544,3 +544,11 @@ _hidden void libxl__json_object_free(libxl__gc *gc, libxl__json_object *obj);
 _hidden libxl__json_object *libxl__json_parse(libxl__gc *gc, const char *s);
 
 #endif
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

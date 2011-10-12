@@ -558,3 +558,11 @@ libxl__json_object *libxl__json_parse(libxl__gc *gc, const char *s)
         return NULL;
     }
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

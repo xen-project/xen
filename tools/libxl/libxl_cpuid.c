@@ -326,3 +326,11 @@ void libxl_cpuid_set(libxl_ctx *ctx, uint32_t domid,
         xc_cpuid_set(ctx->xch, domid, cpuid[i].input,
                      (const char**)(cpuid[i].policy), cpuid_res);
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

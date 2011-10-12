@@ -19,3 +19,11 @@ void xlu__disk_err(DiskParseContext *dpc, const char *erroneous,
 
 
 #endif /*LIBXLU_DISK_I_H*/
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

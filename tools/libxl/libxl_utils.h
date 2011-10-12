@@ -80,3 +80,10 @@ static inline uint32_t libxl__sizekb_to_mb(uint32_t s) {
 
 #endif
 
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

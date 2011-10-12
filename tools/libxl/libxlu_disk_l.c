@@ -2517,3 +2517,11 @@ void xlu__disk_yyfree (void * ptr , yyscan_t yyscanner)
 #define YYTABLES_NAME "yytables"
 
 #line 227 "libxlu_disk_l.l"
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

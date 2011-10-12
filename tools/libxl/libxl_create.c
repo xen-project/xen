@@ -643,3 +643,11 @@ int libxl_domain_create_restore(libxl_ctx *ctx, libxl_domain_config *d_config,
     libxl__free_all(&gc);
     return rc;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

@@ -42,3 +42,11 @@ int xlu__cfg_yyparse(CfgParseContext *ctx);
 
 
 #endif /*LIBXLU_CFG_I_H*/
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

@@ -407,3 +407,11 @@ struct cmd_spec *cmdtable_lookup(const char *s)
     }
     return (count == 1) ? cmd : NULL;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

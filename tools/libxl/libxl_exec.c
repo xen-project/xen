@@ -308,3 +308,11 @@ int libxl__spawn_check(libxl__gc *gc, void *for_spawn_void)
     for_spawn->intermediate = 0;
     return ERROR_FAIL;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

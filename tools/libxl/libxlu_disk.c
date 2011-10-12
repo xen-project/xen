@@ -91,3 +91,10 @@ int xlu_disk_parse(XLU_Config *cfg,
     return dpc.err;
 }
 
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

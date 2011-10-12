@@ -82,3 +82,11 @@ int xlu_disk_parse(XLU_Config *cfg, int nspecs, const char *const *specs,
 
 
 #endif /* LIBXLUTIL_H */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

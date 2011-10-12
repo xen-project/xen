@@ -1303,3 +1303,11 @@ int libxl__e820_alloc(libxl_ctx *ctx, uint32_t domid, libxl_domain_config *d_con
     }
     return 0;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

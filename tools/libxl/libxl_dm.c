@@ -1047,3 +1047,11 @@ int libxl__create_xenpv_qemu(libxl__gc *gc, uint32_t domid,
     libxl__create_device_model(gc, info, NULL, 0, NULL, 0, starting_r);
     return 0;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

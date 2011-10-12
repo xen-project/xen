@@ -121,3 +121,11 @@ char **libxl__xs_directory(libxl__gc *gc, xs_transaction_t t, char *path, unsign
     libxl__ptr_add(gc, ret);
     return ret;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

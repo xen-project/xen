@@ -69,3 +69,11 @@ int libxl_flask_loadpolicy(libxl_ctx *ctx, void *policy, uint32_t size)
 
     return rc;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

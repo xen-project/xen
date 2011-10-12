@@ -2122,3 +2122,11 @@ void xlu__cfg_yyfree (void * ptr , yyscan_t yyscanner)
 #define YYTABLES_NAME "yytables"
 
 #line 104 "libxlu_cfg_l.l"
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
