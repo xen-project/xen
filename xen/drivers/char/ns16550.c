@@ -157,18 +157,15 @@ static void __ns16550_poll(struct cpu_user_regs *regs)
 {
     struct serial_port *port = this_cpu(poll_port);
     struct ns16550 *uart = port->uart;
-    char lsr;
 
     if ( uart->intr_works )
         return; /* Interrupts work - no more polling */
 
-    while ( (lsr = ns_read_reg(uart, LSR)) & (LSR_DR|LSR_THRE) )
-    {
-        if ( lsr & LSR_THRE )
-            serial_tx_interrupt(port, regs);
-        if ( lsr & LSR_DR )
-            serial_rx_interrupt(port, regs);
-    }
+    while ( ns_read_reg(uart, LSR) & LSR_DR )
+        serial_rx_interrupt(port, regs);
+
+    if ( ns_read_reg(uart, LSR) & LSR_THRE )
+        serial_tx_interrupt(port, regs);
 
     set_timer(&uart->timer, NOW() + MILLISECS(uart->timeout_ms));
 }
