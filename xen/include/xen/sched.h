@@ -617,7 +617,7 @@ void scheduler_free(struct scheduler *sched);
 int schedule_cpu_switch(unsigned int cpu, struct cpupool *c);
 void vcpu_force_reschedule(struct vcpu *v);
 int cpu_disable_scheduler(unsigned int cpu);
-int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity);
+int vcpu_set_affinity(struct vcpu *v, const cpumask_t *affinity);
 
 void vcpu_runstate_get(struct vcpu *v, struct vcpu_runstate_info *runstate);
 uint64_t get_cpu_idle_time(unsigned int cpu);

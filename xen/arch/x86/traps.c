@@ -3113,7 +3113,6 @@ static void nmi_mce_softirq(void)
 {
     int cpu = smp_processor_id();
     struct softirq_trap *st = &per_cpu(softirq_trap, cpu);
-    cpumask_t affinity;
 
     BUG_ON(st == NULL);
     BUG_ON(st->vcpu == NULL);
@@ -3129,9 +3128,7 @@ static void nmi_mce_softirq(void)
          * Make sure to wakeup the vcpu on the
          * specified processor.
          */
-        cpus_clear(affinity);
-        cpu_set(st->processor, affinity);
-        vcpu_set_affinity(st->vcpu, &affinity);
+        vcpu_set_affinity(st->vcpu, cpumask_of(st->processor));
 
         /* Affinity is restored in the iret hypercall. */
     }
@@ -3201,14 +3198,11 @@ void async_exception_cleanup(struct vcpu *curr)
                  !test_and_set_bool(curr->mce_pending) )
             {
                 int cpu = smp_processor_id();
-                cpumask_t affinity;
 
                 cpumask_copy(curr->cpu_affinity_tmp, curr->cpu_affinity);
-                cpus_clear(affinity);
-                cpu_set(cpu, affinity);
                 printk(XENLOG_DEBUG "MCE: CPU%d set affinity, old %d\n",
                        cpu, curr->processor);
-                vcpu_set_affinity(curr, &affinity);
+                vcpu_set_affinity(curr, cpumask_of(cpu));
             }
         }
     }

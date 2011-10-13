@@ -587,9 +587,9 @@ int cpu_disable_scheduler(unsigned int cpu)
     return ret;
 }
 
-int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity)
+int vcpu_set_affinity(struct vcpu *v, const cpumask_t *affinity)
 {
-    cpumask_t online_affinity, old_affinity;
+    cpumask_t online_affinity;
     cpumask_t *online;
 
     if ( v->domain->is_pinned )
@@ -601,9 +601,7 @@ int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity)
 
     vcpu_schedule_lock_irq(v);
 
-    cpumask_copy(&old_affinity, v->cpu_affinity);
     cpumask_copy(v->cpu_affinity, affinity);
-    cpumask_copy(affinity, &old_affinity);
     if ( !cpumask_test_cpu(v->processor, v->cpu_affinity) )
         set_bit(_VPF_migrating, &v->pause_flags);
 

@@ -304,7 +304,6 @@ int vmce_wrmsr(u32 msr, u64 val)
 int inject_vmce(struct domain *d)
 {
     int cpu = smp_processor_id();
-    cpumask_t affinity;
 
     /* PV guest and HVM guest have different vMCE# injection methods. */
     if ( !test_and_set_bool(d->vcpu[0]->mce_pending) )
@@ -323,11 +322,9 @@ int inject_vmce(struct domain *d)
             {
                 cpumask_copy(d->vcpu[0]->cpu_affinity_tmp,
                              d->vcpu[0]->cpu_affinity);
-                cpus_clear(affinity);
-                cpu_set(cpu, affinity);
                 mce_printk(MCE_VERBOSE, "MCE: CPU%d set affinity, old %d\n",
                            cpu, d->vcpu[0]->processor);
-                vcpu_set_affinity(d->vcpu[0], &affinity);
+                vcpu_set_affinity(d->vcpu[0], cpumask_of(cpu));
                 vcpu_kick(d->vcpu[0]);
             }
             else
