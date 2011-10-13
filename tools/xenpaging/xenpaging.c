@@ -734,10 +734,12 @@ int main(int argc, char *argv[])
             }
             else
             {
-                DPRINTF("page already populated (domain = %d; vcpu = %d;"
-                        " gfn = %"PRIx64"; paused = %d)\n",
-                        paging->mem_event.domain_id, req.vcpu_id,
-                        req.gfn, req.flags & MEM_EVENT_FLAG_VCPU_PAUSED);
+                DPRINTF("page %s populated (domain = %d; vcpu = %d;"
+                        " gfn = %"PRIx64"; paused = %d; evict_fail = %d)\n",
+                        req.flags & MEM_EVENT_FLAG_EVICT_FAIL ? "not" : "already",
+                        paging->mem_event.domain_id, req.vcpu_id, req.gfn,
+                        !!(req.flags & MEM_EVENT_FLAG_VCPU_PAUSED) ,
+                        !!(req.flags & MEM_EVENT_FLAG_EVICT_FAIL) );
 
                 /* Tell Xen to resume the vcpu */
                 /* XXX: Maybe just check if the vcpu was paused? */
