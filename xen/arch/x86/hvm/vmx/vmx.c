@@ -1693,6 +1693,20 @@ static const struct lbr_info {
     { MSR_C2_LASTBRANCH_0_FROM_IP,  NUM_MSR_C2_LASTBRANCH_FROM_TO },
     { MSR_C2_LASTBRANCH_0_TO_IP,    NUM_MSR_C2_LASTBRANCH_FROM_TO },
     { 0, 0 }
+}, nh_lbr[] = {
+    { MSR_IA32_LASTINTFROMIP,       1 },
+    { MSR_IA32_LASTINTTOIP,         1 },
+    { MSR_C2_LASTBRANCH_TOS,        1 },
+    { MSR_P4_LASTBRANCH_0_FROM_LIP, NUM_MSR_P4_LASTBRANCH_FROM_TO },
+    { MSR_P4_LASTBRANCH_0_TO_LIP,   NUM_MSR_P4_LASTBRANCH_FROM_TO },
+    { 0, 0 }
+}, at_lbr[] = {
+    { MSR_IA32_LASTINTFROMIP,       1 },
+    { MSR_IA32_LASTINTTOIP,         1 },
+    { MSR_C2_LASTBRANCH_TOS,        1 },
+    { MSR_C2_LASTBRANCH_0_FROM_IP,  NUM_MSR_ATOM_LASTBRANCH_FROM_TO },
+    { MSR_C2_LASTBRANCH_0_TO_IP,    NUM_MSR_ATOM_LASTBRANCH_FROM_TO },
+    { 0, 0 }
 #ifdef __i386__
 }, pm_lbr[] = {
     { MSR_IA32_LASTINTFROMIP,       1 },
@@ -1720,7 +1734,19 @@ static const struct lbr_info *last_branch_msr_get(void)
 #endif
         /* Core2 Duo */
         case 15:
+        /* Enhanced Core */
+        case 23:
             return c2_lbr;
+            break;
+        /* Nehalem */
+        case 26: case 30: case 31: case 46:
+        /* Sandy Bridge */
+        case 42: case 45:
+            return nh_lbr;
+            break;
+        /* Atom */
+        case 28:
+            return at_lbr;
             break;
         }
         break;
