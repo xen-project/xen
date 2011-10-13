@@ -87,7 +87,7 @@ static int store_serial_port_info(libxl__qmp_handler *qmp,
     int ret = 0;
 
     if (!(chardev && strncmp("pty:", chardev, 4) == 0)) {
-        return -1;
+        return 0;
     }
 
     path = libxl__xs_get_dompath(&gc, qmp->domid);
