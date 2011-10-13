@@ -527,13 +527,21 @@ static void xmalloc_pool_put(void *p)
 static void *xmalloc_whole_pages(unsigned long size)
 {
     struct bhdr *b;
-    unsigned int pageorder = get_order_from_bytes(size + BHDR_OVERHEAD);
+    unsigned int i, pageorder = get_order_from_bytes(size + BHDR_OVERHEAD);
+    char *p;
 
     b = alloc_xenheap_pages(pageorder, 0);
     if ( b == NULL )
         return NULL;
 
-    b->size = (1 << (pageorder + PAGE_SHIFT));
+    b->size = PAGE_ALIGN(size + BHDR_OVERHEAD);
+    for ( p = (char *)b + b->size, i = 0; i < pageorder; ++i )
+        if ( (unsigned long)p & (PAGE_SIZE << i) )
+        {
+            free_xenheap_pages(p, i);
+            p += PAGE_SIZE << i;
+        }
+
     return (void *)b->ptr.buffer;
 }
 
@@ -611,7 +619,20 @@ void xfree(void *p)
     }
 
     if ( b->size >= PAGE_SIZE )
-        free_xenheap_pages((void *)b, get_order_from_bytes(b->size));
+    {
+        unsigned int i, order = get_order_from_bytes(b->size);
+
+        BUG_ON((unsigned long)b & ((PAGE_SIZE << order) - 1));
+        for ( i = 0; ; ++i )
+        {
+            if ( !(b->size & (PAGE_SIZE << i)) )
+                continue;
+            b->size -= PAGE_SIZE << i;
+            free_xenheap_pages((void *)b + b->size, i);
+            if ( i + 1 >= order )
+                break;
+        }
+    }
     else
         xmem_pool_free(p, xenpool);
 }
