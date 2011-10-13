@@ -929,6 +929,9 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
     rc = libxl__device_disk_set_backend(&gc, disk);
     if (rc) goto out;
 
+    rc = libxl__device_disk_set_backend(&gc, disk);
+    if (rc) goto out;
+
     front = flexarray_make(16, 1);
     if (!front) {
         rc = ERROR_NOMEM;
