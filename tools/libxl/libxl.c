@@ -261,7 +261,7 @@ int libxl_domain_resume(libxl_ctx *ctx, uint32_t domid)
     }
 out:
     libxl__free_all(&gc);
-    return 0;
+    return rc;
 }
 
 /*
