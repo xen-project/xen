@@ -111,6 +111,18 @@ static void xc_osdep_put(xc_osdep_info_t *info)
 #endif
 }
 
+static const char *xc_osdep_type_name(enum xc_osdep_type type)
+{
+    switch ( type )
+    {
+    case XC_OSDEP_PRIVCMD: return "privcmd";
+    case XC_OSDEP_EVTCHN:  return "evtchn";
+    case XC_OSDEP_GNTTAB:  return "gnttab";
+    case XC_OSDEP_GNTSHR:  return "gntshr";
+    }
+    return "unknown";
+}
+
 static struct xc_interface_core *xc_interface_open_common(xentoollog_logger *logger,
                                                           xentoollog_logger *dombuild_logger,
                                                           unsigned open_flags,
@@ -161,7 +173,11 @@ static struct xc_interface_core *xc_interface_open_common(xentoollog_logger *log
 
         xch->ops = xch->osdep.init(xch, type);
         if ( xch->ops == NULL )
+        {
+            ERROR("OSDEP: interface %d (%s) not supported on this platform",
+                  type, xc_osdep_type_name(type));
             goto err_put_iface;
+        }
 
         xch->ops_handle = xch->ops->open(xch);
         if (xch->ops_handle == XC_OSDEP_OPEN_ERROR)

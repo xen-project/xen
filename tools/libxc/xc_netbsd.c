@@ -386,9 +386,6 @@ static struct xc_osdep_ops *netbsd_osdep_init(xc_interface *xch, enum xc_osdep_t
         return &netbsd_privcmd_ops;
     case XC_OSDEP_EVTCHN:
         return &netbsd_evtchn_ops;
-    case XC_OSDEP_GNTTAB:
-        ERROR("GNTTAB interface not supported on this platform");
-        return NULL;
     default:
         return NULL;
     }
