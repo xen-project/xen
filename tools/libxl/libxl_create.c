@@ -601,7 +601,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     if (d_config->c_info.type == LIBXL_DOMAIN_TYPE_PV &&
         d_config->b_info.u.pv.e820_host) {
         int rc;
-        rc = libxl__e820_alloc(ctx, domid, d_config);
+        rc = libxl__e820_alloc(gc, domid, d_config);
         if (rc)
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
                       "Failed while collecting E820 with: %d (errno:%d)\n",

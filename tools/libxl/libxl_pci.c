@@ -1269,8 +1269,9 @@ static int e820_sanitize(libxl_ctx *ctx, struct e820entry src[],
     return 0;
 }
 
-int libxl__e820_alloc(libxl_ctx *ctx, uint32_t domid, libxl_domain_config *d_config)
+int libxl__e820_alloc(libxl__gc *gc, uint32_t domid, libxl_domain_config *d_config)
 {
+    libxl_ctx *ctx = libxl__gc_owner(gc);
     int rc;
     uint32_t nr;
     struct e820entry map[E820MAX];
