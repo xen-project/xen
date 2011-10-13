@@ -51,7 +51,8 @@ nestedsvm_vcpu_stgi(struct vcpu *v)
 static int
 nestedsvm_vmcb_isvalid(struct vcpu *v, uint64_t vmcxaddr)
 {
-    if ( !hvm_svm_enabled(v) || hvm_guest_x86_mode(v) < 2 )
+    /* Address must be 4k aligned */
+    if ( (vmcxaddr & ~PAGE_MASK) != 0 )
         return 0;
 
     /* Maximum valid physical address.
