@@ -30,6 +30,7 @@ extern struct acpi_20_rsdt Rsdt;
 extern struct acpi_20_xsdt Xsdt;
 extern struct acpi_20_fadt Fadt;
 extern struct acpi_20_facs Facs;
+extern struct acpi_20_waet Waet;
 
 /*
  * Located at ACPI_INFO_PHYSICAL_ADDRESS.
@@ -190,12 +191,28 @@ static struct acpi_20_hpet *construct_hpet(void)
     return hpet;
 }
 
+static struct acpi_20_waet *construct_waet(void)
+{
+    struct acpi_20_waet *waet;
+
+    waet = mem_alloc(sizeof(*waet), 16);
+    if (!waet) return NULL;
+
+    memcpy(waet, &Waet, sizeof(*waet));
+
+    waet->header.length = sizeof(*waet);
+    set_checksum(waet, offsetof(struct acpi_header, checksum), sizeof(*waet));
+
+    return waet;
+}
+
 static int construct_secondary_tables(unsigned long *table_ptrs,
                                       struct acpi_info *info)
 {
     int nr_tables = 0;
     struct acpi_20_madt *madt;
     struct acpi_20_hpet *hpet;
+    struct acpi_20_waet *waet;
     struct acpi_20_tcpa *tcpa;
     unsigned char *ssdt;
     static const uint16_t tis_signature[] = {0x0001, 0x0001, 0x0001};
@@ -215,6 +232,11 @@ static int construct_secondary_tables(unsigned long *table_ptrs,
     hpet = construct_hpet();
     if (!hpet) return -1;
     table_ptrs[nr_tables++] = (unsigned long)hpet;
+
+    /* WAET. */
+    waet = construct_waet();
+    if (!waet) return -1;
+    table_ptrs[nr_tables++] = (unsigned long)waet;
 
     if ( battery_port_exists() )
     {

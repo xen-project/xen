@@ -297,6 +297,14 @@ struct acpi_20_hpet {
 #define ACPI_HPET_ADDRESS 0xFED00000UL
 
 /*
+ * WAET Description Table
+ */
+struct acpi_20_waet {
+    struct acpi_header header;
+    uint32_t           flags;
+};
+
+/*
  * Multiple APIC Flags.
  */
 #define ACPI_PCAT_COMPAT (1 << 0)
@@ -366,6 +374,7 @@ struct acpi_20_madt_intsrcovr {
 #define ACPI_2_0_XSDT_SIGNATURE ASCII32('X','S','D','T')
 #define ACPI_2_0_TCPA_SIGNATURE ASCII32('T','C','P','A')
 #define ACPI_2_0_HPET_SIGNATURE ASCII32('H','P','E','T')
+#define ACPI_2_0_WAET_SIGNATURE ASCII32('W','A','E','T')
 
 /*
  * Table revision numbers.
@@ -377,6 +386,7 @@ struct acpi_20_madt_intsrcovr {
 #define ACPI_2_0_XSDT_REVISION 0x01
 #define ACPI_2_0_TCPA_REVISION 0x02
 #define ACPI_2_0_HPET_REVISION 0x01
+#define ACPI_2_0_WAET_REVISION 0x01
 #define ACPI_1_0_FADT_REVISION 0x01
 
 #pragma pack ()

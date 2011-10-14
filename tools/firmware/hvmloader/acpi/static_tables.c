@@ -136,6 +136,26 @@ struct acpi_20_rsdp Rsdp = {
     .length    = sizeof(struct acpi_20_rsdp)
 };
 
+#define ACPI_WAET_RTC_GOOD      0x00000001
+#define ACPI_WAET_PM_TIMER_GOOD 0x00000002
+
+#define ACPI_WAET_FLAGS (ACPI_WAET_RTC_GOOD | \
+                         ACPI_WAET_PM_TIMER_GOOD)
+
+struct acpi_20_waet Waet = {
+    .header = {
+        .signature    = ACPI_2_0_WAET_SIGNATURE,
+        .length       = sizeof(struct acpi_20_waet),
+        .revision     = ACPI_2_0_WAET_REVISION,
+        .oem_id       = ACPI_OEM_ID, 
+        .oem_table_id = ACPI_OEM_TABLE_ID,
+        .oem_revision = ACPI_OEM_REVISION,
+        .creator_id   = ACPI_CREATOR_ID,
+        .creator_revision = ACPI_CREATOR_REVISION
+    },
+    .flags = ACPI_WAET_FLAGS
+};
+
 /*
  * Local variables:
  * mode: C
