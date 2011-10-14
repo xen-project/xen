@@ -1463,7 +1463,7 @@ void disable_IO_APIC(void)
 static void __init setup_ioapic_ids_from_mpc(void)
 {
     union IO_APIC_reg_00 reg_00;
-    physid_mask_t phys_id_present_map;
+    static physid_mask_t __initdata phys_id_present_map;
     int apic;
     int i;
     unsigned char old_id;
@@ -1481,7 +1481,7 @@ static void __init setup_ioapic_ids_from_mpc(void)
      * This is broken; anything with a real cpu count has to
      * circumvent this idiocy regardless.
      */
-    phys_id_present_map = ioapic_phys_id_map(phys_cpu_present_map);
+    ioapic_phys_id_map(&phys_id_present_map);
 
     /*
      * Set the IOAPIC ID to the value stored in the MPC table.
@@ -1508,7 +1508,7 @@ static void __init setup_ioapic_ids_from_mpc(void)
          * system must have a unique ID or we get lots of nice
          * 'stuck on smp_invalidate_needed IPI wait' messages.
          */
-        if (check_apicid_used(phys_id_present_map,
+        if (check_apicid_used(&phys_id_present_map,
                               mp_ioapics[apic].mpc_apicid)) {
             printk(KERN_ERR "BIOS bug, IO-APIC#%d ID %d is already used!...\n",
                    apic, mp_ioapics[apic].mpc_apicid);
@@ -1519,17 +1519,13 @@ static void __init setup_ioapic_ids_from_mpc(void)
                 panic("Max APIC ID exceeded!\n");
             printk(KERN_ERR "... fixing up to %d. (tell your hw vendor)\n",
                    i);
-            physid_set(i, phys_id_present_map);
             mp_ioapics[apic].mpc_apicid = i;
         } else {
-            physid_mask_t tmp;
-            tmp = apicid_to_cpu_present(mp_ioapics[apic].mpc_apicid);
             apic_printk(APIC_VERBOSE, "Setting %d in the "
                         "phys_id_present_map\n",
                         mp_ioapics[apic].mpc_apicid);
-            physids_or(phys_id_present_map, phys_id_present_map, tmp);
         }
-
+        set_apicid(mp_ioapics[apic].mpc_apicid, &phys_id_present_map);
 
         /*
          * We need to adjust the IRQ routing table
@@ -2195,7 +2191,6 @@ int __init io_apic_get_unique_id (int ioapic, int apic_id)
 {
     union IO_APIC_reg_00 reg_00;
     static physid_mask_t __initdata apic_id_map = PHYSID_MASK_NONE;
-    physid_mask_t tmp;
     unsigned long flags;
     int i = 0;
 
@@ -2209,7 +2204,7 @@ int __init io_apic_get_unique_id (int ioapic, int apic_id)
      */
 
     if (physids_empty(apic_id_map))
-        apic_id_map = ioapic_phys_id_map(phys_cpu_present_map);
+        ioapic_phys_id_map(&apic_id_map);
 
     spin_lock_irqsave(&ioapic_lock, flags);
     reg_00.raw = io_apic_read(ioapic, 0);
@@ -2225,10 +2220,10 @@ int __init io_apic_get_unique_id (int ioapic, int apic_id)
      * Every APIC in a system must have a unique ID or we get lots of nice 
      * 'stuck on smp_invalidate_needed IPI wait' messages.
      */
-    if (check_apicid_used(apic_id_map, apic_id)) {
+    if (check_apicid_used(&apic_id_map, apic_id)) {
 
         for (i = 0; i < get_physical_broadcast(); i++) {
-            if (!check_apicid_used(apic_id_map, i))
+            if (!check_apicid_used(&apic_id_map, i))
                 break;
         }
 
@@ -2241,8 +2236,7 @@ int __init io_apic_get_unique_id (int ioapic, int apic_id)
         apic_id = i;
     } 
 
-    tmp = apicid_to_cpu_present(apic_id);
-    physids_or(apic_id_map, apic_id_map, tmp);
+    set_apicid(apic_id, &apic_id_map);
 
     if (reg_00.bits.ID != apic_id) {
         reg_00.bits.ID = apic_id;

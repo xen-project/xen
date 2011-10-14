@@ -89,7 +89,6 @@ static int __devinit MP_processor_info_x(struct mpc_config_processor *m,
 					 u32 apicidx, bool_t hotplug)
 {
  	int ver, apicid, cpu = 0;
-	physid_mask_t phys_cpu;
  	
 	if (!(m->mpc_cpuflag & CPU_ENABLED))
 		return -EINVAL;
@@ -114,8 +113,7 @@ static int __devinit MP_processor_info_x(struct mpc_config_processor *m,
 	}
 	apic_version[apicid] = ver;
 
-	phys_cpu = apicid_to_cpu_present(apicid);
-	physids_or(phys_cpu_present_map, phys_cpu_present_map, phys_cpu);
+	set_apicid(apicid, &phys_cpu_present_map);
 
 	if (num_processors >= NR_CPUS) {
 		printk(KERN_WARNING "WARNING: NR_CPUS limit of %i reached."

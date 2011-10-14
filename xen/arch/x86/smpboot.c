@@ -752,7 +752,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
     {
         printk(KERN_NOTICE "SMP motherboard not detected.\n");
     init_uniprocessor:
-        phys_cpu_present_map = physid_mask_of_physid(0);
+        physids_clear(phys_cpu_present_map);
+        physid_set(0, phys_cpu_present_map);
         if (APIC_init_uniprocessor())
             printk(KERN_NOTICE "Local APIC not detected."
                    " Using dummy APIC emulation.\n");
@@ -767,7 +768,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
      * CPU too, but we do it for the sake of robustness anyway.
      * Makes no sense to do this check in clustered apic mode, so skip it
      */
-    if ( !check_phys_apicid_present(boot_cpu_physical_apicid) )
+    if ( !check_apicid_present(boot_cpu_physical_apicid) )
     {
         printk("weird, boot CPU (#%d) not listed by the BIOS.\n",
                boot_cpu_physical_apicid);

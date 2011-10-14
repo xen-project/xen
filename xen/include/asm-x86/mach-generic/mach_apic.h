@@ -58,29 +58,24 @@ static inline int apic_id_registered(void)
 			    phys_cpu_present_map);
 }
 
-static inline physid_mask_t ioapic_phys_id_map(physid_mask_t phys_map)
+static inline void ioapic_phys_id_map(physid_mask_t *map)
 {
-	return phys_map;
+	*map = phys_cpu_present_map;
 }
 
-static inline unsigned long check_apicid_used(physid_mask_t bitmap, int apicid)
+static inline int check_apicid_used(const physid_mask_t *map, int apicid)
 {
-	return physid_isset(apicid, bitmap);
+	return physid_isset(apicid, *map);
 }
 
-static inline unsigned long check_apicid_present(int apicid)
+static inline int check_apicid_present(int apicid)
 {
 	return physid_isset(apicid, phys_cpu_present_map);
 }
 
-static inline int check_phys_apicid_present(int boot_cpu_physical_apicid)
+static inline void set_apicid(int phys_apicid, physid_mask_t *map)
 {
-	return physid_isset(boot_cpu_physical_apicid, phys_cpu_present_map);
-}
-
-static inline physid_mask_t apicid_to_cpu_present(int phys_apicid)
-{
-	return physid_mask_of_physid(phys_apicid);
+	physid_set(phys_apicid, *map);
 }
 
 #endif /* __ASM_MACH_APIC_H */
