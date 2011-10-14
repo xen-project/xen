@@ -71,7 +71,6 @@ boolean_param("hap_2mb", opt_hap_2mb);
 /* Init the datastructures for later use by the p2m code */
 static void p2m_initialise(struct domain *d, struct p2m_domain *p2m)
 {
-    memset(p2m, 0, sizeof(*p2m));
     mm_lock_init(&p2m->lock);
     INIT_LIST_HEAD(&p2m->np2m_list);
     INIT_PAGE_LIST_HEAD(&p2m->pages);
@@ -100,7 +99,7 @@ p2m_init_nestedp2m(struct domain *d)
 
     mm_lock_init(&d->arch.nested_p2m_lock);
     for (i = 0; i < MAX_NESTEDP2M; i++) {
-        d->arch.nested_p2m[i] = p2m = xmalloc(struct p2m_domain);
+        d->arch.nested_p2m[i] = p2m = xzalloc(struct p2m_domain);
         if (p2m == NULL)
             return -ENOMEM;
         p2m_initialise(d, p2m);
@@ -115,7 +114,7 @@ int p2m_init(struct domain *d)
 {
     struct p2m_domain *p2m;
 
-    p2m_get_hostp2m(d) = p2m = xmalloc(struct p2m_domain);
+    p2m_get_hostp2m(d) = p2m = xzalloc(struct p2m_domain);
     if ( p2m == NULL )
         return -ENOMEM;
     p2m_initialise(d, p2m);
