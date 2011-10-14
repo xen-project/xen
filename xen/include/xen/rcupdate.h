@@ -57,60 +57,6 @@ struct rcu_head {
 } while (0)
 
 
-
-/* Global control variables for rcupdate callback mechanism. */
-struct rcu_ctrlblk {
-    long cur;           /* Current batch number.                      */
-    long completed;     /* Number of the last completed batch         */
-    int  next_pending;  /* Is the next batch already waiting?         */
-
-    spinlock_t  lock __cacheline_aligned;
-    cpumask_t   cpumask; /* CPUs that need to switch in order    */
-    /* for current batch to proceed.        */
-} __cacheline_aligned;
-
-/* Is batch a before batch b ? */
-static inline int rcu_batch_before(long a, long b)
-{
-    return (a - b) < 0;
-}
-
-/* Is batch a after batch b ? */
-static inline int rcu_batch_after(long a, long b)
-{
-    return (a - b) > 0;
-}
-
-/*
- * Per-CPU data for Read-Copy Update.
- * nxtlist - new callbacks are added here
- * curlist - current batch for which quiescent cycle started if any
- */
-struct rcu_data {
-    /* 1) quiescent state handling : */
-    long quiescbatch;    /* Batch # for grace period */
-    int  qs_pending;     /* core waits for quiesc state */
-
-    /* 2) batch handling */
-    long            batch;            /* Batch # for current RCU batch */
-    struct rcu_head *nxtlist;
-    struct rcu_head **nxttail;
-    long            qlen;             /* # of queued callbacks */
-    struct rcu_head *curlist;
-    struct rcu_head **curtail;
-    struct rcu_head *donelist;
-    struct rcu_head **donetail;
-    long            blimit;           /* Upper limit on a processed batch */
-    int cpu;
-    struct rcu_head barrier;
-#ifdef CONFIG_SMP
-    long            last_rs_qlen;     /* qlen during the last resched */
-#endif
-};
-
-DECLARE_PER_CPU(struct rcu_data, rcu_data);
-extern struct rcu_ctrlblk rcu_ctrlblk;
-
 int rcu_pending(int cpu);
 int rcu_needs_cpu(int cpu);
 
