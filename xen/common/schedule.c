@@ -754,14 +754,14 @@ static long domain_watchdog(struct domain *d, uint32_t id, uint32_t timeout)
             break;
         }
         spin_unlock(&d->watchdog_lock);
-        return id == NR_DOMAIN_WATCHDOG_TIMERS ? -EEXIST : id + 1;
+        return id == NR_DOMAIN_WATCHDOG_TIMERS ? -ENOSPC : id + 1;
     }
 
     id -= 1;
     if ( !test_bit(id, &d->watchdog_inuse_map) )
     {
         spin_unlock(&d->watchdog_lock);
-        return -EEXIST;
+        return -EINVAL;
     }
 
     if ( timeout == 0 )
