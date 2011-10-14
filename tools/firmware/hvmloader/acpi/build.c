@@ -186,8 +186,7 @@ static struct acpi_20_hpet *construct_hpet(void)
     hpet->addr.address        = ACPI_HPET_ADDRESS;
 
     hpet->header.length = sizeof(*hpet);
-    set_checksum(hpet, offsetof(struct acpi_header, checksum),
-                 hpet->header.length = sizeof(*hpet));
+    set_checksum(hpet, offsetof(struct acpi_header, checksum), sizeof(*hpet));
     return hpet;
 }
 
