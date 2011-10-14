@@ -124,7 +124,6 @@ struct _cpuid4_info {
 	union _cpuid4_leaf_ebx ebx;
 	union _cpuid4_leaf_ecx ecx;
 	unsigned long size;
-	cpumask_t shared_cpu_map;
 };
 
 unsigned short			num_cache_leaves;
