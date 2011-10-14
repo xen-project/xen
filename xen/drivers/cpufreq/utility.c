@@ -458,8 +458,8 @@ int __cpufreq_set_policy(struct cpufreq_policy *data,
                                  data->governor->name);
 
             /* new governor failed, so re-start old one */
+            data->governor = old_gov;
             if (old_gov) {
-                data->governor = old_gov;
                 __cpufreq_governor(data, CPUFREQ_GOV_START);
                 printk(KERN_WARNING "Still stay at %s governor\n",
                                      data->governor->name);

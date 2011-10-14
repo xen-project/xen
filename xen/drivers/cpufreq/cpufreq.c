@@ -176,8 +176,10 @@ int cpufreq_add_cpu(unsigned int cpu)
 
     if (!domexist || hw_all) {
         policy = xzalloc(struct cpufreq_policy);
-        if (!policy)
+        if (!policy) {
             ret = -ENOMEM;
+            goto err0;
+        }
 
         policy->cpu = cpu;
         per_cpu(cpufreq_cpu_policy, cpu) = policy;
@@ -186,7 +188,7 @@ int cpufreq_add_cpu(unsigned int cpu)
         if (ret) {
             xfree(policy);
             per_cpu(cpufreq_cpu_policy, cpu) = NULL;
-            return ret;
+            goto err0;
         }
         if (cpufreq_verbose)
             printk("CPU %u initialization completed\n", cpu);
@@ -243,7 +245,7 @@ err1:
         cpufreq_driver->exit(policy);
         xfree(policy);
     }
-
+err0:
     if (cpus_empty(cpufreq_dom->map)) {
         list_del(&cpufreq_dom->node);
         xfree(cpufreq_dom);
