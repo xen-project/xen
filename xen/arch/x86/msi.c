@@ -123,18 +123,16 @@ static void msix_put_fixmap(struct pci_dev *dev, int idx)
 void msi_compose_msg(struct irq_desc *desc, struct msi_msg *msg)
 {
     unsigned dest;
-    cpumask_t domain;
     struct irq_cfg *cfg = desc->chip_data;
     int vector = cfg->vector;
-    domain = cfg->cpu_mask;
 
-    if ( cpus_empty( domain ) ) {
+    if ( cpus_empty(cfg->cpu_mask) ) {
         dprintk(XENLOG_ERR,"%s, compose msi message error!!\n", __func__);
-	    return;
+        return;
     }
 
     if ( vector ) {
-        dest = cpu_mask_to_apicid(&domain);
+        dest = cpu_mask_to_apicid(&cfg->cpu_mask);
 
         msg->address_hi = MSI_ADDR_BASE_HI;
         msg->address_lo =
