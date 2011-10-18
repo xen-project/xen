@@ -1656,6 +1656,33 @@ static void libxl__device_disk_from_xs_be(libxl__gc *gc,
     disk->format = LIBXL_DISK_FORMAT_UNKNOWN;
 }
 
+int libxl_devid_to_device_disk(libxl_ctx *ctx, uint32_t domid,
+                               const char *devid, libxl_device_disk *disk)
+{
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    char *dompath, *path;
+    int rc = ERROR_FAIL;
+
+    memset(disk, 0, sizeof (libxl_device_disk));
+    dompath = libxl__xs_get_dompath(&gc, domid);
+    if (!dompath) {
+        goto out;
+    }
+    path = libxl__xs_read(&gc, XBT_NULL,
+                          libxl__sprintf(&gc, "%s/device/vbd/%s/backend",
+                                         dompath, devid));
+    if (!path)
+        goto out;
+
+    libxl__device_disk_from_xs_be(&gc, path, disk);
+
+    rc = 0;
+out:
+    libxl__free_all(&gc);
+    return rc;
+}
+
+
 static int libxl__append_disk_list_of_type(libxl__gc *gc,
                                            uint32_t domid,
                                            const char *type,

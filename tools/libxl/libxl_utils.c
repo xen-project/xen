@@ -483,50 +483,6 @@ int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
     return rc;
 }
 
-int libxl_devid_to_device_disk(libxl_ctx *ctx, uint32_t domid,
-                               const char *devid, libxl_device_disk *disk)
-{
-    libxl__gc gc = LIBXL_INIT_GC(ctx);
-    char *val;
-    char *dompath, *diskpath, *be_path;
-    unsigned int devid_n;
-    int rc = ERROR_INVAL;
-
-    devid_n = libxl__device_disk_dev_number(devid, NULL, NULL);
-    if (devid_n < 0) {
-        goto out;
-    }
-    rc = ERROR_FAIL;
-    dompath = libxl__xs_get_dompath(&gc, domid);
-    diskpath = libxl__sprintf(&gc, "%s/device/vbd/%d", dompath, devid_n);
-    if (!diskpath) {
-        goto out;
-    }
-
-    val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/backend-id", diskpath));
-    if (!val)
-        goto out;
-    disk->backend_domid = strtoul(val, NULL, 10);
-    be_path = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/backend", diskpath));
-    disk->pdev_path = xs_read(ctx->xsh, XBT_NULL,
-                              libxl__sprintf(&gc, "%s/params", be_path), NULL);
-    val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/type", be_path));
-    libxl_string_to_backend(ctx, val, &(disk->backend));
-    disk->vdev = xs_read(ctx->xsh, XBT_NULL,
-                         libxl__sprintf(&gc, "%s/dev", be_path), NULL);
-    val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/removable", be_path));
-    disk->removable = !strcmp(val, "1");
-    val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/mode", be_path));
-    disk->readwrite = !!strcmp(val, "w");
-    val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/device-type", diskpath));
-    disk->is_cdrom = !strcmp(val, "cdrom");
-    rc = 0;
-
-out:
-    libxl__free_all(&gc);
-    return rc;
-}
-
 int libxl_cpumap_alloc(libxl_ctx *ctx, libxl_cpumap *cpumap)
 {
     int max_cpus;
