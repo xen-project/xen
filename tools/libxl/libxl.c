@@ -1896,10 +1896,9 @@ out:
 }
 
 /******************************************************************************/
-void libxl_device_vfb_init(libxl_device_vfb *vfb, int dev_num)
+int libxl_device_vfb_init(libxl_ctx *ctx, libxl_device_vfb *vfb)
 {
     memset(vfb, 0x00, sizeof(libxl_device_vfb));
-    vfb->devid = dev_num;
     vfb->display = NULL;
     vfb->xauthority = NULL;
     vfb->vnc = 1;
@@ -1910,6 +1909,20 @@ void libxl_device_vfb_init(libxl_device_vfb *vfb, int dev_num)
     vfb->keymap = NULL;
     vfb->sdl = 0;
     vfb->opengl = 0;
+    return 0;
+}
+
+static int libxl__device_from_vfb(libxl__gc *gc, uint32_t domid,
+                                  libxl_device_vfb *vfb,
+                                  libxl__device *device)
+{
+    device->backend_devid = vfb->devid;
+    device->backend_domid = vfb->backend_domid;
+    device->backend_kind = LIBXL__DEVICE_KIND_VFB;
+    device->devid = vfb->devid;
+    device->domid = domid;
+    device->kind = LIBXL__DEVICE_KIND_VFB;
+    return 0;
 }
 
 int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb)
@@ -1931,12 +1944,8 @@ int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb)
         goto out_free;
     }
 
-    device.backend_devid = vfb->devid;
-    device.backend_domid = vfb->backend_domid;
-    device.backend_kind = LIBXL__DEVICE_KIND_VFB;
-    device.devid = vfb->devid;
-    device.domid = domid;
-    device.kind = LIBXL__DEVICE_KIND_VFB;
+    rc = libxl__device_from_vfb(&gc, domid, vfb, &device);
+    if (rc != 0) goto out_free;
 
     flexarray_append_pair(back, "frontend-id", libxl__sprintf(&gc, "%d", domid));
     flexarray_append_pair(back, "online", "1");
@@ -1966,6 +1975,38 @@ int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb)
 out_free:
     flexarray_free(front);
     flexarray_free(back);
+out:
+    libxl__free_all(&gc);
+    return rc;
+}
+
+int libxl_device_vfb_remove(libxl_ctx *ctx, uint32_t domid,
+                            libxl_device_vfb *vfb)
+{
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    libxl__device device;
+    int rc;
+
+    rc = libxl__device_from_vfb(&gc, domid, vfb, &device);
+    if (rc != 0) goto out;
+
+    rc = libxl__device_remove(&gc, &device, 1);
+out:
+    libxl__free_all(&gc);
+    return rc;
+}
+
+int libxl_device_vfb_destroy(libxl_ctx *ctx, uint32_t domid,
+                                  libxl_device_vfb *vfb)
+{
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    libxl__device device;
+    int rc;
+
+    rc = libxl__device_from_vfb(&gc, domid, vfb, &device);
+    if (rc != 0) goto out;
+
+    rc = libxl__device_destroy(&gc, &device);
 out:
     libxl__free_all(&gc);
     return rc;

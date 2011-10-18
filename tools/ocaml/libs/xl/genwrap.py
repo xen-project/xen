@@ -22,10 +22,7 @@ DEVICE_FUNCTIONS = [ ("add",            ["t", "domid", "unit"]),
                    ]
 
 functions = { # ( name , [type1,type2,....] )
-    "device_vfb":     [ ("add",            ["t", "domid", "unit"]),
-                        ("clean_shutdown", ["domid", "unit"]),
-                        ("hard_shutdown",  ["domid", "unit"]),
-                      ],
+    "device_vfb":     DEVICE_FUNCTIONS,
     "device_vkb":     DEVICE_FUNCTIONS,
     "device_disk":    DEVICE_FUNCTIONS,
     "device_nic":     DEVICE_FUNCTIONS,
