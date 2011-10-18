@@ -144,10 +144,10 @@ typedef uint8_t libxl_mac[6];
 #define LIBXL_MAC_BYTES(mac) mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]
 
 typedef char **libxl_string_list;
-void libxl_string_list_destroy(libxl_string_list *sl);
+void libxl_string_list_dispose(libxl_string_list *sl);
 
 typedef char **libxl_key_value_list;
-void libxl_key_value_list_destroy(libxl_key_value_list *kvl);
+void libxl_key_value_list_dispose(libxl_key_value_list *kvl);
 
 typedef uint32_t libxl_hwcap[8];
 
@@ -155,14 +155,14 @@ typedef struct {
     uint32_t size;          /* number of bytes in map */
     uint8_t *map;
 } libxl_cpumap;
-void libxl_cpumap_destroy(libxl_cpumap *map);
+void libxl_cpumap_dispose(libxl_cpumap *map);
 
 typedef struct {
     uint32_t entries;
     uint32_t *array;
 } libxl_cpuarray;
 #define LIBXL_CPUARRAY_INVALID_ENTRY  ~0
-void libxl_cpuarray_destroy(libxl_cpuarray *array);
+void libxl_cpuarray_dispose(libxl_cpuarray *array);
 
 typedef struct {
     /*
@@ -174,7 +174,7 @@ typedef struct {
     void * data;
     size_t size;
 } libxl_file_reference;
-void libxl_file_reference_destroy(libxl_file_reference *p);
+void libxl_file_reference_dispose(libxl_file_reference *p);
 
 /* libxl_cpuid_policy_list is a dynamic array storing CPUID policies
  * for multiple leafs. It is terminated with an entry holding
@@ -182,7 +182,7 @@ void libxl_file_reference_destroy(libxl_file_reference *p);
  */
 typedef struct libxl__cpuid_policy libxl_cpuid_policy;
 typedef libxl_cpuid_policy * libxl_cpuid_policy_list;
-void libxl_cpuid_destroy(libxl_cpuid_policy_list *cpuid_list);
+void libxl_cpuid_dispose(libxl_cpuid_policy_list *cpuid_list);
 
 #define LIBXL_PCI_FUNC_ALL (~0U)
 
@@ -261,7 +261,7 @@ int libxl_init_dm_info(libxl_ctx *ctx,
 typedef int (*libxl_console_ready)(libxl_ctx *ctx, uint32_t domid, void *priv);
 int libxl_domain_create_new(libxl_ctx *ctx, libxl_domain_config *d_config, libxl_console_ready cb, void *priv, uint32_t *domid);
 int libxl_domain_create_restore(libxl_ctx *ctx, libxl_domain_config *d_config, libxl_console_ready cb, void *priv, uint32_t *domid, int restore_fd);
-void libxl_domain_config_destroy(libxl_domain_config *d_config);
+void libxl_domain_config_dispose(libxl_domain_config *d_config);
 int libxl_domain_suspend(libxl_ctx *ctx, libxl_domain_suspend_info *info,
                           uint32_t domid, int fd);
 int libxl_domain_resume(libxl_ctx *ctx, uint32_t domid);

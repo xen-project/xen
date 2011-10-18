@@ -8,13 +8,13 @@ namespace("libxl_")
 libxl_domid = Builtin("domid", json_fn = "yajl_gen_integer", autogenerate_json = False)
 libxl_uuid = Builtin("uuid", passby=PASS_BY_REFERENCE)
 libxl_mac = Builtin("mac", passby=PASS_BY_REFERENCE)
-libxl_cpumap = Builtin("cpumap", destructor_fn="libxl_cpumap_destroy", passby=PASS_BY_REFERENCE)
-libxl_cpuarray = Builtin("cpuarray", destructor_fn="libxl_cpuarray_destroy", passby=PASS_BY_REFERENCE)
-libxl_cpuid_policy_list = Builtin("cpuid_policy_list", destructor_fn="libxl_cpuid_destroy", passby=PASS_BY_REFERENCE)
+libxl_cpumap = Builtin("cpumap", dispose_fn="libxl_cpumap_dispose", passby=PASS_BY_REFERENCE)
+libxl_cpuarray = Builtin("cpuarray", dispose_fn="libxl_cpuarray_dispose", passby=PASS_BY_REFERENCE)
+libxl_cpuid_policy_list = Builtin("cpuid_policy_list", dispose_fn="libxl_cpuid_dispose", passby=PASS_BY_REFERENCE)
 
-libxl_string_list = Builtin("string_list", destructor_fn="libxl_string_list_destroy", passby=PASS_BY_REFERENCE)
-libxl_key_value_list = Builtin("key_value_list", destructor_fn="libxl_key_value_list_destroy", passby=PASS_BY_REFERENCE)
-libxl_file_reference = Builtin("file_reference", destructor_fn="libxl_file_reference_destroy", passby=PASS_BY_REFERENCE)
+libxl_string_list = Builtin("string_list", dispose_fn="libxl_string_list_dispose", passby=PASS_BY_REFERENCE)
+libxl_key_value_list = Builtin("key_value_list", dispose_fn="libxl_key_value_list_dispose", passby=PASS_BY_REFERENCE)
+libxl_file_reference = Builtin("file_reference", dispose_fn="libxl_file_reference_dispose", passby=PASS_BY_REFERENCE)
 
 libxl_hwcap = Builtin("hwcap", passby=PASS_BY_REFERENCE)
 
@@ -109,7 +109,7 @@ SHUTDOWN_* constant."""),
     ("cpu_time",    uint64),
     ("vcpu_max_id", uint32),
     ("vcpu_online", uint32),
-    ], destructor_fn=None)
+    ], dispose_fn=None)
 
 libxl_cpupoolinfo = Struct("cpupoolinfo", [
     ("poolid",      uint32),
@@ -121,7 +121,7 @@ libxl_cpupoolinfo = Struct("cpupoolinfo", [
 libxl_vminfo = Struct("vminfo", [
     ("uuid", libxl_uuid),
     ("domid", libxl_domid),
-    ], destructor_fn=None)
+    ], dispose_fn=None)
 
 libxl_version_info = Struct("version_info", [
     ("xen_version_major", integer),
@@ -362,7 +362,7 @@ libxl_physinfo = Struct("physinfo", [
     ("nr_nodes", uint32),
     ("hw_cap", libxl_hwcap),
     ("phys_cap", uint32),
-    ], destructor_fn=None, dir=DIR_OUT)
+    ], dispose_fn=None, dir=DIR_OUT)
 
 libxl_topologyinfo = Struct("topologyinfo", [
     ("coremap", libxl_cpuarray,   False, "cpu to core map"),
@@ -373,4 +373,4 @@ libxl_topologyinfo = Struct("topologyinfo", [
 libxl_sched_credit = Struct("sched_credit", [
     ("weight", integer),
     ("cap", integer),
-    ], destructor_fn=None)
+    ], dispose_fn=None)

@@ -100,8 +100,8 @@ def py_attrib_set(ty, f):
 
 def py_object_def(ty):
     l = []
-    if ty.destructor_fn is not None:
-        dtor = '    %s(&self->obj);\n'%ty.destructor_fn
+    if ty.dispose_fn is not None:
+        dtor = '    %s(&self->obj);\n'%ty.dispose_fn
     else:
         dtor = ''
 

@@ -87,12 +87,12 @@ int libxl_ctx_free(libxl_ctx *ctx)
 {
     if (!ctx) return 0;
     if (ctx->xch) xc_interface_close(ctx->xch);
-    libxl_version_info_destroy(&ctx->version_info);
+    libxl_version_info_dispose(&ctx->version_info);
     if (ctx->xsh) xs_daemon_close(ctx->xsh);
     return 0;
 }
 
-void libxl_string_list_destroy(libxl_string_list *psl)
+void libxl_string_list_dispose(libxl_string_list *psl)
 {
     int i;
     libxl_string_list sl = *psl;
@@ -105,7 +105,7 @@ void libxl_string_list_destroy(libxl_string_list *psl)
     free(sl);
 }
 
-void libxl_key_value_list_destroy(libxl_key_value_list *pkvl)
+void libxl_key_value_list_dispose(libxl_key_value_list *pkvl)
 {
     int i;
     libxl_key_value_list kvl = *pkvl;
@@ -767,7 +767,7 @@ int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid, int force)
         libxl__qmp_cleanup(&gc, domid);
     }
     if (libxl__devices_destroy(&gc, domid, force) < 0)
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "libxl_destroy_devices failed for %d", domid);
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "libxl_devices_dispose failed for %d", domid);
 
     vm_path = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/vm", dom_path));
     if (vm_path)
@@ -1641,7 +1641,7 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk)
     }
 out:
     for (i = 0; i < num; i++)
-        libxl_device_disk_destroy(&disks[i]);
+        libxl_device_disk_dispose(&disks[i]);
     free(disks);
     return ret;
 }
@@ -2241,7 +2241,7 @@ fail:
     xc_hypercall_buffer_free(ctx->xch, coremap);
     xc_hypercall_buffer_free(ctx->xch, socketmap);
     xc_hypercall_buffer_free(ctx->xch, nodemap);
-    libxl_topologyinfo_destroy(info);
+    libxl_topologyinfo_dispose(info);
     return ERROR_FAIL;
 }
 
@@ -2722,7 +2722,7 @@ int libxl_tmem_freeable(libxl_ctx *ctx)
     return rc;
 }
 
-void libxl_file_reference_destroy(libxl_file_reference *f)
+void libxl_file_reference_dispose(libxl_file_reference *f)
 {
     libxl__file_reference_unmap(f);
     free(f->path);
@@ -2852,7 +2852,7 @@ int libxl_destroy_cpupool(libxl_ctx *ctx, uint32_t poolid)
     rc = 0;
 
 out1:
-    libxl_cpumap_destroy(&cpumap);
+    libxl_cpumap_dispose(&cpumap);
 out:
     xc_cpupool_infofree(ctx->xch, info);
     libxl__free_all(&gc);
@@ -2941,10 +2941,10 @@ int libxl_cpupool_cpuadd_node(libxl_ctx *ctx, uint32_t poolid, int node, int *cp
         }
     }
 
-    libxl_topologyinfo_destroy(&topology);
+    libxl_topologyinfo_dispose(&topology);
 
 out:
-    libxl_cpumap_destroy(&freemap);
+    libxl_cpumap_dispose(&freemap);
     return rc;
 }
 
@@ -2993,11 +2993,11 @@ int libxl_cpupool_cpuremove_node(libxl_ctx *ctx, uint32_t poolid, int node, int 
         }
     }
 
-    libxl_topologyinfo_destroy(&topology);
+    libxl_topologyinfo_dispose(&topology);
 
 out:
     for (p = 0; p < n_pools; p++) {
-        libxl_cpupoolinfo_destroy(poolinfo + p);
+        libxl_cpupoolinfo_dispose(poolinfo + p);
     }
 
     return ret;

@@ -246,7 +246,7 @@ int attrib__libxl_hwcap_set(PyObject *v, libxl_hwcap *pptr)
 int attrib__libxl_key_value_list_set(PyObject *v, libxl_key_value_list *pptr)
 {
     if ( *pptr ) {
-        libxl_key_value_list_destroy(pptr);
+        libxl_key_value_list_dispose(pptr);
         *pptr = NULL;
     }
     if ( v == Py_None )

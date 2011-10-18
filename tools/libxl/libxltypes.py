@@ -44,11 +44,11 @@ class Type(object):
             self.rawname = typename
 
         if self.typename is not None:
-            self.destructor_fn = kwargs.setdefault('destructor_fn', self.typename + "_destroy")
+            self.dispose_fn = kwargs.setdefault('dispose_fn', self.typename + "_dispose")
         else:
-            self.destructor_fn = kwargs.setdefault('destructor_fn', None)
+            self.dispose_fn = kwargs.setdefault('dispose_fn', None)
 
-        self.autogenerate_destructor = kwargs.setdefault('autogenerate_destructor', True)
+        self.autogenerate_dispose_fn = kwargs.setdefault('autogenerate_dispose_fn', True)
 
         if self.typename is not None:
             self.json_fn = kwargs.setdefault('json_fn', self.typename + "_gen_json")
@@ -88,15 +88,15 @@ class Type(object):
 class Builtin(Type):
     """Builtin type"""
     def __init__(self, typename, **kwargs):
-        kwargs.setdefault('destructor_fn', None)
-        kwargs.setdefault('autogenerate_destructor', False)
+        kwargs.setdefault('dispose_fn', None)
+        kwargs.setdefault('autogenerate_dispose_fn', False)
         kwargs.setdefault('autogenerate_json', False)
         Type.__init__(self, typename, **kwargs)
 
 class Number(Builtin):
     def __init__(self, ctype, **kwargs):
         kwargs.setdefault('namespace', None)
-        kwargs.setdefault('destructor_fn', None)
+        kwargs.setdefault('dispose_fn', None)
         kwargs.setdefault('signed', False)
         kwargs.setdefault('json_fn', "yajl_gen_integer")
         self.signed = kwargs['signed']
@@ -105,7 +105,7 @@ class Number(Builtin):
 class UInt(Number):
     def __init__(self, w, **kwargs):
         kwargs.setdefault('namespace', None)
-        kwargs.setdefault('destructor_fn', None)
+        kwargs.setdefault('dispose_fn', None)
         Number.__init__(self, "uint%d_t" % w, **kwargs)
 
         self.width = w
@@ -122,7 +122,7 @@ class EnumerationValue(object):
 
 class Enumeration(Type):
     def __init__(self, typename, values, **kwargs):
-        kwargs.setdefault('destructor_fn', None)
+        kwargs.setdefault('dispose_fn', None)
         Type.__init__(self, typename, **kwargs)
 
         self.values = []
@@ -205,7 +205,7 @@ class Union(Aggregate):
         # union therefore any specific instance of this class will
         # need to provide an explicit destructor function.
         kwargs.setdefault('passby', PASS_BY_REFERENCE)
-        kwargs.setdefault('destructor_fn', None)
+        kwargs.setdefault('dispose_fn', None)
         Aggregate.__init__(self, "union", name, fields, **kwargs)
 
 class KeyedUnion(Aggregate):
@@ -244,7 +244,7 @@ uint16 = UInt(16)
 uint32 = UInt(32)
 uint64 = UInt(64)
 
-string = Builtin("char *", namespace = None, destructor_fn = "free",
+string = Builtin("char *", namespace = None, dispose_fn = "free",
                  json_fn = "libxl__string_gen_json",
                  autogenerate_json = False)
 

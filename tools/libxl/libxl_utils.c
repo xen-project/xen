@@ -157,7 +157,7 @@ int libxl_name_to_cpupoolid(libxl_ctx *ctx, const char *name,
             }
             free(poolname);
         }
-        libxl_cpupoolinfo_destroy(poolinfo + i);
+        libxl_cpupoolinfo_dispose(poolinfo + i);
     }
     free(poolinfo);
     return ret;
@@ -478,7 +478,7 @@ int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
     }
 
     for (i=0; i<nb; i++)
-        libxl_nicinfo_destroy(&nics[i]);
+        libxl_nicinfo_dispose(&nics[i]);
     free(nics);
     return rc;
 }
@@ -579,7 +579,7 @@ int libxl_cpumap_alloc(libxl_ctx *ctx, libxl_cpumap *cpumap)
     return 0;
 }
 
-void libxl_cpumap_destroy(libxl_cpumap *map)
+void libxl_cpumap_dispose(libxl_cpumap *map)
 {
     free(map->map);
 }
@@ -624,7 +624,7 @@ int libxl_cpuarray_alloc(libxl_ctx *ctx, libxl_cpuarray *cpuarray)
     return 0;
 }
 
-void libxl_cpuarray_destroy(libxl_cpuarray *array)
+void libxl_cpuarray_dispose(libxl_cpuarray *array)
 {
     free(array->array);
 }

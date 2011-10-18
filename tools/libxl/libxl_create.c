@@ -31,33 +31,33 @@
 #include "libxl_internal.h"
 #include "flexarray.h"
 
-void libxl_domain_config_destroy(libxl_domain_config *d_config)
+void libxl_domain_config_dispose(libxl_domain_config *d_config)
 {
     int i;
 
     for (i=0; i<d_config->num_disks; i++)
-        libxl_device_disk_destroy(&d_config->disks[i]);
+        libxl_device_disk_dispose(&d_config->disks[i]);
     free(d_config->disks);
 
     for (i=0; i<d_config->num_vifs; i++)
-        libxl_device_nic_destroy(&d_config->vifs[i]);
+        libxl_device_nic_dispose(&d_config->vifs[i]);
     free(d_config->vifs);
 
     for (i=0; i<d_config->num_pcidevs; i++)
-        libxl_device_pci_destroy(&d_config->pcidevs[i]);
+        libxl_device_pci_dispose(&d_config->pcidevs[i]);
     free(d_config->pcidevs);
 
     for (i=0; i<d_config->num_vfbs; i++)
-        libxl_device_vfb_destroy(&d_config->vfbs[i]);
+        libxl_device_vfb_dispose(&d_config->vfbs[i]);
     free(d_config->vfbs);
 
     for (i=0; i<d_config->num_vkbs; i++)
-        libxl_device_vkb_destroy(&d_config->vkbs[i]);
+        libxl_device_vkb_dispose(&d_config->vkbs[i]);
     free(d_config->vkbs);
 
-    libxl_domain_create_info_destroy(&d_config->c_info);
-    libxl_domain_build_info_destroy(&d_config->b_info);
-    libxl_device_model_info_destroy(&d_config->dm_info);
+    libxl_domain_create_info_dispose(&d_config->c_info);
+    libxl_domain_build_info_dispose(&d_config->b_info);
+    libxl_device_model_info_dispose(&d_config->dm_info);
 }
 
 int libxl_init_create_info(libxl_ctx *ctx, libxl_domain_create_info *c_info)
@@ -512,7 +512,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
         if ( ret )
             goto error_out;
         libxl__device_console_add(gc, domid, &console, &state);
-        libxl_device_console_destroy(&console);
+        libxl_device_console_dispose(&console);
 
         dm_info->domid = domid;
         ret = libxl__create_device_model(gc, dm_info,
@@ -549,7 +549,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
              console.consback = LIBXL_CONSOLE_BACKEND_IOEMU;
 
         libxl__device_console_add(gc, domid, &console, &state);
-        libxl_device_console_destroy(&console);
+        libxl_device_console_dispose(&console);
 
         if (need_qemu) {
             /* only copy those useful configs */

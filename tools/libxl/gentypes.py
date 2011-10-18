@@ -74,7 +74,7 @@ def libxl_C_type_define(ty, indent = ""):
         raise NotImplementedError("%s" % type(ty))
     return s.replace("\n", "\n%s" % indent)
 
-def libxl_C_type_destroy(ty, v, indent = "    ", parent = None):
+def libxl_C_type_dispose(ty, v, indent = "    ", parent = None):
     s = ""
     if isinstance(ty, libxltypes.KeyedUnion):
         if parent is None:
@@ -83,16 +83,16 @@ def libxl_C_type_destroy(ty, v, indent = "    ", parent = None):
         for f in ty.fields:
             (nparent,fexpr) = ty.member(v, f, parent is None)
             s += "case %s:\n" % f.enumname
-            s += libxl_C_type_destroy(f.type, fexpr, indent + "    ", nparent)
+            s += libxl_C_type_dispose(f.type, fexpr, indent + "    ", nparent)
             s += "    break;\n"
         s += "}\n"
-    elif isinstance(ty, libxltypes.Struct) and (parent is None or ty.destructor_fn is None):
+    elif isinstance(ty, libxltypes.Struct) and (parent is None or ty.dispose_fn is None):
         for f in [f for f in ty.fields if not f.const]:
             (nparent,fexpr) = ty.member(v, f, parent is None)
-            s += libxl_C_type_destroy(f.type, fexpr, "", nparent)
+            s += libxl_C_type_dispose(f.type, fexpr, "", nparent)
     else:
-        if ty.destructor_fn is not None:
-            s += "%s(%s);\n" % (ty.destructor_fn, ty.pass_arg(v, parent is None))
+        if ty.dispose_fn is not None:
+            s += "%s(%s);\n" % (ty.dispose_fn, ty.pass_arg(v, parent is None))
 
     if s != "":
         s = indent + s
@@ -217,8 +217,8 @@ if __name__ == '__main__':
 
     for ty in types:
         f.write(libxl_C_type_define(ty) + ";\n")
-        if ty.destructor_fn is not None:
-            f.write("void %s(%s);\n" % (ty.destructor_fn, ty.make_arg("p")))
+        if ty.dispose_fn is not None:
+            f.write("void %s(%s);\n" % (ty.dispose_fn, ty.make_arg("p")))
         if ty.json_fn is not None:
             f.write("char *%s_to_json(libxl_ctx *ctx, %s);\n" % (ty.typename, ty.make_arg("p")))
         if isinstance(ty, libxltypes.Enumeration):
@@ -277,10 +277,10 @@ if __name__ == '__main__':
 
 """ % " ".join(sys.argv))
 
-    for ty in [t for t in types if t.destructor_fn is not None and t.autogenerate_destructor]:
-        f.write("void %s(%s)\n" % (ty.destructor_fn, ty.make_arg("p")))
+    for ty in [t for t in types if t.dispose_fn is not None and t.autogenerate_dispose_fn]:
+        f.write("void %s(%s)\n" % (ty.dispose_fn, ty.make_arg("p")))
         f.write("{\n")
-        f.write(libxl_C_type_destroy(ty, "p"))
+        f.write(libxl_C_type_dispose(ty, "p"))
         f.write("    memset(p, LIBXL_DTOR_POISON, sizeof(*p));\n")
         f.write("}\n")
         f.write("\n")

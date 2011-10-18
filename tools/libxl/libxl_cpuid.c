@@ -16,7 +16,7 @@
 #include "libxl_osdeps.h"
 #include "libxl_internal.h"
 
-void libxl_cpuid_destroy(libxl_cpuid_policy_list *p_cpuid_list)
+void libxl_cpuid_dispose(libxl_cpuid_policy_list *p_cpuid_list)
 {
     int i, j;
     libxl_cpuid_policy_list cpuid_list = *p_cpuid_list;

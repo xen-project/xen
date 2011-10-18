@@ -256,8 +256,8 @@ int main(int argc, char **argv)
         f.write("    printf(\"%%s: %%s\\n\", \"%s\", s);\n" % ty.typename)
         f.write("    if (s == NULL) abort();\n")
         f.write("    free(s);\n")
-        if ty.destructor_fn is not None:
-            f.write("    %s(&%s_val);\n" % (ty.destructor_fn, ty.typename))
+        if ty.dispose_fn is not None:
+            f.write("    %s(&%s_val);\n" % (ty.dispose_fn, ty.typename))
         f.write("\n")
 
     f.write("    printf(\"Testing Enumerations\\n\");\n")

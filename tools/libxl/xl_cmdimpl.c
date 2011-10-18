@@ -1685,7 +1685,7 @@ start:
             case LIBXL_EVENT_TYPE_DISK_EJECT:
                 if (libxl_event_get_disk_eject_info(ctx, domid, &event, &disk)) {
                     libxl_cdrom_insert(ctx, domid, &disk);
-                    libxl_device_disk_destroy(&disk);
+                    libxl_device_disk_dispose(&disk);
                 }
                 break;
         }
@@ -1701,7 +1701,7 @@ out:
     if (logfile != 2)
         close(logfile);
 
-    libxl_domain_config_destroy(&d_config);
+    libxl_domain_config_dispose(&d_config);
 
     free(config_data);
 
@@ -2047,7 +2047,7 @@ static void pcilist(const char *dom)
         printf("%02x.%01x %04x:%02x:%02x.%01x\n",
                (pcidevs[i].vdevfn >> 3) & 0x1f, pcidevs[i].vdevfn & 0x7,
                pcidevs[i].domain, pcidevs[i].bus, pcidevs[i].dev, pcidevs[i].func);
-        libxl_device_pci_destroy(&pcidevs[i]);
+        libxl_device_pci_dispose(&pcidevs[i]);
     }
     free(pcidevs);
 }
@@ -2078,7 +2078,7 @@ static void pcidetach(const char *dom, const char *bdf, int force)
         exit(2);
     }
     libxl_device_pci_remove(ctx, domid, &pcidev, force);
-    libxl_device_pci_destroy(&pcidev);
+    libxl_device_pci_dispose(&pcidev);
 }
 
 int main_pcidetach(int argc, char **argv)
@@ -2115,7 +2115,7 @@ static void pciattach(const char *dom, const char *bdf, const char *vs)
         exit(2);
     }
     libxl_device_pci_add(ctx, domid, &pcidev);
-    libxl_device_pci_destroy(&pcidev);
+    libxl_device_pci_dispose(&pcidev);
 }
 
 int main_pciattach(int argc, char **argv)
@@ -2231,7 +2231,7 @@ static void list_domains_details(const libxl_dominfo *info, int nb_domain)
         memset(&d_config, 0x00, sizeof(d_config));
         parse_config_data(config_file, (char *)data, len, &d_config, &dm_info);
         printf_info(info[i].domid, &d_config, &dm_info);
-        libxl_domain_config_destroy(&d_config);
+        libxl_domain_config_dispose(&d_config);
         free(data);
         free(config_file);
     }
@@ -3323,7 +3323,7 @@ static void print_domain_vcpuinfo(uint32_t domid, uint32_t nr_cpus)
 
     for (i = 0; i < nb_vcpu; i++) {
         print_vcpuinfo(domid, &vcpuinfo[i], nr_cpus);
-        libxl_vcpuinfo_destroy(&vcpuinfo[i]);
+        libxl_vcpuinfo_dispose(&vcpuinfo[i]);
     }
 
     free(vcpuinfo);
@@ -3445,7 +3445,7 @@ static void vcpupin(const char *d, const char *vcpu, char *cpu)
         }
     }
   vcpupin_out1:
-    libxl_cpumap_destroy(&cpumap);
+    libxl_cpumap_dispose(&cpumap);
   vcpupin_out:
     ;
 }
@@ -3485,7 +3485,7 @@ static void vcpuset(const char *d, const char* nr_vcpus)
     if (libxl_set_vcpuonline(ctx, domid, &cpumap) < 0)
         fprintf(stderr, "libxl_set_vcpuonline failed domid=%d max_vcpus=%d\n", domid, max_vcpus);
 
-    libxl_cpumap_destroy(&cpumap);
+    libxl_cpumap_dispose(&cpumap);
 }
 
 int main_vcpuset(int argc, char **argv)
@@ -3609,7 +3609,7 @@ static void output_topologyinfo(void)
 
     printf("numa_info              : none\n");
 
-    libxl_topologyinfo_destroy(&info);
+    libxl_topologyinfo_dispose(&info);
 
     return;
 }
@@ -4018,7 +4018,7 @@ int main_networkattach(int argc, char **argv)
         fprintf(stderr, "libxl_device_nic_add failed.\n");
         return 1;
     }
-    libxl_device_nic_destroy(&nic);
+    libxl_device_nic_dispose(&nic);
     return 0;
 }
 
@@ -4051,7 +4051,7 @@ int main_networklist(int argc, char **argv)
             printf("%6d %5d %6d %5d/%-11d %-30s\n",
                    nics[i].devid, nics[i].state, nics[i].evtch,
                    nics[i].rref_tx, nics[i].rref_rx, nics[i].backend);
-            libxl_nicinfo_destroy(&nics[i]);
+            libxl_nicinfo_dispose(&nics[i]);
         }
         free(nics);
     }
@@ -4086,7 +4086,7 @@ int main_networkdetach(int argc, char **argv)
         fprintf(stderr, "libxl_device_nic_del failed.\n");
         return 1;
     }
-    libxl_device_nic_destroy(&nic);
+    libxl_device_nic_dispose(&nic);
     return 0;
 }
 
@@ -4152,9 +4152,9 @@ int main_blocklist(int argc, char **argv)
                 printf("%-5d %-3d %-6d %-5d %-6d %-8d %-30s\n",
                        diskinfo.devid, diskinfo.backend_id, diskinfo.frontend_id,
                        diskinfo.state, diskinfo.evtch, diskinfo.rref, diskinfo.backend);
-                libxl_diskinfo_destroy(&diskinfo);
+                libxl_diskinfo_dispose(&diskinfo);
             }
-            libxl_device_disk_destroy(&disks[i]);
+            libxl_device_disk_dispose(&disks[i]);
         }
         free(disks);
     }
@@ -4791,7 +4791,7 @@ int main_cpupoolcreate(int argc, char **argv)
             n_nodes++;
         }
 
-        libxl_topologyinfo_destroy(&topology);
+        libxl_topologyinfo_dispose(&topology);
 
         if (n_cpus == 0) {
             fprintf(stderr, "no free cpu found\n");
@@ -4931,7 +4931,7 @@ int main_cpupoollist(int argc, char **argv)
                 printf("\n");
             }
         }
-        libxl_cpupoolinfo_destroy(poolinfo + p);
+        libxl_cpupoolinfo_dispose(poolinfo + p);
     }
 
     return ret;
@@ -5132,7 +5132,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
     poolid = poolinfo[0].poolid;
     schedid = poolinfo[0].sched_id;
     for (p = 0; p < n_pools; p++) {
-        libxl_cpupoolinfo_destroy(poolinfo + p);
+        libxl_cpupoolinfo_dispose(poolinfo + p);
     }
     if (n_pools > 1) {
         fprintf(stderr, "splitting not possible, already cpupools in use\n");
@@ -5146,7 +5146,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
 
     if (libxl_cpumap_alloc(ctx, &cpumap)) {
         fprintf(stderr, "Failed to allocate cpumap\n");
-        libxl_topologyinfo_destroy(&topology);
+        libxl_topologyinfo_dispose(&topology);
         return -ERROR_FAIL;
     }
 
@@ -5229,8 +5229,8 @@ int main_cpupoolnumasplit(int argc, char **argv)
     }
 
 out:
-    libxl_topologyinfo_destroy(&topology);
-    libxl_cpumap_destroy(&cpumap);
+    libxl_topologyinfo_dispose(&topology);
+    libxl_cpumap_dispose(&cpumap);
 
     return ret;
 }
