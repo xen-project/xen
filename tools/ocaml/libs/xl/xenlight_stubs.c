@@ -306,14 +306,17 @@ value stub_xl_device_vkb_add(value info, value domid)
 	CAMLreturn(Val_unit);
 }
 
-value stub_xl_device_vkb_clean_shutdown(value domid)
+value stub_xl_device_vkb_remove(value info, value domid)
 {
 	CAMLparam1(domid);
+	libxl_device_vkb c_info;
 	int ret;
 	INIT_STRUCT();
 
+	device_vkb_val(&gc, &lg, &c_info, info);
+
 	INIT_CTX();
-	ret = libxl_device_vkb_clean_shutdown(ctx, Int_val(domid));
+	ret = libxl_device_vkb_remove(ctx, Int_val(domid), &c_info);
 	if (ret != 0)
 		failwith_xl("vkb_clean_shutdown", &lg);
 	FREE_CTX();
@@ -321,14 +324,17 @@ value stub_xl_device_vkb_clean_shutdown(value domid)
 	CAMLreturn(Val_unit);
 }
 
-value stub_xl_device_vkb_hard_shutdown(value domid)
+value stub_xl_device_vkb_destroy(value info, value domid)
 {
 	CAMLparam1(domid);
+	libxl_device_vkb c_info;
 	int ret;
 	INIT_STRUCT();
 
+	device_vkb_val(&gc, &lg, &c_info, info);
+
 	INIT_CTX();
-	ret = libxl_device_vkb_hard_shutdown(ctx, Int_val(domid));
+	ret = libxl_device_vkb_destroy(ctx, Int_val(domid), &c_info);
 	if (ret != 0)
 		failwith_xl("vkb_hard_shutdown", &lg);
 	FREE_CTX();

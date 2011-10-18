@@ -1586,10 +1586,24 @@ out:
 }
 
 /******************************************************************************/
-void libxl_device_vkb_init(libxl_device_vkb *vkb, int dev_num)
+int libxl_device_vkb_init(libxl_ctx *ctx, libxl_device_vkb *vkb)
 {
     memset(vkb, 0x00, sizeof(libxl_device_vkb));
-    vkb->devid = dev_num;
+    return 0;
+}
+
+static int libxl__device_from_vkb(libxl__gc *gc, uint32_t domid,
+                                  libxl_device_vkb *vkb,
+                                  libxl__device *device)
+{
+    device->backend_devid = vkb->devid;
+    device->backend_domid = vkb->backend_domid;
+    device->backend_kind = LIBXL__DEVICE_KIND_VKBD;
+    device->devid = vkb->devid;
+    device->domid = domid;
+    device->kind = LIBXL__DEVICE_KIND_VKBD;
+
+    return 0;
 }
 
 int libxl_device_vkb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb)
@@ -1611,12 +1625,8 @@ int libxl_device_vkb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb)
         goto out_free;
     }
 
-    device.backend_devid = vkb->devid;
-    device.backend_domid = vkb->backend_domid;
-    device.backend_kind = LIBXL__DEVICE_KIND_VKBD;
-    device.devid = vkb->devid;
-    device.domid = domid;
-    device.kind = LIBXL__DEVICE_KIND_VKBD;
+    rc = libxl__device_from_vkb(&gc, domid, vkb, &device);
+    if (rc != 0) goto out_free;
 
     flexarray_append(back, "frontend-id");
     flexarray_append(back, libxl__sprintf(&gc, "%d", domid));
@@ -1644,14 +1654,36 @@ out:
     return rc;
 }
 
-int libxl_device_vkb_clean_shutdown(libxl_ctx *ctx, uint32_t domid)
+int libxl_device_vkb_remove(libxl_ctx *ctx, uint32_t domid,
+                            libxl_device_vkb *vkb)
 {
-    return ERROR_NI;
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    libxl__device device;
+    int rc;
+
+    rc = libxl__device_from_vkb(&gc, domid, vkb, &device);
+    if (rc != 0) goto out;
+
+    rc = libxl__device_remove(&gc, &device, 1);
+out:
+    libxl__free_all(&gc);
+    return rc;
 }
 
-int libxl_device_vkb_hard_shutdown(libxl_ctx *ctx, uint32_t domid)
+int libxl_device_vkb_destroy(libxl_ctx *ctx, uint32_t domid,
+                                  libxl_device_vkb *vkb)
 {
-    return ERROR_NI;
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    libxl__device device;
+    int rc;
+
+    rc = libxl__device_from_vkb(&gc, domid, vkb, &device);
+    if (rc != 0) goto out;
+
+    rc = libxl__device_destroy(&gc, &device);
+out:
+    libxl__free_all(&gc);
+    return rc;
 }
 
 static void libxl__device_disk_from_xs_be(libxl__gc *gc,
@@ -1937,16 +1969,6 @@ out_free:
 out:
     libxl__free_all(&gc);
     return rc;
-}
-
-int libxl_device_vfb_clean_shutdown(libxl_ctx *ctx, uint32_t domid)
-{
-    return ERROR_NI;
-}
-
-int libxl_device_vfb_hard_shutdown(libxl_ctx *ctx, uint32_t domid)
-{
-    return ERROR_NI;
 }
 
 /******************************************************************************/

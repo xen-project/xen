@@ -857,7 +857,8 @@ skip:
 
             d_config->vkbs = (libxl_device_vkb *) realloc(d_config->vkbs, sizeof(libxl_device_vkb) * (d_config->num_vkbs + 1));
             vkb = d_config->vkbs + d_config->num_vkbs;
-            libxl_device_vkb_init(vkb, d_config->num_vkbs);
+            libxl_device_vkb_init(ctx, vkb);
+            vkb->devid = d_config->num_vkbs;
 
             p = strtok(buf2, ",");
             if (!p)
