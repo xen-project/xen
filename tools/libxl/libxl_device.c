@@ -49,6 +49,25 @@ char *libxl__device_backend_path(libxl__gc *gc, libxl__device *device)
                           device->domid, device->devid);
 }
 
+int libxl__parse_backend_path(libxl__gc *gc,
+                              const char *path,
+                              libxl__device *dev)
+{
+    /* /local/domain/<domid>/backend/<kind>/<domid>/<devid> */
+    char strkind[16]; /* Longest is actually "console" */
+    uint32_t domain;
+    int rc = sscanf(path, "/local/domain/%d/backend/%15[^/]/%d/%d",
+                    &dev->backend_domid,
+                    strkind,
+                    &domain,
+                    &dev->backend_devid);
+
+    if (rc != 4)
+        return ERROR_FAIL;
+
+    return libxl__device_kind_from_string(strkind, &dev->backend_kind);
+}
+
 int libxl__device_generic_add(libxl__gc *gc, libxl__device *device,
                              char **bents, char **fents)
 {
@@ -348,10 +367,11 @@ int libxl__device_disk_dev_number(const char *virtpath, int *pdisk,
     return -1;
 }
 
-int libxl__device_remove(libxl__gc *gc, char *be_path)
+int libxl__device_remove(libxl__gc *gc, libxl__device *dev)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     xs_transaction_t t;
+    char *be_path = libxl__device_backend_path(gc, dev);
     char *state_path = libxl__sprintf(gc, "%s/state", be_path);
     char *state = libxl__xs_read(gc, XBT_NULL, state_path);
     int rc = 0;
@@ -429,10 +449,12 @@ static int wait_for_dev_destroy(libxl__gc *gc, struct timeval *tv)
 int libxl__devices_destroy(libxl__gc *gc, uint32_t domid, int force)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
-    char *path, *be_path, *fe_path;
+    char *path;
     unsigned int num1, num2;
     char **l1 = NULL, **l2 = NULL;
     int i, j, n_watches = 0;
+    libxl__device dev;
+    libxl__device_kind kind;
 
     path = libxl__sprintf(gc, "/local/domain/%d/device", domid);
     l1 = libxl__xs_directory(gc, XBT_NULL, path, &num1);
@@ -445,22 +467,25 @@ int libxl__devices_destroy(libxl__gc *gc, uint32_t domid, int force)
         num1 = 0;
     }
     for (i = 0; i < num1; i++) {
-        if (!strcmp("vfs", l1[i]))
+        if (libxl__device_kind_from_string(l1[i], &kind))
             continue;
         path = libxl__sprintf(gc, "/local/domain/%d/device/%s", domid, l1[i]);
         l2 = libxl__xs_directory(gc, XBT_NULL, path, &num2);
         if (!l2)
             continue;
         for (j = 0; j < num2; j++) {
-            fe_path = libxl__sprintf(gc, "/local/domain/%d/device/%s/%s", domid, l1[i], l2[j]);
-            be_path = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/backend", fe_path));
-            if (be_path != NULL) {
+            path = libxl__sprintf(gc, "/local/domain/%d/device/%s/%s/backend",
+                                  domid, l1[i], l2[j]);
+            path = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, path));
+            if (path && libxl__parse_backend_path(gc, path, &dev) == 0) {
+                dev.domid = domid;
+                dev.kind = kind;
+                dev.devid = atoi(l2[j]);
+
                 if (force) {
-                    xs_rm(ctx->xsh, XBT_NULL, be_path);
-                    xs_rm(ctx->xsh, XBT_NULL, fe_path);
-                    libxl__device_destroy_tapdisk(gc, be_path);
+                    libxl__device_destroy(gc, &dev);
                 } else {
-                    if (libxl__device_remove(gc, be_path) > 0)
+                    if (libxl__device_remove(gc, &dev) > 0)
                         n_watches++;
                 }
             }
@@ -468,14 +493,18 @@ int libxl__devices_destroy(libxl__gc *gc, uint32_t domid, int force)
     }
 
     /* console 0 frontend directory is not under /local/domain/<domid>/device */
-    fe_path = libxl__sprintf(gc, "/local/domain/%d/console", domid);
-    be_path = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/backend", fe_path));
-    if (be_path && strcmp(be_path, "")) {
+    path = libxl__sprintf(gc, "/local/domain/%d/console/backend", domid);
+    path = libxl__xs_read(gc, XBT_NULL, path);
+    if (path && strcmp(path, "") &&
+        libxl__parse_backend_path(gc, path, &dev) == 0) {
+        dev.domid = domid;
+        dev.kind = LIBXL__DEVICE_KIND_CONSOLE;
+        dev.devid = 0;
+
         if (force) {
-            xs_rm(ctx->xsh, XBT_NULL, be_path);
-            xs_rm(ctx->xsh, XBT_NULL, fe_path);
+            libxl__device_destroy(gc, &dev);
         } else {
-            if (libxl__device_remove(gc, be_path) > 0)
+            if (libxl__device_remove(gc, &dev) > 0)
                 n_watches++;
         }
     }
@@ -505,12 +534,9 @@ int libxl__device_del(libxl__gc *gc, libxl__device *dev)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     struct timeval tv;
-    char *backend_path;
     int rc;
 
-    backend_path = libxl__device_backend_path(gc, dev);
-
-    rc = libxl__device_remove(gc, backend_path);
+    rc = libxl__device_remove(gc, dev);
     if (rc == -1) {
         rc = ERROR_FAIL;
         goto out;

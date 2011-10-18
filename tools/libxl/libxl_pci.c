@@ -410,9 +410,15 @@ retry_transaction2:
             goto retry_transaction2;
 
     if (num == 1) {
-        char *fe_path = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/frontend", be_path));
-        xs_rm(ctx->xsh, XBT_NULL, be_path);
-        xs_rm(ctx->xsh, XBT_NULL, fe_path);
+        libxl__device dev;
+        if (libxl__parse_backend_path(gc, be_path, &dev) != 0)
+            return ERROR_FAIL;
+
+        dev.domid = domid;
+        dev.kind = LIBXL__DEVICE_KIND_PCI;
+        dev.devid = 0;
+
+        libxl__device_destroy(gc, &dev);
         return 0;
     }
 
