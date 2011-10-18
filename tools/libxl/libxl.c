@@ -754,7 +754,7 @@ int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid, int force)
         goto out;
     }
 
-    if (libxl_device_pci_shutdown(ctx, domid) < 0)
+    if (libxl__device_pci_destroy_all(&gc, domid) < 0)
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "pci shutdown failed for domid %d", domid);
     rc = xc_domain_pause(ctx->xch, domid);
     if (rc < 0) {

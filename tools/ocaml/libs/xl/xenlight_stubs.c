@@ -424,24 +424,9 @@ value stub_xl_device_pci_remove(value info, value domid)
 	device_pci_val(&gc, &lg, &c_info, info);
 
 	INIT_CTX();
-	ret = libxl_device_pci_remove(ctx, Int_val(domid), &c_info, 0);
+	ret = libxl_device_pci_remove(ctx, Int_val(domid), &c_info);
 	if (ret != 0)
 		failwith_xl("pci_remove", &lg);
-	FREE_CTX();
-
-	CAMLreturn(Val_unit);
-}
-
-value stub_xl_device_pci_shutdown(value domid)
-{
-	CAMLparam1(domid);
-	int ret;
-	INIT_STRUCT();
-
-	INIT_CTX();
-	ret = libxl_device_pci_shutdown(ctx, Int_val(domid));
-	if (ret != 0)
-		failwith_xl("pci_shutdown", &lg);
 	FREE_CTX();
 
 	CAMLreturn(Val_unit);

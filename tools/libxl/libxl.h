@@ -485,12 +485,28 @@ int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb);
 int libxl_device_vfb_remove(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb);
 int libxl_device_vfb_destroy(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb);
 
+/* PCI Passthrough */
+int libxl_device_pci_init(libxl_ctx *ctx, libxl_device_pci *pci);
 int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev);
-int libxl_device_pci_remove(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev, int force);
-int libxl_device_pci_shutdown(libxl_ctx *ctx, uint32_t domid);
-int libxl_device_pci_list_assigned(libxl_ctx *ctx, libxl_device_pci **list, uint32_t domid, int *num);
-int libxl_device_pci_list_assignable(libxl_ctx *ctx, libxl_device_pci **list, int *num);
-int libxl_device_pci_parse_bdf(libxl_ctx *ctx, libxl_device_pci *pcidev, const char *str);
+int libxl_device_pci_remove(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev);
+int libxl_device_pci_destroy(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev);
+libxl_device_pci *libxl_device_pci_list(libxl_ctx *ctx, uint32_t domid, int *num);
+
+/*
+ * Parse a PCI BDF into a PCI device structure.
+ */
+int libxl_device_pci_parse_bdf(libxl_ctx *ctx,
+                               libxl_device_pci *pcidev,
+                               const char *str);
+
+/*
+ * Similar to libxl_device_pci_list but returns all devices which
+ * could be assigned to a domain (i.e. are bound to the backend
+ * driver) but are not currently.
+ */
+libxl_device_pci *libxl_device_pci_list_assignable(libxl_ctx *ctx, int *num);
+
+/* CPUID handling */
 int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str);
 int libxl_cpuid_parse_config_xend(libxl_cpuid_policy_list *cpuid,
                                   const char* str);

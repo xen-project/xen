@@ -252,6 +252,7 @@ _hidden int libxl__wait_for_backend(libxl__gc *gc, char *be_path, char *state);
 _hidden int libxl__device_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, int starting);
 _hidden int libxl__create_pci_backend(libxl__gc *gc, uint32_t domid,
                                       libxl_device_pci *pcidev, int num);
+_hidden int libxl__device_pci_destroy_all(libxl__gc *gc, uint32_t domid);
 
 /* xl_exec */
 

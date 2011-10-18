@@ -2018,11 +2018,14 @@ static void pcilist_assignable(void)
     libxl_device_pci *pcidevs;
     int num, i;
 
-    if ( libxl_device_pci_list_assignable(ctx, &pcidevs, &num) )
+    pcidevs = libxl_device_pci_list_assignable(ctx, &num);
+
+    if ( pcidevs == NULL )
         return;
     for (i = 0; i < num; i++) {
         printf("%04x:%02x:%02x.%01x\n",
-                pcidevs[i].domain, pcidevs[i].bus, pcidevs[i].dev, pcidevs[i].func);
+               pcidevs[i].domain, pcidevs[i].bus, pcidevs[i].dev, pcidevs[i].func);
+        libxl_device_pci_dispose(&pcidevs[i]);
     }
     free(pcidevs);
 }
@@ -2045,7 +2048,8 @@ static void pcilist(const char *dom)
 
     find_domain(dom);
 
-    if (libxl_device_pci_list_assigned(ctx, &pcidevs, domid, &num))
+    pcidevs = libxl_device_pci_list(ctx, domid, &num);
+    if (pcidevs == NULL)
         return;
     printf("Vdev Device\n");
     for (i = 0; i < num; i++) {
@@ -2082,7 +2086,10 @@ static void pcidetach(const char *dom, const char *bdf, int force)
         fprintf(stderr, "pci-detach: malformed BDF specification \"%s\"\n", bdf);
         exit(2);
     }
-    libxl_device_pci_remove(ctx, domid, &pcidev, force);
+    if (force)
+        libxl_device_pci_destroy(ctx, domid, &pcidev);
+    else
+        libxl_device_pci_remove(ctx, domid, &pcidev);
     libxl_device_pci_dispose(&pcidev);
 }
 

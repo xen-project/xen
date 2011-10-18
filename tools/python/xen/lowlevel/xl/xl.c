@@ -521,9 +521,16 @@ static PyObject *pyxl_pci_del(XlObject *self, PyObject *args)
         return NULL;
     }
     pci = (Py_device_pci *)obj;
-    if ( libxl_device_pci_remove(self->ctx, domid, &pci->obj, force) ) {
-        PyErr_SetString(xl_error_obj, "cannot remove pci device");
-        return NULL;
+    if ( force ) {
+        if ( libxl_device_pci_destroy(self->ctx, domid, &pci->obj) ) {
+            PyErr_SetString(xl_error_obj, "cannot remove pci device");
+            return NULL;
+        }
+    } else {
+        if ( libxl_device_pci_remove(self->ctx, domid, &pci->obj) ) {
+            PyErr_SetString(xl_error_obj, "cannot remove pci device");
+            return NULL;
+        }
     }
     Py_INCREF(Py_None);
     return Py_None;
@@ -558,7 +565,8 @@ static PyObject *pyxl_pci_list_assignable(XlObject *self, PyObject *args)
     PyObject *list;
     int nr_dev, i;
 
-    if ( libxl_device_pci_list_assignable(self->ctx, &dev, &nr_dev) ) {
+    dev = libxl_device_pci_list_assignable(self->ctx, &nr_dev);
+    if ( dev == NULL ) {
         PyErr_SetString(xl_error_obj, "Cannot list assignable devices");
         return NULL;
     }
@@ -594,7 +602,8 @@ static PyObject *pyxl_pci_list(XlObject *self, PyObject *args)
     if ( !PyArg_ParseTuple(args, "i", &domid) )
         return NULL;
 
-    if ( libxl_device_pci_list_assigned(self->ctx, &dev, domid, &nr_dev) ) {
+    dev = libxl_device_pci_list(self->ctx, domid, &nr_dev);
+    if ( dev == NULL ) {
         PyErr_SetString(xl_error_obj, "Cannot list assignable devices");
         return NULL;
     }
