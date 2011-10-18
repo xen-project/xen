@@ -59,7 +59,7 @@ static void log_destroy(struct xentoollog_logger *logger)
 	lg.logger.destroy = log_destroy; \
 	lg.logger.progress = NULL; \
 	caml_enter_blocking_section(); \
-	ret = libxl_ctx_alloc(&ctx, LIBXL_VERSION, (struct xentoollog_logger *) &lg); \
+	ret = libxl_ctx_alloc(&ctx, LIBXL_VERSION, 0, (struct xentoollog_logger *) &lg); \
 	if (ret != 0) \
 		failwith_xl("cannot init context", &lg);
 

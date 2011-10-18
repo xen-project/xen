@@ -239,7 +239,7 @@ int main(int argc, char **argv)
     logger = xtl_createlogger_stdiostream(stderr, XTL_DETAIL, 0);
     if (!logger) exit(1);
 
-    if (libxl_ctx_alloc(&ctx, LIBXL_VERSION, (xentoollog_logger*)logger)) {
+    if (libxl_ctx_alloc(&ctx, LIBXL_VERSION, 0, (xentoollog_logger*)logger)) {
         fprintf(stderr, "cannot init xl context\\n");
         exit(1);
     }

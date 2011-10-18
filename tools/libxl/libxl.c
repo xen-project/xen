@@ -39,7 +39,8 @@
 #define PAGE_TO_MEMKB(pages) ((pages) * 4)
 #define BACKEND_STRING_SIZE 5
 
-int libxl_ctx_alloc(libxl_ctx **pctx, int version, xentoollog_logger * lg)
+int libxl_ctx_alloc(libxl_ctx **pctx, int version,
+                    unsigned flags, xentoollog_logger * lg)
 {
     libxl_ctx *ctx;
     struct stat stat_buf;

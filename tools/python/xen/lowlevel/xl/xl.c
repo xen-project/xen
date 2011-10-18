@@ -687,7 +687,7 @@ PyXl_init(XlObject *self, PyObject *args, PyObject *kwds)
         return -1;
     }
 
-    if ( libxl_ctx_alloc(&self->ctx, LIBXL_VERSION,
+    if ( libxl_ctx_alloc(&self->ctx, LIBXL_VERSION, 0,
                 (xentoollog_logger*)self->logger) ) {
         PyErr_SetString(xl_error_obj, "cannot init xl context");
         return -1;
