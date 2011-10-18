@@ -367,57 +367,6 @@ int libxl__device_disk_dev_number(const char *virtpath, int *pdisk,
     return -1;
 }
 
-int libxl__device_remove(libxl__gc *gc, libxl__device *dev)
-{
-    libxl_ctx *ctx = libxl__gc_owner(gc);
-    xs_transaction_t t;
-    char *be_path = libxl__device_backend_path(gc, dev);
-    char *state_path = libxl__sprintf(gc, "%s/state", be_path);
-    char *state = libxl__xs_read(gc, XBT_NULL, state_path);
-    int rc = 0;
-
-    if (!state)
-        goto out;
-    if (atoi(state) != 4) {
-        libxl__device_destroy_tapdisk(gc, be_path);
-        xs_rm(ctx->xsh, XBT_NULL, be_path);
-        goto out;
-    }
-
-retry_transaction:
-    t = xs_transaction_start(ctx->xsh);
-    xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/online", be_path), "0", strlen("0"));
-    xs_write(ctx->xsh, t, state_path, "5", strlen("5"));
-    if (!xs_transaction_end(ctx->xsh, t, 0)) {
-        if (errno == EAGAIN)
-            goto retry_transaction;
-        else {
-            rc = -1;
-            goto out;
-        }
-    }
-
-    xs_watch(ctx->xsh, state_path, be_path);
-    libxl__device_destroy_tapdisk(gc, be_path);
-    rc = 1;
-out:
-    return rc;
-}
-
-int libxl__device_destroy(libxl__gc *gc, libxl__device *dev)
-{
-    libxl_ctx *ctx = libxl__gc_owner(gc);
-    char *be_path = libxl__device_backend_path(gc, dev);
-    char *fe_path = libxl__device_frontend_path(gc, dev);
-
-    xs_rm(ctx->xsh, XBT_NULL, be_path);
-    xs_rm(ctx->xsh, XBT_NULL, fe_path);
-
-    libxl__device_destroy_tapdisk(gc, be_path);
-
-    return 0;
-}
-
 static int wait_for_dev_destroy(libxl__gc *gc, struct timeval *tv)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
@@ -444,6 +393,71 @@ static int wait_for_dev_destroy(libxl__gc *gc, struct timeval *tv)
         }
     }
     return rc;
+}
+
+/*
+ * Returns 0 (device already destroyed) or 1 (caller must
+ * wait_for_dev_destroy) on success, ERROR_* on fail.
+ */
+int libxl__device_remove(libxl__gc *gc, libxl__device *dev, int wait)
+{
+    libxl_ctx *ctx = libxl__gc_owner(gc);
+    xs_transaction_t t;
+    char *be_path = libxl__device_backend_path(gc, dev);
+    char *state_path = libxl__sprintf(gc, "%s/state", be_path);
+    char *state = libxl__xs_read(gc, XBT_NULL, state_path);
+    int rc = 0;
+
+    if (!state)
+        goto out;
+    if (atoi(state) != 4) {
+        libxl__device_destroy_tapdisk(gc, be_path);
+        xs_rm(ctx->xsh, XBT_NULL, be_path);
+        goto out;
+    }
+
+retry_transaction:
+    t = xs_transaction_start(ctx->xsh);
+    xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/online", be_path), "0", strlen("0"));
+    xs_write(ctx->xsh, t, state_path, "5", strlen("5"));
+    if (!xs_transaction_end(ctx->xsh, t, 0)) {
+        if (errno == EAGAIN)
+            goto retry_transaction;
+        else {
+            rc = ERROR_FAIL;
+            goto out;
+        }
+    }
+
+    xs_watch(ctx->xsh, state_path, be_path);
+    libxl__device_destroy_tapdisk(gc, be_path);
+
+    if (wait) {
+        struct timeval tv;
+        tv.tv_sec = LIBXL_DESTROY_TIMEOUT;
+        tv.tv_usec = 0;
+        (void)wait_for_dev_destroy(gc, &tv);
+        xs_rm(ctx->xsh, XBT_NULL, libxl__device_frontend_path(gc, dev));
+    } else {
+        rc = 1; /* Caller must wait_for_dev_destroy */
+    }
+
+out:
+    return rc;
+}
+
+int libxl__device_destroy(libxl__gc *gc, libxl__device *dev)
+{
+    libxl_ctx *ctx = libxl__gc_owner(gc);
+    char *be_path = libxl__device_backend_path(gc, dev);
+    char *fe_path = libxl__device_frontend_path(gc, dev);
+
+    xs_rm(ctx->xsh, XBT_NULL, be_path);
+    xs_rm(ctx->xsh, XBT_NULL, fe_path);
+
+    libxl__device_destroy_tapdisk(gc, be_path);
+
+    return 0;
 }
 
 int libxl__devices_destroy(libxl__gc *gc, uint32_t domid, int force)
@@ -485,8 +499,12 @@ int libxl__devices_destroy(libxl__gc *gc, uint32_t domid, int force)
                 if (force) {
                     libxl__device_destroy(gc, &dev);
                 } else {
-                    if (libxl__device_remove(gc, &dev) > 0)
-                        n_watches++;
+                    int rc = libxl__device_remove(gc, &dev, 0);
+                    if (rc < 0)
+                        LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                                   "cannot remove device %s\n", path);
+                    else
+                        n_watches += rc;
                 }
             }
         }
@@ -504,8 +522,12 @@ int libxl__devices_destroy(libxl__gc *gc, uint32_t domid, int force)
         if (force) {
             libxl__device_destroy(gc, &dev);
         } else {
-            if (libxl__device_remove(gc, &dev) > 0)
-                n_watches++;
+            int rc = libxl__device_remove(gc, &dev, 0);
+            if (rc < 0)
+                LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                           "cannot remove device %s\n", path);
+            else
+                n_watches += rc;
         }
     }
 
@@ -528,29 +550,6 @@ int libxl__devices_destroy(libxl__gc *gc, uint32_t domid, int force)
     }
 out:
     return 0;
-}
-
-int libxl__device_del(libxl__gc *gc, libxl__device *dev)
-{
-    libxl_ctx *ctx = libxl__gc_owner(gc);
-    struct timeval tv;
-    int rc;
-
-    rc = libxl__device_remove(gc, dev);
-    if (rc == -1) {
-        rc = ERROR_FAIL;
-        goto out;
-    }
-
-    tv.tv_sec = LIBXL_DESTROY_TIMEOUT;
-    tv.tv_usec = 0;
-    (void)wait_for_dev_destroy(gc, &tv);
-
-    xs_rm(ctx->xsh, XBT_NULL, libxl__device_frontend_path(gc, dev));
-    rc = 0;
-
-out:
-    return rc;
 }
 
 int libxl__wait_for_device_model(libxl__gc *gc,
