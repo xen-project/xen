@@ -150,6 +150,7 @@ install: all
 clean:
 	$(RM) -f _*.h *.o *.so* *.a $(CLIENTS) $(DEPS)
 	$(RM) -f _*.c *.pyc _libxl_paths.*.tmp
+	$(RM) -f testidl.c.new testidl.c
 #	$(RM) -f $(AUTOSRCS) $(AUTOINCS)
 
 distclean: clean
