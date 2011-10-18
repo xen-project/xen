@@ -379,6 +379,65 @@ libxl_dominfo * libxl_list_domain(libxl_ctx*, int *nb_domain);
 libxl_cpupoolinfo * libxl_list_cpupool(libxl_ctx*, int *nb_pool);
 libxl_vminfo * libxl_list_vm(libxl_ctx *ctx, int *nb_vm);
 
+/*
+ * Devices
+ * =======
+ *
+ * Each device is represented by a libxl_device_<TYPE> data structure
+ * which is defined via the IDL. In addition some devices have an
+ * additional data type libxl_device_<TYPE>_getinfo which contains
+ * further runtime information about the device.
+ *
+ * A common set of methods are available for each device type. These
+ * are described below.
+ *
+ * Querying
+ * --------
+ *
+ * libxl_device_<type>_list(ctx, domid, nr):
+ *
+ *   Returns an array of libxl_device_<type> length nr representing
+ *   the devices attached to the specified domain.
+ *
+ * libxl_device_<type>_getinfo(ctx, domid, device, info):
+ *
+ *   Initialises info with details of the given device which must be
+ *   attached to the specified domain.
+ *
+ * Creation / Control
+ * ------------------
+ *
+ * libxl_device_<type>_init(ctx, device):
+ *
+ *    Initalises device to a default configuration.
+ *
+ * libxl_device_<type>_add(ctx, domid, device):
+ *
+ *   Adds the given device to the specified domain. This can be called
+ *   while the guest is running (hotplug) or before boot (coldplug).
+ *
+ *   This function only sets up the device but does not wait for the
+ *   domain to connect to the device and therefore cannot block on the
+ *   guest.
+ *
+ * libxl_device_<type>_remove(ctx, domid, device):
+ *
+ *   Removes the given device from the specified domain by performing
+ *   an orderly unplug with guest co-operation. This requires that the
+ *   guest is running.
+ *
+ *   This method is currently synchronous and therefore can block
+ *   while interacting with the guest.
+ *
+ * libxl_device_<type>_destroy(ctx, domid, device):
+ *
+ *   Removes the given device from the specified domain without guest
+ *   co-operation. It is guest specific what affect this will have on
+ *   a running guest.
+ *
+ *   This function does not interact with the guest and therefore
+ *   cannot block on the guest.
+ */
 int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk);
 int libxl_device_disk_del(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk, int wait);
 libxl_device_disk *libxl_device_disk_list(libxl_ctx *ctx, uint32_t domid, int *num);
