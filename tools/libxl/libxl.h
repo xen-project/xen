@@ -503,7 +503,7 @@ int libxl_get_freecpus(libxl_ctx *ctx, libxl_cpumap *cpumap);
 int libxl_create_cpupool(libxl_ctx *ctx, const char *name, int schedid,
                          libxl_cpumap cpumap, libxl_uuid *uuid,
                          uint32_t *poolid);
-int libxl_destroy_cpupool(libxl_ctx *ctx, uint32_t poolid);
+int libxl_cpupool_destroy(libxl_ctx *ctx, uint32_t poolid);
 int libxl_cpupool_rename(libxl_ctx *ctx, const char *name, uint32_t poolid);
 int libxl_cpupool_cpuadd(libxl_ctx *ctx, uint32_t poolid, int cpu);
 int libxl_cpupool_cpuadd_node(libxl_ctx *ctx, uint32_t poolid, int node, int *cpus);

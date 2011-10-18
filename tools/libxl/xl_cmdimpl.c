@@ -4954,7 +4954,7 @@ int main_cpupooldestroy(int argc, char **argv)
         return -ERROR_FAIL;
     }
 
-    return -libxl_destroy_cpupool(ctx, poolid);
+    return -libxl_cpupool_destroy(ctx, poolid);
 }
 
 int main_cpupoolrename(int argc, char **argv)

@@ -2775,7 +2775,7 @@ int libxl_create_cpupool(libxl_ctx *ctx, const char *name, int schedid,
             if (rc) {
                 LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
                     "Error moving cpu to cpupool");
-                libxl_destroy_cpupool(ctx, *poolid);
+                libxl_cpupool_destroy(ctx, *poolid);
                 libxl__free_all(&gc);
                 return ERROR_FAIL;
             }
@@ -2799,7 +2799,7 @@ int libxl_create_cpupool(libxl_ctx *ctx, const char *name, int schedid,
     }
 }
 
-int libxl_destroy_cpupool(libxl_ctx *ctx, uint32_t poolid)
+int libxl_cpupool_destroy(libxl_ctx *ctx, uint32_t poolid)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
     int rc, i;
