@@ -1585,18 +1585,6 @@ out:
     return rc;
 }
 
-int libxl_device_console_add(libxl_ctx *ctx, uint32_t domid,
-                              libxl_device_console *console)
-{
-    libxl__gc gc = LIBXL_INIT_GC(ctx);
-    int rc = ERROR_INVAL;
-
-    rc = libxl__device_console_add(&gc, domid, console, NULL);
-
-    libxl__free_all(&gc);
-    return rc;
-}
-
 /******************************************************************************/
 void libxl_device_vkb_init(libxl_device_vkb *vkb, int dev_num)
 {

@@ -288,23 +288,6 @@ value stub_xl_device_nic_del(value info, value domid)
 	CAMLreturn(Val_unit);
 }
 
-value stub_xl_device_console_add(value info, value domid)
-{
-	CAMLparam2(info, domid);
-	libxl_device_console c_info;
-	int ret;
-	INIT_STRUCT();
-
-	device_console_val(&gc, &lg, &c_info, info);
-
-	INIT_CTX();
-	ret = libxl_device_console_add(ctx, Int_val(domid), &c_info);
-	if (ret != 0)
-		failwith_xl("console_add", &lg);
-	FREE_CTX();
-	CAMLreturn(Val_unit);
-}
-
 value stub_xl_device_vkb_add(value info, value domid)
 {
 	CAMLparam2(info, domid);

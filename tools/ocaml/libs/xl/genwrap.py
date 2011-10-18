@@ -30,8 +30,6 @@ functions = { # ( name , [type1,type2,....] )
                         ("clean_shutdown", ["domid", "unit"]),
                         ("hard_shutdown",  ["domid", "unit"]),
                       ],
-    "device_console": [ ("add",            ["t", "domid", "unit"]),
-                      ],
     "device_disk":    DEVICE_FUNCTIONS,
     "device_nic":     DEVICE_FUNCTIONS,
     "device_pci":     [ ("add",            ["t", "domid", "unit"]),
