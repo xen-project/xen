@@ -1315,7 +1315,7 @@ static void libxl__device_nic_from_xs_be(libxl__gc *gc,
                   libxl__sprintf(gc, "%s/mac", be_path), &len);
     rc = libxl__parse_mac(tmp, nic->mac);
     if (rc)
-            memset(nic->mac, 0, sizeof(nic->mac));
+        memset(nic->mac, 0, sizeof(nic->mac));
 
     nic->ip = xs_read(ctx->xsh, XBT_NULL,
                       libxl__sprintf(gc, "%s/ip", be_path), &len);
@@ -1330,6 +1330,32 @@ static void libxl__device_nic_from_xs_be(libxl__gc *gc,
     nic->nictype = LIBXL_NIC_TYPE_VIF;
     nic->model = NULL; /* XXX Only for TYPE_IOEMU */
     nic->ifname = NULL; /* XXX Only for TYPE_IOEMU */
+}
+
+int libxl_devid_to_device_nic(libxl_ctx *ctx, uint32_t domid,
+                              const char *devid, libxl_device_nic *nic)
+{
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    char *dompath, *path;
+    int rc = ERROR_FAIL;
+
+    memset(nic, 0, sizeof (libxl_device_nic));
+    dompath = libxl__xs_get_dompath(&gc, domid);
+    if (!dompath)
+        goto out;
+
+    path = libxl__xs_read(&gc, XBT_NULL,
+                          libxl__sprintf(&gc, "%s/device/vif/%s/backend",
+                                         dompath, devid));
+    if (!path)
+        goto out;
+
+    libxl__device_nic_from_xs_be(&gc, path, nic);
+
+    rc = 0;
+out:
+    libxl__free_all(&gc);
+    return rc;
 }
 
 static int libxl__append_nic_list_of_type(libxl__gc *gc,

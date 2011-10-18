@@ -483,41 +483,6 @@ int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
     return rc;
 }
 
-int libxl_devid_to_device_nic(libxl_ctx *ctx, uint32_t domid,
-                              const char *devid, libxl_device_nic *nic)
-{
-    libxl__gc gc = LIBXL_INIT_GC(ctx);
-    char *val;
-    char *dompath, *nic_path_fe, *nic_path_be;
-    int rc = ERROR_FAIL;
-
-    memset(nic, 0, sizeof (libxl_device_nic));
-    dompath = libxl__xs_get_dompath(&gc, domid);
-    if (!dompath) {
-        goto out;
-    }
-    nic_path_fe = libxl__sprintf(&gc, "%s/device/vif/%s", dompath, devid);
-    nic_path_be = libxl__xs_read(&gc, XBT_NULL,
-                                libxl__sprintf(&gc, "%s/backend", nic_path_fe));
-    val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/backend-id", nic_path_fe));
-    if ( NULL == val ) {
-        goto out;
-    }
-    nic->backend_domid = strtoul(val, NULL, 10);
-    nic->devid = strtoul(devid, NULL, 10);
-
-    val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/mac", nic_path_fe));
-    rc = libxl__parse_mac(val, nic->mac);
-    if (rc)
-        goto out;
-
-    nic->script = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(&gc, "%s/script", nic_path_be), NULL);
-    rc = 0;
-out:
-    libxl__free_all(&gc);
-    return rc;
-}
-
 int libxl_devid_to_device_disk(libxl_ctx *ctx, uint32_t domid,
                                const char *devid, libxl_device_disk *disk)
 {
