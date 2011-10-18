@@ -1505,24 +1505,69 @@ int libxl_device_vkb_hard_shutdown(libxl_ctx *ctx, uint32_t domid)
     return ERROR_NI;
 }
 
+static void libxl__device_disk_from_xs_be(libxl__gc *gc,
+                                          const char *be_path,
+                                          libxl_device_disk *disk)
+{
+    libxl_ctx *ctx = libxl__gc_owner(gc);
+    unsigned int len;
+    char *tmp;
+    const char *fe_path; /* XXX unsafe */
+
+    memset(disk, 0, sizeof(*disk));
+
+    tmp = xs_read(ctx->xsh, XBT_NULL,
+                  libxl__sprintf(gc, "%s/params", be_path), &len);
+    if (tmp && strchr(tmp, ':')) {
+        disk->pdev_path = strdup(strchr(tmp, ':') + 1);
+        free(tmp);
+    } else {
+        disk->pdev_path = tmp;
+    }
+    libxl_string_to_backend(ctx,
+                        libxl__xs_read(gc, XBT_NULL,
+                                       libxl__sprintf(gc, "%s/type", be_path)),
+                        &(disk->backend));
+    disk->vdev = xs_read(ctx->xsh, XBT_NULL,
+                         libxl__sprintf(gc, "%s/dev", be_path), &len);
+    tmp = libxl__xs_read(gc, XBT_NULL, libxl__sprintf
+                         (gc, "%s/removable", be_path));
+
+    if (tmp)
+        disk->removable = atoi(tmp);
+    else
+        disk->removable = 0;
+
+    tmp = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/mode", be_path));
+    if (!strcmp(tmp, "w"))
+        disk->readwrite = 1;
+    else
+        disk->readwrite = 0;
+
+    fe_path = libxl__xs_read(gc, XBT_NULL,
+                             libxl__sprintf(gc, "%s/frontend", be_path));
+    tmp = libxl__xs_read(gc, XBT_NULL,
+                         libxl__sprintf(gc, "%s/device-type", fe_path));
+    disk->is_cdrom = !strcmp(tmp, "cdrom");
+
+    disk->format = LIBXL_DISK_FORMAT_UNKNOWN;
+}
+
 static int libxl__append_disk_list_of_type(libxl__gc *gc,
                                            uint32_t domid,
                                            const char *type,
                                            libxl_device_disk **disks,
                                            int *ndisks)
 {
-    libxl_ctx *ctx = libxl__gc_owner(gc);
     char *be_path = NULL;
     char **dir = NULL;
-    unsigned int n = 0, len = 0;
+    unsigned int n = 0;
     libxl_device_disk *pdisk = NULL, *pdisk_end = NULL;
-    char *physpath_tmp = NULL;
 
     be_path = libxl__sprintf(gc, "%s/backend/%s/%d",
                              libxl__xs_get_dompath(gc, 0), type, domid);
     dir = libxl__xs_directory(gc, XBT_NULL, be_path, &n);
     if (dir) {
-        char *removable;
         libxl_device_disk *tmp;
         tmp = realloc(*disks, sizeof (libxl_device_disk) * (*ndisks + n));
         if (tmp == NULL)
@@ -1532,32 +1577,10 @@ static int libxl__append_disk_list_of_type(libxl__gc *gc,
         *ndisks += n;
         pdisk_end = *disks + *ndisks;
         for (; pdisk < pdisk_end; pdisk++, dir++) {
-            memset(pdisk, 0, sizeof(*pdisk));
+            const char *p;
+            p = libxl__sprintf(gc, "%s/%s", be_path, *dir);
+            libxl__device_disk_from_xs_be(gc, p, pdisk);
             pdisk->backend_domid = 0;
-            physpath_tmp = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(gc, "%s/%s/params", be_path, *dir), &len);
-            if (physpath_tmp && strchr(physpath_tmp, ':')) {
-                pdisk->pdev_path = strdup(strchr(physpath_tmp, ':') + 1);
-                free(physpath_tmp);
-            } else {
-                pdisk->pdev_path = physpath_tmp;
-            }
-            libxl_string_to_backend(ctx, libxl__xs_read(gc, XBT_NULL,
-                libxl__sprintf(gc, "%s/%s/type", be_path, *dir)),
-                &(pdisk->backend));
-            pdisk->vdev = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(gc, "%s/%s/dev", be_path, *dir), &len);
-            removable = libxl__xs_read(gc, XBT_NULL, libxl__sprintf
-                                       (gc, "%s/%s/removable", be_path, *dir));
-            if (removable)
-                pdisk->removable = atoi(removable);
-            else
-                pdisk->removable = 0;
-            if (!strcmp(libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/%s/mode", be_path, *dir)), "w"))
-                pdisk->readwrite = 1;
-            else
-                pdisk->readwrite = 0;
-            type = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/device-type", libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/%s/frontend", be_path, *dir))));
-            pdisk->is_cdrom = !strcmp(type, "cdrom");
-            pdisk->format = LIBXL_DISK_FORMAT_UNKNOWN;
         }
     }
     return 0;
