@@ -1074,7 +1074,10 @@ int libxl_device_disk_del(libxl_ctx *ctx, uint32_t domid,
     device.domid            = domid;
     device.devid            = devid;
     device.kind             = DEVICE_VBD;
-    rc = libxl__device_del(&gc, &device, wait);
+    if (wait)
+        rc = libxl__device_del(&gc, &device);
+    else
+        rc = libxl__device_destroy(&gc, &device);
 out_free:
     libxl__free_all(&gc);
     return rc;
@@ -1286,7 +1289,11 @@ int libxl_device_nic_del(libxl_ctx *ctx, uint32_t domid,
     device.domid            = domid;
     device.kind             = DEVICE_VIF;
 
-    rc = libxl__device_del(&gc, &device, wait);
+    if (wait)
+        rc = libxl__device_del(&gc, &device);
+    else
+        rc = libxl__device_destroy(&gc, &device);
+
     libxl__free_all(&gc);
     return rc;
 }

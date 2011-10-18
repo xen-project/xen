@@ -401,11 +401,17 @@ out:
     return rc;
 }
 
-int libxl__device_destroy(libxl__gc *gc, char *be_path)
+int libxl__device_destroy(libxl__gc *gc, libxl__device *dev)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
+    char *be_path = libxl__device_backend_path(gc, dev);
+    char *fe_path = libxl__device_frontend_path(gc, dev);
+
     xs_rm(ctx->xsh, XBT_NULL, be_path);
+    xs_rm(ctx->xsh, XBT_NULL, fe_path);
+
     libxl__device_destroy_tapdisk(gc, be_path);
+
     return 0;
 }
 
@@ -466,10 +472,14 @@ int libxl__devices_destroy(libxl__gc *gc, uint32_t domid, int force)
             fe_path = libxl__sprintf(gc, "/local/domain/%d/device/%s/%s", domid, l1[i], l2[j]);
             be_path = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/backend", fe_path));
             if (be_path != NULL) {
-                int rc = force ? libxl__device_destroy(gc, be_path)
-                               : libxl__device_remove(gc, be_path);
-                if (rc > 0)
-                    n_watches++;
+                if (force) {
+                    xs_rm(ctx->xsh, XBT_NULL, be_path);
+                    xs_rm(ctx->xsh, XBT_NULL, fe_path);
+                    libxl__device_destroy_tapdisk(gc, be_path);
+                } else {
+                    if (libxl__device_remove(gc, be_path) > 0)
+                        n_watches++;
+                }
             } else {
                 xs_rm(ctx->xsh, XBT_NULL, path);
             }
@@ -480,10 +490,13 @@ int libxl__devices_destroy(libxl__gc *gc, uint32_t domid, int force)
     fe_path = libxl__sprintf(gc, "/local/domain/%d/console", domid);
     be_path = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/backend", fe_path));
     if (be_path && strcmp(be_path, "")) {
-        int rc = force ? libxl__device_destroy(gc, be_path)
-                       : libxl__device_remove(gc, be_path);
-        if (rc > 0)
-            n_watches++;
+        if (force) {
+            xs_rm(ctx->xsh, XBT_NULL, be_path);
+            xs_rm(ctx->xsh, XBT_NULL, fe_path);
+        } else {
+            if (libxl__device_remove(gc, be_path) > 0)
+                n_watches++;
+        }
     }
 
     if (!force) {
@@ -507,29 +520,24 @@ out:
     return 0;
 }
 
-int libxl__device_del(libxl__gc *gc, libxl__device *dev, int wait)
+int libxl__device_del(libxl__gc *gc, libxl__device *dev)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
+    struct timeval tv;
     char *backend_path;
     int rc;
 
     backend_path = libxl__device_backend_path(gc, dev);
 
-    if (wait)
-        rc = libxl__device_remove(gc, backend_path);
-    else
-        rc = libxl__device_destroy(gc, backend_path);
+    rc = libxl__device_remove(gc, backend_path);
     if (rc == -1) {
         rc = ERROR_FAIL;
         goto out;
     }
 
-    if (wait) {
-        struct timeval tv;
-        tv.tv_sec = LIBXL_DESTROY_TIMEOUT;
-        tv.tv_usec = 0;
-        (void)wait_for_dev_destroy(gc, &tv);
-    }
+    tv.tv_sec = LIBXL_DESTROY_TIMEOUT;
+    tv.tv_usec = 0;
+    (void)wait_for_dev_destroy(gc, &tv);
 
     xs_rm(ctx->xsh, XBT_NULL, libxl__device_frontend_path(gc, dev));
     rc = 0;

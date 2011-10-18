@@ -411,7 +411,7 @@ retry_transaction2:
 
     if (num == 1) {
         char *fe_path = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/frontend", be_path));
-        libxl__device_destroy(gc, be_path);
+        xs_rm(ctx->xsh, XBT_NULL, be_path);
         xs_rm(ctx->xsh, XBT_NULL, fe_path);
         return 0;
     }
