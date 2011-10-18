@@ -464,37 +464,38 @@ int libxl__devices_destroy(libxl__gc *gc, uint32_t domid, int force)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     char *path;
-    unsigned int num1, num2;
-    char **l1 = NULL, **l2 = NULL;
+    unsigned int num_kinds, num_devs;
+    char **kinds = NULL, **devs = NULL;
     int i, j, n_watches = 0;
     libxl__device dev;
     libxl__device_kind kind;
 
     path = libxl__sprintf(gc, "/local/domain/%d/device", domid);
-    l1 = libxl__xs_directory(gc, XBT_NULL, path, &num1);
-    if (!l1) {
+    kinds = libxl__xs_directory(gc, XBT_NULL, path, &num_kinds);
+    if (!kinds) {
         if (errno != ENOENT) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "unable to get xenstore"
                              " device listing %s", path);
             goto out;
         }
-        num1 = 0;
+        num_kinds = 0;
     }
-    for (i = 0; i < num1; i++) {
-        if (libxl__device_kind_from_string(l1[i], &kind))
+    for (i = 0; i < num_kinds; i++) {
+        if (libxl__device_kind_from_string(kinds[i], &kind))
             continue;
-        path = libxl__sprintf(gc, "/local/domain/%d/device/%s", domid, l1[i]);
-        l2 = libxl__xs_directory(gc, XBT_NULL, path, &num2);
-        if (!l2)
+
+        path = libxl__sprintf(gc, "/local/domain/%d/device/%s", domid, kinds[i]);
+        devs = libxl__xs_directory(gc, XBT_NULL, path, &num_devs);
+        if (!devs)
             continue;
-        for (j = 0; j < num2; j++) {
+        for (j = 0; j < num_devs; j++) {
             path = libxl__sprintf(gc, "/local/domain/%d/device/%s/%s/backend",
-                                  domid, l1[i], l2[j]);
+                                  domid, kinds[i], devs[j]);
             path = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, path));
             if (path && libxl__parse_backend_path(gc, path, &dev) == 0) {
                 dev.domid = domid;
                 dev.kind = kind;
-                dev.devid = atoi(l2[j]);
+                dev.devid = atoi(devs[j]);
 
                 if (force) {
                     libxl__device_destroy(gc, &dev);
