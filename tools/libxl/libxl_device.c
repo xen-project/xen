@@ -365,7 +365,7 @@ int libxl__device_disk_dev_number(const char *virtpath, int *pdisk,
     return -1;
 }
 
-int libxl__device_destroy(libxl__gc *gc, char *be_path, int force)
+int libxl__device_remove(libxl__gc *gc, char *be_path)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     xs_transaction_t t;
@@ -393,15 +393,20 @@ retry_transaction:
             goto out;
         }
     }
-    if (!force) {
-        xs_watch(ctx->xsh, state_path, be_path);
-        rc = 1;
-    } else {
-        xs_rm(ctx->xsh, XBT_NULL, be_path);
-    }
+
+    xs_watch(ctx->xsh, state_path, be_path);
     libxl__device_destroy_tapdisk(gc, be_path);
+    rc = 1;
 out:
     return rc;
+}
+
+int libxl__device_destroy(libxl__gc *gc, char *be_path)
+{
+    libxl_ctx *ctx = libxl__gc_owner(gc);
+    xs_rm(ctx->xsh, XBT_NULL, be_path);
+    libxl__device_destroy_tapdisk(gc, be_path);
+    return 0;
 }
 
 static int wait_for_dev_destroy(libxl__gc *gc, struct timeval *tv)
@@ -461,7 +466,9 @@ int libxl__devices_destroy(libxl__gc *gc, uint32_t domid, int force)
             fe_path = libxl__sprintf(gc, "/local/domain/%d/device/%s/%s", domid, l1[i], l2[j]);
             be_path = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/backend", fe_path));
             if (be_path != NULL) {
-                if (libxl__device_destroy(gc, be_path, force) > 0)
+                int rc = force ? libxl__device_destroy(gc, be_path)
+                               : libxl__device_remove(gc, be_path);
+                if (rc > 0)
                     n_watches++;
             } else {
                 xs_rm(ctx->xsh, XBT_NULL, path);
@@ -473,7 +480,9 @@ int libxl__devices_destroy(libxl__gc *gc, uint32_t domid, int force)
     fe_path = libxl__sprintf(gc, "/local/domain/%d/console", domid);
     be_path = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/backend", fe_path));
     if (be_path && strcmp(be_path, "")) {
-        if (libxl__device_destroy(gc, be_path, force) > 0)
+        int rc = force ? libxl__device_destroy(gc, be_path)
+                       : libxl__device_remove(gc, be_path);
+        if (rc > 0)
             n_watches++;
     }
 
@@ -506,7 +515,10 @@ int libxl__device_del(libxl__gc *gc, libxl__device *dev, int wait)
 
     backend_path = libxl__device_backend_path(gc, dev);
 
-    rc = libxl__device_destroy(gc, backend_path, !wait);
+    if (wait)
+        rc = libxl__device_remove(gc, backend_path);
+    else
+        rc = libxl__device_destroy(gc, backend_path);
     if (rc == -1) {
         rc = ERROR_FAIL;
         goto out;
