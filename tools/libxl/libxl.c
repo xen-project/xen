@@ -962,7 +962,7 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
     device.backend_domid = disk->backend_domid;
     device.devid = devid;
     device.domid = domid;
-    device.kind = DEVICE_VBD;
+    device.kind = LIBXL__DEVICE_KIND_VBD;
 
     switch (disk->backend) {
         case LIBXL_DISK_BACKEND_PHY:
@@ -975,7 +975,7 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
             flexarray_append(back, "params");
             flexarray_append(back, dev);
 
-            device.backend_kind = DEVICE_VBD;
+            device.backend_kind = LIBXL__DEVICE_KIND_VBD;
             break;
         case LIBXL_DISK_BACKEND_TAP:
             dev = libxl__blktap_devpath(&gc, disk->pdev_path, disk->format);
@@ -994,7 +994,7 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
             flexarray_append(back, "params");
             flexarray_append(back, libxl__sprintf(&gc, "%s:%s",
                           libxl__device_disk_string_of_format(disk->format), disk->pdev_path));
-            device.backend_kind = DEVICE_QDISK;
+            device.backend_kind = LIBXL__DEVICE_KIND_QDISK;
             break;
         default:
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "unrecognized disk backend type: %d\n", disk->backend);
@@ -1057,13 +1057,13 @@ int libxl_device_disk_del(libxl_ctx *ctx, uint32_t domid,
 
     switch (disk->backend) {
         case LIBXL_DISK_BACKEND_PHY:
-            device.backend_kind = DEVICE_VBD;
+            device.backend_kind = LIBXL__DEVICE_KIND_VBD;
             break;
         case LIBXL_DISK_BACKEND_TAP:
-            device.backend_kind = DEVICE_VBD;
+            device.backend_kind = LIBXL__DEVICE_KIND_VBD;
             break;
         case LIBXL_DISK_BACKEND_QDISK:
-            device.backend_kind = DEVICE_QDISK;
+            device.backend_kind = LIBXL__DEVICE_KIND_QDISK;
             break;
         default:
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "unrecognized disk backend type: %d\n",
@@ -1073,7 +1073,7 @@ int libxl_device_disk_del(libxl_ctx *ctx, uint32_t domid,
     }
     device.domid            = domid;
     device.devid            = devid;
-    device.kind             = DEVICE_VBD;
+    device.kind             = LIBXL__DEVICE_KIND_VBD;
     if (wait)
         rc = libxl__device_del(&gc, &device);
     else
@@ -1221,10 +1221,10 @@ int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic)
 
     device.backend_devid = nic->devid;
     device.backend_domid = nic->backend_domid;
-    device.backend_kind = DEVICE_VIF;
+    device.backend_kind = LIBXL__DEVICE_KIND_VIF;
     device.devid = nic->devid;
     device.domid = domid;
-    device.kind = DEVICE_VIF;
+    device.kind = LIBXL__DEVICE_KIND_VIF;
 
     flexarray_append(back, "frontend-id");
     flexarray_append(back, libxl__sprintf(&gc, "%d", domid));
@@ -1284,10 +1284,10 @@ int libxl_device_nic_del(libxl_ctx *ctx, uint32_t domid,
 
     device.backend_devid    = nic->devid;
     device.backend_domid    = nic->backend_domid;
-    device.backend_kind     = DEVICE_VIF;
+    device.backend_kind     = LIBXL__DEVICE_KIND_VIF;
     device.devid            = nic->devid;
     device.domid            = domid;
-    device.kind             = DEVICE_VIF;
+    device.kind             = LIBXL__DEVICE_KIND_VIF;
 
     if (wait)
         rc = libxl__device_del(&gc, &device);
@@ -1486,10 +1486,10 @@ int libxl__device_console_add(libxl__gc *gc, uint32_t domid,
 
     device.backend_devid = console->devid;
     device.backend_domid = console->backend_domid;
-    device.backend_kind = DEVICE_CONSOLE;
+    device.backend_kind = LIBXL__DEVICE_KIND_CONSOLE;
     device.devid = console->devid;
     device.domid = domid;
-    device.kind = DEVICE_CONSOLE;
+    device.kind = LIBXL__DEVICE_KIND_CONSOLE;
 
     flexarray_append(back, "frontend-id");
     flexarray_append(back, libxl__sprintf(gc, "%d", domid));
@@ -1577,10 +1577,10 @@ int libxl_device_vkb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb)
 
     device.backend_devid = vkb->devid;
     device.backend_domid = vkb->backend_domid;
-    device.backend_kind = DEVICE_VKBD;
+    device.backend_kind = LIBXL__DEVICE_KIND_VKBD;
     device.devid = vkb->devid;
     device.domid = domid;
-    device.kind = DEVICE_VKBD;
+    device.kind = LIBXL__DEVICE_KIND_VKBD;
 
     flexarray_append(back, "frontend-id");
     flexarray_append(back, libxl__sprintf(&gc, "%d", domid));
@@ -1864,10 +1864,10 @@ int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb)
 
     device.backend_devid = vfb->devid;
     device.backend_domid = vfb->backend_domid;
-    device.backend_kind = DEVICE_VFB;
+    device.backend_kind = LIBXL__DEVICE_KIND_VFB;
     device.devid = vfb->devid;
     device.domid = domid;
-    device.kind = DEVICE_VFB;
+    device.kind = LIBXL__DEVICE_KIND_VFB;
 
     flexarray_append_pair(back, "frontend-id", libxl__sprintf(&gc, "%d", domid));
     flexarray_append_pair(back, "online", "1");

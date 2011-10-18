@@ -24,30 +24,20 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-
 #include "libxl.h"
 #include "libxl_internal.h"
-
-static const char *string_of_kinds[] = {
-    [DEVICE_VIF] = "vif",
-    [DEVICE_VBD] = "vbd",
-    [DEVICE_QDISK] = "qdisk",
-    [DEVICE_PCI] = "pci",
-    [DEVICE_VFB] = "vfb",
-    [DEVICE_VKBD] = "vkbd",
-    [DEVICE_CONSOLE] = "console",
-};
 
 char *libxl__device_frontend_path(libxl__gc *gc, libxl__device *device)
 {
     char *dom_path = libxl__xs_get_dompath(gc, device->domid);
 
     /* Console 0 is a special case */
-    if (device->kind == DEVICE_CONSOLE && device->devid == 0)
+    if (device->kind == LIBXL__DEVICE_KIND_CONSOLE && device->devid == 0)
         return libxl__sprintf(gc, "%s/console", dom_path);
 
     return libxl__sprintf(gc, "%s/device/%s/%d", dom_path,
-                          string_of_kinds[device->kind], device->devid);
+                          libxl__device_kind_to_string(device->kind),
+                          device->devid);
 }
 
 char *libxl__device_backend_path(libxl__gc *gc, libxl__device *device)
@@ -55,7 +45,7 @@ char *libxl__device_backend_path(libxl__gc *gc, libxl__device *device)
     char *dom_path = libxl__xs_get_dompath(gc, device->backend_domid);
 
     return libxl__sprintf(gc, "%s/backend/%s/%u/%d", dom_path,
-                          string_of_kinds[device->backend_kind],
+                          libxl__device_kind_to_string(device->backend_kind),
                           device->domid, device->devid);
 }
 
@@ -67,12 +57,6 @@ int libxl__device_generic_add(libxl__gc *gc, libxl__device *device,
     xs_transaction_t t;
     struct xs_permissions frontend_perms[2];
     struct xs_permissions backend_perms[2];
-    int rc;
-
-    if (!is_valid_device_kind(device->backend_kind) || !is_valid_device_kind(device->kind)) {
-        rc = ERROR_INVAL;
-        goto out;
-    }
 
     frontend_path = libxl__device_frontend_path(gc, device);
     backend_path = libxl__device_backend_path(gc, device);
@@ -113,9 +97,8 @@ retry_transaction:
         else
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xs transaction failed");
     }
-    rc = 0;
-out:
-    return rc;
+
+    return 0;
 }
 
 typedef struct {

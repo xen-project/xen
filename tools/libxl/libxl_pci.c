@@ -244,10 +244,10 @@ int libxl__create_pci_backend(libxl__gc *gc, uint32_t domid,
     /* add pci device */
     device.backend_devid = 0;
     device.backend_domid = 0;
-    device.backend_kind = DEVICE_PCI;
+    device.backend_kind = LIBXL__DEVICE_KIND_PCI;
     device.devid = 0;
     device.domid = domid;
-    device.kind = DEVICE_PCI;
+    device.kind = LIBXL__DEVICE_KIND_PCI;
 
     flexarray_append_pair(back, "frontend-id", libxl__sprintf(gc, "%d", domid));
     flexarray_append_pair(back, "online", "1");

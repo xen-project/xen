@@ -97,25 +97,13 @@ struct libxl__ctx {
     libxl_version_info version_info;
 };
 
-typedef enum {
-    DEVICE_VIF = 1,
-    DEVICE_VBD,
-    DEVICE_QDISK,
-    DEVICE_PCI,
-    DEVICE_VFB,
-    DEVICE_VKBD,
-    DEVICE_CONSOLE,
-} libxl__device_kinds;
-
-#define is_valid_device_kind(kind) (((kind) >= DEVICE_VIF) && ((kind) <= DEVICE_CONSOLE))
-
 typedef struct {
     uint32_t backend_devid;
     uint32_t backend_domid;
     uint32_t devid;
     uint32_t domid;
-    libxl__device_kinds backend_kind;
-    libxl__device_kinds kind;
+    libxl__device_kind backend_kind;
+    libxl__device_kind kind;
 } libxl__device;
 
 #define XC_PCI_BDF             "0x%x, 0x%x, 0x%x, 0x%x"
