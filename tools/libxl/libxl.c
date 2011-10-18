@@ -1018,6 +1018,8 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
     flexarray_append(back, libxl__device_disk_string_of_backend(disk->backend));
     flexarray_append(back, "mode");
     flexarray_append(back, disk->readwrite ? "w" : "r");
+    flexarray_append(back, "device-type");
+    flexarray_append(back, disk->is_cdrom ? "cdrom" : "disk");
 
     flexarray_append(front, "backend-id");
     flexarray_append(front, libxl__sprintf(&gc, "%d", disk->backend_domid));
@@ -1512,7 +1514,6 @@ static void libxl__device_disk_from_xs_be(libxl__gc *gc,
     libxl_ctx *ctx = libxl__gc_owner(gc);
     unsigned int len;
     char *tmp;
-    const char *fe_path; /* XXX unsafe */
 
     memset(disk, 0, sizeof(*disk));
 
@@ -1544,10 +1545,8 @@ static void libxl__device_disk_from_xs_be(libxl__gc *gc,
     else
         disk->readwrite = 0;
 
-    fe_path = libxl__xs_read(gc, XBT_NULL,
-                             libxl__sprintf(gc, "%s/frontend", be_path));
     tmp = libxl__xs_read(gc, XBT_NULL,
-                         libxl__sprintf(gc, "%s/device-type", fe_path));
+                         libxl__sprintf(gc, "%s/device-type", be_path));
     disk->is_cdrom = !strcmp(tmp, "cdrom");
 
     disk->format = LIBXL_DISK_FORMAT_UNKNOWN;
