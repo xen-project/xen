@@ -463,8 +463,6 @@ int libxl__devices_destroy(libxl__gc *gc, uint32_t domid, int force)
                     if (libxl__device_remove(gc, be_path) > 0)
                         n_watches++;
                 }
-            } else {
-                xs_rm(ctx->xsh, XBT_NULL, path);
             }
         }
     }
