@@ -330,8 +330,6 @@ libxl_nicinfo = Struct("nicinfo", [
     ("frontend_id", uint32),
     ("devid", integer),
     ("state", integer),
-    ("script", string),
-    ("mac", libxl_mac),
     ("evtch", integer),
     ("rref_tx", integer),
     ("rref_rx", integer),

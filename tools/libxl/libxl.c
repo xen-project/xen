@@ -1291,60 +1291,138 @@ int libxl_device_nic_del(libxl_ctx *ctx, uint32_t domid,
     return rc;
 }
 
-libxl_nicinfo *libxl_list_nics(libxl_ctx *ctx, uint32_t domid, unsigned int *nb)
+static void libxl__device_nic_from_xs_be(libxl__gc *gc,
+                                         const char *be_path,
+                                         libxl_device_nic *nic)
+{
+    libxl_ctx *ctx = libxl__gc_owner(gc);
+    unsigned int len;
+    char *tmp;
+    int rc;
+
+    memset(nic, 0, sizeof(*nic));
+
+    tmp = xs_read(ctx->xsh, XBT_NULL,
+                  libxl__sprintf(gc, "%s/handle", be_path), &len);
+    if ( tmp )
+        nic->devid = atoi(tmp);
+    else
+        nic->devid = 0;
+
+    /* nic->mtu = */
+
+    tmp = xs_read(ctx->xsh, XBT_NULL,
+                  libxl__sprintf(gc, "%s/mac", be_path), &len);
+    rc = libxl__parse_mac(tmp, nic->mac);
+    if (rc)
+            memset(nic->mac, 0, sizeof(nic->mac));
+
+    nic->ip = xs_read(ctx->xsh, XBT_NULL,
+                      libxl__sprintf(gc, "%s/ip", be_path), &len);
+
+    nic->bridge = xs_read(ctx->xsh, XBT_NULL,
+                      libxl__sprintf(gc, "%s/bridge", be_path), &len);
+
+    nic->script = xs_read(ctx->xsh, XBT_NULL,
+                      libxl__sprintf(gc, "%s/script", be_path), &len);
+
+    /* XXX ioemu nics are not in xenstore at all? */
+    nic->nictype = LIBXL_NIC_TYPE_VIF;
+    nic->model = NULL; /* XXX Only for TYPE_IOEMU */
+    nic->ifname = NULL; /* XXX Only for TYPE_IOEMU */
+}
+
+static int libxl__append_nic_list_of_type(libxl__gc *gc,
+                                           uint32_t domid,
+                                           const char *type,
+                                           libxl_device_nic **nics,
+                                           int *nnics)
+{
+    char *be_path = NULL;
+    char **dir = NULL;
+    unsigned int n = 0;
+    libxl_device_nic *pnic = NULL, *pnic_end = NULL;
+
+    be_path = libxl__sprintf(gc, "%s/backend/%s/%d",
+                             libxl__xs_get_dompath(gc, 0), type, domid);
+    dir = libxl__xs_directory(gc, XBT_NULL, be_path, &n);
+    if (dir) {
+        libxl_device_nic *tmp;
+        tmp = realloc(*nics, sizeof (libxl_device_nic) * (*nnics + n));
+        if (tmp == NULL)
+            return ERROR_NOMEM;
+        *nics = tmp;
+        pnic = *nics + *nnics;
+        *nnics += n;
+        pnic_end = *nics + *nnics;
+        for (; pnic < pnic_end; pnic++, dir++) {
+            const char *p;
+            p = libxl__sprintf(gc, "%s/%s", be_path, *dir);
+            libxl__device_nic_from_xs_be(gc, p, pnic);
+            pnic->backend_domid = 0;
+        }
+    }
+    return 0;
+}
+
+libxl_device_nic *libxl_device_nic_list(libxl_ctx *ctx, uint32_t domid, int *num)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
-    char *dompath, *nic_path_fe;
-    char **l, **list;
-    char *val, *tok;
-    unsigned int nb_nics, i;
-    libxl_nicinfo *res, *nics;
+    libxl_device_nic *nics = NULL;
+    int rc;
+
+    *num = 0;
+
+    rc = libxl__append_nic_list_of_type(&gc, domid, "vif", &nics, num);
+    if (rc) goto out_err;
+
+    libxl__free_all(&gc);
+    return nics;
+
+out_err:
+    LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Unable to list nics");
+    while (*num) {
+        (*num)--;
+        libxl_device_nic_dispose(&nics[*num]);
+    }
+    free(nics);
+    return NULL;
+}
+
+int libxl_device_nic_getinfo(libxl_ctx *ctx, uint32_t domid,
+                              libxl_device_nic *nic, libxl_nicinfo *nicinfo)
+{
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    char *dompath, *nicpath;
+    char *val;
 
     dompath = libxl__xs_get_dompath(&gc, domid);
-    if (!dompath)
-        goto err;
-    list = l = libxl__xs_directory(&gc, XBT_NULL,
-                           libxl__sprintf(&gc, "%s/device/vif", dompath), &nb_nics);
-    if (!l)
-        goto err;
-    nics = res = calloc(nb_nics, sizeof (libxl_nicinfo));
-    if (!res)
-        goto err;
-    for (*nb = nb_nics; nb_nics > 0; --nb_nics, ++l, ++nics) {
-        nic_path_fe = libxl__sprintf(&gc, "%s/device/vif/%s", dompath, *l);
+    nicinfo->devid = nic->devid;
 
-        nics->backend = xs_read(ctx->xsh, XBT_NULL,
-                                libxl__sprintf(&gc, "%s/backend", nic_path_fe), NULL);
-        val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/backend-id", nic_path_fe));
-        nics->backend_id = val ? strtoul(val, NULL, 10) : -1;
-
-        nics->devid = strtoul(*l, NULL, 10);
-        val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/state", nic_path_fe));
-        nics->state = val ? strtoul(val, NULL, 10) : -1;
-        val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/mac", nic_path_fe));
-        for (i = 0, tok = strtok(val, ":"); tok && (i < 6);
-             ++i, tok = strtok(NULL, ":")) {
-            nics->mac[i] = strtoul(tok, NULL, 16);
-        }
-        val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/event-channel", nic_path_fe));
-        nics->evtch = val ? strtol(val, NULL, 10) : -1;
-        val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/tx-ring-ref", nic_path_fe));
-        nics->rref_tx = val ? strtol(val, NULL, 10) : -1;
-        val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/rx-ring-ref", nic_path_fe));
-        nics->rref_rx = val ? strtol(val, NULL, 10) : -1;
-        nics->frontend = xs_read(ctx->xsh, XBT_NULL,
-                                 libxl__sprintf(&gc, "%s/frontend", nics->backend), NULL);
-        val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/frontend-id", nics->backend));
-        nics->frontend_id = val ? strtoul(val, NULL, 10) : -1;
-        nics->script = xs_read(ctx->xsh, XBT_NULL,
-                               libxl__sprintf(&gc, "%s/script", nics->backend), NULL);
+    nicpath = libxl__sprintf(&gc, "%s/device/vif/%d", dompath, nicinfo->devid);
+    nicinfo->backend = xs_read(ctx->xsh, XBT_NULL,
+                                libxl__sprintf(&gc, "%s/backend", nicpath), NULL);
+    if (!nicinfo->backend) {
+        libxl__free_all(&gc);
+        return ERROR_FAIL;
     }
+    val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/backend-id", nicpath));
+    nicinfo->backend_id = val ? strtoul(val, NULL, 10) : -1;
+    val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/state", nicpath));
+    nicinfo->state = val ? strtoul(val, NULL, 10) : -1;
+    val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/event-channel", nicpath));
+    nicinfo->evtch = val ? strtoul(val, NULL, 10) : -1;
+    val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/tx-ring-ref", nicpath));
+    nicinfo->rref_tx = val ? strtoul(val, NULL, 10) : -1;
+    val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/rx-ring-ref", nicpath));
+    nicinfo->rref_rx = val ? strtoul(val, NULL, 10) : -1;
+    nicinfo->frontend = xs_read(ctx->xsh, XBT_NULL,
+                                 libxl__sprintf(&gc, "%s/frontend", nicinfo->backend), NULL);
+    val = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/frontend-id", nicinfo->backend));
+    nicinfo->frontend_id = val ? strtoul(val, NULL, 10) : -1;
 
     libxl__free_all(&gc);
-    return res;
-err:
-    libxl__free_all(&gc);
-    return NULL;
+    return 0;
 }
 
 /******************************************************************************/

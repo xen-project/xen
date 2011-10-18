@@ -454,7 +454,9 @@ int libxl_device_disk_local_detach(libxl_ctx *ctx, libxl_device_disk *disk);
 int libxl_device_nic_init(libxl_device_nic *nic, int dev_num);
 int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic);
 int libxl_device_nic_del(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic, int wait);
-libxl_nicinfo *libxl_list_nics(libxl_ctx *ctx, uint32_t domid, unsigned int *nb);
+libxl_device_nic *libxl_device_nic_list(libxl_ctx *ctx, uint32_t domid, int *num);
+int libxl_device_nic_getinfo(libxl_ctx *ctx, uint32_t domid,
+                              libxl_device_nic *nic, libxl_nicinfo *nicinfo);
 
 int libxl_device_console_add(libxl_ctx *ctx, uint32_t domid, libxl_device_console *console);
 
