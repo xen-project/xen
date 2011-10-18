@@ -1505,11 +1505,11 @@ int libxl_device_vkb_hard_shutdown(libxl_ctx *ctx, uint32_t domid)
     return ERROR_NI;
 }
 
-static unsigned int libxl__append_disk_list_of_type(libxl__gc *gc,
-                                                    uint32_t domid,
-                                                    const char *type,
-                                                    libxl_device_disk **disks,
-                                                    unsigned int *ndisks)
+static int libxl__append_disk_list_of_type(libxl__gc *gc,
+                                           uint32_t domid,
+                                           const char *type,
+                                           libxl_device_disk **disks,
+                                           int *ndisks)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     char *be_path = NULL;
@@ -1523,11 +1523,16 @@ static unsigned int libxl__append_disk_list_of_type(libxl__gc *gc,
     dir = libxl__xs_directory(gc, XBT_NULL, be_path, &n);
     if (dir) {
         char *removable;
-        *disks = realloc(*disks, sizeof (libxl_device_disk) * (*ndisks + n));
+        libxl_device_disk *tmp;
+        tmp = realloc(*disks, sizeof (libxl_device_disk) * (*ndisks + n));
+        if (tmp == NULL)
+            return ERROR_NOMEM;
+        *disks = tmp;
         pdisk = *disks + *ndisks;
         *ndisks += n;
         pdisk_end = *disks + *ndisks;
         for (; pdisk < pdisk_end; pdisk++, dir++) {
+            memset(pdisk, 0, sizeof(*pdisk));
             pdisk->backend_domid = 0;
             physpath_tmp = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(gc, "%s/%s/params", be_path, *dir), &len);
             if (physpath_tmp && strchr(physpath_tmp, ':')) {
@@ -1555,22 +1560,37 @@ static unsigned int libxl__append_disk_list_of_type(libxl__gc *gc,
             pdisk->format = LIBXL_DISK_FORMAT_UNKNOWN;
         }
     }
-
-    return n;
+    return 0;
 }
 
 libxl_device_disk *libxl_device_disk_list(libxl_ctx *ctx, uint32_t domid, int *num)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
     libxl_device_disk *disks = NULL;
-    unsigned int ndisks = 0;
+    int rc;
 
-    *num = libxl__append_disk_list_of_type(&gc, domid, "vbd", &disks, &ndisks);
-    *num += libxl__append_disk_list_of_type(&gc, domid, "tap", &disks, &ndisks);
-    *num += libxl__append_disk_list_of_type(&gc, domid, "qdisk", &disks, &ndisks);
+    *num = 0;
+
+    rc = libxl__append_disk_list_of_type(&gc, domid, "vbd", &disks, num);
+    if (rc) goto out_err;
+
+    rc = libxl__append_disk_list_of_type(&gc, domid, "tap", &disks, num);
+    if (rc) goto out_err;
+
+    rc = libxl__append_disk_list_of_type(&gc, domid, "qdisk", &disks, num);
+    if (rc) goto out_err;
 
     libxl__free_all(&gc);
     return disks;
+
+out_err:
+    LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Unable to list disks");
+    while (disks && *num) {
+        (*num)--;
+        libxl_device_disk_dispose(&disks[*num]);
+    }
+    free(disks);
+    return NULL;
 }
 
 int libxl_device_disk_getinfo(libxl_ctx *ctx, uint32_t domid,
