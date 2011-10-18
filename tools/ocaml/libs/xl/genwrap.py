@@ -16,6 +16,11 @@ builtins = {
     "libxl_hwcap":          ("int32 array",            None,                                "Val_hwcap(&%(c)s)"),
     }
 
+DEVICE_FUNCTIONS = [ ("add",            ["t", "domid", "unit"]),
+                     ("remove",         ["t", "domid", "unit"]),
+                     ("destroy",        ["t", "domid", "unit"]),
+                   ]
+
 functions = { # ( name , [type1,type2,....] )
     "device_vfb":     [ ("add",            ["t", "domid", "unit"]),
                         ("clean_shutdown", ["domid", "unit"]),
@@ -27,9 +32,7 @@ functions = { # ( name , [type1,type2,....] )
                       ],
     "device_console": [ ("add",            ["t", "domid", "unit"]),
                       ],
-    "device_disk":    [ ("add",            ["t", "domid", "unit"]),
-                        ("del",            ["t", "domid", "unit"]),
-                      ],
+    "device_disk":    DEVICE_FUNCTIONS,
     "device_nic":     [ ("add",            ["t", "domid", "unit"]),
                         ("del",            ["t", "domid", "unit"]),
                       ],

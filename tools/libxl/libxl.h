@@ -438,15 +438,27 @@ libxl_vminfo * libxl_list_vm(libxl_ctx *ctx, int *nb_vm);
  *   This function does not interact with the guest and therefore
  *   cannot block on the guest.
  */
+
+/* Disks */
+int libxl_device_disk_init(libxl_ctx *ctx, libxl_device_disk *disk);
 int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk);
-int libxl_device_disk_del(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk, int wait);
+int libxl_device_disk_remove(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk);
+int libxl_device_disk_destroy(libxl_ctx *ctx, uint32_t domid,
+                              libxl_device_disk *disk);
+
 libxl_device_disk *libxl_device_disk_list(libxl_ctx *ctx, uint32_t domid, int *num);
 int libxl_device_disk_getinfo(libxl_ctx *ctx, uint32_t domid,
                               libxl_device_disk *disk, libxl_diskinfo *diskinfo);
+
+/*
+ * Insert a CD-ROM device. A device corresponding to disk must already
+ * be attached to the guest.
+ */
 int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk);
 
 /*
- * Make a disk available in this domain. Returns path to a device.
+ * Make a disk available in this (the control) domain. Returns path to
+ * a device.
  */
 char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *disk);
 int libxl_device_disk_local_detach(libxl_ctx *ctx, libxl_device_disk *disk);

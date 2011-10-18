@@ -494,7 +494,7 @@ static void parse_disk_config_multistring(XLU_Config **config,
 {
     int e;
 
-    memset(disk, 0, sizeof(*disk));
+    libxl_device_disk_init(ctx, disk);
 
     if (!*config) {
         *config = xlu_cfg_init(stderr, "command line");
@@ -1893,6 +1893,8 @@ static void cd_insert(const char *dom, const char *virtdev, char *phys)
     disk.backend_domid = 0;
 
     libxl_cdrom_insert(ctx, domid, &disk);
+
+    libxl_device_disk_dispose(&disk);
     free(buf);
 }
 
@@ -4182,8 +4184,8 @@ int main_blockdetach(int argc, char **argv)
         fprintf(stderr, "Error: Device %s not connected.\n", argv[optind+1]);
         return 1;
     }
-    if (libxl_device_disk_del(ctx, domid, &disk, 1)) {
-        fprintf(stderr, "libxl_device_disk_del failed.\n");
+    if (libxl_device_disk_remove(ctx, domid, &disk)) {
+        fprintf(stderr, "libxl_device_disk_remove failed.\n");
     }
     return 0;
 }

@@ -916,13 +916,58 @@ int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass)
 
 /******************************************************************************/
 
+int libxl_device_disk_init(libxl_ctx *ctx, libxl_device_disk *disk)
+{
+    memset(disk, 0x00, sizeof(libxl_device_disk));
+    return 0;
+}
+
+static int libxl__device_from_disk(libxl__gc *gc, uint32_t domid,
+                                   libxl_device_disk *disk,
+                                   libxl__device *device)
+{
+    libxl_ctx *ctx = libxl__gc_owner(gc);
+    int devid;
+
+    devid = libxl__device_disk_dev_number(disk->vdev, NULL, NULL);
+    if (devid==-1) {
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Invalid or unsupported"
+               " virtual disk identifier %s", disk->vdev);
+        return ERROR_INVAL;
+    }
+
+    device->backend_domid = disk->backend_domid;
+    device->backend_devid = devid;
+
+    switch (disk->backend) {
+        case LIBXL_DISK_BACKEND_PHY:
+            device->backend_kind = LIBXL__DEVICE_KIND_VBD;
+            break;
+        case LIBXL_DISK_BACKEND_TAP:
+            device->backend_kind = LIBXL__DEVICE_KIND_VBD;
+            break;
+        case LIBXL_DISK_BACKEND_QDISK:
+            device->backend_kind = LIBXL__DEVICE_KIND_QDISK;
+            break;
+        default:
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "unrecognized disk backend type: %d\n",
+                       disk->backend);
+            return ERROR_INVAL;
+    }
+
+    device->domid = domid;
+    device->devid = devid;
+    device->kind  = LIBXL__DEVICE_KIND_VBD;
+
+    return 0;
+}
+
 int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
     flexarray_t *front;
     flexarray_t *back;
     char *dev;
-    int devid;
     libxl__device device;
     int major, minor, rc;
 
@@ -950,19 +995,12 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
         goto out_free;
     }
 
-    devid = libxl__device_disk_dev_number(disk->vdev, NULL, NULL);
-    if (devid==-1) {
+    rc = libxl__device_from_disk(&gc, domid, disk, &device);
+    if (rc != 0) {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Invalid or unsupported"
                " virtual disk identifier %s", disk->vdev);
-        rc = ERROR_INVAL;
         goto out_free;
     }
-
-    device.backend_devid = devid;
-    device.backend_domid = disk->backend_domid;
-    device.devid = devid;
-    device.domid = domid;
-    device.kind = LIBXL__DEVICE_KIND_VBD;
 
     switch (disk->backend) {
         case LIBXL_DISK_BACKEND_PHY:
@@ -975,7 +1013,7 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
             flexarray_append(back, "params");
             flexarray_append(back, dev);
 
-            device.backend_kind = LIBXL__DEVICE_KIND_VBD;
+            assert(device.backend_kind == LIBXL__DEVICE_KIND_VBD);
             break;
         case LIBXL_DISK_BACKEND_TAP:
             dev = libxl__blktap_devpath(&gc, disk->pdev_path, disk->format);
@@ -994,7 +1032,7 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
             flexarray_append(back, "params");
             flexarray_append(back, libxl__sprintf(&gc, "%s:%s",
                           libxl__device_disk_string_of_format(disk->format), disk->pdev_path));
-            device.backend_kind = LIBXL__DEVICE_KIND_QDISK;
+            assert(device.backend_kind == LIBXL__DEVICE_KIND_QDISK);
             break;
         default:
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "unrecognized disk backend type: %d\n", disk->backend);
@@ -1026,7 +1064,7 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
     flexarray_append(front, "state");
     flexarray_append(front, libxl__sprintf(&gc, "%d", 1));
     flexarray_append(front, "virtual-device");
-    flexarray_append(front, libxl__sprintf(&gc, "%d", devid));
+    flexarray_append(front, libxl__sprintf(&gc, "%d", device.devid));
     flexarray_append(front, "device-type");
     flexarray_append(front, disk->is_cdrom ? "cdrom" : "disk");
 
@@ -1044,45 +1082,37 @@ out:
     return rc;
 }
 
-int libxl_device_disk_del(libxl_ctx *ctx, uint32_t domid,
-                          libxl_device_disk *disk, int wait)
+int libxl_device_disk_remove(libxl_ctx *ctx, uint32_t domid,
+                             libxl_device_disk *disk)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
     libxl__device device;
-    int devid, rc;
+    int rc;
 
-    devid = libxl__device_disk_dev_number(disk->vdev, NULL, NULL);
-    device.backend_domid    = disk->backend_domid;
-    device.backend_devid    = devid;
+    rc = libxl__device_from_disk(&gc, domid, disk, &device);
+    if (rc != 0) goto out;
 
-    switch (disk->backend) {
-        case LIBXL_DISK_BACKEND_PHY:
-            device.backend_kind = LIBXL__DEVICE_KIND_VBD;
-            break;
-        case LIBXL_DISK_BACKEND_TAP:
-            device.backend_kind = LIBXL__DEVICE_KIND_VBD;
-            break;
-        case LIBXL_DISK_BACKEND_QDISK:
-            device.backend_kind = LIBXL__DEVICE_KIND_QDISK;
-            break;
-        default:
-            LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "unrecognized disk backend type: %d\n",
-                       disk->backend);
-            rc = ERROR_INVAL;
-            goto out_free;
-    }
-    device.domid            = domid;
-    device.devid            = devid;
-    device.kind             = LIBXL__DEVICE_KIND_VBD;
-    if (wait)
-        rc = libxl__device_remove(&gc, &device, wait);
-    else
-        rc = libxl__device_destroy(&gc, &device);
-out_free:
+    rc = libxl__device_remove(&gc, &device, 1);
+out:
     libxl__free_all(&gc);
     return rc;
 }
 
+int libxl_device_disk_destroy(libxl_ctx *ctx, uint32_t domid,
+                              libxl_device_disk *disk)
+{
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    libxl__device device;
+    int rc;
+
+    rc = libxl__device_from_disk(&gc, domid, disk, &device);
+    if (rc != 0) goto out;
+
+    rc = libxl__device_destroy(&gc, &device);
+out:
+    libxl__free_all(&gc);
+    return rc;
+}
 char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *disk)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
@@ -1626,7 +1656,7 @@ static void libxl__device_disk_from_xs_be(libxl__gc *gc,
     unsigned int len;
     char *tmp;
 
-    memset(disk, 0, sizeof(*disk));
+    libxl_device_disk_init(ctx, disk);
 
     tmp = xs_read(ctx->xsh, XBT_NULL,
                   libxl__sprintf(gc, "%s/params", be_path), &len);
@@ -1670,7 +1700,8 @@ int libxl_devid_to_device_disk(libxl_ctx *ctx, uint32_t domid,
     char *dompath, *path;
     int rc = ERROR_FAIL;
 
-    memset(disk, 0, sizeof (libxl_device_disk));
+    libxl_device_disk_init(ctx, disk);
+
     dompath = libxl__xs_get_dompath(&gc, domid);
     if (!dompath) {
         goto out;
@@ -1812,11 +1843,11 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk)
 
     ret = 0;
 
-    libxl_device_disk_del(ctx, domid, disks + i, 1);
+    libxl_device_disk_remove(ctx, domid, disks + i);
     libxl_device_disk_add(ctx, domid, disk);
     stubdomid = libxl_get_stubdom_id(ctx, domid);
     if (stubdomid) {
-        libxl_device_disk_del(ctx, stubdomid, disks + i, 1);
+        libxl_device_disk_remove(ctx, stubdomid, disks + i);
         libxl_device_disk_add(ctx, stubdomid, disk);
     }
 out:
