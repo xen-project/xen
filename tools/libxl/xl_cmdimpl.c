@@ -762,7 +762,8 @@ static void parse_config_data(const char *configfile_filename_report,
 
             d_config->vifs = (libxl_device_nic *) realloc(d_config->vifs, sizeof (libxl_device_nic) * (d_config->num_vifs+1));
             nic = d_config->vifs + d_config->num_vifs;
-            CHK_ERRNO( libxl_device_nic_init(nic, d_config->num_vifs) );
+            CHK_ERRNO( libxl_device_nic_init(ctx, nic) );
+            nic->devid = d_config->num_vifs;
 
             if (default_vifscript) {
                 free(nic->script);
@@ -3972,7 +3973,7 @@ int main_networkattach(int argc, char **argv)
         fprintf(stderr, "%s is an invalid domain identifier\n", argv[optind]);
         return 1;
     }
-    libxl_device_nic_init(&nic, -1);
+    libxl_device_nic_init(ctx, &nic);
     for (argv += optind+1, argc -= optind+1; argc > 0; ++argv, --argc) {
         if (MATCH_OPTION("type", *argv, oparg)) {
             if (!strcmp("vif", oparg)) {
@@ -4089,7 +4090,7 @@ int main_networkdetach(int argc, char **argv)
             return 1;
         }
     }
-    if (libxl_device_nic_del(ctx, domid, &nic, 1)) {
+    if (libxl_device_nic_remove(ctx, domid, &nic)) {
         fprintf(stderr, "libxl_device_nic_del failed.\n");
         return 1;
     }

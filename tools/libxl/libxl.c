@@ -1187,32 +1187,46 @@ int libxl_device_disk_local_detach(libxl_ctx *ctx, libxl_device_disk *disk)
 }
 
 /******************************************************************************/
-int libxl_device_nic_init(libxl_device_nic *nic_info, int devnum)
+int libxl_device_nic_init(libxl_ctx *ctx, libxl_device_nic *nic)
 {
     const uint8_t *r;
     libxl_uuid uuid;
 
     libxl_uuid_generate(&uuid);
     r = libxl_uuid_bytearray(&uuid);
-    memset(nic_info, '\0', sizeof(*nic_info));
+    memset(nic, '\0', sizeof(*nic));
 
-    nic_info->backend_domid = 0;
-    nic_info->devid = devnum;
-    nic_info->mtu = 1492;
-    nic_info->model = strdup("rtl8139");
-    nic_info->mac[0] = 0x00;
-    nic_info->mac[1] = 0x16;
-    nic_info->mac[2] = 0x3e;
-    nic_info->mac[3] = r[0] & 0x7f;
-    nic_info->mac[4] = r[1];
-    nic_info->mac[5] = r[2];
-    nic_info->ifname = NULL;
-    nic_info->bridge = strdup("xenbr0");
-    nic_info->ip = NULL;
-    if ( asprintf(&nic_info->script, "%s/vif-bridge",
+    nic->backend_domid = 0;
+    nic->devid = -1;
+    nic->mtu = 1492;
+    nic->model = strdup("rtl8139");
+    nic->mac[0] = 0x00;
+    nic->mac[1] = 0x16;
+    nic->mac[2] = 0x3e;
+    nic->mac[3] = r[0] & 0x7f;
+    nic->mac[4] = r[1];
+    nic->mac[5] = r[2];
+    nic->ifname = NULL;
+    nic->bridge = strdup("xenbr0");
+    nic->ip = NULL;
+    if ( asprintf(&nic->script, "%s/vif-bridge",
                libxl_xen_script_dir_path()) < 0 )
         return ERROR_FAIL;
-    nic_info->nictype = LIBXL_NIC_TYPE_IOEMU;
+    nic->nictype = LIBXL_NIC_TYPE_IOEMU;
+    return 0;
+}
+
+static int libxl__device_from_nic(libxl__gc *gc, uint32_t domid,
+                                  libxl_device_nic *nic,
+                                  libxl__device *device)
+{
+    device->backend_devid    = nic->devid;
+    device->backend_domid    = nic->backend_domid;
+    device->backend_kind     = LIBXL__DEVICE_KIND_VIF;
+    device->devid            = nic->devid;
+    device->domid            = domid;
+    device->kind             = LIBXL__DEVICE_KIND_VIF;
+
     return 0;
 }
 
@@ -1249,12 +1263,8 @@ int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic)
         }
     }
 
-    device.backend_devid = nic->devid;
-    device.backend_domid = nic->backend_domid;
-    device.backend_kind = LIBXL__DEVICE_KIND_VIF;
-    device.devid = nic->devid;
-    device.domid = domid;
-    device.kind = LIBXL__DEVICE_KIND_VIF;
+    rc = libxl__device_from_nic(&gc, domid, nic, &device);
+    if ( rc != 0 ) goto out_free;
 
     flexarray_append(back, "frontend-id");
     flexarray_append(back, libxl__sprintf(&gc, "%d", domid));
@@ -1305,29 +1315,37 @@ out:
     return rc;
 }
 
-int libxl_device_nic_del(libxl_ctx *ctx, uint32_t domid,
-                         libxl_device_nic *nic, int wait)
+int libxl_device_nic_remove(libxl_ctx *ctx, uint32_t domid,
+                            libxl_device_nic *nic)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
     libxl__device device;
     int rc;
 
-    device.backend_devid    = nic->devid;
-    device.backend_domid    = nic->backend_domid;
-    device.backend_kind     = LIBXL__DEVICE_KIND_VIF;
-    device.devid            = nic->devid;
-    device.domid            = domid;
-    device.kind             = LIBXL__DEVICE_KIND_VIF;
+    rc = libxl__device_from_nic(&gc, domid, nic, &device);
+    if (rc != 0) goto out;
 
-    if (wait)
-        rc = libxl__device_remove(&gc, &device, wait);
-    else
-        rc = libxl__device_destroy(&gc, &device);
-
+    rc = libxl__device_remove(&gc, &device, 1);
+out:
     libxl__free_all(&gc);
     return rc;
 }
 
+int libxl_device_nic_destroy(libxl_ctx *ctx, uint32_t domid,
+                                  libxl_device_nic *nic)
+{
+    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    libxl__device device;
+    int rc;
+
+    rc = libxl__device_from_nic(&gc, domid, nic, &device);
+    if (rc != 0) goto out;
+
+    rc = libxl__device_destroy(&gc, &device);
+out:
+    libxl__free_all(&gc);
+    return rc;
+}
 static void libxl__device_nic_from_xs_be(libxl__gc *gc,
                                          const char *be_path,
                                          libxl_device_nic *nic)

@@ -281,7 +281,7 @@ value stub_xl_device_nic_del(value info, value domid)
 	device_nic_val(&gc, &lg, &c_info, info);
 
 	INIT_CTX();
-	ret = libxl_device_nic_del(ctx, Int_val(domid), &c_info, 0);
+	ret = libxl_device_nic_remove(ctx, Int_val(domid), &c_info);
 	if (ret != 0)
 		failwith_xl("nic_del", &lg);
 	FREE_CTX();
