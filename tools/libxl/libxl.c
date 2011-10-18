@@ -1333,7 +1333,7 @@ static void libxl__device_nic_from_xs_be(libxl__gc *gc,
 }
 
 int libxl_devid_to_device_nic(libxl_ctx *ctx, uint32_t domid,
-                              const char *devid, libxl_device_nic *nic)
+                              int devid, libxl_device_nic *nic)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
     char *dompath, *path;
@@ -1345,7 +1345,7 @@ int libxl_devid_to_device_nic(libxl_ctx *ctx, uint32_t domid,
         goto out;
 
     path = libxl__xs_read(&gc, XBT_NULL,
-                          libxl__sprintf(&gc, "%s/device/vif/%s/backend",
+                          libxl__sprintf(&gc, "%s/device/vif/%d/backend",
                                          dompath, devid));
     if (!path)
         goto out;
@@ -1657,7 +1657,7 @@ static void libxl__device_disk_from_xs_be(libxl__gc *gc,
 }
 
 int libxl_devid_to_device_disk(libxl_ctx *ctx, uint32_t domid,
-                               const char *devid, libxl_device_disk *disk)
+                               int devid, libxl_device_disk *disk)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
     char *dompath, *path;
@@ -1669,7 +1669,7 @@ int libxl_devid_to_device_disk(libxl_ctx *ctx, uint32_t domid,
         goto out;
     }
     path = libxl__xs_read(&gc, XBT_NULL,
-                          libxl__sprintf(&gc, "%s/device/vbd/%s/backend",
+                          libxl__sprintf(&gc, "%s/device/vbd/%d/backend",
                                          dompath, devid));
     if (!path)
         goto out;

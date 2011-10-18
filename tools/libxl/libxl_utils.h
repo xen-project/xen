@@ -60,11 +60,11 @@ void libxl_report_child_exitstatus(libxl_ctx *ctx, xentoollog_level,
 
 int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
                             const char *mac, libxl_device_nic *nic);
-int libxl_devid_to_device_nic(libxl_ctx *ctx, uint32_t domid,
-                              const char *devid, libxl_device_nic *nic);
+int libxl_devid_to_device_nic(libxl_ctx *ctx, uint32_t domid, int devid,
+                              libxl_device_nic *nic);
 
-int libxl_devid_to_device_disk(libxl_ctx *ctx, uint32_t domid,
-                               const char *devid, libxl_device_disk *disk);
+int libxl_devid_to_device_disk(libxl_ctx *ctx, uint32_t domid, int devid,
+                               libxl_device_disk *disk);
 
 int libxl_cpumap_alloc(libxl_ctx *ctx, libxl_cpumap *cpumap);
 int libxl_cpumap_test(libxl_cpumap *cpumap, int cpu);
