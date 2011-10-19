@@ -281,7 +281,6 @@ static void hpet_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
 {
     struct msi_msg msg;
     unsigned int dest;
-    struct irq_cfg *cfg= desc->chip_data;
 
     dest = set_desc_affinity(desc, mask);
     if (dest == BAD_APICID)
@@ -289,7 +288,7 @@ static void hpet_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
 
     hpet_msi_read(desc->action->dev_id, &msg);
     msg.data &= ~MSI_DATA_VECTOR_MASK;
-    msg.data |= MSI_DATA_VECTOR(cfg->vector);
+    msg.data |= MSI_DATA_VECTOR(desc->arch.vector);
     msg.address_lo &= ~MSI_ADDR_DEST_ID_MASK;
     msg.address_lo |= MSI_ADDR_DEST_ID(dest);
     hpet_msi_write(desc->action->dev_id, &msg);

@@ -10,6 +10,7 @@ cache.h			-> linux/include/asm-ia64/cache.h
 gcc_intrin.h		-> linux/include/asm-ia64/gcc_intrin.h
 ia64regs.h		-> linux/include/asm-ia64/ia64regs.h
 io.h			-> linux/include/asm-ia64/io.h
+irq.h			-> linux/include/asm-ia64/irq.h
 hw_irq.h		-> linux/include/asm-ia64/hw_irq.h
 kregs.h			-> linux/include/asm-ia64/kregs.h
 mca_asm.h		-> linux/include/asm-ia64/mca_asm.h

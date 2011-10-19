@@ -14,6 +14,14 @@
 #define NR_VECTORS	256
 #define NR_IRQS		256
 
+#ifdef XEN
+struct irq_cfg {
+#define arch_irq_desc irq_cfg
+        int  vector;
+        cpumask_t cpu_mask;
+};
+#endif
+
 static __inline__ int
 irq_canonicalize (int irq)
 {
@@ -41,5 +49,25 @@ struct pt_regs;
 int handle_IRQ_event(unsigned int, struct pt_regs *, struct irqaction *);
 
 extern fastcall unsigned int __do_IRQ(unsigned int irq, struct pt_regs *regs);
+
+#ifdef XEN
+static inline unsigned int irq_to_vector(int);
+extern int setup_irq_vector(unsigned int, struct irqaction *);
+extern void release_irq_vector(unsigned int);
+extern int request_irq_vector(unsigned int vector,
+               void (*handler)(int, void *, struct cpu_user_regs *),
+               unsigned long irqflags, const char * devname, void *dev_id);
+
+#define create_irq(x) assign_irq_vector(AUTO_ASSIGN_IRQ)
+#define destroy_irq(x) free_irq_vector(x)
+
+#define irq_cfg(x)        (&irq_desc[x].arch)
+#define irq_to_desc(x)    (&irq_desc[x]
+
+#define irq_complete_move(x) do {} \
+    while(!x)
+
+#define domain_pirq_to_irq(d, irq) domain_irq_to_vector(d, irq)
+#endif
 
 #endif /* _ASM_IA64_IRQ_H */

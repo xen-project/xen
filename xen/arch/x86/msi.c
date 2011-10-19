@@ -123,16 +123,15 @@ static void msix_put_fixmap(struct pci_dev *dev, int idx)
 void msi_compose_msg(struct irq_desc *desc, struct msi_msg *msg)
 {
     unsigned dest;
-    struct irq_cfg *cfg = desc->chip_data;
-    int vector = cfg->vector;
+    int vector = desc->arch.vector;
 
-    if ( cpus_empty(cfg->cpu_mask) ) {
+    if ( cpumask_empty(&desc->arch.cpu_mask) ) {
         dprintk(XENLOG_ERR,"%s, compose msi message error!!\n", __func__);
         return;
     }
 
     if ( vector ) {
-        dest = cpu_mask_to_apicid(&cfg->cpu_mask);
+        dest = cpu_mask_to_apicid(&desc->arch.cpu_mask);
 
         msg->address_hi = MSI_ADDR_BASE_HI;
         msg->address_lo =
@@ -259,7 +258,6 @@ static void set_msi_affinity(struct irq_desc *desc, const cpumask_t *mask)
     struct msi_msg msg;
     unsigned int dest;
     struct msi_desc *msi_desc = desc->msi_desc;
-    struct irq_cfg *cfg = desc->chip_data;
 
     dest = set_desc_affinity(desc, mask);
     if (dest == BAD_APICID || !msi_desc)
@@ -271,7 +269,7 @@ static void set_msi_affinity(struct irq_desc *desc, const cpumask_t *mask)
     read_msi_msg(msi_desc, &msg);
 
     msg.data &= ~MSI_DATA_VECTOR_MASK;
-    msg.data |= MSI_DATA_VECTOR(cfg->vector);
+    msg.data |= MSI_DATA_VECTOR(desc->arch.vector);
     msg.address_lo &= ~MSI_ADDR_DEST_ID_MASK;
     msg.address_lo |= MSI_ADDR_DEST_ID(dest);
     msg.dest32 = dest;

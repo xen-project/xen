@@ -348,7 +348,6 @@ static void iommu_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
     struct msi_msg msg;
     unsigned int dest;
     struct amd_iommu *iommu = desc->action->dev_id;
-    struct irq_cfg *cfg = desc->chip_data;
     u16 seg = iommu->seg;
     u8 bus = (iommu->bdf >> 8) & 0xff;
     u8 dev = PCI_SLOT(iommu->bdf & 0xff);
@@ -363,7 +362,7 @@ static void iommu_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
     }
 
     memset(&msg, 0, sizeof(msg)); 
-    msg.data = MSI_DATA_VECTOR(cfg->vector) & 0xff;
+    msg.data = MSI_DATA_VECTOR(desc->arch.vector) & 0xff;
     msg.data |= 1 << 14;
     msg.data |= (INT_DELIVERY_MODE != dest_LowestPrio) ?
         MSI_DATA_DELIVERY_FIXED:

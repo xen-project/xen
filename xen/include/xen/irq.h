@@ -63,7 +63,6 @@ extern unsigned int nr_irqs;
 #endif
 
 struct msi_desc;
-struct irq_cfg;
 /*
  * This is the "IRQ descriptor", which contains various information
  * about the irq, including what kind of hardware handling it has,
@@ -74,9 +73,9 @@ typedef struct irq_desc {
     hw_irq_controller *handler;
     struct msi_desc   *msi_desc;
     struct irqaction *action;	/* IRQ action list */
-    struct irq_cfg *chip_data;
     int irq;
     spinlock_t lock;
+    struct arch_irq_desc arch;
     cpumask_t affinity;
     cpumask_t pending_mask;  /* IRQ migration pending mask */
 
@@ -97,32 +96,6 @@ extern irq_desc_t irq_desc[NR_VECTORS];
 
 #define request_irq(irq, handler, irqflags, devname, devid) \
     request_irq_vector(irq_to_vector(irq), handler, irqflags, devname, devid)
-
-static inline unsigned int irq_to_vector(int);
-extern int setup_irq_vector(unsigned int, struct irqaction *);
-extern void release_irq_vector(unsigned int);
-extern int request_irq_vector(unsigned int vector,
-               void (*handler)(int, void *, struct cpu_user_regs *),
-               unsigned long irqflags, const char * devname, void *dev_id);
-
-#define create_irq(x) assign_irq_vector(AUTO_ASSIGN_IRQ)
-#define destroy_irq(x) free_irq_vector(x)
-
-#define irq_cfg(x)        &irq_cfg[(x)]
-#define irq_to_desc(x)    &irq_desc[(x)]
-
-#define irq_complete_move(x) do {} \
-    while(!x)
-
-#define domain_pirq_to_irq(d, irq) domain_irq_to_vector(d, irq)
-
-struct irq_cfg {
-        int  vector;
-        cpumask_t cpu_mask;
-};
-
-extern struct irq_cfg irq_cfg[];
-
 #else
 extern int setup_irq(unsigned int irq, struct irqaction *);
 extern void release_irq(unsigned int irq);

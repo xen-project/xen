@@ -1001,7 +1001,6 @@ static void dma_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
     unsigned int dest;
     unsigned long flags;
     struct iommu *iommu = desc->action->dev_id;
-    struct irq_cfg *cfg = desc->chip_data;
 
 #ifdef CONFIG_X86
     dest = set_desc_affinity(desc, mask);
@@ -1011,7 +1010,7 @@ static void dma_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
     }
 
     memset(&msg, 0, sizeof(msg)); 
-    msg.data = MSI_DATA_VECTOR(cfg->vector) & 0xff;
+    msg.data = MSI_DATA_VECTOR(desc->arch.vector) & 0xff;
     msg.data |= 1 << 14;
     msg.data |= (INT_DELIVERY_MODE != dest_LowestPrio) ?
         MSI_DATA_DELIVERY_FIXED:
@@ -1029,7 +1028,7 @@ static void dma_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
     msg.address_lo |= MSI_ADDR_DEST_ID(dest & 0xff);
 #else
     memset(&msg, 0, sizeof(msg));
-    msg.data = cfg->vector & 0xff;
+    msg.data = desc->arch.vector & 0xff;
     msg.data |= 1 << 14;
     msg.address_lo = (MSI_ADDRESS_HEADER << (MSI_ADDRESS_HEADER_SHIFT + 8));
     msg.address_lo |= MSI_PHYSICAL_MODE << 2;

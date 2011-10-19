@@ -552,7 +552,7 @@ fastcall void smp_irq_move_cleanup_interrupt(struct cpu_user_regs *regs)
         if (!desc)
             continue;
 
-        cfg = desc->chip_data;
+        cfg = &desc->arch;
         spin_lock(&desc->lock);
         if (!cfg->move_cleanup_count)
             goto unlock;
@@ -613,7 +613,7 @@ static void send_cleanup_vector(struct irq_cfg *cfg)
 
 void irq_complete_move(struct irq_desc *desc)
 {
-    struct irq_cfg *cfg = desc->chip_data;
+    struct irq_cfg *cfg = &desc->arch;
     unsigned vector, me;
 
     if (likely(!cfg->move_in_progress))
@@ -638,7 +638,7 @@ unsigned int set_desc_affinity(struct irq_desc *desc, const cpumask_t *mask)
         return BAD_APICID;
 
     irq = desc->irq;
-    cfg = desc->chip_data;
+    cfg = &desc->arch;
 
     local_irq_save(flags);
     lock_vector_lock();
@@ -661,11 +661,9 @@ set_ioapic_affinity_irq(struct irq_desc *desc, const cpumask_t *mask)
     unsigned long flags;
     unsigned int dest;
     int pin, irq;
-    struct irq_cfg *cfg;
     struct irq_pin_list *entry;
 
     irq = desc->irq;
-    cfg = desc->chip_data;
 
     spin_lock_irqsave(&ioapic_lock, flags);
     dest = set_desc_affinity(desc, mask);
@@ -682,7 +680,7 @@ set_ioapic_affinity_irq(struct irq_desc *desc, const cpumask_t *mask)
             io_apic_write(entry->apic, 0x10 + 1 + pin*2, dest);
             data = io_apic_read(entry->apic, 0x10 + pin*2);
             data &= ~IO_APIC_REDIR_VECTOR_MASK;
-            data |= cfg->vector & 0xFF;
+            data |= desc->arch.vector & 0xFF;
             io_apic_modify(entry->apic, 0x10 + pin*2, data);
 
             if (!entry->next)
@@ -2448,7 +2446,7 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
         return irq;
 
     desc = irq_to_desc(irq);
-    cfg = desc->chip_data;
+    cfg = &desc->arch;
 
     /*
      * Since PHYSDEVOP_alloc_irq_vector is dummy, rte.vector is the pirq

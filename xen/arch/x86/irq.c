@@ -45,8 +45,6 @@ struct irq_desc __read_mostly *irq_desc = NULL;
 
 static DECLARE_BITMAP(used_vectors, NR_VECTORS);
 
-struct irq_cfg __read_mostly *irq_cfg = NULL;
-
 static DEFINE_SPINLOCK(vector_lock);
 
 DEFINE_PER_CPU(vector_irq_t, vector_irq);
@@ -156,7 +154,7 @@ static inline int find_unassigned_irq(void)
     int irq;
 
     for (irq = nr_irqs_gsi; irq < nr_irqs; irq++)
-        if (irq_cfg[irq].used == IRQ_UNUSED)
+        if (irq_to_desc(irq)->arch.used == IRQ_UNUSED)
             return irq;
     return -ENOSPC;
 }
@@ -198,7 +196,7 @@ static void dynamic_irq_cleanup(unsigned int irq)
     desc->action  = NULL;
     desc->msi_desc = NULL;
     desc->handler = &no_irq_type;
-    desc->chip_data->used_vectors=NULL;
+    desc->arch.used_vectors = NULL;
     cpus_setall(desc->affinity);
     spin_unlock_irqrestore(&desc->lock, flags);
 
@@ -322,26 +320,22 @@ static void __init init_one_irq_cfg(struct irq_cfg *cfg)
 int __init init_irq_data(void)
 {
     struct irq_desc *desc;
-    struct irq_cfg *cfg;
     int irq, vector;
 
     for (vector = 0; vector < NR_VECTORS; ++vector)
         this_cpu(vector_irq)[vector] = -1;
 
     irq_desc = xzalloc_array(struct irq_desc, nr_irqs);
-    irq_cfg = xzalloc_array(struct irq_cfg, nr_irqs);
     irq_vector = xzalloc_array(u8, nr_irqs_gsi);
     
-    if ( !irq_desc || !irq_cfg ||! irq_vector )
+    if ( !irq_desc || !irq_vector )
         return -ENOMEM;
 
     for (irq = 0; irq < nr_irqs; irq++) {
         desc = irq_to_desc(irq);
-        cfg = irq_cfg(irq);
         desc->irq = irq;
-        desc->chip_data = cfg;
         init_one_irq_desc(desc);
-        init_one_irq_cfg(cfg);
+        init_one_irq_cfg(&desc->arch);
     }
 
     /* Never allocate the hypercall vector or Linux/BSD fast-trap vector. */
@@ -384,7 +378,7 @@ static vmask_t *irq_get_used_vector_mask(int irq)
 
         ret = &global_used_vector_map;
 
-        if ( desc->chip_data->used_vectors )
+        if ( desc->arch.used_vectors )
         {
             printk(XENLOG_INFO "%s: Strange, unassigned irq %d already has used_vectors!\n",
                    __func__, irq);
@@ -526,7 +520,7 @@ int assign_irq_vector(int irq)
 {
     int ret;
     unsigned long flags;
-    struct irq_cfg *cfg = &irq_cfg[irq];
+    struct irq_cfg *cfg = irq_cfg(irq);
     struct irq_desc *desc = irq_to_desc(irq);
     
     BUG_ON(irq >= nr_irqs || irq <0);
@@ -1736,15 +1730,15 @@ int map_domain_pirq(
         setup_msi_handler(desc, msi_desc);
 
         if ( opt_irq_vector_map == OPT_IRQ_VECTOR_MAP_PERDEV
-             && !desc->chip_data->used_vectors )
+             && !desc->arch.used_vectors )
         {
-            desc->chip_data->used_vectors = &pdev->info.used_vectors;
-            if ( desc->chip_data->vector != IRQ_VECTOR_UNASSIGNED )
+            desc->arch.used_vectors = &pdev->info.used_vectors;
+            if ( desc->arch.vector != IRQ_VECTOR_UNASSIGNED )
             {
-                int vector = desc->chip_data->vector;
-                ASSERT(!test_bit(vector, desc->chip_data->used_vectors));
+                int vector = desc->arch.vector;
+                ASSERT(!test_bit(vector, desc->arch.used_vectors));
 
-                set_bit(vector, desc->chip_data->used_vectors);
+                set_bit(vector, desc->arch.used_vectors);
             }
         }
 
@@ -1858,7 +1852,6 @@ static void dump_irqs(unsigned char key)
 {
     int i, irq, pirq;
     struct irq_desc *desc;
-    struct irq_cfg *cfg;
     irq_guest_action_t *action;
     struct domain *d;
     const struct pirq *info;
@@ -1870,7 +1863,6 @@ static void dump_irqs(unsigned char key)
     {
 
         desc = irq_to_desc(irq);
-        cfg = desc->chip_data;
 
         if ( !desc->handler || desc->handler == &no_irq_type )
             continue;
@@ -1881,7 +1873,7 @@ static void dump_irqs(unsigned char key)
                           desc->affinity);
         printk("   IRQ:%4d affinity:%s vec:%02x type=%-15s"
                " status=%08x ",
-               irq, keyhandler_scratch, cfg->vector,
+               irq, keyhandler_scratch, desc->arch.vector,
                desc->handler->typename, desc->status);
 
         if ( !(desc->status & IRQ_GUEST) )

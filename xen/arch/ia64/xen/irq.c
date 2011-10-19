@@ -79,14 +79,11 @@ irq_desc_t irq_desc[NR_IRQS] = {
 		.status = IRQ_DISABLED,
 		.handler = &no_irq_type,
 		.lock = SPIN_LOCK_UNLOCKED
+		.arch = {
+		        .vector = -1,
+		        .cpu_mask = CPU_MASK_ALL,
+		}
 	}
-};
-
-struct irq_cfg irq_cfg[NR_IRQS] = {
-    [0 ... NR_IRQS-1] ={
-        .vector = -1,
-        .cpu_mask = CPU_MASK_ALL,
-}
 };
 
 void __do_IRQ_guest(int irq);
@@ -238,7 +235,6 @@ int setup_vector(unsigned int vector, struct irqaction * new)
 	unsigned long flags;
 	struct irqaction *old, **p;
 	irq_desc_t *desc = irq_descp(vector);
-    struct irq_cfg *cfg = irq_cfg(vector);
 
 	/*
 	 * The following block of code has to be executed atomically
@@ -256,8 +252,7 @@ int setup_vector(unsigned int vector, struct irqaction * new)
 	desc->status &= ~(IRQ_DISABLED | IRQ_INPROGRESS | IRQ_GUEST);
 	desc->handler->startup(vector);
 	desc->handler->enable(vector);
-    desc->chip_data = cfg;
-    cfg->vector = vector;
+	desc->arch.vector = vector;
 	spin_unlock_irqrestore(&desc->lock,flags);
 
 	return 0;
@@ -283,13 +278,11 @@ void __init release_irq_vector(unsigned int vec)
 {
 	unsigned long flags;
 	irq_desc_t *desc;
-    struct irq_cfg *cfg;
 
 	if ( vec == IA64_INVALID_VECTOR )
 		return;
 
 	desc = irq_descp(vec);
-    cfg = irq_cfg(vec);
 
 	spin_lock_irqsave(&desc->lock, flags);
 	clear_bit(vec, ia64_xen_vector);
@@ -297,8 +290,7 @@ void __init release_irq_vector(unsigned int vec)
 	desc->depth = 1;
 	desc->status |= IRQ_DISABLED;
 	desc->handler->shutdown(vec);
-    desc->chip_data = NULL;
-    cfg->vector = -1;
+	desc->arch.vector = -1;
 	spin_unlock_irqrestore(&desc->lock, flags);
 
 	while (desc->status & IRQ_INPROGRESS)

@@ -19,7 +19,6 @@ fpu.h			-> linux/include/asm-ia64/fpu.h
 hdreg.h			-> linux/include/asm-ia64/hdreg.h
 intrinsics.h		-> linux/include/asm-ia64/intrinsics.h
 ioctl.h			-> linux/include/asm-ia64/ioctl.h
-irq.h			-> linux/include/asm-ia64/irq.h
 linkage.h		-> linux/include/asm-ia64/linkage.h
 machvec_hpsim.h		-> linux/include/asm-ia64/machvec_hpsim.h
 mca.h			-> linux/include/asm-ia64/mca.h
