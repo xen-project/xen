@@ -598,6 +598,128 @@ void move_native_irq(struct irq_desc *desc)
     desc->handler->enable(desc);
 }
 
+fastcall void smp_irq_move_cleanup_interrupt(struct cpu_user_regs *regs)
+{
+    unsigned vector, me;
+    struct cpu_user_regs *old_regs = set_irq_regs(regs);
+
+    ack_APIC_irq();
+    this_cpu(irq_count)++;
+    irq_enter();
+
+    me = smp_processor_id();
+    for (vector = FIRST_DYNAMIC_VECTOR; vector < NR_VECTORS; vector++) {
+        unsigned int irq;
+        unsigned int irr;
+        struct irq_desc *desc;
+        irq = __get_cpu_var(vector_irq)[vector];
+
+        if (irq == -1)
+            continue;
+
+        desc = irq_to_desc(irq);
+        if (!desc)
+            continue;
+
+        spin_lock(&desc->lock);
+        if (!desc->arch.move_cleanup_count)
+            goto unlock;
+
+        if (vector == desc->arch.vector && cpumask_test_cpu(me, &desc->arch.cpu_mask))
+            goto unlock;
+
+        irr = apic_read(APIC_IRR + (vector / 32 * 0x10));
+        /*
+         * Check if the vector that needs to be cleanedup is
+         * registered at the cpu's IRR. If so, then this is not
+         * the best time to clean it up. Lets clean it up in the
+         * next attempt by sending another IRQ_MOVE_CLEANUP_VECTOR
+         * to myself.
+         */
+        if (irr  & (1 << (vector % 32))) {
+            genapic->send_IPI_self(IRQ_MOVE_CLEANUP_VECTOR);
+            TRACE_3D(TRC_HW_IRQ_MOVE_CLEANUP_DELAY,
+                     irq, vector, smp_processor_id());
+            goto unlock;
+        }
+
+        TRACE_3D(TRC_HW_IRQ_MOVE_CLEANUP,
+                 irq, vector, smp_processor_id());
+
+        __get_cpu_var(vector_irq)[vector] = -1;
+        desc->arch.move_cleanup_count--;
+
+        if ( desc->arch.move_cleanup_count == 0 )
+        {
+            desc->arch.old_vector = IRQ_VECTOR_UNASSIGNED;
+            cpumask_clear(&desc->arch.old_cpu_mask);
+
+            if ( desc->arch.used_vectors )
+            {
+                ASSERT(test_bit(vector, desc->arch.used_vectors));
+                clear_bit(vector, desc->arch.used_vectors);
+            }
+        }
+unlock:
+        spin_unlock(&desc->lock);
+    }
+
+    irq_exit();
+    set_irq_regs(old_regs);
+}
+
+static void send_cleanup_vector(struct irq_desc *desc)
+{
+    cpumask_t cleanup_mask;
+
+    cpumask_and(&cleanup_mask, &desc->arch.old_cpu_mask, &cpu_online_map);
+    desc->arch.move_cleanup_count = cpumask_weight(&cleanup_mask);
+    genapic->send_IPI_mask(&cleanup_mask, IRQ_MOVE_CLEANUP_VECTOR);
+
+    desc->arch.move_in_progress = 0;
+}
+
+void irq_complete_move(struct irq_desc *desc)
+{
+    unsigned vector, me;
+
+    if (likely(!desc->arch.move_in_progress))
+        return;
+
+    vector = get_irq_regs()->entry_vector;
+    me = smp_processor_id();
+
+    if (vector == desc->arch.vector && cpumask_test_cpu(me, &desc->arch.cpu_mask))
+        send_cleanup_vector(desc);
+}
+
+unsigned int set_desc_affinity(struct irq_desc *desc, const cpumask_t *mask)
+{
+    unsigned int irq;
+    int ret;
+    unsigned long flags;
+    cpumask_t dest_mask;
+
+    if (!cpus_intersects(*mask, cpu_online_map))
+        return BAD_APICID;
+
+    irq = desc->irq;
+
+    local_irq_save(flags);
+    lock_vector_lock();
+    ret = __assign_irq_vector(irq, &desc->arch, mask);
+    unlock_vector_lock();
+    local_irq_restore(flags);
+
+    if (ret < 0)
+        return BAD_APICID;
+
+    cpumask_copy(&desc->affinity, mask);
+    cpumask_and(&dest_mask, mask, &desc->arch.cpu_mask);
+
+    return cpu_mask_to_apicid(&dest_mask);
+}
+
 /* For re-setting irq interrupt affinity for specific irq */
 void irq_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
 {
