@@ -253,6 +253,7 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
     case XEN_DOMCTL_MEM_EVENT_OP_PAGING:
     {
         struct mem_event_domain *med = &d->mem_paging;
+        struct p2m_domain *p2m = p2m_get_hostp2m(d);
         rc = -ENODEV;
         /* Only HAP is supported */
         if ( !hap_enabled(d) )
@@ -260,6 +261,11 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
 
         /* Currently only EPT is supported */
         if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
+            break;
+
+        rc = -EXDEV;
+        /* Disallow paging in a PoD guest */
+        if ( p2m->pod.entry_count )
             break;
 
         switch( mec->op )

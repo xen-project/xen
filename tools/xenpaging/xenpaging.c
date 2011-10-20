@@ -246,6 +246,9 @@ static xenpaging_t *xenpaging_init(domid_t domain_id, int num_pages)
             case ENODEV:
                 ERROR("EPT not supported for this guest");
                 break;
+            case EXDEV:
+                ERROR("xenpaging not supported in a PoD guest");
+                break;
             default:
                 ERROR("Error initialising shared page: %s", strerror(errno));
                 break;
