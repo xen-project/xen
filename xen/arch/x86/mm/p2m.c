@@ -113,6 +113,7 @@ p2m_init_nestedp2m(struct domain *d)
 int p2m_init(struct domain *d)
 {
     struct p2m_domain *p2m;
+    int rc;
 
     p2m_get_hostp2m(d) = p2m = xzalloc(struct p2m_domain);
     if ( p2m == NULL )
@@ -121,9 +122,11 @@ int p2m_init(struct domain *d)
 
     /* Must initialise nestedp2m unconditionally
      * since nestedhvm_enabled(d) returns false here.
-     * (p2m_init runs too early for HVM_PARAM_* options)
-     */
-    return p2m_init_nestedp2m(d);
+     * (p2m_init runs too early for HVM_PARAM_* options) */
+    rc = p2m_init_nestedp2m(d);
+    if ( rc ) 
+        p2m_final_teardown(d);
+    return rc;
 }
 
 void p2m_change_entry_type_global(struct domain *d,
