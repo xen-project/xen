@@ -851,16 +851,22 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn)
     p2m_access_t a;
     mfn_t mfn;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
-    int ret = -ENOMEM;
+    int ret;
 
     p2m_lock(p2m);
 
     mfn = p2m->get_entry(p2m, gfn, &p2mt, &a, p2m_query, NULL);
 
+    ret = -ENOENT;
+    /* Allow only missing pages */
+    if ( p2mt != p2m_ram_paging_in_start )
+        goto out;
+
     /* Allocate a page if the gfn does not have one yet */
     if ( !mfn_valid(mfn) )
     {
         /* Get a free page */
+        ret = -ENOMEM;
         page = alloc_domheap_page(p2m->domain, 0);
         if ( unlikely(page == NULL) )
             goto out;
@@ -896,9 +902,15 @@ void p2m_mem_paging_resume(struct domain *d)
     {
         p2m_lock(p2m);
         mfn = p2m->get_entry(p2m, rsp.gfn, &p2mt, &a, p2m_query, NULL);
-        set_p2m_entry(p2m, rsp.gfn, mfn, 0, p2m_ram_rw, a);
-        set_gpfn_from_mfn(mfn_x(mfn), rsp.gfn);
-        audit_p2m(p2m, 1);
+        /* Allow only pages which were prepared properly, or pages which
+         * were nominated but not evicted */
+        if ( mfn_valid(mfn) && 
+             (p2mt == p2m_ram_paging_in || p2mt == p2m_ram_paging_in_start) )
+        {
+            set_p2m_entry(p2m, rsp.gfn, mfn, 0, p2m_ram_rw, a);
+            set_gpfn_from_mfn(mfn_x(mfn), rsp.gfn);
+            audit_p2m(p2m, 1);
+        }
         p2m_unlock(p2m);
     }
 
