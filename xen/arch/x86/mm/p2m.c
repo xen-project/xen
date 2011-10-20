@@ -668,6 +668,24 @@ set_shared_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
 }
 
 #ifdef __x86_64__
+/**
+ * p2m_mem_paging_nominate - Mark a guest page as to-be-paged-out
+ * @d: guest domain
+ * @gfn: guest page to nominate
+ *
+ * Returns 0 for success or negative errno values if gfn is not pageable.
+ *
+ * p2m_mem_paging_nominate() is called by the pager and checks if a guest page
+ * can be paged out. If the following conditions are met the p2mt will be
+ * changed:
+ * - the gfn is backed by a mfn
+ * - the p2mt of the gfn is pageable
+ * - the mfn is not used for IO
+ * - the mfn has exactly one user and has no special meaning
+ *
+ * Once the p2mt is changed the page is readonly for the guest.  On success the
+ * pager can write the page contents to disk and later evict the page.
+ */
 int p2m_mem_paging_nominate(struct domain *d, unsigned long gfn)
 {
     struct page_info *page;
@@ -714,6 +732,25 @@ int p2m_mem_paging_nominate(struct domain *d, unsigned long gfn)
     return ret;
 }
 
+/**
+ * p2m_mem_paging_evict - Mark a guest page as paged-out
+ * @d: guest domain
+ * @gfn: guest page to evict
+ *
+ * Returns 0 for success or negative errno values if eviction is not possible.
+ *
+ * p2m_mem_paging_evict() is called by the pager and will free a guest page and
+ * release it back to Xen. If the following conditions are met the page can be
+ * freed:
+ * - the gfn is backed by a mfn
+ * - the gfn was nominated
+ * - the mfn has still exactly one user and has no special meaning
+ *
+ * After successful nomination some other process could have mapped the page. In
+ * this case eviction can not be done. If the gfn was populated before the pager
+ * could evict it, eviction can not be done either. In this case the gfn is
+ * still backed by a mfn.
+ */
 int p2m_mem_paging_evict(struct domain *d, unsigned long gfn)
 {
     struct page_info *page;
@@ -773,6 +810,15 @@ int p2m_mem_paging_evict(struct domain *d, unsigned long gfn)
     return ret;
 }
 
+/**
+ * p2m_mem_paging_drop_page - Tell pager to drop its reference to a paged page
+ * @d: guest domain
+ * @gfn: guest page to drop
+ *
+ * p2m_mem_paging_drop_page() will notify the pager that a paged-out gfn was
+ * released by the guest. The pager is supposed to drop its reference of the
+ * gfn.
+ */
 void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn)
 {
     struct vcpu *v = current;
@@ -791,6 +837,27 @@ void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn)
     }
 }
 
+/**
+ * p2m_mem_paging_populate - Tell pager to populete a paged page
+ * @d: guest domain
+ * @gfn: guest page in paging state
+ *
+ * p2m_mem_paging_populate() will notify the pager that a page in any of the
+ * paging states needs to be written back into the guest.
+ * This function needs to be called whenever gfn_to_mfn() returns any of the p2m
+ * paging types because the gfn may not be backed by a mfn.
+ *
+ * The gfn can be in any of the paging states, but the pager needs only be
+ * notified when the gfn is in the paging-out path (paging_out or paged).  This
+ * function may be called more than once from several vcpus. If the vcpu belongs
+ * to the guest, the vcpu must be stopped and the pager notified that the vcpu
+ * was stopped. The pager needs to handle several requests for the same gfn.
+ *
+ * If the gfn is not in the paging-out path and the vcpu does not belong to the
+ * guest, nothing needs to be done and the function assumes that a request was
+ * already sent to the pager. In this case the caller has to try again until the
+ * gfn is fully paged in again.
+ */
 void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
 {
     struct vcpu *v = current;
@@ -844,6 +911,17 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
     mem_event_put_request(d, &d->mem_paging, &req);
 }
 
+/**
+ * p2m_mem_paging_prep - Allocate a new page for the guest
+ * @d: guest domain
+ * @gfn: guest page in paging state
+ *
+ * p2m_mem_paging_prep() will allocate a new page for the guest if the gfn is
+ * not backed by a mfn. It is called by the pager.
+ * It is required that the gfn was already populated. The gfn may already have a
+ * mfn if populate was called for  gfn which was nominated but not evicted. In
+ * this case only the p2mt needs to be forwarded.
+ */
 int p2m_mem_paging_prep(struct domain *d, unsigned long gfn)
 {
     struct page_info *page;
@@ -886,6 +964,21 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn)
     return ret;
 }
 
+/**
+ * p2m_mem_paging_resume - Resume guest gfn and vcpus
+ * @d: guest domain
+ * @gfn: guest page in paging state
+ *
+ * p2m_mem_paging_resume() will forward the p2mt of a gfn to ram_rw and all
+ * waiting vcpus will be unpaused again. It is called by the pager.
+ * 
+ * The gfn was previously either evicted and populated, or nominated and
+ * populated. If the page was evicted the p2mt will be p2m_ram_paging_in. If
+ * the page was just nominated the p2mt will be p2m_ram_paging_in_start because
+ * the pager did not call p2m_mem_paging_prep().
+ *
+ * If the gfn was dropped the vcpu needs to be unpaused.
+ */
 void p2m_mem_paging_resume(struct domain *d)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
