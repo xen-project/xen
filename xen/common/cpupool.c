@@ -489,7 +489,7 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
         if ( cpu == XEN_SYSCTL_CPUPOOL_PAR_ANY )
             cpu = first_cpu(cpupool_free_cpus);
         ret = -EINVAL;
-        if ( cpu >= NR_CPUS )
+        if ( cpu >= nr_cpu_ids )
             goto addcpu_out;
         ret = -EBUSY;
         if ( !cpu_isset(cpu, cpupool_free_cpus) )
@@ -517,7 +517,7 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
         cpu = op->cpu;
         if ( cpu == XEN_SYSCTL_CPUPOOL_PAR_ANY )
             cpu = last_cpu(c->cpu_valid);
-        ret = (cpu < NR_CPUS) ? cpupool_unassign_cpu(c, cpu) : -EINVAL;
+        ret = (cpu < nr_cpu_ids) ? cpupool_unassign_cpu(c, cpu) : -EINVAL;
         cpupool_put(c);
     }
     break;

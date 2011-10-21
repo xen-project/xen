@@ -53,7 +53,7 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
     int ret = 0;
     const struct processor_pminfo *pmpt;
 
-    if ( !op || (op->cpuid >= NR_CPUS) || !cpu_online(op->cpuid) )
+    if ( !op || (op->cpuid >= nr_cpu_ids) || !cpu_online(op->cpuid) )
         return -EINVAL;
     pmpt = processor_pminfo[op->cpuid];
 

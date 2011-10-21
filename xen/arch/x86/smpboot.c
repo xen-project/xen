@@ -535,7 +535,7 @@ int alloc_cpu_id(void)
     int cpu;
     cpus_complement(tmp_map, cpu_present_map);
     cpu = first_cpu(tmp_map);
-    return (cpu < NR_CPUS) ? cpu : -ENODEV;
+    return (cpu < nr_cpu_ids) ? cpu : -ENODEV;
 }
 
 static int do_boot_cpu(int apicid, int cpu)

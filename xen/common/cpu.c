@@ -6,6 +6,12 @@
 #include <xen/sched.h>
 #include <xen/stop_machine.h>
 
+unsigned int __read_mostly nr_cpu_ids = NR_CPUS;
+#ifndef nr_cpumask_bits
+unsigned int __read_mostly nr_cpumask_bits
+    = BITS_TO_LONGS(NR_CPUS) * BITS_PER_LONG;
+#endif
+
 /*
  * cpu_bit_bitmap[] is a special, "compressed" data structure that
  * represents all NR_CPUS bits binary values of 1<<nr.
@@ -80,7 +86,7 @@ int cpu_down(unsigned int cpu)
     if ( !cpu_hotplug_begin() )
         return -EBUSY;
 
-    if ( (cpu >= NR_CPUS) || (cpu == 0) || !cpu_online(cpu) )
+    if ( (cpu >= nr_cpu_ids) || (cpu == 0) || !cpu_online(cpu) )
     {
         cpu_hotplug_done();
         return -EINVAL;
@@ -122,7 +128,7 @@ int cpu_up(unsigned int cpu)
     if ( !cpu_hotplug_begin() )
         return -EBUSY;
 
-    if ( (cpu >= NR_CPUS) || cpu_online(cpu) || !cpu_present(cpu) )
+    if ( (cpu >= nr_cpu_ids) || cpu_online(cpu) || !cpu_present(cpu) )
     {
         cpu_hotplug_done();
         return -EINVAL;

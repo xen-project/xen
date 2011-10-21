@@ -198,7 +198,7 @@ void __init numa_init_array(void)
 	   CPUs, as the number of CPUs is not known yet. 
 	   We round robin the existing nodes. */
 	rr = first_node(node_online_map);
-	for (i = 0; i < NR_CPUS; i++) {
+	for (i = 0; i < nr_cpu_ids; i++) {
 		if (cpu_to_node[i] != NUMA_NO_NODE)
 			continue;
  		numa_set_node(i, rr);
@@ -280,7 +280,7 @@ void __init numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
 	memnodemap = _memnodemap;
 	nodes_clear(node_online_map);
 	node_set_online(0);
-	for (i = 0; i < NR_CPUS; i++)
+	for (i = 0; i < nr_cpu_ids; i++)
 		numa_set_node(i, 0);
 	node_to_cpumask[0] = cpumask_of_cpu(0);
 	setup_node_bootmem(0, (u64)start_pfn << PAGE_SHIFT, (u64)end_pfn << PAGE_SHIFT);
@@ -335,7 +335,7 @@ static __init int numa_setup(char *opt)
 void __init init_cpu_to_node(void)
 {
 	int i, node;
- 	for (i = 0; i < NR_CPUS; i++) {
+ 	for (i = 0; i < nr_cpu_ids; i++) {
 		u32 apicid = x86_cpu_to_apicid[i];
 		if (apicid == BAD_APICID)
 			continue;

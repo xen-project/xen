@@ -81,26 +81,43 @@
 
 typedef struct cpumask{ DECLARE_BITMAP(bits, NR_CPUS); } cpumask_t;
 
+extern unsigned int nr_cpu_ids;
+
+#if NR_CPUS > 4 * BITS_PER_LONG && !defined(__ia64__)
+/* Assuming NR_CPUS is huge, a runtime limit is more efficient.  Also,
+ * not all bits may be allocated. */
+extern unsigned int nr_cpumask_bits;
+#else
+# define nr_cpumask_bits (BITS_TO_LONGS(NR_CPUS) * BITS_PER_LONG)
+#endif
+
+/* verify cpu argument to cpumask_* operators */
+static inline unsigned int cpumask_check(unsigned int cpu)
+{
+	ASSERT(cpu < nr_cpu_ids);
+	return cpu;
+}
+
 #define cpu_set(cpu, dst) cpumask_set_cpu(cpu, &(dst))
 static inline void cpumask_set_cpu(int cpu, volatile cpumask_t *dstp)
 {
-	set_bit(cpu, dstp->bits);
+	set_bit(cpumask_check(cpu), dstp->bits);
 }
 
 #define cpu_clear(cpu, dst) cpumask_clear_cpu(cpu, &(dst))
 static inline void cpumask_clear_cpu(int cpu, volatile cpumask_t *dstp)
 {
-	clear_bit(cpu, dstp->bits);
+	clear_bit(cpumask_check(cpu), dstp->bits);
 }
 
-#define cpumask_setall(dst) __cpus_setall(dst, NR_CPUS)
+#define cpumask_setall(dst) __cpus_setall(dst, nr_cpumask_bits)
 #define cpus_setall(dst) __cpus_setall(&(dst), NR_CPUS)
 static inline void __cpus_setall(cpumask_t *dstp, int nbits)
 {
 	bitmap_fill(dstp->bits, nbits);
 }
 
-#define cpumask_clear(dst) __cpus_clear(dst, NR_CPUS)
+#define cpumask_clear(dst) __cpus_clear(dst, nr_cpumask_bits)
 #define cpus_clear(dst) __cpus_clear(&(dst), NR_CPUS)
 static inline void __cpus_clear(cpumask_t *dstp, int nbits)
 {
@@ -108,24 +125,26 @@ static inline void __cpus_clear(cpumask_t *dstp, int nbits)
 }
 
 /* No static inline type checking - see Subtlety (1) above. */
-#define cpumask_test_cpu(cpu, cpumask) test_bit(cpu, (cpumask)->bits)
+#define cpumask_test_cpu(cpu, cpumask) \
+	test_bit(cpumask_check(cpu), (cpumask)->bits)
 #define cpu_isset(cpu, cpumask) test_bit((cpu), (cpumask).bits)
 
 #define cpu_test_and_set(cpu, cpumask) \
 	cpumask_test_and_set_cpu(cpu, &(cpumask))
 static inline int cpumask_test_and_set_cpu(int cpu, cpumask_t *addr)
 {
-	return test_and_set_bit(cpu, addr->bits);
+	return test_and_set_bit(cpumask_check(cpu), addr->bits);
 }
 
 #define cpu_test_and_clear(cpu, cpumask) \
 	cpumask_test_and_clear_cpu(cpu, &(cpumask))
 static inline int cpumask_test_and_clear_cpu(int cpu, cpumask_t *addr)
 {
-	return test_and_clear_bit(cpu, addr->bits);
+	return test_and_clear_bit(cpumask_check(cpu), addr->bits);
 }
 
-#define cpumask_and(dst, src1, src2) __cpus_and(dst, src1, src2, NR_CPUS)
+#define cpumask_and(dst, src1, src2) \
+	__cpus_and(dst, src1, src2, nr_cpumask_bits)
 #define cpus_and(dst, src1, src2) __cpus_and(&(dst), &(src1), &(src2), NR_CPUS)
 static inline void __cpus_and(cpumask_t *dstp, const cpumask_t *src1p,
 					const cpumask_t *src2p, int nbits)
@@ -133,7 +152,8 @@ static inline void __cpus_and(cpumask_t *dstp, const cpumask_t *src1p,
 	bitmap_and(dstp->bits, src1p->bits, src2p->bits, nbits);
 }
 
-#define cpumask_or(dst, src1, src2) __cpus_or(dst, src1, src2, NR_CPUS)
+#define cpumask_or(dst, src1, src2) \
+	__cpus_or(dst, src1, src2, nr_cpumask_bits)
 #define cpus_or(dst, src1, src2) __cpus_or(&(dst), &(src1), &(src2), NR_CPUS)
 static inline void __cpus_or(cpumask_t *dstp, const cpumask_t *src1p,
 					const cpumask_t *src2p, int nbits)
@@ -141,7 +161,8 @@ static inline void __cpus_or(cpumask_t *dstp, const cpumask_t *src1p,
 	bitmap_or(dstp->bits, src1p->bits, src2p->bits, nbits);
 }
 
-#define cpumask_xor(dst, src1, src2) __cpus_xor(dst, src1, src2, NR_CPUS)
+#define cpumask_xor(dst, src1, src2) \
+	__cpus_xor(dst, src1, src2, nr_cpumask_bits)
 #define cpus_xor(dst, src1, src2) __cpus_xor(&(dst), &(src1), &(src2), NR_CPUS)
 static inline void __cpus_xor(cpumask_t *dstp, const cpumask_t *src1p,
 					const cpumask_t *src2p, int nbits)
@@ -149,7 +170,8 @@ static inline void __cpus_xor(cpumask_t *dstp, const cpumask_t *src1p,
 	bitmap_xor(dstp->bits, src1p->bits, src2p->bits, nbits);
 }
 
-#define cpumask_andnot(dst, src1, src2) __cpus_andnot(dst, src1, src2, NR_CPUS)
+#define cpumask_andnot(dst, src1, src2) \
+	__cpus_andnot(dst, src1, src2, nr_cpumask_bits)
 #define cpus_andnot(dst, src1, src2) \
 				__cpus_andnot(&(dst), &(src1), &(src2), NR_CPUS)
 static inline void __cpus_andnot(cpumask_t *dstp, const cpumask_t *src1p,
@@ -158,7 +180,8 @@ static inline void __cpus_andnot(cpumask_t *dstp, const cpumask_t *src1p,
 	bitmap_andnot(dstp->bits, src1p->bits, src2p->bits, nbits);
 }
 
-#define cpumask_complement(dst, src) __cpus_complement(dst, src, NR_CPUS)
+#define cpumask_complement(dst, src) \
+	__cpus_complement(dst, src, nr_cpumask_bits)
 #define cpus_complement(dst, src) __cpus_complement(&(dst), &(src), NR_CPUS)
 static inline void __cpus_complement(cpumask_t *dstp,
 					const cpumask_t *srcp, int nbits)
@@ -166,55 +189,62 @@ static inline void __cpus_complement(cpumask_t *dstp,
 	bitmap_complement(dstp->bits, srcp->bits, nbits);
 }
 
-#define cpumask_equal(src1, src2) __cpus_equal(src1, src2, NR_CPUS)
-#define cpus_equal(src1, src2) __cpus_equal(&(src1), &(src2), NR_CPUS)
+#define cpumask_equal(src1, src2) __cpus_equal(src1, src2, nr_cpu_ids)
+#define cpus_equal(src1, src2) __cpus_equal(&(src1), &(src2), nr_cpu_ids)
 static inline int __cpus_equal(const cpumask_t *src1p,
 					const cpumask_t *src2p, int nbits)
 {
 	return bitmap_equal(src1p->bits, src2p->bits, nbits);
 }
 
-#define cpus_intersects(src1, src2) __cpus_intersects(&(src1), &(src2), NR_CPUS)
+#define cpumask_intersects(src1, src2) \
+	__cpus_intersects(src1, src2, nr_cpu_ids)
+#define cpus_intersects(src1, src2) \
+	__cpus_intersects(&(src1), &(src2), nr_cpu_ids)
 static inline int __cpus_intersects(const cpumask_t *src1p,
 					const cpumask_t *src2p, int nbits)
 {
 	return bitmap_intersects(src1p->bits, src2p->bits, nbits);
 }
 
-#define cpus_subset(src1, src2) __cpus_subset(&(src1), &(src2), NR_CPUS)
+#define cpumask_subset(src1, src2) __cpus_subset(src1, src2, nr_cpu_ids)
+#define cpus_subset(src1, src2) __cpus_subset(&(src1), &(src2), nr_cpu_ids)
 static inline int __cpus_subset(const cpumask_t *src1p,
 					const cpumask_t *src2p, int nbits)
 {
 	return bitmap_subset(src1p->bits, src2p->bits, nbits);
 }
 
-#define cpumask_empty(src) __cpus_empty(src, NR_CPUS)
-#define cpus_empty(src) __cpus_empty(&(src), NR_CPUS)
+#define cpumask_empty(src) __cpus_empty(src, nr_cpu_ids)
+#define cpus_empty(src) __cpus_empty(&(src), nr_cpu_ids)
 static inline int __cpus_empty(const cpumask_t *srcp, int nbits)
 {
 	return bitmap_empty(srcp->bits, nbits);
 }
 
-#define cpumask_full(cpumask) __cpus_full(cpumask, NR_CPUS)
-#define cpus_full(cpumask) __cpus_full(&(cpumask), NR_CPUS)
+#define cpumask_full(cpumask) __cpus_full(cpumask, nr_cpu_ids)
+#define cpus_full(cpumask) __cpus_full(&(cpumask), nr_cpu_ids)
 static inline int __cpus_full(const cpumask_t *srcp, int nbits)
 {
 	return bitmap_full(srcp->bits, nbits);
 }
 
-#define cpumask_weight(cpumask) __cpus_weight(cpumask, NR_CPUS)
-#define cpus_weight(cpumask) __cpus_weight(&(cpumask), NR_CPUS)
+#define cpumask_weight(cpumask) __cpus_weight(cpumask, nr_cpu_ids)
+#define cpus_weight(cpumask) __cpus_weight(&(cpumask), nr_cpu_ids)
 static inline int __cpus_weight(const cpumask_t *srcp, int nbits)
 {
 	return bitmap_weight(srcp->bits, nbits);
 }
 
-#define cpus_copy(dest, src) cpumask_copy(&(dest), &(src))
-static inline void cpumask_copy(cpumask_t *dstp, const cpumask_t *srcp)
+#define cpumask_copy(dest, src) __cpus_copy(dest, src, nr_cpumask_bits)
+#define cpus_copy(dest, src) __cpus_copy(&(dest), &(src), NR_CPUS)
+static inline void __cpus_copy(cpumask_t *dstp, const cpumask_t *srcp, int nbits)
 {
-	bitmap_copy(dstp->bits, srcp->bits, NR_CPUS);
+	bitmap_copy(dstp->bits, srcp->bits, nbits);
 }
 
+#define cpumask_shift_right(dst, src, n) \
+	__cpus_shift_right(dst, src, n, nr_cpumask_bits)
 #define cpus_shift_right(dst, src, n) \
 			__cpus_shift_right(&(dst), &(src), (n), NR_CPUS)
 static inline void __cpus_shift_right(cpumask_t *dstp,
@@ -223,6 +253,8 @@ static inline void __cpus_shift_right(cpumask_t *dstp,
 	bitmap_shift_right(dstp->bits, srcp->bits, n, nbits);
 }
 
+#define cpumask_shift_left(dst, src, n) \
+	__cpus_shift_left(dst, src, n, nr_cpumask_bits)
 #define cpus_shift_left(dst, src, n) \
 			__cpus_shift_left(&(dst), &(src), (n), NR_CPUS)
 static inline void __cpus_shift_left(cpumask_t *dstp,
@@ -231,22 +263,22 @@ static inline void __cpus_shift_left(cpumask_t *dstp,
 	bitmap_shift_left(dstp->bits, srcp->bits, n, nbits);
 }
 
-#define cpumask_first(src) __first_cpu(src, NR_CPUS)
-#define first_cpu(src) __first_cpu(&(src), NR_CPUS)
+#define cpumask_first(src) __first_cpu(src, nr_cpu_ids)
+#define first_cpu(src) __first_cpu(&(src), nr_cpu_ids)
 static inline int __first_cpu(const cpumask_t *srcp, int nbits)
 {
 	return min_t(int, nbits, find_first_bit(srcp->bits, nbits));
 }
 
-#define cpumask_next(n, src) __next_cpu(n, src, NR_CPUS)
-#define next_cpu(n, src) __next_cpu((n), &(src), NR_CPUS)
+#define cpumask_next(n, src) __next_cpu(n, src, nr_cpu_ids)
+#define next_cpu(n, src) __next_cpu((n), &(src), nr_cpu_ids)
 static inline int __next_cpu(int n, const cpumask_t *srcp, int nbits)
 {
 	return min_t(int, nbits, find_next_bit(srcp->bits, nbits, n+1));
 }
 
-#define cpumask_last(src) __last_cpu(src, NR_CPUS)
-#define last_cpu(src) __last_cpu(&(src), NR_CPUS)
+#define cpumask_last(src) __last_cpu(src, nr_cpu_ids)
+#define last_cpu(src) __last_cpu(&(src), nr_cpu_ids)
 static inline int __last_cpu(const cpumask_t *srcp, int nbits)
 {
 	int cpu, pcpu = nbits;
@@ -257,8 +289,8 @@ static inline int __last_cpu(const cpumask_t *srcp, int nbits)
 	return pcpu;
 }
 
-#define cpumask_cycle(n, src) __cycle_cpu(n, src, NR_CPUS)
-#define cycle_cpu(n, src) __cycle_cpu((n), &(src), NR_CPUS)
+#define cpumask_cycle(n, src) __cycle_cpu(n, src, nr_cpu_ids)
+#define cycle_cpu(n, src) __cycle_cpu((n), &(src), nr_cpu_ids)
 static inline int __cycle_cpu(int n, const cpumask_t *srcp, int nbits)
 {
     int nxt = __next_cpu(n, srcp, nbits);
@@ -317,7 +349,7 @@ static inline const cpumask_t *cpumask_of(unsigned int cpu)
 #define cpus_addr(src) ((src).bits)
 
 #define cpumask_scnprintf(buf, len, src) \
-			__cpumask_scnprintf((buf), (len), &(src), NR_CPUS)
+	__cpumask_scnprintf((buf), (len), &(src), nr_cpu_ids)
 static inline int __cpumask_scnprintf(char *buf, int len,
 					const cpumask_t *srcp, int nbits)
 {
@@ -325,7 +357,7 @@ static inline int __cpumask_scnprintf(char *buf, int len,
 }
 
 #define cpulist_scnprintf(buf, len, src) \
-			__cpulist_scnprintf((buf), (len), &(src), NR_CPUS)
+	__cpulist_scnprintf((buf), (len), &(src), nr_cpu_ids)
 static inline int __cpulist_scnprintf(char *buf, int len,
 					const cpumask_t *srcp, int nbits)
 {
@@ -355,6 +387,11 @@ typedef cpumask_t *cpumask_var_t;
 
 static inline bool_t alloc_cpumask_var(cpumask_var_t *mask)
 {
+	/*
+	 * Once all direct cpumask assignments and all cpus_*() accessors
+	 * still referencing NR_CPUS are gone, we could use nr_cpumask_bits
+	 * to determine the allocation size here.
+	 */
 	return (*mask = xmalloc(cpumask_t)) != NULL;
 }
 
@@ -386,7 +423,7 @@ static inline bool_t zalloc_cpumask_var(cpumask_var_t *mask)
 #if NR_CPUS > 1
 #define for_each_cpu_mask(cpu, mask)		\
 	for ((cpu) = first_cpu(mask);		\
-		(cpu) < NR_CPUS;		\
+		(cpu) < nr_cpu_ids;		\
 		(cpu) = next_cpu((cpu), (mask)))
 #else /* NR_CPUS == 1 */
 #define for_each_cpu_mask(cpu, mask) for ((cpu) = 0; (cpu) < 1; (cpu)++)

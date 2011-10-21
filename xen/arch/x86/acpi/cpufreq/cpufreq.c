@@ -209,7 +209,7 @@ static u32 get_cur_val(const cpumask_t *mask)
 
     if (!cpumask_test_cpu(cpu, mask))
         cpu = cpumask_first(mask);
-    if (cpu >= NR_CPUS || !cpu_online(cpu))
+    if (cpu >= nr_cpu_ids || !cpu_online(cpu))
         return 0;
 
     policy = per_cpu(cpufreq_cpu_policy, cpu);

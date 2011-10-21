@@ -900,7 +900,7 @@ int get_cpu_id(u32 acpi_id)
     if ( apic_id == BAD_APICID )
         return -1;
 
-    for ( i = 0; i < NR_CPUS; i++ )
+    for ( i = 0; i < nr_cpu_ids; i++ )
     {
         if ( apic_id == x86_cpu_to_apicid[i] )
             return i;

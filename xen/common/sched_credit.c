@@ -374,7 +374,7 @@ csched_alloc_pdata(const struct scheduler *ops, int cpu)
 
     INIT_LIST_HEAD(&spc->runq);
     spc->runq_sort_last = prv->runq_sort;
-    spc->idle_bias = NR_CPUS - 1;
+    spc->idle_bias = nr_cpu_ids - 1;
     if ( per_cpu(schedule_data, cpu).sched_priv == NULL )
         per_cpu(schedule_data, cpu).sched_priv = spc;
 

@@ -1201,7 +1201,7 @@ static void sedf_wake(const struct scheduler *ops, struct vcpu *d)
       routine. Try to avoid unnecessary runs but:
       Save approximation: Always switch to scheduler!*/
     ASSERT(d->processor >= 0);
-    ASSERT(d->processor < NR_CPUS);
+    ASSERT(d->processor < nr_cpu_ids);
     ASSERT(per_cpu(schedule_data, d->processor).curr);
 
     if ( should_switch(per_cpu(schedule_data, d->processor).curr, d, now) )

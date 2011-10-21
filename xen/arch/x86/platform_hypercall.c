@@ -442,7 +442,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
             break;
         }
 
-        if ( (g_info->xen_cpuid >= NR_CPUS) ||
+        if ( (g_info->xen_cpuid >= nr_cpu_ids) ||
              !cpu_present(g_info->xen_cpuid) )
         {
             g_info->flags |= XEN_PCPU_FLAGS_INVALID;

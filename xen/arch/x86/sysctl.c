@@ -82,7 +82,7 @@ long arch_do_sysctl(
         pi->nr_cpus = num_online_cpus();
         pi->nr_nodes = num_online_nodes();
         pi->max_node_id = MAX_NUMNODES-1;
-        pi->max_cpu_id = NR_CPUS-1;
+        pi->max_cpu_id = nr_cpu_ids - 1;
         pi->total_pages = total_pages;
         pi->free_pages = avail_domheap_pages();
         pi->scrub_pages = 0;

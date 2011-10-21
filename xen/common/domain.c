@@ -1023,7 +1023,7 @@ int continue_hypercall_on_cpu(
 {
     struct migrate_info *info;
 
-    if ( (cpu >= NR_CPUS) || !cpu_online(cpu) )
+    if ( (cpu >= nr_cpu_ids) || !cpu_online(cpu) )
         return -EINVAL;
 
     info = this_cpu(continue_info);

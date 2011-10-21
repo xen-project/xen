@@ -51,7 +51,7 @@ static bool_t __initdata opt_nosmp;
 boolean_param("nosmp", opt_nosmp);
 
 /* maxcpus: maximum number of CPUs to activate. */
-static unsigned int __initdata max_cpus = NR_CPUS;
+static unsigned int __initdata max_cpus;
 integer_param("maxcpus", max_cpus);
 
 /* opt_watchdog: If true, run a watchdog NMI on each processor. */
@@ -230,7 +230,7 @@ static void __init normalise_cpu_order(void)
          * Among identical longest-prefix matches, pick the smallest APIC ID.
          */
         for ( j = next_cpu(i, cpu_present_map);
-              j < NR_CPUS;
+              j < nr_cpu_ids;
               j = next_cpu(j, cpu_present_map) )
         {
             diff = x86_cpu_to_apicid[j] ^ apicid;
@@ -246,9 +246,9 @@ static void __init normalise_cpu_order(void)
         }
 
         /* If no match then there must be no CPUs remaining to consider. */
-        if ( min_cpu >= NR_CPUS )
+        if ( min_cpu >= nr_cpu_ids )
         {
-            BUG_ON(next_cpu(i, cpu_present_map) < NR_CPUS);
+            BUG_ON(next_cpu(i, cpu_present_map) < nr_cpu_ids);
             break;
         }
 
@@ -1203,6 +1203,17 @@ void __init __start_xen(unsigned long mbi_p)
     if ( smp_found_config )
         get_smp_config();
 
+    if ( opt_nosmp )
+    {
+        max_cpus = 0;
+        set_nr_cpu_ids(1);
+    }
+    else
+    {
+        set_nr_cpu_ids(max_cpus);
+        max_cpus = nr_cpu_ids;
+    }
+
 #ifdef CONFIG_X86_64
     /* Low mappings were only needed for some BIOS table parsing. */
     zap_low_mappings();
@@ -1253,9 +1264,6 @@ void __init __start_xen(unsigned long mbi_p)
 
     acpi_mmcfg_init();
 #endif
-
-    if ( opt_nosmp )
-        max_cpus = 0;
 
     iommu_setup();    /* setup iommu if available */
 

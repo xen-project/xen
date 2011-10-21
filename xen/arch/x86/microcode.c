@@ -126,7 +126,7 @@ static long do_microcode_update(void *_info)
         info->error = error;
 
     info->cpu = next_cpu(info->cpu, cpu_online_map);
-    if ( info->cpu < NR_CPUS )
+    if ( info->cpu < nr_cpu_ids )
         return continue_hypercall_on_cpu(info->cpu, do_microcode_update, info);
 
     error = info->error;

@@ -1487,7 +1487,7 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
         mc_msrinject = &op->u.mc_msrinject;
         target = mc_msrinject->mcinj_cpunr;
 
-        if (target >= NR_CPUS)
+        if (target >= nr_cpu_ids)
             return x86_mcerr("do_mca inject: bad target", -EINVAL);
 
         if (!cpu_online(target))
@@ -1514,7 +1514,7 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
         mc_mceinject = &op->u.mc_mceinject;
         target = mc_mceinject->mceinj_cpunr;
 
-        if (target >= NR_CPUS)
+        if (target >= nr_cpu_ids)
             return x86_mcerr("do_mca #MC: bad target", -EINVAL);
 
         if (!cpu_online(target))

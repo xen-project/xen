@@ -95,7 +95,7 @@ int arch_acpi_set_pdc_bits(u32 acpi_id, u32 *pdc, u32 mask)
 
 	if (!(acpi_id + 1))
 		c = &boot_cpu_data;
-	else if (cpu >= NR_CPUS || !cpu_online(cpu))
+	else if (cpu >= nr_cpu_ids || !cpu_online(cpu))
 		return -EINVAL;
 	else
 		c = cpu_data + cpu;

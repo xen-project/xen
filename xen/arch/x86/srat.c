@@ -447,7 +447,7 @@ int __init acpi_scan_nodes(u64 start, u64 end)
 			continue;
 		setup_node_bootmem(i, nodes[i].start, nodes[i].end);
 	}
-	for (i = 0; i < NR_CPUS; i++) { 
+	for (i = 0; i < nr_cpu_ids; i++) {
 		if (cpu_to_node[i] == NUMA_NO_NODE)
 			continue;
 		if (!node_isset(cpu_to_node[i], nodes_parsed))

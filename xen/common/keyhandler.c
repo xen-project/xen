@@ -98,7 +98,7 @@ void dump_execstate(struct cpu_user_regs *regs)
         return;
 
     cpu = cycle_cpu(cpu, dump_execstate_mask);
-    if ( cpu < NR_CPUS )
+    if ( cpu < nr_cpu_ids )
     {
         smp_send_state_dump(cpu);
         return;

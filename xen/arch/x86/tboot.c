@@ -248,7 +248,7 @@ static int mfn_in_guarded_stack(unsigned long mfn)
     void *p;
     int i;
 
-    for ( i = 0; i < NR_CPUS; i++ )
+    for ( i = 0; i < nr_cpu_ids; i++ )
     {
         if ( !stack_base[i] )
             continue;

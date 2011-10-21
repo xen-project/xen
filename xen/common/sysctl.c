@@ -183,7 +183,7 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
         uint32_t i, nr_cpus;
         struct xen_sysctl_cpuinfo cpuinfo;
 
-        nr_cpus = min_t(uint32_t, op->u.getcpuinfo.max_cpus, NR_CPUS);
+        nr_cpus = min(op->u.getcpuinfo.max_cpus, nr_cpu_ids);
 
         ret = xsm_getcpuinfo();
         if ( ret )

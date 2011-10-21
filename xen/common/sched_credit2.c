@@ -2071,7 +2071,7 @@ csched_init(struct scheduler *ops)
     INIT_LIST_HEAD(&prv->sdom);
 
     /* But un-initialize all runqueues */
-    for ( i=0; i<NR_CPUS; i++)
+    for ( i = 0; i < nr_cpu_ids; i++ )
     {
         prv->runq_map[i] = -1;
         prv->rqd[i].id = -1;

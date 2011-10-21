@@ -3412,7 +3412,7 @@ static void __set_intr_gate(unsigned int n, uint32_t dpl, void *addr)
 {
     int i;
     /* Keep secondary tables in sync with IRQ updates. */
-    for ( i = 1; i < NR_CPUS; i++ )
+    for ( i = 1; i < nr_cpu_ids; i++ )
         if ( idt_tables[i] != NULL )
             _set_gate(&idt_tables[i][n], 14, dpl, addr);
     _set_gate(&idt_table[n], 14, dpl, addr);

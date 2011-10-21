@@ -28,6 +28,7 @@
 #include <asm/mtrr.h>
 #include <asm/mpspec.h>
 #include <asm/io_apic.h>
+#include <asm/setup.h>
 
 #include <mach_apic.h>
 #include <mach_mpparse.h>
@@ -61,9 +62,30 @@ unsigned int __read_mostly boot_cpu_physical_apicid = BAD_APICID;
 
 /* Internal processor count */
 static unsigned int __devinitdata num_processors;
+static unsigned int __initdata disabled_cpus;
 
 /* Bitmask of physically existing CPUs */
 physid_mask_t phys_cpu_present_map;
+
+void __init set_nr_cpu_ids(unsigned int max_cpus)
+{
+	if (!max_cpus)
+		max_cpus = num_processors + disabled_cpus;
+	if (max_cpus > NR_CPUS)
+		max_cpus = NR_CPUS;
+	else if (!max_cpus)
+		max_cpus = 1;
+	printk(XENLOG_INFO "SMP: Allowing %u CPUs (%d hotplug CPUs)\n",
+	       max_cpus, max_t(int, max_cpus - num_processors, 0));
+	nr_cpu_ids = max_cpus;
+
+#ifndef nr_cpumask_bits
+	nr_cpumask_bits = (max_cpus + (BITS_PER_LONG - 1)) &
+			  ~(BITS_PER_LONG - 1);
+	printk(XENLOG_DEBUG "NR_CPUS:%u nr_cpumask_bits:%u\n",
+	       NR_CPUS, nr_cpumask_bits);
+#endif
+}
 
 /*
  * Intel MP BIOS table parsing routines:
@@ -90,8 +112,11 @@ static int __devinit MP_processor_info_x(struct mpc_config_processor *m,
 {
  	int ver, apicid, cpu = 0;
  	
-	if (!(m->mpc_cpuflag & CPU_ENABLED))
+	if (!(m->mpc_cpuflag & CPU_ENABLED)) {
+		if (!hotplug)
+			++disabled_cpus;
 		return -EINVAL;
+	}
 
 	apicid = mpc_apic_id(m, apicidx);
 
@@ -115,9 +140,9 @@ static int __devinit MP_processor_info_x(struct mpc_config_processor *m,
 
 	set_apicid(apicid, &phys_cpu_present_map);
 
-	if (num_processors >= NR_CPUS) {
-		printk(KERN_WARNING "WARNING: NR_CPUS limit of %i reached."
-			"  Processor ignored.\n", NR_CPUS);
+	if (num_processors >= nr_cpu_ids) {
+		printk(KERN_WARNING "WARNING: NR_CPUS limit of %u reached."
+			"  Processor ignored.\n", nr_cpu_ids);
 		return -ENOSPC;
 	}
 

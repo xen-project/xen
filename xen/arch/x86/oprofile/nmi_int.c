@@ -127,7 +127,7 @@ static void nmi_save_registers(void * dummy)
 static void free_msrs(void)
 {
 	int i;
-	for (i = 0; i < NR_CPUS; ++i) {
+	for (i = 0; i < nr_cpu_ids; ++i) {
 		xfree(cpu_msrs[i].counters);
 		cpu_msrs[i].counters = NULL;
 		xfree(cpu_msrs[i].controls);
