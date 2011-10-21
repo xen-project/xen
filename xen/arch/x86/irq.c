@@ -966,7 +966,7 @@ typedef struct {
 #define ACKTYPE_NONE   0     /* No final acknowledgement is required */
 #define ACKTYPE_UNMASK 1     /* Unmask PIC hardware (from any CPU)   */
 #define ACKTYPE_EOI    2     /* EOI on the CPU that was interrupted  */
-    cpumask_t cpu_eoi_map;   /* CPUs that need to EOI this interrupt */
+    cpumask_var_t cpu_eoi_map; /* CPUs that need to EOI this interrupt */
     struct timer eoi_timer;
     struct domain *guest[IRQ_MAX_GUESTS];
 } irq_guest_action_t;
@@ -1040,7 +1040,7 @@ static void irq_guest_eoi_timer_fn(void *data)
             desc->handler->end(desc, 0);
         break;
     case ACKTYPE_EOI:
-        cpumask_copy(&cpu_eoi_map, &action->cpu_eoi_map);
+        cpumask_copy(&cpu_eoi_map, action->cpu_eoi_map);
         spin_unlock_irq(&desc->lock);
         on_selected_cpus(&cpu_eoi_map, set_eoi_ready, desc, 0);
         spin_lock_irq(&desc->lock);
@@ -1079,7 +1079,7 @@ static void __do_IRQ_guest(int irq)
         peoi[sp].vector = vector;
         peoi[sp].ready = 0;
         pending_eoi_sp(peoi) = sp+1;
-        cpu_set(smp_processor_id(), action->cpu_eoi_map);
+        cpumask_set_cpu(smp_processor_id(), action->cpu_eoi_map);
     }
 
     for ( i = 0; i < action->nr_guests; i++ )
@@ -1297,7 +1297,8 @@ static void __set_eoi_ready(struct irq_desc *desc)
 
     if ( !(desc->status & IRQ_GUEST) ||
          (action->in_flight != 0) ||
-         !cpu_test_and_clear(smp_processor_id(), action->cpu_eoi_map) )
+         !cpumask_test_and_clear_cpu(smp_processor_id(),
+                                     action->cpu_eoi_map) )
         return;
 
     sp = pending_eoi_sp(peoi);
@@ -1357,7 +1358,7 @@ void desc_guest_eoi(struct irq_desc *desc, struct pirq *pirq)
 
     if ( action->ack_type == ACKTYPE_UNMASK )
     {
-        ASSERT(cpus_empty(action->cpu_eoi_map));
+        ASSERT(cpumask_empty(action->cpu_eoi_map));
         if ( desc->handler->end )
             desc->handler->end(desc, 0);
         spin_unlock_irq(&desc->lock);
@@ -1366,7 +1367,7 @@ void desc_guest_eoi(struct irq_desc *desc, struct pirq *pirq)
 
     ASSERT(action->ack_type == ACKTYPE_EOI);
         
-    cpumask_copy(&cpu_eoi_map, &action->cpu_eoi_map);
+    cpumask_copy(&cpu_eoi_map, action->cpu_eoi_map);
 
     if ( cpumask_test_and_clear_cpu(smp_processor_id(), &cpu_eoi_map) )
     {
@@ -1504,8 +1505,10 @@ int pirq_guest_bind(struct vcpu *v, struct pirq *pirq, int will_share)
         if ( newaction == NULL )
         {
             spin_unlock_irq(&desc->lock);
-            if ( (newaction = xmalloc(irq_guest_action_t)) != NULL )
+            if ( (newaction = xmalloc(irq_guest_action_t)) != NULL &&
+                 zalloc_cpumask_var(&newaction->cpu_eoi_map) )
                 goto retry;
+            xfree(newaction);
             gdprintk(XENLOG_INFO,
                      "Cannot bind IRQ %d to guest. Out of memory.\n",
                      pirq->pirq);
@@ -1521,7 +1524,6 @@ int pirq_guest_bind(struct vcpu *v, struct pirq *pirq, int will_share)
         action->in_flight   = 0;
         action->shareable   = will_share;
         action->ack_type    = pirq_acktype(v->domain, pirq->pirq);
-        cpumask_clear(&action->cpu_eoi_map);
         init_timer(&action->eoi_timer, irq_guest_eoi_timer_fn, desc, 0);
 
         desc->status |= IRQ_GUEST;
@@ -1574,7 +1576,10 @@ int pirq_guest_bind(struct vcpu *v, struct pirq *pirq, int will_share)
     spin_unlock_irq(&desc->lock);
  out:
     if ( newaction != NULL )
+    {
+        free_cpumask_var(newaction->cpu_eoi_map);
         xfree(newaction);
+    }
     return rc;
 }
 
@@ -1619,7 +1624,7 @@ static irq_guest_action_t *__pirq_guest_unbind(
              (--action->in_flight == 0) &&
              (action->nr_guests != 0) )
         {
-            cpumask_copy(&cpu_eoi_map, &action->cpu_eoi_map);
+            cpumask_copy(&cpu_eoi_map, action->cpu_eoi_map);
             spin_unlock_irq(&desc->lock);
             on_selected_cpus(&cpu_eoi_map, set_eoi_ready, desc, 0);
             spin_lock_irq(&desc->lock);
@@ -1649,7 +1654,7 @@ static irq_guest_action_t *__pirq_guest_unbind(
      * would need to flush all ready EOIs before returning as otherwise the
      * desc->handler could change and we would call the wrong 'end' hook.
      */
-    cpumask_copy(&cpu_eoi_map, &action->cpu_eoi_map);
+    cpumask_copy(&cpu_eoi_map, action->cpu_eoi_map);
     if ( !cpumask_empty(&cpu_eoi_map) )
     {
         BUG_ON(action->ack_type != ACKTYPE_EOI);
@@ -1658,7 +1663,7 @@ static irq_guest_action_t *__pirq_guest_unbind(
         spin_lock_irq(&desc->lock);
     }
 
-    BUG_ON(!cpus_empty(action->cpu_eoi_map));
+    BUG_ON(!cpumask_empty(action->cpu_eoi_map));
 
     desc->action = NULL;
     desc->status &= ~(IRQ_GUEST|IRQ_INPROGRESS);
@@ -1697,6 +1702,7 @@ void pirq_guest_unbind(struct domain *d, struct pirq *pirq)
     if ( oldaction != NULL )
     {
         kill_timer(&oldaction->eoi_timer);
+        free_cpumask_var(oldaction->cpu_eoi_map);
         xfree(oldaction);
     }
     else if ( irq > 0 )
@@ -1740,6 +1746,7 @@ static int pirq_guest_force_unbind(struct domain *d, struct pirq *pirq)
     if ( oldaction != NULL )
     {
         kill_timer(&oldaction->eoi_timer);
+        free_cpumask_var(oldaction->cpu_eoi_map);
         xfree(oldaction);
     }
 
@@ -2114,7 +2121,7 @@ void fixup_irqs(void)
         if ( !(desc->status & IRQ_GUEST) )
             continue;
         action = (irq_guest_action_t *)desc->action;
-        cpu_clear(smp_processor_id(), action->cpu_eoi_map);
+        cpumask_clear_cpu(smp_processor_id(), action->cpu_eoi_map);
     }
 
     /* Flush the interrupt EOI stack. */
