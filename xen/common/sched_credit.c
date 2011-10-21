@@ -166,8 +166,8 @@ struct csched_private {
     uint32_t ncpus;
     struct timer  master_ticker;
     unsigned int master;
-    cpumask_t idlers;
-    cpumask_t cpus;
+    cpumask_var_t idlers;
+    cpumask_var_t cpus;
     uint32_t weight;
     uint32_t credit;
     int credit_balance;
@@ -283,7 +283,7 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
      */
     if ( cur->pri > CSCHED_PRI_IDLE )
     {
-        if ( cpumask_empty(&prv->idlers) )
+        if ( cpumask_empty(prv->idlers) )
         {
             CSCHED_STAT_CRANK(tickle_idlers_none);
         }
@@ -291,7 +291,7 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
         {
             cpumask_t idle_mask;
 
-            cpumask_and(&idle_mask, &prv->idlers, new->vcpu->cpu_affinity);
+            cpumask_and(&idle_mask, prv->idlers, new->vcpu->cpu_affinity);
             if ( !cpumask_empty(&idle_mask) )
             {
                 CSCHED_STAT_CRANK(tickle_idlers_some);
@@ -327,11 +327,11 @@ csched_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
 
     prv->credit -= prv->credits_per_tslice;
     prv->ncpus--;
-    cpu_clear(cpu, prv->idlers);
-    cpu_clear(cpu, prv->cpus);
+    cpumask_clear_cpu(cpu, prv->idlers);
+    cpumask_clear_cpu(cpu, prv->cpus);
     if ( (prv->master == cpu) && (prv->ncpus > 0) )
     {
-        prv->master = first_cpu(prv->cpus);
+        prv->master = cpumask_first(prv->cpus);
         migrate_timer(&prv->master_ticker, prv->master);
     }
     kill_timer(&spc->ticker);
@@ -360,7 +360,7 @@ csched_alloc_pdata(const struct scheduler *ops, int cpu)
     /* Initialize/update system-wide config */
     prv->credit += prv->credits_per_tslice;
     prv->ncpus++;
-    cpu_set(cpu, prv->cpus);
+    cpumask_set_cpu(cpu, prv->cpus);
     if ( prv->ncpus == 1 )
     {
         prv->master = cpu;
@@ -380,7 +380,7 @@ csched_alloc_pdata(const struct scheduler *ops, int cpu)
 
     /* Start off idling... */
     BUG_ON(!is_idle_vcpu(per_cpu(schedule_data, cpu).curr));
-    cpu_set(cpu, prv->idlers);
+    cpumask_set_cpu(cpu, prv->idlers);
 
     spin_unlock_irqrestore(&prv->lock, flags);
 
@@ -488,7 +488,7 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
      * like run two VCPUs on co-hyperthreads while there are idle cores
      * or sockets.
      */
-    cpumask_and(&idlers, &cpu_online_map, &CSCHED_PRIV(ops)->idlers);
+    cpumask_and(&idlers, &cpu_online_map, CSCHED_PRIV(ops)->idlers);
     cpumask_set_cpu(cpu, &idlers);
     cpumask_and(&cpus, &cpus, &idlers);
     cpumask_clear_cpu(cpu, &cpus);
@@ -1242,7 +1242,7 @@ csched_load_balance(struct csched_private *prv, int cpu,
      * Peek at non-idling CPUs in the system, starting with our
      * immediate neighbour.
      */
-    cpumask_andnot(&workers, online, &prv->idlers);
+    cpumask_andnot(&workers, online, prv->idlers);
     cpumask_clear_cpu(cpu, &workers);
     peer_cpu = cpu;
 
@@ -1356,12 +1356,12 @@ csched_schedule(
      */
     if ( snext->pri == CSCHED_PRI_IDLE )
     {
-        if ( !cpu_isset(cpu, prv->idlers) )
-            cpu_set(cpu, prv->idlers);
+        if ( !cpumask_test_cpu(cpu, prv->idlers) )
+            cpumask_set_cpu(cpu, prv->idlers);
     }
-    else if ( cpu_isset(cpu, prv->idlers) )
+    else if ( cpumask_test_cpu(cpu, prv->idlers) )
     {
-        cpu_clear(cpu, prv->idlers);
+        cpumask_clear_cpu(cpu, prv->idlers);
     }
 
     if ( !is_idle_vcpu(snext->vcpu) )
@@ -1481,7 +1481,7 @@ csched_dump(const struct scheduler *ops)
            prv->ticks_per_tslice,
            vcpu_migration_delay);
 
-    cpumask_scnprintf(idlers_buf, sizeof(idlers_buf), &prv->idlers);
+    cpumask_scnprintf(idlers_buf, sizeof(idlers_buf), prv->idlers);
     printk("idlers: %s\n", idlers_buf);
 
     printk("active vcpus:\n");
@@ -1513,6 +1513,13 @@ csched_init(struct scheduler *ops)
     prv = xzalloc(struct csched_private);
     if ( prv == NULL )
         return -ENOMEM;
+    if ( !zalloc_cpumask_var(&prv->cpus) ||
+         !zalloc_cpumask_var(&prv->idlers) )
+    {
+        free_cpumask_var(prv->cpus);
+        xfree(prv);
+        return -ENOMEM;
+    }
 
     ops->sched_data = prv;
     spin_lock_init(&prv->lock);
@@ -1536,7 +1543,11 @@ csched_deinit(const struct scheduler *ops)
 
     prv = CSCHED_PRIV(ops);
     if ( prv != NULL )
+    {
+        free_cpumask_var(prv->cpus);
+        free_cpumask_var(prv->idlers);
         xfree(prv);
+    }
 }
 
 static void csched_tick_suspend(const struct scheduler *ops, unsigned int cpu)
