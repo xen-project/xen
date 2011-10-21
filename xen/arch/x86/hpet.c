@@ -33,7 +33,7 @@ struct hpet_event_channel
     unsigned long mult;
     int           shift;
     s_time_t      next_event;
-    cpumask_t     cpumask;
+    cpumask_var_t cpumask;
     spinlock_t    lock;
     void          (*event_handler)(struct hpet_event_channel *);
 
@@ -182,14 +182,14 @@ again:
     now = NOW();
 
     /* find all expired events */
-    for_each_cpu_mask(cpu, ch->cpumask)
+    for_each_cpu_mask(cpu, *ch->cpumask)
     {
         s_time_t deadline;
 
         rmb();
         deadline = per_cpu(timer_deadline, cpu);
         rmb();
-        if ( !cpumask_test_cpu(cpu, &ch->cpumask) )
+        if ( !cpumask_test_cpu(cpu, ch->cpumask) )
             continue;
 
         if ( deadline <= now )
@@ -377,6 +377,16 @@ static void __init hpet_fsb_cap_lookup(void)
         if ( !(cfg & HPET_TN_FSB_CAP) )
             continue;
 
+        if ( !zalloc_cpumask_var(&ch->cpumask) )
+        {
+            if ( !num_hpets_used )
+            {
+                xfree(hpet_events);
+                hpet_events = NULL;
+            }
+            break;
+        }
+
         ch->flags = 0;
         ch->idx = i;
 
@@ -449,14 +459,14 @@ static void hpet_detach_channel(unsigned int cpu,
     if ( cpu != ch->cpu )
         return;
 
-    if ( cpus_empty(ch->cpumask) )
+    if ( cpumask_empty(ch->cpumask) )
     {
         ch->cpu = -1;
         clear_bit(HPET_EVT_USED_BIT, &ch->flags);
         return;
     }
 
-    ch->cpu = first_cpu(ch->cpumask);
+    ch->cpu = cpumask_first(ch->cpumask);
     hpet_msi_set_affinity(irq_to_desc(ch->irq), cpumask_of(ch->cpu));
 }
 
@@ -502,7 +512,14 @@ void __init hpet_broadcast_init(void)
             return;
 
         if ( !hpet_events )
+        {
             hpet_events = xzalloc(struct hpet_event_channel);
+            if ( hpet_events && !zalloc_cpumask_var(&hpet_events->cpumask) )
+            {
+                xfree(hpet_events);
+                hpet_events = NULL;
+            }
+        }
         if ( !hpet_events )
             return;
         hpet_events->irq = -1;
@@ -635,7 +652,7 @@ void hpet_broadcast_enter(void)
 
     /* Disable LAPIC timer interrupts. */
     disable_APIC_timer();
-    cpu_set(cpu, ch->cpumask);
+    cpumask_set_cpu(cpu, ch->cpumask);
 
     spin_lock(&ch->lock);
     /* reprogram if current cpu expire time is nearer */
@@ -660,7 +677,7 @@ void hpet_broadcast_exit(void)
     if ( !reprogram_timer(per_cpu(timer_deadline, cpu)) )
         raise_softirq(TIMER_SOFTIRQ);
 
-    cpu_clear(cpu, ch->cpumask);
+    cpumask_clear_cpu(cpu, ch->cpumask);
 
     if ( !(ch->flags & HPET_EVT_LEGACY) )
     {
