@@ -346,7 +346,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
         uint32_t cpu;
         uint64_t idletime, now = NOW();
         struct xenctl_cpumap ctlmap;
-        cpumask_t cpumap;
+        cpumask_var_t cpumap;
         XEN_GUEST_HANDLE(uint8) cpumap_bitmap;
         XEN_GUEST_HANDLE(uint64) idletimes;
 
@@ -366,22 +366,26 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
             goto out;
         guest_from_compat_handle(idletimes, op->u.getidletime.idletime);
 
-        for_each_cpu_mask ( cpu, cpumap )
+        for_each_cpu_mask ( cpu, *cpumap )
         {
             if ( idle_vcpu[cpu] == NULL )
-                cpu_clear(cpu, cpumap);
+                cpumask_clear_cpu(cpu, cpumap);
             idletime = get_cpu_idle_time(cpu);
 
-            ret = -EFAULT;
             if ( copy_to_guest_offset(idletimes, cpu, &idletime, 1) )
-                goto out;
+            {
+                ret = -EFAULT;
+                break;
+            }
         }
 
         op->u.getidletime.now = now;
-        if ( (ret = cpumask_to_xenctl_cpumap(&ctlmap, &cpumap)) != 0 )
-            goto out;
+        if ( ret == 0 )
+            ret = cpumask_to_xenctl_cpumap(&ctlmap, cpumap);
+        free_cpumask_var(cpumap);
 
-        ret = copy_to_guest(u_xenpf_op, op, 1) ? -EFAULT : 0;
+        if ( ret == 0 && copy_to_guest(u_xenpf_op, op, 1) )
+            ret = -EFAULT;
     }
     break;
 

@@ -1531,25 +1531,28 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 
     case XEN_MC_inject_v2:
     {
-        cpumask_t cpumap;
+        const cpumask_t *cpumap;
+        cpumask_var_t cmv;
 
         if (nr_mce_banks == 0)
             return x86_mcerr("do_mca #MC", -ENODEV);
 
         if ( op->u.mc_inject_v2.flags & XEN_MC_INJECT_CPU_BROADCAST )
-            cpumask_copy(&cpumap, &cpu_online_map);
+            cpumap = &cpu_online_map;
         else
         {
-            int gcw;
-
-            xenctl_cpumap_to_cpumask(&cpumap,
-                                     &op->u.mc_inject_v2.cpumap);
-            gcw = cpumask_weight(&cpumap);
-            cpumask_and(&cpumap, &cpu_online_map, &cpumap);
-
-            if ( cpumask_empty(&cpumap) )
-                return x86_mcerr("No online CPU passed\n", -EINVAL);
-            else if ( gcw != cpumask_weight(&cpumap) )
+            ret = xenctl_cpumap_to_cpumask(&cmv,
+                                           &op->u.mc_inject_v2.cpumap);
+            if ( ret )
+                break;
+            cpumap = cmv;
+            if ( !cpumask_intersects(cpumap, &cpu_online_map) )
+            {
+                free_cpumask_var(cmv);
+                ret = x86_mcerr("No online CPU passed\n", -EINVAL);
+                break;
+            }
+            if ( !cpumask_subset(cpumap, &cpu_online_map) )
                 dprintk(XENLOG_INFO,
                         "Not all required CPUs are online\n");
         }
@@ -1558,19 +1561,25 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
         {
         case XEN_MC_INJECT_TYPE_MCE:
             if ( mce_broadcast &&
-                 !cpumask_equal(&cpumap, &cpu_online_map) )
+                 !cpumask_equal(cpumap, &cpu_online_map) )
                 printk("Not trigger MCE on all CPUs, may HANG!\n");
-            on_selected_cpus(&cpumap, x86_mc_mceinject, NULL, 1);
+            on_selected_cpus(cpumap, x86_mc_mceinject, NULL, 1);
             break;
         case XEN_MC_INJECT_TYPE_CMCI:
             if ( !cmci_support )
-                return x86_mcerr(
+                ret = x86_mcerr(
                     "No CMCI supported in platform\n", -EINVAL);
-            on_selected_cpus(&cpumap, x86_cmci_inject, NULL, 1);
+            else
+                on_selected_cpus(cpumap, x86_cmci_inject, NULL, 1);
             break;
         default:
-            return x86_mcerr("Wrong mca type\n", -EINVAL);
+            ret = x86_mcerr("Wrong mca type\n", -EINVAL);
+            break;
         }
+
+        if (cpumap != &cpu_online_map)
+            free_cpumask_var(cmv);
+
         break;
     }
 

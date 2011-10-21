@@ -30,11 +30,15 @@
 static DEFINE_SPINLOCK(domctl_lock);
 
 int cpumask_to_xenctl_cpumap(
-    struct xenctl_cpumap *xenctl_cpumap, cpumask_t *cpumask)
+    struct xenctl_cpumap *xenctl_cpumap, const cpumask_t *cpumask)
 {
     unsigned int guest_bytes, copy_bytes, i;
     uint8_t zero = 0;
-    uint8_t bytemap[(NR_CPUS + 7) / 8];
+    int err = 0;
+    uint8_t *bytemap = xmalloc_array(uint8_t, (nr_cpu_ids + 7) / 8);
+
+    if ( !bytemap )
+        return -ENOMEM;
 
     guest_bytes = (xenctl_cpumap->nr_cpus + 7) / 8;
     copy_bytes  = min_t(unsigned int, guest_bytes, (nr_cpu_ids + 7) / 8);
@@ -43,37 +47,48 @@ int cpumask_to_xenctl_cpumap(
 
     if ( copy_bytes != 0 )
         if ( copy_to_guest(xenctl_cpumap->bitmap, bytemap, copy_bytes) )
-            return -EFAULT;
+            err = -EFAULT;
 
-    for ( i = copy_bytes; i < guest_bytes; i++ )
+    for ( i = copy_bytes; !err && i < guest_bytes; i++ )
         if ( copy_to_guest_offset(xenctl_cpumap->bitmap, i, &zero, 1) )
-            return -EFAULT;
+            err = -EFAULT;
 
-    return 0;
+    xfree(bytemap);
+
+    return err;
 }
 
 int xenctl_cpumap_to_cpumask(
-    cpumask_t *cpumask, struct xenctl_cpumap *xenctl_cpumap)
+    cpumask_var_t *cpumask, const struct xenctl_cpumap *xenctl_cpumap)
 {
     unsigned int guest_bytes, copy_bytes;
-    uint8_t bytemap[(NR_CPUS + 7) / 8];
+    int err = 0;
+    uint8_t *bytemap = xzalloc_array(uint8_t, (nr_cpu_ids + 7) / 8);
+
+    if ( !bytemap )
+        return -ENOMEM;
 
     guest_bytes = (xenctl_cpumap->nr_cpus + 7) / 8;
     copy_bytes  = min_t(unsigned int, guest_bytes, (nr_cpu_ids + 7) / 8);
 
-    memset(bytemap, 0, sizeof(bytemap));
-
     if ( copy_bytes != 0 )
     {
         if ( copy_from_guest(bytemap, xenctl_cpumap->bitmap, copy_bytes) )
-            return -EFAULT;
+            err = -EFAULT;
         if ( (xenctl_cpumap->nr_cpus & 7) && (guest_bytes <= sizeof(bytemap)) )
             bytemap[guest_bytes-1] &= ~(0xff << (xenctl_cpumap->nr_cpus & 7));
     }
 
-    bitmap_byte_to_long(cpumask_bits(cpumask), bytemap, nr_cpu_ids);
+    if ( err )
+        /* nothing */;
+    else if ( alloc_cpumask_var(cpumask) )
+        bitmap_byte_to_long(cpumask_bits(*cpumask), bytemap, nr_cpu_ids);
+    else
+        err = -ENOMEM;
 
-    return 0;
+    xfree(bytemap);
+
+    return err;
 }
 
 static inline int is_free_domid(domid_t dom)
@@ -558,7 +573,6 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         domid_t dom = op->domain;
         struct domain *d = rcu_lock_domain_by_id(dom);
         struct vcpu *v;
-        cpumask_t new_affinity;
 
         ret = -ESRCH;
         if ( d == NULL )
@@ -578,10 +592,15 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
         if ( op->cmd == XEN_DOMCTL_setvcpuaffinity )
         {
+            cpumask_var_t new_affinity;
+
             ret = xenctl_cpumap_to_cpumask(
                 &new_affinity, &op->u.vcpuaffinity.cpumap);
             if ( !ret )
-                ret = vcpu_set_affinity(v, &new_affinity);
+            {
+                ret = vcpu_set_affinity(v, new_affinity);
+                free_cpumask_var(new_affinity);
+            }
         }
         else
         {

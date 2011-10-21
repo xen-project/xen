@@ -488,9 +488,7 @@ extern cpumask_t cpu_present_map;
 
 /* Copy to/from cpumap provided by control tools. */
 struct xenctl_cpumap;
-int cpumask_to_xenctl_cpumap(
-    struct xenctl_cpumap *enctl_cpumap, cpumask_t *cpumask);
-int xenctl_cpumap_to_cpumask(
-    cpumask_t *cpumask, struct xenctl_cpumap *enctl_cpumap);
+int cpumask_to_xenctl_cpumap(struct xenctl_cpumap *, const cpumask_t *);
+int xenctl_cpumap_to_cpumask(cpumask_var_t *, const struct xenctl_cpumap *);
 
 #endif /* __XEN_CPUMASK_H */
