@@ -144,8 +144,8 @@ EXPORT_SYMBOL(cpu_online_map);
 cpumask_t cpu_possible_map;
 EXPORT_SYMBOL(cpu_possible_map);
 
-DEFINE_PER_CPU_READ_MOSTLY(cpumask_t, cpu_core_map);
-DEFINE_PER_CPU_READ_MOSTLY(cpumask_t, cpu_sibling_map);
+DEFINE_PER_CPU_READ_MOSTLY(cpumask_var_t, cpu_core_mask);
+DEFINE_PER_CPU_READ_MOSTLY(cpumask_var_t, cpu_sibling_mask);
 int smp_num_siblings = 1;
 int smp_num_cpucores = 1;
 
@@ -687,13 +687,13 @@ clear_cpu_sibling_map(int cpu)
 {
 	int i;
 
-	for_each_cpu_mask(i, per_cpu(cpu_sibling_map, cpu))
-		cpumask_clear_cpu(cpu, &per_cpu(cpu_sibling_map, i));
-	for_each_cpu_mask(i, per_cpu(cpu_core_map, cpu))
-		cpumask_clear_cpu(cpu, &per_cpu(cpu_core_map, i));
+	for_each_cpu_mask(i, *per_cpu(cpu_sibling_mask, cpu))
+		cpumask_clear_cpu(cpu, per_cpu(cpu_sibling_mask, i));
+	for_each_cpu_mask(i, *per_cpu(cpu_core_mask, cpu))
+		cpumask_clear_cpu(cpu, per_cpu(cpu_core_mask, i));
 
-	cpumask_clear(&per_cpu(cpu_sibling_map, cpu));
-	cpumask_clear(&per_cpu(cpu_core_map, cpu));
+	cpumask_clear(per_cpu(cpu_sibling_mask, cpu));
+	cpumask_clear(per_cpu(cpu_core_mask, cpu));
 }
 
 static void
@@ -703,12 +703,12 @@ remove_siblinginfo(int cpu)
 
 	if (cpu_data(cpu)->threads_per_core == 1 &&
 	    cpu_data(cpu)->cores_per_socket == 1) {
-		cpu_clear(cpu, per_cpu(cpu_core_map, cpu));
-		cpu_clear(cpu, per_cpu(cpu_sibling_map, cpu));
+		cpumask_clear_cpu(cpu, per_cpu(cpu_core_mask, cpu));
+		cpumask_clear_cpu(cpu, per_cpu(cpu_sibling_mask, cpu));
 		return;
 	}
 
-	last = (cpus_weight(per_cpu(cpu_core_map, cpu)) == 1);
+	last = (cpumask_weight(per_cpu(cpu_core_mask, cpu)) == 1);
 
 	/* remove it from all sibling map's */
 	clear_cpu_sibling_map(cpu);
@@ -794,11 +794,11 @@ set_cpu_sibling_map(int cpu)
 
 	for_each_online_cpu(i) {
 		if ((cpu_data(cpu)->socket_id == cpu_data(i)->socket_id)) {
-			cpu_set(i, per_cpu(cpu_core_map, cpu));
-			cpu_set(cpu, per_cpu(cpu_core_map, i));
+			cpumask_set_cpu(i, per_cpu(cpu_core_mask, cpu));
+			cpumask_set_cpu(cpu, per_cpu(cpu_core_mask, i));
 			if (cpu_data(cpu)->core_id == cpu_data(i)->core_id) {
-				cpu_set(i, per_cpu(cpu_sibling_map, cpu));
-				cpu_set(cpu, per_cpu(cpu_sibling_map, i));
+				cpumask_set_cpu(i, per_cpu(cpu_sibling_mask, cpu));
+				cpumask_set_cpu(cpu, per_cpu(cpu_sibling_mask, i));
 			}
 		}
 	}
@@ -821,6 +821,14 @@ __cpu_up (unsigned int cpu)
 	if (cpu_isset(cpu, cpu_callin_map))
 		return -EINVAL;
 
+	if (!per_cpu(cpu_sibling_mask, cpu) &&
+            !zalloc_cpumask_var(&per_cpu(cpu_sibling_mask, cpu)))
+		return -ENOMEM;
+
+	if (!per_cpu(cpu_core_mask, cpu) &&
+            !zalloc_cpumask_var(&per_cpu(cpu_core_mask, cpu)))
+		return -ENOMEM;
+
 	per_cpu(cpu_state, cpu) = CPU_UP_PREPARE;
 	/* Processor goes to start_secondary(), sets online flag */
 	ret = do_boot_cpu(sapicid, cpu);
@@ -829,8 +837,8 @@ __cpu_up (unsigned int cpu)
 
 	if (cpu_data(cpu)->threads_per_core == 1 &&
 	    cpu_data(cpu)->cores_per_socket == 1) {
-		cpu_set(cpu, per_cpu(cpu_sibling_map, cpu));
-		cpu_set(cpu, per_cpu(cpu_core_map, cpu));
+		cpumask_set_cpu(cpu, per_cpu(cpu_sibling_mask, cpu));
+		cpumask_set_cpu(cpu, per_cpu(cpu_core_mask, cpu));
 		return 0;
 	}
 

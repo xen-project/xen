@@ -867,7 +867,7 @@ static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
         {
             char *ebufp, ebuf[96] = "MCE: Fatal error happened on CPUs ";
             ebufp = ebuf + strlen(ebuf);
-            cpumask_scnprintf(ebufp, 95 - strlen(ebuf), mce_fatal_cpus);
+            cpumask_scnprintf(ebufp, 95 - strlen(ebuf), &mce_fatal_cpus);
             mc_panic(ebuf);
         }
         atomic_set(&found_error, 0);

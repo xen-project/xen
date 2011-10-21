@@ -76,9 +76,9 @@ long arch_do_sysctl(
 
         memset(pi, 0, sizeof(*pi));
         pi->threads_per_core =
-            cpus_weight(per_cpu(cpu_sibling_map, 0));
+            cpumask_weight(per_cpu(cpu_sibling_mask, 0));
         pi->cores_per_socket =
-            cpus_weight(per_cpu(cpu_core_map, 0)) / pi->threads_per_core;
+            cpumask_weight(per_cpu(cpu_core_mask, 0)) / pi->threads_per_core;
         pi->nr_cpus = num_online_cpus();
         pi->nr_nodes = num_online_nodes();
         pi->max_node_id = MAX_NUMNODES-1;

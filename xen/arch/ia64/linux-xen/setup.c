@@ -577,8 +577,12 @@ late_setup_arch (char **cmdline_p)
 
 	cpu_physical_id(0) = hard_smp_processor_id();
 
-	cpu_set(0, per_cpu(cpu_sibling_map, 0));
-	cpu_set(0, per_cpu(cpu_core_map, 0));
+	if (!zalloc_cpumask_var(&per_cpu(cpu_sibling_mask, 0)) ||
+            !zalloc_cpumask_var(&per_cpu(cpu_core_mask, 0)))
+		panic("No memory for boot CPU sibling/core maps\n");
+
+	cpumask_set_cpu(0, per_cpu(cpu_sibling_mask, 0));
+	cpumask_set_cpu(0, per_cpu(cpu_core_mask, 0));
 
 	check_for_logical_procs();
 	if (smp_num_cpucores > 1)

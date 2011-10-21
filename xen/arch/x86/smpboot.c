@@ -51,9 +51,9 @@
 unsigned long __read_mostly trampoline_phys;
 
 /* representing HT siblings of each logical CPU */
-DEFINE_PER_CPU_READ_MOSTLY(cpumask_t, cpu_sibling_map);
+DEFINE_PER_CPU_READ_MOSTLY(cpumask_var_t, cpu_sibling_mask);
 /* representing HT and core siblings of each logical CPU */
-DEFINE_PER_CPU_READ_MOSTLY(cpumask_t, cpu_core_map);
+DEFINE_PER_CPU_READ_MOSTLY(cpumask_var_t, cpu_core_mask);
 
 cpumask_t cpu_online_map __read_mostly;
 EXPORT_SYMBOL(cpu_online_map);
@@ -233,10 +233,10 @@ static cpumask_t cpu_sibling_setup_map;
 
 static void link_thread_siblings(int cpu1, int cpu2)
 {
-    cpu_set(cpu1, per_cpu(cpu_sibling_map, cpu2));
-    cpu_set(cpu2, per_cpu(cpu_sibling_map, cpu1));
-    cpu_set(cpu1, per_cpu(cpu_core_map, cpu2));
-    cpu_set(cpu2, per_cpu(cpu_core_map, cpu1));
+    cpumask_set_cpu(cpu1, per_cpu(cpu_sibling_mask, cpu2));
+    cpumask_set_cpu(cpu2, per_cpu(cpu_sibling_mask, cpu1));
+    cpumask_set_cpu(cpu1, per_cpu(cpu_core_mask, cpu2));
+    cpumask_set_cpu(cpu2, per_cpu(cpu_core_mask, cpu1));
 }
 
 static void set_cpu_sibling_map(int cpu)
@@ -262,13 +262,13 @@ static void set_cpu_sibling_map(int cpu)
     }
     else
     {
-        cpu_set(cpu, per_cpu(cpu_sibling_map, cpu));
+        cpumask_set_cpu(cpu, per_cpu(cpu_sibling_mask, cpu));
     }
 
     if ( c[cpu].x86_max_cores == 1 )
     {
-        cpumask_copy(&per_cpu(cpu_core_map, cpu),
-                     &per_cpu(cpu_sibling_map, cpu));
+        cpumask_copy(per_cpu(cpu_core_mask, cpu),
+                     per_cpu(cpu_sibling_mask, cpu));
         c[cpu].booted_cores = 1;
         return;
     }
@@ -277,18 +277,18 @@ static void set_cpu_sibling_map(int cpu)
     {
         if ( c[cpu].phys_proc_id == c[i].phys_proc_id )
         {
-            cpu_set(i, per_cpu(cpu_core_map, cpu));
-            cpu_set(cpu, per_cpu(cpu_core_map, i));
+            cpumask_set_cpu(i, per_cpu(cpu_core_mask, cpu));
+            cpumask_set_cpu(cpu, per_cpu(cpu_core_mask, i));
             /*
              *  Does this new cpu bringup a new core?
              */
-            if ( cpus_weight(per_cpu(cpu_sibling_map, cpu)) == 1 )
+            if ( cpumask_weight(per_cpu(cpu_sibling_mask, cpu)) == 1 )
             {
                 /*
                  * for each core in package, increment
                  * the booted_cores for this new cpu
                  */
-                if ( first_cpu(per_cpu(cpu_sibling_map, i)) == i )
+                if ( cpumask_first(per_cpu(cpu_sibling_mask, i)) == i )
                     c[cpu].booted_cores++;
                 /*
                  * increment the core count for all
@@ -641,13 +641,14 @@ static void cpu_smpboot_free(unsigned int cpu)
 {
     unsigned int order;
 
+    free_cpumask_var(per_cpu(cpu_sibling_mask, cpu));
+    free_cpumask_var(per_cpu(cpu_core_mask, cpu));
+
     order = get_order_from_pages(NR_RESERVED_GDT_PAGES);
     free_xenheap_pages(per_cpu(gdt_table, cpu), order);
-    per_cpu(gdt_table, cpu) = NULL;
 
 #ifdef __x86_64__
     free_xenheap_pages(per_cpu(compat_gdt_table, cpu), order);
-    per_cpu(compat_gdt_table, cpu) = NULL;
 #endif
 
     order = get_order_from_bytes(IDT_ENTRIES * sizeof(idt_entry_t));
@@ -696,7 +697,9 @@ static int cpu_smpboot_alloc(unsigned int cpu)
         goto oom;
     memcpy(idt_tables[cpu], idt_table, IDT_ENTRIES * sizeof(idt_entry_t));
 
-    return 0;
+    if ( zalloc_cpumask_var(&per_cpu(cpu_sibling_mask, cpu)) &&
+         zalloc_cpumask_var(&per_cpu(cpu_core_mask, cpu)) )
+        return 0;
 
  oom:
     cpu_smpboot_free(cpu);
@@ -744,6 +747,10 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 
     stack_base[0] = stack_start.esp;
 
+    if ( !zalloc_cpumask_var(&per_cpu(cpu_sibling_mask, 0)) ||
+         !zalloc_cpumask_var(&per_cpu(cpu_core_mask, 0)) )
+        panic("No memory for boot CPU sibling/core maps\n");
+
     set_cpu_sibling_map(0);
 
     /*
@@ -760,8 +767,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
             printk(KERN_NOTICE "Local APIC not detected."
                    " Using dummy APIC emulation.\n");
         map_cpu_to_logical_apicid();
-        cpu_set(0, per_cpu(cpu_sibling_map, 0));
-        cpu_set(0, per_cpu(cpu_core_map, 0));
         return;
     }
 
@@ -792,13 +797,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
     setup_local_APIC();
     map_cpu_to_logical_apicid();
 
-    /*
-     * construct cpu_sibling_map, so that we can tell sibling CPUs
-     * efficiently.
-     */
-    cpu_set(0, per_cpu(cpu_sibling_map, 0));
-    cpu_set(0, per_cpu(cpu_core_map, 0));
-
     smpboot_setup_io_apic();
 
     setup_boot_APIC_clock();
@@ -816,18 +814,18 @@ remove_siblinginfo(int cpu)
     int sibling;
     struct cpuinfo_x86 *c = cpu_data;
 
-    for_each_cpu_mask ( sibling, per_cpu(cpu_core_map, cpu) )
+    for_each_cpu_mask ( sibling, *per_cpu(cpu_core_mask, cpu) )
     {
-        cpu_clear(cpu, per_cpu(cpu_core_map, sibling));
+        cpumask_clear_cpu(cpu, per_cpu(cpu_core_mask, sibling));
         /* Last thread sibling in this cpu core going down. */
-        if ( cpumask_weight(&per_cpu(cpu_sibling_map, cpu)) == 1 )
+        if ( cpumask_weight(per_cpu(cpu_sibling_mask, cpu)) == 1 )
             c[sibling].booted_cores--;
     }
    
-    for_each_cpu_mask(sibling, per_cpu(cpu_sibling_map, cpu))
-        cpumask_clear_cpu(cpu, &per_cpu(cpu_sibling_map, sibling));
-    cpumask_clear(&per_cpu(cpu_sibling_map, cpu));
-    cpumask_clear(&per_cpu(cpu_core_map, cpu));
+    for_each_cpu_mask(sibling, *per_cpu(cpu_sibling_mask, cpu))
+        cpumask_clear_cpu(cpu, per_cpu(cpu_sibling_mask, sibling));
+    cpumask_clear(per_cpu(cpu_sibling_mask, cpu));
+    cpumask_clear(per_cpu(cpu_core_mask, cpu));
     c[cpu].phys_proc_id = BAD_APICID;
     c[cpu].cpu_core_id = BAD_APICID;
     c[cpu].compute_unit_id = BAD_APICID;

@@ -171,7 +171,7 @@ static unsigned int default_vcpu0_location(cpumask_t *online)
      * If we're on a HT system, we only auto-allocate to a non-primary HT. We 
      * favour high numbered CPUs in the event of a tie.
      */
-    cpumask_copy(&cpu_exclude_map, &per_cpu(cpu_sibling_map, 0));
+    cpumask_copy(&cpu_exclude_map, per_cpu(cpu_sibling_mask, 0));
     cpu = cpumask_first(&cpu_exclude_map);
     if ( cpumask_weight(&cpu_exclude_map) > 1 )
         cpu = cpumask_next(cpu, &cpu_exclude_map);
@@ -179,11 +179,11 @@ static unsigned int default_vcpu0_location(cpumask_t *online)
     {
         if ( cpumask_test_cpu(i, &cpu_exclude_map) )
             continue;
-        if ( (i == cpumask_first(&per_cpu(cpu_sibling_map, i))) &&
-             (cpumask_weight(&per_cpu(cpu_sibling_map, i)) > 1) )
+        if ( (i == cpumask_first(per_cpu(cpu_sibling_mask, i))) &&
+             (cpumask_weight(per_cpu(cpu_sibling_mask, i)) > 1) )
             continue;
         cpumask_or(&cpu_exclude_map, &cpu_exclude_map,
-                   &per_cpu(cpu_sibling_map, i));
+                   per_cpu(cpu_sibling_mask, i));
         if ( !cnt || cnt[i] <= cnt[cpu] )
             cpu = i;
     }

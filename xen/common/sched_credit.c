@@ -502,23 +502,23 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
 
         nxt = cpumask_cycle(cpu, &cpus);
 
-        if ( cpumask_test_cpu(cpu, &per_cpu(cpu_core_map, nxt)) )
+        if ( cpumask_test_cpu(cpu, per_cpu(cpu_core_mask, nxt)) )
         {
             /* We're on the same socket, so check the busy-ness of threads.
              * Migrate if # of idlers is less at all */
-            ASSERT( cpumask_test_cpu(nxt, &per_cpu(cpu_core_map, cpu)) );
+            ASSERT( cpumask_test_cpu(nxt, per_cpu(cpu_core_mask, cpu)) );
             migrate_factor = 1;
-            cpumask_and(&cpu_idlers, &idlers, &per_cpu(cpu_sibling_map, cpu));
-            cpumask_and(&nxt_idlers, &idlers, &per_cpu(cpu_sibling_map, nxt));
+            cpumask_and(&cpu_idlers, &idlers, per_cpu(cpu_sibling_mask, cpu));
+            cpumask_and(&nxt_idlers, &idlers, per_cpu(cpu_sibling_mask, nxt));
         }
         else
         {
             /* We're on different sockets, so check the busy-ness of cores.
              * Migrate only if the other core is twice as idle */
-            ASSERT( !cpumask_test_cpu(nxt, &per_cpu(cpu_core_map, cpu)) );
+            ASSERT( !cpumask_test_cpu(nxt, per_cpu(cpu_core_mask, cpu)) );
             migrate_factor = 2;
-            cpumask_and(&cpu_idlers, &idlers, &per_cpu(cpu_core_map, cpu));
-            cpumask_and(&nxt_idlers, &idlers, &per_cpu(cpu_core_map, nxt));
+            cpumask_and(&cpu_idlers, &idlers, per_cpu(cpu_core_mask, cpu));
+            cpumask_and(&nxt_idlers, &idlers, per_cpu(cpu_core_mask, nxt));
         }
 
         weight_cpu = cpumask_weight(&cpu_idlers);
@@ -531,7 +531,7 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
             cpumask_and(&nxt_idlers, &cpus, &nxt_idlers);
             spc = CSCHED_PCPU(nxt);
             cpu = cpumask_cycle(spc->idle_bias, &nxt_idlers);
-            cpumask_andnot(&cpus, &cpus, &per_cpu(cpu_sibling_map, cpu));
+            cpumask_andnot(&cpus, &cpus, per_cpu(cpu_sibling_mask, cpu));
         }
         else
         {
@@ -1419,9 +1419,9 @@ csched_dump_pcpu(const struct scheduler *ops, int cpu)
     spc = CSCHED_PCPU(cpu);
     runq = &spc->runq;
 
-    cpumask_scnprintf(cpustr, sizeof(cpustr), per_cpu(cpu_sibling_map, cpu));
+    cpumask_scnprintf(cpustr, sizeof(cpustr), per_cpu(cpu_sibling_mask, cpu));
     printk(" sort=%d, sibling=%s, ", spc->runq_sort_last, cpustr);
-    cpumask_scnprintf(cpustr, sizeof(cpustr), per_cpu(cpu_core_map, cpu));
+    cpumask_scnprintf(cpustr, sizeof(cpustr), per_cpu(cpu_core_mask, cpu));
     printk("core=%s\n", cpustr);
 
     /* current VCPU */
@@ -1481,7 +1481,7 @@ csched_dump(const struct scheduler *ops)
            prv->ticks_per_tslice,
            vcpu_migration_delay);
 
-    cpumask_scnprintf(idlers_buf, sizeof(idlers_buf), prv->idlers);
+    cpumask_scnprintf(idlers_buf, sizeof(idlers_buf), &prv->idlers);
     printk("idlers: %s\n", idlers_buf);
 
     printk("active vcpus:\n");

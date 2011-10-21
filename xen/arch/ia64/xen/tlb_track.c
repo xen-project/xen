@@ -504,7 +504,7 @@ __tlb_track_entry_printf(const char* func, int line,
     char pcpumask_buf[NR_CPUS + 1];
     char vcpumask_buf[MAX_VIRT_CPUS + 1];
     cpumask_scnprintf(pcpumask_buf, sizeof(pcpumask_buf),
-                      entry->pcpu_dirty_mask);
+                      &entry->pcpu_dirty_mask);
     vcpumask_scnprintf(vcpumask_buf, sizeof(vcpumask_buf),
                        entry->vcpu_dirty_mask);
     printk("%s:%d\n"

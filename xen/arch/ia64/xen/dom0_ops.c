@@ -594,9 +594,9 @@ long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
         xen_sysctl_physinfo_t *pi = &op->u.physinfo;
 
         memset(pi, 0, sizeof(*pi));
-        pi->threads_per_core = cpus_weight(per_cpu(cpu_sibling_map, 0));
+        pi->threads_per_core = cpumask_weight(per_cpu(cpu_sibling_mask, 0));
         pi->cores_per_socket =
-            cpus_weight(per_cpu(cpu_core_map, 0)) / pi->threads_per_core;
+            cpumask_weight(per_cpu(cpu_core_mask, 0)) / pi->threads_per_core;
         pi->nr_nodes         = (u32)num_online_nodes();
         pi->nr_cpus          = (u32)num_online_cpus();
         pi->total_pages      = total_pages; 

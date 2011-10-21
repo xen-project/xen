@@ -3201,7 +3201,7 @@ int do_mmuext_op(
                 cpumask_clear(&mask);
                 for_each_online_cpu(cpu)
                     if ( !cpumask_intersects(&mask,
-                                             &per_cpu(cpu_sibling_map, cpu)) )
+                                             per_cpu(cpu_sibling_mask, cpu)) )
                         cpumask_set_cpu(cpu, &mask);
                 flush_mask(&mask, FLUSH_CACHE);
             }

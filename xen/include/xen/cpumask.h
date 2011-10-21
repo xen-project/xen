@@ -320,20 +320,16 @@ static inline const cpumask_t *cpumask_of(unsigned int cpu)
 #define cpus_addr(src) ((src).bits)
 #define cpumask_bits(maskp) ((maskp)->bits)
 
-#define cpumask_scnprintf(buf, len, src) \
-	__cpumask_scnprintf((buf), (len), &(src), nr_cpu_ids)
-static inline int __cpumask_scnprintf(char *buf, int len,
-					const cpumask_t *srcp, int nbits)
+static inline int cpumask_scnprintf(char *buf, int len,
+				    const cpumask_t *srcp)
 {
-	return bitmap_scnprintf(buf, len, srcp->bits, nbits);
+	return bitmap_scnprintf(buf, len, srcp->bits, nr_cpu_ids);
 }
 
-#define cpulist_scnprintf(buf, len, src) \
-	__cpulist_scnprintf((buf), (len), &(src), nr_cpu_ids)
-static inline int __cpulist_scnprintf(char *buf, int len,
-					const cpumask_t *srcp, int nbits)
+static inline int cpulist_scnprintf(char *buf, int len,
+				    const cpumask_t *srcp)
 {
-	return bitmap_scnlistprintf(buf, len, srcp->bits, nbits);
+	return bitmap_scnlistprintf(buf, len, srcp->bits, nr_cpu_ids);
 }
 
 /*

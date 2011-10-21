@@ -1998,7 +1998,7 @@ static void dump_irqs(unsigned char key)
         spin_lock_irqsave(&desc->lock, flags);
 
         cpumask_scnprintf(keyhandler_scratch, sizeof(keyhandler_scratch),
-                          desc->affinity);
+                          &desc->affinity);
         printk("   IRQ:%4d affinity:%s vec:%02x type=%-15s"
                " status=%08x ",
                irq, keyhandler_scratch, desc->arch.vector,

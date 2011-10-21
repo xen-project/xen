@@ -62,8 +62,8 @@ extern char no_int_routing __devinitdata;
 extern cpumask_t cpu_online_map;
 #define cpu_is_offline(cpu) unlikely(!cpu_online(cpu))
 
-DECLARE_PER_CPU(cpumask_t, cpu_core_map);
-DECLARE_PER_CPU(cpumask_t, cpu_sibling_map);
+DECLARE_PER_CPU(cpumask_var_t, cpu_core_mask);
+DECLARE_PER_CPU(cpumask_var_t, cpu_sibling_mask);
 extern int smp_num_siblings;
 extern int smp_num_cpucores;
 extern void __iomem *ipi_base_addr;

@@ -210,7 +210,7 @@ static struct keyhandler reboot_machine_keyhandler = {
 static void cpuset_print(char *set, int size, const cpumask_t *mask)
 {
     *set++ = '{';
-    set += cpulist_scnprintf(set, size-2, *mask);
+    set += cpulist_scnprintf(set, size-2, mask);
     *set++ = '}';
     *set++ = '\0';
 }

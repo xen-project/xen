@@ -1767,9 +1767,9 @@ csched_dump_pcpu(const struct scheduler *ops, int cpu)
 
     runq = &RQD(ops, cpu)->runq;
 
-    cpumask_scnprintf(cpustr, sizeof(cpustr), per_cpu(cpu_sibling_map,cpu));
+    cpumask_scnprintf(cpustr, sizeof(cpustr), per_cpu(cpu_sibling_mask, cpu));
     printk(" sibling=%s, ", cpustr);
-    cpumask_scnprintf(cpustr, sizeof(cpustr), per_cpu(cpu_core_map,cpu));
+    cpumask_scnprintf(cpustr, sizeof(cpustr), per_cpu(cpu_core_mask, cpu));
     printk("core=%s\n", cpustr);
 
     /* current VCPU */
