@@ -107,7 +107,7 @@ static int powernow_cpufreq_target(struct cpufreq_policy *policy,
     if (unlikely(result))
         return -ENODEV;
 
-    online_policy_cpus = policy->cpus;
+    cpumask_and(&online_policy_cpus, &policy->cpus, &cpu_online_map);
 
     next_perf_state = data->freq_table[next_state].index;
     if (perf->state == next_perf_state) {

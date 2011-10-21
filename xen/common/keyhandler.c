@@ -93,11 +93,11 @@ void dump_execstate(struct cpu_user_regs *regs)
         printk("\n");
     }
 
-    cpu_clear(cpu, dump_execstate_mask);
+    cpumask_clear_cpu(cpu, &dump_execstate_mask);
     if ( !alt_key_handling )
         return;
 
-    cpu = cycle_cpu(cpu, dump_execstate_mask);
+    cpu = cpumask_cycle(cpu, &dump_execstate_mask);
     if ( cpu < nr_cpu_ids )
     {
         smp_send_state_dump(cpu);
@@ -118,7 +118,7 @@ static void dump_registers(unsigned char key, struct cpu_user_regs *regs)
 
     printk("'%c' pressed -> dumping registers\n\n", key);
 
-    dump_execstate_mask = cpu_online_map;
+    cpumask_copy(&dump_execstate_mask, &cpu_online_map);
 
     /* Get local execution state out immediately, in case we get stuck. */
     dump_execstate(regs);
@@ -131,7 +131,7 @@ static void dump_registers(unsigned char key, struct cpu_user_regs *regs)
     for_each_cpu_mask ( cpu, dump_execstate_mask )
     {
         smp_send_state_dump(cpu);
-        while ( cpu_isset(cpu, dump_execstate_mask) )
+        while ( cpumask_test_cpu(cpu, &dump_execstate_mask) )
             cpu_relax();
     }
 
@@ -324,11 +324,11 @@ static void read_clocks_slave(void *unused)
 {
     unsigned int cpu = smp_processor_id();
     local_irq_disable();
-    while ( !cpu_isset(cpu, read_clocks_cpumask) )
+    while ( !cpumask_test_cpu(cpu, &read_clocks_cpumask) )
         cpu_relax();
     per_cpu(read_clocks_time, cpu) = NOW();
     per_cpu(read_cycles_time, cpu) = get_cycles();
-    cpu_clear(cpu, read_clocks_cpumask);
+    cpumask_clear_cpu(cpu, &read_clocks_cpumask);
     local_irq_enable();
 }
 
@@ -348,13 +348,12 @@ static void read_clocks(unsigned char key)
     smp_call_function(read_clocks_slave, NULL, 0);
 
     local_irq_disable();
-    read_clocks_cpumask = cpu_online_map;
+    cpumask_andnot(&read_clocks_cpumask, &cpu_online_map, cpumask_of(cpu));
     per_cpu(read_clocks_time, cpu) = NOW();
     per_cpu(read_cycles_time, cpu) = get_cycles();
-    cpu_clear(cpu, read_clocks_cpumask);
     local_irq_enable();
 
-    while ( !cpus_empty(read_clocks_cpumask) )
+    while ( !cpumask_empty(&read_clocks_cpumask) )
         cpu_relax();
 
     min_stime_cpu = max_stime_cpu = min_cycles_cpu = max_cycles_cpu = cpu;

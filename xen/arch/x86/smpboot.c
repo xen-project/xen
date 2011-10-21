@@ -267,7 +267,8 @@ static void set_cpu_sibling_map(int cpu)
 
     if ( c[cpu].x86_max_cores == 1 )
     {
-        per_cpu(cpu_core_map, cpu) = per_cpu(cpu_sibling_map, cpu);
+        cpumask_copy(&per_cpu(cpu_core_map, cpu),
+                     &per_cpu(cpu_sibling_map, cpu));
         c[cpu].booted_cores = 1;
         return;
     }

@@ -231,9 +231,9 @@ static void set_mtrr(unsigned int reg, unsigned long base,
 	struct set_mtrr_data data;
 	unsigned long flags;
 
-	allbutself = cpu_online_map;
-	cpu_clear(smp_processor_id(), allbutself);
-	nr_cpus = cpus_weight(allbutself);
+	cpumask_andnot(&allbutself, &cpu_online_map,
+                      cpumask_of(smp_processor_id()));
+	nr_cpus = cpumask_weight(&allbutself);
 
 	data.smp_reg = reg;
 	data.smp_base = base;

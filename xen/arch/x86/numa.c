@@ -282,7 +282,7 @@ void __init numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
 	node_set_online(0);
 	for (i = 0; i < nr_cpu_ids; i++)
 		numa_set_node(i, 0);
-	node_to_cpumask[0] = cpumask_of_cpu(0);
+	cpumask_copy(&node_to_cpumask[0], cpumask_of(0));
 	setup_node_bootmem(0, (u64)start_pfn << PAGE_SHIFT, (u64)end_pfn << PAGE_SHIFT);
 }
 

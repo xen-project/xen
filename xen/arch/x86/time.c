@@ -1232,10 +1232,10 @@ static void tsc_check_slave(void *unused)
 {
     unsigned int cpu = smp_processor_id();
     local_irq_disable();
-    while ( !cpu_isset(cpu, tsc_check_cpumask) )
+    while ( !cpumask_test_cpu(cpu, &tsc_check_cpumask) )
         mb();
     check_tsc_warp(cpu_khz, &tsc_max_warp);
-    cpu_clear(cpu, tsc_check_cpumask);
+    cpumask_clear_cpu(cpu, &tsc_check_cpumask);
     local_irq_enable();
 }
 
@@ -1248,12 +1248,11 @@ static void tsc_check_reliability(void)
 
     tsc_check_count++;
     smp_call_function(tsc_check_slave, NULL, 0);
-    tsc_check_cpumask = cpu_online_map;
+    cpumask_andnot(&tsc_check_cpumask, &cpu_online_map, cpumask_of(cpu));
     local_irq_disable();
     check_tsc_warp(cpu_khz, &tsc_max_warp);
-    cpu_clear(cpu, tsc_check_cpumask);
     local_irq_enable();
-    while ( !cpus_empty(tsc_check_cpumask) )
+    while ( !cpumask_empty(&tsc_check_cpumask) )
         cpu_relax();
 
     spin_unlock(&lock);
@@ -1280,7 +1279,7 @@ static void time_calibration_tsc_rendezvous(void *_r)
     int i;
     struct cpu_calibration *c = &this_cpu(cpu_calibration);
     struct calibration_rendezvous *r = _r;
-    unsigned int total_cpus = cpus_weight(r->cpu_calibration_map);
+    unsigned int total_cpus = cpumask_weight(&r->cpu_calibration_map);
 
     /* Loop to get rid of cache effects on TSC skew. */
     for ( i = 4; i >= 0; i-- )
@@ -1331,7 +1330,7 @@ static void time_calibration_std_rendezvous(void *_r)
 {
     struct cpu_calibration *c = &this_cpu(cpu_calibration);
     struct calibration_rendezvous *r = _r;
-    unsigned int total_cpus = cpus_weight(r->cpu_calibration_map);
+    unsigned int total_cpus = cpumask_weight(&r->cpu_calibration_map);
 
     if ( smp_processor_id() == 0 )
     {
@@ -1362,9 +1361,10 @@ static void (*time_calibration_rendezvous_fn)(void *) =
 static void time_calibration(void *unused)
 {
     struct calibration_rendezvous r = {
-        .cpu_calibration_map = cpu_online_map,
         .semaphore = ATOMIC_INIT(0)
     };
+
+    cpumask_copy(&r.cpu_calibration_map, &cpu_online_map);
 
     /* @wait=1 because we must wait for all cpus before freeing @r. */
     on_selected_cpus(&r.cpu_calibration_map,

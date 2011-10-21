@@ -1040,7 +1040,7 @@ static void irq_guest_eoi_timer_fn(void *data)
             desc->handler->end(desc, 0);
         break;
     case ACKTYPE_EOI:
-        cpu_eoi_map = action->cpu_eoi_map;
+        cpumask_copy(&cpu_eoi_map, &action->cpu_eoi_map);
         spin_unlock_irq(&desc->lock);
         on_selected_cpus(&cpu_eoi_map, set_eoi_ready, desc, 0);
         spin_lock_irq(&desc->lock);
@@ -1366,9 +1366,9 @@ void desc_guest_eoi(struct irq_desc *desc, struct pirq *pirq)
 
     ASSERT(action->ack_type == ACKTYPE_EOI);
         
-    cpu_eoi_map = action->cpu_eoi_map;
+    cpumask_copy(&cpu_eoi_map, &action->cpu_eoi_map);
 
-    if ( cpu_test_and_clear(smp_processor_id(), cpu_eoi_map) )
+    if ( cpumask_test_and_clear_cpu(smp_processor_id(), &cpu_eoi_map) )
     {
         __set_eoi_ready(desc);
         spin_unlock(&desc->lock);
@@ -1380,7 +1380,7 @@ void desc_guest_eoi(struct irq_desc *desc, struct pirq *pirq)
         spin_unlock_irq(&desc->lock);
     }
 
-    if ( !cpus_empty(cpu_eoi_map) )
+    if ( !cpumask_empty(&cpu_eoi_map) )
         on_selected_cpus(&cpu_eoi_map, set_eoi_ready, desc, 0);
 }
 
@@ -1619,7 +1619,7 @@ static irq_guest_action_t *__pirq_guest_unbind(
              (--action->in_flight == 0) &&
              (action->nr_guests != 0) )
         {
-            cpu_eoi_map = action->cpu_eoi_map;
+            cpumask_copy(&cpu_eoi_map, &action->cpu_eoi_map);
             spin_unlock_irq(&desc->lock);
             on_selected_cpus(&cpu_eoi_map, set_eoi_ready, desc, 0);
             spin_lock_irq(&desc->lock);
@@ -1649,8 +1649,8 @@ static irq_guest_action_t *__pirq_guest_unbind(
      * would need to flush all ready EOIs before returning as otherwise the
      * desc->handler could change and we would call the wrong 'end' hook.
      */
-    cpu_eoi_map = action->cpu_eoi_map;
-    if ( !cpus_empty(cpu_eoi_map) )
+    cpumask_copy(&cpu_eoi_map, &action->cpu_eoi_map);
+    if ( !cpumask_empty(&cpu_eoi_map) )
     {
         BUG_ON(action->ack_type != ACKTYPE_EOI);
         spin_unlock_irq(&desc->lock);

@@ -359,11 +359,14 @@ typedef cpumask_t *cpumask_var_t;
 
 static inline bool_t alloc_cpumask_var(cpumask_var_t *mask)
 {
-	/*
-	 * Once all direct cpumask assignments are gone, we could use
-	 * nr_cpumask_bits to determine the allocation size here.
-	 */
-	return (*mask = xmalloc(cpumask_t)) != NULL;
+	*(void **)mask = _xmalloc(nr_cpumask_bits / 8, sizeof(long));
+	return *mask != NULL;
+}
+
+static inline bool_t zalloc_cpumask_var(cpumask_var_t *mask)
+{
+	*(void **)mask = _xzalloc(nr_cpumask_bits / 8, sizeof(long));
+	return *mask != NULL;
 }
 
 static inline void free_cpumask_var(cpumask_var_t mask)
@@ -378,18 +381,16 @@ static inline bool_t alloc_cpumask_var(cpumask_var_t *mask)
 	return 1;
 }
 
+static inline bool_t zalloc_cpumask_var(cpumask_var_t *mask)
+{
+	cpumask_clear(*mask);
+	return 1;
+}
+
 static inline void free_cpumask_var(cpumask_var_t mask)
 {
 }
 #endif
-
-static inline bool_t zalloc_cpumask_var(cpumask_var_t *mask)
-{
-	if (!alloc_cpumask_var(mask))
-		return 0;
-	cpumask_clear(*mask);
-	return 1;
-}
 
 #if NR_CPUS > 1
 #define for_each_cpu_mask(cpu, mask)		\

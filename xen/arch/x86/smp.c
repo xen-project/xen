@@ -257,8 +257,8 @@ void new_tlbflush_clock_period(void)
     cpumask_t allbutself;
 
     /* Flush everyone else. We definitely flushed just before entry. */
-    allbutself = cpu_online_map;
-    cpu_clear(smp_processor_id(), allbutself);
+    cpumask_andnot(&allbutself, &cpu_online_map,
+                   cpumask_of(smp_processor_id()));
     flush_mask(&allbutself, FLUSH_TLB);
 
     /* No need for atomicity: we are the only possible updater. */
@@ -289,8 +289,10 @@ void smp_call_function(
     void *info,
     int wait)
 {
-    cpumask_t allbutself = cpu_online_map;
-    cpu_clear(smp_processor_id(), allbutself);
+    cpumask_t allbutself;
+
+    cpumask_andnot(&allbutself, &cpu_online_map,
+                   cpumask_of(smp_processor_id()));
     on_selected_cpus(&allbutself, func, info, wait);
 }
 
@@ -306,9 +308,9 @@ void on_selected_cpus(
 
     spin_lock(&call_lock);
 
-    call_data.selected = *selected;
+    cpumask_copy(&call_data.selected, selected);
 
-    nr_cpus = cpus_weight(call_data.selected);
+    nr_cpus = cpumask_weight(&call_data.selected);
     if ( nr_cpus == 0 )
         goto out;
 
@@ -318,14 +320,14 @@ void on_selected_cpus(
 
     send_IPI_mask(&call_data.selected, CALL_FUNCTION_VECTOR);
 
-    if ( cpu_isset(smp_processor_id(), call_data.selected) )
+    if ( cpumask_test_cpu(smp_processor_id(), &call_data.selected) )
     {
         local_irq_disable();
         __smp_call_function_interrupt();
         local_irq_enable();
     }
 
-    while ( !cpus_empty(call_data.selected) )
+    while ( !cpumask_empty(&call_data.selected) )
         cpu_relax();
 
  out:
@@ -396,7 +398,7 @@ static void __smp_call_function_interrupt(void)
     void *info = call_data.info;
     unsigned int cpu = smp_processor_id();
 
-    if ( !cpu_isset(cpu, call_data.selected) )
+    if ( !cpumask_test_cpu(cpu, &call_data.selected) )
         return;
 
     irq_enter();
@@ -405,12 +407,12 @@ static void __smp_call_function_interrupt(void)
     {
         (*func)(info);
         mb();
-        cpu_clear(cpu, call_data.selected);
+        cpumask_clear_cpu(cpu, &call_data.selected);
     }
     else
     {
         mb();
-        cpu_clear(cpu, call_data.selected);
+        cpumask_clear_cpu(cpu, &call_data.selected);
         (*func)(info);
     }
 

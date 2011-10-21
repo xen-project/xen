@@ -161,8 +161,7 @@ static void force_quiescent_state(struct rcu_data *rdp,
          * Don't send IPI to itself. With irqs disabled,
          * rdp->cpu is the current cpu.
          */
-        cpumask = rcp->cpumask;
-        cpu_clear(rdp->cpu, cpumask);
+        cpumask_andnot(&cpumask, &rcp->cpumask, cpumask_of(rdp->cpu));
         cpumask_raise_softirq(&cpumask, SCHEDULE_SOFTIRQ);
     }
 }
@@ -258,7 +257,7 @@ static void rcu_start_batch(struct rcu_ctrlblk *rcp)
         smp_wmb();
         rcp->cur++;
 
-        rcp->cpumask = cpu_online_map;
+        cpumask_copy(&rcp->cpumask, &cpu_online_map);
     }
 }
 
@@ -269,8 +268,8 @@ static void rcu_start_batch(struct rcu_ctrlblk *rcp)
  */
 static void cpu_quiet(int cpu, struct rcu_ctrlblk *rcp)
 {
-    cpu_clear(cpu, rcp->cpumask);
-    if (cpus_empty(rcp->cpumask)) {
+    cpumask_clear_cpu(cpu, &rcp->cpumask);
+    if (cpumask_empty(&rcp->cpumask)) {
         /* batch completed ! */
         rcp->completed = rcp->cur;
         rcu_start_batch(rcp);

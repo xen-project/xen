@@ -81,9 +81,9 @@ int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
     if ( !get_cpu_maps() )
         return -EBUSY;
 
-    allbutself = cpu_online_map;
-    cpu_clear(smp_processor_id(), allbutself);
-    nr_cpus = cpus_weight(allbutself);
+    cpumask_andnot(&allbutself, &cpu_online_map,
+                   cpumask_of(smp_processor_id()));
+    nr_cpus = cpumask_weight(&allbutself);
 
     /* Must not spin here as the holder will expect us to be descheduled. */
     if ( !spin_trylock(&stopmachine_lock) )
