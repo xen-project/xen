@@ -198,7 +198,7 @@ struct p2m_domain {
      * this p2m and those physical cpus whose vcpu's are in
      * guestmode.
      */
-    cpumask_t          p2m_dirty_cpumask;
+    cpumask_var_t      dirty_cpumask;
 
     struct domain     *domain;   /* back pointer to domain */
 

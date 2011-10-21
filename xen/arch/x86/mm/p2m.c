@@ -81,7 +81,6 @@ static void p2m_initialise(struct domain *d, struct p2m_domain *p2m)
     p2m->default_access = p2m_access_rwx;
 
     p2m->cr3 = CR3_EADDR;
-    cpumask_clear(&p2m->p2m_dirty_cpumask);
 
     if ( hap_enabled(d) && (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) )
         ept_p2m_init(p2m);
@@ -102,6 +101,8 @@ p2m_init_nestedp2m(struct domain *d)
         d->arch.nested_p2m[i] = p2m = xzalloc(struct p2m_domain);
         if (p2m == NULL)
             return -ENOMEM;
+        if ( !zalloc_cpumask_var(&p2m->dirty_cpumask) )
+            return -ENOMEM;
         p2m_initialise(d, p2m);
         p2m->write_p2m_entry = nestedp2m_write_p2m_entry;
         list_add(&p2m->np2m_list, &p2m_get_hostp2m(d)->np2m_list);
@@ -118,6 +119,11 @@ int p2m_init(struct domain *d)
     p2m_get_hostp2m(d) = p2m = xzalloc(struct p2m_domain);
     if ( p2m == NULL )
         return -ENOMEM;
+    if ( !zalloc_cpumask_var(&p2m->dirty_cpumask) )
+    {
+        xfree(p2m);
+        return -ENOMEM;
+    }
     p2m_initialise(d, p2m);
 
     /* Must initialise nestedp2m unconditionally
@@ -333,6 +339,9 @@ static void p2m_teardown_nestedp2m(struct domain *d)
     uint8_t i;
 
     for (i = 0; i < MAX_NESTEDP2M; i++) {
+        if ( !d->arch.nested_p2m[i] )
+            continue;
+        free_cpumask_var(d->arch.nested_p2m[i]->dirty_cpumask);
         xfree(d->arch.nested_p2m[i]);
         d->arch.nested_p2m[i] = NULL;
     }
@@ -341,8 +350,12 @@ static void p2m_teardown_nestedp2m(struct domain *d)
 void p2m_final_teardown(struct domain *d)
 {
     /* Iterate over all p2m tables per domain */
-    xfree(d->arch.p2m);
-    d->arch.p2m = NULL;
+    if ( d->arch.p2m )
+    {
+        free_cpumask_var(d->arch.p2m->dirty_cpumask);
+        xfree(d->arch.p2m);
+        d->arch.p2m = NULL;
+    }
 
     /* We must teardown unconditionally because
      * we initialise them unconditionally.
@@ -1305,7 +1318,7 @@ p2m_get_nestedp2m(struct vcpu *v, uint64_t cr3)
             if (p2m->cr3 == CR3_EADDR)
                 hvm_asid_flush_vcpu(v);
             p2m->cr3 = cr3;
-            cpu_set(v->processor, p2m->p2m_dirty_cpumask);
+            cpumask_set_cpu(v->processor, p2m->dirty_cpumask);
             p2m_unlock(p2m);
             nestedp2m_unlock(d);
             return p2m;
@@ -1322,7 +1335,7 @@ p2m_get_nestedp2m(struct vcpu *v, uint64_t cr3)
     p2m->cr3 = cr3;
     nv->nv_flushp2m = 0;
     hvm_asid_flush_vcpu(v);
-    cpu_set(v->processor, p2m->p2m_dirty_cpumask);
+    cpumask_set_cpu(v->processor, p2m->dirty_cpumask);
     p2m_unlock(p2m);
     nestedp2m_unlock(d);
 
