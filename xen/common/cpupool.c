@@ -39,11 +39,18 @@ DEFINE_PER_CPU(struct cpupool *, cpupool);
 
 static struct cpupool *alloc_cpupool_struct(void)
 {
-    return xzalloc(struct cpupool);
+    struct cpupool *c = xzalloc(struct cpupool);
+
+    if ( c && zalloc_cpumask_var(&c->cpu_valid) )
+        return c;
+    xfree(c);
+    return NULL;
 }
 
 static void free_cpupool_struct(struct cpupool *c)
 {
+    if ( c )
+        free_cpumask_var(c->cpu_valid);
     xfree(c);
 }
 
@@ -191,7 +198,7 @@ static int cpupool_destroy(struct cpupool *c)
         spin_unlock(&cpupool_lock);
         return -ENOENT;
     }
-    if ( (c->n_dom != 0) || cpus_weight(c->cpu_valid) )
+    if ( (c->n_dom != 0) || cpumask_weight(c->cpu_valid) )
     {
         spin_unlock(&cpupool_lock);
         return -EBUSY;
@@ -232,7 +239,7 @@ static int cpupool_assign_cpu_locked(struct cpupool *c, unsigned int cpu)
         cpupool_put(cpupool_cpu_moving);
         cpupool_cpu_moving = NULL;
     }
-    cpu_set(cpu, c->cpu_valid);
+    cpumask_set_cpu(cpu, c->cpu_valid);
     return 0;
 }
 
@@ -296,10 +303,10 @@ int cpupool_unassign_cpu(struct cpupool *c, unsigned int cpu)
         goto out;
 
     ret = 0;
-    if ( !cpu_isset(cpu, c->cpu_valid) && (cpu != cpupool_moving_cpu) )
+    if ( !cpumask_test_cpu(cpu, c->cpu_valid) && (cpu != cpupool_moving_cpu) )
         goto out;
 
-    if ( (c->n_dom > 0) && (cpus_weight(c->cpu_valid) == 1) &&
+    if ( (c->n_dom > 0) && (cpumask_weight(c->cpu_valid) == 1) &&
          (cpu != cpupool_moving_cpu) )
     {
         for_each_domain(d)
@@ -326,15 +333,15 @@ int cpupool_unassign_cpu(struct cpupool *c, unsigned int cpu)
     cpupool_moving_cpu = cpu;
     atomic_inc(&c->refcnt);
     cpupool_cpu_moving = c;
-    cpu_clear(cpu, c->cpu_valid);
+    cpumask_clear_cpu(cpu, c->cpu_valid);
     spin_unlock(&cpupool_lock);
 
     work_cpu = smp_processor_id();
     if ( work_cpu == cpu )
     {
-        work_cpu = first_cpu(cpupool0->cpu_valid);
+        work_cpu = cpumask_first(cpupool0->cpu_valid);
         if ( work_cpu == cpu )
-            work_cpu = next_cpu(cpu, cpupool0->cpu_valid);
+            work_cpu = cpumask_next(cpu, cpupool0->cpu_valid);
     }
     return continue_hypercall_on_cpu(work_cpu, cpupool_unassign_cpu_helper, c);
 
@@ -361,7 +368,7 @@ int cpupool_add_domain(struct domain *d, int poolid)
         return 0;
     spin_lock(&cpupool_lock);
     c = cpupool_find_by_id(poolid);
-    if ( (c != NULL) && cpus_weight(c->cpu_valid) )
+    if ( (c != NULL) && cpumask_weight(c->cpu_valid) )
     {
         c->n_dom++;
         n_dom = c->n_dom;
@@ -418,7 +425,7 @@ static int cpupool_cpu_remove(unsigned int cpu)
     int ret = 0;
 	
     spin_lock(&cpupool_lock);
-    if ( !cpu_isset(cpu, cpupool0->cpu_valid))
+    if ( !cpumask_test_cpu(cpu, cpupool0->cpu_valid))
         ret = -EBUSY;
     else
         cpu_set(cpu, cpupool_locked_cpus);
@@ -473,7 +480,7 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
         op->cpupool_id = c->cpupool_id;
         op->sched_id = c->sched->sched_id;
         op->n_dom = c->n_dom;
-        ret = cpumask_to_xenctl_cpumap(&op->cpumap, &c->cpu_valid);
+        ret = cpumask_to_xenctl_cpumap(&op->cpumap, c->cpu_valid);
         cpupool_put(c);
     }
     break;
@@ -516,7 +523,7 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
             break;
         cpu = op->cpu;
         if ( cpu == XEN_SYSCTL_CPUPOOL_PAR_ANY )
-            cpu = last_cpu(c->cpu_valid);
+            cpu = cpumask_last(c->cpu_valid);
         ret = (cpu < nr_cpu_ids) ? cpupool_unassign_cpu(c, cpu) : -EINVAL;
         cpupool_put(c);
     }
@@ -550,7 +557,7 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
         ret = -ENOENT;
         spin_lock(&cpupool_lock);
         c = cpupool_find_by_id(op->cpupool_id);
-        if ( (c != NULL) && cpus_weight(c->cpu_valid) )
+        if ( (c != NULL) && cpumask_weight(c->cpu_valid) )
         {
             d->cpupool->n_dom--;
             ret = sched_move_domain(d, c);

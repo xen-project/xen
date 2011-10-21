@@ -22,7 +22,7 @@
     } while ( 0 )
 
 #define SEDF_CPUONLINE(_pool)                                             \
-    (((_pool) == NULL) ? &cpupool_free_cpus : &(_pool)->cpu_valid)
+    (((_pool) == NULL) ? &cpupool_free_cpus : (_pool)->cpu_valid)
 
 #ifndef NDEBUG
 #define SEDF_STATS

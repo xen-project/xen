@@ -502,7 +502,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             goto maxvcpu_out;
 
         ret = -ENOMEM;
-        online = (d->cpupool == NULL) ? &cpu_online_map : &d->cpupool->cpu_valid;
+        online = (d->cpupool == NULL) ? &cpu_online_map : d->cpupool->cpu_valid;
         if ( max > d->max_vcpus )
         {
             struct vcpu **vcpus;

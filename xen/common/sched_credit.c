@@ -73,7 +73,7 @@
 #define CSCHED_DOM(_dom)    ((struct csched_dom *) (_dom)->sched_priv)
 #define RUNQ(_cpu)          (&(CSCHED_PCPU(_cpu)->runq))
 #define CSCHED_CPUONLINE(_pool)    \
-    (((_pool) == NULL) ? &cpupool_free_cpus : &(_pool)->cpu_valid)
+    (((_pool) == NULL) ? &cpupool_free_cpus : (_pool)->cpu_valid)
 
 
 /*

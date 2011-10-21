@@ -664,7 +664,7 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op);
 void schedule_dump(struct cpupool *c);
 extern void dump_runq(unsigned char key);
 
-#define num_cpupool_cpus(c) (cpus_weight((c)->cpu_valid))
+#define num_cpupool_cpus(c) cpumask_weight((c)->cpu_valid)
 
 #endif /* __SCHED_H__ */
 

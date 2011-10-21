@@ -74,7 +74,7 @@ static struct scheduler __read_mostly ops;
 #define VCPU2OP(_v)   (DOM2OP((_v)->domain))
 #define VCPU2ONLINE(_v)                                                    \
          (((_v)->domain->cpupool == NULL) ? &cpu_online_map                \
-         : &(_v)->domain->cpupool->cpu_valid)
+         : (_v)->domain->cpupool->cpu_valid)
 
 static inline void trace_runstate_change(struct vcpu *v, int new_state)
 {
@@ -258,7 +258,7 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
 
     domain_pause(d);
 
-    new_p = first_cpu(c->cpu_valid);
+    new_p = cpumask_first(c->cpu_valid);
     for_each_vcpu ( d, v )
     {
         migrate_timer(&v->periodic_timer, new_p);
@@ -273,7 +273,7 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
         v->sched_priv = vcpu_priv[v->vcpu_id];
         evtchn_move_pirqs(v);
 
-        new_p = cycle_cpu(new_p, c->cpu_valid);
+        new_p = cpumask_cycle(new_p, c->cpu_valid);
 
         SCHED_OP(VCPU2OP(v), insert_vcpu, v);
     }
@@ -431,13 +431,13 @@ static void vcpu_migrate(struct vcpu *v)
             if ( pick_called &&
                  (new_lock == per_cpu(schedule_data, new_cpu).schedule_lock) &&
                  cpumask_test_cpu(new_cpu, v->cpu_affinity) &&
-                 cpu_isset(new_cpu, v->domain->cpupool->cpu_valid) )
+                 cpumask_test_cpu(new_cpu, v->domain->cpupool->cpu_valid) )
                 break;
 
             /* Select a new CPU. */
             new_cpu = SCHED_OP(VCPU2OP(v), pick_cpu, v);
             if ( (new_lock == per_cpu(schedule_data, new_cpu).schedule_lock) &&
-                 cpu_isset(new_cpu, v->domain->cpupool->cpu_valid) )
+                 cpumask_test_cpu(new_cpu, v->domain->cpupool->cpu_valid) )
                 break;
             pick_called = 1;
         }
@@ -549,7 +549,7 @@ int cpu_disable_scheduler(unsigned int cpu)
         {
             vcpu_schedule_lock_irq(v);
 
-            cpumask_and(&online_affinity, v->cpu_affinity, &c->cpu_valid);
+            cpumask_and(&online_affinity, v->cpu_affinity, c->cpu_valid);
             if ( cpus_empty(online_affinity) &&
                  cpumask_test_cpu(cpu, v->cpu_affinity) )
             {
@@ -1446,7 +1446,7 @@ void schedule_dump(struct cpupool *c)
     cpumask_t        *cpus;
 
     sched = (c == NULL) ? &ops : c->sched;
-    cpus = (c == NULL) ? &cpupool_free_cpus : &c->cpu_valid;
+    cpus = (c == NULL) ? &cpupool_free_cpus : c->cpu_valid;
     printk("Scheduler: %s (%s)\n", sched->name, sched->opt_name);
     SCHED_OP(sched, dump_settings);
 

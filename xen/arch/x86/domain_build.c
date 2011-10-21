@@ -885,10 +885,10 @@ int __init construct_dom0(
 
     printk("Dom0 has maximum %u VCPUs\n", opt_dom0_max_vcpus);
 
-    cpu = first_cpu(cpupool0->cpu_valid);
+    cpu = cpumask_first(cpupool0->cpu_valid);
     for ( i = 1; i < opt_dom0_max_vcpus; i++ )
     {
-        cpu = cycle_cpu(cpu, cpupool0->cpu_valid);
+        cpu = cpumask_cycle(cpu, cpupool0->cpu_valid);
         (void)alloc_vcpu(d, i, cpu);
     }
 

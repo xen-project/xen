@@ -192,7 +192,7 @@ extern const struct scheduler sched_arinc653_def;
 struct cpupool
 {
     int              cpupool_id;
-    cpumask_t        cpu_valid;      /* all cpus assigned to pool */
+    cpumask_var_t    cpu_valid;      /* all cpus assigned to pool */
     struct cpupool   *next;
     unsigned int     n_dom;
     struct scheduler *sched;
