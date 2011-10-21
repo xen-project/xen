@@ -59,7 +59,6 @@ static struct rcu_ctrlblk {
     .cur = -300,
     .completed = -300,
     .lock = SPIN_LOCK_UNLOCKED,
-    .cpumask = CPU_MASK_NONE,
 };
 
 /*

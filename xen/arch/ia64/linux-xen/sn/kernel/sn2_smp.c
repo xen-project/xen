@@ -206,7 +206,7 @@ sn2_global_tlb_purge(unsigned long start,
 	static DEFINE_SPINLOCK(sn2_ptcg_lock2);
 
 	nodes_clear(nodes_flushed);
-	cpus_clear(selected_cpus);
+	cpumask_clear(&selected_cpus);
 
 	spin_lock(&sn2_ptcg_lock2);
 	node_set(cpu_to_node(smp_processor_id()), nodes_flushed);

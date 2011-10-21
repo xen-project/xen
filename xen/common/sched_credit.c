@@ -260,7 +260,7 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
     cpumask_t mask;
 
     ASSERT(cur);
-    cpus_clear(mask);
+    cpumask_clear(&mask);
 
     /* If strictly higher priority than current VCPU, signal the CPU */
     if ( new->pri > cur->pri )
@@ -274,7 +274,7 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
         else
             CSCHED_STAT_CRANK(tickle_local_other);
 
-        cpu_set(cpu, mask);
+        cpumask_set_cpu(cpu, &mask);
     }
 
     /*
@@ -283,7 +283,7 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
      */
     if ( cur->pri > CSCHED_PRI_IDLE )
     {
-        if ( cpus_empty(prv->idlers) )
+        if ( cpumask_empty(&prv->idlers) )
         {
             CSCHED_STAT_CRANK(tickle_idlers_none);
         }
@@ -292,24 +292,24 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
             cpumask_t idle_mask;
 
             cpumask_and(&idle_mask, &prv->idlers, new->vcpu->cpu_affinity);
-            if ( !cpus_empty(idle_mask) )
+            if ( !cpumask_empty(&idle_mask) )
             {
                 CSCHED_STAT_CRANK(tickle_idlers_some);
                 if ( opt_tickle_one_idle )
                 {
                     this_cpu(last_tickle_cpu) = 
-                        cycle_cpu(this_cpu(last_tickle_cpu), idle_mask);
-                    cpu_set(this_cpu(last_tickle_cpu), mask);
+                        cpumask_cycle(this_cpu(last_tickle_cpu), &idle_mask);
+                    cpumask_set_cpu(this_cpu(last_tickle_cpu), &mask);
                 }
                 else
-                    cpus_or(mask, mask, idle_mask);
+                    cpumask_or(&mask, &mask, &idle_mask);
             }
             cpumask_and(&mask, &mask, new->vcpu->cpu_affinity);
         }
     }
 
     /* Send scheduler interrupts to designated CPUs */
-    if ( !cpus_empty(mask) )
+    if ( !cpumask_empty(&mask) )
         cpumask_raise_softirq(&mask, SCHEDULE_SOFTIRQ);
 }
 
@@ -471,10 +471,10 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
      */
     online = CSCHED_CPUONLINE(vc->domain->cpupool);
     cpumask_and(&cpus, online, vc->cpu_affinity);
-    cpu = cpu_isset(vc->processor, cpus)
+    cpu = cpumask_test_cpu(vc->processor, &cpus)
             ? vc->processor
-            : cycle_cpu(vc->processor, cpus);
-    ASSERT( !cpus_empty(cpus) && cpu_isset(cpu, cpus) );
+            : cpumask_cycle(vc->processor, &cpus);
+    ASSERT( !cpumask_empty(&cpus) && cpumask_test_cpu(cpu, &cpus) );
 
     /*
      * Try to find an idle processor within the above constraints.
@@ -488,54 +488,54 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
      * like run two VCPUs on co-hyperthreads while there are idle cores
      * or sockets.
      */
-    cpus_and(idlers, cpu_online_map, CSCHED_PRIV(ops)->idlers);
-    cpu_set(cpu, idlers);
-    cpus_and(cpus, cpus, idlers);
-    cpu_clear(cpu, cpus);
+    cpumask_and(&idlers, &cpu_online_map, &CSCHED_PRIV(ops)->idlers);
+    cpumask_set_cpu(cpu, &idlers);
+    cpumask_and(&cpus, &cpus, &idlers);
+    cpumask_clear_cpu(cpu, &cpus);
 
-    while ( !cpus_empty(cpus) )
+    while ( !cpumask_empty(&cpus) )
     {
         cpumask_t cpu_idlers;
         cpumask_t nxt_idlers;
         int nxt, weight_cpu, weight_nxt;
         int migrate_factor;
 
-        nxt = cycle_cpu(cpu, cpus);
+        nxt = cpumask_cycle(cpu, &cpus);
 
-        if ( cpu_isset(cpu, per_cpu(cpu_core_map, nxt)) )
+        if ( cpumask_test_cpu(cpu, &per_cpu(cpu_core_map, nxt)) )
         {
             /* We're on the same socket, so check the busy-ness of threads.
              * Migrate if # of idlers is less at all */
-            ASSERT( cpu_isset(nxt, per_cpu(cpu_core_map, cpu)) );
+            ASSERT( cpumask_test_cpu(nxt, &per_cpu(cpu_core_map, cpu)) );
             migrate_factor = 1;
-            cpus_and(cpu_idlers, idlers, per_cpu(cpu_sibling_map, cpu));
-            cpus_and(nxt_idlers, idlers, per_cpu(cpu_sibling_map, nxt));
+            cpumask_and(&cpu_idlers, &idlers, &per_cpu(cpu_sibling_map, cpu));
+            cpumask_and(&nxt_idlers, &idlers, &per_cpu(cpu_sibling_map, nxt));
         }
         else
         {
             /* We're on different sockets, so check the busy-ness of cores.
              * Migrate only if the other core is twice as idle */
-            ASSERT( !cpu_isset(nxt, per_cpu(cpu_core_map, cpu)) );
+            ASSERT( !cpumask_test_cpu(nxt, &per_cpu(cpu_core_map, cpu)) );
             migrate_factor = 2;
-            cpus_and(cpu_idlers, idlers, per_cpu(cpu_core_map, cpu));
-            cpus_and(nxt_idlers, idlers, per_cpu(cpu_core_map, nxt));
+            cpumask_and(&cpu_idlers, &idlers, &per_cpu(cpu_core_map, cpu));
+            cpumask_and(&nxt_idlers, &idlers, &per_cpu(cpu_core_map, nxt));
         }
 
-        weight_cpu = cpus_weight(cpu_idlers);
-        weight_nxt = cpus_weight(nxt_idlers);
+        weight_cpu = cpumask_weight(&cpu_idlers);
+        weight_nxt = cpumask_weight(&nxt_idlers);
         /* smt_power_savings: consolidate work rather than spreading it */
         if ( sched_smt_power_savings ?
              weight_cpu > weight_nxt :
              weight_cpu * migrate_factor < weight_nxt )
         {
-            cpus_and(nxt_idlers, cpus, nxt_idlers);
+            cpumask_and(&nxt_idlers, &cpus, &nxt_idlers);
             spc = CSCHED_PCPU(nxt);
-            cpu = cycle_cpu(spc->idle_bias, nxt_idlers);
-            cpus_andnot(cpus, cpus, per_cpu(cpu_sibling_map, cpu));
+            cpu = cpumask_cycle(spc->idle_bias, &nxt_idlers);
+            cpumask_andnot(&cpus, &cpus, &per_cpu(cpu_sibling_map, cpu));
         }
         else
         {
-            cpus_andnot(cpus, cpus, nxt_idlers);
+            cpumask_andnot(&cpus, &cpus, &nxt_idlers);
         }
     }
 
@@ -1228,7 +1228,7 @@ csched_load_balance(struct csched_private *prv, int cpu,
     online = CSCHED_CPUONLINE(per_cpu(cpupool, cpu));
 
     /* If this CPU is going offline we shouldn't steal work. */
-    if ( unlikely(!cpu_isset(cpu, *online)) )
+    if ( unlikely(!cpumask_test_cpu(cpu, online)) )
         goto out;
 
     if ( snext->pri == CSCHED_PRI_IDLE )
@@ -1242,14 +1242,14 @@ csched_load_balance(struct csched_private *prv, int cpu,
      * Peek at non-idling CPUs in the system, starting with our
      * immediate neighbour.
      */
-    cpus_andnot(workers, *online, prv->idlers);
-    cpu_clear(cpu, workers);
+    cpumask_andnot(&workers, online, &prv->idlers);
+    cpumask_clear_cpu(cpu, &workers);
     peer_cpu = cpu;
 
     while ( !cpus_empty(workers) )
     {
-        peer_cpu = cycle_cpu(peer_cpu, workers);
-        cpu_clear(peer_cpu, workers);
+        peer_cpu = cpumask_cycle(peer_cpu, &workers);
+        cpumask_clear_cpu(peer_cpu, &workers);
 
         /*
          * Get ahold of the scheduler lock for this peer CPU.
@@ -1267,7 +1267,7 @@ csched_load_balance(struct csched_private *prv, int cpu,
         /*
          * Any work over there to steal?
          */
-        speer = cpu_isset(peer_cpu, *online) ?
+        speer = cpumask_test_cpu(peer_cpu, online) ?
             csched_runq_steal(peer_cpu, cpu, snext->pri) : NULL;
         pcpu_schedule_unlock(peer_cpu);
         if ( speer != NULL )

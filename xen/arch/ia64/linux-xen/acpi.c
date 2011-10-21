@@ -957,14 +957,14 @@ int acpi_map_lsapic(acpi_handle handle, int *pcpu)
 	buffer.length = ACPI_ALLOCATE_BUFFER;
 	buffer.pointer = NULL;
 
-	cpus_complement(tmp_map, cpu_present_map);
-	cpu = first_cpu(tmp_map);
-	if (cpu >= NR_CPUS)
+	cpumask_complement(&tmp_map, &cpu_present_map);
+	cpu = cpumask_first(&tmp_map);
+	if (cpu >= nr_cpu_ids)
 		return -EINVAL;
 
 	acpi_map_cpu2node(handle, cpu, physid);
 
-	cpu_set(cpu, cpu_present_map);
+	cpumask_set_cpu(cpu, &cpu_present_map);
 	ia64_cpu_to_sapicid[cpu] = physid;
 
 	*pcpu = cpu;

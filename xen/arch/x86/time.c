@@ -185,15 +185,15 @@ static void smp_send_timer_broadcast_ipi(void)
     int cpu = smp_processor_id();
     cpumask_t mask;
 
-    cpus_and(mask, cpu_online_map, pit_broadcast_mask);
+    cpumask_and(&mask, &cpu_online_map, &pit_broadcast_mask);
 
-    if ( cpu_isset(cpu, mask) )
+    if ( cpumask_test_cpu(cpu, &mask) )
     {
-        cpu_clear(cpu, mask);
+        cpumask_clear_cpu(cpu, &mask);
         raise_softirq(TIMER_SOFTIRQ);
     }
 
-    if ( !cpus_empty(mask) )
+    if ( !cpumask_empty(&mask) )
     {
         cpumask_raise_softirq(&mask, TIMER_SOFTIRQ);
     }
@@ -1226,7 +1226,7 @@ void check_tsc_warp(unsigned long tsc_khz, unsigned long *max_warp)
 }
 
 static unsigned long tsc_max_warp, tsc_check_count;
-static cpumask_t tsc_check_cpumask = CPU_MASK_NONE;
+static cpumask_t tsc_check_cpumask;
 
 static void tsc_check_slave(void *unused)
 {

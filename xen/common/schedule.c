@@ -595,8 +595,8 @@ int vcpu_set_affinity(struct vcpu *v, const cpumask_t *affinity)
     if ( v->domain->is_pinned )
         return -EINVAL;
     online = VCPU2ONLINE(v);
-    cpus_and(online_affinity, *affinity, *online);
-    if ( cpus_empty(online_affinity) )
+    cpumask_and(&online_affinity, affinity, online);
+    if ( cpumask_empty(&online_affinity) )
         return -EINVAL;
 
     vcpu_schedule_lock_irq(v);

@@ -374,7 +374,7 @@ tlb_track_insert_or_dirty(struct tlb_track* tlb_track, struct mm_struct* mm,
         entry->pte_val = old_pte;
         entry->vaddr = vaddr;
         entry->rid = rid;
-        cpus_clear(entry->pcpu_dirty_mask);
+        cpumask_clear(&entry->pcpu_dirty_mask);
         vcpus_clear(entry->vcpu_dirty_mask);
         list_add(&entry->list, head);
 

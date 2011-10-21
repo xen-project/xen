@@ -240,12 +240,12 @@ void flush_area_mask(const cpumask_t *mask, const void *va, unsigned int flags)
     if ( !cpus_subset(*mask, *cpumask_of(smp_processor_id())) )
     {
         spin_lock(&flush_lock);
-        cpus_and(flush_cpumask, *mask, cpu_online_map);
-        cpu_clear(smp_processor_id(), flush_cpumask);
+        cpumask_and(&flush_cpumask, mask, &cpu_online_map);
+        cpumask_clear_cpu(smp_processor_id(), &flush_cpumask);
         flush_va      = va;
         flush_flags   = flags;
         send_IPI_mask(&flush_cpumask, INVALIDATE_TLB_VECTOR);
-        while ( !cpus_empty(flush_cpumask) )
+        while ( !cpumask_empty(&flush_cpumask) )
             cpu_relax();
         spin_unlock(&flush_lock);
     }

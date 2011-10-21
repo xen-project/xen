@@ -1850,7 +1850,7 @@ static void __init check_timer(void)
     int apic1, pin1, apic2, pin2;
     int vector, ret;
     unsigned long flags;
-    cpumask_t mask_all = CPU_MASK_ALL;
+    cpumask_t mask_all;
 
     local_irq_save(flags);
 
@@ -1861,6 +1861,7 @@ static void __init check_timer(void)
     vector = FIRST_HIPRIORITY_VECTOR;
     clear_irq_vector(0);
 
+    cpumask_setall(&mask_all);
     if ((ret = bind_irq_vector(0, vector, &mask_all)))
         printk(KERN_ERR"..IRQ0 is not set correctly with ioapic!!!, err:%d\n", ret);
     

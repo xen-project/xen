@@ -71,11 +71,12 @@ void open_softirq(int nr, softirq_handler handler)
 void cpumask_raise_softirq(const cpumask_t *mask, unsigned int nr)
 {
     int cpu;
-    cpumask_t send_mask = CPU_MASK_NONE;
+    cpumask_t send_mask;
 
+    cpumask_clear(&send_mask);
     for_each_cpu_mask(cpu, *mask)
         if ( !test_and_set_bit(nr, &softirq_pending(cpu)) )
-            cpu_set(cpu, send_mask);
+            cpumask_set_cpu(cpu, &send_mask);
 
     smp_send_event_check_mask(&send_mask);
 }

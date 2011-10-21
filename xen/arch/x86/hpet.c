@@ -178,7 +178,7 @@ again:
     spin_unlock_irq(&ch->lock);
 
     next_event = STIME_MAX;
-    mask = (cpumask_t)CPU_MASK_NONE;
+    cpumask_clear(&mask);
     now = NOW();
 
     /* find all expired events */
@@ -189,11 +189,11 @@ again:
         rmb();
         deadline = per_cpu(timer_deadline, cpu);
         rmb();
-        if ( !cpu_isset(cpu, ch->cpumask) )
+        if ( !cpumask_test_cpu(cpu, &ch->cpumask) )
             continue;
 
         if ( deadline <= now )
-            cpu_set(cpu, mask);
+            cpumask_set_cpu(cpu, &mask);
         else if ( deadline < next_event )
             next_event = deadline;
     }

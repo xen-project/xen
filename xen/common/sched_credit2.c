@@ -507,19 +507,19 @@ runq_tickle(const struct scheduler *ops, unsigned int cpu, struct csched_vcpu *n
     }
     
     /* Get a mask of idle, but not tickled */
-    cpus_andnot(mask, rqd->idle, rqd->tickled);
+    cpumask_andnot(&mask, &rqd->idle, &rqd->tickled);
     
     /* If it's not empty, choose one */
-    if ( !cpus_empty(mask) )
+    if ( !cpumask_empty(&mask) )
     {
-        ipid=first_cpu(mask);
+        ipid = cpumask_first(&mask);
         goto tickle;
     }
 
     /* Otherwise, look for the non-idle cpu with the lowest credit,
      * skipping cpus which have been tickled but not scheduled yet */
-    cpus_andnot(mask, rqd->active, rqd->idle);
-    cpus_andnot(mask, mask, rqd->tickled);
+    cpumask_andnot(&mask, &rqd->active, &rqd->idle);
+    cpumask_andnot(&mask, &mask, &rqd->tickled);
 
     for_each_cpu_mask(i, mask)
     {
@@ -573,7 +573,7 @@ tickle:
                   sizeof(d),
                   (unsigned char *)&d);
     }
-    cpu_set(ipid, rqd->tickled);
+    cpumask_set_cpu(ipid, &rqd->tickled);
     cpu_raise_softirq(ipid, SCHEDULE_SOFTIRQ);
 
 no_tickle:

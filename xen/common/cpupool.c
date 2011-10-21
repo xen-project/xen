@@ -29,7 +29,7 @@ static struct cpupool *cpupool_list;     /* linked list, sorted by poolid */
 
 static int cpupool_moving_cpu = -1;
 static struct cpupool *cpupool_cpu_moving = NULL;
-static cpumask_t cpupool_locked_cpus = CPU_MASK_NONE;
+static cpumask_t cpupool_locked_cpus;
 
 static DEFINE_SPINLOCK(cpupool_lock);
 

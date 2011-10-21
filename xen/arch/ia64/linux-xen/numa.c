@@ -51,7 +51,7 @@ void __init build_cpu_to_node_map(void)
 	int cpu, i, node;
 
 	for(node=0; node < MAX_NUMNODES; node++)
-		cpus_clear(node_to_cpu_mask[node]);
+		cpumask_clear(&node_to_cpu_mask[node]);
 
 	for(cpu = 0; cpu < NR_CPUS; ++cpu) {
 		node = -1;
@@ -62,6 +62,6 @@ void __init build_cpu_to_node_map(void)
 			}
 		cpu_to_node_map[cpu] = (node >= 0) ? node : 0;
 		if (node >= 0)
-			cpu_set(cpu, node_to_cpu_mask[node]);
+			cpumask_set_cpu(cpu, &node_to_cpu_mask[node]);
 	}
 }

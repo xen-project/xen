@@ -1339,8 +1339,10 @@ static void pae_flush_pgd(
 
     if ( unlikely(shadow_mode_enabled(d)) )
     {
-        cpumask_t m = CPU_MASK_NONE;
+        cpumask_t m;
+
         /* Re-shadow this l3 table on any vcpus that are using it */
+        cpumask_clear(&m);
         for_each_vcpu ( d, v )
             if ( pagetable_get_pfn(v->arch.guest_table) == mfn )
             {
@@ -2887,7 +2889,7 @@ static inline int vcpumask_to_pcpumask(
     struct vcpu *v;
     bool_t is_native = !is_pv_32on64_domain(d);
 
-    cpus_clear(*pmask);
+    cpumask_clear(pmask);
     for ( vmask = 0, offs = 0; ; ++offs)
     {
         vcpu_bias = offs * (is_native ? BITS_PER_LONG : 32);
@@ -2899,7 +2901,7 @@ static inline int vcpumask_to_pcpumask(
                       copy_from_guest_offset((unsigned int *)&vmask, bmap,
                                              offs, 1)) )
         {
-            cpus_clear(*pmask);
+            cpumask_clear(pmask);
             return -EFAULT;
         }
 
@@ -3194,12 +3196,13 @@ int do_mmuext_op(
             else if ( likely(cache_flush_permitted(d)) )
             {
                 unsigned int cpu;
-                cpumask_t mask = CPU_MASK_NONE;
+                cpumask_t mask;
 
+                cpumask_clear(&mask);
                 for_each_online_cpu(cpu)
-                    if ( !cpus_intersects(mask,
-                                          per_cpu(cpu_sibling_map, cpu)) )
-                        cpu_set(cpu, mask);
+                    if ( !cpumask_intersects(&mask,
+                                             &per_cpu(cpu_sibling_map, cpu)) )
+                        cpumask_set_cpu(cpu, &mask);
                 flush_mask(&mask, FLUSH_CACHE);
             }
             else

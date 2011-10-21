@@ -594,15 +594,15 @@ smp_build_cpu_map (void)
 	}
 
 	ia64_cpu_to_sapicid[0] = boot_cpu_id;
-	cpus_clear(cpu_present_map);
-	cpu_set(0, cpu_present_map);
-	cpu_set(0, cpu_possible_map);
+	cpumask_clear(&cpu_present_map);
+	cpumask_set_cpu(0, &cpu_present_map);
+	cpumask_set_cpu(0, &cpu_possible_map);
 	for (cpu = 1, i = 0; i < smp_boot_data.cpu_count; i++) {
 		sapicid = smp_boot_data.cpu_phys_id[i];
 		if (sapicid == boot_cpu_id)
 			continue;
-		cpu_set(cpu, cpu_present_map);
-		cpu_set(cpu, cpu_possible_map);
+		cpumask_set_cpu(cpu, &cpu_present_map);
+		cpumask_set_cpu(cpu, &cpu_possible_map);
 		ia64_cpu_to_sapicid[cpu] = sapicid;
 		cpu++;
 	}
@@ -640,12 +640,12 @@ smp_prepare_cpus (unsigned int max_cpus)
 	 */
 	if (!max_cpus) {
 		printk(KERN_INFO "SMP mode deactivated.\n");
-		cpus_clear(cpu_online_map);
-		cpus_clear(cpu_present_map);
-		cpus_clear(cpu_possible_map);
-		cpu_set(0, cpu_online_map);
-		cpu_set(0, cpu_present_map);
-		cpu_set(0, cpu_possible_map);
+		cpumask_clear(&cpu_online_map);
+		cpumask_clear(&cpu_present_map);
+		cpumask_clear(&cpu_possible_map);
+		cpumask_set_cpu(0, &cpu_online_map);
+		cpumask_set_cpu(0, &cpu_present_map);
+		cpumask_set_cpu(0, &cpu_possible_map);
 		return;
 	}
 }
@@ -688,12 +688,12 @@ clear_cpu_sibling_map(int cpu)
 	int i;
 
 	for_each_cpu_mask(i, per_cpu(cpu_sibling_map, cpu))
-		cpu_clear(cpu, per_cpu(cpu_sibling_map, i));
+		cpumask_clear_cpu(cpu, &per_cpu(cpu_sibling_map, i));
 	for_each_cpu_mask(i, per_cpu(cpu_core_map, cpu))
-		cpu_clear(cpu, per_cpu(cpu_core_map, i));
+		cpumask_clear_cpu(cpu, &per_cpu(cpu_core_map, i));
 
-	cpus_clear(per_cpu(cpu_sibling_map, cpu));
-	cpus_clear(per_cpu(cpu_core_map, cpu));
+	cpumask_clear(&per_cpu(cpu_sibling_map, cpu));
+	cpumask_clear(&per_cpu(cpu_core_map, cpu));
 }
 
 static void

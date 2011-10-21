@@ -359,11 +359,12 @@ struct domain *domain_create(
 
 void domain_update_node_affinity(struct domain *d)
 {
-    cpumask_t cpumask = CPU_MASK_NONE;
+    cpumask_t cpumask;
     nodemask_t nodemask = NODE_MASK_NONE;
     struct vcpu *v;
     unsigned int node;
 
+    cpumask_clear(&cpumask);
     spin_lock(&d->node_affinity_lock);
 
     for_each_vcpu ( d, v )

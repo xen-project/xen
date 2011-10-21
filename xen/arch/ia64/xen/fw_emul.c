@@ -866,10 +866,10 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 			             "status %lx", status);
 
 		if (in1 == PAL_CACHE_TYPE_COHERENT) {
-			cpus_setall(current->arch.cache_coherent_map);
-			cpu_clear(processor, current->arch.cache_coherent_map);
-			cpus_setall(cpu_cache_coherent_map);
-			cpu_clear(processor, cpu_cache_coherent_map);
+			cpumask_complement(&current->arch.cache_coherent_map,
+					   cpumask_of(processor));
+			cpumask_complement(&cpu_cache_coherent_map,
+					   cpumask_of(processor));
 		}
 		break;
 	    case PAL_PERF_MON_INFO:

@@ -1537,20 +1537,19 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
             return x86_mcerr("do_mca #MC", -ENODEV);
 
         if ( op->u.mc_inject_v2.flags & XEN_MC_INJECT_CPU_BROADCAST )
-            cpus_copy(cpumap, cpu_online_map);
+            cpumask_copy(&cpumap, &cpu_online_map);
         else
         {
             int gcw;
 
-            cpus_clear(cpumap);
             xenctl_cpumap_to_cpumask(&cpumap,
                                      &op->u.mc_inject_v2.cpumap);
-            gcw = cpus_weight(cpumap);
-            cpus_and(cpumap, cpu_online_map, cpumap);
+            gcw = cpumask_weight(&cpumap);
+            cpumask_and(&cpumap, &cpu_online_map, &cpumap);
 
-            if ( cpus_empty(cpumap) )
+            if ( cpumask_empty(&cpumap) )
                 return x86_mcerr("No online CPU passed\n", -EINVAL);
-            else if ( gcw != cpus_weight(cpumap) )
+            else if ( gcw != cpumask_weight(&cpumap) )
                 dprintk(XENLOG_INFO,
                         "Not all required CPUs are online\n");
         }
@@ -1559,7 +1558,7 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
         {
         case XEN_MC_INJECT_TYPE_MCE:
             if ( mce_broadcast &&
-                 !cpus_equal(cpumap, cpu_online_map) )
+                 !cpumask_equal(&cpumap, &cpu_online_map) )
                 printk("Not trigger MCE on all CPUs, may HANG!\n");
             on_selected_cpus(&cpumap, x86_mc_mceinject, NULL, 1);
             break;

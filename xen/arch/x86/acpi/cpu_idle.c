@@ -233,13 +233,13 @@ void cpuidle_wakeup_mwait(cpumask_t *mask)
     cpumask_t target;
     unsigned int cpu;
 
-    cpus_and(target, *mask, cpuidle_mwait_flags);
+    cpumask_and(&target, mask, &cpuidle_mwait_flags);
 
     /* CPU is MWAITing on the cpuidle_mwait_wakeup flag. */
     for_each_cpu_mask(cpu, target)
         mwait_wakeup(cpu) = 0;
 
-    cpus_andnot(*mask, *mask, target);
+    cpumask_andnot(mask, mask, &target);
 }
 
 static void mwait_idle_with_hints(unsigned long eax, unsigned long ecx)

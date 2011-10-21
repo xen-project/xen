@@ -304,7 +304,7 @@ static struct page_info *alloc_heap_pages(
     unsigned int first_node, i, j, zone = 0, nodemask_retry = 0;
     unsigned int node = (uint8_t)((memflags >> _MEMF_node) - 1);
     unsigned long request = 1UL << order;
-    cpumask_t extra_cpus_mask, mask;
+    cpumask_t mask;
     struct page_info *pg;
     nodemask_t nodemask = (d != NULL ) ? d->node_affinity : node_online_map;
 
@@ -418,7 +418,7 @@ static struct page_info *alloc_heap_pages(
     if ( d != NULL )
         d->last_alloc_node = node;
 
-    cpus_clear(mask);
+    cpumask_clear(&mask);
 
     for ( i = 0; i < (1 << order); i++ )
     {
@@ -429,9 +429,11 @@ static struct page_info *alloc_heap_pages(
         if ( pg[i].u.free.need_tlbflush )
         {
             /* Add in extra CPUs that need flushing because of this page. */
-            cpus_andnot(extra_cpus_mask, cpu_online_map, mask);
+            static cpumask_t extra_cpus_mask;
+
+            cpumask_andnot(&extra_cpus_mask, &cpu_online_map, &mask);
             tlbflush_filter(extra_cpus_mask, pg[i].tlbflush_timestamp);
-            cpus_or(mask, mask, extra_cpus_mask);
+            cpumask_or(&mask, &mask, &extra_cpus_mask);
         }
 
         /* Initialise fields which have other uses for free pages. */
@@ -441,7 +443,7 @@ static struct page_info *alloc_heap_pages(
 
     spin_unlock(&heap_lock);
 
-    if ( unlikely(!cpus_empty(mask)) )
+    if ( unlikely(!cpumask_empty(&mask)) )
     {
         perfc_incr(need_flush_tlb_flush);
         flush_tlb_mask(&mask);

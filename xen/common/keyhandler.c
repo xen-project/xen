@@ -316,7 +316,7 @@ static struct keyhandler dump_domains_keyhandler = {
     .desc = "dump domain (and guest debug) info"
 };
 
-static cpumask_t read_clocks_cpumask = CPU_MASK_NONE;
+static cpumask_t read_clocks_cpumask;
 static DEFINE_PER_CPU(s_time_t, read_clocks_time);
 static DEFINE_PER_CPU(u64, read_cycles_time);
 

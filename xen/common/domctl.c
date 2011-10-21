@@ -37,9 +37,9 @@ int cpumask_to_xenctl_cpumap(
     uint8_t bytemap[(NR_CPUS + 7) / 8];
 
     guest_bytes = (xenctl_cpumap->nr_cpus + 7) / 8;
-    copy_bytes  = min_t(unsigned int, guest_bytes, sizeof(bytemap));
+    copy_bytes  = min_t(unsigned int, guest_bytes, (nr_cpu_ids + 7) / 8);
 
-    bitmap_long_to_byte(bytemap, cpus_addr(*cpumask), NR_CPUS);
+    bitmap_long_to_byte(bytemap, cpumask_bits(cpumask), nr_cpu_ids);
 
     if ( copy_bytes != 0 )
         if ( copy_to_guest(xenctl_cpumap->bitmap, bytemap, copy_bytes) )
@@ -59,7 +59,7 @@ int xenctl_cpumap_to_cpumask(
     uint8_t bytemap[(NR_CPUS + 7) / 8];
 
     guest_bytes = (xenctl_cpumap->nr_cpus + 7) / 8;
-    copy_bytes  = min_t(unsigned int, guest_bytes, sizeof(bytemap));
+    copy_bytes  = min_t(unsigned int, guest_bytes, (nr_cpu_ids + 7) / 8);
 
     memset(bytemap, 0, sizeof(bytemap));
 
@@ -71,7 +71,7 @@ int xenctl_cpumap_to_cpumask(
             bytemap[guest_bytes-1] &= ~(0xff << (xenctl_cpumap->nr_cpus & 7));
     }
 
-    bitmap_byte_to_long(cpus_addr(*cpumask), bytemap, NR_CPUS);
+    bitmap_byte_to_long(cpumask_bits(cpumask), bytemap, nr_cpu_ids);
 
     return 0;
 }
@@ -154,7 +154,7 @@ static unsigned int default_vcpu0_location(cpumask_t *online)
     cpumask_t      cpu_exclude_map;
 
     /* Do an initial CPU placement. Pick the least-populated CPU. */
-    nr_cpus = last_cpu(cpu_online_map) + 1;
+    nr_cpus = cpumask_last(&cpu_online_map) + 1;
     cnt = xzalloc_array(unsigned int, nr_cpus);
     if ( cnt )
     {
@@ -171,18 +171,19 @@ static unsigned int default_vcpu0_location(cpumask_t *online)
      * If we're on a HT system, we only auto-allocate to a non-primary HT. We 
      * favour high numbered CPUs in the event of a tie.
      */
-    cpu = first_cpu(per_cpu(cpu_sibling_map, 0));
-    if ( cpus_weight(per_cpu(cpu_sibling_map, 0)) > 1 )
-        cpu = next_cpu(cpu, per_cpu(cpu_sibling_map, 0));
-    cpu_exclude_map = per_cpu(cpu_sibling_map, 0);
+    cpumask_copy(&cpu_exclude_map, &per_cpu(cpu_sibling_map, 0));
+    cpu = cpumask_first(&cpu_exclude_map);
+    if ( cpumask_weight(&cpu_exclude_map) > 1 )
+        cpu = cpumask_next(cpu, &cpu_exclude_map);
     for_each_cpu_mask(i, *online)
     {
-        if ( cpu_isset(i, cpu_exclude_map) )
+        if ( cpumask_test_cpu(i, &cpu_exclude_map) )
             continue;
-        if ( (i == first_cpu(per_cpu(cpu_sibling_map, i))) &&
-             (cpus_weight(per_cpu(cpu_sibling_map, i)) > 1) )
+        if ( (i == cpumask_first(&per_cpu(cpu_sibling_map, i))) &&
+             (cpumask_weight(&per_cpu(cpu_sibling_map, i)) > 1) )
             continue;
-        cpus_or(cpu_exclude_map, cpu_exclude_map, per_cpu(cpu_sibling_map, i));
+        cpumask_or(&cpu_exclude_map, &cpu_exclude_map,
+                   &per_cpu(cpu_sibling_map, i));
         if ( !cnt || cnt[i] <= cnt[cpu] )
             cpu = i;
     }

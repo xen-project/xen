@@ -176,7 +176,7 @@ int disable_nonboot_cpus(void)
 
     BUG_ON(smp_processor_id() != 0);
 
-    cpus_clear(frozen_cpus);
+    cpumask_clear(&frozen_cpus);
 
     printk("Disabling non-boot CPUs ...\n");
 
@@ -192,7 +192,7 @@ int disable_nonboot_cpus(void)
             break;
         }
 
-        cpu_set(cpu, frozen_cpus);
+        cpumask_set_cpu(cpu, &frozen_cpus);
     }
 
     BUG_ON(!error && (num_online_cpus() != 1));
@@ -214,5 +214,5 @@ void enable_nonboot_cpus(void)
         }
     }
 
-    cpus_clear(frozen_cpus);
+    cpumask_clear(&frozen_cpus);
 }

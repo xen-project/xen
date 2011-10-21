@@ -533,8 +533,9 @@ int alloc_cpu_id(void)
 {
     cpumask_t tmp_map;
     int cpu;
-    cpus_complement(tmp_map, cpu_present_map);
-    cpu = first_cpu(tmp_map);
+
+    cpumask_complement(&tmp_map, &cpu_present_map);
+    cpu = cpumask_first(&tmp_map);
     return (cpu < nr_cpu_ids) ? cpu : -ENODEV;
 }
 
@@ -818,18 +819,18 @@ remove_siblinginfo(int cpu)
     {
         cpu_clear(cpu, per_cpu(cpu_core_map, sibling));
         /* Last thread sibling in this cpu core going down. */
-        if ( cpus_weight(per_cpu(cpu_sibling_map, cpu)) == 1 )
+        if ( cpumask_weight(&per_cpu(cpu_sibling_map, cpu)) == 1 )
             c[sibling].booted_cores--;
     }
    
     for_each_cpu_mask(sibling, per_cpu(cpu_sibling_map, cpu))
-        cpu_clear(cpu, per_cpu(cpu_sibling_map, sibling));
-    cpus_clear(per_cpu(cpu_sibling_map, cpu));
-    cpus_clear(per_cpu(cpu_core_map, cpu));
+        cpumask_clear_cpu(cpu, &per_cpu(cpu_sibling_map, sibling));
+    cpumask_clear(&per_cpu(cpu_sibling_map, cpu));
+    cpumask_clear(&per_cpu(cpu_core_map, cpu));
     c[cpu].phys_proc_id = BAD_APICID;
     c[cpu].cpu_core_id = BAD_APICID;
     c[cpu].compute_unit_id = BAD_APICID;
-    cpu_clear(cpu, cpu_sibling_setup_map);
+    cpumask_clear_cpu(cpu, &cpu_sibling_setup_map);
 }
 
 void __cpu_disable(void)

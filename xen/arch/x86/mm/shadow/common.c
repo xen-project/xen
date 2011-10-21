@@ -3459,7 +3459,7 @@ static void sh_unshadow_for_p2m_change(struct vcpu *v, unsigned long gfn,
         p2m_type_t p2mt = p2m_flags_to_type(l1e_get_flags(*p));
         if ( p2m_is_valid(p2mt) && mfn_valid(omfn) )
         {
-            cpus_clear(flushmask);
+            cpumask_clear(&flushmask);
 
             /* If we're replacing a superpage with a normal L1 page, map it */
             if ( (l1e_get_flags(new) & _PAGE_PRESENT)

@@ -70,7 +70,7 @@ static DEFINE_PER_CPU(unsigned long, lost_records_first_tsc);
 int tb_init_done __read_mostly;
 
 /* which CPUs tracing is enabled on */
-static cpumask_t tb_cpu_mask = CPU_MASK_ALL;
+static cpumask_t tb_cpu_mask;
 
 /* which tracing events are enabled */
 static u32 tb_event_mask = TRC_ALL;
@@ -338,6 +338,7 @@ int trace_will_trace_event(u32 event)
  */
 void __init init_trace_bufs(void)
 {
+    cpumask_setall(&tb_cpu_mask);
     register_cpu_notifier(&cpu_nfb);
 
     if ( opt_tbuf_size )

@@ -592,7 +592,7 @@ skip_move:
     smp_prepare_cpus(max_cpus);
 
     /* We aren't hotplug-capable yet. */
-    cpus_or(cpu_present_map, cpu_present_map, cpu_possible_map);
+    cpumask_or(&cpu_present_map, &cpu_present_map, &cpu_possible_map);
 
     /*  Enable IRQ to receive IPI (needed for ITC sync).  */
     local_irq_enable();
