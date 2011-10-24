@@ -512,15 +512,8 @@ void __init hpet_broadcast_init(void)
             return;
 
         if ( !hpet_events )
-        {
             hpet_events = xzalloc(struct hpet_event_channel);
-            if ( hpet_events && !zalloc_cpumask_var(&hpet_events->cpumask) )
-            {
-                xfree(hpet_events);
-                hpet_events = NULL;
-            }
-        }
-        if ( !hpet_events )
+        if ( !hpet_events || !zalloc_cpumask_var(&hpet_events->cpumask) )
             return;
         hpet_events->irq = -1;
 
