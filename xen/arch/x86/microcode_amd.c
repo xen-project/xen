@@ -97,7 +97,11 @@ static int microcode_fits(void *mc, int cpu)
     }
 
     if ( !equiv_cpu_id )
-	    return 0;
+    {
+        printk(KERN_ERR "microcode: CPU%d cpu_id "
+               "not found in equivalent cpu table\n", cpu);
+        return -EINVAL;
+    }
 
     if ( (mc_header->processor_rev_id) != equiv_cpu_id )
     {
