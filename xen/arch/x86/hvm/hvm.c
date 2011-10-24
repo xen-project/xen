@@ -1208,6 +1208,10 @@ int hvm_hap_nested_page_fault(unsigned long gpa,
             return 0;
         case NESTEDHVM_PAGEFAULT_INJECT:
             return -1;
+        case NESTEDHVM_PAGEFAULT_MMIO:
+            if ( !handle_mmio() )
+                hvm_inject_exception(TRAP_gp_fault, 0, 0);
+            return 1;
         }
     }
 

@@ -50,6 +50,7 @@ bool_t nestedhvm_vcpu_in_guestmode(struct vcpu *v);
 #define NESTEDHVM_PAGEFAULT_DONE   0
 #define NESTEDHVM_PAGEFAULT_INJECT 1
 #define NESTEDHVM_PAGEFAULT_ERROR  2
+#define NESTEDHVM_PAGEFAULT_MMIO   3
 int nestedhvm_hap_nested_page_fault(struct vcpu *v, paddr_t L2_gpa);
 
 /* IO permission map */

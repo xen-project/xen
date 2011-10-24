@@ -1161,6 +1161,15 @@ enum hvm_intblk nsvm_intr_blocked(struct vcpu *v)
         if ( svm->ns_hostflags.fields.vintrmask )
             if ( !svm->ns_hostflags.fields.rflagsif )
                 return hvm_intblk_rflags_ie;
+
+        /* when l1 guest passes its devices through to the l2 guest
+         * and l2 guest does an MMIO access then we may want to
+         * inject an VMEXIT(#INTR) exitcode into the l1 guest.
+         * Delay the injection because this would result in delivering
+         * an interrupt *within* the execution of an instruction.
+         */
+        if ( v->arch.hvm_vcpu.io_state != HVMIO_none )
+            return hvm_intblk_shadow;
     }
 
     if ( nv->nv_vmexit_pending ) {

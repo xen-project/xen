@@ -151,6 +151,9 @@ nestedhap_walk_L0_p2m(struct p2m_domain *p2m, paddr_t L1_gpa, paddr_t *L0_gpa,
     mfn = gfn_to_mfn_type_p2m(p2m, L1_gpa >> PAGE_SHIFT, &p2mt, &p2ma, 
                               p2m_query, page_order);
 
+    if ( p2m_is_mmio(p2mt) )
+        return NESTEDHVM_PAGEFAULT_MMIO;
+
     if ( p2m_is_paging(p2mt) || p2m_is_shared(p2mt) || !p2m_is_ram(p2mt) )
         return NESTEDHVM_PAGEFAULT_ERROR;
 
@@ -228,6 +231,8 @@ nestedhvm_hap_nested_page_fault(struct vcpu *v, paddr_t L2_gpa)
         return rv;
     case NESTEDHVM_PAGEFAULT_DONE:
         break;
+    case NESTEDHVM_PAGEFAULT_MMIO:
+        return rv;
     default:
         BUG();
         break;
