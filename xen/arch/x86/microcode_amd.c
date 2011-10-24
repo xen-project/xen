@@ -76,14 +76,6 @@ static int microcode_fits(void *mc, int cpu)
     /* We should bind the task to the CPU */
     BUG_ON(cpu != raw_smp_processor_id());
 
-    if ( equiv_cpu_table == NULL )
-    {
-        printk(KERN_INFO "microcode: CPU%d microcode update with "
-               "version 0x%x (current=0x%x)\n",
-               cpu, mc_header->patch_id, uci->cpu_sig.rev);
-        goto out;
-    }
-
     current_cpu_id = cpuid_eax(0x00000001);
 
     for ( i = 0; equiv_cpu_table[i].installed_cpu != 0; i++ )
@@ -96,7 +88,7 @@ static int microcode_fits(void *mc, int cpu)
     }
 
     if ( !equiv_cpu_id )
-	    return 0;
+        return 0;
 
     if ( (mc_header->processor_rev_id) != equiv_cpu_id )
     {
@@ -113,8 +105,7 @@ static int microcode_fits(void *mc, int cpu)
            "update with version 0x%x (current=0x%x)\n",
            cpu, mc_header->patch_id, uci->cpu_sig.rev);
 
-out:
-    return 0;
+    return 1;
 }
 
 static int apply_microcode(int cpu)
@@ -285,7 +276,7 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t size)
     while ( (ret = get_next_ucode_from_buffer_amd(mc, buf, size, &offset)) == 0)
     {
         error = microcode_fits(mc, cpu);
-        if (error != 0)
+        if (error <= 0)
             continue;
 
         error = apply_microcode(cpu);
