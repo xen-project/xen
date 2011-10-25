@@ -370,6 +370,7 @@ class Grub2ConfigFile(_GrubConfigFile):
         in_function = False
         img = None
         title = ""
+        menu_level=0
         for l in lines:
             l = l.strip()
             # skip blank lines
@@ -396,10 +397,18 @@ class Grub2ConfigFile(_GrubConfigFile):
                 img = []
                 title = title_match.group(1)
                 continue
-            
+
+            if l.startswith("submenu"):
+                menu_level += 1
+                continue
+
             if l.startswith("}"):
                 if img is None:
-                    raise RuntimeError, "syntax error: closing brace without menuentry"
+                    if menu_level > 0:
+                        menu_level -= 1
+                        continue
+                    else:
+                        raise RuntimeError, "syntax error: closing brace without menuentry"
 
                 self.add_image(Grub2Image(title, img))
                 img = None
