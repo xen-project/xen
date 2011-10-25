@@ -425,6 +425,8 @@ class Grub2ConfigFile(_GrubConfigFile):
                 
             if self.commands.has_key(com):
                 if self.commands[com] is not None:
+                    if arg.strip() == "${saved_entry}":
+                        arg = "0"
                     setattr(self, self.commands[com], arg.strip())
                 else:
                     logging.info("Ignored directive %s" %(com,))
