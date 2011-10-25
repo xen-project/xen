@@ -44,6 +44,30 @@ struct hvm_vcpu_asid {
     uint32_t asid;
 };
 
+struct hvm_vcpu_io {
+    /* I/O request in flight to device model. */
+    enum hvm_io_state   io_state;
+    unsigned long       io_data;
+    int                 io_size;
+
+    /*
+     * HVM emulation:
+     *  Virtual address @mmio_gva maps to MMIO physical frame @mmio_gpfn.
+     *  The latter is known to be an MMIO frame (not RAM).
+     *  This translation is only valid if @mmio_gva is non-zero.
+     */
+    unsigned long       mmio_gva;
+    unsigned long       mmio_gpfn;
+
+    /* We may read up to m128 as a number of device-model transactions. */
+    paddr_t mmio_large_read_pa;
+    uint8_t mmio_large_read[16];
+    unsigned int mmio_large_read_bytes;
+    /* We may write up to m128 as a number of device-model transactions. */
+    paddr_t mmio_large_write_pa;
+    unsigned int mmio_large_write_bytes;
+};
+
 #define VMCX_EADDR    (~0ULL)
 
 struct nestedvcpu {
@@ -135,31 +159,11 @@ struct hvm_vcpu {
     /* Which cache mode is this VCPU in (CR0:CD/NW)? */
     u8                  cache_mode;
 
-    /* I/O request in flight to device model. */
-    enum hvm_io_state   io_state;
-    unsigned long       io_data;
-    int                 io_size;
-
-    /*
-     * HVM emulation:
-     *  Virtual address @mmio_gva maps to MMIO physical frame @mmio_gpfn.
-     *  The latter is known to be an MMIO frame (not RAM).
-     *  This translation is only valid if @mmio_gva is non-zero.
-     */
-    unsigned long       mmio_gva;
-    unsigned long       mmio_gpfn;
+    struct hvm_vcpu_io  hvm_io;
 
     /* Callback into x86_emulate when emulating FPU/MMX/XMM instructions. */
     void (*fpu_exception_callback)(void *, struct cpu_user_regs *);
     void *fpu_exception_callback_arg;
-    /* We may read up to m128 as a number of device-model transactions. */
-    paddr_t mmio_large_read_pa;
-    uint8_t mmio_large_read[16];
-    unsigned int mmio_large_read_bytes;
-    /* We may write up to m128 as a number of device-model transactions. */
-    paddr_t mmio_large_write_pa;
-    unsigned int mmio_large_write_bytes;
-
     /* Pending hw/sw interrupt */
     int           inject_trap;       /* -1 for nothing to inject */
     int           inject_error_code;

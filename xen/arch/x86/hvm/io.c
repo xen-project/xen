@@ -170,28 +170,31 @@ int handle_mmio(void)
 {
     struct hvm_emulate_ctxt ctxt;
     struct vcpu *curr = current;
+    struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
     int rc;
 
     hvm_emulate_prepare(&ctxt, guest_cpu_user_regs());
 
     rc = hvm_emulate_one(&ctxt);
 
-    if ( curr->arch.hvm_vcpu.io_state == HVMIO_awaiting_completion )
-        curr->arch.hvm_vcpu.io_state = HVMIO_handle_mmio_awaiting_completion;
+    if ( vio->io_state == HVMIO_awaiting_completion )
+        vio->io_state = HVMIO_handle_mmio_awaiting_completion;
     else
-        curr->arch.hvm_vcpu.mmio_gva = 0;
+        vio->mmio_gva = 0;
 
     switch ( rc )
     {
     case X86EMUL_UNHANDLEABLE:
         gdprintk(XENLOG_WARNING,
                  "MMIO emulation failed @ %04x:%lx: "
-                 "%02x %02x %02x %02x %02x %02x\n",
+                 "%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
                  hvmemul_get_seg_reg(x86_seg_cs, &ctxt)->sel,
                  ctxt.insn_buf_eip,
                  ctxt.insn_buf[0], ctxt.insn_buf[1],
                  ctxt.insn_buf[2], ctxt.insn_buf[3],
-                 ctxt.insn_buf[4], ctxt.insn_buf[5]);
+                 ctxt.insn_buf[4], ctxt.insn_buf[5],
+                 ctxt.insn_buf[6], ctxt.insn_buf[7],
+                 ctxt.insn_buf[8], ctxt.insn_buf[9]);
         return 0;
     case X86EMUL_EXCEPTION:
         if ( ctxt.exn_pending )
@@ -208,14 +211,16 @@ int handle_mmio(void)
 
 int handle_mmio_with_translation(unsigned long gva, unsigned long gpfn)
 {
-    current->arch.hvm_vcpu.mmio_gva = gva & PAGE_MASK;
-    current->arch.hvm_vcpu.mmio_gpfn = gpfn;
+    struct hvm_vcpu_io *vio = &current->arch.hvm_vcpu.hvm_io;
+    vio->mmio_gva = gva & PAGE_MASK;
+    vio->mmio_gpfn = gpfn;
     return handle_mmio();
 }
 
 int handle_pio(uint16_t port, int size, int dir)
 {
     struct vcpu *curr = current;
+    struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
     unsigned long data, reps = 1;
     int rc;
 
@@ -228,15 +233,14 @@ int handle_pio(uint16_t port, int size, int dir)
     {
     case X86EMUL_OKAY:
         if ( dir == IOREQ_READ )
-            memcpy(&guest_cpu_user_regs()->eax,
-                   &data, curr->arch.hvm_vcpu.io_size);
+            memcpy(&guest_cpu_user_regs()->eax, &data, vio->io_size);
         break;
     case X86EMUL_RETRY:
-        if ( curr->arch.hvm_vcpu.io_state != HVMIO_awaiting_completion )
+        if ( vio->io_state != HVMIO_awaiting_completion )
             return 0;
         /* Completion in hvm_io_assist() with no re-emulation required. */
         ASSERT(dir == IOREQ_READ);
-        curr->arch.hvm_vcpu.io_state = HVMIO_handle_pio_awaiting_completion;
+        vio->io_state = HVMIO_handle_pio_awaiting_completion;
         break;
     default:
         gdprintk(XENLOG_ERR, "Weird HVM ioemulation status %d.\n", rc);
@@ -250,6 +254,7 @@ int handle_pio(uint16_t port, int size, int dir)
 void hvm_io_assist(void)
 {
     struct vcpu *curr = current;
+    struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
     ioreq_t *p = get_ioreq(curr);
     enum hvm_io_state io_state;
 
@@ -257,23 +262,23 @@ void hvm_io_assist(void)
 
     p->state = STATE_IOREQ_NONE;
 
-    io_state = curr->arch.hvm_vcpu.io_state;
-    curr->arch.hvm_vcpu.io_state = HVMIO_none;
+    io_state = vio->io_state;
+    vio->io_state = HVMIO_none;
 
     switch ( io_state )
     {
     case HVMIO_awaiting_completion:
-        curr->arch.hvm_vcpu.io_state = HVMIO_completed;
-        curr->arch.hvm_vcpu.io_data = p->data;
+        vio->io_state = HVMIO_completed;
+        vio->io_data = p->data;
         break;
     case HVMIO_handle_mmio_awaiting_completion:
-        curr->arch.hvm_vcpu.io_state = HVMIO_completed;
-        curr->arch.hvm_vcpu.io_data = p->data;
+        vio->io_state = HVMIO_completed;
+        vio->io_data = p->data;
         (void)handle_mmio();
         break;
     case HVMIO_handle_pio_awaiting_completion:
         memcpy(&guest_cpu_user_regs()->eax,
-               &p->data, curr->arch.hvm_vcpu.io_size);
+               &p->data, vio->io_size);
         break;
     default:
         break;
