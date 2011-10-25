@@ -92,13 +92,17 @@ static void print_cxstat(int cpuid, struct xc_cx_stat *cxstat)
         printf("                       residency  [%020"PRIu64" ms]\n",
                cxstat->residencies[i]/1000000UL);
     }
-    printf("pc3                  : [%020"PRIu64" ms]\n"
+    printf("pc2                  : [%020"PRIu64" ms]\n"
+           "pc3                  : [%020"PRIu64" ms]\n"
            "pc6                  : [%020"PRIu64" ms]\n"
            "pc7                  : [%020"PRIu64" ms]\n",
-           cxstat->pc3/1000000UL, cxstat->pc6/1000000UL, cxstat->pc7/1000000UL);
+            cxstat->pc2/1000000UL, cxstat->pc3/1000000UL,
+            cxstat->pc6/1000000UL, cxstat->pc7/1000000UL);
     printf("cc3                  : [%020"PRIu64" ms]\n"
-           "cc6                  : [%020"PRIu64" ms]\n",
-           cxstat->cc3/1000000UL, cxstat->cc6/1000000UL);
+           "cc6                  : [%020"PRIu64" ms]\n"
+           "cc7                  : [%020"PRIu64" ms]\n",
+            cxstat->cc3/1000000UL, cxstat->cc6/1000000UL,
+            cxstat->cc7/1000000UL);
     printf("\n");
 }
 
@@ -458,6 +462,9 @@ static void signal_int_handler(int signo)
                         break;
                 }
                 printf("Socket %d\n", socket_ids[i]);
+                res = cxstat_end[j].pc2 - cxstat_start[j].pc2;
+                printf("\tPC2\t%"PRIu64" ms\t%.2f%%\n",  res / 1000000UL,
+                       100UL * res / (double)sum_cx[j]);
                 res = cxstat_end[j].pc3 - cxstat_start[j].pc3;
                 printf("\tPC3\t%"PRIu64" ms\t%.2f%%\n",  res / 1000000UL, 
                        100UL * res / (double)sum_cx[j]);
@@ -481,6 +488,9 @@ static void signal_int_handler(int signo)
                            100UL * res / (double)sum_cx[j]);
                     res = cxstat_end[j].cc6 - cxstat_start[j].cc6;
                     printf("\t\tCC6\t%"PRIu64" ms\t%.2f%%\n",  res / 1000000UL, 
+                           100UL * res / (double)sum_cx[j]);
+                    res = cxstat_end[j].cc7 - cxstat_start[j].cc7;
+                    printf("\t\tCC7\t%"PRIu64" ms\t%.2f%%\n",  res / 1000000UL,
                            100UL * res / (double)sum_cx[j]);
                     printf("\n");
 

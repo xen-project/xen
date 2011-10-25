@@ -155,11 +155,13 @@ int xc_pm_get_cxstat(xc_interface *xch, int cpuid, struct xc_cx_stat *cxpt)
     cxpt->nr = sysctl.u.get_pmstat.u.getcx.nr;
     cxpt->last = sysctl.u.get_pmstat.u.getcx.last;
     cxpt->idle_time = sysctl.u.get_pmstat.u.getcx.idle_time;
+    cxpt->pc2 = sysctl.u.get_pmstat.u.getcx.pc2;
     cxpt->pc3 = sysctl.u.get_pmstat.u.getcx.pc3;
     cxpt->pc6 = sysctl.u.get_pmstat.u.getcx.pc6;
     cxpt->pc7 = sysctl.u.get_pmstat.u.getcx.pc7;
     cxpt->cc3 = sysctl.u.get_pmstat.u.getcx.cc3;
     cxpt->cc6 = sysctl.u.get_pmstat.u.getcx.cc6;
+    cxpt->cc7 = sysctl.u.get_pmstat.u.getcx.cc7;
 
 unlock_2:
     xc_hypercall_bounce_post(xch, residencies);

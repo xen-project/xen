@@ -60,11 +60,13 @@
 
 #define GET_HW_RES_IN_NS(msr, val) \
     do { rdmsrl(msr, val); val = tsc_ticks2ns(val); } while( 0 )
+#define GET_PC2_RES(val)  GET_HW_RES_IN_NS(0x60D, val) /* SNB only */
 #define GET_PC3_RES(val)  GET_HW_RES_IN_NS(0x3F8, val)
 #define GET_PC6_RES(val)  GET_HW_RES_IN_NS(0x3F9, val)
 #define GET_PC7_RES(val)  GET_HW_RES_IN_NS(0x3FA, val)
 #define GET_CC3_RES(val)  GET_HW_RES_IN_NS(0x3FC, val)
 #define GET_CC6_RES(val)  GET_HW_RES_IN_NS(0x3FD, val)
+#define GET_CC7_RES(val)  GET_HW_RES_IN_NS(0x3FE, val) /* SNB only */
 
 static void lapic_timer_nop(void) { }
 static void (*lapic_timer_off)(void);
@@ -85,11 +87,13 @@ static struct acpi_processor_power *__read_mostly processor_powers[NR_CPUS];
 
 struct hw_residencies
 {
+    uint64_t pc2;
     uint64_t pc3;
     uint64_t pc6;
     uint64_t pc7;
     uint64_t cc3;
     uint64_t cc6;
+    uint64_t cc7;
 };
 
 static void do_get_hw_residencies(void *arg)
@@ -116,6 +120,17 @@ static void do_get_hw_residencies(void *arg)
         GET_CC3_RES(hw_res->cc3);
         GET_CC6_RES(hw_res->cc6);
         break;
+    /* Sandy bridge */
+    case 0x2A:
+    case 0x2D:
+        GET_PC2_RES(hw_res->pc2);
+        GET_PC3_RES(hw_res->pc3);
+        GET_PC6_RES(hw_res->pc6);
+        GET_PC7_RES(hw_res->pc7);
+        GET_CC3_RES(hw_res->cc3);
+        GET_CC6_RES(hw_res->cc6);
+        GET_CC7_RES(hw_res->cc7);
+        break;
     }
 }
 
@@ -134,10 +149,10 @@ static void print_hw_residencies(uint32_t cpu)
 
     get_hw_residencies(cpu, &hw_res);
 
-    printk("PC3[%"PRId64"] PC6[%"PRId64"] PC7[%"PRId64"]\n",
-           hw_res.pc3, hw_res.pc6, hw_res.pc7);
-    printk("CC3[%"PRId64"] CC6[%"PRId64"]\n",
-           hw_res.cc3, hw_res.cc6);
+    printk("PC2[%"PRId64"] PC3[%"PRId64"] PC6[%"PRId64"] PC7[%"PRId64"]\n",
+           hw_res.pc2, hw_res.pc3, hw_res.pc6, hw_res.pc7);
+    printk("CC3[%"PRId64"] CC6[%"PRId64"] CC7[%"PRId64"]\n",
+           hw_res.cc3, hw_res.cc6,hw_res.cc7);
 }
 
 static char* acpi_cstate_method_name[] =
@@ -1057,11 +1072,13 @@ int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
              copy_to_guest_offset(stat->residencies, 0, &res, 1) )
             return -EFAULT;
 
+        stat->pc2 = 0;
         stat->pc3 = 0;
         stat->pc6 = 0;
         stat->pc7 = 0;
         stat->cc3 = 0;
         stat->cc6 = 0;
+        stat->cc7 = 0;
         return 0;
     }
 
@@ -1086,11 +1103,13 @@ int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
 
     get_hw_residencies(cpuid, &hw_res);
 
+    stat->pc2 = hw_res.pc2;
     stat->pc3 = hw_res.pc3;
     stat->pc6 = hw_res.pc6;
     stat->pc7 = hw_res.pc7;
     stat->cc3 = hw_res.cc3;
     stat->cc6 = hw_res.cc6;
+    stat->cc7 = hw_res.cc7;
 
     return 0;
 }
