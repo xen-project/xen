@@ -395,7 +395,8 @@ class Grub:
                            ["/efi/boot/elilo.conf", "/elilo.conf",])
         else:
             cfg_list = map(lambda x: (x,grub.GrubConf.Grub2ConfigFile),
-                           ["/boot/grub/grub.cfg", "/grub/grub.cfg"]) + \
+                           ["/boot/grub/grub.cfg", "/grub/grub.cfg",
+                            "/boot/grub2/grub.cfg", "/grub2/grub.cfg"]) + \
                        map(lambda x: (x,grub.ExtLinuxConf.ExtLinuxConfigFile),
                            ["/boot/isolinux/isolinux.cfg",
                             "/boot/extlinux.conf"]) + \
