@@ -77,10 +77,17 @@ def get_solaris_slice(file, offset):
 
 def get_fs_offset_gpt(file):
     fd = os.open(file, os.O_RDONLY)
-    # assume the first partition is an EFI system partition.
-    os.lseek(fd, SECTOR_SIZE * 2, 0)
+    os.lseek(fd, SECTOR_SIZE, 0)
     buf = os.read(fd, 512)
-    return struct.unpack("<Q", buf[32:40])[0] * SECTOR_SIZE
+    partcount = struct.unpack("<L", buf[80:84])[0]
+    partsize = struct.unpack("<L", buf[84:88])[0]
+    i = partcount
+    offsets = []
+    while i>0:
+        buf = os.read(fd, partsize)
+        offsets.append(struct.unpack("<Q", buf[32:40])[0] * SECTOR_SIZE)
+        i -= 1
+    return offsets
 
 FDISK_PART_SOLARIS=0xbf
 FDISK_PART_SOLARIS_OLD=0x82
@@ -114,7 +121,9 @@ def get_partition_offsets(file):
                 continue # no solaris magic at that offset, ignore partition
 
         if type == FDISK_PART_GPT:
-            offset = get_fs_offset_gpt(file)
+            for offset in get_fs_offset_gpt(file):
+                part_offs.append(offset)
+            break
 
         # Active partition has 0x80 as the first byte.
         # If active, prepend to front of list, otherwise append to back.
