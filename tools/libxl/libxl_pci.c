@@ -930,6 +930,7 @@ skip1:
             }
         }
         fclose(f);
+        break;
     }
     default:
         abort();
