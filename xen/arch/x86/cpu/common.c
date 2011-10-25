@@ -22,6 +22,9 @@ static int cachesize_override __cpuinitdata = -1;
 static int disable_x86_fxsr __cpuinitdata;
 static int disable_x86_serial_nr __cpuinitdata;
 
+static int use_xsave;
+boolean_param("xsave", use_xsave);
+
 struct cpu_dev * cpu_devs[X86_VENDOR_NUM] = {};
 
 /*
@@ -390,6 +393,13 @@ void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 	 */
 	if (this_cpu->c_init)
 		this_cpu->c_init(c);
+
+        /* Initialize xsave/xrstor features */
+	if ( !use_xsave )
+		clear_bit(X86_FEATURE_XSAVE, boot_cpu_data.x86_capability);
+
+	if ( cpu_has_xsave )
+		xsave_init();
 
 	/* Disable the PN if appropriate */
 	squash_the_stupid_serial_number(c);
