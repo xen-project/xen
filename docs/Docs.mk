@@ -7,3 +7,4 @@ DOXYGEN		:= doxygen
 POD2MAN		:= pod2man
 DOT		:= dot
 NEATO		:= neato
+MARKDOWN	:= markdown

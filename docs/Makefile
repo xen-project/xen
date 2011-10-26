@@ -11,10 +11,11 @@ DOC_MAN1SRC	:= $(wildcard man/*.pod.1)
 DOC_MAN1	:= $(patsubst man/%.pod.1,man1/%.1,$(DOC_MAN1SRC))
 DOC_MAN5	:= $(patsubst man/%.pod.5,man5/%.5,$(DOC_MAN5SRC))
 DOC_TEX		:= src/user.tex src/interface.tex
+DOC_MARKDOWN	:= $(wildcard misc/*.markdown)
 DOC_PS		:= $(patsubst src/%.tex,ps/%.ps,$(DOC_TEX))
 DOC_PDF		:= $(patsubst src/%.tex,pdf/%.pdf,$(DOC_TEX))
-DOC_HTML	:= $(patsubst src/%.tex,html/%/index.html,$(DOC_TEX))
-
+DOC_HTML	:= $(patsubst src/%.tex,html/%/index.html,$(DOC_TEX)) \
+		   $(patsubst %.markdown,html/%.html,$(DOC_MARKDOWN))
 GFX = $(patsubst %.fig, %.eps, $(wildcard figs/*.fig))
 
 .PHONY: all
@@ -37,9 +38,7 @@ ps: $(DOC_PS)
 pdf: $(DOC_PDF)
 
 .PHONY: html
-html:
-	@if which $(LATEX2HTML) 1>/dev/null 2>/dev/null; then \
-	$(MAKE) $(DOC_HTML); fi
+html: $(DOC_HTML)
 
 .PHONY: python-dev-docs
 python-dev-docs:
@@ -110,7 +109,16 @@ ps/%.ps: %.dvi
 	$(FIG2DEV) -L eps $< $@
 
 html/%/index.html: src/%.tex
-	$(INSTALL_DIR) $(@D)
+	@$(INSTALL_DIR) $(@D)
+	@set -e ; if which $(LATEX2HTML) 1>/dev/null 2>/dev/null; then \
+        echo "Running latex2html to generate $*/index.html ... "; \
 	$(LATEX2HTML) -split 0 -show_section_numbers -toc_depth 3 -nonavigation \
 	-numbered_footnotes -local_icons -noinfo -math -dir $(@D) \
-	$< 1>/dev/null 2>/dev/null
+	$< 1>/dev/null 2>/dev/null ;fi
+
+html/%.html: %.markdown
+	@$(INSTALL_DIR) $(@D)
+	@set -e ; if which $(MARKDOWN) 1>/dev/null 2>/dev/null; then \
+	echo "Running markdown to generate $*.html ... "; \
+	$(MARKDOWN) $< > $@.tmp ; \
+	$(call move-if-changed,$@.tmp,$@) ; fi
