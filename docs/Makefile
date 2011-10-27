@@ -16,13 +16,16 @@ DOC_PS		:= $(patsubst src/%.tex,ps/%.ps,$(DOC_TEX))
 DOC_PDF		:= $(patsubst src/%.tex,pdf/%.pdf,$(DOC_TEX))
 DOC_HTML	:= $(patsubst src/%.tex,html/%/index.html,$(DOC_TEX)) \
 		   $(patsubst %.markdown,html/%.html,$(DOC_MARKDOWN))
+DOC_TXT         := $(patsubst %.txt,txt/%.txt,$(wildcard misc/*.txt)) \
+		   $(patsubst %.markdown,txt/%.txt,$(DOC_MARKDOWN))
+
 GFX = $(patsubst %.fig, %.eps, $(wildcard figs/*.fig))
 
 .PHONY: all
 all: build
 
 .PHONY: build
-build: ps pdf html man-pages
+build: ps pdf html txt man-pages
 	@if which $(DOT) 1>/dev/null 2>/dev/null ; then              \
 	$(MAKE) -C xen-api build ; else                              \
         echo "Graphviz (dot) not installed; skipping xen-api." ; fi
@@ -39,6 +42,9 @@ pdf: $(DOC_PDF)
 
 .PHONY: html
 html: $(DOC_HTML)
+
+.PHONY: txt
+txt: $(DOC_TXT)
 
 .PHONY: python-dev-docs
 python-dev-docs:
@@ -122,3 +128,13 @@ html/%.html: %.markdown
 	echo "Running markdown to generate $*.html ... "; \
 	$(MARKDOWN) $< > $@.tmp ; \
 	$(call move-if-changed,$@.tmp,$@) ; fi
+
+txt/%.txt: %.txt
+	$(INSTALL_DIR) $(@D)
+	cp $< $@.tmp
+	$(call move-if-changed,$@.tmp,$@)
+
+txt/%.txt: %.markdown
+	$(INSTALL_DIR) $(@D)
+	cp $< $@.tmp
+	$(call move-if-changed,$@.tmp,$@)

@@ -57,6 +57,7 @@
 ^docs/user/labels\.pl$
 ^docs/user/user\.css$
 ^docs/user/user\.html$
+^docs/txt/.*$
 ^docs/xen-api/vm_lifecycle.eps$
 ^docs/xen-api/xenapi-datamodel-graph.eps$
 ^docs/xen-api/xenapi.out$
