@@ -120,6 +120,9 @@
  * allocation unit in bytes if reported by the device. Otherwise the
  * discard-granularity will be set to match the device's physical block size.
  * It is the minimum size you can discard.
+ * 'discard-secure' - All copies of the discarded sectors (potentially created
+ * by garbage collection) must also be erased.  To use this feature, the flag
+ * BLKIF_DISCARD_SECURE must be set in the blkif_request_discard.
  */
 #define BLKIF_OP_DISCARD           5
 
@@ -160,7 +163,8 @@ typedef struct blkif_request blkif_request_t;
  */
 struct blkif_request_discard {
     uint8_t        operation;    /* BLKIF_OP_DISCARD                     */
-    uint8_t        reserved;     /*                                      */
+    uint8_t        flag;         /* BLKIF_DISCARD_SECURE or zero         */
+#define BLKIF_DISCARD_SECURE (1<<0)  /* ignored if discard-secure=0      */
     blkif_vdev_t   handle;       /* same as for read/write requests      */
     uint64_t       id;           /* private guest value, echoed in resp  */
     blkif_sector_t sector_number;/* start sector idx on disk             */
