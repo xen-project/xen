@@ -331,6 +331,12 @@ _hidden int libxl__wait_for_offspring(libxl__gc *gc,
                                                        const char *state,
                                                        void *userdata),
                                  void *check_callback_userdata);
+
+_hidden int libxl__spawn_confirm_offspring_startup(libxl__gc *gc,
+                                       uint32_t timeout, char *what,
+                                       char *path, char *state,
+                                       libxl__spawner_starting *starting);
+
   /* Logs errors.  A copy of "what" is taken.  Return values:
    *  < 0   error, for_spawn need not be detached
    *   +1   caller is the parent, must call detach on *for_spawn eventually

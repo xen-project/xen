@@ -890,25 +890,16 @@ out:
     return rc;
 }
 
-static int detach_device_model(libxl__gc *gc,
-                               libxl__spawner_starting *starting)
-{
-    int rc;
-    rc = libxl__spawn_detach(gc, starting->for_spawn);
-    if (starting->for_spawn)
-        free(starting->for_spawn);
-    free(starting);
-    return rc;
-}
 
 int libxl__confirm_device_model_startup(libxl__gc *gc,
                                        libxl__spawner_starting *starting)
 {
-    int detach;
-    int problem = libxl__wait_for_device_model(gc, starting->domid, "running",
-                                               starting->for_spawn, NULL, NULL);
-    detach = detach_device_model(gc, starting);
-    return problem ? problem : detach;
+    char *path;
+    int domid = starting->domid;
+    path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/state", domid);
+    return libxl__spawn_confirm_offspring_startup(gc,
+                                     LIBXL_DEVICE_MODEL_START_TIMEOUT,
+                                     "Device Model", path, "running", starting);
 }
 
 int libxl__destroy_device_model(libxl__gc *gc, uint32_t domid)

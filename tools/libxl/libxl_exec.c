@@ -262,6 +262,30 @@ err:
     return -1;
 }
 
+static int detach_offspring(libxl__gc *gc,
+                               libxl__spawner_starting *starting)
+{
+    int rc;
+    rc = libxl__spawn_detach(gc, starting->for_spawn);
+    if (starting->for_spawn)
+        free(starting->for_spawn);
+    free(starting);
+    return rc;
+}
+
+int libxl__spawn_confirm_offspring_startup(libxl__gc *gc,
+                                       uint32_t timeout, char *what,
+                                       char *path, char *state,
+                                       libxl__spawner_starting *starting)
+{
+    int detach;
+    int problem = libxl__wait_for_offspring(gc, starting->domid, timeout, what,
+                                               path, state,
+                                               starting->for_spawn, NULL, NULL);
+    detach = detach_offspring(gc, starting);
+    return problem ? problem : detach;
+}
+
 static int libxl__set_fd_flag(libxl__gc *gc, int fd, int flag)
 {
     int flags;
