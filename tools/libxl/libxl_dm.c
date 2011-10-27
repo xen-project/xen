@@ -848,6 +848,7 @@ int libxl__create_device_model(libxl__gc *gc,
 
     p->domid = info->domid;
     p->dom_path = libxl__xs_get_dompath(gc, info->domid);
+    p->pid_path = "image/device-model-pid";
     if (!p->dom_path) {
         rc = ERROR_FAIL;
         goto out_close;

@@ -151,7 +151,7 @@ void libxl_spawner_record_pid(void *for_spawn, pid_t innerchild)
     char *path = NULL, *pid = NULL;
     int len;
 
-    if (asprintf(&path, "%s/%s", starting->dom_path, "image/device-model-pid") < 0)
+    if (asprintf(&path, "%s/%s", starting->dom_path, starting->pid_path) < 0)
         goto out;
 
     len = asprintf(&pid, "%d", innerchild);
