@@ -1,0 +1,39 @@
+# =====================================================================
+# Example HVM guest configuration
+# =====================================================================
+#
+# This is a fairly minimal example of what is required for an
+# HVM guest. For a more complete guide see <XXX Document TBD>
+
+# Guest name
+name = "example.hvm"
+
+# 128-bit UUID for the domain as a hexadecimal number.
+# Use "uuidgen" to generate one if required.
+# The default behavior is to generate a new UUID each time the guest is started.
+#uuid = "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+
+# Initial memory allocation (MB)
+memory = 128
+
+# Maximum memory (MB)
+# If this is greater than `memory' then the slack will start ballooned
+# (this assumes guest kernel support for ballooning)
+#maxmem = 512
+
+# Number of VCPUS
+vcpus = 2
+
+# Network devices
+# A list of 'vifspec' entries as described in
+# docs/misc/xl-network-configuration.markdown
+vif = [ '' ]
+
+# Disk Devices
+# A list of `diskspec' entries as described in
+# docs/misc/xl-disk-configuration.txt
+disk = [ '/dev/vg/guest-volume,raw,xvda,rw' ]
+
+# Guest VGA console configuration, either SDL or VNC
+sdl = 1
+#vnc = 1
