@@ -24,6 +24,8 @@
 #include <asm/mach-generic/mach_apic.h>
 #include <public/physdev.h>
 
+static void parse_irq_vector_map_param(char *s);
+
 /* opt_noirqbalance: If true, software IRQ balancing/affinity is disabled. */
 bool_t __read_mostly opt_noirqbalance = 0;
 boolean_param("noirqbalance", opt_noirqbalance);
@@ -31,6 +33,12 @@ boolean_param("noirqbalance", opt_noirqbalance);
 unsigned int __read_mostly nr_irqs_gsi = 16;
 unsigned int __read_mostly nr_irqs;
 integer_param("nr_irqs", nr_irqs);
+
+/* This default may be changed by the AMD IOMMU code */
+int __read_mostly opt_irq_vector_map = OPT_IRQ_VECTOR_MAP_DEFAULT;
+custom_param("irq_vector_map", parse_irq_vector_map_param);
+
+vmask_t global_used_vector_map;
 
 u8 __read_mostly *irq_vector;
 struct irq_desc __read_mostly *irq_desc = NULL;
@@ -59,6 +67,26 @@ static struct timer irq_ratelimit_timer;
 /* irq_ratelimit: the max irq rate allowed in every 10ms, set 0 to disable */
 static unsigned int __read_mostly irq_ratelimit_threshold = 10000;
 integer_param("irq_ratelimit", irq_ratelimit_threshold);
+
+static void __init parse_irq_vector_map_param(char *s)
+{
+    char *ss;
+
+    do {
+        ss = strchr(s, ',');
+        if ( ss )
+            *ss = '\0';
+
+        if ( !strcmp(s, "none"))
+            opt_irq_vector_map=OPT_IRQ_VECTOR_MAP_NONE;
+        else if ( !strcmp(s, "global"))
+            opt_irq_vector_map=OPT_IRQ_VECTOR_MAP_GLOBAL;
+        else if ( !strcmp(s, "per-device"))
+            opt_irq_vector_map=OPT_IRQ_VECTOR_MAP_PERDEV;
+
+        s = ss + 1;
+    } while ( ss );
+}
 
 /* Must be called when irq disabled */
 void lock_vector_lock(void)
@@ -94,6 +122,11 @@ static int __init __bind_irq_vector(int irq, int vector, cpumask_t cpu_mask)
         per_cpu(vector_irq, cpu)[vector] = irq;
     cfg->vector = vector;
     cfg->cpu_mask = online_mask;
+    if ( cfg->used_vectors )
+    {
+        ASSERT(!test_bit(vector, cfg->used_vectors));
+        set_bit(vector, cfg->used_vectors);
+    }
     irq_status[irq] = IRQ_USED;
     if (IO_APIC_IRQ(irq))
         irq_vector[irq] = vector;
@@ -159,6 +192,7 @@ static void dynamic_irq_cleanup(unsigned int irq)
     desc->depth   = 1;
     desc->msi_desc = NULL;
     desc->handler = &no_irq_type;
+    desc->chip_data->used_vectors=NULL;
     cpus_setall(desc->affinity);
     spin_unlock_irqrestore(&desc->lock, flags);
 
@@ -191,6 +225,7 @@ static void __clear_irq_vector(int irq)
 
     if (likely(!cfg->move_in_progress))
         return;
+
     cpus_and(tmp_mask, cfg->old_cpu_mask, cpu_online_map);
     for_each_cpu_mask(cpu, tmp_mask) {
         for (vector = FIRST_DYNAMIC_VECTOR; vector <= LAST_DYNAMIC_VECTOR;
@@ -201,6 +236,12 @@ static void __clear_irq_vector(int irq)
              break;
         }
      }
+
+    if ( cfg->used_vectors )
+    {
+        ASSERT(test_bit(vector, cfg->used_vectors));
+        clear_bit(vector, cfg->used_vectors);
+    }
 
     cfg->move_in_progress = 0;
 }
@@ -261,6 +302,7 @@ static void init_one_irq_cfg(struct irq_cfg *cfg)
     cfg->vector = IRQ_VECTOR_UNASSIGNED;
     cpus_clear(cfg->cpu_mask);
     cpus_clear(cfg->old_cpu_mask);
+    cfg->used_vectors = NULL;
 }
 
 int init_irq_data(void)
@@ -330,6 +372,41 @@ hw_irq_controller no_irq_type = {
     end_none
 };
 
+static vmask_t *irq_get_used_vector_mask(int irq)
+{
+    vmask_t *ret = NULL;
+
+    if ( opt_irq_vector_map == OPT_IRQ_VECTOR_MAP_GLOBAL )
+    {
+        struct irq_desc *desc = irq_to_desc(irq);
+
+        ret = &global_used_vector_map;
+
+        if ( desc->chip_data->used_vectors )
+        {
+            printk(XENLOG_INFO "%s: Strange, unassigned irq %d already has used_vectors!\n",
+                   __func__, irq);
+        }
+        else
+        {
+            int vector;
+            
+            vector = irq_to_vector(irq);
+            if ( vector > 0 )
+            {
+                printk(XENLOG_INFO "%s: Strange, irq %d already assigned vector %d!\n",
+                       __func__, irq, vector);
+                
+                ASSERT(!test_bit(vector, ret));
+
+                set_bit(vector, ret);
+            }
+        }
+    }
+
+    return ret;
+}
+
 int __assign_irq_vector(int irq, struct irq_cfg *cfg, const cpumask_t *mask)
 {
     /*
@@ -348,6 +425,7 @@ int __assign_irq_vector(int irq, struct irq_cfg *cfg, const cpumask_t *mask)
     int cpu, err;
     unsigned long flags;
     cpumask_t tmp_mask;
+    vmask_t *irq_used_vectors = NULL;
 
     old_vector = irq_to_vector(irq);
     if (old_vector) {
@@ -362,6 +440,17 @@ int __assign_irq_vector(int irq, struct irq_cfg *cfg, const cpumask_t *mask)
         return -EAGAIN;
 
     err = -ENOSPC;
+
+    /* This is the only place normal IRQs are ever marked
+     * as "in use".  If they're not in use yet, check to see
+     * if we need to assign a global vector mask. */
+    if ( irq_status[irq] == IRQ_USED )
+    {
+        irq_used_vectors = cfg->used_vectors;
+    }
+    else
+        irq_used_vectors = irq_get_used_vector_mask(irq);
+
     for_each_cpu_mask(cpu, *mask) {
         int new_cpu;
         int vector, offset;
@@ -387,6 +476,10 @@ next:
         if (test_bit(vector, used_vectors))
             goto next;
 
+        if (irq_used_vectors
+            && test_bit(vector, irq_used_vectors) )
+            goto next;
+
         for_each_cpu_mask(new_cpu, tmp_mask)
             if (per_cpu(vector_irq, new_cpu)[vector] != -1)
                 goto next;
@@ -404,8 +497,20 @@ next:
         cpus_copy(cfg->cpu_mask, tmp_mask);
 
         irq_status[irq] = IRQ_USED;
-            if (IO_APIC_IRQ(irq))
-                    irq_vector[irq] = vector;
+        ASSERT((cfg->used_vectors == NULL)
+               || (cfg->used_vectors == irq_used_vectors));
+        cfg->used_vectors = irq_used_vectors;
+
+        if (IO_APIC_IRQ(irq))
+            irq_vector[irq] = vector;
+
+        if ( cfg->used_vectors )
+        {
+            ASSERT(!test_bit(vector, cfg->used_vectors));
+
+            set_bit(vector, cfg->used_vectors);
+        }
+
         err = 0;
         local_irq_restore(flags);
         break;
@@ -1494,7 +1599,7 @@ int map_domain_pirq(
 
     if ( !IS_PRIV(current->domain) &&
          !(IS_PRIV_FOR(current->domain, d) &&
-          irq_access_permitted(current->domain, pirq)))
+           irq_access_permitted(current->domain, pirq)))
         return -EPERM;
 
     if ( pirq < 0 || pirq >= d->nr_pirqs || irq < 0 || irq >= nr_irqs )
@@ -1542,8 +1647,21 @@ int map_domain_pirq(
 
         if ( desc->handler != &no_irq_type )
             dprintk(XENLOG_G_ERR, "dom%d: irq %d in use\n",
-              d->domain_id, irq);
+                    d->domain_id, irq);
         desc->handler = &pci_msi_type;
+        if ( opt_irq_vector_map == OPT_IRQ_VECTOR_MAP_PERDEV
+             && !desc->chip_data->used_vectors )
+        {
+            desc->chip_data->used_vectors = &pdev->info.used_vectors;
+            if ( desc->chip_data->vector != IRQ_VECTOR_UNASSIGNED )
+            {
+                int vector = desc->chip_data->vector;
+                ASSERT(!test_bit(vector, desc->chip_data->used_vectors));
+
+                set_bit(vector, desc->chip_data->used_vectors);
+            }
+        }
+
         d->arch.pirq_irq[pirq] = irq;
         d->arch.irq_pirq[irq] = pirq;
         setup_msi_irq(pdev, msi_desc, irq);
@@ -1554,9 +1672,12 @@ int map_domain_pirq(
         d->arch.pirq_irq[pirq] = irq;
         d->arch.irq_pirq[irq] = pirq;
         spin_unlock_irqrestore(&desc->lock, flags);
+
+        if ( opt_irq_vector_map == OPT_IRQ_VECTOR_MAP_PERDEV )
+            printk(XENLOG_INFO "Per-device vector maps for GSIs not implemented yet.\n");
     }
 
- done:
+done:
     return ret;
 }
 

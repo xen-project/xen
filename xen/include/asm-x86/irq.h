@@ -23,11 +23,16 @@
 #define irq_to_desc(irq)    (&irq_desc[irq])
 #define irq_cfg(irq)        (&irq_cfg[irq])
 
+typedef struct {
+    DECLARE_BITMAP(_bits,NR_VECTORS);
+} vmask_t;
+
 struct irq_cfg {
         int  vector;
         cpumask_t cpu_mask;
         cpumask_t old_cpu_mask;
         unsigned move_cleanup_count;
+        vmask_t *used_vectors;
         u8 move_in_progress : 1;
 };
 
@@ -39,6 +44,13 @@ DECLARE_PER_CPU(vector_irq_t, vector_irq);
 extern u8 *irq_vector;
 
 extern bool_t opt_noirqbalance;
+
+#define OPT_IRQ_VECTOR_MAP_DEFAULT 0 /* Do the default thing  */
+#define OPT_IRQ_VECTOR_MAP_NONE    1 /* None */ 
+#define OPT_IRQ_VECTOR_MAP_GLOBAL  2 /* One global vector map (no vector sharing) */ 
+#define OPT_IRQ_VECTOR_MAP_PERDEV  3 /* Per-device vetor map (no vector sharing w/in a device) */
+
+extern int opt_irq_vector_map;
 
 /*
  * Per-cpu current frame pointer - the location of the last exception frame on

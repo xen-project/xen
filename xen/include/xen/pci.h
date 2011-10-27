@@ -11,6 +11,7 @@
 #include <xen/types.h>
 #include <xen/list.h>
 #include <xen/spinlock.h>
+#include <xen/irq.h>
 
 /*
  * The PCI interface treats multi-function devices as independent
@@ -38,6 +39,7 @@ struct pci_dev_info {
         u8 bus;
         u8 devfn;
     } physfn;
+   vmask_t used_vectors; 
 };
 
 struct pci_dev {
