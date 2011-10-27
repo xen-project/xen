@@ -82,25 +82,25 @@
  */
 #define BLKIF_OP_RESERVED_1        4
 /*
- * Recognised only if "feature-trim" is present in backend xenbus info.
- * The "feature-trim" node contains a boolean indicating whether trim
- * requests are likely to succeed or fail. Either way, a trim request
+ * Recognised only if "feature-discard" is present in backend xenbus info.
+ * The "feature-discard" node contains a boolean indicating whether discard
+ * requests are likely to succeed or fail. Either way, a discard request
  * may fail at any time with BLKIF_RSP_EOPNOTSUPP if it is unsupported by
  * the underlying block-device hardware. The boolean simply indicates whether
- * or not it is worthwhile for the frontend to attempt trim requests.
- * If a backend does not recognise BLKIF_OP_TRIM, it should *not*
- * create the "feature-trim" node!
+ * or not it is worthwhile for the frontend to attempt discard requests.
+ * If a backend does not recognise BLKIF_OP_DISCARD, it should *not*
+ * create the "feature-discard" node!
  * 
- * Trim operation is a request for the underlying block device to mark
- * extents to be erased. Trim operations are passed with sector_number as the
- * sector index to begin trim operations at and nr_sectors as the number of
- * sectors to be trimmed. The specified sectors should be trimmed if the
- * underlying block device supports trim operations, or a BLKIF_RSP_EOPNOTSUPP
- * should be returned. More information about trim operations at:
+ * Discard operation is a request for the underlying block device to mark
+ * extents to be erased. Discard operations are passed with sector_number as the
+ * sector index to begin discard operations at and nr_sectors as the number of
+ * sectors to be discarded. The specified sectors should be discarded if the
+ * underlying block device supports discard operations, or a BLKIF_RSP_EOPNOTSUPP
+ * should be returned. More information about discard operations at:
  * http://t13.org/Documents/UploadedDocuments/docs2008/
  *     e07154r6-Data_Set_Management_Proposal_for_ATA-ACS2.doc
  */
-#define BLKIF_OP_TRIM              5
+#define BLKIF_OP_DISCARD           5
 
 /*
  * Maximum scatter/gather segments per request.
@@ -135,17 +135,17 @@ typedef struct blkif_request blkif_request_t;
 
 /*
  * Cast to this structure when blkif_request.operation == BLKIF_OP_TRIM
- * sizeof(struct blkif_request_trim) <= sizeof(struct blkif_request)
+ * sizeof(struct blkif_request_discard) <= sizeof(struct blkif_request)
  */
-struct blkif_request_trim {
-    uint8_t        operation;    /* BLKIF_OP_TRIM                        */
+struct blkif_request_discard {
+    uint8_t        operation;    /* BLKIF_OP_DISCARD                     */
     uint8_t        reserved;     /*                                      */
     blkif_vdev_t   handle;       /* same as for read/write requests      */
     uint64_t       id;           /* private guest value, echoed in resp  */
     blkif_sector_t sector_number;/* start sector idx on disk             */
-    uint64_t       nr_sectors;   /* number of contiguous sectors to trim */
+    uint64_t       nr_sectors;   /* number of contiguous sectors to discard*/
 };
-typedef struct blkif_request_trim blkif_request_trim_t;
+typedef struct blkif_request_discard blkif_request_discard_t;
 
 struct blkif_response {
     uint64_t        id;              /* copied from request */
