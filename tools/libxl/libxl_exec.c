@@ -431,10 +431,9 @@ int libxl__spawn_detach(libxl__gc *gc,
     return rc;
 }
 
-int libxl__spawn_check(libxl__gc *gc, void *for_spawn_void)
+int libxl__spawn_check(libxl__gc *gc, libxl__spawn_starting *for_spawn)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
-    libxl__spawn_starting *for_spawn = for_spawn_void;
     pid_t got;
     int status;
 

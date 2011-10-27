@@ -376,12 +376,10 @@ _hidden int libxl__spawn_detach(libxl__gc *gc,
  * Returns 0 on success, and < 0 on error.
  *
  * Logs errors but also returns them.
- * for_spawn must actually be a  libxl__spawn_starting*  but
- * we take void* so you can pass this function directly to
- * libxl__wait_for_offspring.  Caller must still call detach.
+ * Caller must still call detach.
  */
 _hidden int libxl__spawn_check(libxl__gc *gc,
-                      void *for_spawn);
+                       libxl__spawn_starting *for_spawn);
 
  /* low-level stuff, for synchronous subprocesses etc. */
 
