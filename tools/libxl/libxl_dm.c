@@ -516,31 +516,6 @@ static char ** libxl__build_device_model_args(libxl__gc *gc,
     }
 }
 
-static void dm_xenstore_record_pid(void *for_spawn, pid_t innerchild)
-{
-    libxl__spawner_starting *starting = for_spawn;
-    struct xs_handle *xsh;
-    char *path = NULL, *pid = NULL;
-    int len;
-
-    if (asprintf(&path, "%s/%s", starting->dom_path, "image/device-model-pid") < 0)
-        goto out;
-
-    len = asprintf(&pid, "%d", innerchild);
-    if (len < 0)
-        goto out;
-
-    /* we mustn't use the parent's handle in the child */
-    xsh = xs_daemon_open();
-
-    xs_write(xsh, XBT_NULL, path, pid, len);
-
-    xs_daemon_close(xsh);
-out:
-    free(path);
-    free(pid);
-}
-
 static int libxl__vfb_and_vkb_from_device_model_info(libxl__gc *gc,
                                                      libxl_device_model_info *info,
                                                      libxl_device_vfb *vfb,
@@ -896,7 +871,7 @@ retry_transaction:
     }
 
     rc = libxl__spawn_spawn(gc, p->for_spawn, "device model",
-                            dm_xenstore_record_pid, p);
+                            libxl_spawner_record_pid, p);
     if (rc < 0)
         goto out_close;
     if (!rc) { /* inner child */

@@ -267,7 +267,7 @@ typedef struct {
 } libxl__spawn_starting;
 
 typedef struct {
-    char *dom_path; /* from libxl_malloc, only for dm_xenstore_record_pid */
+    char *dom_path; /* from libxl_malloc, only for libxl_spawner_record_pid */
     int domid;
     libxl__spawn_starting *for_spawn;
 } libxl__spawner_starting;
@@ -317,6 +317,8 @@ _hidden int libxl__spawn_spawn(libxl__gc *gc,
                       void (*intermediate_hook)(void *for_spawn, pid_t innerchild),
                       void *hook_data);
 _hidden int libxl__destroy_device_model(libxl__gc *gc, uint32_t domid);
+
+_hidden void libxl_spawner_record_pid(void *for_spawn, pid_t innerchild);
 
   /* Logs errors.  A copy of "what" is taken.  Return values:
    *  < 0   error, for_spawn need not be detached
