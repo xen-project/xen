@@ -321,6 +321,16 @@ _hidden int libxl__destroy_device_model(libxl__gc *gc, uint32_t domid);
 
 _hidden void libxl_spawner_record_pid(void *for_spawn, pid_t innerchild);
 
+_hidden int libxl__wait_for_offspring(libxl__gc *gc,
+                                 uint32_t domid,
+                                 uint32_t timeout, char *what,
+                                 char *path, char *state,
+                                 libxl__spawn_starting *spawning,
+                                 int (*check_callback)(libxl__gc *gc,
+                                                       uint32_t domid,
+                                                       const char *state,
+                                                       void *userdata),
+                                 void *check_callback_userdata);
   /* Logs errors.  A copy of "what" is taken.  Return values:
    *  < 0   error, for_spawn need not be detached
    *   +1   caller is the parent, must call detach on *for_spawn eventually
@@ -336,7 +346,7 @@ _hidden int libxl__spawn_check(libxl__gc *gc,
   /* Logs errors but also returns them.
    * for_spawn must actually be a  libxl__spawn_starting*  but
    * we take void* so you can pass this function directly to
-   * libxl__wait_for_device_model.  Caller must still call detach. */
+   * libxl__wait_for_offspring.  Caller must still call detach. */
 
  /* low-level stuff, for synchronous subprocesses etc. */
 

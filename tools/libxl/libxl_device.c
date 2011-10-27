@@ -562,88 +562,12 @@ int libxl__wait_for_device_model(libxl__gc *gc,
                                                        void *userdata),
                                  void *check_callback_userdata)
 {
-    libxl_ctx *ctx = libxl__gc_owner(gc);
     char *path;
-    char *p;
-    unsigned int len;
-    int rc = 0;
-    struct xs_handle *xsh;
-    int nfds;
-    fd_set rfds;
-    struct timeval tv;
-    unsigned int num;
-    char **l = NULL;
-
-    xsh = xs_daemon_open();
-    if (xsh == NULL) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Unable to open xenstore connection");
-        goto err;
-    }
-
     path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/state", domid);
-    xs_watch(xsh, path, path);
-    tv.tv_sec = LIBXL_DEVICE_MODEL_START_TIMEOUT;
-    tv.tv_usec = 0;
-    nfds = xs_fileno(xsh) + 1;
-    if (spawning && spawning->fd > xs_fileno(xsh))
-        nfds = spawning->fd + 1;
-
-    while (rc > 0 || (!rc && tv.tv_sec > 0)) {
-        if ( spawning ) {
-            rc = libxl__spawn_check(gc, spawning);
-            if ( rc ) {
-                LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                           "Device Model died during startup");
-                rc = -1;
-                goto err_died;
-            }
-        }
-        p = xs_read(xsh, XBT_NULL, path, &len);
-        if ( NULL == p )
-            goto again;
-
-        if ( NULL != state && strcmp(p, state) )
-            goto again;
-
-        if ( NULL != check_callback ) {
-            rc = (*check_callback)(gc, domid, p, check_callback_userdata);
-            if ( rc > 0 )
-                goto again;
-        }
-
-        free(p);
-        xs_unwatch(xsh, path, path);
-        xs_daemon_close(xsh);
-        return rc;
-again:
-        free(p);
-        FD_ZERO(&rfds);
-        FD_SET(xs_fileno(xsh), &rfds);
-        if (spawning)
-            FD_SET(spawning->fd, &rfds);
-        rc = select(nfds, &rfds, NULL, NULL, &tv);
-        if (rc > 0) {
-            if (FD_ISSET(xs_fileno(xsh), &rfds)) {
-                l = xs_read_watch(xsh, &num);
-                if (l != NULL)
-                    free(l);
-                else
-                    goto again;
-            }
-            if (spawning && FD_ISSET(spawning->fd, &rfds)) {
-                unsigned char dummy;
-                if (read(spawning->fd, &dummy, sizeof(dummy)) != 1)
-                    LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_DEBUG,
-                                     "failed to read spawn status pipe");
-            }
-        }
-    }
-    LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Device Model not ready");
-err_died:
-    xs_unwatch(xsh, path, path);
-    xs_daemon_close(xsh);
-err:
-    return -1;
+    return libxl__wait_for_offspring(gc, domid,
+                                     LIBXL_DEVICE_MODEL_START_TIMEOUT,
+                                     "Device Model", path, state, spawning,
+                                     check_callback, check_callback_userdata);
 }
 
 int libxl__wait_for_backend(libxl__gc *gc, char *be_path, char *state)

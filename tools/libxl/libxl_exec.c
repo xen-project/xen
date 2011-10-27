@@ -169,6 +169,99 @@ out:
     free(pid);
 }
 
+int libxl__wait_for_offspring(libxl__gc *gc,
+                                 uint32_t domid,
+                                 uint32_t timeout, char *what,
+                                 char *path, char *state,
+                                 libxl__spawn_starting *spawning,
+                                 int (*check_callback)(libxl__gc *gc,
+                                                       uint32_t domid,
+                                                       const char *state,
+                                                       void *userdata),
+                                 void *check_callback_userdata)
+{
+    libxl_ctx *ctx = libxl__gc_owner(gc);
+    char *p;
+    unsigned int len;
+    int rc = 0;
+    struct xs_handle *xsh;
+    int nfds;
+    fd_set rfds;
+    struct timeval tv;
+    unsigned int num;
+    char **l = NULL;
+
+    xsh = xs_daemon_open();
+    if (xsh == NULL) {
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Unable to open xenstore connection");
+        goto err;
+    }
+
+    xs_watch(xsh, path, path);
+    tv.tv_sec = timeout;
+    tv.tv_usec = 0;
+    nfds = xs_fileno(xsh) + 1;
+    if (spawning && spawning->fd > xs_fileno(xsh))
+        nfds = spawning->fd + 1;
+
+    while (rc > 0 || (!rc && tv.tv_sec > 0)) {
+        if ( spawning ) {
+            rc = libxl__spawn_check(gc, spawning);
+            if ( rc ) {
+                LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                           "%s died during startup", what);
+                rc = -1;
+                goto err_died;
+            }
+        }
+        p = xs_read(xsh, XBT_NULL, path, &len);
+        if ( NULL == p )
+            goto again;
+
+        if ( NULL != state && strcmp(p, state) )
+            goto again;
+
+        if ( NULL != check_callback ) {
+            rc = (*check_callback)(gc, domid, p, check_callback_userdata);
+            if ( rc > 0 )
+                goto again;
+        }
+
+        free(p);
+        xs_unwatch(xsh, path, path);
+        xs_daemon_close(xsh);
+        return rc;
+again:
+        free(p);
+        FD_ZERO(&rfds);
+        FD_SET(xs_fileno(xsh), &rfds);
+        if (spawning)
+            FD_SET(spawning->fd, &rfds);
+        rc = select(nfds, &rfds, NULL, NULL, &tv);
+        if (rc > 0) {
+            if (FD_ISSET(xs_fileno(xsh), &rfds)) {
+                l = xs_read_watch(xsh, &num);
+                if (l != NULL)
+                    free(l);
+                else
+                    goto again;
+            }
+            if (spawning && FD_ISSET(spawning->fd, &rfds)) {
+                unsigned char dummy;
+                if (read(spawning->fd, &dummy, sizeof(dummy)) != 1)
+                    LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_DEBUG,
+                                     "failed to read spawn status pipe");
+            }
+        }
+    }
+    LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "%s not ready", what);
+err_died:
+    xs_unwatch(xsh, path, path);
+    xs_daemon_close(xsh);
+err:
+    return -1;
+}
+
 static int libxl__set_fd_flag(libxl__gc *gc, int fd, int flag)
 {
     int flags;
