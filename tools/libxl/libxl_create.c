@@ -434,7 +434,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
                             uint32_t *domid_out, int restore_fd)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
-    libxl__device_model_starting *dm_starting = 0;
+    libxl__spawner_starting *dm_starting = 0;
     libxl_device_model_info *dm_info = &d_config->dm_info;
     libxl__domain_build_state state;
     uint32_t domid;

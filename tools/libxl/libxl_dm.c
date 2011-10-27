@@ -518,7 +518,7 @@ static char ** libxl__build_device_model_args(libxl__gc *gc,
 
 static void dm_xenstore_record_pid(void *for_spawn, pid_t innerchild)
 {
-    libxl__device_model_starting *starting = for_spawn;
+    libxl__spawner_starting *starting = for_spawn;
     struct xs_handle *xsh;
     char *path = NULL, *pid = NULL;
     int len;
@@ -619,7 +619,7 @@ static int libxl__create_stubdom(libxl__gc *gc,
                                  libxl_device_nic *vifs, int num_vifs,
                                  libxl_device_vfb *vfb,
                                  libxl_device_vkb *vkb,
-                                 libxl__device_model_starting **starting_r)
+                                 libxl__spawner_starting **starting_r)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     int i, num_console = STUBDOM_SPECIAL_CONSOLES, ret;
@@ -631,7 +631,7 @@ static int libxl__create_stubdom(libxl__gc *gc,
     char **args;
     struct xs_permissions perm[2];
     xs_transaction_t t;
-    libxl__device_model_starting *dm_starting = 0;
+    libxl__spawner_starting *dm_starting = 0;
     libxl_device_model_info xenpv_dm_info;
 
     if (info->device_model_version != LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL) {
@@ -784,7 +784,7 @@ retry_transaction:
     libxl_domain_unpause(ctx, domid);
 
     if (starting_r) {
-        *starting_r = calloc(1, sizeof(libxl__device_model_starting));
+        *starting_r = calloc(1, sizeof(libxl__spawner_starting));
         (*starting_r)->domid = info->domid;
         (*starting_r)->dom_path = libxl__xs_get_dompath(gc, info->domid);
         (*starting_r)->for_spawn = NULL;
@@ -802,14 +802,14 @@ int libxl__create_device_model(libxl__gc *gc,
                               libxl_device_model_info *info,
                               libxl_device_disk *disks, int num_disks,
                               libxl_device_nic *vifs, int num_vifs,
-                              libxl__device_model_starting **starting_r)
+                              libxl__spawner_starting **starting_r)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     char *path, *logfile;
     int logfile_w, null;
     int rc;
     char **args;
-    libxl__device_model_starting buf_starting, *p;
+    libxl__spawner_starting buf_starting, *p;
     xs_transaction_t t;
     char *vm_path;
     char **pass_stuff;
@@ -861,7 +861,7 @@ int libxl__create_device_model(libxl__gc *gc,
 
     if (starting_r) {
         rc = ERROR_NOMEM;
-        *starting_r = calloc(1, sizeof(libxl__device_model_starting));
+        *starting_r = calloc(1, sizeof(libxl__spawner_starting));
         if (!*starting_r)
             goto out_close;
         p = *starting_r;
@@ -915,7 +915,7 @@ out:
 }
 
 static int detach_device_model(libxl__gc *gc,
-                               libxl__device_model_starting *starting)
+                               libxl__spawner_starting *starting)
 {
     int rc;
     rc = libxl__spawn_detach(gc, starting->for_spawn);
@@ -926,7 +926,7 @@ static int detach_device_model(libxl__gc *gc,
 }
 
 int libxl__confirm_device_model_startup(libxl__gc *gc,
-                                       libxl__device_model_starting *starting)
+                                       libxl__spawner_starting *starting)
 {
     int detach;
     int problem = libxl__wait_for_device_model(gc, starting->domid, "running",
@@ -1041,7 +1041,7 @@ out:
 int libxl__create_xenpv_qemu(libxl__gc *gc, uint32_t domid,
                              libxl_device_model_info *info,
                              libxl_device_vfb *vfb,
-                             libxl__device_model_starting **starting_r)
+                             libxl__spawner_starting **starting_r)
 {
     libxl__build_xenpv_qemu_args(gc, domid, vfb, info);
     libxl__create_device_model(gc, info, NULL, 0, NULL, 0, starting_r);

@@ -270,7 +270,7 @@ typedef struct {
     char *dom_path; /* from libxl_malloc, only for dm_xenstore_record_pid */
     int domid;
     libxl__spawn_starting *for_spawn;
-} libxl__device_model_starting;
+} libxl__spawner_starting;
 
 /* from xl_create */
 _hidden int libxl__domain_make(libxl__gc *gc, libxl_domain_create_info *info, uint32_t *domid);
@@ -287,11 +287,11 @@ _hidden int libxl__create_device_model(libxl__gc *gc,
                               libxl_device_model_info *info,
                               libxl_device_disk *disk, int num_disks,
                               libxl_device_nic *vifs, int num_vifs,
-                              libxl__device_model_starting **starting_r);
+                              libxl__spawner_starting **starting_r);
 _hidden int libxl__create_xenpv_qemu(libxl__gc *gc, uint32_t domid,
                               libxl_device_model_info *dm_info,
                               libxl_device_vfb *vfb,
-                              libxl__device_model_starting **starting_r);
+                              libxl__spawner_starting **starting_r);
 _hidden int libxl__need_xenpv_qemu(libxl__gc *gc,
         int nr_consoles, libxl_device_console *consoles,
         int nr_vfbs, libxl_device_vfb *vfbs,
@@ -300,8 +300,8 @@ _hidden int libxl__need_xenpv_qemu(libxl__gc *gc,
    * return pass *starting_r (which will be non-0) to
    * libxl_confirm_device_model or libxl_detach_device_model. */
 _hidden int libxl__confirm_device_model_startup(libxl__gc *gc,
-                              libxl__device_model_starting *starting);
-_hidden int libxl__detach_device_model(libxl__gc *gc, libxl__device_model_starting *starting);
+                              libxl__spawner_starting *starting);
+_hidden int libxl__detach_device_model(libxl__gc *gc, libxl__spawner_starting *starting);
 _hidden int libxl__wait_for_device_model(libxl__gc *gc,
                                 uint32_t domid, char *state,
                                 libxl__spawn_starting *spawning,
