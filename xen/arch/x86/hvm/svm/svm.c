@@ -349,16 +349,17 @@ static int svm_load_vmcb_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
 
 static void svm_fpu_enter(struct vcpu *v)
 {
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    struct vmcb_struct *n1vmcb = vcpu_nestedhvm(v).nv_n1vmcx;
 
     vcpu_restore_fpu_lazy(v);
     vmcb_set_exception_intercepts(
-        vmcb, vmcb_get_exception_intercepts(vmcb) & ~(1U << TRAP_no_device));
+        n1vmcb,
+        vmcb_get_exception_intercepts(n1vmcb) & ~(1U << TRAP_no_device));
 }
 
 static void svm_fpu_leave(struct vcpu *v)
 {
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    struct vmcb_struct *n1vmcb = vcpu_nestedhvm(v).nv_n1vmcx;
 
     ASSERT(!v->fpu_dirtied);
     ASSERT(read_cr0() & X86_CR0_TS);
@@ -372,9 +373,9 @@ static void svm_fpu_leave(struct vcpu *v)
     if ( !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) )
     {
         vmcb_set_exception_intercepts(
-            vmcb,
-            vmcb_get_exception_intercepts(vmcb) | (1U << TRAP_no_device));
-        vmcb_set_cr0(vmcb, vmcb_get_cr0(vmcb) | X86_CR0_TS);
+            n1vmcb,
+            vmcb_get_exception_intercepts(n1vmcb) | (1U << TRAP_no_device));
+        vmcb_set_cr0(n1vmcb, vmcb_get_cr0(n1vmcb) | X86_CR0_TS);
     }
 }
 
@@ -1191,15 +1192,17 @@ static void svm_fpu_dirty_intercept(void)
 {
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    struct vmcb_struct *n1vmcb = vcpu_nestedhvm(v).nv_n1vmcx;
 
     svm_fpu_enter(v);
 
-    if ( nestedhvm_enabled(v->domain) && nestedhvm_vcpu_in_guestmode(v) ) {
-       /* Check if guest must make FPU ready for the nested guest */
+    if ( vmcb != n1vmcb )
+    {
+       /* Check if l1 guest must make FPU ready for the l2 guest */
        if ( v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS )
            hvm_inject_exception(TRAP_no_device, HVM_DELIVER_NO_ERROR_CODE, 0);
        else
-           vmcb_set_cr0(vmcb, vmcb_get_cr0(vmcb) & ~X86_CR0_TS);
+           vmcb_set_cr0(n1vmcb, vmcb_get_cr0(n1vmcb) & ~X86_CR0_TS);
        return;
     }
 
