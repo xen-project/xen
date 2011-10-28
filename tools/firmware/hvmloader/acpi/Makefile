@@ -18,7 +18,7 @@
 XEN_ROOT = $(CURDIR)/../../../..
 include $(XEN_ROOT)/tools/firmware/Rules.mk
 
-C_SRC = build.c dsdt_anycpu.c dsdt_15cpu.c static_tables.c
+C_SRC = build.c dsdt_anycpu.c dsdt_15cpu.c static_tables.c dsdt_anycpu_qemu_xen.c
 OBJS  = $(patsubst %.c,%.o,$(C_SRC))
 
 CFLAGS += $(CFLAGS_xeninclude)
@@ -33,6 +33,10 @@ ssdt_pm.h ssdt_tpm.h: %.h: %.asl iasl
 
 mk_dsdt: mk_dsdt.c
 	$(HOSTCC) $(HOSTCFLAGS) $(CFLAGS_xeninclude) -o $@ mk_dsdt.c
+
+dsdt_anycpu_qemu_xen.asl: dsdt.asl mk_dsdt
+	awk 'NR > 1 {print s} {s=$$0}' $< > $@
+	./mk_dsdt --dm-version qemu-xen >> $@
 
 # NB. awk invocation is a portable alternative to 'head -n -1'
 dsdt_%cpu.asl: dsdt.asl mk_dsdt
