@@ -215,6 +215,19 @@ int main(int argc, char **argv)
     /**** PCI0 start ****/
     push_block("Scope", "\\_SB.PCI0");
 
+    /*
+     * Reserve the IO port ranges [0x10c0, 0x1101] and [0xb044, 0xb047].
+     * Or else, for a hotplugged-in device, the port IO BAR assigned
+     * by guest OS may conflict with the ranges here.
+     */
+    push_block("Device", "HP0"); {
+        stmt("Name", "_HID, EISAID(\"PNP0C02\")");
+        stmt("Name", "_CRS, ResourceTemplate() {"
+             "  IO (Decode16, 0x10c0, 0x10c0, 0x00, 0x82)"
+             "  IO (Decode16, 0xb044, 0xb044, 0x00, 0x04)"
+             "}");
+    } pop_block();
+
     /*** PCI-ISA link definitions ***/
     /* BUFA: List of ISA IRQs available for linking to PCI INTx. */
     stmt("Name", "BUFA, ResourceTemplate() { "
