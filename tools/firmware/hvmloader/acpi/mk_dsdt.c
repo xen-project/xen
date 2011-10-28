@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdint.h>
+#include <string.h>
+#include <getopt.h>
+#include <stdlib.h>
 #include <xen/hvm/hvm_info_table.h>
 
 static unsigned int indent_level;
@@ -71,12 +74,44 @@ static void decision_tree(
     pop_block();
 }
 
+static struct option options[] = {
+    { "maxcpu", 1, 0, 'c' },
+    { 0, 0, 0, 0 }
+};
+
 int main(int argc, char **argv)
 {
     unsigned int slot, dev, intx, link, cpu, max_cpus = HVM_MAX_VCPUS;
 
-    /* Extract optional maximum-cpu specification from invocation name. */
-    sscanf(argv[0], "%*[^0-9]%u", &max_cpus); /* e.g., ./mk_dsdt15 */
+    for ( ; ; )
+    {
+        int opt = getopt_long(argc, argv, "", options, NULL);
+        if ( opt == -1 )
+            break;
+
+        switch ( opt )
+        {
+        case 'c': {
+            long i = 0;
+            char *endptr;
+
+            i = strtol(optarg, &endptr, 10);
+            if ( (*optarg != '\0') && (*endptr == '\0') && (i >= 0) )
+            {
+                max_cpus = i;
+            }
+            else if ( !(strcmp(optarg, "any") == 0) )
+            {
+                fprintf(stderr, "`%s' is not a number or is < 0.\n", optarg);
+                return -1;
+            }
+            break;
+        }
+        default:
+            fprintf(stderr, "options not supported.\n");
+            return -1;
+        }
+    }
 
     /**** DSDT DefinitionBlock start ****/
     /* (we append to existing DSDT definition block) */

@@ -31,15 +31,19 @@ ssdt_pm.h ssdt_tpm.h: %.h: %.asl iasl
 	sed -e 's/AmlCode/$*/g' $*.hex >$@
 	rm -f $*.hex $*.aml
 
+mk_dsdt: mk_dsdt.c
+	$(HOSTCC) $(HOSTCFLAGS) $(CFLAGS_xeninclude) -o $@ mk_dsdt.c
+
 # NB. awk invocation is a portable alternative to 'head -n -1'
-dsdt_15cpu.c dsdt_anycpu.c: %.c: dsdt.asl mk_dsdt.c iasl
-	$(HOSTCC) $(HOSTCFLAGS) $(CFLAGS_xeninclude) -o mk_$* mk_dsdt.c
-	awk 'NR > 1 {print s} {s=$$0}' $< >$*.asl
-	./mk_$* >>$*.asl
+dsdt_%cpu.asl: dsdt.asl mk_dsdt
+	awk 'NR > 1 {print s} {s=$$0}' $< > $@
+	./mk_dsdt --maxcpu $*  >> $@
+
+$(filter dsdt_%.c,$(C_SRC)): %.c: iasl %.asl
 	iasl -vs -p $* -tc $*.asl
 	sed -e 's/AmlCode/$*/g' $*.hex >$@
 	echo "int $*_len=sizeof($*);" >>$@
-	rm -f $*.hex $*.aml $*.asl mk_$*
+	rm -f $*.aml $*.hex
 
 iasl:
 	@echo
@@ -56,7 +60,7 @@ acpi.a: $(OBJS)
 
 clean:
 	rm -rf *.a *.o $(IASL_VER) $(IASL_VER).tar.gz $(DEPS)
-	rm -rf ssdt_*.h dsdt*.c *~ *.aml *.hex mk_dsdt mk_dsdt15 dsdt_*cpu.asl
+	rm -rf ssdt_*.h dsdt*.c *~ *.aml *.hex mk_dsdt dsdt_*.asl
 
 install: all
 
