@@ -15,7 +15,8 @@ static void indent(void)
         printf("    ");
 }
 
-static void _stmt(const char *name, const char *fmt, ...)
+static __attribute__((format(printf, 2, 3)))
+void _stmt(const char *name, const char *fmt, ...)
 {
     va_list args;
 
