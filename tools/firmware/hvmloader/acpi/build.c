@@ -47,17 +47,6 @@ struct acpi_info {
     uint32_t madt_lapic0_addr;  /* 16   - Address of first MADT LAPIC struct */
 };
 
-/*
- * Alternative DSDTs we get linked against. A cover-all DSDT for up to the
- * implementation-defined maximum number of VCPUs, and an alternative for use
- * when a guest can only have up to 15 VCPUs.
- * 
- * The latter is required for Windows 2000, which experiences a BSOD of
- * KMODE_EXCEPTION_NOT_HANDLED if it sees more than 15 processor objects.
- */
-extern unsigned char dsdt_anycpu[], dsdt_15cpu;
-extern int dsdt_anycpu_len, dsdt_15cpu_len;
-
 /* Number of processor objects in the chosen DSDT. */
 static unsigned int nr_processor_objects;
 
@@ -285,7 +274,7 @@ static int construct_secondary_tables(unsigned long *table_ptrs,
     return nr_tables;
 }
 
-void acpi_build_tables(unsigned int physical)
+void acpi_build_tables(struct acpi_config *config, unsigned int physical)
 {
     struct acpi_info *acpi_info = (struct acpi_info *)ACPI_INFO_PHYSICAL_ADDRESS;
     struct acpi_20_rsdp *rsdp;
@@ -308,18 +297,26 @@ void acpi_build_tables(unsigned int physical)
     if (!facs) goto oom;
     memcpy(facs, &Facs, sizeof(struct acpi_20_facs));
 
-    if ( hvm_info->nr_vcpus <= 15 )
+    /*
+     * Alternative DSDTs we get linked against. A cover-all DSDT for up to the
+     * implementation-defined maximum number of VCPUs, and an alternative for use
+     * when a guest can only have up to 15 VCPUs.
+     *
+     * The latter is required for Windows 2000, which experiences a BSOD of
+     * KMODE_EXCEPTION_NOT_HANDLED if it sees more than 15 processor objects.
+     */
+    if ( hvm_info->nr_vcpus <= 15 && config->dsdt_15cpu)
     {
-        dsdt = mem_alloc(dsdt_15cpu_len, 16);
+        dsdt = mem_alloc(config->dsdt_15cpu_len, 16);
         if (!dsdt) goto oom;
-        memcpy(dsdt, &dsdt_15cpu, dsdt_15cpu_len);
+        memcpy(dsdt, config->dsdt_15cpu, config->dsdt_15cpu_len);
         nr_processor_objects = 15;
     }
     else
     {
-        dsdt = mem_alloc(dsdt_anycpu_len, 16);
+        dsdt = mem_alloc(config->dsdt_anycpu_len, 16);
         if (!dsdt) goto oom;
-        memcpy(dsdt, &dsdt_anycpu, dsdt_anycpu_len);
+        memcpy(dsdt, config->dsdt_anycpu, config->dsdt_anycpu_len);
         nr_processor_objects = HVM_MAX_VCPUS;
     }
 

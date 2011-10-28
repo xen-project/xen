@@ -31,6 +31,9 @@
 #define ROM_INCLUDE_SEABIOS
 #include "roms.inc"
 
+extern unsigned char dsdt_anycpu_qemu_xen[];
+extern int dsdt_anycpu_qemu_xen_len;
+
 struct seabios_info {
     char signature[14]; /* XenHVMSeaBIOS\0 */
     uint8_t length;     /* Length of this struct */
@@ -91,7 +94,14 @@ static void add_table(uint32_t t)
 static void seabios_acpi_build_tables(void)
 {
     uint32_t rsdp = (uint32_t)scratch_alloc(sizeof(struct acpi_20_rsdp), 0);
-    acpi_build_tables(rsdp);
+    struct acpi_config config = {
+        .dsdt_anycpu = dsdt_anycpu_qemu_xen,
+        .dsdt_anycpu_len = dsdt_anycpu_qemu_xen_len,
+        .dsdt_15cpu = NULL,
+        .dsdt_15cpu_len = 0,
+    };
+
+    acpi_build_tables(&config, rsdp);
     add_table(rsdp);
 }
 
