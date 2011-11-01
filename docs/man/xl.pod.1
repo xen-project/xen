@@ -1,0 +1,805 @@
+=head1 NAME
+
+XL - Xen management tool, based on LibXenlight
+
+=head1 SYNOPSIS
+
+B<xl> I<subcommand> [I<args>]
+
+=head1 DESCRIPTION
+
+The B<xl> program is the new tool for managing Xen guest
+domains. The program can be used to create, pause, and shutdown
+domains. It can also be used to list current domains, enable or pin
+VCPUs, and attach or detach virtual block devices.
+The old B<xm> tool is deprecated and should not be used.
+
+The basic structure of every B<xl> command is almost always:
+
+=over 2
+
+B<xl> I<subcommand> [I<OPTIONS>] I<domain-id>
+
+=back
+
+Where I<subcommand> is one of the subcommands listed below, I<domain-id>
+is the numeric domain id, or the domain name (which will be internally
+translated to domain id), and I<OPTIONS> are subcommand specific
+options.  There are a few exceptions to this rule in the cases where
+the subcommand in question acts on all domains, the entire machine,
+or directly on the Xen hypervisor.  Those exceptions will be clear for
+each of those subcommands.
+
+=head1 NOTES
+
+Most B<xl> operations rely upon B<xenstored> and B<xenconsoled>: make
+sure you start the script B</etc/init.d/xencommons> at boot time to
+initialize all the daemons needed by B<xl>.
+
+In the most common network configuration, you need to setup a bridge in dom0
+named B<xenbr0> in order to have a working network in the guest domains.
+Please refer to the documentation of your Linux distribution to know how to
+setup the bridge.
+
+Most B<xl> commands require root privileges to run due to the
+communications channels used to talk to the hypervisor.  Running as
+non root will return an error.
+
+=head1 DOMAIN SUBCOMMANDS
+
+The following subcommands manipulate domains directly.  As stated
+previously, most commands take I<domain-id> as the first parameter.
+
+=over 4
+
+=item B<create> [I<OPTIONS>] I<configfile>
+
+The create subcommand requires a config file: see L<xldomain.cfg> for
+full details of that file format and possible options.
+
+I<configfile> can either be an absolute path to a file, or a relative
+path to a file located in /etc/xen.
+
+Create will return B<as soon> as the domain is started.  This B<does
+not> mean the guest OS in the domain has actually booted, or is
+available for input.
+
+B<OPTIONS>
+
+=over 4 
+
+=item B<-q>, B<--quiet>
+
+No console output.
+
+=item B<-f=FILE>, B<--defconfig=FILE>
+
+Use the given configuration file.
+
+=item B<-n>, B<--dryrun>
+
+Dry run - prints the resulting configuration in SXP but does not create
+the domain.
+
+=item B<-p>
+
+Leave the domain paused after it is created.
+
+=item B<-c>
+
+Attach console to the domain as soon as it has started.  This is
+useful for determining issues with crashing domains.
+
+=back
+
+B<EXAMPLES>
+
+=over 4
+
+=item I<with config file>
+
+  xl create DebianLenny
+
+This creates a domain with the file /etc/xen/DebianLenny, and returns as
+soon as it is run.
+
+=back
+
+=item B<console> I<domain-id>
+
+Attach to domain I<domain-id>'s console.  If you've set up your domains to
+have a traditional log in console this will look much like a normal
+text log in screen.
+
+Use the key combination Ctrl+] to detach the domain console.
+
+=item B<vncviewer> [I<OPTIONS>] I<domain-id>
+
+Attach to domain's VNC server, forking a vncviewer process.
+
+B<OPTIONS>
+
+=over 4
+
+=item I<--autopass>
+
+Pass VNC password to vncviewer via stdin.
+
+=back
+
+=item B<destroy> I<domain-id>
+
+Immediately terminate the domain I<domain-id>.  This doesn't give the
+domain OS any chance to react, and is the equivalent of ripping the
+power cord out on a physical machine.  In most cases you will want to
+use the B<shutdown> command instead.
+
+=item B<domid> I<domain-name>
+
+Converts a domain name to a domain id.
+
+=item B<domname> I<domain-id>
+
+Converts a domain id to a domain name.
+
+=item B<rename> I<domain-id> I<new-name>
+
+Change the domain name of I<domain-id> to I<new-name>.
+
+=item B<dump-core> I<domain-id> [I<filename>]
+
+Dumps the virtual machine's memory for the specified domain to the
+I<filename> specified, without pausing the domain.  The dump file will
+be written to a distribution specific directory for dump files.  Such
+as: /var/lib/xen/dump or /var/xen/dump.
+
+=item B<help> [I<--long>]
+
+Displays the short help message (i.e. common commands).
+
+The I<--long> option prints out the complete set of B<xl> subcommands,
+grouped by function.
+
+=item B<list> [I<OPTIONS>] [I<domain-id> ...]
+
+Prints information about one or more domains.  If no domains are
+specified it prints out information about all domains.
+
+
+B<OPTIONS>
+
+=over 4
+
+=item B<-l>, B<--long>
+
+The output for B<xl list> is not the table view shown below, but 
+instead presents the data in SXP compatible format.
+
+=item B<-Z>, B<--context>
+Also prints the security labels.
+
+=item B<-v>, B<--verbose>
+
+Also prints the domain UUIDs, the shutdown reason and security labels.
+
+=back
+
+B<EXAMPLE>
+
+An example format for the list is as follows:
+
+    Name                                        ID   Mem VCPUs      State   Time(s)
+    Domain-0                                     0   750     4     r-----   11794.3
+    win                                          1  1019     1     r-----       0.3
+    linux                                        2  2048     2     r-----    5624.2
+
+Name is the name of the domain.  ID the numeric domain id.  Mem is the
+desired amount of memory to allocate to the domain (although it may
+not be the currently allocated amount).  VCPUs is the number of
+virtual CPUs allocated to the domain.  State is the run state (see
+below).  Time is the total run time of the domain as accounted for by
+Xen.
+
+B<STATES>
+
+The State field lists 6 states for a Xen domain, and which ones the
+current domain is in.
+
+=over 4
+
+=item B<r - running>
+
+The domain is currently running on a CPU.
+
+=item B<b - blocked>
+
+The domain is blocked, and not running or runnable.  This can be caused
+because the domain is waiting on IO (a traditional wait state) or has
+gone to sleep because there was nothing else for it to do.
+
+=item B<p - paused>
+
+The domain has been paused, usually occurring through the administrator
+running B<xl pause>.  When in a paused state the domain will still
+consume allocated resources like memory, but will not be eligible for
+scheduling by the Xen hypervisor.
+
+=item B<s - shutdown>
+
+FIXME: Why would you ever see this state?
+
+=item B<c - crashed>
+
+The domain has crashed, which is always a violent ending.  Usually
+this state can only occur if the domain has been configured not to
+restart on crash.  See L<xldomain.cfg> for more info.
+
+=item B<d - dying>
+
+The domain is in process of dying, but hasn't completely shutdown or
+crashed.
+
+FIXME: Is this right?
+
+=back
+
+B<NOTES>
+
+=over 4
+
+The Time column is deceptive.  Virtual IO (network and block devices)
+used by domains requires coordination by Domain0, which means that
+Domain0 is actually charged for much of the time that a DomainU is
+doing IO.  Use of this time value to determine relative utilizations
+by domains is thus very suspect, as a high IO workload may show as
+less utilized than a high CPU workload.  Consider yourself warned.
+
+=back
+
+=item B<mem-max> I<domain-id> I<mem>
+
+Specify the maximum amount of memory the domain is able to use, appending 't'
+for terabytes, 'g' for gigabytes, 'm' for megabytes, 'k' for kilobytes and 'b'
+for bytes.
+
+The mem-max value may not correspond to the actual memory used in the
+domain, as it may balloon down its memory to give more back to the OS.
+
+=item B<mem-set> I<domain-id> I<mem>
+
+Set the domain's used memory using the balloon driver; append 't' for
+terabytes, 'g' for gigabytes, 'm' for megabytes, 'k' for kilobytes and 'b' for
+bytes.
+
+Because this operation requires cooperation from the domain operating
+system, there is no guarantee that it will succeed.  This command will
+definitely not work unless the domain has the required paravirt
+driver.
+
+B<Warning:> There is no good way to know in advance how small of a
+mem-set will make a domain unstable and cause it to crash.  Be very
+careful when using this command on running domains.
+
+=item B<migrate> [I<OPTIONS>] I<domain-id> I<host>
+
+Migrate a domain to another host machine. By default B<xl> relies on ssh as a
+transport mechanism between the two hosts.
+
+B<OPTIONS>
+
+=over 4
+
+=item B<-s> I<sshcommand>
+
+Use <sshcommand> instead of ssh.  String will be passed to sh. If empty, run
+<host> instead of ssh <host> xl migrate-receive [-d -e].
+
+=item B<-e>
+
+On the new host, do not wait in the background (on <host>) for the death of the
+domain.
+
+=item B<-C> I<config>
+
+Send <config> instead of config file from creation.
+
+=back
+
+=item B<pause> I<domain-id>
+
+Pause a domain.  When in a paused state the domain will still consume
+allocated resources such as memory, but will not be eligible for
+scheduling by the Xen hypervisor.
+
+=item B<reboot> [I<OPTIONS>] I<domain-id>
+
+Reboot a domain.  This acts just as if the domain had the B<reboot>
+command run from the console.  The command returns as soon as it has
+executed the reboot action, which may be significantly before the
+domain actually reboots.
+
+The behavior of what happens to a domain when it reboots is set by the
+B<on_reboot> parameter of the xldomain.cfg file when the domain was
+created.
+
+=item B<restore> [I<OPTIONS>] [I<ConfigFile>] I<CheckpointFile>
+
+Build a domain from an B<xl save> state file.  See B<save> for more info.
+
+B<OPTIONS>
+
+=over 4
+
+=item B<-p>
+
+Do not unpause domain after restoring it.
+
+=item B<-e>
+
+Do not wait in the background for the death of the domain on the new host.
+
+=item B<-d>
+
+Enable debug messages.
+
+=back
+
+=item B<save> [I<OPTIONS>] I<domain-id> I<CheckpointFile> [I<ConfigFile>]
+
+Saves a running domain to a state file so that it can be restored
+later.  Once saved, the domain will no longer be running on the
+system, unless the -c option is used.
+B<xl restore> restores from this checkpoint file.
+Passing a config file argument allows the user to manually select the VM config
+file used to create the domain.
+
+
+=over 4
+
+=item B<-c>
+
+Leave domain running after creating the snapshot.
+
+=back
+
+
+=item B<shutdown> [I<OPTIONS>] I<domain-id>
+
+Gracefully shuts down a domain.  This coordinates with the domain OS
+to perform graceful shutdown, so there is no guarantee that it will
+succeed, and may take a variable length of time depending on what
+services must be shutdown in the domain.  The command returns
+immediately after signally the domain unless that B<-w> flag is used.
+
+The behavior of what happens to a domain when it reboots is set by the
+B<on_shutdown> parameter of the xldomain.cfg file when the domain was
+created.
+
+B<OPTIONS>
+
+=over 4
+
+=item B<-w>
+
+Wait for the domain to complete shutdown before returning.
+
+=back
+
+=item B<sysrq> I<domain-id> I<letter>
+
+Send a I<Magic System Request> signal to the domain.  For more
+information on available magic sys req operations, see sysrq.txt in
+your Linux Kernel sources.
+
+=item B<unpause> I<domain-id>
+
+Moves a domain out of the paused state.  This will allow a previously
+paused domain to now be eligible for scheduling by the Xen hypervisor.
+
+=item B<vcpu-set> I<domain-id> I<vcpu-count>
+
+Enables the I<vcpu-count> virtual CPUs for the domain in question.
+Like mem-set, this command can only allocate up to the maximum virtual
+CPU count configured at boot for the domain.
+
+If the I<vcpu-count> is smaller than the current number of active
+VCPUs, the highest number VCPUs will be hotplug removed.  This may be
+important for pinning purposes.
+
+Attempting to set the VCPUs to a number larger than the initially
+configured VCPU count is an error.  Trying to set VCPUs to < 1 will be
+quietly ignored.
+
+Because this operation requires cooperation from the domain operating
+system, there is no guarantee that it will succeed.  This command will
+not work with a full virt domain.
+
+=item B<vcpu-list> [I<domain-id>]
+
+Lists VCPU information for a specific domain.  If no domain is
+specified, VCPU information for all domains will be provided.
+
+=item B<vcpu-pin> I<domain-id> I<vcpu> I<cpus>
+
+Pins the VCPU to only run on the specific CPUs.  The keyword
+B<all> can be used to apply the I<cpus> list to all VCPUs in the
+domain.
+
+Normally VCPUs can float between available CPUs whenever Xen deems a
+different run state is appropriate.  Pinning can be used to restrict
+this, by ensuring certain VCPUs can only run on certain physical
+CPUs.
+
+=item B<button-press> I<domain-id> I<button>
+
+Indicate an ACPI button press to the domain. I<button> is may be 'power' or
+'sleep'.
+
+=item B<trigger> I<domain-id> I<nmi|reset|init|power|sleep> [I<VCPU>]
+
+Send a trigger to a domain, where the trigger can be: nmi, reset, init, power
+or sleep.  Optionally a specific vcpu number can be passed as an argument.
+
+=item B<getenforce>
+
+Returns the current enforcing mode of the Flask Xen security module.
+
+=item B<setenforce> I<1|0|Enforcing|Permissive>
+
+Sets the current enforcing mode of the Flask Xen security module
+
+=item B<loadpolicy> I<policyfile>
+
+Loads a new policy int the Flask Xen security module.
+
+=back
+
+=head1 XEN HOST SUBCOMMANDS
+
+=over 4
+
+=item B<debug-keys> I<keys>
+
+Send debug I<keys> to Xen.
+
+=item B<dmesg> [B<-c>]
+
+Reads the Xen message buffer, similar to dmesg on a Linux system.  The
+buffer contains informational, warning, and error messages created
+during Xen's boot process.  If you are having problems with Xen, this
+is one of the first places to look as part of problem determination.
+
+B<OPTIONS>
+
+=over 4
+
+=item B<-c>, B<--clear>
+
+Clears Xen's message buffer.
+
+=back
+
+=item B<info> [B<-n>, B<--numa>]
+
+Print information about the Xen host in I<name : value> format.  When
+reporting a Xen bug, please provide this information as part of the
+bug report.
+
+Sample output looks as follows (lines wrapped manually to make the man
+page more readable):
+
+ host                   : talon
+ release                : 2.6.12.6-xen0
+ version                : #1 Mon Nov 14 14:26:26 EST 2005
+ machine                : i686
+ nr_cpus                : 2
+ nr_nodes               : 1
+ cores_per_socket       : 1
+ threads_per_core       : 1
+ cpu_mhz                : 696
+ hw_caps                : 0383fbff:00000000:00000000:00000040
+ total_memory           : 767
+ free_memory            : 37
+ xen_major              : 3
+ xen_minor              : 0
+ xen_extra              : -devel
+ xen_caps               : xen-3.0-x86_32
+ xen_scheduler          : credit
+ xen_pagesize           : 4096
+ platform_params        : virt_start=0xfc000000
+ xen_changeset          : Mon Nov 14 18:13:38 2005 +0100 
+                          7793:090e44133d40
+ cc_compiler            : gcc version 3.4.3 (Mandrakelinux 
+                          10.2 3.4.3-7mdk)
+ cc_compile_by          : sdague
+ cc_compile_domain      : (none)
+ cc_compile_date        : Mon Nov 14 14:16:48 EST 2005
+ xend_config_format     : 4
+
+B<FIELDS>
+
+Not all fields will be explained here, but some of the less obvious
+ones deserve explanation:
+
+=over 4
+
+=item B<hw_caps>
+
+A vector showing what hardware capabilities are supported by your
+processor.  This is equivalent to, though more cryptic, the flags
+field in /proc/cpuinfo on a normal Linux machine.
+
+=item B<free_memory>
+
+Available memory (in MB) not allocated to Xen, or any other domains.
+
+=item B<xen_caps>
+
+The Xen version and architecture.  Architecture values can be one of:
+x86_32, x86_32p (i.e. PAE enabled), x86_64, ia64.
+
+=item B<xen_changeset>
+
+The Xen mercurial changeset id.  Very useful for determining exactly
+what version of code your Xen system was built from.
+
+=back
+
+B<OPTIONS>
+
+=over 4
+
+=item B<-n>, B<--numa>
+
+List host NUMA topology information
+
+=back
+
+=item B<top>
+
+Executes the B<xentop> command, which provides real time monitoring of
+domains.  Xentop is a curses interface, and reasonably self
+explanatory.
+
+=item B<uptime>
+
+Prints the current uptime of the domains running.
+
+=item B<pci-list-assignable-devices>
+
+List all the assignable PCI devices.
+
+=back
+
+=head1 SCHEDULER SUBCOMMANDS
+
+Xen ships with a number of domain schedulers, which can be set at boot
+time with the B<sched=> parameter on the Xen command line.  By
+default B<credit> is used for scheduling.
+
+=over 4
+
+=item B<sched-credit> [ B<-d> I<domain-id> [ B<-w>[B<=>I<WEIGHT>] | B<-c>[B<=>I<CAP>] ] ]
+
+Set credit scheduler parameters.  The credit scheduler is a
+proportional fair share CPU scheduler built from the ground up to be
+work conserving on SMP hosts.
+
+Each domain (including Domain0) is assigned a weight and a cap.
+
+B<PARAMETERS>
+
+=over 4
+
+=item I<WEIGHT>
+
+A domain with a weight of 512 will get twice as much CPU as a domain
+with a weight of 256 on a contended host. Legal weights range from 1
+to 65535 and the default is 256.
+
+=item I<CAP>
+
+The cap optionally fixes the maximum amount of CPU a domain will be
+able to consume, even if the host system has idle CPU cycles. The cap
+is expressed in percentage of one physical CPU: 100 is 1 physical CPU,
+50 is half a CPU, 400 is 4 CPUs, etc. The default, 0, means there is
+no upper cap.
+
+=back
+
+=back
+
+=head1 CPUPOOLS COMMANDS
+
+Xen can group the physical cpus of a server in cpu-pools. Each physical CPU is
+assigned at most to one cpu-pool. Domains are each restricted to a single
+cpu-pool. Scheduling does not cross cpu-pool boundaries, so each cpu-pool has
+an own scheduler.
+Physical cpus and domains can be moved from one pool to another only by an
+explicit command.
+
+=over 4
+
+=item B<cpupool-create> [I<OPTIONS>] I<ConfigFile>
+
+Create a cpu pool based an I<ConfigFile>.
+
+B<OPTIONS>
+
+=over 4
+
+=item B<-f=FILE>, B<--defconfig=FILE>
+
+Use the given configuration file.
+
+=item B<-n>, B<--dryrun>
+
+Dry run - prints the resulting configuration.
+
+=back
+
+=item B<cpupool-list> [I<-c|--cpus> I<cpu-pool>]
+
+List CPU pools on the host.
+If I<-c> is specified, B<xl> prints a list of CPUs used by I<cpu-pool>.
+
+=item B<cpupool-destroy> I<cpu-pool>
+
+Deactivates a cpu pool.
+
+=item B<cpupool-rename> I<cpu-pool> <newname>
+
+Renames a cpu pool to I<newname>.
+
+=item B<cpupool-cpu-add> I<cpu-pool> I<cpu-nr|node-nr>
+
+Adds a cpu or a numa node to a cpu pool.
+
+=item B<cpupool-cpu-remove> I<cpu-nr|node-nr>
+
+Removes a cpu or a numa node from a cpu pool.
+
+=item B<cpupool-migrate> I<domain-id> I<cpu-pool>
+
+Moves a domain into a cpu pool.
+
+=item B<cpupool-numa-split>
+
+Splits up the machine into one cpu pool per numa node.
+
+=back
+
+=head1 VIRTUAL DEVICE COMMANDS
+
+Most virtual devices can be added and removed while guests are
+running.  The effect to the guest OS is much the same as any hotplug
+event.
+
+=head2 BLOCK DEVICES
+
+=over 4
+
+=item B<block-attach> I<domain-id> I<disc-spec-component(s)> ...
+
+Create a new virtual block device.  This will trigger a hotplug event
+for the guest.
+
+B<OPTIONS>
+
+=over 4
+
+=item I<domain-id>
+
+The domain id of the guest domain that the device will be attached to.
+
+=item I<disc-spec-component>
+
+A disc specification in the same format used for the B<disk> variable in
+the domain config file. See L<xldomain.cfg>.
+
+=back
+
+=item B<block-detach> I<domain-id> I<devid> [B<--force>]
+
+Detach a domain's virtual block device. I<devid> may be the symbolic
+name or the numeric device id given to the device by domain 0.  You
+will need to run B<xl block-list> to determine that number.
+
+Detaching the device requires the cooperation of the domain.  If the
+domain fails to release the device (perhaps because the domain is hung
+or is still using the device), the detach will fail.  The B<--force>
+parameter will forcefully detach the device, but may cause IO errors
+in the domain.
+
+=item B<block-list> I<domain-id>
+
+List virtual block devices for a domain.
+
+=item B<cd-insert> I<domain-id> I<VirtualDevice> I<be-dev>
+
+Insert a cdrom into a guest domain's cd drive. Only works with HVM domains.
+
+B<OPTIONS>
+
+=over 4
+
+=item I<VirtualDevice>
+
+How the device should be presented to the guest domain; for example /dev/hdc.
+
+=item I<be-dev>
+
+the device in the backend domain (usually domain 0) to be exported; it can be a
+path to a file (file://path/to/file.iso). See B<disk> in L<xldomain.cfg> for the
+details.
+
+=back
+
+=item B<cd-eject> I<domain-id> I<VirtualDevice>
+
+Eject a cdrom from a guest's cd drive. Only works with HVM domains.
+I<VirtualDevice> is the cdrom device in the guest to eject.
+
+=back
+
+=head2 NETWORK DEVICES
+
+=over 4
+
+=item B<network-attach> I<domain-id> I<network-device>
+
+Creates a new network device in the domain specified by I<domain-id>.
+I<network-device> describes the device to attach, using the same format as the
+B<vif> string in the domain config file. See L<xldomain.cfg> for the
+description.
+
+=item B<network-detach> I<domain-id> I<devid|mac>
+
+Removes the network device from the domain specified by I<domain-id>.
+I<devid> is the virtual interface device number within the domain
+(i.e. the 3 in vif22.3). Alternatively the I<mac> address can be used to
+select the virtual interface to detach.
+
+=item B<network-list> I<domain-id>
+
+List virtual network interfaces for a domain.
+
+=back
+
+=head2 PCI PASS-THROUGH
+
+=over 4
+
+=item B<pci-attach> I<domain-id> I<BDF>
+
+Hot-plug a new pass-through pci device to the specified domain.
+B<BDF> is the PCI Bus/Device/Function of the physical device to pass-through.
+
+=item B<pci-detach> [I<-f>] I<domain-id> I<BDF>
+
+Hot-unplug a previously assigned pci device from a domain. B<BDF> is the PCI
+Bus/Device/Function of the physical device to be removed from the guest domain.
+
+If B<-f> is specified, B<xl> is going to forcefully remove the device even
+without guest's collaboration.
+
+=item B<pci-list> I<domain-id>
+
+List pass-through pci devices for a domain.
+
+=back
+
+=head1 SEE ALSO
+
+B<xldomain.cfg>(5), B<xentop>(1)
+
+=head1 AUTHOR
+
+  Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+  Vincent Hanquez <vincent.hanquez@eu.citrix.com>
+  Ian Jackson <ian.jackson@eu.citrix.com>
+  Ian Campbell <Ian.Campbell@citrix.com>
+
+=head1 BUGS
+
+Send bugs to xen-devel@lists.xensource.com.
