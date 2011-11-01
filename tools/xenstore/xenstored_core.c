@@ -1297,7 +1297,6 @@ static void handle_input(struct connection *conn)
 			goto bad_client;
 		in->used = 0;
 		in->inhdr = false;
-		return;
 	}
 
 	bytes = conn->read(conn, in->buffer + in->used,
