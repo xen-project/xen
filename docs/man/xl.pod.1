@@ -615,14 +615,17 @@ Xen can group the physical cpus of a server in cpu-pools. Each physical CPU is
 assigned at most to one cpu-pool. Domains are each restricted to a single
 cpu-pool. Scheduling does not cross cpu-pool boundaries, so each cpu-pool has
 an own scheduler.
-Physical cpus and domains can be moved from one pool to another only by an
+Physical cpus and domains can be moved from one cpu-pool to another only by an
 explicit command.
+Cpu-pools can be specified either by name or by id.
 
 =over 4
 
-=item B<cpupool-create> [I<OPTIONS>] I<ConfigFile>
+=item B<cpupool-create> [I<OPTIONS>] I<ConfigFile> [I<Variable=Value> ...]
 
 Create a cpu pool based an I<ConfigFile>.
+Variable settings from the I<ConfigFile> may be altered by specifying new
+or additional assignments on the command line.
 
 B<OPTIONS>
 
@@ -638,7 +641,7 @@ Dry run - prints the resulting configuration.
 
 =back
 
-=item B<cpupool-list> [I<-c|--cpus> I<cpu-pool>]
+=item B<cpupool-list> [I<-c|--cpus>] [I<cpu-pool>]
 
 List CPU pools on the host.
 If I<-c> is specified, B<xl> prints a list of CPUs used by I<cpu-pool>.
@@ -646,26 +649,27 @@ If I<-c> is specified, B<xl> prints a list of CPUs used by I<cpu-pool>.
 =item B<cpupool-destroy> I<cpu-pool>
 
 Deactivates a cpu pool.
+This is possible only if no domain is active in the cpu-pool.
 
 =item B<cpupool-rename> I<cpu-pool> <newname>
 
-Renames a cpu pool to I<newname>.
+Renames a cpu-pool to I<newname>.
 
-=item B<cpupool-cpu-add> I<cpu-pool> I<cpu-nr|node-nr>
+=item B<cpupool-cpu-add> I<cpu-pool> I<cpu-nr|node:node-nr>
 
-Adds a cpu or a numa node to a cpu pool.
+Adds a cpu or all cpus of a numa node to a cpu-pool.
 
-=item B<cpupool-cpu-remove> I<cpu-nr|node-nr>
+=item B<cpupool-cpu-remove> I<cpu-nr|node:node-nr>
 
-Removes a cpu or a numa node from a cpu pool.
+Removes a cpu or all cpus of a numa node from a cpu-pool.
 
-=item B<cpupool-migrate> I<domain-id> I<cpu-pool>
+=item B<cpupool-migrate> I<domain> I<cpu-pool>
 
-Moves a domain into a cpu pool.
+Moves a domain specified by domain-id or domain-name into a cpu-pool.
 
 =item B<cpupool-numa-split>
 
-Splits up the machine into one cpu pool per numa node.
+Splits up the machine into one cpu-pool per numa node.
 
 =back
 
@@ -791,7 +795,7 @@ List pass-through pci devices for a domain.
 
 =head1 SEE ALSO
 
-B<xldomain.cfg>(5), B<xentop>(1)
+B<xldomain.cfg>(5), B<xlcpupool.cfg>(5), B<xentop>(1)
 
 =head1 AUTHOR
 
