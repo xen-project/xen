@@ -86,8 +86,8 @@ struct acpi_rhsa_unit {
         for (idx = 0; (bdf = rmrr->scope.devices[idx]) && \
                  idx < rmrr->scope.devices_cnt; idx++)
 
-struct acpi_drhd_unit * acpi_find_matched_drhd_unit(struct pci_dev *pdev);
-struct acpi_atsr_unit * acpi_find_matched_atsr_unit(u16 seg, u8 bus, u8 devfn);
+struct acpi_drhd_unit *acpi_find_matched_drhd_unit(const struct pci_dev *);
+struct acpi_atsr_unit *acpi_find_matched_atsr_unit(const struct pci_dev *);
 
 #define DMAR_TYPE 1
 #define RMRR_TYPE 2

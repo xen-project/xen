@@ -160,7 +160,7 @@ static int __init acpi_register_atsr_unit(struct acpi_atsr_unit *atsr)
     return 0;
 }
 
-struct acpi_drhd_unit * acpi_find_matched_drhd_unit(struct pci_dev *pdev)
+struct acpi_drhd_unit *acpi_find_matched_drhd_unit(const struct pci_dev *pdev)
 {
     u8 bus, devfn;
     struct acpi_drhd_unit *drhd;
@@ -204,17 +204,17 @@ struct acpi_drhd_unit * acpi_find_matched_drhd_unit(struct pci_dev *pdev)
     return include_all;
 }
 
-struct acpi_atsr_unit * acpi_find_matched_atsr_unit(u16 seg, u8 bus, u8 devfn)
+struct acpi_atsr_unit *acpi_find_matched_atsr_unit(const struct pci_dev *pdev)
 {
     struct acpi_atsr_unit *atsr;
     struct acpi_atsr_unit *all_ports = NULL;
 
     list_for_each_entry ( atsr, &acpi_atsr_units, list )
     {
-        if ( atsr->segment != seg )
+        if ( atsr->segment != pdev->seg )
             continue;
 
-        if ( test_bit(bus, atsr->scope.buses) )
+        if ( test_bit(pdev->bus, atsr->scope.buses) )
             return atsr;
 
         if ( atsr->all_ports )

@@ -1410,7 +1410,7 @@ static int domain_context_mapping(
                     domain->domain_id, seg, bus,
                     PCI_SLOT(devfn), PCI_FUNC(devfn));
         ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn);
-        if ( !ret && ats_device(seg, bus, devfn) )
+        if ( !ret && ats_device(pdev, drhd) > 0 )
             enable_ats_device(seg, bus, devfn);
 
         break;
@@ -1541,7 +1541,7 @@ static int domain_context_unmap(
                     domain->domain_id, seg, bus,
                     PCI_SLOT(devfn), PCI_FUNC(devfn));
         ret = domain_context_unmap_one(domain, iommu, bus, devfn);
-        if ( !ret && ats_device(seg, bus, devfn) )
+        if ( !ret && ats_device(pdev, drhd) > 0 )
             disable_ats_device(seg, bus, devfn);
 
         break;

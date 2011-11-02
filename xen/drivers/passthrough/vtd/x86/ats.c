@@ -83,40 +83,32 @@ struct acpi_drhd_unit * find_ats_dev_drhd(struct iommu *iommu)
     return NULL;
 }
 
-int ats_device(int seg, int bus, int devfn)
+int ats_device(const struct pci_dev *pdev, const struct acpi_drhd_unit *drhd)
 {
-    struct acpi_drhd_unit *drhd, *ats_drhd, *new_drhd;
-    struct pci_dev *pdev;
-    int pos = 0;
+    struct acpi_drhd_unit *ats_drhd;
+    int pos;
 
     if ( !ats_enabled || !iommu_qinval )
-        return 0;
-
-    pdev = pci_get_pdev(seg, bus, devfn);
-    if ( !pdev )
-        return 0;
-
-    drhd = acpi_find_matched_drhd_unit(pdev);
-    if ( !drhd )
         return 0;
 
     if ( !ecap_queued_inval(drhd->iommu->ecap) ||
          !ecap_dev_iotlb(drhd->iommu->ecap) )
         return 0;
 
-    if ( !acpi_find_matched_atsr_unit(seg, bus, devfn) )
+    if ( !acpi_find_matched_atsr_unit(pdev) )
         return 0;
 
     ats_drhd = find_ats_dev_drhd(drhd->iommu);
-    pos = pci_find_ext_capability(seg, bus, devfn, PCI_EXT_CAP_ID_ATS);
+    pos = pci_find_ext_capability(pdev->seg, pdev->bus, pdev->devfn,
+                                  PCI_EXT_CAP_ID_ATS);
 
     if ( pos && (ats_drhd == NULL) )
     {
-        new_drhd = xmalloc(struct acpi_drhd_unit);
-        if ( !new_drhd )
-            return 0;
-        memcpy(new_drhd, drhd, sizeof(struct acpi_drhd_unit));
-        list_add_tail(&new_drhd->list, &ats_dev_drhd_units);
+        ats_drhd = xmalloc(struct acpi_drhd_unit);
+        if ( !ats_drhd )
+            return -ENOMEM;
+        *ats_drhd = *drhd;
+        list_add_tail(&ats_drhd->list, &ats_dev_drhd_units);
     }
     return pos;
 }

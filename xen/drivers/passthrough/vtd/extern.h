@@ -61,10 +61,9 @@ extern bool_t ats_enabled;
 
 struct acpi_drhd_unit * find_ats_dev_drhd(struct iommu *iommu);
 
-int ats_device(int seg, int bus, int devfn);
+int ats_device(const struct pci_dev *, const struct acpi_drhd_unit *);
 int enable_ats_device(int seg, int bus, int devfn);
 void disable_ats_device(int seg, int bus, int devfn);
-int invalidate_ats_tcs(struct iommu *iommu);
 
 int dev_invalidate_iotlb(struct iommu *iommu, u16 did,
                          u64 addr, unsigned int size_order, u64 type);
@@ -76,7 +75,8 @@ static inline struct acpi_drhd_unit *find_ats_dev_drhd(struct iommu *iommu)
     return NULL;
 }
 
-static inline int ats_device(int seg, int bus, int devfn)
+static inline int ats_device(const struct pci_dev *pdev,
+                             const struct acpi_drhd_unit *drhd)
 {
     return 0;
 }
