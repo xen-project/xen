@@ -40,15 +40,20 @@ def enable_cursor(ison):
     except _curses.error:
         pass
 
-def is_disk_image(file):
+DISK_TYPE_RAW, DISK_TYPE_HYBRIDISO, DISK_TYPE_DOS = range(3)
+def identify_disk_image(file):
+    """Detect DOS partition table or HybridISO format."""
     fd = os.open(file, os.O_RDONLY)
-    buf = os.read(fd, 512)
+    buf = os.read(fd, 0x8006)
     os.close(fd)
 
     if len(buf) >= 512 and \
            struct.unpack("H", buf[0x1fe: 0x200]) == (0xaa55,):
-        return True
-    return False
+        # HybridISO contains a DOS partition table for booting from USB devices, but really is an ISO image
+        if len(buf) >= 0x8006 and buf[0x8001:0x8006] == 'CD001':
+            return DISK_TYPE_HYBRIDISO
+        return DISK_TYPE_DOS
+    return DISK_TYPE_RAW
 
 SECTOR_SIZE=512
 DK_LABEL_LOC=1
@@ -94,12 +99,19 @@ FDISK_PART_SOLARIS_OLD=0x82
 FDISK_PART_GPT=0xee
 
 def get_partition_offsets(file):
-    if not is_disk_image(file):
+    image_type = identify_disk_image(file)
+    if image_type == DISK_TYPE_RAW:
         # No MBR: assume whole disk filesystem, which is like a 
         # single partition starting at 0
         return [0]
-
-    part_offs = []
+    elif image_type == DISK_TYPE_HYBRIDISO:
+        # A HybridISO contains an ISO filesystem at 0 in addition
+        # to the DOS partition table
+        part_offs = [0]
+    elif image_type == DISK_TYPE_DOS:
+        part_offs = []
+    else:
+        raise ValueError('Unhandled image type returnd by identify_disk_image(): %d' % (image_type,))
 
     fd = os.open(file, os.O_RDONLY)
     buf = os.read(fd, 512)
