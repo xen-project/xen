@@ -28,7 +28,8 @@
 #include "flexarray.h"
 
 #define XENCONSOLED_BUF_SIZE 16
-#define BOOTLOADER_BUF_SIZE 1024
+#define BOOTLOADER_BUF_SIZE 4096
+#define BOOTLOADER_TIMEOUT 1
 
 static char **make_bootloader_args(libxl__gc *gc,
                                    libxl_domain_build_info *info,
@@ -169,6 +170,7 @@ static char * bootloader_interact(libxl__gc *gc, int xenconsoled_fd, int bootloa
 
     size_t nr_out = 0, size_out = 0;
     char *output = NULL;
+    struct timeval wait;
 
     /* input from xenconsole. read on xenconsoled_fd write to bootloader_fd */
     int xenconsoled_prod = 0, xenconsoled_cons = 0;
@@ -181,39 +183,67 @@ static char * bootloader_interact(libxl__gc *gc, int xenconsoled_fd, int bootloa
         fd_set wsel, rsel;
         int nfds;
 
-        if (xenconsoled_prod == xenconsoled_cons)
-            xenconsoled_prod = xenconsoled_cons = 0;
-        if (bootloader_prod == bootloader_cons)
-            bootloader_prod = bootloader_cons = 0;
+        /* Set timeout to 1s before starting to discard data */
+        wait.tv_sec = BOOTLOADER_TIMEOUT;
+        wait.tv_usec = 0;
+
+        /* Move buffers around to drop already consumed data */
+        if (xenconsoled_cons > 0) {
+            xenconsoled_prod -= xenconsoled_cons;
+            memmove(xenconsoled_buf, &xenconsoled_buf[xenconsoled_cons],
+                    xenconsoled_prod);
+            xenconsoled_cons = 0;
+        }
+        if (bootloader_cons > 0) {
+            bootloader_prod -= bootloader_cons;
+            memmove(bootloader_buf, &bootloader_buf[bootloader_cons],
+                    bootloader_prod);
+            bootloader_cons = 0;
+        }
 
         FD_ZERO(&rsel);
         FD_SET(fifo_fd, &rsel);
         nfds = fifo_fd + 1;
-        if (xenconsoled_prod == 0 || (xenconsoled_prod < BOOTLOADER_BUF_SIZE && xenconsoled_cons == 0)) {
+        if (xenconsoled_prod < XENCONSOLED_BUF_SIZE) {
+            /* The buffer is not full, try to read more data */
             FD_SET(xenconsoled_fd, &rsel);
             nfds = xenconsoled_fd + 1 > nfds ? xenconsoled_fd + 1 : nfds;
-        }
-        if (bootloader_prod == 0 || (bootloader_prod < BOOTLOADER_BUF_SIZE && bootloader_cons == 0)) {
+        } 
+        if (bootloader_prod < BOOTLOADER_BUF_SIZE) {
+            /* The buffer is not full, try to read more data */
             FD_SET(bootloader_fd, &rsel);
             nfds = bootloader_fd + 1 > nfds ? bootloader_fd + 1 : nfds;
         }
 
         FD_ZERO(&wsel);
-        if (bootloader_prod != bootloader_cons) {
+        if (bootloader_prod > 0) {
+            /* The buffer has data to consume */
             FD_SET(xenconsoled_fd, &wsel);
             nfds = xenconsoled_fd + 1 > nfds ? xenconsoled_fd + 1 : nfds;
         }
-        if (xenconsoled_prod != xenconsoled_cons) {
+        if (xenconsoled_prod > 0) {
+            /* The buffer has data to consume */
             FD_SET(bootloader_fd, &wsel);
             nfds = bootloader_fd + 1 > nfds ? bootloader_fd + 1 : nfds;
         }
 
-        ret = select(nfds, &rsel, &wsel, NULL, NULL);
-        if (ret < 0)
+        if (xenconsoled_prod == XENCONSOLED_BUF_SIZE ||
+            bootloader_prod == BOOTLOADER_BUF_SIZE)
+            ret = select(nfds, &rsel, &wsel, NULL, &wait);
+        else
+            ret = select(nfds, &rsel, &wsel, NULL, NULL);
+        if (ret < 0) {
+            if (errno == EINTR)
+                continue;
             goto out_err;
+        }
 
         /* Input from xenconsole, read xenconsoled_fd, write bootloader_fd */
-        if (FD_ISSET(xenconsoled_fd, &rsel)) {
+        if (ret == 0 && xenconsoled_prod == XENCONSOLED_BUF_SIZE) {
+            /* Drop the buffer */
+            xenconsoled_prod = 0;
+            xenconsoled_cons = 0;
+        } else if (FD_ISSET(xenconsoled_fd, &rsel)) {
             ret = read(xenconsoled_fd, &xenconsoled_buf[xenconsoled_prod], XENCONSOLED_BUF_SIZE - xenconsoled_prod);
             if (ret < 0 && errno != EIO && errno != EAGAIN)
                 goto out_err;
@@ -229,7 +259,11 @@ static char * bootloader_interact(libxl__gc *gc, int xenconsoled_fd, int bootloa
         }
 
         /* Input from bootloader, read bootloader_fd, write xenconsoled_fd */
-        if (FD_ISSET(bootloader_fd, &rsel)) {
+        if (ret == 0 && bootloader_prod == BOOTLOADER_BUF_SIZE) {
+            /* Drop the buffer */
+            bootloader_prod = 0;
+            bootloader_cons = 0;
+        } else if (FD_ISSET(bootloader_fd, &rsel)) {
             ret = read(bootloader_fd, &bootloader_buf[bootloader_prod], BOOTLOADER_BUF_SIZE - bootloader_prod);
             if (ret < 0 && errno != EIO && errno != EAGAIN)
                 goto out_err;
