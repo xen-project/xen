@@ -92,6 +92,7 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
         {"proccount",    0x00000001, NA, CPUID_REG_EBX, 16,  8},
         {"clflush",      0x00000001, NA, CPUID_REG_EBX,  8,  8},
         {"brandid",      0x00000001, NA, CPUID_REG_EBX,  0,  8},
+        {"hypervisor",   0x00000001, NA, CPUID_REG_ECX, 31,  1},
         {"f16c",         0x00000001, NA, CPUID_REG_ECX, 29,  1},
         {"avx",          0x00000001, NA, CPUID_REG_ECX, 28,  1},
         {"osxsave",      0x00000001, NA, CPUID_REG_ECX, 27,  1},
@@ -178,6 +179,13 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
         {"procpkg",      0x00000004,  0, CPUID_REG_EAX, 26,  6},
         {"apicidsize",   0x80000008, NA, CPUID_REG_ECX, 12,  4},
         {"nc",           0x80000008, NA, CPUID_REG_ECX,  0,  8},
+        {"svm_npt",      0x8000000a, NA, CPUID_REG_EDX,  0,  1},
+        {"svm_lbrv",     0x8000000a, NA, CPUID_REG_EDX,  1,  1},
+        {"svm_nrips",    0x8000000a, NA, CPUID_REG_EDX,  3,  1},
+        {"svm_tscrate",  0x8000000a, NA, CPUID_REG_EDX,  4,  1},
+        {"svm_vmcbclean",0x8000000a, NA, CPUID_REG_EDX,  5,  1},
+        {"svm_decode",   0x8000000a, NA, CPUID_REG_EDX,  7,  1},
+        {"svm_pausefilt",0x8000000a, NA, CPUID_REG_EDX, 10,  1},
 
         {NULL, 0, CPUID_REG_INV, 0, 0}
     };
