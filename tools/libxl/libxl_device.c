@@ -367,6 +367,10 @@ int libxl__device_disk_dev_number(const char *virtpath, int *pdisk,
     return -1;
 }
 
+/*
+ * Returns 0 if a device is removed, ERROR_* if an error
+ * or timeout occurred.
+ */
 static int wait_for_dev_destroy(libxl__gc *gc, struct timeval *tv)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
@@ -375,22 +379,41 @@ static int wait_for_dev_destroy(libxl__gc *gc, struct timeval *tv)
     fd_set rfds;
     char **l1 = NULL;
 
+start:
     rc = 1;
     nfds = xs_fileno(ctx->xsh) + 1;
     FD_ZERO(&rfds);
     FD_SET(xs_fileno(ctx->xsh), &rfds);
-    if (select(nfds, &rfds, NULL, NULL, tv) > 0) {
-        l1 = xs_read_watch(ctx->xsh, &n);
-        if (l1 != NULL) {
-            char *state = libxl__xs_read(gc, XBT_NULL, l1[XS_WATCH_PATH]);
-            if (!state || atoi(state) == 6) {
-                xs_unwatch(ctx->xsh, l1[0], l1[1]);
-                xs_rm(ctx->xsh, XBT_NULL, l1[XS_WATCH_TOKEN]);
-                LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Destroyed device backend at %s", l1[XS_WATCH_TOKEN]);
-                rc = 0;
+    switch (select(nfds, &rfds, NULL, NULL, tv)) {
+        case -1:
+            if (errno == EINTR)
+                goto start;
+            rc = ERROR_FAIL;
+            break;
+        case 0:
+            rc = ERROR_TIMEDOUT;
+            break;
+        default:
+            l1 = xs_read_watch(ctx->xsh, &n);
+            if (l1 != NULL) {
+                char *state = libxl__xs_read(gc, XBT_NULL,
+                                             l1[XS_WATCH_PATH]);
+                if (!state || atoi(state) == 6) {
+                    xs_unwatch(ctx->xsh, l1[0], l1[1]);
+                    xs_rm(ctx->xsh, XBT_NULL, l1[XS_WATCH_TOKEN]);
+                    LIBXL__LOG(ctx, LIBXL__LOG_DEBUG,
+                               "Destroyed device backend at %s",
+                               l1[XS_WATCH_TOKEN]);
+                    rc = 0;
+                } else {
+                    /* State is not "disconnected", continue waiting... */
+                    goto start;
+                }
+                free(l1);
+            } else {
+                rc = ERROR_FAIL;
             }
-            free(l1);
-        }
+            break;
     }
     return rc;
 }
@@ -436,7 +459,9 @@ retry_transaction:
         struct timeval tv;
         tv.tv_sec = LIBXL_DESTROY_TIMEOUT;
         tv.tv_usec = 0;
-        (void)wait_for_dev_destroy(gc, &tv);
+        rc = wait_for_dev_destroy(gc, &tv);
+        if (rc < 0) /* an error or timeout occurred, clear watches */
+            xs_unwatch(ctx->xsh, state_path, be_path);
         xs_rm(ctx->xsh, XBT_NULL, libxl__device_frontend_path(gc, dev));
     } else {
         rc = 1; /* Caller must wait_for_dev_destroy */
@@ -542,7 +567,8 @@ int libxl__devices_destroy(libxl__gc *gc, uint32_t domid, int force)
         tv.tv_sec = LIBXL_DESTROY_TIMEOUT;
         tv.tv_usec = 0;
         while (n_watches > 0) {
-            if (wait_for_dev_destroy(gc, &tv)) {
+            if (wait_for_dev_destroy(gc, &tv) < 0) {
+                /* function returned ERROR_* */
                 break;
             } else {
                 n_watches--;
