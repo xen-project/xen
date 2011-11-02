@@ -201,9 +201,9 @@ endif
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 25378e0a76b282127e9ab8933a4defbc91db3862
-# Thu Oct 6 18:38:08 2011 +0100
-# remove blktap when building for NetBSD
+QEMU_TAG ?= 52834188eedfbbca5636fd869d4c86b3b3044439
+# Tue Nov 1 18:42:55 2011 +0000
+# qemu-xen: remove i386-dm/README.hvm-pv-magic-ioport-disable
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
