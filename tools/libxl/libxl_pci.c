@@ -1098,7 +1098,7 @@ int libxl__device_pci_destroy_all(libxl__gc *gc, uint32_t domid)
 
     pcidevs = libxl_device_pci_list(ctx, domid, &num);
     if ( pcidevs == NULL )
-        return ERROR_FAIL;
+        return 0;
 
     for (i = 0; i < num; i++) {
         /* Force remove on shutdown since, on HVM, qemu will not always
