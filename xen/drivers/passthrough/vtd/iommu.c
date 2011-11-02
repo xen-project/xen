@@ -1900,6 +1900,19 @@ static int intel_iommu_add_device(struct pci_dev *pdev)
     return ret;
 }
 
+static int intel_iommu_enable_device(struct pci_dev *pdev)
+{
+    struct acpi_drhd_unit *drhd = acpi_find_matched_drhd_unit(pdev);
+    int ret = drhd ? ats_device(pdev, drhd) : -ENODEV;
+
+    if ( ret <= 0 )
+        return ret;
+
+    ret = enable_ats_device(pdev->seg, pdev->bus, pdev->devfn);
+
+    return ret >= 0 ? 0 : ret;
+}
+
 static int intel_iommu_remove_device(struct pci_dev *pdev)
 {
     struct acpi_rmrr_unit *rmrr;
@@ -1930,7 +1943,6 @@ static int intel_iommu_remove_device(struct pci_dev *pdev)
 static void __init setup_dom0_device(struct pci_dev *pdev)
 {
     domain_context_mapping(pdev->domain, pdev->seg, pdev->bus, pdev->devfn);
-    pci_enable_acs(pdev);
     pci_vtd_quirk(pdev);
 }
 
@@ -2301,6 +2313,7 @@ const struct iommu_ops intel_iommu_ops = {
     .init = intel_iommu_domain_init,
     .dom0_init = intel_iommu_dom0_init,
     .add_device = intel_iommu_add_device,
+    .enable_device = intel_iommu_enable_device,
     .remove_device = intel_iommu_remove_device,
     .assign_device  = intel_iommu_assign_device,
     .teardown = iommu_domain_teardown,

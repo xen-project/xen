@@ -70,6 +70,7 @@ int iommu_enable_x2apic_IR(void);
 void iommu_disable_x2apic_IR(void);
 
 int iommu_add_device(struct pci_dev *pdev);
+int iommu_enable_device(struct pci_dev *pdev);
 int iommu_remove_device(struct pci_dev *pdev);
 int iommu_domain_init(struct domain *d);
 void iommu_dom0_init(struct domain *d);
@@ -120,6 +121,7 @@ struct iommu_ops {
     int (*init)(struct domain *d);
     void (*dom0_init)(struct domain *d);
     int (*add_device)(struct pci_dev *pdev);
+    int (*enable_device)(struct pci_dev *pdev);
     int (*remove_device)(struct pci_dev *pdev);
     int (*assign_device)(struct domain *d, u16 seg, u8 bus, u8 devfn);
     void (*teardown)(struct domain *d);

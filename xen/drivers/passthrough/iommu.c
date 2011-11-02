@@ -150,6 +150,23 @@ int iommu_add_device(struct pci_dev *pdev)
     return hd->platform_ops->add_device(pdev);
 }
 
+int iommu_enable_device(struct pci_dev *pdev)
+{
+    struct hvm_iommu *hd;
+
+    if ( !pdev->domain )
+        return -EINVAL;
+
+    ASSERT(spin_is_locked(&pcidevs_lock));
+
+    hd = domain_hvm_iommu(pdev->domain);
+    if ( !iommu_enabled || !hd->platform_ops ||
+         !hd->platform_ops->enable_device )
+        return 0;
+
+    return hd->platform_ops->enable_device(pdev);
+}
+
 int iommu_remove_device(struct pci_dev *pdev)
 {
     struct hvm_iommu *hd;

@@ -258,7 +258,7 @@ struct pci_dev *pci_get_pdev_by_domain(
  * pci_enable_acs - enable ACS if hardware support it
  * @dev: the PCI device
  */
-void pci_enable_acs(struct pci_dev *pdev)
+static void pci_enable_acs(struct pci_dev *pdev)
 {
     int pos;
     u16 cap, ctrl, seg = pdev->seg;
@@ -409,8 +409,11 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn, const struct pci_dev_info *info)
         }
 
         list_add(&pdev->domain_list, &dom0->arch.pdev_list);
-        pci_enable_acs(pdev);
     }
+    else
+        iommu_enable_device(pdev);
+
+    pci_enable_acs(pdev);
 
 out:
     spin_unlock(&pcidevs_lock);
