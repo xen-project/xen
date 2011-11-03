@@ -125,13 +125,13 @@ void msi_compose_msg(struct irq_desc *desc, struct msi_msg *msg)
     unsigned dest;
     int vector = desc->arch.vector;
 
-    if ( cpumask_empty(&desc->arch.cpu_mask) ) {
+    if ( cpumask_empty(desc->arch.cpu_mask) ) {
         dprintk(XENLOG_ERR,"%s, compose msi message error!!\n", __func__);
         return;
     }
 
     if ( vector ) {
-        dest = cpu_mask_to_apicid(&desc->arch.cpu_mask);
+        dest = cpu_mask_to_apicid(desc->arch.cpu_mask);
 
         msg->address_hi = MSI_ADDR_BASE_HI;
         msg->address_lo =

@@ -1011,7 +1011,7 @@ void __init smp_intr_init(void)
         irq_vector[irq] = FIRST_HIPRIORITY_VECTOR + seridx + 1;
         per_cpu(vector_irq, cpu)[FIRST_HIPRIORITY_VECTOR + seridx + 1] = irq;
         irq_to_desc(irq)->arch.vector = FIRST_HIPRIORITY_VECTOR + seridx + 1;
-        cpumask_copy(&irq_to_desc(irq)->arch.cpu_mask, &cpu_online_map);
+        cpumask_copy(irq_to_desc(irq)->arch.cpu_mask, &cpu_online_map);
     }
 
     /* IPI for cleanuping vectors after irq move */

@@ -74,17 +74,30 @@ unsigned int __ia64_local_vector_to_irq (ia64_vector vec)
 /*
  * Controller mappings for all interrupt sources:
  */
-irq_desc_t irq_desc[NR_IRQS] = {
-	[0 ... NR_IRQS-1] = {
-		.status = IRQ_DISABLED,
-		.handler = &no_irq_type,
-		.lock = SPIN_LOCK_UNLOCKED
-		.arch = {
-		        .vector = -1,
-		        .cpu_mask = CPU_MASK_ALL,
-		}
+irq_desc_t irq_desc[NR_IRQS];
+
+int __init arch_init_one_irq_desc(struct irq_desc *desc)
+{
+	if (!alloc_cpumask_var(&desc->arch.cpu_mask))
+		return -ENOMEM;
+
+	desc->arch.vector = -1;
+	cpumask_setall(desc->arch.cpu_mask);
+
+	return 0;
+}
+
+int __init init_irq_data(void)
+{
+	unsigned int irq;
+
+	for (irq = 0; irq < NR_IRQS; irq++) {
+		struct irq_desc *desc = irq_to_desc(irq);
+
+		desc->irq = irq;
+		init_one_irq_desc(desc);
 	}
-};
+}
 
 void __do_IRQ_guest(int irq);
 

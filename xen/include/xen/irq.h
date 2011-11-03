@@ -76,14 +76,18 @@ typedef struct irq_desc {
     int irq;
     spinlock_t lock;
     struct arch_irq_desc arch;
-    cpumask_t affinity;
-    cpumask_t pending_mask;  /* IRQ migration pending mask */
+    cpumask_var_t affinity;
 
     /* irq ratelimit */
     s_time_t rl_quantum_start;
     unsigned int rl_cnt;
     struct list_head rl_link;
 } __cacheline_aligned irq_desc_t;
+
+int init_one_irq_desc(struct irq_desc *);
+int arch_init_one_irq_desc(struct irq_desc *);
+
+#define irq_desc_initialized(desc) ((desc)->handler != NULL)
 
 #if defined(__ia64__)
 extern irq_desc_t irq_desc[NR_VECTORS];
@@ -153,7 +157,7 @@ extern irq_desc_t *pirq_spin_lock_irq_desc(
 
 static inline void set_native_irq_info(unsigned int irq, const cpumask_t *mask)
 {
-    cpumask_copy(&irq_desc[irq].affinity, mask);
+    cpumask_copy(irq_to_desc(irq)->affinity, mask);
 }
 
 unsigned int set_desc_affinity(struct irq_desc *, const cpumask_t *);

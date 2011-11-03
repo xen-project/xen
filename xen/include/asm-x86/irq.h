@@ -33,8 +33,9 @@ struct irq_cfg {
 #define arch_irq_desc irq_cfg
         s16 vector;                  /* vector itself is only 8 bits, */
         s16 old_vector;              /* but we use -1 for unassigned  */
-        cpumask_t cpu_mask;
-        cpumask_t old_cpu_mask;
+        cpumask_var_t cpu_mask;
+        cpumask_var_t old_cpu_mask;
+        cpumask_var_t pending_mask;
         unsigned move_cleanup_count;
         vmask_t *used_vectors;
         u8 move_in_progress : 1;
@@ -173,8 +174,6 @@ void __setup_vector_irq(int cpu);
 
 void move_native_irq(struct irq_desc *);
 void move_masked_irq(struct irq_desc *);
-
-int __assign_irq_vector(int irq, struct irq_cfg *, const cpumask_t *);
 
 int bind_irq_vector(int irq, int vector, const cpumask_t *);
 

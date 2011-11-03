@@ -398,7 +398,7 @@ void __init init_IRQ(void)
         
         desc->handler = &i8259A_irq_type;
         per_cpu(vector_irq, cpu)[FIRST_LEGACY_VECTOR + irq] = irq;
-        cpumask_copy(&desc->arch.cpu_mask, cpumask_of(cpu));
+        cpumask_copy(desc->arch.cpu_mask, cpumask_of(cpu));
         desc->arch.vector = FIRST_LEGACY_VECTOR + irq;
     }
     

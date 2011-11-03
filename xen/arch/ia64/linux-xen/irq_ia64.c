@@ -303,6 +303,9 @@ int __init request_irq_vector(unsigned int vector,
 void __init
 init_IRQ (void)
 {
+#ifdef XEN
+	BUG_ON(init_irq_data());
+#endif
 	register_percpu_irq(IA64_SPURIOUS_INT_VECTOR, NULL);
 #ifdef CONFIG_SMP
 	register_percpu_irq(IA64_IPI_VECTOR, &ipi_irqaction);

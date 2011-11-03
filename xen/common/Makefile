@@ -5,6 +5,7 @@ obj-y += domctl.o
 obj-y += domain.o
 obj-y += event_channel.o
 obj-y += grant_table.o
+obj-y += irq.o
 obj-y += kernel.o
 obj-y += keyhandler.o
 obj-y += kexec.o

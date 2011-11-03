@@ -18,8 +18,10 @@
 struct irq_cfg {
 #define arch_irq_desc irq_cfg
         int  vector;
-        cpumask_t cpu_mask;
+        cpumask_var_t cpu_mask;
 };
+
+int init_irq_data(void);
 #endif
 
 static __inline__ int

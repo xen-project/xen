@@ -648,20 +648,21 @@ static int pin_2_irq(int idx, int apic, int pin);
 void /*__init*/ setup_ioapic_dest(void)
 {
     int pin, ioapic, irq, irq_entry;
-    struct irq_cfg *cfg;
 
     if (skip_ioapic_setup)
         return;
 
     for (ioapic = 0; ioapic < nr_ioapics; ioapic++) {
         for (pin = 0; pin < nr_ioapic_entries[ioapic]; pin++) {
+            struct irq_desc *desc;
+
             irq_entry = find_irq_entry(ioapic, pin, mp_INT);
             if (irq_entry == -1)
                 continue;
             irq = pin_2_irq(irq_entry, ioapic, pin);
-            cfg = irq_cfg(irq);
-            BUG_ON(cpus_empty(cfg->cpu_mask));
-            set_ioapic_affinity_irq(irq_to_desc(irq), &cfg->cpu_mask);
+            desc = irq_to_desc(irq);
+            BUG_ON(cpumask_empty(desc->arch.cpu_mask));
+            set_ioapic_affinity_irq(desc, desc->arch.cpu_mask);
         }
 
     }
@@ -956,12 +957,12 @@ static void __init setup_IO_APIC_irqs(void)
     struct IO_APIC_route_entry entry;
     int apic, pin, idx, irq, first_notcon = 1, vector;
     unsigned long flags;
-    struct irq_cfg *cfg;
 
     apic_printk(APIC_VERBOSE, KERN_DEBUG "init IO_APIC IRQs\n");
 
     for (apic = 0; apic < nr_ioapics; apic++) {
         for (pin = 0; pin < nr_ioapic_entries[apic]; pin++) {
+            struct irq_desc *desc;
 
             /*
              * add it to the IO-APIC irq-routing table:
@@ -1016,9 +1017,9 @@ static void __init setup_IO_APIC_irqs(void)
                 if (!apic && platform_legacy_irq(irq))
                     disable_8259A_irq(irq_to_desc(irq));
             }
-            cfg = irq_cfg(irq);
+            desc = irq_to_desc(irq);
             SET_DEST(entry.dest.dest32, entry.dest.logical.logical_dest,
-                     cpu_mask_to_apicid(&cfg->cpu_mask));
+                     cpu_mask_to_apicid(desc->arch.cpu_mask));
             spin_lock_irqsave(&ioapic_lock, flags);
             __ioapic_write_entry(apic, pin, 0, entry);
             set_native_irq_info(irq, TARGET_CPUS);
@@ -2372,7 +2373,7 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
     rte.vector = cfg->vector;
 
     SET_DEST(rte.dest.dest32, rte.dest.logical.logical_dest,
-             cpu_mask_to_apicid(&cfg->cpu_mask));
+             cpu_mask_to_apicid(desc->arch.cpu_mask));
 
     io_apic_write(apic, 0x10 + 2 * pin, *(((int *)&rte) + 0));
     io_apic_write(apic, 0x11 + 2 * pin, *(((int *)&rte) + 1));

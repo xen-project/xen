@@ -1965,17 +1965,18 @@ static int init_vtd_hw(void)
     struct iommu_flush *flush = NULL;
     int ret;
     unsigned long flags;
-    struct irq_cfg *cfg;
 
     /*
      * Basic VT-d HW init: set VT-d interrupt, clear VT-d faults.  
      */
     for_each_drhd_unit ( drhd )
     {
+        struct irq_desc *desc;
+
         iommu = drhd->iommu;
 
-        cfg = irq_cfg(iommu->irq);
-        dma_msi_set_affinity(irq_to_desc(iommu->irq), &cfg->cpu_mask);
+        desc = irq_to_desc(iommu->irq);
+        dma_msi_set_affinity(desc, desc->arch.cpu_mask);
 
         clear_fault_bits(iommu);
 
