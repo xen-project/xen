@@ -429,7 +429,6 @@ static int __assign_irq_vector(
     static int current_vector = FIRST_DYNAMIC_VECTOR, current_offset = 0;
     unsigned int old_vector;
     int cpu, err;
-    unsigned long flags;
     cpumask_t tmp_mask;
     vmask_t *irq_used_vectors = NULL;
 
@@ -493,7 +492,6 @@ next:
         /* Found one! */
         current_vector = vector;
         current_offset = offset;
-        local_irq_save(flags);
         if (old_vector) {
             desc->arch.move_in_progress = 1;
             cpumask_copy(desc->arch.old_cpu_mask, desc->arch.cpu_mask);
@@ -521,7 +519,6 @@ next:
         }
 
         err = 0;
-        local_irq_restore(flags);
         break;
     }
     return err;
@@ -720,11 +717,9 @@ unsigned int set_desc_affinity(struct irq_desc *desc, const cpumask_t *mask)
 
     irq = desc->irq;
 
-    local_irq_save(flags);
-    lock_vector_lock();
+    spin_lock_irqsave(&vector_lock, flags);
     ret = __assign_irq_vector(irq, desc, mask);
-    unlock_vector_lock();
-    local_irq_restore(flags);
+    spin_unlock_irqrestore(&vector_lock, flags);
 
     if (ret < 0)
         return BAD_APICID;
