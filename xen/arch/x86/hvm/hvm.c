@@ -2409,6 +2409,10 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         if ( xsave_enabled(v) )
             *ecx |= (v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_OSXSAVE) ?
                      cpufeat_mask(X86_FEATURE_OSXSAVE) : 0;
+
+        /* Only provide PSE36 when guest runs in 32bit PAE or in long mode */
+        if ( !(hvm_pae_enabled(v) || hvm_long_mode_enabled(v)) )
+            *edx &= ~cpufeat_mask(X86_FEATURE_PSE36);
         break;
     case 0x7:
         if ( (count == 0) && !cpu_has_smep )
@@ -2447,6 +2451,9 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         /* Hide 1GB-superpage feature if we can't emulate it. */
         if (!hvm_pse1gb_supported(d))
             *edx &= ~cpufeat_mask(X86_FEATURE_PAGE1GB);
+        /* Only provide PSE36 when guest runs in 32bit PAE or in long mode */
+        if ( !(hvm_pae_enabled(v) || hvm_long_mode_enabled(v)) )
+            *edx &= ~cpufeat_mask(X86_FEATURE_PSE36);
         break;
     }
 }

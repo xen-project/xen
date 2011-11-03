@@ -98,7 +98,6 @@ static void amd_xc_cpuid_policy(
 
         if ( !is_pae )
             clear_bit(X86_FEATURE_PAE, regs[3]);
-        clear_bit(X86_FEATURE_PSE36, regs[3]);
 
         /* Filter all other features according to a whitelist. */
         regs[2] &= ((is_64bit ? bitmaskof(X86_FEATURE_LAHF_LM) : 0) |
@@ -340,6 +339,7 @@ static void xc_cpuid_hvm_policy(
                     bitmaskof(X86_FEATURE_CMOV) |
                     bitmaskof(X86_FEATURE_PAT) |
                     bitmaskof(X86_FEATURE_CLFLSH) |
+                    bitmaskof(X86_FEATURE_PSE36) |
                     bitmaskof(X86_FEATURE_MMX) |
                     bitmaskof(X86_FEATURE_FXSR) |
                     bitmaskof(X86_FEATURE_XMM) |
@@ -349,8 +349,10 @@ static void xc_cpuid_hvm_policy(
         /* We always support MTRR MSRs. */
         regs[3] |= bitmaskof(X86_FEATURE_MTRR);
 
-        if ( !is_pae )
+        if ( !is_pae ) {
             clear_bit(X86_FEATURE_PAE, regs[3]);
+            clear_bit(X86_FEATURE_PSE36, regs[3]);
+        }
         break;
 
     case 0x00000007: /* Intel-defined CPU features */
@@ -372,8 +374,10 @@ static void xc_cpuid_hvm_policy(
         break;
 
     case 0x80000001:
-        if ( !is_pae )
+        if ( !is_pae ) {
             clear_bit(X86_FEATURE_NX, regs[3]);
+            clear_bit(X86_FEATURE_PSE36, regs[3]);
+        }
         break;
 
     case 0x80000007:
