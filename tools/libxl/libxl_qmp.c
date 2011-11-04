@@ -213,7 +213,9 @@ static void qmp_handle_error_response(libxl__qmp_handler *qmp,
     resp = libxl__json_map_get("desc", resp, JSON_STRING);
 
     if (pp) {
-        pp->callback(qmp, NULL, pp->opaque);
+        if (pp->callback) {
+            pp->callback(qmp, NULL, pp->opaque);
+        }
         if (pp->id == qmp->wait_for_id) {
             /* tell that the id have been processed */
             qmp->wait_for_id = 0;
@@ -245,9 +247,11 @@ static int qmp_handle_response(libxl__qmp_handler *qmp,
         callback_id_pair *pp = qmp_get_callback_from_id(qmp, resp);
 
         if (pp) {
-            pp->callback(qmp,
-                         libxl__json_map_get("return", resp, JSON_ANY),
-                         pp->opaque);
+            if (pp->callback) {
+                pp->callback(qmp,
+                             libxl__json_map_get("return", resp, JSON_ANY),
+                             pp->opaque);
+            }
             if (pp->id == qmp->wait_for_id) {
                 /* tell that the id have been processed */
                 qmp->wait_for_id = 0;
@@ -438,6 +442,7 @@ static int qmp_send(libxl__qmp_handler *qmp,
     unsigned int len = 0;
     yajl_gen_status s;
     yajl_gen hand;
+    callback_id_pair *elm = NULL;
 
     hand = yajl_gen_alloc(&conf, NULL);
     if (!hand) {
@@ -463,19 +468,16 @@ static int qmp_send(libxl__qmp_handler *qmp,
         return -1;
     }
 
-    if (callback) {
-        callback_id_pair *elm = malloc(sizeof (callback_id_pair));
-        if (elm == NULL) {
-            LIBXL__LOG_ERRNO(qmp->ctx, LIBXL__LOG_ERROR,
-                             "Failed to allocate a QMP callback");
-            yajl_gen_free(hand);
-            return -1;
-        }
-        elm->id = qmp->last_id_used;
-        elm->callback = callback;
-        elm->opaque = opaque;
-        SIMPLEQ_INSERT_TAIL(&qmp->callback_list, elm, next);
+    elm = malloc(sizeof (callback_id_pair));
+    if (elm == NULL) {
+        LIBXL__LOG_ERRNO(qmp->ctx, LIBXL__LOG_ERROR,
+                         "Failed to allocate a QMP callback");
+        goto error;
     }
+    elm->id = qmp->last_id_used;
+    elm->callback = callback;
+    elm->opaque = opaque;
+    SIMPLEQ_INSERT_TAIL(&qmp->callback_list, elm, next);
 
     LIBXL__LOG(qmp->ctx, LIBXL__LOG_DEBUG, "next qmp command: '%s'", buf);
 
