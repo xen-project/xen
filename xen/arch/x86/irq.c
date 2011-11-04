@@ -151,16 +151,6 @@ int __init bind_irq_vector(int irq, int vector, const cpumask_t *cpu_mask)
     return ret;
 }
 
-static inline int find_unassigned_irq(void)
-{
-    int irq;
-
-    for (irq = nr_irqs_gsi; irq < nr_irqs; irq++)
-        if (irq_to_desc(irq)->arch.used == IRQ_UNUSED)
-            return irq;
-    return -ENOSPC;
-}
-
 /*
  * Dynamic irq allocate and deallocation for MSI
  */
@@ -170,19 +160,28 @@ int create_irq(void)
     int irq, ret;
     struct irq_desc *desc;
 
-    spin_lock_irqsave(&vector_lock, flags);
+    for (irq = nr_irqs_gsi; irq < nr_irqs; irq++)
+    {
+        desc = irq_to_desc(irq);
+        if (cmpxchg(&desc->arch.used, IRQ_UNUSED, IRQ_RESERVED) == IRQ_UNUSED)
+           break;
+    }
 
-    irq = find_unassigned_irq();
-    if (irq < 0)
-         goto out;
-    desc = irq_to_desc(irq);
+    if (irq >= nr_irqs)
+         return -ENOSPC;
+
     ret = init_one_irq_desc(desc);
     if (!ret)
+    {
+        spin_lock_irqsave(&vector_lock, flags);
         ret = __assign_irq_vector(irq, desc, TARGET_CPUS);
+        spin_unlock_irqrestore(&vector_lock, flags);
+    }
     if (ret < 0)
+    {
+        desc->arch.used = IRQ_UNUSED;
         irq = ret;
-out:
-     spin_unlock_irqrestore(&vector_lock, flags);
+    }
 
     return irq;
 }
