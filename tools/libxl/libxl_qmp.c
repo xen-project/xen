@@ -72,7 +72,7 @@ struct libxl__qmp_handler {
 };
 
 static int qmp_send(libxl__qmp_handler *qmp,
-                    const char *cmd,
+                    const char *cmd, libxl_key_value_list *args,
                     qmp_callback_t callback, void *opaque);
 
 static const int QMP_SOCKET_CONNECT_TIMEOUT = 5;
@@ -161,7 +161,8 @@ static int qmp_capabilities_callback(libxl__qmp_handler *qmp,
 
 static int enable_qmp_capabilities(libxl__qmp_handler *qmp)
 {
-    return qmp_send(qmp, "qmp_capabilities", qmp_capabilities_callback, NULL);
+    return qmp_send(qmp, "qmp_capabilities", NULL,
+                    qmp_capabilities_callback, NULL);
 }
 
 /*
@@ -429,7 +430,7 @@ static int qmp_next(libxl__gc *gc, libxl__qmp_handler *qmp)
 }
 
 static int qmp_send(libxl__qmp_handler *qmp,
-                    const char *cmd,
+                    const char *cmd, libxl_key_value_list *args,
                     qmp_callback_t callback, void *opaque)
 {
     yajl_gen_config conf = { 0, NULL };
@@ -448,6 +449,10 @@ static int qmp_send(libxl__qmp_handler *qmp,
     libxl__yajl_gen_asciiz(hand, cmd);
     libxl__yajl_gen_asciiz(hand, "id");
     yajl_gen_integer(hand, ++qmp->last_id_used);
+    if (args) {
+        libxl__yajl_gen_asciiz(hand, "arguments");
+        libxl_key_value_list_gen_json(hand, args);
+    }
     yajl_gen_map_close(hand);
 
     s = yajl_gen_get_buf(hand, &buf, &len);
@@ -491,6 +496,7 @@ error:
 }
 
 static int qmp_synchronous_send(libxl__qmp_handler *qmp, const char *cmd,
+                                libxl_key_value_list *args,
                                 qmp_callback_t callback, void *opaque,
                                 int ask_timeout)
 {
@@ -498,7 +504,7 @@ static int qmp_synchronous_send(libxl__qmp_handler *qmp, const char *cmd,
     int ret = 0;
     libxl__gc gc = LIBXL_INIT_GC(qmp->ctx);
 
-    id = qmp_send(qmp, cmd, callback, opaque);
+    id = qmp_send(qmp, cmd, args, callback, opaque);
     if (id <= 0) {
         return -1;
     }
@@ -586,7 +592,7 @@ void libxl__qmp_cleanup(libxl__gc *gc, uint32_t domid)
 
 int libxl__qmp_query_serial(libxl__qmp_handler *qmp)
 {
-    return qmp_synchronous_send(qmp, "query-chardev",
+    return qmp_synchronous_send(qmp, "query-chardev", NULL,
                                 register_serials_chardev_callback,
                                 NULL, qmp->timeout);
 }
