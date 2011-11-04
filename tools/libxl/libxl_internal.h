@@ -183,6 +183,8 @@ _hidden char **libxl__xs_directory(libxl__gc *gc, xs_transaction_t t,
                                    char *path, unsigned int *nb);
    /* On error: returns NULL, sets errno (no logging) */
 
+_hidden char *libxl__xs_libxl_path(libxl__gc *gc, uint32_t domid);
+
 /* from xl_dom */
 _hidden libxl_domain_type libxl__domain_type(libxl__gc *gc, uint32_t domid);
 _hidden int libxl__domain_shutdown_reason(libxl__gc *gc, uint32_t domid);
@@ -629,6 +631,11 @@ _hidden const libxl__json_object *libxl__json_map_get(const char *key,
 _hidden void libxl__json_object_free(libxl__gc *gc, libxl__json_object *obj);
 
 _hidden libxl__json_object *libxl__json_parse(libxl__gc *gc, const char *s);
+
+  /* Based on /local/domain/$domid/dm-version xenstore key
+   * default is qemu xen traditional */
+_hidden libxl_device_model_version
+libxl__device_model_version_running(libxl__gc *gc, uint32_t domid);
 
 #endif
 

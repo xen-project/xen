@@ -316,11 +316,13 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_create_info *info,
     char *rw_paths[] = { "control/shutdown", "device", "device/suspend/event-channel" , "data"};
     char *ro_paths[] = { "cpu", "memory", "device", "error", "drivers",
                          "control", "attr", "messages" };
-    char *dom_path, *vm_path;
+    char *dom_path, *vm_path, *libxl_path;
     struct xs_permissions roperm[2];
     struct xs_permissions rwperm[1];
+    struct xs_permissions noperm[1];
     xs_transaction_t t = 0;
     xen_domain_handle_t handle;
+
 
     assert(!libxl_domid_valid_guest(*domid));
 
@@ -368,6 +370,14 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_create_info *info,
         goto out;
     }
 
+    libxl_path = libxl__xs_libxl_path(gc, *domid);
+    if (!libxl_path) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
+    noperm[0].id = 0;
+    noperm[0].perms = XS_PERM_NONE;
+
     roperm[0].id = 0;
     roperm[0].perms = XS_PERM_NONE;
     roperm[1].id = *domid;
@@ -385,6 +395,10 @@ retry_transaction:
     xs_rm(ctx->xsh, t, vm_path);
     xs_mkdir(ctx->xsh, t, vm_path);
     xs_set_permissions(ctx->xsh, t, vm_path, roperm, ARRAY_SIZE(roperm));
+
+    xs_rm(ctx->xsh, t, libxl_path);
+    xs_mkdir(ctx->xsh, t, libxl_path);
+    xs_set_permissions(ctx->xsh, t, libxl_path, noperm, ARRAY_SIZE(noperm));
 
     xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/vm", dom_path), vm_path, strlen(vm_path));
     rc = libxl__domain_rename(gc, *domid, 0, info->name, t);
@@ -427,6 +441,17 @@ retry_transaction:
  out:
     if (t) xs_transaction_end(ctx->xsh, t, 1);
     return rc;
+}
+
+static int store_libxl_entry(libxl__gc *gc, uint32_t domid,
+                             libxl_device_model_info *dm_info)
+{
+    char *path = NULL;
+
+    path = libxl__xs_libxl_path(gc, domid);
+    path = libxl__sprintf(gc, "%s/dm-version", path);
+    return libxl__xs_write(gc, XBT_NULL, path, libxl__strdup(gc,
+        libxl_device_model_version_to_string(dm_info->device_model_version)));
 }
 
 static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
@@ -484,6 +509,8 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
         ret = ERROR_FAIL;
         goto error_out;
     }
+
+    store_libxl_entry(gc, domid, dm_info);
 
     for (i = 0; i < d_config->num_disks; i++) {
         ret = libxl_device_disk_add(ctx, domid, &d_config->disks[i]);

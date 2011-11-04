@@ -778,6 +778,8 @@ int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid, int force)
     if (!xs_rm(ctx->xsh, XBT_NULL, dom_path))
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xs_rm failed for %s", dom_path);
 
+    xs_rm(ctx->xsh, XBT_NULL, libxl__xs_libxl_path(&gc, domid));
+
     libxl__userdata_destroyall(&gc, domid);
 
     rc = xc_domain_destroy(ctx->xch, domid);

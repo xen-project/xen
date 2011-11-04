@@ -319,6 +319,29 @@ int libxl__fd_set_cloexec(int fd)
     return fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
 }
 
+libxl_device_model_version libxl__device_model_version_running(libxl__gc *gc,
+                                                               uint32_t domid)
+{
+    char *path = NULL;
+    char *dm_version = NULL;
+    libxl_device_model_version value;
+
+    path = libxl__xs_libxl_path(gc, domid);
+    path = libxl__sprintf(gc, "%s/dm-version", path);
+    dm_version = libxl__xs_read(gc, XBT_NULL, path);
+    if (!dm_version) {
+        return LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
+    }
+
+    if (libxl_device_model_version_from_string(dm_version, &value) < 0) {
+        libxl_ctx *ctx = libxl__gc_owner(gc);
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                   "fatal: %s contain a wrong value (%s)", path, dm_version);
+        return -1;
+    }
+    return value;
+}
+
 /*
  * Local variables:
  * mode: C

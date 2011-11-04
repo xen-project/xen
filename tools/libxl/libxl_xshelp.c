@@ -122,6 +122,15 @@ char **libxl__xs_directory(libxl__gc *gc, xs_transaction_t t, char *path, unsign
     return ret;
 }
 
+char *libxl__xs_libxl_path(libxl__gc *gc, uint32_t domid)
+{
+    libxl_ctx *ctx = libxl__gc_owner(gc);
+    char *s = libxl__sprintf(gc, "/libxl/%i", domid);
+    if (!s)
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "cannot allocate create paths");
+    return s;
+}
+
 /*
  * Local variables:
  * mode: C
