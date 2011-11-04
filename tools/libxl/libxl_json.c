@@ -730,6 +730,8 @@ libxl__json_object *libxl__json_parse(libxl__gc *gc, const char *s)
 {
     yajl_status status;
     libxl__yajl_ctx yajl_ctx;
+    libxl__json_object *o = NULL;
+    unsigned char *str = NULL;
 
     memset(&yajl_ctx, 0, sizeof (yajl_ctx));
     yajl_ctx.gc = gc;
@@ -744,30 +746,31 @@ libxl__json_object *libxl__json_parse(libxl__gc *gc, const char *s)
         yajl_ctx.hand = yajl_alloc(&callbacks, &cfg, NULL, &yajl_ctx);
     }
     status = yajl_parse(yajl_ctx.hand, (const unsigned char *)s, strlen(s));
+    if (status != yajl_status_ok)
+        goto out;
+
     status = yajl_parse_complete(yajl_ctx.hand);
+    if (status != yajl_status_ok)
+        goto out;
 
-    if (status == yajl_status_ok) {
-        libxl__json_object *o = yajl_ctx.head;
+    o = yajl_ctx.head;
 
-        DEBUG_GEN_REPORT(&yajl_ctx);
+    DEBUG_GEN_REPORT(&yajl_ctx);
 
-        yajl_ctx.head = NULL;
+    yajl_ctx.head = NULL;
 
-        yajl_ctx_free(&yajl_ctx);
-        return o;
-    } else {
-        unsigned char *str = yajl_get_error(yajl_ctx.hand, 1,
-                                            (const unsigned char *)s,
-                                            strlen(s));
+    yajl_ctx_free(&yajl_ctx);
+    return o;
 
-        LIBXL__LOG(libxl__gc_owner(gc), LIBXL__LOG_ERROR,
-                   "yajl error: %s", str);
-        yajl_free_error(yajl_ctx.hand, str);
+out:
+    str = yajl_get_error(yajl_ctx.hand, 1, (const unsigned char*)s, strlen(s));
 
-        libxl__json_object_free(gc, yajl_ctx.head);
-        yajl_ctx_free(&yajl_ctx);
-        return NULL;
-    }
+    LIBXL__LOG(libxl__gc_owner(gc), LIBXL__LOG_ERROR, "yajl error: %s", str);
+    yajl_free_error(yajl_ctx.hand, str);
+
+    libxl__json_object_free(gc, yajl_ctx.head);
+    yajl_ctx_free(&yajl_ctx);
+    return NULL;
 }
 
 static const char *yajl_gen_status_to_string(yajl_gen_status s)
