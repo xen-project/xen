@@ -863,13 +863,45 @@ out:
     return rc;
 }
 
+static int qemu_pci_remove_xenstore(libxl__gc *gc, uint32_t domid,
+                                    libxl_device_pci *pcidev, int force)
+{
+    libxl_ctx *ctx = libxl__gc_owner(gc);
+    char *state;
+    char *path;
+
+    path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/state", domid);
+    state = libxl__xs_read(gc, XBT_NULL, path);
+    path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/parameter", domid);
+    libxl__xs_write(gc, XBT_NULL, path, PCI_BDF, pcidev->domain,
+                    pcidev->bus, pcidev->dev, pcidev->func);
+    path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/command", domid);
+
+    /* Remove all functions at once atomically by only signalling
+     * device-model for function 0 */
+    if ( !force && (pcidev->vdevfn & 0x7) == 0 ) {
+        xs_write(ctx->xsh, XBT_NULL, path, "pci-rem", strlen("pci-rem"));
+        if (libxl__wait_for_device_model(gc, domid, "pci-removed",
+                                         NULL, NULL, NULL) < 0) {
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Device Model didn't respond in time");
+            /* This depends on guest operating system acknowledging the
+             * SCI, if it doesn't respond in time then we may wish to
+             * force the removal.
+             */
+            return ERROR_FAIL;
+        }
+    }
+    path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/state", domid);
+    xs_write(ctx->xsh, XBT_NULL, path, state, strlen(state));
+
+    return 0;
+}
+
 static int do_pci_remove(libxl__gc *gc, uint32_t domid,
                          libxl_device_pci *pcidev, int force)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     libxl_device_pci *assigned;
-    char *path;
-    char *state;
     int hvm = 0, rc, num;
     int stubdomid = 0;
 
@@ -892,29 +924,21 @@ static int do_pci_remove(libxl__gc *gc, uint32_t domid,
                                          NULL, NULL, NULL) < 0)
             goto out_fail;
 
-        path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/state", domid);
-        state = libxl__xs_read(gc, XBT_NULL, path);
-        path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/parameter", domid);
-        libxl__xs_write(gc, XBT_NULL, path, PCI_BDF, pcidev->domain,
-                       pcidev->bus, pcidev->dev, pcidev->func);
-        path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/command", domid);
-
-        /* Remove all functions at once atomically by only signalling
-         * device-model for function 0 */
-        if ( !force && (pcidev->vdevfn & 0x7) == 0 ) {
-            xs_write(ctx->xsh, XBT_NULL, path, "pci-rem", strlen("pci-rem"));
-            if (libxl__wait_for_device_model(gc, domid, "pci-removed",
-                                             NULL, NULL, NULL) < 0) {
-                LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Device Model didn't respond in time");
-                /* This depends on guest operating system acknowledging the
-                 * SCI, if it doesn't respond in time then we may wish to
-                 * force the removal.
-                 */
-                goto out_fail;
-            }
+        switch (libxl__device_model_version_running(gc, domid)) {
+        case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
+            rc = qemu_pci_remove_xenstore(gc, domid, pcidev, force);
+            break;
+        case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
+            rc = libxl__qmp_pci_del(gc, domid, pcidev);
+            break;
+        default:
+            rc = ERROR_INVAL;
+            goto out_fail;
         }
-        path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/state", domid);
-        xs_write(ctx->xsh, XBT_NULL, path, state, strlen(state));
+        if (rc) {
+            rc = ERROR_FAIL;
+            goto out_fail;
+        }
         break;
     case LIBXL_DOMAIN_TYPE_PV:
     {
