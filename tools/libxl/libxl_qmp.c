@@ -403,7 +403,6 @@ static int qmp_next(libxl__gc *gc, libxl__qmp_handler *qmp)
                 *end = '\0';
 
                 o = libxl__json_parse(gc, s);
-                s = end + 2;
 
                 if (o) {
                     qmp_handle_response(qmp, o);
@@ -413,6 +412,8 @@ static int qmp_next(libxl__gc *gc, libxl__qmp_handler *qmp)
                                "Parse error of : %s\n", s);
                     return -1;
                 }
+
+                s = end + 2;
             } else {
                 break;
             }
