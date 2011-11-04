@@ -296,7 +296,7 @@ static int qmp_open(libxl__qmp_handler *qmp, const char *qmp_socket_path,
     if (qmp->qmp_fd < 0) {
         return -1;
     }
-    if ((flags = fcntl(qmp->qmp_fd, F_GETFL)) == 1) {
+    if ((flags = fcntl(qmp->qmp_fd, F_GETFL)) == -1) {
         flags = 0;
     }
     if (fcntl(qmp->qmp_fd, F_SETFL, flags | O_NONBLOCK) == -1) {
