@@ -14,6 +14,7 @@
 
 #include <assert.h>
 #include <string.h>
+#include <math.h>
 
 #include <yajl/yajl_parse.h>
 #include <yajl/yajl_gen.h>
@@ -44,6 +45,7 @@ struct libxl__yajl_ctx {
 #  define DEBUG_GEN(ctx, type)              yajl_gen_##type(ctx->g)
 #  define DEBUG_GEN_VALUE(ctx, type, value) yajl_gen_##type(ctx->g, value)
 #  define DEBUG_GEN_STRING(ctx, str, n)     yajl_gen_string(ctx->g, str, n)
+#  define DEBUG_GEN_NUMBER(ctx, str, n)     yajl_gen_number(ctx->g, str, n)
 #  define DEBUG_GEN_REPORT(yajl_ctx) \
     do { \
         const unsigned char *buf = NULL; \
@@ -60,6 +62,7 @@ struct libxl__yajl_ctx {
 #  define DEBUG_GEN(ctx, type)                  ((void)0)
 #  define DEBUG_GEN_VALUE(ctx, type, value)     ((void)0)
 #  define DEBUG_GEN_STRING(ctx, value, lenght)  ((void)0)
+#  define DEBUG_GEN_NUMBER(ctx, value, lenght)  ((void)0)
 #  define DEBUG_GEN_REPORT(ctx)                 ((void)0)
 #endif
 
@@ -363,6 +366,7 @@ void libxl__json_object_free(libxl__gc *gc, libxl__json_object *obj)
         return;
     switch (obj->type) {
     case JSON_STRING:
+    case JSON_NUMBER:
         free(obj->u.string);
         break;
     case JSON_MAP: {
@@ -504,36 +508,64 @@ static int json_callback_boolean(void *opaque, int boolean)
     return 1;
 }
 
-static int json_callback_integer(void *opaque, long value)
+static bool is_decimal(const char *s, unsigned len)
 {
-    libxl__yajl_ctx *ctx = opaque;
-    libxl__json_object *obj;
-
-    DEBUG_GEN_VALUE(ctx, integer, value);
-
-    if ((obj = json_object_alloc(ctx->gc, JSON_INTEGER)) == NULL)
-        return 0;
-    obj->u.i = value;
-
-    if (json_object_append_to(ctx->gc, obj, ctx->current) == -1) {
-        libxl__json_object_free(ctx->gc, obj);
-        return 0;
+    const char *end = s + len;
+    for (; s < end; s++) {
+        if (*s == '.')
+            return true;
     }
-
-    return 1;
+    return false;
 }
 
-static int json_callback_double(void *opaque, double value)
+static int json_callback_number(void *opaque, const char *s, unsigned int len)
 {
     libxl__yajl_ctx *ctx = opaque;
-    libxl__json_object *obj;
+    libxl__json_object *obj = NULL;
+    char *t = NULL;
 
-    DEBUG_GEN_VALUE(ctx, double, value);
+    DEBUG_GEN_NUMBER(ctx, s, len);
 
-    if ((obj = json_object_alloc(ctx->gc, JSON_DOUBLE)) == NULL)
+    if (is_decimal(s, len)) {
+        double d = strtod(s, NULL);
+
+        if ((d == HUGE_VAL || d == HUGE_VAL) && errno == ERANGE) {
+            goto error;
+        }
+
+        if ((obj = json_object_alloc(ctx->gc, JSON_DOUBLE)) == NULL)
+            return 0;
+        obj->u.d = d;
+    } else {
+        long long i = strtoll(s, NULL, 10);
+
+        if ((i == LLONG_MIN || i == LLONG_MAX) && errno == ERANGE) {
+            goto error;
+        }
+
+        if ((obj = json_object_alloc(ctx->gc, JSON_INTEGER)) == NULL)
+            return 0;
+        obj->u.i = i;
+    }
+    goto out;
+
+error:
+    /* If the conversion fail, we just store the original string. */
+    if ((obj = json_object_alloc(ctx->gc, JSON_NUMBER)) == NULL)
         return 0;
-    obj->u.d = value;
 
+    t = malloc(len + 1);
+    if (t == NULL) {
+        LIBXL__LOG_ERRNO(libxl__gc_owner(ctx->gc), LIBXL__LOG_ERROR,
+                         "Failed to allocate");
+        return 0;
+    }
+    strncpy(t, s, len);
+    t[len] = 0;
+
+    obj->u.string = t;
+
+out:
     if (json_object_append_to(ctx->gc, obj, ctx->current) == -1) {
         libxl__json_object_free(ctx->gc, obj);
         return 0;
@@ -706,9 +738,9 @@ static int json_callback_end_array(void *opaque)
 static yajl_callbacks callbacks = {
     json_callback_null,
     json_callback_boolean,
-    json_callback_integer,
-    json_callback_double,
     NULL,
+    NULL,
+    json_callback_number,
     json_callback_string,
     json_callback_start_map,
     json_callback_map_key,

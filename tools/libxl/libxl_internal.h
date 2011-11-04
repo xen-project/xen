@@ -544,6 +544,8 @@ typedef enum {
     JSON_FALSE,
     JSON_INTEGER,
     JSON_DOUBLE,
+    /* number is store in string, it's too big to be a long long or a double */
+    JSON_NUMBER,
     JSON_STRING,
     JSON_MAP,
     JSON_ARRAY,
@@ -553,7 +555,7 @@ typedef enum {
 typedef struct libxl__json_object {
     libxl__json_node_type type;
     union {
-        long i;
+        long long i;
         double d;
         char *string;
         /* List of libxl__json_object */
@@ -612,7 +614,7 @@ flexarray_t *libxl__json_object_get_array(const libxl__json_object *o)
     else
         return NULL;
 }
-static inline long libxl__json_object_get_integer(const libxl__json_object *o)
+static inline long long libxl__json_object_get_integer(const libxl__json_object *o)
 {
     if (libxl__json_object_is_integer(o))
         return o->u.i;
