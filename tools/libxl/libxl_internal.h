@@ -107,6 +107,9 @@ typedef struct {
 } libxl__device;
 
 #define XC_PCI_BDF             "0x%x, 0x%x, 0x%x, 0x%x"
+#define PCI_DEVFN(slot, func)   ((((slot) & 0x1f) << 3) | ((func) & 0x07))
+#define PCI_SLOT(devfn)         (((devfn) >> 3) & 0x1f)
+#define PCI_FUNC(devfn)         ((devfn) & 0x07)
 #define AUTO_PHP_SLOT          0x100
 #define SYSFS_PCI_DEV          "/sys/bus/pci/devices"
 #define SYSFS_PCIBACK_DRIVER   "/sys/bus/pci/drivers/pciback"
@@ -522,6 +525,7 @@ _hidden libxl__qmp_handler *libxl__qmp_initialize(libxl_ctx *ctx,
                                                   uint32_t domid);
 /* ask to QEMU the serial port information and store it in xenstore. */
 _hidden int libxl__qmp_query_serial(libxl__qmp_handler *qmp);
+_hidden int libxl__qmp_pci_add(libxl__gc *gc, int d, libxl_device_pci *pcidev);
 /* close and free the QMP handler */
 _hidden void libxl__qmp_close(libxl__qmp_handler *qmp);
 /* remove the socket file, if the file has already been removed,

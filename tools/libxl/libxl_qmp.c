@@ -41,6 +41,7 @@
  */
 
 #define QMP_RECEIVE_BUFFER_SIZE 4096
+#define PCI_PT_QDEV_ID "pci-pt-%02x_%02x.%01x"
 
 typedef int (*qmp_callback_t)(libxl__qmp_handler *qmp,
                               const libxl__json_object *tree,
@@ -616,6 +617,100 @@ int libxl__qmp_query_serial(libxl__qmp_handler *qmp)
     return qmp_synchronous_send(qmp, "query-chardev", NULL,
                                 register_serials_chardev_callback,
                                 NULL, qmp->timeout);
+}
+
+static int pci_add_callback(libxl__qmp_handler *qmp,
+                            const libxl__json_object *response, void *opaque)
+{
+    libxl_device_pci *pcidev = opaque;
+    const libxl__json_object *bus = NULL;
+    libxl__gc gc = LIBXL_INIT_GC(qmp->ctx);
+    int i, j, rc = -1;
+    char *asked_id = libxl__sprintf(&gc, PCI_PT_QDEV_ID,
+                                    pcidev->bus, pcidev->dev, pcidev->func);
+
+    for (i = 0; (bus = libxl__json_array_get(response, i)); i++) {
+        const libxl__json_object *devices = NULL;
+        const libxl__json_object *device = NULL;
+        const libxl__json_object *o = NULL;
+        const char *id = NULL;
+
+        devices = libxl__json_map_get("devices", bus, JSON_ARRAY);
+
+        for (j = 0; (device = libxl__json_array_get(devices, j)); j++) {
+             o = libxl__json_map_get("qdev_id", device, JSON_STRING);
+             id = libxl__json_object_get_string(o);
+
+             if (id && strcmp(asked_id, id) == 0) {
+                 int dev_slot, dev_func;
+
+                 o = libxl__json_map_get("slot", device, JSON_INTEGER);
+                 if (!o)
+                     goto out;
+                 dev_slot = libxl__json_object_get_integer(o);
+                 o = libxl__json_map_get("function", device, JSON_INTEGER);
+                 if (!o)
+                     goto out;
+                 dev_func = libxl__json_object_get_integer(o);
+
+                 pcidev->vdevfn = PCI_DEVFN(dev_slot, dev_func);
+
+                 rc = 0;
+                 goto out;
+             }
+        }
+    }
+
+
+out:
+    libxl__free_all(&gc);
+    return rc;
+}
+
+int libxl__qmp_pci_add(libxl__gc *gc, int domid, libxl_device_pci *pcidev)
+{
+    libxl__qmp_handler *qmp = NULL;
+    flexarray_t *parameters = NULL;
+    libxl_key_value_list args = NULL;
+    char *hostaddr = NULL;
+    int rc = 0;
+
+    qmp = libxl__qmp_initialize(libxl__gc_owner(gc), domid);
+    if (!qmp)
+        return -1;
+
+    hostaddr = libxl__sprintf(gc, "%04x:%02x:%02x.%01x", pcidev->domain,
+                              pcidev->bus, pcidev->dev, pcidev->func);
+    if (!hostaddr)
+        return -1;
+
+    parameters = flexarray_make(6, 1);
+    flexarray_append_pair(parameters, "driver", "xen-pci-passthrough");
+    flexarray_append_pair(parameters, "id",
+                          libxl__sprintf(gc, PCI_PT_QDEV_ID,
+                                         pcidev->bus, pcidev->dev,
+                                         pcidev->func));
+    flexarray_append_pair(parameters, "hostaddr", hostaddr);
+    if (pcidev->vdevfn) {
+        flexarray_append_pair(parameters, "addr",
+                              libxl__sprintf(gc, "%x.%x",
+                                             PCI_SLOT(pcidev->vdevfn),
+                                             PCI_FUNC(pcidev->vdevfn)));
+    }
+    args = libxl__xs_kvs_of_flexarray(gc, parameters, parameters->count);
+    if (!args)
+        return -1;
+
+    rc = qmp_synchronous_send(qmp, "device_add", &args,
+                              NULL, NULL, qmp->timeout);
+    if (rc == 0) {
+        rc = qmp_synchronous_send(qmp, "query-pci", NULL,
+                                  pci_add_callback, pcidev, qmp->timeout);
+    }
+
+    flexarray_free(parameters);
+    libxl__qmp_close(qmp);
+    return rc;
 }
 
 int libxl__qmp_initializations(libxl_ctx *ctx, uint32_t domid)
