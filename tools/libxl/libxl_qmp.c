@@ -46,10 +46,15 @@ typedef int (*qmp_callback_t)(libxl__qmp_handler *qmp,
                               const libxl__json_object *tree,
                               void *opaque);
 
+typedef struct qmp_request_context {
+    int rc;
+} qmp_request_context;
+
 typedef struct callback_id_pair {
     int id;
     qmp_callback_t callback;
     void *opaque;
+    qmp_request_context *context;
     SIMPLEQ_ENTRY(callback_id_pair) next;
 } callback_id_pair;
 
@@ -73,7 +78,8 @@ struct libxl__qmp_handler {
 
 static int qmp_send(libxl__qmp_handler *qmp,
                     const char *cmd, libxl_key_value_list *args,
-                    qmp_callback_t callback, void *opaque);
+                    qmp_callback_t callback, void *opaque,
+                    qmp_request_context *context);
 
 static const int QMP_SOCKET_CONNECT_TIMEOUT = 5;
 
@@ -162,7 +168,7 @@ static int qmp_capabilities_callback(libxl__qmp_handler *qmp,
 static int enable_qmp_capabilities(libxl__qmp_handler *qmp)
 {
     return qmp_send(qmp, "qmp_capabilities", NULL,
-                    qmp_capabilities_callback, NULL);
+                    qmp_capabilities_callback, NULL, NULL);
 }
 
 /*
@@ -214,7 +220,10 @@ static void qmp_handle_error_response(libxl__qmp_handler *qmp,
 
     if (pp) {
         if (pp->callback) {
-            pp->callback(qmp, NULL, pp->opaque);
+            int rc = pp->callback(qmp, NULL, pp->opaque);
+            if (pp->context) {
+                pp->context->rc = rc;
+            }
         }
         if (pp->id == qmp->wait_for_id) {
             /* tell that the id have been processed */
@@ -241,16 +250,18 @@ static int qmp_handle_response(libxl__qmp_handler *qmp,
     switch (type) {
     case LIBXL__QMP_MESSAGE_TYPE_QMP:
         /* On the greeting message from the server, enable QMP capabilities */
-        enable_qmp_capabilities(qmp);
-        break;
+        return enable_qmp_capabilities(qmp);
     case LIBXL__QMP_MESSAGE_TYPE_RETURN: {
         callback_id_pair *pp = qmp_get_callback_from_id(qmp, resp);
 
         if (pp) {
             if (pp->callback) {
-                pp->callback(qmp,
+                int rc = pp->callback(qmp,
                              libxl__json_map_get("return", resp, JSON_ANY),
                              pp->opaque);
+                if (pp->context) {
+                    pp->context->rc = rc;
+                }
             }
             if (pp->id == qmp->wait_for_id) {
                 /* tell that the id have been processed */
@@ -259,13 +270,13 @@ static int qmp_handle_response(libxl__qmp_handler *qmp,
             SIMPLEQ_REMOVE(&qmp->callback_list, pp, callback_id_pair, next);
             free(pp);
         }
-        break;
+        return 0;
     }
     case LIBXL__QMP_MESSAGE_TYPE_ERROR:
         qmp_handle_error_response(qmp, resp);
-        break;
+        return -1;
     case LIBXL__QMP_MESSAGE_TYPE_EVENT:
-        break;
+        return 0;
     case LIBXL__QMP_MESSAGE_TYPE_INVALID:
         return -1;
     }
@@ -358,6 +369,7 @@ static int qmp_next(libxl__gc *gc, libxl__qmp_handler *qmp)
 
     char *incomplete = NULL;
     size_t incomplete_size = 0;
+    int rc = 0;
 
     do {
         fd_set rfds;
@@ -415,7 +427,7 @@ static int qmp_next(libxl__gc *gc, libxl__qmp_handler *qmp)
                 o = libxl__json_parse(gc, s);
 
                 if (o) {
-                    qmp_handle_response(qmp, o);
+                    rc = qmp_handle_response(qmp, o);
                     libxl__json_object_free(gc, o);
                 } else {
                     LIBXL__LOG(qmp->ctx, LIBXL__LOG_ERROR,
@@ -430,12 +442,13 @@ static int qmp_next(libxl__gc *gc, libxl__qmp_handler *qmp)
         } while (s < s_end);
    } while (s < s_end);
 
-    return 1;
+    return rc;
 }
 
 static int qmp_send(libxl__qmp_handler *qmp,
                     const char *cmd, libxl_key_value_list *args,
-                    qmp_callback_t callback, void *opaque)
+                    qmp_callback_t callback, void *opaque,
+                    qmp_request_context *context)
 {
     yajl_gen_config conf = { 0, NULL };
     const unsigned char *buf;
@@ -477,6 +490,7 @@ static int qmp_send(libxl__qmp_handler *qmp,
     elm->id = qmp->last_id_used;
     elm->callback = callback;
     elm->opaque = opaque;
+    elm->context = context;
     SIMPLEQ_INSERT_TAIL(&qmp->callback_list, elm, next);
 
     LIBXL__LOG(qmp->ctx, LIBXL__LOG_DEBUG, "next qmp command: '%s'", buf);
@@ -505,8 +519,9 @@ static int qmp_synchronous_send(libxl__qmp_handler *qmp, const char *cmd,
     int id = 0;
     int ret = 0;
     libxl__gc gc = LIBXL_INIT_GC(qmp->ctx);
+    qmp_request_context context = { .rc = 0 };
 
-    id = qmp_send(qmp, cmd, args, callback, opaque);
+    id = qmp_send(qmp, cmd, args, callback, opaque, &context);
     if (id <= 0) {
         return -1;
     }
@@ -514,13 +529,17 @@ static int qmp_synchronous_send(libxl__qmp_handler *qmp, const char *cmd,
 
     while (qmp->wait_for_id == id) {
         if ((ret = qmp_next(&gc, qmp)) < 0) {
-            return ret;
+            break;
         }
+    }
+
+    if (qmp->wait_for_id != id && ret == 0) {
+        ret = context.rc;
     }
 
     libxl__free_all(&gc);
 
-    return 0;
+    return ret;
 }
 
 static void qmp_free_handler(libxl__qmp_handler *qmp)
