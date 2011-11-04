@@ -43,11 +43,13 @@
 #define QMP_RECEIVE_BUFFER_SIZE 4096
 
 typedef int (*qmp_callback_t)(libxl__qmp_handler *qmp,
-                              const libxl__json_object *tree);
+                              const libxl__json_object *tree,
+                              void *opaque);
 
 typedef struct callback_id_pair {
     int id;
     qmp_callback_t callback;
+    void *opaque;
     SIMPLEQ_ENTRY(callback_id_pair) next;
 } callback_id_pair;
 
@@ -70,7 +72,8 @@ struct libxl__qmp_handler {
 };
 
 static int qmp_send(libxl__qmp_handler *qmp,
-                    const char *cmd, qmp_callback_t callback);
+                    const char *cmd,
+                    qmp_callback_t callback, void *opaque);
 
 static const int QMP_SOCKET_CONNECT_TIMEOUT = 5;
 
@@ -100,7 +103,8 @@ static int store_serial_port_info(libxl__qmp_handler *qmp,
 }
 
 static int register_serials_chardev_callback(libxl__qmp_handler *qmp,
-                                             const libxl__json_object *o)
+                                             const libxl__json_object *o,
+                                             void *unused)
 {
     const libxl__json_object *obj = NULL;
     const libxl__json_object *label = NULL;
@@ -144,7 +148,7 @@ static int register_serials_chardev_callback(libxl__qmp_handler *qmp,
 }
 
 static int qmp_capabilities_callback(libxl__qmp_handler *qmp,
-                                     const libxl__json_object *o)
+                                     const libxl__json_object *o, void *unused)
 {
     qmp->connected = true;
 
@@ -157,7 +161,7 @@ static int qmp_capabilities_callback(libxl__qmp_handler *qmp,
 
 static int enable_qmp_capabilities(libxl__qmp_handler *qmp)
 {
-    return qmp_send(qmp, "qmp_capabilities", qmp_capabilities_callback);
+    return qmp_send(qmp, "qmp_capabilities", qmp_capabilities_callback, NULL);
 }
 
 /*
@@ -208,7 +212,7 @@ static void qmp_handle_error_response(libxl__qmp_handler *qmp,
     resp = libxl__json_map_get("desc", resp, JSON_STRING);
 
     if (pp) {
-        pp->callback(qmp, NULL);
+        pp->callback(qmp, NULL, pp->opaque);
         if (pp->id == qmp->wait_for_id) {
             /* tell that the id have been processed */
             qmp->wait_for_id = 0;
@@ -241,7 +245,8 @@ static int qmp_handle_response(libxl__qmp_handler *qmp,
 
         if (pp) {
             pp->callback(qmp,
-                         libxl__json_map_get("return", resp, JSON_ANY));
+                         libxl__json_map_get("return", resp, JSON_ANY),
+                         pp->opaque);
             if (pp->id == qmp->wait_for_id) {
                 /* tell that the id have been processed */
                 qmp->wait_for_id = 0;
@@ -424,7 +429,8 @@ static int qmp_next(libxl__gc *gc, libxl__qmp_handler *qmp)
 }
 
 static int qmp_send(libxl__qmp_handler *qmp,
-                    const char *cmd, qmp_callback_t callback)
+                    const char *cmd,
+                    qmp_callback_t callback, void *opaque)
 {
     yajl_gen_config conf = { 0, NULL };
     const unsigned char *buf;
@@ -462,6 +468,7 @@ static int qmp_send(libxl__qmp_handler *qmp,
         }
         elm->id = qmp->last_id_used;
         elm->callback = callback;
+        elm->opaque = opaque;
         SIMPLEQ_INSERT_TAIL(&qmp->callback_list, elm, next);
     }
 
@@ -484,13 +491,14 @@ error:
 }
 
 static int qmp_synchronous_send(libxl__qmp_handler *qmp, const char *cmd,
-                                qmp_callback_t callback, int ask_timeout)
+                                qmp_callback_t callback, void *opaque,
+                                int ask_timeout)
 {
     int id = 0;
     int ret = 0;
     libxl__gc gc = LIBXL_INIT_GC(qmp->ctx);
 
-    id = qmp_send(qmp, cmd, callback);
+    id = qmp_send(qmp, cmd, callback, opaque);
     if (id <= 0) {
         return -1;
     }
@@ -580,7 +588,7 @@ int libxl__qmp_query_serial(libxl__qmp_handler *qmp)
 {
     return qmp_synchronous_send(qmp, "query-chardev",
                                 register_serials_chardev_callback,
-                                qmp->timeout);
+                                NULL, qmp->timeout);
 }
 
 int libxl__qmp_initializations(libxl_ctx *ctx, uint32_t domid)
