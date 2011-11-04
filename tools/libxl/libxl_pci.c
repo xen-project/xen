@@ -601,11 +601,52 @@ static int pci_ins_check(libxl__gc *gc, uint32_t domid, const char *state, void 
     return 1;
 }
 
+static int qemu_pci_add_xenstore(libxl__gc *gc, uint32_t domid,
+                                 libxl_device_pci *pcidev)
+{
+    libxl_ctx *ctx = libxl__gc_owner(gc);
+    int rc = 0;
+    char *path;
+    char *state, *vdevfn;
+
+    path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/state", domid);
+    state = libxl__xs_read(gc, XBT_NULL, path);
+    path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/parameter",
+                          domid);
+    if (pcidev->vdevfn) {
+        libxl__xs_write(gc, XBT_NULL, path, PCI_BDF_VDEVFN,
+                        pcidev->domain, pcidev->bus, pcidev->dev,
+                        pcidev->func, pcidev->vdevfn);
+    } else {
+        libxl__xs_write(gc, XBT_NULL, path, PCI_BDF, pcidev->domain,
+                        pcidev->bus, pcidev->dev, pcidev->func);
+    }
+    path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/command",
+                          domid);
+    xs_write(ctx->xsh, XBT_NULL, path, "pci-ins", strlen("pci-ins"));
+    rc = libxl__wait_for_device_model(gc, domid, NULL, NULL,
+                                      pci_ins_check, state);
+    path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/parameter",
+                          domid);
+    vdevfn = libxl__xs_read(gc, XBT_NULL, path);
+    path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/state",
+                          domid);
+    if ( rc < 0 )
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                   "qemu refused to add device: %s", vdevfn);
+    else if ( sscanf(vdevfn, "0x%x", &pcidev->vdevfn) != 1 ) {
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                   "wrong format for the vdevfn: '%s'", vdevfn);
+        rc = -1;
+    }
+    xs_write(ctx->xsh, XBT_NULL, path, state, strlen(state));
+
+    return rc;
+}
+
 static int do_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, int starting)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
-    char *path;
-    char *state, *vdevfn;
     int rc, hvm = 0;
 
     switch (libxl__domain_type(gc, domid)) {
@@ -615,27 +656,16 @@ static int do_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, i
                                          NULL, NULL, NULL) < 0) {
             return ERROR_FAIL;
         }
-        path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/state", domid);
-        state = libxl__xs_read(gc, XBT_NULL, path);
-        path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/parameter", domid);
-        if (pcidev->vdevfn)
-            libxl__xs_write(gc, XBT_NULL, path, PCI_BDF_VDEVFN, pcidev->domain,
-                           pcidev->bus, pcidev->dev, pcidev->func, pcidev->vdevfn);
-        else
-            libxl__xs_write(gc, XBT_NULL, path, PCI_BDF, pcidev->domain,
-                           pcidev->bus, pcidev->dev, pcidev->func);
-        path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/command", domid);
-        xs_write(ctx->xsh, XBT_NULL, path, "pci-ins", strlen("pci-ins"));
-        rc = libxl__wait_for_device_model(gc, domid, NULL, NULL,
-                                          pci_ins_check, state);
-        path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/parameter", domid);
-        vdevfn = libxl__xs_read(gc, XBT_NULL, path);
-        path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/state", domid);
-        if ( rc < 0 )
-            LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "qemu refused to add device: %s", vdevfn);
-        else if ( sscanf(vdevfn, "0x%x", &pcidev->vdevfn) != 1 )
-            rc = -1;
-        xs_write(ctx->xsh, XBT_NULL, path, state, strlen(state));
+        switch (libxl__device_model_version_running(gc, domid)) {
+            case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
+                rc = qemu_pci_add_xenstore(gc, domid, pcidev);
+                break;
+            case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
+                rc = libxl__qmp_pci_add(gc, domid, pcidev);
+                break;
+            default:
+                return ERROR_INVAL;
+        }
         if ( rc )
             return ERROR_FAIL;
         break;
