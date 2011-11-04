@@ -526,6 +526,8 @@ _hidden libxl__qmp_handler *libxl__qmp_initialize(libxl_ctx *ctx,
 /* ask to QEMU the serial port information and store it in xenstore. */
 _hidden int libxl__qmp_query_serial(libxl__qmp_handler *qmp);
 _hidden int libxl__qmp_pci_add(libxl__gc *gc, int d, libxl_device_pci *pcidev);
+_hidden int libxl__qmp_pci_del(libxl__gc *gc, int domid,
+                               libxl_device_pci *pcidev);
 /* close and free the QMP handler */
 _hidden void libxl__qmp_close(libxl__qmp_handler *qmp);
 /* remove the socket file, if the file has already been removed,

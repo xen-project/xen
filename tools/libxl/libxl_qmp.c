@@ -713,6 +713,41 @@ int libxl__qmp_pci_add(libxl__gc *gc, int domid, libxl_device_pci *pcidev)
     return rc;
 }
 
+static int qmp_device_del(libxl__gc *gc, int domid, char *id)
+{
+    libxl__qmp_handler *qmp = NULL;
+    flexarray_t *parameters = NULL;
+    libxl_key_value_list args = NULL;
+    int rc = 0;
+
+    qmp = libxl__qmp_initialize(libxl__gc_owner(gc), domid);
+    if (!qmp)
+        return ERROR_FAIL;
+
+    parameters = flexarray_make(2, 1);
+    flexarray_append_pair(parameters, "id", id);
+    args = libxl__xs_kvs_of_flexarray(gc, parameters, parameters->count);
+    if (!args)
+        return ERROR_NOMEM;
+
+    rc = qmp_synchronous_send(qmp, "device_del", &args,
+                              NULL, NULL, qmp->timeout);
+
+    flexarray_free(parameters);
+    libxl__qmp_close(qmp);
+    return rc;
+}
+
+int libxl__qmp_pci_del(libxl__gc *gc, int domid, libxl_device_pci *pcidev)
+{
+    char *id = NULL;
+
+    id = libxl__sprintf(gc, PCI_PT_QDEV_ID,
+                        pcidev->bus, pcidev->dev, pcidev->func);
+
+    return qmp_device_del(gc, domid, id);
+}
+
 int libxl__qmp_initializations(libxl_ctx *ctx, uint32_t domid)
 {
     libxl__qmp_handler *qmp = NULL;
