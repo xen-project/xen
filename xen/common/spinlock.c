@@ -86,17 +86,23 @@ void spin_debug_disable(void)
 
 #ifdef LOCK_PROFILE
 
-#define LOCK_PROFILE_REL                                               \
-    lock->profile.time_hold += NOW() - lock->profile.time_locked;      \
-    lock->profile.lock_cnt++;
+#define LOCK_PROFILE_REL                                                     \
+    if (lock->profile)                                                       \
+    {                                                                        \
+        lock->profile->time_hold += NOW() - lock->profile->time_locked;      \
+        lock->profile->lock_cnt++;                                           \
+    }
 #define LOCK_PROFILE_VAR    s_time_t block = 0
 #define LOCK_PROFILE_BLOCK  block = block ? : NOW();
-#define LOCK_PROFILE_GOT                                               \
-    lock->profile.time_locked = NOW();                                 \
-    if (block)                                                         \
-    {                                                                  \
-        lock->profile.time_block += lock->profile.time_locked - block; \
-        lock->profile.block_cnt++;                                     \
+#define LOCK_PROFILE_GOT                                                     \
+    if (lock->profile)                                                       \
+    {                                                                        \
+        lock->profile->time_locked = NOW();                                  \
+        if (block)                                                           \
+        {                                                                    \
+            lock->profile->time_block += lock->profile->time_locked - block; \
+            lock->profile->block_cnt++;                                      \
+        }                                                                    \
     }
 
 #else
@@ -197,7 +203,8 @@ int _spin_trylock(spinlock_t *lock)
     if ( !_raw_spin_trylock(&lock->raw) )
         return 0;
 #ifdef LOCK_PROFILE
-    lock->profile.time_locked = NOW();
+    if (lock->profile)
+        lock->profile->time_locked = NOW();
 #endif
     preempt_disable();
     return 1;
@@ -211,10 +218,10 @@ void _spin_barrier(spinlock_t *lock)
 
     check_barrier(&lock->debug);
     do { mb(); loop++;} while ( _raw_spin_is_locked(&lock->raw) );
-    if (loop > 1)
+    if ((loop > 1) && lock->profile)
     {
-        lock->profile.time_block += NOW() - block;
-        lock->profile.block_cnt++;
+        lock->profile->time_block += NOW() - block;
+        lock->profile->block_cnt++;
     }
 #else
     check_barrier(&lock->debug);
@@ -586,6 +593,7 @@ static int __init lock_prof_init(void)
     {
         (*q)->next = lock_profile_glb_q.elem_q;
         lock_profile_glb_q.elem_q = *q;
+        (*q)->lock->profile = *q;
     }
 
     _lock_profile_register_struct(

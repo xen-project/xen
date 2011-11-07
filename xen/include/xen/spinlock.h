@@ -20,6 +20,9 @@ struct lock_debug { };
 #endif
 
 #ifdef LOCK_PROFILE
+
+#include <public/sysctl.h>
+
 /*
     lock profiling on:
 
@@ -54,9 +57,12 @@ struct lock_debug { };
       lock_profile_deregister_struct(type, ptr);
 */
 
+struct spinlock;
+
 struct lock_profile {
     struct lock_profile *next;       /* forward link */
     char                *name;       /* lock name */
+    struct spinlock     *lock;       /* the lock itself */
     u64                 lock_cnt;    /* # of complete locking ops */
     u64                 block_cnt;   /* # of complete wait for lock */
     s64                 time_hold;   /* cumulated lock time */
@@ -70,23 +76,29 @@ struct lock_profile_qhead {
     int32_t                   idx;     /* index for printout */
 };
 
-#define _LOCK_PROFILE(name) { 0, name, 0, 0, 0, 0, 0 }
-#define _LOCK_NO_PROFILE _LOCK_PROFILE(NULL)
+#define _LOCK_PROFILE(name) { 0, #name, &name, 0, 0, 0, 0, 0 }
 #define _LOCK_PROFILE_PTR(name)                                               \
     static struct lock_profile *__lock_profile_##name __attribute_used__      \
-    __attribute__ ((__section__(".lockprofile.data"))) = &name.profile
+    __attribute__ ((__section__(".lockprofile.data"))) =                      \
+    &__lock_profile_data_##name
 #define _SPIN_LOCK_UNLOCKED(x) { _RAW_SPIN_LOCK_UNLOCKED, 0xfffu, 0,          \
                                  _LOCK_DEBUG, x }
-#define SPIN_LOCK_UNLOCKED _SPIN_LOCK_UNLOCKED(_LOCK_NO_PROFILE)
+#define SPIN_LOCK_UNLOCKED _SPIN_LOCK_UNLOCKED(NULL)
 #define DEFINE_SPINLOCK(l)                                                    \
-    spinlock_t l = _SPIN_LOCK_UNLOCKED(_LOCK_PROFILE(#l));                    \
+    spinlock_t l = _SPIN_LOCK_UNLOCKED(NULL);                                 \
+    static struct lock_profile __lock_profile_data_##l = _LOCK_PROFILE(l);    \
     _LOCK_PROFILE_PTR(l)
 
 #define spin_lock_init_prof(s, l)                                             \
     do {                                                                      \
-        (s)->l = (spinlock_t)_SPIN_LOCK_UNLOCKED(_LOCK_PROFILE(#l));          \
-        (s)->l.profile.next = (s)->profile_head.elem_q;                       \
-        (s)->profile_head.elem_q = &((s)->l.profile);                         \
+        struct lock_profile *prof;                                            \
+        prof = xzalloc(struct lock_profile);                                  \
+        if (!prof) break;                                                     \
+        prof->name = #l;                                                      \
+        prof->lock = &(s)->l;                                                 \
+        (s)->l = (spinlock_t)_SPIN_LOCK_UNLOCKED(prof);                       \
+        prof->next = (s)->profile_head.elem_q;                                \
+        (s)->profile_head.elem_q = prof;                                      \
     } while(0)
 
 void _lock_profile_register_struct(
@@ -108,7 +120,7 @@ struct lock_profile { };
 struct lock_profile_qhead { };
 
 #define SPIN_LOCK_UNLOCKED                                                    \
-    { _RAW_SPIN_LOCK_UNLOCKED, 0xfffu, 0, _LOCK_DEBUG, { } }
+    { _RAW_SPIN_LOCK_UNLOCKED, 0xfffu, 0, _LOCK_DEBUG, NULL }
 #define DEFINE_SPINLOCK(l) spinlock_t l = SPIN_LOCK_UNLOCKED
 
 #define spin_lock_init_prof(s, l) spin_lock_init(&((s)->l))
@@ -117,12 +129,12 @@ struct lock_profile_qhead { };
 
 #endif
 
-typedef struct {
+typedef struct spinlock {
     raw_spinlock_t raw;
     u16 recurse_cpu:12;
     u16 recurse_cnt:4;
     struct lock_debug debug;
-    struct lock_profile profile;
+    struct lock_profile *profile;
 } spinlock_t;
 
 
