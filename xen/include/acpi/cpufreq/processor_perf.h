@@ -29,7 +29,6 @@ struct processor_performance {
     uint32_t state_count;
     struct xen_processor_px *states;
     struct xen_psd_package domain_info;
-    cpumask_t shared_cpu_map;
     uint32_t shared_type;
 
     uint32_t init;

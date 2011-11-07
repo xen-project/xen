@@ -200,15 +200,17 @@ static int powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
     perf = data->acpi_data;
     policy->shared_type = perf->shared_type;
 
-    /*
-     * Will let policy->cpus know about dependency only when software
-     * coordination is required.
-     */
     if (policy->shared_type == CPUFREQ_SHARED_TYPE_ALL ||
         policy->shared_type == CPUFREQ_SHARED_TYPE_ANY) {
-        policy->cpus = perf->shared_cpu_map;
+        cpumask_set_cpu(cpu, &policy->cpus);
+        if (cpumask_weight(&policy->cpus) != 1) {
+            printk(XENLOG_WARNING "Unsupported sharing type %d (%u CPUs)\n",
+                   policy->shared_type, cpumask_weight(&policy->cpus));
+            result = -ENODEV;
+            goto err_unreg;
+        }
     } else {
-        policy->cpus = cpumask_of_cpu(cpu);    
+        cpumask_copy(&policy->cpus, cpumask_of(cpu));
     }
 
     /* capability check */
