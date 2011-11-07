@@ -105,15 +105,6 @@ void __do_IRQ_guest(int irq);
  * Special irq handlers.
  */
 
-void no_action(int cpl, void *dev_id, struct pt_regs *regs) { }
-
-/*
- * Generic no controller code
- */
-
-static void enable_none(unsigned int irq) { }
-static unsigned int startup_none(unsigned int irq) { return 0; }
-static void disable_none(unsigned int irq) { }
 static void ack_none(unsigned int irq)
 {
 /*
@@ -124,18 +115,14 @@ static void ack_none(unsigned int irq)
 	printk(KERN_ERR "Unexpected irq vector 0x%x on CPU %u!\n", irq, smp_processor_id());
 }
 
-/* startup is the same as "enable", shutdown is same as "disable" */
-#define shutdown_none	disable_none
-#define end_none	enable_none
-
 hw_irq_controller no_irq_type = {
-	"none",
-	startup_none,
-	shutdown_none,
-	enable_none,
-	disable_none,
-	ack_none,
-	end_none
+	.typename = "none",
+	.startup = irq_startup_none,
+	.shutdown = irq_shutdown_none,
+	.enable = irq_enable_none,
+	.disable = irq_disable_none,
+	.ack = ack_none,
+	.end = irq_actor_none
 };
 
 /*

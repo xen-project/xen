@@ -26,3 +26,16 @@ int init_one_irq_desc(struct irq_desc *desc)
 
     return err;
 }
+
+void no_action(int cpl, void *dev_id, struct cpu_user_regs *regs)
+{
+}
+
+void irq_actor_none(struct irq_desc *desc)
+{
+}
+
+unsigned int irq_startup_none(struct irq_desc *desc)
+{
+    return 0;
+}

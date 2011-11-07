@@ -358,10 +358,6 @@ int __init init_irq_data(void)
 
 static void __do_IRQ_guest(int vector);
 
-void no_action(int cpl, void *dev_id, struct cpu_user_regs *regs) { }
-
-void irq_actor_none(struct irq_desc *desc) { }
-unsigned int irq_startup_none(struct irq_desc *desc) { return 0; }
 static void ack_none(struct irq_desc *desc)
 {
     ack_bad_irq(desc->irq);
