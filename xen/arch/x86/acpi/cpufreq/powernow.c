@@ -107,7 +107,7 @@ static int powernow_cpufreq_target(struct cpufreq_policy *policy,
     if (unlikely(result))
         return -ENODEV;
 
-    cpumask_and(&online_policy_cpus, &policy->cpus, &cpu_online_map);
+    cpumask_and(&online_policy_cpus, policy->cpus, &cpu_online_map);
 
     next_perf_state = data->freq_table[next_state].index;
     if (perf->state == next_perf_state) {
@@ -202,15 +202,15 @@ static int powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
 
     if (policy->shared_type == CPUFREQ_SHARED_TYPE_ALL ||
         policy->shared_type == CPUFREQ_SHARED_TYPE_ANY) {
-        cpumask_set_cpu(cpu, &policy->cpus);
-        if (cpumask_weight(&policy->cpus) != 1) {
+        cpumask_set_cpu(cpu, policy->cpus);
+        if (cpumask_weight(policy->cpus) != 1) {
             printk(XENLOG_WARNING "Unsupported sharing type %d (%u CPUs)\n",
-                   policy->shared_type, cpumask_weight(&policy->cpus));
+                   policy->shared_type, cpumask_weight(policy->cpus));
             result = -ENODEV;
             goto err_unreg;
         }
     } else {
-        cpumask_copy(&policy->cpus, cpumask_of(cpu));
+        cpumask_copy(policy->cpus, cpumask_of(cpu));
     }
 
     /* capability check */

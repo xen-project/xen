@@ -211,11 +211,11 @@ static int get_cpufreq_para(struct xen_sysctl_pm_op *op)
     list_for_each(pos, &cpufreq_governor_list)
         gov_num++;
 
-    if ( (op->u.get_para.cpu_num  != cpus_weight(policy->cpus)) ||
+    if ( (op->u.get_para.cpu_num  != cpumask_weight(policy->cpus)) ||
          (op->u.get_para.freq_num != pmpt->perf.state_count)    ||
          (op->u.get_para.gov_num  != gov_num) )
     {
-        op->u.get_para.cpu_num =  cpus_weight(policy->cpus);
+        op->u.get_para.cpu_num =  cpumask_weight(policy->cpus);
         op->u.get_para.freq_num = pmpt->perf.state_count;
         op->u.get_para.gov_num  = gov_num;
         return -EAGAIN;
@@ -223,7 +223,7 @@ static int get_cpufreq_para(struct xen_sysctl_pm_op *op)
 
     if ( !(affected_cpus = xzalloc_array(uint32_t, op->u.get_para.cpu_num)) )
         return -ENOMEM;
-    for_each_cpu_mask(cpu, policy->cpus)
+    for_each_cpu_mask(cpu, *policy->cpus)
         affected_cpus[j++] = cpu;
     ret = copy_to_guest(op->u.get_para.affected_cpus,
                        affected_cpus, op->u.get_para.cpu_num);

@@ -53,7 +53,7 @@ static void cpufreq_cmdline_common_para(struct cpufreq_policy *new_policy);
 
 struct cpufreq_dom {
     unsigned int	dom;
-    cpumask_t		map;
+    cpumask_var_t	map;
     struct list_head	node;
 };
 static LIST_HEAD_READ_MOSTLY(cpufreq_dom_list_head);
@@ -152,11 +152,16 @@ int cpufreq_add_cpu(unsigned int cpu)
         if (!cpufreq_dom)
             return -ENOMEM;
 
+        if (!zalloc_cpumask_var(&cpufreq_dom->map)) {
+            xfree(cpufreq_dom);
+            return -ENOMEM;
+        }
+
         cpufreq_dom->dom = dom;
         list_add(&cpufreq_dom->node, &cpufreq_dom_list_head);
     } else {
         /* domain sanity check under whatever coordination type */
-        firstcpu = first_cpu(cpufreq_dom->map);
+        firstcpu = cpumask_first(cpufreq_dom->map);
         if ((perf->domain_info.coord_type !=
             processor_pminfo[firstcpu]->perf.domain_info.coord_type) ||
             (perf->domain_info.num_processors !=
@@ -181,11 +186,18 @@ int cpufreq_add_cpu(unsigned int cpu)
             goto err0;
         }
 
+        if (!zalloc_cpumask_var(&policy->cpus)) {
+            xfree(policy);
+            ret = -ENOMEM;
+            goto err0;
+        }
+
         policy->cpu = cpu;
         per_cpu(cpufreq_cpu_policy, cpu) = policy;
 
         ret = cpufreq_driver->init(policy);
         if (ret) {
+            free_cpumask_var(policy->cpus);
             xfree(policy);
             per_cpu(cpufreq_cpu_policy, cpu) = NULL;
             goto err0;
@@ -193,7 +205,7 @@ int cpufreq_add_cpu(unsigned int cpu)
         if (cpufreq_verbose)
             printk("CPU %u initialization completed\n", cpu);
     } else {
-        firstcpu = first_cpu(cpufreq_dom->map);
+        firstcpu = cpumask_first(cpufreq_dom->map);
         policy = per_cpu(cpufreq_cpu_policy, firstcpu);
 
         per_cpu(cpufreq_cpu_policy, cpu) = policy;
@@ -201,15 +213,15 @@ int cpufreq_add_cpu(unsigned int cpu)
             printk("adding CPU %u\n", cpu);
     }
 
-    cpu_set(cpu, policy->cpus);
-    cpu_set(cpu, cpufreq_dom->map);
+    cpumask_set_cpu(cpu, policy->cpus);
+    cpumask_set_cpu(cpu, cpufreq_dom->map);
 
     ret = cpufreq_statistic_init(cpu);
     if (ret)
         goto err1;
 
-    if (hw_all ||
-        (cpus_weight(cpufreq_dom->map) == perf->domain_info.num_processors)) {
+    if (hw_all || (cpumask_weight(cpufreq_dom->map) ==
+                   perf->domain_info.num_processors)) {
         memcpy(&new_policy, policy, sizeof(struct cpufreq_policy));
         policy->governor = NULL;
 
@@ -238,16 +250,18 @@ err2:
     cpufreq_statistic_exit(cpu);
 err1:
     per_cpu(cpufreq_cpu_policy, cpu) = NULL;
-    cpu_clear(cpu, policy->cpus);
-    cpu_clear(cpu, cpufreq_dom->map);
+    cpumask_clear_cpu(cpu, policy->cpus);
+    cpumask_clear_cpu(cpu, cpufreq_dom->map);
 
-    if (cpus_empty(policy->cpus)) {
+    if (cpumask_empty(policy->cpus)) {
         cpufreq_driver->exit(policy);
+        free_cpumask_var(policy->cpus);
         xfree(policy);
     }
 err0:
-    if (cpus_empty(cpufreq_dom->map)) {
+    if (cpumask_empty(cpufreq_dom->map)) {
         list_del(&cpufreq_dom->node);
+        free_cpumask_var(cpufreq_dom->map);
         xfree(cpufreq_dom);
     }
 
@@ -291,24 +305,26 @@ int cpufreq_del_cpu(unsigned int cpu)
 
     /* for HW_ALL, stop gov for each core of the _PSD domain */
     /* for SW_ALL & SW_ANY, stop gov for the 1st core of the _PSD domain */
-    if (hw_all ||
-        (cpus_weight(cpufreq_dom->map) == perf->domain_info.num_processors))
+    if (hw_all || (cpumask_weight(cpufreq_dom->map) ==
+                   perf->domain_info.num_processors))
         __cpufreq_governor(policy, CPUFREQ_GOV_STOP);
 
     cpufreq_statistic_exit(cpu);
     per_cpu(cpufreq_cpu_policy, cpu) = NULL;
-    cpu_clear(cpu, policy->cpus);
-    cpu_clear(cpu, cpufreq_dom->map);
+    cpumask_clear_cpu(cpu, policy->cpus);
+    cpumask_clear_cpu(cpu, cpufreq_dom->map);
 
-    if (cpus_empty(policy->cpus)) {
+    if (cpumask_empty(policy->cpus)) {
         cpufreq_driver->exit(policy);
+        free_cpumask_var(policy->cpus);
         xfree(policy);
     }
 
     /* for the last cpu of the domain, clean room */
     /* It's safe here to free freq_table, drv_data and policy */
-    if (cpus_empty(cpufreq_dom->map)) {
+    if (cpumask_empty(cpufreq_dom->map)) {
         list_del(&cpufreq_dom->node);
+        free_cpumask_var(cpufreq_dom->map);
         xfree(cpufreq_dom);
     }
 

@@ -446,7 +446,7 @@ static int acpi_cpufreq_target(struct cpufreq_policy *policy,
     if (unlikely(result))
         return -ENODEV;
 
-    cpumask_and(&online_policy_cpus, &cpu_online_map, &policy->cpus);
+    cpumask_and(&online_policy_cpus, &cpu_online_map, policy->cpus);
 
     next_perf_state = data->freq_table[next_state].index;
     if (perf->state == next_perf_state) {

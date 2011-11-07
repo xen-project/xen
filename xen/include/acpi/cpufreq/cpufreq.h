@@ -42,7 +42,7 @@ struct cpufreq_cpuinfo {
 };
 
 struct cpufreq_policy {
-    cpumask_t           cpus;          /* affected CPUs */
+    cpumask_var_t       cpus;          /* affected CPUs */
     unsigned int        shared_type;   /* ANY or ALL affected CPUs
                                           should set cpufreq */
     unsigned int        cpu;           /* cpu nr of registered CPU */
