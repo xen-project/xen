@@ -55,6 +55,8 @@ int amd_iommu_unmap_page(struct domain *d, unsigned long gfn);
 void amd_iommu_flush_pages(struct domain *d, unsigned long gfn,
                            unsigned int order);
 void amd_iommu_flush_all_pages(struct domain *d);
+void amd_iommu_flush_iotlb(struct pci_dev *pdev, uint64_t gaddr,
+                           unsigned int order);
 
 u64 amd_iommu_get_next_table_from_pte(u32 *entry);
 int amd_iommu_reserve_domain_unity_map(struct domain *domain,
