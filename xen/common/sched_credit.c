@@ -1246,7 +1246,7 @@ csched_load_balance(struct csched_private *prv, int cpu,
     cpumask_clear_cpu(cpu, &workers);
     peer_cpu = cpu;
 
-    while ( !cpus_empty(workers) )
+    while ( !cpumask_empty(&workers) )
     {
         peer_cpu = cpumask_cycle(peer_cpu, &workers);
         cpumask_clear_cpu(peer_cpu, &workers);

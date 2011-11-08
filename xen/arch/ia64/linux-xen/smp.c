@@ -62,7 +62,7 @@ void smp_send_event_check_mask(const cpumask_t *mask)
     int cpu;
 
     /*  Not for me.  */
-    if (cpus_subset(*mask, *cpumask_of(smp_processor_id())))
+    if (cpumask_subset(mask, cpumask_of(smp_processor_id())))
         return;
 
     //printf("smp_send_event_check_mask called\n");
@@ -444,7 +444,7 @@ on_selected_cpus(const cpumask_t *selected, void (*func) (void *info),
                  void *info, int wait)
 {
 	struct call_data_struct data;
-	unsigned int cpu, nr_cpus = cpus_weight(*selected);
+	unsigned int cpu, nr_cpus = cpumask_weight(selected);
 
 	ASSERT(local_irq_is_enabled());
 

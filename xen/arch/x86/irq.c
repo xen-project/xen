@@ -707,7 +707,7 @@ unsigned int set_desc_affinity(struct irq_desc *desc, const cpumask_t *mask)
     unsigned long flags;
     cpumask_t dest_mask;
 
-    if (!cpus_intersects(*mask, cpu_online_map))
+    if (!cpumask_intersects(mask, &cpu_online_map))
         return BAD_APICID;
 
     irq = desc->irq;

@@ -3196,7 +3196,7 @@ int get_page_type(struct page_info *page, unsigned long type)
                 cpumask_copy(&mask, page_get_owner(page)->domain_dirty_cpumask);
                 tlbflush_filter(mask, page->tlbflush_timestamp);
 
-                if ( unlikely(!cpus_empty(mask)) )
+                if ( unlikely(!cpumask_empty(&mask)) )
                 {
                     perfc_incr(need_flush_tlb_flush);
                     flush_tlb_mask(&mask);

@@ -147,7 +147,7 @@ static inline void per_cpu_scan_finalize(int min_cpus, int reserve_cpus)
 	int cpu;
 	int next_nid = 0;
 
-	low_cpu = cpus_weight(early_cpu_possible_map);
+	low_cpu = cpumask_weight(&early_cpu_possible_map);
 
 	high_cpu = max(low_cpu, min_cpus);
 	high_cpu = min(high_cpu + reserve_cpus, NR_CPUS);

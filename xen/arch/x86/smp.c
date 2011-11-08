@@ -140,11 +140,11 @@ void send_IPI_self_x2apic(int vector)
 
 void send_IPI_mask_flat(const cpumask_t *cpumask, int vector)
 {
-    unsigned long mask = cpus_addr(*cpumask)[0];
+    unsigned long mask = cpumask_bits(cpumask)[0];
     unsigned long cfg;
     unsigned long flags;
 
-    mask &= cpus_addr(cpu_online_map)[0];
+    mask &= cpumask_bits(&cpu_online_map)[0];
     mask &= ~(1UL << smp_processor_id());
     if ( mask == 0 )
         return;
@@ -237,7 +237,7 @@ void flush_area_mask(const cpumask_t *mask, const void *va, unsigned int flags)
     if ( cpu_isset(smp_processor_id(), *mask) )
         flush_area_local(va, flags);
 
-    if ( !cpus_subset(*mask, *cpumask_of(smp_processor_id())) )
+    if ( !cpumask_subset(mask, cpumask_of(smp_processor_id())) )
     {
         spin_lock(&flush_lock);
         cpumask_and(&flush_cpumask, mask, &cpu_online_map);

@@ -42,7 +42,7 @@
 	({									\
 		cpumask_t __tmp__;						\
 		__tmp__ = node_to_cpumask(node);				\
-		cpus_weight(__tmp__);						\
+		cpumask_weight(&__tmp__);					\
 	})
 #endif
 

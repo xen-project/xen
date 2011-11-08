@@ -1009,7 +1009,7 @@ choose_cpu(const struct scheduler *ops, struct vcpu *vc)
     struct csched_vcpu *svc = CSCHED_VCPU(vc);
     s_time_t min_avgload;
 
-    BUG_ON(cpus_empty(prv->active_queues));
+    BUG_ON(cpumask_empty(&prv->active_queues));
 
     /* Locking:
      * - vc->processor is already locked
@@ -1098,7 +1098,7 @@ choose_cpu(const struct scheduler *ops, struct vcpu *vc)
         new_cpu = vc->processor;
     else
     {
-        BUG_ON(cpus_empty(prv->rqd[min_rqi].active));
+        BUG_ON(cpumask_empty(&prv->rqd[min_rqi].active));
         new_cpu = first_cpu(prv->rqd[min_rqi].active);
     }
 
@@ -1258,9 +1258,9 @@ retry:
         if ( st.orqd->b_avgload > load_max )
             load_max = st.orqd->b_avgload;
 
-        cpus_max=cpus_weight(st.lrqd->active);
-        if ( cpus_weight(st.orqd->active) > cpus_max )
-            cpus_max = cpus_weight(st.orqd->active);
+        cpus_max = cpumask_weight(&st.lrqd->active);
+        if ( cpumask_weight(&st.orqd->active) > cpus_max )
+            cpus_max = cpumask_weight(&st.orqd->active);
 
         /* If we're under 100% capacaty, only shift if load difference
          * is > 1.  otherwise, shift if under 12.5% */
@@ -1801,7 +1801,7 @@ csched_dump(const struct scheduler *ops)
 
     printk("Active queues: %d\n"
            "\tdefault-weight     = %d\n",
-           cpus_weight(prv->active_queues),
+           cpumask_weight(&prv->active_queues),
            CSCHED_DEFAULT_WEIGHT);
     for_each_cpu_mask(i, prv->active_queues)
     {
@@ -1815,7 +1815,7 @@ csched_dump(const struct scheduler *ops)
                "\tinstload           = %d\n"
                "\taveload            = %3"PRI_stime"\n",
                i,
-               cpus_weight(prv->rqd[i].active),
+               cpumask_weight(&prv->rqd[i].active),
                prv->rqd[i].max_weight,
                prv->rqd[i].load,
                fraction);
@@ -1852,7 +1852,7 @@ static void activate_runqueue(struct csched_private *prv, int rqi)
 
     rqd = prv->rqd + rqi;
 
-    BUG_ON(!cpus_empty(rqd->active));
+    BUG_ON(!cpumask_empty(&rqd->active));
 
     rqd->max_weight = 1;
     rqd->id = rqi;
@@ -1869,7 +1869,7 @@ static void deactivate_runqueue(struct csched_private *prv, int rqi)
 
     rqd = prv->rqd + rqi;
 
-    BUG_ON(!cpus_empty(rqd->active));
+    BUG_ON(!cpumask_empty(&rqd->active));
     
     rqd->id = -1;
 
@@ -1980,7 +1980,7 @@ csched_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
     cpu_clear(cpu, rqd->idle);
     cpu_clear(cpu, rqd->active);
 
-    if ( cpus_empty(rqd->active) )
+    if ( cpumask_empty(&rqd->active) )
     {
         printk(" No cpus left on runqueue, disabling\n");
         deactivate_runqueue(prv, rqi);

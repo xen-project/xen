@@ -163,11 +163,11 @@ static int perfc_copy_info(XEN_GUEST_HANDLE_64(xen_sysctl_perfc_desc_t) desc,
     unsigned int i, j, v;
 
     /* We only copy the name and array-size information once. */
-    if ( !cpus_equal(cpu_online_map, perfc_cpumap) )
+    if ( !cpumask_equal(&cpu_online_map, &perfc_cpumap) )
     {
         unsigned int nr_cpus;
         perfc_cpumap = cpu_online_map;
-        nr_cpus = cpus_weight(perfc_cpumap);
+        nr_cpus = cpumask_weight(&perfc_cpumap);
 
         perfc_nbr_vals = 0;
 

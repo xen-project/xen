@@ -2436,7 +2436,7 @@ static int __get_page_type(struct page_info *page, unsigned long type,
                 /* Don't flush if the timestamp is old enough */
                 tlbflush_filter(mask, page->tlbflush_timestamp);
 
-                if ( unlikely(!cpus_empty(mask)) &&
+                if ( unlikely(!cpumask_empty(&mask)) &&
                      /* Shadow mode: track only writable pages. */
                      (!shadow_mode_enabled(page_get_owner(page)) ||
                       ((nx & PGT_type_mask) == PGT_writable_page)) )

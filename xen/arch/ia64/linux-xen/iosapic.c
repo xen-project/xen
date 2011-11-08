@@ -709,7 +709,7 @@ get_target_cpu (unsigned int gsi, int vector)
 				cpu_clear(numa_cpu, cpu_mask);
 		}
 
-		num_cpus = cpus_weight(cpu_mask);
+		num_cpus = cpumask_weight(&cpu_mask);
 
 		if (!num_cpus)
 			goto skip_numa_setup;

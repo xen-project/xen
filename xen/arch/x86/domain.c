@@ -1611,8 +1611,9 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 
     cpumask_copy(&dirty_mask, next->vcpu_dirty_cpumask);
     /* Allow at most one CPU at a time to be dirty. */
-    ASSERT(cpus_weight(dirty_mask) <= 1);
-    if ( unlikely(!cpu_isset(cpu, dirty_mask) && !cpus_empty(dirty_mask)) )
+    ASSERT(cpumask_weight(&dirty_mask) <= 1);
+    if ( unlikely(!cpumask_test_cpu(cpu, &dirty_mask) &&
+                  !cpumask_empty(&dirty_mask)) )
     {
         /* Other cpus call __sync_local_execstate from flush ipi handler. */
         flush_tlb_mask(&dirty_mask);

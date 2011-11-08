@@ -26,12 +26,12 @@
  * void cpumask_andnot(dst, src1, src2)	dst = src1 & ~src2
  * void cpumask_complement(dst, src)	dst = ~src
  *
- * int cpus_equal(mask1, mask2)		Does mask1 == mask2?
- * int cpus_intersects(mask1, mask2)	Do mask1 and mask2 intersect?
- * int cpus_subset(mask1, mask2)	Is mask1 a subset of mask2?
- * int cpus_empty(mask)			Is mask empty (no bits sets)?
- * int cpus_full(mask)			Is mask full (all bits sets)?
- * int cpus_weight(mask)		Hamming weigh - number of set bits
+ * int cpumask_equal(mask1, mask2)	Does mask1 == mask2?
+ * int cpumask_intersects(mask1, mask2)	Do mask1 and mask2 intersect?
+ * int cpumask_subset(mask1, mask2)	Is mask1 a subset of mask2?
+ * int cpumask_empty(mask)		Is mask empty (no bits sets)?
+ * int cpumask_full(mask)		Is mask full (all bits sets)?
+ * int cpumask_weight(mask)		Hamming weigh - number of set bits
  *
  * void cpumask_shift_right(dst, src, n) Shift right
  * void cpumask_shift_left(dst, src, n)	Shift left
@@ -42,9 +42,7 @@
  * int cycle_cpu(cpu, mask)		Next cpu cycling from 'cpu', or NR_CPUS
  *
  * cpumask_t cpumask_of_cpu(cpu)	Return cpumask with bit 'cpu' set
- * CPU_MASK_ALL				Initializer - all bits set
- * CPU_MASK_NONE			Initializer - no bits set
- * unsigned long *cpus_addr(mask)	Array of unsigned long's in mask
+ * unsigned long *cpumask_bits(mask)	Array of unsigned long's in mask
  *
  * int cpumask_scnprintf(buf, len, mask) Format cpumask for printing
  * int cpulist_scnprintf(buf, len, mask) Format cpumask as list for printing
@@ -168,51 +166,37 @@ static inline void cpumask_complement(cpumask_t *dstp, const cpumask_t *srcp)
 	bitmap_complement(dstp->bits, srcp->bits, nr_cpumask_bits);
 }
 
-#define cpumask_equal(src1, src2) __cpus_equal(src1, src2, nr_cpu_ids)
-#define cpus_equal(src1, src2) __cpus_equal(&(src1), &(src2), nr_cpu_ids)
-static inline int __cpus_equal(const cpumask_t *src1p,
-					const cpumask_t *src2p, int nbits)
+static inline int cpumask_equal(const cpumask_t *src1p,
+				const cpumask_t *src2p)
 {
-	return bitmap_equal(src1p->bits, src2p->bits, nbits);
+	return bitmap_equal(src1p->bits, src2p->bits, nr_cpu_ids);
 }
 
-#define cpumask_intersects(src1, src2) \
-	__cpus_intersects(src1, src2, nr_cpu_ids)
-#define cpus_intersects(src1, src2) \
-	__cpus_intersects(&(src1), &(src2), nr_cpu_ids)
-static inline int __cpus_intersects(const cpumask_t *src1p,
-					const cpumask_t *src2p, int nbits)
+static inline int cpumask_intersects(const cpumask_t *src1p,
+				     const cpumask_t *src2p)
 {
-	return bitmap_intersects(src1p->bits, src2p->bits, nbits);
+	return bitmap_intersects(src1p->bits, src2p->bits, nr_cpu_ids);
 }
 
-#define cpumask_subset(src1, src2) __cpus_subset(src1, src2, nr_cpu_ids)
-#define cpus_subset(src1, src2) __cpus_subset(&(src1), &(src2), nr_cpu_ids)
-static inline int __cpus_subset(const cpumask_t *src1p,
-					const cpumask_t *src2p, int nbits)
+static inline int cpumask_subset(const cpumask_t *src1p,
+				 const cpumask_t *src2p)
 {
-	return bitmap_subset(src1p->bits, src2p->bits, nbits);
+	return bitmap_subset(src1p->bits, src2p->bits, nr_cpu_ids);
 }
 
-#define cpumask_empty(src) __cpus_empty(src, nr_cpu_ids)
-#define cpus_empty(src) __cpus_empty(&(src), nr_cpu_ids)
-static inline int __cpus_empty(const cpumask_t *srcp, int nbits)
+static inline int cpumask_empty(const cpumask_t *srcp)
 {
-	return bitmap_empty(srcp->bits, nbits);
+	return bitmap_empty(srcp->bits, nr_cpu_ids);
 }
 
-#define cpumask_full(cpumask) __cpus_full(cpumask, nr_cpu_ids)
-#define cpus_full(cpumask) __cpus_full(&(cpumask), nr_cpu_ids)
-static inline int __cpus_full(const cpumask_t *srcp, int nbits)
+static inline int cpumask_full(const cpumask_t *srcp)
 {
-	return bitmap_full(srcp->bits, nbits);
+	return bitmap_full(srcp->bits, nr_cpu_ids);
 }
 
-#define cpumask_weight(cpumask) __cpus_weight(cpumask, nr_cpu_ids)
-#define cpus_weight(cpumask) __cpus_weight(&(cpumask), nr_cpu_ids)
-static inline int __cpus_weight(const cpumask_t *srcp, int nbits)
+static inline int cpumask_weight(const cpumask_t *srcp)
 {
-	return bitmap_weight(srcp->bits, nbits);
+	return bitmap_weight(srcp->bits, nr_cpu_ids);
 }
 
 static inline void cpumask_copy(cpumask_t *dstp, const cpumask_t *srcp)
@@ -317,7 +301,6 @@ static inline const cpumask_t *cpumask_of(unsigned int cpu)
 } }
 #endif /* __ia64__ */
 
-#define cpus_addr(src) ((src).bits)
 #define cpumask_bits(maskp) ((maskp)->bits)
 
 static inline int cpumask_scnprintf(char *buf, int len,
@@ -458,9 +441,9 @@ extern cpumask_t cpu_online_map;
 extern cpumask_t cpu_present_map;
 
 #if NR_CPUS > 1
-#define num_online_cpus()	cpus_weight(cpu_online_map)
-#define num_possible_cpus()	cpus_weight(cpu_possible_map)
-#define num_present_cpus()	cpus_weight(cpu_present_map)
+#define num_online_cpus()	cpumask_weight(&cpu_online_map)
+#define num_possible_cpus()	cpumask_weight(&cpu_possible_map)
+#define num_present_cpus()	cpumask_weight(&cpu_present_map)
 #define cpu_online(cpu)		cpu_isset((cpu), cpu_online_map)
 #define cpu_possible(cpu)	cpu_isset((cpu), cpu_possible_map)
 #define cpu_present(cpu)	cpu_isset((cpu), cpu_present_map)

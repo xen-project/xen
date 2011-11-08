@@ -121,7 +121,7 @@ static int rcu_barrier_action(void *_cpu_count)
      */
     call_rcu(&data.head, rcu_barrier_callback);
 
-    while ( atomic_read(data.cpu_count) != cpus_weight(cpu_online_map) )
+    while ( atomic_read(data.cpu_count) != num_online_cpus() )
     {
         process_pending_softirqs();
         cpu_relax();

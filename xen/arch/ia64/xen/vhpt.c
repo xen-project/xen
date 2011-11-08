@@ -556,7 +556,7 @@ void flush_tlb_mask(const cpumask_t *mask)
     if (cpu_isset(cpu, *mask))
         flush_tlb_vhpt_all (NULL);
 
-    if (cpus_subset(*mask, *cpumask_of(cpu)))
+    if (cpumask_subset(mask, cpumask_of(cpu)))
         return;
 
     for_each_cpu_mask (cpu, *mask)

@@ -550,7 +550,7 @@ int cpu_disable_scheduler(unsigned int cpu)
             vcpu_schedule_lock_irq(v);
 
             cpumask_and(&online_affinity, v->cpu_affinity, c->cpu_valid);
-            if ( cpus_empty(online_affinity) &&
+            if ( cpumask_empty(&online_affinity) &&
                  cpumask_test_cpu(cpu, v->cpu_affinity) )
             {
                 printk("Breaking vcpu affinity for domain %d vcpu %d\n",

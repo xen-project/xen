@@ -863,7 +863,7 @@ static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
          */
         if (atomic_read(&found_error) == 0)
             mc_panic("MCE: No CPU found valid MCE, need reset\n");
-        if (!cpus_empty(mce_fatal_cpus))
+        if (!cpumask_empty(&mce_fatal_cpus))
         {
             char *ebufp, ebuf[96] = "MCE: Fatal error happened on CPUs ";
             ebufp = ebuf + strlen(ebuf);

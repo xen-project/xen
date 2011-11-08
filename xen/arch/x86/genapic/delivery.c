@@ -38,7 +38,7 @@ const cpumask_t *vector_allocation_cpumask_flat(int cpu)
 
 unsigned int cpu_mask_to_apicid_flat(const cpumask_t *cpumask)
 {
-	return cpus_addr(*cpumask)[0]&0xFF;
+	return cpumask_bits(cpumask)[0]&0xFF;
 }
 
 /*
