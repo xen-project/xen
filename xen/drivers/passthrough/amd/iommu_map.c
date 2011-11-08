@@ -370,6 +370,17 @@ void amd_iommu_set_root_page_table(
     dte[0] = entry;
 }
 
+void iommu_dte_set_iotlb(u32 *dte, u8 i)
+{
+    u32 entry;
+
+    entry = dte[3];
+    set_field_in_reg_u32(!!i, entry,
+                         IOMMU_DEV_TABLE_IOTLB_SUPPORT_MASK,
+                         IOMMU_DEV_TABLE_IOTLB_SUPPORT_SHIFT, &entry);
+    dte[3] = entry;
+}
+
 void __init amd_iommu_set_intremap_table(
     u32 *dte, u64 intremap_ptr, u8 int_valid)
 {

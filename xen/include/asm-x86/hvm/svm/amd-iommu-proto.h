@@ -75,6 +75,7 @@ void amd_iommu_set_intremap_table(
     u32 *dte, u64 intremap_ptr, u8 int_valid);
 void amd_iommu_set_root_page_table(
     u32 *dte, u64 root_ptr, u16 domain_id, u8 paging_mode, u8 valid);
+void iommu_dte_set_iotlb(u32 *dte, u8 i);
 void invalidate_dev_table_entry(struct amd_iommu *iommu, u16 devic_id);
 
 /* send cmd to iommu */
