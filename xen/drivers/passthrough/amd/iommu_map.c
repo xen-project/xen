@@ -77,23 +77,24 @@ static void invalidate_iommu_pages(struct amd_iommu *iommu,
 {
     u64 addr_lo, addr_hi;
     u32 cmd[4], entry;
-    u64 mask = 0;
     int sflag = 0, pde = 0;
 
-    /* If sflag == 1, the size of the invalidate command is determined
-     by the first zero bit in the address starting from Address[12] */
-    if ( order == 9 || order == 18 )
-    {
-        mask = ((1ULL << (order - 1)) - 1) << PAGE_SHIFT;
-        io_addr |= mask;
-        sflag = 1;
-    }
+    ASSERT ( order == 0 || order == 9 || order == 18 );
 
     /* All pages associated with the domainID are invalidated */
-    else if ( io_addr == 0x7FFFFFFFFFFFF000ULL )
+    if ( order || (io_addr == INV_IOMMU_ALL_PAGES_ADDRESS ) )
     {
         sflag = 1;
         pde = 1;
+    }
+
+    /* If sflag == 1, the size of the invalidate command is determined
+     by the first zero bit in the address starting from Address[12] */
+    if ( order )
+    {
+        u64 mask = 1ULL << (order - 1 + PAGE_SHIFT);
+        io_addr &= ~mask;
+        io_addr |= mask - 1;
     }
 
     addr_lo = io_addr & DMA_32BIT_MASK;
@@ -917,7 +918,7 @@ static void _amd_iommu_flush_pages(struct domain *d,
 
 void amd_iommu_flush_all_pages(struct domain *d)
 {
-    _amd_iommu_flush_pages(d, 0x7FFFFFFFFFFFFULL, 0);
+    _amd_iommu_flush_pages(d, INV_IOMMU_ALL_PAGES_ADDRESS, 0);
 }
 
 void amd_iommu_flush_pages(struct domain *d,
