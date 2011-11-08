@@ -130,7 +130,7 @@ static int powernow_cpufreq_target(struct cpufreq_policy *policy,
 
     on_selected_cpus(cmd.mask, transition_pstate, &cmd, 1);
 
-    for_each_cpu_mask(j, online_policy_cpus)
+    for_each_cpu(j, &online_policy_cpus)
         cpufreq_statistic_update(j, perf->state, next_perf_state);
 
     perf->state = next_perf_state;

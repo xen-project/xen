@@ -463,7 +463,7 @@ __domain_flush_vtlb_track_entry(struct domain* d,
 				local_purge = 0;
 		}
 	} else {
-		for_each_cpu_mask(cpu, entry->pcpu_dirty_mask) {
+		for_each_cpu(cpu, &entry->pcpu_dirty_mask) {
 			/* Invalidate VHPT entries.  */
 			cpu_flush_vhpt_range(cpu, vaddr, 1L << ps);
 
@@ -559,7 +559,7 @@ void flush_tlb_mask(const cpumask_t *mask)
     if (cpumask_subset(mask, cpumask_of(cpu)))
         return;
 
-    for_each_cpu_mask (cpu, *mask)
+    for_each_cpu (cpu, mask)
         if (cpu != smp_processor_id())
             smp_call_function_single
                 (cpu, (void (*)(void *))flush_tlb_vhpt_all, NULL, 1);

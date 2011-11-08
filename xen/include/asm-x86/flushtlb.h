@@ -52,7 +52,7 @@ static inline int NEED_FLUSH(u32 cpu_stamp, u32 lastuse_stamp)
 #define tlbflush_filter(mask, page_timestamp)                           \
 do {                                                                    \
     unsigned int cpu;                                                   \
-    for_each_cpu_mask ( cpu, mask )                                     \
+    for_each_cpu ( cpu, &(mask) )                                       \
         if ( !NEED_FLUSH(per_cpu(tlbflush_time, cpu), page_timestamp) ) \
             cpumask_clear_cpu(cpu, &(mask));                            \
 } while ( 0 )

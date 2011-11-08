@@ -618,7 +618,7 @@ long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
         XEN_GUEST_HANDLE_64(uint32) arr;
         uint32_t i, val, max_array_ent = ti->max_cpu_index;
 
-        ti->max_cpu_index = last_cpu(cpu_online_map);
+        ti->max_cpu_index = cpumask_last(&cpu_online_map);
         max_array_ent = min(max_array_ent, ti->max_cpu_index);
 
         arr = ti->cpu_to_core;

@@ -462,7 +462,7 @@ on_selected_cpus(const cpumask_t *selected, void (*func) (void *info),
 	call_data = &data;
 	wmb();
 
-	for_each_cpu_mask(cpu, *selected)
+	for_each_cpu(cpu, selected)
 		send_IPI_single(cpu, IPI_CALL_FUNC);
 
 	while (atomic_read(wait ? &data.finished : &data.started) != nr_cpus)

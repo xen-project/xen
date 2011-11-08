@@ -182,7 +182,7 @@ void send_IPI_mask_phys(const cpumask_t *mask, int vector)
 
     local_irq_save(flags);
 
-    for_each_cpu_mask ( query_cpu, *mask )
+    for_each_cpu ( query_cpu, mask )
     {
         if ( !cpu_online(query_cpu) || (query_cpu == smp_processor_id()) )
             continue;

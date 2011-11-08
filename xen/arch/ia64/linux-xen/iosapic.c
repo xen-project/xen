@@ -704,7 +704,7 @@ get_target_cpu (unsigned int gsi, int vector)
 
 		cpu_mask = node_to_cpumask(iosapic_lists[iosapic_index].node);
 
-		for_each_cpu_mask(numa_cpu, cpu_mask) {
+		for_each_cpu(numa_cpu, &cpu_mask) {
 			if (!cpu_online(numa_cpu))
 				cpumask_clear_cpu(numa_cpu, &cpu_mask);
 		}
@@ -717,8 +717,8 @@ get_target_cpu (unsigned int gsi, int vector)
 		/* Use vector assigment to distribute across cpus in node */
 		cpu_index = vector % num_cpus;
 
-		for (numa_cpu = first_cpu(cpu_mask) ; i < cpu_index ; i++)
-			numa_cpu = next_cpu(numa_cpu, cpu_mask);
+		for (numa_cpu = cpumask_first(&cpu_mask) ; i < cpu_index ; i++)
+			numa_cpu = cpumask_next(numa_cpu, &cpu_mask);
 
 		if (numa_cpu != NR_CPUS)
 			return cpu_physical_id(numa_cpu);

@@ -103,7 +103,7 @@ long arch_do_sysctl(
         uint32_t i, max_cpu_index, last_online_cpu;
         xen_sysctl_topologyinfo_t *ti = &sysctl->u.topologyinfo;
 
-        last_online_cpu = last_cpu(cpu_online_map);
+        last_online_cpu = cpumask_last(&cpu_online_map);
         max_cpu_index = min_t(uint32_t, ti->max_cpu_index, last_online_cpu);
         ti->max_cpu_index = last_online_cpu;
 

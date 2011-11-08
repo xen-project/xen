@@ -190,7 +190,7 @@ static unsigned int default_vcpu0_location(cpumask_t *online)
     cpu = cpumask_first(&cpu_exclude_map);
     if ( cpumask_weight(&cpu_exclude_map) > 1 )
         cpu = cpumask_next(cpu, &cpu_exclude_map);
-    for_each_cpu_mask(i, *online)
+    for_each_cpu(i, online)
     {
         if ( cpumask_test_cpu(i, &cpu_exclude_map) )
             continue;
@@ -541,7 +541,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
             cpu = (i == 0) ?
                 default_vcpu0_location(online) :
-                cycle_cpu(d->vcpu[i-1]->processor, *online);
+                cpumask_cycle(d->vcpu[i-1]->processor, online);
 
             if ( alloc_vcpu(d, i, cpu) == NULL )
                 goto maxvcpu_out;

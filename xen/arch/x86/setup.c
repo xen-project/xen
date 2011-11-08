@@ -229,9 +229,9 @@ static void __init normalise_cpu_order(void)
          * Find remaining CPU with longest-prefix match on APIC ID.
          * Among identical longest-prefix matches, pick the smallest APIC ID.
          */
-        for ( j = next_cpu(i, cpu_present_map);
+        for ( j = cpumask_next(i, &cpu_present_map);
               j < nr_cpu_ids;
-              j = next_cpu(j, cpu_present_map) )
+              j = cpumask_next(j, &cpu_present_map) )
         {
             diff = x86_cpu_to_apicid[j] ^ apicid;
             while ( diff & (diff-1) )
@@ -248,12 +248,12 @@ static void __init normalise_cpu_order(void)
         /* If no match then there must be no CPUs remaining to consider. */
         if ( min_cpu >= nr_cpu_ids )
         {
-            BUG_ON(next_cpu(i, cpu_present_map) < nr_cpu_ids);
+            BUG_ON(cpumask_next(i, &cpu_present_map) < nr_cpu_ids);
             break;
         }
 
         /* Switch the best-matching CPU with the next CPU in logical order. */
-        j = next_cpu(i, cpu_present_map);
+        j = cpumask_next(i, &cpu_present_map);
         apicid = x86_cpu_to_apicid[min_cpu];
         x86_cpu_to_apicid[min_cpu] = x86_cpu_to_apicid[j];
         x86_cpu_to_apicid[j] = apicid;

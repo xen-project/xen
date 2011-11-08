@@ -501,7 +501,7 @@ int vcpu_initialise(struct vcpu *v)
 
 	if (!VMX_DOMAIN(v))
 		init_timer(&v->arch.hlt_timer, hlt_timer_fn, v,
-		           first_cpu(cpu_online_map));
+		           cpumask_any(&cpu_online_map));
 
 	return 0;
 }

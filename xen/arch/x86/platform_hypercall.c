@@ -366,7 +366,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
             goto out;
         guest_from_compat_handle(idletimes, op->u.getidletime.idletime);
 
-        for_each_cpu_mask ( cpu, *cpumap )
+        for_each_cpu ( cpu, cpumap )
         {
             if ( idle_vcpu[cpu] == NULL )
                 cpumask_clear_cpu(cpu, cpumap);
@@ -460,7 +460,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
                 g_info->flags |= XEN_PCPU_FLAGS_ONLINE;
         }
 
-        g_info->max_present = last_cpu(cpu_present_map);
+        g_info->max_present = cpumask_last(&cpu_present_map);
 
         put_cpu_maps();
 

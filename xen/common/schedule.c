@@ -1450,7 +1450,7 @@ void schedule_dump(struct cpupool *c)
     printk("Scheduler: %s (%s)\n", sched->name, sched->opt_name);
     SCHED_OP(sched, dump_settings);
 
-    for_each_cpu_mask (i, *cpus)
+    for_each_cpu (i, cpus)
     {
         pcpu_schedule_lock(i);
         printk("CPU[%02d] ", i);

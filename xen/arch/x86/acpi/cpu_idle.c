@@ -251,7 +251,7 @@ void cpuidle_wakeup_mwait(cpumask_t *mask)
     cpumask_and(&target, mask, &cpuidle_mwait_flags);
 
     /* CPU is MWAITing on the cpuidle_mwait_wakeup flag. */
-    for_each_cpu_mask(cpu, target)
+    for_each_cpu(cpu, &target)
         mwait_wakeup(cpu) = 0;
 
     cpumask_andnot(mask, mask, &target);

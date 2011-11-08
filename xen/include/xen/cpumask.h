@@ -37,18 +37,19 @@
  * void cpumask_shift_right(dst, src, n) Shift right
  * void cpumask_shift_left(dst, src, n)	Shift left
  *
- * int first_cpu(mask)			Number lowest set bit, or NR_CPUS
- * int next_cpu(cpu, mask)		Next cpu past 'cpu', or NR_CPUS
- * int last_cpu(mask)			Number highest set bit, or NR_CPUS
- * int cycle_cpu(cpu, mask)		Next cpu cycling from 'cpu', or NR_CPUS
+ * int cpumask_first(mask)		Number lowest set bit, or NR_CPUS
+ * int cpumask_next(cpu, mask)		Next cpu past 'cpu', or NR_CPUS
+ * int cpumask_last(mask)		Number highest set bit, or NR_CPUS
+ * int cpumask_any(mask)		Any cpu in mask, or NR_CPUS
+ * int cpumask_cycle(cpu, mask)		Next cpu cycling from 'cpu', or NR_CPUS
  *
- * cpumask_t cpumask_of_cpu(cpu)	Return cpumask with bit 'cpu' set
+ * const cpumask_t *cpumask_of(cpu)	Return cpumask with bit 'cpu' set
  * unsigned long *cpumask_bits(mask)	Array of unsigned long's in mask
  *
  * int cpumask_scnprintf(buf, len, mask) Format cpumask for printing
  * int cpulist_scnprintf(buf, len, mask) Format cpumask as list for printing
  *
- * for_each_cpu_mask(cpu, mask)		for-loop cpu over mask
+ * for_each_cpu(cpu, mask)		for-loop cpu over mask
  *
  * int num_online_cpus()		Number of online CPUs
  * int num_possible_cpus()		Number of all possible CPUs
@@ -210,41 +211,42 @@ static inline void cpumask_shift_left(cpumask_t *dstp,
 	bitmap_shift_left(dstp->bits, srcp->bits, n, nr_cpumask_bits);
 }
 
-#define cpumask_first(src) __first_cpu(src, nr_cpu_ids)
-#define first_cpu(src) __first_cpu(&(src), nr_cpu_ids)
-static inline int __first_cpu(const cpumask_t *srcp, int nbits)
+static inline int cpumask_first(const cpumask_t *srcp)
 {
-	return min_t(int, nbits, find_first_bit(srcp->bits, nbits));
+	return min_t(int, nr_cpu_ids, find_first_bit(srcp->bits, nr_cpu_ids));
 }
 
-#define cpumask_next(n, src) __next_cpu(n, src, nr_cpu_ids)
-#define next_cpu(n, src) __next_cpu((n), &(src), nr_cpu_ids)
-static inline int __next_cpu(int n, const cpumask_t *srcp, int nbits)
+static inline int cpumask_next(int n, const cpumask_t *srcp)
 {
-	return min_t(int, nbits, find_next_bit(srcp->bits, nbits, n+1));
+	/* -1 is a legal arg here. */
+	if (n != -1)
+		cpumask_check(n);
+
+	return min_t(int, nr_cpu_ids,
+                     find_next_bit(srcp->bits, nr_cpu_ids, n + 1));
 }
 
-#define cpumask_last(src) __last_cpu(src, nr_cpu_ids)
-#define last_cpu(src) __last_cpu(&(src), nr_cpu_ids)
-static inline int __last_cpu(const cpumask_t *srcp, int nbits)
+static inline int cpumask_last(const cpumask_t *srcp)
 {
-	int cpu, pcpu = nbits;
-	for (cpu = __first_cpu(srcp, nbits);
-	     cpu < nbits;
-	     cpu = __next_cpu(cpu, srcp, nbits))
+	int cpu, pcpu = nr_cpu_ids;
+
+	for (cpu = cpumask_first(srcp);
+	     cpu < nr_cpu_ids;
+	     cpu = cpumask_next(cpu, srcp))
 		pcpu = cpu;
 	return pcpu;
 }
 
-#define cpumask_cycle(n, src) __cycle_cpu(n, src, nr_cpu_ids)
-#define cycle_cpu(n, src) __cycle_cpu((n), &(src), nr_cpu_ids)
-static inline int __cycle_cpu(int n, const cpumask_t *srcp, int nbits)
+static inline int cpumask_cycle(int n, const cpumask_t *srcp)
 {
-    int nxt = __next_cpu(n, srcp, nbits);
-    if (nxt == nbits)
-        nxt = __first_cpu(srcp, nbits);
+    int nxt = cpumask_next(n, srcp);
+
+    if (nxt == nr_cpu_ids)
+        nxt = cpumask_first(srcp);
     return nxt;
 }
+
+#define cpumask_any(srcp) cpumask_first(srcp)
 
 /*
  * Special-case data structure for "single bit set only" constant CPU masks.
@@ -261,8 +263,6 @@ static inline const cpumask_t *cpumask_of(unsigned int cpu)
 	const unsigned long *p = cpu_bit_bitmap[1 + cpu % BITS_PER_LONG];
 	return (const cpumask_t *)(p - cpu / BITS_PER_LONG);
 }
-
-#define cpumask_of_cpu(cpu) (*cpumask_of(cpu))
 
 #if defined(__ia64__) /* XXX needs cleanup */
 #define CPU_MASK_LAST_WORD BITMAP_LAST_WORD_MASK(NR_CPUS)
@@ -366,12 +366,13 @@ static inline void free_cpumask_var(cpumask_var_t mask)
 #endif
 
 #if NR_CPUS > 1
-#define for_each_cpu_mask(cpu, mask)		\
-	for ((cpu) = first_cpu(mask);		\
-		(cpu) < nr_cpu_ids;		\
-		(cpu) = next_cpu((cpu), (mask)))
+#define for_each_cpu(cpu, mask)			\
+	for ((cpu) = cpumask_first(mask);	\
+	     (cpu) < nr_cpu_ids;		\
+	     (cpu) = cpumask_next(cpu, mask))
 #else /* NR_CPUS == 1 */
-#define for_each_cpu_mask(cpu, mask) for ((cpu) = 0; (cpu) < 1; (cpu)++)
+#define for_each_cpu(cpu, mask)			\
+	for ((cpu) = 0; (cpu) < 1; (cpu)++, (void)(mask))
 #endif /* NR_CPUS */
 
 /*
@@ -450,18 +451,9 @@ extern cpumask_t cpu_present_map;
 #define cpu_present(cpu)	((cpu) == 0)
 #endif
 
-#define any_online_cpu(mask)			\
-({						\
-	int cpu;				\
-	for_each_cpu_mask(cpu, (mask))		\
-		if (cpu_online(cpu))		\
-			break;			\
-	cpu;					\
-})
-
-#define for_each_possible_cpu(cpu) for_each_cpu_mask((cpu), cpu_possible_map)
-#define for_each_online_cpu(cpu)   for_each_cpu_mask((cpu), cpu_online_map)
-#define for_each_present_cpu(cpu)  for_each_cpu_mask((cpu), cpu_present_map)
+#define for_each_possible_cpu(cpu) for_each_cpu(cpu, &cpu_possible_map)
+#define for_each_online_cpu(cpu)   for_each_cpu(cpu, &cpu_online_map)
+#define for_each_present_cpu(cpu)  for_each_cpu(cpu, &cpu_present_map)
 
 /* Copy to/from cpumap provided by control tools. */
 struct xenctl_cpumap;

@@ -211,14 +211,14 @@ static int perfc_copy_info(XEN_GUEST_HANDLE_64(xen_sysctl_perfc_desc_t) desc,
         {
         case TYPE_SINGLE:
         case TYPE_S_SINGLE:
-            for_each_cpu_mask ( cpu, perfc_cpumap )
+            for_each_cpu ( cpu, &perfc_cpumap )
                 perfc_vals[v++] = per_cpu(perfcounters, cpu)[j];
             ++j;
             break;
         case TYPE_ARRAY:
         case TYPE_S_ARRAY:
             memset(perfc_vals + v, 0, perfc_d[i].nr_vals * sizeof(*perfc_vals));
-            for_each_cpu_mask ( cpu, perfc_cpumap )
+            for_each_cpu ( cpu, &perfc_cpumap )
             {
                 perfc_t *counters = per_cpu(perfcounters, cpu) + j;
                 unsigned int k;

@@ -182,7 +182,7 @@ again:
     now = NOW();
 
     /* find all expired events */
-    for_each_cpu_mask(cpu, *ch->cpumask)
+    for_each_cpu(cpu, ch->cpumask)
     {
         s_time_t deadline;
 

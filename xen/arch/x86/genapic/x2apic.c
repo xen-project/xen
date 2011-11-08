@@ -72,7 +72,7 @@ static void __send_IPI_mask_x2apic(
 
     local_irq_save(flags);
 
-    for_each_cpu_mask ( cpu, *cpumask )
+    for_each_cpu ( cpu, cpumask )
     {
         if ( !cpu_online(cpu) || (cpu == smp_processor_id()) )
             continue;

@@ -487,7 +487,7 @@ static int acpi_cpufreq_target(struct cpufreq_policy *policy,
         return -EAGAIN;
     }
 
-    for_each_cpu_mask(j, online_policy_cpus)
+    for_each_cpu(j, &online_policy_cpus)
         cpufreq_statistic_update(j, perf->state, next_perf_state);
 
     perf->state = next_perf_state;

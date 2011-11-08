@@ -1033,7 +1033,7 @@ static void dma_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
     msg.address_lo = (MSI_ADDRESS_HEADER << (MSI_ADDRESS_HEADER_SHIFT + 8));
     msg.address_lo |= MSI_PHYSICAL_MODE << 2;
     msg.address_lo |= MSI_REDIRECTION_HINT_MODE << 3;
-    dest = cpu_physical_id(first_cpu(mask));
+    dest = cpu_physical_id(cpumask_first(mask));
     msg.address_lo |= dest << MSI_TARGET_CPU_SHIFT;
 #endif
 

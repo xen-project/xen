@@ -125,7 +125,7 @@ static int __init __bind_irq_vector(int irq, int vector, const cpumask_t *cpu_ma
     if ( desc->arch.vector != IRQ_VECTOR_UNASSIGNED )
         return -EBUSY;
     trace_irq_mask(TRC_HW_IRQ_BIND_VECTOR, irq, vector, &online_mask);
-    for_each_cpu_mask(cpu, online_mask)
+    for_each_cpu(cpu, &online_mask)
         per_cpu(vector_irq, cpu)[vector] = irq;
     desc->arch.vector = vector;
     cpumask_copy(desc->arch.cpu_mask, &online_mask);
@@ -223,7 +223,7 @@ static void __clear_irq_vector(int irq)
     vector = desc->arch.vector;
     cpumask_and(&tmp_mask, desc->arch.cpu_mask, &cpu_online_map);
 
-    for_each_cpu_mask(cpu, tmp_mask) {
+    for_each_cpu(cpu, &tmp_mask) {
         ASSERT( per_cpu(vector_irq, cpu)[vector] == irq );
         per_cpu(vector_irq, cpu)[vector] = -1;
     }
@@ -248,7 +248,7 @@ static void __clear_irq_vector(int irq)
     old_vector = desc->arch.old_vector;
     cpumask_and(&tmp_mask, desc->arch.old_cpu_mask, &cpu_online_map);
 
-    for_each_cpu_mask(cpu, tmp_mask) {
+    for_each_cpu(cpu, &tmp_mask) {
         ASSERT( per_cpu(vector_irq, cpu)[old_vector] == irq );
         TRACE_3D(TRC_HW_IRQ_MOVE_FINISH, irq, old_vector, cpu);
         per_cpu(vector_irq, cpu)[old_vector] = -1;
@@ -451,7 +451,7 @@ static int __assign_irq_vector(
     else
         irq_used_vectors = irq_get_used_vector_mask(irq);
 
-    for_each_cpu_mask(cpu, *mask) {
+    for_each_cpu(cpu, mask) {
         int new_cpu;
         int vector, offset;
 
@@ -481,7 +481,7 @@ next:
             && test_bit(vector, irq_used_vectors) )
             goto next;
 
-        for_each_cpu_mask(new_cpu, tmp_mask)
+        for_each_cpu(new_cpu, &tmp_mask)
             if (per_cpu(vector_irq, new_cpu)[vector] != -1)
                 goto next;
         /* Found one! */
@@ -493,7 +493,7 @@ next:
             desc->arch.old_vector = desc->arch.vector;
         }
         trace_irq_mask(TRC_HW_IRQ_ASSIGN_VECTOR, irq, vector, &tmp_mask);
-        for_each_cpu_mask(new_cpu, tmp_mask)
+        for_each_cpu(new_cpu, &tmp_mask)
             per_cpu(vector_irq, new_cpu)[vector] = irq;
         desc->arch.vector = vector;
         cpumask_copy(desc->arch.cpu_mask, &tmp_mask);

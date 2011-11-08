@@ -687,9 +687,9 @@ clear_cpu_sibling_map(int cpu)
 {
 	int i;
 
-	for_each_cpu_mask(i, *per_cpu(cpu_sibling_mask, cpu))
+	for_each_cpu(i, per_cpu(cpu_sibling_mask, cpu))
 		cpumask_clear_cpu(cpu, per_cpu(cpu_sibling_mask, i));
-	for_each_cpu_mask(i, *per_cpu(cpu_core_mask, cpu))
+	for_each_cpu(i, per_cpu(cpu_core_mask, cpu))
 		cpumask_clear_cpu(cpu, per_cpu(cpu_core_mask, i));
 
 	cpumask_clear(per_cpu(cpu_sibling_mask, cpu));

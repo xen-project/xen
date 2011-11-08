@@ -548,7 +548,7 @@ static struct keyhandler dump_timerq_keyhandler = {
 
 static void migrate_timers_from_cpu(unsigned int old_cpu)
 {
-    unsigned int new_cpu = first_cpu(cpu_online_map);
+    unsigned int new_cpu = cpumask_any(&cpu_online_map);
     struct timers *old_ts, *new_ts;
     struct timer *t;
     bool_t notify = 0;

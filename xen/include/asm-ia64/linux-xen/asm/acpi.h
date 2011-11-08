@@ -139,7 +139,7 @@ extern int __initdata nid_to_pxm_map[MAX_NUMNODES];
 #ifdef CONFIG_ACPI_NUMA
 extern cpumask_t early_cpu_possible_map;
 #define for_each_possible_early_cpu(cpu)  \
-	for_each_cpu_mask((cpu), early_cpu_possible_map)
+	for_each_cpu(cpu, &early_cpu_possible_map)
 
 static inline void per_cpu_scan_finalize(int min_cpus, int reserve_cpus)
 {

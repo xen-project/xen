@@ -125,7 +125,7 @@ static long do_microcode_update(void *_info)
     if ( error )
         info->error = error;
 
-    info->cpu = next_cpu(info->cpu, cpu_online_map);
+    info->cpu = cpumask_next(info->cpu, &cpu_online_map);
     if ( info->cpu < nr_cpu_ids )
         return continue_hypercall_on_cpu(info->cpu, do_microcode_update, info);
 
@@ -158,7 +158,7 @@ int microcode_update(XEN_GUEST_HANDLE(const_void) buf, unsigned long len)
 
     info->buffer_size = len;
     info->error = 0;
-    info->cpu = first_cpu(cpu_online_map);
+    info->cpu = cpumask_first(&cpu_online_map);
 
     return continue_hypercall_on_cpu(info->cpu, do_microcode_update, info);
 }

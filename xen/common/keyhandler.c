@@ -128,7 +128,7 @@ static void dump_registers(unsigned char key, struct cpu_user_regs *regs)
         return;
 
     /* Normal handling: synchronously dump the remaining CPUs' states. */
-    for_each_cpu_mask ( cpu, dump_execstate_mask )
+    for_each_cpu ( cpu, &dump_execstate_mask )
     {
         smp_send_state_dump(cpu);
         while ( cpumask_test_cpu(cpu, &dump_execstate_mask) )

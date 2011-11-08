@@ -494,7 +494,7 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
                         op->cpupool_id, cpu);
         spin_lock(&cpupool_lock);
         if ( cpu == XEN_SYSCTL_CPUPOOL_PAR_ANY )
-            cpu = first_cpu(cpupool_free_cpus);
+            cpu = cpumask_first(&cpupool_free_cpus);
         ret = -EINVAL;
         if ( cpu >= nr_cpu_ids )
             goto addcpu_out;

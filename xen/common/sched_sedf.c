@@ -442,7 +442,7 @@ static int sedf_pick_cpu(const struct scheduler *ops, struct vcpu *v)
 
     online = SEDF_CPUONLINE(v->domain->cpupool);
     cpumask_and(&online_affinity, v->cpu_affinity, online);
-    return first_cpu(online_affinity);
+    return cpumask_first(&online_affinity);
 }
 
 /*
@@ -1322,7 +1322,7 @@ static int sedf_adjust_weights(struct cpupool *c, struct xen_domctl_scheduler_op
 {
     struct vcpu *p;
     struct domain      *d;
-    unsigned int        cpu, nr_cpus = last_cpu(cpu_online_map) + 1;
+    unsigned int        cpu, nr_cpus = cpumask_last(&cpu_online_map) + 1;
     int                *sumw = xzalloc_array(int, nr_cpus);
     s_time_t           *sumt = xzalloc_array(s_time_t, nr_cpus);
 

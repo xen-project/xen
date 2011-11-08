@@ -248,7 +248,7 @@ static void set_cpu_sibling_map(int cpu)
 
     if ( c[cpu].x86_num_siblings > 1 )
     {
-        for_each_cpu_mask ( i, cpu_sibling_setup_map )
+        for_each_cpu ( i, &cpu_sibling_setup_map )
         {
             if ( cpu_has(c, X86_FEATURE_TOPOEXT) ) {
                 if ( (c[cpu].phys_proc_id == c[i].phys_proc_id) &&
@@ -273,7 +273,7 @@ static void set_cpu_sibling_map(int cpu)
         return;
     }
 
-    for_each_cpu_mask ( i, cpu_sibling_setup_map )
+    for_each_cpu ( i, &cpu_sibling_setup_map )
     {
         if ( c[cpu].phys_proc_id == c[i].phys_proc_id )
         {
@@ -814,7 +814,7 @@ remove_siblinginfo(int cpu)
     int sibling;
     struct cpuinfo_x86 *c = cpu_data;
 
-    for_each_cpu_mask ( sibling, *per_cpu(cpu_core_mask, cpu) )
+    for_each_cpu ( sibling, per_cpu(cpu_core_mask, cpu) )
     {
         cpumask_clear_cpu(cpu, per_cpu(cpu_core_mask, sibling));
         /* Last thread sibling in this cpu core going down. */
@@ -822,7 +822,7 @@ remove_siblinginfo(int cpu)
             c[sibling].booted_cores--;
     }
    
-    for_each_cpu_mask(sibling, *per_cpu(cpu_sibling_mask, cpu))
+    for_each_cpu(sibling, per_cpu(cpu_sibling_mask, cpu))
         cpumask_clear_cpu(cpu, per_cpu(cpu_sibling_mask, sibling));
     cpumask_clear(per_cpu(cpu_sibling_mask, cpu));
     cpumask_clear(per_cpu(cpu_core_mask, cpu));

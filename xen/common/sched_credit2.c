@@ -521,7 +521,7 @@ runq_tickle(const struct scheduler *ops, unsigned int cpu, struct csched_vcpu *n
     cpumask_andnot(&mask, &rqd->active, &rqd->idle);
     cpumask_andnot(&mask, &mask, &rqd->tickled);
 
-    for_each_cpu_mask(i, mask)
+    for_each_cpu(i, &mask)
     {
         struct csched_vcpu * cur;
 
@@ -1051,7 +1051,7 @@ choose_cpu(const struct scheduler *ops, struct vcpu *vc)
         else
         {
             d2printk("d%dv%d +\n", svc->vcpu->domain->domain_id, svc->vcpu->vcpu_id);
-            new_cpu = first_cpu(svc->migrate_rqd->active);
+            new_cpu = cpumask_first(&svc->migrate_rqd->active);
             goto out_up;
         }
     }
@@ -1061,7 +1061,7 @@ choose_cpu(const struct scheduler *ops, struct vcpu *vc)
     min_avgload = MAX_LOAD;
 
     /* Find the runqueue with the lowest instantaneous load */
-    for_each_cpu_mask(i, prv->active_queues)
+    for_each_cpu(i, &prv->active_queues)
     {
         struct csched_runqueue_data *rqd;
         s_time_t rqd_avgload;
@@ -1099,7 +1099,7 @@ choose_cpu(const struct scheduler *ops, struct vcpu *vc)
     else
     {
         BUG_ON(cpumask_empty(&prv->rqd[min_rqi].active));
-        new_cpu = first_cpu(prv->rqd[min_rqi].active);
+        new_cpu = cpumask_first(&prv->rqd[min_rqi].active);
     }
 
 out_up:
@@ -1179,7 +1179,7 @@ void migrate(const struct scheduler *ops,
             on_runq=1;
         }
         __runq_deassign(svc);
-        svc->vcpu->processor = first_cpu(trqd->active);
+        svc->vcpu->processor = cpumask_first(&trqd->active);
         __runq_assign(svc, trqd);
         if ( on_runq )
         {
@@ -1219,7 +1219,7 @@ retry:
 
     st.load_delta = 0;
 
-    for_each_cpu_mask(i, prv->active_queues)
+    for_each_cpu(i, &prv->active_queues)
     {
         s_time_t delta;
         
@@ -1618,7 +1618,7 @@ csched_schedule(
         {
             int rq;
             other_rqi = -2;
-            for_each_cpu_mask ( rq, CSCHED_PRIV(ops)->active_queues )
+            for_each_cpu ( rq, &CSCHED_PRIV(ops)->active_queues )
             {
                 if ( scurr->rqd == &CSCHED_PRIV(ops)->rqd[rq] )
                 {
@@ -1803,7 +1803,7 @@ csched_dump(const struct scheduler *ops)
            "\tdefault-weight     = %d\n",
            cpumask_weight(&prv->active_queues),
            CSCHED_DEFAULT_WEIGHT);
-    for_each_cpu_mask(i, prv->active_queues)
+    for_each_cpu(i, &prv->active_queues)
     {
         s_time_t fraction;
         

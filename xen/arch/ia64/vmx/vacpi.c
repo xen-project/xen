@@ -191,7 +191,7 @@ void vacpi_init(struct domain *d)
 	s->last_gtime = NOW();
 
 	/* Set up callback to fire SCIs when the MSB of TMR_VAL changes */
-	init_timer(&s->timer, pmt_timer_callback, d, first_cpu(cpu_online_map));
+	init_timer(&s->timer, pmt_timer_callback, d, cpumask_first(&cpu_online_map));
 	pmt_timer_callback(d);
 }
 

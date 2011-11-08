@@ -205,7 +205,7 @@ void enable_nonboot_cpus(void)
 
     printk("Enabling non-boot CPUs  ...\n");
 
-    for_each_cpu_mask ( cpu, frozen_cpus )
+    for_each_cpu ( cpu, &frozen_cpus )
     {
         if ( (error = cpu_up(cpu)) )
         {

@@ -101,7 +101,7 @@ int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
 
     smp_wmb();
 
-    for_each_cpu_mask ( i, allbutself )
+    for_each_cpu ( i, &allbutself )
         tasklet_schedule_on_cpu(&per_cpu(stopmachine_tasklet, i), i);
 
     stopmachine_set_state(STOPMACHINE_PREPARE);

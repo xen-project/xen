@@ -122,7 +122,7 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
         return;
 
     /* Get Idle Time */
-    for_each_cpu_mask(j, *policy->cpus) {
+    for_each_cpu(j, policy->cpus) {
         uint64_t idle_ns, total_idle_ns;
         uint64_t load, load_freq, freq_avg;
         struct cpu_dbs_info_s *j_dbs_info;
@@ -233,7 +233,7 @@ int cpufreq_governor_dbs(struct cpufreq_policy *policy, unsigned int event)
 
         dbs_enable++;
 
-        for_each_cpu_mask(j, *policy->cpus) {
+        for_each_cpu(j, policy->cpus) {
             struct cpu_dbs_info_s *j_dbs_info;
             j_dbs_info = &per_cpu(cpu_dbs_info, j);
             j_dbs_info->cur_policy = policy;
