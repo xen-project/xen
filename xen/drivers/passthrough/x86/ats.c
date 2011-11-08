@@ -134,3 +134,19 @@ void disable_ats_device(int seg, int bus, int devfn)
         dprintk(XENLOG_INFO, "%04x:%02x:%02x.%u: ATS is disabled\n",
                 seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
 }
+
+struct pci_ats_dev *get_ats_device(int seg, int bus, int devfn)
+{
+    struct pci_ats_dev *pdev;
+
+    if ( !pci_ats_device(seg, bus, devfn) )
+        return NULL;
+
+    list_for_each_entry ( pdev, &ats_devices, list )
+    {
+        if ( pdev->seg == seg && pdev->bus == bus && pdev->devfn == devfn )
+            return pdev;
+    }
+
+    return NULL;
+}

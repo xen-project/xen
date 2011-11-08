@@ -16,6 +16,8 @@
 #ifndef _ATS_H_
 #define _ATS_H_
 
+#include <xen/pci_regs.h>
+
 struct pci_ats_dev {
     struct list_head list;
     u16 seg;
@@ -36,6 +38,28 @@ extern bool_t ats_enabled;
 
 int enable_ats_device(int seg, int bus, int devfn);
 void disable_ats_device(int seg, int bus, int devfn);
+struct pci_ats_dev *get_ats_device(int seg, int bus, int devfn);
+
+static inline int pci_ats_enabled(int seg, int bus, int devfn)
+{
+    u32 value;
+    int pos;
+
+    pos = pci_find_ext_capability(seg, bus, devfn, PCI_EXT_CAP_ID_ATS);
+    BUG_ON(!pos);
+
+    value = pci_conf_read16(seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+                            pos + ATS_REG_CTL);
+    return value & ATS_ENABLE;
+}
+
+static inline int pci_ats_device(int seg, int bus, int devfn)
+{
+    if ( !ats_enabled )
+        return 0;
+
+    return pci_find_ext_capability(seg, bus, devfn, PCI_EXT_CAP_ID_ATS);
+}
 
 #else
 
@@ -50,6 +74,22 @@ static inline void disable_ats_device(int seg, int bus, int devfn)
 {
     BUG();
 }
+
+static inline int pci_ats_enabled(int seg, int bus, int devfn)
+{
+    return 0;
+}
+
+static inline int pci_ats_device(int seg, int bus, int devfn)
+{
+    return 0;
+}
+
+static inline struct pci_ats_dev *get_ats_device(int seg, int bus, int devfn)
+{
+    return NULL;
+}
+
 #endif
 
 #endif /* _ATS_H_ */
