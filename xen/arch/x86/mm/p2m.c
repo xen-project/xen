@@ -906,7 +906,7 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
     p2m_unlock(p2m);
 
     /* Pause domain if request came from guest and gfn has paging type */
-    if (  p2m_is_paging(p2mt) && v->domain->domain_id == d->domain_id )
+    if (  p2m_is_paging(p2mt) && v->domain == d )
     {
         vcpu_pause_nosync(v);
         req.flags |= MEM_EVENT_FLAG_VCPU_PAUSED;
