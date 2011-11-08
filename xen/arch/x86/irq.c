@@ -25,7 +25,6 @@
 #include <public/physdev.h>
 
 static void parse_irq_vector_map_param(char *s);
-static int __assign_irq_vector(int irq, struct irq_desc *, const cpumask_t *);
 
 /* opt_noirqbalance: If true, software IRQ balancing/affinity is disabled. */
 bool_t __read_mostly opt_noirqbalance = 0;
@@ -156,7 +155,6 @@ int __init bind_irq_vector(int irq, int vector, const cpumask_t *cpu_mask)
  */
 int create_irq(void)
 {
-    unsigned long flags;
     int irq, ret;
     struct irq_desc *desc;
 
@@ -172,11 +170,7 @@ int create_irq(void)
 
     ret = init_one_irq_desc(desc);
     if (!ret)
-    {
-        spin_lock_irqsave(&vector_lock, flags);
-        ret = __assign_irq_vector(irq, desc, TARGET_CPUS);
-        spin_unlock_irqrestore(&vector_lock, flags);
-    }
+        ret = assign_irq_vector(irq);
     if (ret < 0)
     {
         desc->arch.used = IRQ_UNUSED;
