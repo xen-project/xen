@@ -15,8 +15,7 @@
 #define NR_IRQS		256
 
 #ifdef XEN
-struct irq_cfg {
-#define arch_irq_desc irq_cfg
+struct arch_irq_desc {
         int  vector;
         cpumask_var_t cpu_mask;
 };
@@ -62,9 +61,6 @@ extern int request_irq_vector(unsigned int vector,
 
 #define create_irq(x) assign_irq_vector(AUTO_ASSIGN_IRQ)
 #define destroy_irq(x) free_irq_vector(x)
-
-#define irq_cfg(x)        (&irq_desc[x].arch)
-#define irq_to_desc(x)    (&irq_desc[x]
 
 #define irq_complete_move(x) do {} \
     while(!x)

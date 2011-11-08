@@ -2279,7 +2279,6 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
     int apic, pin, irq, ret, vector, pirq;
     struct IO_APIC_route_entry rte = { 0 };
     unsigned long flags;
-    struct irq_cfg *cfg;
     struct irq_desc *desc;
 
     if ( (apic = ioapic_physbase_to_id(physbase)) < 0 )
@@ -2321,7 +2320,6 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
         return irq;
 
     desc = irq_to_desc(irq);
-    cfg = &desc->arch;
 
     /*
      * Since PHYSDEVOP_alloc_irq_vector is dummy, rte.vector is the pirq
@@ -2338,7 +2336,7 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
         spin_lock_irqsave(&ioapic_lock, flags);
         ret = io_apic_read(apic, 0x10 + 2 * pin);
         spin_unlock_irqrestore(&ioapic_lock, flags);
-        rte.vector = cfg->vector;
+        rte.vector = desc->arch.vector;
         if ( *(u32*)&rte != ret )
             WARN_BOGUS_WRITE("old_entry=%08x pirq=%d\n%s: "
                              "Attempt to modify IO-APIC pin for in-use IRQ!\n",
@@ -2346,7 +2344,7 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
         return 0;
     }
 
-    if ( cfg->vector <= 0 || cfg->vector > LAST_DYNAMIC_VECTOR ) {
+    if ( desc->arch.vector <= 0 || desc->arch.vector > LAST_DYNAMIC_VECTOR ) {
         vector = assign_irq_vector(irq);
         if ( vector < 0 )
             return vector;
@@ -2370,7 +2368,7 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
     /* Mask iff level triggered. */
     rte.mask = rte.trigger;
     /* Set the vector field to the real vector! */
-    rte.vector = cfg->vector;
+    rte.vector = desc->arch.vector;
 
     SET_DEST(rte.dest.dest32, rte.dest.logical.logical_dest,
              cpu_mask_to_apicid(desc->arch.cpu_mask));

@@ -84,6 +84,8 @@ typedef struct irq_desc {
     struct list_head rl_link;
 } __cacheline_aligned irq_desc_t;
 
+#define irq_to_desc(irq)    (&irq_desc[irq])
+
 int init_one_irq_desc(struct irq_desc *);
 int arch_init_one_irq_desc(struct irq_desc *);
 

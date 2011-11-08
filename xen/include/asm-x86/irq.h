@@ -20,17 +20,13 @@
 
 #define LEGACY_VECTOR(irq)          ((irq) + FIRST_LEGACY_VECTOR)
 
-#define irq_to_desc(irq)    (&irq_desc[irq])
-#define irq_cfg(irq)        (&irq_desc[irq].arch)
-
 typedef struct {
     DECLARE_BITMAP(_bits,NR_VECTORS);
 } vmask_t;
 
 struct irq_desc;
 
-struct irq_cfg {
-#define arch_irq_desc irq_cfg
+struct arch_irq_desc {
         s16 vector;                  /* vector itself is only 8 bits, */
         s16 old_vector;              /* but we use -1 for unassigned  */
         cpumask_var_t cpu_mask;
@@ -42,7 +38,7 @@ struct irq_cfg {
         s8 used;
 };
 
-/* For use with irq_cfg.used */
+/* For use with irq_desc.arch.used */
 #define IRQ_UNUSED      (0)
 #define IRQ_USED        (1)
 #define IRQ_RESERVED    (-1)

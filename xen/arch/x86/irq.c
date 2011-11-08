@@ -285,16 +285,14 @@ void destroy_irq(unsigned int irq)
 int irq_to_vector(int irq)
 {
     int vector = -1;
-    struct irq_cfg *cfg;
 
     BUG_ON(irq >= nr_irqs || irq < 0);
 
     if (IO_APIC_IRQ(irq))
         vector = irq_vector[irq];
-    else if(MSI_IRQ(irq)) {
-        cfg = irq_cfg(irq);
-        vector = cfg->vector;
-    } else
+    else if (MSI_IRQ(irq))
+        vector = irq_to_desc(irq)->arch.vector;
+    else
         vector = LEGACY_VECTOR(irq);
 
     return vector;
