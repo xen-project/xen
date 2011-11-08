@@ -99,13 +99,19 @@ struct hw_residencies
 static void do_get_hw_residencies(void *arg)
 {
     struct cpuinfo_x86 *c = &current_cpu_data;
-    struct hw_residencies *hw_res = (struct hw_residencies *)arg;
+    struct hw_residencies *hw_res = arg;
 
     if ( c->x86_vendor != X86_VENDOR_INTEL || c->x86 != 6 )
         return;
 
     switch ( c->x86_model )
     {
+    /* Sandy bridge */
+    case 0x2A:
+    case 0x2D:
+        GET_PC2_RES(hw_res->pc2);
+        GET_CC7_RES(hw_res->cc7);
+        /* fall through */
     /* Nehalem */
     case 0x1A:
     case 0x1E:
@@ -120,32 +126,22 @@ static void do_get_hw_residencies(void *arg)
         GET_CC3_RES(hw_res->cc3);
         GET_CC6_RES(hw_res->cc6);
         break;
-    /* Sandy bridge */
-    case 0x2A:
-    case 0x2D:
-        GET_PC2_RES(hw_res->pc2);
-        GET_PC3_RES(hw_res->pc3);
-        GET_PC6_RES(hw_res->pc6);
-        GET_PC7_RES(hw_res->pc7);
-        GET_CC3_RES(hw_res->cc3);
-        GET_CC6_RES(hw_res->cc6);
-        GET_CC7_RES(hw_res->cc7);
-        break;
     }
 }
 
 static void get_hw_residencies(uint32_t cpu, struct hw_residencies *hw_res)
 {
+    memset(hw_res, 0, sizeof(*hw_res));
+
     if ( smp_processor_id() == cpu )
-        do_get_hw_residencies((void *)hw_res);
+        do_get_hw_residencies(hw_res);
     else
-        on_selected_cpus(cpumask_of(cpu),
-                         do_get_hw_residencies, (void *)hw_res, 1);
+        on_selected_cpus(cpumask_of(cpu), do_get_hw_residencies, hw_res, 1);
 }
 
 static void print_hw_residencies(uint32_t cpu)
 {
-    struct hw_residencies hw_res = {0};
+    struct hw_residencies hw_res;
 
     get_hw_residencies(cpu, &hw_res);
 
@@ -1042,7 +1038,7 @@ int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
     struct acpi_processor_power *power = processor_powers[cpuid];
     uint64_t usage, res, idle_usage = 0, idle_res = 0;
     int i;
-    struct hw_residencies hw_res = {0};
+    struct hw_residencies hw_res;
 
     if ( power == NULL )
     {
