@@ -138,7 +138,7 @@ static void synchronize_tsc_master(unsigned int slave)
         return;
 
     if ( boot_cpu_has(X86_FEATURE_TSC_RELIABLE) &&
-         !cpu_isset(slave, tsc_sync_cpu_mask) )
+         !cpumask_test_cpu(slave, &tsc_sync_cpu_mask) )
         return;
 
     for ( i = 1; i <= 5; i++ )
@@ -162,7 +162,7 @@ static void synchronize_tsc_slave(unsigned int slave)
         return;
 
     if ( boot_cpu_has(X86_FEATURE_TSC_RELIABLE) &&
-         !cpu_isset(slave, tsc_sync_cpu_mask) )
+         !cpumask_test_cpu(slave, &tsc_sync_cpu_mask) )
         return;
 
     for ( i = 1; i <= 5; i++ )
@@ -956,7 +956,7 @@ int __cpu_up(unsigned int cpu)
         return ret;
 
     set_cpu_state(CPU_STATE_ONLINE);
-    while ( !cpu_isset(cpu, cpu_online_map) )
+    while ( !cpu_online(cpu) )
     {
         cpu_relax();
         process_pending_softirqs();

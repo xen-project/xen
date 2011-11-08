@@ -299,7 +299,7 @@ int cpupool_unassign_cpu(struct cpupool *c, unsigned int cpu)
     ret = -EBUSY;
     if ( (cpupool_moving_cpu != -1) && (cpu != cpupool_moving_cpu) )
         goto out;
-    if ( cpu_isset(cpu, cpupool_locked_cpus) )
+    if ( cpumask_test_cpu(cpu, &cpupool_locked_cpus) )
         goto out;
 
     ret = 0;
@@ -499,7 +499,7 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
         if ( cpu >= nr_cpu_ids )
             goto addcpu_out;
         ret = -EBUSY;
-        if ( !cpu_isset(cpu, cpupool_free_cpus) )
+        if ( !cpumask_test_cpu(cpu, &cpupool_free_cpus) )
             goto addcpu_out;
         c = cpupool_find_by_id(op->cpupool_id);
         ret = -ENOENT;

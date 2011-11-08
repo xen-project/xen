@@ -1366,7 +1366,7 @@ csched_vcpu_migrate(
     struct csched_runqueue_data *trqd;
 
     /* Check if new_cpu is valid */
-    BUG_ON(!cpu_isset(new_cpu, CSCHED_PRIV(ops)->initialized));
+    BUG_ON(!cpumask_test_cpu(new_cpu, &CSCHED_PRIV(ops)->initialized));
 
     trqd = RQD(ops, new_cpu);
 
@@ -1602,10 +1602,10 @@ csched_schedule(
              scurr->vcpu->vcpu_id,
              now);
 
-    BUG_ON(!cpu_isset(cpu, CSCHED_PRIV(ops)->initialized));
+    BUG_ON(!cpumask_test_cpu(cpu, &CSCHED_PRIV(ops)->initialized));
 
     rqd = RQD(ops, cpu);
-    BUG_ON(!cpu_isset(cpu, rqd->active));
+    BUG_ON(!cpumask_test_cpu(cpu, &rqd->active));
 
     /* Protected by runqueue lock */        
 
@@ -1637,7 +1637,7 @@ csched_schedule(
     BUG_ON(!is_idle_vcpu(scurr->vcpu) && scurr->rqd != rqd);
 
     /* Clear "tickled" bit now that we've been scheduled */
-    if ( cpu_isset(cpu, rqd->tickled) )
+    if ( cpumask_test_cpu(cpu, &rqd->tickled) )
         cpu_clear(cpu, rqd->tickled);
 
     /* Update credits */
@@ -1708,7 +1708,7 @@ csched_schedule(
         }
 
         /* Clear the idle mask if necessary */
-        if ( cpu_isset(cpu, rqd->idle) )
+        if ( cpumask_test_cpu(cpu, &rqd->idle) )
             cpu_clear(cpu, rqd->idle);
 
         snext->start_time = now;
@@ -1724,7 +1724,7 @@ csched_schedule(
     else
     {
         /* Update the idle mask if necessary */
-        if ( !cpu_isset(cpu, rqd->idle) )
+        if ( !cpumask_test_cpu(cpu, &rqd->idle) )
             cpu_set(cpu, rqd->idle);
         /* Make sure avgload gets updated periodically even
          * if there's no activity */
@@ -1885,7 +1885,7 @@ static void init_pcpu(const struct scheduler *ops, int cpu)
 
     spin_lock_irqsave(&prv->lock, flags);
 
-    if ( cpu_isset(cpu, prv->initialized) )
+    if ( cpumask_test_cpu(cpu, &prv->initialized) )
     {
         printk("%s: Strange, cpu %d already initialized!\n", __func__, cpu);
         spin_unlock_irqrestore(&prv->lock, flags);
@@ -1912,7 +1912,7 @@ static void init_pcpu(const struct scheduler *ops, int cpu)
     rqd=prv->rqd + rqi;
 
     printk("Adding cpu %d to runqueue %d\n", cpu, rqi);
-    if ( ! cpu_isset(rqi, prv->active_queues) )
+    if ( ! cpumask_test_cpu(rqi, &prv->active_queues) )
     {
         printk(" First cpu on runqueue, activating\n");
         activate_runqueue(prv, rqi);
@@ -1963,7 +1963,7 @@ csched_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
 
     spin_lock_irqsave(&prv->lock, flags);
 
-    BUG_ON( !cpu_isset(cpu, prv->initialized));
+    BUG_ON(!cpumask_test_cpu(cpu, &prv->initialized));
     
     /* Find the old runqueue and remove this cpu from it */
     rqi = prv->runq_map[cpu];
@@ -1973,7 +1973,7 @@ csched_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
     /* No need to save IRQs here, they're already disabled */
     spin_lock(&rqd->lock);
 
-    BUG_ON(!cpu_isset(cpu, rqd->idle));
+    BUG_ON(!cpumask_test_cpu(cpu, &rqd->idle));
 
     printk("Removing cpu %d from runqueue %d\n", cpu, rqi);
 

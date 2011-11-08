@@ -1580,7 +1580,7 @@ void pit_broadcast_exit(void)
 {
     int cpu = smp_processor_id();
 
-    if ( cpu_test_and_clear(cpu, pit_broadcast_mask) )
+    if ( cpumask_test_and_clear_cpu(cpu, &pit_broadcast_mask) )
         reprogram_timer(this_cpu(timer_deadline));
 }
 

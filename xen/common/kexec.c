@@ -169,7 +169,7 @@ void kexec_crash_save_cpu(void)
     ELF_Prstatus *prstatus;
     crash_xen_core_t *xencore;
 
-    if ( cpu_test_and_set(cpu, crash_saved_cpus) )
+    if ( cpumask_test_and_set_cpu(cpu, &crash_saved_cpus) )
         return;
 
     prstatus = (ELF_Prstatus *)ELFNOTE_DESC(note);
@@ -187,7 +187,7 @@ crash_xen_info_t *kexec_crash_save_info(void)
     crash_xen_info_t info;
     crash_xen_info_t *out = (crash_xen_info_t *)ELFNOTE_DESC(xen_crash_note);
 
-    BUG_ON(!cpu_test_and_set(cpu, crash_saved_cpus));
+    BUG_ON(!cpumask_test_and_set_cpu(cpu, &crash_saved_cpus));
 
     memset(&info, 0, sizeof(info));
     info.xen_major_version = xen_major_version();

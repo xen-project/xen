@@ -140,7 +140,7 @@ static void flush_cache_for_context_switch(struct vcpu *next)
 
 	if (is_idle_vcpu(next) ||
 	    __test_and_clear_bit(cpu, &next->arch.cache_coherent_map)) {
-		if (cpu_test_and_clear(cpu, cpu_cache_coherent_map)) {
+		if (cpumask_test_and_clear_cpu(cpu, &cpu_cache_coherent_map)) {
 			unsigned long flags;
 			u64 progress = 0;
 			s64 status;

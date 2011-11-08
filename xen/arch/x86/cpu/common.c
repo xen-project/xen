@@ -624,7 +624,7 @@ void __cpuinit cpu_init(void)
 		.limit = LAST_RESERVED_GDT_BYTE
 	};
 
-	if (cpu_test_and_set(cpu, cpu_initialized)) {
+	if (cpumask_test_and_set_cpu(cpu, &cpu_initialized)) {
 		printk(KERN_WARNING "CPU#%d already initialized!\n", cpu);
 		for (;;) local_irq_enable();
 	}

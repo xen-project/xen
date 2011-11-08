@@ -820,7 +820,7 @@ static struct task_slice sedf_do_schedule(
     /* Tasklet work (which runs in idle VCPU context) overrides all else. */
     if ( tasklet_work_scheduled ||
          (list_empty(runq) && list_empty(waitq)) ||
-         unlikely(!cpu_isset(cpu, *SEDF_CPUONLINE(per_cpu(cpupool, cpu)))) )
+         unlikely(!cpumask_test_cpu(cpu, SEDF_CPUONLINE(per_cpu(cpupool, cpu)))) )
     {
         ret.task = IDLETASK(cpu);
         ret.time = SECONDS(1);

@@ -234,7 +234,7 @@ void flush_area_mask(const cpumask_t *mask, const void *va, unsigned int flags)
 {
     ASSERT(local_irq_is_enabled());
 
-    if ( cpu_isset(smp_processor_id(), *mask) )
+    if ( cpumask_test_cpu(smp_processor_id(), mask) )
         flush_area_local(va, flags);
 
     if ( !cpumask_subset(mask, cpumask_of(smp_processor_id())) )

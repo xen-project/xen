@@ -553,7 +553,7 @@ void flush_tlb_mask(const cpumask_t *mask)
     int cpu;
 
     cpu = smp_processor_id();
-    if (cpu_isset(cpu, *mask))
+    if (cpumask_test_cpu(cpu, mask))
         flush_tlb_vhpt_all (NULL);
 
     if (cpumask_subset(mask, cpumask_of(cpu)))

@@ -323,7 +323,7 @@ int trace_will_trace_event(u32 event)
                 & ((event >> TRC_SUBCLS_SHIFT) & 0xf )) == 0 )
         return 0;
 
-    if ( !cpu_isset(smp_processor_id(), tb_cpu_mask) )
+    if ( !cpumask_test_cpu(smp_processor_id(), &tb_cpu_mask) )
         return 0;
 
     return 1;
@@ -711,7 +711,7 @@ void __trace_var(u32 event, bool_t cycles, unsigned int extra,
                 & ((event >> TRC_SUBCLS_SHIFT) & 0xf )) == 0 )
         return;
 
-    if ( !cpu_isset(smp_processor_id(), tb_cpu_mask) )
+    if ( !cpumask_test_cpu(smp_processor_id(), &tb_cpu_mask) )
         return;
 
     /* Read tb_init_done /before/ t_bufs. */

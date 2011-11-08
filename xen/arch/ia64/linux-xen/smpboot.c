@@ -548,13 +548,13 @@ do_rest:
 	 */
 	Dprintk("Waiting on callin_map ...");
 	for (timeout = 0; timeout < 100000; timeout++) {
-		if (cpu_isset(cpu, cpu_callin_map))
+		if (cpumask_test_cpu(cpu, &cpu_callin_map))
 			break;  /* It has booted */
 		udelay(100);
 	}
 	Dprintk("\n");
 
-	if (!cpu_isset(cpu, cpu_callin_map)) {
+	if (!cpumask_test_cpu(cpu, &cpu_callin_map)) {
 		printk(KERN_ERR "Processor 0x%x/0x%x is stuck.\n", cpu, sapicid);
 		ia64_cpu_to_sapicid[cpu] = -1;
 		cpu_clear(cpu, cpu_online_map);  /* was set in smp_callin() */
@@ -818,7 +818,7 @@ __cpu_up (unsigned int cpu)
 	 * Already booted cpu? not valid anymore since we dont
 	 * do idle loop tightspin anymore.
 	 */
-	if (cpu_isset(cpu, cpu_callin_map))
+	if (cpumask_test_cpu(cpu, &cpu_callin_map))
 		return -EINVAL;
 
 	if (!per_cpu(cpu_sibling_mask, cpu) &&

@@ -19,6 +19,7 @@
  * void cpumask_clear(mask)		clear all bits
  * int cpumask_test_cpu(cpu, mask)	true iff bit 'cpu' set in mask
  * int cpumask_test_and_set_cpu(cpu, mask) test and set bit 'cpu' in mask
+ * int cpumask_test_and_clear_cpu(cpu, mask) test and clear bit 'cpu' in mask
  *
  * void cpumask_and(dst, src1, src2)	dst = src1 & src2  [intersection]
  * void cpumask_or(dst, src1, src2)	dst = src1 | src2  [union]
@@ -64,12 +65,12 @@
  * for_each_present_cpu(cpu)		for-loop cpu over cpu_present_map
  *
  * Subtlety:
- * 1) The 'type-checked' form of cpu_isset() causes gcc (3.3.2, anyway)
+ * 1) The 'type-checked' form of cpumask_test_cpu() causes gcc (3.3.2, anyway)
  *    to generate slightly worse code.  Note for example the additional
  *    40 lines of assembly code compiling the "for each possible cpu"
  *    loops buried in the disk_stat_read() macros calls when compiling
  *    drivers/block/genhd.c (arch i386, CONFIG_SMP=y).  So use a simple
- *    one-line #define for cpu_isset(), instead of wrapping an inline
+ *    one-line #define for cpumask_test_cpu(), instead of wrapping an inline
  *    inside a macro, the way we do the other calls.
  */
 
@@ -121,17 +122,12 @@ static inline void cpumask_clear(cpumask_t *dstp)
 /* No static inline type checking - see Subtlety (1) above. */
 #define cpumask_test_cpu(cpu, cpumask) \
 	test_bit(cpumask_check(cpu), (cpumask)->bits)
-#define cpu_isset(cpu, cpumask) test_bit((cpu), (cpumask).bits)
 
-#define cpu_test_and_set(cpu, cpumask) \
-	cpumask_test_and_set_cpu(cpu, &(cpumask))
 static inline int cpumask_test_and_set_cpu(int cpu, cpumask_t *addr)
 {
 	return test_and_set_bit(cpumask_check(cpu), addr->bits);
 }
 
-#define cpu_test_and_clear(cpu, cpumask) \
-	cpumask_test_and_clear_cpu(cpu, &(cpumask))
 static inline int cpumask_test_and_clear_cpu(int cpu, cpumask_t *addr)
 {
 	return test_and_clear_bit(cpumask_check(cpu), addr->bits);
@@ -444,9 +440,9 @@ extern cpumask_t cpu_present_map;
 #define num_online_cpus()	cpumask_weight(&cpu_online_map)
 #define num_possible_cpus()	cpumask_weight(&cpu_possible_map)
 #define num_present_cpus()	cpumask_weight(&cpu_present_map)
-#define cpu_online(cpu)		cpu_isset((cpu), cpu_online_map)
-#define cpu_possible(cpu)	cpu_isset((cpu), cpu_possible_map)
-#define cpu_present(cpu)	cpu_isset((cpu), cpu_present_map)
+#define cpu_online(cpu)		cpumask_test_cpu(cpu, &cpu_online_map)
+#define cpu_possible(cpu)	cpumask_test_cpu(cpu, &cpu_possible_map)
+#define cpu_present(cpu)	cpumask_test_cpu(cpu, &cpu_present_map)
 #else
 #define num_online_cpus()	1
 #define num_possible_cpus()	1

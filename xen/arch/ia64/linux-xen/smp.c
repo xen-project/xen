@@ -68,7 +68,7 @@ void smp_send_event_check_mask(const cpumask_t *mask)
     //printf("smp_send_event_check_mask called\n");
 
     for (cpu = 0; cpu < NR_CPUS; ++cpu)
-        if (cpu_isset(cpu, *mask) && cpu != smp_processor_id())
+        if (cpumask_test_cpu(cpu, mask) && cpu != smp_processor_id())
 	    platform_send_ipi(cpu, IA64_IPI_RESCHEDULE, IA64_IPI_DM_INT, 0);
 }
 #endif

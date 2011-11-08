@@ -320,8 +320,8 @@ int set_one_rr_efi(unsigned long rr, unsigned long val)
 	else {
 		if (current && VMX_DOMAIN(current))
 			vpd = __get_cpu_var(inserted_vpd);
-		ia64_new_rr7_efi(val, cpu_isset(smp_processor_id(),
-				 percpu_set), vpd);
+		ia64_new_rr7_efi(val, cpumask_test_cpu(smp_processor_id(),
+						       &percpu_set), vpd);
 	}
 
 	return 1;
@@ -342,8 +342,8 @@ set_one_rr_efi_restore(unsigned long rr, unsigned long val)
 		   and strcut domain are initialized. */
 		if (unlikely(current == NULL || current->domain == NULL ||
 			     is_idle_vcpu(current)))
-			ia64_new_rr7_efi(val, cpu_isset(smp_processor_id(),
-							percpu_set),
+			ia64_new_rr7_efi(val, cpumask_test_cpu(smp_processor_id(),
+							       &percpu_set),
 					 0UL);
 		else if (VMX_DOMAIN(current))
 			__vmx_switch_rr7_vcpu(current, val);
