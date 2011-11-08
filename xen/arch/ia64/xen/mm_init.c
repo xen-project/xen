@@ -38,7 +38,7 @@ ia64_mmu_init (void *my_cpu_data)
 	ia64_set_psr(psr);
 	ia64_srlz_i();
 #ifdef XEN
-	cpu_set(cpu, percpu_set);
+	cpumask_set_cpu(cpu, &percpu_set);
 #endif
 
 	/*

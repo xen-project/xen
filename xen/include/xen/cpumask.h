@@ -97,7 +97,6 @@ static inline unsigned int cpumask_check(unsigned int cpu)
 	return cpu;
 }
 
-#define cpu_set(cpu, dst) cpumask_set_cpu(cpu, &(dst))
 static inline void cpumask_set_cpu(int cpu, volatile cpumask_t *dstp)
 {
 	set_bit(cpumask_check(cpu), dstp->bits);

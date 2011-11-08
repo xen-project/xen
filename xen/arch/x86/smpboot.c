@@ -244,7 +244,7 @@ static void set_cpu_sibling_map(int cpu)
     int i;
     struct cpuinfo_x86 *c = cpu_data;
 
-    cpu_set(cpu, cpu_sibling_setup_map);
+    cpumask_set_cpu(cpu, &cpu_sibling_setup_map);
 
     if ( c[cpu].x86_num_siblings > 1 )
     {
@@ -380,7 +380,7 @@ void start_secondary(void *unused)
      */
     lock_vector_lock();
     __setup_vector_irq(cpu);
-    cpu_set(cpu, cpu_online_map);
+    cpumask_set_cpu(cpu, &cpu_online_map);
     unlock_vector_lock();
 
     init_percpu_time();
@@ -804,8 +804,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 
 void __init smp_prepare_boot_cpu(void)
 {
-    cpu_set(smp_processor_id(), cpu_online_map);
-    cpu_set(smp_processor_id(), cpu_present_map);
+    cpumask_set_cpu(smp_processor_id(), &cpu_online_map);
+    cpumask_set_cpu(smp_processor_id(), &cpu_present_map);
 }
 
 static void
@@ -933,7 +933,7 @@ int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm)
                    "break assumed cross-CPU TSC coherency.\n"
                    " ** Consider using boot parameter \"tsc=skewed\" "
                    "which forces TSC emulation where appropriate.\n", cpu);
-        cpu_set(cpu, tsc_sync_cpu_mask);
+        cpumask_set_cpu(cpu, &tsc_sync_cpu_mask);
     }
 
     srat_detect_node(cpu);

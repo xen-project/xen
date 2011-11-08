@@ -392,7 +392,7 @@ smp_callin (void)
 #else
 	lock_ipi_calllock();
 #endif
-	cpu_set(cpuid, cpu_online_map);
+	cpumask_set_cpu(cpuid, &cpu_online_map);
 #ifdef XEN
 	unlock_ipi_calllock(flags);
 #else
@@ -437,7 +437,7 @@ smp_callin (void)
 	/*
 	 * Allow the master to continue.
 	 */
-	cpu_set(cpuid, cpu_callin_map);
+	cpumask_set_cpu(cpuid, &cpu_callin_map);
 	Dprintk("Stack on CPU %d at about %p\n",cpuid, &cpuid);
 }
 
@@ -625,8 +625,8 @@ smp_prepare_cpus (unsigned int max_cpus)
 	/*
 	 * We have the boot CPU online for sure.
 	 */
-	cpu_set(0, cpu_online_map);
-	cpu_set(0, cpu_callin_map);
+	cpumask_set_cpu(0, &cpu_online_map);
+	cpumask_set_cpu(0, &cpu_callin_map);
 
 	local_cpu_data->loops_per_jiffy = loops_per_jiffy;
 	ia64_cpu_to_sapicid[0] = boot_cpu_id;
@@ -652,8 +652,8 @@ smp_prepare_cpus (unsigned int max_cpus)
 
 void __devinit smp_prepare_boot_cpu(void)
 {
-	cpu_set(smp_processor_id(), cpu_online_map);
-	cpu_set(smp_processor_id(), cpu_callin_map);
+	cpumask_set_cpu(smp_processor_id(), &cpu_online_map);
+	cpumask_set_cpu(smp_processor_id(), &cpu_callin_map);
 	per_cpu(cpu_state, smp_processor_id()) = CPU_ONLINE;
 }
 

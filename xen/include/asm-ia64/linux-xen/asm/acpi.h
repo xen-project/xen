@@ -153,7 +153,7 @@ static inline void per_cpu_scan_finalize(int min_cpus, int reserve_cpus)
 	high_cpu = min(high_cpu + reserve_cpus, NR_CPUS);
 
 	for (cpu = low_cpu; cpu < high_cpu; cpu++) {
-		cpu_set(cpu, early_cpu_possible_map);
+		cpumask_set_cpu(cpu, &early_cpu_possible_map);
 		if (node_cpuid[cpu].nid == NUMA_NO_NODE) {
 			node_cpuid[cpu].nid = next_nid;
 			next_nid++;

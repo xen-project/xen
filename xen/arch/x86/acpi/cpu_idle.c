@@ -271,9 +271,9 @@ static void mwait_idle_with_hints(unsigned long eax, unsigned long ecx)
      */
     if ( expires > NOW() || expires == 0 )
     {
-        cpu_set(cpu, cpuidle_mwait_flags);
+        cpumask_set_cpu(cpu, &cpuidle_mwait_flags);
         __mwait(eax, ecx);
-        cpu_clear(cpu, cpuidle_mwait_flags);
+        cpumask_clear_cpu(cpu, &cpuidle_mwait_flags);
     }
 
     if ( expires <= NOW() && expires > 0 )

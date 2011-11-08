@@ -214,7 +214,7 @@ sn2_global_tlb_purge(unsigned long start,
 	for_each_possible_cpu(cpu) {
 		cnode = cpu_to_node(cpu);
 		if (!node_isset(cnode, nodes_flushed)) {
-			cpu_set(cpu, selected_cpus);
+			cpumask_set_cpu(cpu, &selected_cpus);
 			i++;
 		}
 		node_set(cnode, nodes_flushed);

@@ -389,7 +389,7 @@ tlb_track_insert_or_dirty(struct tlb_track* tlb_track, struct mm_struct* mm,
 
  found:
     BUG_ON(v->processor >= NR_CPUS);
-    cpu_set(v->processor, entry->pcpu_dirty_mask);
+    cpumask_set_cpu(v->processor, &entry->pcpu_dirty_mask);
     BUG_ON(v->vcpu_id >= NR_CPUS);
     vcpu_set(v->vcpu_id, entry->vcpu_dirty_mask);
     perfc_incr(tlb_track_iod_dirtied);

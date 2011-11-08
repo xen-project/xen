@@ -253,7 +253,7 @@ static long cpupool_unassign_cpu_helper(void *info)
 
     spin_lock(&cpupool_lock);
     ret = cpu_disable_scheduler(cpu);
-    cpu_set(cpu, cpupool_free_cpus);
+    cpumask_set_cpu(cpu, &cpupool_free_cpus);
     if ( !ret )
     {
         ret = schedule_cpu_switch(cpu, NULL);
@@ -409,8 +409,8 @@ void cpupool_rm_domain(struct domain *d)
 static void cpupool_cpu_add(unsigned int cpu)
 {
     spin_lock(&cpupool_lock);
-    cpu_clear(cpu, cpupool_locked_cpus);
-    cpu_set(cpu, cpupool_free_cpus);
+    cpumask_clear_cpu(cpu, &cpupool_locked_cpus);
+    cpumask_set_cpu(cpu, &cpupool_free_cpus);
     cpupool_assign_cpu_locked(cpupool0, cpu);
     spin_unlock(&cpupool_lock);
 }
@@ -428,7 +428,7 @@ static int cpupool_cpu_remove(unsigned int cpu)
     if ( !cpumask_test_cpu(cpu, cpupool0->cpu_valid))
         ret = -EBUSY;
     else
-        cpu_set(cpu, cpupool_locked_cpus);
+        cpumask_set_cpu(cpu, &cpupool_locked_cpus);
     spin_unlock(&cpupool_lock);
 
     return ret;

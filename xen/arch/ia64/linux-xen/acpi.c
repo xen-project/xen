@@ -557,7 +557,7 @@ acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
 	    (pa->apic_id << 8) | (pa->local_sapic_eid);
 	/* nid should be overridden as logical node id later */
 	node_cpuid[srat_num_cpus].nid = pxm;
-	cpu_set(srat_num_cpus, early_cpu_possible_map);
+	cpumask_set_cpu(srat_num_cpus, &early_cpu_possible_map);
 	srat_num_cpus++;
 }
 
@@ -917,7 +917,7 @@ __init void prefill_possible_map(void)
 		possible, max((possible - available_cpus), 0));
 
 	for (i = 0; i < possible; i++)
-		cpu_set(i, cpu_possible_map);
+		cpumask_set_cpu(i, &cpu_possible_map);
 }
 
 #ifndef XEN

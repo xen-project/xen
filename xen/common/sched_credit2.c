@@ -1725,7 +1725,7 @@ csched_schedule(
     {
         /* Update the idle mask if necessary */
         if ( !cpumask_test_cpu(cpu, &rqd->idle) )
-            cpu_set(cpu, rqd->idle);
+            cpumask_set_cpu(cpu, &rqd->idle);
         /* Make sure avgload gets updated periodically even
          * if there's no activity */
         update_load(ops, rqd, NULL, 0, now);
@@ -1860,7 +1860,7 @@ static void activate_runqueue(struct csched_private *prv, int rqi)
     INIT_LIST_HEAD(&rqd->runq);
     spin_lock_init(&rqd->lock);
 
-    cpu_set(rqi, prv->active_queues);
+    cpumask_set_cpu(rqi, &prv->active_queues);
 }
 
 static void deactivate_runqueue(struct csched_private *prv, int rqi)
@@ -1927,12 +1927,12 @@ static void init_pcpu(const struct scheduler *ops, int cpu)
     /* Set the runqueue map */
     prv->runq_map[cpu]=rqi;
     
-    cpu_set(cpu, rqd->idle);
-    cpu_set(cpu, rqd->active);
+    cpumask_set_cpu(cpu, &rqd->idle);
+    cpumask_set_cpu(cpu, &rqd->active);
 
     spin_unlock(old_lock);
 
-    cpu_set(cpu, prv->initialized);
+    cpumask_set_cpu(cpu, &prv->initialized);
 
     spin_unlock_irqrestore(&prv->lock, flags);
 

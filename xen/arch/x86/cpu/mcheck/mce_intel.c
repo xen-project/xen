@@ -828,7 +828,7 @@ static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
              * (the MSRs are sticky)
              */
             if (bs.pcc || !bs.recoverable)
-                cpu_set(smp_processor_id(), mce_fatal_cpus);
+                cpumask_set_cpu(smp_processor_id(), &mce_fatal_cpus);
         } else {
             if (mctc != NULL)
                 mctelem_commit(mctc);
@@ -849,7 +849,7 @@ static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
 
     mce_barrier_enter(&mce_trap_bar);
     if ( mctc != NULL && mce_urgent_action(regs, mctc))
-        cpu_set(smp_processor_id(), mce_fatal_cpus);
+        cpumask_set_cpu(smp_processor_id(), &mce_fatal_cpus);
     mce_barrier_exit(&mce_trap_bar);
     /*
      * Wait until everybody has processed the trap.

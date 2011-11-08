@@ -161,7 +161,7 @@ static int __devinit MP_processor_info_x(struct mpc_config_processor *m,
 			return cpu;
 		}
 		x86_cpu_to_apicid[cpu] = apicid;
-		cpu_set(cpu, cpu_present_map);
+		cpumask_set_cpu(cpu, &cpu_present_map);
 	}
 
 	if (++num_processors > 8) {

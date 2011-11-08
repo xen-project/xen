@@ -1573,7 +1573,7 @@ __initcall(disable_pit_irq);
 
 void pit_broadcast_enter(void)
 {
-    cpu_set(smp_processor_id(), pit_broadcast_mask);
+    cpumask_set_cpu(smp_processor_id(), &pit_broadcast_mask);
 }
 
 void pit_broadcast_exit(void)
