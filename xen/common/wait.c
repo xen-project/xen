@@ -33,7 +33,7 @@ struct waitqueue_vcpu {
      * hypervisor context before sleeping (descheduling), setjmp/longjmp-style.
      */
     void *esp;
-    char stack[1500];
+    char stack[3000];
 #endif
 };
 
