@@ -40,6 +40,7 @@
 #include "dmar.h"
 #include "extern.h"
 #include "vtd.h"
+#include "../ats.h"
 
 #ifdef __ia64__
 #define nr_ioapics              iosapic_get_nr_iosapics()

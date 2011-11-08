@@ -57,18 +57,13 @@ struct acpi_drhd_unit * iommu_to_drhd(struct iommu *iommu);
 struct acpi_rhsa_unit * drhd_to_rhsa(struct acpi_drhd_unit *drhd);
 
 #ifdef CONFIG_X86_64
-extern bool_t ats_enabled;
-
 struct acpi_drhd_unit * find_ats_dev_drhd(struct iommu *iommu);
 
 int ats_device(const struct pci_dev *, const struct acpi_drhd_unit *);
-int enable_ats_device(int seg, int bus, int devfn);
-void disable_ats_device(int seg, int bus, int devfn);
 
 int dev_invalidate_iotlb(struct iommu *iommu, u16 did,
                          u64 addr, unsigned int size_order, u64 type);
 #else
-#define ats_enabled 0
 
 static inline struct acpi_drhd_unit *find_ats_dev_drhd(struct iommu *iommu)
 {
@@ -79,15 +74,6 @@ static inline int ats_device(const struct pci_dev *pdev,
                              const struct acpi_drhd_unit *drhd)
 {
     return 0;
-}
-static inline int enable_ats_device(int seg, int bus, int devfn)
-{
-    BUG();
-    return -ENOSYS;
-}
-static inline void disable_ats_device(int seg, int bus, int devfn)
-{
-    BUG();
 }
 
 static inline int dev_invalidate_iotlb(struct iommu *iommu, u16 did, u64 addr,
