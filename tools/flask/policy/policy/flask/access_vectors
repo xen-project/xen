@@ -90,6 +90,7 @@ class hvm
     pciroute
 	bind_irq
 	cacheattr
+    trackdirtyvram
 }
 
 class event

@@ -22,7 +22,7 @@ define(`create_domain', `
 ################################################################################
 define(`create_hvm_dom', `
 	create_domain($1, $2, $3)
-	allow $1 $2:hvm { setparam getparam cacheattr pciroute irqlevel	pcilevel };
+	allow $1 $2:hvm { setparam getparam cacheattr pciroute irqlevel	pcilevel trackdirtyvram };
 	allow $2 $2:hvm setparam;
 ')	
 
