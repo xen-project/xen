@@ -253,32 +253,35 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
     case XEN_DOMCTL_MEM_EVENT_OP_PAGING:
     {
         struct mem_event_domain *med = &d->mem_paging;
-        struct p2m_domain *p2m = p2m_get_hostp2m(d);
-        rc = -ENODEV;
-        /* Only HAP is supported */
-        if ( !hap_enabled(d) )
-            break;
-
-        /* Currently only EPT is supported */
-        if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
-            break;
-
-        rc = -EXDEV;
-        /* Disallow paging in a PoD guest */
-        if ( p2m->pod.entry_count )
-            break;
+        rc = -EINVAL;
 
         switch( mec->op )
         {
         case XEN_DOMCTL_MEM_EVENT_OP_PAGING_ENABLE:
         {
+            struct p2m_domain *p2m = p2m_get_hostp2m(d);
+            rc = -ENODEV;
+            /* Only HAP is supported */
+            if ( !hap_enabled(d) )
+                break;
+
+            /* Currently only EPT is supported */
+            if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
+                break;
+
+            rc = -EXDEV;
+            /* Disallow paging in a PoD guest */
+            if ( p2m->pod.entry_count )
+                break;
+
             rc = mem_event_enable(d, mec, med);
         }
         break;
 
         case XEN_DOMCTL_MEM_EVENT_OP_PAGING_DISABLE:
         {
-            rc = mem_event_disable(med);
+            if ( med->ring_page )
+                rc = mem_event_disable(med);
         }
         break;
 
@@ -295,26 +298,29 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
     case XEN_DOMCTL_MEM_EVENT_OP_ACCESS: 
     {
         struct mem_event_domain *med = &d->mem_access;
-        rc = -ENODEV;
-        /* Only HAP is supported */
-        if ( !hap_enabled(d) )
-            break;
-
-        /* Currently only EPT is supported */
-        if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
-            break;
+        rc = -EINVAL;
 
         switch( mec->op )
         {
         case XEN_DOMCTL_MEM_EVENT_OP_ACCESS_ENABLE:
         {
+            rc = -ENODEV;
+            /* Only HAP is supported */
+            if ( !hap_enabled(d) )
+                break;
+
+            /* Currently only EPT is supported */
+            if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
+                break;
+
             rc = mem_event_enable(d, mec, med);
         }
         break;
 
         case XEN_DOMCTL_MEM_EVENT_OP_ACCESS_DISABLE:
         {
-            rc = mem_event_disable(&d->mem_access);
+            if ( med->ring_page )
+                rc = mem_event_disable(&d->mem_access);
         }
         break;
 
