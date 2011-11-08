@@ -54,7 +54,7 @@ do {                                                                    \
     unsigned int cpu;                                                   \
     for_each_cpu_mask ( cpu, mask )                                     \
         if ( !NEED_FLUSH(per_cpu(tlbflush_time, cpu), page_timestamp) ) \
-            cpu_clear(cpu, mask);                                       \
+            cpumask_clear_cpu(cpu, &(mask));                            \
 } while ( 0 )
 
 void new_tlbflush_clock_period(void);

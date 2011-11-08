@@ -976,7 +976,7 @@ EXPORT_SYMBOL(acpi_map_lsapic);
 int acpi_unmap_lsapic(int cpu)
 {
 	ia64_cpu_to_sapicid[cpu] = -1;
-	cpu_clear(cpu, cpu_present_map);
+	cpumask_clear_cpu(cpu, &cpu_present_map);
 
 #ifdef CONFIG_ACPI_NUMA
 	/* NUMA specific cleanup's */

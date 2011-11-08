@@ -226,7 +226,7 @@ fastcall void smp_invalidate_interrupt(void)
     if ( !__sync_local_execstate() ||
          (flush_flags & (FLUSH_TLB_GLOBAL | FLUSH_CACHE)) )
         flush_area_local(flush_va, flush_flags);
-    cpu_clear(smp_processor_id(), flush_cpumask);
+    cpumask_clear_cpu(smp_processor_id(), &flush_cpumask);
     irq_exit();
 }
 
@@ -353,7 +353,7 @@ void __stop_this_cpu(void)
 static void stop_this_cpu(void *dummy)
 {
     __stop_this_cpu();
-    cpu_clear(smp_processor_id(), cpu_online_map);
+    cpumask_clear_cpu(smp_processor_id(), &cpu_online_map);
     for ( ; ; )
         halt();
 }

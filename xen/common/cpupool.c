@@ -232,7 +232,7 @@ static int cpupool_assign_cpu_locked(struct cpupool *c, unsigned int cpu)
         return ret;
     }
 
-    cpu_clear(cpu, cpupool_free_cpus);
+    cpumask_clear_cpu(cpu, &cpupool_free_cpus);
     if (cpupool_moving_cpu == cpu)
     {
         cpupool_moving_cpu = -1;
@@ -259,7 +259,7 @@ static long cpupool_unassign_cpu_helper(void *info)
         ret = schedule_cpu_switch(cpu, NULL);
         if ( ret )
         {
-            cpu_clear(cpu, cpupool_free_cpus);
+            cpumask_clear_cpu(cpu, &cpupool_free_cpus);
             goto out;
         }
         per_cpu(cpupool, cpu) = NULL;

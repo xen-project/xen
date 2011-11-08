@@ -151,7 +151,7 @@ static void synchronize_tsc_master(unsigned int slave)
     }
 
     atomic_set(&tsc_count, 0);
-    cpu_clear(slave, tsc_sync_cpu_mask);
+    cpumask_clear_cpu(slave, &tsc_sync_cpu_mask);
 }
 
 static void synchronize_tsc_slave(unsigned int slave)

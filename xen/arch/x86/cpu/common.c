@@ -668,5 +668,5 @@ void __cpuinit cpu_init(void)
 
 void cpu_uninit(unsigned int cpu)
 {
-	cpu_clear(cpu, cpu_initialized);
+	cpumask_clear_cpu(cpu, &cpu_initialized);
 }

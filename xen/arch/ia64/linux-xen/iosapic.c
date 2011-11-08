@@ -706,7 +706,7 @@ get_target_cpu (unsigned int gsi, int vector)
 
 		for_each_cpu_mask(numa_cpu, cpu_mask) {
 			if (!cpu_online(numa_cpu))
-				cpu_clear(numa_cpu, cpu_mask);
+				cpumask_clear_cpu(numa_cpu, &cpu_mask);
 		}
 
 		num_cpus = cpumask_weight(&cpu_mask);

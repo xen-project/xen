@@ -102,7 +102,6 @@ static inline void cpumask_set_cpu(int cpu, volatile cpumask_t *dstp)
 	set_bit(cpumask_check(cpu), dstp->bits);
 }
 
-#define cpu_clear(cpu, dst) cpumask_clear_cpu(cpu, &(dst))
 static inline void cpumask_clear_cpu(int cpu, volatile cpumask_t *dstp)
 {
 	clear_bit(cpumask_check(cpu), dstp->bits);

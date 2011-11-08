@@ -134,7 +134,7 @@ stop_this_cpu (void)
 	/*
 	 * Remove this CPU:
 	 */
-	cpu_clear(smp_processor_id(), cpu_online_map);
+	cpumask_clear_cpu(smp_processor_id(), &cpu_online_map);
 	max_xtp();
 	local_irq_disable();
 	cpu_halt();

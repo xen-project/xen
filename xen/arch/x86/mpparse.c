@@ -802,7 +802,7 @@ void mp_unregister_lapic(uint32_t apic_id, uint32_t cpu)
 	physid_clear(apic_id, phys_cpu_present_map);
 
 	x86_cpu_to_apicid[cpu] = BAD_APICID;
-	cpu_clear(cpu, cpu_present_map);
+	cpumask_clear_cpu(cpu, &cpu_present_map);
 }
 
 #ifdef	CONFIG_X86_IO_APIC

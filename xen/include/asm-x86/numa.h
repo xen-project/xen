@@ -43,7 +43,7 @@ extern void init_cpu_to_node(void);
 
 static inline void clear_node_cpumask(int cpu)
 {
-	cpu_clear(cpu, node_to_cpumask[cpu_to_node(cpu)]);
+	cpumask_clear_cpu(cpu, &node_to_cpumask[cpu_to_node(cpu)]);
 }
 
 /* Simple perfect hash to map pdx to node numbers */

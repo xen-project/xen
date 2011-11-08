@@ -557,7 +557,7 @@ do_rest:
 	if (!cpumask_test_cpu(cpu, &cpu_callin_map)) {
 		printk(KERN_ERR "Processor 0x%x/0x%x is stuck.\n", cpu, sapicid);
 		ia64_cpu_to_sapicid[cpu] = -1;
-		cpu_clear(cpu, cpu_online_map);  /* was set in smp_callin() */
+		cpumask_clear_cpu(cpu, &cpu_online_map);  /* was set in smp_callin() */
 		return -EINVAL;
 	}
 	return 0;
@@ -727,12 +727,12 @@ void __cpu_disable(void)
 	int cpu = smp_processor_id();
 
 	remove_siblinginfo(cpu);
-	cpu_clear(cpu, cpu_online_map);
+	cpumask_clear_cpu(cpu, &cpu_online_map);
 #ifndef XEN
 	fixup_irqs();
 #endif
 	local_flush_tlb_all();
-	cpu_clear(cpu, cpu_callin_map);
+	cpumask_clear_cpu(cpu, &cpu_callin_map);
 }
 #else /* !CONFIG_HOTPLUG_CPU */
 void __cpu_disable(void)

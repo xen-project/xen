@@ -1638,7 +1638,7 @@ csched_schedule(
 
     /* Clear "tickled" bit now that we've been scheduled */
     if ( cpumask_test_cpu(cpu, &rqd->tickled) )
-        cpu_clear(cpu, rqd->tickled);
+        cpumask_clear_cpu(cpu, &rqd->tickled);
 
     /* Update credits */
     burn_credits(rqd, scurr, now);
@@ -1709,7 +1709,7 @@ csched_schedule(
 
         /* Clear the idle mask if necessary */
         if ( cpumask_test_cpu(cpu, &rqd->idle) )
-            cpu_clear(cpu, rqd->idle);
+            cpumask_clear_cpu(cpu, &rqd->idle);
 
         snext->start_time = now;
 
@@ -1873,7 +1873,7 @@ static void deactivate_runqueue(struct csched_private *prv, int rqi)
     
     rqd->id = -1;
 
-    cpu_clear(rqi, prv->active_queues);
+    cpumask_clear_cpu(rqi, &prv->active_queues);
 }
 
 static void init_pcpu(const struct scheduler *ops, int cpu)
@@ -1977,8 +1977,8 @@ csched_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
 
     printk("Removing cpu %d from runqueue %d\n", cpu, rqi);
 
-    cpu_clear(cpu, rqd->idle);
-    cpu_clear(cpu, rqd->active);
+    cpumask_clear_cpu(cpu, &rqd->idle);
+    cpumask_clear_cpu(cpu, &rqd->active);
 
     if ( cpumask_empty(&rqd->active) )
     {
@@ -1988,7 +1988,7 @@ csched_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
 
     spin_unlock(&rqd->lock);
 
-    cpu_clear(cpu, prv->initialized);
+    cpumask_clear_cpu(cpu, &prv->initialized);
 
     spin_unlock_irqrestore(&prv->lock, flags);
 
