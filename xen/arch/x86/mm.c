@@ -4005,7 +4005,7 @@ static int create_grant_p2m_mapping(uint64_t addr, unsigned long frame,
     else
         p2mt = p2m_grant_map_rw;
     rc = guest_physmap_add_entry(current->domain,
-                                 addr >> PAGE_SHIFT, frame, 0, p2mt);
+                                 addr >> PAGE_SHIFT, frame, PAGE_ORDER_4K, p2mt);
     if ( rc )
         return GNTST_general_error;
     else
@@ -4062,7 +4062,7 @@ static int replace_grant_p2m_mapping(
                  type, mfn_x(old_mfn), frame);
         return GNTST_general_error;
     }
-    guest_physmap_remove_page(d, gfn, frame, 0);
+    guest_physmap_remove_page(d, gfn, frame, PAGE_ORDER_4K);
 
     return GNTST_okay;
 }
@@ -4689,7 +4689,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         {
             if ( is_xen_heap_mfn(prev_mfn) )
                 /* Xen heap frames are simply unhooked from this phys slot. */
-                guest_physmap_remove_page(d, xatp.gpfn, prev_mfn, 0);
+                guest_physmap_remove_page(d, xatp.gpfn, prev_mfn, PAGE_ORDER_4K);
             else
                 /* Normal domain memory is freed, to avoid leaking memory. */
                 guest_remove_page(d, xatp.gpfn);
@@ -4699,10 +4699,10 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         gpfn = get_gpfn_from_mfn(mfn);
         ASSERT( gpfn != SHARED_M2P_ENTRY );
         if ( gpfn != INVALID_M2P_ENTRY )
-            guest_physmap_remove_page(d, gpfn, mfn, 0);
+            guest_physmap_remove_page(d, gpfn, mfn, PAGE_ORDER_4K);
 
         /* Map at new location. */
-        rc = guest_physmap_add_page(d, xatp.gpfn, mfn, 0);
+        rc = guest_physmap_add_page(d, xatp.gpfn, mfn, PAGE_ORDER_4K);
 
         domain_unlock(d);
 

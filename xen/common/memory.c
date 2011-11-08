@@ -165,7 +165,7 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
     mfn = mfn_x(gfn_to_mfn(d, gmfn, &p2mt)); 
     if ( unlikely(p2m_is_paging(p2mt)) )
     {
-        guest_physmap_remove_page(d, gmfn, mfn, 0);
+        guest_physmap_remove_page(d, gmfn, mfn, PAGE_ORDER_4K);
         p2m_mem_paging_drop_page(d, gmfn);
         return 1;
     }
@@ -186,7 +186,7 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
     if(p2m_is_shared(p2mt))
     {
         put_page_and_type(page);
-        guest_physmap_remove_page(d, gmfn, mfn, 0);
+        guest_physmap_remove_page(d, gmfn, mfn, PAGE_ORDER_4K);
         return 1;
     }
 
@@ -203,7 +203,7 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
     if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
         put_page(page);
 
-    guest_physmap_remove_page(d, gmfn, mfn, 0);
+    guest_physmap_remove_page(d, gmfn, mfn, PAGE_ORDER_4K);
 
     put_page(page);
 
@@ -418,7 +418,7 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
             gfn = mfn_to_gmfn(d, mfn);
             /* Pages were unshared above */
             BUG_ON(SHARED_M2P(gfn));
-            guest_physmap_remove_page(d, gfn, mfn, 0);
+            guest_physmap_remove_page(d, gfn, mfn, PAGE_ORDER_4K);
             put_page(page);
         }
 
