@@ -1740,6 +1740,8 @@ static const struct lbr_info *last_branch_msr_get(void)
             break;
         /* Nehalem */
         case 26: case 30: case 31: case 46:
+        /* Westmere */
+        case 37: case 44: case 47:
         /* Sandy Bridge */
         case 42: case 45:
             return nh_lbr;
