@@ -1076,6 +1076,9 @@ static void dump_msi(unsigned char key)
         unsigned long flags;
         char type;
 
+        if ( !irq_desc_initialized(desc) )
+            continue;
+
         spin_lock_irqsave(&desc->lock, flags);
 
         entry = desc->msi_desc;
