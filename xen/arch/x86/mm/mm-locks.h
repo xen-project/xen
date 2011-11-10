@@ -70,6 +70,27 @@ static inline void _mm_lock(mm_lock_t *l, const char *func, int level, int rec)
         panic("mm lock already held by %s\n", l->locker_function);
     __set_lock_level(level);
 }
+
+static inline void _mm_enforce_order_lock_pre(int level)
+{
+    __check_lock_level(level);
+}
+
+static inline void _mm_enforce_order_lock_post(int level, int *unlock_level,
+                                                unsigned short *recurse_count)
+{
+    if ( recurse_count )
+    {
+        if ( *recurse_count++ == 0 )
+        {
+            *unlock_level = __get_lock_level();
+        }
+    } else {
+        *unlock_level = __get_lock_level();
+    }
+    __set_lock_level(level);
+}
+
 /* This wrapper uses the line number to express the locking order below */
 #define declare_mm_lock(name)                                                 \
     static inline void mm_lock_##name(mm_lock_t *l, const char *func, int rec)\
@@ -77,6 +98,16 @@ static inline void _mm_lock(mm_lock_t *l, const char *func, int level, int rec)
 /* These capture the name of the calling function */
 #define mm_lock(name, l) mm_lock_##name(l, __func__, 0)
 #define mm_lock_recursive(name, l) mm_lock_##name(l, __func__, 1)
+
+/* This wrapper is intended for "external" locks which do not use
+ * the mm_lock_t types. Such locks inside the mm code are also subject
+ * to ordering constraints. */
+#define declare_mm_order_constraint(name)                                   \
+    static inline void mm_enforce_order_lock_pre_##name(void)               \
+    { _mm_enforce_order_lock_pre(__LINE__); }                               \
+    static inline void mm_enforce_order_lock_post_##name(                   \
+                        int *unlock_level, unsigned short *recurse_count)   \
+    { _mm_enforce_order_lock_post(__LINE__, unlock_level, recurse_count); } \
 
 static inline void mm_unlock(mm_lock_t *l)
 {
@@ -86,6 +117,21 @@ static inline void mm_unlock(mm_lock_t *l)
         __set_lock_level(l->unlock_level);
     }
     spin_unlock_recursive(&l->lock);
+}
+
+static inline void mm_enforce_order_unlock(int unlock_level, 
+                                            unsigned short *recurse_count)
+{
+    if ( recurse_count )
+    {
+        BUG_ON(*recurse_count == 0);
+        if ( *recurse_count-- == 1 )
+        {
+            __set_lock_level(unlock_level);
+        }
+    } else {
+        __set_lock_level(unlock_level);
+    }
 }
 
 /************************************************************************
