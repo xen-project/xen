@@ -144,6 +144,44 @@ void p2m_change_entry_type_global(struct domain *d,
     p2m_unlock(p2m);
 }
 
+mfn_t gfn_to_mfn_type_p2m(struct p2m_domain *p2m, unsigned long gfn,
+                    p2m_type_t *t, p2m_access_t *a, p2m_query_t q,
+                    unsigned int *page_order)
+{
+    mfn_t mfn;
+
+    if ( !p2m || !paging_mode_translate(p2m->domain) )
+    {
+        /* Not necessarily true, but for non-translated guests, we claim
+         * it's the most generic kind of memory */
+        *t = p2m_ram_rw;
+        return _mfn(gfn);
+    }
+
+    mfn = p2m->get_entry(p2m, gfn, t, a, q, page_order);
+
+#ifdef __x86_64__
+    if ( q == p2m_unshare && p2m_is_shared(*t) )
+    {
+        ASSERT(!p2m_is_nestedp2m(p2m));
+        mem_sharing_unshare_page(p2m->domain, gfn, 0);
+        mfn = p2m->get_entry(p2m, gfn, t, a, q, page_order);
+    }
+#endif
+
+#ifdef __x86_64__
+    if (unlikely((p2m_is_broken(*t))))
+    {
+        /* Return invalid_mfn to avoid caller's access */
+        mfn = _mfn(INVALID_MFN);
+        if (q == p2m_guest)
+            domain_crash(p2m->domain);
+    }
+#endif
+
+    return mfn;
+}
+
 int set_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn, 
                   unsigned int page_order, p2m_type_t p2mt, p2m_access_t p2ma)
 {
