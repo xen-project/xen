@@ -270,6 +270,11 @@ struct p2m_domain {
      * + p2m_pod_demand_populate() grabs both; the p2m lock to avoid
      *   double-demand-populating of pages, the page_alloc lock to
      *   protect moving stuff from the PoD cache to the domain page list.
+     *
+     * We enforce this lock ordering through a construct in mm-locks.h.
+     * This demands, however, that we store the previous lock-ordering
+     * level in effect before grabbing the page_alloc lock. The unlock
+     * level is stored in the arch section of the domain struct.
      */
     struct {
         struct page_list_head super,   /* List of superpages                */

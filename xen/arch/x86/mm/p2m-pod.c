@@ -45,6 +45,20 @@
 
 #define superpage_aligned(_x)  (((_x)&(SUPERPAGE_PAGES-1))==0)
 
+/* Enforce lock ordering when grabbing the "external" page_alloc lock */
+static inline void lock_page_alloc(struct p2m_domain *p2m)
+{
+    page_alloc_mm_pre_lock();
+    spin_lock(&(p2m->domain->page_alloc_lock));
+    page_alloc_mm_post_lock(p2m->domain->arch.page_alloc_unlock_level);
+}
+
+static inline void unlock_page_alloc(struct p2m_domain *p2m)
+{
+    page_alloc_mm_unlock(p2m->domain->arch.page_alloc_unlock_level);
+    spin_unlock(&(p2m->domain->page_alloc_lock));
+}
+
 /*
  * Populate-on-demand functionality
  */
@@ -100,7 +114,7 @@ p2m_pod_cache_add(struct p2m_domain *p2m,
         unmap_domain_page(b);
     }
 
-    spin_lock(&d->page_alloc_lock);
+    lock_page_alloc(p2m);
 
     /* First, take all pages off the domain list */
     for(i=0; i < 1 << order ; i++)
@@ -128,7 +142,7 @@ p2m_pod_cache_add(struct p2m_domain *p2m,
      * This may cause "zombie domains" since the page will never be freed. */
     BUG_ON( d->arch.relmem != RELMEM_not_started );
 
-    spin_unlock(&d->page_alloc_lock);
+    unlock_page_alloc(p2m);
 
     return 0;
 }
@@ -245,7 +259,7 @@ p2m_pod_set_cache_target(struct p2m_domain *p2m, unsigned long pod_target, int p
 
         /* Grab the lock before checking that pod.super is empty, or the last
          * entries may disappear before we grab the lock. */
-        spin_lock(&d->page_alloc_lock);
+        lock_page_alloc(p2m);
 
         if ( (p2m->pod.count - pod_target) > SUPERPAGE_PAGES
              && !page_list_empty(&p2m->pod.super) )
@@ -257,7 +271,7 @@ p2m_pod_set_cache_target(struct p2m_domain *p2m, unsigned long pod_target, int p
 
         ASSERT(page != NULL);
 
-        spin_unlock(&d->page_alloc_lock);
+        unlock_page_alloc(p2m);
 
         /* Then free them */
         for ( i = 0 ; i < (1 << order) ; i++ )
@@ -378,7 +392,7 @@ p2m_pod_empty_cache(struct domain *d)
     BUG_ON(!d->is_dying);
     spin_barrier(&p2m->lock.lock);
 
-    spin_lock(&d->page_alloc_lock);
+    lock_page_alloc(p2m);
 
     while ( (page = page_list_remove_head(&p2m->pod.super)) )
     {
@@ -403,7 +417,7 @@ p2m_pod_empty_cache(struct domain *d)
 
     BUG_ON(p2m->pod.count != 0);
 
-    spin_unlock(&d->page_alloc_lock);
+    unlock_page_alloc(p2m);
 }
 
 int
@@ -417,7 +431,7 @@ p2m_pod_offline_or_broken_hit(struct page_info *p)
     if ( !(d = page_get_owner(p)) || !(p2m = p2m_get_hostp2m(d)) )
         return 0;
 
-    spin_lock(&d->page_alloc_lock);
+    lock_page_alloc(p2m);
     bmfn = mfn_x(page_to_mfn(p));
     page_list_for_each_safe(q, tmp, &p2m->pod.super)
     {
@@ -448,12 +462,12 @@ p2m_pod_offline_or_broken_hit(struct page_info *p)
         }
     }
 
-    spin_unlock(&d->page_alloc_lock);
+    unlock_page_alloc(p2m);
     return 0;
 
 pod_hit:
     page_list_add_tail(p, &d->arch.relmem_list);
-    spin_unlock(&d->page_alloc_lock);
+    unlock_page_alloc(p2m);
     return 1;
 }
 
@@ -994,7 +1008,7 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
     if ( q == p2m_guest && gfn > p2m->pod.max_guest )
         p2m->pod.max_guest = gfn;
 
-    spin_lock(&d->page_alloc_lock);
+    lock_page_alloc(p2m);
 
     if ( p2m->pod.count == 0 )
         goto out_of_memory;
@@ -1008,7 +1022,7 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
 
     BUG_ON((mfn_x(mfn) & ((1 << order)-1)) != 0);
 
-    spin_unlock(&d->page_alloc_lock);
+    unlock_page_alloc(p2m);
 
     gfn_aligned = (gfn >> order) << order;
 
@@ -1040,7 +1054,7 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
 
     return 0;
 out_of_memory:
-    spin_unlock(&d->page_alloc_lock);
+    unlock_page_alloc(p2m);
 
     printk("%s: Out of populate-on-demand memory! tot_pages %" PRIu32 " pod_entries %" PRIi32 "\n",
            __func__, d->tot_pages, p2m->pod.entry_count);
@@ -1049,7 +1063,7 @@ out_fail:
     return -1;
 remap_and_retry:
     BUG_ON(order != PAGE_ORDER_2M);
-    spin_unlock(&d->page_alloc_lock);
+    unlock_page_alloc(p2m);
 
     /* Remap this 2-meg region in singleton chunks */
     gfn_aligned = (gfn>>order)<<order;

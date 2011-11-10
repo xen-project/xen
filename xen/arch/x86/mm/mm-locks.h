@@ -174,6 +174,18 @@ declare_mm_lock(p2m)
 #define p2m_unlock(p)         mm_unlock(&(p)->lock)
 #define p2m_locked_by_me(p)   mm_locked_by_me(&(p)->lock)
 
+/* Page alloc lock (per-domain)
+ *
+ * This is an external lock, not represented by an mm_lock_t. However, 
+ * pod code uses it in conjunction with the p2m lock, and expecting
+ * the ordering which we enforce here.
+ * The lock is not recursive. */
+
+declare_mm_order_constraint(page_alloc)
+#define page_alloc_mm_pre_lock()   mm_enforce_order_lock_pre_page_alloc()
+#define page_alloc_mm_post_lock(l) mm_enforce_order_lock_post_page_alloc(&(l), NULL)
+#define page_alloc_mm_unlock(l)    mm_enforce_order_unlock((l), NULL)
+
 /* Paging lock (per-domain)
  *
  * For shadow pagetables, this lock protects

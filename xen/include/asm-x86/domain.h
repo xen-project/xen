@@ -269,6 +269,9 @@ struct arch_domain
 
     struct paging_domain paging;
     struct p2m_domain *p2m;
+    /* To enforce lock ordering in the pod code wrt the 
+     * page_alloc lock */
+    int page_alloc_unlock_level;
 
     /* nestedhvm: translate l2 guest physical to host physical */
     struct p2m_domain *nested_p2m[MAX_NESTEDP2M];
