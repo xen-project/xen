@@ -28,6 +28,7 @@
 
 /* Per-CPU variable for enforcing the lock ordering */
 DECLARE_PER_CPU(int, mm_lock_level);
+#define __get_lock_level()  (this_cpu(mm_lock_level))
 
 static inline void mm_lock_init(mm_lock_t *l)
 {
@@ -42,22 +43,32 @@ static inline int mm_locked_by_me(mm_lock_t *l)
     return (l->lock.recurse_cpu == current->processor);
 }
 
+/* If you see this crash, the numbers printed are lines in this file 
+ * where the offending locks are declared. */
+#define __check_lock_level(l)                           \
+do {                                                    \
+    if ( unlikely(__get_lock_level()) > (l) )           \
+        panic("mm locking order violation: %i > %i\n",  \
+              __get_lock_level(), (l));                 \
+} while(0)
+
+#define __set_lock_level(l)         \
+do {                                \
+    __get_lock_level() = (l);       \
+} while(0)
+
 static inline void _mm_lock(mm_lock_t *l, const char *func, int level, int rec)
 {
-    /* If you see this crash, the numbers printed are lines in this file 
-     * where the offending locks are declared. */
-    if ( unlikely(this_cpu(mm_lock_level) > level) )
-        panic("mm locking order violation: %i > %i\n", 
-              this_cpu(mm_lock_level), level);
+    __check_lock_level(level);
     spin_lock_recursive(&l->lock);
     if ( l->lock.recurse_cnt == 1 )
     {
         l->locker_function = func;
-        l->unlock_level = this_cpu(mm_lock_level);
+        l->unlock_level = __get_lock_level();
     }
     else if ( (unlikely(!rec)) )
         panic("mm lock already held by %s\n", l->locker_function);
-    this_cpu(mm_lock_level) = level;
+    __set_lock_level(level);
 }
 /* This wrapper uses the line number to express the locking order below */
 #define declare_mm_lock(name)                                                 \
@@ -72,7 +83,7 @@ static inline void mm_unlock(mm_lock_t *l)
     if ( l->lock.recurse_cnt == 1 )
     {
         l->locker_function = "nobody";
-        this_cpu(mm_lock_level) = l->unlock_level;
+        __set_lock_level(l->unlock_level);
     }
     spin_unlock_recursive(&l->lock);
 }
