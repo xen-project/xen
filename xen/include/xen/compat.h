@@ -185,6 +185,34 @@ static inline int name(k xen_ ## n *x, k compat_ ## n *c) \
     CHECK_FIELD_COMMON_(k, CHECK_NAME_(k, n ## __ ## f1 ## __ ## f2 ## __ ## \
                                        f3, F2), n, f1.f2.f3)
 
+/*
+ * Translate a native continuation into a compat guest continuation.
+ *
+ * id: If non-NULL then points to an integer N between 0-5. Will be updated
+ * with the value of the N'th argument to the hypercall. The N'th argument must
+ * not be subject to translation (i.e. cannot be referenced by @mask below).
+ * This option is useful for extracting the "op" argument or similar from the
+ * hypercall to enable further xlat processing.
+ *
+ * mask: Specifies which of the hypercall arguments require compat translation.
+ * bit 0 indicates that the 0'th argument requires translation, bit 1 indicates
+ * that the first argument requires translation and so on. Native and compat
+ * values for each translated argument are provided as @varargs (see below).
+ *
+ * varargs: For each bit which is set in @mask the varargs contain a native
+ * value (unsigned long) and a compat value (unsigned int). If the native value
+ * and compat value differ and the N'th argument is equal to the native value
+ * then that argument is replaced by the compat value. If the native and compat
+ * values are equal then no translation takes place. If the N'th argument does
+ * not equal the native value then no translation takes place.
+ *
+ * Any untranslated argument (whether due to not being requested in @mask,
+ * native and compat values being equal or N'th argument not equalling native
+ * value) must be equal in both native and compat representations (i.e. the
+ * native version cannot have any bits > 32 set)
+ *
+ * Return: Number of arguments which were actually translated.
+ */
 int hypercall_xlat_continuation(unsigned int *id, unsigned int mask, ...);
 
 /* In-place translation functons: */
