@@ -25,6 +25,7 @@ do_multicall(
 {
     struct mc_state *mcs = &current->mc_state;
     unsigned int     i;
+    int              rc = 0;
 
     if ( unlikely(__test_and_set_bit(_MCSF_in_multicall, &mcs->flags)) )
     {
@@ -33,15 +34,18 @@ do_multicall(
     }
 
     if ( unlikely(!guest_handle_okay(call_list, nr_calls)) )
-        goto fault;
+        rc = -EFAULT;
 
-    for ( i = 0; i < nr_calls; i++ )
+    for ( i = 0; !rc && i < nr_calls; i++ )
     {
         if ( hypercall_preempt_check() )
             goto preempted;
 
         if ( unlikely(__copy_from_guest(&mcs->call, call_list, 1)) )
-            goto fault;
+        {
+            rc = -EFAULT;
+            break;
+        }
 
         do_multicall_call(&mcs->call);
 
@@ -58,30 +62,25 @@ do_multicall(
 #endif
 
         if ( unlikely(__copy_field_to_guest(call_list, &mcs->call, result)) )
-            goto fault;
-
-        if ( test_bit(_MCSF_call_preempted, &mcs->flags) )
+            rc = -EFAULT;
+        else if ( test_bit(_MCSF_call_preempted, &mcs->flags) )
         {
             /* Translate sub-call continuation to guest layout */
             xlat_multicall_entry(mcs);
 
             /* Copy the sub-call continuation. */
-            (void)__copy_to_guest(call_list, &mcs->call, 1);
-            goto preempted;
+            if ( likely(!__copy_to_guest(call_list, &mcs->call, 1)) )
+                goto preempted;
+            rc = -EFAULT;
         }
-
-        guest_handle_add_offset(call_list, 1);
+        else
+            guest_handle_add_offset(call_list, 1);
     }
 
     perfc_incr(calls_to_multicall);
-    perfc_add(calls_from_multicall, nr_calls);
+    perfc_add(calls_from_multicall, i);
     mcs->flags = 0;
-    return 0;
-
- fault:
-    perfc_incr(calls_to_multicall);
-    mcs->flags = 0;
-    return -EFAULT;
+    return rc;
 
  preempted:
     perfc_add(calls_from_multicall, i);
