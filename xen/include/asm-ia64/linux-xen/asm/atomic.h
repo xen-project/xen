@@ -24,18 +24,64 @@ typedef struct { volatile __s32 counter; } atomic_t;
 typedef struct { volatile __s64 counter; } atomic64_t;
 
 #ifndef XEN
+
 #define ATOMIC_INIT(i)		((atomic_t) { (i) })
 #define ATOMIC64_INIT(i)	((atomic64_t) { (i) })
-#else
-#define ATOMIC_INIT(i)		{ (i) }
-#define ATOMIC64_INIT(i)	{ (i) }
-#endif
 
 #define atomic_read(v)		((v)->counter)
 #define atomic64_read(v)	((v)->counter)
 
 #define atomic_set(v,i)		(((v)->counter) = (i))
 #define atomic64_set(v,i)	(((v)->counter) = (i))
+
+#else
+
+#define ATOMIC_INIT(i)		{ (i) }
+#define ATOMIC64_INIT(i)	{ (i) }
+
+#define build_atomic_read(tag, type) \
+static inline type atomic_read##tag(const volatile type *addr) \
+{ \
+	type ret; \
+	asm volatile("ld%2.acq %0 = %1" \
+		     : "=r" (ret) \
+		     : "m" (*addr), "i" (sizeof(type))); \
+	return ret; \
+}
+
+#define build_atomic_write(tag, type) \
+static inline void atomic_write##tag(volatile type *addr, type val) \
+{ \
+	asm volatile("st%2.rel %0 = %1" \
+		     : "=m" (*addr) \
+		     : "r" (val), "i" (sizeof(type))); \
+}
+
+build_atomic_read(8, uint8_t)
+build_atomic_read(16, uint16_t)
+build_atomic_read(32, uint32_t)
+build_atomic_read(64, uint64_t)
+build_atomic_read(_int, int)
+build_atomic_read(_long, long)
+
+build_atomic_write(8, uint8_t)
+build_atomic_write(16, uint16_t)
+build_atomic_write(32, uint32_t)
+build_atomic_write(64, uint64_t)
+build_atomic_write(_int, int)
+build_atomic_write(_long, long)
+
+#define _atomic_read(v)		((v).counter)
+#define _atomic64_read(v)	((v).counter)
+#define atomic_read(v)		atomic_read_int(&((v)->counter))
+#define atomic64_read(v)	atomic_read_long(&((v)->counter))
+
+#define _atomic_set(v,i)	(((v).counter) = (i))
+#define _atomic64_set(v,i)	(((v).counter) = (i))
+#define atomic_set(v,i)		atomic_write_int(&((v)->counter), i)
+#define atomic64_set(v,l)	atomic_write_long(&((v)->counter), l)
+
+#endif
 
 static __inline__ int
 ia64_atomic_add (int i, atomic_t *v)
@@ -59,7 +105,7 @@ ia64_atomic64_add (__s64 i, atomic64_t *v)
 
 	do {
 		CMPXCHG_BUGCHECK(v);
-		old = atomic_read(v);
+		old = atomic64_read(v);
 		new = old + i;
 	} while (ia64_cmpxchg(acq, v, old, new, sizeof(atomic64_t)) != old);
 	return new;
@@ -87,7 +133,7 @@ ia64_atomic64_sub (__s64 i, atomic64_t *v)
 
 	do {
 		CMPXCHG_BUGCHECK(v);
-		old = atomic_read(v);
+		old = atomic64_read(v);
 		new = old - i;
 	} while (ia64_cmpxchg(acq, v, old, new, sizeof(atomic64_t)) != old);
 	return new;
