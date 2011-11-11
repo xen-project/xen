@@ -30,38 +30,19 @@
 static int __init get_iommu_msi_capabilities(
     u16 seg, u8 bus, u8 dev, u8 func, struct amd_iommu *iommu)
 {
-    int cap_ptr, cap_id;
-    u32 cap_header;
+    int pos;
     u16 control;
-    int count = 0;
 
-    cap_ptr = pci_conf_read8(seg, bus, dev, func,
-            PCI_CAPABILITY_LIST);
+    pos = pci_find_cap_offset(seg, bus, dev, func, PCI_CAP_ID_MSI);
 
-    while ( cap_ptr >= PCI_MIN_CAP_OFFSET &&
-        count < PCI_MAX_CAP_BLOCKS )
-    {
-        cap_ptr &= PCI_CAP_PTR_MASK;
-        cap_header = pci_conf_read32(seg, bus, dev, func, cap_ptr);
-        cap_id = get_field_from_reg_u32(cap_header,
-                PCI_CAP_ID_MASK, PCI_CAP_ID_SHIFT);
-
-        if ( cap_id == PCI_CAP_ID_MSI )
-        {
-            iommu->msi_cap = cap_ptr;
-            break;
-        }
-        cap_ptr = get_field_from_reg_u32(cap_header,
-                PCI_CAP_NEXT_PTR_MASK, PCI_CAP_NEXT_PTR_SHIFT);
-        count++;
-    }
-
-    if ( !iommu->msi_cap )
+    if ( !pos )
         return -ENODEV;
 
-    AMD_IOMMU_DEBUG("Found MSI capability block \n");
+    AMD_IOMMU_DEBUG("Found MSI capability block at %#x\n", pos);
+
+    iommu->msi_cap = pos;
     control = pci_conf_read16(seg, bus, dev, func,
-            iommu->msi_cap + PCI_MSI_FLAGS);
+                              iommu->msi_cap + PCI_MSI_FLAGS);
     iommu->maskbit = control & PCI_MSI_FLAGS_MASKBIT;
     return 0;
 }
