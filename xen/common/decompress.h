@@ -10,9 +10,6 @@
 #define INIT __init
 #define INITDATA __initdata
 
-static void(*__initdata error)(const char *);
-#define set_error_fn(x) error = x;
-
 #define malloc xmalloc_bytes
 #define free xfree
 

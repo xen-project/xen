@@ -67,6 +67,7 @@ struct rc {
 	uint32_t code;
 	uint32_t range;
 	uint32_t bound;
+	void (*error)(const char *);
 };
 
 
@@ -85,7 +86,7 @@ static void INIT rc_read(struct rc *rc)
 {
 	rc->buffer_size = rc->fill((char *)rc->buffer, LZMA_IOBUF_SIZE);
 	if (rc->buffer_size <= 0)
-		error("unexpected EOF");
+		rc->error("unexpected EOF");
 	rc->ptr = rc->buffer;
 	rc->buffer_end = rc->buffer + rc->buffer_size;
 }
@@ -529,7 +530,7 @@ STATIC int INIT unlzma(unsigned char *buf, unsigned int in_len,
 		       int(*flush)(void*, unsigned int),
 		       unsigned char *output,
 		       unsigned int *posp,
-		       void(*error_fn)(const char *x)
+		       void(*error)(const char *x)
 	)
 {
 	struct lzma_header header;
@@ -545,7 +546,7 @@ STATIC int INIT unlzma(unsigned char *buf, unsigned int in_len,
 	unsigned char *inbuf;
 	int ret = -1;
 
-	set_error_fn(error_fn);
+	rc.error = error;
 
 	if (buf)
 		inbuf = buf;

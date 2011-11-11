@@ -161,14 +161,12 @@ STATIC int INIT unxz(unsigned char *in, unsigned int in_size,
 		     int (*fill)(void *dest, unsigned int size),
 		     int (*flush)(void *src, unsigned int size),
 		     unsigned char *out, unsigned int *in_used,
-		     void (*error_fn)(const char *x))
+		     void (*error)(const char *x))
 {
 	struct xz_buf b;
 	struct xz_dec *s;
 	enum xz_ret ret;
 	bool_t must_free_in = false;
-
-	set_error_fn(error_fn);
 
 	xz_crc32_init();
 

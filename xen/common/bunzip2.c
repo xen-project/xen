@@ -666,13 +666,12 @@ STATIC int INIT bunzip2(unsigned char *buf, unsigned int len,
 			int(*flush)(void*, unsigned int),
 			unsigned char *outbuf,
 			unsigned int *pos,
-			void(*error_fn)(const char *x))
+			void(*error)(const char *x))
 {
 	struct bunzip_data *bd;
 	int i = -1;
 	unsigned char *inbuf;
 
-	set_error_fn(error_fn);
 	if (flush)
 		outbuf = malloc(BZIP2_IOBUF_SIZE);
 

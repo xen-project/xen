@@ -105,15 +105,13 @@ STATIC int INIT unlzo(u8 *input, unsigned int in_len,
 		      int (*fill) (void *, unsigned int),
 		      int (*flush) (void *, unsigned int),
 		      u8 *output, unsigned int *posp,
-		      void (*error_fn) (const char *x))
+		      void (*error) (const char *x))
 {
 	u8 skip = 0, r = 0;
 	u32 src_len, dst_len;
 	size_t tmp;
 	u8 *in_buf, *in_buf_save, *out_buf;
 	int ret = -1;
-
-	set_error_fn(error_fn);
 
 	if (output) {
 		out_buf = output;
