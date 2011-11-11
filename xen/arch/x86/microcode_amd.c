@@ -59,7 +59,7 @@ static int collect_cpu_info(int cpu, struct cpu_signature *csig)
 
     rdmsrl(MSR_AMD_PATCHLEVEL, csig->rev);
 
-    printk(KERN_INFO "microcode: collect_cpu_info: patch_id=0x%x\n",
+    printk(KERN_DEBUG "microcode: collect_cpu_info: patch_id=0x%x\n",
            csig->rev);
 
     return 0;
@@ -92,7 +92,7 @@ static int microcode_fits(void *mc, int cpu)
 
     if ( (mc_header->processor_rev_id) != equiv_cpu_id )
     {
-        printk(KERN_INFO "microcode: CPU%d patch does not match "
+        printk(KERN_DEBUG "microcode: CPU%d patch does not match "
                "(patch is %x, cpu base id is %x) \n",
                cpu, mc_header->processor_rev_id, equiv_cpu_id);
         return -EINVAL;
@@ -101,7 +101,7 @@ static int microcode_fits(void *mc, int cpu)
     if ( mc_header->patch_id <= uci->cpu_sig.rev )
         return -EINVAL;
 
-    printk(KERN_INFO "microcode: CPU%d found a matching microcode "
+    printk(KERN_DEBUG "microcode: CPU%d found a matching microcode "
            "update with version 0x%x (current=0x%x)\n",
            cpu, mc_header->patch_id, uci->cpu_sig.rev);
 
@@ -139,8 +139,7 @@ static int apply_microcode(int cpu)
         return -EIO;
     }
 
-    printk("microcode: CPU%d updated from revision "
-           "0x%x to 0x%x \n",
+    printk(KERN_INFO "microcode: CPU%d updated from revision %#x to %#x\n",
            cpu, uci->cpu_sig.rev, mc_amd->hdr.patch_id);
 
     uci->cpu_sig.rev = rev;
@@ -170,7 +169,7 @@ static int get_next_ucode_from_buffer_amd(void *mc, const void *buf,
 
     total_size = (unsigned long) (bufp[off+4] + (bufp[off+5] << 8));
 
-    printk(KERN_INFO "microcode: size %lu, total_size %lu, offset %ld\n",
+    printk(KERN_DEBUG "microcode: size %lu, total_size %lu, offset %ld\n",
            (unsigned long)size, total_size, off);
 
     if ( (off + total_size) > size )
