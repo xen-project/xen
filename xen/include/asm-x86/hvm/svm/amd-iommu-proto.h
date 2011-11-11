@@ -166,4 +166,19 @@ static inline void __free_amd_iommu_tables(void *table, int order)
     free_xenheap_pages(table, order);
 }
 
+static inline void iommu_set_bit(uint32_t *reg, uint32_t bit)
+{
+    set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, *reg, 1U << bit, bit, reg);
+}
+
+static inline void iommu_clear_bit(uint32_t *reg, uint32_t bit)
+{
+    set_field_in_reg_u32(IOMMU_CONTROL_DISABLED, *reg, 1U << bit, bit, reg);
+}
+
+static inline uint32_t iommu_get_bit(uint32_t reg, uint32_t bit)
+{
+    return get_field_from_reg_u32(reg, 1U << bit, bit);
+}
+
 #endif /* _ASM_X86_64_AMD_IOMMU_PROTO_H */

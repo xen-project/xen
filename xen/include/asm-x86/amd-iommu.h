@@ -57,11 +57,7 @@ struct amd_iommu {
     u8 ht_tunnel_support;
     u8 iotlb_support;
 
-    u8 isochronous;
-    u8 coherent;
-    u8 res_pass_pw;
-    u8 pass_pw;
-    u8 ht_tunnel_enable;
+    u8 ht_flags;
 
     void *mmio_base;
     unsigned long mmio_base_phys;

@@ -98,25 +98,8 @@ int __init amd_iommu_detect_one_acpi(void *ivhd)
     iommu->cap_offset = ivhd_block->cap_offset;
     iommu->mmio_base_phys = ivhd_block->mmio_base;
 
-    /* override IOMMU support flags */
-    iommu->coherent = get_field_from_byte(ivhd_block->header.flags,
-                        AMD_IOMMU_ACPI_COHERENT_MASK,
-                        AMD_IOMMU_ACPI_COHERENT_SHIFT);
-    iommu->iotlb_support = get_field_from_byte(ivhd_block->header.flags,
-                        AMD_IOMMU_ACPI_IOTLB_SUP_MASK,
-                        AMD_IOMMU_ACPI_IOTLB_SUP_SHIFT);
-    iommu->isochronous = get_field_from_byte(ivhd_block->header.flags,
-                        AMD_IOMMU_ACPI_ISOC_MASK,
-                        AMD_IOMMU_ACPI_ISOC_SHIFT);
-    iommu->res_pass_pw = get_field_from_byte(ivhd_block->header.flags,
-                        AMD_IOMMU_ACPI_RES_PASS_PW_MASK,
-                        AMD_IOMMU_ACPI_RES_PASS_PW_SHIFT);
-    iommu->pass_pw = get_field_from_byte(ivhd_block->header.flags,
-                        AMD_IOMMU_ACPI_PASS_PW_MASK,
-                        AMD_IOMMU_ACPI_PASS_PW_SHIFT);
-    iommu->ht_tunnel_enable = get_field_from_byte(ivhd_block->header.flags,
-                        AMD_IOMMU_ACPI_HT_TUN_ENB_MASK,
-                        AMD_IOMMU_ACPI_HT_TUN_ENB_SHIFT);
+    /* override IOMMU HT flags */
+    iommu->ht_flags = ivhd_block->header.flags;
 
     bus = PCI_BUS(iommu->bdf);
     dev = PCI_SLOT(iommu->bdf);
