@@ -23,6 +23,7 @@
 #include <xen/hvm/iommu.h>
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
+#include <asm/hvm/svm/amd-iommu-acpi.h>
 #include "../ats.h"
 #include <xen/pci.h>
 
@@ -419,35 +420,23 @@ void __init amd_iommu_set_intremap_table(
     dte[4] = entry;
 }
 
-void __init amd_iommu_add_dev_table_entry(
-    u32 *dte, u8 sys_mgt, u8 dev_ex, u8 lint1_pass, u8 lint0_pass, 
-    u8 nmi_pass, u8 ext_int_pass, u8 init_pass)
+void __init iommu_dte_add_device_entry(u32 *dte, struct ivrs_mappings *ivrs_dev)
 {
     u32 entry;
+    u8 sys_mgt, dev_ex, flags;
+    u8 mask = ~(0x7 << 3);
 
     dte[7] = dte[6] = dte[4] = dte[2] = dte[1] = dte[0] = 0;
 
+    flags = ivrs_dev->device_flags;
+    sys_mgt = get_field_from_byte(flags, AMD_IOMMU_ACPI_SYS_MGT_MASK,
+                                  AMD_IOMMU_ACPI_SYS_MGT_SHIFT);
+    dev_ex = ivrs_dev->dte_allow_exclusion;
 
-    set_field_in_reg_u32(init_pass ? IOMMU_CONTROL_ENABLED :
-                        IOMMU_CONTROL_DISABLED, 0,
-                        IOMMU_DEV_TABLE_INIT_PASSTHRU_MASK,
-                        IOMMU_DEV_TABLE_INIT_PASSTHRU_SHIFT, &entry);
-    set_field_in_reg_u32(ext_int_pass ? IOMMU_CONTROL_ENABLED :
-                        IOMMU_CONTROL_DISABLED, entry,
-                        IOMMU_DEV_TABLE_EINT_PASSTHRU_MASK,
-                        IOMMU_DEV_TABLE_EINT_PASSTHRU_SHIFT, &entry);
-    set_field_in_reg_u32(nmi_pass ? IOMMU_CONTROL_ENABLED :
-                        IOMMU_CONTROL_DISABLED, entry,
-                        IOMMU_DEV_TABLE_NMI_PASSTHRU_MASK,
-                        IOMMU_DEV_TABLE_NMI_PASSTHRU_SHIFT, &entry);
-    set_field_in_reg_u32(lint0_pass ? IOMMU_CONTROL_ENABLED :
-                        IOMMU_CONTROL_DISABLED, entry,
-                        IOMMU_DEV_TABLE_LINT0_ENABLE_MASK,
-                        IOMMU_DEV_TABLE_LINT0_ENABLE_SHIFT, &entry);
-    set_field_in_reg_u32(lint1_pass ? IOMMU_CONTROL_ENABLED :
-                        IOMMU_CONTROL_DISABLED, entry,
-                        IOMMU_DEV_TABLE_LINT1_ENABLE_MASK,
-                        IOMMU_DEV_TABLE_LINT1_ENABLE_SHIFT, &entry);
+    flags &= mask;
+    set_field_in_reg_u32(flags, 0,
+                         IOMMU_DEV_TABLE_IVHD_FLAGS_MASK,
+                         IOMMU_DEV_TABLE_IVHD_FLAGS_SHIFT, &entry);
     dte[5] = entry;
 
     set_field_in_reg_u32(sys_mgt, 0,

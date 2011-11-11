@@ -31,38 +31,14 @@ static void __init add_ivrs_mapping_entry(
     u16 bdf, u16 alias_id, u8 flags, struct amd_iommu *iommu)
 {
     struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(iommu->seg);
-    u8 sys_mgt, lint1_pass, lint0_pass, nmi_pass, ext_int_pass, init_pass;
+
     ASSERT( ivrs_mappings != NULL );
 
     /* setup requestor id */
     ivrs_mappings[bdf].dte_requestor_id = alias_id;
 
     /* override flags for range of devices */
-    sys_mgt = get_field_from_byte(flags,
-                                  AMD_IOMMU_ACPI_SYS_MGT_MASK,
-                                  AMD_IOMMU_ACPI_SYS_MGT_SHIFT);
-    lint1_pass = get_field_from_byte(flags,
-                                  AMD_IOMMU_ACPI_LINT1_PASS_MASK,
-                                  AMD_IOMMU_ACPI_LINT1_PASS_SHIFT);
-    lint0_pass = get_field_from_byte(flags,
-                                  AMD_IOMMU_ACPI_LINT0_PASS_MASK,
-                                  AMD_IOMMU_ACPI_LINT0_PASS_SHIFT);
-    nmi_pass = get_field_from_byte(flags,
-                                  AMD_IOMMU_ACPI_NMI_PASS_MASK,
-                                  AMD_IOMMU_ACPI_NMI_PASS_SHIFT);
-    ext_int_pass = get_field_from_byte(flags,
-                                  AMD_IOMMU_ACPI_EINT_PASS_MASK,
-                                  AMD_IOMMU_ACPI_EINT_PASS_SHIFT);
-    init_pass = get_field_from_byte(flags,
-                                  AMD_IOMMU_ACPI_INIT_PASS_MASK,
-                                  AMD_IOMMU_ACPI_INIT_PASS_SHIFT);
-
-    ivrs_mappings[bdf].dte_sys_mgt_enable = sys_mgt;
-    ivrs_mappings[bdf].dte_lint1_pass = lint1_pass;
-    ivrs_mappings[bdf].dte_lint0_pass = lint0_pass;
-    ivrs_mappings[bdf].dte_nmi_pass = nmi_pass;
-    ivrs_mappings[bdf].dte_ext_int_pass = ext_int_pass;
-    ivrs_mappings[bdf].dte_init_pass = init_pass;
+    ivrs_mappings[bdf].device_flags = flags;
 
     if (ivrs_mappings[alias_id].intremap_table == NULL )
     {

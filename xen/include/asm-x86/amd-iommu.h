@@ -86,7 +86,6 @@ struct amd_iommu {
 
 struct ivrs_mappings {
     u16 dte_requestor_id;
-    u8 dte_sys_mgt_enable;
     u8 dte_allow_exclusion;
     u8 unity_map_enable;
     u8 write_permission;
@@ -99,12 +98,8 @@ struct ivrs_mappings {
     void *intremap_table;
     spinlock_t intremap_lock;
 
-    /* interrupt remapping settings */
-    u8 dte_lint1_pass;
-    u8 dte_lint0_pass;
-    u8 dte_nmi_pass;
-    u8 dte_ext_int_pass;
-    u8 dte_init_pass;
+    /* ivhd device data settings */
+    u8 device_flags;
 };
 
 extern unsigned short ivrs_bdf_entries;

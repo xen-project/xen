@@ -790,18 +790,12 @@ static int __init alloc_ivrs_mappings(u16 seg)
     for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )
     {
         ivrs_mappings[bdf].dte_requestor_id = bdf;
-        ivrs_mappings[bdf].dte_sys_mgt_enable =
-            IOMMU_DEV_TABLE_SYS_MGT_MSG_FORWARDED;
         ivrs_mappings[bdf].dte_allow_exclusion = IOMMU_CONTROL_DISABLED;
         ivrs_mappings[bdf].unity_map_enable = IOMMU_CONTROL_DISABLED;
         ivrs_mappings[bdf].iommu = NULL;
 
         ivrs_mappings[bdf].intremap_table = NULL;
-        ivrs_mappings[bdf].dte_lint1_pass = IOMMU_CONTROL_DISABLED;
-        ivrs_mappings[bdf].dte_lint0_pass = IOMMU_CONTROL_DISABLED;
-        ivrs_mappings[bdf].dte_nmi_pass = IOMMU_CONTROL_DISABLED;
-        ivrs_mappings[bdf].dte_ext_int_pass = IOMMU_CONTROL_DISABLED;
-        ivrs_mappings[bdf].dte_init_pass = IOMMU_CONTROL_DISABLED;
+        ivrs_mappings[bdf].device_flags = 0;
 
         if ( amd_iommu_perdev_intremap )
             spin_lock_init(&ivrs_mappings[bdf].intremap_lock);
@@ -817,8 +811,6 @@ static int __init amd_iommu_setup_device_table(
 {
     int bdf;
     void *intr_tb, *dte;
-    int sys_mgt, dev_ex, lint1_pass, lint0_pass,
-       nmi_pass, ext_int_pass, init_pass;
 
     BUG_ON( (ivrs_bdf_entries == 0) );
 
@@ -840,21 +832,9 @@ static int __init amd_iommu_setup_device_table(
 
         if ( intr_tb )
         {
-            sys_mgt = ivrs_mappings[bdf].dte_sys_mgt_enable;
-            dev_ex = ivrs_mappings[bdf].dte_allow_exclusion;
-
-            /* get interrupt remapping settings */
-            lint1_pass = ivrs_mappings[bdf].dte_lint1_pass;
-            lint0_pass = ivrs_mappings[bdf].dte_lint0_pass;
-            nmi_pass = ivrs_mappings[bdf].dte_nmi_pass;
-            ext_int_pass = ivrs_mappings[bdf].dte_ext_int_pass;
-            init_pass = ivrs_mappings[bdf].dte_init_pass;
-
             /* add device table entry */
             dte = device_table.buffer + (bdf * IOMMU_DEV_TABLE_ENTRY_SIZE);
-            amd_iommu_add_dev_table_entry(
-                dte, sys_mgt, dev_ex, lint1_pass, lint0_pass,
-                nmi_pass, ext_int_pass, init_pass);
+            iommu_dte_add_device_entry(dte, &ivrs_mappings[bdf]);
 
             amd_iommu_set_intremap_table(
                 dte, (u64)virt_to_maddr(intr_tb), iommu_intremap);
