@@ -100,8 +100,6 @@ struct pci_dev *pci_get_pdev(int seg, int bus, int devfn);
 struct pci_dev *pci_get_pdev_by_domain(
     struct domain *, int seg, int bus, int devfn);
 
-void disconnect_pci_devices(void);
-
 uint8_t pci_conf_read8(
     unsigned int seg, unsigned int bus, unsigned int dev, unsigned int func,
     unsigned int reg);

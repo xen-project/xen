@@ -683,30 +683,6 @@ void __init setup_dom0_pci_devices(
     spin_unlock(&pcidevs_lock);
 }
 
-/* Disconnect all PCI devices from the PCI buses. From the PCI spec:
- *   "When a 0 is written to [the COMMAND] register, the device is
- *    logically disconnected from the PCI bus for all accesses except
- *    configuration accesses. All devices are required to support
- *    this base level of functionality."
- */
-static int _disconnect_pci_devices(struct pci_seg *pseg, void *arg)
-{
-    struct pci_dev *pdev;
-
-    list_for_each_entry ( pdev, &pseg->alldevs_list, alldevs_list )
-        pci_conf_write16(pseg->nr, pdev->bus, PCI_SLOT(pdev->devfn),
-                         PCI_FUNC(pdev->devfn), PCI_COMMAND, 0);
-
-    return 0;
-}
-
-void disconnect_pci_devices(void)
-{
-    spin_lock(&pcidevs_lock);
-    pci_segments_iterate(_disconnect_pci_devices, NULL);
-    spin_unlock(&pcidevs_lock);
-}
-
 #ifdef SUPPORT_MSI_REMAPPING
 static int _dump_pci_devices(struct pci_seg *pseg, void *arg)
 {
