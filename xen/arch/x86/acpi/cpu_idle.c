@@ -663,6 +663,8 @@ static int acpi_processor_ffh_cstate_probe(xen_processor_cx_t *cx)
     unsigned int edx_part;
     unsigned int cstate_type; /* C-state type and not ACPI C-state type */
     unsigned int num_cstate_subtype;
+    int ret = 0;
+    static unsigned long printed;
 
     if ( c->cpuid_level < CPUID_MWAIT_LEAF )
     {
@@ -671,8 +673,9 @@ static int acpi_processor_ffh_cstate_probe(xen_processor_cx_t *cx)
     }
 
     cpuid(CPUID_MWAIT_LEAF, &eax, &ebx, &ecx, &edx);
-    printk(XENLOG_DEBUG "cpuid.MWAIT[.eax=%x, .ebx=%x, .ecx=%x, .edx=%x]\n",
-           eax, ebx, ecx, edx);
+    if ( opt_cpu_info )
+        printk(XENLOG_DEBUG "cpuid.MWAIT[eax=%x ebx=%x ecx=%x edx=%x]\n",
+               eax, ebx, ecx, edx);
 
     /* Check whether this particular cx_type (in CST) is supported or not */
     cstate_type = (cx->reg.address >> MWAIT_SUBSTATE_SIZE) + 1;
@@ -680,15 +683,16 @@ static int acpi_processor_ffh_cstate_probe(xen_processor_cx_t *cx)
     num_cstate_subtype = edx_part & MWAIT_SUBSTATE_MASK;
 
     if ( num_cstate_subtype < (cx->reg.address & MWAIT_SUBSTATE_MASK) )
-        return -EFAULT;
-
+        ret = -ERANGE;
     /* mwait ecx extensions INTERRUPT_BREAK should be supported for C2/C3 */
-    if ( !(ecx & CPUID5_ECX_EXTENSIONS_SUPPORTED) ||
-         !(ecx & CPUID5_ECX_INTERRUPT_BREAK) )
-        return -EFAULT;
-
-    printk(XENLOG_INFO "Monitor-Mwait will be used to enter C-%d state\n", cx->type);
-    return 0;
+    else if ( !(ecx & CPUID5_ECX_EXTENSIONS_SUPPORTED) ||
+              !(ecx & CPUID5_ECX_INTERRUPT_BREAK) )
+        ret = -ENODEV;
+    else if ( opt_cpu_info || cx->type >= BITS_PER_LONG ||
+              !test_and_set_bit(cx->type, &printed) )
+        printk(XENLOG_INFO "Monitor-Mwait will be used to enter C%d state\n",
+               cx->type);
+    return ret;
 }
 
 /*
