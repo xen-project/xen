@@ -48,25 +48,16 @@ static int __init get_iommu_msi_capabilities(
 }
 
 static int __init get_iommu_capabilities(
-    u16 seg, u8 bus, u8 dev, u8 func, u8 cap_ptr, struct amd_iommu *iommu)
+    u16 seg, u8 bus, u8 dev, u8 func, u16 cap_ptr, struct amd_iommu *iommu)
 {
-    u32 cap_header, cap_range, misc_info;
+    u8 type;
 
-    cap_header = pci_conf_read32(seg, bus, dev, func, cap_ptr);
-    iommu->revision = get_field_from_reg_u32(
-        cap_header, PCI_CAP_REV_MASK, PCI_CAP_REV_SHIFT);
-    iommu->pte_not_present_cached = get_field_from_reg_u32(
-        cap_header, PCI_CAP_NP_CACHE_MASK, PCI_CAP_NP_CACHE_SHIFT);
+    iommu->cap.header = pci_conf_read32(seg, bus, dev, func, cap_ptr);
+    type = get_field_from_reg_u32(iommu->cap.header, PCI_CAP_TYPE_MASK,
+                                  PCI_CAP_TYPE_SHIFT);
 
-    cap_range = pci_conf_read32(seg, bus, dev, func,
-                                cap_ptr + PCI_CAP_RANGE_OFFSET);
-    iommu->unit_id = get_field_from_reg_u32(
-        cap_range, PCI_CAP_UNIT_ID_MASK, PCI_CAP_UNIT_ID_SHIFT);
-
-    misc_info = pci_conf_read32(seg, bus, dev, func,
-                                cap_ptr + PCI_MISC_INFO_OFFSET);
-    iommu->msi_number = get_field_from_reg_u32(
-        misc_info, PCI_CAP_MSI_NUMBER_MASK, PCI_CAP_MSI_NUMBER_SHIFT);
+    if ( type != PCI_CAP_TYPE_IOMMU )
+        return -ENODEV;
 
     return 0;
 }
@@ -76,6 +67,7 @@ int __init amd_iommu_detect_one_acpi(void *ivhd)
     struct amd_iommu *iommu;
     u8 bus, dev, func;
     struct acpi_ivhd_block_header *ivhd_block;
+    int rt = 0;
 
     ivhd_block = (struct acpi_ivhd_block_header *)ivhd;
 
@@ -125,12 +117,19 @@ int __init amd_iommu_detect_one_acpi(void *ivhd)
     iommu->ht_tunnel_enable = get_field_from_byte(ivhd_block->header.flags,
                         AMD_IOMMU_ACPI_HT_TUN_ENB_MASK,
                         AMD_IOMMU_ACPI_HT_TUN_ENB_SHIFT);
-    bus = iommu->bdf >> 8;
-    dev = PCI_SLOT(iommu->bdf & 0xFF);
-    func = PCI_FUNC(iommu->bdf & 0xFF);
-    get_iommu_capabilities(iommu->seg, bus, dev, func,
-                           iommu->cap_offset, iommu);
-    get_iommu_msi_capabilities(iommu->seg, bus, dev, func, iommu);
+
+    bus = PCI_BUS(iommu->bdf);
+    dev = PCI_SLOT(iommu->bdf);
+    func = PCI_FUNC(iommu->bdf);
+
+    rt = get_iommu_capabilities(iommu->seg, bus, dev, func,
+                                iommu->cap_offset, iommu);
+    if ( rt )
+        return -ENODEV;
+
+    rt = get_iommu_msi_capabilities(iommu->seg, bus, dev, func, iommu);
+    if ( rt )
+        return -ENODEV;
 
     list_add_tail(&iommu->list, &amd_iommu_head);
 

@@ -36,16 +36,22 @@ struct table_struct {
     unsigned long alloc_size;
 };
 
+typedef struct iommu_cap {
+    uint32_t header;                    /* offset 00h */
+    uint32_t base_low;                  /* offset 04h */
+    uint32_t base_hi;                   /* offset 08h */
+    uint32_t range;                     /* offset 0Ch */
+    uint32_t misc;                      /* offset 10h */
+} iommu_cap_t;
+
 struct amd_iommu {
     struct list_head list;
     spinlock_t lock; /* protect iommu */
 
     u16 seg;
     u16 bdf;
-    u8  cap_offset;
-    u8  revision;
-    u8  unit_id;
-    u8  msi_number;
+    u16 cap_offset;
+    iommu_cap_t cap;
 
     u8 pte_not_present_cached;
     u8 ht_tunnel_support;
