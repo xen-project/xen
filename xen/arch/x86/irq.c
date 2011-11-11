@@ -40,7 +40,6 @@ custom_param("irq_vector_map", parse_irq_vector_map_param);
 
 vmask_t global_used_vector_map;
 
-u8 __read_mostly *irq_vector;
 struct irq_desc __read_mostly *irq_desc = NULL;
 
 static DECLARE_BITMAP(used_vectors, NR_VECTORS);
@@ -134,8 +133,6 @@ static int __init __bind_irq_vector(int irq, int vector, const cpumask_t *cpu_ma
         set_bit(vector, desc->arch.used_vectors);
     }
     desc->arch.used = IRQ_USED;
-    if (IO_APIC_IRQ(irq))
-        irq_vector[irq] = vector;
     return 0;
 }
 
@@ -283,7 +280,11 @@ int irq_to_vector(int irq)
     BUG_ON(irq >= nr_irqs || irq < 0);
 
     if (IO_APIC_IRQ(irq))
-        vector = irq_vector[irq];
+    {
+        vector = irq_to_desc(irq)->arch.vector;
+        if (vector >= FIRST_LEGACY_VECTOR && vector <= LAST_LEGACY_VECTOR)
+            vector = 0;
+    }
     else if (MSI_IRQ(irq))
         vector = irq_to_desc(irq)->arch.vector;
     else
@@ -325,9 +326,8 @@ int __init init_irq_data(void)
         this_cpu(vector_irq)[vector] = -1;
 
     irq_desc = xzalloc_array(struct irq_desc, nr_irqs);
-    irq_vector = xzalloc_array(u8, nr_irqs_gsi);
     
-    if ( !irq_desc || !irq_vector )
+    if ( !irq_desc )
         return -ENOMEM;
 
     for (irq = 0; irq < nr_irqs_gsi; irq++) {
@@ -420,7 +420,7 @@ static int __assign_irq_vector(
     vmask_t *irq_used_vectors = NULL;
 
     old_vector = irq_to_vector(irq);
-    if (old_vector) {
+    if (old_vector > 0) {
         cpumask_and(&tmp_mask, mask, &cpu_online_map);
         if (cpumask_intersects(&tmp_mask, desc->arch.cpu_mask)) {
             desc->arch.vector = old_vector;
@@ -479,7 +479,7 @@ next:
         /* Found one! */
         current_vector = vector;
         current_offset = offset;
-        if (old_vector) {
+        if (old_vector > 0) {
             desc->arch.move_in_progress = 1;
             cpumask_copy(desc->arch.old_cpu_mask, desc->arch.cpu_mask);
             desc->arch.old_vector = desc->arch.vector;
@@ -494,9 +494,6 @@ next:
         ASSERT((desc->arch.used_vectors == NULL)
                || (desc->arch.used_vectors == irq_used_vectors));
         desc->arch.used_vectors = irq_used_vectors;
-
-        if (IO_APIC_IRQ(irq))
-            irq_vector[irq] = vector;
 
         if ( desc->arch.used_vectors )
         {

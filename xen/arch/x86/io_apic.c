@@ -452,10 +452,10 @@ static void unmask_IO_APIC_irq(struct irq_desc *desc)
     spin_unlock_irqrestore(&ioapic_lock, flags);
 }
 
-static void __eoi_IO_APIC_irq(unsigned int irq)
+static void __eoi_IO_APIC_irq(struct irq_desc *desc)
 {
-    struct irq_pin_list *entry = irq_2_pin + irq;
-    unsigned int pin, vector = IO_APIC_VECTOR(irq);
+    struct irq_pin_list *entry = irq_2_pin + desc->irq;
+    unsigned int pin, vector = desc->arch.vector;
 
     for (;;) {
         pin = entry->pin;
@@ -468,11 +468,11 @@ static void __eoi_IO_APIC_irq(unsigned int irq)
     }
 }
 
-static void eoi_IO_APIC_irq(unsigned int irq)
+static void eoi_IO_APIC_irq(struct irq_desc *desc)
 {
     unsigned long flags;
     spin_lock_irqsave(&ioapic_lock, flags);
-    __eoi_IO_APIC_irq(irq);
+    __eoi_IO_APIC_irq(desc);
     spin_unlock_irqrestore(&ioapic_lock, flags);
 }
 
@@ -1200,7 +1200,7 @@ static void /*__init*/ __print_IO_APIC(void)
         struct irq_pin_list *entry = irq_2_pin + i;
         if (entry->pin < 0)
             continue;
-        printk(KERN_DEBUG "IRQ%d ", IO_APIC_VECTOR(i));
+        printk(KERN_DEBUG "IRQ%d ", irq_to_desc(i)->arch.vector);
         for (;;) {
             printk("-> %d:%d", entry->apic, entry->pin);
             if (!entry->next)
@@ -1621,7 +1621,7 @@ static void mask_and_ack_level_ioapic_irq(struct irq_desc *desc)
  * operation to prevent an edge-triggered interrupt escaping meanwhile.
  * The idea is from Manfred Spraul.  --macro
  */
-    i = IO_APIC_VECTOR(desc->irq);
+    i = desc->arch.vector;
 
     v = apic_read(APIC_TMR + ((i & ~0x1f) >> 1));
 
@@ -1653,12 +1653,12 @@ static void end_level_ioapic_irq(struct irq_desc *desc, u8 vector)
         {
             if ( !(desc->status & (IRQ_DISABLED|IRQ_MOVE_PENDING)) )
             {
-                eoi_IO_APIC_irq(desc->irq);
+                eoi_IO_APIC_irq(desc);
                 return;
             }
 
             mask_IO_APIC_irq(desc);
-            eoi_IO_APIC_irq(desc->irq);
+            eoi_IO_APIC_irq(desc);
             if ( (desc->status & IRQ_MOVE_PENDING) &&
                  !io_apic_level_ack_pending(desc->irq) )
                 move_masked_irq(desc);
@@ -1689,7 +1689,7 @@ static void end_level_ioapic_irq(struct irq_desc *desc, u8 vector)
  * operation to prevent an edge-triggered interrupt escaping meanwhile.
  * The idea is from Manfred Spraul.  --macro
  */
-    i = IO_APIC_VECTOR(desc->irq);
+    i = desc->arch.vector;
 
     /* Manually EOI the old vector if we are moving to the new */
     if ( vector && i != vector )
@@ -1752,7 +1752,7 @@ static inline void init_IO_APIC_traps(void)
     int irq;
     /* Xen: This is way simpler than the Linux implementation. */
     for (irq = 0; platform_legacy_irq(irq); irq++)
-        if (IO_APIC_IRQ(irq) && !IO_APIC_VECTOR(irq))
+        if (IO_APIC_IRQ(irq) && !irq_to_vector(irq))
             make_8259A_irq(irq);
 }
 

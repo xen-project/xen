@@ -14,7 +14,6 @@
 #define IO_APIC_IRQ(irq)    (platform_legacy_irq(irq) ?    \
 			     (1 << (irq)) & io_apic_irqs : \
 			     (irq) < nr_irqs_gsi)
-#define IO_APIC_VECTOR(irq) (irq_vector[irq])
 
 #define MSI_IRQ(irq)       ((irq) >= nr_irqs_gsi && (irq) < nr_irqs)
 
@@ -47,8 +46,6 @@ struct arch_irq_desc {
 
 typedef int vector_irq_t[NR_VECTORS];
 DECLARE_PER_CPU(vector_irq_t, vector_irq);
-
-extern u8 *irq_vector;
 
 extern bool_t opt_noirqbalance;
 
