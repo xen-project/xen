@@ -53,10 +53,6 @@ struct amd_iommu {
     u16 cap_offset;
     iommu_cap_t cap;
 
-    u8 pte_not_present_cached;
-    u8 ht_tunnel_support;
-    u8 iotlb_support;
-
     u8 ht_flags;
 
     void *mmio_base;

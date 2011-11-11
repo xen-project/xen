@@ -115,7 +115,7 @@ static void amd_iommu_setup_domain_device(
             hd->paging_mode, valid);
 
         if ( pci_ats_device(iommu->seg, bus, devfn) &&
-             iommu->iotlb_support )
+             iommu_has_cap(iommu, PCI_CAP_IOTLB_SHIFT) )
             iommu_dte_set_iotlb((u32 *)dte, dte_i);
 
         invalidate_dev_table_entry(iommu, req_id);
@@ -307,7 +307,7 @@ void amd_iommu_disable_domain_device(struct domain *domain,
         disable_translation((u32 *)dte);
 
         if ( pci_ats_device(iommu->seg, bus, devfn) &&
-             iommu->iotlb_support )
+             iommu_has_cap(iommu, PCI_CAP_IOTLB_SHIFT) )
             iommu_dte_set_iotlb((u32 *)dte, 0);
 
         invalidate_dev_table_entry(iommu, req_id);

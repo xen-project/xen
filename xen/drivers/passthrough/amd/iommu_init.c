@@ -79,9 +79,10 @@ static void set_iommu_ht_flags(struct amd_iommu *iommu)
     entry = readl(iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
 
     /* Setup HT flags */
-    iommu_has_ht_flag(iommu, AMD_IOMMU_ACPI_HT_TUN_ENB_SHIFT) ?
-        iommu_set_bit(&entry, IOMMU_CONTROL_HT_TUNNEL_TRANSLATION_SHIFT):
-        iommu_clear_bit(&entry, IOMMU_CONTROL_HT_TUNNEL_TRANSLATION_SHIFT);
+    if ( iommu_has_cap(iommu, PCI_CAP_HT_TUNNEL_SHIFT) )
+        iommu_has_ht_flag(iommu, AMD_IOMMU_ACPI_HT_TUN_ENB_SHIFT) ?
+            iommu_set_bit(&entry, IOMMU_CONTROL_HT_TUNNEL_TRANSLATION_SHIFT) :
+            iommu_clear_bit(&entry, IOMMU_CONTROL_HT_TUNNEL_TRANSLATION_SHIFT);
 
     iommu_has_ht_flag(iommu, AMD_IOMMU_ACPI_RES_PASS_PW_SHIFT) ?
         iommu_set_bit(&entry, IOMMU_CONTROL_RESP_PASS_POSTED_WRITE_SHIFT):

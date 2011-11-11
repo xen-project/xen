@@ -996,7 +996,7 @@ void amd_iommu_flush_iotlb(struct pci_dev *pdev,
         return;
     }
 
-    if ( !iommu->iotlb_support )
+    if ( !iommu_has_cap(iommu, PCI_CAP_IOTLB_SHIFT) )
         return;
 
     req_id = get_dma_requestor_id(iommu->seg, bdf);

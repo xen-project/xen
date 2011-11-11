@@ -181,4 +181,10 @@ static inline uint32_t iommu_get_bit(uint32_t reg, uint32_t bit)
     return get_field_from_reg_u32(reg, 1U << bit, bit);
 }
 
+static inline int iommu_has_cap(struct amd_iommu *iommu, uint32_t bit)
+{
+    u32 mask = 1U << bit;
+    return iommu->cap.header & mask;
+}
+
 #endif /* _ASM_X86_64_AMD_IOMMU_PROTO_H */
