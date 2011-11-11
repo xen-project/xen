@@ -51,9 +51,9 @@ gfn_to_paddr(gfn_t gfn)
     return ((paddr_t)gfn_x(gfn)) << PAGE_SHIFT;
 }
 
-/* Override gfn_to_mfn to work with gfn_t */
-#undef gfn_to_mfn
-#define gfn_to_mfn(d, g, t) gfn_to_mfn_type((d), gfn_x(g), (t), p2m_alloc)
+/* Override get_gfn to work with gfn_t */
+#undef get_gfn
+#define get_gfn(d, g, t) get_gfn_type((d), gfn_x(g), (t), p2m_alloc)
 
 
 /* Types of the guest's page tables and access functions for them */

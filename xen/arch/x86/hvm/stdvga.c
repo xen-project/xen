@@ -482,7 +482,7 @@ static int mmio_move(struct hvm_hw_stdvga *s, ioreq_t *p)
                 if ( hvm_copy_to_guest_phys(data, &tmp, p->size) !=
                      HVMCOPY_okay )
                 {
-                    (void)gfn_to_mfn(d, data >> PAGE_SHIFT, &p2mt);
+                    (void)get_gfn_unlocked(d, data >> PAGE_SHIFT, &p2mt);
                     /*
                      * The only case we handle is vga_mem <-> vga_mem.
                      * Anything else disables caching and leaves it to qemu-dm.
@@ -504,7 +504,7 @@ static int mmio_move(struct hvm_hw_stdvga *s, ioreq_t *p)
                 if ( hvm_copy_from_guest_phys(&tmp, data, p->size) !=
                      HVMCOPY_okay )
                 {
-                    (void)gfn_to_mfn(d, data >> PAGE_SHIFT, &p2mt);
+                    (void)get_gfn_unlocked(d, data >> PAGE_SHIFT, &p2mt);
                     if ( (p2mt != p2m_mmio_dm) || (data < VGA_MEM_BASE) ||
                          ((data + p->size) > (VGA_MEM_BASE + VGA_MEM_SIZE)) )
                         return 0;

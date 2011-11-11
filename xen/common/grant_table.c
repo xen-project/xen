@@ -110,7 +110,7 @@ static unsigned inline int max_nr_maptrack_frames(void)
 #define gfn_to_mfn_private(_d, _gfn) ({                     \
     p2m_type_t __p2mt;                                      \
     unsigned long __x;                                      \
-    __x = mfn_x(gfn_to_mfn_unshare((_d), (_gfn), &__p2mt)); \
+    __x = mfn_x(get_gfn_unshare((_d), (_gfn), &__p2mt));    \
     BUG_ON(p2m_is_shared(__p2mt)); /* XXX fixme */          \
     if ( !p2m_is_valid(__p2mt) )                            \
         __x = INVALID_MFN;                                  \
@@ -150,10 +150,10 @@ static int __get_paged_frame(unsigned long gfn, unsigned long *frame, int readon
     mfn_t mfn;
 
     if ( readonly )
-        mfn = gfn_to_mfn(rd, gfn, &p2mt);
+        mfn = get_gfn(rd, gfn, &p2mt);
     else
     {
-        mfn = gfn_to_mfn_unshare(rd, gfn, &p2mt);
+        mfn = get_gfn_unshare(rd, gfn, &p2mt);
         BUG_ON(p2m_is_shared(p2mt));
         /* XXX Here, and above in gfn_to_mfn_private, need to handle
          * XXX failure to unshare. */
@@ -164,14 +164,16 @@ static int __get_paged_frame(unsigned long gfn, unsigned long *frame, int readon
         if ( p2m_is_paging(p2mt) )
         {
             p2m_mem_paging_populate(rd, gfn);
+            put_gfn(rd, gfn);
             rc = GNTST_eagain;
         }
     } else {
+       put_gfn(rd, gfn);
        *frame = INVALID_MFN;
        rc = GNTST_bad_page;
     }
 #else
-    *frame = readonly ? gmfn_to_mfn(rd, gfn) : gfn_to_mfn_private(rd, gfn);
+    *frame = readonly ? get_gfn_untyped(rd, gfn) : gfn_to_mfn_private(rd, gfn);
 #endif
 
     return rc;
@@ -468,13 +470,14 @@ __gnttab_map_grant_ref(
     struct domain *ld, *rd, *owner;
     struct vcpu   *led;
     int            handle;
+    unsigned long  gfn = INVALID_GFN;
     unsigned long  frame = 0, nr_gets = 0;
     struct page_info *pg;
     int            rc = GNTST_okay;
     u32            old_pin;
     u32            act_pin;
     unsigned int   cache_flags;
-    struct active_grant_entry *act;
+    struct active_grant_entry *act = NULL;
     struct grant_mapping *mt;
     grant_entry_v1_t *sha1;
     grant_entry_v2_t *sha2;
@@ -565,7 +568,6 @@ __gnttab_map_grant_ref(
 
         if ( !act->pin )
         {
-            unsigned long gfn;
             unsigned long frame;
 
             gfn = sha1 ? sha1->frame : sha2->full_page.frame;
@@ -698,6 +700,7 @@ __gnttab_map_grant_ref(
     op->handle       = handle;
     op->status       = GNTST_okay;
 
+    put_gfn(rd, gfn);
     rcu_unlock_domain(rd);
     return;
 
@@ -735,6 +738,8 @@ __gnttab_map_grant_ref(
         gnttab_clear_flag(_GTF_reading, status);
 
  unlock_out:
+    if ( gfn != INVALID_GFN )
+        put_gfn(rd, gfn);
     spin_unlock(&rd->grant_table->lock);
     op->status = rc;
     put_maptrack_handle(ld->grant_table, handle);
@@ -1475,6 +1480,7 @@ gnttab_transfer(
         /* Check the passed page frame for basic validity. */
         if ( unlikely(!mfn_valid(mfn)) )
         { 
+            put_gfn(d, gop.mfn);
             gdprintk(XENLOG_INFO, "gnttab_transfer: out-of-range %lx\n",
                     (unsigned long)gop.mfn);
             gop.status = GNTST_bad_page;
@@ -1484,6 +1490,7 @@ gnttab_transfer(
         page = mfn_to_page(mfn);
         if ( unlikely(is_xen_heap_page(page)) )
         { 
+            put_gfn(d, gop.mfn);
             gdprintk(XENLOG_INFO, "gnttab_transfer: xen frame %lx\n",
                     (unsigned long)gop.mfn);
             gop.status = GNTST_bad_page;
@@ -1492,6 +1499,7 @@ gnttab_transfer(
 
         if ( steal_page(d, page, 0) < 0 )
         {
+            put_gfn(d, gop.mfn);
             gop.status = GNTST_bad_page;
             goto copyback;
         }
@@ -1504,6 +1512,7 @@ gnttab_transfer(
         /* Find the target domain. */
         if ( unlikely((e = rcu_lock_domain_by_id(gop.domid)) == NULL) )
         {
+            put_gfn(d, gop.mfn);
             gdprintk(XENLOG_INFO, "gnttab_transfer: can't find domain %d\n",
                     gop.domid);
             page->count_info &= ~(PGC_count_mask|PGC_allocated);
@@ -1514,6 +1523,7 @@ gnttab_transfer(
 
         if ( xsm_grant_transfer(d, e) )
         {
+            put_gfn(d, gop.mfn);
             gop.status = GNTST_permission_denied;
         unlock_and_copyback:
             rcu_unlock_domain(e);
@@ -1566,6 +1576,7 @@ gnttab_transfer(
                         e->tot_pages, e->max_pages, gop.ref, e->is_dying);
             spin_unlock(&e->page_alloc_lock);
             rcu_unlock_domain(e);
+            put_gfn(d, gop.mfn);
             page->count_info &= ~(PGC_count_mask|PGC_allocated);
             free_domheap_page(page);
             gop.status = GNTST_general_error;
@@ -1579,6 +1590,7 @@ gnttab_transfer(
         page_set_owner(page, e);
 
         spin_unlock(&e->page_alloc_lock);
+        put_gfn(d, gop.mfn);
 
         TRACE_1D(TRC_MEM_PAGE_GRANT_TRANSFER, e->domain_id);
 
@@ -1850,6 +1862,8 @@ __acquire_grant_for_copy(
         {
             gfn = sha1->frame;
             rc = __get_paged_frame(gfn, &grant_frame, readonly, rd);
+            /* We drop this immediately per the comments at the top */
+            put_gfn(rd, gfn);
             if ( rc != GNTST_okay )
                 goto unlock_out;
             act->gfn = gfn;
@@ -1862,6 +1876,7 @@ __acquire_grant_for_copy(
         {
             gfn = sha2->full_page.frame;
             rc = __get_paged_frame(gfn, &grant_frame, readonly, rd);
+            put_gfn(rd, gfn);
             if ( rc != GNTST_okay )
                 goto unlock_out;
             act->gfn = gfn;
@@ -1874,6 +1889,7 @@ __acquire_grant_for_copy(
         {
             gfn = sha2->sub_page.frame;
             rc = __get_paged_frame(gfn, &grant_frame, readonly, rd);
+            put_gfn(rd, gfn);
             if ( rc != GNTST_okay )
                 goto unlock_out;
             act->gfn = gfn;
@@ -1973,6 +1989,7 @@ __gnttab_copy(
     {
 #ifdef CONFIG_X86
         rc = __get_paged_frame(op->source.u.gmfn, &s_frame, 1, sd);
+        put_gfn(sd, op->source.u.gmfn);
         if ( rc != GNTST_okay )
             goto error_out;
 #else
@@ -2012,6 +2029,7 @@ __gnttab_copy(
     {
 #ifdef CONFIG_X86
         rc = __get_paged_frame(op->dest.u.gmfn, &d_frame, 0, dd);
+        put_gfn(dd, op->dest.u.gmfn);
         if ( rc != GNTST_okay )
             goto error_out;
 #else

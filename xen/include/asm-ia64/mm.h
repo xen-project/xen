@@ -549,6 +549,8 @@ extern u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__,
 #define gmfn_to_mfn(_d, gpfn)			\
     gmfn_to_mfn_foreign((_d), (gpfn))
 
+#define put_gfn(d, g)   ((void)0)
+
 #define __gpfn_invalid(_d, gpfn)			\
 	(lookup_domain_mpa((_d), ((gpfn)<<PAGE_SHIFT), NULL) == INVALID_MFN)
 

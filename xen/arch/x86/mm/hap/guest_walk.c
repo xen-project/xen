@@ -56,26 +56,30 @@ unsigned long hap_p2m_ga_to_gfn(GUEST_PAGING_LEVELS)(
     p2m_type_t p2mt;
     p2m_access_t p2ma;
     walk_t gw;
+    unsigned long top_gfn;
 
     /* Get the top-level table's MFN */
-    top_mfn = gfn_to_mfn_type_p2m(p2m, cr3 >> PAGE_SHIFT, 
-                                  &p2mt, &p2ma, p2m_unshare, NULL);
+    top_gfn = cr3 >> PAGE_SHIFT;
+    top_mfn = get_gfn_type_access(p2m, top_gfn, &p2mt, &p2ma, p2m_unshare, NULL);
     if ( p2m_is_paging(p2mt) )
     {
         ASSERT(!p2m_is_nestedp2m(p2m));
         p2m_mem_paging_populate(p2m->domain, cr3 >> PAGE_SHIFT);
 
         pfec[0] = PFEC_page_paged;
+        __put_gfn(p2m, top_gfn);
         return INVALID_GFN;
     }
     if ( p2m_is_shared(p2mt) )
     {
         pfec[0] = PFEC_page_shared;
+        __put_gfn(p2m, top_gfn);
         return INVALID_GFN;
     }
     if ( !p2m_is_ram(p2mt) )
     {
         pfec[0] &= ~PFEC_page_present;
+        __put_gfn(p2m, top_gfn);
         return INVALID_GFN;
     }
 
@@ -87,25 +91,30 @@ unsigned long hap_p2m_ga_to_gfn(GUEST_PAGING_LEVELS)(
 #endif
     missing = guest_walk_tables(v, p2m, ga, &gw, pfec[0], top_mfn, top_map);
     unmap_domain_page(top_map);
+    __put_gfn(p2m, top_gfn);
 
     /* Interpret the answer */
     if ( missing == 0 )
     {
         gfn_t gfn = guest_l1e_get_gfn(gw.l1e);
-        gfn_to_mfn_type_p2m(p2m, gfn_x(gfn), &p2mt, &p2ma, p2m_unshare, NULL);
+        (void)get_gfn_type_access(p2m, gfn_x(gfn), &p2mt, &p2ma, p2m_unshare, NULL); 
         if ( p2m_is_paging(p2mt) )
         {
             ASSERT(!p2m_is_nestedp2m(p2m));
             p2m_mem_paging_populate(p2m->domain, gfn_x(gfn));
 
             pfec[0] = PFEC_page_paged;
+            __put_gfn(p2m, gfn_x(gfn));
             return INVALID_GFN;
         }
         if ( p2m_is_shared(p2mt) )
         {
             pfec[0] = PFEC_page_shared;
+            __put_gfn(p2m, gfn_x(gfn));
             return INVALID_GFN;
         }
+
+        __put_gfn(p2m, gfn_x(gfn));
 
         if ( page_order )
             *page_order = guest_walk_to_page_order(&gw);

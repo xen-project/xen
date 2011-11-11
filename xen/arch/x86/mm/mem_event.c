@@ -47,7 +47,7 @@ static int mem_event_enable(struct domain *d,
     unsigned long ring_addr = mec->ring_addr;
     unsigned long shared_addr = mec->shared_addr;
     l1_pgentry_t l1e;
-    unsigned long gfn;
+    unsigned long shared_gfn = 0, ring_gfn = 0; /* gcc ... */
     p2m_type_t p2mt;
     mfn_t ring_mfn;
     mfn_t shared_mfn;
@@ -60,23 +60,36 @@ static int mem_event_enable(struct domain *d,
 
     /* Get MFN of ring page */
     guest_get_eff_l1e(v, ring_addr, &l1e);
-    gfn = l1e_get_pfn(l1e);
-    ring_mfn = gfn_to_mfn(dom_mem_event, gfn, &p2mt);
+    ring_gfn = l1e_get_pfn(l1e);
+    /* We're grabbing these two in an order that could deadlock
+     * dom0 if 1. it were an hvm 2. there were two concurrent
+     * enables 3. the two gfn's in each enable criss-crossed
+     * 2MB regions. Duly noted.... */
+    ring_mfn = get_gfn(dom_mem_event, ring_gfn, &p2mt);
 
     if ( unlikely(!mfn_valid(mfn_x(ring_mfn))) )
+    {
+        put_gfn(dom_mem_event, ring_gfn);
         return -EINVAL;
+    }
 
     /* Get MFN of shared page */
     guest_get_eff_l1e(v, shared_addr, &l1e);
-    gfn = l1e_get_pfn(l1e);
-    shared_mfn = gfn_to_mfn(dom_mem_event, gfn, &p2mt);
+    shared_gfn = l1e_get_pfn(l1e);
+    shared_mfn = get_gfn(dom_mem_event, shared_gfn, &p2mt);
 
     if ( unlikely(!mfn_valid(mfn_x(shared_mfn))) )
+    {
+        put_gfn(dom_mem_event, ring_gfn);
+        put_gfn(dom_mem_event, shared_gfn);
         return -EINVAL;
+    }
 
     /* Map ring and shared pages */
     med->ring_page = map_domain_page(mfn_x(ring_mfn));
     med->shared_page = map_domain_page(mfn_x(shared_mfn));
+    put_gfn(dom_mem_event, ring_gfn);
+    put_gfn(dom_mem_event, shared_gfn); 
 
     /* Allocate event channel */
     rc = alloc_unbound_xen_event_channel(d->vcpu[0],

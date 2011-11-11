@@ -162,11 +162,12 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
     unsigned long mfn;
 
 #ifdef CONFIG_X86
-    mfn = mfn_x(gfn_to_mfn(d, gmfn, &p2mt)); 
+    mfn = mfn_x(get_gfn(d, gmfn, &p2mt)); 
     if ( unlikely(p2m_is_paging(p2mt)) )
     {
         guest_physmap_remove_page(d, gmfn, mfn, PAGE_ORDER_4K);
         p2m_mem_paging_drop_page(d, gmfn);
+        put_gfn(d, gmfn);
         return 1;
     }
 #else
@@ -174,6 +175,7 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
 #endif
     if ( unlikely(!mfn_valid(mfn)) )
     {
+        put_gfn(d, gmfn);
         gdprintk(XENLOG_INFO, "Domain %u page number %lx invalid\n",
                 d->domain_id, gmfn);
         return 0;
@@ -187,12 +189,14 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
     {
         put_page_and_type(page);
         guest_physmap_remove_page(d, gmfn, mfn, PAGE_ORDER_4K);
+        put_gfn(d, gmfn);
         return 1;
     }
 
 #endif /* CONFIG_X86 */
     if ( unlikely(!get_page(page, d)) )
     {
+        put_gfn(d, gmfn);
         gdprintk(XENLOG_INFO, "Bad page free for domain %u\n", d->domain_id);
         return 0;
     }
@@ -206,6 +210,7 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
     guest_physmap_remove_page(d, gmfn, mfn, PAGE_ORDER_4K);
 
     put_page(page);
+    put_gfn(d, gmfn);
 
     return 1;
 }
@@ -265,7 +270,7 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
     PAGE_LIST_HEAD(out_chunk_list);
     unsigned long in_chunk_order, out_chunk_order;
     xen_pfn_t     gpfn, gmfn, mfn;
-    unsigned long i, j, k;
+    unsigned long i, j, k = 0; /* gcc ... */
     unsigned int  memflags = 0;
     long          rc = 0;
     struct domain *d;
@@ -363,9 +368,10 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
                 p2m_type_t p2mt;
 
                 /* Shared pages cannot be exchanged */
-                mfn = mfn_x(gfn_to_mfn_unshare(d, gmfn + k, &p2mt));
+                mfn = mfn_x(get_gfn_unshare(d, gmfn + k, &p2mt));
                 if ( p2m_is_shared(p2mt) )
                 {
+                    put_gfn(d, gmfn + k);
                     rc = -ENOMEM;
                     goto fail; 
                 }
@@ -374,6 +380,7 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
 #endif
                 if ( unlikely(!mfn_valid(mfn)) )
                 {
+                    put_gfn(d, gmfn + k);
                     rc = -EINVAL;
                     goto fail;
                 }
@@ -382,11 +389,13 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
 
                 if ( unlikely(steal_page(d, page, MEMF_no_refcount)) )
                 {
+                    put_gfn(d, gmfn + k);
                     rc = -EINVAL;
                     goto fail;
                 }
 
                 page_list_add(page, &in_chunk_list);
+                put_gfn(d, gmfn + k);
             }
         }
 
@@ -487,8 +496,12 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
  fail:
     /* Reassign any input pages we managed to steal. */
     while ( (page = page_list_remove_head(&in_chunk_list)) )
+    {
+        put_gfn(d, gmfn + k--);
         if ( assign_pages(d, page, 0, MEMF_no_refcount) )
             BUG();
+    }
+
  dying:
     rcu_unlock_domain(d);
     /* Free any output pages we managed to allocate. */

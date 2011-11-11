@@ -720,6 +720,7 @@ int arch_set_info_guest(
     struct vcpu *v, vcpu_guest_context_u c)
 {
     struct domain *d = v->domain;
+    unsigned long cr3_gfn;
     unsigned long cr3_pfn = INVALID_MFN;
     unsigned long flags, cr4;
     unsigned int i;
@@ -931,7 +932,8 @@ int arch_set_info_guest(
 
     if ( !compat )
     {
-        cr3_pfn = gmfn_to_mfn(d, xen_cr3_to_pfn(c.nat->ctrlreg[3]));
+        cr3_gfn = xen_cr3_to_pfn(c.nat->ctrlreg[3]);
+        cr3_pfn = get_gfn_untyped(d, cr3_gfn);
 
         if ( !mfn_valid(cr3_pfn) ||
              (paging_mode_refcounts(d)
@@ -939,16 +941,18 @@ int arch_set_info_guest(
               : !get_page_and_type(mfn_to_page(cr3_pfn), d,
                                    PGT_base_page_table)) )
         {
+            put_gfn(d, cr3_gfn);
             destroy_gdt(v);
             return -EINVAL;
         }
 
         v->arch.guest_table = pagetable_from_pfn(cr3_pfn);
-
+        put_gfn(d, cr3_gfn);
 #ifdef __x86_64__
         if ( c.nat->ctrlreg[1] )
         {
-            cr3_pfn = gmfn_to_mfn(d, xen_cr3_to_pfn(c.nat->ctrlreg[1]));
+            cr3_gfn = xen_cr3_to_pfn(c.nat->ctrlreg[1]);
+            cr3_pfn = get_gfn_untyped(d, cr3_gfn);
 
             if ( !mfn_valid(cr3_pfn) ||
                  (paging_mode_refcounts(d)
@@ -962,11 +966,13 @@ int arch_set_info_guest(
                     put_page(mfn_to_page(cr3_pfn));
                 else
                     put_page_and_type(mfn_to_page(cr3_pfn));
+                put_gfn(d, cr3_gfn); 
                 destroy_gdt(v);
                 return -EINVAL;
             }
 
             v->arch.guest_table_user = pagetable_from_pfn(cr3_pfn);
+            put_gfn(d, cr3_gfn); 
         }
         else if ( !(flags & VGCF_in_kernel) )
         {
@@ -978,7 +984,8 @@ int arch_set_info_guest(
     {
         l4_pgentry_t *l4tab;
 
-        cr3_pfn = gmfn_to_mfn(d, compat_cr3_to_pfn(c.cmp->ctrlreg[3]));
+        cr3_gfn = compat_cr3_to_pfn(c.cmp->ctrlreg[3]);
+        cr3_pfn = get_gfn_untyped(d, cr3_gfn);
 
         if ( !mfn_valid(cr3_pfn) ||
              (paging_mode_refcounts(d)
@@ -986,6 +993,7 @@ int arch_set_info_guest(
               : !get_page_and_type(mfn_to_page(cr3_pfn), d,
                                    PGT_l3_page_table)) )
         {
+            put_gfn(d, cr3_gfn); 
             destroy_gdt(v);
             return -EINVAL;
         }
@@ -993,6 +1001,7 @@ int arch_set_info_guest(
         l4tab = __va(pagetable_get_paddr(v->arch.guest_table));
         *l4tab = l4e_from_pfn(
             cr3_pfn, _PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED);
+        put_gfn(d, cr3_gfn); 
 #endif
     }
 
@@ -1058,11 +1067,12 @@ unmap_vcpu_info(struct vcpu *v)
  * event doesn't get missed.
  */
 static int
-map_vcpu_info(struct vcpu *v, unsigned long mfn, unsigned offset)
+map_vcpu_info(struct vcpu *v, unsigned long gfn, unsigned offset)
 {
     struct domain *d = v->domain;
     void *mapping;
     vcpu_info_t *new_info;
+    unsigned long mfn;
     int i;
 
     if ( offset > (PAGE_SIZE - sizeof(vcpu_info_t)) )
@@ -1075,15 +1085,19 @@ map_vcpu_info(struct vcpu *v, unsigned long mfn, unsigned offset)
     if ( (v != current) && !test_bit(_VPF_down, &v->pause_flags) )
         return -EINVAL;
 
-    mfn = gmfn_to_mfn(d, mfn);
+    mfn = get_gfn_untyped(d, gfn);
     if ( !mfn_valid(mfn) ||
          !get_page_and_type(mfn_to_page(mfn), d, PGT_writable_page) )
+    {
+        put_gfn(d, gfn); 
         return -EINVAL;
+    }
 
     mapping = map_domain_page_global(mfn);
     if ( mapping == NULL )
     {
         put_page_and_type(mfn_to_page(mfn));
+        put_gfn(d, gfn); 
         return -ENOMEM;
     }
 
@@ -1113,6 +1127,7 @@ map_vcpu_info(struct vcpu *v, unsigned long mfn, unsigned offset)
     for ( i = 0; i < BITS_PER_EVTCHN_WORD(d); i++ )
         set_bit(i, &vcpu_info(v, evtchn_pending_sel));
 
+    put_gfn(d, gfn); 
     return 0;
 }
 

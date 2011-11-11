@@ -227,7 +227,7 @@ static void mem_sharing_audit(void)
                             g->domain, g->gfn, mfn_x(e->mfn));
                     continue;
                 }
-                mfn = gfn_to_mfn(d, g->gfn, &t); 
+                mfn = get_gfn_unlocked(d, g->gfn, &t); 
                 if(mfn_x(mfn) != mfn_x(e->mfn))
                     MEM_SHARING_DEBUG("Incorrect P2M for d=%d, PFN=%lx."
                                       "Expecting MFN=%ld, got %ld\n",
@@ -335,7 +335,7 @@ int mem_sharing_debug_gfn(struct domain *d, unsigned long gfn)
     p2m_type_t p2mt;
     mfn_t mfn;
 
-    mfn = gfn_to_mfn(d, gfn, &p2mt);
+    mfn = get_gfn_unlocked(d, gfn, &p2mt);
 
     printk("Debug for domain=%d, gfn=%lx, ", 
             d->domain_id, 
@@ -460,7 +460,7 @@ int mem_sharing_nominate_page(struct domain *d,
     *phandle = 0UL;
 
     shr_lock(); 
-    mfn = gfn_to_mfn(d, gfn, &p2mt);
+    mfn = get_gfn(d, gfn, &p2mt);
 
     /* Check if mfn is valid */
     ret = -EINVAL;
@@ -524,6 +524,7 @@ int mem_sharing_nominate_page(struct domain *d,
     ret = 0;
 
 out:
+    put_gfn(d, gfn);
     shr_unlock();
     return ret;
 }
@@ -593,14 +594,18 @@ int mem_sharing_unshare_page(struct domain *d,
     shr_handle_t handle;
     struct list_head *le;
 
+    /* Remove the gfn_info from the list */
+   
+    /* This is one of the reasons why we can't enforce ordering
+     * between shr_lock and p2m fine-grained locks in mm-lock. 
+     * Callers may walk in here already holding the lock for this gfn */
     shr_lock();
     mem_sharing_audit();
-    
-    /* Remove the gfn_info from the list */
-    mfn = gfn_to_mfn(d, gfn, &p2mt);
+    mfn = get_gfn(d, gfn, &p2mt);
     
     /* Has someone already unshared it? */
     if (!p2m_is_shared(p2mt)) {
+        put_gfn(d, gfn);
         shr_unlock();
         return 0;
     }
@@ -634,6 +639,7 @@ gfn_found:
             /* Even though we don't allocate a private page, we have to account
              * for the MFN that originally backed this PFN. */
             atomic_dec(&nr_saved_mfns);
+        put_gfn(d, gfn);
         shr_unlock();
         put_page_and_type(page);
         if(last_gfn && 
@@ -653,6 +659,7 @@ gfn_found:
         /* We've failed to obtain memory for private page. Need to re-add the
          * gfn_info to relevant list */
         list_add(&gfn_info->list, &hash_entry->gfns);
+        put_gfn(d, gfn);
         shr_unlock();
         return -ENOMEM;
     }
@@ -663,6 +670,13 @@ gfn_found:
     unmap_domain_page(s);
     unmap_domain_page(t);
 
+    /* NOTE: set_shared_p2m_entry will switch the underlying mfn. If
+     * we do get_page withing get_gfn, the correct sequence here
+     * should be
+       get_page(page);
+       put_page(old_page);
+     * so that the ref to the old page is dropped, and a ref to
+     * the new page is obtained to later be dropped in put_gfn */
     BUG_ON(set_shared_p2m_entry(d, gfn, page_to_mfn(page)) == 0);
     put_page_and_type(old_page);
 
@@ -683,6 +697,7 @@ private_page_found:
     /* Update m2p entry */
     set_gpfn_from_mfn(mfn_x(page_to_mfn(page)), gfn);
 
+    put_gfn(d, gfn);
     shr_unlock();
     return 0;
 }

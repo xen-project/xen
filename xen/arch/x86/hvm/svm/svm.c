@@ -244,9 +244,10 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     {
         if ( c->cr0 & X86_CR0_PG )
         {
-            mfn = mfn_x(gfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT, &p2mt));
+            mfn = mfn_x(get_gfn(v->domain, c->cr3 >> PAGE_SHIFT, &p2mt));
             if ( !p2m_is_ram(p2mt) || !get_page(mfn_to_page(mfn), v->domain) )
             {
+                put_gfn(v->domain, c->cr3 >> PAGE_SHIFT);
                 gdprintk(XENLOG_ERR, "Invalid CR3 value=0x%"PRIx64"\n",
                          c->cr3);
                 return -EINVAL;
@@ -257,6 +258,8 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
             put_page(pagetable_get_page(v->arch.guest_table));
 
         v->arch.guest_table = pagetable_from_pfn(mfn);
+        if ( c->cr0 & X86_CR0_PG )
+            put_gfn(v->domain, c->cr3 >> PAGE_SHIFT);
     }
 
     v->arch.hvm_vcpu.guest_cr[0] = c->cr0 | X86_CR0_ET;
@@ -1161,7 +1164,9 @@ static void svm_do_nested_pgfault(struct vcpu *v,
         p2m = p2m_get_p2m(v);
         _d.gpa = gpa;
         _d.qualification = 0;
-        _d.mfn = mfn_x(gfn_to_mfn_type_p2m(p2m, gfn, &_d.p2mt, &p2ma, p2m_query, NULL));
+        mfn = get_gfn_type_access(p2m, gfn, &_d.p2mt, &p2ma, p2m_query, NULL);
+        __put_gfn(p2m, gfn);
+        _d.mfn = mfn_x(mfn);
         
         __trace_var(TRC_HVM_NPF, 0, sizeof(_d), &_d);
     }
@@ -1181,7 +1186,8 @@ static void svm_do_nested_pgfault(struct vcpu *v,
     if ( p2m == NULL )
         p2m = p2m_get_p2m(v);
     /* Everything else is an error. */
-    mfn = gfn_to_mfn_type_p2m(p2m, gfn, &p2mt, &p2ma, p2m_guest, NULL);
+    mfn = get_gfn_type_access(p2m, gfn, &p2mt, &p2ma, p2m_guest, NULL);
+    __put_gfn(p2m, gfn);
     gdprintk(XENLOG_ERR,
          "SVM violation gpa %#"PRIpaddr", mfn %#lx, type %i\n",
          gpa, mfn_x(mfn), p2mt);

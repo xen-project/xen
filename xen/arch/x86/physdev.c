@@ -297,16 +297,20 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             break;
 
         ret = -EINVAL;
-        mfn = gmfn_to_mfn(current->domain, info.gmfn);
+        mfn = get_gfn_untyped(current->domain, info.gmfn);
         if ( !mfn_valid(mfn) ||
              !get_page_and_type(mfn_to_page(mfn), v->domain,
                                 PGT_writable_page) )
+        {
+            put_gfn(current->domain, info.gmfn);
             break;
+        }
 
         if ( cmpxchg(&v->domain->arch.pv_domain.pirq_eoi_map_mfn,
                      0, mfn) != 0 )
         {
             put_page_and_type(mfn_to_page(mfn));
+            put_gfn(current->domain, info.gmfn);
             ret = -EBUSY;
             break;
         }
@@ -316,10 +320,12 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         {
             v->domain->arch.pv_domain.pirq_eoi_map_mfn = 0;
             put_page_and_type(mfn_to_page(mfn));
+            put_gfn(current->domain, info.gmfn);
             ret = -ENOSPC;
             break;
         }
 
+        put_gfn(current->domain, info.gmfn);
         ret = 0;
         break;
     }

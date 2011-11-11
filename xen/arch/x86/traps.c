@@ -673,11 +673,12 @@ int wrmsr_hypervisor_regs(uint32_t idx, uint64_t val)
             return 0;
         }
 
-        mfn = gmfn_to_mfn(d, gmfn);
+        mfn = get_gfn_untyped(d, gmfn);
 
         if ( !mfn_valid(mfn) ||
              !get_page_and_type(mfn_to_page(mfn), d, PGT_writable_page) )
         {
+            put_gfn(d, gmfn);
             gdprintk(XENLOG_WARNING,
                      "Bad GMFN %lx (MFN %lx) to MSR %08x\n",
                      gmfn, mfn, base + idx);
@@ -689,6 +690,7 @@ int wrmsr_hypervisor_regs(uint32_t idx, uint64_t val)
         unmap_domain_page(hypercall_page);
 
         put_page_and_type(mfn_to_page(mfn));
+        put_gfn(d, gmfn);
         break;
     }
 
@@ -2347,18 +2349,25 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             arch_set_cr2(v, *reg);
             break;
 
-        case 3: /* Write CR3 */
+        case 3: {/* Write CR3 */
+            unsigned long mfn, gfn;
             domain_lock(v->domain);
             if ( !is_pv_32on64_vcpu(v) )
-                rc = new_guest_cr3(gmfn_to_mfn(v->domain, xen_cr3_to_pfn(*reg)));
+            {
+                gfn = xen_cr3_to_pfn(*reg);
 #ifdef CONFIG_COMPAT
-            else
-                rc = new_guest_cr3(gmfn_to_mfn(v->domain, compat_cr3_to_pfn(*reg)));
+            } else {
+                gfn = compat_cr3_to_pfn(*reg);
 #endif
+            }
+            mfn = get_gfn_untyped(v->domain, gfn);
+            rc = new_guest_cr3(mfn);
+            put_gfn(v->domain, gfn);
             domain_unlock(v->domain);
             if ( rc == 0 ) /* not okay */
                 goto fail;
             break;
+        }
 
         case 4: /* Write CR4 */
             v->arch.pv_vcpu.ctrlreg[4] = pv_guest_cr4_fixup(v, *reg);

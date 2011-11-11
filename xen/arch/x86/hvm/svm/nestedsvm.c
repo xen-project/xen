@@ -81,6 +81,10 @@ int nestedsvm_vmcb_map(struct vcpu *v, uint64_t vmcbaddr)
         if (nv->nv_vvmcx == NULL)
             return 0;
         nv->nv_vvmcxaddr = vmcbaddr;
+        /* put_gfn here even though the map survives beyond this caller.
+         * The map can likely survive beyond a hypervisor exit, thus we
+         * need to put the gfn */
+        put_gfn(current->domain, vmcbaddr >> PAGE_SHIFT);
     }
 
     return 1;
@@ -354,6 +358,7 @@ static int nsvm_vmrun_permissionmap(struct vcpu *v, bool_t viopm)
     ioport_80 = test_bit(0x80, ns_viomap);
     ioport_ed = test_bit(0xed, ns_viomap);
     hvm_unmap_guest_frame(ns_viomap);
+    put_gfn(current->domain, svm->ns_iomap_pa >> PAGE_SHIFT);
 
     svm->ns_iomap = nestedhvm_vcpu_iomap_get(ioport_80, ioport_ed);
 
@@ -857,23 +862,25 @@ nsvm_vmcb_guest_intercepts_ioio(paddr_t iopm_pa, uint64_t exitinfo1)
     ioio_info_t ioinfo;
     uint16_t port;
     bool_t enabled;
+    unsigned long gfn = 0; /* gcc ... */
 
     ioinfo.bytes = exitinfo1;
     port = ioinfo.fields.port;
 
     switch (port) {
     case 0 ... 32767: /* first 4KB page */
-        io_bitmap = hvm_map_guest_frame_ro(iopm_gfn);
+        gfn = iopm_gfn;
         break;
     case 32768 ... 65535: /* second 4KB page */
         port -= 32768;
-        io_bitmap = hvm_map_guest_frame_ro(iopm_gfn+1);
+        gfn = iopm_gfn + 1;
         break;
     default:
         BUG();
         break;
     }
 
+    io_bitmap = hvm_map_guest_frame_ro(gfn);
     if (io_bitmap == NULL) {
         gdprintk(XENLOG_ERR,
             "IOIO intercept: mapping of permission map failed\n");
@@ -882,6 +889,8 @@ nsvm_vmcb_guest_intercepts_ioio(paddr_t iopm_pa, uint64_t exitinfo1)
 
     enabled = test_bit(port, io_bitmap);
     hvm_unmap_guest_frame(io_bitmap);
+    put_gfn(current->domain, gfn);
+
     if (!enabled)
         return NESTEDHVM_VMEXIT_HOST;
 

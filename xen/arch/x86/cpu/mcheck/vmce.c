@@ -574,6 +574,7 @@ int unmmap_broken_page(struct domain *d, mfn_t mfn, unsigned long gfn)
 {
     mfn_t r_mfn;
     p2m_type_t pt;
+    int rc;
 
     /* Always trust dom0's MCE handler will prevent future access */
     if ( d == dom0 )
@@ -585,14 +586,16 @@ int unmmap_broken_page(struct domain *d, mfn_t mfn, unsigned long gfn)
     if ( !is_hvm_domain(d) || !paging_mode_hap(d) )
         return -ENOSYS;
 
-    r_mfn = gfn_to_mfn_query(d, gfn, &pt);
+    rc = -1;
+    r_mfn = get_gfn_query(d, gfn, &pt);
     if ( p2m_to_mask(pt) & P2M_UNMAP_TYPES)
     {
         ASSERT(mfn_x(r_mfn) == mfn_x(mfn));
         p2m_change_type(d, gfn, pt, p2m_ram_broken);
-        return 0;
+        rc = 0;
     }
+    put_gfn(d, gfn);
 
-    return -1;
+    return rc;
 }
 

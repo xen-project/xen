@@ -389,7 +389,7 @@ uint32_t get_pat_flags(struct vcpu *v,
     {
         struct domain *d = v->domain;
         p2m_type_t p2mt;
-        gfn_to_mfn_query(d, paddr_to_pfn(gpaddr), &p2mt);
+        get_gfn_query_unlocked(d, paddr_to_pfn(gpaddr), &p2mt);
         if (p2m_is_ram(p2mt))
             gdprintk(XENLOG_WARNING,
                     "Conflict occurs for a given guest l1e flags:%x "

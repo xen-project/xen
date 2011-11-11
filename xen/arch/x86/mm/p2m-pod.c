@@ -531,9 +531,10 @@ p2m_pod_decrease_reservation(struct domain *d,
     /* FIXME: Add contiguous; query for PSE entries? */
     for ( i=0; i<(1<<order); i++)
     {
+        p2m_access_t a;
         p2m_type_t t;
 
-        gfn_to_mfn_query(d, gpfn + i, &t);
+        (void)p2m->get_entry(p2m, gpfn + i, &t, &a, p2m_query, NULL);
 
         if ( t == p2m_populate_on_demand )
             pod++;
@@ -572,8 +573,9 @@ p2m_pod_decrease_reservation(struct domain *d,
     {
         mfn_t mfn;
         p2m_type_t t;
+        p2m_access_t a;
 
-        mfn = gfn_to_mfn_query(d, gpfn + i, &t);
+        mfn = p2m->get_entry(p2m, gpfn + i, &t, &a, p2m_query, NULL);
         if ( t == p2m_populate_on_demand )
         {
             set_p2m_entry(p2m, gpfn + i, _mfn(INVALID_MFN), 0, p2m_invalid, p2m->default_access);
@@ -653,8 +655,8 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
      * and aligned, and mapping them. */
     for ( i=0; i<SUPERPAGE_PAGES; i++ )
     {
-        
-        mfn = gfn_to_mfn_query(d, gfn + i, &type);
+        p2m_access_t a; 
+        mfn = p2m->get_entry(p2m, gfn + i, &type, &a, p2m_query, NULL);
 
         if ( i == 0 )
         {
@@ -782,7 +784,8 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
     /* First, get the gfn list, translate to mfns, and map the pages. */
     for ( i=0; i<count; i++ )
     {
-        mfns[i] = gfn_to_mfn_query(d, gfns[i], types + i);
+        p2m_access_t a;
+        mfns[i] = p2m->get_entry(p2m, gfns[i], types + i, &a, p2m_query, NULL);
         /* If this is ram, and not a pagetable or from the xen heap, and probably not mapped
            elsewhere, map it; otherwise, skip. */
         if ( p2m_is_ram(types[i])
@@ -923,7 +926,8 @@ p2m_pod_emergency_sweep(struct p2m_domain *p2m)
     /* FIXME: Figure out how to avoid superpages */
     for ( i=p2m->pod.reclaim_single; i > 0 ; i-- )
     {
-        gfn_to_mfn_query(p2m->domain, i, &t );
+        p2m_access_t a;
+        (void)p2m->get_entry(p2m, i, &t, &a, p2m_query, NULL);
         if ( p2m_is_ram(t) )
         {
             gfns[j] = i;
@@ -1112,7 +1116,8 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
     /* Make sure all gpfns are unused */
     for ( i = 0; i < (1UL << order); i++ )
     {
-        omfn = gfn_to_mfn_query(d, gfn + i, &ot);
+        p2m_access_t a;
+        omfn = p2m->get_entry(p2m, gfn + i, &ot, &a, p2m_query, NULL);
         if ( p2m_is_ram(ot) )
         {
             printk("%s: gfn_to_mfn returned type %d!\n",

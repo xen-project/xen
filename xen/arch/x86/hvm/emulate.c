@@ -63,14 +63,18 @@ static int hvmemul_do_io(
     int rc;
 
     /* Check for paged out page */
-    ram_mfn = gfn_to_mfn_unshare(curr->domain, ram_gfn, &p2mt);
+    ram_mfn = get_gfn_unshare(curr->domain, ram_gfn, &p2mt);
     if ( p2m_is_paging(p2mt) )
     {
         p2m_mem_paging_populate(curr->domain, ram_gfn);
+        put_gfn(curr->domain, ram_gfn); 
         return X86EMUL_RETRY;
     }
     if ( p2m_is_shared(p2mt) )
+    {
+        put_gfn(curr->domain, ram_gfn); 
         return X86EMUL_RETRY;
+    }
 
     /*
      * Weird-sized accesses have undefined behaviour: we discard writes
@@ -82,6 +86,7 @@ static int hvmemul_do_io(
         ASSERT(p_data != NULL); /* cannot happen with a REP prefix */
         if ( dir == IOREQ_READ )
             memset(p_data, ~0, size);
+        put_gfn(curr->domain, ram_gfn); 
         return X86EMUL_UNHANDLEABLE;
     }
 
@@ -101,7 +106,10 @@ static int hvmemul_do_io(
             paddr_t pa = vio->mmio_large_write_pa;
             unsigned int bytes = vio->mmio_large_write_bytes;
             if ( (addr >= pa) && ((addr + size) <= (pa + bytes)) )
+            {
+                put_gfn(curr->domain, ram_gfn); 
                 return X86EMUL_OKAY;
+            }
         }
         else
         {
@@ -111,6 +119,7 @@ static int hvmemul_do_io(
             {
                 memcpy(p_data, &vio->mmio_large_read[addr - pa],
                        size);
+                put_gfn(curr->domain, ram_gfn); 
                 return X86EMUL_OKAY;
             }
         }
@@ -123,15 +132,22 @@ static int hvmemul_do_io(
     case HVMIO_completed:
         vio->io_state = HVMIO_none;
         if ( p_data == NULL )
+        {
+            put_gfn(curr->domain, ram_gfn);
             return X86EMUL_UNHANDLEABLE;
+        }
         goto finish_access;
     case HVMIO_dispatched:
         /* May have to wait for previous cycle of a multi-write to complete. */
         if ( is_mmio && !value_is_ptr && (dir == IOREQ_WRITE) &&
              (addr == (vio->mmio_large_write_pa +
                        vio->mmio_large_write_bytes)) )
+        {
+            put_gfn(curr->domain, ram_gfn);
             return X86EMUL_RETRY;
+        }
     default:
+        put_gfn(curr->domain, ram_gfn);
         return X86EMUL_UNHANDLEABLE;
     }
 
@@ -139,6 +155,7 @@ static int hvmemul_do_io(
     {
         gdprintk(XENLOG_WARNING, "WARNING: io already pending (%d)?\n",
                  p->state);
+        put_gfn(curr->domain, ram_gfn); 
         return X86EMUL_UNHANDLEABLE;
     }
 
@@ -189,7 +206,10 @@ static int hvmemul_do_io(
     }
 
     if ( rc != X86EMUL_OKAY )
+    {
+        put_gfn(curr->domain, ram_gfn); 
         return rc;
+    }
 
  finish_access:
     if ( p_data != NULL )
@@ -223,6 +243,7 @@ static int hvmemul_do_io(
         }
     }
 
+    put_gfn(curr->domain, ram_gfn); 
     return X86EMUL_OKAY;
 }
 
@@ -671,12 +692,14 @@ static int hvmemul_rep_movs(
     if ( rc != X86EMUL_OKAY )
         return rc;
 
-    (void)gfn_to_mfn(current->domain, sgpa >> PAGE_SHIFT, &p2mt);
+    /* Unlocked works here because we get_gfn for real in whatever
+     * we call later. */
+    (void)get_gfn_unlocked(current->domain, sgpa >> PAGE_SHIFT, &p2mt);
     if ( !p2m_is_ram(p2mt) && !p2m_is_grant(p2mt) )
         return hvmemul_do_mmio(
             sgpa, reps, bytes_per_rep, dgpa, IOREQ_READ, df, NULL);
 
-    (void)gfn_to_mfn(current->domain, dgpa >> PAGE_SHIFT, &p2mt);
+    (void)get_gfn_unlocked(current->domain, dgpa >> PAGE_SHIFT, &p2mt);
     if ( !p2m_is_ram(p2mt) && !p2m_is_grant(p2mt) )
         return hvmemul_do_mmio(
             dgpa, reps, bytes_per_rep, sgpa, IOREQ_WRITE, df, NULL);

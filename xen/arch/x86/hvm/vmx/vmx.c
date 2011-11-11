@@ -487,9 +487,10 @@ static int vmx_restore_cr0_cr3(
     {
         if ( cr0 & X86_CR0_PG )
         {
-            mfn = mfn_x(gfn_to_mfn(v->domain, cr3 >> PAGE_SHIFT, &p2mt));
+            mfn = mfn_x(get_gfn(v->domain, cr3 >> PAGE_SHIFT, &p2mt));
             if ( !p2m_is_ram(p2mt) || !get_page(mfn_to_page(mfn), v->domain) )
             {
+                put_gfn(v->domain, cr3 >> PAGE_SHIFT);
                 gdprintk(XENLOG_ERR, "Invalid CR3 value=0x%lx\n", cr3);
                 return -EINVAL;
             }
@@ -499,6 +500,8 @@ static int vmx_restore_cr0_cr3(
             put_page(pagetable_get_page(v->arch.guest_table));
 
         v->arch.guest_table = pagetable_from_pfn(mfn);
+        if ( cr0 & X86_CR0_PG )
+            put_gfn(v->domain, cr3 >> PAGE_SHIFT);
     }
 
     v->arch.hvm_vcpu.guest_cr[0] = cr0 | X86_CR0_ET;
@@ -1007,9 +1010,12 @@ static void vmx_load_pdptrs(struct vcpu *v)
     if ( cr3 & 0x1fUL )
         goto crash;
 
-    mfn = mfn_x(gfn_to_mfn(v->domain, cr3 >> PAGE_SHIFT, &p2mt));
+    mfn = mfn_x(get_gfn(v->domain, cr3 >> PAGE_SHIFT, &p2mt));
     if ( !p2m_is_ram(p2mt) )
+    {
+        put_gfn(v->domain, cr3 >> PAGE_SHIFT);
         goto crash;
+    }
 
     p = map_domain_page(mfn);
 
@@ -1037,6 +1043,7 @@ static void vmx_load_pdptrs(struct vcpu *v)
     vmx_vmcs_exit(v);
 
     unmap_domain_page(p);
+    put_gfn(v->domain, cr3 >> PAGE_SHIFT);
     return;
 
  crash:
@@ -2090,7 +2097,7 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
 
         _d.gpa = gpa;
         _d.qualification = qualification;
-        _d.mfn = mfn_x(gfn_to_mfn_query(d, gfn, &_d.p2mt));
+        _d.mfn = mfn_x(get_gfn_query_unlocked(d, gfn, &_d.p2mt));
         
         __trace_var(TRC_HVM_NPF, 0, sizeof(_d), &_d);
     }
@@ -2106,7 +2113,7 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
         return;
 
     /* Everything else is an error. */
-    mfn = gfn_to_mfn_guest(d, gfn, &p2mt);
+    mfn = get_gfn_guest_unlocked(d, gfn, &p2mt);
     gdprintk(XENLOG_ERR, "EPT violation %#lx (%c%c%c/%c%c%c), "
              "gpa %#"PRIpaddr", mfn %#lx, type %i.\n", 
              qualification, 

@@ -146,22 +146,29 @@ nestedhap_walk_L0_p2m(struct p2m_domain *p2m, paddr_t L1_gpa, paddr_t *L0_gpa,
     mfn_t mfn;
     p2m_type_t p2mt;
     p2m_access_t p2ma;
+    int rc;
 
     /* walk L0 P2M table */
-    mfn = gfn_to_mfn_type_p2m(p2m, L1_gpa >> PAGE_SHIFT, &p2mt, &p2ma, 
+    mfn = get_gfn_type_access(p2m, L1_gpa >> PAGE_SHIFT, &p2mt, &p2ma, 
                               p2m_query, page_order);
 
+    rc = NESTEDHVM_PAGEFAULT_MMIO;
     if ( p2m_is_mmio(p2mt) )
-        return NESTEDHVM_PAGEFAULT_MMIO;
+        goto out;
 
+    rc = NESTEDHVM_PAGEFAULT_ERROR;
     if ( p2m_is_paging(p2mt) || p2m_is_shared(p2mt) || !p2m_is_ram(p2mt) )
-        return NESTEDHVM_PAGEFAULT_ERROR;
+        goto out;
 
+    rc = NESTEDHVM_PAGEFAULT_ERROR;
     if ( !mfn_valid(mfn) )
-        return NESTEDHVM_PAGEFAULT_ERROR;
+        goto out;
 
     *L0_gpa = (mfn_x(mfn) << PAGE_SHIFT) + (L1_gpa & ~PAGE_MASK);
-    return NESTEDHVM_PAGEFAULT_DONE;
+    rc = NESTEDHVM_PAGEFAULT_DONE;
+out:
+    __put_gfn(p2m, L1_gpa >> PAGE_SHIFT);
+    return rc;
 }
 
 /* This function uses L2_gpa to walk the P2M page table in L1. If the 

@@ -3,6 +3,7 @@
  *
  * physical-to-machine mappings for automatically-translated domains.
  *
+ * Copyright (c) 2011 GridCentric Inc. (Andres Lagar-Cavilla)
  * Copyright (c) 2007 Advanced Micro Devices (Wei Huang)
  * Parts of this code are Copyright (c) 2006-2007 by XenSource Inc.
  * Parts of this code are Copyright (c) 2006 by Michael A Fetterman
@@ -305,46 +306,65 @@ struct p2m_domain *p2m_get_p2m(struct vcpu *v);
 
 #define p2m_get_pagetable(p2m)  ((p2m)->phys_table)
 
+/**** p2m query accessors. After calling any of the variants below, you
+ * need to call put_gfn(domain, gfn). If you don't, you'll lock the
+ * hypervisor. ****/
 
 /* Read a particular P2M table, mapping pages as we go.  Most callers
- * should _not_ call this directly; use the other gfn_to_mfn_* functions
+ * should _not_ call this directly; use the other get_gfn* functions
  * below unless you know you want to walk a p2m that isn't a domain's
  * main one.
  * If the lookup succeeds, the return value is != INVALID_MFN and 
  * *page_order is filled in with the order of the superpage (if any) that
  * the entry was found in.  */
-mfn_t gfn_to_mfn_type_p2m(struct p2m_domain *p2m, unsigned long gfn,
+mfn_t get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn,
                     p2m_type_t *t, p2m_access_t *a, p2m_query_t q,
                     unsigned int *page_order);
 
 /* General conversion function from gfn to mfn */
-static inline mfn_t gfn_to_mfn_type(struct domain *d,
+static inline mfn_t get_gfn_type(struct domain *d,
                                     unsigned long gfn, p2m_type_t *t,
                                     p2m_query_t q)
 {
     p2m_access_t a;
-    return gfn_to_mfn_type_p2m(p2m_get_hostp2m(d), gfn, t, &a, q, NULL);
+    return get_gfn_type_access(p2m_get_hostp2m(d), gfn, t, &a, q, NULL);
 }
 
 /* Syntactic sugar: most callers will use one of these. 
- * N.B. gfn_to_mfn_query() is the _only_ one guaranteed not to take the
+ * N.B. get_gfn_query() is the _only_ one guaranteed not to take the
  * p2m lock; none of the others can be called with the p2m or paging
  * lock held. */
-#define gfn_to_mfn(d, g, t)         gfn_to_mfn_type((d), (g), (t), p2m_alloc)
-#define gfn_to_mfn_query(d, g, t)   gfn_to_mfn_type((d), (g), (t), p2m_query)
-#define gfn_to_mfn_guest(d, g, t)   gfn_to_mfn_type((d), (g), (t), p2m_guest)
-#define gfn_to_mfn_unshare(d, g, t) gfn_to_mfn_type((d), (g), (t), p2m_unshare)
+#define get_gfn(d, g, t)         get_gfn_type((d), (g), (t), p2m_alloc)
+#define get_gfn_query(d, g, t)   get_gfn_type((d), (g), (t), p2m_query)
+#define get_gfn_guest(d, g, t)   get_gfn_type((d), (g), (t), p2m_guest)
+#define get_gfn_unshare(d, g, t) get_gfn_type((d), (g), (t), p2m_unshare)
 
 /* Compatibility function exporting the old untyped interface */
-static inline unsigned long gmfn_to_mfn(struct domain *d, unsigned long gpfn)
+static inline unsigned long get_gfn_untyped(struct domain *d, unsigned long gpfn)
 {
     mfn_t mfn;
     p2m_type_t t;
-    mfn = gfn_to_mfn(d, gpfn, &t);
+    mfn = get_gfn(d, gpfn, &t);
     if ( p2m_is_valid(t) )
         return mfn_x(mfn);
     return INVALID_MFN;
 }
+
+/* This is a noop for now. */
+static inline void __put_gfn(struct p2m_domain *p2m, unsigned long gfn)
+{
+}
+
+#define put_gfn(d, gfn) __put_gfn(p2m_get_hostp2m((d)), (gfn))
+
+/* These are identical for now. The intent is to have the caller not worry 
+ * about put_gfn. To only be used in printk's, crash situations, or to 
+ * peek at a type. You're not holding the p2m entry exclsively after calling
+ * this. */
+#define get_gfn_unlocked(d, g, t)         get_gfn_type((d), (g), (t), p2m_alloc)
+#define get_gfn_query_unlocked(d, g, t)   get_gfn_type((d), (g), (t), p2m_query)
+#define get_gfn_guest_unlocked(d, g, t)   get_gfn_type((d), (g), (t), p2m_guest)
+#define get_gfn_unshare_unlocked(d, g, t) get_gfn_type((d), (g), (t), p2m_unshare)
 
 /* General conversion function from mfn to gfn */
 static inline unsigned long mfn_to_gfn(struct domain *d, mfn_t mfn)
@@ -529,7 +549,8 @@ static inline int p2m_gfn_check_limit(
 #define p2m_gfn_check_limit(d, g, o) 0
 #endif
 
-/* Directly set a p2m entry: only for use by p2m code */
+/* Directly set a p2m entry: only for use by p2m code. Does not need
+ * a call to put_gfn afterwards/ */
 int set_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn, 
                   unsigned int page_order, p2m_type_t p2mt, p2m_access_t p2ma);
 

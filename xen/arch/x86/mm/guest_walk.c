@@ -86,30 +86,35 @@ static uint32_t set_ad_bits(void *guest_p, void *walk_p, int set_dirty)
     return 0;
 }
 
+/* If the map is non-NULL, we leave this function having 
+ * called get_gfn, you need to call put_gfn. */
 static inline void *map_domain_gfn(struct p2m_domain *p2m,
                                    gfn_t gfn, 
                                    mfn_t *mfn,
                                    p2m_type_t *p2mt,
                                    uint32_t *rc) 
 {
-    p2m_access_t a;
+    p2m_access_t p2ma;
 
     /* Translate the gfn, unsharing if shared */
-    *mfn = gfn_to_mfn_type_p2m(p2m, gfn_x(gfn), p2mt, &a, p2m_unshare, NULL);
+    *mfn = get_gfn_type_access(p2m, gfn_x(gfn), p2mt, &p2ma, p2m_unshare, NULL);
     if ( p2m_is_paging(*p2mt) )
     {
         ASSERT(!p2m_is_nestedp2m(p2m));
         p2m_mem_paging_populate(p2m->domain, gfn_x(gfn));
+        __put_gfn(p2m, gfn_x(gfn));
         *rc = _PAGE_PAGED;
         return NULL;
     }
     if ( p2m_is_shared(*p2mt) )
     {
+        __put_gfn(p2m, gfn_x(gfn));
         *rc = _PAGE_SHARED;
         return NULL;
     }
     if ( !p2m_is_ram(*p2mt) ) 
     {
+        __put_gfn(p2m, gfn_x(gfn));
         *rc |= _PAGE_PRESENT;
         return NULL;
     }
@@ -120,6 +125,9 @@ static inline void *map_domain_gfn(struct p2m_domain *p2m,
 
 
 /* Walk the guest pagetables, after the manner of a hardware walker. */
+/* Because the walk is essentially random, it can cause a deadlock 
+ * warning in the p2m locking code. Highly unlikely this is an actual
+ * deadlock, because who would walk page table in the opposite order? */
 uint32_t
 guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
                   unsigned long va, walk_t *gw, 
@@ -288,7 +296,6 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
 #endif
             rc |= _PAGE_INVALID_BITS;
         }
-
         /* Increment the pfn by the right number of 4k pages.  
          * Mask out PAT and invalid bits. */
         start = _gfn((gfn_x(start) & ~GUEST_L2_GFN_MASK) +
@@ -347,12 +354,24 @@ set_ad:
 
  out:
 #if GUEST_PAGING_LEVELS == 4
-    if ( l3p ) unmap_domain_page(l3p);
+    if ( l3p ) 
+    {
+        unmap_domain_page(l3p);
+        __put_gfn(p2m, gfn_x(guest_l4e_get_gfn(gw->l4e)));
+    }
 #endif
 #if GUEST_PAGING_LEVELS >= 3
-    if ( l2p ) unmap_domain_page(l2p);
+    if ( l2p ) 
+    {
+        unmap_domain_page(l2p);
+        __put_gfn(p2m, gfn_x(guest_l3e_get_gfn(gw->l3e))); 
+    }
 #endif
-    if ( l1p ) unmap_domain_page(l1p);
+    if ( l1p ) 
+    {
+        unmap_domain_page(l1p);
+        __put_gfn(p2m, gfn_x(guest_l2e_get_gfn(gw->l2e)));
+    }
 
     return rc;
 }
