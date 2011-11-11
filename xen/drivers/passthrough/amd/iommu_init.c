@@ -838,10 +838,6 @@ static int __init amd_iommu_setup_device_table(
 
             amd_iommu_set_intremap_table(
                 dte, (u64)virt_to_maddr(intr_tb), iommu_intremap);
-
-            AMD_IOMMU_DEBUG("Add device table entry: device id = 0x%04x, "
-                            "interupt table = 0x%"PRIx64"\n", bdf,
-                            (u64)virt_to_maddr(intr_tb));
         }
     }
 
