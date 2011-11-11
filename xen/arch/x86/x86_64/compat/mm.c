@@ -133,7 +133,11 @@ int compat_arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         XLAT_pod_target(&cmp, nat);
 
         if ( copy_to_guest(arg, &cmp, 1) )
+        {
+            if ( rc == __HYPERVISOR_memory_op )
+                hypercall_cancel_continuation();
             rc = -EFAULT;
+        }
 
         break;
     }

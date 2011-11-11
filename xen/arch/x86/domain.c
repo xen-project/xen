@@ -1724,6 +1724,24 @@ void sync_vcpu_execstate(struct vcpu *v)
     __arg;                                                                  \
 })
 
+void hypercall_cancel_continuation(void)
+{
+    struct cpu_user_regs *regs = guest_cpu_user_regs();
+    struct mc_state *mcs = &current->mc_state;
+
+    if ( test_bit(_MCSF_in_multicall, &mcs->flags) )
+    {
+        __clear_bit(_MCSF_call_preempted, &mcs->flags);
+    }
+    else
+    {
+        if ( !is_hvm_vcpu(current) )
+            regs->eip += 2; /* skip re-execute 'syscall' / 'int $xx' */
+        else
+            current->arch.hvm_vcpu.hcall_preempted = 0;
+    }
+}
+
 unsigned long hypercall_create_continuation(
     unsigned int op, const char *format, ...)
 {
