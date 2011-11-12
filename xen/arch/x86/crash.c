@@ -28,7 +28,6 @@
 #include <asm/apic.h>
 #include <asm/io_apic.h>
 #include <xen/iommu.h>
-#include <xen/pci.h>
 #include <asm/hpet.h>
 
 static atomic_t waiting_for_crash_ipi;
@@ -82,8 +81,6 @@ static void nmi_shootdown_cpus(void)
         mdelay(1);
         msecs--;
     }
-
-    disconnect_pci_devices();
 
     /* Crash shutdown any IOMMU functionality as the crashdump kernel is not
      * happy when booting if interrupt/dma remapping is still enabled */
