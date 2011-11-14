@@ -101,6 +101,9 @@ class XendStateStore:
         if not os.path.exists(xml_path):
             return {}
 
+        if not os.path.getsize(xml_path) == 0:
+            return {}
+
         dom = minidom.parse(xml_path)
         root = dom.documentElement
         state = {}
