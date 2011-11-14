@@ -25,15 +25,23 @@ has_or_fail() {
 }
 
 has_header() {
-	case $1 in
-		/*) ;;
-		*) set -- "/usr/include/$1" ;;
-	esac
-
 	check_sys_root || return 1
 
-	test -r "$CROSS_SYS_ROOT$1"
-	return $?
+	case $1 in
+		/*) ;;
+		*)
+		if [ -r "$CROSS_SYS_ROOT/usr/include/$1" ]; then
+			return 0
+		fi
+		for path in ${CHECK_INCLUDES}; do
+			if [ -r "$CROSS_SYS_ROOT${path}/$1" ]; then
+				return 0
+			fi
+		done
+		;;
+	esac
+
+	return 1
 }
 
 has_lib() {
@@ -42,6 +50,7 @@ has_lib() {
 	# subshell to prevent pollution of caller's environment
 	(
 	PATH=/sbin:$PATH        # for ldconfig
+	LIBRARIES="$CHECK_LIB /usr/lib"
 
 	# This relatively common in a sys-root; libs are installed but
 	# ldconfig hasn't run there, so ldconfig -p won't work.
@@ -49,8 +58,15 @@ has_lib() {
 	    echo "Please run ldconfig -r \"$CROSS_SYS_ROOT\" to generate ld.so.cache"
 	    # fall through; ldconfig test below should fail
 	fi
-	ldconfig -p ${CROSS_SYS_ROOT+-r "$CROSS_SYS_ROOT"} | grep -Fq "$1"
-	return $?
+	if [ "${OS}" = "Linux" ]; then
+		ldconfig -p ${CROSS_SYS_ROOT+-r "$CROSS_SYS_ROOT"} | grep -Fq "$1"
+		return $?
+	fi
+	if [ "${OS}" = "NetBSD" ]; then
+		ls -1 ${LIBRARIES} | grep -Fq "$1"
+		return $?
+	fi
+	return 1
 	)
 }
 
