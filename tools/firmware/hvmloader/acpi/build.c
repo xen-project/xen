@@ -276,7 +276,7 @@ static int construct_secondary_tables(unsigned long *table_ptrs,
 
 void acpi_build_tables(struct acpi_config *config, unsigned int physical)
 {
-    struct acpi_info *acpi_info = (struct acpi_info *)ACPI_INFO_PHYSICAL_ADDRESS;
+    struct acpi_info *acpi_info;
     struct acpi_20_rsdp *rsdp;
     struct acpi_20_rsdt *rsdt;
     struct acpi_20_xsdt *xsdt;
@@ -287,6 +287,9 @@ void acpi_build_tables(struct acpi_config *config, unsigned int physical)
     unsigned long        secondary_tables[16];
     int                  nr_secondaries, i;
 
+    /* Allocate and initialise the acpi info area. */
+    mem_hole_populate_ram(ACPI_INFO_PHYSICAL_ADDRESS >> PAGE_SHIFT, 1);
+    acpi_info = (struct acpi_info *)ACPI_INFO_PHYSICAL_ADDRESS;
     memset(acpi_info, 0, sizeof(*acpi_info));
 
     /*

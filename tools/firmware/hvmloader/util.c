@@ -343,7 +343,7 @@ void mem_hole_populate_ram(xen_pfn_t mfn, uint32_t nr_mfns)
     }
 }
 
-static uint32_t reserve = RESERVED_MEMBASE - 1;
+static uint32_t reserve = RESERVED_MEMORY_DYNAMIC - 1;
 
 xen_pfn_t mem_hole_alloc(uint32_t nr_mfns)
 {

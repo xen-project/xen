@@ -81,55 +81,24 @@ int build_e820_table(struct e820entry *e820,
     /* Lowmem must be at least 512K to keep Windows happy) */
     ASSERT ( lowmem_reserved_base > 512<<10 );
 
-    /*
-     * Lowmem reservation must either cover the ACPI info region
-     * entirely or not at all. Sitting half way through suggests
-     * something funny is going on.
-     */
-    ASSERT ( lowmem_reserved_base < ACPI_INFO_PHYSICAL_ADDRESS ||
-             lowmem_reserved_base > ACPI_INFO_PHYSICAL_END );
-
     ASSERT ( bios_image_base < 0x100000 );
 
-    if ( lowmem_reserved_base < ACPI_INFO_PHYSICAL_ADDRESS )
-    {
-        /*
-         * 0x0-lowmem_reserved_base: Ordinary RAM.
-         */
-        e820[nr].addr = 0x00000;
-        e820[nr].size = lowmem_reserved_base;
-        e820[nr].type = E820_RAM;
-        nr++;
-    }
-    else
-    {
-        /* 0x0-ACPI_INFO: Ordinary RAM. */
-        e820[nr].addr = 0x00000;
-        e820[nr].size = ACPI_INFO_PHYSICAL_ADDRESS;
-        e820[nr].type = E820_RAM;
-        nr++;
+    /*
+     * 0x0-lowmem_reserved_base: Ordinary RAM.
+     */
+    e820[nr].addr = 0x00000;
+    e820[nr].size = lowmem_reserved_base;
+    e820[nr].type = E820_RAM;
+    nr++;
 
-        /* ACPI INFO: Reserved. */
-        e820[nr].addr = ACPI_INFO_PHYSICAL_ADDRESS;
-        e820[nr].size = ACPI_INFO_SIZE;
-        e820[nr].type = E820_RESERVED;
-        nr++;
-
-        /* ACPI_INFO-lowmem_reserved_base: Ordinary RAM. */
-        e820[nr].addr = ACPI_INFO_PHYSICAL_END;
-        e820[nr].size = lowmem_reserved_base - ACPI_INFO_PHYSICAL_END;
-        e820[nr].type = E820_RAM;
-        nr++;
-    }
-
-    /* lowmem_reserved_base-0xa00000: reserved by BIOS implementation. */
+    /* lowmem_reserved_base-0xA0000: reserved by BIOS implementation. */
     if ( lowmem_reserved_base < 0xA0000 )
     {
-            /* Reserved for internal use. */
-            e820[nr].addr = lowmem_reserved_base;
-            e820[nr].size = 0xA0000-lowmem_reserved_base;
-            e820[nr].type = E820_RESERVED;
-            nr++;
+        /* Reserved for internal use. */
+        e820[nr].addr = lowmem_reserved_base;
+        e820[nr].size = 0xA0000-lowmem_reserved_base;
+        e820[nr].type = E820_RESERVED;
+        nr++;
     }
 
     /*

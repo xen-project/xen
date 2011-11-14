@@ -54,18 +54,17 @@ extern struct bios_config seabios_config;
 #define PCI_MEM_END         0xfc000000
 extern unsigned long pci_mem_start, pci_mem_end;
 
-/* Reserved for special BIOS mappings, etc. */
-#define RESERVED_MEMBASE    0xfc000000
 
 /* Memory map. */
 #define SCRATCH_PHYSICAL_ADDRESS      0x00010000
 #define HYPERCALL_PHYSICAL_ADDRESS    0x00080000
-#define ACPI_INFO_PHYSICAL_ADDRESS    0x0009F000
 #define VGABIOS_PHYSICAL_ADDRESS      0x000C0000
 #define HVMLOADER_PHYSICAL_ADDRESS    0x00100000
-
-#define ACPI_INFO_SIZE                     0xC00
-#define ACPI_INFO_PHYSICAL_END (ACPI_INFO_PHYSICAL_ADDRESS + ACPI_INFO_SIZE)
+/* Special BIOS mappings, etc. are allocated from here upwards... */
+#define RESERVED_MEMBASE              0xFC000000
+/* NB. ACPI_INFO_PHYSICAL_ADDRESS *MUST* match definition in acpi/dsdt.asl! */
+#define ACPI_INFO_PHYSICAL_ADDRESS    0xFC000000
+#define RESERVED_MEMORY_DYNAMIC       0xFC001000
 
 extern unsigned long scratch_start;
 

@@ -47,7 +47,6 @@ static void rombios_setup_e820(void)
 {
     /*
      * 0x9E000-0x09F000: Stack.
-     * 0x9F000-0x09C000: ACPI info.
      * 0x9FC00-0x0A0000: Extended BIOS Data Area (EBDA).
      * ...
      * 0xE0000-0x0F0000: PC-specific area. We place various tables here.
