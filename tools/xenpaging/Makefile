@@ -20,7 +20,7 @@ IBINS    = xenpaging
 all: $(IBINS)
 
 xenpaging: $(OBJS)
-	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(APPEND_LDFLAGS)
 
 install: all
 	$(INSTALL_DIR) $(DESTDIR)/var/lib/xen/xenpaging

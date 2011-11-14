@@ -41,9 +41,9 @@ clean:
 	$(RM) -f xentrace_setmake setmask.o
 
 xenbaked: xenbaked.o Makefile
-	$(CC) $(LDFLAGS) $< -o $@ $(LDLIBS)
+	$(CC) $(LDFLAGS) $< -o $@ $(LDLIBS) $(APPEND_LDFLAGS)
 
 xentrace_setmask: setmask.o Makefile
-	$(CC) $(LDFLAGS) $< -o $@ $(LDLIBS)
+	$(CC) $(LDFLAGS) $< -o $@ $(LDLIBS) $(APPEND_LDFLAGS)
 
 -include $(DEPS)

@@ -29,16 +29,16 @@ libxenvchan.so.$(MAJOR): libxenvchan.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
 libxenvchan.so.$(MAJOR).$(MINOR): $(LIBVCHAN_PIC_OBJS)
-	$(CC) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenvchan.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(LIBVCHAN_LIBS)
+	$(CC) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenvchan.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(LIBVCHAN_LIBS) $(APPEND_LDFLAGS)
 
 libxenvchan.a: $(LIBVCHAN_OBJS)
 	$(AR) rcs libxenvchan.a $^
 
 vchan-node1: $(NODE_OBJS) libxenvchan.so
-	$(CC) $(LDFLAGS) -o $@ $(NODE_OBJS) $(LDLIBS_libxenvchan)
+	$(CC) $(LDFLAGS) -o $@ $(NODE_OBJS) $(LDLIBS_libxenvchan) $(APPEND_LDFLAGS)
 
 vchan-node2: $(NODE2_OBJS) libxenvchan.so
-	$(CC) $(LDFLAGS) -o $@ $(NODE2_OBJS) $(LDLIBS_libxenvchan)
+	$(CC) $(LDFLAGS) -o $@ $(NODE2_OBJS) $(LDLIBS_libxenvchan) $(APPEND_LDFLAGS)
 
 .PHONY: install
 install: all

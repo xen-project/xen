@@ -33,6 +33,6 @@ clean:
 	rm -f $(DEPS)
 
 xenbackendd: xenbackendd.o
-	$(CC) $(LDFLAGS) $< -o $@ $(LDLIBS)
+	$(CC) $(LDFLAGS) $< -o $@ $(LDLIBS) $(APPEND_LDFLAGS)
 
 -include $(DEPS)

@@ -47,30 +47,30 @@ clean:
 	set -e; for d in $(SUBDIRS); do $(MAKE) -C $$d clean; done
 
 xen-hvmctx: xen-hvmctx.o
-	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl)
+	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(APPEND_LDFLAGS)
 
 xen-hvmcrash: xen-hvmcrash.o
-	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl)
+	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(APPEND_LDFLAGS)
 
 xenperf: xenperf.o
-	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl)
+	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(APPEND_LDFLAGS)
 
 xenpm: xenpm.o
-	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl)
+	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(APPEND_LDFLAGS)
 
 gtracestat: gtracestat.o
-	$(CC) $(LDFLAGS) -o $@ $<
+	$(CC) $(LDFLAGS) -o $@ $< $(APPEND_LDFLAGS)
 
 xenlockprof: xenlockprof.o
-	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl)
+	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(APPEND_LDFLAGS)
 
 xen-hptool: xen-hptool.o
-	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore)
+	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore) $(APPEND_LDFLAGS)
 
 xenwatchdogd: xenwatchdogd.o
-	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl)
+	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(APPEND_LDFLAGS)
 
 gtraceview: gtraceview.o
-	$(CC) $(LDFLAGS) -o $@ $< $(CURSES_LIBS)
+	$(CC) $(LDFLAGS) -o $@ $< $(CURSES_LIBS) $(APPEND_LDFLAGS)
 
 -include $(DEPS)

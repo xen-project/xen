@@ -19,6 +19,6 @@ clean:
 	$(RM) -f xenpmd xenpmd.o $(DEPS)
 
 xenpmd: xenpmd.o Makefile
-	$(CC) $(LDFLAGS) $< -o $@ $(LDLIBS)
+	$(CC) $(LDFLAGS) $< -o $@ $(LDLIBS) $(APPEND_LDFLAGS)
 
 -include $(DEPS)

@@ -35,13 +35,13 @@ clean:
 	$(RM) *.a *.so *.o *.rpm $(BIN) $(LIBBIN) $(DEPS)
 
 xentrace: xentrace.o
-	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS)
+	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS) $(APPEND_LDFLAGS)
 
 xenctx: xenctx.o
-	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS)
+	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS) $(APPEND_LDFLAGS)
 
 xentrace_setsize: setsize.o
-	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS)
+	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS) $(APPEND_LDFLAGS)
 
 -include $(DEPS)
 

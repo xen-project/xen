@@ -44,13 +44,13 @@ libxenapi.so.$(MAJOR): libxenapi.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
 libxenapi.so.$(MAJOR).$(MINOR): $(LIBXENAPI_OBJS)
-	$(CC) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenapi.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^
+	$(CC) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenapi.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(APPEND_LDFLAGS)
 
 libxenapi.a: $(LIBXENAPI_OBJS)
 	$(AR) rcs libxenapi.a $^
 
 $(TEST_PROGRAMS): test/%: test/%.o libxenapi.so
-	$(CC) $(LDFLAGS) -o $@ $< -L . -lxenapi
+	$(CC) $(LDFLAGS) -o $@ $< -L . -lxenapi $(APPEND_LDFLAGS)
 
 
 .PHONY: install
