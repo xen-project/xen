@@ -58,7 +58,8 @@ python-dev-docs:
 .PHONY: man-pages
 man-pages:
 	@if which $(POD2MAN) 1>/dev/null 2>/dev/null; then \
-	$(MAKE) $(DOC_MAN1) $(DOC_MAN5); fi
+	$(MAKE) $(DOC_MAN1) $(DOC_MAN5); else              \
+	echo "pod2man not installed; skipping man-pages."; fi
 
 man1/%.1: man/%.pod.1 Makefile
 	$(INSTALL_DIR) $(@D)
@@ -120,14 +121,16 @@ html/%/index.html: src/%.tex
         echo "Running latex2html to generate $*/index.html ... "; \
 	$(LATEX2HTML) -split 0 -show_section_numbers -toc_depth 3 -nonavigation \
 	-numbered_footnotes -local_icons -noinfo -math -dir $(@D) \
-	$< 1>/dev/null 2>/dev/null ;fi
+	$< 1>/dev/null 2>/dev/null ; else \
+	echo "latex2html not installed; skipping $*."; fi
 
 html/%.html: %.markdown
 	@$(INSTALL_DIR) $(@D)
 	@set -e ; if which $(MARKDOWN) 1>/dev/null 2>/dev/null; then \
 	echo "Running markdown to generate $*.html ... "; \
 	$(MARKDOWN) $< > $@.tmp ; \
-	$(call move-if-changed,$@.tmp,$@) ; fi
+	$(call move-if-changed,$@.tmp,$@) ; else \
+	echo "markdown not installed; skipping $*.html."; fi
 
 txt/%.txt: %.txt
 	$(INSTALL_DIR) $(@D)
