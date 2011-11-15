@@ -10,6 +10,7 @@ extern void relocate_new_kernel(unsigned long indirection_page,
                                 unsigned long boot_param,
                                 unsigned long dom0_relocate_new_kernel);
 void crash_save_xen_notes(void);
+void kexec_disable_iosapic(void);
 void machine_kexec(xen_kexec_image_t *image);
 unsigned long kdump_find_rsvd_region(unsigned long size,
                                      struct rsvd_region *rsvd_regions, int n);

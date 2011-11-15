@@ -15,6 +15,7 @@
 #include <linux/hardirq.h>
 #include <linux/smp.h>
 #include <asm/processor.h>
+#include <asm/kexec.h>
 #include <xen/sched.h>
 
 void machine_crash_shutdown(void)
