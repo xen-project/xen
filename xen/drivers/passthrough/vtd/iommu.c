@@ -33,9 +33,11 @@
 #include <xen/keyhandler.h>
 #include <asm/msi.h>
 #include <asm/irq.h>
+#ifndef __ia64__
 #include <asm/hvm/vmx/vmx.h>
 #include <asm/p2m.h>
 #include <mach_apic.h>
+#endif
 #include "iommu.h"
 #include "dmar.h"
 #include "extern.h"
@@ -990,7 +992,11 @@ static unsigned int dma_msi_startup(struct irq_desc *desc)
     return 0;
 }
 
+#ifndef __ia64__
 static void dma_msi_end(struct irq_desc *desc, u8 vector)
+#else
+static void dma_msi_end(struct irq_desc *desc)
+#endif
 {
     dma_msi_unmask(desc);
     ack_APIC_irq();
@@ -1790,6 +1796,7 @@ void iommu_pte_flush(struct domain *d, u64 gfn, u64 *pte,
 
 static int vtd_ept_page_compatible(struct iommu *iommu)
 {
+#ifndef __ia64__
     u64 ept_cap, vtd_cap = iommu->cap;
 
     /* EPT is not initialised yet, so we must check the capability in
@@ -1799,6 +1806,9 @@ static int vtd_ept_page_compatible(struct iommu *iommu)
 
     return ( ept_has_2mb(ept_cap) == cap_sps_2mb(vtd_cap) 
              && ept_has_1gb(ept_cap) == cap_sps_1gb(vtd_cap) );
+#else
+    return 0;
+#endif
 }
 
 /*
@@ -1806,6 +1816,7 @@ static int vtd_ept_page_compatible(struct iommu *iommu)
  */
 void iommu_set_pgd(struct domain *d)
 {
+#ifndef __ia64__
     struct hvm_iommu *hd  = domain_hvm_iommu(d);
     mfn_t pgd_mfn;
 
@@ -1816,6 +1827,7 @@ void iommu_set_pgd(struct domain *d)
 
     pgd_mfn = pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d)));
     hd->pgd_maddr = pagetable_get_paddr(pagetable_from_mfn(pgd_mfn));
+#endif
 }
 
 static int rmrr_identity_mapping(struct domain *d,
@@ -2107,7 +2119,7 @@ int __init intel_vtd_setup(void)
             iommu_intremap = 0;
 
         if ( !vtd_ept_page_compatible(iommu) )
-            iommu_hap_pt_share = FALSE;
+            iommu_hap_pt_share = 0;
 
         ret = iommu_set_interrupt(iommu);
         if ( ret < 0 )

@@ -42,7 +42,12 @@
 #include <asm/page.h>
 #include <asm/numa.h>
 #include <asm/flushtlb.h>
+#ifdef CONFIG_X86
 #include <asm/p2m.h>
+#else
+#define p2m_pod_offline_or_broken_hit(pg) 0
+#define p2m_pod_offline_or_broken_replace(pg) BUG_ON(pg != NULL)
+#endif
 
 /*
  * Comma-separated list of hexadecimal page numbers containing bad bytes.

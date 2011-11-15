@@ -176,6 +176,7 @@
 #include <asm/tlb_track.h>
 #include <linux/efi.h>
 #include <linux/sort.h>
+#include <xen/grant_table.h>
 #include <xen/guest_access.h>
 #include <asm/page.h>
 #include <asm/dom_fw_common.h>

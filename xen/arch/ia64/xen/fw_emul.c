@@ -31,7 +31,7 @@
 #include <asm/vcpu.h>
 #include <asm/vmx_vcpu.h>
 #include <asm/dom_fw.h>
-#include <asm/uaccess.h>
+#include <xen/guest_access.h>
 #include <xen/console.h>
 #include <xen/hypercall.h>
 #include <xen/softirq.h>

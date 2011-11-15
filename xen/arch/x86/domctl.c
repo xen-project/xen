@@ -27,7 +27,7 @@
 #include <asm/hvm/cacheattr.h>
 #include <asm/processor.h>
 #include <asm/acpi.h> /* for hvm_acpi_power_button */
-#include <asm/hypercall.h> /* for arch_do_domctl */
+#include <xen/hypercall.h> /* for arch_do_domctl */
 #include <xsm/xsm.h>
 #include <xen/iommu.h>
 #include <asm/mem_event.h>

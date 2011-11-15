@@ -809,6 +809,7 @@ int platform_supports_intremap(void)
     return ((dmar_flags & flags) == DMAR_INTR_REMAP);
 }
 
+#ifdef CONFIG_X86
 int platform_supports_x2apic(void)
 {
     unsigned int flags = 0;
@@ -819,3 +820,4 @@ int platform_supports_x2apic(void)
     flags = DMAR_INTR_REMAP | DMAR_X2APIC_OPT_OUT;
     return ((dmar_flags & flags) == DMAR_INTR_REMAP);
 }
+#endif

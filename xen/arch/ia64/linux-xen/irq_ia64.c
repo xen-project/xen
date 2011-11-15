@@ -242,6 +242,16 @@ static struct irqaction __read_mostly ipi_irqaction = {
 };
 #endif
 
+static hw_irq_controller irq_type_ia64_lsapic = {
+	.typename =	"LSAPIC",
+	.startup =	irq_startup_none,
+	.shutdown =	irq_shutdown_none,
+	.enable =	irq_enable_none,
+	.disable =	irq_disable_none,
+	.ack =		irq_actor_none,
+	.end =		irq_actor_none
+};
+
 void
 register_percpu_irq (ia64_vector vec, struct irqaction *action)
 {

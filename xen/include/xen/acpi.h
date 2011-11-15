@@ -360,7 +360,9 @@ static inline unsigned int acpi_get_cstate_limit(void) { return 0; }
 static inline void acpi_set_cstate_limit(unsigned int new_limit) { return; }
 #endif
 
+#ifdef XEN_GUEST_HANDLE
 int acpi_set_pdc_bits(u32 acpi_id, XEN_GUEST_HANDLE(uint32));
+#endif
 int arch_acpi_set_pdc_bits(u32 acpi_id, u32 *, u32 mask);
 
 #ifdef CONFIG_ACPI_NUMA

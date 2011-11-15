@@ -15,9 +15,16 @@
 #define NR_IRQS		256
 
 #ifdef XEN
+#include <xen/hvm/irq.h>
+
 struct arch_irq_desc {
         int  vector;
+	unsigned int depth;
         cpumask_var_t cpu_mask;
+};
+
+struct arch_pirq {
+	struct hvm_pirq_dpci dpci;
 };
 
 int init_irq_data(void);
@@ -66,6 +73,8 @@ extern int request_irq_vector(unsigned int vector,
     while(!x)
 
 #define domain_pirq_to_irq(d, irq) domain_irq_to_vector(d, irq)
+
+#define hvm_domain_use_pirq(d, info) 0
 #endif
 
 #endif /* _ASM_IA64_IRQ_H */

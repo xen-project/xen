@@ -24,6 +24,8 @@
 #ifndef __ASM_XENOPROF_H__
 #define __ASM_XENOPROF_H__
 
+#include <xen/grant_table.h>
+
 int xenoprof_arch_init(int *num_events, char *cpu_type);
 int xenoprof_arch_reserve_counters(void);
 int xenoprof_arch_counter(XEN_GUEST_HANDLE(void) arg);

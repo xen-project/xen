@@ -7,7 +7,6 @@
 
 #include <public/physdev.h>
 #include <public/arch-x86/xen-mca.h> /* for do_mca */
-#include <public/domctl.h> /* for arch_do_domctl */
 #include <xen/types.h>
 
 /*
@@ -95,11 +94,6 @@ struct vcpu;
 extern long
 arch_do_vcpu_op(
     int cmd, struct vcpu *v, XEN_GUEST_HANDLE(void) arg);
-
-extern long
-arch_do_domctl(
-    struct xen_domctl *domctl,
-    XEN_GUEST_HANDLE(xen_domctl_t) u_domctl);
 
 extern long
 arch_do_sysctl(

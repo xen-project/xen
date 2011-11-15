@@ -107,7 +107,8 @@ static inline void account_system_vtime(struct task_struct *tsk)
 #define irq_enter()					\
 	do {						\
 		account_system_vtime(current);		\
-		add_preempt_count(HARDIRQ_OFFSET);	\
+		/*add_preempt_count(HARDIRQ_OFFSET);*/	\
+		preempt_count() += HARDIRQ_OFFSET;	\
 	} while (0)
 
 extern void irq_exit(void);

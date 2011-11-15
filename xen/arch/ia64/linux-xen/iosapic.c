@@ -275,12 +275,6 @@ set_rte (unsigned int gsi, unsigned int vector, unsigned int dest, int mask)
 	iosapic_intr_info[vector].dest = dest;
 }
 
-static void
-nop (struct irq_desc *desc)
-{
-	/* do nothing... */
-}
-
 void
 kexec_disable_iosapic(void)
 {
@@ -428,7 +422,7 @@ iosapic_end_level_irq (struct irq_desc *desc)
 #define iosapic_shutdown_level_irq	mask_irq
 #define iosapic_enable_level_irq	unmask_irq
 #define iosapic_disable_level_irq	mask_irq
-#define iosapic_ack_level_irq		nop
+#define iosapic_ack_level_irq		irq_actor_none
 
 static hw_irq_controller irq_type_iosapic_level = {
 	.typename =	"IO-SAPIC-level",
@@ -446,9 +440,9 @@ static hw_irq_controller irq_type_iosapic_level = {
  */
 
 static unsigned int
-iosapic_startup_edge_irq (unsigned int irq)
+iosapic_startup_edge_irq (struct irq_desc *desc)
 {
-	unmask_irq(irq);
+	unmask_irq(desc);
 	/*
 	 * IOSAPIC simply drops interrupts pended while the
 	 * corresponding pin was masked, so we can't know if an
@@ -458,23 +452,21 @@ iosapic_startup_edge_irq (unsigned int irq)
 }
 
 static void
-iosapic_ack_edge_irq (unsigned int irq)
+iosapic_ack_edge_irq (struct irq_desc *desc)
 {
-	irq_desc_t *idesc = irq_descp(irq);
-
-	move_irq(irq);
+	move_irq(idesc->irq);
 	/*
 	 * Once we have recorded IRQ_PENDING already, we can mask the
 	 * interrupt for real. This prevents IRQ storms from unhandled
 	 * devices.
 	 */
-	if ((idesc->status & (IRQ_PENDING|IRQ_DISABLED)) == (IRQ_PENDING|IRQ_DISABLED))
-		mask_irq(irq);
+	if ((desc->status & (IRQ_PENDING|IRQ_DISABLED)) == (IRQ_PENDING|IRQ_DISABLED))
+		mask_irq(desc);
 }
 
 #define iosapic_enable_edge_irq		unmask_irq
-#define iosapic_disable_edge_irq	nop
-#define iosapic_end_edge_irq		nop
+#define iosapic_disable_edge_irq	irq_disable_none
+#define iosapic_end_edge_irq		irq_actor_none
 
 static hw_irq_controller irq_type_iosapic_edge = {
 	.typename =	"IO-SAPIC-edge",

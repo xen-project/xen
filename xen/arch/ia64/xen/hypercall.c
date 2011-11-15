@@ -70,7 +70,8 @@ static long __do_pirq_guest_eoi(struct domain *d, int pirq)
 		evtchn_unmask(pirq_to_evtchn(d, pirq));
 		spin_unlock(&d->event_lock);
 	}
-	return pirq_guest_eoi(pirq);
+	pirq_guest_eoi(pirq_info(d, pirq));
+	return 0;
 }
 
 long do_pirq_guest_eoi(int pirq)

@@ -72,6 +72,7 @@ void sn_intr_free(nasid_t local_nasid, int local_widget,
 			(u64) sn_irq_info->irq_cookie, 0, 0);
 }
 
+#ifndef XEN
 static unsigned int sn_startup_irq(unsigned int irq)
 {
 	return 0;
@@ -88,9 +89,16 @@ static void sn_disable_irq(unsigned int irq)
 static void sn_enable_irq(unsigned int irq)
 {
 }
+#endif
 
+#ifdef XEN
+static void sn_ack_irq(struct irq_desc *desc)
+{
+	unsigned int irq = desc->irq;
+#else
 static void sn_ack_irq(unsigned int irq)
 {
+#endif
 	u64 event_occurred, mask;
 
 	irq = irq & 0xff;
@@ -102,8 +110,14 @@ static void sn_ack_irq(unsigned int irq)
 	move_native_irq(irq);
 }
 
+#ifdef XEN
+static void sn_end_irq(struct irq_desc *desc)
+{
+	unsigned int irq = desc->irq;
+#else
 static void sn_end_irq(unsigned int irq)
 {
+#endif
 	int ivec;
 	u64 event_occurred;
 
@@ -224,13 +238,17 @@ static void sn_set_affinity_irq(unsigned int irq, cpumask_t mask)
 static hw_irq_controller irq_type_sn = {
 #ifndef XEN
 	.name		= "SN hub",
-#else
-	.typename	= "SN hub",
-#endif
 	.startup	= sn_startup_irq,
 	.shutdown	= sn_shutdown_irq,
 	.enable		= sn_enable_irq,
 	.disable	= sn_disable_irq,
+#else
+	.typename	= "SN hub",
+	.startup	= irq_startup_none,
+	.shutdown	= irq_shutdown_none,
+	.enable		= irq_enable_none,
+	.disable	= irq_disable_none,
+#endif
 	.ack		= sn_ack_irq,
 	.end		= sn_end_irq,
 #ifndef XEN

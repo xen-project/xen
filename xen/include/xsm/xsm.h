@@ -109,6 +109,10 @@ struct xsm_operations {
     int (*add_range) (struct domain *d, char *name, unsigned long s, unsigned long e);
     int (*remove_range) (struct domain *d, char *name, unsigned long s, unsigned long e);
 
+    int (*test_assign_device) (uint32_t machine_bdf);
+    int (*assign_device) (struct domain *d, uint32_t machine_bdf);
+    int (*deassign_device) (struct domain *d, uint32_t machine_bdf);
+
     long (*__do_xsm_op) (XEN_GUEST_HANDLE(xsm_op_t) op);
 
 #ifdef CONFIG_X86
@@ -146,9 +150,6 @@ struct xsm_operations {
 			      struct page_info *page);
     int (*add_to_physmap) (struct domain *d1, struct domain *d2);
     int (*sendtrigger) (struct domain *d);
-    int (*test_assign_device) (uint32_t machine_bdf);
-    int (*assign_device) (struct domain *d, uint32_t machine_bdf);
-    int (*deassign_device) (struct domain *d, uint32_t machine_bdf);
     int (*bind_pt_irq) (struct domain *d, struct xen_domctl_bind_pt_irq *bind);
     int (*pin_mem_cacheattr) (struct domain *d);
     int (*ext_vcpucontext) (struct domain *d, uint32_t cmd);
@@ -428,6 +429,21 @@ static inline int xsm_remove_range (struct domain *d, char *name, unsigned long 
     return xsm_call(remove_range(d, name, s, e));
 }
 
+static inline int xsm_test_assign_device(uint32_t machine_bdf)
+{
+    return xsm_call(test_assign_device(machine_bdf));
+}
+
+static inline int xsm_assign_device(struct domain *d, uint32_t machine_bdf)
+{
+    return xsm_call(assign_device(d, machine_bdf));
+}
+
+static inline int xsm_deassign_device(struct domain *d, uint32_t machine_bdf)
+{
+    return xsm_call(deassign_device(d, machine_bdf));
+}
+
 static inline long __do_xsm_op (XEN_GUEST_HANDLE(xsm_op_t) op)
 {
 #ifdef XSM_ENABLE
@@ -610,21 +626,6 @@ static inline int xsm_add_to_physmap(struct domain *d1, struct domain *d2)
 static inline int xsm_sendtrigger(struct domain *d)
 {
     return xsm_call(sendtrigger(d));
-}
-
-static inline int xsm_test_assign_device(uint32_t machine_bdf)
-{
-    return xsm_call(test_assign_device(machine_bdf));
-}
-
-static inline int xsm_assign_device(struct domain *d, uint32_t machine_bdf)
-{
-    return xsm_call(assign_device(d, machine_bdf));
-}
-
-static inline int xsm_deassign_device(struct domain *d, uint32_t machine_bdf)
-{
-    return xsm_call(deassign_device(d, machine_bdf));
 }
 
 static inline int xsm_bind_pt_irq(struct domain *d, 

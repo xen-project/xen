@@ -83,54 +83,57 @@ pci_sal_write (unsigned int seg, unsigned int bus, unsigned int devfn,
 
 
 uint8_t pci_conf_read8(
-    unsigned int bus, unsigned int dev, unsigned int func, unsigned int reg)
+    unsigned int seg, unsigned int bus, unsigned int dev, unsigned int func,
+    unsigned int reg)
 {
     uint32_t value;
-    BUG_ON((bus > 255) || (dev > 31) || (func > 7) || (reg > 255));
-    pci_sal_read(0, bus, (dev<<3)|func, reg, 1, &value);
+    BUG_ON((seg > 65535) || (bus > 255) || (dev > 31) || (func > 7) || (reg > 255));
+    pci_sal_read(seg, bus, (dev<<3)|func, reg, 1, &value);
     return (uint8_t)value;
 }
 
 uint16_t pci_conf_read16(
-    unsigned int bus, unsigned int dev, unsigned int func, unsigned int reg)
+    unsigned int seg, unsigned int bus, unsigned int dev, unsigned int func,
+    unsigned int reg)
 {
     uint32_t value;
-    BUG_ON((bus > 255) || (dev > 31) || (func > 7) || (reg > 255));
-    pci_sal_read(0, bus, (dev<<3)|func, reg, 2, &value);
+    BUG_ON((seg > 65535) || (bus > 255) || (dev > 31) || (func > 7) || (reg > 255));
+    pci_sal_read(seg, bus, (dev<<3)|func, reg, 2, &value);
     return (uint16_t)value;
 }
 
 uint32_t pci_conf_read32(
-    unsigned int bus, unsigned int dev, unsigned int func, unsigned int reg)
+    unsigned int seg, unsigned int bus, unsigned int dev, unsigned int func,
+    unsigned int reg)
 {
     uint32_t value;
-    BUG_ON((bus > 255) || (dev > 31) || (func > 7) || (reg > 255));
-    pci_sal_read(0, bus, (dev<<3)|func, reg, 4, &value);
+    BUG_ON((seg > 65535) || (bus > 255) || (dev > 31) || (func > 7) || (reg > 255));
+    pci_sal_read(seg, bus, (dev<<3)|func, reg, 4, &value);
     return (uint32_t)value;
 }
 
 void pci_conf_write8(
-    unsigned int bus, unsigned int dev, unsigned int func, unsigned int reg,
-    uint8_t data)
+    unsigned int seg, unsigned int bus, unsigned int dev, unsigned int func,
+    unsigned int reg, uint8_t data)
 {
-    BUG_ON((bus > 255) || (dev > 31) || (func > 7) || (reg > 255));
-    pci_sal_write(0, bus, (dev<<3)|func, reg, 1, data);
+    BUG_ON((seg > 65535) || (bus > 255) || (dev > 31) || (func > 7) || (reg > 255));
+    pci_sal_write(seg, bus, (dev<<3)|func, reg, 1, data);
 }
 
 void pci_conf_write16(
-    unsigned int bus, unsigned int dev, unsigned int func, unsigned int reg,
-    uint16_t data)
+    unsigned int seg, unsigned int bus, unsigned int dev, unsigned int func,
+    unsigned int reg, uint16_t data)
 {
-    BUG_ON((bus > 255) || (dev > 31) || (func > 7) || (reg > 255));
-    pci_sal_write(0, bus, (dev<<3)|func, reg, 2, data);
+    BUG_ON((seg > 65535) || (bus > 255) || (dev > 31) || (func > 7) || (reg > 255));
+    pci_sal_write(seg, bus, (dev<<3)|func, reg, 2, data);
 }
 
 void pci_conf_write32(
-    unsigned int bus, unsigned int dev, unsigned int func, unsigned int reg,
-    uint32_t data)
+    unsigned int seg, unsigned int bus, unsigned int dev, unsigned int func,
+    unsigned int reg, uint32_t data)
 {
-    BUG_ON((bus > 255) || (dev > 31) || (func > 7) || (reg > 255));
-    pci_sal_write(0, bus, (dev<<3)|func, reg, 4, data);
+    BUG_ON((seg > 65535) || (bus > 255) || (dev > 31) || (func > 7) || (reg > 255));
+    pci_sal_write(seg, bus, (dev<<3)|func, reg, 4, data);
 }
 
 int pci_find_ext_capability(int seg, int bus, int devfn, int cap)

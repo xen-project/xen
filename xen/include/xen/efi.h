@@ -1,10 +1,12 @@
 #ifndef __XEN_EFI_H__
 #define __XEN_EFI_H__
 
+#ifndef __ASSEMBLY__
 #include <xen/types.h>
+#endif
 
 #if defined(__ia64__)
-# #include <linux/efi.h>
+# include_next <linux/efi.h>
 #else
 
 # if defined(__i386__)
@@ -27,6 +29,8 @@ extern struct efi efi;
 
 #endif
 
+#ifndef __ASSEMBLY__
+
 union xenpf_efi_info;
 union compat_pf_efi_info;
 
@@ -43,5 +47,7 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *);
 #endif
 int efi_compat_get_info(uint32_t idx, union compat_pf_efi_info *);
 int efi_compat_runtime_call(struct compat_pf_efi_runtime_call *);
+
+#endif /* !__ASSEMBLY__ */
 
 #endif /* __XEN_EFI_H__ */

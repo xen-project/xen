@@ -7,7 +7,6 @@ the instructions in the README there.
 efi_stub.S		-> linux/arch/ia64/kernel/efi_stub.S
 extable.c		-> linux/arch/ia64/mm/extable.c
 hpsim.S			-> linux/arch/ia64/hp/sim/hpsim.S
-irq_lsapic.c		-> linux/arch/ia64/kernel/irq_lsapic.c
 linuxextable.c		-> linux/kernel/extable.c
 machvec.c		-> linux/arch/ia64/kernel/machvec.c
 numa.c			-> linux/arch/ia64/mm/numa.c

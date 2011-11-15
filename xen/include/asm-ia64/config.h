@@ -211,10 +211,6 @@ void sort_main_extable(void);
 // see common/keyhandler.c
 #define	nop()	asm volatile ("nop 0")
 
-// from include/linux/preempt.h (needs including from interrupt.h or smp.h)
-#define preempt_enable()	do { } while (0)
-#define preempt_disable()	do { } while (0)
-
 // needed for include/xen/linuxtime.h
 typedef s64 time_t;
 typedef s64 suseconds_t;

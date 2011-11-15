@@ -22,7 +22,7 @@
 #ifndef __ASM_IA64_HVM_IRQ_H__
 #define __ASM_IA64_HVM_IRQ_H__
 
-#include <xen/irq.h>
+#include <asm/irq.h>
 
 #define VIOAPIC_NUM_PINS  48
 

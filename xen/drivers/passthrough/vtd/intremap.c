@@ -47,8 +47,8 @@
 })
 #define __ioapic_write_entry(apic, pin, raw, ent) ({ \
     ASSERT(raw); \
-    __io_apic_write(apic, 0x10 + 2 * (pin), ((u32 *)&_e_)[0]); \
-    __io_apic_write(apic, 0x11 + 2 * (pin), ((u32 *)&_e_)[1]); \
+    __io_apic_write(apic, 0x10 + 2 * (pin), ((u32 *)&(ent))[0]); \
+    __io_apic_write(apic, 0x11 + 2 * (pin), ((u32 *)&(ent))[1]); \
 })
 #else
 #include <asm/apic.h>
@@ -392,7 +392,7 @@ unsigned int io_apic_read_remap_rte(
         ( (index = apic_pin_2_ir_idx[apic][ioapic_pin]) < 0 ) )
         return __io_apic_read(apic, reg);
 
-    old_rte = __ioapic_read_entry(apic, ioapic_pin, TRUE);
+    old_rte = __ioapic_read_entry(apic, ioapic_pin, 1);
 
     if ( remap_entry_to_ioapic_rte(iommu, index, &old_rte) )
         return __io_apic_read(apic, reg);
@@ -420,7 +420,7 @@ void io_apic_write_remap_rte(
         return;
     }
 
-    old_rte = __ioapic_read_entry(apic, ioapic_pin, TRUE);
+    old_rte = __ioapic_read_entry(apic, ioapic_pin, 1);
 
     remap_rte = (struct IO_APIC_route_remap_entry *) &old_rte;
 
@@ -440,7 +440,7 @@ void io_apic_write_remap_rte(
             __io_apic_write(apic, reg & ~1, *(u32 *)&old_rte);
     }
     else
-        __ioapic_write_entry(apic, ioapic_pin, TRUE, old_rte);
+        __ioapic_write_entry(apic, ioapic_pin, 1, old_rte);
 }
 
 #if defined(__i386__) || defined(__x86_64__)
@@ -838,6 +838,8 @@ out:
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
 
+#ifndef __ia64__
+
 /*
  * This function is used to enable Interrupt remapping when
  * enable x2apic
@@ -912,3 +914,5 @@ void iommu_disable_x2apic_IR(void)
     for_each_drhd_unit ( drhd )
         disable_qinval(drhd->iommu);
 }
+
+#endif /* !__ia64__ */

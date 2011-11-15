@@ -27,6 +27,7 @@ struct irqaction {
 #define IRQ_GUEST         (1u<<4) /* IRQ is handled by guest OS(es) */
 #define IRQ_MOVE_PENDING  (1u<<5) /* IRQ is migrating to another CPUs */
 #define IRQ_PER_CPU       (1u<<6) /* IRQ is per CPU */
+#define IRQ_GUEST_EOI_PENDING (1u<<7) /* IRQ was disabled, pending a guest EOI */
 
 /* Special IRQ numbers. */
 #define AUTO_ASSIGN_IRQ         (-1)
@@ -46,7 +47,11 @@ struct hw_interrupt_type {
     void (*enable)(struct irq_desc *);
     void (*disable)(struct irq_desc *);
     void (*ack)(struct irq_desc *);
+#ifdef CONFIG_X86
     void (*end)(struct irq_desc *, u8 vector);
+#else
+    void (*end)(struct irq_desc *);
+#endif
     void (*set_affinity)(struct irq_desc *, const cpumask_t *);
 };
 

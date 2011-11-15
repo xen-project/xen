@@ -22,6 +22,7 @@
 
 #include <asm/tlb_track.h>
 #include <asm/p2m_entry.h>
+#include <xen/grant_table.h>
 #include <asm/vmx_mm_def.h>  /* for IA64_RR_SHIFT */
 #include <asm/vmx_vcpu.h>    /* for VRN7 */
 #include <asm/vcpu.h>        /* for PSCB() */

@@ -95,8 +95,11 @@ int __init init_irq_data(void)
 		struct irq_desc *desc = irq_to_desc(irq);
 
 		desc->irq = irq;
-		init_one_irq_desc(desc);
+		if (init_one_irq_desc(desc))
+			BUG();
 	}
+
+	return 0;
 }
 
 void __do_IRQ_guest(int irq);
@@ -105,14 +108,14 @@ void __do_IRQ_guest(int irq);
  * Special irq handlers.
  */
 
-static void ack_none(unsigned int irq)
+static void ack_none(struct irq_desc *desc)
 {
 /*
  * 'what should we do if we get a hw irq event on an illegal vector'.
  * each architecture has to answer this themselves, it doesn't deserve
  * a generic callback i think.
  */
-	printk(KERN_ERR "Unexpected irq vector 0x%x on CPU %u!\n", irq, smp_processor_id());
+	printk(KERN_ERR "Unexpected irq vector 0x%x on CPU %u!\n", desc->irq, smp_processor_id());
 }
 
 hw_irq_controller no_irq_type = {
@@ -147,11 +150,11 @@ fastcall unsigned int __do_IRQ(unsigned int irq, struct pt_regs *regs)
 		/*
 		 * No locking required for CPU-local interrupts:
 		 */
-		desc->handler->ack(irq);
+		desc->handler->ack(desc);
 		local_irq_enable();
 		desc->action->handler(irq, desc->action->dev_id, regs);
 		local_irq_disable();
-		desc->handler->end(irq);
+		desc->handler->end(desc);
 		return 1;
 	}
 
@@ -163,7 +166,7 @@ fastcall unsigned int __do_IRQ(unsigned int irq, struct pt_regs *regs)
 		return 1;
 	}
 
-	desc->handler->ack(irq);
+	desc->handler->ack(desc);
 	status = desc->status & ~IRQ_REPLAY;
 	status |= IRQ_PENDING; /* we _want_ to handle it */
 
@@ -215,7 +218,7 @@ out:
 	 * The ->end() handler has to deal with interrupts which got
 	 * disabled while the handler was running.
 	 */
-	desc->handler->end(irq);
+	desc->handler->end(desc);
 	spin_unlock(&desc->lock);
 
 	return 1;
@@ -248,10 +251,10 @@ int setup_vector(unsigned int vector, struct irqaction * new)
 
 	*p = new;
 
-	desc->depth = 0;
+	desc->arch.depth = 0;
 	desc->status &= ~(IRQ_DISABLED | IRQ_INPROGRESS | IRQ_GUEST);
-	desc->handler->startup(vector);
-	desc->handler->enable(vector);
+	desc->handler->startup(desc);
+	desc->handler->enable(desc);
 	desc->arch.vector = vector;
 	spin_unlock_irqrestore(&desc->lock,flags);
 
@@ -287,9 +290,9 @@ void __init release_irq_vector(unsigned int vec)
 	spin_lock_irqsave(&desc->lock, flags);
 	clear_bit(vec, ia64_xen_vector);
 	desc->action = NULL;
-	desc->depth = 1;
+	desc->arch.depth = 1;
 	desc->status |= IRQ_DISABLED;
-	desc->handler->shutdown(vec);
+	desc->handler->shutdown(desc);
 	desc->arch.vector = -1;
 	spin_unlock_irqrestore(&desc->lock, flags);
 
@@ -336,7 +339,7 @@ static void _irq_guest_eoi(irq_desc_t *desc)
         clear_pirq_eoi(action->guest[i], vector);
 
     desc->status &= ~(IRQ_INPROGRESS|IRQ_GUEST_EOI_PENDING);
-    desc->handler->enable(vector);
+    desc->handler->enable(desc);
 }
 
 static struct timer irq_guest_eoi_timer[NR_IRQS];
@@ -383,7 +386,7 @@ void __do_IRQ_guest(int irq)
 	if ( already_pending == action->nr_guests )
 	{
 		stop_timer(&irq_guest_eoi_timer[irq]);
-		desc->handler->disable(irq);
+		desc->handler->disable(desc);
         desc->status |= IRQ_GUEST_EOI_PENDING;
         for ( i = 0; i < already_pending; ++i )
         {
@@ -417,31 +420,28 @@ static int pirq_acktype(int irq)
     return ACKTYPE_NONE;
 }
 
-int pirq_guest_eoi(struct pirq *pirq)
+void pirq_guest_eoi(struct pirq *pirq)
 {
     irq_desc_t *desc;
     irq_guest_action_t *action;
 
-    desc = &irq_desc[irq];
+    desc = &irq_desc[pirq->pirq];
     spin_lock_irq(&desc->lock);
     action = (irq_guest_action_t *)desc->action;
 
     if ( action->ack_type == ACKTYPE_NONE )
     {
         ASSERT(!pirq->masked);
-        stop_timer(&irq_guest_eoi_timer[irq]);
+        stop_timer(&irq_guest_eoi_timer[pirq->pirq]);
         _irq_guest_eoi(desc);
     }
 
     if ( test_and_clear_bool(pirq->masked) && (--action->in_flight == 0) )
     {
         ASSERT(action->ack_type == ACKTYPE_UNMASK);
-        desc->handler->end(irq);
+        desc->handler->end(desc);
     }
     spin_unlock_irq(&desc->lock);
-
-    return 0;
-
 }
 
 int pirq_guest_unmask(struct domain *d)
@@ -505,12 +505,12 @@ int pirq_guest_bind(struct vcpu *v, struct pirq *pirq, int will_share)
         action->nr_guests = 0;
         action->in_flight = 0;
         action->shareable = will_share;
-        action->ack_type  = pirq_acktype(irq);
+        action->ack_type  = pirq_acktype(pirq->pirq);
         
-        desc->depth = 0;
+        desc->arch.depth = 0;
         desc->status |= IRQ_GUEST;
         desc->status &= ~IRQ_DISABLED;
-        desc->handler->startup(pirq->pirq);
+        desc->handler->startup(desc);
 
         /* Attempt to bind the interrupt target to the correct CPU. */
 #if 0 /* FIXME CONFIG_SMP ??? */
@@ -549,9 +549,9 @@ int pirq_guest_bind(struct vcpu *v, struct pirq *pirq, int will_share)
     return rc;
 }
 
-void pirq_guest_unbind(struct domain *d, int irq, struct pirq *pirq)
+void pirq_guest_unbind(struct domain *d, struct pirq *pirq)
 {
-    irq_desc_t         *desc = &irq_desc[irq];
+    irq_desc_t         *desc = &irq_desc[pirq->pirq];
     irq_guest_action_t *action;
     unsigned long       flags;
     int                 i;
@@ -569,17 +569,17 @@ void pirq_guest_unbind(struct domain *d, int irq, struct pirq *pirq)
     if ( action->ack_type == ACKTYPE_UNMASK )
         if ( test_and_clear_bool(pirq->masked) &&
              (--action->in_flight == 0) )
-            desc->handler->end(irq);
+            desc->handler->end(desc);
 
     if ( !action->nr_guests )
     {
         BUG_ON(action->in_flight != 0);
         desc->action = NULL;
         xfree(action);
-        desc->depth   = 1;
+        desc->arch.depth   = 1;
         desc->status |= IRQ_DISABLED;
         desc->status &= ~IRQ_GUEST;
-        desc->handler->shutdown(irq);
+        desc->handler->shutdown(desc);
     }
 
     spin_unlock_irqrestore(&desc->lock, flags);    
@@ -610,10 +610,24 @@ void pirq_set_affinity(struct domain *d, int irq, const cpumask_t *mask)
 	/* FIXME */
 }
 
+void (pirq_cleanup_check)(struct pirq *pirq, struct domain *d)
+{
+    /*
+     * Check whether all fields have their default values, and delete
+     * the entry from the tree if so.
+     *
+     * NB: Common parts were already checked.
+     */
+    if ( !pt_pirq_cleanup_check(&pirq->arch.dpci) )
+        return;
+
+    if ( radix_tree_delete(&d->pirq_tree, pirq->pirq) != pirq )
+        BUG();
+}
 /*
  * Exit an interrupt context. Process softirqs if needed and possible:
  */
 void irq_exit(void)
 {
-	sub_preempt_count(IRQ_EXIT_OFFSET);
+	preempt_count() -= IRQ_EXIT_OFFSET;/* sub_preempt_count(IRQ_EXIT_OFFSET); */
 }

@@ -317,12 +317,8 @@ struct arch_vcpu {
     cpumask_t cache_coherent_map;
 };
 
-struct arch_pirq {
-    struct hvm_pirq_dpci dpci;
-};
-
 #define pirq_dpci(pirq) ((pirq) ? &(pirq)->arch.dpci : NULL)
-#define dpci_pirq(dpci) container_of(dpci, struct pirq, arch.dpci)
+#define dpci_pirq(dp) container_of(dp, struct pirq, arch.dpci)
 
 #define alloc_pirq_struct(d) ({ \
     struct pirq *pirq = xmalloc(struct pirq); \

@@ -9,7 +9,6 @@ obj-y += efi_stub.o
 obj-y += extable.o
 obj-y += flush.o
 obj-y += hpsim.o
-obj-y += irq_lsapic.o
 obj-y += linuxextable.o
 obj-y += machvec.o
 obj-y += memcpy_mck.o

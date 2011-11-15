@@ -35,6 +35,17 @@ typedef struct {
 } raw_rwlock_t;
 #define _RAW_RW_LOCK_UNLOCKED /*(raw_rwlock_t)*/ { 0, 0 }
 
+#define _raw_read_lock(rw)								\
+do {											\
+	raw_rwlock_t *__read_lock_ptr = (rw);						\
+											\
+	while (unlikely(ia64_fetchadd(1, (int *) __read_lock_ptr, acq) < 0)) {		\
+		ia64_fetchadd(-1, (int *) __read_lock_ptr, rel);			\
+		while (*(volatile int *)__read_lock_ptr < 0)				\
+			cpu_relax();							\
+	}										\
+} while (0)
+
 #define _raw_read_unlock(rw)					\
 do {								\
 	raw_rwlock_t *__read_lock_ptr = (rw);			\
@@ -68,7 +79,14 @@ do {								\
 
 #endif /* !ASM_SUPPORTED */
 
-#define _raw_read_trylock(lock) generic_raw_read_trylock(lock)
+#define _raw_read_trylock(rw) ({					\
+	raw_rwlock_t *__read_lock_ptr = (rw);				\
+	int orig = ia64_fetchadd(1, (int *) __read_lock_ptr, acq);	\
+									\
+	if (unlikely(orig < 0))						\
+		ia64_fetchadd(-1, (int *) __read_lock_ptr, rel);	\
+	(orig >= 0);							\
+})
 
 #define _raw_write_unlock(x)								\
 ({											\

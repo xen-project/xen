@@ -36,6 +36,11 @@ do_domctl(
     XEN_GUEST_HANDLE(xen_domctl_t) u_domctl);
 
 extern long
+arch_do_domctl(
+    struct xen_domctl *domctl,
+    XEN_GUEST_HANDLE(xen_domctl_t) u_domctl);
+
+extern long
 do_sysctl(
     XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl);
 

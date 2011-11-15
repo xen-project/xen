@@ -39,7 +39,9 @@ struct pci_dev_info {
         u8 bus;
         u8 devfn;
     } physfn;
-   vmask_t used_vectors; 
+#ifdef CONFIG_X86
+    vmask_t used_vectors;
+#endif
 };
 
 struct pci_dev {

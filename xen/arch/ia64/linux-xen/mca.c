@@ -428,9 +428,9 @@ void disable_irq_nosync(unsigned int irq)
 		return;
 
 	spin_lock_irqsave(&desc->lock, flags);
-	if (!desc->depth++) {
+	if (!desc->arch.depth++) {
 		desc->status |= IRQ_DISABLED;
-		desc->handler->disable(irq);
+		desc->handler->disable(desc);
 	}
 	spin_unlock_irqrestore(&desc->lock, flags);
 }
@@ -456,7 +456,7 @@ void enable_irq(unsigned int irq)
 		return;
 
 	spin_lock_irqsave(&desc->lock, flags);
-	switch (desc->depth) {
+	switch (desc->arch.depth) {
 	case 0:
 		WARN_ON(1);
 		break;
@@ -468,11 +468,11 @@ void enable_irq(unsigned int irq)
 			desc->status = status | IRQ_REPLAY;
 			hw_resend_irq(desc->handler,irq);
 		}
-		desc->handler->enable(irq);
+		desc->handler->enable(desc);
 		/* fall-through */
 	}
 	default:
-		desc->depth--;
+		desc->arch.depth--;
 	}
 	spin_unlock_irqrestore(&desc->lock, flags);
 }
