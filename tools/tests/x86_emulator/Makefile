@@ -37,8 +37,10 @@ install:
 x86_emulate:
 	[ -L x86_emulate ] || ln -sf $(XEN_ROOT)/xen/arch/x86/x86_emulate .
 
+HOSTCFLAGS += $(CFLAGS_xeninclude)
+
 x86_emulate.o: x86_emulate.c x86_emulate
-	$(HOSTCC) $(HOSTCFLAGS) -I$(XEN_ROOT)/xen/include -c -o $@ $<
+	$(HOSTCC) $(HOSTCFLAGS) -c -o $@ $<
 
 test_x86_emulator.o: test_x86_emulator.c blowfish.h x86_emulate
-	$(HOSTCC) $(HOSTCFLAGS) -I$(XEN_ROOT)/xen/include -c -o $@ $<
+	$(HOSTCC) $(HOSTCFLAGS) -c -o $@ $<
