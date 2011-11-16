@@ -955,6 +955,47 @@ in_protmode(
     return !(in_realmode(ctxt, ops) || (ctxt->regs->eflags & EFLG_VM));
 }
 
+#define EAX 0
+#define ECX 1
+#define EDX 2
+#define EBX 3
+
+static bool_t vcpu_has(
+    unsigned int eax,
+    unsigned int reg,
+    unsigned int bit,
+    struct x86_emulate_ctxt *ctxt,
+    const struct x86_emulate_ops *ops)
+{
+    unsigned int ebx = 0, ecx = 0, edx = 0;
+    int rc = X86EMUL_OKAY;
+
+    fail_if(!ops->cpuid);
+    rc = ops->cpuid(&eax, &ebx, &ecx, &edx, ctxt);
+    if ( rc == X86EMUL_OKAY )
+    {
+        switch ( reg )
+        {
+        case EAX: reg = eax; break;
+        case EBX: reg = ebx; break;
+        case ECX: reg = ecx; break;
+        case EDX: reg = edx; break;
+        default: BUG();
+        }
+        if ( !(reg & (1U << bit)) )
+            rc = ~X86EMUL_OKAY;
+    }
+
+ done:
+    return rc == X86EMUL_OKAY;
+}
+
+#define vcpu_must_have(leaf, reg, bit) \
+    generate_exception_if(!vcpu_has(leaf, reg, bit, ctxt, ops), EXC_UD, -1)
+#define vcpu_must_have_sse2() vcpu_must_have(0x00000001, EDX, 26)
+#define vcpu_must_have_sse3() vcpu_must_have(0x00000001, ECX,  0)
+#define vcpu_must_have_cx16() vcpu_must_have(0x00000001, ECX, 13)
+
 static int
 in_longmode(
     struct x86_emulate_ctxt *ctxt,
@@ -2738,6 +2779,7 @@ x86_emulate(
                 emulate_fpu_insn_memsrc("fildl", src.val);
                 break;
             case 1: /* fisttp m32i */
+                vcpu_must_have_sse3();
                 ea.bytes = 4;
                 dst = ea;
                 dst.type = OP_MEM;
@@ -2846,6 +2888,7 @@ x86_emulate(
                 emulate_fpu_insn_memsrc("fldl", src.val);
                 break;
             case 1: /* fisttp m64i */
+                vcpu_must_have_sse3();
                 ea.bytes = 8;
                 dst = ea;
                 dst.type = OP_MEM;
@@ -2953,6 +2996,7 @@ x86_emulate(
                 emulate_fpu_insn_memsrc("filds", src.val);
                 break;
             case 1: /* fisttp m16i */
+                vcpu_must_have_sse3();
                 ea.bytes = 2;
                 dst = ea;
                 dst.type = OP_MEM;
@@ -4141,6 +4185,7 @@ x86_emulate(
 
     case 0xc3: /* movnti */
         /* Ignore the non-temporal hint for now. */
+        vcpu_must_have_sse2();
         generate_exception_if(dst.bytes <= 2, EXC_UD, -1);
         dst.val = src.val;
         break;
@@ -4151,6 +4196,8 @@ x86_emulate(
 
         generate_exception_if((modrm_reg & 7) != 1, EXC_UD, -1);
         generate_exception_if(ea.type != OP_MEM, EXC_UD, -1);
+        if ( op_bytes == 8 )
+            vcpu_must_have_cx16();
         op_bytes *= 2;
 
         /* Get actual old value. */
