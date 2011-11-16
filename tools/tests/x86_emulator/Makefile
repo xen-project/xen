@@ -7,6 +7,10 @@ TARGET := test_x86_emulator
 .PHONY: all
 all: $(TARGET)
 
+.PHONY: run
+run: $(TARGET)
+	./$(TARGET)
+
 .PHONY: blowfish.h
 blowfish.h:
 	rm -f blowfish.bin
