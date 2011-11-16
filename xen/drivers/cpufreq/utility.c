@@ -400,7 +400,7 @@ void cpufreq_enable_turbo(int cpuid)
     struct cpufreq_policy *policy;
 
     policy = per_cpu(cpufreq_cpu_policy, cpuid);
-    if (policy->turbo != CPUFREQ_TURBO_UNSUPPORTED)
+    if (policy && policy->turbo != CPUFREQ_TURBO_UNSUPPORTED)
         policy->turbo = CPUFREQ_TURBO_ENABLED;
 }
 
@@ -409,7 +409,7 @@ void cpufreq_disable_turbo(int cpuid)
     struct cpufreq_policy *policy;
 
     policy = per_cpu(cpufreq_cpu_policy, cpuid);
-    if (policy->turbo != CPUFREQ_TURBO_UNSUPPORTED)
+    if (policy && policy->turbo != CPUFREQ_TURBO_UNSUPPORTED)
         policy->turbo = CPUFREQ_TURBO_DISABLED;
 }
 
@@ -418,7 +418,7 @@ int cpufreq_get_turbo_status(int cpuid)
     struct cpufreq_policy *policy;
 
     policy = per_cpu(cpufreq_cpu_policy, cpuid);
-    return policy->turbo;
+    return policy && policy->turbo;
 }
 
 /*********************************************************************
