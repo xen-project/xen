@@ -30,7 +30,7 @@ asm (
 #else
     "shlq $32,%rdx; movl %eax,%edi; orq %rdx,%rdi; "
     "call blowfish_test; "
-    "movq %rax,%rdi; movl %eax,%eax; shrq $32,%rdx; "
+    "movq %rax,%rdx; movl %eax,%eax; shrq $32,%rdx; "
 #endif
     "ret"
     );
