@@ -52,6 +52,7 @@
 #define HVM_PARAM_IOREQ_PFN    5
 
 #define HVM_PARAM_BUFIOREQ_PFN 6
+#define HVM_PARAM_BUFIOREQ_EVTCHN 26
 
 #ifdef __ia64__
 
@@ -141,6 +142,6 @@
 /* Boolean: Enable nestedhvm (hvm only) */
 #define HVM_PARAM_NESTEDHVM    24
 
-#define HVM_NR_PARAMS          26
+#define HVM_NR_PARAMS          27
 
 #endif /* __XEN_PUBLIC_HVM_PARAMS_H__ */

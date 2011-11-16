@@ -985,6 +985,16 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
     /* Register ioreq event channel. */
     v->arch.hvm_vcpu.xen_port = rc;
+
+    if ( v->vcpu_id == 0 )
+    {
+        /* Create bufioreq event channel. */
+        rc = alloc_unbound_xen_event_channel(v, 0);
+        if ( rc < 0 )
+            goto fail2;
+        v->domain->arch.hvm_domain.params[HVM_PARAM_BUFIOREQ_EVTCHN] = rc;
+    }
+
     spin_lock(&v->domain->arch.hvm_domain.ioreq.lock);
     if ( v->domain->arch.hvm_domain.ioreq.va != NULL )
         get_ioreq(v)->vp_eport = v->arch.hvm_vcpu.xen_port;
@@ -3596,6 +3606,9 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                     for_each_vcpu(d, v)
                         if ( rc == 0 )
                             rc = nestedhvm_vcpu_initialise(v);
+                break;
+            case HVM_PARAM_BUFIOREQ_EVTCHN:
+                rc = -EINVAL;
                 break;
             }
 

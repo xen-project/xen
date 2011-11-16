@@ -118,6 +118,8 @@ int hvm_buffered_io_send(ioreq_t *p)
     wmb();
     pg->write_pointer += qw ? 2 : 1;
 
+    notify_via_xen_event_channel(v->domain,
+            v->domain->arch.hvm_domain.params[HVM_PARAM_BUFIOREQ_EVTCHN]);
     spin_unlock(&iorp->lock);
     
     return 1;
