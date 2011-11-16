@@ -538,7 +538,7 @@ do {                                                    \
  * Given byte has even parity (even number of 1s)? SDM Vol. 1 Sec. 3.4.3.1,
  * "Status Flags": EFLAGS.PF reflects parity of least-sig. byte of result only.
  */
-static int even_parity(uint8_t v)
+static bool_t even_parity(uint8_t v)
 {
     asm ( "test %b0,%b0; setp %b0" : "=a" (v) : "0" (v) );
     return v;
@@ -728,9 +728,9 @@ static int read_ulong(
  * IN:  Multiplicand=m[0], Multiplier=m[1]
  * OUT: Return CF/OF (overflow status); Result=m[1]:m[0]
  */
-static int mul_dbl(unsigned long m[2])
+static bool_t mul_dbl(unsigned long m[2])
 {
-    int rc;
+    bool_t rc;
     asm ( "mul %4; seto %b2"
           : "=a" (m[0]), "=d" (m[1]), "=q" (rc)
           : "0" (m[0]), "1" (m[1]), "2" (0) );
@@ -742,9 +742,9 @@ static int mul_dbl(unsigned long m[2])
  * IN:  Multiplicand=m[0], Multiplier=m[1]
  * OUT: Return CF/OF (overflow status); Result=m[1]:m[0]
  */
-static int imul_dbl(unsigned long m[2])
+static bool_t imul_dbl(unsigned long m[2])
 {
-    int rc;
+    bool_t rc;
     asm ( "imul %4; seto %b2"
           : "=a" (m[0]), "=d" (m[1]), "=q" (rc)
           : "0" (m[0]), "1" (m[1]), "2" (0) );
@@ -757,7 +757,7 @@ static int imul_dbl(unsigned long m[2])
  * OUT: Return 1: #DE
  *      Return 0: Quotient=u[0], Remainder=u[1]
  */
-static int div_dbl(unsigned long u[2], unsigned long v)
+static bool_t div_dbl(unsigned long u[2], unsigned long v)
 {
     if ( (v == 0) || (u[1] >= v) )
         return 1;
@@ -775,9 +775,9 @@ static int div_dbl(unsigned long u[2], unsigned long v)
  * NB. We don't use idiv directly as it's moderately hard to work out
  *     ahead of time whether it will #DE, which we cannot allow to happen.
  */
-static int idiv_dbl(unsigned long u[2], unsigned long v)
+static bool_t idiv_dbl(unsigned long u[2], unsigned long v)
 {
-    int negu = (long)u[1] < 0, negv = (long)v < 0;
+    bool_t negu = (long)u[1] < 0, negv = (long)v < 0;
 
     /* u = abs(u) */
     if ( negu )
@@ -809,7 +809,7 @@ static int idiv_dbl(unsigned long u[2], unsigned long v)
     return 0;
 }
 
-static int
+static bool_t
 test_cc(
     unsigned int condition, unsigned int flags)
 {
@@ -932,7 +932,7 @@ static int ioport_access_check(
     return ops->inject_hw_exception(EXC_GP, 0, ctxt) ? : X86EMUL_EXCEPTION;
 }
 
-static int
+static bool_t
 in_realmode(
     struct x86_emulate_ctxt *ctxt,
     const struct x86_emulate_ops  *ops)
@@ -947,7 +947,7 @@ in_realmode(
     return (!rc && !(cr0 & CR0_PE));
 }
 
-static int
+static bool_t
 in_protmode(
     struct x86_emulate_ctxt *ctxt,
     const struct x86_emulate_ops  *ops)
@@ -1178,7 +1178,7 @@ decode_register(
     case 14: p = &regs->r14; break;
     case 15: p = &regs->r15; break;
 #endif
-    default: p = NULL; break;
+    default: BUG(); p = NULL; break;
     }
 
     return p;
