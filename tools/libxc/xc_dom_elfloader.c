@@ -237,7 +237,7 @@ static int xc_dom_load_elf_symtab(struct xc_dom_image *dom,
 
         /* Name is NULL. */
         if ( elf_64bit(&syms) )
-            *(Elf64_Half*)(&shdr->e64.sh_name) = 0;
+            *(Elf64_Word*)(&shdr->e64.sh_name) = 0;
         else
             *(Elf32_Word*)(&shdr->e32.sh_name) = 0;
     }
