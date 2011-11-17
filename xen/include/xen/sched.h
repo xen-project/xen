@@ -554,6 +554,7 @@ void startup_cpu_idle_loop(void);
  */
 unsigned long hypercall_create_continuation(
     unsigned int op, const char *format, ...);
+void hypercall_cancel_continuation(void);
 
 #define hypercall_preempt_check() (unlikely(    \
         softirq_pending(smp_processor_id()) |   \
