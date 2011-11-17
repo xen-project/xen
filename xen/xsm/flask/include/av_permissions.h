@@ -63,6 +63,7 @@
 #define HVM__PCIROUTE                             0x00000040UL
 #define HVM__BIND_IRQ                             0x00000080UL
 #define HVM__CACHEATTR                            0x00000100UL
+#define HVM__TRACKDIRTYVRAM                       0x00000200UL
 
 #define EVENT__BIND                               0x00000001UL
 #define EVENT__SEND                               0x00000002UL

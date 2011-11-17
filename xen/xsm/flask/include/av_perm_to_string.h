@@ -56,6 +56,7 @@
    S_(SECCLASS_HVM, HVM__GETHVMC, "gethvmc")
    S_(SECCLASS_HVM, HVM__SETPARAM, "setparam")
    S_(SECCLASS_HVM, HVM__GETPARAM, "getparam")
+   S_(SECCLASS_HVM, HVM__TRACKDIRTYVRAM, "trackdirtyvram")
    S_(SECCLASS_HVM, HVM__PCILEVEL, "pcilevel")
    S_(SECCLASS_HVM, HVM__IRQLEVEL, "irqlevel")
    S_(SECCLASS_HVM, HVM__PCIROUTE, "pciroute")
