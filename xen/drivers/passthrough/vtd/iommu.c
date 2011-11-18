@@ -663,7 +663,8 @@ static void dma_pte_clear_one(struct domain *domain, u64 addr)
     spin_unlock(&hd->mapping_lock);
     iommu_flush_cache_entry(pte, sizeof(struct dma_pte));
 
-    __intel_iommu_iotlb_flush(domain, addr >> PAGE_SHIFT_4K , 0, 1);
+    if ( !this_cpu(iommu_dont_flush_iotlb) )
+        __intel_iommu_iotlb_flush(domain, addr >> PAGE_SHIFT_4K , 0, 1);
 
     unmap_vtd_domain_page(page);
 
@@ -1760,7 +1761,8 @@ static int intel_iommu_map_page(
     spin_unlock(&hd->mapping_lock);
     unmap_vtd_domain_page(page);
 
-    __intel_iommu_iotlb_flush(d, gfn, dma_pte_present(old), 1);
+    if ( !this_cpu(iommu_dont_flush_iotlb) )
+        __intel_iommu_iotlb_flush(d, gfn, dma_pte_present(old), 1);
 
     return 0;
 }

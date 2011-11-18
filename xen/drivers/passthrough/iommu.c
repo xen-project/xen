@@ -52,6 +52,8 @@ bool_t __read_mostly iommu_hap_pt_share = 1;
 bool_t __read_mostly iommu_debug;
 bool_t __read_mostly amd_iommu_perdev_intremap;
 
+DEFINE_PER_CPU(bool_t, iommu_dont_flush_iotlb);
+
 static void __init parse_iommu_param(char *s)
 {
     char *ss;
@@ -227,6 +229,7 @@ static int iommu_populate_page_table(struct domain *d)
 
     spin_lock(&d->page_alloc_lock);
 
+    this_cpu(iommu_dont_flush_iotlb) = 1;
     page_list_for_each ( page, &d->page_list )
     {
         if ( is_hvm_domain(d) ||
@@ -244,6 +247,8 @@ static int iommu_populate_page_table(struct domain *d)
             }
         }
     }
+    this_cpu(iommu_dont_flush_iotlb) = 0;
+    iommu_iotlb_flush_all(d);
     spin_unlock(&d->page_alloc_lock);
     return 0;
 }

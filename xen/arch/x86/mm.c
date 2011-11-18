@@ -4794,10 +4794,15 @@ static int xenmem_add_to_physmap_once(struct domain *d,
 static int xenmem_add_to_physmap(struct domain *d,
                                  struct xen_add_to_physmap *xatp)
 {
+    struct xen_add_to_physmap start_xatp;
     int rc = 0;
 
     if ( xatp->space == XENMAPSPACE_gmfn_range )
     {
+        if ( need_iommu(d) )
+            this_cpu(iommu_dont_flush_iotlb) = 1;
+
+        start_xatp = *xatp;
         while ( xatp->size > 0 )
         {
             rc = xenmem_add_to_physmap_once(d, xatp);
@@ -4814,6 +4819,13 @@ static int xenmem_add_to_physmap(struct domain *d,
                 rc = -EAGAIN;
                 break;
             }
+        }
+
+        if ( need_iommu(d) )
+        {
+            this_cpu(iommu_dont_flush_iotlb) = 0;
+            iommu_iotlb_flush(d, start_xatp.idx, start_xatp.size - xatp->size);
+            iommu_iotlb_flush(d, start_xatp.gpfn, start_xatp.size - xatp->size);
         }
 
         return rc;

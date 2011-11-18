@@ -164,4 +164,16 @@ int iommu_do_domctl(struct xen_domctl *, XEN_GUEST_HANDLE(xen_domctl_t));
 void iommu_iotlb_flush(struct domain *d, unsigned long gfn, unsigned int page_count);
 void iommu_iotlb_flush_all(struct domain *d);
 
+/*
+ * The purpose of the iommu_dont_flush_iotlb optional cpu flag is to
+ * avoid unecessary iotlb_flush in the low level IOMMU code.
+ *
+ * iommu_map_page/iommu_unmap_page must flush the iotlb but somethimes
+ * this operation can be really expensive. This flag will be set by the
+ * caller to notify the low level IOMMU code to avoid the iotlb flushes.
+ * iommu_iotlb_flush/iommu_iotlb_flush_all will be explicitly called by
+ * the caller.
+ */
+DECLARE_PER_CPU(bool_t, iommu_dont_flush_iotlb);
+
 #endif /* _IOMMU_H_ */
