@@ -50,6 +50,7 @@ void pci_setup(void)
         uint32_t devfn, bar_reg, bar_sz;
     } *bars = (struct bars *)scratch_start;
     unsigned int i, nr_bars = 0;
+    unsigned long pci_mem_reloc_pg;
 
     /* Program PCI-ISA bridge with appropriate link routes. */
     isa_irq = 0;
@@ -185,18 +186,25 @@ void pci_setup(void)
             ((pci_mem_start << 1) != 0) )
         pci_mem_start <<= 1;
 
-    while ( (pci_mem_start >> PAGE_SHIFT) < hvm_info->low_mem_pgend )
+    /* Relocate RAM that overlaps (in 64K chunks) */
+    pci_mem_reloc_pg = (pci_mem_start >> PAGE_SHIFT);
+    while (pci_mem_reloc_pg < hvm_info->low_mem_pgend)
     {
         struct xen_add_to_physmap xatp;
-        if ( hvm_info->high_mem_pgend == 0 )
-            hvm_info->high_mem_pgend = 1ull << (32 - PAGE_SHIFT);
+        unsigned int size = hvm_info->low_mem_pgend - pci_mem_reloc_pg;
         xatp.domid = DOMID_SELF;
-        xatp.space = XENMAPSPACE_gmfn;
-        xatp.idx   = --hvm_info->low_mem_pgend;
-        xatp.gpfn  = hvm_info->high_mem_pgend++;
+        xatp.space = XENMAPSPACE_gmfn_range;
+        xatp.idx = pci_mem_reloc_pg;
+        xatp.gpfn = hvm_info->high_mem_pgend;
+        size = size > ((1 << 16) - 1) ? ((1 << 16) - 1) : size;
+        xatp.size = size;
+
         if ( hypercall_memory_op(XENMEM_add_to_physmap, &xatp) != 0 )
             BUG();
+        pci_mem_reloc_pg += size;
+        hvm_info->high_mem_pgend += size;
     }
+    hvm_info->low_mem_pgend = pci_mem_start >> PAGE_SHIFT;
 
     mem_resource.base = pci_mem_start;
     mem_resource.max = pci_mem_end;
