@@ -309,10 +309,9 @@ int cpupool_unassign_cpu(struct cpupool *c, unsigned int cpu)
     if ( (c->n_dom > 0) && (cpumask_weight(c->cpu_valid) == 1) &&
          (cpu != cpupool_moving_cpu) )
     {
-        for_each_domain(d)
+        rcu_read_lock(&domlist_read_lock);
+        for_each_domain_in_cpupool(d, c)
         {
-            if ( d->cpupool != c )
-                continue;
             if ( !d->is_dying )
             {
                 ret = -EBUSY;
@@ -327,6 +326,7 @@ int cpupool_unassign_cpu(struct cpupool *c, unsigned int cpu)
             }
             cpupool0->n_dom++;
         }
+        rcu_read_unlock(&domlist_read_lock);
         if ( ret )
             goto out;
     }

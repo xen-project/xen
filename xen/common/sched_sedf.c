@@ -1304,6 +1304,8 @@ static void sedf_dump_cpu_state(const struct scheduler *ops, int i)
     rcu_read_lock(&domlist_read_lock);
     for_each_domain ( d )
     {
+        if ( (d->cpupool ? d->cpupool->sched : &sched_sedf_def) != ops )
+            continue;
         for_each_vcpu(d, ed)
         {
             if ( !__task_on_queue(ed) && (ed->processor == i) )
@@ -1335,10 +1337,8 @@ static int sedf_adjust_weights(struct cpupool *c, struct xen_domctl_scheduler_op
 
     /* Sum across all weights. */
     rcu_read_lock(&domlist_read_lock);
-    for_each_domain( d )
+    for_each_domain_in_cpupool( d, c )
     {
-        if ( c != d->cpupool )
-            continue;
         for_each_vcpu( d, p )
         {
             if ( (cpu = p->processor) >= nr_cpus )
@@ -1367,7 +1367,7 @@ static int sedf_adjust_weights(struct cpupool *c, struct xen_domctl_scheduler_op
 
     /* Adjust all slices (and periods) to the new weight. */
     rcu_read_lock(&domlist_read_lock);
-    for_each_domain( d )
+    for_each_domain_in_cpupool( d, c )
     {
         for_each_vcpu ( d, p )
         {

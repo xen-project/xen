@@ -538,11 +538,8 @@ int cpu_disable_scheduler(unsigned int cpu)
     if ( c == NULL )
         return ret;
 
-    for_each_domain ( d )
+    for_each_domain_in_cpupool ( d, c )
     {
-        if ( d->cpupool != c )
-            continue;
-
         affinity_broken = 0;
 
         for_each_vcpu ( d, v )

@@ -564,10 +564,30 @@ void hypercall_cancel_continuation(void);
 extern struct domain *domain_list;
 
 /* Caller must hold the domlist_read_lock or domlist_update_lock. */
+static inline struct domain *first_domain_in_cpupool( struct cpupool *c)
+{
+    struct domain *d;
+    for (d = rcu_dereference(domain_list); d && d->cpupool != c;
+         d = rcu_dereference(d->next_in_list));
+    return d;
+}
+static inline struct domain *next_domain_in_cpupool(
+    struct domain *d, struct cpupool *c)
+{
+    for (d = rcu_dereference(d->next_in_list); d && d->cpupool != c;
+         d = rcu_dereference(d->next_in_list));
+    return d;
+}
+
 #define for_each_domain(_d)                     \
  for ( (_d) = rcu_dereference(domain_list);     \
        (_d) != NULL;                            \
        (_d) = rcu_dereference((_d)->next_in_list )) \
+
+#define for_each_domain_in_cpupool(_d,_c)       \
+ for ( (_d) = first_domain_in_cpupool(_c);      \
+       (_d) != NULL;                            \
+       (_d) = next_domain_in_cpupool((_d), (_c)))
 
 #define for_each_vcpu(_d,_v)                    \
  for ( (_v) = (_d)->vcpu ? (_d)->vcpu[0] : NULL; \
