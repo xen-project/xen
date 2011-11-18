@@ -581,16 +581,53 @@ static void iommu_flush_all(void)
     }
 }
 
+static void __intel_iommu_iotlb_flush(struct domain *d, unsigned long gfn,
+        int dma_old_pte_present, unsigned int page_count)
+{
+    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    struct acpi_drhd_unit *drhd;
+    struct iommu *iommu;
+    int flush_dev_iotlb;
+    int iommu_domid;
+
+    /*
+     * No need pcideves_lock here because we have flush
+     * when assign/deassign device
+     */
+    for_each_drhd_unit ( drhd )
+    {
+        iommu = drhd->iommu;
+
+        if ( !test_bit(iommu->index, &hd->iommu_bitmap) )
+            continue;
+
+        flush_dev_iotlb = find_ats_dev_drhd(iommu) ? 1 : 0;
+        iommu_domid= domain_iommu_domid(d, iommu);
+        if ( iommu_domid == -1 )
+            continue;
+
+        if ( page_count > 1 || gfn == -1 )
+        {
+            if ( iommu_flush_iotlb_dsi(iommu, iommu_domid,
+                        0, flush_dev_iotlb) )
+                iommu_flush_write_buffer(iommu);
+        }
+        else
+        {
+            if ( iommu_flush_iotlb_psi(iommu, iommu_domid,
+                        (paddr_t)gfn << PAGE_SHIFT_4K, 0,
+                        !dma_old_pte_present, flush_dev_iotlb) )
+                iommu_flush_write_buffer(iommu);
+        }
+    }
+}
+
 /* clear one page's page table */
 static void dma_pte_clear_one(struct domain *domain, u64 addr)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(domain);
-    struct acpi_drhd_unit *drhd;
-    struct iommu *iommu;
     struct dma_pte *page = NULL, *pte = NULL;
     u64 pg_maddr;
-    int flush_dev_iotlb;
-    int iommu_domid;
     struct mapped_rmrr *mrmrr;
 
     spin_lock(&hd->mapping_lock);
@@ -616,21 +653,7 @@ static void dma_pte_clear_one(struct domain *domain, u64 addr)
     spin_unlock(&hd->mapping_lock);
     iommu_flush_cache_entry(pte, sizeof(struct dma_pte));
 
-    /* No need pcidevs_lock here since do that on assign/deassign device*/
-    for_each_drhd_unit ( drhd )
-    {
-        iommu = drhd->iommu;
-        if ( test_bit(iommu->index, &hd->iommu_bitmap) )
-        {
-            flush_dev_iotlb = find_ats_dev_drhd(iommu) ? 1 : 0;
-            iommu_domid= domain_iommu_domid(domain, iommu);
-            if ( iommu_domid == -1 )
-                continue;
-            if ( iommu_flush_iotlb_psi(iommu, iommu_domid, addr,
-                                       0, 0, flush_dev_iotlb) )
-                iommu_flush_write_buffer(iommu);
-        }
-    }
+    __intel_iommu_iotlb_flush(domain, addr >> PAGE_SHIFT_4K , 0, 1);
 
     unmap_vtd_domain_page(page);
 
@@ -1684,12 +1707,8 @@ static int intel_iommu_map_page(
     unsigned int flags)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
-    struct acpi_drhd_unit *drhd;
-    struct iommu *iommu;
     struct dma_pte *page = NULL, *pte = NULL, old, new = { 0 };
     u64 pg_maddr;
-    int flush_dev_iotlb;
-    int iommu_domid;
 
     /* Do nothing if VT-d shares EPT page table */
     if ( iommu_use_hap_pt(d) )
@@ -1731,26 +1750,7 @@ static int intel_iommu_map_page(
     spin_unlock(&hd->mapping_lock);
     unmap_vtd_domain_page(page);
 
-    /*
-     * No need pcideves_lock here because we have flush
-     * when assign/deassign device
-     */
-    for_each_drhd_unit ( drhd )
-    {
-        iommu = drhd->iommu;
-
-        if ( !test_bit(iommu->index, &hd->iommu_bitmap) )
-            continue;
-
-        flush_dev_iotlb = find_ats_dev_drhd(iommu) ? 1 : 0;
-        iommu_domid= domain_iommu_domid(d, iommu);
-        if ( iommu_domid == -1 )
-            continue;
-        if ( iommu_flush_iotlb_psi(iommu, iommu_domid,
-                                   (paddr_t)gfn << PAGE_SHIFT_4K, 0,
-                                   !dma_pte_present(old), flush_dev_iotlb) )
-            iommu_flush_write_buffer(iommu);
-    }
+    __intel_iommu_iotlb_flush(d, gfn, dma_pte_present(old), 1);
 
     return 0;
 }
