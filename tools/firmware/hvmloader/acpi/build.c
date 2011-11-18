@@ -17,6 +17,8 @@
  */
 
 #include "acpi2_0.h"
+#include "ssdt_s3.h"
+#include "ssdt_s4.h"
 #include "ssdt_tpm.h"
 #include "ssdt_pm.h"
 #include "../config.h"
@@ -233,6 +235,26 @@ static int construct_secondary_tables(unsigned long *table_ptrs,
         if (!ssdt) return -1;
         memcpy(ssdt, ssdt_pm, sizeof(ssdt_pm));
         table_ptrs[nr_tables++] = (unsigned long)ssdt;
+    }
+
+    if ( !strncmp(xenstore_read("platform/acpi_s3", "1"), "1", 1) )
+    {
+        ssdt = mem_alloc(sizeof(ssdt_s3), 16);
+        if (!ssdt) return -1;
+        memcpy(ssdt, ssdt_s3, sizeof(ssdt_s3));
+        table_ptrs[nr_tables++] = (unsigned long)ssdt;
+    } else {
+        printf("S3 disabled\n");
+    }
+
+    if ( !strncmp(xenstore_read("platform/acpi_s4", "1"), "1", 1) )
+    {
+        ssdt = mem_alloc(sizeof(ssdt_s4), 16);
+        if (!ssdt) return -1;
+        memcpy(ssdt, ssdt_s4, sizeof(ssdt_s4));
+        table_ptrs[nr_tables++] = (unsigned long)ssdt;
+    } else {
+        printf("S4 disabled\n");
     }
 
     /* TPM TCPA and SSDT. */

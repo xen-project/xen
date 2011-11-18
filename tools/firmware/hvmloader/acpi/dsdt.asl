@@ -27,24 +27,7 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
     Name (\APCL, 0x00010000)
     Name (\PUID, 0x00)
 
-    /*
-     * S3 (suspend-to-ram), S4 (suspend-to-disc) and S5 (power-off) type codes:
-     * must match piix4 emulation.
-     */
-    Name (\_S3, Package (0x04)
-    {
-        0x01,  /* PM1a_CNT.SLP_TYP */
-        0x01,  /* PM1b_CNT.SLP_TYP */
-        0x0,   /* reserved */
-        0x0    /* reserved */
-    })
-    Name (\_S4, Package (0x04)
-    {
-        0x00,  /* PM1a_CNT.SLP_TYP */
-        0x00,  /* PM1b_CNT.SLP_TYP */
-        0x00,  /* reserved */
-        0x00   /* reserved */
-    })
+    /* _S3 and _S4 are in separate SSDTs */
     Name (\_S5, Package (0x04)
     {
         0x00,  /* PM1a_CNT.SLP_TYP */

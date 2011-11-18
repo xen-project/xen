@@ -167,6 +167,8 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                        ("pae", bool),
                                        ("apic", bool),
                                        ("acpi", bool),
+                                       ("acpi_s3", bool),
+                                       ("acpi_s4", bool),
                                        ("nx", bool),
                                        ("viridian", bool),
                                        ("timeoffset", string),

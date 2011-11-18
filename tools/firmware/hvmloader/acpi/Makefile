@@ -26,7 +26,7 @@ CFLAGS += $(CFLAGS_xeninclude)
 vpath iasl $(PATH)
 all: acpi.a
 
-ssdt_pm.h ssdt_tpm.h: %.h: %.asl iasl
+ssdt_s3.h ssdt_s4.h ssdt_pm.h ssdt_tpm.h: %.h: %.asl iasl
 	iasl -vs -p $* -tc $<
 	sed -e 's/AmlCode/$*/g' $*.hex >$@
 	rm -f $*.hex $*.aml
@@ -57,7 +57,7 @@ iasl:
 	@echo 
 	@exit 1
 
-build.o: ssdt_pm.h ssdt_tpm.h
+build.o: ssdt_s3.h ssdt_s4.h ssdt_pm.h ssdt_tpm.h
 
 acpi.a: $(OBJS)
 	$(AR) rc $@ $(OBJS)

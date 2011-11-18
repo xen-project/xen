@@ -93,6 +93,8 @@ int libxl_init_build_info(libxl_ctx *ctx,
         b_info->u.hvm.pae = 1;
         b_info->u.hvm.apic = 1;
         b_info->u.hvm.acpi = 1;
+        b_info->u.hvm.acpi_s3 = 1;
+        b_info->u.hvm.acpi_s4 = 1;
         b_info->u.hvm.nx = 1;
         b_info->u.hvm.viridian = 0;
         b_info->u.hvm.hpet = 1;
@@ -189,9 +191,13 @@ int libxl__domain_build(libxl__gc *gc,
         vments[4] = "start_time";
         vments[5] = libxl__sprintf(gc, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
 
-        localents = libxl__calloc(gc, 3, sizeof(char *));
+        localents = libxl__calloc(gc, 7, sizeof(char *));
         localents[0] = "platform/acpi";
         localents[1] = (info->u.hvm.acpi) ? "1" : "0";
+        localents[2] = "platform/acpi_s3";
+        localents[3] = (info->u.hvm.acpi_s3) ? "1" : "0";
+        localents[4] = "platform/acpi_s4";
+        localents[5] = (info->u.hvm.acpi_s4) ? "1" : "0";
 
         break;
     case LIBXL_DOMAIN_TYPE_PV:

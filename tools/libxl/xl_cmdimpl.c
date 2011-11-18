@@ -683,6 +683,10 @@ static void parse_config_data(const char *configfile_filename_report,
             b_info->u.hvm.apic = l;
         if (!xlu_cfg_get_long (config, "acpi", &l))
             b_info->u.hvm.acpi = l;
+        if (!xlu_cfg_get_long (config, "acpi_s3", &l))
+            b_info->u.hvm.acpi_s3 = l;
+        if (!xlu_cfg_get_long (config, "acpi_s4", &l))
+            b_info->u.hvm.acpi_s4 = l;
         if (!xlu_cfg_get_long (config, "nx", &l))
             b_info->u.hvm.nx = l;
         if (!xlu_cfg_get_long (config, "viridian", &l))
