@@ -17,7 +17,6 @@
 #include <asm/xstate.h>
 #include <asm/asm_defns.h>
 
-#define MXCSR_DEFAULT 0x1f80
 static void fpu_init(void)
 {
     unsigned long val;
