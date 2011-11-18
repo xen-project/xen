@@ -268,6 +268,20 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             ret = pirq_guest_eoi(v->domain, eoi.irq);
         else
             ret = 0;
+        spin_lock(&v->domain->event_lock);
+        if ( is_hvm_domain(v->domain) &&
+                domain_pirq_to_emuirq(v->domain, eoi.irq) > 0 )
+        {
+            struct hvm_irq *hvm_irq = &v->domain->arch.hvm_domain.irq;
+            int gsi = domain_pirq_to_emuirq(v->domain, eoi.irq);
+
+            /* if this is a level irq and count > 0, send another
+             * notification */ 
+            if ( gsi >= NR_ISAIRQS /* ISA irqs are edge triggered */
+                    && hvm_irq->gsi_assert_count[gsi] )
+                send_guest_pirq(v->domain, eoi.irq);
+        }
+        spin_unlock(&v->domain->event_lock);
         break;
     }
 
@@ -323,9 +337,10 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             break;
         irq_status_query.flags = 0;
         if ( is_hvm_domain(v->domain) &&
-             domain_pirq_to_irq(v->domain, irq) <= 0 )
+                domain_pirq_to_irq(v->domain, irq) <= 0 &&
+                domain_pirq_to_emuirq(v->domain, irq) == IRQ_UNBOUND )
         {
-            ret = copy_to_guest(arg, &irq_status_query, 1) ? -EFAULT : 0;
+            ret = -EINVAL;
             break;
         }
 
