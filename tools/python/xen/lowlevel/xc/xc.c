@@ -996,7 +996,6 @@ static PyObject *pyxc_hvm_build(XcObject *self,
     if ( va_map == NULL )
         return PyErr_SetFromErrno(xc_error_obj);
     va_hvm = (struct hvm_info_table *)(va_map + HVM_INFO_OFFSET);
-    va_hvm->acpi_enabled = acpi;
     va_hvm->apic_mode    = apic;
     va_hvm->nr_vcpus     = vcpus;
     memcpy(va_hvm->vcpu_online, vcpu_avail, sizeof(vcpu_avail));

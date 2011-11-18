@@ -188,6 +188,11 @@ int libxl__domain_build(libxl__gc *gc,
         vments[3] = "hvm";
         vments[4] = "start_time";
         vments[5] = libxl__sprintf(gc, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
+
+        localents = libxl__calloc(gc, 3, sizeof(char *));
+        localents[0] = "platform/acpi";
+        localents[1] = (info->u.hvm.acpi) ? "1" : "0";
+
         break;
     case LIBXL_DOMAIN_TYPE_PV:
         ret = libxl__build_pv(gc, domid, info, state);

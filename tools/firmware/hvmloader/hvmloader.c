@@ -423,6 +423,7 @@ int main(void)
     const struct bios_config *bios;
     int option_rom_sz = 0, vgabios_sz = 0, etherboot_sz = 0;
     uint32_t etherboot_phys_addr = 0, option_rom_phys_addr = 0;
+    int acpi_enabled;
 
     /* Initialise hypercall stubs with RET, rendering them no-ops. */
     memset((void *)HYPERCALL_PHYSICAL_ADDRESS, 0xc3 /* RET */, PAGE_SIZE);
@@ -506,7 +507,9 @@ int main(void)
                                              option_rom_phys_addr);
     }
 
-    if ( hvm_info->acpi_enabled )
+    acpi_enabled = !strncmp(xenstore_read("platform/acpi", "1"), "1", 1);
+
+    if ( acpi_enabled )
     {
         struct xen_hvm_param p = {
             .domid = DOMID_SELF,

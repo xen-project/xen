@@ -37,9 +37,6 @@ struct hvm_info_table {
     uint32_t    length;
     uint8_t     checksum;
 
-    /* Should firmware build ACPI tables? */
-    uint8_t     acpi_enabled;
-
     /* Should firmware build APIC descriptors (APIC MADT / MP BIOS)? */
     uint8_t     apic_mode;
 

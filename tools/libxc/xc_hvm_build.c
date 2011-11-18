@@ -67,7 +67,6 @@ static void build_hvm_info(void *hvm_info_page, uint64_t mem_size)
     hvm_info->length = sizeof(struct hvm_info_table);
 
     /* Sensible defaults: these can be overridden by the caller. */
-    hvm_info->acpi_enabled = 1;
     hvm_info->apic_mode = 1;
     hvm_info->nr_vcpus = 1;
     memset(hvm_info->vcpu_online, 0xff, sizeof(hvm_info->vcpu_online));
