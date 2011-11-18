@@ -4677,10 +4677,119 @@ static int handle_iomem_range(unsigned long s, unsigned long e, void *p)
     return 0;
 }
 
-long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
+static int xenmem_add_to_physmap(struct domain *d,
+                                 const struct xen_add_to_physmap *xatp)
 {
     struct page_info *page = NULL;
     unsigned long gfn = 0; /* gcc ... */
+    unsigned long prev_mfn, mfn = 0, gpfn, idx;
+    int rc;
+
+    switch ( xatp->space )
+    {
+        case XENMAPSPACE_shared_info:
+            if ( xatp->idx == 0 )
+                mfn = virt_to_mfn(d->shared_info);
+            break;
+        case XENMAPSPACE_grant_table:
+            spin_lock(&d->grant_table->lock);
+
+            if ( d->grant_table->gt_version == 0 )
+                d->grant_table->gt_version = 1;
+
+            idx = xatp->idx;
+            if ( d->grant_table->gt_version == 2 &&
+                 (xatp->idx & XENMAPIDX_grant_table_status) )
+            {
+                idx &= ~XENMAPIDX_grant_table_status;
+                if ( xatp->idx < nr_status_frames(d->grant_table) )
+                    mfn = virt_to_mfn(d->grant_table->status[idx]);
+            }
+            else
+            {
+                if ( (idx >= nr_grant_frames(d->grant_table)) &&
+                     (idx < max_nr_grant_frames) )
+                    gnttab_grow_table(d, idx + 1);
+
+                if ( idx < nr_grant_frames(d->grant_table) )
+                    mfn = virt_to_mfn(d->grant_table->shared_raw[idx]);
+            }
+
+            spin_unlock(&d->grant_table->lock);
+            break;
+        case XENMAPSPACE_gmfn:
+        {
+            p2m_type_t p2mt;
+            gfn = xatp->idx;
+
+            idx = mfn_x(get_gfn_unshare(d, xatp->idx, &p2mt));
+            /* If the page is still shared, exit early */
+            if ( p2m_is_shared(p2mt) )
+            {
+                put_gfn(d, gfn);
+                rcu_unlock_domain(d);
+                return -ENOMEM;
+            }
+            if ( !get_page_from_pagenr(idx, d) )
+                break;
+            mfn = idx;
+            page = mfn_to_page(mfn);
+            break;
+        }
+        default:
+            break;
+    }
+
+    if ( !paging_mode_translate(d) || (mfn == 0) )
+    {
+        if ( page )
+            put_page(page);
+        if ( xatp->space == XENMAPSPACE_gmfn )
+            put_gfn(d, gfn);
+        rcu_unlock_domain(d);
+        return -EINVAL;
+    }
+
+    domain_lock(d);
+
+    if ( page )
+        put_page(page);
+
+    /* Remove previously mapped page if it was present. */
+    prev_mfn = get_gfn_untyped(d, xatp->gpfn);
+    if ( mfn_valid(prev_mfn) )
+    {
+        if ( is_xen_heap_mfn(prev_mfn) )
+            /* Xen heap frames are simply unhooked from this phys slot. */
+            guest_physmap_remove_page(d, xatp->gpfn, prev_mfn, PAGE_ORDER_4K);
+        else
+            /* Normal domain memory is freed, to avoid leaking memory. */
+            guest_remove_page(d, xatp->gpfn);
+    }
+    /* In the XENMAPSPACE_gmfn case we still hold a ref on the old page. */
+    put_gfn(d, xatp->gpfn);
+
+    /* Unmap from old location, if any. */
+    gpfn = get_gpfn_from_mfn(mfn);
+    ASSERT( gpfn != SHARED_M2P_ENTRY );
+    if ( gpfn != INVALID_M2P_ENTRY )
+        guest_physmap_remove_page(d, gpfn, mfn, PAGE_ORDER_4K);
+
+    /* Map at new location. */
+    rc = guest_physmap_add_page(d, xatp->gpfn, mfn, PAGE_ORDER_4K);
+
+    /* In the XENMAPSPACE_gmfn, we took a ref and locked the p2m at the top */
+    if ( xatp->space == XENMAPSPACE_gmfn )
+        put_gfn(d, gfn);
+    domain_unlock(d);
+
+    rcu_unlock_domain(d);
+
+    return rc;
+}
+
+long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
+{
     int rc;
 
     switch ( op )
@@ -4688,7 +4797,6 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
     case XENMEM_add_to_physmap:
     {
         struct xen_add_to_physmap xatp;
-        unsigned long prev_mfn, mfn = 0, gpfn;
         struct domain *d;
 
         if ( copy_from_guest(&xatp, arg, 1) )
@@ -4704,102 +4812,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
             return -EPERM;
         }
 
-        switch ( xatp.space )
-        {
-        case XENMAPSPACE_shared_info:
-            if ( xatp.idx == 0 )
-                mfn = virt_to_mfn(d->shared_info);
-            break;
-        case XENMAPSPACE_grant_table:
-            spin_lock(&d->grant_table->lock);
-
-            if ( d->grant_table->gt_version == 0 )
-                d->grant_table->gt_version = 1;
-
-            if ( d->grant_table->gt_version == 2 &&
-                 (xatp.idx & XENMAPIDX_grant_table_status) )
-            {
-                xatp.idx &= ~XENMAPIDX_grant_table_status;
-                if ( xatp.idx < nr_status_frames(d->grant_table) )
-                    mfn = virt_to_mfn(d->grant_table->status[xatp.idx]);
-            }
-            else
-            {
-                if ( (xatp.idx >= nr_grant_frames(d->grant_table)) &&
-                     (xatp.idx < max_nr_grant_frames) )
-                    gnttab_grow_table(d, xatp.idx + 1);
-
-                if ( xatp.idx < nr_grant_frames(d->grant_table) )
-                    mfn = virt_to_mfn(d->grant_table->shared_raw[xatp.idx]);
-            }
-
-            spin_unlock(&d->grant_table->lock);
-            break;
-        case XENMAPSPACE_gmfn:
-        {
-            p2m_type_t p2mt;
-            gfn = xatp.idx;
-
-            xatp.idx = mfn_x(get_gfn_unshare(d, xatp.idx, &p2mt));
-            /* If the page is still shared, exit early */
-            if ( p2m_is_shared(p2mt) )
-            {
-                put_gfn(d, gfn);
-                rcu_unlock_domain(d);
-                return -ENOMEM;
-            }
-            if ( !get_page_from_pagenr(xatp.idx, d) )
-                break;
-            mfn = xatp.idx;
-            page = mfn_to_page(mfn);
-            break;
-        }
-        default:
-            break;
-        }
-
-        if ( !paging_mode_translate(d) || (mfn == 0) )
-        {
-            if ( page )
-                put_page(page);
-            if ( xatp.space == XENMAPSPACE_gmfn )
-                put_gfn(d, gfn);
-            rcu_unlock_domain(d);
-            return -EINVAL;
-        }
-
-        domain_lock(d);
-
-        if ( page )
-            put_page(page);
-
-        /* Remove previously mapped page if it was present. */
-        prev_mfn = get_gfn_untyped(d, xatp.gpfn);
-        if ( mfn_valid(prev_mfn) )
-        {
-            if ( is_xen_heap_mfn(prev_mfn) )
-                /* Xen heap frames are simply unhooked from this phys slot. */
-                guest_physmap_remove_page(d, xatp.gpfn, prev_mfn, PAGE_ORDER_4K);
-            else
-                /* Normal domain memory is freed, to avoid leaking memory. */
-                guest_remove_page(d, xatp.gpfn);
-        }
-        /* In the XENMAPSPACE_gmfn case we still hold a ref on the old page. */
-        put_gfn(d, xatp.gpfn);
-
-        /* Unmap from old location, if any. */
-        gpfn = get_gpfn_from_mfn(mfn);
-        ASSERT( gpfn != SHARED_M2P_ENTRY );
-        if ( gpfn != INVALID_M2P_ENTRY )
-            guest_physmap_remove_page(d, gpfn, mfn, PAGE_ORDER_4K);
-
-        /* Map at new location. */
-        rc = guest_physmap_add_page(d, xatp.gpfn, mfn, PAGE_ORDER_4K);
-
-        /* In the XENMAPSPACE_gmfn, we took a ref and locked the p2m at the top */
-        if ( xatp.space == XENMAPSPACE_gmfn )
-            put_gfn(d, gfn);
-        domain_unlock(d);
+        rc = xenmem_add_to_physmap(d, &xatp);
 
         rcu_unlock_domain(d);
 
