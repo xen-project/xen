@@ -395,6 +395,11 @@ static vmask_t *irq_get_used_vector_mask(int irq)
             }
         }
     }
+    else if ( IO_APIC_IRQ(irq) &&
+              opt_irq_vector_map != OPT_IRQ_VECTOR_MAP_NONE )
+    {
+        ret = io_apic_get_used_vector_map(irq);
+    }
 
     return ret;
 }

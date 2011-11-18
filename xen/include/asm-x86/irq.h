@@ -116,6 +116,7 @@ int i8259A_resume(void);
 void setup_IO_APIC(void);
 void disable_IO_APIC(void);
 void setup_ioapic_dest(void);
+vmask_t *io_apic_get_used_vector_map(unsigned int irq);
 
 extern unsigned int io_apic_irqs;
 

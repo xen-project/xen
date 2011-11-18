@@ -69,6 +69,34 @@ int __read_mostly nr_ioapics;
 
 #define ioapic_has_eoi_reg(apic) (mp_ioapics[(apic)].mpc_apicver >= 0x20)
 
+static int apic_pin_2_gsi_irq(int apic, int pin);
+
+static vmask_t *__read_mostly vector_map[MAX_IO_APICS];
+
+static void share_vector_maps(unsigned int src, unsigned int dst)
+{
+    unsigned int pin;
+
+    if (vector_map[src] == vector_map[dst])
+        return;
+
+    bitmap_or(vector_map[src]->_bits, vector_map[src]->_bits,
+              vector_map[dst]->_bits, NR_VECTORS);
+
+    for (pin = 0; pin < nr_ioapic_entries[dst]; ++pin) {
+        int irq = apic_pin_2_gsi_irq(dst, pin);
+        struct irq_desc *desc;
+
+        if (irq < 0)
+            continue;
+        desc = irq_to_desc(irq);
+        if (desc->arch.used_vectors == vector_map[dst])
+            desc->arch.used_vectors = vector_map[src];
+    }
+
+    vector_map[dst] = vector_map[src];
+}
+
 /*
  * This is performance-critical, we want to do it O(1)
  *
@@ -109,6 +137,7 @@ static void add_pin_to_irq(unsigned int irq, int apic, int pin)
     }
     entry->apic = apic;
     entry->pin = pin;
+    share_vector_maps(irq_2_pin[irq].apic, apic);
 }
 
 /*
@@ -124,11 +153,22 @@ static void __init replace_pin_at_irq(unsigned int irq,
         if (entry->apic == oldapic && entry->pin == oldpin) {
             entry->apic = newapic;
             entry->pin = newpin;
+            share_vector_maps(oldapic, newapic);
         }
         if (!entry->next)
             break;
         entry = irq_2_pin + entry->next;
     }
+}
+
+vmask_t *io_apic_get_used_vector_map(unsigned int irq)
+{
+    struct irq_pin_list *entry = irq_2_pin + irq;
+
+    if (entry->pin == -1)
+        return NULL;
+
+    return vector_map[entry->apic];
 }
 
 struct IO_APIC_route_entry **alloc_ioapic_entries(void)
@@ -1189,6 +1229,18 @@ static void __init enable_IO_APIC(void)
         irq_2_pin[i].pin = -1;
     for (i = irq_2_pin_free_entry = nr_irqs_gsi; i < PIN_MAP_SIZE; i++)
         irq_2_pin[i].next = i + 1;
+
+    if (directed_eoi_enabled) {
+        for (apic = 0; apic < nr_ioapics; apic++) {
+            vector_map[apic] = xzalloc(vmask_t);
+            BUG_ON(!vector_map[apic]);
+        }
+    } else {
+        vector_map[0] = xzalloc(vmask_t);
+        BUG_ON(!vector_map[0]);
+        for (apic = 1; apic < nr_ioapics; apic++)
+            vector_map[apic] = vector_map[0];
+    }
 
     for(apic = 0; apic < nr_ioapics; apic++) {
         int pin;
@@ -2287,13 +2339,12 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
     }
 
     if ( desc->arch.vector <= 0 || desc->arch.vector > LAST_DYNAMIC_VECTOR ) {
+        add_pin_to_irq(irq, apic, pin);
         vector = assign_irq_vector(irq);
         if ( vector < 0 )
             return vector;
 
         printk(XENLOG_INFO "allocated vector %02x for irq %d\n", vector, irq);
-
-        add_pin_to_irq(irq, apic, pin);
     }
     spin_lock(&dom0->event_lock);
     ret = map_domain_pirq(dom0, pirq, irq,
