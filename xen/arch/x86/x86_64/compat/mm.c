@@ -64,6 +64,21 @@ int compat_arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         XLAT_add_to_physmap(nat, &cmp);
         rc = arch_memory_op(op, guest_handle_from_ptr(nat, void));
 
+        if ( cmp.space == XENMAPSPACE_gmfn_range )
+        {
+            if ( rc )
+            {
+                XLAT_add_to_physmap(&cmp, nat);
+                if ( copy_to_guest(arg, &cmp, 1) )
+                {
+                    hypercall_cancel_continuation();
+                    return -EFAULT;
+                }
+            }
+            if ( rc == __HYPERVISOR_memory_op )
+                hypercall_xlat_continuation(NULL, 0x2, nat, arg);
+        }
+
         break;
     }
 

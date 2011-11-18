@@ -4677,8 +4677,8 @@ static int handle_iomem_range(unsigned long s, unsigned long e, void *p)
     return 0;
 }
 
-static int xenmem_add_to_physmap(struct domain *d,
-                                 const struct xen_add_to_physmap *xatp)
+static int xenmem_add_to_physmap_once(struct domain *d,
+                                      const struct xen_add_to_physmap *xatp)
 {
     struct page_info *page = NULL;
     unsigned long gfn = 0; /* gcc ... */
@@ -4717,6 +4717,7 @@ static int xenmem_add_to_physmap(struct domain *d,
 
             spin_unlock(&d->grant_table->lock);
             break;
+        case XENMAPSPACE_gmfn_range:
         case XENMAPSPACE_gmfn:
         {
             p2m_type_t p2mt;
@@ -4744,7 +4745,8 @@ static int xenmem_add_to_physmap(struct domain *d,
     {
         if ( page )
             put_page(page);
-        if ( xatp->space == XENMAPSPACE_gmfn )
+        if ( xatp->space == XENMAPSPACE_gmfn ||
+             xatp->space == XENMAPSPACE_gmfn_range )
             put_gfn(d, gfn);
         rcu_unlock_domain(d);
         return -EINVAL;
@@ -4779,13 +4781,45 @@ static int xenmem_add_to_physmap(struct domain *d,
     rc = guest_physmap_add_page(d, xatp->gpfn, mfn, PAGE_ORDER_4K);
 
     /* In the XENMAPSPACE_gmfn, we took a ref and locked the p2m at the top */
-    if ( xatp->space == XENMAPSPACE_gmfn )
+    if ( xatp->space == XENMAPSPACE_gmfn ||
+         xatp->space == XENMAPSPACE_gmfn_range )
         put_gfn(d, gfn);
     domain_unlock(d);
 
     rcu_unlock_domain(d);
 
     return rc;
+}
+
+static int xenmem_add_to_physmap(struct domain *d,
+                                 struct xen_add_to_physmap *xatp)
+{
+    int rc = 0;
+
+    if ( xatp->space == XENMAPSPACE_gmfn_range )
+    {
+        while ( xatp->size > 0 )
+        {
+            rc = xenmem_add_to_physmap_once(d, xatp);
+            if ( rc < 0 )
+                return rc;
+
+            xatp->idx++;
+            xatp->gpfn++;
+            xatp->size--;
+
+            /* Check for continuation if it's not the last interation */
+            if ( xatp->size > 0 && hypercall_preempt_check() )
+            {
+                rc = -EAGAIN;
+                break;
+            }
+        }
+
+        return rc;
+    }
+
+    return xenmem_add_to_physmap_once(d, xatp);
 }
 
 long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
@@ -4815,6 +4849,19 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         rc = xenmem_add_to_physmap(d, &xatp);
 
         rcu_unlock_domain(d);
+
+        if ( xatp.space == XENMAPSPACE_gmfn_range )
+        {
+            if ( rc )
+            {
+                if ( copy_to_guest(arg, &xatp, 1) )
+                    return -EFAULT;
+            }
+
+            if ( rc == -EAGAIN )
+                rc = hypercall_create_continuation(
+                        __HYPERVISOR_memory_op, "ih", op, arg);
+        }
 
         return rc;
     }
