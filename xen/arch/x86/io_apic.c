@@ -69,10 +69,6 @@ int __read_mostly nr_ioapics;
 
 #define ioapic_has_eoi_reg(apic) (mp_ioapics[(apic)].mpc_apicver >= 0x20)
 
-#define io_apic_eoi_vector(apic, vector) io_apic_eoi((apic), (vector), -1)
-#define io_apic_eoi_pin(apic, pin) io_apic_eoi((apic), -1, (pin))
-
-
 /*
  * This is performance-critical, we want to do it O(1)
  *
@@ -213,21 +209,18 @@ static void ioapic_write_entry(
     spin_unlock_irqrestore(&ioapic_lock, flags);
 }
 
-/* EOI an IO-APIC entry.  One of vector or pin may be -1, indicating that
- * it should be worked out using the other.  This function expect that the
- * ioapic_lock is taken, and interrupts are disabled (or there is a good reason
- * not to), and that if both pin and vector are passed, that they refer to the
+/* EOI an IO-APIC entry.  Vector may be -1, indicating that it should be
+ * worked out using the pin.  This function expects that the ioapic_lock is
+ * being held, and interrupts are disabled (or there is a good reason not
+ * to), and that if both pin and vector are passed, that they refer to the
  * same redirection entry in the IO-APIC. */
 static void __io_apic_eoi(unsigned int apic, unsigned int vector, unsigned int pin)
 {
-    /* Ensure some useful information is passed in */
-    BUG_ON( (vector == -1 && pin == -1) );
-    
     /* Prefer the use of the EOI register if available */
     if ( ioapic_has_eoi_reg(apic) )
     {
         /* If vector is unknown, read it from the IO-APIC */
-        if ( vector == -1 )
+        if ( vector == IRQ_VECTOR_UNASSIGNED )
             vector = __ioapic_read_entry(apic, pin, TRUE).vector;
 
         *(IO_APIC_BASE(apic)+16) = vector;
@@ -238,42 +231,6 @@ static void __io_apic_eoi(unsigned int apic, unsigned int vector, unsigned int p
          * and back */
         struct IO_APIC_route_entry entry;
         bool_t need_to_unmask = 0;
-
-        /* If pin is unknown, search for it */
-        if ( pin == -1 )
-        {
-            unsigned int p;
-            for ( p = 0; p < nr_ioapic_entries[apic]; ++p )
-            {
-                entry = __ioapic_read_entry(apic, p, TRUE);
-                if ( entry.vector == vector )
-                {
-                    pin = p;
-                    /* break; */
-
-                    /* Here should be a break out of the loop, but at the 
-                     * Xen code doesn't actually prevent multiple IO-APIC
-                     * entries being assigned the same vector, so EOI all
-                     * pins which have the correct vector.
-                     *
-                     * Remove the following code when the above assertion
-                     * is fulfilled. */
-                    __io_apic_eoi(apic, vector, p);
-                }
-            }
-            
-            /* If search fails, nothing to do */
-
-            /* if ( pin == -1 ) */
-
-            /* Because the loop wasn't broken out of (see comment above),
-             * all relevant pins have been EOI, so we can always return.
-             * 
-             * Re-instate the if statement above when the Xen logic has been
-             * fixed.*/
-
-            return;
-        }
 
         entry = __ioapic_read_entry(apic, pin, TRUE);
 
@@ -299,17 +256,6 @@ static void __io_apic_eoi(unsigned int apic, unsigned int vector, unsigned int p
             __ioapic_write_entry(apic, pin, TRUE, entry);
         }
     }
-}
-
-/* EOI an IO-APIC entry.  One of vector or pin may be -1, indicating that
- * it should be worked out using the other.  This function disables interrupts
- * and takes the ioapic_lock */
-static void io_apic_eoi(unsigned int apic, unsigned int vector, unsigned int pin)
-{
-    unsigned int flags;
-    spin_lock_irqsave(&ioapic_lock, flags);
-    __io_apic_eoi(apic, vector, pin);
-    spin_unlock_irqrestore(&ioapic_lock, flags);
 }
 
 /*
@@ -1693,11 +1639,7 @@ static void end_level_ioapic_irq(struct irq_desc *desc, u8 vector)
 
     /* Manually EOI the old vector if we are moving to the new */
     if ( vector && i != vector )
-    {
-        int ioapic;
-        for (ioapic = 0; ioapic < nr_ioapics; ioapic++)
-            io_apic_eoi_vector(ioapic, i);
-    }
+        eoi_IO_APIC_irq(desc);
 
     v = apic_read(APIC_TMR + ((i & ~0x1f) >> 1));
 
