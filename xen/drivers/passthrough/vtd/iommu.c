@@ -622,6 +622,16 @@ static void __intel_iommu_iotlb_flush(struct domain *d, unsigned long gfn,
     }
 }
 
+static void intel_iommu_iotlb_flush(struct domain *d, unsigned long gfn, unsigned int page_count)
+{
+    __intel_iommu_iotlb_flush(d, gfn, 1, page_count);
+}
+
+static void intel_iommu_iotlb_flush_all(struct domain *d)
+{
+    __intel_iommu_iotlb_flush(d, 0, 0, 0);
+}
+
 /* clear one page's page table */
 static void dma_pte_clear_one(struct domain *domain, u64 addr)
 {
@@ -2343,6 +2353,8 @@ const struct iommu_ops intel_iommu_ops = {
     .resume = vtd_resume,
     .share_p2m = iommu_set_pgd,
     .crash_shutdown = vtd_crash_shutdown,
+    .iotlb_flush = intel_iommu_iotlb_flush,
+    .iotlb_flush_all = intel_iommu_iotlb_flush_all,
 };
 
 /*

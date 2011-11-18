@@ -143,6 +143,8 @@ struct iommu_ops {
     void (*resume)(void);
     void (*share_p2m)(struct domain *d);
     void (*crash_shutdown)(void);
+    void (*iotlb_flush)(struct domain *d, unsigned long gfn, unsigned int page_count);
+    void (*iotlb_flush_all)(struct domain *d);
 };
 
 void iommu_update_ire_from_apic(unsigned int apic, unsigned int reg, unsigned int value);
@@ -158,5 +160,8 @@ void iommu_set_dom0_mapping(struct domain *d);
 void iommu_share_p2m_table(struct domain *d);
 
 int iommu_do_domctl(struct xen_domctl *, XEN_GUEST_HANDLE(xen_domctl_t));
+
+void iommu_iotlb_flush(struct domain *d, unsigned long gfn, unsigned int page_count);
+void iommu_iotlb_flush_all(struct domain *d);
 
 #endif /* _IOMMU_H_ */

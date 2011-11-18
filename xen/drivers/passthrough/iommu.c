@@ -301,6 +301,26 @@ int iommu_unmap_page(struct domain *d, unsigned long gfn)
     return hd->platform_ops->unmap_page(d, gfn);
 }
 
+void iommu_iotlb_flush(struct domain *d, unsigned long gfn, unsigned int page_count)
+{
+    struct hvm_iommu *hd = domain_hvm_iommu(d);
+
+    if ( !iommu_enabled || !hd->platform_ops || !hd->platform_ops->iotlb_flush )
+        return;
+
+    hd->platform_ops->iotlb_flush(d, gfn, page_count);
+}
+
+void iommu_iotlb_flush_all(struct domain *d)
+{
+    struct hvm_iommu *hd = domain_hvm_iommu(d);
+
+    if ( !iommu_enabled || !hd->platform_ops || !hd->platform_ops->iotlb_flush_all )
+        return;
+
+    hd->platform_ops->iotlb_flush_all(d);
+}
+
 /* caller should hold the pcidevs_lock */
 int deassign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
 {
