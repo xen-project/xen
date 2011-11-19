@@ -4677,8 +4677,9 @@ static int handle_iomem_range(unsigned long s, unsigned long e, void *p)
     return 0;
 }
 
-static int xenmem_add_to_physmap_once(struct domain *d,
-                                      const struct xen_add_to_physmap *xatp)
+static int xenmem_add_to_physmap_once(
+    struct domain *d,
+    const struct xen_add_to_physmap *xatp)
 {
     struct page_info *page = NULL;
     unsigned long gfn = 0; /* gcc ... */
@@ -4728,7 +4729,6 @@ static int xenmem_add_to_physmap_once(struct domain *d,
             if ( p2m_is_shared(p2mt) )
             {
                 put_gfn(d, gfn);
-                rcu_unlock_domain(d);
                 return -ENOMEM;
             }
             if ( !get_page_from_pagenr(idx, d) )
@@ -4748,7 +4748,6 @@ static int xenmem_add_to_physmap_once(struct domain *d,
         if ( xatp->space == XENMAPSPACE_gmfn ||
              xatp->space == XENMAPSPACE_gmfn_range )
             put_gfn(d, gfn);
-        rcu_unlock_domain(d);
         return -EINVAL;
     }
 
@@ -4785,8 +4784,6 @@ static int xenmem_add_to_physmap_once(struct domain *d,
          xatp->space == XENMAPSPACE_gmfn_range )
         put_gfn(d, gfn);
     domain_unlock(d);
-
-    rcu_unlock_domain(d);
 
     return rc;
 }
@@ -4864,11 +4861,8 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
         if ( xatp.space == XENMAPSPACE_gmfn_range )
         {
-            if ( rc )
-            {
-                if ( copy_to_guest(arg, &xatp, 1) )
-                    return -EFAULT;
-            }
+            if ( rc && copy_to_guest(arg, &xatp, 1) )
+                rc = -EFAULT;
 
             if ( rc == -EAGAIN )
                 rc = hypercall_create_continuation(
