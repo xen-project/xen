@@ -467,6 +467,9 @@ static int xenpaging_evict_page(xenpaging_t *paging,
     /* Notify policy of page being paged out */
     policy_notify_paged_out(victim->gfn);
 
+    /* Record number of evicted pages */
+    paging->num_paged_out++;
+
  out:
     return ret;
 }
@@ -480,7 +483,12 @@ static int xenpaging_resume_page(xenpaging_t *paging, mem_event_response_t *rsp,
 
     /* Notify policy of page being paged in */
     if ( notify_policy )
+    {
         policy_notify_paged_in(rsp->gfn);
+
+       /* Record number of resumed pages */
+       paging->num_paged_out--;
+    }
 
     /* Tell Xen page is ready */
     ret = xc_mem_paging_resume(paging->xc_handle, paging->mem_event.domain_id,
