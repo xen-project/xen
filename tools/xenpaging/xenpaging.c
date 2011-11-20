@@ -795,7 +795,7 @@ int main(int argc, char *argv[])
     xc_interface *xch;
 
     int open_flags = O_CREAT | O_TRUNC | O_RDWR;
-    mode_t open_mode = S_IRUSR | S_IRGRP | S_IROTH | S_IWUSR | S_IWGRP | S_IWOTH;
+    mode_t open_mode = S_IRUSR | S_IWUSR;
     int fd;
 
     /* Initialise domain paging */
