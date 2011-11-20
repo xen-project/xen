@@ -41,16 +41,16 @@ int policy_init(xenpaging_t *paging)
     int i;
     int rc = -ENOMEM;
 
+    max_pages = paging->max_pages;
+
     /* Allocate bitmap for pages not to page out */
-    bitmap = bitmap_alloc(paging->domain_info->max_pages);
+    bitmap = bitmap_alloc(max_pages);
     if ( !bitmap )
         goto out;
     /* Allocate bitmap to track unusable pages */
-    unconsumed = bitmap_alloc(paging->domain_info->max_pages);
+    unconsumed = bitmap_alloc(max_pages);
     if ( !unconsumed )
         goto out;
-
-    max_pages = paging->domain_info->max_pages;
 
     /* Initialise MRU list of paged in pages */
     if ( paging->policy_mru_size > 0 )

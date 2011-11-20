@@ -44,11 +44,11 @@ typedef struct xenpaging {
     xc_interface *xc_handle;
     struct xs_handle *xs_handle;
 
-    xc_domaininfo_t    *domain_info;
-
     unsigned long *bitmap;
 
     mem_event_t mem_event;
+    /* number of pages for which data structures were allocated */
+    int max_pages;
     int num_pages;
     int policy_mru_size;
     unsigned long pagein_queue[XENPAGING_PAGEIN_QUEUE_SIZE];

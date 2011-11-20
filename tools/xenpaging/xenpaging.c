@@ -164,6 +164,7 @@ static void *init_page(void)
 static xenpaging_t *xenpaging_init(domid_t domain_id, int num_pages)
 {
     xenpaging_t *paging;
+    xc_domaininfo_t domain_info;
     xc_interface *xch;
     xentoollog_logger *dbg = NULL;
     char *p;
@@ -275,34 +276,29 @@ static xenpaging_t *xenpaging_init(domid_t domain_id, int num_pages)
 
     paging->mem_event.port = rc;
 
-    /* Get domaininfo */
-    paging->domain_info = malloc(sizeof(xc_domaininfo_t));
-    if ( paging->domain_info == NULL )
-    {
-        PERROR("Error allocating memory for domain info");
-        goto err;
-    }
-
     rc = xc_domain_getinfolist(xch, paging->mem_event.domain_id, 1,
-                               paging->domain_info);
+                               &domain_info);
     if ( rc != 1 )
     {
         PERROR("Error getting domain info");
         goto err;
     }
 
+    /* Record number of max_pages */
+    paging->max_pages = domain_info.max_pages;
+
     /* Allocate bitmap for tracking pages that have been paged out */
-    paging->bitmap = bitmap_alloc(paging->domain_info->max_pages);
+    paging->bitmap = bitmap_alloc(paging->max_pages);
     if ( !paging->bitmap )
     {
         PERROR("Error allocating bitmap");
         goto err;
     }
-    DPRINTF("max_pages = %"PRIx64"\n", paging->domain_info->max_pages);
+    DPRINTF("max_pages = %d\n", paging->max_pages);
 
-    if ( num_pages < 0 || num_pages > paging->domain_info->max_pages )
+    if ( num_pages < 0 || num_pages > paging->max_pages )
     {
-        num_pages = paging->domain_info->max_pages;
+        num_pages = paging->max_pages;
         DPRINTF("setting num_pages to %d\n", num_pages);
     }
     paging->num_pages = num_pages;
@@ -337,7 +333,6 @@ static xenpaging_t *xenpaging_init(domid_t domain_id, int num_pages)
         }
 
         free(paging->bitmap);
-        free(paging->domain_info);
         free(paging);
     }
 
@@ -765,7 +760,7 @@ int main(int argc, char *argv[])
         if ( interrupted == SIGTERM || interrupted == SIGINT )
         {
             int num = 0;
-            for ( i = 0; i < paging->domain_info->max_pages; i++ )
+            for ( i = 0; i < paging->max_pages; i++ )
             {
                 if ( test_bit(i, paging->bitmap) )
                 {
@@ -781,7 +776,7 @@ int main(int argc, char *argv[])
              */
             if ( num )
                 page_in_trigger();
-            else if ( i == paging->domain_info->max_pages )
+            else if ( i == paging->max_pages )
                 break;
         }
         else
