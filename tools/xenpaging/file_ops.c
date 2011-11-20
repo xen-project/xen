@@ -21,55 +21,44 @@
 
 
 #include <unistd.h>
-#include <stdarg.h>
 #include <xc_private.h>
 
-
-#define page_offset(_pfn)     (((off_t)(_pfn)) << PAGE_SHIFT)
-
-
 static int file_op(int fd, void *page, int i,
-                   ssize_t (*fn)(int, const void *, size_t))
+                   ssize_t (*fn)(int, void *, size_t))
 {
     off_t seek_ret;
-    int total;
+    int total = 0;
     int bytes;
-    int ret;
 
     seek_ret = lseek(fd, i << PAGE_SHIFT, SEEK_SET);
+    if ( seek_ret == (off_t)-1 )
+        return -1;
 
-    total = 0;
     while ( total < PAGE_SIZE )
     {
         bytes = fn(fd, page + total, PAGE_SIZE - total);
         if ( bytes <= 0 )
-        {
-            ret = -errno;
-            goto err;
-        }
+            return -1;
 
         total += bytes;
     }
 
     return 0;
-
- err:
-    return ret;
 }
 
-static ssize_t my_read(int fd, const void *buf, size_t count)
+static ssize_t my_write(int fd, void *buf, size_t count)
 {
-    return read(fd, (void *)buf, count);
+    return write(fd, buf, count);
 }
 
 int read_page(int fd, void *page, int i)
 {
-    return file_op(fd, page, i, &my_read);
+    return file_op(fd, page, i, &read);
 }
 
 int write_page(int fd, void *page, int i)
 {
-    return file_op(fd, page, i, &write);
+    return file_op(fd, page, i, &my_write);
 }
 
 
