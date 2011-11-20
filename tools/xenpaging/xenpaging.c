@@ -744,7 +744,6 @@ int main(int argc, char *argv[])
                         !!(req.flags & MEM_EVENT_FLAG_EVICT_FAIL) );
 
                 /* Tell Xen to resume the vcpu */
-                /* XXX: Maybe just check if the vcpu was paused? */
                 if ( req.flags & MEM_EVENT_FLAG_VCPU_PAUSED )
                 {
                     /* Prepare the response */
