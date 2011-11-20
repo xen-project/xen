@@ -50,7 +50,7 @@ typedef struct xenpaging {
     /* number of pages for which data structures were allocated */
     int max_pages;
     int num_paged_out;
-    int num_pages;
+    int target_tot_pages;
     int policy_mru_size;
     unsigned long pagein_queue[XENPAGING_PAGEIN_QUEUE_SIZE];
 } xenpaging_t;

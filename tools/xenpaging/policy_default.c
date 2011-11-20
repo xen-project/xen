@@ -71,7 +71,6 @@ int policy_init(xenpaging_t *paging)
 
     /* Start in the middle to avoid paging during BIOS startup */
     current_gfn = max_pages / 2;
-    current_gfn -= paging->num_pages / 2;
 
     rc = 0;
  out:

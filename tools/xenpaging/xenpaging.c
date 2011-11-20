@@ -136,6 +136,21 @@ err:
     return rc;
 }
 
+static int xenpaging_get_tot_pages(xenpaging_t *paging)
+{
+    xc_interface *xch = paging->xc_handle;
+    xc_domaininfo_t domain_info;
+    int rc;
+
+    rc = xc_domain_getinfolist(xch, paging->mem_event.domain_id, 1, &domain_info);
+    if ( rc != 1 )
+    {
+        PERROR("Error getting domain info");
+        return -1;
+    }
+    return domain_info.tot_pages;
+}
+
 static void *init_page(void)
 {
     void *buffer;
@@ -161,7 +176,7 @@ static void *init_page(void)
     return NULL;
 }
 
-static xenpaging_t *xenpaging_init(domid_t domain_id, int num_pages)
+static xenpaging_t *xenpaging_init(domid_t domain_id, int target_tot_pages)
 {
     xenpaging_t *paging;
     xc_domaininfo_t domain_info;
@@ -296,12 +311,7 @@ static xenpaging_t *xenpaging_init(domid_t domain_id, int num_pages)
     }
     DPRINTF("max_pages = %d\n", paging->max_pages);
 
-    if ( num_pages < 0 || num_pages > paging->max_pages )
-    {
-        num_pages = paging->max_pages;
-        DPRINTF("setting num_pages to %d\n", num_pages);
-    }
-    paging->num_pages = num_pages;
+    paging->target_tot_pages = target_tot_pages;
 
     /* Initialise policy */
     rc = policy_init(paging);
@@ -648,7 +658,9 @@ int main(int argc, char *argv[])
     xenpaging_victim_t *victims;
     mem_event_request_t req;
     mem_event_response_t rsp;
+    int num, prev_num = 0;
     int i;
+    int tot_pages;
     int rc = -1;
     int rc1;
     xc_interface *xch;
@@ -659,7 +671,7 @@ int main(int argc, char *argv[])
 
     if ( argc != 3 )
     {
-        fprintf(stderr, "Usage: %s <domain_id> <num_pages>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <domain_id> <tot_pages>\n", argv[0]);
         return -1;
     }
 
@@ -672,7 +684,7 @@ int main(int argc, char *argv[])
     }
     xch = paging->xc_handle;
 
-    DPRINTF("starting %s %u %d\n", argv[0], paging->mem_event.domain_id, paging->num_pages);
+    DPRINTF("starting %s %u %d\n", argv[0], paging->mem_event.domain_id, paging->target_tot_pages);
 
     /* Open file */
     sprintf(filename, "page_cache_%u", paging->mem_event.domain_id);
@@ -703,9 +715,6 @@ int main(int argc, char *argv[])
 
     /* listen for page-in events to stop pager */
     create_page_in_thread(paging);
-
-    i = evict_pages(paging, fd, victims, paging->num_pages);
-    DPRINTF("%d pages evicted. Done.\n", i);
 
     /* Swap pages in and out */
     while ( 1 )
@@ -771,12 +780,8 @@ int main(int argc, char *argv[])
                     goto out;
                 }
 
-                /* Evict a new page to replace the one we just paged in,
-                 * or clear this pagefile slot on exit */
-                if ( interrupted )
-                    victims[i].gfn = INVALID_MFN;
-                else
-                    evict_victim(paging, &victims[i], fd, i);
+                /* Clear this pagefile slot */
+                victims[i].gfn = INVALID_MFN;
             }
             else
             {
@@ -822,6 +827,43 @@ int main(int argc, char *argv[])
         /* Exit main loop on any other signal */
         if ( interrupted )
             break;
+
+        /* Check if the target has been reached already */
+        tot_pages = xenpaging_get_tot_pages(paging);
+        if ( tot_pages < 0 )
+            goto out;
+
+        /* Resume all pages if paging is disabled or no target was set */
+        if ( paging->target_tot_pages == 0 )
+        {
+            if ( paging->num_paged_out )
+                resume_pages(paging, paging->num_paged_out);
+        }
+        /* Evict more pages if target not reached */
+        else if ( tot_pages > paging->target_tot_pages )
+        {
+            num = tot_pages - paging->target_tot_pages;
+            if ( num != prev_num )
+            {
+                DPRINTF("Need to evict %d pages to reach %d target_tot_pages\n", num, paging->target_tot_pages);
+                prev_num = num;
+            }
+            /* Limit the number of evicts to be able to process page-in requests */
+            if ( num > 42 )
+                num = 42;
+            evict_pages(paging, fd, victims, num);
+        }
+        /* Resume some pages if target not reached */
+        else if ( tot_pages < paging->target_tot_pages && paging->num_paged_out )
+        {
+            num = paging->target_tot_pages - tot_pages;
+            if ( num != prev_num )
+            {
+                DPRINTF("Need to resume %d pages to reach %d target_tot_pages\n", num, paging->target_tot_pages);
+                prev_num = num;
+            }
+            resume_pages(paging, num);
+        }
 
     }
     DPRINTF("xenpaging got signal %d\n", interrupted);
