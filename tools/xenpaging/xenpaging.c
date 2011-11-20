@@ -108,6 +108,7 @@ static int xenpaging_wait_for_event_or_timeout(xenpaging_t *paging)
         vec = xs_read_watch(paging->xs_handle, &num);
         if ( vec )
         {
+            DPRINTF("path '%s' token '%s'\n", vec[XS_WATCH_PATH], vec[XS_WATCH_TOKEN]);
             if ( strcmp(vec[XS_WATCH_TOKEN], watch_token) == 0 )
             {
                 /* If our guest disappeared, set interrupt flag and fall through */
