@@ -1,5 +1,4 @@
 /******************************************************************************
- * tools/xenpaging/xenpaging.c
  *
  * Domain paging. 
  * Copyright (c) 2009 by Citrix Systems, Inc. (Patrick Colp)

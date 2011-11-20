@@ -1,5 +1,4 @@
 /******************************************************************************
- * tools/xenpaging/policy.c
  *
  * Xen domain paging default policy.
  *
