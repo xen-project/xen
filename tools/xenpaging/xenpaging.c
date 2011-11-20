@@ -805,7 +805,7 @@ int main(int argc, char *argv[])
             }
         }
 
-        /* Write all pages back into the guest */
+        /* If interrupted, write all pages back into the guest */
         if ( interrupted == SIGTERM || interrupted == SIGINT )
         {
             /* If no more pages to process, exit loop. */
@@ -814,13 +814,15 @@ int main(int argc, char *argv[])
             
             /* One more round if there are still pages to process. */
             resume_pages(paging, paging->num_paged_out);
+
+            /* Resume main loop */
+            continue;
         }
-        else
-        {
-            /* Exit on any other signal */
-            if ( interrupted )
-                break;
-        }
+
+        /* Exit main loop on any other signal */
+        if ( interrupted )
+            break;
+
     }
     DPRINTF("xenpaging got signal %d\n", interrupted);
 
