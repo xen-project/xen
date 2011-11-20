@@ -4,6 +4,7 @@
 /* bitmap operations for single threaded access */
 
 #include <stdlib.h>
+#include <string.h>
 
 #define BITS_PER_LONG (sizeof(unsigned long) * 8)
 #define ORDER_LONG (sizeof(unsigned long) == 4 ? 5 : 6)
@@ -23,6 +24,11 @@ static inline int bitmap_size(int nr_bits)
 static inline unsigned long *bitmap_alloc(int nr_bits)
 {
     return calloc(1, bitmap_size(nr_bits));
+}
+
+static inline void bitmap_clear(unsigned long *addr, int nr_bits)
+{
+    memset(addr, 0, bitmap_size(nr_bits));
 }
 
 static inline int test_bit(int nr, volatile unsigned long *addr)
