@@ -52,6 +52,7 @@ typedef struct xenpaging {
     int num_paged_out;
     int target_tot_pages;
     int policy_mru_size;
+    int debug;
     unsigned long pagein_queue[XENPAGING_PAGEIN_QUEUE_SIZE];
 } xenpaging_t;
 

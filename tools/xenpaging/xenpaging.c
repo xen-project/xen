@@ -31,6 +31,7 @@
 #include <poll.h>
 #include <xc_private.h>
 #include <xs.h>
+#include <getopt.h>
 
 #include "xc_bitops.h"
 #include "file_ops.h"
@@ -42,12 +43,12 @@
 static char *watch_target_tot_pages;
 static char *dom_path;
 static char watch_token[16];
-static char filename[80];
+static char *filename;
 static int interrupted;
 
 static void unlink_pagefile(void)
 {
-    if ( filename[0] )
+    if ( filename && filename[0] )
     {
         unlink(filename);
         filename[0] = '\0';
@@ -201,11 +202,85 @@ static void *init_page(void)
     return NULL;
 }
 
-static xenpaging_t *xenpaging_init(domid_t domain_id, int target_tot_pages)
+static void usage(void)
+{
+    printf("usage:\n\n");
+
+    printf("  xenpaging [options] -f <pagefile> -d <domain_id>\n\n");
+
+    printf("options:\n");
+    printf(" -d <domid>     --domain=<domid>         numerical domain_id of guest. This option is required.\n");
+    printf(" -f <file>      --pagefile=<file>        pagefile to use. This option is required.\n");
+    printf(" -m <max_memkb> --max_memkb=<max_memkb>  maximum amount of memory to handle.\n");
+    printf(" -r <num>       --mru_size=<num>         number of paged-in pages to keep in memory.\n");
+    printf(" -v             --verbose                enable debug output.\n");
+    printf(" -h             --help                   this output.\n");
+}
+
+static int xenpaging_getopts(xenpaging_t *paging, int argc, char *argv[])
+{
+    int ch;
+    static const char sopts[] = "hvd:f:m:r:";
+    static const struct option lopts[] = {
+        {"help", 0, NULL, 'h'},
+        {"verbose", 0, NULL, 'v'},
+        {"domain", 1, NULL, 'd'},
+        {"pagefile", 1, NULL, 'f'},
+        {"mru_size", 1, NULL, 'm'},
+        { }
+    };
+
+    while ((ch = getopt_long(argc, argv, sopts, lopts, NULL)) != -1)
+    {
+        switch(ch) {
+        case 'd':
+            paging->mem_event.domain_id = atoi(optarg);
+            break;
+        case 'f':
+            filename = strdup(optarg);
+            break;
+        case 'm':
+            /* KiB to pages */
+            paging->max_pages = atoi(optarg) >> 2;
+            break;
+        case 'r':
+            paging->policy_mru_size = atoi(optarg);
+            break;
+        case 'v':
+            paging->debug = 1;
+            break;
+        case 'h':
+        case '?':
+            usage();
+            return 1;
+        }
+    }
+
+    argv += optind; argc -= optind;
+    
+    /* Path to pagefile is required */
+    if ( !filename )
+    {
+        printf("Filename for pagefile missing!\n");
+        usage();
+        return 1;
+    }
+
+    /* Set domain id */
+    if ( !paging->mem_event.domain_id )
+    {
+        printf("Numerical <domain_id> missing!\n");
+        return 1;
+    }
+
+    return 0;
+}
+
+static xenpaging_t *xenpaging_init(int argc, char *argv[])
 {
     xenpaging_t *paging;
     xc_domaininfo_t domain_info;
-    xc_interface *xch;
+    xc_interface *xch = NULL;
     xentoollog_logger *dbg = NULL;
     char *p;
     int rc;
@@ -215,7 +290,12 @@ static xenpaging_t *xenpaging_init(domid_t domain_id, int target_tot_pages)
     if ( !paging )
         goto err;
 
-    if ( getenv("XENPAGING_DEBUG") )
+    /* Get cmdline options and domain_id */
+    if ( xenpaging_getopts(paging, argc, argv) )
+        goto err;
+
+    /* Enable debug output */
+    if ( paging->debug )
         dbg = (xentoollog_logger *)xtl_createlogger_stdiostream(stderr, XTL_DEBUG, 0);
 
     /* Open connection to xen */
@@ -234,7 +314,7 @@ static xenpaging_t *xenpaging_init(domid_t domain_id, int target_tot_pages)
     }
 
     /* write domain ID to watch so we can ignore other domain shutdowns */
-    snprintf(watch_token, sizeof(watch_token), "%u", domain_id);
+    snprintf(watch_token, sizeof(watch_token), "%u", paging->mem_event.domain_id);
     if ( xs_watch(paging->xs_handle, "@releaseDomain", watch_token) == false )
     {
         PERROR("Could not bind to shutdown watch\n");
@@ -242,7 +322,7 @@ static xenpaging_t *xenpaging_init(domid_t domain_id, int target_tot_pages)
     }
 
     /* Watch xenpagings working target */
-    dom_path = xs_get_domain_path(paging->xs_handle, domain_id);
+    dom_path = xs_get_domain_path(paging->xs_handle, paging->mem_event.domain_id);
     if ( !dom_path )
     {
         PERROR("Could not find domain path\n");
@@ -259,16 +339,6 @@ static xenpaging_t *xenpaging_init(domid_t domain_id, int target_tot_pages)
         PERROR("Could not bind to xenpaging watch\n");
         goto err;
     }
-
-    p = getenv("XENPAGING_POLICY_MRU_SIZE");
-    if ( p && *p )
-    {
-         paging->policy_mru_size = atoi(p);
-         DPRINTF("Setting policy mru_size to %d\n", paging->policy_mru_size);
-    }
-
-    /* Set domain id */
-    paging->mem_event.domain_id = domain_id;
 
     /* Initialise shared page */
     paging->mem_event.shared_page = init_page();
@@ -335,16 +405,20 @@ static xenpaging_t *xenpaging_init(domid_t domain_id, int target_tot_pages)
 
     paging->mem_event.port = rc;
 
-    rc = xc_domain_getinfolist(xch, paging->mem_event.domain_id, 1,
-                               &domain_info);
-    if ( rc != 1 )
+    /* Get max_pages from guest if not provided via cmdline */
+    if ( !paging->max_pages )
     {
-        PERROR("Error getting domain info");
-        goto err;
-    }
+        rc = xc_domain_getinfolist(xch, paging->mem_event.domain_id, 1,
+                                   &domain_info);
+        if ( rc != 1 )
+        {
+            PERROR("Error getting domain info");
+            goto err;
+        }
 
-    /* Record number of max_pages */
-    paging->max_pages = domain_info.max_pages;
+        /* Record number of max_pages */
+        paging->max_pages = domain_info.max_pages;
+    }
 
     /* Allocate bitmap for tracking pages that have been paged out */
     paging->bitmap = bitmap_alloc(paging->max_pages);
@@ -354,8 +428,6 @@ static xenpaging_t *xenpaging_init(domid_t domain_id, int target_tot_pages)
         goto err;
     }
     DPRINTF("max_pages = %d\n", paging->max_pages);
-
-    paging->target_tot_pages = target_tot_pages;
 
     /* Initialise policy */
     rc = policy_init(paging);
@@ -718,25 +790,18 @@ int main(int argc, char *argv[])
     mode_t open_mode = S_IRUSR | S_IRGRP | S_IROTH | S_IWUSR | S_IWGRP | S_IWOTH;
     int fd;
 
-    if ( argc != 3 )
-    {
-        fprintf(stderr, "Usage: %s <domain_id> <tot_pages>\n", argv[0]);
-        return -1;
-    }
-
     /* Initialise domain paging */
-    paging = xenpaging_init(atoi(argv[1]), atoi(argv[2]));
+    paging = xenpaging_init(argc, argv);
     if ( paging == NULL )
     {
-        fprintf(stderr, "Error initialising paging");
+        fprintf(stderr, "Error initialising paging\n");
         return 1;
     }
     xch = paging->xc_handle;
 
-    DPRINTF("starting %s %u %d\n", argv[0], paging->mem_event.domain_id, paging->target_tot_pages);
+    DPRINTF("starting %s for domain_id %u with pagefile %s\n", argv[0], paging->mem_event.domain_id, filename);
 
     /* Open file */
-    sprintf(filename, "page_cache_%u", paging->mem_event.domain_id);
     fd = open(filename, open_flags, open_mode);
     if ( fd < 0 )
     {
