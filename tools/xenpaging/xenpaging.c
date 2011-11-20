@@ -553,6 +553,27 @@ static int xenpaging_populate_page(xenpaging_t *paging,
     return ret;
 }
 
+/* Trigger a page-in for a batch of pages */
+static void resume_pages(xenpaging_t *paging, int num_pages)
+{
+    xc_interface *xch = paging->xc_handle;
+    int i, num = 0;
+
+    for ( i = 0; i < paging->max_pages && num < num_pages; i++ )
+    {
+        if ( test_bit(i, paging->bitmap) )
+        {
+            paging->pagein_queue[num] = i;
+            num++;
+            if ( num == XENPAGING_PAGEIN_QUEUE_SIZE )
+                break;
+        }
+    }
+    /* num may be less than num_pages, caller has to try again */
+    if ( num )
+        page_in_trigger();
+}
+
 static int evict_victim(xenpaging_t *paging,
                         xenpaging_victim_t *victim, int fd, int i)
 {
@@ -594,6 +615,30 @@ static int evict_victim(xenpaging_t *paging,
 
  out:
     return ret;
+}
+
+/* Evict a batch of pages and write them to a free slot in the paging file */
+static int evict_pages(xenpaging_t *paging, int fd, xenpaging_victim_t *victims, int num_pages)
+{
+    xc_interface *xch = paging->xc_handle;
+    int rc, slot, num = 0;
+
+    for ( slot = 0; slot < paging->max_pages && num < num_pages; slot++ )
+    {
+        /* Slot is allocated */
+        if ( victims[slot].gfn != INVALID_MFN )
+            continue;
+
+        rc = evict_victim(paging, &victims[slot], fd, slot);
+        if ( rc == -ENOSPC )
+            break;
+        if ( rc == -EINTR )
+            break;
+        if ( num && num % 100 == 0 )
+            DPRINTF("%d pages evicted\n", num);
+        num++;
+    }
+    return num;
 }
 
 int main(int argc, char *argv[])
@@ -638,7 +683,14 @@ int main(int argc, char *argv[])
         return 2;
     }
 
-    victims = calloc(paging->num_pages, sizeof(xenpaging_victim_t));
+    /* Allocate upper limit of pages to allow growing and shrinking */
+    victims = calloc(paging->max_pages, sizeof(xenpaging_victim_t));
+    if ( !victims )
+        goto out;
+
+    /* Mark all slots as unallocated */
+    for ( i = 0; i < paging->max_pages; i++ )
+        victims[i].gfn = INVALID_MFN;
 
     /* ensure that if we get a signal, we'll do cleanup, then exit */
     act.sa_handler = close_handler;
@@ -652,18 +704,7 @@ int main(int argc, char *argv[])
     /* listen for page-in events to stop pager */
     create_page_in_thread(paging);
 
-    /* Evict pages */
-    for ( i = 0; i < paging->num_pages; i++ )
-    {
-        rc = evict_victim(paging, &victims[i], fd, i);
-        if ( rc == -ENOSPC )
-            break;
-        if ( rc == -EINTR )
-            break;
-        if ( i % 100 == 0 )
-            DPRINTF("%d pages evicted\n", i);
-    }
-
+    i = evict_pages(paging, fd, victims, paging->num_pages);
     DPRINTF("%d pages evicted. Done.\n", i);
 
     /* Swap pages in and out */
@@ -689,13 +730,13 @@ int main(int argc, char *argv[])
             if ( test_and_clear_bit(req.gfn, paging->bitmap) )
             {
                 /* Find where in the paging file to read from */
-                for ( i = 0; i < paging->num_pages; i++ )
+                for ( i = 0; i < paging->max_pages; i++ )
                 {
                     if ( victims[i].gfn == req.gfn )
                         break;
                 }
     
-                if ( i >= paging->num_pages )
+                if ( i >= paging->max_pages )
                 {
                     DPRINTF("Couldn't find page %"PRIx64"\n", req.gfn);
                     goto out;
@@ -767,25 +808,12 @@ int main(int argc, char *argv[])
         /* Write all pages back into the guest */
         if ( interrupted == SIGTERM || interrupted == SIGINT )
         {
-            int num = 0;
-            for ( i = 0; i < paging->max_pages; i++ )
-            {
-                if ( test_bit(i, paging->bitmap) )
-                {
-                    paging->pagein_queue[num] = i;
-                    num++;
-                    if ( num == XENPAGING_PAGEIN_QUEUE_SIZE )
-                        break;
-                }
-            }
-            /*
-             * One more round if there are still pages to process.
-             * If no more pages to process, exit loop.
-             */
-            if ( num )
-                page_in_trigger();
-            else if ( i == paging->max_pages )
+            /* If no more pages to process, exit loop. */
+            if ( !paging->num_paged_out )
                 break;
+            
+            /* One more round if there are still pages to process. */
+            resume_pages(paging, paging->num_paged_out);
         }
         else
         {
