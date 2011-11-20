@@ -169,17 +169,20 @@ static xenpaging_t *xenpaging_init(domid_t domain_id, int num_pages)
     char *p;
     int rc;
 
+    /* Allocate memory */
+    paging = calloc(1, sizeof(xenpaging_t));
+    if ( !paging )
+        goto err;
+
     if ( getenv("XENPAGING_DEBUG") )
         dbg = (xentoollog_logger *)xtl_createlogger_stdiostream(stderr, XTL_DEBUG, 0);
-    xch = xc_interface_open(dbg, NULL, 0);
+
+    /* Open connection to xen */
+    paging->xc_handle = xch = xc_interface_open(dbg, NULL, 0);
     if ( !xch )
-        goto err_iface;
+        goto err;
 
     DPRINTF("xenpaging init\n");
-
-    /* Allocate memory */
-    paging = malloc(sizeof(xenpaging_t));
-    memset(paging, 0, sizeof(xenpaging_t));
 
     /* Open connection to xenstore */
     paging->xs_handle = xs_open(0);
@@ -203,9 +206,6 @@ static xenpaging_t *xenpaging_init(domid_t domain_id, int num_pages)
          paging->policy_mru_size = atoi(p);
          DPRINTF("Setting policy mru_size to %d\n", paging->policy_mru_size);
     }
-
-    /* Open connection to xen */
-    paging->xc_handle = xch;
 
     /* Set domain id */
     paging->mem_event.domain_id = domain_id;
@@ -322,7 +322,8 @@ static xenpaging_t *xenpaging_init(domid_t domain_id, int num_pages)
     {
         if ( paging->xs_handle )
             xs_close(paging->xs_handle);
-        xc_interface_close(xch);
+        if ( xch )
+            xc_interface_close(xch);
         if ( paging->mem_event.shared_page )
         {
             munlock(paging->mem_event.shared_page, PAGE_SIZE);
@@ -340,7 +341,6 @@ static xenpaging_t *xenpaging_init(domid_t domain_id, int num_pages)
         free(paging);
     }
 
- err_iface: 
     return NULL;
 }
 
