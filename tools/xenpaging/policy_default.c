@@ -57,7 +57,7 @@ int policy_init(xenpaging_t *paging)
     if ( paging->policy_mru_size > 0 )
         mru_size = paging->policy_mru_size;
     else
-        mru_size = DEFAULT_MRU_SIZE;
+        mru_size = paging->policy_mru_size = DEFAULT_MRU_SIZE;
 
     mru = malloc(sizeof(*mru) * mru_size);
     if ( mru == NULL )
@@ -120,15 +120,36 @@ void policy_notify_paged_out(unsigned long gfn)
     clear_bit(gfn, unconsumed);
 }
 
-void policy_notify_paged_in(unsigned long gfn)
+static void policy_handle_paged_in(unsigned long gfn, int do_mru)
 {
     unsigned long old_gfn = mru[i_mru & (mru_size - 1)];
 
     if ( old_gfn != INVALID_MFN )
         clear_bit(old_gfn, bitmap);
     
-    mru[i_mru & (mru_size - 1)] = gfn;
+    if (do_mru) {
+        mru[i_mru & (mru_size - 1)] = gfn;
+    } else {
+        clear_bit(gfn, bitmap);
+        mru[i_mru & (mru_size - 1)] = INVALID_MFN;
+    }
+
     i_mru++;
+}
+
+void policy_notify_paged_in(unsigned long gfn)
+{
+    policy_handle_paged_in(gfn, 1);
+}
+
+void policy_notify_paged_in_nomru(unsigned long gfn)
+{
+    policy_handle_paged_in(gfn, 0);
+}
+
+void policy_notify_dropped(unsigned long gfn)
+{
+    clear_bit(gfn, bitmap);
 }
 
 

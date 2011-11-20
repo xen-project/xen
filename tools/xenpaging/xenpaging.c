@@ -615,7 +615,14 @@ static int xenpaging_resume_page(xenpaging_t *paging, mem_event_response_t *rsp,
     /* Notify policy of page being paged in */
     if ( notify_policy )
     {
-        policy_notify_paged_in(rsp->gfn);
+        /*
+         * Do not add gfn to mru list if the target is lower than mru size.
+         * This allows page-out of these gfns if the target grows again.
+         */
+        if (paging->num_paged_out > paging->policy_mru_size)
+            policy_notify_paged_in(rsp->gfn);
+        else
+            policy_notify_paged_in_nomru(rsp->gfn);
 
        /* Record number of resumed pages */
        paging->num_paged_out--;
@@ -869,7 +876,7 @@ int main(int argc, char *argv[])
                 {
                     DPRINTF("drop_page ^ gfn %"PRIx64" pageslot %d\n", req.gfn, i);
                     /* Notify policy of page being dropped */
-                    policy_notify_paged_in(req.gfn);
+                    policy_notify_dropped(req.gfn);
                 }
                 else
                 {
