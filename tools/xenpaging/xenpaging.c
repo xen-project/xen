@@ -19,8 +19,10 @@
  */
 
 #define _XOPEN_SOURCE	600
+#define _GNU_SOURCE
 
 #include <inttypes.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <time.h>
@@ -35,6 +37,10 @@
 #include "policy.h"
 #include "xenpaging.h"
 
+/* Defines number of mfns a guest should use at a time, in KiB */
+#define WATCH_TARGETPAGES "memory/target-tot_pages"
+static char *watch_target_tot_pages;
+static char *dom_path;
 static char watch_token[16];
 static char filename[80];
 static int interrupted;
@@ -72,7 +78,7 @@ static int xenpaging_wait_for_event_or_timeout(xenpaging_t *paging)
 {
     xc_interface *xch = paging->xc_handle;
     xc_evtchn *xce = paging->mem_event.xce_handle;
-    char **vec;
+    char **vec, *val;
     unsigned int num;
     struct pollfd fd[2];
     int port;
@@ -109,6 +115,25 @@ static int xenpaging_wait_for_event_or_timeout(xenpaging_t *paging)
                     xs_unwatch(paging->xs_handle, "@releaseDomain", watch_token);
                     interrupted = SIGQUIT;
                     rc = 0;
+                }
+            }
+            else if ( strcmp(vec[XS_WATCH_PATH], watch_target_tot_pages) == 0 )
+            {
+                int ret, target_tot_pages;
+                val = xs_read(paging->xs_handle, XBT_NULL, vec[XS_WATCH_PATH], NULL);
+                if ( val )
+                {
+                    ret = sscanf(val, "%d", &target_tot_pages);
+                    if ( ret > 0 )
+                    {
+                        /* KiB to pages */
+                        target_tot_pages >>= 2;
+                        if ( target_tot_pages < 0 || target_tot_pages > paging->max_pages )
+                            target_tot_pages = paging->max_pages;
+                        paging->target_tot_pages = target_tot_pages;
+                        DPRINTF("new target_tot_pages %d\n", target_tot_pages);
+                    }
+                    free(val);
                 }
             }
             free(vec);
@@ -213,6 +238,25 @@ static xenpaging_t *xenpaging_init(domid_t domain_id, int target_tot_pages)
     if ( xs_watch(paging->xs_handle, "@releaseDomain", watch_token) == false )
     {
         PERROR("Could not bind to shutdown watch\n");
+        goto err;
+    }
+
+    /* Watch xenpagings working target */
+    dom_path = xs_get_domain_path(paging->xs_handle, domain_id);
+    if ( !dom_path )
+    {
+        PERROR("Could not find domain path\n");
+        goto err;
+    }
+    if ( asprintf(&watch_target_tot_pages, "%s/%s", dom_path, WATCH_TARGETPAGES) < 0 )
+    {
+        PERROR("Could not alloc watch path\n");
+        goto err;
+    }
+    DPRINTF("watching '%s'\n", watch_target_tot_pages);
+    if ( xs_watch(paging->xs_handle, watch_target_tot_pages, "") == false )
+    {
+        PERROR("Could not bind to xenpaging watch\n");
         goto err;
     }
 
@@ -342,6 +386,8 @@ static xenpaging_t *xenpaging_init(domid_t domain_id, int target_tot_pages)
             free(paging->mem_event.ring_page);
         }
 
+        free(dom_path);
+        free(watch_target_tot_pages);
         free(paging->bitmap);
         free(paging);
     }
@@ -356,6 +402,9 @@ static int xenpaging_teardown(xenpaging_t *paging)
 
     if ( paging == NULL )
         return 0;
+
+    xs_unwatch(paging->xs_handle, watch_target_tot_pages, "");
+    xs_unwatch(paging->xs_handle, "@releaseDomain", watch_token);
 
     xch = paging->xc_handle;
     paging->xc_handle = NULL;
