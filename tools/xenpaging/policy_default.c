@@ -32,6 +32,7 @@ static unsigned int i_mru;
 static unsigned int mru_size;
 static unsigned long *bitmap;
 static unsigned long *unconsumed;
+static unsigned int unconsumed_cleared;
 static unsigned long current_gfn;
 static unsigned long max_pages;
 
@@ -87,8 +88,21 @@ int policy_choose_victim(xenpaging_t *paging, xenpaging_victim_t *victim)
         current_gfn++;
         if ( current_gfn >= max_pages )
             current_gfn = 0;
+        /* Could not nominate any gfn */
         if ( wrap == current_gfn )
         {
+            /* Count wrap arounds */
+            unconsumed_cleared++;
+            /* Force retry every few seconds (depends on poll() timeout) */
+            if ( unconsumed_cleared > 123)
+            {
+                /* Force retry of unconsumed gfns */
+                bitmap_clear(unconsumed, max_pages);
+                unconsumed_cleared = 0;
+                DPRINTF("clearing unconsumed, wrap %lx", wrap);
+                /* One more round before returning ENOSPC */
+                continue;
+            }
             victim->gfn = INVALID_MFN;
             return -ENOSPC;
         }
