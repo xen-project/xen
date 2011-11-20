@@ -24,8 +24,8 @@ xenpaging: $(OBJS)
 
 install: all
 	$(INSTALL_DIR) $(DESTDIR)/var/lib/xen/xenpaging
-	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
-	$(INSTALL_PROG) $(IBINS) $(DESTDIR)$(SBINDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(LIBEXEC)
+	$(INSTALL_PROG) $(IBINS) $(DESTDIR)$(LIBEXEC)
 
 clean:
 	rm -f *.o *~ $(DEPS) xen TAGS $(IBINS) $(LIB)
