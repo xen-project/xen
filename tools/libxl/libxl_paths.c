@@ -70,6 +70,11 @@ const char *libxl_run_dir_path(void)
     return XEN_RUN_DIR;
 }
 
+const char *libxl_xenpaging_dir_path(void)
+{
+    return XEN_PAGING_DIR;
+}
+
 /*
  * Local variables:
  * mode: C

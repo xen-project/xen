@@ -142,7 +142,7 @@ define buildmakevars2file-closure
 	$(foreach var,                                                      \
 	          SBINDIR BINDIR LIBEXEC LIBDIR SHAREDIR PRIVATE_BINDIR     \
 	          XENFIRMWAREDIR XEN_CONFIG_DIR XEN_SCRIPT_DIR XEN_LOCK_DIR \
-	          XEN_RUN_DIR,                                              \
+	          XEN_RUN_DIR XEN_PAGING_DIR,                               \
 	          echo "$(var)=\"$($(var))\"" >>$(1).tmp;)        \
 	$(call move-if-changed,$(1).tmp,$(1))
 endef
