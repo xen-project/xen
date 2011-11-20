@@ -444,7 +444,7 @@ static int xenpaging_evict_page(xenpaging_t *paging,
                                 PROT_READ | PROT_WRITE, &gfn, 1);
     if ( page == NULL )
     {
-        PERROR("Error mapping page");
+        PERROR("Error mapping page %lx", victim->gfn);
         goto out;
     }
 
@@ -452,7 +452,7 @@ static int xenpaging_evict_page(xenpaging_t *paging,
     ret = write_page(fd, page, i);
     if ( ret != 0 )
     {
-        PERROR("Error copying page");
+        PERROR("Error copying page %lx", victim->gfn);
         munmap(page, PAGE_SIZE);
         goto out;
     }
@@ -464,7 +464,7 @@ static int xenpaging_evict_page(xenpaging_t *paging,
                               victim->gfn);
     if ( ret != 0 )
     {
-        PERROR("Error evicting page");
+        PERROR("Error evicting page %lx", victim->gfn);
         goto out;
     }
 
@@ -520,7 +520,7 @@ static int xenpaging_populate_page(xenpaging_t *paging,
                 sleep(1);
                 continue;
             }
-            PERROR("Error preparing for page in");
+            PERROR("Error preparing %"PRI_xen_pfn" for page-in", gfn);
             goto out_map;
         }
     }
@@ -532,7 +532,7 @@ static int xenpaging_populate_page(xenpaging_t *paging,
                                 PROT_READ | PROT_WRITE, &gfn, 1);
     if ( page == NULL )
     {
-        PERROR("Error mapping page: page is null");
+        PERROR("Error mapping page %"PRI_xen_pfn": page is null", gfn);
         goto out_map;
     }
 
@@ -540,7 +540,7 @@ static int xenpaging_populate_page(xenpaging_t *paging,
     ret = read_page(fd, page, i);
     if ( ret != 0 )
     {
-        PERROR("Error reading page");
+        PERROR("Error reading page %"PRI_xen_pfn"", gfn);
         goto out;
     }
 
@@ -710,7 +710,7 @@ int main(int argc, char *argv[])
                     rc = xenpaging_populate_page(paging, req.gfn, fd, i);
                     if ( rc != 0 )
                     {
-                        PERROR("Error populating page");
+                        PERROR("Error populating page %"PRIx64"", req.gfn);
                         goto out;
                     }
                 }
@@ -723,7 +723,7 @@ int main(int argc, char *argv[])
                 rc = xenpaging_resume_page(paging, &rsp, 1);
                 if ( rc != 0 )
                 {
-                    PERROR("Error resuming page");
+                    PERROR("Error resuming page %"PRIx64"", req.gfn);
                     goto out;
                 }
 
@@ -754,7 +754,7 @@ int main(int argc, char *argv[])
                     rc = xenpaging_resume_page(paging, &rsp, 0);
                     if ( rc != 0 )
                     {
-                        PERROR("Error resuming");
+                        PERROR("Error resuming page %"PRIx64"", req.gfn);
                         goto out;
                     }
                 }
