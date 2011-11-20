@@ -90,7 +90,7 @@ static int xenpaging_wait_for_event_or_timeout(xenpaging_t *paging)
         if (errno == EINTR)
             return 0;
 
-        ERROR("Poll exited with an error");
+        PERROR("Poll exited with an error");
         return -errno;
     }
 
@@ -121,7 +121,7 @@ static int xenpaging_wait_for_event_or_timeout(xenpaging_t *paging)
         port = xc_evtchn_pending(xce);
         if ( port == -1 )
         {
-            ERROR("Failed to read port from event channel");
+            PERROR("Failed to read port from event channel");
             rc = -1;
             goto err;
         }
@@ -129,7 +129,7 @@ static int xenpaging_wait_for_event_or_timeout(xenpaging_t *paging)
         rc = xc_evtchn_unmask(xce, port);
         if ( rc < 0 )
         {
-            ERROR("Failed to unmask event channel port");
+            PERROR("Failed to unmask event channel port");
         }
     }
 err:
@@ -185,7 +185,7 @@ static xenpaging_t *xenpaging_init(domid_t domain_id, int num_pages)
     paging->xs_handle = xs_open(0);
     if ( paging->xs_handle == NULL )
     {
-        ERROR("Error initialising xenstore connection");
+        PERROR("Error initialising xenstore connection");
         goto err;
     }
 
@@ -193,7 +193,7 @@ static xenpaging_t *xenpaging_init(domid_t domain_id, int num_pages)
     snprintf(watch_token, sizeof(watch_token), "%u", domain_id);
     if ( xs_watch(paging->xs_handle, "@releaseDomain", watch_token) == false )
     {
-        ERROR("Could not bind to shutdown watch\n");
+        PERROR("Could not bind to shutdown watch\n");
         goto err;
     }
 
@@ -214,7 +214,7 @@ static xenpaging_t *xenpaging_init(domid_t domain_id, int num_pages)
     paging->mem_event.shared_page = init_page();
     if ( paging->mem_event.shared_page == NULL )
     {
-        ERROR("Error initialising shared page");
+        PERROR("Error initialising shared page");
         goto err;
     }
 
@@ -222,7 +222,7 @@ static xenpaging_t *xenpaging_init(domid_t domain_id, int num_pages)
     paging->mem_event.ring_page = init_page();
     if ( paging->mem_event.ring_page == NULL )
     {
-        ERROR("Error initialising ring page");
+        PERROR("Error initialising ring page");
         goto err;
     }
 
@@ -249,7 +249,7 @@ static xenpaging_t *xenpaging_init(domid_t domain_id, int num_pages)
                 ERROR("xenpaging not supported in a PoD guest");
                 break;
             default:
-                ERROR("Error initialising shared page: %s", strerror(errno));
+                PERROR("Error initialising shared page");
                 break;
         }
         goto err;
@@ -259,7 +259,7 @@ static xenpaging_t *xenpaging_init(domid_t domain_id, int num_pages)
     paging->mem_event.xce_handle = xc_evtchn_open(NULL, 0);
     if ( paging->mem_event.xce_handle == NULL )
     {
-        ERROR("Failed to open event channel");
+        PERROR("Failed to open event channel");
         goto err;
     }
 
@@ -269,7 +269,7 @@ static xenpaging_t *xenpaging_init(domid_t domain_id, int num_pages)
                                     paging->mem_event.shared_page->port);
     if ( rc < 0 )
     {
-        ERROR("Failed to bind event channel");
+        PERROR("Failed to bind event channel");
         goto err;
     }
 
@@ -279,7 +279,7 @@ static xenpaging_t *xenpaging_init(domid_t domain_id, int num_pages)
     paging->domain_info = malloc(sizeof(xc_domaininfo_t));
     if ( paging->domain_info == NULL )
     {
-        ERROR("Error allocating memory for domain info");
+        PERROR("Error allocating memory for domain info");
         goto err;
     }
 
@@ -287,7 +287,7 @@ static xenpaging_t *xenpaging_init(domid_t domain_id, int num_pages)
                                paging->domain_info);
     if ( rc != 1 )
     {
-        ERROR("Error getting domain info");
+        PERROR("Error getting domain info");
         goto err;
     }
 
@@ -295,7 +295,7 @@ static xenpaging_t *xenpaging_init(domid_t domain_id, int num_pages)
     paging->bitmap = bitmap_alloc(paging->domain_info->max_pages);
     if ( !paging->bitmap )
     {
-        ERROR("Error allocating bitmap");
+        PERROR("Error allocating bitmap");
         goto err;
     }
     DPRINTF("max_pages = %"PRIx64"\n", paging->domain_info->max_pages);
@@ -311,7 +311,7 @@ static xenpaging_t *xenpaging_init(domid_t domain_id, int num_pages)
     rc = policy_init(paging);
     if ( rc != 0 )
     {
-        ERROR("Error initialising policy");
+        PERROR("Error initialising policy");
         goto err;
     }
 
@@ -358,14 +358,14 @@ static int xenpaging_teardown(xenpaging_t *paging)
     rc = xc_mem_paging_disable(xch, paging->mem_event.domain_id);
     if ( rc != 0 )
     {
-        ERROR("Error tearing down domain paging in xen");
+        PERROR("Error tearing down domain paging in xen");
     }
 
     /* Unbind VIRQ */
     rc = xc_evtchn_unbind(paging->mem_event.xce_handle, paging->mem_event.port);
     if ( rc != 0 )
     {
-        ERROR("Error unbinding event port");
+        PERROR("Error unbinding event port");
     }
     paging->mem_event.port = -1;
 
@@ -373,7 +373,7 @@ static int xenpaging_teardown(xenpaging_t *paging)
     rc = xc_evtchn_close(paging->mem_event.xce_handle);
     if ( rc != 0 )
     {
-        ERROR("Error closing event channel");
+        PERROR("Error closing event channel");
     }
     paging->mem_event.xce_handle = NULL;
     
@@ -384,7 +384,7 @@ static int xenpaging_teardown(xenpaging_t *paging)
     rc = xc_interface_close(xch);
     if ( rc != 0 )
     {
-        ERROR("Error closing connection to xen");
+        PERROR("Error closing connection to xen");
     }
 
     return 0;
@@ -444,7 +444,7 @@ static int xenpaging_evict_page(xenpaging_t *paging,
                                 PROT_READ | PROT_WRITE, &gfn, 1);
     if ( page == NULL )
     {
-        ERROR("Error mapping page");
+        PERROR("Error mapping page");
         goto out;
     }
 
@@ -452,8 +452,8 @@ static int xenpaging_evict_page(xenpaging_t *paging,
     ret = write_page(fd, page, i);
     if ( ret != 0 )
     {
+        PERROR("Error copying page");
         munmap(page, PAGE_SIZE);
-        ERROR("Error copying page");
         goto out;
     }
 
@@ -464,7 +464,7 @@ static int xenpaging_evict_page(xenpaging_t *paging,
                               victim->gfn);
     if ( ret != 0 )
     {
-        ERROR("Error evicting page");
+        PERROR("Error evicting page");
         goto out;
     }
 
@@ -520,7 +520,7 @@ static int xenpaging_populate_page(xenpaging_t *paging,
                 sleep(1);
                 continue;
             }
-            ERROR("Error preparing for page in");
+            PERROR("Error preparing for page in");
             goto out_map;
         }
     }
@@ -532,7 +532,7 @@ static int xenpaging_populate_page(xenpaging_t *paging,
                                 PROT_READ | PROT_WRITE, &gfn, 1);
     if ( page == NULL )
     {
-        ERROR("Error mapping page: page is null");
+        PERROR("Error mapping page: page is null");
         goto out_map;
     }
 
@@ -540,7 +540,7 @@ static int xenpaging_populate_page(xenpaging_t *paging,
     ret = read_page(fd, page, i);
     if ( ret != 0 )
     {
-        ERROR("Error reading page");
+        PERROR("Error reading page");
         goto out;
     }
 
@@ -579,7 +579,7 @@ static int evict_victim(xenpaging_t *paging,
         {
             if ( j++ % 1000 == 0 )
                 if ( xenpaging_mem_paging_flush_ioemu_cache(paging) )
-                    ERROR("Error flushing ioemu cache");
+                    PERROR("Error flushing ioemu cache");
         }
     }
     while ( ret );
@@ -670,7 +670,7 @@ int main(int argc, char *argv[])
         rc = xenpaging_wait_for_event_or_timeout(paging);
         if ( rc < 0 )
         {
-            ERROR("Error getting event");
+            PERROR("Error getting event");
             goto out;
         }
         else if ( rc != 0 )
@@ -710,7 +710,7 @@ int main(int argc, char *argv[])
                     rc = xenpaging_populate_page(paging, req.gfn, fd, i);
                     if ( rc != 0 )
                     {
-                        ERROR("Error populating page");
+                        PERROR("Error populating page");
                         goto out;
                     }
                 }
@@ -723,7 +723,7 @@ int main(int argc, char *argv[])
                 rc = xenpaging_resume_page(paging, &rsp, 1);
                 if ( rc != 0 )
                 {
-                    ERROR("Error resuming page");
+                    PERROR("Error resuming page");
                     goto out;
                 }
 
@@ -754,7 +754,7 @@ int main(int argc, char *argv[])
                     rc = xenpaging_resume_page(paging, &rsp, 0);
                     if ( rc != 0 )
                     {
-                        ERROR("Error resuming");
+                        PERROR("Error resuming");
                         goto out;
                     }
                 }
