@@ -154,8 +154,9 @@ static void vioapic_write_redirent(
     {
         vlapic_adjust_i8259_target(d);
     }
-    else if ( (ent.fields.trig_mode == VIOAPIC_LEVEL_TRIG) &&
-              !ent.fields.mask &&
+    else if ( ent.fields.trig_mode == VIOAPIC_EDGE_TRIG )
+        pent->fields.remote_irr = 0;
+    else if ( !ent.fields.mask &&
               !ent.fields.remote_irr &&
               hvm_irq->gsi_assert_count[idx] )
     {
