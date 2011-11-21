@@ -31,6 +31,11 @@ void __bug(char *file, int line) __attribute__((noreturn));
 #define BUG_ON(p) do { if (p) BUG(); } while (0)
 #define BUILD_BUG_ON(p) ((void)sizeof(char[1 - 2 * !!(p)]))
 
+#define min_t(type,x,y) \
+        ({ type __x = (x); type __y = (y); __x < __y ? __x: __y; })
+#define max_t(type,x,y) \
+        ({ type __x = (x); type __y = (y); __x > __y ? __x: __y; })
+
 static inline int test_bit(unsigned int b, void *p)
 {
     return !!(((uint8_t *)p)[b>>3] & (1u<<(b&7)));
