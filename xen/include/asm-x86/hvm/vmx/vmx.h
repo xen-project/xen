@@ -231,15 +231,6 @@ static inline void __vmptrld(u64 addr)
                    : "memory");
 }
 
-static inline void __vmptrst(u64 addr)
-{
-    asm volatile ( VMPTRST_OPCODE
-                   MODRM_EAX_07
-                   :
-                   : "a" (&addr)
-                   : "memory");
-}
-
 static inline void __vmpclear(u64 addr)
 {
     asm volatile ( VMCLEAR_OPCODE
