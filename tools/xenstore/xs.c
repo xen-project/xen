@@ -182,15 +182,13 @@ error:
 	return -1;
 }
 
-static int get_dev(const char *connect_to, unsigned long flags)
+static int get_dev(const char *connect_to)
 {
-	if (flags & XS_OPEN_READONLY)
-		return open(connect_to, O_RDONLY);
-	else
-		return open(connect_to, O_RDWR);
+	/* We cannot open read-only because requests are writes */
+	return open(connect_to, O_RDWR);
 }
 
-static struct xs_handle *get_handle(const char *connect_to, unsigned long flags)
+static struct xs_handle *get_handle(const char *connect_to)
 {
 	struct stat buf;
 	struct xs_handle *h = NULL;
@@ -202,7 +200,7 @@ static struct xs_handle *get_handle(const char *connect_to, unsigned long flags)
 	if (S_ISSOCK(buf.st_mode))
 		fd = get_socket(connect_to);
 	else
-		fd = get_dev(connect_to, flags);
+		fd = get_dev(connect_to);
 
 	if (fd == -1)
 		return NULL;
@@ -258,12 +256,12 @@ struct xs_handle *xs_open(unsigned long flags)
 	struct xs_handle *xsh = NULL;
 
 	if (flags & XS_OPEN_READONLY)
-		xsh = get_handle(xs_daemon_socket_ro(), flags);
+		xsh = get_handle(xs_daemon_socket_ro());
 	else
-		xsh = get_handle(xs_daemon_socket(), flags);
+		xsh = get_handle(xs_daemon_socket());
 
 	if (!xsh && !(flags & XS_OPEN_SOCKETONLY))
-		xsh = get_handle(xs_domain_dev(), flags);
+		xsh = get_handle(xs_domain_dev());
 
 	return xsh;
 }
