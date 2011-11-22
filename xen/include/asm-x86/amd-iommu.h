@@ -54,6 +54,7 @@ struct amd_iommu {
     iommu_cap_t cap;
 
     u8 ht_flags;
+    u64 features;
 
     void *mmio_base;
     unsigned long mmio_base_phys;

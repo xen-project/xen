@@ -43,6 +43,7 @@
 int amd_iommu_get_ivrs_dev_entries(void);
 int amd_iommu_detect_one_acpi(void *ivhd);
 int amd_iommu_detect_acpi(void);
+void get_iommu_features(struct amd_iommu *iommu);
 
 /* amd-iommu-init functions */
 int amd_iommu_init(void);
@@ -183,8 +184,14 @@ static inline uint32_t iommu_get_bit(uint32_t reg, uint32_t bit)
 
 static inline int iommu_has_cap(struct amd_iommu *iommu, uint32_t bit)
 {
-    u32 mask = 1U << bit;
-    return iommu->cap.header & mask;
+    return !!(iommu->cap.header & (1u << bit));
+}
+
+static inline int iommu_has_feature(struct amd_iommu *iommu, uint32_t bit)
+{
+    if ( !iommu_has_cap(iommu, PCI_CAP_EFRSUP_SHIFT) )
+        return 0;
+    return !!(iommu->features & (1U << bit));
 }
 
 #endif /* _ASM_X86_64_AMD_IOMMU_PROTO_H */

@@ -684,6 +684,8 @@ static int __init amd_iommu_init_one(struct amd_iommu *iommu)
     iommu->dev_table.entries = device_table.entries;
     iommu->dev_table.buffer = device_table.buffer;
 
+    get_iommu_features(iommu);
+
     enable_iommu(iommu);
     printk("AMD-Vi: IOMMU %d Enabled.\n", nr_amd_iommus );
     nr_amd_iommus++;

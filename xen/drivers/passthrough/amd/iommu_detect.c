@@ -62,6 +62,47 @@ static int __init get_iommu_capabilities(
     return 0;
 }
 
+void __init get_iommu_features(struct amd_iommu *iommu)
+{
+    u32 low, high;
+    int i = 0 ;
+    char * feature_str[] = {
+        "- Prefetch Pages Command", 
+        "- Peripheral Page Service Request", 
+        "- X2APIC Supported", 
+        "- NX bit Supported", 
+        "- Guest Translation", 
+        "- Reserved bit [5]",
+        "- Invalidate All Command", 
+        "- Guest APIC supported", 
+        "- Hardware Error Registers", 
+        "- Performance Counters", 
+        NULL
+    };
+
+    ASSERT( iommu->mmio_base );
+
+    if ( !iommu_has_cap(iommu, PCI_CAP_EFRSUP_SHIFT) )
+    {
+        iommu->features = 0;
+        return;
+    }
+
+    low = readl(iommu->mmio_base + IOMMU_EXT_FEATURE_MMIO_OFFSET);
+    high = readl(iommu->mmio_base + IOMMU_EXT_FEATURE_MMIO_OFFSET + 4);
+
+    iommu->features = ((u64)high << 32) | low;
+
+    printk("AMD-Vi: IOMMU Extended Features:\n");
+
+    while ( feature_str[i] )
+    {
+        if ( iommu_has_feature(iommu, i) )
+            printk( " %s\n", feature_str[i]);
+        i++;
+    }
+}
+
 int __init amd_iommu_detect_one_acpi(void *ivhd)
 {
     struct amd_iommu *iommu;
