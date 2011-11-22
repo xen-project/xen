@@ -78,6 +78,7 @@ void amd_iommu_flush_iotlb(struct pci_dev *pdev, uint64_t gaddr,
                            unsigned int order);
 void amd_iommu_flush_device(struct amd_iommu *iommu, uint16_t bdf);
 void amd_iommu_flush_intremap(struct amd_iommu *iommu, uint16_t bdf);
+void amd_iommu_flush_all_caches(struct amd_iommu *iommu);
 
 /* find iommu for bdf */
 struct amd_iommu *find_iommu_for_device(int seg, int bdf);

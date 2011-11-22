@@ -277,6 +277,20 @@ static void invalidate_interrupt_table(struct amd_iommu *iommu, u16 device_id)
     send_iommu_command(iommu, cmd);
 }
 
+void invalidate_iommu_all(struct amd_iommu *iommu)
+{
+    u32 cmd[4], entry;
+
+    cmd[3] = cmd[2] = cmd[0] = 0;
+
+    set_field_in_reg_u32(IOMMU_CMD_INVALIDATE_IOMMU_ALL, 0,
+                         IOMMU_CMD_OPCODE_MASK, IOMMU_CMD_OPCODE_SHIFT,
+                         &entry);
+    cmd[1] = entry;
+
+    send_iommu_command(iommu, cmd);
+}
+
 void amd_iommu_flush_iotlb(struct pci_dev *pdev,
                            uint64_t gaddr, unsigned int order)
 {
@@ -378,5 +392,13 @@ void amd_iommu_flush_intremap(struct amd_iommu *iommu, uint16_t bdf)
     ASSERT( spin_is_locked(&iommu->lock) );
 
     invalidate_interrupt_table(iommu, bdf);
+    flush_command_buffer(iommu);
+}
+
+void amd_iommu_flush_all_caches(struct amd_iommu *iommu)
+{
+    ASSERT( spin_is_locked(&iommu->lock) );
+
+    invalidate_iommu_all(iommu);
     flush_command_buffer(iommu);
 }

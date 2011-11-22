@@ -598,6 +598,9 @@ static void enable_iommu(struct amd_iommu *iommu)
     set_iommu_event_log_control(iommu, IOMMU_CONTROL_ENABLED);
     set_iommu_translation_control(iommu, IOMMU_CONTROL_ENABLED);
 
+    if ( iommu_has_feature(iommu, IOMMU_EXT_FEATURE_IASUP_SHIFT) )
+        amd_iommu_flush_all_caches(iommu);
+
     iommu->enabled = 1;
     spin_unlock_irqrestore(&iommu->lock, flags);
 
@@ -970,6 +973,9 @@ void amd_iommu_resume(void)
     }
 
     /* flush all cache entries after iommu re-enabled */
-    invalidate_all_devices();
-    invalidate_all_domain_pages();
+    if ( !iommu_has_feature(iommu, IOMMU_EXT_FEATURE_IASUP_SHIFT) )
+    {
+        invalidate_all_devices();
+        invalidate_all_domain_pages();
+    }
 }
