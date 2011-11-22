@@ -245,9 +245,10 @@ static void dump_domains(unsigned char key)
         unsigned int i;
         printk("General information for domain %u:\n", d->domain_id);
         cpuset_print(tmpstr, sizeof(tmpstr), d->domain_dirty_cpumask);
-        printk("    refcnt=%d dying=%d nr_pages=%d xenheap_pages=%d "
-               "dirty_cpus=%s max_pages=%u\n",
+        printk("    refcnt=%d dying=%d pause_count=%d\n",
                atomic_read(&d->refcnt), d->is_dying,
+               atomic_read(&d->pause_count));
+        printk("    nr_pages=%d xenheap_pages=%d dirty_cpus=%s max_pages=%u\n",
                d->tot_pages, d->xenheap_pages, tmpstr, d->max_pages);
         printk("    handle=%02x%02x%02x%02x-%02x%02x-%02x%02x-"
                "%02x%02x-%02x%02x%02x%02x%02x%02x vm_assist=%08lx\n",
@@ -271,17 +272,18 @@ static void dump_domains(unsigned char key)
                d->domain_id);
         for_each_vcpu ( d, v )
         {
-            printk("    VCPU%d: CPU%d [has=%c] flags=%lx poll=%d "
+            printk("    VCPU%d: CPU%d [has=%c] poll=%d "
                    "upcall_pend = %02x, upcall_mask = %02x ",
                    v->vcpu_id, v->processor,
-                   v->is_running ? 'T':'F',
-                   v->pause_flags, v->poll_evtchn,
+                   v->is_running ? 'T':'F', v->poll_evtchn,
                    vcpu_info(v, evtchn_upcall_pending),
                    vcpu_info(v, evtchn_upcall_mask));
             cpuset_print(tmpstr, sizeof(tmpstr), v->vcpu_dirty_cpumask);
             printk("dirty_cpus=%s ", tmpstr);
             cpuset_print(tmpstr, sizeof(tmpstr), v->cpu_affinity);
             printk("cpu_affinity=%s\n", tmpstr);
+            printk("    pause_count=%d pause_flags=%lx\n",
+                   atomic_read(&v->pause_count), v->pause_flags);
             arch_dump_vcpu_info(v);
             periodic_timer_print(tmpstr, sizeof(tmpstr), v->periodic_period);
             printk("    %s\n", tmpstr);
