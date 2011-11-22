@@ -933,9 +933,8 @@ static int _invalidate_all_devices(
         if ( iommu )
         {
             spin_lock_irqsave(&iommu->lock, flags);
-            invalidate_dev_table_entry(iommu, req_id);
-            invalidate_interrupt_table(iommu, req_id);
-            flush_command_buffer(iommu);
+            amd_iommu_flush_device(iommu, req_id);
+            amd_iommu_flush_intremap(iommu, req_id);
             spin_unlock_irqrestore(&iommu->lock, flags);
         }
     }

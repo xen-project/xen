@@ -118,8 +118,7 @@ static void amd_iommu_setup_domain_device(
              iommu_has_cap(iommu, PCI_CAP_IOTLB_SHIFT) )
             iommu_dte_set_iotlb((u32 *)dte, dte_i);
 
-        invalidate_dev_table_entry(iommu, req_id);
-        flush_command_buffer(iommu);
+        amd_iommu_flush_device(iommu, req_id);
 
         AMD_IOMMU_DEBUG("Setup I/O page table: device id = 0x%04x, "
                         "root table = 0x%"PRIx64", "
@@ -310,8 +309,8 @@ void amd_iommu_disable_domain_device(struct domain *domain,
              iommu_has_cap(iommu, PCI_CAP_IOTLB_SHIFT) )
             iommu_dte_set_iotlb((u32 *)dte, 0);
 
-        invalidate_dev_table_entry(iommu, req_id);
-        flush_command_buffer(iommu);
+        amd_iommu_flush_device(iommu, req_id);
+
         AMD_IOMMU_DEBUG("Disable: device id = 0x%04x, "
                         "domain = %d, paging mode = %d\n",
                         req_id,  domain_hvm_iommu(domain)->domain_id,

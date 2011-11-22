@@ -53,12 +53,6 @@ int amd_iommu_update_ivrs_mapping_acpi(void);
 int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
                        unsigned int flags);
 int amd_iommu_unmap_page(struct domain *d, unsigned long gfn);
-void amd_iommu_flush_pages(struct domain *d, unsigned long gfn,
-                           unsigned int order);
-void amd_iommu_flush_all_pages(struct domain *d);
-void amd_iommu_flush_iotlb(struct pci_dev *pdev, uint64_t gaddr,
-                           unsigned int order);
-
 u64 amd_iommu_get_next_table_from_pte(u32 *entry);
 int amd_iommu_reserve_domain_unity_map(struct domain *domain,
                                        u64 phys_addr, unsigned long size,
@@ -75,11 +69,15 @@ void amd_iommu_set_root_page_table(
     u32 *dte, u64 root_ptr, u16 domain_id, u8 paging_mode, u8 valid);
 void iommu_dte_set_iotlb(u32 *dte, u8 i);
 void iommu_dte_add_device_entry(u32 *dte, struct ivrs_mappings *ivrs_dev);
-void invalidate_dev_table_entry(struct amd_iommu *iommu, u16 devic_id);
 
 /* send cmd to iommu */
-int send_iommu_command(struct amd_iommu *iommu, u32 cmd[]);
-void flush_command_buffer(struct amd_iommu *iommu);
+void amd_iommu_flush_all_pages(struct domain *d);
+void amd_iommu_flush_pages(struct domain *d, unsigned long gfn,
+                           unsigned int order);
+void amd_iommu_flush_iotlb(struct pci_dev *pdev, uint64_t gaddr,
+                           unsigned int order);
+void amd_iommu_flush_device(struct amd_iommu *iommu, uint16_t bdf);
+void amd_iommu_flush_intremap(struct amd_iommu *iommu, uint16_t bdf);
 
 /* find iommu for bdf */
 struct amd_iommu *find_iommu_for_device(int seg, int bdf);
@@ -88,7 +86,6 @@ struct amd_iommu *find_iommu_for_device(int seg, int bdf);
 int amd_iommu_setup_ioapic_remapping(void);
 void *amd_iommu_alloc_intremap_table(void);
 int amd_iommu_free_intremap_table(u16 seg, struct ivrs_mappings *);
-void invalidate_interrupt_table(struct amd_iommu *iommu, u16 device_id);
 void amd_iommu_ioapic_update_ire(
     unsigned int apic, unsigned int reg, unsigned int value);
 void amd_iommu_msi_msg_update_ire(

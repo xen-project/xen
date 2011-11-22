@@ -96,22 +96,6 @@ static void update_intremap_entry(u32* entry, u8 vector, u8 int_type,
                             INT_REMAP_ENTRY_VECTOR_SHIFT, entry);
 }
 
-void invalidate_interrupt_table(struct amd_iommu *iommu, u16 device_id)
-{
-    u32 cmd[4], entry;
-
-    cmd[3] = cmd[2] = 0;
-    set_field_in_reg_u32(device_id, 0,
-                         IOMMU_INV_INT_TABLE_DEVICE_ID_MASK,
-                         IOMMU_INV_INT_TABLE_DEVICE_ID_SHIFT, &entry);
-    cmd[0] = entry;
-    set_field_in_reg_u32(IOMMU_CMD_INVALIDATE_INT_TABLE, 0,
-                         IOMMU_CMD_OPCODE_MASK, IOMMU_CMD_OPCODE_SHIFT,
-                         &entry);
-    cmd[1] = entry;
-    send_iommu_command(iommu, cmd);
-}
-
 static void update_intremap_entry_from_ioapic(
     int bdf,
     struct amd_iommu *iommu,
@@ -144,8 +128,7 @@ static void update_intremap_entry_from_ioapic(
     if ( iommu->enabled )
     {
         spin_lock_irqsave(&iommu->lock, flags);
-        invalidate_interrupt_table(iommu, req_id);
-        flush_command_buffer(iommu);
+        amd_iommu_flush_intremap(iommu, req_id);
         spin_unlock_irqrestore(&iommu->lock, flags);
     }
 }
@@ -202,8 +185,7 @@ int __init amd_iommu_setup_ioapic_remapping(void)
             if ( iommu->enabled )
             {
                 spin_lock_irqsave(&iommu->lock, flags);
-                invalidate_interrupt_table(iommu, req_id);
-                flush_command_buffer(iommu);
+                amd_iommu_flush_intremap(iommu, req_id);
                 spin_unlock_irqrestore(&iommu->lock, flags);
             }
         }
@@ -347,10 +329,9 @@ done:
     if ( iommu->enabled )
     {
         spin_lock_irqsave(&iommu->lock, flags);
-        invalidate_interrupt_table(iommu, req_id);
+        amd_iommu_flush_intremap(iommu, req_id);
         if ( alias_id != req_id )
-            invalidate_interrupt_table(iommu, alias_id);
-        flush_command_buffer(iommu);
+            amd_iommu_flush_intremap(iommu, alias_id);
         spin_unlock_irqrestore(&iommu->lock, flags);
     }
 }
