@@ -33,7 +33,7 @@ struct waitqueue_vcpu {
      * hypervisor context before sleeping (descheduling), setjmp/longjmp-style.
      */
     void *esp;
-    char stack[3000];
+    char *stack;
 #endif
 };
 
@@ -44,6 +44,15 @@ int init_waitqueue_vcpu(struct vcpu *v)
     wqv = xzalloc(struct waitqueue_vcpu);
     if ( wqv == NULL )
         return -ENOMEM;
+
+#ifdef CONFIG_X86
+    wqv->stack = alloc_xenheap_page();
+    if ( wqv->stack == NULL )
+    {
+        xfree(wqv);
+        return -ENOMEM;
+    }
+#endif
 
     INIT_LIST_HEAD(&wqv->list);
     wqv->vcpu = v;
@@ -62,6 +71,9 @@ void destroy_waitqueue_vcpu(struct vcpu *v)
         return;
 
     BUG_ON(!list_empty(&wqv->list));
+#ifdef CONFIG_X86
+    free_xenheap_page(wqv->stack);
+#endif
     xfree(wqv);
 
     v->waitqueue_vcpu = NULL;
@@ -114,7 +126,7 @@ static void __prepare_to_wait(struct waitqueue_vcpu *wqv)
         : "=S" (wqv->esp)
         : "c" (cpu_info), "D" (wqv->stack)
         : "memory" );
-    BUG_ON((cpu_info - (char *)wqv->esp) > sizeof(wqv->stack));
+    BUG_ON((cpu_info - (char *)wqv->esp) > PAGE_SIZE);
 }
 
 static void __finish_wait(struct waitqueue_vcpu *wqv)
