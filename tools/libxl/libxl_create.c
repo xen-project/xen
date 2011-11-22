@@ -545,12 +545,19 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     case LIBXL_DOMAIN_TYPE_HVM:
     {
         libxl_device_console console;
+        libxl_device_vkb vkb;
 
         ret = init_console_info(&console, 0);
         if ( ret )
             goto error_out;
         libxl__device_console_add(gc, domid, &console, &state);
         libxl_device_console_dispose(&console);
+
+        ret = libxl_device_vkb_init(ctx, &vkb);
+        if ( ret )
+            goto error_out;
+        libxl_device_vkb_add(ctx, domid, &vkb);
+        libxl_device_vkb_dispose(&vkb);
 
         dm_info->domid = domid;
         ret = libxl__create_device_model(gc, dm_info,
