@@ -279,7 +279,7 @@ static int flask_grant_mapref(struct domain *d1, struct domain *d2,
 {
     u32 perms = GRANT__MAP_READ;
 
-    if ( flags & GTF_writing )
+    if ( !(flags & GNTMAP_readonly) )
         perms |= GRANT__MAP_WRITE;
 
     return domain_has_perm(d1, d2, SECCLASS_GRANT, perms);
