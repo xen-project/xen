@@ -82,6 +82,14 @@ int security_device_sid(u32 device, u32 *out_sid);
 int security_validate_transition(u32 oldsid, u32 newsid, u32 tasksid,
                                                                     u16 tclass);
 
+typedef int (*security_iterate_fn)(void *data, u32 sid, unsigned long start,
+                                                        unsigned long end);
+int security_iterate_iomem_sids(unsigned long start, unsigned long end,
+                                security_iterate_fn fn, void *data);
+
+int security_iterate_ioport_sids(u32 start, u32 end,
+                                security_iterate_fn fn, void *data);
+
 int security_ocontext_add(char *ocontext, unsigned long low,
                            unsigned long high, u32 sid);
 
