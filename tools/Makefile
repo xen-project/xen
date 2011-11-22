@@ -1,6 +1,10 @@
 XEN_ROOT = $(CURDIR)/..
 include $(XEN_ROOT)/tools/Rules.mk
 
+ifneq ($(CONFIG_SYSTEM_LIBAIO),y)
+SUBDIRS-libaio := libaio
+endif
+
 SUBDIRS-y :=
 SUBDIRS-y += check
 SUBDIRS-y += include
@@ -18,11 +22,11 @@ SUBDIRS-y += xenmon
 SUBDIRS-$(VTPM_TOOLS) += vtpm_manager
 SUBDIRS-$(VTPM_TOOLS) += vtpm
 SUBDIRS-y += xenstat
-SUBDIRS-$(CONFIG_Linux) += libaio
+SUBDIRS-$(CONFIG_Linux) += $(SUBDIRS-libaio)
 SUBDIRS-$(CONFIG_Linux) += memshr 
 SUBDIRS-$(CONFIG_Linux) += blktap
 SUBDIRS-$(CONFIG_Linux) += blktap2
-SUBDIRS-$(CONFIG_NetBSD) += libaio
+SUBDIRS-$(CONFIG_NetBSD) += $(SUBDIRS-libaio)
 SUBDIRS-$(CONFIG_NetBSD) += blktap2
 SUBDIRS-$(CONFIG_NetBSD) += xenbackendd
 SUBDIRS-y += libfsimage

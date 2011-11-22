@@ -48,6 +48,8 @@ provided by your OS distributor:
     * Development install of x11 (e.g. xorg-x11-dev)
     * Development install of uuid (e.g. uuid-dev)
     * Development install of yajl (e.g. libyajl-dev)
+    * Development install of libaio (e.g. libaio-dev) version 0.3.107 or
+      greater. Set CONFIG_SYSTEM_LIBAIO in .config if this is not available.
     * bridge-utils package (/sbin/brctl)
     * iproute package (/sbin/ip)
     * hotplug or udev
