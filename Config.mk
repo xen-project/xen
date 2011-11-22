@@ -179,10 +179,9 @@ endif
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG := xen-4.1.2
-#QEMU_TAG ?= e073e69457b4d99b6da0b6536296e3498f7f6599
-# Fri Feb 11 17:54:51 2011 +0000
-# qemu-xen: fix segfault with empty cdroms
+QEMU_TAG ?= 3981d218912e186cb4205ee6732f446c177a36a2
+# Tue Nov 22 18:49:15 2011 +0000
+# qemu-xen: Don't redefine libpci (3.1.7) defines.
 
 # Optional components
 XENSTAT_XENTOP     ?= y
