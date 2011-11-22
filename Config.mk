@@ -208,9 +208,9 @@ endif
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 52834188eedfbbca5636fd869d4c86b3b3044439
-# Tue Nov 1 18:42:55 2011 +0000
-# qemu-xen: remove i386-dm/README.hvm-pv-magic-ioport-disable
+QEMU_TAG ?= 9b33a3e5603ecd3ceca482a72c6ff8e951afb6d2
+# Tue Nov 22 16:12:40 2011 +0000
+# qemu-xen: add vkbd support for PV on HVM guests
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
