@@ -1594,6 +1594,53 @@ out:
     return rc;
 }
 
+int security_iterate_iomem_sids(unsigned long start, unsigned long end,
+                                security_iterate_fn fn, void *data)
+{
+    struct ocontext *c;
+    int rc = 0;
+
+    POLICY_RDLOCK;
+
+    c = policydb.ocontexts[OCON_IOMEM];
+    while (c && c->u.iomem.high_iomem < start)
+        c = c->next;
+
+    while (c && c->u.iomem.low_iomem <= end) {
+        if (!c->sid[0])
+        {
+            rc = sidtab_context_to_sid(&sidtab, &c->context[0], &c->sid[0]);
+            if ( rc )
+                goto out;
+        }
+        if (start < c->u.iomem.low_iomem) {
+            /* found a gap */
+            rc = fn(data, SECINITSID_IOMEM, start, c->u.iomem.low_iomem - 1);
+            if (rc)
+                goto out;
+            start = c->u.iomem.low_iomem;
+        }
+        if (end <= c->u.iomem.high_iomem) {
+            /* iteration ends in the middle of this range */
+            rc = fn(data, c->sid[0], start, end);
+            goto out;
+        }
+
+        rc = fn(data, c->sid[0], start, c->u.iomem.high_iomem);
+        if (rc)
+            goto out;
+        start = c->u.iomem.high_iomem + 1;
+
+        c = c->next;
+    }
+
+    rc = fn(data, SECINITSID_IOMEM, start, end);
+
+out:
+    POLICY_RDUNLOCK;
+    return rc;
+}
+
 /**
  * security_ioport_sid - Obtain the SID for an ioport.
  * @ioport: ioport
@@ -1629,6 +1676,53 @@ int security_ioport_sid(u32 ioport, u32 *out_sid)
     {
         *out_sid = SECINITSID_IOPORT;
     }
+
+out:
+    POLICY_RDUNLOCK;
+    return rc;
+}
+
+int security_iterate_ioport_sids(u32 start, u32 end,
+                                security_iterate_fn fn, void *data)
+{
+    struct ocontext *c;
+    int rc = 0;
+
+    POLICY_RDLOCK;
+
+    c = policydb.ocontexts[OCON_IOPORT];
+    while (c && c->u.ioport.high_ioport < start)
+        c = c->next;
+
+    while (c && c->u.ioport.low_ioport <= end) {
+        if (!c->sid[0])
+        {
+            rc = sidtab_context_to_sid(&sidtab, &c->context[0], &c->sid[0]);
+            if ( rc )
+                goto out;
+        }
+        if (start < c->u.ioport.low_ioport) {
+            /* found a gap */
+            rc = fn(data, SECINITSID_IOPORT, start, c->u.ioport.low_ioport - 1);
+            if (rc)
+                goto out;
+            start = c->u.ioport.low_ioport;
+        }
+        if (end <= c->u.ioport.high_ioport) {
+            /* iteration ends in the middle of this range */
+            rc = fn(data, c->sid[0], start, end);
+            goto out;
+        }
+
+        rc = fn(data, c->sid[0], start, c->u.ioport.high_ioport);
+        if (rc)
+            goto out;
+        start = c->u.ioport.high_ioport + 1;
+
+        c = c->next;
+    }
+
+    rc = fn(data, SECINITSID_IOPORT, start, end);
 
 out:
     POLICY_RDUNLOCK;
@@ -1963,6 +2057,7 @@ int security_ocontext_add( char *ocontext, unsigned long low, unsigned long high
     int ret = 0;
     int ocon = 0;
     struct ocontext *c;
+    struct ocontext *prev;
     struct ocontext *add;
 
     if ( (ocon = determine_ocontext(ocontext)) < 0 )
@@ -2006,23 +2101,27 @@ int security_ocontext_add( char *ocontext, unsigned long low, unsigned long high
         add->u.ioport.low_ioport = low;
         add->u.ioport.high_ioport = high;
 
+        prev = NULL;
         c = policydb.ocontexts[OCON_IOPORT];
-        while ( c )
-        {
-            if ( c->u.ioport.low_ioport <= add->u.ioport.high_ioport &&
-                 add->u.ioport.low_ioport <= c->u.ioport.high_ioport )
-            {
-                printk("%s: IO Port overlap with entry 0x%x - 0x%x\n",
-                       __FUNCTION__, c->u.ioport.low_ioport,
-                       c->u.ioport.high_ioport);
-                ret = -EINVAL;
-                break;
-            }
+
+        while ( c && c->u.ioport.high_ioport < low ) {
+            prev = c;
             c = c->next;
         }
 
-        if ( ret == 0 )
+        if (c && c->u.ioport.low_ioport <= high)
         {
+            printk("%s: IO Port overlap with entry 0x%x - 0x%x\n",
+                   __FUNCTION__, c->u.ioport.low_ioport,
+                   c->u.ioport.high_ioport);
+            ret = -EINVAL;
+            break;
+        }
+
+        if (prev) {
+            add->next = prev->next;
+            prev->next = add;
+        } else {
             add->next = policydb.ocontexts[OCON_IOPORT];
             policydb.ocontexts[OCON_IOPORT] = add;
         }
@@ -2032,23 +2131,27 @@ int security_ocontext_add( char *ocontext, unsigned long low, unsigned long high
         add->u.iomem.low_iomem = low;
         add->u.iomem.high_iomem = high;
 
+        prev = NULL;
         c = policydb.ocontexts[OCON_IOMEM];
-        while ( c )
-        {
-            if ( c->u.iomem.low_iomem <= add->u.iomem.high_iomem &&
-                 add->u.iomem.low_iomem <= c->u.iomem.high_iomem )
-            {
-                printk("%s: IO Memory overlap with entry 0x%x - 0x%x\n",
-                       __FUNCTION__, c->u.iomem.low_iomem,
-                       c->u.iomem.high_iomem);
-                ret = -EINVAL;
-                break;
-            }
+
+        while ( c && c->u.iomem.high_iomem < low ) {
+            prev = c;
             c = c->next;
         }
 
-        if ( ret == 0 )
+        if (c && c->u.iomem.low_iomem <= high)
         {
+            printk("%s: IO Memory overlap with entry 0x%x - 0x%x\n",
+                   __FUNCTION__, c->u.iomem.low_iomem,
+                   c->u.iomem.high_iomem);
+            ret = -EINVAL;
+            break;
+        }
+
+        if (prev) {
+            add->next = prev->next;
+            prev->next = add;
+        } else {
             add->next = policydb.ocontexts[OCON_IOMEM];
             policydb.ocontexts[OCON_IOMEM] = add;
         }

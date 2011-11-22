@@ -664,14 +664,32 @@ static int irq_has_perm(struct domain *d, uint8_t pirq, uint8_t access)
         return rc;
 }
 
-static int iomem_has_perm(struct domain *d, unsigned long mfn, uint8_t access)
-{
+struct iomem_has_perm_data {
+    struct domain_security_struct *ssec, *tsec;
     u32 perm;
-    u32 rsid;
+};
+
+static int _iomem_has_perm(void *v, u32 sid, unsigned long start, unsigned long end)
+{
+    struct iomem_has_perm_data *data = v;
+    struct avc_audit_data ad;
     int rc = -EPERM;
 
-    struct domain_security_struct *ssec, *tsec;
-    struct avc_audit_data ad;
+    AVC_AUDIT_DATA_INIT(&ad, DEV);
+    ad.device = start;
+
+    rc = avc_has_perm(data->ssec->sid, sid, SECCLASS_RESOURCE, data->perm, &ad);
+
+    if ( rc )
+        return rc;
+
+    return avc_has_perm(data->tsec->sid, sid, SECCLASS_RESOURCE, RESOURCE__USE, &ad);
+}
+
+static int iomem_has_perm(struct domain *d, unsigned long start, unsigned long end, uint8_t access)
+{
+    struct iomem_has_perm_data data;
+    int rc;
 
     rc = domain_has_perm(current->domain, d, SECCLASS_RESOURCE,
                          resource_to_perm(access));
@@ -679,27 +697,14 @@ static int iomem_has_perm(struct domain *d, unsigned long mfn, uint8_t access)
         return rc;
 
     if ( access )
-        perm = RESOURCE__ADD_IOMEM;
+        data.perm = RESOURCE__ADD_IOMEM;
     else
-        perm = RESOURCE__REMOVE_IOMEM;
+        data.perm = RESOURCE__REMOVE_IOMEM;
 
-    ssec = current->domain->ssid;
-    tsec = d->ssid;
+    data.ssec = current->domain->ssid;
+    data.tsec = d->ssid;
 
-    rc = security_iomem_sid(mfn, &rsid);
-    if ( rc )
-        return rc;
-
-    AVC_AUDIT_DATA_INIT(&ad, DEV);
-    ad.device = mfn;
-
-    rc = avc_has_perm(ssec->sid, rsid, SECCLASS_RESOURCE, perm, &ad);
-
-    if ( rc )
-        return rc;
-
-    return avc_has_perm(tsec->sid, rsid, SECCLASS_RESOURCE, 
-                        RESOURCE__USE, &ad);
+    return security_iterate_iomem_sids(start, end, _iomem_has_perm, &data);
 }
 
 static int flask_perfcontrol(void)
@@ -736,14 +741,33 @@ static int flask_shadow_control(struct domain *d, uint32_t op)
     return domain_has_perm(current->domain, d, SECCLASS_SHADOW, perm);
 }
 
-static int ioport_has_perm(struct domain *d, uint32_t ioport, uint8_t access)
-{
-    u32 perm;
-    u32 rsid;
-    int rc = -EPERM;
-
-    struct avc_audit_data ad;
+struct ioport_has_perm_data {
     struct domain_security_struct *ssec, *tsec;
+    u32 perm;
+};
+
+static int _ioport_has_perm(void *v, u32 sid, unsigned long start, unsigned long end)
+{
+    struct ioport_has_perm_data *data = v;
+    struct avc_audit_data ad;
+    int rc;
+
+    AVC_AUDIT_DATA_INIT(&ad, DEV);
+    ad.device = start;
+
+    rc = avc_has_perm(data->ssec->sid, sid, SECCLASS_RESOURCE, data->perm, &ad);
+
+    if ( rc )
+        return rc;
+
+    return avc_has_perm(data->tsec->sid, sid, SECCLASS_RESOURCE, RESOURCE__USE, &ad);
+}
+
+
+static int ioport_has_perm(struct domain *d, uint32_t start, uint32_t end, uint8_t access)
+{
+    int rc;
+    struct ioport_has_perm_data data;
 
     rc = domain_has_perm(current->domain, d, SECCLASS_RESOURCE,
                          resource_to_perm(access));
@@ -752,29 +776,14 @@ static int ioport_has_perm(struct domain *d, uint32_t ioport, uint8_t access)
         return rc;
 
     if ( access )
-        perm = RESOURCE__ADD_IOPORT;
+        data.perm = RESOURCE__ADD_IOPORT;
     else
-        perm = RESOURCE__REMOVE_IOPORT;
+        data.perm = RESOURCE__REMOVE_IOPORT;
 
-    ssec = current->domain->ssid;
-    tsec = d->ssid;
+    data.ssec = current->domain->ssid;
+    data.tsec = d->ssid;
 
-    rc = security_ioport_sid(ioport, &rsid);
-    if ( rc )
-        return rc;
-
-    AVC_AUDIT_DATA_INIT(&ad, DEV);
-    ad.device = ioport;
-
-    rc = avc_has_perm(ssec->sid, rsid, SECCLASS_RESOURCE, perm, &ad);
-    if ( rc )
-        return rc;
-
-    if ( access )
-        return avc_has_perm(tsec->sid, rsid, SECCLASS_RESOURCE, 
-                            RESOURCE__USE, &ad);
-    else
-        return rc;
+    return security_iterate_ioport_sids(start, end, _ioport_has_perm, &data);
 }
 
 static int flask_getpageframeinfo(struct page_info *page)
@@ -1184,31 +1193,25 @@ static int io_has_perm(struct domain *d, char *name, unsigned long s,
 
     if ( strcmp(name, "I/O Memory") == 0 )
     {
-        rc = iomem_has_perm(d, s, access);
+        rc = iomem_has_perm(d, s, e, access);
         if ( rc )
             return rc;
-
-        if ( s != e )
-            rc = iomem_has_perm(d, e, access);
     }
     else if ( strcmp(name, "Interrupts") == 0 )
     {
-        rc = irq_has_perm(d, s, access);
-        if ( rc )
-            return rc;
-
-        if ( s != e )
-            rc = irq_has_perm(d, e, access);
+        while (s <= e) {
+            rc = irq_has_perm(d, s, access);
+            if ( rc )
+                return rc;
+            s++;
+        }
     }
 #ifdef CONFIG_X86
     else if ( strcmp(name, "I/O Ports") == 0 )
     {
-        rc = ioport_has_perm(d, s, access);
+        rc = ioport_has_perm(d, s, e, access);
         if ( rc )
             return rc;
-
-        if ( s != e )
-            rc = ioport_has_perm(d, e, access);
     }
 #endif
 
