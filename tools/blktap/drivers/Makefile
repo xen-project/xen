@@ -3,7 +3,6 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 IBIN         = blktapctrl tapdisk
 QCOW_UTIL    = img2qcow qcow2raw qcow-create
-LIBAIO_DIR   = ../../libaio/src
 MEMSHR_DIR   = ../../memshr
 
 CFLAGS   += -Werror
@@ -11,7 +10,6 @@ CFLAGS   += -Wno-unused
 CFLAGS   += -I../lib
 CFLAGS   += $(CFLAGS_libxenctrl)
 CFLAGS   += $(CFLAGS_libxenstore)
-CFLAGS   += -I $(LIBAIO_DIR)
 CFLAGS   += -I $(MEMSHR_DIR)
 CFLAGS   += -D_GNU_SOURCE
 
@@ -29,8 +27,16 @@ CFLAGS += -DMEMSHR
 MEMSHRLIBS += $(MEMSHR_DIR)/libmemshr.a
 endif
 
+ifneq ($(CONFIG_SYSTEM_LIBAIO),y)
+LIBAIO_DIR   = ../../libaio/src
+CFLAGS      += -I $(LIBAIO_DIR)
+AIOLIBS     := $(LIBAIO_DIR)/libaio.a
+else
+AIOLIBS     := -laio
+endif
+
 LDLIBS_blktapctrl := $(MEMSHRLIBS) $(LDLIBS_libxenctrl) $(LDLIBS_libxenstore) -L../lib -lblktap -lrt -lm -lpthread
-LDLIBS_img := $(LIBAIO_DIR)/libaio.a $(CRYPT_LIB) -lpthread -lz
+LDLIBS_img := $(AIOLIBS) $(CRYPT_LIB) -lpthread -lz
 
 BLK-OBJS-y  := block-aio.o
 BLK-OBJS-y  += block-sync.o
