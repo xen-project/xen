@@ -444,6 +444,7 @@ static int libxl__domain_suspend_common_callback(void *data)
             usleep(100000);
 
             state = libxl__xs_read(si->gc, XBT_NULL, path);
+            if (!state) state = "";
 
             watchdog--;
         }
@@ -463,6 +464,7 @@ static int libxl__domain_suspend_common_callback(void *data)
             t = xs_transaction_start(ctx->xsh);
 
             state = libxl__xs_read(si->gc, t, path);
+            if (!state) state = "";
 
             if (!strcmp(state, "suspend"))
                 libxl__xs_write(si->gc, t, path, "");
