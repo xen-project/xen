@@ -554,7 +554,7 @@ static void __init ns16550_parse_port_config(
     if ( *conf == ',' )
     {
         conf++;
-        if ( strncmp(conf, "pci", 5) == 0 )
+        if ( strncmp(conf, "pci", 3) == 0 )
         {
             if ( pci_uart_config(uart, 1/* skip AMT */, uart - ns16550_com) )
                 return;
