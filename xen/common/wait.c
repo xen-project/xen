@@ -34,6 +34,8 @@ struct waitqueue_vcpu {
      */
     void *esp;
     char *stack;
+    cpumask_t saved_affinity;
+    unsigned int wakeup_cpu;
 #endif
 };
 
@@ -106,8 +108,18 @@ void wake_up(struct waitqueue_head *wq)
 static void __prepare_to_wait(struct waitqueue_vcpu *wqv)
 {
     char *cpu_info = (char *)get_cpu_info();
+    struct vcpu *curr = current;
 
     ASSERT(wqv->esp == 0);
+
+    /* Save current VCPU affinity; force wakeup on *this* CPU only. */
+    wqv->wakeup_cpu = smp_processor_id();
+    cpumask_copy(&wqv->saved_affinity, curr->cpu_affinity);
+    if ( vcpu_set_affinity(curr, cpumask_of(wqv->wakeup_cpu)) )
+    {
+        gdprintk(XENLOG_ERR, "Unable to set vcpu affinity\n");
+        domain_crash_synchronous();
+    }
 
     asm volatile (
 #ifdef CONFIG_X86_64
@@ -144,6 +156,7 @@ static void __prepare_to_wait(struct waitqueue_vcpu *wqv)
 static void __finish_wait(struct waitqueue_vcpu *wqv)
 {
     wqv->esp = NULL;
+    (void)vcpu_set_affinity(current, &wqv->saved_affinity);
 }
 
 void check_wakeup_from_wait(void)
@@ -154,6 +167,20 @@ void check_wakeup_from_wait(void)
 
     if ( likely(wqv->esp == NULL) )
         return;
+
+    /* Check if we woke up on the wrong CPU. */
+    if ( unlikely(smp_processor_id() != wqv->wakeup_cpu) )
+    {
+        /* Re-set VCPU affinity and re-enter the scheduler. */
+        struct vcpu *curr = current;
+        cpumask_copy(&wqv->saved_affinity, curr->cpu_affinity);
+        if ( vcpu_set_affinity(curr, cpumask_of(wqv->wakeup_cpu)) )
+        {
+            gdprintk(XENLOG_ERR, "Unable to set vcpu affinity\n");
+            domain_crash_synchronous();
+        }
+        wait(); /* takes us back into the scheduler */
+    }
 
     asm volatile (
         "mov %1,%%"__OP"sp; rep movsb; jmp *(%%"__OP"sp)"
