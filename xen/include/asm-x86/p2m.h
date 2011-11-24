@@ -150,7 +150,8 @@ typedef enum {
 #define P2M_MAGIC_TYPES (p2m_to_mask(p2m_populate_on_demand))
 
 /* Pageable types */
-#define P2M_PAGEABLE_TYPES (p2m_to_mask(p2m_ram_rw))
+#define P2M_PAGEABLE_TYPES (p2m_to_mask(p2m_ram_rw) \
+                            | p2m_to_mask(p2m_ram_logdirty) )
 
 #define P2M_PAGING_TYPES (p2m_to_mask(p2m_ram_paging_out)        \
                           | p2m_to_mask(p2m_ram_paged)           \

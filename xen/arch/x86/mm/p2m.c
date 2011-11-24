@@ -1061,7 +1061,9 @@ void p2m_mem_paging_resume(struct domain *d)
         if ( mfn_valid(mfn) && 
              (p2mt == p2m_ram_paging_in || p2mt == p2m_ram_paging_in_start) )
         {
-            set_p2m_entry(p2m, rsp.gfn, mfn, PAGE_ORDER_4K, p2m_ram_rw, a);
+            set_p2m_entry(p2m, rsp.gfn, mfn, PAGE_ORDER_4K, 
+                            paging_mode_log_dirty(d) ? p2m_ram_logdirty : p2m_ram_rw, 
+                            a);
             set_gpfn_from_mfn(mfn_x(mfn), rsp.gfn);
             audit_p2m(p2m, 1);
         }
