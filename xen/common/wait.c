@@ -106,13 +106,16 @@ void wake_up(struct waitqueue_head *wq)
 static void __prepare_to_wait(struct waitqueue_vcpu *wqv)
 {
     char *cpu_info = (char *)get_cpu_info();
+
     asm volatile (
 #ifdef CONFIG_X86_64
         "push %%rax; push %%rbx; push %%rcx; push %%rdx; push %%rdi; "
         "push %%rbp; push %%r8; push %%r9; push %%r10; push %%r11; "
         "push %%r12; push %%r13; push %%r14; push %%r15; call 1f; "
         "1: mov 80(%%rsp),%%rdi; mov 96(%%rsp),%%rcx; mov %%rsp,%%rsi; "
-        "sub %%rsi,%%rcx; rep movsb; mov %%rsp,%%rsi; pop %%rax; "
+        "sub %%rsi,%%rcx; cmp %3,%%rcx; jbe 2f; "
+        "xor %%esi,%%esi; jmp 3f; "
+        "2: rep movsb; mov %%rsp,%%rsi; 3: pop %%rax; "
         "pop %%r15; pop %%r14; pop %%r13; pop %%r12; "
         "pop %%r11; pop %%r10; pop %%r9; pop %%r8; "
         "pop %%rbp; pop %%rdi; pop %%rdx; pop %%rcx; pop %%rbx; pop %%rax"
@@ -120,13 +123,20 @@ static void __prepare_to_wait(struct waitqueue_vcpu *wqv)
         "push %%eax; push %%ebx; push %%ecx; push %%edx; push %%edi; "
         "push %%ebp; call 1f; "
         "1: mov 8(%%esp),%%edi; mov 16(%%esp),%%ecx; mov %%esp,%%esi; "
-        "sub %%esi,%%ecx; rep movsb; mov %%esp,%%esi; pop %%eax; "
+        "sub %%esi,%%ecx; cmp %3,%%ecx; jbe 2f; "
+        "xor %%esi,%%esi; jmp 3f; "
+        "2: rep movsb; mov %%esp,%%esi; 3: pop %%eax; "
         "pop %%ebp; pop %%edi; pop %%edx; pop %%ecx; pop %%ebx; pop %%eax"
 #endif
         : "=S" (wqv->esp)
-        : "c" (cpu_info), "D" (wqv->stack)
+        : "c" (cpu_info), "D" (wqv->stack), "i" (PAGE_SIZE)
         : "memory" );
-    BUG_ON((cpu_info - (char *)wqv->esp) > PAGE_SIZE);
+
+    if ( unlikely(wqv->esp == 0) )
+    {
+        gdprintk(XENLOG_ERR, "Stack too large in %s\n", __FUNCTION__);
+        domain_crash_synchronous();
+    }
 }
 
 static void __finish_wait(struct waitqueue_vcpu *wqv)
@@ -162,6 +172,7 @@ void prepare_to_wait(struct waitqueue_head *wq)
     struct vcpu *curr = current;
     struct waitqueue_vcpu *wqv = curr->waitqueue_vcpu;
 
+    ASSERT(!in_atomic());
     ASSERT(list_empty(&wqv->list));
 
     spin_lock(&wq->lock);
