@@ -105,6 +105,8 @@
 #define PCI_MIN_GNT  0x3e /* 8 bits */
 #define PCI_MAX_LAT  0x3f /* 8 bits */
 
+#define PCI_INTEL_OPREGION 0xfc /* 4 bits */
+
 #endif /* __HVMLOADER_PCI_REGS_H__ */
 
 /*

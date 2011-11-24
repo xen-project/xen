@@ -32,6 +32,7 @@ unsigned long pci_mem_start = PCI_MEM_START;
 unsigned long pci_mem_end = PCI_MEM_END;
 
 enum virtual_vga virtual_vga = VGA_none;
+unsigned long igd_opregion_pgbase = 0;
 
 void pci_setup(void)
 {
@@ -95,6 +96,17 @@ void pci_setup(void)
             {
                 vga_devfn = devfn;
                 virtual_vga = VGA_pt;
+                if ( vendor_id == 0x8086 )
+                {
+                    igd_opregion_pgbase = mem_hole_alloc(2);
+                    /*
+                     * Write the the OpRegion offset to give the opregion
+                     * address to the device model. The device model will trap 
+                     * and map the OpRegion at the give address.
+                     */
+                    pci_writel(vga_devfn, PCI_INTEL_OPREGION,
+                               igd_opregion_pgbase << PAGE_SHIFT);
+                }
             }
             break;
         case 0x0680:

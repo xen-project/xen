@@ -5,6 +5,7 @@
 
 enum virtual_vga { VGA_none, VGA_std, VGA_cirrus, VGA_pt };
 extern enum virtual_vga virtual_vga;
+extern unsigned long igd_opregion_pgbase;
 
 struct bios_config {
     const char *name;

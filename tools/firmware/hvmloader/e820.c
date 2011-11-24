@@ -128,11 +128,37 @@ int build_e820_table(struct e820entry *e820,
      * Explicitly reserve space for special pages.
      * This space starts at RESERVED_MEMBASE an extends to cover various
      * fixed hardware mappings (e.g., LAPIC, IOAPIC, default SVGA framebuffer).
+     *
+     * If igd_opregion_pgbase we need to split the RESERVED region in two.
      */
-    e820[nr].addr = RESERVED_MEMBASE;
-    e820[nr].size = (uint32_t)-e820[nr].addr;
-    e820[nr].type = E820_RESERVED;
-    nr++;
+
+    if ( igd_opregion_pgbase )
+    {
+        uint32_t igd_opregion_base = igd_opregion_pgbase << PAGE_SHIFT;
+
+        e820[nr].addr = RESERVED_MEMBASE;
+        e820[nr].size = (uint32_t) igd_opregion_base - RESERVED_MEMBASE;
+        e820[nr].type = E820_RESERVED;
+        nr++;
+
+        e820[nr].addr = igd_opregion_base;
+        e820[nr].size = 2 * PAGE_SIZE;
+        e820[nr].type = E820_NVS;
+        nr++;
+
+        e820[nr].addr = igd_opregion_base + 2 * PAGE_SIZE;
+        e820[nr].size = (uint32_t)-e820[nr].addr;
+        e820[nr].type = E820_RESERVED;
+        nr++;
+    }
+    else
+    {
+        e820[nr].addr = RESERVED_MEMBASE;
+        e820[nr].size = (uint32_t)-e820[nr].addr;
+        e820[nr].type = E820_RESERVED;
+        nr++;
+    }
+
 
     if ( hvm_info->high_mem_pgend )
     {
