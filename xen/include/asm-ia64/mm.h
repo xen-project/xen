@@ -532,6 +532,7 @@ extern u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__,
 				u64* itir, struct p2m_entry* entry);
 #define machine_to_phys_mapping	mpt_table
 
+#define INVALID_GFN              (~0UL)
 #define INVALID_M2P_ENTRY        (~0UL)
 #define VALID_M2P(_e)            (!((_e) & (1UL<<63)))
 #define SHARED_M2P(_e)           0

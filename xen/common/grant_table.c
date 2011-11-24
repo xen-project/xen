@@ -173,7 +173,7 @@ static int __get_paged_frame(unsigned long gfn, unsigned long *frame, int readon
        rc = GNTST_bad_page;
     }
 #else
-    *frame = readonly ? get_gfn_untyped(rd, gfn) : gfn_to_mfn_private(rd, gfn);
+    *frame = readonly ? gmfn_to_mfn(rd, gfn) : gfn_to_mfn_private(rd, gfn);
 #endif
 
     return rc;
