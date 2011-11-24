@@ -385,7 +385,7 @@ struct libxenvchan *libxenvchan_client_init(xentoollog_logger *logger, int domai
 
 	ctrl->gnttab = xc_gnttab_open(logger, 0);
 	if (!ctrl->gnttab)
-		goto out;
+		goto fail;
 
 // set up event channel
 	if (init_evt_cli(ctrl, domain, logger))
