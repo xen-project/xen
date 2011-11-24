@@ -141,7 +141,7 @@ int hap_track_dirty_vram(struct domain *d,
         }
         else if ( !paging_mode_log_dirty(d) && !dirty_vram )
         {
-            rc -ENOMEM;
+            rc = -ENOMEM;
             if ( (dirty_vram = xmalloc(struct sh_dirty_vram)) == NULL )
                 goto param_fail;
 
