@@ -6,6 +6,7 @@ export PYTHON
 export LIBXENAPI_BINDINGS
 export CHECK_INCLUDES
 export CHECK_LIB
+export CONFIG_SYSTEM_LIBAIO
 
 .PHONY: all install
 all install: check-build
