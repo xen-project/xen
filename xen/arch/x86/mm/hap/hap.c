@@ -709,6 +709,8 @@ int hap_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
         return rc;
     case XEN_DOMCTL_SHADOW_OP_GET_ALLOCATION:
         sc->mb = hap_get_allocation(d);
+        /* Fall through... */
+    case XEN_DOMCTL_SHADOW_OP_OFF:
         return 0;
     default:
         HAP_ERROR("Bad hap domctl op %u\n", sc->op);
