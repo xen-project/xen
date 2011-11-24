@@ -714,8 +714,9 @@ set_shared_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
      * sharable first */
     ASSERT(p2m_is_shared(ot));
     ASSERT(mfn_valid(omfn));
-    /* XXX: M2P translations have to be handled properly for shared pages */
-    set_gpfn_from_mfn(mfn_x(omfn), INVALID_M2P_ENTRY);
+    if ( ((mfn_to_page(omfn)->u.inuse.type_info & PGT_type_mask) 
+                    != PGT_shared_page) )
+        set_gpfn_from_mfn(mfn_x(omfn), INVALID_M2P_ENTRY);
 
     P2M_DEBUG("set shared %lx %lx\n", gfn, mfn_x(mfn));
     rc = set_p2m_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2m_ram_shared, p2m->default_access);
