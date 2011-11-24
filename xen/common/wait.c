@@ -107,6 +107,8 @@ static void __prepare_to_wait(struct waitqueue_vcpu *wqv)
 {
     char *cpu_info = (char *)get_cpu_info();
 
+    ASSERT(wqv->esp == 0);
+
     asm volatile (
 #ifdef CONFIG_X86_64
         "push %%rax; push %%rbx; push %%rcx; push %%rdx; push %%rdi; "
@@ -173,14 +175,13 @@ void prepare_to_wait(struct waitqueue_head *wq)
     struct waitqueue_vcpu *wqv = curr->waitqueue_vcpu;
 
     ASSERT(!in_atomic());
-    ASSERT(list_empty(&wqv->list));
+    __prepare_to_wait(wqv);
 
+    ASSERT(list_empty(&wqv->list));
     spin_lock(&wq->lock);
     list_add_tail(&wqv->list, &wq->list);
     vcpu_pause_nosync(curr);
     spin_unlock(&wq->lock);
-
-    __prepare_to_wait(wqv);
 }
 
 void finish_wait(struct waitqueue_head *wq)
