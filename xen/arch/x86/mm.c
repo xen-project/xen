@@ -4773,13 +4773,16 @@ static int xenmem_add_to_physmap_once(
     /* Unmap from old location, if any. */
     gpfn = get_gpfn_from_mfn(mfn);
     ASSERT( gpfn != SHARED_M2P_ENTRY );
+    if ( xatp->space == XENMAPSPACE_gmfn ||
+         xatp->space == XENMAPSPACE_gmfn_range )
+        ASSERT( gpfn == gfn );
     if ( gpfn != INVALID_M2P_ENTRY )
         guest_physmap_remove_page(d, gpfn, mfn, PAGE_ORDER_4K);
 
     /* Map at new location. */
     rc = guest_physmap_add_page(d, xatp->gpfn, mfn, PAGE_ORDER_4K);
 
-    /* In the XENMAPSPACE_gmfn, we took a ref and locked the p2m at the top */
+    /* In the XENMAPSPACE_gmfn, we took a ref of the gfn at the top */
     if ( xatp->space == XENMAPSPACE_gmfn ||
          xatp->space == XENMAPSPACE_gmfn_range )
         put_gfn(d, gfn);
