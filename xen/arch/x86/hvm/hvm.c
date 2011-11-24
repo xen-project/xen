@@ -3755,7 +3755,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         for ( pfn = a.first_pfn; pfn < a.first_pfn + a.nr; pfn++ )
         {
             p2m_type_t t;
-            mfn_t mfn = get_gfn(d, pfn, &t);
+            mfn_t mfn = get_gfn_unshare(d, pfn, &t);
             if ( p2m_is_paging(t) )
             {
                 p2m_mem_paging_populate(d, pfn);
@@ -3764,8 +3764,16 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                 goto param_fail3;
             }
             if( p2m_is_shared(t) )
+            {
+                /* If it insists on not unsharing itself, crash the domain 
+                 * rather than crashing the host down in mark dirty */
                 gdprintk(XENLOG_WARNING,
                          "shared pfn 0x%lx modified?\n", pfn);
+                domain_crash(d);
+                put_gfn(d, pfn);
+                rc = -EINVAL;
+                goto param_fail3;
+            }
             
             if ( mfn_x(mfn) != INVALID_MFN )
             {
