@@ -52,7 +52,7 @@ install: all
 
 .PHONY: clean
 clean:
-	$(RM) -f *.o *.so* *.a vchan-node1 vchan-node2 $(DEPS)
+	$(RM) -f *.o *.opic *.so* *.a vchan-node1 vchan-node2 $(DEPS)
 
 distclean: clean
 
