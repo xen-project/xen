@@ -542,10 +542,11 @@ pod_retry_l3:
             /* The read has succeeded, so we know that mapping exists */
             if ( q != p2m_query )
             {
-                if ( !p2m_pod_demand_populate(p2m, gfn, PAGE_ORDER_1G, q) )
+                if ( !p2m_pod_check_and_populate(p2m, gfn,
+                                      (l1_pgentry_t *) &l3e, PAGE_ORDER_1G, q) )
                     goto pod_retry_l3;
                 p2mt = p2m_invalid;
-                printk("%s: Allocate 1GB failed!\n", __func__);
+                gdprintk(XENLOG_ERR, "%s: Allocate 1GB failed!\n", __func__);
                 goto out;
             }
             else
@@ -743,8 +744,10 @@ pod_retry_l3:
             {
                 if ( q != p2m_query )
                 {
-                    if ( !p2m_pod_demand_populate(p2m, gfn, PAGE_ORDER_1G, q) )
+                    if ( !p2m_pod_check_and_populate(p2m, gfn,
+                                      (l1_pgentry_t *) l3e, PAGE_ORDER_1G, q) )
                         goto pod_retry_l3;
+                    gdprintk(XENLOG_ERR, "%s: Allocate 1GB failed!\n", __func__);
                 }
                 else
                     *t = p2m_populate_on_demand;

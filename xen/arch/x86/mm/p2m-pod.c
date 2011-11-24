@@ -987,7 +987,6 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
         set_p2m_entry(p2m, gfn_aligned, _mfn(0), PAGE_ORDER_2M,
                       p2m_populate_on_demand, p2m->default_access);
         audit_p2m(p2m, 1);
-        p2m_unlock(p2m);
         return 0;
     }
 
