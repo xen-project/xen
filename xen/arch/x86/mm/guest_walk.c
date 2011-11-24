@@ -87,7 +87,7 @@ static uint32_t set_ad_bits(void *guest_p, void *walk_p, int set_dirty)
 }
 
 /* If the map is non-NULL, we leave this function having 
- * called get_gfn, you need to call put_gfn. */
+ * acquired an extra ref on mfn_to_page(*mfn) */
 static inline void *map_domain_gfn(struct p2m_domain *p2m,
                                    gfn_t gfn, 
                                    mfn_t *mfn,
@@ -95,6 +95,7 @@ static inline void *map_domain_gfn(struct p2m_domain *p2m,
                                    uint32_t *rc) 
 {
     p2m_access_t p2ma;
+    void *map;
 
     /* Translate the gfn, unsharing if shared */
     *mfn = get_gfn_type_access(p2m, gfn_x(gfn), p2mt, &p2ma, p2m_unshare, NULL);
@@ -120,7 +121,12 @@ static inline void *map_domain_gfn(struct p2m_domain *p2m,
     }
     ASSERT(mfn_valid(mfn_x(*mfn)));
     
-    return map_domain_page(mfn_x(*mfn));
+    /* Get an extra ref to the page to ensure liveness of the map.
+     * Then we can safely put gfn */
+    page_get_owner_and_reference(mfn_to_page(mfn_x(*mfn)));
+    map = map_domain_page(mfn_x(*mfn));
+    __put_gfn(p2m, gfn_x(gfn));
+    return map;
 }
 
 
@@ -357,20 +363,20 @@ set_ad:
     if ( l3p ) 
     {
         unmap_domain_page(l3p);
-        __put_gfn(p2m, gfn_x(guest_l4e_get_gfn(gw->l4e)));
+        put_page(mfn_to_page(mfn_x(gw->l3mfn)));
     }
 #endif
 #if GUEST_PAGING_LEVELS >= 3
     if ( l2p ) 
     {
         unmap_domain_page(l2p);
-        __put_gfn(p2m, gfn_x(guest_l3e_get_gfn(gw->l3e))); 
+        put_page(mfn_to_page(mfn_x(gw->l2mfn)));
     }
 #endif
     if ( l1p ) 
     {
         unmap_domain_page(l1p);
-        __put_gfn(p2m, gfn_x(guest_l2e_get_gfn(gw->l2e)));
+        put_page(mfn_to_page(mfn_x(gw->l1mfn)));
     }
 
     return rc;
