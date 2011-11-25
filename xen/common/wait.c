@@ -87,13 +87,13 @@ void init_waitqueue_head(struct waitqueue_head *wq)
     INIT_LIST_HEAD(&wq->list);
 }
 
-void wake_up(struct waitqueue_head *wq)
+void wake_up_nr(struct waitqueue_head *wq, unsigned int nr)
 {
     struct waitqueue_vcpu *wqv;
 
     spin_lock(&wq->lock);
 
-    while ( !list_empty(&wq->list) )
+    while ( !list_empty(&wq->list) && nr-- )
     {
         wqv = list_entry(wq->list.next, struct waitqueue_vcpu, list);
         list_del_init(&wqv->list);
@@ -101,6 +101,16 @@ void wake_up(struct waitqueue_head *wq)
     }
 
     spin_unlock(&wq->lock);
+}
+
+void wake_up_one(struct waitqueue_head *wq)
+{
+    wake_up_nr(wq, 1);
+}
+
+void wake_up_all(struct waitqueue_head *wq)
+{
+    wake_up_nr(wq, UINT_MAX);
 }
 
 #ifdef CONFIG_X86

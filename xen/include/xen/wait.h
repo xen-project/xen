@@ -28,8 +28,10 @@ struct waitqueue_head {
 /* Dynamically initialise a waitqueue. */
 void init_waitqueue_head(struct waitqueue_head *wq);
 
-/* Wake all VCPUs waiting on specified waitqueue. */
-void wake_up(struct waitqueue_head *wq);
+/* Wake VCPU(s) waiting on specified waitqueue. */
+void wake_up_nr(struct waitqueue_head *wq, unsigned int nr);
+void wake_up_one(struct waitqueue_head *wq);
+void wake_up_all(struct waitqueue_head *wq);
 
 /* Wait on specified waitqueue until @condition is true. */
 #define wait_event(wq, condition)               \
