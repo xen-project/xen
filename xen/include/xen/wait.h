@@ -25,8 +25,9 @@ struct waitqueue_head {
         .list = LIST_HEAD_INIT((name).list)     \
     }
 
-/* Dynamically initialise a waitqueue. */
+/* Dynamically initialise/destroy a waitqueue. */
 void init_waitqueue_head(struct waitqueue_head *wq);
+void destroy_waitqueue_head(struct waitqueue_head *wq);
 
 /* Wake VCPU(s) waiting on specified waitqueue. */
 void wake_up_nr(struct waitqueue_head *wq, unsigned int nr);

@@ -87,6 +87,11 @@ void init_waitqueue_head(struct waitqueue_head *wq)
     INIT_LIST_HEAD(&wq->list);
 }
 
+void destroy_waitqueue_head(struct waitqueue_head *wq)
+{
+    wake_up_all(wq);
+}
+
 void wake_up_nr(struct waitqueue_head *wq, unsigned int nr)
 {
     struct waitqueue_vcpu *wqv;
@@ -98,6 +103,7 @@ void wake_up_nr(struct waitqueue_head *wq, unsigned int nr)
         wqv = list_entry(wq->list.next, struct waitqueue_vcpu, list);
         list_del_init(&wqv->list);
         vcpu_unpause(wqv->vcpu);
+        put_domain(wqv->vcpu->domain);
     }
 
     spin_unlock(&wq->lock);
@@ -218,6 +224,7 @@ void prepare_to_wait(struct waitqueue_head *wq)
     spin_lock(&wq->lock);
     list_add_tail(&wqv->list, &wq->list);
     vcpu_pause_nosync(curr);
+    get_knownalive_domain(curr->domain);
     spin_unlock(&wq->lock);
 }
 
@@ -236,6 +243,7 @@ void finish_wait(struct waitqueue_head *wq)
     {
         list_del_init(&wqv->list);
         vcpu_unpause(curr);
+        put_domain(curr->domain);
     }
     spin_unlock(&wq->lock);
 }
