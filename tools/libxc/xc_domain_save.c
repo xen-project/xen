@@ -1506,6 +1506,18 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
             PERROR("Error when writing the firmware ioport version");
             goto out;
         }
+
+        chunk.id = XC_SAVE_ID_HVM_VIRIDIAN;
+        chunk.data = 0;
+        xc_get_hvm_param(xch, dom, HVM_PARAM_VIRIDIAN,
+                         (unsigned long *)&chunk.data);
+
+        if ( (chunk.data != 0) &&
+             wrexact(io_fd, &chunk, sizeof(chunk)) )
+        {
+            PERROR("Error when writing the viridian flag");
+            goto out;
+        }
     }
 
     if ( !callbacks->checkpoint )

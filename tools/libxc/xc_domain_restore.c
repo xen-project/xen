@@ -675,6 +675,7 @@ typedef struct {
     uint64_t vm86_tss;
     uint64_t console_pfn;
     uint64_t acpi_ioport_location;
+    uint64_t viridian;
 } pagebuf_t;
 
 static int pagebuf_init(pagebuf_t* buf)
@@ -805,6 +806,16 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
              RDEXACT(fd, &buf->acpi_ioport_location, sizeof(uint64_t)) )
         {
             PERROR("error read the acpi ioport location");
+            return -1;
+        }
+        return pagebuf_get_one(xch, ctx, buf, fd, dom);
+
+    case XC_SAVE_ID_HVM_VIRIDIAN:
+        /* Skip padding 4 bytes then read the acpi ioport location. */
+        if ( RDEXACT(fd, &buf->viridian, sizeof(uint32_t)) ||
+             RDEXACT(fd, &buf->viridian, sizeof(uint64_t)) )
+        {
+            PERROR("error read the viridian flag");
             return -1;
         }
         return pagebuf_get_one(xch, ctx, buf, fd, dom);
@@ -1439,6 +1450,9 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
         if ( !ctx->last_checkpoint )
             fcntl(io_fd, F_SETFL, orig_io_fd_flags | O_NONBLOCK);
     }
+
+    if (pagebuf.viridian != 0)
+        xc_set_hvm_param(xch, dom, HVM_PARAM_VIRIDIAN, 1);
 
     if (pagebuf.acpi_ioport_location == 1) {
         DBGPRINTF("Use new firmware ioport from the checkpoint\n");
