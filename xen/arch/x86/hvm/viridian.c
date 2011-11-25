@@ -206,11 +206,8 @@ int wrmsr_viridian_regs(uint32_t idx, uint64_t val)
     struct vcpu *v = current;
     struct domain *d = v->domain;
 
-    if ( !is_viridian_domain(d) ) {
-        gdprintk(XENLOG_WARNING, "%s: %d not a viridian domain\n", __func__,
-                 d->domain_id);
+    if ( !is_viridian_domain(d) )
         return 0;
-    }
 
     switch ( idx )
     {
@@ -274,11 +271,8 @@ int rdmsr_viridian_regs(uint32_t idx, uint64_t *val)
     struct vcpu *v = current;
     struct domain *d = v->domain;
     
-    if ( !is_viridian_domain(d) ) {
-        gdprintk(XENLOG_WARNING, "%s: %d not a viridian domain\n", __func__,
-                 d->domain_id);
+    if ( !is_viridian_domain(d) )
         return 0;
-    }
 
     switch ( idx )
     {
@@ -417,8 +411,6 @@ static int viridian_load_domain_ctxt(struct domain *d, hvm_domain_context_t *h)
     if ( hvm_load_entry(VIRIDIAN_DOMAIN, h, &ctxt) != 0 )
         return -EINVAL;
 
-    ASSERT(is_viridian_domain(d));
-
     d->arch.hvm_domain.viridian.hypercall_gpa.raw = ctxt.hypercall_gpa;
     d->arch.hvm_domain.viridian.guest_os_id.raw   = ctxt.guest_os_id;
 
@@ -462,8 +454,6 @@ static int viridian_load_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 
     if ( hvm_load_entry(VIRIDIAN_VCPU, h, &ctxt) != 0 )
         return -EINVAL;
-
-    ASSERT(is_viridian_domain(d));
 
     v->arch.hvm_vcpu.viridian.apic_assist.raw = ctxt.apic_assist;
 
