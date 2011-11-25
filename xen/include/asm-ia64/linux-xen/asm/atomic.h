@@ -39,8 +39,8 @@ typedef struct { volatile __s64 counter; } atomic64_t;
 #define ATOMIC_INIT(i)		{ (i) }
 #define ATOMIC64_INIT(i)	{ (i) }
 
-#define build_atomic_read(tag, type) \
-static inline type atomic_read##tag(const volatile type *addr) \
+#define build_read_atomic(tag, type) \
+static inline type read_##tag##_atomic(const volatile type *addr) \
 { \
 	type ret; \
 	asm volatile("ld%2.acq %0 = %1" \
@@ -49,37 +49,62 @@ static inline type atomic_read##tag(const volatile type *addr) \
 	return ret; \
 }
 
-#define build_atomic_write(tag, type) \
-static inline void atomic_write##tag(volatile type *addr, type val) \
+#define build_write_atomic(tag, type) \
+static inline void write_##tag##_atomic(volatile type *addr, type val) \
 { \
 	asm volatile("st%2.rel %0 = %1" \
 		     : "=m" (*addr) \
 		     : "r" (val), "i" (sizeof(type))); \
 }
 
-build_atomic_read(8, uint8_t)
-build_atomic_read(16, uint16_t)
-build_atomic_read(32, uint32_t)
-build_atomic_read(64, uint64_t)
-build_atomic_read(_int, int)
-build_atomic_read(_long, long)
+build_read_atomic(u8, uint8_t)
+build_read_atomic(u16, uint16_t)
+build_read_atomic(u32, uint32_t)
+build_read_atomic(u64, uint64_t)
 
-build_atomic_write(8, uint8_t)
-build_atomic_write(16, uint16_t)
-build_atomic_write(32, uint32_t)
-build_atomic_write(64, uint64_t)
-build_atomic_write(_int, int)
-build_atomic_write(_long, long)
+build_write_atomic(u8, uint8_t)
+build_write_atomic(u16, uint16_t)
+build_write_atomic(u32, uint32_t)
+build_write_atomic(u64, uint64_t)
+
+#undef build_read_atomic
+#undef build_write_atomic
+
+void __bad_atomic_size(void);
+
+#define read_atomic(p) ({                                               \
+    typeof(*p) __x;                                                     \
+    switch ( sizeof(*p) ) {                                             \
+    case 1: __x = (typeof(*p))read_u8_atomic((uint8_t *)p); break;      \
+    case 2: __x = (typeof(*p))read_u16_atomic((uint16_t *)p); break;    \
+    case 4: __x = (typeof(*p))read_u32_atomic((uint32_t *)p); break;    \
+    case 8: __x = (typeof(*p))read_u64_atomic((uint64_t *)p); break;    \
+    default: __x = 0; __bad_atomic_size(); break;                       \
+    }                                                                   \
+    __x;                                                                \
+})
+
+#define write_atomic(p, x) ({                                           \
+    typeof(*p) __x = (x);                                               \
+    switch ( sizeof(*p) ) {                                             \
+    case 1: write_u8_atomic((uint8_t *)p, (uint8_t)__x); break;         \
+    case 2: write_u16_atomic((uint16_t *)p, (uint16_t)__x); break;      \
+    case 4: write_u32_atomic((uint32_t *)p, (uint32_t)__x); break;      \
+    case 8: write_u64_atomic((uint64_t *)p, (uint64_t)__x); break;      \
+    default: __bad_atomic_size(); break;                                \
+    }                                                                   \
+    __x;                                                                \
+})
 
 #define _atomic_read(v)		((v).counter)
 #define _atomic64_read(v)	((v).counter)
-#define atomic_read(v)		atomic_read_int(&((v)->counter))
-#define atomic64_read(v)	atomic_read_long(&((v)->counter))
+#define atomic_read(v)		read_atomic(&((v)->counter))
+#define atomic64_read(v)	read_atomic(&((v)->counter))
 
 #define _atomic_set(v,i)	(((v).counter) = (i))
 #define _atomic64_set(v,i)	(((v).counter) = (i))
-#define atomic_set(v,i)		atomic_write_int(&((v)->counter), i)
-#define atomic64_set(v,l)	atomic_write_long(&((v)->counter), l)
+#define atomic_set(v,i)		write_atomic(&((v)->counter), i)
+#define atomic64_set(v,l)	write_atomic(&((v)->counter), l)
 
 #endif
 

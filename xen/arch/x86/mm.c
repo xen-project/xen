@@ -4629,7 +4629,7 @@ long do_update_descriptor(u64 pa, u64 desc)
 
     /* All is good so make the update. */
     gdt_pent = map_domain_page(mfn);
-    atomic_write64((uint64_t *)&gdt_pent[offset], *(uint64_t *)&d);
+    write_atomic((uint64_t *)&gdt_pent[offset], *(uint64_t *)&d);
     unmap_domain_page(gdt_pent);
 
     put_page_type(page);

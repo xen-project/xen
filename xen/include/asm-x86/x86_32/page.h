@@ -85,15 +85,15 @@ extern unsigned int PAGE_HYPERVISOR_NOCACHE;
 
 #endif
 
-#define pte_read_atomic(ptep)       atomic_read64(ptep)
-#define pte_write_atomic(ptep, pte) atomic_write64(ptep, pte)
-#define pte_write(ptep, pte) do {                             \
-    u32 *__ptep_words = (u32 *)(ptep);                        \
-    atomic_write32(&__ptep_words[0], 0);                      \
-    wmb();                                                    \
-    atomic_write32(&__ptep_words[1], (pte) >> 32);            \
-    wmb();                                                    \
-    atomic_write32(&__ptep_words[0], (pte) >>  0);            \
+#define pte_read_atomic(ptep)       read_atomic(ptep)
+#define pte_write_atomic(ptep, pte) write_atomic(ptep, pte)
+#define pte_write(ptep, pte) do {                   \
+    u32 *__ptep_words = (u32 *)(ptep);              \
+    write_atomic(&__ptep_words[0], 0);              \
+    wmb();                                          \
+    write_atomic(&__ptep_words[1], (pte) >> 32);    \
+    wmb();                                          \
+    write_atomic(&__ptep_words[0], (pte) >>  0);    \
 } while ( 0 )
 
 /* root table */

@@ -239,7 +239,7 @@ static inline bool_t timer_lock(struct timer *timer)
 
     for ( ; ; )
     {
-        cpu = atomic_read16(&timer->cpu);
+        cpu = read_atomic(&timer->cpu);
         if ( unlikely(cpu == TIMER_CPU_status_killed) )
         {
             rcu_read_unlock(&timer_cpu_read_lock);
@@ -292,7 +292,7 @@ void init_timer(
     memset(timer, 0, sizeof(*timer));
     timer->function = function;
     timer->data = data;
-    atomic_write16(&timer->cpu, cpu);
+    write_atomic(&timer->cpu, cpu);
     timer->status = TIMER_STATUS_inactive;
     if ( !timer_lock_irqsave(timer, flags) )
         BUG();
@@ -343,7 +343,7 @@ void migrate_timer(struct timer *timer, unsigned int new_cpu)
 
     for ( ; ; )
     {
-        old_cpu = atomic_read16(&timer->cpu);
+        old_cpu = read_atomic(&timer->cpu);
         if ( (old_cpu == new_cpu) || (old_cpu == TIMER_CPU_status_killed) )
         {
             rcu_read_unlock(&timer_cpu_read_lock);
@@ -375,7 +375,7 @@ void migrate_timer(struct timer *timer, unsigned int new_cpu)
         deactivate_timer(timer);
 
     list_del(&timer->inactive);
-    atomic_write16(&timer->cpu, new_cpu);
+    write_atomic(&timer->cpu, new_cpu);
     list_add(&timer->inactive, &per_cpu(timers, new_cpu).inactive);
 
     if ( active )
@@ -402,7 +402,7 @@ void kill_timer(struct timer *timer)
     list_del(&timer->inactive);
     timer->status = TIMER_STATUS_killed;
     old_cpu = timer->cpu;
-    atomic_write16(&timer->cpu, TIMER_CPU_status_killed);
+    write_atomic(&timer->cpu, TIMER_CPU_status_killed);
 
     spin_unlock_irqrestore(&per_cpu(timers, old_cpu).lock, flags);
 
@@ -573,7 +573,7 @@ static void migrate_timers_from_cpu(unsigned int old_cpu)
              ? old_ts->heap[1] : old_ts->list) != NULL )
     {
         remove_entry(t);
-        atomic_write16(&t->cpu, new_cpu);
+        write_atomic(&t->cpu, new_cpu);
         notify |= add_entry(t);
     }
 
@@ -581,7 +581,7 @@ static void migrate_timers_from_cpu(unsigned int old_cpu)
     {
         t = list_entry(old_ts->inactive.next, struct timer, inactive);
         list_del(&t->inactive);
-        atomic_write16(&t->cpu, new_cpu);
+        write_atomic(&t->cpu, new_cpu);
         list_add(&t->inactive, &new_ts->inactive);
     }
 

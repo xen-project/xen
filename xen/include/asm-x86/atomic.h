@@ -4,36 +4,34 @@
 #include <xen/config.h>
 #include <asm/system.h>
 
-#define build_atomic_read(name, size, type, reg, barrier) \
+#define build_read_atomic(name, size, type, reg, barrier) \
 static inline type name(const volatile type *addr) \
 { type ret; asm volatile("mov" size " %1,%0":reg (ret) \
 :"m" (*(volatile type *)addr) barrier); return ret; }
 
-#define build_atomic_write(name, size, type, reg, barrier) \
+#define build_write_atomic(name, size, type, reg, barrier) \
 static inline void name(volatile type *addr, type val) \
 { asm volatile("mov" size " %1,%0": "=m" (*(volatile type *)addr) \
 :reg (val) barrier); }
 
-build_atomic_read(atomic_read8, "b", uint8_t, "=q", )
-build_atomic_read(atomic_read16, "w", uint16_t, "=r", )
-build_atomic_read(atomic_read32, "l", uint32_t, "=r", )
-build_atomic_read(atomic_read_int, "l", int, "=r", )
+build_read_atomic(read_u8_atomic, "b", uint8_t, "=q", )
+build_read_atomic(read_u16_atomic, "w", uint16_t, "=r", )
+build_read_atomic(read_u32_atomic, "l", uint32_t, "=r", )
 
-build_atomic_write(atomic_write8, "b", uint8_t, "q", )
-build_atomic_write(atomic_write16, "w", uint16_t, "r", )
-build_atomic_write(atomic_write32, "l", uint32_t, "r", )
-build_atomic_write(atomic_write_int, "l", int, "r", )
+build_write_atomic(write_u8_atomic, "b", uint8_t, "q", )
+build_write_atomic(write_u16_atomic, "w", uint16_t, "r", )
+build_write_atomic(write_u32_atomic, "l", uint32_t, "r", )
 
 #ifdef __x86_64__
-build_atomic_read(atomic_read64, "q", uint64_t, "=r", )
-build_atomic_write(atomic_write64, "q", uint64_t, "r", )
+build_read_atomic(read_u64_atomic, "q", uint64_t, "=r", )
+build_write_atomic(write_u64_atomic, "q", uint64_t, "r", )
 #else
-static inline uint64_t atomic_read64(const volatile uint64_t *addr)
+static inline uint64_t read_u64_atomic(const volatile uint64_t *addr)
 {
     uint64_t *__addr = (uint64_t *)addr;
     return __cmpxchg8b(__addr, 0, 0);
 }
-static inline void atomic_write64(volatile uint64_t *addr, uint64_t val)
+static inline void write_u64_atomic(volatile uint64_t *addr, uint64_t val)
 {
     uint64_t old = *addr, new, *__addr = (uint64_t *)addr;
     while ( (new = __cmpxchg8b(__addr, old, val)) != old )
@@ -41,8 +39,34 @@ static inline void atomic_write64(volatile uint64_t *addr, uint64_t val)
 }
 #endif
 
-#undef build_atomic_read
-#undef build_atomic_write
+#undef build_read_atomic
+#undef build_write_atomic
+
+void __bad_atomic_size(void);
+
+#define read_atomic(p) ({                                               \
+    typeof(*p) __x;                                                     \
+    switch ( sizeof(*p) ) {                                             \
+    case 1: __x = (typeof(*p))read_u8_atomic((uint8_t *)p); break;      \
+    case 2: __x = (typeof(*p))read_u16_atomic((uint16_t *)p); break;    \
+    case 4: __x = (typeof(*p))read_u32_atomic((uint32_t *)p); break;    \
+    case 8: __x = (typeof(*p))read_u64_atomic((uint64_t *)p); break;    \
+    default: __x = 0; __bad_atomic_size(); break;                       \
+    }                                                                   \
+    __x;                                                                \
+})
+
+#define write_atomic(p, x) ({                                           \
+    typeof(*p) __x = (x);                                               \
+    switch ( sizeof(*p) ) {                                             \
+    case 1: write_u8_atomic((uint8_t *)p, (uint8_t)__x); break;         \
+    case 2: write_u16_atomic((uint16_t *)p, (uint16_t)__x); break;      \
+    case 4: write_u32_atomic((uint32_t *)p, (uint32_t)__x); break;      \
+    case 8: write_u64_atomic((uint64_t *)p, (uint64_t)__x); break;      \
+    default: __bad_atomic_size(); break;                                \
+    }                                                                   \
+    __x;                                                                \
+})
 
 /*
  * NB. I've pushed the volatile qualifier into the operations. This allows
@@ -60,7 +84,7 @@ typedef struct { int counter; } atomic_t;
  * Atomically reads the value of @v.
  */
 #define _atomic_read(v)  ((v).counter)
-#define atomic_read(v)   atomic_read_int(&((v)->counter))
+#define atomic_read(v)   read_atomic(&((v)->counter))
 
 /**
  * atomic_set - set atomic variable
@@ -70,7 +94,7 @@ typedef struct { int counter; } atomic_t;
  * Atomically sets the value of @v to @i.
  */ 
 #define _atomic_set(v,i) (((v).counter) = (i))
-#define atomic_set(v,i)  atomic_write_int(&((v)->counter), (i))
+#define atomic_set(v,i)  write_atomic(&((v)->counter), (i))
 
 /**
  * atomic_add - add integer to atomic variable

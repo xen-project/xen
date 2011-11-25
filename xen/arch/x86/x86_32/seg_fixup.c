@@ -314,7 +314,7 @@ static int fixup_seg(u16 seg, unsigned long offset)
     b &= ~0xf0000; b |= limit & 0xf0000;
     b ^= _SEGMENT_EC; /* grows-up <-> grows-down */
     /* NB. This can't fault. Checked readable above; must also be writable. */
-    atomic_write64((uint64_t *)&table[2*idx], ((uint64_t)b<<32) | a);
+    write_atomic((uint64_t *)&table[2*idx], ((uint64_t)b<<32) | a);
     return 1;
 }
 

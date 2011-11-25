@@ -35,9 +35,9 @@
 #include "mm-locks.h"
 
 #define atomic_read_ept_entry(__pepte)                              \
-    ( (ept_entry_t) { .epte = atomic_read64(&(__pepte)->epte) } )
+    ( (ept_entry_t) { .epte = read_atomic(&(__pepte)->epte) } )
 #define atomic_write_ept_entry(__pepte, __epte)                     \
-    atomic_write64(&(__pepte)->epte, (__epte).epte)
+    write_atomic(&(__pepte)->epte, (__epte).epte)
 
 #define is_epte_present(ept_entry)      ((ept_entry)->epte & 0x7)
 #define is_epte_superpage(ept_entry)    ((ept_entry)->sp)
