@@ -208,9 +208,9 @@ endif
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 9b33a3e5603ecd3ceca482a72c6ff8e951afb6d2
-# Tue Nov 22 16:12:40 2011 +0000
-# qemu-xen: add vkbd support for PV on HVM guests
+QEMU_TAG ?= 89daacab7035d408f32f2cb1acf68c96d6cbefed
+# Mon Nov 28 17:16:52 2011 +0000
+# qemu-dm: open char devices "file:..." with O_APPEND
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
