@@ -44,8 +44,10 @@ tap_ctl_create(const char *params, char **devname)
 		return err;
 
 	id = tap_ctl_spawn();
-	if (id < 0)
+	if (id < 0) {
+		err = id;
 		goto destroy;
+	}
 
 	err = tap_ctl_attach(id, minor);
 	if (err)
