@@ -3783,25 +3783,90 @@ static int sched_credit_domain_set(
     return rc;
 }
 
-static void sched_credit_domain_output(
-    int domid, libxl_sched_credit *scinfo)
+static int sched_credit_domain_output(
+    int domid)
 {
     char *domname;
+    libxl_sched_credit scinfo;
+    int rc;
+
+    if (domid < 0) {
+        printf("%-33s %4s %6s %4s\n", "Name", "ID", "Weight", "Cap");
+        return 0;
+    }
+    rc = sched_credit_domain_get(domid, &scinfo);
+    if (rc)
+        return rc;
     domname = libxl_domid_to_name(ctx, domid);
     printf("%-33s %4d %6d %4d\n",
         domname,
         domid,
-        scinfo->weight,
-        scinfo->cap);
+        scinfo.weight,
+        scinfo.cap);
     free(domname);
+    return 0;
+}
+
+static int sched_domain_output(
+    uint32_t sched, int (*output)(int), const char *cpupool)
+{
+    libxl_dominfo *info;
+    libxl_cpupoolinfo *poolinfo = NULL;
+    uint32_t poolid;
+    char *poolname;
+    int nb_domain, n_pools = 0, i, p;
+    int rc = 0;
+
+    if (cpupool) {
+        if (cpupool_qualifier_to_cpupoolid(cpupool, &poolid, NULL) ||
+            !libxl_cpupoolid_to_name(ctx, poolid)) {
+            fprintf(stderr, "unknown cpupool \'%s\'\n", cpupool);
+            return -ERROR_FAIL;
+        }
+    }
+
+    info = libxl_list_domain(ctx, &nb_domain);
+    if (!info) {
+        fprintf(stderr, "libxl_domain_infolist failed.\n");
+        return 1;
+    }
+    poolinfo = libxl_list_cpupool(ctx, &n_pools);
+    if (!poolinfo) {
+        fprintf(stderr, "error getting cpupool info\n");
+        return -ERROR_NOMEM;
+    }
+
+    for (p = 0; !rc && (p < n_pools); p++) {
+        if ((poolinfo[p].sched_id != sched) ||
+            (cpupool && (poolid != poolinfo[p].poolid)))
+            continue;
+
+        poolname = libxl_cpupoolid_to_name(ctx, poolinfo[p].poolid);
+        printf("Cpupool %s:\n", poolname);
+        free(poolname);
+
+        output(-1);
+        for (i = 0; i < nb_domain; i++) {
+            if (info[i].cpupool != poolinfo[p].poolid)
+                continue;
+            rc = output(info[i].domid);
+            if (rc)
+                break;
+        }
+    }
+    if (poolinfo) {
+        for (p = 0; p < n_pools; p++) {
+            libxl_cpupoolinfo_dispose(poolinfo + p);
+        }
+    }
+    return 0;
 }
 
 int main_sched_credit(int argc, char **argv)
 {
-    libxl_dominfo *info;
     libxl_sched_credit scinfo;
-    int nb_domain, i;
     const char *dom = NULL;
+    const char *cpupool = NULL;
     int weight = 256, cap = 0, opt_w = 0, opt_c = 0;
     int opt, rc;
     int option_index = 0;
@@ -3809,12 +3874,14 @@ int main_sched_credit(int argc, char **argv)
         {"domain", 1, 0, 'd'},
         {"weight", 1, 0, 'w'},
         {"cap", 1, 0, 'c'},
+        {"cpupool", 1, 0, 'p'},
         {"help", 0, 0, 'h'},
         {0, 0, 0, 0}
     };
 
     while (1) {
-        opt = getopt_long(argc, argv, "d:w:c:h", long_options, &option_index);
+        opt = getopt_long(argc, argv, "d:w:c:p:h", long_options,
+                          &option_index);
         if (opt == -1)
             break;
         switch (opt) {
@@ -3831,31 +3898,28 @@ int main_sched_credit(int argc, char **argv)
             cap = strtol(optarg, NULL, 10);
             opt_c = 1;
             break;
+        case 'p':
+            cpupool = optarg;
+            break;
         case 'h':
             help("sched-credit");
             return 0;
         }
     }
 
+    if (cpupool && (dom || opt_w || opt_c)) {
+        fprintf(stderr, "Specifying a cpupool is not allowed with other "
+                "options.\n");
+        return 1;
+    }
     if (!dom && (opt_w || opt_c)) {
         fprintf(stderr, "Must specify a domain.\n");
         return 1;
     }
 
     if (!dom) { /* list all domain's credit scheduler info */
-        info = libxl_list_domain(ctx, &nb_domain);
-        if (!info) {
-            fprintf(stderr, "libxl_domain_infolist failed.\n");
-            return 1;
-        }
-
-        printf("%-33s %4s %6s %4s\n", "Name", "ID", "Weight", "Cap");
-        for (i = 0; i < nb_domain; i++) {
-            rc = sched_credit_domain_get(info[i].domid, &scinfo);
-            if (rc)
-                return -rc;
-            sched_credit_domain_output(info[i].domid, &scinfo);
-        }
+        return -sched_domain_output(XEN_SCHEDULER_CREDIT,
+                                    sched_credit_domain_output, cpupool);
     } else {
         find_domain(dom);
 
@@ -3864,8 +3928,8 @@ int main_sched_credit(int argc, char **argv)
             return -rc;
 
         if (!opt_w && !opt_c) { /* output credit scheduler info */
-            printf("%-33s %4s %6s %4s\n", "Name", "ID", "Weight", "Cap");
-            sched_credit_domain_output(domid, &scinfo);
+            sched_credit_domain_output(-1);
+            return -sched_credit_domain_output(domid);
         } else { /* set credit scheduler paramaters */
             if (opt_w)
                 scinfo.weight = weight;

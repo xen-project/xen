@@ -361,6 +361,7 @@ static void xcinfo2xlinfo(const xc_domaininfo_t *xcinfo,
     xlinfo->cpu_time = xcinfo->cpu_time;
     xlinfo->vcpu_max_id = xcinfo->max_vcpu_id;
     xlinfo->vcpu_online = xcinfo->nr_online_vcpus;
+    xlinfo->cpupool = xcinfo->cpupool;
 }
 
 libxl_dominfo * libxl_list_domain(libxl_ctx *ctx, int *nb_domain)

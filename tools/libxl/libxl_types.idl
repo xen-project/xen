@@ -116,6 +116,7 @@ SHUTDOWN_* constant."""),
     ("cpu_time",    uint64),
     ("vcpu_max_id", uint32),
     ("vcpu_online", uint32),
+    ("cpupool",     uint32),
     ], dispose_fn=None)
 
 libxl_cpupoolinfo = Struct("cpupoolinfo", [
