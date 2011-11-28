@@ -705,6 +705,48 @@ Restrict output to domains in the specified cpupool.
 
 =back
 
+=item B<sched-sedf> [I<OPTIONS>]
+
+Set or get Simple EDF (Earliest Deadline First) scheduler parameters. This
+scheduler provides weighted CPU sharing in an intuitive way and uses
+realtime-algorithms to ensure time guarantees.  For more information see
+docs/misc/sedf_scheduler_mini-HOWTO.txt in the Xen distribution.
+
+B<OPTIONS>
+
+=over 4
+
+=item B<-d DOMAIN>, B<--domain=DOMAIN>
+
+Specify domain for which scheduler parameters are to be modified or retrieved.
+Mandatory for modifying scheduler parameters.
+
+=item B<-p PERIOD>, B<--period=PERIOD>
+
+The normal EDF scheduling usage in milliseconds.
+
+=item B<-s SLICE>, B<--slice=SLICE>
+
+The normal EDF scheduling usage in milliseconds.
+
+=item B<-l LATENCY>, B<--latency=LATENCY>
+
+Scaled period if domain is doing heavy I/O.
+
+=item B<-e EXTRA>, B<--extra=EXTRA>
+
+Flag for allowing domain to run in extra time (0 or 1).
+
+=item B<-w WEIGHT>, B<--weight=WEIGHT>
+
+Another way of setting CPU slice.
+
+=item B<-c CPUPOOL>, B<--cpupool=CPUPOOL>
+
+Restrict output to domains in the specified cpupool.
+
+=back
+
 =back
 
 =head1 CPUPOOLS COMMANDS

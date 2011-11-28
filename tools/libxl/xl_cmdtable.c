@@ -206,6 +206,22 @@ struct cmd_spec cmd_table[] = {
       "-w WEIGHT, --weight=WEIGHT     Weight (int)\n"
       "-p CPUPOOL, --cpupool=CPUPOOL  Restrict output to CPUPOOL"
     },
+    { "sched-sedf",
+      &main_sched_sedf, 0,
+      "Get/set sedf scheduler parameters",
+      "[options]",
+      "-d DOMAIN, --domain=DOMAIN     Domain to modify\n"
+      "-p MS, --period=MS             Relative deadline(ms)\n"
+      "-s MS, --slice=MS              Worst-case execution time(ms).\n"
+      "                               (slice < period)\n"
+      "-l MS, --latency=MS            Scaled period (ms) when domain\n"
+      "                               performs heavy I/O\n"
+      "-e FLAG, --extra=FLAG          Flag (0 or 1) controls if domain\n"
+      "                               can run in extra time\n"
+      "-w FLOAT, --weight=FLOAT       CPU Period/slice (do not set with\n"
+      "                               --period/--slice)\n"
+      "-c CPUPOOL, --cpupool=CPUPOOL  Restrict output to CPUPOOL"
+    },
     { "domid",
       &main_domid, 0,
       "Convert a domain name to domain id",

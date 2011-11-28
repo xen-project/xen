@@ -386,3 +386,11 @@ libxl_sched_credit = Struct("sched_credit", [
 libxl_sched_credit2 = Struct("sched_credit2", [
     ("weight", integer),
     ], dispose_fn=None)
+
+libxl_sched_sedf = Struct("sched_sedf", [
+    ("period", integer),
+    ("slice", integer),
+    ("latency", integer),
+    ("extratime", integer),
+    ("weight", integer),
+    ], dispose_fn=None)

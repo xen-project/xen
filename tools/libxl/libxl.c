@@ -2782,6 +2782,58 @@ int libxl_sched_credit2_domain_set(libxl_ctx *ctx, uint32_t domid,
     return 0;
 }
 
+int libxl_sched_sedf_domain_get(libxl_ctx *ctx, uint32_t domid,
+                                libxl_sched_sedf *scinfo)
+{
+    uint64_t period;
+    uint64_t slice;
+    uint64_t latency;
+    uint16_t extratime;
+    uint16_t weight;
+    int rc;
+
+    rc = xc_sedf_domain_get(ctx->xch, domid, &period, &slice, &latency,
+                            &extratime, &weight);
+    if (rc != 0) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting domain sched sedf");
+        return ERROR_FAIL;
+    }
+
+    scinfo->period = period / 1000000;
+    scinfo->slice = slice / 1000000;
+    scinfo->latency = latency / 1000000;
+    scinfo->extratime = extratime;
+    scinfo->weight = weight;
+
+    return 0;
+}
+
+int libxl_sched_sedf_domain_set(libxl_ctx *ctx, uint32_t domid,
+                                libxl_sched_sedf *scinfo)
+{
+    xc_domaininfo_t domaininfo;
+    int rc;
+
+    rc = xc_domain_getinfolist(ctx->xch, domid, 1, &domaininfo);
+    if (rc < 0) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting domain info list");
+        return ERROR_FAIL;
+    }
+    if (rc != 1 || domaininfo.domain != domid)
+        return ERROR_INVAL;
+
+
+    rc = xc_sedf_domain_set(ctx->xch, domid, scinfo->period * 1000000,
+                            scinfo->slice * 1000000, scinfo->latency * 1000000,
+                            scinfo->extratime, scinfo->weight);
+    if ( rc < 0 ) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "setting domain sched sedf");
+        return ERROR_FAIL;
+    }
+
+    return 0;
+}
+
 static int trigger_type_from_string(char *trigger_name)
 {
     if (!strcmp(trigger_name, "nmi"))

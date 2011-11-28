@@ -3854,6 +3854,58 @@ static int sched_credit2_domain_output(
     return 0;
 }
 
+static int sched_sedf_domain_get(
+    int domid, libxl_sched_sedf *scinfo)
+{
+    int rc;
+
+    rc = libxl_sched_sedf_domain_get(ctx, domid, scinfo);
+    if (rc)
+        fprintf(stderr, "libxl_sched_sedf_domain_get failed.\n");
+
+    return rc;
+}
+
+static int sched_sedf_domain_set(
+    int domid, libxl_sched_sedf *scinfo)
+{
+    int rc;
+
+    rc = libxl_sched_sedf_domain_set(ctx, domid, scinfo);
+    if (rc)
+        fprintf(stderr, "libxl_sched_sedf_domain_set failed.\n");
+
+    return rc;
+}
+
+static int sched_sedf_domain_output(
+    int domid)
+{
+    char *domname;
+    libxl_sched_sedf scinfo;
+    int rc;
+
+    if (domid < 0) {
+        printf("%-33s %4s %6s %-6s %7s %5s %6s\n", "Name", "ID", "Period",
+               "Slice", "Latency", "Extra", "Weight");
+        return 0;
+    }
+    rc = sched_sedf_domain_get(domid, &scinfo);
+    if (rc)
+        return rc;
+    domname = libxl_domid_to_name(ctx, domid);
+    printf("%-33s %4d %6d %6d %7d %5d %6d\n",
+        domname,
+        domid,
+        scinfo.period,
+        scinfo.slice,
+        scinfo.latency,
+        scinfo.extratime,
+        scinfo.weight);
+    free(domname);
+    return 0;
+}
+
 static int sched_domain_output(
     uint32_t sched, int (*output)(int), const char *cpupool)
 {
@@ -4057,6 +4109,124 @@ int main_sched_credit2(int argc, char **argv)
             if (opt_w)
                 scinfo.weight = weight;
             rc = sched_credit2_domain_set(domid, &scinfo);
+            if (rc)
+                return -rc;
+        }
+    }
+
+    return 0;
+}
+
+int main_sched_sedf(int argc, char **argv)
+{
+    libxl_sched_sedf scinfo;
+    const char *dom = NULL;
+    const char *cpupool = NULL;
+    int period = 0, opt_p = 0;
+    int slice = 0, opt_s = 0;
+    int latency = 0, opt_l = 0;
+    int extra = 0, opt_e = 0;
+    int weight = 0, opt_w = 0;
+    int opt, rc;
+    int option_index = 0;
+    static struct option long_options[] = {
+        {"period", 1, 0, 'p'},
+        {"slice", 1, 0, 's'},
+        {"latency", 1, 0, 'l'},
+        {"extra", 1, 0, 'e'},
+        {"weight", 1, 0, 'w'},
+        {"cpupool", 1, 0, 'c'},
+        {"help", 0, 0, 'h'},
+        {0, 0, 0, 0}
+    };
+
+    while (1) {
+        opt = getopt_long(argc, argv, "d:p:s:l:e:w:c:h", long_options,
+                          &option_index);
+        if (opt == -1)
+            break;
+        switch (opt) {
+        case 0: case 2:
+            return opt;
+        case 'd':
+            dom = optarg;
+            break;
+        case 'p':
+            period = strtol(optarg, NULL, 10);
+            opt_p = 1;
+            break;
+        case 's':
+            slice = strtol(optarg, NULL, 10);
+            opt_s = 1;
+            break;
+        case 'l':
+            latency = strtol(optarg, NULL, 10);
+            opt_l = 1;
+            break;
+        case 'e':
+            extra = strtol(optarg, NULL, 10);
+            opt_e = 1;
+            break;
+        case 'w':
+            weight = strtol(optarg, NULL, 10);
+            opt_w = 1;
+            break;
+        case 'c':
+            cpupool = optarg;
+            break;
+        case 'h':
+            help("sched-sedf");
+            return 0;
+        }
+    }
+
+    if (cpupool && (dom || opt_p || opt_s || opt_l || opt_e || opt_w)) {
+        fprintf(stderr, "Specifying a cpupool is not allowed with other "
+                "options.\n");
+        return 1;
+    }
+    if (!dom && (opt_p || opt_s || opt_l || opt_e || opt_w)) {
+        fprintf(stderr, "Must specify a domain.\n");
+        return 1;
+    }
+    if (opt_w && (opt_p || opt_s)) {
+        fprintf(stderr, "Specifying a weight AND period or slice is not "
+                "allowed.\n");
+    }
+
+    if (!dom) { /* list all domain's credit scheduler info */
+        return -sched_domain_output(XEN_SCHEDULER_SEDF,
+                                    sched_sedf_domain_output, cpupool);
+    } else {
+        find_domain(dom);
+
+        rc = sched_sedf_domain_get(domid, &scinfo);
+        if (rc)
+            return -rc;
+
+        if (!opt_p && !opt_s && !opt_l && !opt_e && !opt_w) {
+            /* output sedf scheduler info */
+            sched_sedf_domain_output(-1);
+            return -sched_sedf_domain_output(domid);
+        } else { /* set sedf scheduler paramaters */
+            if (opt_p) {
+                scinfo.period = period;
+                scinfo.weight = 0;
+            }
+            if (opt_s) {
+                scinfo.slice = slice;
+                scinfo.weight = 0;
+            }
+            if (opt_l)
+                scinfo.latency = latency;
+            if (opt_e)
+                scinfo.extratime = extra;
+            if (opt_w) {
+                scinfo.weight = weight;
+                scinfo.period = 0;
+                scinfo.slice = 0;
+            }
+            rc = sched_sedf_domain_set(domid, &scinfo);
             if (rc)
                 return -rc;
         }
