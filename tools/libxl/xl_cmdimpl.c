@@ -3804,8 +3804,19 @@ int main_sched_credit(int argc, char **argv)
     const char *dom = NULL;
     int weight = 256, cap = 0, opt_w = 0, opt_c = 0;
     int opt, rc;
+    int option_index = 0;
+    static struct option long_options[] = {
+        {"domain", 1, 0, 'd'},
+        {"weight", 1, 0, 'w'},
+        {"cap", 1, 0, 'c'},
+        {"help", 0, 0, 'h'},
+        {0, 0, 0, 0}
+    };
 
-    while ((opt = def_getopt(argc, argv, "d:w:c:", "sched-credit", 0)) != -1) {
+    while (1) {
+        opt = getopt_long(argc, argv, "d:w:c:h", long_options, &option_index);
+        if (opt == -1)
+            break;
         switch (opt) {
         case 0: case 2:
             return opt;
@@ -3820,6 +3831,9 @@ int main_sched_credit(int argc, char **argv)
             cap = strtol(optarg, NULL, 10);
             opt_c = 1;
             break;
+        case 'h':
+            help("sched-credit");
+            return 0;
         }
     }
 

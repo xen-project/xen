@@ -639,25 +639,30 @@ default B<credit> is used for scheduling.
 
 =over 4
 
-=item B<sched-credit> [ B<-d> I<domain-id> [ B<-w>[B<=>I<WEIGHT>] | B<-c>[B<=>I<CAP>] ] ]
+=item B<sched-credit> [I<OPTIONS>]
 
-Set credit scheduler parameters.  The credit scheduler is a
+Set or get credit scheduler parameters.  The credit scheduler is a
 proportional fair share CPU scheduler built from the ground up to be
 work conserving on SMP hosts.
 
 Each domain (including Domain0) is assigned a weight and a cap.
 
-B<PARAMETERS>
+B<OPTIONS>
 
 =over 4
 
-=item I<WEIGHT>
+=item B<-d DOMAIN>, B<--domain=DOMAIN>
+
+Specify domain for which scheduler parameters are to be modified or retrieved.
+Mandatory for modifying scheduler parameters.
+
+=item B<-w WEIGHT>, B<--weight=WEIGHT>
 
 A domain with a weight of 512 will get twice as much CPU as a domain
 with a weight of 256 on a contended host. Legal weights range from 1
 to 65535 and the default is 256.
 
-=item I<CAP>
+=item B<-c CAP>, B<--cap=CAP>
 
 The cap optionally fixes the maximum amount of CPU a domain will be
 able to consume, even if the host system has idle CPU cycles. The cap
