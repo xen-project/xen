@@ -3807,6 +3807,53 @@ static int sched_credit_domain_output(
     return 0;
 }
 
+static int sched_credit2_domain_get(
+    int domid, libxl_sched_credit2 *scinfo)
+{
+    int rc;
+
+    rc = libxl_sched_credit2_domain_get(ctx, domid, scinfo);
+    if (rc)
+        fprintf(stderr, "libxl_sched_credit2_domain_get failed.\n");
+
+    return rc;
+}
+
+static int sched_credit2_domain_set(
+    int domid, libxl_sched_credit2 *scinfo)
+{
+    int rc;
+
+    rc = libxl_sched_credit2_domain_set(ctx, domid, scinfo);
+    if (rc)
+        fprintf(stderr, "libxl_sched_credit2_domain_set failed.\n");
+
+    return rc;
+}
+
+static int sched_credit2_domain_output(
+    int domid)
+{
+    char *domname;
+    libxl_sched_credit2 scinfo;
+    int rc;
+
+    if (domid < 0) {
+        printf("%-33s %4s %6s\n", "Name", "ID", "Weight");
+        return 0;
+    }
+    rc = sched_credit2_domain_get(domid, &scinfo);
+    if (rc)
+        return rc;
+    domname = libxl_domid_to_name(ctx, domid);
+    printf("%-33s %4d %6d\n",
+        domname,
+        domid,
+        scinfo.weight);
+    free(domname);
+    return 0;
+}
+
 static int sched_domain_output(
     uint32_t sched, int (*output)(int), const char *cpupool)
 {
@@ -3936,6 +3983,80 @@ int main_sched_credit(int argc, char **argv)
             if (opt_c)
                 scinfo.cap = cap;
             rc = sched_credit_domain_set(domid, &scinfo);
+            if (rc)
+                return -rc;
+        }
+    }
+
+    return 0;
+}
+
+int main_sched_credit2(int argc, char **argv)
+{
+    libxl_sched_credit2 scinfo;
+    const char *dom = NULL;
+    const char *cpupool = NULL;
+    int weight = 256, opt_w = 0;
+    int opt, rc;
+    int option_index = 0;
+    static struct option long_options[] = {
+        {"domain", 1, 0, 'd'},
+        {"weight", 1, 0, 'w'},
+        {"cpupool", 1, 0, 'p'},
+        {"help", 0, 0, 'h'},
+        {0, 0, 0, 0}
+    };
+
+    while (1) {
+        opt = getopt_long(argc, argv, "d:w:p:h", long_options, &option_index);
+        if (opt == -1)
+            break;
+        switch (opt) {
+        case 0: case 2:
+            return opt;
+        case 'd':
+            dom = optarg;
+            break;
+        case 'w':
+            weight = strtol(optarg, NULL, 10);
+            opt_w = 1;
+            break;
+        case 'p':
+            cpupool = optarg;
+            break;
+        case 'h':
+            help("sched-credit");
+            return 0;
+        }
+    }
+
+    if (cpupool && (dom || opt_w)) {
+        fprintf(stderr, "Specifying a cpupool is not allowed with other "
+                "options.\n");
+        return 1;
+    }
+    if (!dom && opt_w) {
+        fprintf(stderr, "Must specify a domain.\n");
+        return 1;
+    }
+
+    if (!dom) { /* list all domain's credit scheduler info */
+        return -sched_domain_output(XEN_SCHEDULER_CREDIT2,
+                                    sched_credit2_domain_output, cpupool);
+    } else {
+        find_domain(dom);
+
+        rc = sched_credit2_domain_get(domid, &scinfo);
+        if (rc)
+            return -rc;
+
+        if (!opt_w) { /* output credit2 scheduler info */
+            sched_credit2_domain_output(-1);
+            return -sched_credit2_domain_output(domid);
+        } else { /* set credit2 scheduler paramaters */
+            if (opt_w)
+                scinfo.weight = weight;
+            rc = sched_credit2_domain_set(domid, &scinfo);
             if (rc)
                 return -rc;
         }

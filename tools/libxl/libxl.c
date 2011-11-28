@@ -2729,6 +2729,59 @@ int libxl_sched_credit_domain_set(libxl_ctx *ctx, uint32_t domid, libxl_sched_cr
     return 0;
 }
 
+int libxl_sched_credit2_domain_get(libxl_ctx *ctx, uint32_t domid,
+                                   libxl_sched_credit2 *scinfo)
+{
+    struct xen_domctl_sched_credit2 sdom;
+    int rc;
+
+    rc = xc_sched_credit2_domain_get(ctx->xch, domid, &sdom);
+    if (rc != 0) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                         "getting domain sched credit2");
+        return ERROR_FAIL;
+    }
+
+    scinfo->weight = sdom.weight;
+
+    return 0;
+}
+
+int libxl_sched_credit2_domain_set(libxl_ctx *ctx, uint32_t domid,
+                                   libxl_sched_credit2 *scinfo)
+{
+    struct xen_domctl_sched_credit2 sdom;
+    xc_domaininfo_t domaininfo;
+    int rc;
+
+    rc = xc_domain_getinfolist(ctx->xch, domid, 1, &domaininfo);
+    if (rc < 0) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting domain info list");
+        return ERROR_FAIL;
+    }
+    if (rc != 1 || domaininfo.domain != domid)
+        return ERROR_INVAL;
+
+
+    if (scinfo->weight < 1 || scinfo->weight > 65535) {
+        LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
+            "Cpu weight out of range, valid values are within range from "
+            "1 to 65535");
+        return ERROR_INVAL;
+    }
+
+    sdom.weight = scinfo->weight;
+
+    rc = xc_sched_credit2_domain_set(ctx->xch, domid, &sdom);
+    if ( rc < 0 ) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                         "setting domain sched credit2");
+        return ERROR_FAIL;
+    }
+
+    return 0;
+}
+
 static int trigger_type_from_string(char *trigger_name)
 {
     if (!strcmp(trigger_name, "nmi"))

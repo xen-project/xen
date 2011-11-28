@@ -382,3 +382,7 @@ libxl_sched_credit = Struct("sched_credit", [
     ("weight", integer),
     ("cap", integer),
     ], dispose_fn=None)
+
+libxl_sched_credit2 = Struct("sched_credit2", [
+    ("weight", integer),
+    ], dispose_fn=None)

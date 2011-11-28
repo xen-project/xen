@@ -198,6 +198,14 @@ struct cmd_spec cmd_table[] = {
       "-c CAP, --cap=CAP              Cap (int)\n"
       "-p CPUPOOL, --cpupool=CPUPOOL  Restrict output to CPUPOOL"
     },
+    { "sched-credit2",
+      &main_sched_credit2, 0,
+      "Get/set credit2 scheduler parameters",
+      "[-d <Domain> [-w[=WEIGHT]]] [-p CPUPOOL]",
+      "-d DOMAIN, --domain=DOMAIN     Domain to modify\n"
+      "-w WEIGHT, --weight=WEIGHT     Weight (int)\n"
+      "-p CPUPOOL, --cpupool=CPUPOOL  Restrict output to CPUPOOL"
+    },
     { "domid",
       &main_domid, 0,
       "Convert a domain name to domain id",
