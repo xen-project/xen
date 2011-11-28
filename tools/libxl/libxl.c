@@ -2679,7 +2679,7 @@ int libxl_sched_credit_domain_get(libxl_ctx *ctx, uint32_t domid, libxl_sched_cr
 
     rc = xc_sched_credit_domain_get(ctx->xch, domid, &sdom);
     if (rc != 0) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "setting domain sched credit");
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting domain sched credit");
         return ERROR_FAIL;
     }
 
