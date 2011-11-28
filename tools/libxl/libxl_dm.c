@@ -830,7 +830,7 @@ int libxl__create_device_model(libxl__gc *gc,
     libxl__xs_write(gc, XBT_NULL, libxl__sprintf(gc, "%s/disable_pf", path), "%d", !info->xen_platform_pci);
 
     libxl_create_logfile(ctx, libxl__sprintf(gc, "qemu-dm-%s", info->dom_name), &logfile);
-    logfile_w = open(logfile, O_WRONLY|O_CREAT, 0644);
+    logfile_w = open(logfile, O_WRONLY|O_CREAT|O_APPEND, 0644);
     free(logfile);
     null = open("/dev/null", O_RDONLY);
 

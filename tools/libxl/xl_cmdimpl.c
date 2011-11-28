@@ -1597,7 +1597,8 @@ start:
             exit(-1);
         }
 
-        CHK_ERRNO(( logfile = open(fullname, O_WRONLY|O_CREAT, 0644) )<0);
+        CHK_ERRNO(( logfile = open(fullname, O_WRONLY|O_CREAT|O_APPEND,
+                                   0644) )<0);
         free(fullname);
         free(name);
 
