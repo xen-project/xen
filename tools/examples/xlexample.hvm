@@ -5,6 +5,9 @@
 # This is a fairly minimal example of what is required for an
 # HVM guest. For a more complete guide see <XXX Document TBD>
 
+# This configures an HVM rather than PV guest
+builder = "hvm"
+
 # Guest name
 name = "example.hvm"
 
