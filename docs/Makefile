@@ -14,7 +14,7 @@ DOC_TEX		:= src/user.tex src/interface.tex
 DOC_MARKDOWN	:= $(wildcard misc/*.markdown)
 DOC_PS		:= $(patsubst src/%.tex,ps/%.ps,$(DOC_TEX))
 DOC_PDF		:= $(patsubst src/%.tex,pdf/%.pdf,$(DOC_TEX))
-DOC_HTML	:= $(patsubst src/%.tex,html/%/index.html,$(DOC_TEX)) \
+DOC_HTML	:= $(patsubst src/%.tex,html/reference/%/index.html,$(DOC_TEX)) \
 		   $(patsubst %.markdown,html/%.html,$(DOC_MARKDOWN)) \
 		   $(patsubst man/%.pod.1,html/man/%.1.html,$(DOC_MAN1SRC)) \
 		   $(patsubst man/%.pod.5,html/man/%.5.html,$(DOC_MAN5SRC))
@@ -119,14 +119,14 @@ ps/%.ps: %.dvi
 %.eps: %.fig
 	$(FIG2DEV) -L eps $< $@
 
-html/%/index.html: src/%.tex
+html/reference/%/index.html: src/%.tex
 	@$(INSTALL_DIR) $(@D)
 	@set -e ; if which $(LATEX2HTML) 1>/dev/null 2>/dev/null; then \
-        echo "Running latex2html to generate $*/index.html ... "; \
+        echo "Running latex2html to generate reference/$*/index.html ... "; \
 	$(LATEX2HTML) -split 0 -show_section_numbers -toc_depth 3 -nonavigation \
 	-numbered_footnotes -local_icons -noinfo -math -dir $(@D) \
 	$< 1>/dev/null 2>/dev/null ; else \
-	echo "latex2html not installed; skipping $*."; fi
+	echo "latex2html not installed; skipping reference/$*."; fi
 
 html/index.html: $(DOC_HTML) ./gen-html-index INDEX
 	perl -w -- ./gen-html-index -i INDEX html $(DOC_HTML)

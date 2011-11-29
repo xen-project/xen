@@ -1,5 +1,5 @@
 misc/hvm-emulated-unplug	Xen HVM emulated device unplug protocol
 
 # These are not all that useful anymore, hide them from the index
-interface/index			NO-INDEX
-user/index			NO-INDEX
+reference/interface/index	NO-INDEX
+reference/user/index		NO-INDEX
