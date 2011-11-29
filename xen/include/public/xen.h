@@ -240,6 +240,72 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
  * ptr[1:0] == MMU_PT_UPDATE_PRESERVE_AD:
  * As MMU_NORMAL_PT_UPDATE above, but A/D bits currently in the PTE are ORed
  * with those in @val.
+ *
+ * @val is usually the machine frame number along with some attributes.
+ * The attributes by default follow the architecture defined bits. Meaning that
+ * if this is a X86_64 machine and four page table layout is used, the layout
+ * of val is:
+ *  - 63 if set means No execute (NX)
+ *  - 46-13 the machine frame number
+ *  - 12 available for guest
+ *  - 11 available for guest
+ *  - 10 available for guest
+ *  - 9 available for guest
+ *  - 8 global
+ *  - 7 PAT (PSE is disabled, must use hypercall to make 4MB or 2MB pages)
+ *  - 6 dirty
+ *  - 5 accessed
+ *  - 4 page cached disabled
+ *  - 3 page write through
+ *  - 2 userspace accessible
+ *  - 1 writeable
+ *  - 0 present
+ *
+ *  The one bits that does not fit with the default layout is the PAGE_PSE
+ *  also called PAGE_PAT). The MMUEXT_[UN]MARK_SUPER arguments to the
+ *  HYPERVISOR_mmuext_op serve as mechanism to set a pagetable to be 4MB
+ *  (or 2MB) instead of using the PAGE_PSE bit.
+ *
+ *  The reason that the PAGE_PSE (bit 7) is not being utilized is due to Xen
+ *  using it as the Page Attribute Table (PAT) bit - for details on it please
+ *  refer to Intel SDM 10.12. The PAT allows to set the caching attributes of
+ *  pages instead of using MTRRs.
+ *
+ *  The PAT MSR is as follow (it is a 64-bit value, each entry is 8 bits):
+ *             PAT4                 PAT0
+ *   +---+----+----+----+-----+----+----+
+ *    WC | WC | WB | UC | UC- | WC | WB |  <= Linux
+ *   +---+----+----+----+-----+----+----+
+ *    WC | WT | WB | UC | UC- | WT | WB |  <= BIOS (default when machine boots)
+ *   +---+----+----+----+-----+----+----+
+ *    WC | WP | WC | UC | UC- | WT | WB |  <= Xen
+ *   +---+----+----+----+-----+----+----+
+ *
+ *  The lookup of this index table translates to looking up
+ *  Bit 7, Bit 4, and Bit 3 of val entry:
+ *
+ *  PAT/PSE (bit 7) ... PCD (bit 4) .. PWT (bit 3).
+ *
+ *  If all bits are off, then we are using PAT0. If bit 3 turned on,
+ *  then we are using PAT1, if bit 3 and bit 4, then PAT2..
+ *
+ *  As you can see, the Linux PAT1 translates to PAT4 under Xen. Which means
+ *  that if a guest that follows Linux's PAT setup and would like to set Write
+ *  Combined on pages it MUST use PAT4 entry. Meaning that Bit 7 (PAGE_PAT) is
+ *  set. For example, under Linux it only uses PAT0, PAT1, and PAT2 for the
+ *  caching as:
+ *
+ *   WB = none (so PAT0)
+ *   WC = PWT (bit 3 on)
+ *   UC = PWT | PCD (bit 3 and 4 are on).
+ *
+ * To make it work with Xen, it needs to translate the WC bit as so:
+ *
+ *  PWT (so bit 3 on) --> PAT (so bit 7 is on) and clear bit 3
+ *
+ * And to translate back it would:
+ *
+ * PAT (bit 7 on) --> PWT (bit 3 on) and clear bit 7.
  */
 #define MMU_NORMAL_PT_UPDATE      0 /* checked '*ptr = val'. ptr is MA.      */
 #define MMU_MACHPHYS_UPDATE       1 /* ptr = MA of frame to modify entry for */
