@@ -154,6 +154,14 @@ html/man/%.5.html: man/%.pod.5 Makefile
 	$(POD2HTML) --infile=$< --outfile=$@.tmp
 	$(call move-if-changed,$@.tmp,$@)
 
+html/hypercall/stamp:
+	@$(INSTALL_DIR) $(@D)
+	./xen-headers -O $(@D) \
+		-T 'arch-x86_64 - Xen public headers' \
+		-X arch-ia64 -X arch-x86_32 -X xen-x86_32 \
+		../xen include/public
+	touch $@
+
 txt/%.txt: %.txt
 	$(INSTALL_DIR) $(@D)
 	cp $< $@.tmp
