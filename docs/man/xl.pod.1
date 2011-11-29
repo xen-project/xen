@@ -54,7 +54,7 @@ previously, most commands take I<domain-id> as the first parameter.
 
 =item B<create> [I<OPTIONS>] I<configfile>
 
-The create subcommand requires a config file: see L<xldomain.cfg> for
+The create subcommand requires a config file: see L<xl.cfg(5)> for
 full details of that file format and possible options.
 
 I<configfile> can either be an absolute path to a file, or a relative
@@ -232,7 +232,7 @@ FIXME: Why would you ever see this state?
 
 The domain has crashed, which is always a violent ending.  Usually
 this state can only occur if the domain has been configured not to
-restart on crash.  See L<xldomain.cfg> for more info.
+restart on crash.  See L<xl.cfg(5)> for more info.
 
 =item B<d - dying>
 
@@ -319,8 +319,8 @@ executed the reboot action, which may be significantly before the
 domain actually reboots.
 
 The behavior of what happens to a domain when it reboots is set by the
-B<on_reboot> parameter of the xldomain.cfg file when the domain was
-created.
+B<on_reboot> parameter of the domain configuration file when the
+domain was created.
 
 =item B<restore> [I<OPTIONS>] [I<ConfigFile>] I<CheckpointFile>
 
@@ -372,8 +372,8 @@ services must be shutdown in the domain.  The command returns
 immediately after signally the domain unless that B<-w> flag is used.
 
 The behavior of what happens to a domain when it reboots is set by the
-B<on_shutdown> parameter of the xldomain.cfg file when the domain was
-created.
+B<on_shutdown> parameter of the domain configuration file when the
+domain was created.
 
 B<OPTIONS>
 
@@ -699,7 +699,7 @@ The domain id of the guest domain that the device will be attached to.
 =item I<disc-spec-component>
 
 A disc specification in the same format used for the B<disk> variable in
-the domain config file. See L<xldomain.cfg>.
+the domain config file. See F<xl-disk-configuration>.
 
 =back
 
@@ -733,9 +733,9 @@ How the device should be presented to the guest domain; for example /dev/hdc.
 
 =item I<be-dev>
 
-the device in the backend domain (usually domain 0) to be exported; it can be a
-path to a file (file://path/to/file.iso). See B<disk> in L<xldomain.cfg> for the
-details.
+the device in the backend domain (usually domain 0) to be exported; it
+can be a path to a file (file://path/to/file.iso). See B<disk> in
+L<xl.cfg(5)> for the details.
 
 =back
 
@@ -754,7 +754,7 @@ I<VirtualDevice> is the cdrom device in the guest to eject.
 
 Creates a new network device in the domain specified by I<domain-id>.
 I<network-device> describes the device to attach, using the same format as the
-B<vif> string in the domain config file. See L<xldomain.cfg> for the
+B<vif> string in the domain config file. See L<xl.cfg(5)> for the
 description.
 
 =item B<network-detach> I<domain-id> I<devid|mac>
@@ -795,7 +795,7 @@ List pass-through pci devices for a domain.
 
 =head1 SEE ALSO
 
-B<xldomain.cfg>(5), B<xlcpupool.cfg>(5), B<xentop>(1)
+L<xl.cfg(5)>, L<xlcpupool.cfg(5)>, B<xentop(1)>
 
 =head1 AUTHOR
 
