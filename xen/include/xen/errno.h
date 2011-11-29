@@ -1,6 +1,9 @@
 #ifndef _I386_ERRNO_H
 #define _I386_ERRNO_H
 
+/* ` enum neg_errnoval {  [ -Efoo for each Efoo in the list below ]  } */
+/* ` enum errnoval { */
+
 #define	EPERM		 1	/* Operation not permitted */
 #define	ENOENT		 2	/* No such file or directory */
 #define	ESRCH		 3	/* No such process */
@@ -128,5 +131,7 @@
 
 #define	ENOMEDIUM	123	/* No medium found */
 #define	EMEDIUMTYPE	124	/* Wrong medium type */
+
+/* ` } */
 
 #endif

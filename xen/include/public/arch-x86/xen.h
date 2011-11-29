@@ -82,7 +82,13 @@ typedef unsigned long xen_pfn_t;
 typedef unsigned long xen_ulong_t;
 
 /*
+ * ` enum neg_errnoval
+ * ` HYPERVISOR_set_trap_table(const struct trap_info traps[]);
+ * `
+ */
+/*
  * Send an array of these to HYPERVISOR_set_trap_table().
+ * Terminate the array with a sentinel entry, with traps[].address==0.
  * The privilege level specifies which modes may enter a trap via a software
  * interrupt. On x86/64, since rings 1 and 2 are unavailable, we allocate
  * privilege levels as follows:

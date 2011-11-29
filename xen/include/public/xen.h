@@ -55,6 +55,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
  * HYPERCALLS
  */
 
+/* ` enum hypercall_num { // __HYPERVISOR_* => HYPERVISOR_*() */
+
 #define __HYPERVISOR_set_trap_table        0
 #define __HYPERVISOR_mmu_update            1
 #define __HYPERVISOR_set_gdt               2
@@ -104,6 +106,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 #define __HYPERVISOR_arch_5               53
 #define __HYPERVISOR_arch_6               54
 #define __HYPERVISOR_arch_7               55
+
+/* ` } */
 
 /*
  * HYPERCALL COMPATIBILITY.
@@ -163,8 +167,11 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 #define NR_VIRQS       24
 
 /*
- * HYPERVISOR_mmu_update(reqs, count, pdone, foreigndom)
- * 
+ * ` enum neg_errnoval
+ * ` HYPERVISOR_mmu_update(const struct mmu_update reqs[],
+ * `                       unsigned count, unsigned *done_out,
+ * `                       unsigned foreigndom)
+ * `
  * @reqs is an array of mmu_update_t structures ((ptr, val) pairs).
  * @count is the length of the above array.
  * @pdone is an output parameter indicating number of completed operations

@@ -159,7 +159,7 @@ html/hypercall/stamp:
 	./xen-headers -O $(@D) \
 		-T 'arch-x86_64 - Xen public headers' \
 		-X arch-ia64 -X arch-x86_32 -X xen-x86_32 \
-		../xen include/public
+		../xen include/public include/xen/errno.h
 	touch $@
 
 txt/%.txt: %.txt
