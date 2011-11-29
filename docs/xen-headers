@@ -325,6 +325,12 @@ END
 }
 
 foreach $pass (qw(1 2)) {
+    my $depspath = "$outdir/.deps";
+    my $depsout;
+    if ($pass==2) {
+	$depsout = new IO::File "$depspath.new", 'w' or die $!;
+    }
+
     find({ wanted => 
 	       sub {
 		   return unless m/\.h$/;
@@ -341,11 +347,19 @@ foreach $pass (qw(1 2)) {
 		   $leaf_opath = $leaf;
 		   $leaf_opath =~ s#/#,#g;
 		   $leaf_opath .= ".html";
+		   print $depsout "$outdir/index.html: $File::Find::name\n"
+		       or die $!
+		       if $pass==2;
 		   process_file($File::Find::name, $outdir.'/'.$leaf_opath);
 	   },
 	   no_chdir => 1,
 	 },
 	 map { "$basedir/$_" } @indirs);
+
+    if ($pass==2) {
+	close $depsout or die $!;
+	rename "$depspath.new", "$depspath" or die $!;
+    }
 }
 
 output_index();

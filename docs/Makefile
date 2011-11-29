@@ -18,7 +18,8 @@ DOC_HTML	:= $(patsubst src/%.tex,html/reference/%/index.html,$(DOC_TEX)) \
 		   $(patsubst %.markdown,html/%.html,$(DOC_MARKDOWN)) \
 		   $(patsubst man/%.pod.1,html/man/%.1.html,$(DOC_MAN1SRC)) \
 		   $(patsubst man/%.pod.5,html/man/%.5.html,$(DOC_MAN5SRC)) \
-		   $(patsubst %.txt,html/%.txt,$(wildcard misc/*.txt))
+		   $(patsubst %.txt,html/%.txt,$(wildcard misc/*.txt)) \
+		   html/hypercall/index.html
 DOC_TXT         := $(patsubst %.txt,txt/%.txt,$(wildcard misc/*.txt)) \
 		   $(patsubst %.markdown,txt/%.txt,$(DOC_MARKDOWN)) \
 		   $(patsubst man/%.pod.1,txt/man/%.1.txt,$(DOC_MAN1SRC)) \
@@ -154,13 +155,15 @@ html/man/%.5.html: man/%.pod.5 Makefile
 	$(POD2HTML) --infile=$< --outfile=$@.tmp
 	$(call move-if-changed,$@.tmp,$@)
 
-html/hypercall/stamp:
+html/hypercall/index.html: ./xen-headers
+	rm -rf $(@D)
 	@$(INSTALL_DIR) $(@D)
 	./xen-headers -O $(@D) \
 		-T 'arch-x86_64 - Xen public headers' \
 		-X arch-ia64 -X arch-x86_32 -X xen-x86_32 \
 		../xen include/public include/xen/errno.h
-	touch $@
+
+-include html/hypercall/.deps
 
 txt/%.txt: %.txt
 	$(INSTALL_DIR) $(@D)
