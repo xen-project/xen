@@ -15,9 +15,13 @@ DOC_MARKDOWN	:= $(wildcard misc/*.markdown)
 DOC_PS		:= $(patsubst src/%.tex,ps/%.ps,$(DOC_TEX))
 DOC_PDF		:= $(patsubst src/%.tex,pdf/%.pdf,$(DOC_TEX))
 DOC_HTML	:= $(patsubst src/%.tex,html/%/index.html,$(DOC_TEX)) \
-		   $(patsubst %.markdown,html/%.html,$(DOC_MARKDOWN))
+		   $(patsubst %.markdown,html/%.html,$(DOC_MARKDOWN)) \
+		   $(patsubst man/%.pod.1,html/man/%.1.html,$(DOC_MAN1SRC)) \
+		   $(patsubst man/%.pod.5,html/man/%.5.html,$(DOC_MAN5SRC))
 DOC_TXT         := $(patsubst %.txt,txt/%.txt,$(wildcard misc/*.txt)) \
-		   $(patsubst %.markdown,txt/%.txt,$(DOC_MARKDOWN))
+		   $(patsubst %.markdown,txt/%.txt,$(DOC_MARKDOWN)) \
+		   $(patsubst man/%.pod.1,txt/man/%.1.txt,$(DOC_MAN1SRC)) \
+		   $(patsubst man/%.pod.5,txt/man/%.5.txt,$(DOC_MAN5SRC))
 
 GFX = $(patsubst %.fig, %.eps, $(wildcard figs/*.fig))
 
@@ -76,7 +80,7 @@ clean:
 	$(MAKE) -C xen-api clean
 	rm -rf .word_count *.aux *.dvi *.bbl *.blg *.glo *.idx *~ 
 	rm -rf *.ilg *.log *.ind *.toc *.bak core
-	rm -rf $(GFX) ps pdf html
+	rm -rf $(GFX) ps pdf html txt
 	rm -rf api
 	rm -rf man5
 	rm -rf man1
@@ -132,6 +136,16 @@ html/%.html: %.markdown
 	$(call move-if-changed,$@.tmp,$@) ; else \
 	echo "markdown not installed; skipping $*.html."; fi
 
+html/man/%.1.html: man/%.pod.1 Makefile
+	$(INSTALL_DIR) $(@D)
+	$(POD2HTML) --infile=$< --outfile=$@.tmp
+	$(call move-if-changed,$@.tmp,$@)
+
+html/man/%.5.html: man/%.pod.5 Makefile
+	$(INSTALL_DIR) $(@D)
+	$(POD2HTML) --infile=$< --outfile=$@.tmp
+	$(call move-if-changed,$@.tmp,$@)
+
 txt/%.txt: %.txt
 	$(INSTALL_DIR) $(@D)
 	cp $< $@.tmp
@@ -141,3 +155,14 @@ txt/%.txt: %.markdown
 	$(INSTALL_DIR) $(@D)
 	cp $< $@.tmp
 	$(call move-if-changed,$@.tmp,$@)
+
+txt/man/%.1.txt: man/%.pod.1 Makefile
+	$(INSTALL_DIR) $(@D)
+	$(POD2TEXT) $< $@.tmp
+	$(call move-if-changed,$@.tmp,$@)
+
+txt/man/%.5.txt: man/%.pod.5 Makefile
+	$(INSTALL_DIR) $(@D)
+	$(POD2TEXT) $< $@.tmp
+	$(call move-if-changed,$@.tmp,$@)
+
