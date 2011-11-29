@@ -575,8 +575,10 @@ static void parse_config_data(const char *configfile_filename_report,
     if (!xlu_cfg_get_long (config, "hap", &l))
         c_info->hap = l;
 
-    if (xlu_cfg_replace_string (config, "name", &c_info->name))
-        c_info->name = strdup("test");
+    if (xlu_cfg_replace_string (config, "name", &c_info->name)) {
+        fprintf(stderr, "Domain name must be specified.");
+        exit(1);
+    }
 
     if (!xlu_cfg_get_string (config, "uuid", &buf) ) {
         if ( libxl_uuid_from_string(&c_info->uuid, buf) ) {
