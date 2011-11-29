@@ -16,6 +16,11 @@ name = "example.hvm"
 # The default behavior is to generate a new UUID each time the guest is started.
 #uuid = "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
 
+# Enable Microsoft Hyper-V compatibile paravirtualisation /
+# enlightenment interfaces. Turning this on can improve Windows guest
+# performance and is therefore recommended
+#viridian = 1
+
 # Initial memory allocation (MB)
 memory = 128
 
