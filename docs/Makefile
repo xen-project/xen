@@ -45,7 +45,7 @@ ps: $(DOC_PS)
 pdf: $(DOC_PDF)
 
 .PHONY: html
-html: $(DOC_HTML)
+html: $(DOC_HTML) html/index.html
 
 .PHONY: txt
 txt: $(DOC_TXT)
@@ -127,6 +127,9 @@ html/%/index.html: src/%.tex
 	-numbered_footnotes -local_icons -noinfo -math -dir $(@D) \
 	$< 1>/dev/null 2>/dev/null ; else \
 	echo "latex2html not installed; skipping $*."; fi
+
+html/index.html: $(DOC_HTML) ./gen-html-index INDEX
+	perl -w -- ./gen-html-index -i INDEX html $(DOC_HTML)
 
 html/%.html: %.markdown
 	@$(INSTALL_DIR) $(@D)

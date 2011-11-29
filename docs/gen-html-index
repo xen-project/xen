@@ -1,0 +1,136 @@
+#!/usr/bin/env perl
+
+#
+# Generate indexes for html documentation
+#
+
+use strict;
+use warnings;
+
+use Getopt::Long;
+use IO::File;
+use File::Basename;
+use List::MoreUtils qw/ uniq /;
+
+Getopt::Long::Configure('bundling');
+
+@ARGV >= 2 or die;
+
+our @docs;
+our @dirs;
+our %index;
+
+our $outdir;
+
+GetOptions("i=s" => sub { read_index(@_);} )
+    or die;
+
+($outdir,@docs) = @ARGV;
+
+sub write_file ($$) {
+    my ($opath, $odata) = @_;
+    print STDOUT "Writing: $opath\n";
+    my $out = new IO::File "$opath.new", '>' or die "$opath $!";
+    print $out $odata or die $!;
+    rename "$opath.new", "$opath" or die "$opath $!";
+}
+
+sub make_page ($$$) {
+    my ($file,$title,$content) = @_;
+    my $o = '';
+    my $h1;
+    if ( $title eq "" )
+    {
+        $title = $h1 = "Xen Documentation";
+    }
+    else
+    {
+        $h1 = "<a href=\"../index.(?:html|txt)\">Xen Documentation</a> - $title";
+        $title = "Xen Documentation - $title";
+    }
+    $o .= <<END;
+<html><head><title>$title</title></head>
+<body>
+<h1>$h1</h1>
+<ul>
+$content
+</ul>
+</body></html>
+END
+    write_file($file, $o);
+}
+
+sub make_linktext ($) {
+    my ($l) = @_;
+    return "$1($2)" if $l =~ m,^man/(.*)\.([0-9].*)\.html,;
+    $l =~ s/.(html)$//g;
+    return $index{$l} if exists $index{$l};
+    return basename($l);
+}
+
+sub make_link ($$) {
+    my ($ref,$base) = @_;
+
+    my $txt = make_linktext($ref);
+    $ref = basename($ref) if $base;
+
+    return "<li><a href=\"$ref\">$txt</a></li>\n";
+}
+
+sub make_links ($$@) {
+    my ($dir,$base,@docs) = @_;
+    my $idx = '';
+    foreach my $of (sort { $a cmp $b } @docs) {
+        $idx .= make_link($of,$base);
+    }
+    return $idx;
+}
+
+sub read_index ($$) {
+    my ($opt, $val) = @_;
+    my $idx = new IO::File "$val", '<' or die "$val $!";
+    while ($_ = $idx->getline()) {
+	s/^\s+//;
+	s/\s+$//;
+	next if m/^\#/;
+	next unless m/\S/;
+	m/^(\S+)\s+(\S.*)$/ or die;
+        $index{$1} = $2;
+    }
+}
+
+for (@docs) { s,^\Q$outdir\E/,, }
+
+@docs = grep { -e "$outdir/$_" && (make_linktext($_) ne "NO-INDEX") } @docs;
+
+my $top = '';
+
+foreach my $od (sort { $a cmp $b } uniq map { dirname($_) } @docs) {
+    my @d = (grep /^\Q$od\E/, @docs);
+    if ( @d == 1 and $d[0] eq "$od/index.html" )
+    {
+        $top .= "<li><a href=\"${od}/index.html\">${od}/index.html</a></li>\n";
+    }
+    else
+    {
+	my $links = make_links($od,0,@d);
+	$top .= <<END;
+<li><a href=\"${od}/index.html\">$od</a></li>
+<ul>
+$links
+</ul>
+END
+
+	$links = make_links($od,1,@d);
+        my $idx = '';
+	$idx .= <<END;
+<li>$od</li>
+<ul>
+$links
+</ul>
+END
+        make_page("$outdir/$od/index.html", $od, $idx);
+    }
+}
+
+make_page("$outdir/index.html", "", $top);
