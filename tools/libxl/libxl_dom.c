@@ -73,12 +73,29 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
               libxl_domain_build_info *info, libxl__domain_build_state *state)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
+    int tsc_mode;
     xc_domain_max_vcpus(ctx->xch, domid, info->max_vcpus);
     xc_domain_setmaxmem(ctx->xch, domid, info->target_memkb + LIBXL_MAXMEM_CONSTANT);
     if (info->type == LIBXL_DOMAIN_TYPE_PV)
         xc_domain_set_memmap_limit(ctx->xch, domid,
                 (info->max_memkb + info->u.pv.slack_memkb));
-    xc_domain_set_tsc_info(ctx->xch, domid, info->tsc_mode, 0, 0, 0);
+    switch (info->tsc_mode) {
+    case LIBXL_TSC_MODE_DEFAULT:
+        tsc_mode = 0;
+        break;
+    case LIBXL_TSC_MODE_ALWAYS_EMULATE:
+        tsc_mode = 1;
+        break;
+    case LIBXL_TSC_MODE_NATIVE:
+        tsc_mode = 2;
+        break;
+    case LIBXL_TSC_MODE_NATIVE_PARAVIRT:
+        tsc_mode = 3;
+        break;
+    default:
+        abort();
+    }
+    xc_domain_set_tsc_info(ctx->xch, domid, tsc_mode, 0, 0, 0);
     if ( info->disable_migrate )
         xc_domain_disable_migrate(ctx->xch, domid);
 

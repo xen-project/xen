@@ -328,7 +328,7 @@ static void printf_info(int domid,
 
     printf("\t(build_info)\n");
     printf("\t(max_vcpus %d)\n", b_info->max_vcpus);
-    printf("\t(tsc_mode %d)\n", b_info->tsc_mode);
+    printf("\t(tsc_mode %s)\n", libxl_tsc_mode_to_string(b_info->tsc_mode));
     printf("\t(max_memkb %d)\n", b_info->max_memkb);
     printf("\t(target_memkb %d)\n", b_info->target_memkb);
     printf("\t(nomigrate %d)\n", b_info->disable_migrate);
@@ -662,8 +662,28 @@ static void parse_config_data(const char *configfile_filename_report,
     if (!xlu_cfg_get_long (config, "nomigrate", &l, 0))
         b_info->disable_migrate = l;
 
-    if (!xlu_cfg_get_long(config, "tsc_mode", &l, 0))
+    if (!xlu_cfg_get_long(config, "tsc_mode", &l, 1)) {
+        const char *s = libxl_tsc_mode_to_string(l);
+        fprintf(stderr, "WARNING: specifying \"tsc_mode\" as an integer is deprecated. "
+                "Please use the named parameter variant. %s%s%s\n",
+                s ? "e.g. tsc_mode=\"" : "",
+                s ? s : "",
+                s ? "\"" : "");
+
+        if (l < LIBXL_TSC_MODE_DEFAULT ||
+            l > LIBXL_TSC_MODE_NATIVE_PARAVIRT) {
+            fprintf(stderr, "ERROR: invalid value %ld for \"tsc_mode\"\n", l);
+            exit (1);
+        }
         b_info->tsc_mode = l;
+    } else if (!xlu_cfg_get_string(config, "tsc_mode", &buf, 0)) {
+        fprintf(stderr, "got a tsc mode string: \"%s\"\n", buf);
+        if (libxl_tsc_mode_from_string(buf, &b_info->tsc_mode)) {
+            fprintf(stderr, "ERROR: invalid value \"%s\" for \"tsc_mode\"\n",
+                    buf);
+            exit (1);
+        }
+    }
 
     if (!xlu_cfg_get_long (config, "videoram", &l, 0))
         b_info->video_memkb = l * 1024;

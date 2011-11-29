@@ -491,10 +491,44 @@ compatibility mode on more modern Windows OS).
 
 =item B<tsc_mode="MODE">
 
+
 Specifies how the TSC (Time Stamp Counter) should be provided to the
-guest.  XXX ???
+guest (X86 only). Specifying this option as a number is
+deprecated. Options are:
+
+=over 4
+
+=item B<"default">
+
+Guest rdtsc/p executed natively when monotonicity can be guaranteed
+and emulated otherwise (with frequency scaled if necessary).
+
+=item B<"always_emulate">
+
+Guest rdtsc/p always emulated at 1GHz (kernel and user). Guest rdtsc/p
+always emulated and the virtual TSC will appear to increment (kernel
+and user) at a fixed 1GHz rate, regardless of the PCPU HZ rate or
+power state; Although there is an overhead associated with emulation
+this will NOT affect underlying CPU performance.
+
+=item B<"native">
+
+Guest rdtsc always executed natively (no monotonicity/frequency
+guarantees); guest rdtscp emulated at native frequency if unsupported
+by h/w, else executed natively.
+
+=item B<"native_paravirt">
+
+Same as B<native>, except xen manages TSC_AUX register so guest can
+determine when a restore/migration has occurred and assumes guest
+obtains/uses pvclock-like mechanism to adjust for monotonicity and
+frequency changes.
 
 =back
+
+=back
+
+Please see F<docs/misc/tscmode.txt> for more information on this option.
 
 =head3 Support for Paravirtualisation of HVM Guests
 

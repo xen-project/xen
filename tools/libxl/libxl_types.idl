@@ -85,6 +85,13 @@ libxl_button = Enumeration("button", [
     (2, "SLEEP"),
     ])
 
+libxl_tsc_mode = Enumeration("tsc_mode", [
+    (0, "default"),
+    (1, "always_emulate"),
+    (2, "native"),
+    (3, "native_paravirt"),
+    ])
+
 #
 # Complex libxl types
 #
@@ -154,7 +161,7 @@ libxl_domain_create_info = Struct("domain_create_info",[
 libxl_domain_build_info = Struct("domain_build_info",[
     ("max_vcpus",       integer),
     ("cur_vcpus",       integer),
-    ("tsc_mode",        integer),
+    ("tsc_mode",        libxl_tsc_mode),
     ("max_memkb",       uint32),
     ("target_memkb",    uint32),
     ("video_memkb",     uint32),
