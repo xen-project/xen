@@ -45,7 +45,7 @@ sub make_page ($$$) {
     }
     else
     {
-        $h1 = "<a href=\"../index.(?:html|txt)\">Xen Documentation</a> - $title";
+        $h1 = "<a href=\"../index.html\">Xen Documentation</a> - $title";
         $title = "Xen Documentation - $title";
     }
     $o .= <<END;
@@ -63,7 +63,7 @@ END
 sub make_linktext ($) {
     my ($l) = @_;
     return "$1($2)" if $l =~ m,^man/(.*)\.([0-9].*)\.html,;
-    $l =~ s/.(html)$//g;
+    $l =~ s/.(?:html|txt)$//g;
     return $index{$l} if exists $index{$l};
     return basename($l);
 }
@@ -109,13 +109,14 @@ foreach my $od (sort { $a cmp $b } uniq map { dirname($_) } @docs) {
     my @d = (grep /^\Q$od\E/, @docs);
     if ( @d == 1 and $d[0] eq "$od/index.html" )
     {
-        $top .= "<li><a href=\"${od}/index.html\">${od}/index.html</a></li>\n";
+        $top .= make_link("$od/index.html", 0);
     }
     else
     {
 	my $links = make_links($od,0,@d);
+	my $secttitle = make_linktext($od);
 	$top .= <<END;
-<li><a href=\"${od}/index.html\">$od</a></li>
+<li><a href=\"${od}/index.html\">$secttitle</a></li>
 <ul>
 $links
 </ul>
@@ -124,12 +125,12 @@ END
 	$links = make_links($od,1,@d);
         my $idx = '';
 	$idx .= <<END;
-<li>$od</li>
+<li>$secttitle</li>
 <ul>
 $links
 </ul>
 END
-        make_page("$outdir/$od/index.html", $od, $idx);
+        make_page("$outdir/$od/index.html", $secttitle, $idx);
     }
 }
 
