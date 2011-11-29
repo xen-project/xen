@@ -17,7 +17,8 @@ DOC_PDF		:= $(patsubst src/%.tex,pdf/%.pdf,$(DOC_TEX))
 DOC_HTML	:= $(patsubst src/%.tex,html/reference/%/index.html,$(DOC_TEX)) \
 		   $(patsubst %.markdown,html/%.html,$(DOC_MARKDOWN)) \
 		   $(patsubst man/%.pod.1,html/man/%.1.html,$(DOC_MAN1SRC)) \
-		   $(patsubst man/%.pod.5,html/man/%.5.html,$(DOC_MAN5SRC))
+		   $(patsubst man/%.pod.5,html/man/%.5.html,$(DOC_MAN5SRC)) \
+		   $(patsubst %.txt,html/%.txt,$(wildcard misc/*.txt))
 DOC_TXT         := $(patsubst %.txt,txt/%.txt,$(wildcard misc/*.txt)) \
 		   $(patsubst %.markdown,txt/%.txt,$(DOC_MARKDOWN)) \
 		   $(patsubst man/%.pod.1,txt/man/%.1.txt,$(DOC_MAN1SRC)) \
@@ -138,6 +139,10 @@ html/%.html: %.markdown
 	$(MARKDOWN) $< > $@.tmp ; \
 	$(call move-if-changed,$@.tmp,$@) ; else \
 	echo "markdown not installed; skipping $*.html."; fi
+
+html/%.txt: %.txt
+	@$(INSTALL_DIR) $(@D)
+	cp $< $@
 
 html/man/%.1.html: man/%.pod.1 Makefile
 	$(INSTALL_DIR) $(@D)

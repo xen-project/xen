@@ -1,5 +1,7 @@
 misc/hvm-emulated-unplug	Xen HVM emulated device unplug protocol
 
+misc/console.txt		Xen PV Console notes
+
 # These are not all that useful anymore, hide them from the index
 reference/interface/index	NO-INDEX
 reference/user/index		NO-INDEX
