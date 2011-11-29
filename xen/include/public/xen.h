@@ -55,7 +55,9 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
  * HYPERCALLS
  */
 
-/* ` enum hypercall_num { // __HYPERVISOR_* => HYPERVISOR_*() */
+/* `incontents 100 hcalls List of hypercalls
+ * ` enum hypercall_num { // __HYPERVISOR_* => HYPERVISOR_*()
+ */
 
 #define __HYPERVISOR_set_trap_table        0
 #define __HYPERVISOR_mmu_update            1

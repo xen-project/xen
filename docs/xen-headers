@@ -17,6 +17,10 @@
 
 #  definitions must start in LH column
 #  extra syntax:
+#   `incontents <seq> <shortname> <anchor text html>...
+#                              make a table of contents entry; they
+#                              will be sorted by increasing seq, and
+#                              shortname will be used as the anchor target
 #    /* ` <definition>                          } parse as if <definition>
 #     * ` <definition>                          }  was not commented
 #   enum <name> { // <pattern>* => <func>()     } cross-reference
@@ -60,6 +64,8 @@ my ($basedir,@indirs) = @ARGV;
 # general globals
 our $pass;
 our %sdef; 
+our @incontents;
+our @outfiles;
 # $sdef{$type}{$name} => {
 #     DefLocs => { "$leaf_path:$lineno" => $leaf_opath ,... }
 #     Xrefs => { "$leaf_path,$lineno" => "$xref", ... }
@@ -187,6 +193,19 @@ sub out_xrefs ($) {
     @pending_xrefs = ();
 }
 
+sub incontents ($$$) {
+    my ($text, $seq, $anchor) = @_;
+    $anchor = "incontents_$anchor";
+    if ($pass==2) {
+	push @incontents, { 
+	    Seq => $seq,
+	    Href => "$leaf_opath#$anchor",
+	    Title => $text,
+	};
+    }
+    return "<a name=\"$anchor\"><strong>$text</strong></a>";
+}
+
 sub write_file ($$) {
     my ($opath, $odata) = @_;
     my $out = new IO::File "$opath.new", '>' or die "$opath $!";
@@ -242,6 +261,8 @@ sub process_file ($$) {
 	    }
 	} elsif (s/^( \s* \#define \s+ ) (\w+) ( \s+\S )
                   / $1.defmacro($2).norm($3) /xe) {
+	} elsif (s/( \`incontents \s+ (\d+) \s+ (\w+) \s+ )(\S .* \S)
+                 / norm($1).incontents($4, $2, $3) /xe) {
 	} else {
 	    if (m/^\s*\}/) {
 		$in_enum = undef;
@@ -261,11 +282,47 @@ sub process_file ($$) {
     warning("pending xrefs at end of file") if @pending_xrefs;
 
     if ($pass == 2) {
+	push @outfiles, [ $leaf, $leaf_opath ];
 	$o .= "</pre></body></html>";
 	write_file($outfile, $o);
     }
 }
 
+sub output_index () {
+    my $title = "contents - $xtitle";
+    $o = '';
+    $o .= <<END;
+<html><head><title>$title</title></head>
+<body>
+<h1>$title</h1>
+<h2>Starting points</h2>
+<ul>
+END
+    foreach my $ic (sort { $a->{Seq} <=> $b->{Seq} } @incontents) {
+	$o .= "<li><a href=\"$ic->{Href}\">$ic->{Title}</a></li>\n";
+    }
+    $o .= "</ul>\n";
+    my $forkind = sub {
+	my ($type,$desc,$pfx,$sfx) = @_;
+	$o .= "<h2>$desc</h2><ul>\n";
+	foreach my $name (sort keys %{ $sdef{$type} }) {
+	    my $href = refhref($type,$name);
+	    next unless $href =~ m/\S/;
+	    $o .= "<li><a $href>$pfx$name$sfx</a></li>\n";
+	}
+	$o .= "</ul>\n";
+    };
+    $forkind->('Func','Functions','','()');
+    $forkind->('Struct','Structs','struct ','');
+    $forkind->('Enum','Enums and sets of #defines','','');
+    $forkind->('EnumVal','Enum values and individual #defines','','');
+    $o .= "</ul>\n<h2>Files</h2><ul>\n";
+    foreach my $of (sort { $a->[0] cmp $b->[0] } @outfiles) {
+	$o .= "<li><a href=\"$of->[1]\">$of->[0]</a></li>\n";
+    }
+    $o .= "</ul></body></html>\n";
+    write_file("$outdir/index.html", $o);
+}
 
 foreach $pass (qw(1 2)) {
     find({ wanted => 
@@ -290,3 +347,5 @@ foreach $pass (qw(1 2)) {
 	 },
 	 map { "$basedir/$_" } @indirs);
 }
+
+output_index();
