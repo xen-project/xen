@@ -61,10 +61,10 @@ provided by your OS distributor:
 Second, you need to acquire a suitable kernel for use in domain 0. If
 possible you should use a kernel provided by your OS distributor. If
 no suitable kernel is available from your OS distributor then refer to
-http://wiki.xen.org/xenwiki/XenDom0Kernels for suggestions for
+http://wiki.xen.org/wiki/XenDom0Kernels for suggestions for
 suitable kernels to use.
 If you are looking to compile a Dom0 kernel from source, please refer to
-http://wiki.xensource.com/xenwiki/XenParavirtOps.
+http://wiki.xen.org/wiki/XenParavirtOps.
 
 [NB. Unless noted otherwise, all the following steps should be
 performed with root privileges.]

@@ -72,7 +72,7 @@ static void parse(CfgParseContext *ctx) {
         fputs(
  "warning: Config file looks like it contains Python code.\n"
  "warning:  Arbitrary Python is no longer supported.\n"
- "warning:  See http://wiki.xen.org/xenwiki/PythonInXlConfig\n",
+ "warning:  See http://wiki.xen.org/wiki/PythonInXlConfig\n",
               ctx->cfg->report);
     }
 }

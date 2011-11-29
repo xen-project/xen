@@ -123,4 +123,4 @@ defaults to domain 0. Specifying another domain requires setting up a
 driver domain which is outside the scope of this document.
 
 [oui]: http://en.wikipedia.org/wiki/Organizationally_Unique_Identifier
-[net]: http://wiki.xen.org/xenwiki/HostConfiguration/Networking
+[net]: http://wiki.xen.org/wiki/HostConfiguration/Networking

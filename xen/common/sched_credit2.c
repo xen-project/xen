@@ -51,7 +51,7 @@
 /*
  * WARNING: This is still in an experimental phase.  Status and work can be found at the
  * credit2 wiki page:
- *  http://wiki.xensource.com/xenwiki/Credit2_Scheduler_Development
+ *  http://wiki.xen.org/wiki/Credit2_Scheduler_Development
  * TODO:
  * + Immediate bug-fixes
  *  - Do per-runqueue, grab proper lock for dump debugkey

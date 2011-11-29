@@ -159,7 +159,7 @@ SET_PERMS		<path>|<perm-as-string>|+?
 		r<domid>	read only
 		b<domid>	both read and write
 		n<domid>	no access
-	See http://wiki.xensource.com/xenwiki/XenBus section
+	See http://wiki.xen.org/wiki/XenBus section
 	`Permissions' for details of the permissions system.
 
 ---------- Watches ----------
