@@ -334,9 +334,14 @@ static void printf_info(int domid,
     printf("\t(nomigrate %d)\n", b_info->disable_migrate);
 
     if (c_info->type == LIBXL_DOMAIN_TYPE_PV && b_info->u.pv.bootloader) {
+        int i;
         printf("\t(bootloader %s)\n", b_info->u.pv.bootloader);
-        if (b_info->u.pv.bootloader_args)
-            printf("\t(bootloader_args %s)\n", b_info->u.pv.bootloader_args);
+        if (b_info->u.pv.bootloader_args) {
+            printf("\t(bootloader_args");
+            for (i=0; b_info->u.pv.bootloader_args[i]; i++)
+                printf(" %s", b_info->u.pv.bootloader_args[i]);
+            printf(")\n");
+        }
     }
 
     printf("\t(image\n");
@@ -513,6 +518,51 @@ static void parse_disk_config(XLU_Config **config, const char *spec,
                               libxl_device_disk *disk)
 {
     parse_disk_config_multistring(config, 1, &spec, disk);
+}
+
+static void split_string_into_string_list(const char *str,
+                                          const char *delim,
+                                          libxl_string_list *psl)
+{
+    char *s, *saveptr;
+    const char *p;
+    libxl_string_list sl;
+
+    int i = 0, nr = 0;
+
+    s = strdup(str);
+    if (s == NULL) {
+        fprintf(stderr, "unable to allocate memory to parse bootloader args\n");
+        exit(-1);
+    }
+
+    /* Count number of entries */
+    p = strtok_r(s, delim, &saveptr);
+    do {
+        nr++;
+    } while ((p = strtok_r(NULL, delim, &saveptr)));
+
+    free(s);
+
+    s = strdup(str);
+
+    sl = malloc((nr+1) * sizeof (char *));
+    if (sl == NULL) {
+        fprintf(stderr, "unable to allocate memory for bootloader args\n");
+        exit(-1);
+    }
+
+    p = strtok_r(s, delim, &saveptr);
+    do {
+        assert(i < nr);
+        sl[i] = strdup(p);
+        i++;
+    } while ((p = strtok_r(NULL, delim, &saveptr)));
+    sl[i] = NULL;
+
+    *psl = sl;
+
+    free(s);
 }
 
 static void parse_config_data(const char *configfile_filename_report,
@@ -739,10 +789,27 @@ static void parse_config_data(const char *configfile_filename_report,
             exit(1);
         }
 
-        xlu_cfg_replace_string (config, "bootloader",
-                                &b_info->u.pv.bootloader, 0);
-        xlu_cfg_replace_string (config, "bootloader_args",
-                                &b_info->u.pv.bootloader_args, 0);
+        xlu_cfg_replace_string (config, "bootloader", &b_info->u.pv.bootloader, 0);
+        switch (xlu_cfg_get_list_as_string_list(config, "bootloader_args",
+                                      &b_info->u.pv.bootloader_args, 1))
+        {
+
+        case 0: break; /* Success */
+        case ESRCH: break; /* Option not present */
+        case EINVAL:
+            if (!xlu_cfg_get_string(config, "bootloader_args", &buf, 0)) {
+
+                fprintf(stderr, "WARNING: Specifying \"bootloader_args\""
+                        " as a string is deprecated. "
+                        "Please use a list of arguments.\n");
+                split_string_into_string_list(buf, " \t\n",
+                                              &b_info->u.pv.bootloader_args);
+            }
+            break;
+        default:
+            fprintf(stderr,"xl: Unable to parse bootloader_args.\n");
+            exit(-ERROR_FAIL);
+        }
 
         if (!b_info->u.pv.bootloader && !b_info->u.pv.kernel.path) {
             fprintf(stderr, "Neither kernel nor bootloader specified\n");

@@ -187,7 +187,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
                  ("pv", Struct(None, [("kernel", libxl_file_reference),
                                       ("slack_memkb", uint32),
                                       ("bootloader", string),
-                                      ("bootloader_args", string),
+                                      ("bootloader_args", libxl_string_list),
                                       ("cmdline", string),
                                       ("ramdisk", libxl_file_reference),
                                       ("features", string, True),

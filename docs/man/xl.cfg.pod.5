@@ -321,10 +321,11 @@ Run C<PROGRAM> to find the kernel image and ramdisk to use.  Normally
 C<PROGRAM> would be C<pygrub>, which is an emulation of
 grub/grub2/syslinux.
 
-=item B<bootloader_args=STRING>
+=item B<bootloader_args=[ "ARG", "ARG", ...]>
 
-Append B<STRING> (split into words at whitespace) to the arguments to
-the B<bootloader> program.  XXX this should be a list of strings.
+Append B<ARG>s to the arguments to the B<bootloader>
+program. Alternatively if the argument is a simple string then it will
+be split into words at whitespace (this second option is deprecated).
 
 =item B<root="STRING">
 

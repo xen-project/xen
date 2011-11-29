@@ -58,13 +58,9 @@ static char **make_bootloader_args(libxl__gc *gc,
     flexarray_set(args, nr++, libxl__sprintf(gc, "--output-directory=%s", "/var/run/libxl/"));
 
     if (info->u.pv.bootloader_args) {
-        char *saveptr;
-        /* Operate on a duplicate since strtok modifes the argument */
-        char *dup = libxl__strdup(gc, info->u.pv.bootloader_args);
-        char *t = strtok_r(dup, " \t\n", &saveptr);
-        do {
-            flexarray_set(args, nr++, t);
-        } while ((t = strtok_r(NULL, " \t\n", &saveptr)));
+        char *p = info->u.pv.bootloader_args[0];
+        while (*(p++))
+            flexarray_set(args, nr++, p);
     }
 
     flexarray_set(args, nr++, disk);
