@@ -196,6 +196,40 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
  * FD == DOMID_XEN: Map restricted areas of Xen's heap space.
  * ptr[:2]  -- Machine address of the page-table entry to modify.
  * val      -- Value to write.
+ *
+ * There also certain implicit requirements when using this hypercall. The
+ * pages that make up a pagetable must be mapped read-only in the guest.
+ * This prevents uncontrolled guest updates to the pagetable. Xen strictly
+ * enforces this, and will disallow any pagetable update which will end up
+ * mapping pagetable page RW, and will disallow using any writable page as a
+ * pagetable. In practice it means that when constructing a page table for a
+ * process, thread, etc, we MUST be very dilligient in following these rules:
+ *  1). Start with top-level page (PGD or in Xen language: L4). Fill out
+ *      the entries.
+ *  2). Keep on going, filling out the upper (PUD or L3), and middle (PMD
+ *      or L2).
+ *  3). Start filling out the PTE table (L1) with the PTE entries. Once
+ *  	done, make sure to set each of those entries to RO (so writeable bit
+ *  	is unset). Once that has been completed, set the PMD (L2) for this
+ *  	PTE table as RO.
+ *  4). When completed with all of the PMD (L2) entries, and all of them have
+ *  	been set to RO, make sure to set RO the PUD (L3). Do the same
+ *  	operation on PGD (L4) pagetable entries that have a PUD (L3) entry.
+ *  5). Now before you can use those pages (so setting the cr3), you MUST also
+ *      pin them so that the hypervisor can verify the entries. This is done
+ *      via the HYPERVISOR_mmuext_op(MMUEXT_PIN_L4_TABLE, guest physical frame
+ *      number of the PGD (L4)). And this point the HYPERVISOR_mmuext_op(
+ *      MMUEXT_NEW_BASEPTR, guest physical frame number of the PGD (L4)) can be
+ *      issued.
+ * For 32-bit guests, the L4 is not used (as there is less pagetables), so
+ * instead use L3.
+ * At this point the pagetables can be modified using the MMU_NORMAL_PT_UPDATE
+ * hypercall. Also if so desired the OS can also try to write to the PTE
+ * and be trapped by the hypervisor (as the PTE entry is RO).
+ *
+ * To deallocate the pages, the operations are the reverse of the steps
+ * mentioned above. The argument is MMUEXT_UNPIN_TABLE for all levels and the
+ * pagetable MUST not be in use (meaning that the cr3 is not set to it).
  * 
  * ptr[1:0] == MMU_MACHPHYS_UPDATE:
  * Updates an entry in the machine->pseudo-physical mapping table.
