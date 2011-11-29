@@ -62,10 +62,10 @@ static void parse_global_config(const char *configfile,
         exit(1);
     }
 
-    if (!xlu_cfg_get_long (config, "autoballoon", &l))
+    if (!xlu_cfg_get_long (config, "autoballoon", &l, 0))
         autoballoon = l;
 
-    if (!xlu_cfg_get_string (config, "lockfile", &buf))
+    if (!xlu_cfg_get_string (config, "lockfile", &buf, 0))
         lockfile = strdup(buf);
     else {
         e = asprintf(&lockfile, "%s/xl", (char *)libxl_lock_dir_path());
@@ -75,7 +75,7 @@ static void parse_global_config(const char *configfile,
         }
     }
 
-    if (!xlu_cfg_get_string (config, "vifscript", &buf))
+    if (!xlu_cfg_get_string (config, "vifscript", &buf, 0))
         default_vifscript = strdup(buf);
 
     xlu_cfg_destroy(config);

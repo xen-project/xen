@@ -554,7 +554,7 @@ static void parse_config_data(const char *configfile_filename_report,
     if (libxl_init_create_info(ctx, c_info))
         exit(1);
 
-    if (!xlu_cfg_get_string (config, "seclabel", &buf)) {
+    if (!xlu_cfg_get_string (config, "seclabel", &buf, 0)) {
         e = libxl_flask_context_to_sid(ctx, (char *)buf, strlen(buf),
                                     &c_info->ssidref);
         if (e) {
@@ -568,19 +568,19 @@ static void parse_config_data(const char *configfile_filename_report,
     }
 
     c_info->type = LIBXL_DOMAIN_TYPE_PV;
-    if (!xlu_cfg_get_string (config, "builder", &buf) &&
+    if (!xlu_cfg_get_string (config, "builder", &buf, 0) &&
         !strncmp(buf, "hvm", strlen(buf)))
         c_info->type = LIBXL_DOMAIN_TYPE_HVM;
 
-    if (!xlu_cfg_get_long (config, "hap", &l))
+    if (!xlu_cfg_get_long (config, "hap", &l, 0))
         c_info->hap = l;
 
-    if (xlu_cfg_replace_string (config, "name", &c_info->name)) {
+    if (xlu_cfg_replace_string (config, "name", &c_info->name, 0)) {
         fprintf(stderr, "Domain name must be specified.");
         exit(1);
     }
 
-    if (!xlu_cfg_get_string (config, "uuid", &buf) ) {
+    if (!xlu_cfg_get_string (config, "uuid", &buf, 0) ) {
         if ( libxl_uuid_from_string(&c_info->uuid, buf) ) {
             fprintf(stderr, "Failed to parse UUID: %s\n", buf);
             exit(1);
@@ -589,10 +589,10 @@ static void parse_config_data(const char *configfile_filename_report,
         libxl_uuid_generate(&c_info->uuid);
     }
 
-    if (!xlu_cfg_get_long(config, "oos", &l))
+    if (!xlu_cfg_get_long(config, "oos", &l, 0))
         c_info->oos = l;
 
-    if (!xlu_cfg_get_string (config, "pool", &buf)) {
+    if (!xlu_cfg_get_string (config, "pool", &buf, 0)) {
         c_info->poolid = -1;
         cpupool_qualifier_to_cpupoolid(buf, &c_info->poolid, NULL);
     }
@@ -606,37 +606,37 @@ static void parse_config_data(const char *configfile_filename_report,
         exit(1);
 
     /* the following is the actual config parsing with overriding values in the structures */
-    if (!xlu_cfg_get_long (config, "vcpus", &l)) {
+    if (!xlu_cfg_get_long (config, "vcpus", &l, 0)) {
         b_info->max_vcpus = l;
         b_info->cur_vcpus = (1 << l) - 1;
     }
 
-    if (!xlu_cfg_get_long (config, "maxvcpus", &l))
+    if (!xlu_cfg_get_long (config, "maxvcpus", &l, 0))
         b_info->max_vcpus = l;
 
-    if (!xlu_cfg_get_long (config, "memory", &l)) {
+    if (!xlu_cfg_get_long (config, "memory", &l, 0)) {
         b_info->max_memkb = l * 1024;
         b_info->target_memkb = b_info->max_memkb;
     }
 
-    if (!xlu_cfg_get_long (config, "maxmem", &l))
+    if (!xlu_cfg_get_long (config, "maxmem", &l, 0))
         b_info->max_memkb = l * 1024;
 
-    if (xlu_cfg_get_string (config, "on_poweroff", &buf))
+    if (xlu_cfg_get_string (config, "on_poweroff", &buf, 0))
         buf = "destroy";
     if (!parse_action_on_shutdown(buf, &d_config->on_poweroff)) {
         fprintf(stderr, "Unknown on_poweroff action \"%s\" specified\n", buf);
         exit(1);
     }
 
-    if (xlu_cfg_get_string (config, "on_reboot", &buf))
+    if (xlu_cfg_get_string (config, "on_reboot", &buf, 0))
         buf = "restart";
     if (!parse_action_on_shutdown(buf, &d_config->on_reboot)) {
         fprintf(stderr, "Unknown on_reboot action \"%s\" specified\n", buf);
         exit(1);
     }
 
-    if (xlu_cfg_get_string (config, "on_watchdog", &buf))
+    if (xlu_cfg_get_string (config, "on_watchdog", &buf, 0))
         buf = "destroy";
     if (!parse_action_on_shutdown(buf, &d_config->on_watchdog)) {
         fprintf(stderr, "Unknown on_watchdog action \"%s\" specified\n", buf);
@@ -644,7 +644,7 @@ static void parse_config_data(const char *configfile_filename_report,
     }
 
 
-    if (xlu_cfg_get_string (config, "on_crash", &buf))
+    if (xlu_cfg_get_string (config, "on_crash", &buf, 0))
         buf = "destroy";
     if (!parse_action_on_shutdown(buf, &d_config->on_crash)) {
         fprintf(stderr, "Unknown on_crash action \"%s\" specified\n", buf);
@@ -654,52 +654,52 @@ static void parse_config_data(const char *configfile_filename_report,
     /* libxl_get_required_shadow_memory() must be called after final values
      * (default or specified) for vcpus and memory are set, because the
      * calculation depends on those values. */
-    b_info->shadow_memkb = !xlu_cfg_get_long(config, "shadow_memory", &l)
+    b_info->shadow_memkb = !xlu_cfg_get_long(config, "shadow_memory", &l, 0)
         ? l * 1024
         : libxl_get_required_shadow_memory(b_info->max_memkb,
                                            b_info->max_vcpus);
 
-    if (!xlu_cfg_get_long (config, "nomigrate", &l))
+    if (!xlu_cfg_get_long (config, "nomigrate", &l, 0))
         b_info->disable_migrate = l;
 
-    if (!xlu_cfg_get_long(config, "tsc_mode", &l))
+    if (!xlu_cfg_get_long(config, "tsc_mode", &l, 0))
         b_info->tsc_mode = l;
 
-    if (!xlu_cfg_get_long (config, "videoram", &l))
+    if (!xlu_cfg_get_long (config, "videoram", &l, 0))
         b_info->video_memkb = l * 1024;
 
-    if (!xlu_cfg_get_long (config, "gfx_passthru", &l))
+    if (!xlu_cfg_get_long (config, "gfx_passthru", &l, 0))
         dm_info->gfx_passthru = l;
 
     switch(c_info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
-        if (!xlu_cfg_get_string (config, "kernel", &buf))
+        if (!xlu_cfg_get_string (config, "kernel", &buf, 0))
             fprintf(stderr, "WARNING: ignoring \"kernel\" directive for HVM guest. "
                     "Use \"firmware_override\" instead if you really want a non-default firmware\n");
 
         xlu_cfg_replace_string (config, "firmware_override",
-                                &b_info->u.hvm.firmware);
-        if (!xlu_cfg_get_long (config, "pae", &l))
+                                &b_info->u.hvm.firmware, 0);
+        if (!xlu_cfg_get_long (config, "pae", &l, 0))
             b_info->u.hvm.pae = l;
-        if (!xlu_cfg_get_long (config, "apic", &l))
+        if (!xlu_cfg_get_long (config, "apic", &l, 0))
             b_info->u.hvm.apic = l;
-        if (!xlu_cfg_get_long (config, "acpi", &l))
+        if (!xlu_cfg_get_long (config, "acpi", &l, 0))
             b_info->u.hvm.acpi = l;
-        if (!xlu_cfg_get_long (config, "acpi_s3", &l))
+        if (!xlu_cfg_get_long (config, "acpi_s3", &l, 0))
             b_info->u.hvm.acpi_s3 = l;
-        if (!xlu_cfg_get_long (config, "acpi_s4", &l))
+        if (!xlu_cfg_get_long (config, "acpi_s4", &l, 0))
             b_info->u.hvm.acpi_s4 = l;
-        if (!xlu_cfg_get_long (config, "nx", &l))
+        if (!xlu_cfg_get_long (config, "nx", &l, 0))
             b_info->u.hvm.nx = l;
-        if (!xlu_cfg_get_long (config, "viridian", &l))
+        if (!xlu_cfg_get_long (config, "viridian", &l, 0))
             b_info->u.hvm.viridian = l;
-        if (!xlu_cfg_get_long (config, "hpet", &l))
+        if (!xlu_cfg_get_long (config, "hpet", &l, 0))
             b_info->u.hvm.hpet = l;
-        if (!xlu_cfg_get_long (config, "vpt_align", &l))
+        if (!xlu_cfg_get_long (config, "vpt_align", &l, 0))
             b_info->u.hvm.vpt_align = l;
-        if (!xlu_cfg_get_long (config, "timer_mode", &l))
+        if (!xlu_cfg_get_long (config, "timer_mode", &l, 0))
             b_info->u.hvm.timer_mode = l;
-        if (!xlu_cfg_get_long (config, "nestedhvm", &l))
+        if (!xlu_cfg_get_long (config, "nestedhvm", &l, 0))
             b_info->u.hvm.nested_hvm = l;
         break;
     case LIBXL_DOMAIN_TYPE_PV:
@@ -707,12 +707,12 @@ static void parse_config_data(const char *configfile_filename_report,
         char *cmdline = NULL;
         const char *root = NULL, *extra = "";
 
-        xlu_cfg_replace_string (config, "kernel", &b_info->u.pv.kernel.path);
+        xlu_cfg_replace_string (config, "kernel", &b_info->u.pv.kernel.path, 0);
 
-        xlu_cfg_replace_string (config, "kernel", &b_info->u.pv.kernel.path);
+        xlu_cfg_replace_string (config, "kernel", &b_info->u.pv.kernel.path, 0);
 
-        xlu_cfg_get_string (config, "root", &root);
-        xlu_cfg_get_string (config, "extra", &extra);
+        xlu_cfg_get_string (config, "root", &root, 0);
+        xlu_cfg_get_string (config, "extra", &extra, 0);
 
         if (root) {
             if (asprintf(&cmdline, "root=%s %s", root, extra) == -1)
@@ -726,8 +726,10 @@ static void parse_config_data(const char *configfile_filename_report,
             exit(1);
         }
 
-        xlu_cfg_replace_string (config, "bootloader", &b_info->u.pv.bootloader);
-        xlu_cfg_replace_string (config, "bootloader_args", &b_info->u.pv.bootloader_args);
+        xlu_cfg_replace_string (config, "bootloader",
+                                &b_info->u.pv.bootloader, 0);
+        xlu_cfg_replace_string (config, "bootloader_args",
+                                &b_info->u.pv.bootloader_args, 0);
 
         if (!b_info->u.pv.bootloader && !b_info->u.pv.kernel.path) {
             fprintf(stderr, "Neither kernel nor bootloader specified\n");
@@ -735,7 +737,7 @@ static void parse_config_data(const char *configfile_filename_report,
         }
 
         b_info->u.pv.cmdline = cmdline;
-        xlu_cfg_replace_string (config, "ramdisk", &b_info->u.pv.ramdisk.path);
+        xlu_cfg_replace_string (config, "ramdisk", &b_info->u.pv.ramdisk.path, 0);
         break;
     }
     default:
@@ -910,15 +912,15 @@ skip_vfb:
         }
     }
 
-    if (!xlu_cfg_get_long (config, "pci_msitranslate", &l))
+    if (!xlu_cfg_get_long (config, "pci_msitranslate", &l, 0))
         pci_msitranslate = l;
 
-    if (!xlu_cfg_get_long (config, "pci_power_mgmt", &l))
+    if (!xlu_cfg_get_long (config, "pci_power_mgmt", &l, 0))
         pci_power_mgmt = l;
 
     /* To be reworked (automatically enabled) once the auto ballooning
      * after guest starts is done (with PCI devices passed in). */
-    if (!xlu_cfg_get_long (config, "e820_host", &l)) {
+    if (!xlu_cfg_get_long (config, "e820_host", &l, 0)) {
         switch (c_info->type) {
         case LIBXL_DOMAIN_TYPE_HVM:
             fprintf(stderr, "Can't do e820_host in HVM mode!");
@@ -986,7 +988,7 @@ skip_vfb:
         }
         break;
     case EINVAL:    /* config option is not a list, parse as a string */
-        if (!xlu_cfg_get_string(config, "cpuid", &buf)) {
+        if (!xlu_cfg_get_string(config, "cpuid", &buf, 0)) {
             char *buf2, *p, *strtok_ptr = NULL;
             const char *errstr;
 
@@ -1034,7 +1036,7 @@ skip_vfb:
     if (libxl_init_dm_info(ctx, dm_info, c_info, b_info))
         exit(1);
     /* parse device model arguments, this works for pv, hvm and stubdom */
-    if (!xlu_cfg_get_string (config, "device_model", &buf)) {
+    if (!xlu_cfg_get_string (config, "device_model", &buf, 0)) {
         fprintf(stderr,
                 "WARNING: ignoring device_model directive.\n"
                 "WARNING: Use \"device_model_override\" instead if you"
@@ -1053,8 +1055,8 @@ skip_vfb:
 
 
     xlu_cfg_replace_string (config, "device_model_override",
-                            &dm_info->device_model);
-    if (!xlu_cfg_get_string (config, "device_model_version", &buf)) {
+                            &dm_info->device_model, 0);
+    if (!xlu_cfg_get_string (config, "device_model_version", &buf, 0)) {
         if (!strcmp(buf, "qemu-xen-traditional")) {
             dm_info->device_model_version
                 = LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
@@ -1068,7 +1070,7 @@ skip_vfb:
         }
     } else if (dm_info->device_model)
         fprintf(stderr, "WARNING: device model override given without specific DM version\n");
-    if (!xlu_cfg_get_long (config, "device_model_stubdomain_override", &l))
+    if (!xlu_cfg_get_long (config, "device_model_stubdomain_override", &l, 0))
         dm_info->device_model_stubdomain = l;
 
 #define parse_extra_args(type)                                          \
@@ -1096,46 +1098,46 @@ skip_vfb:
 #undef parse_extra_args
 
     if (c_info->type == LIBXL_DOMAIN_TYPE_HVM) {
-        if (!xlu_cfg_get_long (config, "stdvga", &l))
+        if (!xlu_cfg_get_long (config, "stdvga", &l, 0))
             dm_info->stdvga = l;
-        if (!xlu_cfg_get_long (config, "vnc", &l))
+        if (!xlu_cfg_get_long (config, "vnc", &l, 0))
             dm_info->vnc = l;
-        xlu_cfg_replace_string (config, "vnclisten", &dm_info->vnclisten);
-        xlu_cfg_replace_string (config, "vncpasswd", &dm_info->vncpasswd);
-        if (!xlu_cfg_get_long (config, "vncdisplay", &l))
+        xlu_cfg_replace_string (config, "vnclisten", &dm_info->vnclisten, 0);
+        xlu_cfg_replace_string (config, "vncpasswd", &dm_info->vncpasswd, 0);
+        if (!xlu_cfg_get_long (config, "vncdisplay", &l, 0))
             dm_info->vncdisplay = l;
-        if (!xlu_cfg_get_long (config, "vncunused", &l))
+        if (!xlu_cfg_get_long (config, "vncunused", &l, 0))
             dm_info->vncunused = l;
-        xlu_cfg_replace_string (config, "keymap", &dm_info->keymap);
-        if (!xlu_cfg_get_long (config, "sdl", &l))
+        xlu_cfg_replace_string (config, "keymap", &dm_info->keymap, 0);
+        if (!xlu_cfg_get_long (config, "sdl", &l, 0))
             dm_info->sdl = l;
-        if (!xlu_cfg_get_long (config, "opengl", &l))
+        if (!xlu_cfg_get_long (config, "opengl", &l, 0))
             dm_info->opengl = l;
-        if (!xlu_cfg_get_long (config, "spice", &l))
+        if (!xlu_cfg_get_long (config, "spice", &l, 0))
             dm_info->spice = l;
-        if (!xlu_cfg_get_long (config, "spiceport", &l))
+        if (!xlu_cfg_get_long (config, "spiceport", &l, 0))
             dm_info->spiceport = l;
-        if (!xlu_cfg_get_long (config, "spicetls_port", &l))
+        if (!xlu_cfg_get_long (config, "spicetls_port", &l, 0))
             dm_info->spicetls_port = l;
-        xlu_cfg_replace_string (config, "spicehost", &dm_info->spicehost);
-        if (!xlu_cfg_get_long (config, "spicedisable_ticketing", &l))
+        xlu_cfg_replace_string (config, "spicehost", &dm_info->spicehost, 0);
+        if (!xlu_cfg_get_long (config, "spicedisable_ticketing", &l, 0))
             dm_info->spicedisable_ticketing = l;
-        xlu_cfg_replace_string (config, "spicepasswd", &dm_info->spicepasswd);
-        if (!xlu_cfg_get_long (config, "spiceagent_mouse", &l))
+        xlu_cfg_replace_string (config, "spicepasswd", &dm_info->spicepasswd, 0);
+        if (!xlu_cfg_get_long (config, "spiceagent_mouse", &l, 0))
             dm_info->spiceagent_mouse = l;
         else
             dm_info->spiceagent_mouse = 1;
-        if (!xlu_cfg_get_long (config, "nographic", &l))
+        if (!xlu_cfg_get_long (config, "nographic", &l, 0))
             dm_info->nographic = l;
-        if (!xlu_cfg_get_long (config, "gfx_passthru", &l))
+        if (!xlu_cfg_get_long (config, "gfx_passthru", &l, 0))
             dm_info->gfx_passthru = l;
-        xlu_cfg_replace_string (config, "serial", &dm_info->serial);
-        xlu_cfg_replace_string (config, "boot", &dm_info->boot);
-        if (!xlu_cfg_get_long (config, "usb", &l))
+        xlu_cfg_replace_string (config, "serial", &dm_info->serial, 0);
+        xlu_cfg_replace_string (config, "boot", &dm_info->boot, 0);
+        if (!xlu_cfg_get_long (config, "usb", &l, 0))
             dm_info->usb = l;
-        xlu_cfg_replace_string (config, "usbdevice", &dm_info->usbdevice);
-        xlu_cfg_replace_string (config, "soundhw", &dm_info->soundhw);
-        if (!xlu_cfg_get_long (config, "xen_platform_pci", &l))
+        xlu_cfg_replace_string (config, "usbdevice", &dm_info->usbdevice, 0);
+        xlu_cfg_replace_string (config, "soundhw", &dm_info->soundhw, 0);
+        if (!xlu_cfg_get_long (config, "xen_platform_pci", &l, 0))
             dm_info->xen_platform_pci = l;
     }
 
@@ -4766,7 +4768,7 @@ int main_cpupoolcreate(int argc, char **argv)
         return -ERROR_FAIL;
     }
 
-    if (!xlu_cfg_get_string (config, "name", &buf))
+    if (!xlu_cfg_get_string (config, "name", &buf, 0))
         name = strdup(buf);
     else
         name = libxl_basename(filename);
@@ -4775,7 +4777,7 @@ int main_cpupoolcreate(int argc, char **argv)
         return -ERROR_FAIL;
     }
 
-    if (!xlu_cfg_get_string (config, "sched", &buf)) {
+    if (!xlu_cfg_get_string (config, "sched", &buf, 0)) {
         if ((schedid = libxl_name_to_schedid(ctx, buf)) < 0) {
             fprintf(stderr, "Unknown scheduler\n");
             return -ERROR_FAIL;

@@ -165,17 +165,18 @@ static XLU_ConfigSetting *find(const XLU_Config *cfg, const char *n) {
 }
 
 static int find_atom(const XLU_Config *cfg, const char *n,
-                     XLU_ConfigSetting **set_r) {
+                     XLU_ConfigSetting **set_r, int dont_warn) {
     XLU_ConfigSetting *set;
 
     set= find(cfg,n);
     if (!set) return ESRCH;
 
     if (set->avalues!=1) {
-        fprintf(cfg->report,
-                "%s:%d: warning: parameter `%s' is"
-                " a list but should be a single value\n",
-                cfg->filename, set->lineno, n);
+        if (!dont_warn)
+            fprintf(cfg->report,
+                    "%s:%d: warning: parameter `%s' is"
+                    " a list but should be a single value\n",
+                    cfg->filename, set->lineno, n);
         return EINVAL;
     }
     *set_r= set;
@@ -183,49 +184,51 @@ static int find_atom(const XLU_Config *cfg, const char *n,
 }
 
 int xlu_cfg_get_string(const XLU_Config *cfg, const char *n,
-                       const char **value_r) {
+                       const char **value_r, int dont_warn) {
     XLU_ConfigSetting *set;
     int e;
 
-    e= find_atom(cfg,n,&set);  if (e) return e;
+    e= find_atom(cfg,n,&set,dont_warn);  if (e) return e;
     *value_r= set->values[0];
     return 0;
 }
 
 int xlu_cfg_replace_string(const XLU_Config *cfg, const char *n,
-                           char **value_r) {
+                           char **value_r, int dont_warn) {
     XLU_ConfigSetting *set;
     int e;
 
-    e= find_atom(cfg,n,&set);  if (e) return e;
+    e= find_atom(cfg,n,&set,dont_warn);  if (e) return e;
     free(*value_r);
     *value_r= strdup(set->values[0]);
     return 0;
 }
 
 int xlu_cfg_get_long(const XLU_Config *cfg, const char *n,
-                     long *value_r) {
+                     long *value_r, int dont_warn) {
     long l;
     XLU_ConfigSetting *set;
     int e;
     char *ep;
 
-    e= find_atom(cfg,n,&set);  if (e) return e;
+    e= find_atom(cfg,n,&set,dont_warn);  if (e) return e;
     errno= 0; l= strtol(set->values[0], &ep, 0);
     e= errno;
     if (errno) {
         e= errno;
         assert(e==EINVAL || e==ERANGE);
-        fprintf(cfg->report,
-                "%s:%d: warning: parameter `%s' could not be parsed"
-                " as a number: %s\n",
-                cfg->filename, set->lineno, n, strerror(e));
+        if (!dont_warn)
+            fprintf(cfg->report,
+                    "%s:%d: warning: parameter `%s' could not be parsed"
+                    " as a number: %s\n",
+                    cfg->filename, set->lineno, n, strerror(e));
         return e;
     }
     if (*ep || ep==set->values[0]) {
-        fprintf(cfg->report,
-                "%s:%d: warning: parameter `%s' is not a valid number\n",
-                cfg->filename, set->lineno, n);
+        if (!dont_warn)
+            fprintf(cfg->report,
+                    "%s:%d: warning: parameter `%s' is not a valid number\n",
+                    cfg->filename, set->lineno, n);
         return EINVAL;
     }
     *value_r= l;
