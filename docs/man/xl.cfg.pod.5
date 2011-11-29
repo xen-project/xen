@@ -555,7 +555,13 @@ Windows L<http://wiki.xen.org/wiki/XenWindowsGplPv>.
 
 Turns on or off the exposure of MicroSoft Hyper-V (AKA viridian)
 compatible enlightenments to the guest.  These can improve performance
-of Microsoft Windows guests (XXX which versions of Windows benefit?)
+of Microsoft Windows guests from Windows Vista and Windows 2008
+onwards and setting this option for such guests is strongly
+recommended. This option should be harmless for other versions of
+Windows (although it won't give any benefit) and the majority of other
+non-Windows OSes. However it is known to be incompatible with some
+other Operating Systems and in some circumstance can prevent Xen's own
+paravirtualisation interfaces for HVM guests from being used.
 
 =back
 
