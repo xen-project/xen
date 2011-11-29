@@ -529,13 +529,6 @@ static void parse_config_data(const char *configfile_filename_report,
     int pci_msitranslate = 1;
     int e;
 
-    XLU_ConfigList *dmargs;
-    int nr_dmargs = 0;
-    XLU_ConfigList *dmargs_hvm;
-    int nr_dmargs_hvm = 0;
-    XLU_ConfigList *dmargs_pv;
-    int nr_dmargs_pv = 0;
-
     libxl_domain_create_info *c_info = &d_config->c_info;
     libxl_domain_build_info *b_info = &d_config->b_info;
 
@@ -1093,19 +1086,14 @@ skip_vfb:
     if (!xlu_cfg_get_long (config, "device_model_stubdomain_override", &l, 0))
         dm_info->device_model_stubdomain = l;
 
-#define parse_extra_args(type)                                          \
-    if (!xlu_cfg_get_list(config, "device_model_args"#type,             \
-                          &dmargs##type, &nr_dmargs##type, 0))          \
-    {                                                                   \
-        int i;                                                          \
-        dm_info->extra##type =                                          \
-            xmalloc(sizeof(char*)*(nr_dmargs##type + 1));               \
-        dm_info->extra##type[nr_dmargs##type] = NULL;                   \
-        for (i=0; i<nr_dmargs##type; i++) {                             \
-            const char *a = xlu_cfg_get_listitem(dmargs##type, i);      \
-            dm_info->extra##type[i] = a ? strdup(a) : NULL;             \
-        }                                                               \
-    }                                                                   \
+#define parse_extra_args(type)                                            \
+    e = xlu_cfg_get_list_as_string_list(config, "device_model_args"#type, \
+                                    &dm_info->extra##type, 0);            \
+    if (e && e != ESRCH) {                                                \
+        fprintf(stderr,"xl: Unable to parse device_model_args"#type".\n");\
+        exit(-ERROR_FAIL);                                                \
+    }
+
     /* parse extra args for qemu, common to both pv, hvm */
     parse_extra_args();
 

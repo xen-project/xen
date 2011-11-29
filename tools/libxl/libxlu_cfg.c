@@ -254,6 +254,29 @@ int xlu_cfg_get_list(const XLU_Config *cfg, const char *n,
     return 0;
 }
 
+int xlu_cfg_get_list_as_string_list(const XLU_Config *cfg, const char *n,
+                     libxl_string_list *psl, int dont_warn) {
+    int i, rc, nr;
+    XLU_ConfigList *list;
+    libxl_string_list sl;
+
+    rc = xlu_cfg_get_list(cfg, n, &list, &nr, dont_warn);
+    if (rc)  return rc;
+
+    sl = malloc(sizeof(char*)*(nr + 1));
+    if (sl == NULL) return ENOMEM;
+
+    for (i=0; i<nr; i++) {
+        const char *a = xlu_cfg_get_listitem(list, i);
+        sl[i] = a ? strdup(a) : NULL;
+    }
+
+    sl[nr] = NULL;
+
+    *psl = sl;
+    return 0;
+}
+
 const char *xlu_cfg_get_listitem(const XLU_ConfigList *set, int entry) {
     if (entry < 0 || entry >= set->nvalues) return 0;
     return set->values[entry];

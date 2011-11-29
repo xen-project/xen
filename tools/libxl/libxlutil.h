@@ -58,6 +58,8 @@ int xlu_cfg_get_list(const XLU_Config*, const char *n,
                      int *entries_r /* may be 0 */,
                      int dont_warn);
   /* there is no need to free *list_r; lifetime is that of the XLU_Config */
+int xlu_cfg_get_list_as_string_list(const XLU_Config *cfg, const char *n,
+                                    libxl_string_list *sl, int dont_warn);
 const char *xlu_cfg_get_listitem(const XLU_ConfigList*, int entry);
   /* xlu_cfg_get_listitem cannot fail, except that if entry is
    * out of range it returns 0 (not setting errno) */
