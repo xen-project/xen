@@ -24,6 +24,7 @@
 #include <xen/event.h>
 #include <xen/sched.h>
 #include <xen/irq.h>
+#include <xen/keyhandler.h>
 #include <asm/hvm/domain.h>
 #include <asm/hvm/support.h>
 #include <asm/msi.h>
@@ -434,11 +435,11 @@ int hvm_local_events_need_delivery(struct vcpu *v)
     return !hvm_interrupt_blocked(v, intack);
 }
 
-#if 0 /* Keep for debugging */
 static void irq_dump(struct domain *d)
 {
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
     int i; 
+    printk("Domain %d:\n", d->domain_id);
     printk("PCI 0x%16.16"PRIx64"%16.16"PRIx64
            " ISA 0x%8.8"PRIx32" ROUTE %u %u %u %u\n",
            hvm_irq->pci_intx.pad[0],  hvm_irq->pci_intx.pad[1],
@@ -446,8 +447,9 @@ static void irq_dump(struct domain *d)
            hvm_irq->pci_link.route[0], hvm_irq->pci_link.route[1],
            hvm_irq->pci_link.route[2], hvm_irq->pci_link.route[3]);
     for ( i = 0 ; i < VIOAPIC_NUM_PINS; i += 8 )
-        printk("GSI  %2.2"PRIu8" %2.2"PRIu8" %2.2"PRIu8" %2.2"PRIu8
+        printk("GSI [%x - %x] %2.2"PRIu8" %2.2"PRIu8" %2.2"PRIu8" %2.2"PRIu8
                " %2.2"PRIu8" %2.2"PRIu8" %2.2"PRIu8" %2.2"PRIu8"\n",
+               i, i+7,
                hvm_irq->gsi_assert_count[i+0],
                hvm_irq->gsi_assert_count[i+1],
                hvm_irq->gsi_assert_count[i+2],
@@ -465,7 +467,34 @@ static void irq_dump(struct domain *d)
            hvm_irq->callback_via_type, hvm_irq->callback_via.gsi, 
            hvm_irq->callback_via_asserted ? "" : " not");
 }
-#endif
+
+static void dump_irq_info(unsigned char key)
+{
+    struct domain *d;
+
+    printk("'%c' pressed -> dumping HVM irq info\n", key);
+
+    rcu_read_lock(&domlist_read_lock);
+
+    for_each_domain ( d )
+        if ( is_hvm_domain(d) )
+            irq_dump(d);
+
+    rcu_read_unlock(&domlist_read_lock);
+}
+
+static struct keyhandler dump_irq_info_keyhandler = {
+    .diagnostic = 1,
+    .u.fn = dump_irq_info,
+    .desc = "dump HVM irq info"
+};
+
+static int __init dump_irq_info_key_init(void)
+{
+    register_keyhandler('I', &dump_irq_info_keyhandler);
+    return 0;
+}
+__initcall(dump_irq_info_key_init);
 
 static int irq_save_pci(struct domain *d, hvm_domain_context_t *h)
 {
