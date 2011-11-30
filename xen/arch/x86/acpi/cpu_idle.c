@@ -120,6 +120,7 @@ static void do_get_hw_residencies(void *arg)
     /* Westmere */
     case 0x25:
     case 0x2C:
+    case 0x2F:
         GET_PC3_RES(hw_res->pc3);
         GET_PC6_RES(hw_res->pc6);
         GET_PC7_RES(hw_res->pc7);
