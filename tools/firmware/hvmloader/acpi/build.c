@@ -47,6 +47,7 @@ struct acpi_info {
     uint32_t pci_min, pci_len;  /* 4, 8 - PCI I/O hole boundaries */
     uint32_t madt_csum_addr;    /* 12   - Address of MADT checksum */
     uint32_t madt_lapic0_addr;  /* 16   - Address of first MADT LAPIC struct */
+    uint32_t vm_gid_addr;       /* 20   - Address of VM generation id buffer */
 };
 
 /* Number of processor objects in the chosen DSDT. */
