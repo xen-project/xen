@@ -171,6 +171,10 @@ void uuid_to_string(char *dest, uint8_t *uuid);
 int printf(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 int vprintf(const char *fmt, va_list ap);
 
+/* Buffer output */
+typedef unsigned long size_t;
+int snprintf(char *buf, size_t size, const char *fmt, ...) __attribute__ ((format (printf, 3, 4)));
+
 /* Populate specified memory hole with RAM. */
 void mem_hole_populate_ram(xen_pfn_t mfn, uint32_t nr_mfns);
 

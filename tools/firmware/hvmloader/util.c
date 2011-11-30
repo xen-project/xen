@@ -528,7 +528,7 @@ static char *printnum(char *p, unsigned long num, int base)
     return p;
 }
 
-static void _doprint(void (*put)(char), const char *fmt, va_list ap)
+static void _doprint(void (*emit)(void *, char), void *arg, const char *fmt, va_list ap)
 {
     char *str, c;
     int lflag, zflag, nflag;
@@ -540,7 +540,7 @@ static void _doprint(void (*put)(char), const char *fmt, va_list ap)
     {
         if ( *fmt != '%' )
         {
-            put(*fmt);
+            emit(arg, *fmt);
             continue;
         }
 
@@ -571,7 +571,7 @@ static void _doprint(void (*put)(char), const char *fmt, va_list ap)
                 if ( (c == 'd') && ((long)value < 0) )
                 {
                     value = -value;
-                    put('-');
+                    emit(arg, '-');
                 }
             }
             else
@@ -580,7 +580,7 @@ static void _doprint(void (*put)(char), const char *fmt, va_list ap)
                 if ( (c == 'd') && ((int)value < 0) )
                 {
                     value = -(int)value;
-                    put('-');
+                    emit(arg, '-');
                 }
             }
             str = buffer;
@@ -588,13 +588,13 @@ static void _doprint(void (*put)(char), const char *fmt, va_list ap)
                      c == 'o' ? 8 : ((c == 'x') || (c == 'X') ? 16 : 10));
             slen = strlen(str);
             for ( i = pad - slen; i > 0; i-- )
-                put(zflag ? '0' : ' ');
+                emit(arg, zflag ? '0' : ' ');
             while ( *str )
             {
                 char ch = *str++;
                 if ( (ch >= 'a') && (c == 'X') )
                     ch += 'A'-'a';
-                put(ch);
+                emit(arg, ch);
             }
         }
         else if ( c == 's' )
@@ -603,20 +603,20 @@ static void _doprint(void (*put)(char), const char *fmt, va_list ap)
             slen = strlen(str);
             if ( nflag == 0 )
                 for ( i = pad - slen; i > 0; i-- )
-                    put(' ');
+                    emit(arg, ' ');
             while ( *str )
-                put(*str++);
+                emit(arg, *str++);
             if ( nflag )
                 for ( i = pad - slen; i > 0; i-- )
-                    put(' ');
+                    emit(arg, ' ');
         }
         else if ( c == 'c' )
         {
-            put(va_arg(ap, int));
+            emit(arg, va_arg(ap, int));
         }
         else
         {
-            put(*fmt);
+            emit(arg, *fmt);
         }
     }
 }
@@ -626,12 +626,17 @@ static void putchar(char c)
     outb(0xe9, c);
 }
 
+static void __put(void *arg, char c)
+{
+    putchar(c);
+}
+
 int printf(const char *fmt, ...)
 {
     va_list ap;
 
     va_start(ap, fmt);
-    _doprint(putchar, fmt, ap);
+    _doprint(__put, NULL, fmt, ap);
     va_end(ap);
 
     return 0;
@@ -639,8 +644,46 @@ int printf(const char *fmt, ...)
 
 int vprintf(const char *fmt, va_list ap)
 {
-    _doprint(putchar, fmt, ap);
+    _doprint(__put, NULL, fmt, ap);
     return 0;
+}
+
+struct __copy_context {
+    char *ptr;
+    size_t emitted;
+    size_t remaining;
+};
+
+static void __copy(void *arg, char c)
+{
+    struct __copy_context *ctxt = arg;
+
+    ctxt->emitted++;
+
+    if (ctxt->remaining == 0)
+        return;
+    
+    *(ctxt->ptr++) = c;
+    --ctxt->remaining;
+}
+
+int snprintf(char *buf, size_t size, const char *fmt, ...)
+{
+    va_list ap;
+    struct __copy_context ctxt;
+
+    ctxt.ptr = buf;
+    ctxt.emitted = 0;
+    ctxt.remaining = size;
+
+    va_start(ap, fmt);
+    _doprint(__copy, &ctxt, fmt, ap);
+    va_end(ap);
+
+    if (ctxt.remaining != 0)
+        *ctxt.ptr = '\0';
+
+    return ctxt.emitted;
 }
 
 static void __attribute__((noreturn)) crash(void)
