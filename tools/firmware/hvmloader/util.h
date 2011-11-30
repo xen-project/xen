@@ -152,6 +152,7 @@ int strncmp(const char *s1, const char *s2, uint32_t n);
 char *strcpy(char *dest, const char *src);
 char *strncpy(char *dest, const char *src, unsigned n);
 unsigned strlen(const char *s);
+long long strtoll(const char *s, char **end, int base);
 int memcmp(const void *s1, const void *s2, unsigned n);
 void *memcpy(void *dest, const void *src, unsigned n);
 void *memmove(void *dest, const void *src, unsigned n);

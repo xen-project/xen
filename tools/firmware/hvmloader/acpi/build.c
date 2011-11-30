@@ -297,6 +297,20 @@ static int construct_secondary_tables(unsigned long *table_ptrs,
     return nr_tables;
 }
 
+unsigned long new_vm_gid(void)
+{
+    uint64_t gid;
+    unsigned char *buf;
+
+    buf = mem_alloc(8, 8);
+    if (!buf) return 0;
+
+    gid = strtoll(xenstore_read("platform/generation-id", "0"), NULL, 0);
+    *(uint64_t *)buf = gid;
+
+    return virt_to_phys(buf);    
+}
+
 void acpi_build_tables(struct acpi_config *config, unsigned int physical)
 {
     struct acpi_info *acpi_info;
@@ -309,6 +323,7 @@ void acpi_build_tables(struct acpi_config *config, unsigned int physical)
     unsigned char       *dsdt;
     unsigned long        secondary_tables[16];
     int                  nr_secondaries, i;
+    unsigned long        vm_gid_addr;
 
     /* Allocate and initialise the acpi info area. */
     mem_hole_populate_ram(ACPI_INFO_PHYSICAL_ADDRESS >> PAGE_SHIFT, 1);
@@ -421,12 +436,16 @@ void acpi_build_tables(struct acpi_config *config, unsigned int physical)
                  offsetof(struct acpi_20_rsdp, extended_checksum),
                  sizeof(struct acpi_20_rsdp));
 
+    vm_gid_addr = new_vm_gid();
+    if (!vm_gid_addr) goto oom;
+
     acpi_info->com1_present = uart_exists(0x3f8);
     acpi_info->com2_present = uart_exists(0x2f8);
     acpi_info->lpt1_present = lpt_exists(0x378);
     acpi_info->hpet_present = hpet_exists(ACPI_HPET_ADDRESS);
     acpi_info->pci_min = pci_mem_start;
     acpi_info->pci_len = pci_mem_end - pci_mem_start;
+    acpi_info->vm_gid_addr = vm_gid_addr;
 
     return;
 

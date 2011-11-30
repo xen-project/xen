@@ -205,6 +205,78 @@ strlen(const char *s)
     return i;
 }
 
+static inline int __digit(char c, int base)
+{
+    int d = -1;
+
+    if ( (c >= '0') && (c <= '9') )
+        d = c - '0';
+
+    if ( (c >= 'A') && (c <= 'Z') )
+        d = c - 'A' + 10;
+
+    if ( (c >= 'a') && (c <= 'z') )
+        d = c - 'a' + 10;
+
+    if (d >= base)
+        d = -1;
+
+    return d;
+}
+
+long long
+strtoll(const char *s, char **end, int base)
+{
+    long long v = 0;
+    int sign = 1;
+
+    while ( (*s != '\0') && isspace(*s) )
+        s++;
+
+    if ( *s == '\0' ) goto out;
+
+    if ( *s == '-' ) {
+        sign = -1;
+        s++;
+    } else {
+        if ( *s == '+' )
+            s++;
+    }
+
+    if ( *s == '\0' ) goto out;
+
+    if ( *s == '0' ) {
+        s++;
+        if ( *s == '\0' ) goto out;
+
+        if ( *s == 'x' ) {
+            if ( base != 0 && base != 16) goto out;
+            base = 16;
+            s++;
+        } else {
+            if ( base != 0 && base != 8) goto out;
+            base = 8;
+        }
+    } else {
+        if (base != 0 && base != 10) goto out;
+        base = 10;
+    }
+
+    while ( *s != '\0' ) {
+        int d = __digit(*s, base);
+
+        if ( d < 0 ) goto out;
+
+        v = (v * base) + d;
+        s++;
+    }
+
+out:
+    if (end) *end = (char *)s;
+
+    return sign * v;
+}
+
 void *
 memset(void *s, int c, unsigned n)
 {
