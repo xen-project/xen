@@ -203,6 +203,11 @@ void xenbus_shutdown(void);
  */
 const char *xenstore_read(const char *path, const char *default_resp);
 
+/* Write a xenstore key.  @value must be a nul-terminated string. Returns
+ * zero on success or a xenstore error code on failure.
+ */
+int xenstore_write(const char *path, const char *value);
+
 /* Setup PCI bus */
 void pci_setup(void);
 

@@ -143,17 +143,19 @@ static void ring_read(char *data, uint32_t len)
     }
 }
 
+#define MAX_SEGMENTS    4
 
-/* Send a request and wait for the answer.
- * Returns 0 for success, or an errno for error.
- * The answer is returned in a static buffer which is only
- * valid until the next call of xenbus_send(). */
-static int xenbus_send(uint32_t type, uint32_t len, const char *data,
-                       uint32_t *reply_len, const char **reply_data)
+/* Send a request. */
+static void xenbus_send(uint32_t type, ...)
 {
     struct xsd_sockmsg hdr;
+    va_list ap;
+    struct {
+        const char *data;
+        uint32_t len;
+    } seg[MAX_SEGMENTS];
     evtchn_send_t send;
-    int i;
+    int i, n;
 
     /* Not acceptable to use xenbus before setting it up */
     ASSERT(rings != NULL);
@@ -162,16 +164,37 @@ static int xenbus_send(uint32_t type, uint32_t len, const char *data,
     hdr.type = type;
     hdr.req_id = 0;  /* We only ever issue one request at a time */
     hdr.tx_id = 0;   /* We never use transactions */
-    hdr.len = len;
+    hdr.len = 0;
+
+    va_start(ap, type);
+    for ( i = 0; ; i++ ) {
+        seg[i].data = va_arg(ap, const char *);
+        seg[i].len = va_arg(ap, uint32_t);
+
+        if ( seg[i].data == NULL )
+            break;
+
+        hdr.len += seg[i].len;
+    }
+    n = i;
+    va_end(ap);
+
     ring_write((char *) &hdr, sizeof hdr);
-    ring_write(data, len);
+    for ( i = 0; i < n; i++ )
+        ring_write(seg[i].data, seg[i].len);
 
     /* Tell the other end about the request */
     send.port = event;
     hypercall_event_channel_op(EVTCHNOP_send, &send);
+}
 
-    /* Properly we should poll the event channel now but that involves
-     * mapping the shared-info page and handling the bitmaps. */
+/* Wait for the answer to a previous request.
+ * Returns 0 for success, or an errno for error.
+ * The answer is returned in a static buffer which is only
+ * valid until the next call of xenbus_send(). */
+static int xenbus_recv(uint32_t *reply_len, const char **reply_data)
+{
+    struct xsd_sockmsg hdr;
 
     /* Pull the reply off the ring */
     ring_read((char *) &hdr, sizeof(hdr));
@@ -182,6 +205,8 @@ static int xenbus_send(uint32_t type, uint32_t len, const char *data,
     /* Handle errors */
     if ( hdr.type == XS_ERROR )
     {
+        int i;
+
         *reply_len = 0;
         for ( i = 0; i < ((sizeof xsd_errors) / (sizeof xsd_errors[0])); i++ )
             if ( !strcmp(xsd_errors[i].errstring, payload) )
@@ -190,8 +215,10 @@ static int xenbus_send(uint32_t type, uint32_t len, const char *data,
         return EIO;
     }
 
-    *reply_data = payload;
-    *reply_len = hdr.len;
+    if ( reply_data )
+        *reply_data = payload;
+    if ( reply_len )
+        *reply_len = hdr.len;
     return 0;
 }
 
@@ -207,17 +234,34 @@ const char *xenstore_read(const char *path, const char *default_resp)
     uint32_t len = 0;
     const char *answer = NULL;
 
-    /* Include the nul in the request */
-    if ( xenbus_send(XS_READ, strlen(path) + 1, path, &len, &answer) )
+    xenbus_send(XS_READ,
+                path, strlen(path),
+                "", 1, /* nul separator */
+                NULL, 0);
+
+    if ( xenbus_recv(&len, &answer) )
         answer = NULL;
 
     if ( (default_resp != NULL) && ((answer == NULL) || (*answer == '\0')) )
         answer = default_resp;
 
-    /* We know xenbus_send() nul-terminates its answer, so just pass it on. */
+    /* We know xenbus_recv() nul-terminates its answer, so just pass it on. */
     return answer;
 }
 
+/* Write a xenstore key.  @value must be a nul-terminated string. Returns
+ * zero on success or a xenstore error code on failure.
+ */
+int xenstore_write(const char *path, const char *value)
+{
+    xenbus_send(XS_WRITE,
+                path, strlen(path),
+                "", 1, /* nul separator */
+                value, strlen(value),
+                NULL, 0);
+
+    return ( xenbus_recv(NULL, NULL) );
+}
 
 /*
  * Local variables:
