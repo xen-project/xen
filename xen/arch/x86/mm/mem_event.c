@@ -265,7 +265,7 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
     {
     case XEN_DOMCTL_MEM_EVENT_OP_PAGING:
     {
-        struct mem_event_domain *med = &d->mem_paging;
+        struct mem_event_domain *med = &d->mem_event->paging;
         rc = -EINVAL;
 
         switch( mec->op )
@@ -310,7 +310,7 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
 
     case XEN_DOMCTL_MEM_EVENT_OP_ACCESS: 
     {
-        struct mem_event_domain *med = &d->mem_access;
+        struct mem_event_domain *med = &d->mem_event->access;
         rc = -EINVAL;
 
         switch( mec->op )
@@ -333,7 +333,7 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
         case XEN_DOMCTL_MEM_EVENT_OP_ACCESS_DISABLE:
         {
             if ( med->ring_page )
-                rc = mem_event_disable(&d->mem_access);
+                rc = mem_event_disable(med);
         }
         break;
 

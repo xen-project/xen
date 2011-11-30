@@ -304,6 +304,10 @@ struct domain *domain_create(
         init_status |= INIT_gnttab;
 
         poolid = 0;
+
+        d->mem_event = xzalloc(struct mem_event_per_domain);
+        if ( !d->mem_event )
+            goto fail;
     }
 
     if ( arch_domain_create(d, domcr_flags) != 0 )
@@ -335,6 +339,7 @@ struct domain *domain_create(
  fail:
     d->is_dying = DOMDYING_dead;
     atomic_set(&d->refcnt, DOMAIN_DESTROYED);
+    xfree(d->mem_event);
     if ( init_status & INIT_arch )
         arch_domain_destroy(d);
     if ( init_status & INIT_gnttab )

@@ -281,12 +281,12 @@ static struct page_info* mem_sharing_alloc_page(struct domain *d,
     vcpu_pause_nosync(v);
     req.flags |= MEM_EVENT_FLAG_VCPU_PAUSED;
 
-    if(mem_event_check_ring(d, &d->mem_share)) return page;
+    if(mem_event_check_ring(d, &d->mem_event->share)) return page;
 
     req.gfn = gfn;
     req.p2mt = p2m_ram_shared;
     req.vcpu_id = v->vcpu_id;
-    mem_event_put_request(d, &d->mem_share, &req);
+    mem_event_put_request(d, &d->mem_event->share, &req);
 
     return page;
 }
@@ -301,7 +301,7 @@ int mem_sharing_sharing_resume(struct domain *d)
     mem_event_response_t rsp;
 
     /* Get request off the ring */
-    mem_event_get_response(&d->mem_share, &rsp);
+    mem_event_get_response(&d->mem_event->share, &rsp);
 
     /* Unpause domain/vcpu */
     if( rsp.flags & MEM_EVENT_FLAG_VCPU_PAUSED )

@@ -194,6 +194,16 @@ struct mem_event_domain
     int xen_port;
 };
 
+struct mem_event_per_domain
+{
+    /* Memory sharing support */
+    struct mem_event_domain share;
+    /* Memory paging support */
+    struct mem_event_domain paging;
+    /* Memory access support */
+    struct mem_event_domain access;
+};
+
 struct domain
 {
     domid_t          domain_id;
@@ -318,12 +328,8 @@ struct domain
     /* Non-migratable and non-restoreable? */
     bool_t disable_migrate;
 
-    /* Memory sharing support */
-    struct mem_event_domain mem_share;
-    /* Memory paging support */
-    struct mem_event_domain mem_paging;
-    /* Memory access support */
-    struct mem_event_domain mem_access;
+    /* Various mem_events */
+    struct mem_event_per_domain *mem_event;
 
     /* Currently computed from union of all vcpu cpu-affinity masks. */
     nodemask_t node_affinity;
