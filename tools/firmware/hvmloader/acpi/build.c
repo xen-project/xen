@@ -301,9 +301,15 @@ unsigned long new_vm_gid(void)
 {
     uint64_t gid;
     unsigned char *buf;
+    char addr[11];
 
     buf = mem_alloc(8, 8);
     if (!buf) return 0;
+
+    if ( snprintf(addr, sizeof(addr), "0x%lx", virt_to_phys(buf))
+         >= sizeof(addr) )
+        return 0;
+    xenstore_write("data/generation-id", addr);
 
     gid = strtoll(xenstore_read("platform/generation-id", "0"), NULL, 0);
     *(uint64_t *)buf = gid;
