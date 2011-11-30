@@ -225,8 +225,6 @@ void perform_tests(void);
 #define perform_tests() ((void)0)
 #endif
 
-#define isdigit(c) ((c) >= '0' && (c) <= '9')
-
 extern char _start[], _end[];
 
 #endif /* __HVMLOADER_UTIL_H__ */

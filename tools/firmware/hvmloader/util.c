@@ -21,6 +21,7 @@
 #include "util.h"
 #include "config.h"
 #include "hypercall.h"
+#include "ctype.h"
 #include <stdint.h>
 #include <xen/xen.h>
 #include <xen/memory.h>
