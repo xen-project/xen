@@ -2217,6 +2217,7 @@ static int vmx_handle_eoi_write(void)
     {
         update_guest_eip(); /* Safe: APIC data write */
         vlapic_EOI_set(vcpu_vlapic(current));
+        HVMTRACE_0D(VLAPIC);
         return 1;
     }
 
@@ -2324,6 +2325,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
             {
                 perfc_incr(realmode_exits);
                 v->arch.hvm_vmx.vmx_emulate = 1;
+                HVMTRACE_0D(REALMODE_EMULATE);
                 return;
             }
         case EXIT_REASON_EXTERNAL_INTERRUPT:
@@ -2343,6 +2345,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         default:
             v->arch.hvm_vmx.vmx_emulate = 1;
             perfc_incr(realmode_exits);
+            HVMTRACE_0D(REALMODE_EMULATE);
             return;
         }
     }
@@ -2386,6 +2389,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
              * Table 23-1, "Exit Qualification for Debug Exceptions").
              */
             exit_qualification = __vmread(EXIT_QUALIFICATION);
+            HVMTRACE_1D(TRAP_DEBUG, exit_qualification);
             write_debugreg(6, exit_qualification | 0xffff0ff0);
             if ( !v->domain->debugger_attached || cpu_has_monitor_trap_flag )
                 goto exit_and_crash;
@@ -2393,6 +2397,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
             break;
         case TRAP_int3: 
         {
+            HVMTRACE_1D(TRAP, vector);
             if ( v->domain->debugger_attached )
             {
                 update_guest_eip(); /* Safe: INT3 */            
@@ -2415,6 +2420,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
             goto exit_and_crash;
         }
         case TRAP_no_device:
+            HVMTRACE_1D(TRAP, vector);
             vmx_fpu_dirty_intercept();
             break;
         case TRAP_page_fault:
@@ -2455,9 +2461,11 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
             /* Already handled above. */
             break;
         case TRAP_invalid_op:
+            HVMTRACE_1D(TRAP, vector);
             vmx_vmexit_ud_intercept(regs);
             break;
         default:
+            HVMTRACE_1D(TRAP, vector);
             goto exit_and_crash;
         }
         break;
