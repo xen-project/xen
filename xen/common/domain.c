@@ -668,6 +668,8 @@ static void complete_domain_destroy(struct rcu_head *head)
     /* Free page used by xen oprofile buffer. */
     free_xenoprof_pages(d);
 
+    xfree(d->mem_event);
+
     for ( i = d->max_vcpus - 1; i >= 0; i-- )
         if ( (v = d->vcpu[i]) != NULL )
         {
