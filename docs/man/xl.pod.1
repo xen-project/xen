@@ -52,13 +52,14 @@ previously, most commands take I<domain-id> as the first parameter.
 
 =over 4
 
-=item B<create> [I<OPTIONS>] I<configfile>
+=item B<create> [I<configfile>] [I<OPTIONS>]
 
-The create subcommand requires a config file: see L<xl.cfg(5)> for
-full details of that file format and possible options.
+The create subcommand takes a config file as first argument: see
+L<xl.cfg> for full details of that file format and possible options.
+If I<configfile> is missing B<XL> creates the domain starting from the
+default value for every option.
 
-I<configfile> can either be an absolute path to a file, or a relative
-path to a file located in /etc/xen.
+I<configfile> has to be an absolute path to a file.
 
 Create will return B<as soon> as the domain is started.  This B<does
 not> mean the guest OS in the domain has actually booted, or is
@@ -88,7 +89,15 @@ Leave the domain paused after it is created.
 =item B<-c>
 
 Attach console to the domain as soon as it has started.  This is
-useful for determining issues with crashing domains.
+useful for determining issues with crashing domains and just as a
+general convenience since you often want to watch the
+domain boot.
+
+=item B<key=value>
+
+It is possible to pass I<key=value> pairs on the command line to provide
+options as if they were written in the configuration file; these override
+whatever is in the I<configfile>.
 
 =back
 
