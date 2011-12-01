@@ -430,6 +430,8 @@ int xc_shadow_control(xc_interface *xch,
     DECLARE_DOMCTL;
     DECLARE_HYPERCALL_BUFFER_ARGUMENT(dirty_bitmap);
 
+    memset(&domctl, 0, sizeof(domctl));
+
     domctl.cmd = XEN_DOMCTL_shadow_op;
     domctl.domain = (domid_t)domid;
     domctl.u.shadow_op.op     = sop;
