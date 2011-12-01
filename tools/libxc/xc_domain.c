@@ -1472,6 +1472,28 @@ int xc_domain_debug_control(xc_interface *xc, uint32_t domid, uint32_t sop, uint
     return do_domctl(xc, &domctl);
 }
 
+int xc_domain_p2m_audit(xc_interface *xch, 
+                        uint32_t domid,
+                        uint64_t *orphans_debug,
+                        uint64_t *orphans_invalid,
+                        uint64_t *m2p_bad,   
+                        uint64_t *p2m_bad)
+{
+    DECLARE_DOMCTL;
+    int rc;
+
+    domctl.cmd = XEN_DOMCTL_audit_p2m;
+    domctl.domain = domid;
+    rc = do_domctl(xch, &domctl);
+
+    *orphans_debug      = domctl.u.audit_p2m.orphans_debug;
+    *orphans_invalid    = domctl.u.audit_p2m.orphans_invalid;
+    *m2p_bad            = domctl.u.audit_p2m.m2p_bad;
+    *p2m_bad            = domctl.u.audit_p2m.p2m_bad;
+
+    return rc;
+}
+
 int xc_domain_set_access_required(xc_interface *xch,
                                   uint32_t domid,
                                   unsigned int required)
