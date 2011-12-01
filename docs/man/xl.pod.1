@@ -793,6 +793,72 @@ List pass-through pci devices for a domain.
 
 =back
 
+=head2 TMEM
+
+=over 4
+
+=item B<tmem-list> I[<-l>] I<domain-id>
+
+List tmem pools. If I<-l> is specified, also list tmem stats.
+
+=item B<tmem-freeze> I<domain-id>
+
+Freeze tmem pools.
+
+=item B<tmem-destroy> I<domain-id>
+
+Destroy tmem pools.
+
+=item B<tmem-thaw> I<domain-id>
+
+Thaw tmem pools.
+
+=item B<tmem-set> I<domain-id> [I<OPTIONS>]
+
+Change tmem settings.
+
+B<OPTIONS>
+
+=over 4
+
+=item B<-w> I<WEIGHT>
+
+Weight (int)
+
+=item B<-c> I<CAP>
+
+Cap (int)
+
+=item B<-p> I<COMPRESS>
+
+Compress (int)
+
+=back
+
+=item B<tmem-shared-auth> I<domain-id> [I<OPTIONS>]
+
+De/authenticate shared tmem pool.
+
+B<OPTIONS>
+
+=over 4
+
+=item B<-u> I<UUID>
+
+Specify uuid (abcdef01-2345-6789-1234-567890abcdef)
+
+=item B<-a> I<AUTH>
+
+0=auth,1=deauth
+
+=back
+
+=item B<tmem-freeable>
+
+Get information about how much freeable memory (MB) is in-use by tmem.
+
+=back
+
 =head1 SEE ALSO
 
 L<xl.cfg(5)>, L<xlcpupool.cfg(5)>, B<xentop(1)>
