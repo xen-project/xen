@@ -16,6 +16,7 @@
 #include <xen/paging.h>
 #include <xen/trace.h>
 #include <asm/event.h>
+#include <asm/xstate.h>
 #include <asm/hvm/emulate.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/trace.h>
@@ -926,6 +927,20 @@ static int hvmemul_get_fpu(
         break;
     case X86EMUL_FPU_mmx:
         if ( !cpu_has_mmx )
+            return X86EMUL_UNHANDLEABLE;
+        break;
+    case X86EMUL_FPU_xmm:
+        if ( !cpu_has_xmm ||
+             (curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_EM) ||
+             !(curr->arch.hvm_vcpu.guest_cr[4] & X86_CR4_OSFXSR) )
+            return X86EMUL_UNHANDLEABLE;
+        break;
+    case X86EMUL_FPU_ymm:
+        if ( !(curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE) ||
+             vm86_mode(ctxt->regs) ||
+             !(curr->arch.hvm_vcpu.guest_cr[4] & X86_CR4_OSXSAVE) ||
+             !(curr->arch.xcr0 & XSTATE_SSE) ||
+             !(curr->arch.xcr0 & XSTATE_YMM) )
             return X86EMUL_UNHANDLEABLE;
         break;
     default:

@@ -248,10 +248,51 @@ static uint8_t twobyte_table[256] = {
     /* 0xD0 - 0xDF */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     /* 0xE0 - 0xEF */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, ImplicitOps|ModRM, 0, 0, 0, 0, 0, 0, 0, 0,
     /* 0xF0 - 0xFF */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
+
+#define REX_PREFIX 0x40
+#define REX_B 0x01
+#define REX_X 0x02
+#define REX_R 0x04
+#define REX_W 0x08
+
+#define vex_none 0
+
+enum vex_opcx {
+    vex_0f = vex_none + 1,
+    vex_0f38,
+    vex_0f3a,
+};
+
+enum vex_pfx {
+    vex_66 = vex_none + 1,
+    vex_f3,
+    vex_f2
+};
+
+union vex {
+    uint8_t raw[2];
+    struct {
+        uint8_t opcx:5;
+        uint8_t b:1;
+        uint8_t x:1;
+        uint8_t r:1;
+        uint8_t pfx:2;
+        uint8_t l:1;
+        uint8_t reg:4;
+        uint8_t w:1;
+    };
+};
+
+#define copy_REX_VEX(ptr, rex, vex) do { \
+    if ( (vex).opcx != vex_none ) \
+        ptr[0] = 0xc4, ptr[1] = (vex).raw[0], ptr[2] = (vex).raw[1]; \
+    else if ( mode_64bit() ) \
+        ptr[1] = rex | REX_PREFIX; \
+} while (0)
 
 /* Type, address-of, and value of an instruction's operand. */
 struct operand {
@@ -280,6 +321,23 @@ struct operand {
         } mem;
     };
 };
+
+typedef union {
+    uint64_t mmx;
+    uint64_t __attribute__ ((aligned(16))) xmm[2];
+    uint64_t __attribute__ ((aligned(32))) ymm[4];
+} mmval_t;
+
+/*
+ * While proper alignment gets specified above, this doesn't get honored by
+ * the compiler for automatic variables. Use this helper to instantiate a
+ * suitably aligned variable, producing a pointer to access it.
+ */
+#define DECLARE_ALIGNED(type, var)                                   \
+    long __##var[sizeof(type) + __alignof(type) - __alignof(long)];  \
+    type *const var##p =                                             \
+        (void *)((long)(__##var + __alignof(type) - __alignof(long)) \
+                 & -__alignof(type))
 
 /* MSRs. */
 #define MSR_TSC          0x00000010
@@ -992,9 +1050,12 @@ static bool_t vcpu_has(
 
 #define vcpu_must_have(leaf, reg, bit) \
     generate_exception_if(!vcpu_has(leaf, reg, bit, ctxt, ops), EXC_UD, -1)
+#define vcpu_must_have_mmx()  vcpu_must_have(0x00000001, EDX, 23)
+#define vcpu_must_have_sse()  vcpu_must_have(0x00000001, EDX, 25)
 #define vcpu_must_have_sse2() vcpu_must_have(0x00000001, EDX, 26)
 #define vcpu_must_have_sse3() vcpu_must_have(0x00000001, ECX,  0)
 #define vcpu_must_have_cx16() vcpu_must_have(0x00000001, ECX, 13)
+#define vcpu_must_have_avx()  vcpu_must_have(0x00000001, ECX, 28)
 
 static int
 in_longmode(
@@ -1252,13 +1313,14 @@ x86_emulate(
 
     uint8_t b, d, sib, sib_index, sib_base, twobyte = 0, rex_prefix = 0;
     uint8_t modrm = 0, modrm_mod = 0, modrm_reg = 0, modrm_rm = 0;
+    union vex vex = {};
     unsigned int op_bytes, def_op_bytes, ad_bytes, def_ad_bytes;
 #define REPE_PREFIX  1
 #define REPNE_PREFIX 2
     unsigned int lock_prefix = 0, rep_prefix = 0;
     int override_seg = -1, rc = X86EMUL_OKAY;
     struct operand src, dst;
-
+    DECLARE_ALIGNED(mmval_t, mmval);
     /*
      * Data operand effective address (usually computed from ModRM).
      * Default is a memory operand relative to segment DS.
@@ -1284,6 +1346,7 @@ x86_emulate(
         {
         case 0x66: /* operand-size override */
             op_bytes = def_op_bytes ^ 6;
+            vex.pfx = vex_66;
             break;
         case 0x67: /* address-size override */
             ad_bytes = def_ad_bytes ^ (mode_64bit() ? 12 : 6);
@@ -1311,9 +1374,11 @@ x86_emulate(
             break;
         case 0xf2: /* REPNE/REPNZ */
             rep_prefix = REPNE_PREFIX;
+            vex.pfx = vex_f2;
             break;
         case 0xf3: /* REP/REPE/REPZ */
             rep_prefix = REPE_PREFIX;
+            vex.pfx = vex_f3;
             break;
         case 0x40 ... 0x4f: /* REX */
             if ( !mode_64bit() )
@@ -1357,6 +1422,70 @@ x86_emulate(
     {
         modrm = insn_fetch_type(uint8_t);
         modrm_mod = (modrm & 0xc0) >> 6;
+
+        if ( !twobyte && ((b & ~1) == 0xc4) )
+            switch ( def_ad_bytes )
+            {
+            default:
+                BUG();
+            case 2:
+                if ( in_realmode(ctxt, ops) || (_regs.eflags & EFLG_VM) )
+                    break;
+                /* fall through */
+            case 4:
+                if ( modrm_mod != 3 )
+                    break;
+                /* fall through */
+            case 8:
+                /* VEX */
+                generate_exception_if(rex_prefix || vex.pfx, EXC_UD, -1);
+
+                vex.raw[0] = b;
+                if ( b & 1 )
+                {
+                    vex.raw[1] = b;
+                    vex.opcx = vex_0f;
+                    vex.x = 1;
+                    vex.b = 1;
+                    vex.w = 0;
+                }
+                else
+                {
+                    vex.raw[1] = insn_fetch_type(uint8_t);
+                    if ( mode_64bit() )
+                    {
+                        if ( !vex.b )
+                            rex_prefix |= REX_B;
+                        if ( !vex.x )
+                            rex_prefix |= REX_X;
+                        if ( vex.w )
+                        {
+                            rex_prefix |= REX_W;
+                            op_bytes = 8;
+                        }
+                    }
+                }
+                vex.reg ^= 0xf;
+                if ( !mode_64bit() )
+                    vex.reg &= 0x7;
+                else if ( !vex.r )
+                    rex_prefix |= REX_R;
+
+                fail_if(vex.opcx != vex_0f);
+                twobyte = 1;
+                b = insn_fetch_type(uint8_t);
+                d = twobyte_table[b];
+
+                /* Unrecognised? */
+                if ( d == 0 )
+                    goto cannot_emulate;
+
+                modrm = insn_fetch_type(uint8_t);
+                modrm_mod = (modrm & 0xc0) >> 6;
+
+                break;
+            }
+
         modrm_reg = ((rex_prefix & 4) << 1) | ((modrm & 0x38) >> 3);
         modrm_rm  = modrm & 0x07;
 
@@ -3914,44 +4043,78 @@ x86_emulate(
         break;
     }
 
-    case 0x6f: /* movq mm/m64,mm */ {
-        uint8_t stub[] = { 0x0f, 0x6f, modrm, 0xc3 };
+    case 0xe7: /* movntq mm,m64 */
+               /* {,v}movntdq xmm,m128 */
+               /* vmovntdq ymm,m256 */
+        fail_if(ea.type != OP_MEM);
+        fail_if(vex.pfx == vex_f3);
+        /* fall through */
+    case 0x6f: /* movq mm/m64,mm */
+               /* {,v}movdq{a,u} xmm/m128,xmm */
+               /* vmovdq{a,u} ymm/m256,ymm */
+    case 0x7f: /* movq mm,mm/m64 */
+               /* {,v}movdq{a,u} xmm,xmm/m128 */
+               /* vmovdq{a,u} ymm,ymm/m256 */
+    {
+        uint8_t stub[] = { 0x3e, 0x3e, 0x0f, b, modrm, 0xc3 };
         struct fpu_insn_ctxt fic = { .insn_bytes = sizeof(stub)-1 };
-        uint64_t val;
-        if ( ea.type == OP_MEM )
-        {
-            unsigned long lval, hval;
-            if ( (rc = read_ulong(ea.mem.seg, ea.mem.off+0,
-                                  &lval, 4, ctxt, ops)) ||
-                 (rc = read_ulong(ea.mem.seg, ea.mem.off+4,
-                                  &hval, 4, ctxt, ops)) )
-                goto done;
-            val = ((uint64_t)hval << 32) | (uint32_t)lval;
-            stub[2] = modrm & 0x38; /* movq (%eax),%mmN */
-        }
-        get_fpu(X86EMUL_FPU_mmx, &fic);
-        asm volatile ( "call *%0" : : "r" (stub), "a" (&val) : "memory" );
-        put_fpu(&fic);
-        break;
-    }
 
-    case 0x7f: /* movq mm,mm/m64 */ {
-        uint8_t stub[] = { 0x0f, 0x7f, modrm, 0xc3 };
-        struct fpu_insn_ctxt fic = { .insn_bytes = sizeof(stub)-1 };
-        uint64_t val;
-        if ( ea.type == OP_MEM )
-            stub[2] = modrm & 0x38; /* movq %mmN,(%eax) */
-        get_fpu(X86EMUL_FPU_mmx, &fic);
-        asm volatile ( "call *%0" : : "r" (stub), "a" (&val) : "memory" );
-        put_fpu(&fic);
+        if ( vex.opcx == vex_none )
+        {
+            switch ( vex.pfx )
+            {
+            case vex_66:
+            case vex_f3:
+                vcpu_must_have_sse2();
+                stub[0] = 0x66; /* movdqa */
+                get_fpu(X86EMUL_FPU_xmm, &fic);
+                ea.bytes = 16;
+                break;
+            case vex_none:
+                if ( b != 0xe7 )
+                    vcpu_must_have_mmx();
+                else
+                    vcpu_must_have_sse();
+                get_fpu(X86EMUL_FPU_mmx, &fic);
+                ea.bytes = 8;
+                break;
+            default:
+                goto cannot_emulate;
+            }
+        }
+        else
+        {
+            fail_if((vex.opcx != vex_0f) || vex.reg ||
+                    ((vex.pfx != vex_66) && (vex.pfx != vex_f3)));
+            vcpu_must_have_avx();
+            get_fpu(X86EMUL_FPU_ymm, &fic);
+            ea.bytes = 16 << vex.l;
+        }
         if ( ea.type == OP_MEM )
         {
-            unsigned long lval = (uint32_t)val, hval = (uint32_t)(val >> 32);
-            if ( (rc = ops->write(ea.mem.seg, ea.mem.off+0, &lval, 4, ctxt)) ||
-                 (rc = ops->write(ea.mem.seg, ea.mem.off+4, &hval, 4, ctxt)) )
-                goto done;
+            /* XXX enable once there is ops->ea() or equivalent
+            generate_exception_if((vex.pfx == vex_66) &&
+                                  (ops->ea(ea.mem.seg, ea.mem.off)
+                                   & (ea.bytes - 1)), EXC_GP, 0); */
+            if ( b == 0x6f )
+                rc = ops->read(ea.mem.seg, ea.mem.off+0, mmvalp,
+                               ea.bytes, ctxt);
+            /* convert memory operand to (%rAX) */
+            rex_prefix &= ~REX_B;
+            vex.b = 1;
+            stub[4] &= 0x38;
         }
-        break;
+        if ( !rc )
+        {
+           copy_REX_VEX(stub, rex_prefix, vex);
+           asm volatile ( "call *%0" : : "r" (stub), "a" (mmvalp)
+                                     : "memory" );
+        }
+        put_fpu(&fic);
+        if ( !rc && (b != 0x6f) && (ea.type == OP_MEM) )
+            rc = ops->write(ea.mem.seg, ea.mem.off, mmvalp,
+                            ea.bytes, ctxt);
+        goto done;
     }
 
     case 0x80 ... 0x8f: /* jcc (near) */ {

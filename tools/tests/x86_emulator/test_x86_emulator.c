@@ -1,3 +1,5 @@
+#include <errno.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -53,11 +55,84 @@ static int cmpxchg(
     return X86EMUL_OKAY;
 }
 
+static int cpuid(
+    unsigned int *eax,
+    unsigned int *ebx,
+    unsigned int *ecx,
+    unsigned int *edx,
+    struct x86_emulate_ctxt *ctxt)
+{
+    asm ("cpuid" : "+a" (*eax), "+c" (*ecx), "=d" (*edx), "=b" (*ebx));
+    return X86EMUL_OKAY;
+}
+
+#define cpu_has_mmx ({ \
+    unsigned int eax = 1, ecx = 0, edx; \
+    cpuid(&eax, &ecx, &ecx, &edx, NULL); \
+    (edx & (1U << 23)) != 0; \
+})
+
+#define cpu_has_sse ({ \
+    unsigned int eax = 1, ecx = 0, edx; \
+    cpuid(&eax, &ecx, &ecx, &edx, NULL); \
+    (edx & (1U << 25)) != 0; \
+})
+
+#define cpu_has_sse2 ({ \
+    unsigned int eax = 1, ecx = 0, edx; \
+    cpuid(&eax, &ecx, &ecx, &edx, NULL); \
+    (edx & (1U << 26)) != 0; \
+})
+
+static inline uint64_t xgetbv(uint32_t xcr)
+{
+    uint64_t res;
+
+    asm ( ".byte 0x0f, 0x01, 0xd0" : "=A" (res) : "c" (xcr) );
+
+    return res;
+}
+
+#define cpu_has_avx ({ \
+    unsigned int eax = 1, ecx = 0, edx; \
+    cpuid(&eax, &edx, &ecx, &edx, NULL); \
+    if ( !(ecx & (1U << 27)) || ((xgetbv(0) & 6) != 6) ) \
+        ecx = 0; \
+    (ecx & (1U << 28)) != 0; \
+})
+
+int get_fpu(
+    void (*exception_callback)(void *, struct cpu_user_regs *),
+    void *exception_callback_arg,
+    enum x86_emulate_fpu_type type,
+    struct x86_emulate_ctxt *ctxt)
+{
+    switch ( type )
+    {
+    case X86EMUL_FPU_fpu:
+        break;
+    case X86EMUL_FPU_ymm:
+        if ( cpu_has_avx )
+            break;
+    case X86EMUL_FPU_xmm:
+        if ( cpu_has_sse )
+            break;
+    case X86EMUL_FPU_mmx:
+        if ( cpu_has_mmx )
+            break;
+    default:
+        return X86EMUL_UNHANDLEABLE;
+    }
+    return X86EMUL_OKAY;
+}
+
 static struct x86_emulate_ops emulops = {
     .read       = read,
     .insn_fetch = read,
     .write      = write,
     .cmpxchg    = cmpxchg,
+    .cpuid      = cpuid,
+    .get_fpu    = get_fpu,
 };
 
 int main(int argc, char **argv)
@@ -66,6 +141,8 @@ int main(int argc, char **argv)
     struct cpu_user_regs regs;
     char *instr;
     unsigned int *res, i, j;
+    unsigned long sp;
+    bool stack_exec;
     int rc;
 #ifndef __x86_64__
     unsigned int bcdres_native, bcdres_emul;
@@ -84,6 +161,16 @@ int main(int argc, char **argv)
         exit(1);
     }
     instr = (char *)res + 0x100;
+
+#ifdef __x86_64__
+    asm ("movq %%rsp, %0" : "=g" (sp));
+#else
+    asm ("movl %%esp, %0" : "=g" (sp));
+#endif
+    stack_exec = mprotect((void *)(sp & -0x1000L) - (MMAP_SZ - 0x1000),
+                          MMAP_SZ, PROT_READ|PROT_WRITE|PROT_EXEC) == 0;
+    if ( !stack_exec )
+        printf("Warning: Stack could not be made executable (%d).\n", errno);
 
     printf("%-40s", "Testing addl %%ecx,(%%eax)...");
     instr[0] = 0x01; instr[1] = 0x08;
@@ -441,6 +528,106 @@ int main(int argc, char **argv)
 #else
     printf("skipped\n");
 #endif
+
+    printf("%-40s", "Testing movq %mm3,(%ecx)...");
+    if ( stack_exec && cpu_has_mmx )
+    {
+        extern const unsigned char movq_to_mem[];
+
+        asm volatile ( "pcmpeqb %%mm3, %%mm3\n"
+                       ".pushsection .test, \"a\", @progbits\n"
+                       "movq_to_mem: movq %%mm3, (%0)\n"
+                       ".popsection" :: "c" (NULL) );
+
+        memcpy(instr, movq_to_mem, 15);
+        memset(res, 0x33, 64);
+        memset(res + 8, 0xff, 8);
+        regs.eip    = (unsigned long)&instr[0];
+        regs.ecx    = (unsigned long)res;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) || memcmp(res, res + 8, 32) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing movq (%edx),%mm5...");
+    if ( stack_exec && cpu_has_mmx )
+    {
+        extern const unsigned char movq_from_mem[];
+
+        asm volatile ( "pcmpgtb %%mm5, %%mm5\n"
+                       ".pushsection .test, \"a\", @progbits\n"
+                       "movq_from_mem: movq (%0), %%mm5\n"
+                       ".popsection" :: "d" (NULL) );
+
+        memcpy(instr, movq_from_mem, 15);
+        regs.eip    = (unsigned long)&instr[0];
+        regs.ecx    = 0;
+        regs.edx    = (unsigned long)res;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY )
+            goto fail;
+        asm ( "pcmpeqb %%mm3, %%mm3\n\t"
+              "pcmpeqb %%mm5, %%mm3\n\t"
+              "pmovmskb %%mm3, %0" : "=r" (rc) );
+        if ( rc != 0xff )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing movdqu %xmm2,(%ecx)...");
+    if ( stack_exec && cpu_has_sse2 )
+    {
+        extern const unsigned char movdqu_to_mem[];
+
+        asm volatile ( "pcmpeqb %%xmm2, %%xmm2\n"
+                       ".pushsection .test, \"a\", @progbits\n"
+                       "movdqu_to_mem: movdqu %%xmm2, (%0)\n"
+                       ".popsection" :: "c" (NULL) );
+
+        memcpy(instr, movdqu_to_mem, 15);
+        memset(res, 0x55, 64);
+        memset(res + 8, 0xff, 16);
+        regs.eip    = (unsigned long)&instr[0];
+        regs.ecx    = (unsigned long)res;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) || memcmp(res, res + 8, 32) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing movdqu (%edx),%xmm4...");
+    if ( stack_exec && cpu_has_sse2 )
+    {
+        extern const unsigned char movdqu_from_mem[];
+
+        asm volatile ( "pcmpgtb %%xmm4, %%xmm4\n"
+                       ".pushsection .test, \"a\", @progbits\n"
+                       "movdqu_from_mem: movdqu (%0), %%xmm4\n"
+                       ".popsection" :: "d" (NULL) );
+
+        memcpy(instr, movdqu_from_mem, 15);
+        regs.eip    = (unsigned long)&instr[0];
+        regs.ecx    = 0;
+        regs.edx    = (unsigned long)res;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY )
+            goto fail;
+        asm ( "pcmpeqb %%xmm2, %%xmm2\n\t"
+              "pcmpeqb %%xmm4, %%xmm2\n\t"
+              "pmovmskb %%xmm2, %0" : "=r" (rc) );
+        if ( rc != 0xffff )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
 
     for ( j = 1; j <= 2; j++ )
     {
