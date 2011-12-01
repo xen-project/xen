@@ -304,6 +304,10 @@ union vex {
         ptr[1] = rex | REX_PREFIX; \
 } while (0)
 
+#define rep_prefix()   (vex.pfx >= vex_f3)
+#define repe_prefix()  (vex.pfx == vex_f3)
+#define repne_prefix() (vex.pfx == vex_f2)
+
 /* Type, address-of, and value of an instruction's operand. */
 struct operand {
     enum { OP_REG, OP_MEM, OP_IMM, OP_NONE } type;
@@ -734,7 +738,7 @@ static unsigned long __get_rep_prefix(
 
 #define get_rep_prefix() ({                                             \
     unsigned long max_reps = 1;                                         \
-    if ( rep_prefix )                                                   \
+    if ( rep_prefix() )                                                 \
         max_reps = __get_rep_prefix(&_regs, ctxt->regs, ad_bytes);      \
     if ( max_reps == 0 )                                                \
         goto done;                                                      \
@@ -765,7 +769,7 @@ static void __put_rep_prefix(
 }
 
 #define put_rep_prefix(reps_completed) ({                               \
-    if ( rep_prefix )                                                   \
+    if ( rep_prefix() )                                                 \
         __put_rep_prefix(&_regs, ctxt->regs, ad_bytes, reps_completed); \
 })
 
@@ -1328,9 +1332,7 @@ x86_emulate(
     uint8_t modrm = 0, modrm_mod = 0, modrm_reg = 0, modrm_rm = 0;
     union vex vex = {};
     unsigned int op_bytes, def_op_bytes, ad_bytes, def_ad_bytes;
-#define REPE_PREFIX  1
-#define REPNE_PREFIX 2
-    unsigned int lock_prefix = 0, rep_prefix = 0;
+    bool_t lock_prefix = 0;
     int override_seg = -1, rc = X86EMUL_OKAY;
     struct operand src, dst;
     DECLARE_ALIGNED(mmval_t, mmval);
@@ -1359,7 +1361,8 @@ x86_emulate(
         {
         case 0x66: /* operand-size override */
             op_bytes = def_op_bytes ^ 6;
-            vex.pfx = vex_66;
+            if ( !vex.pfx )
+                vex.pfx = vex_66;
             break;
         case 0x67: /* address-size override */
             ad_bytes = def_ad_bytes ^ (mode_64bit() ? 12 : 6);
@@ -1386,11 +1389,9 @@ x86_emulate(
             lock_prefix = 1;
             break;
         case 0xf2: /* REPNE/REPNZ */
-            rep_prefix = REPNE_PREFIX;
             vex.pfx = vex_f2;
             break;
         case 0xf3: /* REP/REPE/REPZ */
-            rep_prefix = REPE_PREFIX;
             vex.pfx = vex_f3;
             break;
         case 0x40 ... 0x4f: /* REX */
@@ -1407,7 +1408,7 @@ x86_emulate(
     }
  done_prefixes:
 
-    if ( rex_prefix & 8 ) /* REX.W */
+    if ( rex_prefix & REX_W )
         op_bytes = 8;
 
     /* Opcode byte(s). */
@@ -2418,8 +2419,8 @@ x86_emulate(
         put_rep_prefix(1);
         /* cmp: dst - src ==> src=*%%edi,dst=*%%esi ==> *%%esi - *%%edi */
         emulate_2op_SrcV("cmp", src, dst, _regs.eflags);
-        if ( ((rep_prefix == REPE_PREFIX) && !(_regs.eflags & EFLG_ZF)) ||
-             ((rep_prefix == REPNE_PREFIX) && (_regs.eflags & EFLG_ZF)) )
+        if ( (repe_prefix() && !(_regs.eflags & EFLG_ZF)) ||
+             (repne_prefix() && (_regs.eflags & EFLG_ZF)) )
             _regs.eip = next_eip;
         break;
     }
@@ -2464,8 +2465,8 @@ x86_emulate(
         put_rep_prefix(1);
         /* cmp: dst - src ==> src=*%%edi,dst=%%eax ==> %%eax - *%%edi */
         emulate_2op_SrcV("cmp", src, dst, _regs.eflags);
-        if ( ((rep_prefix == REPE_PREFIX) && !(_regs.eflags & EFLG_ZF)) ||
-             ((rep_prefix == REPNE_PREFIX) && (_regs.eflags & EFLG_ZF)) )
+        if ( (repe_prefix() && !(_regs.eflags & EFLG_ZF)) ||
+             (repne_prefix() && (_regs.eflags & EFLG_ZF)) )
             _regs.eip = next_eip;
         break;
     }
@@ -4076,7 +4077,7 @@ x86_emulate(
     case 0x35: /* sysexit */ {
         uint64_t msr_content;
         struct segment_register cs, ss;
-        int user64 = !!(rex_prefix & 8); /* REX.W */
+        bool_t user64 = !!(rex_prefix & REX_W);
         int rc;
 
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
@@ -4366,7 +4367,7 @@ x86_emulate(
               : "=r" (dst.val), "=q" (zf)
               : "r" (src.val) );
         _regs.eflags &= ~EFLG_ZF;
-        if ( (rep_prefix == REPE_PREFIX) && vcpu_has_bmi1() )
+        if ( (vex.pfx == vex_f3) && vcpu_has_bmi1() )
         {
             _regs.eflags &= ~EFLG_CF;
             if ( zf )
@@ -4391,7 +4392,7 @@ x86_emulate(
               : "=r" (dst.val), "=q" (zf)
               : "r" (src.val) );
         _regs.eflags &= ~EFLG_ZF;
-        if ( (rep_prefix == REPE_PREFIX) && vcpu_has_lzcnt() )
+        if ( (vex.pfx == vex_f3) && vcpu_has_lzcnt() )
         {
             _regs.eflags &= ~EFLG_CF;
             if ( zf )
