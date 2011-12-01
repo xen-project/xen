@@ -73,7 +73,7 @@ void minios_interface_close_fd(int fd)
 
 static void *minios_privcmd_alloc_hypercall_buffer(xc_interface *xch, xc_osdep_handle h, int npages)
 {
-    return memalign(PAGE_SIZE, npages * PAGE_SIZE);
+    return xc_memalign(xch, PAGE_SIZE, npages * PAGE_SIZE);
 }
 
 static void minios_privcmd_free_hypercall_buffer(xc_interface *xch, xc_osdep_handle h, void *ptr, int npages)
@@ -435,6 +435,11 @@ void discard_file_cache(xc_interface *xch, int fd, int flush)
 {
     if (flush)
         fsync(fd);
+}
+
+void *xc_memalign(xc_interface *xch, size_t alignment, size_t size)
+{
+    return memalign(alignment, size);
 }
 
 static xc_osdep_handle minios_gnttab_open(xc_gnttab *xcg)

@@ -1156,6 +1156,8 @@ int xc_lockprof_query(xc_interface *xch,
                       uint64_t *time,
                       xc_hypercall_buffer_t *data);
 
+void *xc_memalign(xc_interface *xch, size_t alignment, size_t size);
+
 /**
  * Memory maps a range within one domain to a local address range.  Mappings
  * should be unmapped with munmap and should follow the same rules as mmap

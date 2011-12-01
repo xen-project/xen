@@ -71,8 +71,9 @@ static int netbsd_privcmd_close(xc_interface *xch, xc_osdep_handle h)
 static void *netbsd_privcmd_alloc_hypercall_buffer(xc_interface *xch, xc_osdep_handle h, int npages)
 {
     size_t size = npages * XC_PAGE_SIZE;
-    void *p = valloc(size);
+    void *p;
 
+    p = xc_memalign(xch, XC_PAGE_SIZE, size);
     if (!p)
         return NULL;
 
@@ -376,6 +377,11 @@ void discard_file_cache(xc_interface *xch, int fd, int flush)
 
  out:
     errno = saved_errno;
+}
+
+void *xc_memalign(xc_interface *xch, size_t alignment, size_t size)
+{
+    return valloc(size);
 }
 
 static struct xc_osdep_ops *netbsd_osdep_init(xc_interface *xch, enum xc_osdep_type type)

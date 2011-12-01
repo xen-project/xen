@@ -55,6 +55,18 @@ void discard_file_cache(xc_interface *xch, int fd, int flush)
     errno = saved_errno;
 }
 
+void *xc_memalign(xc_interface *xch, size_t alignment, size_t size)
+{
+    int ret;
+    void *ptr;
+
+    ret = posix_memalign(&ptr, alignment, size);
+    if (ret != 0 || !ptr)
+        return NULL;
+
+    return ptr;
+}
+
 /*
  * Local variables:
  * mode: C
