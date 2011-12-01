@@ -71,7 +71,7 @@ previously, most commands take I<domain-id> as the first parameter.
 =item B<button-press> I<domain-id> I<button>
 
 Indicate an ACPI button press to the domain. I<button> is may be 'power' or
-'sleep'.
+'sleep'. This command is only available for HVM domains.
 
 =item B<create> [I<configfile>] [I<OPTIONS>]
 
@@ -443,6 +443,7 @@ It requires PV drivers to be installed in your guest OS.
 
 Send a trigger to a domain, where the trigger can be: nmi, reset, init, power
 or sleep.  Optionally a specific vcpu number can be passed as an argument.
+This command is only available for HVM domains.
 
 =item B<unpause> I<domain-id>
 
