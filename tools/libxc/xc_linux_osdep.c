@@ -566,7 +566,7 @@ static void *linux_gnttab_grant_map(xc_gnttab *xch, xc_osdep_handle h,
         struct ioctl_gntdev_unmap_notify notify;
         notify.index = map->index;
         notify.action = 0;
-        if (notify_offset >= 0 && notify_offset < XC_PAGE_SIZE * count) {
+        if (notify_offset < XC_PAGE_SIZE * count) {
             notify.index += notify_offset;
             notify.action |= UNMAP_NOTIFY_CLEAR_BYTE;
         }
@@ -708,11 +708,11 @@ static void *linux_gntshr_share_pages(xc_gntshr *xch, xc_osdep_handle h,
 
     notify.index = gref_info->index;
     notify.action = 0;
-    if (notify_offset >= 0) {
+    if (notify_offset < XC_PAGE_SIZE * count) {
         notify.index += notify_offset;
         notify.action |= UNMAP_NOTIFY_CLEAR_BYTE;
     }
-    if (notify_port >= 0) {
+    if (notify_port != -1) {
         notify.event_channel_port = notify_port;
         notify.action |= UNMAP_NOTIFY_SEND_EVENT;
     }
