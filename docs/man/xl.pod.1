@@ -357,6 +357,7 @@ Reboot a domain.  This acts just as if the domain had the B<reboot>
 command run from the console.  The command returns as soon as it has
 executed the reboot action, which may be significantly before the
 domain actually reboots.
+It requires PV drivers installed in your guest OS.
 
 The behavior of what happens to a domain when it reboots is set by the
 B<on_reboot> parameter of the domain configuration file when the
@@ -414,6 +415,7 @@ to perform graceful shutdown, so there is no guarantee that it will
 succeed, and may take a variable length of time depending on what
 services must be shutdown in the domain.  The command returns
 immediately after signally the domain unless that B<-w> flag is used.
+For HVM domains it requires PV drivers to be installed in your guest OS.
 
 The behavior of what happens to a domain when it reboots is set by the
 B<on_shutdown> parameter of the domain configuration file when the
@@ -458,10 +460,6 @@ important for pinning purposes.
 Attempting to set the VCPUs to a number larger than the initially
 configured VCPU count is an error.  Trying to set VCPUs to < 1 will be
 quietly ignored.
-
-Because this operation requires cooperation from the domain operating
-system, there is no guarantee that it will succeed.  This command will
-not work with a full virt domain.
 
 =item B<vcpu-list> [I<domain-id>]
 
