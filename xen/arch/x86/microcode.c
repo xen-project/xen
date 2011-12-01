@@ -22,17 +22,17 @@
  */
 
 #include <xen/config.h>
+#include <xen/cpu.h>
 #include <xen/lib.h>
 #include <xen/kernel.h>
 #include <xen/init.h>
+#include <xen/notifier.h>
 #include <xen/sched.h>
 #include <xen/smp.h>
 #include <xen/spinlock.h>
 #include <xen/guest_access.h>
 
-#include <asm/current.h>
 #include <asm/msr.h>
-#include <asm/uaccess.h>
 #include <asm/processor.h>
 #include <asm/microcode.h>
 
@@ -69,30 +69,50 @@ int microcode_resume_cpu(int cpu)
     int err;
     struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
     struct cpu_signature nsig;
+    unsigned int cpu2;
 
-    if ( !uci->mc.mc_valid )
-        return -EIO;
+    spin_lock(&microcode_mutex);
 
-    /*
-     * Let's verify that the 'cached' ucode does belong
-     * to this cpu (a bit of paranoia):
-     */
-    err = microcode_ops->collect_cpu_info(cpu, &nsig);
+    err = microcode_ops->collect_cpu_info(cpu, &uci->cpu_sig);
     if ( err )
     {
-        microcode_fini_cpu(cpu);
+        __microcode_fini_cpu(cpu);
+        spin_unlock(&microcode_mutex);
         return err;
     }
 
-    if ( microcode_ops->microcode_resume_match(cpu, &nsig) )
+    if ( uci->mc.mc_valid )
     {
-        return microcode_ops->apply_microcode(cpu);
+        err = microcode_ops->microcode_resume_match(cpu, uci->mc.mc_valid);
+        if ( err >= 0 )
+        {
+            if ( err )
+                err = microcode_ops->apply_microcode(cpu);
+            spin_unlock(&microcode_mutex);
+            return err;
+        }
     }
-    else
+
+    nsig = uci->cpu_sig;
+    __microcode_fini_cpu(cpu);
+    uci->cpu_sig = nsig;
+
+    err = -EIO;
+    for_each_online_cpu ( cpu2 )
     {
-        microcode_fini_cpu(cpu);
-        return -EIO;
+        uci = &per_cpu(ucode_cpu_info, cpu2);
+        if ( uci->mc.mc_valid &&
+             microcode_ops->microcode_resume_match(cpu, uci->mc.mc_valid) > 0 )
+        {
+            err = microcode_ops->apply_microcode(cpu);
+            break;
+        }
     }
+
+    __microcode_fini_cpu(cpu);
+    spin_unlock(&microcode_mutex);
+
+    return err;
 }
 
 static int microcode_update_cpu(const void *buf, size_t size)
@@ -162,3 +182,30 @@ int microcode_update(XEN_GUEST_HANDLE(const_void) buf, unsigned long len)
 
     return continue_hypercall_on_cpu(info->cpu, do_microcode_update, info);
 }
+
+static int microcode_percpu_callback(
+    struct notifier_block *nfb, unsigned long action, void *hcpu)
+{
+    unsigned int cpu = (unsigned long)hcpu;
+
+    switch ( action )
+    {
+    case CPU_DEAD:
+        microcode_fini_cpu(cpu);
+        break;
+    }
+
+    return NOTIFY_DONE;
+}
+
+static struct notifier_block microcode_percpu_nfb = {
+    .notifier_call = microcode_percpu_callback,
+};
+
+static int __init microcode_presmp_init(void)
+{
+    if ( microcode_ops )
+        register_cpu_notifier(&microcode_percpu_nfb);
+    return 0;
+}
+presmp_initcall(microcode_presmp_init);

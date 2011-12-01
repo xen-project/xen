@@ -30,11 +30,42 @@
 #include <xen/spinlock.h>
 
 #include <asm/msr.h>
-#include <asm/uaccess.h>
 #include <asm/processor.h>
 #include <asm/microcode.h>
 
 #define pr_debug(x...) ((void)0)
+
+struct microcode_header_intel {
+    unsigned int hdrver;
+    unsigned int rev;
+    unsigned int date;
+    unsigned int sig;
+    unsigned int cksum;
+    unsigned int ldrver;
+    unsigned int pf;
+    unsigned int datasize;
+    unsigned int totalsize;
+    unsigned int reserved[3];
+};
+
+struct microcode_intel {
+    struct microcode_header_intel hdr;
+    unsigned int bits[0];
+};
+
+/* microcode format is extended from prescott processors */
+struct extended_signature {
+    unsigned int sig;
+    unsigned int pf;
+    unsigned int cksum;
+};
+
+struct extended_sigtable {
+    unsigned int count;
+    unsigned int cksum;
+    unsigned int reserved[3];
+    struct extended_signature sigs[0];
+};
 
 #define DEFAULT_UCODE_DATASIZE  (2000)
 #define MC_HEADER_SIZE          (sizeof(struct microcode_header_intel))
@@ -98,7 +129,8 @@ static int collect_cpu_info(int cpu_num, struct cpu_signature *csig)
 }
 
 static inline int microcode_update_match(
-    int cpu_num, struct microcode_header_intel *mc_header, int sig, int pf)
+    int cpu_num, const struct microcode_header_intel *mc_header,
+    int sig, int pf)
 {
     struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu_num);
 
@@ -200,11 +232,11 @@ static int microcode_sanity_check(void *mc)
  * return 1 - found update
  * return < 0 - error
  */
-static int get_matching_microcode(void *mc, int cpu)
+static int get_matching_microcode(const void *mc, int cpu)
 {
     struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
-    struct microcode_header_intel *mc_header = mc;
-    struct extended_sigtable *ext_header;
+    const struct microcode_header_intel *mc_header = mc;
+    const struct extended_sigtable *ext_header;
     unsigned long total_size = get_totalsize(mc_header);
     int ext_sigcount, i;
     struct extended_signature *ext_sig;
@@ -229,6 +261,8 @@ static int get_matching_microcode(void *mc, int cpu)
     }
     return 0;
  find:
+    if ( uci->mc.mc_intel && uci->mc.mc_intel->hdr.rev >= mc_header->rev )
+        return 0;
     pr_debug("microcode: CPU%d found a matching microcode update with"
              " version 0x%x (current=0x%x)\n",
              cpu, mc_header->rev, uci->cpu_sig.rev);
@@ -239,10 +273,8 @@ static int get_matching_microcode(void *mc, int cpu)
         return -ENOMEM;
     }
 
-    /* free previous update file */
-    xfree(uci->mc.mc_intel);
-
     memcpy(new_mc, mc, total_size);
+    xfree(uci->mc.mc_intel);
     uci->mc.mc_intel = new_mc;
     return 1;
 }
@@ -361,12 +393,9 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t size)
     return error;
 }
 
-static int microcode_resume_match(int cpu, struct cpu_signature *nsig)
+static int microcode_resume_match(int cpu, const void *mc)
 {
-    struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
-
-    return (sigmatch(nsig->sig, uci->cpu_sig.sig, nsig->pf, uci->cpu_sig.pf) &&
-            (uci->cpu_sig.rev > nsig->rev));
+    return get_matching_microcode(mc, cpu);
 }
 
 static const struct microcode_ops microcode_intel_ops = {
@@ -382,4 +411,4 @@ static __init int microcode_init_intel(void)
         microcode_ops = &microcode_intel_ops;
     return 0;
 }
-__initcall(microcode_init_intel);
+presmp_initcall(microcode_init_intel);
