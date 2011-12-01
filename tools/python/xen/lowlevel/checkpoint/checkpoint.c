@@ -104,13 +104,14 @@ static PyObject* pycheckpoint_start(PyObject* obj, PyObject* args) {
   PyObject* postcopy_cb = NULL;
   PyObject* checkpoint_cb = NULL;
   unsigned int interval = 0;
+  unsigned int flags = 0;
 
   int fd;
   struct save_callbacks callbacks;
   int rc;
 
-  if (!PyArg_ParseTuple(args, "O|OOOI", &iofile, &suspend_cb, &postcopy_cb,
-                       &checkpoint_cb, &interval))
+  if (!PyArg_ParseTuple(args, "O|OOOII", &iofile, &suspend_cb, &postcopy_cb,
+			&checkpoint_cb, &interval, &flags))
     return NULL;
 
   self->interval = interval;
@@ -160,7 +161,7 @@ static PyObject* pycheckpoint_start(PyObject* obj, PyObject* args) {
   callbacks.data = self;
 
   self->threadstate = PyEval_SaveThread();
-  rc = checkpoint_start(&self->cps, fd, &callbacks);
+  rc = checkpoint_start(&self->cps, fd, &callbacks, flags);
   PyEval_RestoreThread(self->threadstate);
 
   if (rc < 0) {
