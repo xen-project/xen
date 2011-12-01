@@ -1823,12 +1823,16 @@ int hvm_virtual_to_linear_addr(
     return 0;
 }
 
-/* We leave this function holding a lock on the p2m entry */
+/* On non-NULL return, we leave this function holding an additional 
+ * ref on the underlying mfn, if any */
 static void *__hvm_map_guest_frame(unsigned long gfn, bool_t writable)
 {
+    void *map;
     unsigned long mfn;
     p2m_type_t p2mt;
+    struct page_info *pg;
     struct domain *d = current->domain;
+    int rc;
 
     mfn = mfn_x(writable
                 ? get_gfn_unshare(d, gfn, &p2mt)
@@ -1850,7 +1854,21 @@ static void *__hvm_map_guest_frame(unsigned long gfn, bool_t writable)
     if ( writable )
         paging_mark_dirty(d, mfn);
 
-    return map_domain_page(mfn);
+    /* Get a ref on the page, considering that it could be shared */
+    pg = mfn_to_page(mfn);
+    rc = get_page(pg, d);
+    if ( !rc && !writable )
+        /* Page could be shared */
+        rc = get_page(pg, dom_cow);
+    if ( !rc )
+    {
+        put_gfn(d, gfn);
+        return NULL;
+    }
+
+    map = map_domain_page(mfn);
+    put_gfn(d, gfn);
+    return map;
 }
 
 void *hvm_map_guest_frame_rw(unsigned long gfn)
@@ -1866,11 +1884,16 @@ void *hvm_map_guest_frame_ro(unsigned long gfn)
 void hvm_unmap_guest_frame(void *p)
 {
     if ( p )
+    {
+        unsigned long mfn = domain_page_map_to_mfn(p);
         unmap_domain_page(p);
+        put_page(mfn_to_page(mfn));
+    }
 }
 
-static void *hvm_map_entry(unsigned long va, unsigned long *gfn)
+static void *hvm_map_entry(unsigned long va)
 {
+    unsigned long gfn;
     uint32_t pfec;
     char *v;
 
@@ -1887,11 +1910,11 @@ static void *hvm_map_entry(unsigned long va, unsigned long *gfn)
      * treat it as a kernel-mode read (i.e. no access checks).
      */
     pfec = PFEC_page_present;
-    *gfn = paging_gva_to_gfn(current, va, &pfec);
+    gfn = paging_gva_to_gfn(current, va, &pfec);
     if ( (pfec == PFEC_page_paged) || (pfec == PFEC_page_shared) )
         goto fail;
 
-    v = hvm_map_guest_frame_rw(*gfn);
+    v = hvm_map_guest_frame_rw(gfn);
     if ( v == NULL )
         goto fail;
 
@@ -1902,11 +1925,9 @@ static void *hvm_map_entry(unsigned long va, unsigned long *gfn)
     return NULL;
 }
 
-static void hvm_unmap_entry(void *p, unsigned long gfn)
+static void hvm_unmap_entry(void *p)
 {
     hvm_unmap_guest_frame(p);
-    if ( p && (gfn != INVALID_GFN) )
-        put_gfn(current->domain, gfn);
 }
 
 static int hvm_load_segment_selector(
@@ -1918,7 +1939,6 @@ static int hvm_load_segment_selector(
     int fault_type = TRAP_invalid_tss;
     struct cpu_user_regs *regs = guest_cpu_user_regs();
     struct vcpu *v = current;
-    unsigned long pdesc_gfn = INVALID_GFN;
 
     if ( regs->eflags & X86_EFLAGS_VM )
     {
@@ -1952,7 +1972,7 @@ static int hvm_load_segment_selector(
     if ( ((sel & 0xfff8) + 7) > desctab.limit )
         goto fail;
 
-    pdesc = hvm_map_entry(desctab.base + (sel & 0xfff8), &pdesc_gfn);
+    pdesc = hvm_map_entry(desctab.base + (sel & 0xfff8));
     if ( pdesc == NULL )
         goto hvm_map_fail;
 
@@ -2012,7 +2032,7 @@ static int hvm_load_segment_selector(
     desc.b |= 0x100;
 
  skip_accessed_flag:
-    hvm_unmap_entry(pdesc, pdesc_gfn);
+    hvm_unmap_entry(pdesc);
 
     segr.base = (((desc.b <<  0) & 0xff000000u) |
                  ((desc.b << 16) & 0x00ff0000u) |
@@ -2028,7 +2048,7 @@ static int hvm_load_segment_selector(
     return 0;
 
  unmap_and_fail:
-    hvm_unmap_entry(pdesc, pdesc_gfn);
+    hvm_unmap_entry(pdesc);
  fail:
     hvm_inject_exception(fault_type, sel & 0xfffc, 0);
  hvm_map_fail:
@@ -2043,7 +2063,7 @@ void hvm_task_switch(
     struct cpu_user_regs *regs = guest_cpu_user_regs();
     struct segment_register gdt, tr, prev_tr, segr;
     struct desc_struct *optss_desc = NULL, *nptss_desc = NULL, tss_desc;
-    unsigned long eflags, optss_gfn = INVALID_GFN, nptss_gfn = INVALID_GFN;
+    unsigned long eflags;
     int exn_raised, rc;
     struct {
         u16 back_link,__blh;
@@ -2069,11 +2089,11 @@ void hvm_task_switch(
         goto out;
     }
 
-    optss_desc = hvm_map_entry(gdt.base + (prev_tr.sel & 0xfff8), &optss_gfn);
+    optss_desc = hvm_map_entry(gdt.base + (prev_tr.sel & 0xfff8)); 
     if ( optss_desc == NULL )
         goto out;
 
-    nptss_desc = hvm_map_entry(gdt.base + (tss_sel & 0xfff8), &nptss_gfn);
+    nptss_desc = hvm_map_entry(gdt.base + (tss_sel & 0xfff8)); 
     if ( nptss_desc == NULL )
         goto out;
 
@@ -2238,8 +2258,8 @@ void hvm_task_switch(
     }
 
  out:
-    hvm_unmap_entry(optss_desc, optss_gfn);
-    hvm_unmap_entry(nptss_desc, nptss_gfn);
+    hvm_unmap_entry(optss_desc);
+    hvm_unmap_entry(nptss_desc);
 }
 
 #define HVMCOPY_from_guest (0u<<0)
