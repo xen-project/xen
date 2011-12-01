@@ -1868,6 +1868,8 @@ int xc_mem_paging_nominate(xc_interface *xch, domid_t domain_id,
                            unsigned long gfn);
 int xc_mem_paging_evict(xc_interface *xch, domid_t domain_id, unsigned long gfn);
 int xc_mem_paging_prep(xc_interface *xch, domid_t domain_id, unsigned long gfn);
+int xc_mem_paging_load(xc_interface *xch, domid_t domain_id, 
+                        unsigned long gfn, void *buffer);
 int xc_mem_paging_resume(xc_interface *xch, domid_t domain_id,
                          unsigned long gfn);
 

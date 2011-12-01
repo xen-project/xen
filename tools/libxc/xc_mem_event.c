@@ -24,7 +24,7 @@
 #include "xc_private.h"
 
 int xc_mem_event_control(xc_interface *xch, domid_t domain_id, unsigned int op,
-                         unsigned int mode, void *shared_page,
+                         unsigned int mode, void *page,
                          void *ring_page, unsigned long gfn)
 {
     DECLARE_DOMCTL;
@@ -34,7 +34,7 @@ int xc_mem_event_control(xc_interface *xch, domid_t domain_id, unsigned int op,
     domctl.u.mem_event_op.op = op;
     domctl.u.mem_event_op.mode = mode;
 
-    domctl.u.mem_event_op.shared_addr = (unsigned long)shared_page;
+    domctl.u.mem_event_op.u.shared_addr = (unsigned long)page;
     domctl.u.mem_event_op.ring_addr = (unsigned long)ring_page;
 
     domctl.u.mem_event_op.gfn = gfn;
