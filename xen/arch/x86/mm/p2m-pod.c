@@ -522,7 +522,6 @@ p2m_pod_decrease_reservation(struct domain *d,
     steal_for_cache =  ( p2m->pod.entry_count > p2m->pod.count );
 
     p2m_lock(p2m);
-    audit_p2m(p2m, 1);
 
     if ( unlikely(d->is_dying) )
         goto out_unlock;
@@ -616,7 +615,6 @@ out_entry_check:
     }
 
 out_unlock:
-    audit_p2m(p2m, 1);
     p2m_unlock(p2m);
 
 out:
@@ -986,7 +984,6 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
          */
         set_p2m_entry(p2m, gfn_aligned, _mfn(0), PAGE_ORDER_2M,
                       p2m_populate_on_demand, p2m->default_access);
-        audit_p2m(p2m, 1);
         return 0;
     }
 
@@ -1108,7 +1105,6 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
         return rc;
 
     p2m_lock(p2m);
-    audit_p2m(p2m, 1);
 
     P2M_DEBUG("mark pod gfn=%#lx\n", gfn);
 
@@ -1142,7 +1138,6 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
         BUG_ON(p2m->pod.entry_count < 0);
     }
 
-    audit_p2m(p2m, 1);
     p2m_unlock(p2m);
 
 out:

@@ -483,7 +483,6 @@ static int p2m_pod_check_and_populate(struct p2m_domain *p2m, unsigned long gfn,
     /* This is called from the p2m lookups, which can happen with or 
      * without the lock hed. */
     p2m_lock_recursive(p2m);
-    audit_p2m(p2m, 1);
 
     /* Check to make sure this is still PoD */
     if ( p2m_flags_to_type(l1e_get_flags(*p2m_entry)) != p2m_populate_on_demand )
@@ -494,7 +493,6 @@ static int p2m_pod_check_and_populate(struct p2m_domain *p2m, unsigned long gfn,
 
     r = p2m_pod_demand_populate(p2m, gfn, order, q);
 
-    audit_p2m(p2m, 1);
     p2m_unlock(p2m);
 
     return r;
@@ -975,118 +973,23 @@ static void p2m_change_type_global(struct p2m_domain *p2m,
 
 }
 
-/* Set up the p2m function pointers for pagetable format */
-void p2m_pt_init(struct p2m_domain *p2m)
-{
-    p2m->set_entry = p2m_set_entry;
-    p2m->get_entry = p2m_gfn_to_mfn;
-    p2m->change_entry_type_global = p2m_change_type_global;
-    p2m->write_p2m_entry = paging_write_p2m_entry;
-}
-
-
 #if P2M_AUDIT
-/* strict_m2p == 0 allows m2p mappings that don'#t match the p2m. 
- * It's intended for add_to_physmap, when the domain has just been allocated 
- * new mfns that might have stale m2p entries from previous owners */
-void audit_p2m(struct p2m_domain *p2m, int strict_m2p)
+long p2m_pt_audit_p2m(struct p2m_domain *p2m)
 {
-    struct page_info *page;
-    struct domain *od;
-    unsigned long mfn, gfn, m2pfn, lp2mfn = 0;
     int entry_count = 0;
-    mfn_t p2mfn;
-    unsigned long orphans_d = 0, orphans_i = 0, mpbad = 0, pmbad = 0;
+    unsigned long pmbad = 0;
+    unsigned long mfn, gfn, m2pfn;
     int test_linear;
-    p2m_type_t type;
     struct domain *d = p2m->domain;
 
-    if ( !paging_mode_translate(d) )
-        return;
-
-    //P2M_PRINTK("p2m audit starts\n");
+    ASSERT(p2m_locked_by_me(p2m));
 
     test_linear = ( (d == current->domain)
                     && !pagetable_is_null(current->arch.monitor_table) );
     if ( test_linear )
         flush_tlb_local();
 
-    spin_lock(&d->page_alloc_lock);
-
-    /* Audit part one: walk the domain's page allocation list, checking
-     * the m2p entries. */
-    page_list_for_each ( page, &d->page_list )
-    {
-        mfn = mfn_x(page_to_mfn(page));
-
-        // P2M_PRINTK("auditing guest page, mfn=%#lx\n", mfn);
-
-        od = page_get_owner(page);
-
-        if ( od != d )
-        {
-            P2M_PRINTK("wrong owner %#lx -> %p(%u) != %p(%u)\n",
-                       mfn, od, (od?od->domain_id:-1), d, d->domain_id);
-            continue;
-        }
-
-        gfn = get_gpfn_from_mfn(mfn);
-        if ( gfn == INVALID_M2P_ENTRY )
-        {
-            orphans_i++;
-            //P2M_PRINTK("orphaned guest page: mfn=%#lx has invalid gfn\n",
-            //               mfn);
-            continue;
-        }
-
-        if ( gfn == 0x55555555 || gfn == 0x5555555555555555 )
-        {
-            orphans_d++;
-            //P2M_PRINTK("orphaned guest page: mfn=%#lx has debug gfn\n",
-            //               mfn);
-            continue;
-        }
-
-        if ( gfn == SHARED_M2P_ENTRY )
-        {
-            P2M_PRINTK("shared mfn (%lx) on domain page list!\n",
-                    mfn);
-            continue;
-        }
-
-        p2mfn = gfn_to_mfn_type_p2m(p2m, gfn, &type, p2m_query);
-        if ( strict_m2p && mfn_x(p2mfn) != mfn )
-        {
-            mpbad++;
-            P2M_PRINTK("map mismatch mfn %#lx -> gfn %#lx -> mfn %#lx"
-                       " (-> gfn %#lx)\n",
-                       mfn, gfn, mfn_x(p2mfn),
-                       (mfn_valid(p2mfn)
-                        ? get_gpfn_from_mfn(mfn_x(p2mfn))
-                        : -1u));
-            /* This m2p entry is stale: the domain has another frame in
-             * this physical slot.  No great disaster, but for neatness,
-             * blow away the m2p entry. */
-            set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY);
-        }
-
-        if ( test_linear && (gfn <= p2m->max_mapped_pfn) )
-        {
-            lp2mfn = mfn_x(gfn_to_mfn_type_p2m(p2m, gfn, &type, p2m_query));
-            if ( lp2mfn != mfn_x(p2mfn) )
-            {
-                P2M_PRINTK("linear mismatch gfn %#lx -> mfn %#lx "
-                           "(!= mfn %#lx)\n", gfn, lp2mfn, mfn_x(p2mfn));
-            }
-        }
-
-        // P2M_PRINTK("OK: mfn=%#lx, gfn=%#lx, p2mfn=%#lx, lp2mfn=%#lx\n",
-        //                mfn, gfn, mfn_x(p2mfn), lp2mfn);
-    }
-
-    spin_unlock(&d->page_alloc_lock);
-
-    /* Audit part two: walk the domain's p2m table, checking the entries. */
+    /* Audit part one: walk the domain's p2m table, checking the entries. */
     if ( pagetable_get_pfn(p2m_get_pagetable(p2m)) != 0 )
     {
         l2_pgentry_t *l2e;
@@ -1239,17 +1142,23 @@ void audit_p2m(struct p2m_domain *p2m, int strict_m2p)
                entry_count);
         BUG();
     }
-        
-    //P2M_PRINTK("p2m audit complete\n");
-    //if ( orphans_i | orphans_d | mpbad | pmbad )
-    //    P2M_PRINTK("p2m audit found %lu orphans (%lu inval %lu debug)\n",
-    //                   orphans_i + orphans_d, orphans_i, orphans_d);
-    if ( mpbad | pmbad )
-    {
-        P2M_PRINTK("p2m audit found %lu odd p2m, %lu bad m2p entries\n",
-                   pmbad, mpbad);
-        WARN();
-    }
+
+    return pmbad;
 }
 #endif /* P2M_AUDIT */
+
+/* Set up the p2m function pointers for pagetable format */
+void p2m_pt_init(struct p2m_domain *p2m)
+{
+    p2m->set_entry = p2m_set_entry;
+    p2m->get_entry = p2m_gfn_to_mfn;
+    p2m->change_entry_type_global = p2m_change_type_global;
+    p2m->write_p2m_entry = paging_write_p2m_entry;
+#if P2M_AUDIT
+    p2m->audit_p2m = p2m_pt_audit_p2m;
+#else
+    p2m->audit_p2m = NULL;
+#endif
+}
+
 

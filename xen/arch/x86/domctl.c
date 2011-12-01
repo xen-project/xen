@@ -1449,6 +1449,27 @@ long arch_do_domctl(
     break;
 #endif /* __x86_64__ */
 
+#if P2M_AUDIT
+    case XEN_DOMCTL_audit_p2m:
+    {
+        struct domain *d;
+
+        ret = rcu_lock_remote_target_domain_by_id(domctl->domain, &d);
+        if ( ret != 0 )
+            break;
+
+        audit_p2m(d,
+                  &domctl->u.audit_p2m.orphans_debug,
+                  &domctl->u.audit_p2m.orphans_invalid,
+                  &domctl->u.audit_p2m.m2p_bad,
+                  &domctl->u.audit_p2m.p2m_bad);
+        rcu_unlock_domain(d);
+        if ( copy_to_guest(u_domctl, domctl, 1) ) 
+            ret = -EFAULT;
+    }
+    break;
+#endif /* P2M_AUDIT */
+
     case XEN_DOMCTL_set_access_required:
     {
         struct domain *d;

@@ -439,9 +439,7 @@ guest_physmap_remove_page(struct domain *d, unsigned long gfn,
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     p2m_lock(p2m);
-    audit_p2m(p2m, 1);
     p2m_remove_page(p2m, gfn, mfn, page_order);
-    audit_p2m(p2m, 1);
     p2m_unlock(p2m);
 }
 
@@ -482,7 +480,6 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
         return rc;
 
     p2m_lock(p2m);
-    audit_p2m(p2m, 0);
 
     P2M_DEBUG("adding gfn=%#lx mfn=%#lx\n", gfn, mfn);
 
@@ -566,7 +563,6 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
         }
     }
 
-    audit_p2m(p2m, 1);
     p2m_unlock(p2m);
 
     return rc;
@@ -656,7 +652,6 @@ set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
 
     P2M_DEBUG("set mmio %lx %lx\n", gfn, mfn_x(mfn));
     rc = set_p2m_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2m_mmio_direct, p2m->default_access);
-    audit_p2m(p2m, 1);
     p2m_unlock(p2m);
     if ( 0 == rc )
         gdprintk(XENLOG_ERR,
@@ -688,7 +683,6 @@ clear_mmio_p2m_entry(struct domain *d, unsigned long gfn)
         goto out;
     }
     rc = set_p2m_entry(p2m, gfn, _mfn(INVALID_MFN), PAGE_ORDER_4K, p2m_invalid, p2m->default_access);
-    audit_p2m(p2m, 1);
 
 out:
     p2m_unlock(p2m);
@@ -785,7 +779,6 @@ int p2m_mem_paging_nominate(struct domain *d, unsigned long gfn)
 
     /* Fix p2m entry */
     set_p2m_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2m_ram_paging_out, a);
-    audit_p2m(p2m, 1);
     ret = 0;
 
  out:
@@ -852,7 +845,6 @@ int p2m_mem_paging_evict(struct domain *d, unsigned long gfn)
 
     /* Remove mapping from p2m table */
     set_p2m_entry(p2m, gfn, _mfn(INVALID_MFN), PAGE_ORDER_4K, p2m_ram_paged, a);
-    audit_p2m(p2m, 1);
 
     /* Clear content before returning the page to Xen */
     scrub_one_page(page);
@@ -946,7 +938,6 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
             req.flags |= MEM_EVENT_FLAG_EVICT_FAIL;
 
         set_p2m_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2m_ram_paging_in_start, a);
-        audit_p2m(p2m, 1);
     }
     p2m_unlock(p2m);
 
@@ -1014,7 +1005,6 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn)
 
     /* Fix p2m mapping */
     set_p2m_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2m_ram_paging_in, a);
-    audit_p2m(p2m, 1);
 
     atomic_dec(&d->paged_pages);
 
@@ -1065,7 +1055,6 @@ void p2m_mem_paging_resume(struct domain *d)
                             paging_mode_log_dirty(d) ? p2m_ram_logdirty : p2m_ram_rw, 
                             a);
             set_gpfn_from_mfn(mfn_x(mfn), rsp.gfn);
-            audit_p2m(p2m, 1);
         }
         p2m_unlock(p2m);
     }
@@ -1426,6 +1415,119 @@ unsigned long paging_gva_to_gfn(struct vcpu *v,
 
     return hostmode->gva_to_gfn(v, hostp2m, va, pfec);
 }
+
+/*** Audit ***/
+
+#if P2M_AUDIT
+void audit_p2m(struct domain *d,
+                uint64_t *orphans_debug,
+                uint64_t *orphans_invalid,
+                uint64_t *m2p_bad,
+                uint64_t *p2m_bad)
+{
+    struct page_info *page;
+    struct domain *od;
+    unsigned long mfn, gfn;
+    mfn_t p2mfn;
+    unsigned long orphans_d = 0, orphans_i = 0, mpbad = 0, pmbad = 0;
+    p2m_access_t p2ma;
+    p2m_type_t type;
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+
+    if ( !paging_mode_translate(d) )
+        goto out_p2m_audit;
+
+    P2M_PRINTK("p2m audit starts\n");
+
+    p2m_lock(p2m);
+
+    if (p2m->audit_p2m)
+        pmbad = p2m->audit_p2m(p2m);
+
+    /* Audit part two: walk the domain's page allocation list, checking
+     * the m2p entries. */
+    spin_lock(&d->page_alloc_lock);
+    page_list_for_each ( page, &d->page_list )
+    {
+        mfn = mfn_x(page_to_mfn(page));
+
+        P2M_PRINTK("auditing guest page, mfn=%#lx\n", mfn);
+
+        od = page_get_owner(page);
+
+        if ( od != d )
+        {
+            P2M_PRINTK("wrong owner %#lx -> %p(%u) != %p(%u)\n",
+                       mfn, od, (od?od->domain_id:-1), d, d->domain_id);
+            continue;
+        }
+
+        gfn = get_gpfn_from_mfn(mfn);
+        if ( gfn == INVALID_M2P_ENTRY )
+        {
+            orphans_i++;
+            P2M_PRINTK("orphaned guest page: mfn=%#lx has invalid gfn\n",
+                           mfn);
+            continue;
+        }
+
+        if ( gfn == 0x55555555 || gfn == 0x5555555555555555 )
+        {
+            orphans_d++;
+            P2M_PRINTK("orphaned guest page: mfn=%#lx has debug gfn\n",
+                           mfn);
+            continue;
+        }
+
+        if ( gfn == SHARED_M2P_ENTRY )
+        {
+            P2M_PRINTK("shared mfn (%lx) on domain page list!\n",
+                    mfn);
+            continue;
+        }
+
+        p2mfn = get_gfn_type_access(p2m, gfn, &type, &p2ma, p2m_query, NULL);
+        if ( mfn_x(p2mfn) != mfn )
+        {
+            mpbad++;
+            P2M_PRINTK("map mismatch mfn %#lx -> gfn %#lx -> mfn %#lx"
+                       " (-> gfn %#lx)\n",
+                       mfn, gfn, mfn_x(p2mfn),
+                       (mfn_valid(p2mfn)
+                        ? get_gpfn_from_mfn(mfn_x(p2mfn))
+                        : -1u));
+            /* This m2p entry is stale: the domain has another frame in
+             * this physical slot.  No great disaster, but for neatness,
+             * blow away the m2p entry. */
+            set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY);
+        }
+        __put_gfn(p2m, gfn);
+
+        P2M_PRINTK("OK: mfn=%#lx, gfn=%#lx, p2mfn=%#lx, lp2mfn=%#lx\n",
+                       mfn, gfn, mfn_x(p2mfn), lp2mfn);
+    }
+    spin_unlock(&d->page_alloc_lock);
+
+    p2m_unlock(p2m);
+ 
+    P2M_PRINTK("p2m audit complete\n");
+    if ( orphans_i | orphans_d | mpbad | pmbad )
+        P2M_PRINTK("p2m audit found %lu orphans (%lu inval %lu debug)\n",
+                       orphans_i + orphans_d, orphans_i, orphans_d);
+    if ( mpbad | pmbad )
+    {
+        P2M_PRINTK("p2m audit found %lu odd p2m, %lu bad m2p entries\n",
+                   pmbad, mpbad);
+        WARN();
+    }
+
+out_p2m_audit:
+    *orphans_debug      = (uint64_t) orphans_d;
+    *orphans_invalid    = (uint64_t) orphans_i;
+    *m2p_bad            = (uint64_t) mpbad;
+    *p2m_bad            = (uint64_t) pmbad;
+}
+#endif /* P2M_AUDIT */
 
 /*
  * Local variables:

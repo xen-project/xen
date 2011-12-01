@@ -245,6 +245,7 @@ struct p2m_domain {
                                           unsigned long gfn, l1_pgentry_t *p,
                                           mfn_t table_mfn, l1_pgentry_t new,
                                           unsigned int level);
+    long               (*audit_p2m)(struct p2m_domain *p2m);
 
     /* Default P2M access type for each page in the the domain: new pages,
      * swapped in pages, cleared pages, and pages that are ambiquously
@@ -559,13 +560,15 @@ int set_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
 extern void p2m_pt_init(struct p2m_domain *p2m);
 
 /* Debugging and auditing of the P2M code? */
-#define P2M_AUDIT     0
+#define P2M_AUDIT     1
 #define P2M_DEBUGGING 0
 
 #if P2M_AUDIT
-extern void audit_p2m(struct p2m_domain *p2m, int strict_m2p);
-#else
-# define audit_p2m(_p2m, _m2p) do { (void)(_p2m),(_m2p); } while (0)
+extern void audit_p2m(struct domain *d,
+                        uint64_t *orphans_debug,
+                        uint64_t *orphans_invalid,
+                        uint64_t *m2p_bad,
+                        uint64_t *p2m_bad);
 #endif /* P2M_AUDIT */
 
 /* Printouts */
