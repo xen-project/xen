@@ -105,13 +105,30 @@ soon as it is run.
 
 =back
 
-=item B<console> I<domain-id>
+=item B<console> [I<OPTIONS>] I<domain-id>
 
 Attach to domain I<domain-id>'s console.  If you've set up your domains to
 have a traditional log in console this will look much like a normal
 text log in screen.
 
 Use the key combination Ctrl+] to detach the domain console.
+
+B<OPTIONS>
+
+=over 4
+
+=item I<-t [pv|serial]>
+
+Connect to a PV console or connect to an emulated serial console.
+PV consoles are the only consoles available for PV domains while HVM
+domains can have both. If this option is not specified it defaults to
+emulated serial for HVM guests and PV console for PV guests.
+
+=item I<-n NUM>
+
+Connect to console number I<NUM>. Console numbers start from 0.
+
+=back
 
 =item B<vncviewer> [I<OPTIONS>] I<domain-id>
 
