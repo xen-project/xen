@@ -176,7 +176,7 @@ static uint8_t twobyte_table[256] = {
     /* 0x08 - 0x0F */
     ImplicitOps, ImplicitOps, 0, 0, 0, ImplicitOps|ModRM, 0, 0,
     /* 0x10 - 0x17 */
-    0, 0, 0, 0, 0, 0, 0, 0,
+    ImplicitOps|ModRM, ImplicitOps|ModRM, 0, 0, 0, 0, 0, 0,
     /* 0x18 - 0x1F */
     ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM,
     ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM,
@@ -184,7 +184,7 @@ static uint8_t twobyte_table[256] = {
     ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM,
     0, 0, 0, 0,
     /* 0x28 - 0x2F */
-    0, 0, 0, 0, 0, 0, 0, 0,
+    ImplicitOps|ModRM, ImplicitOps|ModRM, 0, ImplicitOps|ModRM, 0, 0, 0, 0,
     /* 0x30 - 0x37 */
     ImplicitOps, ImplicitOps, ImplicitOps, 0,
     ImplicitOps, ImplicitOps, 0, 0,
@@ -272,6 +272,16 @@ enum vex_pfx {
     vex_f3,
     vex_f2
 };
+
+#define VEX_PREFIX_DOUBLE_MASK 0x1
+#define VEX_PREFIX_SCALAR_MASK 0x2
+
+static const uint8_t sse_prefix[] = { 0x66, 0xf3, 0xf2 };
+
+#define SET_SSE_PREFIX(dst, vex_pfx) do { \
+    if ( vex_pfx ) \
+        (dst) = sse_prefix[(vex_pfx) - 1]; \
+} while (0)
 
 union vex {
     uint8_t raw[2];
@@ -3849,6 +3859,76 @@ x86_emulate(
     case 0x18: /* Grp16 (prefetch/nop) */
     case 0x19 ... 0x1f: /* nop (amd-defined) */
         break;
+
+    case 0x2b: /* {,v}movntp{s,d} xmm,m128 */
+               /* vmovntp{s,d} ymm,m256 */
+        fail_if(ea.type != OP_MEM);
+        /* fall through */
+    case 0x28: /* {,v}movap{s,d} xmm/m128,xmm */
+               /* vmovap{s,d} ymm/m256,ymm */
+    case 0x29: /* {,v}movap{s,d} xmm,xmm/m128 */
+               /* vmovap{s,d} ymm,ymm/m256 */
+        fail_if(vex.pfx & VEX_PREFIX_SCALAR_MASK);
+        /* fall through */
+    case 0x10: /* {,v}movup{s,d} xmm/m128,xmm */
+               /* vmovup{s,d} ymm/m256,ymm */
+               /* {,v}movss xmm/m32,xmm */
+               /* {,v}movsd xmm/m64,xmm */
+    case 0x11: /* {,v}movup{s,d} xmm,xmm/m128 */
+               /* vmovup{s,d} ymm,ymm/m256 */
+               /* {,v}movss xmm,xmm/m32 */
+               /* {,v}movsd xmm,xmm/m64 */
+    {
+        uint8_t stub[] = { 0x3e, 0x3e, 0x0f, b, modrm, 0xc3 };
+        struct fpu_insn_ctxt fic = { .insn_bytes = sizeof(stub)-1 };
+
+        if ( vex.opcx == vex_none )
+        {
+            if ( vex.pfx & VEX_PREFIX_DOUBLE_MASK )
+                vcpu_must_have_sse2();
+            else
+                vcpu_must_have_sse();
+            ea.bytes = 16;
+            SET_SSE_PREFIX(stub[0], vex.pfx);
+            get_fpu(X86EMUL_FPU_xmm, &fic);
+        }
+        else
+        {
+            fail_if((vex.opcx != vex_0f) ||
+                    (vex.reg && ((ea.type == OP_MEM) ||
+                                 !(vex.pfx & VEX_PREFIX_SCALAR_MASK))));
+            vcpu_must_have_avx();
+            get_fpu(X86EMUL_FPU_ymm, &fic);
+            ea.bytes = 16 << vex.l;
+        }
+        if ( vex.pfx & VEX_PREFIX_SCALAR_MASK )
+            ea.bytes = vex.pfx & VEX_PREFIX_DOUBLE_MASK ? 8 : 4;
+        if ( ea.type == OP_MEM )
+        {
+            /* XXX enable once there is ops->ea() or equivalent
+            generate_exception_if((b >= 0x28) &&
+                                  (ops->ea(ea.mem.seg, ea.mem.off)
+                                   & (ea.bytes - 1)), EXC_GP, 0); */
+            if ( !(b & 1) )
+                rc = ops->read(ea.mem.seg, ea.mem.off+0, mmvalp,
+                               ea.bytes, ctxt);
+            /* convert memory operand to (%rAX) */
+            rex_prefix &= ~REX_B;
+            vex.b = 1;
+            stub[4] &= 0x38;
+        }
+        if ( !rc )
+        {
+           copy_REX_VEX(stub, rex_prefix, vex);
+           asm volatile ( "call *%0" : : "r" (stub), "a" (mmvalp)
+                                     : "memory" );
+        }
+        put_fpu(&fic);
+        if ( !rc && (b & 1) && (ea.type == OP_MEM) )
+            rc = ops->write(ea.mem.seg, ea.mem.off, mmvalp,
+                            ea.bytes, ctxt);
+        goto done;
+    }
 
     case 0x20: /* mov cr,reg */
     case 0x21: /* mov dr,reg */

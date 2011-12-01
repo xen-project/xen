@@ -629,6 +629,60 @@ int main(int argc, char **argv)
     else
         printf("skipped\n");
 
+    printf("%-40s", "Testing movsd %xmm5,(%ecx)...");
+    memset(res, 0x77, 64);
+    memset(res + 10, 0x66, 8);
+    if ( stack_exec && cpu_has_sse2 )
+    {
+        extern const unsigned char movsd_to_mem[];
+
+        asm volatile ( "movlpd %0, %%xmm5\n\t"
+                       "movhpd %0, %%xmm5\n"
+                       ".pushsection .test, \"a\", @progbits\n"
+                       "movsd_to_mem: movsd %%xmm5, (%1)\n"
+                       ".popsection" :: "m" (res[10]), "c" (NULL) );
+
+        memcpy(instr, movsd_to_mem, 15);
+        regs.eip    = (unsigned long)&instr[0];
+        regs.ecx    = (unsigned long)(res + 2);
+        regs.edx    = 0;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) || memcmp(res, res + 8, 32) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+    {
+        printf("skipped\n");
+        memset(res + 2, 0x66, 8);
+    }
+
+    printf("%-40s", "Testing movaps (%edx),%xmm7...");
+    if ( stack_exec && cpu_has_sse )
+    {
+        extern const unsigned char movaps_from_mem[];
+
+        asm volatile ( "xorps %%xmm7, %%xmm7\n"
+                       ".pushsection .test, \"a\", @progbits\n"
+                       "movaps_from_mem: movaps (%0), %%xmm7\n"
+                       ".popsection" :: "d" (NULL) );
+
+        memcpy(instr, movaps_from_mem, 15);
+        regs.eip    = (unsigned long)&instr[0];
+        regs.ecx    = 0;
+        regs.edx    = (unsigned long)res;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY )
+            goto fail;
+        asm ( "cmpeqps %1, %%xmm7\n\t"
+              "movmskps %%xmm7, %0" : "=r" (rc) : "m" (res[8]) );
+        if ( rc != 0xf )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
     for ( j = 1; j <= 2; j++ )
     {
 #if defined(__i386__)
