@@ -49,6 +49,7 @@ static UINT32 __initdata mdesc_ver;
 static struct file __initdata cfg;
 static struct file __initdata kernel;
 static struct file __initdata ramdisk;
+static struct file __initdata ucode;
 static struct file __initdata xsm;
 
 static multiboot_info_t __initdata mbi = {
@@ -174,6 +175,8 @@ static void __init __attribute__((__noreturn__)) blexit(const CHAR16 *str)
         efi_bs->FreePages(kernel.addr, PFN_UP(kernel.size));
     if ( ramdisk.addr )
         efi_bs->FreePages(ramdisk.addr, PFN_UP(ramdisk.size));
+    if ( ucode.addr )
+        efi_bs->FreePages(ucode.addr, PFN_UP(ucode.size));
     if ( xsm.addr )
         efi_bs->FreePages(xsm.addr, PFN_UP(xsm.size));
 
@@ -803,6 +806,17 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     {
         split_value(name.s);
         read_file(dir_handle, s2w(&name), &ramdisk);
+        efi_bs->FreePool(name.w);
+    }
+
+    name.s = get_value(&cfg, section.s, "ucode");
+    if ( !name.s )
+        name.s = get_value(&cfg, "global", "ucode");
+    if ( name.s )
+    {
+        microcode_set_module(mbi.mods_count);
+        split_value(name.s);
+        read_file(dir_handle, s2w(&name), &ucode);
         efi_bs->FreePool(name.w);
     }
 

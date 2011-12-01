@@ -560,10 +560,7 @@ static void __map_io_bitmap(struct vcpu *v, u64 vmcs_reg)
     if (nvmx->iobitmap[index])
         hvm_unmap_guest_frame (nvmx->iobitmap[index]); 
     gpa = __get_vvmcs(vcpu_nestedhvm(v).nv_vvmcx, vmcs_reg);
-    nvmx->iobitmap[index] = hvm_map_guest_frame_ro (gpa >> PAGE_SHIFT);
-    /* See comment in nestedsvm_vmcb_map re putting this gfn and 
-     * liveness of the map it backs */
-    put_gfn(current->domain, gpa >> PAGE_SHIFT);
+    nvmx->iobitmap[index] = hvm_map_guest_frame_ro(gpa >> PAGE_SHIFT);
 }
 
 static inline void map_io_bitmap_all(struct vcpu *v)
@@ -1138,12 +1135,9 @@ int nvmx_handle_vmptrld(struct cpu_user_regs *regs)
 
     if ( nvcpu->nv_vvmcxaddr == VMCX_EADDR )
     {
-        nvcpu->nv_vvmcx = hvm_map_guest_frame_rw (gpa >> PAGE_SHIFT);
+        nvcpu->nv_vvmcx = hvm_map_guest_frame_rw(gpa >> PAGE_SHIFT);
         nvcpu->nv_vvmcxaddr = gpa;
         map_io_bitmap_all (v);
-        /* See comment in nestedsvm_vmcb_map regarding putting this 
-         * gfn and liveness of the map that uses it */
-        put_gfn(current->domain, gpa >> PAGE_SHIFT);
     }
 
     vmreturn(regs, VMSUCCEED);
@@ -1205,7 +1199,6 @@ int nvmx_handle_vmclear(struct cpu_user_regs *regs)
         if ( vvmcs ) 
             __set_vvmcs(vvmcs, NVMX_LAUNCH_STATE, 0);
         hvm_unmap_guest_frame(vvmcs);
-        put_gfn(current->domain, gpa >> PAGE_SHIFT);
     }
 
     vmreturn(regs, VMSUCCEED);

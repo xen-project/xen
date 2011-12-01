@@ -26,6 +26,12 @@ void *map_domain_page(unsigned long mfn);
  */
 void unmap_domain_page(const void *va);
 
+
+/* 
+ * Given a VA from map_domain_page(), return its underlying MFN.
+ */
+unsigned long domain_page_map_to_mfn(void *va);
+
 /*
  * Similar to the above calls, except the mapping is accessible in all
  * address spaces (not just within the VCPU that created the mapping). Global
@@ -102,6 +108,7 @@ domain_mmap_cache_destroy(struct domain_mmap_cache *cache)
 #define map_domain_page(mfn)                mfn_to_virt(mfn)
 #define __map_domain_page(pg)               page_to_virt(pg)
 #define unmap_domain_page(va)               ((void)(va))
+#define domain_page_map_to_mfn(va)          virt_to_mfn((unsigned long)(va))
 
 #define map_domain_page_global(mfn)         mfn_to_virt(mfn)
 #define __map_domain_page_global(pg)        page_to_virt(pg)

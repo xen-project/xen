@@ -454,14 +454,15 @@ static inline long __do_xsm_op (XEN_GUEST_HANDLE(xsm_op_t) op)
 }
 
 #ifdef XSM_ENABLE
-extern int xsm_init(unsigned int *initrdidx, const multiboot_info_t *mbi,
+extern int xsm_init(unsigned long *module_map, const multiboot_info_t *mbi,
                     void *(*bootstrap_map)(const module_t *));
-extern int xsm_policy_init(unsigned int *initrdidx, const multiboot_info_t *mbi,
+extern int xsm_policy_init(unsigned long *module_map,
+                           const multiboot_info_t *mbi,
                            void *(*bootstrap_map)(const module_t *));
 extern int register_xsm(struct xsm_operations *ops);
 extern int unregister_xsm(struct xsm_operations *ops);
 #else
-static inline int xsm_init (unsigned int *initrdidx,
+static inline int xsm_init (unsigned long *module_map,
                             const multiboot_info_t *mbi,
                             void *(*bootstrap_map)(const module_t *))
 {

@@ -23,26 +23,52 @@
 #include <xen/spinlock.h>
 
 #include <asm/msr.h>
-#include <asm/uaccess.h>
 #include <asm/processor.h>
 #include <asm/microcode.h>
 
 #define pr_debug(x...) ((void)0)
+
+struct equiv_cpu_entry {
+    uint32_t installed_cpu;
+    uint32_t fixed_errata_mask;
+    uint32_t fixed_errata_compare;
+    uint16_t equiv_cpu;
+    uint16_t reserved;
+} __attribute__((packed));
+
+struct microcode_header_amd {
+    uint32_t data_code;
+    uint32_t patch_id;
+    uint8_t  mc_patch_data_id[2];
+    uint8_t  mc_patch_data_len;
+    uint8_t  init_flag;
+    uint32_t mc_patch_data_checksum;
+    uint32_t nb_dev_id;
+    uint32_t sb_dev_id;
+    uint16_t processor_rev_id;
+    uint8_t  nb_rev_id;
+    uint8_t  sb_rev_id;
+    uint8_t  bios_api_rev;
+    uint8_t  reserved1[3];
+    uint32_t match_reg[8];
+} __attribute__((packed));
 
 #define UCODE_MAGIC                0x00414d44
 #define UCODE_EQUIV_CPU_TABLE_TYPE 0x00000000
 #define UCODE_UCODE_TYPE           0x00000001
 
 #define UCODE_MAX_SIZE          (2048)
-#define DEFAULT_UCODE_DATASIZE  (896)
 #define MC_HEADER_SIZE          (sizeof(struct microcode_header_amd))
-#define DEFAULT_UCODE_TOTALSIZE (DEFAULT_UCODE_DATASIZE + MC_HEADER_SIZE)
-#define DWSIZE                  (sizeof(uint32_t))
+
+struct microcode_amd {
+    struct microcode_header_amd hdr;
+    unsigned int mpb[(UCODE_MAX_SIZE - MC_HEADER_SIZE) / 4];
+    unsigned int equiv_cpu_table_size;
+    struct equiv_cpu_entry equiv_cpu_table[];
+};
 
 /* serialize access to the physical write */
 static DEFINE_SPINLOCK(microcode_update_lock);
-
-struct equiv_cpu_entry *equiv_cpu_table;
 
 static int collect_cpu_info(int cpu, struct cpu_signature *csig)
 {
@@ -65,10 +91,11 @@ static int collect_cpu_info(int cpu, struct cpu_signature *csig)
     return 0;
 }
 
-static int microcode_fits(void *mc, int cpu)
+static int microcode_fits(const struct microcode_amd *mc_amd, int cpu)
 {
     struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
-    struct microcode_header_amd *mc_header = mc;
+    const struct microcode_header_amd *mc_header = &mc_amd->hdr;
+    const struct equiv_cpu_entry *equiv_cpu_table = mc_amd->equiv_cpu_table;
     unsigned int current_cpu_id;
     unsigned int equiv_cpu_id = 0x0;
     unsigned int i;
@@ -99,7 +126,7 @@ static int microcode_fits(void *mc, int cpu)
     }
 
     if ( mc_header->patch_id <= uci->cpu_sig.rev )
-        return -EINVAL;
+        return 0;
 
     printk(KERN_DEBUG "microcode: CPU%d found a matching microcode "
            "update with version 0x%x (current=0x%x)\n",
@@ -186,17 +213,15 @@ static int get_next_ucode_from_buffer_amd(void *mc, const void *buf,
     return 0;
 }
 
-static int install_equiv_cpu_table(const void *buf, uint32_t size,
-                                   unsigned long *offset)
+static int install_equiv_cpu_table(
+    struct microcode_amd *mc_amd,
+    const uint32_t *buf_pos,
+    unsigned long *offset)
 {
-    const uint32_t *buf_pos = buf;
-    unsigned long off;
-
-    off = *offset;
-    *offset = 0;
+    uint32_t size = buf_pos[2];
 
     /* No more data */
-    if ( off >= size )
+    if ( size + 12 >= *offset )
         return -EINVAL;
 
     if ( buf_pos[1] != UCODE_EQUIV_CPU_TABLE_TYPE )
@@ -213,15 +238,8 @@ static int install_equiv_cpu_table(const void *buf, uint32_t size,
         return -EINVAL;
     }
 
-    equiv_cpu_table = xmalloc_bytes(size);
-    if ( equiv_cpu_table == NULL )
-    {
-        printk(KERN_ERR "microcode: error, can't allocate "
-               "memory for equiv CPU table\n");
-        return -ENOMEM;
-    }
-
-    memcpy(equiv_cpu_table, (const void *)&buf_pos[3], size);
+    memcpy(mc_amd->equiv_cpu_table, &buf_pos[3], size);
+    mc_amd->equiv_cpu_table_size = size;
 
     *offset = size + 12;	/* add header length */
 
@@ -231,11 +249,11 @@ static int install_equiv_cpu_table(const void *buf, uint32_t size,
 static int cpu_request_microcode(int cpu, const void *buf, size_t size)
 {
     const uint32_t *buf_pos;
-    unsigned long offset = 0;
+    struct microcode_amd *mc_amd, *mc_old;
+    unsigned long offset = size;
     int error = 0;
     int ret;
     struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
-    void *mc;
 
     /* We should bind the task to the CPU */
     BUG_ON(cpu != raw_smp_processor_id());
@@ -249,59 +267,85 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t size)
         return -EINVAL;
     }
 
-    error = install_equiv_cpu_table(buf, (uint32_t)(buf_pos[2]), &offset);
+    mc_amd = xmalloc_bytes(sizeof(*mc_amd) + buf_pos[2]);
+    if ( !mc_amd )
+    {
+        printk(KERN_ERR "microcode: error! "
+               "Can not allocate memory for microcode patch\n");
+        return -ENOMEM;
+    }
+
+    error = install_equiv_cpu_table(mc_amd, buf, &offset);
     if ( error )
     {
+        xfree(mc_amd);
         printk(KERN_ERR "microcode: installing equivalent cpu table failed\n");
         return -EINVAL;
     }
 
-    mc = xmalloc_bytes(UCODE_MAX_SIZE);
-    if ( mc == NULL )
-    {
-        printk(KERN_ERR "microcode: error! "
-               "Can not allocate memory for microcode patch\n");
-        error = -ENOMEM;
-        goto out;
-    }
-
+    mc_old = uci->mc.mc_amd;
     /* implicitely validates uci->mc.mc_valid */
-    uci->mc.mc_amd = mc;
+    uci->mc.mc_amd = mc_amd;
 
     /*
      * It's possible the data file has multiple matching ucode,
      * lets keep searching till the latest version
      */
-    while ( (ret = get_next_ucode_from_buffer_amd(mc, buf, size, &offset)) == 0)
+    while ( (ret = get_next_ucode_from_buffer_amd(&mc_amd->hdr, buf, size,
+                                                  &offset)) == 0 )
     {
-        error = microcode_fits(mc, cpu);
+        error = microcode_fits(mc_amd, cpu);
         if (error <= 0)
             continue;
 
         error = apply_microcode(cpu);
         if (error == 0)
+        {
+            error = 1;
             break;
+        }
     }
+
+    if ( ret < 0 )
+        error = ret;
 
     /* On success keep the microcode patch for
      * re-apply on resume.
      */
-    if (error) {
-        xfree(mc);
-        mc = NULL;
+    if (error == 1)
+    {
+        xfree(mc_old);
+        return 0;
     }
-    uci->mc.mc_amd = mc;
-
-out:
-    xfree(equiv_cpu_table);
-    equiv_cpu_table = NULL;
+    xfree(mc_amd);
+    uci->mc.mc_amd = mc_old;
 
     return error;
 }
 
-static int microcode_resume_match(int cpu, struct cpu_signature *nsig)
+static int microcode_resume_match(int cpu, const void *mc)
 {
-    return 0;
+    struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
+    struct microcode_amd *mc_amd = uci->mc.mc_amd;
+    const struct microcode_amd *src = mc;
+    int res = microcode_fits(src, cpu);
+
+    if ( res <= 0 )
+        return res;
+
+    if ( src != mc_amd )
+    {
+        xfree(mc_amd);
+        mc_amd = xmalloc_bytes(sizeof(*src) + src->equiv_cpu_table_size);
+        uci->mc.mc_amd = mc_amd;
+        if ( !mc_amd )
+            return -ENOMEM;
+        memcpy(mc_amd, src, UCODE_MAX_SIZE);
+        memcpy(mc_amd->equiv_cpu_table, src->equiv_cpu_table,
+               src->equiv_cpu_table_size);
+    }
+
+    return 1;
 }
 
 static const struct microcode_ops microcode_amd_ops = {
@@ -317,4 +361,4 @@ static __init int microcode_init_amd(void)
         microcode_ops = &microcode_amd_ops;
     return 0;
 }
-__initcall(microcode_init_amd);
+presmp_initcall(microcode_init_amd);
