@@ -433,9 +433,11 @@ Wait for the domain to complete shutdown before returning.
 
 =item B<sysrq> I<domain-id> I<letter>
 
-Send a I<Magic System Request> signal to the domain.  For more
-information on available magic sys req operations, see sysrq.txt in
-your Linux Kernel sources.
+Send a <Magic System Request> to the domain, each type of request is
+represented by a different letter.
+It can be used to send SysRq requests to Linux guests, see sysrq.txt in
+your Linux Kernel sources for more information.
+It requires PV drivers to be installed in your guest OS.
 
 =item B<trigger> I<domain-id> I<nmi|reset|init|power|sleep> [I<VCPU>]
 
