@@ -71,17 +71,6 @@ static inline void *__maddr_to_virt(unsigned long ma)
     return (void *)(ma + DIRECTMAP_VIRT_START);
 }
 
-static inline unsigned long __xen_map_to_mfn(void *va)
-{
-    l1_pgentry_t *l1e;
-
-    ASSERT( (((unsigned long) va) >= MAPCACHE_VIRT_START) &&
-            (((unsigned long) va) <= MAPCACHE_VIRT_END) );
-    l1e = &__linear_l1_table[
-            l1_linear_offset((unsigned long) va)];
-    return l1e_get_pfn(*l1e);
-}
-
 /* read access (should only be used for debug printk's) */
 typedef u64 intpte_t;
 #define PRIpte "016llx"

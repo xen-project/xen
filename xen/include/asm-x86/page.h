@@ -272,7 +272,6 @@ void copy_page_sse2(void *, const void *);
 #define pfn_to_paddr(pfn)   __pfn_to_paddr(pfn)
 #define paddr_to_pfn(pa)    __paddr_to_pfn(pa)
 #define paddr_to_pdx(pa)    pfn_to_pdx(paddr_to_pfn(pa))
-#define xen_map_to_mfn(va)  __xen_map_to_mfn(va)
 
 #endif /* !defined(__ASSEMBLY__) */
 
