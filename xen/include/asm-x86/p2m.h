@@ -163,7 +163,8 @@ typedef enum {
 /* Shared types */
 /* XXX: Sharable types could include p2m_ram_ro too, but we would need to
  * reinit the type correctly after fault */
-#define P2M_SHARABLE_TYPES (p2m_to_mask(p2m_ram_rw))
+#define P2M_SHARABLE_TYPES (p2m_to_mask(p2m_ram_rw) \
+                            | p2m_to_mask(p2m_ram_logdirty) )
 #define P2M_SHARED_TYPES   (p2m_to_mask(p2m_ram_shared))
 
 /* Broken type: the frame backing this pfn has failed in hardware

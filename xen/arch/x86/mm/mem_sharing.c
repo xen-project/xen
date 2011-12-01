@@ -697,6 +697,9 @@ private_page_found:
     /* Update m2p entry */
     set_gpfn_from_mfn(mfn_x(page_to_mfn(page)), gfn);
 
+    /* Now that the gfn<->mfn map is properly established,
+     * marking dirty is feasible */
+    paging_mark_dirty(d, mfn_x(page_to_mfn(page)));
     put_gfn(d, gfn);
     shr_unlock();
     return 0;
