@@ -208,9 +208,9 @@ endif
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 9fa2794d45ba915b42b77d4762dfa607d5587dfc
-# Thu Dec 1 17:52:39 2011 +0000
-# increase minimum timeout to 1h
+QEMU_TAG ?= 65b27b1dd6f205835aa8174031eea057c75f8afb
+# Thu Dec 1 18:23:34 2011 +0000
+# qemu-xen: passthrough, add PT_LOG_DEV
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
