@@ -208,9 +208,9 @@ endif
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 89daacab7035d408f32f2cb1acf68c96d6cbefed
-# Mon Nov 28 17:16:52 2011 +0000
-# qemu-dm: open char devices "file:..." with O_APPEND
+QEMU_TAG ?= 9fa2794d45ba915b42b77d4762dfa607d5587dfc
+# Thu Dec 1 17:52:39 2011 +0000
+# increase minimum timeout to 1h
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
