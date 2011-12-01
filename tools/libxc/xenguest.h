@@ -27,6 +27,7 @@
 #define XCFLAGS_DEBUG     2
 #define XCFLAGS_HVM       4
 #define XCFLAGS_STDVGA    8
+#define XCFLAGS_CHECKPOINT_COMPRESS    16
 #define X86_64_B_SIZE   64 
 #define X86_32_B_SIZE   32
 

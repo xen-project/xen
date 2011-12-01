@@ -67,7 +67,7 @@
  *
  *   consists of p2m_size bytes comprising an array of xen_pfn_t sized entries.
  *
- * BODY PHASE
+ * BODY PHASE - Format A (for live migration or Remus without compression)
  * ----------
  *
  * A series of chunks with a common header:
@@ -86,6 +86,122 @@
  * metadata types.  See definitions of XC_SAVE_ID_* below.
  *
  * If chunk type is 0 then body phase is complete.
+ *
+ *
+ * BODY PHASE - Format B (for Remus with compression)
+ * ----------
+ *
+ * A series of chunks with a common header:
+ *   int              : chunk type
+ *
+ * If the chunk type is +ve then chunk contains array of PFNs corresponding
+ * to guest memory and type contains the number of PFNs in the batch:
+ *
+ *     unsigned long[]  : PFN array, length == number of pages in batch
+ *                        Each entry consists of XEN_DOMCTL_PFINFO_*
+ *                        in bits 31-28 and the PFN number in bits 27-0.
+ *
+ * If the chunk type is -ve then chunk consists of one of a number of
+ * metadata types.  See definitions of XC_SAVE_ID_* below.
+ *
+ * If the chunk type is -ve and equals XC_SAVE_ID_COMPRESSED_DATA, then the
+ * chunk consists of compressed page data, in the following format:
+ *
+ *     unsigned long        : Size of the compressed chunk to follow
+ *     compressed data :      variable length data of size indicated above.
+ *                            This chunk consists of compressed page data.
+ *                            The number of pages in one chunk depends on
+ *                            the amount of space available in the sender's
+ *                            output buffer.
+ *
+ * Format of compressed data:
+ *   compressed_data = <deltas>*
+ *   delta           = <marker, run*>
+ *   marker          = (RUNFLAG|SKIPFLAG) bitwise-or RUNLEN [1 byte marker]
+ *   RUNFLAG         = 0
+ *   SKIPFLAG        = 1 << 7
+ *   RUNLEN          = 7-bit unsigned value indicating number of WORDS in the run
+ *   run             = string of bytes of length sizeof(WORD) * RUNLEN
+ *
+ *    If marker contains RUNFLAG, then RUNLEN * sizeof(WORD) bytes of data following
+ *   the marker is copied into the target page at the appropriate offset indicated by
+ *   the offset_ptr
+ *    If marker contains SKIPFLAG, then the offset_ptr is advanced
+ *   by RUNLEN * sizeof(WORD).
+ *
+ * If chunk type is 0 then body phase is complete.
+ *
+ * There can be one or more chunks with type XC_SAVE_ID_COMPRESSED_DATA,
+ * containing compressed pages. The compressed chunks are collated to form
+ * one single compressed chunk for the entire iteration. The number of pages
+ * present in this final compressed chunk will be equal to the total number
+ * of valid PFNs specified by the +ve chunks.
+ *
+ * At the sender side, compressed pages are inserted into the output stream
+ * in the same order as they would have been if compression logic was absent.
+ *
+ * Until last iteration, the BODY is sent in Format A, to maintain live
+ * migration compatibility with receivers of older Xen versions.
+ * At the last iteration, if Remus compression was enabled, the sender sends
+ * a trigger, XC_SAVE_ID_ENABLE_COMPRESSION to tell the receiver to parse the
+ * BODY in Format B from the next iteration onwards.
+ *
+ * An example sequence of chunks received in Format B:
+ *     +16                              +ve chunk
+ *     unsigned long[16]                PFN array
+ *     +100                             +ve chunk
+ *     unsigned long[100]               PFN array
+ *     +50                              +ve chunk
+ *     unsigned long[50]                PFN array
+ *
+ *     XC_SAVE_ID_COMPRESSED_DATA       TAG
+ *       N                              Length of compressed data
+ *       N bytes of DATA                Decompresses to 166 pages
+ *
+ *     XC_SAVE_ID_*                     other xc save chunks
+ *     0                                END BODY TAG
+ *
+ * Corner case with checkpoint compression:
+ *     At sender side, after pausing the domain, dirty pages are usually
+ *   copied out to a temporary buffer. After the domain is resumed,
+ *   compression is done and the compressed chunk(s) are sent, followed by
+ *   other XC_SAVE_ID_* chunks.
+ *     If the temporary buffer gets full while scanning for dirty pages,
+ *   the sender stops buffering of dirty pages, compresses the temporary
+ *   buffer and sends the compressed data with XC_SAVE_ID_COMPRESSED_DATA.
+ *   The sender then resumes the buffering of dirty pages and continues
+ *   scanning for the dirty pages.
+ *     For e.g., assume that the temporary buffer can hold 4096 pages and
+ *   there are 5000 dirty pages. The following is the sequence of chunks
+ *   that the receiver will see:
+ *
+ *     +1024                       +ve chunk
+ *     unsigned long[1024]         PFN array
+ *     +1024                       +ve chunk
+ *     unsigned long[1024]         PFN array
+ *     +1024                       +ve chunk
+ *     unsigned long[1024]         PFN array
+ *     +1024                       +ve chunk
+ *     unsigned long[1024]         PFN array
+ *
+ *     XC_SAVE_ID_COMPRESSED_DATA  TAG
+ *      N                          Length of compressed data
+ *      N bytes of DATA            Decompresses to 4096 pages
+ *
+ *     +4                          +ve chunk
+ *     unsigned long[4]            PFN array
+ *
+ *     XC_SAVE_ID_COMPRESSED_DATA  TAG
+ *      M                          Length of compressed data
+ *      M bytes of DATA            Decompresses to 4 pages
+ *
+ *     XC_SAVE_ID_*                other xc save chunks
+ *     0                           END BODY TAG
+ *
+ *     In other words, XC_SAVE_ID_COMPRESSED_DATA can be interleaved with
+ *   +ve chunks arbitrarily. But at the receiver end, the following condition
+ *   always holds true until the end of BODY PHASE:
+ *    num(PFN entries +ve chunks) >= num(pages received in compressed form)
  *
  * TAIL PHASE
  * ----------
@@ -135,6 +251,8 @@
 #define XC_SAVE_ID_LAST_CHECKPOINT    -9 /* Commit to restoring after completion of current iteration. */
 #define XC_SAVE_ID_HVM_ACPI_IOPORTS_LOCATION -10
 #define XC_SAVE_ID_HVM_VIRIDIAN       -11
+#define XC_SAVE_ID_COMPRESSED_DATA    -12 /* Marker to indicate arrival of compressed data */
+#define XC_SAVE_ID_ENABLE_COMPRESSION -13 /* Marker to enable compression logic at receiver side */
 
 /*
 ** We process save/restore/migrate in batches of pages; the below
