@@ -263,7 +263,8 @@ scheduling by the Xen hypervisor.
 
 =item B<s - shutdown>
 
-FIXME: Why would you ever see this state?
+The guest OS has shut down (SCHEDOP_shutdown has been called) but the
+domain is not dying yet.
 
 =item B<c - crashed>
 
@@ -275,8 +276,6 @@ restart on crash.  See L<xl.cfg(5)> for more info.
 
 The domain is in process of dying, but hasn't completely shutdown or
 crashed.
-
-FIXME: Is this right?
 
 =back
 
