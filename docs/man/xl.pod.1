@@ -716,8 +716,8 @@ Splits up the machine into one cpu-pool per numa node.
 =head1 VIRTUAL DEVICE COMMANDS
 
 Most virtual devices can be added and removed while guests are
-running.  The effect to the guest OS is much the same as any hotplug
-event.
+running, assuming that the necessary support exists in the guest.  The
+effect to the guest OS is much the same as any hotplug event.
 
 =head2 BLOCK DEVICES
 
@@ -739,7 +739,8 @@ The domain id of the guest domain that the device will be attached to.
 =item I<disc-spec-component>
 
 A disc specification in the same format used for the B<disk> variable in
-the domain config file. See F<xl-disk-configuration>.
+the domain config file. See
+L<http://xenbits.xen.org/docs/unstable/misc/xl-disk-configuration.txt>.
 
 =back
 
@@ -794,8 +795,9 @@ I<VirtualDevice> is the cdrom device in the guest to eject.
 
 Creates a new network device in the domain specified by I<domain-id>.
 I<network-device> describes the device to attach, using the same format as the
-B<vif> string in the domain config file. See L<xl.cfg(5)> for the
-description.
+B<vif> string in the domain config file. See L<xl.cfg> and
+L<http://xenbits.xen.org/docs/unstable/misc/xl-network-configuration.html>
+for more informations.
 
 =item B<network-detach> I<domain-id> I<devid|mac>
 
@@ -917,7 +919,14 @@ Xen Flask security module.
 
 =head1 SEE ALSO
 
-L<xl.cfg(5)>, L<xlcpupool.cfg(5)>, B<xentop(1)>
+The following man pages:
+
+L<xl.cfg>(5), L<xlcpupool.cfg>(5), B<xentop>(1)
+
+And the following documents on the xen.org website:
+
+L<http://xenbits.xen.org/docs/unstable/misc/xl-network-configuration.html>
+L<http://xenbits.xen.org/docs/unstable/misc/xl-disk-configuration.txt>
 
 =head1 AUTHOR
 
