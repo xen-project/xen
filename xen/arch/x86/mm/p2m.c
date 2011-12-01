@@ -974,14 +974,21 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
  * mfn if populate was called for  gfn which was nominated but not evicted. In
  * this case only the p2mt needs to be forwarded.
  */
-int p2m_mem_paging_prep(struct domain *d, unsigned long gfn)
+int p2m_mem_paging_prep(struct domain *d, unsigned long gfn, uint64_t buffer)
 {
     struct page_info *page;
     p2m_type_t p2mt;
     p2m_access_t a;
     mfn_t mfn;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
-    int ret;
+    int ret, page_extant = 1;
+    const void *user_ptr = (const void *) buffer;
+
+    if ( user_ptr )
+        /* Sanity check the buffer and bail out early if trouble */
+        if ( (buffer & (PAGE_SIZE - 1)) || 
+             (!access_ok(user_ptr, PAGE_SIZE)) )
+            return -EINVAL;
 
     p2m_lock(p2m);
 
@@ -1001,6 +1008,27 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn)
         if ( unlikely(page == NULL) )
             goto out;
         mfn = page_to_mfn(page);
+        page_extant = 0;
+    }
+
+    /* If we were given a buffer, now is the time to use it */
+    if ( !page_extant && user_ptr )
+    {
+        void *guest_map;
+        int rc;
+
+        ASSERT( mfn_valid(mfn) );
+        guest_map = map_domain_page(mfn_x(mfn));
+        rc = copy_from_user(guest_map, user_ptr, PAGE_SIZE);
+        unmap_domain_page(guest_map);
+        if ( rc )
+        {
+            gdprintk(XENLOG_ERR, "Failed to load paging-in gfn %lx domain %u "
+                                 "bytes left %d\n", gfn, d->domain_id, rc);
+            ret = -EFAULT;
+            put_page(page); /* Don't leak pages */
+            goto out;            
+        }
     }
 
     /* Fix p2m mapping */

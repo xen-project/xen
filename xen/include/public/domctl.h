@@ -742,8 +742,12 @@ struct xen_domctl_mem_event_op {
     uint32_t       op;           /* XEN_DOMCTL_MEM_EVENT_OP_*_* */
     uint32_t       mode;         /* XEN_DOMCTL_MEM_EVENT_OP_* */
 
-    /* OP_ENABLE */
-    uint64_aligned_t shared_addr;  /* IN:  Virtual address of shared page */
+    union {
+        /* OP_ENABLE IN:  Virtual address of shared page */
+        uint64_aligned_t shared_addr;  
+        /* PAGING_PREP IN: buffer to immediately fill page in */
+        uint64_aligned_t buffer;
+    } u;
     uint64_aligned_t ring_addr;    /* IN:  Virtual address of ring page */
 
     /* Other OPs */

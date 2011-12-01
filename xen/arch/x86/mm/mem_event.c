@@ -45,7 +45,7 @@ static int mem_event_enable(struct domain *d,
     struct domain *dom_mem_event = current->domain;
     struct vcpu *v = current;
     unsigned long ring_addr = mec->ring_addr;
-    unsigned long shared_addr = mec->shared_addr;
+    unsigned long shared_addr = mec->u.shared_addr;
     l1_pgentry_t l1e;
     unsigned long shared_gfn = 0, ring_gfn = 0; /* gcc ... */
     p2m_type_t p2mt;

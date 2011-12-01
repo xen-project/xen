@@ -479,7 +479,7 @@ void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn);
 /* Start populating a paged out frame */
 void p2m_mem_paging_populate(struct domain *d, unsigned long gfn);
 /* Prepare the p2m for paging a frame in */
-int p2m_mem_paging_prep(struct domain *d, unsigned long gfn);
+int p2m_mem_paging_prep(struct domain *d, unsigned long gfn, uint64_t buffer);
 /* Resume normal operation (in case a domain was paused) */
 void p2m_mem_paging_resume(struct domain *d);
 #else

@@ -47,7 +47,7 @@ int mem_paging_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
     case XEN_DOMCTL_MEM_EVENT_OP_PAGING_PREP:
     {
         unsigned long gfn = mec->gfn;
-        return p2m_mem_paging_prep(d, gfn);
+        return p2m_mem_paging_prep(d, gfn, mec->u.buffer);
     }
     break;
 
