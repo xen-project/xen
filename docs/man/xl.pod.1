@@ -32,18 +32,34 @@ each of those subcommands.
 
 =head1 NOTES
 
+=over 4
+
+=item start the script B</etc/init.d/xencommons> at boot time
+
 Most B<xl> operations rely upon B<xenstored> and B<xenconsoled>: make
 sure you start the script B</etc/init.d/xencommons> at boot time to
 initialize all the daemons needed by B<xl>.
+
+=item setup a B<xenbr0> bridge in dom0
 
 In the most common network configuration, you need to setup a bridge in dom0
 named B<xenbr0> in order to have a working network in the guest domains.
 Please refer to the documentation of your Linux distribution to know how to
 setup the bridge.
 
+=item B<autoballoon>
+
+If you specify the amount of memory dom0 has, passing B<dom0_mem> to
+Xen, it is highly reccomended to disable B<autoballoon>. Edit
+B</etc/xen/xl.conf> and set it to 0.
+
+=item run xl as B<root>
+
 Most B<xl> commands require root privileges to run due to the
 communications channels used to talk to the hypervisor.  Running as
 non root will return an error.
+
+=back
 
 =head1 GLOBAL OPTIONS
 
