@@ -408,8 +408,10 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
         }
     }
     if (info->saved_state) {
-        flexarray_append(dm_args, "-loadvm");
-        flexarray_append(dm_args, info->saved_state);
+        /* This file descriptor is meant to be used by QEMU */
+        int migration_fd = open(info->saved_state, O_RDONLY);
+        flexarray_append(dm_args, "-incoming");
+        flexarray_append(dm_args, libxl__sprintf(gc, "fd:%d", migration_fd));
     }
     for (i = 0; info->extra && info->extra[i] != NULL; i++)
         flexarray_append(dm_args, info->extra[i]);

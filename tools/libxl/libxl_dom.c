@@ -613,9 +613,31 @@ int libxl__domain_save_device_model(libxl__gc *gc, uint32_t domid, int fd)
     struct stat st;
     uint32_t qemu_state_len;
 
-    LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Saving device model state to %s", filename);
-    libxl__xs_write(gc, XBT_NULL, libxl__sprintf(gc, "/local/domain/0/device-model/%d/command", domid), "save");
-    libxl__wait_for_device_model(gc, domid, "paused", NULL, NULL, NULL);
+    switch (libxl__device_model_version_running(gc, domid)) {
+    case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL: {
+        char *path = NULL;
+        LIBXL__LOG(ctx, LIBXL__LOG_DEBUG,
+                   "Saving device model state to %s", filename);
+        path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/command",
+                              domid);
+        libxl__xs_write(gc, XBT_NULL, path, "save");
+        libxl__wait_for_device_model(gc, domid, "paused", NULL, NULL, NULL);
+        break;
+    }
+    case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
+        fd2 = open(filename, O_WRONLY | O_CREAT | O_TRUNC);
+        if (fd2 < 0) {
+            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                             "Unable to create a QEMU save file\n");
+            return ERROR_FAIL;
+        }
+        /* Save DM state into fd2 */
+        if (libxl__qmp_migrate(gc, domid, fd2))
+            return ERROR_FAIL;
+        break;
+    default:
+        return ERROR_INVAL;
+    }
 
     if (stat(filename, &st) < 0)
     {
