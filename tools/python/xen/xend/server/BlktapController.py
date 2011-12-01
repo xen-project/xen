@@ -249,11 +249,12 @@ class TapdiskController(object):
         _list = TapdiskController.exc('list')
         if not _list: return []
 
-        for line in _list.split('\n'):
+        for line in _list.splitlines():
             tapdisk = TapdiskController.Tapdisk()
 
-            for pair in line.split():
-                key, value = pair.split('=')
+            # Since 'tap-ctl list' does not escape blanks in the path, hard-code the current format using 4 pairs to prevent splitting the path
+            for pair in line.split(None, 4):
+                key, value = pair.split('=', 1)
                 if key == 'pid':
                     tapdisk.pid = value
                 elif key == 'minor':
@@ -264,7 +265,7 @@ class TapdiskController(object):
                 elif key == 'state':
                     tapdisk.state = value
                 elif key == 'args' and value.find(':') != -1:
-                    tapdisk.dtype, tapdisk.image = value.split(':')
+                    tapdisk.dtype, tapdisk.image = value.split(':', 1)
 
             tapdisks.append(tapdisk)
 
