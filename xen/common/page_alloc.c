@@ -547,10 +547,6 @@ static void free_heap_pages(
 
     for ( i = 0; i < (1 << order); i++ )
     {
-        /* This page is not a guest frame any more. */
-        page_set_owner(&pg[i], NULL); /* set_gpfn_from_mfn snoops pg owner */
-        set_gpfn_from_mfn(mfn + i, INVALID_M2P_ENTRY);
-
         /*
          * Cannot assume that count_info == 0, as there are some corner cases
          * where it isn't the case and yet it isn't a bug:
@@ -574,6 +570,10 @@ static void free_heap_pages(
         pg[i].u.free.need_tlbflush = (page_get_owner(&pg[i]) != NULL);
         if ( pg[i].u.free.need_tlbflush )
             pg[i].tlbflush_timestamp = tlbflush_current_time();
+
+        /* This page is not a guest frame any more. */
+        page_set_owner(&pg[i], NULL); /* set_gpfn_from_mfn snoops pg owner */
+        set_gpfn_from_mfn(mfn + i, INVALID_M2P_ENTRY);
     }
 
     avail[node][zone] += 1 << order;
