@@ -1058,6 +1058,9 @@ static bool_t vcpu_has(
     return rc == X86EMUL_OKAY;
 }
 
+#define vcpu_has_lzcnt() vcpu_has(0x80000001, ECX,  5, ctxt, ops)
+#define vcpu_has_bmi1()  vcpu_has(0x00000007, EBX,  3, ctxt, ops)
+
 #define vcpu_must_have(leaf, reg, bit) \
     generate_exception_if(!vcpu_has(leaf, reg, bit, ctxt, ops), EXC_UD, -1)
 #define vcpu_must_have_mmx()  vcpu_must_have(0x00000001, EDX, 23)
@@ -4357,13 +4360,24 @@ x86_emulate(
         dst.val   = (uint8_t)src.val;
         break;
 
-    case 0xbc: /* bsf */ {
-        int zf;
+    case 0xbc: /* bsf or tzcnt */ {
+        bool_t zf;
         asm ( "bsf %2,%0; setz %b1"
               : "=r" (dst.val), "=q" (zf)
-              : "r" (src.val), "1" (0) );
+              : "r" (src.val) );
         _regs.eflags &= ~EFLG_ZF;
-        if ( zf )
+        if ( (rep_prefix == REPE_PREFIX) && vcpu_has_bmi1() )
+        {
+            _regs.eflags &= ~EFLG_CF;
+            if ( zf )
+            {
+                _regs.eflags |= EFLG_CF;
+                dst.val = op_bytes * 8;
+            }
+            else if ( !dst.val )
+                _regs.eflags |= EFLG_ZF;
+        }
+        else if ( zf )
         {
             _regs.eflags |= EFLG_ZF;
             dst.type = OP_NONE;
@@ -4371,13 +4385,28 @@ x86_emulate(
         break;
     }
 
-    case 0xbd: /* bsr */ {
-        int zf;
+    case 0xbd: /* bsr or lzcnt */ {
+        bool_t zf;
         asm ( "bsr %2,%0; setz %b1"
               : "=r" (dst.val), "=q" (zf)
-              : "r" (src.val), "1" (0) );
+              : "r" (src.val) );
         _regs.eflags &= ~EFLG_ZF;
-        if ( zf )
+        if ( (rep_prefix == REPE_PREFIX) && vcpu_has_lzcnt() )
+        {
+            _regs.eflags &= ~EFLG_CF;
+            if ( zf )
+            {
+                _regs.eflags |= EFLG_CF;
+                dst.val = op_bytes * 8;
+            }
+            else
+            {
+                dst.val = op_bytes * 8 - 1 - dst.val;
+                if ( !dst.val )
+                    _regs.eflags |= EFLG_ZF;
+            }
+        }
+        else if ( zf )
         {
             _regs.eflags |= EFLG_ZF;
             dst.type = OP_NONE;
