@@ -184,7 +184,8 @@ static int vmx_init_vmcs_config(void)
                SECONDARY_EXEC_WBINVD_EXITING |
                SECONDARY_EXEC_ENABLE_EPT |
                SECONDARY_EXEC_ENABLE_RDTSCP |
-               SECONDARY_EXEC_PAUSE_LOOP_EXITING);
+               SECONDARY_EXEC_PAUSE_LOOP_EXITING |
+               SECONDARY_EXEC_ENABLE_INVPCID);
         if ( opt_vpid_enabled )
             opt |= SECONDARY_EXEC_ENABLE_VPID;
         if ( opt_unrestricted_guest_enabled )
@@ -732,7 +733,8 @@ static int construct_vmcs(struct vcpu *v)
     {
         v->arch.hvm_vmx.secondary_exec_control &= 
             ~(SECONDARY_EXEC_ENABLE_EPT | 
-              SECONDARY_EXEC_UNRESTRICTED_GUEST);
+              SECONDARY_EXEC_UNRESTRICTED_GUEST |
+              SECONDARY_EXEC_ENABLE_INVPCID);
         vmexit_ctl &= ~(VM_EXIT_SAVE_GUEST_PAT |
                         VM_EXIT_LOAD_HOST_PAT);
         vmentry_ctl &= ~VM_ENTRY_LOAD_GUEST_PAT;

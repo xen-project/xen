@@ -224,6 +224,8 @@
 
 #define cpu_has_x2apic          boot_cpu_has(X86_FEATURE_X2APIC)
 
+#define cpu_has_pcid            boot_cpu_has(X86_FEATURE_PCID)
+
 #define cpu_has_xsave           boot_cpu_has(X86_FEATURE_XSAVE)
 #define cpu_has_avx             boot_cpu_has(X86_FEATURE_AVX)
 #define cpu_has_lwp             boot_cpu_has(X86_FEATURE_LWP)

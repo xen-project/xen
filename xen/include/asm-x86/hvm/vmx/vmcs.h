@@ -184,6 +184,7 @@ extern u32 vmx_vmentry_control;
 #define SECONDARY_EXEC_WBINVD_EXITING           0x00000040
 #define SECONDARY_EXEC_UNRESTRICTED_GUEST       0x00000080
 #define SECONDARY_EXEC_PAUSE_LOOP_EXITING       0x00000400
+#define SECONDARY_EXEC_ENABLE_INVPCID           0x00001000
 extern u32 vmx_secondary_exec_control;
 
 extern bool_t cpu_has_vmx_ins_outs_instr_info;

@@ -129,6 +129,7 @@ void vmx_update_cpu_exec_control(struct vcpu *v);
 #define EXIT_REASON_INVVPID             53
 #define EXIT_REASON_WBINVD              54
 #define EXIT_REASON_XSETBV              55
+#define EXIT_REASON_INVPCID             58
 
 /*
  * Interruption-information format

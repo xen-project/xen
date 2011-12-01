@@ -1007,7 +1007,7 @@ static void vmx_load_pdptrs(struct vcpu *v)
     if ( !hvm_pae_enabled(v) || (v->arch.hvm_vcpu.guest_efer & EFER_LMA) )
         return;
 
-    if ( cr3 & 0x1fUL )
+    if ( (cr3 & 0x1fUL) && !hvm_pcid_enabled(v) )
         goto crash;
 
     mfn = mfn_x(get_gfn(v->domain, cr3 >> PAGE_SHIFT, &p2mt));
@@ -2704,6 +2704,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     case EXIT_REASON_ACCESS_GDTR_OR_IDTR:
     case EXIT_REASON_ACCESS_LDTR_OR_TR:
     case EXIT_REASON_VMX_PREEMPTION_TIMER_EXPIRED:
+    case EXIT_REASON_INVPCID:
     /* fall through */
     default:
     exit_and_crash:

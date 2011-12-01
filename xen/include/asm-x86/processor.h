@@ -84,6 +84,7 @@
 #define X86_CR4_VMXE		0x2000  /* enable VMX */
 #define X86_CR4_SMXE		0x4000  /* enable SMX */
 #define X86_CR4_FSGSBASE	0x10000 /* enable {rd,wr}{fs,gs}base */
+#define X86_CR4_PCIDE		0x20000 /* enable PCID */
 #define X86_CR4_OSXSAVE	0x40000 /* enable XSAVE/XRSTOR */
 #define X86_CR4_SMEP		0x100000/* enable SMEP */
 

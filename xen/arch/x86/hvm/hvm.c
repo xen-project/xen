@@ -1582,6 +1582,13 @@ int hvm_set_cr0(unsigned long value)
     }
     else if ( !(value & X86_CR0_PG) && (old_value & X86_CR0_PG) )
     {
+        if ( hvm_pcid_enabled(v) )
+        {
+            HVM_DBG_LOG(DBG_LEVEL_1, "Guest attempts to clear CR0.PG "
+                        "while CR4.PCIDE=1");
+            goto gpf;
+        }
+
         /* When CR0.PG is cleared, LMA is cleared immediately. */
         if ( hvm_long_mode_enabled(v) )
         {
@@ -1700,12 +1707,27 @@ int hvm_set_cr4(unsigned long value)
     }
 
     old_cr = v->arch.hvm_vcpu.guest_cr[4];
+
+    if ( (value & X86_CR4_PCIDE) && !(old_cr & X86_CR4_PCIDE) &&
+         (!hvm_long_mode_enabled(v) ||
+          (v->arch.hvm_vcpu.guest_cr[3] & 0xfff)) )
+    {
+        HVM_DBG_LOG(DBG_LEVEL_1, "Guest attempts to change CR4.PCIDE from "
+                    "0 to 1 while either EFER.LMA=0 or CR3[11:0]!=000H");
+        goto gpf;
+    }
+
     v->arch.hvm_vcpu.guest_cr[4] = value;
     hvm_update_guest_cr(v, 4);
 
-    /* Modifying CR4.{PSE,PAE,PGE,SMEP} invalidates all TLB entries. */
-    if ( (old_cr ^ value) & (X86_CR4_PSE | X86_CR4_PGE |
-                             X86_CR4_PAE | X86_CR4_SMEP) ) {
+    /*
+     * Modifying CR4.{PSE,PAE,PGE,SMEP}, or clearing CR4.PCIDE
+     * invalidate all TLB entries.
+     */
+    if ( ((old_cr ^ value) &
+          (X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE | X86_CR4_SMEP)) ||
+         (!(value & X86_CR4_PCIDE) && (old_cr & X86_CR4_PCIDE)) )
+    {
         if ( !nestedhvm_vmswitch_in_progress(v) && nestedhvm_vcpu_in_guestmode(v) )
             paging_update_nestedmode(v);
         else
@@ -2465,6 +2487,10 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
             *ecx |= (v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_OSXSAVE) ?
                      cpufeat_mask(X86_FEATURE_OSXSAVE) : 0;
 
+        /* Don't expose PCID to non-hap hvm. */
+        if ( !hap_enabled(d) )
+            *ecx &= ~cpufeat_mask(X86_FEATURE_PCID);
+
         /* Only provide PSE36 when guest runs in 32bit PAE or in long mode */
         if ( !(hvm_pae_enabled(v) || hvm_long_mode_enabled(v)) )
             *edx &= ~cpufeat_mask(X86_FEATURE_PSE36);
@@ -2472,6 +2498,10 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
     case 0x7:
         if ( (count == 0) && !cpu_has_smep )
             *ebx &= ~cpufeat_mask(X86_FEATURE_SMEP);
+
+        /* Don't expose INVPCID to non-hap hvm. */
+        if ( (count == 0) && !hap_enabled(d) )
+            *ebx &= ~cpufeat_mask(X86_FEATURE_INVPCID);
         break;
     case 0xb:
         /* Fix the x2APIC identifier. */
