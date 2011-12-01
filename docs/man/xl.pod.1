@@ -68,6 +68,11 @@ previously, most commands take I<domain-id> as the first parameter.
 
 =over 4
 
+=item B<button-press> I<domain-id> I<button>
+
+Indicate an ACPI button press to the domain. I<button> is may be 'power' or
+'sleep'.
+
 =item B<create> [I<configfile>] [I<OPTIONS>]
 
 The create subcommand takes a config file as first argument: see
@@ -155,20 +160,6 @@ Connect to console number I<NUM>. Console numbers start from 0.
 
 =back
 
-=item B<vncviewer> [I<OPTIONS>] I<domain-id>
-
-Attach to domain's VNC server, forking a vncviewer process.
-
-B<OPTIONS>
-
-=over 4
-
-=item I<--autopass>
-
-Pass VNC password to vncviewer via stdin.
-
-=back
-
 =item B<destroy> I<domain-id>
 
 Immediately terminate the domain I<domain-id>.  This doesn't give the
@@ -194,6 +185,10 @@ Dumps the virtual machine's memory for the specified domain to the
 I<filename> specified, without pausing the domain.  The dump file will
 be written to a distribution specific directory for dump files.  Such
 as: /var/lib/xen/dump or /var/xen/dump.
+
+=item B<getenforce>
+
+Returns the current enforcing mode of the Flask Xen security module.
 
 =item B<help> [I<--long>]
 
@@ -298,6 +293,10 @@ less utilized than a high CPU workload.  Consider yourself warned.
 
 =back
 
+=item B<loadpolicy> I<policyfile>
+
+Loads a new policy int the Flask Xen security module.
+
 =item B<mem-max> I<domain-id> I<mem>
 
 Specify the maximum amount of memory the domain is able to use, appending 't'
@@ -386,6 +385,10 @@ Enable debug messages.
 
 =back
 
+=item B<setenforce> I<1|0|Enforcing|Permissive>
+
+Sets the current enforcing mode of the Flask Xen security module
+
 =item B<save> [I<OPTIONS>] I<domain-id> I<CheckpointFile> [I<ConfigFile>]
 
 Saves a running domain to a state file so that it can be restored
@@ -394,7 +397,6 @@ system, unless the -c option is used.
 B<xl restore> restores from this checkpoint file.
 Passing a config file argument allows the user to manually select the VM config
 file used to create the domain.
-
 
 =over 4
 
@@ -432,6 +434,11 @@ Wait for the domain to complete shutdown before returning.
 Send a I<Magic System Request> signal to the domain.  For more
 information on available magic sys req operations, see sysrq.txt in
 your Linux Kernel sources.
+
+=item B<trigger> I<domain-id> I<nmi|reset|init|power|sleep> [I<VCPU>]
+
+Send a trigger to a domain, where the trigger can be: nmi, reset, init, power
+or sleep.  Optionally a specific vcpu number can be passed as an argument.
 
 =item B<unpause> I<domain-id>
 
@@ -472,27 +479,19 @@ different run state is appropriate.  Pinning can be used to restrict
 this, by ensuring certain VCPUs can only run on certain physical
 CPUs.
 
-=item B<button-press> I<domain-id> I<button>
+=item B<vncviewer> [I<OPTIONS>] I<domain-id>
 
-Indicate an ACPI button press to the domain. I<button> is may be 'power' or
-'sleep'.
+Attach to domain's VNC server, forking a vncviewer process.
 
-=item B<trigger> I<domain-id> I<nmi|reset|init|power|sleep> [I<VCPU>]
+B<OPTIONS>
 
-Send a trigger to a domain, where the trigger can be: nmi, reset, init, power
-or sleep.  Optionally a specific vcpu number can be passed as an argument.
+=over 4
 
-=item B<getenforce>
+=item I<--autopass>
 
-Returns the current enforcing mode of the Flask Xen security module.
+Pass VNC password to vncviewer via stdin.
 
-=item B<setenforce> I<1|0|Enforcing|Permissive>
-
-Sets the current enforcing mode of the Flask Xen security module
-
-=item B<loadpolicy> I<policyfile>
-
-Loads a new policy int the Flask Xen security module.
+=back
 
 =back
 
