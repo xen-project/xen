@@ -526,38 +526,40 @@ Clears Xen's message buffer.
 
 Print information about the Xen host in I<name : value> format.  When
 reporting a Xen bug, please provide this information as part of the
-bug report.
+bug report. See I<http://wiki.xen.org/xenwiki/ReportingBugs> on how to
+report Xen bugs.
 
-Sample output looks as follows (lines wrapped manually to make the man
-page more readable):
+Sample output looks as follows:
 
- host                   : talon
- release                : 2.6.12.6-xen0
- version                : #1 Mon Nov 14 14:26:26 EST 2005
- machine                : i686
- nr_cpus                : 2
+ host                   : scarlett
+ release                : 3.1.0-rc4+
+ version                : #1001 SMP Wed Oct 19 11:09:54 UTC 2011
+ machine                : x86_64
+ nr_cpus                : 4
  nr_nodes               : 1
- cores_per_socket       : 1
+ cores_per_socket       : 4
  threads_per_core       : 1
- cpu_mhz                : 696
- hw_caps                : 0383fbff:00000000:00000000:00000040
- total_memory           : 767
- free_memory            : 37
- xen_major              : 3
- xen_minor              : 0
- xen_extra              : -devel
- xen_caps               : xen-3.0-x86_32
+ cpu_mhz                : 2266
+ hw_caps                : bfebfbff:28100800:00000000:00003b40:009ce3bd:00000000:00000001:00000000
+ virt_caps              : hvm hvm_directio
+ total_memory           : 6141
+ free_memory            : 4274
+ free_cpus              : 0
+ xen_major              : 4
+ xen_minor              : 2
+ xen_extra              : -unstable
+ xen_caps               : xen-3.0-x86_64 xen-3.0-x86_32p hvm-3.0-x86_32 hvm-3.0-x86_32p hvm-3.0-x86_64 
  xen_scheduler          : credit
  xen_pagesize           : 4096
- platform_params        : virt_start=0xfc000000
- xen_changeset          : Mon Nov 14 18:13:38 2005 +0100 
-                          7793:090e44133d40
- cc_compiler            : gcc version 3.4.3 (Mandrakelinux 
-                          10.2 3.4.3-7mdk)
- cc_compile_by          : sdague
- cc_compile_domain      : (none)
- cc_compile_date        : Mon Nov 14 14:16:48 EST 2005
+ platform_params        : virt_start=0xffff800000000000
+ xen_changeset          : Wed Nov 02 17:09:09 2011 +0000 24066:54a5e994a241
+ xen_commandline        : com1=115200,8n1 guest_loglvl=all dom0_mem=750M console=com1 
+ cc_compiler            : gcc version 4.4.5 (Debian 4.4.5-8) 
+ cc_compile_by          : sstabellini
+ cc_compile_domain      : uk.xensource.com
+ cc_compile_date        : Tue Nov  8 12:03:05 UTC 2011
  xend_config_format     : 4
+
 
 B<FIELDS>
 
@@ -570,7 +572,8 @@ ones deserve explanation:
 
 A vector showing what hardware capabilities are supported by your
 processor.  This is equivalent to, though more cryptic, the flags
-field in /proc/cpuinfo on a normal Linux machine.
+field in /proc/cpuinfo on a normal Linux machine: they both derive from
+the feature bits returned by the cpuid command on x86 platforms.
 
 =item B<free_memory>
 
