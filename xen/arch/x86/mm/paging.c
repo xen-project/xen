@@ -595,7 +595,6 @@ void paging_log_dirty_init(struct domain *d,
     d->arch.paging.log_dirty.enable_log_dirty = enable_log_dirty;
     d->arch.paging.log_dirty.disable_log_dirty = disable_log_dirty;
     d->arch.paging.log_dirty.clean_dirty_bitmap = clean_dirty_bitmap;
-    d->arch.paging.log_dirty.top = _mfn(INVALID_MFN);
 }
 
 /* This function fress log dirty bitmap resources. */
@@ -616,6 +615,11 @@ int paging_domain_init(struct domain *d, unsigned int domcr_flags)
         return rc;
 
     mm_lock_init(&d->arch.paging.lock);
+
+    /* This must be initialized separately from the rest of the
+     * log-dirty init code as that can be called more than once and we
+     * don't want to leak any active log-dirty bitmaps */
+    d->arch.paging.log_dirty.top = _mfn(INVALID_MFN);
 
     /* The order of the *_init calls below is important, as the later
      * ones may rewrite some common fields.  Shadow pagetables are the
