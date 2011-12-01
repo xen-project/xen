@@ -45,6 +45,7 @@ static char *dom_path;
 static char watch_token[16];
 static char *filename;
 static int interrupted;
+static void *paging_buffer = NULL;
 
 static void unlink_pagefile(void)
 {
@@ -438,6 +439,13 @@ static xenpaging_t *xenpaging_init(int argc, char *argv[])
         goto err;
     }
 
+    paging_buffer = init_page();
+    if ( !paging_buffer )
+    {
+        ERROR("Creating page aligned load buffer");
+        goto err;
+    }
+
     return paging;
 
  err:
@@ -649,10 +657,20 @@ static int xenpaging_populate_page(xenpaging_t *paging,
     unsigned char oom = 0;
 
     DPRINTF("populate_page < gfn %"PRI_xen_pfn" pageslot %d\n", gfn, i);
+
+    /* Read page */
+    ret = read_page(fd, paging_buffer, i);
+    if ( ret != 0 )
+    {
+        ERROR("Error reading page");
+        goto out;
+    }
+
     do
     {
         /* Tell Xen to allocate a page for the domain */
-        ret = xc_mem_paging_prep(xch, paging->mem_event.domain_id, gfn);
+        ret = xc_mem_paging_load(xch, paging->mem_event.domain_id, gfn,
+                                    paging_buffer);
         if ( ret != 0 )
         {
             if ( errno == ENOMEM )
@@ -662,33 +680,14 @@ static int xenpaging_populate_page(xenpaging_t *paging,
                 sleep(1);
                 continue;
             }
-            PERROR("Error preparing %"PRI_xen_pfn" for page-in", gfn);
-            goto out_map;
+            PERROR("Error loading %"PRI_xen_pfn" during page-in", gfn);
+            goto out;
         }
     }
     while ( ret && !interrupted );
 
-    /* Map page */
-    ret = -EFAULT;
-    page = xc_map_foreign_pages(xch, paging->mem_event.domain_id,
-                                PROT_READ | PROT_WRITE, &gfn, 1);
-    if ( page == NULL )
-    {
-        PERROR("Error mapping page %"PRI_xen_pfn": page is null", gfn);
-        goto out_map;
-    }
-
-    /* Read page */
-    ret = read_page(fd, page, i);
-    if ( ret != 0 )
-    {
-        PERROR("Error reading page %"PRI_xen_pfn"", gfn);
-        goto out;
-    }
 
  out:
-    munmap(page, PAGE_SIZE);
- out_map:
     return ret;
 }
 
