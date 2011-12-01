@@ -10,7 +10,6 @@ use warnings;
 use Getopt::Long;
 use IO::File;
 use File::Basename;
-use List::MoreUtils qw/ uniq /;
 
 Getopt::Long::Configure('bundling');
 
@@ -99,6 +98,12 @@ sub read_index ($$) {
     }
 }
 
+sub uniq (@) {
+    my %h;
+    foreach (@_) { $h{$_} = 1; }
+    return keys %h;
+}
+    
 for (@docs) { s,^\Q$outdir\E/,, }
 
 @docs = grep { -e "$outdir/$_" && (make_linktext($_) ne "NO-INDEX") } @docs;
