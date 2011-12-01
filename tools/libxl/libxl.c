@@ -3330,6 +3330,19 @@ int libxl_cpupool_movedomain(libxl_ctx *ctx, uint32_t poolid, uint32_t domid)
     return 0;
 }
 
+int libxl_fd_set_cloexec(int fd)
+{
+    int flags = 0;
+
+    if ((flags = fcntl(fd, F_GETFD)) == -1) {
+        flags = 0;
+    }
+    if ((flags & FD_CLOEXEC)) {
+        return 0;
+    }
+    return fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
+}
+
 /*
  * Local variables:
  * mode: C

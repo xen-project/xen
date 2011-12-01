@@ -170,7 +170,8 @@ static int noop_switch_logdirty(int domid, unsigned enable, void *data)
 }
 
 int checkpoint_start(checkpoint_state* s, int fd,
-                    struct save_callbacks* callbacks)
+		     struct save_callbacks* callbacks,
+		     unsigned int remus_flags)
 {
     int hvm, rc;
     int flags = XCFLAGS_LIVE;
@@ -188,6 +189,8 @@ int checkpoint_start(checkpoint_state* s, int fd,
        if (switch_qemu_logdirty(s, 1))
            return -1;
     }
+    if (remus_flags & CHECKPOINT_FLAGS_COMPRESSION)
+      flags |= XCFLAGS_CHECKPOINT_COMPRESS;
 
     callbacks->switch_qemu_logdirty = noop_switch_logdirty;
 

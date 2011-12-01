@@ -306,19 +306,6 @@ _hidden int libxl__compare_macs(libxl_mac *a, libxl_mac *b)
     return 0;
 }
 
-int libxl__fd_set_cloexec(int fd)
-{
-    int flags = 0;
-
-    if ((flags = fcntl(fd, F_GETFD)) == -1) {
-        flags = 0;
-    }
-    if ((flags & FD_CLOEXEC)) {
-        return 0;
-    }
-    return fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
-}
-
 libxl_device_model_version libxl__device_model_version_running(libxl__gc *gc,
                                                                uint32_t domid)
 {

@@ -91,10 +91,9 @@ static void *linux_privcmd_alloc_hypercall_buffer(xc_interface *xch, xc_osdep_ha
 {
     size_t size = npages * XC_PAGE_SIZE;
     void *p;
-    int ret;
 
-    ret = posix_memalign(&p, XC_PAGE_SIZE, size);
-    if (ret != 0 || !p)
+    p = xc_memalign(xch, XC_PAGE_SIZE, size);
+    if (!p)
         return NULL;
 
     if ( mlock(p, size) < 0 )

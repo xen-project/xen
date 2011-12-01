@@ -20,11 +20,12 @@
 
 #include <xsm/xsm.h>
 #include <xen/multiboot.h>
+#include <asm/bitops.h>
 
 char *__initdata policy_buffer = NULL;
 u32 __initdata policy_size = 0;
 
-int xsm_policy_init(unsigned int *initrdidx, const multiboot_info_t *mbi,
+int xsm_policy_init(unsigned long *module_map, const multiboot_info_t *mbi,
                     void *(*bootstrap_map)(const module_t *))
 {
     int i;
@@ -35,10 +36,13 @@ int xsm_policy_init(unsigned int *initrdidx, const multiboot_info_t *mbi,
 
     /*
      * Try all modules and see whichever could be the binary policy.
-     * Adjust the initrdidx if module[1] is the binary policy.
+     * Adjust module_map for the module that is the binary policy.
      */
     for ( i = mbi->mods_count-1; i >= 1; i-- )
     {
+        if ( !test_bit(i, module_map) )
+            continue;
+
         _policy_start = bootstrap_map(mod + i);
         _policy_len   = mod[i].mod_end;
 
@@ -50,8 +54,7 @@ int xsm_policy_init(unsigned int *initrdidx, const multiboot_info_t *mbi,
             printk("Policy len  0x%lx, start at %p.\n",
                    _policy_len,_policy_start);
 
-            if ( i == 1 )
-                *initrdidx = (mbi->mods_count > 2) ? 2 : 0;
+            __clear_bit(i, module_map);
             break;
 
         }

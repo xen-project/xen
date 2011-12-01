@@ -1459,8 +1459,12 @@ static int create_domain(struct domain_create *dom_info)
         union { uint32_t u32; char b[4]; } u32buf;
         uint32_t badflags;
 
-        restore_fd = migrate_fd >= 0 ? migrate_fd :
-            open(restore_file, O_RDONLY);
+        if (migrate_fd >= 0) {
+            restore_fd = migrate_fd;
+        } else {
+            restore_fd = open(restore_file, O_RDONLY);
+            libxl_fd_set_cloexec(restore_fd);
+        }
 
         CHK_ERRNO( libxl_read_exactly(ctx, restore_fd, &hdr,
                    sizeof(hdr), restore_file, "header") );

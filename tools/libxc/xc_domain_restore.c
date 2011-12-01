@@ -43,6 +43,7 @@ struct restore_ctx {
     xen_pfn_t *p2m_batch; /* A table of P2M mappings in the current region.  */
     int completed; /* Set when a consistent image is available */
     int last_checkpoint; /* Set when we should commit to the current checkpoint when it completes. */
+    int compressing; /* Set when sender signals that pages would be sent compressed (for Remus) */
     struct domain_info_context dinfo;
 };
 
@@ -663,6 +664,10 @@ typedef struct {
     /* pages is of length nr_physpages, pfn_types is of length nr_pages */
     unsigned int nr_physpages, nr_pages;
 
+    /* checkpoint compression state */
+    int compressing;
+    unsigned long compbuf_pos, compbuf_size;
+
     /* Types of the pfns in the current region */
     unsigned long* pfn_types;
 
@@ -701,6 +706,7 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
 {
     int count, countpages, oldcount, i;
     void* ptmp;
+    unsigned long compbuf_size;
 
     if ( RDEXACT(fd, &count, sizeof(count)) )
     {
@@ -820,6 +826,40 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
         }
         return pagebuf_get_one(xch, ctx, buf, fd, dom);
 
+    case XC_SAVE_ID_ENABLE_COMPRESSION:
+        /* We cannot set compression flag directly in pagebuf structure,
+         * since this pagebuf still has uncompressed pages that are yet to
+         * be applied. We enable the compression field in pagebuf structure
+         * after receiving the first tailbuf.
+         */
+        ctx->compressing = 1;
+        // DPRINTF("compression flag received");
+        return pagebuf_get_one(xch, ctx, buf, fd, dom);
+
+    case XC_SAVE_ID_COMPRESSED_DATA:
+
+        /* read the length of compressed chunk coming in */
+        if ( RDEXACT(fd, &compbuf_size, sizeof(unsigned long)) )
+        {
+            PERROR("Error when reading compbuf_size");
+            return -1;
+        }
+        if (!compbuf_size) return 1;
+
+        buf->compbuf_size += compbuf_size;
+        if (!(ptmp = realloc(buf->pages, buf->compbuf_size))) {
+            ERROR("Could not (re)allocate compression buffer");
+            return -1;
+        }
+        buf->pages = ptmp;
+
+        if ( RDEXACT(fd, buf->pages + (buf->compbuf_size - compbuf_size),
+                     compbuf_size) ) {
+            PERROR("Error when reading compression buffer");
+            return -1;
+        }
+        return compbuf_size;
+
     default:
         if ( (count > MAX_BATCH_SIZE) || (count < 0) ) {
             ERROR("Max batch size exceeded (%d). Giving up.", count);
@@ -857,6 +897,13 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
     if (!countpages)
         return count;
 
+    /* If Remus Checkpoint Compression is turned on, we will only be
+     * receiving the pfn lists now. The compressed pages will come in later,
+     * following a <XC_SAVE_ID_COMPRESSED_DATA, compressedChunkSize> tuple.
+     */
+    if (buf->compressing)
+        return pagebuf_get_one(xch, ctx, buf, fd, dom);
+
     oldcount = buf->nr_physpages;
     buf->nr_physpages += countpages;
     if (!buf->pages) {
@@ -885,6 +932,7 @@ static int pagebuf_get(xc_interface *xch, struct restore_ctx *ctx,
     int rc;
 
     buf->nr_physpages = buf->nr_pages = 0;
+    buf->compbuf_pos = buf->compbuf_size = 0;
 
     do {
         rc = pagebuf_get_one(xch, ctx, buf, fd, dom);
@@ -1102,7 +1150,21 @@ static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
         /* In verify mode, we use a copy; otherwise we work in place */
         page = pagebuf->verify ? (void *)buf : (region_base + i*PAGE_SIZE);
 
-        memcpy(page, pagebuf->pages + (curpage + curbatch) * PAGE_SIZE, PAGE_SIZE);
+        /* Remus - page decompression */
+        if (pagebuf->compressing)
+        {
+            if (xc_compression_uncompress_page(xch, pagebuf->pages,
+                                               pagebuf->compbuf_size,
+                                               &pagebuf->compbuf_pos,
+                                               (char *)page))
+            {
+                ERROR("Failed to uncompress page (pfn=%lx)\n", pfn);
+                goto err_mapped;
+            }
+        }
+        else
+            memcpy(page, pagebuf->pages + (curpage + curbatch) * PAGE_SIZE,
+                   PAGE_SIZE);
 
         pagetype &= XEN_DOMCTL_PFINFO_LTABTYPE_MASK;
 
@@ -1364,6 +1426,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
 
         if ( !ctx->completed ) {
             pagebuf.nr_physpages = pagebuf.nr_pages = 0;
+            pagebuf.compbuf_pos = pagebuf.compbuf_size = 0;
             if ( pagebuf_get_one(xch, ctx, &pagebuf, io_fd, dom) < 0 ) {
                 PERROR("Error when reading batch");
                 goto out;
@@ -1406,6 +1469,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
         }
 
         pagebuf.nr_physpages = pagebuf.nr_pages = 0;
+        pagebuf.compbuf_pos = pagebuf.compbuf_size = 0;
 
         n += j; /* crude stats */
 
@@ -1449,6 +1513,13 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
          */
         if ( !ctx->last_checkpoint )
             fcntl(io_fd, F_SETFL, orig_io_fd_flags | O_NONBLOCK);
+
+        /*
+         * If sender had sent enable compression flag, switch to compressed
+         * checkpoints mode once the first checkpoint is received.
+         */
+        if (ctx->compressing)
+            pagebuf.compressing = 1;
     }
 
     if (pagebuf.viridian != 0)

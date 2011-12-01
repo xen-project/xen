@@ -43,7 +43,7 @@ static void __init do_xsm_initcalls(void)
     }
 }
 
-int __init xsm_init(unsigned int *initrdidx, const multiboot_info_t *mbi,
+int __init xsm_init(unsigned long *module_map, const multiboot_info_t *mbi,
                     void *(*bootstrap_map)(const module_t *))
 {
     int ret = 0;
@@ -52,7 +52,7 @@ int __init xsm_init(unsigned int *initrdidx, const multiboot_info_t *mbi,
 
     if ( XSM_MAGIC )
     {
-        ret = xsm_policy_init(initrdidx, mbi, bootstrap_map);
+        ret = xsm_policy_init(module_map, mbi, bootstrap_map);
         if ( ret )
         {
             bootstrap_map(NULL);

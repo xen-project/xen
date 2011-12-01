@@ -70,7 +70,7 @@ static int solaris_privcmd_close(xc_interface *xch, xc_osdep_handle h)
 
 static void *solaris_privcmd_alloc_hypercall_buffer(xc_interface *xch, xc_osdep_handle h, int npages)
 {
-    return memalign(XC_PAGE_SIZE, npages * XC_PAGE_SIZE);
+    return xc_memalign(xch, XC_PAGE_SIZE, npages * XC_PAGE_SIZE);
 }
 
 static void solaris_privcmd_free_hypercall_buffer(xc_interface *xch, xc_osdep_handle h, void *ptr, int npages)
@@ -312,6 +312,11 @@ static struct xc_osdep_ops solaris_evtchn_ops = {
 void discard_file_cache(xc_interface *xch, int fd, int flush) 
 {
     // TODO: Implement for Solaris!
+}
+
+void *xc_memalign(xc_interface *xch, size_t alignment, size_t size)
+{
+    return memalign(alignment, size);
 }
 
 static struct xc_osdep_ops *solaris_osdep_init(xc_interface *xch, enum xc_osdep_type type)

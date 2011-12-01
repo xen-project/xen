@@ -635,6 +635,9 @@ const char *libxl_lock_dir_path(void);
 const char *libxl_run_dir_path(void);
 const char *libxl_xenpaging_dir_path(void);
 
+/* misc */
+int libxl_fd_set_cloexec(int fd);
+
 #endif /* LIBXL_H */
 
 /*

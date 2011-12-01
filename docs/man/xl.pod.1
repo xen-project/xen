@@ -32,18 +32,50 @@ each of those subcommands.
 
 =head1 NOTES
 
+=over 4
+
+=item start the script B</etc/init.d/xencommons> at boot time
+
 Most B<xl> operations rely upon B<xenstored> and B<xenconsoled>: make
 sure you start the script B</etc/init.d/xencommons> at boot time to
 initialize all the daemons needed by B<xl>.
+
+=item setup a B<xenbr0> bridge in dom0
 
 In the most common network configuration, you need to setup a bridge in dom0
 named B<xenbr0> in order to have a working network in the guest domains.
 Please refer to the documentation of your Linux distribution to know how to
 setup the bridge.
 
+=item B<autoballoon>
+
+If you specify the amount of memory dom0 has, passing B<dom0_mem> to
+Xen, it is highly reccomended to disable B<autoballoon>. Edit
+B</etc/xen/xl.conf> and set it to 0.
+
+=item run xl as B<root>
+
 Most B<xl> commands require root privileges to run due to the
 communications channels used to talk to the hypervisor.  Running as
 non root will return an error.
+
+=back
+
+=head1 GLOBAL OPTIONS
+
+Some global options are always available:
+
+=over 4
+
+=item B<-v>
+
+Verbose.
+
+=item B<-N>
+
+Dry run: do not actually execute the command.
+
+=back
 
 =head1 DOMAIN SUBCOMMANDS
 
@@ -52,13 +84,19 @@ previously, most commands take I<domain-id> as the first parameter.
 
 =over 4
 
-=item B<create> [I<OPTIONS>] I<configfile>
+=item B<button-press> I<domain-id> I<button>
 
-The create subcommand requires a config file: see L<xl.cfg(5)> for
-full details of that file format and possible options.
+Indicate an ACPI button press to the domain. I<button> is may be 'power' or
+'sleep'. This command is only available for HVM domains.
 
-I<configfile> can either be an absolute path to a file, or a relative
-path to a file located in /etc/xen.
+=item B<create> [I<configfile>] [I<OPTIONS>]
+
+The create subcommand takes a config file as first argument: see
+L<xl.cfg> for full details of that file format and possible options.
+If I<configfile> is missing B<XL> creates the domain starting from the
+default value for every option.
+
+I<configfile> has to be an absolute path to a file.
 
 Create will return B<as soon> as the domain is started.  This B<does
 not> mean the guest OS in the domain has actually booted, or is
@@ -76,11 +114,6 @@ No console output.
 
 Use the given configuration file.
 
-=item B<-n>, B<--dryrun>
-
-Dry run - prints the resulting configuration in SXP but does not create
-the domain.
-
 =item B<-p>
 
 Leave the domain paused after it is created.
@@ -88,7 +121,15 @@ Leave the domain paused after it is created.
 =item B<-c>
 
 Attach console to the domain as soon as it has started.  This is
-useful for determining issues with crashing domains.
+useful for determining issues with crashing domains and just as a
+general convenience since you often want to watch the
+domain boot.
+
+=item B<key=value>
+
+It is possible to pass I<key=value> pairs on the command line to provide
+options as if they were written in the configuration file; these override
+whatever is in the I<configfile>.
 
 =back
 
@@ -105,7 +146,7 @@ soon as it is run.
 
 =back
 
-=item B<console> I<domain-id>
+=item B<console> [I<OPTIONS>] I<domain-id>
 
 Attach to domain I<domain-id>'s console.  If you've set up your domains to
 have a traditional log in console this will look much like a normal
@@ -113,17 +154,20 @@ text log in screen.
 
 Use the key combination Ctrl+] to detach the domain console.
 
-=item B<vncviewer> [I<OPTIONS>] I<domain-id>
-
-Attach to domain's VNC server, forking a vncviewer process.
-
 B<OPTIONS>
 
 =over 4
 
-=item I<--autopass>
+=item I<-t [pv|serial]>
 
-Pass VNC password to vncviewer via stdin.
+Connect to a PV console or connect to an emulated serial console.
+PV consoles are the only consoles available for PV domains while HVM
+domains can have both. If this option is not specified it defaults to
+emulated serial for HVM guests and PV console for PV guests.
+
+=item I<-n NUM>
+
+Connect to console number I<NUM>. Console numbers start from 0.
 
 =back
 
@@ -152,6 +196,10 @@ Dumps the virtual machine's memory for the specified domain to the
 I<filename> specified, without pausing the domain.  The dump file will
 be written to a distribution specific directory for dump files.  Such
 as: /var/lib/xen/dump or /var/xen/dump.
+
+=item B<getenforce>
+
+Returns the current enforcing mode of the Flask Xen security module.
 
 =item B<help> [I<--long>]
 
@@ -226,7 +274,8 @@ scheduling by the Xen hypervisor.
 
 =item B<s - shutdown>
 
-FIXME: Why would you ever see this state?
+The guest OS has shut down (SCHEDOP_shutdown has been called) but the
+domain is not dying yet.
 
 =item B<c - crashed>
 
@@ -238,8 +287,6 @@ restart on crash.  See L<xl.cfg(5)> for more info.
 
 The domain is in process of dying, but hasn't completely shutdown or
 crashed.
-
-FIXME: Is this right?
 
 =back
 
@@ -255,6 +302,10 @@ by domains is thus very suspect, as a high IO workload may show as
 less utilized than a high CPU workload.  Consider yourself warned.
 
 =back
+
+=item B<loadpolicy> I<policyfile>
+
+Loads a new policy int the Flask Xen security module.
 
 =item B<mem-max> I<domain-id> I<mem>
 
@@ -297,7 +348,7 @@ Use <sshcommand> instead of ssh.  String will be passed to sh. If empty, run
 =item B<-e>
 
 On the new host, do not wait in the background (on <host>) for the death of the
-domain.
+domain. See the corresponding option of the I<create> subcommand.
 
 =item B<-C> I<config>
 
@@ -317,6 +368,7 @@ Reboot a domain.  This acts just as if the domain had the B<reboot>
 command run from the console.  The command returns as soon as it has
 executed the reboot action, which may be significantly before the
 domain actually reboots.
+It requires PV drivers installed in your guest OS.
 
 The behavior of what happens to a domain when it reboots is set by the
 B<on_reboot> parameter of the domain configuration file when the
@@ -337,12 +389,17 @@ Do not unpause domain after restoring it.
 =item B<-e>
 
 Do not wait in the background for the death of the domain on the new host.
+See the corresponding option of the I<create> subcommand.
 
 =item B<-d>
 
 Enable debug messages.
 
 =back
+
+=item B<setenforce> I<1|0|Enforcing|Permissive>
+
+Sets the current enforcing mode of the Flask Xen security module
 
 =item B<save> [I<OPTIONS>] I<domain-id> I<CheckpointFile> [I<ConfigFile>]
 
@@ -352,7 +409,6 @@ system, unless the -c option is used.
 B<xl restore> restores from this checkpoint file.
 Passing a config file argument allows the user to manually select the VM config
 file used to create the domain.
-
 
 =over 4
 
@@ -370,6 +426,7 @@ to perform graceful shutdown, so there is no guarantee that it will
 succeed, and may take a variable length of time depending on what
 services must be shutdown in the domain.  The command returns
 immediately after signally the domain unless that B<-w> flag is used.
+For HVM domains it requires PV drivers to be installed in your guest OS.
 
 The behavior of what happens to a domain when it reboots is set by the
 B<on_shutdown> parameter of the domain configuration file when the
@@ -387,9 +444,17 @@ Wait for the domain to complete shutdown before returning.
 
 =item B<sysrq> I<domain-id> I<letter>
 
-Send a I<Magic System Request> signal to the domain.  For more
-information on available magic sys req operations, see sysrq.txt in
-your Linux Kernel sources.
+Send a <Magic System Request> to the domain, each type of request is
+represented by a different letter.
+It can be used to send SysRq requests to Linux guests, see sysrq.txt in
+your Linux Kernel sources for more information.
+It requires PV drivers to be installed in your guest OS.
+
+=item B<trigger> I<domain-id> I<nmi|reset|init|power|sleep> [I<VCPU>]
+
+Send a trigger to a domain, where the trigger can be: nmi, reset, init, power
+or sleep.  Optionally a specific vcpu number can be passed as an argument.
+This command is only available for HVM domains.
 
 =item B<unpause> I<domain-id>
 
@@ -410,10 +475,6 @@ Attempting to set the VCPUs to a number larger than the initially
 configured VCPU count is an error.  Trying to set VCPUs to < 1 will be
 quietly ignored.
 
-Because this operation requires cooperation from the domain operating
-system, there is no guarantee that it will succeed.  This command will
-not work with a full virt domain.
-
 =item B<vcpu-list> [I<domain-id>]
 
 Lists VCPU information for a specific domain.  If no domain is
@@ -430,27 +491,19 @@ different run state is appropriate.  Pinning can be used to restrict
 this, by ensuring certain VCPUs can only run on certain physical
 CPUs.
 
-=item B<button-press> I<domain-id> I<button>
+=item B<vncviewer> [I<OPTIONS>] I<domain-id>
 
-Indicate an ACPI button press to the domain. I<button> is may be 'power' or
-'sleep'.
+Attach to domain's VNC server, forking a vncviewer process.
 
-=item B<trigger> I<domain-id> I<nmi|reset|init|power|sleep> [I<VCPU>]
+B<OPTIONS>
 
-Send a trigger to a domain, where the trigger can be: nmi, reset, init, power
-or sleep.  Optionally a specific vcpu number can be passed as an argument.
+=over 4
 
-=item B<getenforce>
+=item I<--autopass>
 
-Returns the current enforcing mode of the Flask Xen security module.
+Pass VNC password to vncviewer via stdin.
 
-=item B<setenforce> I<1|0|Enforcing|Permissive>
-
-Sets the current enforcing mode of the Flask Xen security module
-
-=item B<loadpolicy> I<policyfile>
-
-Loads a new policy int the Flask Xen security module.
+=back
 
 =back
 
@@ -460,7 +513,8 @@ Loads a new policy int the Flask Xen security module.
 
 =item B<debug-keys> I<keys>
 
-Send debug I<keys> to Xen.
+Send debug I<keys> to Xen. It is the same as pressing the Xen
+"conswitch" (Ctrl-A by default) three times and then pressing "keys".
 
 =item B<dmesg> [B<-c>]
 
@@ -483,38 +537,40 @@ Clears Xen's message buffer.
 
 Print information about the Xen host in I<name : value> format.  When
 reporting a Xen bug, please provide this information as part of the
-bug report.
+bug report. See I<http://wiki.xen.org/xenwiki/ReportingBugs> on how to
+report Xen bugs.
 
-Sample output looks as follows (lines wrapped manually to make the man
-page more readable):
+Sample output looks as follows:
 
- host                   : talon
- release                : 2.6.12.6-xen0
- version                : #1 Mon Nov 14 14:26:26 EST 2005
- machine                : i686
- nr_cpus                : 2
+ host                   : scarlett
+ release                : 3.1.0-rc4+
+ version                : #1001 SMP Wed Oct 19 11:09:54 UTC 2011
+ machine                : x86_64
+ nr_cpus                : 4
  nr_nodes               : 1
- cores_per_socket       : 1
+ cores_per_socket       : 4
  threads_per_core       : 1
- cpu_mhz                : 696
- hw_caps                : 0383fbff:00000000:00000000:00000040
- total_memory           : 767
- free_memory            : 37
- xen_major              : 3
- xen_minor              : 0
- xen_extra              : -devel
- xen_caps               : xen-3.0-x86_32
+ cpu_mhz                : 2266
+ hw_caps                : bfebfbff:28100800:00000000:00003b40:009ce3bd:00000000:00000001:00000000
+ virt_caps              : hvm hvm_directio
+ total_memory           : 6141
+ free_memory            : 4274
+ free_cpus              : 0
+ xen_major              : 4
+ xen_minor              : 2
+ xen_extra              : -unstable
+ xen_caps               : xen-3.0-x86_64 xen-3.0-x86_32p hvm-3.0-x86_32 hvm-3.0-x86_32p hvm-3.0-x86_64 
  xen_scheduler          : credit
  xen_pagesize           : 4096
- platform_params        : virt_start=0xfc000000
- xen_changeset          : Mon Nov 14 18:13:38 2005 +0100 
-                          7793:090e44133d40
- cc_compiler            : gcc version 3.4.3 (Mandrakelinux 
-                          10.2 3.4.3-7mdk)
- cc_compile_by          : sdague
- cc_compile_domain      : (none)
- cc_compile_date        : Mon Nov 14 14:16:48 EST 2005
+ platform_params        : virt_start=0xffff800000000000
+ xen_changeset          : Wed Nov 02 17:09:09 2011 +0000 24066:54a5e994a241
+ xen_commandline        : com1=115200,8n1 guest_loglvl=all dom0_mem=750M console=com1 
+ cc_compiler            : gcc version 4.4.5 (Debian 4.4.5-8) 
+ cc_compile_by          : sstabellini
+ cc_compile_domain      : uk.xensource.com
+ cc_compile_date        : Tue Nov  8 12:03:05 UTC 2011
  xend_config_format     : 4
+
 
 B<FIELDS>
 
@@ -527,7 +583,8 @@ ones deserve explanation:
 
 A vector showing what hardware capabilities are supported by your
 processor.  This is equivalent to, though more cryptic, the flags
-field in /proc/cpuinfo on a normal Linux machine.
+field in /proc/cpuinfo on a normal Linux machine: they both derive from
+the feature bits returned by the cpuid command on x86 platforms.
 
 =item B<free_memory>
 
@@ -568,6 +625,9 @@ Prints the current uptime of the domains running.
 =item B<pci-list-assignable-devices>
 
 List all the assignable PCI devices.
+These are devices in the system which are configured to be
+available for passthrough and are bound to a suitable PCI
+backend driver in domain 0 rather than a real driver.
 
 =back
 
@@ -635,10 +695,6 @@ B<OPTIONS>
 
 Use the given configuration file.
 
-=item B<-n>, B<--dryrun>
-
-Dry run - prints the resulting configuration.
-
 =back
 
 =item B<cpupool-list> [I<-c|--cpus>] [I<cpu-pool>]
@@ -676,8 +732,8 @@ Splits up the machine into one cpu-pool per numa node.
 =head1 VIRTUAL DEVICE COMMANDS
 
 Most virtual devices can be added and removed while guests are
-running.  The effect to the guest OS is much the same as any hotplug
-event.
+running, assuming that the necessary support exists in the guest.  The
+effect to the guest OS is much the same as any hotplug event.
 
 =head2 BLOCK DEVICES
 
@@ -699,7 +755,8 @@ The domain id of the guest domain that the device will be attached to.
 =item I<disc-spec-component>
 
 A disc specification in the same format used for the B<disk> variable in
-the domain config file. See F<xl-disk-configuration>.
+the domain config file. See
+L<http://xenbits.xen.org/docs/unstable/misc/xl-disk-configuration.txt>.
 
 =back
 
@@ -754,8 +811,9 @@ I<VirtualDevice> is the cdrom device in the guest to eject.
 
 Creates a new network device in the domain specified by I<domain-id>.
 I<network-device> describes the device to attach, using the same format as the
-B<vif> string in the domain config file. See L<xl.cfg(5)> for the
-description.
+B<vif> string in the domain config file. See L<xl.cfg> and
+L<http://xenbits.xen.org/docs/unstable/misc/xl-network-configuration.html>
+for more informations.
 
 =item B<network-detach> I<domain-id> I<devid|mac>
 
@@ -793,17 +851,100 @@ List pass-through pci devices for a domain.
 
 =back
 
+=head2 TMEM
+
+=over 4
+
+=item B<tmem-list> I[<-l>] I<domain-id>
+
+List tmem pools. If I<-l> is specified, also list tmem stats.
+
+=item B<tmem-freeze> I<domain-id>
+
+Freeze tmem pools.
+
+=item B<tmem-destroy> I<domain-id>
+
+Destroy tmem pools.
+
+=item B<tmem-thaw> I<domain-id>
+
+Thaw tmem pools.
+
+=item B<tmem-set> I<domain-id> [I<OPTIONS>]
+
+Change tmem settings.
+
+B<OPTIONS>
+
+=over 4
+
+=item B<-w> I<WEIGHT>
+
+Weight (int)
+
+=item B<-c> I<CAP>
+
+Cap (int)
+
+=item B<-p> I<COMPRESS>
+
+Compress (int)
+
+=back
+
+=item B<tmem-shared-auth> I<domain-id> [I<OPTIONS>]
+
+De/authenticate shared tmem pool.
+
+B<OPTIONS>
+
+=over 4
+
+=item B<-u> I<UUID>
+
+Specify uuid (abcdef01-2345-6789-1234-567890abcdef)
+
+=item B<-a> I<AUTH>
+
+0=auth,1=deauth
+
+=back
+
+=item B<tmem-freeable>
+
+Get information about how much freeable memory (MB) is in-use by tmem.
+
+=back
+
+=head1 TO BE DOCUMENTED
+
+We need better documentation for:
+
+=over 4
+
+=item B<tmem>
+
+Trascendent Memory.
+
+=item B<Flask>
+
+Xen Flask security module.
+
+=back
+
 =head1 SEE ALSO
 
-L<xl.cfg(5)>, L<xlcpupool.cfg(5)>, B<xentop(1)>
+The following man pages:
 
-=head1 AUTHOR
+L<xl.cfg>(5), L<xlcpupool.cfg>(5), B<xentop>(1)
 
-  Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-  Vincent Hanquez <vincent.hanquez@eu.citrix.com>
-  Ian Jackson <ian.jackson@eu.citrix.com>
-  Ian Campbell <Ian.Campbell@citrix.com>
+And the following documents on the xen.org website:
+
+L<http://xenbits.xen.org/docs/unstable/misc/xl-network-configuration.html>
+L<http://xenbits.xen.org/docs/unstable/misc/xl-disk-configuration.txt>
 
 =head1 BUGS
 
-Send bugs to xen-devel@lists.xensource.com.
+Send bugs to xen-devel@lists.xensource.com, see
+http://wiki.xen.org/xenwiki/ReportingBugs on how to send bug reports.

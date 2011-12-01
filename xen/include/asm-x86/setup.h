@@ -44,4 +44,7 @@ void discard_initial_images(void);
 int xen_in_range(unsigned long mfn);
 void arch_get_xen_caps(xen_capabilities_info_t *info);
 
+void microcode_grab_module(
+    unsigned long *, const multiboot_info_t *, void *(*)(const module_t *));
+
 #endif

@@ -16,6 +16,9 @@ from xen.xend import XendOptions
 class CfgException(Exception): pass
 
 class Cfg(object):
+
+    REMUS_FLAGS_COMPRESSION = 1
+
     def __init__(self):
         # must be set
         self.domid = 0
@@ -25,6 +28,7 @@ class Cfg(object):
         self.port = XendOptions.instance().get_xend_relocation_port()
         self.interval = 200
         self.netbuffer = True
+        self.flags = self.REMUS_FLAGS_COMPRESSION
         self.timer = False
 
         parser = optparse.OptionParser()
@@ -38,6 +42,8 @@ class Cfg(object):
                           help='replicate to /dev/null (no disk checkpoints, only memory & net buffering)')
         parser.add_option('', '--no-net', dest='nonet', action='store_true',
                           help='run without net buffering (benchmark option)')
+        parser.add_option('', '--no-compression', dest='nocompress', action='store_true',
+                          help='run without checkpoint compression')
         parser.add_option('', '--timer', dest='timer', action='store_true',
                           help='force pause at checkpoint interval (experimental)')
         self.parser = parser
@@ -56,6 +62,8 @@ class Cfg(object):
             self.nullremus = True
         if opts.nonet:
             self.netbuffer = False
+        if opts.nocompress:
+            self.flags &= ~self.REMUS_FLAGS_COMPRESSION
         if opts.timer:
             self.timer = True
 
@@ -190,7 +198,7 @@ def run(cfg):
     rc = 0
 
     checkpointer = save.Saver(cfg.domid, fd, postsuspend, preresume, commit,
-                              interval)
+                              interval, cfg.flags)
 
     try:
         checkpointer.start()

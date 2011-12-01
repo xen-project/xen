@@ -599,6 +599,7 @@ int cpuid_hypervisor_leaves( uint32_t idx, uint32_t sub_idx,
 int rdmsr_hypervisor_regs(uint32_t idx, uint64_t *val);
 int wrmsr_hypervisor_regs(uint32_t idx, uint64_t val);
 
+void microcode_set_module(unsigned int);
 int microcode_update(XEN_GUEST_HANDLE(const_void), unsigned long len);
 int microcode_resume_cpu(int cpu);
 

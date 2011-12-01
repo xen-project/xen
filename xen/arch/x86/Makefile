@@ -30,9 +30,10 @@ obj-y += io_apic.o
 obj-y += msi.o
 obj-y += ioport_emulate.o
 obj-y += irq.o
-obj-y += microcode.o
 obj-y += microcode_amd.o
 obj-y += microcode_intel.o
+# This must come after the vendor specific files.
+obj-y += microcode.o
 obj-y += mm.o
 obj-y += mpparse.o
 obj-y += nmi.o

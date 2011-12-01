@@ -40,13 +40,15 @@ typedef struct {
     timer_t timer;
 } checkpoint_state;
 
+#define CHECKPOINT_FLAGS_COMPRESSION 1
 char* checkpoint_error(checkpoint_state* s);
 
 void checkpoint_init(checkpoint_state* s);
 int checkpoint_open(checkpoint_state* s, unsigned int domid);
 void checkpoint_close(checkpoint_state* s);
 int checkpoint_start(checkpoint_state* s, int fd,
-                    struct save_callbacks* callbacks);
+		     struct save_callbacks* callbacks,
+		     unsigned int remus_flags);
 int checkpoint_suspend(checkpoint_state* s);
 int checkpoint_resume(checkpoint_state* s);
 int checkpoint_postflush(checkpoint_state* s);

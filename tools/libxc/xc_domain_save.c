@@ -218,6 +218,56 @@ static inline int write_uncached(xc_interface *xch,
         return noncached_write(xch, ob, fd, buf, len);
 }
 
+static int write_compressed(xc_interface *xch, comp_ctx *compress_ctx,
+                            int dobuf, struct outbuf* ob, int fd)
+{
+    int rc = 0;
+    int header = sizeof(int) + sizeof(unsigned long);
+    int marker = XC_SAVE_ID_COMPRESSED_DATA;
+    unsigned long compbuf_len = 0;
+
+    do
+    {
+        /* check for available space (atleast 8k) */
+        if ((ob->pos + header + XC_PAGE_SIZE * 2) > ob->size)
+        {
+            if (outbuf_flush(xch, ob, fd) < 0)
+            {
+                ERROR("Error when flushing outbuf intermediate");
+                return -1;
+            }
+        }
+
+        rc = xc_compression_compress_pages(xch, compress_ctx,
+                                           ob->buf + ob->pos + header,
+                                           ob->size - ob->pos - header,
+                                           &compbuf_len);
+        if (!rc)
+            return 0;
+
+        if (outbuf_hardwrite(xch, ob, fd, &marker, sizeof(marker)) < 0)
+        {
+            PERROR("Error when writing marker (errno %d)", errno);
+            return -1;
+        }
+
+        if (outbuf_hardwrite(xch, ob, fd, &compbuf_len, sizeof(compbuf_len)) < 0)
+        {
+            PERROR("Error when writing compbuf_len (errno %d)", errno);
+            return -1;
+        }
+
+        ob->pos += (size_t) compbuf_len;
+        if (!dobuf && outbuf_flush(xch, ob, fd) < 0)
+        {
+            ERROR("Error when writing compressed chunk");
+            return -1;
+        }
+    } while (rc != 0);
+
+    return 0;
+}
+
 struct time_stats {
     struct timeval wall;
     long long d0_cpu, d1_cpu;
@@ -815,10 +865,34 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
     unsigned long mfn;
 
-    struct outbuf ob;
+    /* Without checkpoint compression, the dirty pages, pfn arrays
+     * and tailbuf (vcpu ctx, shared info page, etc.)  are written
+     * directly to outbuf. All of this is done while the domain is
+     * suspended.
+     *
+     * When checkpoint compression is enabled, the dirty pages are
+     * buffered, compressed "after" the domain is resumed and then
+     * written to outbuf. Since tailbuf data are collected while a
+     * domain is suspended, they cannot be directly written to the
+     * outbuf as there is no dirty page data preceeding tailbuf.
+     *
+     * So,two output buffers are maintained. Tailbuf data goes into
+     * ob_tailbuf. The dirty pages are compressed after resuming the
+     * domain and written to ob_pagebuf. ob_tailbuf is then appended
+     * to ob_pagebuf and finally flushed out.
+     */
+    struct outbuf ob_pagebuf, ob_tailbuf, *ob = NULL;
     struct save_ctx _ctx;
     struct save_ctx *ctx = &_ctx;
     struct domain_info_context *dinfo = &ctx->dinfo;
+
+    /* Compression context */
+    comp_ctx *compress_ctx= NULL;
+    /* Even if XCFLAGS_CHECKPOINT_COMPRESS is set, we enable compression only
+     * after sending XC_SAVE_ID_ENABLE_COMPRESSION and the tailbuf for
+     * first time.
+     */
+    int compressing = 0;
 
     int completed = 0;
 
@@ -829,7 +903,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
         return 1;
     }
 
-    outbuf_init(xch, &ob, OUTBUF_SIZE);
+    outbuf_init(xch, &ob_pagebuf, OUTBUF_SIZE);
 
     memset(ctx, 0, sizeof(*ctx));
 
@@ -915,6 +989,16 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
             ERROR("Domain appears not to have suspended");
             goto out;
         }
+    }
+
+    if ( flags & XCFLAGS_CHECKPOINT_COMPRESS )
+    {
+        if (!(compress_ctx = xc_compression_create_context(xch, dinfo->p2m_size)))
+        {
+            ERROR("Failed to create compression context");
+            goto out;
+        }
+        outbuf_init(xch, &ob_tailbuf, OUTBUF_SIZE/4);
     }
 
     last_iter = !live;
@@ -1025,9 +1109,11 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
     }
 
   copypages:
-#define wrexact(fd, buf, len) write_buffer(xch, last_iter, &ob, (fd), (buf), (len))
-#define wruncached(fd, live, buf, len) write_uncached(xch, last_iter, &ob, (fd), (buf), (len))
+#define wrexact(fd, buf, len) write_buffer(xch, last_iter, ob, (fd), (buf), (len))
+#define wruncached(fd, live, buf, len) write_uncached(xch, last_iter, ob, (fd), (buf), (len))
+#define wrcompressed(fd) write_compressed(xch, compress_ctx, last_iter, ob, (fd))
 
+    ob = &ob_pagebuf; /* Holds pfn_types, pages/compressed pages */
     /* Now write out each data page, canonicalising page tables as we go... */
     for ( ; ; )
     {
@@ -1270,7 +1356,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
                 {
                     /* If the page is not a normal data page, write out any
                        run of pages we may have previously acumulated */
-                    if ( run )
+                    if ( !compressing && run )
                     {
                         if ( wruncached(io_fd, live,
                                        (char*)region_base+(PAGE_SIZE*(j-run)), 
@@ -1305,7 +1391,41 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
                         goto out;
                     }
 
-                    if ( wruncached(io_fd, live, page, PAGE_SIZE) != PAGE_SIZE )
+                    if (compressing)
+                    {
+                        int c_err;
+                        /* Mark pagetable page to be sent uncompressed */
+                        c_err = xc_compression_add_page(xch, compress_ctx, page,
+                                                        pfn, 1 /* raw page */);
+                        if (c_err == -2) /* OOB PFN */
+                        {
+                            ERROR("Could not add pagetable page "
+                                  "(pfn:%" PRIpfn "to page buffer\n", pfn);
+                            goto out;
+                        }
+
+                        if (c_err == -1)
+                        {
+                            /*
+                             * We are out of buffer space to hold dirty
+                             * pages. Compress and flush the current buffer
+                             * to make space. This is a corner case, that
+                             * slows down checkpointing as the compression
+                             * happens while domain is suspended. Happens
+                             * seldom and if you find this occuring
+                             * frequently, increase the PAGE_BUFFER_SIZE
+                             * in xc_compression.c.
+                             */
+                            if (wrcompressed(io_fd) < 0)
+                            {
+                                ERROR("Error when writing compressed"
+                                      " data (4b)\n");
+                                goto out;
+                            }
+                        }
+                    }
+                    else if ( wruncached(io_fd, live, page,
+                                         PAGE_SIZE) != PAGE_SIZE )
                     {
                         PERROR("Error when writing to state file (4b)"
                               " (errno %d)", errno);
@@ -1315,7 +1435,34 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
                 else
                 {
                     /* We have a normal page: accumulate it for writing. */
-                    run++;
+                    if (compressing)
+                    {
+                        int c_err;
+                        /* For checkpoint compression, accumulate the page in the
+                         * page buffer, to be compressed later.
+                         */
+                        c_err = xc_compression_add_page(xch, compress_ctx, spage,
+                                                        pfn, 0 /* not raw page */);
+
+                        if (c_err == -2) /* OOB PFN */
+                        {
+                            ERROR("Could not add page "
+                                  "(pfn:%" PRIpfn "to page buffer\n", pfn);
+                            goto out;
+                        }
+
+                        if (c_err == -1)
+                        {
+                            if (wrcompressed(io_fd) < 0)
+                            {
+                                ERROR("Error when writing compressed"
+                                      " data (4c)\n");
+                                goto out;
+                            }
+                        }
+                    }
+                    else
+                        run++;
                 }
             } /* end of the write out for this batch */
 
@@ -1422,6 +1569,15 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
     } /* end of infinite for loop */
 
     DPRINTF("All memory is saved\n");
+
+    /* After last_iter, buffer the rest of pagebuf & tailbuf data into a
+     * separate output buffer and flush it after the compressed page chunks.
+     */
+    if (compressing)
+    {
+        ob = &ob_tailbuf;
+        ob->pos = 0;
+    }
 
     {
         struct {
@@ -1530,6 +1686,25 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
         if ( wrexact(io_fd, &i, sizeof(int)) )
         {
             PERROR("Error when writing last checkpoint chunk");
+            goto out;
+        }
+    }
+
+    /* Enable compression logic on both sides by sending this
+     * one time marker.
+     * NOTE: We could have simplified this procedure by sending
+     * the enable/disable compression flag before the beginning of
+     * the main for loop. But this would break compatibility for
+     * live migration code, with older versions of xen. So we have
+     * to enable it after the last_iter, when the XC_SAVE_ID_*
+     * elements are sent.
+     */
+    if (!compressing && (flags & XCFLAGS_CHECKPOINT_COMPRESS))
+    {
+        i = XC_SAVE_ID_ENABLE_COMPRESSION;
+        if ( wrexact(io_fd, &i, sizeof(int)) )
+        {
+            PERROR("Error when writing enable_compression marker");
             goto out;
         }
     }
@@ -1778,13 +1953,37 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
     if ( !rc && callbacks->postcopy )
         callbacks->postcopy(callbacks->data);
 
+    /* guest has been resumed. Now we can compress data
+     * at our own pace.
+     */
+    if (!rc && compressing)
+    {
+        ob = &ob_pagebuf;
+        if (wrcompressed(io_fd) < 0)
+        {
+            ERROR("Error when writing compressed data, after postcopy\n");
+            rc = 1;
+            goto out;
+        }
+        /* Append the tailbuf data to the main outbuf */
+        if ( wrexact(io_fd, ob_tailbuf.buf, ob_tailbuf.pos) )
+        {
+            rc = 1;
+            PERROR("Error when copying tailbuf into outbuf");
+            goto out;
+        }
+    }
+
     /* Flush last write and discard cache for file. */
-    if ( outbuf_flush(xch, &ob, io_fd) < 0 ) {
+    if ( outbuf_flush(xch, ob, io_fd) < 0 ) {
         PERROR("Error when flushing output buffer");
         rc = 1;
     }
 
     discard_file_cache(xch, io_fd, 1 /* flush */);
+
+    /* Enable compression now, finally */
+    compressing = (flags & XCFLAGS_CHECKPOINT_COMPRESS);
 
     /* checkpoint_cb can spend arbitrarily long in between rounds */
     if (!rc && callbacks->checkpoint &&
@@ -1826,6 +2025,9 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
         if ( hvm && callbacks->switch_qemu_logdirty(dom, 0, callbacks->data) )
             DPRINTF("Warning - couldn't disable qemu log-dirty mode");
     }
+
+    if (compress_ctx)
+        xc_compression_free_context(xch, compress_ctx);
 
     if ( live_shinfo )
         munmap(live_shinfo, PAGE_SIZE);
