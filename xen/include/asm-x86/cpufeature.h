@@ -97,6 +97,7 @@
 #define X86_FEATURE_CX16        (4*32+13) /* CMPXCHG16B */
 #define X86_FEATURE_XTPR	(4*32+14) /* Send Task Priority Messages */
 #define X86_FEATURE_PDCM	(4*32+15) /* Perf/Debug Capability MSR */
+#define X86_FEATURE_PCID	(4*32+17) /* Process Context ID */
 #define X86_FEATURE_DCA		(4*32+18) /* Direct Cache Access */
 #define X86_FEATURE_SSE4_1	(4*32+19) /* Streaming SIMD Extensions 4.1 */
 #define X86_FEATURE_SSE4_2	(4*32+20) /* Streaming SIMD Extensions 4.2 */
@@ -152,6 +153,7 @@
 #define X86_FEATURE_SMEP	(7*32+ 7) /* Supervisor Mode Execution Protection */
 #define X86_FEATURE_BMI2	(7*32+ 8) /* 2nd bit manipulation extensions */
 #define X86_FEATURE_ERMS	(7*32+ 9) /* Enhanced REP MOVSB/STOSB */
+#define X86_FEATURE_INVPCID	(7*32+10) /* Invalidate Process Context ID */
 
 #define cpu_has(c, bit)		test_bit(bit, (c)->x86_capability)
 #define boot_cpu_has(bit)	test_bit(bit, boot_cpu_data.x86_capability)
