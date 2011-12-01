@@ -495,7 +495,7 @@ static inline void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
 void p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long gla, 
                           bool_t access_r, bool_t access_w, bool_t access_x);
 /* Resumes the running of the VCPU, restarting the last instruction */
-void p2m_mem_access_resume(struct p2m_domain *p2m);
+void p2m_mem_access_resume(struct domain *d);
 
 /* Set access type for a region of pfns.
  * If start_pfn == -1ul, sets the default access type */

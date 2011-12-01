@@ -29,13 +29,12 @@ int mem_access_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
                       XEN_GUEST_HANDLE(void) u_domctl)
 {
     int rc;
-    struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
     switch( mec->op )
     {
     case XEN_DOMCTL_MEM_EVENT_OP_ACCESS_RESUME:
     {
-        p2m_mem_access_resume(p2m);
+        p2m_mem_access_resume(d);
         rc = 0;
     }
     break;

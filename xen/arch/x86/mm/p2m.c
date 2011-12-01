@@ -1142,9 +1142,8 @@ void p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long gla
     /* VCPU paused, mem event request sent */
 }
 
-void p2m_mem_access_resume(struct p2m_domain *p2m)
+void p2m_mem_access_resume(struct domain *d)
 {
-    struct domain *d = p2m->domain;
     mem_event_response_t rsp;
 
     mem_event_get_response(&d->mem_event->access, &rsp);
