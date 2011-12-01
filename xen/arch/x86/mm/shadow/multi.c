@@ -4591,7 +4591,7 @@ int sh_rm_mappings_from_l1(struct vcpu *v, mfn_t sl1mfn, mfn_t target_mfn)
         {
             (void) shadow_set_l1e(v, sl1e, shadow_l1e_empty(),
                                   p2m_invalid, sl1mfn);
-            if ( (mfn_to_page(target_mfn)->count_info & PGC_count_mask) == 0 )
+            if ( sh_check_page_has_no_refs(mfn_to_page(target_mfn)) )
                 /* This breaks us cleanly out of the FOREACH macro */
                 done = 1;
         }

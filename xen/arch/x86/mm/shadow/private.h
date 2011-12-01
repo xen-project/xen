@@ -30,6 +30,7 @@
 #include <xen/domain_page.h>
 #include <asm/x86_emulate.h>
 #include <asm/hvm/support.h>
+#include <asm/atomic.h>
 
 #include "../mm-locks.h"
 
@@ -815,6 +816,12 @@ static inline unsigned long vtlb_lookup(struct vcpu *v,
 }
 #endif /* (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB) */
 
+static inline int sh_check_page_has_no_refs(struct page_info *page)
+{
+    unsigned long count = read_atomic(&page->count_info);
+    return ( (count & PGC_count_mask) ==
+             ((count & PGC_allocated) ? 1 : 0) ); 
+}
 
 #endif /* _XEN_SHADOW_PRIVATE_H */
 

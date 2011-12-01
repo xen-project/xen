@@ -2464,7 +2464,6 @@ int sh_remove_write_access_from_sl1p(struct vcpu *v, mfn_t gmfn,
 int sh_remove_all_mappings(struct vcpu *v, mfn_t gmfn)
 {
     struct page_info *page = mfn_to_page(gmfn);
-    int expected_count;
 
     /* Dispatch table for getting per-type functions */
     static const hash_callback_t callbacks[SH_type_unused] = {
@@ -2501,7 +2500,7 @@ int sh_remove_all_mappings(struct vcpu *v, mfn_t gmfn)
         ;
 
     perfc_incr(shadow_mappings);
-    if ( (page->count_info & PGC_count_mask) == 0 )
+    if ( sh_check_page_has_no_refs(page) )
         return 0;
 
     /* Although this is an externally visible function, we do not know
@@ -2517,8 +2516,7 @@ int sh_remove_all_mappings(struct vcpu *v, mfn_t gmfn)
     hash_foreach(v, callback_mask, callbacks, gmfn);
 
     /* If that didn't catch the mapping, something is very wrong */
-    expected_count = (page->count_info & PGC_allocated) ? 1 : 0;
-    if ( (page->count_info & PGC_count_mask) != expected_count )
+    if ( !sh_check_page_has_no_refs(page) )
     {
         /* Don't complain if we're in HVM and there are some extra mappings: 
          * The qemu helper process has an untyped mapping of this dom's RAM 
