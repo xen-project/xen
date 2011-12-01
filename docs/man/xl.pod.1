@@ -45,6 +45,22 @@ Most B<xl> commands require root privileges to run due to the
 communications channels used to talk to the hypervisor.  Running as
 non root will return an error.
 
+=head1 GLOBAL OPTIONS
+
+Some global options are always available:
+
+=over 4
+
+=item B<-v>
+
+Verbose.
+
+=item B<-N>
+
+Dry run: do not actually execute the command.
+
+=back
+
 =head1 DOMAIN SUBCOMMANDS
 
 The following subcommands manipulate domains directly.  As stated
