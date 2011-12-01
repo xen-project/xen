@@ -104,6 +104,11 @@ static inline void *__maddr_to_virt(unsigned long ma)
                      ((ma & ma_top_mask) >> pfn_pdx_hole_shift)));
 }
 
+static inline unsigned long __xen_map_to_mfn(void *va)
+{
+    return (__virt_to_maddr((unsigned long) va) >> PAGE_SHIFT);
+}
+
 /* read access (should only be used for debug printk's) */
 typedef u64 intpte_t;
 #define PRIpte "016lx"
