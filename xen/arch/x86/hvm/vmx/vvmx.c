@@ -581,7 +581,7 @@ static void nvmx_purge_vvmcs(struct vcpu *v)
     __clear_current_vvmcs(v);
     if ( nvcpu->nv_vvmcxaddr != VMCX_EADDR )
         hvm_unmap_guest_frame(nvcpu->nv_vvmcx);
-    nvcpu->nv_vvmcx == NULL;
+    nvcpu->nv_vvmcx = NULL;
     nvcpu->nv_vvmcxaddr = VMCX_EADDR;
     for (i=0; i<2; i++) {
         if ( nvmx->iobitmap[i] ) {
