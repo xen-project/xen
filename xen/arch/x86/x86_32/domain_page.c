@@ -265,3 +265,15 @@ void unmap_domain_page_global(const void *va)
     idx = (__va - IOREMAP_VIRT_START) >> PAGE_SHIFT;
     set_bit(idx, garbage);
 }
+
+/* Translate a map-domain-page'd address to the underlying MFN */
+unsigned long domain_page_map_to_mfn(void *va)
+{
+    l1_pgentry_t *l1e;
+
+    ASSERT( (((unsigned long) va) >= MAPCACHE_VIRT_START) &&
+            (((unsigned long) va) <= MAPCACHE_VIRT_END) );
+    l1e = &__linear_l1_table[
+            l1_linear_offset((unsigned long) va)];
+    return l1e_get_pfn(*l1e);
+}
