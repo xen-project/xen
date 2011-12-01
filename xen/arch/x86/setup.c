@@ -550,10 +550,10 @@ void __init __start_xen(unsigned long mbi_p)
 {
     char *memmap_type = NULL;
     char *cmdline, *kextra, *loader;
-    unsigned int initrdidx = 1;
+    unsigned int initrdidx;
     multiboot_info_t *mbi = __va(mbi_p);
     module_t *mod = (module_t *)__va(mbi->mods_addr);
-    unsigned long nr_pages, modules_headroom;
+    unsigned long nr_pages, modules_headroom, *module_map;
     int i, j, e820_warn = 0, bytes = 0;
     bool_t acpi_boot_table_init_done = 0;
     struct ns16550_defaults ns16550 = {
@@ -1229,7 +1229,13 @@ void __init __start_xen(unsigned long mbi_p)
 
     init_IRQ();
 
-    xsm_init(&initrdidx, mbi, bootstrap_map);
+    module_map = xmalloc_array(unsigned long, BITS_TO_LONGS(mbi->mods_count));
+    bitmap_fill(module_map, mbi->mods_count);
+    __clear_bit(0, module_map); /* Dom0 kernel is always first */
+
+    xsm_init(module_map, mbi, bootstrap_map);
+
+    microcode_grab_module(module_map, mbi, bootstrap_map);
 
     timer_init();
 
@@ -1355,6 +1361,12 @@ void __init __start_xen(unsigned long mbi_p)
 
     if ( xen_cpuidle )
         xen_processor_pmbits |= XEN_PROCESSOR_PM_CX;
+
+    initrdidx = find_first_bit(module_map, mbi->mods_count);
+    if ( bitmap_weight(module_map, mbi->mods_count) > 1 )
+        printk(XENLOG_WARNING
+               "Multiple initrd candidates, picking module #%u\n",
+               initrdidx);
 
     /*
      * We're going to setup domain0 using the module(s) that we stashed safely

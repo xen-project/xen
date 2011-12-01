@@ -29,12 +29,48 @@
 #include <xen/notifier.h>
 #include <xen/sched.h>
 #include <xen/smp.h>
+#include <xen/softirq.h>
 #include <xen/spinlock.h>
+#include <xen/tasklet.h>
 #include <xen/guest_access.h>
 
 #include <asm/msr.h>
 #include <asm/processor.h>
+#include <asm/setup.h>
 #include <asm/microcode.h>
+
+static module_t __initdata ucode_mod;
+static void *(*__initdata ucode_mod_map)(const module_t *);
+static unsigned int __initdata ucode_mod_idx;
+static bool_t __initdata ucode_mod_forced;
+static cpumask_t __initdata init_mask;
+
+void __init microcode_set_module(unsigned int idx)
+{
+    ucode_mod_idx = idx;
+    ucode_mod_forced = 1;
+}
+
+static void __init parse_ucode(char *s)
+{
+    if ( !ucode_mod_forced )
+        ucode_mod_idx = simple_strtoul(s, NULL, 0);
+}
+custom_param("ucode", parse_ucode);
+
+void __init microcode_grab_module(
+    unsigned long *module_map,
+    const multiboot_info_t *mbi,
+    void *(*map)(const module_t *))
+{
+    module_t *mod = (module_t *)__va(mbi->mods_addr);
+
+    if ( !ucode_mod_idx || ucode_mod_idx >= mbi->mods_count ||
+         !__test_and_clear_bit(ucode_mod_idx, module_map) )
+        return;
+    ucode_mod = mod[ucode_mod_idx];
+    ucode_mod_map = map;
+}
 
 const struct microcode_ops *microcode_ops;
 
@@ -183,6 +219,41 @@ int microcode_update(XEN_GUEST_HANDLE(const_void) buf, unsigned long len)
     return continue_hypercall_on_cpu(info->cpu, do_microcode_update, info);
 }
 
+static void __init _do_microcode_update(unsigned long data)
+{
+    microcode_update_cpu((void *)data, ucode_mod.mod_end);
+    cpumask_set_cpu(smp_processor_id(), &init_mask);
+}
+
+static int __init microcode_init(void)
+{
+    void *data;
+    static struct tasklet __initdata tasklet;
+    unsigned int cpu;
+
+    if ( !microcode_ops || !ucode_mod.mod_end )
+        return 0;
+
+    data = ucode_mod_map(&ucode_mod);
+    if ( !data )
+        return -ENOMEM;
+
+    softirq_tasklet_init(&tasklet, _do_microcode_update, (unsigned long)data);
+
+    for_each_online_cpu ( cpu )
+    {
+        tasklet_schedule_on_cpu(&tasklet, cpu);
+        do {
+            process_pending_softirqs();
+        } while ( !cpumask_test_cpu(cpu, &init_mask) );
+    }
+
+    ucode_mod_map(NULL);
+
+    return 0;
+}
+__initcall(microcode_init);
+
 static int microcode_percpu_callback(
     struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
@@ -205,7 +276,20 @@ static struct notifier_block microcode_percpu_nfb = {
 static int __init microcode_presmp_init(void)
 {
     if ( microcode_ops )
+    {
+        if ( ucode_mod.mod_end )
+        {
+            void *data = ucode_mod_map(&ucode_mod);
+
+            if ( data )
+                microcode_update_cpu(data, ucode_mod.mod_end);
+
+            ucode_mod_map(NULL);
+        }
+
         register_cpu_notifier(&microcode_percpu_nfb);
+    }
+
     return 0;
 }
 presmp_initcall(microcode_presmp_init);
