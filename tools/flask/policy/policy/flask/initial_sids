@@ -5,13 +5,12 @@
 #
 sid xen
 sid dom0
-sid domU
 sid domio
 sid domxen
 sid unlabeled
 sid security
 sid ioport
 sid iomem
-sid pirq
+sid irq
 sid device
 # FLASK

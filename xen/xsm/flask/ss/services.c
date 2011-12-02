@@ -1546,7 +1546,7 @@ int security_irq_sid(int pirq, u32 *out_sid)
     }
     else
     {
-        *out_sid = SECINITSID_PIRQ;
+        *out_sid = SECINITSID_IRQ;
     }
 
 out:

@@ -4,14 +4,13 @@ static char *initial_sid_to_string[] =
     "null",
     "xen",
     "dom0",
-    "domU",
     "domio",
     "domxen",
     "unlabeled",
     "security",
     "ioport",
     "iomem",
-    "pirq",
+    "irq",
     "device",
 };
 

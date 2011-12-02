@@ -20,16 +20,15 @@
  */
 #define SECINITSID_XEN                                  1
 #define SECINITSID_DOM0                                 2
-#define SECINITSID_DOMU                                 3
-#define SECINITSID_DOMIO                                4
-#define SECINITSID_DOMXEN                               5
-#define SECINITSID_UNLABELED                            6
-#define SECINITSID_SECURITY                             7
-#define SECINITSID_IOPORT                               8
-#define SECINITSID_IOMEM                                9
-#define SECINITSID_PIRQ                                 10
-#define SECINITSID_DEVICE                               11
+#define SECINITSID_DOMIO                                3
+#define SECINITSID_DOMXEN                               4
+#define SECINITSID_UNLABELED                            5
+#define SECINITSID_SECURITY                             6
+#define SECINITSID_IOPORT                               7
+#define SECINITSID_IOMEM                                8
+#define SECINITSID_IRQ                                  9
+#define SECINITSID_DEVICE                               10
 
-#define SECINITSID_NUM                                  11
+#define SECINITSID_NUM                                  10
 
 #endif

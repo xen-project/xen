@@ -16,7 +16,7 @@ type unlabeled_t, domain_type;
 
 type security_t, domain_type;
 
-type pirq_t, resource_type;
+type irq_t, resource_type;
 type ioport_t, resource_type;
 type iomem_t, resource_type;
 type device_t, resource_type;
@@ -43,8 +43,8 @@ allow xen_t ioport_t:resource {add_ioport remove_ioport};
 allow dom0_t ioport_t:resource {use};
 allow xen_t iomem_t:resource {add_iomem remove_iomem};
 allow dom0_t iomem_t:resource {use};
-allow xen_t pirq_t:resource {add_irq remove_irq};
-allow dom0_t pirq_t:resource { add_irq remove_irq use};
+allow xen_t irq_t:resource {add_irq remove_irq};
+allow dom0_t irq_t:resource { add_irq remove_irq use};
 allow dom0_t dom0_t:resource { add remove };
 allow dom0_t xen_t:xen firmware;
 
@@ -140,12 +140,11 @@ manage_domain(dom0_t, domHU_t)
 ################################################################################
 sid xen gen_context(system_u:system_r:xen_t,s0)
 sid dom0 gen_context(system_u:system_r:dom0_t,s0)
-sid domU gen_context(system_u:system_r:domU_t,s0)
 sid domxen gen_context(system_u:system_r:domxen_t,s0)
 sid domio gen_context(system_u:system_r:domio_t,s0)
 sid unlabeled gen_context(system_u:system_r:unlabeled_t,s0)
 sid security gen_context(system_u:system_r:security_t,s0)
-sid pirq gen_context(system_u:object_r:pirq_t,s0)
+sid irq gen_context(system_u:object_r:irq_t,s0)
 sid iomem gen_context(system_u:object_r:iomem_t,s0)
 sid ioport gen_context(system_u:object_r:ioport_t,s0)
 sid device gen_context(system_u:object_r:device_t,s0)
