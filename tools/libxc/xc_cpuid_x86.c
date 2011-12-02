@@ -52,7 +52,7 @@ static void cpuid(const unsigned int *input, unsigned int *regs)
         "mov %%edx,12(%4)\n\t"
         "pop %%edx; pop %%ebx\n\t"
         : "=a" (regs[0]), "=c" (regs[2])
-        : "0" (input[0]), "1" (count), "S" (_regs)
+        : "0" (input[0]), "1" (count), "S" (regs)
         : "memory" );
 #else
     asm (
