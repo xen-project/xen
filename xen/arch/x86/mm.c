@@ -3517,6 +3517,9 @@ int do_mmu_update(
         {
             p2m_type_t p2mt;
 
+            rc = xsm_mmu_normal_update(d, pg_owner, req.val);
+            if ( rc )
+                break;
             rc = -EINVAL;
 
             req.ptr -= cmd;
@@ -3544,14 +3547,6 @@ int do_mmu_update(
             va = (void *)((unsigned long)va +
                           (unsigned long)(req.ptr & ~PAGE_MASK));
             page = mfn_to_page(mfn);
-
-            rc = xsm_mmu_normal_update(d, req.val, page);
-            if ( rc ) {
-                unmap_domain_page_with_cache(va, &mapcache);
-                put_page(page);
-                put_gfn(pt_owner, gmfn);
-                break;
-            }
 
             if ( page_lock(page) )
             {
@@ -3740,6 +3735,10 @@ int do_mmu_update(
             mfn = req.ptr >> PAGE_SHIFT;
             gpfn = req.val;
 
+            rc = xsm_mmu_machphys_update(d, mfn);
+            if ( rc )
+                break;
+
             if ( unlikely(!get_page_from_pagenr(mfn, pg_owner)) )
             {
                 MEM_LOG("Could not get page for mach->phys update");
@@ -3753,10 +3752,6 @@ int do_mmu_update(
                 rc = -EINVAL;
                 break;
             }
-
-            rc = xsm_mmu_machphys_update(d, mfn_to_page(mfn));
-            if ( rc )
-                break;
 
             set_gpfn_from_mfn(mfn, gpfn);
 
@@ -4384,6 +4379,10 @@ static int __do_update_va_mapping(
 
     perfc_incr(calls_to_update_va);
 
+    rc = xsm_update_va_mapping(d, pg_owner, val);
+    if ( rc )
+        return rc;
+
     rc = -EINVAL;
     pl1e = guest_map_l1e(v, va, &gl1mfn);
     if ( unlikely(!pl1e || !get_page_from_pagenr(gl1mfn, d)) )
@@ -4398,13 +4397,6 @@ static int __do_update_va_mapping(
 
     if ( (gl1pg->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table )
     {
-        page_unlock(gl1pg);
-        put_page(gl1pg);
-        goto out;
-    }
-
-    rc = xsm_update_va_mapping(d, val, gl1pg);
-    if ( rc ) {
         page_unlock(gl1pg);
         put_page(gl1pg);
         goto out;
