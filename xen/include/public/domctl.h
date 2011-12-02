@@ -806,8 +806,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_mem_sharing_op_t);
 
 struct xen_domctl_audit_p2m {
     /* OUT error counts */
-    uint64_t orphans_debug;
-    uint64_t orphans_invalid;
+    uint64_t orphans;
     uint64_t m2p_bad;
     uint64_t p2m_bad;
 };

@@ -718,9 +718,7 @@ int xc_domain_setdebugging(xc_interface *xch,
  * @parm xch a handle to an open hypervisor interface
  * @parm domid the domain id whose top level p2m we 
  *       want to audit
- * @parm orphans_debug count of m2p entries for valid
- *       domain pages containing a debug value
- * @parm orphans_invalid count of m2p entries for valid
+ * @parm orphans count of m2p entries for valid
  *       domain pages containing an invalid value
  * @parm m2p_bad count of m2p entries mismatching the
  *       associated p2m entry for this domain
@@ -732,9 +730,8 @@ int xc_domain_setdebugging(xc_interface *xch,
  *          -EFAULT: could not copy results back to guest
  */
 int xc_domain_p2m_audit(xc_interface *xch,
-				        uint32_t domid,
-                        uint64_t *orphans_debug,
-                        uint64_t *orphans_invalid,
+                        uint32_t domid,
+                        uint64_t *orphans,
                         uint64_t *m2p_bad,   
                         uint64_t *p2m_bad);
 

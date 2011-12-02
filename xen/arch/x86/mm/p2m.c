@@ -307,13 +307,7 @@ int p2m_alloc_table(struct p2m_domain *p2m)
             /* Pages should not be shared that early */
             ASSERT(gfn != SHARED_M2P_ENTRY);
             page_count++;
-            if (
-#ifdef __x86_64__
-                (gfn != 0x5555555555555555L)
-#else
-                (gfn != 0x55555555L)
-#endif
-                && gfn != INVALID_M2P_ENTRY
+            if ( gfn != INVALID_M2P_ENTRY
                 && !set_p2m_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2m_ram_rw, p2m->default_access) )
                 goto error_unlock;
         }
@@ -513,14 +507,7 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
         if ( page_get_owner(mfn_to_page(_mfn(mfn + i))) != d )
             continue;
         ogfn = mfn_to_gfn(d, _mfn(mfn+i));
-        if (
-#ifdef __x86_64__
-            (ogfn != 0x5555555555555555L)
-#else
-            (ogfn != 0x55555555L)
-#endif
-            && (ogfn != INVALID_M2P_ENTRY)
-            && (ogfn != gfn + i) )
+        if ( (ogfn != INVALID_M2P_ENTRY) && (ogfn != gfn + i) )
         {
             /* This machine frame is already mapped at another physical
              * address */
@@ -1447,8 +1434,7 @@ unsigned long paging_gva_to_gfn(struct vcpu *v,
 
 #if P2M_AUDIT
 void audit_p2m(struct domain *d,
-                uint64_t *orphans_debug,
-                uint64_t *orphans_invalid,
+               uint64_t *orphans,
                 uint64_t *m2p_bad,
                 uint64_t *p2m_bad)
 {
@@ -1456,7 +1442,7 @@ void audit_p2m(struct domain *d,
     struct domain *od;
     unsigned long mfn, gfn;
     mfn_t p2mfn;
-    unsigned long orphans_d = 0, orphans_i = 0, mpbad = 0, pmbad = 0;
+    unsigned long orphans_count = 0, mpbad = 0, pmbad = 0;
     p2m_access_t p2ma;
     p2m_type_t type;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
@@ -1492,16 +1478,8 @@ void audit_p2m(struct domain *d,
         gfn = get_gpfn_from_mfn(mfn);
         if ( gfn == INVALID_M2P_ENTRY )
         {
-            orphans_i++;
+            orphans_count++;
             P2M_PRINTK("orphaned guest page: mfn=%#lx has invalid gfn\n",
-                           mfn);
-            continue;
-        }
-
-        if ( gfn == 0x55555555 || gfn == 0x5555555555555555 )
-        {
-            orphans_d++;
-            P2M_PRINTK("orphaned guest page: mfn=%#lx has debug gfn\n",
                            mfn);
             continue;
         }
@@ -1538,9 +1516,8 @@ void audit_p2m(struct domain *d,
     p2m_unlock(p2m);
  
     P2M_PRINTK("p2m audit complete\n");
-    if ( orphans_i | orphans_d | mpbad | pmbad )
-        P2M_PRINTK("p2m audit found %lu orphans (%lu inval %lu debug)\n",
-                       orphans_i + orphans_d, orphans_i, orphans_d);
+    if ( orphans_count | mpbad | pmbad )
+        P2M_PRINTK("p2m audit found %lu orphans\n", orphans);
     if ( mpbad | pmbad )
     {
         P2M_PRINTK("p2m audit found %lu odd p2m, %lu bad m2p entries\n",
@@ -1549,10 +1526,9 @@ void audit_p2m(struct domain *d,
     }
 
 out_p2m_audit:
-    *orphans_debug      = (uint64_t) orphans_d;
-    *orphans_invalid    = (uint64_t) orphans_i;
-    *m2p_bad            = (uint64_t) mpbad;
-    *p2m_bad            = (uint64_t) pmbad;
+    *orphans = (uint64_t) orphans_count;
+    *m2p_bad = (uint64_t) mpbad;
+    *p2m_bad = (uint64_t) pmbad;
 }
 #endif /* P2M_AUDIT */
 

@@ -114,8 +114,8 @@ void __init paging_init(void)
         l2e_write(&idle_pg_table_l2[l2_linear_offset(RO_MPT_VIRT_START) + i],
                   l2e_from_page(
                       pg, (__PAGE_HYPERVISOR | _PAGE_PSE) & ~_PAGE_RW));
-        /* Fill with an obvious debug pattern. */
-        memset((void *)(RDWR_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT)), 0x55,
+        /* Fill with INVALID_M2P_ENTRY. */
+        memset((void *)(RDWR_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT)), 0xFF,
                1UL << L2_PAGETABLE_SHIFT);
     }
 #undef CNT

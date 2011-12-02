@@ -566,10 +566,9 @@ extern void p2m_pt_init(struct p2m_domain *p2m);
 
 #if P2M_AUDIT
 extern void audit_p2m(struct domain *d,
-                        uint64_t *orphans_debug,
-                        uint64_t *orphans_invalid,
-                        uint64_t *m2p_bad,
-                        uint64_t *p2m_bad);
+                      uint64_t *orphans,
+                      uint64_t *m2p_bad,
+                      uint64_t *p2m_bad);
 #endif /* P2M_AUDIT */
 
 /* Printouts */

@@ -1459,8 +1459,7 @@ long arch_do_domctl(
             break;
 
         audit_p2m(d,
-                  &domctl->u.audit_p2m.orphans_debug,
-                  &domctl->u.audit_p2m.orphans_invalid,
+                  &domctl->u.audit_p2m.orphans,
                   &domctl->u.audit_p2m.m2p_bad,
                   &domctl->u.audit_p2m.p2m_bad);
         rcu_unlock_domain(d);

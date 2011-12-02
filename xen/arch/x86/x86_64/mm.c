@@ -495,7 +495,8 @@ static int setup_compat_m2p_table(struct mem_hotadd_info *info)
                                PAGE_HYPERVISOR);
         if ( err )
             break;
-        memset((void *)rwva, 0x55, 1UL << L2_PAGETABLE_SHIFT);
+        /* Fill with INVALID_M2P_ENTRY. */
+        memset((void *)rwva, 0xFF, 1UL << L2_PAGETABLE_SHIFT);
         /* NB. Cannot be GLOBAL as the ptes get copied into per-VM space. */
         l2e_write(&l2_ro_mpt[l2_table_offset(va)], l2e_from_page(l1_pg, _PAGE_PSE|_PAGE_PRESENT));
     }
@@ -569,8 +570,9 @@ static int setup_m2p_table(struct mem_hotadd_info *info)
                         PAGE_HYPERVISOR);
             if ( ret )
                 goto error;
+            /* Fill with INVALID_M2P_ENTRY. */
             memset((void *)(RDWR_MPT_VIRT_START + i * sizeof(unsigned long)),
-                   0x55, 1UL << L2_PAGETABLE_SHIFT);
+                   0xFF, 1UL << L2_PAGETABLE_SHIFT);
 
             ASSERT(!(l3e_get_flags(l3_ro_mpt[l3_table_offset(va)]) &
                   _PAGE_PSE));
@@ -727,8 +729,9 @@ void __init paging_init(void)
                 page_to_mfn(l1_pg),
                 1UL << PAGETABLE_ORDER,
                 PAGE_HYPERVISOR);
+            /* Fill with INVALID_M2P_ENTRY. */
             memset((void *)(RDWR_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT)),
-                   0x55, 1UL << L2_PAGETABLE_SHIFT);
+                   0xFF, 1UL << L2_PAGETABLE_SHIFT);
         }
         if ( !((unsigned long)l2_ro_mpt & ~PAGE_MASK) )
         {
