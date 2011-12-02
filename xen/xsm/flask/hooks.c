@@ -907,18 +907,6 @@ static int flask_apic(struct domain *d, int cmd)
     return domain_has_xen(d, perm);
 }
 
-static int flask_assign_vector(struct domain *d, uint32_t pirq)
-{
-    u32 psid;
-    struct domain_security_struct *dsec;
-    dsec = d->ssid;
-
-    if ( security_pirq_sid(pirq, &psid) )
-        return -EPERM;
-
-    return avc_has_perm(dsec->sid, psid, SECCLASS_EVENT, EVENT__VECTOR, NULL);
-}
-
 static int flask_xen_settime(void)
 {
     return domain_has_xen(current->domain, XEN__SETTIME);
@@ -1306,7 +1294,6 @@ static struct xsm_operations flask_ops = {
     .hvm_set_isa_irq_level = flask_hvm_set_isa_irq_level,
     .hvm_set_pci_link_route = flask_hvm_set_pci_link_route,
     .apic = flask_apic,
-    .assign_vector = flask_assign_vector,
     .xen_settime = flask_xen_settime,
     .memtype = flask_memtype,
     .microcode = flask_microcode,

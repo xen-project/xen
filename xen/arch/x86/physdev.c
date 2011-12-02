@@ -452,10 +452,6 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         if ( !IS_PRIV(v->domain) )
             break;
 
-        ret = xsm_assign_vector(v->domain, irq_op.irq);
-        if ( ret )
-            break;
-
         /* Vector is only used by hypervisor, and dom0 shouldn't
            touch it in its world, return irq_op.irq as the vecotr,
            and make this hypercall dummy, and also defer the vector 

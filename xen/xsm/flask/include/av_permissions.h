@@ -70,8 +70,7 @@
 #define EVENT__STATUS                             0x00000004UL
 #define EVENT__NOTIFY                             0x00000008UL
 #define EVENT__CREATE                             0x00000010UL
-#define EVENT__VECTOR                             0x00000020UL
-#define EVENT__RESET                              0x00000040UL
+#define EVENT__RESET                              0x00000020UL
 
 #define GRANT__MAP_READ                           0x00000001UL
 #define GRANT__MAP_WRITE                          0x00000002UL

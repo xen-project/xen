@@ -67,7 +67,6 @@ define(`create_channel', `
 ###############################################################################
 define(`create_passthrough_resource', `
         type $3, resource_type;
-        allow $1 $3:event vector;
         allow $1 $2:resource {add remove};
         allow $1 ioport_t:resource {add_ioport use};
         allow $1 iomem_t:resource {add_iomem use};

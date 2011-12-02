@@ -31,7 +31,6 @@ scheduler physinfo heap quirk readconsole writeconsole settime microcode};
 
 allow dom0_t domio_t:mmu {map_read map_write};
 allow dom0_t iomem_t:mmu {map_read map_write};
-allow dom0_t pirq_t:event {vector};
 allow dom0_t xen_t:mmu {memorymap};
 
 allow dom0_t dom0_t:mmu {pinpage map_read map_write adjust updatemp};

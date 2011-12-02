@@ -100,7 +100,6 @@ class event
 	status
 	notify
 	create
-    vector
     reset
 }
 
