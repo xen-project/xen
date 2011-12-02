@@ -151,4 +151,5 @@ sid iomem gen_context(system_u:object_r:iomem_t,s0)
 sid ioport gen_context(system_u:object_r:ioport_t,s0)
 sid device gen_context(system_u:object_r:device_t,s0)
 
+role system_r;
 role system_r types { xen_type domain_type };
