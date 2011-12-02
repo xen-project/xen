@@ -1016,6 +1016,9 @@ static int flask_mmu_normal_update(struct domain *d, struct domain *f,
     struct domain_security_struct *dsec;
     u32 fsid;
 
+    if ( !(l1e_get_flags(l1e_from_intpte(fpte)) & _PAGE_PRESENT) )
+        return 0;
+
     dsec = d->ssid;
 
     if ( l1e_get_flags(l1e_from_intpte(fpte)) & _PAGE_RW )
@@ -1053,15 +1056,18 @@ static int flask_update_va_mapping(struct domain *d, struct domain *f,
     unsigned long mfn;
     struct domain_security_struct *dsec;
 
+    if ( !(l1e_get_flags(pte) & _PAGE_PRESENT) )
+        return 0;
+
+    if ( l1e_get_flags(pte) & _PAGE_RW )
+        map_perms |= MMU__MAP_WRITE;
+
     dsec = d->ssid;
 
     mfn = get_gfn_untyped(f, l1e_get_pfn(pte));
     rc = get_mfn_sid(mfn, &psid);
     if ( rc )
         return rc;
-
-    if ( l1e_get_flags(pte) & _PAGE_RW )
-        map_perms |= MMU__MAP_WRITE;
 
     return avc_has_perm(dsec->sid, psid, SECCLASS_MMU, map_perms, NULL);
 }
