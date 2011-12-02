@@ -23,7 +23,7 @@ struct mmcfg_virt {
     char __iomem *virt;
 };
 static struct mmcfg_virt *pci_mmcfg_virt;
-static int __initdata mmcfg_pci_segment_shift;
+static unsigned int mmcfg_pci_segment_shift;
 
 static char __iomem *get_virt(unsigned int seg, unsigned int *bus)
 {
