@@ -399,7 +399,7 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
                 } 
 
                 Device(VGID) {
-                    Name(_HID, EisaID ("PNP0A06"))
+                    Name(_HID, EisaID ("XEN0000"))
                     Name(_UID, 0x00)
                     Name(_CID, "VM_Gen_Counter")
                     Name(_DDN, "VM_Gen_Counter")
