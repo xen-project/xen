@@ -43,23 +43,23 @@ static int hypervisor_is_64bit(xc_interface *xch)
 static void cpuid(const unsigned int *input, unsigned int *regs)
 {
     unsigned int count = (input[1] == XEN_CPUID_INPUT_UNUSED) ? 0 : input[1];
-    asm (
 #ifdef __i386__
+    /* Use the stack to avoid reg constraint failures with some gcc flags */
+    asm (
         "push %%ebx; push %%edx\n\t"
-#else
-        "push %%rbx; push %%rdx\n\t"
-#endif
         "cpuid\n\t"
         "mov %%ebx,4(%4)\n\t"
         "mov %%edx,12(%4)\n\t"
-#ifdef __i386__
         "pop %%edx; pop %%ebx\n\t"
-#else
-        "pop %%rdx; pop %%rbx\n\t"
-#endif
         : "=a" (regs[0]), "=c" (regs[2])
-        : "0" (input[0]), "1" (count), "S" (regs)
+        : "0" (input[0]), "1" (count), "S" (_regs)
         : "memory" );
+#else
+    asm (
+        "cpuid"
+        : "=a" (regs[0]), "=b" (regs[1]), "=c" (regs[2]), "=d" (regs[3])
+        : "0" (input[0]), "2" (count) );
+#endif
 }
 
 /* Get the manufacturer brand name of the host processor. */
