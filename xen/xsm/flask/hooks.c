@@ -643,7 +643,7 @@ static inline u32 resource_to_perm(uint8_t access)
         return RESOURCE__REMOVE;
 }
 
-static int irq_has_perm(struct domain *d, uint8_t pirq, uint8_t access)
+static int flask_irq_permission (struct domain *d, int pirq, uint8_t access)
 {
     u32 perm;
     u32 rsid;
@@ -678,10 +678,9 @@ static int irq_has_perm(struct domain *d, uint8_t pirq, uint8_t access)
         return rc;
 
     if ( access )
-        return avc_has_perm(tsec->sid, rsid, SECCLASS_RESOURCE, 
+        rc = avc_has_perm(tsec->sid, rsid, SECCLASS_RESOURCE, 
                             RESOURCE__USE, &ad);
-    else
-        return rc;
+    return rc;
 }
 
 struct iomem_has_perm_data {
@@ -706,7 +705,7 @@ static int _iomem_has_perm(void *v, u32 sid, unsigned long start, unsigned long 
     return avc_has_perm(data->tsec->sid, sid, SECCLASS_RESOURCE, RESOURCE__USE, &ad);
 }
 
-static int iomem_has_perm(struct domain *d, unsigned long start, unsigned long end, uint8_t access)
+static int flask_iomem_permission(struct domain *d, uint64_t start, uint64_t end, uint8_t access)
 {
     struct iomem_has_perm_data data;
     int rc;
@@ -784,7 +783,7 @@ static int _ioport_has_perm(void *v, u32 sid, unsigned long start, unsigned long
 }
 
 
-static int ioport_has_perm(struct domain *d, uint32_t start, uint32_t end, uint8_t access)
+static int flask_ioport_permission(struct domain *d, uint32_t start, uint32_t end, uint8_t access)
 {
     int rc;
     struct ioport_has_perm_data data;
@@ -1142,23 +1141,30 @@ static int flask_bind_pt_irq (struct domain *d, struct xen_domctl_bind_pt_irq *b
 {
     u32 rsid;
     int rc = -EPERM;
+    int irq;
     struct domain_security_struct *ssec, *tsec;
+    struct avc_audit_data ad;
 
     rc = domain_has_perm(current->domain, d, SECCLASS_RESOURCE, RESOURCE__ADD);
     if ( rc )
         return rc;
 
-    rc = security_pirq_sid(bind->machine_irq, &rsid);
+    irq = domain_pirq_to_irq(d, bind->machine_irq);
+
+    rc = security_pirq_sid(irq, &rsid);
     if ( rc )
         return rc;
 
+    AVC_AUDIT_DATA_INIT(&ad, DEV);
+    ad.device = (unsigned long)irq;
+
     ssec = current->domain->ssid;
-    rc = avc_has_perm(ssec->sid, rsid, SECCLASS_HVM, HVM__BIND_IRQ, NULL);
+    rc = avc_has_perm(ssec->sid, rsid, SECCLASS_HVM, HVM__BIND_IRQ, &ad);
     if ( rc )
         return rc;
 
     tsec = d->ssid;
-    return avc_has_perm(tsec->sid, rsid, SECCLASS_RESOURCE, RESOURCE__USE, NULL);
+    return avc_has_perm(tsec->sid, rsid, SECCLASS_RESOURCE, RESOURCE__USE, &ad);
 }
 
 static int flask_pin_mem_cacheattr (struct domain *d)
@@ -1204,50 +1210,6 @@ static int flask_vcpuextstate (struct domain *d, uint32_t cmd)
     return domain_has_perm(current->domain, d, SECCLASS_DOMAIN, perm);
 }
 #endif
-
-static int io_has_perm(struct domain *d, char *name, unsigned long s, 
-                       unsigned long e, u32 access)
-{
-    int rc = -EPERM;
-
-    if ( strcmp(name, "I/O Memory") == 0 )
-    {
-        rc = iomem_has_perm(d, s, e, access);
-        if ( rc )
-            return rc;
-    }
-    else if ( strcmp(name, "Interrupts") == 0 )
-    {
-        while (s <= e) {
-            rc = irq_has_perm(d, s, access);
-            if ( rc )
-                return rc;
-            s++;
-        }
-    }
-#ifdef CONFIG_X86
-    else if ( strcmp(name, "I/O Ports") == 0 )
-    {
-        rc = ioport_has_perm(d, s, e, access);
-        if ( rc )
-            return rc;
-    }
-#endif
-
-    return rc;    
-}
-
-static int flask_add_range(struct domain *d, char *name, unsigned long s,
-                           unsigned long e)
-{
-    return io_has_perm(d, name, s, e, 1);
-}
-
-static int flask_remove_range(struct domain *d, char *name, unsigned long s,
-                              unsigned long e)
-{
-    return io_has_perm(d, name, s, e, 0);
-}
 
 long do_flask_op(XEN_GUEST_HANDLE(xsm_op_t) u_flask_op);
 
@@ -1308,8 +1270,8 @@ static struct xsm_operations flask_ops = {
     .kexec = flask_kexec,
     .schedop_shutdown = flask_schedop_shutdown,
 
-    .add_range = flask_add_range,
-    .remove_range = flask_remove_range,
+    .irq_permission = flask_irq_permission,
+    .iomem_permission = flask_iomem_permission,
 
     .__do_xsm_op = do_flask_op,
 
@@ -1348,6 +1310,7 @@ static struct xsm_operations flask_ops = {
     .pin_mem_cacheattr = flask_pin_mem_cacheattr,
     .ext_vcpucontext = flask_ext_vcpucontext,
     .vcpuextstate = flask_vcpuextstate,
+    .ioport_permission = flask_ioport_permission,
 #endif
 };
 

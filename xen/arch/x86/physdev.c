@@ -229,6 +229,10 @@ int physdev_unmap_pirq(domid_t domid, int pirq)
     if ( !IS_PRIV_FOR(current->domain, d) )
         goto free_domain;
 
+    ret = xsm_irq_permission(d, pirq, 0);
+    if ( ret )
+        goto free_domain;
+
     spin_lock(&pcidevs_lock);
     spin_lock(&d->event_lock);
     ret = unmap_domain_pirq(d, pirq);

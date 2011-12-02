@@ -97,10 +97,6 @@ int rangeset_add_range(
     struct range *x, *y;
     int rc = 0;
 
-    rc = xsm_add_range(r->domain, r->name, s, e);
-    if ( rc )
-        return rc;
-
     ASSERT(s <= e);
 
     spin_lock(&r->lock);
@@ -168,10 +164,6 @@ int rangeset_remove_range(
 {
     struct range *x, *y, *t;
     int rc = 0;
-
-    rc = xsm_remove_range(r->domain, r->name, s, e);
-    if ( rc )
-        return rc;
 
     ASSERT(s <= e);
 

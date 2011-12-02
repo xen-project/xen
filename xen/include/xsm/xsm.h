@@ -106,8 +106,8 @@ struct xsm_operations {
 
     int (*kexec) (void);
     int (*schedop_shutdown) (struct domain *d1, struct domain *d2);
-    int (*add_range) (struct domain *d, char *name, unsigned long s, unsigned long e);
-    int (*remove_range) (struct domain *d, char *name, unsigned long s, unsigned long e);
+    int (*irq_permission) (struct domain *d, int pirq, uint8_t allow);
+    int (*iomem_permission) (struct domain *d, uint64_t s, uint64_t e, uint8_t allow);
 
     int (*test_assign_device) (uint32_t machine_bdf);
     int (*assign_device) (struct domain *d, uint32_t machine_bdf);
@@ -152,6 +152,7 @@ struct xsm_operations {
     int (*pin_mem_cacheattr) (struct domain *d);
     int (*ext_vcpucontext) (struct domain *d, uint32_t cmd);
     int (*vcpuextstate) (struct domain *d, uint32_t cmd);
+    int (*ioport_permission) (struct domain *d, uint32_t s, uint32_t e, uint8_t allow);
 #endif
 };
 
@@ -415,16 +416,14 @@ static inline int xsm_schedop_shutdown (struct domain *d1, struct domain *d2)
     return xsm_call(schedop_shutdown(d1, d2));
 }
 
-static inline int xsm_add_range (struct domain *d, char *name, unsigned long s,
-                                                                        unsigned long e)
+static inline int xsm_irq_permission (struct domain *d, int pirq, uint8_t allow)
 {
-    return xsm_call(add_range(d, name, s, e));
+    return xsm_call(irq_permission(d, pirq, allow));
 }
- 
-static inline int xsm_remove_range (struct domain *d, char *name, unsigned long s,
-                                                                        unsigned long e)
+
+static inline int xsm_iomem_permission (struct domain *d, uint64_t s, uint64_t e, uint8_t allow)
 {
-    return xsm_call(remove_range(d, name, s, e));
+    return xsm_call(iomem_permission(d, s, e, allow));
 }
 
 static inline int xsm_test_assign_device(uint32_t machine_bdf)
@@ -639,6 +638,11 @@ static inline int xsm_ext_vcpucontext(struct domain *d, uint32_t cmd)
 static inline int xsm_vcpuextstate(struct domain *d, uint32_t cmd)
 {
     return xsm_call(vcpuextstate(d, cmd));
+}
+
+static inline int xsm_ioport_permission (struct domain *d, uint32_t s, uint32_t e, uint8_t allow)
+{
+    return xsm_call(ioport_permission(d, s, e, allow));
 }
 #endif /* CONFIG_X86 */
 

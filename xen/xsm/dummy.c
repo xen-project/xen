@@ -273,13 +273,12 @@ static long dummy___do_xsm_op(XEN_GUEST_HANDLE(xsm_op_t) op)
     return -ENOSYS;
 }
 
-static int dummy_add_range (struct domain *d, char *name, unsigned long s, unsigned long e)
+static int dummy_irq_permission (struct domain *d, int pirq, uint8_t allow)
 {
     return 0;
 }
 
-static int dummy_remove_range (struct domain *d, char *name, unsigned long s, 
-                                                                        unsigned long e)
+static int dummy_iomem_permission (struct domain *d, uint64_t s, uint64_t e, uint8_t allow)
 {
     return 0;
 }
@@ -462,6 +461,10 @@ static int dummy_vcpuextstate (struct domain *d, uint32_t cmd)
     return 0;
 }
 
+static int dummy_ioport_permission (struct domain *d, uint32_t s, uint32_t e, uint8_t allow)
+{
+    return 0;
+}
 #endif
 
 struct xsm_operations dummy_xsm_ops;
@@ -536,8 +539,8 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, kexec);
     set_to_dummy_if_null(ops, schedop_shutdown);
 
-    set_to_dummy_if_null(ops, add_range);
-    set_to_dummy_if_null(ops, remove_range);
+    set_to_dummy_if_null(ops, irq_permission);
+    set_to_dummy_if_null(ops, iomem_permission);
 
     set_to_dummy_if_null(ops, __do_xsm_op);
 
@@ -577,5 +580,6 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, pin_mem_cacheattr);
     set_to_dummy_if_null(ops, ext_vcpucontext);
     set_to_dummy_if_null(ops, vcpuextstate);
+    set_to_dummy_if_null(ops, ioport_permission);
 #endif
 }

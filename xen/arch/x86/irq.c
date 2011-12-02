@@ -18,6 +18,7 @@
 #include <xen/iocap.h>
 #include <xen/iommu.h>
 #include <xen/trace.h>
+#include <xsm/xsm.h>
 #include <asm/msi.h>
 #include <asm/current.h>
 #include <asm/flushtlb.h>
@@ -1815,6 +1816,14 @@ int map_domain_pirq(
         dprintk(XENLOG_G_WARNING, "dom%d: pirq %d or irq %d already mapped\n",
                 d->domain_id, pirq, irq);
         return 0;
+    }
+
+    ret = xsm_irq_permission(d, irq, 1);
+    if ( ret )
+    {
+        dprintk(XENLOG_G_ERR, "dom%d: could not permit access to irq %d mapping to pirq %d\n",
+                d->domain_id, irq, pirq);
+        return ret;
     }
 
     ret = irq_permit_access(d, pirq);

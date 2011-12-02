@@ -76,6 +76,7 @@ long arch_do_domctl(
         struct domain *d;
         unsigned int fp = domctl->u.ioport_permission.first_port;
         unsigned int np = domctl->u.ioport_permission.nr_ports;
+        int allow = domctl->u.ioport_permission.allow_access;
 
         ret = -EINVAL;
         if ( (fp + np) > 65536 )
@@ -87,7 +88,9 @@ long arch_do_domctl(
 
         if ( np == 0 )
             ret = 0;
-        else if ( domctl->u.ioport_permission.allow_access )
+        else if ( xsm_ioport_permission(d, fp, fp + np - 1, allow) )
+            ret = -EPERM;
+        else if ( allow )
             ret = ioports_permit_access(d, fp, fp + np - 1);
         else
             ret = ioports_deny_access(d, fp, fp + np - 1);
@@ -822,6 +825,7 @@ long arch_do_domctl(
         unsigned long gfn = domctl->u.memory_mapping.first_gfn;
         unsigned long mfn = domctl->u.memory_mapping.first_mfn;
         unsigned long nr_mfns = domctl->u.memory_mapping.nr_mfns;
+        int add = domctl->u.memory_mapping.add_mapping;
         int i;
 
         ret = -EINVAL;
@@ -837,8 +841,13 @@ long arch_do_domctl(
         if ( unlikely((d = rcu_lock_domain_by_id(domctl->domain)) == NULL) )
             break;
 
-        ret=0;
-        if ( domctl->u.memory_mapping.add_mapping )
+        ret = xsm_iomem_permission(d, mfn, mfn + nr_mfns - 1, add);
+        if ( ret ) {
+            rcu_unlock_domain(d);
+            break;
+        }
+
+        if ( add )
         {
             gdprintk(XENLOG_INFO,
                 "memory_map:add: gfn=%lx mfn=%lx nr_mfns=%lx\n",
@@ -871,6 +880,7 @@ long arch_do_domctl(
         unsigned int fgp = domctl->u.ioport_mapping.first_gport;
         unsigned int fmp = domctl->u.ioport_mapping.first_mport;
         unsigned int np = domctl->u.ioport_mapping.nr_ports;
+        unsigned int add = domctl->u.ioport_mapping.add_mapping;
         struct g2m_ioport *g2m_ioport;
         int found = 0;
 
@@ -893,8 +903,14 @@ long arch_do_domctl(
         if ( unlikely((d = rcu_lock_domain_by_id(domctl->domain)) == NULL) )
             break;
 
+        ret = xsm_ioport_permission(d, fmp, fmp + np - 1, add);
+        if ( ret ) {
+            rcu_unlock_domain(d);
+            break;
+        }
+
         hd = domain_hvm_iommu(d);
-        if ( domctl->u.ioport_mapping.add_mapping )
+        if ( add )
         {
             gdprintk(XENLOG_INFO,
                 "ioport_map:add f_gport=%x f_mport=%x np=%x\n",

@@ -858,6 +858,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     {
         struct domain *d;
         unsigned int pirq = op->u.irq_permission.pirq;
+        int allow = op->u.irq_permission.allow_access;
 
         ret = -ESRCH;
         d = rcu_lock_domain_by_id(op->domain);
@@ -866,7 +867,9 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
         if ( pirq >= d->nr_pirqs )
             ret = -EINVAL;
-        else if ( op->u.irq_permission.allow_access )
+        else if ( xsm_irq_permission(d, pirq, allow) )
+            ret = -EPERM;
+        else if ( allow )
             ret = irq_permit_access(d, pirq);
         else
             ret = irq_deny_access(d, pirq);
@@ -880,6 +883,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         struct domain *d;
         unsigned long mfn = op->u.iomem_permission.first_mfn;
         unsigned long nr_mfns = op->u.iomem_permission.nr_mfns;
+        int allow = op->u.iomem_permission.allow_access;
 
         ret = -EINVAL;
         if ( (mfn + nr_mfns - 1) < mfn ) /* wrap? */
@@ -890,7 +894,9 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( d == NULL )
             break;
 
-        if ( op->u.iomem_permission.allow_access )
+        if ( xsm_iomem_permission(d, mfn, mfn + nr_mfns - 1, allow) )
+            ret = -EPERM;
+        else if ( allow )
             ret = iomem_permit_access(d, mfn, mfn + nr_mfns - 1);
         else
             ret = iomem_deny_access(d, mfn, mfn + nr_mfns - 1);
