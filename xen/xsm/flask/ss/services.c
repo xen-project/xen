@@ -1514,11 +1514,11 @@ err:
 }
 
 /**
- * security_pirq_sid - Obtain the SID for a physical irq.
+ * security_irq_sid - Obtain the SID for a physical irq.
  * @pirq: physical irq
  * @out_sid: security identifier
  */
-int security_pirq_sid(int pirq, u32 *out_sid)
+int security_irq_sid(int pirq, u32 *out_sid)
 {
     int rc = 0;
     struct ocontext *c;

@@ -666,7 +666,7 @@ static int flask_irq_permission (struct domain *d, int pirq, uint8_t access)
     ssec = current->domain->ssid;
     tsec = d->ssid;
 
-    rc = security_pirq_sid(pirq, &rsid);
+    rc = security_irq_sid(pirq, &rsid);
     if ( rc )
         return rc;
 
@@ -1151,7 +1151,7 @@ static int flask_bind_pt_irq (struct domain *d, struct xen_domctl_bind_pt_irq *b
 
     irq = domain_pirq_to_irq(d, bind->machine_irq);
 
-    rc = security_pirq_sid(irq, &rsid);
+    rc = security_irq_sid(irq, &rsid);
     if ( rc )
         return rc;
 
