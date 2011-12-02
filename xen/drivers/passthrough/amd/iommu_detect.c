@@ -66,7 +66,7 @@ void __init get_iommu_features(struct amd_iommu *iommu)
 {
     u32 low, high;
     int i = 0 ;
-    char * feature_str[] = {
+    static const char *__initdata feature_str[] = {
         "- Prefetch Pages Command", 
         "- Peripheral Page Service Request", 
         "- X2APIC Supported", 
