@@ -395,6 +395,10 @@ static int kexec_get_range_compat(XEN_GUEST_HANDLE(void) uarg)
 
     ret = kexec_get_range_internal(&range);
 
+    /* Dont silently truncate physical addresses or sizes. */
+    if ( (range.start | range.size) & ~(unsigned long)(~0u) )
+        return -ERANGE;
+
     if ( ret == 0 ) {
         XLAT_kexec_range(&compat_range, &range);
         if ( unlikely(copy_to_guest(uarg, &compat_range, 1)) )
