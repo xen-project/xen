@@ -15,6 +15,7 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <unistd.h>
+#include <inttypes.h>
 #include <libflask.h>
 
 /* Pulled from linux/include/linux/ioport.h */
@@ -76,22 +77,22 @@ int main (int argCnt, char *argv[])
 		goto done;
 	}
 
-	while (fscanf(f, "0x%lx 0x%lx 0x%lx\n", &start, &end, &flags) == 3) {
+	while (fscanf(f, "0x%"SCNx64" 0x%"SCNx64" 0x%"SCNx64"\n", &start, &end, &flags) == 3) {
 		if (flags & IORESOURCE_IO) {
-			// printf("Port %lx-%lx\n", start, end);
+			// printf("Port %"PRIx64"-%"PRIx64"\n", start, end);
 			ret = flask_add_ioport(xch, start, end, argv[2]);
 			if (ret) {
-				fprintf(stderr, "flask_add_ioport %lx-%lx failed: %d\n",
+				fprintf(stderr, "flask_add_ioport %"PRIx64"-%"PRIx64" failed: %d\n",
 						start, end, ret);
 				err = 2;
 			}
 		} else if (flags & IORESOURCE_MEM) {
 			start >>= 12;
 			end >>= 12;
-			// printf("IOMEM %lx-%lx\n", start, end);
+			// printf("IOMEM %"PRIx64"-%"PRIx64"\n", start, end);
 			ret = flask_add_iomem(xch, start, end, argv[2]);
 			if (ret) {
-				fprintf(stderr, "flask_add_iomem %lx-%lx failed: %d\n",
+				fprintf(stderr, "flask_add_iomem %"PRIx64"-%"PRIx64" failed: %d\n",
 						start, end, ret);
 				err = 2;
 			}
@@ -104,12 +105,12 @@ int main (int argCnt, char *argv[])
 	f = fopen(buf, "r");
 	if (!f)
 		goto done;
-	start = 0;
-	fscanf(f, "%ld", &start);
+	if (fscanf(f, "%" SCNu64, &start) != 1)
+		start = 0;
 	if (start) {
 		ret = flask_add_pirq(xch, start, argv[2]);
 		if (ret) {
-			fprintf(stderr, "flask_add_pirq %ld failed: %d\n",
+			fprintf(stderr, "flask_add_pirq %"PRIu64" failed: %d\n",
 					start, ret);
 			err = 2;
 		}
