@@ -323,8 +323,6 @@ int main(int argc, char **argv)
      * the ACPI event:
      *  _EJ0: eject a device
      *  _STA: return a device's status, e.g. enabled or removed
-     * Other methods are optional: 
-     *  _PS0/3: put them here for debug purpose
      * 
      * Eject button would generate a general-purpose event, then the
      * control method for this event uses Notify() to inform OSPM which
@@ -344,14 +342,6 @@ int main(int argc, char **argv)
             stmt("Name", "_ADR, 0x%08x", ((slot & ~7) << 13) | (slot & 7));
             /* _SUN == dev */
             stmt("Name", "_SUN, 0x%08x", slot >> 3);
-            push_block("Method", "_PS0, 0");
-            stmt("Store", "0x%02x, \\_GPE.DPT1", slot);
-            stmt("Store", "0x80, \\_GPE.DPT2");
-            pop_block();
-            push_block("Method", "_PS3, 0");
-            stmt("Store", "0x%02x, \\_GPE.DPT1", slot);
-            stmt("Store", "0x83, \\_GPE.DPT2");
-            pop_block();
             push_block("Method", "_EJ0, 1");
             stmt("Store", "0x%02x, \\_GPE.DPT1", slot);
             stmt("Store", "0x88, \\_GPE.DPT2");
