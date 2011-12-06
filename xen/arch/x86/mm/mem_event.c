@@ -143,6 +143,12 @@ void mem_event_put_request(struct domain *d, struct mem_event_domain *med, mem_e
     front_ring = &med->front_ring;
     req_prod = front_ring->req_prod_pvt;
 
+    if ( current->domain != d )
+    {
+        req->flags |= MEM_EVENT_FLAG_FOREIGN;
+        ASSERT( !(req->flags & MEM_EVENT_FLAG_VCPU_PAUSED) );
+    }
+
     /* Copy request */
     memcpy(RING_GET_REQUEST(front_ring, req_prod), req, sizeof(*req));
     req_prod++;
