@@ -1288,7 +1288,8 @@ int hvm_hap_nested_page_fault(unsigned long gpa,
      * If this GFN is emulated MMIO or marked as read-only, pass the fault
      * to the mmio handler.
      */
-    if ( (p2mt == p2m_mmio_dm) || (p2mt == p2m_ram_ro) )
+    if ( (p2mt == p2m_mmio_dm) || 
+         (access_w && (p2mt == p2m_ram_ro)) )
     {
         if ( !handle_mmio() )
             hvm_inject_exception(TRAP_gp_fault, 0, 0);
@@ -1302,7 +1303,7 @@ int hvm_hap_nested_page_fault(unsigned long gpa,
         p2m_mem_paging_populate(v->domain, gfn);
 
     /* Mem sharing: unshare the page and try again */
-    if ( p2mt == p2m_ram_shared )
+    if ( access_w && (p2mt == p2m_ram_shared) )
     {
         ASSERT(!p2m_is_nestedp2m(p2m));
         mem_sharing_unshare_page(p2m->domain, gfn, 0);
@@ -1319,14 +1320,17 @@ int hvm_hap_nested_page_fault(unsigned long gpa,
          * a large page, we do not change other pages type within that large
          * page.
          */
-        paging_mark_dirty(v->domain, mfn_x(mfn));
-        p2m_change_type(v->domain, gfn, p2m_ram_logdirty, p2m_ram_rw);
+        if ( access_w )
+        {
+            paging_mark_dirty(v->domain, mfn_x(mfn));
+            p2m_change_type(v->domain, gfn, p2m_ram_logdirty, p2m_ram_rw);
+        }
         rc = 1;
         goto out_put_gfn;
     }
 
     /* Shouldn't happen: Maybe the guest was writing to a r/o grant mapping? */
-    if ( p2mt == p2m_grant_map_ro )
+    if ( access_w && (p2mt == p2m_grant_map_ro) )
     {
         gdprintk(XENLOG_WARNING,
                  "trying to write to read-only grant mapping\n");
