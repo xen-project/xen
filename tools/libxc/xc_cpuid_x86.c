@@ -485,6 +485,7 @@ static void xc_cpuid_pv_policy(
         }
         clear_bit(X86_FEATURE_XTPR, regs[2]);
         clear_bit(X86_FEATURE_PDCM, regs[2]);
+        clear_bit(X86_FEATURE_PCID, regs[2]);
         clear_bit(X86_FEATURE_DCA, regs[2]);
         set_bit(X86_FEATURE_HYPERVISOR, regs[2]);
         break;
