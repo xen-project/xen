@@ -377,7 +377,7 @@ vmx_vcpu_initialise(struct vcpu *v)
 {
 	struct vmx_ioreq_page *iorp = &v->domain->arch.hvm_domain.ioreq;
 
-	int rc = alloc_unbound_xen_event_channel(v, 0);
+	int rc = alloc_unbound_xen_event_channel(v, 0, NULL);
 	if (rc < 0)
 		return rc;
 	v->arch.arch_vmx.xen_port = rc;

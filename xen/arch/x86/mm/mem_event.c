@@ -93,7 +93,8 @@ static int mem_event_enable(struct domain *d,
 
     /* Allocate event channel */
     rc = alloc_unbound_xen_event_channel(d->vcpu[0],
-                                         current->domain->domain_id);
+                                         current->domain->domain_id,
+                                         NULL);
     if ( rc < 0 )
         goto err;
 

@@ -57,6 +57,51 @@
         goto out;                                                   \
     } while ( 0 )
 
+#define consumer_is_xen(e) (!!(e)->xen_consumer)
+
+/*
+ * The function alloc_unbound_xen_event_channel() allows an arbitrary
+ * notifier function to be specified. However, very few unique functions
+ * are specified in practice, so to prevent bloating the evtchn structure
+ * with a pointer, we stash them dynamically in a small lookup array which
+ * can be indexed by a small integer.
+ */
+static xen_event_channel_notification_t xen_consumers[8];
+
+/* Default notification action: wake up from wait_on_xen_event_channel(). */
+static void default_xen_notification_fn(struct vcpu *v, unsigned int port)
+{
+    /* Consumer needs notification only if blocked. */
+    if ( test_and_clear_bit(_VPF_blocked_in_xen, &v->pause_flags) )
+        vcpu_wake(v);
+}
+
+/*
+ * Given a notification function, return the value to stash in
+ * the evtchn->xen_consumer field.
+ */
+static uint8_t get_xen_consumer(xen_event_channel_notification_t fn)
+{
+    unsigned int i;
+
+    if ( fn == NULL )
+        fn = default_xen_notification_fn;
+
+    for ( i = 0; i < ARRAY_SIZE(xen_consumers); i++ )
+    {
+        if ( xen_consumers[i] == NULL )
+            xen_consumers[i] = fn;
+        if ( xen_consumers[i] == fn )
+            break;
+    }
+
+    BUG_ON(i >= ARRAY_SIZE(xen_consumers));
+    return i+1;
+}
+
+/* Get the notification function for a given Xen-bound event channel. */
+#define xen_notification_fn(e) (xen_consumers[(e)->xen_consumer-1])
+
 static int evtchn_set_pending(struct vcpu *v, int port);
 
 static int virq_is_global(int virq)
@@ -397,7 +442,7 @@ static long __evtchn_close(struct domain *d1, int port1)
     chn1 = evtchn_from_port(d1, port1);
 
     /* Guest cannot close a Xen-attached event channel. */
-    if ( unlikely(chn1->consumer_is_xen) )
+    if ( unlikely(consumer_is_xen(chn1)) )
     {
         rc = -EINVAL;
         goto out;
@@ -537,7 +582,7 @@ int evtchn_send(struct domain *d, unsigned int lport)
     lchn = evtchn_from_port(ld, lport);
 
     /* Guest cannot send via a Xen-attached event channel. */
-    if ( unlikely(lchn->consumer_is_xen) )
+    if ( unlikely(consumer_is_xen(lchn)) )
     {
         spin_unlock(&ld->event_lock);
         return -EINVAL;
@@ -554,13 +599,8 @@ int evtchn_send(struct domain *d, unsigned int lport)
         rport = lchn->u.interdomain.remote_port;
         rchn  = evtchn_from_port(rd, rport);
         rvcpu = rd->vcpu[rchn->notify_vcpu_id];
-        if ( rchn->consumer_is_xen )
-        {
-            /* Xen consumers need notification only if they are blocked. */
-            if ( test_and_clear_bit(_VPF_blocked_in_xen,
-                                    &rvcpu->pause_flags) )
-                vcpu_wake(rvcpu);
-        }
+        if ( consumer_is_xen(rchn) )
+            (*xen_notification_fn(rchn))(rvcpu, rport);
         else
         {
             evtchn_set_pending(rvcpu, rport);
@@ -787,7 +827,7 @@ long evtchn_bind_vcpu(unsigned int port, unsigned int vcpu_id)
     chn = evtchn_from_port(d, port);
 
     /* Guest cannot re-bind a Xen-attached event channel. */
-    if ( unlikely(chn->consumer_is_xen) )
+    if ( unlikely(consumer_is_xen(chn)) )
     {
         rc = -EINVAL;
         goto out;
@@ -998,7 +1038,8 @@ long do_event_channel_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 
 
 int alloc_unbound_xen_event_channel(
-    struct vcpu *local_vcpu, domid_t remote_domid)
+    struct vcpu *local_vcpu, domid_t remote_domid,
+    xen_event_channel_notification_t notification_fn)
 {
     struct evtchn *chn;
     struct domain *d = local_vcpu->domain;
@@ -1011,7 +1052,7 @@ int alloc_unbound_xen_event_channel(
     chn = evtchn_from_port(d, port);
 
     chn->state = ECS_UNBOUND;
-    chn->consumer_is_xen = 1;
+    chn->xen_consumer = get_xen_consumer(notification_fn);
     chn->notify_vcpu_id = local_vcpu->vcpu_id;
     chn->u.unbound.remote_domid = remote_domid;
 
@@ -1038,8 +1079,8 @@ void free_xen_event_channel(
 
     BUG_ON(!port_is_valid(d, port));
     chn = evtchn_from_port(d, port);
-    BUG_ON(!chn->consumer_is_xen);
-    chn->consumer_is_xen = 0;
+    BUG_ON(!consumer_is_xen(chn));
+    chn->xen_consumer = 0;
 
     spin_unlock(&d->event_lock);
 
@@ -1063,7 +1104,7 @@ void notify_via_xen_event_channel(struct domain *ld, int lport)
 
     ASSERT(port_is_valid(ld, lport));
     lchn = evtchn_from_port(ld, lport);
-    ASSERT(lchn->consumer_is_xen);
+    ASSERT(consumer_is_xen(lchn));
 
     if ( likely(lchn->state == ECS_INTERDOMAIN) )
     {
@@ -1106,7 +1147,7 @@ void evtchn_destroy(struct domain *d)
     /* Close all existing event channels. */
     for ( i = 0; port_is_valid(d, i); i++ )
     {
-        evtchn_from_port(d, i)->consumer_is_xen = 0;
+        evtchn_from_port(d, i)->xen_consumer = 0;
         (void)__evtchn_close(d, i);
     }
 
@@ -1192,7 +1233,7 @@ static void domain_dump_evtchn_info(struct domain *d)
             printk(" v=%d", chn->u.virq);
             break;
         }
-        printk(" x=%d\n", chn->consumer_is_xen);
+        printk(" x=%d\n", chn->xen_consumer);
     }
 
     spin_unlock(&d->event_lock);

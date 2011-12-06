@@ -47,7 +47,7 @@ struct evtchn
 #define ECS_VIRQ         5 /* Channel is bound to a virtual IRQ line.        */
 #define ECS_IPI          6 /* Channel is bound to a virtual IPI line.        */
     u8  state;             /* ECS_* */
-    u8  consumer_is_xen;   /* Consumed by Xen or by guest? */
+    u8  xen_consumer;      /* Consumer in Xen, if any? (0 = send to guest) */
     u16 notify_vcpu_id;    /* VCPU for local delivery notification */
     union {
         struct {
