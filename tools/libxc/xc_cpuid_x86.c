@@ -310,6 +310,7 @@ static void xc_cpuid_hvm_policy(
                     bitmaskof(X86_FEATURE_SSSE3) |
                     bitmaskof(X86_FEATURE_FMA) |
                     bitmaskof(X86_FEATURE_CX16) |
+                    bitmaskof(X86_FEATURE_PCID) |
                     bitmaskof(X86_FEATURE_SSE4_1) |
                     bitmaskof(X86_FEATURE_SSE4_2) |
                     bitmaskof(X86_FEATURE_MOVBE)  |
@@ -365,6 +366,7 @@ static void xc_cpuid_hvm_policy(
                         bitmaskof(X86_FEATURE_SMEP) |
                         bitmaskof(X86_FEATURE_BMI2) |
                         bitmaskof(X86_FEATURE_ERMS) |
+                        bitmaskof(X86_FEATURE_INVPCID) |
                         bitmaskof(X86_FEATURE_FSGSBASE));
         } else
             regs[1] = 0;
