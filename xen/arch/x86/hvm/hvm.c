@@ -1250,6 +1250,7 @@ int hvm_hap_nested_page_fault(unsigned long gpa,
         switch (p2ma) 
         {
         case p2m_access_n:
+        case p2m_access_n2rwx:
         default:
             violation = access_r || access_w || access_x;
             break;

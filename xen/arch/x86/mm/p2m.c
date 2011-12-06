@@ -1107,6 +1107,11 @@ bool_t p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long g
         p2m_unlock(p2m);
         return 1;
     }
+    else if ( p2ma == p2m_access_n2rwx )
+    {
+        ASSERT(access_w || access_r || access_x);
+        p2m->set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2mt, p2m_access_rwx);
+    }
     p2m_unlock(p2m);
 
     /* Otherwise, check if there is a memory event listener, and send the message along */
@@ -1124,10 +1129,13 @@ bool_t p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long g
         }
         else
         {
-            /* A listener is not required, so clear the access restrictions */
-            p2m_lock(p2m);
-            p2m->set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2mt, p2m_access_rwx);
-            p2m_unlock(p2m);
+            if ( p2ma != p2m_access_n2rwx )
+            {
+                /* A listener is not required, so clear the access restrictions */
+                p2m_lock(p2m);
+                p2m->set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2mt, p2m_access_rwx);
+                p2m_unlock(p2m);
+            }
             return 1;
         }
 
@@ -1140,9 +1148,12 @@ bool_t p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long g
     req.type = MEM_EVENT_TYPE_ACCESS;
     req.reason = MEM_EVENT_REASON_VIOLATION;
 
-    /* Pause the current VCPU unconditionally */
-    vcpu_pause_nosync(v);
-    req.flags |= MEM_EVENT_FLAG_VCPU_PAUSED;    
+    /* Pause the current VCPU */
+    if ( p2ma != p2m_access_n2rwx )
+    {
+        vcpu_pause_nosync(v);
+        req.flags |= MEM_EVENT_FLAG_VCPU_PAUSED;
+    } 
 
     /* Send request to mem event */
     req.gfn = gfn;
@@ -1157,8 +1168,8 @@ bool_t p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long g
 
     mem_event_put_request(d, &d->mem_event->access, &req);
 
-    /* VCPU paused, mem event request sent */
-    return 0;
+    /* VCPU may be paused, return whether we promoted automatically */
+    return (p2ma == p2m_access_n2rwx);
 }
 
 void p2m_mem_access_resume(struct domain *d)
@@ -1204,6 +1215,7 @@ int p2m_set_mem_access(struct domain *d, unsigned long start_pfn,
         p2m_access_wx,
         p2m_access_rwx,
         p2m_access_rx2rw,
+        p2m_access_n2rwx,
         p2m->default_access,
     };
 

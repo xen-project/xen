@@ -111,6 +111,7 @@ static void ept_p2m_type_to_flags(ept_entry_t *entry, p2m_type_t type, p2m_acces
     switch (access) 
     {
         case p2m_access_n:
+        case p2m_access_n2rwx:
             entry->r = entry->w = entry->x = 0;
             break;
         case p2m_access_r:

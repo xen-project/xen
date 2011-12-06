@@ -174,6 +174,9 @@ typedef enum {
     HVMMEM_access_rwx,
     HVMMEM_access_rx2rw,       /* Page starts off as r-x, but automatically
                                 * change to r-w on a write */
+    HVMMEM_access_n2rwx,       /* Log access: starts off as n, automatically 
+                                * goes to rwx, generating an event without
+                                * pausing the vcpu */
     HVMMEM_access_default      /* Take the domain default */
 } hvmmem_access_t;
 /* Notify that a region of memory is to have specific access types */
