@@ -195,7 +195,8 @@ static void intel_xc_cpuid_policy(
         int is_64bit = hypervisor_is_64bit(xch) && is_pae;
 
         /* Only a few features are advertised in Intel's 0x80000001. */
-        regs[2] &= (is_64bit ? bitmaskof(X86_FEATURE_LAHF_LM) : 0);
+        regs[2] &= (is_64bit ? bitmaskof(X86_FEATURE_LAHF_LM) : 0) |
+                               bitmaskof(X86_FEATURE_ABM);
         regs[3] &= ((is_pae ? bitmaskof(X86_FEATURE_NX) : 0) |
                     (is_64bit ? bitmaskof(X86_FEATURE_LM) : 0) |
                     (is_64bit ? bitmaskof(X86_FEATURE_SYSCALL) : 0) |
@@ -307,9 +308,11 @@ static void xc_cpuid_hvm_policy(
         regs[2] &= (bitmaskof(X86_FEATURE_XMM3) |
                     bitmaskof(X86_FEATURE_PCLMULQDQ) |
                     bitmaskof(X86_FEATURE_SSSE3) |
+                    bitmaskof(X86_FEATURE_FMA) |
                     bitmaskof(X86_FEATURE_CX16) |
                     bitmaskof(X86_FEATURE_SSE4_1) |
                     bitmaskof(X86_FEATURE_SSE4_2) |
+                    bitmaskof(X86_FEATURE_MOVBE)  |
                     bitmaskof(X86_FEATURE_POPCNT) |
                     bitmaskof(X86_FEATURE_AES) |
                     bitmaskof(X86_FEATURE_F16C) |
@@ -357,7 +360,10 @@ static void xc_cpuid_hvm_policy(
 
     case 0x00000007: /* Intel-defined CPU features */
         if ( input[1] == 0 ) {
-            regs[1] &= (bitmaskof(X86_FEATURE_SMEP) |
+            regs[1] &= (bitmaskof(X86_FEATURE_BMI1) |
+                        bitmaskof(X86_FEATURE_AVX2) |
+                        bitmaskof(X86_FEATURE_SMEP) |
+                        bitmaskof(X86_FEATURE_BMI2) |
                         bitmaskof(X86_FEATURE_ERMS) |
                         bitmaskof(X86_FEATURE_FSGSBASE));
         } else
@@ -485,8 +491,11 @@ static void xc_cpuid_pv_policy(
 
     case 0x00000007:
         if ( input[1] == 0 )
-            regs[1] &= (bitmaskof(X86_FEATURE_FSGSBASE) |
-                        bitmaskof(X86_FEATURE_ERMS));
+            regs[1] &= (bitmaskof(X86_FEATURE_BMI1) |
+                        bitmaskof(X86_FEATURE_AVX2) |
+                        bitmaskof(X86_FEATURE_BMI2) |
+                        bitmaskof(X86_FEATURE_ERMS) |
+                        bitmaskof(X86_FEATURE_FSGSBASE));
         else
             regs[1] = 0;
         regs[0] = regs[2] = regs[3] = 0;

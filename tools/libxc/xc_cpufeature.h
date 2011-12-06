@@ -74,6 +74,7 @@
 #define X86_FEATURE_TM2          8 /* Thermal Monitor 2 */
 #define X86_FEATURE_SSSE3        9 /* Supplemental Streaming SIMD Exts-3 */
 #define X86_FEATURE_CID         10 /* Context ID */
+#define X86_FEATURE_FMA         12 /* Fused Multiply Add */
 #define X86_FEATURE_CX16        13 /* CMPXCHG16B */
 #define X86_FEATURE_XTPR        14 /* Send Task Priority Messages */
 #define X86_FEATURE_PDCM        15 /* Perf/Debug Capability MSR */
@@ -81,6 +82,7 @@
 #define X86_FEATURE_SSE4_1      19 /* Streaming SIMD Extensions 4.1 */
 #define X86_FEATURE_SSE4_2      20 /* Streaming SIMD Extensions 4.2 */
 #define X86_FEATURE_X2APIC      21 /* x2APIC */
+#define X86_FEATURE_MOVBE       22 /* movbe instruction */
 #define X86_FEATURE_POPCNT      23 /* POPCNT instruction */
 #define X86_FEATURE_TSC_DEADLINE 24 /* "tdt" TSC Deadline Timer */
 #define X86_FEATURE_AES         25 /* AES acceleration instructions */
@@ -125,7 +127,10 @@
 
 /* Intel-defined CPU features, CPUID level 0x00000007:0 (ebx) */
 #define X86_FEATURE_FSGSBASE     0 /* {RD,WR}{FS,GS}BASE instructions */
+#define X86_FEATURE_BMI1         3 /* 1st group bit manipulation extensions */
+#define X86_FEATURE_AVX2         5 /* AVX2 instructions */
 #define X86_FEATURE_SMEP         7 /* Supervisor Mode Execution Protection */
+#define X86_FEATURE_BMI2         8 /* 2nd group bit manipulation extensions */
 #define X86_FEATURE_ERMS         9 /* Enhanced REP MOVSB/STOSB */
 
 #endif /* __LIBXC_CPUFEATURE_H */
