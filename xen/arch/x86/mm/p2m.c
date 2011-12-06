@@ -1084,7 +1084,7 @@ void p2m_mem_paging_resume(struct domain *d)
     mem_event_unpause_vcpus(d);
 }
 
-void p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long gla, 
+bool_t p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long gla, 
                           bool_t access_r, bool_t access_w, bool_t access_x)
 {
     struct vcpu *v = current;
@@ -1105,7 +1105,7 @@ void p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long gla
     {
         p2m->set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2mt, p2m_access_rw);
         p2m_unlock(p2m);
-        return;
+        return 1;
     }
     p2m_unlock(p2m);
 
@@ -1128,12 +1128,13 @@ void p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long gla
             p2m_lock(p2m);
             p2m->set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2mt, p2m_access_rwx);
             p2m_unlock(p2m);
+            return 1;
         }
 
-        return;
+        return 0;
     }
     else if ( res > 0 )
-        return;  /* No space in buffer; VCPU paused */
+        return 0;  /* No space in buffer; VCPU paused */
 
     memset(&req, 0, sizeof(req));
     req.type = MEM_EVENT_TYPE_ACCESS;
@@ -1157,6 +1158,7 @@ void p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long gla
     mem_event_put_request(d, &d->mem_event->access, &req);
 
     /* VCPU paused, mem event request sent */
+    return 0;
 }
 
 void p2m_mem_access_resume(struct domain *d)

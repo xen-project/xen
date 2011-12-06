@@ -491,8 +491,9 @@ static inline void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
 
 #ifdef __x86_64__
 /* Send mem event based on the access (gla is -1ull if not available).  Handles
- * the rw2rx conversion */
-void p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long gla, 
+ * the rw2rx conversion. Boolean return value indicates if access rights have 
+ * been promoted with no underlying vcpu pause. */
+bool_t p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long gla, 
                           bool_t access_r, bool_t access_w, bool_t access_x);
 /* Resumes the running of the VCPU, restarting the last instruction */
 void p2m_mem_access_resume(struct domain *d);
@@ -508,10 +509,10 @@ int p2m_get_mem_access(struct domain *d, unsigned long pfn,
                        hvmmem_access_t *access);
 
 #else
-static inline void p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, 
+static inline bool_t p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, 
                                         unsigned long gla, bool_t access_r, 
                                         bool_t access_w, bool_t access_x)
-{ }
+{ return 1; }
 static inline int p2m_set_mem_access(struct domain *d, 
                                      unsigned long start_pfn, 
                                      uint32_t nr, hvmmem_access_t access)

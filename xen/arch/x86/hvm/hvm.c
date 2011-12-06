@@ -1205,7 +1205,7 @@ int hvm_hap_nested_page_fault(unsigned long gpa,
     mfn_t mfn;
     struct vcpu *v = current;
     struct p2m_domain *p2m;
-    int rc;
+    int rc, fall_through = 0;
 
     /* On Nested Virtualization, walk the guest page table.
      * If this succeeds, all is fine.
@@ -1278,9 +1278,15 @@ int hvm_hap_nested_page_fault(unsigned long gpa,
 
         if ( violation )
         {
-            p2m_mem_access_check(gpa, gla_valid, gla, access_r, access_w, access_x);
-            rc = 1;
-            goto out_put_gfn;
+            if ( p2m_mem_access_check(gpa, gla_valid, gla, access_r, 
+                                        access_w, access_x) )
+            {
+                fall_through = 1;
+            } else {
+                /* Rights not promoted, vcpu paused, work here is done */
+                rc = 1;
+                goto out_put_gfn;
+            }
         }
     }
 
@@ -1339,7 +1345,11 @@ int hvm_hap_nested_page_fault(unsigned long gpa,
         goto out_put_gfn;
     }
 
-    rc = 0;
+    /* If we fell through, the vcpu will retry now that access restrictions have
+     * been removed. It may fault again if the p2m entry type still requires so.
+     * Otherwise, this is an error condition. */
+    rc = fall_through;
+
 out_put_gfn:
     put_gfn(p2m->domain, gfn);
     return rc;
