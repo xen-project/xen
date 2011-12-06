@@ -37,9 +37,11 @@
 #define mem_event_ring_lock(_med)       spin_lock(&(_med)->ring_lock)
 #define mem_event_ring_unlock(_med)     spin_unlock(&(_med)->ring_lock)
 
-static int mem_event_enable(struct domain *d,
-                            xen_domctl_mem_event_op_t *mec,
-                            struct mem_event_domain *med)
+static int mem_event_enable(
+    struct domain *d,
+    xen_domctl_mem_event_op_t *mec,
+    struct mem_event_domain *med,
+    xen_event_channel_notification_t notification_fn)
 {
     int rc;
     struct domain *dom_mem_event = current->domain;
@@ -94,7 +96,7 @@ static int mem_event_enable(struct domain *d,
     /* Allocate event channel */
     rc = alloc_unbound_xen_event_channel(d->vcpu[0],
                                          current->domain->domain_id,
-                                         NULL);
+                                         notification_fn);
     if ( rc < 0 )
         goto err;
 
@@ -233,6 +235,18 @@ int mem_event_check_ring(struct domain *d, struct mem_event_domain *med)
     return ring_full;
 }
 
+/* Registered with Xen-bound event channel for incoming notifications. */
+static void mem_paging_notification(struct vcpu *v, unsigned int port)
+{
+    p2m_mem_paging_resume(v->domain);
+}
+
+/* Registered with Xen-bound event channel for incoming notifications. */
+static void mem_access_notification(struct vcpu *v, unsigned int port)
+{
+    p2m_mem_access_resume(v->domain);
+}
+
 int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
                      XEN_GUEST_HANDLE(void) u_domctl)
 {
@@ -294,7 +308,7 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
             if ( p2m->pod.entry_count )
                 break;
 
-            rc = mem_event_enable(d, mec, med);
+            rc = mem_event_enable(d, mec, med, mem_paging_notification);
         }
         break;
 
@@ -333,7 +347,7 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
             if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
                 break;
 
-            rc = mem_event_enable(d, mec, med);
+            rc = mem_event_enable(d, mec, med, mem_access_notification);
         }
         break;
 
