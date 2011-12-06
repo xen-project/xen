@@ -1056,6 +1056,8 @@ void p2m_mem_paging_resume(struct domain *d)
     /* Pull all responses off the ring */
     while( mem_event_get_response(&d->mem_event->paging, &rsp) )
     {
+        if ( rsp.flags & MEM_EVENT_FLAG_DUMMY )
+            continue;
         /* Fix p2m entry if the page was not dropped */
         if ( !(rsp.flags & MEM_EVENT_FLAG_DROP_PAGE) )
         {
@@ -1164,6 +1166,8 @@ void p2m_mem_access_resume(struct domain *d)
     /* Pull all responses off the ring */
     while( mem_event_get_response(&d->mem_event->access, &rsp) )
     {
+        if ( rsp.flags & MEM_EVENT_FLAG_DUMMY )
+            continue;
         /* Unpause domain */
         if ( rsp.flags & MEM_EVENT_FLAG_VCPU_PAUSED )
             vcpu_unpause(d->vcpu[rsp.vcpu_id]);

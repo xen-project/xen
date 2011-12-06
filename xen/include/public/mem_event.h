@@ -40,6 +40,7 @@
 #define MEM_EVENT_FLAG_DROP_PAGE    (1 << 1)
 #define MEM_EVENT_FLAG_EVICT_FAIL   (1 << 2)
 #define MEM_EVENT_FLAG_FOREIGN      (1 << 3)
+#define MEM_EVENT_FLAG_DUMMY        (1 << 4)
 
 /* Reasons for the memory event request */
 #define MEM_EVENT_REASON_UNKNOWN     0    /* typical reason */

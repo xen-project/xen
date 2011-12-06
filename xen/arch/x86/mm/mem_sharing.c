@@ -303,6 +303,8 @@ int mem_sharing_sharing_resume(struct domain *d)
     /* Get all requests off the ring */
     while ( mem_event_get_response(&d->mem_event->share, &rsp) )
     {
+        if ( rsp.flags & MEM_EVENT_FLAG_DUMMY )
+            continue;
         /* Unpause domain/vcpu */
         if ( rsp.flags & MEM_EVENT_FLAG_VCPU_PAUSED )
             vcpu_unpause(d->vcpu[rsp.vcpu_id]);
