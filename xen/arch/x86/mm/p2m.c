@@ -1053,30 +1053,30 @@ void p2m_mem_paging_resume(struct domain *d)
     p2m_access_t a;
     mfn_t mfn;
 
-    /* Pull the response off the ring */
-    mem_event_get_response(&d->mem_event->paging, &rsp);
-
-    /* Fix p2m entry if the page was not dropped */
-    if ( !(rsp.flags & MEM_EVENT_FLAG_DROP_PAGE) )
+    /* Pull all responses off the ring */
+    while( mem_event_get_response(&d->mem_event->paging, &rsp) )
     {
-        p2m_lock(p2m);
-        mfn = p2m->get_entry(p2m, rsp.gfn, &p2mt, &a, p2m_query, NULL);
-        /* Allow only pages which were prepared properly, or pages which
-         * were nominated but not evicted */
-        if ( mfn_valid(mfn) && 
-             (p2mt == p2m_ram_paging_in || p2mt == p2m_ram_paging_in_start) )
+        /* Fix p2m entry if the page was not dropped */
+        if ( !(rsp.flags & MEM_EVENT_FLAG_DROP_PAGE) )
         {
-            set_p2m_entry(p2m, rsp.gfn, mfn, PAGE_ORDER_4K, 
-                            paging_mode_log_dirty(d) ? p2m_ram_logdirty : p2m_ram_rw, 
-                            a);
-            set_gpfn_from_mfn(mfn_x(mfn), rsp.gfn);
+            p2m_lock(p2m);
+            mfn = p2m->get_entry(p2m, rsp.gfn, &p2mt, &a, p2m_query, NULL);
+            /* Allow only pages which were prepared properly, or pages which
+             * were nominated but not evicted */
+            if ( mfn_valid(mfn) && 
+                 (p2mt == p2m_ram_paging_in || p2mt == p2m_ram_paging_in_start) )
+            {
+                set_p2m_entry(p2m, rsp.gfn, mfn, PAGE_ORDER_4K, 
+                                paging_mode_log_dirty(d) ? p2m_ram_logdirty : 
+                                p2m_ram_rw, a);
+                set_gpfn_from_mfn(mfn_x(mfn), rsp.gfn);
+            }
+            p2m_unlock(p2m);
         }
-        p2m_unlock(p2m);
+        /* Unpause domain */
+        if ( rsp.flags & MEM_EVENT_FLAG_VCPU_PAUSED )
+            vcpu_unpause(d->vcpu[rsp.vcpu_id]);
     }
-
-    /* Unpause domain */
-    if ( rsp.flags & MEM_EVENT_FLAG_VCPU_PAUSED )
-        vcpu_unpause(d->vcpu[rsp.vcpu_id]);
 
     /* Unpause any domains that were paused because the ring was full */
     mem_event_unpause_vcpus(d);
@@ -1161,11 +1161,13 @@ void p2m_mem_access_resume(struct domain *d)
 {
     mem_event_response_t rsp;
 
-    mem_event_get_response(&d->mem_event->access, &rsp);
-
-    /* Unpause domain */
-    if ( rsp.flags & MEM_EVENT_FLAG_VCPU_PAUSED )
-        vcpu_unpause(d->vcpu[rsp.vcpu_id]);
+    /* Pull all responses off the ring */
+    while( mem_event_get_response(&d->mem_event->access, &rsp) )
+    {
+        /* Unpause domain */
+        if ( rsp.flags & MEM_EVENT_FLAG_VCPU_PAUSED )
+            vcpu_unpause(d->vcpu[rsp.vcpu_id]);
+    }
 
     /* Unpause any domains that were paused because the ring was full or no listener 
      * was available */

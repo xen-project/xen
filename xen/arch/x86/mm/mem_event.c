@@ -166,7 +166,7 @@ void mem_event_put_request(struct domain *d, struct mem_event_domain *med, mem_e
     notify_via_xen_event_channel(d, med->xen_port);
 }
 
-void mem_event_get_response(struct mem_event_domain *med, mem_event_response_t *rsp)
+int mem_event_get_response(struct mem_event_domain *med, mem_event_response_t *rsp)
 {
     mem_event_front_ring_t *front_ring;
     RING_IDX rsp_cons;
@@ -175,6 +175,12 @@ void mem_event_get_response(struct mem_event_domain *med, mem_event_response_t *
 
     front_ring = &med->front_ring;
     rsp_cons = front_ring->rsp_cons;
+
+    if ( !RING_HAS_UNCONSUMED_RESPONSES(front_ring) )
+    {
+        mem_event_ring_unlock(med);
+        return 0;
+    }
 
     /* Copy response */
     memcpy(rsp, RING_GET_RESPONSE(front_ring, rsp_cons), sizeof(*rsp));
@@ -185,6 +191,8 @@ void mem_event_get_response(struct mem_event_domain *med, mem_event_response_t *
     front_ring->sring->rsp_event = rsp_cons + 1;
 
     mem_event_ring_unlock(med);
+
+    return 1;
 }
 
 void mem_event_unpause_vcpus(struct domain *d)
