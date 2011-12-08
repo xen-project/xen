@@ -253,7 +253,7 @@ class TapdiskController(object):
             tapdisk = TapdiskController.Tapdisk()
 
             # Since 'tap-ctl list' does not escape blanks in the path, hard-code the current format using 4 pairs to prevent splitting the path
-            for pair in line.split(None, 4):
+            for pair in line.split(None, 3):
                 key, value = pair.split('=', 1)
                 if key == 'pid':
                     tapdisk.pid = value
