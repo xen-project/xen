@@ -1,6 +1,6 @@
 =head1 NAME
 
-xm - Xen management user interface
+xm - Obsolete xen management user interface
 
 =head1 SYNOPSIS
 
@@ -8,10 +8,14 @@ B<xm> I<subcommand> [I<args>]
 
 =head1 DESCRIPTION
 
-The B<xm> program is the main interface for managing Xen guest
-domains. The program can be used to create, pause, and shutdown
-domains. It can also be used to list current domains, enable or pin
-VCPUs, and attach or detach virtual block devices.
+This program is now superseded by B<xl>, which should be largely
+backwards-compatible with B<xm>.
+
+The B<xm> program is the main interface for managing Xen guest domains
+when the obsolete Xend toolstack is in use. The program can be used to
+create, pause, and shutdown domains. It can also be used to list
+current domains, enable or pin VCPUs, and attach or detach virtual
+block devices.
 
 The basic structure of every B<xm> command is almost always:
 
