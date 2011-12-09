@@ -814,7 +814,8 @@ int libxl__device_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcide
     stubdomid = libxl_get_stubdom_id(ctx, domid);
     if (stubdomid != 0) {
         libxl_device_pci pcidev_s = *pcidev;
-        rc = do_pci_add(gc, stubdomid, &pcidev_s, starting);
+        /* stubdomain is always running by now, even at create time */
+        rc = do_pci_add(gc, stubdomid, &pcidev_s, 0);
         if ( rc )
             goto out;
     }
