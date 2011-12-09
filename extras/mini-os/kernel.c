@@ -448,6 +448,7 @@ static void print_pcidev(unsigned int domain, unsigned int bus, unsigned int slo
 
 static void pcifront_thread(void *p)
 {
+    pcifront_watches(NULL);
     pci_dev = init_pcifront(NULL);
     if (!pci_dev)
         return;

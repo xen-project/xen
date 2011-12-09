@@ -280,23 +280,14 @@ void pcifront_scan(struct pcifront_dev *dev, void (*func)(unsigned int domain, u
 {
     char *path;
     int i, n, len;
-    char *s, *msg = NULL, *err = NULL;
+    char *s, *msg = NULL;
     unsigned int domain, bus, slot, fun;
 
     if (!dev)
         dev = pcidev;
     if (!dev) {
-        xenbus_event_queue events = NULL;
-        char *fe_state = "device/pci/0/state";
-        xenbus_watch_path_token(XBT_NIL, fe_state, fe_state, &events);
-        while ((err = xenbus_read(XBT_NIL, fe_state, &msg)) != NULL || msg[0] != '4') {
-            free(msg);
-            free(err);
-            printk("pcifront_scan: waiting for pcifront to become ready\n");
-            xenbus_wait_for_watch(&events);
-        }
-        xenbus_unwatch_path_token(XBT_NIL, fe_state, fe_state);
-        dev = pcidev;
+	printk("pcifront_scan: device or bus\n");
+	return;
     }
 
     len = strlen(dev->backend) + 1 + 5 + 10 + 1;
