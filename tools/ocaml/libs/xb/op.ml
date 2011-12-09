@@ -22,9 +22,6 @@ type operation = Debug | Directory | Read | Getperms |
                  Resume | Set_target
                | Restrict 
 
-(* There are two sets of XB operations: the one coming from open-source and *)
-(* the one coming from our private patch queue. These operations            *)
-(* in two differents arrays for make easier the forward compatibility       *)
 let operation_c_mapping =
 	[| Debug; Directory; Read; Getperms;
            Watch; Unwatch; Transaction_start;
@@ -33,12 +30,6 @@ let operation_c_mapping =
            Setperms; Watchevent; Error; Isintroduced;
            Resume; Set_target; Restrict |]
 let size = Array.length operation_c_mapping
-
-(* [offset_pq] has to be the same as in <xen/io/xs_wire.h> *)
-let offset_pq = size
-let operation_c_mapping_pq =
-	[| |]
-let size_pq = Array.length operation_c_mapping_pq
 
 let array_search el a =
 	let len = Array.length a in
@@ -50,14 +41,10 @@ let array_search el a =
 let of_cval i =
 	if i >= 0 && i < size
 	then operation_c_mapping.(i)
-	else if i >= offset_pq && i < offset_pq + size_pq
-	then operation_c_mapping_pq.(i-offset_pq)
 	else raise Not_found
 
 let to_cval op =
-	try
 	array_search op operation_c_mapping
-	with _ -> offset_pq + array_search op operation_c_mapping_pq
 
 let to_string ty =
 	match ty with

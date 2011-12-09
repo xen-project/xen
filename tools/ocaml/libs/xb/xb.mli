@@ -25,9 +25,6 @@ module Op :
       | Restrict
     val operation_c_mapping : operation array
     val size : int
-    val offset_pq : int
-    val operation_c_mapping_pq : 'a array
-    val size_pq : int
     val array_search : 'a -> 'a array -> int
     val of_cval : int -> operation
     val to_cval : operation -> int
