@@ -105,7 +105,7 @@ let string_of_date () =
 		(int_of_float (1000.0 *. msec))
 
 let xenstored_log_file = ref "/var/log/xenstored.log"
-let xenstored_log_level = ref Null
+let xenstored_log_level = ref Warn
 let xenstored_log_nb_files = ref 10
 let xenstored_log_nb_lines = ref 13215
 let xenstored_log_nb_chars = ref (-1)
