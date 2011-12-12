@@ -28,7 +28,6 @@
 #include <unistd.h>
 #include <assert.h>
 
-#include "libxl_utils.h"
 #include "libxl_internal.h"
 
 struct schedid_name {

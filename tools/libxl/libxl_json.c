@@ -12,6 +12,8 @@
  * GNU Lesser General Public License for more details.
  */
 
+#include "libxl_osdeps.h"
+
 #include <assert.h>
 #include <string.h>
 #include <math.h>
@@ -19,7 +21,6 @@
 #include <yajl/yajl_parse.h>
 #include <yajl/yajl_gen.h>
 
-#include <libxl.h>
 #include "libxl_internal.h"
 
 /* #define DEBUG_ANSWER */

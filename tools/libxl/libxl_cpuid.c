@@ -10,10 +10,6 @@
  * GNU Lesser General Public License for more details.
  */
 
-#include <string.h>
-
-#include "libxl.h"
-#include "libxl_osdeps.h"
 #include "libxl_internal.h"
 
 void libxl_cpuid_dispose(libxl_cpuid_policy_list *p_cpuid_list)

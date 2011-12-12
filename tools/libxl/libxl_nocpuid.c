@@ -10,7 +10,7 @@
  * GNU Lesser General Public License for more details.
  */
 
-#include "libxl.h"
+#include "libxl_internal.h"
 
 void libxl_cpuid_destroy(libxl_cpuid_policy_list *p_cpuid_list)
 {

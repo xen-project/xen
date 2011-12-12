@@ -7,13 +7,14 @@
  *  as published by the Free Software Foundation.
  */
 
+#include "libxl_osdeps.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 #include <xenctrl.h>
 
-#include "libxl.h"
 #include "libxl_internal.h"
 
 int libxl_flask_context_to_sid(libxl_ctx *ctx, char *buf, size_t len,

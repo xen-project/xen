@@ -16,8 +16,6 @@
 #include "libxl_osdeps.h"
 
 #include <stdio.h>
-#include <stdarg.h>
-#include <string.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -25,9 +23,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-#include "libxl.h"
 #include "libxl_internal.h"
-#include "libxl_utils.h"
 
 int libxl__error_set(libxl__gc *gc, int code)
 {

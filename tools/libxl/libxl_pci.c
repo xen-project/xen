@@ -17,7 +17,6 @@
 #include "libxl_osdeps.h"
 
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <fcntl.h>
@@ -27,15 +26,11 @@
 #include <sys/stat.h>
 #include <signal.h>
 #include <unistd.h> /* for write, unlink and close */
-#include <stdint.h>
 #include <inttypes.h>
 #include <dirent.h>
 #include <assert.h>
 
-#include "libxl.h"
-#include "libxl_utils.h"
 #include "libxl_internal.h"
-#include "flexarray.h"
 
 #define PCI_BDF                "%04x:%02x:%02x.%01x"
 #define PCI_BDF_SHORT          "%02x:%02x.%01x"

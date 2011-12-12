@@ -24,7 +24,6 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include "libxl.h"
 #include "libxl_internal.h"
 
 char *libxl__device_frontend_path(libxl__gc *gc, libxl__device *device)

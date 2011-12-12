@@ -26,10 +26,8 @@
 #include <xc_dom.h>
 #include <xenguest.h>
 #include <assert.h>
-#include "libxl.h"
-#include "libxl_utils.h"
+
 #include "libxl_internal.h"
-#include "flexarray.h"
 
 void libxl_domain_config_dispose(libxl_domain_config *d_config)
 {

@@ -28,7 +28,6 @@
 #include <signal.h> /* for SIGKILL */
 #include <fcntl.h>
 
-#include "libxl.h"
 #include "libxl_internal.h"
 
 static int call_waitpid(pid_t (*waitpid_cb)(pid_t, int *, int), pid_t pid, int *status, int options)

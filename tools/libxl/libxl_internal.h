@@ -17,13 +17,18 @@
 #ifndef LIBXL_INTERNAL_H
 #define LIBXL_INTERNAL_H
 
+#include "libxl_osdeps.h"
+
 #include <stdint.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <xs.h>
 #include <xenctrl.h>
 #include "xentoollog.h"
+
+#include "libxl.h"
 
 #if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 1)
 #define _hidden __attribute__((visibility("hidden")))

@@ -12,7 +12,7 @@
  * GNU Lesser General Public License for more details.
  */
 
-#include "libxl.h"
+#include "libxl_internal.h"
 #include "_libxl_paths.h"
 
 const char *libxl_sbindir_path(void)

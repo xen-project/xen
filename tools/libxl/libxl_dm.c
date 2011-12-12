@@ -24,10 +24,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <assert.h>
-#include "libxl_utils.h"
+
 #include "libxl_internal.h"
-#include "libxl.h"
-#include "flexarray.h"
 
 static const char *libxl_tapif_script(libxl__gc *gc)
 {

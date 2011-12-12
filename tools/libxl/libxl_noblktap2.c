@@ -12,8 +12,6 @@
  * GNU Lesser General Public License for more details.
  */
 
-#include "libxl.h"
-#include "libxl_osdeps.h"
 #include "libxl_internal.h"
 
 int libxl__blktap_enabled(libxl__gc *gc)

@@ -32,7 +32,6 @@
 
 #include <xen/hvm/hvm_info_table.h>
 
-#include "libxl.h"
 #include "libxl_internal.h"
 
 libxl_domain_type libxl__domain_type(libxl__gc *gc, uint32_t domid)

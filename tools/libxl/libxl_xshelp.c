@@ -21,7 +21,6 @@
 #include <stdarg.h>
 #include <inttypes.h>
 
-#include "libxl.h"
 #include "libxl_internal.h"
 
 char **libxl__xs_kvs_of_flexarray(libxl__gc *gc, flexarray_t *array, int length)

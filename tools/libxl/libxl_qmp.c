@@ -18,6 +18,8 @@
  * Specification, see in the QEMU repository.
  */
 
+#include "libxl_osdeps.h"
+
 #include <unistd.h>
 #include <sys/un.h>
 #include <sys/queue.h>

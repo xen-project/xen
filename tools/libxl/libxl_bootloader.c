@@ -14,7 +14,6 @@
 
 #include "libxl_osdeps.h"
 
-#include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <termios.h>
@@ -22,10 +21,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include "libxl.h"
 #include "libxl_internal.h"
-
-#include "flexarray.h"
 
 #define XENCONSOLED_BUF_SIZE 16
 #define BOOTLOADER_BUF_SIZE 4096

@@ -31,10 +31,7 @@
 #include <inttypes.h>
 #include <assert.h>
 
-#include "libxl.h"
-#include "libxl_utils.h"
 #include "libxl_internal.h"
-#include "flexarray.h"
 
 #define PAGE_TO_MEMKB(pages) ((pages) * 4)
 #define BACKEND_STRING_SIZE 5

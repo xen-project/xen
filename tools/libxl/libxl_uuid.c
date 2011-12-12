@@ -12,7 +12,11 @@
  * GNU Lesser General Public License for more details.
  */
 
+#include "libxl_osdeps.h"
+
 #include <libxl_uuid.h>
+
+#include "libxl_internal.h"
 
 #if defined(__linux__)
 
