@@ -157,6 +157,7 @@
 ^tools/flask/utils/flask-getenforce$
 ^tools/flask/utils/flask-loadpolicy$
 ^tools/flask/utils/flask-setenforce$
+^tools/flask/utils/flask-label-pci$
 ^tools/fs-back/fs-backend$
 ^tools/hotplug/common/hotplugpath\.sh$
 ^tools/include/xen/.*$
