@@ -483,7 +483,7 @@ static int is_assigned(libxl_device_pci *assigned, int num_assigned,
 
 libxl_device_pci *libxl_device_pci_list_assignable(libxl_ctx *ctx, int *num)
 {
-    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    GC_INIT(ctx);
     libxl_device_pci *pcidevs = NULL, *new, *assigned;
     struct dirent *de;
     DIR *dir;
@@ -491,7 +491,7 @@ libxl_device_pci *libxl_device_pci_list_assignable(libxl_ctx *ctx, int *num)
 
     *num = 0;
 
-    rc = get_all_assigned_devices(&gc, &assigned, &num_assigned);
+    rc = get_all_assigned_devices(gc, &assigned, &num_assigned);
     if ( rc )
         goto out;
 
@@ -528,7 +528,7 @@ libxl_device_pci *libxl_device_pci_list_assignable(libxl_ctx *ctx, int *num)
 out_closedir:
     closedir(dir);
 out:
-    libxl__free_all(&gc);
+    GC_FREE;
     return pcidevs;
 }
 
@@ -782,10 +782,10 @@ static int libxl__device_pci_reset(libxl__gc *gc, unsigned int domain, unsigned 
 
 int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
 {
-    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    GC_INIT(ctx);
     int rc;
-    rc = libxl__device_pci_add(&gc, domid, pcidev, 0);
-    libxl__free_all(&gc);
+    rc = libxl__device_pci_add(gc, domid, pcidev, 0);
+    GC_FREE;
     return rc;
 }
 
@@ -1057,24 +1057,24 @@ out:
 
 int libxl_device_pci_remove(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
 {
-    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    GC_INIT(ctx);
     int rc;
 
-    rc = libxl__device_pci_remove_common(&gc, domid, pcidev, 0);
+    rc = libxl__device_pci_remove_common(gc, domid, pcidev, 0);
 
-    libxl__free_all(&gc);
+    GC_FREE;
     return rc;
 }
 
 int libxl_device_pci_destroy(libxl_ctx *ctx, uint32_t domid,
                                   libxl_device_pci *pcidev)
 {
-    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    GC_INIT(ctx);
     int rc;
 
-    rc = libxl__device_pci_remove_common(&gc, domid, pcidev, 1);
+    rc = libxl__device_pci_remove_common(gc, domid, pcidev, 1);
 
-    libxl__free_all(&gc);
+    GC_FREE;
     return rc;
 }
 
@@ -1115,15 +1115,15 @@ static void libxl__device_pci_from_xs_be(libxl__gc *gc,
 
 libxl_device_pci *libxl_device_pci_list(libxl_ctx *ctx, uint32_t domid, int *num)
 {
-    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    GC_INIT(ctx);
     char *be_path, *num_devs;
     int n, i;
     libxl_device_pci *pcidevs = NULL;
 
     *num = 0;
 
-    be_path = libxl__sprintf(&gc, "%s/backend/pci/%d/0", libxl__xs_get_dompath(&gc, 0), domid);
-    num_devs = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/num_devs", be_path));
+    be_path = libxl__sprintf(gc, "%s/backend/pci/%d/0", libxl__xs_get_dompath(gc, 0), domid);
+    num_devs = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/num_devs", be_path));
     if (!num_devs)
         goto out;
 
@@ -1131,11 +1131,11 @@ libxl_device_pci *libxl_device_pci_list(libxl_ctx *ctx, uint32_t domid, int *num
     pcidevs = calloc(n, sizeof(libxl_device_pci));
 
     for (i = 0; i < n; i++)
-        libxl__device_pci_from_xs_be(&gc, be_path, pcidevs + i, i);
+        libxl__device_pci_from_xs_be(gc, be_path, pcidevs + i, i);
 
     *num = n;
 out:
-    libxl__free_all(&gc);
+    GC_FREE;
     return pcidevs;
 }
 

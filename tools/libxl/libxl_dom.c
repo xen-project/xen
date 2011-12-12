@@ -752,7 +752,7 @@ int libxl_userdata_store(libxl_ctx *ctx, uint32_t domid,
                               const char *userdata_userid,
                               const uint8_t *data, int datalen)
 {
-    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    GC_INIT(ctx);
     const char *filename;
     const char *newfilename;
     int e, rc;
@@ -760,18 +760,18 @@ int libxl_userdata_store(libxl_ctx *ctx, uint32_t domid,
     FILE *f = NULL;
     size_t rs;
 
-    filename = userdata_path(&gc, domid, userdata_userid, "d");
+    filename = userdata_path(gc, domid, userdata_userid, "d");
     if (!filename) {
         rc = ERROR_NOMEM;
         goto out;
     }
 
     if (!datalen) {
-        rc = userdata_delete(&gc, filename);
+        rc = userdata_delete(gc, filename);
         goto out;
     }
 
-    newfilename = userdata_path(&gc, domid, userdata_userid, "n");
+    newfilename = userdata_path(gc, domid, userdata_userid, "n");
     if (!newfilename) {
         rc = ERROR_NOMEM;
         goto out;
@@ -813,7 +813,7 @@ err:
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "cannot write %s for %s",
                  newfilename, filename);
 out:
-    libxl__free_all(&gc);
+    GC_FREE;
     return rc;
 }
 
@@ -821,13 +821,13 @@ int libxl_userdata_retrieve(libxl_ctx *ctx, uint32_t domid,
                                  const char *userdata_userid,
                                  uint8_t **data_r, int *datalen_r)
 {
-    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    GC_INIT(ctx);
     const char *filename;
     int e, rc;
     int datalen = 0;
     void *data = 0;
 
-    filename = userdata_path(&gc, domid, userdata_userid, "d");
+    filename = userdata_path(gc, domid, userdata_userid, "d");
     if (!filename) {
         rc = ERROR_NOMEM;
         goto out;
@@ -849,7 +849,7 @@ int libxl_userdata_retrieve(libxl_ctx *ctx, uint32_t domid,
     if (datalen_r) *datalen_r = datalen;
     rc = 0;
 out:
-    libxl__free_all(&gc);
+    GC_FREE;
     return rc;
 }
 

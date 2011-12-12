@@ -328,7 +328,7 @@ int libxl_run_bootloader(libxl_ctx *ctx,
                          libxl_device_disk *disk,
                          uint32_t domid)
 {
-    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    GC_INIT(ctx);
     int ret, rc = 0;
     char *fifo = NULL;
     char *diskpath = NULL;
@@ -388,7 +388,7 @@ int libxl_run_bootloader(libxl_ctx *ctx,
         goto out_close;
     }
 
-    args = make_bootloader_args(&gc, info, domid, fifo, diskpath);
+    args = make_bootloader_args(gc, info, domid, fifo, diskpath);
     if (args == NULL) {
         rc = ERROR_NOMEM;
         goto out_close;
@@ -411,8 +411,8 @@ int libxl_run_bootloader(libxl_ctx *ctx,
         goto out_close;
     }
 
-    dom_console_xs_path = libxl__sprintf(&gc, "%s/console/tty", libxl__xs_get_dompath(&gc, domid));
-    libxl__xs_write(&gc, XBT_NULL, dom_console_xs_path, "%s", dom_console_slave_tty_path);
+    dom_console_xs_path = libxl__sprintf(gc, "%s/console/tty", libxl__xs_get_dompath(gc, domid));
+    libxl__xs_write(gc, XBT_NULL, dom_console_xs_path, "%s", dom_console_slave_tty_path);
 
     pid = fork_exec_bootloader(&bootloader_fd, info->u.pv.bootloader, args);
     if (pid < 0) {
@@ -435,7 +435,7 @@ int libxl_run_bootloader(libxl_ctx *ctx,
 
     fcntl(fifo_fd, F_SETFL, O_NDELAY);
 
-    blout = bootloader_interact(&gc, xenconsoled_fd, bootloader_fd, fifo_fd);
+    blout = bootloader_interact(gc, xenconsoled_fd, bootloader_fd, fifo_fd);
     if (blout == NULL) {
         goto out_close;
     }
@@ -445,7 +445,7 @@ int libxl_run_bootloader(libxl_ctx *ctx,
         goto out_close;
     }
 
-    parse_bootloader_result(&gc, info, blout);
+    parse_bootloader_result(gc, info, blout);
 
     rc = 0;
 out_close:
@@ -472,7 +472,7 @@ out_close:
     free(args);
 
 out:
-    libxl__free_all(&gc);
+    GC_FREE;
     return rc;
 }
 

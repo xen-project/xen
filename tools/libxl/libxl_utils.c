@@ -186,29 +186,29 @@ char *libxl_schedid_to_name(libxl_ctx *ctx, int schedid)
 
 int libxl_get_stubdom_id(libxl_ctx *ctx, int guest_domid)
 {
-    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    GC_INIT(ctx);
     char * stubdom_id_s;
     int ret;
 
-    stubdom_id_s = libxl__xs_read(&gc, XBT_NULL,
-                                 libxl__sprintf(&gc, "%s/image/device-model-domid",
-                                               libxl__xs_get_dompath(&gc, guest_domid)));
+    stubdom_id_s = libxl__xs_read(gc, XBT_NULL,
+                                 libxl__sprintf(gc, "%s/image/device-model-domid",
+                                               libxl__xs_get_dompath(gc, guest_domid)));
     if (stubdom_id_s)
         ret = atoi(stubdom_id_s);
     else
         ret = 0;
-    libxl__free_all(&gc);
+    GC_FREE;
     return ret;
 }
 
 int libxl_is_stubdom(libxl_ctx *ctx, uint32_t domid, uint32_t *target_domid)
 {
-    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    GC_INIT(ctx);
     char *target, *endptr;
     uint32_t value;
     int ret = 0;
 
-    target = libxl__xs_read(&gc, XBT_NULL, libxl__sprintf(&gc, "%s/target", libxl__xs_get_dompath(&gc, domid)));
+    target = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/target", libxl__xs_get_dompath(gc, domid)));
     if (!target)
         goto out;
     value = strtol(target, &endptr, 10);
@@ -218,7 +218,7 @@ int libxl_is_stubdom(libxl_ctx *ctx, uint32_t domid, uint32_t *target_domid)
         *target_domid = value;
     ret = 1;
 out:
-    libxl__free_all(&gc);
+    GC_FREE;
     return ret;
 }
 
@@ -240,27 +240,27 @@ static int logrename(libxl__gc *gc, const char *old, const char *new)
 
 int libxl_create_logfile(libxl_ctx *ctx, char *name, char **full_name)
 {
-    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    GC_INIT(ctx);
     struct stat stat_buf;
     char *logfile, *logfile_new;
     int i, rc;
 
-    logfile = libxl__sprintf(&gc, "/var/log/xen/%s.log", name);
+    logfile = libxl__sprintf(gc, "/var/log/xen/%s.log", name);
     if (stat(logfile, &stat_buf) == 0) {
         /* file exists, rotate */
-        logfile = libxl__sprintf(&gc, "/var/log/xen/%s.log.10", name);
+        logfile = libxl__sprintf(gc, "/var/log/xen/%s.log.10", name);
         unlink(logfile);
         for (i = 9; i > 0; i--) {
-            logfile = libxl__sprintf(&gc, "/var/log/xen/%s.log.%d", name, i);
-            logfile_new = libxl__sprintf(&gc, "/var/log/xen/%s.log.%d", name, i + 1);
-            rc = logrename(&gc, logfile, logfile_new);
+            logfile = libxl__sprintf(gc, "/var/log/xen/%s.log.%d", name, i);
+            logfile_new = libxl__sprintf(gc, "/var/log/xen/%s.log.%d", name, i + 1);
+            rc = logrename(gc, logfile, logfile_new);
             if (rc)
                 goto out;
         }
-        logfile = libxl__sprintf(&gc, "/var/log/xen/%s.log", name);
-        logfile_new = libxl__sprintf(&gc, "/var/log/xen/%s.log.1", name);
+        logfile = libxl__sprintf(gc, "/var/log/xen/%s.log", name);
+        logfile_new = libxl__sprintf(gc, "/var/log/xen/%s.log.1", name);
 
-        rc = logrename(&gc, logfile, logfile_new);
+        rc = logrename(gc, logfile, logfile_new);
         if (rc)
             goto out;
     } else {
@@ -272,7 +272,7 @@ int libxl_create_logfile(libxl_ctx *ctx, char *name, char **full_name)
     *full_name = strdup(logfile);
     rc = 0;
 out:
-    libxl__free_all(&gc);
+    GC_FREE;
     return rc;
 }
 

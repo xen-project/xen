@@ -670,20 +670,20 @@ error_out:
 int libxl_domain_create_new(libxl_ctx *ctx, libxl_domain_config *d_config,
                             libxl_console_ready cb, void *priv, uint32_t *domid)
 {
-    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    GC_INIT(ctx);
     int rc;
-    rc = do_domain_create(&gc, d_config, cb, priv, domid, -1);
-    libxl__free_all(&gc);
+    rc = do_domain_create(gc, d_config, cb, priv, domid, -1);
+    GC_FREE;
     return rc;
 }
 
 int libxl_domain_create_restore(libxl_ctx *ctx, libxl_domain_config *d_config,
                                 libxl_console_ready cb, void *priv, uint32_t *domid, int restore_fd)
 {
-    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    GC_INIT(ctx);
     int rc;
-    rc = do_domain_create(&gc, d_config, cb, priv, domid, restore_fd);
-    libxl__free_all(&gc);
+    rc = do_domain_create(gc, d_config, cb, priv, domid, restore_fd);
+    GC_FREE;
     return rc;
 }
 

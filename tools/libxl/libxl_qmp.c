@@ -94,7 +94,7 @@ static int store_serial_port_info(libxl__qmp_handler *qmp,
                                   const char *chardev,
                                   int port)
 {
-    libxl__gc gc = LIBXL_INIT_GC(qmp->ctx);
+    GC_INIT(qmp->ctx);
     char *path = NULL;
     int ret = 0;
 
@@ -102,12 +102,12 @@ static int store_serial_port_info(libxl__qmp_handler *qmp,
         return 0;
     }
 
-    path = libxl__xs_get_dompath(&gc, qmp->domid);
-    path = libxl__sprintf(&gc, "%s/serial/%d/tty", path, port);
+    path = libxl__xs_get_dompath(gc, qmp->domid);
+    path = libxl__sprintf(gc, "%s/serial/%d/tty", path, port);
 
-    ret = libxl__xs_write(&gc, XBT_NULL, path, "%s", chardev + 4);
+    ret = libxl__xs_write(gc, XBT_NULL, path, "%s", chardev + 4);
 
-    libxl__free_all(&gc);
+    GC_FREE;
     return ret;
 }
 
@@ -587,7 +587,7 @@ static int qmp_synchronous_send(libxl__qmp_handler *qmp, const char *cmd,
 {
     int id = 0;
     int ret = 0;
-    libxl__gc gc = LIBXL_INIT_GC(qmp->ctx);
+    GC_INIT(qmp->ctx);
     qmp_request_context context = { .rc = 0 };
 
     id = qmp_send(qmp, cmd, args, callback, opaque, &context);
@@ -597,7 +597,7 @@ static int qmp_synchronous_send(libxl__qmp_handler *qmp, const char *cmd,
     qmp->wait_for_id = id;
 
     while (qmp->wait_for_id == id) {
-        if ((ret = qmp_next(&gc, qmp)) < 0) {
+        if ((ret = qmp_next(gc, qmp)) < 0) {
             break;
         }
     }
@@ -606,7 +606,7 @@ static int qmp_synchronous_send(libxl__qmp_handler *qmp, const char *cmd,
         ret = context.rc;
     }
 
-    libxl__free_all(&gc);
+    GC_FREE;
 
     return ret;
 }
@@ -625,15 +625,15 @@ libxl__qmp_handler *libxl__qmp_initialize(libxl_ctx *ctx, uint32_t domid)
     int ret = 0;
     libxl__qmp_handler *qmp = NULL;
     char *qmp_socket;
-    libxl__gc gc = LIBXL_INIT_GC(ctx);
+    GC_INIT(ctx);
 
     qmp = qmp_init_handler(ctx, domid);
 
-    qmp_socket = libxl__sprintf(&gc, "%s/qmp-libxl-%d",
+    qmp_socket = libxl__sprintf(gc, "%s/qmp-libxl-%d",
                                 libxl_run_dir_path(), domid);
     if ((ret = qmp_open(qmp, qmp_socket, QMP_SOCKET_CONNECT_TIMEOUT)) < 0) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Connection error");
-        libxl__free_all(&gc);
+        GC_FREE;
         qmp_free_handler(qmp);
         return NULL;
     }
@@ -642,12 +642,12 @@ libxl__qmp_handler *libxl__qmp_initialize(libxl_ctx *ctx, uint32_t domid)
 
     /* Wait for the response to qmp_capabilities */
     while (!qmp->connected) {
-        if ((ret = qmp_next(&gc, qmp)) < 0) {
+        if ((ret = qmp_next(gc, qmp)) < 0) {
             break;
         }
     }
 
-    libxl__free_all(&gc);
+    GC_FREE;
     if (!qmp->connected) {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Failed to connect to QMP");
         libxl__qmp_close(qmp);
@@ -692,9 +692,9 @@ static int pci_add_callback(libxl__qmp_handler *qmp,
 {
     libxl_device_pci *pcidev = opaque;
     const libxl__json_object *bus = NULL;
-    libxl__gc gc = LIBXL_INIT_GC(qmp->ctx);
+    GC_INIT(qmp->ctx);
     int i, j, rc = -1;
-    char *asked_id = libxl__sprintf(&gc, PCI_PT_QDEV_ID,
+    char *asked_id = libxl__sprintf(gc, PCI_PT_QDEV_ID,
                                     pcidev->bus, pcidev->dev, pcidev->func);
 
     for (i = 0; (bus = libxl__json_array_get(response, i)); i++) {
@@ -731,7 +731,7 @@ static int pci_add_callback(libxl__qmp_handler *qmp,
 
 
 out:
-    libxl__free_all(&gc);
+    GC_FREE;
     return rc;
 }
 
