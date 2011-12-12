@@ -49,7 +49,7 @@ char **libxl__xs_kvs_of_flexarray(libxl__gc *gc, flexarray_t *array, int length)
 }
 
 int libxl__xs_writev(libxl__gc *gc, xs_transaction_t t,
-                    char *dir, char *kvs[])
+                     const char *dir, char *kvs[])
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     char *path;
@@ -69,7 +69,7 @@ int libxl__xs_writev(libxl__gc *gc, xs_transaction_t t,
 }
 
 int libxl__xs_write(libxl__gc *gc, xs_transaction_t t,
-                   char *path, const char *fmt, ...)
+                    const char *path, const char *fmt, ...)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     char *s;
@@ -87,7 +87,7 @@ int libxl__xs_write(libxl__gc *gc, xs_transaction_t t,
     return 0;
 }
 
-char * libxl__xs_read(libxl__gc *gc, xs_transaction_t t, char *path)
+char * libxl__xs_read(libxl__gc *gc, xs_transaction_t t, const char *path)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     char *ptr;
@@ -113,7 +113,8 @@ char *libxl__xs_get_dompath(libxl__gc *gc, uint32_t domid)
     return s;
 }
 
-char **libxl__xs_directory(libxl__gc *gc, xs_transaction_t t, char *path, unsigned int *nb)
+char **libxl__xs_directory(libxl__gc *gc, xs_transaction_t t,
+                           const char *path, unsigned int *nb)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     char **ret = NULL;

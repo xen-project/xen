@@ -172,18 +172,19 @@ _hidden char *libxl__dirname(libxl__gc *gc, const char *s);
 _hidden char **libxl__xs_kvs_of_flexarray(libxl__gc *gc, flexarray_t *array, int length);
 
 _hidden int libxl__xs_writev(libxl__gc *gc, xs_transaction_t t,
-                    char *dir, char **kvs);
+                             const char *dir, char **kvs);
 _hidden int libxl__xs_write(libxl__gc *gc, xs_transaction_t t,
-                   char *path, const char *fmt, ...) PRINTF_ATTRIBUTE(4, 5);
+               const char *path, const char *fmt, ...) PRINTF_ATTRIBUTE(4, 5);
    /* Each fn returns 0 on success.
     * On error: returns -1, sets errno (no logging) */
 
 _hidden char *libxl__xs_get_dompath(libxl__gc *gc, uint32_t domid);
    /* On error: logs, returns NULL, sets errno. */
 
-_hidden char *libxl__xs_read(libxl__gc *gc, xs_transaction_t t, char *path);
+_hidden char *libxl__xs_read(libxl__gc *gc, xs_transaction_t t,
+                             const char *path);
 _hidden char **libxl__xs_directory(libxl__gc *gc, xs_transaction_t t,
-                                   char *path, unsigned int *nb);
+                                   const char *path, unsigned int *nb);
    /* On error: returns NULL, sets errno (no logging) */
 
 _hidden char *libxl__xs_libxl_path(libxl__gc *gc, uint32_t domid);
