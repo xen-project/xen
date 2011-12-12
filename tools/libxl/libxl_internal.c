@@ -72,6 +72,8 @@ void libxl__free_all(libxl__gc *gc)
         free(ptr);
     }
     free(gc->alloc_ptrs);
+    gc->alloc_ptrs = 0;
+    gc->alloc_maxsize = 0;
 }
 
 void *libxl__zalloc(libxl__gc *gc, int bytes)
