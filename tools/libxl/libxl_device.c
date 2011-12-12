@@ -516,7 +516,7 @@ int libxl__devices_destroy(libxl__gc *gc, uint32_t domid, int force)
         for (j = 0; j < num_devs; j++) {
             path = libxl__sprintf(gc, "/local/domain/%d/device/%s/%s/backend",
                                   domid, kinds[i], devs[j]);
-            path = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, path));
+            path = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s", path));
             if (path && libxl__parse_backend_path(gc, path, &dev) == 0) {
                 dev.domid = domid;
                 dev.kind = kind;
