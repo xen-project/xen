@@ -647,6 +647,54 @@ _hidden libxl__json_object *libxl__json_parse(libxl__gc *gc, const char *s);
 _hidden libxl_device_model_version
 libxl__device_model_version_running(libxl__gc *gc, uint32_t domid);
 
+
+/*
+ * Convenience macros.
+ */
+
+
+/*
+ * All of these assume (or define)
+ *    libxl__gc *gc;
+ * as a local variable.
+ */
+
+#define GC_INIT(ctx)  libxl__gc gc[1] = { LIBXL_INIT_GC(ctx) }
+#define GC_FREE       libxl__free_all(gc)
+#define CTX           libxl__gc_owner(gc)
+
+
+/*
+ * Inserts "elm_new" into the sorted list "head".
+ *
+ * "elm_search" must be a loop search variable of the same type as
+ * "elm_new".  "new_after_search_p" must be an expression which is
+ * true iff the element "elm_new" sorts after the element
+ * "elm_search".
+ *
+ * "search_body" can be empty, or some declaration(s) and statement(s)
+ * needed for "new_after_search_p".
+ */
+#define LIBXL_TAILQ_INSERT_SORTED(head, entry, elm_new, elm_search,     \
+                                  search_body, new_after_search_p)      \
+    do {                                                                \
+        for ((elm_search) = LIBXL_TAILQ_FIRST((head));                  \
+             (elm_search);                                              \
+             (elm_search) = LIBXL_TAILQ_NEXT((elm_search), entry)) {    \
+            search_body;                                                \
+            if (!(new_after_search_p))                                  \
+                break;                                                  \
+        }                                                               \
+        /* now elm_search is either the element before which we want    \
+         * to place elm_new, or NULL meaning we want to put elm_new at  \
+         * the end */                                                   \
+        if ((elm_search))                                               \
+            LIBXL_TAILQ_INSERT_BEFORE((elm_search), (elm_new), entry);  \
+        else                                                            \
+            LIBXL_TAILQ_INSERT_TAIL((head), (elm_new), entry);          \
+    } while(0)
+
+
 #endif
 
 /*
