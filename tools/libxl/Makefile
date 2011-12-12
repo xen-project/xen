@@ -42,7 +42,7 @@ LIBXL_OBJS += _libxl_types.o libxl_flask.o _libxl_types_internal.o
 
 $(LIBXL_OBJS): CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) $(CFLAGS_libxenstore) $(CFLAGS_libblktapctl)
 
-AUTOINCS= libxlu_cfg_y.h libxlu_cfg_l.h
+AUTOINCS= libxlu_cfg_y.h libxlu_cfg_l.h _libxl_list.h
 AUTOSRCS= libxlu_cfg_y.c libxlu_cfg_l.c
 LIBXLU_OBJS = libxlu_cfg_y.o libxlu_cfg_l.o libxlu_cfg.o \
 	libxlu_disk_l.o libxlu_disk.o
@@ -55,7 +55,7 @@ $(XL_OBJS): CFLAGS += $(CFLAGS_libxenctrl) # For xentoollog.h
 $(XL_OBJS): CFLAGS += $(CFLAGS_libxenlight)
 
 testidl.o: CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenlight)
-testidl.c: libxl_types.idl gentest.py libxl.h
+testidl.c: libxl_types.idl gentest.py libxl.h $(AUTOINCS)
 	$(PYTHON) gentest.py libxl_types.idl testidl.c.new
 	mv testidl.c.new testidl.c
 
@@ -63,7 +63,7 @@ testidl.c: libxl_types.idl gentest.py libxl.h
 all: $(CLIENTS) libxenlight.so libxenlight.a libxlutil.so libxlutil.a \
 	$(AUTOSRCS) $(AUTOINCS)
 
-$(LIBXLU_OBJS): $(AUTOINCS)
+$(LIBXL_OBJS) $(LIBXLU_OBJS) $(XL_OBJS): $(AUTOINCS)
 
 %.c %.h: %.y
 	@rm -f $*.[ch]
@@ -80,6 +80,10 @@ _libxl_paths.h: genpath
 	sed -e "s/\([^=]*\)=\(.*\)/#define \1 \2/g" $@.tmp >$@.2.tmp
 	rm -f $@.tmp
 	$(call move-if-changed,$@.2.tmp,$@)
+
+_libxl_list.h: bsd-sys-queue-h-seddery external/bsd-sys-queue.h
+	perl ./$^ --prefix=libxl >$@.new
+	$(call move-if-changed,$@.new,$@)
 
 libxl_paths.c: _libxl_paths.h
 
@@ -143,7 +147,7 @@ install: all
 	ln -sf libxlutil.so.$(XLUMAJOR).$(XLUMINOR) $(DESTDIR)$(LIBDIR)/libxlutil.so.$(XLUMAJOR)
 	ln -sf libxlutil.so.$(XLUMAJOR) $(DESTDIR)$(LIBDIR)/libxlutil.so
 	$(INSTALL_DATA) libxlutil.a $(DESTDIR)$(LIBDIR)
-	$(INSTALL_DATA) libxl.h libxl_json.h _libxl_types.h _libxl_types_json.h libxl_utils.h libxl_uuid.h $(DESTDIR)$(INCLUDEDIR)
+	$(INSTALL_DATA) libxl.h libxl_json.h _libxl_types.h _libxl_types_json.h _libxl_list.h libxl_utils.h libxl_uuid.h $(DESTDIR)$(INCLUDEDIR)
 	$(INSTALL_DATA) bash-completion $(DESTDIR)$(BASH_COMPLETION_DIR)/xl.sh
 
 .PHONY: clean
