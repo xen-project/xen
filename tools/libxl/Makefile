@@ -11,7 +11,8 @@ MINOR = 0
 XLUMAJOR = 1.0
 XLUMINOR = 0
 
-CFLAGS += -Werror -Wno-format-zero-length -Wmissing-declarations
+CFLAGS += -Werror -Wno-format-zero-length -Wmissing-declarations \
+	-Wno-declaration-after-statement
 CFLAGS += -I. -fPIC
 
 ifeq ($(CONFIG_Linux),y)
