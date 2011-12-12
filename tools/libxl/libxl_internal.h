@@ -23,6 +23,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 
 #include <xs.h>
 #include <xenctrl.h>
@@ -94,6 +95,18 @@ struct libxl__ctx {
     xentoollog_logger *lg;
     xc_interface *xch;
     struct xs_handle *xsh;
+
+    pthread_mutex_t lock; /* protects data structures hanging off the ctx */
+      /* Always use CTX_LOCK and CTX_UNLOCK to manipulate this.
+       *
+       * You may acquire this mutex recursively if it is convenient to
+       * do so.  You may not acquire this lock at the same time as any
+       * other lock.  If you need to call application code outside
+       * libxl (ie, a callback) with this lock held then it is
+       * necessaray to impose restrictions on the caller to maintain a
+       * proper lock hierarchy, and these restrictions must then be
+       * documented in the libxl public interface.
+       */
 
     /* for callers who reap children willy-nilly; caller must only
      * set this after libxl_init and before any other call - or
@@ -667,6 +680,20 @@ libxl__device_model_version_running(libxl__gc *gc, uint32_t domid);
 #define GC_INIT(ctx)  libxl__gc gc[1] = { LIBXL_INIT_GC(ctx) }
 #define GC_FREE       libxl__free_all(gc)
 #define CTX           libxl__gc_owner(gc)
+
+
+/* Locking functions.  See comment for "lock" member of libxl__ctx. */
+
+#define CTX_LOCK do {                                   \
+        int mutex_r = pthread_mutex_lock(&CTX->lock);   \
+        assert(!mutex_r);                               \
+    } while(0)
+
+#define CTX_UNLOCK do {                                 \
+        int mutex_r = pthread_mutex_unlock(&CTX->lock); \
+        assert(!mutex_r);                               \
+    } while(0)
+        
 
 
 /*
