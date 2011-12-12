@@ -56,7 +56,7 @@ def libxl_C_type_define(ty, indent = ""):
         if ty.typename is None:
             s += "%s {\n" % ty.kind
         else:
-            s += "typedef %s {\n" % ty.kind
+            s += "typedef %s %s {\n" % (ty.kind, ty.typename)
 
         for f in ty.fields:
             if f.comment is not None:
