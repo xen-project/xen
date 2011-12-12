@@ -179,7 +179,7 @@ char *libxl__dirname(libxl__gc *gc, const char *s)
 
 void libxl__logv(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
              const char *file, int line, const char *func,
-             char *fmt, va_list ap)
+             const char *fmt, va_list ap)
 {
     char *enomem = "[out of memory formatting log message]";
     char *base = NULL;
@@ -206,7 +206,7 @@ void libxl__logv(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
 
 void libxl__log(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
             const char *file, int line, const char *func,
-            char *fmt, ...)
+            const char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);

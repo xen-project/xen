@@ -80,13 +80,13 @@
 _hidden void libxl__logv(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
              const char *file /* may be 0 */, int line /* ignored if !file */,
              const char *func /* may be 0 */,
-             char *fmt, va_list al)
+             const char *fmt, va_list al)
      __attribute__((format(printf,7,0)));
 
 _hidden void libxl__log(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
             const char *file /* may be 0 */, int line /* ignored if !file */,
             const char *func /* may be 0 */,
-            char *fmt, ...)
+            const char *fmt, ...)
      __attribute__((format(printf,7,8)));
 
      /* these functions preserve errno (saving and restoring) */
