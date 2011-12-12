@@ -139,7 +139,9 @@ void __devinit early_intel_workaround(struct cpuinfo_x86 *c)
 			misc_enable &= ~MSR_IA32_MISC_ENABLE_LIMIT_CPUID;
 			wrmsrl(MSR_IA32_MISC_ENABLE, misc_enable);
 			c->cpuid_level = cpuid_eax(0);
-			printk("revised cpuid_level = %d\n", c->cpuid_level);
+			if (opt_cpu_info || c == &boot_cpu_data)
+				printk(KERN_INFO "revised cpuid level: %d\n",
+				       c->cpuid_level);
 		}
 	}
 }
