@@ -135,6 +135,22 @@ bool xs_watch(struct xs_handle *h, const char *path, const char *token);
 /* Return the FD to poll on to see if a watch has fired. */
 int xs_fileno(struct xs_handle *h);
 
+/* Check for node changes.  On success, returns a non-NULL pointer ret
+ * such that ret[0] and ret[1] are valid C strings, namely the
+ * triggering path (see docs/misc/xenstore.txt) and the token (from
+ * xs_watch).  On error return value is NULL setting errno.
+ * 
+ * Callers should, after xs_fileno has become readable, repeatedly
+ * call xs_check_watch until it returns NULL and sets errno to EAGAIN.
+ * (If the fd became readable, xs_check_watch is allowed to make it no
+ * longer show up as readable even if future calls to xs_check_watch
+ * will return more watch events.)
+ *
+ * After the caller is finished with the returned information it
+ * should be freed all in one go with free(ret).
+ */
+char **xs_check_watch(struct xs_handle *h);
+
 /* Find out what node change was on (will block if nothing pending).
  * Returns array containing the path and token. Use XS_WATCH_* to access these
  * elements. Call free() after use.

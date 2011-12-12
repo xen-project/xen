@@ -132,7 +132,23 @@ struct xs_handle {
 
 #endif
 
-static int read_message(struct xs_handle *h);
+static int read_message(struct xs_handle *h, int nonblocking);
+
+static void setnonblock(int fd, int nonblock) {
+	int esave = errno;
+	int flags = fcntl(fd, F_GETFL);
+	if (flags == -1)
+		goto out;
+
+	if (nonblock)
+		flags |= O_NONBLOCK;
+	else
+		flags &= ~O_NONBLOCK;
+
+	fcntl(fd, F_SETFL, flags);
+out:
+	errno = esave;
+}
 
 int xs_fileno(struct xs_handle *h)
 {
@@ -325,8 +341,16 @@ void xs_close(struct xs_handle* xsh)
 		xs_daemon_close(xsh);
 }
 
-static bool read_all(int fd, void *data, unsigned int len)
+static bool read_all(int fd, void *data, unsigned int len, int nonblocking)
+	/* With nonblocking, either reads either everything requested,
+	 * or nothing. */
 {
+	if (!len)
+		return true;
+
+	if (nonblocking)
+		setnonblock(fd, 1);
+
 	while (len) {
 		int done;
 
@@ -334,18 +358,28 @@ static bool read_all(int fd, void *data, unsigned int len)
 		if (done < 0) {
 			if (errno == EINTR)
 				continue;
-			return false;
+			goto out_false;
 		}
 		if (done == 0) {
 			/* It closed fd on us?  EBADF is appropriate. */
 			errno = EBADF;
-			return false;
+			goto out_false;
 		}
 		data += done;
 		len -= done;
+
+		if (nonblocking) {
+			setnonblock(fd, 0);
+			nonblocking = 0;
+		}
 	}
 
 	return true;
+
+out_false:
+	if (nonblocking)
+		setnonblock(fd, 0);
+	return false;
 }
 
 #ifdef XSTEST
@@ -374,7 +408,7 @@ static void *read_reply(
 	read_from_thread = read_thread_exists(h);
 
 	/* Read from comms channel ourselves if there is no reader thread. */
-	if (!read_from_thread && (read_message(h) == -1))
+	if (!read_from_thread && (read_message(h, 0) == -1))
 		return NULL;
 
 	mutex_lock(&h->reply_mutex);
@@ -693,7 +727,8 @@ bool xs_watch(struct xs_handle *h, const char *path, const char *token)
  * Returns array of two pointers: path and token, or NULL.
  * Call free() after use.
  */
-char **xs_read_watch(struct xs_handle *h, unsigned int *num)
+static char **read_watch_internal(struct xs_handle *h, unsigned int *num,
+				  int nonblocking)
 {
 	struct xs_stored_msg *msg;
 	char **ret, *strings, c = 0;
@@ -707,14 +742,20 @@ char **xs_read_watch(struct xs_handle *h, unsigned int *num)
 	 * we haven't called xs_watch.	Presumably the application
 	 * will do so later; in the meantime we just block.
 	 */
-	while (list_empty(&h->watch_list) && h->fd != -1)
+	while (list_empty(&h->watch_list) && h->fd != -1) {
+		if (nonblocking) {
+			mutex_unlock(&h->watch_mutex);
+			errno = EAGAIN;
+			return 0;
+		}
 		condvar_wait(&h->watch_condvar, &h->watch_mutex);
+	}
 #else /* !defined(USE_PTHREAD) */
 	/* Read from comms channel ourselves if there are no threads
 	 * and therefore no reader thread. */
 
 	assert(!read_thread_exists(h)); /* not threadsafe but worth a check */
-	if ((read_message(h) == -1))
+	if ((read_message(h, nonblocking) == -1))
 		return NULL;
 
 #endif /* !defined(USE_PTHREAD) */
@@ -758,6 +799,24 @@ char **xs_read_watch(struct xs_handle *h, unsigned int *num)
 	*num = num_strings;
 
 	return ret;
+}
+
+char **xs_check_watch(struct xs_handle *h)
+{
+	unsigned int num;
+	char **ret;
+	ret = read_watch_internal(h, &num, 1);
+	if (ret) assert(num >= 2);
+	return ret;
+}
+
+/* Find out what node change was on (will block if nothing pending).
+ * Returns array of two pointers: path and token, or NULL.
+ * Call free() after use.
+ */
+char **xs_read_watch(struct xs_handle *h, unsigned int *num)
+{
+	return read_watch_internal(h, num, 0);
 }
 
 /* Remove a watch on a node.
@@ -940,11 +999,17 @@ char *xs_debug_command(struct xs_handle *h, const char *cmd,
 			ARRAY_SIZE(iov), NULL);
 }
 
-static int read_message(struct xs_handle *h)
+static int read_message(struct xs_handle *h, int nonblocking)
 {
 	/* IMPORTANT: It is forbidden to call this function without
 	 * acquiring the request lock and checking that h->read_thr_exists
 	 * is false.  See "Lock discipline" in struct xs_handle, above. */
+
+	/* If nonblocking==1, this function will always read either
+	 * nothing, returning -1 and setting errno==EAGAIN, or we read
+	 * whole amount requested.  Ie as soon as we have the start of
+	 * the message we block until we get all of it.
+	 */
          
 	struct xs_stored_msg *msg = NULL;
 	char *body = NULL;
@@ -956,7 +1021,7 @@ static int read_message(struct xs_handle *h)
 	if (msg == NULL)
 		goto error;
 	cleanup_push(free, msg);
-	if (!read_all(h->fd, &msg->hdr, sizeof(msg->hdr))) { /* Cancellation point */
+	if (!read_all(h->fd, &msg->hdr, sizeof(msg->hdr), nonblocking)) { /* Cancellation point */
 		saved_errno = errno;
 		goto error_freemsg;
 	}
@@ -966,7 +1031,7 @@ static int read_message(struct xs_handle *h)
 	if (body == NULL)
 		goto error_freemsg;
 	cleanup_push(free, body);
-	if (!read_all(h->fd, body, msg->hdr.len)) { /* Cancellation point */
+	if (!read_all(h->fd, body, msg->hdr.len, 0)) { /* Cancellation point */
 		saved_errno = errno;
 		goto error_freebody;
 	}
@@ -1021,7 +1086,7 @@ static void *read_thread(void *arg)
 	struct xs_handle *h = arg;
 	int fd;
 
-	while (read_message(h) != -1)
+	while (read_message(h, 0) != -1)
 		continue;
 
 	/* An error return from read_message leaves the socket in an undefined
