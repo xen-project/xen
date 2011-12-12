@@ -33,6 +33,8 @@ class Type(object):
         if self.passby not in [PASS_BY_VALUE, PASS_BY_REFERENCE]:
             raise ValueError
 
+        self.private = kwargs.setdefault('private', False)
+
         if typename is None: # Anonymous type
             self.typename = None
             self.rawname = None
@@ -50,7 +52,7 @@ class Type(object):
 
         self.autogenerate_dispose_fn = kwargs.setdefault('autogenerate_dispose_fn', True)
 
-        if self.typename is not None:
+        if self.typename is not None and not self.private:
             self.json_fn = kwargs.setdefault('json_fn', self.typename + "_gen_json")
         else:
             self.json_fn = kwargs.setdefault('json_fn', None)

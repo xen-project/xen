@@ -56,6 +56,8 @@ def gen_rand_init(ty, v, indent = "    ", parent = None):
         s += "%s = rand() %% 2;\n" % v
     elif ty.typename in ["char *"]:
         s += "%s = rand_str();\n" % v
+    elif ty.private:
+        pass
     elif ty.typename in handcoded:
         raise Exception("Gen for handcoded %s" % ty.typename)
     else:

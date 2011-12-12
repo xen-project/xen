@@ -129,6 +129,8 @@ static PyObject *Py%(rawname)s_new(PyTypeObject *type, PyObject *args, PyObject 
 
     l.append('static PyGetSetDef Py%s_getset[] = {'%ty.rawname)
     for f in ty.fields:
+        if f.type.private:
+            continue
         l.append('    { .name = "%s", '%f.name)
         if ty.marshal_out():
             l.append('      .get = (getter)py_%s_%s_get, '%(ty.rawname, f.name))
@@ -295,9 +297,13 @@ _hidden int genwrap__ll_set(PyObject *v, long long *val, long long mask);
 
 """ % tuple((' '.join(sys.argv),) + (os.path.split(decls)[-1:]),))
     for ty in types:
+        if ty.private:
+            continue
         if isinstance(ty, libxltypes.Aggregate):
             f.write('/* Attribute get/set functions for %s */\n'%ty.typename)
             for a in ty.fields:
+                if a.type.private:
+                    continue
                 if ty.marshal_out():
                     f.write(py_attrib_get(ty,a))
                 if ty.marshal_in():
