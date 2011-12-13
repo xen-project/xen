@@ -3,7 +3,7 @@
  */
 
 #include <xen/config.h>
-#include <xen/types.h>
+#include <xen/lib.h>
 #include <compat/platform.h>
 
 DEFINE_XEN_GUEST_HANDLE(compat_platform_op_t);
@@ -26,8 +26,13 @@ DEFINE_XEN_GUEST_HANDLE(compat_platform_op_t);
 #define xen_processor_power_t   compat_processor_power_t
 #define set_cx_pminfo           compat_set_cx_pminfo
 
-#define xenpf_pcpuinfo compat_pf_pcpuinfo
-#define xenpf_pcpuinfo_t compat_pf_pcpuinfo_t
+#define xen_pf_pcpuinfo xenpf_pcpuinfo
+CHECK_pf_pcpuinfo;
+#undef xen_pf_pcpuinfo
+
+#define xen_pf_pcpu_version xenpf_pcpu_version
+CHECK_pf_pcpu_version;
+#undef xen_pf_pcpu_version
 
 #define xenpf_enter_acpi_sleep compat_pf_enter_acpi_sleep
 

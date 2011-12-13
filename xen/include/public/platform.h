@@ -449,6 +449,21 @@ struct xenpf_pcpuinfo {
 typedef struct xenpf_pcpuinfo xenpf_pcpuinfo_t;
 DEFINE_XEN_GUEST_HANDLE(xenpf_pcpuinfo_t);
 
+#define XENPF_get_cpu_version 48
+struct xenpf_pcpu_version {
+    /* IN */
+    uint32_t xen_cpuid;
+    /* OUT */
+    /* The maxium cpu_id that is present */
+    uint32_t max_present;
+    char vendor_id[12];
+    uint32_t family;
+    uint32_t model;
+    uint32_t stepping;
+};
+typedef struct xenpf_pcpu_version xenpf_pcpu_version_t;
+DEFINE_XEN_GUEST_HANDLE(xenpf_pcpu_version_t);
+
 #define XENPF_cpu_online    56
 #define XENPF_cpu_offline   57
 struct xenpf_cpu_ol
@@ -492,6 +507,7 @@ struct xen_platform_op {
         struct xenpf_getidletime       getidletime;
         struct xenpf_set_processor_pminfo set_pminfo;
         struct xenpf_pcpuinfo          pcpu_info;
+        struct xenpf_pcpu_version      pcpu_version;
         struct xenpf_cpu_ol            cpu_ol;
         struct xenpf_cpu_hotadd        cpu_add;
         struct xenpf_mem_hotadd        mem_add;

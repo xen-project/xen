@@ -469,6 +469,42 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
     }
     break;
 
+    case XENPF_get_cpu_version:
+    {
+        struct xenpf_pcpu_version *ver = &op->u.pcpu_version;
+
+        if ( !get_cpu_maps() )
+        {
+            ret = -EBUSY;
+            break;
+        }
+
+        if ( (ver->xen_cpuid >= nr_cpu_ids) || !cpu_online(ver->xen_cpuid) )
+        {
+            memset(ver->vendor_id, 0, sizeof(ver->vendor_id));
+            ver->family = 0;
+            ver->model = 0;
+            ver->stepping = 0;
+        }
+        else
+        {
+            const struct cpuinfo_x86 *c = &cpu_data[ver->xen_cpuid];
+
+            memcpy(ver->vendor_id, c->x86_vendor_id, sizeof(ver->vendor_id));
+            ver->family = c->x86;
+            ver->model = c->x86_model;
+            ver->stepping = c->x86_mask;
+        }
+
+        ver->max_present = cpumask_last(&cpu_present_map);
+
+        put_cpu_maps();
+
+        if ( copy_field_to_guest(u_xenpf_op, op, u.pcpu_version) )
+            ret = -EFAULT;
+    }
+    break;
+
     case XENPF_cpu_online:
     {
         int cpu = op->u.cpu_ol.cpuid;
