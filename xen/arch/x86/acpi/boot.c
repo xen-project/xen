@@ -87,9 +87,9 @@ static int __init acpi_parse_madt(struct acpi_table_header *table)
 static int __init
 acpi_parse_x2apic(struct acpi_subtable_header *header, const unsigned long end)
 {
-	struct acpi_table_x2apic *processor = NULL;
-
-	processor = (struct acpi_table_x2apic *)header;
+	struct acpi_madt_local_x2apic *processor =
+		container_of(header, struct acpi_madt_local_x2apic, header);
+	bool_t enabled = 0;
 
 	if (BAD_MADT_ENTRY(processor, end))
 		return -EINVAL;
@@ -97,8 +97,11 @@ acpi_parse_x2apic(struct acpi_subtable_header *header, const unsigned long end)
 	acpi_table_print_madt_entry(header);
 
 	/* Record local apic id only when enabled */
-	if (processor->flags.enabled)
-		x86_acpiid_to_apicid[processor->acpi_uid] = processor->id;
+	if (processor->lapic_flags & ACPI_MADT_ENABLED) {
+		x86_acpiid_to_apicid[processor->uid] =
+			processor->local_apic_id;
+		enabled = 1;
+	}
 
 	/*
 	 * We need to register disabled CPU as well to permit
@@ -107,9 +110,7 @@ acpi_parse_x2apic(struct acpi_subtable_header *header, const unsigned long end)
 	 * to not preallocating memory for all NR_CPUS
 	 * when we use CPU hotplug.
 	 */
-	mp_register_lapic(processor->id,	/* X2APIC ID */
-			  processor->flags.enabled,	/* Enabled? */
-			  0);
+	mp_register_lapic(processor->local_apic_id, enabled, 0);
 
 	return 0;
 }
@@ -117,9 +118,9 @@ acpi_parse_x2apic(struct acpi_subtable_header *header, const unsigned long end)
 static int __init
 acpi_parse_lapic(struct acpi_subtable_header * header, const unsigned long end)
 {
-	struct acpi_table_lapic *processor = NULL;
-
-	processor = (struct acpi_table_lapic *)header;
+	struct acpi_madt_local_apic *processor =
+		container_of(header, struct acpi_madt_local_apic, header);
+	bool_t enabled = 0;
 
 	if (BAD_MADT_ENTRY(processor, end))
 		return -EINVAL;
@@ -127,8 +128,10 @@ acpi_parse_lapic(struct acpi_subtable_header * header, const unsigned long end)
 	acpi_table_print_madt_entry(header);
 
 	/* Record local apic id only when enabled */
-	if (processor->flags.enabled)
-		x86_acpiid_to_apicid[processor->acpi_id] = processor->id;
+	if (processor->lapic_flags & ACPI_MADT_ENABLED) {
+		x86_acpiid_to_apicid[processor->processor_id] = processor->id;
+		enabled = 1;
+	}
 
 	/*
 	 * We need to register disabled CPU as well to permit
@@ -137,9 +140,7 @@ acpi_parse_lapic(struct acpi_subtable_header * header, const unsigned long end)
 	 * to not preallocating memory for all NR_CPUS
 	 * when we use CPU hotplug.
 	 */
-	mp_register_lapic(processor->id,	/* APIC ID */
-			  processor->flags.enabled,	/* Enabled? */
-			  0);
+	mp_register_lapic(processor->id, enabled, 0);
 
 	return 0;
 }
@@ -148,9 +149,9 @@ static int __init
 acpi_parse_lapic_addr_ovr(struct acpi_subtable_header * header,
 			  const unsigned long end)
 {
-	struct acpi_table_lapic_addr_ovr *lapic_addr_ovr = NULL;
-
-	lapic_addr_ovr = (struct acpi_table_lapic_addr_ovr *)header;
+	struct acpi_madt_local_apic_override *lapic_addr_ovr =
+		container_of(header, struct acpi_madt_local_apic_override,
+			     header);
 
 	if (BAD_MADT_ENTRY(lapic_addr_ovr, end))
 		return -EINVAL;
@@ -164,9 +165,9 @@ static int __init
 acpi_parse_x2apic_nmi(struct acpi_subtable_header *header,
 		      const unsigned long end)
 {
-	struct acpi_table_x2apic_nmi *x2apic_nmi = NULL;
-
-	x2apic_nmi = (struct acpi_table_x2apic_nmi *)header;
+	struct acpi_madt_local_x2apic_nmi *x2apic_nmi =
+		container_of(header, struct acpi_madt_local_x2apic_nmi,
+			     header);
 
 	if (BAD_MADT_ENTRY(x2apic_nmi, end))
 		return -EINVAL;
@@ -182,9 +183,8 @@ acpi_parse_x2apic_nmi(struct acpi_subtable_header *header,
 static int __init
 acpi_parse_lapic_nmi(struct acpi_subtable_header * header, const unsigned long end)
 {
-	struct acpi_table_lapic_nmi *lapic_nmi = NULL;
-
-	lapic_nmi = (struct acpi_table_lapic_nmi *)header;
+	struct acpi_madt_local_apic_nmi *lapic_nmi =
+		container_of(header, struct acpi_madt_local_apic_nmi, header);
 
 	if (BAD_MADT_ENTRY(lapic_nmi, end))
 		return -EINVAL;
@@ -204,9 +204,8 @@ acpi_parse_lapic_nmi(struct acpi_subtable_header * header, const unsigned long e
 static int __init
 acpi_parse_ioapic(struct acpi_subtable_header * header, const unsigned long end)
 {
-	struct acpi_table_ioapic *ioapic = NULL;
-
-	ioapic = (struct acpi_table_ioapic *)header;
+	struct acpi_madt_io_apic *ioapic =
+		container_of(header, struct acpi_madt_io_apic, header);
 
 	if (BAD_MADT_ENTRY(ioapic, end))
 		return -EINVAL;
@@ -223,9 +222,9 @@ static int __init
 acpi_parse_int_src_ovr(struct acpi_subtable_header * header,
 		       const unsigned long end)
 {
-	struct acpi_table_int_src_ovr *intsrc = NULL;
-
-	intsrc = (struct acpi_table_int_src_ovr *)header;
+	struct acpi_madt_interrupt_override *intsrc =
+		container_of(header, struct acpi_madt_interrupt_override,
+			     header);
 
 	if (BAD_MADT_ENTRY(intsrc, end))
 		return -EINVAL;
@@ -233,14 +232,15 @@ acpi_parse_int_src_ovr(struct acpi_subtable_header * header,
 	acpi_table_print_madt_entry(header);
 
 	if (acpi_skip_timer_override &&
-		intsrc->bus_irq == 0 && intsrc->global_irq == 2) {
+	    intsrc->source_irq == 0 && intsrc->global_irq == 2) {
 			printk(PREFIX "BIOS IRQ0 pin2 override ignored.\n");
 			return 0;
 	}
 
-	mp_override_legacy_irq(intsrc->bus_irq,
-			       intsrc->flags.polarity,
-			       intsrc->flags.trigger, intsrc->global_irq);
+	mp_override_legacy_irq(intsrc->source_irq,
+			       ACPI_MADT_GET_POLARITY(intsrc->inti_flags),
+			       ACPI_MADT_GET_TRIGGER(intsrc->inti_flags),
+			       intsrc->global_irq);
 
 	return 0;
 }
@@ -248,9 +248,8 @@ acpi_parse_int_src_ovr(struct acpi_subtable_header * header,
 static int __init
 acpi_parse_nmi_src(struct acpi_subtable_header * header, const unsigned long end)
 {
-	struct acpi_table_nmi_src *nmi_src = NULL;
-
-	nmi_src = (struct acpi_table_nmi_src *)header;
+	struct acpi_madt_nmi_source *nmi_src =
+		container_of(header, struct acpi_madt_nmi_source, header);
 
 	if (BAD_MADT_ENTRY(nmi_src, end))
 		return -EINVAL;
@@ -270,7 +269,7 @@ static int __init acpi_parse_hpet(struct acpi_table_header *table)
 {
 	struct acpi_table_hpet *hpet_tbl = (struct acpi_table_hpet *)table;
 
-	if (hpet_tbl->address.space_id != ACPI_SPACE_MEM) {
+	if (hpet_tbl->address.space_id != ACPI_ADR_SPACE_SYSTEM_MEMORY) {
 		printk(KERN_WARNING PREFIX "HPET timers must be located in "
 		       "memory.\n");
 		return -1;

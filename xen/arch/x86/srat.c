@@ -396,7 +396,8 @@ void __init srat_parse_regions(u64 addr)
 		return;
 
 	srat_region_mask = fill_mask(addr - 1);
-	acpi_table_parse_srat(ACPI_SRAT_MEMORY_AFFINITY, srat_parse_region, 0);
+	acpi_table_parse_srat(ACPI_SRAT_TYPE_MEMORY_AFFINITY,
+			      srat_parse_region, 0);
 
 	for (mask = srat_region_mask, i = 0; mask && i < e820.nr_map; i++) {
 		if (e820.map[i].type != E820_RAM)

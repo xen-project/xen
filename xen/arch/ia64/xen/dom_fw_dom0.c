@@ -53,11 +53,11 @@ static u32 lsapic_nbr;
 static int __init
 acpi_update_lsapic(struct acpi_subtable_header * header, const unsigned long end)
 {
-	struct acpi_table_lsapic *lsapic;
+	struct acpi_madt_local_sapic *lsapic =
+		container_of(header, struct acpi_madt_local_sapic, header);
 	int enable;
 
-	lsapic = (struct acpi_table_lsapic *)header;
-	if (!lsapic)
+	if (!header)
 		return -EINVAL;
 
 	if (lsapic_nbr < dom0->max_vcpus && dom0->vcpu[lsapic_nbr] != NULL)
@@ -65,14 +65,14 @@ acpi_update_lsapic(struct acpi_subtable_header * header, const unsigned long end
 	else
 		enable = 0;
 
-	if (lsapic->flags.enabled && enable) {
+	if ((lsapic->lapic_flags & ACPI_MADT_ENABLED) && enable) {
 		printk("enable lsapic entry: 0x%lx\n", (u64) lsapic);
 		lsapic->id = lsapic_nbr;
 		lsapic->eid = 0;
 		lsapic_nbr++;
-	} else if (lsapic->flags.enabled) {
+	} else if (lsapic->lapic_flags & ACPI_MADT_ENABLED) {
 		printk("DISABLE lsapic entry: 0x%lx\n", (u64) lsapic);
-		lsapic->flags.enabled = 0;
+		lsapic->lapic_flags &= ~ACPI_MADT_ENABLED;
 		lsapic->id = 0;
 		lsapic->eid = 0;
 	}
@@ -83,10 +83,11 @@ static int __init
 acpi_patch_plat_int_src(struct acpi_subtable_header * header,
 			const unsigned long end)
 {
-	struct acpi_table_plat_int_src *plintsrc;
+	struct acpi_madt_interrupt_source *plintsrc =
+		container_of(header, struct acpi_madt_interrupt_source,
+			     header);
 
-	plintsrc = (struct acpi_table_plat_int_src *)header;
-	if (!plintsrc)
+	if (!header)
 		return -EINVAL;
 
 	if (plintsrc->type == ACPI_INTERRUPT_CPEI) {
@@ -193,12 +194,13 @@ static void __init touch_acpi_table(void)
 	 */
 	acpi_table_parse(ACPI_SIG_MADT, acpi_backup_table);
 
-	if (acpi_table_parse_madt(ACPI_MADT_LSAPIC, acpi_update_lsapic, 0) < 0)
+	if (acpi_table_parse_madt(ACPI_MADT_TYPE_LOCAL_SAPIC,
+				  acpi_update_lsapic, 0) < 0)
 		printk("Error parsing MADT - no LAPIC entries\n");
 
 	acpi_update_madt_checksum(madt);
 
-	if (acpi_table_parse_madt(ACPI_MADT_PLAT_INT_SRC,
+	if (acpi_table_parse_madt(ACPI_MADT_TYPE_INTERRUPT_SOURCE,
 				  acpi_patch_plat_int_src, 0) < 0)
 		printk("Error parsing MADT - no PLAT_INT_SRC entries\n");
 

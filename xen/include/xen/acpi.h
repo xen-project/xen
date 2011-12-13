@@ -34,165 +34,19 @@
 #include <acpi/acpi.h>
 #include <asm/acpi.h>
 
+#define ACPI_MADT_GET_(fld, x) (((x) & ACPI_MADT_##fld##_MASK) / \
+	(ACPI_MADT_##fld##_MASK & -ACPI_MADT_##fld##_MASK))
+
+#define ACPI_MADT_GET_POLARITY(inti)	ACPI_MADT_GET_(POLARITY, inti)
+#define ACPI_MADT_GET_TRIGGER(inti)	ACPI_MADT_GET_(TRIGGER, inti)
+
 #ifdef CONFIG_ACPI_BOOT
-
-enum acpi_madt_entry_id {
-	ACPI_MADT_LAPIC = 0,
-	ACPI_MADT_IOAPIC,
-	ACPI_MADT_INT_SRC_OVR,
-	ACPI_MADT_NMI_SRC,
-	ACPI_MADT_LAPIC_NMI,
-	ACPI_MADT_LAPIC_ADDR_OVR,
-	ACPI_MADT_IOSAPIC,
-	ACPI_MADT_LSAPIC,
-	ACPI_MADT_PLAT_INT_SRC,
-	ACPI_MADT_X2APIC,
-	ACPI_MADT_X2APIC_NMI,
-	ACPI_MADT_ENTRY_COUNT
-};
-
-typedef struct {
-	u16			polarity:2;
-	u16			trigger:2;
-	u16			reserved:12;
-} __attribute__ ((packed)) acpi_interrupt_flags;
-
-struct acpi_table_lapic {
-	struct acpi_subtable_header	header;
-	u8			acpi_id;
-	u8			id;
-	struct {
-		u32			enabled:1;
-		u32			reserved:31;
-	}			flags;
-} __attribute__ ((packed));
-
-struct acpi_table_x2apic {
-	struct acpi_subtable_header header;
-	u16			reserved;
-	u32			id;
-	struct {
-		u32			enabled:1;
-		u32			reserved:31;
-	}			flags;
-	u32         acpi_uid;
-} __attribute__ ((packed));
-
-struct acpi_table_ioapic {
-	struct acpi_subtable_header	header;
-	u8			id;
-	u8			reserved;
-	u32			address;
-	u32			global_irq_base;
-} __attribute__ ((packed));
-
-struct acpi_table_int_src_ovr {
-	struct acpi_subtable_header	header;
-	u8			bus;
-	u8			bus_irq;
-	u32			global_irq;
-	acpi_interrupt_flags	flags;
-} __attribute__ ((packed));
-
-struct acpi_table_nmi_src {
-	struct acpi_subtable_header	header;
-	acpi_interrupt_flags	flags;
-	u32			global_irq;
-} __attribute__ ((packed));
-
-struct acpi_table_lapic_nmi {
-	struct acpi_subtable_header	header;
-	u8			acpi_id;
-	acpi_interrupt_flags	flags;
-	u8			lint;
-} __attribute__ ((packed));
-
-struct acpi_table_x2apic_nmi {
-	struct acpi_subtable_header header;
-	acpi_interrupt_flags	flags;
-	u32			acpi_uid;
-	u8			lint;
-	u8			reserved[3];
-} __attribute__ ((packed));
-
-struct acpi_table_lapic_addr_ovr {
-	struct acpi_subtable_header	header;
-	u8			reserved[2];
-	u64			address;
-} __attribute__ ((packed));
-
-struct acpi_table_iosapic {
-	struct acpi_subtable_header	header;
-	u8			id;
-	u8			reserved;
-	u32			global_irq_base;
-	u64			address;
-} __attribute__ ((packed));
-
-struct acpi_table_lsapic {
-	struct acpi_subtable_header	header;
-	u8			acpi_id;
-	u8			id;
-	u8			eid;
-	u8			reserved[3];
-	struct {
-		u32			enabled:1;
-		u32			reserved:31;
-	}			flags;
-} __attribute__ ((packed));
-
-struct acpi_table_plat_int_src {
-	struct acpi_subtable_header	header;
-	acpi_interrupt_flags	flags;
-	u8			type;	/* See acpi_interrupt_type */
-	u8			id;
-	u8			eid;
-	u8			iosapic_vector;
-	u32			global_irq;
-	u32			reserved;
-} __attribute__ ((packed));
 
 enum acpi_interrupt_id {
 	ACPI_INTERRUPT_PMI	= 1,
 	ACPI_INTERRUPT_INIT,
 	ACPI_INTERRUPT_CPEI,
 	ACPI_INTERRUPT_COUNT
-};
-
-#define	ACPI_SPACE_MEM		0
-
-/*
- * Simple Boot Flags
- * http://www.microsoft.com/whdc/hwdev/resources/specs/simp_bios.mspx
- */
-struct acpi_table_sbf
-{
-	u8 sbf_signature[4];
-	u32 sbf_len;
-	u8 sbf_revision;
-	u8 sbf_csum;
-	u8 sbf_oemid[6];
-	u8 sbf_oemtable[8];
-	u8 sbf_revdata[4];
-	u8 sbf_creator[4];
-	u8 sbf_crearev[4];
-	u8 sbf_cmos;
-	u8 sbf_spare[3];
-} __attribute__ ((packed));
-
-enum acpi_srat_entry_id {
-	ACPI_SRAT_PROCESSOR_AFFINITY = 0,
-	ACPI_SRAT_MEMORY_AFFINITY,
-	ACPI_SRAT_X2APIC_AFFINITY,
-	ACPI_SRAT_ENTRY_COUNT
-};
-
-enum acpi_address_range_id {
-	ACPI_ADDRESS_RANGE_MEMORY = 1,
-	ACPI_ADDRESS_RANGE_RESERVED = 2,
-	ACPI_ADDRESS_RANGE_ACPI = 3,
-	ACPI_ADDRESS_RANGE_NVS	= 4,
-	ACPI_ADDRESS_RANGE_COUNT
 };
 
 /* DMA Remapping Reporting Table (DMAR) */
@@ -282,8 +136,8 @@ int acpi_table_parse(char *id, acpi_table_handler handler);
 int acpi_table_parse_entries(char *id, unsigned long table_size,
 	int entry_id, acpi_table_entry_handler handler, unsigned int max_entries);
 int acpi_table_parse_madt(enum acpi_madt_type id, acpi_table_entry_handler handler, unsigned int max_entries);
-int acpi_table_parse_srat(enum acpi_srat_entry_id id,
-	acpi_madt_entry_handler handler, unsigned int max_entries);
+int acpi_table_parse_srat(int id, acpi_madt_entry_handler handler,
+	unsigned int max_entries);
 int acpi_parse_srat(struct acpi_table_header *);
 void acpi_table_print (struct acpi_table_header *header, unsigned long phys_addr);
 void acpi_table_print_madt_entry (struct acpi_subtable_header *madt);

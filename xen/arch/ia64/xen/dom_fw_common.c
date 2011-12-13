@@ -347,7 +347,7 @@ struct fake_acpi_tables {
 	struct acpi_table_header dsdt;
 	uint8_t aml[8 + 11 * MAX_VIRT_CPUS];
 	struct acpi_table_madt madt;
-	struct acpi_table_lsapic lsapic[MAX_VIRT_CPUS];
+	struct acpi_madt_local_sapic lsapic[MAX_VIRT_CPUS];
 	uint8_t pm1a_event_block[4];
 	uint8_t pm1a_control_block[1];
 	uint8_t pm_timer_block[4];
@@ -365,7 +365,7 @@ dom_fw_fake_acpi(domain_t *d, struct fake_acpi_tables *tables)
 	struct acpi_table_facs *facs = &tables->facs;
 	struct acpi_table_header *dsdt = &tables->dsdt;
 	struct acpi_table_madt *madt = &tables->madt;
-	struct acpi_table_lsapic *lsapic = tables->lsapic;
+	struct acpi_madt_local_sapic *lsapic = tables->lsapic;
 	int i;
 	int aml_len;
 	int nbr_cpus;
@@ -492,18 +492,18 @@ dom_fw_fake_acpi(domain_t *d, struct fake_acpi_tables *tables)
 	/* An LSAPIC entry describes a CPU.  */
 	nbr_cpus = 0;
 	for (i = 0; i < MAX_VIRT_CPUS; i++) {
-		lsapic[i].header.type = ACPI_MADT_LSAPIC;
-		lsapic[i].header.length = sizeof(struct acpi_table_lsapic);
-		lsapic[i].acpi_id = i;
+		lsapic[i].header.type = ACPI_MADT_TYPE_LOCAL_SAPIC;
+		lsapic[i].header.length = sizeof(lsapic[i]);
+		lsapic[i].processor_id = i;
 		lsapic[i].id = i;
 		lsapic[i].eid = 0;
 		if (xen_ia64_is_vcpu_allocated(d, i)) {
-			lsapic[i].flags.enabled = 1;
+			lsapic[i].lapic_flags = ACPI_MADT_ENABLED;
 			nbr_cpus++;
 		}
 	}
 	madt->header.length = sizeof(struct acpi_table_madt) +
-	                      nbr_cpus * sizeof(struct acpi_table_lsapic);
+	                      nbr_cpus * sizeof(*lsapic);
 	madt->header.checksum = -acpi_tb_checksum((u8*)madt,
 						  madt->header.length);
 	return;

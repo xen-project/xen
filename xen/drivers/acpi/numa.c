@@ -46,7 +46,7 @@ void __init acpi_table_print_srat_entry(struct acpi_subtable_header * header)
 
 	switch (header->type) {
 
-	case ACPI_SRAT_PROCESSOR_AFFINITY:
+	case ACPI_SRAT_TYPE_CPU_AFFINITY:
 #ifdef ACPI_DEBUG_OUTPUT
 		{
 			struct acpi_srat_cpu_affinity *p =
@@ -68,7 +68,7 @@ void __init acpi_table_print_srat_entry(struct acpi_subtable_header * header)
 #endif				/* ACPI_DEBUG_OUTPUT */
 		break;
 
-	case ACPI_SRAT_MEMORY_AFFINITY:
+	case ACPI_SRAT_TYPE_MEMORY_AFFINITY:
 #ifdef ACPI_DEBUG_OUTPUT
 		{
 			struct acpi_srat_mem_affinity *p =
@@ -194,8 +194,8 @@ int __init acpi_parse_srat(struct acpi_table_header *table)
 }
 
 int __init
-acpi_table_parse_srat(enum acpi_srat_entry_id id,
-		      acpi_madt_entry_handler handler, unsigned int max_entries)
+acpi_table_parse_srat(int id, acpi_madt_entry_handler handler,
+		      unsigned int max_entries)
 {
 	return acpi_table_parse_entries(ACPI_SIG_SRAT,
 					sizeof(struct acpi_table_srat), id,
@@ -206,12 +206,13 @@ int __init acpi_numa_init(void)
 {
 	/* SRAT: Static Resource Affinity Table */
 	if (!acpi_table_parse(ACPI_SIG_SRAT, acpi_parse_srat)) {
-		acpi_table_parse_srat(ACPI_SRAT_X2APIC_AFFINITY,
-				           acpi_parse_x2apic_affinity, NR_CPUS);
-		acpi_table_parse_srat(ACPI_SRAT_PROCESSOR_AFFINITY,
-					       acpi_parse_processor_affinity,
-					       NR_CPUS);
-		acpi_table_parse_srat(ACPI_SRAT_MEMORY_AFFINITY, acpi_parse_memory_affinity, NR_NODE_MEMBLKS);	// IA64 specific
+		acpi_table_parse_srat(ACPI_SRAT_TYPE_X2APIC_CPU_AFFINITY,
+				      acpi_parse_x2apic_affinity, NR_CPUS);
+		acpi_table_parse_srat(ACPI_SRAT_TYPE_CPU_AFFINITY,
+				      acpi_parse_processor_affinity, NR_CPUS);
+		acpi_table_parse_srat(ACPI_SRAT_TYPE_MEMORY_AFFINITY,
+				      acpi_parse_memory_affinity,
+				      NR_NODE_MEMBLKS);
 	}
 
 	/* SLIT: System Locality Information Table */
