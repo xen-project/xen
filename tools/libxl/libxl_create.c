@@ -459,8 +459,8 @@ static int store_libxl_entry(libxl__gc *gc, uint32_t domid,
 
     path = libxl__xs_libxl_path(gc, domid);
     path = libxl__sprintf(gc, "%s/dm-version", path);
-    return libxl__xs_write(gc, XBT_NULL, path, "%s", libxl__strdup(gc,
-        libxl_device_model_version_to_string(dm_info->device_model_version)));
+    return libxl__xs_write(gc, XBT_NULL, path, "%s",
+        libxl_device_model_version_to_string(dm_info->device_model_version));
 }
 
 static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
