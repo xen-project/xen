@@ -22,10 +22,6 @@
 
 #include <xen/types.h>
 
-/* DMAR Flags bits */
-#define DMAR_INTR_REMAP 0x1
-#define DMAR_X2APIC_OPT_OUT 0x2
-
 /*
  * Intel IOMMU register specification per version 1.0 public spec.
  */

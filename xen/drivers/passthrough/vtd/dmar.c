@@ -38,8 +38,8 @@
 #define PREFIX VTDPREFIX "ACPI DMAR:"
 #define DEBUG
 
-#define MIN_SCOPE_LEN (sizeof(struct acpi_pci_path) + \
-                       sizeof(struct acpi_dev_scope))
+#define MIN_SCOPE_LEN (sizeof(struct acpi_dmar_device_scope) + \
+                       sizeof(struct acpi_dmar_pci_path))
 
 LIST_HEAD_READ_MOSTLY(acpi_drhd_units);
 LIST_HEAD_READ_MOSTLY(acpi_rmrr_units);
@@ -247,25 +247,25 @@ int is_igd_drhd(struct acpi_drhd_unit *drhd)
  * Count number of devices in device scope.  Do not include PCI sub
  * hierarchies.
  */
-static int scope_device_count(void *start, void *end)
+static int __init scope_device_count(const void *start, const void *end)
 {
-    struct acpi_dev_scope *scope;
+    const struct acpi_dmar_device_scope *scope;
     int count = 0;
 
     while ( start < end )
     {
         scope = start;
         if ( (scope->length < MIN_SCOPE_LEN) ||
-             (scope->dev_type >= ACPI_DEV_ENTRY_COUNT) )
+             (scope->entry_type >= ACPI_DMAR_SCOPE_TYPE_RESERVED) )
         {
             dprintk(XENLOG_WARNING VTDPREFIX, "Invalid device scope.\n");
             return -EINVAL;
         }
 
-        if ( scope->dev_type == ACPI_DEV_P2PBRIDGE ||
-             scope->dev_type == ACPI_DEV_ENDPOINT ||
-             scope->dev_type == ACPI_DEV_IOAPIC ||
-             scope->dev_type == ACPI_DEV_MSI_HPET )
+        if ( scope->entry_type == ACPI_DMAR_SCOPE_TYPE_BRIDGE ||
+             scope->entry_type == ACPI_DMAR_SCOPE_TYPE_ENDPOINT ||
+             scope->entry_type == ACPI_DMAR_SCOPE_TYPE_IOAPIC ||
+             scope->entry_type == ACPI_DMAR_SCOPE_TYPE_HPET )
             count++;
 
         start += scope->length;
@@ -276,13 +276,13 @@ static int scope_device_count(void *start, void *end)
 
 
 static int __init acpi_parse_dev_scope(
-    void *start, void *end, void *acpi_entry, int type, u16 seg)
+    const void *start, const void *end, void *acpi_entry, int type, u16 seg)
 {
     struct dmar_scope *scope = acpi_entry;
     struct acpi_ioapic_unit *acpi_ioapic_unit;
-    struct acpi_dev_scope *acpi_scope;
+    const struct acpi_dmar_device_scope *acpi_scope;
     u16 bus, sub_bus, sec_bus;
-    struct acpi_pci_path *path;
+    const struct acpi_dmar_pci_path *path;
     int depth, cnt, didx = 0;
 
     if ( (cnt = scope_device_count(start, end)) < 0 )
@@ -299,10 +299,9 @@ static int __init acpi_parse_dev_scope(
     while ( start < end )
     {
         acpi_scope = start;
-        path = (struct acpi_pci_path *)(acpi_scope + 1);
-        depth = (acpi_scope->length - sizeof(struct acpi_dev_scope))
-		    / sizeof(struct acpi_pci_path);
-        bus = acpi_scope->start_bus;
+        path = (const void *)(acpi_scope + 1);
+        depth = (acpi_scope->length - sizeof(*acpi_scope)) / sizeof(*path);
+        bus = acpi_scope->bus;
 
         while ( --depth > 0 )
         {
@@ -311,9 +310,9 @@ static int __init acpi_parse_dev_scope(
             path++;
         }
 
-        switch ( acpi_scope->dev_type )
+        switch ( acpi_scope->entry_type )
         {
-        case ACPI_DEV_P2PBRIDGE:
+        case ACPI_DMAR_SCOPE_TYPE_BRIDGE:
             sec_bus = pci_conf_read8(seg, bus, path->dev, path->fn,
                                      PCI_SECONDARY_BUS);
             sub_bus = pci_conf_read8(seg, bus, path->dev, path->fn,
@@ -322,18 +321,18 @@ static int __init acpi_parse_dev_scope(
                 dprintk(VTDPREFIX,
                         " bridge: %04x:%02x:%02x.%u start=%x sec=%x sub=%x\n",
                         seg, bus, path->dev, path->fn,
-                        acpi_scope->start_bus, sec_bus, sub_bus);
+                        acpi_scope->bus, sec_bus, sub_bus);
 
             dmar_scope_add_buses(scope, sec_bus, sub_bus);
             break;
 
-        case ACPI_DEV_MSI_HPET:
+        case ACPI_DMAR_SCOPE_TYPE_HPET:
             if ( iommu_verbose )
                 dprintk(VTDPREFIX, " MSI HPET: %04x:%02x:%02x.%u\n",
                         seg, bus, path->dev, path->fn);
             break;
 
-        case ACPI_DEV_ENDPOINT:
+        case ACPI_DMAR_SCOPE_TYPE_ENDPOINT:
             if ( iommu_verbose )
                 dprintk(VTDPREFIX, " endpoint: %04x:%02x:%02x.%u\n",
                         seg, bus, path->dev, path->fn);
@@ -349,7 +348,7 @@ static int __init acpi_parse_dev_scope(
 
             break;
 
-        case ACPI_DEV_IOAPIC:
+        case ACPI_DMAR_SCOPE_TYPE_IOAPIC:
             if ( iommu_verbose )
                 dprintk(VTDPREFIX, " IOAPIC: %04x:%02x:%02x.%u\n",
                         seg, bus, path->dev, path->fn);
@@ -360,7 +359,7 @@ static int __init acpi_parse_dev_scope(
                 acpi_ioapic_unit = xmalloc(struct acpi_ioapic_unit);
                 if ( !acpi_ioapic_unit )
                     return -ENOMEM;
-                acpi_ioapic_unit->apic_id = acpi_scope->enum_id;
+                acpi_ioapic_unit->apic_id = acpi_scope->enumeration_id;
                 acpi_ioapic_unit->ioapic.bdf.bus = bus;
                 acpi_ioapic_unit->ioapic.bdf.dev = path->dev;
                 acpi_ioapic_unit->ioapic.bdf.func = path->fn;
@@ -377,7 +376,7 @@ static int __init acpi_parse_dev_scope(
 }
 
 static int __init acpi_dmar_check_length(
-    struct acpi_dmar_entry_header *h, unsigned int min_len)
+    const struct acpi_dmar_header *h, unsigned int min_len)
 {
     if ( h->length >= min_len )
         return 0;
@@ -388,9 +387,10 @@ static int __init acpi_dmar_check_length(
 }
 
 static int __init
-acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
+acpi_parse_one_drhd(struct acpi_dmar_header *header)
 {
-    struct acpi_table_drhd * drhd = (struct acpi_table_drhd *)header;
+    struct acpi_dmar_hardware_unit *drhd =
+        container_of(header, struct acpi_dmar_hardware_unit, header);
     void *dev_scope_start, *dev_scope_end;
     struct acpi_drhd_unit *dmaru;
     int ret;
@@ -405,7 +405,7 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
 
     dmaru->address = drhd->address;
     dmaru->segment = drhd->segment;
-    dmaru->include_all = drhd->flags & 1; /* BIT0: INCLUDE_ALL */
+    dmaru->include_all = drhd->flags & ACPI_DMAR_INCLUDE_ALL;
     INIT_LIST_HEAD(&dmaru->ioapic_list);
     if ( iommu_verbose )
         dprintk(VTDPREFIX, "  dmaru->address = %"PRIx64"\n",
@@ -443,17 +443,20 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
     {
         u8 b, d, f;
         unsigned int i = 0, invalid_cnt = 0;
-        void *p;
+        union {
+            const void *raw;
+            const struct acpi_dmar_device_scope *scope;
+        } p;
 
         /* Skip checking if segment is not accessible yet. */
         if ( !pci_known_segment(drhd->segment) )
             i = UINT_MAX;
 
-        for ( p = dev_scope_start; i < dmaru->scope.devices_cnt;
-              i++, p += ((struct acpi_dev_scope *)p)->length )
+        for ( p.raw = dev_scope_start; i < dmaru->scope.devices_cnt;
+              i++, p.raw += p.scope->length )
         {
-            if ( ((struct acpi_dev_scope *)p)->dev_type == ACPI_DEV_IOAPIC ||
-                 ((struct acpi_dev_scope *)p)->dev_type == ACPI_DEV_MSI_HPET )
+            if ( p.scope->entry_type == ACPI_DMAR_SCOPE_TYPE_IOAPIC ||
+                 p.scope->entry_type == ACPI_DMAR_SCOPE_TYPE_HPET )
                 continue;
 
             b = PCI_BUS(dmaru->scope.devices[i]);
@@ -505,9 +508,10 @@ out:
 }
 
 static int __init
-acpi_parse_one_rmrr(struct acpi_dmar_entry_header *header)
+acpi_parse_one_rmrr(struct acpi_dmar_header *header)
 {
-    struct acpi_table_rmrr *rmrr = (struct acpi_table_rmrr *)header;
+    struct acpi_dmar_reserved_memory *rmrr =
+        container_of(header, struct acpi_dmar_reserved_memory, header);
     struct acpi_rmrr_unit *rmrru;
     void *dev_scope_start, *dev_scope_end;
     u64 base_addr = rmrr->base_address, end_addr = rmrr->end_address;
@@ -610,9 +614,10 @@ acpi_parse_one_rmrr(struct acpi_dmar_entry_header *header)
 }
 
 static int __init
-acpi_parse_one_atsr(struct acpi_dmar_entry_header *header)
+acpi_parse_one_atsr(struct acpi_dmar_header *header)
 {
-    struct acpi_table_atsr *atsr = (struct acpi_table_atsr *)header;
+    struct acpi_dmar_atsr *atsr =
+        container_of(header, struct acpi_dmar_atsr, header);
     struct acpi_atsr_unit *atsru;
     int ret;
     static int all_ports;
@@ -626,7 +631,7 @@ acpi_parse_one_atsr(struct acpi_dmar_entry_header *header)
         return -ENOMEM;
 
     atsru->segment = atsr->segment;
-    atsru->all_ports = atsr->flags & 1; /* BIT0: ALL_PORTS */
+    atsru->all_ports = atsr->flags & ACPI_DMAR_ALL_PORTS;
     if ( iommu_verbose )
         dprintk(VTDPREFIX,
                 "  atsru->all_ports: %x\n", atsru->all_ports);
@@ -660,9 +665,10 @@ acpi_parse_one_atsr(struct acpi_dmar_entry_header *header)
 }
 
 static int __init
-acpi_parse_one_rhsa(struct acpi_dmar_entry_header *header)
+acpi_parse_one_rhsa(struct acpi_dmar_header *header)
 {
-    struct acpi_table_rhsa *rhsa = (struct acpi_table_rhsa *)header;
+    struct acpi_dmar_rhsa *rhsa =
+        container_of(header, struct acpi_dmar_rhsa, header);
     struct acpi_rhsa_unit *rhsau;
     int ret;
 
@@ -673,7 +679,7 @@ acpi_parse_one_rhsa(struct acpi_dmar_entry_header *header)
     if ( !rhsau )
         return -ENOMEM;
 
-    rhsau->address = rhsa->address;
+    rhsau->address = rhsa->base_address;
     rhsau->proximity_domain = rhsa->proximity_domain;
     list_add_tail(&rhsau->list, &acpi_rhsa_units);
     if ( iommu_verbose )
@@ -688,7 +694,7 @@ acpi_parse_one_rhsa(struct acpi_dmar_entry_header *header)
 static int __init acpi_parse_dmar(struct acpi_table_header *table)
 {
     struct acpi_table_dmar *dmar;
-    struct acpi_dmar_entry_header *entry_header;
+    struct acpi_dmar_header *entry_header;
     u8 dmar_host_address_width;
     int ret = 0;
 
@@ -713,33 +719,32 @@ static int __init acpi_parse_dmar(struct acpi_table_header *table)
         dprintk(VTDPREFIX, "Host address width %d\n",
                 dmar_host_address_width);
 
-    entry_header = (struct acpi_dmar_entry_header *)(dmar + 1);
+    entry_header = (void *)(dmar + 1);
     while ( ((unsigned long)entry_header) <
             (((unsigned long)dmar) + table->length) )
     {
-        ret = acpi_dmar_check_length(
-            entry_header, sizeof(struct acpi_dmar_entry_header));
+        ret = acpi_dmar_check_length(entry_header, sizeof(*entry_header));
         if ( ret )
             break;
 
         switch ( entry_header->type )
         {
-        case ACPI_DMAR_DRHD:
+        case ACPI_DMAR_TYPE_HARDWARE_UNIT:
             if ( iommu_verbose )
                 dprintk(VTDPREFIX, "found ACPI_DMAR_DRHD:\n");
             ret = acpi_parse_one_drhd(entry_header);
             break;
-        case ACPI_DMAR_RMRR:
+        case ACPI_DMAR_TYPE_RESERVED_MEMORY:
             if ( iommu_verbose )
                 dprintk(VTDPREFIX, "found ACPI_DMAR_RMRR:\n");
             ret = acpi_parse_one_rmrr(entry_header);
             break;
-        case ACPI_DMAR_ATSR:
+        case ACPI_DMAR_TYPE_ATSR:
             if ( iommu_verbose )
                 dprintk(VTDPREFIX, "found ACPI_DMAR_ATSR:\n");
             ret = acpi_parse_one_atsr(entry_header);
             break;
-        case ACPI_DMAR_RHSA:
+        case ACPI_DMAR_HARDWARE_AFFINITY:
             if ( iommu_verbose )
                 dprintk(VTDPREFIX, "found ACPI_DMAR_RHSA:\n");
             ret = acpi_parse_one_rhsa(entry_header);
@@ -803,21 +808,19 @@ void acpi_dmar_zap(void)
 
 int platform_supports_intremap(void)
 {
-    unsigned int flags = 0;
+    unsigned int mask = ACPI_DMAR_INTR_REMAP;
 
-    flags = DMAR_INTR_REMAP;
-    return ((dmar_flags & flags) == DMAR_INTR_REMAP);
+    return (dmar_flags & mask) == ACPI_DMAR_INTR_REMAP;
 }
 
 #ifdef CONFIG_X86
 int platform_supports_x2apic(void)
 {
-    unsigned int flags = 0;
+    unsigned int mask = ACPI_DMAR_INTR_REMAP | ACPI_DMAR_X2APIC_OPT_OUT;
 
     if (!cpu_has_x2apic)
         return 0;
 
-    flags = DMAR_INTR_REMAP | DMAR_X2APIC_OPT_OUT;
-    return ((dmar_flags & flags) == DMAR_INTR_REMAP);
+    return (dmar_flags & mask) == ACPI_DMAR_INTR_REMAP;
 }
 #endif
