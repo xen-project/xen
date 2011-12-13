@@ -18,12 +18,13 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
 
+#include <xen/config.h>
+#include <xen/acpi.h>
 #include <xen/sched.h>
 #include <asm/p2m.h>
 #include <xen/hvm/iommu.h>
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
-#include <asm/hvm/svm/amd-iommu-acpi.h>
 #include "../ats.h"
 #include <xen/pci.h>
 
@@ -215,8 +216,7 @@ void __init iommu_dte_add_device_entry(u32 *dte, struct ivrs_mappings *ivrs_dev)
     dte[7] = dte[6] = dte[4] = dte[2] = dte[1] = dte[0] = 0;
 
     flags = ivrs_dev->device_flags;
-    sys_mgt = get_field_from_byte(flags, AMD_IOMMU_ACPI_SYS_MGT_MASK,
-                                  AMD_IOMMU_ACPI_SYS_MGT_SHIFT);
+    sys_mgt = get_field_from_byte(flags, ACPI_IVHD_SYSTEM_MGMT);
     dev_ex = ivrs_dev->dte_allow_exclusion;
 
     flags &= mask;

@@ -26,6 +26,8 @@
 #include <asm/apicdef.h>
 #include <xen/domain_page.h>
 
+struct acpi_ivrs_hardware;
+
 #define for_each_amd_iommu(amd_iommu) \
     list_for_each_entry(amd_iommu, \
         &amd_iommu_head, list)
@@ -41,7 +43,7 @@
 
 /* amd-iommu-detect functions */
 int amd_iommu_get_ivrs_dev_entries(void);
-int amd_iommu_detect_one_acpi(void *ivhd);
+int amd_iommu_detect_one_acpi(const struct acpi_ivrs_hardware *);
 int amd_iommu_detect_acpi(void);
 void get_iommu_features(struct amd_iommu *iommu);
 
@@ -121,11 +123,9 @@ static inline u32 set_field_in_reg_u32(u32 field, u32 reg_value,
     return reg_value;
 }
 
-static inline u8 get_field_from_byte(u8 value, u8 mask, u8 shift)
+static inline u8 get_field_from_byte(u8 value, u8 mask)
 {
-    u8 field;
-    field = (value & mask) >> shift;
-    return field;
+    return (value & mask) / (mask & -mask);
 }
 
 static inline unsigned long region_to_pages(unsigned long addr, unsigned long size)

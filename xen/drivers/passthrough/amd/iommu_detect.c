@@ -20,12 +20,12 @@
 
 #include <xen/config.h>
 #include <xen/errno.h>
+#include <xen/acpi.h>
 #include <xen/iommu.h>
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
-#include <asm/hvm/svm/amd-iommu-acpi.h>
 
 static int __init get_iommu_msi_capabilities(
     u16 seg, u8 bus, u8 dev, u8 func, struct amd_iommu *iommu)
@@ -103,23 +103,21 @@ void __init get_iommu_features(struct amd_iommu *iommu)
     }
 }
 
-int __init amd_iommu_detect_one_acpi(void *ivhd)
+int __init amd_iommu_detect_one_acpi(
+    const struct acpi_ivrs_hardware *ivhd_block)
 {
     struct amd_iommu *iommu;
     u8 bus, dev, func;
-    struct acpi_ivhd_block_header *ivhd_block;
     int rt = 0;
 
-    ivhd_block = (struct acpi_ivhd_block_header *)ivhd;
-
-    if ( ivhd_block->header.length < sizeof(struct acpi_ivhd_block_header) )
+    if ( ivhd_block->header.length < sizeof(*ivhd_block) )
     {
         AMD_IOMMU_DEBUG("Invalid IVHD Block Length!\n");
         return -ENODEV;
     }
 
-    if ( !ivhd_block->header.dev_id ||
-        !ivhd_block->cap_offset || !ivhd_block->mmio_base)
+    if ( !ivhd_block->header.device_id ||
+        !ivhd_block->capability_offset || !ivhd_block->base_address)
     {
         AMD_IOMMU_DEBUG("Invalid IVHD Block!\n");
         return -ENODEV;
@@ -134,10 +132,10 @@ int __init amd_iommu_detect_one_acpi(void *ivhd)
 
     spin_lock_init(&iommu->lock);
 
-    iommu->seg = ivhd_block->pci_segment;
-    iommu->bdf = ivhd_block->header.dev_id;
-    iommu->cap_offset = ivhd_block->cap_offset;
-    iommu->mmio_base_phys = ivhd_block->mmio_base;
+    iommu->seg = ivhd_block->pci_segment_group;
+    iommu->bdf = ivhd_block->header.device_id;
+    iommu->cap_offset = ivhd_block->capability_offset;
+    iommu->mmio_base_phys = ivhd_block->base_address;
 
     /* override IOMMU HT flags */
     iommu->ht_flags = ivhd_block->header.flags;

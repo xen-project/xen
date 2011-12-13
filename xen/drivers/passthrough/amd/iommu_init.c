@@ -20,6 +20,7 @@
 
 #include <xen/config.h>
 #include <xen/errno.h>
+#include <xen/acpi.h>
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
 #include <xen/irq.h>
@@ -28,7 +29,6 @@
 #include <asm/hvm/svm/amd-iommu-proto.h>
 #include <asm-x86/fixmap.h>
 #include <mach_apic.h>
-#include <asm/hvm/svm/amd-iommu-acpi.h>
 
 static int __initdata nr_amd_iommus;
 
@@ -37,9 +37,8 @@ static struct radix_tree_root ivrs_maps;
 struct list_head amd_iommu_head;
 struct table_struct device_table;
 
-static int iommu_has_ht_flag(struct amd_iommu *iommu, uint8_t bit)
+static int iommu_has_ht_flag(struct amd_iommu *iommu, u8 mask)
 {
-    u8 mask = 1U << bit;
     return iommu->ht_flags & mask;
 }
 
@@ -80,19 +79,19 @@ static void set_iommu_ht_flags(struct amd_iommu *iommu)
 
     /* Setup HT flags */
     if ( iommu_has_cap(iommu, PCI_CAP_HT_TUNNEL_SHIFT) )
-        iommu_has_ht_flag(iommu, AMD_IOMMU_ACPI_HT_TUN_ENB_SHIFT) ?
+        iommu_has_ht_flag(iommu, ACPI_IVHD_TT_ENABLE) ?
             iommu_set_bit(&entry, IOMMU_CONTROL_HT_TUNNEL_TRANSLATION_SHIFT) :
             iommu_clear_bit(&entry, IOMMU_CONTROL_HT_TUNNEL_TRANSLATION_SHIFT);
 
-    iommu_has_ht_flag(iommu, AMD_IOMMU_ACPI_RES_PASS_PW_SHIFT) ?
+    iommu_has_ht_flag(iommu, ACPI_IVHD_RES_PASS_PW) ?
         iommu_set_bit(&entry, IOMMU_CONTROL_RESP_PASS_POSTED_WRITE_SHIFT):
         iommu_clear_bit(&entry, IOMMU_CONTROL_RESP_PASS_POSTED_WRITE_SHIFT);
 
-    iommu_has_ht_flag(iommu, AMD_IOMMU_ACPI_ISOC_SHIFT) ?
+    iommu_has_ht_flag(iommu, ACPI_IVHD_ISOC) ?
         iommu_set_bit(&entry, IOMMU_CONTROL_ISOCHRONOUS_SHIFT):
         iommu_clear_bit(&entry, IOMMU_CONTROL_ISOCHRONOUS_SHIFT);
 
-    iommu_has_ht_flag(iommu, AMD_IOMMU_ACPI_PASS_PW_SHIFT) ?
+    iommu_has_ht_flag(iommu, ACPI_IVHD_PASS_PW) ?
         iommu_set_bit(&entry, IOMMU_CONTROL_PASS_POSTED_WRITE_SHIFT):
         iommu_clear_bit(&entry, IOMMU_CONTROL_PASS_POSTED_WRITE_SHIFT);
 
