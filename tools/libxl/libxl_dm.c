@@ -751,7 +751,8 @@ retry_transaction:
         ret = ERROR_FAIL;
         goto out_free;
     }
-    if (libxl__confirm_device_model_startup(gc, dm_starting) < 0) {
+    if (libxl__confirm_device_model_startup(gc, &xenpv_dm_info,
+                                            dm_starting) < 0) {
         ret = ERROR_FAIL;
         goto out_free;
     }
@@ -892,14 +893,26 @@ out:
 
 
 int libxl__confirm_device_model_startup(libxl__gc *gc,
-                                       libxl__spawner_starting *starting)
+                                libxl_device_model_info *dm_info,
+                                libxl__spawner_starting *starting)
 {
+    libxl_ctx *ctx = libxl__gc_owner(gc);
     char *path;
     int domid = starting->domid;
+    int ret, ret2;
     path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/state", domid);
-    return libxl__spawn_confirm_offspring_startup(gc,
+    ret = libxl__spawn_confirm_offspring_startup(gc,
                                      LIBXL_DEVICE_MODEL_START_TIMEOUT,
                                      "Device Model", path, "running", starting);
+    if (dm_info->saved_state) {
+        ret2 = unlink(dm_info->saved_state);
+        if (ret2) LIBXL__LOG_ERRNO(ctx, XTL_ERROR,
+                                   "failed to remove device-model state %s\n",
+                                   dm_info->saved_state);
+        /* Do not clobber spawn_confirm error code with unlink error code. */
+        if (!ret) ret = ret2;
+    }
+    return ret;
 }
 
 int libxl__destroy_device_model(libxl__gc *gc, uint32_t domid)

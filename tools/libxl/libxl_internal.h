@@ -438,6 +438,7 @@ _hidden int libxl__need_xenpv_qemu(libxl__gc *gc,
    * return pass *starting_r (which will be non-0) to
    * libxl__confirm_device_model_startup or libxl__detach_device_model. */
 _hidden int libxl__confirm_device_model_startup(libxl__gc *gc,
+                              libxl_device_model_info *dm_info,
                               libxl__spawner_starting *starting);
 _hidden int libxl__detach_device_model(libxl__gc *gc, libxl__spawner_starting *starting);
 _hidden int libxl__wait_for_device_model(libxl__gc *gc,
