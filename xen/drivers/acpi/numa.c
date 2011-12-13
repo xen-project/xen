@@ -78,9 +78,11 @@ void __init acpi_table_print_srat_entry(struct acpi_subtable_header * header)
 			if (srat_rev < 2)
 				proximity_domain &= 0xff;
 			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
-					  "SRAT Memory (0x%016"PRIx64" length 0x%016"PRIx64" type 0x%x) in proximity domain %d %s%s\n",
+					  "SRAT Memory (%#016"PRIx64
+					  " length %#016"PRIx64")"
+					  " in proximity domain %d %s%s\n",
 					  p->base_address, p->length,
-					  p->memory_type, proximity_domain,
+					  proximity_domain,
 					  p->flags & ACPI_SRAT_MEM_ENABLED
 					  ? "enabled" : "disabled",
 					  p->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE
