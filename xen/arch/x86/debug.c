@@ -37,8 +37,8 @@
 #define DBGP1(...) {(kdbdbg>1) ? kdbp(__VA_ARGS__):0;}
 #define DBGP2(...) {(kdbdbg>2) ? kdbp(__VA_ARGS__):0;}
 #else
-#define DBGP1(...) {0;}
-#define DBGP2(...) {0;}
+#define DBGP1(...) ((void)0)
+#define DBGP2(...) ((void)0)
 #endif
 
 /* Returns: mfn for the given (hvm guest) vaddr */

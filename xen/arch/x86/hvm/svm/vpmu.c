@@ -154,7 +154,7 @@ static int amd_vpmu_do_interrupt(struct cpu_user_regs *regs)
     if ( GET_APIC_DELIVERY_MODE(vlapic_lvtpc) == APIC_MODE_FIXED )
         vlapic_set_irq(vcpu_vlapic(v), int_vec, 0);
     else
-        test_and_set_bool(v->nmi_pending);
+        v->nmi_pending = 1;
 
     return 1;
 }

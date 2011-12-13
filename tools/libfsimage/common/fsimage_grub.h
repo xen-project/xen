@@ -57,7 +57,7 @@ typedef struct fsig_plugin_ops {
 #define	disk_read_func (*fsig_disk_read_junk())
 #define	disk_read_hook (*fsig_disk_read_junk())
 #define	print_possibilities 0
-#define	noisy_printf
+#define	noisy_printf(fmt...)
 
 #define	grub_memset memset
 #define	grub_memmove memmove

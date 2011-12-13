@@ -163,7 +163,7 @@ extern struct xsm_operations *xsm_ops;
 static inline void xsm_security_domaininfo (struct domain *d,
                                         struct xen_domctl_getdomaininfo *info)
 {
-    xsm_call(security_domaininfo(d, info));
+    (void)xsm_call(security_domaininfo(d, info));
 }
 
 static inline int xsm_setvcpucontext(struct domain *d)
@@ -310,7 +310,7 @@ static inline int xsm_evtchn_interdomain (struct domain *d1,
 
 static inline void xsm_evtchn_close_post (struct evtchn *chn)
 {
-    xsm_call(evtchn_close_post(chn));
+    (void)xsm_call(evtchn_close_post(chn));
 }
 
 static inline int xsm_evtchn_send (struct domain *d, struct evtchn *chn)
@@ -366,7 +366,7 @@ static inline int xsm_alloc_security_domain (struct domain *d)
 
 static inline void xsm_free_security_domain (struct domain *d)
 {
-    xsm_call(free_security_domain(d));
+    (void)xsm_call(free_security_domain(d));
 }
 
 static inline int xsm_alloc_security_evtchn (struct evtchn *chn)
@@ -376,7 +376,7 @@ static inline int xsm_alloc_security_evtchn (struct evtchn *chn)
 
 static inline void xsm_free_security_evtchn (struct evtchn *chn)
 {
-    xsm_call(free_security_evtchn(chn));
+    (void)xsm_call(free_security_evtchn(chn));
 }
 
 static inline int xsm_memory_adjust_reservation (struct domain *d1, struct

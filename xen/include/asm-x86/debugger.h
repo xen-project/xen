@@ -55,7 +55,12 @@ static inline int debugger_trap_fatal(
 
 #else
 
-#define debugger_trap_fatal(v, r) (0)
+static inline int debugger_trap_fatal(
+    unsigned int vector, struct cpu_user_regs *regs)
+{
+    return 0;
+}
+
 #define debugger_trap_immediate() ((void)0)
 
 #endif

@@ -365,7 +365,7 @@ static inline int tmh_page_cmp(pfp_t *pfp1, pfp_t *pfp2)
     // FIXME: code in assembly?
 ASSERT(p1 != NULL);
 ASSERT(p2 != NULL);
-    for ( i = PAGE_SIZE/sizeof(uint64_t); i && *p1 == *p2; i--, *p1++, *p2++ );
+    for ( i = PAGE_SIZE/sizeof(uint64_t); i && *p1 == *p2; i--, p1++, p2++ );
     if ( !i )
         return 0;
     if ( *p1 < *p2 )
@@ -386,7 +386,7 @@ static inline int tmh_pcd_cmp(void *va1, pagesize_t len1, void *va2, pagesize_t 
     if ( len1 > len2 )
         return 1;
     ASSERT(len1 == len2);
-    for ( i = len2; i && *p1 == *p2; i--, *p1++, *p2++ );
+    for ( i = len2; i && *p1 == *p2; i--, p1++, p2++ );
     if ( !i )
         return 0;
     if ( *p1 < *p2 )
@@ -413,7 +413,7 @@ static inline int tmh_tze_pfp_cmp(pfp_t *pfp1, pagesize_t pfp_len, void *tva, pa
     if ( pfp_len > tze_len )
         return 1;
     ASSERT(pfp_len == tze_len);
-    for ( i = tze_len/sizeof(uint64_t); i && *p1 == *p2; i--, *p1++, *p2++ );
+    for ( i = tze_len/sizeof(uint64_t); i && *p1 == *p2; i--, p1++, p2++ );
     if ( !i )
         return 0;
     if ( *p1 < *p2 )

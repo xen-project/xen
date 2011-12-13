@@ -235,7 +235,7 @@ int hvm_girq_dest_2_vcpu_id(struct domain *d, uint8_t dest, uint8_t dest_mode);
 #define hvm_long_mode_enabled(v) \
     ((v)->arch.hvm_vcpu.guest_efer & EFER_LMA)
 #else
-#define hvm_long_mode_enabled(v) (v,0)
+#define hvm_long_mode_enabled(v) ((void)(v),0)
 #endif
 
 enum hvm_intblk

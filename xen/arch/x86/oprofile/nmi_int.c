@@ -92,7 +92,7 @@ static int nmi_callback(struct cpu_user_regs *regs, int cpu)
 		send_guest_vcpu_virq(current, VIRQ_XENOPROF);
 
 	if ( ovf == 2 ) 
-                test_and_set_bool(current->nmi_pending);
+                current->nmi_pending = 1;
 	return 1;
 }
  

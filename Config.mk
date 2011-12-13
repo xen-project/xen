@@ -157,10 +157,6 @@ CFLAGS += -std=gnu99
 
 CFLAGS += -Wall -Wstrict-prototypes
 
-# -Wunused-value makes GCC 4.x too aggressive for my taste: ignoring the
-# result of any casted expression causes a warning.
-CFLAGS += -Wno-unused-value
-
 # Clang complains about macros that expand to 'if ( ( foo == bar ) ) ...'
 # and is over-zealous with the printf format lint
 CFLAGS-$(clang) += -Wno-parentheses -Wno-format
