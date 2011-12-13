@@ -41,7 +41,7 @@
 
 static module_t __initdata ucode_mod;
 static void *(*__initdata ucode_mod_map)(const module_t *);
-static unsigned int __initdata ucode_mod_idx;
+static signed int __initdata ucode_mod_idx;
 static bool_t __initdata ucode_mod_forced;
 static cpumask_t __initdata init_mask;
 
@@ -54,7 +54,7 @@ void __init microcode_set_module(unsigned int idx)
 static void __init parse_ucode(char *s)
 {
     if ( !ucode_mod_forced )
-        ucode_mod_idx = simple_strtoul(s, NULL, 0);
+        ucode_mod_idx = simple_strtol(s, NULL, 0);
 }
 custom_param("ucode", parse_ucode);
 
@@ -65,7 +65,9 @@ void __init microcode_grab_module(
 {
     module_t *mod = (module_t *)__va(mbi->mods_addr);
 
-    if ( !ucode_mod_idx || ucode_mod_idx >= mbi->mods_count ||
+    if ( ucode_mod_idx < 0 )
+        ucode_mod_idx += mbi->mods_count;
+    if ( ucode_mod_idx <= 0 || ucode_mod_idx >= mbi->mods_count ||
          !__test_and_clear_bit(ucode_mod_idx, module_map) )
         return;
     ucode_mod = mod[ucode_mod_idx];
