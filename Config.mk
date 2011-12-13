@@ -4,6 +4,9 @@ ifeq ($(filter /%,$(XEN_ROOT)),)
 $(error XEN_ROOT must be absolute)
 endif
 
+# fallback for older make
+realpath = $(wildcard $(foreach file,$(1),$(shell cd -P $(dir $(file)) && echo "$$PWD/$(notdir $(file))")))
+
 -include $(XEN_ROOT)/.config
 
 # A debug build of Xen and tools?
