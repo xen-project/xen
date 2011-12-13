@@ -33,8 +33,9 @@ struct mce_quirkdata {
  */
 
 enum mcequirk_amd_flags {
-	MCEQUIRK_K7_BANK0 = 0x1,
-	MCEQUIRK_K8_GART = 0x2,
+	MCEQUIRK_K7_BANK0 = 1,
+	MCEQUIRK_K8_GART,
+	MCEQUIRK_F10_GART
 };
 
 enum mcequirk_intel_flags {

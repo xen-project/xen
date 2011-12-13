@@ -46,6 +46,7 @@
 #include <asm/msr.h>
 
 #include "mce.h"
+#include "mce_quirks.h"
 #include "x86_mca.h"
 
 
@@ -91,8 +92,13 @@ amd_f10_handler(struct mc_info *mi, uint16_t bank, uint64_t status)
 /* AMD Family10 machine check */
 enum mcheck_type amd_f10_mcheck_init(struct cpuinfo_x86 *c)
 { 
+	enum mcequirk_amd_flags quirkflag = mcequirk_lookup_amd_quirkdata(c);
+
 	if (amd_k8_mcheck_init(c) == mcheck_none)
 		return mcheck_none;
+
+	if (quirkflag == MCEQUIRK_F10_GART)
+		mcequirk_amd_apply(quirkflag);
 
 	x86_mce_callback_register(amd_f10_handler);
 

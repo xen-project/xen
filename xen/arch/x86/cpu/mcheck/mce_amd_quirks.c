@@ -29,6 +29,8 @@ static const struct mce_quirkdata mce_amd_quirks[] = {
 	  MCEQUIRK_K7_BANK0 },
 	{ 0xf /* cpu family */, ANY /* all models */, ANY /* all steppings */,
 	  MCEQUIRK_K8_GART },
+	{ 0x10 /* cpu family */, ANY /* all models */, ANY /* all steppings */,
+	  MCEQUIRK_F10_GART },
 };
 
 enum mcequirk_amd_flags
@@ -54,6 +56,8 @@ mcequirk_lookup_amd_quirkdata(struct cpuinfo_x86 *c)
 
 int mcequirk_amd_apply(enum mcequirk_amd_flags flags)
 {
+	u64 val;
+
 	switch (flags) {
 	case MCEQUIRK_K7_BANK0:
 		return 1; /* first bank */
@@ -66,6 +70,10 @@ int mcequirk_amd_apply(enum mcequirk_amd_flags flags)
 		 */
 		wrmsrl(MSR_IA32_MC4_CTL, ~(1ULL << 10));
 		wrmsrl(MSR_IA32_MC4_STATUS, 0ULL);
+		break;
+	case MCEQUIRK_F10_GART:
+		if (rdmsr_safe(MSR_AMD64_MCx_MASK(4), val) == 0)
+			wrmsr_safe(MSR_AMD64_MCx_MASK(4), val | (1 << 10));
 		break;
 	}
 
