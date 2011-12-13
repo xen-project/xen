@@ -221,6 +221,7 @@ class GrubLineEditor(curses.textpad.Textbox):
         
 
 class Grub:
+    ENTRY_WIN_LINES = 8
     def __init__(self, file, fs = None):
         self.screen = None
         self.entry_win = None
@@ -238,7 +239,7 @@ class Grub:
                 except:
                     pass # Not important if we can't use colour
             enable_cursor(False)
-            self.entry_win = curses.newwin(10, 74, 2, 1)
+            self.entry_win = curses.newwin(Grub.ENTRY_WIN_LINES + 2, 74, 2, 1)
             self.text_win = curses.newwin(10, 70, 12, 5)
             curses.def_prog_mode()
         
@@ -287,12 +288,20 @@ class Grub:
             self.text_win.noutrefresh()
 
         curline = 0
+        pos = 0
         img = copy.deepcopy(origimg)
         while 1:
             draw()
             self.entry_win.erase()
-            self.entry_win.box()
-            for idx in range(0, len(img.lines)):
+
+            rs = 0
+            re = len(img.lines)
+            idp = 1
+            if re > Grub.ENTRY_WIN_LINES:
+                rs = curline - pos
+                re = rs + Grub.ENTRY_WIN_LINES
+
+            for idx in range(rs, re):
                 # current line should be highlighted
                 if idx == curline:
                     self.entry_win.attron(curses.A_REVERSE)
@@ -302,9 +311,11 @@ class Grub:
                 if len(l) > 70:
                     l = l[:69] + ">"
                     
-                self.entry_win.addstr(idx + 1, 2, l)
+                self.entry_win.addstr(idp, 2, l)
                 if idx == curline:
                     self.entry_win.attroff(curses.A_REVERSE)
+                idp += 1
+            self.entry_win.box()
             self.entry_win.noutrefresh()
             curses.doupdate()
 
@@ -313,8 +324,12 @@ class Grub:
                 break
             elif c == curses.KEY_UP:
                 curline -= 1
+                if pos > 0:
+                    pos -= 1
             elif c == curses.KEY_DOWN:
                 curline += 1
+                if pos < Grub.ENTRY_WIN_LINES - 1:
+                    pos += 1
             elif c == ord('b'):
                 self.isdone = True
                 break
