@@ -522,7 +522,7 @@ class Grub:
                 # find the kernel line, edit it and then boot
                 img = self.cf.images[self.selected_image]
                 for line in img.lines:
-                    if line.startswith("kernel"):
+                    if line.startswith("kernel") or line.startswith("linux"):
                         l = self.edit_line(line)
                         if l is not None:
                             img.set_from_line(l, replace = True)
