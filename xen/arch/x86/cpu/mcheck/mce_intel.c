@@ -986,7 +986,7 @@ static DEFINE_SPINLOCK(cmci_discover_lock);
  */
 static int do_cmci_discover(int i)
 {
-    unsigned msr = MSR_IA32_MC0_CTL2 + i;
+    unsigned msr = MSR_IA32_MCx_CTL2(i);
     u64 val;
 
     rdmsrl(msr, val);
@@ -1095,7 +1095,7 @@ static void clear_cmci(void)
             smp_processor_id());
 
     for (i = 0; i < nr_mce_banks; i++) {
-        unsigned msr = MSR_IA32_MC0_CTL2 + i;
+        unsigned msr = MSR_IA32_MCx_CTL2(i);
         u64 val;
         if (!mcabanks_test(i, __get_cpu_var(mce_banks_owned)))
             continue;

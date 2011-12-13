@@ -1318,7 +1318,7 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         *msr_content = v->arch.hvm_svm.guest_sysenter_eip;
         break;
 
-    case MSR_IA32_MC4_MISC: /* Threshold register */
+    case MSR_IA32_MCx_MISC(4): /* Threshold register */
     case MSR_F10_MC4_MISC1 ... MSR_F10_MC4_MISC3:
         /*
          * MCA/MCE: We report that the threshold register is unavailable
@@ -1498,7 +1498,7 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         vpmu_do_wrmsr(msr, msr_content);
         break;
 
-    case MSR_IA32_MC4_MISC: /* Threshold register */
+    case MSR_IA32_MCx_MISC(4): /* Threshold register */
     case MSR_F10_MC4_MISC1 ... MSR_F10_MC4_MISC3:
         /*
          * MCA/MCE: Threshold register is reported to be locked, so we ignore

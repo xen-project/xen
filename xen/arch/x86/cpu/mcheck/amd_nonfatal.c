@@ -144,7 +144,7 @@ static void mce_amd_work_fn(void *data)
 		uint64_t value;
 		uint32_t counter;
 
-		value = mca_rdmsr(MSR_IA32_MC4_MISC);
+		value = mca_rdmsr(MSR_IA32_MCx_MISC(4));
 		/* Only the error counter field is of interest
 		 * Bit field is described in AMD K8 BKDG chapter 6.4.5.5
 		 */
@@ -174,7 +174,7 @@ static void mce_amd_work_fn(void *data)
 			value &= ~(0x60FFF00000000ULL);
 			/* Counter enable */
 			value |= (1ULL << 51);
-			mca_wrmsr(MSR_IA32_MC4_MISC, value);
+			mca_wrmsr(MSR_IA32_MCx_MISC(4), value);
 			wmb();
 		}
 	}
@@ -217,7 +217,7 @@ void amd_nonfatal_mcheck_init(struct cpuinfo_x86 *c)
 
 		/* hw threshold registers present */
 		hw_threshold = 1;
-		rdmsrl(MSR_IA32_MC4_MISC, value);
+		rdmsrl(MSR_IA32_MCx_MISC(4), value);
 
 		if (value & (1ULL << 61)) { /* Locked bit */
 			/* Locked by BIOS. Not available for use */
@@ -238,7 +238,7 @@ void amd_nonfatal_mcheck_init(struct cpuinfo_x86 *c)
 			value &= ~(0x60FFF00000000ULL);
 			/* Counter enable */
 			value |= (1ULL << 51);
-			wrmsrl(MSR_IA32_MC4_MISC, value);
+			wrmsrl(MSR_IA32_MCx_MISC(4), value);
 			/* serialize */
 			wmb();
 			printk(XENLOG_INFO "MCA: Use hw thresholding to adjust polling frequency\n");

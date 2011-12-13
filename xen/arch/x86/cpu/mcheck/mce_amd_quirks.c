@@ -68,8 +68,8 @@ int mcequirk_amd_apply(enum mcequirk_amd_flags flags)
 		 * TBL walk error reporting, which trips off incorrectly
 		 * with AGP GART & 3ware & Cerberus.
 		 */
-		wrmsrl(MSR_IA32_MC4_CTL, ~(1ULL << 10));
-		wrmsrl(MSR_IA32_MC4_STATUS, 0ULL);
+		wrmsrl(MSR_IA32_MCx_CTL(4), ~(1ULL << 10));
+		wrmsrl(MSR_IA32_MCx_STATUS(4), 0ULL);
 		break;
 	case MCEQUIRK_F10_GART:
 		if (rdmsr_safe(MSR_AMD64_MCx_MASK(4), val) == 0)
