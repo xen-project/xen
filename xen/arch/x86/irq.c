@@ -151,7 +151,7 @@ int __init bind_irq_vector(int irq, int vector, const cpumask_t *cpu_mask)
 /*
  * Dynamic irq allocate and deallocation for MSI
  */
-int create_irq(void)
+int create_irq(int node)
 {
     int irq, ret;
     struct irq_desc *desc;
@@ -168,7 +168,17 @@ int create_irq(void)
 
     ret = init_one_irq_desc(desc);
     if (!ret)
-        ret = assign_irq_vector(irq);
+    {
+        cpumask_t *mask = NULL;
+
+        if (node != NUMA_NO_NODE && node >= 0)
+        {
+            mask = &node_to_cpumask(node);
+            if (cpumask_empty(mask))
+                mask = NULL;
+        }
+        ret = assign_irq_vector(irq, mask);
+    }
     if (ret < 0)
     {
         desc->arch.used = IRQ_UNUSED;
@@ -514,7 +524,7 @@ next:
     return err;
 }
 
-int assign_irq_vector(int irq)
+int assign_irq_vector(int irq, const cpumask_t *mask)
 {
     int ret;
     unsigned long flags;
@@ -523,7 +533,7 @@ int assign_irq_vector(int irq)
     BUG_ON(irq >= nr_irqs || irq <0);
 
     spin_lock_irqsave(&vector_lock, flags);
-    ret = __assign_irq_vector(irq, desc, TARGET_CPUS);
+    ret = __assign_irq_vector(irq, desc, mask ?: TARGET_CPUS);
     if (!ret) {
         ret = desc->arch.vector;
         cpumask_copy(desc->affinity, desc->arch.cpu_mask);

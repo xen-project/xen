@@ -995,7 +995,7 @@ static void __init setup_IO_APIC_irqs(void)
                 continue;
 
             if (IO_APIC_IRQ(irq)) {
-                vector = assign_irq_vector(irq);
+                vector = assign_irq_vector(irq, NULL);
                 BUG_ON(vector < 0);
                 entry.vector = vector;
                 ioapic_register_intr(irq, IOAPIC_AUTO);
@@ -2188,7 +2188,7 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
     if (!platform_legacy_irq(irq))
         add_pin_to_irq(irq, ioapic, pin);
 
-    vector = assign_irq_vector(irq);
+    vector = assign_irq_vector(irq, NULL);
     if (vector < 0)
         return vector;
     entry.vector = vector;
@@ -2340,7 +2340,7 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
 
     if ( desc->arch.vector <= 0 || desc->arch.vector > LAST_DYNAMIC_VECTOR ) {
         add_pin_to_irq(irq, apic, pin);
-        vector = assign_irq_vector(irq);
+        vector = assign_irq_vector(irq, NULL);
         if ( vector < 0 )
             return vector;
 

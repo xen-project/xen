@@ -11,6 +11,7 @@
 #include <xen/smp.h>
 #include <xen/softirq.h>
 #include <xen/irq.h>
+#include <xen/numa.h>
 #include <asm/fixmap.h>
 #include <asm/div64.h>
 #include <asm/hpet.h>
@@ -334,7 +335,7 @@ static int __init hpet_assign_irq(unsigned int idx)
 {
     int irq;
 
-    if ( (irq = create_irq()) < 0 )
+    if ( (irq = create_irq(NUMA_NO_NODE)) < 0 )
         return irq;
 
     if ( hpet_setup_msi_irq(irq, hpet_events + idx) )

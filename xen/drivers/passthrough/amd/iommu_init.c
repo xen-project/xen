@@ -551,7 +551,7 @@ static int __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
 {
     int irq, ret;
 
-    irq = create_irq();
+    irq = create_irq(NUMA_NO_NODE);
     if ( irq <= 0 )
     {
         dprintk(XENLOG_ERR, "IOMMU: no irqs\n");

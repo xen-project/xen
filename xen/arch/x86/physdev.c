@@ -132,7 +132,7 @@ int physdev_map_pirq(domid_t domid, int type, int *index, int *pirq_p,
     case MAP_PIRQ_TYPE_MSI:
         irq = *index;
         if ( irq == -1 )
-            irq = create_irq();
+            irq = create_irq(NUMA_NO_NODE);
 
         if ( irq < 0 || irq >= nr_irqs )
         {

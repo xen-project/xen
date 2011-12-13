@@ -1096,11 +1096,13 @@ static hw_irq_controller dma_msi_type = {
     .set_affinity = dma_msi_set_affinity,
 };
 
-static int __init iommu_set_interrupt(struct iommu *iommu)
+static int __init iommu_set_interrupt(struct acpi_drhd_unit *drhd)
 {
     int irq, ret;
+    struct acpi_rhsa_unit *rhsa = drhd_to_rhsa(drhd);
 
-    irq = create_irq();
+    irq = create_irq(rhsa ? pxm_to_node(rhsa->proximity_domain)
+                          : NUMA_NO_NODE);
     if ( irq <= 0 )
     {
         dprintk(XENLOG_ERR VTDPREFIX, "IOMMU: no irq available!\n");
@@ -1109,9 +1111,9 @@ static int __init iommu_set_interrupt(struct iommu *iommu)
 
     irq_desc[irq].handler = &dma_msi_type;
 #ifdef CONFIG_X86
-    ret = request_irq(irq, iommu_page_fault, 0, "dmar", iommu);
+    ret = request_irq(irq, iommu_page_fault, 0, "dmar", drhd->iommu);
 #else
-    ret = request_irq_vector(irq, iommu_page_fault, 0, "dmar", iommu);
+    ret = request_irq_vector(irq, iommu_page_fault, 0, "dmar", drhd->iommu);
 #endif
     if ( ret )
     {
@@ -2133,7 +2135,7 @@ int __init intel_vtd_setup(void)
         if ( !vtd_ept_page_compatible(iommu) )
             iommu_hap_pt_share = 0;
 
-        ret = iommu_set_interrupt(iommu);
+        ret = iommu_set_interrupt(drhd);
         if ( ret < 0 )
         {
             dprintk(XENLOG_ERR VTDPREFIX, "IOMMU: interrupt setup failed\n");

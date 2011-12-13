@@ -213,9 +213,6 @@ static inline void ioapic_suspend(void) {}
 static inline void ioapic_resume(void) {}
 #endif
 
-extern int assign_irq_vector(int irq);
-extern int free_irq_vector(int vector);
-
 unsigned highest_gsi(void);
 
 int ioapic_guest_read( unsigned long physbase, unsigned int reg, u32 *pval);
