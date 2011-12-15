@@ -375,8 +375,18 @@ static int mce_urgent_action(struct cpu_user_regs *regs,
         return 0;
 
     gstatus = mca_rdmsr(MSR_IA32_MCG_STATUS);
-    /* Xen is not pre-emptible */
-    if ( !(gstatus & MCG_STATUS_RIPV) && !guest_mode(regs))
+
+    /*
+     * FIXME: When RIPV = EIPV = 0, it's a little bit tricky. It may be an
+     * asynchronic error, currently we have no way to precisely locate
+     * whether the error occur at guest or hypervisor.
+     * To avoid handling error in wrong way, we treat it as unrecovered.
+     *
+     * Another unrecovered case is RIPV = 0 while in hypervisor
+     * since Xen is not pre-emptible.
+     */
+    if ( !(gstatus & MCG_STATUS_RIPV) &&
+         (!(gstatus & MCG_STATUS_EIPV) || !guest_mode(regs)) )
         return -1;
 
     return mce_action(regs, mctc) == MCER_RESET ? -1 : 0;
