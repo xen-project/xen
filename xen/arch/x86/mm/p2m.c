@@ -1244,7 +1244,6 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
         set_p2m_entry(p2m, gfn_aligned, _mfn(POPULATE_ON_DEMAND_MFN), 9,
                       p2m_populate_on_demand, p2m->default_access);
         audit_p2m(p2m, 1);
-        p2m_unlock(p2m);
         return 0;
     }
 
@@ -1602,7 +1601,8 @@ pod_retry_l3:
             {
                 if ( q != p2m_query )
                 {
-                    if ( !p2m_pod_demand_populate(p2m, gfn, 18, q) )
+                    if ( !p2m_pod_check_and_populate(p2m, gfn,
+                              (l1_pgentry_t *) &l3e, 18, q) )
                         goto pod_retry_l3;
                 }
                 else
@@ -1733,7 +1733,8 @@ static mfn_t p2m_gfn_to_mfn_current(struct p2m_domain *p2m,
                 /* The read has succeeded, so we know that mapping exists */
                 if ( q != p2m_query )
                 {
-                    if ( !p2m_pod_demand_populate(p2m, gfn, 18, q) )
+                    if ( !p2m_pod_check_and_populate(p2m, gfn,
+                              (l1_pgentry_t *) &l3e, 18, q) )
                         goto pod_retry_l3;
                     p2mt = p2m_invalid;
                     printk("%s: Allocate 1GB failed!\n", __func__);
