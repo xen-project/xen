@@ -52,5 +52,7 @@ bins: $(PROGRAMS)
 install: all
 	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
 	$(INSTALL_PROG) oxenstored $(DESTDIR)$(SBINDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(XEN_CONFIG_DIR)
+	$(INSTALL_DATA) oxenstored.conf $(DESTDIR)$(XEN_CONFIG_DIR)
 
 include $(OCAML_TOPLEVEL)/Makefile.rules

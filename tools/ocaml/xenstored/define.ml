@@ -23,7 +23,7 @@ let xenstored_proc_port = "/proc/xen/xsd_port"
 let xs_daemon_socket = "/var/run/xenstored/socket"
 let xs_daemon_socket_ro = "/var/run/xenstored/socket_ro"
 
-let default_config_dir = "/etc/xensource"
+let default_config_dir = "/etc/xen"
 
 let maxwatch = ref (50)
 let maxtransaction = ref (20)

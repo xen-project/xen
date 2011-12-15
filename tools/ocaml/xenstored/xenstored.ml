@@ -71,7 +71,7 @@ let sighup_handler _ =
 let config_filename cf =
 	match cf.config_file with
 	| Some name -> name
-	| None      -> Define.default_config_dir ^ "/xenstored.conf"
+	| None      -> Define.default_config_dir ^ "/oxenstored.conf"
 
 let default_pidfile = "/var/run/xenstored.pid"
 
