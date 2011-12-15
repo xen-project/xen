@@ -36,6 +36,11 @@ static const char *libxl_tapif_script(libxl__gc *gc)
 #endif
 }
 
+const char *libxl__device_model_savefile(libxl__gc *gc, uint32_t domid)
+{
+    return libxl__sprintf(gc, "/var/lib/xen/qemu-save.%d", domid);
+}
+
 const char *libxl__domain_device_model(libxl__gc *gc,
                                        libxl_device_model_info *info)
 {
@@ -721,7 +726,8 @@ retry_transaction:
                 free(filename);
                 break;
             case STUBDOM_CONSOLE_SAVE:
-                console[i].output = libxl__sprintf(gc, "file:"SAVEFILE".%d", info->domid);
+                console[i].output = libxl__sprintf(gc, "file:%s",
+                                libxl__device_model_savefile(gc, info->domid));
                 break;
             case STUBDOM_CONSOLE_RESTORE:
                 if (info->saved_state)
@@ -924,6 +930,8 @@ int libxl__destroy_device_model(libxl__gc *gc, uint32_t domid)
     pid = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "/local/domain/%d/image/device-model-pid", domid));
     if (!pid) {
         int stubdomid = libxl_get_stubdom_id(ctx, domid);
+        const char *savefile;
+
         if (!stubdomid) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Couldn't find device model's pid");
             ret = ERROR_INVAL;
@@ -933,6 +941,20 @@ int libxl__destroy_device_model(libxl__gc *gc, uint32_t domid)
         ret = libxl_domain_destroy(ctx, stubdomid, 0);
         if (ret)
             goto out;
+
+        savefile = libxl__device_model_savefile(gc, domid);
+        ret = unlink(savefile);
+        /*
+         * On suspend libxl__domain_save_device_model will have already
+         * unlinked the save file.
+         */
+        if (ret && errno == ENOENT) ret = 0;
+        if (ret) {
+            LIBXL__LOG_ERRNO(ctx, XTL_ERROR,
+                             "failed to remove device-model savefile %s\n",
+                             savefile);
+            goto out;
+        }
     } else {
         ret = kill(atoi(pid), SIGHUP);
         if (ret < 0 && errno == ESRCH) {

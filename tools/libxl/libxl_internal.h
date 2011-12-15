@@ -59,7 +59,6 @@
 #define STUBDOM_CONSOLE_RESTORE 2
 #define STUBDOM_CONSOLE_SERIAL 3
 #define STUBDOM_SPECIAL_CONSOLES 3
-#define SAVEFILE "/var/lib/xen/qemu-save"
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
 
@@ -244,6 +243,7 @@ _hidden int libxl__domain_restore_common(libxl__gc *gc, uint32_t domid,
 _hidden int libxl__domain_suspend_common(libxl__gc *gc, uint32_t domid, int fd,
                                          libxl_domain_type type,
                                          int live, int debug);
+_hidden const char *libxl__device_model_savefile(libxl__gc *gc, uint32_t domid);
 _hidden int libxl__domain_save_device_model(libxl__gc *gc, uint32_t domid, int fd);
 _hidden void libxl__userdata_destroyall(libxl__gc *gc, uint32_t domid);
 

@@ -608,7 +608,7 @@ int libxl__domain_save_device_model(libxl__gc *gc, uint32_t domid, int fd)
     libxl_ctx *ctx = libxl__gc_owner(gc);
     int fd2, c;
     char buf[1024];
-    char *filename = libxl__sprintf(gc, "/var/lib/xen/qemu-save.%d", domid);
+    const char *filename = libxl__device_model_savefile(gc, domid);
     struct stat st;
     uint32_t qemu_state_len;
 
