@@ -437,10 +437,10 @@ static PyObject *pyxl_domain_shutdown(XlObject *self, PyObject *args)
 
 static PyObject *pyxl_domain_destroy(XlObject *self, PyObject *args)
 {
-    int domid, force = 1;
-    if ( !PyArg_ParseTuple(args, "i|i", &domid, &force) )
+    int domid;
+    if ( !PyArg_ParseTuple(args, "i", &domid) )
         return NULL;
-    if ( libxl_domain_destroy(self->ctx, domid, force) ) {
+    if ( libxl_domain_destroy(self->ctx, domid) ) {
         PyErr_SetString(xl_error_obj, "cannot destroy domain");
         return NULL;
     }

@@ -662,7 +662,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
 
 error_out:
     if (domid)
-        libxl_domain_destroy(ctx, domid, 0);
+        libxl_domain_destroy(ctx, domid);
 
     return ret;
 }

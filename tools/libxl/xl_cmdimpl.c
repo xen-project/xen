@@ -1283,7 +1283,7 @@ static int handle_domain_death(libxl_ctx *ctx, uint32_t domid, libxl_event *even
         /* fall-through */
     case LIBXL_ACTION_ON_SHUTDOWN_DESTROY:
         LOG("Domain %d needs to be cleaned up: destroying the domain", domid);
-        libxl_domain_destroy(ctx, domid, 0);
+        libxl_domain_destroy(ctx, domid);
         break;
 
     case LIBXL_ACTION_ON_SHUTDOWN_COREDUMP_DESTROY:
@@ -1786,7 +1786,7 @@ start:
 error_out:
     release_lock();
     if (libxl_domid_valid_guest(domid))
-        libxl_domain_destroy(ctx, domid, 0);
+        libxl_domain_destroy(ctx, domid);
 
 out:
     if (logfile != 2)
@@ -2256,7 +2256,7 @@ static void destroy_domain(const char *p)
         fprintf(stderr, "Cannot destroy privileged domain 0.\n\n");
         exit(-1);
     }
-    rc = libxl_domain_destroy(ctx, domid, 0);
+    rc = libxl_domain_destroy(ctx, domid);
     if (rc) { fprintf(stderr,"destroy failed (rc=%d)\n",rc); exit(-1); }
 }
 
@@ -2502,7 +2502,7 @@ static int save_domain(const char *p, const char *filename, int checkpoint,
     if (checkpoint)
         libxl_domain_unpause(ctx, domid);
     else
-        libxl_domain_destroy(ctx, domid, 0);
+        libxl_domain_destroy(ctx, domid);
 
     exit(0);
 }
@@ -2735,7 +2735,7 @@ static void migrate_domain(const char *domain_spec, const char *rune,
     }
 
     fprintf(stderr, "migration sender: Target reports successful startup.\n");
-    libxl_domain_destroy(ctx, domid, 1); /* bang! */
+    libxl_domain_destroy(ctx, domid); /* bang! */
     fprintf(stderr, "Migration successful.\n");
     exit(0);
 
@@ -2852,7 +2852,7 @@ static void migrate_receive(int debug, int daemonize, int monitor)
     if (rc) {
         fprintf(stderr, "migration target: Failure, destroying our copy.\n");
 
-        rc2 = libxl_domain_destroy(ctx, domid, 1);
+        rc2 = libxl_domain_destroy(ctx, domid);
         if (rc2) {
             fprintf(stderr, "migration target: Failed to destroy our copy"
                     " (code %d).\n", rc2);

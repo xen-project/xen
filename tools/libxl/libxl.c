@@ -723,7 +723,7 @@ int libxl_event_get_disk_eject_info(libxl_ctx *ctx, uint32_t domid, libxl_event 
     return 1;
 }
 
-int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid, int force)
+int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid)
 {
     GC_INIT(ctx);
     libxl_dominfo dominfo;
@@ -772,7 +772,7 @@ int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid, int force)
 
         libxl__qmp_cleanup(gc, domid);
     }
-    if (libxl__devices_destroy(gc, domid, force) < 0)
+    if (libxl__devices_destroy(gc, domid, 1) < 0)
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, 
                    "libxl__devices_destroy failed for %d", domid);
 
