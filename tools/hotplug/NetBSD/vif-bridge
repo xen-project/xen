@@ -24,12 +24,9 @@ case $xstatus in
 	xfid=$(xenstore-read "$xpath/frontend-id")
 	xhandle=$(xenstore-read "$xpath/handle")
 	iface=$(xenstore-read "$xpath/vifname")
-	echo ifconfig $iface up
 	ifconfig $iface up
 	brconfig $xbridge add $iface
-	echo brconfig $xbridge add $iface
 	xenstore-write $xpath/hotplug-status connected
-	echo xenstore-write $xpath/hotplug-status connected
 	exit 0
 	;;
 *)

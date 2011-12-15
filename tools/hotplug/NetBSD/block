@@ -64,14 +64,12 @@ case $xstatus in
 			if [ "$status" = "free" ] && \
 			    vnconfig /dev/${disk}d $xparams >/dev/null; then
 				device=/dev/${disk}d
-				echo vnconfig /dev/${disk}d $xparams
 				break	
 			fi
 		done
 		if [ x$device = x ] ; then
 			error "no available vnd device"
 		fi
-		echo xenstore-write $xpath/vnd $device
 		xenstore-write $xpath/vnd $device
 		;;
 	phy)
@@ -79,9 +77,7 @@ case $xstatus in
 		;;
 	esac
 	physical_device=$(stat -f '%r' "$device")
-	echo xenstore-write $xpath/physical-device $physical_device
 	xenstore-write $xpath/physical-device $physical_device
-	echo xenstore-write $xpath/hotplug-status connected
 	xenstore-write $xpath/hotplug-status connected
 	exit 0
 	;;
