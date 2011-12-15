@@ -117,6 +117,9 @@ let init_xenstored_log () =
 			make_logger 
 				!xenstored_log_file !xenstored_log_nb_files !xenstored_log_nb_lines
 				!xenstored_log_nb_chars ignore in
+		let date = string_of_date() in
+		logger.write ("[%s|%5s|%s] Xen Storage Daemon, version %d.%d") date "" "startup"
+		  Define.xenstored_major Define.xenstored_minor;
 		xenstored_logger := Some logger
 
 let xenstored_logging level key (fmt: (_,_,_,_) format4) =

@@ -284,9 +284,6 @@ let _ =
 		Logging.init_access_log post_rotate
 	end;
 
-	info "Xen Storage Daemon, version %d.%d"
-	     Define.xenstored_major Define.xenstored_minor;
-
 	let spec_fds =
 		(match rw_sock with None -> [] | Some x -> [ x ]) @
 		(match ro_sock with None -> [] | Some x -> [ x ]) @
