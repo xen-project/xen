@@ -38,6 +38,14 @@ static int __read_mostly nr_intel_ext_msrs;
 #define INTEL_SRAO_MEM_SCRUB 0xC0 ... 0xCF
 #define INTEL_SRAO_L3_EWB    0x17A
 
+/*
+ * Currently Intel SDM define 2 kinds of srar errors:
+ * 1). Data Load error, error code = 0x134
+ * 2). Instruction Fetch error, error code = 0x150
+ */
+#define INTEL_SRAR_DATA_LOAD	0x134
+#define INTEL_SRAR_INSTR_FETCH	0x150
+
 /* Thermal Hanlding */
 #ifdef CONFIG_X86_MCE_THERMAL
 static void unexpected_thermal_interrupt(struct cpu_user_regs *regs)
@@ -256,7 +264,7 @@ static enum mce_result mce_action(struct cpu_user_regs *regs,
         for ( i = 0; i < handler_num; i++ ) {
             if (handlers[i].owned_error(binfo.mib->mc_status))
             {
-                handlers[i].recovery_handler(&binfo, &bank_result);
+                handlers[i].recovery_handler(&binfo, &bank_result, regs);
                 if (worst_result < bank_result)
                     worst_result = bank_result;
                 break;
@@ -622,7 +630,8 @@ struct mcinfo_recovery *mci_add_pageoff_action(int bank, struct mc_info *mi,
 
 static void intel_memerr_dhandler(
              struct mca_binfo *binfo,
-             enum mce_result *result)
+             enum mce_result *result,
+             struct cpu_user_regs *regs)
 {
     struct mcinfo_bank *bank = binfo->mib;
     struct mcinfo_global *global = binfo->mig;
@@ -721,6 +730,32 @@ vmce_failed:
     }
 }
 
+static int intel_srar_check(uint64_t status)
+{
+    return ( intel_check_mce_type(status) == intel_mce_ucr_srar );
+}
+
+static void intel_srar_dhandler(
+             struct mca_binfo *binfo,
+             enum mce_result *result,
+             struct cpu_user_regs *regs)
+{
+    uint64_t status = binfo->mib->mc_status;
+
+    /* For unknown srar error code, reset system */
+    *result = MCER_RESET;
+
+    switch ( status & INTEL_MCCOD_MASK )
+    {
+    case INTEL_SRAR_DATA_LOAD:
+    case INTEL_SRAR_INSTR_FETCH:
+        intel_memerr_dhandler(binfo, result, regs);
+        break;
+    default:
+        break;
+    }
+}
+
 static int intel_srao_check(uint64_t status)
 {
     return ( intel_check_mce_type(status) == intel_mce_ucr_srao );
@@ -728,7 +763,8 @@ static int intel_srao_check(uint64_t status)
 
 static void intel_srao_dhandler(
              struct mca_binfo *binfo,
-             enum mce_result *result)
+             enum mce_result *result,
+             struct cpu_user_regs *regs)
 {
     uint64_t status = binfo->mib->mc_status;
 
@@ -741,7 +777,7 @@ static void intel_srao_dhandler(
         {
         case INTEL_SRAO_MEM_SCRUB:
         case INTEL_SRAO_L3_EWB:
-            intel_memerr_dhandler(binfo, result);
+            intel_memerr_dhandler(binfo, result, regs);
             break;
         default:
             break;
@@ -756,14 +792,15 @@ static int intel_default_check(uint64_t status)
 
 static void intel_default_mce_dhandler(
              struct mca_binfo *binfo,
-             enum mce_result *result)
+             enum mce_result *result,
+             struct cpu_user_regs * regs)
 {
     uint64_t status = binfo->mib->mc_status;
     enum intel_mce_type type;
 
     type = intel_check_mce_type(status);
 
-    if (type == intel_mce_fatal || type == intel_mce_ucr_srar)
+    if (type == intel_mce_fatal)
         *result = MCER_RESET;
     else
         *result = MCER_CONTINUE;
@@ -771,12 +808,14 @@ static void intel_default_mce_dhandler(
 
 static const struct mca_error_handler intel_mce_dhandlers[] = {
     {intel_srao_check, intel_srao_dhandler},
+    {intel_srar_check, intel_srar_dhandler},
     {intel_default_check, intel_default_mce_dhandler}
 };
 
 static void intel_default_mce_uhandler(
              struct mca_binfo *binfo,
-             enum mce_result *result)
+             enum mce_result *result,
+             struct cpu_user_regs *regs)
 {
     uint64_t status = binfo->mib->mc_status;
     enum intel_mce_type type;
@@ -785,8 +824,6 @@ static void intel_default_mce_uhandler(
 
     switch (type)
     {
-    /* Panic if no handler for SRAR error */
-    case intel_mce_ucr_srar:
     case intel_mce_fatal:
         *result = MCER_RESET;
         break;
@@ -961,10 +998,8 @@ static int intel_recoverable_scan(u64 status)
     /* SRAR error */
     else if ( ser_support && !(status & MCi_STATUS_OVER) 
                 && !(status & MCi_STATUS_PCC) && (status & MCi_STATUS_S)
-                && (status & MCi_STATUS_AR) ) {
-        mce_printk(MCE_VERBOSE, "MCE: No SRAR error defined currently.\n");
-        return 0;
-    }
+                && (status & MCi_STATUS_AR) && (status & MCi_STATUS_EN) )
+        return 1;
     /* SRAO error */
     else if (ser_support && !(status & MCi_STATUS_PCC)
                 && (status & MCi_STATUS_S) && !(status & MCi_STATUS_AR)
