@@ -19,8 +19,7 @@ type operation = Debug | Directory | Read | Getperms |
                  Transaction_end | Introduce | Release |
                  Getdomainpath | Write | Mkdir | Rm |
                  Setperms | Watchevent | Error | Isintroduced |
-                 Resume | Set_target
-               | Restrict 
+                 Resume | Set_target | Restrict | Invalid
 
 let operation_c_mapping =
 	[| Debug; Directory; Read; Getperms;
@@ -41,7 +40,7 @@ let array_search el a =
 let of_cval i =
 	if i >= 0 && i < size
 	then operation_c_mapping.(i)
-	else raise Not_found
+	else Invalid
 
 let to_cval op =
 	array_search op operation_c_mapping
@@ -69,3 +68,4 @@ let to_string ty =
 	| Resume		-> "RESUME"
 	| Set_target		-> "SET_TARGET"
 	| Restrict		-> "RESTRICT"
+	| Invalid		-> "INVALID"

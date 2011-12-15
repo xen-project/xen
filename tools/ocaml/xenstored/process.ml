@@ -324,7 +324,8 @@ let function_of_type ty =
 	| Xenbus.Xb.Op.Resume            -> reply_ack do_resume
 	| Xenbus.Xb.Op.Set_target        -> reply_ack do_set_target
 	| Xenbus.Xb.Op.Restrict          -> reply_ack do_restrict
-	| _                       -> reply_ack do_error
+	| Xenbus.Xb.Op.Invalid           -> reply_ack do_error
+	| _                              -> reply_ack do_error
 
 let input_handle_error ~cons ~doms ~fct ~ty ~con ~t ~rid ~data =
 	let reply_error e =

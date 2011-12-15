@@ -23,6 +23,7 @@ module Op :
       | Resume
       | Set_target
       | Restrict
+      | Invalid (* Not a valid wire operation *)
     val operation_c_mapping : operation array
     val size : int
     val array_search : 'a -> 'a array -> int

@@ -182,6 +182,7 @@ let string_of_access_type = function
 
 	| Xenbus.Xb.Op.Error             -> "error    "
 	| Xenbus.Xb.Op.Watchevent        -> "w event  "
+	| Xenbus.Xb.Op.Invalid           -> "invalid  "
 	(*
 	| x                       -> Xenbus.Xb.Op.to_string x
 	*)
