@@ -24,10 +24,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <sys/time.h>
 
 #include <xs.h>
 #include <xenctrl.h>
 #include "xentoollog.h"
+
+#include <xen/io/xenbus.h>
 
 #include "libxl.h"
 
@@ -270,6 +273,31 @@ _hidden int libxl__device_remove(libxl__gc *gc, libxl__device *dev, int wait);
 _hidden int libxl__device_destroy(libxl__gc *gc, libxl__device *dev);
 _hidden int libxl__devices_destroy(libxl__gc *gc, uint32_t domid, int force);
 _hidden int libxl__wait_for_backend(libxl__gc *gc, char *be_path, char *state);
+
+/* Handler for the libxl__wait_for_device_state callback */
+/*
+ * libxl__device_state_handler - Handler for the libxl__wait_for_device_state
+ * gc: allocation pool
+ * l1: array containing the path and token
+ * state: string that contains the state of the device
+ *
+ * Returns 0 on success, and < 0 on error.
+ */
+typedef int libxl__device_state_handler(libxl__gc *gc, char **l1, char *state);
+
+/*
+ * libxl__wait_for_device_state - waits a given time for a device to
+ * reach a given state
+ * gc: allocation pool
+ * tv: timeval struct containing the maximum time to wait
+ * state: state to wait for (check xen/io/xenbus.h)
+ * handler: callback function to execute when state is reached
+ *
+ * Returns 0 on success, and < 0 on error.
+ */
+_hidden int libxl__wait_for_device_state(libxl__gc *gc, struct timeval *tv,
+                                         XenbusState state,
+                                         libxl__device_state_handler handler);
 
 /*
  * libxl__try_phy_backend - Check if there's support for the passed

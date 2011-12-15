@@ -369,7 +369,9 @@ int libxl__device_disk_dev_number(const char *virtpath, int *pdisk,
  * Returns 0 if a device is removed, ERROR_* if an error
  * or timeout occurred.
  */
-static int wait_for_dev_destroy(libxl__gc *gc, struct timeval *tv)
+int libxl__wait_for_device_state(libxl__gc *gc, struct timeval *tv,
+                                 XenbusState state,
+                                 libxl__device_state_handler handler)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     int nfds, rc;
@@ -394,17 +396,14 @@ start:
         default:
             l1 = xs_read_watch(ctx->xsh, &n);
             if (l1 != NULL) {
-                char *state = libxl__xs_read(gc, XBT_NULL,
+                char *sstate = libxl__xs_read(gc, XBT_NULL,
                                              l1[XS_WATCH_PATH]);
-                if (!state || atoi(state) == 6) {
-                    xs_unwatch(ctx->xsh, l1[0], l1[1]);
-                    xs_rm(ctx->xsh, XBT_NULL, l1[XS_WATCH_TOKEN]);
-                    LIBXL__LOG(ctx, LIBXL__LOG_DEBUG,
-                               "Destroyed device backend at %s",
-                               l1[XS_WATCH_TOKEN]);
-                    rc = 0;
+                if (!sstate || atoi(sstate) == state) {
+                    /* Call handler function if present */
+                    if (handler)
+                        rc = handler(gc, l1, sstate);
                 } else {
-                    /* State is not "disconnected", continue waiting... */
+                    /* State is different than expected, continue waiting... */
                     goto start;
                 }
                 free(l1);
@@ -414,6 +413,23 @@ start:
             break;
     }
     return rc;
+}
+
+/*
+ * Handler function for device destruction to be passed to
+ * libxl__wait_for_device_state
+ */
+static int destroy_device(libxl__gc *gc, char **l1, char *state)
+{
+    libxl_ctx *ctx = libxl__gc_owner(gc);
+
+    xs_unwatch(ctx->xsh, l1[0], l1[1]);
+    xs_rm(ctx->xsh, XBT_NULL, l1[XS_WATCH_TOKEN]);
+    LIBXL__LOG(ctx, LIBXL__LOG_DEBUG,
+               "Destroyed device backend at %s",
+               l1[XS_WATCH_TOKEN]);
+
+    return 0;
 }
 
 /*
@@ -457,7 +473,8 @@ retry_transaction:
         struct timeval tv;
         tv.tv_sec = LIBXL_DESTROY_TIMEOUT;
         tv.tv_usec = 0;
-        rc = wait_for_dev_destroy(gc, &tv);
+        rc = libxl__wait_for_device_state(gc, &tv, XenbusStateClosed,
+                                          destroy_device);
         if (rc < 0) /* an error or timeout occurred, clear watches */
             xs_unwatch(ctx->xsh, state_path, be_path);
         xs_rm(ctx->xsh, XBT_NULL, libxl__device_frontend_path(gc, dev));
@@ -565,7 +582,8 @@ int libxl__devices_destroy(libxl__gc *gc, uint32_t domid, int force)
         tv.tv_sec = LIBXL_DESTROY_TIMEOUT;
         tv.tv_usec = 0;
         while (n_watches > 0) {
-            if (wait_for_dev_destroy(gc, &tv) < 0) {
+            if (libxl__wait_for_device_state(gc, &tv, XenbusStateClosed,
+                                             destroy_device) < 0) {
                 /* function returned ERROR_* */
                 break;
             } else {
