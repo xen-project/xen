@@ -773,7 +773,8 @@ int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid, int force)
         libxl__qmp_cleanup(gc, domid);
     }
     if (libxl__devices_destroy(gc, domid, force) < 0)
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "libxl_devices_dispose failed for %d", domid);
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, 
+                   "libxl__devices_destroy failed for %d", domid);
 
     vm_path = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/vm", dom_path));
     if (vm_path)
