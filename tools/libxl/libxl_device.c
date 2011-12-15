@@ -500,13 +500,13 @@ int libxl__device_destroy(libxl__gc *gc, libxl__device *dev)
     return 0;
 }
 
-int libxl__devices_destroy(libxl__gc *gc, uint32_t domid, int force)
+int libxl__devices_destroy(libxl__gc *gc, uint32_t domid)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     char *path;
     unsigned int num_kinds, num_devs;
     char **kinds = NULL, **devs = NULL;
-    int i, j, n_watches = 0;
+    int i, j;
     libxl__device dev;
     libxl__device_kind kind;
 
@@ -537,16 +537,7 @@ int libxl__devices_destroy(libxl__gc *gc, uint32_t domid, int force)
                 dev.kind = kind;
                 dev.devid = atoi(devs[j]);
 
-                if (force) {
-                    libxl__device_destroy(gc, &dev);
-                } else {
-                    int rc = libxl__device_remove(gc, &dev, 0);
-                    if (rc < 0)
-                        LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                                   "cannot remove device %s\n", path);
-                    else
-                        n_watches += rc;
-                }
+                libxl__device_destroy(gc, &dev);
             }
         }
     }
@@ -560,37 +551,9 @@ int libxl__devices_destroy(libxl__gc *gc, uint32_t domid, int force)
         dev.kind = LIBXL__DEVICE_KIND_CONSOLE;
         dev.devid = 0;
 
-        if (force) {
-            libxl__device_destroy(gc, &dev);
-        } else {
-            int rc = libxl__device_remove(gc, &dev, 0);
-            if (rc < 0)
-                LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                           "cannot remove device %s\n", path);
-            else
-                n_watches += rc;
-        }
+        libxl__device_destroy(gc, &dev);
     }
 
-    if (!force) {
-        /* Linux-ism. Most implementations leave the timeout
-         * untouched after select. Linux, however, will chip
-         * away the elapsed time from it, which is what we
-         * need to enforce a single time span waiting for
-         * device destruction. */
-        struct timeval tv;
-        tv.tv_sec = LIBXL_DESTROY_TIMEOUT;
-        tv.tv_usec = 0;
-        while (n_watches > 0) {
-            if (libxl__wait_for_device_state(gc, &tv, XenbusStateClosed,
-                                             destroy_device) < 0) {
-                /* function returned ERROR_* */
-                break;
-            } else {
-                n_watches--;
-            }
-        }
-    }
 out:
     return 0;
 }

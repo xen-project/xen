@@ -271,7 +271,7 @@ _hidden int libxl__parse_backend_path(libxl__gc *gc, const char *path,
                                       libxl__device *dev);
 _hidden int libxl__device_remove(libxl__gc *gc, libxl__device *dev, int wait);
 _hidden int libxl__device_destroy(libxl__gc *gc, libxl__device *dev);
-_hidden int libxl__devices_destroy(libxl__gc *gc, uint32_t domid, int force);
+_hidden int libxl__devices_destroy(libxl__gc *gc, uint32_t domid);
 _hidden int libxl__wait_for_backend(libxl__gc *gc, char *be_path, char *state);
 
 /* Handler for the libxl__wait_for_device_state callback */

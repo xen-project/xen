@@ -772,7 +772,7 @@ int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid)
 
         libxl__qmp_cleanup(gc, domid);
     }
-    if (libxl__devices_destroy(gc, domid, 1) < 0)
+    if (libxl__devices_destroy(gc, domid) < 0)
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, 
                    "libxl__devices_destroy failed for %d", domid);
 
