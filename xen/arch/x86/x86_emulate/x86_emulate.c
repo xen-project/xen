@@ -2761,6 +2761,9 @@ x86_emulate(
     case 0xd9: /* FPU 0xd9 */
         switch ( modrm )
         {
+        case 0xfb: /* fsincos */
+            fail_if(cpu_has_amd_erratum(573));
+            /* fall through */
         case 0xc0 ... 0xc7: /* fld %stN */
         case 0xc8 ... 0xcf: /* fxch %stN */
         case 0xd0: /* fnop */
@@ -2786,7 +2789,6 @@ x86_emulate(
         case 0xf8: /* fprem */
         case 0xf9: /* fyl2xp1 */
         case 0xfa: /* fsqrt */
-        case 0xfb: /* fsincos */
         case 0xfc: /* frndint */
         case 0xfd: /* fscale */
         case 0xfe: /* fsin */
