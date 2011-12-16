@@ -250,6 +250,12 @@ _hidden const char *libxl__device_model_savefile(libxl__gc *gc, uint32_t domid);
 _hidden int libxl__domain_save_device_model(libxl__gc *gc, uint32_t domid, int fd);
 _hidden void libxl__userdata_destroyall(libxl__gc *gc, uint32_t domid);
 
+_hidden int libxl__domain_pvcontrol_available(libxl__gc *gc, uint32_t domid);
+_hidden char * libxl__domain_pvcontrol_read(libxl__gc *gc,
+                                            xs_transaction_t t, uint32_t domid);
+_hidden int libxl__domain_pvcontrol_write(libxl__gc *gc, xs_transaction_t t,
+                                          uint32_t domid, const char *cmd);
+
 /* from xl_device */
 _hidden char *libxl__device_disk_string_of_backend(libxl_disk_backend backend);
 _hidden char *libxl__device_disk_string_of_format(libxl_disk_format format);

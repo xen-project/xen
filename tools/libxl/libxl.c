@@ -542,6 +542,58 @@ int libxl_domain_unpause(libxl_ctx *ctx, uint32_t domid)
     return rc;
 }
 
+int libxl__domain_pvcontrol_available(libxl__gc *gc, uint32_t domid)
+{
+    libxl_ctx *ctx = libxl__gc_owner(gc);
+
+    unsigned long pvdriver = 0;
+    int ret;
+
+    if (LIBXL__DOMAIN_IS_TYPE(gc, domid, PV))
+        return 1;
+
+    ret = xc_get_hvm_param(ctx->xch, domid, HVM_PARAM_CALLBACK_IRQ, &pvdriver);
+    if (ret<0) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting HVM callback IRQ");
+        return ERROR_FAIL;
+    }
+    return !!pvdriver;
+}
+
+char * libxl__domain_pvcontrol_read(libxl__gc *gc, xs_transaction_t t,
+                                    uint32_t domid)
+{
+    const char *shutdown_path;
+    const char *dom_path;
+
+    dom_path = libxl__xs_get_dompath(gc, domid);
+    if (!dom_path)
+        return NULL;
+
+    shutdown_path = libxl__sprintf(gc, "%s/control/shutdown", dom_path);
+    if (!shutdown_path)
+        return NULL;
+
+    return libxl__xs_read(gc, t, shutdown_path);
+}
+
+int libxl__domain_pvcontrol_write(libxl__gc *gc, xs_transaction_t t,
+                                  uint32_t domid, const char *cmd)
+{
+    const char *shutdown_path;
+    const char *dom_path;
+
+    dom_path = libxl__xs_get_dompath(gc, domid);
+    if (!dom_path)
+        return ERROR_FAIL;
+
+    shutdown_path = libxl__sprintf(gc, "%s/control/shutdown", dom_path);
+    if (!shutdown_path)
+        return ERROR_FAIL;
+
+    return libxl__xs_write(gc, t, shutdown_path, "%s", cmd);
+}
+
 static char *req_table[] = {
     [0] = "poweroff",
     [1] = "reboot",
@@ -553,42 +605,29 @@ static char *req_table[] = {
 int libxl_domain_shutdown(libxl_ctx *ctx, uint32_t domid, int req)
 {
     GC_INIT(ctx);
-    char *shutdown_path;
-    char *dom_path;
+    int ret;
 
     if (req > ARRAY_SIZE(req_table)) {
         GC_FREE;
         return ERROR_INVAL;
     }
 
-    dom_path = libxl__xs_get_dompath(gc, domid);
-    if (!dom_path) {
-        GC_FREE;
-        return ERROR_FAIL;
+    ret = libxl__domain_pvcontrol_available(gc, domid);
+    if (ret < 0)
+        goto out;
+
+    if (!ret) {
+        LIBXL__LOG(CTX, LIBXL__LOG_ERROR, "PV shutdown control not available:"
+                   " graceful shutdown not possible, use destroy");
+        ret = ERROR_FAIL;
+        goto out;
     }
 
-    if (LIBXL__DOMAIN_IS_TYPE(gc,  domid, HVM)) {
-        unsigned long pvdriver = 0;
-        int ret;
-        ret = xc_get_hvm_param(ctx->xch, domid, HVM_PARAM_CALLBACK_IRQ, &pvdriver);
-        if (ret<0) {
-            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting HVM callback IRQ");
-            GC_FREE;
-            return ERROR_FAIL;
-        }
-        if (!pvdriver) {
-            LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "HVM domain without PV drivers:"
-                       " graceful shutdown not possible, use destroy");
-            GC_FREE;
-            return ERROR_FAIL;
-        }
-    }
+    ret = libxl__domain_pvcontrol_write(gc, XBT_NULL, domid, req_table[req]);
 
-    shutdown_path = libxl__sprintf(gc, "%s/control/shutdown", dom_path);
-    xs_write(ctx->xsh, XBT_NULL, shutdown_path, req_table[req], strlen(req_table[req]));
-
+out:
     GC_FREE;
-    return 0;
+    return ret;
 }
 
 int libxl_get_wait_fd(libxl_ctx *ctx, int *fd)

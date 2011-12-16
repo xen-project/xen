@@ -415,7 +415,7 @@ static int libxl__domain_suspend_common_callback(void *data)
     struct suspendinfo *si = data;
     unsigned long hvm_s_state = 0, hvm_pvdrv = 0;
     int ret;
-    char *path, *state = "suspend";
+    char *state = "suspend";
     int watchdog;
     libxl_ctx *ctx = libxl__gc_owner(si->gc);
     xs_transaction_t t;
@@ -451,15 +451,14 @@ static int libxl__domain_suspend_common_callback(void *data)
         LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "issuing %s suspend request via XenBus control node",
                    si->hvm ? "PVHVM" : "PV");
 
-        path = libxl__sprintf(si->gc, "%s/control/shutdown", libxl__xs_get_dompath(si->gc, si->domid));
-        libxl__xs_write(si->gc, XBT_NULL, path, "suspend");
+        libxl__domain_pvcontrol_write(si->gc, XBT_NULL, si->domid, "suspend");
 
         LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "wait for the guest to acknowledge suspend request");
         watchdog = 60;
         while (!strcmp(state, "suspend") && watchdog > 0) {
             usleep(100000);
 
-            state = libxl__xs_read(si->gc, XBT_NULL, path);
+            state = libxl__domain_pvcontrol_read(si->gc, XBT_NULL, si->domid);
             if (!state) state = "";
 
             watchdog--;
@@ -479,11 +478,11 @@ static int libxl__domain_suspend_common_callback(void *data)
         retry_transaction:
             t = xs_transaction_start(ctx->xsh);
 
-            state = libxl__xs_read(si->gc, t, path);
+            state = libxl__domain_pvcontrol_read(si->gc, t, si->domid);
             if (!state) state = "";
 
             if (!strcmp(state, "suspend"))
-                libxl__xs_write(si->gc, t, path, "");
+                libxl__domain_pvcontrol_write(si->gc, t, si->domid, "");
 
             if (!xs_transaction_end(ctx->xsh, t, 0))
                 if (errno == EAGAIN)
