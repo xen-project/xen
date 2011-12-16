@@ -320,11 +320,8 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_create_info *info,
   * on exit (even error exit), domid may be valid and refer to a domain */
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
-    int flags, ret, i, rc;
+    int flags, ret, rc;
     char *uuid_string;
-    char *rw_paths[] = { "control/shutdown", "device", "device/suspend/event-channel" , "data"};
-    char *ro_paths[] = { "cpu", "memory", "device", "error", "drivers",
-                         "control", "attr", "messages" };
     char *dom_path, *vm_path, *libxl_path;
     struct xs_permissions roperm[2];
     struct xs_permissions rwperm[1];
@@ -384,6 +381,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_create_info *info,
         rc = ERROR_FAIL;
         goto out;
     }
+
     noperm[0].id = 0;
     noperm[0].perms = XS_PERM_NONE;
 
@@ -391,6 +389,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_create_info *info,
     roperm[0].perms = XS_PERM_NONE;
     roperm[1].id = *domid;
     roperm[1].perms = XS_PERM_READ;
+
     rwperm[0].id = *domid;
     rwperm[0].perms = XS_PERM_NONE;
 
@@ -398,32 +397,42 @@ retry_transaction:
     t = xs_transaction_start(ctx->xsh);
 
     xs_rm(ctx->xsh, t, dom_path);
-    xs_mkdir(ctx->xsh, t, dom_path);
-    xs_set_permissions(ctx->xsh, t, dom_path, roperm, ARRAY_SIZE(roperm));
+    libxl__xs_mkdir(gc, t, dom_path, roperm, ARRAY_SIZE(roperm));
+
 
     xs_rm(ctx->xsh, t, vm_path);
-    xs_mkdir(ctx->xsh, t, vm_path);
-    xs_set_permissions(ctx->xsh, t, vm_path, roperm, ARRAY_SIZE(roperm));
+    libxl__xs_mkdir(gc, t, vm_path, roperm, ARRAY_SIZE(roperm));
 
     xs_rm(ctx->xsh, t, libxl_path);
-    xs_mkdir(ctx->xsh, t, libxl_path);
-    xs_set_permissions(ctx->xsh, t, libxl_path, noperm, ARRAY_SIZE(noperm));
+    libxl__xs_mkdir(gc, t, libxl_path, noperm, ARRAY_SIZE(noperm));
 
     xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/vm", dom_path), vm_path, strlen(vm_path));
     rc = libxl__domain_rename(gc, *domid, 0, info->name, t);
     if (rc)
         goto out;
 
-    for (i = 0; i < ARRAY_SIZE(rw_paths); i++) {
-        char *path = libxl__sprintf(gc, "%s/%s", dom_path, rw_paths[i]);
-        xs_mkdir(ctx->xsh, t, path);
-        xs_set_permissions(ctx->xsh, t, path, rwperm, ARRAY_SIZE(rwperm));
-    }
-    for (i = 0; i < ARRAY_SIZE(ro_paths); i++) {
-        char *path = libxl__sprintf(gc, "%s/%s", dom_path, ro_paths[i]);
-        xs_mkdir(ctx->xsh, t, path);
-        xs_set_permissions(ctx->xsh, t, path, roperm, ARRAY_SIZE(roperm));
-    }
+    libxl__xs_mkdir(gc, t,
+                    libxl__sprintf(gc, "%s/cpu", dom_path),
+                    roperm, ARRAY_SIZE(roperm));
+    libxl__xs_mkdir(gc, t,
+                    libxl__sprintf(gc, "%s/memory", dom_path),
+                    roperm, ARRAY_SIZE(roperm));
+    libxl__xs_mkdir(gc, t,
+                    libxl__sprintf(gc, "%s/device", dom_path),
+                    roperm, ARRAY_SIZE(roperm));
+    libxl__xs_mkdir(gc, t,
+                    libxl__sprintf(gc, "%s/control", dom_path),
+                    roperm, ARRAY_SIZE(roperm));
+
+    libxl__xs_mkdir(gc, t,
+                    libxl__sprintf(gc, "%s/control/shutdown", dom_path),
+                    rwperm, ARRAY_SIZE(rwperm));
+    libxl__xs_mkdir(gc, t,
+                    libxl__sprintf(gc, "%s/device/suspend/event-channel", dom_path),
+                    rwperm, ARRAY_SIZE(rwperm));
+    libxl__xs_mkdir(gc, t,
+                    libxl__sprintf(gc, "%s/data", dom_path),
+                    rwperm, ARRAY_SIZE(rwperm));
 
     xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/uuid", vm_path), uuid_string, strlen(uuid_string));
     xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/name", vm_path), info->name, strlen(info->name));

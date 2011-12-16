@@ -206,6 +206,9 @@ _hidden char *libxl__xs_read(libxl__gc *gc, xs_transaction_t t,
 _hidden char **libxl__xs_directory(libxl__gc *gc, xs_transaction_t t,
                                    const char *path, unsigned int *nb);
    /* On error: returns NULL, sets errno (no logging) */
+_hidden bool libxl__xs_mkdir(libxl__gc *gc, xs_transaction_t t,
+                             const char *path, struct xs_permissions *perms,
+			     unsigned int num_perms);
 
 _hidden char *libxl__xs_libxl_path(libxl__gc *gc, uint32_t domid);
 

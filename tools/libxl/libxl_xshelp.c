@@ -122,6 +122,16 @@ char **libxl__xs_directory(libxl__gc *gc, xs_transaction_t t,
     return ret;
 }
 
+bool libxl__xs_mkdir(libxl__gc *gc, xs_transaction_t t,
+                     const char *path, struct xs_permissions *perms,
+			         unsigned int num_perms)
+{
+    libxl_ctx *ctx = libxl__gc_owner(gc);
+    if (!xs_mkdir(ctx->xsh, t, path))
+        return false;
+    return xs_set_permissions(ctx->xsh, t, path, perms, num_perms);
+}
+
 char *libxl__xs_libxl_path(libxl__gc *gc, uint32_t domid)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
