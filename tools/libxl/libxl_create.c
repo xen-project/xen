@@ -99,6 +99,7 @@ int libxl_init_build_info(libxl_ctx *ctx,
         b_info->u.hvm.vpt_align = 1;
         b_info->u.hvm.timer_mode = 1;
         b_info->u.hvm.nested_hvm = 0;
+        b_info->u.hvm.no_incr_generationid = 0;
         break;
     case LIBXL_DOMAIN_TYPE_PV:
         b_info->u.pv.slack_memkb = 8 * 1024;

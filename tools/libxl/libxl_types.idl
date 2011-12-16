@@ -184,6 +184,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                        ("vpt_align", bool),
                                        ("timer_mode", integer),
                                        ("nested_hvm", bool),
+                                       ("no_incr_generationid", bool),
                                        ])),
                  ("pv", Struct(None, [("kernel", libxl_file_reference),
                                       ("slack_memkb", uint32),

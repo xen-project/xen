@@ -681,6 +681,7 @@ typedef struct {
     uint64_t console_pfn;
     uint64_t acpi_ioport_location;
     uint64_t viridian;
+    uint64_t vm_generationid_addr;
 } pagebuf_t;
 
 static int pagebuf_init(pagebuf_t* buf)
@@ -859,6 +860,17 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
             return -1;
         }
         return compbuf_size;
+
+    case XC_SAVE_ID_HVM_GENERATION_ID_ADDR:
+        /* Skip padding 4 bytes then read the generation id buffer location. */
+        if ( RDEXACT(fd, &buf->vm_generationid_addr, sizeof(uint32_t)) ||
+             RDEXACT(fd, &buf->vm_generationid_addr, sizeof(uint64_t)) )
+        {
+            PERROR("error read the generation id buffer location");
+            return -1;
+        }
+        DPRINTF("read generation id buffer address");
+        return pagebuf_get_one(xch, ctx, buf, fd, dom);
 
     default:
         if ( (count > MAX_BATCH_SIZE) || (count < 0) ) {
@@ -1248,7 +1260,9 @@ static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
 int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                       unsigned int store_evtchn, unsigned long *store_mfn,
                       unsigned int console_evtchn, unsigned long *console_mfn,
-                      unsigned int hvm, unsigned int pae, int superpages)
+                      unsigned int hvm, unsigned int pae, int superpages,
+                      int no_incr_generationid,
+                      unsigned long *vm_generationid_addr)
 {
     DECLARE_DOMCTL;
     int rc = 1, frc, i, j, n, m, pae_extended_cr3 = 0, ext_vcpucontext = 0;
@@ -1449,6 +1463,39 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                 xc_set_hvm_param(xch, dom, HVM_PARAM_VM86_TSS, pagebuf.vm86_tss);
             if ( pagebuf.console_pfn )
                 console_pfn = pagebuf.console_pfn;
+            if ( pagebuf.vm_generationid_addr ) {
+                if ( !no_incr_generationid ) {
+                    unsigned int offset;
+                    unsigned char *buf;
+                    unsigned long long generationid;
+
+                    /*
+                     * Map the VM generation id buffer and inject the new value.
+                     */
+
+                    pfn = pagebuf.vm_generationid_addr >> PAGE_SHIFT;
+                    offset = pagebuf.vm_generationid_addr & (PAGE_SIZE - 1);
+                
+                    if ( (pfn >= dinfo->p2m_size) ||
+                         (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB) )
+                    {
+                        ERROR("generation id buffer frame is bad");
+                        goto out;
+                    }
+
+                    mfn = ctx->p2m[pfn];
+                    buf = xc_map_foreign_range(xch, dom, PAGE_SIZE,
+                                               PROT_READ | PROT_WRITE, mfn);
+
+                    generationid = *(unsigned long long *)(buf + offset);
+                    *(unsigned long long *)(buf + offset) = generationid + 1;
+
+                    munmap(buf, PAGE_SIZE);
+                }
+
+                *vm_generationid_addr = pagebuf.vm_generationid_addr;
+            }
+
             break;  /* our work here is done */
         }
 

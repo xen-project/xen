@@ -175,6 +175,7 @@ int checkpoint_start(checkpoint_state* s, int fd,
 {
     int hvm, rc;
     int flags = XCFLAGS_LIVE;
+    unsigned long vm_generationid_addr;
 
     if (!s->domid) {
        s->errstr = "checkpoint state not opened";
@@ -185,16 +186,28 @@ int checkpoint_start(checkpoint_state* s, int fd,
 
     hvm = s->domtype > dt_pv;
     if (hvm) {
+       char path[128];
+       char *addr;
+
+       sprintf(path, "/local/domain/%u/hvmloader/generation-id-address", s->domid);
+       addr = xs_read(s->xsh, XBT_NULL, path, NULL);
+
+       vm_generationid_addr = (addr) ? strtoul(addr, NULL, 0) : 0;
+       free(addr);
+
        flags |= XCFLAGS_HVM;
        if (switch_qemu_logdirty(s, 1))
            return -1;
+    } else {
+       vm_generationid_addr = 0;
     }
     if (remus_flags & CHECKPOINT_FLAGS_COMPRESSION)
       flags |= XCFLAGS_CHECKPOINT_COMPRESS;
 
     callbacks->switch_qemu_logdirty = noop_switch_logdirty;
 
-    rc = xc_domain_save(s->xch, fd, s->domid, 0, 0, flags, callbacks, hvm);
+    rc = xc_domain_save(s->xch, fd, s->domid, 0, 0, flags, callbacks, hvm,
+                        vm_generationid_addr);
 
     if (hvm)
        switch_qemu_logdirty(s, 0);

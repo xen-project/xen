@@ -46,7 +46,8 @@ main(int argc, char **argv)
 	    superpages = !!hvm;
 
     ret = xc_domain_restore(xch, io_fd, domid, store_evtchn, &store_mfn,
-                            console_evtchn, &console_mfn, hvm, pae, superpages);
+                            console_evtchn, &console_mfn, hvm, pae, superpages,
+                            0, NULL);
 
     if ( ret == 0 )
     {

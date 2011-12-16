@@ -208,7 +208,7 @@ main(int argc, char **argv)
     callbacks.suspend = suspend;
     callbacks.switch_qemu_logdirty = switch_qemu_logdirty;
     ret = xc_domain_save(si.xch, io_fd, si.domid, maxit, max_f, si.flags, 
-                         &callbacks, !!(si.flags & XCFLAGS_HVM));
+                         &callbacks, !!(si.flags & XCFLAGS_HVM), 0);
 
     if (si.suspend_evtchn > 0)
 	 xc_suspend_evtchn_release(si.xch, si.xce, si.domid, si.suspend_evtchn);

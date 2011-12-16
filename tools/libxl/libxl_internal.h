@@ -223,6 +223,7 @@ typedef struct {
 
     uint32_t console_port;
     unsigned long console_mfn;
+    unsigned long vm_generationid_addr;
 } libxl__domain_build_state;
 
 _hidden int libxl__build_pre(libxl__gc *gc, uint32_t domid,
