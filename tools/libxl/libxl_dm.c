@@ -827,10 +827,10 @@ int libxl__create_device_model(libxl__gc *gc,
         goto out;
     }
 
-    path = libxl__sprintf(gc, "/local/domain/%d/hvmloader", info->domid);
-    xs_mkdir(ctx->xsh, XBT_NULL, path);
-    libxl__xs_write(gc, XBT_NULL, libxl__sprintf(gc, "%s/bios", path),
+    path = xs_get_domain_path(ctx->xsh, info->domid);
+    libxl__xs_write(gc, XBT_NULL, libxl__sprintf(gc, "%s/hvmloader/bios", path),
                     "%s", libxl__domain_bios(gc, info));
+    free(path);
 
     path = libxl__sprintf(gc, "/local/domain/0/device-model/%d", info->domid);
     xs_mkdir(ctx->xsh, XBT_NULL, path);

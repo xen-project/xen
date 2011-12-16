@@ -423,6 +423,10 @@ retry_transaction:
     libxl__xs_mkdir(gc, t,
                     libxl__sprintf(gc, "%s/control", dom_path),
                     roperm, ARRAY_SIZE(roperm));
+    if (info->type == LIBXL_DOMAIN_TYPE_HVM)
+        libxl__xs_mkdir(gc, t,
+                        libxl__sprintf(gc, "%s/hvmloader", dom_path),
+                        roperm, ARRAY_SIZE(roperm));
 
     libxl__xs_mkdir(gc, t,
                     libxl__sprintf(gc, "%s/control/shutdown", dom_path),
@@ -433,6 +437,10 @@ retry_transaction:
     libxl__xs_mkdir(gc, t,
                     libxl__sprintf(gc, "%s/data", dom_path),
                     rwperm, ARRAY_SIZE(rwperm));
+    if (info->type == LIBXL_DOMAIN_TYPE_HVM)
+        libxl__xs_mkdir(gc, t,
+            libxl__sprintf(gc, "%s/hvmloader/generation-id-address", dom_path),
+                        rwperm, ARRAY_SIZE(rwperm));
 
     xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/uuid", vm_path), uuid_string, strlen(uuid_string));
     xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/name", vm_path), info->name, strlen(info->name));
