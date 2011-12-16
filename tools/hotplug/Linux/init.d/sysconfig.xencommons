@@ -1,6 +1,9 @@
 # Log xenconsoled messages (cf xl dmesg)
 #XENCONSOLED_TRACE=[none|guest|hv|all]
 
+# Select xenstored implementation
+#XENSTORED=[oxenstored|xenstored]
+
 # Log xenstored messages
 #XENSTORED_TRACE=[yes|on|1]
 

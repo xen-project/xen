@@ -65,8 +65,19 @@ do_start () {
 		rm -f "$XENSTORED_ROOTDIR"/tdb* &>/dev/null
 		test -z "$XENSTORED_TRACE" || XENSTORED_ARGS=" -T /var/log/xen/xenstored-trace.log"
 
-		echo -n Starting xenstored...
-		xenstored --pid-file=/var/run/xenstored.pid $XENSTORED_ARGS
+		if [ -n "$XENSTORED" ] ; then
+		    echo -n Starting $XENSTORED...
+		    $XENSTORED --pid-file /var/run/xenstored.pid $XENSTORED_ARGS
+		elif [ -x /usr/sbin/oxenstored ] ; then
+		    echo -n Starting oxenstored...
+		    /usr/sbin/oxenstored --pid-file /var/run/xenstored.pid $XENSTORED_ARGS
+		elif [ -x /usr/sbin/xenstored ] ; then
+		    echo -n Starting C xenstored...
+		    /usr/sbin/xenstored --pid-file /var/run/xenstored.pid $XENSTORED_ARGS
+		else
+		    echo "No xenstored found"
+		    exit 1
+		fi
 
 		# Wait for xenstored to actually come up, timing out after 30 seconds
                 while [ $time -lt $timeout ] && ! `xenstore-read -s / >/dev/null 2>&1` ; do
