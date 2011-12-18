@@ -4699,7 +4699,7 @@ static int xenmem_add_to_physmap_once(
                  (xatp->idx & XENMAPIDX_grant_table_status) )
             {
                 idx &= ~XENMAPIDX_grant_table_status;
-                if ( xatp->idx < nr_status_frames(d->grant_table) )
+                if ( idx < nr_status_frames(d->grant_table) )
                     mfn = virt_to_mfn(d->grant_table->status[idx]);
             }
             else
