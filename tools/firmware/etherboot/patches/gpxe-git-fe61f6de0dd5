@@ -1,0 +1,32 @@
+commit fe61f6de0dd5d39ac3de5e8e18742f9bd0aafad7
+Author: Gilles Espinasse <g.esp@free.fr>
+Date:   Tue Mar 29 15:30:11 2011 +0100
+
+    [build] Fix compilation when gcc is patched to default to -fPIE -Wl,-pie
+    
+    Signed-off-by: Gilles Espinasse <g.esp@free.fr>
+    Modified-by: Michael Brown <mcb30@ipxe.org>
+    Signed-off-by: Michael Brown <mcb30@ipxe.org>
+
+diff --git a/src/Makefile.housekeeping b/src/Makefile.housekeeping
+index 57e52c0..c184351 100644
+--- a/src/Makefile.housekeeping
++++ b/src/Makefile.housekeeping
+@@ -138,6 +138,17 @@ SP_FLAGS := $(shell $(SP_TEST) && $(ECHO) '-fno-stack-protector')
+ WORKAROUND_CFLAGS += $(SP_FLAGS)
+ endif
+ 
++# Some widespread patched versions of gcc include -fPIE -Wl,-pie by
++# default.  Note that gcc will exit *successfully* if it fails to
++# recognise an option that starts with "no", so we have to test for
++# output on stderr instead of checking the exit status.
++#
++ifeq ($(CCTYPE),gcc)
++PIE_TEST = [ -z "`$(CC) -fno-PIE -nopie -x c -c /dev/null -o /dev/null 2>&1`" ]
++PIE_FLAGS := $(shell $(PIE_TEST) && $(ECHO) '-fno-PIE -nopie')
++WORKAROUND_CFLAGS += $(PIE_FLAGS)
++endif
++
+ # gcc 4.4 generates .eh_frame sections by default, which distort the
+ # output of "size".  Inhibit this.
+ #
