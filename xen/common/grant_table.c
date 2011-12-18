@@ -2199,17 +2199,15 @@ gnttab_get_version(XEN_GUEST_HANDLE(gnttab_get_version_t uop))
 {
     gnttab_get_version_t op;
     struct domain *d;
+    int rc;
 
     if ( copy_from_guest(&op, uop, 1) )
         return -EFAULT;
-    d = rcu_lock_domain_by_id(op.dom);
-    if ( d == NULL )
-        return -ESRCH;
-    if ( !IS_PRIV_FOR(current->domain, d) )
-    {
-        rcu_unlock_domain(d);
-        return -EPERM;
-    }
+
+    rc = rcu_lock_target_domain_by_id(op.dom, &d);
+    if ( rc < 0 )
+        return rc;
+
     spin_lock(&d->grant_table->lock);
     op.version = d->grant_table->gt_version;
     spin_unlock(&d->grant_table->lock);
