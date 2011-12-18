@@ -1428,6 +1428,7 @@ int security_load_policy(void *data, size_t len)
         }
         if ( validate_classes(&policydb) )
         {
+            LOAD_UNLOCK;
             printk(KERN_ERR
                    "Flask:  the definition of a class is incorrect\n");
             sidtab_destroy(&sidtab);
