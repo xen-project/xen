@@ -134,8 +134,12 @@ static int mca_cpuinfo(xc_interface *xc_handle)
 {
     struct xen_mc mc;
 
+    memset(&mc, 0, sizeof(struct xen_mc));
+
     mc.cmd = XEN_MC_physcpuinfo;
-    if (xc_mca_op(xc_handle, &mc))
+    mc.interface_version = XEN_MCA_INTERFACE_VERSION;
+
+    if (!xc_mca_op(xc_handle, &mc))
         return mc.u.mc_physcpuinfo.ncpus;
     else
         return 0;
