@@ -568,8 +568,17 @@ void avc_audit(u32 ssid, u32 tsid, u16 tclass, u32 requested,
         d = a->d;
     if ( d )
         printk("domid=%d ", d->domain_id);
-    if ( a && a->device )
+    switch ( a ? a->type : 0 ) {
+    case AVC_AUDIT_DATA_DEV:
         printk("device=0x%lx ", a->device);
+        break;
+    case AVC_AUDIT_DATA_IRQ:
+        printk("irq=%d ", a->irq);
+        break;
+    case AVC_AUDIT_DATA_RANGE:
+        printk("range=0x%lx-0x%lx ", a->range.start, a->range.end);
+        break;
+    }
 
     avc_dump_query(ssid, tsid, tclass);
     printk("\n");

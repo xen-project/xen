@@ -670,8 +670,8 @@ static int flask_irq_permission (struct domain *d, int pirq, uint8_t access)
     if ( rc )
         return rc;
 
-    AVC_AUDIT_DATA_INIT(&ad, DEV);
-    ad.device = (unsigned long) pirq;
+    AVC_AUDIT_DATA_INIT(&ad, IRQ);
+    ad.irq = pirq;
 
     rc = avc_has_perm(ssec->sid, rsid, SECCLASS_RESOURCE, perm, &ad);
     if ( rc )
@@ -694,8 +694,9 @@ static int _iomem_has_perm(void *v, u32 sid, unsigned long start, unsigned long 
     struct avc_audit_data ad;
     int rc = -EPERM;
 
-    AVC_AUDIT_DATA_INIT(&ad, DEV);
-    ad.device = start;
+    AVC_AUDIT_DATA_INIT(&ad, RANGE);
+    ad.range.start = start;
+    ad.range.end = end;
 
     rc = avc_has_perm(data->ssec->sid, sid, SECCLASS_RESOURCE, data->perm, &ad);
 
@@ -771,8 +772,9 @@ static int _ioport_has_perm(void *v, u32 sid, unsigned long start, unsigned long
     struct avc_audit_data ad;
     int rc;
 
-    AVC_AUDIT_DATA_INIT(&ad, DEV);
-    ad.device = start;
+    AVC_AUDIT_DATA_INIT(&ad, RANGE);
+    ad.range.start = start;
+    ad.range.end = end;
 
     rc = avc_has_perm(data->ssec->sid, sid, SECCLASS_RESOURCE, data->perm, &ad);
 
@@ -1155,8 +1157,8 @@ static int flask_bind_pt_irq (struct domain *d, struct xen_domctl_bind_pt_irq *b
     if ( rc )
         return rc;
 
-    AVC_AUDIT_DATA_INIT(&ad, DEV);
-    ad.device = (unsigned long)irq;
+    AVC_AUDIT_DATA_INIT(&ad, IRQ);
+    ad.irq = irq;
 
     ssec = current->domain->ssid;
     rc = avc_has_perm(ssec->sid, rsid, SECCLASS_HVM, HVM__BIND_IRQ, &ad);
