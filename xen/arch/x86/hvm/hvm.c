@@ -2857,6 +2857,7 @@ static int grant_table_op_is_allowed(unsigned int cmd)
     case GNTTABOP_query_size:
     case GNTTABOP_setup_table:
     case GNTTABOP_set_version:
+    case GNTTABOP_get_version:
     case GNTTABOP_copy:
     case GNTTABOP_map_grant_ref:
     case GNTTABOP_unmap_grant_ref:
