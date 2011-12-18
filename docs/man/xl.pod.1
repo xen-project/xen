@@ -197,10 +197,6 @@ I<filename> specified, without pausing the domain.  The dump file will
 be written to a distribution specific directory for dump files.  Such
 as: /var/lib/xen/dump or /var/xen/dump.
 
-=item B<getenforce>
-
-Returns the current enforcing mode of the Flask Xen security module.
-
 =item B<help> [I<--long>]
 
 Displays the short help message (i.e. common commands).
@@ -303,10 +299,6 @@ less utilized than a high CPU workload.  Consider yourself warned.
 
 =back
 
-=item B<loadpolicy> I<policyfile>
-
-Loads a new policy int the Flask Xen security module.
-
 =item B<mem-max> I<domain-id> I<mem>
 
 Specify the maximum amount of memory the domain is able to use, appending 't'
@@ -396,10 +388,6 @@ See the corresponding option of the I<create> subcommand.
 Enable debug messages.
 
 =back
-
-=item B<setenforce> I<1|0|Enforcing|Permissive>
-
-Sets the current enforcing mode of the Flask Xen security module
 
 =item B<save> [I<OPTIONS>] I<domain-id> I<CheckpointFile> [I<ConfigFile>]
 
@@ -997,6 +985,28 @@ Get information about how much freeable memory (MB) is in-use by tmem.
 
 =back
 
+=head2 FLASK
+
+=over 4
+
+=item B<getenforce>
+
+Determine if the FLASK security module is loaded and enforcing its policy.
+
+=item B<setenforce> I<1|0|Enforcing|Permissive>
+
+Enable or disable enforcing of the FLASK access controls. The default is
+permissive and can be changed using the flask_enforcing option on the
+hypervisor's command line.
+
+=item B<loadpolicy> I<policy-file>
+
+Load FLASK policy from the given policy file. The initial policy is provided to
+the hypervisor as a multiboot module; this command allows runtime updates to the
+policy. Loading new security policy will reset runtime changes to device labels.
+
+=back
+
 =head1 TO BE DOCUMENTED
 
 We need better documentation for:
@@ -1006,10 +1016,6 @@ We need better documentation for:
 =item B<tmem>
 
 Trascendent Memory.
-
-=item B<Flask>
-
-Xen Flask security module.
 
 =back
 
