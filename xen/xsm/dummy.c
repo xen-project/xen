@@ -89,6 +89,11 @@ static int dummy_set_target (struct domain *d, struct domain *e)
     return 0;
 }
 
+static int dummy_domctl(struct domain *d, int cmd)
+{
+    return 0;
+}
+
 static int dummy_tbufcontrol (void)
 {
     return 0;
@@ -139,7 +144,17 @@ static int dummy_get_pmstat (void)
     return 0;
 }
 
+static int dummy_setpminfo (void)
+{
+    return 0;
+}
+
 static int dummy_pm_op (void)
+{
+    return 0;
+}
+
+static int dummy_do_mca (void)
 {
     return 0;
 }
@@ -268,6 +283,77 @@ static void dummy_free_security_evtchn (struct evtchn *chn)
     return;
 }
 
+static int dummy_test_assign_device (uint32_t machine_bdf)
+{
+    return 0;
+}
+
+static int dummy_assign_device (struct domain *d, uint32_t machine_bdf)
+{
+    return 0;
+}
+
+static int dummy_deassign_device (struct domain *d, uint32_t machine_bdf)
+{
+    return 0;
+}
+
+static int dummy_resource_plug_core (void)
+{
+    return 0;
+}
+
+static int dummy_resource_unplug_core (void)
+{
+    return 0;
+}
+
+static int dummy_resource_plug_pci (uint32_t machine_bdf)
+{
+    return 0;
+}
+
+static int dummy_resource_unplug_pci (uint32_t machine_bdf)
+{
+    return 0;
+}
+
+static int dummy_resource_setup_pci (uint32_t machine_bdf)
+{
+    return 0;
+}
+
+static int dummy_resource_setup_gsi (int gsi)
+{
+    return 0;
+}
+
+static int dummy_resource_setup_misc (void)
+{
+    return 0;
+}
+
+static int dummy_page_offline (uint32_t cmd)
+{
+    return 0;
+}
+
+static int dummy_lockprof (void)
+{
+    return 0;
+}
+
+static int dummy_cpupool_op (void)
+{
+    return 0;
+}
+
+static int dummy_sched_op (void)
+{
+    return 0;
+}
+
+
 static long dummy___do_xsm_op(XEN_GUEST_HANDLE(xsm_op_t) op)
 {
     return -ENOSYS;
@@ -335,6 +421,21 @@ static int dummy_hvm_set_isa_irq_level (struct domain *d)
 }
 
 static int dummy_hvm_set_pci_link_route (struct domain *d)
+{
+    return 0;
+}
+
+static int dummy_hvm_inject_msi (struct domain *d)
+{
+    return 0;
+}
+
+static int dummy_mem_event (struct domain *d)
+{
+    return 0;
+}
+
+static int dummy_mem_sharing (struct domain *d)
 {
     return 0;
 }
@@ -426,21 +527,6 @@ static int dummy_sendtrigger (struct domain *d)
     return 0;
 }
 
-static int dummy_test_assign_device (uint32_t machine_bdf)
-{
-    return 0;
-}
-
-static int dummy_assign_device (struct domain *d, uint32_t machine_bdf)
-{
-    return 0;
-}
-
-static int dummy_deassign_device (struct domain *d, uint32_t machine_bdf)
-{
-    return 0;
-}
-
 static int dummy_bind_pt_irq (struct domain *d, struct xen_domctl_bind_pt_irq *bind)
 {
     return 0;
@@ -497,6 +583,7 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, getvcpuinfo);
     set_to_dummy_if_null(ops, domain_settime);
     set_to_dummy_if_null(ops, set_target);
+    set_to_dummy_if_null(ops, domctl);
     set_to_dummy_if_null(ops, tbufcontrol);
     set_to_dummy_if_null(ops, readconsole);
     set_to_dummy_if_null(ops, sched_id);
@@ -506,9 +593,11 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, perfcontrol);
     set_to_dummy_if_null(ops, debug_keys);
     set_to_dummy_if_null(ops, getcpuinfo);
-    set_to_dummy_if_null(ops, pm_op);
-    set_to_dummy_if_null(ops, get_pmstat);
     set_to_dummy_if_null(ops, availheap);
+    set_to_dummy_if_null(ops, get_pmstat);
+    set_to_dummy_if_null(ops, setpminfo);
+    set_to_dummy_if_null(ops, pm_op);
+    set_to_dummy_if_null(ops, do_mca);
 
     set_to_dummy_if_null(ops, evtchn_unbound);
     set_to_dummy_if_null(ops, evtchn_interdomain);
@@ -543,6 +632,23 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, irq_permission);
     set_to_dummy_if_null(ops, iomem_permission);
 
+    set_to_dummy_if_null(ops, test_assign_device);
+    set_to_dummy_if_null(ops, assign_device);
+    set_to_dummy_if_null(ops, deassign_device);
+
+    set_to_dummy_if_null(ops, resource_plug_core);
+    set_to_dummy_if_null(ops, resource_unplug_core);
+    set_to_dummy_if_null(ops, resource_plug_pci);
+    set_to_dummy_if_null(ops, resource_unplug_pci);
+    set_to_dummy_if_null(ops, resource_setup_pci);
+    set_to_dummy_if_null(ops, resource_setup_gsi);
+    set_to_dummy_if_null(ops, resource_setup_misc);
+
+    set_to_dummy_if_null(ops, page_offline);
+    set_to_dummy_if_null(ops, lockprof);
+    set_to_dummy_if_null(ops, cpupool_op);
+    set_to_dummy_if_null(ops, sched_op);
+
     set_to_dummy_if_null(ops, __do_xsm_op);
 
 #ifdef CONFIG_X86
@@ -557,6 +663,9 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, hvm_set_pci_intx_level);
     set_to_dummy_if_null(ops, hvm_set_isa_irq_level);
     set_to_dummy_if_null(ops, hvm_set_pci_link_route);
+    set_to_dummy_if_null(ops, hvm_inject_msi);
+    set_to_dummy_if_null(ops, mem_event);
+    set_to_dummy_if_null(ops, mem_sharing);
     set_to_dummy_if_null(ops, apic);
     set_to_dummy_if_null(ops, xen_settime);
     set_to_dummy_if_null(ops, memtype);
@@ -574,9 +683,6 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, update_va_mapping);
     set_to_dummy_if_null(ops, add_to_physmap);
     set_to_dummy_if_null(ops, sendtrigger);
-    set_to_dummy_if_null(ops, test_assign_device);
-    set_to_dummy_if_null(ops, assign_device);
-    set_to_dummy_if_null(ops, deassign_device);
     set_to_dummy_if_null(ops, bind_pt_irq);
     set_to_dummy_if_null(ops, pin_mem_cacheattr);
     set_to_dummy_if_null(ops, ext_vcpucontext);
