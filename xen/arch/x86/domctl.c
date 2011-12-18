@@ -1441,8 +1441,10 @@ long arch_do_domctl(
         d = rcu_lock_domain_by_id(domctl->domain);
         if ( d != NULL )
         {
-            ret = mem_event_domctl(d, &domctl->u.mem_event_op,
-                                   guest_handle_cast(u_domctl, void));
+            ret = xsm_mem_event(d);
+            if ( !ret )
+                ret = mem_event_domctl(d, &domctl->u.mem_event_op,
+                                       guest_handle_cast(u_domctl, void));
             rcu_unlock_domain(d);
             copy_to_guest(u_domctl, domctl, 1);
         } 
@@ -1457,7 +1459,9 @@ long arch_do_domctl(
         d = rcu_lock_domain_by_id(domctl->domain);
         if ( d != NULL )
         {
-            ret = mem_sharing_domctl(d, &domctl->u.mem_sharing_op);
+            ret = xsm_mem_sharing(d);
+            if ( !ret )
+                ret = mem_sharing_domctl(d, &domctl->u.mem_sharing_op);
             rcu_unlock_domain(d);
             copy_to_guest(u_domctl, domctl, 1);
         } 
@@ -1498,8 +1502,11 @@ long arch_do_domctl(
         d = rcu_lock_domain_by_id(domctl->domain);
         if ( d != NULL )
         {
-            p2m = p2m_get_hostp2m(d);
-            p2m->access_required = domctl->u.access_required.access_required;
+            ret = xsm_mem_event(d);
+            if ( !ret ) {
+                p2m = p2m_get_hostp2m(d);
+                p2m->access_required = domctl->u.access_required.access_required;
+            }
             rcu_unlock_domain(d);
         } 
     }

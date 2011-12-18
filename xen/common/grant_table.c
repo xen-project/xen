@@ -2208,6 +2208,11 @@ gnttab_get_status_frames(XEN_GUEST_HANDLE(gnttab_get_status_frames_t) uop,
             op.status = GNTST_general_error;
         goto out1;
     }
+    rc = xsm_grant_setup(current->domain, d);
+    if ( rc ) {
+        op.status = GNTST_permission_denied;
+        goto out1;
+    }
 
     gt = d->grant_table;
 
@@ -2255,6 +2260,11 @@ gnttab_get_version(XEN_GUEST_HANDLE(gnttab_get_version_t uop))
     if ( d == NULL )
         return -ESRCH;
     if ( !IS_PRIV_FOR(current->domain, d) )
+    {
+        rcu_unlock_domain(d);
+        return -EPERM;
+    }
+    if ( xsm_grant_query_size(current->domain, d) )
     {
         rcu_unlock_domain(d);
         return -EPERM;

@@ -1384,6 +1384,10 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
     if (!IS_PRIV(v->domain) )
         return x86_mcerr(NULL, -EPERM);
 
+    ret = xsm_do_mca();
+    if ( ret )
+        return x86_mcerr(NULL, ret);
+
     if ( copy_from_guest(op, u_xen_mc, 1) )
         return x86_mcerr("do_mca: failed copyin of xen_mc_t", -EFAULT);
 

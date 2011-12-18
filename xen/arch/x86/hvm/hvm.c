@@ -3869,6 +3869,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         if ( rc != 0 )
             return rc;
 
+        rc = xsm_hvm_param(d, op);
+        if ( rc )
+            goto param_fail_getmemtype;
+
         rc = -EINVAL;
         if ( is_hvm_domain(d) )
         {
@@ -3883,6 +3887,8 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                 a.mem_type =  HVMMEM_mmio_dm;
             rc = copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
         }
+
+    param_fail_getmemtype:
         rcu_unlock_domain(d);
         break;
     }
@@ -3909,6 +3915,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
 
         rc = -EINVAL;
         if ( !is_hvm_domain(d) )
+            goto param_fail4;
+
+        rc = xsm_hvm_param(d, op);
+        if ( rc )
             goto param_fail4;
 
         rc = -EINVAL;
@@ -3986,6 +3996,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         if ( !is_hvm_domain(d) )
             goto param_fail5;
 
+        rc = xsm_hvm_param(d, op);
+        if ( rc )
+            goto param_fail5;
+
         rc = -EINVAL;
         if ( (a.first_pfn > domain_get_maximum_gpfn(d)) ||
              ((a.first_pfn + a.nr - 1) < a.first_pfn) ||
@@ -4014,6 +4028,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
 
         rc = -EINVAL;
         if ( !is_hvm_domain(d) )
+            goto param_fail6;
+
+        rc = xsm_hvm_param(d, op);
+        if ( rc )
             goto param_fail6;
 
         rc = -EINVAL;
@@ -4046,6 +4064,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
 
         rc = -EINVAL;
         if ( !is_hvm_domain(d) || !paging_mode_shadow(d) )
+            goto param_fail7;
+
+        rc = xsm_hvm_param(d, op);
+        if ( rc )
             goto param_fail7;
 
         rc = 0;
@@ -4096,6 +4118,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
 
         rc = -EINVAL;
         if ( !is_hvm_domain(d) )
+            goto param_fail8;
+
+        rc = xsm_hvm_param(d, op);
+        if ( rc )
             goto param_fail8;
 
         rc = -ENOENT;

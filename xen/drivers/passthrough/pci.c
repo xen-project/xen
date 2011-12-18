@@ -28,6 +28,7 @@
 #include <xen/keyhandler.h>
 #include <xen/radix-tree.h>
 #include <xen/tasklet.h>
+#include <xsm/xsm.h>
 #ifdef CONFIG_X86
 #include <asm/msi.h>
 #endif
@@ -297,7 +298,7 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn, const struct pci_dev_info *info)
     struct pci_dev *pdev;
     unsigned int slot = PCI_SLOT(devfn), func = PCI_FUNC(devfn);
     const char *pdev_type;
-    int ret = -ENOMEM;
+    int ret;
 
     if (!info)
         pdev_type = "device";
@@ -317,6 +318,12 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn, const struct pci_dev_info *info)
         info = NULL;
         pdev_type = "device";
     }
+
+    ret = xsm_resource_plug_pci((seg << 16) | (bus << 8) | devfn);
+    if ( ret )
+        return ret;
+
+    ret = -ENOMEM;
 
     spin_lock(&pcidevs_lock);
     pseg = alloc_pseg(seg);
@@ -426,7 +433,13 @@ int pci_remove_device(u16 seg, u8 bus, u8 devfn)
 {
     struct pci_seg *pseg = get_pseg(seg);
     struct pci_dev *pdev;
-    int ret = -ENODEV;
+    int ret;
+
+    ret = xsm_resource_unplug_pci((seg << 16) | (bus << 8) | devfn);
+    if ( ret )
+        return ret;
+
+    ret = -ENODEV;
 
     if ( !pseg )
         return -ENODEV;

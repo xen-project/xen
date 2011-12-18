@@ -24,6 +24,11 @@
 #define XEN__DEBUG                                0x00400000UL
 #define XEN__GETCPUINFO                           0x00800000UL
 #define XEN__HEAP                                 0x01000000UL
+#define XEN__PM_OP                                0x02000000UL
+#define XEN__MCA_OP                               0x04000000UL
+#define XEN__LOCKPROF                             0x08000000UL
+#define XEN__CPUPOOL_OP                           0x10000000UL
+#define XEN__SCHED_OP                             0x20000000UL
 
 #define DOMAIN__SETVCPUCONTEXT                    0x00000001UL
 #define DOMAIN__PAUSE                             0x00000002UL
@@ -53,6 +58,9 @@
 #define DOMAIN__SETEXTVCPUCONTEXT                 0x02000000UL
 #define DOMAIN__GETVCPUEXTSTATE                   0x04000000UL
 #define DOMAIN__SETVCPUEXTSTATE                   0x08000000UL
+#define DOMAIN__GETPODTARGET                      0x10000000UL
+#define DOMAIN__SETPODTARGET                      0x20000000UL
+#define DOMAIN__SET_MISC_INFO                     0x40000000UL
 
 #define HVM__SETHVMC                              0x00000001UL
 #define HVM__GETHVMC                              0x00000002UL
@@ -64,6 +72,9 @@
 #define HVM__BIND_IRQ                             0x00000080UL
 #define HVM__CACHEATTR                            0x00000100UL
 #define HVM__TRACKDIRTYVRAM                       0x00000200UL
+#define HVM__HVMCTL                               0x00000400UL
+#define HVM__MEM_EVENT                            0x00000800UL
+#define HVM__MEM_SHARING                          0x00001000UL
 
 #define EVENT__BIND                               0x00000001UL
 #define EVENT__SEND                               0x00000002UL
@@ -110,6 +121,9 @@
 #define RESOURCE__STAT_DEVICE                     0x00000200UL
 #define RESOURCE__ADD_DEVICE                      0x00000400UL
 #define RESOURCE__REMOVE_DEVICE                   0x00000800UL
+#define RESOURCE__PLUG                            0x00001000UL
+#define RESOURCE__UNPLUG                          0x00002000UL
+#define RESOURCE__SETUP                           0x00004000UL
 
 #define SECURITY__COMPUTE_AV                      0x00000001UL
 #define SECURITY__COMPUTE_CREATE                  0x00000002UL

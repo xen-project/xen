@@ -63,6 +63,7 @@ struct xsm_operations {
     int (*getvcpuinfo) (struct domain *d);
     int (*domain_settime) (struct domain *d);
     int (*set_target) (struct domain *d, struct domain *e);
+    int (*domctl) (struct domain *d, int cmd);
     int (*tbufcontrol) (void);
     int (*readconsole) (uint32_t clear);
     int (*sched_id) (void);
@@ -74,7 +75,9 @@ struct xsm_operations {
     int (*getcpuinfo) (void);
     int (*availheap) (void);
     int (*get_pmstat) (void);
+    int (*setpminfo) (void);
     int (*pm_op) (void);
+    int (*do_mca) (void);
 
     int (*evtchn_unbound) (struct domain *d, struct evtchn *chn, domid_t id2);
     int (*evtchn_interdomain) (struct domain *d1, struct evtchn *chn1,
@@ -96,6 +99,8 @@ struct xsm_operations {
     int (*alloc_security_evtchn) (struct evtchn *chn);
     void (*free_security_evtchn) (struct evtchn *chn);
 
+    int (*get_pod_target) (struct domain *d);
+    int (*set_pod_target) (struct domain *d);
     int (*memory_adjust_reservation) (struct domain *d1, struct domain *d2);
     int (*memory_stat_reservation) (struct domain *d1, struct domain *d2);
     int (*memory_pin_page) (struct domain *d, struct page_info *page);
@@ -109,9 +114,23 @@ struct xsm_operations {
     int (*irq_permission) (struct domain *d, int pirq, uint8_t allow);
     int (*iomem_permission) (struct domain *d, uint64_t s, uint64_t e, uint8_t allow);
 
+    int (*get_device_group) (uint32_t machine_bdf);
     int (*test_assign_device) (uint32_t machine_bdf);
     int (*assign_device) (struct domain *d, uint32_t machine_bdf);
     int (*deassign_device) (struct domain *d, uint32_t machine_bdf);
+
+    int (*resource_plug_core) (void);
+    int (*resource_unplug_core) (void);
+    int (*resource_plug_pci) (uint32_t machine_bdf);
+    int (*resource_unplug_pci) (uint32_t machine_bdf);
+    int (*resource_setup_pci) (uint32_t machine_bdf);
+    int (*resource_setup_gsi) (int gsi);
+    int (*resource_setup_misc) (void);
+
+    int (*page_offline)(uint32_t cmd);
+    int (*lockprof)(void);
+    int (*cpupool_op)(void);
+    int (*sched_op)(void);
 
     long (*__do_xsm_op) (XEN_GUEST_HANDLE(xsm_op_t) op);
 
@@ -128,6 +147,8 @@ struct xsm_operations {
     int (*hvm_set_isa_irq_level) (struct domain *d);
     int (*hvm_set_pci_link_route) (struct domain *d);
     int (*hvm_inject_msi) (struct domain *d);
+    int (*mem_event) (struct domain *d);
+    int (*mem_sharing) (struct domain *d);
     int (*apic) (struct domain *d, int cmd);
     int (*xen_settime) (void);
     int (*memtype) (uint32_t access);
@@ -149,6 +170,7 @@ struct xsm_operations {
     int (*add_to_physmap) (struct domain *d1, struct domain *d2);
     int (*sendtrigger) (struct domain *d);
     int (*bind_pt_irq) (struct domain *d, struct xen_domctl_bind_pt_irq *bind);
+    int (*unbind_pt_irq) (struct domain *d);
     int (*pin_mem_cacheattr) (struct domain *d);
     int (*ext_vcpucontext) (struct domain *d, uint32_t cmd);
     int (*vcpuextstate) (struct domain *d, uint32_t cmd);
@@ -236,6 +258,11 @@ static inline int xsm_set_target (struct domain *d, struct domain *e)
     return xsm_call(set_target(d, e));
 }
 
+static inline int xsm_domctl (struct domain *d, int cmd)
+{
+    return xsm_call(domctl(d, cmd));
+}
+
 static inline int xsm_tbufcontrol (void)
 {
     return xsm_call(tbufcontrol());
@@ -291,9 +318,19 @@ static inline int xsm_get_pmstat(void)
     return xsm_call(get_pmstat());
 }
 
+static inline int xsm_setpminfo(void)
+{
+	return xsm_call(setpminfo());
+}
+
 static inline int xsm_pm_op(void)
 {
     return xsm_call(pm_op());
+}
+
+static inline int xsm_do_mca(void)
+{
+    return xsm_call(do_mca());
 }
 
 static inline int xsm_evtchn_unbound (struct domain *d1, struct evtchn *chn,
@@ -379,6 +416,16 @@ static inline void xsm_free_security_evtchn (struct evtchn *chn)
     (void)xsm_call(free_security_evtchn(chn));
 }
 
+static inline int xsm_get_pod_target (struct domain *d)
+{
+    return xsm_call(get_pod_target(d));
+}
+
+static inline int xsm_set_pod_target (struct domain *d)
+{
+    return xsm_call(set_pod_target(d));
+}
+
 static inline int xsm_memory_adjust_reservation (struct domain *d1, struct
                                                                     domain *d2)
 {
@@ -426,6 +473,11 @@ static inline int xsm_iomem_permission (struct domain *d, uint64_t s, uint64_t e
     return xsm_call(iomem_permission(d, s, e, allow));
 }
 
+static inline int xsm_get_device_group(uint32_t machine_bdf)
+{
+    return xsm_call(get_device_group(machine_bdf));
+}
+
 static inline int xsm_test_assign_device(uint32_t machine_bdf)
 {
     return xsm_call(test_assign_device(machine_bdf));
@@ -439,6 +491,61 @@ static inline int xsm_assign_device(struct domain *d, uint32_t machine_bdf)
 static inline int xsm_deassign_device(struct domain *d, uint32_t machine_bdf)
 {
     return xsm_call(deassign_device(d, machine_bdf));
+}
+
+static inline int xsm_resource_plug_pci (uint32_t machine_bdf)
+{
+    return xsm_call(resource_plug_pci(machine_bdf));
+}
+
+static inline int xsm_resource_unplug_pci (uint32_t machine_bdf)
+{
+    return xsm_call(resource_unplug_pci(machine_bdf));
+}
+
+static inline int xsm_resource_plug_core (void)
+{
+    return xsm_call(resource_plug_core());
+}
+
+static inline int xsm_resource_unplug_core (void)
+{
+    return xsm_call(resource_unplug_core());
+}
+
+static inline int xsm_resource_setup_pci (uint32_t machine_bdf)
+{
+    return xsm_call(resource_setup_pci(machine_bdf));
+}
+
+static inline int xsm_resource_setup_gsi (int gsi)
+{
+    return xsm_call(resource_setup_gsi(gsi));
+}
+
+static inline int xsm_resource_setup_misc (void)
+{
+    return xsm_call(resource_setup_misc());
+}
+
+static inline int xsm_page_offline(uint32_t cmd)
+{
+    return xsm_call(page_offline(cmd));
+}
+
+static inline int xsm_lockprof(void)
+{
+    return xsm_call(lockprof());
+}
+
+static inline int xsm_cpupool_op(void)
+{
+    return xsm_call(cpupool_op());
+}
+
+static inline int xsm_sched_op(void)
+{
+    return xsm_call(sched_op());
 }
 
 static inline long __do_xsm_op (XEN_GUEST_HANDLE(xsm_op_t) op)
@@ -526,6 +633,16 @@ static inline int xsm_hvm_set_pci_link_route (struct domain *d)
 static inline int xsm_hvm_inject_msi (struct domain *d)
 {
     return xsm_call(hvm_inject_msi(d));
+}
+
+static inline int xsm_mem_event (struct domain *d)
+{
+    return xsm_call(mem_event(d));
+}
+
+static inline int xsm_mem_sharing (struct domain *d)
+{
+    return xsm_call(mem_sharing(d));
 }
 
 static inline int xsm_apic (struct domain *d, int cmd)
@@ -624,6 +741,11 @@ static inline int xsm_bind_pt_irq(struct domain *d,
                                                 struct xen_domctl_bind_pt_irq *bind)
 {
     return xsm_call(bind_pt_irq(d, bind));
+}
+
+static inline int xsm_unbind_pt_irq(struct domain *d)
+{
+    return xsm_call(unbind_pt_irq(d));
 }
 
 static inline int xsm_pin_mem_cacheattr(struct domain *d)

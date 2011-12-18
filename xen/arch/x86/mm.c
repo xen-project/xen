@@ -5041,7 +5041,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
         /* Support DOMID_SELF? */
         if ( !IS_PRIV(current->domain) )
-            return -EINVAL;
+            return -EPERM;
 
         if ( copy_from_guest(&target, arg, 1) )
             return -EFAULT;
@@ -5049,6 +5049,14 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         rc = rcu_lock_target_domain_by_id(target.domid, &d);
         if ( rc != 0 )
             return rc;
+
+        if ( op == XENMEM_set_pod_target )
+            rc = xsm_set_pod_target(d);
+        else
+            rc = xsm_get_pod_target(d);
+
+        if ( rc != 0 )
+            goto pod_target_out_unlock;
 
         if ( op == XENMEM_set_pod_target )
         {

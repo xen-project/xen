@@ -29,6 +29,7 @@
 #include <io_ports.h>
 #include <public/physdev.h>
 #include <xen/iommu.h>
+#include <xsm/xsm.h>
 
 /* bitmap indicate which fixed map is free */
 DEFINE_SPINLOCK(msix_fixmap_lock);
@@ -992,6 +993,7 @@ int pci_restore_msi_state(struct pci_dev *pdev)
 {
     unsigned long flags;
     int irq;
+    int ret;
     struct msi_desc *entry, *tmp;
     struct irq_desc *desc;
 
@@ -999,6 +1001,10 @@ int pci_restore_msi_state(struct pci_dev *pdev)
 
     if (!pdev)
         return -EINVAL;
+
+    ret = xsm_resource_setup_pci((pdev->seg << 16) | (pdev->bus << 8) | pdev->devfn);
+    if ( ret )
+        return ret;
 
     list_for_each_entry_safe( entry, tmp, &pdev->msi_list, list )
     {

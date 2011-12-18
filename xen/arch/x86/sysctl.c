@@ -103,6 +103,10 @@ long arch_do_sysctl(
         uint32_t i, max_cpu_index, last_online_cpu;
         xen_sysctl_topologyinfo_t *ti = &sysctl->u.topologyinfo;
 
+        ret = xsm_physinfo();
+        if ( ret )
+            break;
+
         last_online_cpu = cpumask_last(&cpu_online_map);
         max_cpu_index = min_t(uint32_t, ti->max_cpu_index, last_online_cpu);
         ti->max_cpu_index = last_online_cpu;
@@ -138,6 +142,10 @@ long arch_do_sysctl(
     {
         uint32_t i, j, max_node_index, last_online_node;
         xen_sysctl_numainfo_t *ni = &sysctl->u.numainfo;
+
+        ret = xsm_physinfo();
+        if ( ret )
+            break;
 
         last_online_node = last_node(node_online_map);
         max_node_index = min_t(uint32_t, ni->max_node_index, last_online_node);
@@ -189,10 +197,16 @@ long arch_do_sysctl(
         switch ( sysctl->u.cpu_hotplug.op )
         {
         case XEN_SYSCTL_CPU_HOTPLUG_ONLINE:
+            ret = xsm_resource_plug_core();
+            if ( ret )
+                break;
             ret = continue_hypercall_on_cpu(
                 0, cpu_up_helper, (void *)(unsigned long)cpu);
             break;
         case XEN_SYSCTL_CPU_HOTPLUG_OFFLINE:
+            ret = xsm_resource_unplug_core();
+            if ( ret )
+                break;
             ret = continue_hypercall_on_cpu(
                 0, cpu_down_helper, (void *)(unsigned long)cpu);
             break;

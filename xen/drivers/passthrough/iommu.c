@@ -425,12 +425,16 @@ static int iommu_get_device_group(
              ((pdev->bus == bus) && (pdev->devfn == devfn)) )
             continue;
 
+        if ( xsm_get_device_group((seg << 16) | (pdev->bus << 8) | pdev->devfn) )
+            continue;
+
         sdev_id = ops->get_device_group_id(seg, pdev->bus, pdev->devfn);
         if ( (sdev_id == group_id) && (i < max_sdevs) )
         {
             bdf = 0;
             bdf |= (pdev->bus & 0xff) << 16;
             bdf |= (pdev->devfn & 0xff) << 8;
+
             if ( unlikely(copy_to_guest_offset(buf, i, &bdf, 1)) )
             {
                 spin_unlock(&pcidevs_lock);
@@ -518,6 +522,10 @@ int iommu_do_domctl(
     {
         u32 max_sdevs;
         XEN_GUEST_HANDLE_64(uint32) sdevs;
+
+        ret = xsm_get_device_group(domctl->u.get_device_group.machine_sbdf);
+        if ( ret )
+            break;
 
         ret = -EINVAL;
         if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )

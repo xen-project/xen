@@ -152,6 +152,11 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 #ifdef LOCK_PROFILE
     case XEN_SYSCTL_lockprof_op:
     {
+        ret = xsm_lockprof();
+        if ( ret )
+            break;
+
+        ret = perfc_control(&op->u.perfc_op);
         ret = spinlock_profile_control(&op->u.lockprof_op);
         if ( copy_to_guest(u_sysctl, op, 1) )
             ret = -EFAULT;
@@ -260,6 +265,10 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
         uint32_t *status, *ptr;
         unsigned long pfn;
 
+        ret = xsm_page_offline(op->u.page_offline.cmd);
+        if ( ret )
+            break;
+
         ptr = status = xmalloc_bytes( sizeof(uint32_t) *
                                 (op->u.page_offline.end -
                                   op->u.page_offline.start + 1));
@@ -314,6 +323,10 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 
     case XEN_SYSCTL_cpupool_op:
     {
+        ret = xsm_cpupool_op();
+        if ( ret )
+            break;
+
         ret = cpupool_do_sysctl(&op->u.cpupool_op);
         if ( (ret == 0) && copy_to_guest(u_sysctl, op, 1) )
             ret = -EFAULT;
@@ -322,6 +335,10 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 
     case XEN_SYSCTL_scheduler_op:
     {
+        ret = xsm_sched_op();
+        if ( ret )
+            break;
+
         ret = sched_adjust_global(&op->u.scheduler_op);
         if ( (ret == 0) && copy_to_guest(u_sysctl, op, 1) )
             ret = -EFAULT;

@@ -390,6 +390,10 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
     break;
 
     case XENPF_set_processor_pminfo:
+        ret = xsm_setpminfo();
+        if ( ret )
+            break;
+
         switch ( op->u.set_pminfo.type )
         {
         case XEN_PM_PX:
@@ -439,6 +443,10 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
         struct xenpf_pcpuinfo *g_info;
 
         g_info = &op->u.pcpu_info;
+
+        ret = xsm_getcpuinfo();
+        if ( ret )
+            break;
 
         if ( !get_cpu_maps() )
         {
@@ -509,6 +517,10 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
     {
         int cpu = op->u.cpu_ol.cpuid;
 
+        ret = xsm_resource_plug_core();
+        if ( ret )
+            break;
+
         if ( cpu >= nr_cpu_ids || !cpu_present(cpu) )
         {
             ret = -EINVAL;
@@ -521,6 +533,10 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
             break;
         }
 
+        ret = xsm_resource_plug_core();
+        if ( ret )
+            break;
+
         ret = continue_hypercall_on_cpu(
             0, cpu_up_helper, (void *)(unsigned long)cpu);
         break;
@@ -529,6 +545,10 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
     case XENPF_cpu_offline:
     {
         int cpu = op->u.cpu_ol.cpuid;
+
+        ret = xsm_resource_unplug_core();
+        if ( ret )
+            break;
 
         if ( cpu == 0 )
         {
@@ -555,12 +575,20 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
     break;
 
     case XENPF_cpu_hotadd:
+        ret = xsm_resource_plug_core();
+        if ( ret )
+            break;
+
         ret = cpu_add(op->u.cpu_add.apic_id,
                       op->u.cpu_add.acpi_id,
                       op->u.cpu_add.pxm);
     break;
 
     case XENPF_mem_hotadd:
+        ret = xsm_resource_plug_core();
+        if ( ret )
+            break;
+
         ret = memory_add(op->u.mem_add.spfn,
                       op->u.mem_add.epfn,
                       op->u.mem_add.pxm);

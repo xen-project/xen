@@ -972,9 +972,10 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         d = rcu_lock_domain_by_id(op->domain);
         if ( d != NULL )
         {
-            d->suspend_evtchn = op->u.subscribe.port;
+            ret = xsm_domctl(d, op->cmd);
+            if ( !ret )
+                d->suspend_evtchn = op->u.subscribe.port;
             rcu_unlock_domain(d);
-            ret = 0;
         }
     }
     break;
@@ -985,9 +986,10 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         ret = -ESRCH;
         if ( (d = rcu_lock_domain_by_id(op->domain)) != NULL )
         {
-            d->disable_migrate = op->u.disable_migrate.disable;
+            ret = xsm_domctl(d, op->cmd);
+            if ( !ret )
+                d->disable_migrate = op->u.disable_migrate.disable;
             rcu_unlock_domain(d);
-            ret = 0;
         }
     }
     break;

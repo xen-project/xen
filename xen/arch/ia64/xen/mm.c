@@ -3496,6 +3496,14 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
             return rc;
 
         if ( op == XENMEM_set_pod_target )
+            rc = xsm_set_pod_target(d);
+        else
+            rc = xsm_get_pod_target(d);
+
+        if ( rc != 0 )
+            goto pod_target_out_unlock;
+
+        if ( op == XENMEM_set_pod_target )
         {
             /* if -ENOSYS is returned,
                domain builder aborts domain creation. */

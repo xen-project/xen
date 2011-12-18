@@ -600,6 +600,10 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         if ( !IS_PRIV(current->domain) )
             break;
 
+        ret = xsm_resource_setup_misc();
+        if ( ret )
+            break;
+
         ret = -EFAULT;
         if ( copy_from_guest(&info, arg, 1) )
             break;
@@ -662,6 +666,11 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         ret = -EINVAL;
         if ( setup_gsi.gsi < 0 || setup_gsi.gsi >= nr_irqs_gsi )
             break;
+
+        ret = xsm_resource_setup_gsi(setup_gsi.gsi);
+        if ( ret )
+            break;
+
         ret = mp_register_gsi(setup_gsi.gsi, setup_gsi.triggering,
                               setup_gsi.polarity);
         break; 

@@ -45,6 +45,11 @@ class xen
 	debug
 	getcpuinfo
 	heap
+	pm_op
+	mca_op
+	lockprof
+	cpupool_op
+	sched_op
 }
 
 class domain
@@ -77,6 +82,9 @@ class domain
 	setextvcpucontext
 	getvcpuextstate
 	setvcpuextstate
+	getpodtarget
+	setpodtarget
+	set_misc_info
 }
 
 class hvm
@@ -91,6 +99,9 @@ class hvm
 	bind_irq
 	cacheattr
     trackdirtyvram
+    hvmctl
+    mem_event
+    mem_sharing
 }
 
 class event
@@ -152,6 +163,9 @@ class resource
 	stat_device
 	add_device
 	remove_device
+	plug
+	unplug
+	setup
 }
 
 class security
