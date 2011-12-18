@@ -309,7 +309,7 @@ unsigned long new_vm_gid(void)
     if ( snprintf(addr, sizeof(addr), "0x%lx", virt_to_phys(buf))
          >= sizeof(addr) )
         return 0;
-    xenstore_write("data/generation-id", addr);
+    xenstore_write("hvmloader/generation-id-address", addr);
 
     gid = strtoll(xenstore_read("platform/generation-id", "0"), NULL, 0);
     *(uint64_t *)buf = gid;
