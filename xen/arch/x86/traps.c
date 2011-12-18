@@ -72,6 +72,7 @@
 #include <asm/mc146818rtc.h>
 #include <asm/hpet.h>
 #include <public/arch-x86/cpuid.h>
+#include <xsm/xsm.h>
 
 /*
  * opt_nmi: one of 'ignore', 'dom0', or 'fatal'.
@@ -1680,6 +1681,21 @@ static int admin_io_okay(
     return ioports_access_permitted(v->domain, port, port + bytes - 1);
 }
 
+static int pci_cfg_ok(struct domain *d, int write, int size)
+{
+    uint32_t machine_bdf;
+    uint16_t start, end;
+    if (!IS_PRIV(d))
+        return 0;
+
+    machine_bdf = (d->arch.pci_cf8 >> 8) & 0xFFFF;
+    start = d->arch.pci_cf8 & 0xFF;
+    end = start + size - 1;
+    if (xsm_pci_config_permission(d, machine_bdf, start, end, write))
+        return 0;
+    return 1;
+}
+
 static uint32_t guest_io_read(
     unsigned int port, unsigned int bytes,
     struct vcpu *v, struct cpu_user_regs *regs)
@@ -1726,12 +1742,13 @@ static uint32_t guest_io_read(
             size = 4;
             sub_data = v->domain->arch.pci_cf8;
         }
-        else if ( ((port & 0xfffc) == 0xcfc) && IS_PRIV(v->domain) )
+        else if ( (port & 0xfffc) == 0xcfc )
         {
             size = min(bytes, 4 - (port & 3));
             if ( size == 3 )
                 size = 2;
-            sub_data = pci_conf_read(v->domain->arch.pci_cf8, port & 3, size);
+            if ( pci_cfg_ok(v->domain, 0, size) )
+                sub_data = pci_conf_read(v->domain->arch.pci_cf8, port & 3, size);
         }
 
         if ( size == 4 )
@@ -1798,12 +1815,13 @@ static void guest_io_write(
             size = 4;
             v->domain->arch.pci_cf8 = data;
         }
-        else if ( ((port & 0xfffc) == 0xcfc) && IS_PRIV(v->domain) )
+        else if ( (port & 0xfffc) == 0xcfc )
         {
             size = min(bytes, 4 - (port & 3));
             if ( size == 3 )
                 size = 2;
-            pci_conf_write(v->domain->arch.pci_cf8, port & 3, size, data);
+            if ( pci_cfg_ok(v->domain, 1, size) )
+                pci_conf_write(v->domain->arch.pci_cf8, port & 3, size, data);
         }
 
         if ( size == 4 )

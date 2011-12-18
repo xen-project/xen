@@ -762,6 +762,29 @@ static int flask_iomem_permission(struct domain *d, uint64_t start, uint64_t end
     return security_iterate_iomem_sids(start, end, _iomem_has_perm, &data);
 }
 
+static int flask_pci_config_permission(struct domain *d, uint32_t machine_bdf, uint16_t start, uint16_t end, uint8_t access)
+{
+    u32 rsid;
+    int rc = -EPERM;
+    struct avc_audit_data ad;
+    struct domain_security_struct *ssec;
+    u32 perm = RESOURCE__USE;
+
+    rc = security_device_sid(machine_bdf, &rsid);
+    if ( rc )
+        return rc;
+
+    /* Writes to the BARs count as setup */
+    if ( access && (end >= 0x10 && start < 0x28) )
+        perm = RESOURCE__SETUP;
+
+    AVC_AUDIT_DATA_INIT(&ad, DEV);
+    ad.device = (unsigned long) machine_bdf;
+    ssec = d->ssid;
+    return avc_has_perm(ssec->sid, rsid, SECCLASS_RESOURCE, perm, &ad);
+
+}
+
 static int flask_resource_plug_core(void)
 {
     struct domain_security_struct *ssec;
@@ -1481,6 +1504,7 @@ static struct xsm_operations flask_ops = {
 
     .irq_permission = flask_irq_permission,
     .iomem_permission = flask_iomem_permission,
+    .pci_config_permission = flask_pci_config_permission,
 
     .resource_plug_core = flask_resource_plug_core,
     .resource_unplug_core = flask_resource_unplug_core,

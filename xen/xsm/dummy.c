@@ -369,6 +369,13 @@ static int dummy_iomem_permission (struct domain *d, uint64_t s, uint64_t e, uin
     return 0;
 }
 
+static int dummy_pci_config_permission (struct domain *d, uint32_t machine_bdf,
+                                        uint16_t start, uint16_t end,
+                                        uint8_t access)
+{
+    return 0;
+}
+
 #ifdef CONFIG_X86
 static int dummy_shadow_control (struct domain *d, uint32_t op)
 {
@@ -631,6 +638,7 @@ void xsm_fixup_ops (struct xsm_operations *ops)
 
     set_to_dummy_if_null(ops, irq_permission);
     set_to_dummy_if_null(ops, iomem_permission);
+    set_to_dummy_if_null(ops, pci_config_permission);
 
     set_to_dummy_if_null(ops, test_assign_device);
     set_to_dummy_if_null(ops, assign_device);

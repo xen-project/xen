@@ -14,6 +14,7 @@
 #include <xen/xmalloc.h>
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
+#include <xsm/xsm.h>
 
 #include "mmconfig.h"
 
@@ -58,11 +59,18 @@ int pci_mmcfg_read(unsigned int seg, unsigned int bus,
               unsigned int devfn, int reg, int len, u32 *value)
 {
     char __iomem *addr;
+    uint32_t mbdf;
 
     /* Why do we have this when nobody checks it. How about a BUG()!? -AK */
     if (unlikely((bus > 255) || (devfn > 255) || (reg > 4095))) {
 err:        *value = -1;
         return -EINVAL;
+    }
+
+    mbdf = (seg << 16) | (bus << 8) | devfn;
+    if (xsm_pci_config_permission(current->domain, mbdf, reg, reg + len - 1, 0)) {
+        *value = -1;
+        return -EPERM;
     }
 
     addr = pci_dev_base(seg, bus, devfn);
@@ -88,10 +96,15 @@ int pci_mmcfg_write(unsigned int seg, unsigned int bus,
                unsigned int devfn, int reg, int len, u32 value)
 {
     char __iomem *addr;
+    uint32_t mbdf;
 
     /* Why do we have this when nobody checks it. How about a BUG()!? -AK */
     if (unlikely((bus > 255) || (devfn > 255) || (reg > 4095)))
         return -EINVAL;
+
+    mbdf = (seg << 16) | (bus << 8) | devfn;
+    if (xsm_pci_config_permission(current->domain, mbdf, reg, reg + len - 1, 1))
+        return -EPERM;
 
     addr = pci_dev_base(seg, bus, devfn);
     if (!addr)

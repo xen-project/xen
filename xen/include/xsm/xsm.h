@@ -113,6 +113,7 @@ struct xsm_operations {
     int (*schedop_shutdown) (struct domain *d1, struct domain *d2);
     int (*irq_permission) (struct domain *d, int pirq, uint8_t allow);
     int (*iomem_permission) (struct domain *d, uint64_t s, uint64_t e, uint8_t allow);
+    int (*pci_config_permission) (struct domain *d, uint32_t machine_bdf, uint16_t start, uint16_t end, uint8_t access);
 
     int (*get_device_group) (uint32_t machine_bdf);
     int (*test_assign_device) (uint32_t machine_bdf);
@@ -471,6 +472,11 @@ static inline int xsm_irq_permission (struct domain *d, int pirq, uint8_t allow)
 static inline int xsm_iomem_permission (struct domain *d, uint64_t s, uint64_t e, uint8_t allow)
 {
     return xsm_call(iomem_permission(d, s, e, allow));
+}
+
+static inline int xsm_pci_config_permission (struct domain *d, uint32_t machine_bdf, uint16_t start, uint16_t end, uint8_t access)
+{
+    return xsm_call(pci_config_permission(d, machine_bdf, start, end, access));
 }
 
 static inline int xsm_get_device_group(uint32_t machine_bdf)
