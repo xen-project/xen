@@ -3517,7 +3517,7 @@ int do_mmu_update(
         {
             p2m_type_t p2mt;
 
-            rc = xsm_mmu_normal_update(d, pg_owner, req.val);
+            rc = xsm_mmu_normal_update(d, pt_owner, pg_owner, req.val);
             if ( rc )
                 break;
             rc = -EINVAL;

@@ -92,6 +92,7 @@
 #define MMU__PINPAGE                              0x00000200UL
 #define MMU__MFNLIST                              0x00000400UL
 #define MMU__MEMORYMAP                            0x00000800UL
+#define MMU__REMOTE_REMAP                         0x00001000UL
 
 #define SHADOW__DISABLE                           0x00000001UL
 #define SHADOW__ENABLE                            0x00000002UL

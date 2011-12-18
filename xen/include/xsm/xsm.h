@@ -141,8 +141,8 @@ struct xsm_operations {
     int (*getidletime) (void);
     int (*machine_memory_map) (void);
     int (*domain_memory_map) (struct domain *d);
-    int (*mmu_normal_update) (struct domain *d, struct domain *f, 
-                                                                intpte_t fpte);
+    int (*mmu_normal_update) (struct domain *d, struct domain *t,
+                              struct domain *f, intpte_t fpte);
     int (*mmu_machphys_update) (struct domain *d, unsigned long mfn);
     int (*update_va_mapping) (struct domain *d, struct domain *f, 
                                                             l1_pgentry_t pte);
@@ -593,10 +593,10 @@ static inline int xsm_domain_memory_map(struct domain *d)
     return xsm_call(domain_memory_map(d));
 }
 
-static inline int xsm_mmu_normal_update (struct domain *d, struct domain *f, 
-                                                                intpte_t fpte)
+static inline int xsm_mmu_normal_update (struct domain *d, struct domain *t,
+                                         struct domain *f, intpte_t fpte)
 {
-    return xsm_call(mmu_normal_update(d, f, fpte));
+    return xsm_call(mmu_normal_update(d, t, f, fpte));
 }
 
 static inline int xsm_mmu_machphys_update (struct domain *d, unsigned long mfn)

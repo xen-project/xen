@@ -399,8 +399,8 @@ static int dummy_domain_memory_map (struct domain *d)
     return 0;
 }
 
-static int dummy_mmu_normal_update (struct domain *d, struct domain *f, 
-                                                                intpte_t fpte)
+static int dummy_mmu_normal_update (struct domain *d, struct domain *t,
+                                    struct domain *f, intpte_t fpte)
 {
     return 0;
 }

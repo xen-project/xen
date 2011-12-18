@@ -1008,14 +1008,19 @@ static int flask_domain_memory_map(struct domain *d)
     return domain_has_perm(current->domain, d, SECCLASS_MMU, MMU__MEMORYMAP);
 }
 
-static int flask_mmu_normal_update(struct domain *d, struct domain *f, 
-                                   intpte_t fpte)
+static int flask_mmu_normal_update(struct domain *d, struct domain *t,
+                                   struct domain *f, intpte_t fpte)
 {
     int rc = 0;
     u32 map_perms = MMU__MAP_READ;
     unsigned long fmfn;
     struct domain_security_struct *dsec;
     u32 fsid;
+
+    if (d != t)
+        rc = domain_has_perm(d, t, SECCLASS_MMU, MMU__REMOTE_REMAP);
+    if ( rc )
+        return rc;
 
     if ( !(l1e_get_flags(l1e_from_intpte(fpte)) & _PAGE_PRESENT) )
         return 0;
