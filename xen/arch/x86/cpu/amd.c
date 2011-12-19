@@ -186,7 +186,7 @@ static void __devinit set_cpuidmask(const struct cpuinfo_x86 *c)
  * Check for the presence of an AMD erratum. Arguments are defined in amd.h 
  * for each known erratum. Return 1 if erratum is found.
  */
-int cpu_has_amd_erratum(const struct cpuinfo_x86 *cpu, int osvw, ...) 
+int cpu_has_amd_erratum(const struct cpuinfo_x86 *cpu, int osvw_id, ...)
 {
 	va_list ap;
 	u32 range;
@@ -195,27 +195,24 @@ int cpu_has_amd_erratum(const struct cpuinfo_x86 *cpu, int osvw, ...)
 	if (cpu->x86_vendor != X86_VENDOR_AMD)
 		return 0;
 
-	va_start(ap, osvw);
+	if (osvw_id >= 0 && cpu_has(cpu, X86_FEATURE_OSVW)) {
+		u64 osvw_len;
 
-	if (osvw) {
-		u16 osvw_id = va_arg(ap, int);
+		rdmsrl(MSR_AMD_OSVW_ID_LENGTH, osvw_len);
 
-		if (cpu_has(cpu, X86_FEATURE_OSVW)) {
-			u64 osvw_len;
-			rdmsrl(MSR_AMD_OSVW_ID_LENGTH, osvw_len);
+		if (osvw_id < osvw_len) {
+			u64 osvw_bits;
 
-			if (osvw_id < osvw_len) {
-				u64 osvw_bits;
-				rdmsrl(MSR_AMD_OSVW_STATUS + (osvw_id >> 6), 
-				       osvw_bits);
+			rdmsrl(MSR_AMD_OSVW_STATUS + (osvw_id >> 6),
+			       osvw_bits);
 
-				va_end(ap);
-				return (osvw_bits >> (osvw_id & 0x3f)) & 0x01;
-			}
+			return (osvw_bits >> (osvw_id & 0x3f)) & 1;
 		}
 	}
 
 	/* OSVW unavailable or ID unknown, match family-model-stepping range */
+	va_start(ap, osvw_id);
+
 	ms = (cpu->x86_model << 4) | cpu->x86_mask;
 	while ((range = va_arg(ap, int))) {
 		if ((cpu->x86 == AMD_MODEL_RANGE_FAMILY(range)) &&

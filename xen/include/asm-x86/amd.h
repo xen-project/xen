@@ -119,8 +119,8 @@
  *   
  */
 
-#define AMD_LEGACY_ERRATUM(...)         0 /* legacy */, __VA_ARGS__, 0
-#define AMD_OSVW_ERRATUM(osvw_id, ...)  1 /* osvw */, osvw_id, __VA_ARGS__, 0
+#define AMD_LEGACY_ERRATUM(...)         -1 /* legacy */, __VA_ARGS__, 0
+#define AMD_OSVW_ERRATUM(osvw_id, ...)  osvw_id, __VA_ARGS__, 0
 #define AMD_MODEL_RANGE(f, m_start, s_start, m_end, s_end)              \
     ((f << 24) | (m_start << 16) | (s_start << 12) | (m_end << 4) | (s_end))
 #define AMD_MODEL_RANGE_FAMILY(range)   (((range) >> 24) & 0xff)
