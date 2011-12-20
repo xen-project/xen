@@ -606,7 +606,7 @@ out:
 int libxl__domain_save_device_model(libxl__gc *gc, uint32_t domid, int fd)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
-    int fd2, c;
+    int ret, fd2 = -1, c;
     char buf[1024];
     const char *filename = libxl__device_model_savefile(gc, domid);
     struct stat st;
@@ -631,8 +631,11 @@ int libxl__domain_save_device_model(libxl__gc *gc, uint32_t domid, int fd)
             return ERROR_FAIL;
         }
         /* Save DM state into fd2 */
-        if (libxl__qmp_migrate(gc, domid, fd2))
-            return ERROR_FAIL;
+        ret = libxl__qmp_migrate(gc, domid, fd2);
+        if (ret)
+            goto out;
+        close(fd2);
+        fd2 = -1;
         break;
     default:
         return ERROR_INVAL;
@@ -641,37 +644,45 @@ int libxl__domain_save_device_model(libxl__gc *gc, uint32_t domid, int fd)
     if (stat(filename, &st) < 0)
     {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Unable to stat qemu save file\n");
-        return ERROR_FAIL;
+        ret = ERROR_FAIL;
+        goto out;
     }
 
     qemu_state_len = st.st_size;
     LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Qemu state is %d bytes\n", qemu_state_len);
 
-    c = libxl_write_exactly(ctx, fd, QEMU_SIGNATURE, strlen(QEMU_SIGNATURE),
-                            "saved-state file", "qemu signature");
-    if (c)
-        return c;
+    ret = libxl_write_exactly(ctx, fd, QEMU_SIGNATURE, strlen(QEMU_SIGNATURE),
+                              "saved-state file", "qemu signature");
+    if (ret)
+        goto out;
 
-    c = libxl_write_exactly(ctx, fd, &qemu_state_len, sizeof(qemu_state_len),
+    ret = libxl_write_exactly(ctx, fd, &qemu_state_len, sizeof(qemu_state_len),
                             "saved-state file", "saved-state length");
-    if (c)
-        return c;
+    if (ret)
+        goto out;
 
     fd2 = open(filename, O_RDONLY);
+    if (fd2 < 0) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Unable to open qemu save file\n");
+        goto out;
+    }
     while ((c = read(fd2, buf, sizeof(buf))) != 0) {
         if (c < 0) {
             if (errno == EINTR)
                 continue;
-            return errno;
+            ret = errno;
+            goto out;
         }
-        c = libxl_write_exactly(
+        ret = libxl_write_exactly(
             ctx, fd, buf, c, "saved-state file", "qemu state");
-        if (c)
-            return c;
+        if (ret)
+            goto out;
     }
-    close(fd2);
+    ret = 0;
+out:
+    if (fd2 >= 0) close(fd2);
     unlink(filename);
-    return 0;
+    return ret;
 }
 
 char *libxl__uuid2string(libxl__gc *gc, const libxl_uuid uuid)
