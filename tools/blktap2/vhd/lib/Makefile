@@ -23,6 +23,10 @@ ifeq ($(CONFIG_Linux),y)
 LIBS            := -luuid
 endif
 
+ifeq ($(CONFIG_LIBICONV),y)
+LIBS            += -liconv
+endif
+
 LIB-SRCS        := libvhd.c
 LIB-SRCS        += libvhd-journal.c
 LIB-SRCS        += vhd-util-coalesce.c
