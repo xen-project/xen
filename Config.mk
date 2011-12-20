@@ -181,6 +181,11 @@ CHECK_INCLUDES = $(EXTRA_INCLUDES) $(PREPEND_INCLUDES) $(APPEND_INCLUDES)
 EMBEDDED_EXTRA_CFLAGS := -nopie -fno-stack-protector -fno-stack-protector-all
 EMBEDDED_EXTRA_CFLAGS += -fno-exceptions
 
+CONFIG_LIBICONV   := $(shell export OS="`uname -s`"; \
+                       export CHECK_LIB="$(CHECK_LIB)"; \
+                       . $(XEN_ROOT)/tools/check/funcs.sh; \
+                       has_lib libiconv.so && echo 'y' || echo 'n')
+
 # Enable XSM security module (by default, Flask).
 XSM_ENABLE ?= n
 FLASK_ENABLE ?= $(XSM_ENABLE)
