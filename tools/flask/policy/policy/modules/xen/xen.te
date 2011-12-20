@@ -1,21 +1,47 @@
+################################################################################
+#
+# Attributes for types
+#
+# An attribute may be used in a rule as shorthand for all types with that
+# attribute.
+#
+################################################################################
 attribute xen_type;
 attribute domain_type;
 attribute resource_type;
 attribute event_type;
 attribute mls_priv;
 
+################################################################################
+#
+# Types for the initial SIDs
+#
+# These types are used internally for objects created during Xen startup or for
+# devices that have not yet been labeled
+#
+################################################################################
+
+# The hypervisor itself
 type xen_t, xen_type, domain_type, mls_priv;
 
+# Domain 0
 type dom0_t, domain_type, mls_priv;
 
+# Untracked I/O memory (pseudo-domain)
 type domio_t, domain_type;
 
+# Xen heap (pseudo-domain)
 type domxen_t, domain_type;
 
+# Unlabeled objects
 type unlabeled_t, domain_type;
 
+# The XSM/FLASK security server
 type security_t, domain_type;
 
+# Unlabeled device resources
+# Note: don't allow access to these types directly; see below for how to label
+#       devices and use that label for allow rules
 type irq_t, resource_type;
 type ioport_t, resource_type;
 type iomem_t, resource_type;
@@ -23,119 +49,115 @@ type device_t, resource_type;
 
 ################################################################################
 #
-# Boot the hypervisor and dom0
+# Rules required to boot the hypervisor and dom0
 #
 ################################################################################
-allow dom0_t xen_t:xen {kexec readapic writeapic mtrr_read mtrr_add mtrr_del 
-scheduler physinfo heap quirk readconsole writeconsole settime microcode};
+allow xen_t dom0_t:domain { create };
 
-allow dom0_t domio_t:mmu {map_read map_write};
-allow dom0_t iomem_t:mmu {map_read map_write};
-allow dom0_t xen_t:mmu {memorymap};
+allow dom0_t xen_t:xen { kexec readapic writeapic mtrr_read mtrr_add mtrr_del
+	scheduler physinfo heap quirk readconsole writeconsole settime
+	microcode cpupool_op sched_op };
+allow dom0_t xen_t:mmu { memorymap };
+allow dom0_t security_t:security { check_context compute_av compute_create
+	compute_member load_policy compute_relabel compute_user setenforce
+	setbool setsecparam add_ocontext del_ocontext };
 
-allow dom0_t dom0_t:mmu {pinpage map_read map_write adjust updatemp};
-allow dom0_t dom0_t:grant {query setup};
-allow dom0_t dom0_t:domain {scheduler getdomaininfo getvcpuinfo getvcpuaffinity};
-
-allow xen_t dom0_t:domain {create};
-allow xen_t dom0_t:resource {add remove};
-allow xen_t ioport_t:resource {add_ioport remove_ioport};
-allow dom0_t ioport_t:resource {use};
-allow xen_t iomem_t:resource {add_iomem remove_iomem};
-allow dom0_t iomem_t:resource {use};
-allow xen_t irq_t:resource {add_irq remove_irq};
-allow dom0_t irq_t:resource { add_irq remove_irq use};
+allow dom0_t dom0_t:domain { getdomaininfo getvcpuinfo getvcpuaffinity };
+allow dom0_t dom0_t:grant { query setup };
+allow dom0_t dom0_t:mmu { adjust physmap map_read map_write stat pinpage };
 allow dom0_t dom0_t:resource { add remove };
-allow dom0_t xen_t:xen firmware;
 
-allow dom0_t security_t:security {compute_av compute_create compute_member 
-check_context load_policy compute_relabel compute_user setenforce setbool
-setsecparam add_ocontext del_ocontext};
+admin_device(dom0_t, device_t)
+admin_device(dom0_t, irq_t)
+admin_device(dom0_t, ioport_t)
+admin_device(dom0_t, iomem_t)
+allow dom0_t domio_t:mmu { map_read map_write };
 
-create_channel(dom0_t, dom0_t, evchn0-0_t)
-allow dom0_t evchn0-0_t:event {send};
+domain_self_comms(dom0_t)
 
-################################################################################
-#
-# Create and manage a domU w/ dom0 IO
-#
-################################################################################
-create_pv_dom(dom0_t, domU_t, evchnU-0_t, domio_t)
-
-create_channel(domU_t, domU_t, evchnU-U_t)
-allow domU_t evchnU-U_t:event {send};
-
-create_channel(dom0_t, domU_t, evchn0-U_t)
-allow dom0_t evchn0-U_t:event {send};
-
-create_channel(domU_t, dom0_t, evchnU-0_t)
-allow domU_t evchnU-0_t:event {send};
-
-allow dom0_t dom0_t:event {send};
-allow dom0_t domU_t:grant {copy};
-allow domU_t domU_t:grant {copy};
+auditallow dom0_t security_t:security { load_policy setenforce };
 
 ###############################################################################
 #
-# Create device labels
+# Domain creation
 #
 ###############################################################################
 
-# create device resources
-#create_passthrough_resource(dom0_t, domU_t, nicP_t)
-#create_hvm_resource(dom0_t, domHU_t, nicP_t)
+declare_domain(domU_t)
+domain_self_comms(domU_t)
+create_domain(dom0_t, domU_t)
+domain_comms(dom0_t, domU_t)
+
+declare_domain(isolated_domU_t)
+create_domain(dom0_t, isolated_domU_t)
+domain_comms(dom0_t, isolated_domU_t)
+
+###############################################################################
+#
+# Device delegation
+#
+###############################################################################
+
+type nic_dev_t, resource_type;
+
+admin_device(dom0_t, nic_dev_t)
+use_device(domU_t, nic_dev_t)
+
+delegate_devices(dom0_t, domU_t)
+
+###############################################################################
+#
+# Label devices for delegation
+#
+# The PCI, IRQ, memory, and I/O port ranges are hardware-specific.
+# You may also use flask-label-pci to dynamically label devices on each boot.
+#
+###############################################################################
 
 # label e1000e nic
-#pirqcon 33 system_u:object_r:nicP_t
-#pirqcon 55 system_u:object_r:nicP_t
-#iomemcon 0xfebe0-0xfebff system_u:object_r:nicP_t
-#iomemcon 0xfebd9 system_u:object_r:nicP_t
-#ioportcon 0xecc0-0xecdf system_u:object_r:nicP_t
-#pcidevicecon 0xc800 system_u:object_r:nicP_t
+#pirqcon 33 system_u:object_r:nic_dev_t
+#pirqcon 55 system_u:object_r:nic_dev_t
+#iomemcon 0xfebe0-0xfebff system_u:object_r:nic_dev_t
+#iomemcon 0xfebd9 system_u:object_r:nic_dev_t
+#ioportcon 0xecc0-0xecdf system_u:object_r:nic_dev_t
+#pcidevicecon 0xc800 system_u:object_r:nic_dev_t
 
 # label e100 nic
-#pirqcon 16 system_u:object_r:nicP_t
-#iomemcon 0xfe5df system_u:object_r:nicP_t
-#iomemcon 0xfe5e0-0xfe5ff system_u:object_r:nicP_t
-#iomemcon 0xc2000-0xc200f system_u:object_r:nicP_t
-#ioportcon 0xccc0-0xcd00 system_u:object_r:nicP_t
+#pirqcon 16 system_u:object_r:nic_dev_t
+#iomemcon 0xfe5df system_u:object_r:nic_dev_t
+#iomemcon 0xfe5e0-0xfe5ff system_u:object_r:nic_dev_t
+#iomemcon 0xc2000-0xc200f system_u:object_r:nic_dev_t
+#ioportcon 0xccc0-0xcd00 system_u:object_r:nic_dev_t
 
 # label usb 1d.0-2 1d.7
-#pirqcon 23 system_u:object_r:nicP_t
-#pirqcon 17 system_u:object_r:nicP_t
-#pirqcon 18 system_u:object_r:nicP_t
-#ioportcon 0xff80-0xFF9F system_u:object_r:nicP_t
-#ioportcon 0xff60-0xff7f system_u:object_r:nicP_t
-#ioportcon 0xff40-0xff5f system_u:object_r:nicP_t
-#iomemcon 0xff980 system_u:object_r:nicP_t
-#ioportcon 0xff00-0xff1f system_u:object_r:nicP_t
-
-manage_domain(dom0_t, domU_t)
+#pirqcon 23 system_u:object_r:nic_dev_t
+#pirqcon 17 system_u:object_r:nic_dev_t
+#pirqcon 18 system_u:object_r:nic_dev_t
+#ioportcon 0xff80-0xFF9F system_u:object_r:nic_dev_t
+#ioportcon 0xff60-0xff7f system_u:object_r:nic_dev_t
+#ioportcon 0xff40-0xff5f system_u:object_r:nic_dev_t
+#iomemcon 0xff980 system_u:object_r:nic_dev_t
+#ioportcon 0xff00-0xff1f system_u:object_r:nic_dev_t
 
 ################################################################################
 #
-# Create and manage an HVM domU w/ dom0 IO
+# Constraints
 #
 ################################################################################
-create_hvm_dom(dom0_t, domHU_t, evchnHU-0_t)
-allow dom0_t evchn0-HU_t:event {send};
 
-create_channel(domHU_t, domHU_t, evchnHU-HU_t)
-allow domHU_t evchnU-U_t:event {send};
+# Domains must be declared using domain_type
+neverallow * ~domain_type:domain create;
 
-create_channel(dom0_t, domHU_t, evchn0-HU_t)
-allow dom0_t evchn0-U_t:event {send};
+# Resources must be declared using resource_type
+neverallow * ~resource_type:resource use;
 
-create_channel(domHU_t, dom0_t, evchnHU-0_t)
-allow domHU_t evchnU-0_t:event {send};
-
-allow dom0_t dom0_t:event {send};
-
-manage_domain(dom0_t, domHU_t)
+# Events must use event_type (see create_channel for a template)
+neverallow ~event_type *:event bind;
+neverallow * ~event_type:event { create send status };
 
 ################################################################################
 #
-#
+# Labels for initial SIDs and system role
 #
 ################################################################################
 sid xen gen_context(system_u:system_r:xen_t,s0)
