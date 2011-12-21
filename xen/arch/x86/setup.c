@@ -486,7 +486,7 @@ static void __init kexec_reserve_area(struct e820map *e820)
 {
     unsigned long kdump_start = kexec_crash_area.start;
     unsigned long kdump_size  = kexec_crash_area.size;
-    static int is_reserved = 0;
+    static bool_t __initdata is_reserved = 0;
 
     kdump_size = (kdump_size + PAGE_SIZE - 1) & PAGE_MASK;
 
@@ -1330,7 +1330,7 @@ void __init __start_xen(unsigned long mbi_p)
     cmdline = (char *)(mod[0].string ? __va(mod[0].string) : NULL);
     if ( (cmdline != NULL) || (kextra != NULL) )
     {
-        static char dom0_cmdline[MAX_GUEST_CMDLINE];
+        static char __initdata dom0_cmdline[MAX_GUEST_CMDLINE];
 
         cmdline = cmdline_cook(cmdline, loader);
         safe_strcpy(dom0_cmdline, cmdline);
@@ -1430,7 +1430,7 @@ int __init xen_in_range(unsigned long mfn)
     enum { region_s3, region_text, region_bss, nr_regions };
     static struct {
         paddr_t s, e;
-    } xen_regions[nr_regions];
+    } xen_regions[nr_regions] __initdata;
 
     /* initialize first time */
     if ( !xen_regions[0].s )
