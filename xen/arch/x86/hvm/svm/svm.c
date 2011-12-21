@@ -63,6 +63,8 @@
 #include <asm/debugger.h>
 #include <asm/xstate.h>
 
+void svm_asm_do_resume(void);
+
 u32 svm_feature_flags;
 
 /* Indicates whether guests may use EFER.LMSLE. */

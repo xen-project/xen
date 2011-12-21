@@ -508,7 +508,7 @@ static void __init kexec_reserve_area(struct e820map *e820)
     }
 }
 
-void init_done(void)
+static void noinline init_done(void)
 {
     /* Free (or page-protect) the init areas. */
     memset(__init_begin, 0xcc, __init_end - __init_begin); /* int3 poison */

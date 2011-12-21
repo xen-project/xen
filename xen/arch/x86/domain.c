@@ -74,17 +74,6 @@ static void paravirt_ctxt_switch_to(struct vcpu *v);
 
 static void vcpu_destroy_pagetables(struct vcpu *v);
 
-static void continue_idle_domain(struct vcpu *v)
-{
-    reset_stack_and_jump(idle_loop);
-}
-
-static void continue_nonidle_domain(struct vcpu *v)
-{
-    check_wakeup_from_wait();
-    reset_stack_and_jump(ret_from_intr);
-}
-
 static void default_idle(void)
 {
     local_irq_disable();
@@ -118,7 +107,7 @@ static void play_dead(void)
     (*dead_idle)();
 }
 
-void idle_loop(void)
+static void idle_loop(void)
 {
     for ( ; ; )
     {
@@ -139,6 +128,17 @@ void startup_cpu_idle_loop(void)
     cpumask_set_cpu(v->processor, v->vcpu_dirty_cpumask);
 
     reset_stack_and_jump(idle_loop);
+}
+
+static void continue_idle_domain(struct vcpu *v)
+{
+    reset_stack_and_jump(idle_loop);
+}
+
+static void continue_nonidle_domain(struct vcpu *v)
+{
+    check_wakeup_from_wait();
+    reset_stack_and_jump(ret_from_intr);
 }
 
 void dump_pageframe_info(struct domain *d)

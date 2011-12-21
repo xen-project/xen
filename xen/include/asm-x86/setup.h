@@ -7,8 +7,6 @@
 extern bool_t early_boot;
 extern unsigned long xenheap_initial_phys_start;
 
-void init_done(void);
-
 void early_cpu_init(void);
 void early_time_init(void);
 void early_page_fault(void);

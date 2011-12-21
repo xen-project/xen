@@ -8,6 +8,10 @@
 #endif
 #include <asm/processor.h>
 
+#ifndef __ASSEMBLY__
+void ret_from_intr(void);
+#endif
+
 #ifdef __x86_64__
 #include <asm/x86_64/asm_defns.h>
 #else

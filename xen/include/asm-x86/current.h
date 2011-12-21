@@ -56,8 +56,8 @@ static inline struct cpu_info *get_cpu_info(void)
 
 #define reset_stack_and_jump(__fn)              \
     __asm__ __volatile__ (                      \
-        "mov %0,%%"__OP"sp; jmp "STR(__fn)      \
-        : : "r" (guest_cpu_user_regs()) : "memory" )
+        "mov %0,%%"__OP"sp; jmp %c1"            \
+        : : "r" (guest_cpu_user_regs()), "i" (__fn) : "memory" )
 
 #define schedule_tail(vcpu) (((vcpu)->arch.schedule_tail)(vcpu))
 
