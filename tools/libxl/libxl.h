@@ -222,6 +222,7 @@ enum {
     ERROR_BADFAIL = -7,
     ERROR_GUEST_TIMEDOUT = -8,
     ERROR_TIMEDOUT = -9,
+    ERROR_NOPARAVIRT = -10,
 };
 
 #define LIBXL_VERSION 0

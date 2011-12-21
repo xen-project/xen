@@ -603,11 +603,8 @@ static int libxl__domain_pvcontrol(libxl__gc *gc, uint32_t domid,
     if (ret < 0)
         return ret;
 
-    if (!ret) {
-        LIBXL__LOG(CTX, LIBXL__LOG_ERROR,
-                   "PV control interface not available\n");
-        return ERROR_FAIL;
-    }
+    if (!ret)
+        return ERROR_NOPARAVIRT;
 
     return libxl__domain_pvcontrol_write(gc, XBT_NULL, domid, cmd);
 }

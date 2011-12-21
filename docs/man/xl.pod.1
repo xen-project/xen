@@ -360,7 +360,11 @@ Reboot a domain.  This acts just as if the domain had the B<reboot>
 command run from the console.  The command returns as soon as it has
 executed the reboot action, which may be significantly before the
 domain actually reboots.
-It requires PV drivers installed in your guest OS.
+
+For HVM domains this requires PV drivers to be installed in your guest
+OS. If PV drivers are not present but you have configured the guest OS
+to behave appropriately you may be able to use the I<button-press>
+subcommand to trigger a power button press.
 
 The behavior of what happens to a domain when it reboots is set by the
 B<on_reboot> parameter of the domain configuration file when the
@@ -412,9 +416,15 @@ Leave domain running after creating the snapshot.
 Gracefully shuts down a domain.  This coordinates with the domain OS
 to perform graceful shutdown, so there is no guarantee that it will
 succeed, and may take a variable length of time depending on what
-services must be shutdown in the domain.  The command returns
-immediately after signally the domain unless that B<-w> flag is used.
-For HVM domains it requires PV drivers to be installed in your guest OS.
+services must be shutdown in the domain.
+
+For HVM domains this requires PV drivers to be installed in your guest
+OS. If PV drivers are not present but you have configured the guest OS
+to behave appropriately you may be able to use the I<button-press>
+subcommand to trigger a power button press.
+
+The command returns immediately after signally the domain unless that
+B<-w> flag is used.
 
 The behavior of what happens to a domain when it reboots is set by the
 B<on_shutdown> parameter of the domain configuration file when the

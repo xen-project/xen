@@ -2266,7 +2266,15 @@ static void shutdown_domain(const char *p, int wait)
 
     find_domain(p);
     rc=libxl_domain_shutdown(ctx, domid);
-    if (rc) { fprintf(stderr,"shutdown failed (rc=%d)\n",rc);exit(-1); }
+    if (rc) {
+        if (rc == ERROR_NOPARAVIRT) {
+            fprintf(stderr, "PV control interface not available:"
+                    " external graceful shutdown not possible.\n");
+            fprintf(stderr, "Use \"xl button-press <dom> power\" or"
+                    " \"xl destroy <dom>\".\n");
+        }
+        fprintf(stderr,"shutdown failed (rc=%d)\n",rc);exit(-1);
+    }
 
     if (wait) {
         libxl_waiter waiter;
@@ -2308,7 +2316,14 @@ static void reboot_domain(const char *p)
     int rc;
     find_domain(p);
     rc=libxl_domain_reboot(ctx, domid);
-    if (rc) { fprintf(stderr,"reboot failed (rc=%d)\n",rc);exit(-1); }
+    if (rc) {
+        if (rc == ERROR_NOPARAVIRT) {
+            fprintf(stderr, "PV control interface not available:"
+                    " external graceful reboot not possible.\n");
+            fprintf(stderr, "Use \"xl button-press <dom> power\" or"
+                    " \"xl destroy <dom>\".\n");
+        }
+        fprintf(stderr,"reboot failed (rc=%d)\n",rc);exit(-1); }
 }
 
 static void list_domains_details(const libxl_dominfo *info, int nb_domain)
