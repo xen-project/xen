@@ -594,38 +594,38 @@ int libxl__domain_pvcontrol_write(libxl__gc *gc, xs_transaction_t t,
     return libxl__xs_write(gc, t, shutdown_path, "%s", cmd);
 }
 
-static char *req_table[] = {
-    [0] = "poweroff",
-    [1] = "reboot",
-    [2] = "suspend",
-    [3] = "crash",
-    [4] = "halt",
-};
-
-int libxl_domain_shutdown(libxl_ctx *ctx, uint32_t domid, int req)
+static int libxl__domain_pvcontrol(libxl__gc *gc, uint32_t domid,
+                                   const char *cmd)
 {
-    GC_INIT(ctx);
     int ret;
-
-    if (req > ARRAY_SIZE(req_table)) {
-        GC_FREE;
-        return ERROR_INVAL;
-    }
 
     ret = libxl__domain_pvcontrol_available(gc, domid);
     if (ret < 0)
-        goto out;
+        return ret;
 
     if (!ret) {
-        LIBXL__LOG(CTX, LIBXL__LOG_ERROR, "PV shutdown control not available:"
-                   " graceful shutdown not possible, use destroy");
-        ret = ERROR_FAIL;
-        goto out;
+        LIBXL__LOG(CTX, LIBXL__LOG_ERROR,
+                   "PV control interface not available\n");
+        return ERROR_FAIL;
     }
 
-    ret = libxl__domain_pvcontrol_write(gc, XBT_NULL, domid, req_table[req]);
+    return libxl__domain_pvcontrol_write(gc, XBT_NULL, domid, cmd);
+}
 
-out:
+int libxl_domain_shutdown(libxl_ctx *ctx, uint32_t domid)
+{
+    GC_INIT(ctx);
+    int ret;
+    ret = libxl__domain_pvcontrol(gc, domid, "poweroff");
+    GC_FREE;
+    return ret;
+}
+
+int libxl_domain_reboot(libxl_ctx *ctx, uint32_t domid)
+{
+    GC_INIT(ctx);
+    int ret;
+    ret = libxl__domain_pvcontrol(gc, domid, "reboot");
     GC_FREE;
     return ret;
 }

@@ -424,11 +424,24 @@ static PyObject *pyxl_domid_to_name(XlObject *self, PyObject *args)
 
 static PyObject *pyxl_domain_shutdown(XlObject *self, PyObject *args)
 {
-    int domid, req = 0;
-    if ( !PyArg_ParseTuple(args, "i|i", &domid, &req) )
+    int domid;
+    if ( !PyArg_ParseTuple(args, "i", &domid) )
         return NULL;
-    if ( libxl_domain_shutdown(self->ctx, domid, req) ) {
+    if ( libxl_domain_shutdown(self->ctx, domid) ) {
         PyErr_SetString(xl_error_obj, "cannot shutdown domain");
+        return NULL;
+    }
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject *pyxl_domain_reboot(XlObject *self, PyObject *args)
+{
+    int domid;
+    if ( !PyArg_ParseTuple(args, "i", &domid) )
+        return NULL;
+    if ( libxl_domain_reboot(self->ctx, domid) ) {
+        PyErr_SetString(xl_error_obj, "cannot reboot domain");
         return NULL;
     }
     Py_INCREF(Py_None);
@@ -637,6 +650,8 @@ static PyMethodDef pyxl_methods[] = {
          "Retrieve name from domain-id"},
     {"domain_shutdown", (PyCFunction)pyxl_domain_shutdown, METH_VARARGS,
          "Shutdown a domain"},
+    {"domain_reboot", (PyCFunction)pyxl_domain_reboot, METH_VARARGS,
+         "Reboot a domain"},
     {"domain_destroy", (PyCFunction)pyxl_domain_destroy, METH_VARARGS,
          "Destroy a domain"},
     {"domain_pause", (PyCFunction)pyxl_domain_pause, METH_VARARGS,
