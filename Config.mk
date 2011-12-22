@@ -207,9 +207,9 @@ endif
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 54e24021005458ad0a361c1d83011b751726a94b
-# Thu Dec 8 16:38:06 2011 +0000
-# qemu_get_timer: Provide a comment about the behaviour on ts==NULL
+QEMU_TAG ?= 56d7747a3cf811910c4cf865e1ebcb8b82502005
+# Thu Dec 22 14:46:31 2011 +0000
+# qemu: clean up MSI-X table handling
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
