@@ -42,6 +42,7 @@
 #include <asm/msr.h>
 #include <asm/mtrr.h>
 #include <asm/time.h>
+#include <asm/tboot.h>
 #include <mach_apic.h>
 #include <mach_wakecpu.h>
 #include <smpboot_hooks.h>
@@ -462,6 +463,18 @@ static int wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
             udelay(100);
             send_status = apic_read(APIC_ICR) & APIC_ICR_BUSY;
         } while ( send_status && (timeout++ < 1000) );
+    }
+    else if ( tboot_in_measured_env() )
+    {
+        /*
+         * With tboot AP is actually spinning in a mini-guest before 
+         * receiving INIT. Upon receiving INIT ipi, AP need time to VMExit, 
+         * update VMCS to tracking SIPIs and VMResume.
+         *
+         * While AP is in root mode handling the INIT the CPU will drop
+         * any SIPIs
+         */
+        udelay(10);
     }
 
     /*
