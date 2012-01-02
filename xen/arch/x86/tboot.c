@@ -110,7 +110,8 @@ void __init tboot_probe(void)
 
     /* new tboot_shared (w/ GAS support, integrity, etc.) is not backwards
        compatible */
-    if ( tboot_shared->version < 4 ) {
+    if ( tboot_shared->version < 4 )
+    {
         printk("unsupported version of tboot (%u)\n", tboot_shared->version);
         return;
     }
@@ -188,8 +189,10 @@ static void update_pagetable_mac(vmac_ctx_t *ctx)
 
         if ( !mfn_valid(mfn) )
             continue;
-        if ( is_page_in_use(page) && !is_xen_heap_page(page) ) {
-            if ( page->count_info & PGC_page_table ) {
+        if ( is_page_in_use(page) && !is_xen_heap_page(page) )
+        {
+            if ( page->count_info & PGC_page_table )
+            {
                 void *pg = map_domain_page(mfn);
                 vmac_update(pg, PAGE_SIZE, ctx);
                 unmap_domain_page(pg);
@@ -283,7 +286,8 @@ static void tboot_gen_xenheap_integrity(const uint8_t key[TB_KEY_SIZE],
                               + 3 * PAGE_SIZE)) )
             continue; /* skip tboot and its page tables */
 
-        if ( is_page_in_use(page) && is_xen_heap_page(page) ) {
+        if ( is_page_in_use(page) && is_xen_heap_page(page) )
+        {
             void *pg;
 
             if ( mfn_in_guarded_stack(mfn) )
@@ -344,14 +348,16 @@ void tboot_shutdown(uint32_t shutdown_type)
 
     err = map_pages_to_xen(map_base << PAGE_SHIFT, map_base, map_size,
                            __PAGE_HYPERVISOR);
-    if ( err != 0 ) {
+    if ( err != 0 )
+    {
         printk("error (0x%x) mapping tboot pages (mfns) @ 0x%x, 0x%x\n", err,
                map_base, map_size);
         return;
     }
 
     /* if this is S3 then set regions to MAC */
-    if ( shutdown_type == TB_SHUTDOWN_S3 ) {
+    if ( shutdown_type == TB_SHUTDOWN_S3 )
+    {
         /*
          * Xen regions for tboot to MAC
          */
@@ -400,26 +406,25 @@ int __init tboot_protect_mem_regions(void)
     /* TXT Heap */
     if ( txt_heap_base == 0 )
         return 0;
-    rc = e820_change_range_type(
-        &e820, txt_heap_base, txt_heap_base + txt_heap_size,
-        E820_RESERVED, E820_UNUSABLE);
+    rc = e820_change_range_type(&e820, txt_heap_base,
+                                txt_heap_base + txt_heap_size,
+                                E820_RESERVED, E820_UNUSABLE);
     if ( !rc )
         return 0;
 
     /* SINIT */
     if ( sinit_base == 0 )
         return 0;
-    rc = e820_change_range_type(
-        &e820, sinit_base, sinit_base + sinit_size,
-        E820_RESERVED, E820_UNUSABLE);
+    rc = e820_change_range_type(&e820, sinit_base,
+                                sinit_base + sinit_size,
+                                E820_RESERVED, E820_UNUSABLE);
     if ( !rc )
         return 0;
 
     /* TXT Private Space */
-    rc = e820_change_range_type(
-        &e820, TXT_PRIV_CONFIG_REGS_BASE,
-        TXT_PRIV_CONFIG_REGS_BASE + NR_TXT_CONFIG_PAGES * PAGE_SIZE,
-        E820_RESERVED, E820_UNUSABLE);
+    rc = e820_change_range_type(&e820, TXT_PRIV_CONFIG_REGS_BASE,
+                 TXT_PRIV_CONFIG_REGS_BASE + NR_TXT_CONFIG_PAGES * PAGE_SIZE,
+                 E820_RESERVED, E820_UNUSABLE);
     if ( !rc )
         return 0;
 
@@ -435,7 +440,6 @@ int __init tboot_parse_dmar_table(acpi_table_handler dmar_handler)
     unsigned long pa;
     sinit_mle_data_t sinit_mle_data;
     unsigned char *dmar_table_raw;
-
 
     if ( !tboot_in_measured_env() )
         return acpi_table_parse(ACPI_SIG_DMAR, dmar_handler);
