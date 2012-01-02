@@ -131,6 +131,7 @@ F:	tools/libxc/ia64/*
 
 INTEL(R) TRUSTED EXECUTION TECHNOLOGY (TXT)
 M:	Joseph Cihula <joseph.cihula@intel.com>
+M:	Gang Wei <gang.wei@intel.com>
 M:	Shane Wang <shane.wang@intel.com>
 S:	Supported
 F:	xen/arch/x86/tboot.c
