@@ -359,19 +359,9 @@ static void *sedf_alloc_vdata(const struct scheduler *ops, struct vcpu *v, void 
     inf->latency     = 0;
     inf->status      = EXTRA_AWARE | SEDF_ASLEEP;
     inf->extraweight = 1;
-
-    if ( v->domain->domain_id == 0 )
-    {
-        /* Domain0 gets 75% guaranteed (15ms every 20ms). */
-        inf->period    = MILLISECS(20);
-        inf->slice     = MILLISECS(15);
-    }
-    else
-    {
-        /* Best-effort extratime only. */
-        inf->period    = WEIGHT_PERIOD;
-        inf->slice     = 0;
-    }
+    /* Upon creation all domain are best-effort. */
+    inf->period      = WEIGHT_PERIOD;
+    inf->slice       = 0;
 
     inf->period_orig = inf->period; inf->slice_orig = inf->slice;
     INIT_LIST_HEAD(&(inf->list));
