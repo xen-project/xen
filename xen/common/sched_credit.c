@@ -161,6 +161,7 @@ struct csched_dom {
  * System-wide private data
  */
 struct csched_private {
+    /* lock for the whole pluggable scheduler, nests inside cpupool_lock */
     spinlock_t lock;
     struct list_head active_sdom;
     uint32_t ncpus;
@@ -800,6 +801,10 @@ csched_dom_cntl(
     struct csched_private *prv = CSCHED_PRIV(ops);
     unsigned long flags;
 
+    /* Protect both get and put branches with the pluggable scheduler
+     * lock. Runq lock not needed anywhere in here. */
+    spin_lock_irqsave(&prv->lock, flags);
+
     if ( op->cmd == XEN_DOMCTL_SCHEDOP_getinfo )
     {
         op->u.credit.weight = sdom->weight;
@@ -808,8 +813,6 @@ csched_dom_cntl(
     else
     {
         ASSERT(op->cmd == XEN_DOMCTL_SCHEDOP_putinfo);
-
-        spin_lock_irqsave(&prv->lock, flags);
 
         if ( op->u.credit.weight != 0 )
         {
@@ -824,8 +827,9 @@ csched_dom_cntl(
         if ( op->u.credit.cap != (uint16_t)~0U )
             sdom->cap = op->u.credit.cap;
 
-        spin_unlock_irqrestore(&prv->lock, flags);
     }
+
+    spin_unlock_irqrestore(&prv->lock, flags);
 
     return 0;
 }

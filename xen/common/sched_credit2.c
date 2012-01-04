@@ -1384,6 +1384,10 @@ csched_dom_cntl(
     struct csched_private *prv = CSCHED_PRIV(ops);
     unsigned long flags;
 
+    /* Must hold csched_priv lock to read and update sdom,
+     * runq lock to update csvcs. */
+    spin_lock_irqsave(&prv->lock, flags);
+
     if ( op->cmd == XEN_DOMCTL_SCHEDOP_getinfo )
     {
         op->u.credit2.weight = sdom->weight;
@@ -1397,10 +1401,6 @@ csched_dom_cntl(
             struct list_head *iter;
             int old_weight;
 
-            /* Must hold csched_priv lock to update sdom, runq lock to
-             * update csvcs. */
-            spin_lock_irqsave(&prv->lock, flags);
-
             old_weight = sdom->weight;
 
             sdom->weight = op->u.credit2.weight;
@@ -1411,21 +1411,22 @@ csched_dom_cntl(
                 struct csched_vcpu *svc = list_entry(iter, struct csched_vcpu, sdom_elem);
 
                 /* NB: Locking order is important here.  Because we grab this lock here, we
-                 * must never lock csched_priv.lock if we're holding a runqueue
-                 * lock. */
-                vcpu_schedule_lock_irq(svc->vcpu);
+                 * must never lock csched_priv.lock if we're holding a runqueue lock.
+                 * Also, calling vcpu_schedule_lock() is enough, since IRQs have already
+                 * been disabled. */
+                vcpu_schedule_lock(svc->vcpu);
 
                 BUG_ON(svc->rqd != RQD(ops, svc->vcpu->processor));
 
                 svc->weight = sdom->weight;
                 update_max_weight(svc->rqd, svc->weight, old_weight);
 
-                vcpu_schedule_unlock_irq(svc->vcpu);
+                vcpu_schedule_unlock(svc->vcpu);
             }
-
-            spin_unlock_irqrestore(&prv->lock, flags);
         }
     }
+
+    spin_unlock_irqrestore(&prv->lock, flags);
 
     return 0;
 }

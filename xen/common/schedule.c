@@ -1005,7 +1005,6 @@ int sched_id(void)
 /* Adjust scheduling parameter for a given domain. */
 long sched_adjust(struct domain *d, struct xen_domctl_scheduler_op *op)
 {
-    struct vcpu *v;
     long ret;
     
     if ( (op->sched_id != DOM2OP(d)->sched_id) ||
@@ -1013,39 +1012,10 @@ long sched_adjust(struct domain *d, struct xen_domctl_scheduler_op *op)
           (op->cmd != XEN_DOMCTL_SCHEDOP_getinfo)) )
         return -EINVAL;
 
-    /*
-     * Most VCPUs we can simply pause. If we are adjusting this VCPU then
-     * we acquire the local schedule_lock to guard against concurrent updates.
-     *
-     * We only acquire the local schedule lock after we have paused all other
-     * VCPUs in this domain. There are two reasons for this:
-     * 1- We don't want to hold up interrupts as pausing a VCPU can
-     *    trigger a tlb shootdown.
-     * 2- Pausing other VCPUs involves briefly locking the schedule
-     *    lock of the CPU they are running on. This CPU could be the
-     *    same as ours.
-     */
-
-    for_each_vcpu ( d, v )
-    {
-        if ( v != current )
-            vcpu_pause(v);
-    }
-
-    if ( d == current->domain )
-        vcpu_schedule_lock_irq(current);
-
+    /* NB: the pluggable scheduler code needs to take care
+     * of locking by itself. */
     if ( (ret = SCHED_OP(DOM2OP(d), adjust, d, op)) == 0 )
         TRACE_1D(TRC_SCHED_ADJDOM, d->domain_id);
-
-    if ( d == current->domain )
-        vcpu_schedule_unlock_irq(current);
-
-    for_each_vcpu ( d, v )
-    {
-        if ( v != current )
-            vcpu_unpause(v);
-    }
 
     return ret;
 }

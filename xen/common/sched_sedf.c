@@ -61,6 +61,11 @@ struct sedf_dom_info {
     struct domain  *domain;
 };
 
+struct sedf_priv_info {
+    /* lock for the whole pluggable scheduler, nests inside cpupool_lock */
+    spinlock_t lock;
+};
+
 struct sedf_vcpu_info {
     struct vcpu *vcpu;
     struct list_head list;
@@ -115,6 +120,8 @@ struct sedf_cpu_info {
     s_time_t         current_slice_expires;
 };
 
+#define SEDF_PRIV(_ops) \
+    ((struct sedf_priv_info *)((_ops)->sched_data))
 #define EDOM_INFO(d)   ((struct sedf_vcpu_info *)((d)->sched_priv))
 #define CPU_INFO(cpu)  \
     ((struct sedf_cpu_info *)per_cpu(schedule_data, cpu).sched_priv)
@@ -762,6 +769,31 @@ static struct task_slice sedf_do_extra_schedule(
 }
 
 
+static int sedf_init(struct scheduler *ops)
+{
+    struct sedf_priv_info *prv;
+
+    prv = xzalloc(struct sedf_priv_info);
+    if ( prv == NULL )
+        return -ENOMEM;
+
+    ops->sched_data = prv;
+    spin_lock_init(&prv->lock);
+
+    return 0;
+}
+
+
+static void sedf_deinit(const struct scheduler *ops)
+{
+    struct sedf_priv_info *prv;
+
+    prv = SEDF_PRIV(ops);
+    if ( prv != NULL )
+        xfree(prv);
+}
+
+
 /* Main scheduling function
    Reasons for calling this function are:
    -timeslice for the current period used up
@@ -1310,22 +1342,15 @@ static void sedf_dump_cpu_state(const struct scheduler *ops, int i)
 
 
 /* Adjusts periods and slices of the domains accordingly to their weights. */
-static int sedf_adjust_weights(struct cpupool *c, struct xen_domctl_scheduler_op *cmd)
+static int sedf_adjust_weights(struct cpupool *c, int nr_cpus, int *sumw, s_time_t *sumt)
 {
     struct vcpu *p;
     struct domain      *d;
-    unsigned int        cpu, nr_cpus = cpumask_last(&cpu_online_map) + 1;
-    int                *sumw = xzalloc_array(int, nr_cpus);
-    s_time_t           *sumt = xzalloc_array(s_time_t, nr_cpus);
+    unsigned int        cpu;
 
-    if ( !sumw || !sumt )
-    {
-        xfree(sumt);
-        xfree(sumw);
-        return -ENOMEM;
-    }
-
-    /* Sum across all weights. */
+    /* Sum across all weights. Notice that no runq locking is needed
+     * here: the caller holds sedf_priv_info.lock and we're not changing
+     * anything that is accessed during scheduling. */
     rcu_read_lock(&domlist_read_lock);
     for_each_domain_in_cpupool( d, c )
     {
@@ -1355,7 +1380,9 @@ static int sedf_adjust_weights(struct cpupool *c, struct xen_domctl_scheduler_op
     }
     rcu_read_unlock(&domlist_read_lock);
 
-    /* Adjust all slices (and periods) to the new weight. */
+    /* Adjust all slices (and periods) to the new weight. Unlike above, we
+     * need to take thr runq lock for the various VCPUs: we're modyfing
+     * slice and period which are referenced during scheduling. */
     rcu_read_lock(&domlist_read_lock);
     for_each_domain_in_cpupool( d, c )
     {
@@ -1365,19 +1392,19 @@ static int sedf_adjust_weights(struct cpupool *c, struct xen_domctl_scheduler_op
                 continue;
             if ( EDOM_INFO(p)->weight )
             {
+                /* Interrupts already off */
+                vcpu_schedule_lock(p);
                 EDOM_INFO(p)->period_orig = 
                     EDOM_INFO(p)->period  = WEIGHT_PERIOD;
                 EDOM_INFO(p)->slice_orig  =
                     EDOM_INFO(p)->slice   = 
                     (EDOM_INFO(p)->weight *
                      (WEIGHT_PERIOD - WEIGHT_SAFETY - sumt[cpu])) / sumw[cpu];
+                vcpu_schedule_unlock(p);
             }
         }
     }
     rcu_read_unlock(&domlist_read_lock);
-
-    xfree(sumt);
-    xfree(sumw);
 
     return 0;
 }
@@ -1386,19 +1413,45 @@ static int sedf_adjust_weights(struct cpupool *c, struct xen_domctl_scheduler_op
 /* set or fetch domain scheduling parameters */
 static int sedf_adjust(const struct scheduler *ops, struct domain *p, struct xen_domctl_scheduler_op *op)
 {
+    struct sedf_priv_info *prv = SEDF_PRIV(ops);
+    unsigned long flags;
+    unsigned int nr_cpus = cpumask_last(&cpu_online_map) + 1;
+    int *sumw = xzalloc_array(int, nr_cpus);
+    s_time_t *sumt = xzalloc_array(s_time_t, nr_cpus);
     struct vcpu *v;
-    int rc;
+    int rc = 0;
 
     PRINT(2,"sedf_adjust was called, domain-id %i new period %"PRIu64" "
           "new slice %"PRIu64"\nlatency %"PRIu64" extra:%s\n",
           p->domain_id, op->u.sedf.period, op->u.sedf.slice,
           op->u.sedf.latency, (op->u.sedf.extratime)?"yes":"no");
 
+    /* Serialize against the pluggable scheduler lock to protect from
+     * concurrent updates. We need to take the runq lock for the VCPUs
+     * as well, since we are touching extraweight, weight, slice and
+     * period. As in sched_credit2.c, runq locks nest inside the
+     * pluggable scheduler lock. */
+    spin_lock_irqsave(&prv->lock, flags);
+
     if ( op->cmd == XEN_DOMCTL_SCHEDOP_putinfo )
     {
+        /* These are used in sedf_adjust_weights() but have to be allocated in
+         * this function, as we need to avoid nesting xmem_pool_alloc's lock
+         * within our prv->lock. */
+        if ( !sumw || !sumt )
+        {
+            /* Check for errors here, the _getinfo branch doesn't care */
+            rc = -ENOMEM;
+            goto out;
+        }
+
         /* Check for sane parameters. */
         if ( !op->u.sedf.period && !op->u.sedf.weight )
-            return -EINVAL;
+        {
+            rc = -EINVAL;
+            goto out;
+        }
+
         if ( op->u.sedf.weight )
         {
             if ( (op->u.sedf.extratime & EXTRA_AWARE) &&
@@ -1407,59 +1460,78 @@ static int sedf_adjust(const struct scheduler *ops, struct domain *p, struct xen
                 /* Weight-driven domains with extratime only. */
                 for_each_vcpu ( p, v )
                 {
+                    /* (Here and everywhere in the following) IRQs are already off,
+                     * hence vcpu_spin_lock() is the one. */
+                    vcpu_schedule_lock(v);
                     EDOM_INFO(v)->extraweight = op->u.sedf.weight;
                     EDOM_INFO(v)->weight = 0;
                     EDOM_INFO(v)->slice = 0;
                     EDOM_INFO(v)->period = WEIGHT_PERIOD;
+                    vcpu_schedule_unlock(v);
                 }
             }
             else
             {
                 /* Weight-driven domains with real-time execution. */
-                for_each_vcpu ( p, v )
+                for_each_vcpu ( p, v ) {
+                    vcpu_schedule_lock(v);
                     EDOM_INFO(v)->weight = op->u.sedf.weight;
+                    vcpu_schedule_unlock(v);
+                }
             }
         }
         else
         {
+            /*
+             * Sanity checking: note that disabling extra weight requires
+             * that we set a non-zero slice.
+             */
+            if ( (op->u.sedf.period > PERIOD_MAX) ||
+                 (op->u.sedf.period < PERIOD_MIN) ||
+                 (op->u.sedf.slice  > op->u.sedf.period) ||
+                 (op->u.sedf.slice  < SLICE_MIN) )
+            {
+                rc = -EINVAL;
+                goto out;
+            }
+
             /* Time-driven domains. */
             for_each_vcpu ( p, v )
             {
-                /*
-                 * Sanity checking: note that disabling extra weight requires
-                 * that we set a non-zero slice.
-                 */
-                if ( (op->u.sedf.period > PERIOD_MAX) ||
-                     (op->u.sedf.period < PERIOD_MIN) ||
-                     (op->u.sedf.slice  > op->u.sedf.period) ||
-                     (op->u.sedf.slice  < SLICE_MIN) )
-                    return -EINVAL;
+                vcpu_schedule_lock(v);
                 EDOM_INFO(v)->weight = 0;
                 EDOM_INFO(v)->extraweight = 0;
                 EDOM_INFO(v)->period_orig = 
                     EDOM_INFO(v)->period  = op->u.sedf.period;
                 EDOM_INFO(v)->slice_orig  = 
                     EDOM_INFO(v)->slice   = op->u.sedf.slice;
+                vcpu_schedule_unlock(v);
             }
         }
 
-        rc = sedf_adjust_weights(p->cpupool, op);
+        rc = sedf_adjust_weights(p->cpupool, nr_cpus, sumw, sumt);
         if ( rc )
-            return rc;
+            goto out;
 
         for_each_vcpu ( p, v )
         {
+            vcpu_schedule_lock(v);
             EDOM_INFO(v)->status  = 
                 (EDOM_INFO(v)->status &
                  ~EXTRA_AWARE) | (op->u.sedf.extratime & EXTRA_AWARE);
             EDOM_INFO(v)->latency = op->u.sedf.latency;
             extraq_check(v);
+            vcpu_schedule_unlock(v);
         }
     }
     else if ( op->cmd == XEN_DOMCTL_SCHEDOP_getinfo )
     {
         if ( p->vcpu[0] == NULL )
-            return -EINVAL;
+        {
+            rc = -EINVAL;
+            goto out;
+        }
+
         op->u.sedf.period    = EDOM_INFO(p->vcpu[0])->period;
         op->u.sedf.slice     = EDOM_INFO(p->vcpu[0])->slice;
         op->u.sedf.extratime = EDOM_INFO(p->vcpu[0])->status & EXTRA_AWARE;
@@ -1467,14 +1539,23 @@ static int sedf_adjust(const struct scheduler *ops, struct domain *p, struct xen
         op->u.sedf.weight    = EDOM_INFO(p->vcpu[0])->weight;
     }
 
-    PRINT(2,"sedf_adjust_finished\n");
-    return 0;
+out:
+    spin_unlock_irqrestore(&prv->lock, flags);
+
+    xfree(sumt);
+    xfree(sumw);
+
+    PRINT(2,"sedf_adjust_finished with return code %d\n", rc);
+    return rc;
 }
 
+static struct sedf_priv_info _sedf_priv;
+
 const struct scheduler sched_sedf_def = {
-    .name     = "Simple EDF Scheduler",
-    .opt_name = "sedf",
-    .sched_id = XEN_SCHEDULER_SEDF,
+    .name           = "Simple EDF Scheduler",
+    .opt_name       = "sedf",
+    .sched_id       = XEN_SCHEDULER_SEDF,
+    .sched_data     = &_sedf_priv,
     
     .init_domain    = sedf_init_domain,
     .destroy_domain = sedf_destroy_domain,
@@ -1487,6 +1568,9 @@ const struct scheduler sched_sedf_def = {
     .free_pdata     = sedf_free_pdata,
     .alloc_domdata  = sedf_alloc_domdata,
     .free_domdata   = sedf_free_domdata,
+
+    .init           = sedf_init,
+    .deinit         = sedf_deinit,
 
     .do_schedule    = sedf_do_schedule,
     .pick_cpu       = sedf_pick_cpu,
