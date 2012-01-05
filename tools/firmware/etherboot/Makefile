@@ -56,7 +56,7 @@ $D/src/bin/NIC: $D/src/arch/i386/Makefile
 
 .PHONY: clean
 clean:
-	rm -rf $D $D.git *~ eb-roms.h _$T
+	rm -rf $D $D.git *~ eb-roms.h _$T $T
 
 .PHONY: distclean
 distclean: clean
