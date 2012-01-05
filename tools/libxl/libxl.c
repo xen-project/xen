@@ -1534,6 +1534,12 @@ int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic)
                                           libxl_xen_script_dir_path(),
                                           nic->script));
     }
+
+    if (nic->ifname) {
+        flexarray_append(back, "vifname");
+        flexarray_append(back, nic->ifname);
+    }
+
     flexarray_append(back, "mac");
     flexarray_append(back,libxl__sprintf(gc,
                                     LIBXL_MAC_FMT, LIBXL_MAC_BYTES(nic->mac)));
