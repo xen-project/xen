@@ -207,9 +207,9 @@ endif
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 56d7747a3cf811910c4cf865e1ebcb8b82502005
-# Thu Dec 22 14:46:31 2011 +0000
-# qemu: clean up MSI-X table handling
+QEMU_TAG ?= bb36d632e4cabf47882adff07a45c6702c4a5b30
+# Thu Jan 5 17:16:46 2012 +0000
+# qemu-xen: adjust MSI-X related log messages
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
