@@ -2240,6 +2240,7 @@ x86_emulate(
     }
 
     case 0x8d: /* lea */
+        generate_exception_if(ea.type != OP_MEM, EXC_UD, -1);
         dst.val = ea.mem.off;
         break;
 
