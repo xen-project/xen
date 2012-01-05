@@ -419,6 +419,8 @@ static void printf_info(int domid,
     for (i = 0; i < d_config->num_vifs; i++) {
         printf("\t(device\n");
         printf("\t\t(vif\n");
+        if (d_config->vifs[i].ifname)
+            printf("\t\t\t(vifname %s)\n", d_config->vifs[i].ifname);
         printf("\t\t\t(backend_domid %d)\n", d_config->vifs[i].backend_domid);
         printf("\t\t\t(frontend_domid %d)\n", domid);
         printf("\t\t\t(devid %d)\n", d_config->vifs[i].devid);
