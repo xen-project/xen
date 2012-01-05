@@ -1770,6 +1770,7 @@ class XendDomainInfo:
         f('store/port',       self.store_port)
         f('store/ring-ref',   self.store_mfn)
 
+        f('control/platform-feature-xs_reset_watches', True)
         if arch.type == "x86":
             f('control/platform-feature-multiprocessor-suspend', True)
 
