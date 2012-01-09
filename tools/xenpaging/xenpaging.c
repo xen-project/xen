@@ -527,7 +527,7 @@ static int xenpaging_teardown(struct xenpaging *paging)
     return -1;
 }
 
-static void get_request(mem_event_t *mem_event, mem_event_request_t *req)
+static void get_request(struct mem_event *mem_event, mem_event_request_t *req)
 {
     mem_event_back_ring_t *back_ring;
     RING_IDX req_cons;
@@ -544,7 +544,7 @@ static void get_request(mem_event_t *mem_event, mem_event_request_t *req)
     back_ring->sring->req_event = req_cons + 1;
 }
 
-static void put_response(mem_event_t *mem_event, mem_event_response_t *rsp)
+static void put_response(struct mem_event *mem_event, mem_event_response_t *rsp)
 {
     mem_event_back_ring_t *back_ring;
     RING_IDX rsp_prod;

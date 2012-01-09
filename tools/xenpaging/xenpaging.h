@@ -31,14 +31,14 @@
 
 #define XENPAGING_PAGEIN_QUEUE_SIZE 64
 
-typedef struct mem_event {
+struct mem_event {
     domid_t domain_id;
     xc_evtchn *xce_handle;
     int port;
     mem_event_back_ring_t back_ring;
     mem_event_shared_page_t *shared_page;
     void *ring_page;
-} mem_event_t;
+};
 
 struct xenpaging {
     xc_interface *xc_handle;
@@ -46,7 +46,7 @@ struct xenpaging {
 
     unsigned long *bitmap;
 
-    mem_event_t mem_event;
+    struct mem_event mem_event;
     /* number of pages for which data structures were allocated */
     int max_pages;
     int num_paged_out;
