@@ -1877,7 +1877,7 @@ int map_domain_pirq(
         if ( opt_irq_vector_map == OPT_IRQ_VECTOR_MAP_PERDEV
              && !desc->arch.used_vectors )
         {
-            desc->arch.used_vectors = &pdev->info.used_vectors;
+            desc->arch.used_vectors = &pdev->arch.used_vectors;
             if ( desc->arch.vector != IRQ_VECTOR_UNASSIGNED )
             {
                 int vector = desc->arch.vector;

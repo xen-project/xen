@@ -12,6 +12,7 @@
 #include <xen/list.h>
 #include <xen/spinlock.h>
 #include <xen/irq.h>
+#include <asm/pci.h>
 
 /*
  * The PCI interface treats multi-function devices as independent
@@ -39,9 +40,6 @@ struct pci_dev_info {
         u8 bus;
         u8 devfn;
     } physfn;
-#ifdef CONFIG_X86
-    vmask_t used_vectors;
-#endif
 };
 
 struct pci_dev {
@@ -62,6 +60,7 @@ struct pci_dev {
     const u8 bus;
     const u8 devfn;
     struct pci_dev_info info;
+    struct arch_pci_dev arch;
     u64 vf_rlen[6];
 };
 

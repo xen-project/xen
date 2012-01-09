@@ -28,6 +28,10 @@ void pcibios_config_init(void);
 
 struct pci_dev;
 
+#ifdef XEN
+struct arch_pci_dev {};
+#endif
+
 /*
  * PCI_DMA_BUS_IS_PHYS should be set to 1 if there is _necessarily_ a direct correspondence
  * between device bus addresses and CPU physical addresses.  Platforms with a hardware I/O
@@ -43,6 +47,7 @@ struct pci_dev;
 extern unsigned long ia64_max_iommu_merge_mask;
 #define PCI_DMA_BUS_IS_PHYS	(ia64_max_iommu_merge_mask == ~0UL)
 
+#ifndef XEN
 static inline void
 pcibios_set_master (struct pci_dev *dev)
 {
@@ -110,7 +115,6 @@ extern int pci_mmap_page_range (struct pci_dev *dev, struct vm_area_struct *vma,
 #define HAVE_PCI_LEGACY
 extern int pci_mmap_legacy_page_range(struct pci_bus *bus,
 				      struct vm_area_struct *vma);
-#ifndef XEN
 extern ssize_t pci_read_legacy_io(struct kobject *kobj, char *buf, loff_t off,
 				  size_t count);
 extern ssize_t pci_write_legacy_io(struct kobject *kobj, char *buf, loff_t off,
@@ -144,6 +148,7 @@ struct pci_controller {
 #define PCI_CONTROLLER(busdev) ((struct pci_controller *) busdev->sysdata)
 #define pci_domain_nr(busdev)    (PCI_CONTROLLER(busdev)->segment)
 
+#ifndef XEN
 extern struct pci_ops pci_root_ops;
 
 static inline int pci_proc_domain(struct pci_bus *bus)
@@ -161,7 +166,6 @@ extern void pcibios_resource_to_bus(struct pci_dev *dev,
 extern void pcibios_bus_to_resource(struct pci_dev *dev,
 		struct resource *res, struct pci_bus_region *region);
 
-#ifndef XEN
 static inline struct resource *
 pcibios_select_root(struct pci_dev *pdev, struct resource *res)
 {
