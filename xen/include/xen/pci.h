@@ -33,8 +33,8 @@
 #define MAX_MSIX_TABLE_ENTRIES  2048
 #define MAX_MSIX_TABLE_PAGES    8
 struct pci_dev_info {
-    unsigned is_extfn;
-    unsigned is_virtfn;
+    bool_t is_extfn;
+    bool_t is_virtfn;
     struct {
         u8 bus;
         u8 devfn;
