@@ -57,10 +57,10 @@ typedef struct xenpaging {
 } xenpaging_t;
 
 
-typedef struct xenpaging_victim {
+struct victim {
     /* the gfn of the page to evict */
     unsigned long gfn;
-} xenpaging_victim_t;
+};
 
 
 extern void create_page_in_thread(xenpaging_t *paging);

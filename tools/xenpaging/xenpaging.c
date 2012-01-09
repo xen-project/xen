@@ -561,8 +561,7 @@ static void put_response(mem_event_t *mem_event, mem_event_response_t *rsp)
     RING_PUSH_RESPONSES(back_ring);
 }
 
-static int xenpaging_evict_page(xenpaging_t *paging,
-                         xenpaging_victim_t *victim, int fd, int i)
+static int xenpaging_evict_page(xenpaging_t *paging, struct victim *victim, int fd, int i)
 {
     xc_interface *xch = paging->xc_handle;
     void *page;
@@ -711,8 +710,7 @@ static void resume_pages(xenpaging_t *paging, int num_pages)
         page_in_trigger();
 }
 
-static int evict_victim(xenpaging_t *paging,
-                        xenpaging_victim_t *victim, int fd, int i)
+static int evict_victim(xenpaging_t *paging, struct victim *victim, int fd, int i)
 {
     xc_interface *xch = paging->xc_handle;
     int j = 0;
@@ -755,7 +753,7 @@ static int evict_victim(xenpaging_t *paging,
 }
 
 /* Evict a batch of pages and write them to a free slot in the paging file */
-static int evict_pages(xenpaging_t *paging, int fd, xenpaging_victim_t *victims, int num_pages)
+static int evict_pages(xenpaging_t *paging, int fd, struct victim *victims, int num_pages)
 {
     xc_interface *xch = paging->xc_handle;
     int rc, slot, num = 0;
@@ -782,7 +780,7 @@ int main(int argc, char *argv[])
 {
     struct sigaction act;
     xenpaging_t *paging;
-    xenpaging_victim_t *victims;
+    struct victim *victims;
     mem_event_request_t req;
     mem_event_response_t rsp;
     int num, prev_num = 0;
@@ -816,7 +814,7 @@ int main(int argc, char *argv[])
     }
 
     /* Allocate upper limit of pages to allow growing and shrinking */
-    victims = calloc(paging->max_pages, sizeof(xenpaging_victim_t));
+    victims = calloc(paging->max_pages, sizeof(struct victim));
     if ( !victims )
         goto out;
 
