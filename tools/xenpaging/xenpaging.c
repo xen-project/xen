@@ -61,7 +61,7 @@ static void close_handler(int sig)
     unlink_pagefile();
 }
 
-static int xenpaging_mem_paging_flush_ioemu_cache(xenpaging_t *paging)
+static int xenpaging_mem_paging_flush_ioemu_cache(struct xenpaging *paging)
 {
     struct xs_handle *xsh = paging->xs_handle;
     domid_t domain_id = paging->mem_event.domain_id;
@@ -75,7 +75,7 @@ static int xenpaging_mem_paging_flush_ioemu_cache(xenpaging_t *paging)
     return rc == true ? 0 : -1;
 }
 
-static int xenpaging_wait_for_event_or_timeout(xenpaging_t *paging)
+static int xenpaging_wait_for_event_or_timeout(struct xenpaging *paging)
 {
     xc_interface *xch = paging->xc_handle;
     xc_evtchn *xce = paging->mem_event.xce_handle;
@@ -163,7 +163,7 @@ err:
     return rc;
 }
 
-static int xenpaging_get_tot_pages(xenpaging_t *paging)
+static int xenpaging_get_tot_pages(struct xenpaging *paging)
 {
     xc_interface *xch = paging->xc_handle;
     xc_domaininfo_t domain_info;
@@ -218,7 +218,7 @@ static void usage(void)
     printf(" -h             --help                   this output.\n");
 }
 
-static int xenpaging_getopts(xenpaging_t *paging, int argc, char *argv[])
+static int xenpaging_getopts(struct xenpaging *paging, int argc, char *argv[])
 {
     int ch;
     static const char sopts[] = "hvd:f:m:r:";
@@ -277,9 +277,9 @@ static int xenpaging_getopts(xenpaging_t *paging, int argc, char *argv[])
     return 0;
 }
 
-static xenpaging_t *xenpaging_init(int argc, char *argv[])
+static struct xenpaging *xenpaging_init(int argc, char *argv[])
 {
-    xenpaging_t *paging;
+    struct xenpaging *paging;
     xc_domaininfo_t domain_info;
     xc_interface *xch = NULL;
     xentoollog_logger *dbg = NULL;
@@ -287,7 +287,7 @@ static xenpaging_t *xenpaging_init(int argc, char *argv[])
     int rc;
 
     /* Allocate memory */
-    paging = calloc(1, sizeof(xenpaging_t));
+    paging = calloc(1, sizeof(struct xenpaging));
     if ( !paging )
         goto err;
 
@@ -475,7 +475,7 @@ static xenpaging_t *xenpaging_init(int argc, char *argv[])
     return NULL;
 }
 
-static int xenpaging_teardown(xenpaging_t *paging)
+static int xenpaging_teardown(struct xenpaging *paging)
 {
     int rc;
     xc_interface *xch;
@@ -561,7 +561,7 @@ static void put_response(mem_event_t *mem_event, mem_event_response_t *rsp)
     RING_PUSH_RESPONSES(back_ring);
 }
 
-static int xenpaging_evict_page(xenpaging_t *paging, struct victim *victim, int fd, int i)
+static int xenpaging_evict_page(struct xenpaging *paging, struct victim *victim, int fd, int i)
 {
     xc_interface *xch = paging->xc_handle;
     void *page;
@@ -612,7 +612,7 @@ static int xenpaging_evict_page(xenpaging_t *paging, struct victim *victim, int 
     return ret;
 }
 
-static int xenpaging_resume_page(xenpaging_t *paging, mem_event_response_t *rsp, int notify_policy)
+static int xenpaging_resume_page(struct xenpaging *paging, mem_event_response_t *rsp, int notify_policy)
 {
     int ret;
 
@@ -646,7 +646,7 @@ static int xenpaging_resume_page(xenpaging_t *paging, mem_event_response_t *rsp,
     return ret;
 }
 
-static int xenpaging_populate_page(xenpaging_t *paging,
+static int xenpaging_populate_page(struct xenpaging *paging,
     xen_pfn_t gfn, int fd, int i)
 {
     xc_interface *xch = paging->xc_handle;
@@ -690,7 +690,7 @@ static int xenpaging_populate_page(xenpaging_t *paging,
 }
 
 /* Trigger a page-in for a batch of pages */
-static void resume_pages(xenpaging_t *paging, int num_pages)
+static void resume_pages(struct xenpaging *paging, int num_pages)
 {
     xc_interface *xch = paging->xc_handle;
     int i, num = 0;
@@ -710,7 +710,7 @@ static void resume_pages(xenpaging_t *paging, int num_pages)
         page_in_trigger();
 }
 
-static int evict_victim(xenpaging_t *paging, struct victim *victim, int fd, int i)
+static int evict_victim(struct xenpaging *paging, struct victim *victim, int fd, int i)
 {
     xc_interface *xch = paging->xc_handle;
     int j = 0;
@@ -753,7 +753,7 @@ static int evict_victim(xenpaging_t *paging, struct victim *victim, int fd, int 
 }
 
 /* Evict a batch of pages and write them to a free slot in the paging file */
-static int evict_pages(xenpaging_t *paging, int fd, struct victim *victims, int num_pages)
+static int evict_pages(struct xenpaging *paging, int fd, struct victim *victims, int num_pages)
 {
     xc_interface *xch = paging->xc_handle;
     int rc, slot, num = 0;
@@ -779,7 +779,7 @@ static int evict_pages(xenpaging_t *paging, int fd, struct victim *victims, int 
 int main(int argc, char *argv[])
 {
     struct sigaction act;
-    xenpaging_t *paging;
+    struct xenpaging *paging;
     struct victim *victims;
     mem_event_request_t req;
     mem_event_response_t rsp;

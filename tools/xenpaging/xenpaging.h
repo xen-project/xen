@@ -40,7 +40,7 @@ typedef struct mem_event {
     void *ring_page;
 } mem_event_t;
 
-typedef struct xenpaging {
+struct xenpaging {
     xc_interface *xc_handle;
     struct xs_handle *xs_handle;
 
@@ -54,7 +54,7 @@ typedef struct xenpaging {
     int policy_mru_size;
     int debug;
     unsigned long pagein_queue[XENPAGING_PAGEIN_QUEUE_SIZE];
-} xenpaging_t;
+};
 
 
 struct victim {
@@ -63,7 +63,7 @@ struct victim {
 };
 
 
-extern void create_page_in_thread(xenpaging_t *paging);
+extern void create_page_in_thread(struct xenpaging *paging);
 extern void page_in_trigger(void);
 
 #endif // __XEN_PAGING_H__

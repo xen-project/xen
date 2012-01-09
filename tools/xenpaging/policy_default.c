@@ -37,7 +37,7 @@ static unsigned long current_gfn;
 static unsigned long max_pages;
 
 
-int policy_init(xenpaging_t *paging)
+int policy_init(struct xenpaging *paging)
 {
     int i;
     int rc = -ENOMEM;
@@ -77,7 +77,7 @@ int policy_init(xenpaging_t *paging)
     return rc;
 }
 
-int policy_choose_victim(xenpaging_t *paging, struct victim *victim)
+int policy_choose_victim(struct xenpaging *paging, struct victim *victim)
 {
     xc_interface *xch = paging->xc_handle;
     unsigned long wrap = current_gfn;

@@ -28,8 +28,8 @@
 #include "xenpaging.h"
 
 
-int policy_init(xenpaging_t *paging);
-int policy_choose_victim(xenpaging_t *paging, struct victim *victim);
+int policy_init(struct xenpaging *paging);
+int policy_choose_victim(struct xenpaging *paging, struct victim *victim);
 void policy_notify_paged_out(unsigned long gfn);
 void policy_notify_paged_in(unsigned long gfn);
 void policy_notify_paged_in_nomru(unsigned long gfn);

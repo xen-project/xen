@@ -61,7 +61,7 @@ void page_in_trigger(void)
     pthread_cond_signal(&page_in_cond);
 }
 
-void create_page_in_thread(xenpaging_t *paging)
+void create_page_in_thread(struct xenpaging *paging)
 {
     page_in_args.dom = paging->mem_event.domain_id;
     page_in_args.pagein_queue = paging->pagein_queue;
