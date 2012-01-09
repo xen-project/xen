@@ -249,7 +249,8 @@ static int vmx_init_vmcs_config(void)
     if ( (_vmx_secondary_exec_control & SECONDARY_EXEC_PAUSE_LOOP_EXITING) &&
           ple_gap == 0 )
     {
-        printk("Disable Pause-Loop Exiting.\n");
+        if ( !vmx_pin_based_exec_control )
+            printk(XENLOG_INFO "Disable Pause-Loop Exiting.\n");
         _vmx_secondary_exec_control &= ~ SECONDARY_EXEC_PAUSE_LOOP_EXITING;
     }
 
