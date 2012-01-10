@@ -1,0 +1,11 @@
+DEFAULT menu.c32
+PROMPT 0
+MENU TITLE Alpine/Linux Boot Menu
+MENU HIDDEN
+MENU AUTOBOOT Alpine will be booted automatically in # seconds.
+TIMEOUT 30
+LABEL grsec
+  MENU DEFAULT
+  MENU LABEL Linux 3.0.10-grsec
+  KERNEL vmlinuz-3.0.10-grsec
+  APPEND initrd=initramfs-3.0.10-grsec root=UUID=a97ffe64-430f-4fd3-830e-4736d9a27af0 modules=sd-mod,usb-storage,ext4 quiet

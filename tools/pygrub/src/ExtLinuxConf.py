@@ -60,6 +60,13 @@ class ExtLinuxImage(object):
 
                 # Bypass regular self.commands handling
                 com = None
+            elif arg.find("initrd="):
+                # find initrd image in append line
+                args = arg.strip().split(" ")
+                for a in args:
+                    if a.lower().startswith("initrd="):
+                        setattr(self, "initrd", a.replace("initrd=", ""))
+                        arg = arg.replace(a, "")
 
         if com is not None and self.commands.has_key(com):
             if self.commands[com] is not None:
@@ -86,10 +93,12 @@ class ExtLinuxImage(object):
         self._args = args
     def get_kernel(self):
         return self._kernel
+    def set_args(self, val):
+        self._args = val
     def get_args(self):
         return self._args
     kernel = property(get_kernel, set_kernel)
-    args = property(get_args)
+    args = property(get_args, set_args)
 
     def set_initrd(self, val):
         self._initrd = (None,val)
