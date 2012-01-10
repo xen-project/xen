@@ -1880,29 +1880,29 @@ int xc_mem_access_resume(xc_interface *xch, domid_t domain_id,
  * memshr operations
  */
 int xc_memshr_control(xc_interface *xch,
-                      uint32_t domid,
+                      domid_t domid,
                       int enable);
 int xc_memshr_nominate_gfn(xc_interface *xch,
-                           uint32_t domid,
+                           domid_t domid,
                            unsigned long gfn,
                            uint64_t *handle);
 int xc_memshr_nominate_gref(xc_interface *xch,
-                            uint32_t domid,
+                            domid_t domid,
                             grant_ref_t gref,
                             uint64_t *handle);
 int xc_memshr_share(xc_interface *xch,
                     uint64_t source_handle,
                     uint64_t client_handle);
 int xc_memshr_domain_resume(xc_interface *xch,
-                            uint32_t domid);
+                            domid_t domid);
 int xc_memshr_debug_gfn(xc_interface *xch,
-                        uint32_t domid,
+                        domid_t domid,
                         unsigned long gfn);
 int xc_memshr_debug_mfn(xc_interface *xch,
-                        uint32_t domid,
+                        domid_t domid,
                         unsigned long mfn);
 int xc_memshr_debug_gref(xc_interface *xch,
-                         uint32_t domid,
+                         domid_t domid,
                          grant_ref_t gref);
 
 int xc_flask_load(xc_interface *xc_handle, char *buf, uint32_t size);

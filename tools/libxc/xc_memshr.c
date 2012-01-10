@@ -26,7 +26,7 @@
 #include <xen/grant_table.h>
 
 int xc_memshr_control(xc_interface *xch,
-                      uint32_t domid,
+                      domid_t domid,
                       int enable)
 {
     DECLARE_DOMCTL;
@@ -34,7 +34,7 @@ int xc_memshr_control(xc_interface *xch,
 
     domctl.cmd = XEN_DOMCTL_mem_sharing_op;
     domctl.interface_version = XEN_DOMCTL_INTERFACE_VERSION;
-    domctl.domain = (domid_t)domid;
+    domctl.domain = domid;
     op = &(domctl.u.mem_sharing_op);
     op->op = XEN_DOMCTL_MEM_EVENT_OP_SHARING_CONTROL;
     op->u.enable = enable;
@@ -43,7 +43,7 @@ int xc_memshr_control(xc_interface *xch,
 }
 
 int xc_memshr_nominate_gfn(xc_interface *xch,
-                           uint32_t domid,
+                           domid_t domid,
                            unsigned long gfn,
                            uint64_t *handle)
 {
@@ -53,7 +53,7 @@ int xc_memshr_nominate_gfn(xc_interface *xch,
 
     domctl.cmd = XEN_DOMCTL_mem_sharing_op;
     domctl.interface_version = XEN_DOMCTL_INTERFACE_VERSION;
-    domctl.domain = (domid_t)domid;
+    domctl.domain = domid;
     op = &(domctl.u.mem_sharing_op);
     op->op = XEN_DOMCTL_MEM_EVENT_OP_SHARING_NOMINATE_GFN;
     op->u.nominate.u.gfn = gfn;
@@ -65,7 +65,7 @@ int xc_memshr_nominate_gfn(xc_interface *xch,
 }
 
 int xc_memshr_nominate_gref(xc_interface *xch,
-                            uint32_t domid,
+                            domid_t domid,
                             grant_ref_t gref,
                             uint64_t *handle)
 {
@@ -75,7 +75,7 @@ int xc_memshr_nominate_gref(xc_interface *xch,
 
     domctl.cmd = XEN_DOMCTL_mem_sharing_op;
     domctl.interface_version = XEN_DOMCTL_INTERFACE_VERSION;
-    domctl.domain = (domid_t)domid;
+    domctl.domain = domid;
     op = &(domctl.u.mem_sharing_op);
     op->op = XEN_DOMCTL_MEM_EVENT_OP_SHARING_NOMINATE_GREF;
     op->u.nominate.u.grant_ref = gref;
@@ -105,14 +105,14 @@ int xc_memshr_share(xc_interface *xch,
 }
 
 int xc_memshr_domain_resume(xc_interface *xch,
-                            uint32_t domid)
+                            domid_t domid)
 {
     DECLARE_DOMCTL;
     struct xen_domctl_mem_sharing_op *op;
 
     domctl.cmd = XEN_DOMCTL_mem_sharing_op;
     domctl.interface_version = XEN_DOMCTL_INTERFACE_VERSION;
-    domctl.domain = (domid_t)domid;
+    domctl.domain = domid;
     op = &(domctl.u.mem_sharing_op);
     op->op = XEN_DOMCTL_MEM_EVENT_OP_SHARING_RESUME;
 
@@ -120,7 +120,7 @@ int xc_memshr_domain_resume(xc_interface *xch,
 }
 
 int xc_memshr_debug_gfn(xc_interface *xch,
-                        uint32_t domid,
+                        domid_t domid,
                         unsigned long gfn)
 {
     DECLARE_DOMCTL;
@@ -128,7 +128,7 @@ int xc_memshr_debug_gfn(xc_interface *xch,
 
     domctl.cmd = XEN_DOMCTL_mem_sharing_op;
     domctl.interface_version = XEN_DOMCTL_INTERFACE_VERSION;
-    domctl.domain = (domid_t)domid;
+    domctl.domain = domid;
     op = &(domctl.u.mem_sharing_op);
     op->op = XEN_DOMCTL_MEM_EVENT_OP_SHARING_DEBUG_GFN;
     op->u.debug.u.gfn = gfn;
@@ -137,7 +137,7 @@ int xc_memshr_debug_gfn(xc_interface *xch,
 }
 
 int xc_memshr_debug_mfn(xc_interface *xch,
-                        uint32_t domid,
+                        domid_t domid,
                         unsigned long mfn)
 {
     DECLARE_DOMCTL;
@@ -145,7 +145,7 @@ int xc_memshr_debug_mfn(xc_interface *xch,
 
     domctl.cmd = XEN_DOMCTL_mem_sharing_op;
     domctl.interface_version = XEN_DOMCTL_INTERFACE_VERSION;
-    domctl.domain = (domid_t)domid;
+    domctl.domain = domid;
     op = &(domctl.u.mem_sharing_op);
     op->op = XEN_DOMCTL_MEM_EVENT_OP_SHARING_DEBUG_MFN;
     op->u.debug.u.mfn = mfn;
@@ -154,7 +154,7 @@ int xc_memshr_debug_mfn(xc_interface *xch,
 }
 
 int xc_memshr_debug_gref(xc_interface *xch,
-                         uint32_t domid,
+                         domid_t domid,
                          grant_ref_t gref)
 {
     DECLARE_DOMCTL;
@@ -162,7 +162,7 @@ int xc_memshr_debug_gref(xc_interface *xch,
 
     domctl.cmd = XEN_DOMCTL_mem_sharing_op;
     domctl.interface_version = XEN_DOMCTL_INTERFACE_VERSION;
-    domctl.domain = (domid_t)domid;
+    domctl.domain = domid;
     op = &(domctl.u.mem_sharing_op);
     op->op = XEN_DOMCTL_MEM_EVENT_OP_SHARING_DEBUG_GREF;
     op->u.debug.u.gref = gref;
