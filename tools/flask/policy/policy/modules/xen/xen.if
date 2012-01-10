@@ -29,6 +29,13 @@ define(`create_domain', `
 	allow $1 $2_$1_channel:event create;
 ')
 
+# manage_domain(priv, target)
+#   Allow managing a running domain
+define(`manage_domain', `
+	allow $1 $2:domain { getdomaininfo getvcpuinfo getvcpuaffinity
+			getaddrsize pause unpause trigger shutdown destroy
+			setvcpuaffinity setdomainmaxmem };
+')
 ################################################################################
 #
 # Inter-domain communication
