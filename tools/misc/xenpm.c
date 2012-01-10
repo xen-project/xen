@@ -87,20 +87,20 @@ static void print_cxstat(int cpuid, struct xc_cx_stat *cxstat)
            cxstat->idle_time/1000000UL);
     for ( i = 0; i < cxstat->nr; i++ )
     {
-        printf("C%d                   : transition [%020"PRIu64"]\n",
+        printf("C%-20d: transition [%20"PRIu64"]\n",
                i, cxstat->triggers[i]);
-        printf("                       residency  [%020"PRIu64" ms]\n",
+        printf("                       residency  [%20"PRIu64" ms]\n",
                cxstat->residencies[i]/1000000UL);
     }
-    printf("pc2                  : [%020"PRIu64" ms]\n"
-           "pc3                  : [%020"PRIu64" ms]\n"
-           "pc6                  : [%020"PRIu64" ms]\n"
-           "pc7                  : [%020"PRIu64" ms]\n",
+    printf("pc2                  : [%20"PRIu64" ms]\n"
+           "pc3                  : [%20"PRIu64" ms]\n"
+           "pc6                  : [%20"PRIu64" ms]\n"
+           "pc7                  : [%20"PRIu64" ms]\n",
             cxstat->pc2/1000000UL, cxstat->pc3/1000000UL,
             cxstat->pc6/1000000UL, cxstat->pc7/1000000UL);
-    printf("cc3                  : [%020"PRIu64" ms]\n"
-           "cc6                  : [%020"PRIu64" ms]\n"
-           "cc7                  : [%020"PRIu64" ms]\n",
+    printf("cc3                  : [%20"PRIu64" ms]\n"
+           "cc6                  : [%20"PRIu64" ms]\n"
+           "cc7                  : [%20"PRIu64" ms]\n",
             cxstat->cc3/1000000UL, cxstat->cc6/1000000UL,
             cxstat->cc7/1000000UL);
     printf("\n");
@@ -114,7 +114,7 @@ static int get_cxstat_by_cpuid(xc_interface *xc_handle, int cpuid, struct xc_cx_
 
     ret = xc_pm_get_max_cx(xc_handle, cpuid, &max_cx_num);
     if ( ret )
-        return errno;
+        return -errno;
 
     if ( !cxstat )
         return -EINVAL;
@@ -135,15 +135,14 @@ static int get_cxstat_by_cpuid(xc_interface *xc_handle, int cpuid, struct xc_cx_
     ret = xc_pm_get_cxstat(xc_handle, cpuid, cxstat);
     if( ret )
     {
-        int temp = errno;
+        ret = -errno;
         free(cxstat->triggers);
         free(cxstat->residencies);
         cxstat->triggers = NULL;
         cxstat->residencies = NULL;
-        return temp;
     }
 
-    return 0;
+    return ret;
 }
 
 static int show_max_cstate(xc_interface *xc_handle)
@@ -214,14 +213,13 @@ static void print_pxstat(int cpuid, struct xc_px_stat *pxstat)
     for ( i = 0; i < pxstat->total; i++ )
     {
         if ( pxstat->cur == i )
-            printf("*P%d", i);
+            printf("*P%-9d", i);
         else
-            printf("P%d ", i);
-        printf("                  : freq       [%04"PRIu64" MHz]\n",
-               pxstat->pt[i].freq);
-        printf("                       transition [%020"PRIu64"]\n",
+            printf("P%-10d", i);
+        printf("[%4"PRIu64" MHz]", pxstat->pt[i].freq);
+        printf(": transition [%20"PRIu64"]\n",
                pxstat->pt[i].count);
-        printf("                       residency  [%020"PRIu64" ms]\n",
+        printf("                       residency  [%20"PRIu64" ms]\n",
                pxstat->pt[i].residency/1000000UL);
     }
     printf("\n");
@@ -235,7 +233,7 @@ static int get_pxstat_by_cpuid(xc_interface *xc_handle, int cpuid, struct xc_px_
 
     ret = xc_pm_get_max_px(xc_handle, cpuid, &max_px_num);
     if ( ret )
-        return errno;
+        return -errno;
 
     if ( !pxstat)
         return -EINVAL;
@@ -254,15 +252,14 @@ static int get_pxstat_by_cpuid(xc_interface *xc_handle, int cpuid, struct xc_px_
     ret = xc_pm_get_pxstat(xc_handle, cpuid, pxstat);
     if( ret )
     {
-        int temp = errno;
+        ret = -errno;
         free(pxstat->trans_pt);
         free(pxstat->pt);
         pxstat->trans_pt = NULL;
         pxstat->pt = NULL;
-        return temp;
     }
 
-    return 0;
+    return ret;
 }
 
 /* show cpu actual average freq information on CPU cpuid */
@@ -272,11 +269,9 @@ static int get_avgfreq_by_cpuid(xc_interface *xc_handle, int cpuid, int *avgfreq
 
     ret = xc_get_cpufreq_avgfreq(xc_handle, cpuid, avgfreq);
     if ( ret )
-    {
-        return errno;
-    }
+        ret = -errno;
 
-    return 0;
+    return ret;
 }
 
 static int show_pxstat_by_cpuid(xc_interface *xc_handle, int cpuid)
@@ -325,7 +320,7 @@ static uint64_t *sum, *sum_cx, *sum_px;
 
 static void signal_int_handler(int signo)
 {
-    int i, j, k, ret;
+    int i, j, k;
     struct timeval tv;
     int cx_cap = 0, px_cap = 0;
     DECLARE_HYPERCALL_BUFFER(uint32_t, cpu_to_core);
@@ -404,6 +399,8 @@ static void signal_int_handler(int signo)
                         res / 1000000UL, 100UL * res / (double)sum_px[i]);
             }
         }
+        if ( px_cap && avgfreq[i] )
+            printf("  Avg freq\t%d\tKHz\n", avgfreq[i]);
     }
 
     set_xen_guest_handle(info.cpu_to_core, cpu_to_core);
@@ -411,8 +408,7 @@ static void signal_int_handler(int signo)
     set_xen_guest_handle(info.cpu_to_node, cpu_to_node);
     info.max_cpu_index = MAX_NR_CPU - 1;
 
-    ret = xc_topologyinfo(xc_handle, &info);
-    if ( !ret )
+    if ( cx_cap && !xc_topologyinfo(xc_handle, &info) )
     {
         uint32_t socket_ids[MAX_NR_CPU];
         uint32_t core_ids[MAX_NR_CPU];
@@ -461,7 +457,7 @@ static void signal_int_handler(int signo)
                     if ( cpu_to_socket[j] == socket_ids[i] )
                         break;
                 }
-                printf("Socket %d\n", socket_ids[i]);
+                printf("\nSocket %d\n", socket_ids[i]);
                 res = cxstat_end[j].pc2 - cxstat_start[j].pc2;
                 printf("\tPC2\t%"PRIu64" ms\t%.2f%%\n",  res / 1000000UL,
                        100UL * res / (double)sum_cx[j]);
@@ -492,12 +488,9 @@ static void signal_int_handler(int signo)
                     res = cxstat_end[j].cc7 - cxstat_start[j].cc7;
                     printf("\t\tCC7\t%"PRIu64" ms\t%.2f%%\n",  res / 1000000UL,
                            100UL * res / (double)sum_cx[j]);
-                    printf("\n");
-
                 }
             }
         }
-        printf("  Avg freq\t%d\tKHz\n", avgfreq[i]);
     }
 
     /* some clean up and then exits */
@@ -542,23 +535,23 @@ void start_gather_func(int argc, char *argv[])
     }
     usec_start = tv.tv_sec * 1000000UL + tv.tv_usec;
 
-    sum = malloc(sizeof(uint64_t) * 2 * max_cpu_nr);
+    sum = calloc(2 * max_cpu_nr, sizeof(*sum));
     if ( sum == NULL )
         return ;
-    cxstat = malloc(sizeof(struct xc_cx_stat) * 2 * max_cpu_nr);
+    cxstat = calloc(2 * max_cpu_nr, sizeof(*cxstat));
     if ( cxstat == NULL )
     {
         free(sum);
         return ;
     }
-    pxstat = malloc(sizeof(struct xc_px_stat) * 2 * max_cpu_nr);
+    pxstat = calloc(2 * max_cpu_nr, sizeof(*pxstat));
     if ( pxstat == NULL )
     {
         free(sum);
         free(cxstat);
         return ;
     }
-    avgfreq = malloc(sizeof(int) * max_cpu_nr);
+    avgfreq = calloc(max_cpu_nr, sizeof(*avgfreq));
     if ( avgfreq == NULL )
     {
         free(sum);
@@ -566,10 +559,6 @@ void start_gather_func(int argc, char *argv[])
         free(pxstat);
         return ;
     }
-    memset(sum, 0, sizeof(uint64_t) * 2 * max_cpu_nr);
-    memset(cxstat, 0, sizeof(struct xc_cx_stat) * 2 * max_cpu_nr);
-    memset(pxstat, 0, sizeof(struct xc_px_stat) * 2 * max_cpu_nr);
-    memset(avgfreq, 0, sizeof(int) * max_cpu_nr);
     sum_cx = sum;
     sum_px = sum + max_cpu_nr;
     cxstat_start = cxstat;
