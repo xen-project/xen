@@ -59,6 +59,8 @@ def ocaml_type_of(ty):
         if not typename:
             raise NotImplementedError("No typename for Builtin %s (%s)" % (ty.typename, type(ty)))
         return typename
+    elif isinstance(ty,libxltypes.Aggregate):
+        return ty.rawname.capitalize() + ".t"
     else:
         return ty.rawname
 
