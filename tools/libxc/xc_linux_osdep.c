@@ -232,7 +232,7 @@ static void *linux_privcmd_map_foreign_bulk(xc_interface *xch, xc_osdep_handle h
             do {
                 usleep(100);
                 rc = ioctl(fd, IOCTL_PRIVCMD_MMAPBATCH_V2, &ioctlx);
-            } while ( rc < 0 && err[i] == -ENOENT );
+            } while ( rc < 0 && errno == ENOENT && err[i] == -ENOENT );
         }
     }
 
