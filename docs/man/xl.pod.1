@@ -906,7 +906,7 @@ List virtual network interfaces for a domain.
 
 =back
 
-=head2 PCI PASS-THROUGH
+=head1 PCI PASS-THROUGH
 
 =over 4
 
@@ -929,7 +929,7 @@ List pass-through pci devices for a domain.
 
 =back
 
-=head2 TMEM
+=head1 TMEM
 
 =over 4
 
@@ -995,7 +995,20 @@ Get information about how much freeable memory (MB) is in-use by tmem.
 
 =back
 
-=head2 FLASK
+=head1 FLASK
+
+B<FLASK> is a security framework that defines a mandatory access control policy
+providing fine-grained controls over Xen domains, allowing the policy writer
+to define what interactions between domains, devices, and the hypervisor are
+permitted. Some example of what you can do using XSM/FLASK:
+ - Prevent two domains from communicating via event channels or grants
+ - Control which domains can use device passthrough (and which devices)
+ - Restrict or audit operations performed by privileged domains
+ - Prevent a privileged domain from arbitrarily mapping pages from other
+   domains.
+
+You can find more details on how to use FLASK and an example security
+policy here: L<http://xenbits.xen.org/docs/unstable/misc/xsm-flask.txt>
 
 =over 4
 
@@ -1039,6 +1052,7 @@ And the following documents on the xen.org website:
 
 L<http://xenbits.xen.org/docs/unstable/misc/xl-network-configuration.html>
 L<http://xenbits.xen.org/docs/unstable/misc/xl-disk-configuration.txt>
+L<http://xenbits.xen.org/docs/unstable/misc/xsm-flask.txt>
 
 =head1 BUGS
 
