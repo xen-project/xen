@@ -123,7 +123,7 @@ void memshr_vbd_initialize(void)
     vbd_info.enabled = 1;
 }
 
-uint16_t memshr_vbd_image_get(char* file)
+uint16_t memshr_vbd_image_get(const char* file)
 {
     uint16_t id;
 

@@ -44,7 +44,7 @@ typedef struct shared_memshr_info {
 shared_memshr_info_t * shm_shared_info_open(int unlink);
 struct fgprtshr_hash * shm_fgprtshr_hash_open(int unlink);
 struct blockshr_hash * shm_blockshr_hash_open(int unlink);
-uint16_t shm_vbd_image_get(char* file, vbd_image_info_t *vbd_imgs);
+uint16_t shm_vbd_image_get(const char* file, vbd_image_info_t *vbd_imgs);
 void     shm_vbd_image_put(uint16_t memshr_id, vbd_image_info_t *vbd_imgs);
 
 #endif /* __SHM_H__ */

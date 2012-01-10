@@ -187,7 +187,7 @@ struct blockshr_hash * shm_blockshr_hash_open(int unlink)
     return h;
 } 
 
-uint16_t shm_vbd_image_get(char* file, vbd_image_info_t *vbd_imgs)
+uint16_t shm_vbd_image_get(const char* file, vbd_image_info_t *vbd_imgs)
 {
     vbd_image_info_t *img, *next_img;
     int i, img_id;

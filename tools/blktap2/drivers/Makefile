@@ -43,7 +43,7 @@ MEMSHR_DIR = $(XEN_ROOT)/tools/memshr
 MEMSHRLIBS :=
 ifeq ($(CONFIG_Linux), __fixme__)
 CFLAGS += -DMEMSHR
-MEMSHRLIBS += $(MEMSHR_DIR)/libmemshr.a
+MEMSHRLIBS += -L$(XEN_ROOT)/tools/libxc -lxenctrl $(MEMSHR_DIR)/libmemshr.a
 endif
 
 ifeq ($(VHD_STATIC),y)
