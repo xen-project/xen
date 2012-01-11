@@ -123,6 +123,8 @@ void __init tboot_probe(void)
     printk("  shutdown_entry: 0x%08x\n", tboot_shared->shutdown_entry);
     printk("  tboot_base: 0x%08x\n", tboot_shared->tboot_base);
     printk("  tboot_size: 0x%x\n", tboot_shared->tboot_size);
+    if ( tboot_shared->version >= 6 )
+        printk("  flags: 0x%08x\n", tboot_shared->flags);
 
     /* these will be needed by tboot_protect_mem_regions() and/or
        tboot_parse_dmar_table(), so get them now */
@@ -527,6 +529,18 @@ void tboot_s3_error(int error)
     printk("MAC for %s before S3 is: 0x%08"PRIx64"\n", what, orig_mac);
     printk("MAC for %s after S3 is: 0x%08"PRIx64"\n", what, resume_mac);
     panic("Memory integrity was lost on resume (%d)\n", error);
+}
+
+int tboot_wake_ap(int apicid, unsigned long sipi_vec)
+{
+    if ( g_tboot_shared->version >= 6 &&
+         (g_tboot_shared->flags & TB_FLAG_AP_WAKE_SUPPORT) )
+    {
+        g_tboot_shared->ap_wake_addr = sipi_vec;
+        g_tboot_shared->ap_wake_trigger = apicid;
+        return 0;
+    }
+    return 1;
 }
 
 /*

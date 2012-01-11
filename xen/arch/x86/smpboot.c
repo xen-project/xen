@@ -555,8 +555,7 @@ int alloc_cpu_id(void)
 
 static int do_boot_cpu(int apicid, int cpu)
 {
-    unsigned long boot_error;
-    int timeout, rc = 0;
+    int timeout, boot_error = 0, rc = 0;
     unsigned long start_eip;
 
     /*
@@ -586,7 +585,8 @@ static int do_boot_cpu(int apicid, int cpu)
     smpboot_setup_warm_reset_vector(start_eip);
 
     /* Starting actual IPI sequence... */
-    boot_error = wakeup_secondary_cpu(apicid, start_eip);
+    if ( !tboot_in_measured_env() || tboot_wake_ap(apicid, start_eip) )
+        boot_error = wakeup_secondary_cpu(apicid, start_eip);
 
     if ( !boot_error )
     {
