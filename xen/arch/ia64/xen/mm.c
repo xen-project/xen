@@ -180,6 +180,7 @@
 #include <xen/guest_access.h>
 #include <asm/page.h>
 #include <asm/dom_fw_common.h>
+#include <xsm/xsm.h>
 #include <public/memory.h>
 #include <asm/event.h>
 #include <asm/debugger.h>

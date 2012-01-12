@@ -4,6 +4,8 @@
 #include <xen/types.h>
 #include <xen/kexec.h>
 
+struct rsvd_region;
+
 extern const unsigned int relocate_new_kernel_size;
 extern void relocate_new_kernel(unsigned long indirection_page,
                                 unsigned long start_address,
