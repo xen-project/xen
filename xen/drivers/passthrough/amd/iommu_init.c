@@ -126,14 +126,15 @@ static void register_iommu_dev_table_in_mmio_space(struct amd_iommu *iommu)
 
 static void register_iommu_cmd_buffer_in_mmio_space(struct amd_iommu *iommu)
 {
-    u64 addr_64, addr_lo, addr_hi;
+    u64 addr_64;
+    u32 addr_lo, addr_hi;
     u32 power_of2_entries;
     u32 entry;
 
     ASSERT( iommu->cmd_buffer.buffer );
 
-    addr_64 = (u64)virt_to_maddr(iommu->cmd_buffer.buffer);
-    addr_lo = addr_64 & DMA_32BIT_MASK;
+    addr_64 = virt_to_maddr(iommu->cmd_buffer.buffer);
+    addr_lo = addr_64;
     addr_hi = addr_64 >> 32;
 
     entry = 0;
@@ -153,14 +154,15 @@ static void register_iommu_cmd_buffer_in_mmio_space(struct amd_iommu *iommu)
 
 static void register_iommu_event_log_in_mmio_space(struct amd_iommu *iommu)
 {
-    u64 addr_64, addr_lo, addr_hi;
+    u64 addr_64;
+    u32 addr_lo, addr_hi;
     u32 power_of2_entries;
     u32 entry;
 
     ASSERT( iommu->event_log.buffer );
 
-    addr_64 = (u64)virt_to_maddr(iommu->event_log.buffer);
-    addr_lo = addr_64 & DMA_32BIT_MASK;
+    addr_64 = virt_to_maddr(iommu->event_log.buffer);
+    addr_lo = addr_64;
     addr_hi = addr_64 >> 32;
 
     entry = 0;
@@ -177,6 +179,35 @@ static void register_iommu_event_log_in_mmio_space(struct amd_iommu *iommu)
                         IOMMU_EVENT_LOG_LENGTH_SHIFT, &entry);
     writel(entry, iommu->mmio_base+IOMMU_EVENT_LOG_BASE_HIGH_OFFSET);
 }
+
+static void register_iommu_ppr_log_in_mmio_space(struct amd_iommu *iommu)
+{
+    u64 addr_64;
+    u32 addr_lo, addr_hi;
+    u32 power_of2_entries;
+    u32 entry;
+
+    ASSERT ( iommu->ppr_log.buffer );
+
+    addr_64 = virt_to_maddr(iommu->ppr_log.buffer);
+    addr_lo = addr_64;
+    addr_hi = addr_64 >> 32;
+
+    entry = 0;
+    iommu_set_addr_lo_to_reg(&entry, addr_lo >> PAGE_SHIFT);
+    writel(entry, iommu->mmio_base + IOMMU_PPR_LOG_BASE_LOW_OFFSET);
+
+    power_of2_entries = get_order_from_bytes(iommu->ppr_log.alloc_size) +
+                        IOMMU_PPR_LOG_POWER_OF2_ENTRIES_PER_PAGE;
+
+    entry = 0;
+    iommu_set_addr_hi_to_reg(&entry, addr_hi);
+    set_field_in_reg_u32(power_of2_entries, entry,
+                        IOMMU_PPR_LOG_LENGTH_MASK,
+                        IOMMU_PPR_LOG_LENGTH_SHIFT, &entry);
+    writel(entry, iommu->mmio_base + IOMMU_PPR_LOG_BASE_HIGH_OFFSET);
+}
+
 
 static void set_iommu_translation_control(struct amd_iommu *iommu,
                                                  int enable)
@@ -215,10 +246,10 @@ static void set_iommu_command_buffer_control(struct amd_iommu *iommu,
 
 static void register_iommu_exclusion_range(struct amd_iommu *iommu)
 {
-    u64 addr_lo, addr_hi;
+    u32 addr_lo, addr_hi;
     u32 entry;
 
-    addr_lo = iommu->exclusion_limit & DMA_32BIT_MASK;
+    addr_lo = iommu->exclusion_limit;
     addr_hi = iommu->exclusion_limit >> 32;
 
     set_field_in_reg_u32((u32)addr_hi, 0,
@@ -276,6 +307,35 @@ static void set_iommu_event_log_control(struct amd_iommu *iommu,
     iommu_clear_bit(&entry, IOMMU_CONTROL_COMP_WAIT_INT_SHIFT);
 
     writel(entry, iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
+}
+
+static void set_iommu_ppr_log_control(struct amd_iommu *iommu,
+                                      int enable)
+{
+    u32 entry;
+
+    entry = readl(iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
+
+    /*reset head and tail pointer manually before enablement */
+    if ( enable )
+    {
+        writel(0x0, iommu->mmio_base + IOMMU_PPR_LOG_HEAD_OFFSET);
+        writel(0x0, iommu->mmio_base + IOMMU_PPR_LOG_TAIL_OFFSET);
+
+        iommu_set_bit(&entry, IOMMU_CONTROL_PPR_ENABLE_SHIFT);
+        iommu_set_bit(&entry, IOMMU_CONTROL_PPR_INT_SHIFT);
+        iommu_set_bit(&entry, IOMMU_CONTROL_PPR_LOG_ENABLE_SHIFT);
+    }
+    else
+    {
+        iommu_clear_bit(&entry, IOMMU_CONTROL_PPR_ENABLE_SHIFT);
+        iommu_clear_bit(&entry, IOMMU_CONTROL_PPR_INT_SHIFT);
+        iommu_clear_bit(&entry, IOMMU_CONTROL_PPR_LOG_ENABLE_SHIFT);
+    }
+
+    writel(entry, iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
+    if ( enable )
+        AMD_IOMMU_DEBUG("PPR Log Enabled.\n");
 }
 
 static void parse_event_log_entry(struct amd_iommu *, u32 entry[]);
@@ -585,12 +645,19 @@ static void enable_iommu(struct amd_iommu *iommu)
     register_iommu_event_log_in_mmio_space(iommu);
     register_iommu_exclusion_range(iommu);
 
+    if ( iommu_has_feature(iommu, IOMMU_EXT_FEATURE_PPRSUP_SHIFT) )
+        register_iommu_ppr_log_in_mmio_space(iommu);
+
     iommu_msi_set_affinity(irq_to_desc(iommu->irq), &cpu_online_map);
     amd_iommu_msi_enable(iommu, IOMMU_CONTROL_ENABLED);
 
     set_iommu_ht_flags(iommu);
     set_iommu_command_buffer_control(iommu, IOMMU_CONTROL_ENABLED);
     set_iommu_event_log_control(iommu, IOMMU_CONTROL_ENABLED);
+
+    if ( iommu_has_feature(iommu, IOMMU_EXT_FEATURE_PPRSUP_SHIFT) )
+        set_iommu_ppr_log_control(iommu, IOMMU_CONTROL_ENABLED);
+
     set_iommu_translation_control(iommu, IOMMU_CONTROL_ENABLED);
 
     if ( iommu_has_feature(iommu, IOMMU_EXT_FEATURE_IASUP_SHIFT) )
@@ -671,16 +738,29 @@ static void * __init allocate_event_log(struct amd_iommu *iommu)
                                 IOMMU_EVENT_LOG_DEFAULT_ENTRIES, "Event Log");
 }
 
+static void * __init allocate_ppr_log(struct amd_iommu *iommu)
+{
+    /* allocate 'ppr log' in power of 2 increments of 4K */
+    return allocate_ring_buffer(&iommu->ppr_log, sizeof(ppr_entry_t),
+                                IOMMU_PPR_LOG_DEFAULT_ENTRIES, "PPR Log");
+}
+
 static int __init amd_iommu_init_one(struct amd_iommu *iommu)
 {
+    if ( map_iommu_mmio_region(iommu) != 0 )
+        goto error_out;
+
+    get_iommu_features(iommu);
+
     if ( allocate_cmd_buffer(iommu) == NULL )
         goto error_out;
 
     if ( allocate_event_log(iommu) == NULL )
         goto error_out;
 
-    if ( map_iommu_mmio_region(iommu) != 0 )
-        goto error_out;
+    if ( iommu_has_feature(iommu, IOMMU_EXT_FEATURE_PPRSUP_SHIFT) )
+        if ( allocate_ppr_log(iommu) == NULL )
+            goto error_out;
 
     if ( set_iommu_interrupt_handler(iommu) == 0 )
         goto error_out;
@@ -692,8 +772,6 @@ static int __init amd_iommu_init_one(struct amd_iommu *iommu)
     iommu->dev_table.alloc_size = device_table.alloc_size;
     iommu->dev_table.entries = device_table.entries;
     iommu->dev_table.buffer = device_table.buffer;
-
-    get_iommu_features(iommu);
 
     enable_iommu(iommu);
     printk("AMD-Vi: IOMMU %d Enabled.\n", nr_amd_iommus );
@@ -717,6 +795,7 @@ static void __init amd_iommu_init_cleanup(void)
         {
             deallocate_ring_buffer(&iommu->cmd_buffer);
             deallocate_ring_buffer(&iommu->event_log);
+            deallocate_ring_buffer(&iommu->ppr_log);
             unmap_iommu_mmio_region(iommu);
         }
         xfree(iommu);
@@ -915,6 +994,10 @@ static void disable_iommu(struct amd_iommu *iommu)
     amd_iommu_msi_enable(iommu, IOMMU_CONTROL_DISABLED);
     set_iommu_command_buffer_control(iommu, IOMMU_CONTROL_DISABLED);
     set_iommu_event_log_control(iommu, IOMMU_CONTROL_DISABLED);
+
+    if ( iommu_has_feature(iommu, IOMMU_EXT_FEATURE_PPRSUP_SHIFT) )
+        set_iommu_ppr_log_control(iommu, IOMMU_CONTROL_DISABLED);
+
     set_iommu_translation_control(iommu, IOMMU_CONTROL_DISABLED);
 
     iommu->enabled = 0;

@@ -27,6 +27,9 @@
 /* IOMMU Event Log entries: in power of 2 increments, minimum of 256 */
 #define IOMMU_EVENT_LOG_DEFAULT_ENTRIES     512
 
+/* IOMMU PPR Log entries: in power of 2 increments, minimum of 256 */
+#define IOMMU_PPR_LOG_DEFAULT_ENTRIES       512
+
 #define PTE_PER_TABLE_SHIFT		9
 #define PTE_PER_TABLE_SIZE		(1 << PTE_PER_TABLE_SHIFT)
 #define PTE_PER_TABLE_MASK		(~(PTE_PER_TABLE_SIZE - 1))

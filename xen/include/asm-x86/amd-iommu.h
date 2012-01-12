@@ -93,6 +93,7 @@ struct amd_iommu {
     struct table_struct dev_table;
     struct ring_buffer cmd_buffer;
     struct ring_buffer event_log;
+    struct ring_buffer ppr_log;
 
     int exclusion_enable;
     int exclusion_allow_all;
