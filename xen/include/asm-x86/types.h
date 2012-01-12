@@ -55,14 +55,4 @@ typedef char bool_t;
 
 #endif /* __ASSEMBLY__ */
 
-#if defined(__i386__)
-#define BITS_PER_LONG 32
-#define BYTES_PER_LONG 4
-#define LONG_BYTEORDER 2
-#elif defined(__x86_64__)
-#define BITS_PER_LONG 64
-#define BYTES_PER_LONG 8
-#define LONG_BYTEORDER 3
-#endif
-
 #endif /* __X86_TYPES_H__ */

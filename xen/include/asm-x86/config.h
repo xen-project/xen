@@ -8,10 +8,15 @@
 #define __X86_CONFIG_H__
 
 #if defined(__x86_64__)
+# define LONG_BYTEORDER 3
 # define CONFIG_PAGING_LEVELS 4
 #else
+# define LONG_BYTEORDER 2
 # define CONFIG_PAGING_LEVELS 3
 #endif
+
+#define BYTES_PER_LONG (1 << LONG_BYTEORDER)
+#define BITS_PER_LONG (BYTES_PER_LONG << 3)
 
 #define CONFIG_X86 1
 #define CONFIG_X86_HT 1
