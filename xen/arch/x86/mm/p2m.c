@@ -964,7 +964,7 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
 int p2m_mem_paging_prep(struct domain *d, unsigned long gfn, uint64_t buffer)
 {
     struct page_info *page;
-    p2m_type_t p2mt;
+    p2m_type_t p2mt, target_p2mt;
     p2m_access_t a;
     mfn_t mfn;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
@@ -982,8 +982,8 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn, uint64_t buffer)
     mfn = p2m->get_entry(p2m, gfn, &p2mt, &a, p2m_query, NULL);
 
     ret = -ENOENT;
-    /* Allow only missing pages */
-    if ( p2mt != p2m_ram_paging_in_start )
+    /* Allow missing pages */
+    if ( (p2mt != p2m_ram_paging_in_start) && (p2mt != p2m_ram_paged) )
         goto out;
 
     /* Allocate a page if the gfn does not have one yet */
@@ -1018,8 +1018,15 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn, uint64_t buffer)
         }
     }
 
+    target_p2mt = (p2mt == p2m_ram_paging_in_start) ?
+        /* If we kicked the pager with a populate event, the pager will send
+         * a resume event back */
+        p2m_ram_paging_in :
+        /* If this was called asynchronously by the pager, then we can 
+         * transition directly to the final guest-accessible type */
+        (paging_mode_log_dirty(d) ? p2m_ram_logdirty : p2m_ram_rw);
     /* Fix p2m mapping */
-    set_p2m_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2m_ram_paging_in, a);
+    set_p2m_entry(p2m, gfn, mfn, PAGE_ORDER_4K, target_p2mt, a);
 
     atomic_dec(&d->paged_pages);
 
