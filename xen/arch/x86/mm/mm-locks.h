@@ -81,7 +81,7 @@ static inline void _mm_enforce_order_lock_post(int level, int *unlock_level,
 {
     if ( recurse_count )
     {
-        if ( *recurse_count++ == 0 )
+        if ( (*recurse_count)++ == 0 )
         {
             *unlock_level = __get_lock_level();
         }
@@ -125,7 +125,7 @@ static inline void mm_enforce_order_unlock(int unlock_level,
     if ( recurse_count )
     {
         BUG_ON(*recurse_count == 0);
-        if ( *recurse_count-- == 1 )
+        if ( (*recurse_count)-- == 1 )
         {
             __set_lock_level(unlock_level);
         }
