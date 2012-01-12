@@ -1,4 +1,4 @@
-CFLAGS += -fshort-wchar -mno-sse
+CFLAGS += -fshort-wchar
 
 obj-y += stub.o
 
