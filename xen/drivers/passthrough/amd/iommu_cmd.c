@@ -398,3 +398,15 @@ void amd_iommu_flush_all_caches(struct amd_iommu *iommu)
     invalidate_iommu_all(iommu);
     flush_command_buffer(iommu);
 }
+
+void amd_iommu_send_guest_cmd(struct amd_iommu *iommu, u32 cmd[])
+{
+    unsigned long flags;
+
+    spin_lock_irqsave(&iommu->lock, flags);
+
+    send_iommu_command(iommu, cmd);
+    flush_command_buffer(iommu);
+
+    spin_unlock_irqrestore(&iommu->lock, flags);
+}

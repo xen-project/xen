@@ -260,6 +260,8 @@ static int amd_iommu_domain_init(struct domain *d)
 
     hd->domain_id = d->domain_id;
 
+    guest_iommu_init(d);
+
     return 0;
 }
 
@@ -443,6 +445,7 @@ static void deallocate_iommu_page_tables(struct domain *d)
 
 static void amd_iommu_domain_destroy(struct domain *d)
 {
+    guest_iommu_destroy(d);
     deallocate_iommu_page_tables(d);
     amd_iommu_flush_all_pages(d);
 }

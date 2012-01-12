@@ -47,6 +47,7 @@ struct hvm_iommu {
     int domain_id;
     int paging_mode;
     struct page_info *root_table;
+    struct guest_iommu *g_iommu;
 
     /* iommu_ops */
     const struct iommu_ops *platform_ops;

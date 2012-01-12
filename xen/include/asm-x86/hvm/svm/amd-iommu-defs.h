@@ -113,6 +113,13 @@
 #define IOMMU_DEV_TABLE_PAGE_TABLE_PTR_LOW_SHIFT	12
 
 /* DeviceTable Entry[63:32] */
+#define IOMMU_DEV_TABLE_GV_SHIFT                    23
+#define IOMMU_DEV_TABLE_GV_MASK                     0x800000
+#define IOMMU_DEV_TABLE_GLX_SHIFT                   24
+#define IOMMU_DEV_TABLE_GLX_MASK                    0x3000000
+#define IOMMU_DEV_TABLE_GCR3_1_SHIFT                26
+#define IOMMU_DEV_TABLE_GCR3_1_MASK                 0x1c000000
+
 #define IOMMU_DEV_TABLE_PAGE_TABLE_PTR_HIGH_MASK	0x000FFFFF
 #define IOMMU_DEV_TABLE_PAGE_TABLE_PTR_HIGH_SHIFT	0
 #define IOMMU_DEV_TABLE_IO_READ_PERMISSION_MASK		0x20000000
@@ -123,6 +130,8 @@
 /* DeviceTable Entry[95:64] */
 #define IOMMU_DEV_TABLE_DOMAIN_ID_MASK	0x0000FFFF
 #define IOMMU_DEV_TABLE_DOMAIN_ID_SHIFT	0
+#define IOMMU_DEV_TABLE_GCR3_2_SHIFT                16
+#define IOMMU_DEV_TABLE_GCR3_2_MASK                 0xFFFF0000
 
 /* DeviceTable Entry[127:96] */
 #define IOMMU_DEV_TABLE_IOTLB_SUPPORT_MASK		0x00000001
@@ -151,6 +160,8 @@
 #define IOMMU_DEV_TABLE_INT_TABLE_IGN_UNMAPPED_SHIFT      5
 #define IOMMU_DEV_TABLE_INT_TABLE_PTR_LOW_MASK      0xFFFFFFC0
 #define IOMMU_DEV_TABLE_INT_TABLE_PTR_LOW_SHIFT     6
+#define IOMMU_DEV_TABLE_GCR3_3_SHIFT                11
+#define IOMMU_DEV_TABLE_GCR3_3_MASK                 0xfffff800
 
 /* DeviceTable Entry[191:160] */
 #define IOMMU_DEV_TABLE_INT_TABLE_PTR_HIGH_MASK     0x000FFFFF
@@ -179,6 +190,7 @@
 #define IOMMU_CMD_INVALIDATE_IOMMU_PAGES	0x3
 #define IOMMU_CMD_INVALIDATE_IOTLB_PAGES	0x4
 #define IOMMU_CMD_INVALIDATE_INT_TABLE		0x5
+#define IOMMU_CMD_COMPLETE_PPR_REQUEST      0x7
 #define IOMMU_CMD_INVALIDATE_IOMMU_ALL      0x8
 
 /* COMPLETION_WAIT command */
@@ -265,6 +277,28 @@
 #define IOMMU_EVENT_DEVICE_ID_MASK           0x0000FFFF
 #define IOMMU_EVENT_DEVICE_ID_SHIFT          0
 
+/* PPR Log */
+#define IOMMU_PPR_LOG_ENTRY_SIZE                        16
+#define IOMMU_PPR_LOG_POWER_OF2_ENTRIES_PER_PAGE        8
+#define IOMMU_PPR_LOG_U32_PER_ENTRY   (IOMMU_PPR_LOG_ENTRY_SIZE / 4)
+
+#define IOMMU_PPR_LOG_BASE_LOW_OFFSET                   0x0038
+#define IOMMU_PPR_LOG_BASE_HIGH_OFFSET                  0x003C
+#define IOMMU_PPR_LOG_BASE_LOW_MASK                     0xFFFFF000
+#define IOMMU_PPR_LOG_BASE_LOW_SHIFT                    12
+#define IOMMU_PPR_LOG_BASE_HIGH_MASK                    0x000FFFFF
+#define IOMMU_PPR_LOG_BASE_HIGH_SHIFT                   0
+#define IOMMU_PPR_LOG_LENGTH_MASK                       0x0F000000
+#define IOMMU_PPR_LOG_LENGTH_SHIFT                      24
+#define IOMMU_PPR_LOG_HEAD_MASK                         0x0007FFF0
+#define IOMMU_PPR_LOG_HEAD_SHIFT                        4
+#define IOMMU_PPR_LOG_TAIL_MASK                         0x0007FFF0
+#define IOMMU_PPR_LOG_TAIL_SHIFT                        4
+#define IOMMU_PPR_LOG_HEAD_OFFSET                       0x2030
+#define IOMMU_PPR_LOG_TAIL_OFFSET                       0x2038
+#define IOMMU_PPR_LOG_DEVICE_ID_MASK                    0x0000FFFF
+#define IOMMU_PPR_LOG_DEVICE_ID_SHIFT                   0
+
 /* Control Register */
 #define IOMMU_CONTROL_MMIO_OFFSET			0x18
 #define IOMMU_CONTROL_TRANSLATION_ENABLE_MASK		0x00000001
@@ -291,6 +325,11 @@
 #define IOMMU_CONTROL_COMMAND_BUFFER_ENABLE_SHIFT	12
 #define IOMMU_CONTROL_RESTART_MASK			0x80000000
 #define IOMMU_CONTROL_RESTART_SHIFT			31
+
+#define IOMMU_CONTROL_PPR_LOG_ENABLE_SHIFT      13
+#define IOMMU_CONTROL_PPR_INT_SHIFT             14
+#define IOMMU_CONTROL_PPR_ENABLE_SHIFT          15
+#define IOMMU_CONTROL_GT_ENABLE_SHIFT           16
 
 /* Exclusion Register */
 #define IOMMU_EXCLUSION_BASE_LOW_OFFSET		0x20
@@ -325,7 +364,8 @@
 #define IOMMU_EXT_FEATURE_HATS_MASK                     0x00000C00
 #define IOMMU_EXT_FEATURE_GATS_SHIFT                    0x12
 #define IOMMU_EXT_FEATURE_GATS_MASK                     0x00003000
-#define IOMMU_EXT_FEATURE_GLXSUP                        0x14
+#define IOMMU_EXT_FEATURE_GLXSUP_SHIFT                  0x14
+#define IOMMU_EXT_FEATURE_GLXSUP_MASK                   0x0000C000
 
 #define IOMMU_EXT_FEATURE_PASMAX_SHIFT                  0x0
 #define IOMMU_EXT_FEATURE_PASMAX_MASK                   0x0000001F
@@ -342,6 +382,9 @@
 #define IOMMU_STATUS_EVENT_LOG_RUN_SHIFT	3
 #define IOMMU_STATUS_CMD_BUFFER_RUN_MASK	0x00000010
 #define IOMMU_STATUS_CMD_BUFFER_RUN_SHIFT	4
+#define IOMMU_STATUS_PPR_LOG_OVERFLOW_SHIFT     5
+#define IOMMU_STATUS_PPR_LOG_INT_SHIFT          6
+#define IOMMU_STATUS_PPR_LOG_RUN_SHIFT          7
 
 /* I/O Page Table */
 #define IOMMU_PAGE_TABLE_ENTRY_SIZE	8

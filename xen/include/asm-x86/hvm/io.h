@@ -69,8 +69,9 @@ extern const struct hvm_mmio_handler hpet_mmio_handler;
 extern const struct hvm_mmio_handler vlapic_mmio_handler;
 extern const struct hvm_mmio_handler vioapic_mmio_handler;
 extern const struct hvm_mmio_handler msixtbl_mmio_handler;
+extern const struct hvm_mmio_handler iommu_mmio_handler;
 
-#define HVM_MMIO_HANDLER_NR 4
+#define HVM_MMIO_HANDLER_NR 5
 
 int hvm_io_intercept(ioreq_t *p, int type);
 void register_io_handler(

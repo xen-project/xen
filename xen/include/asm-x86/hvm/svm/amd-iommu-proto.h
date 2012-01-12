@@ -71,6 +71,8 @@ void amd_iommu_set_root_page_table(
     u32 *dte, u64 root_ptr, u16 domain_id, u8 paging_mode, u8 valid);
 void iommu_dte_set_iotlb(u32 *dte, u8 i);
 void iommu_dte_add_device_entry(u32 *dte, struct ivrs_mappings *ivrs_dev);
+void iommu_dte_set_guest_cr3(u32 *dte, u16 dom_id, u64 gcr3,
+                             int gv, unsigned int glx);
 
 /* send cmd to iommu */
 void amd_iommu_flush_all_pages(struct domain *d);
@@ -105,6 +107,14 @@ extern void *shared_intremap_table;
 void amd_iommu_resume(void);
 void amd_iommu_suspend(void);
 void amd_iommu_crash_shutdown(void);
+
+/* guest iommu support */
+void amd_iommu_send_guest_cmd(struct amd_iommu *iommu, u32 cmd[]);
+void guest_iommu_add_ppr_log(struct domain *d, u32 entry[]);
+void guest_iommu_add_event_log(struct domain *d, u32 entry[]);
+int guest_iommu_init(struct domain* d);
+void guest_iommu_destroy(struct domain *d);
+int guest_iommu_set_base(struct domain *d, uint64_t base);
 
 static inline u32 get_field_from_reg_u32(u32 reg_value, u32 mask, u32 shift)
 {

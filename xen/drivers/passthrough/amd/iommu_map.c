@@ -234,6 +234,53 @@ void __init iommu_dte_add_device_entry(u32 *dte, struct ivrs_mappings *ivrs_dev)
     dte[3] = entry;
 }
 
+void iommu_dte_set_guest_cr3(u32 *dte, u16 dom_id, u64 gcr3,
+                             int gv, unsigned int glx)
+{
+    u32 entry, gcr3_1, gcr3_2, gcr3_3;
+
+    gcr3_3 = gcr3 >> 31;
+    gcr3_2 = (gcr3 >> 15) & 0xFFFF;
+    gcr3_1 = (gcr3 >> PAGE_SHIFT) & 0x7;
+
+    /* I bit must be set when gcr3 is enabled */
+    entry = dte[3];
+    set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
+                         IOMMU_DEV_TABLE_IOTLB_SUPPORT_MASK,
+                         IOMMU_DEV_TABLE_IOTLB_SUPPORT_SHIFT, &entry);
+    /* update gcr3 */
+    set_field_in_reg_u32(gcr3_3, entry,
+                         IOMMU_DEV_TABLE_GCR3_3_MASK,
+                         IOMMU_DEV_TABLE_GCR3_3_SHIFT, &entry);
+    dte[3] = entry;
+
+    set_field_in_reg_u32(dom_id, entry,
+                         IOMMU_DEV_TABLE_DOMAIN_ID_MASK,
+                         IOMMU_DEV_TABLE_DOMAIN_ID_SHIFT, &entry);
+    /* update gcr3 */
+    entry = dte[2];
+    set_field_in_reg_u32(gcr3_2, entry,
+                         IOMMU_DEV_TABLE_GCR3_2_MASK,
+                         IOMMU_DEV_TABLE_GCR3_2_SHIFT, &entry);
+    dte[2] = entry;
+
+    entry = dte[1];
+    /* Enable GV bit */
+    set_field_in_reg_u32(!!gv, entry,
+                         IOMMU_DEV_TABLE_GV_MASK,
+                         IOMMU_DEV_TABLE_GV_SHIFT, &entry);
+
+    /* 1 level guest cr3 table  */
+    set_field_in_reg_u32(glx, entry,
+                         IOMMU_DEV_TABLE_GLX_MASK,
+                         IOMMU_DEV_TABLE_GLX_SHIFT, &entry);
+    /* update gcr3 */
+    set_field_in_reg_u32(gcr3_1, entry,
+                         IOMMU_DEV_TABLE_GCR3_1_MASK,
+                         IOMMU_DEV_TABLE_GCR3_1_SHIFT, &entry);
+    dte[1] = entry;
+}
+
 u64 amd_iommu_get_next_table_from_pte(u32 *entry)
 {
     u64 addr_lo, addr_hi, ptr;

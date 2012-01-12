@@ -38,7 +38,8 @@ hvm_mmio_handlers[HVM_MMIO_HANDLER_NR] =
     &hpet_mmio_handler,
     &vlapic_mmio_handler,
     &vioapic_mmio_handler,
-    &msixtbl_mmio_handler
+    &msixtbl_mmio_handler,
+    &iommu_mmio_handler
 };
 
 static int hvm_mmio_access(struct vcpu *v,
