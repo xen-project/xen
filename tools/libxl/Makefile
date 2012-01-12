@@ -35,11 +35,13 @@ LIBXL_OBJS-$(CONFIG_IA64) += libxl_nocpuid.o
 
 ifeq ($(CONFIG_NetBSD),y)
 LIBXL_OBJS-y += libxl_netbsd.o
-else ifeq ($(CONFIG_Linux),y)
+else
+ifeq ($(CONFIG_Linux),y)
 LIBXL_OBJS-y += libxl_linux.o
 else
 $(error Your Operating System is not supported by libxenlight, \
 please check libxl_linux.c and libxl_netbsd.c to see how to get it ported)
+endif
 endif
 
 LIBXL_LIBS += -lyajl
