@@ -14,6 +14,7 @@
 #include <public/platform.h>
 #include <public/event_channel.h>
 #include <public/tmem.h>
+#include <public/version.h>
 #include <asm/hypercall.h>
 #include <xsm/xsm.h>
 
@@ -42,6 +43,11 @@ arch_do_domctl(
 
 extern long
 do_sysctl(
+    XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl);
+
+extern long
+arch_do_sysctl(
+    struct xen_sysctl *sysctl,
     XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl);
 
 extern long
@@ -100,6 +106,12 @@ extern long
 do_vcpu_op(
     int cmd,
     int vcpuid,
+    XEN_GUEST_HANDLE(void) arg);
+
+struct vcpu;
+extern long
+arch_do_vcpu_op(int cmd,
+    struct vcpu *v,
     XEN_GUEST_HANDLE(void) arg);
 
 extern long
@@ -166,5 +178,7 @@ compat_set_timer_op(
     s_time_t timeout);
 
 #endif
+
+void arch_get_xen_caps(xen_capabilities_info_t *info);
 
 #endif /* __XEN_HYPERCALL_H__ */

@@ -10,7 +10,7 @@
 #include <xen/multiboot.h>
 #include <xen/sched.h>
 #include <xen/mm.h>
-#include <public/version.h>
+#include <xen/hypercall.h>
 #include <xen/gdbstub.h>
 #include <xen/version.h>
 #include <xen/console.h>

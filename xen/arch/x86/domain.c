@@ -23,6 +23,7 @@
 #include <xen/grant_table.h>
 #include <xen/iocap.h>
 #include <xen/kernel.h>
+#include <xen/hypercall.h>
 #include <xen/multicall.h>
 #include <xen/irq.h>
 #include <xen/event.h>
@@ -46,7 +47,6 @@
 #include <asm/xstate.h>
 #include <asm/mpspec.h>
 #include <asm/ldt.h>
-#include <asm/hypercall.h>
 #include <asm/fixmap.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>

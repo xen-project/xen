@@ -22,7 +22,4 @@ vmx_do_mmu_update(
     u64 *pdone,
     u64 foreigndom);
 
-extern long
-arch_do_vcpu_op(int cmd, struct vcpu *v, XEN_GUEST_HANDLE(void) arg);
-
 #endif /* __ASM_IA64_HYPERCALL_H__ */

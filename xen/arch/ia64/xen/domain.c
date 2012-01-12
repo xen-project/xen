@@ -31,6 +31,7 @@
 #include <asm/processor.h>
 #include <xen/event.h>
 #include <xen/console.h>
+#include <xen/hypercall.h>
 #include <xen/version.h>
 #include <xen/libelf.h>
 #include <asm/pgalloc.h>

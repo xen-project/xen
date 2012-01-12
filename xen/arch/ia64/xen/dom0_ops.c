@@ -19,6 +19,7 @@
 #include <xen/console.h>
 #include <xen/grant_table.h>
 #include <xen/guest_access.h>
+#include <xen/hypercall.h>
 #include <xen/pci.h>
 #include <asm/vmx.h>
 #include <asm/dom_fw.h>

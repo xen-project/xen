@@ -13,13 +13,10 @@
 #include <xen/paging.h>
 #include <xen/nmi.h>
 #include <xen/guest_access.h>
+#include <xen/hypercall.h>
 #include <asm/current.h>
 #include <public/nmi.h>
 #include <public/version.h>
-#ifdef CONFIG_X86
-#include <asm/shared.h>
-#include <asm/setup.h>
-#endif
 
 #ifndef COMPAT
 

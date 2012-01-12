@@ -90,16 +90,6 @@ extern unsigned long
 do_iret(
     void);
 
-struct vcpu;
-extern long
-arch_do_vcpu_op(
-    int cmd, struct vcpu *v, XEN_GUEST_HANDLE(void) arg);
-
-extern long
-arch_do_sysctl(
-    struct xen_sysctl *op, 
-    XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl);
-
 extern int
 do_kexec(
     unsigned long op, unsigned arg1, XEN_GUEST_HANDLE(void) uarg);
