@@ -83,6 +83,13 @@ static bool_t set_iommu_pde_present(u32 *pde, unsigned long next_mfn,
     set_field_in_reg_u32(ir, entry,
                          IOMMU_PDE_IO_READ_PERMISSION_MASK,
                          IOMMU_PDE_IO_READ_PERMISSION_SHIFT, &entry);
+
+    /* FC bit should be enabled in PTE, this helps to solve potential
+     * issues with ATS devices
+     */
+    if ( next_level == IOMMU_PAGING_MODE_LEVEL_0 )
+        set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
+                             IOMMU_PTE_FC_MASK, IOMMU_PTE_FC_SHIFT, &entry);
     pde[1] = entry;
 
     /* mark next level as 'present' */
