@@ -217,10 +217,27 @@ static void set_iommu_translation_control(struct amd_iommu *iommu,
     entry = readl(iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
 
     enable ?
-        iommu_set_bit(&entry, IOMMU_CONTROL_TRANSLATION_ENABLE_SHIFT):
+        iommu_set_bit(&entry, IOMMU_CONTROL_TRANSLATION_ENABLE_SHIFT) :
         iommu_clear_bit(&entry, IOMMU_CONTROL_TRANSLATION_ENABLE_SHIFT);
 
     writel(entry, iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
+}
+
+static void set_iommu_guest_translation_control(struct amd_iommu *iommu,
+                                                int enable)
+{
+    u32 entry;
+
+    entry = readl(iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
+
+    enable ?
+        iommu_set_bit(&entry, IOMMU_CONTROL_GT_ENABLE_SHIFT) :
+        iommu_clear_bit(&entry, IOMMU_CONTROL_GT_ENABLE_SHIFT);
+
+    writel(entry, iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
+
+    if ( enable )
+        AMD_IOMMU_DEBUG("Guest Translation Enabled.\n");
 }
 
 static void set_iommu_command_buffer_control(struct amd_iommu *iommu,
@@ -658,6 +675,9 @@ static void enable_iommu(struct amd_iommu *iommu)
     if ( iommu_has_feature(iommu, IOMMU_EXT_FEATURE_PPRSUP_SHIFT) )
         set_iommu_ppr_log_control(iommu, IOMMU_CONTROL_ENABLED);
 
+    if ( iommu_has_feature(iommu, IOMMU_EXT_FEATURE_GTSUP_SHIFT) )
+        set_iommu_guest_translation_control(iommu, IOMMU_CONTROL_ENABLED);
+
     set_iommu_translation_control(iommu, IOMMU_CONTROL_ENABLED);
 
     if ( iommu_has_feature(iommu, IOMMU_EXT_FEATURE_IASUP_SHIFT) )
@@ -997,6 +1017,9 @@ static void disable_iommu(struct amd_iommu *iommu)
 
     if ( iommu_has_feature(iommu, IOMMU_EXT_FEATURE_PPRSUP_SHIFT) )
         set_iommu_ppr_log_control(iommu, IOMMU_CONTROL_DISABLED);
+
+    if ( iommu_has_feature(iommu, IOMMU_EXT_FEATURE_GTSUP_SHIFT) )
+        set_iommu_guest_translation_control(iommu, IOMMU_CONTROL_DISABLED);
 
     set_iommu_translation_control(iommu, IOMMU_CONTROL_DISABLED);
 
