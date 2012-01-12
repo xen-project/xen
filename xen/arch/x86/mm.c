@@ -4316,9 +4316,9 @@ int page_make_sharable(struct domain *d,
         return -EEXIST;
     }
 
-    /* Check if the ref count is 2. The first from PGT_allocated, and
+    /* Check if the ref count is 2. The first from PGC_allocated, and
      * the second from get_page_and_type at the top of this function */
-    if(page->count_info != (PGC_allocated | (2 + expected_refcnt)))
+    if ( page->count_info != (PGC_allocated | (2 + expected_refcnt)) )
     {
         /* Return type count back to zero */
         put_page_and_type(page);
@@ -4335,7 +4335,7 @@ int page_make_sharable(struct domain *d,
 
 int page_make_private(struct domain *d, struct page_info *page)
 {
-    if(!get_page(page, dom_cow))
+    if ( !get_page(page, dom_cow) )
         return -EINVAL;
     
     spin_lock(&d->page_alloc_lock);
