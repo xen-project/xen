@@ -183,10 +183,10 @@ static int get_next_ucode_from_buffer_amd(
     struct microcode_amd *mc_amd,
     const void *buf,
     size_t bufsize,
-    unsigned long *offset)
+    size_t *offset)
 {
     const uint8_t *bufp = buf;
-    unsigned long off;
+    size_t off;
     const struct mpbhdr *mpbuf;
 
     off = *offset;
@@ -203,7 +203,7 @@ static int get_next_ucode_from_buffer_amd(
         return -EINVAL;
     }
 
-    printk(KERN_DEBUG "microcode: size %lu, block size %u, offset %ld\n",
+    printk(KERN_DEBUG "microcode: size %zu, block size %u, offset %zu\n",
            bufsize, mpbuf->len, off);
 
     if ( (off + mpbuf->len) > bufsize )
@@ -234,7 +234,7 @@ static int get_next_ucode_from_buffer_amd(
 static int install_equiv_cpu_table(
     struct microcode_amd *mc_amd,
     const uint32_t *buf,
-    unsigned long *offset)
+    size_t *offset)
 {
     const struct mpbhdr *mpbuf = (const struct mpbhdr *)&buf[1];
 

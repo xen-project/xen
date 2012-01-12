@@ -47,7 +47,13 @@ typedef unsigned long paddr_t;
 #define PRIpaddr "016lx"
 #endif
 
+#if defined(__SIZE_TYPE__)
+typedef __SIZE_TYPE__ size_t;
+#elif defined(__i386__)
+typedef unsigned int size_t;
+#else
 typedef unsigned long size_t;
+#endif
 
 typedef char bool_t;
 #define test_and_set_bool(b)   xchg(&(b), 1)
