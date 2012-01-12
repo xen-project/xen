@@ -29,7 +29,7 @@ static int queue_iommu_command(struct amd_iommu *iommu, u32 cmd[])
     u32 tail, head, *cmd_buffer;
     int i;
 
-    tail = iommu->cmd_buffer_tail;
+    tail = iommu->cmd_buffer.tail;
     if ( ++tail == iommu->cmd_buffer.entries )
         tail = 0;
 
@@ -40,13 +40,13 @@ static int queue_iommu_command(struct amd_iommu *iommu, u32 cmd[])
     if ( head != tail )
     {
         cmd_buffer = (u32 *)(iommu->cmd_buffer.buffer +
-                             (iommu->cmd_buffer_tail *
+                             (iommu->cmd_buffer.tail *
                              IOMMU_CMD_BUFFER_ENTRY_SIZE));
 
         for ( i = 0; i < IOMMU_CMD_BUFFER_U32_PER_ENTRY; i++ )
             cmd_buffer[i] = cmd[i];
 
-        iommu->cmd_buffer_tail = tail;
+        iommu->cmd_buffer.tail = tail;
         return 1;
     }
 
@@ -57,7 +57,7 @@ static void commit_iommu_command_buffer(struct amd_iommu *iommu)
 {
     u32 tail;
 
-    set_field_in_reg_u32(iommu->cmd_buffer_tail, 0,
+    set_field_in_reg_u32(iommu->cmd_buffer.tail, 0,
                          IOMMU_CMD_BUFFER_TAIL_MASK,
                          IOMMU_CMD_BUFFER_TAIL_SHIFT, &tail);
     writel(tail, iommu->mmio_base+IOMMU_CMD_BUFFER_TAIL_OFFSET);

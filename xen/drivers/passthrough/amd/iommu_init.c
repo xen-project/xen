@@ -294,20 +294,20 @@ static int amd_iommu_read_event_log(struct amd_iommu *iommu)
                                   IOMMU_EVENT_LOG_TAIL_MASK,
                                   IOMMU_EVENT_LOG_TAIL_SHIFT);
 
-    while ( tail != iommu->event_log_head )
+    while ( tail != iommu->event_log.head )
     {
         /* read event log entry */
         event_log = (u32 *)(iommu->event_log.buffer +
-                           (iommu->event_log_head *
+                           (iommu->event_log.head *
                            IOMMU_EVENT_LOG_ENTRY_SIZE));
 
         parse_event_log_entry(iommu, event_log);
 
-        if ( ++iommu->event_log_head == iommu->event_log.entries )
-            iommu->event_log_head = 0;
+        if ( ++iommu->event_log.head == iommu->event_log.entries )
+            iommu->event_log.head = 0;
 
         /* update head pointer */
-        set_field_in_reg_u32(iommu->event_log_head, 0,
+        set_field_in_reg_u32(iommu->event_log.head, 0,
                              IOMMU_EVENT_LOG_HEAD_MASK,
                              IOMMU_EVENT_LOG_HEAD_SHIFT, &head);
         writel(head, iommu->mmio_base + IOMMU_EVENT_LOG_HEAD_OFFSET);
@@ -346,7 +346,7 @@ static void amd_iommu_reset_event_log(struct amd_iommu *iommu)
     writel(entry, iommu->mmio_base+IOMMU_STATUS_MMIO_OFFSET);
 
     /*reset event log base address */
-    iommu->event_log_head = 0;
+    iommu->event_log.head = 0;
 
     set_iommu_event_log_control(iommu, IOMMU_CONTROL_ENABLED);
 }
@@ -605,71 +605,82 @@ static void enable_iommu(struct amd_iommu *iommu)
 
 }
 
-static void __init deallocate_iommu_table_struct(
-    struct table_struct *table)
+static void __init deallocate_buffer(void *buf, uint32_t sz)
 {
     int order = 0;
-    if ( table->buffer )
+    if ( buf )
     {
-        order = get_order_from_bytes(table->alloc_size);
-        __free_amd_iommu_tables(table->buffer, order);
-        table->buffer = NULL;
+        order = get_order_from_bytes(sz);
+        __free_amd_iommu_tables(buf, order);
     }
 }
 
-static int __init allocate_iommu_table_struct(struct table_struct *table,
-                                              const char *name)
+static void __init deallocate_device_table(struct table_struct *table)
 {
-    int order = 0;
-    if ( table->buffer == NULL )
-    {
-        order = get_order_from_bytes(table->alloc_size);
-        table->buffer = __alloc_amd_iommu_tables(order);
-
-        if ( table->buffer == NULL )
-        {
-            AMD_IOMMU_DEBUG("Error allocating %s\n", name);
-            return -ENOMEM;
-        }
-        memset(table->buffer, 0, PAGE_SIZE * (1UL << order));
-    }
-    return 0;
+    deallocate_buffer(table->buffer, table->alloc_size);
+    table->buffer = NULL;
 }
 
-static int __init allocate_cmd_buffer(struct amd_iommu *iommu)
+static void __init deallocate_ring_buffer(struct ring_buffer *ring_buf)
+{
+    deallocate_buffer(ring_buf->buffer, ring_buf->alloc_size);
+    ring_buf->buffer = NULL;
+    ring_buf->head = 0;
+    ring_buf->tail = 0;
+}
+
+static void * __init allocate_buffer(uint32_t alloc_size, const char *name)
+{
+    void * buffer;
+    int order = get_order_from_bytes(alloc_size);
+
+    buffer = __alloc_amd_iommu_tables(order);
+
+    if ( buffer == NULL )
+    {
+        AMD_IOMMU_DEBUG("Error allocating %s\n", name);
+        return NULL;
+    }
+
+    memset(buffer, 0, PAGE_SIZE * (1UL << order));
+    return buffer;
+}
+
+static void * __init allocate_ring_buffer(struct ring_buffer *ring_buf,
+                                          uint32_t entry_size,
+                                          uint64_t entries, const char *name)
+{
+    ring_buf->head = 0;
+    ring_buf->tail = 0;
+
+    ring_buf->alloc_size = PAGE_SIZE << get_order_from_bytes(entries *
+                                                             entry_size);
+    ring_buf->entries = ring_buf->alloc_size / entry_size;
+    ring_buf->buffer = allocate_buffer(ring_buf->alloc_size, name);
+    return ring_buf->buffer;
+}
+
+static void * __init allocate_cmd_buffer(struct amd_iommu *iommu)
 {
     /* allocate 'command buffer' in power of 2 increments of 4K */
-    iommu->cmd_buffer_tail = 0;
-    iommu->cmd_buffer.alloc_size = PAGE_SIZE <<
-                                   get_order_from_bytes(
-                                   PAGE_ALIGN(IOMMU_CMD_BUFFER_DEFAULT_ENTRIES
-                                              * IOMMU_CMD_BUFFER_ENTRY_SIZE));
-    iommu->cmd_buffer.entries = iommu->cmd_buffer.alloc_size /
-                                IOMMU_CMD_BUFFER_ENTRY_SIZE;
-
-    return (allocate_iommu_table_struct(&iommu->cmd_buffer, "Command Buffer"));
+    return allocate_ring_buffer(&iommu->cmd_buffer, sizeof(cmd_entry_t),
+                                IOMMU_CMD_BUFFER_DEFAULT_ENTRIES,
+                                "Command Buffer");
 }
 
-static int __init allocate_event_log(struct amd_iommu *iommu)
+static void * __init allocate_event_log(struct amd_iommu *iommu)
 {
-   /* allocate 'event log' in power of 2 increments of 4K */
-    iommu->event_log_head = 0;
-    iommu->event_log.alloc_size = PAGE_SIZE <<
-                                  get_order_from_bytes(
-                                  PAGE_ALIGN(IOMMU_EVENT_LOG_DEFAULT_ENTRIES *
-                                  IOMMU_EVENT_LOG_ENTRY_SIZE));
-    iommu->event_log.entries = iommu->event_log.alloc_size /
-                               IOMMU_EVENT_LOG_ENTRY_SIZE;
-
-    return (allocate_iommu_table_struct(&iommu->event_log, "Event Log"));
+    /* allocate 'event log' in power of 2 increments of 4K */
+    return allocate_ring_buffer(&iommu->event_log, sizeof(event_entry_t),
+                                IOMMU_EVENT_LOG_DEFAULT_ENTRIES, "Event Log");
 }
 
 static int __init amd_iommu_init_one(struct amd_iommu *iommu)
 {
-    if ( allocate_cmd_buffer(iommu) != 0 )
+    if ( allocate_cmd_buffer(iommu) == NULL )
         goto error_out;
 
-    if ( allocate_event_log(iommu) != 0 )
+    if ( allocate_event_log(iommu) == NULL )
         goto error_out;
 
     if ( map_iommu_mmio_region(iommu) != 0 )
@@ -708,8 +719,8 @@ static void __init amd_iommu_init_cleanup(void)
         list_del(&iommu->list);
         if ( iommu->enabled )
         {
-            deallocate_iommu_table_struct(&iommu->cmd_buffer);
-            deallocate_iommu_table_struct(&iommu->event_log);
+            deallocate_ring_buffer(&iommu->cmd_buffer);
+            deallocate_ring_buffer(&iommu->event_log);
             unmap_iommu_mmio_region(iommu);
         }
         xfree(iommu);
@@ -719,7 +730,7 @@ static void __init amd_iommu_init_cleanup(void)
     iterate_ivrs_entries(amd_iommu_free_intremap_table);
 
     /* free device table */
-    deallocate_iommu_table_struct(&device_table);
+    deallocate_device_table(&device_table);
 
     /* free ivrs_mappings[] */
     radix_tree_destroy(&ivrs_maps, xfree);
@@ -830,8 +841,10 @@ static int __init amd_iommu_setup_device_table(
     device_table.entries = device_table.alloc_size /
                            IOMMU_DEV_TABLE_ENTRY_SIZE;
 
-    if ( allocate_iommu_table_struct(&device_table, "Device Table") != 0 )
-         return -ENOMEM;
+    device_table.buffer = allocate_buffer(device_table.alloc_size,
+                                          "Device Table");
+    if  ( device_table.buffer == NULL )
+        return -ENOMEM;
 
     /* Add device table entries */
     for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )

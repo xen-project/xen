@@ -30,10 +30,40 @@
 
 extern struct list_head amd_iommu_head;
 
+#pragma pack(1)
+typedef struct event_entry
+{
+    uint32_t data[4];
+} event_entry_t;
+
+typedef struct ppr_entry
+{
+    uint32_t data[4];
+} ppr_entry_t;
+
+typedef struct cmd_entry
+{
+    uint32_t data[4];
+} cmd_entry_t;
+
+typedef struct dev_entry
+{
+    uint32_t data[8];
+} dev_entry_t;
+#pragma pack()
+
 struct table_struct {
     void *buffer;
     unsigned long entries;
     unsigned long alloc_size;
+};
+
+struct ring_buffer {
+    void *buffer;
+    unsigned long entries;
+    unsigned long alloc_size;
+    uint32_t tail;
+    uint32_t head;
 };
 
 typedef struct iommu_cap {
@@ -60,10 +90,8 @@ struct amd_iommu {
     unsigned long mmio_base_phys;
 
     struct table_struct dev_table;
-    struct table_struct cmd_buffer;
-    u32 cmd_buffer_tail;
-    struct table_struct event_log;
-    u32 event_log_head;
+    struct ring_buffer cmd_buffer;
+    struct ring_buffer event_log;
 
     int exclusion_enable;
     int exclusion_allow_all;
