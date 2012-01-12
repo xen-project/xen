@@ -33,10 +33,8 @@ static int queue_iommu_command(struct amd_iommu *iommu, u32 cmd[])
     if ( ++tail == iommu->cmd_buffer.entries )
         tail = 0;
 
-    head = get_field_from_reg_u32(readl(iommu->mmio_base + 
-                                        IOMMU_CMD_BUFFER_HEAD_OFFSET),
-                                  IOMMU_CMD_BUFFER_HEAD_MASK,
-                                  IOMMU_CMD_BUFFER_HEAD_SHIFT);
+    head = iommu_get_rb_pointer(readl(iommu->mmio_base +
+                                      IOMMU_CMD_BUFFER_HEAD_OFFSET));
     if ( head != tail )
     {
         cmd_buffer = (u32 *)(iommu->cmd_buffer.buffer +
@@ -55,11 +53,9 @@ static int queue_iommu_command(struct amd_iommu *iommu, u32 cmd[])
 
 static void commit_iommu_command_buffer(struct amd_iommu *iommu)
 {
-    u32 tail;
+    u32 tail = 0;
 
-    set_field_in_reg_u32(iommu->cmd_buffer.tail, 0,
-                         IOMMU_CMD_BUFFER_TAIL_MASK,
-                         IOMMU_CMD_BUFFER_TAIL_SHIFT, &tail);
+    iommu_set_rb_pointer(&tail, iommu->cmd_buffer.tail);
     writel(tail, iommu->mmio_base+IOMMU_CMD_BUFFER_TAIL_OFFSET);
 }
 

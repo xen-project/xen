@@ -192,4 +192,71 @@ static inline int iommu_has_feature(struct amd_iommu *iommu, uint32_t bit)
     return !!(iommu->features & (1U << bit));
 }
 
+/* access tail or head pointer of ring buffer */
+static inline uint32_t iommu_get_rb_pointer(uint32_t reg)
+{
+    return get_field_from_reg_u32(reg, IOMMU_RING_BUFFER_PTR_MASK,
+                                  IOMMU_RING_BUFFER_PTR_SHIFT);
+}
+
+static inline void iommu_set_rb_pointer(uint32_t *reg, uint32_t val)
+{
+    set_field_in_reg_u32(val, *reg, IOMMU_RING_BUFFER_PTR_MASK,
+                         IOMMU_RING_BUFFER_PTR_SHIFT, reg);
+}
+
+/* access device id field from iommu cmd */
+static inline uint16_t iommu_get_devid_from_cmd(uint32_t cmd)
+{
+    return get_field_from_reg_u32(cmd, IOMMU_CMD_DEVICE_ID_MASK,
+                                  IOMMU_CMD_DEVICE_ID_SHIFT);
+}
+
+static inline void iommu_set_devid_to_cmd(uint32_t *cmd, uint16_t id)
+{
+    set_field_in_reg_u32(id, *cmd, IOMMU_CMD_DEVICE_ID_MASK,
+                         IOMMU_CMD_DEVICE_ID_SHIFT, cmd);
+}
+
+/* access address field from iommu cmd */
+static inline uint32_t iommu_get_addr_lo_from_cmd(uint32_t cmd)
+{
+    return get_field_from_reg_u32(cmd, IOMMU_CMD_ADDR_LOW_MASK,
+                                  IOMMU_CMD_ADDR_LOW_SHIFT);
+}
+
+static inline uint32_t iommu_get_addr_hi_from_cmd(uint32_t cmd)
+{
+    return get_field_from_reg_u32(cmd, IOMMU_CMD_ADDR_LOW_MASK,
+                                  IOMMU_CMD_ADDR_HIGH_SHIFT);
+}
+
+/* access address field from event log entry */
+#define iommu_get_devid_from_event          iommu_get_devid_from_cmd
+
+/* access iommu base addresses field from mmio regs */
+static inline void iommu_set_addr_lo_to_reg(uint32_t *reg, uint32_t addr)
+{
+    set_field_in_reg_u32(addr, *reg, IOMMU_REG_BASE_ADDR_LOW_MASK,
+                         IOMMU_REG_BASE_ADDR_LOW_SHIFT, reg);
+}
+
+static inline void iommu_set_addr_hi_to_reg(uint32_t *reg, uint32_t addr)
+{
+    set_field_in_reg_u32(addr, *reg, IOMMU_REG_BASE_ADDR_HIGH_MASK,
+                         IOMMU_REG_BASE_ADDR_HIGH_SHIFT, reg);
+}
+
+static inline uint32_t iommu_get_addr_lo_from_reg(uint32_t reg)
+{
+    return get_field_from_reg_u32(reg, IOMMU_REG_BASE_ADDR_LOW_MASK,
+                                  IOMMU_REG_BASE_ADDR_LOW_SHIFT);
+}
+
+static inline uint32_t iommu_get_addr_hi_from_reg(uint32_t reg)
+{
+    return get_field_from_reg_u32(reg, IOMMU_REG_BASE_ADDR_HIGH_MASK,
+                                  IOMMU_REG_BASE_ADDR_HIGH_SHIFT);
+}
+
 #endif /* _ASM_X86_64_AMD_IOMMU_PROTO_H */
