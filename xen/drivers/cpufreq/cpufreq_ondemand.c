@@ -18,7 +18,6 @@
 #include <xen/types.h>
 #include <xen/sched.h>
 #include <xen/timer.h>
-#include <asm/config.h>
 #include <acpi/cpufreq/cpufreq.h>
 
 #define DEF_FREQUENCY_UP_THRESHOLD              (80)

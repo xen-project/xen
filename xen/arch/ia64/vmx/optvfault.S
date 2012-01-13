@@ -6,8 +6,6 @@
  * Xuefei Xu (Anthony Xu) <anthony.xu@intel.com>
  */
 
-#include <linux/config.h>
-#include <asm/config.h>
 #include <asm/pgtable.h>
 #include <asm/asmmacro.h>
 #include <asm/kregs.h>

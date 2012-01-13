@@ -1,6 +1,6 @@
 #ifndef _XEN_IA64_PRIVOP_STAT_H
 #define _XEN_IA64_PRIVOP_STAT_H
-#include <asm/config.h>
+
 #include <xen/types.h>
 #include <public/xen.h>
 

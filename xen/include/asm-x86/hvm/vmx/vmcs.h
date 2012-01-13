@@ -19,7 +19,6 @@
 #ifndef __ASM_X86_HVM_VMX_VMCS_H__
 #define __ASM_X86_HVM_VMX_VMCS_H__
 
-#include <asm/config.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/vpmu.h>
 

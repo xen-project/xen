@@ -38,7 +38,6 @@
 #include <asm/bug.h>
 #include <asm/msr.h>
 #include <asm/io.h>
-#include <asm/config.h>
 #include <asm/processor.h>
 #include <asm/percpu.h>
 #include <asm/cpufeature.h>

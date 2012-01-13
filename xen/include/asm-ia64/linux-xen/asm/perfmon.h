@@ -7,7 +7,6 @@
 #define _ASM_IA64_PERFMON_H
 
 #ifdef XEN
-#include <asm/config.h>
 #ifndef pt_regs
 #define pt_regs cpu_user_regs
 #endif

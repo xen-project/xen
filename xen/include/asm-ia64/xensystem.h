@@ -10,7 +10,6 @@
  * 	Kun Tian (Kevin Tian) <kevin.tian@intel.com>
  *
  */
-#include <asm/config.h>
 
 /* Define HV space hierarchy.
    VMM memory space is protected by CPL for paravirtualized domains and

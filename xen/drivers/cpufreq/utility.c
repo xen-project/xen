@@ -28,7 +28,6 @@
 #include <xen/sched.h>
 #include <xen/timer.h>
 #include <xen/trace.h>
-#include <asm/config.h>
 #include <acpi/cpufreq/cpufreq.h>
 #include <public/sysctl.h>
 

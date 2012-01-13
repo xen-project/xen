@@ -1,7 +1,6 @@
 #include <asm/debugger.h>
 #include <asm/vhpt.h>
 #include <public/arch-ia64.h>
-#include <asm/config.h>
 /*
  * arch/ia64/kernel/ivt.S
  *
@@ -42,8 +41,6 @@
  *
  * Table is based upon EAS2.6 (Oct 1999)
  */
-
-#include <linux/config.h>
 
 #include <asm/asmmacro.h>
 #include <asm/break.h>

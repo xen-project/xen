@@ -19,7 +19,6 @@
 #ifndef __ASM_X86_HVM_SVM_NESTEDSVM_H__
 #define __ASM_X86_HVM_SVM_NESTEDSVM_H__
 
-#include <asm/config.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/svm/vmcb.h>
 
