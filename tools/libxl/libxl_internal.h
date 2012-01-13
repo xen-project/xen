@@ -115,7 +115,8 @@ struct libxl__ctx {
     struct xs_handle *xsh;
 
     pthread_mutex_t lock; /* protects data structures hanging off the ctx */
-      /* Always use CTX_LOCK and CTX_UNLOCK to manipulate this.
+      /* Always use libxl__ctx_lock and _unlock (or the convenience
+       * macors CTX_LOCK and CTX_UNLOCK) to manipulate this.
        *
        * You may acquire this mutex recursively if it is convenient to
        * do so.  You may not acquire this lock at the same time as any
@@ -753,16 +754,18 @@ libxl__device_model_version_running(libxl__gc *gc, uint32_t domid);
 
 /* Locking functions.  See comment for "lock" member of libxl__ctx. */
 
-#define CTX_LOCK do {                                   \
-        int mutex_r = pthread_mutex_lock(&CTX->lock);   \
-        assert(!mutex_r);                               \
-    } while(0)
+static inline void libxl__ctx_lock(libxl_ctx *ctx) {
+    int r = pthread_mutex_lock(&ctx->lock);
+    assert(!r);
+}
 
-#define CTX_UNLOCK do {                                 \
-        int mutex_r = pthread_mutex_unlock(&CTX->lock); \
-        assert(!mutex_r);                               \
-    } while(0)
-        
+static inline void libxl__ctx_unlock(libxl_ctx *ctx) {
+    int r = pthread_mutex_unlock(&ctx->lock);
+    assert(!r);
+}
+
+#define CTX_LOCK (libxl__ctx_lock(CTX))
+#define CTX_UNLOCK (libxl__ctx_unlock(CTX))
 
 
 /*
