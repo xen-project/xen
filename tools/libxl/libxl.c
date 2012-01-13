@@ -24,17 +24,17 @@
 int libxl_ctx_alloc(libxl_ctx **pctx, int version,
                     unsigned flags, xentoollog_logger * lg)
 {
-    libxl_ctx *ctx;
+    libxl_ctx *ctx = NULL;
     struct stat stat_buf;
     const pthread_mutex_t mutex_value = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+    int rc;
 
-    if (version != LIBXL_VERSION)
-        return ERROR_VERSION;
+    if (version != LIBXL_VERSION) { rc = ERROR_VERSION; goto out; }
 
     ctx = malloc(sizeof(*ctx));
     if (!ctx) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Failed to allocate context\n");
-        return ERROR_NOMEM;
+        rc = ERROR_NOMEM; goto out;
     }
 
     memset(ctx, 0, sizeof(libxl_ctx));
@@ -48,14 +48,14 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
     if ( stat(XENSTORE_PID_FILE, &stat_buf) != 0 ) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Is xenstore daemon running?\n"
                      "failed to stat %s", XENSTORE_PID_FILE);
-        return ERROR_FAIL;
+        rc = ERROR_FAIL; goto out;
     }
 
     ctx->xch = xc_interface_open(lg,lg,0);
     if (!ctx->xch) {
         LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, errno,
                         "cannot open libxc handle");
-        return ERROR_FAIL;
+        rc = ERROR_FAIL; goto out;
     }
 
     ctx->xsh = xs_daemon_open();
@@ -64,12 +64,16 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
     if (!ctx->xsh) {
         LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, errno,
                         "cannot connect to xenstore");
-        xc_interface_close(ctx->xch);
-        return ERROR_FAIL;
+        rc = ERROR_FAIL; goto out;
     }
 
     *pctx = ctx;
     return 0;
+
+ out:
+    libxl_ctx_free(ctx);
+    *pctx = NULL;
+    return rc;
 }
 
 int libxl_ctx_free(libxl_ctx *ctx)
