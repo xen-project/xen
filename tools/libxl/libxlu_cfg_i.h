@@ -18,6 +18,7 @@
 #ifndef LIBXLU_CFG_I_H
 #define LIBXLU_CFG_I_H
 
+#include "libxl_osdeps.h" /* must come before any other headers */
 #include "libxlu_internal.h"
 #include "libxlu_cfg_y.h"
 

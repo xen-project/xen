@@ -12,10 +12,8 @@
  * GNU Lesser General Public License for more details.
  */
 
-#include "libxl_osdeps.h"
+#include "libxl_osdeps.h" /* must come before any other headers */
 
-#include <assert.h>
-#include <string.h>
 #include <math.h>
 
 #include <yajl/yajl_parse.h>

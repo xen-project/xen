@@ -13,22 +13,13 @@
  * GNU Lesser General Public License for more details.
  */
 
-#include "libxl_osdeps.h"
+#include "libxl_osdeps.h" /* must come before any other headers */
 
-#include <stdio.h>
-#include <assert.h>
 #include <glob.h>
-#include <inttypes.h>
-#include <string.h>
-#include <sys/mman.h>
-#include <sys/time.h> /* for struct timeval */
-#include <sys/stat.h> /* for stat */
-#include <unistd.h> /* for sleep(2) */
 
 #include <xenctrl.h>
 #include <xc_dom.h>
 #include <xenguest.h>
-#include <fcntl.h>
 
 #include <xen/hvm/hvm_info_table.h>
 

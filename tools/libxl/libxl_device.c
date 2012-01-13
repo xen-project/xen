@@ -14,15 +14,7 @@
  * GNU Lesser General Public License for more details.
  */
 
-#include "libxl_osdeps.h"
-
-#include <string.h>
-#include <stdio.h>
-#include <sys/time.h> /* for struct timeval */
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <fcntl.h>
+#include "libxl_osdeps.h" /* must come before any other headers */
 
 #include "libxl_internal.h"
 

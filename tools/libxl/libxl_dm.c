@@ -15,15 +15,7 @@
  * GNU Lesser General Public License for more details.
  */
 
-#include "libxl_osdeps.h"
-
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <signal.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <assert.h>
+#include "libxl_osdeps.h" /* must come before any other headers */
 
 #include "libxl_internal.h"
 

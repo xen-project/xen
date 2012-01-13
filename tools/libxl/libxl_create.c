@@ -15,19 +15,12 @@
  * GNU Lesser General Public License for more details.
  */
 
-#include "libxl_osdeps.h"
-
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <xenctrl.h>
-#include <xc_dom.h>
-#include <xenguest.h>
-#include <assert.h>
+#include "libxl_osdeps.h" /* must come before any other headers */
 
 #include "libxl_internal.h"
+
+#include <xc_dom.h>
+#include <xenguest.h>
 
 void libxl_domain_config_dispose(libxl_domain_config *d_config)
 {

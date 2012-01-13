@@ -17,17 +17,33 @@
 #ifndef LIBXL_INTERNAL_H
 #define LIBXL_INTERNAL_H
 
-#include "libxl_osdeps.h"
+#include "libxl_osdeps.h" /* must come before any other headers */
 
-#include <stdint.h>
+#include <assert.h>
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <inttypes.h>
+#include <pthread.h>
+#include <signal.h>
 #include <stdarg.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <pthread.h>
+#include <unistd.h>
+
+#include <sys/mman.h>
+#include <sys/select.h>
+#include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 #include <xs.h>
 #include <xenctrl.h>
+
 #include "xentoollog.h"
 
 #include <xen/io/xenbus.h>

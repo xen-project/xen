@@ -13,13 +13,7 @@
  * GNU Lesser General Public License for more details.
  */
 
-#include "libxl_osdeps.h"
-
-#include <string.h>
-#include <stddef.h>
-#include <stdio.h>
-#include <stdarg.h>
-#include <inttypes.h>
+#include "libxl_osdeps.h" /* must come before any other headers */
 
 #include "libxl_internal.h"
 

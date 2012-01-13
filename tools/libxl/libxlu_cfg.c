@@ -16,6 +16,8 @@
  */
 
 
+#include "libxl_osdeps.h" /* must come before any other headers */
+
 #include <limits.h>
 
 #include "libxlu_internal.h"

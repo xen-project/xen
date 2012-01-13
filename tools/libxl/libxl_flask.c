@@ -7,13 +7,7 @@
  *  as published by the Free Software Foundation.
  */
 
-#include "libxl_osdeps.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <errno.h>
-#include <xenctrl.h>
+#include "libxl_osdeps.h" /* must come before any other headers */
 
 #include "libxl_internal.h"
 

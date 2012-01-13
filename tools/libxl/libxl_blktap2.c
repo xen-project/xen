@@ -12,12 +12,10 @@
  * GNU Lesser General Public License for more details.
  */
 
-#include "libxl_osdeps.h"
+#include "libxl_osdeps.h" /* must come before any other headers */
 #include "libxl_internal.h"
 
 #include "tap-ctl.h"
-
-#include <string.h>
 
 int libxl__blktap_enabled(libxl__gc *gc)
 {

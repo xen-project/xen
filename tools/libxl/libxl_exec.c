@@ -15,18 +15,7 @@
  * GNU Lesser General Public License for more details.
  */
 
-#include "libxl_osdeps.h"
-
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <assert.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <signal.h> /* for SIGKILL */
-#include <fcntl.h>
+#include "libxl_osdeps.h" /* must come before any other headers */
 
 #include "libxl_internal.h"
 

@@ -12,6 +12,7 @@
  * GNU Lesser General Public License for more details.
  */
 
+#include "libxl_osdeps.h" /* must come before any other headers */
 #include "libxl_internal.h"
 #include "_libxl_paths.h"
 

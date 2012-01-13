@@ -13,7 +13,7 @@
  * GNU Lesser General Public License for more details.
  */
  
-#include <sys/stat.h>
+#include "libxl_osdeps.h" /* must come before any other headers */
 
 #include "libxl_internal.h"
  

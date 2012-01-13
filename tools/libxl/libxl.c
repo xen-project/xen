@@ -16,21 +16,6 @@
 
 #include "libxl_osdeps.h"
 
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <sys/select.h>
-#include <sys/wait.h>
-#include <sys/time.h>
-#include <signal.h>
-#include <unistd.h> /* for write, unlink and close */
-#include <stdint.h>
-#include <inttypes.h>
-#include <assert.h>
-
 #include "libxl_internal.h"
 
 #define PAGE_TO_MEMKB(pages) ((pages) * 4)

@@ -18,12 +18,10 @@
  * Specification, see in the QEMU repository.
  */
 
-#include "libxl_osdeps.h"
+#include "libxl_osdeps.h" /* must come before any other headers */
 
-#include <unistd.h>
 #include <sys/un.h>
 #include <sys/queue.h>
-#include <fcntl.h>
 
 #include <yajl/yajl_gen.h>
 

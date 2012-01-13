@@ -13,20 +13,9 @@
  * GNU Lesser General Public License for more details.
  */
 
-#include "libxl_osdeps.h"
+#include "libxl_osdeps.h" /* must come before any other headers */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
-#include <xs.h>
-#include <xenctrl.h>
 #include <ctype.h>
-#include <errno.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <assert.h>
 
 #include "libxl_internal.h"
 

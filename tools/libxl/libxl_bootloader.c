@@ -12,14 +12,9 @@
  * GNU Lesser General Public License for more details.
  */
 
-#include "libxl_osdeps.h"
+#include "libxl_osdeps.h" /* must come before any other headers */
 
-#include <unistd.h>
-#include <fcntl.h>
 #include <termios.h>
-
-#include <sys/stat.h>
-#include <sys/types.h>
 
 #include "libxl_internal.h"
 
