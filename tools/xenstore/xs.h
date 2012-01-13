@@ -207,6 +207,13 @@ bool xs_release_domain(struct xs_handle *h, unsigned int domid);
  */
 char *xs_get_domain_path(struct xs_handle *h, unsigned int domid);
 
+/* Returns true if child is either equal to parent, or a node underneath
+ * parent; or false otherwise.  Done by string comparison, so relative and
+ * absolute pathnames never in a parent/child relationship by this
+ * definition.  Cannot fail.
+ */
+bool xs_path_is_subpath(const char *parent, const char *child);
+
 /* Return whether the domain specified has been introduced to xenstored.
  */
 bool xs_is_domain_introduced(struct xs_handle *h, unsigned int domid);

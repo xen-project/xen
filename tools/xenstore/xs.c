@@ -950,6 +950,23 @@ char *xs_get_domain_path(struct xs_handle *h, unsigned int domid)
 	return xs_single(h, XBT_NULL, XS_GET_DOMAIN_PATH, domid_str, NULL);
 }
 
+bool xs_path_is_subpath(const char *parent, const char *child)
+{
+        size_t childlen = strlen(child);
+        size_t parentlen = strlen(parent);
+
+	if (childlen < parentlen)
+		return false;
+
+	if (memcmp(child, parent, parentlen))
+		return false;
+
+	if (childlen > parentlen && child[parentlen] != '/')
+		return false;
+
+	return true;
+}
+
 bool xs_is_domain_introduced(struct xs_handle *h, unsigned int domid)
 {
 	char *domain = single_with_domid(h, XS_IS_DOMAIN_INTRODUCED, domid);
