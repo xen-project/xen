@@ -513,7 +513,7 @@ static int qmp_send(libxl__qmp_handler *qmp,
 {
     char *buf = NULL;
     int rc = -1;
-    libxl__gc gc = LIBXL_INIT_GC(qmp->ctx);
+    libxl__gc gc; LIBXL_INIT_GC(gc,qmp->ctx);
 
     buf = qmp_send_prepare(&gc, qmp, cmd, args, callback, opaque, context);
 

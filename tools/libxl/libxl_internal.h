@@ -147,7 +147,12 @@ typedef struct {
     libxl_ctx *owner;
 } libxl__gc;
 
-#define LIBXL_INIT_GC(ctx) (libxl__gc){ .alloc_maxsize = 0, .alloc_ptrs = 0, .owner = ctx }
+#define LIBXL_INIT_GC(gc,ctx) do{               \
+        (gc).alloc_maxsize = 0;                 \
+        (gc).alloc_ptrs = 0;                    \
+        (gc).owner = (ctx);                     \
+    } while(0)
+
 static inline libxl_ctx *libxl__gc_owner(libxl__gc *gc)
 {
     return gc->owner;
@@ -725,7 +730,7 @@ libxl__device_model_version_running(libxl__gc *gc, uint32_t domid);
  * as a local variable.
  */
 
-#define GC_INIT(ctx)  libxl__gc gc[1] = { LIBXL_INIT_GC(ctx) }
+#define GC_INIT(ctx)  libxl__gc gc[1]; LIBXL_INIT_GC(gc[0],ctx)
 #define GC_FREE       libxl__free_all(gc)
 #define CTX           libxl__gc_owner(gc)
 
