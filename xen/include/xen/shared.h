@@ -1,8 +1,6 @@
 #ifndef __XEN_SHARED_H__
 #define __XEN_SHARED_H__
 
-#include <xen/config.h>
-
 #ifdef CONFIG_COMPAT
 
 #include <compat/xen.h>

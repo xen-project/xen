@@ -9,7 +9,6 @@
 #ifndef __XEN_EVENT_H__
 #define __XEN_EVENT_H__
 
-#include <xen/config.h>
 #include <xen/sched.h>
 #include <xen/smp.h>
 #include <xen/softirq.h>

@@ -75,7 +75,6 @@
  *    inside a macro, the way we do the other calls.
  */
 
-#include <xen/config.h>
 #include <xen/bitmap.h>
 #include <xen/kernel.h>
 

@@ -7,7 +7,6 @@
 #ifndef __XEN_PCI_H__
 #define __XEN_PCI_H__
 
-#include <xen/config.h>
 #include <xen/types.h>
 #include <xen/list.h>
 #include <xen/spinlock.h>

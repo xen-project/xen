@@ -23,7 +23,6 @@
 #ifndef _XEN_INTTYPES_H
 #define _XEN_INTTYPES_H	1
 
-#include <xen/config.h>
 #include <xen/types.h>
 
 # if BITS_PER_LONG == 64

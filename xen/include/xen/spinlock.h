@@ -1,7 +1,6 @@
 #ifndef __SPINLOCK_H__
 #define __SPINLOCK_H__
 
-#include <xen/config.h>
 #include <asm/system.h>
 #include <asm/spinlock.h>
 

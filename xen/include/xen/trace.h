@@ -23,7 +23,6 @@
 
 extern int tb_init_done;
 
-#include <xen/config.h>
 #include <public/sysctl.h>
 #include <public/trace.h>
 #include <asm/trace.h>

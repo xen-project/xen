@@ -11,7 +11,6 @@ enum {
     NR_COMMON_SOFTIRQS
 };
 
-#include <xen/config.h>
 #include <xen/lib.h>
 #include <xen/smp.h>
 #include <asm/bitops.h>

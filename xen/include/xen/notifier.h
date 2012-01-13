@@ -10,7 +10,6 @@
 #ifndef __XEN_NOTIFIER_H__
 #define __XEN_NOTIFIER_H__
 
-#include <xen/config.h>
 #include <xen/types.h>
 #include <xen/errno.h>
 #include <xen/kernel.h>

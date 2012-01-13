@@ -9,7 +9,6 @@
 #ifndef __XEN_TMEM_XEN_H__
 #define __XEN_TMEM_XEN_H__
 
-#include <xen/config.h>
 #include <xen/mm.h> /* heap alloc/free */
 #include <xen/xmalloc.h> /* xmalloc/xfree */
 #include <xen/sched.h>  /* struct domain */

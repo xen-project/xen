@@ -24,7 +24,6 @@
 #ifndef __XEN_GRANT_TABLE_H__
 #define __XEN_GRANT_TABLE_H__
 
-#include <xen/config.h>
 #include <public/grant_table.h>
 #include <asm/grant_table.h>
 

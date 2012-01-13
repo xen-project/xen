@@ -1,7 +1,6 @@
 #ifndef _XEN_NUMA_H
 #define _XEN_NUMA_H
 
-#include <xen/config.h>
 #include <asm/numa.h>
 
 #ifndef NODES_SHIFT

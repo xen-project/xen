@@ -5,8 +5,6 @@
 #ifndef __XEN_COMPAT_H__
 #define __XEN_COMPAT_H__
 
-#include <xen/config.h>
-
 #ifdef CONFIG_COMPAT
 
 #include <xen/types.h>

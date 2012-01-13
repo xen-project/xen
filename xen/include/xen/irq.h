@@ -1,7 +1,6 @@
 #ifndef __XEN_IRQ_H__
 #define __XEN_IRQ_H__
 
-#include <xen/config.h>
 #include <xen/cpumask.h>
 #include <xen/rcupdate.h>
 #include <xen/spinlock.h>

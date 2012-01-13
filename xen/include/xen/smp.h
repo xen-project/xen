@@ -1,7 +1,6 @@
 #ifndef __XEN_SMP_H__
 #define __XEN_SMP_H__
 
-#include <xen/config.h>
 #include <asm/smp.h>
 
 /*

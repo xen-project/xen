@@ -1,7 +1,6 @@
 #ifndef __TYPES_H__
 #define __TYPES_H__
 
-#include <xen/config.h>
 #include <asm/types.h>
 
 #define BITS_TO_LONGS(bits) \

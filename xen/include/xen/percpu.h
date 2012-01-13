@@ -1,7 +1,6 @@
 #ifndef __XEN_PERCPU_H__
 #define __XEN_PERCPU_H__
 
-#include <xen/config.h>
 #include <asm/percpu.h>
 
 /*

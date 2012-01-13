@@ -9,7 +9,6 @@
 #ifndef __XEN_PREEMPT_H__
 #define __XEN_PREEMPT_H__
 
-#include <xen/config.h>
 #include <xen/types.h>
 #include <xen/percpu.h>
 

@@ -9,7 +9,6 @@
 #ifndef _XEN_VGA_H
 #define _XEN_VGA_H
 
-#include <xen/config.h>
 #include <public/xen.h>
 
 #ifdef CONFIG_VGA

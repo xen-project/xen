@@ -1,7 +1,6 @@
 #ifndef _XEN_SYMBOLS_H
 #define _XEN_SYMBOLS_H
 
-#include <xen/config.h>
 #include <xen/types.h>
 
 #define KSYM_NAME_LEN 127

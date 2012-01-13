@@ -20,7 +20,6 @@
 #ifndef _XEN_RADIX_TREE_H
 #define _XEN_RADIX_TREE_H
 
-#include <xen/config.h>
 #include <xen/types.h>
 #include <xen/lib.h>
 #include <xen/rcupdate.h>

@@ -3,7 +3,6 @@
 
 #include <xen/inttypes.h>
 #include <xen/stdarg.h>
-#include <xen/config.h>
 #include <xen/types.h>
 #include <xen/xmalloc.h>
 #include <xen/string.h>

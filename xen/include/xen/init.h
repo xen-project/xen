@@ -1,7 +1,6 @@
 #ifndef _LINUX_INIT_H
 #define _LINUX_INIT_H
 
-#include <xen/config.h>
 #include <asm/init.h>
 
 /*

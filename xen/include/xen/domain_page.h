@@ -9,7 +9,6 @@
 #ifndef __XEN_DOMAIN_PAGE_H__
 #define __XEN_DOMAIN_PAGE_H__
 
-#include <xen/config.h>
 #include <xen/mm.h>
 
 #ifdef CONFIG_DOMAIN_PAGE

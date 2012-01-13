@@ -2,8 +2,6 @@
 #ifndef __XEN_PAGING_H__
 #define __XEN_PAGING_H__
 
-#include <xen/config.h>
-
 #if defined CONFIG_PAGING_ASSISTANCE
 
 #include <asm/paging.h>

@@ -9,7 +9,6 @@
  * Keith Owens <kaos@ocs.com.au> July 2000.
  */
 
-#include <xen/config.h>
 #include <asm/hardirq.h>
 
 /*
