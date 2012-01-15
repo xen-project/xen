@@ -549,7 +549,7 @@ void show_registers(struct cpu_user_regs *regs);
 void show_execution_state(struct cpu_user_regs *regs);
 #define dump_execution_state() run_in_exception_handler(show_execution_state)
 void show_page_walk(unsigned long addr);
-asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs);
+void fatal_trap(int trapnr, struct cpu_user_regs *regs);
 
 #ifdef CONFIG_COMPAT
 void compat_show_guest_stack(struct vcpu *, struct cpu_user_regs *, int lines);
@@ -563,8 +563,8 @@ extern void mtrr_bp_init(void);
 void mcheck_init(struct cpuinfo_x86 *c, bool_t bsp);
 
 #define DECLARE_TRAP_HANDLER(_name)                     \
-asmlinkage void _name(void);                            \
-asmlinkage void do_ ## _name(struct cpu_user_regs *regs)
+void _name(void);                            \
+void do_ ## _name(struct cpu_user_regs *regs)
 DECLARE_TRAP_HANDLER(divide_error);
 DECLARE_TRAP_HANDLER(debug);
 DECLARE_TRAP_HANDLER(nmi);
@@ -586,13 +586,13 @@ DECLARE_TRAP_HANDLER(alignment_check);
 DECLARE_TRAP_HANDLER(spurious_interrupt_bug);
 #undef DECLARE_TRAP_HANDLER
 
-asmlinkage void syscall_enter(void);
-asmlinkage void sysenter_entry(void);
-asmlinkage void sysenter_eflags_saved(void);
-asmlinkage void compat_hypercall(void);
-asmlinkage void int80_direct_trap(void);
+void syscall_enter(void);
+void sysenter_entry(void);
+void sysenter_eflags_saved(void);
+void compat_hypercall(void);
+void int80_direct_trap(void);
 
-extern asmlinkage int hypercall(void);
+extern int hypercall(void);
 
 int cpuid_hypervisor_leaves( uint32_t idx, uint32_t sub_idx,
           uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx);

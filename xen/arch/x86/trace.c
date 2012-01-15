@@ -11,7 +11,7 @@
 #define TRC_64_FLAG 0
 #endif
 
-asmlinkage void trace_hypercall(void)
+void trace_hypercall(void)
 {
     struct cpu_user_regs *regs = guest_cpu_user_regs();
 

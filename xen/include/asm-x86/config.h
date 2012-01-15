@@ -119,12 +119,12 @@ extern unsigned short boot_edid_caps;
 extern unsigned char boot_edid_info[128];
 #endif
 
+#define asmlinkage
+
 #if defined(__x86_64__)
 
 #define CONFIG_X86_64 1
 #define CONFIG_COMPAT 1
-
-#define asmlinkage
 
 #define PML4_ENTRY_BITS  39
 #ifndef __ASSEMBLY__
@@ -288,8 +288,6 @@ extern unsigned char boot_edid_info[128];
 
 #define CONFIG_X86_32      1
 #define CONFIG_DOMAIN_PAGE 1
-
-#define asmlinkage __attribute__((regparm(0)))
 
 /*
  * Memory layout (high to low):                          PAE-SIZE

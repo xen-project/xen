@@ -138,7 +138,7 @@ __asm__(                                        \
 #define IRQ_NAME(nr) IRQ_NAME2(IRQ##nr)
 
 #define BUILD_IRQ(nr)                           \
-asmlinkage void IRQ_NAME(nr);                   \
+void IRQ_NAME(nr);                   \
 __asm__(                                        \
 "\n"__ALIGN_STR"\n"                             \
 STR(IRQ) #nr "_interrupt:\n\t"                  \

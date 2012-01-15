@@ -132,7 +132,7 @@ static void enable_intr_window(struct vcpu *v, struct hvm_intack intack)
         vmcb, general1_intercepts | GENERAL1_INTERCEPT_VINTR);
 }
 
-asmlinkage void svm_intr_assist(void) 
+void svm_intr_assist(void) 
 {
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;

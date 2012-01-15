@@ -216,8 +216,8 @@ void show_page_walk(unsigned long addr)
            l1_table_offset(addr), l1e_get_intpte(l1e), pfn);
 }
 
-asmlinkage void double_fault(void);
-asmlinkage void do_double_fault(struct cpu_user_regs *regs)
+void double_fault(void);
+void do_double_fault(struct cpu_user_regs *regs)
 {
     unsigned int cpu;
 

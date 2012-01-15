@@ -172,7 +172,7 @@ void nvmx_update_exec_control(struct vcpu *v, u32 value);
 void nvmx_update_secondary_exec_control(struct vcpu *v,
                                         unsigned long value);
 void nvmx_update_exception_bitmap(struct vcpu *v, unsigned long value);
-asmlinkage void nvmx_switch_guest(void);
+void nvmx_switch_guest(void);
 void nvmx_idtv_handling(void);
 u64 nvmx_get_tsc_offset(struct vcpu *v);
 int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,

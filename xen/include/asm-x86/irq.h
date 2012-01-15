@@ -101,7 +101,7 @@ fastcall void smp_thermal_interrupt(struct cpu_user_regs *regs);
 fastcall void smp_cmci_interrupt(struct cpu_user_regs *regs);
 fastcall void smp_irq_move_cleanup_interrupt(struct cpu_user_regs *regs);
 
-asmlinkage void do_IRQ(struct cpu_user_regs *regs);
+void do_IRQ(struct cpu_user_regs *regs);
 
 void disable_8259A_irq(struct irq_desc *);
 void enable_8259A_irq(struct irq_desc *);

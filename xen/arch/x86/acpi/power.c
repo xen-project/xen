@@ -311,7 +311,7 @@ static void tboot_sleep(u8 sleep_state)
 }
 
 /* System is really put into sleep state by this stub */
-acpi_status asmlinkage acpi_enter_sleep_state(u8 sleep_state)
+acpi_status acpi_enter_sleep_state(u8 sleep_state)
 {
     acpi_status status;
 

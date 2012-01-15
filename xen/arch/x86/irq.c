@@ -757,7 +757,7 @@ void pirq_set_affinity(struct domain *d, int pirq, const cpumask_t *mask)
 
 DEFINE_PER_CPU(unsigned int, irq_count);
 
-asmlinkage void do_IRQ(struct cpu_user_regs *regs)
+void do_IRQ(struct cpu_user_regs *regs)
 {
     struct irqaction *action;
     uint32_t          tsc_in;

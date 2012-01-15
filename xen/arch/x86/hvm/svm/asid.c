@@ -39,7 +39,7 @@ void svm_asid_init(struct cpuinfo_x86 *c)
  * Called directly before VMRUN.  Checks if the VCPU needs a new ASID,
  * assigns it, and if required, issues required TLB flushes.
  */
-asmlinkage void svm_asid_handle_vmrun(void)
+void svm_asid_handle_vmrun(void)
 {
     struct vcpu *curr = current;
     struct vmcb_struct *vmcb = curr->arch.hvm_svm.vmcb;

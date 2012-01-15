@@ -968,7 +968,7 @@ static void virtual_vmexit(struct cpu_user_regs *regs)
     vmreturn(regs, VMSUCCEED);
 }
 
-asmlinkage void nvmx_switch_guest(void)
+void nvmx_switch_guest(void)
 {
     struct vcpu *v = current;
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);

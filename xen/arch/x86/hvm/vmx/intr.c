@@ -200,7 +200,7 @@ static int nvmx_intr_intercept(struct vcpu *v, struct hvm_intack intack)
     return 0;
 }
 
-asmlinkage void vmx_intr_assist(void)
+void vmx_intr_assist(void)
 {
     struct hvm_intack intack;
     struct vcpu *v = current;
