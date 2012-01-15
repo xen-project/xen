@@ -71,8 +71,8 @@ struct microcode_header_amd {
 } __attribute__((packed));
 
 struct microcode_amd {
-    struct microcode_header_amd hdr;
-    unsigned int mpb[0];
+    void *mpb;
+    size_t mpb_size;
 };
 
 struct cpu_signature {
