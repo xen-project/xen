@@ -121,16 +121,9 @@ static unsigned int host_domid(struct domain *d, uint64_t g_domid)
 
 static unsigned long get_gfn_from_base_reg(uint64_t base_raw)
 {
-    struct mmio_reg reg;
-    uint64_t addr64;
-
-    reg.lo = iommu_get_addr_lo_from_reg(base_raw & DMA_32BIT_MASK);
-    reg.hi = iommu_get_addr_hi_from_reg(base_raw >> 32);
-    addr64 = reg_to_u64(reg);
-
-    ASSERT ( addr64 != 0 );
-
-    return addr64 >> PAGE_SHIFT;
+    base_raw &= PADDR_MASK;
+    ASSERT ( base_raw != 0 );
+    return base_raw >> PAGE_SHIFT;
 }
 
 static void guest_iommu_deliver_msi(struct domain *d)

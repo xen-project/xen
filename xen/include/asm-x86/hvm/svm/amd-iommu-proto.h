@@ -257,16 +257,4 @@ static inline void iommu_set_addr_hi_to_reg(uint32_t *reg, uint32_t addr)
                          IOMMU_REG_BASE_ADDR_HIGH_SHIFT, reg);
 }
 
-static inline uint32_t iommu_get_addr_lo_from_reg(uint32_t reg)
-{
-    return get_field_from_reg_u32(reg, IOMMU_REG_BASE_ADDR_LOW_MASK,
-                                  IOMMU_REG_BASE_ADDR_LOW_SHIFT);
-}
-
-static inline uint32_t iommu_get_addr_hi_from_reg(uint32_t reg)
-{
-    return get_field_from_reg_u32(reg, IOMMU_REG_BASE_ADDR_HIGH_MASK,
-                                  IOMMU_REG_BASE_ADDR_HIGH_SHIFT);
-}
-
 #endif /* _ASM_X86_64_AMD_IOMMU_PROTO_H */
