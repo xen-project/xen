@@ -41,7 +41,7 @@ ALL_OBJS-y               += $(BASEDIR)/xsm/built_in.o
 ALL_OBJS-y               += $(BASEDIR)/arch/$(TARGET_ARCH)/built_in.o
 ALL_OBJS-$(x86)          += $(BASEDIR)/crypto/built_in.o
 
-CFLAGS-y                += -g -D__XEN__ --include $(BASEDIR)/include/xen/config.h
+CFLAGS-y                += -g -D__XEN__ -include $(BASEDIR)/include/xen/config.h
 CFLAGS-$(XSM_ENABLE)    += -DXSM_ENABLE
 CFLAGS-$(FLASK_ENABLE)  += -DFLASK_ENABLE -DXSM_MAGIC=0xf97cff8c
 CFLAGS-$(FLASK_ENABLE)  += -DFLASK_DEVELOP -DFLASK_BOOTPARAM -DFLASK_AVC_STATS
@@ -59,7 +59,7 @@ ifneq ($(max_phys_irqs),)
 CFLAGS-y                += -DMAX_PHYS_IRQS=$(max_phys_irqs)
 endif
 
-AFLAGS-y                += -D__ASSEMBLY__ --include $(BASEDIR)/include/xen/config.h
+AFLAGS-y                += -D__ASSEMBLY__ -include $(BASEDIR)/include/xen/config.h
 
 # Clang's built-in assembler can't handle .code16/.code32/.code64 yet
 AFLAGS-$(clang)         += -no-integrated-as
