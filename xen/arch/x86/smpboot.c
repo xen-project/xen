@@ -42,6 +42,7 @@
 #include <asm/msr.h>
 #include <asm/mtrr.h>
 #include <asm/time.h>
+#include <asm/tboot.h>
 #include <mach_apic.h>
 #include <mach_wakecpu.h>
 #include <smpboot_hooks.h>
@@ -445,29 +446,42 @@ static int wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
     apic_icr_write(APIC_INT_LEVELTRIG | APIC_INT_ASSERT | APIC_DM_INIT,
                    phys_apicid);
 
-    Dprintk("Waiting for send to finish...\n");
-    timeout = 0;
-    do {
-        Dprintk("+");
-        udelay(100);
-        if ( !x2apic_enabled )
+    if ( !x2apic_enabled )
+    {
+        Dprintk("Waiting for send to finish...\n");
+        timeout = 0;
+        do {
+            Dprintk("+");
+            udelay(100);
             send_status = apic_read(APIC_ICR) & APIC_ICR_BUSY;
-    } while ( send_status && (timeout++ < 1000) );
+        } while ( send_status && (timeout++ < 1000) );
 
-    mdelay(10);
+        mdelay(10);
 
-    Dprintk("Deasserting INIT.\n");
+        Dprintk("Deasserting INIT.\n");
 
-    apic_icr_write(APIC_INT_LEVELTRIG | APIC_DM_INIT, phys_apicid);
+        apic_icr_write(APIC_INT_LEVELTRIG | APIC_DM_INIT, phys_apicid);
 
-    Dprintk("Waiting for send to finish...\n");
-    timeout = 0;
-    do {
-        Dprintk("+");
-        udelay(100);
-        if ( !x2apic_enabled )
+        Dprintk("Waiting for send to finish...\n");
+        timeout = 0;
+        do {
+            Dprintk("+");
+            udelay(100);
             send_status = apic_read(APIC_ICR) & APIC_ICR_BUSY;
-    } while ( send_status && (timeout++ < 1000) );
+        } while ( send_status && (timeout++ < 1000) );
+    }
+    else if ( tboot_in_measured_env() )
+    {
+        /*
+         * With tboot AP is actually spinning in a mini-guest before 
+         * receiving INIT. Upon receiving INIT ipi, AP need time to VMExit, 
+         * update VMCS to tracking SIPIs and VMResume.
+         *
+         * While AP is in root mode handling the INIT the CPU will drop
+         * any SIPIs
+         */
+        udelay(10);
+    }
 
     /*
      * Should we send STARTUP IPIs ?
@@ -496,22 +510,24 @@ static int wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
          */
         apic_icr_write(APIC_DM_STARTUP | (start_eip >> 12), phys_apicid);
 
-        /* Give the other CPU some time to accept the IPI. */
-        udelay(300);
+        if ( !x2apic_enabled )
+        {
+            /* Give the other CPU some time to accept the IPI. */
+            udelay(300);
 
-        Dprintk("Startup point 1.\n");
+            Dprintk("Startup point 1.\n");
 
-        Dprintk("Waiting for send to finish...\n");
-        timeout = 0;
-        do {
-            Dprintk("+");
-            udelay(100);
-            if ( !x2apic_enabled )
-            send_status = apic_read(APIC_ICR) & APIC_ICR_BUSY;
-        } while ( send_status && (timeout++ < 1000) );
+            Dprintk("Waiting for send to finish...\n");
+            timeout = 0;
+            do {
+                Dprintk("+");
+                udelay(100);
+                send_status = apic_read(APIC_ICR) & APIC_ICR_BUSY;
+            } while ( send_status && (timeout++ < 1000) );
 
-        /* Give the other CPU some time to accept the IPI. */
-        udelay(200);
+            /* Give the other CPU some time to accept the IPI. */
+            udelay(200);
+        }
 
         /* Due to the Pentium erratum 3AP. */
         if ( maxlvt > 3 )
