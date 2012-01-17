@@ -53,6 +53,8 @@ bool_t __read_mostly untrusted_msi;
 
 int nr_iommus;
 
+static struct tasklet vtd_fault_tasklet;
+
 static void setup_dom0_device(struct pci_dev *);
 static void setup_dom0_rmrr(struct domain *d);
 
@@ -918,10 +920,8 @@ static void iommu_fault_status(u32 fault_status)
 }
 
 #define PRIMARY_FAULT_REG_LEN (16)
-static void iommu_page_fault(int irq, void *dev_id,
-                             struct cpu_user_regs *regs)
+static void __do_iommu_page_fault(struct iommu *iommu)
 {
-    struct iommu *iommu = dev_id;
     int reg, fault_index;
     u32 fault_status;
     unsigned long flags;
@@ -994,6 +994,37 @@ clear_overflow:
         dmar_writel(iommu->reg, DMAR_FSTS_REG, DMA_FSTS_PFO);
         spin_unlock_irqrestore(&iommu->register_lock, flags);
     }
+}
+
+static void do_iommu_page_fault(unsigned long data)
+{
+    struct acpi_drhd_unit *drhd;
+
+    if ( list_empty(&acpi_drhd_units) )
+    {
+       INTEL_IOMMU_DEBUG("no device found, something must be very wrong!\n");
+       return;
+    }
+
+    /*
+     * No matter from whom the interrupt came from, check all the
+     * IOMMUs present in the system. This allows for having just one
+     * tasklet (instead of one per each IOMMUs) and should be more than
+     * fine, considering how rare the event of a fault should be.
+     */
+    for_each_drhd_unit ( drhd )
+        __do_iommu_page_fault(drhd->iommu);
+}
+
+static void iommu_page_fault(int irq, void *dev_id,
+                             struct cpu_user_regs *regs)
+{
+    /*
+     * Just flag the tasklet as runnable. This is fine, according to VT-d
+     * specs since a new interrupt won't be generated until we clear all
+     * the faults that caused this one to happen.
+     */
+    tasklet_schedule(&vtd_fault_tasklet);
 }
 
 static void dma_msi_unmask(struct irq_desc *desc)
@@ -2143,6 +2174,8 @@ int __init intel_vtd_setup(void)
         }
         iommu->irq = ret;
     }
+
+    softirq_tasklet_init(&vtd_fault_tasklet, do_iommu_page_fault, 0);
 
     if ( !iommu_qinval && iommu_intremap )
     {
