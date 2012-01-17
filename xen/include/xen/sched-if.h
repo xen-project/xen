@@ -16,6 +16,11 @@ extern struct cpupool *cpupool0;
 /* cpus currently in no cpupool */
 extern cpumask_t cpupool_free_cpus;
 
+/* Scheduler generic parameters
+ * */
+extern int sched_ratelimit_us;
+
+
 /*
  * In order to allow a scheduler to remap the lock->cpu mapping,
  * we have a per-cpu pointer, along with a pre-allocated set of

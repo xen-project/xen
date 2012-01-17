@@ -16,6 +16,7 @@ PERFCOUNTER(sched_irq,              "sched: timer")
 PERFCOUNTER(sched_run,              "sched: runs through scheduler")
 PERFCOUNTER(sched_ctx,              "sched: context switches")
 
+PERFCOUNTER(delay_ms,               "csched: delay")
 PERFCOUNTER(vcpu_check,             "csched: vcpu_check")
 PERFCOUNTER(schedule,               "csched: schedule")
 PERFCOUNTER(acct_run,               "csched: acct_run")

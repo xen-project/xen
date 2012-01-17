@@ -47,6 +47,11 @@ string_param("sched", opt_sched);
 bool_t sched_smt_power_savings = 0;
 boolean_param("sched_smt_power_savings", sched_smt_power_savings);
 
+/* Default scheduling rate limit: 1ms 
+ * The behavior when sched_ratelimit_us is greater than sched_credit_tslice_ms is undefined
+ * */
+int sched_ratelimit_us = 1000;
+integer_param("sched_ratelimit_us", sched_ratelimit_us);
 /* Various timer handlers. */
 static void s_timer_fn(void *unused);
 static void vcpu_periodic_timer_fn(void *data);

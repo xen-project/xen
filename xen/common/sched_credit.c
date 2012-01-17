@@ -173,6 +173,7 @@ struct csched_private {
     uint32_t credit;
     int credit_balance;
     uint32_t runq_sort;
+    unsigned ratelimit_us;
     /* Period of master and tick in milliseconds */
     unsigned tslice_ms, tick_period_us, ticks_per_tslice;
     unsigned credits_per_tslice;
@@ -1301,9 +1302,14 @@ csched_schedule(
     struct csched_private *prv = CSCHED_PRIV(ops);
     struct csched_vcpu *snext;
     struct task_slice ret;
+    s_time_t runtime, tslice;
 
     CSCHED_STAT_CRANK(schedule);
     CSCHED_VCPU_CHECK(current);
+
+    runtime = now - current->runstate.state_entry_time;
+    if ( runtime < 0 ) /* Does this ever happen? */
+        runtime = 0;
 
     if ( !is_idle_vcpu(scurr->vcpu) )
     {
@@ -1316,6 +1322,35 @@ csched_schedule(
         /* Re-instate a boosted idle VCPU as normal-idle. */
         scurr->pri = CSCHED_PRI_IDLE;
     }
+
+    /* Choices, choices:
+     * - If we have a tasklet, we need to run the idle vcpu no matter what.
+     * - If sched rate limiting is in effect, and the current vcpu has
+     *   run for less than that amount of time, continue the current one,
+     *   but with a shorter timeslice and return it immediately
+     * - Otherwise, chose the one with the highest priority (which may
+     *   be the one currently running)
+     * - If the currently running one is TS_OVER, see if there
+     *   is a higher priority one waiting on the runqueue of another
+     *   cpu and steal it.
+     */
+
+    /* If we have schedule rate limiting enabled, check to see
+     * how long we've run for. */
+    if ( !tasklet_work_scheduled
+         && prv->ratelimit_us
+         && vcpu_runnable(current)
+         && !is_idle_vcpu(current)
+         && runtime < MICROSECS(prv->ratelimit_us) )
+    {
+        snext = scurr;
+        snext->start_time += now;
+        perfc_incr(delay_ms);
+        tslice = MICROSECS(prv->ratelimit_us);
+        ret.migrated = 0;
+        goto out;
+    }
+    tslice = MILLISECS(prv->tslice_ms);
 
     /*
      * Select next runnable local VCPU (ie top of local runq)
@@ -1371,11 +1406,12 @@ csched_schedule(
     if ( !is_idle_vcpu(snext->vcpu) )
         snext->start_time += now;
 
+out:
     /*
      * Return task to run next...
      */
     ret.time = (is_idle_vcpu(snext->vcpu) ?
-                -1 : MILLISECS(prv->tslice_ms));
+                -1 : tslice);
     ret.task = snext->vcpu;
 
     CSCHED_VCPU_CHECK(ret.task);
@@ -1537,6 +1573,15 @@ csched_init(struct scheduler *ops)
     prv->tick_period_us = prv->tslice_ms * 1000 / prv->ticks_per_tslice;
     prv->credits_per_tslice = CSCHED_CREDITS_PER_MSEC * prv->tslice_ms;
 
+    if ( MICROSECS(sched_ratelimit_us) > MILLISECS(sched_credit_tslice_ms) )
+    {
+        printk("WARNING: sched_ratelimit_us >" 
+               "sched_credit_tslice_ms is undefined\n"
+               "Setting ratelimit_us to 1000 * tslice_ms\n");
+        prv->ratelimit_us = 1000 * prv->tslice_ms;
+    }
+    else
+        prv->ratelimit_us = sched_ratelimit_us;
     return 0;
 }
 
