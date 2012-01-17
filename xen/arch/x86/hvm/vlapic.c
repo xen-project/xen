@@ -142,14 +142,11 @@ static int vlapic_find_highest_irr(struct vlapic *vlapic)
 
 int vlapic_set_irq(struct vlapic *vlapic, uint8_t vec, uint8_t trig)
 {
-    int ret;
-
-    ret = !vlapic_test_and_set_irr(vec, vlapic);
     if ( trig )
         vlapic_set_vector(vec, &vlapic->regs->data[APIC_TMR]);
 
     /* We may need to wake up target vcpu, besides set pending bit here */
-    return ret;
+    return !vlapic_test_and_set_irr(vec, vlapic);
 }
 
 static int vlapic_find_highest_isr(struct vlapic *vlapic)
