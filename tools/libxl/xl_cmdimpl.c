@@ -1580,7 +1580,9 @@ static int create_domain(struct domain_create *dom_info)
         }
     }
 
-    d_config.b_info.u.hvm.no_incr_generationid = dom_info->no_incr_generationid;
+    if (d_config.c_info.type == LIBXL_DOMAIN_TYPE_HVM)
+        d_config.b_info.u.hvm.no_incr_generationid =
+            dom_info->no_incr_generationid;
 
     if (debug || dom_info->dryrun)
         printf_info(-1, &d_config, &d_config.dm_info);
