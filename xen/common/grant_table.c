@@ -141,7 +141,7 @@ shared_entry_header(struct grant_table *t, grant_ref_t ref)
 #define active_entry(t, e) \
     ((t)->active[(e)/ACGNT_PER_PAGE][(e)%ACGNT_PER_PAGE])
 
-/* Check if the page has been paged out */
+/* Check if the page has been paged out. If rc == GNTST_okay, caller must do put_gfn(rd, gfn) */
 static int __get_paged_frame(unsigned long gfn, unsigned long *frame, int readonly, struct domain *rd)
 {
     int rc = GNTST_okay;
@@ -573,7 +573,10 @@ __gnttab_map_grant_ref(
             gfn = sha1 ? sha1->frame : sha2->full_page.frame;
             rc = __get_paged_frame(gfn, &frame, !!(op->flags & GNTMAP_readonly), rd);
             if ( rc != GNTST_okay )
+            {
+                gfn = INVALID_GFN;
                 goto unlock_out;
+            }
             act->gfn = gfn;
             act->domid = ld->domain_id;
             act->frame = frame;
@@ -700,7 +703,8 @@ __gnttab_map_grant_ref(
     op->handle       = handle;
     op->status       = GNTST_okay;
 
-    put_gfn(rd, gfn);
+    if ( gfn != INVALID_GFN )
+        put_gfn(rd, gfn);
     rcu_unlock_domain(rd);
     return;
 
