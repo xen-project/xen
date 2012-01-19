@@ -182,7 +182,13 @@ void guest_iommu_add_ppr_log(struct domain *d, u32 entry[])
     ppr_entry_t *log, *log_base;
     struct guest_iommu *iommu;
 
+    if ( !is_hvm_domain(d) )
+        return;
+
     iommu = domain_iommu(d);
+    if ( !iommu )
+        return;
+
     tail = iommu_get_rb_pointer(iommu->ppr_log.reg_tail.lo);
     head = iommu_get_rb_pointer(iommu->ppr_log.reg_head.lo);
 
@@ -225,7 +231,13 @@ void guest_iommu_add_event_log(struct domain *d, u32 entry[])
     event_entry_t *log, *log_base;
     struct guest_iommu *iommu;
 
+    if ( !is_hvm_domain(d) )
+        return;
+
     iommu = domain_iommu(d);
+    if ( !iommu )
+        return;
+
     tail = iommu_get_rb_pointer(iommu->event_log.reg_tail.lo);
     head = iommu_get_rb_pointer(iommu->event_log.reg_head.lo);
 
@@ -793,6 +805,9 @@ int guest_iommu_set_base(struct domain *d, uint64_t base)
     p2m_type_t t;
     struct guest_iommu *iommu = domain_iommu(d);
 
+    if ( !iommu )
+        return -EACCES;
+
     iommu->mmio_base = base;
     base >>= PAGE_SHIFT;
 
@@ -882,6 +897,8 @@ void guest_iommu_destroy(struct domain *d)
         return;
 
     iommu = domain_iommu(d);
+    if ( !iommu )
+        return;
 
     tasklet_kill(&iommu->cmd_buffer_tasklet);
     xfree(iommu);
@@ -893,7 +910,7 @@ static int guest_iommu_mmio_range(struct vcpu *v, unsigned long addr)
 {
     struct guest_iommu *iommu = vcpu_iommu(v);
 
-    return addr >= iommu->mmio_base &&
+    return iommu && addr >= iommu->mmio_base &&
            addr < iommu->mmio_base + IOMMU_MMIO_SIZE;
 }
 

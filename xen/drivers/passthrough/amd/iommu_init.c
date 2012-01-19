@@ -651,7 +651,7 @@ void parse_ppr_log_entry(struct amd_iommu *iommu, u32 entry[])
     local_irq_enable();
 
     spin_lock(&pcidevs_lock);
-    pdev = pci_get_pdev(0, bus, devfn);
+    pdev = pci_get_pdev(iommu->seg, bus, devfn);
     spin_unlock(&pcidevs_lock);
 
     local_irq_disable();
