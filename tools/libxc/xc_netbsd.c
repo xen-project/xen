@@ -103,7 +103,7 @@ static int netbsd_privcmd_hypercall(xc_interface *xch, xc_osdep_handle h, privcm
      * implementation.
      */
     if (error < 0)
-        return -errno;
+        return error;
     else
         return hypercall->retval;
 }
