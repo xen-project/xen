@@ -41,6 +41,10 @@
 
 #define is_epte_present(ept_entry)      ((ept_entry)->epte & 0x7)
 #define is_epte_superpage(ept_entry)    ((ept_entry)->sp)
+static inline bool_t is_epte_valid(ept_entry_t *e)
+{
+    return (e->epte != 0 && e->sa_p2mt != p2m_invalid);
+}
 
 /* Non-ept "lock-and-check" wrapper */
 static int ept_pod_check_and_populate(struct p2m_domain *p2m, unsigned long gfn,
@@ -777,7 +781,7 @@ static void ept_change_entry_type_page(mfn_t ept_page_mfn, int ept_page_level,
 
     for ( int i = 0; i < EPT_PAGETABLE_ENTRIES; i++ )
     {
-        if ( !is_epte_present(epte + i) )
+        if ( !is_epte_valid(epte + i) )
             continue;
 
         if ( (ept_page_level > 0) && !is_epte_superpage(epte + i) )
