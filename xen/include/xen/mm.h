@@ -317,6 +317,8 @@ page_list_splice(struct page_list_head *list, struct page_list_head *head)
 
 void scrub_one_page(struct page_info *);
 
+/* Returns 1 on success, 0 on error, negative if the ring
+ * for event propagation is full in the presence of paging */
 int guest_remove_page(struct domain *d, unsigned long gmfn);
 
 #define RAM_TYPE_CONVENTIONAL 0x00000001

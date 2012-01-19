@@ -4198,15 +4198,21 @@ static int hvm_memory_event_traps(long p, uint32_t reason,
 
     if ( (p & HVMPME_onchangeonly) && (value == old) )
         return 1;
-    
-    rc = mem_event_check_ring(d, &d->mem_event->access);
-    if ( rc )
+
+    rc = mem_event_claim_slot(d, &d->mem_event->access);
+    if ( rc == -ENOSYS )
+    {
+        /* If there was no ring to handle the event, then
+         * simple continue executing normally. */
+        return 1;
+    }
+    else if ( rc < 0 )
         return rc;
-    
+
     memset(&req, 0, sizeof(req));
     req.type = MEM_EVENT_TYPE_ACCESS;
     req.reason = reason;
-    
+
     if ( (p & HVMPME_MODE_MASK) == HVMPME_mode_sync ) 
     {
         req.flags |= MEM_EVENT_FLAG_VCPU_PAUSED;    

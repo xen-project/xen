@@ -13,6 +13,7 @@
 #include <xen/nodemask.h>
 #include <xen/radix-tree.h>
 #include <xen/multicall.h>
+#include <xen/wait.h>
 #include <public/xen.h>
 #include <public/domctl.h>
 #include <public/sysctl.h>
@@ -182,7 +183,9 @@ struct mem_event_domain
 {
     /* ring lock */
     spinlock_t ring_lock;
-    unsigned int req_producers;
+    /* The ring has 64 entries */
+    unsigned char foreign_producers;
+    unsigned char target_producers;
     /* shared page */
     mem_event_shared_page_t *shared_page;
     /* shared ring page */
@@ -191,6 +194,14 @@ struct mem_event_domain
     mem_event_front_ring_t front_ring;
     /* event channel port (vcpu0 only) */
     int xen_port;
+    /* mem_event bit for vcpu->pause_flags */
+    int pause_flag;
+    /* list of vcpus waiting for room in the ring */
+    struct waitqueue_head wq;
+    /* the number of vCPUs blocked */
+    unsigned int blocked;
+    /* The last vcpu woken up */
+    unsigned int last_vcpu_wake_up;
 };
 
 struct mem_event_per_domain
@@ -614,9 +625,12 @@ static inline struct domain *next_domain_in_cpupool(
  /* VCPU affinity has changed: migrating to a new CPU. */
 #define _VPF_migrating       3
 #define VPF_migrating        (1UL<<_VPF_migrating)
- /* VCPU is blocked on memory-event ring. */
-#define _VPF_mem_event       4
-#define VPF_mem_event        (1UL<<_VPF_mem_event)
+ /* VCPU is blocked due to missing mem_paging ring. */
+#define _VPF_mem_paging      4
+#define VPF_mem_paging       (1UL<<_VPF_mem_paging)
+ /* VCPU is blocked due to missing mem_access ring. */
+#define _VPF_mem_access      5
+#define VPF_mem_access       (1UL<<_VPF_mem_access)
 
 static inline int vcpu_runnable(struct vcpu *v)
 {

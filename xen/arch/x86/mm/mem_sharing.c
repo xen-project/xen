@@ -253,18 +253,10 @@ static void mem_sharing_audit(void)
 #endif
 
 
-static struct page_info* mem_sharing_alloc_page(struct domain *d, 
-                                                unsigned long gfn)
+static void mem_sharing_notify_helper(struct domain *d, unsigned long gfn)
 {
-    struct page_info* page;
     struct vcpu *v = current;
-    mem_event_request_t req;
-
-    page = alloc_domheap_page(d, 0); 
-    if(page != NULL) return page;
-
-    memset(&req, 0, sizeof(req));
-    req.type = MEM_EVENT_TYPE_SHARED;
+    mem_event_request_t req = { .type = MEM_EVENT_TYPE_SHARED };
 
     if ( v->domain != d )
     {
@@ -275,20 +267,21 @@ static struct page_info* mem_sharing_alloc_page(struct domain *d,
         gdprintk(XENLOG_ERR, 
                  "Failed alloc on unshare path for foreign (%d) lookup\n",
                  d->domain_id);
-        return page;
+        return;
     }
 
-    vcpu_pause_nosync(v);
-    req.flags |= MEM_EVENT_FLAG_VCPU_PAUSED;
+    if (mem_event_claim_slot(d, &d->mem_event->share) < 0)
+    {
+        return;
+    }
 
-    if(mem_event_check_ring(d, &d->mem_event->share)) return page;
+    req.flags = MEM_EVENT_FLAG_VCPU_PAUSED;
+    vcpu_pause_nosync(v);
 
     req.gfn = gfn;
     req.p2mt = p2m_ram_shared;
     req.vcpu_id = v->vcpu_id;
     mem_event_put_request(d, &d->mem_event->share, &req);
-
-    return page;
 }
 
 unsigned int mem_sharing_get_nr_saved_mfns(void)
@@ -301,7 +294,7 @@ int mem_sharing_sharing_resume(struct domain *d)
     mem_event_response_t rsp;
 
     /* Get all requests off the ring */
-    while ( mem_event_get_response(&d->mem_event->share, &rsp) )
+    while ( mem_event_get_response(d, &d->mem_event->share, &rsp) )
     {
         if ( rsp.flags & MEM_EVENT_FLAG_DUMMY )
             continue;
@@ -658,13 +651,14 @@ gfn_found:
     if(ret == 0) goto private_page_found;
         
     old_page = page;
-    page = mem_sharing_alloc_page(d, gfn);
+    page = alloc_domheap_page(d, 0);
     if(!page) 
     {
         /* We've failed to obtain memory for private page. Need to re-add the
          * gfn_info to relevant list */
         list_add(&gfn_info->list, &hash_entry->gfns);
         put_gfn(d, gfn);
+        mem_sharing_notify_helper(d, gfn);
         shr_unlock();
         return -ENOMEM;
     }

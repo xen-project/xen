@@ -861,20 +861,23 @@ int p2m_mem_paging_evict(struct domain *d, unsigned long gfn)
  */
 void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn)
 {
-    struct vcpu *v = current;
     mem_event_request_t req;
 
-    /* Check that there's space on the ring for this request */
-    if ( mem_event_check_ring(d, &d->mem_event->paging) == 0)
-    {
-        /* Send release notification to pager */
-        memset(&req, 0, sizeof(req));
-        req.flags |= MEM_EVENT_FLAG_DROP_PAGE;
-        req.gfn = gfn;
-        req.vcpu_id = v->vcpu_id;
+    /* We allow no ring in this unique case, because it won't affect
+     * correctness of the guest execution at this point.  If this is the only
+     * page that happens to be paged-out, we'll be okay..  but it's likely the
+     * guest will crash shortly anyways. */
+    int rc = mem_event_claim_slot(d, &d->mem_event->paging);
+    if ( rc < 0 )
+        return;
 
-        mem_event_put_request(d, &d->mem_event->paging, &req);
-    }
+    /* Send release notification to pager */
+    memset(&req, 0, sizeof(req));
+    req.type = MEM_EVENT_TYPE_PAGING;
+    req.gfn = gfn;
+    req.flags = MEM_EVENT_FLAG_DROP_PAGE;
+
+    mem_event_put_request(d, &d->mem_event->paging, &req);
 }
 
 /**
@@ -907,8 +910,16 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
     mfn_t mfn;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
-    /* Check that there's space on the ring for this request */
-    if ( mem_event_check_ring(d, &d->mem_event->paging) )
+    /* We're paging. There should be a ring */
+    int rc = mem_event_claim_slot(d, &d->mem_event->paging);
+    if ( rc == -ENOSYS )
+    {
+        gdprintk(XENLOG_ERR, "Domain %hu paging gfn %lx yet no ring "
+                             "in place\n", d->domain_id, gfn);
+        domain_crash(d);
+        return;
+    }
+    else if ( rc < 0 )
         return;
 
     memset(&req, 0, sizeof(req));
@@ -929,7 +940,7 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
     p2m_unlock(p2m);
 
     /* Pause domain if request came from guest and gfn has paging type */
-    if (  p2m_is_paging(p2mt) && v->domain == d )
+    if ( p2m_is_paging(p2mt) && v->domain == d )
     {
         vcpu_pause_nosync(v);
         req.flags |= MEM_EVENT_FLAG_VCPU_PAUSED;
@@ -938,7 +949,7 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
     else if ( p2mt != p2m_ram_paging_out && p2mt != p2m_ram_paged )
     {
         /* gfn is already on its way back and vcpu is not paused */
-        mem_event_put_req_producers(&d->mem_event->paging);
+        mem_event_cancel_slot(d, &d->mem_event->paging);
         return;
     }
 
@@ -1065,7 +1076,7 @@ void p2m_mem_paging_resume(struct domain *d)
     mfn_t mfn;
 
     /* Pull all responses off the ring */
-    while( mem_event_get_response(&d->mem_event->paging, &rsp) )
+    while( mem_event_get_response(d, &d->mem_event->paging, &rsp) )
     {
         if ( rsp.flags & MEM_EVENT_FLAG_DUMMY )
             continue;
@@ -1090,9 +1101,6 @@ void p2m_mem_paging_resume(struct domain *d)
         if ( rsp.flags & MEM_EVENT_FLAG_VCPU_PAUSED )
             vcpu_unpause(d->vcpu[rsp.vcpu_id]);
     }
-
-    /* Unpause any domains that were paused because the ring was full */
-    mem_event_unpause_vcpus(d);
 }
 
 bool_t p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long gla, 
@@ -1103,7 +1111,6 @@ bool_t p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long g
     unsigned long gfn = gpa >> PAGE_SHIFT;
     struct domain *d = v->domain;    
     struct p2m_domain* p2m = p2m_get_hostp2m(d);
-    int res;
     mfn_t mfn;
     p2m_type_t p2mt;
     p2m_access_t p2ma;
@@ -1126,17 +1133,16 @@ bool_t p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long g
     p2m_unlock(p2m);
 
     /* Otherwise, check if there is a memory event listener, and send the message along */
-    res = mem_event_check_ring(d, &d->mem_event->access);
-    if ( res < 0 ) 
+    if ( mem_event_claim_slot(d, &d->mem_event->access) == -ENOSYS )
     {
         /* No listener */
         if ( p2m->access_required ) 
         {
-            printk(XENLOG_INFO 
-                   "Memory access permissions failure, no mem_event listener: pausing VCPU %d, dom %d\n",
-                   v->vcpu_id, d->domain_id);
-
-            mem_event_mark_and_pause(v);
+            gdprintk(XENLOG_INFO, "Memory access permissions failure, "
+                                  "no mem_event listener VCPU %d, dom %d\n",
+                                  v->vcpu_id, d->domain_id);
+            domain_crash(v->domain);
+            return 0;
         }
         else
         {
@@ -1149,11 +1155,7 @@ bool_t p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long g
             }
             return 1;
         }
-
-        return 0;
     }
-    else if ( res > 0 )
-        return 0;  /* No space in buffer; VCPU paused */
 
     memset(&req, 0, sizeof(req));
     req.type = MEM_EVENT_TYPE_ACCESS;
@@ -1188,7 +1190,7 @@ void p2m_mem_access_resume(struct domain *d)
     mem_event_response_t rsp;
 
     /* Pull all responses off the ring */
-    while( mem_event_get_response(&d->mem_event->access, &rsp) )
+    while( mem_event_get_response(d, &d->mem_event->access, &rsp) )
     {
         if ( rsp.flags & MEM_EVENT_FLAG_DUMMY )
             continue;
@@ -1196,12 +1198,7 @@ void p2m_mem_access_resume(struct domain *d)
         if ( rsp.flags & MEM_EVENT_FLAG_VCPU_PAUSED )
             vcpu_unpause(d->vcpu[rsp.vcpu_id]);
     }
-
-    /* Unpause any domains that were paused because the ring was full or no listener 
-     * was available */
-    mem_event_unpause_vcpus(d);
 }
-
 
 /* Set access type for a region of pfns.
  * If start_pfn == -1ul, sets the default access type */

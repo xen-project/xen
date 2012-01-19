@@ -24,17 +24,23 @@
 #ifndef __MEM_EVENT_H__
 #define __MEM_EVENT_H__
 
-/* Pauses VCPU while marking pause flag for mem event */
-void mem_event_mark_and_pause(struct vcpu *v);
-int mem_event_check_ring(struct domain *d, struct mem_event_domain *med);
-void mem_event_put_req_producers(struct mem_event_domain *med);
-void mem_event_put_request(struct domain *d, struct mem_event_domain *med, mem_event_request_t *req);
-int mem_event_get_response(struct mem_event_domain *med, mem_event_response_t *rsp);
-void mem_event_unpause_vcpus(struct domain *d);
+/* Returns 0 on success, -ENOSYS if there is no ring, -EBUSY if there is no
+ * available space. For success or -EBUSY, the vCPU may be left blocked
+ * temporarily to ensure that the ring does not lose future events.  In
+ * general, you must follow a claim_slot() call with either put_request() or
+ * cancel_slot(), both of which are guaranteed to succeed. */
+int mem_event_claim_slot(struct domain *d, struct mem_event_domain *med);
+
+void mem_event_cancel_slot(struct domain *d, struct mem_event_domain *med);
+
+void mem_event_put_request(struct domain *d, struct mem_event_domain *med,
+                            mem_event_request_t *req);
+
+int mem_event_get_response(struct domain *d, struct mem_event_domain *med,
+                           mem_event_response_t *rsp);
 
 int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
                      XEN_GUEST_HANDLE(void) u_domctl);
-
 
 #endif /* __MEM_EVENT_H__ */
 
