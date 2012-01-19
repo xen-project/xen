@@ -489,7 +489,7 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
             
             return -EINVAL;
         }
-        else if ( p2m_is_ram(ot) )
+        else if ( p2m_is_ram(ot) && !p2m_is_paged(ot) )
         {
             ASSERT(mfn_valid(omfn));
             set_gpfn_from_mfn(mfn_x(omfn), INVALID_M2P_ENTRY);
@@ -514,7 +514,7 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
             P2M_DEBUG("aliased! mfn=%#lx, old gfn=%#lx, new gfn=%#lx\n",
                       mfn + i, ogfn, gfn + i);
             omfn = p2m->get_entry(p2m, ogfn, &ot, &a, p2m_query, NULL);
-            if ( p2m_is_ram(ot) )
+            if ( p2m_is_ram(ot) && !p2m_is_paged(ot) )
             {
                 ASSERT(mfn_valid(omfn));
                 P2M_DEBUG("old gfn=%#lx -> mfn %#lx\n",
