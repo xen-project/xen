@@ -96,6 +96,12 @@ static int netbsd_privcmd_hypercall(xc_interface *xch, xc_osdep_handle h, privcm
     int fd = (int)h;
     int error = ioctl(fd, IOCTL_PRIVCMD_HYPERCALL, hypercall);
 
+    /*
+     * Since NetBSD ioctl can only return 0 on success or < 0 on
+     * error, if we want to return a value from ioctl we should
+     * do so by setting hypercall->retval, to mimic Linux ioctl
+     * implementation.
+     */
     if (error < 0)
         return -errno;
     else
