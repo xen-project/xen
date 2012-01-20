@@ -32,6 +32,8 @@
 
 static int __initdata nr_amd_iommus;
 
+static struct tasklet amd_iommu_irq_tasklet;
+
 unsigned short ivrs_bdf_entries;
 static struct radix_tree_root ivrs_maps;
 struct list_head amd_iommu_head;
@@ -689,14 +691,48 @@ static void iommu_check_ppr_log(struct amd_iommu *iommu)
     spin_unlock_irqrestore(&iommu->lock, flags);
 }
 
+static void do_amd_iommu_irq(unsigned long data)
+{
+    struct amd_iommu *iommu;
+
+    if ( !iommu_found() )
+    {
+        AMD_IOMMU_DEBUG("no device found, something must be very wrong!\n");
+        return;
+    }
+
+    /*
+     * No matter from where the interrupt came from, check all the
+     * IOMMUs present in the system. This allows for having just one
+     * tasklet (instead of one per each IOMMUs).
+     */
+    for_each_amd_iommu ( iommu ) {
+        iommu_check_event_log(iommu);
+
+        if ( iommu->ppr_log.buffer != NULL )
+            iommu_check_ppr_log(iommu);
+    }
+}
+
 static void iommu_interrupt_handler(int irq, void *dev_id,
                                     struct cpu_user_regs *regs)
 {
+    u32 entry;
+    unsigned long flags;
     struct amd_iommu *iommu = dev_id;
-    iommu_check_event_log(iommu);
 
-    if ( iommu->ppr_log.buffer != NULL )
-        iommu_check_ppr_log(iommu);
+    spin_lock_irqsave(&iommu->lock, flags);
+
+    /* Silence interrupts from both event and PPR logging */
+    entry = readl(iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
+    iommu_clear_bit(&entry, IOMMU_STATUS_EVENT_LOG_INT_SHIFT);
+    iommu_clear_bit(&entry, IOMMU_STATUS_PPR_LOG_INT_SHIFT);
+    writel(entry, iommu->mmio_base+IOMMU_STATUS_MMIO_OFFSET);
+
+    spin_unlock_irqrestore(&iommu->lock, flags);
+
+    /* It is the tasklet that will clear the logs and re-enable interrupts */
+    tasklet_schedule(&amd_iommu_irq_tasklet);
 }
 
 static int __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
@@ -875,6 +911,8 @@ static int __init amd_iommu_init_one(struct amd_iommu *iommu)
     enable_iommu(iommu);
     printk("AMD-Vi: IOMMU %d Enabled.\n", nr_amd_iommus );
     nr_amd_iommus++;
+
+    softirq_tasklet_init(&amd_iommu_irq_tasklet, do_amd_iommu_irq, 0);
 
     return 0;
 
