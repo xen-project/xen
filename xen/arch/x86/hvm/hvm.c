@@ -685,11 +685,7 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     }
 
     /* Need to init this vcpu before loading its contents */
-    rc = 0;
-    domain_lock(d);
-    if ( !v->is_initialised )
-        rc = boot_vcpu(d, vcpuid, NULL);
-    domain_unlock(d);
+    rc = boot_vcpu(d, vcpuid, NULL);
     if ( rc != 0 )
         return rc;
 

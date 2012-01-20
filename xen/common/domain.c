@@ -781,10 +781,13 @@ void domain_unpause_by_systemcontroller(struct domain *d)
 int boot_vcpu(struct domain *d, int vcpuid, vcpu_guest_context_u ctxt)
 {
     struct vcpu *v = d->vcpu[vcpuid];
+    int rc;
 
-    BUG_ON(v->is_initialised);
+    domain_lock(d);
+    rc = v->is_initialised ? -EEXIST : arch_set_info_guest(v, ctxt);
+    domain_unlock(d);
 
-    return arch_set_info_guest(v, ctxt);
+    return rc;
 }
 
 void vcpu_reset(struct vcpu *v)
@@ -844,23 +847,23 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
             return -EFAULT;
         }
 
-        domain_lock(d);
-        rc = -EEXIST;
-        if ( !v->is_initialised )
-            rc = boot_vcpu(d, vcpuid, ctxt);
-        domain_unlock(d);
+        rc = boot_vcpu(d, vcpuid, ctxt);
 
         free_vcpu_guest_context(ctxt);
         break;
 
-    case VCPUOP_up:
+    case VCPUOP_up: {
+        bool_t wake = 0;
+        domain_lock(d);
         if ( !v->is_initialised )
-            return -EINVAL;
-
-        if ( test_and_clear_bit(_VPF_down, &v->pause_flags) )
+            rc = -EINVAL;
+        else
+            wake = test_and_clear_bit(_VPF_down, &v->pause_flags);
+        domain_unlock(d);
+        if ( wake )
             vcpu_wake(v);
-
         break;
+    }
 
     case VCPUOP_down:
         if ( !test_and_set_bit(_VPF_down, &v->pause_flags) )

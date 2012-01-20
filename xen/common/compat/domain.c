@@ -46,11 +46,7 @@ int compat_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
             break;
         }
 
-        domain_lock(d);
-        rc = -EEXIST;
-        if ( !v->is_initialised )
-            rc = boot_vcpu(d, vcpuid, cmp_ctxt);
-        domain_unlock(d);
+        rc = boot_vcpu(d, vcpuid, cmp_ctxt);
 
         xfree(cmp_ctxt);
         break;
