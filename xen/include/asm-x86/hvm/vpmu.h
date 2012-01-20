@@ -56,8 +56,8 @@ struct arch_vpmu_ops {
     void (*arch_vpmu_load)(struct vcpu *v);
 };
 
-extern struct arch_vpmu_ops core2_vpmu_ops;
-extern struct arch_vpmu_ops amd_vpmu_ops;
+int vmx_vpmu_initialise(struct vcpu *v);
+int svm_vpmu_initialise(struct vcpu *v);
 
 struct vpmu_struct {
     u32 flags;

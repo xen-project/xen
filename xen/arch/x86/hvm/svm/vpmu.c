@@ -296,7 +296,7 @@ static void amd_vpmu_initialise(struct vcpu *v)
 {
     struct amd_vpmu_context *ctxt = NULL;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
-    __u8 family = current_cpu_data.x86;
+    uint8_t family = current_cpu_data.x86;
 
     if ( vpmu->flags & VPMU_CONTEXT_ALLOCATED )
         return;
@@ -362,3 +362,25 @@ struct arch_vpmu_ops amd_vpmu_ops = {
     .arch_vpmu_save = amd_vpmu_save,
     .arch_vpmu_load = amd_vpmu_restore
 };
+
+int svm_vpmu_initialise(struct vcpu *v)
+{
+    struct vpmu_struct *vpmu = vcpu_vpmu(v);
+    uint8_t family = current_cpu_data.x86;
+
+    switch ( family )
+    {
+    case 0x10:
+    case 0x12:
+    case 0x14:
+    case 0x15:
+        vpmu->arch_vpmu_ops = &amd_vpmu_ops;
+        return 0;
+    }
+
+    printk("VPMU: Initialization failed. "
+           "AMD processor family %d has not "
+           "been supported\n", family);
+    return -EINVAL;
+}
+

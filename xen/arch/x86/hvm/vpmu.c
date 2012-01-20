@@ -81,9 +81,7 @@ void vpmu_load(struct vcpu *v)
 void vpmu_initialise(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
-    __u8 vendor = current_cpu_data.x86_vendor;
-    __u8 family = current_cpu_data.x86;
-    __u8 cpu_model = current_cpu_data.x86_model;
+    uint8_t vendor = current_cpu_data.x86_vendor;
 
     if ( !opt_vpmu_enabled )
         return;
@@ -94,47 +92,19 @@ void vpmu_initialise(struct vcpu *v)
     switch ( vendor )
     {
     case X86_VENDOR_AMD:
-        switch ( family )
-        {
-        case 0x10:
-        case 0x12:
-        case 0x14:
-        case 0x15:
-            vpmu->arch_vpmu_ops = &amd_vpmu_ops;
-            break;
-        default:
-            printk("VPMU: Initialization failed. "
-                   "AMD processor family %d has not "
-                   "been supported\n", family);
-            return;
-        }
+        if ( svm_vpmu_initialise(v) != 0 )
+            opt_vpmu_enabled = 0;
         break;
 
     case X86_VENDOR_INTEL:
-        if ( family == 6 )
-        {
-            switch ( cpu_model )
-            {
-            case 15:
-            case 23:
-            case 26:
-            case 29:
-            case 42:
-            case 46:
-            case 47:
-                vpmu->arch_vpmu_ops = &core2_vpmu_ops;
-                break;
-            }
-        }
-        if ( vpmu->arch_vpmu_ops == NULL )
-            printk("VPMU: Initialization failed. "
-                   "Intel processor family %d model %d has not "
-                   "been supported\n", family, cpu_model);
+        if ( vmx_vpmu_initialise(v) != 0 )
+            opt_vpmu_enabled = 0;
         break;
 
     default:
         printk("VPMU: Initialization failed. "
                "Unknown CPU vendor %d\n", vendor);
+        opt_vpmu_enabled = 0;
         break;
     }
 

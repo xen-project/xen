@@ -607,3 +607,32 @@ struct arch_vpmu_ops core2_vpmu_ops = {
     .arch_vpmu_save = core2_vpmu_save,
     .arch_vpmu_load = core2_vpmu_load
 };
+
+int vmx_vpmu_initialise(struct vcpu *v)
+{
+    struct vpmu_struct *vpmu = vcpu_vpmu(v);
+    uint8_t family = current_cpu_data.x86;
+    uint8_t cpu_model = current_cpu_data.x86_model;
+
+    if ( family == 6 )
+    {
+        switch ( cpu_model )
+        {
+        case 15:
+        case 23:
+        case 26:
+        case 29:
+        case 42:
+        case 46:
+        case 47:
+            vpmu->arch_vpmu_ops = &core2_vpmu_ops;
+            return 0;
+        }
+    }
+
+    printk("VPMU: Initialization failed. "
+           "Intel processor family %d model %d has not "
+           "been supported\n", family, cpu_model);
+    return -EINVAL;
+}
+
