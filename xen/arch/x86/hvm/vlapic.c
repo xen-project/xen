@@ -323,7 +323,16 @@ static int vlapic_accept_irq(struct vcpu *v, uint32_t icr_low)
 
     case APIC_DM_NMI:
         if ( !test_and_set_bool(v->nmi_pending) )
+        {
+            bool_t wake = 0;
+            domain_lock(v->domain);
+            if ( v->is_initialised )
+                wake = test_and_clear_bit(_VPF_down, &v->pause_flags);
+            domain_unlock(v->domain);
+            if ( wake )
+                vcpu_wake(v);
             vcpu_kick(v);
+        }
         break;
 
     case APIC_DM_INIT:
