@@ -564,7 +564,7 @@ struct hvm_hw_cpu_xsave {
 
         struct { char x[0]; } ymm;    /* YMM */
     } save_area;
-} __attribute__((packed));
+};
 
 #define CPU_XSAVE_CODE  16
 
