@@ -69,14 +69,16 @@
  *  DEFINITIONS FOR CPU BARRIERS
  */
 
+#define xen_barrier() asm volatile ( "" : : : "memory")
+
 #if defined(__i386__)
 #define xen_mb()  asm volatile ( "lock; addl $0,0(%%esp)" : : : "memory" )
-#define xen_rmb() asm volatile ( "lock; addl $0,0(%%esp)" : : : "memory" )
-#define xen_wmb() asm volatile ( "" : : : "memory")
+#define xen_rmb() xen_barrier()
+#define xen_wmb() xen_barrier()
 #elif defined(__x86_64__)
 #define xen_mb()  asm volatile ( "mfence" : : : "memory")
-#define xen_rmb() asm volatile ( "lfence" : : : "memory")
-#define xen_wmb() asm volatile ( "" : : : "memory")
+#define xen_rmb() xen_barrier()
+#define xen_wmb() xen_barrier()
 #elif defined(__ia64__)
 #define xen_mb()   asm volatile ("mf" ::: "memory")
 #define xen_rmb()  asm volatile ("mf" ::: "memory")
