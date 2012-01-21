@@ -21,10 +21,10 @@
 #include "libxl_osdeps.h" /* must come before any other headers */
 
 #include <sys/un.h>
-#include <sys/queue.h>
 
 #include <yajl/yajl_gen.h>
 
+#include "_libxl_list.h"
 #include "libxl_internal.h"
 
 /* #define DEBUG_RECEIVED */
@@ -56,7 +56,7 @@ typedef struct callback_id_pair {
     qmp_callback_t callback;
     void *opaque;
     qmp_request_context *context;
-    SIMPLEQ_ENTRY(callback_id_pair) next;
+    LIBXL_STAILQ_ENTRY(struct callback_id_pair) next;
 } callback_id_pair;
 
 struct libxl__qmp_handler {
@@ -74,7 +74,7 @@ struct libxl__qmp_handler {
     uint32_t domid;
 
     int last_id_used;
-    SIMPLEQ_HEAD(callback_list, callback_id_pair) callback_list;
+    LIBXL_STAILQ_HEAD(callback_list, callback_id_pair) callback_list;
 };
 
 static int qmp_send(libxl__qmp_handler *qmp,
@@ -202,7 +202,7 @@ static callback_id_pair *qmp_get_callback_from_id(libxl__qmp_handler *qmp,
     if (id_object) {
         id = libxl__json_object_get_integer(id_object);
 
-        SIMPLEQ_FOREACH(pp, &qmp->callback_list, next) {
+        LIBXL_STAILQ_FOREACH(pp, &qmp->callback_list, next) {
             if (pp->id == id) {
                 return pp;
             }
@@ -230,7 +230,7 @@ static void qmp_handle_error_response(libxl__qmp_handler *qmp,
             /* tell that the id have been processed */
             qmp->wait_for_id = 0;
         }
-        SIMPLEQ_REMOVE(&qmp->callback_list, pp, callback_id_pair, next);
+        LIBXL_STAILQ_REMOVE(&qmp->callback_list, pp, callback_id_pair, next);
         free(pp);
     }
 
@@ -268,7 +268,8 @@ static int qmp_handle_response(libxl__qmp_handler *qmp,
                 /* tell that the id have been processed */
                 qmp->wait_for_id = 0;
             }
-            SIMPLEQ_REMOVE(&qmp->callback_list, pp, callback_id_pair, next);
+            LIBXL_STAILQ_REMOVE(
+                &qmp->callback_list, pp, callback_id_pair, next);
             free(pp);
         }
         return 0;
@@ -302,7 +303,7 @@ static libxl__qmp_handler *qmp_init_handler(libxl_ctx *ctx, uint32_t domid)
     qmp->domid = domid;
     qmp->timeout = 5;
 
-    SIMPLEQ_INIT(&qmp->callback_list);
+    LIBXL_STAILQ_INIT(&qmp->callback_list);
 
     return qmp;
 }
@@ -353,7 +354,7 @@ static void qmp_close(libxl__qmp_handler *qmp)
     callback_id_pair *tmp = NULL;
 
     close(qmp->qmp_fd);
-    SIMPLEQ_FOREACH(pp, &qmp->callback_list, next) {
+    LIBXL_STAILQ_FOREACH(pp, &qmp->callback_list, next) {
         if (tmp)
             free(tmp);
         tmp = pp;
@@ -493,7 +494,7 @@ static char *qmp_send_prepare(libxl__gc *gc, libxl__qmp_handler *qmp,
     elm->callback = callback;
     elm->opaque = opaque;
     elm->context = context;
-    SIMPLEQ_INSERT_TAIL(&qmp->callback_list, elm, next);
+    LIBXL_STAILQ_INSERT_TAIL(&qmp->callback_list, elm, next);
 
     ret = libxl__strndup(gc, (const char*)buf, len);
 
