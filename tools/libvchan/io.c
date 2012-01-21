@@ -55,9 +55,6 @@
 #define VCHAN_DEBUG 0
 #endif
 
-#define barrier() asm volatile("" ::: "memory")
-
-
 static inline uint32_t rd_prod(struct libxenvchan *ctrl)
 {
 	return ctrl->read.shr->prod;
@@ -104,12 +101,15 @@ static inline void request_notify(struct libxenvchan *ctrl, uint8_t bit)
 {
 	uint8_t *notify = ctrl->is_server ? &ctrl->ring->cli_notify : &ctrl->ring->srv_notify;
 	__sync_or_and_fetch(notify, bit);
+	xen_mb(); /* post the request /before/ caller re-reads any indexes */
 }
 
 static inline int send_notify(struct libxenvchan *ctrl, uint8_t bit)
 {
-	uint8_t *notify = ctrl->is_server ? &ctrl->ring->srv_notify : &ctrl->ring->cli_notify;
-	uint8_t prev = __sync_fetch_and_and(notify, ~bit);
+	uint8_t *notify, prev;
+	xen_mb(); /* caller updates indexes /before/ we decode to notify */
+	notify = ctrl->is_server ? &ctrl->ring->srv_notify : &ctrl->ring->cli_notify;
+	prev = __sync_fetch_and_and(notify, ~bit);
 	if (prev & bit)
 		return xc_evtchn_notify(ctrl->event, ctrl->event_port);
 	else
@@ -197,15 +197,15 @@ static int do_send(struct libxenvchan *ctrl, const void *data, size_t size)
 	}
 	if (avail_contig > size)
 		avail_contig = size;
+	xen_mb(); /* read indexes /then/ write data */
 	memcpy(wr_ring(ctrl) + real_idx, data, avail_contig);
 	if (avail_contig < size)
 	{
 		// we rolled across the end of the ring
 		memcpy(wr_ring(ctrl), data + avail_contig, size - avail_contig);
 	}
-	barrier(); // data must be in the ring prior to increment
+	xen_wmb(); /* write data /then/ notify */
 	wr_prod(ctrl) += size;
-	barrier(); // increment must happen prior to notify
 	if (send_notify(ctrl, VCHAN_NOTIFY_WRITE))
 		return -1;
 	return size;
@@ -268,13 +268,14 @@ static int do_recv(struct libxenvchan *ctrl, void *data, size_t size)
 	int avail_contig = rd_ring_size(ctrl) - real_idx;
 	if (avail_contig > size)
 		avail_contig = size;
-	barrier(); // data read must happen after rd_cons read
+	xen_rmb(); /* data read must happen /after/ rd_cons read */
 	memcpy(data, rd_ring(ctrl) + real_idx, avail_contig);
 	if (avail_contig < size)
 	{
 		// we rolled across the end of the ring
 		memcpy(data + avail_contig, rd_ring(ctrl), size - avail_contig);
 	}
+	xen_mb(); /* consume /then/ notify */
 	rd_cons(ctrl) += size;
 	if (VCHAN_DEBUG) {
 		char metainfo[32];
@@ -285,7 +286,6 @@ static int do_recv(struct libxenvchan *ctrl, void *data, size_t size)
 		iov[1].iov_len = size;
 		writev(-1, iov, 2);
 	}
-	barrier(); // consumption must happen prior to notify of newly freed space
 	if (send_notify(ctrl, VCHAN_NOTIFY_READ))
 		return -1;
 	return size;
