@@ -709,13 +709,7 @@ CHECK_FIELD_(struct, vcpu_guest_context, fpu_ctxt);
 #undef xen_vcpu_guest_context
 #endif
 
-/*
- * This is called by do_domctl(XEN_DOMCTL_setvcpucontext, ...), boot_vcpu(),
- * and hvm_load_cpu_ctxt().
- *
- * Note that for a HVM guest NULL may be passed for the context pointer,
- * meaning "use current values".
- */
+/* Called by XEN_DOMCTL_setvcpucontext and VCPUOP_initialise. */
 int arch_set_info_guest(
     struct vcpu *v, vcpu_guest_context_u c)
 {
@@ -735,7 +729,7 @@ int arch_set_info_guest(
 #else
 #define c(fld) (c.nat->fld)
 #endif
-    flags = c.nat ? c(flags) : v->arch.vgc_flags;
+    flags = c(flags);
 
     if ( !is_hvm_vcpu(v) )
     {
@@ -791,28 +785,25 @@ int arch_set_info_guest(
 
     v->arch.vgc_flags = flags;
 
-    if ( c.nat )
+    memcpy(v->arch.fpu_ctxt, &c.nat->fpu_ctxt, sizeof(c.nat->fpu_ctxt));
+    if ( !compat )
     {
-        memcpy(v->arch.fpu_ctxt, &c.nat->fpu_ctxt, sizeof(c.nat->fpu_ctxt));
-        if ( !compat )
-        {
-            memcpy(&v->arch.user_regs, &c.nat->user_regs, sizeof(c.nat->user_regs));
-            if ( !is_hvm_vcpu(v) )
-                memcpy(v->arch.pv_vcpu.trap_ctxt, c.nat->trap_ctxt,
-                       sizeof(c.nat->trap_ctxt));
-        }
-#ifdef CONFIG_COMPAT
-        else
-        {
-            XLAT_cpu_user_regs(&v->arch.user_regs, &c.cmp->user_regs);
-            for ( i = 0; i < ARRAY_SIZE(c.cmp->trap_ctxt); ++i )
-                XLAT_trap_info(v->arch.pv_vcpu.trap_ctxt + i,
-                               c.cmp->trap_ctxt + i);
-        }
-#endif
-        for ( i = 0; i < ARRAY_SIZE(v->arch.debugreg); ++i )
-            v->arch.debugreg[i] = c(debugreg[i]);
+        memcpy(&v->arch.user_regs, &c.nat->user_regs, sizeof(c.nat->user_regs));
+        if ( !is_hvm_vcpu(v) )
+            memcpy(v->arch.pv_vcpu.trap_ctxt, c.nat->trap_ctxt,
+                   sizeof(c.nat->trap_ctxt));
     }
+#ifdef CONFIG_COMPAT
+    else
+    {
+        XLAT_cpu_user_regs(&v->arch.user_regs, &c.cmp->user_regs);
+        for ( i = 0; i < ARRAY_SIZE(c.cmp->trap_ctxt); ++i )
+            XLAT_trap_info(v->arch.pv_vcpu.trap_ctxt + i,
+                           c.cmp->trap_ctxt + i);
+    }
+#endif
+    for ( i = 0; i < ARRAY_SIZE(v->arch.debugreg); ++i )
+        v->arch.debugreg[i] = c(debugreg[i]);
 
     v->arch.user_regs.eflags |= 2;
 

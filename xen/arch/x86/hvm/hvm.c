@@ -670,7 +670,7 @@ static bool_t hvm_efer_valid(struct domain *d,
 
 static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 {
-    int vcpuid, rc;
+    int vcpuid;
     struct vcpu *v;
     struct hvm_hw_cpu ctxt;
     struct segment_register seg;
@@ -683,11 +683,6 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         gdprintk(XENLOG_ERR, "HVM restore: domain has no vcpu %u\n", vcpuid);
         return -EINVAL;
     }
-
-    /* Need to init this vcpu before loading its contents */
-    rc = boot_vcpu(d, vcpuid, NULL);
-    if ( (rc != 0) && (rc != -EEXIST) )
-        return rc;
 
     if ( hvm_load_entry(CPU, h, &ctxt) != 0 ) 
         return -EINVAL;

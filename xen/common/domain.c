@@ -778,18 +778,6 @@ void domain_unpause_by_systemcontroller(struct domain *d)
         domain_unpause(d);
 }
 
-int boot_vcpu(struct domain *d, int vcpuid, vcpu_guest_context_u ctxt)
-{
-    struct vcpu *v = d->vcpu[vcpuid];
-    int rc;
-
-    domain_lock(d);
-    rc = v->is_initialised ? -EEXIST : arch_set_info_guest(v, ctxt);
-    domain_unlock(d);
-
-    return rc;
-}
-
 void vcpu_reset(struct vcpu *v)
 {
     struct domain *d = v->domain;
@@ -847,7 +835,9 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
             return -EFAULT;
         }
 
-        rc = boot_vcpu(d, vcpuid, ctxt);
+        domain_lock(d);
+        rc = v->is_initialised ? -EEXIST : arch_set_info_guest(v, ctxt);
+        domain_unlock(d);
 
         free_vcpu_guest_context(ctxt);
         break;
