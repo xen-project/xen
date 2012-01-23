@@ -122,12 +122,6 @@ int msi_free_irq(struct msi_desc *entry);
  */
 #define NR_HP_RESERVED_VECTORS 	20
 
-#define PCI_MSIX_ENTRY_SIZE			16
-#define  PCI_MSIX_ENTRY_LOWER_ADDR_OFFSET	0
-#define  PCI_MSIX_ENTRY_UPPER_ADDR_OFFSET	4
-#define  PCI_MSIX_ENTRY_DATA_OFFSET		8
-#define  PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET	12
-
 #define msi_control_reg(base)		(base + PCI_MSI_FLAGS)
 #define msi_lower_address_reg(base)	(base + PCI_MSI_ADDRESS_LO)
 #define msi_upper_address_reg(base)	(base + PCI_MSI_ADDRESS_HI)

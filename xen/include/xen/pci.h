@@ -11,6 +11,8 @@
 #include <xen/list.h>
 #include <xen/spinlock.h>
 #include <xen/irq.h>
+#include <xen/pci_regs.h>
+#include <xen/pfn.h>
 #include <asm/pci.h>
 
 /*
@@ -30,8 +32,10 @@
 #define PCI_BDF(b,d,f)  ((((b) & 0xff) << 8) | PCI_DEVFN(d,f))
 #define PCI_BDF2(b,df)  ((((b) & 0xff) << 8) | ((df) & 0xff))
 
-#define MAX_MSIX_TABLE_ENTRIES  2048
-#define MAX_MSIX_TABLE_PAGES    8
+#define MAX_MSIX_TABLE_ENTRIES  (PCI_MSIX_FLAGS_QSIZE + 1)
+#define MAX_MSIX_TABLE_PAGES    PFN_UP(MAX_MSIX_TABLE_ENTRIES * \
+                                       PCI_MSIX_ENTRY_SIZE + \
+                                       (~PCI_MSIX_BIRMASK & (PAGE_SIZE - 1)))
 struct pci_dev_info {
     bool_t is_extfn;
     bool_t is_virtfn;

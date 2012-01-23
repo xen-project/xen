@@ -165,7 +165,7 @@ struct msixtbl_entry
     struct pci_dev *pdev;
     unsigned long gtable;       /* gpa of msix table */
     unsigned long table_len;
-    unsigned long table_flags[MAX_MSIX_TABLE_ENTRIES / BITS_PER_LONG + 1];
+    unsigned long table_flags[BITS_TO_LONGS(MAX_MSIX_TABLE_ENTRIES)];
 #define MAX_MSIX_ACC_ENTRIES 3
     struct { 
         uint32_t msi_ad[3];	/* Shadow of address low, high and data */
@@ -192,16 +192,13 @@ static struct msixtbl_entry *msixtbl_find_entry(
 static void __iomem *msixtbl_addr_to_virt(
     struct msixtbl_entry *entry, unsigned long addr)
 {
-    int idx, nr_page;
+    unsigned int idx, nr_page;
 
-    if ( !entry )
+    if ( !entry || !entry->pdev )
         return NULL;
 
     nr_page = (addr >> PAGE_SHIFT) -
               (entry->gtable >> PAGE_SHIFT);
-
-    if ( !entry->pdev )
-        return NULL;
 
     idx = entry->pdev->msix_table_idx[nr_page];
     if ( !idx )
@@ -215,37 +212,34 @@ static int msixtbl_read(
     struct vcpu *v, unsigned long address,
     unsigned long len, unsigned long *pval)
 {
-    unsigned long offset, val;
+    unsigned long offset;
     struct msixtbl_entry *entry;
     void *virt;
-    int nr_entry, index;
+    unsigned int nr_entry, index;
     int r = X86EMUL_UNHANDLEABLE;
+
+    if ( len != 4 || (address & 3) )
+        return r;
 
     rcu_read_lock(&msixtbl_rcu_lock);
 
-    if ( len != 4 )
-        goto out;
-
     entry = msixtbl_find_entry(v, address);
-    virt = msixtbl_addr_to_virt(entry, address);
-    if ( !virt )
-        goto out;
-
-    nr_entry = (address - entry->gtable) / PCI_MSIX_ENTRY_SIZE;
     offset = address & (PCI_MSIX_ENTRY_SIZE - 1);
-    if ( nr_entry >= MAX_MSIX_ACC_ENTRIES && 
-         offset != PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET )
-        goto out;
 
-    val = readl(virt);
     if ( offset != PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET )
     {
+        nr_entry = (address - entry->gtable) / PCI_MSIX_ENTRY_SIZE;
+        if ( nr_entry >= MAX_MSIX_ACC_ENTRIES )
+            goto out;
         index = offset / sizeof(uint32_t);
         *pval = entry->gentries[nr_entry].msi_ad[index];
     }
     else 
     {
-        *pval = val;
+        virt = msixtbl_addr_to_virt(entry, address);
+        if ( !virt )
+            goto out;
+        *pval = readl(virt);
     }
     
     r = X86EMUL_OKAY;
@@ -260,13 +254,13 @@ static int msixtbl_write(struct vcpu *v, unsigned long address,
     unsigned long offset;
     struct msixtbl_entry *entry;
     void *virt;
-    int nr_entry, index;
+    unsigned int nr_entry, index;
     int r = X86EMUL_UNHANDLEABLE;
 
-    rcu_read_lock(&msixtbl_rcu_lock);
+    if ( len != 4 || (address & 3) )
+        return r;
 
-    if ( len != 4 )
-        goto out;
+    rcu_read_lock(&msixtbl_rcu_lock);
 
     entry = msixtbl_find_entry(v, address);
     nr_entry = (address - entry->gtable) / PCI_MSIX_ENTRY_SIZE;
@@ -291,9 +285,22 @@ static int msixtbl_write(struct vcpu *v, unsigned long address,
     if ( !virt )
         goto out;
 
+    /* Do not allow the mask bit to be changed. */
+#if 0 /* XXX
+       * As the mask bit is the only defined bit in the word, and as the
+       * host MSI-X code doesn't preserve the other bits anyway, doing
+       * this is pointless. So for now just discard the write (also
+       * saving us from having to determine the matching irq_desc).
+       */
+    spin_lock_irqsave(&desc->lock, flags);
+    orig = readl(virt);
+    val &= ~PCI_MSIX_VECTOR_BITMASK;
+    val |= orig & PCI_MSIX_VECTOR_BITMASK;
     writel(val, virt);
-    r = X86EMUL_OKAY;
+    spin_unlock_irqrestore(&desc->lock, flags);
+#endif
 
+    r = X86EMUL_OKAY;
 out:
     rcu_read_unlock(&msixtbl_rcu_lock);
     return r;
