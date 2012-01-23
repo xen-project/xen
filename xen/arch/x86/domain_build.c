@@ -903,7 +903,12 @@ int __init construct_dom0(
 
     /* Copy the OS image and free temporary buffer. */
     elf.dest = (void*)vkern_start;
-    elf_load_binary(&elf);
+    rc = elf_load_binary(&elf);
+    if ( rc < 0 )
+    {
+        printk("Failed to load the kernel binary\n");
+        return rc;
+    }
     bootstrap_map(NULL);
 
     if ( UNSET_ADDR != parms.virt_hypercall )

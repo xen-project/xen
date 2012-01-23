@@ -109,8 +109,9 @@ static int loadelfimage(
     elf->dest += elf->pstart & (PAGE_SIZE - 1);
 
     /* Load the initial elf image. */
-    elf_load_binary(elf);
-    rc = 0;
+    rc = elf_load_binary(elf);
+    if ( rc < 0 )
+        PERROR("Failed to load elf binary\n");
 
     munmap(elf->dest, pages << PAGE_SHIFT);
     elf->dest = NULL;

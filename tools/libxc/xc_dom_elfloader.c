@@ -310,9 +310,15 @@ static int xc_dom_parse_elf_kernel(struct xc_dom_image *dom)
 static int xc_dom_load_elf_kernel(struct xc_dom_image *dom)
 {
     struct elf_binary *elf = dom->private_loader;
+    int rc;
 
     elf->dest = xc_dom_seg_to_ptr(dom, &dom->kernel_seg);
-    elf_load_binary(elf);
+    rc = elf_load_binary(elf);
+    if ( rc < 0 )
+    {
+        DOMPRINTF("%s: failed to load elf binary", __FUNCTION__);
+        return rc;
+    }
     if ( dom->parms.bsd_symtab )
         xc_dom_load_elf_symtab(dom, elf, 1);
     return 0;

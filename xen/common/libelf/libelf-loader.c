@@ -107,10 +107,33 @@ void elf_set_log(struct elf_binary *elf, elf_log_callback *log_callback,
     elf->log_caller_data = log_caller_data;
     elf->verbose = verbose;
 }
+
+static int elf_load_image(void *dst, const void *src, uint64_t filesz, uint64_t memsz)
+{
+    memcpy(dst, src, filesz);
+    memset(dst + filesz, 0, memsz - filesz);
+    return 0;
+}
 #else
+#include <asm/guest_access.h>
+
 void elf_set_verbose(struct elf_binary *elf)
 {
     elf->verbose = 1;
+}
+
+static int elf_load_image(void *dst, const void *src, uint64_t filesz, uint64_t memsz)
+{
+    int rc;
+    if ( filesz > ULONG_MAX || memsz > ULONG_MAX )
+        return -1;
+    rc = raw_copy_to_guest(dst, src, filesz);
+    if ( rc != 0 )
+        return -1;
+    rc = raw_clear_guest(dst + filesz, memsz - filesz);
+    if ( rc != 0 )
+        return -1;
+    return 0;
 }
 #endif
 
@@ -237,7 +260,7 @@ void elf_parse_binary(struct elf_binary *elf)
             __FUNCTION__, elf->pstart, elf->pend);
 }
 
-void elf_load_binary(struct elf_binary *elf)
+int elf_load_binary(struct elf_binary *elf)
 {
     const elf_phdr *phdr;
     uint64_t i, count, paddr, offset, filesz, memsz;
@@ -256,11 +279,12 @@ void elf_load_binary(struct elf_binary *elf)
         dest = elf_get_ptr(elf, paddr);
         elf_msg(elf, "%s: phdr %" PRIu64 " at 0x%p -> 0x%p\n",
                 __func__, i, dest, dest + filesz);
-        memcpy(dest, elf->image + offset, filesz);
-        memset(dest + filesz, 0, memsz - filesz);
+        if ( elf_load_image(dest, elf->image + offset, filesz, memsz) != 0 )
+            return -1;
     }
 
     elf_load_bsdsyms(elf);
+    return 0;
 }
 
 void *elf_get_ptr(struct elf_binary *elf, unsigned long addr)
