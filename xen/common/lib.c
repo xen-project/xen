@@ -399,6 +399,25 @@ s64 __moddi3(s64 a, s64 b)
     return (neg ? -urem : urem);
 }
 
+/*
+ * Quotient and remainder of unsigned long long division
+ */
+s64 __ldivmod_helper(s64 a, s64 b, s64 *r)
+{
+    u64 ua, ub, rem, quot;
+
+    ua = ABS(a);
+    ub = ABS(b);
+    quot = __qdivrem(ua, ub, &rem);
+    if ( a < 0 )
+        *r = -rem;
+    else
+        *r = rem;
+    if ( (a < 0) ^ (b < 0) )
+        return -quot;
+    else
+        return quot;
+}
 #endif /* BITS_PER_LONG == 32 */
 
 /* Compute with 96 bit intermediate result: (a*b)/c */
