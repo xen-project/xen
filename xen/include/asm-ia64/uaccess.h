@@ -236,6 +236,18 @@ __copy_from_user (void *to, const void __user *from, unsigned long count)
 	__cu_len;									\
 })
 
+extern unsigned long __do_clear_user (void __user * to, unsigned long count);
+
+#define clear_user(to, n)					\
+({								\
+	void __user *__cu_to = (to);							\
+	long __cu_len = (n);								\
+											\
+	if (__access_ok(__cu_to))							\
+		__cu_len = __do_clear_user(__cu_to, __cu_len);	\
+	__cu_len;						\
+})
+
 #define copy_from_user(to, from, n)							\
 ({											\
 	void *__cu_to = (to);								\

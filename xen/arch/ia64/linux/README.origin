@@ -15,6 +15,7 @@ pcdp.h			-> linux/drivers/firmware/pcdp.h
 
 bitop.c			-> linux/arch/ia64/lib/bitop.c
 clear_page.S		-> linux/arch/ia64/lib/clear_page.S
+clear_user.S		-> linux/arch/ia64/lib/clear_user.S
 copy_page_mck.S		-> linux/arch/ia64/lib/copy_page_mck.S
 flush.S			-> linux/arch/ia64/lib/flush.S
 idiv32.S		-> linux/arch/ia64/lib/idiv32.S

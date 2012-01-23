@@ -4,6 +4,7 @@ subdir-y += sn
 
 obj-y += bitop.o
 obj-y += clear_page.o
+obj-y += clear_user.o
 obj-y += copy_page_mck.o
 obj-y += efi_stub.o
 obj-y += extable.o

@@ -414,6 +414,117 @@ out:
     return n - from_pos;
 }
 
+static int
+xencomm_clear_chunk(
+    unsigned long paddr, unsigned int  len)
+{
+    struct page_info *page;
+    int res;
+
+    do {
+        res = xencomm_get_page(paddr, &page);
+    } while ( res == -EAGAIN );
+
+    if ( res )
+        return res;
+
+    memset(xencomm_vaddr(paddr, page), 0x00, len);
+    xencomm_mark_dirty((unsigned long)xencomm_vaddr(paddr, page), len);
+    put_page(page);
+
+    return 0;
+}
+
+static unsigned long
+xencomm_inline_clear_guest(
+    void *to, unsigned int n, unsigned int skip)
+{
+    unsigned long dest_paddr = xencomm_inline_addr(to) + skip;
+
+    while ( n > 0 )
+    {
+        unsigned int chunksz, bytes;
+
+        chunksz = PAGE_SIZE - (dest_paddr % PAGE_SIZE);
+        bytes   = min(chunksz, n);
+
+        if ( xencomm_clear_chunk(dest_paddr, bytes) )
+            return n;
+        dest_paddr += bytes;
+        n -= bytes;
+    }
+
+    /* Always successful. */
+    return 0;
+}
+
+/**
+ * xencomm_clear_guest: Clear a block of data in domain space.
+ * @to:     Physical address to xencomm buffer descriptor.
+ * @n:      Number of bytes to copy.
+ * @skip: Number of bytes from the start to skip.
+ *
+ * Clear domain data
+ *
+ * Returns number of bytes that could not be cleared
+ * On success, this will be zero.
+ */
+unsigned long
+xencomm_clear_guest(
+    void *to, unsigned int n, unsigned int skip)
+{
+    struct xencomm_ctxt ctxt;
+    unsigned int from_pos = 0;
+    unsigned int to_pos = 0;
+    unsigned int i = 0;
+
+    if ( xencomm_is_inline(to) )
+        return xencomm_inline_clear_guest(to, n, skip);
+
+    if ( xencomm_ctxt_init(to, &ctxt) )
+        return n;
+
+    /* Iterate through the descriptor, copying up to a page at a time */
+    while ( (from_pos < n) && (i < xencomm_ctxt_nr_addrs(&ctxt)) )
+    {
+        unsigned long dest_paddr;
+        unsigned int pgoffset, chunksz, chunk_skip;
+
+        if ( xencomm_ctxt_next(&ctxt, i) )
+            goto out;
+        dest_paddr = *xencomm_ctxt_address(&ctxt);
+        if ( dest_paddr == XENCOMM_INVALID )
+        {
+            i++;
+            continue;
+        }
+
+        pgoffset = dest_paddr % PAGE_SIZE;
+        chunksz = PAGE_SIZE - pgoffset;
+
+        chunk_skip = min(chunksz, skip);
+        to_pos += chunk_skip;
+        chunksz -= chunk_skip;
+        skip -= chunk_skip;
+
+        if ( skip == 0 && chunksz > 0 )
+        {
+            unsigned int bytes = min(chunksz, n - from_pos);
+
+            if ( xencomm_clear_chunk(dest_paddr + chunk_skip, bytes) )
+                goto out;
+            from_pos += bytes;
+            to_pos += bytes;
+        }
+
+        i++;
+    }
+
+out:
+    xencomm_ctxt_done(&ctxt);
+    return n - from_pos;
+}
+
 static int xencomm_inline_add_offset(void **handle, unsigned int bytes)
 {
     *handle += bytes;

@@ -16,6 +16,7 @@
 #endif
 
 unsigned long copy_to_user(void *to, const void *from, unsigned len);
+unsigned long clear_user(void *to, unsigned len);
 unsigned long copy_from_user(void *to, const void *from, unsigned len);
 /* Handles exceptions in both to and from, but doesn't do access_ok */
 unsigned long __copy_to_user_ll(void *to, const void *from, unsigned n);

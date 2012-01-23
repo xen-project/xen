@@ -27,6 +27,8 @@ unsigned long xencomm_copy_to_guest(
     void *to, const void *from, unsigned int len, unsigned int skip); 
 unsigned long xencomm_copy_from_guest(
     void *to, const void *from, unsigned int len, unsigned int skip); 
+unsigned long xencomm_clear_guest(
+    void *to, unsigned int n, unsigned int skip);
 int xencomm_add_offset(void **handle, unsigned int bytes);
 int xencomm_handle_is_null(void *ptr);
 
@@ -40,6 +42,16 @@ static inline unsigned long xencomm_inline_addr(const void *handle)
 {
     return (unsigned long)handle & ~XENCOMM_INLINE_FLAG;
 }
+
+#define raw_copy_to_guest(dst, src, len)       \
+    xencomm_copy_to_guest(dst, src, len, 0)
+#define raw_copy_from_guest(dst, src, len)     \
+    xencomm_copy_from_guest(dst, src, nr, 0)
+#define raw_clear_guest(dst, len)              \
+    xencomm_clear_guest(dst, len, 0)
+#define __raw_copy_to_guest raw_copy_to_guest
+#define __raw_copy_from_guest raw_copy_from_guest
+#define __raw_clear_guest raw_clear_guest
 
 /* Is the guest handle a NULL reference? */
 #define guest_handle_is_null(hnd) \
@@ -82,6 +94,13 @@ static inline unsigned long xencomm_inline_addr(const void *handle)
 #define copy_from_guest_offset(ptr, hnd, idx, nr) \
     __copy_from_guest_offset(ptr, hnd, idx, nr)
 
+/*
+ * Clear an array of objects in guest context via a guest handle.
+ * Optionally specify an offset into the guest array.
+ */
+#define clear_guest_offset(hnd, idx, nr) \
+    __clear_guest_offset(hnd, idx, nr)
+
 /* Copy sub-field of a structure from guest context via a guest handle. */
 #define copy_field_from_guest(ptr, hnd, field) \
     __copy_field_from_guest(ptr, hnd, field)
@@ -113,6 +132,11 @@ static inline unsigned long xencomm_inline_addr(const void *handle)
     typeof(&(ptr)->field) _d = &(ptr)->field;                       \
     ((void)(&(hnd).p->field == &(ptr)->field));                     \
     xencomm_copy_from_guest(_d, _s, sizeof(*_d), _off);             \
+})
+
+#define __clear_guest_offset(hnd, idx, nr) ({                \
+    void *_d = (hnd).p;                                             \
+    xencomm_clear_guest(_d, nr, idx); \
 })
 
 #ifdef CONFIG_XENCOMM_MARK_DIRTY

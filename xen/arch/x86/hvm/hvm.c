@@ -2381,6 +2381,96 @@ static enum hvm_copy_result __hvm_copy(
     return HVMCOPY_okay;
 }
 
+static enum hvm_copy_result __hvm_clear(paddr_t addr, int size)
+{
+    struct vcpu *curr = current;
+    unsigned long gfn, mfn;
+    p2m_type_t p2mt;
+    char *p;
+    int count, todo = size;
+    uint32_t pfec = PFEC_page_present | PFEC_write_access;
+
+    /*
+     * XXX Disable for 4.1.0: PV-on-HVM drivers will do grant-table ops
+     * such as query_size. Grant-table code currently does copy_to/from_guest
+     * accesses under the big per-domain lock, which this test would disallow.
+     * The test is not needed until we implement sleeping-on-waitqueue when
+     * we access a paged-out frame, and that's post 4.1.0 now.
+     */
+#if 0
+    /*
+     * If the required guest memory is paged out, this function may sleep.
+     * Hence we bail immediately if called from atomic context.
+     */
+    if ( in_atomic() )
+        return HVMCOPY_unhandleable;
+#endif
+
+    while ( todo > 0 )
+    {
+        count = min_t(int, PAGE_SIZE - (addr & ~PAGE_MASK), todo);
+
+        gfn = paging_gva_to_gfn(curr, addr, &pfec);
+        if ( gfn == INVALID_GFN )
+        {
+            if ( pfec == PFEC_page_paged )
+                return HVMCOPY_gfn_paged_out;
+            if ( pfec == PFEC_page_shared )
+                return HVMCOPY_gfn_shared;
+            return HVMCOPY_bad_gva_to_gfn;
+        }
+
+        mfn = mfn_x(get_gfn_unshare(curr->domain, gfn, &p2mt));
+
+        if ( p2m_is_paging(p2mt) )
+        {
+            p2m_mem_paging_populate(curr->domain, gfn);
+            put_gfn(curr->domain, gfn);
+            return HVMCOPY_gfn_paged_out;
+        }
+        if ( p2m_is_shared(p2mt) )
+        {
+            put_gfn(curr->domain, gfn);
+            return HVMCOPY_gfn_shared;
+        }
+        if ( p2m_is_grant(p2mt) )
+        {
+            put_gfn(curr->domain, gfn);
+            return HVMCOPY_unhandleable;
+        }
+        if ( !p2m_is_ram(p2mt) )
+        {
+            put_gfn(curr->domain, gfn);
+            return HVMCOPY_bad_gfn_to_mfn;
+        }
+        ASSERT(mfn_valid(mfn));
+
+        p = (char *)map_domain_page(mfn) + (addr & ~PAGE_MASK);
+
+        if ( p2mt == p2m_ram_ro )
+        {
+            static unsigned long lastpage;
+            if ( xchg(&lastpage, gfn) != gfn )
+                gdprintk(XENLOG_DEBUG, "guest attempted write to read-only"
+                        " memory page. gfn=%#lx, mfn=%#lx\n",
+                        gfn, mfn);
+        }
+        else
+        {
+            memset(p, 0x00, count);
+            paging_mark_dirty(curr->domain, mfn);
+        }
+
+        unmap_domain_page(p);
+
+        addr += count;
+        todo -= count;
+        put_gfn(curr->domain, gfn);
+    }
+
+    return HVMCOPY_okay;
+}
+
 enum hvm_copy_result hvm_copy_to_guest_phys(
     paddr_t paddr, void *buf, int size)
 {
@@ -2464,6 +2554,23 @@ unsigned long copy_to_user_hvm(void *to, const void *from, unsigned int len)
 
     rc = hvm_copy_to_guest_virt_nofault((unsigned long)to, (void *)from,
                                         len, 0);
+    return rc ? len : 0; /* fake a copy_to_user() return code */
+}
+
+unsigned long clear_user_hvm(void *to, unsigned int len)
+{
+    int rc;
+
+#ifdef __x86_64__
+    if ( !current->arch.hvm_vcpu.hcall_64bit &&
+         is_compat_arg_xlat_range(to, len) )
+    {
+        memset(to, 0x00, len);
+        return 0;
+    }
+#endif
+
+    rc = __hvm_clear((unsigned long)to, len);
     return rc ? len : 0; /* fake a copy_to_user() return code */
 }
 

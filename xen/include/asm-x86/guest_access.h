@@ -21,6 +21,10 @@
     (is_hvm_vcpu(current) ?                     \
      copy_from_user_hvm((dst), (src), (len)) :  \
      copy_from_user((dst), (src), (len)))
+#define raw_clear_guest(dst,  len)              \
+    (is_hvm_vcpu(current) ?                     \
+     clear_user_hvm((dst), (len)) :             \
+     clear_user((dst), (len)))
 #define __raw_copy_to_guest(dst, src, len)      \
     (is_hvm_vcpu(current) ?                     \
      copy_to_user_hvm((dst), (src), (len)) :    \
@@ -29,6 +33,10 @@
     (is_hvm_vcpu(current) ?                     \
      copy_from_user_hvm((dst), (src), (len)) :  \
      __copy_from_user((dst), (src), (len)))
+#define __raw_clear_guest(dst,  len)            \
+    (is_hvm_vcpu(current) ?                     \
+     clear_user_hvm((dst), (len)) :             \
+     clear_user((dst), (len)))
 
 /* Is the guest handle a NULL reference? */
 #define guest_handle_is_null(hnd)        ((hnd).p == NULL)
@@ -67,6 +75,11 @@
     const typeof(*(ptr)) *_s = (hnd).p;                 \
     typeof(*(ptr)) *_d = (ptr);                         \
     raw_copy_from_guest(_d, _s+(off), sizeof(*_d)*(nr));\
+})
+
+#define clear_guest_offset(hnd, off, nr) ({    \
+    void *_d = (hnd).p;                        \
+    raw_clear_guest(_d+(off), nr);             \
 })
 
 /* Copy sub-field of a structure to guest context via a guest handle. */
@@ -108,6 +121,11 @@
     const typeof(*(ptr)) *_s = (hnd).p;                 \
     typeof(*(ptr)) *_d = (ptr);                         \
     __raw_copy_from_guest(_d, _s+(off), sizeof(*_d)*(nr));\
+})
+
+#define __clear_guest_offset(hnd, off, nr) ({    \
+    void *_d = (hnd).p;                          \
+    __raw_clear_guest(_d+(off), nr);             \
 })
 
 #define __copy_field_to_guest(hnd, ptr, field) ({       \

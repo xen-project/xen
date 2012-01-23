@@ -15,10 +15,16 @@
 #define copy_from_guest(ptr, hnd, nr)                   \
     copy_from_guest_offset(ptr, hnd, 0, nr)
 
+#define clear_guest(hnd, nr)                            \
+    clear_guest_offset(hnd, 0, nr)
+
 #define __copy_to_guest(hnd, ptr, nr)                   \
     __copy_to_guest_offset(hnd, 0, ptr, nr)
 
 #define __copy_from_guest(ptr, hnd, nr)                 \
     __copy_from_guest_offset(ptr, hnd, 0, nr)
+
+#define __clear_guest(hnd, nr)                          \
+    __clear_guest_offset(hnd, 0, nr)
 
 #endif /* __XEN_GUEST_ACCESS_H__ */

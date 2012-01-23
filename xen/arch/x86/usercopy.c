@@ -110,6 +110,42 @@ copy_to_user(void __user *to, const void *from, unsigned n)
     return n;
 }
 
+#define __do_clear_user(addr,size)					\
+do {									\
+	long __d0;							\
+	__asm__ __volatile__(						\
+		"0:	rep; stosl\n"					\
+		"	movl %2,%0\n"					\
+		"1:	rep; stosb\n"					\
+		"2:\n"							\
+		".section .fixup,\"ax\"\n"				\
+		"3:	lea 0(%2,%0,4),%0\n"				\
+		"	jmp 2b\n"					\
+		".previous\n"						\
+		_ASM_EXTABLE(0b,3b)					\
+		_ASM_EXTABLE(1b,2b)					\
+		: "=&c"(size), "=&D" (__d0)				\
+		: "r"(size & 3), "0"(size / 4), "1"((long)addr), "a"(0));	\
+} while (0)
+
+/**
+ * clear_user: - Zero a block of memory in user space.
+ * @to:   Destination address, in user space.
+ * @n:    Number of bytes to zero.
+ *
+ * Zero a block of memory in user space.
+ *
+ * Returns number of bytes that could not be cleared.
+ * On success, this will be zero.
+ */
+unsigned long
+clear_user(void __user *to, unsigned n)
+{
+	if ( access_ok(to, n) )
+		__do_clear_user(to, n);
+	return n;
+}
+
 /**
  * copy_from_user: - Copy a block of data from user space.
  * @to:   Destination address, in kernel space.
