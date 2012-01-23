@@ -20,6 +20,13 @@ struct frame_head {
     unsigned long ret;
 } __attribute__((packed));
 
+#ifdef CONFIG_X86_64
+struct frame_head_32bit {
+    uint32_t ebp;
+    unsigned long ret;
+} __attribute__((packed));
+#endif
+
 static struct frame_head *
 dump_hypervisor_backtrace(struct domain *d, struct vcpu *vcpu, 
 			  struct frame_head * head, int mode)
@@ -35,19 +42,46 @@ dump_hypervisor_backtrace(struct domain *d, struct vcpu *vcpu,
     return head->ebp;
 }
 
+#ifdef CONFIG_X86_64
+static inline int is_32bit_vcpu(struct vcpu *vcpu)
+{
+    if (is_hvm_vcpu(vcpu))
+        return !hvm_long_mode_enabled(vcpu);
+    else
+        return is_pv_32bit_vcpu(vcpu);
+}
+#endif
+
 static struct frame_head *
 dump_guest_backtrace(struct domain *d, struct vcpu *vcpu, 
 		     struct frame_head * head, int mode)
 {
     struct frame_head bufhead[2];
     XEN_GUEST_HANDLE(char) guest_head = guest_handle_from_ptr(head, char);
-	
-    /* Also check accessibility of one struct frame_head beyond */
-    if (!guest_handle_okay(guest_head, sizeof(bufhead)))
-        return 0;
-    if (__copy_from_guest_offset((char *)bufhead, guest_head, 0, 
-                                 sizeof(bufhead)))
-        return 0;
+
+#ifdef CONFIG_X86_64
+    if ( is_32bit_vcpu(vcpu) )
+    {
+        struct frame_head_32bit bufhead32[2];
+        /* Also check accessibility of one struct frame_head beyond */
+        if (!guest_handle_okay(guest_head, sizeof(bufhead32)))
+            return 0;
+        if (__copy_from_guest_offset((char *)bufhead32, guest_head, 0, 
+                                     sizeof(bufhead32)))
+            return 0;
+        bufhead[0].ebp=(struct frame_head *)(unsigned long)bufhead32[0].ebp;
+        bufhead[0].ret=bufhead32[0].ret;
+    }
+    else
+#endif
+    {
+        /* Also check accessibility of one struct frame_head beyond */
+        if (!guest_handle_okay(guest_head, sizeof(bufhead)))
+            return 0;
+        if (__copy_from_guest_offset((char *)bufhead, guest_head, 0, 
+                                     sizeof(bufhead)))
+            return 0;
+    }
     
     if (!xenoprof_add_trace(d, vcpu, bufhead[0].ret, mode))
         return 0;
