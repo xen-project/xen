@@ -556,7 +556,7 @@ STATIC int INIT unlzma(unsigned char *buf, unsigned int in_len,
 	else
 		inbuf = malloc(LZMA_IOBUF_SIZE);
 	if (!inbuf) {
-		error("Could not allocate input bufer");
+		error("Could not allocate input buffer");
 		goto exit_0;
 	}
 
