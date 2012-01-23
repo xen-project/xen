@@ -68,7 +68,7 @@ struct event_log {
 };
 
 /* PC value that indicates a special code */
-#define XENOPROF_ESCAPE_CODE ~0UL
+#define XENOPROF_ESCAPE_CODE (~0ULL)
 /* Transient events for the xenoprof->oprofile cpu buf */
 #define XENOPROF_TRACE_BEGIN 1
 
