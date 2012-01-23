@@ -254,7 +254,7 @@ STATIC int INIT unlzo(u8 *input, unsigned int in_len,
 	ret = 0;
 exit_2:
 	if (!input)
-		free(in_buf);
+		free(in_buf_save);
 exit_1:
 	if (!output)
 		free(out_buf);
