@@ -83,4 +83,6 @@ int continue_hypercall_on_cpu(
 
 extern unsigned int xen_processor_pmbits;
 
+extern bool_t opt_dom0_vcpus_pin;
+
 #endif /* __XEN_DOMAIN_H__ */

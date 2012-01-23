@@ -31,8 +31,8 @@
 #include <xen/grant_table.h>
 #include <xen/xenoprof.h>
 #include <xen/irq.h>
-#include <acpi/cpufreq/cpufreq.h>
 #include <asm/debugger.h>
+#include <asm/processor.h>
 #include <public/sched.h>
 #include <public/sysctl.h>
 #include <public/vcpu.h>
@@ -45,39 +45,8 @@
 unsigned int xen_processor_pmbits = XEN_PROCESSOR_PM_PX;
 
 /* opt_dom0_vcpus_pin: If true, dom0 VCPUs are pinned. */
-static bool_t opt_dom0_vcpus_pin;
+bool_t opt_dom0_vcpus_pin;
 boolean_param("dom0_vcpus_pin", opt_dom0_vcpus_pin);
-
-/* set xen as default cpufreq */
-enum cpufreq_controller cpufreq_controller = FREQCTL_xen;
-
-static void __init setup_cpufreq_option(char *str)
-{
-    char *arg;
-
-    if ( !strcmp(str, "dom0-kernel") )
-    {
-        xen_processor_pmbits &= ~XEN_PROCESSOR_PM_PX;
-        cpufreq_controller = FREQCTL_dom0_kernel;
-        opt_dom0_vcpus_pin = 1;
-        return;
-    }
-
-    if ( !strcmp(str, "none") )
-    {
-        xen_processor_pmbits &= ~XEN_PROCESSOR_PM_PX;
-        cpufreq_controller = FREQCTL_none;
-        return;
-    }
-
-    if ( (arg = strpbrk(str, ",:")) != NULL )
-        *arg++ = '\0';
-
-    if ( !strcmp(str, "xen") )
-        if ( arg && *arg )
-            cpufreq_cmdline_parse(arg);
-}
-custom_param("cpufreq", setup_cpufreq_option);
 
 /* Protect updates/reads (resp.) of domain_list and domain_hash. */
 DEFINE_SPINLOCK(domlist_update_lock);

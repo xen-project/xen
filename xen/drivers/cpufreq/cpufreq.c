@@ -60,6 +60,37 @@ static LIST_HEAD_READ_MOSTLY(cpufreq_dom_list_head);
 struct cpufreq_governor *__read_mostly cpufreq_opt_governor;
 LIST_HEAD_READ_MOSTLY(cpufreq_governor_list);
 
+/* set xen as default cpufreq */
+enum cpufreq_controller cpufreq_controller = FREQCTL_xen;
+
+static void __init setup_cpufreq_option(char *str)
+{
+    char *arg;
+
+    if ( !strcmp(str, "dom0-kernel") )
+    {
+        xen_processor_pmbits &= ~XEN_PROCESSOR_PM_PX;
+        cpufreq_controller = FREQCTL_dom0_kernel;
+        opt_dom0_vcpus_pin = 1;
+        return;
+    }
+
+    if ( !strcmp(str, "none") )
+    {
+        xen_processor_pmbits &= ~XEN_PROCESSOR_PM_PX;
+        cpufreq_controller = FREQCTL_none;
+        return;
+    }
+
+    if ( (arg = strpbrk(str, ",:")) != NULL )
+        *arg++ = '\0';
+
+    if ( !strcmp(str, "xen") )
+        if ( arg && *arg )
+            cpufreq_cmdline_parse(arg);
+}
+custom_param("cpufreq", setup_cpufreq_option);
+
 bool_t __read_mostly cpufreq_verbose;
 
 struct cpufreq_governor *__find_governor(const char *governor)
