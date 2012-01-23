@@ -13,6 +13,10 @@
 #include <xen/nodemask.h>
 #include <xen/radix-tree.h>
 #include <xen/multicall.h>
+#include <xen/tasklet.h>
+#include <xen/mm.h>
+#include <xen/smp.h>
+#include <asm/atomic.h>
 #include <xen/wait.h>
 #include <public/xen.h>
 #include <public/domctl.h>

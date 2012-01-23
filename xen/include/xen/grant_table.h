@@ -25,6 +25,7 @@
 #define __XEN_GRANT_TABLE_H__
 
 #include <public/grant_table.h>
+#include <asm/page.h>
 #include <asm/grant_table.h>
 
 /* Active grant entry - used for shadowing GTF_permit_access grants. */

@@ -12,6 +12,7 @@
 #include <xen/time.h>
 #include <xen/string.h>
 #include <xen/list.h>
+#include <xen/percpu.h>
 
 struct timer {
     /* System time expiry value (nanoseconds since boot). */

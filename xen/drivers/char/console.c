@@ -12,6 +12,7 @@
 
 #include <xen/version.h>
 #include <xen/lib.h>
+#include <xen/init.h>
 #include <xen/event.h>
 #include <xen/console.h>
 #include <xen/serial.h>

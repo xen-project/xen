@@ -23,6 +23,7 @@
 #include <xen/config.h>
 #include <xen/sched.h>
 #include <xen/wait.h>
+#include <xen/errno.h>
 
 struct waitqueue_vcpu {
     struct list_head list;

@@ -1,5 +1,6 @@
 #include <xen/config.h>
 #include <xen/irq.h>
+#include <xen/errno.h>
 
 int init_one_irq_desc(struct irq_desc *desc)
 {

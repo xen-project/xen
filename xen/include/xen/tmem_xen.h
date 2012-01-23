@@ -10,6 +10,7 @@
 #define __XEN_TMEM_XEN_H__
 
 #include <xen/mm.h> /* heap alloc/free */
+#include <xen/pfn.h>
 #include <xen/xmalloc.h> /* xmalloc/xfree */
 #include <xen/sched.h>  /* struct domain */
 #include <xen/guest_access.h> /* copy_from_guest */

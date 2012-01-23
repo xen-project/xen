@@ -15,6 +15,7 @@
 #include <xen/compat.h>
 #include <xen/ctype.h>
 #include <xen/perfc.h>
+#include <xen/init.h>
 #include <asm/debugger.h>
 #include <asm/div64.h>
 

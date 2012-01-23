@@ -38,6 +38,7 @@
 #include <xen/paging.h>
 #include <xen/keyhandler.h>
 #include <xsm/xsm.h>
+#include <asm/flushtlb.h>
 
 #ifndef max_nr_grant_frames
 unsigned int max_nr_grant_frames = DEFAULT_MAX_NR_GRANT_FRAMES;

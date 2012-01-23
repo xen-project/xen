@@ -8,6 +8,7 @@
 #define __XEN_LIST_H__
 
 #include <xen/lib.h>
+#include <xen/prefetch.h>
 #include <asm/system.h>
 
 /* These are non-NULL pointers that will result in page faults

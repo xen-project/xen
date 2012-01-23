@@ -8,6 +8,7 @@
 #include <xen/preempt.h>
 #include <public/sysctl.h>
 #include <asm/processor.h>
+#include <asm/atomic.h>
 
 #ifndef NDEBUG
 

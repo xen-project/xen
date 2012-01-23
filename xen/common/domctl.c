@@ -24,6 +24,7 @@
 #include <xen/paging.h>
 #include <xen/hypercall.h>
 #include <asm/current.h>
+#include <asm/page.h>
 #include <public/domctl.h>
 #include <xsm/xsm.h>
 
