@@ -30,6 +30,7 @@ struct vcpu;
  */
 
 typedef s64 s_time_t;
+#define PRI_stime PRId64
 
 s_time_t get_s_time(void);
 unsigned long get_localtime(struct domain *d);

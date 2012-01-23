@@ -635,7 +635,9 @@ static void complete_domain_destroy(struct rcu_head *head)
     sched_destroy_domain(d);
 
     /* Free page used by xen oprofile buffer. */
+#ifdef CONFIG_XENOPROF
     free_xenoprof_pages(d);
+#endif
 
     xfree(d->mem_event);
 

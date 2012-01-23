@@ -26,12 +26,6 @@
 #include <xen/trace.h>
 #include <xen/cpu.h>
 
-#if __i386__
-#define PRI_stime "lld"
-#else
-#define PRI_stime "ld"
-#endif
-
 #define d2printk(x...)
 //#define d2printk printk
 

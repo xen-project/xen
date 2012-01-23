@@ -48,6 +48,8 @@
 #define CONFIG_HOTPLUG 1
 #define CONFIG_HOTPLUG_CPU 1
 
+#define CONFIG_XENOPROF 1
+
 #define HZ 100
 
 #define OPT_CONSOLE_STR "vga"
