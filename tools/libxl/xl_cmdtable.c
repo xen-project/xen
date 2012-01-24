@@ -240,7 +240,7 @@ struct cmd_spec cmd_table[] = {
     { "trigger",
       &main_trigger, 0,
       "Send a trigger to a domain",
-      "<Domain> <nmi|reset|init|power|sleep> [<VCPU>]",
+      "<Domain> <nmi|reset|init|power|sleep|s3resume> [<VCPU>]",
     },
     { "sysrq",
       &main_sysrq, 0,
