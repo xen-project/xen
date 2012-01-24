@@ -11,6 +11,7 @@
 #include <xen/ctype.h>
 #include <xen/errno.h>
 #include <xen/sched.h>
+#include <xen/sched-if.h>
 #include <xen/domain.h>
 #include <xen/mm.h>
 #include <xen/event.h>
@@ -335,17 +336,29 @@ struct domain *domain_create(
 void domain_update_node_affinity(struct domain *d)
 {
     cpumask_var_t cpumask;
+    cpumask_var_t online_affinity;
+    const cpumask_t *online;
     nodemask_t nodemask = NODE_MASK_NONE;
     struct vcpu *v;
     unsigned int node;
 
     if ( !zalloc_cpumask_var(&cpumask) )
         return;
+    if ( !alloc_cpumask_var(&online_affinity) )
+    {
+        free_cpumask_var(cpumask);
+        return;
+    }
+
+    online = cpupool_online_cpumask(d->cpupool);
 
     spin_lock(&d->node_affinity_lock);
 
     for_each_vcpu ( d, v )
-        cpumask_or(cpumask, cpumask, v->cpu_affinity);
+    {
+        cpumask_and(online_affinity, v->cpu_affinity, online);
+        cpumask_or(cpumask, cpumask, online_affinity);
+    }
 
     for_each_online_node ( node )
         if ( cpumask_intersects(&node_to_cpumask(node), cpumask) )
@@ -354,6 +367,7 @@ void domain_update_node_affinity(struct domain *d)
     d->node_affinity = nodemask;
     spin_unlock(&d->node_affinity_lock);
 
+    free_cpumask_var(online_affinity);
     free_cpumask_var(cpumask);
 }
 

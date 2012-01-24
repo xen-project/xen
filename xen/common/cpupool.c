@@ -220,6 +220,7 @@ static int cpupool_assign_cpu_locked(struct cpupool *c, unsigned int cpu)
 {
     int ret;
     struct cpupool *old;
+    struct domain *d;
 
     if ( (cpupool_moving_cpu == cpu) && (c != cpupool_cpu_moving) )
         return -EBUSY;
@@ -240,6 +241,14 @@ static int cpupool_assign_cpu_locked(struct cpupool *c, unsigned int cpu)
         cpupool_cpu_moving = NULL;
     }
     cpumask_set_cpu(cpu, c->cpu_valid);
+
+    rcu_read_lock(&domlist_read_lock);
+    for_each_domain_in_cpupool(d, c)
+    {
+        domain_update_node_affinity(d);
+    }
+    rcu_read_unlock(&domlist_read_lock);
+
     return 0;
 }
 

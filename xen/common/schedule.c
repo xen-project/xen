@@ -280,11 +280,12 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
 
         SCHED_OP(VCPU2OP(v), insert_vcpu, v);
     }
-    domain_update_node_affinity(d);
 
     d->cpupool = c;
     SCHED_OP(DOM2OP(d), free_domdata, d->sched_priv);
     d->sched_priv = domdata;
+
+    domain_update_node_affinity(d);
 
     domain_unpause(d);
 
@@ -535,7 +536,6 @@ int cpu_disable_scheduler(unsigned int cpu)
     struct cpupool *c;
     cpumask_t online_affinity;
     int    ret = 0;
-    bool_t affinity_broken;
 
     c = per_cpu(cpupool, cpu);
     if ( c == NULL )
@@ -543,8 +543,6 @@ int cpu_disable_scheduler(unsigned int cpu)
 
     for_each_domain_in_cpupool ( d, c )
     {
-        affinity_broken = 0;
-
         for_each_vcpu ( d, v )
         {
             vcpu_schedule_lock_irq(v);
@@ -556,7 +554,6 @@ int cpu_disable_scheduler(unsigned int cpu)
                 printk("Breaking vcpu affinity for domain %d vcpu %d\n",
                         v->domain->domain_id, v->vcpu_id);
                 cpumask_setall(v->cpu_affinity);
-                affinity_broken = 1;
             }
 
             if ( v->processor == cpu )
@@ -580,8 +577,7 @@ int cpu_disable_scheduler(unsigned int cpu)
                 ret = -EAGAIN;
         }
 
-        if ( affinity_broken )
-            domain_update_node_affinity(d);
+        domain_update_node_affinity(d);
     }
 
     return ret;
