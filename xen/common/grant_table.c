@@ -2283,6 +2283,81 @@ gnttab_get_version(XEN_GUEST_HANDLE(gnttab_get_version_t uop))
     return 0;
 }
 
+static s16
+__gnttab_swap_grant_ref(grant_ref_t ref_a, grant_ref_t ref_b)
+{
+    struct domain *d;
+    struct active_grant_entry *act;
+    s16 rc = GNTST_okay;
+
+    d = rcu_lock_current_domain();
+
+    spin_lock(&d->grant_table->lock);
+
+    act = &active_entry(d->grant_table, ref_a);
+    if ( act->pin )
+        PIN_FAIL(out, GNTST_eagain, "ref a %ld busy\n", (long)ref_a);
+
+    act = &active_entry(d->grant_table, ref_b);
+    if ( act->pin )
+        PIN_FAIL(out, GNTST_eagain, "ref b %ld busy\n", (long)ref_b);
+
+    if ( d->grant_table->gt_version == 1 )
+    {
+        grant_entry_v1_t shared;
+
+        shared = shared_entry_v1(d->grant_table, ref_a);
+
+        shared_entry_v1(d->grant_table, ref_a) =
+            shared_entry_v1(d->grant_table, ref_b);
+
+        shared_entry_v1(d->grant_table, ref_b) = shared;
+    }
+    else
+    {
+        grant_entry_v2_t shared;
+        grant_status_t status;
+
+        shared = shared_entry_v2(d->grant_table, ref_a);
+        status = status_entry(d->grant_table, ref_a);
+
+        shared_entry_v2(d->grant_table, ref_a) =
+            shared_entry_v2(d->grant_table, ref_b);
+        status_entry(d->grant_table, ref_a) =
+            status_entry(d->grant_table, ref_b);
+
+        shared_entry_v2(d->grant_table, ref_b) = shared;
+        status_entry(d->grant_table, ref_b) = status;
+    }
+
+out:
+    spin_unlock(&d->grant_table->lock);
+
+    rcu_unlock_domain(d);
+
+    return rc;
+}
+
+static long
+gnttab_swap_grant_ref(XEN_GUEST_HANDLE(gnttab_swap_grant_ref_t uop),
+                      unsigned int count)
+{
+    int i;
+    gnttab_swap_grant_ref_t op;
+
+    for ( i = 0; i < count; i++ )
+    {
+        if ( i && hypercall_preempt_check() )
+            return i;
+        if ( unlikely(__copy_from_guest_offset(&op, uop, i, 1)) )
+            return -EFAULT;
+        op.status = __gnttab_swap_grant_ref(op.ref_a, op.ref_b);
+        if ( unlikely(__copy_to_guest_offset(uop, i, &op, 1)) )
+            return -EFAULT;
+    }
+    return 0;
+}
+
 long
 do_grant_table_op(
     unsigned int cmd, XEN_GUEST_HANDLE(void) uop, unsigned int count)
@@ -2399,6 +2474,20 @@ do_grant_table_op(
     case GNTTABOP_get_version:
     {
         rc = gnttab_get_version(guest_handle_cast(uop, gnttab_get_version_t));
+        break;
+    }
+    case GNTTABOP_swap_grant_ref:
+    {
+        XEN_GUEST_HANDLE(gnttab_swap_grant_ref_t) swap =
+            guest_handle_cast(uop, gnttab_swap_grant_ref_t);
+        if ( unlikely(!guest_handle_okay(swap, count)) )
+            goto out;
+        rc = gnttab_swap_grant_ref(swap, count);
+        if ( rc > 0 )
+        {
+            guest_handle_add_offset(swap, rc);
+            uop = guest_handle_cast(swap, void);
+        }
         break;
     }
     default:

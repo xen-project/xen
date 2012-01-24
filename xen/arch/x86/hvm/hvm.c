@@ -2959,6 +2959,7 @@ static int grant_table_op_is_allowed(unsigned int cmd)
     case GNTTABOP_copy:
     case GNTTABOP_map_grant_ref:
     case GNTTABOP_unmap_grant_ref:
+    case GNTTABOP_swap_grant_ref:
         return 1;
     default:
         /* all other commands need auditing */

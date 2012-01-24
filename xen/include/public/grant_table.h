@@ -511,6 +511,20 @@ struct gnttab_get_version {
 typedef struct gnttab_get_version gnttab_get_version_t;
 DEFINE_XEN_GUEST_HANDLE(gnttab_get_version_t);
 
+/* 
+ * GNTTABOP_swap_grant_ref: Swap the contents of two grant entries.
+ */
+#define GNTTABOP_swap_grant_ref	      11
+struct gnttab_swap_grant_ref {
+    /* IN parameters */
+    grant_ref_t ref_a;
+    grant_ref_t ref_b;
+    /* OUT parameters */
+    int16_t status;             /* GNTST_* */
+};
+typedef struct gnttab_swap_grant_ref gnttab_swap_grant_ref_t;
+DEFINE_XEN_GUEST_HANDLE(gnttab_swap_grant_ref_t);
+
 #endif /* __XEN_INTERFACE_VERSION__ */
 
 /*
@@ -566,7 +580,7 @@ DEFINE_XEN_GUEST_HANDLE(gnttab_get_version_t);
 #define GNTST_bad_page         (-9) /* Specified page was invalid for op.    */
 #define GNTST_bad_copy_arg    (-10) /* copy arguments cross page boundary.   */
 #define GNTST_address_too_big (-11) /* transfer page address too large.      */
-#define GNTST_eagain          (-12) /* Could not map at the moment. Retry.   */
+#define GNTST_eagain          (-12) /* Operation not done; try again.        */
 
 #define GNTTABOP_error_msgs {                   \
     "okay",                                     \
@@ -581,7 +595,7 @@ DEFINE_XEN_GUEST_HANDLE(gnttab_get_version_t);
     "bad page",                                 \
     "copy arguments cross page boundary",       \
     "page address size too large",              \
-    "could not map at the moment, retry"        \
+    "operation not done; try again"             \
 }
 
 #endif /* __XEN_PUBLIC_GRANT_TABLE_H__ */

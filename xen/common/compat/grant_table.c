@@ -47,6 +47,10 @@ DEFINE_XEN_GUEST_HANDLE(gnttab_get_status_frames_compat_t);
 CHECK_gnttab_get_version;
 #undef xen_gnttab_get_version
 
+#define xen_gnttab_swap_grant_ref gnttab_swap_grant_ref
+CHECK_gnttab_swap_grant_ref;
+#undef xen_gnttab_swap_grant_ref
+
 int compat_grant_table_op(unsigned int cmd,
                           XEN_GUEST_HANDLE(void) cmp_uop,
                           unsigned int count)
@@ -96,6 +100,10 @@ int compat_grant_table_op(unsigned int cmd,
 
 #ifndef CHECK_gnttab_get_status_frames
     CASE(get_status_frames);
+#endif
+
+#ifndef CHECK_gnttab_swap_grant_ref
+    CASE(swap_grant_ref);
 #endif
 
 #undef CASE

@@ -50,6 +50,7 @@
 ?	grant_entry_v1			grant_table.h
 ?       grant_entry_header              grant_table.h
 ?	grant_entry_v2			grant_table.h
+?	gnttab_swap_grant_ref		grant_table.h
 ?	kexec_exec			kexec.h
 !	kexec_image			kexec.h
 !	kexec_range			kexec.h
