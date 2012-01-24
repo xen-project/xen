@@ -36,6 +36,7 @@ SUBDIRS-y += libvchan
 # do not recurse in to a dir we are about to delete
 ifneq "$(MAKECMDGOALS)" "distclean"
 SUBDIRS-$(CONFIG_IOEMU) += qemu-xen-traditional-dir
+SUBDIRS-$(CONFIG_IOEMU) += qemu-xen-dir
 endif
 
 SUBDIRS-y += xenpmd
@@ -76,6 +77,7 @@ clean: subdirs-clean
 .PHONY: distclean
 distclean: subdirs-distclean
 	rm -rf qemu-xen-traditional-dir qemu-xen-traditional-dir-remote
+	rm -rf qemu-xen-dir qemu-xen-dir-remote
 
 ifneq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
 IOEMU_CONFIGURE_CROSS ?= --cpu=$(XEN_TARGET_ARCH) \
@@ -95,6 +97,14 @@ qemu-xen-traditional-dir-find:
 	else \
 		export GIT=$(GIT); \
 		$(XEN_ROOT)/scripts/git-checkout.sh $(CONFIG_QEMU) $(QEMU_TAG) qemu-xen-traditional-dir; \
+	fi
+
+qemu-xen-dir-find:
+	if test -d $(QEMU_UPSTREAM_URL) ; then \
+		mkdir -p qemu-xen-dir; \
+	else \
+		export GIT=$(GIT); \
+		$(XEN_ROOT)/scripts/git-checkout.sh $(QEMU_UPSTREAM_URL) $(QEMU_UPSTREAM_REVISION) qemu-xen-dir ; \
 	fi
 
 .PHONY: qemu-xen-traditional-dir-force-update
@@ -117,6 +127,40 @@ subdir-clean-qemu-xen-traditional-dir:
 	set -e; if test -d qemu-xen-traditional-dir/.; then \
 		$(buildmakevars2shellvars); \
 		$(MAKE) -C qemu-xen-traditional-dir clean; \
+	fi
+
+.PHONY: qemu-xen-dir-force-update
+qemu-xen-dir-force-update:
+	set -ex; \
+	if [ "$(QEMU_UPSTREAM_REVISION)" ]; then \
+		cd qemu-xen-dir-remote; \
+		$(GIT) fetch origin; \
+		$(GIT) reset --hard $(QEMU_UPSTREAM_REVISION); \
+	fi
+
+subdir-all-qemu-xen-dir subdir-install-qemu-xen-dir: qemu-xen-dir-find
+	if test -d $(QEMU_UPSTREAM_URL) ; then \
+		source=$(QEMU_UPSTREAM_URL); \
+	else \
+		source=.; \
+	fi; \
+	cd qemu-xen-dir; \
+	$$source/configure --enable-xen --target-list=i386-softmmu \
+		--source-path=$$source \
+		--extra-cflags="-I$(XEN_ROOT)/tools/include \
+		-I$(XEN_ROOT)/tools/libxc \
+		-I$(XEN_ROOT)/tools/xenstore" \
+		--extra-ldflags="-L$(XEN_ROOT)/tools/libxc \
+		-L$(XEN_ROOT)/tools/xenstore" \
+		--bindir=$(LIBEXEC) \
+		--disable-kvm \
+		$(IOEMU_CONFIGURE_CROSS); \
+	$(MAKE) install
+
+subdir-clean-qemu-xen-dir:
+	set -e; if test -d qemu-xen-dir/.; then \
+		$(buildmakevars2shellvars); \
+		$(MAKE) -C qemu-xen-dir clean; \
 	fi
 
 subdir-clean-debugger/gdbsx subdir-distclean-debugger/gdbsx: .phony

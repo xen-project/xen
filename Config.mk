@@ -207,6 +207,13 @@ else
 QEMU_REMOTE=git://xenbits.xensource.com/qemu-xen-unstable.git
 endif
 
+ifeq ($(GIT_HTTP),y)
+QEMU_UPSTREAM_URL ?= http://xenbits.xen.org/git-http/qemu-upstream-unstable.git
+else
+QEMU_UPSTREAM_URL ?= git://xenbits.xen.org/qemu-upstream-unstable.git
+endif
+QEMU_UPSTREAM_REVISION ?= master
+
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git

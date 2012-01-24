@@ -298,6 +298,8 @@
 ^tools/xm-test/tests/.*\.test$
 ^tools/qemu-xen-traditional-dir-remote
 ^tools/qemu-xen-traditional-dir$
+^tools/qemu-xen-dir-remote
+^tools/qemu-xen-dir$
 ^tools/ocaml/.*/.*\.annot$
 ^tools/ocaml/.*/.*\.cmx?a$
 ^tools/ocaml/.*/META$

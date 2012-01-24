@@ -70,7 +70,7 @@ install-tools:
 	$(MAKE) -C tools install
 
 ifeq ($(CONFIG_IOEMU),y)
-install-tools: tools/qemu-xen-traditional-dir
+install-tools: tools/qemu-xen-traditional-dir tools/qemu-xen-dir
 endif
 
 .PHONY: install-kernels
@@ -90,6 +90,13 @@ tools/qemu-xen-traditional-dir:
 .PHONY: tools/qemu-xen-traditional-dir-force-update
 tools/qemu-xen-traditional-dir-force-update:
 	$(MAKE) -C tools qemu-xen-traditional-dir-force-update
+
+tools/qemu-xen-dir:
+	$(MAKE) -C tools qemu-xen-dir-find
+
+.PHONY: tools/qemu-xen-dir-force-update
+tools/qemu-xen-dir-force-update:
+	$(MAKE) -C tools qemu-xen-dir-force-update
 
 .PHONY: install-docs
 install-docs:
