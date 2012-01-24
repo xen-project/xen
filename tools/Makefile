@@ -75,7 +75,7 @@ clean: subdirs-clean
 
 .PHONY: distclean
 distclean: subdirs-distclean
-	rm -rf ioemu-dir ioemu-remote
+	rm -rf ioemu-dir ioemu-dir-remote
 
 ifneq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
 IOEMU_CONFIGURE_CROSS ?= --cpu=$(XEN_TARGET_ARCH) \
@@ -93,20 +93,8 @@ ioemu-dir-find:
 	if test -d $(CONFIG_QEMU); then \
 		mkdir -p ioemu-dir; \
 	else \
-		if [ ! -d ioemu-remote ]; then \
-			rm -rf ioemu-remote ioemu-remote.tmp; \
-			mkdir ioemu-remote.tmp; rmdir ioemu-remote.tmp; \
-			$(GIT) clone $(CONFIG_QEMU) ioemu-remote.tmp; \
-			if [ "$(QEMU_TAG)" ]; then			\
-				cd ioemu-remote.tmp;			\
-				$(GIT) branch -D dummy >/dev/null 2>&1 ||:; \
-				$(GIT) checkout -b dummy $(QEMU_TAG);	\
-				cd ..;					\
-			fi;						\
-			mv ioemu-remote.tmp ioemu-remote; \
-		fi; \
-		rm -f ioemu-dir; \
-		ln -sf ioemu-remote ioemu-dir; \
+		export GIT=$(GIT); \
+		$(XEN_ROOT)/scripts/git-checkout.sh $(CONFIG_QEMU) $(QEMU_TAG) ioemu-dir; \
 	fi
 	set -e; \
 		$(buildmakevars2shellvars); \
@@ -117,7 +105,7 @@ ioemu-dir-find:
 ioemu-dir-force-update:
 	set -ex; \
 	if [ "$(QEMU_TAG)" ]; then \
-		cd ioemu-remote; \
+		cd ioemu-dir-remote; \
 		$(GIT) fetch origin; \
 		$(GIT) reset --hard $(QEMU_TAG); \
 	fi
