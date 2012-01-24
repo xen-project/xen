@@ -447,7 +447,7 @@ static int get_all_assigned_devices(libxl__gc *gc, libxl_device_pci **list, int 
     return 0;
 }
 
-static int is_assigned(libxl_device_pci *assigned, int num_assigned,
+static int is_pcidev_in_array(libxl_device_pci *assigned, int num_assigned,
                        int dom, int bus, int dev, int func)
 {
     int i;
@@ -496,7 +496,7 @@ libxl_device_pci *libxl_device_pci_list_assignable(libxl_ctx *ctx, int *num)
         if ( sscanf(de->d_name, PCI_BDF, &dom, &bus, &dev, &func) != 4 )
             continue;
 
-        if ( is_assigned(assigned, num_assigned, dom, bus, dev, func) )
+        if ( is_pcidev_in_array(assigned, num_assigned, dom, bus, dev, func) )
             continue;
 
         new = realloc(pcidevs, ((*num) + 1) * sizeof(*new));
@@ -788,7 +788,7 @@ int libxl__device_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcide
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "cannot determine if device is assigned, refusing to continue");
         goto out;
     }
-    if ( is_assigned(assigned, num_assigned, pcidev->domain,
+    if ( is_pcidev_in_array(assigned, num_assigned, pcidev->domain,
                      pcidev->bus, pcidev->dev, pcidev->func) ) {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "PCI device already attached to a domain");
         rc = ERROR_FAIL;
@@ -892,7 +892,7 @@ static int do_pci_remove(libxl__gc *gc, uint32_t domid,
         return ERROR_FAIL;
 
     rc = ERROR_INVAL;
-    if ( !is_assigned(assigned, num, pcidev->domain,
+    if ( !is_pcidev_in_array(assigned, num, pcidev->domain,
                       pcidev->bus, pcidev->dev, pcidev->func) ) {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "PCI device not attached to this domain");
         goto out_fail;
