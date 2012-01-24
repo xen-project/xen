@@ -96,10 +96,6 @@ qemu-xen-traditional-dir-find:
 		export GIT=$(GIT); \
 		$(XEN_ROOT)/scripts/git-checkout.sh $(CONFIG_QEMU) $(QEMU_TAG) qemu-xen-traditional-dir; \
 	fi
-	set -e; \
-		$(buildmakevars2shellvars); \
-		cd qemu-xen-traditional-dir; \
-		$(QEMU_ROOT)/xen-setup $(IOEMU_CONFIGURE_CROSS)
 
 .PHONY: qemu-xen-traditional-dir-force-update
 qemu-xen-traditional-dir-force-update:
@@ -111,6 +107,11 @@ qemu-xen-traditional-dir-force-update:
 	fi
 
 subdir-all-qemu-xen-traditional-dir subdir-install-qemu-xen-traditional-dir: qemu-xen-traditional-dir-find
+	set -e; \
+		$(buildmakevars2shellvars); \
+		cd qemu-xen-traditional-dir; \
+		$(QEMU_ROOT)/xen-setup $(IOEMU_CONFIGURE_CROSS); \
+		$(MAKE) install
 
 subdir-clean-qemu-xen-traditional-dir:
 	set -e; if test -d qemu-xen-traditional-dir/.; then \
