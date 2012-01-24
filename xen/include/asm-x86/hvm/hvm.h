@@ -409,7 +409,6 @@ int hvm_debug_op(struct vcpu *v, int32_t op);
 
 int hvm_hap_nested_page_fault(unsigned long gpa,
                               bool_t gla_valid, unsigned long gla,
-                              bool_t access_valid, 
                               bool_t access_r,
                               bool_t access_w,
                               bool_t access_x);

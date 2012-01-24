@@ -2106,7 +2106,6 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
                                    qualification & EPT_GLA_VALID       ? 1 : 0,
                                    qualification & EPT_GLA_VALID
                                      ? __vmread(GUEST_LINEAR_ADDRESS) : ~0ull,
-                                   1, /* access types are as follows */
                                    qualification & EPT_READ_VIOLATION  ? 1 : 0,
                                    qualification & EPT_WRITE_VIOLATION ? 1 : 0,
                                    qualification & EPT_EXEC_VIOLATION  ? 1 : 0) )

@@ -1185,7 +1185,6 @@ void hvm_inject_exception(unsigned int trapnr, int errcode, unsigned long cr2)
 int hvm_hap_nested_page_fault(unsigned long gpa,
                               bool_t gla_valid,
                               unsigned long gla,
-                              bool_t access_valid,
                               bool_t access_r,
                               bool_t access_w,
                               bool_t access_x)
@@ -1234,7 +1233,7 @@ int hvm_hap_nested_page_fault(unsigned long gpa,
     mfn = get_gfn_type_access(p2m, gfn, &p2mt, &p2ma, p2m_guest, NULL);
 
     /* Check access permissions first, then handle faults */
-    if ( access_valid && (mfn_x(mfn) != INVALID_MFN) )
+    if ( mfn_x(mfn) != INVALID_MFN )
     {
         int violation = 0;
         /* If the access is against the permissions, then send to mem_event */

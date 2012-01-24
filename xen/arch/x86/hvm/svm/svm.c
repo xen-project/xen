@@ -1143,7 +1143,7 @@ struct hvm_function_table * __init start_svm(void)
 }
 
 static void svm_do_nested_pgfault(struct vcpu *v,
-    struct cpu_user_regs *regs, paddr_t gpa)
+    struct cpu_user_regs *regs, uint32_t npfec, paddr_t gpa)
 {
     int ret;
     unsigned long gfn = gpa >> PAGE_SHIFT;
@@ -1152,7 +1152,10 @@ static void svm_do_nested_pgfault(struct vcpu *v,
     p2m_access_t p2ma;
     struct p2m_domain *p2m = NULL;
 
-    ret = hvm_hap_nested_page_fault(gpa, 0, ~0ul, 0, 0, 0, 0);
+    ret = hvm_hap_nested_page_fault(gpa, 0, ~0ul, 
+                                    1, /* All NPFs count as reads */
+                                    npfec & PFEC_write_access, 
+                                    npfec & PFEC_insn_fetch);
 
     if ( tb_init_done )
     {
@@ -1181,7 +1184,7 @@ static void svm_do_nested_pgfault(struct vcpu *v,
     case -1:
         ASSERT(nestedhvm_enabled(v->domain) && nestedhvm_vcpu_in_guestmode(v));
         /* inject #VMEXIT(NPF) into guest. */
-        nestedsvm_vmexit_defer(v, VMEXIT_NPF, regs->error_code, gpa);
+        nestedsvm_vmexit_defer(v, VMEXIT_NPF, npfec, gpa);
         return;
     }
 
@@ -2198,10 +2201,9 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     case VMEXIT_NPF:
         perfc_incra(svmexits, VMEXIT_NPF_PERFC);
-        regs->error_code = vmcb->exitinfo1;
         if ( cpu_has_svm_decode )
             v->arch.hvm_svm.cached_insn_len = vmcb->guest_ins_len & 0xf;
-        svm_do_nested_pgfault(v, regs, vmcb->exitinfo2);
+        svm_do_nested_pgfault(v, regs, vmcb->exitinfo1, vmcb->exitinfo2);
         v->arch.hvm_svm.cached_insn_len = 0;
         break;
 
