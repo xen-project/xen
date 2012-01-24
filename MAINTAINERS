@@ -176,6 +176,11 @@ M:	Ian Jackson <ian.jackson@eu.citrix.com>
 S:	Supported
 T:	git git://xenbits.xen.org/qemu-xen-*.git
 
+QEMU UPSTREAM
+M:	Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+S:	Supported
+T:	git git://xenbits.xen.org/qemu-upstream-*.git
+
 REMUS
 M:	Shriram Rajagopalan <rshriram@cs.ubc.ca>
 S:	Maintained
@@ -189,6 +194,11 @@ SCHEDULING
 M:	George Dunlap <george.dunlap@eu.citrix.com>
 S:	Supported
 F:	xen/common/sched*
+
+SEABIOS UPSTREAM
+M:	Ian Campbell <ian.campbell@citrix.com>
+S:	Supported
+T:	git git://xenbits.xen.org/seabios.git
 
 STUB DOMAINS
 M:	Stefano Stabellini <stefano.stabellini@eu.citrix.com>
