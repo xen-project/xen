@@ -204,4 +204,9 @@ struct cpupool
     atomic_t         refcnt;
 };
 
+#define cpupool_scheduler_cpumask(_pool) \
+    (((_pool) == NULL) ? &cpupool_free_cpus : (_pool)->cpu_valid)
+#define cpupool_online_cpumask(_pool) \
+    (((_pool) == NULL) ? &cpu_online_map : (_pool)->cpu_valid)
+
 #endif /* __XEN_SCHED_IF_H__ */

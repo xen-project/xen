@@ -169,8 +169,6 @@ integer_param("sched_credit2_migrate_resist", opt_migrate_resist);
     ((struct csched_private *)((_ops)->sched_data))
 #define CSCHED_VCPU(_vcpu)  ((struct csched_vcpu *) (_vcpu)->sched_priv)
 #define CSCHED_DOM(_dom)    ((struct csched_dom *) (_dom)->sched_priv)
-#define CSCHED_CPUONLINE(_pool)    \
-    (((_pool) == NULL) ? &cpupool_free_cpus : (_pool)->cpu_valid)
 /* CPU to runq_id macro */
 #define c2r(_ops, _cpu)     (CSCHED_PRIV(_ops)->runq_map[(_cpu)])
 /* CPU to runqueue struct macro */

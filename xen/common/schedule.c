@@ -77,9 +77,7 @@ static struct scheduler __read_mostly ops;
 
 #define DOM2OP(_d)    (((_d)->cpupool == NULL) ? &ops : ((_d)->cpupool->sched))
 #define VCPU2OP(_v)   (DOM2OP((_v)->domain))
-#define VCPU2ONLINE(_v)                                                    \
-         (((_v)->domain->cpupool == NULL) ? &cpu_online_map                \
-         : (_v)->domain->cpupool->cpu_valid)
+#define VCPU2ONLINE(_v) cpupool_online_cpumask((_v)->domain->cpupool)
 
 static inline void trace_runstate_change(struct vcpu *v, int new_state)
 {
@@ -1418,7 +1416,7 @@ void schedule_dump(struct cpupool *c)
     cpumask_t        *cpus;
 
     sched = (c == NULL) ? &ops : c->sched;
-    cpus = (c == NULL) ? &cpupool_free_cpus : c->cpu_valid;
+    cpus = cpupool_scheduler_cpumask(c);
     printk("Scheduler: %s (%s)\n", sched->name, sched->opt_name);
     SCHED_OP(sched, dump_settings);
 

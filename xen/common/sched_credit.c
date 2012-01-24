@@ -72,8 +72,6 @@
 #define CSCHED_VCPU(_vcpu)  ((struct csched_vcpu *) (_vcpu)->sched_priv)
 #define CSCHED_DOM(_dom)    ((struct csched_dom *) (_dom)->sched_priv)
 #define RUNQ(_cpu)          (&(CSCHED_PCPU(_cpu)->runq))
-#define CSCHED_CPUONLINE(_pool)    \
-    (((_pool) == NULL) ? &cpupool_free_cpus : (_pool)->cpu_valid)
 
 
 /*
@@ -471,7 +469,7 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
      * Pick from online CPUs in VCPU's affinity mask, giving a
      * preference to its current processor if it's in there.
      */
-    online = CSCHED_CPUONLINE(vc->domain->cpupool);
+    online = cpupool_scheduler_cpumask(vc->domain->cpupool);
     cpumask_and(&cpus, online, vc->cpu_affinity);
     cpu = cpumask_test_cpu(vc->processor, &cpus)
             ? vc->processor
@@ -1230,7 +1228,7 @@ csched_load_balance(struct csched_private *prv, int cpu,
     int peer_cpu;
 
     BUG_ON( cpu != snext->vcpu->processor );
-    online = CSCHED_CPUONLINE(per_cpu(cpupool, cpu));
+    online = cpupool_scheduler_cpumask(per_cpu(cpupool, cpu));
 
     /* If this CPU is going offline we shouldn't steal work. */
     if ( unlikely(!cpumask_test_cpu(cpu, online)) )

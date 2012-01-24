@@ -13,9 +13,6 @@
 #include <xen/time.h>
 #include <xen/errno.h>
 
-#define SEDF_CPUONLINE(_pool)                                             \
-    (((_pool) == NULL) ? &cpupool_free_cpus : (_pool)->cpu_valid)
-
 #ifndef NDEBUG
 #define SEDF_STATS
 #define CHECK(_p)                                           \
@@ -397,7 +394,7 @@ static int sedf_pick_cpu(const struct scheduler *ops, struct vcpu *v)
     cpumask_t online_affinity;
     cpumask_t *online;
 
-    online = SEDF_CPUONLINE(v->domain->cpupool);
+    online = cpupool_scheduler_cpumask(v->domain->cpupool);
     cpumask_and(&online_affinity, v->cpu_affinity, online);
     return cpumask_first(&online_affinity);
 }
@@ -801,7 +798,8 @@ static struct task_slice sedf_do_schedule(
      */
     if ( tasklet_work_scheduled ||
          (list_empty(runq) && list_empty(waitq)) ||
-         unlikely(!cpumask_test_cpu(cpu, SEDF_CPUONLINE(per_cpu(cpupool, cpu)))) )
+         unlikely(!cpumask_test_cpu(cpu,
+                   cpupool_scheduler_cpumask(per_cpu(cpupool, cpu)))) )
     {
         ret.task = IDLETASK(cpu);
         ret.time = SECONDS(1);
