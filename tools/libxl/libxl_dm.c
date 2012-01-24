@@ -50,7 +50,7 @@ const char *libxl__domain_device_model(libxl__gc *gc,
             dm = libxl__abs_path(gc, "qemu-dm", libxl_libexec_path());
             break;
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
-            dm = libxl__strdup(gc, "/usr/bin/qemu");
+            dm = libxl__abs_path(gc, "qemu", libxl_libexec_path());
             break;
         default:
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
