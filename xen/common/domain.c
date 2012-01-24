@@ -220,6 +220,7 @@ struct domain *domain_create(
     INIT_PAGE_LIST_HEAD(&d->xenpage_list);
 
     spin_lock_init(&d->node_affinity_lock);
+    d->node_affinity = NODE_MASK_ALL;
 
     spin_lock_init(&d->shutdown_lock);
     d->shutdown_code = -1;
@@ -333,23 +334,27 @@ struct domain *domain_create(
 
 void domain_update_node_affinity(struct domain *d)
 {
-    cpumask_t cpumask;
+    cpumask_var_t cpumask;
     nodemask_t nodemask = NODE_MASK_NONE;
     struct vcpu *v;
     unsigned int node;
 
-    cpumask_clear(&cpumask);
+    if ( !zalloc_cpumask_var(&cpumask) )
+        return;
+
     spin_lock(&d->node_affinity_lock);
 
     for_each_vcpu ( d, v )
-        cpumask_or(&cpumask, &cpumask, v->cpu_affinity);
+        cpumask_or(cpumask, cpumask, v->cpu_affinity);
 
     for_each_online_node ( node )
-        if ( cpumask_intersects(&node_to_cpumask(node), &cpumask) )
+        if ( cpumask_intersects(&node_to_cpumask(node), cpumask) )
             node_set(node, nodemask);
 
     d->node_affinity = nodemask;
     spin_unlock(&d->node_affinity_lock);
+
+    free_cpumask_var(cpumask);
 }
 
 
