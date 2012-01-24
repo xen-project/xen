@@ -98,6 +98,10 @@ tools/qemu-xen-dir:
 tools/qemu-xen-dir-force-update:
 	$(MAKE) -C tools qemu-xen-dir-force-update
 
+.PHONY: tools/firmware/seabios-dir-force-update
+tools/firmware/seabios-dir-force-update:
+	$(MAKE) -C tools/firmware seabios-dir-force-update
+
 .PHONY: install-docs
 install-docs:
 	sh ./docs/check_pkgs && $(MAKE) -C docs install || true
