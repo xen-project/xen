@@ -218,15 +218,15 @@ $(CROSS_ROOT): cross-newlib cross-zlib cross-libpci
 QEMU_ROOT := $(shell if [ -d "$(CONFIG_QEMU)" ]; then echo "$(CONFIG_QEMU)"; else echo .; fi)
 
 ifeq ($(QEMU_ROOT),.)
-$(XEN_ROOT)/tools/ioemu-dir:
-	$(CROSS_MAKE) -C $(XEN_ROOT)/tools ioemu-dir-find
+$(XEN_ROOT)/tools/qemu-xen-traditional-dir:
+	$(CROSS_MAKE) -C $(XEN_ROOT)/tools qemu-xen-traditional-dir-find
 
-ioemu/linkfarm.stamp: $(XEN_ROOT)/tools/ioemu-dir
+ioemu/linkfarm.stamp: $(XEN_ROOT)/tools/qemu-xen-traditional-dir
 	mkdir -p ioemu
 	set -e;									\
 	$(buildmakevars2shellvars);						\
 	cd ioemu;								\
-	src="$$XEN_ROOT/tools/ioemu-dir"; export src;				\
+	src="$$XEN_ROOT/tools/qemu-xen-traditional-dir"; export src;		\
 	(cd $$src && find * -type d -print) | xargs mkdir -p;			\
 	(cd $$src && find *	! -type l  -type f  $(addprefix ! -name ,	\
 			'*.[oda1]' 'config-*' config.mak qemu-dm qemu-img-xen	\

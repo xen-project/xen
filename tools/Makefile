@@ -35,7 +35,7 @@ SUBDIRS-y += libvchan
 
 # do not recurse in to a dir we are about to delete
 ifneq "$(MAKECMDGOALS)" "distclean"
-SUBDIRS-$(CONFIG_IOEMU) += ioemu-dir
+SUBDIRS-$(CONFIG_IOEMU) += qemu-xen-traditional-dir
 endif
 
 SUBDIRS-y += xenpmd
@@ -75,7 +75,7 @@ clean: subdirs-clean
 
 .PHONY: distclean
 distclean: subdirs-distclean
-	rm -rf ioemu-dir ioemu-dir-remote
+	rm -rf qemu-xen-traditional-dir qemu-xen-traditional-dir-remote
 
 ifneq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
 IOEMU_CONFIGURE_CROSS ?= --cpu=$(XEN_TARGET_ARCH) \
@@ -88,34 +88,34 @@ ifneq ($(QEMU_ROOT),.)
 export QEMU_ROOT
 endif
 
-ioemu-dir-find:
+qemu-xen-traditional-dir-find:
 	set -ex; \
 	if test -d $(CONFIG_QEMU); then \
-		mkdir -p ioemu-dir; \
+		mkdir -p qemu-xen-traditional-dir; \
 	else \
 		export GIT=$(GIT); \
-		$(XEN_ROOT)/scripts/git-checkout.sh $(CONFIG_QEMU) $(QEMU_TAG) ioemu-dir; \
+		$(XEN_ROOT)/scripts/git-checkout.sh $(CONFIG_QEMU) $(QEMU_TAG) qemu-xen-traditional-dir; \
 	fi
 	set -e; \
 		$(buildmakevars2shellvars); \
-		cd ioemu-dir; \
+		cd qemu-xen-traditional-dir; \
 		$(QEMU_ROOT)/xen-setup $(IOEMU_CONFIGURE_CROSS)
 
-.PHONY: ioemu-dir-force-update
-ioemu-dir-force-update:
+.PHONY: qemu-xen-traditional-dir-force-update
+qemu-xen-traditional-dir-force-update:
 	set -ex; \
 	if [ "$(QEMU_TAG)" ]; then \
-		cd ioemu-dir-remote; \
+		cd qemu-xen-traditional-dir-remote; \
 		$(GIT) fetch origin; \
 		$(GIT) reset --hard $(QEMU_TAG); \
 	fi
 
-subdir-all-ioemu-dir subdir-install-ioemu-dir: ioemu-dir-find
+subdir-all-qemu-xen-traditional-dir subdir-install-qemu-xen-traditional-dir: qemu-xen-traditional-dir-find
 
-subdir-clean-ioemu-dir:
-	set -e; if test -d ioemu-dir/.; then \
+subdir-clean-qemu-xen-traditional-dir:
+	set -e; if test -d qemu-xen-traditional-dir/.; then \
 		$(buildmakevars2shellvars); \
-		$(MAKE) -C ioemu-dir clean; \
+		$(MAKE) -C qemu-xen-traditional-dir clean; \
 	fi
 
 subdir-clean-debugger/gdbsx subdir-distclean-debugger/gdbsx: .phony

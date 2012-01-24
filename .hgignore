@@ -296,8 +296,8 @@
 ^tools/xm-test/lib/XmTestLib/config.py$
 ^tools/xm-test/lib/XmTestReport/xmtest.py$
 ^tools/xm-test/tests/.*\.test$
-^tools/ioemu-dir-remote
-^tools/ioemu-dir$
+^tools/qemu-xen-traditional-dir-remote
+^tools/qemu-xen-traditional-dir$
 ^tools/ocaml/.*/.*\.annot$
 ^tools/ocaml/.*/.*\.cmx?a$
 ^tools/ocaml/.*/META$
