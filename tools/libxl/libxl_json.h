@@ -18,6 +18,5 @@
 #include <yajl/yajl_gen.h>
 
 #include <_libxl_types_json.h>
-#include <_libxl_types_internal_json.h>
 
 #endif /* LIBXL_JSON_H */
