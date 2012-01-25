@@ -104,7 +104,7 @@ tools/firmware/seabios-dir-force-update:
 
 .PHONY: install-docs
 install-docs:
-	sh ./docs/check_pkgs && $(MAKE) -C docs install || true
+	$(MAKE) -C docs install || true
 
 .PHONY: dev-docs
 dev-docs:
