@@ -1,9 +1,7 @@
 #ifndef __XEN_STDARG_H__
 #define __XEN_STDARG_H__
 
-#if defined(__OpenBSD__)
-#  include "/usr/include/stdarg.h"
-#elif defined (__NetBSD__)
+#if defined(__OpenBSD__) || defined (__NetBSD__)
    typedef __builtin_va_list va_list;
 #  ifdef __GNUC__
 #    define __GNUC_PREREQ__(x, y)                                       \
