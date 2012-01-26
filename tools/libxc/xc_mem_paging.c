@@ -68,23 +68,28 @@ int xc_mem_paging_prep(xc_interface *xch, domid_t domain_id, unsigned long gfn)
 int xc_mem_paging_load(xc_interface *xch, domid_t domain_id, 
                                 unsigned long gfn, void *buffer)
 {
-    int rc;
+    int rc, old_errno;
+
+    errno = -EINVAL;
 
     if ( !buffer )
-        return -EINVAL;
+        return -1;
 
     if ( ((unsigned long) buffer) & (XC_PAGE_SIZE - 1) )
-        return -EINVAL;
+        return -1;
 
     if ( mlock(buffer, XC_PAGE_SIZE) )
-        return -errno;
+        return -1;
         
     rc = xc_mem_event_control(xch, domain_id,
                                 XEN_DOMCTL_MEM_EVENT_OP_PAGING_PREP,
                                 XEN_DOMCTL_MEM_EVENT_OP_PAGING,
                                 buffer, NULL, gfn);
 
-    (void)munlock(buffer, XC_PAGE_SIZE);
+    old_errno = errno;
+    munlock(buffer, XC_PAGE_SIZE);
+    errno = old_errno;
+
     return rc;
 }
 
