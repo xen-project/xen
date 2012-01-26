@@ -728,18 +728,57 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
 
         case XEN_DOMCTL_MEM_EVENT_OP_SHARING_SHARE:
         {
-            unsigned long sgfn  = mec->u.share.source_gfn;
-            shr_handle_t sh     = mec->u.share.source_handle;
-            struct domain *cd   = get_domain_by_id(mec->u.share.client_domain);
-            if ( cd )
+            unsigned long sgfn, cgfn;
+            struct domain *cd;
+            shr_handle_t sh, ch;
+
+            if ( !mem_sharing_enabled(d) )
+                return -EINVAL;
+
+            cd = get_domain_by_id(mec->u.share.client_domain);
+            if ( !cd )
+                return -ESRCH;
+
+            if ( !mem_sharing_enabled(cd) )
             {
-                unsigned long cgfn  = mec->u.share.client_gfn;
-                shr_handle_t ch     = mec->u.share.client_handle;
-                rc = mem_sharing_share_pages(d, sgfn, sh, cd, cgfn, ch); 
                 put_domain(cd);
+                return -EINVAL;
             }
-            else
-                return -EEXIST;
+
+            if ( XEN_DOMCTL_MEM_SHARING_FIELD_IS_GREF(mec->u.share.source_gfn) )
+            {
+                grant_ref_t gref = (grant_ref_t) 
+                                    (XEN_DOMCTL_MEM_SHARING_FIELD_GET_GREF(
+                                        mec->u.share.source_gfn));
+                if ( mem_sharing_gref_to_gfn(d, gref, &sgfn) < 0 )
+                {
+                    put_domain(cd);
+                    return -EINVAL;
+                }
+            } else {
+                sgfn  = mec->u.share.source_gfn;
+            }
+
+            if ( XEN_DOMCTL_MEM_SHARING_FIELD_IS_GREF(mec->u.share.client_gfn) )
+            {
+                grant_ref_t gref = (grant_ref_t) 
+                                    (XEN_DOMCTL_MEM_SHARING_FIELD_GET_GREF(
+                                        mec->u.share.client_gfn));
+                if ( mem_sharing_gref_to_gfn(cd, gref, &cgfn) < 0 )
+                {
+                    put_domain(cd);
+                    return -EINVAL;
+                }
+            } else {
+                cgfn  = mec->u.share.client_gfn;
+            }
+
+            sh = mec->u.share.source_handle;
+            ch = mec->u.share.client_handle;
+
+            rc = mem_sharing_share_pages(d, sgfn, sh, cd, cgfn, ch); 
+
+            put_domain(cd);
         }
         break;
 

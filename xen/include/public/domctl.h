@@ -775,6 +775,19 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_mem_event_op_t);
 #define XEN_DOMCTL_MEM_SHARING_S_HANDLE_INVALID  (-10)
 #define XEN_DOMCTL_MEM_SHARING_C_HANDLE_INVALID  (-9)
 
+/* The following allows sharing of grant refs. This is useful
+ * for sharing utilities sitting as "filters" in IO backends
+ * (e.g. memshr + blktap(2)). The IO backend is only exposed 
+ * to grant references, and this allows sharing of the grefs */
+#define XEN_DOMCTL_MEM_SHARING_FIELD_IS_GREF_FLAG   (1ULL << 62)
+
+#define XEN_DOMCTL_MEM_SHARING_FIELD_MAKE_GREF(field, val)  \
+    (field) = (XEN_DOMCTL_MEM_SHARING_FIELD_IS_GREF_FLAG | val)
+#define XEN_DOMCTL_MEM_SHARING_FIELD_IS_GREF(field)         \
+    ((field) & XEN_DOMCTL_MEM_SHARING_FIELD_IS_GREF_FLAG)
+#define XEN_DOMCTL_MEM_SHARING_FIELD_GET_GREF(field)        \
+    ((field) & (~XEN_DOMCTL_MEM_SHARING_FIELD_IS_GREF_FLAG))
+
 struct xen_domctl_mem_sharing_op {
     uint8_t op; /* XEN_DOMCTL_MEM_EVENT_OP_* */
 
