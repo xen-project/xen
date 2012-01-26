@@ -46,12 +46,11 @@ int libxl__parse_backend_path(libxl__gc *gc,
 {
     /* /local/domain/<domid>/backend/<kind>/<domid>/<devid> */
     char strkind[16]; /* Longest is actually "console" */
-    uint32_t domain;
-    int rc = sscanf(path, "/local/domain/%d/backend/%15[^/]/%d/%d",
+    int rc = sscanf(path, "/local/domain/%d/backend/%15[^/]/%u/%d",
                     &dev->backend_domid,
                     strkind,
-                    &domain,
-                    &dev->backend_devid);
+                    &dev->domid,
+                    &dev->devid);
 
     if (rc != 4)
         return ERROR_FAIL;
