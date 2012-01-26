@@ -1534,8 +1534,8 @@ void audit_p2m(struct domain *d,
         }
         __put_gfn(p2m, gfn);
 
-        P2M_PRINTK("OK: mfn=%#lx, gfn=%#lx, p2mfn=%#lx, lp2mfn=%#lx\n",
-                       mfn, gfn, mfn_x(p2mfn), lp2mfn);
+        P2M_PRINTK("OK: mfn=%#lx, gfn=%#lx, p2mfn=%#lx\n",
+                       mfn, gfn, mfn_x(p2mfn));
     }
     spin_unlock(&d->page_alloc_lock);
 
