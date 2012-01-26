@@ -3574,6 +3574,11 @@ p2m_pod_decrease_reservation(struct domain *d, xen_pfn_t gpfn,
     return 0;
 }
 
+/* Simple no-op */
+void arch_dump_shared_mem_info(void)
+{
+}
+
 /*
  * Local variables:
  * mode: C

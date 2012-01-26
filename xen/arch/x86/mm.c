@@ -113,6 +113,7 @@
 #include <asm/e820.h>
 #include <asm/hypercall.h>
 #include <asm/shared.h>
+#include <asm/mem_sharing.h>
 #include <public/memory.h>
 #include <public/sched.h>
 #include <xsm/xsm.h>
@@ -5830,6 +5831,19 @@ void memguard_unguard_stack(void *p)
                  PRIMARY_STACK_SIZE - PAGE_SIZE);
     memguard_unguard_range(p, PAGE_SIZE);
 }
+
+#if defined(__x86_64__)
+void arch_dump_shared_mem_info(void)
+{
+    printk("Shared frames %u -- Saved frames %u\n",
+            mem_sharing_get_nr_shared_mfns(),
+            mem_sharing_get_nr_saved_mfns());
+}
+#else
+void arch_dump_shared_mem_info(void)
+{
+}
+#endif
 
 /*
  * Local variables:

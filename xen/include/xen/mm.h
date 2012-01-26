@@ -72,6 +72,9 @@ int assign_pages(
     unsigned int order,
     unsigned int memflags);
 
+/* Dump info to serial console */
+void arch_dump_shared_mem_info(void);
+
 /* memflags: */
 #define _MEMF_no_refcount 0
 #define  MEMF_no_refcount (1U<<_MEMF_no_refcount)

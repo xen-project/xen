@@ -15,6 +15,7 @@
 #include <xen/compat.h>
 #include <xen/ctype.h>
 #include <xen/perfc.h>
+#include <xen/mm.h>
 #include <xen/init.h>
 #include <asm/debugger.h>
 #include <asm/div64.h>
@@ -249,8 +250,8 @@ static void dump_domains(unsigned char key)
         printk("    refcnt=%d dying=%d pause_count=%d\n",
                atomic_read(&d->refcnt), d->is_dying,
                atomic_read(&d->pause_count));
-        printk("    nr_pages=%d xenheap_pages=%d dirty_cpus=%s max_pages=%u\n",
-               d->tot_pages, d->xenheap_pages, tmpstr, d->max_pages);
+        printk("    nr_pages=%d xenheap_pages=%d shared_pages=%u dirty_cpus=%s max_pages=%u\n",
+               d->tot_pages, d->xenheap_pages, atomic_read(&d->shr_pages), tmpstr, d->max_pages);
         printk("    handle=%02x%02x%02x%02x-%02x%02x-%02x%02x-"
                "%02x%02x-%02x%02x%02x%02x%02x%02x vm_assist=%08lx\n",
                d->handle[ 0], d->handle[ 1], d->handle[ 2], d->handle[ 3],
@@ -308,6 +309,8 @@ static void dump_domains(unsigned char key)
             send_guest_vcpu_virq(v, VIRQ_DEBUG);
         }
     }
+
+    arch_dump_shared_mem_info();
 
     rcu_read_unlock(&domlist_read_lock);
 #undef tmpstr
