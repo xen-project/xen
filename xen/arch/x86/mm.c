@@ -119,7 +119,6 @@
 #include <xen/trace.h>
 #include <asm/setup.h>
 #include <asm/fixmap.h>
-#include <asm/mem_sharing.h>
 
 /*
  * Mapping of first 2 or 4 megabytes of memory. This is mapped with 4kB
@@ -5022,11 +5021,6 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         rcu_unlock_domain(d);
         return rc;
     }
-
-#ifdef __x86_64__
-    case XENMEM_get_sharing_freed_pages:
-        return mem_sharing_get_nr_saved_mfns();
-#endif
 
     default:
         return subarch_memory_op(op, arg);

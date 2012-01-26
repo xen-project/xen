@@ -205,6 +205,12 @@ int compat_arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
+    case XENMEM_get_sharing_freed_pages:
+        return mem_sharing_get_nr_saved_mfns();
+
+    case XENMEM_get_sharing_shared_pages:
+        return mem_sharing_get_nr_shared_mfns();
+
     default:
         rc = -ENOSYS;
         break;

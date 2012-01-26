@@ -138,6 +138,7 @@ static inline shr_handle_t get_next_handle(void)
 #define page_to_mfn(_pg) _mfn(__page_to_mfn(_pg))
 
 static atomic_t nr_saved_mfns   = ATOMIC_INIT(0); 
+static atomic_t nr_shared_mfns  = ATOMIC_INIT(0);
 
 typedef struct gfn_info
 {
@@ -208,9 +209,12 @@ static struct page_info* mem_sharing_lookup(unsigned long mfn)
 static void mem_sharing_audit(void)
 {
     int errors = 0;
+    unsigned long count_expected;
+    unsigned long count_found = 0;
     struct list_head *ae;
 
     ASSERT(shr_locked_by_me());
+    count_expected = atomic_read(&nr_shared_mfns);
 
     list_for_each(ae, &shr_audit_list)
     {
@@ -258,6 +262,9 @@ static void mem_sharing_audit(void)
            continue;
         }
 
+        /* We've found a page that is shared */
+        count_found++;
+
         /* Check if all GFNs map to the MFN, and the p2m types */
         list_for_each(le, &pg->shared_info->gfns)
         {
@@ -302,6 +309,14 @@ static void mem_sharing_audit(void)
             errors++;
         }
     }
+
+    if ( count_found != count_expected )
+    {
+        MEM_SHARING_DEBUG("Expected %ld shared mfns, found %ld.",
+                          count_expected, count_found);
+        errors++;
+    }
+
 }
 #endif
 
@@ -340,6 +355,11 @@ static void mem_sharing_notify_helper(struct domain *d, unsigned long gfn)
 unsigned int mem_sharing_get_nr_saved_mfns(void)
 {
     return ((unsigned int)atomic_read(&nr_saved_mfns));
+}
+
+unsigned int mem_sharing_get_nr_shared_mfns(void)
+{
+    return (unsigned int)atomic_read(&nr_shared_mfns);
 }
 
 int mem_sharing_sharing_resume(struct domain *d)
@@ -663,6 +683,9 @@ int mem_sharing_nominate_page(struct domain *d,
         goto out;
     }
 
+    /* Account for this page. */
+    atomic_inc(&nr_shared_mfns);
+
     /* Update m2p entry to SHARED_M2P_ENTRY */
     set_gpfn_from_mfn(mfn_x(mfn), SHARED_M2P_ENTRY);
 
@@ -786,6 +809,7 @@ int mem_sharing_share_pages(struct domain *sd, unsigned long sgfn, shr_handle_t 
         put_page(cpage);
 
     /* We managed to free a domain page. */
+    atomic_dec(&nr_shared_mfns);
     atomic_inc(&nr_saved_mfns);
     ret = 0;
     
@@ -851,6 +875,7 @@ gfn_found:
         audit_del_list(page);
         xfree(page->shared_info);
         page->shared_info = NULL;
+        atomic_dec(&nr_shared_mfns);
     }
     else
         atomic_dec(&nr_saved_mfns);

@@ -294,6 +294,7 @@ typedef struct xen_pod_target xen_pod_target_t;
  * The call never fails. 
  */
 #define XENMEM_get_sharing_freed_pages    18
+#define XENMEM_get_sharing_shared_pages   19
 
 #endif /* __XEN_PUBLIC_MEMORY_H__ */
 

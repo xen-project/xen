@@ -45,6 +45,7 @@ struct page_sharing_info
     (is_hvm_domain(_d) && paging_mode_hap(_d)) 
 
 unsigned int mem_sharing_get_nr_saved_mfns(void);
+unsigned int mem_sharing_get_nr_shared_mfns(void);
 int mem_sharing_nominate_page(struct domain *d, 
                               unsigned long gfn,
                               int expected_refcnt,

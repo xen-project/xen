@@ -34,6 +34,7 @@
 #include <asm/msr.h>
 #include <asm/setup.h>
 #include <asm/numa.h>
+#include <asm/mem_sharing.h>
 #include <public/memory.h>
 
 /* Parameters for PFN/MADDR compression. */
@@ -1092,6 +1093,12 @@ long subarch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
             return -EFAULT;
 
         break;
+
+    case XENMEM_get_sharing_freed_pages:
+        return mem_sharing_get_nr_saved_mfns();
+
+    case XENMEM_get_sharing_shared_pages:
+        return mem_sharing_get_nr_shared_mfns();
 
     default:
         rc = -ENOSYS;
