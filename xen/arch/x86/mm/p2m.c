@@ -975,7 +975,7 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
 int p2m_mem_paging_prep(struct domain *d, unsigned long gfn, uint64_t buffer)
 {
     struct page_info *page;
-    p2m_type_t p2mt, target_p2mt;
+    p2m_type_t p2mt;
     p2m_access_t a;
     mfn_t mfn;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
@@ -1033,15 +1033,13 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn, uint64_t buffer)
         }
     }
 
-    target_p2mt = (p2mt == p2m_ram_paging_in_start) ?
-        /* If we kicked the pager with a populate event, the pager will send
-         * a resume event back */
-        p2m_ram_paging_in :
-        /* If this was called asynchronously by the pager, then we can 
-         * transition directly to the final guest-accessible type */
-        (paging_mode_log_dirty(d) ? p2m_ram_logdirty : p2m_ram_rw);
-    /* Fix p2m mapping */
-    set_p2m_entry(p2m, gfn, mfn, PAGE_ORDER_4K, target_p2mt, a);
+    /* Make the page already guest-accessible. If the pager still has a
+     * pending resume operation, it will be idempotent p2m entry-wise,
+     * but will unpause the vcpu */
+    set_p2m_entry(p2m, gfn, mfn, PAGE_ORDER_4K, 
+                    paging_mode_log_dirty(d) ? p2m_ram_logdirty : 
+                    p2m_ram_rw, a);
+    set_gpfn_from_mfn(mfn_x(mfn), gfn);
 
     atomic_dec(&d->paged_pages);
 
