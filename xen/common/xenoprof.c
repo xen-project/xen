@@ -475,7 +475,7 @@ static int xenoprof_buf_space(struct domain *d, xenoprof_buf_t * buf, int size)
 
 /* Check for space and add a sample. Return 1 if successful, 0 otherwise. */
 static int xenoprof_add_sample(struct domain *d, xenoprof_buf_t *buf,
-                               unsigned long eip, int mode, int event)
+                               uint64_t eip, int mode, int event)
 {
     int head, tail, size;
 
@@ -512,7 +512,7 @@ static int xenoprof_add_sample(struct domain *d, xenoprof_buf_t *buf,
 }
 
 int xenoprof_add_trace(struct domain *d, struct vcpu *vcpu,
-                       unsigned long eip, int mode)
+                       uint64_t eip, int mode)
 {
     xenoprof_buf_t *buf = d->xenoprof->vcpu[vcpu->vcpu_id].buffer;
 
@@ -527,7 +527,7 @@ int xenoprof_add_trace(struct domain *d, struct vcpu *vcpu,
 }
 
 void xenoprof_log_event(struct vcpu *vcpu, 
-                        struct cpu_user_regs * regs, unsigned long eip, 
+                        struct cpu_user_regs * regs, uint64_t eip, 
                         int mode, int event)
 {
     struct domain *d = vcpu->domain;
