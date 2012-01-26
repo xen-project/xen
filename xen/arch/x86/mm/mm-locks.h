@@ -61,7 +61,8 @@ do {                                \
 
 static inline void _mm_lock(mm_lock_t *l, const char *func, int level, int rec)
 {
-    __check_lock_level(level);
+    if ( !((mm_locked_by_me(l)) && rec) ) 
+        __check_lock_level(level);
     spin_lock_recursive(&l->lock);
     if ( l->lock.recurse_cnt == 1 )
     {
