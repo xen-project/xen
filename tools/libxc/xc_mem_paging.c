@@ -87,7 +87,7 @@ int xc_mem_paging_load(xc_interface *xch, domid_t domain_id,
                                 buffer, NULL, gfn);
 
     old_errno = errno;
-    munlock(buffer, XC_PAGE_SIZE);
+    (void) munlock(buffer, XC_PAGE_SIZE);
     errno = old_errno;
 
     return rc;
