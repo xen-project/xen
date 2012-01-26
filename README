@@ -50,6 +50,8 @@ provided by your OS distributor:
     * Development install of yajl (e.g. libyajl-dev)
     * Development install of libaio (e.g. libaio-dev) version 0.3.107 or
       greater. Set CONFIG_SYSTEM_LIBAIO in .config if this is not available.
+    * Development install of GLib v2.0 (e.g. libglib2.0-dev)
+    * pkg-config
     * bridge-utils package (/sbin/brctl)
     * iproute package (/sbin/ip)
     * hotplug or udev
