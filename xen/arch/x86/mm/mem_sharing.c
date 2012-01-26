@@ -35,10 +35,21 @@
 
 #include "mm-locks.h"
 
+static shr_handle_t next_handle = 1;
+
 #if MEM_SHARING_AUDIT
+
+static mm_lock_t shr_lock;
+
+#define shr_lock()          _shr_lock()
+#define shr_unlock()        _shr_unlock()
+#define shr_locked_by_me()  _shr_locked_by_me()
+
 static void mem_sharing_audit(void);
+
 #define MEM_SHARING_DEBUG(_f, _a...)                                  \
     debugtrace_printk("mem_sharing_debug: %s(): " _f, __func__, ##_a)
+
 static struct list_head shr_audit_list;
 
 static inline void audit_add_list(struct page_info *page)
@@ -51,11 +62,53 @@ static inline void audit_del_list(struct page_info *page)
 {
     list_del(&page->shared_info->entry);
 }
+
+static inline int mem_sharing_page_lock(struct page_info *p)
+{
+    return 1;
+}
+#define mem_sharing_page_unlock(p)   ((void)0)
+
+#define get_next_handle()   next_handle++;
 #else
+
+#define shr_lock()          ((void)0)
+#define shr_unlock()        ((void)0)
+/* Only used inside audit code */
+//#define shr_locked_by_me()  ((void)0)
+
 #define mem_sharing_audit() ((void)0)
 
 #define audit_add_list(p)  ((void)0)
 #define audit_del_list(p)  ((void)0)
+
+static inline int mem_sharing_page_lock(struct page_info *pg)
+{
+    int rc;
+    rc = page_lock(pg);
+    if ( rc )
+    {
+        preempt_disable();
+    }
+    return rc;
+}
+
+static inline void mem_sharing_page_unlock(struct page_info *pg)
+{
+    preempt_enable();
+    page_unlock(pg);
+}
+
+static inline shr_handle_t get_next_handle(void)
+{
+    /* Get the next handle get_page style */ 
+    uint64_t x, y = next_handle;
+    do {
+        x = y;
+    }
+    while ( (y = cmpxchg(&next_handle, x, x + 1)) != x );
+    return x + 1;
+}
 #endif /* MEM_SHARING_AUDIT */
 
 #define mem_sharing_enabled(d) \
@@ -68,7 +121,6 @@ static inline void audit_del_list(struct page_info *page)
 #undef page_to_mfn
 #define page_to_mfn(_pg) _mfn(__page_to_mfn(_pg))
 
-static shr_handle_t next_handle = 1;
 static atomic_t nr_saved_mfns   = ATOMIC_INIT(0); 
 
 typedef struct gfn_info
@@ -77,8 +129,6 @@ typedef struct gfn_info
     domid_t domain; 
     struct list_head list;
 } gfn_info_t;
-
-static mm_lock_t shr_lock;
 
 /* Returns true if list has only one entry. O(1) complexity. */
 static inline int list_has_one_entry(struct list_head *head)
@@ -398,6 +448,113 @@ int mem_sharing_debug_gref(struct domain *d, grant_ref_t ref)
     return mem_sharing_debug_gfn(d, gfn); 
 }
 
+/* Functions that change a page's type and ownership */
+static int page_make_sharable(struct domain *d, 
+                       struct page_info *page, 
+                       int expected_refcnt)
+{
+    spin_lock(&d->page_alloc_lock);
+
+    /* Change page type and count atomically */
+    if ( !get_page_and_type(page, d, PGT_shared_page) )
+    {
+        spin_unlock(&d->page_alloc_lock);
+        return -EINVAL;
+    }
+
+    /* Check it wasn't already sharable and undo if it was */
+    if ( (page->u.inuse.type_info & PGT_count_mask) != 1 )
+    {
+        put_page_and_type(page);
+        spin_unlock(&d->page_alloc_lock);
+        return -EEXIST;
+    }
+
+    /* Check if the ref count is 2. The first from PGC_allocated, and
+     * the second from get_page_and_type at the top of this function */
+    if ( page->count_info != (PGC_allocated | (2 + expected_refcnt)) )
+    {
+        /* Return type count back to zero */
+        put_page_and_type(page);
+        spin_unlock(&d->page_alloc_lock);
+        return -E2BIG;
+    }
+
+    page_set_owner(page, dom_cow);
+    d->tot_pages--;
+    page_list_del(page, &d->page_list);
+    spin_unlock(&d->page_alloc_lock);
+    return 0;
+}
+
+static int page_make_private(struct domain *d, struct page_info *page)
+{
+    unsigned long expected_type;
+
+    if ( !get_page(page, dom_cow) )
+        return -EINVAL;
+    
+    spin_lock(&d->page_alloc_lock);
+
+    /* We can only change the type if count is one */
+    /* If we are locking pages individually, then we need to drop
+     * the lock here, while the page is typed. We cannot risk the 
+     * race of page_unlock and then put_page_type. */
+#if MEM_SHARING_AUDIT
+    expected_type = (PGT_shared_page | PGT_validated | 1);
+#else
+    expected_type = (PGT_shared_page | PGT_validated | PGT_locked | 2);
+#endif
+    if ( page->u.inuse.type_info != expected_type )
+    {
+        put_page(page);
+        spin_unlock(&d->page_alloc_lock);
+        return -EEXIST;
+    }
+
+    /* Drop the final typecount */
+    put_page_and_type(page);
+
+#ifndef MEM_SHARING_AUDIT
+    /* Now that we've dropped the type, we can unlock */
+    mem_sharing_page_unlock(page);
+#endif
+
+    /* Change the owner */
+    ASSERT(page_get_owner(page) == dom_cow);
+    page_set_owner(page, d);
+
+    d->tot_pages++;
+    page_list_add_tail(page, &d->page_list);
+    spin_unlock(&d->page_alloc_lock);
+
+    put_page(page);
+
+    return 0;
+}
+
+static inline struct page_info *__grab_shared_page(mfn_t mfn)
+{
+    struct page_info *pg = NULL;
+
+    if ( !mfn_valid(mfn) )
+        return NULL;
+    pg = mfn_to_page(mfn);
+
+    /* If the page is not validated we can't lock it, and if it's  
+     * not validated it's obviously not shared. */
+    if ( !mem_sharing_page_lock(pg) )
+        return NULL;
+
+    if ( mem_sharing_lookup(mfn_x(mfn)) == NULL )
+    {
+        mem_sharing_page_unlock(pg);
+        return NULL;
+    }
+
+    return pg;
+}
+
 int mem_sharing_nominate_page(struct domain *d,
                               unsigned long gfn,
                               int expected_refcnt,
@@ -405,7 +562,7 @@ int mem_sharing_nominate_page(struct domain *d,
 {
     p2m_type_t p2mt;
     mfn_t mfn;
-    struct page_info *page;
+    struct page_info *page = NULL; /* gcc... */
     int ret;
     struct gfn_info *gfn_info;
 
@@ -420,10 +577,17 @@ int mem_sharing_nominate_page(struct domain *d,
         goto out;
 
     /* Return the handle if the page is already shared */
-    page = mfn_to_page(mfn);
     if ( p2m_is_shared(p2mt) ) {
-        *phandle = page->shared_info->handle;
+        struct page_info *pg = __grab_shared_page(mfn);
+        if ( !pg )
+        {
+            gdprintk(XENLOG_ERR, "Shared p2m entry gfn %lx, but could not "
+                        "grab page %lx dom %d\n", gfn, mfn_x(mfn), d->domain_id);
+            BUG();
+        }
+        *phandle = pg->shared_info->handle;
         ret = 0;
+        mem_sharing_page_unlock(pg);
         goto out;
     }
 
@@ -432,8 +596,16 @@ int mem_sharing_nominate_page(struct domain *d,
         goto out;
 
     /* Try to convert the mfn to the sharable type */
+    page = mfn_to_page(mfn);
     ret = page_make_sharable(d, page, expected_refcnt); 
     if ( ret ) 
+        goto out;
+
+    /* Now that the page is validated, we can lock it. There is no 
+     * race because we're holding the p2m entry, so no one else 
+     * could be nominating this gfn */
+    ret = -ENOENT;
+    if ( !mem_sharing_page_lock(page) )
         goto out;
 
     /* Initialize the shared state */
@@ -441,6 +613,7 @@ int mem_sharing_nominate_page(struct domain *d,
     if ( (page->shared_info = 
             xmalloc(struct page_sharing_info)) == NULL )
     {
+        /* Making a page private atomically unlocks it */
         BUG_ON(page_make_private(d, page) != 0);
         goto out;
     }
@@ -448,7 +621,7 @@ int mem_sharing_nominate_page(struct domain *d,
     INIT_LIST_HEAD(&page->shared_info->gfns);
 
     /* Create the handle */
-    page->shared_info->handle = next_handle++;  
+    page->shared_info->handle = get_next_handle();  
 
     /* Create the local gfn info */
     if ( (gfn_info = mem_sharing_gfn_alloc(page, d, gfn)) == NULL )
@@ -479,6 +652,7 @@ int mem_sharing_nominate_page(struct domain *d,
 
     *phandle = page->shared_info->handle;
     audit_add_list(page);
+    mem_sharing_page_unlock(page);
     ret = 0;
 
 out:
@@ -490,7 +664,7 @@ out:
 int mem_sharing_share_pages(struct domain *sd, unsigned long sgfn, shr_handle_t sh,
                             struct domain *cd, unsigned long cgfn, shr_handle_t ch) 
 {
-    struct page_info *spage, *cpage;
+    struct page_info *spage, *cpage, *firstpg, *secondpg;
     struct list_head *le, *te;
     gfn_info_t *gfn;
     struct domain *d;
@@ -505,26 +679,63 @@ int mem_sharing_share_pages(struct domain *sd, unsigned long sgfn, shr_handle_t 
     smfn = get_gfn(sd, sgfn, &smfn_type);
     cmfn = get_gfn(cd, cgfn, &cmfn_type);
 
-    ret = XEN_DOMCTL_MEM_SHARING_S_HANDLE_INVALID;
-    spage = mem_sharing_lookup(mfn_x(smfn));
-    if ( spage == NULL )
+    /* This tricky business is to avoid two callers deadlocking if 
+     * grabbing pages in opposite client/source order */
+    if( mfn_x(smfn) == mfn_x(cmfn) )
+    {
+        /* The pages are already the same.  We could return some
+         * kind of error here, but no matter how you look at it,
+         * the pages are already 'shared'.  It possibly represents
+         * a big problem somewhere else, but as far as sharing is
+         * concerned: great success! */
+        ret = 0;
         goto err_out;
+    }
+    else if ( mfn_x(smfn) < mfn_x(cmfn) )
+    {
+        ret = XEN_DOMCTL_MEM_SHARING_S_HANDLE_INVALID;
+        spage = firstpg = __grab_shared_page(smfn);
+        if ( spage == NULL )
+            goto err_out;
+
+        ret = XEN_DOMCTL_MEM_SHARING_C_HANDLE_INVALID;
+        cpage = secondpg = __grab_shared_page(cmfn);
+        if ( cpage == NULL )
+        {
+            mem_sharing_page_unlock(spage);
+            goto err_out;
+        }
+    } else {
+        ret = XEN_DOMCTL_MEM_SHARING_C_HANDLE_INVALID;
+        cpage = firstpg = __grab_shared_page(cmfn);
+        if ( cpage == NULL )
+            goto err_out;
+
+        ret = XEN_DOMCTL_MEM_SHARING_S_HANDLE_INVALID;
+        spage = secondpg = __grab_shared_page(smfn);
+        if ( spage == NULL )
+        {
+            mem_sharing_page_unlock(cpage);
+            goto err_out;
+        }
+    }
+
     ASSERT(smfn_type == p2m_ram_shared);
-    ret = XEN_DOMCTL_MEM_SHARING_C_HANDLE_INVALID;
-    cpage = mem_sharing_lookup(mfn_x(cmfn));
-    if ( cpage == NULL )
-        goto err_out;
     ASSERT(cmfn_type == p2m_ram_shared);
 
     /* Check that the handles match */
     if ( spage->shared_info->handle != sh )
     {
         ret = XEN_DOMCTL_MEM_SHARING_S_HANDLE_INVALID;
+        mem_sharing_page_unlock(secondpg);
+        mem_sharing_page_unlock(firstpg);
         goto err_out;
     }
     if ( cpage->shared_info->handle != ch )
     {
         ret = XEN_DOMCTL_MEM_SHARING_C_HANDLE_INVALID;
+        mem_sharing_page_unlock(secondpg);
+        mem_sharing_page_unlock(firstpg);
         goto err_out;
     }
 
@@ -550,6 +761,9 @@ int mem_sharing_share_pages(struct domain *sd, unsigned long sgfn, shr_handle_t 
     audit_del_list(cpage);
     xfree(cpage->shared_info);
     cpage->shared_info = NULL;
+
+    mem_sharing_page_unlock(secondpg);
+    mem_sharing_page_unlock(firstpg);
 
     /* Free the client page */
     if(test_and_clear_bit(_PGC_allocated, &cpage->count_info))
@@ -592,7 +806,7 @@ int mem_sharing_unshare_page(struct domain *d,
         return 0;
     }
 
-    page = mem_sharing_lookup(mfn_x(mfn));
+    page = __grab_shared_page(mfn);
     if ( page == NULL )
     {
         gdprintk(XENLOG_ERR, "Domain p2m is shared, but page is not: "
@@ -628,18 +842,20 @@ gfn_found:
      * (possibly freeing the page), and exit early */
     if ( flags & MEM_SHARING_DESTROY_GFN )
     {
-        put_gfn(d, gfn);
-        shr_unlock();
         put_page_and_type(page);
+        mem_sharing_page_unlock(page);
         if ( last_gfn && 
             test_and_clear_bit(_PGC_allocated, &page->count_info) ) 
             put_page(page);
+        put_gfn(d, gfn);
+        shr_unlock();
 
         return 0;
     }
  
     if ( last_gfn )
     {
+        /* Making a page private atomically unlocks it */
         BUG_ON(page_make_private(d, page) != 0);
         goto private_page_found;
     }
@@ -648,6 +864,7 @@ gfn_found:
     page = alloc_domheap_page(d, 0);
     if ( !page ) 
     {
+        mem_sharing_page_unlock(old_page);
         put_gfn(d, gfn);
         mem_sharing_notify_helper(d, gfn);
         shr_unlock();
@@ -661,6 +878,7 @@ gfn_found:
     unmap_domain_page(t);
 
     BUG_ON(set_shared_p2m_entry(d, gfn, page_to_mfn(page)) == 0);
+    mem_sharing_page_unlock(old_page);
     put_page_and_type(old_page);
 
 private_page_found:    
@@ -678,6 +896,7 @@ private_page_found:
     /* Now that the gfn<->mfn map is properly established,
      * marking dirty is feasible */
     paging_mark_dirty(d, mfn_x(page_to_mfn(page)));
+    /* We do not need to unlock a private page */
     put_gfn(d, gfn);
     shr_unlock();
     return 0;
@@ -826,8 +1045,8 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
 void __init mem_sharing_init(void)
 {
     printk("Initing memory sharing.\n");
-    mm_lock_init(&shr_lock);
 #if MEM_SHARING_AUDIT
+    mm_lock_init(&shr_lock);
     INIT_LIST_HEAD(&shr_audit_list);
 #endif
 }

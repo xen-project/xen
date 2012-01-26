@@ -1719,7 +1719,7 @@ static int free_l4_table(struct page_info *page, int preemptible)
 #define free_l4_table(page, preemptible) (-EINVAL)
 #endif
 
-static int page_lock(struct page_info *page)
+int page_lock(struct page_info *page)
 {
     unsigned long x, nx;
 
@@ -1736,7 +1736,7 @@ static int page_lock(struct page_info *page)
     return 1;
 }
 
-static void page_unlock(struct page_info *page)
+void page_unlock(struct page_info *page)
 {
     unsigned long x, nx, y = page->u.inuse.type_info;
 
@@ -4293,76 +4293,6 @@ int steal_page(
             (void *)page_to_mfn(page), d, d->domain_id,
             page_get_owner(page), page->count_info, page->u.inuse.type_info);
     return -1;
-}
-
-int page_make_sharable(struct domain *d, 
-                       struct page_info *page, 
-                       int expected_refcnt)
-{
-    spin_lock(&d->page_alloc_lock);
-
-    /* Change page type and count atomically */
-    if ( !get_page_and_type(page, d, PGT_shared_page) )
-    {
-        spin_unlock(&d->page_alloc_lock);
-        return -EINVAL;
-    }
-
-    /* Check it wasn't already sharable and undo if it was */
-    if ( (page->u.inuse.type_info & PGT_count_mask) != 1 )
-    {
-        put_page_and_type(page);
-        spin_unlock(&d->page_alloc_lock);
-        return -EEXIST;
-    }
-
-    /* Check if the ref count is 2. The first from PGC_allocated, and
-     * the second from get_page_and_type at the top of this function */
-    if ( page->count_info != (PGC_allocated | (2 + expected_refcnt)) )
-    {
-        /* Return type count back to zero */
-        put_page_and_type(page);
-        spin_unlock(&d->page_alloc_lock);
-        return -E2BIG;
-    }
-
-    page_set_owner(page, dom_cow);
-    d->tot_pages--;
-    page_list_del(page, &d->page_list);
-    spin_unlock(&d->page_alloc_lock);
-    return 0;
-}
-
-int page_make_private(struct domain *d, struct page_info *page)
-{
-    if ( !get_page(page, dom_cow) )
-        return -EINVAL;
-    
-    spin_lock(&d->page_alloc_lock);
-
-    /* We can only change the type if count is one */
-    if ( (page->u.inuse.type_info & (PGT_type_mask | PGT_count_mask))
-         != (PGT_shared_page | 1) )
-    {
-        put_page(page);
-        spin_unlock(&d->page_alloc_lock);
-        return -EEXIST;
-    }
-
-    /* Drop the final typecount */
-    put_page_and_type(page);
-
-    /* Change the owner */
-    ASSERT(page_get_owner(page) == dom_cow);
-    page_set_owner(page, d);
-
-    d->tot_pages++;
-    page_list_add_tail(page, &d->page_list);
-    spin_unlock(&d->page_alloc_lock);
-
-    put_page(page);
-
-    return 0;
 }
 
 static int __do_update_va_mapping(

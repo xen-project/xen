@@ -26,6 +26,8 @@
 #ifndef _MM_LOCKS_H
 #define _MM_LOCKS_H
 
+#include <asm/mem_sharing.h>
+
 /* Per-CPU variable for enforcing the lock ordering */
 DECLARE_PER_CPU(int, mm_lock_level);
 #define __get_lock_level()  (this_cpu(mm_lock_level))
@@ -141,15 +143,22 @@ static inline void mm_enforce_order_unlock(int unlock_level,
  *                                                                      *
  ************************************************************************/
 
+#if MEM_SHARING_AUDIT
 /* Page-sharing lock (global) 
  *
  * A single global lock that protects the memory-sharing code's
  * hash tables. */
 
 declare_mm_lock(shr)
-#define shr_lock()         mm_lock(shr, &shr_lock)
-#define shr_unlock()       mm_unlock(&shr_lock)
-#define shr_locked_by_me() mm_locked_by_me(&shr_lock)
+#define _shr_lock()         mm_lock(shr, &shr_lock)
+#define _shr_unlock()       mm_unlock(&shr_lock)
+#define _shr_locked_by_me() mm_locked_by_me(&shr_lock)
+
+#else
+
+/* We use an efficient per-page lock when AUDIT is not enabled. */
+
+#endif /* MEM_SHARING_AUDIT */
 
 /* Nested P2M lock (per-domain)
  *

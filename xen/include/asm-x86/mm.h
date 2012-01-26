@@ -337,6 +337,29 @@ int is_iomem_page(unsigned long mfn);
 
 void clear_superpage_mark(struct page_info *page);
 
+/* Per page locks:
+ * page_lock() is used for two purposes: pte serialization, and memory sharing.
+ *
+ * All users of page lock for pte serialization live in mm.c, use it
+ * to lock a page table page during pte updates, do not take other locks within
+ * the critical section delimited by page_lock/unlock, and perform no
+ * nesting. 
+ *
+ * All users of page lock for memory sharing live in mm/mem_sharing.c. Page_lock
+ * is used in memory sharing to protect addition (share) and removal (unshare) 
+ * of (gfn,domain) tupples to a list of gfn's that the shared page is currently 
+ * backing. Nesting may happen when sharing (and locking) two pages -- deadlock 
+ * is avoided by locking pages in increasing order.
+ * Memory sharing may take the p2m_lock within a page_lock/unlock
+ * critical section. 
+ *
+ * These two users (pte serialization and memory sharing) do not collide, since
+ * sharing is only supported for hvm guests, which do not perform pv pte updates.
+ * 
+ */
+int page_lock(struct page_info *page);
+void page_unlock(struct page_info *page);
+
 struct domain *page_get_owner_and_reference(struct page_info *page);
 void put_page(struct page_info *page);
 int  get_page(struct page_info *page, struct domain *domain);
@@ -588,10 +611,6 @@ int steal_page(
     struct domain *d, struct page_info *page, unsigned int memflags);
 int donate_page(
     struct domain *d, struct page_info *page, unsigned int memflags);
-int page_make_sharable(struct domain *d, 
-                       struct page_info *page, 
-                       int expected_refcnt);
-int page_make_private(struct domain *d, struct page_info *page);
 
 int map_ldt_shadow_page(unsigned int);
 
