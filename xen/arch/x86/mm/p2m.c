@@ -1041,7 +1041,8 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn, uint64_t buffer)
                     p2m_ram_rw, a);
     set_gpfn_from_mfn(mfn_x(mfn), gfn);
 
-    atomic_dec(&d->paged_pages);
+    if ( !page_extant )
+        atomic_dec(&d->paged_pages);
 
     ret = 0;
 
