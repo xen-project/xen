@@ -57,7 +57,7 @@ struct page_info
          * of sharing share the version they expect to.
          * This list is allocated and freed when a page is shared/unshared.
          */
-        struct page_sharing_info *shared_info;
+        struct page_sharing_info *sharing;
     };
 
     /* Reference count and various PGC_xxx flags and fields. */
