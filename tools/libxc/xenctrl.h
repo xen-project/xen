@@ -1228,6 +1228,23 @@ int xc_mmuext_op(xc_interface *xch, struct mmuext_op *op, unsigned int nr_ops,
 /* System wide memory properties */
 long xc_maximum_ram_page(xc_interface *xch);
 
+/**
+ * This function returns the total number of pages freed by using sharing
+ * on the system.  For example, if two domains contain a single entry in
+ * their p2m map that points to the same shared page (and no other pages
+ * in the system are shared), then this function should return 1.
+ */
+long xc_sharing_freed_pages(xc_interface *xch);
+
+/**
+ * This function returns the total number of frames occupied by shared
+ * pages on the system.  This is independent of the number of domains
+ * pointing at these frames.  For example, in the above scenario this
+ * should return 1. The following should hold:
+ *  memory usage without sharing = freed_pages + used_frames
+ */
+long xc_sharing_used_frames(xc_interface *xch);
+
 /* Get current total pages allocated to a domain. */
 long xc_get_tot_pages(xc_interface *xch, uint32_t domid);
 

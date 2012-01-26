@@ -225,3 +225,13 @@ int xc_memshr_debug_gref(xc_interface *xch,
     return do_domctl(xch, &domctl);
 }
 
+long xc_sharing_freed_pages(xc_interface *xch)
+{
+    return do_memory_op(xch, XENMEM_get_sharing_freed_pages, NULL, 0);
+}
+
+long xc_sharing_used_frames(xc_interface *xch)
+{
+    return do_memory_op(xch, XENMEM_get_sharing_shared_pages, NULL, 0);
+}
+
