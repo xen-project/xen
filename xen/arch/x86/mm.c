@@ -878,7 +878,8 @@ get_page_from_l1e(
         return 1;
     }
 
-    if ( unlikely(real_pg_owner != pg_owner) )
+    if ( unlikely( (real_pg_owner != pg_owner) &&
+                   (real_pg_owner != dom_cow) ) )
     {
         /*
          * Let privileged domains transfer the right to map their target
@@ -891,6 +892,11 @@ get_page_from_l1e(
             goto could_not_pin;
         pg_owner = real_pg_owner;
     }
+
+    /* Extra paranoid check for shared memory. Writable mappings 
+     * disallowed (unshare first!) */
+    if ( (l1f & _PAGE_RW) && (real_pg_owner == dom_cow) )
+        goto could_not_pin;
 
     /* Foreign mappings into guests in shadow external mode don't
      * contribute to writeable mapping refcounts.  (This allows the
