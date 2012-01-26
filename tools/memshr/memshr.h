@@ -25,6 +25,13 @@
 
 typedef uint64_t xen_mfn_t;
 
+typedef struct share_tuple 
+{
+    uint32_t domain;
+    uint64_t frame;
+    uint64_t handle;
+} share_tuple_t;
+
 extern void memshr_set_domid(int domid);
 extern void memshr_daemon_initialize(void);
 extern void memshr_vbd_initialize(void);
@@ -35,9 +42,9 @@ extern int memshr_vbd_issue_ro_request(char *buf,
                                        uint16_t file_id, 
                                        uint64_t sec, 
                                        int secs,
-                                       uint64_t *hnd);
+                                       share_tuple_t *hnd);
 extern void memshr_vbd_complete_ro_request(
-                                       uint64_t hnd,
+                                       share_tuple_t hnd,
                                        uint16_t file_id, 
                                        uint64_t sec, 
                                        int secs);

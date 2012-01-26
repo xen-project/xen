@@ -20,6 +20,7 @@
 #define __BIDIR_HASH_H__
 
 #include <stdint.h>
+#include <string.h>
 #include "memshr-priv.h"
 
 typedef struct vbdblk {
@@ -81,15 +82,16 @@ static int fgprtshr_mfn_cmp(uint32_t m1, uint32_t m2)
 #undef BIDIR_VALUE
 #undef BIDIR_KEY_T
 #undef BIDIR_VALUE_T
+
 /* TODO better hashes! */
 static inline uint32_t blockshr_block_hash(vbdblk_t block)
 {
     return (uint32_t)(block.sec) ^ (uint32_t)(block.disk_id);
 }
 
-static inline uint32_t blockshr_shrhnd_hash(uint64_t shrhnd)
+static inline uint32_t blockshr_shrhnd_hash(share_tuple_t shrhnd)
 {
-    return (uint32_t)shrhnd;
+    return ((uint32_t) shrhnd.handle);
 }
 
 static inline int blockshr_block_cmp(vbdblk_t b1, vbdblk_t b2)
@@ -97,15 +99,15 @@ static inline int blockshr_block_cmp(vbdblk_t b1, vbdblk_t b2)
     return (b1.sec == b2.sec) && (b1.disk_id == b2.disk_id);
 }
 
-static inline int blockshr_shrhnd_cmp(uint64_t h1, uint64_t h2)
+static inline int blockshr_shrhnd_cmp(share_tuple_t h1, share_tuple_t h2)
 {
-    return (h1 == h2);
+    return ( !memcmp(&h1, &h2, sizeof(share_tuple_t)) );
 }
 #define BIDIR_NAME_PREFIX       blockshr
 #define BIDIR_KEY               block
 #define BIDIR_VALUE             shrhnd
 #define BIDIR_KEY_T             vbdblk_t
-#define BIDIR_VALUE_T           uint64_t
+#define BIDIR_VALUE_T           share_tuple_t
 #include "bidir-namedefs.h"
 
 #endif /* BLOCK_MAP */

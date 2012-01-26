@@ -140,7 +140,7 @@ struct td_request {
 	void                        *private;
     
 #ifdef MEMSHR
-	uint64_t                     memshr_hnd;
+	share_tuple_t                memshr_hnd;
 #endif
 };
 

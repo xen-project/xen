@@ -19,16 +19,25 @@
 #include <pthread.h>
 #include <inttypes.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include "bidir-hash.h"
 #include "memshr-priv.h"
 
 static struct blockshr_hash *blks_hash;
 
+/* Callback in the iterator, remember this value, and leave */
+int find_one(vbdblk_t k, share_tuple_t v, void *priv)
+{
+    share_tuple_t *rv = (share_tuple_t *) priv;
+    *rv = v;
+    /* Break out of iterator loop */
+    return 1;
+}
+
 void* bidir_daemon(void *unused)
 {
     uint32_t nr_ent, max_nr_ent, tab_size, max_load, min_load;
-    static uint64_t shrhnd = 1;
 
     while(1)
     {
@@ -41,20 +50,30 @@ void* bidir_daemon(void *unused)
         /* Remove some hints as soon as we get to 90% capacity */ 
         if(10 * nr_ent > 9 * max_nr_ent)
         {
-            uint64_t next_remove = shrhnd;
+            share_tuple_t next_remove;
             int to_remove;
             int ret;
 
             to_remove = 0.1 * max_nr_ent; 
             while(to_remove > 0) 
             {
-                ret = blockshr_shrhnd_remove(blks_hash, next_remove, NULL);
-                if(ret < 0)
+                /* We use the iterator to get one entry */
+                next_remove.handle = 0;
+                ret = blockshr_hash_iterator(blks_hash, find_one, &next_remove);
+
+                if ( !ret )
+                    if ( next_remove.handle == 0 )
+                        ret = -ESRCH;
+
+                if ( !ret )
+                    ret = blockshr_shrhnd_remove(blks_hash, next_remove, NULL);
+
+                if(ret <= 0)
                 {
                     /* We failed to remove an entry, because of a serious hash
                      * table error */
                     DPRINTF("Could not remove handle %"PRId64", error: %d\n",
-                            next_remove, ret);
+                            next_remove.handle, ret);
                     /* Force to exit the loop early */
                     to_remove = 0;
                 } else 
@@ -62,12 +81,7 @@ void* bidir_daemon(void *unused)
                 {
                     /* Managed to remove the entry. Note next_remove not
                      * incremented, in case there are duplicates */
-                    shrhnd = next_remove;
                     to_remove--;
-                } else
-                {
-                    /* Failed to remove, because there is no such handle */
-                    next_remove++;
                 }
             }
         }

@@ -86,20 +86,75 @@ int xc_memshr_nominate_gref(xc_interface *xch,
     return ret;
 }
 
-int xc_memshr_share(xc_interface *xch,
-                    uint64_t source_handle,
-                    uint64_t client_handle)
+int xc_memshr_share_gfns(xc_interface *xch,
+                         domid_t source_domain,
+                         unsigned long source_gfn,
+                         uint64_t source_handle,
+                         domid_t client_domain,
+                         unsigned long client_gfn,
+                         uint64_t client_handle)
 {
     DECLARE_DOMCTL;
     struct xen_domctl_mem_sharing_op *op;
 
     domctl.cmd = XEN_DOMCTL_mem_sharing_op;
     domctl.interface_version = XEN_DOMCTL_INTERFACE_VERSION;
-    domctl.domain = 0;
+    domctl.domain = source_domain;
     op = &(domctl.u.mem_sharing_op);
     op->op = XEN_DOMCTL_MEM_EVENT_OP_SHARING_SHARE;
     op->u.share.source_handle = source_handle;
+    op->u.share.source_gfn    = source_gfn;
+    op->u.share.client_domain = client_domain;
+    op->u.share.client_gfn    = client_gfn;
     op->u.share.client_handle = client_handle;
+
+    return do_domctl(xch, &domctl);
+}
+
+int xc_memshr_share_grefs(xc_interface *xch,
+                          domid_t source_domain,
+                          grant_ref_t source_gref,
+                          uint64_t source_handle,
+                          domid_t client_domain,
+                          grant_ref_t client_gref,
+                          uint64_t client_handle)
+{
+    DECLARE_DOMCTL;
+    struct xen_domctl_mem_sharing_op *op;
+
+    domctl.cmd = XEN_DOMCTL_mem_sharing_op;
+    domctl.interface_version = XEN_DOMCTL_INTERFACE_VERSION;
+    domctl.domain = source_domain;
+    op = &(domctl.u.mem_sharing_op);
+    op->op = XEN_DOMCTL_MEM_EVENT_OP_SHARING_SHARE;
+    op->u.share.source_handle = source_handle;
+    XEN_DOMCTL_MEM_SHARING_FIELD_MAKE_GREF(op->u.share.source_gfn, source_gref);
+    op->u.share.client_domain = client_domain;
+    XEN_DOMCTL_MEM_SHARING_FIELD_MAKE_GREF(op->u.share.client_gfn, client_gref);
+    op->u.share.client_handle = client_handle;
+
+    return do_domctl(xch, &domctl);
+}
+
+int xc_memshr_add_to_physmap(xc_interface *xch,
+                    domid_t source_domain,
+                    unsigned long source_gfn,
+                    uint64_t source_handle,
+                    domid_t client_domain,
+                    unsigned long client_gfn)
+{
+    DECLARE_DOMCTL;
+    struct xen_domctl_mem_sharing_op *op;
+
+    domctl.cmd                  = XEN_DOMCTL_mem_sharing_op;
+    domctl.interface_version    = XEN_DOMCTL_INTERFACE_VERSION;
+    domctl.domain               = source_domain;
+    op = &(domctl.u.mem_sharing_op);
+    op->op = XEN_DOMCTL_MEM_EVENT_OP_SHARING_ADD_PHYSMAP;
+    op->u.share.source_gfn      = source_gfn;
+    op->u.share.source_handle   = source_handle;
+    op->u.share.client_gfn      = client_gfn;
+    op->u.share.client_domain   = client_domain;
 
     return do_domctl(xch, &domctl);
 }

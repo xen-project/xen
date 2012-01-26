@@ -145,16 +145,17 @@ void memshr_vbd_image_put(uint16_t memshr_id)
     
 int memshr_vbd_issue_ro_request(char *buf,
                                 grant_ref_t gref,
-                                uint16_t file_id, 
+                                uint16_t file_id,
                                 uint64_t sec, 
                                 int secs,
-                                uint64_t *hnd)
+                                share_tuple_t *hnd)
 {
     vbdblk_t blk;
-    uint64_t s_hnd, c_hnd;
+    share_tuple_t source_st, client_st;
+    uint64_t c_hnd;
     int ret;
 
-    *hnd = 0;
+    *hnd = (share_tuple_t){ 0, 0, 0 };
     if(!vbd_info.enabled) 
         return -1;
 
@@ -169,26 +170,31 @@ int memshr_vbd_issue_ro_request(char *buf,
     /* If page couldn't be made sharable, we cannot do anything about it */
     if(ret != 0)
         return -3;
-    *hnd = c_hnd;
+
+    client_st = (share_tuple_t){ vbd_info.domid, gref, c_hnd };
+    *hnd = client_st;
 
     /* Check if we've read matching disk block previously */
     blk.sec     = sec;
     blk.disk_id = file_id;
-    if(blockshr_block_lookup(memshr.blks, blk, &s_hnd) > 0)
+    if(blockshr_block_lookup(memshr.blks, blk, &source_st) > 0)
     {
-        ret = xc_memshr_share(vbd_info.xc_handle, s_hnd, c_hnd);
+        ret = xc_memshr_share_grefs(vbd_info.xc_handle, source_st.domain, source_st.frame, 
+                                    source_st.handle, vbd_info.domid, gref, c_hnd);
         if(!ret) return 0;
         /* Handles failed to be shared => at least one of them must be invalid,
            remove the relevant ones from the map */
         switch(ret)
         {
             case XEN_DOMCTL_MEM_SHARING_S_HANDLE_INVALID:
-                ret = blockshr_shrhnd_remove(memshr.blks, s_hnd, NULL);
-                if(ret) DPRINTF("Could not rm invl s_hnd: %"PRId64"\n", s_hnd);
+                ret = blockshr_shrhnd_remove(memshr.blks, source_st, NULL);
+                if(ret) DPRINTF("Could not rm invl s_hnd: %u %"PRId64" %"PRId64"\n", 
+                                    source_st.domain, source_st.frame, source_st.handle);
                 break;
             case XEN_DOMCTL_MEM_SHARING_C_HANDLE_INVALID:
-                ret = blockshr_shrhnd_remove(memshr.blks, c_hnd, NULL);
-                if(ret) DPRINTF("Could not rm invl c_hnd: %"PRId64"\n", c_hnd);
+                ret = blockshr_shrhnd_remove(memshr.blks, client_st, NULL);
+                if(ret) DPRINTF("Could not rm invl c_hnd: %u %"PRId64" %"PRId64"\n", 
+                                    client_st.domain, client_st.frame, client_st.handle);
                 break;
             default:
                 break;
@@ -199,7 +205,7 @@ int memshr_vbd_issue_ro_request(char *buf,
     return -4;
 }
 
-void memshr_vbd_complete_ro_request(uint64_t hnd,
+void memshr_vbd_complete_ro_request(share_tuple_t hnd,
                                     uint16_t file_id, 
                                     uint64_t sec, 
                                     int secs)

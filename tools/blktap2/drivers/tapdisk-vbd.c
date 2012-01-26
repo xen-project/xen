@@ -1218,14 +1218,14 @@ __tapdisk_vbd_complete_td_request(td_vbd_t *vbd, td_vbd_request_t *vreq,
 #ifdef MEMSHR
 		if (treq.op == TD_OP_READ
 		   && td_flag_test(image->flags, TD_OPEN_RDONLY)) {
-			uint64_t hnd  = treq.memshr_hnd;
+			share_tuple_t hnd = treq.memshr_hnd;
 			uint16_t uid  = image->memshr_id;
 			blkif_request_t *breq = &vreq->req;
 			uint64_t sec  = tapdisk_vbd_breq_get_sector(breq, treq);
 			int secs = breq->seg[treq.sidx].last_sect -
 			    breq->seg[treq.sidx].first_sect + 1;
 
-			if (hnd != 0)
+			if (hnd.handle != 0)
 				memshr_vbd_complete_ro_request(hnd, uid,
 								sec, secs);
 		}
@@ -1297,7 +1297,7 @@ __tapdisk_vbd_reissue_td_request(td_vbd_t *vbd,
 				/* Reset memshr handle. This'll prevent
 				 * memshr_vbd_complete_ro_request being called
 				 */
-				treq.memshr_hnd = 0;
+				treq.memshr_hnd.handle = 0;
 				td_complete_request(treq, 0);
 			} else
 				td_queue_read(parent, treq);
