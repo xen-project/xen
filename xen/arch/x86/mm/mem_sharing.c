@@ -37,6 +37,13 @@
 
 static shr_handle_t next_handle = 1;
 
+typedef struct pg_lock_data {
+    int mm_unlock_level;
+    unsigned short recurse_count;
+} pg_lock_data_t;
+
+DEFINE_PER_CPU(pg_lock_data_t, __pld);
+
 #if MEM_SHARING_AUDIT
 
 static mm_lock_t shr_lock;
@@ -85,16 +92,25 @@ static inline int mem_sharing_page_lock(struct page_info *p)
 static inline int mem_sharing_page_lock(struct page_info *pg)
 {
     int rc;
+    pg_lock_data_t *pld = &(this_cpu(__pld));
+
+    page_sharing_mm_pre_lock();
     rc = page_lock(pg);
     if ( rc )
     {
         preempt_disable();
+        page_sharing_mm_post_lock(&pld->mm_unlock_level, 
+                                  &pld->recurse_count);
     }
     return rc;
 }
 
 static inline void mem_sharing_page_unlock(struct page_info *pg)
 {
+    pg_lock_data_t *pld = &(this_cpu(__pld));
+
+    page_sharing_mm_unlock(pld->mm_unlock_level, 
+                           &pld->recurse_count);
     preempt_enable();
     page_unlock(pg);
 }

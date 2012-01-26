@@ -156,7 +156,23 @@ declare_mm_lock(shr)
 
 #else
 
-/* We use an efficient per-page lock when AUDIT is not enabled. */
+/* Sharing per page lock
+ *
+ * This is an external lock, not represented by an mm_lock_t. The memory
+ * sharing lock uses it to protect addition and removal of (gfn,domain)
+ * tuples to a shared page. We enforce order here against the p2m lock,
+ * which is taken after the page_lock to change the gfn's p2m entry.
+ *
+ * Note that in sharing audit mode, we use the global page lock above, 
+ * instead.
+ *
+ * The lock is recursive because during share we lock two pages. */
+
+declare_mm_order_constraint(per_page_sharing)
+#define page_sharing_mm_pre_lock()   mm_enforce_order_lock_pre_per_page_sharing()
+#define page_sharing_mm_post_lock(l, r) \
+        mm_enforce_order_lock_post_per_page_sharing((l), (r))
+#define page_sharing_mm_unlock(l, r) mm_enforce_order_unlock((l), (r))
 
 #endif /* MEM_SHARING_AUDIT */
 
