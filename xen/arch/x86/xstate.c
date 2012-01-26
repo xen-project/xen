@@ -40,13 +40,13 @@ static inline void xsetbv(u32 index, u64 xfeatures)
             "a" (lo), "d" (hi));
 }
 
-inline void set_xcr0(u64 xfeatures)
+void set_xcr0(u64 xfeatures)
 {
     this_cpu(xcr0) = xfeatures;
     xsetbv(XCR_XFEATURE_ENABLED_MASK, xfeatures);
 }
 
-inline uint64_t get_xcr0(void)
+uint64_t get_xcr0(void)
 {
     return this_cpu(xcr0);
 }
