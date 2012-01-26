@@ -31,6 +31,8 @@ struct page_list_entry
     __pdx_t next, prev;
 };
 
+struct page_sharing_info;
+
 struct page_info
 {
     union {
@@ -49,8 +51,13 @@ struct page_info
         /* For non-pinnable single-page shadows, a higher entry that points
          * at us. */
         paddr_t up;
-        /* For shared/sharable pages the sharing handle */
-        uint64_t shr_handle; 
+        /* For shared/sharable pages, we use a doubly-linked list
+         * of all the {pfn,domain} pairs that map this page. We also include
+         * an opaque handle, which is effectively a version, so that clients
+         * of sharing share the version they expect to.
+         * This list is allocated and freed when a page is shared/unshared.
+         */
+        struct page_sharing_info *shared_info;
     };
 
     /* Reference count and various PGC_xxx flags and fields. */

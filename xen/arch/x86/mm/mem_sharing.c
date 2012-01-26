@@ -3,6 +3,7 @@
  *
  * Memory sharing support.
  *
+ * Copyright (c) 2011 GridCentric, Inc. (Adin Scannell & Andres Lagar-Cavilla)
  * Copyright (c) 2009 Citrix Systems, Inc. (Grzegorz Milos)
  *
  * This program is free software; you can redistribute it and/or modify
@@ -34,15 +35,27 @@
 
 #include "mm-locks.h"
 
-/* Auditing of memory sharing code? */
-#define MEM_SHARING_AUDIT 0
-
 #if MEM_SHARING_AUDIT
 static void mem_sharing_audit(void);
 #define MEM_SHARING_DEBUG(_f, _a...)                                  \
     debugtrace_printk("mem_sharing_debug: %s(): " _f, __func__, ##_a)
+static struct list_head shr_audit_list;
+
+static inline void audit_add_list(struct page_info *page)
+{
+    INIT_LIST_HEAD(&page->shared_info->entry);
+    list_add(&page->shared_info->entry, &shr_audit_list);
+}
+
+static inline void audit_del_list(struct page_info *page)
+{
+    list_del(&page->shared_info->entry);
+}
 #else
-#define mem_sharing_audit() do {} while(0)
+#define mem_sharing_audit() ((void)0)
+
+#define audit_add_list(p)  ((void)0)
+#define audit_del_list(p)  ((void)0)
 #endif /* MEM_SHARING_AUDIT */
 
 #define mem_sharing_enabled(d) \
@@ -57,17 +70,6 @@ static void mem_sharing_audit(void);
 
 static shr_handle_t next_handle = 1;
 static atomic_t nr_saved_mfns   = ATOMIC_INIT(0); 
-
-typedef struct shr_hash_entry 
-{
-    shr_handle_t handle;
-    mfn_t mfn; 
-    struct shr_hash_entry *next;
-    struct list_head gfns;
-} shr_hash_entry_t;
-
-#define SHR_HASH_LENGTH 1000
-static shr_hash_entry_t *shr_hash[SHR_HASH_LENGTH];
 
 typedef struct gfn_info
 {
@@ -89,164 +91,149 @@ static inline gfn_info_t *gfn_get_info(struct list_head *list)
     return list_entry(list->next, gfn_info_t, list);
 }
 
-static void __init mem_sharing_hash_init(void)
+static inline gfn_info_t *mem_sharing_gfn_alloc(struct page_info *page,
+                                                struct domain *d,
+                                                unsigned long gfn)
 {
-    int i;
+    gfn_info_t *gfn_info = xmalloc(gfn_info_t);
 
-    mm_lock_init(&shr_lock);
-    for(i=0; i<SHR_HASH_LENGTH; i++)
-        shr_hash[i] = NULL;
+    if ( gfn_info == NULL )
+        return NULL; 
+
+    gfn_info->gfn = gfn;
+    gfn_info->domain = d->domain_id;
+    INIT_LIST_HEAD(&gfn_info->list);
+    list_add(&gfn_info->list, &page->shared_info->gfns);
+
+    /* Increment our number of shared pges. */
+    atomic_inc(&d->shr_pages);
+
+    return gfn_info;
 }
 
-static shr_hash_entry_t *mem_sharing_hash_alloc(void)
+static inline void mem_sharing_gfn_destroy(struct domain *d,
+                                           gfn_info_t *gfn_info)
 {
-    return xmalloc(shr_hash_entry_t); 
+    /* Decrement the number of pages. */
+    atomic_dec(&d->shr_pages);
+
+    /* Free the gfn_info structure. */
+    list_del(&gfn_info->list);
+    xfree(gfn_info);
 }
 
-static void mem_sharing_hash_destroy(shr_hash_entry_t *e)
+static struct page_info* mem_sharing_lookup(unsigned long mfn)
 {
-    xfree(e);
-}
-
-static gfn_info_t *mem_sharing_gfn_alloc(void)
-{
-    return xmalloc(gfn_info_t); 
-}
-
-static void mem_sharing_gfn_destroy(gfn_info_t *gfn, int was_shared)
-{
-    /* Decrement the number of pages, if the gfn was shared before */
-    if ( was_shared )
+    if ( mfn_valid(_mfn(mfn)) )
     {
-        struct domain *d = get_domain_by_id(gfn->domain);
-        /* Domain may have been destroyed by now *
-         * (if we are called from p2m_teardown)  */
-        if ( d )
+        struct page_info* page = mfn_to_page(_mfn(mfn));
+        if ( page_get_owner(page) == dom_cow )
         {
-            atomic_dec(&d->shr_pages);
-            put_domain(d);
+            ASSERT(page->u.inuse.type_info & PGT_type_mask); 
+            ASSERT(get_gpfn_from_mfn(mfn) == SHARED_M2P_ENTRY); 
+            return page;
         }
-    }
-    xfree(gfn);
-}
-
-static shr_hash_entry_t* mem_sharing_hash_lookup(shr_handle_t handle)
-{
-    shr_hash_entry_t *e;
-    
-    e = shr_hash[handle % SHR_HASH_LENGTH]; 
-    while(e != NULL)
-    {
-        if(e->handle == handle)
-            return e;
-        e = e->next;
     }
 
     return NULL;
 }
 
-static shr_hash_entry_t* mem_sharing_hash_insert(shr_handle_t handle, mfn_t mfn)
-{
-    shr_hash_entry_t *e, **ee;
-    
-    e = mem_sharing_hash_alloc();
-    if(e == NULL) return NULL;
-    e->handle = handle;
-    e->mfn = mfn;
-    ee = &shr_hash[handle % SHR_HASH_LENGTH]; 
-    e->next = *ee;
-    *ee = e;
-    return e;
-}
-
-static void mem_sharing_hash_delete(shr_handle_t handle)
-{
-    shr_hash_entry_t **pprev, *e;  
-
-    pprev = &shr_hash[handle % SHR_HASH_LENGTH];
-    e = *pprev;
-    while(e != NULL)
-    {
-        if(e->handle == handle)
-        {
-            *pprev = e->next;
-            mem_sharing_hash_destroy(e);
-            return;
-        }
-        pprev = &e->next;
-        e = e->next;
-    }
-    printk("Could not find shr entry for handle %"PRIx64"\n", handle);
-    BUG();
-} 
-
 #if MEM_SHARING_AUDIT
 static void mem_sharing_audit(void)
 {
-    shr_hash_entry_t *e;
-    struct list_head *le;
-    gfn_info_t *g;
-    int bucket;
-    struct page_info *pg;
+    int errors = 0;
+    struct list_head *ae;
 
     ASSERT(shr_locked_by_me());
 
-    for(bucket=0; bucket < SHR_HASH_LENGTH; bucket++)
+    list_for_each(ae, &shr_audit_list)
     {
-        e = shr_hash[bucket];    
-        /* Loop over all shr_hash_entries */ 
-        while(e != NULL)
+        struct page_sharing_info *shared_info;
+        unsigned long nr_gfns = 0;
+        struct page_info *pg;
+        struct list_head *le;
+        mfn_t mfn;
+
+        shared_info = list_entry(ae, struct page_sharing_info, entry);
+        pg = shared_info->pg;
+        mfn = page_to_mfn(pg);
+
+        /* Check if the MFN has correct type, owner and handle. */ 
+        if ( !(pg->u.inuse.type_info & PGT_shared_page) )
         {
-            int nr_gfns=0;
+           MEM_SHARING_DEBUG("mfn %lx in audit list, but not PGT_shared_page (%lx)!\n",
+                              mfn_x(mfn), pg->u.inuse.type_info & PGT_type_mask);
+           errors++;
+           continue;
+        }
 
-            /* Check if the MFN has correct type, owner and handle */ 
-            pg = mfn_to_page(e->mfn);
-            if((pg->u.inuse.type_info & PGT_type_mask) != PGT_shared_page)
-                MEM_SHARING_DEBUG("mfn %lx not shared, but in the hash!\n",
-                                   mfn_x(e->mfn));
-            if(page_get_owner(pg) != dom_cow)
-                MEM_SHARING_DEBUG("mfn %lx shared, but wrong owner (%d)!\n",
-                                   mfn_x(e->mfn), 
-                                   page_get_owner(pg)->domain_id);
-            if(e->handle != pg->shr_handle)
-                MEM_SHARING_DEBUG("mfn %lx shared, but wrong handle "
-                                  "(%ld != %ld)!\n",
-                                   mfn_x(e->mfn), pg->shr_handle, e->handle);
-            /* Check if all GFNs map to the MFN, and the p2m types */
-            list_for_each(le, &e->gfns)
+        /* Check the page owner. */
+        if ( page_get_owner(pg) != dom_cow )
+        {
+           MEM_SHARING_DEBUG("mfn %lx shared, but wrong owner (%hu)!\n",
+                             mfn_x(mfn), page_get_owner(pg)->domain_id);
+           errors++;
+        }
+
+        /* Check the m2p entry */
+        if ( get_gpfn_from_mfn(mfn_x(mfn)) != SHARED_M2P_ENTRY )
+        {
+           MEM_SHARING_DEBUG("mfn %lx shared, but wrong m2p entry (%lx)!\n",
+                             mfn_x(mfn), get_gpfn_from_mfn(mfn_x(mfn)));
+           errors++;
+        }
+
+        /* Check we have a list */
+        if ( (!pg->shared_info) || (list_empty(&pg->shared_info->gfns)) )
+        {
+           MEM_SHARING_DEBUG("mfn %lx shared, but empty gfn list!\n",
+                             mfn_x(mfn));
+           errors++;
+           continue;
+        }
+
+        /* Check if all GFNs map to the MFN, and the p2m types */
+        list_for_each(le, &pg->shared_info->gfns)
+        {
+            struct domain *d;
+            p2m_type_t t;
+            mfn_t o_mfn;
+            gfn_info_t *g;
+
+            g = list_entry(le, gfn_info_t, list);
+            d = get_domain_by_id(g->domain);
+            if ( d == NULL )
             {
-                struct domain *d;
-                p2m_type_t t;
-                mfn_t mfn;
-
-                g = list_entry(le, struct gfn_info, list);
-                d = get_domain_by_id(g->domain);
-                if(d == NULL)
-                {
-                    MEM_SHARING_DEBUG("Unknow dom: %d, for PFN=%lx, MFN=%lx\n",
-                            g->domain, g->gfn, mfn_x(e->mfn));
-                    continue;
-                }
-                mfn = get_gfn_unlocked(d, g->gfn, &t); 
-                if(mfn_x(mfn) != mfn_x(e->mfn))
-                    MEM_SHARING_DEBUG("Incorrect P2M for d=%d, PFN=%lx."
-                                      "Expecting MFN=%ld, got %ld\n",
-                                      g->domain, g->gfn, mfn_x(e->mfn),
-                                      mfn_x(mfn));
-                if(t != p2m_ram_shared)
-                    MEM_SHARING_DEBUG("Incorrect P2M type for d=%d, PFN=%lx."
-                                      "Expecting t=%d, got %d\n",
-                                      g->domain, g->gfn, mfn_x(e->mfn),
-                                      p2m_ram_shared, t);
-                put_domain(d);
-                nr_gfns++;
-            } 
-            if(nr_gfns != (pg->u.inuse.type_info & PGT_count_mask))
-                MEM_SHARING_DEBUG("Mismatched counts for MFN=%lx."
-                                  "nr_gfns in hash %d, in type_info %d\n",
-                                  mfn_x(e->mfn), nr_gfns, 
-                                 (pg->u.inuse.type_info & PGT_count_mask));
-            e = e->next;
+                MEM_SHARING_DEBUG("Unknown dom: %hu, for PFN=%lx, MFN=%lx\n",
+                                  g->domain, g->gfn, mfn_x(mfn));
+                errors++;
+                continue;
+            }
+            o_mfn = get_gfn_query_unlocked(d, g->gfn, &t); 
+            if ( mfn_x(o_mfn) != mfn_x(mfn) )
+            {
+                MEM_SHARING_DEBUG("Incorrect P2M for d=%hu, PFN=%lx."
+                                  "Expecting MFN=%lx, got %lx\n",
+                                  g->domain, g->gfn, mfn_x(mfn), mfn_x(o_mfn));
+                errors++;
+            }
+            if ( t != p2m_ram_shared )
+            {
+                MEM_SHARING_DEBUG("Incorrect P2M type for d=%hu, PFN=%lx MFN=%lx."
+                                  "Expecting t=%d, got %d\n",
+                                  g->domain, g->gfn, mfn_x(mfn), p2m_ram_shared, t);
+                errors++;
+            }
+            put_domain(d);
+            nr_gfns++;
+        }
+        if ( nr_gfns != (pg->u.inuse.type_info & PGT_count_mask) )
+        {
+            MEM_SHARING_DEBUG("Mismatched counts for MFN=%lx."
+                              "nr_gfns in list %lu, in type_info %lx\n",
+                              mfn_x(mfn), nr_gfns, 
+                              (pg->u.inuse.type_info & PGT_count_mask));
+            errors++;
         }
     }
 }
@@ -383,36 +370,6 @@ static int mem_sharing_gref_to_gfn(struct domain *d,
     return 0;
 }
 
-/* Account for a GFN being shared/unshared.
- * When sharing this function needs to be called _before_ gfn lists are merged
- * together, but _after_ gfn is removed from the list when unsharing.
- */
-static int mem_sharing_gfn_account(struct gfn_info *gfn, int sharing)
-{
-    struct domain *d;
-
-    /* A) When sharing:
-     * if the gfn being shared is in > 1 long list, its already been 
-     * accounted for
-     * B) When unsharing:
-     * if the list is longer than > 1, we don't have to account yet. 
-     */
-    if(list_has_one_entry(&gfn->list))
-    {
-        d = get_domain_by_id(gfn->domain);
-        BUG_ON(!d);
-        if(sharing) 
-            atomic_inc(&d->shr_pages);
-        else
-            atomic_dec(&d->shr_pages);
-        put_domain(d);
-
-        return 1;
-    }
-    mem_sharing_audit();
-
-    return 0;
-}
 
 int mem_sharing_debug_gref(struct domain *d, grant_ref_t ref)
 {
@@ -450,8 +407,6 @@ int mem_sharing_nominate_page(struct domain *d,
     mfn_t mfn;
     struct page_info *page;
     int ret;
-    shr_handle_t handle;
-    shr_hash_entry_t *hash_entry;
     struct gfn_info *gfn_info;
 
     *phandle = 0UL;
@@ -467,7 +422,7 @@ int mem_sharing_nominate_page(struct domain *d,
     /* Return the handle if the page is already shared */
     page = mfn_to_page(mfn);
     if ( p2m_is_shared(p2mt) ) {
-        *phandle = page->shr_handle;
+        *phandle = page->shared_info->handle;
         ret = 0;
         goto out;
     }
@@ -481,16 +436,26 @@ int mem_sharing_nominate_page(struct domain *d,
     if ( ret ) 
         goto out;
 
-    /* Create the handle */
+    /* Initialize the shared state */
     ret = -ENOMEM;
-    handle = next_handle++;  
-    if((hash_entry = mem_sharing_hash_insert(handle, mfn)) == NULL)
+    if ( (page->shared_info = 
+            xmalloc(struct page_sharing_info)) == NULL )
     {
+        BUG_ON(page_make_private(d, page) != 0);
         goto out;
     }
-    if((gfn_info = mem_sharing_gfn_alloc()) == NULL)
+    page->shared_info->pg = page;
+    INIT_LIST_HEAD(&page->shared_info->gfns);
+
+    /* Create the handle */
+    page->shared_info->handle = next_handle++;  
+
+    /* Create the local gfn info */
+    if ( (gfn_info = mem_sharing_gfn_alloc(page, d, gfn)) == NULL )
     {
-        mem_sharing_hash_destroy(hash_entry);
+        xfree(page->shared_info);
+        page->shared_info = NULL;
+        BUG_ON(page_make_private(d, page) != 0);
         goto out;
     }
 
@@ -501,23 +466,19 @@ int mem_sharing_nominate_page(struct domain *d,
          * it a few lines above.
          * The mfn needs to revert back to rw type. This should never fail,
          * since no-one knew that the mfn was temporarily sharable */
+        mem_sharing_gfn_destroy(d, gfn_info);
+        xfree(page->shared_info);
+        page->shared_info = NULL;
+        /* NOTE: We haven't yet added this to the audit list. */
         BUG_ON(page_make_private(d, page) != 0);
-        mem_sharing_hash_destroy(hash_entry);
-        mem_sharing_gfn_destroy(gfn_info, 0);
         goto out;
     }
 
     /* Update m2p entry to SHARED_M2P_ENTRY */
     set_gpfn_from_mfn(mfn_x(mfn), SHARED_M2P_ENTRY);
 
-    INIT_LIST_HEAD(&hash_entry->gfns);
-    INIT_LIST_HEAD(&gfn_info->list);
-    list_add(&gfn_info->list, &hash_entry->gfns);
-    gfn_info->gfn = gfn;
-    gfn_info->domain = d->domain_id;
-    page->shr_handle = handle;
-    *phandle = handle;
-
+    *phandle = page->shared_info->handle;
+    audit_add_list(page);
     ret = 0;
 
 out:
@@ -526,54 +487,82 @@ out:
     return ret;
 }
 
-int mem_sharing_share_pages(shr_handle_t sh, shr_handle_t ch) 
+int mem_sharing_share_pages(struct domain *sd, unsigned long sgfn, shr_handle_t sh,
+                            struct domain *cd, unsigned long cgfn, shr_handle_t ch) 
 {
-    shr_hash_entry_t *se, *ce;
     struct page_info *spage, *cpage;
     struct list_head *le, *te;
-    struct gfn_info *gfn;
+    gfn_info_t *gfn;
     struct domain *d;
-    int ret;
+    int ret = -EINVAL;
+    mfn_t smfn, cmfn;
+    p2m_type_t smfn_type, cmfn_type;
 
     shr_lock();
 
+    /* XXX if sd == cd handle potential deadlock by ordering
+     * the get_ and put_gfn's */
+    smfn = get_gfn(sd, sgfn, &smfn_type);
+    cmfn = get_gfn(cd, cgfn, &cmfn_type);
+
     ret = XEN_DOMCTL_MEM_SHARING_S_HANDLE_INVALID;
-    se = mem_sharing_hash_lookup(sh);
-    if(se == NULL) goto err_out;
+    spage = mem_sharing_lookup(mfn_x(smfn));
+    if ( spage == NULL )
+        goto err_out;
+    ASSERT(smfn_type == p2m_ram_shared);
     ret = XEN_DOMCTL_MEM_SHARING_C_HANDLE_INVALID;
-    ce = mem_sharing_hash_lookup(ch);
-    if(ce == NULL) goto err_out;
-    spage = mfn_to_page(se->mfn); 
-    cpage = mfn_to_page(ce->mfn); 
-    /* gfn lists always have at least one entry => save to call list_entry */
-    mem_sharing_gfn_account(gfn_get_info(&ce->gfns), 1);
-    mem_sharing_gfn_account(gfn_get_info(&se->gfns), 1);
-    list_for_each_safe(le, te, &ce->gfns)
+    cpage = mem_sharing_lookup(mfn_x(cmfn));
+    if ( cpage == NULL )
+        goto err_out;
+    ASSERT(cmfn_type == p2m_ram_shared);
+
+    /* Check that the handles match */
+    if ( spage->shared_info->handle != sh )
     {
-        gfn = list_entry(le, struct gfn_info, list);
-        /* Get the source page and type, this should never fail 
-         * because we are under shr lock, and got non-null se */
+        ret = XEN_DOMCTL_MEM_SHARING_S_HANDLE_INVALID;
+        goto err_out;
+    }
+    if ( cpage->shared_info->handle != ch )
+    {
+        ret = XEN_DOMCTL_MEM_SHARING_C_HANDLE_INVALID;
+        goto err_out;
+    }
+
+    /* Merge the lists together */
+    list_for_each_safe(le, te, &cpage->shared_info->gfns)
+    {
+        gfn = list_entry(le, gfn_info_t, list);
+        /* Get the source page and type, this should never fail: 
+         * we are under shr lock, and got a successful lookup */
         BUG_ON(!get_page_and_type(spage, dom_cow, PGT_shared_page));
-        /* Move the gfn_info from ce list to se list */
+        /* Move the gfn_info from client list to source list */
         list_del(&gfn->list);
+        list_add(&gfn->list, &spage->shared_info->gfns);
+        put_page_and_type(cpage);
         d = get_domain_by_id(gfn->domain);
         BUG_ON(!d);
-        BUG_ON(set_shared_p2m_entry(d, gfn->gfn, se->mfn) == 0);
+        BUG_ON(set_shared_p2m_entry(d, gfn->gfn, smfn) == 0);
         put_domain(d);
-        list_add(&gfn->list, &se->gfns);
-        put_page_and_type(cpage);
-    } 
-    ASSERT(list_empty(&ce->gfns));
-    mem_sharing_hash_delete(ch);
-    atomic_inc(&nr_saved_mfns);
+    }
+    ASSERT(list_empty(&cpage->shared_info->gfns));
+
+    /* Clear the rest of the shared state */
+    audit_del_list(cpage);
+    xfree(cpage->shared_info);
+    cpage->shared_info = NULL;
+
     /* Free the client page */
     if(test_and_clear_bit(_PGC_allocated, &cpage->count_info))
         put_page(cpage);
+
+    /* We managed to free a domain page. */
+    atomic_inc(&nr_saved_mfns);
     ret = 0;
     
 err_out:
+    put_gfn(cd, cgfn);
+    put_gfn(sd, sgfn);
     shr_unlock();
-
     return ret;
 }
 
@@ -585,13 +574,9 @@ int mem_sharing_unshare_page(struct domain *d,
     mfn_t mfn;
     struct page_info *page, *old_page;
     void *s, *t;
-    int ret, last_gfn;
-    shr_hash_entry_t *hash_entry;
-    struct gfn_info *gfn_info = NULL;
-    shr_handle_t handle;
+    int last_gfn;
+    gfn_info_t *gfn_info = NULL;
     struct list_head *le;
-
-    /* Remove the gfn_info from the list */
    
     /* This is one of the reasons why we can't enforce ordering
      * between shr_lock and p2m fine-grained locks in mm-lock. 
@@ -607,56 +592,62 @@ int mem_sharing_unshare_page(struct domain *d,
         return 0;
     }
 
-    page = mfn_to_page(mfn);
-    handle = page->shr_handle;
- 
-    hash_entry = mem_sharing_hash_lookup(handle); 
-    list_for_each(le, &hash_entry->gfns)
+    page = mem_sharing_lookup(mfn_x(mfn));
+    if ( page == NULL )
     {
-        gfn_info = list_entry(le, struct gfn_info, list);
+        gdprintk(XENLOG_ERR, "Domain p2m is shared, but page is not: "
+                                "%lx\n", gfn);
+        BUG();
+    }
+
+    list_for_each(le, &page->shared_info->gfns)
+    {
+        gfn_info = list_entry(le, gfn_info_t, list);
         if ( (gfn_info->gfn == gfn) && (gfn_info->domain == d->domain_id) )
             goto gfn_found;
     }
     gdprintk(XENLOG_ERR, "Could not find gfn_info for shared gfn: "
                             "%lx\n", gfn);
     BUG();
-gfn_found: 
-    /* Delete gfn_info from the list, but hold on to it, until we've allocated
-     * memory to make a copy */
-    list_del(&gfn_info->list);
-    last_gfn = list_empty(&hash_entry->gfns);
 
+gfn_found:
+    /* Do the accounting first. If anything fails below, we have bigger
+     * bigger fish to fry. First, remove the gfn from the list. */ 
+    last_gfn = list_has_one_entry(&page->shared_info->gfns);
+    mem_sharing_gfn_destroy(d, gfn_info);
+    if ( last_gfn )
+    {
+        /* Clean up shared state */
+        audit_del_list(page);
+        xfree(page->shared_info);
+        page->shared_info = NULL;
+    }
+    else
+        atomic_dec(&nr_saved_mfns);
     /* If the GFN is getting destroyed drop the references to MFN 
      * (possibly freeing the page), and exit early */
     if ( flags & MEM_SHARING_DESTROY_GFN )
     {
-        mem_sharing_gfn_destroy(gfn_info, !last_gfn);
-        if(last_gfn) 
-            mem_sharing_hash_delete(handle);
-        else 
-            /* Even though we don't allocate a private page, we have to account
-             * for the MFN that originally backed this PFN. */
-            atomic_dec(&nr_saved_mfns);
         put_gfn(d, gfn);
         shr_unlock();
         put_page_and_type(page);
-        if(last_gfn && 
-           test_and_clear_bit(_PGC_allocated, &page->count_info)) 
+        if ( last_gfn && 
+            test_and_clear_bit(_PGC_allocated, &page->count_info) ) 
             put_page(page);
+
         return 0;
     }
  
-    ret = page_make_private(d, page);
-    BUG_ON(last_gfn & ret);
-    if(ret == 0) goto private_page_found;
-        
+    if ( last_gfn )
+    {
+        BUG_ON(page_make_private(d, page) != 0);
+        goto private_page_found;
+    }
+
     old_page = page;
     page = alloc_domheap_page(d, 0);
-    if(!page) 
+    if ( !page ) 
     {
-        /* We've failed to obtain memory for private page. Need to re-add the
-         * gfn_info to relevant list */
-        list_add(&gfn_info->list, &hash_entry->gfns);
         put_gfn(d, gfn);
         mem_sharing_notify_helper(d, gfn);
         shr_unlock();
@@ -669,30 +660,18 @@ gfn_found:
     unmap_domain_page(s);
     unmap_domain_page(t);
 
-    /* NOTE: set_shared_p2m_entry will switch the underlying mfn. If
-     * we do get_page withing get_gfn, the correct sequence here
-     * should be
-       get_page(page);
-       put_page(old_page);
-     * so that the ref to the old page is dropped, and a ref to
-     * the new page is obtained to later be dropped in put_gfn */
     BUG_ON(set_shared_p2m_entry(d, gfn, page_to_mfn(page)) == 0);
     put_page_and_type(old_page);
 
 private_page_found:    
-    /* We've got a private page, we can commit the gfn destruction */
-    mem_sharing_gfn_destroy(gfn_info, !last_gfn);
-    if(last_gfn) 
-        mem_sharing_hash_delete(handle);
-    else
-        atomic_dec(&nr_saved_mfns);
-
     if ( p2m_change_type(d, gfn, p2m_ram_shared, p2m_ram_rw) != 
                                                 p2m_ram_shared ) 
     {
-        printk("Could not change p2m type.\n");
+        gdprintk(XENLOG_ERR, "Could not change p2m type d %hu gfn %lx.\n", 
+                                d->domain_id, gfn);
         BUG();
     }
+
     /* Update m2p entry */
     set_gpfn_from_mfn(mfn_x(page_to_mfn(page)), gfn);
 
@@ -749,9 +728,18 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
 
         case XEN_DOMCTL_MEM_EVENT_OP_SHARING_SHARE:
         {
-            shr_handle_t sh = mec->u.share.source_handle;
-            shr_handle_t ch = mec->u.share.client_handle;
-            rc = mem_sharing_share_pages(sh, ch); 
+            unsigned long sgfn  = mec->u.share.source_gfn;
+            shr_handle_t sh     = mec->u.share.source_handle;
+            struct domain *cd   = get_domain_by_id(mec->u.share.client_domain);
+            if ( cd )
+            {
+                unsigned long cgfn  = mec->u.share.client_gfn;
+                shr_handle_t ch     = mec->u.share.client_handle;
+                rc = mem_sharing_share_pages(d, sgfn, sh, cd, cgfn, ch); 
+                put_domain(cd);
+            }
+            else
+                return -EEXIST;
         }
         break;
 
@@ -799,6 +787,9 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
 void __init mem_sharing_init(void)
 {
     printk("Initing memory sharing.\n");
-    mem_sharing_hash_init();
+    mm_lock_init(&shr_lock);
+#if MEM_SHARING_AUDIT
+    INIT_LIST_HEAD(&shr_audit_list);
+#endif
 }
 

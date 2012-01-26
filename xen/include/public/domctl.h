@@ -789,7 +789,10 @@ struct xen_domctl_mem_sharing_op {
             uint64_aligned_t  handle;     /* OUT: the handle           */
         } nominate;
         struct mem_sharing_op_share {     /* OP_SHARE */
+            uint64_aligned_t source_gfn;    /* IN: the gfn of the source page */
             uint64_aligned_t source_handle; /* IN: handle to the source page */
+            domid_t          client_domain; /* IN: the client domain id */
+            uint64_aligned_t client_gfn;    /* IN: the client gfn */
             uint64_aligned_t client_handle; /* IN: handle to the client page */
         } share; 
         struct mem_sharing_op_debug {     /* OP_DEBUG_xxx */

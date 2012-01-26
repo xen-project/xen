@@ -22,12 +22,27 @@
 #ifndef __MEM_SHARING_H__
 #define __MEM_SHARING_H__
 
+#include <public/domctl.h>
+
+/* Auditing of memory sharing code? */
+#define MEM_SHARING_AUDIT 0
+
+typedef uint64_t shr_handle_t; 
+
+struct page_sharing_info
+{
+    struct page_info *pg;   /* Back pointer to the page. */
+    shr_handle_t handle;    /* Globally unique version / handle. */
+#if MEM_SHARING_AUDIT
+    struct list_head entry; /* List of all shared pages (entry). */
+#endif
+    struct list_head gfns;  /* List of domains and gfns for this page (head). */
+};
+
 #ifdef __x86_64__
 
 #define sharing_supported(_d) \
     (is_hvm_domain(_d) && paging_mode_hap(_d)) 
-
-typedef uint64_t shr_handle_t; 
 
 unsigned int mem_sharing_get_nr_saved_mfns(void);
 int mem_sharing_nominate_page(struct domain *d, 
