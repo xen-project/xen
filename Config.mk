@@ -215,7 +215,7 @@ QEMU_UPSTREAM_URL ?= git://xenbits.xen.org/qemu-upstream-unstable.git
 SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
 QEMU_UPSTREAM_REVISION ?= master
-SEABIOS_UPSTREAM_TAG ?= 7fc039e9c262b4199fab497f3e12f4e425c37560
+SEABIOS_UPSTREAM_TAG ?= rel-1.6.3.1
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
