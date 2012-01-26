@@ -143,28 +143,12 @@ static inline void mm_enforce_order_unlock(int unlock_level,
  *                                                                      *
  ************************************************************************/
 
-#if MEM_SHARING_AUDIT
-/* Page-sharing lock (global) 
- *
- * A single global lock that protects the memory-sharing code's
- * hash tables. */
-
-declare_mm_lock(shr)
-#define _shr_lock()         mm_lock(shr, &shr_lock)
-#define _shr_unlock()       mm_unlock(&shr_lock)
-#define _shr_locked_by_me() mm_locked_by_me(&shr_lock)
-
-#else
-
 /* Sharing per page lock
  *
  * This is an external lock, not represented by an mm_lock_t. The memory
  * sharing lock uses it to protect addition and removal of (gfn,domain)
  * tuples to a shared page. We enforce order here against the p2m lock,
  * which is taken after the page_lock to change the gfn's p2m entry.
- *
- * Note that in sharing audit mode, we use the global page lock above, 
- * instead.
  *
  * The lock is recursive because during share we lock two pages. */
 
@@ -173,8 +157,6 @@ declare_mm_order_constraint(per_page_sharing)
 #define page_sharing_mm_post_lock(l, r) \
         mm_enforce_order_lock_post_per_page_sharing((l), (r))
 #define page_sharing_mm_unlock(l, r) mm_enforce_order_unlock((l), (r))
-
-#endif /* MEM_SHARING_AUDIT */
 
 /* Nested P2M lock (per-domain)
  *

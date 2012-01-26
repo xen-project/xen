@@ -32,6 +32,7 @@
 #include <asm/p2m.h>
 #include <asm/mem_event.h>
 #include <asm/atomic.h>
+#include <xen/rcupdate.h>
 
 #include "mm-locks.h"
 
@@ -46,48 +47,49 @@ DEFINE_PER_CPU(pg_lock_data_t, __pld);
 
 #if MEM_SHARING_AUDIT
 
-static mm_lock_t shr_lock;
-
-#define shr_lock()          _shr_lock()
-#define shr_unlock()        _shr_unlock()
-#define shr_locked_by_me()  _shr_locked_by_me()
-
 static void mem_sharing_audit(void);
 
 #define MEM_SHARING_DEBUG(_f, _a...)                                  \
     debugtrace_printk("mem_sharing_debug: %s(): " _f, __func__, ##_a)
 
 static struct list_head shr_audit_list;
+static spinlock_t shr_audit_lock;
+DEFINE_RCU_READ_LOCK(shr_audit_read_lock);
+
+/* RCU delayed free of audit list entry */
+static void _free_pg_shared_info(struct rcu_head *head)
+{
+    xfree(container_of(head, struct page_sharing_info, rcu_head));
+}
 
 static inline void audit_add_list(struct page_info *page)
 {
     INIT_LIST_HEAD(&page->shared_info->entry);
-    list_add(&page->shared_info->entry, &shr_audit_list);
+    spin_lock(&shr_audit_lock);
+    list_add_rcu(&page->shared_info->entry, &shr_audit_list);
+    spin_unlock(&shr_audit_lock);
 }
 
 static inline void audit_del_list(struct page_info *page)
 {
-    list_del(&page->shared_info->entry);
+    spin_lock(&shr_audit_lock);
+    list_del_rcu(&page->shared_info->entry);
+    spin_unlock(&shr_audit_lock);
+    INIT_RCU_HEAD(&page->shared_info->rcu_head);
+    call_rcu(&page->shared_info->rcu_head, _free_pg_shared_info);
 }
 
-static inline int mem_sharing_page_lock(struct page_info *p)
-{
-    return 1;
-}
-#define mem_sharing_page_unlock(p)   ((void)0)
-
-#define get_next_handle()   next_handle++;
 #else
-
-#define shr_lock()          ((void)0)
-#define shr_unlock()        ((void)0)
-/* Only used inside audit code */
-//#define shr_locked_by_me()  ((void)0)
 
 #define mem_sharing_audit() ((void)0)
 
 #define audit_add_list(p)  ((void)0)
-#define audit_del_list(p)  ((void)0)
+static inline void audit_del_list(struct page_info *page)
+{
+    xfree(page->shared_info);
+}
+
+#endif /* MEM_SHARING_AUDIT */
 
 static inline int mem_sharing_page_lock(struct page_info *pg)
 {
@@ -125,7 +127,6 @@ static inline shr_handle_t get_next_handle(void)
     while ( (y = cmpxchg(&next_handle, x, x + 1)) != x );
     return x + 1;
 }
-#endif /* MEM_SHARING_AUDIT */
 
 #define mem_sharing_enabled(d) \
     (is_hvm_domain(d) && (d)->arch.hvm_domain.mem_sharing_enabled)
@@ -213,10 +214,11 @@ static void mem_sharing_audit(void)
     unsigned long count_found = 0;
     struct list_head *ae;
 
-    ASSERT(shr_locked_by_me());
     count_expected = atomic_read(&nr_shared_mfns);
 
-    list_for_each(ae, &shr_audit_list)
+    rcu_read_lock(&shr_audit_read_lock);
+
+    list_for_each_rcu(ae, &shr_audit_list)
     {
         struct page_sharing_info *shared_info;
         unsigned long nr_gfns = 0;
@@ -227,6 +229,15 @@ static void mem_sharing_audit(void)
         shared_info = list_entry(ae, struct page_sharing_info, entry);
         pg = shared_info->pg;
         mfn = page_to_mfn(pg);
+
+        /* If we can't lock it, it's definitely not a shared page */
+        if ( !mem_sharing_page_lock(pg) )
+        {
+           MEM_SHARING_DEBUG("mfn %lx in audit list, but cannot be locked (%lx)!\n",
+                              mfn_x(mfn), pg->u.inuse.type_info);
+           errors++;
+           continue;
+        }
 
         /* Check if the MFN has correct type, owner and handle. */ 
         if ( !(pg->u.inuse.type_info & PGT_shared_page) )
@@ -300,7 +311,8 @@ static void mem_sharing_audit(void)
             put_domain(d);
             nr_gfns++;
         }
-        if ( nr_gfns != (pg->u.inuse.type_info & PGT_count_mask) )
+        /* The type count has an extra ref because we have locked the page */
+        if ( (nr_gfns + 1) != (pg->u.inuse.type_info & PGT_count_mask) )
         {
             MEM_SHARING_DEBUG("Mismatched counts for MFN=%lx."
                               "nr_gfns in list %lu, in type_info %lx\n",
@@ -308,7 +320,11 @@ static void mem_sharing_audit(void)
                               (pg->u.inuse.type_info & PGT_count_mask));
             errors++;
         }
+
+        mem_sharing_page_unlock(pg);
     }
+
+    rcu_read_unlock(&shr_audit_read_lock);
 
     if ( count_found != count_expected )
     {
@@ -533,14 +549,10 @@ static int page_make_private(struct domain *d, struct page_info *page)
     spin_lock(&d->page_alloc_lock);
 
     /* We can only change the type if count is one */
-    /* If we are locking pages individually, then we need to drop
+    /* Because we are locking pages individually, we need to drop
      * the lock here, while the page is typed. We cannot risk the 
      * race of page_unlock and then put_page_type. */
-#if MEM_SHARING_AUDIT
-    expected_type = (PGT_shared_page | PGT_validated | 1);
-#else
     expected_type = (PGT_shared_page | PGT_validated | PGT_locked | 2);
-#endif
     if ( page->u.inuse.type_info != expected_type )
     {
         put_page(page);
@@ -551,10 +563,8 @@ static int page_make_private(struct domain *d, struct page_info *page)
     /* Drop the final typecount */
     put_page_and_type(page);
 
-#ifndef MEM_SHARING_AUDIT
     /* Now that we've dropped the type, we can unlock */
     mem_sharing_page_unlock(page);
-#endif
 
     /* Change the owner */
     ASSERT(page_get_owner(page) == dom_cow);
@@ -604,7 +614,6 @@ int mem_sharing_nominate_page(struct domain *d,
 
     *phandle = 0UL;
 
-    shr_lock(); 
     mfn = get_gfn(d, gfn, &p2mt);
 
     /* Check if mfn is valid */
@@ -696,7 +705,6 @@ int mem_sharing_nominate_page(struct domain *d,
 
 out:
     put_gfn(d, gfn);
-    shr_unlock();
     return ret;
 }
 
@@ -710,8 +718,6 @@ int mem_sharing_share_pages(struct domain *sd, unsigned long sgfn, shr_handle_t 
     int ret = -EINVAL;
     mfn_t smfn, cmfn;
     p2m_type_t smfn_type, cmfn_type;
-
-    shr_lock();
 
     /* XXX if sd == cd handle potential deadlock by ordering
      * the get_ and put_gfn's */
@@ -798,7 +804,6 @@ int mem_sharing_share_pages(struct domain *sd, unsigned long sgfn, shr_handle_t 
 
     /* Clear the rest of the shared state */
     audit_del_list(cpage);
-    xfree(cpage->shared_info);
     cpage->shared_info = NULL;
 
     mem_sharing_page_unlock(secondpg);
@@ -816,7 +821,6 @@ int mem_sharing_share_pages(struct domain *sd, unsigned long sgfn, shr_handle_t 
 err_out:
     put_gfn(cd, cgfn);
     put_gfn(sd, sgfn);
-    shr_unlock();
     return ret;
 }
 
@@ -899,17 +903,12 @@ int mem_sharing_unshare_page(struct domain *d,
     gfn_info_t *gfn_info = NULL;
     struct list_head *le;
    
-    /* This is one of the reasons why we can't enforce ordering
-     * between shr_lock and p2m fine-grained locks in mm-lock. 
-     * Callers may walk in here already holding the lock for this gfn */
-    shr_lock();
     mem_sharing_audit();
     mfn = get_gfn(d, gfn, &p2mt);
     
     /* Has someone already unshared it? */
     if ( !p2m_is_shared(p2mt) ) {
         put_gfn(d, gfn);
-        shr_unlock();
         return 0;
     }
 
@@ -940,7 +939,6 @@ gfn_found:
     {
         /* Clean up shared state */
         audit_del_list(page);
-        xfree(page->shared_info);
         page->shared_info = NULL;
         atomic_dec(&nr_shared_mfns);
     }
@@ -956,7 +954,6 @@ gfn_found:
             test_and_clear_bit(_PGC_allocated, &page->count_info) ) 
             put_page(page);
         put_gfn(d, gfn);
-        shr_unlock();
 
         return 0;
     }
@@ -975,7 +972,6 @@ gfn_found:
         mem_sharing_page_unlock(old_page);
         put_gfn(d, gfn);
         mem_sharing_notify_helper(d, gfn);
-        shr_unlock();
         return -ENOMEM;
     }
 
@@ -1006,7 +1002,6 @@ private_page_found:
     paging_mark_dirty(d, mfn_x(page_to_mfn(page)));
     /* We do not need to unlock a private page */
     put_gfn(d, gfn);
-    shr_unlock();
     return 0;
 }
 
@@ -1179,9 +1174,7 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
             break;
     }
 
-    shr_lock();
     mem_sharing_audit();
-    shr_unlock();
 
     return rc;
 }
@@ -1190,7 +1183,7 @@ void __init mem_sharing_init(void)
 {
     printk("Initing memory sharing.\n");
 #if MEM_SHARING_AUDIT
-    mm_lock_init(&shr_lock);
+    spin_lock_init(&shr_audit_lock);
     INIT_LIST_HEAD(&shr_audit_list);
 #endif
 }

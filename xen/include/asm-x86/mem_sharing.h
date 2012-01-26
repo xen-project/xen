@@ -35,6 +35,7 @@ struct page_sharing_info
     shr_handle_t handle;    /* Globally unique version / handle. */
 #if MEM_SHARING_AUDIT
     struct list_head entry; /* List of all shared pages (entry). */
+    struct rcu_head rcu_head; /* List of all shared pages (entry). */
 #endif
     struct list_head gfns;  /* List of domains and gfns for this page (head). */
 };
