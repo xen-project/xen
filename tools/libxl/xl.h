@@ -28,6 +28,7 @@ struct cmd_spec {
 
 int main_vcpulist(int argc, char **argv);
 int main_info(int argc, char **argv);
+int main_sharing(int argc, char **argv);
 int main_cd_eject(int argc, char **argv);
 int main_cd_insert(int argc, char **argv);
 int main_console(int argc, char **argv);

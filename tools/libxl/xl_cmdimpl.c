@@ -3701,6 +3701,8 @@ static void output_physinfo(void)
         i = (1 << 20) / vinfo->pagesize;
         printf("total_memory           : %"PRIu64"\n", info.total_pages / i);
         printf("free_memory            : %"PRIu64"\n", info.free_pages / i);
+        printf("sharing_freed_memory   : %"PRIu64"\n", info.sharing_freed_pages / i);
+        printf("sharing_used_memory    : %"PRIu64"\n", info.sharing_used_frames / i);
     }
     if (!libxl_get_freecpus(ctx, &cpumap)) {
         libxl_for_each_cpu(i, cpumap)
@@ -3781,6 +3783,70 @@ int main_info(int argc, char **argv)
     }
 
     info(numa);
+    return 0;
+}
+
+static void sharing(const libxl_dominfo *info, int nb_domain)
+{
+    int i;
+
+    printf("Name                                        ID   Mem Shared\n");
+
+    for (i = 0; i < nb_domain; i++) {
+        char *domname;
+        unsigned shutdown_reason;
+        domname = libxl_domid_to_name(ctx, info[i].domid);
+        shutdown_reason = info[i].shutdown ? info[i].shutdown_reason : 0;
+        printf("%-40s %5d %5lu  %5lu\n",
+                domname,
+                info[i].domid,
+                (unsigned long) (info[i].current_memkb / 1024),
+                (unsigned long) (info[i].shared_memkb / 1024));
+        free(domname);
+    }
+}
+
+int main_sharing(int argc, char **argv)
+{
+    int opt = 0;
+    libxl_dominfo info_buf;
+    libxl_dominfo *info, *info_free = NULL;
+    int nb_domain, rc;
+
+    if ((opt = def_getopt(argc, argv, "", "sharing", 0)) != -1)
+        return opt;
+
+    if (optind >= argc) {
+        info = libxl_list_domain(ctx, &nb_domain);
+        if (!info) {
+            fprintf(stderr, "libxl_domain_infolist failed.\n");
+            return 1;
+        }
+        info_free = info;
+    } else if (optind == argc-1) {
+        find_domain(argv[optind]);
+        rc = libxl_domain_info(ctx, &info_buf, domid);
+        if (rc == ERROR_INVAL) {
+            fprintf(stderr, "Error: Domain \'%s\' does not exist.\n",
+                argv[optind]);
+            return -rc;
+        }
+        if (rc) {
+            fprintf(stderr, "libxl_domain_info failed (code %d).\n", rc);
+            return -rc;
+        }
+        info = &info_buf;
+        nb_domain = 1;
+    } else {
+        help("sharing");
+        return 2;
+    }
+
+    sharing(info, nb_domain);
+
+    if (info_free)
+        free(info_free);
+
     return 0;
 }
 

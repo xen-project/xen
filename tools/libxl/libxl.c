@@ -2507,6 +2507,8 @@ int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo)
     physinfo->total_pages = xcphysinfo.total_pages;
     physinfo->free_pages = xcphysinfo.free_pages;
     physinfo->scrub_pages = xcphysinfo.scrub_pages;
+    physinfo->sharing_freed_pages = xc_sharing_freed_pages(ctx->xch);
+    physinfo->sharing_used_frames = xc_sharing_used_frames(ctx->xch);
     physinfo->nr_nodes = xcphysinfo.nr_nodes;
     memcpy(physinfo->hw_cap,xcphysinfo.hw_cap, sizeof(physinfo->hw_cap));
     physinfo->phys_cap = xcphysinfo.capabilities;
