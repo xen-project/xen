@@ -771,6 +771,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_mem_event_op_t);
 #define XEN_DOMCTL_MEM_EVENT_OP_SHARING_DEBUG_GFN      5
 #define XEN_DOMCTL_MEM_EVENT_OP_SHARING_DEBUG_MFN      6
 #define XEN_DOMCTL_MEM_EVENT_OP_SHARING_DEBUG_GREF     7
+#define XEN_DOMCTL_MEM_EVENT_OP_SHARING_ADD_PHYSMAP    8
 
 #define XEN_DOMCTL_MEM_SHARING_S_HANDLE_INVALID  (-10)
 #define XEN_DOMCTL_MEM_SHARING_C_HANDLE_INVALID  (-9)
@@ -801,7 +802,7 @@ struct xen_domctl_mem_sharing_op {
             } u;
             uint64_aligned_t  handle;     /* OUT: the handle           */
         } nominate;
-        struct mem_sharing_op_share {     /* OP_SHARE */
+        struct mem_sharing_op_share {     /* OP_SHARE/ADD_PHYSMAP */
             uint64_aligned_t source_gfn;    /* IN: the gfn of the source page */
             uint64_aligned_t source_handle; /* IN: handle to the source page */
             domid_t          client_domain; /* IN: the client domain id */

@@ -820,6 +820,73 @@ err_out:
     return ret;
 }
 
+int mem_sharing_add_to_physmap(struct domain *sd, unsigned long sgfn, shr_handle_t sh,
+                            struct domain *cd, unsigned long cgfn) 
+{
+    struct page_info *spage;
+    int ret = -EINVAL;
+    mfn_t smfn, cmfn;
+    p2m_type_t smfn_type, cmfn_type;
+    struct gfn_info *gfn_info;
+    struct p2m_domain *p2m = p2m_get_hostp2m(cd);
+    p2m_access_t a;
+    
+    /* XXX if sd == cd handle potential deadlock by ordering
+     * the get_ and put_gfn's */
+    smfn = get_gfn_query(sd, sgfn, &smfn_type);
+    cmfn = get_gfn_type_access(p2m, cgfn, &cmfn_type, &a, p2m_query, NULL);
+
+    /* Get the source shared page, check and lock */
+    ret = XEN_DOMCTL_MEM_SHARING_S_HANDLE_INVALID;
+    spage = __grab_shared_page(smfn);
+    if ( spage == NULL )
+        goto err_out;
+    ASSERT(smfn_type == p2m_ram_shared);
+
+    /* Check that the handles match */
+    if ( spage->shared_info->handle != sh )
+        goto err_unlock;
+
+    /* Make sure the target page is a hole in the physmap */
+    if ( mfn_valid(cmfn) ||
+         (!(p2m_is_ram(cmfn_type))) )
+    {
+        ret = XEN_DOMCTL_MEM_SHARING_C_HANDLE_INVALID;
+        goto err_unlock;
+    }
+
+    /* This is simpler than regular sharing */
+    BUG_ON(!get_page_and_type(spage, dom_cow, PGT_shared_page));
+    if ( (gfn_info = mem_sharing_gfn_alloc(spage, cd, cgfn)) == NULL )
+    {
+        put_page_and_type(spage);
+        ret = -ENOMEM;
+        goto err_unlock;
+    }
+
+    p2m_lock(p2m);
+    ret = set_p2m_entry(p2m, cgfn, smfn, PAGE_ORDER_4K, p2m_ram_shared, a);
+    p2m_unlock(p2m);
+
+    /* Tempted to turn this into an assert */
+    if ( !ret )
+    {
+        ret = -ENOENT;
+        mem_sharing_gfn_destroy(cd, gfn_info);
+        put_page_and_type(spage);
+    } else
+        ret = 0;
+
+    atomic_inc(&nr_saved_mfns);
+
+err_unlock:
+    mem_sharing_page_unlock(spage);
+err_out:
+    put_gfn(cd, cgfn);
+    put_gfn(sd, sgfn);
+    return ret;
+}
+
 int mem_sharing_unshare_page(struct domain *d,
                              unsigned long gfn, 
                              uint16_t flags)
@@ -1037,6 +1104,42 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
             ch = mec->u.share.client_handle;
 
             rc = mem_sharing_share_pages(d, sgfn, sh, cd, cgfn, ch); 
+
+            put_domain(cd);
+        }
+        break;
+
+        case XEN_DOMCTL_MEM_EVENT_OP_SHARING_ADD_PHYSMAP:
+        {
+            unsigned long sgfn, cgfn;
+            struct domain *cd;
+            shr_handle_t sh;
+
+            if ( !mem_sharing_enabled(d) )
+                return -EINVAL;
+
+            cd = get_domain_by_id(mec->u.share.client_domain);
+            if ( !cd )
+                return -ESRCH;
+
+            if ( !mem_sharing_enabled(cd) )
+            {
+                put_domain(cd);
+                return -EINVAL;
+            }
+
+            if ( XEN_DOMCTL_MEM_SHARING_FIELD_IS_GREF(mec->u.share.source_gfn) )
+            {
+                /* Cannot add a gref to the physmap */
+                put_domain(cd);
+                return -EINVAL;
+            }
+
+            sgfn    = mec->u.share.source_gfn;
+            sh      = mec->u.share.source_handle;
+            cgfn    = mec->u.share.client_gfn;
+
+            rc = mem_sharing_add_to_physmap(d, sgfn, sh, cd, cgfn); 
 
             put_domain(cd);
         }
