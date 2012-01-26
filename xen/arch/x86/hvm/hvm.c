@@ -3975,7 +3975,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         rc = -EINVAL;
         if ( is_hvm_domain(d) )
         {
-            get_gfn_unshare_unlocked(d, a.pfn, &t);
+            /* Use get_gfn query as we are interested in the current 
+             * type, not in allocating or unsharing. That'll happen 
+             * on access. */
+            get_gfn_query_unlocked(d, a.pfn, &t);
             if ( p2m_is_mmio(t) )
                 a.mem_type =  HVMMEM_mmio_dm;
             else if ( p2m_is_readonly(t) )

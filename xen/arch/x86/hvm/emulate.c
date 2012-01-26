@@ -660,7 +660,7 @@ static int hvmemul_rep_movs(
 {
     struct hvm_emulate_ctxt *hvmemul_ctxt =
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
-    unsigned long saddr, daddr, bytes;
+    unsigned long saddr, daddr, bytes, sgfn, dgfn;
     paddr_t sgpa, dgpa;
     uint32_t pfec = PFEC_page_present;
     p2m_type_t p2mt;
@@ -693,17 +693,28 @@ static int hvmemul_rep_movs(
     if ( rc != X86EMUL_OKAY )
         return rc;
 
-    /* Unlocked works here because we get_gfn for real in whatever
-     * we call later. */
-    (void)get_gfn_unlocked(current->domain, sgpa >> PAGE_SHIFT, &p2mt);
+    /* XXX In a fine-grained p2m locking scenario, we need to sort this
+     * get_gfn's, or else we might deadlock */
+    sgfn = sgpa >> PAGE_SHIFT;
+    (void)get_gfn(current->domain, sgfn, &p2mt);
     if ( !p2m_is_ram(p2mt) && !p2m_is_grant(p2mt) )
-        return hvmemul_do_mmio(
+    {
+        rc = hvmemul_do_mmio(
             sgpa, reps, bytes_per_rep, dgpa, IOREQ_READ, df, NULL);
+        put_gfn(current->domain, sgfn);
+        return rc;
+    }
 
-    (void)get_gfn_unlocked(current->domain, dgpa >> PAGE_SHIFT, &p2mt);
+    dgfn = dgpa >> PAGE_SHIFT;
+    (void)get_gfn(current->domain, dgfn, &p2mt);
     if ( !p2m_is_ram(p2mt) && !p2m_is_grant(p2mt) )
-        return hvmemul_do_mmio(
+    {
+        rc = hvmemul_do_mmio(
             dgpa, reps, bytes_per_rep, sgpa, IOREQ_WRITE, df, NULL);
+        put_gfn(current->domain, sgfn);
+        put_gfn(current->domain, dgfn);
+        return rc;
+    }
 
     /* RAM-to-RAM copy: emulate as equivalent of memmove(dgpa, sgpa, bytes). */
     bytes = *reps * bytes_per_rep;
@@ -718,7 +729,11 @@ static int hvmemul_rep_movs(
      * can be emulated by a source-to-buffer-to-destination block copy.
      */
     if ( ((dgpa + bytes_per_rep) > sgpa) && (dgpa < (sgpa + bytes)) )
+    {
+        put_gfn(current->domain, sgfn);
+        put_gfn(current->domain, dgfn);
         return X86EMUL_UNHANDLEABLE;
+    }
 
     /* Adjust destination address for reverse copy. */
     if ( df )
@@ -727,7 +742,11 @@ static int hvmemul_rep_movs(
     /* Allocate temporary buffer. Fall back to slow emulation if this fails. */
     buf = xmalloc_bytes(bytes);
     if ( buf == NULL )
+    {
+        put_gfn(current->domain, sgfn);
+        put_gfn(current->domain, dgfn);
         return X86EMUL_UNHANDLEABLE;
+    }
 
     /*
      * We do a modicum of checking here, just for paranoia's sake and to
@@ -738,6 +757,8 @@ static int hvmemul_rep_movs(
         rc = hvm_copy_to_guest_phys(dgpa, buf, bytes);
 
     xfree(buf);
+    put_gfn(current->domain, sgfn);
+    put_gfn(current->domain, dgfn);
 
     if ( rc == HVMCOPY_gfn_paged_out )
         return X86EMUL_RETRY;

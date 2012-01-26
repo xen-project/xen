@@ -2112,7 +2112,7 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
         return;
 
     /* Everything else is an error. */
-    mfn = get_gfn_guest_unlocked(d, gfn, &p2mt);
+    mfn = get_gfn_query_unlocked(d, gfn, &p2mt);
     gdprintk(XENLOG_ERR, "EPT violation %#lx (%c%c%c/%c%c%c), "
              "gpa %#"PRIpaddr", mfn %#lx, type %i.\n", 
              qualification, 
