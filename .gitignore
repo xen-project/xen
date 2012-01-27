@@ -15,8 +15,6 @@ TAGS
 .config
 
 dist
-tools/ioemu-dir
-tools/ioemu-remote
 stubdom/*.tar.gz
 
 build-*
@@ -162,20 +160,6 @@ tools/hotplug/common/hotplugpath.sh
 tools/include/xen/*
 tools/include/xen-foreign/*.(c|h|size)
 tools/include/xen-foreign/checker
-tools/ioemu/.pc/*
-tools/ioemu/config-host.h
-tools/ioemu/config-host.mak
-tools/ioemu/i386-dm/Makefile
-tools/ioemu/i386-dm/config.h
-tools/ioemu/i386-dm/config.mak
-tools/ioemu/i386-dm/qemu-dm
-tools/ioemu/qemu-doc.html
-tools/ioemu/qemu-img.1
-tools/ioemu/qemu-img.pod
-tools/ioemu/qemu-tech.html
-tools/ioemu/qemu.1
-tools/ioemu/qemu.pod
-tools/ioemu/tapdisk-ioemu
 tools/libxc/ia64/asm/*.h
 tools/libxc/ia64/acpi/*.h
 tools/libxc/ia64/acpi/platform/*.h
@@ -285,8 +269,6 @@ tools/xm-test/*/Makefile(.in)*
 tools/xm-test/lib/XmTestLib/config.py
 tools/xm-test/lib/XmTestReport/xmtest.py
 tools/xm-test/tests/*.test
-tools/ioemu-remote
-tools/ioemu-dir
 tools/ocaml-xenstored*
 xen/.banner*
 xen/BLOG
@@ -324,6 +306,15 @@ unmodified_drivers/linux-2.6/*.cmd
 unmodified_drivers/linux-2.6/*.ko
 unmodified_drivers/linux-2.6/*.mod.c
 LibVNCServer*
+
+tools/qemu-xen-dir-remote
+tools/qemu-xen-dir
+
+tools/qemu-xen-traditional-dir-remote
+tools/qemu-xen-traditional-dir
+
+tools/firmware/seabios-dir-remote
+tools/firmware/seabios-dir
 
 tools/firmware/rombios/_rombios_.c
 tools/firmware/rombios/rombios.s
