@@ -325,7 +325,8 @@ static int qmp_open(libxl__qmp_handler *qmp, const char *qmp_socket_path,
     if (fcntl(qmp->qmp_fd, F_SETFL, flags | O_NONBLOCK) == -1) {
         return -1;
     }
-    libxl_fd_set_cloexec(qmp->qmp_fd);
+    ret = libxl_fd_set_cloexec(qmp->ctx, qmp->qmp_fd, 1);
+    if (ret) return -1;
 
     memset(&qmp->addr, 0, sizeof (&qmp->addr));
     qmp->addr.sun_family = AF_UNIX;

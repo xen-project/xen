@@ -3658,18 +3658,37 @@ int libxl_cpupool_movedomain(libxl_ctx *ctx, uint32_t poolid, uint32_t domid)
     return 0;
 }
 
-int libxl_fd_set_cloexec(int fd)
+static int fd_set_flags(libxl_ctx *ctx, int fd,
+                        int fcntlgetop, int fcntlsetop, const char *fl,
+                        int flagmask, int set_p)
 {
-    int flags = 0;
+    int flags, r;
 
-    if ((flags = fcntl(fd, F_GETFD)) == -1) {
-        flags = 0;
+    flags = fcntl(fd, fcntlgetop);
+    if (flags == -1) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "fcntl(,F_GET%s) failed",fl);
+        return ERROR_FAIL;
     }
-    if ((flags & FD_CLOEXEC)) {
-        return 0;
+
+    if (set_p)
+        flags |= flagmask;
+    else
+        flags &= ~flagmask;
+
+    r = fcntl(fd, fcntlsetop, flags);
+    if (r == -1) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "fcntl(,F_SET%s) failed",fl);
+        return ERROR_FAIL;
     }
-    return fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
+
+    return 0;
 }
+
+int libxl_fd_set_cloexec(libxl_ctx *ctx, int fd, int cloexec)
+  { return fd_set_flags(ctx,fd, F_GETFD,F_SETFD,"FD", FD_CLOEXEC, cloexec); }
+
+int libxl_fd_set_nonblock(libxl_ctx *ctx, int fd, int nonblock)
+  { return fd_set_flags(ctx,fd, F_GETFL,F_SETFL,"FL", O_NONBLOCK, nonblock); }
 
 /*
  * Local variables:

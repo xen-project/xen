@@ -613,7 +613,12 @@ const char *libxl_run_dir_path(void);
 const char *libxl_xenpaging_dir_path(void);
 
 /* misc */
-int libxl_fd_set_cloexec(int fd);
+
+/* Each of these sets or clears the flag according to whether the
+ * 2nd parameter is nonzero.  On failure, they log, and
+ * return ERROR_FAIL, but also leave errno valid. */
+int libxl_fd_set_cloexec(libxl_ctx *ctx, int fd, int cloexec);
+int libxl_fd_set_nonblock(libxl_ctx *ctx, int fd, int nonblock);
 
 #include <libxl_event.h>
 
