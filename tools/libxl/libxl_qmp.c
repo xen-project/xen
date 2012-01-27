@@ -408,17 +408,18 @@ static int qmp_next(libxl__gc *gc, libxl__qmp_handler *qmp)
             char *end = NULL;
             if (incomplete) {
                 size_t current_pos = s - incomplete;
-                incomplete_size += rd;
                 incomplete = libxl__realloc(gc, incomplete,
-                                            incomplete_size + 1);
-                incomplete = strncat(incomplete, qmp->buffer, rd);
+                                            incomplete_size + rd);
+                strncat(incomplete + incomplete_size, qmp->buffer, rd);
                 s = incomplete + current_pos;
+                incomplete_size += rd;
                 s_end = incomplete + incomplete_size;
             } else {
                 incomplete = libxl__strndup(gc, qmp->buffer, rd);
                 incomplete_size = rd;
                 s = incomplete;
                 s_end = s + rd;
+                rd = 0;
             }
 
             end = strstr(s, "\r\n");
