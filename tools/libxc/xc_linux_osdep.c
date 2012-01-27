@@ -217,6 +217,7 @@ static void *linux_privcmd_map_foreign_bulk(xc_interface *xch, xc_osdep_handle h
 
     rc = ioctl(fd, IOCTL_PRIVCMD_MMAPBATCH_V2, &ioctlx);
 
+    /* Command was recognized, some gfn in arr are in paging state */
     if ( rc < 0 && errno == ENOENT )
     {
         for ( i = rc = 0; rc == 0 && i < num; i++ )
@@ -235,8 +236,8 @@ static void *linux_privcmd_map_foreign_bulk(xc_interface *xch, xc_osdep_handle h
             } while ( rc < 0 && errno == ENOENT && err[i] == -ENOENT );
         }
     }
-
-    if ( rc < 0 && errno == EINVAL && (int)num > 0 )
+    /* Command was not recognized, use fall back */
+    else if ( rc < 0 && errno == EINVAL && (int)num > 0 )
     {
         /*
          * IOCTL_PRIVCMD_MMAPBATCH_V2 is not supported - fall back to
