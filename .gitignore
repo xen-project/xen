@@ -210,6 +210,7 @@ tools/tests/x86_emulate
 tools/tests/regression/installed/*
 tools/tests/regression/build/*
 tools/tests/regression/downloads/*
+tools/tests/mem-sharing/memshrtool
 tools/vnet/Make.local
 tools/vnet/build/*
 tools/vnet/gc
