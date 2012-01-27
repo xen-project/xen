@@ -26,12 +26,12 @@
 static int file_op(int fd, void *page, int i,
                    ssize_t (*fn)(int, void *, size_t))
 {
-    off_t seek_ret;
+    off_t offset = i;
     int total = 0;
     int bytes;
 
-    seek_ret = lseek(fd, i << PAGE_SHIFT, SEEK_SET);
-    if ( seek_ret == (off_t)-1 )
+    offset = lseek(fd, offset << PAGE_SHIFT, SEEK_SET);
+    if ( offset == (off_t)-1 )
         return -1;
 
     while ( total < PAGE_SIZE )
