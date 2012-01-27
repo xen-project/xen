@@ -18,6 +18,181 @@
 
 #include <libxl.h>
 
+/*======================================================================*/
+
+/*
+ * Domain event handling - getting Xen events from libxl
+ *
+ * (Callers inside libxl may not call libxl_event_check or _wait.)
+ */
+
+#define LIBXL_EVENTMASK_ALL (~(unsigned long)0)
+
+typedef int libxl_event_predicate(const libxl_event*, void *user);
+  /* Return value is 0 if the event is unwanted or non-0 if it is.
+   * Predicates are not allowed to fail.
+   */
+
+int libxl_event_check(libxl_ctx *ctx, libxl_event **event_r,
+                      uint64_t typemask,
+                      libxl_event_predicate *predicate, void *predicate_user);
+  /* Searches for an event, already-happened, which matches typemask
+   * and predicate.  predicate==0 matches any event.
+   * libxl_event_check returns the event, which must then later be
+   * freed by the caller using libxl_event_free.
+   *
+   * Returns ERROR_NOT_READY if no such event has happened.
+   */
+
+int libxl_event_wait(libxl_ctx *ctx, libxl_event **event_r,
+                     uint64_t typemask,
+                     libxl_event_predicate *predicate, void *predicate_user);
+  /* Like libxl_event_check but blocks if no suitable events are
+   * available, until some are.  Uses libxl_osevent_beforepoll/
+   * _afterpoll so may be inefficient if very many domains are being
+   * handled by a single program.
+   */
+
+void libxl_event_free(libxl_ctx *ctx, libxl_event *event);
+
+
+/* Alternatively or additionally, the application may also use this: */
+
+typedef struct libxl_event_hooks {
+    uint64_t event_occurs_mask;
+    void (*event_occurs)(void *user, const libxl_event *event);
+    void (*disaster)(void *user, libxl_event_type type,
+                     const char *msg, int errnoval);
+} libxl_event_hooks;
+
+void libxl_event_register_callbacks(libxl_ctx *ctx,
+                                    const libxl_event_hooks *hooks, void *user);
+  /*
+   * Arranges that libxl will henceforth call event_occurs for any
+   * events whose type is set in event_occurs_mask, rather than
+   * queueing the event for retrieval by libxl_event_check/wait.
+   * Events whose bit is clear in mask are not affected.
+   *
+   * event becomes owned by the application and must be freed, either
+   * by event_occurs or later.
+   *
+   * event_occurs may be NULL if mask is 0.
+   *
+   * libxl_event_register_callback also provides a way for libxl to
+   * report to the application that there was a problem reporting
+   * events; this can occur due to lack of host memory during event
+   * handling, or other wholly unrecoverable errors from system calls
+   * made by libxl.  This will not happen for frivolous reasons - only
+   * if the system, or the Xen components of it, are badly broken.
+   *
+   * msg and errnoval will describe the action that libxl was trying
+   * to do, and type specifies the type of libxl events which may be
+   * missing.  type may be 0 in which case events of all types may be
+   * missing.
+   *
+   * disaster may be NULL.  If it is, or if _register_callbacks has
+   * not been called, errors of this kind are fatal to the entire
+   * application: libxl will print messages to its logs and to stderr
+   * and call exit(-1).
+   *
+   * If disaster returns, it may be the case that some or all future
+   * libxl calls will return errors; likewise it may be the case that
+   * no more events (of the specified type, if applicable) can be
+   * produced.  An application which supplies a disaster function
+   * should normally react either by exiting, or by (when it has
+   * returned to its main event loop) shutting down libxl with
+   * libxl_ctx_free and perhaps trying to restart it with
+   * libxl_ctx_init.
+   *
+   * In any case before calling disaster, libxl will have logged a
+   * message with level XTL_CRITICAL.
+   *
+   * Reentrancy: it IS permitted to call libxl from within
+   * event_occurs.  It is NOT permitted to call libxl from within
+   * disaster.  The event_occurs and disaster callbacks may occur on
+   * any thread in which the application calls libxl.
+   *
+   * libxl_event_register_callbacks may be called as many times, with
+   * different parameters, as the application likes; the most recent
+   * call determines the libxl behaviour.  However it is NOT safe to
+   * call _register_callbacks concurrently with, or reentrantly from,
+   * any other libxl function.
+   *
+   * Calls to _register_callbacks do not affect events which have
+   * already occurred.
+   */
+
+
+/*
+ * Events are only generated if they have been requested.
+ * The following functions request the generation of specific events.
+ *
+ * Each set of functions for controlling event generation has this form:
+ *
+ *   typedef struct libxl__evgen_FOO libxl__evgen_FOO;
+ *   int libxl_evenable_FOO(libxl_ctx *ctx, FURTHER PARAMETERS,
+ *                          libxl_ev_user user, libxl__evgen_FOO **evgen_out);
+ *   void libxl_evdisable_FOO(libxl_ctx *ctx, libxl__evgen_FOO *evgen);
+ *
+ * The evenable function arranges that the events (as described in the
+ * doc comment for the individual function) will start to be generated
+ * by libxl.  On success, *evgen_out is set to a non-null pointer to
+ * an opaque struct.
+ *
+ * The user value is returned in the generated events and may be
+ * used by the caller for whatever it likes.  The type ev_user is
+ * guaranteed to be an unsigned integer type which is at least
+ * as big as uint64_t and is also guaranteed to be big enough to
+ * contain any intptr_t value.
+ *
+ * If it becomes desirable to stop generation of the relevant events,
+ * or to reclaim the resources in libxl associated with the evgen
+ * structure, the same evgen value should be passed to the evdisable
+ * function.  However, note that events which occurred prior to the
+ * evdisable call may still be returned.
+ *
+ * The caller may enable identical events more than once.  If they do
+ * so, each actual occurrence will generate several events to be
+ * returned by libxl_event_check, with the appropriate user value(s).
+ * Aside from this, each occurrence of each event is returned by
+ * libxl_event_check exactly once.
+ *
+ * An evgen is associated with the libxl_ctx used for its creation.
+ * After libxl_ctx_free, all corresponding evgen handles become
+ * invalid and must no longer be passed to evdisable.
+ *
+ * Events enabled with evenable prior to a fork and libxl_ctx_postfork
+ * are no longer generated after the fork/postfork; however the evgen
+ * structures are still valid and must be passed to evdisable if the
+ * memory they use should not be leaked.
+ *
+ * Applications should ensure that they eventually retrieve every
+ * event using libxl_event_check or libxl_event_wait, since events
+ * which occur but are not retreived by the application will be queued
+ * inside libxl indefinitely.  libxl_event_check/_wait may be O(n)
+ * where n is the number of queued events which do not match the
+ * criteria specified in the arguments to check/wait.
+ */
+
+typedef struct libxl__evgen_domain_death libxl_evgen_domain_death;
+int libxl_evenable_domain_death(libxl_ctx *ctx, uint32_t domid,
+                         libxl_ev_user, libxl_evgen_domain_death **evgen_out);
+void libxl_evdisable_domain_death(libxl_ctx *ctx, libxl_evgen_domain_death*);
+  /* Arranges for the generation of DOMAIN_SHUTDOWN and DOMAIN_DESTROY
+   * events.  A domain which is destroyed before it shuts down
+   * may generate only a DESTROY event.
+   */
+
+typedef struct libxl__evgen_disk_eject libxl_evgen_disk_eject;
+int libxl_evenable_disk_eject(libxl_ctx *ctx, uint32_t domid, const char *vdev,
+                        libxl_ev_user, libxl_evgen_disk_eject **evgen_out);
+void libxl_evdisable_disk_eject(libxl_ctx *ctx, libxl_evgen_disk_eject*);
+  /* Arranges for the generation of DISK_EJECT events.  A copy of the
+   * string *vdev will be made for libxl's internal use, and a pointer
+   * to this (or some other) copy will be returned as the vdev
+   * member of event.u.
+   */
+
 
 /*======================================================================*/
 
@@ -36,10 +211,10 @@
  *      poll();
  *      libxl_osevent_afterpoll(...);
  *      for (;;) {
- *        r=libxl_event_check(...);
- *        if (r==LIBXL_NOT_READY) break;
- *        if (r) handle failure;
- *        do something with the event;
+ *          r = libxl_event_check(...);
+ *          if (r==LIBXL_NOT_READY) break;
+ *          if (r) goto error_out;
+ *          do something with the event;
  *      }
  *   }
  *

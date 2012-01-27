@@ -53,7 +53,10 @@
  *    A public function may be called from within libxl; the call
  *    context initialisation macros will make sure that the internal
  *    caller's context is reused (eg, so that the same xenstore
- *    transaction is used).
+ *    transaction is used).  But in-libxl callers of libxl public
+ *    functions should note that any libxl public function may cause
+ *    recursively reentry into libxl via the application's event
+ *    callback hook.
  *
  *    Public functions have names like libxl_foobar.
  *
@@ -152,6 +155,8 @@ void libxl_key_value_list_dispose(libxl_key_value_list *kvl);
 
 typedef uint32_t libxl_hwcap[8];
 
+typedef uint64_t libxl_ev_user;
+
 typedef struct {
     uint32_t size;          /* number of bytes in map */
     uint8_t *map;
@@ -199,6 +204,9 @@ typedef struct {
     const char *s;
     int v;
 } libxl_enum_string_table;
+
+struct libxl_event;
+typedef LIBXL_TAILQ_ENTRY(struct libxl_event) libxl_ev_link;
 
 typedef struct libxl__ctx libxl_ctx;
 
@@ -300,51 +308,6 @@ int libxl_run_bootloader(libxl_ctx *ctx,
 
   /* 0 means ERROR_ENOMEM, which we have logged */
 
-/* events handling */
-
-typedef struct {
-    /* event type */
-    libxl_event_type type;
-    /* data for internal use of the library */
-    char *path;
-    char *token;
-} libxl_event;
-
-typedef struct {
-    char *path;
-    char *token;
-} libxl_waiter;
-
-
-int libxl_get_wait_fd(libxl_ctx *ctx, int *fd);
-/* waiter is allocated by the caller */
-int libxl_wait_for_domain_death(libxl_ctx *ctx, uint32_t domid, libxl_waiter *waiter);
-/* waiter is a preallocated array of num_disks libxl_waiter elements */
-int libxl_wait_for_disk_ejects(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disks, int num_disks, libxl_waiter *waiter);
-int libxl_get_event(libxl_ctx *ctx, libxl_event *event);
-int libxl_stop_waiting(libxl_ctx *ctx, libxl_waiter *waiter);
-int libxl_free_event(libxl_event *event);
-int libxl_free_waiter(libxl_waiter *waiter);
-
-/*
- * Returns:
- *  - 0 if the domain is dead but there is no cleanup to be done. e.g
- *    because someone else has already done it.
- *  - 1 if the domain is dead and there is cleanup to be done.
- *
- * Can return error if the domain exists and is still running.
- *
- * *info will contain valid domain state iff 1 is returned. In
- * particular if 1 is returned then info->shutdown_reason is
- * guaranteed to be valid since by definition the domain is
- * (shutdown||dying))
- */
-int libxl_event_get_domain_death_info(libxl_ctx *ctx, uint32_t domid, libxl_event *event, libxl_dominfo *info);
-
-/*
- * Returns true and fills *disk if the caller should eject the disk
- */
-int libxl_event_get_disk_eject_info(libxl_ctx *ctx, uint32_t domid, libxl_event *event, libxl_device_disk *disk);
 
 int libxl_domain_rename(libxl_ctx *ctx, uint32_t domid,
                         const char *old_name, const char *new_name);

@@ -177,10 +177,44 @@ typedef struct libxl__ev_watch_slot {
     
 libxl__ev_xswatch *libxl__watch_slot_contents(libxl__gc *gc, int slotnum);
 
+
+/*
+ * evgen structures, which are the state we use for generating
+ * events for the caller.
+ *
+ * In general in each case there's an internal and an external
+ * version of the _evdisable_FOO function; the internal one is
+ * used during cleanup.
+ */
+
+struct libxl__evgen_domain_death {
+    uint32_t domid;
+    unsigned shutdown_reported:1, death_reported:1;
+    LIBXL_TAILQ_ENTRY(libxl_evgen_domain_death) entry;
+        /* on list .death_reported ? CTX->death_list : CTX->death_reported */
+    libxl_ev_user user;
+};
+_hidden void
+libxl__evdisable_domain_death(libxl__gc*, libxl_evgen_domain_death*);
+
+struct libxl__evgen_disk_eject {
+    libxl__ev_xswatch watch;
+    uint32_t domid;
+    LIBXL_LIST_ENTRY(libxl_evgen_disk_eject) entry;
+    libxl_ev_user user;
+    char *vdev;
+};
+_hidden void
+libxl__evdisable_disk_eject(libxl__gc*, libxl_evgen_disk_eject*);
+
+
 struct libxl__ctx {
     xentoollog_logger *lg;
     xc_interface *xch;
     struct xs_handle *xsh;
+
+    const libxl_event_hooks *event_hooks;
+    void *event_hooks_user;
 
     pthread_mutex_t lock; /* protects data structures hanging off the ctx */
       /* Always use libxl__ctx_lock and _unlock (or the convenience
@@ -195,12 +229,16 @@ struct libxl__ctx {
        * documented in the libxl public interface.
        */
 
+    LIBXL_TAILQ_HEAD(libxl__event_list, libxl_event) occurred;
+
     int osevent_in_hook;
     const libxl_osevent_hooks *osevent_hooks;
     void *osevent_user;
       /* See the comment for OSEVENT_HOOK_INTERN in libxl_event.c
        * for restrictions on the use of the osevent fields. */
 
+    struct pollfd *fd_polls;
+    int fd_polls_allocd;
     int fd_rindex_allocd;
     int *fd_rindex; /* see libxl_osevent_beforepoll */
     LIBXL_LIST_HEAD(, libxl__ev_fd) efds;
@@ -211,6 +249,13 @@ struct libxl__ctx {
     LIBXL_SLIST_HEAD(, libxl__ev_watch_slot) watch_freeslots;
     uint32_t watch_counter; /* helps disambiguate slot reuse */
     libxl__ev_fd watch_efd;
+
+    LIBXL_TAILQ_HEAD(libxl__evgen_domain_death_list, libxl_evgen_domain_death)
+        death_list /* sorted by domid */,
+        death_reported;
+    libxl__ev_xswatch death_watch;
+    
+    LIBXL_LIST_HEAD(, libxl_evgen_disk_eject) disk_eject_evgens;
 
     /* for callers who reap children willy-nilly; caller must only
      * set this after libxl_init and before any other call - or
@@ -252,6 +297,7 @@ struct libxl__gc {
 struct libxl__egc {
     /* for event-generating functions only */
     struct libxl__gc gc;
+    struct libxl__event_list occurred_for_callback;
 };
 
 #define LIBXL_INIT_GC(gc,ctx) do{               \
@@ -396,6 +442,9 @@ _hidden char *libxl__xs_libxl_path(libxl__gc *gc, uint32_t domid);
  *
  * Callers of libxl__ev_KIND_register must ensure that the
  * registration is undone, with _deregister, in libxl_ctx_free.
+ * This means that normally each kind of libxl__evgen (ie each
+ * application-requested event source) needs to be on a list so that
+ * it can be automatically deregistered as promised in libxl_event.h.
  */
 
 
@@ -437,6 +486,25 @@ static inline void libxl__ev_xswatch_init(libxl__ev_xswatch *xswatch_out)
 static inline int libxl__ev_xswatch_isregistered(const libxl__ev_xswatch *xw)
                 { return xw->slotnum >= 0; }
 
+
+/*
+ * Other event-handling support provided by the libxl event core to
+ * the rest of libxl.
+ */
+
+_hidden void libxl__event_occurred(libxl__egc*, libxl_event *event);
+  /* Arranges to notify the application that the event has occurred.
+   * event should be suitable for passing to libxl_event_free. */
+
+_hidden libxl_event *libxl__event_new(libxl__egc*, libxl_event_type,
+                                      uint32_t domid);
+  /* Convenience function.
+   * Allocates a new libxl_event, fills in domid and type.
+   * If allocation fails, calls _disaster, and returns NULL. */
+
+#define NEW_EVENT(egc, type, domid)                              \
+    libxl__event_new((egc), LIBXL_EVENT_TYPE_##type, (domid));
+    /* Convenience macro. */
 
 /*
  * In general, call this via the macro LIBXL__EVENT_DISASTER.
@@ -995,12 +1063,15 @@ libxl__device_model_version_running(libxl__gc *gc, uint32_t domid);
 
 /* egc initialisation and destruction: */
 
-#define LIBXL_INIT_EGC(egc,ctx) do{             \
-        LIBXL_INIT_GC((egc).gc,ctx);            \
-        /* list of occurred events tbd */       \
+#define LIBXL_INIT_EGC(egc,ctx) do{                     \
+        LIBXL_INIT_GC((egc).gc,ctx);                    \
+        LIBXL_TAILQ_INIT(&(egc).occurred_for_callback); \
     } while(0)
 
 _hidden void libxl__egc_cleanup(libxl__egc *egc);
+  /* Frees memory allocated within this egc's gc, and and report all
+   * occurred events via callback, if applicable.  May reenter the
+   * application; see restrictions above. */
 
 /* convenience macros: */
 

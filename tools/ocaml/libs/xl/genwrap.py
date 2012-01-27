@@ -275,6 +275,7 @@ if __name__ == '__main__':
         "device_model_info",
         "vcpuinfo",
         "topologyinfo",
+        "event",
         ]
 
     for t in blacklist:

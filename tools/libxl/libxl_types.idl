@@ -75,11 +75,6 @@ libxl_action_on_shutdown = Enumeration("action_on_shutdown", [
     (6, "COREDUMP_RESTART"),
     ])
 
-libxl_event_type = Enumeration("event_type", [
-    (1, "DOMAIN_DEATH"),
-    (2, "DISK_EJECT"),
-    ])
-
 libxl_button = Enumeration("button", [
     (1, "POWER"),
     (2, "SLEEP"),
@@ -397,3 +392,32 @@ libxl_sched_sedf = Struct("sched_sedf", [
     ("extratime", integer),
     ("weight", integer),
     ], dispose_fn=None)
+
+libxl_event_type = Enumeration("event_type", [
+    (1, "DOMAIN_SHUTDOWN"),
+    (2, "DOMAIN_DESTROY"),
+    (3, "DISK_EJECT"),
+    ])
+
+libxl_ev_user = UInt(64)
+
+libxl_ev_link = Builtin("ev_link", passby=PASS_BY_REFERENCE, private=True)
+
+libxl_event = Struct("event",[
+    ("link",     libxl_ev_link),
+     # for use by libxl; caller may use this once the event has been
+     #   returned by libxl_event_{check,wait}
+    ("domid",    libxl_domid),
+    ("domuuid",  libxl_uuid),
+    ("for_user", libxl_ev_user),
+    ("type",     libxl_event_type),
+    ("u", KeyedUnion(None, libxl_event_type, "type",
+          [("domain_shutdown", Struct(None, [
+                                             ("shutdown_reason", uint8),
+                                      ])),
+           ("domain_destroy", Struct(None, [])),
+           ("disk_eject", Struct(None, [
+                                        ("vdev", string),
+                                        ("disk", libxl_device_disk),
+                                 ])),
+           ]))])

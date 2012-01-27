@@ -1226,14 +1226,16 @@ skip_vfb:
     xlu_cfg_destroy(config);
 }
 
-/* Returns 1 if domain should be restarted, 2 if domain should be renamed then restarted  */
-static int handle_domain_death(libxl_ctx *ctx, uint32_t domid, libxl_event *event,
-                               libxl_domain_config *d_config, libxl_dominfo *info)
+/* Returns 1 if domain should be restarted,
+ * 2 if domain should be renamed then restarted, or 0 */
+static int handle_domain_death(libxl_ctx *ctx, uint32_t domid,
+                               libxl_event *event,
+                               libxl_domain_config *d_config)
 {
     int restart = 0;
     libxl_action_on_shutdown action;
 
-    switch (info->shutdown_reason) {
+    switch (event->u.domain_shutdown.shutdown_reason) {
     case SHUTDOWN_poweroff:
         action = d_config->on_poweroff;
         break;
@@ -1250,11 +1252,14 @@ static int handle_domain_death(libxl_ctx *ctx, uint32_t domid, libxl_event *even
         action = d_config->on_watchdog;
         break;
     default:
-        LOG("Unknown shutdown reason code %d. Destroying domain.", info->shutdown_reason);
+        LOG("Unknown shutdown reason code %d. Destroying domain.",
+            event->u.domain_shutdown.shutdown_reason);
         action = LIBXL_ACTION_ON_SHUTDOWN_DESTROY;
     }
 
-    LOG("Action for shutdown reason code %d is %s", info->shutdown_reason, action_on_shutdown_names[action]);
+    LOG("Action for shutdown reason code %d is %s",
+        event->u.domain_shutdown.shutdown_reason,
+        action_on_shutdown_names[action]);
 
     if (action == LIBXL_ACTION_ON_SHUTDOWN_COREDUMP_DESTROY || action == LIBXL_ACTION_ON_SHUTDOWN_COREDUMP_RESTART) {
         char *corefile;
@@ -1319,7 +1324,7 @@ static void replace_string(char **str, const char *val)
 
 
 static int preserve_domain(libxl_ctx *ctx, uint32_t domid, libxl_event *event,
-                           libxl_domain_config *d_config, libxl_dominfo *info)
+                           libxl_domain_config *d_config)
 {
     time_t now;
     struct tm tm;
@@ -1432,6 +1437,40 @@ static int autoconnect_console(libxl_ctx *ctx, uint32_t domid, void *priv)
     _exit(1);
 }
 
+static int domain_wait_event(libxl_event **event_r)
+{
+    int ret;
+    for (;;) {
+        ret = libxl_event_wait(ctx, event_r, LIBXL_EVENTMASK_ALL, 0,0);
+        if (ret) {
+            LOG("Domain %d, failed to get event, quitting (rc=%d)", domid, ret);
+            return ret;
+        }
+        if ((*event_r)->domid != domid) {
+            char *evstr = libxl_event_to_json(ctx, *event_r);
+            LOG("INTERNAL PROBLEM - ignoring unexpected event for"
+                " domain %d (expected %d): event=%s",
+                (*event_r)->domid, domid, evstr);
+            free(evstr);
+            libxl_event_free(ctx, *event_r);
+            continue;
+        }
+        return ret;
+    }
+}
+
+static void evdisable_disk_ejects(libxl_evgen_disk_eject **diskws,
+                                 int num_disks)
+{
+    int i;
+
+    for (i = 0; i < num_disks; i++) {
+        if (diskws[i])
+            libxl_evdisable_disk_eject(ctx, diskws[i]);
+        diskws[i] = NULL;
+    }
+}
+
 static int create_domain(struct domain_create *dom_info)
 {
     libxl_domain_config d_config;
@@ -1445,10 +1484,11 @@ static int create_domain(struct domain_create *dom_info)
     const char *restore_file = dom_info->restore_file;
     int migrate_fd = dom_info->migrate_fd;
 
-    int fd, i;
+    int i;
     int need_daemon = daemonize;
     int ret, rc;
-    libxl_waiter *w1 = NULL, *w2 = NULL;
+    libxl_evgen_domain_death *deathw = NULL;
+    libxl_evgen_disk_eject **diskws = NULL; /* one per disk */
     void *config_data = 0;
     int config_len = 0;
     int restore_fd = -1;
@@ -1661,14 +1701,14 @@ start:
                 if (errno != EINTR) {
                     perror("failed to wait for daemonizing child");
                     ret = ERROR_FAIL;
-                    goto error_out;
+                    goto out;
                 }
             }
             if (status) {
                 libxl_report_child_exitstatus(ctx, XTL_ERROR,
                            "daemonizing child", child1, status);
                 ret = ERROR_FAIL;
-                goto error_out;
+                goto out;
             }
             ret = domid;
             goto out;
@@ -1705,92 +1745,105 @@ start:
     }
     LOG("Waiting for domain %s (domid %d) to die [pid %ld]",
         d_config.c_info.name, domid, (long)getpid());
-    w1 = (libxl_waiter*) xmalloc(sizeof(libxl_waiter) * d_config.num_disks);
-    w2 = (libxl_waiter*) xmalloc(sizeof(libxl_waiter));
-    libxl_wait_for_disk_ejects(ctx, domid, d_config.disks, d_config.num_disks, w1);
-    libxl_wait_for_domain_death(ctx, domid, w2);
-    libxl_get_wait_fd(ctx, &fd);
+
+    ret = libxl_evenable_domain_death(ctx, domid, 0, &deathw);
+    if (ret) goto out;
+
+    if (!diskws) {
+        diskws = xmalloc(sizeof(*diskws) * d_config.num_disks);
+        for (i = 0; i < d_config.num_disks; i++)
+            diskws[i] = NULL;
+    }
+    for (i = 0; i < d_config.num_disks; i++) {
+        if (d_config.disks[i].removable) {
+            ret = libxl_evenable_disk_eject(ctx, domid, d_config.disks[i].vdev,
+                                            0, &diskws[i]);
+            if (ret) goto out;
+        }
+    }
     while (1) {
-        int ret;
-        fd_set rfds;
-        libxl_dominfo info;
-        libxl_event event;
-        libxl_device_disk disk;
+        libxl_event *event;
+        ret = domain_wait_event(&event);
+        if (ret) goto out;
 
-        FD_ZERO(&rfds);
-        FD_SET(fd, &rfds);
+        switch (event->type) {
 
-        ret = select(fd + 1, &rfds, NULL, NULL, NULL);
-        if (!ret)
-            continue;
-        libxl_get_event(ctx, &event);
-        switch (event.type) {
-            case LIBXL_EVENT_TYPE_DOMAIN_DEATH:
-                ret = libxl_event_get_domain_death_info(ctx, domid, &event, &info);
-
-                if (ret < 0) {
-                    libxl_free_event(&event);
-                    continue;
-                }
-
-                LOG("Domain %d is dead", domid);
-
-                if (ret) {
-                    switch (handle_domain_death(ctx, domid, &event, &d_config, &info)) {
-                    case 2:
-                        if (!preserve_domain(ctx, domid, &event, &d_config, &info)) {
-                            /* If we fail then exit leaving the old domain in place. */
-                            ret = -1;
-                            goto out;
-                        }
-
-                        /* Otherwise fall through and restart. */
-                    case 1:
-
-                        for (i = 0; i < d_config.num_disks; i++)
-                            libxl_free_waiter(&w1[i]);
-                        libxl_free_waiter(w2);
-                        free(w1);
-                        free(w2);
-
-                        /*
-                         * Do not attempt to reconnect if we come round again due to a
-                         * guest reboot -- the stdin/out will be disconnected by then.
-                         */
-                        dom_info->console_autoconnect = 0;
-
-                        /* Some settings only make sense on first boot. */
-                        paused = 0;
-                        if (common_domname
-                            && strcmp(d_config.c_info.name, common_domname)) {
-                            d_config.c_info.name = strdup(common_domname);
-                        }
-
-                        /*
-                         * XXX FIXME: If this sleep is not there then domain
-                         * re-creation fails sometimes.
-                         */
-                        LOG("Done. Rebooting now");
-                        sleep(2);
-                        goto start;
-                    case 0:
-                        LOG("Done. Exiting now");
-                        ret = 0;
-                        goto out;
-                    }
-                } else {
-                    LOG("Unable to get domain death info, quitting");
+        case LIBXL_EVENT_TYPE_DOMAIN_SHUTDOWN:
+            LOG("Domain %d has shut down, reason code %d 0x%x", domid,
+                event->u.domain_shutdown.shutdown_reason,
+                event->u.domain_shutdown.shutdown_reason);
+            switch (handle_domain_death(ctx, domid, event, &d_config)) {
+            case 2:
+                if (!preserve_domain(ctx, domid, event, &d_config)) {
+                    /* If we fail then exit leaving the old domain in place. */
+                    ret = -1;
                     goto out;
                 }
-                break;
-            case LIBXL_EVENT_TYPE_DISK_EJECT:
-                if (libxl_event_get_disk_eject_info(ctx, domid, &event, &disk)) {
-                    libxl_cdrom_insert(ctx, domid, &disk);
-                    libxl_device_disk_dispose(&disk);
+
+                /* Otherwise fall through and restart. */
+            case 1:
+                libxl_event_free(ctx, event);
+                libxl_evdisable_domain_death(ctx, deathw);
+                deathw = NULL;
+                evdisable_disk_ejects(diskws, d_config.num_disks);
+                /* discard any other events which may have been generated */
+                while (!(ret = libxl_event_check(ctx, &event,
+                                                 LIBXL_EVENTMASK_ALL, 0,0))) {
+                    libxl_event_free(ctx, event);
                 }
-                break;
+                if (ret != ERROR_NOT_READY) {
+                    LOG("warning, libxl_event_check (cleanup) failed (rc=%d)",
+                        ret);
+                }
+
+                /*
+                 * Do not attempt to reconnect if we come round again due to a
+                 * guest reboot -- the stdin/out will be disconnected by then.
+                 */
+                dom_info->console_autoconnect = 0;
+
+                /* Some settings only make sense on first boot. */
+                paused = 0;
+                if (common_domname
+                    && strcmp(d_config.c_info.name, common_domname)) {
+                    d_config.c_info.name = strdup(common_domname);
+                }
+
+                /*
+                 * XXX FIXME: If this sleep is not there then domain
+                 * re-creation fails sometimes.
+                 */
+                LOG("Done. Rebooting now");
+                sleep(2);
+                goto start;
+
+            case 0:
+                LOG("Done. Exiting now");
+                ret = 0;
+                goto out;
+
+            default:
+                abort();
+            }
+
+        case LIBXL_EVENT_TYPE_DOMAIN_DESTROY:
+            LOG("Domain %d has been destroyed.", domid);
+            ret = 0;
+            goto out;
+
+        case LIBXL_EVENT_TYPE_DISK_EJECT:
+            /* XXX what is this for? */
+            libxl_cdrom_insert(ctx, domid, &event->u.disk_eject.disk);
+            break;
+
+        default:;
+            char *evstr = libxl_event_to_json(ctx, event);
+            LOG("warning, got unexpected event type %d, event=%s",
+                event->type, evstr);
+            free(evstr);
         }
-        libxl_free_event(&event);
+
+        libxl_event_free(ctx, event);
     }
 
 error_out:
@@ -1810,6 +1863,13 @@ waitpid_out:
     if (child_console_pid > 0 &&
             waitpid(child_console_pid, &status, 0) < 0 && errno == EINTR)
         goto waitpid_out;
+
+    if (deathw)
+        libxl_evdisable_domain_death(ctx, deathw);
+    if (diskws) {
+        evdisable_disk_ejects(diskws, d_config.num_disks);
+        free(diskws);
+    }
 
     /*
      * If we have daemonized then do not return to the caller -- this has
@@ -2273,6 +2333,7 @@ static void destroy_domain(const char *p)
 static void shutdown_domain(const char *p, int wait)
 {
     int rc;
+    libxl_event *event;
 
     find_domain(p);
     rc=libxl_domain_shutdown(ctx, domid);
@@ -2287,37 +2348,39 @@ static void shutdown_domain(const char *p, int wait)
     }
 
     if (wait) {
-        libxl_waiter waiter;
-        int fd;
+        libxl_evgen_domain_death *deathw;
 
-        libxl_wait_for_domain_death(ctx, domid, &waiter);
-
-        libxl_get_wait_fd(ctx, &fd);
-
-        while (wait) {
-            fd_set rfds;
-            libxl_event event;
-            libxl_dominfo info;
-
-            FD_ZERO(&rfds);
-            FD_SET(fd, &rfds);
-
-            if (!select(fd + 1, &rfds, NULL, NULL, NULL))
-                continue;
-
-            libxl_get_event(ctx, &event);
-
-            if (event.type == LIBXL_EVENT_TYPE_DOMAIN_DEATH) {
-                if (libxl_event_get_domain_death_info(ctx, domid, &event, &info) < 0)
-                    continue;
-
-                LOG("Domain %d is dead", domid);
-                wait = 0;
-            }
-
-            libxl_free_event(&event);
+        rc = libxl_evenable_domain_death(ctx, domid, 0, &deathw);
+        if (rc) {
+            fprintf(stderr,"wait for death failed (evgen, rc=%d)\n",rc);
+            exit(-1);
         }
-        libxl_free_waiter(&waiter);
+
+        for (;;) {
+            rc = domain_wait_event(&event);
+            if (rc) exit(-1);
+
+            switch (event->type) {
+
+            case LIBXL_EVENT_TYPE_DOMAIN_DESTROY:
+                LOG("Domain %d has been destroyed", domid);
+                goto done;
+
+            case LIBXL_EVENT_TYPE_DOMAIN_SHUTDOWN:
+                LOG("Domain %d has been shut down, reason code %d %x", domid,
+                    event->u.domain_shutdown.shutdown_reason,
+                    event->u.domain_shutdown.shutdown_reason);
+                goto done;
+
+            default:
+                LOG("Unexpected event type %d", event->type);
+                break;
+            }
+            libxl_event_free(ctx, event);
+        }
+    done:
+        libxl_event_free(ctx, event);
+        libxl_evdisable_domain_death(ctx, deathw);
     }
 }
 

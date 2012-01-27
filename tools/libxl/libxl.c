@@ -45,8 +45,11 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
      * only as an initialiser, not as an expression. */
     memcpy(&ctx->lock, &mutex_value, sizeof(ctx->lock));
 
+    LIBXL_TAILQ_INIT(&ctx->occurred);
+
     ctx->osevent_hooks = 0;
 
+    ctx->fd_polls = 0;
     ctx->fd_rindex = 0;
     LIBXL_LIST_INIT(&ctx->efds);
     LIBXL_TAILQ_INIT(&ctx->etimes);
@@ -54,6 +57,9 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
     ctx->watch_slots = 0;
     LIBXL_SLIST_INIT(&ctx->watch_freeslots);
     libxl__ev_fd_init(&ctx->watch_efd);
+
+    LIBXL_TAILQ_INIT(&ctx->death_list);
+    libxl__ev_xswatch_init(&ctx->death_watch);
 
     if ( stat(XENSTORE_PID_FILE, &stat_buf) != 0 ) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Is xenstore daemon running?\n"
@@ -86,6 +92,20 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
     return rc;
 }
 
+static void free_disable_deaths(libxl__gc *gc,
+                                struct libxl__evgen_domain_death_list *l) {
+    libxl_evgen_domain_death *death;
+    while ((death = LIBXL_TAILQ_FIRST(l)))
+        libxl__evdisable_domain_death(gc, death);
+}
+
+static void discard_events(struct libxl__event_list *l) {
+    /* doesn't bother unlinking from the list, so l is corrupt on return */
+    libxl_event *ev;
+    LIBXL_TAILQ_FOREACH(ev, l, link)
+        libxl_event_free(0, ev);
+}
+
 int libxl_ctx_free(libxl_ctx *ctx)
 {
     if (!ctx) return 0;
@@ -94,6 +114,13 @@ int libxl_ctx_free(libxl_ctx *ctx)
     GC_INIT(ctx);
 
     /* Deregister all libxl__ev_KINDs: */
+
+    free_disable_deaths(gc, &CTX->death_list);
+    free_disable_deaths(gc, &CTX->death_reported);
+
+    libxl_evgen_disk_eject *eject;
+    while ((eject = LIBXL_LIST_FIRST(&CTX->disk_eject_evgens)))
+        libxl__evdisable_disk_eject(gc, eject);
 
     for (i = 0; i < ctx->watch_nslots; i++)
         assert(!libxl__watch_slot_contents(gc, i));
@@ -108,8 +135,11 @@ int libxl_ctx_free(libxl_ctx *ctx)
     libxl_version_info_dispose(&ctx->version_info);
     if (ctx->xsh) xs_daemon_close(ctx->xsh);
 
+    free(ctx->fd_polls);
     free(ctx->fd_rindex);
     free(ctx->watch_slots);
+
+    discard_events(&ctx->occurred);
 
     GC_FREE;
     free(ctx);
@@ -646,117 +676,177 @@ int libxl_domain_reboot(libxl_ctx *ctx, uint32_t domid)
     return ret;
 }
 
-int libxl_get_wait_fd(libxl_ctx *ctx, int *fd)
-{
-    *fd = xs_fileno(ctx->xsh);
-    return 0;
-}
+static void domain_death_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
+                                        const char *wpath, const char *epath) {
+    EGC_GC;
+    libxl_evgen_domain_death *evg;
+    uint32_t domid;
+    int rc;
 
-int libxl_wait_for_domain_death(libxl_ctx *ctx, uint32_t domid, libxl_waiter *waiter)
-{
-    waiter->path = strdup("@releaseDomain");
-    if (asprintf(&(waiter->token), "%d", LIBXL_EVENT_TYPE_DOMAIN_DEATH) < 0)
-        return -1;
-    if (!xs_watch(ctx->xsh, waiter->path, waiter->token))
-        return -1;
-    return 0;
-}
+    CTX_LOCK;
 
-int libxl_wait_for_disk_ejects(libxl_ctx *ctx, uint32_t guest_domid, libxl_device_disk *disks, int num_disks, libxl_waiter *waiter)
-{
-    GC_INIT(ctx);
-    int i, rc = -1;
-    uint32_t domid = libxl_get_stubdom_id(ctx, guest_domid);
+    evg = LIBXL_TAILQ_FIRST(&CTX->death_list);
+    if (!evg) goto out;
 
-    if (!domid)
-        domid = guest_domid;
+    domid = evg->domid;
 
-    for (i = 0; i < num_disks; i++) {
-        if (asprintf(&(waiter[i].path), "%s/device/vbd/%d/eject",
-                     libxl__xs_get_dompath(gc, domid),
-                     libxl__device_disk_dev_number(disks[i].vdev,
-                                                   NULL, NULL)) < 0)
+    for (;;) {
+        int nentries = LIBXL_TAILQ_NEXT(evg, entry) ? 200 : 1;
+        xc_domaininfo_t domaininfos[nentries];
+        const xc_domaininfo_t *got = domaininfos, *gotend;
+
+        rc = xc_domain_getinfolist(CTX->xch, domid, nentries, domaininfos);
+        if (rc == -1) {
+            LIBXL__EVENT_DISASTER(egc, "xc_domain_getinfolist failed while"
+                                  " processing @releaseDomain watch event",
+                                  errno, 0);
             goto out;
-        if (asprintf(&(waiter[i].token), "%d", LIBXL_EVENT_TYPE_DISK_EJECT) < 0)
-            goto out;
-        xs_watch(ctx->xsh, waiter[i].path, waiter[i].token);
+        }
+        gotend = &domaininfos[rc];
+
+        for (;;) {
+            if (!evg)
+                goto all_reported;
+
+            if (!rc || got->domain > evg->domid) {
+                /* ie, the list doesn't contain evg->domid any more so
+                 * the domain has been destroyed */
+                libxl_evgen_domain_death *evg_next;
+
+                libxl_event *ev = NEW_EVENT(egc, DOMAIN_DESTROY, evg->domid);
+                if (!ev) goto out;
+
+                libxl__event_occurred(egc, ev);
+
+                evg->death_reported = 1;
+                evg_next = LIBXL_TAILQ_NEXT(evg, entry);
+                LIBXL_TAILQ_REMOVE(&CTX->death_list, evg, entry);
+                LIBXL_TAILQ_INSERT_HEAD(&CTX->death_reported, evg, entry);
+                evg = evg_next;
+
+                continue;
+            }
+            
+            if (got == gotend)
+                break;
+
+            if (got->domain < evg->domid) {
+                got++;
+                continue;
+            }
+
+            assert(evg->domid == got->domain);
+
+            if (!evg->shutdown_reported &&
+                (got->flags & XEN_DOMINF_shutdown)) {
+                libxl_event *ev = NEW_EVENT(egc, DOMAIN_SHUTDOWN, got->domain);
+                if (!ev) goto out;
+                
+                ev->u.domain_shutdown.shutdown_reason =
+                    (got->flags >> XEN_DOMINF_shutdownshift) &
+                    XEN_DOMINF_shutdownmask;
+                libxl__event_occurred(egc, ev);
+
+                evg->shutdown_reported = 1;
+            }
+            evg = LIBXL_TAILQ_NEXT(evg, entry);
+        }
+
+        assert(rc); /* rc==0 results in us eating all evgs and quitting */
+        domid = gotend[-1].domain;
     }
+ all_reported:
+ out:
+
+    CTX_UNLOCK;
+}
+
+int libxl_evenable_domain_death(libxl_ctx *ctx, uint32_t domid,
+                libxl_ev_user user, libxl_evgen_domain_death **evgen_out) {
+    GC_INIT(ctx);
+    libxl_evgen_domain_death *evg, *evg_search;
+    int rc;
+    
+    CTX_LOCK;
+
+    evg = malloc(sizeof(*evg));  if (!evg) { rc = ERROR_NOMEM; goto out; }
+    memset(evg, 0, sizeof(*evg));
+    evg->domid = domid;
+    evg->user = user;
+
+    LIBXL_TAILQ_INSERT_SORTED(&ctx->death_list, entry, evg, evg_search, ,
+                              evg->domid > evg_search->domid);
+
+    if (!libxl__ev_xswatch_isregistered(&ctx->death_watch)) {
+        rc = libxl__ev_xswatch_register(gc, &ctx->death_watch,
+                        domain_death_xswatch_callback, "@releaseDomain");
+        if (rc) { libxl__evdisable_domain_death(gc, evg); goto out; }
+    }
+
+    *evgen_out = evg;
     rc = 0;
-out:
+
+ out:
+    CTX_UNLOCK;
     GC_FREE;
     return rc;
-}
+};
 
-int libxl_get_event(libxl_ctx *ctx, libxl_event *event)
-{
-    unsigned int num;
-    char **events = xs_read_watch(ctx->xsh, &num);
-    if (num != 2) {
-        free(events);
-        return ERROR_FAIL;
-    }
-    event->path = strdup(events[XS_WATCH_PATH]);
-    event->token = strdup(events[XS_WATCH_TOKEN]);
-    event->type = atoi(event->token);
-    free(events);
-    return 0;
-}
+void libxl__evdisable_domain_death(libxl__gc *gc,
+                                   libxl_evgen_domain_death *evg) {
+    CTX_LOCK;
 
-int libxl_stop_waiting(libxl_ctx *ctx, libxl_waiter *waiter)
-{
-    if (!xs_unwatch(ctx->xsh, waiter->path, waiter->token))
-        return ERROR_FAIL;
+    if (!evg->death_reported)
+        LIBXL_TAILQ_REMOVE(&CTX->death_list, evg, entry);
     else
-        return 0;
+        LIBXL_TAILQ_REMOVE(&CTX->death_reported, evg, entry);
+
+    free(evg);
+
+    if (!LIBXL_TAILQ_FIRST(&CTX->death_list) &&
+        libxl__ev_xswatch_isregistered(&CTX->death_watch))
+        libxl__ev_xswatch_deregister(gc, &CTX->death_watch);
+
+    CTX_UNLOCK;
 }
 
-int libxl_free_event(libxl_event *event)
-{
-    free(event->path);
-    free(event->token);
-    return 0;
-}
-
-int libxl_free_waiter(libxl_waiter *waiter)
-{
-    free(waiter->path);
-    free(waiter->token);
-    return 0;
-}
-
-int libxl_event_get_domain_death_info(libxl_ctx *ctx, uint32_t domid, libxl_event *event, libxl_dominfo *info)
-{
-    if (libxl_domain_info(ctx, info, domid) < 0)
-        return 0;
-
-    if (info->running || (!info->shutdown && !info->dying))
-        return ERROR_INVAL;
-
-    return 1;
-}
-
-int libxl_event_get_disk_eject_info(libxl_ctx *ctx, uint32_t domid, libxl_event *event, libxl_device_disk *disk)
-{
+void libxl_evdisable_domain_death(libxl_ctx *ctx,
+                                  libxl_evgen_domain_death *evg) {
     GC_INIT(ctx);
-    char *path;
+    libxl__evdisable_domain_death(gc, evg);
+    GC_FREE;
+}
+
+static void disk_eject_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
+                                        const char *wpath, const char *epath) {
+    EGC_GC;
+    libxl_evgen_disk_eject *evg = (void*)w;
     char *backend;
     char *value;
     char backend_type[BACKEND_STRING_SIZE+1];
 
-    value = libxl__xs_read(gc, XBT_NULL, event->path);
+    value = libxl__xs_read(gc, XBT_NULL, wpath);
 
-    if (!value || strcmp(value,  "eject")) {
-        GC_FREE;
-        return 0;
+    if (!value || strcmp(value,  "eject"))
+        return;
+
+    if (libxl__xs_write(gc, XBT_NULL, wpath, "")) {
+        LIBXL__EVENT_DISASTER(egc, "xs_write failed acknowledging eject",
+                              errno, LIBXL_EVENT_TYPE_DISK_EJECT);
+        return;
     }
 
-    path = strdup(event->path);
-    path[strlen(path) - 6] = '\0';
-    backend = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/backend", path));
+    libxl_event *ev = NEW_EVENT(egc, DISK_EJECT, evg->domid);
+    libxl_device_disk *disk = &ev->u.disk_eject.disk;
+    
+    backend = libxl__xs_read(gc, XBT_NULL,
+                             libxl__sprintf(gc, "%.*s/backend",
+                                            (int)strlen(wpath)-6, wpath));
 
     sscanf(backend,
-            "/local/domain/%d/backend/%" TOSTRING(BACKEND_STRING_SIZE) "[a-z]/%*d/%*d",
-            &disk->backend_domid, backend_type);
+            "/local/domain/%d/backend/%" TOSTRING(BACKEND_STRING_SIZE)
+           "[a-z]/%*d/%*d",
+           &disk->backend_domid, backend_type);
     if (!strcmp(backend_type, "tap") || !strcmp(backend_type, "vbd")) {
         disk->backend = LIBXL_DISK_BACKEND_TAP;
     } else if (!strcmp(backend_type, "qdisk")) {
@@ -765,18 +855,82 @@ int libxl_event_get_disk_eject_info(libxl_ctx *ctx, uint32_t domid, libxl_event 
         disk->backend = LIBXL_DISK_BACKEND_UNKNOWN;
     }
 
-    disk->pdev_path = strdup("");
+    disk->pdev_path = strdup(""); /* xxx fixme malloc failure */
     disk->format = LIBXL_DISK_FORMAT_EMPTY;
     /* this value is returned to the user: do not free right away */
-    disk->vdev = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(gc, "%s/dev", backend), NULL);
+    disk->vdev = xs_read(CTX->xsh, XBT_NULL,
+                         libxl__sprintf(gc, "%s/dev", backend), NULL);
     disk->removable = 1;
     disk->readwrite = 0;
     disk->is_cdrom = 1;
 
-    free(path);
-    GC_FREE;
-    return 1;
+    libxl__event_occurred(egc, ev);
 }
+
+int libxl_evenable_disk_eject(libxl_ctx *ctx, uint32_t guest_domid,
+                              const char *vdev, libxl_ev_user user,
+                              libxl_evgen_disk_eject **evgen_out) {
+    GC_INIT(ctx);
+    CTX_LOCK;
+    int rc;
+    char *path;
+    libxl_evgen_disk_eject *evg = NULL;
+
+    evg = malloc(sizeof(*evg));  if (!evg) { rc = ERROR_NOMEM; goto out; }
+    memset(evg, 0, sizeof(*evg));
+    evg->user = user;
+    evg->domid = guest_domid;
+    LIBXL_LIST_INSERT_HEAD(&CTX->disk_eject_evgens, evg, entry);
+
+    evg->vdev = strdup(vdev);
+    if (!evg->vdev) { rc = ERROR_NOMEM; goto out; }
+
+    uint32_t domid = libxl_get_stubdom_id(ctx, guest_domid);
+
+    if (!domid)
+        domid = guest_domid;
+
+    path = libxl__sprintf(gc, "%s/device/vbd/%d/eject",
+                 libxl__xs_get_dompath(gc, domid),
+                 libxl__device_disk_dev_number(vdev, NULL, NULL));
+    if (!path) { rc = ERROR_NOMEM; goto out; }
+
+    rc = libxl__ev_xswatch_register(gc, &evg->watch,
+                                    disk_eject_xswatch_callback, path);
+    if (rc) goto out;
+
+    *evgen_out = evg;
+    CTX_UNLOCK;
+    GC_FREE;
+    return 0;
+
+ out:
+    if (evg)
+        libxl__evdisable_disk_eject(gc, evg);
+    CTX_UNLOCK;
+    GC_FREE;
+    return rc;
+}
+
+void libxl__evdisable_disk_eject(libxl__gc *gc, libxl_evgen_disk_eject *evg) {
+    CTX_LOCK;
+
+    LIBXL_LIST_REMOVE(evg, entry);
+
+    if (libxl__ev_xswatch_isregistered(&evg->watch))
+        libxl__ev_xswatch_deregister(gc, &evg->watch);
+
+    free(evg->vdev);
+    free(evg);
+
+    CTX_UNLOCK;
+}
+
+void libxl_evdisable_disk_eject(libxl_ctx *ctx, libxl_evgen_disk_eject *evg) {
+    GC_INIT(ctx);
+    libxl__evdisable_disk_eject(gc, evg);
+    GC_FREE;
+}    
 
 int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid)
 {

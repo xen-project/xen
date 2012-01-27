@@ -510,9 +510,9 @@ void libxl__ev_xswatch_deregister(libxl__gc *gc, libxl__ev_xswatch *w)
  * osevent poll
  */
 
-int libxl_osevent_beforepoll(libxl_ctx *ctx, int *nfds_io,
-                             struct pollfd *fds, int *timeout_upd,
-                             struct timeval now)
+static int beforepoll_internal(libxl__gc *gc, int *nfds_io,
+                               struct pollfd *fds, int *timeout_upd,
+                               struct timeval now)
 {
     libxl__ev_fd *efd;
     int rc;
@@ -523,9 +523,6 @@ int libxl_osevent_beforepoll(libxl_ctx *ctx, int *nfds_io,
      * data structure in CTX->fd_beforepolled: each slot in
      * the fds array corresponds to a slot in fd_beforepolled.
      */
-
-    GC_INIT(ctx);
-    CTX_LOCK;
 
     if (*nfds_io) {
         /*
@@ -593,8 +590,18 @@ int libxl_osevent_beforepoll(libxl_ctx *ctx, int *nfds_io,
     }
 
  out:
+    return rc;
+}
+
+int libxl_osevent_beforepoll(libxl_ctx *ctx, int *nfds_io,
+                             struct pollfd *fds, int *timeout_upd,
+                             struct timeval now)
+{
+    EGC_INIT(ctx);
+    CTX_LOCK;
+    int rc = beforepoll_internal(gc, nfds_io, fds, timeout_upd, now);
     CTX_UNLOCK;
-    GC_FREE;
+    EGC_FREE;
     return rc;
 }
 
@@ -623,11 +630,11 @@ static int afterpoll_check_fd(libxl_ctx *ctx,
     return revents;
 }
 
-void libxl_osevent_afterpoll(libxl_ctx *ctx, int nfds, const struct pollfd *fds,
-                             struct timeval now)
+static void afterpoll_internal(libxl__egc *egc,
+                               int nfds, const struct pollfd *fds,
+                               struct timeval now)
 {
-    EGC_INIT(ctx);
-    CTX_LOCK;
+    EGC_GC;
     libxl__ev_fd *efd;
 
     LIBXL_LIST_FOREACH(efd, &CTX->efds, entry) {
@@ -653,11 +660,17 @@ void libxl_osevent_afterpoll(libxl_ctx *ctx, int nfds, const struct pollfd *fds,
 
         etime->func(egc, etime, &etime->abs);
     }
+}
 
+void libxl_osevent_afterpoll(libxl_ctx *ctx, int nfds, const struct pollfd *fds,
+                             struct timeval now)
+{
+    EGC_INIT(ctx);
+    CTX_LOCK;
+    afterpoll_internal(egc, nfds, fds, now);
     CTX_UNLOCK;
     EGC_FREE;
 }
-
 
 /*
  * osevent hook and callback machinery
@@ -723,11 +736,10 @@ void libxl__event_disaster(libxl__egc *egc, const char *msg, int errnoval,
                type ? libxl_event_type_to_string(type) : "",
                type ? ")" : "");
 
-    /*
-     * FIXME: This should call the "disaster" hook supplied to
-     * libxl_event_register_callbacks, which will be introduced in the
-     * next patch.
-     */
+    if (CTX->event_hooks && CTX->event_hooks->disaster) {
+        CTX->event_hooks->disaster(CTX->event_hooks_user, type, msg, errnoval);
+        return;
+    }
 
     const char verybad[] =
         "DISASTER in event loop not handled by libxl application";
@@ -736,9 +748,197 @@ void libxl__event_disaster(libxl__egc *egc, const char *msg, int errnoval,
     exit(-1);
 }
 
+static void egc_run_callbacks(libxl__egc *egc)
+{
+    EGC_GC;
+    libxl_event *ev, *ev_tmp;
+    LIBXL_TAILQ_FOREACH_SAFE(ev, &egc->occurred_for_callback, link, ev_tmp) {
+        LIBXL_TAILQ_REMOVE(&egc->occurred_for_callback, ev, link);
+        CTX->event_hooks->event_occurs(CTX->event_hooks_user, ev);
+    }
+}
+
 void libxl__egc_cleanup(libxl__egc *egc)
 {
-    libxl__free_all(&egc->gc);
+    EGC_GC;
+    libxl__free_all(gc);
+
+    egc_run_callbacks(egc);
+}
+
+/*
+ * Event retrieval etc.
+ */
+
+void libxl_event_register_callbacks(libxl_ctx *ctx,
+                  const libxl_event_hooks *hooks, void *user)
+{
+    ctx->event_hooks = hooks;
+    ctx->event_hooks_user = user;
+}
+
+void libxl__event_occurred(libxl__egc *egc, libxl_event *event)
+{
+    EGC_GC;
+
+    if (CTX->event_hooks &&
+        (CTX->event_hooks->event_occurs_mask & (1UL << event->type))) {
+        /* libxl__egc_cleanup will call the callback, just before exit
+         * from libxl.  This helps avoid reentrancy bugs: parts of
+         * libxl that call libxl__event_occurred do not have to worry
+         * that libxl might be reentered at that point. */
+        LIBXL_TAILQ_INSERT_TAIL(&egc->occurred_for_callback, event, link);
+        return;
+    } else {
+        LIBXL_TAILQ_INSERT_TAIL(&CTX->occurred, event, link);
+    }
+}
+
+void libxl_event_free(libxl_ctx *ctx, libxl_event *event)
+{
+    /* Exceptionally, this function may be called from libxl, with ctx==0 */
+    libxl_event_dispose(event);
+    free(event);
+}
+
+libxl_event *libxl__event_new(libxl__egc *egc,
+                              libxl_event_type type, uint32_t domid)
+{
+    libxl_event *ev;
+
+    ev = malloc(sizeof(*ev));
+    if (!ev) {
+        LIBXL__EVENT_DISASTER(egc, "allocate new event", errno, type);
+        return NULL;
+    }
+
+    memset(ev, 0, sizeof(*ev));
+    ev->type = type;
+    ev->domid = domid;
+
+    return ev;
+}
+
+static int event_check_internal(libxl__egc *egc, libxl_event **event_r,
+                                unsigned long typemask,
+                                libxl_event_predicate *pred, void *pred_user)
+{
+    EGC_GC;
+    libxl_event *ev;
+    int rc;
+
+    LIBXL_TAILQ_FOREACH(ev, &CTX->occurred, link) {
+        if (!(typemask & ((uint64_t)1 << ev->type)))
+            continue;
+
+        if (pred && !pred(ev, pred_user))
+            continue;
+
+        /* got one! */
+        LIBXL_TAILQ_REMOVE(&CTX->occurred, ev, link);
+        *event_r = ev;
+        rc = 0;
+        goto out;
+    }
+    rc = ERROR_NOT_READY;
+
+ out:
+    return rc;
+}
+
+int libxl_event_check(libxl_ctx *ctx, libxl_event **event_r,
+                      uint64_t typemask,
+                      libxl_event_predicate *pred, void *pred_user)
+{
+    EGC_INIT(ctx);
+    CTX_LOCK;
+    int rc = event_check_internal(egc, event_r, typemask, pred, pred_user);
+    CTX_UNLOCK;
+    EGC_FREE;
+    return rc;
+}
+
+static int eventloop_iteration(libxl__egc *egc) {
+    EGC_GC;
+    int rc;
+    struct timeval now;
+    
+    CTX_LOCK;
+
+    rc = libxl__gettimeofday(gc, &now);
+    if (rc) goto out;
+
+    int timeout;
+
+    for (;;) {
+        int nfds = CTX->fd_polls_allocd;
+        timeout = -1;
+        rc = beforepoll_internal(gc, &nfds, CTX->fd_polls, &timeout, now);
+        if (!rc) break;
+        if (rc != ERROR_BUFFERFULL) goto out;
+
+        struct pollfd *newarray =
+            (nfds > INT_MAX / sizeof(struct pollfd) / 2) ? 0 :
+            realloc(CTX->fd_polls, sizeof(*newarray) * nfds);
+
+        if (!newarray) { rc = ERROR_NOMEM; goto out; }
+
+        CTX->fd_polls = newarray;
+        CTX->fd_polls_allocd = nfds;
+    }
+
+    rc = poll(CTX->fd_polls, CTX->fd_polls_allocd, timeout);
+    if (rc < 0) {
+        if (errno == EINTR)
+            return 0; /* will go round again if caller requires */
+
+        LIBXL__LOG_ERRNOVAL(CTX, LIBXL__LOG_ERROR, errno, "poll failed");
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    rc = libxl__gettimeofday(gc, &now);
+    if (rc) goto out;
+
+    afterpoll_internal(egc, CTX->fd_polls_allocd, CTX->fd_polls, now);
+
+    CTX_UNLOCK;
+
+    rc = 0;
+ out:
+    return rc;
+}
+
+int libxl_event_wait(libxl_ctx *ctx, libxl_event **event_r,
+                     uint64_t typemask,
+                     libxl_event_predicate *pred, void *pred_user)
+{
+    int rc;
+
+    EGC_INIT(ctx);
+    CTX_LOCK;
+
+    for (;;) {
+        rc = event_check_internal(egc, event_r, typemask, pred, pred_user);
+        if (rc != ERROR_NOT_READY) goto out;
+
+        rc = eventloop_iteration(egc);
+        if (rc) goto out;
+
+        /* we unlock and cleanup the egc each time we go through this loop,
+         * so that (a) we don't accumulate garbage and (b) any events
+         * which are to be dispatched by callback are actually delivered
+         * in a timely fashion.
+         */
+        CTX_UNLOCK;
+        libxl__egc_cleanup(egc);
+        CTX_LOCK;
+    }
+
+ out:
+    CTX_UNLOCK;
+    EGC_FREE;
+    return rc;
 }
 
 /*
