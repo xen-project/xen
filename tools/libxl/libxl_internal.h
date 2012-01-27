@@ -1235,6 +1235,35 @@ _hidden void libxl__ao__destroy(libxl_ctx*, libxl__ao *ao);
  * Convenience macros.
  */
 
+/*
+ * CONTAINER_OF work like this.  Given:
+ *    typedef struct {
+ *      ...
+ *      member_type member_name;
+ *      ...
+ *    } outer_type;
+ *    outer_type outer, *outer_var;
+ *    member_type *inner_ptr = &outer->member_name;
+ *
+ * Then, effectively:
+ *    outer_type *CONTAINER_OF(member_type *inner_ptr,
+ *                             *outer_var, // or type name for outer_type
+ *                             member_name);
+ *
+ * So that:
+ *    CONTAINER_OF(inner_ptr, *outer_var, member_name) == &outer
+ *    CONTAINER_OF(inner_ptr, outer_type, member_name) == &outer
+ */
+#define CONTAINER_OF(inner_ptr, outer, member_name)                     \
+    ({                                                                  \
+        typeof(outer) *container_of_;                                   \
+        container_of_ = (void*)((char*)(inner_ptr) -                    \
+                                offsetof(typeof(outer), member_name));  \
+        (void)(&container_of_->member_name ==                           \
+               (typeof(inner_ptr))0) /* type check */;                  \
+        container_of_;                                                  \
+    })
+
 
 /*
  * All of these assume (or define)
