@@ -114,6 +114,7 @@ _hidden void libxl__log(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
 
 typedef struct libxl__gc libxl__gc;
 typedef struct libxl__egc libxl__egc;
+typedef struct libxl__ao libxl__ao;
 
 typedef struct libxl__ev_fd libxl__ev_fd;
 typedef void libxl__ev_fd_callback(libxl__egc *egc, libxl__ev_fd *ev,
@@ -217,6 +218,10 @@ struct libxl__poller {
      * own pipe, and put its poller on the pollers_event list, before
      * releasing the ctx lock and going into poll; when it comes out
      * of poll it will take the poller off the pollers_event list.
+     *
+     * A thread which is waiting for completion of a synchronous ao
+     * will allocate a poller and record it in the ao, so that other
+     * threads can wake it up.
      *
      * When a thread is done with a poller it should put it onto
      * pollers_idle, where it can be reused later.
@@ -324,6 +329,21 @@ struct libxl__egc {
     /* for event-generating functions only */
     struct libxl__gc gc;
     struct libxl__event_list occurred_for_callback;
+    LIBXL_TAILQ_HEAD(, libxl__ao) aos_for_callback;
+};
+
+#define LIBXL__AO_MAGIC              0xA0FACE00ul
+#define LIBXL__AO_MAGIC_DESTROYED    0xA0DEAD00ul
+
+struct libxl__ao {
+    uint32_t magic;
+    unsigned in_initiator:1, complete:1, notified:1;
+    int rc;
+    libxl__gc gc;
+    libxl_asyncop_how how;
+    libxl__poller *poller;
+    uint32_t domid;
+    LIBXL_TAILQ_ENTRY(libxl__ao) entry_for_callback;
 };
 
 #define LIBXL_INIT_GC(gc,ctx) do{               \
@@ -1108,6 +1128,7 @@ libxl__device_model_version_running(libxl__gc *gc, uint32_t domid);
 #define LIBXL_INIT_EGC(egc,ctx) do{                     \
         LIBXL_INIT_GC((egc).gc,ctx);                    \
         LIBXL_TAILQ_INIT(&(egc).occurred_for_callback); \
+        LIBXL_TAILQ_INIT(&(egc).aos_for_callback);      \
     } while(0)
 
 _hidden void libxl__egc_cleanup(libxl__egc *egc);
@@ -1123,6 +1144,92 @@ _hidden void libxl__egc_cleanup(libxl__egc *egc);
 
 #define EGC_FREE           libxl__egc_cleanup(egc)
 
+
+/*
+ * Machinery for asynchronous operations ("ao")
+ *
+ * All "slow" functions (includes anything that might block on a
+ * guest or an external script) need to use the asynchronous
+ * operation ("ao") machinery.  The function should take a parameter
+ * const libxl_asyncop_how *ao_how and must start with a call to
+ * AO_INITIATOR_ENTRY.  These functions MAY NOT be called from
+ * outside libxl, because they can cause reentrancy callbacks.
+ *
+ * Lifecycle of an ao:
+ *
+ * - Created by libxl__ao_create (or the AO_CREATE convenience macro).
+ *
+ * - After creation, can be used by code which implements
+ *   the operation as follows:
+ *      - the ao's gc, for allocating memory for the lifetime
+ *        of the operation (possibly with the help of the AO_GC
+ *        macro to introduce the gc into scope)
+ *      - the ao itself may be passed about to sub-functions
+ *        so that they can stash it away etc.
+ *      - in particular, the ao pointer must be stashed in some
+ *        per-operation structure which is also passed as a user
+ *        pointer to the internal event generation request routines
+ *        libxl__evgen_FOO, so that at some point a CALLBACK will be
+ *        made when the operation is complete.
+ *
+ * - If initiation is successful, the initiating function needs
+ *   to run libxl__ao_inprogress right before unlocking and
+ *   returning, and return whatever it returns (AO_INPROGRESS macro).
+ *
+ * - If the initiation is unsuccessful, the initiating function must
+ *   call libxl__ao_abort before unlocking and returning whatever
+ *   error code is appropriate (AO_ABORT macro).
+ *
+ * - Later, some callback function, whose callback has been requested
+ *   directly or indirectly, should call libxl__ao_complete (with the
+ *   ctx locked, as it will generally already be in any event callback
+ *   function).  This must happen exactly once for each ao (and not if
+ *   the ao has been destroyed, obviously), and it may not happen
+ *   until libxl__ao_inprogress has been called on the ao.
+ *
+ * - Note that during callback functions, two gcs are available:
+ *    - The one in egc, whose lifetime is only this callback
+ *    - The one in ao, whose lifetime is the asynchronous operation
+ *   Usually callback function should use CONTAINER_OF
+ *   to obtain its own structure, containing a pointer to the ao,
+ *   and then use the gc from that ao.
+ */
+
+#define AO_CREATE(ctx, domid, ao_how)                           \
+    libxl__ctx_lock(ctx);                                       \
+    libxl__ao *ao = libxl__ao_create(ctx, domid, ao_how);       \
+    if (!ao) { libxl__ctx_unlock(ctx); return ERROR_NOMEM; }    \
+    AO_GC;
+
+#define AO_INPROGRESS ({                                        \
+        libxl_ctx *ao__ctx = libxl__gc_owner(&ao->gc);          \
+        int ao__rc = libxl__ao_inprogress(ao);                  \
+        libxl__ctx_unlock(ao__ctx); /* gc is now invalid */     \
+        (ao__rc);                                               \
+   })
+
+#define AO_ABORT(rc) ({                                         \
+        libxl_ctx *ao__ctx = libxl__gc_owner(&ao->gc);          \
+        assert(rc);                                             \
+        libxl__ao_abort(ao);                                    \
+        libxl__ctx_unlock(ao__ctx); /* gc is now invalid */     \
+        (rc);                                                   \
+    })
+
+#define AO_GC                                   \
+    libxl__gc *const gc = &ao->gc
+
+
+/* All of these MUST be called with the ctx locked.
+ * libxl__ao_inprogress MUST be called with the ctx locked exactly once. */
+_hidden libxl__ao *libxl__ao_create(libxl_ctx*, uint32_t domid,
+                                    const libxl_asyncop_how*);
+_hidden int libxl__ao_inprogress(libxl__ao *ao);
+_hidden void libxl__ao_abort(libxl__ao *ao);
+_hidden void libxl__ao_complete(libxl__egc *egc, libxl__ao *ao, int rc);
+
+/* For use by ao machinery ONLY */
+_hidden void libxl__ao__destroy(libxl_ctx*, libxl__ao *ao);
 
 /*
  * Convenience macros.

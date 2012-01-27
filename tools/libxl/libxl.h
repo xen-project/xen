@@ -237,6 +237,59 @@ enum {
     ERROR_BUFFERFULL = -13,
 };
 
+
+/*
+ * Some libxl operations can take a long time.  These functions take a
+ * parameter to control their concurrency:
+ *     libxl_asyncop_how *ao_how
+ *
+ * If ao_how==NULL, the function will be synchronous.
+ *
+ * If ao_how!=NULL, the function will set the operation going, and if
+ * this is successful will return 0.  In this case the zero error
+ * response does NOT mean that the operation was successful; it just
+ * means that it has been successfully started.  It will finish later,
+ * perhaps with an error.
+ *
+ * If ao_how->callback!=NULL, the callback will be called when the
+ * operation completes.  The same rules as for libxl_event_hooks
+ * apply, including the reentrancy rules and the possibility of
+ * "disaster", except that libxl calls ao_how->callback instead of
+ * libxl_event_hooks.event_occurs.  (See libxl_event.h.)
+ *
+ * If ao_how->callback==NULL, a libxl_event will be generated which
+ * can be obtained from libxl_event_wait or libxl_event_check.  The
+ * event will have type OPERATION_COMPLETE (which is not used
+ * elsewhere).
+ *
+ * Note that it is possible for an asynchronous operation which is to
+ * result in a callback to complete during its initiating function
+ * call.  In this case the initiating function will return 0
+ * indicating the at the operation is "in progress", even though by
+ * the time it returns the operation is complete and the callback has
+ * already happened.
+ *
+ * The application must set and use ao_how->for_event (which will be
+ * copied into libxl_event.for_user) or ao_how->for_callback (passed
+ * to the callback) to determine which operation finished, and it must
+ * of course check the rc value for errors.
+ *
+ * *ao_how does not need to remain valid after the initiating function
+ * returns.
+ *
+ * Callbacks may occur on any thread in which the application calls
+ * libxl.
+ */
+
+typedef struct {
+    void (*callback)(libxl_ctx *ctx, int rc, void *for_callback);
+    union {
+        libxl_ev_user for_event; /* used if callback==NULL */
+        void *for_callback; /* passed to callback */
+    } u;
+} libxl_asyncop_how;
+
+
 #define LIBXL_VERSION 0
 
 typedef struct {

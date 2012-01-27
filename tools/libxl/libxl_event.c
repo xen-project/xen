@@ -771,9 +771,20 @@ static void egc_run_callbacks(libxl__egc *egc)
 {
     EGC_GC;
     libxl_event *ev, *ev_tmp;
+
     LIBXL_TAILQ_FOREACH_SAFE(ev, &egc->occurred_for_callback, link, ev_tmp) {
         LIBXL_TAILQ_REMOVE(&egc->occurred_for_callback, ev, link);
         CTX->event_hooks->event_occurs(CTX->event_hooks_user, ev);
+    }
+
+    libxl__ao *ao, *ao_tmp;
+    LIBXL_TAILQ_FOREACH_SAFE(ao, &egc->aos_for_callback,
+                             entry_for_callback, ao_tmp) {
+        LIBXL_TAILQ_REMOVE(&egc->aos_for_callback, ao, entry_for_callback);
+        ao->how.callback(CTX, ao->rc, ao->how.u.for_callback);
+        ao->notified = 1;
+        if (!ao->in_initiator)
+            libxl__ao__destroy(CTX, ao);
     }
 }
 
@@ -1060,6 +1071,183 @@ int libxl_event_wait(libxl_ctx *ctx, libxl_event **event_r,
     EGC_FREE;
     return rc;
 }
+
+
+
+/*
+ * The two possible state flow of an ao:
+ *
+ * Completion before initiator return:
+ *
+ *     Initiator thread                       Possible other threads
+ *
+ *   * ao_create allocates memory and
+ *     initialises the struct
+ *
+ *   * the initiator function does its
+ *     work, setting up various internal
+ *     asynchronous operations -----------> * asynchronous operations
+ *                                            start to take place and
+ *                                            might cause ao completion
+ *                                                |
+ *   * initiator calls ao_inprogress              |
+ *     - if synchronous, run event loop           |
+ *       until the ao completes                   |
+ *                              - ao completes on some thread
+ *                              - completing thread releases the lock
+ *                     <--------------'
+ *     - ao_inprogress takes the lock
+ *     - destroy the ao
+ *
+ *
+ * Completion after initiator return (asynch. only):
+ *
+ *
+ *     Initiator thread                       Possible other threads
+ *
+ *   * ao_create allocates memory and
+ *     initialises the struct
+ *
+ *   * the initiator function does its
+ *     work, setting up various internal
+ *     asynchronous operations -----------> * asynchronous operations
+ *                                            start to take place and
+ *                                            might cause ao completion
+ *                                                |
+ *   * initiator calls ao_inprogress              |
+ *     - observes event not yet done,             |
+ *     - returns to caller                        |
+ *                                                |
+ *                              - ao completes on some thread
+ *                              - generate the event or call the callback
+ *                              - destroy the ao
+ */
+
+void libxl__ao__destroy(libxl_ctx *ctx, libxl__ao *ao)
+{
+    if (!ao) return;
+    if (ao->poller) libxl__poller_put(ctx, ao->poller);
+    ao->magic = LIBXL__AO_MAGIC_DESTROYED;
+    libxl__free_all(&ao->gc);
+    free(ao);
+}
+
+void libxl__ao_abort(libxl__ao *ao)
+{
+    AO_GC;
+    assert(ao->magic == LIBXL__AO_MAGIC);
+    assert(ao->in_initiator);
+    assert(!ao->complete);
+    libxl__ao__destroy(CTX, ao);
+}
+
+void libxl__ao_complete(libxl__egc *egc, libxl__ao *ao, int rc)
+{
+    assert(ao->magic == LIBXL__AO_MAGIC);
+    assert(!ao->complete);
+    ao->complete = 1;
+    ao->rc = rc;
+
+    if (ao->poller) {
+        assert(ao->in_initiator);
+        libxl__poller_wakeup(egc, ao->poller);
+    } else if (ao->how.callback) {
+        LIBXL_TAILQ_INSERT_TAIL(&egc->aos_for_callback, ao, entry_for_callback);
+    } else {
+        libxl_event *ev;
+        ev = NEW_EVENT(egc, OPERATION_COMPLETE, ao->domid);
+        if (ev) {
+            ev->for_user = ao->how.u.for_event;
+            ev->u.operation_complete.rc = ao->rc;
+            libxl__event_occurred(egc, ev);
+        }
+        ao->notified = 1;
+    }
+    if (!ao->in_initiator && ao->notified)
+        libxl__ao__destroy(libxl__gc_owner(&egc->gc), ao);
+}
+
+libxl__ao *libxl__ao_create(libxl_ctx *ctx, uint32_t domid,
+                            const libxl_asyncop_how *how)
+{
+    libxl__ao *ao;
+
+    ao = calloc(1, sizeof(*ao));
+    if (!ao) goto out;
+
+    ao->magic = LIBXL__AO_MAGIC;
+    ao->in_initiator = 1;
+    ao->poller = 0;
+    ao->domid = domid;
+    LIBXL_INIT_GC(ao->gc, ctx);
+
+    if (how) {
+        ao->how = *how;
+    } else {
+        ao->poller = libxl__poller_get(ctx);
+        if (!ao->poller) goto out;
+    }
+    return ao;
+
+ out:
+    if (ao) libxl__ao__destroy(ctx, ao);
+    return NULL;
+}
+
+int libxl__ao_inprogress(libxl__ao *ao)
+{
+    AO_GC;
+    int rc;
+
+    assert(ao->magic == LIBXL__AO_MAGIC);
+    assert(ao->in_initiator);
+
+    if (ao->poller) {
+        /* Caller wants it done synchronously. */
+        /* We use a fresh gc, so that we can free things
+         * each time round the loop. */
+        libxl__egc egc;
+        LIBXL_INIT_EGC(egc,CTX);
+
+        for (;;) {
+            assert(ao->magic == LIBXL__AO_MAGIC);
+
+            if (ao->complete) {
+                rc = ao->rc;
+                ao->notified = 1;
+                break;
+            }
+
+            rc = eventloop_iteration(&egc,ao->poller);
+            if (rc) {
+                /* Oh dear, this is quite unfortunate. */
+                LIBXL__LOG(CTX, LIBXL__LOG_ERROR, "Error waiting for"
+                           " event during long-running operation (rc=%d)", rc);
+                sleep(1);
+                /* It's either this or return ERROR_I_DONT_KNOW_WHETHER
+                 * _THE_THING_YOU_ASKED_FOR_WILL_BE_DONE_LATER_WHEN
+                 * _YOU_DIDNT_EXPECT_IT, since we don't have any kind of
+                 * cancellation ability. */
+            }
+
+            CTX_UNLOCK;
+            libxl__egc_cleanup(&egc);
+            CTX_LOCK;
+        }
+    } else {
+        rc = 0;
+    }
+
+    ao->in_initiator = 0;
+
+    if (ao->notified) {
+        assert(ao->complete);
+        libxl__ao__destroy(CTX,ao);
+    }
+
+    return rc;
+}
+
 
 /*
  * Local variables:
