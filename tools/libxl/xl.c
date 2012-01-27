@@ -135,6 +135,7 @@ int main(int argc, char **argv)
                 config_file, strerror(errno));
     parse_global_config(config_file, config_data, config_len);
     free(config_file);
+    free(config_data);
 
     /* Reset options for per-command use of getopt. */
     argv += optind;

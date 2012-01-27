@@ -278,7 +278,7 @@ static void dolog(const char *file, int line, const char *func, char *fmt, ...)
 static void dolog(const char *file, int line, const char *func, char *fmt, ...)
 {
     va_list ap;
-    char *s;
+    char *s = NULL;
     int rc;
 
     va_start(ap, fmt);
@@ -286,6 +286,7 @@ static void dolog(const char *file, int line, const char *func, char *fmt, ...)
     va_end(ap);
     if (rc >= 0)
         libxl_write_exactly(NULL, logfile, s, rc, NULL, NULL);
+    free(s);
 }
 
 static void printf_info(int domid,
