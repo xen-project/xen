@@ -507,6 +507,81 @@ void libxl__ev_xswatch_deregister(libxl__gc *gc, libxl__ev_xswatch *w)
 }
 
 /*
+ * waiting for device state
+ */
+
+static void devstate_watch_callback(libxl__egc *egc, libxl__ev_xswatch *watch,
+                                const char *watch_path, const char *event_path)
+{
+    EGC_GC;
+    libxl__ev_devstate *ds = CONTAINER_OF(watch, *ds, watch);
+    int rc;
+
+    char *sstate = libxl__xs_read(gc, XBT_NULL, watch_path);
+    if (!sstate) {
+        if (errno == ENOENT) {
+            LIBXL__LOG(CTX, LIBXL__LOG_DEBUG, "backend %s wanted state %d"
+                       " but it was removed", watch_path, ds->wanted);
+            rc = ERROR_INVAL;
+        } else {
+            LIBXL__LOG_ERRNO(CTX, LIBXL__LOG_ERROR, "backend %s wanted state"
+                             " %d but read failed", watch_path, ds->wanted);
+            rc = ERROR_FAIL;
+        }
+    } else {
+        int got = atoi(sstate);
+        if (got == ds->wanted) {
+            LIBXL__LOG(CTX, LIBXL__LOG_DEBUG, "backend %s wanted state %d ok",
+                       watch_path, ds->wanted);
+            rc = 0;
+        } else {
+            LIBXL__LOG(CTX, LIBXL__LOG_DEBUG, "backend %s wanted state %d"
+                       " still waiting state %d", watch_path, ds->wanted, got);
+            return;
+        }
+    }
+    libxl__ev_devstate_cancel(gc, ds);
+    ds->callback(egc, ds, rc);
+}
+
+static void devstate_timeout(libxl__egc *egc, libxl__ev_time *ev,
+                             const struct timeval *requested_abs)
+{
+    EGC_GC;
+    libxl__ev_devstate *ds = CONTAINER_OF(ev, *ds, timeout);
+    LIBXL__LOG(CTX, LIBXL__LOG_DEBUG, "backend %s wanted state %d "
+               " timed out", ds->watch.path, ds->wanted);
+    libxl__ev_devstate_cancel(gc, ds);
+    ds->callback(egc, ds, ERROR_TIMEDOUT);
+}
+
+int libxl__ev_devstate_wait(libxl__gc *gc, libxl__ev_devstate *ds,
+                            libxl__ev_devstate_callback cb,
+                            const char *state_path, int state, int milliseconds)
+{
+    int rc;
+
+    libxl__ev_time_init(&ds->timeout);
+    libxl__ev_xswatch_init(&ds->watch);
+    ds->wanted = state;
+    ds->callback = cb;
+
+    rc = libxl__ev_time_register_rel(gc, &ds->timeout, devstate_timeout,
+                                     milliseconds);
+    if (rc) goto out;
+
+    rc = libxl__ev_xswatch_register(gc, &ds->watch, devstate_watch_callback,
+                                    state_path);
+    if (rc) goto out;
+
+    return 0;
+
+ out:
+    libxl__ev_devstate_cancel(gc, ds);
+    return rc;
+}
+
+/*
  * osevent poll
  */
 

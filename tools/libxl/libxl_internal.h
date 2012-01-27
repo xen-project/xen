@@ -686,6 +686,47 @@ _hidden int libxl__wait_for_device_state(libxl__gc *gc, struct timeval *tv,
                                          libxl__device_state_handler handler);
 
 /*
+ * libxl__ev_devstate - waits a given time for a device to
+ * reach a given state.  Follows the libxl_ev_* conventions.
+ * Will generate only one event, and after that is automatically
+ * cancelled.
+ */
+typedef struct libxl__ev_devstate libxl__ev_devstate;
+typedef void libxl__ev_devstate_callback(libxl__egc *egc, libxl__ev_devstate*,
+                                         int rc);
+  /* rc will be 0, ERROR_TIMEDOUT, ERROR_INVAL (meaning path was removed),
+   * or ERROR_FAIL if other stuff went wrong (in which latter case, logged) */
+
+struct libxl__ev_devstate {
+    /* read-only for caller, who may read only when waiting: */
+    int wanted;
+    libxl__ev_devstate_callback *callback;
+    /* as for the remainder, read-only public parts may also be
+     * read by the caller (notably, watch.path), but only when waiting: */
+    libxl__ev_xswatch watch;
+    libxl__ev_time timeout;
+};
+
+static inline void libxl__ev_devstate_init(libxl__ev_devstate *ds)
+{
+    libxl__ev_time_init(&ds->timeout);
+    libxl__ev_xswatch_init(&ds->watch);
+}
+
+static inline void libxl__ev_devstate_cancel(libxl__gc *gc,
+                                             libxl__ev_devstate *ds)
+{
+    libxl__ev_time_deregister(gc,&ds->timeout);
+    libxl__ev_xswatch_deregister(gc,&ds->watch);
+}
+
+_hidden int libxl__ev_devstate_wait(libxl__gc *gc, libxl__ev_devstate *ds,
+                                    libxl__ev_devstate_callback cb,
+                                    const char *state_path,
+                                    int state, int milliseconds);
+
+
+/*
  * libxl__try_phy_backend - Check if there's support for the passed
  * type of file using the PHY backend
  * st_mode: mode_t of the file, as returned by stat function
