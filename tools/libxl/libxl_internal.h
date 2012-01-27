@@ -207,6 +207,33 @@ struct libxl__evgen_disk_eject {
 _hidden void
 libxl__evdisable_disk_eject(libxl__gc*, libxl_evgen_disk_eject*);
 
+typedef struct libxl__poller libxl__poller;
+struct libxl__poller {
+    /*
+     * These are used to allow other threads to wake up a thread which
+     * may be stuck in poll, because whatever it was waiting for
+     * hadn't happened yet.  Threads which generate events will write
+     * a byte to each pipe.  A thread which is waiting will empty its
+     * own pipe, and put its poller on the pollers_event list, before
+     * releasing the ctx lock and going into poll; when it comes out
+     * of poll it will take the poller off the pollers_event list.
+     *
+     * When a thread is done with a poller it should put it onto
+     * pollers_idle, where it can be reused later.
+     *
+     * The "poller_app" is never idle, but is sometimes on
+     * pollers_event.
+     */
+    LIBXL_LIST_ENTRY(libxl__poller) entry;
+
+    struct pollfd *fd_polls;
+    int fd_polls_allocd;
+
+    int fd_rindex_allocd;
+    int *fd_rindex; /* see libxl_osevent_beforepoll */
+
+    int wakeup_pipe[2]; /* 0 means no fd allocated */
+};
 
 struct libxl__ctx {
     xentoollog_logger *lg;
@@ -237,10 +264,9 @@ struct libxl__ctx {
       /* See the comment for OSEVENT_HOOK_INTERN in libxl_event.c
        * for restrictions on the use of the osevent fields. */
 
-    struct pollfd *fd_polls;
-    int fd_polls_allocd;
-    int fd_rindex_allocd;
-    int *fd_rindex; /* see libxl_osevent_beforepoll */
+    libxl__poller poller_app; /* libxl_osevent_beforepoll and _afterpoll */
+    LIBXL_LIST_HEAD(, libxl__poller) pollers_event, pollers_idle;
+
     LIBXL_LIST_HEAD(, libxl__ev_fd) efds;
     LIBXL_TAILQ_HEAD(, libxl__ev_time) etimes;
 
@@ -524,6 +550,22 @@ _hidden void libxl__event_disaster(libxl__egc*, const char *msg, int errnoval,
                                    const char *func);
 #define LIBXL__EVENT_DISASTER(egc, msg, errnoval, type) \
     libxl__event_disaster(egc, msg, errnoval, type, __FILE__,__LINE__,__func__)
+
+
+/* Fills in, or disposes of, the resources held by, a poller whose
+ * space the caller has allocated.  ctx must be locked. */
+int libxl__poller_init(libxl_ctx *ctx, libxl__poller *p);
+void libxl__poller_dispose(libxl__poller *p);
+
+/* Obtain a fresh poller from malloc or the idle list, and put it
+ * away again afterwards.  _get can fail, returning NULL.
+ * ctx must be locked. */
+libxl__poller *libxl__poller_get(libxl_ctx *ctx);
+void libxl__poller_put(libxl_ctx *ctx, libxl__poller *p);
+
+/* Notifies whoever is polling using p that they should wake up.
+ * ctx must be locked. */
+void libxl__poller_wakeup(libxl__egc *egc, libxl__poller *p);
 
 
 /* from xl_dom */
