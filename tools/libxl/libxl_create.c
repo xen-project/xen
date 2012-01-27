@@ -71,6 +71,9 @@ int libxl_init_build_info(libxl_ctx *ctx,
     memset(b_info, '\0', sizeof(*b_info));
     b_info->max_vcpus = 1;
     b_info->cur_vcpus = 1;
+    if (libxl_cpumap_alloc(ctx, &b_info->cpumap))
+        return ERROR_NOMEM;
+    libxl_cpumap_set_any(&b_info->cpumap);
     b_info->max_memkb = 32 * 1024;
     b_info->target_memkb = b_info->max_memkb;
     b_info->disable_migrate = 0;

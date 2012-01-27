@@ -2874,6 +2874,21 @@ int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
     return 0;
 }
 
+int libxl_set_vcpuaffinity_all(libxl_ctx *ctx, uint32_t domid,
+                               unsigned int max_vcpus, libxl_cpumap *cpumap)
+{
+    int i, rc = 0;
+
+    for (i = 0; i < max_vcpus; i++) {
+        if (libxl_set_vcpuaffinity(ctx, domid, i, cpumap)) {
+            LIBXL__LOG(ctx, LIBXL__LOG_WARNING,
+                       "failed to set affinity for %d", i);
+            rc = ERROR_FAIL;
+        }
+    }
+    return rc;
+}
+
 int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid, libxl_cpumap *cpumap)
 {
     GC_INIT(ctx);

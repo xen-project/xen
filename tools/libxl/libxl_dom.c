@@ -65,6 +65,7 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
     libxl_ctx *ctx = libxl__gc_owner(gc);
     int tsc_mode;
     xc_domain_max_vcpus(ctx->xch, domid, info->max_vcpus);
+    libxl_set_vcpuaffinity_all(ctx, domid, info->max_vcpus, &info->cpumap);
     xc_domain_setmaxmem(ctx->xch, domid, info->target_memkb + LIBXL_MAXMEM_CONSTANT);
     if (info->type == LIBXL_DOMAIN_TYPE_PV)
         xc_domain_set_memmap_limit(ctx->xch, domid,

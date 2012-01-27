@@ -70,6 +70,18 @@ int libxl_cpumap_alloc(libxl_ctx *ctx, libxl_cpumap *cpumap);
 int libxl_cpumap_test(libxl_cpumap *cpumap, int cpu);
 void libxl_cpumap_set(libxl_cpumap *cpumap, int cpu);
 void libxl_cpumap_reset(libxl_cpumap *cpumap, int cpu);
+static inline void libxl_cpumap_set_any(libxl_cpumap *cpumap)
+{
+    memset(cpumap->map, -1, cpumap->size);
+}
+static inline void libxl_cpumap_set_none(libxl_cpumap *cpumap)
+{
+    memset(cpumap->map, 0, cpumap->size);
+}
+static inline int libxl_cpumap_cpu_valid(libxl_cpumap *cpumap, int cpu)
+{
+    return cpu >= 0 && cpu < (cpumap->size * 8);
+}
 #define libxl_for_each_cpu(var, map) for (var = 0; var < (map).size * 8; var++)
 #define libxl_for_each_set_cpu(v, m) for (v = 0; v < (m).size * 8; v++) \
                                              if (libxl_cpumap_test(&(m), v))

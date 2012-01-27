@@ -157,6 +157,7 @@ libxl_domain_create_info = Struct("domain_create_info",[
 libxl_domain_build_info = Struct("domain_build_info",[
     ("max_vcpus",       integer),
     ("cur_vcpus",       integer),
+    ("cpumap",          libxl_cpumap),
     ("tsc_mode",        libxl_tsc_mode),
     ("max_memkb",       uint32),
     ("target_memkb",    uint32),
