@@ -93,6 +93,8 @@ def gen_ocaml_ml(ty, interface, indent=""):
             s += "\t{\n"
             
         for f in ty.fields:
+            if f.type.private:
+                continue
             x = ocaml_instance_of(f.type, f.name)
             x = x.replace("\n", "\n\t\t")
             s += "\t\t" + x + ";\n"
@@ -148,6 +150,8 @@ def c_val(ty, c, o, indent="", parent = None):
     elif isinstance(ty, libxltypes.Aggregate) and (parent is None):
         n = 0
         for f in ty.fields:
+            if f.type.private:
+                continue
             s += "%s\n" % c_val(f.type, "%s->%s" % (c, f.name), "Field(%s, %d)" % (o,n), parent="%s->" % (c))
             n = n + 1
     else:
@@ -212,6 +216,8 @@ def ocaml_Val(ty, o, c, indent="", parent = None):
         
         n = 0
         for f in ty.fields:
+            if f.type.private:
+                continue
             s += "\n"
             s += "\t%s\n" % ocaml_Val(f.type, "%s_field" % ty.rawname, "%s->%s" % (c,f.name), parent="%s->" % c)
             s += "\tStore_field(%s, %d, %s);\n" % (o, n, "%s_field" % ty.rawname)
@@ -290,6 +296,8 @@ if __name__ == '__main__':
     cinc.write(autogen_header("/*", "*/"))
 
     for ty in types:
+        if ty.private:
+            continue
         #sys.stdout.write(" TYPE    %-20s " % ty.rawname)
         ml.write(gen_ocaml_ml(ty, False))
         ml.write("\n")
