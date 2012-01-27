@@ -35,6 +35,7 @@
 #include <unistd.h>
 
 #include <sys/mman.h>
+#include <sys/poll.h>
 #include <sys/select.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -111,6 +112,71 @@ _hidden void libxl__log(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
 
      /* these functions preserve errno (saving and restoring) */
 
+typedef struct libxl__gc libxl__gc;
+typedef struct libxl__egc libxl__egc;
+
+typedef struct libxl__ev_fd libxl__ev_fd;
+typedef void libxl__ev_fd_callback(libxl__egc *egc, libxl__ev_fd *ev,
+                                   int fd, short events, short revents);
+struct libxl__ev_fd {
+    /* caller should include this in their own struct */
+    /* read-only for caller, who may read only when registered: */
+    int fd;
+    short events;
+    libxl__ev_fd_callback *func;
+    /* remainder is private for libxl__ev_fd... */
+    LIBXL_LIST_ENTRY(libxl__ev_fd) entry;
+    void *for_app_reg;
+};
+
+
+typedef struct libxl__ev_time libxl__ev_time;
+typedef void libxl__ev_time_callback(libxl__egc *egc, libxl__ev_time *ev,
+                                     const struct timeval *requested_abs);
+struct libxl__ev_time {
+    /* caller should include this in their own struct */
+    /* read-only for caller, who may read only when registered: */
+    libxl__ev_time_callback *func;
+    /* remainder is private for libxl__ev_time... */
+    int infinite; /* not registered in list or with app if infinite */
+    LIBXL_TAILQ_ENTRY(libxl__ev_time) entry;
+    struct timeval abs;
+    void *for_app_reg;
+};
+
+typedef struct libxl__ev_xswatch libxl__ev_xswatch;
+typedef void libxl__ev_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch*,
+                            const char *watch_path, const char *event_path);
+struct libxl__ev_xswatch {
+    /* caller should include this in their own struct */
+    /* read-only for caller, who may read only when registered: */
+    char *path;
+    libxl__ev_xswatch_callback *callback;
+    /* remainder is private for libxl__ev_xswatch... */
+    int slotnum; /* registered iff slotnum >= 0 */
+    uint32_t counterval;
+};
+
+/*
+ * An entry in the watch_slots table is either:
+ *  1. an entry in the free list, ie NULL or pointer to next free list entry
+ *  2. an pointer to a libxl__ev_xswatch
+ *
+ * But we don't want to use unions or type-punning because the
+ * compiler might "prove" that our code is wrong and misoptimise it.
+ *
+ * The rules say that all struct pointers have identical
+ * representation and alignment requirements (C99+TC1+TC2 6.2.5p26) so
+ * what we do is simply declare our array as containing only the free
+ * list pointers, and explicitly convert from and to our actual
+ * xswatch pointers when we store and retrieve them.
+ */
+typedef struct libxl__ev_watch_slot {
+    LIBXL_SLIST_ENTRY(struct libxl__ev_watch_slot) empty;
+} libxl__ev_watch_slot;
+    
+libxl__ev_xswatch *libxl__watch_slot_contents(libxl__gc *gc, int slotnum);
+
 struct libxl__ctx {
     xentoollog_logger *lg;
     xc_interface *xch;
@@ -128,6 +194,23 @@ struct libxl__ctx {
        * proper lock hierarchy, and these restrictions must then be
        * documented in the libxl public interface.
        */
+
+    int osevent_in_hook;
+    const libxl_osevent_hooks *osevent_hooks;
+    void *osevent_user;
+      /* See the comment for OSEVENT_HOOK_INTERN in libxl_event.c
+       * for restrictions on the use of the osevent fields. */
+
+    int fd_rindex_allocd;
+    int *fd_rindex; /* see libxl_osevent_beforepoll */
+    LIBXL_LIST_HEAD(, libxl__ev_fd) efds;
+    LIBXL_TAILQ_HEAD(, libxl__ev_time) etimes;
+
+    libxl__ev_watch_slot *watch_slots;
+    int watch_nslots;
+    LIBXL_SLIST_HEAD(, libxl__ev_watch_slot) watch_freeslots;
+    uint32_t watch_counter; /* helps disambiguate slot reuse */
+    libxl__ev_fd watch_efd;
 
     /* for callers who reap children willy-nilly; caller must only
      * set this after libxl_init and before any other call - or
@@ -159,12 +242,17 @@ typedef struct {
 
 #define PRINTF_ATTRIBUTE(x, y) __attribute__((format(printf, x, y)))
 
-typedef struct {
+struct libxl__gc {
     /* mini-GC */
     int alloc_maxsize;
     void **alloc_ptrs;
     libxl_ctx *owner;
-} libxl__gc;
+};
+
+struct libxl__egc {
+    /* for event-generating functions only */
+    struct libxl__gc gc;
+};
 
 #define LIBXL_INIT_GC(gc,ctx) do{               \
         (gc).alloc_maxsize = 0;                 \
@@ -235,6 +323,140 @@ _hidden bool libxl__xs_mkdir(libxl__gc *gc, xs_transaction_t t,
 			     unsigned int num_perms);
 
 _hidden char *libxl__xs_libxl_path(libxl__gc *gc, uint32_t domid);
+
+
+/*
+ * Event generation functions provided by the libxl event core to the
+ * rest of libxl.  Implemented in terms of _beforepoll/_afterpoll
+ * and/or the fd registration machinery, as provided by the
+ * application.
+ *
+ * Semantics are similar to those of the fd and timeout registration
+ * functions provided to libxl_osevent_register_hooks.
+ *
+ * Non-0 returns from libxl__ev_{modify,deregister} have already been
+ * logged by the core and should be returned unmodified to libxl's
+ * caller; NB that they may be valid libxl error codes but they may
+ * also be positive numbers supplied by the caller.
+ *
+ * In each case, there is a libxl__ev_FOO structure which can be in
+ * one of three states:
+ *
+ *   Undefined   - Might contain anything.  All-bits-zero is
+ *                 an undefined state.
+ *
+ *   Idle        - Struct contents are defined enough to pass to any
+ *                 libxl__ev_FOO function but not registered and
+ *                 callback will not be called.  The struct does not
+ *                 contain references to any allocated resources so
+ *                 can be thrown away.
+ *
+ *   Active      - Request for events has been registered and events
+ *                 may be generated.  _deregister must be called to
+ *                 reclaim resources.
+ *
+ * These functions are provided for each kind of event KIND:
+ *
+ *   int libxl__ev_KIND_register(libxl__gc *gc, libxl__ev_KIND *GEN,
+ *                              libxl__ev_KIND_callback *FUNC,
+ *                              DETAILS);
+ *      On entry *GEN must be in state Undefined or Idle.
+ *      Returns a libxl error code; on error return *GEN is Idle.
+ *      On successful return *GEN is Active and FUNC wil be
+ *      called by the event machinery in future.  FUNC will
+ *      not be called from within the call to _register.
+ *      FUNC will be called with the context locked (with CTX_LOCK).
+ *
+ *  void libxl__ev_KIND_deregister(libxl__gc *gc, libxl__ev_KIND *GEN_upd);
+ *      On entry *GEN must be in state Active or Idle.
+ *      On return it is Idle.  (Idempotent.)
+ *
+ *  void libxl__ev_KIND_init(libxl__ev_KIND *GEN);
+ *      Provided for initialising an Undefined KIND.
+ *      On entry *GEN must be in state Idle or Undefined.
+ *      On return it is Idle.  (Idempotent.)
+ *
+ *  int libxl__ev_KIND_isregistered(const libxl__ev_KIND *GEN);
+ *      On entry *GEN must be Idle or Active.
+ *      Returns nonzero if it is Active, zero otherwise.
+ *      Cannot fail.
+ *
+ *  int libxl__ev_KIND_modify(libxl__gc*, libxl__ev_KIND *GEN,
+ *                            DETAILS);
+ *      Only provided for some kinds of generator.
+ *      On entry *GEN must be Active and on return, whether successful
+ *      or not, it will be Active.
+ *      Returns a libxl error code; on error the modification
+ *      is not effective.
+ *
+ * All of these functions are fully threadsafe and may be called by
+ * general code in libxl even from within event callback FUNCs.
+ * The ctx will be locked on entry to each FUNC and FUNC should not
+ * unlock it.
+ *
+ * Callers of libxl__ev_KIND_register must ensure that the
+ * registration is undone, with _deregister, in libxl_ctx_free.
+ */
+
+
+_hidden int libxl__ev_fd_register(libxl__gc*, libxl__ev_fd *ev_out,
+                                  libxl__ev_fd_callback*,
+                                  int fd, short events /* as for poll(2) */);
+_hidden int libxl__ev_fd_modify(libxl__gc*, libxl__ev_fd *ev,
+                                short events);
+_hidden void libxl__ev_fd_deregister(libxl__gc*, libxl__ev_fd *ev);
+static inline void libxl__ev_fd_init(libxl__ev_fd *efd)
+                    { efd->fd = -1; }
+static inline int libxl__ev_fd_isregistered(libxl__ev_fd *efd)
+                    { return efd->fd >= 0; }
+
+_hidden int libxl__ev_time_register_rel(libxl__gc*, libxl__ev_time *ev_out,
+                                        libxl__ev_time_callback*,
+                                        int milliseconds /* as for poll(2) */);
+_hidden int libxl__ev_time_register_abs(libxl__gc*, libxl__ev_time *ev_out,
+                                        libxl__ev_time_callback*,
+                                        struct timeval);
+_hidden int libxl__ev_time_modify_rel(libxl__gc*, libxl__ev_time *ev,
+                                      int milliseconds /* as for poll(2) */);
+_hidden int libxl__ev_time_modify_abs(libxl__gc*, libxl__ev_time *ev,
+                                      struct timeval);
+_hidden void libxl__ev_time_deregister(libxl__gc*, libxl__ev_time *ev);
+static inline void libxl__ev_time_init(libxl__ev_time *ev)
+                { ev->func = 0; }
+static inline int libxl__ev_time_isregistered(libxl__ev_time *ev)
+                { return !!ev->func; }
+
+
+_hidden int libxl__ev_xswatch_register(libxl__gc*, libxl__ev_xswatch *xsw_out,
+                                       libxl__ev_xswatch_callback*,
+                                       const char *path /* copied */);
+_hidden void libxl__ev_xswatch_deregister(libxl__gc *gc, libxl__ev_xswatch*);
+
+static inline void libxl__ev_xswatch_init(libxl__ev_xswatch *xswatch_out)
+                { xswatch_out->slotnum = -1; }
+static inline int libxl__ev_xswatch_isregistered(const libxl__ev_xswatch *xw)
+                { return xw->slotnum >= 0; }
+
+
+/*
+ * In general, call this via the macro LIBXL__EVENT_DISASTER.
+ *
+ * Event-generating functions may call this if they might have wanted
+ * to generate an event (either an internal one ie a
+ * libxl__ev_FOO_callback or an application event), but are prevented
+ * from doing so due to eg lack of memory.
+ *
+ * NB that this function may return and the caller isn't supposed to
+ * then crash, although it may fail (and henceforth leave things in a
+ * state where many or all calls fail).
+ */
+_hidden void libxl__event_disaster(libxl__egc*, const char *msg, int errnoval,
+                                   libxl_event_type type /* may be 0 */,
+                                   const char *file, int line,
+                                   const char *func);
+#define LIBXL__EVENT_DISASTER(egc, msg, errnoval, type) \
+    libxl__event_disaster(egc, msg, errnoval, type, __FILE__,__LINE__,__func__)
+
 
 /* from xl_dom */
 _hidden libxl_domain_type libxl__domain_type(libxl__gc *gc, uint32_t domid);
@@ -602,6 +824,8 @@ _hidden int libxl__parse_mac(const char *s, libxl_mac mac);
 /* compare mac address @a and @b. 0 if the same, -ve if a<b and +ve if a>b */
 _hidden int libxl__compare_macs(libxl_mac *a, libxl_mac *b);
 
+_hidden int libxl__gettimeofday(libxl__gc *gc, struct timeval *now_r);
+
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 
@@ -736,6 +960,55 @@ _hidden libxl__json_object *libxl__json_parse(libxl__gc *gc, const char *s);
    * default is qemu xen traditional */
 _hidden libxl_device_model_version
 libxl__device_model_version_running(libxl__gc *gc, uint32_t domid);
+
+
+/*
+ * Calling context and GC for event-generating functions:
+ *
+ * These are for use by parts of libxl which directly or indirectly
+ * call libxl__event_occurred.  These contain a gc but also a list of
+ * deferred events.
+ *
+ * You should never need to initialise an egc unless you are part of
+ * the event machinery itself.  Otherwise you will always be given an
+ * egc if you need one.  Even functions which generate specific kinds
+ * of events don't need to - rather, they will be passed an egc into
+ * their own callback function and should just use the one they're
+ * given.
+ *
+ * Functions using LIBXL__INIT_EGC may *not* generally be called from
+ * within libxl, because libxl__egc_cleanup may call back into the
+ * application.  This should be documented near the function
+ * prototype(s) for callers of LIBXL__INIT_EGC and EGC_INIT.  You
+ * should in any case not find it necessary to call egc-creators from
+ * within libxl.
+ *
+ * For the same reason libxl__egc_cleanup (or EGC_FREE) must be called
+ * with the ctx *unlocked*.  So the right pattern has the EGC_...
+ * macro calls on the outside of the CTX_... ones.
+ */
+
+/* useful for all functions which take an egc: */
+
+#define EGC_GC                                  \
+    libxl__gc *const gc = &egc->gc
+
+/* egc initialisation and destruction: */
+
+#define LIBXL_INIT_EGC(egc,ctx) do{             \
+        LIBXL_INIT_GC((egc).gc,ctx);            \
+        /* list of occurred events tbd */       \
+    } while(0)
+
+_hidden void libxl__egc_cleanup(libxl__egc *egc);
+
+/* convenience macros: */
+
+#define EGC_INIT(ctx)                       \
+    libxl__egc egc[1]; LIBXL_INIT_EGC(egc[0],ctx);      \
+    EGC_GC
+
+#define EGC_FREE           libxl__egc_cleanup(egc)
 
 
 /*

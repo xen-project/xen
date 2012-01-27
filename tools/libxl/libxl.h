@@ -137,6 +137,7 @@
 #include <xen/sysctl.h>
 
 #include <libxl_uuid.h>
+#include <_libxl_list.h>
 
 typedef uint8_t libxl_mac[6];
 #define LIBXL_MAC_FMT "%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx"
@@ -223,6 +224,9 @@ enum {
     ERROR_GUEST_TIMEDOUT = -8,
     ERROR_TIMEDOUT = -9,
     ERROR_NOPARAVIRT = -10,
+    ERROR_NOT_READY = -11,
+    ERROR_OSEVENT_REG_FAIL = -12,
+    ERROR_BUFFERFULL = -13,
 };
 
 #define LIBXL_VERSION 0
@@ -647,6 +651,8 @@ const char *libxl_xenpaging_dir_path(void);
 
 /* misc */
 int libxl_fd_set_cloexec(int fd);
+
+#include <libxl_event.h>
 
 #endif /* LIBXL_H */
 
