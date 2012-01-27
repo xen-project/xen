@@ -655,35 +655,15 @@ _hidden char *libxl__device_backend_path(libxl__gc *gc, libxl__device *device);
 _hidden char *libxl__device_frontend_path(libxl__gc *gc, libxl__device *device);
 _hidden int libxl__parse_backend_path(libxl__gc *gc, const char *path,
                                       libxl__device *dev);
-_hidden int libxl__device_remove(libxl__gc *gc, libxl__device *dev, int wait);
 _hidden int libxl__device_destroy(libxl__gc *gc, libxl__device *dev);
 _hidden int libxl__devices_destroy(libxl__gc *gc, uint32_t domid);
 _hidden int libxl__wait_for_backend(libxl__gc *gc, char *be_path, char *state);
 
-/* Handler for the libxl__wait_for_device_state callback */
-/*
- * libxl__device_state_handler - Handler for the libxl__wait_for_device_state
- * gc: allocation pool
- * l1: array containing the path and token
- * state: string that contains the state of the device
- *
- * Returns 0 on success, and < 0 on error.
- */
-typedef int libxl__device_state_handler(libxl__gc *gc, char **l1, char *state);
-
-/*
- * libxl__wait_for_device_state - waits a given time for a device to
- * reach a given state
- * gc: allocation pool
- * tv: timeval struct containing the maximum time to wait
- * state: state to wait for (check xen/io/xenbus.h)
- * handler: callback function to execute when state is reached
- *
- * Returns 0 on success, and < 0 on error.
- */
-_hidden int libxl__wait_for_device_state(libxl__gc *gc, struct timeval *tv,
-                                         XenbusState state,
-                                         libxl__device_state_handler handler);
+/* Arranges that dev will be removed from its guest.  When
+ * this is done, the ao will be completed.  An error
+ * return from libxl__initiate_device_remove means that the ao
+ * will _not_ be completed and the caller must do so. */
+_hidden int libxl__initiate_device_remove(libxl__ao*, libxl__device *dev);
 
 /*
  * libxl__ev_devstate - waits a given time for a device to

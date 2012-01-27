@@ -4712,7 +4712,7 @@ int main_networkdetach(int argc, char **argv)
             return 1;
         }
     }
-    if (libxl_device_nic_remove(ctx, domid, &nic)) {
+    if (libxl_device_nic_remove(ctx, domid, &nic, 0)) {
         fprintf(stderr, "libxl_device_nic_del failed.\n");
         return 1;
     }
@@ -4807,7 +4807,7 @@ int main_blockdetach(int argc, char **argv)
         fprintf(stderr, "Error: Device %s not connected.\n", argv[optind+1]);
         return 1;
     }
-    if (libxl_device_disk_remove(ctx, domid, &disk)) {
+    if (libxl_device_disk_remove(ctx, domid, &disk, 0)) {
         fprintf(stderr, "libxl_device_disk_remove failed.\n");
     }
     return 0;

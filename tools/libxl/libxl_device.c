@@ -356,85 +356,36 @@ int libxl__device_disk_dev_number(const char *virtpath, int *pdisk,
     return -1;
 }
 
-/*
- * Returns 0 if a device is removed, ERROR_* if an error
- * or timeout occurred.
- */
-int libxl__wait_for_device_state(libxl__gc *gc, struct timeval *tv,
-                                 XenbusState state,
-                                 libxl__device_state_handler handler)
-{
-    libxl_ctx *ctx = libxl__gc_owner(gc);
-    int nfds, rc;
-    unsigned int n;
-    fd_set rfds;
-    char **l1 = NULL;
 
-start:
-    rc = 1;
-    nfds = xs_fileno(ctx->xsh) + 1;
-    FD_ZERO(&rfds);
-    FD_SET(xs_fileno(ctx->xsh), &rfds);
-    switch (select(nfds, &rfds, NULL, NULL, tv)) {
-        case -1:
-            if (errno == EINTR)
-                goto start;
-            rc = ERROR_FAIL;
-            break;
-        case 0:
-            rc = ERROR_TIMEDOUT;
-            break;
-        default:
-            l1 = xs_read_watch(ctx->xsh, &n);
-            if (l1 != NULL) {
-                char *sstate = libxl__xs_read(gc, XBT_NULL,
-                                             l1[XS_WATCH_PATH]);
-                if (!sstate || atoi(sstate) == state) {
-                    /* Call handler function if present */
-                    if (handler)
-                        rc = handler(gc, l1, sstate);
-                } else {
-                    /* State is different than expected, continue waiting... */
-                    goto start;
-                }
-                free(l1);
-            } else {
-                rc = ERROR_FAIL;
-            }
-            break;
-    }
-    return rc;
+typedef struct {
+    libxl__ao *ao;
+    libxl__ev_devstate ds;
+} libxl__ao_device_remove;
+
+static void device_remove_cleanup(libxl__gc *gc,
+                                  libxl__ao_device_remove *aorm) {
+    if (!aorm) return;
+    libxl__ev_devstate_cancel(gc, &aorm->ds);
 }
 
-/*
- * Handler function for device destruction to be passed to
- * libxl__wait_for_device_state
- */
-static int destroy_device(libxl__gc *gc, char **l1, char *state)
-{
-    libxl_ctx *ctx = libxl__gc_owner(gc);
-
-    xs_unwatch(ctx->xsh, l1[0], l1[1]);
-    xs_rm(ctx->xsh, XBT_NULL, l1[XS_WATCH_TOKEN]);
-    LIBXL__LOG(ctx, LIBXL__LOG_DEBUG,
-               "Destroyed device backend at %s",
-               l1[XS_WATCH_TOKEN]);
-
-    return 0;
+static void device_remove_callback(libxl__egc *egc, libxl__ev_devstate *ds,
+                                   int rc) {
+    libxl__ao_device_remove *aorm = CONTAINER_OF(ds, *aorm, ds);
+    libxl__gc *gc = &aorm->ao->gc;
+    libxl__ao_complete(egc, aorm->ao, rc);
+    device_remove_cleanup(gc, aorm);
 }
 
-/*
- * Returns 0 (device already destroyed) or 1 (caller must
- * wait_for_dev_destroy) on success, ERROR_* on fail.
- */
-int libxl__device_remove(libxl__gc *gc, libxl__device *dev, int wait)
+int libxl__initiate_device_remove(libxl__ao *ao, libxl__device *dev)
 {
+    AO_GC;
     libxl_ctx *ctx = libxl__gc_owner(gc);
     xs_transaction_t t;
     char *be_path = libxl__device_backend_path(gc, dev);
     char *state_path = libxl__sprintf(gc, "%s/state", be_path);
     char *state = libxl__xs_read(gc, XBT_NULL, state_path);
     int rc = 0;
+    libxl__ao_device_remove *aorm = 0;
 
     if (!state)
         goto out;
@@ -457,23 +408,21 @@ retry_transaction:
         }
     }
 
-    xs_watch(ctx->xsh, state_path, be_path);
     libxl__device_destroy_tapdisk(gc, be_path);
 
-    if (wait) {
-        struct timeval tv;
-        tv.tv_sec = LIBXL_DESTROY_TIMEOUT;
-        tv.tv_usec = 0;
-        rc = libxl__wait_for_device_state(gc, &tv, XenbusStateClosed,
-                                          destroy_device);
-        if (rc < 0) /* an error or timeout occurred, clear watches */
-            xs_unwatch(ctx->xsh, state_path, be_path);
-        xs_rm(ctx->xsh, XBT_NULL, libxl__device_frontend_path(gc, dev));
-    } else {
-        rc = 1; /* Caller must wait_for_dev_destroy */
-    }
+    aorm = libxl__zalloc(gc, sizeof(*aorm));
+    aorm->ao = ao;
+    libxl__ev_devstate_init(&aorm->ds);
 
-out:
+    rc = libxl__ev_devstate_wait(gc, &aorm->ds, device_remove_callback,
+                                 state_path, XenbusStateClosed,
+                                 LIBXL_DESTROY_TIMEOUT * 1000);
+    if (rc) goto out;
+
+    return 0;
+
+ out:
+    device_remove_cleanup(gc, aorm);
     return rc;
 }
 

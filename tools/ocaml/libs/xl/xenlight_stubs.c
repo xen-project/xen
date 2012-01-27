@@ -247,7 +247,7 @@ value stub_xl_device_disk_del(value info, value domid)
 	device_disk_val(&gc, &lg, &c_info, info);
 
 	INIT_CTX();
-	ret = libxl_device_disk_remove(ctx, Int_val(domid), &c_info);
+	ret = libxl_device_disk_remove(ctx, Int_val(domid), &c_info, 0);
 	if (ret != 0)
 		failwith_xl("disk_del", &lg);
 	FREE_CTX();
@@ -281,7 +281,7 @@ value stub_xl_device_nic_del(value info, value domid)
 	device_nic_val(&gc, &lg, &c_info, info);
 
 	INIT_CTX();
-	ret = libxl_device_nic_remove(ctx, Int_val(domid), &c_info);
+	ret = libxl_device_nic_remove(ctx, Int_val(domid), &c_info, 0);
 	if (ret != 0)
 		failwith_xl("nic_del", &lg);
 	FREE_CTX();
@@ -316,7 +316,7 @@ value stub_xl_device_vkb_remove(value info, value domid)
 	device_vkb_val(&gc, &lg, &c_info, info);
 
 	INIT_CTX();
-	ret = libxl_device_vkb_remove(ctx, Int_val(domid), &c_info);
+	ret = libxl_device_vkb_remove(ctx, Int_val(domid), &c_info, 0);
 	if (ret != 0)
 		failwith_xl("vkb_clean_shutdown", &lg);
 	FREE_CTX();
@@ -370,7 +370,7 @@ value stub_xl_device_vfb_remove(value info, value domid)
 	device_vfb_val(&gc, &lg, &c_info, info);
 
 	INIT_CTX();
-	ret = libxl_device_vfb_remove(ctx, Int_val(domid), &c_info);
+	ret = libxl_device_vfb_remove(ctx, Int_val(domid), &c_info, 0);
 	if (ret != 0)
 		failwith_xl("vfb_clean_shutdown", &lg);
 	FREE_CTX();

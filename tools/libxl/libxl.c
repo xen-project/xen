@@ -1311,19 +1311,23 @@ out:
 }
 
 int libxl_device_disk_remove(libxl_ctx *ctx, uint32_t domid,
-                             libxl_device_disk *disk)
+                             libxl_device_disk *disk,
+                             const libxl_asyncop_how *ao_how)
 {
-    GC_INIT(ctx);
+    AO_CREATE(ctx, domid, ao_how);
     libxl__device device;
     int rc;
 
     rc = libxl__device_from_disk(gc, domid, disk, &device);
     if (rc != 0) goto out;
 
-    rc = libxl__device_remove(gc, &device, 1);
+    rc = libxl__initiate_device_remove(ao, &device);
+    if (rc) goto out;
+
+    return AO_INPROGRESS;
+
 out:
-    GC_FREE;
-    return rc;
+    return AO_ABORT(rc);
 }
 
 int libxl_device_disk_destroy(libxl_ctx *ctx, uint32_t domid,
@@ -1537,11 +1541,11 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk)
 
     ret = 0;
 
-    libxl_device_disk_remove(ctx, domid, disks + i);
+    libxl_device_disk_remove(ctx, domid, disks + i, 0);
     libxl_device_disk_add(ctx, domid, disk);
     stubdomid = libxl_get_stubdom_id(ctx, domid);
     if (stubdomid) {
-        libxl_device_disk_remove(ctx, stubdomid, disks + i);
+        libxl_device_disk_remove(ctx, stubdomid, disks + i, 0);
         libxl_device_disk_add(ctx, stubdomid, disk);
     }
 out:
@@ -1760,19 +1764,23 @@ out:
 }
 
 int libxl_device_nic_remove(libxl_ctx *ctx, uint32_t domid,
-                            libxl_device_nic *nic)
+                            libxl_device_nic *nic,
+                            const libxl_asyncop_how *ao_how)
 {
-    GC_INIT(ctx);
+    AO_CREATE(ctx, domid, ao_how);
     libxl__device device;
     int rc;
 
     rc = libxl__device_from_nic(gc, domid, nic, &device);
     if (rc != 0) goto out;
 
-    rc = libxl__device_remove(gc, &device, 1);
+    rc = libxl__initiate_device_remove(ao, &device);
+    if (rc) goto out;
+
+    return AO_INPROGRESS;
+
 out:
-    GC_FREE;
-    return rc;
+    return AO_ABORT(rc);
 }
 
 int libxl_device_nic_destroy(libxl_ctx *ctx, uint32_t domid,
@@ -2100,19 +2108,23 @@ out:
 }
 
 int libxl_device_vkb_remove(libxl_ctx *ctx, uint32_t domid,
-                            libxl_device_vkb *vkb)
+                            libxl_device_vkb *vkb,
+                            const libxl_asyncop_how *ao_how)
 {
-    GC_INIT(ctx);
+    AO_CREATE(ctx, domid, ao_how);
     libxl__device device;
     int rc;
 
     rc = libxl__device_from_vkb(gc, domid, vkb, &device);
     if (rc != 0) goto out;
 
-    rc = libxl__device_remove(gc, &device, 1);
+    rc = libxl__initiate_device_remove(ao, &device);
+    if (rc) goto out;
+
+    return AO_INPROGRESS;
+
 out:
-    GC_FREE;
-    return rc;
+    return AO_ABORT(rc);
 }
 
 int libxl_device_vkb_destroy(libxl_ctx *ctx, uint32_t domid,
@@ -2217,19 +2229,23 @@ out:
 }
 
 int libxl_device_vfb_remove(libxl_ctx *ctx, uint32_t domid,
-                            libxl_device_vfb *vfb)
+                            libxl_device_vfb *vfb,
+                            const libxl_asyncop_how *ao_how)
 {
-    GC_INIT(ctx);
+    AO_CREATE(ctx, domid, ao_how);
     libxl__device device;
     int rc;
 
     rc = libxl__device_from_vfb(gc, domid, vfb, &device);
     if (rc != 0) goto out;
 
-    rc = libxl__device_remove(gc, &device, 1);
+    rc = libxl__initiate_device_remove(ao, &device);
+    if (rc) goto out;
+
+    return AO_INPROGRESS;
+
 out:
-    GC_FREE;
-    return rc;
+    return AO_ABORT(rc);
 }
 
 int libxl_device_vfb_destroy(libxl_ctx *ctx, uint32_t domid,
