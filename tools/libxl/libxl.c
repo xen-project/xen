@@ -26,7 +26,6 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
 {
     libxl_ctx *ctx = NULL;
     struct stat stat_buf;
-    const pthread_mutex_t mutex_value = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
     int rc;
 
     if (version != LIBXL_VERSION) { rc = ERROR_VERSION; goto out; }
@@ -40,10 +39,10 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
     memset(ctx, 0, sizeof(libxl_ctx));
     ctx->lg = lg;
 
-    /* This somewhat convoluted approach is needed because
-     * PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP is defined to be valid
-     * only as an initialiser, not as an expression. */
-    memcpy(&ctx->lock, &mutex_value, sizeof(ctx->lock));
+    if (libxl__init_recursive_mutex(ctx, &ctx->lock) < 0) {
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Failed to initialize mutex");
+        return ERROR_FAIL;
+    }
 
     LIBXL_TAILQ_INIT(&ctx->occurred);
 

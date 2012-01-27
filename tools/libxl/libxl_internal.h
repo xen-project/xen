@@ -974,6 +974,8 @@ _hidden int libxl__e820_alloc(libxl__gc *gc, uint32_t domid, libxl_domain_config
 _hidden int libxl__parse_mac(const char *s, libxl_mac mac);
 /* compare mac address @a and @b. 0 if the same, -ve if a<b and +ve if a>b */
 _hidden int libxl__compare_macs(libxl_mac *a, libxl_mac *b);
+/* init a recursive mutex */
+_hidden int libxl__init_recursive_mutex(libxl_ctx *ctx, pthread_mutex_t *lock);
 
 _hidden int libxl__gettimeofday(libxl__gc *gc, struct timeval *now_r);
 

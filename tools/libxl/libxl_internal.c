@@ -296,6 +296,33 @@ _hidden int libxl__compare_macs(libxl_mac *a, libxl_mac *b)
     return 0;
 }
 
+_hidden int libxl__init_recursive_mutex(libxl_ctx *ctx, pthread_mutex_t *lock)
+{
+    pthread_mutexattr_t attr;
+    int rc = 0;
+
+    if (pthread_mutexattr_init(&attr) != 0) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, 
+                         "Failed to init mutex attributes\n");
+        return ERROR_FAIL;
+    }
+    if (pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE) != 0) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, 
+                         "Failed to set mutex attributes\n");
+        rc = ERROR_FAIL;
+        goto out;
+    }
+    if (pthread_mutex_init(lock, &attr) != 0) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, 
+                         "Failed to init mutex\n");
+        rc = ERROR_FAIL;
+        goto out;
+    }
+out:
+    pthread_mutexattr_destroy(&attr);
+    return rc;
+}
+
 libxl_device_model_version libxl__device_model_version_running(libxl__gc *gc,
                                                                uint32_t domid)
 {
