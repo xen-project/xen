@@ -3568,13 +3568,72 @@ int main_vcpulist(int argc, char **argv)
     return 0;
 }
 
+static int vcpupin_parse(char *cpu, libxl_cpumap *cpumap)
+{
+    libxl_cpumap exclude_cpumap;
+    uint32_t cpuida, cpuidb;
+    char *endptr, *toka, *tokb, *saveptr = NULL;
+    int i, rc = 0, rmcpu;
+
+    if (!strcmp(cpu, "all")) {
+        memset(cpumap->map, -1, cpumap->size);
+        return 0;
+    }
+
+    if (libxl_cpumap_alloc(ctx, &exclude_cpumap)) {
+        fprintf(stderr, "Error: Failed to allocate cpumap.\n");
+        return ENOMEM;
+    }
+
+    for (toka = strtok_r(cpu, ",", &saveptr); toka;
+         toka = strtok_r(NULL, ",", &saveptr)) {
+        rmcpu = 0;
+        if (*toka == '^') {
+            /* This (These) Cpu(s) will be removed from the map */
+            toka++;
+            rmcpu = 1;
+        }
+        /* Extract a valid (range of) cpu(s) */
+        cpuida = cpuidb = strtoul(toka, &endptr, 10);
+        if (endptr == toka) {
+            fprintf(stderr, "Error: Invalid argument.\n");
+            rc = EINVAL;
+            goto vcpp_out;
+        }
+        if (*endptr == '-') {
+            tokb = endptr + 1;
+            cpuidb = strtoul(tokb, &endptr, 10);
+            if (endptr == tokb || cpuida > cpuidb) {
+                fprintf(stderr, "Error: Invalid argument.\n");
+                rc = EINVAL;
+                goto vcpp_out;
+            }
+        }
+        while (cpuida <= cpuidb) {
+            rmcpu == 0 ? libxl_cpumap_set(cpumap, cpuida) :
+                         libxl_cpumap_set(&exclude_cpumap, cpuida);
+            cpuida++;
+        }
+    }
+
+    /* Clear all the cpus from the removal list */
+    libxl_for_each_set_cpu(i, exclude_cpumap) {
+        libxl_cpumap_reset(cpumap, i);
+    }
+
+vcpp_out:
+    libxl_cpumap_dispose(&exclude_cpumap);
+
+    return rc;
+}
+
 static void vcpupin(const char *d, const char *vcpu, char *cpu)
 {
     libxl_vcpuinfo *vcpuinfo;
     libxl_cpumap cpumap;
 
-    uint32_t vcpuid, cpuida, cpuidb;
-    char *endptr, *toka, *tokb;
+    uint32_t vcpuid;
+    char *endptr;
     int i, nb_vcpu;
 
     vcpuid = strtoul(vcpu, &endptr, 10);
@@ -3591,32 +3650,9 @@ static void vcpupin(const char *d, const char *vcpu, char *cpu)
     if (libxl_cpumap_alloc(ctx, &cpumap)) {
         goto vcpupin_out;
     }
-    if (strcmp(cpu, "all")) {
-        for (toka = strtok(cpu, ","), i = 0; toka; toka = strtok(NULL, ","), ++i) {
-            cpuida = strtoul(toka, &endptr, 10);
-            if (toka == endptr) {
-                fprintf(stderr, "Error: Invalid argument.\n");
-                goto vcpupin_out1;
-            }
-            if (*endptr == '-') {
-                tokb = endptr + 1;
-                cpuidb = strtoul(tokb, &endptr, 10);
-                if ((tokb == endptr) || (cpuida > cpuidb)) {
-                    fprintf(stderr, "Error: Invalid argument.\n");
-                    goto vcpupin_out1;
-                }
-                while (cpuida <= cpuidb) {
-                    libxl_cpumap_set(&cpumap, cpuida);
-                    ++cpuida;
-                }
-            } else {
-                libxl_cpumap_set(&cpumap, cpuida);
-            }
-        }
-    }
-    else {
-        memset(cpumap.map, -1, cpumap.size);
-    }
+
+    if (vcpupin_parse(cpu, &cpumap))
+        goto vcpupin_out1;
 
     if (vcpuid != -1) {
         if (libxl_set_vcpuaffinity(ctx, domid, vcpuid, &cpumap) == -1) {
