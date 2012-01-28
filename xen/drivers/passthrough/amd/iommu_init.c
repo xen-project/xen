@@ -38,6 +38,7 @@ unsigned short ivrs_bdf_entries;
 static struct radix_tree_root ivrs_maps;
 struct list_head amd_iommu_head;
 struct table_struct device_table;
+bool_t iommuv2_enabled;
 
 static int iommu_has_ht_flag(struct amd_iommu *iommu, u8 mask)
 {
@@ -887,6 +888,9 @@ static int __init amd_iommu_init_one(struct amd_iommu *iommu)
 
     get_iommu_features(iommu);
 
+    if ( iommu->features )
+        iommuv2_enabled = 1;
+
     if ( allocate_cmd_buffer(iommu) == NULL )
         goto error_out;
 
@@ -950,6 +954,7 @@ static void __init amd_iommu_init_cleanup(void)
     iommu_enabled = 0;
     iommu_passthrough = 0;
     iommu_intremap = 0;
+    iommuv2_enabled = 0;
 }
 
 /*

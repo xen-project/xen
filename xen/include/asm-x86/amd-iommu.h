@@ -182,4 +182,6 @@ struct guest_iommu {
     struct guest_iommu_msi  msi;
 };
 
+extern bool_t iommuv2_enabled;
+
 #endif /* _ASM_X86_64_AMD_IOMMU_H */
