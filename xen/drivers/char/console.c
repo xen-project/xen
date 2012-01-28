@@ -549,6 +549,8 @@ void __init console_init_preirq(void)
             p++;
         if ( !strncmp(p, "vga", 3) )
             vga_init();
+        else if ( !strncmp(p, "none", 4) )
+            continue;
         else if ( strncmp(p, "com", 3) ||
                   (sercon_handle = serial_parse_handle(p)) == -1 )
         {
