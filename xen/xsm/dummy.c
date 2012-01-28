@@ -66,6 +66,8 @@ static int dummy_scheduler (struct domain *d)
 
 static int dummy_getdomaininfo (struct domain *d)
 {
+    if ( !IS_PRIV(current->domain) )
+        return -EPERM;
     return 0;
 }
 
