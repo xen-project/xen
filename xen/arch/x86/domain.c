@@ -2125,6 +2125,7 @@ int domain_relinquish_resources(struct domain *d)
                 put_page_and_type(
                     mfn_to_page(d->arch.pv_domain.pirq_eoi_map_mfn));
                 d->arch.pv_domain.pirq_eoi_map = NULL;
+                d->arch.pv_domain.auto_unmask = 0;
             }
         }
 

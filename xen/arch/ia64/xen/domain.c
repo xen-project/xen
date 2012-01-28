@@ -1731,6 +1731,7 @@ int domain_relinquish_resources(struct domain *d)
 		if (d->arch.pirq_eoi_map != NULL) {
 			put_page(virt_to_page(d->arch.pirq_eoi_map));
 			d->arch.pirq_eoi_map = NULL;
+			d->arch.auto_unmask = 0;
 		}
 
 		/* Tear down shadow mode stuff. */

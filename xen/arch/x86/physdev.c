@@ -271,7 +271,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             break;
         }
         if ( !is_hvm_domain(v->domain) &&
-             v->domain->arch.pv_domain.pirq_eoi_map )
+             v->domain->arch.pv_domain.auto_unmask )
             evtchn_unmask(pirq->evtchn);
         if ( !is_hvm_domain(v->domain) ||
              domain_pirq_to_irq(v->domain, eoi.irq) > 0 )
@@ -293,7 +293,8 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
-    case PHYSDEVOP_pirq_eoi_gmfn: {
+    case PHYSDEVOP_pirq_eoi_gmfn_v2:
+    case PHYSDEVOP_pirq_eoi_gmfn_v1: {
         struct physdev_pirq_eoi_gmfn info;
         unsigned long mfn;
 
@@ -329,6 +330,8 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             ret = -ENOSPC;
             break;
         }
+        if ( cmd == PHYSDEVOP_pirq_eoi_gmfn_v1 )
+            v->domain->arch.pv_domain.auto_unmask = 1;
 
         put_gfn(current->domain, info.gmfn);
         ret = 0;

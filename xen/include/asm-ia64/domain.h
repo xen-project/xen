@@ -186,6 +186,9 @@ struct arch_domain {
     /* Shared page for notifying that explicit PIRQ EOI is required. */
     unsigned long *pirq_eoi_map;
     unsigned long pirq_eoi_map_mfn;
+    /* set auto_unmask to 1 if you want PHYSDEVOP_eoi to automatically
+     * unmask the event channel */
+    bool_t auto_unmask;
 
     /* Address of efi_runtime_services_t (placed in domain memory)  */
     void *efi_runtime;
