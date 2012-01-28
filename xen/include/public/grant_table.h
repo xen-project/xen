@@ -117,6 +117,13 @@ struct grant_entry_v1 {
 };
 typedef struct grant_entry_v1 grant_entry_v1_t;
 
+/* The first few grant table entries will be preserved across grant table
+ * version changes and may be pre-populated at domain creation by tools.
+ */
+#define GNTTAB_NR_RESERVED_ENTRIES     8
+#define GNTTAB_RESERVED_CONSOLE        0
+#define GNTTAB_RESERVED_XENSTORE       1
+
 /*
  * Type of grant entry.
  *  GTF_invalid: This grant entry grants no privileges.

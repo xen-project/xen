@@ -2111,6 +2111,7 @@ gnttab_set_version(XEN_GUEST_HANDLE(gnttab_set_version_t uop))
     struct domain *d = current->domain;
     struct grant_table *gt = d->grant_table;
     struct active_grant_entry *act;
+    grant_entry_v1_t reserved_entries[GNTTAB_NR_RESERVED_ENTRIES];
     long res;
     int i;
 
@@ -2127,11 +2128,12 @@ gnttab_set_version(XEN_GUEST_HANDLE(gnttab_set_version_t uop))
 
     spin_lock(&gt->lock);
     /* Make sure that the grant table isn't currently in use when we
-       change the version number. */
-    /* (You need to change the version number for e.g. kexec.) */
+       change the version number, except for the first 8 entries which
+       are allowed to be in use (xenstore/xenconsole keeps them mapped).
+       (You need to change the version number for e.g. kexec.) */
     if ( gt->gt_version != 0 )
     {
-        for ( i = 0; i < nr_grant_entries(gt); i++ )
+        for ( i = GNTTAB_NR_RESERVED_ENTRIES; i < nr_grant_entries(gt); i++ )
         {
             act = &active_entry(gt, i);
             if ( act->pin != 0 )
@@ -2156,15 +2158,55 @@ gnttab_set_version(XEN_GUEST_HANDLE(gnttab_set_version_t uop))
             goto out_unlock;
     }
 
+    /* Preserve the first 8 entries (toolstack reserved grants) */
+    if ( gt->gt_version == 1 )
+    {
+        memcpy(reserved_entries, &shared_entry_v1(gt, 0), sizeof(reserved_entries));
+    }
+    else if ( gt->gt_version == 2 )
+    {
+        for ( i = 0; i < GNTTAB_NR_RESERVED_ENTRIES && i < nr_grant_entries(gt); i++ )
+        {
+            int flags = status_entry(gt, i);
+            flags |= shared_entry_v2(gt, i).hdr.flags;
+            if ((flags & GTF_type_mask) == GTF_permit_access)
+            {
+                reserved_entries[i].flags = flags;
+                reserved_entries[i].domid = shared_entry_v2(gt, i).hdr.domid;
+                reserved_entries[i].frame = shared_entry_v2(gt, i).full_page.frame;
+            }
+            else
+            {
+                if ((flags & GTF_type_mask) != GTF_invalid)
+                    gdprintk(XENLOG_INFO, "d%d: bad flags %x in grant %d when switching grant version\n",
+                           d->domain_id, flags, i);
+                memset(&reserved_entries[i], 0, sizeof(reserved_entries[i]));
+            }
+        }
+    }
+
     if ( op.version < 2 && gt->gt_version == 2 )
         gnttab_unpopulate_status_frames(d, gt);
 
-    if ( op.version != gt->gt_version )
+    /* Make sure there's no crud left over in the table from the
+       old version. */
+    for ( i = 0; i < nr_grant_frames(gt); i++ )
+        memset(gt->shared_raw[i], 0, PAGE_SIZE);
+
+    /* Restore the first 8 entries (toolstack reserved grants) */
+    if ( gt->gt_version != 0 && op.version == 1 )
     {
-        /* Make sure there's no crud left over in the table from the
-           old version. */
-        for ( i = 0; i < nr_grant_frames(gt); i++ )
-            memset(gt->shared_raw[i], 0, PAGE_SIZE);
+        memcpy(&shared_entry_v1(gt, 0), reserved_entries, sizeof(reserved_entries));
+    }
+    else if ( gt->gt_version != 0 && op.version == 2 )
+    {
+        for ( i = 0; i < GNTTAB_NR_RESERVED_ENTRIES; i++ )
+        {
+            status_entry(gt, i) = reserved_entries[i].flags & (GTF_reading|GTF_writing);
+            shared_entry_v2(gt, i).hdr.flags = reserved_entries[i].flags & ~(GTF_reading|GTF_writing);
+            shared_entry_v2(gt, i).hdr.domid = reserved_entries[i].domid;
+            shared_entry_v2(gt, i).full_page.frame = reserved_entries[i].frame;
+        }
     }
 
     gt->gt_version = op.version;
