@@ -151,24 +151,6 @@ void __init vesa_init(void)
     xfree(line_len);
 }
 
-void __init vesa_endboot(bool_t keep)
-{
-    if ( keep )
-    {
-        xpos = 0;
-        vga_puts = vesa_scroll_puts;
-    }
-    else
-    {
-        unsigned int i, bpp = (vlfb_info.bits_per_pixel + 7) >> 3;
-        for ( i = 0; i < vlfb_info.height; i++ )
-            memset(lfb + i * vlfb_info.bytes_per_line, 0,
-                   vlfb_info.width * bpp);
-    }
-
-    xfree(line_len);
-}
-
 #if defined(CONFIG_X86)
 
 #include <asm/mtrr.h>
@@ -214,6 +196,25 @@ static void lfb_flush(void)
 #define lfb_flush() ((void)0)
 
 #endif
+
+void __init vesa_endboot(bool_t keep)
+{
+    if ( keep )
+    {
+        xpos = 0;
+        vga_puts = vesa_scroll_puts;
+    }
+    else
+    {
+        unsigned int i, bpp = (vlfb_info.bits_per_pixel + 7) >> 3;
+        for ( i = 0; i < vlfb_info.height; i++ )
+            memset(lfb + i * vlfb_info.bytes_per_line, 0,
+                   vlfb_info.width * bpp);
+        lfb_flush();
+    }
+
+    xfree(line_len);
+}
 
 /* Render one line of text to given linear framebuffer line. */
 static void vesa_show_line(
