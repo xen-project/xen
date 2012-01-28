@@ -20,7 +20,7 @@
  *  @v:        VCPU to which virtual IRQ should be sent
  *  @virq:     Virtual IRQ number (VIRQ_*)
  */
-void send_guest_vcpu_virq(struct vcpu *v, int virq);
+void send_guest_vcpu_virq(struct vcpu *v, uint32_t virq);
 
 /*
  * send_global_virq: Notify the domain handling a global VIRQ.
@@ -65,7 +65,7 @@ void free_xen_event_channel(
     struct vcpu *local_vcpu, int port);
 
 /* Query if event channel is in use by the guest */
-int guest_enabled_event(struct vcpu *v, int virq);
+int guest_enabled_event(struct vcpu *v, uint32_t virq);
 
 /* Notify remote end of a Xen-attached event channel.*/
 void notify_via_xen_event_channel(struct domain *ld, int lport);

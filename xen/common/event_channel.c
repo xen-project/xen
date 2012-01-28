@@ -104,11 +104,11 @@ static uint8_t get_xen_consumer(xen_event_channel_notification_t fn)
 
 static int evtchn_set_pending(struct vcpu *v, int port);
 
-static int virq_is_global(int virq)
+static int virq_is_global(uint32_t virq)
 {
     int rc;
 
-    ASSERT((virq >= 0) && (virq < NR_VIRQS));
+    ASSERT(virq < NR_VIRQS);
 
     switch ( virq )
     {
@@ -665,12 +665,12 @@ static int evtchn_set_pending(struct vcpu *v, int port)
     return 0;
 }
 
-int guest_enabled_event(struct vcpu *v, int virq)
+int guest_enabled_event(struct vcpu *v, uint32_t virq)
 {
     return ((v != NULL) && (v->virq_to_evtchn[virq] != 0));
 }
 
-void send_guest_vcpu_virq(struct vcpu *v, int virq)
+void send_guest_vcpu_virq(struct vcpu *v, uint32_t virq)
 {
     unsigned long flags;
     int port;
@@ -689,7 +689,7 @@ void send_guest_vcpu_virq(struct vcpu *v, int virq)
     spin_unlock_irqrestore(&v->virq_lock, flags);
 }
 
-static void send_guest_global_virq(struct domain *d, int virq)
+static void send_guest_global_virq(struct domain *d, uint32_t virq)
 {
     unsigned long flags;
     int port;

@@ -39,7 +39,7 @@ static inline void local_event_delivery_enable(void)
 }
 
 /* No arch specific virq definition now. Default to global. */
-static inline int arch_virq_is_global(int virq)
+static inline int arch_virq_is_global(uint32_t virq)
 {
     return 1;
 }
