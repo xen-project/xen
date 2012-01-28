@@ -229,6 +229,22 @@ struct xen_add_to_physmap {
 typedef struct xen_add_to_physmap xen_add_to_physmap_t;
 DEFINE_XEN_GUEST_HANDLE(xen_add_to_physmap_t);
 
+/*
+ * Unmaps the page appearing at a particular GPFN from the specified guest's
+ * pseudophysical address space.
+ * arg == addr of xen_remove_from_physmap_t.
+ */
+#define XENMEM_remove_from_physmap      15
+struct xen_remove_from_physmap {
+    /* Which domain to change the mapping for. */
+    domid_t domid;
+
+    /* GPFN of the current mapping of the page. */
+    xen_pfn_t     gpfn;
+};
+typedef struct xen_remove_from_physmap xen_remove_from_physmap_t;
+DEFINE_XEN_GUEST_HANDLE(xen_remove_from_physmap_t);
+
 /*** REMOVED ***/
 /*#define XENMEM_translate_gpfn_list  8*/
 

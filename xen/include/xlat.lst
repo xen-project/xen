@@ -60,6 +60,7 @@
 !	memory_map			memory.h
 !	memory_reservation		memory.h
 !	pod_target			memory.h
+!	remove_from_physmap		memory.h
 ?	physdev_eoi			physdev.h
 ?	physdev_get_free_pirq		physdev.h
 ?	physdev_irq			physdev.h

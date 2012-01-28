@@ -659,6 +659,43 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
 
         break;
 
+    case XENMEM_remove_from_physmap:
+    {
+        struct xen_remove_from_physmap xrfp;
+        unsigned long mfn;
+        struct domain *d;
+
+        if ( copy_from_guest(&xrfp, arg, 1) )
+            return -EFAULT;
+
+        rc = rcu_lock_target_domain_by_id(xrfp.domid, &d);
+        if ( rc != 0 )
+            return rc;
+
+        if ( xsm_remove_from_physmap(current->domain, d) )
+        {
+            rcu_unlock_domain(d);
+            return -EPERM;
+        }
+
+        domain_lock(d);
+
+        mfn = get_gfn_untyped(d, xrfp.gpfn);
+
+        if ( mfn_valid(mfn) )
+            guest_physmap_remove_page(d, xrfp.gpfn, mfn, PAGE_ORDER_4K);
+        else
+            rc = -ENOENT;
+
+        put_gfn(d, xrfp.gpfn);
+
+        domain_unlock(d);
+
+        rcu_unlock_domain(d);
+
+        break;
+    }
+
     default:
         rc = arch_memory_op(op, arg);
         break;

@@ -25,6 +25,7 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE(void) compat)
             XEN_GUEST_HANDLE(void) hnd;
             struct xen_memory_reservation *rsrv;
             struct xen_memory_exchange *xchg;
+            struct xen_remove_from_physmap *xrfp;
         } nat;
         union {
             struct compat_memory_reservation rsrv;
@@ -179,6 +180,18 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE(void) compat)
             nat.hnd = compat;
             break;
 
+        case XENMEM_remove_from_physmap:
+        {
+            struct compat_remove_from_physmap cmp;
+
+            if ( copy_from_guest(&cmp, compat, 1) )
+                return -EFAULT;
+
+            XLAT_remove_from_physmap(nat.xrfp, &cmp);
+
+            break;
+        }
+
         default:
             return compat_arch_memory_op(cmd, compat);
         }
@@ -284,6 +297,7 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE(void) compat)
         case XENMEM_current_reservation:
         case XENMEM_maximum_reservation:
         case XENMEM_maximum_gpfn:
+        case XENMEM_remove_from_physmap:
             break;
 
         default:
