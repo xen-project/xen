@@ -689,7 +689,7 @@ void send_guest_vcpu_virq(struct vcpu *v, int virq)
     spin_unlock_irqrestore(&v->virq_lock, flags);
 }
 
-void send_guest_global_virq(struct domain *d, int virq)
+static void send_guest_global_virq(struct domain *d, int virq)
 {
     unsigned long flags;
     int port;
@@ -739,6 +739,68 @@ int send_guest_pirq(struct domain *d, const struct pirq *pirq)
     return evtchn_set_pending(d->vcpu[chn->notify_vcpu_id], port);
 }
 
+static struct domain *global_virq_handlers[NR_VIRQS] __read_mostly;
+
+static DEFINE_SPINLOCK(global_virq_handlers_lock);
+
+void send_global_virq(uint32_t virq)
+{
+    ASSERT(virq < NR_VIRQS);
+    ASSERT(virq_is_global(virq));
+
+    send_guest_global_virq(global_virq_handlers[virq] ?: dom0, virq);
+}
+
+int set_global_virq_handler(struct domain *d, uint32_t virq)
+{
+    struct domain *old;
+
+    if (virq >= NR_VIRQS)
+        return -EINVAL;
+    if (!virq_is_global(virq))
+        return -EINVAL;
+
+    if (global_virq_handlers[virq] == d)
+        return 0;
+
+    if (unlikely(!get_domain(d)))
+        return -EINVAL;
+
+    spin_lock(&global_virq_handlers_lock);
+    old = global_virq_handlers[virq];
+    global_virq_handlers[virq] = d;
+    spin_unlock(&global_virq_handlers_lock);
+
+    if (old != NULL)
+        put_domain(old);
+
+    return 0;
+}
+
+static void clear_global_virq_handlers(struct domain *d)
+{
+    uint32_t virq;
+    int put_count = 0;
+
+    spin_lock(&global_virq_handlers_lock);
+
+    for (virq = 0; virq < NR_VIRQS; virq++)
+    {
+        if (global_virq_handlers[virq] == d)
+        {
+            global_virq_handlers[virq] = NULL;
+            put_count++;
+        }
+    }
+
+    spin_unlock(&global_virq_handlers_lock);
+
+    while (put_count)
+    {
+        put_domain(d);
+        put_count--;
+    }
+}
 
 static long evtchn_status(evtchn_status_t *status)
 {
@@ -1160,6 +1222,8 @@ void evtchn_destroy(struct domain *d)
         d->evtchn[i] = NULL;
     }
     spin_unlock(&d->event_lock);
+
+    clear_global_virq_handlers(d);
 }
 
 

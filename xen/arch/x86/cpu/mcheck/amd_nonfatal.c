@@ -100,7 +100,7 @@ static void mce_amd_checkregs(void *info)
 
 		if (dom0_vmce_enabled()) {
 			mctelem_commit(mctc);
-			send_guest_global_virq(dom0, VIRQ_MCA);
+			send_global_virq(VIRQ_MCA);
 		} else if (++dumpcount >= 10) {
 			x86_mcinfo_dump((struct mc_info *)mctelem_dataptr(mctc));
 			mctelem_dismiss(mctc);

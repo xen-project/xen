@@ -661,7 +661,7 @@ static inline void insert_lost_records(struct t_buf *buf)
  */
 static void trace_notify_dom0(unsigned long unused)
 {
-    send_guest_global_virq(dom0, VIRQ_TBUF);
+    send_global_virq(VIRQ_TBUF);
 }
 static DECLARE_SOFTIRQ_TASKLET(trace_notify_dom0_tasklet,
                                trace_notify_dom0, 0);

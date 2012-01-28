@@ -354,7 +354,7 @@ static void mce_softirq(void)
         /* Step2: Send Log to DOM0 through vIRQ */
         if (dom0_vmce_enabled()) {
             mce_printk(MCE_VERBOSE, "MCE: send MCE# to DOM0 through virq\n");
-            send_guest_global_virq(dom0, VIRQ_MCA);
+            send_global_virq(VIRQ_MCA);
         }
     }
 
@@ -1085,7 +1085,7 @@ static void cmci_discover(void)
     if (bs.errcnt && mctc != NULL) {
         if (dom0_vmce_enabled()) {
             mctelem_commit(mctc);
-            send_guest_global_virq(dom0, VIRQ_MCA);
+            send_global_virq(VIRQ_MCA);
         } else {
             x86_mcinfo_dump(mctelem_dataptr(mctc));
             mctelem_dismiss(mctc);
@@ -1205,7 +1205,7 @@ fastcall void smp_cmci_interrupt(struct cpu_user_regs *regs)
         if (dom0_vmce_enabled()) {
             mctelem_commit(mctc);
             mce_printk(MCE_VERBOSE, "CMCI: send CMCI to DOM0 through virq\n");
-            send_guest_global_virq(dom0, VIRQ_MCA);
+            send_global_virq(VIRQ_MCA);
         } else {
             x86_mcinfo_dump(mctelem_dataptr(mctc));
             mctelem_dismiss(mctc);

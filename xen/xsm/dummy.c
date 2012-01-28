@@ -94,6 +94,11 @@ static int dummy_domctl(struct domain *d, int cmd)
     return 0;
 }
 
+static int dummy_set_virq_handler(struct domain *d, uint32_t virq)
+{
+    return 0;
+}
+
 static int dummy_tbufcontrol (void)
 {
     return 0;
@@ -596,6 +601,7 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, domain_settime);
     set_to_dummy_if_null(ops, set_target);
     set_to_dummy_if_null(ops, domctl);
+    set_to_dummy_if_null(ops, set_virq_handler);
     set_to_dummy_if_null(ops, tbufcontrol);
     set_to_dummy_if_null(ops, readconsole);
     set_to_dummy_if_null(ops, sched_id);

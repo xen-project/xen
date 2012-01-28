@@ -749,6 +749,15 @@ int xc_domain_p2m_audit(xc_interface *xch,
 int xc_domain_set_access_required(xc_interface *xch,
 				  uint32_t domid,
 				  unsigned int required);
+/**
+ * This function sets the handler of global VIRQs sent by the hypervisor
+ *
+ * @parm xch a handle to an open hypervisor interface
+ * @parm domid the domain id which will handle the VIRQ
+ * @parm virq the virq number (VIRQ_*)
+ * return 0 on success, -1 on failure
+ */
+int xc_domain_set_virq_handler(xc_interface *xch, uint32_t domid, int virq);
 
 /*
  * CPUPOOL MANAGEMENT FUNCTIONS

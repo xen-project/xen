@@ -85,6 +85,7 @@ class domain
 	getpodtarget
 	setpodtarget
 	set_misc_info
+	set_virq_handler
 }
 
 class hvm

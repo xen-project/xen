@@ -995,6 +995,23 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     }
     break;
 
+    case XEN_DOMCTL_set_virq_handler:
+    {
+        struct domain *d;
+        uint32_t virq = op->u.set_virq_handler.virq;
+
+        ret = -ESRCH;
+        d = rcu_lock_domain_by_id(op->domain);
+        if ( d != NULL )
+        {
+            ret = xsm_set_virq_handler(d, virq);
+            if ( !ret )
+                ret = set_global_virq_handler(d, virq);
+            rcu_unlock_domain(d);
+        }
+    }
+    break;
+
     default:
         ret = arch_do_domctl(op, u_domctl);
         break;

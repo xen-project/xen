@@ -60,6 +60,7 @@
    S_(SECCLASS_DOMAIN, DOMAIN__GETPODTARGET, "getpodtarget")
    S_(SECCLASS_DOMAIN, DOMAIN__SETPODTARGET, "setpodtarget")
    S_(SECCLASS_DOMAIN, DOMAIN__SET_MISC_INFO, "set_misc_info")
+   S_(SECCLASS_DOMAIN, DOMAIN__SET_VIRQ_HANDLER, "set_virq_handler")
    S_(SECCLASS_HVM, HVM__SETHVMC, "sethvmc")
    S_(SECCLASS_HVM, HVM__GETHVMC, "gethvmc")
    S_(SECCLASS_HVM, HVM__SETPARAM, "setparam")

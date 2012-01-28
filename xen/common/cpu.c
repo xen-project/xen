@@ -108,7 +108,7 @@ int cpu_down(unsigned int cpu)
     notifier_rc = notifier_call_chain(&cpu_chain, CPU_DEAD, hcpu, NULL);
     BUG_ON(notifier_rc != NOTIFY_DONE);
 
-    send_guest_global_virq(dom0, VIRQ_PCPU_STATE);
+    send_global_virq(VIRQ_PCPU_STATE);
     cpu_hotplug_done();
     return 0;
 
@@ -148,7 +148,7 @@ int cpu_up(unsigned int cpu)
     notifier_rc = notifier_call_chain(&cpu_chain, CPU_ONLINE, hcpu, NULL);
     BUG_ON(notifier_rc != NOTIFY_DONE);
 
-    send_guest_global_virq(dom0, VIRQ_PCPU_STATE);
+    send_global_virq(VIRQ_PCPU_STATE);
 
     cpu_hotplug_done();
     return 0;

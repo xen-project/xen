@@ -597,6 +597,11 @@ static int flask_domctl(struct domain *d, int cmd)
     return domain_has_perm(current->domain, d, SECCLASS_DOMAIN, DOMAIN__SET_MISC_INFO);
 }
 
+static int flask_set_virq_handler(struct domain *d, uint32_t virq)
+{
+    return domain_has_perm(current->domain, d, SECCLASS_DOMAIN, DOMAIN__SET_VIRQ_HANDLER);
+}
+
 static int flask_tbufcontrol(void)
 {
     return domain_has_xen(current->domain, XEN__TBUFCONTROL);
@@ -1460,6 +1465,7 @@ static struct xsm_operations flask_ops = {
     .domain_settime = flask_domain_settime,
     .set_target = flask_set_target,
     .domctl = flask_domctl,
+    .set_virq_handler = flask_set_virq_handler,
     .tbufcontrol = flask_tbufcontrol,
     .readconsole = flask_readconsole,
     .sched_id = flask_sched_id,

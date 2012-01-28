@@ -61,6 +61,7 @@
 #define DOMAIN__GETPODTARGET                      0x10000000UL
 #define DOMAIN__SETPODTARGET                      0x20000000UL
 #define DOMAIN__SET_MISC_INFO                     0x40000000UL
+#define DOMAIN__SET_VIRQ_HANDLER                  0x80000000UL
 
 #define HVM__SETHVMC                              0x00000001UL
 #define HVM__GETHVMC                              0x00000002UL

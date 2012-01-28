@@ -1504,6 +1504,16 @@ int xc_domain_set_access_required(xc_interface *xch,
     return do_domctl(xch, &domctl);
 }
 
+int xc_domain_set_virq_handler(xc_interface *xch, uint32_t domid, int virq)
+{
+    DECLARE_DOMCTL;
+
+    domctl.cmd = XEN_DOMCTL_set_virq_handler;
+    domctl.domain = domid;
+    domctl.u.set_virq_handler.virq = virq;
+    return do_domctl(xch, &domctl);
+}
+
 /*
  * Local variables:
  * mode: C

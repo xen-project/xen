@@ -86,7 +86,7 @@ static void __domain_finalise_shutdown(struct domain *d)
     if ( (d->shutdown_code == SHUTDOWN_suspend) && d->suspend_evtchn )
         evtchn_send(d, d->suspend_evtchn);
     else
-        send_guest_global_virq(dom0, VIRQ_DOM_EXC);
+        send_global_virq(VIRQ_DOM_EXC);
 }
 
 static void vcpu_check_shutdown(struct vcpu *v)
@@ -480,7 +480,7 @@ int domain_kill(struct domain *d)
         }
         d->is_dying = DOMDYING_dead;
         put_domain(d);
-        send_guest_global_virq(dom0, VIRQ_DOM_EXC);
+        send_global_virq(VIRQ_DOM_EXC);
         /* fallthrough */
     case DOMDYING_dead:
         break;
@@ -621,7 +621,7 @@ void domain_pause_for_debugger(void)
     for_each_vcpu ( d, v )
         vcpu_sleep_nosync(v);
 
-    send_guest_global_virq(dom0, VIRQ_DEBUGGER);
+    send_global_virq(VIRQ_DEBUGGER);
 }
 
 /* Complete domain destroy after RCU readers are not holding old references. */
@@ -680,7 +680,7 @@ static void complete_domain_destroy(struct rcu_head *head)
     free_cpumask_var(d->domain_dirty_cpumask);
     free_domain_struct(d);
 
-    send_guest_global_virq(dom0, VIRQ_DOM_EXC);
+    send_global_virq(VIRQ_DOM_EXC);
 }
 
 /* Release resources belonging to task @p. */

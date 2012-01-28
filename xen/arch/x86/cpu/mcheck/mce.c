@@ -594,7 +594,7 @@ void mcheck_cmn_handler(struct cpu_user_regs *regs, long error_code,
         if (dom0_vmce_enabled()) {
             if (mctc != NULL)
                 mctelem_commit(mctc);
-            send_guest_global_virq(dom0, VIRQ_MCA);
+            send_global_virq(VIRQ_MCA);
         } else {
             x86_mcinfo_dump(mci);
             if (mctc != NULL)

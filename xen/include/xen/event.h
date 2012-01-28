@@ -23,11 +23,17 @@
 void send_guest_vcpu_virq(struct vcpu *v, int virq);
 
 /*
- * send_guest_global_virq: Notify guest via a global VIRQ.
- *  @d:        Domain to which virtual IRQ should be sent
+ * send_global_virq: Notify the domain handling a global VIRQ.
  *  @virq:     Virtual IRQ number (VIRQ_*)
  */
-void send_guest_global_virq(struct domain *d, int virq);
+void send_global_virq(uint32_t virq);
+
+/*
+ * sent_global_virq_handler: Set a global VIRQ handler.
+ *  @d:        New target domain for this VIRQ
+ *  @virq:     Virtual IRQ number (VIRQ_*), must be global
+ */
+int set_global_virq_handler(struct domain *d, uint32_t virq);
 
 /*
  * send_guest_pirq:
