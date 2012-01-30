@@ -685,6 +685,30 @@ int libxl_domain_reboot(libxl_ctx *ctx, uint32_t domid)
     return ret;
 }
 
+static void domain_death_occurred(libxl__egc *egc,
+                                  libxl_evgen_domain_death **evg_upd,
+                                  const char *why) {
+    /* Removes **evg_upd from death_list and puts it on death_reported
+     * and advances *evg_upd to the next entry.
+     * Call sites in domain_death_xswatch_callback must use "continue". */
+    EGC_GC;
+    libxl_evgen_domain_death *const evg = *evg_upd;
+
+    LIBXL__LOG(CTX, LIBXL__LOG_DEBUG, "%s", why);
+
+    libxl_evgen_domain_death *evg_next = LIBXL_TAILQ_NEXT(evg, entry);
+    *evg_upd = evg_next;
+
+    libxl_event *ev = NEW_EVENT(egc, DOMAIN_DEATH, evg->domid);
+    if (!ev) return;
+
+    libxl__event_occurred(egc, ev);
+
+    evg->death_reported = 1;
+    LIBXL_TAILQ_REMOVE(&CTX->death_list, evg, entry);
+    LIBXL_TAILQ_INSERT_HEAD(&CTX->death_reported, evg, entry);
+}
+
 static void domain_death_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
                                         const char *wpath, const char *epath) {
     EGC_GC;
@@ -728,30 +752,21 @@ static void domain_death_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
                        evg, evg->domid, (int)(got - domaininfos),
                        got < gotend ? (long)got->domain : -1L);
 
-            if (!rc || got->domain > evg->domid) {
-                /* ie, the list doesn't contain evg->domid any more so
-                 * the domain has been destroyed */
-                libxl_evgen_domain_death *evg_next;
-
-                LIBXL__LOG(CTX, LIBXL__LOG_DEBUG, " destroyed");
-
-                libxl_event *ev = NEW_EVENT(egc, DOMAIN_DESTROY, evg->domid);
-                if (!ev) goto out;
-
-                libxl__event_occurred(egc, ev);
-
-                evg->death_reported = 1;
-                evg_next = LIBXL_TAILQ_NEXT(evg, entry);
-                LIBXL_TAILQ_REMOVE(&CTX->death_list, evg, entry);
-                LIBXL_TAILQ_INSERT_HEAD(&CTX->death_reported, evg, entry);
-                evg = evg_next;
-
+            if (!rc) {
+                domain_death_occurred(egc, &evg, "empty list");
                 continue;
             }
-            
+
             if (got == gotend) {
                 LIBXL__LOG(CTX, LIBXL__LOG_DEBUG, " got==gotend");
                 break;
+            }
+
+            if (got->domain > evg->domid) {
+                /* ie, the list doesn't contain evg->domid any more so
+                 * the domain has been destroyed */
+                domain_death_occurred(egc, &evg, "missing from list");
+                continue;
             }
 
             if (got->domain < evg->domid) {
@@ -763,6 +778,11 @@ static void domain_death_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
             LIBXL__LOG(CTX, LIBXL__LOG_DEBUG, " exists shutdown_reported=%d"
                        " dominf.flags=%x",
                        evg->shutdown_reported, got->flags);
+
+            if (got->flags & XEN_DOMINF_dying) {
+                domain_death_occurred(egc, &evg, "dying");
+                continue;
+            }
 
             if (!evg->shutdown_reported &&
                 (got->flags & XEN_DOMINF_shutdown)) {

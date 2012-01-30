@@ -1909,7 +1909,7 @@ start:
                 abort();
             }
 
-        case LIBXL_EVENT_TYPE_DOMAIN_DESTROY:
+        case LIBXL_EVENT_TYPE_DOMAIN_DEATH:
             LOG("Domain %d has been destroyed.", domid);
             ret = 0;
             goto out;
@@ -2445,7 +2445,7 @@ static void shutdown_domain(const char *p, int wait)
 
             switch (event->type) {
 
-            case LIBXL_EVENT_TYPE_DOMAIN_DESTROY:
+            case LIBXL_EVENT_TYPE_DOMAIN_DEATH:
                 LOG("Domain %d has been destroyed", domid);
                 goto done;
 

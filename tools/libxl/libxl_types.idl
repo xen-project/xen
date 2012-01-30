@@ -396,7 +396,7 @@ libxl_sched_sedf = Struct("sched_sedf", [
 
 libxl_event_type = Enumeration("event_type", [
     (1, "DOMAIN_SHUTDOWN"),
-    (2, "DOMAIN_DESTROY"),
+    (2, "DOMAIN_DEATH"),
     (3, "DISK_EJECT"),
     (4, "OPERATION_COMPLETE"),
     ])
@@ -417,7 +417,7 @@ libxl_event = Struct("event",[
           [("domain_shutdown", Struct(None, [
                                              ("shutdown_reason", uint8),
                                       ])),
-           ("domain_destroy", Struct(None, [])),
+           ("domain_death", Struct(None, [])),
            ("disk_eject", Struct(None, [
                                         ("vdev", string),
                                         ("disk", libxl_device_disk),
