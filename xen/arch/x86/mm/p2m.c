@@ -735,19 +735,17 @@ int p2m_mem_paging_nominate(struct domain *d, unsigned long gfn)
     p2m_type_t p2mt;
     p2m_access_t a;
     mfn_t mfn;
-    int ret;
+    int ret = -EBUSY;
 
     p2m_lock(p2m);
 
     mfn = p2m->get_entry(p2m, gfn, &p2mt, &a, p2m_query, NULL);
 
     /* Check if mfn is valid */
-    ret = -EINVAL;
     if ( !mfn_valid(mfn) )
         goto out;
 
     /* Check p2m type */
-    ret = -EAGAIN;
     if ( !p2m_is_pageable(p2mt) )
         goto out;
 
@@ -799,7 +797,7 @@ int p2m_mem_paging_evict(struct domain *d, unsigned long gfn)
     p2m_access_t a;
     mfn_t mfn;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
-    int ret = -EINVAL;
+    int ret = -EBUSY;
 
     p2m_lock(p2m);
 
@@ -812,7 +810,6 @@ int p2m_mem_paging_evict(struct domain *d, unsigned long gfn)
     if ( p2mt != p2m_ram_paging_out )
         goto out;
 
-    ret = -EBUSY;
     /* Get the page so it doesn't get modified under Xen's feet */
     page = mfn_to_page(mfn);
     if ( unlikely(!get_page(page, d)) )
