@@ -713,14 +713,27 @@ static void domain_death_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
         }
         gotend = &domaininfos[rc];
 
+        LIBXL__LOG(CTX, LIBXL__LOG_DEBUG, "[evg=%p:%"PRIu32"]"
+                   " from domid=%"PRIu32" nentries=%d rc=%d",
+                   evg, evg->domid, domid, nentries, rc);
+
         for (;;) {
-            if (!evg)
+            if (!evg) {
+                LIBXL__LOG(CTX, LIBXL__LOG_DEBUG, "[evg=0] all reported");
                 goto all_reported;
+            }
+
+            LIBXL__LOG(CTX, LIBXL__LOG_DEBUG, "[evg=%p:%"PRIu32"]"
+                       "   got=domaininfos[%d] got->domain=%ld",
+                       evg, evg->domid, (int)(got - domaininfos),
+                       got < gotend ? (long)got->domain : -1L);
 
             if (!rc || got->domain > evg->domid) {
                 /* ie, the list doesn't contain evg->domid any more so
                  * the domain has been destroyed */
                 libxl_evgen_domain_death *evg_next;
+
+                LIBXL__LOG(CTX, LIBXL__LOG_DEBUG, " destroyed");
 
                 libxl_event *ev = NEW_EVENT(egc, DOMAIN_DESTROY, evg->domid);
                 if (!ev) goto out;
@@ -736,8 +749,10 @@ static void domain_death_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
                 continue;
             }
             
-            if (got == gotend)
+            if (got == gotend) {
+                LIBXL__LOG(CTX, LIBXL__LOG_DEBUG, " got==gotend");
                 break;
+            }
 
             if (got->domain < evg->domid) {
                 got++;
@@ -745,12 +760,17 @@ static void domain_death_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
             }
 
             assert(evg->domid == got->domain);
+            LIBXL__LOG(CTX, LIBXL__LOG_DEBUG, " exists shutdown_reported=%d"
+                       " dominf.flags=%x",
+                       evg->shutdown_reported, got->flags);
 
             if (!evg->shutdown_reported &&
                 (got->flags & XEN_DOMINF_shutdown)) {
                 libxl_event *ev = NEW_EVENT(egc, DOMAIN_SHUTDOWN, got->domain);
                 if (!ev) goto out;
                 
+                LIBXL__LOG(CTX, LIBXL__LOG_DEBUG, " shutdown reporting");
+
                 ev->u.domain_shutdown.shutdown_reason =
                     (got->flags >> XEN_DOMINF_shutdownshift) &
                     XEN_DOMINF_shutdownmask;
@@ -766,6 +786,8 @@ static void domain_death_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
     }
  all_reported:
  out:
+
+    LIBXL__LOG(CTX, LIBXL__LOG_DEBUG, "domain death search done");
 
     CTX_UNLOCK;
 }
