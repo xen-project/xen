@@ -265,8 +265,6 @@ libxl_domain_build_info = Struct("domain_build_info",[
 # Device Model Information
 libxl_device_model_info = Struct("device_model_info",[
     ("domid",            libxl_domid),
-    
-    ("saved_state",      string),
     ],
 )
 

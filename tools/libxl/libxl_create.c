@@ -278,9 +278,8 @@ static int domain_restore(libxl__gc *gc, libxl_domain_build_info *info,
     if (ret)
         goto out;
 
-    dm_info->saved_state = NULL;
     if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
-        ret = asprintf(&dm_info->saved_state,
+        ret = asprintf(&state->saved_state,
                        XC_DEVICE_MODEL_RESTORE_FILE".%d", domid);
         ret = (ret < 0) ? ERROR_FAIL : 0;
     }
@@ -512,13 +511,11 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
         }
     }
 
+    memset(&state, 0, sizeof(state));
+
     if ( restore_fd >= 0 ) {
         ret = domain_restore(gc, &d_config->b_info, domid, restore_fd, &state, dm_info);
     } else {
-        if (dm_info->saved_state) {
-            free(dm_info->saved_state);
-            dm_info->saved_state = NULL;
-        }
         ret = libxl__domain_build(gc, &d_config->b_info, dm_info, domid, &state);
     }
 
@@ -568,7 +565,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
 
         dm_info->domid = domid;
         ret = libxl__create_device_model(gc, d_config, dm_info,
-                                        &dm_starting);
+                                         &state, &dm_starting);
         if (ret < 0) {
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
                        "failed to create device model: %d", ret);
@@ -605,8 +602,8 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
             /* only copy those useful configs */
             memset((void*)&xenpv_dm_info, 0, sizeof(libxl_device_model_info));
 
-            libxl__create_xenpv_qemu(gc, domid,
-                                     d_config, &xenpv_dm_info, &dm_starting);
+            libxl__create_xenpv_qemu(gc, domid, d_config,
+                                     &xenpv_dm_info, &state, &dm_starting);
         }
         break;
     }
@@ -620,7 +617,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
             == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
             libxl__qmp_initializations(ctx, domid);
         }
-        ret = libxl__confirm_device_model_startup(gc, dm_info, dm_starting);
+        ret = libxl__confirm_device_model_startup(gc, &state, dm_starting);
         if (ret < 0) {
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
                        "device model did not start: %d", ret);

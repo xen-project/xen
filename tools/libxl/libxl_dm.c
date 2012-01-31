@@ -111,7 +111,8 @@ static const char *dm_keymap(const libxl_domain_config *guest_config,
 static char ** libxl__build_device_model_args_old(libxl__gc *gc,
                                         const char *dm,
                                         const libxl_domain_config *guest_config,
-                                        const libxl_device_model_info *info)
+                                        const libxl_device_model_info *info,
+                                        const libxl__domain_build_state *state)
 {
     const libxl_domain_create_info *c_info = &guest_config->c_info;
     const libxl_domain_build_info *b_info = &guest_config->b_info;
@@ -248,8 +249,8 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
             flexarray_append(dm_args, "-nographic");
     }
 
-    if (info->saved_state) {
-        flexarray_vappend(dm_args, "-loadvm", info->saved_state, NULL);
+    if (state->saved_state) {
+        flexarray_vappend(dm_args, "-loadvm", state->saved_state, NULL);
     }
     for (i = 0; b_info->extra && b_info->extra[i] != NULL; i++)
         flexarray_append(dm_args, b_info->extra[i]);
@@ -321,7 +322,8 @@ static char *dm_spice_options(libxl__gc *gc,
 static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                                         const char *dm,
                                         const libxl_domain_config *guest_config,
-                                        const libxl_device_model_info *info)
+                                        const libxl_device_model_info *info,
+                                        const libxl__domain_build_state *state)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     const libxl_domain_create_info *c_info = &guest_config->c_info;
@@ -489,9 +491,9 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
         }
     }
 
-    if (info->saved_state) {
+    if (state->saved_state) {
         /* This file descriptor is meant to be used by QEMU */
-        int migration_fd = open(info->saved_state, O_RDONLY);
+        int migration_fd = open(state->saved_state, O_RDONLY);
         flexarray_append(dm_args, "-incoming");
         flexarray_append(dm_args, libxl__sprintf(gc, "fd:%d", migration_fd));
     }
@@ -581,15 +583,16 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
 static char ** libxl__build_device_model_args(libxl__gc *gc,
                                         const char *dm,
                                         const libxl_domain_config *guest_config,
-                                        const libxl_device_model_info *info)
+                                        const libxl_device_model_info *info,
+                                        const libxl__domain_build_state *state)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
 
     switch (guest_config->b_info.device_model_version) {
     case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
-        return libxl__build_device_model_args_old(gc, dm, guest_config, info);
+        return libxl__build_device_model_args_old(gc, dm, guest_config, info, state);
     case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
-        return libxl__build_device_model_args_new(gc, dm, guest_config, info);
+        return libxl__build_device_model_args_new(gc, dm, guest_config, info, state);
     default:
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "unknown device model version %d",
                          guest_config->b_info.device_model_version);
@@ -672,6 +675,7 @@ retry_transaction:
 static int libxl__create_stubdom(libxl__gc *gc,
                                  libxl_domain_config *guest_config,
                                  libxl_device_model_info *info,
+                                 libxl__domain_build_state *d_state,
                                  libxl__spawner_starting **starting_r)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
@@ -680,7 +684,7 @@ static int libxl__create_stubdom(libxl__gc *gc,
     libxl_domain_config dm_config;
     libxl_device_vfb vfb;
     libxl_device_vkb vkb;
-    libxl__domain_build_state state;
+    libxl__domain_build_state stubdom_state;
     uint32_t domid;
     char **args;
     struct xs_permissions perm[2];
@@ -738,12 +742,12 @@ static int libxl__create_stubdom(libxl__gc *gc,
     ret = libxl__domain_make(gc, &dm_config.c_info, &domid);
     if (ret)
         goto out;
-    ret = libxl__domain_build(gc, &dm_config.b_info, info, domid, &state);
+    ret = libxl__domain_build(gc, &dm_config.b_info, info, domid, &stubdom_state);
     if (ret)
         goto out;
 
     args = libxl__build_device_model_args(gc, "stubdom-dm",
-                                          guest_config, info);
+                                          guest_config, info, d_state);
     if (!args) {
         ret = ERROR_FAIL;
         goto out;
@@ -813,7 +817,8 @@ retry_transaction:
             char *filename;
             char *name;
             case STUBDOM_CONSOLE_LOGGING:
-                name = libxl__sprintf(gc, "qemu-dm-%s", libxl_domid_to_name(ctx, info->domid));
+                name = libxl__sprintf(gc, "qemu-dm-%s",
+                                      libxl_domid_to_name(ctx, info->domid));
                 libxl_create_logfile(ctx, name, &filename);
                 console[i].output = libxl__sprintf(gc, "file:%s", filename);
                 free(filename);
@@ -823,15 +828,16 @@ retry_transaction:
                                 libxl__device_model_savefile(gc, info->domid));
                 break;
             case STUBDOM_CONSOLE_RESTORE:
-                if (info->saved_state)
-                    console[i].output = libxl__sprintf(gc, "pipe:%s", info->saved_state);
+                if (d_state->saved_state)
+                    console[i].output =
+                        libxl__sprintf(gc, "pipe:%s", d_state->saved_state);
                 break;
             default:
                 console[i].output = "pty";
                 break;
         }
         ret = libxl__device_console_add(gc, domid, &console[i],
-                                    i == STUBDOM_CONSOLE_LOGGING ? &state : NULL);
+                        i == STUBDOM_CONSOLE_LOGGING ? &stubdom_state : NULL);
         if (ret)
             goto out_free;
     }
@@ -841,12 +847,12 @@ retry_transaction:
     if (libxl__create_xenpv_qemu(gc, domid,
                                  &dm_config,
                                  &xenpv_dm_info,
+                                 &stubdom_state,
                                  &dm_starting) < 0) {
         ret = ERROR_FAIL;
         goto out_free;
     }
-    if (libxl__confirm_device_model_startup(gc, &xenpv_dm_info,
-                                            dm_starting) < 0) {
+    if (libxl__confirm_device_model_startup(gc, d_state, dm_starting) < 0) {
         ret = ERROR_FAIL;
         goto out_free;
     }
@@ -871,6 +877,7 @@ out:
 int libxl__create_device_model(libxl__gc *gc,
                               libxl_domain_config *guest_config,
                               libxl_device_model_info *info,
+                              libxl__domain_build_state *state,
                               libxl__spawner_starting **starting_r)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
@@ -888,7 +895,7 @@ int libxl__create_device_model(libxl__gc *gc,
     const char *dm;
 
     if (b_info->device_model_stubdomain) {
-        rc = libxl__create_stubdom(gc, guest_config, info, starting_r);
+        rc = libxl__create_stubdom(gc, guest_config, info, state, starting_r);
         goto out;
     }
 
@@ -903,7 +910,7 @@ int libxl__create_device_model(libxl__gc *gc,
         rc = ERROR_FAIL;
         goto out;
     }
-    args = libxl__build_device_model_args(gc, dm, guest_config, info);
+    args = libxl__build_device_model_args(gc, dm, guest_config, info, state);
     if (!args) {
         rc = ERROR_FAIL;
         goto out;
@@ -984,10 +991,9 @@ out:
 
 
 int libxl__confirm_device_model_startup(libxl__gc *gc,
-                                libxl_device_model_info *dm_info,
+                                libxl__domain_build_state *state,
                                 libxl__spawner_starting *starting)
 {
-    libxl_ctx *ctx = libxl__gc_owner(gc);
     char *path;
     int domid = starting->domid;
     int ret, ret2;
@@ -995,11 +1001,11 @@ int libxl__confirm_device_model_startup(libxl__gc *gc,
     ret = libxl__spawn_confirm_offspring_startup(gc,
                                      LIBXL_DEVICE_MODEL_START_TIMEOUT,
                                      "Device Model", path, "running", starting);
-    if (dm_info->saved_state) {
-        ret2 = unlink(dm_info->saved_state);
-        if (ret2) LIBXL__LOG_ERRNO(ctx, XTL_ERROR,
+    if (state->saved_state) {
+        ret2 = unlink(state->saved_state);
+        if (ret2) LIBXL__LOG_ERRNO(CTX, XTL_ERROR,
                                    "failed to remove device-model state %s\n",
-                                   dm_info->saved_state);
+                                   state->saved_state);
         /* Do not clobber spawn_confirm error code with unlink error code. */
         if (!ret) ret = ret2;
     }
@@ -1110,10 +1116,11 @@ out:
 int libxl__create_xenpv_qemu(libxl__gc *gc, uint32_t domid,
                              libxl_domain_config *guest_config,
                              libxl_device_model_info *info,
+                             libxl__domain_build_state *state,
                              libxl__spawner_starting **starting_r)
 {
     libxl__build_xenpv_qemu_args(gc, domid, info);
-    libxl__create_device_model(gc, guest_config, info, starting_r);
+    libxl__create_device_model(gc, guest_config, info, state, starting_r);
     return 0;
 }
 

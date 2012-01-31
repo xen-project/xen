@@ -599,7 +599,10 @@ typedef struct {
 
     uint32_t console_port;
     unsigned long console_mfn;
+
     unsigned long vm_generationid_addr;
+
+    char *saved_state;
 } libxl__domain_build_state;
 
 _hidden int libxl__build_pre(libxl__gc *gc, uint32_t domid,
@@ -868,10 +871,12 @@ _hidden const char *libxl__domain_device_model(libxl__gc *gc,
 _hidden int libxl__create_device_model(libxl__gc *gc,
                               libxl_domain_config *guest_config,
                               libxl_device_model_info *info,
+                              libxl__domain_build_state *state,
                               libxl__spawner_starting **starting_r);
 _hidden int libxl__create_xenpv_qemu(libxl__gc *gc, uint32_t domid,
                               libxl_domain_config *guest_config,
                               libxl_device_model_info *dm_info,
+                              libxl__domain_build_state *state,
                               libxl__spawner_starting **starting_r);
 _hidden int libxl__need_xenpv_qemu(libxl__gc *gc,
         int nr_consoles, libxl_device_console *consoles,
@@ -881,7 +886,7 @@ _hidden int libxl__need_xenpv_qemu(libxl__gc *gc,
    * return pass *starting_r (which will be non-0) to
    * libxl__confirm_device_model_startup or libxl__detach_device_model. */
 _hidden int libxl__confirm_device_model_startup(libxl__gc *gc,
-                              libxl_device_model_info *dm_info,
+                              libxl__domain_build_state *state,
                               libxl__spawner_starting *starting);
 _hidden int libxl__detach_device_model(libxl__gc *gc, libxl__spawner_starting *starting);
 _hidden int libxl__wait_for_device_model(libxl__gc *gc,
