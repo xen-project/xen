@@ -48,7 +48,6 @@ void libxl_domain_config_dispose(libxl_domain_config *d_config)
 
     libxl_domain_create_info_dispose(&d_config->c_info);
     libxl_domain_build_info_dispose(&d_config->b_info);
-    libxl_device_model_info_dispose(&d_config->dm_info);
 }
 
 int libxl_init_create_info(libxl_ctx *ctx, libxl_domain_create_info *c_info)
@@ -130,17 +129,6 @@ int libxl_init_build_info(libxl_ctx *ctx,
     return 0;
 }
 
-int libxl_init_dm_info(libxl_ctx *ctx,
-                       libxl_device_model_info *dm_info,
-                       libxl_domain_create_info *c_info,
-                       libxl_domain_build_info *b_info)
-{
-    memset(dm_info, '\0', sizeof(*dm_info));
-
-
-    return 0;
-}
-
 static int init_console_info(libxl_device_console *console, int dev_num)
 {
     memset(console, 0x00, sizeof(libxl_device_console));
@@ -154,7 +142,6 @@ static int init_console_info(libxl_device_console *console, int dev_num)
 
 int libxl__domain_build(libxl__gc *gc,
                         libxl_domain_build_info *info,
-                        libxl_device_model_info *dm_info,
                         uint32_t domid,
                         libxl__domain_build_state *state)
 {
@@ -170,7 +157,7 @@ int libxl__domain_build(libxl__gc *gc,
 
     switch (info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
-        ret = libxl__build_hvm(gc, domid, info, dm_info, state);
+        ret = libxl__build_hvm(gc, domid, info, state);
         if (ret)
             goto out;
 
@@ -224,8 +211,7 @@ out:
 
 static int domain_restore(libxl__gc *gc, libxl_domain_build_info *info,
                           uint32_t domid, int fd,
-                          libxl__domain_build_state *state,
-                          libxl_device_model_info *dm_info)
+                          libxl__domain_build_state *state)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     char **vments = NULL, **localents = NULL;
@@ -477,7 +463,6 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     libxl__spawner_starting *dm_starting = 0;
-    libxl_device_model_info *dm_info = &d_config->dm_info;
     libxl__domain_build_state state;
     uint32_t domid;
     int i, ret;
@@ -514,9 +499,9 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     memset(&state, 0, sizeof(state));
 
     if ( restore_fd >= 0 ) {
-        ret = domain_restore(gc, &d_config->b_info, domid, restore_fd, &state, dm_info);
+        ret = domain_restore(gc, &d_config->b_info, domid, restore_fd, &state);
     } else {
-        ret = libxl__domain_build(gc, &d_config->b_info, dm_info, domid, &state);
+        ret = libxl__domain_build(gc, &d_config->b_info, domid, &state);
     }
 
     if (ret) {
@@ -563,8 +548,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
         libxl_device_vkb_add(ctx, domid, &vkb);
         libxl_device_vkb_dispose(&vkb);
 
-        dm_info->domid = domid;
-        ret = libxl__create_device_model(gc, d_config, dm_info,
+        ret = libxl__create_device_model(gc, domid, d_config,
                                          &state, &dm_starting);
         if (ret < 0) {
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
@@ -577,7 +561,6 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     {
         int need_qemu = 0;
         libxl_device_console console;
-        libxl_device_model_info xenpv_dm_info;
 
         for (i = 0; i < d_config->num_vfbs; i++) {
             libxl_device_vfb_add(ctx, domid, &d_config->vfbs[i]);
@@ -599,11 +582,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
         libxl_device_console_dispose(&console);
 
         if (need_qemu) {
-            /* only copy those useful configs */
-            memset((void*)&xenpv_dm_info, 0, sizeof(libxl_device_model_info));
-
-            libxl__create_xenpv_qemu(gc, domid, d_config,
-                                     &xenpv_dm_info, &state, &dm_starting);
+            libxl__create_xenpv_qemu(gc, domid, d_config, &state, &dm_starting);
         }
         break;
     }

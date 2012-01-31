@@ -290,8 +290,7 @@ static void dolog(const char *file, int line, const char *func, char *fmt, ...)
 }
 
 static void printf_info(int domid,
-                        libxl_domain_config *d_config,
-                        libxl_device_model_info *dm_info)
+                        libxl_domain_config *d_config)
 {
     int i;
     libxl_dominfo info;
@@ -631,8 +630,7 @@ vcpp_out:
 static void parse_config_data(const char *configfile_filename_report,
                               const char *configfile_data,
                               int configfile_len,
-                              libxl_domain_config *d_config,
-                              libxl_device_model_info *dm_info)
+                              libxl_domain_config *d_config)
 {
     const char *buf;
     long l;
@@ -1194,9 +1192,6 @@ skip_vfb:
         break;
     }
 
-    /* init dm from c and b */
-    if (libxl_init_dm_info(ctx, dm_info, c_info, b_info))
-        exit(1);
     /* parse device model arguments, this works for pv, hvm and stubdom */
     if (!xlu_cfg_get_string (config, "device_model", &buf, 0)) {
         fprintf(stderr,
@@ -1452,7 +1447,7 @@ struct domain_create {
     int no_incr_generationid;
 };
 
-static int freemem(libxl_domain_build_info *b_info, libxl_device_model_info *dm_info)
+static int freemem(libxl_domain_build_info *b_info)
 {
     int rc, retries = 3;
     uint32_t need_memkb, free_memkb;
@@ -1460,7 +1455,7 @@ static int freemem(libxl_domain_build_info *b_info, libxl_device_model_info *dm_
     if (!autoballoon)
         return 0;
 
-    rc = libxl_domain_need_memory(ctx, b_info, dm_info, &need_memkb);
+    rc = libxl_domain_need_memory(ctx, b_info, &need_memkb);
     if (rc < 0)
         return rc;
 
@@ -1679,7 +1674,7 @@ static int create_domain(struct domain_create *dom_info)
     if (!dom_info->quiet)
         printf("Parsing config file %s\n", config_file);
 
-    parse_config_data(config_file, config_data, config_len, &d_config, &d_config.dm_info);
+    parse_config_data(config_file, config_data, config_len, &d_config);
 
     if (migrate_fd >= 0) {
         if (d_config.c_info.name) {
@@ -1704,7 +1699,7 @@ static int create_domain(struct domain_create *dom_info)
             dom_info->no_incr_generationid;
 
     if (debug || dom_info->dryrun)
-        printf_info(-1, &d_config, &d_config.dm_info);
+        printf_info(-1, &d_config);
 
     ret = 0;
     if (dom_info->dryrun)
@@ -1717,7 +1712,7 @@ start:
     if (rc < 0)
         goto error_out;
 
-    ret = freemem(&d_config.b_info, &d_config.dm_info);
+    ret = freemem(&d_config.b_info);
     if (ret < 0) {
         fprintf(stderr, "failed to free memory for the domain\n");
         ret = ERROR_FAIL;
@@ -2484,7 +2479,6 @@ static void list_domains_details(const libxl_dominfo *info, int nb_domain)
     char *config_file;
     uint8_t *data;
     int i, len, rc;
-    libxl_device_model_info dm_info;
 
     for (i = 0; i < nb_domain; i++) {
         /* no detailed info available on dom0 */
@@ -2495,8 +2489,8 @@ static void list_domains_details(const libxl_dominfo *info, int nb_domain)
             continue;
         CHK_ERRNO(asprintf(&config_file, "<domid %d data>", info[i].domid));
         memset(&d_config, 0x00, sizeof(d_config));
-        parse_config_data(config_file, (char *)data, len, &d_config, &dm_info);
-        printf_info(info[i].domid, &d_config, &dm_info);
+        parse_config_data(config_file, (char *)data, len, &d_config);
+        printf_info(info[i].domid, &d_config);
         libxl_domain_config_dispose(&d_config);
         free(data);
         free(config_file);

@@ -291,8 +291,7 @@ static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
 }
 
 static const char *libxl__domain_firmware(libxl__gc *gc,
-                                          libxl_domain_build_info *info,
-                                          libxl_device_model_info *dm_info)
+                                          libxl_domain_build_info *info)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     const char *firmware;
@@ -320,12 +319,11 @@ static const char *libxl__domain_firmware(libxl__gc *gc,
 
 int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
               libxl_domain_build_info *info,
-              libxl_device_model_info *dm_info,
               libxl__domain_build_state *state)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     int ret, rc = ERROR_FAIL;
-    const char *firmware = libxl__domain_firmware(gc, info, dm_info);
+    const char *firmware = libxl__domain_firmware(gc, info);
 
     if (!firmware)
         goto out;

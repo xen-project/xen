@@ -2621,7 +2621,7 @@ out:
 }
 
 int libxl_domain_need_memory(libxl_ctx *ctx, libxl_domain_build_info *b_info,
-        libxl_device_model_info *dm_info, uint32_t *need_memkb)
+                             uint32_t *need_memkb)
 {
     GC_INIT(ctx);
     int rc = ERROR_INVAL;

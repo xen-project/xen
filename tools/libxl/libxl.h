@@ -295,7 +295,6 @@ typedef struct {
 typedef struct {
     libxl_domain_create_info c_info;
     libxl_domain_build_info b_info;
-    libxl_device_model_info dm_info;
 
     int num_disks, num_vifs, num_pcidevs, num_vfbs, num_vkbs;
 
@@ -323,10 +322,6 @@ int libxl_init_create_info(libxl_ctx *ctx, libxl_domain_create_info *c_info);
 int libxl_init_build_info(libxl_ctx *ctx,
                           libxl_domain_build_info *b_info,
                           libxl_domain_create_info *c_info);
-int libxl_init_dm_info(libxl_ctx *ctx,
-                       libxl_device_model_info *dm_info,
-                       libxl_domain_create_info *c_info,
-                       libxl_domain_build_info *b_info);
 typedef int (*libxl_console_ready)(libxl_ctx *ctx, uint32_t domid, void *priv);
 int libxl_domain_create_new(libxl_ctx *ctx, libxl_domain_config *d_config, libxl_console_ready cb, void *priv, uint32_t *domid);
 int libxl_domain_create_restore(libxl_ctx *ctx, libxl_domain_config *d_config, libxl_console_ready cb, void *priv, uint32_t *domid, int restore_fd);
@@ -379,7 +374,7 @@ int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid, int32_t target_memkb
 int libxl_get_memory_target(libxl_ctx *ctx, uint32_t domid, uint32_t *out_target);
 /* how much free memory in the system a domain needs to be built */
 int libxl_domain_need_memory(libxl_ctx *ctx, libxl_domain_build_info *b_info,
-        libxl_device_model_info *dm_info, uint32_t *need_memkb);
+                             uint32_t *need_memkb);
 /* how much free memory is available in the system */
 int libxl_get_free_memory(libxl_ctx *ctx, uint32_t *memkb);
 /* wait for a given amount of memory to be free in the system */

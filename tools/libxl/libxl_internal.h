@@ -615,7 +615,6 @@ _hidden int libxl__build_pv(libxl__gc *gc, uint32_t domid,
              libxl_domain_build_info *info, libxl__domain_build_state *state);
 _hidden int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
               libxl_domain_build_info *info,
-              libxl_device_model_info *dm_info,
               libxl__domain_build_state *state);
 
 _hidden int libxl__domain_rename(libxl__gc *gc, uint32_t domid,
@@ -858,10 +857,11 @@ _hidden void libxl__exec(int stdinfd, int stdoutfd, int stderrfd,
                const char *arg0, char **args); // logs errors, never returns
 
 /* from xl_create */
-_hidden int libxl__domain_make(libxl__gc *gc, libxl_domain_create_info *info, uint32_t *domid);
+_hidden int libxl__domain_make(libxl__gc *gc,
+                               libxl_domain_create_info *info,
+                               uint32_t *domid);
 _hidden int libxl__domain_build(libxl__gc *gc,
                                 libxl_domain_build_info *info,
-                                libxl_device_model_info *dm_info,
                                 uint32_t domid,
                                 libxl__domain_build_state *state);
 
@@ -869,13 +869,12 @@ _hidden int libxl__domain_build(libxl__gc *gc,
 _hidden const char *libxl__domain_device_model(libxl__gc *gc,
                                         const libxl_domain_build_info *info);
 _hidden int libxl__create_device_model(libxl__gc *gc,
+                              int domid,
                               libxl_domain_config *guest_config,
-                              libxl_device_model_info *info,
                               libxl__domain_build_state *state,
                               libxl__spawner_starting **starting_r);
 _hidden int libxl__create_xenpv_qemu(libxl__gc *gc, uint32_t domid,
                               libxl_domain_config *guest_config,
-                              libxl_device_model_info *dm_info,
                               libxl__domain_build_state *state,
                               libxl__spawner_starting **starting_r);
 _hidden int libxl__need_xenpv_qemu(libxl__gc *gc,

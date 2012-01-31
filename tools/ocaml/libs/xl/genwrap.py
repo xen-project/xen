@@ -266,7 +266,6 @@ if __name__ == '__main__':
         "cpupoolinfo",
         "domain_create_info",
         "domain_build_info",
-        "device_model_info",
         "vcpuinfo",
         "topologyinfo",
         "event",
