@@ -195,6 +195,7 @@ static void libxl_string_list_rand_init(libxl_string_list *p)
     *p = l;
 }
 
+#if 0 /* To be remove in a subsequent patch */
 static void libxl_cpuarray_rand_init(libxl_cpuarray *p)
 {
     int i;
@@ -209,6 +210,7 @@ static void libxl_cpuarray_rand_init(libxl_cpuarray *p)
             p->array[i] = r;
     }
 }
+#endif
 """)
     for ty in builtins + types:
         if ty.typename not in handcoded:

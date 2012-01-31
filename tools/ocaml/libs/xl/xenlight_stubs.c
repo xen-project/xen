@@ -210,28 +210,6 @@ static value Val_hwcap(libxl_hwcap *c_val)
 
 #include "_libxl_types.inc"
 
-static value Val_topologyinfo(libxl_topologyinfo *c_val)
-{
-	CAMLparam0();
-	CAMLlocal3(v, topology, topologyinfo);
-	int i;
-
-	topologyinfo = caml_alloc_tuple(c_val->coremap.entries);
-	for (i = 0; i < c_val->coremap.entries; i++) {
-		v = Val_none;
-		if (c_val->coremap.array[i] != LIBXL_CPUARRAY_INVALID_ENTRY) {
-			topology = caml_alloc_tuple(3);
-			Store_field(topology, 0, Val_int(c_val->coremap.array[i]));
-			Store_field(topology, 1, Val_int(c_val->socketmap.array[i]));
-			Store_field(topology, 2, Val_int(c_val->nodemap.array[i]));
-			v = Val_some(topology);
-		}
-		Store_field(topologyinfo, i, v);
-	}
-
-	CAMLreturn(topologyinfo);
-}
-
 value stub_xl_device_disk_add(value info, value domid)
 {
 	CAMLparam2(info, domid);
@@ -462,22 +440,33 @@ value stub_xl_physinfo_get(value unit)
 	CAMLreturn(physinfo);
 }
 
-value stub_xl_topologyinfo(value unit)
+value stub_xl_cputopology_get(value unit)
 {
 	CAMLparam1(unit);
-	CAMLlocal1(topologyinfo);
-	libxl_topologyinfo c_topologyinfo;
-	int ret;
+	CAMLlocal2(topology, v);
+	libxl_cputopology *c_topology;
+	int i, nr, ret;
 	INIT_STRUCT();
 
 	INIT_CTX();
-	ret = libxl_get_topologyinfo(ctx, &c_topologyinfo);
+
+	c_topology = libxl_get_cpu_topology(ctx, &nr);
 	if (ret != 0)
 		failwith_xl("topologyinfo", &lg);
-	FREE_CTX();
 
-	topologyinfo = Val_topologyinfo(&c_topologyinfo);
-	CAMLreturn(topologyinfo);
+	topology = caml_alloc_tuple(nr);
+	for (i = 0; i < nr; i++) {
+		if (c_topology[i].core != LIBXL_CPUTOPOLOGY_INVALID_ENTRY)
+			v = Val_some(Val_cputopology(&gc, &lg, &c_topology[i]));
+		else
+			v = Val_none;
+		Store_field(topology, i, v);
+	}
+
+	libxl_cputopology_list_free(c_topology, nr);
+
+	FREE_CTX();
+	CAMLreturn(topology);
 }
 
 value stub_xl_sched_credit_domain_get(value domid)

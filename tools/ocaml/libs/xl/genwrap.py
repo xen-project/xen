@@ -29,6 +29,8 @@ functions = { # ( name , [type1,type2,....] )
     "device_pci":     DEVICE_FUNCTIONS,
     "physinfo":       [ ("get",            ["unit", "t"]),
                       ],
+    "cputopology":    [ ("get",            ["unit", "t array"]),
+                      ],
     "sched_credit":   [ ("domain_get",     ["domid", "t"]),
                         ("domain_set",     ["domid", "t", "unit"]),
                       ],
@@ -266,7 +268,6 @@ if __name__ == '__main__':
         "domain_create_info",
         "domain_build_info",
         "vcpuinfo",
-        "topologyinfo",
         "event",
         ]
 

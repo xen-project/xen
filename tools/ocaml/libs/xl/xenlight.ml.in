@@ -19,17 +19,6 @@ type domid = int
 
 (* @@LIBXL_TYPES@@ *)
 
-module Topologyinfo = struct
-	type t =
-	{
-		core : int;
-		socket : int;
-		node : int;
-	}
-	external get : unit -> t array = "stub_xl_topologyinfo"
-end
-
-
 external send_trigger : domid -> trigger -> int -> unit = "stub_xl_send_trigger"
 external send_sysrq : domid -> char -> unit = "stub_xl_send_sysrq"
 external send_debug_keys : domid -> string -> unit = "stub_xl_send_debug_keys"

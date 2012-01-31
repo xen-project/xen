@@ -557,6 +557,14 @@ int libxl__enum_from_string(const libxl_enum_string_table *t,
     return ERROR_FAIL;
 }
 
+void libxl_cputopology_list_free(libxl_cputopology *list, int nr)
+{
+    int i;
+    for (i = 0; i < nr; i++)
+        libxl_cputopology_dispose(&list[i]);
+    free(list);
+}
+
 /*
  * Local variables:
  * mode: C

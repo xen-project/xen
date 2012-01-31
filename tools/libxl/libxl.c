@@ -2755,57 +2755,68 @@ int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo)
     return 0;
 }
 
-int libxl_get_topologyinfo(libxl_ctx *ctx, libxl_topologyinfo *info)
+libxl_cputopology *libxl_get_cpu_topology(libxl_ctx *ctx, int *nr)
 {
     xc_topologyinfo_t tinfo;
     DECLARE_HYPERCALL_BUFFER(xc_cpu_to_core_t, coremap);
     DECLARE_HYPERCALL_BUFFER(xc_cpu_to_socket_t, socketmap);
     DECLARE_HYPERCALL_BUFFER(xc_cpu_to_node_t, nodemap);
+    libxl_cputopology *ret = NULL;
     int i;
-    int rc = 0;
+    int max_cpus;
 
-    rc += libxl_cpuarray_alloc(ctx, &info->coremap);
-    rc += libxl_cpuarray_alloc(ctx, &info->socketmap);
-    rc += libxl_cpuarray_alloc(ctx, &info->nodemap);
-    if (rc)
-        goto fail;
+    max_cpus = libxl_get_max_cpus(ctx);
+    if (max_cpus == 0)
+    {
+        LIBXL__LOG(ctx, XTL_ERROR, "Unable to determine number of CPUS");
+        return NULL;
+    }
 
-    coremap = xc_hypercall_buffer_alloc(ctx->xch, coremap, sizeof(*coremap) * info->coremap.entries);
-    socketmap = xc_hypercall_buffer_alloc(ctx->xch, socketmap, sizeof(*socketmap) * info->socketmap.entries);
-    nodemap = xc_hypercall_buffer_alloc(ctx->xch, nodemap, sizeof(*nodemap) * info->nodemap.entries);
-    if ((coremap == NULL) || (socketmap == NULL) || (nodemap == NULL))
+    coremap = xc_hypercall_buffer_alloc
+        (ctx->xch, coremap, sizeof(*coremap) * max_cpus);
+    socketmap = xc_hypercall_buffer_alloc
+        (ctx->xch, socketmap, sizeof(*socketmap) * max_cpus);
+    nodemap = xc_hypercall_buffer_alloc
+        (ctx->xch, nodemap, sizeof(*nodemap) * max_cpus);
+    if ((coremap == NULL) || (socketmap == NULL) || (nodemap == NULL)) {
+        LIBXL__LOG_ERRNOVAL(ctx, XTL_ERROR, ENOMEM,
+                            "Unable to allocate hypercall arguments");
         goto fail;
+    }
 
     set_xen_guest_handle(tinfo.cpu_to_core, coremap);
     set_xen_guest_handle(tinfo.cpu_to_socket, socketmap);
     set_xen_guest_handle(tinfo.cpu_to_node, nodemap);
-    tinfo.max_cpu_index = info->coremap.entries - 1;
-    if (xc_topologyinfo(ctx->xch, &tinfo) != 0)
+    tinfo.max_cpu_index = max_cpus - 1;
+    if (xc_topologyinfo(ctx->xch, &tinfo) != 0) {
+        LIBXL__LOG_ERRNO(ctx, XTL_ERROR, "Topology info hypercall failed");
         goto fail;
-
-    for (i = 0; i <= tinfo.max_cpu_index; i++) {
-        if (i < info->coremap.entries)
-            info->coremap.array[i] = (coremap[i] == INVALID_TOPOLOGY_ID) ?
-                LIBXL_CPUARRAY_INVALID_ENTRY : coremap[i];
-        if (i < info->socketmap.entries)
-            info->socketmap.array[i] = (socketmap[i] == INVALID_TOPOLOGY_ID) ?
-                LIBXL_CPUARRAY_INVALID_ENTRY : socketmap[i];
-        if (i < info->nodemap.entries)
-            info->nodemap.array[i] = (nodemap[i] == INVALID_TOPOLOGY_ID) ?
-                LIBXL_CPUARRAY_INVALID_ENTRY : nodemap[i];
     }
 
-    xc_hypercall_buffer_free(ctx->xch, coremap);
-    xc_hypercall_buffer_free(ctx->xch, socketmap);
-    xc_hypercall_buffer_free(ctx->xch, nodemap);
-    return 0;
+    ret = malloc(sizeof(libxl_cputopology) * max_cpus);
+    if (ret == NULL) {
+        LIBXL__LOG_ERRNOVAL(ctx, XTL_ERROR, ENOMEM,
+                            "Unable to allocate return value");
+        goto fail;
+    }
+
+    for (i = 0; i <= max_cpus; i++) {
+#define V(map, i) (map[i] == INVALID_TOPOLOGY_ID) ? \
+    LIBXL_CPUTOPOLOGY_INVALID_ENTRY : map[i]
+        ret[i].core = V(coremap, i);
+        ret[i].socket = V(socketmap, i);
+        ret[i].node = V(nodemap, i);
+#undef V
+    }
 
 fail:
     xc_hypercall_buffer_free(ctx->xch, coremap);
     xc_hypercall_buffer_free(ctx->xch, socketmap);
     xc_hypercall_buffer_free(ctx->xch, nodemap);
-    libxl_topologyinfo_dispose(info);
-    return ERROR_FAIL;
+
+    if (ret)
+        *nr = max_cpus;
+    return ret;
 }
 
 const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx)
@@ -3604,30 +3615,30 @@ int libxl_cpupool_cpuadd(libxl_ctx *ctx, uint32_t poolid, int cpu)
 int libxl_cpupool_cpuadd_node(libxl_ctx *ctx, uint32_t poolid, int node, int *cpus)
 {
     int rc = 0;
-    int cpu;
+    int cpu, nr;
     libxl_cpumap freemap;
-    libxl_topologyinfo topology;
+    libxl_cputopology *topology;
 
     if (libxl_get_freecpus(ctx, &freemap)) {
         return ERROR_FAIL;
     }
 
-    if (libxl_get_topologyinfo(ctx, &topology)) {
+    topology = libxl_get_cpu_topology(ctx, &nr);
+    if (!topology) {
         rc = ERROR_FAIL;
         goto out;
     }
 
     *cpus = 0;
-    for (cpu = 0; cpu < topology.nodemap.entries; cpu++) {
-        if (libxl_cpumap_test(&freemap, cpu) &&
-            (topology.nodemap.array[cpu] == node) &&
+    for (cpu = 0; cpu < nr; cpu++) {
+        if (libxl_cpumap_test(&freemap, cpu) && (topology[cpu].node == node) &&
             !libxl_cpupool_cpuadd(ctx, poolid, cpu)) {
                 (*cpus)++;
         }
+        libxl_cputopology_dispose(&topology[cpu]);
     }
 
-    libxl_topologyinfo_dispose(&topology);
-
+    free(topology);
 out:
     libxl_cpumap_dispose(&freemap);
     return rc;
@@ -3651,8 +3662,8 @@ int libxl_cpupool_cpuremove_node(libxl_ctx *ctx, uint32_t poolid, int node, int 
     int ret = 0;
     int n_pools;
     int p;
-    int cpu;
-    libxl_topologyinfo topology;
+    int cpu, nr_cpus;
+    libxl_cputopology *topology;
     libxl_cpupoolinfo *poolinfo;
 
     poolinfo = libxl_list_cpupool(ctx, &n_pools);
@@ -3660,7 +3671,8 @@ int libxl_cpupool_cpuremove_node(libxl_ctx *ctx, uint32_t poolid, int node, int 
         return ERROR_NOMEM;
     }
 
-    if (libxl_get_topologyinfo(ctx, &topology)) {
+    topology = libxl_get_cpu_topology(ctx, &nr_cpus);
+    if (!topology) {
         ret = ERROR_FAIL;
         goto out;
     }
@@ -3668,8 +3680,8 @@ int libxl_cpupool_cpuremove_node(libxl_ctx *ctx, uint32_t poolid, int node, int 
     *cpus = 0;
     for (p = 0; p < n_pools; p++) {
         if (poolinfo[p].poolid == poolid) {
-            for (cpu = 0; cpu < topology.nodemap.entries; cpu++) {
-                if ((topology.nodemap.array[cpu] == node) &&
+            for (cpu = 0; cpu < nr_cpus; cpu++) {
+                if ((topology[cpu].node == node) &&
                     libxl_cpumap_test(&poolinfo[p].cpumap, cpu) &&
                     !libxl_cpupool_cpuremove(ctx, poolid, cpu)) {
                         (*cpus)++;
@@ -3678,7 +3690,9 @@ int libxl_cpupool_cpuremove_node(libxl_ctx *ctx, uint32_t poolid, int node, int 
         }
     }
 
-    libxl_topologyinfo_dispose(&topology);
+    for (cpu = 0; cpu < nr_cpus; cpu++)
+        libxl_cputopology_dispose(&topology[cpu]);
+    free(topology);
 
 out:
     for (p = 0; p < n_pools; p++) {

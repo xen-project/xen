@@ -3833,10 +3833,11 @@ static void output_physinfo(void)
 
 static void output_topologyinfo(void)
 {
-    libxl_topologyinfo info;
-    int i;
+    libxl_cputopology *info;
+    int i, nr;
 
-    if (libxl_get_topologyinfo(ctx, &info)) {
+    info = libxl_get_cpu_topology(ctx, &nr);
+    if (info == NULL) {
         fprintf(stderr, "libxl_get_topologyinfo failed.\n");
         return;
     }
@@ -3844,15 +3845,15 @@ static void output_topologyinfo(void)
     printf("cpu_topology           :\n");
     printf("cpu:    core    socket     node\n");
 
-    for (i = 0; i < info.coremap.entries; i++) {
-        if (info.coremap.array[i] != LIBXL_CPUARRAY_INVALID_ENTRY)
-            printf("%3d:    %4d     %4d     %4d\n", i, info.coremap.array[i],
-                info.socketmap.array[i], info.nodemap.array[i]);
+    for (i = 0; i < nr; i++) {
+        if (info[i].core != LIBXL_CPUTOPOLOGY_INVALID_ENTRY)
+            printf("%3d:    %4d     %4d     %4d\n", i,
+                   info[i].core, info[i].socket, info[i].node);
     }
 
-    printf("numa_info              : none\n");
+    libxl_cputopology_list_free(info, nr);
 
-    libxl_topologyinfo_dispose(&info);
+    printf("numa_info              : none\n");
 
     return;
 }
@@ -5350,7 +5351,7 @@ int main_cpupoolcreate(int argc, char **argv)
     libxl_cpumap freemap;
     libxl_cpumap cpumap;
     libxl_uuid uuid;
-    libxl_topologyinfo topology;
+    libxl_cputopology *topology;
 
     while (1) {
         opt = getopt_long(argc, argv, "hnf:", long_options, &option_index);
@@ -5459,16 +5460,18 @@ int main_cpupoolcreate(int argc, char **argv)
         return -ERROR_FAIL;
     }
     if (!xlu_cfg_get_list(config, "nodes", &nodes, 0, 0)) {
+        int nr;
         n_cpus = 0;
         n_nodes = 0;
-        if (libxl_get_topologyinfo(ctx, &topology)) {
+        topology = libxl_get_cpu_topology(ctx, &nr);
+        if (topology == NULL) {
             fprintf(stderr, "libxl_get_topologyinfo failed\n");
             return -ERROR_FAIL;
         }
         while ((buf = xlu_cfg_get_listitem(nodes, n_nodes)) != NULL) {
             n = atoi(buf);
-            for (i = 0; i < topology.nodemap.entries; i++) {
-                if ((topology.nodemap.array[i] == n) &&
+            for (i = 0; i < nr; i++) {
+                if ((topology[i].node == n) &&
                     libxl_cpumap_test(&freemap, i)) {
                     libxl_cpumap_set(&cpumap, i);
                     n_cpus++;
@@ -5477,7 +5480,7 @@ int main_cpupoolcreate(int argc, char **argv)
             n_nodes++;
         }
 
-        libxl_topologyinfo_dispose(&topology);
+        libxl_cputopology_list_free(topology, nr);
 
         if (n_cpus == 0) {
             fprintf(stderr, "no free cpu found\n");
@@ -5799,11 +5802,12 @@ int main_cpupoolnumasplit(int argc, char **argv)
     int schedid;
     int n_pools;
     int node;
+    int n_cpus;
     char name[16];
     libxl_uuid uuid;
     libxl_cpumap cpumap;
     libxl_cpupoolinfo *poolinfo;
-    libxl_topologyinfo topology;
+    libxl_cputopology *topology;
     libxl_dominfo info;
 
     if ((opt = def_getopt(argc, argv, "", "cpupool-numa-split", 0)) != -1)
@@ -5825,21 +5829,22 @@ int main_cpupoolnumasplit(int argc, char **argv)
         return -ERROR_FAIL;
     }
 
-    if (libxl_get_topologyinfo(ctx, &topology)) {
+    topology = libxl_get_cpu_topology(ctx, &n_cpus);
+    if (topology == NULL) {
         fprintf(stderr, "libxl_get_topologyinfo failed\n");
         return -ERROR_FAIL;
     }
 
     if (libxl_cpumap_alloc(ctx, &cpumap)) {
         fprintf(stderr, "Failed to allocate cpumap\n");
-        libxl_topologyinfo_dispose(&topology);
+        libxl_cputopology_list_free(topology, n_cpus);
         return -ERROR_FAIL;
     }
 
     /* Reset Pool-0 to 1st node: first add cpus, then remove cpus to avoid
        a cpupool without cpus in between */
 
-    node = topology.nodemap.array[0];
+    node = topology[0].node;
     if (libxl_cpupool_cpuadd_node(ctx, 0, node, &n)) {
         fprintf(stderr, "error on adding cpu to Pool 0\n");
         return -ERROR_FAIL;
@@ -5853,9 +5858,9 @@ int main_cpupoolnumasplit(int argc, char **argv)
     }
 
     n = 0;
-    for (c = 0; c < topology.nodemap.entries; c++) {
-        if (topology.nodemap.array[c] == node) {
-            topology.nodemap.array[c] = LIBXL_CPUARRAY_INVALID_ENTRY;
+    for (c = 0; c < n_cpus; c++) {
+        if (topology[c].node == node) {
+            topology[c].node = LIBXL_CPUTOPOLOGY_INVALID_ENTRY;
             libxl_cpumap_set(&cpumap, n);
             n++;
         }
@@ -5880,12 +5885,12 @@ int main_cpupoolnumasplit(int argc, char **argv)
     }
     memset(cpumap.map, 0, cpumap.size);
 
-    for (c = 0; c < topology.nodemap.entries; c++) {
-        if (topology.nodemap.array[c] == LIBXL_CPUARRAY_INVALID_ENTRY) {
+    for (c = 0; c < n_cpus; c++) {
+        if (topology[c].node == LIBXL_CPUTOPOLOGY_INVALID_ENTRY) {
             continue;
         }
 
-        node = topology.nodemap.array[c];
+        node = topology[c].node;
         ret = -libxl_cpupool_cpuremove_node(ctx, 0, node, &n);
         if (ret) {
             fprintf(stderr, "error on removing cpu from Pool 0\n");
@@ -5907,15 +5912,15 @@ int main_cpupoolnumasplit(int argc, char **argv)
             goto out;
         }
 
-        for (p = c; p < topology.nodemap.entries; p++) {
-            if (topology.nodemap.array[p] == node) {
-                topology.nodemap.array[p] = LIBXL_CPUARRAY_INVALID_ENTRY;
+        for (p = c; p < n_cpus; p++) {
+            if (topology[p].node == node) {
+                topology[p].node = LIBXL_CPUTOPOLOGY_INVALID_ENTRY;
             }
         }
     }
 
 out:
-    libxl_topologyinfo_dispose(&topology);
+    libxl_cputopology_list_free(topology, n_cpus);
     libxl_cpumap_dispose(&cpumap);
 
     return ret;

@@ -576,7 +576,9 @@ int libxl_userdata_retrieve(libxl_ctx *ctx, uint32_t domid,
    */
 
 int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo);
-int libxl_get_topologyinfo(libxl_ctx *ctx, libxl_topologyinfo *info);
+#define LIBXL_CPUTOPOLOGY_INVALID_ENTRY (~(uint32_t)0)
+libxl_cputopology *libxl_get_cpu_topology(libxl_ctx *ctx, int *nr);
+void libxl_cputopology_list_free(libxl_cputopology *, int nr);
 libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
                                        int *nb_vcpu, int *nrcpus);
 int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,

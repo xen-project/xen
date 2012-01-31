@@ -376,10 +376,10 @@ libxl_physinfo = Struct("physinfo", [
     ("phys_cap", uint32),
     ], dispose_fn=None, dir=DIR_OUT)
 
-libxl_topologyinfo = Struct("topologyinfo", [
-    ("coremap", libxl_cpuarray),   # cpu to core map
-    ("socketmap", libxl_cpuarray), # cpu to socket map
-    ("nodemap", libxl_cpuarray),   # cpu to node map
+libxl_cputopology = Struct("cputopology", [
+    ("core", uint32),
+    ("socket", uint32),
+    ("node", uint32),
     ])
 
 libxl_sched_credit = Struct("sched_credit", [
