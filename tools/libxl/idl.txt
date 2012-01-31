@@ -2,10 +2,9 @@ libxl IDL
 ---------
 
 Each type in the libxl interface is represented by an object of type
-idl.Type (or a subclass thereof). Every local variable defined by
-the .idl file must be an instance of idl.Type (e.g. you may not
-define Python functions or any other construct other than defining
-variables)
+idl.Type (or a subclass thereof). Every local variable defined by the
+.idl file must be an instance of idl.Type (e.g. you may not define
+Python functions or any other construct other than defining variables)
 
 The name of the type must be passed as the first argument to the
 constructor when defining a new type. The name given should not
@@ -16,9 +15,9 @@ The Type.typename contains the C name of the type _including_ the
 namespace element while Type.rawname is always set to the 'base' name
 of the type.
 
-The idl.Type base class has several other properties which apply
-to all types. The properties are set by passing a named parameter to
-the constructor.
+The idl.Type base class has several other properties which apply to
+all types. The properties are set by passing a named parameter to the
+constructor.
 
 Type.namespace: (default: "libxl_")
 
@@ -81,7 +80,7 @@ idl.Enumeration
 
   Each EnumerationValue has the following properties:
 
-    EnumerationValue.enum	Reference to containing Enumeration
+    EnumerationValue.enum       Reference to containing Enumeration
     EnumerationValue.name       The C name of this value, including
                                     the namespace and typename of the
                                     containing Enumeration (e.g.
@@ -90,10 +89,10 @@ idl.Enumeration
                                     the namespace but including the
                                     typename of the containing
                                     Enumeration (e.g. "FOOENUM_VALUE")
-    EnumerationValue.valuename	The name of this value, excluding the
-				    name of the containing Enumeration
-				    and any namespace (e.g. "VALUE")
-    EnumerationValue.value	The integer value associated with this name.
+    EnumerationValue.valuename  The name of this value, excluding the
+                                    name of the containing Enumeration
+                                    and any namespace (e.g. "VALUE")
+    EnumerationValue.value      The integer value associated with this name.
 
 idl.Aggregate
 
@@ -106,10 +105,10 @@ idl.Aggregate
 
  Each field has the following properties:
 
-  Field.type	The type of the member (a idl.Type).
+  Field.type    The type of the member (a idl.Type).
   Field.name    The name of the member (can be None for anonymous
-		fields).
-  Field.const	Boolean, true if the member is const.
+                fields).
+  Field.const   Boolean, true if the member is const.
 
 idl.Struct
 
@@ -139,15 +138,13 @@ Standard Types
 
 Several standard types a predefined. They are
 
-void			(void pointer type)
+void                    (void pointer type)
 bool
 size_t
-integer			24 bit signed integer.
+integer                 24 bit signed integer.
 
-uint{8,16,32,64}	uint{8,16,32,64}_t
+uint{8,16,32,64}        uint{8,16,32,64}_t
 
-domid			Domain ID
+domid                   Domain ID
 
-string			NULL terminated string
-
-inaddr_ip		struct in_addr
+string                  NULL terminated string
