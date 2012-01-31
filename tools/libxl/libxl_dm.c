@@ -78,6 +78,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
                                         const libxl_domain_config *guest_config,
                                         const libxl_device_model_info *info)
 {
+    const libxl_domain_build_info *b_info = &guest_config->b_info;
     const libxl_device_nic *vifs = guest_config->vifs;
     const int num_vifs = guest_config->num_vifs;
     int i;
@@ -159,14 +160,18 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
         if (info->soundhw) {
             flexarray_vappend(dm_args, "-soundhw", info->soundhw, NULL);
         }
-        if (info->acpi) {
+        if (b_info->u.hvm.acpi) {
             flexarray_append(dm_args, "-acpi");
         }
-        if (info->vcpus > 1) {
-            flexarray_vappend(dm_args, "-vcpus", libxl__sprintf(gc, "%d", info->vcpus), NULL);
+        if (b_info->max_vcpus > 1) {
+            flexarray_vappend(dm_args, "-vcpus",
+                              libxl__sprintf(gc, "%d", b_info->max_vcpus),
+                              NULL);
         }
-        if (info->vcpu_avail) {
-            flexarray_vappend(dm_args, "-vcpu_avail", libxl__sprintf(gc, "0x%x", info->vcpu_avail), NULL);
+        if (b_info->cur_vcpus) {
+            flexarray_vappend(dm_args, "-vcpu_avail",
+                              libxl__sprintf(gc, "0x%x", b_info->cur_vcpus),
+                              NULL);
         }
         for (i = 0; i < num_vifs; i++) {
             if (vifs[i].nictype == LIBXL_NIC_TYPE_IOEMU) {
@@ -234,6 +239,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                                         const libxl_device_model_info *info)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
+    const libxl_domain_build_info *b_info = &guest_config->b_info;
     const libxl_device_disk *disks = guest_config->disks;
     const libxl_device_nic *vifs = guest_config->vifs;
     const int num_disks = guest_config->num_disks;
@@ -366,15 +372,18 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
         if (info->soundhw) {
             flexarray_vappend(dm_args, "-soundhw", info->soundhw, NULL);
         }
-        if (!info->acpi) {
+        if (!b_info->u.hvm.acpi) {
             flexarray_append(dm_args, "-no-acpi");
         }
-        if (info->vcpus > 1) {
+        if (b_info->max_vcpus > 1) {
             flexarray_append(dm_args, "-smp");
-            if (info->vcpu_avail)
-                flexarray_append(dm_args, libxl__sprintf(gc, "%d,maxcpus=%d", info->vcpus, info->vcpu_avail));
+            if (b_info->cur_vcpus)
+                flexarray_append(dm_args, libxl__sprintf(gc, "%d,maxcpus=%d",
+                                                         b_info->max_vcpus,
+                                                         b_info->cur_vcpus));
             else
-                flexarray_append(dm_args, libxl__sprintf(gc, "%d", info->vcpus));
+                flexarray_append(dm_args, libxl__sprintf(gc, "%d",
+                                                         b_info->max_vcpus));
         }
         for (i = 0; i < num_vifs; i++) {
             if (vifs[i].nictype == LIBXL_NIC_TYPE_IOEMU) {
@@ -432,7 +441,9 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
 
     /* RAM Size */
     flexarray_append(dm_args, "-m");
-    flexarray_append(dm_args, libxl__sprintf(gc, "%d", info->target_ram));
+    flexarray_append(dm_args,
+                     libxl__sprintf(gc, "%d",
+                                    libxl__sizekb_to_mb(b_info->target_memkb)));
 
     if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
         for (i = 0; i < num_disks; i++) {

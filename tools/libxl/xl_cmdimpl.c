@@ -380,7 +380,6 @@ static void printf_info(int domid,
         printf("\t\t\t(boot %s)\n", dm_info->boot);
         printf("\t\t\t(usb %d)\n", dm_info->usb);
         printf("\t\t\t(usbdevice %s)\n", dm_info->usbdevice);
-        printf("\t\t\t(acpi %d)\n", dm_info->acpi);
         printf("\t\t\t(spice %d)\n", dm_info->spice.enable);
         printf("\t\t\t(spiceport %d)\n", dm_info->spice.port);
         printf("\t\t\t(spicetls_port %d)\n", dm_info->spice.tls_port);

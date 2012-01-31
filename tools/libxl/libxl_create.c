@@ -122,11 +122,7 @@ int libxl_init_dm_info(libxl_ctx *ctx,
     dm_info->device_model_version = LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
     dm_info->device_model_stubdomain = false;
     dm_info->device_model = NULL;
-    dm_info->target_ram = libxl__sizekb_to_mb(b_info->target_memkb);
     dm_info->videoram = libxl__sizekb_to_mb(b_info->video_memkb);
-    dm_info->acpi = b_info->u.hvm.acpi;
-    dm_info->vcpus = b_info->max_vcpus;
-    dm_info->vcpu_avail = b_info->cur_vcpus;
 
     dm_info->stdvga = 0;
     dm_info->vnc.enable = 1;

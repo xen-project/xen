@@ -244,7 +244,6 @@ libxl_device_model_info = Struct("device_model_info",[
     ("device_model",     string),
     ("saved_state",      string),
     ("type",             libxl_domain_type),
-    ("target_ram",       uint32),
     # size of the videoram in MB
     ("videoram",         integer), 
     ("stdvga",           bool),
@@ -261,9 +260,6 @@ libxl_device_model_info = Struct("device_model_info",[
     # usbdevice: "tablet" for absolute mouse, "mouse" for PS/2 protocol relative mouse
     ("usbdevice",        string),
     ("soundhw",          string),
-    ("acpi",             bool),
-    ("vcpus",            integer), # max number of vcpus
-    ("vcpu_avail",       integer), # vcpus actually available
     ("xen_platform_pci", bool),
     # extra parameters pass directly to qemu, NULL terminated
     ("extra",            libxl_string_list),
