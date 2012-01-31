@@ -195,8 +195,8 @@ xc_ia64_send_vcpumap(xc_interface *xch, int io_fd, uint32_t dom,
     uint64_t *vcpumap = NULL;
 
     vcpumap_size = bitmap_size(max_virt_cpus);
-    rc = bitmap_alloc(&vcpumap, max_virt_cpus);
-    if (rc < 0) {
+    vcpumap = bitmap_alloc(max_virt_cpus);
+    if (!vcpumap) {
         ERROR("memory alloc for vcpumap");
         goto out;
     }
