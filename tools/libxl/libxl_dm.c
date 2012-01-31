@@ -240,7 +240,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
         if ( ioemu_vifs == 0 ) {
             flexarray_vappend(dm_args, "-net", "none", NULL);
         }
-        if (info->gfx_passthru) {
+        if (b_info->u.hvm.gfx_passthru) {
             flexarray_append(dm_args, "-gfx_passthru");
         }
     } else {
@@ -480,7 +480,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             flexarray_append(dm_args, "-net");
             flexarray_append(dm_args, "none");
         }
-        if (info->gfx_passthru) {
+        if (b_info->u.hvm.gfx_passthru) {
             flexarray_append(dm_args, "-gfx_passthru");
         }
     } else {

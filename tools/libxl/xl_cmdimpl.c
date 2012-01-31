@@ -382,7 +382,7 @@ static void printf_info(int domid,
         printf("\t\t\t(spiceagent_mouse %d)\n", b_info->u.hvm.spice.agent_mouse);
 
         printf("\t\t\t(device_model %s)\n", dm_info->device_model ? : "default");
-        printf("\t\t\t(gfx_passthru %d)\n", dm_info->gfx_passthru);
+        printf("\t\t\t(gfx_passthru %d)\n", b_info->u.hvm.gfx_passthru);
         printf("\t\t\t(serial %s)\n", b_info->u.hvm.serial);
         printf("\t\t\t(boot %s)\n", b_info->u.hvm.boot);
         printf("\t\t\t(usb %d)\n", b_info->u.hvm.usb);
@@ -815,9 +815,6 @@ static void parse_config_data(const char *configfile_filename_report,
 
     if (!xlu_cfg_get_long (config, "videoram", &l, 0))
         b_info->video_memkb = l * 1024;
-
-    if (!xlu_cfg_get_long (config, "gfx_passthru", &l, 0))
-        dm_info->gfx_passthru = l;
 
     switch(c_info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
@@ -1292,7 +1289,7 @@ skip_vfb:
         if (!xlu_cfg_get_long (config, "nographic", &l, 0))
             b_info->u.hvm.nographic = l;
         if (!xlu_cfg_get_long (config, "gfx_passthru", &l, 0))
-            dm_info->gfx_passthru = l;
+            b_info->u.hvm.gfx_passthru = l;
         xlu_cfg_replace_string (config, "serial", &b_info->u.hvm.serial, 0);
         xlu_cfg_replace_string (config, "boot", &b_info->u.hvm.boot, 0);
         if (!xlu_cfg_get_long (config, "usb", &l, 0))

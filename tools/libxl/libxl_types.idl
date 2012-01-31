@@ -223,6 +223,8 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                        ("sdl",              libxl_sdl_info),
                                        ("spice",            libxl_spice_info),
                                        
+                                       ("gfx_passthru",     bool),
+                                       
                                        ("serial",           string),
                                        ("boot",             string),
                                        ("usb",              bool),
@@ -260,7 +262,6 @@ libxl_device_model_info = Struct("device_model_info",[
     ("device_model",     string),
     ("saved_state",      string),
     ("type",             libxl_domain_type),
-    ("gfx_passthru",     bool),
     # extra parameters pass directly to qemu, NULL terminated
     ("extra",            libxl_string_list),
     # extra parameters pass directly to qemu for PV guest, NULL terminated
