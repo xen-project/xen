@@ -62,6 +62,7 @@
 ^docs/xen-api/xenapi-datamodel-graph.eps$
 ^docs/xen-api/xenapi.out$
 ^extras/mini-os/arch/ia64/gen_off.s$
+^extras/mini-os/include/list\.h$
 ^extras/mini-os/include/mini-os$
 ^extras/mini-os/include/ia64/mini-os$
 ^extras/mini-os/include/ia64/offsets.h$

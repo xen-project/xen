@@ -54,19 +54,20 @@
 #define DEBUG(_f, _a...)    ((void)0)
 #endif
 
+MINIOS_TAILQ_HEAD(thread_list, struct thread);
+
 struct thread *idle_thread = NULL;
-MINIOS_LIST_HEAD(exited_threads);
+static struct thread_list exited_threads = MINIOS_TAILQ_HEAD_INITIALIZER(exited_threads);
+static struct thread_list thread_list = MINIOS_TAILQ_HEAD_INITIALIZER(thread_list);
 static int threads_started;
 
 struct thread *main_thread;
 
 void inline print_runqueue(void)
 {
-    struct minios_list_head *it;
     struct thread *th;
-    minios_list_for_each(it, &idle_thread->thread_list)
+    MINIOS_TAILQ_FOREACH(th, &thread_list, thread_list)
     {
-        th = minios_list_entry(it, struct thread, thread_list);
         printk("   Thread \"%s\", runnable=%d\n", th->name, is_runnable(th));
     }
     printk("\n");
@@ -74,8 +75,7 @@ void inline print_runqueue(void)
 
 void schedule(void)
 {
-    struct thread *prev, *next, *thread;
-    struct minios_list_head *iterator, *next_iterator;
+    struct thread *prev, *next, *thread, *tmp;
     unsigned long flags;
 
     prev = current;
@@ -96,10 +96,9 @@ void schedule(void)
            time when the next timeout expires, else use 10 seconds. */
         s_time_t now = NOW();
         s_time_t min_wakeup_time = now + SECONDS(10);
-        next = NULL;   
-        minios_list_for_each_safe(iterator, next_iterator, &idle_thread->thread_list)
+        next = NULL;
+        MINIOS_TAILQ_FOREACH_SAFE(thread, &thread_list, thread_list, tmp)
         {
-            thread = minios_list_entry(iterator, struct thread, thread_list);
             if (!is_runnable(thread) && thread->wakeup_time != 0LL)
             {
                 if (thread->wakeup_time <= now)
@@ -111,8 +110,8 @@ void schedule(void)
             {
                 next = thread;
                 /* Put this thread on the end of the list */
-                minios_list_del(&thread->thread_list);
-                minios_list_add_tail(&thread->thread_list, &idle_thread->thread_list);
+                MINIOS_TAILQ_REMOVE(&thread_list, thread, thread_list);
+                MINIOS_TAILQ_INSERT_TAIL(&thread_list, thread, thread_list);
                 break;
             }
         }
@@ -128,12 +127,11 @@ void schedule(void)
        inturrupted at the return instruction. And therefore at safe point. */
     if(prev != next) switch_threads(prev, next);
 
-    minios_list_for_each_safe(iterator, next_iterator, &exited_threads)
+    MINIOS_TAILQ_FOREACH_SAFE(thread, &exited_threads, thread_list, tmp)
     {
-        thread = minios_list_entry(iterator, struct thread, thread_list);
         if(thread != prev)
         {
-            minios_list_del(&thread->thread_list);
+            MINIOS_TAILQ_REMOVE(&exited_threads, thread, thread_list);
             free_pages(thread->stack, STACK_SIZE_PAGE_ORDER);
             xfree(thread);
         }
@@ -154,13 +152,7 @@ struct thread* create_thread(char *name, void (*function)(void *), void *data)
 #endif
     set_runnable(thread);
     local_irq_save(flags);
-    if(idle_thread != NULL) {
-        minios_list_add_tail(&thread->thread_list, &idle_thread->thread_list); 
-    } else if(function != idle_thread_fn)
-    {
-        printk("BUG: Not allowed to create thread before initialising scheduler.\n");
-        BUG();
-    }
+    MINIOS_TAILQ_INSERT_TAIL(&thread_list, thread, thread_list);
     local_irq_restore(flags);
     return thread;
 }
@@ -208,10 +200,10 @@ void exit_thread(void)
     printk("Thread \"%s\" exited.\n", thread->name);
     local_irq_save(flags);
     /* Remove from the thread list */
-    minios_list_del(&thread->thread_list);
+    MINIOS_TAILQ_REMOVE(&thread_list, thread, thread_list);
     clear_runnable(thread);
     /* Put onto exited list */
-    minios_list_add(&thread->thread_list, &exited_threads);
+    MINIOS_TAILQ_INSERT_HEAD(&exited_threads, thread, thread_list);
     local_irq_restore(flags);
     /* Schedule will free the resources */
     while(1)
@@ -296,6 +288,14 @@ void init_sched(void)
     _REENT_INIT_PTR((&callback_reent))
 #endif
     idle_thread = create_thread("Idle", idle_thread_fn, NULL);
-    MINIOS_INIT_LIST_HEAD(&idle_thread->thread_list);
 }
 
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

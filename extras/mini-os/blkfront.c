@@ -323,7 +323,7 @@ static void blkfront_wait_slot(struct blkfront_dev *dev)
 	    schedule();
 	    local_irq_save(flags);
 	}
-	remove_waiter(w);
+	remove_waiter(w, blkfront_queue);
 	local_irq_restore(flags);
     }
 }
@@ -414,7 +414,7 @@ void blkfront_io(struct blkfront_aiocb *aiocbp, int write)
 	schedule();
 	local_irq_save(flags);
     }
-    remove_waiter(w);
+    remove_waiter(w, blkfront_queue);
     local_irq_restore(flags);
 }
 
@@ -470,7 +470,7 @@ void blkfront_sync(struct blkfront_dev *dev)
 	schedule();
 	local_irq_save(flags);
     }
-    remove_waiter(w);
+    remove_waiter(w, blkfront_queue);
     local_irq_restore(flags);
 }
 

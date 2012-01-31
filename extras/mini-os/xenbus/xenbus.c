@@ -85,7 +85,7 @@ char **xenbus_wait_for_watch_return(xenbus_event_queue *queue)
         add_waiter(w, xenbus_watch_queue);
         schedule();
     }
-    remove_waiter(w);
+    remove_waiter(w, xenbus_watch_queue);
     *queue = event->next;
     return &event->path;
 }
@@ -441,7 +441,7 @@ xenbus_msg_reply(int type,
     xb_write(type, id, trans, io, nr_reqs);
 
     schedule();
-    remove_waiter(w);
+    remove_waiter(w, req_info[id].waitq);
     wake(current);
 
     rep = req_info[id].reply;

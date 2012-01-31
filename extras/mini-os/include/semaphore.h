@@ -21,7 +21,6 @@ struct semaphore
 struct rw_semaphore {
 	signed long		count;
 	spinlock_t		wait_lock;
-	struct minios_list_head	wait_list;
 	int			debug;
 };
 

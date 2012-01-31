@@ -222,9 +222,9 @@ SEABIOS_UPSTREAM_TAG ?= rel-1.6.3.1
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= bb36d632e4cabf47882adff07a45c6702c4a5b30
-# Thu Jan 5 17:16:46 2012 +0000
-# qemu-xen: adjust MSI-X related log messages
+QEMU_TAG ?= de05447400930da4be216e4fb0fe52b8be81490e
+# Tue Jan 31 15:42:38 2012 +0000
+# block-vbd: update to new mini-os wait queue API (new linked list API)
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.

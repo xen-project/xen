@@ -44,15 +44,17 @@
 #include <mini-os/xmalloc.h>
 
 #ifndef HAVE_LIBC
-static MINIOS_LIST_HEAD(freelist);
 /* static spinlock_t freelist_lock = SPIN_LOCK_UNLOCKED; */
 
 struct xmalloc_hdr
 {
     /* Total including this hdr, unused padding and second hdr. */
     size_t size;
-    struct minios_list_head freelist;
+    MINIOS_TAILQ_ENTRY(struct xmalloc_hdr) freelist;
 } __cacheline_aligned;
+
+static MINIOS_TAILQ_HEAD(,struct xmalloc_hdr) freelist =
+	MINIOS_TAILQ_HEAD_INITIALIZER(freelist);
 
 /* Unused padding data between the two hdrs. */
 
@@ -82,7 +84,7 @@ static void maybe_split(struct xmalloc_hdr *hdr, size_t size, size_t block)
         extra = (struct xmalloc_hdr *)((unsigned long)hdr + size);
         extra->size = leftover;
         /* spin_lock_irqsave(&freelist_lock, flags); */
-        minios_list_add(&extra->freelist, &freelist);
+        MINIOS_TAILQ_INSERT_HEAD(&freelist, extra, freelist);
         /* spin_unlock_irqrestore(&freelist_lock, flags); */
     }
     else
@@ -91,8 +93,6 @@ static void maybe_split(struct xmalloc_hdr *hdr, size_t size, size_t block)
     }
 
     hdr->size = size;
-    /* Debugging aid. */
-    hdr->freelist.next = hdr->freelist.prev = NULL;
 }
 
 static struct xmalloc_hdr *xmalloc_new_page(size_t size)
@@ -128,8 +128,6 @@ static void *xmalloc_whole_pages(size_t size, size_t align)
         return NULL;
 
     hdr->size = (1UL << (pageorder + PAGE_SHIFT));
-    /* Debugging aid. */
-    hdr->freelist.next = hdr->freelist.prev = NULL;
 
     ret = (char*)hdr + hdr_size;
     pad = (struct xmalloc_pad *) ret - 1;
@@ -155,14 +153,14 @@ void *_xmalloc(size_t size, size_t align)
 
     /* Search free list. */
     /* spin_lock_irqsave(&freelist_lock, flags); */
-    minios_list_for_each_entry_safe( i, tmp, &freelist, freelist )
+    MINIOS_TAILQ_FOREACH_SAFE(i, &freelist, freelist, tmp)
     {
         data_begin = align_up((uintptr_t)i + hdr_size, align);
 
         if ( data_begin + size > (uintptr_t)i + i->size )
             continue;
 
-        minios_list_del(&i->freelist);
+        MINIOS_TAILQ_REMOVE(&freelist, i, freelist);
         /* spin_unlock_irqrestore(&freelist_lock, flags); */
 
         uintptr_t size_before = (data_begin - hdr_size) - (uintptr_t)i;
@@ -173,7 +171,7 @@ void *_xmalloc(size_t size, size_t align)
             new_i->size = i->size - size_before;
             i->size = size_before;
             /* spin_lock_irqsave(&freelist_lock, flags); */
-            minios_list_add(&i->freelist, &freelist);
+            MINIOS_TAILQ_INSERT_HEAD(&freelist, i, freelist);
             /* spin_unlock_irqrestore(&freelist_lock, flags); */
             i = new_i;
         }
@@ -224,16 +222,9 @@ void xfree(const void *p)
         *(int*)0=0;
     }
 
-    /* Not previously freed. */
-    if(hdr->freelist.next || hdr->freelist.prev)
-    {
-        printk("Should not be previously freed\n");
-        *(int*)0=0;
-    }
-
     /* Merge with other free block, or put in list. */
     /* spin_lock_irqsave(&freelist_lock, flags); */
-    minios_list_for_each_entry_safe( i, tmp, &freelist, freelist )
+    MINIOS_TAILQ_FOREACH_SAFE(i, &freelist, freelist, tmp)
     {
         unsigned long _i   = (unsigned long)i;
         unsigned long _hdr = (unsigned long)hdr;
@@ -245,7 +236,7 @@ void xfree(const void *p)
         /* We follow this block?  Swallow it. */
         if ( (_i + i->size) == _hdr )
         {
-            minios_list_del(&i->freelist);
+            MINIOS_TAILQ_REMOVE(&freelist, i, freelist);
             i->size += hdr->size;
             hdr = i;
         }
@@ -253,7 +244,7 @@ void xfree(const void *p)
         /* We precede this block? Swallow it. */
         if ( (_hdr + hdr->size) == _i )
         {
-            minios_list_del(&i->freelist);
+            MINIOS_TAILQ_REMOVE(&freelist, i, freelist);
             hdr->size += i->size;
         }
     }
@@ -270,7 +261,7 @@ void xfree(const void *p)
     }
     else
     {
-        minios_list_add(&hdr->freelist, &freelist);
+        MINIOS_TAILQ_INSERT_HEAD(&freelist, hdr, freelist);
     }
 
     /* spin_unlock_irqrestore(&freelist_lock, flags); */
@@ -306,3 +297,13 @@ void *_realloc(void *ptr, size_t size)
     return new;
 }
 #endif
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

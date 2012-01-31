@@ -5,47 +5,47 @@
 #include <mini-os/os.h>
 #include <mini-os/waittypes.h>
 
-#define DEFINE_WAIT(name)                               \
-struct wait_queue name = {                              \
-    .thread       = get_current(),                            \
-    .thread_list  = MINIOS_LIST_HEAD_INIT((name).thread_list), \
+#define DEFINE_WAIT(name)                          \
+struct wait_queue name = {                         \
+    .thread       = get_current(),                 \
+    .waiting      = 0,                             \
 }
 
 
 static inline void init_waitqueue_head(struct wait_queue_head *h)
 {
-  MINIOS_INIT_LIST_HEAD(&h->thread_list);
+    MINIOS_STAILQ_INIT(h);
 }
 
 static inline void init_waitqueue_entry(struct wait_queue *q, struct thread *thread)
 {
     q->thread = thread;
-    MINIOS_INIT_LIST_HEAD(&q->thread_list);
+    q->waiting = 0;
 }
-
 
 static inline void add_wait_queue(struct wait_queue_head *h, struct wait_queue *q)
 {
-    if (minios_list_empty(&q->thread_list))
-        minios_list_add(&q->thread_list, &h->thread_list);   
+    if (!q->waiting) {
+        MINIOS_STAILQ_INSERT_HEAD(h, q, thread_list);
+        q->waiting = 1;
+    }
 }
 
-static inline void remove_wait_queue(struct wait_queue *q)
+static inline void remove_wait_queue(struct wait_queue_head *h, struct wait_queue *q)
 {
-    minios_list_del(&q->thread_list);
+    if (q->waiting) {
+        MINIOS_STAILQ_REMOVE(h, q, struct wait_queue, thread_list);
+        q->waiting = 0;
+    }
 }
 
 static inline void wake_up(struct wait_queue_head *head)
 {
     unsigned long flags;
-    struct minios_list_head *tmp, *next;
+    struct wait_queue *curr, *tmp;
     local_irq_save(flags);
-    minios_list_for_each_safe(tmp, next, &head->thread_list)
-    {
-         struct wait_queue *curr;
-         curr = minios_list_entry(tmp, struct wait_queue, thread_list);
+    MINIOS_STAILQ_FOREACH_SAFE(curr, head, thread_list, tmp)
          wake(curr->thread);
-    }
     local_irq_restore(flags);
 }
 
@@ -57,11 +57,11 @@ static inline void wake_up(struct wait_queue_head *head)
     local_irq_restore(flags);   \
 } while (0)
 
-#define remove_waiter(w) do {   \
-    unsigned long flags;        \
-    local_irq_save(flags);      \
-    remove_wait_queue(&w);      \
-    local_irq_restore(flags);   \
+#define remove_waiter(w, wq) do {  \
+    unsigned long flags;           \
+    local_irq_save(flags);         \
+    remove_wait_queue(&wq, &w);    \
+    local_irq_restore(flags);      \
 } while (0)
 
 #define wait_event_deadline(wq, condition, deadline) do {       \
@@ -84,7 +84,7 @@ static inline void wake_up(struct wait_queue_head *head)
     local_irq_save(flags);                                      \
     /* need to wake up */                                       \
     wake(get_current());                                        \
-    remove_wait_queue(&__wait);                                 \
+    remove_wait_queue(&wq, &__wait);                            \
     local_irq_restore(flags);                                   \
 } while(0) 
 
@@ -93,3 +93,13 @@ static inline void wake_up(struct wait_queue_head *head)
 
 
 #endif /* __WAIT_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

@@ -569,7 +569,7 @@ static void fbfront_out_event(struct fbfront_dev *dev, union xenfb_out_event *ev
     add_waiter(w, fbfront_queue);
     while (page->out_prod - page->out_cons == XENFB_OUT_RING_LEN)
         schedule();
-    remove_waiter(w);
+    remove_waiter(w, fbfront_queue);
 
     prod = page->out_prod;
     mb(); /* ensure ring space available */

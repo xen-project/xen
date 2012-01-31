@@ -93,8 +93,8 @@ _libxl_paths.h: genpath
 	rm -f $@.tmp
 	$(call move-if-changed,$@.2.tmp,$@)
 
-_libxl_list.h: bsd-sys-queue-h-seddery external/bsd-sys-queue.h
-	perl ./$^ --prefix=libxl >$@.new
+_libxl_list.h: $(XEN_INCLUDE)/xen-external/bsd-sys-queue-h-seddery $(XEN_INCLUDE)/xen-external/bsd-sys-queue.h
+	perl $^ --prefix=libxl >$@.new
 	$(call move-if-changed,$@.new,$@)
 
 libxl_paths.c: _libxl_paths.h

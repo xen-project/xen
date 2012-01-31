@@ -234,7 +234,7 @@ int read(int fd, void *buf, size_t nbytes)
                     break;
                 schedule();
             }
-            remove_waiter(w);
+            remove_waiter(w, console_queue);
             return ret;
         }
 #ifdef HAVE_LWIP
@@ -705,12 +705,12 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
     fd_set myread, mywrite, myexcept;
     struct thread *thread = get_current();
     s_time_t start = NOW(), stop;
-    DEFINE_WAIT(w1);
-    DEFINE_WAIT(w2);
-    DEFINE_WAIT(w3);
-    DEFINE_WAIT(w4);
-    DEFINE_WAIT(w5);
-    DEFINE_WAIT(w6);
+    DEFINE_WAIT(netfront_w);
+    DEFINE_WAIT(event_w);
+    DEFINE_WAIT(blkfront_w);
+    DEFINE_WAIT(xenbus_watch_w);
+    DEFINE_WAIT(kbdfront_w);
+    DEFINE_WAIT(console_w);
 
     assert(thread == main_thread);
 
@@ -727,12 +727,12 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
     /* Tell people we're going to sleep before looking at what they are
      * saying, hence letting them wake us if events happen between here and
      * schedule() */
-    add_waiter(w1, netfront_queue);
-    add_waiter(w2, event_queue);
-    add_waiter(w3, blkfront_queue);
-    add_waiter(w4, xenbus_watch_queue);
-    add_waiter(w5, kbdfront_queue);
-    add_waiter(w6, console_queue);
+    add_waiter(netfront_w, netfront_queue);
+    add_waiter(event_w, event_queue);
+    add_waiter(blkfront_w, blkfront_queue);
+    add_waiter(xenbus_watch_w, xenbus_watch_queue);
+    add_waiter(kbdfront_w, kbdfront_queue);
+    add_waiter(console_w, console_queue);
 
     if (readfds)
         myread = *readfds;
@@ -814,12 +814,12 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
     ret = -1;
 
 out:
-    remove_waiter(w1);
-    remove_waiter(w2);
-    remove_waiter(w3);
-    remove_waiter(w4);
-    remove_waiter(w5);
-    remove_waiter(w6);
+    remove_waiter(netfront_w, netfront_queue);
+    remove_waiter(event_w, event_queue);
+    remove_waiter(blkfront_w, blkfront_queue);
+    remove_waiter(xenbus_watch_w, xenbus_watch_queue);
+    remove_waiter(kbdfront_w, kbdfront_queue);
+    remove_waiter(console_w, console_queue);
     return ret;
 }
 
