@@ -106,7 +106,7 @@ static void *linux_privcmd_alloc_hypercall_buffer(xc_interface *xch, xc_osdep_ha
 
 static void linux_privcmd_free_hypercall_buffer(xc_interface *xch, xc_osdep_handle h, void *ptr, int npages)
 {
-    (void) munlock(ptr, npages * XC_PAGE_SIZE);
+    munlock(ptr, npages * XC_PAGE_SIZE);
     free(ptr);
 }
 
