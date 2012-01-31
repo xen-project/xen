@@ -251,6 +251,13 @@ out:
     return ret == 0 ? 0 : ERROR_FAIL;
 }
 
+static unsigned long timer_mode(const libxl_domain_build_info *info)
+{
+    const libxl_timer_mode mode = info->u.hvm.timer_mode;
+    assert(mode != LIBXL_TIMER_MODE_DELAY_FOR_MISSED_TICKS &&
+           mode <= LIBXL_TIMER_MODE_ONE_MISSED_TICK_PENDING);
+    return ((unsigned long)mode);
+}
 static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
                                 libxl_domain_build_info *info,
                                 int store_evtchn, unsigned long *store_mfn,
@@ -282,7 +289,7 @@ static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
     xc_set_hvm_param(handle, domid, HVM_PARAM_VIRIDIAN, info->u.hvm.viridian);
     xc_set_hvm_param(handle, domid, HVM_PARAM_HPET_ENABLED, (unsigned long) info->u.hvm.hpet);
 #endif
-    xc_set_hvm_param(handle, domid, HVM_PARAM_TIMER_MODE, (unsigned long) info->u.hvm.timer_mode);
+    xc_set_hvm_param(handle, domid, HVM_PARAM_TIMER_MODE, timer_mode(info));
     xc_set_hvm_param(handle, domid, HVM_PARAM_VPT_ALIGN, (unsigned long) info->u.hvm.vpt_align);
     xc_set_hvm_param(handle, domid, HVM_PARAM_NESTEDHVM, info->u.hvm.nested_hvm);
     xc_set_hvm_param(handle, domid, HVM_PARAM_STORE_EVTCHN, store_evtchn);

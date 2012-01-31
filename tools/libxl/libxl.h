@@ -203,6 +203,8 @@ typedef LIBXL_TAILQ_ENTRY(struct libxl_event) libxl_ev_link;
 
 typedef struct libxl__ctx libxl_ctx;
 
+#define LIBXL_TIMER_MODE_DEFAULT LIBXL_TIMER_MODE_NO_DELAY_FOR_MISSED_TICKS
+
 #include "_libxl_types.h"
 
 const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx);

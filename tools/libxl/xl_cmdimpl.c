@@ -358,7 +358,9 @@ static void printf_info(int domid,
         printf("\t\t\t(viridian %d)\n", b_info->u.hvm.viridian);
         printf("\t\t\t(hpet %d)\n", b_info->u.hvm.hpet);
         printf("\t\t\t(vpt_align %d)\n", b_info->u.hvm.vpt_align);
-        printf("\t\t\t(timer_mode %d)\n", b_info->u.hvm.timer_mode);
+        printf("\t\t\t(timer_mode %s)\n",
+               libxl_timer_mode_to_string(b_info->u.hvm.timer_mode));
+
         printf("\t\t\t(nestedhvm %d)\n", b_info->u.hvm.nested_hvm);
         printf("\t\t\t(no_incr_generationid %d)\n",
                     b_info->u.hvm.no_incr_generationid);
@@ -840,8 +842,30 @@ static void parse_config_data(const char *configfile_filename_report,
             b_info->u.hvm.hpet = l;
         if (!xlu_cfg_get_long (config, "vpt_align", &l, 0))
             b_info->u.hvm.vpt_align = l;
-        if (!xlu_cfg_get_long (config, "timer_mode", &l, 0))
+
+        if (!xlu_cfg_get_long(config, "timer_mode", &l, 1)) {
+            const char *s = libxl_timer_mode_to_string(l);
+            fprintf(stderr, "WARNING: specifying \"timer_mode\" as an integer is deprecated. "
+                    "Please use the named parameter variant. %s%s%s\n",
+                    s ? "e.g. timer_mode=\"" : "",
+                    s ? s : "",
+                    s ? "\"" : "");
+
+            if (l < LIBXL_TIMER_MODE_DELAY_FOR_MISSED_TICKS ||
+                l > LIBXL_TIMER_MODE_ONE_MISSED_TICK_PENDING) {
+                fprintf(stderr, "ERROR: invalid value %ld for \"timer_mode\"\n", l);
+                exit (1);
+            }
             b_info->u.hvm.timer_mode = l;
+        } else if (!xlu_cfg_get_string(config, "timer_mode", &buf, 0)) {
+            fprintf(stderr, "got a timer mode string: \"%s\"\n", buf);
+            if (libxl_timer_mode_from_string(buf, &b_info->u.hvm.timer_mode)) {
+                fprintf(stderr, "ERROR: invalid value \"%s\" for \"timer_mode\"\n",
+                        buf);
+                exit (1);
+            }
+        }
+
         if (!xlu_cfg_get_long (config, "nestedhvm", &l, 0))
             b_info->u.hvm.nested_hvm = l;
         break;

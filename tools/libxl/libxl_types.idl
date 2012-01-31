@@ -91,6 +91,14 @@ libxl_tsc_mode = Enumeration("tsc_mode", [
     (3, "native_paravirt"),
     ])
 
+# Consistent with the values defined for HVM_PARAM_TIMER_MODE.
+libxl_timer_mode = Enumeration("timer_mode", [
+    (0, "delay_for_missed_ticks"),
+    (1, "no_delay_for_missed_ticks"),
+    (2, "no_missed_ticks_pending"),
+    (3, "one_missed_tick_pending"),
+    ])
+
 #
 # Complex libxl types
 #
@@ -229,7 +237,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                        ("timeoffset", string),
                                        ("hpet", bool),
                                        ("vpt_align", bool),
-                                       ("timer_mode", integer),
+                                       ("timer_mode", libxl_timer_mode),
                                        ("nested_hvm", bool),
                                        ("no_incr_generationid", bool),
                                        ("nographic",        bool),
