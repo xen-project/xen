@@ -31,29 +31,29 @@ static inline void bitmap_clear(unsigned long *addr, int nr_bits)
     memset(addr, 0, bitmap_size(nr_bits));
 }
 
-static inline int test_bit(int nr, volatile unsigned long *addr)
+static inline int test_bit(int nr, unsigned long *addr)
 {
     return (BITMAP_ENTRY(nr, addr) >> BITMAP_SHIFT(nr)) & 1;
 }
 
-static inline void clear_bit(int nr, volatile unsigned long *addr)
+static inline void clear_bit(int nr, unsigned long *addr)
 {
     BITMAP_ENTRY(nr, addr) &= ~(1UL << BITMAP_SHIFT(nr));
 }
 
-static inline void set_bit(int nr, volatile unsigned long *addr)
+static inline void set_bit(int nr, unsigned long *addr)
 {
     BITMAP_ENTRY(nr, addr) |= (1UL << BITMAP_SHIFT(nr));
 }
 
-static inline int test_and_clear_bit(int nr, volatile unsigned long *addr)
+static inline int test_and_clear_bit(int nr, unsigned long *addr)
 {
     int oldbit = test_bit(nr, addr);
     clear_bit(nr, addr);
     return oldbit;
 }
 
-static inline int test_and_set_bit(int nr, volatile unsigned long *addr)
+static inline int test_and_set_bit(int nr, unsigned long *addr)
 {
     int oldbit = test_bit(nr, addr);
     set_bit(nr, addr);
