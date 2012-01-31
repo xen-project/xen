@@ -96,6 +96,16 @@ int libxl_init_build_info(libxl_ctx *ctx,
         b_info->u.hvm.timer_mode = 1;
         b_info->u.hvm.nested_hvm = 0;
         b_info->u.hvm.no_incr_generationid = 0;
+
+        b_info->u.hvm.stdvga = 0;
+        b_info->u.hvm.vnc.enable = 1;
+        b_info->u.hvm.vnc.listen = strdup("127.0.0.1");
+        b_info->u.hvm.vnc.display = 0;
+        b_info->u.hvm.vnc.findunused = 1;
+        b_info->u.hvm.keymap = NULL;
+        b_info->u.hvm.sdl.enable = 0;
+        b_info->u.hvm.sdl.opengl = 0;
+        b_info->u.hvm.nographic = 0;
         break;
     case LIBXL_DOMAIN_TYPE_PV:
         b_info->u.pv.slack_memkb = 8 * 1024;
@@ -121,17 +131,7 @@ int libxl_init_dm_info(libxl_ctx *ctx,
     dm_info->device_model_version = LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
     dm_info->device_model_stubdomain = false;
     dm_info->device_model = NULL;
-    dm_info->videoram = libxl__sizekb_to_mb(b_info->video_memkb);
 
-    dm_info->stdvga = 0;
-    dm_info->vnc.enable = 1;
-    dm_info->vnc.listen = strdup("127.0.0.1");
-    dm_info->vnc.display = 0;
-    dm_info->vnc.findunused = 1;
-    dm_info->keymap = NULL;
-    dm_info->sdl.enable = 0;
-    dm_info->sdl.opengl = 0;
-    dm_info->nographic = 0;
     dm_info->serial = NULL;
     dm_info->boot = strdup("cda");
     dm_info->usb = 0;

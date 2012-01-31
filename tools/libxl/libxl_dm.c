@@ -78,7 +78,7 @@ static const libxl_vnc_info *dm_vnc(const libxl_domain_config *guest_config,
 {
     const libxl_vnc_info *vnc = NULL;
     if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
-        vnc = &info->vnc;
+        vnc = &guest_config->b_info.u.hvm.vnc;
     } else if (guest_config->num_vfbs > 0) {
         vnc = &guest_config->vfbs[0].vnc;
     }
@@ -90,11 +90,22 @@ static const libxl_sdl_info *dm_sdl(const libxl_domain_config *guest_config,
 {
     const libxl_sdl_info *sdl = NULL;
     if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
-        sdl = &info->sdl;
+        sdl = &guest_config->b_info.u.hvm.sdl;
     } else if (guest_config->num_vfbs > 0) {
         sdl = &guest_config->vfbs[0].sdl;
     }
     return sdl && sdl->enable ? sdl : NULL;
+}
+
+static const char *dm_keymap(const libxl_domain_config *guest_config,
+                             const libxl_device_model_info *info)
+{
+    if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
+        return guest_config->b_info.u.hvm.keymap;
+    } else if (guest_config->num_vfbs > 0) {
+        return guest_config->vfbs[0].keymap;
+    } else
+        return NULL;
 }
 
 static char ** libxl__build_device_model_args_old(libxl__gc *gc,
@@ -108,6 +119,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
     const libxl_vnc_info *vnc = dm_vnc(guest_config, info);
     const libxl_sdl_info *sdl = dm_sdl(guest_config, info);
     const int num_vifs = guest_config->num_vifs;
+    const char *keymap = dm_keymap(guest_config, info);
     int i;
     flexarray_t *dm_args;
     dm_args = flexarray_make(16, 1);
@@ -156,11 +168,8 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
         }
         /* XXX sdl->{display,xauthority} into $DISPLAY/$XAUTHORITY */
     }
-    if (info->keymap) {
-        flexarray_vappend(dm_args, "-k", info->keymap, NULL);
-    }
-    if (info->nographic && (!sdl && !vnc)) {
-        flexarray_append(dm_args, "-nographic");
+    if (keymap) {
+        flexarray_vappend(dm_args, "-k", keymap, NULL);
     }
     if (info->serial) {
         flexarray_vappend(dm_args, "-serial", info->serial, NULL);
@@ -168,10 +177,17 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
     if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
         int ioemu_vifs = 0;
 
-        if (info->videoram) {
-            flexarray_vappend(dm_args, "-videoram", libxl__sprintf(gc, "%d", info->videoram), NULL);
+        if (b_info->u.hvm.nographic && (!sdl && !vnc)) {
+            flexarray_append(dm_args, "-nographic");
         }
-        if (info->stdvga) {
+
+        if (b_info->video_memkb) {
+            flexarray_vappend(dm_args, "-videoram",
+                    libxl__sprintf(gc, "%d",
+                                   libxl__sizekb_to_mb(b_info->video_memkb)),
+                    NULL);
+        }
+        if (b_info->u.hvm.stdvga) {
             flexarray_append(dm_args, "-std-vga");
         }
 
@@ -225,7 +241,11 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
         if (info->gfx_passthru) {
             flexarray_append(dm_args, "-gfx_passthru");
         }
+    } else {
+        if (!sdl && !vnc)
+            flexarray_append(dm_args, "-nographic");
     }
+
     if (info->saved_state) {
         flexarray_vappend(dm_args, "-loadvm", info->saved_state, NULL);
     }
@@ -260,6 +280,42 @@ static const char *qemu_disk_format_string(libxl_disk_format format)
     }
 }
 
+static char *dm_spice_options(libxl__gc *gc,
+                                    const libxl_spice_info *spice)
+{
+    char *opt;
+
+    if (!spice->port && !spice->tls_port) {
+        LIBXL__LOG(CTX, LIBXL__LOG_ERROR,
+                   "at least one of the spiceport or tls_port must be provided");
+        return NULL;
+    }
+
+    if (!spice->disable_ticketing) {
+        if (!spice->passwd) {
+            LIBXL__LOG(CTX, LIBXL__LOG_ERROR,
+                       "spice ticketing is enabled but missing password");
+            return NULL;
+        }
+        else if (!spice->passwd[0]) {
+            LIBXL__LOG(CTX, LIBXL__LOG_ERROR,
+                               "spice password can't be empty");
+            return NULL;
+        }
+    }
+    opt = libxl__sprintf(gc, "port=%d,tls-port=%d",
+                         spice->port, spice->tls_port);
+    if (spice->host)
+        opt = libxl__sprintf(gc, "%s,addr=%s", opt, spice->host);
+    if (spice->disable_ticketing)
+        opt = libxl__sprintf(gc, "%s,disable-ticketing", opt);
+    else
+        opt = libxl__sprintf(gc, "%s,password=%s", opt, spice->passwd);
+    opt = libxl__sprintf(gc, "%s,agent-mouse=%s", opt,
+                         spice->agent_mouse ? "on" : "off");
+    return opt;
+}
+
 static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                                         const char *dm,
                                         const libxl_domain_config *guest_config,
@@ -274,6 +330,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     const int num_vifs = guest_config->num_vifs;
     const libxl_vnc_info *vnc = dm_vnc(guest_config, info);
     const libxl_sdl_info *sdl = dm_sdl(guest_config, info);
+    const char *keymap = dm_keymap(guest_config, info);
     flexarray_t *dm_args;
     int i;
 
@@ -332,61 +389,36 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
         flexarray_append(dm_args, "-sdl");
         /* XXX sdl->{display,xauthority} into $DISPLAY/$XAUTHORITY */
     }
-    if (info->spice.enable) {
-        char *spiceoptions = NULL;
-        if (!info->spice.port && !info->spice.tls_port) {
-            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                "at least one of the spiceport or tls_port must be provided");
-            return NULL;
-        }
 
-        if (!info->spice.disable_ticketing) {
-            if (!info->spice.passwd) {
-                LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                    "spice ticketing is enabled but missing password");
-                return NULL;
-            }
-            else if (!info->spice.passwd[0]) {
-                LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                    "spice password can't be empty");
-                return NULL;
-            }
-        }
-        spiceoptions = libxl__sprintf(gc, "port=%d,tls-port=%d",
-                                      info->spice.port, info->spice.tls_port);
-        if (info->spice.host)
-            spiceoptions = libxl__sprintf(gc,
-                    "%s,addr=%s", spiceoptions, info->spice.host);
-        if (info->spice.disable_ticketing)
-            spiceoptions = libxl__sprintf(gc, "%s,disable-ticketing",
-                                               spiceoptions);
-        else
-            spiceoptions = libxl__sprintf(gc,
-                    "%s,password=%s", spiceoptions, info->spice.passwd);
-        spiceoptions = libxl__sprintf(gc, "%s,agent-mouse=%s", spiceoptions,
-                                      info->spice.agent_mouse ? "on" : "off");
-
-        flexarray_append(dm_args, "-spice");
-        flexarray_append(dm_args, spiceoptions);
-    }
-
-    if (info->type == LIBXL_DOMAIN_TYPE_PV && !info->nographic) {
+    /*if (info->type == LIBXL_DOMAIN_TYPE_PV && !b_info->nographic) {
         flexarray_vappend(dm_args, "-vga", "xenfb", NULL);
+      } never was possible?*/
+
+    if (keymap) {
+        flexarray_vappend(dm_args, "-k", keymap, NULL);
     }
 
-    if (info->keymap) {
-        flexarray_vappend(dm_args, "-k", info->keymap, NULL);
-    }
-    if (info->nographic && (!sdl && !vnc)) {
-        flexarray_append(dm_args, "-nographic");
-    }
     if (info->serial) {
         flexarray_vappend(dm_args, "-serial", info->serial, NULL);
     }
     if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
         int ioemu_vifs = 0;
 
-        if (info->stdvga) {
+        if (b_info->u.hvm.nographic && (!sdl && !vnc)) {
+            flexarray_append(dm_args, "-nographic");
+        }
+
+        if (b_info->u.hvm.spice.enable) {
+            const libxl_spice_info *spice = &b_info->u.hvm.spice;
+            char *spiceoptions = dm_spice_options(gc, spice);
+            if (!spiceoptions)
+                return NULL;
+
+            flexarray_append(dm_args, "-spice");
+            flexarray_append(dm_args, spiceoptions);
+        }
+
+        if (b_info->u.hvm.stdvga) {
                 flexarray_vappend(dm_args, "-vga", "std", NULL);
         }
 
@@ -446,7 +478,12 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
         if (info->gfx_passthru) {
             flexarray_append(dm_args, "-gfx_passthru");
         }
+    } else {
+        if (!sdl && !vnc) {
+            flexarray_append(dm_args, "-nographic");
+        }
     }
+
     if (info->saved_state) {
         /* This file descriptor is meant to be used by QEMU */
         int migration_fd = open(info->saved_state, O_RDONLY);
@@ -555,19 +592,24 @@ static char ** libxl__build_device_model_args(libxl__gc *gc,
     }
 }
 
-static int libxl__vfb_and_vkb_from_device_model_info(libxl__gc *gc,
-                                        const libxl_device_model_info *info,
+static int libxl__vfb_and_vkb_from_hvm_guest_config(libxl__gc *gc,
+                                        const libxl_domain_config *guest_config,
                                         libxl_device_vfb *vfb,
                                         libxl_device_vkb *vkb)
 {
+    const libxl_domain_build_info *b_info = &guest_config->b_info;
+
+    if (b_info->type != LIBXL_DOMAIN_TYPE_HVM)
+        return ERROR_INVAL;
+
     memset(vfb, 0x00, sizeof(libxl_device_vfb));
     memset(vkb, 0x00, sizeof(libxl_device_vkb));
 
     vfb->backend_domid = 0;
     vfb->devid = 0;
-    vfb->vnc = info->vnc;
-    vfb->keymap = info->keymap;
-    vfb->sdl = info->sdl;
+    vfb->vnc = b_info->u.hvm.vnc;
+    vfb->keymap = b_info->u.hvm.keymap;
+    vfb->sdl = b_info->u.hvm.sdl;
 
     vkb->backend_domid = 0;
     vkb->devid = 0;
@@ -670,8 +712,7 @@ static int libxl__create_stubdom(libxl__gc *gc,
     dm_config.vifs = guest_config->vifs;
     dm_config.num_vifs = guest_config->num_vifs;
 
-    libxl__vfb_and_vkb_from_device_model_info(gc, info, &vfb, &vkb);
-
+    libxl__vfb_and_vkb_from_hvm_guest_config(gc, guest_config, &vfb, &vkb);
     dm_config.vfbs = &vfb;
     dm_config.num_vfbs = 1;
     dm_config.vkbs = &vkb;

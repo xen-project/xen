@@ -364,29 +364,29 @@ static void printf_info(int domid,
         printf("\t\t\t(no_incr_generationid %d)\n",
                     b_info->u.hvm.no_incr_generationid);
 
+        printf("\t\t\t(stdvga %d)\n", b_info->u.hvm.stdvga);
+        printf("\t\t\t(vnc %d)\n", b_info->u.hvm.vnc.enable);
+        printf("\t\t\t(vnclisten %s)\n", b_info->u.hvm.vnc.listen);
+        printf("\t\t\t(vncdisplay %d)\n", b_info->u.hvm.vnc.display);
+        printf("\t\t\t(vncunused %d)\n", b_info->u.hvm.vnc.findunused);
+        printf("\t\t\t(keymap %s)\n", b_info->u.hvm.keymap);
+        printf("\t\t\t(sdl %d)\n", b_info->u.hvm.sdl.enable);
+        printf("\t\t\t(opengl %d)\n", b_info->u.hvm.sdl.opengl);
+        printf("\t\t\t(nographic %d)\n", b_info->u.hvm.nographic);
+        printf("\t\t\t(spice %d)\n", b_info->u.hvm.spice.enable);
+        printf("\t\t\t(spiceport %d)\n", b_info->u.hvm.spice.port);
+        printf("\t\t\t(spicetls_port %d)\n", b_info->u.hvm.spice.tls_port);
+        printf("\t\t\t(spicehost %s)\n", b_info->u.hvm.spice.host);
+        printf("\t\t\t(spicedisable_ticketing %d)\n",
+                    b_info->u.hvm.spice.disable_ticketing);
+        printf("\t\t\t(spiceagent_mouse %d)\n", b_info->u.hvm.spice.agent_mouse);
+
         printf("\t\t\t(device_model %s)\n", dm_info->device_model ? : "default");
-        printf("\t\t\t(videoram %d)\n", dm_info->videoram);
-        printf("\t\t\t(stdvga %d)\n", dm_info->stdvga);
-        printf("\t\t\t(vnc %d)\n", dm_info->vnc.enable);
-        printf("\t\t\t(vnclisten %s)\n", dm_info->vnc.listen);
-        printf("\t\t\t(vncdisplay %d)\n", dm_info->vnc.display);
-        printf("\t\t\t(vncunused %d)\n", dm_info->vnc.findunused);
-        printf("\t\t\t(keymap %s)\n", dm_info->keymap);
-        printf("\t\t\t(sdl %d)\n", dm_info->sdl.enable);
         printf("\t\t\t(gfx_passthru %d)\n", dm_info->gfx_passthru);
-        printf("\t\t\t(opengl %d)\n", dm_info->sdl.opengl);
-        printf("\t\t\t(nographic %d)\n", dm_info->nographic);
         printf("\t\t\t(serial %s)\n", dm_info->serial);
         printf("\t\t\t(boot %s)\n", dm_info->boot);
         printf("\t\t\t(usb %d)\n", dm_info->usb);
         printf("\t\t\t(usbdevice %s)\n", dm_info->usbdevice);
-        printf("\t\t\t(spice %d)\n", dm_info->spice.enable);
-        printf("\t\t\t(spiceport %d)\n", dm_info->spice.port);
-        printf("\t\t\t(spicetls_port %d)\n", dm_info->spice.tls_port);
-        printf("\t\t\t(spicehost %s)\n", dm_info->spice.host);
-        printf("\t\t\t(spicedisable_ticketing %d)\n",
-                    dm_info->spice.disable_ticketing);
-        printf("\t\t\t(spiceagent_mouse %d)\n", dm_info->spice.agent_mouse);
         printf("\t\t)\n");
         break;
     case LIBXL_DOMAIN_TYPE_PV:
@@ -1259,37 +1259,38 @@ skip_vfb:
 
     if (c_info->type == LIBXL_DOMAIN_TYPE_HVM) {
         if (!xlu_cfg_get_long (config, "stdvga", &l, 0))
-            dm_info->stdvga = l;
+            b_info->u.hvm.stdvga = l;
         if (!xlu_cfg_get_long (config, "vnc", &l, 0))
-            dm_info->vnc.enable = l;
-        xlu_cfg_replace_string (config, "vnclisten", &dm_info->vnc.listen, 0);
-        xlu_cfg_replace_string (config, "vncpasswd", &dm_info->vnc.passwd, 0);
+            b_info->u.hvm.vnc.enable = l;
+        xlu_cfg_replace_string (config, "vnclisten", &b_info->u.hvm.vnc.listen, 0);
+        xlu_cfg_replace_string (config, "vncpasswd", &b_info->u.hvm.vnc.passwd, 0);
         if (!xlu_cfg_get_long (config, "vncdisplay", &l, 0))
-            dm_info->vnc.display = l;
+            b_info->u.hvm.vnc.display = l;
         if (!xlu_cfg_get_long (config, "vncunused", &l, 0))
-            dm_info->vnc.findunused = l;
-        xlu_cfg_replace_string (config, "keymap", &dm_info->keymap, 0);
+            b_info->u.hvm.vnc.findunused = l;
+        xlu_cfg_replace_string (config, "keymap", &b_info->u.hvm.keymap, 0);
         if (!xlu_cfg_get_long (config, "sdl", &l, 0))
-            dm_info->sdl.enable = l;
+            b_info->u.hvm.sdl.enable = l;
         if (!xlu_cfg_get_long (config, "opengl", &l, 0))
-            dm_info->sdl.opengl = l;
+            b_info->u.hvm.sdl.opengl = l;
         if (!xlu_cfg_get_long (config, "spice", &l, 0))
-            dm_info->spice.enable = l;
+            b_info->u.hvm.spice.enable = l;
         if (!xlu_cfg_get_long (config, "spiceport", &l, 0))
-            dm_info->spice.port = l;
+            b_info->u.hvm.spice.port = l;
         if (!xlu_cfg_get_long (config, "spicetls_port", &l, 0))
-            dm_info->spice.tls_port = l;
-        xlu_cfg_replace_string (config, "spicehost", &dm_info->spice.host, 0);
+            b_info->u.hvm.spice.tls_port = l;
+        xlu_cfg_replace_string (config, "spicehost",
+                                &b_info->u.hvm.spice.host, 0);
         if (!xlu_cfg_get_long (config, "spicedisable_ticketing", &l, 0))
-            dm_info->spice.disable_ticketing = l;
+            b_info->u.hvm.spice.disable_ticketing = l;
         xlu_cfg_replace_string (config, "spicepasswd",
-                                &dm_info->spice.passwd, 0);
+                                &b_info->u.hvm.spice.passwd, 0);
         if (!xlu_cfg_get_long (config, "spiceagent_mouse", &l, 0))
-            dm_info->spice.agent_mouse = l;
+            b_info->u.hvm.spice.agent_mouse = l;
         else
-            dm_info->spice.agent_mouse = 1;
+            b_info->u.hvm.spice.agent_mouse = 1;
         if (!xlu_cfg_get_long (config, "nographic", &l, 0))
-            dm_info->nographic = l;
+            b_info->u.hvm.nographic = l;
         if (!xlu_cfg_get_long (config, "gfx_passthru", &l, 0))
             dm_info->gfx_passthru = l;
         xlu_cfg_replace_string (config, "serial", &dm_info->serial, 0);
