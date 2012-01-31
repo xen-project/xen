@@ -365,12 +365,27 @@ domain actually reboots.
 
 For HVM domains this requires PV drivers to be installed in your guest
 OS. If PV drivers are not present but you have configured the guest OS
-to behave appropriately you may be able to use the I<button-press>
-subcommand to trigger a power button press.
+to behave appropriately you may be able to use the I<-F> option
+trigger a reset button press.
 
 The behavior of what happens to a domain when it reboots is set by the
 B<on_reboot> parameter of the domain configuration file when the
 domain was created.
+
+B<OPTIONS>
+
+=over 4
+
+=item B<-F>
+
+If the guest does not support PV reboot control then fallback to
+sending an ACPI power event (equivalent to the I<reset> option to
+I<trigger>.
+
+You should ensure that the guest is configured to behave as expected
+in response to this event.
+
+=back
 
 =item B<restore> [I<OPTIONS>] [I<ConfigFile>] I<CheckpointFile>
 
@@ -435,8 +450,8 @@ services must be shutdown in the domain.
 
 For HVM domains this requires PV drivers to be installed in your guest
 OS. If PV drivers are not present but you have configured the guest OS
-to behave appropriately you may be able to use the I<button-press>
-subcommand to trigger a power button press.
+to behave appropriately you may be able to use the I<-F> option
+trigger a power button press.
 
 The command returns immediately after signally the domain unless that
 B<-w> flag is used.
@@ -452,6 +467,15 @@ B<OPTIONS>
 =item B<-w>
 
 Wait for the domain to complete shutdown before returning.
+
+=item B<-F>
+
+If the guest does not support PV shutdown control then fallback to
+sending an ACPI power event (equivalent to the I<power> option to
+I<trigger>.
+
+You should ensure that the guest is configured to behave as expected
+in response to this event.
 
 =back
 

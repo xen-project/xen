@@ -2427,20 +2427,25 @@ static void destroy_domain(const char *p)
     if (rc) { fprintf(stderr,"destroy failed (rc=%d)\n",rc); exit(-1); }
 }
 
-static void shutdown_domain(const char *p, int wait)
+static void shutdown_domain(const char *p, int wait, int fallback_trigger)
 {
     int rc;
     libxl_event *event;
 
     find_domain(p);
     rc=libxl_domain_shutdown(ctx, domid);
-    if (rc) {
-        if (rc == ERROR_NOPARAVIRT) {
+    if (rc == ERROR_NOPARAVIRT) {
+        if (fallback_trigger) {
+            fprintf(stderr, "PV control interface not available:"
+                    " sending ACPI power button event.\n");
+            rc = libxl_send_trigger(ctx, domid, LIBXL_TRIGGER_POWER, 0);
+        } else {
             fprintf(stderr, "PV control interface not available:"
                     " external graceful shutdown not possible.\n");
-            fprintf(stderr, "Use \"xl button-press <dom> power\" or"
-                    " \"xl destroy <dom>\".\n");
+            fprintf(stderr, "Use \"-F\" to fallback to ACPI power event.\n");
         }
+    }
+    if (rc) {
         fprintf(stderr,"shutdown failed (rc=%d)\n",rc);exit(-1);
     }
 
@@ -2481,19 +2486,25 @@ static void shutdown_domain(const char *p, int wait)
     }
 }
 
-static void reboot_domain(const char *p)
+static void reboot_domain(const char *p, int fallback_trigger)
 {
     int rc;
     find_domain(p);
     rc=libxl_domain_reboot(ctx, domid);
-    if (rc) {
-        if (rc == ERROR_NOPARAVIRT) {
+    if (rc == ERROR_NOPARAVIRT) {
+        if (fallback_trigger) {
+            fprintf(stderr, "PV control interface not available:"
+                    " sending ACPI reset button event.\n");
+            rc = libxl_send_trigger(ctx, domid, LIBXL_TRIGGER_RESET, 0);
+        } else {
             fprintf(stderr, "PV control interface not available:"
                     " external graceful reboot not possible.\n");
-            fprintf(stderr, "Use \"xl button-press <dom> power\" or"
-                    " \"xl destroy <dom>\".\n");
+            fprintf(stderr, "Use \"-F\" to fallback to ACPI reset event.\n");
         }
-        fprintf(stderr,"reboot failed (rc=%d)\n",rc);exit(-1); }
+    }
+    if (rc) {
+        fprintf(stderr,"reboot failed (rc=%d)\n",rc);exit(-1);
+    }
 }
 
 static void list_domains_details(const libxl_dominfo *info, int nb_domain)
@@ -3277,29 +3288,41 @@ int main_shutdown(int argc, char **argv)
 {
     int opt;
     int wait = 0;
+    int fallback_trigger = 0;
 
-    while ((opt = def_getopt(argc, argv, "w", "shutdown", 1)) != -1) {
+    while ((opt = def_getopt(argc, argv, "wF", "shutdown", 1)) != -1) {
         switch (opt) {
         case 0: case 2:
             return opt;
         case 'w':
             wait = 1;
             break;
+        case 'F':
+            fallback_trigger = 1;
+            break;
         }
     }
 
-    shutdown_domain(argv[optind], wait);
+    shutdown_domain(argv[optind], wait, fallback_trigger);
     return 0;
 }
 
 int main_reboot(int argc, char **argv)
 {
     int opt;
+    int fallback_trigger = 0;
 
-    if ((opt = def_getopt(argc, argv, "", "reboot", 1)) != -1)
-        return opt;
+    while ((opt = def_getopt(argc, argv, "F", "reboot", 1)) != -1) {
+        switch (opt) {
+        case 0: case 2:
+            return opt;
+        case 'F':
+            fallback_trigger = 1;
+            break;
+        }
+    }
 
-    reboot_domain(argv[optind]);
+    reboot_domain(argv[optind], fallback_trigger);
     return 0;
 }
 
