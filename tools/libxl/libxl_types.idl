@@ -28,8 +28,8 @@ libxl_domain_type = Enumeration("domain_type", [
     ])
 
 libxl_device_model_version = Enumeration("device_model_version", [
-    (1, "QEMU_XEN_TRADITIONAL", "Historical qemu-xen device model (qemu-dm)"),
-    (2, "QEMU_XEN", "Upstream based qemu-xen device model"),
+    (1, "QEMU_XEN_TRADITIONAL"), # Historical qemu-xen device model (qemu-dm)
+    (2, "QEMU_XEN"),             # Upstream based qemu-xen device model
     ])
 
 libxl_console_type = Enumeration("console_type", [
@@ -93,18 +93,18 @@ libxl_tsc_mode = Enumeration("tsc_mode", [
 libxl_dominfo = Struct("dominfo",[
     ("uuid",        libxl_uuid),
     ("domid",       libxl_domid),
-    ("ssidref",      uint32),
+    ("ssidref",     uint32),
     ("running",     bool),
     ("blocked",     bool),
     ("paused",      bool),
     ("shutdown",    bool),
     ("dying",       bool),
 
-    ("shutdown_reason", uint8, False,
-"""Valid SHUTDOWN_* value from xen/sched.h iff (shutdown||dying).
-
-Otherwise set to a value guaranteed not to clash with any valid
-SHUTDOWN_* constant."""),
+    # Valid SHUTDOWN_* value from xen/sched.h iff (shutdown||dying).
+    #
+    # Otherwise set to a value guaranteed not to clash with any valid
+    # SHUTDOWN_* constant.
+    ("shutdown_reason", uint8),
     ("current_memkb",   uint64),
     ("shared_memkb", uint64),
     ("max_memkb",   uint64),
@@ -153,6 +153,11 @@ libxl_domain_create_info = Struct("domain_create_info",[
     ("poolid",       uint32),
     ])
 
+# Instances of libxl_file_reference contained in this struct which
+# have been mapped (with libxl_file_reference_map) will be unmapped
+# by libxl_domain_build/restore. If either of these are never called
+# then the user is responsible for calling
+# libxl_file_reference_unmap.
 libxl_domain_build_info = Struct("domain_build_info",[
     ("max_vcpus",       integer),
     ("cur_vcpus",       integer),
@@ -188,84 +193,87 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                       ("cmdline", string),
                                       ("ramdisk", libxl_file_reference),
                                       ("features", string, True),
-                                      ("e820_host", bool, False, "Use host's E820 for PCI passthrough."),
+                                      # Use host's E820 for PCI passthrough.
+                                      ("e820_host", bool),
                                       ])),
                  ])),
     ],
-    comment =
-"""Instances of libxl_file_reference contained in this struct which
-have been mapped (with libxl_file_reference_map) will be unmapped
-by libxl_domain_build/restore. If either of these are never called
-then the user is responsible for calling
-libxl_file_reference_unmap.""")
+)
 
+# Device Model Information
 libxl_device_model_info = Struct("device_model_info",[
     ("domid",            libxl_domid),
-    ("uuid",             libxl_uuid,  False, "this is use only with stubdom, and must be different from the domain uuid"),
+    
+    # uuid is used only with stubdom, and must be different from the
+    # domain uuid
+    ("uuid",             libxl_uuid),
     ("dom_name",         string),
     ("device_model_version", libxl_device_model_version),
     ("device_model_stubdomain", bool),
-    ("device_model",     string, False, "if you set this you must set device_model_version too"),
+    # you set device_model you must set device_model_version too
+    ("device_model",     string),
     ("saved_state",      string),
     ("type",             libxl_domain_type),
     ("target_ram",       uint32),
-    ("videoram",         integer,           False, "size of the videoram in MB"),
-    ("stdvga",           bool,              False, "stdvga enabled or disabled"),
-    ("vnc",              bool,              False, "vnc enabled or disabled"),
-    ("vnclisten",        string,            False, "address:port that should be listened on for the VNC server if vnc is set"),
-    ("vncpasswd",        string,            False, "the VNC password"),
-    ("vncdisplay",       integer,           False, "set VNC display number"),
-    ("vncunused",        bool,              False, "try to find an unused port for the VNC server"),
-    ("keymap",           string,            False, "set keyboard layout, default is en-us keyboard"),
-    ("sdl",              bool,              False, "sdl enabled or disabled"),
-    ("opengl",           bool,              False, "opengl enabled or disabled (if enabled requires sdl enabled)"),
-    ("spice",            bool,              False,
-    "spice enabled or disabled"),
-    ("spiceport",        integer,           False,
-    "the port that should be listened on for the spice server"),
-    ("spicetls_port",    integer,           False, """the tls port
-that should be listened on for the spice server,
-at least one of the port or tls port must be given"""),
-    ("spicehost",        string,            False, """the interface
-that should be listened on if given otherwise any interface"""),
-    ("spicedisable_ticketing", bool,        False,
-    "enable client connection with no password"),
-    ("spicepasswd",      string,            False, """set ticket password
-witch must be used by a client for connection.
-The password never expires"""),
-    ("spiceagent_mouse", bool,              False,
-    "Whether spice agent is used for client mouse mode(default is on)"),
-    ("nographic",        bool,              False, "no graphics, use serial port"),
-    ("gfx_passthru",     bool,              False, "graphics passthrough enabled or disabled"),
-    ("serial",           string,            False, "serial port re-direct to pty deivce"),
-    ("boot",             string,            False, "boot order, for example dca"),
-    ("usb",              bool,              False, "usb support enabled or disabled"),
-    ("usbdevice",        string,            False, "enable usb mouse: tablet for absolute mouse, mouse for PS/2 protocol relative mouse"),
-    ("soundhw",          string,            False, "enable sound hardware"),
-    ("acpi",             bool,              False, "acpi enabled or disabled"),
-    ("vcpus",            integer,           False, "max number of vcpus"),
-    ("vcpu_avail",       integer,           False, "vcpus actually available"),
-    ("xen_platform_pci", bool,              False, "enable/disable the xen platform pci device"),
-    ("extra",            libxl_string_list, False, "extra parameters pass directly to qemu, NULL terminated"),
-    ("extra_pv",         libxl_string_list, False, "extra parameters pass directly to qemu for PV guest, NULL terminated"),
-    ("extra_hvm",        libxl_string_list, False, "extra parameters pass directly to qemu for HVM guest, NULL terminated"),
+    # size of the videoram in MB
+    ("videoram",         integer), 
+    ("stdvga",           bool),
+    ("vnc",              bool),
+    # "address:port" that should be listened on for the VNC server
+    ("vnclisten",        string),
+    ("vncpasswd",        string),
+    # VNC display number
+    ("vncdisplay",       integer),
+    # If set then try to find an unused port for the VNC server
+    ("vncunused",        bool),
+    # keyboard layout, default is en-us keyboard
+    ("keymap",           string),
+    ("sdl",              bool),
+    ("opengl",           bool), # (requires sdl enabled)
+    ("spice",            bool),
+    # At least one of spice port or spicetls_post must be given
+    ("spiceport",        integer),
+    ("spicetls_port",    integer),
+    # Interface to bind to
+    ("spicehost",        string),
+    # enable client connection with no password
+    ("spicedisable_ticketing", bool),
+    ("spicepasswd",      string),
+    ("spiceagent_mouse", bool),
+    ("nographic",        bool),
+    ("gfx_passthru",     bool),
+    ("serial",           string),
+    ("boot",             string),
+    ("usb",              bool),
+    # usbdevice: "tablet" for absolute mouse, "mouse" for PS/2 protocol relative mouse
+    ("usbdevice",        string),
+    ("soundhw",          string),
+    ("acpi",             bool),
+    ("vcpus",            integer), # max number of vcpus
+    ("vcpu_avail",       integer), # vcpus actually available
+    ("xen_platform_pci", bool),
+    # extra parameters pass directly to qemu, NULL terminated
+    ("extra",            libxl_string_list),
+    # extra parameters pass directly to qemu for PV guest, NULL terminated
+    ("extra_pv",         libxl_string_list),
+    # extra parameters pass directly to qemu for HVM guest, NULL terminated
+    ("extra_hvm",        libxl_string_list),
     ],
-    comment=
-"""Device Model information.
-
-Network is missing""")
+)
 
 libxl_device_vfb = Struct("device_vfb", [
     ("backend_domid", libxl_domid),
     ("devid",         integer),
-    ("vnc",           bool,     False, "vnc enabled or disabled"),
-    ("vnclisten",     string,   False, "address:port that should be listened on for the VNC server if vnc is set"),
-    ("vncpasswd",     string,   False, "the VNC password"),
-    ("vncdisplay",    integer,  False, "set VNC display number"),
-    ("vncunused",     bool,     False, "try to find an unused port for the VNC server"),
-    ("keymap",        string,   False, "set keyboard layout, default is en-us keyboard"),
-    ("sdl",           bool,     False, "sdl enabled or disabled"),
-    ("opengl",        bool,     False, "opengl enabled or disabled (if enabled requires sdl enabled)"),
+    ("vnc",           bool),
+    # address:port that should be listened on for the VNC server if vnc is set
+    ("vnclisten",     string),
+    ("vncpasswd",     string),
+    ("vncdisplay",    integer),
+    ("vncunused",     bool),
+    # set keyboard layout, default is en-us keyboard
+    ("keymap",        string),
+    ("sdl",           bool),
+    ("opengl",        bool), # (if enabled requires sdl enabled)
     ("display",       string),
     ("xauthority",    string),
     ])
@@ -342,13 +350,13 @@ libxl_nicinfo = Struct("nicinfo", [
     ])
 
 libxl_vcpuinfo = Struct("vcpuinfo", [
-    ("vcpuid", uint32,              False, "vcpu's id"),
-    ("cpu", uint32,                 False, "current mapping"),
-    ("online", bool,                False, "currently online (not hotplugged)?"),
-    ("blocked", bool,               False, "blocked waiting for an event?"),
-    ("running", bool,               False, "currently scheduled on its CPU?"),
-    ("vcpu_time", uint64,           False, "total vcpu time ran (ns)"),
-    ("cpumap", libxl_cpumap,        False, "current cpu's affinities"),
+    ("vcpuid", uint32),
+    ("cpu", uint32),
+    ("online", bool),
+    ("blocked", bool),
+    ("running", bool),
+    ("vcpu_time", uint64), # total vcpu time ran (ns)
+    ("cpumap", libxl_cpumap), # current cpu's affinities
     ])
 
 libxl_physinfo = Struct("physinfo", [
@@ -371,9 +379,9 @@ libxl_physinfo = Struct("physinfo", [
     ], dispose_fn=None, dir=DIR_OUT)
 
 libxl_topologyinfo = Struct("topologyinfo", [
-    ("coremap", libxl_cpuarray,   False, "cpu to core map"),
-    ("socketmap", libxl_cpuarray, False, "cpu to socket map"),
-    ("nodemap", libxl_cpuarray,   False, "cpu to node map"),
+    ("coremap", libxl_cpuarray),   # cpu to core map
+    ("socketmap", libxl_cpuarray), # cpu to socket map
+    ("nodemap", libxl_cpuarray),   # cpu to node map
     ])
 
 libxl_sched_credit = Struct("sched_credit", [

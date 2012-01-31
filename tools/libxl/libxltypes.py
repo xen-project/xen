@@ -22,7 +22,6 @@ def _get_default_namespace():
 
 class Type(object):
     def __init__(self, typename, **kwargs):
-        self.comment = kwargs.setdefault('comment', None)
         self.namespace = kwargs.setdefault('namespace',
                 _get_default_namespace())
         self.dir = kwargs.setdefault('dir', DIR_BOTH)
@@ -120,7 +119,6 @@ class EnumerationValue(object):
         self.rawname = str.upper(enum.rawname) + "_" + self.valuename
         self.name = str.upper(enum.namespace) + self.rawname
         self.value = value
-        self.comment = kwargs.setdefault("comment", None)
 
 class Enumeration(Type):
     def __init__(self, typename, values, **kwargs):
@@ -129,16 +127,9 @@ class Enumeration(Type):
 
         self.values = []
         for v in values:
-            # (value, name[, comment=None])
-            if len(v) == 2:
-                (num,name) = v
-                comment = None
-            elif len(v) == 3:
-                num,name,comment = v
-            else:
-                raise ""
+            # (value, name)
+            (num,name) = v
             self.values.append(EnumerationValue(self, num, name,
-                                                comment=comment,
                                                 typename=self.rawname))
     def lookup(self, name):
         for v in self.values:
@@ -152,7 +143,6 @@ class Field(object):
         self.type = type
         self.name = name
         self.const = kwargs.setdefault('const', False)
-        self.comment = kwargs.setdefault('comment', None)
         self.enumname = kwargs.setdefault('enumname', None)
 
 class Aggregate(Type):
@@ -164,19 +154,17 @@ class Aggregate(Type):
 
         self.fields = []
         for f in fields:
-            # (name, type[, const=False[, comment=None]])
+            # (name, type[, const=False])
             if len(f) == 2:
                 n,t = f
                 const = False
-                comment = None
             elif len(f) == 3:
                 n,t,const = f
-                comment = None
             else:
-                n,t,const,comment = f
+                raise ValueError
             if n is None:
                 raise ValueError
-            self.fields.append(Field(t,n,const=const,comment=comment))
+            self.fields.append(Field(t,n,const=const))
 
     # Returns a tuple (stem, field-expr)
     #

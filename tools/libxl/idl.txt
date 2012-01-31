@@ -20,10 +20,6 @@ The libxltypes.Type base class has several other properties which
 apply to all types. The properties are set by passing a named
 parameter to the constructor.
 
-Type.comment:
-
-  A free text comment which describes the type.
-
 Type.namespace: (default: "libxl_")
 
  The namespace in which the type resides. Usually this is "libxl_" but
@@ -98,7 +94,6 @@ libxltype.Enumeration
 				    name of the containing Enumeration
 				    and any namespace (e.g. "VALUE")
     EnumerationValue.value	The integer value associated with this name.
-    EnumerationValue.comment	A free text comment which describes the member.
 
 libxltype.Aggregate
 
@@ -115,7 +110,6 @@ libxltype.Aggregate
   Field.name    The name of the member (can be None for anonymous
 		fields).
   Field.const	Boolean, true if the member is const.
-  Field.comment	A free text comment which describes the member.
 
 libxltype.Struct
 

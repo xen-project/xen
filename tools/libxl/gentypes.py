@@ -5,19 +5,6 @@ import re
 
 import libxltypes
 
-def format_comment(level, comment):
-    indent = reduce(lambda x,y: x + " ", range(level), "")
-    s  = "%s/*\n" % indent
-    s += "%s * " % indent
-    comment = comment.replace("\n", "\n%s * " % indent)
-    x = re.compile(r'^%s \* $' % indent, re.MULTILINE)
-    comment = x.sub("%s *" % indent, comment)
-    s += comment
-    s += "\n"
-    s += "%s */" % indent
-    s += "\n"
-    return s
-
 def libxl_C_instance_of(ty, instancename):
     if isinstance(ty, libxltypes.Aggregate) and ty.typename is None:
         if instancename is None:
@@ -30,17 +17,12 @@ def libxl_C_instance_of(ty, instancename):
 def libxl_C_type_define(ty, indent = ""):
     s = ""
     if isinstance(ty, libxltypes.Enumeration):
-        if ty.comment is not None:
-            s += format_comment(0, ty.comment)
-
         if ty.typename is None:
             s += "enum {\n"
         else:
             s += "typedef enum %s {\n" % ty.typename
 
         for v in ty.values:
-            if v.comment is not None:
-                s += format_comment(4, v.comment)
             x = "%s = %d" % (v.name, v.value)
             x = x.replace("\n", "\n    ")
             s += "    " + x + ",\n"
@@ -50,17 +32,12 @@ def libxl_C_type_define(ty, indent = ""):
             s += "} %s" % ty.typename
 
     elif isinstance(ty, libxltypes.Aggregate):
-        if ty.comment is not None:
-            s += format_comment(0, ty.comment)
-
         if ty.typename is None:
             s += "%s {\n" % ty.kind
         else:
             s += "typedef %s %s {\n" % (ty.kind, ty.typename)
 
         for f in ty.fields:
-            if f.comment is not None:
-                s += format_comment(4, f.comment)
             x = libxl_C_instance_of(f.type, f.name)
             if f.const:
                 x = "const " + x
