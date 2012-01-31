@@ -130,6 +130,19 @@ static int string_string_tuple_array_val (caml_gc *gc, char ***c_val, value v)
 
 #endif
 
+/* Option type support as per http://www.linux-nantes.org/~fmonnier/ocaml/ocaml-wrapping-c.php */
+#define Val_none Val_int(0)
+#define Some_val(v) Field(v,0)
+
+static value Val_some(value v)
+{
+	CAMLparam1(v);
+	CAMLlocal1(some);
+	some = caml_alloc(1, 0);
+	Store_field(some, 0, v);
+	CAMLreturn(some);
+}
+
 static value Val_mac (libxl_mac *c_val)
 {
 	CAMLparam0();
@@ -205,14 +218,13 @@ static value Val_topologyinfo(libxl_topologyinfo *c_val)
 
 	topologyinfo = caml_alloc_tuple(c_val->coremap.entries);
 	for (i = 0; i < c_val->coremap.entries; i++) {
-		v = Val_int(0); /* None */
+		v = Val_none;
 		if (c_val->coremap.array[i] != LIBXL_CPUARRAY_INVALID_ENTRY) {
 			topology = caml_alloc_tuple(3);
 			Store_field(topology, 0, Val_int(c_val->coremap.array[i]));
 			Store_field(topology, 1, Val_int(c_val->socketmap.array[i]));
 			Store_field(topology, 2, Val_int(c_val->nodemap.array[i]));
-			v = caml_alloc(1, 0); /* Some */
-			Store_field(v, 0, topology);
+			v = Val_some(topology);
 		}
 		Store_field(topologyinfo, i, v);
 	}
