@@ -154,17 +154,17 @@ class Aggregate(Type):
 
         self.fields = []
         for f in fields:
-            # (name, type[, const=False])
+            # (name, type[, {kw args}])
             if len(f) == 2:
                 n,t = f
-                const = False
+                kw = {}
             elif len(f) == 3:
-                n,t,const = f
+                n,t,kw = f
             else:
                 raise ValueError
             if n is None:
                 raise ValueError
-            self.fields.append(Field(t,n,const=const))
+            self.fields.append(Field(t,n,**kw))
 
     # Returns a tuple (stem, field-expr)
     #

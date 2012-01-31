@@ -192,7 +192,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                       ("bootloader_args", libxl_string_list),
                                       ("cmdline", string),
                                       ("ramdisk", libxl_file_reference),
-                                      ("features", string, True),
+                                      ("features", string, {'const': True}),
                                       # Use host's E820 for PCI passthrough.
                                       ("e820_host", bool),
                                       ])),
