@@ -78,6 +78,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
                                         const libxl_domain_config *guest_config,
                                         const libxl_device_model_info *info)
 {
+    const libxl_domain_create_info *c_info = &guest_config->c_info;
     const libxl_domain_build_info *b_info = &guest_config->b_info;
     const libxl_device_nic *vifs = guest_config->vifs;
     const int num_vifs = guest_config->num_vifs;
@@ -91,8 +92,8 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
     flexarray_vappend(dm_args, dm,
                       "-d", libxl__sprintf(gc, "%d", info->domid), NULL);
 
-    if (info->dom_name)
-        flexarray_vappend(dm_args, "-domain-name", info->dom_name, NULL);
+    if (c_info->name)
+        flexarray_vappend(dm_args, "-domain-name", c_info->name, NULL);
 
     if (info->vnc.enable) {
         char *vncarg;
@@ -239,6 +240,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                                         const libxl_device_model_info *info)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
+    const libxl_domain_create_info *c_info = &guest_config->c_info;
     const libxl_domain_build_info *b_info = &guest_config->b_info;
     const libxl_device_disk *disks = guest_config->disks;
     const libxl_device_nic *vifs = guest_config->vifs;
@@ -268,8 +270,8 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
         flexarray_append(dm_args, "-xen-attach");
     }
 
-    if (info->dom_name) {
-        flexarray_vappend(dm_args, "-name", info->dom_name, NULL);
+    if (c_info->name) {
+        flexarray_vappend(dm_args, "-name", c_info->name, NULL);
     }
     if (info->vnc.enable) {
         int display = 0;
@@ -793,6 +795,7 @@ int libxl__create_device_model(libxl__gc *gc,
                               libxl_device_model_info *info,
                               libxl__spawner_starting **starting_r)
 {
+    const libxl_domain_create_info *c_info = &guest_config->c_info;
     libxl_ctx *ctx = libxl__gc_owner(gc);
     char *path, *logfile;
     int logfile_w, null;
@@ -835,7 +838,9 @@ int libxl__create_device_model(libxl__gc *gc,
     xs_mkdir(ctx->xsh, XBT_NULL, path);
     libxl__xs_write(gc, XBT_NULL, libxl__sprintf(gc, "%s/disable_pf", path), "%d", !info->xen_platform_pci);
 
-    libxl_create_logfile(ctx, libxl__sprintf(gc, "qemu-dm-%s", info->dom_name), &logfile);
+    libxl_create_logfile(ctx,
+                         libxl__sprintf(gc, "qemu-dm-%s", c_info->name),
+                         &logfile);
     logfile_w = open(logfile, O_WRONLY|O_CREAT|O_APPEND, 0644);
     free(logfile);
     null = open("/dev/null", O_RDONLY);
@@ -981,8 +986,6 @@ static int libxl__build_xenpv_qemu_args(libxl__gc *gc,
                                         libxl_device_vfb *vfb,
                                         libxl_device_model_info *info)
 {
-    libxl_ctx *ctx = libxl__gc_owner(gc);
-
     if (vfb != NULL) {
         info->vnc.enable = vfb->vnc.enable;
         if (vfb->vnc.listen)
@@ -997,7 +1000,6 @@ static int libxl__build_xenpv_qemu_args(libxl__gc *gc,
     } else
         info->nographic = 1;
     info->domid = domid;
-    info->dom_name = libxl_domid_to_name(ctx, domid);
     return 0;
 }
 

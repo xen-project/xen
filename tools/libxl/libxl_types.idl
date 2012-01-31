@@ -237,7 +237,6 @@ libxl_device_model_info = Struct("device_model_info",[
     # uuid is used only with stubdom, and must be different from the
     # domain uuid
     ("uuid",             libxl_uuid),
-    ("dom_name",         string),
     ("device_model_version", libxl_device_model_version),
     ("device_model_stubdomain", bool),
     # you set device_model you must set device_model_version too
