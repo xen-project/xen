@@ -35,7 +35,7 @@ int libxl_uuid_from_string(libxl_uuid *uuid, const char *in)
      return uuid_parse(in, uuid->uuid);
 }
 
-void libxl_uuid_copy(libxl_uuid *dst, libxl_uuid *src)
+void libxl_uuid_copy(libxl_uuid *dst, const libxl_uuid *src)
 {
      uuid_copy(dst->uuid, src->uuid);
 }
@@ -82,7 +82,7 @@ int libxl_uuid_from_string(libxl_uuid *uuid, const char *in)
 }
 #undef LIBXL__UUID_PTRS
 
-void libxl_uuid_copy(libxl_uuid *dst, libxl_uuid *src)
+void libxl_uuid_copy(libxl_uuid *dst, const libxl_uuid *src)
 {
      memcpy(dst->uuid, src->uuid, sizeof(dst->uuid));
 }

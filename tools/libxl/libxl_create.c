@@ -571,7 +571,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
         libxl_device_vkb_dispose(&vkb);
 
         dm_info->domid = domid;
-        ret = libxl__create_device_model(gc, dm_info,
+        ret = libxl__create_device_model(gc, d_config, dm_info,
                                         d_config->disks, d_config->num_disks,
                                         d_config->vifs, d_config->num_vifs,
                                         &dm_starting);
@@ -618,7 +618,8 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
             xenpv_dm_info.extra_pv = d_config->dm_info.extra_pv;
             xenpv_dm_info.extra_hvm = d_config->dm_info.extra_hvm;
 
-            libxl__create_xenpv_qemu(gc, domid, &xenpv_dm_info,
+            libxl__create_xenpv_qemu(gc, domid,
+                                     d_config, &xenpv_dm_info,
                                      d_config->vfbs, &dm_starting);
         }
         break;

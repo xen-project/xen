@@ -866,11 +866,13 @@ _hidden int libxl__domain_build(libxl__gc *gc,
 _hidden const char *libxl__domain_device_model(libxl__gc *gc,
                                                libxl_device_model_info *info);
 _hidden int libxl__create_device_model(libxl__gc *gc,
+                              libxl_domain_config *guest_config,
                               libxl_device_model_info *info,
-                              libxl_device_disk *disk, int num_disks,
+                              libxl_device_disk *disks, int num_disks,
                               libxl_device_nic *vifs, int num_vifs,
                               libxl__spawner_starting **starting_r);
 _hidden int libxl__create_xenpv_qemu(libxl__gc *gc, uint32_t domid,
+                              libxl_domain_config *guest_config,
                               libxl_device_model_info *dm_info,
                               libxl_device_vfb *vfb,
                               libxl__spawner_starting **starting_r);
