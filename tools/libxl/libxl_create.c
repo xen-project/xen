@@ -131,8 +131,6 @@ int libxl_init_dm_info(libxl_ctx *ctx,
 {
     memset(dm_info, '\0', sizeof(*dm_info));
 
-    libxl_uuid_generate(&dm_info->uuid);
-
     dm_info->device_model_version = LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
     dm_info->device_model_stubdomain = false;
     dm_info->device_model = NULL;
