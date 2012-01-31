@@ -929,8 +929,12 @@ int libxl__create_device_model(libxl__gc *gc,
 
     path = libxl__sprintf(gc, "/local/domain/0/device-model/%d", domid);
     xs_mkdir(ctx->xsh, XBT_NULL, path);
-    libxl__xs_write(gc, XBT_NULL, libxl__sprintf(gc, "%s/disable_pf", path),
-                    "%d", !b_info->u.hvm.xen_platform_pci);
+
+    if (b_info->type == LIBXL_DOMAIN_TYPE_HVM &&
+        b_info->device_model_version
+        == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL)
+        libxl__xs_write(gc, XBT_NULL, libxl__sprintf(gc, "%s/disable_pf", path),
+                        "%d", !b_info->u.hvm.xen_platform_pci);
 
     libxl_create_logfile(ctx,
                          libxl__sprintf(gc, "qemu-dm-%s", c_info->name),
