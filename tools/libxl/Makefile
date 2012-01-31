@@ -111,7 +111,7 @@ libxl_internal_json.h: _libxl_types_internal_json.h
 $(LIBXL_OBJS) $(LIBXLU_OBJS) $(XL_OBJS): libxl.h
 $(LIBXL_OBJS): libxl_internal.h
 
-_libxl_type%.h _libxl_type%_json.h _libxl_type%.c: libxl_type%.idl gentypes.py libxltypes.py
+_libxl_type%.h _libxl_type%_json.h _libxl_type%.c: libxl_type%.idl gentypes.py idl.py
 	$(PYTHON) gentypes.py libxl_type$*.idl __libxl_type$*.h __libxl_type$*_json.h __libxl_type$*.c
 	$(call move-if-changed,__libxl_type$*.h,_libxl_type$*.h)
 	$(call move-if-changed,__libxl_type$*_json.h,_libxl_type$*_json.h)

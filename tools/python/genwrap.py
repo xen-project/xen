@@ -2,23 +2,23 @@
 
 import sys,os
 
-import libxltypes
+import idl
 
 (TYPE_BOOL, TYPE_INT, TYPE_UINT, TYPE_STRING, TYPE_AGGREGATE) = range(5)
 
 def py_type(ty):
-    if ty == libxltypes.bool:
+    if ty == idl.bool:
         return TYPE_BOOL
-    if isinstance(ty, libxltypes.Enumeration):
+    if isinstance(ty, idl.Enumeration):
         return TYPE_UINT
-    if isinstance(ty, libxltypes.Number):
+    if isinstance(ty, idl.Number):
         if ty.signed:
             return TYPE_INT
         else:
             return TYPE_UINT
-    if isinstance(ty, libxltypes.Aggregate):
+    if isinstance(ty, idl.Aggregate):
         return TYPE_AGGREGATE
-    if ty == libxltypes.string:
+    if ty == idl.string:
         return TYPE_STRING
     return None
 
@@ -38,7 +38,7 @@ def fsanitize(name):
 
 def py_decls(ty):
     l = []
-    if isinstance(ty, libxltypes.Aggregate):
+    if isinstance(ty, idl.Aggregate):
         l.append('_hidden Py_%s *Py%s_New(void);\n'%(ty.rawname, ty.rawname))
         l.append('_hidden int Py%s_Check(PyObject *self);\n'%ty.rawname)
         for f in ty.fields:
@@ -211,10 +211,10 @@ def py_initfuncs(types):
     l.append('void genwrap__init(PyObject *m)')
     l.append('{')
     for ty in types:
-        if isinstance(ty, libxltypes.Enumeration):
+        if isinstance(ty, idl.Enumeration):
             for v in ty.values:
                 l.append('    PyModule_AddIntConstant(m, "%s", %s);' % (v.rawname, v.name))
-        elif isinstance(ty, libxltypes.Aggregate):
+        elif isinstance(ty, idl.Aggregate):
             l.append('    if (PyType_Ready(&Py%s_Type) >= 0) {'%ty.rawname)
             l.append('        Py_INCREF(&Py%s_Type);'%ty.rawname)
             l.append('        PyModule_AddObject(m, "%s", (PyObject *)&Py%s_Type);'%(ty.rawname, ty.rawname))
@@ -227,7 +227,7 @@ def py_initfuncs(types):
 
 def tree_frob(types):
     ret = types[:]
-    for ty in [ty for ty in ret if isinstance(ty, libxltypes.Aggregate)]:
+    for ty in [ty for ty in ret if isinstance(ty, idl.Aggregate)]:
         ty.fields = filter(lambda f:f.name is not None and f.type.typename is not None, ty.fields)
     return ret
 
@@ -236,8 +236,7 @@ if __name__ == '__main__':
         print >>sys.stderr, "Usage: genwrap.py <idl> <decls> <defns>"
         sys.exit(1)
 
-    idl = sys.argv[1]
-    (_,types) = libxltypes.parse(idl)
+    (_,types) = idl.parse(sys.argv[1])
 
     types = tree_frob(types)
 
@@ -278,7 +277,7 @@ _hidden PyObject *genwrap__ll_get(long long val);
 _hidden int genwrap__ll_set(PyObject *v, long long *val, long long mask);
 
 """ % " ".join(sys.argv))
-    for ty in [ty for ty in types if isinstance(ty, libxltypes.Aggregate)]:
+    for ty in [ty for ty in types if isinstance(ty, idl.Aggregate)]:
         f.write('/* Internal API for %s wrapper */\n'%ty.typename)
         f.write(py_wrapstruct(ty))
         f.write(py_decls(ty))
@@ -307,7 +306,7 @@ _hidden int genwrap__ll_set(PyObject *v, long long *val, long long mask);
     for ty in types:
         if ty.private:
             continue
-        if isinstance(ty, libxltypes.Aggregate):
+        if isinstance(ty, idl.Aggregate):
             f.write('/* Attribute get/set functions for %s */\n'%ty.typename)
             for a in ty.fields:
                 if a.type.private:

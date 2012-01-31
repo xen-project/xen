@@ -4,7 +4,7 @@ import sys
 import re
 import random
 
-import libxltypes
+import idl
 
 def randomize_char(c):
     if random.random() < 0.5:
@@ -25,9 +25,9 @@ handcoded = ["libxl_cpumap", "libxl_key_value_list",
 
 def gen_rand_init(ty, v, indent = "    ", parent = None):
     s = ""
-    if isinstance(ty, libxltypes.Enumeration):
+    if isinstance(ty, idl.Enumeration):
         s += "%s = %s;\n" % (ty.pass_arg(v, parent is None), randomize_enum(ty))
-    elif isinstance(ty, libxltypes.KeyedUnion):
+    elif isinstance(ty, idl.KeyedUnion):
         if parent is None:
             raise Exception("KeyedUnion type must have a parent")
         s += "switch (%s) {\n" % (parent + ty.keyvar_name)
@@ -37,7 +37,7 @@ def gen_rand_init(ty, v, indent = "    ", parent = None):
             s += gen_rand_init(f.type, fexpr, indent + "    ", nparent)
             s += "    break;\n"
         s += "}\n"
-    elif isinstance(ty, libxltypes.Struct) \
+    elif isinstance(ty, idl.Struct) \
      and (parent is None or ty.json_fn is None):
         for f in [f for f in ty.fields if not f.const]:
             (nparent,fexpr) = ty.member(v, f, parent is None)
@@ -45,10 +45,10 @@ def gen_rand_init(ty, v, indent = "    ", parent = None):
     elif hasattr(ty, "rand_init") and ty.rand_init is not None:
         s += "%s(%s);\n" % (ty.rand_init,
                             ty.pass_arg(v, isref=parent is None,
-                                        passby=libxltypes.PASS_BY_REFERENCE))
+                                        passby=idl.PASS_BY_REFERENCE))
     elif ty.typename in ["libxl_uuid", "libxl_mac", "libxl_hwcap"]:
         s += "rand_bytes((uint8_t *)%s, sizeof(*%s));\n" % (v,v)
-    elif ty.typename in ["libxl_domid"] or isinstance(ty, libxltypes.Number):
+    elif ty.typename in ["libxl_domid"] or isinstance(ty, idl.Number):
         s += "%s = rand() %% (sizeof(%s)*8);\n" % \
              (ty.pass_arg(v, parent is None),
               ty.pass_arg(v, parent is None))
@@ -74,8 +74,7 @@ if __name__ == '__main__':
 
     random.seed()
 
-    idl = sys.argv[1]
-    (builtins,types) = libxltypes.parse(idl)
+    (builtins,types) = idl.parse(sys.argv[1])
 
     impl = sys.argv[2]
     f = open(impl, "w")
@@ -215,10 +214,10 @@ static void libxl_cpuarray_rand_init(libxl_cpuarray *p)
         if ty.typename not in handcoded:
             f.write("static void %s_rand_init(%s);\n" % \
                     (ty.typename,
-                     ty.make_arg("p", passby=libxltypes.PASS_BY_REFERENCE)))
+                     ty.make_arg("p", passby=idl.PASS_BY_REFERENCE)))
             f.write("static void %s_rand_init(%s)\n" % \
                     (ty.typename,
-                     ty.make_arg("p", passby=libxltypes.PASS_BY_REFERENCE)))
+                     ty.make_arg("p", passby=idl.PASS_BY_REFERENCE)))
             f.write("{\n")
             f.write(gen_rand_init(ty, "p"))
             f.write("}\n")
@@ -252,7 +251,7 @@ int main(int argc, char **argv)
     for ty in [t for t in types if t.json_fn is not None]:
         arg = ty.typename + "_val"
         f.write("    %s_rand_init(%s);\n" % (ty.typename, \
-            ty.pass_arg(arg, isref=False, passby=libxltypes.PASS_BY_REFERENCE)))
+            ty.pass_arg(arg, isref=False, passby=idl.PASS_BY_REFERENCE)))
         f.write("    s = %s_to_json(ctx, %s);\n" % \
                 (ty.typename, ty.pass_arg(arg, isref=False)))
         f.write("    printf(\"%%s: %%s\\n\", \"%s\", s);\n" % ty.typename)
@@ -265,7 +264,7 @@ int main(int argc, char **argv)
     f.write("    printf(\"Testing Enumerations\\n\");\n")
     f.write("    printf(\"--------------------\\n\");\n")
     f.write("    printf(\"\\n\");\n")
-    for ty in [t for t in types if isinstance(t,libxltypes.Enumeration)]:
+    for ty in [t for t in types if isinstance(t,idl.Enumeration)]:
         f.write("    printf(\"%s -- to string:\\n\");\n" % (ty.typename))
         for v in ty.values:
             f.write("    printf(\"\\t%s = %%d = \\\"%%s\\\"\\n\", " \

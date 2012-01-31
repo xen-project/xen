@@ -1,10 +1,10 @@
-libxltypes IDL
---------------
+libxl IDL
+---------
 
 Each type in the libxl interface is represented by an object of type
-libxltypes.Type (or a subclass thereof). Every local variable defined
-by the .idl file must be an instance of libxltypes.Type (e.g. you may
-not define Python functions or any other construct other than defining
+idl.Type (or a subclass thereof). Every local variable defined by
+the .idl file must be an instance of idl.Type (e.g. you may not
+define Python functions or any other construct other than defining
 variables)
 
 The name of the type must be passed as the first argument to the
@@ -16,9 +16,9 @@ The Type.typename contains the C name of the type _including_ the
 namespace element while Type.rawname is always set to the 'base' name
 of the type.
 
-The libxltypes.Type base class has several other properties which
-apply to all types. The properties are set by passing a named
-parameter to the constructor.
+The idl.Type base class has several other properties which apply
+to all types. The properties are set by passing a named parameter to
+the constructor.
 
 Type.namespace: (default: "libxl_")
 
@@ -28,12 +28,12 @@ Type.namespace: (default: "libxl_")
  If the typename is not None then the namespace is prepended to the
  type.
  
-Type.passby: (default: libxltypes.PASS_BY_VALUE)
+Type.passby: (default: idl.PASS_BY_VALUE)
 
  Defines the manner in which a type should be passed to C
  functions. Valid values for this fields are:
-   libxltypes.PASS_BY_VALUE
-   libxltypes.PASS_BY_REFERENCE
+   idl.PASS_BY_VALUE
+   idl.PASS_BY_REFERENCE
 
 Type.dispose_fn: (default: typename + "_dispose" or None if type == None)
 
@@ -57,12 +57,12 @@ Type.autogenerate_json: (default: True)
 Other simple type-Classes
 -------------------------
 
-libxltype.Builtin
+idl.Builtin
 
  Instances of this class represent types which are predefined within
  the system.
 
-libxltype.UInt
+idl.UInt
 
  Instances of this class represent the standard uint<N>_t types.
 
@@ -72,12 +72,12 @@ libxltype.UInt
 Complex type-Classes
 --------------------
 
-libxltype.Enumeration
+idl.Enumeration
 
   A class representing an enumeration (named integer values).
 
   The values are available in the list Enumeration.values. Each
-  element in the list is of type libxltype.EnumerationValue.
+  element in the list is of type idl.EnumerationValue.
 
   Each EnumerationValue has the following properties:
 
@@ -95,37 +95,37 @@ libxltype.Enumeration
 				    and any namespace (e.g. "VALUE")
     EnumerationValue.value	The integer value associated with this name.
 
-libxltype.Aggregate
+idl.Aggregate
 
  Base class for type-Classes which contain a number of other types
  (e.g. structs and unions).
 
  The contained types are available in the list Aggregate.fields. Each
- element in the list is of type libxltype.Field representing a member
- of the aggregate.
+ element in the list is of type idl.Field representing a member of the
+ aggregate.
 
  Each field has the following properties:
 
-  Field.type	The type of the member (a libxltypes.Type).
+  Field.type	The type of the member (a idl.Type).
   Field.name    The name of the member (can be None for anonymous
 		fields).
   Field.const	Boolean, true if the member is const.
 
-libxltype.Struct
+idl.Struct
 
- A subclass of libxltype.Aggregate representing the C struct type.
+ A subclass of idl.Aggregate representing the C struct type.
 
  Struct.kind == "struct"
 
-libxltype.Union
+idl.Union
 
- A subclass of libxltype.Aggregate representing the C union type.
+ A subclass of idl.Aggregate representing the C union type.
 
  Union.kind == "union"
 
-libxltype.KeyedUnion
+idl.KeyedUnion
 
- A subclass of libxltype.Aggregate which represents the C union type
+ A subclass of idl.Aggregate which represents the C union type
  where the currently valid member of the union can be determined based
  upon another member in the containing type.
 

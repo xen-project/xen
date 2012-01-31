@@ -11,7 +11,7 @@ $(eval $(genpath-target))
 
 .PHONY: build
 build: genpath genwrap.py $(XEN_ROOT)/tools/libxl/libxl_types.idl \
-		$(XEN_ROOT)/tools/libxl/libxltypes.py
+		$(XEN_ROOT)/tools/libxl/idl.py
 	PYTHONPATH=$(XEN_ROOT)/tools/libxl $(PYTHON) genwrap.py \
 		$(XEN_ROOT)/tools/libxl/libxl_types.idl \
 		xen/lowlevel/xl/_pyxl_types.h \

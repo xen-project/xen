@@ -2,7 +2,7 @@
 
 import sys,os
 
-import libxltypes
+import idl
 
 # typename -> ( ocaml_type, c_from_ocaml, ocaml_from_c )
 builtins = {
@@ -39,7 +39,7 @@ def stub_fn_name(ty, name):
 def ocaml_type_of(ty):
     if ty.rawname == "domid":
         return "domid"
-    elif isinstance(ty,libxltypes.UInt):
+    elif isinstance(ty,idl.UInt):
         if ty.width in [8, 16]:
             # handle as ints
             width = None
@@ -52,14 +52,14 @@ def ocaml_type_of(ty):
         else:
             return "int"
 
-    elif isinstance(ty,libxltypes.Builtin):
+    elif isinstance(ty,idl.Builtin):
         if not builtins.has_key(ty.typename):
             raise NotImplementedError("Unknown Builtin %s (%s)" % (ty.typename, type(ty)))
         typename,_,_ = builtins[ty.typename]
         if not typename:
             raise NotImplementedError("No typename for Builtin %s (%s)" % (ty.typename, type(ty)))
         return typename
-    elif isinstance(ty,libxltypes.Aggregate):
+    elif isinstance(ty,idl.Aggregate):
         return ty.rawname.capitalize() + ".t"
     else:
         return ty.rawname
@@ -73,11 +73,11 @@ def gen_ocaml_ml(ty, interface, indent=""):
         s = ("""(* %s interface *)\n""" % ty.typename)
     else:
         s = ("""(* %s implementation *)\n""" % ty.typename)
-    if isinstance(ty, libxltypes.Enumeration):
+    if isinstance(ty, idl.Enumeration):
         s = "type %s = \n" % ty.rawname
         for v in ty.values:
             s += "\t | %s\n" % v.rawname
-    elif isinstance(ty, libxltypes.Aggregate):
+    elif isinstance(ty, idl.Aggregate):
         s = ""
         if ty.typename is None:
             raise NotImplementedError("%s has no typename" % type(ty))
@@ -115,7 +115,7 @@ def gen_ocaml_ml(ty, interface, indent=""):
 
 def c_val(ty, c, o, indent="", parent = None):
     s = indent
-    if isinstance(ty,libxltypes.UInt):
+    if isinstance(ty,idl.UInt):
         if ty.width in [8, 16]:
             # handle as ints
             width = None
@@ -127,14 +127,14 @@ def c_val(ty, c, o, indent="", parent = None):
             s += "%s = Int%d_val(%s);" % (c, width, o)
         else:
             s += "%s = Int_val(%s);" % (c, o)
-    elif isinstance(ty,libxltypes.Builtin):
+    elif isinstance(ty,idl.Builtin):
         if not builtins.has_key(ty.typename):
             raise NotImplementedError("Unknown Builtin %s (%s)" % (ty.typename, type(ty)))
         _,fn,_ = builtins[ty.typename]
         if not fn:
             raise NotImplementedError("No c_val fn for Builtin %s (%s)" % (ty.typename, type(ty)))
         s += "%s;" % (fn % { "o": o, "c": c })
-    elif isinstance(ty,libxltypes.Enumeration) and (parent is None):
+    elif isinstance(ty,idl.Enumeration) and (parent is None):
         n = 0
         s += "switch(Int_val(%s)) {\n" % o
         for e in ty.values:
@@ -142,7 +142,7 @@ def c_val(ty, c, o, indent="", parent = None):
             n += 1
         s += "    default: failwith_xl(\"cannot convert value to %s\", lg); break;\n" % ty.typename
         s += "}"
-    elif isinstance(ty, libxltypes.Aggregate) and (parent is None):
+    elif isinstance(ty, idl.Aggregate) and (parent is None):
         n = 0
         for f in ty.fields:
             if f.type.private:
@@ -151,14 +151,14 @@ def c_val(ty, c, o, indent="", parent = None):
             s += "%s\n" % c_val(f.type, fexpr, "Field(%s, %d)" % (o,n), parent=nparent)
             n = n + 1
     else:
-        s += "%s_val(gc, lg, %s, %s);" % (ty.rawname, ty.pass_arg(c, parent is None, passby=libxltypes.PASS_BY_REFERENCE), o)
+        s += "%s_val(gc, lg, %s, %s);" % (ty.rawname, ty.pass_arg(c, parent is None, passby=idl.PASS_BY_REFERENCE), o)
     
     return s.replace("\n", "\n%s" % indent)
 
 def gen_c_val(ty, indent=""):
     s = "/* Convert caml value to %s */\n" % ty.rawname
     
-    s += "static int %s_val (caml_gc *gc, struct caml_logger *lg, %s, value v)\n" % (ty.rawname, ty.make_arg("c_val", passby=libxltypes.PASS_BY_REFERENCE))
+    s += "static int %s_val (caml_gc *gc, struct caml_logger *lg, %s, value v)\n" % (ty.rawname, ty.make_arg("c_val", passby=idl.PASS_BY_REFERENCE))
     s += "{\n"
     s += "\tCAMLparam1(v);\n"
     s += "\n"
@@ -172,7 +172,7 @@ def gen_c_val(ty, indent=""):
 
 def ocaml_Val(ty, o, c, indent="", parent = None):
     s = indent
-    if isinstance(ty,libxltypes.UInt):
+    if isinstance(ty,idl.UInt):
         if ty.width in [8, 16]:
             # handle as ints
             width = None
@@ -184,14 +184,14 @@ def ocaml_Val(ty, o, c, indent="", parent = None):
             s += "%s = caml_copy_int%d(%s);" % (o, width, c)
         else:
             s += "%s = Val_int(%s);" % (o, c)
-    elif isinstance(ty,libxltypes.Builtin):
+    elif isinstance(ty,idl.Builtin):
         if not builtins.has_key(ty.typename):
             raise NotImplementedError("Unknown Builtin %s (%s)" % (ty.typename, type(ty)))
         _,_,fn = builtins[ty.typename]
         if not fn:
             raise NotImplementedError("No ocaml Val fn for Builtin %s (%s)" % (ty.typename, type(ty)))
         s += "%s = %s;" % (o, fn % { "c": c })
-    elif isinstance(ty,libxltypes.Enumeration) and (parent is None):
+    elif isinstance(ty,idl.Enumeration) and (parent is None):
         n = 0
         s += "switch(%s) {\n" % c
         for e in ty.values:
@@ -199,7 +199,7 @@ def ocaml_Val(ty, o, c, indent="", parent = None):
             n += 1
         s += "    default: failwith_xl(\"cannot convert value from %s\", lg); break;\n" % ty.typename
         s += "}"
-    elif isinstance(ty,libxltypes.Aggregate) and (parent is None):
+    elif isinstance(ty,idl.Aggregate) and (parent is None):
         s += "{\n"
         s += "\tvalue %s_field;\n" % ty.rawname
         s += "\n"
@@ -258,8 +258,7 @@ if __name__ == '__main__':
         print >>sys.stderr, "Usage: genwrap.py <idl> <mli> <ml> <c-inc>"
         sys.exit(1)
 
-    idl = sys.argv[1]
-    (_,types) = libxltypes.parse(idl)
+    (_,types) = idl.parse(sys.argv[1])
 
     # Do not generate these yet.
     blacklist = [

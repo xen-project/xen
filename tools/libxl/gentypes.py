@@ -3,10 +3,10 @@
 import sys
 import re
 
-import libxltypes
+import idl
 
 def libxl_C_instance_of(ty, instancename):
-    if isinstance(ty, libxltypes.Aggregate) and ty.typename is None:
+    if isinstance(ty, idl.Aggregate) and ty.typename is None:
         if instancename is None:
             return libxl_C_type_define(ty)
         else:
@@ -16,7 +16,7 @@ def libxl_C_instance_of(ty, instancename):
 
 def libxl_C_type_define(ty, indent = ""):
     s = ""
-    if isinstance(ty, libxltypes.Enumeration):
+    if isinstance(ty, idl.Enumeration):
         if ty.typename is None:
             s += "enum {\n"
         else:
@@ -31,7 +31,7 @@ def libxl_C_type_define(ty, indent = ""):
         else:
             s += "} %s" % ty.typename
 
-    elif isinstance(ty, libxltypes.Aggregate):
+    elif isinstance(ty, idl.Aggregate):
         if ty.typename is None:
             s += "%s {\n" % ty.kind
         else:
@@ -53,7 +53,7 @@ def libxl_C_type_define(ty, indent = ""):
 
 def libxl_C_type_dispose(ty, v, indent = "    ", parent = None):
     s = ""
-    if isinstance(ty, libxltypes.KeyedUnion):
+    if isinstance(ty, idl.KeyedUnion):
         if parent is None:
             raise Exception("KeyedUnion type must have a parent")
         s += "switch (%s) {\n" % (parent + ty.keyvar_name)
@@ -63,7 +63,7 @@ def libxl_C_type_dispose(ty, v, indent = "    ", parent = None):
             s += libxl_C_type_dispose(f.type, fexpr, indent + "    ", nparent)
             s += "    break;\n"
         s += "}\n"
-    elif isinstance(ty, libxltypes.Struct) and (parent is None or ty.dispose_fn is None):
+    elif isinstance(ty, idl.Struct) and (parent is None or ty.dispose_fn is None):
         for f in [f for f in ty.fields if not f.const]:
             (nparent,fexpr) = ty.member(v, f, parent is None)
             s += libxl_C_type_dispose(f.type, fexpr, "", nparent)
@@ -79,11 +79,11 @@ def libxl_C_type_gen_json(ty, v, indent = "    ", parent = None):
     s = ""
     if parent is None:
         s += "yajl_gen_status s;\n"
-    if isinstance(ty, libxltypes.Enumeration):
+    if isinstance(ty, idl.Enumeration):
         s += "s = libxl__yajl_gen_enum(hand, %s_to_string(%s));\n" % (ty.typename, ty.pass_arg(v, parent is None))
         s += "if (s != yajl_gen_status_ok)\n"
         s += "    goto out;\n"
-    elif isinstance(ty, libxltypes.KeyedUnion):
+    elif isinstance(ty, idl.KeyedUnion):
         if parent is None:
             raise Exception("KeyedUnion type must have a parent")
         s += "switch (%s) {\n" % (parent + ty.keyvar_name)
@@ -93,7 +93,7 @@ def libxl_C_type_gen_json(ty, v, indent = "    ", parent = None):
             s += libxl_C_type_gen_json(f.type, fexpr, indent + "    ", nparent)
             s += "    break;\n"
         s += "}\n"
-    elif isinstance(ty, libxltypes.Struct) and (parent is None or ty.json_fn is None):
+    elif isinstance(ty, idl.Struct) and (parent is None or ty.json_fn is None):
         s += "s = yajl_gen_map_open(hand);\n"
         s += "if (s != yajl_gen_status_ok)\n"
         s += "    goto out;\n"
@@ -123,7 +123,7 @@ def libxl_C_type_gen_json(ty, v, indent = "    ", parent = None):
 def libxl_C_type_to_json(ty, v, indent = "    "):
     s = ""
     gen = "(libxl__gen_json_callback)&%s_gen_json" % ty.typename
-    s += "return libxl__object_to_json(ctx, \"%s\", %s, (void *)%s);\n" % (ty.typename, gen, ty.pass_arg(v, passby=libxltypes.PASS_BY_REFERENCE))
+    s += "return libxl__object_to_json(ctx, \"%s\", %s, (void *)%s);\n" % (ty.typename, gen, ty.pass_arg(v, passby=idl.PASS_BY_REFERENCE))
 
     if s != "":
         s = indent + s
@@ -171,9 +171,9 @@ if __name__ == '__main__':
         print >>sys.stderr, "Usage: gentypes.py <idl> <header> <header-json> <implementation>"
         sys.exit(1)
 
-    (_, idl, header, header_json, impl) = sys.argv
+    (_, idlname, header, header_json, impl) = sys.argv
 
-    (builtins,types) = libxltypes.parse(idl)
+    (builtins,types) = idl.parse(idlname)
 
     print "outputting libxl type definitions to %s" % header
 
@@ -198,9 +198,9 @@ if __name__ == '__main__':
             f.write("void %s(%s);\n" % (ty.dispose_fn, ty.make_arg("p")))
         if ty.json_fn is not None:
             f.write("char *%s_to_json(libxl_ctx *ctx, %s);\n" % (ty.typename, ty.make_arg("p")))
-        if isinstance(ty, libxltypes.Enumeration):
+        if isinstance(ty, idl.Enumeration):
             f.write("const char *%s_to_string(%s);\n" % (ty.typename, ty.make_arg("p")))
-            f.write("int %s_from_string(const char *s, %s);\n" % (ty.typename, ty.make_arg("e", passby=libxltypes.PASS_BY_REFERENCE)))
+            f.write("int %s_from_string(const char *s, %s);\n" % (ty.typename, ty.make_arg("e", passby=idl.PASS_BY_REFERENCE)))
             f.write("extern libxl_enum_string_table %s_string_table[];\n" % (ty.typename))
         f.write("\n")
 
@@ -225,7 +225,7 @@ if __name__ == '__main__':
 """ % (header_json_define, header_json_define, " ".join(sys.argv)))
 
     for ty in [ty for ty in types+builtins if ty.json_fn is not None]:
-        f.write("yajl_gen_status %s_gen_json(yajl_gen hand, %s);\n" % (ty.typename, ty.make_arg("p", passby=libxltypes.PASS_BY_REFERENCE)))
+        f.write("yajl_gen_status %s_gen_json(yajl_gen hand, %s);\n" % (ty.typename, ty.make_arg("p", passby=idl.PASS_BY_REFERENCE)))
 
     f.write("\n")
     f.write("""#endif /* %s */\n""" % header_json_define)
@@ -262,7 +262,7 @@ if __name__ == '__main__':
         f.write("}\n")
         f.write("\n")
 
-    for ty in [t for t in types if isinstance(t,libxltypes.Enumeration)]:
+    for ty in [t for t in types if isinstance(t,idl.Enumeration)]:
         f.write("const char *%s_to_string(%s e)\n" % (ty.typename, ty.typename))
         f.write("{\n")
         f.write(libxl_C_enum_to_string(ty, "e"))
@@ -278,7 +278,7 @@ if __name__ == '__main__':
         f.write("\n")
 
     for ty in [t for t in types if t.json_fn is not None]:
-        f.write("yajl_gen_status %s_gen_json(yajl_gen hand, %s)\n" % (ty.typename, ty.make_arg("p", passby=libxltypes.PASS_BY_REFERENCE)))
+        f.write("yajl_gen_status %s_gen_json(yajl_gen hand, %s)\n" % (ty.typename, ty.make_arg("p", passby=idl.PASS_BY_REFERENCE)))
         f.write("{\n")
         f.write(libxl_C_type_gen_json(ty, "p"))
         f.write("}\n")
