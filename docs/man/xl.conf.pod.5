@@ -1,0 +1,93 @@
+=head1 NAME
+
+/etc/xen/xl.conf - XL Global/Host Configuration 
+
+=head1 DESCRIPTION
+
+The F<xl.conf> file allows configuration of hostwide C<xl> toolstack
+options.
+
+For details of per-domain configuration options please see
+L<xl.cfg(5)>.
+
+=head1 SYNTAX
+
+The config file consists of a series of C<KEY=VALUE> pairs.
+
+A value C<VALUE> is one of:
+
+=over 4
+
+=item B<"STRING">
+
+A string, surrounded by either single or double quotes.
+
+=item B<NUMBER>
+
+A number, in either decimal, octal (using a C<0> prefix) or
+hexadecimal (using an C<0x> prefix).
+
+=item B<BOOLEAN>
+
+A C<NUMBER> interpreted as C<False> (C<0>) or C<True> (any other
+value).
+
+=item B<[ VALUE, VALUE, ... ]>
+
+A list of C<VALUES> of the above types. Lists are homogeneous and are
+not nested.
+
+=back
+
+The semantics of each C<KEY> defines which form of C<VALUE> is required.
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<autoballoon=BOOLEAN>
+
+If enabled then C<xl> will not attempt to reduce the amount of memory
+assigned to domain 0 in order to create free memory when starting a
+new domain. You should set this if you use the C<dom0_mem> hypervisor
+command line to reduce the amount of memory given to domain 0 by
+default.
+
+Default: C<0>
+
+=item B<lockfile="PATH">
+
+Sets the path to the lock file used by xl to serialise certain
+operations (primarily domain creation).
+
+Default: C</var/lock/xl>
+
+=item B<vifscript="PATH">
+
+Configures the default hotplug script used by virtual network devices.
+
+Default: C</etc/xen/scripts/vif-bridge>
+
+=item B<output_format="json|sxp">
+
+Configures the default output format used by xl when printing "machine
+readable" information. The default is to use the C<JSON>
+L<http://www.json.org/> syntax. However for compatibility with the
+previous C<xm> toolstack this can be configured to use the old C<SXP>
+(S-Expression-like) syntax instead.
+
+Default: C<json>
+
+=back
+
+=head1 SEE ALSO
+
+=over 4
+
+=item L<xl(1)>
+
+=item L<xl.cfg(5)>
+
+=item http://www.json.org/
+
+=back
