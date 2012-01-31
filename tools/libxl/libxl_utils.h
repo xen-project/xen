@@ -86,8 +86,6 @@ static inline int libxl_cpumap_cpu_valid(libxl_cpumap *cpumap, int cpu)
 #define libxl_for_each_set_cpu(v, m) for (v = 0; v < (m).size * 8; v++) \
                                              if (libxl_cpumap_test(&(m), v))
 
-int libxl_cpuarray_alloc(libxl_ctx *ctx, libxl_cpuarray *cpuarray);
-
 static inline uint32_t libxl__sizekb_to_mb(uint32_t s) {
     return (s + 1023) / 1024;
 }

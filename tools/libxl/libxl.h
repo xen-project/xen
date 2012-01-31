@@ -164,13 +164,6 @@ typedef struct {
 void libxl_cpumap_dispose(libxl_cpumap *map);
 
 typedef struct {
-    uint32_t entries;
-    uint32_t *array;
-} libxl_cpuarray;
-#define LIBXL_CPUARRAY_INVALID_ENTRY  ~0
-void libxl_cpuarray_dispose(libxl_cpuarray *array);
-
-typedef struct {
     /*
      * Path is always set if the file reference is valid. However if
      * mapped is true then the actual file may already be unlinked.

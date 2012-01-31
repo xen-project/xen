@@ -246,27 +246,6 @@ out:
     return s;
 }
 
-yajl_gen_status libxl_cpuarray_gen_json(yajl_gen hand,
-                                        libxl_cpuarray *cpuarray)
-{
-    yajl_gen_status s;
-    int i;
-
-    s = yajl_gen_array_open(hand);
-    if (s != yajl_gen_status_ok) goto out;
-
-    for(i=0; i<cpuarray->entries; i++) {
-        if (cpuarray->array[i] == LIBXL_CPUARRAY_INVALID_ENTRY)
-            s = yajl_gen_null(hand);
-        else
-            s = yajl_gen_integer(hand, cpuarray->array[i]);
-        if (s != yajl_gen_status_ok) goto out;
-    }
-    s = yajl_gen_array_close(hand);
-out:
-    return s;
-}
-
 yajl_gen_status libxl_file_reference_gen_json(yajl_gen hand,
                                               libxl_file_reference *p)
 {

@@ -21,7 +21,7 @@ def randomize_enum(e):
 
 handcoded = ["libxl_cpumap", "libxl_key_value_list",
              "libxl_cpuid_policy_list", "libxl_file_reference",
-             "libxl_string_list", "libxl_cpuarray"]
+             "libxl_string_list"]
 
 def gen_rand_init(ty, v, indent = "    ", parent = None):
     s = ""
@@ -194,23 +194,6 @@ static void libxl_string_list_rand_init(libxl_string_list *p)
     l[i] = NULL;
     *p = l;
 }
-
-#if 0 /* To be remove in a subsequent patch */
-static void libxl_cpuarray_rand_init(libxl_cpuarray *p)
-{
-    int i;
-    /* Up to 16 VCPUs on 32 PCPUS */
-    p->entries = rand() % 16;
-    p->array = calloc(p->entries, sizeof(*p->array));
-    for (i = 0; i < p->entries; i++) {
-        int r = rand() % 32*1.5; /* 2:1 valid:invalid */
-        if (r >= 32)
-            p->array[i] = LIBXL_CPUARRAY_INVALID_ENTRY;
-        else
-            p->array[i] = r;
-    }
-}
-#endif
 """)
     for ty in builtins + types:
         if ty.typename not in handcoded:

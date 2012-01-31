@@ -514,30 +514,6 @@ void libxl_cpumap_reset(libxl_cpumap *cpumap, int cpu)
     cpumap->map[cpu / 8] &= ~(1 << (cpu & 7));
 }
 
-int libxl_cpuarray_alloc(libxl_ctx *ctx, libxl_cpuarray *cpuarray)
-{
-    int max_cpus;
-    int i;
-
-    max_cpus = libxl_get_max_cpus(ctx);
-    if (max_cpus == 0)
-        return ERROR_FAIL;
-
-    cpuarray->array = calloc(max_cpus, sizeof(*cpuarray->array));
-    if (!cpuarray->array)
-        return ERROR_NOMEM;
-    cpuarray->entries = max_cpus;
-    for (i = 0; i < max_cpus; i++)
-        cpuarray->array[i] = LIBXL_CPUARRAY_INVALID_ENTRY;
-
-    return 0;
-}
-
-void libxl_cpuarray_dispose(libxl_cpuarray *array)
-{
-    free(array->array);
-}
-
 int libxl_get_max_cpus(libxl_ctx *ctx)
 {
     return xc_get_max_cpus(ctx->xch);

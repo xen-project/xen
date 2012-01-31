@@ -9,7 +9,6 @@ libxl_domid = Builtin("domid", json_fn = "yajl_gen_integer", autogenerate_json =
 libxl_uuid = Builtin("uuid", passby=PASS_BY_REFERENCE)
 libxl_mac = Builtin("mac", passby=PASS_BY_REFERENCE)
 libxl_cpumap = Builtin("cpumap", dispose_fn="libxl_cpumap_dispose", passby=PASS_BY_REFERENCE)
-libxl_cpuarray = Builtin("cpuarray", dispose_fn="libxl_cpuarray_dispose", passby=PASS_BY_REFERENCE)
 libxl_cpuid_policy_list = Builtin("cpuid_policy_list", dispose_fn="libxl_cpuid_dispose", passby=PASS_BY_REFERENCE)
 
 libxl_string_list = Builtin("string_list", dispose_fn="libxl_string_list_dispose", passby=PASS_BY_REFERENCE)
