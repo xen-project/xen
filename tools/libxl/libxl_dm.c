@@ -76,10 +76,10 @@ static const char *libxl__domain_bios(libxl__gc *gc,
 static char ** libxl__build_device_model_args_old(libxl__gc *gc,
                                         const char *dm,
                                         const libxl_domain_config *guest_config,
-                                        const libxl_device_model_info *info,
-                                        const libxl_device_disk *disks, int num_disks,
-                                        const libxl_device_nic *vifs, int num_vifs)
+                                        const libxl_device_model_info *info)
 {
+    const libxl_device_nic *vifs = guest_config->vifs;
+    const int num_vifs = guest_config->num_vifs;
     int i;
     flexarray_t *dm_args;
     dm_args = flexarray_make(16, 1);
@@ -231,11 +231,13 @@ static const char *qemu_disk_format_string(libxl_disk_format format)
 static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                                         const char *dm,
                                         const libxl_domain_config *guest_config,
-                                        const libxl_device_model_info *info,
-                                        const libxl_device_disk *disks, int num_disks,
-                                        const libxl_device_nic *vifs, int num_vifs)
+                                        const libxl_device_model_info *info)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
+    const libxl_device_disk *disks = guest_config->disks;
+    const libxl_device_nic *vifs = guest_config->vifs;
+    const int num_disks = guest_config->num_disks;
+    const int num_vifs = guest_config->num_vifs;
     flexarray_t *dm_args;
     int i;
 
@@ -496,21 +498,15 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
 static char ** libxl__build_device_model_args(libxl__gc *gc,
                                         const char *dm,
                                         const libxl_domain_config *guest_config,
-                                        const libxl_device_model_info *info,
-                                        const libxl_device_disk *disks, int num_disks,
-                                        const libxl_device_nic *vifs, int num_vifs)
+                                        const libxl_device_model_info *info)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
 
     switch (info->device_model_version) {
     case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
-        return libxl__build_device_model_args_old(gc, dm, guest_config, info,
-                                                  disks, num_disks,
-                                                  vifs, num_vifs);
+        return libxl__build_device_model_args_old(gc, dm, guest_config, info);
     case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
-        return libxl__build_device_model_args_new(gc, dm, guest_config, info,
-                                                  disks, num_disks,
-                                                  vifs, num_vifs);
+        return libxl__build_device_model_args_new(gc, dm, guest_config, info);
     default:
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "unknown device model version %d",
                          info->device_model_version);
@@ -588,16 +584,14 @@ retry_transaction:
 static int libxl__create_stubdom(libxl__gc *gc,
                                  libxl_domain_config *guest_config,
                                  libxl_device_model_info *info,
-                                 libxl_device_disk *disks, int num_disks,
-                                 libxl_device_nic *vifs, int num_vifs,
-                                 libxl_device_vfb *vfb,
-                                 libxl_device_vkb *vkb,
                                  libxl__spawner_starting **starting_r)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     int i, num_console = STUBDOM_SPECIAL_CONSOLES, ret;
     libxl_device_console *console;
     libxl_domain_config dm_config;
+    libxl_device_vfb vfb;
+    libxl_device_vkb vkb;
     libxl__domain_build_state state;
     uint32_t domid;
     char **args;
@@ -629,6 +623,19 @@ static int libxl__create_stubdom(libxl__gc *gc,
     dm_config.b_info.u.pv.ramdisk.path = "";
     dm_config.b_info.u.pv.features = "";
 
+    dm_config.disks = guest_config->disks;
+    dm_config.num_disks = guest_config->num_disks;
+
+    dm_config.vifs = guest_config->vifs;
+    dm_config.num_vifs = guest_config->num_vifs;
+
+    libxl__vfb_and_vkb_from_device_model_info(gc, info, &vfb, &vkb);
+
+    dm_config.vfbs = &vfb;
+    dm_config.num_vfbs = 1;
+    dm_config.vkbs = &vkb;
+    dm_config.num_vkbs = 1;
+
     /* fixme: this function can leak the stubdom if it fails */
     domid = 0;
     ret = libxl__domain_make(gc, &dm_config.c_info, &domid);
@@ -639,9 +646,7 @@ static int libxl__create_stubdom(libxl__gc *gc,
         goto out;
 
     args = libxl__build_device_model_args(gc, "stubdom-dm",
-                                          guest_config, info,
-                                          disks, num_disks,
-                                          vifs, num_vifs);
+                                          guest_config, info);
     if (!args) {
         ret = ERROR_FAIL;
         goto out;
@@ -674,20 +679,20 @@ retry_transaction:
         if (errno == EAGAIN)
             goto retry_transaction;
 
-    for (i = 0; i < num_disks; i++) {
-        ret = libxl_device_disk_add(ctx, domid, &disks[i]);
+    for (i = 0; i < dm_config.num_disks; i++) {
+        ret = libxl_device_disk_add(ctx, domid, &dm_config.disks[i]);
         if (ret)
             goto out_free;
     }
-    for (i = 0; i < num_vifs; i++) {
-        ret = libxl_device_nic_add(ctx, domid, &vifs[i]);
+    for (i = 0; i < dm_config.num_vifs; i++) {
+        ret = libxl_device_nic_add(ctx, domid, &dm_config.vifs[i]);
         if (ret)
             goto out_free;
     }
-    ret = libxl_device_vfb_add(ctx, domid, vfb);
+    ret = libxl_device_vfb_add(ctx, domid, &dm_config.vfbs[0]);
     if (ret)
         goto out_free;
-    ret = libxl_device_vkb_add(ctx, domid, vkb);
+    ret = libxl_device_vkb_add(ctx, domid, &dm_config.vkbs[0]);
     if (ret)
         goto out_free;
 
@@ -745,7 +750,7 @@ retry_transaction:
     if (libxl__create_xenpv_qemu(gc, domid,
                                  &dm_config,
                                  &xenpv_dm_info,
-                                 vfb, &dm_starting) < 0) {
+                                 &dm_starting) < 0) {
         ret = ERROR_FAIL;
         goto out_free;
     }
@@ -775,8 +780,6 @@ out:
 int libxl__create_device_model(libxl__gc *gc,
                               libxl_domain_config *guest_config,
                               libxl_device_model_info *info,
-                              libxl_device_disk *disks, int num_disks,
-                              libxl_device_nic *vifs, int num_vifs,
                               libxl__spawner_starting **starting_r)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
@@ -791,14 +794,7 @@ int libxl__create_device_model(libxl__gc *gc,
     const char *dm;
 
     if (info->device_model_stubdomain) {
-        libxl_device_vfb vfb;
-        libxl_device_vkb vkb;
-
-        libxl__vfb_and_vkb_from_device_model_info(gc, info, &vfb, &vkb);
-        rc = libxl__create_stubdom(gc, guest_config, info,
-                                   disks, num_disks,
-                                   vifs, num_vifs,
-                                   &vfb, &vkb, starting_r);
+        rc = libxl__create_stubdom(gc, guest_config, info, starting_r);
         goto out;
     }
 
@@ -813,9 +809,7 @@ int libxl__create_device_model(libxl__gc *gc,
         rc = ERROR_FAIL;
         goto out;
     }
-    args = libxl__build_device_model_args(gc, dm, guest_config, info,
-                                          disks, num_disks,
-                                          vifs, num_vifs);
+    args = libxl__build_device_model_args(gc, dm, guest_config, info);
     if (!args) {
         rc = ERROR_FAIL;
         goto out;
@@ -1036,11 +1030,10 @@ out:
 int libxl__create_xenpv_qemu(libxl__gc *gc, uint32_t domid,
                              libxl_domain_config *guest_config,
                              libxl_device_model_info *info,
-                             libxl_device_vfb *vfb,
                              libxl__spawner_starting **starting_r)
 {
-    libxl__build_xenpv_qemu_args(gc, domid, vfb, info);
-    libxl__create_device_model(gc, guest_config, info, NULL, 0, NULL, 0, starting_r);
+    libxl__build_xenpv_qemu_args(gc, domid, &guest_config->vfbs[0], info);
+    libxl__create_device_model(gc, guest_config, info, starting_r);
     return 0;
 }
 
