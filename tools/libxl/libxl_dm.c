@@ -34,7 +34,7 @@ const char *libxl__device_model_savefile(libxl__gc *gc, uint32_t domid)
 }
 
 const char *libxl__domain_device_model(libxl__gc *gc,
-                                       libxl_device_model_info *info)
+                                       const libxl_domain_build_info *info)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     const char *dm;
@@ -64,7 +64,7 @@ const char *libxl__domain_device_model(libxl__gc *gc,
 }
 
 static const char *libxl__domain_bios(libxl__gc *gc,
-                                libxl_device_model_info *info)
+                                const libxl_domain_build_info *info)
 {
     switch (info->device_model_version) {
     case 1: return "rombios";
@@ -251,19 +251,19 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
     if (info->saved_state) {
         flexarray_vappend(dm_args, "-loadvm", info->saved_state, NULL);
     }
-    for (i = 0; info->extra && info->extra[i] != NULL; i++)
-        flexarray_append(dm_args, info->extra[i]);
+    for (i = 0; b_info->extra && b_info->extra[i] != NULL; i++)
+        flexarray_append(dm_args, b_info->extra[i]);
     flexarray_append(dm_args, "-M");
     switch (b_info->type) {
     case LIBXL_DOMAIN_TYPE_PV:
         flexarray_append(dm_args, "xenpv");
-        for (i = 0; info->extra_pv && info->extra_pv[i] != NULL; i++)
-            flexarray_append(dm_args, info->extra_pv[i]);
+        for (i = 0; b_info->extra_pv && b_info->extra_pv[i] != NULL; i++)
+            flexarray_append(dm_args, b_info->extra_pv[i]);
         break;
     case LIBXL_DOMAIN_TYPE_HVM:
         flexarray_append(dm_args, "xenfv");
-        for (i = 0; info->extra_hvm && info->extra_hvm[i] != NULL; i++)
-            flexarray_append(dm_args, info->extra_hvm[i]);
+        for (i = 0; b_info->extra_hvm && b_info->extra_hvm[i] != NULL; i++)
+            flexarray_append(dm_args, b_info->extra_hvm[i]);
         break;
     }
     flexarray_append(dm_args, NULL);
@@ -495,19 +495,19 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
         flexarray_append(dm_args, "-incoming");
         flexarray_append(dm_args, libxl__sprintf(gc, "fd:%d", migration_fd));
     }
-    for (i = 0; info->extra && info->extra[i] != NULL; i++)
-        flexarray_append(dm_args, info->extra[i]);
+    for (i = 0; b_info->extra && b_info->extra[i] != NULL; i++)
+        flexarray_append(dm_args, b_info->extra[i]);
     flexarray_append(dm_args, "-M");
     switch (b_info->type) {
     case LIBXL_DOMAIN_TYPE_PV:
         flexarray_append(dm_args, "xenpv");
-        for (i = 0; info->extra_pv && info->extra_pv[i] != NULL; i++)
-            flexarray_append(dm_args, info->extra_pv[i]);
+        for (i = 0; b_info->extra_pv && b_info->extra_pv[i] != NULL; i++)
+            flexarray_append(dm_args, b_info->extra_pv[i]);
         break;
     case LIBXL_DOMAIN_TYPE_HVM:
         flexarray_append(dm_args, "xenfv");
-        for (i = 0; info->extra_hvm && info->extra_hvm[i] != NULL; i++)
-            flexarray_append(dm_args, info->extra_hvm[i]);
+        for (i = 0; b_info->extra_hvm && b_info->extra_hvm[i] != NULL; i++)
+            flexarray_append(dm_args, b_info->extra_hvm[i]);
         break;
     }
 
@@ -585,14 +585,14 @@ static char ** libxl__build_device_model_args(libxl__gc *gc,
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
 
-    switch (info->device_model_version) {
+    switch (guest_config->b_info.device_model_version) {
     case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
         return libxl__build_device_model_args_old(gc, dm, guest_config, info);
     case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
         return libxl__build_device_model_args_new(gc, dm, guest_config, info);
     default:
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "unknown device model version %d",
-                         info->device_model_version);
+                         guest_config->b_info.device_model_version);
         return NULL;
     }
 }
@@ -688,7 +688,8 @@ static int libxl__create_stubdom(libxl__gc *gc,
     libxl__spawner_starting *dm_starting = 0;
     libxl_device_model_info xenpv_dm_info;
 
-    if (info->device_model_version != LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL) {
+    if (guest_config->b_info.device_model_version !=
+        LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL) {
         ret = ERROR_INVAL;
         goto out;
     }
@@ -711,6 +712,14 @@ static int libxl__create_stubdom(libxl__gc *gc,
     dm_config.b_info.u.pv.cmdline = libxl__sprintf(gc, " -d %d", info->domid);
     dm_config.b_info.u.pv.ramdisk.path = "";
     dm_config.b_info.u.pv.features = "";
+
+    dm_config.b_info.device_model_version =
+        guest_config->b_info.device_model_version;
+    dm_config.b_info.device_model =
+        guest_config->b_info.device_model;
+    dm_config.b_info.extra = guest_config->b_info.extra;
+    dm_config.b_info.extra_pv = guest_config->b_info.extra_pv;
+    dm_config.b_info.extra_hvm = guest_config->b_info.extra_hvm;
 
     dm_config.disks = guest_config->disks;
     dm_config.num_disks = guest_config->num_disks;
@@ -828,11 +837,6 @@ retry_transaction:
     }
 
     memset((void*)&xenpv_dm_info, 0, sizeof(libxl_device_model_info));
-    xenpv_dm_info.device_model_version = info->device_model_version;
-    xenpv_dm_info.device_model = info->device_model;
-    xenpv_dm_info.extra = info->extra;
-    xenpv_dm_info.extra_pv = info->extra_pv;
-    xenpv_dm_info.extra_hvm = info->extra_hvm;
 
     if (libxl__create_xenpv_qemu(gc, domid,
                                  &dm_config,
@@ -871,6 +875,7 @@ int libxl__create_device_model(libxl__gc *gc,
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     const libxl_domain_create_info *c_info = &guest_config->c_info;
+    const libxl_domain_build_info *b_info = &guest_config->b_info;
     const libxl_vnc_info *vnc = dm_vnc(guest_config, info);
     char *path, *logfile;
     int logfile_w, null;
@@ -882,12 +887,12 @@ int libxl__create_device_model(libxl__gc *gc,
     char **pass_stuff;
     const char *dm;
 
-    if (info->device_model_stubdomain) {
+    if (b_info->device_model_stubdomain) {
         rc = libxl__create_stubdom(gc, guest_config, info, starting_r);
         goto out;
     }
 
-    dm = libxl__domain_device_model(gc, info);
+    dm = libxl__domain_device_model(gc, b_info);
     if (!dm) {
         rc = ERROR_FAIL;
         goto out;
@@ -906,13 +911,13 @@ int libxl__create_device_model(libxl__gc *gc,
 
     path = xs_get_domain_path(ctx->xsh, info->domid);
     libxl__xs_write(gc, XBT_NULL, libxl__sprintf(gc, "%s/hvmloader/bios", path),
-                    "%s", libxl__domain_bios(gc, info));
+                    "%s", libxl__domain_bios(gc, b_info));
     free(path);
 
     path = libxl__sprintf(gc, "/local/domain/0/device-model/%d", info->domid);
     xs_mkdir(ctx->xsh, XBT_NULL, path);
     libxl__xs_write(gc, XBT_NULL, libxl__sprintf(gc, "%s/disable_pf", path),
-                    "%d", !guest_config->b_info.u.hvm.xen_platform_pci);
+                    "%d", !b_info->u.hvm.xen_platform_pci);
 
     libxl_create_logfile(ctx,
                          libxl__sprintf(gc, "qemu-dm-%s", c_info->name),

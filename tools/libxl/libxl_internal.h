@@ -864,7 +864,7 @@ _hidden int libxl__domain_build(libxl__gc *gc,
 
 /* for device model creation */
 _hidden const char *libxl__domain_device_model(libxl__gc *gc,
-                                               libxl_device_model_info *info);
+                                        const libxl_domain_build_info *info);
 _hidden int libxl__create_device_model(libxl__gc *gc,
                               libxl_domain_config *guest_config,
                               libxl_device_model_info *info,

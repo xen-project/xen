@@ -381,7 +381,7 @@ static void printf_info(int domid,
                     b_info->u.hvm.spice.disable_ticketing);
         printf("\t\t\t(spiceagent_mouse %d)\n", b_info->u.hvm.spice.agent_mouse);
 
-        printf("\t\t\t(device_model %s)\n", dm_info->device_model ? : "default");
+        printf("\t\t\t(device_model %s)\n", b_info->device_model ? : "default");
         printf("\t\t\t(gfx_passthru %d)\n", b_info->u.hvm.gfx_passthru);
         printf("\t\t\t(serial %s)\n", b_info->u.hvm.serial);
         printf("\t\t\t(boot %s)\n", b_info->u.hvm.boot);
@@ -1217,27 +1217,27 @@ skip_vfb:
 
 
     xlu_cfg_replace_string (config, "device_model_override",
-                            &dm_info->device_model, 0);
+                            &b_info->device_model, 0);
     if (!xlu_cfg_get_string (config, "device_model_version", &buf, 0)) {
         if (!strcmp(buf, "qemu-xen-traditional")) {
-            dm_info->device_model_version
+            b_info->device_model_version
                 = LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
         } else if (!strcmp(buf, "qemu-xen")) {
-            dm_info->device_model_version
+            b_info->device_model_version
                 = LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN;
         } else {
             fprintf(stderr,
                     "Unknown device_model_version \"%s\" specified\n", buf);
             exit(1);
         }
-    } else if (dm_info->device_model)
+    } else if (b_info->device_model)
         fprintf(stderr, "WARNING: device model override given without specific DM version\n");
     if (!xlu_cfg_get_long (config, "device_model_stubdomain_override", &l, 0))
-        dm_info->device_model_stubdomain = l;
+        b_info->device_model_stubdomain = l;
 
 #define parse_extra_args(type)                                            \
     e = xlu_cfg_get_list_as_string_list(config, "device_model_args"#type, \
-                                    &dm_info->extra##type, 0);            \
+                                    &b_info->extra##type, 0);            \
     if (e && e != ESRCH) {                                                \
         fprintf(stderr,"xl: Unable to parse device_model_args"#type".\n");\
         exit(-ERROR_FAIL);                                                \

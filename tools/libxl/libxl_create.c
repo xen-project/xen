@@ -80,6 +80,12 @@ int libxl_init_build_info(libxl_ctx *ctx,
     b_info->cpuid = NULL;
     b_info->shadow_memkb = 0;
     b_info->type = c_info->type;
+
+    b_info->device_model_version =
+        LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
+    b_info->device_model_stubdomain = false;
+    b_info->device_model = NULL;
+
     switch (b_info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
         b_info->video_memkb = 8 * 1024;
@@ -131,9 +137,6 @@ int libxl_init_dm_info(libxl_ctx *ctx,
 {
     memset(dm_info, '\0', sizeof(*dm_info));
 
-    dm_info->device_model_version = LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
-    dm_info->device_model_stubdomain = false;
-    dm_info->device_model = NULL;
 
     return 0;
 }
@@ -459,14 +462,14 @@ retry_transaction:
 }
 
 static int store_libxl_entry(libxl__gc *gc, uint32_t domid,
-                             libxl_device_model_info *dm_info)
+                             libxl_domain_build_info *b_info)
 {
     char *path = NULL;
 
     path = libxl__xs_libxl_path(gc, domid);
     path = libxl__sprintf(gc, "%s/dm-version", path);
     return libxl__xs_write(gc, XBT_NULL, path, "%s",
-        libxl_device_model_version_to_string(dm_info->device_model_version));
+        libxl_device_model_version_to_string(b_info->device_model_version));
 }
 
 static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
@@ -525,7 +528,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
         goto error_out;
     }
 
-    store_libxl_entry(gc, domid, dm_info);
+    store_libxl_entry(gc, domid, &d_config->b_info);
 
     for (i = 0; i < d_config->num_disks; i++) {
         ret = libxl_device_disk_add(ctx, domid, &d_config->disks[i]);
@@ -601,12 +604,6 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
         if (need_qemu) {
             /* only copy those useful configs */
             memset((void*)&xenpv_dm_info, 0, sizeof(libxl_device_model_info));
-            xenpv_dm_info.device_model_version =
-                d_config->dm_info.device_model_version;
-            xenpv_dm_info.device_model = d_config->dm_info.device_model;
-            xenpv_dm_info.extra = d_config->dm_info.extra;
-            xenpv_dm_info.extra_pv = d_config->dm_info.extra_pv;
-            xenpv_dm_info.extra_hvm = d_config->dm_info.extra_hvm;
 
             libxl__create_xenpv_qemu(gc, domid,
                                      d_config, &xenpv_dm_info, &dm_starting);
@@ -619,7 +616,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     }
 
     if (dm_starting) {
-        if (dm_info->device_model_version
+        if (d_config->b_info.device_model_version
             == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
             libxl__qmp_initializations(ctx, domid);
         }

@@ -300,7 +300,7 @@ static const char *libxl__domain_firmware(libxl__gc *gc,
     if (info->u.hvm.firmware)
         firmware = info->u.hvm.firmware;
     else {
-        switch (dm_info->device_model_version)
+        switch (info->device_model_version)
         {
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
             firmware = "hvmloader";
@@ -310,7 +310,7 @@ static const char *libxl__domain_firmware(libxl__gc *gc,
             break;
         default:
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "invalid device model version %d",
-                       dm_info->device_model_version);
+                       info->device_model_version);
             return NULL;
             break;
         }
