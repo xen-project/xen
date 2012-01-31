@@ -333,7 +333,7 @@ DEFINE_XEN_GUEST_HANDLE(physdev_pci_device_t);
 #define PHYSDEVOP_IRQ_NEEDS_UNMASK_NOTIFY XENIRQSTAT_needs_eoi
 #define PHYSDEVOP_IRQ_SHARED             XENIRQSTAT_shared
 
-#if __XEN_INTERFACE_VERSION < 0x00040200
+#if __XEN_INTERFACE_VERSION__ < 0x00040200
 #define PHYSDEVOP_pirq_eoi_gmfn PHYSDEVOP_pirq_eoi_gmfn_v1
 #else
 #define PHYSDEVOP_pirq_eoi_gmfn PHYSDEVOP_pirq_eoi_gmfn_v2
