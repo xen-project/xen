@@ -134,8 +134,8 @@ int libxl_init_dm_info(libxl_ctx *ctx,
     dm_info->vnc.display = 0;
     dm_info->vnc.findunused = 1;
     dm_info->keymap = NULL;
-    dm_info->sdl = 0;
-    dm_info->opengl = 0;
+    dm_info->sdl.enable = 0;
+    dm_info->sdl.opengl = 0;
     dm_info->nographic = 0;
     dm_info->serial = NULL;
     dm_info->boot = strdup("cda");

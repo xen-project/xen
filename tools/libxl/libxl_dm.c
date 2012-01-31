@@ -120,16 +120,17 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
             flexarray_append(dm_args, "-vncunused");
         }
     }
-    if (info->sdl) {
+    if (info->sdl.enable) {
         flexarray_append(dm_args, "-sdl");
-        if (!info->opengl) {
+        if (!info->sdl.opengl) {
             flexarray_append(dm_args, "-disable-opengl");
         }
+        /* XXX info->sdl.{display,xauthority} into $DISPLAY/$XAUTHORITY */
     }
     if (info->keymap) {
         flexarray_vappend(dm_args, "-k", info->keymap, NULL);
     }
-    if (info->nographic && (!info->sdl && !info->vnc.enable)) {
+    if (info->nographic && (!info->sdl.enable && !info->vnc.enable)) {
         flexarray_append(dm_args, "-nographic");
     }
     if (info->serial) {
@@ -287,8 +288,9 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                     libxl__sprintf(gc, "%s:%d%s", listen, display,
                         info->vnc.findunused ? ",to=99" : ""));
     }
-    if (info->sdl) {
+    if (info->sdl.enable) {
         flexarray_append(dm_args, "-sdl");
+        /* XXX info->sdl.{display,xauthority} into $DISPLAY/$XAUTHORITY */
     }
     if (info->spice.enable) {
         char *spiceoptions = NULL;
@@ -335,7 +337,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     if (info->keymap) {
         flexarray_vappend(dm_args, "-k", info->keymap, NULL);
     }
-    if (info->nographic && (!info->sdl && !info->vnc.enable)) {
+    if (info->nographic && (!info->sdl.enable && !info->vnc.enable)) {
         flexarray_append(dm_args, "-nographic");
     }
     if (info->serial) {
@@ -526,7 +528,6 @@ static int libxl__vfb_and_vkb_from_device_model_info(libxl__gc *gc,
     vfb->vnc = info->vnc;
     vfb->keymap = info->keymap;
     vfb->sdl = info->sdl;
-    vfb->opengl = info->opengl;
 
     vkb->backend_domid = 0;
     vkb->devid = 0;
@@ -981,7 +982,6 @@ static int libxl__build_xenpv_qemu_args(libxl__gc *gc,
         if (vfb->keymap)
             info->keymap = libxl__strdup(gc, vfb->keymap);
         info->sdl = vfb->sdl;
-        info->opengl = vfb->opengl;
     } else
         info->nographic = 1;
     info->domid = domid;

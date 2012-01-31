@@ -251,8 +251,7 @@ libxl_device_model_info = Struct("device_model_info",[
     ("vnc",              libxl_vnc_info),
     # keyboard layout, default is en-us keyboard
     ("keymap",           string),
-    ("sdl",              bool),
-    ("opengl",           bool), # (requires sdl enabled)
+    ("sdl",              libxl_sdl_info),
     ("spice",            libxl_spice_info),
     ("nographic",        bool),
     ("gfx_passthru",     bool),
@@ -279,12 +278,9 @@ libxl_device_vfb = Struct("device_vfb", [
     ("backend_domid", libxl_domid),
     ("devid",         integer),
     ("vnc",           libxl_vnc_info),
+    ("sdl",           libxl_sdl_info),
     # set keyboard layout, default is en-us keyboard
     ("keymap",        string),
-    ("sdl",           bool),
-    ("opengl",        bool), # (if enabled requires sdl enabled)
-    ("display",       string),
-    ("xauthority",    string),
     ])
 
 libxl_device_vkb = Struct("device_vkb", [

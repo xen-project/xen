@@ -2188,16 +2188,16 @@ out:
 int libxl_device_vfb_init(libxl_ctx *ctx, libxl_device_vfb *vfb)
 {
     memset(vfb, 0x00, sizeof(libxl_device_vfb));
-    vfb->display = NULL;
-    vfb->xauthority = NULL;
     vfb->vnc.enable = 1;
     vfb->vnc.passwd = NULL;
     vfb->vnc.listen = strdup("127.0.0.1");
     vfb->vnc.display = 0;
     vfb->vnc.findunused = 1;
     vfb->keymap = NULL;
-    vfb->sdl = 0;
-    vfb->opengl = 0;
+    vfb->sdl.enable = 0;
+    vfb->sdl.opengl = 0;
+    vfb->sdl.display = NULL;
+    vfb->sdl.xauthority = NULL;
     return 0;
 }
 
@@ -2248,16 +2248,19 @@ int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb)
                           libxl__sprintf(gc, "%d", vfb->vnc.display));
     flexarray_append_pair(back, "vncunused",
                           libxl__sprintf(gc, "%d", vfb->vnc.findunused));
-    flexarray_append_pair(back, "sdl", libxl__sprintf(gc, "%d", vfb->sdl));
-    flexarray_append_pair(back, "opengl", libxl__sprintf(gc, "%d", vfb->opengl));
-    if (vfb->xauthority) {
-        flexarray_append_pair(back, "xauthority", vfb->xauthority);
+    flexarray_append_pair(back, "sdl",
+                          libxl__sprintf(gc, "%d", vfb->sdl.enable));
+    flexarray_append_pair(back, "opengl",
+                          libxl__sprintf(gc, "%d", vfb->sdl.opengl));
+    if (vfb->sdl.xauthority) {
+        flexarray_append_pair(back, "xauthority", vfb->sdl.xauthority);
     }
-    if (vfb->display) {
-        flexarray_append_pair(back, "display", vfb->display);
+    if (vfb->sdl.display) {
+        flexarray_append_pair(back, "display", vfb->sdl.display);
     }
 
-    flexarray_append_pair(front, "backend-id", libxl__sprintf(gc, "%d", vfb->backend_domid));
+    flexarray_append_pair(front, "backend-id",
+                          libxl__sprintf(gc, "%d", vfb->backend_domid));
     flexarray_append_pair(front, "state", libxl__sprintf(gc, "%d", 1));
 
     libxl__device_generic_add(gc, &device,

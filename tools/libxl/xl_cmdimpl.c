@@ -372,9 +372,9 @@ static void printf_info(int domid,
         printf("\t\t\t(vncdisplay %d)\n", dm_info->vnc.display);
         printf("\t\t\t(vncunused %d)\n", dm_info->vnc.findunused);
         printf("\t\t\t(keymap %s)\n", dm_info->keymap);
-        printf("\t\t\t(sdl %d)\n", dm_info->sdl);
+        printf("\t\t\t(sdl %d)\n", dm_info->sdl.enable);
         printf("\t\t\t(gfx_passthru %d)\n", dm_info->gfx_passthru);
-        printf("\t\t\t(opengl %d)\n", dm_info->opengl);
+        printf("\t\t\t(opengl %d)\n", dm_info->sdl.opengl);
         printf("\t\t\t(nographic %d)\n", dm_info->nographic);
         printf("\t\t\t(serial %s)\n", dm_info->serial);
         printf("\t\t\t(boot %s)\n", dm_info->boot);
@@ -462,10 +462,10 @@ static void printf_info(int domid,
         printf("\t\t\t(vncdisplay %d)\n", d_config->vfbs[i].vnc.display);
         printf("\t\t\t(vncunused %d)\n", d_config->vfbs[i].vnc.findunused);
         printf("\t\t\t(keymap %s)\n", d_config->vfbs[i].keymap);
-        printf("\t\t\t(sdl %d)\n", d_config->vfbs[i].sdl);
-        printf("\t\t\t(opengl %d)\n", d_config->vfbs[i].opengl);
-        printf("\t\t\t(display %s)\n", d_config->vfbs[i].display);
-        printf("\t\t\t(xauthority %s)\n", d_config->vfbs[i].xauthority);
+        printf("\t\t\t(sdl %d)\n", d_config->vfbs[i].sdl.enable);
+        printf("\t\t\t(opengl %d)\n", d_config->vfbs[i].sdl.opengl);
+        printf("\t\t\t(display %s)\n", d_config->vfbs[i].sdl.display);
+        printf("\t\t\t(xauthority %s)\n", d_config->vfbs[i].sdl.xauthority);
         printf("\t\t)\n");
         printf("\t)\n");
     }
@@ -1060,15 +1060,15 @@ skip:
                     free(vfb->keymap);
                     vfb->keymap = strdup(p2 + 1);
                 } else if (!strcmp(p, "sdl")) {
-                    vfb->sdl = atoi(p2 + 1);
+                    vfb->sdl.enable = atoi(p2 + 1);
                 } else if (!strcmp(p, "opengl")) {
-                    vfb->opengl = atoi(p2 + 1);
+                    vfb->sdl.opengl = atoi(p2 + 1);
                 } else if (!strcmp(p, "display")) {
-                    free(vfb->display);
-                    vfb->display = strdup(p2 + 1);
+                    free(vfb->sdl.display);
+                    vfb->sdl.display = strdup(p2 + 1);
                 } else if (!strcmp(p, "xauthority")) {
-                    free(vfb->xauthority);
-                    vfb->xauthority = strdup(p2 + 1);
+                    free(vfb->sdl.xauthority);
+                    vfb->sdl.xauthority = strdup(p2 + 1);
                 }
             } while ((p = strtok(NULL, ",")) != NULL);
 skip_vfb:
@@ -1271,9 +1271,9 @@ skip_vfb:
             dm_info->vnc.findunused = l;
         xlu_cfg_replace_string (config, "keymap", &dm_info->keymap, 0);
         if (!xlu_cfg_get_long (config, "sdl", &l, 0))
-            dm_info->sdl = l;
+            dm_info->sdl.enable = l;
         if (!xlu_cfg_get_long (config, "opengl", &l, 0))
-            dm_info->opengl = l;
+            dm_info->sdl.opengl = l;
         if (!xlu_cfg_get_long (config, "spice", &l, 0))
             dm_info->spice.enable = l;
         if (!xlu_cfg_get_long (config, "spiceport", &l, 0))
