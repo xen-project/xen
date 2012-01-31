@@ -100,6 +100,26 @@ libxl_vnc_info = Struct("vnc_info", [
     ("findunused",    bool),
     ])
 
+libxl_spice_info = Struct("spice_info", [
+    ("enable",            bool),
+    # At least one of spice port or spicetls_post must be given
+    ("port",        integer),
+    ("tls_port",    integer),
+    # Interface to bind to
+    ("host",        string),
+    # enable client connection with no password
+    ("disable_ticketing", bool),
+    ("passwd",      string),
+    ("agent_mouse", bool),
+    ])
+
+libxl_sdl_info = Struct("sdl_info", [
+    ("enable",        bool),
+    ("opengl",        bool),
+    ("display",       string),
+    ("xauthority",    string),
+    ])
+
 libxl_dominfo = Struct("dominfo",[
     ("uuid",        libxl_uuid),
     ("domid",       libxl_domid),
@@ -233,16 +253,7 @@ libxl_device_model_info = Struct("device_model_info",[
     ("keymap",           string),
     ("sdl",              bool),
     ("opengl",           bool), # (requires sdl enabled)
-    ("spice",            bool),
-    # At least one of spice port or spicetls_post must be given
-    ("spiceport",        integer),
-    ("spicetls_port",    integer),
-    # Interface to bind to
-    ("spicehost",        string),
-    # enable client connection with no password
-    ("spicedisable_ticketing", bool),
-    ("spicepasswd",      string),
-    ("spiceagent_mouse", bool),
+    ("spice",            libxl_spice_info),
     ("nographic",        bool),
     ("gfx_passthru",     bool),
     ("serial",           string),

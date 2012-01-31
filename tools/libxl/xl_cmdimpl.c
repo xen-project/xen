@@ -381,13 +381,13 @@ static void printf_info(int domid,
         printf("\t\t\t(usb %d)\n", dm_info->usb);
         printf("\t\t\t(usbdevice %s)\n", dm_info->usbdevice);
         printf("\t\t\t(acpi %d)\n", dm_info->acpi);
-        printf("\t\t\t(spice %d)\n", dm_info->spice);
-        printf("\t\t\t(spiceport %d)\n", dm_info->spiceport);
-        printf("\t\t\t(spicetls_port %d)\n", dm_info->spicetls_port);
-        printf("\t\t\t(spicehost %s)\n", dm_info->spicehost);
+        printf("\t\t\t(spice %d)\n", dm_info->spice.enable);
+        printf("\t\t\t(spiceport %d)\n", dm_info->spice.port);
+        printf("\t\t\t(spicetls_port %d)\n", dm_info->spice.tls_port);
+        printf("\t\t\t(spicehost %s)\n", dm_info->spice.host);
         printf("\t\t\t(spicedisable_ticketing %d)\n",
-                    dm_info->spicedisable_ticketing);
-        printf("\t\t\t(spiceagent_mouse %d)\n", dm_info->spiceagent_mouse);
+                    dm_info->spice.disable_ticketing);
+        printf("\t\t\t(spiceagent_mouse %d)\n", dm_info->spice.agent_mouse);
         printf("\t\t)\n");
         break;
     case LIBXL_DOMAIN_TYPE_PV:
@@ -1275,19 +1275,20 @@ skip_vfb:
         if (!xlu_cfg_get_long (config, "opengl", &l, 0))
             dm_info->opengl = l;
         if (!xlu_cfg_get_long (config, "spice", &l, 0))
-            dm_info->spice = l;
+            dm_info->spice.enable = l;
         if (!xlu_cfg_get_long (config, "spiceport", &l, 0))
-            dm_info->spiceport = l;
+            dm_info->spice.port = l;
         if (!xlu_cfg_get_long (config, "spicetls_port", &l, 0))
-            dm_info->spicetls_port = l;
-        xlu_cfg_replace_string (config, "spicehost", &dm_info->spicehost, 0);
+            dm_info->spice.tls_port = l;
+        xlu_cfg_replace_string (config, "spicehost", &dm_info->spice.host, 0);
         if (!xlu_cfg_get_long (config, "spicedisable_ticketing", &l, 0))
-            dm_info->spicedisable_ticketing = l;
-        xlu_cfg_replace_string (config, "spicepasswd", &dm_info->spicepasswd, 0);
+            dm_info->spice.disable_ticketing = l;
+        xlu_cfg_replace_string (config, "spicepasswd",
+                                &dm_info->spice.passwd, 0);
         if (!xlu_cfg_get_long (config, "spiceagent_mouse", &l, 0))
-            dm_info->spiceagent_mouse = l;
+            dm_info->spice.agent_mouse = l;
         else
-            dm_info->spiceagent_mouse = 1;
+            dm_info->spice.agent_mouse = 1;
         if (!xlu_cfg_get_long (config, "nographic", &l, 0))
             dm_info->nographic = l;
         if (!xlu_cfg_get_long (config, "gfx_passthru", &l, 0))
