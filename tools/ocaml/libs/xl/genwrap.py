@@ -114,11 +114,6 @@ def gen_ocaml_ml(ty, interface, indent=""):
     return s.replace("\n", "\n%s" % indent)
 
 def c_val(ty, c, o, indent="", parent = None):
-    if ty.passby == libxltypes.PASS_BY_REFERENCE:
-        makeref = ""
-    else:
-        makeref = "&"
-
     s = indent
     if isinstance(ty,libxltypes.UInt):
         if ty.width in [8, 16]:
@@ -152,17 +147,18 @@ def c_val(ty, c, o, indent="", parent = None):
         for f in ty.fields:
             if f.type.private:
                 continue
-            s += "%s\n" % c_val(f.type, "%s->%s" % (c, f.name), "Field(%s, %d)" % (o,n), parent="%s->" % (c))
+            (nparent,fexpr) = ty.member(c, f, parent is None)
+            s += "%s\n" % c_val(f.type, fexpr, "Field(%s, %d)" % (o,n), parent=nparent)
             n = n + 1
     else:
-        s += "%s_val(gc, lg, %s, %s);" % (ty.rawname, makeref + c, o)
+        s += "%s_val(gc, lg, %s, %s);" % (ty.rawname, ty.pass_arg(c, parent is None, passby=libxltypes.PASS_BY_REFERENCE), o)
     
     return s.replace("\n", "\n%s" % indent)
 
 def gen_c_val(ty, indent=""):
     s = "/* Convert caml value to %s */\n" % ty.rawname
     
-    s += "static int %s_val (caml_gc *gc, struct caml_logger *lg, %s *c_val, value v)\n" % (ty.rawname, ty.typename)
+    s += "static int %s_val (caml_gc *gc, struct caml_logger *lg, %s, value v)\n" % (ty.rawname, ty.make_arg("c_val", passby=libxltypes.PASS_BY_REFERENCE))
     s += "{\n"
     s += "\tCAMLparam1(v);\n"
     s += "\n"
@@ -175,11 +171,6 @@ def gen_c_val(ty, indent=""):
     return s.replace("\n", "\n%s" % indent)
 
 def ocaml_Val(ty, o, c, indent="", parent = None):
-    if ty.passby == libxltypes.PASS_BY_REFERENCE:
-        makeref = ""
-    else:
-        makeref = "&"
-    
     s = indent
     if isinstance(ty,libxltypes.UInt):
         if ty.width in [8, 16]:
@@ -202,7 +193,7 @@ def ocaml_Val(ty, o, c, indent="", parent = None):
         s += "%s = %s;" % (o, fn % { "c": c })
     elif isinstance(ty,libxltypes.Enumeration) and (parent is None):
         n = 0
-        s += "switch(*%s) {\n" % c
+        s += "switch(%s) {\n" % c
         for e in ty.values:
             s += "    case %s: %s = Int_val(%d); break;\n" % (e.name, o, n)
             n += 1
@@ -218,20 +209,23 @@ def ocaml_Val(ty, o, c, indent="", parent = None):
         for f in ty.fields:
             if f.type.private:
                 continue
+
+            (nparent,fexpr) = ty.member(c, f, parent is None)
+
             s += "\n"
-            s += "\t%s\n" % ocaml_Val(f.type, "%s_field" % ty.rawname, "%s->%s" % (c,f.name), parent="%s->" % c)
+            s += "\t%s\n" % ocaml_Val(f.type, "%s_field" % ty.rawname, ty.pass_arg(fexpr, c), parent=nparent)
             s += "\tStore_field(%s, %d, %s);\n" % (o, n, "%s_field" % ty.rawname)
             n = n + 1
         s += "}"
     else:
-        s += "%s = Val_%s(gc, lg, %s);" % (o, ty.rawname, makeref + c)
+        s += "%s = Val_%s(gc, lg, %s);" % (o, ty.rawname, ty.pass_arg(c, parent is None))
     
     return s.replace("\n", "\n%s" % indent).rstrip(indent)
 
 def gen_Val_ocaml(ty, indent=""):
     s = "/* Convert %s to a caml value */\n" % ty.rawname
 
-    s += "static value Val_%s (caml_gc *gc, struct caml_logger *lg, %s *%s_c)\n" % (ty.rawname, ty.typename, ty.rawname)
+    s += "static value Val_%s (caml_gc *gc, struct caml_logger *lg, %s)\n" % (ty.rawname, ty.make_arg(ty.rawname+"_c"))
     s += "{\n"
     s += "\tCAMLparam0();\n"
     s += "\tCAMLlocal1(%s_ocaml);\n" % ty.rawname
