@@ -26,7 +26,7 @@ module Topologyinfo = struct
 		socket : int;
 		node : int;
 	}
-	external get : unit -> t = "stub_xl_topologyinfo"
+	external get : unit -> t array = "stub_xl_topologyinfo"
 end
 
 
