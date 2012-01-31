@@ -316,7 +316,7 @@ static void printf_info(int domid,
         printf("\t(uuid <unknown>)\n");
     }
 
-    printf("\t(cpupool %s)\n", c_info->poolname);
+    printf("\t(cpupool %s)\n", libxl_cpupoolid_to_name(ctx, c_info->poolid));
     if (c_info->xsdata)
         printf("\t(xsdata contains data)\n");
     else
@@ -703,8 +703,7 @@ static void parse_config_data(const char *configfile_filename_report,
         c_info->poolid = -1;
         cpupool_qualifier_to_cpupoolid(buf, &c_info->poolid, NULL);
     }
-    c_info->poolname = libxl_cpupoolid_to_name(ctx, c_info->poolid);
-    if (!c_info->poolname) {
+    if (!libxl_cpupoolid_to_name(ctx, c_info->poolid)) {
         fprintf(stderr, "Illegal pool specified\n");
         exit(1);
     }

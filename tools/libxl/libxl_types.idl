@@ -151,7 +151,6 @@ libxl_domain_create_info = Struct("domain_create_info",[
     ("xsdata",       libxl_key_value_list),
     ("platformdata", libxl_key_value_list),
     ("poolid",       uint32),
-    ("poolname",     string),
     ])
 
 libxl_domain_build_info = Struct("domain_build_info",[
