@@ -93,6 +93,15 @@ int physdev_map_pirq(domid_t domid, int type, int *index, int *pirq_p,
 
     if ( domid == DOMID_SELF && is_hvm_domain(d) )
     {
+        /*
+         * Only makes sense for vector-based callback, else HVM-IRQ logic
+         * calls back into itself and deadlocks on hvm_domain.irq_lock.
+         */
+        if ( !is_hvm_pv_evtchn_domain(d) )
+        {
+            ret = -EINVAL;
+            goto free_domain;
+        }
         ret = physdev_hvm_map_pirq(d, type, index, pirq_p);
         goto free_domain;
     }
