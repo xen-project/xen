@@ -186,6 +186,11 @@ CONFIG_LIBICONV   := $(shell export OS="`uname -s`"; \
                        . $(XEN_ROOT)/tools/check/funcs.sh; \
                        has_lib libiconv.so && echo 'y' || echo 'n')
 
+CONFIG_YAJL_VERSION := $(shell export OS="`uname -s`"; \
+                       export CHECK_INCLUDES="$(CHECK_INCLUDES)"; \
+                       . $(XEN_ROOT)/tools/check/funcs.sh; \
+                       has_header yajl/yajl_version.h && echo 'y' || echo 'n')
+
 # Enable XSM security module (by default, Flask).
 XSM_ENABLE ?= n
 FLASK_ENABLE ?= $(XSM_ENABLE)

@@ -517,7 +517,7 @@ static bool is_decimal(const char *s, unsigned len)
     return false;
 }
 
-static int json_callback_number(void *opaque, const char *s, unsigned int len)
+static int json_callback_number(void *opaque, const char *s, libxl_yajl_length len)
 {
     libxl__yajl_ctx *ctx = opaque;
     libxl__json_object *obj = NULL;
@@ -574,7 +574,7 @@ out:
 }
 
 static int json_callback_string(void *opaque, const unsigned char *str,
-                                unsigned int len)
+                                libxl_yajl_length len)
 {
     libxl__yajl_ctx *ctx = opaque;
     char *t = NULL;
@@ -607,7 +607,7 @@ static int json_callback_string(void *opaque, const unsigned char *str,
 }
 
 static int json_callback_map_key(void *opaque, const unsigned char *str,
-                                 unsigned int len)
+                                 libxl_yajl_length len)
 {
     libxl__yajl_ctx *ctx = opaque;
     char *t = NULL;
@@ -770,17 +770,13 @@ libxl__json_object *libxl__json_parse(libxl__gc *gc, const char *s)
     DEBUG_GEN_ALLOC(&yajl_ctx);
 
     if (yajl_ctx.hand == NULL) {
-        yajl_parser_config cfg = {
-            .allowComments = 1,
-            .checkUTF8 = 1,
-        };
-        yajl_ctx.hand = yajl_alloc(&callbacks, &cfg, NULL, &yajl_ctx);
+        yajl_ctx.hand = libxl__yajl_alloc(&callbacks, NULL, &yajl_ctx);
     }
     status = yajl_parse(yajl_ctx.hand, (const unsigned char *)s, strlen(s));
     if (status != yajl_status_ok)
         goto out;
 
-    status = yajl_parse_complete(yajl_ctx.hand);
+    status = yajl_complete_parse(yajl_ctx.hand);
     if (status != yajl_status_ok)
         goto out;
 
@@ -832,14 +828,13 @@ static const char *yajl_gen_status_to_string(yajl_gen_status s)
 char *libxl__object_to_json(libxl_ctx *ctx, const char *type,
                             libxl__gen_json_callback gen, void *p)
 {
-    yajl_gen_config conf = { 1, "    " };
     const unsigned char *buf;
     char *ret = NULL;
-    unsigned int len = 0;
+    libxl_yajl_length len = 0;
     yajl_gen_status s;
     yajl_gen hand;
 
-    hand = yajl_gen_alloc(&conf, NULL);
+    hand = libxl__yajl_gen_alloc(NULL);
     if (!hand)
         return NULL;
 

@@ -19,6 +19,10 @@ ifeq ($(CONFIG_Linux),y)
 LIBUUID_LIBS += -luuid
 endif
 
+ifeq ($(CONFIG_YAJL_VERSION),y)
+CFLAGS += -DHAVE_YAJL_VERSION
+endif
+
 LIBXL_LIBS =
 LIBXL_LIBS = $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore) $(LDLIBS_libblktapctl) $(UTIL_LIBS) $(LIBUUID_LIBS)
 

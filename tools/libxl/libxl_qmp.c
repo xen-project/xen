@@ -454,15 +454,15 @@ static char *qmp_send_prepare(libxl__gc *gc, libxl__qmp_handler *qmp,
                               qmp_callback_t callback, void *opaque,
                               qmp_request_context *context)
 {
-    yajl_gen_config conf = { 0, NULL };
     const unsigned char *buf = NULL;
     char *ret = NULL;
-    unsigned int len = 0;
+    libxl_yajl_length len = 0;
     yajl_gen_status s;
     yajl_gen hand;
     callback_id_pair *elm = NULL;
 
-    hand = yajl_gen_alloc(&conf, NULL);
+    hand = libxl__yajl_gen_alloc(NULL);
+
     if (!hand) {
         return NULL;
     }
