@@ -3702,16 +3702,6 @@ int libxl_cpupool_movedomain(libxl_ctx *ctx, uint32_t poolid, uint32_t domid)
 {
     GC_INIT(ctx);
     int rc;
-    char *dom_path;
-    char *vm_path;
-    char *poolname;
-    xs_transaction_t t;
-
-    dom_path = libxl__xs_get_dompath(gc, domid);
-    if (!dom_path) {
-        GC_FREE;
-        return ERROR_FAIL;
-    }
 
     rc = xc_cpupool_movedomain(ctx->xch, poolid, domid);
     if (rc) {
@@ -3719,21 +3709,6 @@ int libxl_cpupool_movedomain(libxl_ctx *ctx, uint32_t poolid, uint32_t domid)
             "Error moving domain to cpupool");
         GC_FREE;
         return ERROR_FAIL;
-    }
-
-    for (;;) {
-        t = xs_transaction_start(ctx->xsh);
-
-        poolname = libxl__cpupoolid_to_name(gc, poolid);
-        vm_path = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/vm", dom_path));
-        if (!vm_path)
-            break;
-
-        libxl__xs_write(gc, t, libxl__sprintf(gc, "%s/pool_name", vm_path),
-                        "%s", poolname);
-
-        if (xs_transaction_end(ctx->xsh, t, 0) || (errno != EAGAIN))
-            break;
     }
 
     GC_FREE;

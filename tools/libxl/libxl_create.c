@@ -441,9 +441,6 @@ retry_transaction:
 
     xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/uuid", vm_path), uuid_string, strlen(uuid_string));
     xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/name", vm_path), info->name, strlen(info->name));
-    if (info->poolid != -1)
-        libxl__xs_write(gc, t, libxl__sprintf(gc, "%s/pool_name", vm_path),
-                        "%s", libxl__cpupoolid_to_name(gc, info->poolid));
 
     libxl__xs_writev(gc, t, dom_path, info->xsdata);
     libxl__xs_writev(gc, t, libxl__sprintf(gc, "%s/platform", dom_path), info->platformdata);
