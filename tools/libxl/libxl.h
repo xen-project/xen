@@ -635,7 +635,7 @@ int libxl_tmem_shared_auth(libxl_ctx *ctx, uint32_t domid, char* uuid,
 int libxl_tmem_freeable(libxl_ctx *ctx);
 
 int libxl_get_freecpus(libxl_ctx *ctx, libxl_cpumap *cpumap);
-int libxl_create_cpupool(libxl_ctx *ctx, const char *name, int schedid,
+int libxl_cpupool_create(libxl_ctx *ctx, const char *name, int schedid,
                          libxl_cpumap cpumap, libxl_uuid *uuid,
                          uint32_t *poolid);
 int libxl_cpupool_destroy(libxl_ctx *ctx, uint32_t poolid);
