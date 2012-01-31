@@ -77,7 +77,7 @@ static const libxl_vnc_info *dm_vnc(const libxl_domain_config *guest_config,
                                     const libxl_device_model_info *info)
 {
     const libxl_vnc_info *vnc = NULL;
-    if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
+    if (guest_config->b_info.type == LIBXL_DOMAIN_TYPE_HVM) {
         vnc = &guest_config->b_info.u.hvm.vnc;
     } else if (guest_config->num_vfbs > 0) {
         vnc = &guest_config->vfbs[0].vnc;
@@ -89,7 +89,7 @@ static const libxl_sdl_info *dm_sdl(const libxl_domain_config *guest_config,
                                     const libxl_device_model_info *info)
 {
     const libxl_sdl_info *sdl = NULL;
-    if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
+    if (guest_config->b_info.type == LIBXL_DOMAIN_TYPE_HVM) {
         sdl = &guest_config->b_info.u.hvm.sdl;
     } else if (guest_config->num_vfbs > 0) {
         sdl = &guest_config->vfbs[0].sdl;
@@ -100,7 +100,7 @@ static const libxl_sdl_info *dm_sdl(const libxl_domain_config *guest_config,
 static const char *dm_keymap(const libxl_domain_config *guest_config,
                              const libxl_device_model_info *info)
 {
-    if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
+    if (guest_config->b_info.type == LIBXL_DOMAIN_TYPE_HVM) {
         return guest_config->b_info.u.hvm.keymap;
     } else if (guest_config->num_vfbs > 0) {
         return guest_config->vfbs[0].keymap;
@@ -171,7 +171,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
     if (keymap) {
         flexarray_vappend(dm_args, "-k", keymap, NULL);
     }
-    if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
+    if (b_info->type == LIBXL_DOMAIN_TYPE_HVM) {
         int ioemu_vifs = 0;
 
         if (b_info->u.hvm.serial) {
@@ -254,7 +254,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
     for (i = 0; info->extra && info->extra[i] != NULL; i++)
         flexarray_append(dm_args, info->extra[i]);
     flexarray_append(dm_args, "-M");
-    switch (info->type) {
+    switch (b_info->type) {
     case LIBXL_DOMAIN_TYPE_PV:
         flexarray_append(dm_args, "xenpv");
         for (i = 0; info->extra_pv && info->extra_pv[i] != NULL; i++)
@@ -353,7 +353,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     flexarray_append(dm_args, "-mon");
     flexarray_append(dm_args, "chardev=libxl-cmd,mode=control");
 
-    if (info->type == LIBXL_DOMAIN_TYPE_PV) {
+    if (b_info->type == LIBXL_DOMAIN_TYPE_PV) {
         flexarray_append(dm_args, "-xen-attach");
     }
 
@@ -400,7 +400,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
         flexarray_vappend(dm_args, "-k", keymap, NULL);
     }
 
-    if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
+    if (b_info->type == LIBXL_DOMAIN_TYPE_HVM) {
         int ioemu_vifs = 0;
 
         if (b_info->u.hvm.serial) {
@@ -498,7 +498,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     for (i = 0; info->extra && info->extra[i] != NULL; i++)
         flexarray_append(dm_args, info->extra[i]);
     flexarray_append(dm_args, "-M");
-    switch (info->type) {
+    switch (b_info->type) {
     case LIBXL_DOMAIN_TYPE_PV:
         flexarray_append(dm_args, "xenpv");
         for (i = 0; info->extra_pv && info->extra_pv[i] != NULL; i++)
@@ -517,7 +517,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                      libxl__sprintf(gc, "%d",
                                     libxl__sizekb_to_mb(b_info->target_memkb)));
 
-    if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
+    if (b_info->type == LIBXL_DOMAIN_TYPE_HVM) {
         for (i = 0; i < num_disks; i++) {
             int disk, part;
             int dev_number =
@@ -700,6 +700,7 @@ static int libxl__create_stubdom(libxl__gc *gc,
     libxl_uuid_copy(&dm_config.c_info.uuid, &info->uuid);
 
     memset(&dm_config.b_info, 0x00, sizeof(libxl_domain_build_info));
+    dm_config.b_info.type = dm_config.c_info.type;
     dm_config.b_info.max_vcpus = 1;
     dm_config.b_info.max_memkb = 32 * 1024;
     dm_config.b_info.target_memkb = dm_config.b_info.max_memkb;
@@ -828,7 +829,6 @@ retry_transaction:
 
     memset((void*)&xenpv_dm_info, 0, sizeof(libxl_device_model_info));
     xenpv_dm_info.device_model_version = info->device_model_version;
-    xenpv_dm_info.type = LIBXL_DOMAIN_TYPE_PV;
     xenpv_dm_info.device_model = info->device_model;
     xenpv_dm_info.extra = info->extra;
     xenpv_dm_info.extra_pv = info->extra_pv;

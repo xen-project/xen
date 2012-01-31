@@ -605,7 +605,6 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
             memset((void*)&xenpv_dm_info, 0, sizeof(libxl_device_model_info));
             xenpv_dm_info.device_model_version =
                 d_config->dm_info.device_model_version;
-            xenpv_dm_info.type = d_config->dm_info.type;
             xenpv_dm_info.device_model = d_config->dm_info.device_model;
             xenpv_dm_info.extra = d_config->dm_info.extra;
             xenpv_dm_info.extra_pv = d_config->dm_info.extra_pv;

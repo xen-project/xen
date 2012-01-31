@@ -261,7 +261,6 @@ libxl_device_model_info = Struct("device_model_info",[
     # you set device_model you must set device_model_version too
     ("device_model",     string),
     ("saved_state",      string),
-    ("type",             libxl_domain_type),
     # extra parameters pass directly to qemu, NULL terminated
     ("extra",            libxl_string_list),
     # extra parameters pass directly to qemu for PV guest, NULL terminated

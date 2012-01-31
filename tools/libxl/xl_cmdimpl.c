@@ -1300,8 +1300,6 @@ skip_vfb:
             b_info->u.hvm.xen_platform_pci = l;
     }
 
-    dm_info->type = c_info->type;
-
     xlu_cfg_destroy(config);
 }
 
