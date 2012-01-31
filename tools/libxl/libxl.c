@@ -2728,24 +2728,6 @@ out:
     return 0;
 }
 
-int libxl_button_press(libxl_ctx *ctx, uint32_t domid, libxl_button button)
-{
-    int rc = -1;
-
-    switch (button) {
-    case LIBXL_BUTTON_POWER:
-        rc = xc_domain_send_trigger(ctx->xch, domid, XEN_DOMCTL_SENDTRIGGER_POWER, 0);
-        break;
-    case LIBXL_BUTTON_SLEEP:
-        rc = xc_domain_send_trigger(ctx->xch, domid, XEN_DOMCTL_SENDTRIGGER_SLEEP, 0);
-        break;
-    default:
-        break;
-    }
-
-    return rc;
-}
-
 int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo)
 {
     xc_physinfo_t xcphysinfo = { 0 };
@@ -3144,44 +3126,46 @@ int libxl_sched_sedf_domain_set(libxl_ctx *ctx, uint32_t domid,
     return 0;
 }
 
-static int trigger_type_from_string(char *trigger_name)
+int libxl_send_trigger(libxl_ctx *ctx, uint32_t domid,
+                       libxl_trigger trigger, uint32_t vcpuid)
 {
-    if (!strcmp(trigger_name, "nmi"))
-        return XEN_DOMCTL_SENDTRIGGER_NMI;
-    else if (!strcmp(trigger_name, "reset"))
-        return XEN_DOMCTL_SENDTRIGGER_RESET;
-    else if (!strcmp(trigger_name, "init"))
-        return XEN_DOMCTL_SENDTRIGGER_INIT;
-    else if (!strcmp(trigger_name, "power"))
-        return XEN_DOMCTL_SENDTRIGGER_POWER;
-    else if (!strcmp(trigger_name, "sleep"))
-        return XEN_DOMCTL_SENDTRIGGER_SLEEP;
-    else
-        return -1;
-}
+    int rc;
 
-int libxl_send_trigger(libxl_ctx *ctx, uint32_t domid, char *trigger_name, uint32_t vcpuid)
-{
-    int rc = -1;
-    int trigger_type = -1;
-
-    if (!strcmp(trigger_name, "s3resume")) {
+    switch (trigger) {
+    case LIBXL_TRIGGER_POWER:
+        rc = xc_domain_send_trigger(ctx->xch, domid,
+                                    XEN_DOMCTL_SENDTRIGGER_POWER, vcpuid);
+        break;
+    case LIBXL_TRIGGER_SLEEP:
+        rc = xc_domain_send_trigger(ctx->xch, domid,
+                                    XEN_DOMCTL_SENDTRIGGER_SLEEP, vcpuid);
+        break;
+    case LIBXL_TRIGGER_NMI:
+        rc = xc_domain_send_trigger(ctx->xch, domid,
+                                    XEN_DOMCTL_SENDTRIGGER_NMI, vcpuid);
+        break;
+    case LIBXL_TRIGGER_INIT:
+        rc = xc_domain_send_trigger(ctx->xch, domid,
+                                    XEN_DOMCTL_SENDTRIGGER_INIT, vcpuid);
+        break;
+    case LIBXL_TRIGGER_RESET:
+        rc = xc_domain_send_trigger(ctx->xch, domid,
+                                    XEN_DOMCTL_SENDTRIGGER_RESET, vcpuid);
+        break;
+    case LIBXL_TRIGGER_S3RESUME:
         xc_set_hvm_param(ctx->xch, domid, HVM_PARAM_ACPI_S_STATE, 0);
-        return 0;
+        rc = 0;
+        break;
+    default:
+        rc = EINVAL;
+        break;
     }
 
-    trigger_type = trigger_type_from_string(trigger_name);
-    if (trigger_type == -1) {
-        LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, -1,
-            "Invalid trigger, valid triggers are <nmi|reset|init|power|sleep>");
-        return ERROR_INVAL;
-    }
-
-    rc = xc_domain_send_trigger(ctx->xch, domid, trigger_type, vcpuid);
     if (rc != 0) {
         LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
-            "Send trigger '%s' failed", trigger_name);
-        return ERROR_FAIL;
+                            "Send trigger '%s' failed",
+                            libxl_trigger_to_string(trigger));
+        rc = ERROR_FAIL;
     }
 
     return 0;

@@ -75,9 +75,14 @@ libxl_action_on_shutdown = Enumeration("action_on_shutdown", [
     (6, "COREDUMP_RESTART"),
     ])
 
-libxl_button = Enumeration("button", [
+libxl_trigger = Enumeration("trigger", [
+    (0, "UNKNOWN"),
     (1, "POWER"),
     (2, "SLEEP"),
+    (3, "NMI"),
+    (4, "INIT"),
+    (5, "RESET"),
+    (6, "S3RESUME"),
     ])
 
 libxl_tsc_mode = Enumeration("tsc_mode", [

@@ -575,8 +575,6 @@ int libxl_userdata_retrieve(libxl_ctx *ctx, uint32_t domid,
    * On error return, *data_r and *datalen_r are undefined.
    */
 
-int libxl_button_press(libxl_ctx *ctx, uint32_t domid, libxl_button button);
-
 int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo);
 int libxl_get_topologyinfo(libxl_ctx *ctx, libxl_topologyinfo *info);
 libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
@@ -603,7 +601,7 @@ int libxl_sched_sedf_domain_get(libxl_ctx *ctx, uint32_t domid,
 int libxl_sched_sedf_domain_set(libxl_ctx *ctx, uint32_t domid,
                                 libxl_sched_sedf *scinfo);
 int libxl_send_trigger(libxl_ctx *ctx, uint32_t domid,
-                       char *trigger_name, uint32_t vcpuid);
+                       libxl_trigger trigger, uint32_t vcpuid);
 int libxl_send_sysrq(libxl_ctx *ctx, uint32_t domid, char sysrq);
 int libxl_send_debug_keys(libxl_ctx *ctx, char *keys);
 

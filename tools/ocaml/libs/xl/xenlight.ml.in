@@ -29,10 +29,8 @@ module Topologyinfo = struct
 	external get : unit -> t = "stub_xl_topologyinfo"
 end
 
-external button_press : domid -> button -> unit = "stub_xl_button_press"
 
-
-external send_trigger : domid -> string -> int -> unit = "stub_xl_send_trigger"
+external send_trigger : domid -> trigger -> int -> unit = "stub_xl_send_trigger"
 external send_sysrq : domid -> char -> unit = "stub_xl_send_sysrq"
 external send_debug_keys : domid -> string -> unit = "stub_xl_send_debug_keys"
 

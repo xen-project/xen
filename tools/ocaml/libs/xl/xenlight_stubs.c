@@ -432,21 +432,6 @@ value stub_xl_device_pci_remove(value info, value domid)
 	CAMLreturn(Val_unit);
 }
 
-value stub_xl_button_press(value domid, value button)
-{
-	CAMLparam2(domid, button);
-	int ret;
-	INIT_STRUCT();
-
-	INIT_CTX();
-	ret = libxl_button_press(ctx, Int_val(domid), Int_val(button) + LIBXL_BUTTON_POWER);
-	if (ret != 0)
-		failwith_xl("button_press", &lg);
-	FREE_CTX();
-
-	CAMLreturn(Val_unit);
-}
-
 value stub_xl_physinfo_get(value unit)
 {
 	CAMLparam1(unit);
@@ -523,10 +508,10 @@ value stub_xl_send_trigger(value domid, value trigger, value vcpuid)
 {
 	CAMLparam3(domid, trigger, vcpuid);
 	int ret;
-	char *c_trigger;
+	libxl_trigger c_trigger = LIBXL_TRIGGER_UNKNOWN;
 	INIT_STRUCT();
 
-	c_trigger = dup_String_val(&gc, trigger);
+	trigger_val(&gc, &lg, &c_trigger, trigger);
 
 	INIT_CTX();
 	ret = libxl_send_trigger(ctx, Int_val(domid), c_trigger, Int_val(vcpuid));

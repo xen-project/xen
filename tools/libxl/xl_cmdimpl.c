@@ -3465,25 +3465,28 @@ int main_create(int argc, char **argv)
 
 static void button_press(const char *p, const char *b)
 {
-    libxl_button button;
+    libxl_trigger trigger;
 
     find_domain(p);
 
     if (!strcmp(b, "power")) {
-        button = LIBXL_BUTTON_POWER;
+        trigger = LIBXL_TRIGGER_POWER;
     } else if (!strcmp(b, "sleep")) {
-        button = LIBXL_BUTTON_SLEEP;
+        trigger = LIBXL_TRIGGER_SLEEP;
     } else {
         fprintf(stderr, "%s is an invalid button identifier\n", b);
         exit(2);
     }
 
-    libxl_button_press(ctx, domid, button);
+    libxl_send_trigger(ctx, domid, trigger, 0);
 }
 
 int main_button_press(int argc, char **argv)
 {
     int opt;
+
+    fprintf(stderr, "WARNING: \"button-press\" is deprecated. "
+            "Please use \"trigger\"\n");
 
     if ((opt = def_getopt(argc, argv, "", "button-press", 2)) != -1)
         return opt;
@@ -4512,10 +4515,11 @@ int main_rename(int argc, char **argv)
 int main_trigger(int argc, char **argv)
 {
     int opt;
-    char *trigger_name = NULL;
     char *endptr = NULL;
     const char *dom = NULL;
     int vcpuid = 0;
+    const char *trigger_name = NULL;
+    libxl_trigger trigger;
 
     if ((opt = def_getopt(argc, argv, "", "trigger", 2)) != -1)
         return opt;
@@ -4525,6 +4529,10 @@ int main_trigger(int argc, char **argv)
     find_domain(dom);
 
     trigger_name = argv[optind++];
+    if (libxl_trigger_from_string(trigger_name, &trigger)) {
+        fprintf(stderr, "Invalid trigger \"%s\"\n", trigger_name);
+        return -1;
+    }
 
     if (argv[optind]) {
         vcpuid = strtol(argv[optind], &endptr, 10);
@@ -4533,7 +4541,7 @@ int main_trigger(int argc, char **argv)
         }
     }
 
-    libxl_send_trigger(ctx, domid, trigger_name, vcpuid);
+    libxl_send_trigger(ctx, domid, trigger, vcpuid);
 
     return 0;
 }
